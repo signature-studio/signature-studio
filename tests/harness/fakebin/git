@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Test double for git, only for `push`: FAKE_GIT_PUSH=403 fails like the previous bot identity did, FAKE_GIT_PUSH=ok succeeds. Both send nothing anywhere.
+# Without FAKE_GIT_PUSH every call goes to the real git (tests that push to a LOCAL bare repository rely on that).
+if [ "$1" = push ]; then
+  case "${FAKE_GIT_PUSH:-}" in
+    403)
+      echo "remote: Permission to fake/repo.git denied to fake-bot[bot]." >&2
+      echo "fatal: unable to access 'https://github.com/fake/repo.git/': The requested URL returned error: 403" >&2
+      exit 128 ;;
+    ok) echo "To https://github.com/fake/repo.git" >&2; echo " * [new branch]      HEAD -> main" >&2; exit 0 ;;
+  esac
+fi
+real=$(PATH=${PATH#*fakebin:} command -v git) || { echo "fake git: no real git" >&2; exit 127; }
+exec "$real" "$@"

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Test double for opencode, used by the launch.sh test and the preflight goal rows. Records every call (one JSON line per call, stdin ignored) in $FAKE_OC_LOG.
+# It never contacts a server and creates nothing. Answers:
+#   debug agents       -> the contents of $FAKE_OC_AGENTS (a file), if set
+#   api session.create -> {"data":{"id":"ses_FAKELAUNCH0001"}}      (FAKE_OC_FAIL=<operation> makes that operation exit 1)
+#   api POST /api/rpc/opencode.goal/get -> {"output":{"status":"$FAKE_OC_GOAL"}} (default active; "none" -> {"output":null})
+#   api session.prompt / session.command / session.active -> {} / {} / {"data":{}}
+#   reload -> "Configuration reloaded"
+log="${FAKE_OC_LOG:-/dev/null}"
+jq -nc --arg a "$*" '{args:$a}' >> "$log"
+case "$1" in
+  debug) [ "$2" = agents ] && { [ -n "${FAKE_OC_AGENTS:-}" ] && cat "$FAKE_OC_AGENTS" && exit 0; echo "fake opencode: no FAKE_OC_AGENTS" >&2; exit 1; } ;;
+  reload) echo "Configuration reloaded"; exit 0 ;;
+  api)
+    op="$2"
+    [ "${FAKE_OC_FAIL:-}" = "$op" ] && { echo "fake failure of $op" >&2; exit 1; }
+    case "$op" in
+      session.create) echo '{"data":{"id":"ses_FAKELAUNCH0001"}}' ;;
+      POST)
+        if [ "${FAKE_OC_GOAL:-active}" = none ]; then echo '{"output":null}'; else echo "{\"output\":{\"status\":\"${FAKE_OC_GOAL:-active}\"}}"; fi ;;
+      session.active) echo '{"data":{}}' ;;
+      *) echo '{}' ;;
+    esac
+    exit 0 ;;
+esac
+echo "fake opencode: unexpected call: $*" >&2
+exit 64

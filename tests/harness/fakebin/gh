@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Test double for gh. Never talks to GitHub. Behaviour is chosen by FAKE_GH (set by the test, not by any project script):
+#   private (default) | public | fail
+case "$1 $2" in
+  "auth status")
+    [ "${FAKE_GH:-private}" = fail ] && { echo "You are not logged into any GitHub hosts." >&2; exit 1; }
+    echo "github.com"
+    echo "  ✓ Logged in to github.com account fake-bot[bot] (keyring)"
+    echo "  - Token: $(printf 'gho')_$(printf 'FAKE%.0s' 1 2 3 4 5 6 7 8)"   # a real gh prints a masked token; t05 checks that preflight never repeats this line
+    exit 0 ;;
+  "api repos/"*) ;;
+  *) echo "fake gh: unexpected call: $*" >&2; exit 64 ;;
+esac
+[ "${FAKE_GH:-private}" = fail ] && { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+priv=true; [ "${FAKE_GH:-private}" = public ] && priv=false
+filter=""
+for ((i = 1; i <= $#; i++)); do [ "${!i}" = "--jq" ] && { j=$((i + 1)); filter="${!j}"; }; done
+case "$filter" in
+  .private) echo "$priv" ;;
+  *) echo "{\"private\":$priv,\"permissions\":{\"admin\":false,\"maintain\":false,\"pull\":true,\"push\":false,\"triage\":false}}" ;;
+esac

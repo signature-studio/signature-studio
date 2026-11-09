@@ -1,0 +1,87 @@
+# Not committed: generated, vendor-owned or machine-local. `.opencode/` is NOT ignored on purpose (`.opencode/plugins/` holds the harness).
+# `docs/archive/` is outside git except its README (see the end of this file).
+
+# real engine bundle (wasm 143 MB) and the FL binaries: not our own work, never in git
+artifacts/
+binaries/
+*.dll
+*.exe
+
+# lift output: the old working tree had 371 directories (172 GB)
+lift/out*/
+lift/**/target/
+lift/**/__pycache__/
+lift/**/venv/
+lift/**/tmp/
+
+# build output and dependencies
+target/
+node_modules/
+dist/
+.wrangler/
+.cloudflare/
+tools/__pycache__/
+__pycache__/
+*.pyc
+*.o
+*.so
+*.a
+
+# wasm is a build output (143 MB in the engine bundle). A small test wasm can be allowed later with an exception such as:
+#   !lift/testdata/*.wasm
+*.wasm
+
+# logs and scratch. Measurement logs under evidence/ and archive/ are records (the Windows replay logs are the only record of the real machine): kept.
+*.log
+!evidence/**/*.log
+!archive/**/*.log
+tmp/
+.cache/
+.tmp-*
+*.new
+
+# product data and archives that must never be committed (the old tree's publish audit)
+*.ilfont
+*.ttf
+!lift/harness/seeds/os-fonts/*.ttf
+*.otf
+*.7z
+*.zip
+*.msi
+*.tar.gz
+
+# environment files (the example is allowed)
+.env
+.env.*
+!.env.example
+
+# stray / temporary files of the old tree (listed there as "not deleted, just excluded")
+lift/lift/
+lift/runtime/*.note.txt
+lift/run-probe.exit
+lift/out-git-list.tmp
+lift/crates/**/tests/*_bin
+lift/runtime/*.new
+lift/objdump-text.txt
+lift/closure-run*.txt
+
+# measurement beacon of the dev/preview server: user-agent strings and machine specs, not for git
+perf-log*.jsonl
+
+# generated from FLEngine code (product-derived)
+lift/harness/draw1/lifted_*.c
+
+# e2e artifacts written into the repository root by tests
+/downloads-chrome/
+/testdata-files/
+
+# ci working directory and generated deploy configuration
+ci-work/
+app/wrangler.deploy.json
+ci/agents/out/
+
+# docs/archive/ holds the original text of the old documents. It stays in the working tree for the workers to read, but outside git:
+# the repository is PUBLIC, and publishing that text is the owner's decision (docs/BLOCKERS.md, the visibility row).
+# When the visibility is settled, remove these two lines, run scripts/scan-forbidden.sh, then commit.
+docs/archive/*
+!docs/archive/README.md

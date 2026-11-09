@@ -1,0 +1,384 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // V-xx = handover/02-what-went-wrong.md. R3 = handover/setup/R3-models.md.
+  // A typo in this file silently removes every deny below (R3 B.1: fail-open).
+  // scripts/preflight.sh row "agents" compares `opencode debug agents` with this file. Run it every cycle.
+  // scripts/set-model-profile.sh rewrites only the "model" lines of: top level, agents.build, agents.worker, agents.reviewer.
+
+  "model": "console-cloudflare-ai-gateway-custom/claude-sonnet-5-5",
+  "default_agent": "build",
+
+  // policies are evaluated after every agent's permissions. They only turn allow/ask into deny. An agent cannot override them.
+  "policies": [
+    // V-F04: the five commands the owner banned (first word only; `env sleep`, `bash -c` are found by audit-session.sh).
+    { "action": "tool.use", "resource": "shell:sleep *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:timeout *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:nohup *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:disown *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:systemd-run *", "effect": "deny" },
+    // V-F05, R3 B.5: `opencode api` is an allowlist. switchModel, session.update, session.create, session.prompt stay blocked.
+    { "action": "tool.use", "resource": "shell:opencode api *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:opencode api session.active", "effect": "allow" },
+    { "action": "tool.use", "resource": "shell:opencode api session.get *", "effect": "allow" },
+    { "action": "tool.use", "resource": "shell:opencode api session.message.list *", "effect": "allow" },
+    { "action": "tool.use", "resource": "shell:opencode api session.synthetic *", "effect": "allow" },
+    { "action": "tool.use", "resource": "shell:opencode api POST /api/rpc/opencode.goal/get *", "effect": "allow" },
+    { "action": "tool.use", "resource": "shell:opencode api session.command --param sessionID=* --data '{\"name\":\"goal\",\"text\":\"resume\"}'", "effect": "allow" },
+    // The allowance above is a glob and `*` spans spaces, so a second body (`--data ... --data ...`, or the short `-d`) would also match it. Deny both, after the allows (the last matching statement wins).
+    { "action": "tool.use", "resource": "shell:opencode api *--data*--data*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:opencode api * -d *", "effect": "deny" },
+    // model drift (R3 A.2): a second opencode that picks its own model, or another server.
+    { "action": "tool.use", "resource": "shell:opencode run*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:opencode --server*", "effect": "deny" },
+    // V-A07: services and timers are enabled by the owner.
+    { "action": "tool.use", "resource": "shell:opencode service *", "effect": "deny" },
+    // R3 B.4: the build agent starts only worker and reviewer.
+    { "action": "tool.use", "resource": "subagent:*", "effect": "deny" },
+    { "action": "tool.use", "resource": "subagent:worker", "effect": "allow" },
+    { "action": "tool.use", "resource": "subagent:reviewer", "effect": "allow" }
+  ],
+
+  // Rules for every agent. No `ask` is left: nobody is present to answer, and the machine auto-accepts `ask`.
+  "permissions": [
+    // V-G01/V-G04: credentials and opencode's own state are the owner's. read = the read tool; external_directory = grep/glob and `cd` targets.
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": "*.env.example", "effect": "allow" },
+    { "action": "read", "resource": "~/.local/share/opencode/*", "effect": "deny" },
+    { "action": "read", "resource": "~/.config/opencode/*", "effect": "deny" },
+    { "action": "read", "resource": "~/.local/share/botid/*", "effect": "deny" },
+    { "action": "read", "resource": "~/.config/botid/*", "effect": "deny" },
+    // Truncated tool output and background shell output are saved under opencode's data directory and the model is told to read them. Allowed again (later rule wins).
+    { "action": "read", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
+    { "action": "read", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/opencode/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "~/.config/opencode/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "~/.local/share/botid/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "~/.config/botid/*", "effect": "deny" },
+    { "action": "external_directory", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
+    // V-F04, repeated here so that removing a policy does not remove the ban.
+    { "action": "shell", "resource": "sleep *", "effect": "deny" },
+    { "action": "shell", "resource": "timeout *", "effect": "deny" },
+    { "action": "shell", "resource": "nohup *", "effect": "deny" },
+    { "action": "shell", "resource": "disown *", "effect": "deny" },
+    { "action": "shell", "resource": "systemd-run *", "effect": "deny" }
+  ],
+
+  "agents": {
+    // MAIN. Instructs only. V-F01: the previous main session made 174 direct edits/writes and 8,734 shell calls.
+    // `* deny` first, then an allowlist (last match wins). Cannot edit, write, or run arbitrary shell.
+    "build": {
+      "model": "console-cloudflare-ai-gateway-custom/claude-sonnet-5-5#xhigh",
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "deny" },
+        // read-only tools. The credential paths are denied again after the broad allow.
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "read", "resource": "*.env", "effect": "deny" },
+        { "action": "read", "resource": "*.env.*", "effect": "deny" },
+        { "action": "read", "resource": "*.env.example", "effect": "allow" },
+        { "action": "read", "resource": "~/.local/share/opencode/*", "effect": "deny" },
+        { "action": "read", "resource": "~/.config/opencode/*", "effect": "deny" },
+        { "action": "read", "resource": "~/.local/share/botid/*", "effect": "deny" },
+        { "action": "read", "resource": "~/.config/botid/*", "effect": "deny" },
+        { "action": "read", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
+        { "action": "read", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
+        { "action": "glob", "resource": "*", "effect": "allow" },
+        { "action": "grep", "resource": "*", "effect": "allow" },
+        { "action": "skill", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "~/.local/share/opencode/*", "effect": "deny" },
+        { "action": "external_directory", "resource": "~/.config/opencode/*", "effect": "deny" },
+        { "action": "external_directory", "resource": "~/.local/share/botid/*", "effect": "deny" },
+        { "action": "external_directory", "resource": "~/.config/botid/*", "effect": "deny" },
+        { "action": "external_directory", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
+        { "action": "external_directory", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
+        // V-F02: verify a worker's report against the real diff.
+        { "action": "shell", "resource": "git status *", "effect": "allow" },
+        { "action": "shell", "resource": "git diff *", "effect": "allow" },
+        { "action": "shell", "resource": "git log *", "effect": "allow" },
+        { "action": "shell", "resource": "git show *", "effect": "allow" },
+        { "action": "shell", "resource": "git -C * status *", "effect": "allow" },
+        { "action": "shell", "resource": "git -C * diff *", "effect": "allow" },
+        { "action": "shell", "resource": "git -C * log *", "effect": "allow" },
+        { "action": "shell", "resource": "ls *", "effect": "allow" },
+        { "action": "shell", "resource": "stat *", "effect": "allow" },
+        { "action": "shell", "resource": "wc *", "effect": "allow" },
+        // V-D03/V-A02: the cycle's status commands. V-F05: agent-to-agent messages. goal resume only in the exact form AGENTS.md gives.
+        { "action": "shell", "resource": "opencode api session.active", "effect": "allow" },
+        { "action": "shell", "resource": "opencode api session.get *", "effect": "allow" },
+        { "action": "shell", "resource": "opencode api session.message.list *", "effect": "allow" },
+        { "action": "shell", "resource": "opencode api session.synthetic *", "effect": "allow" },
+        { "action": "shell", "resource": "opencode api POST /api/rpc/opencode.goal/get *", "effect": "allow" },
+        { "action": "shell", "resource": "opencode api session.command --param sessionID=* --data '{\"name\":\"goal\",\"text\":\"resume\"}'", "effect": "allow" },
+        // The skill's sender script, in the three spellings of its location. Anchored on purpose: a leading `*` would also match `bash -c "..." .../oc-msg.sh send`.
+        // It sits before the redirect denial below: `oc-msg.sh send ... > file` would otherwise overwrite any file with the receipt.
+        // Consequence (a limit): a message body is part of the command text, so it must not contain `>` (write "to" or the arrow character).
+        { "action": "shell", "resource": "~/.agents/skills/opencode-send-message/scripts/oc-msg.sh *", "effect": "allow" },
+        { "action": "shell", "resource": "$HOME/.agents/skills/opencode-send-message/scripts/oc-msg.sh *", "effect": "allow" },
+        { "action": "shell", "resource": "/home/*/.agents/skills/opencode-send-message/scripts/oc-msg.sh *", "effect": "allow" },
+        // The harness's own checks (repository-relative).
+        { "action": "shell", "resource": "scripts/preflight.sh", "effect": "allow" },
+        { "action": "shell", "resource": "./scripts/preflight.sh", "effect": "allow" },
+        { "action": "shell", "resource": "scripts/audit-session.sh *", "effect": "allow" },
+        { "action": "shell", "resource": "./scripts/audit-session.sh *", "effect": "allow" },
+        // R3 B.5: an allowlisted `ls *` lets a redirect through (`ls > f` is a write). Deny the write forms after the allowlist.
+        { "action": "shell", "resource": "*>*", "effect": "deny" },
+        { "action": "shell", "resource": "*--output*", "effect": "deny" },
+        // The `session.command` allowance above is a glob and `*` spans spaces: a second body (`--data ... --data ...`, or `-d`, the short form) would also match it. Deny both doublings.
+        { "action": "shell", "resource": "opencode api *--data*--data*", "effect": "deny" },
+        { "action": "shell", "resource": "opencode api * -d *", "effect": "deny" },
+        // `git diff --no-index` reads any file (R3 B.5 item 5). `git -C <dir> <writing subcommand>` would pass `git -C * status *` because `*` spans spaces.
+        { "action": "shell", "resource": "git diff *--no-index*", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * diff *--no-index*", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * add *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * am *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * apply *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * branch *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * checkout *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * cherry-pick *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * clean *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * clone *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * commit *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * config *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * fetch *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * init *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * merge *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * mv *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * pull *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * push *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * rebase *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * remote *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * reset *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * restore *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * revert *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * rm *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * stash *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * switch *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * tag *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * update-ref *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * worktree *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * bisect *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * filter-branch *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * gc *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * lfs *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * maintenance *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * notes *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * prune *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * reflog *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * replace *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * sparse-checkout *", "effect": "deny" },
+        { "action": "shell", "resource": "git -C * submodule *", "effect": "deny" },
+        // Limit: the list above is a list of verbs; an unlisted verb followed by the word status/diff/log later in the command still matches the allow (README "Limits").
+        // `scripts/preflight.sh` takes no argument. `?*` means "at least one more character"; a plain ` *` would also match the bare command.
+        { "action": "shell", "resource": "scripts/preflight.sh ?*", "effect": "deny" },
+        { "action": "shell", "resource": "./scripts/preflight.sh ?*", "effect": "deny" },
+        // V-F01: the only way to change anything is a worker.
+        { "action": "subagent", "resource": "worker", "effect": "allow" },
+        { "action": "subagent", "resource": "reviewer", "effect": "allow" }
+      ]
+    },
+
+    // R3 B.3: `general` has no model of its own and inherits the parent's (465 of 465 children did). `plan` is not used. Disabled.
+    "general": { "disabled": true },
+    "explore": { "disabled": true },
+    "plan": { "disabled": true },
+
+    // Title and summary run on the session's model unless pinned. compaction is not pinned: each session summarizes on its own model (R3: about 17 USD in total).
+    "title": { "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#low" },
+    "summary": { "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#low" },
+
+    // WORKER. Does the work: everything is allowed except the lines below. The list is short on purpose (a worker that cannot do what it should is a failure too).
+    // Limits: a glob sees the first word only. `FOO=1 sleep`, `env sleep`, `bash -c "..."`, `python -c`, `xargs` bypass it; `rm -r` outside the repository is not expressible. audit-session.sh and review find the rest.
+    "worker": {
+      "description": "Implements one assigned task end to end: edits files, runs commands and tests, commits, and reports facts.",
+      "mode": "subagent",
+      "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#high",
+      "permissions": [
+        // R3 B.4: no grandchildren, no questions to the (absent) owner, no Code Mode (its fetch can reach the local API).
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "question", "resource": "*", "effect": "deny" },
+        { "action": "execute", "resource": "*", "effect": "deny" },
+        // V-C01: the files that enforce these rules are not edited by the agents they bind (shell can still write them; git diff shows it).
+        { "action": "edit", "resource": "*/opencode.json", "effect": "deny" },
+        { "action": "edit", "resource": "*/opencode.jsonc", "effect": "deny" },
+        { "action": "edit", "resource": "opencode.json", "effect": "deny" },
+        { "action": "edit", "resource": "opencode.jsonc", "effect": "deny" },
+        { "action": "edit", "resource": "*/.opencode/*", "effect": "deny" },
+        { "action": "edit", "resource": ".opencode/*", "effect": "deny" },
+        { "action": "edit", "resource": "*/.githooks/*", "effect": "deny" },
+        { "action": "edit", "resource": ".githooks/*", "effect": "deny" },
+        // V-G05, V-A08: history rewrites and force pushes are irreversible and reach every clone.
+        { "action": "shell", "resource": "git push --force*", "effect": "deny" },
+        { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+        { "action": "shell", "resource": "git push * --force*", "effect": "deny" },
+        { "action": "shell", "resource": "git push * -f*", "effect": "deny" },
+        { "action": "shell", "resource": "git push * +*", "effect": "deny" },
+        { "action": "shell", "resource": "git push *:+*", "effect": "deny" },
+        { "action": "shell", "resource": "git push * :*", "effect": "deny" },
+        { "action": "shell", "resource": "git push *--delete*", "effect": "deny" },
+        { "action": "shell", "resource": "git push -d *", "effect": "deny" },
+        { "action": "shell", "resource": "git push * -d *", "effect": "deny" },
+        { "action": "shell", "resource": "git push *--mirror*", "effect": "deny" },
+        { "action": "shell", "resource": "git filter-repo*", "effect": "deny" },
+        { "action": "shell", "resource": "git reset --hard *", "effect": "deny" },
+        // The hooks (scan-forbidden, public-repo refusal) are the harness. `git push --no-verify` is for the owner.
+        { "action": "shell", "resource": "git commit *--no-verify*", "effect": "deny" },
+        { "action": "shell", "resource": "git commit -n*", "effect": "deny" },
+        { "action": "shell", "resource": "git push *--no-verify*", "effect": "deny" },
+        { "action": "shell", "resource": "git *core.hooksPath*", "effect": "deny" },
+        // V-G05: GitHub writes that change visibility, secrets, variables, workflows or contents. A CI is a design decision, not started by a worker.
+        { "action": "shell", "resource": "gh repo delete*", "effect": "deny" },
+        { "action": "shell", "resource": "gh repo edit*", "effect": "deny" },
+        { "action": "shell", "resource": "gh repo archive*", "effect": "deny" },
+        { "action": "shell", "resource": "gh repo rename*", "effect": "deny" },
+        { "action": "shell", "resource": "gh secret *", "effect": "deny" },
+        { "action": "shell", "resource": "gh variable *", "effect": "deny" },
+        { "action": "shell", "resource": "gh workflow run*", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *-X *", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *--method*", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *-f *", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *-F *", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *--field*", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *--raw-field*", "effect": "deny" },
+        { "action": "shell", "resource": "gh api *--input*", "effect": "deny" },
+        // V-G01, V-G02, V-G04: the owner's credentials and identities. `opencode auth export` (no target) wrote every provider's key to a file; `gh auth switch` is an identity change.
+        { "action": "shell", "resource": "opencode auth *", "effect": "deny" },
+        { "action": "shell", "resource": "gh auth token*", "effect": "deny" },
+        { "action": "shell", "resource": "gh auth switch*", "effect": "deny" },
+        { "action": "shell", "resource": "gh auth login*", "effect": "deny" },
+        { "action": "shell", "resource": "gh auth logout*", "effect": "deny" },
+        { "action": "shell", "resource": "gh auth refresh*", "effect": "deny" },
+        { "action": "shell", "resource": "*GH_CONFIG_DIR=*", "effect": "deny" },
+        { "action": "shell", "resource": "*GIT_CONFIG_GLOBAL=*", "effect": "deny" },
+        // V-G01, V-G04: the same directories as the read denials, for shell. The scanner does not expand `~`, so the command text is matched.
+        // Known cost: a command whose text merely mentions one of these paths (a commit message, a heredoc) is denied too. Use the edit/write tool for such text.
+        { "action": "shell", "resource": "*.config/opencode*", "effect": "deny" },
+        { "action": "shell", "resource": "*opencode.db*", "effect": "deny" },
+        { "action": "shell", "resource": "*.local/share/opencode/auth*", "effect": "deny" },
+        { "action": "shell", "resource": "*.config/botid*", "effect": "deny" },
+        { "action": "shell", "resource": "*.config/gh/*", "effect": "deny" },
+        { "action": "shell", "resource": "*.local/share/botid*", "effect": "deny" },
+        { "action": "shell", "resource": "*.bash_history*", "effect": "deny" },
+        // Cloudflare (R1 D4): the OAuth reaches the whole account. A glob cannot say "outside fl-*", so deletions and secrets are denied outright.
+        { "action": "shell", "resource": "wrangler delete*", "effect": "deny" },
+        { "action": "shell", "resource": "wrangler r2 bucket delete*", "effect": "deny" },
+        { "action": "shell", "resource": "wrangler r2 object delete*", "effect": "deny" },
+        { "action": "shell", "resource": "wrangler secret *", "effect": "deny" },
+        { "action": "shell", "resource": "npx wrangler delete*", "effect": "deny" },
+        { "action": "shell", "resource": "npx wrangler r2 bucket delete*", "effect": "deny" },
+        { "action": "shell", "resource": "npx wrangler r2 object delete*", "effect": "deny" },
+        { "action": "shell", "resource": "npx wrangler secret *", "effect": "deny" },
+        // V-A07: timers and services are enabled by the owner. Reading (`systemctl --user list-timers`, `status`) stays allowed; only verbs that change something are denied.
+        { "action": "shell", "resource": "systemctl enable*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * enable*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl disable*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * disable*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl start*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * start*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl stop*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * stop*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl restart*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * restart*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl reload*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * reload*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl mask*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * mask*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl unmask*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * unmask*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl kill*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * kill*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl daemon-reload*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * daemon-reload*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl edit*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * edit*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl set-property*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * set-property*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl link*", "effect": "deny" },
+        { "action": "shell", "resource": "systemctl * link*", "effect": "deny" },
+        { "action": "shell", "resource": "sudo systemctl *", "effect": "deny" },
+        // launch.sh and set-model-profile.sh change the model profile and create the real session: the owner runs them. Only the invocations are denied (`shellcheck scripts/launch.sh` stays possible); both scripts also refuse to run inside a session.
+        { "action": "shell", "resource": "scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "./scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "/*scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash ./scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash /*scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "sh scripts/launch.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "./scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "/*scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash ./scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "bash /*scripts/set-model-profile.sh*", "effect": "deny" },
+        { "action": "shell", "resource": "sh scripts/set-model-profile.sh*", "effect": "deny" },
+        // V-G06: `rm -r` of the root, the home directory, the repository itself, the old trees. In this matcher `*` also spans `/` and spaces, so `rm -rf /*` would match
+        // EVERY absolute path: measured on the previous session's 111,000 commands, about 750 were legitimate cleanups of the agent's own directories (/tmp/opencode/..., ~/.cache/...).
+        // The dangerous targets are named instead. `?` is one character, so `/?` matches `/*` (and `/a`). Not expressible (limits): `rm -rf *` and `rm -rf ./*` (a literal `*` cannot be told from a one-letter
+        // file name such as `rm -f a b`: 64 such legitimate commands), and `rm -rf` of any other directory outside the repository. audit-session.sh and the reviewer look for those.
+        // the root
+        { "action": "shell", "resource": "rm -* /", "effect": "deny" },
+        // `/*` and other one-character names under the root
+        { "action": "shell", "resource": "rm -* /?", "effect": "deny" },
+        // the home directory
+        { "action": "shell", "resource": "rm -* ~", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ~/", "effect": "deny" },
+        // `~/*`
+        { "action": "shell", "resource": "rm -* ~/?", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* $HOME", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* $HOME/", "effect": "deny" },
+        // `$HOME/*`
+        { "action": "shell", "resource": "rm -* $HOME/?", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* \"$HOME\"", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* \"$HOME\"/", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* \"$HOME\"/?", "effect": "deny" },
+        // the directory that holds this repository and the old working trees
+        { "action": "shell", "resource": "rm -* ~/work", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ~/work/", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ~/work/?", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* $HOME/work", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* /home/*/work", "effect": "deny" },
+        // this repository itself (an absolute path to it)
+        { "action": "shell", "resource": "rm -* */work/signature-studio", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* */work/signature-studio/", "effect": "deny" },
+        // the old working trees (`signature-studio-` followed by anything: read only for everyone)
+        { "action": "shell", "resource": "rm -* */signature-studio-?*", "effect": "deny" },
+        // the current directory
+        { "action": "shell", "resource": "rm -* .", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ./", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ..", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* ../", "effect": "deny" },
+        // the history
+        { "action": "shell", "resource": "rm -* .git", "effect": "deny" },
+        { "action": "shell", "resource": "rm -* .git/", "effect": "deny" },
+        { "action": "shell", "resource": "sudo rm -r*", "effect": "deny" }
+      ]
+    },
+
+    // REVIEWER. Read-only verification: no edit; shell is limited to git reads, ls, wc, stat. Cannot run tests (a limit: it compares diffs and files).
+    "reviewer": {
+      "description": "Read-only verifier: compares a worker's report with the actual files and git state. Cannot edit or run builds.",
+      "mode": "subagent",
+      "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#high",
+      "permissions": [
+        { "action": "edit", "resource": "*", "effect": "deny" },
+        { "action": "subagent", "resource": "*", "effect": "deny" },
+        { "action": "question", "resource": "*", "effect": "deny" },
+        { "action": "execute", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "*", "effect": "deny" },
+        { "action": "shell", "resource": "git status *", "effect": "allow" },
+        { "action": "shell", "resource": "git diff *", "effect": "allow" },
+        { "action": "shell", "resource": "git log *", "effect": "allow" },
+        { "action": "shell", "resource": "git show *", "effect": "allow" },
+        { "action": "shell", "resource": "ls *", "effect": "allow" },
+        { "action": "shell", "resource": "wc *", "effect": "allow" },
+        { "action": "shell", "resource": "stat *", "effect": "allow" },
+        { "action": "shell", "resource": "*>*", "effect": "deny" },
+        { "action": "shell", "resource": "*--output*", "effect": "deny" },
+        { "action": "shell", "resource": "git diff *--no-index*", "effect": "deny" }
+        // No `git -C <dir>` here on purpose: `*` spans spaces, so `git -C x commit -m status` would satisfy `git -C * status *`. To look at another work tree use `cd <dir> && git status` (the scanner drops the `cd`).
+      ]
+    }
+  }
+}
