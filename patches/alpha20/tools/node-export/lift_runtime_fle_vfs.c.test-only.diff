@@ -1,0 +1,29 @@
+--- /tmp/base-lift_runtime_fle_vfs.c	2026-11-06 21:18:16.666385607 +0900
++++ tt-split/lift/runtime/fle_vfs.c	2026-11-06 19:48:09.779284478 +0900
+@@ -2580,6 +2580,26 @@
+ 
+ /* Decision 0188 (exp1, PROVISIONAL), for the G3 script command `vfsdump` (harness/fruity_g3.c): the bytes of a file on the virtual volume (a file the guest wrote), by its guest path. Returns 1 with *data / *size
+  * (valid until the next write to the file; data is NULL for size 0), 0 when the path is not a file. Reads nothing into the guest and writes nothing. */
++/* Decision 0308/0310 (alpha1, TEST ONLY, disposable tree): the children of a directory of the virtual volume, for the G3 op vfsdumpdir (the files a Split mixer tracks Export wrote). cb returns non-zero to stop. Returns the number of children, -1 when wdir is not a directory. */
++int fle_vfs_walk_dir(const uint16_t *wdir, int (*cb)(const uint16_t *name, size_t nlen, const uint8_t *data, uint64_t size, int is_dir, void *u), void *u)
++{
++    static const char api[] = "fle_vfs_walk_dir";
++    vpath v;
++    fle_node *n, *par;
++    uint32_t st;
++    size_t i;
++
++    parse_path(api, (uint64_t)(uintptr_t)wdir, 0, &v);
++    st = lookup(api, &v, &n, &par);
++    vp_free(&v);
++    if (st || !n->is_dir) return -1;
++    for (i = 0; i < n->nkids; i++) {
++        fle_node *k = n->kids[i];
++        if (cb(k->name, k->nlen, k->data, k->size, k->is_dir, u)) break;
++    }
++    return (int)n->nkids;
++}
++
+ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *size)
+ {
+     static const char api[] = "fle_vfs_peek_file";

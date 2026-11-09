@@ -1,0 +1,61 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -4947,8 +4947,19 @@
+     return 1;
+ }
+ 
++/* Decision 0319 section 13 (alpha1, PROVISIONAL; O1 'the picture of the clip that is dragged is not drawn'): Learn GetDCEx: DCX_LOCKWINDOWUPDATE "Allows drawing even if there is a LockWindowUpdate call in effect that would
++ * otherwise exclude this window. This value is used for drawing during tracking." (0x400, UNOFFICIAL numbers as in fle_gdc.h). A DC of GetDCEx with that flag therefore ignores the lock of LockWindowUpdate; every other DC
++ * of a locked window (or of a child of it) keeps the empty visible region (Learn LockWindowUpdate, decision 0126). FL calls GetDCEx with 0x402 and 0x412 (= DCX_CACHE [| DCX_CLIPSIBLINGS] | DCX_LOCKWINDOWUPDATE) while
++ * it holds LockWindowUpdate (7 call sites): the drawing of a drag was discarded. `dcx` = the raw flags of a GetDCEx DC, 0 for every other DC. */
++#define FLE_DCX_LOCKWINDOWUPDATE_ 0x00000400u
++int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out);
+ int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out)
+ {
++    return fle_win_dc_query_ex(hwnd, 0u, out);
++}
++
++int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out)
++{
+     int64_t i, r, a;
+     uint32_t cs = 0;
+     int32_t rx = 0, ry = 0, ox, oy;
+@@ -4987,7 +4998,7 @@
+     out->root_cy = tab[r].pcy;
+     out->org_x = ox - rx;
+     out->org_y = oy - ry;
+-    out->visible = is_visible(i) && !is_locked_or_child(i) && !is_no_redraw_chain(i);       /* decision 0126: a locked window's DC has an empty visible region (LockWindowUpdate page) */
++    out->visible = is_visible(i) && ((dcx & FLE_DCX_LOCKWINDOWUPDATE_) != 0u || !is_locked_or_child(i)) && !is_no_redraw_chain(i);       /* decision 0126: a locked window's DC has an empty visible region (LockWindowUpdate page); decision 0319: not for a GetDCEx DC with DCX_LOCKWINDOWUPDATE */
+     l = out->org_x;
+     t = out->org_y;
+     rr = l + tab[i].pcx;
+--- a/lift/runtime/fle_win.h
++++ b/lift/runtime/fle_win.h
+@@ -291,6 +291,8 @@
+     int32_t clip_l, clip_t, clip_r, clip_b;
+ } fle_win_dcq;
+ int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out);
++/* decision 0319 section 13: the same for a DC made by GetDCEx with the flags `dcx` (DCX_LOCKWINDOWUPDATE 0x400: the DC ignores LockWindowUpdate); fle_win_dc_query is dcx = 0 */
++int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out);
+ 
+ /* Decision 0319 (PROVISIONAL): the bits and the update area of ScrollWindowEx / ScrollWindow (fle_win.c, "fle_win_scroll"). `scroll` / `clip` are client-coordinate RECTs (l, t, r, b) or NULL; flags are the SW_* flags of
+  * ScrollWindowEx. Returns 1 with *res filled (res->invalid: the handle is not a live window; res->parts: the number of rectangles of the uncovered area; res->unc: its bounding rectangle, res->upd: the bounding rectangle of the
+--- a/lift/runtime/fle_gdi.c
++++ b/lift/runtime/fle_gdi.c
+@@ -1567,6 +1567,7 @@
+ void fle_win_lock_attempted(uint64_t hwnd) __attribute__((weak));
+ /* weak too (decision 0126): a unit-test link of this file without fle_win.c has no window table, so a window / screen DC stops by name */
+ int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out) __attribute__((weak));
++int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out) __attribute__((weak));   /* decision 0319 section 13 */
+ int fle_win_frame_margins(uint64_t hwnd, int32_t m[4]) __attribute__((weak));   /* decision 0244 */
+ /* weak too (decision 0142): without fle_visrgn.c / the window table's region function a window DC is clipped to its client rectangle and the client rectangles of its parents only, as before */
+ int fle_win_dc_region(uint64_t hwnd, uint32_t clip_flags, fle_visrgn *out) __attribute__((weak));
+@@ -1710,7 +1711,7 @@
+             ht = q.root_cy;
+         } else {
+             if (!fle_win_dc_query) pixel_stop(api, pre, "no window table is linked: a window DC has no surface");
+-            if (!fle_win_dc_query(gi.hwnd, &q)) pixel_stop(api, pre, "the window of the DC is gone");
++            if (!(fle_win_dc_query_ex ? fle_win_dc_query_ex(gi.hwnd, gi.from_ex ? gi.flags : 0u, &q) : fle_win_dc_query(gi.hwnd, &q))) pixel_stop(api, pre, "the window of the DC is gone");   /* decision 0319 section 13: a GetDCEx DC with DCX_LOCKWINDOWUPDATE draws during LockWindowUpdate */
+             t->hwnd = gi.hwnd;
+             t->lid = q.root_lid;
+             w = q.root_cx;

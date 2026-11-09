@@ -1,0 +1,30 @@
+<!doctype html><meta charset=utf-8><title>mt1 vfs</title>
+<script type="module">
+window.__log = [];
+const q = new URLSearchParams(location.search);
+const MB = +(q.get('mb') || 105), N = +(q.get('n') || 4), MODE = q.get('mode') || 'shared', CHUNK = +(q.get('chunk') || 65536), READS = +(q.get('reads') || 4000);
+(async () => {
+  try {
+    const t0 = performance.now();
+    const sab = new SharedArrayBuffer(MB * 1048576);
+    const u = new Uint8Array(sab);
+    for (let i = 0; i < u.length; i += 4096) u[i] = (i >> 12) & 255;      // touch every page (the data a fetch would have written)
+    const tAlloc = performance.now() - t0;
+    window.__tAlloc = tAlloc;
+    window.__ready = true;
+    while (!window.__go) await new Promise((r) => setTimeout(r, 5));
+    const workers = [], res = [];
+    const t1 = performance.now();
+    for (let i = 0; i < N; i++) {
+      const w = new Worker('vfs-worker.js', { type: 'module' }); workers.push(w);
+      res.push(new Promise((r) => { w.onmessage = (e) => r(e.data); }));
+      w.postMessage({ sab, mode: MODE, chunk: CHUNK, reads: READS, seed: 12345 + i, id: i, hold: true });
+    }
+    const r = await Promise.all(res);
+    window.__result = { MB, N, MODE, CHUNK, READS, tAlloc, wall: performance.now() - t1, workers: r };
+    window.__done = true;
+    while (!window.__terminate) await new Promise((r) => setTimeout(r, 20));
+    for (const w of workers) w.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); window.__done = true; }
+})();
+</script>

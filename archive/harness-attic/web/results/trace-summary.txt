@@ -1,0 +1,31 @@
+# CDP Tracing (categories v8.wasm, disabled-by-default-v8.wasm.detailed), default flags, fast=1, identity; one run (J-trace). Counts of events (ph, cat|name):
+7835 disabled-by-default-v8.wasm.detailed|wasm.AddCompiledCode|X
+7614 v8.wasm|wasm.CompileLazy|X
+7614 disabled-by-default-v8.wasm.detailed|wasm.CompileBaseline|X
+6461 disabled-by-default-v8.wasm.detailed|wasm.PublishCode|X
+5677 v8.wasm|wasm.OnBytesReceived|X
+1533 disabled-by-default-v8.wasm.detailed|wasm.PublishCode|I
+396 v8.wasm|wasm.ExecuteCompilationUnits|X
+394 v8.wasm|wasm.TopTierCompilation|X
+377 disabled-by-default-v8.wasm.detailed|wasm.OnFinishedUnits|X
+286 v8.wasm|wasm.ValidateFunctionsStreaming|X
+173 disabled-by-default-v8.wasm.detailed|wasm.AddCompiledCode|I
+18 __metadata|thread_name|M
+11 __metadata|ActiveProcesses|I
+3 disabled-by-default-v8.wasm.detailed|wasm.OnFinishedUnits|I
+2 __metadata|process_name|M
+1 __metadata|process_uptime_seconds|M
+1 v8.wasm|wasm.StartStreamingCompilation|X
+1 disabled-by-default-v8.wasm.detailed|wasm.AsyncCompileJob|X
+1 v8.wasm|wasm.InitializeStreaming|X
+1 v8.wasm|wasm.WasmStreaming.Unpack|X
+1 v8.wasm|wasm.SetUrl|X
+1 v8.wasm|wasm.GetStreamingCompilationOwnership|X
+1 disabled-by-default-v8.wasm.detailed|wasm.NewNativeModule|X
+1 v8.wasm|wasm.BaselineFinished|X
+# lazily compiled (Liftoff) functions: 7614 unique, body bytes 9636662 (2.49% of the 387,190,488 B Code section); largest bodies [566069, 239100, 143021, 143021, 119278, 119278]
+# sum of durations wasm.CompileBaseline = 719.8 ms (over all threads)
+# sum of durations wasm.TopTierCompilation = 527.0 ms (over all threads)
+# sum of durations wasm.ValidateFunctionsStreaming = 903.6 ms (over all threads)
+# sum of durations wasm.GrowMemory = 62.5 ms (over all threads)
+# sum of durations wasm.SerializeModule = 5.1 ms (over all threads)

@@ -1,0 +1,36 @@
+# CONTROL (no F8, no Escape): the same script as f8.g3 without the F8 key press; for the CPU difference on the engine in node (virtual time): the first idle, Enter closes the wizard (as cmp-short.g3), a main-window snapshot, F8 (0x77), snapshots of the opening
+# animation every 250 virtual ms for 4 s, Escape, snapshots of the closing.
+snap wiz0
+advance 4000
+tap 13
+advance 3000
+snap e3000
+advance 2000
+snap main-idle
+advance 100
+snap f8-0100
+advance 150
+snap f8-0250
+advance 250
+snap f8-0500
+advance 250
+snap f8-0750
+advance 250
+snap f8-1000
+advance 500
+snap f8-1500
+advance 500
+snap f8-2000
+advance 1000
+snap f8-3000
+advance 1000
+snap f8-4000
+advance 100
+snap c-0100
+advance 400
+snap c-0500
+advance 1000
+snap c-1500
+advance 2000
+snap c-3500
+end

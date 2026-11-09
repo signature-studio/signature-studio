@@ -1,0 +1,202 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -28,6 +28,7 @@
+ #include "fle_loadimage.h"
+ #include "fle_monitor.h"
+ #include "fle_thread.h"
++#include "fle_test_env.h"
+ #include "fle_win.h"
+ #include "fle_visrgn.h"
+ #include "fle_input.h"
+@@ -585,6 +586,57 @@
+             tab[i].parent >= 0 ? "parent" : "owner", par >= 0 ? handle_of(par) : (uint64_t)0, is_visible(i), tab[i].enabled, (unsigned)z, (unsigned)tab[i].owner, tab[i].msgonly ? " message-only" : "");
+ }
+ 
++/* Decision 0319 TEST-ONLY diagnostic (never pushed; FLE_TEST_GETENV is a null constant in the product, so this is dead code there): FLE_DIAG_WIN=1 prints every window the guest creates and destroys (class, title,
++ * rect, style, parent lid, the guest return address of the creating call, thread) on stderr as "fl-diag: win ...". The window table lists only live windows; this shows the ones that live and die within one operation
++ * (O13: the 8 windows that were created and destroyed by one click on a mixer slot name). Observation only: it changes nothing the guest sees. */
++static void diag_win_log(const char *what, int64_t i, uint64_t ra)
++{
++    static int on = -1;
++    static unsigned n;
++    char title[80], cls[80];
++    uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
++    int64_t par;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++    if (!on || n >= 4000u) return;
++    n++;
++    u16_ascii(title, sizeof title, tab[i].text, tab[i].text_len < 60 ? tab[i].text_len : 60);
++    cls[0] = 0;
++    if (fle_class_name_of(tab[i].atom, nm, &nl)) u16_ascii(cls, sizeof cls, nm, nl < 79 ? nl : 79);
++    par = tab[i].parent >= 0 ? tab[i].parent : tab[i].owner_win;
++    fprintf(stderr, "fl-diag: win %s lid %u class \"%s\" title \"%s\" rect (%d,%d,%dx%d) style %#x exstyle %#x parent_lid %d%s caller %#llx thread %u\n", what, (unsigned)tab[i].lid, cls, title,
++            (int)tab[i].px, (int)tab[i].py, (int)tab[i].pcx, (int)tab[i].pcy, (unsigned)tab[i].style, (unsigned)tab[i].exstyle, par >= 0 ? (int)tab[par].lid : -1,
++            tab[i].parent >= 0 ? "" : " (owner)", (unsigned long long)ra, fle_thread_current ? fle_thread_current() : 0u);
++}
++
++/* Decision 0319 TEST-ONLY (ci1's request, 0322 audit item (1)): FLE_DIAG_WIN=1 also prints every DefWindowProc answer to WM_ERASEBKGND and WM_PAINT with the window and its ancestor chain (class names, up to 4 levels), so that the
++ * windows of one family (the plug-in editor TPluginForm / TWPControlForm / TVectorSheet ... of Fruity Balance) can be told from the log. DefWindowProc's WM_ERASEBKGND draws nothing and answers 1 here (runtime reading of the
++ * Learn page: it should erase with the class background brush); the log shows how often and for which windows that answer was used. */
++static void diag_def_log(int64_t wi, uint32_t msg)
++{
++    static int on = -1;
++    static unsigned n;
++    char chain[220], cls[60];
++    uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
++    int64_t a = wi;
++    int depth = 0;
++    size_t at = 0;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++    if (!on || n >= 3000u) return;
++    n++;
++    chain[0] = 0;
++    for (; a >= 0 && depth < 4; depth++) {
++        cls[0] = 0;
++        if (fle_class_name_of(tab[a].atom, nm, &nl)) u16_ascii(cls, sizeof cls, nm, nl < 59 ? nl : 59);
++        at += (size_t)snprintf(chain + at, sizeof chain - at, "%s%s(%u)", depth ? " < " : "", cls, (unsigned)tab[a].lid);
++        if (at >= sizeof chain) break;
++        a = tab[a].parent >= 0 ? tab[a].parent : tab[a].owner_win;
++    }
++    fprintf(stderr, "fl-diag: DefWindowProc %s lid %u rect (%d,%d,%dx%d) visible %d chain %s\n", msg == FLE_WM_ERASEBKGND ? "WM_ERASEBKGND" : "WM_PAINT", (unsigned)tab[wi].lid, (int)tab[wi].px, (int)tab[wi].py,
++            (int)tab[wi].pcx, (int)tab[wi].pcy, is_visible(wi) ? 1 : 0, chain);
++}
++
+ void fle_win_timer_report(FILE *f);
+ 
+ void fle_win_table_report(FILE *f)
+@@ -1061,6 +1113,7 @@
+     memcpy(tab[idx].text, text, ((size_t)text_len + 1u) * 2u);
+     tab[idx].text_len = text_len;
+     h = FLE_WIN_HANDLE_BASE + (uint64_t)FLE_WIN_HANDLE_STEP * (idx + 1u);
++    diag_win_log("create", (int64_t)idx, fle_ld(sp, 8));
+ 
+     /* The RECT and the CREATESTRUCTW live on the guest stack below the API's frame; the callee is called below them. */
+     rect = (sp - 16) & ~UINT64_C(15);
+@@ -1336,6 +1389,7 @@
+ 
+     fle_win_check_thread(api);
+     wi = need_window(api, h);
++    if (msg == FLE_WM_ERASEBKGND || msg == FLE_WM_PAINT) diag_def_log(wi, msg);
+     switch (msg) {
+     case FLE_WM_NCCREATE:
+         if (lp == 0) fle_stop(api, "WM_NCCREATE with a NULL lParam: the page says lParam points to the CREATESTRUCT");
+@@ -4338,6 +4392,7 @@
+     uint64_t q;
+ 
+     if (!tab[i].live) return;
++    diag_win_log("destroy", i, 0);
+     (void)send_to(api, i, FLE_WM_DESTROY, 0, 0);
+     n = siblings(i, idx, SIB_MAX);
+     for (k = 0; k < n; k++) destroy_tree(api, idx[k]);
+--- a/lift/runtime/fle_wall_ia2w.c
++++ b/lift/runtime/fle_wall_ia2w.c
+@@ -12,6 +12,7 @@
+ #include "fle_gdi.h"
+ #include "fle_raster.h"
+ #include "fle_wall_ia2.h"
++#include "fle_test_env.h"
+ 
+ /* decision 0214: weak, so that a link without the raster side (tests/wall_ia2.rs) is unchanged */
+ void fle_raster_wrote(const fle_rsurf *s, fle_rrect r, const char *api) __attribute__((weak));
+@@ -63,6 +64,7 @@
+     irect client, src, clip, dst, unc;
+     const fle_rsurf *surf;
+     int rows = 0, type, parts;
++    uint64_t diag_ra = fle_ld(R[4], 8);   /* decision 0319 TEST-ONLY diagnostic: the guest return address */
+ 
+     if (flags & 0x1u) fle_stop(api, "SW_SCROLLCHILDREN: moving the child windows (and the WM_MOVE they get) is not modelled");
+     if (!fle_win_dc_query(hwnd, &q)) {
+@@ -155,6 +157,22 @@
+         fle_imp_InvalidateRect();
+         memcpy(R, saved, sizeof saved);
+     }
++    {   /* decision 0319 TEST-ONLY diagnostic (FLE_DIAG_SCROLL=1; dead code in the product): the arguments, the answer and the uncovered area of every ScrollWindowEx, on stderr as "fl-diag: ScrollWindowEx ..." */
++        static int on = -1;
++        static unsigned n;
++
++        if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_SCROLL"); on = e != NULL && e[0] == '1'; }
++        if (on && n < 4000u) {
++            char ss[64] = "NULL", cc[64] = "NULL";
++
++            n++;
++            if (prc_scroll != 0) { irect r = rect_ld(prc_scroll); snprintf(ss, sizeof ss, "(%d,%d,%d,%d)", (int)r.l, (int)r.t, (int)r.r, (int)r.b); }
++            if (prc_clip != 0) { irect r = rect_ld(prc_clip); snprintf(cc, sizeof cc, "(%d,%d,%d,%d)", (int)r.l, (int)r.t, (int)r.r, (int)r.b); }
++            fprintf(stderr, "fl-diag: ScrollWindowEx hwnd %#llx dx %d dy %d prcScroll %s prcClip %s hrgnUpdate %#llx prcUpdate %#llx flags %#x -> %d uncovered (%d,%d,%d,%d) rows moved %d client %dx%d caller %#llx\n",
++                    (unsigned long long)hwnd, (int)dx, (int)dy, ss, cc, (unsigned long long)hrgn, (unsigned long long)prc_update, (unsigned)flags, type, (int)unc.l, (int)unc.t, (int)unc.r, (int)unc.b, rows,
++                    (int)client.r, (int)client.b, (unsigned long long)diag_ra);
++        }
++    }
+     R[0] = (uint64_t)type;
+ }
+ 
+--- a/lift/runtime/fle_vfs.c
++++ b/lift/runtime/fle_vfs.c
+@@ -12,6 +12,7 @@
+ #include "fle_modules.h"
+ #include "fle_realmod.h"
+ #include "fle_vfs.h"
++#include "fle_test_env.h"
+ 
+ #define ATTR_READONLY  0x1u
+ #define ATTR_HIDDEN    0x2u
+@@ -344,7 +345,7 @@
+ 
+ /* 0 found; 2 the last component is missing (its directory exists); 3 an earlier component is missing or is a
+  * file (ERROR_PATH_NOT_FOUND). *parent is the directory holding the last component (NULL for the root). */
+-static uint32_t lookup(const char *api, const vpath *v, fle_node **node, fle_node **parent)
++static uint32_t lookup_impl(const char *api, const vpath *v, fle_node **node, fle_node **parent)
+ {
+     fle_node *cur = &root_node;
+     size_t i;
+@@ -370,6 +371,34 @@
+     return 3;
+ }
+ 
++/* Decision 0319 TEST-ONLY diagnostic (FLE_DIAG_VFS_MISS=1; dead code in the product): every path that the guest asked for and the virtual volume does not have (status 2 = the last component, 3 = an earlier one), with the API
++ * that asked, on stderr as "fl-diag: vfs-miss ...". The same path asked again by the same API is printed once. It answers 'which files (fonts, Data, Plugins) does FL look for and not find'. */
++static uint32_t lookup(const char *api, const vpath *v, fle_node **node, fle_node **parent)
++{
++    static int on = -1;
++    static unsigned n;
++    static char last[600];
++    uint32_t st = lookup_impl(api, v, node, parent);
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_VFS_MISS"); on = e != NULL && e[0] == '1'; }
++    if (on && st != 0 && n < 6000u) {
++        char buf[600];
++        size_t i, j, at = 0;
++
++        for (i = 0; i < v->n && at + 2 < sizeof buf; i++) {
++            if (i > 0) buf[at++] = '\\';
++            for (j = 0; j < v->l[i] && at + 2 < sizeof buf; j++) buf[at++] = v->p[i][j] < 128 && v->p[i][j] >= 32 ? (char)v->p[i][j] : '?';
++        }
++        buf[at] = 0;
++        if (strcmp(buf, last) != 0) {
++            n++;
++            snprintf(last, sizeof last, "%s", buf);
++            fprintf(stderr, "fl-diag: vfs-miss %s status %u path %s\n", api, (unsigned)st, buf);
++        }
++    }
++    return st;
++}
++
+ /* ---- file handles ---- */
+ 
+ typedef struct {
+--- a/lift/runtime/fle_thread.c
++++ b/lift/runtime/fle_thread.c
+@@ -744,6 +744,12 @@
+ {
+     twait *w = &T[cur].w;
+ 
++    if (trace_on) {   /* decision 0319 TEST-ONLY diagnostic (rides on FLE_FRUITY_THREAD_TRACE, the same switch as tlog): who parks, in which API, for how long, called from where */
++        char buf[200];
++        int nn = snprintf(buf, sizeof buf, "fle-thread: wait %s kind %d thread %u timeout %u caller %#llx\n", api, kind, cur, (unsigned)ms, (unsigned long long)fle_ld(R[4], 8));
++
++        if (nn > 0 && write(2, buf, (size_t)nn) < 0) nn = 0;
++    }
+     memset(w, 0, sizeof *w);
+     w->kind = kind;
+     w->api = api;

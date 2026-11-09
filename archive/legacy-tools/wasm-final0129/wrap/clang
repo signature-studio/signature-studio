@@ -1,0 +1,8 @@
+#!/bin/bash
+# wasm-final0129 wrapper (same as idle1/perf1): drops a bare -g (no build path in the debug info, so the native SHA does not depend on the OUT name) and nothing else. It does NOT delete any source.
+args=()
+for a in "$@"; do
+    [ "$a" = "-g" ] && continue
+    args+=("$a")
+done
+exec /usr/bin/clang "${args[@]}"

@@ -1,0 +1,9 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>setTimeout lateness in a Worker</title>
+<script>
+'use strict';
+const w = new Worker('st-worker.js');
+w.onmessage = (e) => { window.__result = e.data; window.__done = true; };
+w.postMessage({ list: [0, 1, 2, 5, 10, 16, 20, 50] });
+</script>

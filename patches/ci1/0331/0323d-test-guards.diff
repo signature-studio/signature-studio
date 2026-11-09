@@ -1,0 +1,83 @@
+--- a/lift/crates/fe-lift/tests/window.rs
++++ b/lift/crates/fe-lift/tests/window.rs
+@@ -1218,12 +1218,17 @@
+     for bad in [
+         "getpid", "getppid", "gettid", "getenv", "environ", "fopen", "open(", "stat(", "/proc", "/etc", "/home", "/dev", "/tmp", "exit(", "_exit",
+         "clock_gettime", "gettimeofday", "time(", "clock(", "nanosleep", "usleep", "sleep(", "select(", "<time.h>", "<sys/time.h>", "pthread", "<sys/",
+-        "<unistd.h>", "<signal.h>", "fork(", "exec", "syscall", "sched_", "futex", "asm", "__asm__", "uintptr_t", "abort(", "X11", "DISPLAY", "xrandr",
++        "<unistd.h>", "<signal.h>", "fork(", "exec", "syscall", "sched_", "futex", "asm", "__asm__", "abort(", "X11", "DISPLAY", "xrandr",
+         "wayland", "fb0", "ioctl", "emscripten", "SDL", "dlopen", "LoadLibrary", "fle_load_", "fle_res_", "GetLastError", "setjmp",
+         "longjmp", "fle_dispatch_table", "(void (*)",
+     ] {
+         assert!(!code.contains(bad), "fle_win.c must not use {bad}");
+     }
++    // decision 0323 (1) (old: "uintptr_t" was in the list above): def_erase_background (DefWindowProc(WM_ERASEBKGND) filling with the class background brush) hands the address of its own 16-byte RECT, a local array, to
++    // GetClipBox / FillRect as a guest address (guest addresses are host addresses in this runtime: fle_addr is the identity, or the high-32 check): the one use of uintptr_t in fle_win.c
++    assert_eq!(code.matches("uintptr_t").count(), 1);
++    let at = code.find("uintptr_t").unwrap();
++    assert!(code[..at].rfind("static uint64_t def_erase_background(").is_some_and(|f| !code[f..at].contains("\n}\n")), "the one uintptr_t is inside def_erase_background");
+     // decision 0123 (old: "fle_dispatch(" was in the list above): wall 31 adds exactly one call, in fle_win_try_thunk (the guest's own `call [reg+disp]` of the MakeObjectInstance slot, reached from fle_dispatch_miss)
+     assert_eq!(code.matches("fle_dispatch(").count(), 1);
+     let at = code.find("fle_dispatch(").unwrap();
+@@ -1276,7 +1281,8 @@
+     // Decision 0123 (old: exactly 2): call_wndproc keeps its 2 sites; the other 4 are the timer procedure of a WM_TIMER message with a callback (Learn SetTimer: TIMERPROC) and the three callbacks of EnumWindows,
+     // EnumChildWindows and EnumThreadWindows (WNDENUMPROC, Learn), each called with the handle and lParam
+     // Decision 0171 (old: 6): +2, the WH_CALLWNDPROC hook procedure (callwndproc_hooks) and the next procedure of the chain (CallNextHookEx)
+-    assert_eq!(code.matches("fle_call_guest(").count(), 8);
++    // Decision 0323 (3) (old: 8): +1, the WH_MOUSE / WH_KEYBOARD hook procedure that the input retrieval calls (fle_win_input_call_hooks; Learn MouseProc / KeyboardProc)
++    assert_eq!(code.matches("fle_call_guest(").count(), 9);
+     let wndproc_sites = code.matches("return fle_call_guest(proc, h, msg, wp, lp)").count() + code.matches("return fle_call_guest(jump, h, msg, wp, lp)").count();
+     assert_eq!(wndproc_sites, 2, "call_wndproc");
+     let (a, b2, c) = (code.find("FLE_WM_NCCREATE, 0").unwrap(), code.find("FLE_WM_NCCALCSIZE, 0").unwrap(), code.find("FLE_WM_CREATE, 0").unwrap());
+--- a/lift/crates/fe-lift/tests/wall_fr9.rs
++++ b/lift/crates/fe-lift/tests/wall_fr9.rs
+@@ -1531,9 +1531,14 @@
+         assert!(!win.contains(bad), "fle_win.c must not use {bad}");
+     }
+     // nothing is drawn: the window model writes no pixel and calls no drawing API of fle_gdi.c
+-    for pix in ["BitBlt", "StretchDIBits", "SetDIBitsToDevice", "CreateDIBSection", "PatBlt", "FillRect", "TextOut", "ExtTextOut", "SetPixel", "LineTo", "Rectangle("] {
++    for pix in ["BitBlt", "StretchDIBits", "SetDIBitsToDevice", "CreateDIBSection", "PatBlt", "TextOut", "ExtTextOut", "SetPixel", "LineTo", "Rectangle("] {
+         assert!(!win.contains(pix), "fle_win.c must not draw: {pix}");
+     }
++    // decision 0323 (1): the one drawing call of the window model is DefWindowProc(WM_ERASEBKGND) filling with the class background brush (Learn WM_ERASEBKGND / WNDCLASS.hbrBackground): the weak fle_imp_FillRect, declared once and
++    // called once, and no other form of the word
++    assert!(win.contains("void fle_imp_FillRect(void) __attribute__((weak));"));
++    assert_eq!(win.matches("FillRect").count(), win.matches("fle_imp_FillRect").count(), "FillRect only as fle_imp_FillRect");
++    assert_eq!(win.matches("fle_imp_FillRect()").count(), 1, "one call of FillRect");
+     // the only GDI entries that the window model calls are GetDC and ReleaseDC, both through weak references, in two pairs: BeginPaint / EndPaint, and the DC that RedrawWindow (RDW_ERASENOW / RDW_UPDATENOW) gives to
+     // WM_ERASEBKGND (paint_now_tree, decision 0253: Learn WM_ERASEBKGND "wParam: A handle to the device context")
+     assert!(win.contains("void fle_imp_GetDC(void) __attribute__((weak));") && win.contains("void fle_imp_ReleaseDC(void) __attribute__((weak));"));
+@@ -1542,7 +1547,9 @@
+     for (head, gets, releases) in [
+         ("void fle_imp_BeginPaint(void)", 1, 0),
+         ("void fle_imp_EndPaint(void)", 0, 1),
+-        ("static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)", 1, 1),
++        // decision 0323: the DC of the WM_ERASEBKGND that RedrawWindow gives (GetDC ... ReleaseDC) moved from paint_now_tree into erase_now_one (which clips it to the update region)
++        ("static void erase_now_one(const char *api, int64_t i)\n{", 1, 1),
++        ("static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)", 0, 0),
+     ] {
+         let at = win.find(head).unwrap_or_else(|| panic!("fle_win.c has no {head}"));
+         let rest = &win[at..];
+--- a/lift/crates/fe-lift/tests/wall_fr14.rs
++++ b/lift/crates/fe-lift/tests/wall_fr14.rs
+@@ -186,7 +186,19 @@
+ fn a_disabled_window_gets_no_mouse_input_and_nothing_goes_to_the_window_beneath() {
+     // S-disabled-drops (Learn WindowFromPoint: "does not retrieve a handle to a hidden or disabled window"); EnableWindow(FALSE) sends WM_CANCELMODE (0x1f) and WM_ENABLE (0xa) (decision 0123).
+     let o = msgs("disabled", true);
+-    assert_eq!(o, ["  A msg 1f wp 0 lp 0", "  A msg a wp 0 lp 0", "A is disabled; click on A at (300,250):", "pump 0"]);
++    // decision 0323b (Wine 10.0 process_mouse_message): the input for a disabled top-level window is dropped, but the window is sent WM_SETCURSOR with HTERROR (-2) and the mouse message (move 0x200, press 0x201, release 0x202)
++    assert_eq!(
++        o,
++        [
++            "  A msg 1f wp 0 lp 0",
++            "  A msg a wp 0 lp 0",
++            "A is disabled; click on A at (300,250):",
++            "  A msg 20 SETCURSOR wp A hit -2 mouse 200",
++            "  A msg 20 SETCURSOR wp A hit -2 mouse 201",
++            "  A msg 20 SETCURSOR wp A hit -2 mouse 202",
++            "pump 0"
++        ]
++    );
+ }
+ 
+ #[test]

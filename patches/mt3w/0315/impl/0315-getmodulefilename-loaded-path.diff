@@ -1,0 +1,297 @@
+--- a/lift/runtime/fle_realmod.h
++++ b/lift/runtime/fle_realmod.h
+@@ -82,6 +82,14 @@
+  * A module that is not loaded stops. Decision 0104 (provisional): used for GetModuleFileNameW of a real module (fle_vfs.c). */
+ int fle_realmod_file_name(const char *api, int idx, char *out, unsigned n) FLE_REALMOD_REF;
+ 
++/* Decision 0315 (mt3, PROVISIONAL): the path with which a real module was first requested by LoadLibraryW through the path table (decision 0183), in the fully qualified form (see canon_loaded_path in fle_realmod.c: '/' as '\\',
++ * "." and ".." and repeated separators folded, the case as given; a verbatim \\?\ path as given), or NULL when the first request was not an absolute path (a name only, a relative path ...: then GetModuleFileNameW answers as before).
++ * GetModuleFileNameW of the module is this path (Learn GetModuleFileNameW: "the fully qualified path of the file that contains the specified module"; the module was loaded from there): a plug-in finds its own folder with it and, in that
++ * folder, its other files (Frequency Shifter: ExtractFilePath(GetModuleFileNameW(HInstance)) + "Engine_x64.dll", then LoadLibraryW of that path). Only the FIRST request counts (the module stays loaded from it); a path with a non-ASCII unit
++ * or one that does not fit is not recorded. */
++void fle_realmod_set_loaded_path(int idx, const uint16_t *u, size_t n) FLE_REALMOD_REF;
++const char *fle_realmod_loaded_path(int idx) FLE_REALMOD_REF;
++
+ /* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: a link that supplies no path table behaves as before): a module requested by a PATH
+  * ("C:\...\Plugins\Fruity\Generators\Fruity Wrapper\Fruity Wrapper_x64.dll") is the real module `name` when the link's path table has an entry whose `suffix`
+  * (lower-case, backslashes, no drive) is the tail of the requested path (ASCII case and '/' folded to '\'; the character before the tail is a separator or there is none).
+--- a/lift/runtime/fle_realmod.c
++++ b/lift/runtime/fle_realmod.c
+@@ -33,6 +33,8 @@
+ } rm_t;
+ 
+ static rm_t mods[RM_MAX];
++static char loaded_path[RM_MAX][520];   /* decision 0315: the fully qualified path of the first LoadLibraryW through the path table (empty: none) */
++static uint8_t path_requested[RM_MAX];   /* the first request of the module was seen */
+ static int table_ready;
+ 
+ /* Checks the table once, on the first lookup: a wrong table is a build error, so it stops the run by name. */
+@@ -274,6 +276,93 @@
+     return mods[idx].state == ST_LOADED ? fle_realmod_table[idx].base : 0;
+ }
+ 
++/* The fully qualified form of a path that LoadLibraryW was given (Learn GetModuleFileNameW: "the fully qualified path of the file that contains the specified module"; Wine 10 keeps the NT path that
++ * RtlDosPathNameToNtPathName_U made of the request: '/' is '\', ".", ".." and repeated separators are folded, the case is the one given). Only an absolute path is recorded: with a drive ("X:\...",
++ * "X:/...") or UNC ("\\server\share\..."); a name only, a relative path, a rooted path without a drive ("\x"), a drive-relative one ("X:x") and a device path ("\\.\") give no answer here (0), and
++ * GetModuleFileNameW then answers as before; so does a ".." that would leave the root. A verbatim path ("\\?\X:\..." or "\\?\UNC\...") is returned as it was given (Learn: "the same form as was specified when
++ * the module was loaded", also with the \\?\ prefix). Returns 1 and the path in out (at most in_n + 1 bytes), or 0. */
++static int canon_loaded_path(const char *in, size_t n, char *out)
++{
++    char t[520];
++    size_t starts[130];
++    size_t i, o, depth = 0;
++    int drive, unc;
++
++    if (n >= 4 && in[0] == '\\' && in[1] == '\\' && in[2] == '?' && in[3] == '\\') {
++        const char *r = in + 4;
++        size_t rn = n - 4;
++
++        drive = rn >= 3 && ((r[0] >= 'A' && r[0] <= 'Z') || (r[0] >= 'a' && r[0] <= 'z')) && r[1] == ':' && r[2] == '\\';
++        unc = rn >= 4 && (r[0] == 'U' || r[0] == 'u') && (r[1] == 'N' || r[1] == 'n') && (r[2] == 'C' || r[2] == 'c') && r[3] == '\\';
++        if (!drive && !unc) return 0;
++        memcpy(out, in, n);
++        out[n] = 0;
++        return 1;
++    }
++    for (i = 0; i < n; i++) t[i] = in[i] == '/' ? '\\' : in[i];
++    t[n] = 0;
++    if (n >= 3 && ((t[0] >= 'A' && t[0] <= 'Z') || (t[0] >= 'a' && t[0] <= 'z')) && t[1] == ':' && t[2] == '\\') {
++        memcpy(out, t, 2);   /* "X:"; every component below is added as "\name" */
++        o = 2;
++        i = 2;
++    } else if (n >= 5 && t[0] == '\\' && t[1] == '\\' && t[2] != '\\' && t[2] != '.' && t[2] != '?') {
++        size_t k = 2, m;
++
++        while (k < n && t[k] != '\\') k++;
++        if (k >= n) return 0;
++        m = k + 1;
++        while (m < n && t[m] != '\\') m++;
++        if (m == k + 1) return 0;
++        memcpy(out, t, m);   /* "\\server\share" */
++        o = m;
++        i = m;
++    } else {
++        return 0;
++    }
++    while (i < n) {
++        size_t c0, cl;
++
++        while (i < n && t[i] == '\\') i++;
++        if (i >= n) break;
++        c0 = i;
++        while (i < n && t[i] != '\\') i++;
++        cl = i - c0;
++        if (cl == 1 && t[c0] == '.') continue;
++        if (cl == 2 && t[c0] == '.' && t[c0 + 1] == '.') {
++            if (depth == 0) return 0;
++            o = starts[--depth];
++            continue;
++        }
++        if (depth >= 128) return 0;
++        starts[depth++] = o;
++        out[o++] = '\\';
++        memcpy(out + o, t + c0, cl);
++        o += cl;
++    }
++    if (depth == 0) return 0;
++    out[o] = 0;
++    return 1;
++}
++
++void fle_realmod_set_loaded_path(int idx, const uint16_t *u, size_t n)
++{
++    char in[520];
++    size_t i;
++
++    if (idx < 0 || (uint64_t)idx >= fle_realmod_count || (uint64_t)idx >= RM_MAX || path_requested[idx] || n == 0 || n >= sizeof in) return;
++    path_requested[idx] = 1;   /* the module stays loaded from the FIRST request: a later request by another string does not change it, also when the first one could not be recorded */
++    for (i = 0; i < n; i++) {
++        if (u[i] == 0 || u[i] > 0x7f) return;
++        in[i] = (char)u[i];
++    }
++    if (!canon_loaded_path(in, n, loaded_path[idx])) loaded_path[idx][0] = 0;
++}
++
++const char *fle_realmod_loaded_path(int idx)
++{
++    return idx >= 0 && (uint64_t)idx < fle_realmod_count && (uint64_t)idx < RM_MAX && loaded_path[idx][0] != 0 ? loaded_path[idx] : NULL;
++}
++
+ int fle_realmod_file_name(const char *api, int idx, char *out, unsigned n)
+ {
+     rm_t *m = &mods[idx];
+--- a/lift/runtime/fle_load.c
++++ b/lift/runtime/fle_load.c
+@@ -328,6 +328,7 @@
+                 R[0] = 0;
+                 return;
+             }
++            fle_realmod_set_loaded_path(rm, u, n);   /* decision 0315: GetModuleFileNameW answers this path */
+             R[0] = fle_realmod_load(api, rm);
+             return;
+         }
+--- a/lift/runtime/fle_vfs.c
++++ b/lift/runtime/fle_vfs.c
+@@ -1731,6 +1731,7 @@
+     if (h == 0) return FLE_VIRTUAL_EXE_PATH;
+     if (h == FLE_EXE_HANDLE) return FLE_VIRTUAL_DLL_PATH;
+     rm = FLE_REALMOD_PRESENT() ? fle_realmod_find_handle(h) : -1;
++    if (rm >= 0 && fle_realmod_loaded_path != 0 && fle_realmod_loaded_path(rm) != NULL) return fle_realmod_loaded_path(rm);   /* decision 0315: the module was requested by this path */
+     if (rm < 0 || fle_realmod_file_name(api, rm, nm, sizeof nm) <= 0)
+         fle_stop(api, "only the lifted DLL has a path (hModule is not NULL or 0x400000)");
+     snprintf(buf, cap, "%s%s", FLE_VIRTUAL_SHARED_DIR, nm);
+--- a/lift/crates/fe-lift/tests/wall_wrp1.rs
++++ b/lift/crates/fe-lift/tests/wall_wrp1.rs
+@@ -93,6 +93,152 @@
+ }
+ 
+ #[test]
++fn the_path_of_the_first_request_is_the_loaded_path_of_the_module() {
++    // decision 0315 (+ alpha1's review, docs/0319 section 19.3): GetModuleFileNameW of a module that LoadLibraryW got by a path answers the fully qualified form of that path (the first request only;
++    // '/' as '\'; "." and ".." and repeated separators folded; a verbatim \\?\ path as given); a name only, a relative path, a rooted or drive-relative one, a ".." above the root and a non-ASCII unit give no answer
++    let (rc, out) = run(
++        "loaded_path",
++        &["fle_realmod.c"],
++        &format!(
++            r#"{REALMOD_PRE}
++static void set(int idx, const char *s) {{ uint16_t *w = W(s); fle_realmod_set_loaded_path(idx, w, strlen(s)); free(w); }}
++static void show(const char *l, int idx) {{ const char *p = fle_realmod_loaded_path(idx); printf("%s %s\n", l, p ? p : "(none)"); }}
++int main(void) {{
++    uint16_t wide[] = {{ 'C', ':', '\\', 0x3042, 0 }};
++    show("none", 1);
++    set(1, "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll");
++    show("first", 1);
++    set(1, "D:\\other\\Fruity Wrapper_x64.dll");
++    show("again", 1);
++    set(2, "c:/Program Files/Image-Line/FL Studio 21/Plugins/Fruity/Generators/Fruity Wrapper/Fruity Wrapper_x64.dll");
++    show("slash", 2);
++    set(3, "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\..\\Plugins\\.\\Fruity\\\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll");
++    show("fold", 3);
++    show("name", 0);
++    set(0, "Fruity Wrapper_x64.dll");
++    show("name-set", 0);
++    set(0, "C:\\later\\x.dll");
++    show("name-then-abs", 0);
++    set(1 + 3, "x");
++    set(2 + 0, "Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll");
++    fle_realmod_set_loaded_path(2, wide, 4);
++    show("kept", 2);
++    show("range", 9);
++    show("neg", -1);
++    return 0;
++}}"#
++        ),
++    );
++    assert_eq!(rc, 0, "{out:?}");
++    assert_eq!(
++        out,
++        [
++            "none (none)",
++            "first C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll",
++            "again C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll",
++            "slash c:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll",
++            "fold C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll",
++            "name (none)",
++            "name-set (none)",
++            "name-then-abs (none)",
++            "kept c:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Fruity Wrapper\\Fruity Wrapper_x64.dll",
++            "range (none)",
++            "neg (none)"
++        ]
++    );
++}
++
++/// decision 0315: the cases (label, path as a C string literal body) are put through fle_realmod_set_loaded_path, one module index each (the first request of a module is the only one that counts; RM_MAX is 16, so at most 16 cases per run)
++fn loaded_path_forms(name: &str, cases: &[(&str, &str)]) -> Vec<String> {
++    let mut body = String::new();
++    for (i, (label, path)) in cases.iter().enumerate() {
++        body.push_str(&format!("    one({i}, \"{label}\", \"{path}\");\n"));
++    }
++    let pre = REALMOD_PRE.replace("fle_realmod_count = 4;", "fle_realmod_count = 16;");
++    let (rc, out) = run(
++        name,
++        &["fle_realmod.c"],
++        &format!(
++            r#"{pre}
++static void one(int idx, const char *label, const char *s) {{
++    uint16_t *w = W(s);
++    const char *p;
++    fle_realmod_set_loaded_path(idx, w, strlen(s));
++    free(w);
++    p = fle_realmod_loaded_path(idx);
++    printf("%s %s\n", label, p ? p : "(none)");
++}}
++int main(void) {{
++{body}    return 0;
++}}"#
++        ),
++    );
++    assert_eq!(rc, 0, "{out:?}");
++    out
++}
++
++#[test]
++fn an_absolute_path_is_folded_and_a_name_a_relative_or_a_rooted_path_is_not_recorded() {
++    // alpha1's section 19.3 table: drive + backslash or slash, UNC (also with slashes); relative, name only, rooted, drive-relative, ".." above the root, UNC without a share: not recorded
++    let out = loaded_path_forms(
++        "loaded_path_abs",
++        &[
++            ("abs", "C:\\\\a\\\\b.dll"),
++            ("fwd", "C:/a/b.dll"),
++            ("dotdot", "C:\\\\a\\\\..\\\\b\\\\.\\\\c.dll"),
++            ("dup", "C:\\\\\\\\a\\\\\\\\\\\\b.dll"),
++            ("name", "b.dll"),
++            ("rel", "a\\\\b.dll"),
++            ("dotrel", ".\\\\a\\\\b.dll"),
++            ("rooted", "\\\\a\\\\b.dll"),
++            ("driverel", "C:a\\\\b.dll"),
++            ("above-root", "C:\\\\..\\\\a.dll"),
++            ("root-only", "C:\\\\"),
++            ("unc", "\\\\\\\\server\\\\share\\\\dir\\\\..\\\\b.dll"),
++            ("unc-fwd", "//server/share/b.dll"),
++            ("unc-noshare", "\\\\\\\\server\\\\b.dll"),
++        ],
++    );
++    assert_eq!(
++        out,
++        [
++            "abs C:\\a\\b.dll",
++            "fwd C:\\a\\b.dll",
++            "dotdot C:\\b\\c.dll",
++            "dup C:\\a\\b.dll",
++            "name (none)",
++            "rel (none)",
++            "dotrel (none)",
++            "rooted (none)",
++            "driverel (none)",
++            "above-root (none)",
++            "root-only (none)",
++            "unc \\\\server\\share\\b.dll",
++            "unc-fwd \\\\server\\share\\b.dll",   // "/" is "\\" before the root is read, so "//server/share" is a UNC path as in Windows and Wine
++            "unc-noshare (none)"
++        ]
++    );
++}
++
++#[test]
++fn a_verbatim_path_is_kept_as_given_and_other_prefixes_are_not_recorded() {
++    // Learn GetModuleFileNameW: "the same form as was specified when the module was loaded", also with the \\?\ prefix: kept as given (not folded); a prefix that is not a drive or UNC, and a device path: not recorded
++    let out = loaded_path_forms(
++        "loaded_path_verbatim",
++        &[
++            ("verbatim", "\\\\\\\\?\\\\C:\\\\a\\\\..\\\\b.dll"),
++            ("verbatim-unc", "\\\\\\\\?\\\\UNC\\\\server\\\\share\\\\b.dll"),
++            ("verbatim-bad", "\\\\\\\\?\\\\GLOBALROOT\\\\b.dll"),
++            ("device", "\\\\\\\\.\\\\C:\\\\a.dll"),
++        ],
++    );
++    assert_eq!(
++        out,
++        ["verbatim \\\\?\\C:\\a\\..\\b.dll", "verbatim-unc \\\\?\\UNC\\server\\share\\b.dll", "verbatim-bad (none)", "device (none)"]
++    );
++}
++
++#[test]
+ fn a_tail_inside_a_component_a_foreign_directory_or_a_non_ascii_unit_does_not_match() {
+     let (rc, out) = run(
+         "path_no_match",

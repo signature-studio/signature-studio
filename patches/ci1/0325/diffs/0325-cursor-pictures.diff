@@ -1,0 +1,1270 @@
+diff -ruN a/lift/harness/c0325/build.sh b/lift/harness/c0325/build.sh
+--- a/lift/harness/c0325/build.sh	1970-01-01 09:00:00.000000000 +0900
++++ b/lift/harness/c0325/build.sh	2026-11-07 08:12:45.726348965 +0900
+@@ -0,0 +1,19 @@
++#!/bin/bash
++# Decision 0325 (ci1, native test). usage: build.sh TREE WORKDIR [I|M|S]   -> WORKDIR/cursor_img (clang -O0, nice 19) and its output WORKDIR/cursor_img.out
++set -eu -o pipefail
++T=$(readlink -f "$1"); mkdir -p "$2"; W=$(readlink -f "$2"); RT=$T/lift/runtime; HERE=$T/lift/harness/c0325
++WL="fle_api2_call fle_appview fle_callback fle_class fle_comctl fle_cursor fle_env fle_event fle_gdc fle_gdi fle_host fle_imports fle_input fle_layered fle_locale fle_mxcsr fle_proc fle_raster fle_res fle_sys fle_thread fle_time fle_token fle_vfs fle_visrgn fle_vmap fle_vol fle_wall_ia2 fle_wall_ia2w fle_win fle_x87 fle_x87ctl fle_loadimage"
++O=""
++for f in $WL; do
++  if [ ! -f "$W/$f.o" ] || [ "$RT/$f.c" -nt "$W/$f.o" ]; then nice -n 19 clang -O0 -std=gnu11 -w -fPIE -c -I"$RT" "$RT/$f.c" -o "$W/$f.o"; fi
++  O="$O $W/$f.o"
++done
++for i in 1 2 3 4 5 6 7 8; do
++  miss=$(nice -n 19 clang -O0 -std=gnu11 -w -fPIE -pthread -I"$RT" "$HERE/cursor_img.c" $O -o "$W/cursor_img" -lm 2>&1 | grep "undefined reference" | sed "s/.*undefined reference to .\(.*\)'/\1/" | sort -u || true)
++  [ -z "$miss" ] && break
++  for s in $miss; do
++    f=$(grep -l "^[a-z].* $s(" "$RT"/*.c 2>/dev/null | head -1 || true)
++    if [ -n "$f" ]; then n=$(basename "$f" .c); case " $WL " in *" $n "*) ;; *) WL="$WL $n"; nice -n 19 clang -O0 -std=gnu11 -w -fPIE -c -I"$RT" "$f" -o "$W/$n.o"; O="$O $W/$n.o";; esac; fi
++  done
++done
++set +e; "$W/cursor_img" ${3:-} ${4:-} ${5:-} > "$W/cursor_img.out" 2> "$W/cursor_img.err"; echo "rc=$?"
+diff -ruN a/lift/harness/c0325/cursor_img.c b/lift/harness/c0325/cursor_img.c
+--- a/lift/harness/c0325/cursor_img.c	1970-01-01 09:00:00.000000000 +0900
++++ b/lift/harness/c0325/cursor_img.c	2026-11-07 08:12:45.722680291 +0900
+@@ -0,0 +1,322 @@
++/* Decision 0325 (ci1, native test): the picture and the hot spot of a cursor, as fle_av_cursor_image gives them to the browser (O18). Self-checking: every line is PASS or FAIL, the exit code is the number of FAILs.
++ *   I  cursors made by CreateIconIndirect: a colour cursor (mask bit 1 and black = transparent, mask bit 0 = the colour), a monochrome cursor (AND / XOR halves), an icon (hot spot in the centre), the number that is new
++ *      for a recreated cursor, the picture going away with DestroyCursor
++ *   M  cursors of a module's resources, read from a PE image built in memory at 0x400000 (FLE_EXE_HANDLE): a 1-bit cursor, a 32-bit cursor with alpha, a 24-bit cursor with an AND mask, by ordinal (LoadImageW) and by name
++ *      (LoadCursorW)
++ *   S  a standard cursor and handles without a picture give none */
++#define _GNU_SOURCE
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++#include <sys/mman.h>
++#include "fle_runtime.h"
++#include "fle_sse.h"
++#include "fle_dispatch.h"
++#include "fle_imports.h"
++#include "fle_env.h"
++#include "fle_callback.h"
++#include "fle_class.h"
++#include "fle_win.h"
++#include "fle_thread.h"
++#include "fle_cursor.h"
++#include "fle_loadimage.h"
++#include "fle_input.h"
++#include "fle_gdc.h"
++#include "fle_gdi.h"
++#include "fle_appview.h"
++#include "fle_api2.h"
++uint64_t R[16];
++fle_eflags FL;
++fle_xmm X[16];
++void fle_imp_CreateBitmap(void);
++void fle_imp_CreateCompatibleBitmap(void);
++void fle_imp_CreateCompatibleDC(void);
++void fle_imp_SelectObject(void);
++void fle_imp_SetPixel(void);
++void fle_imp_GetDC(void);
++void fle_imp_ReleaseDC(void);
++void fle_imp_DeleteObject(void);
++void fle_imp_DeleteDC(void);
++void fle_imp_CreateIconIndirect(void);
++void fle_imp_DestroyCursor(void);
++void fle_imp_DestroyIcon(void);
++void fle_imp_SetCursor(void);
++void fle_imp_LoadImageW(void);
++void fle_imp_LoadCursorW(void);
++const fle_fn_entry fle_dispatch_table[] = { { 0x2000, 0 } };
++const uint64_t fle_dispatch_count = 0;
++static uint64_t stk[0x4000] __attribute__((aligned(4096)));
++#define A(x) ((uint64_t)(uintptr_t)(x))
++#define API(name, ...) fle_api2_call(fle_imp_##name, __VA_ARGS__)
++static int fails;
++#define CHECK(cond, ...) do { if (cond) printf("PASS "); else { printf("FAIL "); fails++; } printf(__VA_ARGS__); printf("\n"); } while (0)
++
++static const fle_av_cursor_img *img_of(uint64_t h) { return fle_av_cursor_image((uint32_t)h); }
++static const uint8_t *px(const fle_av_cursor_img *im, int x, int y) { return (const uint8_t *)(uintptr_t)im->rgba + 4 * (y * (int)im->width + x); }
++static int is_px(const fle_av_cursor_img *im, int x, int y, int r, int g, int b, int a) { const uint8_t *p = px(im, x, y); return p[0] == r && p[1] == g && p[2] == b && p[3] == a; }
++
++static uint64_t make_mask(int w, int h, const uint8_t *rows /* h rows of ceil(w/16)*2 bytes */) { return API(CreateBitmap, (uint32_t)w, (uint32_t)h, 1, 1, A(rows), 0, 0, 0); }
++static uint64_t make_color(int w, int h, const uint32_t *cref)
++{
++    uint64_t scr = API(GetDC, 0, 0, 0, 0, 0, 0, 0, 0), dc = API(CreateCompatibleDC, scr, 0, 0, 0, 0, 0, 0, 0), b = API(CreateCompatibleBitmap, scr, (uint32_t)w, (uint32_t)h, 0, 0, 0, 0, 0), old;
++    int x, y;
++    old = API(SelectObject, dc, b, 0, 0, 0, 0, 0, 0);
++    for (y = 0; y < h; y++) for (x = 0; x < w; x++) (void)API(SetPixel, dc, (uint32_t)x, (uint32_t)y, cref[y * w + x], 0, 0, 0, 0);
++    (void)API(SelectObject, dc, old, 0, 0, 0, 0, 0, 0);
++    (void)API(DeleteDC, dc, 0, 0, 0, 0, 0, 0, 0);
++    (void)API(ReleaseDC, 0, scr, 0, 0, 0, 0, 0, 0);
++    return b;
++}
++static uint64_t icon_indirect(int ficon, int hx, int hy, uint64_t mask, uint64_t color)
++{
++    uint8_t ii[32];
++    uint32_t f = (uint32_t)ficon, x = (uint32_t)hx, y = (uint32_t)hy;
++    memset(ii, 0, sizeof ii);
++    memcpy(ii, &f, 4); memcpy(ii + 4, &x, 4); memcpy(ii + 8, &y, 4); memcpy(ii + 16, &mask, 8); memcpy(ii + 24, &color, 8);
++    return API(CreateIconIndirect, A(ii), 0, 0, 0, 0, 0, 0, 0);
++}
++
++static void sc_I(void)
++{
++    /* I1: a colour cursor, 4 x 4, hot spot (1, 2). Mask rows (4 pixels per row, bit 7 = x 0, 1 = bit set): y0: 0110, y1: 0000, y2: 1111, y3: 1001. Colours (COLORREF 0x00BBGGRR): y0: x0 red, x1 any, x2 any, x3 blue;
++     * y1: all green; y2: x0 black (transparent), x1 non-black (shown), x2 black, x3 black; y3: x0 black, x1 white, x2 white, x3 black. */
++    const uint8_t mk[8] = { 0x60, 0, 0x00, 0, 0xF0, 0, 0x90, 0 };
++    uint32_t col[16] = { 0x000000FF, 0x00112233, 0x00112233, 0x00FF0000,
++                         0x0000FF00, 0x0000FF00, 0x0000FF00, 0x0000FF00,
++                         0x00000000, 0x00123456, 0x00000000, 0x00000000,
++                         0x00000000, 0x00FFFFFF, 0x00FFFFFF, 0x00000000 };
++    uint64_t m = make_mask(4, 4, mk), c = make_color(4, 4, col), h1, h2, h3;
++    const fle_av_cursor_img *im;
++    uint32_t s1;
++
++    h1 = icon_indirect(0, 1, 2, m, c);
++    (void)API(SetCursor, h1, 0, 0, 0, 0, 0, 0, 0);
++    im = img_of(h1);
++    CHECK(im != NULL && im->magic == FLE_AV_CURSOR_MAGIC && im->width == 4 && im->height == 4, "I1 a colour cursor has a 4 x 4 picture");
++    if (im) {
++        CHECK(im->hot_x == 1 && im->hot_y == 2, "I1 hot spot (1, 2): %u, %u", im->hot_x, im->hot_y);
++        CHECK(is_px(im, 0, 0, 255, 0, 0, 255), "I1 (0,0) mask 0 shows the colour red");
++        CHECK(is_px(im, 1, 0, 0x33, 0x22, 0x11, 255), "I1 (1,0) mask 1 and a colour that is not black shows the colour (S-cursor-xor)");
++        CHECK(is_px(im, 3, 0, 0, 0, 255, 255), "I1 (3,0) mask 0 shows blue");
++        CHECK(is_px(im, 0, 1, 0, 255, 0, 255), "I1 (0,1) mask 0 shows green");
++        CHECK(px(im, 0, 2)[3] == 0, "I1 (0,2) mask 1 and black is transparent");
++        CHECK(is_px(im, 1, 2, 0x56, 0x34, 0x12, 255), "I1 (1,2) mask 1 and a colour that is not black shows the colour (S-cursor-xor)");
++        CHECK(px(im, 3, 3)[3] == 0 && is_px(im, 1, 3, 255, 255, 255, 255), "I1 (3,3) mask 1 and black is transparent; (1,3) mask 0 and white shows white");
++    }
++    s1 = im ? im->serial : 0;
++    CHECK(s1 != 0, "I1 the picture has a serial (%u)", s1);
++    /* I2: a monochrome cursor 8 x 4: the mask bitmap is 8 x 8: the top 4 rows AND, the bottom 4 rows XOR. */
++    {
++        /* AND rows: y0 0111 1111 (x0 AND 0), y1 0x00 (all AND 0), y2 0xFF (all AND 1), y3 0xFF.  XOR rows: y0 1000 0000 (x0 white), y1 0x0F (x4..7 white), y2 0x80 (x0 XOR 1 with AND 1: invert), y3 0x00 */
++        const uint8_t mono[16] = { 0x7F, 0, 0x00, 0, 0xFF, 0, 0xFF, 0, 0x80, 0, 0x0F, 0, 0x80, 0, 0x00, 0 };
++        uint64_t mm = make_mask(8, 8, mono);
++
++        h2 = icon_indirect(0, 7, 3, mm, 0);
++        im = img_of(h2);
++        CHECK(im != NULL && im->width == 8 && im->height == 4 && im->hot_x == 7 && im->hot_y == 3, "I2 a monochrome cursor is 8 x 4 (the mask is twice the height), hot spot (7, 3)");
++        if (im) {
++            CHECK(is_px(im, 0, 0, 255, 255, 255, 255), "I2 AND 0 XOR 1: white");
++            CHECK(px(im, 1, 0)[3] == 0, "I2 (1,0) AND 1 XOR 0: transparent");
++            CHECK(is_px(im, 0, 1, 0, 0, 0, 255), "I2 (0,1) AND 0 XOR 0: black");
++            CHECK(is_px(im, 4, 1, 255, 255, 255, 255), "I2 (4,1) AND 0 XOR 1: white");
++            CHECK(px(im, 3, 2)[3] == 0, "I2 (3,2) AND 1 XOR 0: transparent");
++            CHECK(is_px(im, 0, 2, 255, 255, 255, 255), "I2 (0,2) AND 1 XOR 1 (invert): white (S-cursor-xor)");
++        }
++    }
++    /* I3: an icon (fIcon TRUE): the hot spot is the centre */
++    h3 = icon_indirect(1, 0, 0, m, c);
++    im = img_of(h3);
++    CHECK(im != NULL && im->hot_x == 2 && im->hot_y == 2, "I3 an icon has its hot spot in the centre (2, 2)");
++    /* I4: destroy and recreate: the picture goes, a new object has a new serial */
++    (void)API(SetCursor, 0, 0, 0, 0, 0, 0, 0, 0);
++    (void)API(DestroyCursor, h1, 0, 0, 0, 0, 0, 0, 0);
++    CHECK(img_of(h1) == NULL, "I4 a destroyed cursor has no picture");
++    {
++        uint64_t h4 = icon_indirect(0, 0, 0, m, c);
++        const fle_av_cursor_img *i4 = img_of(h4);
++
++        CHECK(i4 != NULL && i4->serial != s1, "I4 a new cursor has a new serial (%u, was %u)", i4 ? i4->serial : 0, s1);
++    }
++}
++
++/* ---- a PE image in memory with resources (Learn "PE Format", "The .rsrc Section") ---- */
++static uint8_t *pe;
++static void w16(uint32_t off, uint32_t v) { pe[off] = (uint8_t)v; pe[off + 1] = (uint8_t)(v >> 8); }
++static void w32(uint32_t off, uint32_t v) { w16(off, v & 0xFFFF); w16(off + 2, v >> 16); }
++static void dir(uint32_t at, uint32_t named, uint32_t ids) { w32(at, 0); w32(at + 4, 0); w16(at + 8, 0); w16(at + 10, 0); w16(at + 12, named); w16(at + 14, ids); }
++static void ent(uint32_t at, uint32_t name, uint32_t target) { w32(at, name); w32(at + 4, target); }
++#define RS 0x1000u
++static void data_entry(uint32_t at, uint32_t rva, uint32_t size) { w32(at, rva); w32(at + 4, size); w32(at + 8, 0); w32(at + 12, 0); }
++static uint32_t put_blob(uint32_t at, const uint8_t *b, uint32_t n) { memcpy(pe + at, b, n); return at; }
++
++static void build_pe(void)
++{
++    uint8_t blob[256];
++    uint32_t p = 0x1800;      /* the data blobs start here (RVA = offset: the image is flat) */
++    uint32_t rva_c1, rva_c2, rva_c3, rva_ga = 0, rva_gb = 0, rva_gc = 0;
++    uint32_t i;
++
++    pe = (uint8_t *)mmap((void *)0x400000, 0x10000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
++    if (pe != (uint8_t *)0x400000) { printf("FAIL cannot map the image at 0x400000\n"); fails++; return; }
++    memset(pe, 0, 0x10000);
++    pe[0] = 'M'; pe[1] = 'Z'; w32(0x3c, 0x80);
++    memcpy(pe + 0x80, "PE\0\0", 4);
++    w16(0x98, 0x20b);
++    memcpy(pe + 0xB0, &(uint64_t){ 0x400000 }, 8);
++    w32(0xD0, 0x10000);
++    w32(0x104, 16);
++    w32(0x118, RS); w32(0x11C, 0x800);
++    /* the resource tree (offsets inside the directory) */
++    dir(RS + 0x000, 0, 2); ent(RS + 0x010, 1, 0x80000000u | 0x030); ent(RS + 0x018, 12, 0x80000000u | 0x0A0);
++    dir(RS + 0x030, 0, 3); ent(RS + 0x040, 1, 0x80000000u | 0x058); ent(RS + 0x048, 2, 0x80000000u | 0x070); ent(RS + 0x050, 3, 0x80000000u | 0x088);
++    dir(RS + 0x058, 0, 1); ent(RS + 0x068, 0x409, 0x120);
++    dir(RS + 0x070, 0, 1); ent(RS + 0x080, 0x409, 0x130);
++    dir(RS + 0x088, 0, 1); ent(RS + 0x098, 0x409, 0x140);
++    dir(RS + 0x0A0, 1, 2); ent(RS + 0x0B0, 0x80000000u | 0x110, 0x80000000u | 0x0C8); ent(RS + 0x0B8, 32762, 0x80000000u | 0x0E0); ent(RS + 0x0C0, 32763, 0x80000000u | 0x0F8);
++    dir(RS + 0x0C8, 0, 1); ent(RS + 0x0D8, 0x409, 0x150);
++    dir(RS + 0x0E0, 0, 1); ent(RS + 0x0F0, 0x409, 0x160);
++    dir(RS + 0x0F8, 0, 1); ent(RS + 0x108, 0x409, 0x170);
++    w16(RS + 0x110, 5); { const char *nm = "MYCUR"; for (i = 0; i < 5; i++) w16(RS + 0x112 + 2 * i, (uint32_t)nm[i]); }
++    /* cursor 1: 1 bit, 8 x 8, hot spot (1, 2). XOR (bottom-up rows, 4 bytes each, palette black white), then AND. Row y of the picture: y0: XOR 10000000 AND 01111111; y1: XOR 0 AND 0 (black); the others: AND 0xFF XOR 0 (transparent) */
++    memset(blob, 0, sizeof blob);
++    { uint8_t *b = blob; b[0] = 1; b[1] = 0; b[2] = 2; b[3] = 0;
++      b[4] = 40; b[8] = 8; b[12] = 16; b[16] = 1; b[18] = 1; b[20] = 0;
++      /* palette at 44: black, white */ b[44 + 4] = 255; b[44 + 5] = 255; b[44 + 6] = 255;
++      /* XOR at 52, bottom-up: image row y is stored at index 7 - y */
++      b[52 + 4 * 7] = 0x80;                                        /* y0 */
++      /* AND at 52 + 32 = 84 */
++      for (i = 0; i < 8; i++) b[84 + 4 * (7 - i)] = 0xFF;
++      b[84 + 4 * 7] = 0x7F;                                        /* y0: x0 AND 0 */
++      b[84 + 4 * 6] = 0x00;                                        /* y1: all AND 0, XOR 0: black */
++    }
++    rva_c1 = put_blob(p, blob, 116); p += 128;
++    /* cursor 2: 32 bit, 4 x 4, hot spot (0, 3), alpha: (0,0) = B 0x10 G 0x20 R 0x30 A 0x80, the rest alpha 0; the AND mask is all 1 (not used) */
++    memset(blob, 0, sizeof blob);
++    { uint8_t *b = blob; b[0] = 0; b[1] = 0; b[2] = 3; b[3] = 0;
++      b[4] = 40; b[8] = 4; b[12] = 8; b[16] = 1; b[18] = 32;
++      b[44 + 4 * 4 * 3 + 0] = 0x10; b[44 + 4 * 4 * 3 + 1] = 0x20; b[44 + 4 * 4 * 3 + 2] = 0x30; b[44 + 4 * 4 * 3 + 3] = 0x80;   /* row y0 is stored last */
++      for (i = 0; i < 16; i++) b[44 + 64 + i] = 0xFF; }
++    rva_c2 = put_blob(p, blob, 44 + 64 + 16); p += 160;
++    /* cursor 3: 24 bit, 4 x 4, hot spot (3, 3): (0,0) R1 G2 B3 AND 0 (opaque); (1,0) black AND 1 (transparent); (2,0) R9 G9 B9 AND 1 (shown); the stride is 12 */
++    memset(blob, 0, sizeof blob);
++    { uint8_t *b = blob; b[0] = 3; b[1] = 0; b[2] = 3; b[3] = 0;
++      b[4] = 40; b[8] = 4; b[12] = 8; b[16] = 1; b[18] = 24;
++      uint32_t x0 = 44 + 12 * 3;                                  /* row y0 */
++      b[x0 + 0] = 3; b[x0 + 1] = 2; b[x0 + 2] = 1;                /* B G R */
++      b[x0 + 6] = 9; b[x0 + 7] = 9; b[x0 + 8] = 9;
++      for (i = 0; i < 4; i++) b[44 + 48 + 4 * i] = 0xFF;          /* AND: all 1 ... */
++      b[44 + 48 + 4 * 3] = 0x3F; }                                /* ... except y0: x0 AND 0, x1 AND 0 (black but opaque), x2 AND 1, x3 AND 1 */
++    rva_c3 = put_blob(p, blob, 44 + 48 + 16); p += 160;
++    /* the groups: NEWHEADER (0, 2, 1) and one RESDIR (14 bytes) each; the width and height of the entry are the picture's */
++    for (i = 0; i < 3; i++) {
++        uint8_t g[20];
++        uint32_t id = i + 1, w = i == 0 ? 8 : 4, hh = i == 0 ? 16 : 8, bpp = i == 0 ? 1 : i == 1 ? 32 : 24, sz = i == 0 ? 116 : i == 1 ? 124 : 108;
++
++        memset(g, 0, sizeof g);
++        g[2] = 2; g[4] = 1; g[6] = (uint8_t)w; g[8] = (uint8_t)hh; g[10] = 1; g[12] = (uint8_t)bpp; g[14] = (uint8_t)sz; g[18] = (uint8_t)id;
++        if (i == 0) rva_ga = put_blob(p, g, 20);
++        else if (i == 1) rva_gb = put_blob(p, g, 20);
++        else rva_gc = put_blob(p, g, 20);
++        p += 32;
++    }
++    data_entry(RS + 0x120, rva_c1, 116); data_entry(RS + 0x130, rva_c2, 124); data_entry(RS + 0x140, rva_c3, 108);
++    data_entry(RS + 0x150, rva_ga, 20); data_entry(RS + 0x160, rva_gb, 20); data_entry(RS + 0x170, rva_gc, 20);
++}
++
++static void sc_M(void)
++{
++    uint16_t myname[] = { 'M', 'Y', 'C', 'U', 'R', 0 };
++    uint64_t h;
++    const fle_av_cursor_img *im;
++
++    build_pe();
++    if (!pe) return;
++    h = API(LoadImageW, 0x400000, 32762, 2, 32, 32, 0x8000, 0, 0);
++    CHECK(h != 0, "M0 LoadImageW(32762) gives a handle (0x%llx)", (unsigned long long)h);
++    im = img_of(h);
++    CHECK(im != NULL && im->width == 4 && im->height == 4 && im->hot_x == 0 && im->hot_y == 3, "M1 the 32-bit cursor (ordinal 32762) is 4 x 4 with hot spot (0, 3)");
++    if (im) {
++        CHECK(is_px(im, 0, 0, 0x30, 0x20, 0x10, 0x80), "M1 (0,0) has the colour and the alpha of the pixel (R 30 G 20 B 10 A 80)");
++        CHECK(px(im, 1, 0)[3] == 0 && px(im, 0, 1)[3] == 0, "M1 the other pixels have alpha 0 (the AND mask is not used when there is alpha)");
++    }
++    h = API(LoadImageW, 0x400000, 32763, 2, 32, 32, 0x8000, 0, 0);
++    im = img_of(h);
++    CHECK(im != NULL && im->width == 4 && im->height == 4 && im->hot_x == 3 && im->hot_y == 3, "M2 the 24-bit cursor (ordinal 32763) is 4 x 4 with hot spot (3, 3)");
++    if (im) {
++        CHECK(is_px(im, 0, 0, 1, 2, 3, 255), "M2 (0,0) R1 G2 B3 AND 0: opaque");
++        CHECK(is_px(im, 1, 0, 0, 0, 0, 255), "M2 (1,0) black with AND 0: opaque black");
++        CHECK(is_px(im, 2, 0, 9, 9, 9, 255), "M2 (2,0) colour with AND 1: shown (S-cursor-xor)");
++        CHECK(px(im, 3, 0)[3] == 0, "M2 (3,0) black with AND 1: transparent");
++    }
++    h = API(LoadCursorW, 0x400000, A(myname), 0, 0, 0, 0, 0, 0);
++    CHECK(h != 0, "M3 LoadCursorW(L\"MYCUR\") gives a handle (0x%llx)", (unsigned long long)h);
++    im = img_of(h);
++    CHECK(im != NULL && im->width == 8 && im->height == 8 && im->hot_x == 1 && im->hot_y == 2, "M3 the named 1-bit cursor is 8 x 8 with hot spot (1, 2)");
++    if (im) {
++        CHECK(is_px(im, 0, 0, 255, 255, 255, 255), "M3 (0,0) XOR 1 AND 0: white");
++        CHECK(is_px(im, 0, 1, 0, 0, 0, 255), "M3 (0,1) XOR 0 AND 0: black");
++        CHECK(px(im, 3, 4)[3] == 0, "M3 (3,4) AND 1 XOR 0: transparent");
++    }
++}
++
++/* R: the real FLEngine_x64.dll (its mapped image written by tools: argv[2]) at 0x400000, the six ordinals LoadImageW answers and every named RT_GROUP_CURSOR (argv[3]: one name per line): one line per cursor, name, size, hot spot, FNV-1a of the RGBA bytes (the same line made by an independent decoder of tools/real-cursors.py is compared by the caller) */
++static uint64_t fnv(const uint8_t *b, size_t n) { uint64_t h = 0xcbf29ce484222325ull; size_t i; for (i = 0; i < n; i++) { h ^= b[i]; h *= 0x100000001b3ull; } return h; }
++static void sc_R(const char *flat, const char *names)
++{
++    FILE *f = fopen(flat, "rb"), *nf = fopen(names, "r");
++    char line[128];
++    uint32_t id;
++    uint8_t *img;
++
++    if (!f || !nf) { printf("FAIL cannot open %s or %s\n", flat, names); fails++; return; }
++    img = (uint8_t *)mmap((void *)0x400000, 0x18C0000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0);
++    if (img != (uint8_t *)0x400000) { printf("FAIL cannot map the image at 0x400000\n"); fails++; return; }
++    if (fread(img, 1, 0x18C0000, f) < 1000000) { printf("FAIL short image\n"); fails++; return; }
++    for (id = 32762; id <= 32767; id++) {
++        uint64_t h = API(LoadImageW, 0x400000, id, 2, 32, 32, 0x8000, 0, 0);
++        const fle_av_cursor_img *im = img_of(h);
++
++        if (im) printf("%u %u %u %u %u %016llx\n", id, im->width, im->height, im->hot_x, im->hot_y, (unsigned long long)fnv((const uint8_t *)(uintptr_t)im->rgba, (size_t)im->width * im->height * 4));
++        else { printf("FAIL %u has no picture\n", id); fails++; }
++    }
++    while (fgets(line, sizeof line, nf)) {
++        uint16_t nm[64];
++        size_t i, n = strcspn(line, "\r\n");
++        uint64_t h;
++        const fle_av_cursor_img *im;
++
++        line[n] = 0;
++        for (i = 0; i < n; i++) nm[i] = (uint16_t)(uint8_t)line[i];
++        nm[n] = 0;
++        h = API(LoadCursorW, 0x400000, A(nm), 0, 0, 0, 0, 0, 0);
++        im = img_of(h);
++        if (im) printf("%s %u %u %u %u %016llx\n", line, im->width, im->height, im->hot_x, im->hot_y, (unsigned long long)fnv((const uint8_t *)(uintptr_t)im->rgba, (size_t)im->width * im->height * 4));
++        else { printf("FAIL %s has no picture\n", line); fails++; }
++    }
++}
++
++static void sc_S(void)
++{
++    uint64_t arrow = API(LoadCursorW, 0, 32512, 0, 0, 0, 0, 0, 0);
++
++    CHECK(img_of(arrow) == NULL, "S1 the standard arrow has no picture (the page uses the CSS cursor)");
++    CHECK(img_of(0) == NULL, "S2 NULL has no picture");
++    CHECK(img_of(0x12345678) == NULL, "S3 a number that is no handle has no picture");
++    CHECK(img_of(0x7FDA0000 + 4 * 5) == NULL, "S4 a module-cursor handle of a group the image does not have has no picture");
++}
++
++int main(int argc, char **argv)
++{
++    char only = argc > 1 ? argv[1][0] : 0;
++
++    setvbuf(stdout, NULL, _IONBF, 0);
++    R[4] = (uint64_t)(uintptr_t)stk + 0x10000 + 8;
++    fle_st(R[4], 8, 0xdead0000);
++    fle_teb_set_stack(A(stk), A(stk) + sizeof stk);
++    if (!only || only == 'I') sc_I();
++    if (!only || only == 'M') sc_M();
++    if (!only || only == 'S') sc_S();
++    if (only == 'R' && argc > 3) sc_R(argv[2], argv[3]);
++    printf("%s: %d FAIL\n", fails ? "RESULT FAIL" : "RESULT OK", fails);
++    return fails;
++}
+diff -ruN a/lift/harness/c0325/real-cursors.py b/lift/harness/c0325/real-cursors.py
+--- a/lift/harness/c0325/real-cursors.py	1970-01-01 09:00:00.000000000 +0900
++++ b/lift/harness/c0325/real-cursors.py	2026-11-07 08:13:10.864524643 +0900
+@@ -0,0 +1,80 @@
++#!/usr/bin/env python3
++"""Decision 0325 (ci1): an independent decoder of the RT_GROUP_CURSOR / RT_CURSOR resources of FLEngine_x64.dll (pefile + numpy), for the scenario R of cursor_img.c.
++usage: real-cursors.py DLL OUTDIR [--png]   -> OUTDIR/flat.bin (the mapped image), names.txt, expected.txt (name w h hotx hoty fnv1a64 of the RGBA bytes), contact.png (--png)
++Semantics = fle_res.c fle_cursor_shared_image: 1 / 4 / 8 / 24 bit XOR image + 1-bit AND mask; a 32-bit image with any alpha uses its alpha; AND 1 with a black colour is transparent; AND 1 with another colour shows it."""
++import sys, struct, zlib, numpy as np, pefile
++dll, out = sys.argv[1], sys.argv[2]
++pe = pefile.PE(dll)
++open(out + '/flat.bin', 'wb').write(pe.get_memory_mapped_image())
++res = {}
++for t in pe.DIRECTORY_ENTRY_RESOURCE.entries:
++    if t.id not in (1, 12): continue
++    for n in t.directory.entries:
++        name = n.name.decode() if n.name else n.id
++        for l in n.directory.entries:
++            d = l.data.struct
++            res[(t.id, name)] = pe.get_data(d.OffsetToData, d.Size)
++groups = {k[1]: v for k, v in res.items() if k[0] == 12}
++cursors = {k[1]: v for k, v in res.items() if k[0] == 1}
++def fnv(b):
++    h = 0xcbf29ce484222325
++    for x in b:
++        h ^= x; h = (h * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF
++    return h
++def decode(c):
++    hx, hy = struct.unpack_from('<HH', c, 0)
++    sz, w, h2, pl, bpp, comp, simg, xp, yp, clrused, clrimp = struct.unpack_from('<IiiHHIIiiII', c, 4)
++    h = h2 // 2
++    ncol = (clrused or (1 << bpp)) if bpp <= 8 else 0
++    pal = [struct.unpack_from('<BBBB', c, 44 + 4 * i) for i in range(ncol)]
++    xs = ((w * bpp + 31) // 32) * 4; as_ = ((w + 31) // 32) * 4
++    xo = 44 + 4 * ncol; ao = xo + xs * h
++    o = np.zeros((h, w, 4), np.uint8); anyalpha = False
++    for y in range(h):
++        row = h - 1 - y
++        for x in range(w):
++            if bpp == 32:
++                b, g, r, a = c[xo + xs * row + 4 * x: xo + xs * row + 4 * x + 4]
++                anyalpha |= bool(a)
++            elif bpp == 24:
++                b, g, r = c[xo + xs * row + 3 * x: xo + xs * row + 3 * x + 3]; a = 255
++            else:
++                rb = c[xo + xs * row: xo + xs * row + xs]
++                idx = rb[x] if bpp == 8 else ((rb[x // 2] >> 4) if x % 2 == 0 else (rb[x // 2] & 15)) if bpp == 4 else (rb[x // 8] >> (7 - x % 8)) & 1
++                b, g, r, _ = pal[idx]; a = 255
++            andbit = (c[ao + as_ * row + x // 8] >> (7 - x % 8)) & 1
++            if bpp != 32: a = 0 if (andbit and r == 0 and g == 0 and b == 0) else 255
++            o[y, x] = (r, g, b, a)
++    if bpp == 32 and not anyalpha:
++        for y in range(h):
++            row = h - 1 - y
++            for x in range(w):
++                andbit = (c[ao + as_ * row + x // 8] >> (7 - x % 8)) & 1
++                r, g, b, _ = o[y, x]
++                o[y, x, 3] = 0 if (andbit and r == 0 and g == 0 and b == 0) else 255
++    return w, h, hx, hy, o
++names = [k for k in groups if isinstance(k, str)]
++ords = [k for k in groups if isinstance(k, int) and 32762 <= k <= 32767]
++open(out + '/names.txt', 'w').write('\n'.join(names) + '\n')
++sheet = []
++with open(out + '/expected.txt', 'w') as f:
++    for k in ords + names:
++        w, h, hx, hy, o = decode(cursors[struct.unpack_from('<H', groups[k], 18)[0]])
++        f.write(f'{k} {w} {h} {hx} {hy} {fnv(o.tobytes()):016x}\n'); sheet.append((k, o, hx, hy))
++if '--png' in sys.argv:
++    cols, cell, sc = 8, 40, 3
++    rows = (len(sheet) + cols - 1) // cols
++    img = np.zeros((rows * cell * sc, cols * cell * sc, 3), np.uint8)
++    for yy in range(img.shape[0]):
++        for xx in range(img.shape[1]):
++            img[yy, xx] = (200, 200, 200) if ((yy // 8) + (xx // 8)) % 2 == 0 else (150, 150, 150)
++    for i, (k, o, hx, hy) in enumerate(sheet):
++        cx, cy = (i % cols) * cell * sc + 4 * sc, (i // cols) * cell * sc + 4 * sc
++        for y in range(o.shape[0]):
++            for x in range(o.shape[1]):
++                r, g, b, a = [int(v) for v in o[y, x]]
++                if a: img[cy + y * sc: cy + (y + 1) * sc, cx + x * sc: cx + (x + 1) * sc] = (r, g, b)
++        img[cy + hy * sc: cy + (hy + 1) * sc, cx + hx * sc: cx + (hx + 1) * sc] = (255, 0, 255)      # the hot spot in magenta
++    def chunk(t, d): return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xFFFFFFFF)
++    raw = b''.join(b'\0' + img[y].tobytes() for y in range(img.shape[0]))
++    open(out + '/contact.png', 'wb').write(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', img.shape[1], img.shape[0], 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw)) + chunk(b'IEND', b''))
+diff -ruN a/lift/runtime/fle_appview.c b/lift/runtime/fle_appview.c
+--- a/lift/runtime/fle_appview.c	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_appview.c	2026-11-07 08:10:04.018710677 +0900
+@@ -21,9 +21,12 @@
+ _Static_assert(offsetof(fle_av_window, x) == 16 && offsetof(fle_av_window, style) == 32 && offsetof(fle_av_window, cls) == 48 && offsetof(fle_av_window, title) == 80, "window fields");
+ _Static_assert(offsetof(fle_av_state, seq) == 16 && offsetof(fle_av_state, cursor) == 20 && offsetof(fle_av_state, pointer_x) == 32 && offsetof(fle_av_state, n_windows) == 44 && offsetof(fle_av_state, screen_w) == 48 && offsetof(fle_av_state, screen_h) == 52, "header fields");
+ _Static_assert(offsetof(fle_av_state, windows) == 68, "AV_HEADER_BYTES");
++_Static_assert(offsetof(fle_av_state, cursor_serial) == 56 && sizeof(fle_av_cursor_img) == 32 && offsetof(fle_av_cursor_img, rgba) == 24, "cursor picture fields");
+ 
+ extern uint64_t fle_gdi_cursor_current(void) __attribute__((weak));
+ extern int fle_cursor_is_shared_handle(uint64_t h) __attribute__((weak));
++extern int fle_gdi_icon_image(uint64_t h, uint32_t *w, uint32_t *ht, uint32_t *hx, uint32_t *hy, uint64_t *serial, const uint8_t **rgba) __attribute__((weak));
++extern int fle_cursor_shared_image(uint64_t h, uint32_t *w, uint32_t *ht, uint32_t *hx, uint32_t *hy, uint8_t *rgba, uint32_t cap) __attribute__((weak));
+ 
+ static void copy_ascii(char *dst, unsigned cap, const char *src)
+ {
+@@ -50,6 +53,14 @@
+     if (cur) {
+         st.cursor_idc = fle_cursor_image_idc_of(cur);
+         st.cursor_shared = st.cursor_idc == 0 && fle_cursor_is_shared_handle && fle_cursor_is_shared_handle(cur) ? 1u : 0u;
++        if (st.cursor_shared) st.cursor_serial = 1u;
++        else if (st.cursor_idc == 0) {
++            uint32_t w, ht, hx, hy;
++            uint64_t serial;
++            const uint8_t *px;
++
++            if (fle_gdi_icon_image && fle_gdi_icon_image(cur, &w, &ht, &hx, &hy, &serial, &px)) st.cursor_serial = (uint32_t)serial;
++        }
+     }
+     fle_win_pointer_get(&st.pointer_x, &st.pointer_y);
+     st.pending_events = fle_input_host_pending();
+@@ -98,3 +109,31 @@
+     st.seq = seq;
+     return &st;
+ }
++
++/* Decision 0325 (O18). The picture of a cursor for the browser (fle_appview.h). A cursor made by CreateIconIndirect keeps the picture it was made with (fle_gdi.c); a module cursor is read from the resources (fle_res.c). Both are copied
++ * into one buffer here, so the structure stays valid until the next call whatever the guest does in between. */
++EMSCRIPTEN_KEEPALIVE const fle_av_cursor_img *fle_av_cursor_image(uint32_t handle)
++{
++    static fle_av_cursor_img img;
++    static uint8_t rgba[FLE_AV_CURSOR_MAX * FLE_AV_CURSOR_MAX * 4u];
++    uint32_t w = 0, ht = 0, hx = 0, hy = 0;
++    uint64_t serial = 0;
++    const uint8_t *px = NULL;
++
++    memset(&img, 0, sizeof img);
++    if (handle == 0 || fle_cursor_image_idc_of(handle) != 0) return NULL;
++    if (fle_gdi_icon_image && fle_gdi_icon_image(handle, &w, &ht, &hx, &hy, &serial, &px)) {
++        if (w == 0 || ht == 0 || w > FLE_AV_CURSOR_MAX || ht > FLE_AV_CURSOR_MAX) return NULL;
++        memcpy(rgba, px, (size_t)w * ht * 4u);
++    } else if (fle_cursor_shared_image && fle_cursor_shared_image(handle, &w, &ht, &hx, &hy, rgba, (uint32_t)sizeof rgba)) {
++        serial = 1u;
++    } else return NULL;
++    img.magic = FLE_AV_CURSOR_MAGIC;
++    img.serial = (uint32_t)serial;
++    img.width = w;
++    img.height = ht;
++    img.hot_x = hx;
++    img.hot_y = hy;
++    img.rgba = (uint64_t)(uintptr_t)rgba;
++    return &img;
++}
+diff -ruN a/lift/runtime/fle_appview.h b/lift/runtime/fle_appview.h
+--- a/lift/runtime/fle_appview.h	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_appview.h	2026-11-07 08:10:04.018227459 +0900
+@@ -39,11 +39,25 @@
+     uint32_t pending_events;           /* raw input events queued by the host and not yet turned into messages */
+     uint32_t n_windows;
+     uint32_t screen_w, screen_h;       /* decision 0212: the size of the virtual screen the guest is told (fle_screen.h); 0 in a build older than this field: the page then takes 1920 x 1080 */
+-    uint32_t reserved[3];
++    uint32_t cursor_serial;            /* decision 0325: 0 for a handle without a picture or a standard cursor, 1 for a module cursor, else a number that is new for every icon or cursor made by CreateIconIndirect (a reused handle has another one) */
++    uint32_t reserved[2];
+     fle_av_window windows[FLE_AV_MAX_WINDOWS];
+ } fle_av_state;
+ 
+ /* Fills the state and returns its address (always the same). Exported to JS in the browser build. */
+ const fle_av_state *fle_av_poll(void);
+ 
++/* Decision 0325 (O18): the picture of a cursor that is not one of the standard ones. Learn About Cursors: a cursor is a picture and a hot spot. Straight RGBA (R, G, B, A bytes, 4 * width * height of them at `rgba`, an address in the
++ * linear memory), at most FLE_AV_CURSOR_MAX pixels a side; the browser can show a cursor of 128 x 128 pixels at most. */
++#define FLE_AV_CURSOR_MAGIC 0x52554343u      /* "CCUR" as bytes 'C' 'C' 'U' 'R' */
++#define FLE_AV_CURSOR_MAX 128u
++typedef struct {
++    uint32_t magic, serial, width, height, hot_x, hot_y;
++    uint64_t rgba;                           /* the address of the bytes; JS reads the low 32 bits (the linear memory of the wasm build is 32-bit) */
++} fle_av_cursor_img;                         /* 32 bytes */
++
++/* The picture of the cursor `handle` (the low 32 bits of the handle fle_av_state.cursor gave): of a cursor made by CreateIconIndirect (the fIcon FALSE form and the icon form, the hot spot of an icon its centre) or loaded from a
++ * module's resources (LoadImageW / LoadCursorW). 0 for a standard cursor, NULL and any handle without a picture (the page then shows the arrow). The structure and the bytes are valid until the next call. Exported to JS. */
++const fle_av_cursor_img *fle_av_cursor_image(uint32_t handle);
++
+ #endif
+diff -ruN a/lift/runtime/fle_gdi.c b/lift/runtime/fle_gdi.c
+--- a/lift/runtime/fle_gdi.c	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_gdi.c	2026-11-07 08:07:04.125274543 +0900
+@@ -1501,6 +1501,18 @@
+     R[0] = (idx >= 0 && idx < FLE_GDI_SYS_COLOR_COUNT) ? sys_colors[idx] : 0u;
+ }
+ 
++/* Decision 0325 (O18, S-created-cursor-default): the picture of an icon or cursor made by CreateIconIndirect, kept for the browser (fle_appview.c: fle_av_cursor_image). Learn CreateIconIndirect: "The system copies the bitmaps in
++ * the ICONINFO structure before creating the icon or cursor", so the picture is made at the call, as straight RGBA (R, G, B, A bytes), w x h. The rules of the cursor masks (Learn About Cursors, "Cursor Resources"; the
++ * classic AND / XOR pair): with a colour bitmap, a pixel whose mask bit is 0 shows the colour; a pixel whose mask bit is 1 is transparent when its colour is black, and shows the colour otherwise (the real result is the
++ * screen XOR the colour: a browser cursor cannot invert, so the colour is shown, S-cursor-xor). Without one the mask is twice the height, the top half the AND mask, the bottom half the XOR mask: AND 0 XOR 0 black, AND 0
++ * XOR 1 white, AND 1 XOR 0 transparent, AND 1 XOR 1 (invert) white (S-cursor-xor). Learn ICONINFO: "If this structure defines an icon, the hot spot is always in the center of the icon". Nothing is invented for a picture
++ * that cannot be made (a size above 256, no memory): the handle then has no picture and the browser keeps its arrow. */
++typedef struct { uint32_t w, h, hx, hy; uint64_t serial; uint8_t *rgba; } gdi_icon_img;
++static uint64_t icon_serial;
++static int ddb_view(gdi_obj *o, fle_rsurf *v);
++static void dib_view(const gdi_dib *d, fle_rsurf *v);
++static gdi_icon_img *make_icon_img(gdi_obj *m, gdi_obj *c, uint32_t ficon, uint32_t hx, uint32_t hy);
++
+ /* user32!CreateIconIndirect: HICON f(PICONINFO piconinfo rcx). Learn (CreateIconIndirect): "creates an icon or cursor from an ICONINFO structure"; "The system copies the bitmaps in the ICONINFO structure
+  * before creating the icon or cursor. Because the system may temporarily select the bitmaps in a device context, the hbmMask and hbmColor members of the ICONINFO structure should not already be selected into
+  * a device context. The application must continue to manage the original bitmaps and delete them"; Learn (ICONINFO): fIcon TRUE is an icon and FALSE a cursor; "If this structure defines an icon, the hot spot
+@@ -1546,6 +1558,7 @@
+     o->u[3] = m->bm[0];
+     o->u[4] = m->bm[1];
+     o->u[5] = (uint32_t)has_color;
++    o->ext = make_icon_img(m, has_color ? live_obj(hcolor) : NULL, ficon, hx, hy);      /* decision 0325 */
+     issue(o, FLE_GDI_KIND_ICONCUR);
+     R[0] = slot_handle(slot);
+ }
+@@ -1657,6 +1670,72 @@
+     return 1;
+ }
+ 
++static gdi_icon_img *make_icon_img(gdi_obj *m, gdi_obj *c, uint32_t ficon, uint32_t hx, uint32_t hy)
++{
++    fle_rsurf ms, cs;
++    uint32_t w = m->bm[0], h = c ? m->bm[1] : m->bm[1] / 2u, x, y;
++    gdi_icon_img *im;
++
++    if (w == 0 || h == 0 || w > 256u || h > 256u) return NULL;
++    if (m->fmt == FLE_GDI_BMP_DIB) dib_view((const gdi_dib *)m->ext, &ms);
++    else if (!ddb_view(m, &ms)) return NULL;
++    if (c) {
++        if (c->fmt == FLE_GDI_BMP_DIB) dib_view((const gdi_dib *)c->ext, &cs);
++        else if (!ddb_view(c, &cs)) return NULL;
++    }
++    im = (gdi_icon_img *)calloc(1, sizeof *im);
++    if (!im) return NULL;
++    im->rgba = (uint8_t *)malloc((size_t)w * h * 4u);
++    if (!im->rgba) {
++        free(im);
++        return NULL;
++    }
++    for (y = 0; y < h; y++)
++        for (x = 0; x < w; x++) {
++            uint8_t *o = im->rgba + 4u * ((size_t)y * w + x);
++            uint32_t and_bit = fle_r_get(&ms, x, y) != 0, col = 0, alpha = 255;
++
++            if (c) {
++                col = fle_r_get(&cs, x, y) & 0xFFFFFFu;
++                if (and_bit && col == 0) alpha = 0;
++            } else {
++                uint32_t xor_bit = fle_r_get(&ms, x, y + h) != 0;
++
++                if (!and_bit) col = xor_bit ? 0xFFFFFFu : 0u;
++                else if (xor_bit) col = 0xFFFFFFu;
++                else alpha = 0;
++            }
++            o[0] = (uint8_t)(col & 0xFFu);
++            o[1] = (uint8_t)((col >> 8) & 0xFFu);
++            o[2] = (uint8_t)((col >> 16) & 0xFFu);
++            o[3] = (uint8_t)alpha;
++        }
++    im->w = w;
++    im->h = h;
++    im->hx = ficon ? w / 2u : (hx < w ? hx : w - 1u);
++    im->hy = ficon ? h / 2u : (hy < h ? hy : h - 1u);
++    im->serial = ++icon_serial;
++    return im;
++}
++
++/* Decision 0325: the picture of a live icon or cursor of CreateIconIndirect (1 and the facts; the bytes stay owned by the table and are valid until DestroyIcon / DestroyCursor), 0 for any other handle or when
++ * no picture could be made. */
++int fle_gdi_icon_image(uint64_t h, uint32_t *w, uint32_t *ht, uint32_t *hx, uint32_t *hy, uint64_t *serial, const uint8_t **rgba)
++{
++    gdi_obj *o = live_obj(h);
++    const gdi_icon_img *im;
++
++    if (!o || o->kind != FLE_GDI_KIND_ICONCUR || !o->ext) return 0;
++    im = (const gdi_icon_img *)o->ext;
++    *w = im->w;
++    *ht = im->h;
++    *hx = im->hx;
++    *hy = im->hy;
++    *serial = im->serial;
++    *rgba = im->rgba;
++    return 1;
++}
++
+ /* Decision 0140: the pixels of the bitmap selected into the memory DC `h` (UpdateLayeredWindow reads its source through this; fle_layered.c). 1 and the view in *out; 0 when h is not a live memory DC with a bitmap. */
+ int fle_gdi_memdc_surface(uint64_t h, fle_rsurf *out)
+ {
+@@ -2961,6 +3040,11 @@
+     if (o->kind != FLE_GDI_KIND_ICONCUR) fle_stop(api, "hIcon is not an icon or cursor made by CreateIconIndirect: the page says not to destroy a shared icon or cursor and gives no result for one");
+     if (cursor_only && o->u[0]) fle_stop(api, "hCursor is an icon (fIcon TRUE): DestroyCursor is defined for cursors, DestroyIcon for icons (decision 0111)");
+     if (h == cur_cursor) fle_stop(api, "the handle is the current cursor of SetCursor: the page says the cursor must not be in use and gives no result for one that is");
++    if (o->kind == FLE_GDI_KIND_ICONCUR && o->ext) {      /* decision 0325: the picture goes with the object */
++        free(((gdi_icon_img *)o->ext)->rgba);
++        free(o->ext);
++        o->ext = NULL;
++    }
+     o->state = ST_DELETED;                  /* the kind stays (like a deleted DC): a second call is told from a handle that never was an icon */
+     objs_live--;
+     slot_release((uint64_t)i);
+diff -ruN a/lift/runtime/fle_gdi.h b/lift/runtime/fle_gdi.h
+--- a/lift/runtime/fle_gdi.h	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_gdi.h	2026-11-07 08:07:34.466139697 +0900
+@@ -236,6 +236,8 @@
+ uint32_t fle_gdi_selected_count(uint64_t h);
+ int fle_gdi_bitmap_format(uint64_t h);
+ int fle_gdi_dib_info(uint64_t h, uint64_t *bits, uint32_t out[6]);
++/* Decision 0325: the picture (straight RGBA, w x h) and the hot spot of a live icon or cursor made by CreateIconIndirect, and a number that is new for every such object (a reused handle has another one). 0 for any other handle. */
++int fle_gdi_icon_image(uint64_t h, uint32_t *w, uint32_t *ht, uint32_t *hx, uint32_t *hy, uint64_t *serial, const uint8_t **rgba);
+ /* Decision 0140: the pixel view of the bitmap selected into the memory DC `h` (1 and *out), or 0 (not a live memory DC with a bitmap). */
+ int fle_gdi_memdc_surface(uint64_t h, fle_rsurf *out);
+ uint32_t fle_gdi_dib_color(uint64_t h, uint32_t i);
+diff -ruN a/lift/runtime/fle_res.c b/lift/runtime/fle_res.c
+--- a/lift/runtime/fle_res.c	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_res.c	2026-11-07 08:07:57.357306276 +0900
+@@ -640,3 +640,140 @@
+     leaf_data(api, &im, e, va, size);
+     return 1;
+ }
++
++/* Decision 0325 (O18, S-module-cursor-default). The picture and the hot spot of a cursor that user32!LoadImageW / LoadCursorW loaded from a module's resources. The handle is a pure function of (module, RT_GROUP_CURSOR)
++ * (fle_loadimage.h: FLE_LI_MODULE_HANDLE_BASE + FLE_LI_REALMOD_STRIDE * k + 4 * q; q 1..6 the ordinals 32762..32767, q from FLE_LI_NAMED_FIRST the position of the name among the named entries), so it is turned back into the
++ * group here. Learn "Resource File Formats" (RT_GROUP_CURSOR: a NEWHEADER and RESDIR entries whose last member is the id of an RT_CURSOR component), "About Cursors": the cursor is chosen from the group the way LoadImageW(32, 32)
++ * asks: the component closest to 32 x 32, and of those the deepest. An RT_CURSOR component is the hot spot (two WORDs: x, y) and a DIB: a BITMAPINFOHEADER whose height is twice the cursor's (the XOR image and the AND mask
++ * follow), the colour table when the depth is 8 bits or less, the XOR image (bottom-up rows padded to 4 bytes) and the 1-bit AND mask. A 32-bit XOR image with any alpha byte above 0 is a picture with alpha (the AND mask is
++ * then not used); otherwise the AND bit 1 makes a pixel transparent, unless its XOR colour is not black, in which case the colour is shown (the real result is the screen XOR the colour: S-cursor-xor, as in fle_gdi.c). */
++static uint32_t cur_u16(uint64_t a) { return (uint16_t)fle_ld(a, 2); }
++
++int fle_cursor_shared_image(uint64_t h, uint32_t *ow, uint32_t *oh, uint32_t *ohx, uint32_t *ohy, uint8_t *rgba, uint32_t cap)
++{
++    static const char api[] = "cursor picture";
++    uint64_t off, base, data, cdata, best_data = 0;
++    uint32_t k, q, size, csize, entry, count, i, best_score = UINT32_MAX, best_bpp = 0, best_size = 0, nn, f, o2, p;
++    res_img im;
++    res_key kt, kn;
++
++    if (h <= UINT64_C(0x7FDA0000)) return 0;
++    off = h - UINT64_C(0x7FDA0000);
++    if (off % 4u != 0 || off / FLE_LI_REALMOD_STRIDE > 8u) return 0;
++    k = (uint32_t)(off / FLE_LI_REALMOD_STRIDE);
++    q = (uint32_t)((off % FLE_LI_REALMOD_STRIDE) / 4u);
++    if (k == 0) base = FLE_EXE_HANDLE;
++    else {
++        if (!FLE_REALMOD_PRESENT() || fle_realmod_total() < k) return 0;
++        base = fle_realmod_base((int)k - 1);
++    }
++    img_open(api, &im, base);
++    kt.is_id = 1;
++    kt.id = 12u;
++    kt.nlen = 0;
++    kn.is_id = 1;
++    kn.nlen = 0;
++    if (q >= 1u && q <= 6u) kn.id = FLE_LI_MODULE_FIRST + q - 1u;
++    else if (q >= FLE_LI_NAMED_FIRST && q < FLE_LI_NAMED_FIRST + FLE_LI_NAMED_MAX) {
++        p = q - FLE_LI_NAMED_FIRST;
++        if (im.dir_rva == 0 || !table_find(api, &im, 0, &kt, &f) || !(f >> 31)) return 0;
++        o2 = f & 0x7fffffffu;
++        nn = d16(api, &im, o2 + 12);
++        if (p >= nn) return 0;
++        f = d32(api, &im, o2 + 16u + 8u * p);
++        if (!(f >> 31)) return 0;
++        f &= 0x7fffffffu;
++        kn.nlen = d16(api, &im, f);
++        if (kn.nlen > RES_NAME_MAX) return 0;
++        for (i = 0; i < kn.nlen; i++) kn.name[i] = (uint16_t)d16(api, &im, f + 2u + 2u * i);
++        kn.is_id = 0;
++    } else return 0;
++    if (find_leaf(api, &im, &kt, &kn, &entry) != 0) return 0;
++    leaf_data(api, &im, entry, &data, &size);
++    if (size < 6u || cur_u16(data) != 0 || cur_u16(data + 2) != 2u) return 0;
++    count = cur_u16(data + 4);
++    if (count == 0 || 6ull + 14ull * count > size) return 0;
++    kt.id = 1u;      /* RT_CURSOR */
++    for (i = 0; i < count; i++) {
++        uint32_t w, hh, bpp, score;
++
++        kn.is_id = 1;
++        kn.nlen = 0;
++        kn.id = cur_u16(data + 6u + 14u * i + 12u);
++        if (find_leaf(api, &im, &kt, &kn, &entry) != 0) continue;
++        leaf_data(api, &im, entry, &cdata, &csize);
++        if (csize < 44u || (uint32_t)fle_ld(cdata + 4, 4) != 40u) continue;
++        w = (uint32_t)fle_ld(cdata + 8, 4);
++        hh = (uint32_t)fle_ld(cdata + 12, 4) / 2u;
++        bpp = cur_u16(cdata + 18);
++        if (w == 0 || hh == 0 || w > 128u || hh > 128u) continue;
++        score = (w > 32u ? w - 32u : 32u - w) + (hh > 32u ? hh - 32u : 32u - hh);
++        if (score < best_score || (score == best_score && bpp > best_bpp)) {
++            best_score = score;
++            best_bpp = bpp;
++            best_data = cdata;
++            best_size = csize;
++        }
++    }
++    if (best_data == 0) return 0;
++    {
++        const uint8_t *c = (const uint8_t *)(uintptr_t)best_data;
++        uint32_t w = (uint32_t)fle_ld(best_data + 8, 4), hh = (uint32_t)fle_ld(best_data + 12, 4) / 2u, bpp = cur_u16(best_data + 18), comp = (uint32_t)fle_ld(best_data + 20, 4), clrused = (uint32_t)fle_ld(best_data + 36, 4);
++        uint32_t ncol = bpp <= 8u ? (clrused ? clrused : 1u << bpp) : 0u, xs, as, x, y, any_alpha = 0;
++        uint64_t need;
++        const uint8_t *pal, *xorp, *andp;
++
++        if (cur_u16(best_data + 16) != 1u || comp != 0 || (bpp != 1u && bpp != 4u && bpp != 8u && bpp != 24u && bpp != 32u) || ncol > 256u) return 0;
++        if ((uint64_t)w * hh * 4u > cap) return 0;
++        xs = ((w * bpp + 31u) / 32u) * 4u;
++        as = ((w + 31u) / 32u) * 4u;
++        need = 44ull + 4ull * ncol + (uint64_t)xs * hh + (uint64_t)as * hh;
++        if (need > best_size) return 0;
++        pal = c + 44;
++        xorp = pal + 4u * ncol;
++        andp = xorp + (size_t)xs * hh;
++        for (y = 0; y < hh; y++) {
++            const uint8_t *xr = xorp + (size_t)xs * (hh - 1u - y), *ar = andp + (size_t)as * (hh - 1u - y);
++
++            for (x = 0; x < w; x++) {
++                uint8_t *o = rgba + 4u * ((size_t)y * w + x);
++                uint32_t r, g, b, a = 255, idx;
++
++                if (bpp == 32u) {
++                    b = xr[4u * x]; g = xr[4u * x + 1u]; r = xr[4u * x + 2u]; a = xr[4u * x + 3u];
++                    if (a) any_alpha = 1;
++                } else if (bpp == 24u) {
++                    b = xr[3u * x]; g = xr[3u * x + 1u]; r = xr[3u * x + 2u];
++                } else {
++                    idx = bpp == 8u ? xr[x] : bpp == 4u ? (uint32_t)((xr[x >> 1] >> ((x & 1u) ? 0 : 4)) & 15u) : (uint32_t)((xr[x >> 3] >> (7u - (x & 7u))) & 1u);
++                    if (idx >= ncol) idx = 0;
++                    b = pal[4u * idx]; g = pal[4u * idx + 1u]; r = pal[4u * idx + 2u];
++                }
++                if (bpp != 32u) {
++                    uint32_t and_bit = (ar[x >> 3] >> (7u - (x & 7u))) & 1u;
++
++                    a = (and_bit && r == 0 && g == 0 && b == 0) ? 0u : 255u;
++                }
++                o[0] = (uint8_t)r; o[1] = (uint8_t)g; o[2] = (uint8_t)b; o[3] = (uint8_t)a;
++            }
++        }
++        if (bpp == 32u && !any_alpha) {
++            /* a 32-bit image without alpha: the AND mask decides, as for the other depths */
++            for (y = 0; y < hh; y++) {
++                const uint8_t *ar = andp + (size_t)as * (hh - 1u - y);
++
++                for (x = 0; x < w; x++) {
++                    uint8_t *o = rgba + 4u * ((size_t)y * w + x);
++                    uint32_t and_bit = (ar[x >> 3] >> (7u - (x & 7u))) & 1u;
++
++                    o[3] = (and_bit && o[0] == 0 && o[1] == 0 && o[2] == 0) ? 0u : 255u;
++                }
++            }
++        }
++        *ow = w;
++        *oh = hh;
++        *ohx = cur_u16(best_data) < w ? cur_u16(best_data) : w - 1u;
++        *ohy = cur_u16(best_data + 2) < hh ? cur_u16(best_data + 2) : hh - 1u;
++    }
++    return 1;
++}
+diff -ruN a/lift/runtime/fle_res.h b/lift/runtime/fle_res.h
+--- a/lift/runtime/fle_res.h	2026-11-07 08:02:49.000000000 +0900
++++ b/lift/runtime/fle_res.h	2026-11-07 08:07:34.466601395 +0900
+@@ -50,6 +50,10 @@
+ /* Decision 0125 (PROVISIONAL), wall 54: user32!LoadCursorW(hInstance non-NULL, name) for a cursor of the lifted DLL or of a real module (the rules are in fle_res.c). Returns 1 with *handle set, or 0 with
+  * *handle = 0 and the last error set. fle_cursor.c reaches it through a weak reference. */
+ int fle_cursor_load_named(const char *api, uint64_t inst, uint64_t name, uint64_t *handle);
++/* Decision 0325 (O18): the picture of a cursor that LoadImageW / LoadCursorW loaded from a module (the shared handle forms of fle_loadimage.h): straight RGBA (R, G, B, A bytes) of w x h pixels (at most 128 x 128, in `rgba`
++ * of `cap` bytes) and the hot spot. 1 when the handle names an RT_GROUP_CURSOR whose chosen RT_CURSOR component could be read; 0 for any other handle or for a form that is not read (PNG, a size above 128, a depth other than
++ * 1, 4, 8, 24, 32 bits). Never stops the run: a cursor without a picture is shown as the arrow by the browser. No state moves. */
++int fle_cursor_shared_image(uint64_t h, uint32_t *w, uint32_t *ht, uint32_t *hx, uint32_t *hy, uint8_t *rgba, uint32_t cap);
+ 
+ /* Decision 0129 (PROVISIONAL, S-version-info-real-resource): the RT_VERSION resource of the image mapped at FLE_EXE_HANDLE: 1 with its VA and size, or 0 when there is none. See fle_res.c. */
+ int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size);
+diff -ruN a/app/src/engine/appview.ts b/app/src/engine/appview.ts
+--- a/app/src/engine/appview.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/appview.ts	2026-11-07 08:14:05.184110836 +0900
+@@ -26,6 +26,8 @@
+   cursorShared: boolean;
+   pointerX: number; pointerY: number;
+   pendingEvents: number;
++  /** decision 0325: 0 for a standard cursor or a handle without a picture, 1 for a module cursor, else a number that is new for every cursor made by CreateIconIndirect (a reused handle has another one) */
++  cursorSerial: number;
+   /** decision 0212: the size of the virtual screen the guest is told (lift/runtime/fle_screen.h); 0 from a build that does not report it (the page then takes 1920 x 1080) */
+   screenW?: number; screenH?: number;
+   /** top-level windows, top of the z-order first */
+@@ -59,7 +61,26 @@
+     });
+   }
+   return {
+-    seq: dv.getUint32(16, true), cursor: dv.getUint32(20, true), cursorIdc: dv.getUint32(24, true), cursorShared: dv.getUint32(28, true) !== 0,
++    seq: dv.getUint32(16, true), cursor: dv.getUint32(20, true), cursorIdc: dv.getUint32(24, true), cursorShared: dv.getUint32(28, true) !== 0, cursorSerial: dv.getUint32(56, true),
+     pointerX: dv.getInt32(32, true), pointerY: dv.getInt32(36, true), pendingEvents: dv.getUint32(40, true), screenW: dv.getUint32(48, true), screenH: dv.getUint32(52, true), windows,
+   };
+ }
++
++// Decision 0325 (O18): the picture of a cursor that is not a standard one (lift/runtime/fle_appview.h fle_av_cursor_img, 32 bytes: magic, serial, width, height, hot_x, hot_y, rgba [64 bits, the low 32 are the address in the linear memory]).
++export const CURSOR_MAGIC = 0x52554343;     // bytes 'C' 'C' 'U' 'R'
++export const CURSOR_IMG_BYTES = 32;
++export const CURSOR_MAX_SIDE = 128;         // the largest cursor a browser shows
++export interface CursorImage { serial: number; width: number; height: number; hotX: number; hotY: number; rgba: Uint8ClampedArray }
++
++/** the picture fle_av_cursor_image(handle) described at `ptr`; null when the engine gave none (ptr 0), the structure does not match, or the size is outside 1..CURSOR_MAX_SIDE. The pixels are COPIED (the engine reuses its buffer). */
++export function readCursorImage(buffer: ArrayBufferLike, ptr: number): CursorImage | null {
++  if (ptr === 0) return null;
++  const dv = new DataView(buffer, ptr, CURSOR_IMG_BYTES);
++  if (dv.getUint32(0, true) !== CURSOR_MAGIC) return null;
++  const width = dv.getUint32(8, true), height = dv.getUint32(12, true), at = dv.getUint32(24, true);
++  if (width < 1 || height < 1 || width > CURSOR_MAX_SIDE || height > CURSOR_MAX_SIDE || at === 0 || at + width * height * 4 > buffer.byteLength) return null;
++  const src = new Uint8Array(buffer, at, width * height * 4);
++  const rgba = new Uint8ClampedArray(width * height * 4);
++  rgba.set(src);
++  return { serial: dv.getUint32(4, true), width, height, hotX: Math.min(dv.getUint32(16, true), width - 1), hotY: Math.min(dv.getUint32(20, true), height - 1), rgba };
++}
+diff -ruN a/app/src/engine/client.ts b/app/src/engine/client.ts
+--- a/app/src/engine/client.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/client.ts	2026-11-07 08:14:05.186472339 +0900
+@@ -32,6 +32,8 @@
+   osstate?(m: Extract<FromWorker, { t: 'osstate' }>): void;
+   /** decision 0223: the desktop presenter's counters and the instants of its presents (at most every 100 ms) */
+   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
++  /** decision 0325: the picture and hot spot of a non-standard cursor (before the osstate that names it) */
++  cursorImage?(m: Extract<FromWorker, { t: 'cursor-image' }>): void;
+   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
+   taskbar?(m: Extract<FromWorker, { t: 'taskbar' }>): void;
+ }
+@@ -167,6 +169,7 @@
+       case 'pong': break;
+       case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
+       case 'osstate': this.events.osstate?.(m); break;
++      case 'cursor-image': this.events.cursorImage?.(m); break;
+       case 'desk': this.events.desk?.(m); break;
+       case 'taskbar': this.events.taskbar?.(m); break;
+     }
+diff -ruN a/app/src/engine/fruity.ts b/app/src/engine/fruity.ts
+--- a/app/src/engine/fruity.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/fruity.ts	2026-11-07 08:14:05.184704617 +0900
+@@ -10,7 +10,7 @@
+ // Display: the runtime composes the windows into one picture (fle_desk_compose) and the Worker shows it (worker.ts, desk.ts).
+ 
+ import type { FruityOptions, Manifest } from '../bundle/manifest.ts';
+-import { type AppView, readAppView } from './appview.ts';
++import { type AppView, type CursorImage, readAppView, readCursorImage } from './appview.ts';
+ import type { DeskApi } from './desk.ts';
+ import { HostFiles, type HostFileStats, type HostPack, installHostFiles, SUPPORTED_EMSCRIPTEN, unsupportedImports } from './hostfiles.ts';
+ import type { EngineInput } from './idle-driver.ts';
+@@ -249,6 +249,14 @@
+     return readAppView(this.memory.buffer, ptr, sinceSeq);
+   }
+ 
++  /** decision 0325: the picture of the cursor `handle` (fle_av_cursor_image of lift/runtime/fle_appview.c); null when the wasm has no such export or the engine has no picture for the handle */
++  cursorImage(handle: number): CursorImage | null {
++    const ex = this.instance?.exports as Record<string, unknown> | undefined;
++    if (!ex || typeof ex.fle_av_cursor_image !== 'function' || !this.memory) return null;
++    const ptr = (ex.fle_av_cursor_image as (h: number) => number)(handle);
++    return readCursorImage(this.memory.buffer, ptr);
++  }
++
+   get idle(): boolean { return this.opts.fleIdleWaiting ? this.opts.fleIdleWaiting() : false; }
+   get idleStartedAt(): number | null { return this.idleSince; }
+ 
+diff -ruN a/app/src/engine/os-state.ts b/app/src/engine/os-state.ts
+--- a/app/src/engine/os-state.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/os-state.ts	2026-11-07 08:14:05.185336118 +0900
+@@ -3,7 +3,7 @@
+ // general fact of the operating system and names no FL window: the title is the one a window shows in its title bar, and the foreground window is the one Windows calls active (Learn, GetForegroundWindow / WM_ACTIVATE).
+ import type { AppView } from './appview.ts';
+ 
+-export interface OsState { cursor: number; cursorIdc: number; cursorShared: boolean; title: string; screenW: number; screenH: number }
++export interface OsState { cursor: number; cursorIdc: number; cursorShared: boolean; /** decision 0325 */ cursorSerial: number; title: string; screenW: number; screenH: number }
+ 
+ /**
+  * `lastTitle` is the title shown so far. The new title is the title of the active, visible window whose title is not empty (a menu or a tooltip is a window with an empty title; it is active for a moment and must not blank the
+@@ -11,8 +11,8 @@
+  */
+ export function osStateOf(v: AppView, lastTitle: string): OsState {
+   const act = v.windows.find((w) => w.active && w.visible && w.title.trim() !== '');
+-  return { cursor: v.cursor, cursorIdc: v.cursorIdc, cursorShared: v.cursorShared, title: act ? act.title.trim() : lastTitle, screenW: v.screenW ?? 0, screenH: v.screenH ?? 0 };
++  return { cursor: v.cursor, cursorIdc: v.cursorIdc, cursorShared: v.cursorShared, cursorSerial: v.cursorSerial, title: act ? act.title.trim() : lastTitle, screenW: v.screenW ?? 0, screenH: v.screenH ?? 0 };
+ }
+ 
+ /** a change of the key is a change of the state: the Worker posts `osstate` only then */
+-export const osStateKey = (s: OsState): string => `${s.cursor}/${s.cursorIdc}/${s.cursorShared ? 1 : 0}/${s.screenW}x${s.screenH}/${s.title}`;
++export const osStateKey = (s: OsState): string => `${s.cursor}/${s.cursorIdc}/${s.cursorShared ? 1 : 0}/${s.cursorSerial}/${s.screenW}x${s.screenH}/${s.title}`;
+diff -ruN a/app/src/engine/protocol.ts b/app/src/engine/protocol.ts
+--- a/app/src/engine/protocol.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/protocol.ts	2026-11-07 08:14:05.185647123 +0900
+@@ -59,8 +59,10 @@
+   | { t: 'desk-dump-error'; message: string }
+   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
+   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
+-  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
++  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; cursorSerial: number; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
+   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
++  /** decision 0325 (O18): the picture and hot spot of a cursor the guest chose that is not a standard one (made by CreateIconIndirect or loaded from a module's resources); sent once per (handle, serial) BEFORE the osstate that names the handle. `rgba` is width x height x 4 bytes, straight alpha (transferred) */
++  | { t: 'cursor-image'; handle: number; serial: number; width: number; height: number; hotX: number; hotY: number; rgba: ArrayBuffer }
+   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
+   | { t: 'taskbar'; lid: number }
+   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** animation frames delivered to the Worker / presents made from the engine's idle because none was */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
+diff -ruN a/app/src/engine/worker.ts b/app/src/engine/worker.ts
+--- a/app/src/engine/worker.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/engine/worker.ts	2026-11-07 08:14:05.186059877 +0900
+@@ -399,7 +399,11 @@
+     const os = osStateOf(v, lastTitle);
+     lastTitle = os.title;
+     const key = osStateKey(os);
+-    if (key !== lastOs) { lastOs = key; post({ t: 'osstate', ...os, abs: nowAbs() }); }
++    if (key !== lastOs) {
++      lastOs = key;
++      sendCursorImage(os.cursor, os.cursorIdc, os.cursorSerial);
++      post({ t: 'osstate', ...os, abs: nowAbs() });
++    }
+   }
+   // decision 0272: a minimized window with a taskbar button, as the engine says it (null: this build has no such export; nothing is posted)
+   const tb = taskbarReport.next(fruity.taskbarIconic());
+@@ -407,6 +411,19 @@
+   if (flush) flushDeskStats(false);
+   return shown > 0;
+ }
++// decision 0325 (O18): the picture of a cursor that is not a standard one goes to the page once per (handle, serial), before the osstate that names it (the engine reuses a handle after DestroyCursor; its serial then differs)
++const cursorsSent = new Set<string>();
++function sendCursorImage(handle: number, idc: number, serial: number): void {
++  if (handle === 0 || idc !== 0 || serial === 0 || !fruity) return;
++  const key = `${handle}:${serial}`;
++  if (cursorsSent.has(key)) return;
++  const img = fruity.cursorImage(handle);
++  if (!img) return;
++  if (cursorsSent.size > 4096) cursorsSent.clear();
++  cursorsSent.add(key);
++  const rgba = img.rgba.buffer as ArrayBuffer;
++  post({ t: 'cursor-image', handle, serial: img.serial, width: img.width, height: img.height, hotX: img.hotX, hotY: img.hotY, rgba }, [rgba]);
++}
+ function flushDeskStats(force: boolean, answers?: number[]): void {
+   const now = performance.now();
+   if (!force && now - lastDeskReport < 100) return;
+diff -ruN a/app/src/main.ts b/app/src/main.ts
+--- a/app/src/main.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/main.ts	2026-11-07 08:15:56.952761354 +0900
+@@ -13,7 +13,7 @@
+ import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
+ import type { AppView } from './engine/appview.ts';
+ import type { HostFileStats } from './engine/hostfiles.ts';
+-import { cursorCss } from './ui/cursor.ts';
++import { cursorCss, CursorPictureStore } from './ui/cursor.ts';
+ import { DesktopView } from './ui/desktop.ts';
+ import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
+ import { LatencyTracker, toAnyFrame, type InputMeta } from './ui/latency.ts';
+@@ -543,10 +543,28 @@
+ $('perf-send-note').textContent = ' · 測定値はこのサーバーに送られます';
+ setInterval(renderPerf, 1000);
+ 
++// decision 0325 (O18): the pictures of the guest's own cursors (the engine's Worker sends each once, before the osstate that names it); PNG by a canvas of the page
++const cursorPictures = new CursorPictureStore({
++  encode(rgba, width, height) {
++    const cv = document.createElement('canvas');
++    cv.width = width;
++    cv.height = height;
++    (cv.getContext('2d') as CanvasRenderingContext2D).putImageData(new ImageData(Uint8ClampedArray.from(rgba), width, height), 0, 0);
++    return cv.toDataURL('image/png');
++  },
++  imageSet: () => typeof CSS !== 'undefined' && typeof CSS.supports === 'function' && CSS.supports('cursor', 'image-set(url("data:image/png;base64,iVBORw0KGgo=") 1x) 0 0, default'),
++});
++let lastOsCursor = { cursor: 0, cursorIdc: 0, cursorShared: false, cursorSerial: 0 };
+ const client = new EngineClient({
+   deskCanvas: () => view.deskCanvas(),
++  cursorImage(m) {
++    cursorPictures.add(m);
++    // the picture normally comes before the osstate that names it; if the guest's cursor is this one already (a resend), it is applied now
++    if (m.handle === lastOsCursor.cursor && m.serial === lastOsCursor.cursorSerial) { const c = cursorCss(lastOsCursor, cursorPictures); app.cursor = c; view.setCursor(c.css); }
++  },
+   osstate(m) {
+-    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared });
++    lastOsCursor = { cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared, cursorSerial: m.cursorSerial };
++    const c = cursorCss(lastOsCursor, cursorPictures);
+     app.cursor = c;
+     view.setCursor(c.css);
+     osTitle = m.title;
+diff -ruN a/app/src/ui/cursor.ts b/app/src/ui/cursor.ts
+--- a/app/src/ui/cursor.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/src/ui/cursor.ts	2026-11-07 08:14:22.946994936 +0900
+@@ -1,6 +1,8 @@
+ // The cursor the guest chose (SetCursor / WM_SETCURSOR result, read through fle_av_poll: lift/runtime/fle_appview.h) as a CSS cursor value.
+ // Windows names (Learn "About Cursors", numbers as in lift/runtime/fle_cursor.h) -> MDN CSS `cursor` keywords. A handle of 0 is "no cursor" (Learn SetCursor: NULL removes the cursor from the screen) -> `none`.
+-// A cursor the guest loaded from one of its own modules (fle_cursor_is_shared_handle) has no standard identifier: it is shown as `default` until a picture of it is supplied (S-module-cursor-default).
++// A cursor the guest loaded from one of its own modules (fle_cursor_is_shared_handle) or made itself (CreateIconIndirect) has no standard identifier: since decision 0325 (O18) the engine gives its picture and hot spot
++// (lift/runtime/fle_appview.h fle_av_cursor_image), the page makes a CSS `cursor: url(...) x y` of it, once per (handle, serial). Until the picture has arrived, or when the engine has none, the arrow is shown
++// (S-module-cursor-default / S-created-cursor-default of decisions 0141 and 0322).
+ import type { AppView } from '../engine/appview.ts';
+ 
+ export const IDC_CSS: Readonly<Record<number, string>> = {
+@@ -22,13 +24,66 @@
+ 
+ export interface CursorChoice { css: string; why: string }
+ 
+-export function cursorCss(v: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared'> | null): CursorChoice {
++/** the pictures of the cursors the page has received, by (handle, serial) */
++export interface CursorPictures { css(handle: number, serial: number): string | null }
++
++export const cursorKey = (handle: number, serial: number): string => `${handle}:${serial}`;
++
++/** nearest-neighbour 2x: the picture for a screen with a device pixel ratio above 1 (a browser would blur the 1x picture when it scales it) */
++export function scale2x(rgba: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
++  const out = new Uint8ClampedArray(w * 2 * h * 2 * 4);
++  for (let y = 0; y < h * 2; y++) {
++    for (let x = 0; x < w * 2; x++) {
++      const s = ((y >> 1) * w + (x >> 1)) * 4, d = (y * w * 2 + x) * 4;
++      out[d] = rgba[s] as number; out[d + 1] = rgba[s + 1] as number; out[d + 2] = rgba[s + 2] as number; out[d + 3] = rgba[s + 3] as number;
++    }
++  }
++  return out;
++}
++
++export interface CursorPictureHost {
++  /** a PNG data URL of straight-alpha RGBA pixels (the page: a canvas; a test: a made-up string) */
++  encode(rgba: Uint8ClampedArray, width: number, height: number): string;
++  /** whether `cursor: image-set(url(...) 1x, url(...) 2x) x y, default` is a valid value in this browser (an invalid value would leave the previous cursor in place) */
++  imageSet(): boolean;
++}
++export const MAX_CURSOR_SIDE = 128;
++
++/** The pictures received from the Worker (message `cursor-image`) as CSS cursor values. */
++export class CursorPictureStore implements CursorPictures {
++  private readonly byKey = new Map<string, string>();
++  private readonly host: CursorPictureHost;
++  constructor(host: CursorPictureHost) { this.host = host; }
++  get size(): number { return this.byKey.size; }
++
++  add(m: { handle: number; serial: number; width: number; height: number; hotX: number; hotY: number; rgba: ArrayBuffer | Uint8ClampedArray }): string | null {
++    if (m.width < 1 || m.height < 1 || m.width > MAX_CURSOR_SIDE || m.height > MAX_CURSOR_SIDE) return null;
++    const px = m.rgba instanceof Uint8ClampedArray ? m.rgba : new Uint8ClampedArray(m.rgba);
++    if (px.length !== m.width * m.height * 4) return null;
++    const hot = `${Math.min(m.hotX, m.width - 1)} ${Math.min(m.hotY, m.height - 1)}`;
++    const one = this.host.encode(px, m.width, m.height);
++    let css = `url("${one}") ${hot}, default`;
++    if (m.width * 2 <= MAX_CURSOR_SIDE && m.height * 2 <= MAX_CURSOR_SIDE && this.host.imageSet()) {
++      const two = this.host.encode(scale2x(px, m.width, m.height), m.width * 2, m.height * 2);
++      css = `image-set(url("${one}") 1x, url("${two}") 2x) ${hot}, default`;
++    }
++    if (this.byKey.size >= 4096) this.byKey.clear();
++    this.byKey.set(cursorKey(m.handle, m.serial), css);
++    return css;
++  }
++
++  css(handle: number, serial: number): string | null { return this.byKey.get(cursorKey(handle, serial)) ?? null; }
++}
++
++export function cursorCss(v: (Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared'> & { cursorSerial?: number }) | null, pictures?: CursorPictures): CursorChoice {
+   if (!v) return { css: 'default', why: 'the engine reports no cursor' };
+   if (v.cursor === 0) return { css: 'none', why: 'SetCursor(NULL): the guest removed the cursor' };
+   if (v.cursorIdc !== 0) {
+     const css = IDC_CSS[v.cursorIdc];
+     return css ? { css, why: `standard cursor IDC ${v.cursorIdc}` } : { css: 'default', why: `standard cursor IDC ${v.cursorIdc} has no CSS equivalent` };
+   }
+-  if (v.cursorShared) return { css: 'default', why: `a cursor from a module of the guest (handle 0x${v.cursor.toString(16)}): shown as the arrow` };
+-  return { css: 'default', why: `a cursor the guest made itself (handle 0x${v.cursor.toString(16)}): shown as the arrow` };
++  const pic = pictures?.css(v.cursor, v.cursorSerial ?? 0) ?? null;
++  if (pic) return { css: pic, why: `${v.cursorShared ? 'a cursor from a module of the guest' : 'a cursor the guest made itself'} (handle 0x${v.cursor.toString(16)}): its own picture` };
++  if (v.cursorShared) return { css: 'default', why: `a cursor from a module of the guest (handle 0x${v.cursor.toString(16)}): its picture has not arrived or the engine has none: shown as the arrow` };
++  return { css: 'default', why: `a cursor the guest made itself (handle 0x${v.cursor.toString(16)}): its picture has not arrived or the engine has none: shown as the arrow` };
+ }
+diff -ruN a/app/test/unit/appview.test.ts b/app/test/unit/appview.test.ts
+--- a/app/test/unit/appview.test.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/test/unit/appview.test.ts	2026-11-07 08:15:20.179940401 +0900
+@@ -27,7 +27,7 @@
+     const win = /typedef struct \{([^}]*)\} fle_av_window;/.exec(h)?.[1] ?? '';
+     expect(win.replace(/\s+/g, ' ')).toContain('uint32_t lid, hwnd, flags, owner_lid; int32_t x, y, width, height; uint32_t style, exstyle, thread, reserved; char cls[FLE_AV_CLASS_BYTES]; char title[FLE_AV_TITLE_BYTES];');
+     const st = /typedef struct \{([^}]*)\} fle_av_state;/.exec(h)?.[1] ?? '';
+-    expect(st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ')).toContain('uint32_t magic, version, entry_size, max_windows; uint32_t seq; uint32_t cursor; uint32_t cursor_idc; uint32_t cursor_shared; int32_t pointer_x, pointer_y; uint32_t pending_events; uint32_t n_windows; uint32_t screen_w, screen_h; uint32_t reserved[3]; fle_av_window windows[FLE_AV_MAX_WINDOWS];');
++    expect(st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ')).toContain('uint32_t magic, version, entry_size, max_windows; uint32_t seq; uint32_t cursor; uint32_t cursor_idc; uint32_t cursor_shared; int32_t pointer_x, pointer_y; uint32_t pending_events; uint32_t n_windows; uint32_t screen_w, screen_h; uint32_t cursor_serial; uint32_t reserved[2]; fle_av_window windows[FLE_AV_MAX_WINDOWS];');
+   });
+ });
+ 
+diff -ruN a/app/test/unit/cursor-picture.test.ts b/app/test/unit/cursor-picture.test.ts
+--- a/app/test/unit/cursor-picture.test.ts	1970-01-01 09:00:00.000000000 +0900
++++ b/app/test/unit/cursor-picture.test.ts	2026-11-07 08:15:56.953136709 +0900
+@@ -0,0 +1,136 @@
++// Decision 0325 (O18): the picture of the guest's own cursors reaches the browser. The layout is the one of lift/runtime/fle_appview.h (read from the file), the store makes the CSS value, the cursor of the page uses it.
++import fs from 'node:fs';
++import path from 'node:path';
++import { describe, expect, it } from 'vitest';
++import { CURSOR_IMG_BYTES, CURSOR_MAGIC, readAppView, readCursorImage } from '../../src/engine/appview.ts';
++import { osStateKey, osStateOf } from '../../src/engine/os-state.ts';
++import { cursorCss, CursorPictureStore, scale2x, type CursorPictureHost } from '../../src/ui/cursor.ts';
++
++const REPO = process.env.APP_REPO_ROOT || path.resolve(__dirname, '../../..');
++const rt = (f: string): string => fs.readFileSync(path.join(REPO, 'lift/runtime', f), 'utf8');
++
++describe('the picture structure is the one of lift/runtime/fle_appview.h', () => {
++  const h = rt('fle_appview.h'), c = rt('fle_appview.c');
++  it('magic, size and the fields in the order the reader assumes', () => {
++    expect(Number(/#define FLE_AV_CURSOR_MAGIC (0x[0-9a-fA-F]+)u/.exec(h)?.[1])).toBe(CURSOR_MAGIC);
++    const st = /typedef struct \{([^}]*)\} fle_av_cursor_img;/.exec(h)?.[1] ?? '';
++    expect(st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ')).toContain('uint32_t magic, serial, width, height, hot_x, hot_y; uint64_t rgba;');
++    expect(c).toContain(`sizeof(fle_av_cursor_img) == ${CURSOR_IMG_BYTES} && offsetof(fle_av_cursor_img, rgba) == 24`);
++    expect(c).toContain('offsetof(fle_av_state, cursor_serial) == 56');
++  });
++});
++
++function picture(opts: { w: number; h: number; hx: number; hy: number; serial?: number; px?: (x: number, y: number) => [number, number, number, number]; at?: number; magic?: number }): { buf: ArrayBuffer; ptr: number } {
++  const at = opts.at ?? 256, ptr = 64;
++  const buf = new ArrayBuffer(at + opts.w * opts.h * 4 + 16);
++  const dv = new DataView(buf), u8 = new Uint8Array(buf);
++  dv.setUint32(ptr, opts.magic ?? CURSOR_MAGIC, true); dv.setUint32(ptr + 4, opts.serial ?? 7, true);
++  dv.setUint32(ptr + 8, opts.w, true); dv.setUint32(ptr + 12, opts.h, true); dv.setUint32(ptr + 16, opts.hx, true); dv.setUint32(ptr + 20, opts.hy, true); dv.setUint32(ptr + 24, at, true);
++  for (let y = 0; y < opts.h; y++) for (let x = 0; x < opts.w; x++) u8.set(opts.px ? opts.px(x, y) : [x, y, 3, 255], at + (y * opts.w + x) * 4);
++  return { buf, ptr };
++}
++
++describe('readCursorImage', () => {
++  it('reads the size, the hot spot, the serial and COPIES the pixels', () => {
++    const { buf, ptr } = picture({ w: 4, h: 3, hx: 1, hy: 2 });
++    const im = readCursorImage(buf, ptr);
++    expect(im).toMatchObject({ serial: 7, width: 4, height: 3, hotX: 1, hotY: 2 });
++    expect(Array.from((im?.rgba ?? new Uint8ClampedArray()).subarray(0, 8))).toEqual([0, 0, 3, 255, 1, 0, 3, 255]);
++    new Uint8Array(buf)[256] = 99;      // the engine reuses its buffer: the copy keeps what it was
++    expect(im?.rgba[0]).toBe(0);
++  });
++  it('the hot spot is pulled inside the picture', () => {
++    expect(readCursorImage(...Object.values(picture({ w: 2, h: 2, hx: 9, hy: 9 })) as [ArrayBuffer, number])).toMatchObject({ hotX: 1, hotY: 1 });
++  });
++  it('null for no picture (pointer 0), a wrong magic, a size outside 1..128, a pixel address outside the memory', () => {
++    expect(readCursorImage(new ArrayBuffer(1024), 0)).toBeNull();
++    const bad = picture({ w: 2, h: 2, hx: 0, hy: 0, magic: 5 });
++    expect(readCursorImage(bad.buf, bad.ptr)).toBeNull();
++    const big = picture({ w: 129, h: 1, hx: 0, hy: 0 });
++    expect(readCursorImage(big.buf, big.ptr)).toBeNull();
++    const ok = picture({ w: 128, h: 128, hx: 0, hy: 0 });
++    expect(readCursorImage(ok.buf, ok.ptr)).toMatchObject({ width: 128, height: 128 });
++    const away = picture({ w: 2, h: 2, hx: 0, hy: 0 });
++    new DataView(away.buf).setUint32(away.ptr + 24, away.buf.byteLength - 8, true);      // the 16 pixel bytes would run past the end of the memory
++    expect(readCursorImage(away.buf, away.ptr)).toBeNull();
++  });
++});
++
++describe('scale2x', () => {
++  it('repeats every pixel into a 2 x 2 block', () => {
++    const src = new Uint8ClampedArray([1, 2, 3, 4, 5, 6, 7, 8]);      // two pixels, 2 x 1
++    const out = scale2x(src, 2, 1);
++    expect(out.length).toBe(4 * 2 * 4);
++    expect(Array.from(out.subarray(0, 16))).toEqual([1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 5, 6, 7, 8]);
++    expect(Array.from(out.subarray(16, 32))).toEqual(Array.from(out.subarray(0, 16)));
++  });
++});
++
++const host = (imageSet: boolean): CursorPictureHost & { calls: [number, number][] } => {
++  const calls: [number, number][] = [];
++  return { calls, encode: (_rgba, w, h) => { calls.push([w, h]); return `data:${w}x${h}`; }, imageSet: () => imageSet };
++};
++type Msg = { handle: number; serial: number; width: number; height: number; hotX: number; hotY: number; rgba: ArrayBuffer };
++const msg = (o: Partial<Msg> = {}): Msg => ({ handle: 0x7fda0004, serial: 1, width: 32, height: 32, hotX: 4, hotY: 5, rgba: new ArrayBuffer(32 * 32 * 4), ...o });
++
++describe('CursorPictureStore', () => {
++  it('a picture becomes a url() cursor with its hot spot and the arrow as fallback; without image-set it is the 1x picture only', () => {
++    const h = host(false), s = new CursorPictureStore(h);
++    expect(s.add(msg())).toBe('url("data:32x32") 4 5, default');
++    expect(h.calls).toEqual([[32, 32]]);
++    expect(s.css(0x7fda0004, 1)).toBe('url("data:32x32") 4 5, default');
++  });
++  it('with image-set the 2x picture is made too (when it fits 128 x 128), and a larger picture stays 1x', () => {
++    const s = new CursorPictureStore(host(true));
++    expect(s.add(msg())).toBe('image-set(url("data:32x32") 1x, url("data:64x64") 2x) 4 5, default');
++    expect(s.add(msg({ handle: 9, width: 100, height: 100, rgba: new ArrayBuffer(100 * 100 * 4) }))).toBe('url("data:100x100") 4 5, default');
++  });
++  it('the hot spot is pulled inside; a size outside 1..128 or a pixel array of the wrong length is refused', () => {
++    const s = new CursorPictureStore(host(false));
++    expect(s.add(msg({ hotX: 99, hotY: 99 }))).toBe('url("data:32x32") 31 31, default');
++    expect(s.add(msg({ width: 129 }))).toBeNull();
++    expect(s.add(msg({ width: 0 }))).toBeNull();
++    expect(s.add({ ...msg(), rgba: new ArrayBuffer(10) })).toBeNull();
++  });
++  it('a handle with another serial is another cursor (the engine reuses handles)', () => {
++    const s = new CursorPictureStore(host(false));
++    s.add(msg({ serial: 1 }));
++    expect(s.css(0x7fda0004, 2)).toBeNull();
++    s.add(msg({ serial: 2, width: 16, height: 16, rgba: new ArrayBuffer(16 * 16 * 4) }));
++    expect(s.css(0x7fda0004, 2)).toBe('url("data:16x16") 4 5, default');
++    expect(s.css(0x7fda0004, 1)).toBe('url("data:32x32") 4 5, default');
++  });
++});
++
++describe('the cursor of the page', () => {
++  const store = new CursorPictureStore(host(false));
++  store.add(msg({ handle: 0x7fba0100, serial: 3, width: 16, height: 16, hotX: 0, hotY: 0, rgba: new ArrayBuffer(16 * 16 * 4) }));
++  store.add(msg());
++  it('a module cursor and a cursor the guest made use their picture', () => {
++    expect(cursorCss({ cursor: 0x7fda0004, cursorIdc: 0, cursorShared: true, cursorSerial: 1 }, store)).toMatchObject({ css: 'url("data:32x32") 4 5, default' });
++    expect(cursorCss({ cursor: 0x7fba0100, cursorIdc: 0, cursorShared: false, cursorSerial: 3 }, store).css).toBe('url("data:16x16") 0 0, default');
++  });
++  it('without the picture (not arrived, or the engine has none) the arrow, and the reason says so', () => {
++    const c = cursorCss({ cursor: 0x7fba0100, cursorIdc: 0, cursorShared: false, cursorSerial: 99 }, store);
++    expect(c.css).toBe('default');
++    expect(c.why).toContain('picture');
++    expect(cursorCss({ cursor: 0x7fda0004, cursorIdc: 0, cursorShared: true }, store).css).toBe('default');
++  });
++  it('a standard cursor keeps its CSS cursor; NULL keeps none: no picture is looked up', () => {
++    expect(cursorCss({ cursor: 0x7fca0004, cursorIdc: 32644, cursorShared: false, cursorSerial: 0 }, store).css).toBe('ew-resize');
++    expect(cursorCss({ cursor: 0, cursorIdc: 0, cursorShared: false, cursorSerial: 0 }, store).css).toBe('none');
++  });
++});
++
++describe('the serial is part of the state the Worker reports', () => {
++  it('another serial for the same handle changes the key, so the page hears of the new picture', () => {
++    const v = (serial: number) => osStateOf({ seq: 1, cursor: 0x7fba0100, cursorIdc: 0, cursorShared: false, cursorSerial: serial, pointerX: 0, pointerY: 0, pendingEvents: 0, windows: [] }, '');
++    expect(osStateKey(v(1))).not.toBe(osStateKey(v(2)));
++    expect(osStateKey(v(1))).toBe(osStateKey(v(1)));
++  });
++  it('readAppView returns cursorSerial from offset 56', () => {
++    const dv = new DataView(new ArrayBuffer(68 + 144 * 32));
++    dv.setUint32(0, 0x50414c46, true); dv.setUint32(4, 1, true); dv.setUint32(8, 144, true); dv.setUint32(12, 32, true); dv.setUint32(56, 42, true);
++    expect(readAppView(dv.buffer, 0)?.cursorSerial).toBe(42);
++  });
++});
+diff -ruN a/app/test/unit/os-state.test.ts b/app/test/unit/os-state.test.ts
+--- a/app/test/unit/os-state.test.ts	2026-11-07 08:02:49.000000000 +0900
++++ b/app/test/unit/os-state.test.ts	2026-11-07 08:15:27.964653636 +0900
+@@ -3,7 +3,7 @@
+ import { osStateKey, osStateOf } from '../../src/engine/os-state.ts';
+ 
+ const win = (o: Partial<AvWindow>): AvWindow => ({ lid: 1, hwnd: 1, flags: 0, ownerLid: 0, x: 0, y: 0, width: 10, height: 10, style: 0, exstyle: 0, thread: 0, className: 'AnyClass', title: '', visible: true, enabled: true, topmost: false, active: false, focus: false, capture: false, ...o });
+-const view = (windows: AvWindow[], o: Partial<AppView> = {}): AppView => ({ seq: 2, cursor: 0, cursorIdc: 0, cursorShared: false, pointerX: 0, pointerY: 0, pendingEvents: 0, windows, ...o });
++const view = (windows: AvWindow[], o: Partial<AppView> = {}): AppView => ({ seq: 2, cursor: 0, cursorIdc: 0, cursorShared: false, cursorSerial: 0, pointerX: 0, pointerY: 0, pendingEvents: 0, windows, ...o });
+ 
+ describe('the operating-system state the Worker reports (decision 0223)', () => {
+   it('the title is the title of the active, visible window; the class of the window plays no part', () => {
+@@ -30,7 +30,7 @@
+ 
+   it('the cursor and the screen size are passed through; a build that does not report the screen size gives 0', () => {
+     const s = osStateOf(view([], { cursor: 0x10003, cursorIdc: 32649, cursorShared: true, screenW: 2060, screenH: 1264 }), '');
+-    expect(s).toEqual({ cursor: 0x10003, cursorIdc: 32649, cursorShared: true, title: '', screenW: 2060, screenH: 1264 });
++    expect(s).toEqual({ cursor: 0x10003, cursorIdc: 32649, cursorShared: true, cursorSerial: 0, title: '', screenW: 2060, screenH: 1264 });
+     expect(osStateOf(view([]), '')).toMatchObject({ screenW: 0, screenH: 0 });
+   });
+ 

@@ -1,0 +1,145 @@
+--- a/lift/runtime/fle_gdi.c
++++ b/lift/runtime/fle_gdi.c
+@@ -2228,6 +2228,124 @@
+     target_wrote(api, &t, r, n);
+ }
+ 
++/* user32!ScrollDC: BOOL f(HDC hDC rcx, int dx edx, int dy r8d, const RECT *lprcScroll r9, const RECT *lprcClip [5], HRGN hrgnUpdate [6], LPRECT lprcUpdate [7]). Decision 0319 (alpha1, PROVISIONAL; PM 07:5x, O9).
++ * Learn (ScrollDC): "scrolls a rectangle of bits horizontally and vertically"; dx, dy "in device units" (negative: left, up); lprcScroll "the bits to be scrolled. The only bits affected by the scroll operation are bits in the
++ * intersection of this rectangle and the rectangle specified by lprcClip. If lprcScroll is NULL, the entire client area is used"; lprcClip "the only bits that will be painted are the bits that remain inside this rectangle after the
++ * scroll operation has been completed. If lprcClip is NULL, the entire client area is used"; hrgnUpdate "the region uncovered by the scrolling process. ScrollDC defines this region; it is not necessarily a rectangle";
++ * lprcUpdate "the rectangle bounding the scrolling update region ... in client coordinates, regardless of the mapping mode"; "If lprcUpdate is NULL, the system does not compute the update rectangle. If both hrgnUpdate and
++ * lprcUpdate are NULL, the system does not compute the update region"; the return value is nonzero on success. ScrollDC does not invalidate anything (the page: the uncovered region is for the caller to use, e.g. with InvalidateRgn).
++ * Model (the same as ScrollWindowEx's fle_win_scroll in fle_win.c, which the Wine 10 probes of docs/0319 section 1.5 fix; for ScrollDC the probes are in section 6.6): the bits that exist are the DC's own clip (the visible region of a window
++ * DC with its clip style, and the clipping region of SelectClipRgn: what drawing through this DC reaches); the bits of (scroll rectangle inside them) move by (dx, dy) into (clip rectangle inside them); what the scroll rectangle held
++ * there and the move did not cover is the uncovered area. The rectangles are device units of the DC (client coordinates of a client DC); a memory DC's "client area" is its bitmap. A window that is not visible has no bits
++ * that exist: nothing moves and the uncovered area is empty. A format that is not a whole number of bytes per pixel (a monochrome bitmap) stops by name. */
++void fle_imp_ScrollDC(void)
++{
++    static const char api[] = "ScrollDC";
++    uint64_t hdc = R[1], prc_scroll = R[9], prc_clip = fle_arg(5), hrgn = fle_arg(6), prc_update = fle_arg(7);
++    int32_t dx = (int32_t)(uint32_t)R[2], dy = (int32_t)(uint32_t)R[8], ox = 0, oy = 0;
++    target t;
++    fle_rrect kext, sr, cr, bnd;
++    fle_visrgn vis, src, dgeo, unc, tmp;
++    const fle_rrect *cl;
++    uint32_t nc, k, bpp;
++    uint64_t npx = 0;
++    char pre[160];
++    int chk;
++
++    fle_gdi_check_thread(api);
++    snprintf(pre, sizeof pre, "scrolling the bits of a DC (dx %d, dy %d)", (int)dx, (int)dy);
++    get_target(api, pre, hdc, "hDC", &t);
++    if (t.is_window) {
++        fle_gdc_info gi;
++
++        ox = t.org[0]; oy = t.org[1];
++        if (!fle_gdc_dc_info(hdc, &gi)) pixel_stop(api, pre, "the DC is not live");
++        if (gi.kind == FLE_GDC_K_SCREEN) kext = t.clip;
++        else { kext.x0 = ox; kext.y0 = oy; kext.x1 = (int64_t)ox + gi.cx; kext.y1 = (int64_t)oy + gi.cy; }
++    } else {
++        kext = fle_r_bounds(&t.s);
++    }
++    if (prc_scroll != 0) {
++        sr.x0 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_scroll, 4) + ox; sr.y0 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_scroll + 4u, 4) + oy;
++        sr.x1 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_scroll + 8u, 4) + ox; sr.y1 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_scroll + 12u, 4) + oy;
++    } else sr = kext;
++    if (prc_clip != 0) {
++        cr.x0 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_clip, 4) + ox; cr.y0 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_clip + 4u, 4) + oy;
++        cr.x1 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_clip + 8u, 4) + ox; cr.y1 = (int64_t)(int32_t)(uint32_t)fle_ld(prc_clip + 12u, 4) + oy;
++    } else cr = kext;
++    if (!fle_r_direct(&t.s) || (t.s.bpp & 7u) != 0) pixel_stop(api, pre, "the pixels of this surface (a monochrome or palette format) cannot be moved byte-wise: not modelled");
++    bpp = t.s.bpp / 8u;
++    memset(&vis, 0, sizeof vis);
++    if (!(t.is_window && t.hidden)) {
++        nc = clip_pieces(&t, &cl);
++        if (nc > FLE_VISRGN_MAX) pixel_stop(api, pre, "the clip of the DC has more rectangles than the region model holds");
++        for (k = 0; k < nc; k++) if (cl[k].x1 > cl[k].x0 && cl[k].y1 > cl[k].y0) vis.r[vis.n++] = cl[k];
++    }
++    src = vis;
++    fle_visrgn_intersect_rect(&src, sr);
++    dgeo = src;
++    for (k = 0; k < dgeo.n; k++) { dgeo.r[k].x0 += dx; dgeo.r[k].x1 += dx; dgeo.r[k].y0 += dy; dgeo.r[k].y1 += dy; }
++    fle_visrgn_intersect_rect(&dgeo, cr);
++    fle_visrgn_intersect(&dgeo, &vis);
++    unc = src;
++    fle_visrgn_intersect_rect(&unc, cr);
++    for (k = 0; k < dgeo.n; k++) if (!fle_visrgn_subtract(&unc, dgeo.r[k])) pixel_stop(api, pre, "the uncovered area has more rectangles than the region model holds");
++    if (dgeo.n && (dx != 0 || dy != 0)) {
++        uint8_t *buf, *p;
++        size_t total = 0;
++
++        for (k = 0; k < dgeo.n; k++) total += (size_t)(dgeo.r[k].x1 - dgeo.r[k].x0) * (size_t)(dgeo.r[k].y1 - dgeo.r[k].y0) * bpp;
++        buf = (uint8_t *)malloc(total);
++        if (!buf) fle_stop(api, "out of memory");
++        bnd = dgeo.r[0];
++        p = buf;
++        for (k = 0; k < dgeo.n; k++) {          /* gather first, then write: the source and the destination may overlap */
++            int64_t y, w = dgeo.r[k].x1 - dgeo.r[k].x0;
++
++            for (y = dgeo.r[k].y0; y < dgeo.r[k].y1; y++) {
++                memcpy(p, fle_r_row(&t.s, (uint32_t)(y - dy)) + (size_t)(dgeo.r[k].x0 - dx) * bpp, (size_t)w * bpp);
++                p += (size_t)w * bpp;
++            }
++            if (dgeo.r[k].x0 < bnd.x0) bnd.x0 = dgeo.r[k].x0;
++            if (dgeo.r[k].y0 < bnd.y0) bnd.y0 = dgeo.r[k].y0;
++            if (dgeo.r[k].x1 > bnd.x1) bnd.x1 = dgeo.r[k].x1;
++            if (dgeo.r[k].y1 > bnd.y1) bnd.y1 = dgeo.r[k].y1;
++        }
++        chk = target_live(api, &t) ? blit_begin(&t) : 0;
++        p = buf;
++        for (k = 0; k < dgeo.n; k++) {
++            int64_t y, w = dgeo.r[k].x1 - dgeo.r[k].x0;
++
++            for (y = dgeo.r[k].y0; y < dgeo.r[k].y1; y++) {
++                memcpy(fle_r_row(&t.s, (uint32_t)y) + (size_t)dgeo.r[k].x0 * bpp, p, (size_t)w * bpp);
++                p += (size_t)w * bpp;
++            }
++            npx += (uint64_t)w * (uint64_t)(dgeo.r[k].y1 - dgeo.r[k].y0);
++        }
++        free(buf);
++        blit_end(chk, &bnd, &npx);
++        target_wrote(api, &t, bnd, npx);
++    }
++    if (hrgn != 0) {
++        int32_t pc[64][4];
++
++        if (unc.n > 64u) pixel_stop(api, pre, "the uncovered area has more than 64 rectangles: the region of hrgnUpdate holds at most 64 in this model");
++        for (k = 0; k < unc.n; k++) { pc[k][0] = (int32_t)(unc.r[k].x0 - ox); pc[k][1] = (int32_t)(unc.r[k].y0 - oy); pc[k][2] = (int32_t)(unc.r[k].x1 - ox); pc[k][3] = (int32_t)(unc.r[k].y1 - oy); }
++        if (!fle_gdi_region_set_pieces(hrgn, (const int32_t (*)[4])pc, unc.n)) pixel_stop(api, pre, "hrgnUpdate is not a live region handle (the page gives no rule for another value)");
++    }
++    if (prc_update != 0) {
++        int32_t z[4] = { 0, 0, 0, 0 };
++
++        if (unc.n) {
++            tmp = unc;
++            bnd = fle_visrgn_bounds(&tmp);
++            z[0] = (int32_t)(bnd.x0 - ox); z[1] = (int32_t)(bnd.y0 - oy); z[2] = (int32_t)(bnd.x1 - ox); z[3] = (int32_t)(bnd.y1 - oy);
++        }
++        fle_st(prc_update, 4, (uint32_t)z[0]); fle_st(prc_update + 4u, 4, (uint32_t)z[1]); fle_st(prc_update + 8u, 4, (uint32_t)z[2]); fle_st(prc_update + 12u, 4, (uint32_t)z[3]);
++    }
++    R[0] = 1;
++}
++
+ /* user32!InvertRect: BOOL f(HDC hDC rcx, const RECT *lprc rdx). Learn (InvertRect): "inverts a rectangle in a window by performing a logical NOT operation on the color values for each pixel in the rectangle's
+  * interior"; "Calling InvertRect twice for the same rectangle restores the display to its previous colors"; the rectangle is in logical coordinates; nonzero on success. Answered: DSTINVERT of the rectangle [left, right) x
+  * [top, bottom) (the half-open rule of the other rectangle calls is a READING: the page does not say which edges "the interior" includes: S-invertrect-edges). */
+--- a/lift/runtime/fle_gdi.h
++++ b/lift/runtime/fle_gdi.h
+@@ -213,6 +213,7 @@
+ void fle_imp_BitBlt(void);
+ void fle_imp_PatBlt(void);
+ void fle_imp_FillRect(void);
++void fle_imp_ScrollDC(void);   /* decision 0319 */
+ void fle_imp_GetDIBits(void);
+ void fle_imp_RealizePalette(void);
+ 
+--- a/lift/harness/seeds/ship6-imports.txt
++++ b/lift/harness/seeds/ship6-imports.txt
+@@ -304,3 +304,5 @@
+ dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo
+ # Decision 0319 (alpha1, PROVISIONAL): user32!ScrollWindow (runtime/fle_wall_ia2w.c: ScrollWindowEx's older form, on the window model of fle_win_scroll). The engine imports it (like ScrollDC, which is not here). Appended LAST (decision 0015: append only).
+ user32.dll ScrollWindow fle_imp_ScrollWindow
++# Decision 0319 (alpha1, PROVISIONAL): user32!ScrollDC (runtime/fle_gdi.c: the bits of a DC move inside its clip, the uncovered area is returned, nothing is invalidated). The engine imports it. Appended LAST (decision 0015: append only).
++user32.dll ScrollDC fle_imp_ScrollDC

@@ -1,0 +1,17 @@
+{
+ "file": "dist/flengine6.wasm",
+ "size": 389439333,
+ "results": [
+  {
+   "label": "gzip -9",
+   "seconds": 36.1,
+   "status": 0,
+   "bytes": 112199383
+  },
+  {
+   "label": "brotli q11 lgwin24",
+   "seconds": 583,
+   "bytes": 44269611
+  }
+ ]
+}

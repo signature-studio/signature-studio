@@ -1,0 +1,22 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Cache Storage put() of large responses</title>
+<script>
+'use strict';
+window.__done = false;
+(async () => {
+  const out = [];
+  const cache = await caches.open('t');
+  for (const [name, url] of [['font 8 KB', 'dist/data/seed/lift/out-inventory/extracted/fonts/ILCursors.ilfont'], ['font 103 KB', 'dist/data/seed/lift/out-inventory/extracted/fonts/ILGlyphsEx.ilfont'], ['freetype 607 KB', 'dist/data/freetype_x64.4b00000.dll'], ['Blend2D 2 MB', 'dist/data/Blend2D.4700000.dll'], ['ILTools 3.6 MB', 'dist/data/ILTools_x64.6000000.dll'], ['FLEngine dll 22 MB', 'dist/data/FLEngine_x64.dll'], ['dsp dll 40 MB', 'dist/data/dsp_ippv2_x64.2000000.dll'], ...(location.search.includes('big') ? [['wasm br (decoded 389 MB)', 'dist/flengine6.wasm?enc=br']] : [])]) {
+    const t0 = performance.now();
+    try {
+      const r = await fetch(url);
+      await cache.put(url, r);
+      const m = await cache.match(url);
+      out.push({ name, ok: true, ms: Math.round(performance.now() - t0), contentLength: m.headers.get('content-length'), contentEncoding: m.headers.get('content-encoding') });
+    } catch (e) { out.push({ name, ok: false, ms: Math.round(performance.now() - t0), error: String(e) }); }
+  }
+  window.__result = { out, estimate: await navigator.storage.estimate() };
+  window.__done = true;
+})();
+</script>

@@ -1,0 +1,131 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -30,6 +30,7 @@
+ #include "fle_thread.h"
+ #include "fle_win.h"
+ #include "fle_visrgn.h"
++#include "fle_test_env.h"
+ #include "fle_input.h"
+ #include "fle_defproc_zero.h"
+ 
+@@ -4048,8 +4049,18 @@
+  * receives the focus." (the activation: of the top-level window that contains it, unless it is already active). hWnd NULL: "keystrokes are ignored": the focus becomes NULL (a window that loses it gets WM_KILLFOCUS with
+  * wParam 0). A window that the calling thread does not own: NULL and ERROR_INVALID_PARAMETER... the page says "not attached to the calling thread's message queue": the last error then is a choice: 1400 for an invalid handle,
+  * 87 for a disabled window (the page names 87 for it), 5 for a window of another thread (a choice without a source). */
++void fle_win_diag_focus(const char *api, uint64_t arg, uint64_t answer, uint64_t caller);
++
++static void setfocus_impl(void);
+ void fle_imp_SetFocus(void)
+ {
++    uint64_t h = R[1], ra = fle_ld(R[4], 8);
++    setfocus_impl();
++    fle_win_diag_focus("SetFocus", h, R[0], ra);   /* gpu8 0335: observation only (after the call; ra = the guest return address at entry) */
++}
++
++static void setfocus_impl(void)
++{
+     static const char api[] = "SetFocus";
+     uint64_t h = R[1];
+     unsigned t = cur_thread();
+@@ -4102,8 +4113,16 @@
+ /* user32!SetActiveWindow: HWND f(HWND rcx). Learn: "The SetActiveWindow function activates a window, but not if the application is in the background. ... If the window identified by the hWnd parameter was created by the
+  * calling thread, the active window status of the calling thread is set to hWnd. Otherwise, the active window status of the calling thread is set to NULL." The return value is the handle of the window that was previously
+  * active; NULL on failure. The application is in the foreground in this model (there is one application) unless the foreground window is another thread's... the foreground window is set to the activated window when none is set. */
++static void setactivewindow_impl(void);
+ void fle_imp_SetActiveWindow(void)
+ {
++    uint64_t h = R[1], ra = fle_ld(R[4], 8);
++    setactivewindow_impl();
++    fle_win_diag_focus("SetActiveWindow", h, R[0], ra);   /* gpu8 0335: observation only (after the call) */
++}
++
++static void setactivewindow_impl(void)
++{
+     static const char api[] = "SetActiveWindow";
+     unsigned t = cur_thread();
+     int64_t i, prev;
+@@ -4224,8 +4243,16 @@
+ /* user32!SetForegroundWindow: BOOL f(HWND rcx). Learn: nonzero if the window was brought to the foreground, zero if not; the process may set the foreground window only under the listed conditions, among them "The calling
+  * process is the foreground process" and "There is currently no foreground window, and thus no foreground process": both hold in this model (one process: the model gives the right to its own windows). The window becomes
+  * the foreground window and the active window of its thread (the window must be a visible top-level window of an enabled state: a child is not brought: the top-level window containing it is, a choice). */
++static void setforegroundwindow_impl(void);
+ void fle_imp_SetForegroundWindow(void)
+ {
++    uint64_t h = R[1], ra = fle_ld(R[4], 8);
++    setforegroundwindow_impl();
++    fle_win_diag_focus("SetForegroundWindow", h, R[0], ra);   /* gpu8 0335: observation only (after the call) */
++}
++
++static void setforegroundwindow_impl(void)
++{
+     static const char api[] = "SetForegroundWindow";
+     int64_t i = win_arg(R[1]), r;
+     unsigned saved;
+@@ -6731,6 +6758,48 @@
+     return 0;
+ }
+ 
++/* gpu8 0335 TEST-ONLY diagnostic (FLE_DIAG_WIN=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there): one line per key message that is sent to a window (its lid and class), the message and the
++ * focus / active / foreground windows of its thread at that time, and one line per SetFocus / SetActiveWindow / SetForegroundWindow / GetFocus / GetActiveWindow call (the window argument and the answer). Observation only. */
++void fle_win_diag_key(const char *what, uint64_t w, uint32_t msg, uint32_t vk, unsigned thread)
++{
++    static int on = -1;
++    static unsigned n;
++    int64_t i = live_index(w);
++    uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
++    char cls[80];
++    int64_t f, a;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++    if (!on || n >= 3000u) return;
++    n++;
++    inp_ensure();
++    cls[0] = 0;
++    if (i >= 0 && fle_class_name_of(tab[i].atom, nm, &nl)) u16_ascii(cls, sizeof cls, nm, nl < 79 ? nl : 79);
++    f = thread < MAXT ? inp[thread].focus : -1;
++    a = thread < MAXT ? inp[thread].active : -1;
++    fprintf(stderr, "fl-diag: key %s thread %u msg %#x vk %#x -> lid %d class \"%s\" (focus lid %d, active lid %d, foreground lid %d)\n", what, thread, (unsigned)msg, (unsigned)vk,
++            i >= 0 ? (int)tab[i].lid : -1, cls, f >= 0 ? (int)tab[f].lid : -1, a >= 0 ? (int)tab[a].lid : -1, fg_window >= 0 ? (int)tab[fg_window].lid : -1);
++}
++
++void fle_win_diag_focus(const char *api, uint64_t arg, uint64_t answer, uint64_t caller)
++{
++    static int on = -1;
++    static unsigned n;
++    int64_t i = live_index(arg);
++    uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
++    char cls[80];
++    unsigned t = cur_thread();
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++    if (!on || n >= 3000u) return;
++    n++;
++    inp_ensure();
++    cls[0] = 0;
++    if (i >= 0 && fle_class_name_of(tab[i].atom, nm, &nl)) u16_ascii(cls, sizeof cls, nm, nl < 79 ? nl : 79);
++    fprintf(stderr, "fl-diag: focus %s thread %u arg %#" PRIx64 " lid %d class \"%s\" -> answer %#" PRIx64 " (after the call: focus lid %d, active lid %d, foreground lid %d) caller %#" PRIx64 "\n", api, t, arg, i >= 0 ? (int)tab[i].lid : -1, cls, answer,
++            inp[t].focus >= 0 ? (int)tab[inp[t].focus].lid : -1, inp[t].active >= 0 ? (int)tab[inp[t].active].lid : -1, fg_window >= 0 ? (int)tab[fg_window].lid : -1, caller);
++}
++
+ /* Decision 0141 (PROVISIONAL), read-only for the browser front end (fle_appview.c): the live top-level windows in z-order, top first (the order of the list the stop report prints); the text of a window (ASCII, as the report
+  * prints it) and the logical id of its owner window (0 = none). Nothing moves. */
+ unsigned fle_win_input_toplevels(uint64_t *handles, unsigned max)
+--- a/lift/runtime/fle_input.c
++++ b/lift/runtime/fle_input.c
+@@ -596,6 +596,8 @@
+     out_push(v.owner, w, FLE_WM_MOUSEWHEEL, ((uint64_t)(uint16_t)(int16_t)e->data << 16) | e->mk, lparam_xy(e->x, e->y), e->ticks, e->x, e->y);
+ }
+ 
++void fle_win_diag_key(const char *what, uint64_t w, uint32_t msg, uint32_t vk, unsigned thread) __attribute__((weak));   /* gpu8 0335: TEST-ONLY observation */
++
+ static void translate_key(const hwev *e)
+ {
+     unsigned tt = 0;
+@@ -620,6 +622,7 @@
+     if (prev) lp |= 1u << 30;
+     if (!down) lp |= (1u << 30) | (1u << 31);
+     set_key(key_sync, e->vk, down);
++    if (fle_win_diag_key) fle_win_diag_key(down ? "down" : "up", w, msg, vk, tt);   /* gpu8 0335: observation only */
+     out_push(v.owner, w, msg, vk, lp, e->ticks, e->x, e->y);
+ }
+ 

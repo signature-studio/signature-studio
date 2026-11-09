@@ -1,0 +1,42 @@
+=== F=500 O0
+compile O0 sync: 1.31 319752
+compile O0 async: 1.29 315876
+base	1647707	0.49	88824
+jspi	1647798	0.46	91112
+asyncify	3056344	0.72	277748
+asyncify_ignore_indirect	3012802	0.72	277928
+=== F=500 O2
+compile O2 sync: 7.60 261104
+compile O2 async: 7.58 261264
+base	757110	0.80	98136
+jspi	757121	0.83	99960
+asyncify	943315	1.06	127036
+asyncify_ignore_indirect	920773	1.03	128876
+=== F=2000 O0
+compile O0 sync: 4.90 1073616
+compile O0 async: 10.22 1073332
+base	6548272	1.06	87732
+jspi	6548363	1.10	88500
+asyncify	12130218	2.70	508612
+asyncify_ignore_indirect	11940404	2.52	510972
+=== F=2000 O2
+compile O2 sync: 34.38 813416
+compile O2 async: 31.54 816484
+base	3116195	1.19	152252
+jspi	3116206	1.17	149528
+asyncify	3837831	2.13	274908
+asyncify_ignore_indirect	3750049	2.11	264612
+=== F=8000 O0
+compile O0 sync: 20.90 4087280
+compile O0 async: 20.21 4088024
+base	26147746	0.75	191076
+jspi	26147837	0.85	191056
+asyncify	48475479	4.68	1253212
+asyncify_ignore_indirect	47714083	4.71	1244776
+=== F=8000 O2
+compile O2 sync: 196.66 3021408
+compile O2 async: 219.55 3021516
+base	12239254	2.70	418516
+jspi	12239265	2.53	412024
+asyncify	15149828	6.13	868144
+asyncify_ignore_indirect	14786866	5.86	847316

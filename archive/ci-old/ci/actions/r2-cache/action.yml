@@ -1,0 +1,141 @@
+name: r2-cache
+description: >-
+  A stage cache in the CACHE R2 bucket (not GitHub's Actions cache): lookup (is the key there?), restore, or save-and-verify. A thin wrapper around runs-on/cache/restore and /save
+  (pinned by commit) that sets the S3 settings for R2 and refuses to run when the bucket is not configured, because runs-on/cache then falls back to GitHub's own cache without a word.
+inputs:
+  op:
+    description: lookup | restore | save
+    required: true
+  stage:
+    description: name of the stage (for the summary table)
+    required: true
+  key:
+    description: cache key (ci/plan.sh / ci/objkeys.sh)
+    required: true
+  path:
+    description: files and directories (multi-line; wildcards allowed). The same list must be used for restore and save (it is part of the cache version).
+    required: true
+  expect-hit:
+    description: "true = the lookup said the key exists; a restore that then misses is counted and reported as a RESTORE FAILURE"
+    required: false
+    default: "false"
+  bucket:
+    description: the cache bucket name (variable R2_CACHE_BUCKET)
+    required: true
+  endpoint:
+    description: the S3 endpoint, https://<account id>.r2.cloudflarestorage.com
+    required: true
+  access-key-id:
+    description: R2 S3 token, read and write on the cache bucket
+    required: true
+  secret-access-key:
+    description: the token's secret
+    required: true
+outputs:
+  cache-hit:
+    description: "'true' when the key exists (lookup) or was restored (restore)"
+    value: ${{ steps.lookup.outputs.cache-hit == 'true' && 'true' || (steps.restore.outputs.cache-hit == 'true' && 'true' || 'false') }}
+  restore-failed:
+    description: "'true' when expect-hit was set and the restore did not produce the entry"
+    value: ${{ steps.row.outputs.restore-failed }}
+runs:
+  using: composite
+  steps:
+    - name: guard
+      shell: bash
+      env:
+        BUCKET: ${{ inputs.bucket }}
+        ENDPOINT: ${{ inputs.endpoint }}
+        AK: ${{ inputs.access-key-id }}
+        SK: ${{ inputs.secret-access-key }}
+      run: |
+        # runs-on/cache without RUNS_ON_S3_BUCKET_CACHE uses GitHub's Actions cache silently: never let that happen
+        [ -n "$BUCKET" ] && [ -n "$AK" ] && [ -n "$SK" ] && [ "${ENDPOINT#https://}" != "$ENDPOINT" ] || { echo "::error::the R2 cache is not configured (variable R2_CACHE_BUCKET, secrets R2_CACHE_*): refusing to fall back to GitHub's cache"; exit 1; }
+    - name: lookup (${{ inputs.stage }})
+      id: lookup
+      if: inputs.op == 'lookup'
+      uses: runs-on/cache/restore@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: ${{ inputs.bucket }}
+        RUNS_ON_S3_BUCKET_ENDPOINT: ${{ inputs.endpoint }}
+        RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+        RUNS_ON_RUNNER_NAME: ""
+        RUNS_ON_AWS_REGION: auto
+        AWS_REGION: auto
+        <CREDENTIAL-NAME>: ${{ inputs.access-key-id }}
+        <CREDENTIAL-NAME>: ${{ inputs.secret-access-key }}
+      with:
+        key: ${{ inputs.key }}
+        path: ${{ inputs.path }}
+        lookup-only: true
+    - name: restore (${{ inputs.stage }})
+      id: restore
+      if: inputs.op == 'restore'
+      uses: runs-on/cache/restore@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: ${{ inputs.bucket }}
+        RUNS_ON_S3_BUCKET_ENDPOINT: ${{ inputs.endpoint }}
+        RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+        RUNS_ON_RUNNER_NAME: ""
+        RUNS_ON_AWS_REGION: auto
+        AWS_REGION: auto
+        <CREDENTIAL-NAME>: ${{ inputs.access-key-id }}
+        <CREDENTIAL-NAME>: ${{ inputs.secret-access-key }}
+      with:
+        key: ${{ inputs.key }}
+        path: ${{ inputs.path }}
+    - name: save (${{ inputs.stage }})
+      id: save
+      if: inputs.op == 'save'
+      uses: runs-on/cache/save@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: ${{ inputs.bucket }}
+        RUNS_ON_S3_BUCKET_ENDPOINT: ${{ inputs.endpoint }}
+        RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+        RUNS_ON_RUNNER_NAME: ""
+        RUNS_ON_AWS_REGION: auto
+        AWS_REGION: auto
+        <CREDENTIAL-NAME>: ${{ inputs.access-key-id }}
+        <CREDENTIAL-NAME>: ${{ inputs.secret-access-key }}
+      with:
+        key: ${{ inputs.key }}
+        path: ${{ inputs.path }}
+    - name: verify the save (${{ inputs.stage }})
+      id: verify
+      if: inputs.op == 'save'
+      uses: runs-on/cache/restore@88d90644011a3a9957fd141a106f5a94f9794203 # v5.0.7
+      env:
+        RUNS_ON_S3_BUCKET_CACHE: ${{ inputs.bucket }}
+        RUNS_ON_S3_BUCKET_ENDPOINT: ${{ inputs.endpoint }}
+        RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+        RUNS_ON_RUNNER_NAME: ""
+        RUNS_ON_AWS_REGION: auto
+        AWS_REGION: auto
+        <CREDENTIAL-NAME>: ${{ inputs.access-key-id }}
+        <CREDENTIAL-NAME>: ${{ inputs.secret-access-key }}
+      with:
+        key: ${{ inputs.key }}
+        path: ${{ inputs.path }}
+        lookup-only: true
+    - name: record (${{ inputs.stage }})
+      id: row
+      shell: bash
+      env:
+        OP: ${{ inputs.op }}
+        STAGE: ${{ inputs.stage }}
+        KEY: ${{ inputs.key }}
+        EXPECT: ${{ inputs.expect-hit }}
+        LOOKUP_HIT: ${{ steps.lookup.outputs.cache-hit }}
+        RESTORE_HIT: ${{ steps.restore.outputs.cache-hit }}
+        VERIFY_HIT: ${{ steps.verify.outputs.cache-hit }}
+      run: |
+        res=""; failed=false
+        case "$OP" in
+          lookup)  [ "$LOOKUP_HIT" = true ] && res=hit || res=miss ;;
+          restore) if [ "$RESTORE_HIT" = true ]; then res=restored; elif [ "$EXPECT" = true ]; then res="RESTORE FAILED (the lookup found the entry)"; failed=true; else res=miss; fi ;;
+          save)    if [ "$VERIFY_HIT" = true ]; then res="saved + verified"; else res="SAVE NOT FOUND AFTERWARDS"; failed=true; fi ;;
+        esac
+        printf '%s\t%s\t%s\t%s\n' "$STAGE" "$KEY" "$OP" "$res" >> "${RUNNER_TEMP}/r2cache-rows.tsv"
+        echo "restore-failed=$failed" >> "$GITHUB_OUTPUT"
+        if [ "$OP" = save ] && [ "$failed" = true ]; then echo "::error::the cache entry $KEY is not in the bucket after the save (R2 or network error): the stage output is lost for the next run"; exit 1; fi
+        if [ "$failed" = true ]; then echo "::warning::restore of $STAGE ($KEY) failed although the lookup found it (transient R2/network error?). It is counted in the summary."; fi

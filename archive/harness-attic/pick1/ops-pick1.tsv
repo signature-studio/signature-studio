@@ -1,0 +1,27 @@
+# pick1 (decision 0242): the operation matrix for the plug-in picker / menus / overlay questions. Columns (TAB): session, op, category, description, commands (' ; '-separated G3 commands, lift/harness/fruity_g3.c), kind (D = discrete input, C = continuous activity per virtual second)
+# Coordinates: 1920x1080 display, Basic.flp open (same as lift/harness/parity/ops.tsv and lift/out-ia2/scripts/ops2.tsv). THE INPUT IS A HARNESS SIMULATION (G3 script), NOT A USER OPERATION.
+pk	cal_snap	calibration	nothing between two snapshots	advance 1	D
+pk	idle_5s	idle	5 virtual seconds without input, Basic.flp open	advance 5000	C
+pk	add_picker	picker	menu bar ADD > Plugin picker, 3 s	click 73 20 L ; advance 800 ; click 241 83 L ; advance 3000	D
+pk	picker_idle_2s	picker	picker open, 2 virtual seconds without input	advance 2000	C
+pk	picker_hover_2s	picker	pointer moves without a button over the picker, 120 moves at 62.5/s	@moves 300 300 1500 800 120 16	C
+pk	picker_wheel_2s	picker	60 wheel events (62.5/s) down and 60 up over the picker	@wheel 960 540 -120 60 16 ; @wheel 960 540 120 60 16 ; advance 300	C
+pk	picker_type	picker	type S E R U (search text) with 300 ms between keys	tap 0x53 ; advance 300 ; tap 0x45 ; advance 300 ; tap 0x52 ; advance 300 ; tap 0x55 ; advance 1000	D
+pk	picker_erase	picker	BackSpace x4	tap 8 ; advance 200 ; tap 8 ; advance 200 ; tap 8 ; advance 200 ; tap 8 ; advance 800	D
+pk	add_picker_close	picker	Escape	tap 27 ; advance 2000	D
+pk	f8_open	picker	F8, 3 s open	tap 0x77 ; advance 3000	D
+pk	f8_close	picker	Escape	tap 27 ; advance 2000	D
+pk	view_picker	picker	menu bar VIEW > Plugin picker, 3 s	click 160 20 L ; advance 800 ; click 200 178 L ; advance 3000	D
+pk	view_picker_close	picker	Escape	tap 27 ; advance 2000	D
+pk	menu_sel_mixer	menu	VIEW menu, hover Mixer, click it (selection fade of the chosen item), 1.5 s after	click 160 20 L ; advance 800 ; move 200 121 ; advance 300 ; click 200 121 L ; advance 1500	D
+pk	menu_sel_mixer2	menu	the same again (toggles back)	click 160 20 L ; advance 800 ; move 200 121 ; advance 300 ; click 200 121 L ; advance 1500	D
+pk	dd_sel	menu	channel rack filter drop-down: open, hover Unsorted, click, 1.5 s after	click 525 103 L ; advance 600 ; move 500 142 ; advance 300 ; click 500 142 L ; advance 1500	D
+pk	dd_sel_back	menu	the same drop-down back to All	click 525 103 L ; advance 600 ; move 500 116 ; advance 300 ; click 500 116 L ; advance 1500	D
+pk	pl_tool_clicks	playlist	click the 8 tool icons of the playlist toolbar one after the other (400 ms apart)	click 946 103 L ; advance 400 ; click 967 103 L ; advance 400 ; click 988 103 L ; advance 400 ; click 1009 103 L ; advance 400 ; click 1030 103 L ; advance 400 ; click 1051 103 L ; advance 400 ; click 1072 103 L ; advance 400 ; click 1093 103 L ; advance 800	D
+pk	mixer_open	mixer	F9 shows the mixer window	tap 0x78 ; advance 2500	D
+pk	mixer_ins1	mixer	click the name of Insert 1	click 506 674 L ; advance 600	D
+pk	mixer_slot_arrow	mixer	click the arrow under Insert 1 (slot area)	click 515 999 L ; advance 800	D
+pk	mixer_close	mixer	F9 hides the mixer	tap 0x78 ; advance 1500	D
+pk	cr_plus	channel rack	click the + button under the channel list (a small plug-in menu opens)	click 528 289 L ; advance 800	D
+pk	cr_plus_esc	channel rack	Escape closes the + menu	tap 27 ; advance 600	D
+pk	cr_plus_more	picker	+ then the first item More plugins... : the plug-in picker (full screen) opens, 3 s	click 528 289 L ; advance 800 ; click 555 304 L ; advance 3000	D

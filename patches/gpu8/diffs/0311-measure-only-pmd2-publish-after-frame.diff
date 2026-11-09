@@ -1,0 +1,39 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -32,6 +32,9 @@
+ const rafDt = [0, 0, 0, 0, 0];
+ let lastRaf = 0;
+ const wl8 = { n: 0, over2: 0, over8: 0, over16: 0, sumMs: 0, maxMs: 0 };
++// MEASUREMENT ONLY (decision 0311, 2nd round): how long after this Worker's last animation frame the engine Worker published (<= 2, <= 5, <= 9, <= 14, > 14 ms) and, per class, how many of those wakes were later than 8 ms
++let lastRafAbs = 0;
++const pubAfterRaf = [0, 0, 0, 0, 0], pubAfterRafSlow = [0, 0, 0, 0, 0];
+ 
+ self.onmessage = (ev: MessageEvent<{ cmd: 'init'; link: SharedArrayBuffer; port: MessagePort }>) => {
+   const m = ev.data;
+@@ -84,7 +87,7 @@
+   const next = (): void => { if (g.requestAnimationFrame) g.requestAnimationFrame(tick); else setTimeout(tick, 16); };
+   const tick = (): void => {
+     frameTicks++;
+-    { const t = performance.now(); if (lastRaf) { const dt = t - lastRaf; const k = dt <= 14 ? 0 : dt <= 19 ? 1 : dt <= 25 ? 2 : dt <= 40 ? 3 : 4; rafDt[k] = (rafDt[k] ?? 0) + 1; } lastRaf = t; }
++    { const t = performance.now(); if (lastRaf) { const dt = t - lastRaf; const k = dt <= 14 ? 0 : dt <= 19 ? 1 : dt <= 25 ? 2 : dt <= 40 ? 3 : 4; rafDt[k] = (rafDt[k] ?? 0) + 1; } lastRaf = t; lastRafAbs = nowAbs(); }
+     const now = performance.now();
+     L.requestScene();
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+@@ -102,7 +105,7 @@
+   for (;;) {
+     const seq = await L.waitPublished(seen);
+     seen = seq;
+-    { const wl = nowAbs() - L.publishAt; wl8.n++; wl8.sumMs += wl; if (wl > 2) wl8.over2++; if (wl > 8) wl8.over8++; if (wl > 16) wl8.over16++; if (wl > wl8.maxMs) wl8.maxMs = wl; }
++    { const wl = nowAbs() - L.publishAt; wl8.n++; wl8.sumMs += wl; if (wl > 2) wl8.over2++; if (wl > 8) wl8.over8++; { const dr = L.publishAt - lastRafAbs; const k = dr <= 2 ? 0 : dr <= 5 ? 1 : dr <= 9 ? 2 : dr <= 14 ? 3 : 4; pubAfterRaf[k] = (pubAfterRaf[k] ?? 0) + 1; if (wl > 8) pubAfterRafSlow[k] = (pubAfterRafSlow[k] ?? 0) + 1; } if (wl > 16) wl8.over16++; if (wl > wl8.maxMs) wl8.maxMs = wl; }
+     let shown = 0;
+     try { shown = pres?.present() ?? 0; } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+     const at = nowAbs();
+@@ -121,7 +124,7 @@
+   if (!force && now - lastReport < 100) return;
+   if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
+   lastReport = now;
+-  const stats = { ...pres.stats, ringReads: L.counter(10), ringFull: 0, wakes: L.counter(11), ticks: frameTicks, idleTicks: L.counter(12), sleeps: quiet.sleeps, ansN: L.counter(13), ansSettlePubUs: L.counter(14), ansPubDoneUs: L.counter(15), ansSkipBusy: L.counter(20), ansEarlyShown: L.counter(21), wakeN: wl8.n, wakeOver2: wl8.over2, wakeOver8: wl8.over8, wakeOver16: wl8.over16, wakeSumMs: wl8.sumMs, wakeMaxMs: wl8.maxMs, rafDt0: rafDt[0] ?? 0, rafDt1: rafDt[1] ?? 0, rafDt2: rafDt[2] ?? 0, rafDt3: rafDt[3] ?? 0, rafDt4: rafDt[4] ?? 0 };   // MEASUREMENT ONLY: a variable, not a literal, so that the extra counters are allowed
++  const stats = { ...pres.stats, ringReads: L.counter(10), ringFull: 0, wakes: L.counter(11), ticks: frameTicks, idleTicks: L.counter(12), sleeps: quiet.sleeps, ansN: L.counter(13), ansSettlePubUs: L.counter(14), ansPubDoneUs: L.counter(15), ansSkipBusy: L.counter(20), ansEarlyShown: L.counter(21), wakeN: wl8.n, wakeOver2: wl8.over2, wakeOver8: wl8.over8, wakeOver16: wl8.over16, wakeSumMs: wl8.sumMs, wakeMaxMs: wl8.maxMs, rafDt0: rafDt[0] ?? 0, rafDt1: rafDt[1] ?? 0, rafDt2: rafDt[2] ?? 0, rafDt3: rafDt[3] ?? 0, rafDt4: rafDt[4] ?? 0, par0: pubAfterRaf[0] ?? 0, par1: pubAfterRaf[1] ?? 0, par2: pubAfterRaf[2] ?? 0, par3: pubAfterRaf[3] ?? 0, par4: pubAfterRaf[4] ?? 0, pas0: pubAfterRafSlow[0] ?? 0, pas1: pubAfterRafSlow[1] ?? 0, pas2: pubAfterRafSlow[2] ?? 0, pas3: pubAfterRafSlow[3] ?? 0, pas4: pubAfterRafSlow[4] ?? 0 };   // MEASUREMENT ONLY: a variable, not a literal, so that the extra counters are allowed
+   post({ t: 'desk', stats, at: presentedAt.splice(0, 64), nWindows: 0 });
+ }
+ 

@@ -1,0 +1,877 @@
+{
+ "name": "audio-coi",
+ "page": "/coi/audio.html?matrix=1",
+ "started": "2026-10-28T16:05:11.805Z",
+ "loadavg_before": "2.51 1.76 1.72 5/1401 646579",
+ "url": "http://127.0.0.1:41991/coi/audio.html?matrix=1",
+ "loadavg_after": "1.53 1.58 1.65 4/1419 647867",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/audio-coi",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "--autoplay-policy=no-user-gesture-required",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": true,
+   "AudioContext": "function",
+   "AudioWorklet": "function",
+   "OfflineAudioContext": "function",
+   "SharedArrayBuffer": "function",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "mediaDevices": true,
+   "outputDevices": [
+    {
+     "id": "",
+     "label": ""
+    }
+   ],
+   "allDevices": 1
+  },
+  "runs": [
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 2048,
+     "chunk": 512,
+     "ms": 5000
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 242176,
+     "waits": 1735,
+     "stalls": 0,
+     "elapsed_ms": 5003.844999998808
+    },
+    "timing": {
+     "wall_ms": 5018.1,
+     "audioContext_currentTime_delta_s": 5.013,
+     "realtime_factor": 0.9991
+    },
+    "worklet": {
+     "blocks": 1880,
+     "expectedBlocks": 1880,
+     "underrunBlocksTotal": 4,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 1664,
+     "maxFill": 2048,
+     "blocksPerSecondWall": 374.6,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.032
+    },
+    "setup_ms": 9.1
+   },
+   {
+    "cfg": {
+     "sampleRate": 44100,
+     "cap": 2048,
+     "chunk": 512,
+     "ms": 5000
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 44100,
+     "baseLatency": 0.010680272108843538,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 222720,
+     "waits": 1679,
+     "stalls": 0,
+     "elapsed_ms": 5002.879999995232
+    },
+    "timing": {
+     "wall_ms": 5017.8,
+     "audioContext_currentTime_delta_s": 5.021,
+     "realtime_factor": 1.0007
+    },
+    "worklet": {
+     "blocks": 1730,
+     "expectedBlocks": 1730,
+     "underrunBlocksTotal": 4,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 1280,
+     "maxFill": 2048,
+     "blocksPerSecondWall": 344.8,
+     "expectedBlocksPerSecond": 344.5
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 15.8
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 256,
+     "chunk": 128,
+     "ms": 3000,
+     "stallMs": 0,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 79616,
+     "waits": 886,
+     "stalls": 0,
+     "elapsed_ms": 3001.0349999964237
+    },
+    "timing": {
+     "wall_ms": 3010.3,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0028
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 512,
+     "underrunBlocksAfterStart": 504,
+     "startedFlag": 1,
+     "underrunFrames": 64512,
+     "minFill": 0,
+     "maxFill": 256,
+     "blocksPerSecondWall": 376,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.032
+    },
+    "setup_ms": 9.4
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 256,
+     "chunk": 128,
+     "ms": 3000,
+     "stallMs": 5,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 80256,
+     "waits": 888,
+     "stalls": 5,
+     "elapsed_ms": 3001.330000013113
+    },
+    "timing": {
+     "wall_ms": 3009.2,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0031
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 507,
+     "underrunBlocksAfterStart": 499,
+     "startedFlag": 1,
+     "underrunFrames": 63872,
+     "minFill": 0,
+     "maxFill": 256,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 7.6
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 256,
+     "chunk": 128,
+     "ms": 3000,
+     "stallMs": 20,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 79616,
+     "waits": 868,
+     "stalls": 5,
+     "elapsed_ms": 3000.9000000059605
+    },
+    "timing": {
+     "wall_ms": 3009.8,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.003
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 512,
+     "underrunBlocksAfterStart": 504,
+     "startedFlag": 1,
+     "underrunFrames": 64512,
+     "minFill": 0,
+     "maxFill": 256,
+     "blocksPerSecondWall": 376.1,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 9.3
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 256,
+     "chunk": 128,
+     "ms": 3000,
+     "stallMs": 50,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 73472,
+     "waits": 809,
+     "stalls": 5,
+     "elapsed_ms": 3001.1050000190735
+    },
+    "timing": {
+     "wall_ms": 3009.4,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0031
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 560,
+     "underrunBlocksAfterStart": 552,
+     "startedFlag": 1,
+     "underrunFrames": 70656,
+     "minFill": 0,
+     "maxFill": 256,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.2
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 0,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 144896,
+     "waits": 943,
+     "stalls": 0,
+     "elapsed_ms": 3000.405000001192
+    },
+    "timing": {
+     "wall_ms": 3009.6,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.003
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 640,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 376.1,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 9.2
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 5,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 144896,
+     "waits": 936,
+     "stalls": 5,
+     "elapsed_ms": 3000.6649999916553
+    },
+    "timing": {
+     "wall_ms": 3009.1,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0032
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 640,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 7.5
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 20,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 144896,
+     "waits": 910,
+     "stalls": 5,
+     "elapsed_ms": 3000.625
+    },
+    "timing": {
+     "wall_ms": 3009.3,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0031
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 128,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.6
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 50,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 137216,
+     "waits": 879,
+     "stalls": 5,
+     "elapsed_ms": 3000.6599999964237
+    },
+    "timing": {
+     "wall_ms": 3009.4,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0031
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 68,
+     "underrunBlocksAfterStart": 60,
+     "startedFlag": 1,
+     "underrunFrames": 7680,
+     "minFill": 0,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.3
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 4096,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 0,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 147968,
+     "waits": 964,
+     "stalls": 0,
+     "elapsed_ms": 3000.7150000035763
+    },
+    "timing": {
+     "wall_ms": 3010.2,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0028
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 3712,
+     "maxFill": 4096,
+     "blocksPerSecondWall": 376.1,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 9.1
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 4096,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 5,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 147968,
+     "waits": 930,
+     "stalls": 5,
+     "elapsed_ms": 3000.4650000035763
+    },
+    "timing": {
+     "wall_ms": 3009,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.0032
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 3712,
+     "maxFill": 4096,
+     "blocksPerSecondWall": 376.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.7
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 4096,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 20,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 147968,
+     "waits": 914,
+     "stalls": 5,
+     "elapsed_ms": 3000.9549999833107
+    },
+    "timing": {
+     "wall_ms": 3009.7,
+     "audioContext_currentTime_delta_s": 3.019,
+     "realtime_factor": 1.003
+    },
+    "worklet": {
+     "blocks": 1132,
+     "expectedBlocks": 1132,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 3200,
+     "maxFill": 4096,
+     "blocksPerSecondWall": 376.1,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 9.4
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 4096,
+     "chunk": 512,
+     "ms": 3000,
+     "stallMs": 50,
+     "stallEveryMs": 500
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 147968,
+     "waits": 875,
+     "stalls": 5,
+     "elapsed_ms": 3002.3550000190735
+    },
+    "timing": {
+     "wall_ms": 3012,
+     "audioContext_currentTime_delta_s": 3.029,
+     "realtime_factor": 1.0058
+    },
+    "worklet": {
+     "blocks": 1136,
+     "expectedBlocks": 1136,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 1664,
+     "maxFill": 4096,
+     "blocksPerSecondWall": 377.2,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.3
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 256,
+     "ms": 4000,
+     "mainBusy": {
+      "ms": 100,
+      "every": 250
+     }
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 193024,
+     "waits": 1191,
+     "stalls": 0,
+     "elapsed_ms": 4003.3400000035763
+    },
+    "timing": {
+     "wall_ms": 4011.6,
+     "audioContext_currentTime_delta_s": 4.021,
+     "realtime_factor": 1.0024
+    },
+    "worklet": {
+     "blocks": 1508,
+     "expectedBlocks": 1508,
+     "underrunBlocksTotal": 8,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 640,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 375.9,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.3
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 256,
+     "ms": 4000,
+     "loadMs": 3
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 192768,
+     "waits": 778,
+     "stalls": 0,
+     "elapsed_ms": 4001.0699999928474
+    },
+    "timing": {
+     "wall_ms": 4009.7,
+     "audioContext_currentTime_delta_s": 4.021,
+     "realtime_factor": 1.0029
+    },
+    "worklet": {
+     "blocks": 1508,
+     "expectedBlocks": 1508,
+     "underrunBlocksTotal": 10,
+     "underrunBlocksAfterStart": 0,
+     "startedFlag": 1,
+     "underrunFrames": 0,
+     "minFill": 640,
+     "maxFill": 1024,
+     "blocksPerSecondWall": 376.1,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.5
+   },
+   {
+    "cfg": {
+     "sampleRate": 48000,
+     "cap": 1024,
+     "chunk": 256,
+     "ms": 4000,
+     "loadMs": 6
+    },
+    "created": {
+     "state": "running",
+     "sampleRate": 48000,
+     "baseLatency": 0.010666666666666666,
+     "outputLatency": 0,
+     "hasWorklet": true
+    },
+    "afterResume": {
+     "state": "running"
+    },
+    "producer": {
+     "type": "result",
+     "produced": 170496,
+     "waits": 0,
+     "stalls": 0,
+     "elapsed_ms": 4001.7249999940395
+    },
+    "timing": {
+     "wall_ms": 4010.3,
+     "audioContext_currentTime_delta_s": 4.021,
+     "realtime_factor": 1.0028
+    },
+    "worklet": {
+     "blocks": 1508,
+     "expectedBlocks": 1508,
+     "underrunBlocksTotal": 180,
+     "underrunBlocksAfterStart": 168,
+     "startedFlag": 1,
+     "underrunFrames": 21504,
+     "minFill": 0,
+     "maxFill": 512,
+     "blocksPerSecondWall": 376,
+     "expectedBlocksPerSecond": 375
+    },
+    "after": {
+     "state": "running",
+     "outputLatency": 0.04
+    },
+    "setup_ms": 8.7
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

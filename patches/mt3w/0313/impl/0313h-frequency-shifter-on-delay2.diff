@@ -1,0 +1,74 @@
+--- a/ci/extract-dlls.tsv
++++ b/ci/extract-dlls.tsv
+@@ -14,3 +14,6 @@
+ Fruity Filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
+ # Delay 2 step (G9-c): the plugin Fruity Delay 2 (3,731,968 bytes; the SHA-256 is the one of the installer, checked with ci/lib/extract_fl.py against flstudio_win64_26.1.7.5653.exe)
+ Fruity Delay 2_x64.dll	lift/out-plugins/fruity_delay_2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc
++# Frequency Shifter step (G9-d): the plugin Frequency Shifter (3,876,864 bytes) and its engine Engine_x64.dll (263,168 bytes; many effects have a file of this name: the SHA-256 picks the one of Frequency Shifter); the SHA-256 are the ones of the installer
++Frequency Shifter_x64.dll	lift/out-plugins/frequency_shifter_x64.dll	35784e539182e3b5787e8b627ce36a362e3de049fd345c3e17bcc7779f4c81cd
++Engine_x64.dll	lift/out-plugins/frequency_shifter_engine_x64.dll	1e14656b0eaf2496bc3b18bef5dfee6f2dd450c3c9e024d37b2bc8b046e17980
+--- a/lift/harness/seeds/vfs-seed-idle1.tsv
++++ b/lift/harness/seeds/vfs-seed-idle1.tsv
+@@ -242,3 +242,5 @@
+ C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064
+ C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
+ C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Delay 2\Fruity Delay 2_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Delay_2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc
++C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Frequency Shifter\Frequency Shifter_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Frequency_Shifter_x64.dll	35784e539182e3b5787e8b627ce36a362e3de049fd345c3e17bcc7779f4c81cd
++C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Frequency Shifter\Engine_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Frequency_Shifter_Engine_x64.dll	1e14656b0eaf2496bc3b18bef5dfee6f2dd450c3c9e024d37b2bc8b046e17980
+--- a/lift/harness/b2d2/gen-direct.sh
++++ b/lift/harness/b2d2/gen-direct.sh
+@@ -24,6 +24,8 @@
+   "fruity_balance_x64.dll|$HL/out-plugins/fruity_balance_x64.dll|0x6800000|--pdata --hook-points $H/hooks/fruity-delphi-effect-hook-points.txt|plugins/fruity/effects/fruity balance/fruity balance_x64.dll"
+   "fruity_filter_x64.dll|$HL/out-plugins/fruity_filter_x64.dll|0x7000000|--pdata --hook-points $H/hooks/fruity-delphi-effect-hook-points.txt|plugins/fruity/effects/fruity filter/fruity filter_x64.dll"
+   "fruity_delay_2_x64.dll|$HL/out-plugins/fruity_delay_2_x64.dll|0x7800000|--pdata --hook-points $H/hooks/fruity-delphi-effect-hook-points.txt|plugins/fruity/effects/fruity delay 2/fruity delay 2_x64.dll"
++  "frequency_shifter_x64.dll|$HL/out-plugins/frequency_shifter_x64.dll|0x8000000|--pdata --hook-points $H/hooks/fruity-delphi-shifter-hook-points.txt|plugins/fruity/effects/frequency shifter/frequency shifter_x64.dll"
++  "frequency_shifter_engine_x64.dll|$HL/out-plugins/frequency_shifter_engine_x64.dll|0x8800000|--pdata|plugins/fruity/effects/frequency shifter/engine_x64.dll"
+ )
+ # FLE_EXTRA_IMPORTS (decision 0171) goes to every real module (the response table must be the same in all of them); FLEngine gets it from gen_two.sh itself
+ XARGS=" --extra-imports $FLE_EXTRA_IMPORTS"
+--- a/app/scripts/build-engine-bundle.sh
++++ b/app/scripts/build-engine-bundle.sh
+@@ -45,7 +45,7 @@
+ PRUNE_LIST=$SRCTREE/docs/investigations/prune1/tables/prune-SM.tsv   # decision 0168: the S+M level, for dsp_ippv2 only (gen-direct.sh)
+ AI_UNITS_FILE=$SRCTREE/lift/harness/seeds/ship-hot-units-F2.tsv      # decision 0151: the start-up-heavy units compiled with -DFLE_ALWAYS_INLINE
+ AI_UNITS=$(awk -F'\t' '/^#/ {next} {print $1}' "$AI_UNITS_FILE" | tr '\n' ' ')
+-EXTRA_MODULES="oggio elastique fruity_balance fruity_filter fruity_delay_2"; NEXTRA=5     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine); decision 0313: module 8, the plugin Fruity Balance, the Filter step of G9-c: module 9, the plugin Fruity Filter, and the Delay 2 step: module 10, the plugin Fruity Delay 2 (neither is in HYB_MODS: all of it is C part)
++EXTRA_MODULES="oggio elastique fruity_balance fruity_filter fruity_delay_2 frequency_shifter frequency_shifter_engine"; NEXTRA=7     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine); decision 0313: module 8, the plugin Fruity Balance, the Filter step of G9-c: module 9, the plugin Fruity Filter, the Delay 2 step: module 10, the plugin Fruity Delay 2, and the Frequency Shifter step: modules 11 and 12, the plugin Frequency Shifter and its engine DLL (none of them is in HYB_MODS: all of it is C part)
+ HYB_MODS="fle dsp b2d qfc ft ilt oggio elastique"   # the modules of the hybrid lists lift/harness/seeds/hyb-U-<m>.txt (decision 0239)
+ HYB=$WORK/hyb
+ B2D_UPSTREAM_LIB=${B2D_UPSTREAM_LIB:-}
+--- a/ci/objkeys.sh
++++ b/ci/objkeys.sh
+@@ -18,7 +18,7 @@
+   grp fle $(ls "$W"/src/fle-[0-9][0-9].c)
+   for k in 1 2 3 4 5; do
+     # shellcheck disable=SC2046
+-    grp "m$k" $(ls "$tagdir"/src/m$k-[0-9][0-9].c $( [ "$k" = 5 ] && ls "$tagdir"/src/m[6-9]-[0-9][0-9].c "$tagdir"/src/m10-[0-9][0-9].c 2>/dev/null ))
++    grp "m$k" $(ls "$tagdir"/src/m$k-[0-9][0-9].c $( [ "$k" = 5 ] && ls "$tagdir"/src/m[6-9]-[0-9][0-9].c "$tagdir"/src/m1[0-9]-[0-9][0-9].c 2>/dev/null ))
+   done
+   PLAN_SP_WASM="${PLAN_SP_WASM:-}|b2d=${PLAN_K_B2D:-}" grp rt "$tagdir/src/common.c" "$(ls -d "$ENGINE_WORK"/onat/v-*/native)/realmod_table_gen.c" "$tagdir/modules.txt"
+ } > "$OUT"
+--- a/ci/test-hybrid.sh
++++ b/ci/test-hybrid.sh
+@@ -60,6 +60,10 @@
+ awk -F'\t' '$3 == "f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Filter\\Fruity Filter_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "the seed list puts Fruity Filter_x64.dll on the volume" || bad "vfs-seed-idle1.tsv: the Fruity Filter file row is missing or wrong"
+ awk -F'\t' '$1 == "Fruity Delay 2_x64.dll" && $2 == "lift/out-plugins/fruity_delay_2_x64.dll" && $3 == "c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc" {n++} END {exit n == 1 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the row of Fruity Delay 2_x64.dll (the installer's SHA-256)" || bad "ci/extract-dlls.tsv: the Fruity Delay 2 row is missing"
+ awk -F'\t' '$3 == "c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Delay 2\\Fruity Delay 2_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "the seed list puts Fruity Delay 2_x64.dll on the volume" || bad "the seed list: the Fruity Delay 2 row is missing"
++awk -F'\t' '$1 == "Frequency Shifter_x64.dll" && $2 == "lift/out-plugins/frequency_shifter_x64.dll" && $3 == "35784e539182e3b5787e8b627ce36a362e3de049fd345c3e17bcc7779f4c81cd" {n++} END {exit n == 1 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the row of Frequency Shifter" || bad "ci/extract-dlls.tsv: the row of Frequency Shifter"
++awk -F'\t' '$1 == "Engine_x64.dll" && $2 == "lift/out-plugins/frequency_shifter_engine_x64.dll" && $3 == "1e14656b0eaf2496bc3b18bef5dfee6f2dd450c3c9e024d37b2bc8b046e17980" {n++} END {exit n == 1 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the row of the Frequency Shifter engine" || bad "ci/extract-dlls.tsv: the row of the Frequency Shifter engine"
++awk -F'\t' '$3 == "35784e539182e3b5787e8b627ce36a362e3de049fd345c3e17bcc7779f4c81cd" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Frequency Shifter\\Frequency Shifter_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "vfs-seed-idle1.tsv has the Frequency Shifter plugin" || bad "vfs-seed-idle1.tsv: the Frequency Shifter plugin"
++awk -F'\t' '$3 == "1e14656b0eaf2496bc3b18bef5dfee6f2dd450c3c9e024d37b2bc8b046e17980" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Frequency Shifter\\Engine_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "vfs-seed-idle1.tsv has the Frequency Shifter engine" || bad "vfs-seed-idle1.tsv: the Frequency Shifter engine"
+ # the number of modules of the table: the five of the engine + NEXTRA extra ones; NEXTRA = the names in EXTRA_MODULES; the specs of gen-direct.sh = 5 + NEXTRA; RM_MAX of the runtime holds them all
+ nx=$(sed -n 's/^EXTRA_MODULES="\([^"]*\)"; NEXTRA=\([0-9]*\) .*/\1 \2/p' "$repo/app/scripts/build-engine-bundle.sh"); nn=${nx##* }; nl=$(echo "${nx% *}" | wc -w)
+ ns=$(grep -c '^  "[a-z0-9_]*\.dll|' "$repo/lift/harness/b2d2/gen-direct.sh"); rmx=$(sed -n 's/^#define RM_MAX \([0-9]*\)u$/\1/p' "$repo/lift/runtime/fle_realmod.c")
+--- /dev/null
++++ b/lift/harness/hooks/fruity-delphi-shifter-hook-points.txt
+@@ -0,0 +1,8 @@
++# Inline hook points of the Delphi plugin Frequency Shifter (Frequency Shifter step, G9-d; the mechanism of decisions 0105/0106/0183 and the file fruity-delphi-effect-hook-points.txt: fe-lift lift --hook-points).
++#   Plugins\Fruity\Effects\Frequency Shifter\Frequency Shifter_x64.dll   3,876,864 bytes, SHA-256 35784e539182e3b5787e8b627ce36a362e3de049fd345c3e17bcc7779f4c81cd
++# Found with docs/investigations/alpha20/tools/node-export/find-hook-points.py on this DLL: the VirtualProtect caller 0x5c3610, its hook constructor 0x5c3490, the three calls at 0x5c72b7, 0x5c72df, 0x5c7307. The first bytes at the three
++# targets are the same as in Balance, Filter and Delay 2 (55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50): the same three Delphi runtime functions at other RVAs. One address per line: "rva:" and a hex RVA (relative to the ImageBase 0x400000).
++# The engine DLL (Engine_x64.dll) is MSVC code and has no such hooks: it is lifted without a hook-points file.
++rva:0x17e90   # 0x417e90, first bytes 555653c644 (replacement 0x5bdbd0, call at 0x5c72b7)
++rva:0x320b0   # 0x4320b0, first bytes 534883ec20 (replacement 0x5bdac0, call at 0x5c72df)
++rva:0x320d0   # 0x4320d0, first bytes 554883ec50 (replacement 0x5bdb30, call at 0x5c7307)

@@ -1,0 +1,170 @@
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -1,13 +1,23 @@
+ /* Calling a guest function from the runtime (docs/decisions/0064-guest-callback.md). Stateless except the nesting counter.
+  * Nothing here reads the host: no thread, no clock, no file, no signal. */
++#include <inttypes.h>
+ #include <stdint.h>
+ #include <stdio.h>
++#include <string.h>
+ 
+ #include "fle_runtime.h"
+ #include "fle_dispatch.h"
+ #include "fle_env.h"
+ #include "fle_gil.h"
+ #include "fle_callback.h"
++#include "fle_test_env.h"
++
++/* Decision 0319: the TEB of the running guest thread (fle_vex.h; weak, so that a link without it still links: no guest stack is registered then and that check is skipped). With FLE_TLS_MORE fle_teb_cur is a field of the
++ * thread-local block (fle_ctx_more.h), a macro, so it is not declared here. */
++extern uint8_t fle_teb[] __attribute__((weak));
++#ifndef FLE_TLS_MORE
++extern uint8_t *fle_teb_cur __attribute__((weak));
++#endif
+ 
+ #ifdef FLE_TLS_MORE
+ #include "fle_ctx_more.h"
+@@ -16,6 +26,30 @@
+ static unsigned depth;
+ #endif
+ 
++/* Decision 0319 TEST-ONLY diagnostic (FLE_DIAG_CB=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there; PM 09:2x, the stop 'callback nesting is deeper than FLE_CB_MAX_DEPTH' after a display change): every
++ * nested call of a guest function from the runtime (depth >= 1) is recorded with the callee (va, rcx, rdx, r8, r9: for a window procedure hwnd, message, wParam, lParam), the guest return address of the API that runs (the caller site in
++ * the guest), the guest stack pointer and the bytes the host (C) stack of the running thread has left; the frames are printed on stderr as "fl-diag: cb depth D ..." the first 24 times the depth exceeds 8 and, always, for every level when
++ * a stack limit stops the run. */
++typedef struct { uint64_t va, a1, a2, a3, a4, sp, ret, hostfree; } cb_frame;
++static cb_frame cb_fr[FLE_CB_MAX_DEPTH + 2];
++static int cb_diag_on(void)
++{
++    static int on = -1;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_CB"); on = e != NULL && e[0] == '1'; }
++    return on;
++}
++static void cb_dump(const char *why, unsigned upto)
++{
++    unsigned i;
++
++    fprintf(stderr, "fl-diag: cb %s: nesting %u\n", why, upto);
++    for (i = 0; i < upto && i < FLE_CB_MAX_DEPTH + 2; i++)
++        fprintf(stderr, "fl-diag: cb depth %u va %#" PRIx64 " hwnd/a1 %#" PRIx64 " msg/a2 %#" PRIx64 " wp/a3 %#" PRIx64 " lp/a4 %#" PRIx64 " caller-site %#" PRIx64 " sp %#" PRIx64 " host-stack-free %" PRIu64 "\n", i + 1, (uint64_t)cb_fr[i].va, (uint64_t)cb_fr[i].a1,
++                (uint64_t)cb_fr[i].a2, (uint64_t)cb_fr[i].a3, (uint64_t)cb_fr[i].a4, (uint64_t)cb_fr[i].ret, (uint64_t)cb_fr[i].sp, (uint64_t)cb_fr[i].hostfree);
++}
++
++
+ unsigned fle_callback_depth(void)
+ {
+     return depth;
+@@ -44,8 +78,48 @@
+     char why[160];
+ 
+     if (va == 0) fle_stop(api, "the callback address is 0");
++    if (cb_diag_on() && depth < FLE_CB_MAX_DEPTH + 2) {
++        static unsigned shown;
++
++        cb_fr[depth].va = va; cb_fr[depth].a1 = rcx; cb_fr[depth].a2 = rdx; cb_fr[depth].a3 = r8; cb_fr[depth].a4 = r9; cb_fr[depth].sp = entry_sp; cb_fr[depth].ret = fle_ld(entry_sp, 8);
++        cb_fr[depth].hostfree = fle_cstack_left ? (uint64_t)fle_cstack_left() : 0;
++        if (depth >= 8 && shown < 24u) { shown++; cb_dump("deep", depth + 1); }
++    }
++    {   /* Decision 0319: Windows limits the nesting by the stack only (see fle_callback.h) */
++        const uint8_t *cur = NULL, *teb;
++        uint64_t limit = 0, base = 0, reserve = FLE_CB_GUEST_RESERVE;
++
++#ifdef FLE_TLS_MORE
++        cur = fle_teb_cur;
++#else
++        if (&fle_teb_cur != NULL) cur = fle_teb_cur;   /* a weak VARIABLE: read it only when it is linked (a test that links fle_callback.c with a few files has none) */
++#endif
++        teb = cur ? cur : fle_teb;
++        if (teb) {
++            memcpy(&base, teb + 0x8, sizeof base);     /* NT_TIB.StackBase / StackLimit (fle_vex.h FLE_TEB_STACKBASE, FLE_TEB_STACKLIMIT) */
++            memcpy(&limit, teb + 0x10, sizeof limit);
++        }
++        if (limit != 0 && base > limit && (base - limit) / 4u < reserve) reserve = (base - limit) / 4u;   /* a small stack (the tests use 64 KiB): a quarter of it */
++        if (limit != 0 && entry_sp < limit + reserve) {
++            snprintf(why, sizeof why, "callback nesting %u: the guest stack is used up (rsp %#" PRIx64 ", StackLimit %#" PRIx64 ", reserve %" PRIu64 "): Windows limits the nesting by the stack size only, decision 0319", depth + 1u,
++                     (uint64_t)entry_sp, (uint64_t)limit, (uint64_t)reserve);
++            if (cb_diag_on()) cb_dump("LIMIT-guest", depth + 1);
++            fle_stop(api, why);
++        }
++    }
++    if (fle_cstack_left) {   /* defined by the file that knows the host (fle_thread_wasm.c in a wasm build); not linked = unknown */
++        size_t host_free = fle_cstack_left();
++
++        if (host_free < FLE_CB_HOST_RESERVE) {
++            snprintf(why, sizeof why, "callback nesting %u: the host (C) stack of the thread is used up (%" PRIu64 " bytes free, reserve %u): Windows limits the nesting by the stack size only, decision 0319", depth + 1u,
++                     (uint64_t)host_free, (unsigned)FLE_CB_HOST_RESERVE);
++            if (cb_diag_on()) cb_dump("LIMIT-host", depth + 1);
++            fle_stop(api, why);
++        }
++    }
+     if (depth >= FLE_CB_MAX_DEPTH) {
+-        snprintf(why, sizeof why, "callback nesting is deeper than FLE_CB_MAX_DEPTH (%u): decision 0064", (unsigned)FLE_CB_MAX_DEPTH);
++        snprintf(why, sizeof why, "callback nesting is deeper than FLE_CB_MAX_DEPTH (%u), the backstop against a runaway recursion: decision 0319", (unsigned)FLE_CB_MAX_DEPTH);
++        if (cb_diag_on()) cb_dump("LIMIT-count", depth + 1);
+         fle_stop(api, why);
+     }
+ 
+--- a/lift/runtime/fle_callback.h
++++ b/lift/runtime/fle_callback.h
+@@ -14,11 +14,22 @@
+ #ifndef FLE_CALLBACK_H
+ #define FLE_CALLBACK_H
+ 
++#include <stddef.h>
+ #include <stdint.h>
+ 
+-/* The deepest nesting of fle_call_guest (a callback that makes the runtime call another callback, and so on). Deeper stops the run
+- * by name. A limit of this lift environment, not a Windows rule (Windows is limited by the stack size only). */
+-#define FLE_CB_MAX_DEPTH 16
++/* Decision 0319 (O5; replaces the depth limit 16 of decision 0064, which was "a choice of this environment, not a value with a basis"): Windows limits the nesting of callbacks by the size of the
++ * stack only, so the run stops when the stack of the running thread is nearly used up, by name and with the numbers:
++ *   - the guest stack: rsp at the call less than FLE_CB_GUEST_RESERVE (a quarter of the stack when the stack is smaller than 4 x the reserve: the tests use 64 KiB) above the StackLimit of the thread's TEB
++ *     (fle_teb_set_stack; the bounds of the memory the guest runs on);
++ *   - the host (C) stack of the lifted code, in a wasm build: the shadow stack of the running thread (emscripten's STACK_SIZE for the first thread, FLE_THREAD_WASM_CSTACK_BYTES for the others) less
++ *     FLE_CB_HOST_RESERVE. The most one nested level used in the measurement of decision 0319 (display change, 17 levels, wizard open) is 34,912 bytes of host stack (a window message sent from
++ *     SetWindowPos) and 1,500 bytes of guest stack.
++ * FLE_CB_MAX_DEPTH stays only as a backstop against a runaway recursion in a build that cannot ask its host stack (native tests); 17 levels were measured in a real run, a window tree is never near this deep. */
++#define FLE_CB_MAX_DEPTH 256
++#define FLE_CB_GUEST_RESERVE 65536    /* 64 KiB */
++#define FLE_CB_HOST_RESERVE 524288    /* 512 KiB */
++/* The bytes of the host (C) stack that the running thread has left. Defined by the file that knows the host (fle_thread_wasm.c in a wasm build); a build without it is not linked with a definition and the host check is skipped. */
++size_t fle_cstack_left(void) __attribute__((weak));
+ 
+ /* The caller-allocated space for the four register arguments that the x64 convention requires at every call (Learn, x64 calling
+  * convention: "The caller must always allocate sufficient space to store four register parameters"). */
+@@ -38,7 +49,7 @@
+  * flags) are whatever the callee left, as after any call, and the callee-saved registers (rbx, rbp, rsi, rdi, r12-r15) have their
+  * entry values. The function stops the run, by name, when:
+  *   - va is 0, or is not a function entry of the image (fle_dispatch_miss);
+- *   - the nesting is deeper than FLE_CB_MAX_DEPTH;
++ *   - the guest stack or (wasm) the host stack of the running thread has less than FLE_CB_GUEST_RESERVE / FLE_CB_HOST_RESERVE left, or the nesting is deeper than FLE_CB_MAX_DEPTH (a backstop);
+  *   - the callee returns with R[4] not where its return address is, with the return address slot changed, or with a callee-saved
+  *     register changed (the callee broke the calling convention, or the lift did). xmm6-15 are not checked. */
+ uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9);
+--- a/lift/runtime/fle_thread_wasm.c
++++ b/lift/runtime/fle_thread_wasm.c
+@@ -14,6 +14,7 @@
+ #include "fle_env.h"
+ #include "fle_thread.h"
+ #include "fle_thread_wasm.h"
++#include "fle_callback.h"
+ 
+ /* The JS library (harness/web/threads/fle_thread_lib.js). `fle_wasm_thread_switch` is an async import (WebAssembly.Suspending under -sJSPI): it returns when another thread has
+  * switched back to `from`. `fle_wasm_thread_exit` throws a JS exception that ends the calling JSPI stack and hands over to `to`; it never returns. */
+@@ -92,6 +93,15 @@
+     region[idx] = NULL;
+ }
+ 
++size_t fle_cstack_left(void)
++{
++    uintptr_t sp = (uintptr_t)emscripten_stack_get_current();
++    unsigned idx = fle_thread_current ? fle_thread_current() : 0u;
++
++    if (idx == 0 || idx >= FLE_THREAD_MAX || !region[idx]) return (size_t)emscripten_stack_get_free();
++    return sp > (uintptr_t)region[idx] + CANARY_BYTES ? (size_t)(sp - ((uintptr_t)region[idx] + CANARY_BYTES)) : 0u;
++}
++
+ size_t fle_thread_wasm_hiwater(unsigned idx)
+ {
+     return idx < FLE_THREAD_MAX ? hiwater[idx] : 0;

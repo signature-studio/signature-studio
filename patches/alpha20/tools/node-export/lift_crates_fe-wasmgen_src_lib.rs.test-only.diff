@@ -1,0 +1,15 @@
+--- /tmp/base-lift_crates_fe-wasmgen_src_lib.rs	2026-11-06 21:18:16.698384930 +0900
++++ tt-split/lift/crates/fe-wasmgen/src/lib.rs	2026-11-06 21:15:21.049735150 +0900
+@@ -612,10 +612,10 @@
+         module.import_global("c", "__tls_base");
+     }
+     if let Some((m, n)) = &conf.mem_import {
+-        if conf.tls_ctx.is_some() { module.import_memory_shared(m, n, 1, 32768); } else { module.import_memory(m, n, 1, None); }
++        if conf.tls_ctx.is_some() { module.import_memory_shared(m, n, 1, 65536); } else { module.import_memory(m, n, 1, None); }
+     } else {
+         let name = if conf.hybrid_r.is_some() { "memory" } else { "mem" };
+-        if conf.tls_ctx.is_some() { module.import_memory_shared("env", name, 1, 32768); } else { module.import_memory("env", name, 1, None); }
++        if conf.tls_ctx.is_some() { module.import_memory_shared("env", name, 1, 65536); } else { module.import_memory("env", name, 1, None); }
+     }
+     let ui = FuncType { params: vec![Ty::I64; 6], results: vec![Ty::I64] };
+     let ui_ty = module.type_index(ui.clone());

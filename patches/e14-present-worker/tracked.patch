@@ -1,0 +1,415 @@
+diff --git a/app/src/engine/client.ts b/app/src/engine/client.ts
+index 0be085f1..861bc65d 100644
+--- a/app/src/engine/client.ts
++++ b/app/src/engine/client.ts
+@@ -4,6 +4,7 @@ import type { RawInput } from '../input/events.ts';
+ import { browserWorkerDiagHost, diagnoseWorkerStart, isPlainWorkerStartEvent } from './worker-diag.ts';
+ import { parseRequest, type FileDlgAnswer, type FileDlgRequest } from './filedlg.ts';
+ import type { BundleAssets, DeskHandover, FromWorker, ToWorker } from './protocol.ts';
++import { newDeskLink } from './desk-link.ts';
+ import { newRingBuffer, RingWriter } from '../input/ring.ts';
+ 
+ export interface ExitInfo { reason: 'finished' | 'stopped' | 'trap'; code: number; message: string; presents: number }
+@@ -32,12 +33,15 @@ export interface ClientEvents {
+   osstate?(m: Extract<FromWorker, { t: 'osstate' }>): void;
+   /** decision 0223: the desktop presenter's counters and the instants of its presents (at most every 100 ms) */
+   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
++  deskAnswers?(m: Extract<FromWorker, { t: 'desk-answers' }>): void;
+   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
+   taskbar?(m: Extract<FromWorker, { t: 'taskbar' }>): void;
+ }
+ 
+ export class EngineClient {
+   private worker: Worker | null = null;
++  /** decision 0311: the present Worker */
++  private deskWorker: Worker | null = null;
+   private readonly readbacks = new Map<string, (m: FromWorker) => void>();
+   private readyResolve: (() => void) | null = null;
+   private exitInfo: ExitInfo | null = null;
+@@ -86,11 +90,19 @@ export class EngineClient {
+     const off = this.events.deskCanvas().transferControlToOffscreen();
+     const sab = newRingBuffer();
+     this.ring = new RingWriter(sab);
+-    const desk: DeskHandover = { canvas: off, ring: sab };
+-    transfer.push(off);
++    // decision 0311: the present Worker owns the canvas's WebGL context once the engine has a scene description; it reaches the page directly (its messages are the same kinds as the engine Worker's)
++    const link = newDeskLink();
++    const pw = new Worker(new URL('./desk-worker.ts', import.meta.url), { type: 'module', name: 'fl-desk' });
++    this.deskWorker = pw;
++    pw.onmessage = (ev: MessageEvent<FromWorker>) => this.onMessage(ev.data);
++    pw.onerror = (ev) => this.events.error('worker', `${ev.message || 'the present Worker raised an error'} (${ev.filename}:${ev.lineno})`);
++    const chan = new MessageChannel();
++    const desk: DeskHandover = { canvas: off, ring: sab, link, port: chan.port1 };
++    transfer.push(off, chan.port1);
+     const msg: ToWorker = { cmd: 'init', manifest, assets, desk };
+     // the packs are handed over, not copied (the DLL pack alone is about 70 MB)
+     this.send(msg, transfer);
++    pw.postMessage({ cmd: 'init', link, port: chan.port2 }, [chan.port2]);
+     await ready;
+   }
+ 
+@@ -118,7 +130,7 @@ export class EngineClient {
+     this.terminate();
+     this.finishExit({ reason: 'stopped', code: -1, message: 'the engine Worker was terminated by the page while the engine was running', presents: 0 });
+   }
+-  terminate(): void { this.worker?.terminate(); this.worker = null; }
++  terminate(): void { this.worker?.terminate(); this.worker = null; this.deskWorker?.terminate(); this.deskWorker = null; }
+ 
+   whenExited(): Promise<ExitInfo> {
+     if (this.exitInfo) return Promise.resolve(this.exitInfo);
+@@ -168,6 +180,7 @@ export class EngineClient {
+       case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
+       case 'osstate': this.events.osstate?.(m); break;
+       case 'desk': this.events.desk?.(m); break;
++      case 'desk-answers': this.events.deskAnswers?.(m); break;
+       case 'taskbar': this.events.taskbar?.(m); break;
+     }
+   }
+diff --git a/app/src/engine/desk-gl.ts b/app/src/engine/desk-gl.ts
+index 16a594c2..82362059 100644
+--- a/app/src/engine/desk-gl.ts
++++ b/app/src/engine/desk-gl.ts
+@@ -52,6 +52,8 @@ export interface SceneApi {
+   sceneMode(on: number): void;
+   resync(): void;
+   describe(): string;
++  /** decision 0311: resync() only asks (the present Worker cannot call the engine); the whole picture arrives with a later scene, so a present that asked must not look again at once */
++  readonly deferred?: boolean;
+ }
+ 
+ /** the presenter the Worker uses for the real engine: `present()` shows what changed and says how many rectangles it uploaded (1 when only the arrangement changed, 0 when nothing did) */
+@@ -144,12 +146,15 @@ export class GlDeskPresenter implements DeskShow {
+   private readonly surface: GlSurface;
+   private readonly api: SceneApi;
+   private readonly memory: () => ArrayBufferLike | null;
++  private readonly sceneMemory: () => ArrayBufferLike | null;
+   private readonly now: () => number;
+ 
+-  constructor(surface: GlSurface, api: SceneApi, memory: () => ArrayBufferLike | null, now: () => number = () => performance.now()) {
++  /** `sceneMemory`: where api.scene()'s address points when that is not the engine's memory (decision 0311: the present Worker reads the description from the link's slot and the surfaces from the engine's memory) */
++  constructor(surface: GlSurface, api: SceneApi, memory: () => ArrayBufferLike | null, now: () => number = () => performance.now(), sceneMemory?: () => ArrayBufferLike | null) {
+     this.surface = surface;
+     this.api = api;
+     this.memory = memory;
++    this.sceneMemory = sceneMemory ?? memory;
+     this.now = now;
+     const gl = surface.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+     if (!gl) throw new Error('no webgl2 context for the desktop canvas');
+@@ -201,11 +206,11 @@ export class GlDeskPresenter implements DeskShow {
+     if (!this.memory() || this.lost) return 0;
+     const t0 = this.now();
+     const ptr = this.api.scene();
+-    const sc = readScene(this.memory() as ArrayBufferLike, ptr);
++    const sc = readScene(this.sceneMemory() as ArrayBufferLike, ptr);
+     const t1 = this.now();
+     this.stats.composeMs += t1 - t0;
+     if (!sc) return 0;
+-    if (this.surface.width !== sc.width || this.surface.height !== sc.height) { this.surface.width = sc.width; this.surface.height = sc.height; this.needDraw = true; this.api.resync(); return this.present(); }
++    if (this.surface.width !== sc.width || this.surface.height !== sc.height) { this.surface.width = sc.width; this.surface.height = sc.height; this.needDraw = true; this.api.resync(); return this.api.deferred ? 0 : this.present(); }
+     const changed = (sc.flags & (SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE)) !== 0;
+     if (sc.updates.length === 0 && !changed && !this.needDraw) return 0;
+     const gl = this.gl;
+diff --git a/app/src/engine/protocol.ts b/app/src/engine/protocol.ts
+index e87df97d..7e752611 100644
+--- a/app/src/engine/protocol.ts
++++ b/app/src/engine/protocol.ts
+@@ -6,7 +6,11 @@ import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
+ import type { HostFileStats } from './hostfiles.ts';
+ 
+ /** decision 0223: what the page hands the Worker for the desktop: the ONE canvas (transferred) and the input ring (shared). The Worker presents the compositor's picture on the canvas itself and reads the input from the ring. */
+-export interface DeskHandover { canvas: OffscreenCanvas; ring: SharedArrayBuffer }
++export interface DeskHandover {
++  canvas: OffscreenCanvas; ring: SharedArrayBuffer;
++  /** decision 0311 (measurement tree): the link to the present Worker (desk-link.ts) and the port on which the engine Worker hands the canvas and the engine's memory to it */
++  link: SharedArrayBuffer; port: MessagePort;
++}
+ 
+ /** What the page loaded and verified for the engine (transferred to the Worker). */
+ export interface BundleAssets {
+@@ -63,4 +67,6 @@ export type FromWorker =
+   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
+   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
+   | { t: 'taskbar'; lid: number }
++  /** decision 0311: the inputs the engine took inline are answered by the present of the scene it published (the present Worker made it at `at`) */
++  | { t: 'desk-answers'; answers: number[]; at: number }
+   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** animation frames delivered to the Worker / presents made from the engine's idle because none was */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
+diff --git a/app/src/engine/worker.ts b/app/src/engine/worker.ts
+index 5299cfc7..ecd0cc23 100644
+--- a/app/src/engine/worker.ts
++++ b/app/src/engine/worker.ts
+@@ -15,6 +15,7 @@ import { DeskPresenter, readDeskState, type DeskApi, type DeskSurface } from './
+ import { GlDeskPresenter, webgl2Usable, type DeskShow, type GlSurface, type SceneApi } from './desk-gl.ts';
+ import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
+ import { QuietClock } from './desk-sleep.ts';
++import { DeskLinkEngine } from './desk-link.ts';
+ import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
+ 
+ declare const self: DedicatedWorkerGlobalScope;
+@@ -40,6 +41,19 @@ const DESK_FALLBACK_MS = 20;
+ /** desk2: when no present changed a pixel for this long, the Worker stops asking for animation frames and looks for a change from the engine's idle (at most every DESK_FALLBACK_MS); the first change wakes the frame loop */
+ const DESK_SLEEP_AFTER_MS = 100;
+ const deskCounters = { ringReads: 0, wakes: 0, ticks: 0, idleTicks: 0 };
++// decision 0311 (PROVISIONAL, measurement tree): when the engine has a scene description and the platform gives WebGL2, the canvas and the engine's memory are handed to the present Worker (desk-worker.ts); this Worker then only
++// publishes the description (fle_desk_scene) through the link and learns from the link when the present is done. deskLink / deskPort exist when the page made the present Worker.
++let deskLink: DeskLinkEngine | null = null;
++let deskPort: MessagePort | null = null;
++let deskHanded = false;
++let deskWaiting = false;   // the present Worker has not yet said whether this platform can use it: the engine Worker waits for the next idle to decide
++let deskApiP: import('./desk.ts').DeskApi | null = null;
++// decision 0311: the inputs the IdleDriver processed at an idle (not taken inline at a scheduler point) are answered by the first scene published after they were processed, when it shows something (as before: the present right after processing)
++let idleAnswerSeqs: number[] = [];
++// V4 (decision 0311): the last scene that showed something (when it was published, when it was drawn) and when the guest last settled: an input the IdleDriver processed is answered at once by a scene published after the injection and the settle that showed something, when there is one
++let lastShown: { tPubAbs: number; at: number } | null = null;
++let tSettledAt = 0;
++let pendingScene: { answers: number[]; seq: number; gate: boolean; tPub: number } | null = null;
+ 
+ const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
+ 
+@@ -66,6 +80,7 @@ async function handle(m: ToWorker): Promise<void> {
+ 
+ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
+   deskCanvas = m.desk.canvas;
++  if (m.desk.link && m.desk.port) { deskLink = new DeskLinkEngine(m.desk.link); deskPort = m.desk.port; }
+   ring = new RingReader(m.desk.ring);
+   watchContextLoss(deskCanvas as unknown as ContextLossTarget, { lost: () => { deskPresenter?.resync(); wakeDesk(); }, restored: () => { deskPresenter?.resync(); wakeDesk(); } });   // a sleeping frame loop (desk2) is woken: the whole picture is sent again
+   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');
+@@ -113,7 +128,7 @@ function ensureDriver(): IdleDriver | null {
+       flushLogs();
+       post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle })) });
+       // decision 0223: what the engine drew in answer to the input is shown now, not at the next animation frame (S-desk-input-present); the compositor holds the frame until the display's next refresh either way
+-      if (deskPresenter) { try { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
++      if (deskPresenter || deskHanded) { try { if (deskHanded) { const t0 = Math.max(Math.min(...list.map((x) => x.tInject)), performance.timeOrigin + tSettledAt); if (lastShown && lastShown.tPubAbs >= t0) post({ t: 'desk-answers', answers: list.map((x) => x.seq), at: lastShown.at }); else idleAnswerSeqs.push(...list.map((x) => x.seq)); deskTick(false); } else { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+     },
+     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
+     resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
+@@ -154,8 +169,9 @@ function readSettled(ptr: number, max: number): number {
+ }
+ function inputPoll(ptr: number, max: number): number {
+   const d = driver, mem = fruity?.memory;
+-  if (!ring || !d || !d.ready || !mem) return 0;
+-  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
++  if (!ring || !d || !d.ready || !mem) { servicePresent(false); return 0; }
++  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) { inlineSettled = true; tSettledAt = performance.now(); }
++  servicePresent(false);   // decision 0311: after the settled word was read, so that a scene published here is the one that may answer the inputs
+   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
+   let i32: Int32Array | null = null;
+   inlineStaged = [];
+@@ -196,14 +212,16 @@ function completeInline(shown: boolean): void {
+   inlineSince = 0;
+   inlineSettled = false;
+   post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle: at })) });
++  if (deskHanded) { if (shown && list.length > 0 && deskLink) post({ t: 'desk-answers', answers: list.map((x) => x.seq), at: deskLink.presentAt }); return; }
+   flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined);
+ }
+ function answerInline(): void {
+   const d = driver;
+-  if (!d || d.awaitingCount === 0 || !deskPresenter || inlineSince === 0) return;
++  if (!d || d.awaitingCount === 0 || (!deskPresenter && !deskHanded) || inlineSince === 0) return;
+   const t = performance.now();
+   if (!inlineSettled) { if (t - inlineSince >= INLINE_GIVEUP_MS) completeInline(false); return; }
+   if (t - inlineTryAt < INLINE_TRY_MS) return;
++  if (deskHanded) { reapPresented(); if (pendingScene || !deskLink?.canPublish()) return; }   // decision 0311: the present Worker is still drawing the last scene: ask again at the next scheduler point, not after INLINE_TRY_MS
+   inlineTryAt = t;
+   try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+   if (d.awaitingCount > 0 && performance.now() - inlineSince >= INLINE_GIVEUP_MS) completeInline(false);
+@@ -221,9 +239,11 @@ function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
+   const ck = trace.push(n, nowTicks, nextTicks);
+   if (ck) checkpoints.push(ck);
+   flushLogs();
+-  startDeskLoop();
++  ensureDesk();
++  if (deskHanded) servicePresent(true);
++  else if (!deskWaiting) startDeskLoop();
+   // the Worker's requestAnimationFrame is not delivered while the engine keeps the Worker busy (measured, when the engine runs behind the wall clock): the picture is then shown from here, at most every DESK_FALLBACK_MS
+-  if (performance.now() - lastTickAt > DESK_FALLBACK_MS) { lastTickAt = performance.now(); deskCounters.idleTicks++; try { deskTick(); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
++  if (!deskHanded && !deskWaiting && performance.now() - lastTickAt > DESK_FALLBACK_MS) { lastTickAt = performance.now(); deskCounters.idleTicks++; try { deskTick(); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+   if (saveArmed) pollSavedFiles();
+   ensureDriver();
+   drainRing(); // the page's input waits in the ring: it is queued now and given to the engine by onIdle below
+@@ -279,7 +299,7 @@ async function startFruity(f: FruityEngine): Promise<void> {
+   flushLogs();
+   try { deskTick(); } catch (e) { log('error', `final desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+   flushDeskStats(true);
+-  const drawn = deskPresenter?.stats.presents ?? 0;
++  const drawn = deskHanded ? deskLink?.presents ?? 0 : deskPresenter?.stats.presents ?? 0;
+   mark('worker_done', { memoryBytes: curMemory()?.buffer.byteLength ?? null, drawn, hostFiles: f.hostFileStats });
+   if (result.kind === 'trap') {
+     const c = classifyEngineError(result.message);
+@@ -292,6 +312,7 @@ async function startFruity(f: FruityEngine): Promise<void> {
+ }
+ 
+ function deskGlRead(): void {
++  if (deskHanded) { deskPort?.postMessage({ cmd: 'desk-gl-read' }); return; }
+   const p = deskPresenter;
+   if (!(p instanceof GlDeskPresenter)) { post({ t: 'desk-dump-error', message: 'the desktop is not shown with WebGL (the canvas gave no WebGL2 context)' }); return; }
+   const r = p.readPixels();
+@@ -301,6 +322,7 @@ function deskGlRead(): void {
+ }
+ 
+ async function readback(key: string): Promise<void> {
++  if (deskHanded) { deskPort?.postMessage({ cmd: 'readback', key }); return; }
+   if (key !== 'desk' || !deskCanvas) { post({ t: 'readback-error', key, message: `no OffscreenCanvas bound to ${key}` }); return; }
+   if (deskPresenter instanceof GlDeskPresenter) {
+     const r = deskPresenter.readPixels();
+@@ -377,21 +399,82 @@ function makeDeskPresenter(api: DeskApi): DeskShow {
+   } else log('info', 'display method D: no scene description in this engine build (fle_desk_scene) or no usable WebGL2 (a context with a largest texture of at least 8192); the runtime composes one picture and this Worker shows it with putImageData');
+   return new DeskPresenter(deskCanvas as unknown as DeskSurface, api, memory);
+ }
+-/** one present; true when it changed a pixel. `flush`: tell the page about it now unless it was told less than 100 ms ago */
+-function deskTick(flush = true): boolean {
++/** decision 0311: decides once how the desktop is shown: the present Worker (a scene description and WebGL2), else what this Worker did before (WebGL2 here with the scene, or the runtime's one picture with putImageData) */
++function ensureDesk(): boolean {
++  if (deskPresenter || deskHanded) return true;
+   if (!fruity || !deskCanvas) return false;
+-  if (!deskPresenter) {
+-    const api = fruity.deskApi;
+-    if (!api) { log('error', 'display method D: this engine build has no desktop compositor'); deskLoopOn = false; return false; }
+-    deskPresenter = makeDeskPresenter(api);
++  const api = fruity.deskApi;
++  if (!api) { log('error', 'display method D: this engine build has no desktop compositor'); deskLoopOn = false; return false; }
++  const mem = fruity.memory;
++  if (deskLink && deskPort && mem && api.scene && api.sceneMode && deskLink.ready !== 2) {
++    if (deskLink.ready === 0) { deskWaiting = true; return false; }
++    deskWaiting = false;
++    deskApiP = api;
++    deskPort.postMessage({ cmd: 'handover', canvas: deskCanvas, memory: mem }, [deskCanvas as unknown as Transferable]);
++    deskCanvas = null;
++    deskHanded = true;
++    log('info', 'display method D: handing the desktop canvas to the present Worker');
++    return true;
++  }
++  deskPresenter = makeDeskPresenter(api);
++  return true;
++}
++/** decision 0311: learn that the scene in flight was drawn (the inputs the runtime took inline are answered when it showed something and was published after the guest settled) */
++function reapPresented(): void {
++  const L = deskLink;
++  if (!L || !pendingScene || L.done !== pendingScene.seq) return;
++  const p = pendingScene;
++  pendingScene = null;
++  if (L.result > 0) lastShown = { tPubAbs: performance.timeOrigin + p.tPub, at: L.presentAt };
++  if (L.result > 0 && p.answers.length > 0) post({ t: 'desk-answers', answers: p.answers, at: L.presentAt });
++  if (L.result > 0) {
++    if (p.gate) completeInline(true);   // decision 0280: the first present that shows something after the guest settled answers the inputs taken inline
++    if (!firstDeskPixel) { firstDeskPixel = true; mark('first_pixel', { source: 'desktop' }); }
+   }
+-  const gate = inlineSettled;   // decision 0280, L1c: read before the present: the picture of this present is composed after it
+-  const shown = deskPresenter.present();
+-  if (shown > 0) {
+-    presentedAt.push(nowAbs());
+-    if (deskQuiet.changed(performance.now())) deskNextFrame?.();
+-    if (gate) completeInline(true);   // decision 0280: inputs the runtime took inline are answered by the first present that shows something
+-    if (!firstDeskPixel) { firstDeskPixel = true; mark('first_pixel', { source: 'desktop', width: deskCanvas.width, height: deskCanvas.height }); }
++}
++function servicePresent(atIdle: boolean): void {
++  if (!deskHanded) return;
++  try { pService(atIdle); } catch (e) { log('error', `present link: ${String((e as Error)?.stack ?? e)}`); }
++}
++/** decision 0311: what the engine Worker does for the present Worker at a scheduler point or an idle: switch the runtime to the scene when asked, resync when asked, learn that the scene in flight was drawn, publish the next scene when P asks for one (an animation frame) or, while P's frame loop sleeps, look for a change from the idle */
++function pService(atIdle: boolean): void {
++  const L = deskLink, api = deskApiP;
++  if (!L || !api || !deskHanded) return;
++  if (L.modeRequested()) { api.sceneMode?.(1); L.setModeOn(); }
++  if (L.takeResync()) api.resync();
++  reapPresented();
++  L.setCounters(deskCounters.ringReads, deskCounters.wakes, deskCounters.idleTicks);
++  if (pendingScene) return;
++  if (L.wantSet) deskTick(false);
++  else if (atIdle && L.asleep && performance.now() - lastTickAt > DESK_FALLBACK_MS) { lastTickAt = performance.now(); deskCounters.idleTicks++; deskTick(false); }
++}
++/** decision 0311: ask the runtime for the description and hand it to the present Worker; one scene in flight (the written rectangles a call hands out are consumed by it) */
++function publishScene(): void {
++  const L = deskLink, api = deskApiP, mem = fruity?.memory;
++  if (!L || !api?.scene || !mem) return;
++  reapPresented();
++  if (L.ready !== 1 || !L.modeOn || !L.canPublish()) return;
++  const gate = inlineSettled;   // decision 0280, L1c: read before the scene is asked for: the description is made after it
++  const ptr = api.scene();   // the call can grow the memory: the buffer is read after it
++  const seq = L.publish(mem.buffer, ptr);
++  L.clearWant();
++  pendingScene = { answers: idleAnswerSeqs.splice(0), seq, gate, tPub: performance.now() };
++}
++/** one present; true when it changed a pixel. `flush`: tell the page about it now unless it was told less than 100 ms ago. With the present Worker the scene is only published here (the answer comes back through pService) and the result is false */
++function deskTick(flush = true): boolean {
++  if (!fruity || (!deskCanvas && !deskHanded)) return false;
++  if (!ensureDesk()) return false;
++  let shown = 0;
++  if (deskHanded) publishScene();
++  else {
++    const gate = inlineSettled;   // decision 0280, L1c: read before the present: the picture of this present is composed after it
++    shown = (deskPresenter as DeskShow).present();
++    if (shown > 0) {
++      presentedAt.push(nowAbs());
++      if (deskQuiet.changed(performance.now())) deskNextFrame?.();
++      if (gate) completeInline(true);   // decision 0280: inputs the runtime took inline are answered by the first present that shows something
++      if (!firstDeskPixel) { firstDeskPixel = true; mark('first_pixel', { source: 'desktop', width: (deskCanvas as OffscreenCanvas).width, height: (deskCanvas as OffscreenCanvas).height }); }
++    }
+   }
+   const v = fruity.readAppView(lastAppSeq);
+   if (v) {
+@@ -408,6 +491,7 @@ function deskTick(flush = true): boolean {
+   return shown > 0;
+ }
+ function flushDeskStats(force: boolean, answers?: number[]): void {
++  if (deskHanded) return;   // decision 0311: the present Worker reports its own counters
+   const now = performance.now();
+   if (!force && now - lastDeskReport < 100) return;
+   if (!deskPresenter || (presentedAt.length === 0 && !force && now - lastDeskReport < 1000)) return;
+@@ -418,6 +502,7 @@ function flushDeskStats(force: boolean, answers?: number[]): void {
+ // A test aid (any display method): the compositor is asked for the whole desktop as the window table is now, and the picture is copied out. With display method D the next present shows everything again as well.
+ function deskDump(peek: boolean): void {
+   const api = fruity?.deskApi, mem = fruity?.memory;
++  if (deskHanded && peek) { deskPort?.postMessage({ cmd: 'desk-peek', windows: api ? api.describe() : '' }); return; }   // decision 0311: the picture is the present Worker's; the compositor's text is the engine's
+   if (!api || !mem) { post({ t: 'desk-dump-error', message: 'this engine build has no desktop compositor' }); return; }
+   // peek: the picture as it is (what the presenter last read), no compose; dump: the whole picture drawn again from the window table (the next present then shows everything)
+   if (peek && deskPresenter instanceof GlDeskPresenter) {   // decision 0240: with WebGL the picture 'as it is' is the scene drawn again from the textures the browser holds, read back
+diff --git a/app/src/main.ts b/app/src/main.ts
+index 7590a39a..7fbc8aab 100644
+--- a/app/src/main.ts
++++ b/app/src/main.ts
+@@ -555,6 +555,7 @@ const client = new EngineClient({
+     renderDesktopInfo();
+   },
+   taskbar(m) { app.taskbar.update(m.lid); },
++  deskAnswers(m) { if (m.answers.length > 0) app.latency.answer(m.answers, DESKTOP, m.at); },
+   desk(m) {
+     app.deskStats = m.stats;
+     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
+diff --git a/app/test/unit/worker-diag.test.ts b/app/test/unit/worker-diag.test.ts
+index b4a093f3..29ea0548 100644
+--- a/app/test/unit/worker-diag.test.ts
++++ b/app/test/unit/worker-diag.test.ts
+@@ -57,7 +57,7 @@ describe('EngineClient: a plain Worker event is reported as before and then diag
+   const assets = { module: {} as WebAssembly.Module, seed: new Uint8Array(0), glue: new Uint8Array(0), dll: new Uint8Array(0) };
+   const run = async (ev: { message: string; filename: string; lineno: number }) => {
+     let w: { onerror: ((e: unknown) => void) | null } | null = null;
+-    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor() { w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
++    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor() { if (!w) w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
+     g.Worker = FakeWorker; g.fetch = async () => ({ status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) });
+     const errors: string[] = [], logs: string[] = [];
+     const events = { deskCanvas: () => ({ transferControlToOffscreen: () => ({}) }) as unknown as HTMLCanvasElement, log: (_l: string, t: string) => { logs.push(t); }, exit: () => undefined, error: (p: string, m: string) => { errors.push(`${p}: ${m}`); } };
+diff --git a/app/tsconfig.json b/app/tsconfig.json
+index 53c75340..4a5fcf2e 100644
+--- a/app/tsconfig.json
++++ b/app/tsconfig.json
+@@ -35,6 +35,7 @@
+   ],
+   "exclude": [
+     "src/engine/worker.ts",
+-    "src/engine/worker-*.ts"
++    "src/engine/worker-*.ts",
++    "src/engine/desk-worker.ts"
+   ]
+ }
+diff --git a/app/tsconfig.webworker.json b/app/tsconfig.webworker.json
+index b0bc142c..211a52bc 100644
+--- a/app/tsconfig.webworker.json
++++ b/app/tsconfig.webworker.json
+@@ -4,6 +4,6 @@
+     "lib": ["ES2023", "WebWorker"],
+     "types": []
+   },
+-  "include": ["src/engine/worker.ts", "src/engine/worker-*.ts", "src/engine/protocol.ts", "src/bundle/**/*.ts", "shared/**/*.ts"],
++  "include": ["src/engine/worker.ts", "src/engine/worker-*.ts", "src/engine/desk-worker.ts", "src/engine/protocol.ts", "src/bundle/**/*.ts", "shared/**/*.ts"],
+   "exclude": []
+ }

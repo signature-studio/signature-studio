@@ -1,0 +1,65 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -6023,15 +6023,13 @@
+  * (SetPhysicalCursorPos) its counterpart. There is no input device here and no ClipCursor (no row): the position is a state of the runtime, starting at (0, 0) (S-cursor-start: decision 0123's value), set by the setters
+  * to the given point clamped to the virtual screen [0, 1920) x [0, 1080) (S-cursor-screen: the page's "adjusts the coordinates so that the cursor stays within the rectangle" is applied with the screen as the rectangle),
+  * and read back by the getters. The physical and the logical position are the same (no DPI virtualisation: fle_gdc.h 96 DPI, S-physical-cursor).
+- * Decision 0319 (O20): Windows's "cursor state" is a virtual cursor. SetCursorPos moves it, and the host
+- * (browser) pointer's absolute motion is relative to that new place: the guest position is the host's latest
+- * absolute position plus an offset, clamped to the screen. SetCursorPos/SetPhysicalCursorPos stores the
+- * requested point and re-anchors the host latest to that point (offset = 0); the next host absolute move is
+- * then measured from the new position. The host move records its absolute browser point and derives the
+- * guest point as host + offset clamped to the screen. With no offset this is the same behaviour as before. */
++ * Decision 0319 (O20, delta form): the host (browser) can only report an absolute point, but a pointer device reports motion. SetCursorPos moves the cursor, and a pointer device's motion after it is relative to
++ * that new place. While the cursor is hidden (the display count of ShowCursor is negative, as FL's drag does) a host move is therefore applied as the motion since the host's previous point: the guest position
++ * becomes itself plus that motion, clamped to the screen, and SetCursorPos/SetPhysicalCursorPos change the guest position only (the host's previous point is not touched). While the cursor is shown the host's
++ * visible pointer is the cursor and the guest position is that point (S-pointer-shown-absolute, choice: the page of SetCursorPos names no host pointer). Without a SetCursorPos while hidden the guest position
++ * equals the host's point, so nothing changes for a guest that never moves the cursor itself. */
+ static int32_t ptr_x, ptr_y;
+ static int32_t host_ptr_x, host_ptr_y;
+-static int32_t virt_off_x, virt_off_y;
+ 
+ void fle_imp_GetCursorPos(void)
+ {
+@@ -6065,10 +6063,6 @@
+     fle_win_check_thread(api);
+     ptr_x = clamp_x(x);
+     ptr_y = clamp_y(y);
+-    host_ptr_x = ptr_x;
+-    host_ptr_y = ptr_y;
+-    virt_off_x = 0;
+-    virt_off_y = 0;
+     R[0] = 1;
+ }
+ 
+@@ -6104,10 +6098,17 @@
+ }
+ void fle_win_host_pointer_set(int32_t x, int32_t y)
+ {
+-    host_ptr_x = clamp_x(x);
+-    host_ptr_y = clamp_y(y);
+-    ptr_x = clamp_x(host_ptr_x + virt_off_x);
+-    ptr_y = clamp_y(host_ptr_y + virt_off_y);
++    int32_t nx = clamp_x(x), ny = clamp_y(y);
++
++    if (fle_gdi_cursor_display_count && fle_gdi_cursor_display_count() < 0) {
++        ptr_x = clamp_x(ptr_x + (nx - host_ptr_x));
++        ptr_y = clamp_y(ptr_y + (ny - host_ptr_y));
++    } else {
++        ptr_x = nx;
++        ptr_y = ny;
++    }
++    host_ptr_x = nx;
++    host_ptr_y = ny;
+ }
+ void fle_win_pointer_reclamp(void)
+ {
+@@ -6115,8 +6116,6 @@
+     host_ptr_y = clamp_y(host_ptr_y);
+     ptr_x = clamp_x(ptr_x);
+     ptr_y = clamp_y(ptr_y);
+-    virt_off_x = ptr_x - host_ptr_x;
+-    virt_off_y = ptr_y - host_ptr_y;
+ }
+ 
+ void fle_win_pointer_get(int32_t *x, int32_t *y)

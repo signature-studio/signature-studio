@@ -1,0 +1,116 @@
+{
+ "name": "mb-rtt-r2",
+ "page": "/coi/mb.html?n=10000&opts=O2&tests=env,rtt",
+ "started": "2026-10-28T16:08:57.422Z",
+ "loadavg_before": "1.61 1.80 1.75 8/1413 653248",
+ "url": "http://127.0.0.1:40343/coi/mb.html?n=10000&opts=O2&tests=env,rtt",
+ "loadavg_after": "1.56 1.79 1.74 1/1426 653343",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/mb-rtt-r2",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": true,
+   "SharedArrayBuffer": "function",
+   "JSPI": {
+    "Suspending": "function",
+    "promising": "function"
+   },
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  "rtt": [
+   {
+    "variant": "mb_asyncify_O2",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 30.000001192092896,
+     "max": 2119.999974966049,
+     "mean": 104.63549998998641,
+     "p50": 94.9999988079071,
+     "p95": 145.00001072883606,
+     "p99": 349.9999940395355
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_asyncify_O2",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 45.00001668930054,
+     "max": 715.0000035762787,
+     "mean": 111.09999999403954,
+     "p50": 105.00001907348633,
+     "p95": 150.00000596046448,
+     "p99": 219.9999988079071
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_jspi_O2",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 25.000005960464478,
+     "max": 1489.9999797344208,
+     "mean": 99.54999999403954,
+     "p50": 94.9999988079071,
+     "p95": 139.99998569488525,
+     "p99": 260.0000202655792
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "jspi"
+   },
+   {
+    "variant": "mb_jspi_O2",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 44.99998688697815,
+     "max": 864.9999797344208,
+     "mean": 103.71450002193451,
+     "p50": 99.99999403953552,
+     "p95": 144.99998092651367,
+     "p99": 199.99998807907104
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "jspi"
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

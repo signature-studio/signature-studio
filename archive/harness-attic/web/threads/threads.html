@@ -1,0 +1,13 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fle thread scenarios (decision 0124)</title>
+<!-- window.runScen(args, dist): runs one scenario in a new Worker (threads-worker.js) and resolves with its {out, err, code, stats, ms}. Driven by run_chrome_scen.mjs over CDP. -->
+<script>
+window.runScen = (args, dist) => new Promise((resolve) => {
+  const w = new Worker(new URL('threads-worker.js', location.href));   // relative: under /coi/ the worker script gets the COOP/COEP headers too
+  w.onmessage = (e) => { resolve(e.data); w.terminate(); };
+  w.onerror = (e) => { resolve({ out: [], err: ['[js] worker error: ' + e.message], code: 98, stats: null, ms: 0 }); w.terminate(); };
+  w.postMessage({ args, dist: dist || '/dist/' });
+});
+window.__ready = true;
+</script>

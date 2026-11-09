@@ -1,0 +1,400 @@
+diff -ruN new/lift/harness/c0323/expected/README.md new4/lift/harness/c0323/expected/README.md
+--- new/lift/harness/c0323/expected/README.md	2026-11-07 07:54:22.922192936 +0900
++++ new4/lift/harness/c0323/expected/README.md	2026-11-07 08:02:37.696386082 +0900
+@@ -3,12 +3,13 @@
+ - `wine-10.0.out`: contract_0323.c (scenarios E P T H) built with mingw and run under Wine 10.0 (headless, a prefix of its own). UNOFFICIAL reference: Wine is not Windows.
+ - `runtime-HEAD-3969ad31.out`: the same file against the runtime of HEAD 3969ad31 (before decision 0323): 130 differing lines against Wine (E 20, P 16, T 51, H 31).
+ - `runtime-0323.out`: against the runtime with the 0323 diff: 48 differing lines against Wine (E 0, P 0, T 35, H 13). Scenarios E and P are identical to Wine.
++- `runtime-0323-plus-4.out`: with the second diff (④, S-disabled-drops): 38 differing lines against Wine (T4 and T5 now match Wine; win_act's P3 lines `WM_SETCURSOR hit=-2` match the Wine reference of decision 0222).
+ - `runtime-0323-scenario-N.out`, `runtime-HEAD-3969ad31-scenario-N.out`: scenario N (runtime only: `contract_0323 N`; Wine's null driver has no window surface to read): the pixels of a window after the erase of the update rectangle.
+ - `regress.sh TREE WORKDIR` (after `build.sh native TREE WORKDIR`): the native outputs of api2/win_upd.c, win_seq.c and win_act.c, to be compared between two trees. HEAD and 0323 differ only by 2 WM_ERASEBKGND lines in win_seq (Wine has them too) and 0 lines in win_upd and win_act.
+ 
+ The 48 lines that remain in T and H (known divergences, each judged against the Learn page):
+ - T1: Wine 10.0 does not walk from a transparent top-level window to a sibling top-level window (its window_from_point looks only below the top-level window the server chose); Learn WM_NCHITTEST says "underlying windows in the same thread". The runtime follows Learn.
+-- T4, T5: S-disabled-drops of decision 0136 (not part of 0323): Wine skips a disabled child (the parent gets the click) and answers a disabled top-level window with HTERROR (WM_SETCURSOR hit=-2); the runtime drops the event.
++- T4, T5 (before the second diff): S-disabled-drops of decision 0136: Wine skips a disabled child (the parent gets the click) and answers a disabled top-level window with HTERROR (WM_SETCURSOR hit=-2); the runtime dropped the event. The second diff follows Wine.
+ - the trailing WM_NCHITTEST that Wine sends after a click (a refresh of the hit test), and the WM_SETCURSOR of a button-up, which the runtime does not send (decision 0136).
+ - H: the runtime sends WM_SETCURSOR / WM_MOUSEACTIVATE / WM_PARENTNOTIFY when it translates the event, i.e. before the hook is called; Wine sends them after the hook, and not at all for a message the hook discards. PM_NOREMOVE: Wine hit-tests at the peek.
+ 
+diff -ruN new/lift/harness/c0323/expected/runtime-0323-plus-4.out new4/lift/harness/c0323/expected/runtime-0323-plus-4.out
+--- new/lift/harness/c0323/expected/runtime-0323-plus-4.out	1970-01-01 09:00:00.000000000 +0900
++++ new4/lift/harness/c0323/expected/runtime-0323-plus-4.out	2026-11-07 08:02:37.687897335 +0900
+@@ -0,0 +1,208 @@
++#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC
++E1 solid brush (class csolid)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E2 no brush (class cnone)
++  E WM_ERASEBKGND dc=1 -> 0
++  whole DC: result=0 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 0
++  clip (4,4,10,8): result=0 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E3 COLOR_WINDOW + 1 (class cwin)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=ffffff (8,8)=ffffff (15,15)=ffffff
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=ffffff (4,4)=ffffff (9,7)=ffffff (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E4 CS_PARENTDC with a brush (class cpar)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++#### scenario P: the erase of a window DC
++P1 default WM_PAINT, class with a brush (window WS, class csolid)
++  WS WM_PAINT (default)
++  WS WM_ERASEBKGND dc=1 -> 1
++  after: update rect 0 (0,0,0,0)
++P2 default WM_PAINT, class without a brush (window WN, class cnone)
++  WN WM_PAINT (default)
++  WN WM_ERASEBKGND dc=1 -> 0
++  after: update rect 0 (0,0,0,0)
++P3 own BeginPaint, class with a brush (window C1, class csolid)
++  C1 WM_ERASEBKGND dc=1 -> 1
++  C1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P4 own BeginPaint, class without a brush (window C2, class cnone)
++  C2 WM_ERASEBKGND dc=1 -> 0
++  C2 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P5 own BeginPaint, bErase FALSE (window C3, class csolid)
++  C3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P6 RDW_ERASENOW then BeginPaint, class with a brush (window C4, class csolid)
++  C4 WM_ERASEBKGND dc=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C4 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P7 RDW_ERASENOW then BeginPaint, class without a brush (window C5, class cnone)
++  C5 WM_ERASEBKGND dc=1 -> 0
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C5 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint) (window Q1, class csolid)
++  Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW) (window Q2, class csolid)
++  Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  Q2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT) (window Q3, class csolid)
++  Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++#### scenario T: WM_NCHITTEST answered HTTRANSPARENT
++T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A):
++ click (160,120): in both:
++  TB WM_NCHITTEST
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=140 y=100
++  TB WM_NCHITTEST
++  A WM_NCHITTEST
++  A WM_MOUSEACTIVATE hit=1 msg=0x201
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=140 y=100
++  A WM_NCHITTEST
++  A WM_LBUTTONUP x=140 y=100
++ click (280,200): only in TB: nothing beneath:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (60,50): only in A:
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=40 y=30
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=40 y=30
++  A WM_NCHITTEST
++  A WM_LBUTTONUP x=40 y=30
++T2 a transparent child (TC) of a pop-up (P): the click goes to P:
++ click (80,80): in TC:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_LBUTTONUP x=40 y=40
++T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P:
++ click (160,120): in C (and in TC):
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_SETCURSOR hit=1 msg=0x200
++  P WM_SETCURSOR hit=1 msg=0x200
++  C WM_MOUSEMOVE x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  C WM_SETCURSOR hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  C WM_LBUTTONDOWN x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_LBUTTONUP x=20 y=20
++ click (80,80): in TC only:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_LBUTTONUP x=40 y=40
++T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it:
++ click (80,80): in D:
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  P WM_NCHITTEST
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  P WM_NCHITTEST
++  P WM_LBUTTONUP x=40 y=40
++T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event:
++ click (100,80): in DP:
++  DP WM_SETCURSOR hit=-2 msg=0x200
++  DP WM_SETCURSOR hit=-2 msg=0x201
++  DP WM_SETCURSOR hit=-2 msg=0x202
++#### scenario H: WH_MOUSE and WH_KEYBOARD
++H1 click on W with a mouse hook that lets everything pass:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONUP x=70 y=50
++H2 the key A down and up with a keyboard hook that lets everything pass:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 -> 0
++  W WM_KEYDOWN vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++  HOOK2 -> 0
++  W WM_KEYUP vk=0x41 lp=0xc01e0001
++H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONUP x=70 y=50
++H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION):
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=3 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  peek(noremove) -> 0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=90 y=60
++  peek(remove) -> 0x200
++H6 the mouse hook is removed: no hook line:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_LBUTTONUP x=70 y=50
+diff -ruN new/lift/runtime/fle_input.c new4/lift/runtime/fle_input.c
+--- new/lift/runtime/fle_input.c	2026-11-07 07:52:27.823470986 +0900
++++ new4/lift/runtime/fle_input.c	2026-11-07 08:01:48.110154945 +0900
+@@ -381,8 +381,9 @@
+ }
+ 
+ /* The window that gets the mouse event: the capture window if some window has the capture, else the window at the point. Learn WM_MOUSEMOVE: "If the mouse is not captured, the message is posted to the window that contains
+- * the cursor. Otherwise, the message is posted to the window that has captured the mouse." A disabled window (or one with a disabled ancestor) gets no mouse input: the event is dropped (S-disabled-drops: Learn
+- * WindowFromPoint "does not retrieve a handle to a hidden or disabled window"; the page of mouse input says nothing about a click on a disabled window, which Windows swallows). */
++ * the cursor. Otherwise, the message is posted to the window that has captured the mouse." Decision 0324 (replaces S-disabled-drops of decision 0136): the window is the first of fle_win_input_hit_list, which skips a
++ * disabled child (the window beneath it gets the event) and finds a disabled pop-up or top-level window itself; translate_mouse answers that one with WM_SETCURSOR(HTERROR) and gives it no mouse message (Wine 10.0,
++ * window_from_point and process_mouse_message, UNOFFICIAL; Learn WindowFromPoint "does not retrieve a handle to a hidden or disabled window"; the page of mouse input says nothing about a click on a disabled window). */
+ static uint64_t mouse_target(int32_t x, int32_t y, unsigned *thread, int *captured)
+ {
+     unsigned ct;
+@@ -400,9 +401,6 @@
+     if (!h || !fle_win_input_view(h, &v)) {
+         return 0;
+     }
+-    if (!v.enabled) {
+-        return 0;
+-    }
+     *thread = v.owner;
+     return h;
+ }
+@@ -500,15 +498,21 @@
+  * underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)". The windows that contain the point are walked in the order of Wine 10.0's window_from_point (win32u/window.c,
+  * UNOFFICIAL: the list of fle_win_input_hit_list, a child before its parent, a sibling below after the whole of the one above): each one that belongs to the thread of the first one is sent WM_NCHITTEST; the first
+  * answer that is not HTTRANSPARENT decides the window and the hit-test code; a window of another thread is not asked (Wine: HTCLIENT, "the hit test is only sent to windows of the current thread"). A disabled
+- * window ends the walk with the event dropped, as it does for the first one (S-disabled-drops). When every window answers HTTRANSPARENT there is no window (Wine: the result is NULL). `first` is the window
+- * mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
++ * window ends the walk with HTERROR (decision 0324: window_from_point checks WS_DISABLED before it sends WM_NCHITTEST, for the first window as for the others). When every window answers HTTRANSPARENT
++ * there is no window (Wine: the result is NULL). `first` is the window mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
+ #define HIT_LIST_MAX 64u
+ static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, int *ht)
+ {
+     uint64_t list[HIT_LIST_MAX];
+     unsigned n, k;
+-    int r = send_hittest("input", first, x, y);
++    fle_win_iview fv;
++    int r;
+ 
++    if (fle_win_input_view(first, &fv) && !fv.enabled) {
++        *ht = FLE_HTERROR;
++        return first;
++    }
++    r = send_hittest("input", first, x, y);
+     *ht = r;
+     if (r != FLE_HTTRANSPARENT) return first;      /* the common case: the first window decides (no list is made) */
+     *ht = FLE_HTNOWHERE;
+@@ -518,7 +522,10 @@
+         fle_win_iview cv;
+ 
+         if (!fle_win_input_view(list[k], &cv)) continue;          /* a window that went away while an earlier one handled WM_NCHITTEST */
+-        if (!cv.enabled) return 0;
++        if (!cv.enabled) {
++            *ht = FLE_HTERROR;
++            return list[k];
++        }
+         if (cv.owner != thread) {
+             *ht = FLE_HTCLIENT;
+             return list[k];
+@@ -554,6 +561,15 @@
+             pointer_over_nothing(e);
+             return;
+         }
++        if (ht == FLE_HTERROR) {
++            /* decision 0324: the window under the pointer is disabled. Wine 10.0 process_mouse_message: "if hittest == HTERROR || HTNOWHERE: send_message(WM_SETCURSOR, hwnd, MAKELONG(hittest, msg->message)); the message is dropped".
++             * The message number is the client message the event would have made (the button's down / up message, WM_MOUSEMOVE). The window the pointer was in gets its leave notification as before. */
++            uint32_t cm = e->kind == FLE_IN_MOVE ? FLE_WM_MOUSEMOVE : btn_down[e->data == (int32_t)FLE_IN_BTN_R ? 1u : e->data == (int32_t)FLE_IN_BTN_M ? 2u : 0u] + (e->kind == FLE_IN_BUP ? 1u : 0u);
++
++            pointer_over_nothing(e);
++            (void)fle_win_input_send("input", w, FLE_WM_SETCURSOR, w, ((uint64_t)cm << 16) | (uint16_t)FLE_HTERROR);
++            return;
++        }
+     }
+     /* S-capture-client: while a window has the capture it gets the client messages (WM_MOUSEMOVE, WM_LBUTTONDOWN ... with coordinates relative to its client area, negative or beyond its size when the pointer is outside)
+      * whatever WM_NCHITTEST answered (Learn WM_MOUSEMOVE: "the message is posted to the window that has captured the mouse"; the page says nothing of a non-client message to it). */
+diff -ruN new/lift/runtime/fle_input.h new4/lift/runtime/fle_input.h
+--- new/lift/runtime/fle_input.h	2026-11-07 07:42:58.126764838 +0900
++++ new4/lift/runtime/fle_input.h	2026-11-07 08:01:48.108566345 +0900
+@@ -76,7 +76,7 @@
+ int fle_win_input_view(uint64_t hwnd, fle_win_iview *v);
+ int fle_win_input_call_hooks(int id, unsigned thread, int ncode, uint64_t wp, uint64_t lp, const void *blob, unsigned len, uint64_t *result);   /* decision 0323: the WH_MOUSE / WH_KEYBOARD chain of the thread; 1 = a hook was called */
+ unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned max);   /* decision 0323: the visible windows that contain the point, children before their parent, top sibling first (the first one is what fle_win_input_hit gives); the count */
+-uint64_t fle_win_input_hit(int32_t x, int32_t y);                 /* the deepest visible window that contains the point (disabled windows are found), 0 = none */
++uint64_t fle_win_input_hit(int32_t x, int32_t y);                 /* the first window of fle_win_input_hit_list (decision 0324: a disabled pop-up is found, the window beneath a disabled child is), 0 = none */
+ uint64_t fle_win_input_send(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp, uint64_t lp);
+ void fle_win_input_showwindow(const char *api, uint64_t hwnd, int cmd);   /* decision 0267: the ShowWindow that DefWindowProcW makes of WM_SYSCOMMAND SC_MINIMIZE / SC_MAXIMIZE / SC_RESTORE */
+ unsigned fle_win_input_remaximize(int32_t dw, int32_t dh);        /* decision 0212: the zoomed top-level windows grow by the change of the screen; returns how many moved */
+@@ -113,6 +113,7 @@
+ #define FLE_SPI_SETWORKAREA   0x002Fu
+ #define FLE_HTERROR           (-2)
+ #define FLE_HTTRANSPARENT     (-1)
++#define FLE_HTERROR           (-2)
+ #define FLE_HTNOWHERE         0
+ #define FLE_HTCLIENT          1
+ #define FLE_MA_ACTIVATE       1u
+diff -ruN new/lift/runtime/fle_win.c new4/lift/runtime/fle_win.c
+--- new/lift/runtime/fle_win.c	2026-11-07 07:48:38.858426955 +0900
++++ new4/lift/runtime/fle_win.c	2026-11-07 08:01:48.107985934 +0900
+@@ -6683,35 +6683,14 @@
+ 
+ /* ---- Decision 0136 (PROVISIONAL): what runtime/fle_input.c (the input round trip) needs of the window table ---- */
+ 
+-/* The deepest visible window that contains the screen point, disabled windows included (the mouse input of a disabled window is dropped by fle_input.c, not given to the window beneath it). The same walk as hit_test
+- * without the enabled test. */
+-static int64_t hit_visible(int64_t parent, int32_t px, int32_t py)
+-{
+-    int64_t idx[SIB_MAX];
+-    uint32_t n = siblings(parent, idx, SIB_MAX), k;
+-
+-    for (k = 0; k < n; k++) {
+-        int64_t i = idx[k];
+-        int32_t ox, oy;
+-
+-        if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
+-        if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
+-        else ox = oy = 0;
+-        if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
+-        if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
+-        {
+-            int64_t c = hit_visible(i, px, py);
+-
+-            return c >= 0 ? c : i;
+-        }
+-    }
+-    return -1;
+-}
+-
+ /* Decision 0323: every visible window that contains the screen point, in the order of Wine 10.0's list for window_from_point (server/window.c get_window_children_from_point and all_windows_from_point, UNOFFICIAL): the
+  * siblings from the top of the z-order, and for each the windows below it that contain the point (recursively, the same rule) BEFORE the window itself. The first entry is what fle_win_input_hit gives. Learn WM_NCHITTEST,
+  * HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)":
+- * fle_input.c walks this list. Disabled windows are in it (as in fle_win_input_hit); the same tests as hit_visible. */
++ * fle_input.c walks this list.
++ * Decision 0324 (replaces S-disabled-drops of decision 0136, which found the deepest window even when it was disabled and dropped the event): a DISABLED CHILD window (WS_CHILD, not WS_POPUP, WS_DISABLED) is not in the
++ * list, with everything below it, so the window beneath it, its parent, is found (Wine 10.0, server/window.c is_point_in_window: "disabled child"); the children of any other disabled window are not looked at
++ * (get_window_children_from_point: "if point is in client area, and window is not minimized or disabled, check children"), so a disabled pop-up or top-level window is found itself, and fle_input.c answers it
++ * with HTERROR (window_from_point: "If window is minimized or disabled, return at once"). Learn WindowFromPoint: "does not retrieve a handle to a hidden or disabled window". */
+ static unsigned hit_list_rec(int64_t parent, int32_t px, int32_t py, uint64_t *out, unsigned max, unsigned n)
+ {
+     int64_t idx[SIB_MAX];
+@@ -6722,11 +6701,12 @@
+         int32_t ox, oy;
+ 
+         if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
++        if ((tab[i].style & (FLE_WS_POPUP | FLE_WS_CHILD | FLE_WS_DISABLED)) == (FLE_WS_CHILD | FLE_WS_DISABLED)) continue;      /* decision 0324: a disabled child, and what is below it */
+         if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
+         else ox = oy = 0;
+         if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
+         if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
+-        n = hit_list_rec(i, px, py, out, max, n);
++        if (!(tab[i].style & FLE_WS_DISABLED)) n = hit_list_rec(i, px, py, out, max, n);      /* decision 0324: the children of a disabled window are not looked at */
+         if (n < max) out[n++] = handle_of(i);
+     }
+     return n;
+@@ -6740,11 +6720,9 @@
+ 
+ uint64_t fle_win_input_hit(int32_t x, int32_t y)
+ {
+-    int64_t i;
++    uint64_t h = 0;
+ 
+-    if (!tab_n) return 0;
+-    i = hit_visible(-1, x, y);
+-    return i >= 0 ? handle_of(i) : 0;
++    return fle_win_input_hit_list(x, y, &h, 1) ? h : 0;
+ }
+ 
+ int fle_win_input_view(uint64_t h, fle_win_iview *v)

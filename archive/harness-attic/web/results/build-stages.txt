@@ -1,0 +1,10 @@
+stage 'rt harness' rc=0 wall=7s maxrss=75656KB web=670MB all=1295MB
+stage 'units' rc=0 wall=227s maxrss=8825784KB web=694MB all=1327MB
+stage 'o1' rc=0 wall=468s maxrss=3643828KB web=609MB all=1278MB
+stage 'link' rc=0 wall=8s maxrss=1691200KB web=985MB all=1654MB
+total wall=710s
+total 380496
+-rw-rw-r-- 1 ubuntu ubuntu    186067 Oct 28 19:32 flengine6.js
+-rwxrwxr-x 1 ubuntu ubuntu 389439365 Oct 28 19:32 flengine6.wasm
+d0f2f0a190baf28aa546ca9f8ad1e7c46e26c8f9dbd701df67f9297345049853  /tmp/opencode/web/ow/wasm-force/bin/flengine6.wasm
+8cb4aeec6c81a17e559c36093ebbdaa271436c9f0ac81d3d82596466238ba13f  /tmp/opencode/web/ow/wasm-force/bin/flengine6.js

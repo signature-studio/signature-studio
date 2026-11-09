@@ -1,0 +1,33 @@
+// Takes a screenshot of the file manager window for the record (decision 0216, opfs1): isolated Chrome, the reference zip extracted through the window, then the folder opened.
+// usage: node test/e2e/files-shot.mjs OUT.png   (needs a built dist/)
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { start, freePort } from '../helpers/proc.mjs';
+import { APP, workDirOf } from '../helpers/wrangler.mjs';
+import { openBrowser } from './browser.mjs';
+const out = process.argv[2] || 'files.png';
+const work = workDirOf('files-shot');
+const port = await freePort();
+const server = start(path.join(APP, 'node_modules/.bin/vite'), ['preview', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: APP, env: { ...process.env, FL_ASSETS_DIR: work, FL_PERF_LOG: path.join(work, 'perf.jsonl') }, ready: /Local:\s+http/, label: 'preview' });
+await server.ready;
+const b = await openBrowser(work, 'shot');
+const p = await b.newPage({ width: 1280, height: 800 });
+await p.goto(`http://127.0.0.1:${port}/`);
+await p.waitFor('!!window.__files', 30000);
+await p.S('DOM.enable');
+await p.ev(`document.getElementById('files-btn').click(); true`);
+await p.waitFor(`!!window.__files.explorer && !!document.querySelector('#fx-list .fx-empty, #fx-list .fx-row[data-name]')`, 20000);
+const ref = path.join(os.homedir(), 'ダウンロード', 'serina1-serum2.zip');
+const { root } = await p.S('DOM.getDocument', { depth: 0 });
+const { nodeId } = await p.S('DOM.querySelector', { nodeId: root.nodeId, selector: '#fx-input-zip' });
+await p.S('DOM.setFileInputFiles', { files: [ref], nodeId });
+await p.waitFor(`!document.getElementById('fx-modal').hidden`, 20000);
+await p.ev(`document.getElementById('fx-modal-ok').click(); true`);
+await p.waitFor(`window.__files.explorer && !window.__files.explorer.busy && document.querySelector('#fx-modal').hidden && document.querySelector('#fx-list .fx-row[data-name="serina1-serum2"]')`, 120000);
+await p.ev(`window.__files.explorer.navigate('/serina1-serum2').then(() => true)`);
+await p.waitFor(`window.__files.explorer.statsDone >= window.__files.explorer.navSeq`, 20000);
+await p.ev(`(() => { const r = document.querySelector('#fx-list .fx-row[data-name]'); r && r.click(); return true; })()`);
+fs.writeFileSync(out, await p.shot(0, 0, 1280, 800));
+await b.close(); await server.stop();
+console.log('wrote', out);

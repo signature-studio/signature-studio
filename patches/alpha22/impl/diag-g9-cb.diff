@@ -1,0 +1,76 @@
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -9,6 +9,7 @@
+ #include "fle_dispatch.h"
+ #include "fle_env.h"
+ #include "fle_callback.h"
++#include "fle_test_env.h"
+ 
+ /* Decision 0319: the TEB of the running guest thread (fle_vex.h; weak, so that a link without it still links: no guest stack is registered then and that check is skipped) */
+ extern uint8_t fle_teb[] __attribute__((weak));
+@@ -16,6 +17,29 @@
+ 
+ static unsigned depth;
+ 
++/* Decision 0319 TEST-ONLY diagnostic (FLE_DIAG_CB=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there; PM 09:2x, the stop 'callback nesting is deeper than FLE_CB_MAX_DEPTH' after a display change): every
++ * nested call of a guest function from the runtime (depth >= 1) is recorded with the callee (va, rcx, rdx, r8, r9: for a window procedure hwnd, message, wParam, lParam), the guest return address of the API that runs (the caller site in
++ * the guest), the guest stack pointer and the bytes the host (C) stack of the running thread has left; the frames are printed on stderr as "fl-diag: cb depth D ..." the first 24 times the depth exceeds 8 and, always, for every level when
++ * a stack limit stops the run. */
++typedef struct { uint64_t va, a1, a2, a3, a4, sp, ret, hostfree; } cb_frame;
++static cb_frame cb_fr[FLE_CB_MAX_DEPTH + 2];
++static int cb_diag_on(void)
++{
++    static int on = -1;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_CB"); on = e != NULL && e[0] == '1'; }
++    return on;
++}
++static void cb_dump(const char *why, unsigned upto)
++{
++    unsigned i;
++
++    fprintf(stderr, "fl-diag: cb %s: nesting %u\n", why, upto);
++    for (i = 0; i < upto && i < FLE_CB_MAX_DEPTH + 2; i++)
++        fprintf(stderr, "fl-diag: cb depth %u va %#" PRIx64 " hwnd/a1 %#" PRIx64 " msg/a2 %#" PRIx64 " wp/a3 %#" PRIx64 " lp/a4 %#" PRIx64 " caller-site %#" PRIx64 " sp %#" PRIx64 " host-stack-free %" PRIu64 "\n", i + 1, (uint64_t)cb_fr[i].va, (uint64_t)cb_fr[i].a1,
++                (uint64_t)cb_fr[i].a2, (uint64_t)cb_fr[i].a3, (uint64_t)cb_fr[i].a4, (uint64_t)cb_fr[i].ret, (uint64_t)cb_fr[i].sp, (uint64_t)cb_fr[i].hostfree);
++}
++
+ unsigned fle_callback_depth(void)
+ {
+     return depth;
+@@ -44,6 +68,13 @@
+     char why[160];
+ 
+     if (va == 0) fle_stop(api, "the callback address is 0");
++    if (cb_diag_on() && depth < FLE_CB_MAX_DEPTH + 2) {
++        static unsigned shown;
++
++        cb_fr[depth].va = va; cb_fr[depth].a1 = rcx; cb_fr[depth].a2 = rdx; cb_fr[depth].a3 = r8; cb_fr[depth].a4 = r9; cb_fr[depth].sp = entry_sp; cb_fr[depth].ret = fle_ld(entry_sp, 8);
++        cb_fr[depth].hostfree = fle_cstack_left ? (uint64_t)fle_cstack_left() : 0;
++        if (depth >= 8 && shown < 24u) { shown++; cb_dump("deep", depth + 1); }
++    }
+     {   /* Decision 0319: Windows limits the nesting by the stack only (see fle_callback.h) */
+         const uint8_t *cur = NULL, *teb;
+         uint64_t limit = 0, base = 0, reserve = FLE_CB_GUEST_RESERVE;
+@@ -62,6 +93,7 @@
+         if (limit != 0 && entry_sp < limit + reserve) {
+             snprintf(why, sizeof why, "callback nesting %u: the guest stack is used up (rsp %#" PRIx64 ", StackLimit %#" PRIx64 ", reserve %" PRIu64 "): Windows limits the nesting by the stack size only, decision 0319", depth + 1u,
+                      (uint64_t)entry_sp, (uint64_t)limit, (uint64_t)reserve);
++            if (cb_diag_on()) cb_dump("LIMIT-guest", depth + 1);
+             fle_stop(api, why);
+         }
+     }
+@@ -71,11 +103,13 @@
+         if (host_free < FLE_CB_HOST_RESERVE) {
+             snprintf(why, sizeof why, "callback nesting %u: the host (C) stack of the thread is used up (%" PRIu64 " bytes free, reserve %u): Windows limits the nesting by the stack size only, decision 0319", depth + 1u,
+                      (uint64_t)host_free, (unsigned)FLE_CB_HOST_RESERVE);
++            if (cb_diag_on()) cb_dump("LIMIT-host", depth + 1);
+             fle_stop(api, why);
+         }
+     }
+     if (depth >= FLE_CB_MAX_DEPTH) {
+         snprintf(why, sizeof why, "callback nesting is deeper than FLE_CB_MAX_DEPTH (%u), the backstop against a runaway recursion: decision 0319", (unsigned)FLE_CB_MAX_DEPTH);
++        if (cb_diag_on()) cb_dump("LIMIT-count", depth + 1);
+         fle_stop(api, why);
+     }
+ 

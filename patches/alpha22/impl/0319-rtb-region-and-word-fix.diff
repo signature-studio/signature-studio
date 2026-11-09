@@ -1,0 +1,25 @@
+--- a/lift/runtime/fle_imagelist.h
++++ b/lift/runtime/fle_imagelist.h
+@@ -14,8 +14,9 @@
+ #include <stdint.h>
+ 
+ /* Handles of the lists: FLE_IL_HANDLE_BASE + 4 * (slot + 1), never reused (the pages give no value; 32-bit clean like the other handle regions of this runtime). */
+-#define FLE_IL_HANDLE_BASE UINT64_C(0x7FCB0000)
+-#define FLE_IL_REGION_SIZE UINT64_C(0x00100000)
++/* The region [0x7FB90000, 0x7FBA0000) is the 64 KiB gap between the DC region (fle_gdc.h, up to 0x7FB90000) and the GDI region (fle_gdi.h, from 0x7FBA0000); 64 lists need 260 bytes. It overlaps no other virtual handle region below 2 GiB (lift/crates/fe-lift/tests/window.rs checks it). */
++#define FLE_IL_HANDLE_BASE UINT64_C(0x7FB90000)
++#define FLE_IL_REGION_SIZE UINT64_C(0x00010000)
+ 
+ void fle_imp_ImageList_Create(void);
+ void fle_imp_ImageList_Destroy(void);
+--- a/lift/runtime/fle_sysinfo.c
++++ b/lift/runtime/fle_sysinfo.c
+@@ -263,7 +263,7 @@
+     uint32_t g = (uint32_t)(R[1] & 0xFFFFu);
+ 
+     fle_sysinfo_check_thread(api);
+-    if (g != 0u && g != 0xFFFFu) fle_stop(api, "a processor group other than 0: this environment has one group and the page names no error for another");
++    if (g != 0u && g != 0xFFFFu) fle_stop(api, "a processor group other than 0: this machine has one group and the page names no error for another");
+     return fle_sys_processors();
+ }
+ 

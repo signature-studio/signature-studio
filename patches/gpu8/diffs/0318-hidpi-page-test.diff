@@ -1,0 +1,146 @@
+--- a/app/test/unit/screen-fit.test.ts
++++ b/app/test/unit/screen-fit.test.ts
+@@ -1,7 +1,7 @@
+ import fs from 'node:fs';
+ import path from 'node:path';
+ import { describe, expect, it } from 'vitest';
+-import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, SCREEN_MAX, SCREEN_MIN, type GuestScreenInfo, type Room } from '../../src/ui/screen-fit.ts';
++import { chooseGuestScreen, deviceRatio, dpiOfRatio, drawScale, RoomDebouncer, roomDevicePx, screenEnv, SCREEN_DEFAULT, SCREEN_MAX, SCREEN_MIN, type GuestScreenInfo, type Room } from '../../src/ui/screen-fit.ts';
+ import { beaconProblems } from '../../shared/perf.ts';
+ import { AV_HEADER_BYTES, AV_MAGIC, AV_VERSION, AV_WINDOW_BYTES, readAppView } from '../../src/engine/appview.ts';
+ import { clientToScreen } from '../../src/input/tracker.ts';
+@@ -18,25 +18,66 @@
+     expect({ width: num('FLE_SCREEN_DEFAULT_W'), height: num('FLE_SCREEN_DEFAULT_H') }).toEqual(SCREEN_DEFAULT);
+     expect(h).toContain('"FLE_MONITOR_W"');
+     expect(h).toContain('"FLE_MONITOR_H"');
+-    expect(Object.keys(screenEnv(1, 2))).toEqual(['FLE_MONITOR_W', 'FLE_MONITOR_H']);
++    expect(h).toContain('"FLE_SCREEN_DPI"');
++    expect(Object.keys(screenEnv(1, 2))).toEqual(['FLE_MONITOR_W', 'FLE_MONITOR_H', 'FLE_SCREEN_DPI']);
++    expect(screenEnv(1, 2)).toEqual({ FLE_MONITOR_W: '1', FLE_MONITOR_H: '2', FLE_SCREEN_DPI: '96' });
++    expect(screenEnv(3840, 2160, 168)).toEqual({ FLE_MONITOR_W: '3840', FLE_MONITOR_H: '2160', FLE_SCREEN_DPI: '168' });
++  });
++  it('the DPI range is the one of lift/runtime/fle_screen.h (read from the file) and dpiOfRatio stays inside it', () => {
++    const h = rt('fle_screen.h');
++    const num = (n: string): number => Number(new RegExp(`#define ${n} (\\d+)u`).exec(h)?.[1]);
++    const lo = num('FLE_SCREEN_DPI_DEFAULT'), hi = num('FLE_SCREEN_DPI_MAX');
++    expect([lo, hi]).toEqual([96, 384]);
++    for (const r of [0.25, 0.5, 1, 1.25, 1.5, 1.7647, 1.75, 2, 2.5, 3, 4, 5, 10, Number.NaN, Infinity]) {
++      const d = dpiOfRatio(r);
++      expect(Number.isInteger(d) && d >= lo && d <= hi).toBe(true);
++    }
++    expect([1, 1.25, 1.5, 1.75, 2, 3, 4].map(dpiOfRatio)).toEqual([96, 120, 144, 168, 192, 288, 384]);
++    expect(dpiOfRatio(0.5)).toBe(96);
++    expect(dpiOfRatio(1.7647)).toBe(169);
+   });
+ });
+ 
+-describe('the guest screen for a room', () => {
++describe('the guest screen for a room (decision 0318: the room in device pixels)', () => {
+   const room = (width: number, height: number, dpr: number): Room => ({ width, height, dpr });
+-  it('the guest screen is the room in CSS pixels, drawn at scale 1', () => {
+-    const g = chooseGuestScreen(room(1836, 1048, 1.7647));
+-    expect(g).toEqual({ width: 1836, height: 1048, scale: 1, snap: 1, clamped: false });
+-    // a room of 1836.4 CSS pixels still gives a scale of exactly 1: a guest pixel is a CSS pixel, not 1.0002 of one
++  it('at a ratio of 1 the guest screen is the room in pixels, drawn at scale 1', () => {
++    expect(chooseGuestScreen(room(1836, 1048, 1))).toEqual({ width: 1836, height: 1048, scale: 1, snap: 1, clamped: false });
++    // a room of 1836.4 CSS pixels still gives a scale of exactly 1: a guest pixel is a device pixel, not 1.0002 of one
+     expect(chooseGuestScreen(room(1836.4, 1048.7, 1))).toMatchObject({ width: 1836, height: 1048, scale: 1 });
+   });
++  it('above 1 the guest screen is the room in DEVICE pixels, drawn at 1 / the ratio CSS pixels per guest pixel', () => {
++    const g = chooseGuestScreen(room(1920, 1080, 2));
++    expect(g).toEqual({ width: 3840, height: 2160, scale: 0.5, snap: 0.5, clamped: false });
++    const f = chooseGuestScreen(room(1836, 1048, 1.75));
++    expect(f).toMatchObject({ width: 3213, height: 1834, clamped: false });
++    expect(f.scale).toBeCloseTo(1 / 1.75, 12);
++    expect(f.snap).toBeCloseTo(1 / 1.75, 12);
++    // the canvas is then guest / ratio CSS pixels, which is the room (to a device pixel)
++    expect(f.width * f.scale).toBeLessThanOrEqual(1836 + 1e-9);
++    expect(1836 - f.width * f.scale).toBeLessThan(1 / 1.75 + 1e-9);
++  });
++  it('a ratio below 1 (zoomed out) is treated as 1: the screen is not bigger than the room in CSS pixels', () => {
++    expect(deviceRatio(room(1000, 800, 0.5))).toBe(1);
++    expect(chooseGuestScreen(room(1000, 800, 0.5))).toMatchObject({ width: 1000, height: 800, scale: 1, snap: 1 });
++  });
++  it('whole device pixels from the browser (device-pixel-content-box) are used when the ratio is above 1', () => {
++    expect(roomDevicePx({ width: 1836.4, height: 1048.7, dpr: 1.75 })).toEqual({ width: 1836.4 * 1.75, height: 1048.7 * 1.75 });
++    expect(roomDevicePx({ width: 1836.4, height: 1048.7, dpr: 1.75, deviceWidth: 3214, deviceHeight: 1835 })).toEqual({ width: 3214, height: 1835 });
++    expect(chooseGuestScreen({ width: 1836.4, height: 1048.7, dpr: 1.75, deviceWidth: 3214, deviceHeight: 1835 })).toMatchObject({ width: 3214, height: 1835 });
++    // at a ratio of 1 or below they are not used (the screen is the CSS size)
++    expect(roomDevicePx({ width: 1000, height: 800, dpr: 1, deviceWidth: 999, deviceHeight: 799 })).toEqual({ width: 1000, height: 800 });
++  });
+   it('drawScale: natural scale when the guest has the pixels the room holds, a fit when it does not (a bundle that did not take the size)', () => {
+-    expect(drawScale({ width: 1836, height: 1056 }, room(1836.4, 1056.9, 1.7647))).toEqual({ scale: 1, snap: 1 });
++    expect(drawScale({ width: 1836, height: 1056 }, room(1836.4, 1056.9, 1))).toEqual({ scale: 1, snap: 1 });
++    expect(drawScale({ width: 3213, height: 1848 }, room(1836.4, 1056.9, 1.75)).scale).toBeCloseTo(1 / 1.75, 12);
+     // a guest that is bigger than the room (the engine kept 1920x1080 in a 1836 room): fitted, not cut
+     expect(drawScale({ width: 1920, height: 1080 }, room(1836, 1056, 1)).scale).toBeCloseTo(1836 / 1920, 9);
++    // the same in device pixels: a 1920x1080 guest in a room of 1836 CSS px at ratio 2 (3672 device px) is shown at 3672 / 1920 / 2 CSS px per guest px (the guest is smaller than the room's pixels: natural scale)
++    expect(drawScale({ width: 1920, height: 1080 }, room(1836, 1056, 2)).scale).toBeCloseTo(0.5, 12);
+     // a guest that the engine did not size to the room (not honoured) is fitted in both directions
+     expect(drawScale({ width: 1920, height: 1080 }, room(960, 540, 1), false)).toEqual({ scale: 0.5, snap: 1 });
+     expect(drawScale({ width: 1920, height: 1080 }, room(3840, 2160, 1), false)).toEqual({ scale: 2, snap: 1 });
++    expect(drawScale({ width: 1920, height: 1080 }, room(1920, 1080, 2), false).scale).toBeCloseTo(1, 12);
+   });
+   it('a room outside the engine limits is pulled inside them: below the minimum the screen is fitted into the room, above the maximum it stays at its natural scale', () => {
+     const small = chooseGuestScreen(room(500, 300, 1));
+@@ -45,13 +86,19 @@
+     const big = chooseGuestScreen(room(9000, 5000, 1));
+     expect(big).toMatchObject({ width: 7680, height: 4320, clamped: true });
+     expect(big.scale).toBe(1);
++    // in device pixels: a room of 4000 x 2500 CSS px at ratio 2 is 8000 x 5000 device px, pulled to 7680 x 4320 and drawn at 0.5 CSS px per guest px
++    const big2 = chooseGuestScreen(room(4000, 2500, 2));
++    expect(big2).toMatchObject({ width: 7680, height: 4320, clamped: true });
++    expect(big2.scale).toBe(0.5);
+   });
+   it('a pointer at a canvas edge lands on the first and the last guest pixel', () => {
+-    const g = chooseGuestScreen(room(1836.4, 1048.7, 1.7647));
+-    const w = g.width * g.scale, h = g.height * g.scale;
+-    const view = { left: 0, top: 44, width: w, height: h };
+-    expect(clientToScreen(0, 44, view, g)).toMatchObject({ x: 0, y: 0, inside: true });
+-    expect(clientToScreen(w - 0.01, 44 + h - 0.01, view, g)).toMatchObject({ x: g.width - 1, y: g.height - 1, inside: true });
++    for (const dpr of [1, 1.7647, 2]) {
++      const g = chooseGuestScreen(room(1836.4, 1048.7, dpr));
++      const w = g.width * g.scale, h = g.height * g.scale;
++      const view = { left: 0, top: 44, width: w, height: h };
++      expect(clientToScreen(0, 44, view, g)).toMatchObject({ x: 0, y: 0, inside: true });
++      expect(clientToScreen(w - 0.01, 44 + h - 0.01, view, g)).toMatchObject({ x: g.width - 1, y: g.height - 1, inside: true });
++    }
+   });
+ });
+ 
+@@ -92,6 +139,18 @@
+     f.advance(1000);
+     expect(seen).toEqual([{ width: 1, height: 2, dpr: 1 }]);
+   });
++  it('a change of the whole device pixels alone counts as a new room', () => {
++    const f = fake();
++    const seen: Room[] = [];
++    const d = new RoomDebouncer((r) => seen.push(r), f, 10);
++    d.push({ width: 5, height: 5, dpr: 1.75, deviceWidth: 9, deviceHeight: 9 });
++    f.advance(10);
++    d.push({ width: 5, height: 5, dpr: 1.75, deviceWidth: 9, deviceHeight: 9 });
++    expect(f.count()).toBe(0);
++    d.push({ width: 5, height: 5, dpr: 1.75, deviceWidth: 10, deviceHeight: 9 });
++    f.advance(10);
++    expect(seen.map((r) => r.deviceWidth)).toEqual([9, 10]);
++  });
+   it('a change of the device pixel ratio alone counts as a new room', () => {
+     const f = fake();
+     const seen: Room[] = [];
+@@ -105,7 +164,7 @@
+ });
+ 
+ describe('the beacon block guestScreen (additive in version 3)', () => {
+-  const ok: GuestScreenInfo = { mode: 'fit', source: 'default', width: 1836, height: 1056, reported: true, dpi: null, roomWidth: 1836, roomHeight: 1056, dpr: 1.7647, follow: 'live' };
++  const ok: GuestScreenInfo = { mode: 'fit', source: 'default', width: 1836, height: 1056, reported: true, dpi: 169, roomWidth: 1836, roomHeight: 1056, dpr: 1.7647, follow: 'live' };
+   const problems = (g: unknown): string[] => beaconProblems({ v: 3, sid: '0123456789ab', guestScreen: g }).filter((p) => p.startsWith('guestScreen'));
+   it('the block the page writes is accepted; absent and null are accepted', () => {
+     expect(problems(ok)).toEqual([]);
+@@ -144,6 +203,6 @@
+     expect(rt('fle_appview.c')).toContain('offsetof(fle_av_state, screen_w) == 48 && offsetof(fle_av_state, screen_h) == 52');
+   });
+   it('the one mode the page writes is accepted by the validator', () => {
+-    for (const mode of ['fit']) expect(beaconProblems({ v: 3, sid: '0123456789ab', guestScreen: { mode, source: 'default', width: 100, height: 100, reported: true, dpi: null, roomWidth: null, roomHeight: null, dpr: 1, follow: 'reload' } }).filter((p) => p.startsWith('guestScreen'))).toEqual([]);
++    for (const mode of ['fit']) expect(beaconProblems({ v: 3, sid: '0123456789ab', guestScreen: { mode, source: 'default', width: 100, height: 100, reported: true, dpi: 169, roomWidth: null, roomHeight: null, dpr: 1, follow: 'reload' } }).filter((p) => p.startsWith('guestScreen'))).toEqual([]);
+   });
+ });

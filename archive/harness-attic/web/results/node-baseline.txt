@@ -1,0 +1,6 @@
+# node v24.19.0, run_node_nmod.cjs unmodified, FLE_WASM_FAST_RETADDR=1, FLE_WASM_TIMING; same wasm (SHA-256 6e52a849...), same input files; 3 runs
+run 1: read 188 ms;instantiated 584 ms;end 3099 ms; wall=0:03.23 maxrss_KB=1248660
+run 2: read 203 ms;instantiated 574 ms;end 3102 ms; wall=0:03.22 maxrss_KB=1249804
+run 3: read 185 ms;instantiated 548 ms;end 3086 ms; wall=0:03.20 maxrss_KB=1248960
+stdout of run 1 vs the browser stdout (normal environment): 1 differing line (line 16, the rsp= value)
+stdout with env -i (only FLE_VFS_SEED, FLE_VFS_SEED_ROOT, FLE_WASM_*): byte-identical to the browser stdout

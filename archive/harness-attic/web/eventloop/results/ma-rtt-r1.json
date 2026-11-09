@@ -1,0 +1,116 @@
+{
+ "name": "ma-rtt-r1",
+ "page": "/coi/ma.html?tests=env%2Crtt%2Cpp",
+ "started": "2026-10-28T16:07:27.772Z",
+ "loadavg_before": "2.36 1.97 1.79 9/1412 650266",
+ "url": "http://127.0.0.1:36437/coi/ma.html?tests=env%2Crtt%2Cpp",
+ "loadavg_after": "2.28 1.97 1.79 1/1446 650645",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/ma-rtt-r1",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": true,
+   "SharedArrayBuffer": "function",
+   "waitAsync": "function",
+   "hardwareConcurrency": 16,
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "timeResolution_us": 5
+  },
+  "rtt_nonblocking_pm": {
+   "unit": "us",
+   "n": 10000,
+   "rtt": {
+    "n": 10000,
+    "min": 20.00001072883606,
+    "max": 5175.000011920929,
+    "mean": 92.41449999511242,
+    "p50": 89.9999737739563,
+    "p95": 125,
+    "p99": 174.99998211860657
+   }
+  },
+  "rtt_sab_sab": {
+   "unit": "us",
+   "n": 10000,
+   "pace_ms": 0,
+   "reply": "sab",
+   "rtt": {
+    "n": 10000,
+    "min": 4.999995231628418,
+    "max": 710.0000083446503,
+    "mean": 74.37650000751019,
+    "p50": 74.99998807907104,
+    "p95": 104.99998927116394,
+    "p99": 140.00001549720764
+   },
+   "worker": {
+    "handled": 10200
+   }
+  },
+  "rtt_sab_pm": {
+   "unit": "us",
+   "n": 10000,
+   "pace_ms": 0,
+   "reply": "pm",
+   "rtt": {
+    "n": 10000,
+    "min": 9.999990463256836,
+    "max": 814.9999976158142,
+    "mean": 82.89999995529652,
+    "p50": 80.00001311302185,
+    "p95": 110.00001430511475,
+    "p99": 150.00000596046448
+   },
+   "worker": {
+    "handled": 10200
+   }
+  },
+  "rtt_sab_sab_paced4ms": {
+   "unit": "us",
+   "n": 2500,
+   "pace_ms": 4,
+   "reply": "sab",
+   "rtt": {
+    "n": 2500,
+    "min": 45.00001668930054,
+    "max": 515.0000154972076,
+    "mean": 98.18199994564057,
+    "p50": 90.00000357627869,
+    "p95": 170.00001668930054,
+    "p99": 229.99998927116394
+   },
+   "worker": {
+    "handled": 2700
+   }
+  },
+  "pingpong_worker_worker": {
+   "unit": "us",
+   "rtt": {
+    "n": 10000,
+    "min": 0,
+    "max": 435.0000023841858,
+    "mean": 64.99049996137619,
+    "p50": 60.00000238418579,
+    "p95": 90.00000357627869,
+    "p99": 125
+   }
+  }
+ },
+ "chrome_pids_left": 0
+}

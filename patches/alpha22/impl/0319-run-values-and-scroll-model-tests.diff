@@ -1,0 +1,36 @@
+--- a/lift/crates/fe-lift/tests/time.rs
++++ b/lift/crates/fe-lift/tests/time.rs
+@@ -1016,7 +1016,9 @@
+ 
+ #[test]
+ fn source_uses_no_host_clock_time_zone_or_environment() {
+-    let code = strip_comments(&std::fs::read_to_string(src_dir().join("fle_time.c")).unwrap());
++    // decision 0319 section 7: the two RUN VALUES of the page (the real time and the zone bias: FLE_WALL_FILETIME, FLE_TZ_BIAS_MIN) are read by name from the engine's environment, like FLE_MONITOR_W / H (fle_test_env.h);
++    // nothing else of the environment is read here
++    let code = strip_comments(&std::fs::read_to_string(src_dir().join("fle_time.c")).unwrap()).replace("getenv(\"FLE_WALL_FILETIME\")", "").replace("getenv(\"FLE_TZ_BIAS_MIN\")", "");
+     for bad in ["<time.h>", "clock_gettime", "gettimeofday", "localtime", "gmtime", "mktime", "tzset", "timezone", "getenv", "environ", "fopen", "getpid", "<unistd.h>", "sys/time.h"] {
+         assert!(!code.contains(bad), "fle_time.c must not use {bad}");
+     }
+--- a/lift/crates/fe-lift/tests/vfs.rs
++++ b/lift/crates/fe-lift/tests/vfs.rs
+@@ -85,7 +85,8 @@
+ #[test]
+ fn runtime_never_uses_host_file_environment_or_registry_apis() {
+     for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c"] {
+-        let t = std::fs::read_to_string(runtime_dir().join(f)).unwrap();
++        // decision 0319 section 7: the run value FLE_ENV_DEFAULTS of the page (the initial environment block) is read by name from the engine's environment; no other environment read
++        let t = std::fs::read_to_string(runtime_dir().join(f)).unwrap().replace("getenv(\"FLE_ENV_DEFAULTS\")", "");
+         for bad in [
+             "fopen", "getenv", "opendir", "readdir", "char **environ", "<unistd.h>", "<fcntl.h>", "<dirent.h>", "<sys/stat.h>",
+             "<sys/types.h>", "popen", "system(", "realpath", "getcwd", "/proc", "/etc", "/home",
+--- a/lift/crates/fe-lift/tests/wall_ia2.rs
++++ b/lift/crates/fe-lift/tests/wall_ia2.rs
+@@ -448,6 +448,8 @@
+ void fle_imp_InvalidateRect(void) { inval_calls++; inval_hwnd = R[1]; inval_erase = R[8]; if (R[2]) memcpy(inval, (const void *)(uintptr_t)R[2], 16); R[0] = 1; }
+ void fle_set_last_error(uint32_t e) { last_err = e; }
+ static int rgn_calls; static int32_t rgn[5];
++/* decision 0319: the window model (fle_win.c) is not linked here: it "cannot answer" and the former simple path of fle_wall_ia2w.c answers, which is what these tests check */
++int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const int32_t *scroll, const int32_t *clip, uint32_t flags, fle_win_scroll_result *res) { (void)api; (void)hwnd; (void)dx; (void)dy; (void)scroll; (void)clip; (void)flags; (void)res; return 0; }
+ void fle_imp_SetRectRgn(void) { rgn_calls++; rgn[0] = (int32_t)R[1]; rgn[1] = (int32_t)R[2]; rgn[2] = (int32_t)R[8]; rgn[3] = (int32_t)R[9]; rgn[4] = (int32_t)((uint64_t *)(uintptr_t)R[4])[5]; R[0] = 1; }
+ static int rgnbox_kind = 2; static int32_t rgnbox[4] = { 1, 2, 5, 6 };
+ void fle_imp_GetRgnBox(void) { if (rgnbox_kind) memcpy((void *)(uintptr_t)R[2], rgnbox, 16); R[0] = (uint64_t)rgnbox_kind; }

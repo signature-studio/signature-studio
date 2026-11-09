@@ -1,0 +1,99 @@
+{
+ "name": "cpsrun-F2000-task",
+ "page": "/plain/cpsrun.html?f=2000&budget=3000000&reps=7&wait=task",
+ "started": "2026-10-28T16:28:11.532Z",
+ "loadavg_before": "1.76 1.86 2.00 6/1452 699079",
+ "url": "http://127.0.0.1:34813/plain/cpsrun.html?f=2000&budget=3000000&reps=7&wait=task",
+ "loadavg_after": "2.59 2.05 2.06 1/1433 700042",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/cpsrun-F2000-task",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "f": "2000",
+  "budget_function_entries": 3000000,
+  "reps": 7,
+  "wait": "task",
+  "rows": [
+   {
+    "opt": "O0",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 1815.9,
+    "ms_median": 2144.1,
+    "ns_per_function_entry_min": 605.3
+   },
+   {
+    "opt": "O0",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 2011.3,
+    "ms_median": 2489.8,
+    "ns_per_function_entry_min": 670.4
+   },
+   {
+    "opt": "O2",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 274.6,
+    "ms_median": 290.2,
+    "ns_per_function_entry_min": 91.5
+   },
+   {
+    "opt": "O2",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 312.7,
+    "ms_median": 433,
+    "ns_per_function_entry_min": 104.2
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

@@ -1,0 +1,11 @@
+
+## V3: LoadLibraryW / GetProcAddress of the real modules, Problems window, stops
+run: rt-rtb-v3; scenario 'rtb-v3-delay2'; state engine-idle; stopped False; firstIdleMs 7936.31982421875; opErrors []; error None
+| module | LoadLibraryW | expected | GetProcAddress(CreatePlugInstance) | expected | verdict |
+|---|---|---|---|---|---|
+| Fruity Balance | 0x6800000 | 0x6800000 | 0x6abdde0 | 0x6abdde0 | PASS |
+| Fruity Filter | 0x7000000 | 0x7000000 | 0x72cb670 | 0x72cb670 | PASS |
+| Fruity Delay 2 | 0x7800000 | 0x7800000 | 0x7abf1a0 | 0x7abf1a0 | PASS |
+Problems window: 691x295 -> 5 plugin(s) (8 rows = 343 px, 16 px per row, no 'samples' rows); expected 5 (295 px); PASS; picture: problems-pic.png
+stop / unsupported / abort lines: 0
+verdict: PASS

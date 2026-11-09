@@ -1,0 +1,100 @@
+--- a/lift/runtime/fle_vfs.c
++++ b/lift/runtime/fle_vfs.c
+@@ -2580,6 +2580,26 @@
+ 
+ /* Decision 0188 (exp1, PROVISIONAL), for the G3 script command `vfsdump` (harness/fruity_g3.c): the bytes of a file on the virtual volume (a file the guest wrote), by its guest path. Returns 1 with *data / *size
+  * (valid until the next write to the file; data is NULL for size 0), 0 when the path is not a file. Reads nothing into the guest and writes nothing. */
++/* Decision 0308/0310 (alpha1, TEST ONLY, disposable tree): the children of a directory of the virtual volume, for the G3 op vfsdumpdir (the files a Split mixer tracks Export wrote). cb returns non-zero to stop. Returns the number of children, -1 when wdir is not a directory. */
++int fle_vfs_walk_dir(const uint16_t *wdir, int (*cb)(const uint16_t *name, size_t nlen, const uint8_t *data, uint64_t size, int is_dir, void *u), void *u)
++{
++    static const char api[] = "fle_vfs_walk_dir";
++    vpath v;
++    fle_node *n, *par;
++    uint32_t st;
++    size_t i;
++
++    parse_path(api, (uint64_t)(uintptr_t)wdir, 0, &v);
++    st = lookup(api, &v, &n, &par);
++    vp_free(&v);
++    if (st || !n->is_dir) return -1;
++    for (i = 0; i < n->nkids; i++) {
++        fle_node *k = n->kids[i];
++        if (cb(k->name, k->nlen, k->data, k->size, k->is_dir, u)) break;
++    }
++    return (int)n->nkids;
++}
++
+ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *size)
+ {
+     static const char api[] = "fle_vfs_peek_file";
+--- a/lift/runtime/fle_vfs.h
++++ b/lift/runtime/fle_vfs.h
+@@ -137,6 +137,8 @@
+ 
+ /* Decision 0188 (PROVISIONAL), for the G3 script command `vfsdump`: the bytes of a file of the virtual volume by its UTF-16 guest path (1 = a file, *data valid until the next write to it, NULL for size 0; 0 = not a file). */
+ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *size);
++/* TEST ONLY (decision 0308/0310, disposable tree): walk the children of a directory of the virtual volume. */
++int fle_vfs_walk_dir(const uint16_t *wdir, int (*cb)(const uint16_t *name, size_t nlen, const uint8_t *data, uint64_t size, int is_dir, void *u), void *u);
+ 
+ /* Decision 0193 (fpick1, PROVISIONAL), for the browser file dialog bridge (fle_filedlg.c): the user's file is put on the volume from the host side, and a file the engine saved is looked at.
+  * fle_vfs_make_dirs: 0 done, 1 invalid path, 5 a component is a file. fle_vfs_put_file: `data` is malloc'd and the volume TAKES IT OVER (also on failure); 0 done, 1 invalid path, 2 the target is a directory, 3 it is open,
+--- a/lift/harness/fruity_g3.c
++++ b/lift/harness/fruity_g3.c
+@@ -179,6 +179,36 @@
+ }
+ static int last_open_request;
+ 
++/* decision 0308/0310 (alpha1, TEST ONLY): the callback of vfsdumpdir */
++struct vdd { const char *dir; unsigned idx; };
++static int g3_vdd_cb(const uint16_t *name, size_t nlen, const uint8_t *data, uint64_t size, int is_dir, void *u) {
++    struct vdd *st = (struct vdd *)u;
++    char nm[300], path[700], hex[65];
++    size_t i;
++    sha_t sh;
++    FILE *f;
++    for (i = 0; i < nlen && i < sizeof nm - 1; i++) {
++        uint16_t c = name[i];
++        nm[i] = (c < 128 && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) ? (char)c : '_';
++    }
++    nm[i] = 0;
++    if (is_dir) { printf("g3-vfsdumpdir: %s: directory\n", nm); return 0; }
++    sha_init(&sh); if (size) sha_update(&sh, data, (size_t)size); sha_final(&sh, hex);
++    if (st->dir && st->dir[0]) {
++        snprintf(path, sizeof path, "%s/%02u-%s", st->dir, st->idx, nm);
++        f = fopen(path, "wb");
++        if (f) {   /* TEST ONLY: copy through a staging buffer in low memory (a pointer above 2 GiB must not reach the JS file system as a signed number) */
++            static unsigned char stage[1u << 20];
++            uint64_t off = 0;
++            while (off < size) { size_t c = (size - off) > sizeof stage ? sizeof stage : (size_t)(size - off); memcpy(stage, data + off, c); fwrite(stage, 1, c, f); off += c; }
++            fclose(f);
++        }
++        printf("g3-vfsdumpdir: %s: %" PRIu64 " bytes sha256 %s -> %s%s\n", nm, size, hex, path, f ? "" : " (NOT WRITTEN)");
++    } else printf("g3-vfsdumpdir: %s: %" PRIu64 " bytes sha256 %s\n", nm, size, hex);
++    st->idx++;
++    return 0;
++}
++
+ /* decision 0144: the raw BGRX bytes of every live surface (a file per surface) for the PNG record of a stage */
+ static void g8_dump(const char *name) {
+     const char *dir = FLE_TEST_GETENV("FLE_G8_DUMPDIR");
+@@ -543,6 +573,20 @@
+             continue;
+         }
+ #endif
++        if (!strcmp(cmd, "vfsdumpdir") && nf >= 2) {   /* decision 0308/0310 (alpha1, TEST ONLY): vfsdumpdir GUESTDIR (the rest of the line, spaces allowed): every file of the directory is written to $FLE_G8_DUMPDIR/NN-<name with every character outside [A-Za-z0-9._-] replaced by _>; prints name, size, SHA-256 */
++            const char *p = ln + 10;
++            const char *dd = FLE_TEST_GETENV("FLE_G8_DUMPDIR");
++            uint16_t *w;
++            struct vdd st = { dd, 0 };
++            int n;
++            while (*p == ' ') p++;
++            w = fle_w_from_ascii(p);
++            n = fle_vfs_walk_dir(w, g3_vdd_cb, &st);
++            free(w);
++            printf("g3-vfsdumpdir: %s: %d entries%s\n", p, n, (dd && dd[0]) ? "" : " (FLE_G8_DUMPDIR is not set: nothing written)");
++            fflush(stdout);
++            continue;
++        }
+         if (!strcmp(cmd, "probetimer") && nf >= 4) {
+             int ok = fle_win_host_timer(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)strtoul(a1, NULL, 0), strtoull(a2, NULL, 0), (uint32_t)strtoul(a3, NULL, 0));
+             printf("g3: probetimer lid %s id %s %s ms: %s\n", a1, a2, a3, ok ? "set" : "NOT set");

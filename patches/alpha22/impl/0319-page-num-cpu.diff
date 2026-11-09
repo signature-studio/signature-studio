@@ -1,0 +1,224 @@
+--- a/app/src/main.ts
++++ b/app/src/main.ts
+@@ -27,6 +27,7 @@
+ import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
+ import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+ import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
++import { applyNumCpu, parseCpuParam } from './engine/num-cpu.ts';
+ import { browserDisplayHost } from './perf/display-host.ts';
+ import { engineExitMessage } from './perf/exit-message.ts';
+ import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
+@@ -643,6 +644,13 @@
+   error: (phase, message) => showError(message, `engine worker, ${phase}`, 'end', 'engine-error'),
+ });
+ 
++// decision 0319 section 11: the number of logical processors the guest sees (FLE_NUM_CPU) is a run value: the Workers that can really run in parallel. Only a bundle that asks (`"FLE_NUM_CPU": "auto"` in its manifest's engine.env,
++// or the URL parameter fle_cpu=auto) gets it; a cooperative bundle keeps answering one processor.
++function applyNumCpuParam(manifest: Manifest): void {
++  const r = applyNumCpu(manifest.engine.env, (globalThis as { navigator?: { hardwareConcurrency?: number } }).navigator?.hardwareConcurrency, parseCpuParam(globalThis.location?.search ?? ''));
++  for (const l of r.lines) addLog(l.level, l.text);
++}
++
+ // decision 0182: the refresh rate goes into the engine's environment before the Worker is given the manifest. The page measures its frame rate from the start of boot() (the manifest fetch and the downloads
+ // wait for the network meanwhile) and applies the result after the downloads: the measurement does not delay the start (decision 0243).
+ function applyHzParam(manifest: Manifest, measured: HzMeasurement | null): void {
+@@ -660,7 +668,6 @@
+   for (const l of r.lines) addLog(l.level, l.text);
+ }
+ 
+-
+ // decision 0220: after the downloads: the browser's storage state, and the removal of the stored copies of older versions (the ones the manifest no longer names and no other page holds)
+ async function finishAssets(store: AssetStore | null, recorder: AssetsRecorder, keep: AssetRef[]): Promise<void> {
+   if (!store) return;
+@@ -727,6 +734,7 @@
+     stamp('download_done');
+     void finishAssets(store, recorder, refs.map(([, r]) => r));
+     applyHzParam(manifest, await hzMeasuring);
++    applyNumCpuParam(manifest);
+     applyScreenParam(manifest);
+     applyWallClockParam(manifest);
+     setState('loaded', 'starting engine');
+--- a/app/src/engine/num-cpu.ts
++++ b/app/src/engine/num-cpu.ts
+@@ -0,0 +1,75 @@
++// Decision 0319 section 11 (PROVISIONAL, PM 08:4x): the number of logical processors the guest sees is a RUN VALUE the page puts into the engine's environment (the manifest's engine.env, which the Worker hands to the
++// engine), like the refresh rate (hz.ts), the screen size (ui/screen-fit.ts) and the wall clock (wall-clock.ts):
++//     FLE_NUM_CPU=<n>     n = clamp(navigator.hardwareConcurrency - 1, 2, 8) = the number of Workers that can really run guest threads in parallel
++// The runtime side is lift/runtime/fle_sys.c fle_sys_processors (impl 0319-num-cpu.diff, on the real-thread build): GetSystemInfo, GetLogicalProcessorInformation, the affinity masks, GetActiveProcessorCount and CPUID
++// all answer this one number, and the real-thread build runs clamp(FLE_NUM_CPU, 2, 8) Workers (PM decision Y). FLE_WORKERS is not passed.
++// WHEN: only for a bundle that asks for it. A cooperative bundle (one guest thread at a time) must keep answering 1, so nothing is added unless the manifest's engine.env says
++//     "FLE_NUM_CPU": "auto"        (the real-thread bundle's manifest: the page replaces `auto` by the number above)
++// or the page's URL says `fle_cpu=auto` (an experiment on any bundle), `fle_cpu=<n>` (pin n, 1..32) or `fle_cpu=off` (remove the variable: the bundle then answers as it did before). A NUMBER that the manifest already
++// carries (a pinned run, a test) is never overwritten by `auto`; only `fle_cpu=<n>` / `off` replace it. The Export harness (which does not use this page) leaves the variable unset: 1 processor, every answer unchanged.
++// Everything here is pure: the processor count is passed in (test/unit/num-cpu.test.ts).
++
++/** the runtime's accepted range (fle_sys.c FLE_SYS_MAX_PROCESSORS) */
++export const NUM_CPU_MAX = 32;
++/** the Worker range of the real-thread build (decision Y: Workers = clamp(FLE_NUM_CPU, 2, 8)) */
++export const WORKERS_MIN = 2;
++export const WORKERS_MAX = 8;
++
++/** the Workers that can run in parallel on this machine: one logical processor stays with the page and the audio thread, at least 2, at most 8; null when the browser does not say */
++export function workersOf(hardwareConcurrency: number | null | undefined): number | null {
++  if (typeof hardwareConcurrency !== 'number' || !Number.isFinite(hardwareConcurrency) || hardwareConcurrency < 1) return null;
++  return Math.min(WORKERS_MAX, Math.max(WORKERS_MIN, Math.floor(hardwareConcurrency) - 1));
++}
++
++export type CpuParam = { mode: 'default' } | { mode: 'auto' } | { mode: 'off' } | { mode: 'fixed'; n: number };
++
++/** the page's URL parameter fle_cpu: `auto`, `off`, or a whole number 1..32; anything else (or none) = the bundle's own manifest decides */
++export function parseCpuParam(search: string): CpuParam {
++  let v: string | null = null;
++  try { v = new URLSearchParams(search).get('fle_cpu'); } catch { v = null; }
++  if (v === null) return { mode: 'default' };
++  if (v === 'auto') return { mode: 'auto' };
++  if (v === 'off') return { mode: 'off' };
++  if (/^\d{1,2}$/.test(v)) {
++    const n = Number(v);
++    if (n >= 1 && n <= NUM_CPU_MAX) return { mode: 'fixed', n };
++  }
++  return { mode: 'default' };
++}
++
++export interface CpuApplied {
++  /** the value the call put into env, or null when it changed nothing / removed the variable */
++  value: string | null;
++  /** lines for the page's log */
++  lines: { level: 'info' | 'warn'; text: string }[];
++}
++
++/** Puts FLE_NUM_CPU into `env` (the manifest's engine.env) as described above. */
++export function applyNumCpu(env: Record<string, string>, hardwareConcurrency: number | null | undefined, param: CpuParam = { mode: 'default' }): CpuApplied {
++  const lines: CpuApplied['lines'] = [];
++  const have = env.FLE_NUM_CPU;
++  const w = workersOf(hardwareConcurrency);
++  if (param.mode === 'off') {
++    if (have !== undefined) { delete env.FLE_NUM_CPU; lines.push({ level: 'info', text: 'FLE_NUM_CPU removed (fle_cpu=off): the engine answers one processor' }); }
++    return { value: null, lines };
++  }
++  if (param.mode === 'fixed') {
++    env.FLE_NUM_CPU = String(param.n);
++    lines.push({ level: 'info', text: `FLE_NUM_CPU=${param.n} (pinned by fle_cpu)` });
++    return { value: String(param.n), lines };
++  }
++  const wantsAuto = param.mode === 'auto' || have === 'auto';
++  if (!wantsAuto) return { value: null, lines };                                  // a cooperative bundle: nothing is added; a number the manifest carries stays
++  if (have !== undefined && have !== 'auto') {
++    lines.push({ level: 'info', text: `FLE_NUM_CPU=${have} kept (the manifest pins it)` });
++    return { value: null, lines };
++  }
++  if (w === null) {
++    delete env.FLE_NUM_CPU;                                                       // 'auto' must never reach the engine as text
++    lines.push({ level: 'warn', text: 'FLE_NUM_CPU not set: the browser does not report navigator.hardwareConcurrency; the engine answers one processor' });
++    return { value: null, lines };
++  }
++  env.FLE_NUM_CPU = String(w);
++  lines.push({ level: 'info', text: `FLE_NUM_CPU=${w} (navigator.hardwareConcurrency ${String(hardwareConcurrency)} - 1, within ${WORKERS_MIN}..${WORKERS_MAX})` });
++  return { value: String(w), lines };
++}
+--- a/app/test/unit/num-cpu.test.ts
++++ b/app/test/unit/num-cpu.test.ts
+@@ -0,0 +1,103 @@
++import { describe, expect, it } from 'vitest';
++import { NUM_CPU_MAX, WORKERS_MAX, WORKERS_MIN, applyNumCpu, parseCpuParam, workersOf } from '../../src/engine/num-cpu.ts';
++
++describe('workersOf', () => {
++  it('is hardwareConcurrency - 1 within 2..8', () => {
++    expect(workersOf(16)).toBe(8);
++    expect(workersOf(32)).toBe(8);
++    expect(workersOf(9)).toBe(8);
++    expect(workersOf(8)).toBe(7);
++    expect(workersOf(4)).toBe(3);
++    expect(workersOf(3)).toBe(2);
++    expect(workersOf(2)).toBe(2);
++    expect(workersOf(1)).toBe(2);
++    expect(workersOf(12.9)).toBe(8);
++  });
++  it('is null when the browser does not say', () => {
++    expect(workersOf(undefined)).toBeNull();
++    expect(workersOf(null)).toBeNull();
++    expect(workersOf(0)).toBeNull();
++    expect(workersOf(-4)).toBeNull();
++    expect(workersOf(Number.NaN)).toBeNull();
++    expect(workersOf(Number.POSITIVE_INFINITY)).toBeNull();
++  });
++  it('keeps the range constants of the runtime', () => {
++    expect([WORKERS_MIN, WORKERS_MAX, NUM_CPU_MAX]).toEqual([2, 8, 32]);
++  });
++});
++
++describe('parseCpuParam', () => {
++  it('reads fle_cpu', () => {
++    expect(parseCpuParam('')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?x=1')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=auto')).toEqual({ mode: 'auto' });
++    expect(parseCpuParam('?fle_cpu=off')).toEqual({ mode: 'off' });
++    expect(parseCpuParam('?fle_cpu=6')).toEqual({ mode: 'fixed', n: 6 });
++    expect(parseCpuParam('?a=b&fle_cpu=32')).toEqual({ mode: 'fixed', n: 32 });
++  });
++  it('ignores what is not a count in range', () => {
++    expect(parseCpuParam('?fle_cpu=0')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=33')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=100')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=abc')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=')).toEqual({ mode: 'default' });
++    expect(parseCpuParam('?fle_cpu=-1')).toEqual({ mode: 'default' });
++  });
++});
++
++describe('applyNumCpu', () => {
++  it('adds nothing for a cooperative bundle (no manifest value, no parameter)', () => {
++    const env: Record<string, string> = { FLE_MONITOR_W: '1920' };
++    const r = applyNumCpu(env, 16);
++    expect(r.value).toBeNull();
++    expect(env).toEqual({ FLE_MONITOR_W: '1920' });
++    expect(r.lines).toEqual([]);
++  });
++  it('replaces the manifest placeholder auto by the number of Workers', () => {
++    const env: Record<string, string> = { FLE_NUM_CPU: 'auto' };
++    const r = applyNumCpu(env, 16);
++    expect(env.FLE_NUM_CPU).toBe('8');
++    expect(r.value).toBe('8');
++    expect(r.lines[0]?.level).toBe('info');
++    const e2: Record<string, string> = { FLE_NUM_CPU: 'auto' };
++    applyNumCpu(e2, 4);
++    expect(e2.FLE_NUM_CPU).toBe('3');
++  });
++  it('never leaves auto as text when the browser does not say', () => {
++    const env: Record<string, string> = { FLE_NUM_CPU: 'auto' };
++    const r = applyNumCpu(env, undefined);
++    expect('FLE_NUM_CPU' in env).toBe(false);
++    expect(r.value).toBeNull();
++    expect(r.lines[0]?.level).toBe('warn');
++  });
++  it('keeps a number that the manifest pins, also under fle_cpu=auto', () => {
++    const env: Record<string, string> = { FLE_NUM_CPU: '4' };
++    expect(applyNumCpu(env, 16).value).toBeNull();
++    expect(env.FLE_NUM_CPU).toBe('4');
++    const e2: Record<string, string> = { FLE_NUM_CPU: '4' };
++    applyNumCpu(e2, 16, { mode: 'auto' });
++    expect(e2.FLE_NUM_CPU).toBe('4');
++  });
++  it('fle_cpu=auto opts any bundle in', () => {
++    const env: Record<string, string> = {};
++    const r = applyNumCpu(env, 12, { mode: 'auto' });
++    expect(env.FLE_NUM_CPU).toBe('8');
++    expect(r.value).toBe('8');
++  });
++  it('fle_cpu=<n> pins n and replaces the manifest value; fle_cpu=off removes it', () => {
++    const env: Record<string, string> = { FLE_NUM_CPU: 'auto' };
++    applyNumCpu(env, 16, { mode: 'fixed', n: 5 });
++    expect(env.FLE_NUM_CPU).toBe('5');
++    const e2: Record<string, string> = { FLE_NUM_CPU: '6' };
++    const r = applyNumCpu(e2, 16, { mode: 'off' });
++    expect('FLE_NUM_CPU' in e2).toBe(false);
++    expect(r.value).toBeNull();
++    const e3: Record<string, string> = {};
++    expect(applyNumCpu(e3, 16, { mode: 'off' }).lines).toEqual([]);
++  });
++  it('does not touch other variables', () => {
++    const env: Record<string, string> = { FLE_NUM_CPU: 'auto', FLE_DWM_HZ: '60', FLE_MONITOR_W: '2560' };
++    applyNumCpu(env, 16);
++    expect(env).toEqual({ FLE_NUM_CPU: '8', FLE_DWM_HZ: '60', FLE_MONITOR_W: '2560' });
++  });
++});

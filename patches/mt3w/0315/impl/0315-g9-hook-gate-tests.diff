@@ -1,0 +1,208 @@
+--- a/lift/crates/fe-lift/tests/g9_hook_gate.rs
++++ b/lift/crates/fe-lift/tests/g9_hook_gate.rs
+@@ -0,0 +1,205 @@
++//! Decision 0320 (mt3, RT-H; TEST-ONLY diagnostics): the census hook of runtime/fle_callback.c (g9_hook, decision 0097) is installed only
++//! while a diagnostic switch of the build is on. The RT builds installed it with a constructor for every run, so every indirect call of
++//! the guest went through the hook, which E13's build never did (the product's fle_dispatch.h runs `if (fle_dispatch_hook)` on every call).
++//!
++//! A native driver (fle_callback.c + fle_env.c + fle_imports.c + a main with one stub guest function inside the plug-in image range of the
++//! hook, 0x6800000..0x7400000) is run with a cleared environment and one variable set. Observed from outside: the main prints whether
++//! `fle_dispatch_hook` is set after the constructors ran, and the hook itself prints "g9-diag: first call into the plug-in image" on stderr
++//! when a call into that range goes through it. The expected values come from the rule (on = one of FLE_DIAG_G9F, FLE_DIAG_ATOM,
++//! FLE_DIAG_GIL, FLE_DIAG_CENSUS equal to "1"; every other value or variable = off), not from reading the C code back.
++
++mod etxt_common;
++
++use std::path::{Path, PathBuf};
++use std::process::Command;
++use std::sync::OnceLock;
++
++fn manifest() -> PathBuf {
++    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++}
++fn runtime_dir() -> PathBuf {
++    manifest().join("../../runtime")
++}
++fn work_dir() -> PathBuf {
++    let d = manifest().join("../../out-cb/test");
++    std::fs::create_dir_all(d.join("tmp")).unwrap();
++    d
++}
++
++const DRIVER: &str = r#"
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdint.h>
++#include "fle_runtime.h"
++#include "fle_dispatch.h"
++#include "fle_env.h"
++#include "fle_callback.h"
++
++uint64_t R[16];
++static uint64_t stk[0x2000] __attribute__((aligned(4096)));
++uint8_t fle_teb[0x2000] __attribute__((aligned(16)));
++#define E0 ((uint64_t)(uintptr_t)stk + 0x8000 + 8)
++#define VA_PLAIN 0x1000
++#define VA_IMAGE 0x6800100
++
++static void cb_add(void) { R[0] = R[1] + R[2]; }
++
++const fle_fn_entry fle_dispatch_table[] = { { VA_PLAIN, cb_add }, { VA_IMAGE, cb_add } };
++const uint64_t fle_dispatch_count = sizeof fle_dispatch_table / sizeof fle_dispatch_table[0];
++
++int main(void)
++{
++    uint64_t a, b;
++
++    R[4] = E0;
++    fle_st(E0, 8, UINT64_C(0xdead0000));
++    printf("hook %d\n", fle_dispatch_hook != NULL);
++    a = fle_call_guest(VA_PLAIN, 40, 2, 0, 0);
++    b = fle_call_guest(VA_IMAGE, 40, 2, 0, 0);
++    printf("results %llu %llu rsp-kept %d\n", (unsigned long long)a, (unsigned long long)b, (int)(R[4] == E0));
++    return 0;
++}
++"#;
++
++fn driver() -> &'static PathBuf {
++    static D: OnceLock<PathBuf> = OnceLock::new();
++    D.get_or_init(|| {
++        let dir = work_dir();
++        let tag = etxt_common::per_process("g9gate-driver");
++        let rt = runtime_dir();
++        let obj = dir.join(format!("{tag}-callback.o"));
++        let cc = Command::new("clang")
++            .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-fPIE", "-c", "-I"])
++            .arg(&rt)
++            .arg(rt.join("fle_callback.c"))
++            .arg("-o")
++            .arg(&obj)
++            .env("TMPDIR", dir.join("tmp"))
++            .output()
++            .expect("clang not found");
++        assert!(cc.status.success(), "clang failed for fle_callback.c: {}", String::from_utf8_lossy(&cc.stderr));
++        let main_c = dir.join(format!("{tag}-main.c"));
++        std::fs::write(&main_c, DRIVER).unwrap();
++        let exe = dir.join(&tag);
++        let cc = Command::new("clang")
++            .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-I"])
++            .arg(&rt)
++            .arg(&obj)
++            .arg(rt.join("fle_env.c"))
++            .arg(rt.join("fle_imports.c"))
++            .arg("-o")
++            .arg(&exe)
++            .arg(&main_c)
++            .env("TMPDIR", dir.join("tmp"))
++            .output()
++            .expect("clang not found");
++        assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
++        exe
++    })
++}
++
++struct Run {
++    hook: bool,
++    g9_lines: usize,
++    results: String,
++}
++
++/// The driver with a cleared environment and `vars` set.
++fn run(vars: &[(&str, &str)]) -> Run {
++    let mut cmd = Command::new(driver());
++    cmd.env_clear().env("TMPDIR", work_dir().join("tmp"));
++    for (k, v) in vars {
++        cmd.env(k, v);
++    }
++    let r = cmd.output().expect("run failed");
++    let out = String::from_utf8_lossy(&r.stdout).to_string();
++    let err = String::from_utf8_lossy(&r.stderr).to_string();
++    assert!(r.status.success(), "{vars:?}: driver failed: {err}\n{out}");
++    let hook_line = out.lines().find(|l| l.starts_with("hook ")).unwrap_or_else(|| panic!("{vars:?}: no hook line in {out}"));
++    Run {
++        hook: hook_line == "hook 1",
++        g9_lines: err.lines().filter(|l| l.starts_with("g9-diag: first call into the plug-in image at 0x6800100")).count(),
++        results: out.lines().find(|l| l.starts_with("results ")).unwrap_or("").to_string(),
++    }
++}
++
++/// The guest call has the same result and keeps rsp whether or not the hook is installed (42 = 40 + 2, for a plain address and one inside the image range).
++const SAME: &str = "results 42 42 rsp-kept 1";
++
++#[test]
++fn without_a_diagnostic_switch_the_hook_is_not_installed() {
++    let r = run(&[]);
++    assert!(!r.hook, "fle_dispatch_hook is set with no FLE_DIAG_* switch");
++    assert_eq!(r.g9_lines, 0, "a call went through g9_hook with no switch");
++    assert_eq!(r.results, SAME);
++}
++
++#[test]
++fn each_hook_switch_installs_the_hook_and_the_call_goes_through_it() {
++    for name in ["FLE_DIAG_G9F", "FLE_DIAG_ATOM", "FLE_DIAG_GIL", "FLE_DIAG_CENSUS"] {
++        let r = run(&[(name, "1")]);
++        assert!(r.hook, "{name}=1: the hook is not installed");
++        assert_eq!(r.g9_lines, 1, "{name}=1: the call into the image range did not go through g9_hook");
++        assert_eq!(r.results, SAME, "{name}=1");
++    }
++}
++
++#[test]
++fn a_switch_that_is_not_one_leaves_the_hook_out() {
++    for (name, v) in [
++        ("FLE_DIAG_G9F", "0"),
++        ("FLE_DIAG_ATOM", ""),
++        ("FLE_DIAG_GIL", "0"),
++        ("FLE_DIAG_CENSUS", "yes"),
++        ("FLE_DIAG_CB", "1"),
++        ("FLE_DIAG_WIN", "1"),
++        ("FLE_DIAG_VFS_MISS", "1"),
++        ("FLE_DIAG_SCROLL", "1"),
++    ] {
++        let r = run(&[(name, v)]);
++        assert!(!r.hook, "{name}={v:?}: the hook is installed");
++        assert_eq!(r.g9_lines, 0, "{name}={v:?}: a call went through g9_hook");
++        assert_eq!(r.results, SAME, "{name}={v:?}");
++    }
++}
++
++#[test]
++fn two_switches_install_the_hook_once() {
++    let r = run(&[("FLE_DIAG_GIL", "1"), ("FLE_DIAG_ATOM", "1"), ("FLE_DIAG_G9F", "0")]);
++    assert!(r.hook);
++    assert_eq!(r.g9_lines, 1);
++}
++
++fn strip_comments(s: &str) -> String {
++    let b: Vec<char> = s.chars().collect();
++    let mut o = String::new();
++    let mut i = 0;
++    while i < b.len() {
++        if b[i] == '/' && i + 1 < b.len() && b[i + 1] == '*' {
++            i += 2;
++            while i + 1 < b.len() && !(b[i] == '*' && b[i + 1] == '/') {
++                i += 1;
++            }
++            i += 2;
++        } else if b[i] == '/' && i + 1 < b.len() && b[i + 1] == '/' {
++            while i < b.len() && b[i] != '\n' {
++                i += 1;
++            }
++        } else {
++            o.push(b[i]);
++            i += 1;
++        }
++    }
++    o
++}
++
++#[test]
++fn the_only_assignment_of_the_hook_is_behind_the_diagnostic_test() {
++    let code = strip_comments(&std::fs::read_to_string(Path::new(&runtime_dir()).join("fle_callback.c")).unwrap());
++    assert_eq!(code.matches("fle_dispatch_hook =").count(), 1, "fle_callback.c assigns fle_dispatch_hook more than once");
++    assert!(code.contains("if (g9_diag_on()) fle_dispatch_hook = g9_hook;"), "the assignment is not behind g9_diag_on()");
++    for name in ["FLE_DIAG_G9F", "FLE_DIAG_ATOM", "FLE_DIAG_GIL", "FLE_DIAG_CENSUS"] {
++        let read = format!("FLE_TEST_GETENV(\"{name}\")");
++        assert!(code.contains(&read), "g9_diag_on() does not read {name}");
++    }
++}

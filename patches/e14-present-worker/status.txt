@@ -1,0 +1,12 @@
+ M app/src/engine/client.ts
+ M app/src/engine/desk-gl.ts
+ M app/src/engine/protocol.ts
+ M app/src/engine/worker.ts
+ M app/src/main.ts
+ M app/test/unit/worker-diag.test.ts
+ M app/tsconfig.json
+ M app/tsconfig.webworker.json
+?? app/src/engine/desk-link.ts
+?? app/src/engine/desk-worker.ts
+?? app/test/unit/desk-gl-link.test.ts
+?? app/test/unit/desk-link.test.ts

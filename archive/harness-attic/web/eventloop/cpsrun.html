@@ -1,0 +1,31 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>M-C': generator-made unwind/rewind on synthetic lifted-shaped code</title>
+<script>
+'use strict';
+// ?f=2000&budget=3000000&reps=7&wait=micro|task|none. For every repetition a fresh instance of cps_base (the wait only counts) and cps_cps
+// (the wait unwinds the whole call chain by returning, the driver awaits, then re-enters and the resume switches jump back to the call sites).
+// Checksums of the final guest state must be equal (same call graph, same number of waits) or the transformation is wrong.
+const Q = new URLSearchParams(location.search);
+const F = Q.get('f') || '2000';
+const BUDGET = +(Q.get('budget') || 3000000);
+const REPS = +(Q.get('reps') || 7);
+const WAIT = Q.get('wait') || 'micro';
+const run = (variant) => new Promise((res, rej) => {
+  const w = new Worker('cpsrun-worker.js');
+  w.onmessage = (e) => { w.terminate(); res(e.data); };
+  w.onerror = (e) => rej(new Error('worker: ' + e.message));
+  w.postMessage({ variant, budget: BUDGET, reps: REPS, wait: WAIT });
+});
+(async () => {
+  const R = { f: F, budget_function_entries: BUDGET, reps: REPS, wait: WAIT, rows: [] };
+  for (const o of (Q.get('opts') || 'O0,O2').split(',')) for (const v of ['base', 'cps']) {
+    const r = await run(`cps_${v}_${F}-${o}`);
+    if (r.error) { R.rows.push({ opt: o, variant: v, error: r.error }); continue; }
+    const s = r.ms.slice(1).sort((a, b) => a - b);
+    R.rows.push({ opt: o, variant: v, checksums: [...new Set(r.checksums)], waits: [...new Set(r.waits)], suspensions: [...new Set(r.suspensions)], ms_min: +s[0].toFixed(1), ms_median: +s[s.length >> 1].toFixed(1), ns_per_function_entry_min: +(s[0] * 1e6 / BUDGET).toFixed(1) });
+    (window.__log = window.__log || []).push(`${o} ${v} done`);
+  }
+  window.__result = R; window.__done = true;
+})().catch((e) => { window.__error = String(e && e.stack || e); });
+</script>

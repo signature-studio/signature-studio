@@ -1,0 +1,11 @@
+--- /tmp/base-lift_runtime_fle_vfs.h	2026-11-06 21:18:16.674385438 +0900
++++ tt-split/lift/runtime/fle_vfs.h	2026-11-06 19:48:09.779404383 +0900
+@@ -137,6 +137,8 @@
+ 
+ /* Decision 0188 (PROVISIONAL), for the G3 script command `vfsdump`: the bytes of a file of the virtual volume by its UTF-16 guest path (1 = a file, *data valid until the next write to it, NULL for size 0; 0 = not a file). */
+ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *size);
++/* TEST ONLY (decision 0308/0310, disposable tree): walk the children of a directory of the virtual volume. */
++int fle_vfs_walk_dir(const uint16_t *wdir, int (*cb)(const uint16_t *name, size_t nlen, const uint8_t *data, uint64_t size, int is_dir, void *u), void *u);
+ 
+ /* Decision 0193 (fpick1, PROVISIONAL), for the browser file dialog bridge (fle_filedlg.c): the user's file is put on the volume from the host side, and a file the engine saved is looked at.
+  * fle_vfs_make_dirs: 0 done, 1 invalid path, 5 a component is a file. fle_vfs_put_file: `data` is malloc'd and the volume TAKES IT OVER (also on failure); 0 done, 1 invalid path, 2 the target is a directory, 3 it is open,

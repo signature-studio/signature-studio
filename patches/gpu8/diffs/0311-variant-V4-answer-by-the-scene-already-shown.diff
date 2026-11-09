@@ -1,0 +1,27 @@
+--- a/app/src/engine/worker.ts
++++ b/app/src/engine/worker.ts
+@@ -50,6 +50,7 @@
+ let deskApiP: import('./desk.ts').DeskApi | null = null;
+ // decision 0311: the inputs the IdleDriver processed at an idle (not taken inline at a scheduler point) are answered by the first scene published after they were processed, when it shows something (as before: the present right after processing)
+ let idleAnswerSeqs: number[] = [];
++let lastShown: { tPubAbs: number; at: number } | null = null;   // V4: the last scene that showed something: when it was published and when it was drawn
+ let pendingScene: { answers: number[]; seq: number; gate: boolean; tPub: number; tSet: number; early: boolean } | null = null;
+ let tSettledAt = 0;   // MEASUREMENT ONLY (decision 0311)
+ 
+@@ -138,7 +139,7 @@
+       flushLogs();
+       post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle })) });
+       // decision 0223: what the engine drew in answer to the input is shown now, not at the next animation frame (S-desk-input-present); the compositor holds the frame until the display's next refresh either way
+-      if (deskPresenter || deskHanded) { try { if (deskHanded) { idleAnswerSeqs.push(...list.map((x) => x.seq)); deskTick(false); } else { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
++      if (deskPresenter || deskHanded) { try { if (deskHanded) { const t0 = Math.max(Math.min(...list.map((x) => x.tInject)), performance.timeOrigin + tSettledAt); if (lastShown && lastShown.tPubAbs >= t0) post({ t: 'desk-answers', answers: list.map((x) => x.seq), at: lastShown.at }); else idleAnswerSeqs.push(...list.map((x) => x.seq)); deskTick(false); } else { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+     },
+     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
+     resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
+@@ -436,6 +437,7 @@
+   if (!L || !pendingScene || L.done !== pendingScene.seq) return;
+   const p = pendingScene;
+   pendingScene = null;
++  if (L.result > 0) lastShown = { tPubAbs: performance.timeOrigin + p.tPub, at: L.presentAt };
+   if (L.result > 0 && p.answers.length > 0) post({ t: 'desk-answers', answers: p.answers, at: L.presentAt });
+   if (ep && p.gate) { ep.doneSeen = nowAbs(); ep.res = L.result; }
+   if (L.result > 0 && p.early) L.addCounter(21, 1);   // MEASUREMENT ONLY: a scene published before the guest settled took the rectangles the input's answer would need

@@ -1,0 +1,10 @@
+# Directories of the virtual volume for a plugin run (decision 0156, S-vst-vfs): only the profile folders that SHGetFolderPathW / SHGetSpecialFolderPathW answer (fle_env.c), as directories without files.
+# Format of lift/harness/vfs_seed.h (decision 0129): <guest path ending in a backslash> TAB - TAB -
+C:\Users\user\	-	-
+C:\Users\user\AppData\	-	-
+C:\Users\user\AppData\Roaming\	-	-
+C:\Users\user\AppData\Local\	-	-
+C:\Users\user\Documents\	-	-
+C:\ProgramData\	-	-
+C:\Program Files\Common Files\	-	-
+C:\Program Files\Common Files\VST3\	-	-

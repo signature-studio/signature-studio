@@ -1,0 +1,192 @@
+--- a/app/src/main.ts
++++ b/app/src/main.ts
+@@ -9,6 +9,7 @@
+ import { EngineClient, type ExitInfo } from './engine/client.ts';
+ import { stateAfterFirstPixel } from './engine/start-state.ts';
+ import { applyHz, HZ_DEFAULT, measureFrameRate, type FrameHost, type HzMeasurement } from './engine/hz.ts';
++import { applyWallClock, parseWallParam } from './engine/wall-clock.ts';
+ import { blockingMissing, describeMissing, detectFeatures, type FeatureReport } from './engine/features.ts';
+ import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
+ import type { AppView } from './engine/appview.ts';
+@@ -652,6 +653,13 @@
+   for (const l of r.lines) addLog(l.level, l.text);
+ }
+ 
++// decision 0319: the wall-clock time and time zone of the guest and its default environment block go into the engine's environment too (engine/wall-clock.ts): the page reads the host clock once, here, so the
++// guest's 'Starting at' time and temporary folder are the user's. A value already in the manifest (a pinned run) is kept; the URL parameter fle_wall=off leaves the engine's fixed origin, fle_wall=<unix ms> pins it.
++function applyWallClockParam(manifest: Manifest): void {
++  const r = applyWallClock(manifest.engine.env, { now: () => Date.now(), tzOffsetMin: () => new Date().getTimezoneOffset() }, parseWallParam(location.search));
++  for (const l of r.lines) addLog(l.level, l.text);
++}
++
+ 
+ // decision 0220: after the downloads: the browser's storage state, and the removal of the stored copies of older versions (the ones the manifest no longer names and no other page holds)
+ async function finishAssets(store: AssetStore | null, recorder: AssetsRecorder, keep: AssetRef[]): Promise<void> {
+@@ -720,6 +728,7 @@
+     void finishAssets(store, recorder, refs.map(([, r]) => r));
+     applyHzParam(manifest, await hzMeasuring);
+     applyScreenParam(manifest);
++    applyWallClockParam(manifest);
+     setState('loaded', 'starting engine');
+     await client.init(manifest, { module, seed: seed.bytes, glue, dll: dll.bytes });
+     stamp('worker_ready');
+--- /dev/null
++++ b/app/src/engine/wall-clock.ts
+@@ -0,0 +1,78 @@
++// Decision 0319 (PROVISIONAL, PM 07:2x; O8 'Starting at 12:00:00 AM', 'Temporary folder C:\Windows\...'): the wall-clock time, the time zone and the initial environment block of the guest are RUN VALUES the page puts into the
++// engine's environment (the manifest's engine.env, which the Worker hands to the engine), like the refresh rate (hz.ts, decision 0182) and the screen size (ui/screen-fit.ts, decision 0212):
++//     FLE_WALL_FILETIME=<decimal FILETIME, 100 ns since 1601-01-01 UTC>   the UTC instant at which the engine starts (the page reads the host clock ONCE; the engine's virtual clock runs from it)
++//     FLE_TZ_BIAS_MIN=<decimal minutes>                                    the Windows bias (UTC = local + bias; Japan standard time is -540); JavaScript's getTimezoneOffset() has the same sign
++//     FLE_ENV_DEFAULTS=1                                                   the guest's environment block starts with TEMP, TMP, USERPROFILE, APPDATA, LOCALAPPDATA, windir ... (runtime/fle_env.c)
++// The runtime side is lift/runtime/fle_time.c and fle_env.c (impl 0319-time-env-run-values.diff). Without these values the engine keeps its fixed origin (2021-01-01 00:00 UTC) and an empty environment: every test and the Export
++// harness (which does not use this page) are unchanged. DETERMINISM: a value that the manifest already carries (a pinned run, a test) is never overwritten, and the URL parameter `fle_wall=off` (or `fle_wall=<unix ms>`)
++// leaves the origin fixed (or pins it) for a reproducible run of the product page. daylight saving time and Windows time-zone names are not modelled (the bias is the one at start).
++// Everything here is pure: the clock is passed in (test/unit/wall-clock.test.ts).
++
++/** FILETIME of 1970-01-01T00:00:00Z (100 ns since 1601-01-01) */
++export const FILETIME_UNIX_EPOCH = 116444736000000000n;
++/** the runtime's accepted bias range, minutes (fle_time.c: -1440..1440) */
++export const TZ_BIAS_LIMIT = 1440;
++
++/** the decimal FILETIME of a Unix time in ms; null when the time is not a finite number or is before 1970 or after 9999 (the SYSTEMTIME range ends at 30827, the engine's limit is lower) */
++export function filetimeOfUnixMs(ms: number): string | null {
++  if (!Number.isFinite(ms) || ms < 0 || ms > 253402300799999) return null;
++  return (BigInt(Math.trunc(ms)) * 10000n + FILETIME_UNIX_EPOCH).toString();
++}
++
++/** the Windows bias from getTimezoneOffset() (minutes, UTC - local; the same sign): an integer within the runtime's range, else null */
++export function biasOfOffsetMin(offsetMin: number): string | null {
++  if (!Number.isFinite(offsetMin)) return null;
++  const v = Math.round(offsetMin);
++  if (v < -TZ_BIAS_LIMIT || v > TZ_BIAS_LIMIT) return null;
++  return String(v === 0 ? 0 : v);
++}
++
++export type WallParam = { mode: 'real' } | { mode: 'off' } | { mode: 'fixed'; unixMs: number };
++
++/** the page's URL parameter fle_wall: `off` = leave the engine's fixed origin; a decimal Unix time in ms = pin the start instant (the bias stays the host's); anything else (or none) = the real clock */
++export function parseWallParam(search: string): WallParam {
++  let v: string | null = null;
++  try { v = new URLSearchParams(search).get('fle_wall'); } catch { v = null; }
++  if (v === null) return { mode: 'real' };
++  if (v === 'off') return { mode: 'off' };
++  if (/^\d{1,15}$/.test(v)) return { mode: 'fixed', unixMs: Number(v) };
++  return { mode: 'real' };
++}
++
++export interface WallHost {
++  /** Date.now() */
++  now(): number;
++  /** new Date().getTimezoneOffset() */
++  tzOffsetMin(): number;
++}
++
++export interface WallApplied {
++  /** the variables this call added (the ones the manifest already carried are not listed) */
++  added: string[];
++  /** lines for the page's log */
++  lines: { level: 'info' | 'warn'; text: string }[];
++}
++
++/** Puts the run values into `env` (the manifest's engine.env). A name that `env` already has is kept. */
++export function applyWallClock(env: Record<string, string>, host: WallHost, param: WallParam = { mode: 'real' }): WallApplied {
++  const added: string[] = [];
++  const lines: WallApplied['lines'] = [];
++  const put = (k: string, v: string): void => {
++    if (env[k] !== undefined) { lines.push({ level: 'info', text: `${k}: the manifest already carries ${env[k]}: kept` }); return; }
++    env[k] = v;
++    added.push(k);
++  };
++  put('FLE_ENV_DEFAULTS', '1');
++  if (param.mode === 'off') {
++    lines.push({ level: 'info', text: 'guest clock: the engine\'s fixed origin (URL fle_wall=off); the environment block has the default variables' });
++    return { added, lines };
++  }
++  const ft = filetimeOfUnixMs(param.mode === 'fixed' ? param.unixMs : host.now());
++  const bias = biasOfOffsetMin(host.tzOffsetMin());
++  if (ft === null) lines.push({ level: 'warn', text: 'guest clock: the host clock gave no usable time: the engine keeps its fixed origin' });
++  else put('FLE_WALL_FILETIME', ft);
++  if (bias === null) lines.push({ level: 'warn', text: 'guest clock: the host time zone offset is not usable: UTC' });
++  else put('FLE_TZ_BIAS_MIN', bias);
++  if (ft !== null) lines.push({ level: 'info', text: `guest clock: FLE_WALL_FILETIME=${env.FLE_WALL_FILETIME ?? ft}${param.mode === 'fixed' ? ' (pinned by URL fle_wall)' : ''}, FLE_TZ_BIAS_MIN=${env.FLE_TZ_BIAS_MIN ?? (bias ?? 'unset')}` });
++  return { added, lines };
++}
+--- /dev/null
++++ b/app/test/unit/wall-clock.test.ts
+@@ -0,0 +1,76 @@
++import { describe, expect, it } from 'vitest';
++import { FILETIME_UNIX_EPOCH, TZ_BIAS_LIMIT, applyWallClock, biasOfOffsetMin, filetimeOfUnixMs, parseWallParam } from '../../src/engine/wall-clock.ts';
++
++const host = (now: number, off: number): { now(): number; tzOffsetMin(): number } => ({ now: () => now, tzOffsetMin: () => off });
++
++describe('the guest clock as a run value (decision 0319)', () => {
++  it('converts a Unix time in ms to a decimal FILETIME exactly (beyond 2^53)', () => {
++    expect(filetimeOfUnixMs(0)).toBe('116444736000000000');
++    expect(filetimeOfUnixMs(1)).toBe('116444736000010000');
++    const ms = 1_794_000_000_123;   // 2026-11
++    expect(filetimeOfUnixMs(ms)).toBe((BigInt(ms) * 10000n + FILETIME_UNIX_EPOCH).toString());
++    expect(BigInt(filetimeOfUnixMs(ms) as string) > 2n ** 53n).toBe(true);
++  });
++  it('truncates the fraction of a millisecond and refuses times that are not usable', () => {
++    expect(filetimeOfUnixMs(1000.9)).toBe(filetimeOfUnixMs(1000));
++    expect(filetimeOfUnixMs(Number.NaN)).toBeNull();
++    expect(filetimeOfUnixMs(Infinity)).toBeNull();
++    expect(filetimeOfUnixMs(-1)).toBeNull();
++    expect(filetimeOfUnixMs(253402300800000)).toBeNull();
++  });
++  it('takes the bias from getTimezoneOffset (same sign: UTC - local; Japan is -540) as an integer in the runtime\'s range', () => {
++    expect(biasOfOffsetMin(-540)).toBe('-540');
++    expect(biasOfOffsetMin(0)).toBe('0');
++    expect(biasOfOffsetMin(-0)).toBe('0');
++    expect(biasOfOffsetMin(300)).toBe('300');
++    expect(biasOfOffsetMin(-9.6)).toBe('-10');
++    expect(biasOfOffsetMin(TZ_BIAS_LIMIT)).toBe('1440');
++    expect(biasOfOffsetMin(TZ_BIAS_LIMIT + 1)).toBeNull();
++    expect(biasOfOffsetMin(Number.NaN)).toBeNull();
++  });
++  it('reads the URL parameter fle_wall', () => {
++    expect(parseWallParam('')).toEqual({ mode: 'real' });
++    expect(parseWallParam('?x=1')).toEqual({ mode: 'real' });
++    expect(parseWallParam('?fle_wall=off')).toEqual({ mode: 'off' });
++    expect(parseWallParam('?a=b&fle_wall=1700000000000')).toEqual({ mode: 'fixed', unixMs: 1700000000000 });
++    expect(parseWallParam('?fle_wall=abc')).toEqual({ mode: 'real' });
++    expect(parseWallParam('?fle_wall=-5')).toEqual({ mode: 'real' });
++    expect(parseWallParam('?fle_wall=12345678901234567')).toEqual({ mode: 'real' });
++  });
++  it('puts the three run values into the manifest\'s engine.env', () => {
++    const env: Record<string, string> = { FLE_DWM_HZ: '120' };
++    const r = applyWallClock(env, host(1_794_000_000_000, -540));
++    expect(env.FLE_ENV_DEFAULTS).toBe('1');
++    expect(env.FLE_WALL_FILETIME).toBe(filetimeOfUnixMs(1_794_000_000_000));
++    expect(env.FLE_TZ_BIAS_MIN).toBe('-540');
++    expect(env.FLE_DWM_HZ).toBe('120');   // the others are untouched
++    expect(r.added.sort()).toEqual(['FLE_ENV_DEFAULTS', 'FLE_TZ_BIAS_MIN', 'FLE_WALL_FILETIME']);
++    expect(r.lines.some((l) => l.text.includes('FLE_WALL_FILETIME='))).toBe(true);
++  });
++  it('never overwrites a value that the manifest already carries (a pinned run keeps its time)', () => {
++    const env: Record<string, string> = { FLE_WALL_FILETIME: '132539292000000000', FLE_TZ_BIAS_MIN: '0' };
++    const r = applyWallClock(env, host(1_794_000_000_000, -540));
++    expect(env.FLE_WALL_FILETIME).toBe('132539292000000000');
++    expect(env.FLE_TZ_BIAS_MIN).toBe('0');
++    expect(env.FLE_ENV_DEFAULTS).toBe('1');
++    expect(r.added).toEqual(['FLE_ENV_DEFAULTS']);
++  });
++  it('fle_wall=off leaves the engine\'s fixed origin (no clock value) and still gives the default environment block', () => {
++    const env: Record<string, string> = {};
++    const r = applyWallClock(env, host(1_794_000_000_000, -540), { mode: 'off' });
++    expect(env).toEqual({ FLE_ENV_DEFAULTS: '1' });
++    expect(r.added).toEqual(['FLE_ENV_DEFAULTS']);
++  });
++  it('fle_wall=<ms> pins the start instant and keeps the host\'s bias', () => {
++    const env: Record<string, string> = {};
++    applyWallClock(env, host(5, -540), { mode: 'fixed', unixMs: 1_700_000_000_000 });
++    expect(env.FLE_WALL_FILETIME).toBe(filetimeOfUnixMs(1_700_000_000_000));
++    expect(env.FLE_TZ_BIAS_MIN).toBe('-540');
++  });
++  it('an unusable host clock or offset adds nothing for that value and says so', () => {
++    const env: Record<string, string> = {};
++    const r = applyWallClock(env, host(Number.NaN, 5000));
++    expect(env).toEqual({ FLE_ENV_DEFAULTS: '1' });
++    expect(r.lines.filter((l) => l.level === 'warn').length).toBe(2);
++  });
++});

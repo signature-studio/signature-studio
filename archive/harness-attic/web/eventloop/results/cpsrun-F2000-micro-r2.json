@@ -1,0 +1,99 @@
+{
+ "name": "cpsrun-F2000-micro-r2",
+ "page": "/plain/cpsrun.html?f=2000&budget=3000000&reps=9&wait=micro",
+ "started": "2026-10-28T16:26:13.176Z",
+ "loadavg_before": "1.44 1.79 2.01 7/1433 691322",
+ "url": "http://127.0.0.1:32885/plain/cpsrun.html?f=2000&budget=3000000&reps=9&wait=micro",
+ "loadavg_after": "2.07 1.90 2.03 2/1452 694927",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/cpsrun-F2000-micro-r2",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "f": "2000",
+  "budget_function_entries": 3000000,
+  "reps": 9,
+  "wait": "micro",
+  "rows": [
+   {
+    "opt": "O0",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 1814.5,
+    "ms_median": 2168.9,
+    "ns_per_function_entry_min": 604.8
+   },
+   {
+    "opt": "O0",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 1990.4,
+    "ms_median": 2392.6,
+    "ns_per_function_entry_min": 663.5
+   },
+   {
+    "opt": "O2",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 260.1,
+    "ms_median": 291,
+    "ns_per_function_entry_min": 86.7
+   },
+   {
+    "opt": "O2",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 311.9,
+    "ms_median": 336.3,
+    "ns_per_function_entry_min": 104
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

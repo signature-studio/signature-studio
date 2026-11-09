@@ -1,0 +1,660 @@
+--- a/lift/runtime/fle_imagelist.h
++++ b/lift/runtime/fle_imagelist.h
+@@ -0,0 +1,54 @@
++/* comctl32 image lists, as far as the DRAG of an image needs them (decision 0319 section 14, alpha1, PROVISIONAL; PM 09:1x, O1 'the picture of the clip that is dragged is not drawn'; design: docs/decisions/0313 section 11).
++ * Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx), R[8] (r8), R[9] (r9) and from the fifth on on the guest stack (fle_arg); the Win32 return value in R[0]; the guest return address stays on the stack.
++ * Learn names no GetLastError value for any ImageList_ function: the last error is never touched.
++ *
++ * Implemented (the state of a list, the pixels the drag needs, the drag itself):
++ *   ImageList_Create, Destroy, GetImageCount, GetIconSize, SetIconSize, GetBkColor, SetBkColor            (layer A of 0313 section 11)
++ *   ImageList_Add, Replace                                                                                 (layer B: the pixels, copied out of the bitmaps; the drag image is made of them)
++ *   ImageList_BeginDrag, DragEnter, DragMove, DragLeave, DragShowNolock, EndDrag, GetDragImage             (layer E)
++ * Named stops (the engine and the plug-ins import them, nothing observed calls them yet): Remove, SetImageCount, GetIcon, Draw, DrawEx, Read, Write.
++ * Not imported by any module of the reference install (api-coverage.tsv): SetDragCursorImage (no row; not implemented). */
++#ifndef FLE_IMAGELIST_H
++#define FLE_IMAGELIST_H
++
++#include <stdint.h>
++
++/* Handles of the lists: FLE_IL_HANDLE_BASE + 4 * (slot + 1), never reused (the pages give no value; 32-bit clean like the other handle regions of this runtime). */
++/* The region [0x7FB90000, 0x7FBA0000) is the 64 KiB gap between the DC region (fle_gdc.h, up to 0x7FB90000) and the GDI region (fle_gdi.h, from 0x7FBA0000); 64 lists need 260 bytes. It overlaps no other virtual handle region below 2 GiB (lift/crates/fe-lift/tests/window.rs checks it). */
++#define FLE_IL_HANDLE_BASE UINT64_C(0x7FB90000)
++#define FLE_IL_REGION_SIZE UINT64_C(0x00010000)
++
++void fle_imp_ImageList_Create(void);
++void fle_imp_ImageList_Destroy(void);
++void fle_imp_ImageList_GetImageCount(void);
++void fle_imp_ImageList_GetIconSize(void);
++void fle_imp_ImageList_SetIconSize(void);
++void fle_imp_ImageList_GetBkColor(void);
++void fle_imp_ImageList_SetBkColor(void);
++void fle_imp_ImageList_Add(void);
++void fle_imp_ImageList_Replace(void);
++void fle_imp_ImageList_BeginDrag(void);
++void fle_imp_ImageList_DragEnter(void);
++void fle_imp_ImageList_DragMove(void);
++void fle_imp_ImageList_DragLeave(void);
++void fle_imp_ImageList_DragShowNolock(void);
++void fle_imp_ImageList_EndDrag(void);
++void fle_imp_ImageList_GetDragImage(void);
++void fle_imp_ImageList_Remove(void);
++void fle_imp_ImageList_SetImageCount(void);
++void fle_imp_ImageList_GetIcon(void);
++void fle_imp_ImageList_Draw(void);
++void fle_imp_ImageList_DrawEx(void);
++void fle_imp_ImageList_Read(void);
++void fle_imp_ImageList_Write(void);
++
++/* Inspection (tests and tools; no state moves): 1 and the state of a live list, 0 for any other handle. */
++typedef struct {
++    int32_t cx, cy, count;
++    uint32_t flags, bk;
++} fle_il_info;
++int fle_il_query(uint64_t himl, fle_il_info *out);
++/* 1 while a drag is begun (ImageList_BeginDrag without the EndDrag), and whether its image is shown. */
++int fle_il_drag_active(int *shown);
++
++#endif
+--- a/lift/runtime/fle_imagelist.c
++++ b/lift/runtime/fle_imagelist.c
+@@ -0,0 +1,439 @@
++/* comctl32 image lists for the drag of an image (decision 0319 section 14, alpha1, PROVISIONAL). See fle_imagelist.h for what is and is not implemented.
++ *
++ * Pages: Learn ImageList_Create ("creates a new image list": cx, cy "the width / height, in pixels, of each image", flags ILC_MASK 0x1 and ILC_COLOR* (4, 8, 16, 24, 32 = 0x20, ILC_COLORDDB 0xFE), cInitial, cGrow; NULL on failure),
++ * ImageList_Destroy, GetImageCount, GetIconSize ("retrieves the dimensions of images in an image list. All images in an image list have the same dimensions"), SetIconSize ("sets the dimensions of images in an image list and
++ * removes all images from the list"), GetBkColor / SetBkColor ("the background color of an image list. This function only works if you add an icon or use ImageList_AddMasked with a black and white bitmap. Without a
++ * mask, the entire image draws, so the background color is not visible"; CLR_NONE draws transparently; SetBkColor returns the previous color, CLR_NONE on failure), ImageList_Add ("the number of images is inferred from the
++ * width of the bitmap"; "the bitmaps are copied into the image list's internal structure; the caller deletes them"; returns the index of the first new image, -1 on failure; the mask is ignored for a list without ILC_MASK),
++ * ImageList_Replace, ImageList_BeginDrag ("creates a temporary image list that the system uses for dragging an image"; himlTrack, iTrack, dxHotspot "the x-position of the hot spot within the new image that
++ * defines the hotspot"), DragEnter ("locks updates to the specified window during a drag operation and displays the drag image at the specified position within the window"; x, y "relative to the upper-left corner of the
++ * window, not the client area"), DragMove ("moves the image that is being dragged"), DragLeave ("unlocks the specified window and hides the drag image, allowing the window to be updated"), DragShowNolock ("shows or hides the
++ * image being dragged"; "does not lock the window"), EndDrag ("ends a drag operation"), GetDragImage ("retrieves the temporary image list that is used for the drag image. The function also retrieves the current drag position
++ * and the offset of the drag image relative to the drag position").
++ * Where the pages are silent the reference is Wine 10.0 (dlls/comctl32/imagelist.c; UNOFFICIAL): BeginDrag fails when himlTrack or iTrack is not valid or a drag is already begun; the drag position is the CURSOR position
++ * and the image is drawn at (x - dxHotspot, y - dyHotspot); the drag image is laid over the window with alpha 192/255 (ILS_ALPHA, Frame 192) and the pixels it covered are saved and put back when it moves or hides;
++ * DragShowNolock returns FALSE when the image is already shown / hidden; DragEnter fails without a drag; the window of a NULL hwndLock is the desktop; GetDragImage gives the position (x, y) and the hotspot;
++ * the list's background color starts as CLR_NONE. Drawing goes through a window DC made with GetDCEx(DCX_WINDOW | DCX_CACHE | DCX_LOCKWINDOWUPDATE) like Wine's, which draws while a LockWindowUpdate is in effect
++ * (decision 0319 section 13: the exception of Learn GetDCEx). DragEnter takes LockWindowUpdate on the window (Learn); a failure to lock (another window is locked) does not stop the drag.
++ * A list stores its images as 32-bit B, G, R, A bytes (straight alpha): A = 255 where the image is opaque, 0 where the mask is set (a 1 bit of the mask = transparent: Learn Bitmap Masks), the per-pixel alpha of a 32-bit DIB
++ * section when the list is ILC_COLOR32 and the source has any alpha, else 255. */
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "fle_env.h"
++#include "fle_gdi.h"
++#include "fle_gdc.h"
++#include "fle_imagelist.h"
++#include "fle_imports.h"
++#include "fle_raster.h"
++#include "fle_runtime.h"
++#include "fle_win.h"
++
++#define IL_MAX 64u
++#define CLR_NONE_ 0xFFFFFFFFu
++#define ILC_MASK_ 0x1u
++#define ILC_COLOR_MASK_ 0xFEu
++#define ILC_COLOR32_ 0x20u
++#define DRAG_ALPHA 192u
++
++void fle_imp_LockWindowUpdate(void) __attribute__((weak));
++void fle_imp_GetDCEx(void) __attribute__((weak));
++void fle_imp_ReleaseDC(void) __attribute__((weak));
++
++typedef struct {
++    int used;
++    int32_t cx, cy, count, cap;
++    uint32_t flags, bk;
++    uint32_t *px;                 /* count images of cx * cy pixels, image k at px + k * cx * cy */
++} il_t;
++
++static il_t ils[IL_MAX];
++
++static int il_index(uint64_t h)
++{
++    uint64_t off;
++
++    if (h < FLE_IL_HANDLE_BASE + 4u || h >= FLE_IL_HANDLE_BASE + FLE_IL_REGION_SIZE || ((h - FLE_IL_HANDLE_BASE) & 3u) != 0) return -1;
++    off = (h - FLE_IL_HANDLE_BASE) / 4u - 1u;
++    if (off >= IL_MAX || !ils[off].used) return -1;
++    return (int)off;
++}
++static uint64_t il_handle(int k) { return FLE_IL_HANDLE_BASE + 4u * ((uint64_t)k + 1u); }
++
++static int il_new(int32_t cx, int32_t cy, uint32_t flags, int32_t cinitial)
++{
++    int k;
++
++    for (k = 0; k < (int)IL_MAX; k++) {
++        if (!ils[k].used) {
++            memset(&ils[k], 0, sizeof ils[k]);
++            ils[k].used = 1;
++            ils[k].cx = cx; ils[k].cy = cy;
++            ils[k].flags = flags;
++            ils[k].bk = CLR_NONE_;
++            ils[k].cap = cinitial > 0 ? cinitial : 4;
++            ils[k].px = (uint32_t *)calloc((size_t)ils[k].cap * (size_t)cx * (size_t)cy, 4);
++            if (!ils[k].px) { ils[k].used = 0; return -1; }
++            return k;
++        }
++    }
++    return -1;
++}
++
++static void il_free(int k)
++{
++    free(ils[k].px);
++    memset(&ils[k], 0, sizeof ils[k]);
++}
++
++static int il_grow(il_t *l, int32_t want)
++{
++    uint32_t *p;
++    int32_t ncap = l->cap;
++
++    if (want <= l->cap) return 1;
++    while (ncap < want) ncap *= 2;
++    p = (uint32_t *)realloc(l->px, (size_t)ncap * (size_t)l->cx * (size_t)l->cy * 4u);
++    if (!p) return 0;
++    l->px = p;
++    l->cap = ncap;
++    return 1;
++}
++
++int fle_il_query(uint64_t himl, fle_il_info *out)
++{
++    int k = il_index(himl);
++
++    if (k < 0) return 0;
++    out->cx = ils[k].cx; out->cy = ils[k].cy; out->count = ils[k].count; out->flags = ils[k].flags; out->bk = ils[k].bk;
++    return 1;
++}
++
++/* the pixels of image `idx` of list `l` out of a bitmap (and its mask) at column `col` of the bitmap: 1 on success */
++static int il_load(il_t *l, int32_t idx, const fle_rsurf *img, const fle_rsurf *mask, int32_t col)
++{
++    int32_t x, y;
++    int per_pixel_alpha = 0;
++    uint32_t *dst = l->px + (size_t)idx * (size_t)l->cx * (size_t)l->cy;
++
++    if (!fle_r_readable(img)) return 0;
++    if ((l->flags & ILC_COLOR_MASK_) == ILC_COLOR32_ && img->bpp == 32 && img->comp == 0) {
++        for (y = 0; y < l->cy && !per_pixel_alpha; y++) {
++            const uint8_t *row = fle_r_row(img, (uint32_t)y);
++
++            for (x = 0; x < l->cx; x++) if (row[4 * ((size_t)col * (size_t)l->cx + (size_t)x) + 3] != 0) { per_pixel_alpha = 1; break; }
++        }
++    }
++    for (y = 0; y < l->cy; y++) {
++        for (x = 0; x < l->cx; x++) {
++            uint32_t sx = (uint32_t)((int64_t)col * l->cx + x), a = 255u, c;
++
++            if (per_pixel_alpha) {
++                const uint8_t *p = fle_r_row(img, (uint32_t)y) + 4u * (size_t)sx;
++
++                dst[(size_t)y * (size_t)l->cx + (size_t)x] = (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
++                continue;
++            }
++            c = fle_r_get(img, sx, (uint32_t)y);               /* COLORREF 0x00BBGGRR */
++            if ((l->flags & ILC_MASK_) && mask && fle_r_readable(mask) && sx < mask->width && (uint32_t)y < mask->height && (fle_r_get(mask, sx, (uint32_t)y) & 0xFFFFFFu) != 0) a = 0;
++            dst[(size_t)y * (size_t)l->cx + (size_t)x] = ((c >> 16) & 0xFFu) | (c & 0xFF00u) | ((c & 0xFFu) << 16) | (a << 24);
++        }
++    }
++    return 1;
++}
++
++static void il_stop(const char *api, const char *why) __attribute__((noreturn));
++static void il_stop(const char *api, const char *why)
++{
++    char buf[300];
++
++    snprintf(buf, sizeof buf, "%s (decision 0319 section 14: only the drag of an image is implemented for image lists; nothing observed calls this one yet)", why);
++    fle_stop(api, buf);
++}
++
++/* ---- layer A ---- */
++void fle_imp_ImageList_Create(void)
++{
++    int32_t cx = (int32_t)(uint32_t)R[1], cy = (int32_t)(uint32_t)R[2], cinit = (int32_t)(uint32_t)R[9];
++    uint32_t flags = (uint32_t)R[8];
++    int k;
++
++    if (cx <= 0 || cy <= 0 || cinit < 0 || (int64_t)cx * cy > 4096 * 4096) { R[0] = 0; return; }
++    k = il_new(cx, cy, flags, cinit);
++    R[0] = k < 0 ? 0 : il_handle(k);
++}
++
++void fle_imp_ImageList_Destroy(void)
++{
++    int k = il_index(R[1]);
++
++    if (k < 0) { R[0] = 0; return; }
++    il_free(k);
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_GetImageCount(void)
++{
++    int k = il_index(R[1]);
++
++    R[0] = k < 0 ? 0 : (uint32_t)ils[k].count;
++}
++
++void fle_imp_ImageList_GetIconSize(void)
++{
++    int k = il_index(R[1]);
++    uint64_t pcx = R[2], pcy = R[8];
++
++    if (k < 0 || (pcx == 0 && pcy == 0)) { R[0] = 0; return; }
++    if (pcx) fle_st(pcx, 4, (uint32_t)ils[k].cx);
++    if (pcy) fle_st(pcy, 4, (uint32_t)ils[k].cy);
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_SetIconSize(void)
++{
++    int k = il_index(R[1]);
++    int32_t cx = (int32_t)(uint32_t)R[2], cy = (int32_t)(uint32_t)R[8];
++    uint32_t *p;
++
++    if (k < 0 || cx <= 0 || cy <= 0 || (int64_t)cx * cy > 4096 * 4096) { R[0] = 0; return; }
++    p = (uint32_t *)calloc((size_t)(ils[k].cap > 0 ? ils[k].cap : 4) * (size_t)cx * (size_t)cy, 4);
++    if (!p) { R[0] = 0; return; }
++    free(ils[k].px);
++    ils[k].px = p;
++    ils[k].cx = cx; ils[k].cy = cy; ils[k].count = 0;       /* Learn: "removes all images from the list" */
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_GetBkColor(void)
++{
++    int k = il_index(R[1]);
++
++    R[0] = k < 0 ? CLR_NONE_ : ils[k].bk;
++}
++
++void fle_imp_ImageList_SetBkColor(void)
++{
++    int k = il_index(R[1]);
++    uint32_t old;
++
++    if (k < 0) { R[0] = CLR_NONE_; return; }
++    old = ils[k].bk;
++    ils[k].bk = (uint32_t)R[2];
++    R[0] = old;
++}
++
++/* ---- layer B: Add / Replace ---- */
++void fle_imp_ImageList_Add(void)
++{
++    static const char api[] = "ImageList_Add";
++    int k = il_index(R[1]);
++    fle_rsurf img, mask;
++    int32_t n, first, j;
++    int have_mask = 0;
++
++    if (k < 0 || R[2] == 0 || !fle_gdi_bitmap_view(R[2], &img) || img.width == 0 || img.height < (uint32_t)ils[k].cy) { R[0] = (uint32_t)-1; return; }
++    if (R[8] != 0 && (ils[k].flags & ILC_MASK_)) have_mask = fle_gdi_bitmap_view(R[8], &mask);
++    n = (int32_t)(img.width / (uint32_t)ils[k].cx);                  /* Learn: the number of images is inferred from the width of the bitmap */
++    if (n <= 0) { R[0] = (uint32_t)-1; return; }
++    first = ils[k].count;
++    if (!il_grow(&ils[k], first + n)) { R[0] = (uint32_t)-1; return; }
++    for (j = 0; j < n; j++) {
++        if (!il_load(&ils[k], first + j, &img, have_mask ? &mask : NULL, j)) il_stop(api, "the bitmap has a pixel format that the image list cannot read");
++    }
++    ils[k].count = first + n;
++    R[0] = (uint32_t)first;
++}
++
++void fle_imp_ImageList_Replace(void)
++{
++    static const char api[] = "ImageList_Replace";
++    int k = il_index(R[1]);
++    int32_t i = (int32_t)(uint32_t)R[2];
++    fle_rsurf img, mask;
++    int have_mask = 0;
++
++    if (k < 0 || i < 0 || i >= ils[k].count || R[8] == 0 || !fle_gdi_bitmap_view(R[8], &img) || img.width < (uint32_t)ils[k].cx || img.height < (uint32_t)ils[k].cy) { R[0] = 0; return; }
++    if (R[9] != 0 && (ils[k].flags & ILC_MASK_)) have_mask = fle_gdi_bitmap_view(R[9], &mask);
++    if (!il_load(&ils[k], i, &img, have_mask ? &mask : NULL, 0)) il_stop(api, "the bitmap has a pixel format that the image list cannot read");
++    R[0] = 1;
++}
++
++/* ---- layer E: the drag ---- */
++static struct {
++    int active;                   /* BeginDrag without EndDrag */
++    int slot;                     /* the temporary list (one image) */
++    uint64_t hwnd;                /* the window of DragEnter (the desktop for NULL) */
++    int locked;                   /* DragEnter took LockWindowUpdate */
++    int32_t x, y, dx, dy;
++    int shown;
++    uint32_t *saved;              /* the pixels under the image while it is shown */
++    uint8_t *valid;
++} drag;
++
++/* a window DC like Wine's: GetDCEx(hwnd, NULL, DCX_WINDOW | DCX_CACHE | DCX_LOCKWINDOWUPDATE); 0 when it cannot be made */
++static uint64_t drag_dc(void)
++{
++    uint64_t sv[16], dc;
++
++    if (!fle_imp_GetDCEx) fle_stop("ImageList_DragEnter", "GetDCEx is not linked");
++    memcpy(sv, R, sizeof sv);
++    R[1] = drag.hwnd == FLE_DESKTOP_HANDLE ? 0 : drag.hwnd; R[2] = 0; R[8] = 0x403u;
++    fle_imp_GetDCEx();
++    dc = R[0];
++    memcpy(R, sv, sizeof sv);
++    return dc;
++}
++
++static void drag_release(uint64_t dc)
++{
++    uint64_t sv[16];
++
++    if (!fle_imp_ReleaseDC) return;
++    memcpy(sv, R, sizeof sv);
++    R[1] = drag.hwnd == FLE_DESKTOP_HANDLE ? 0 : drag.hwnd; R[2] = dc;
++    fle_imp_ReleaseDC();
++    memcpy(R, sv, sizeof sv);
++}
++
++static void drag_lock(uint64_t hwnd)
++{
++    uint64_t sv[16];
++
++    if (!fle_imp_LockWindowUpdate) return;
++    memcpy(sv, R, sizeof sv);
++    R[1] = hwnd;
++    fle_imp_LockWindowUpdate();
++    if (hwnd != 0) drag.locked = (R[0] & 0xFFFFFFFFu) != 0;
++    memcpy(R, sv, sizeof sv);
++}
++
++/* show (1) or hide (0) the drag image: 1 on success, 0 when it already is so or no drag */
++static int drag_show(const char *api, int show)
++{
++    il_t *l;
++    uint64_t dc;
++    int32_t x, y;
++
++    if (!drag.active) return 0;
++    if ((drag.shown && show) || (!drag.shown && !show)) return 0;
++    l = &ils[drag.slot];
++    x = drag.x - drag.dx;
++    y = drag.y - drag.dy;
++    dc = drag_dc();
++    if (dc == 0) return 0;
++    if (show) {
++        size_t n = (size_t)l->cx * (size_t)l->cy;
++
++        free(drag.saved); free(drag.valid);
++        drag.saved = (uint32_t *)calloc(n, 4);
++        drag.valid = (uint8_t *)calloc(n, 1);
++        if (!drag.saved || !drag.valid) fle_stop(api, "out of memory");
++        if (!fle_gdi_dc_blend32(api, dc, x, y, l->cx, l->cy, l->px, DRAG_ALPHA, drag.saved, drag.valid)) fle_stop(api, "the window's drawing surface is not a 32-bit surface that can be written");
++    } else if (drag.saved) {
++        if (!fle_gdi_dc_put32(api, dc, x, y, l->cx, l->cy, drag.saved, drag.valid)) fle_stop(api, "the window's drawing surface is not a 32-bit surface that can be written");
++    }
++    drag.shown = show;
++    drag_release(dc);
++    return 1;
++}
++
++void fle_imp_ImageList_BeginDrag(void)
++{
++    int k = il_index(R[1]), t;
++    int32_t i = (int32_t)(uint32_t)R[2];
++
++    if (k < 0 || i < 0 || i >= ils[k].count || drag.active) { R[0] = 0; return; }
++    t = il_new(ils[k].cx, ils[k].cy, ils[k].flags, 1);
++    if (t < 0) { R[0] = 0; return; }
++    memcpy(ils[t].px, ils[k].px + (size_t)i * (size_t)ils[k].cx * (size_t)ils[k].cy, (size_t)ils[k].cx * (size_t)ils[k].cy * 4u);
++    ils[t].count = 1;
++    ils[t].bk = ils[k].bk;
++    memset(&drag, 0, sizeof drag);
++    drag.active = 1;
++    drag.slot = t;
++    drag.dx = (int32_t)(uint32_t)R[8];
++    drag.dy = (int32_t)(uint32_t)R[9];
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_DragEnter(void)
++{
++    uint64_t hwnd = R[1];
++
++    if (!drag.active) { R[0] = 0; return; }
++    drag.hwnd = hwnd ? hwnd : FLE_DESKTOP_HANDLE;
++    drag.x = (int32_t)(uint32_t)R[2];
++    drag.y = (int32_t)(uint32_t)R[8];
++    if (hwnd) drag_lock(hwnd);                                    /* Learn: "locks updates to the specified window during a drag operation" */
++    R[0] = drag_show("ImageList_DragEnter", 1) ? 1u : 0u;
++}
++
++void fle_imp_ImageList_DragMove(void)
++{
++    int32_t x = (int32_t)(uint32_t)R[1], y = (int32_t)(uint32_t)R[2];
++
++    if (!drag.active) { R[0] = 0; return; }
++    if (drag.shown) {
++        (void)drag_show("ImageList_DragMove", 0);               /* put the pixels back, then save and draw at the new place */
++        drag.x = x; drag.y = y;
++        (void)drag_show("ImageList_DragMove", 1);
++    } else {
++        drag.x = x; drag.y = y;
++    }
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_DragLeave(void)
++{
++    if (drag.active) (void)drag_show("ImageList_DragLeave", 0);
++    if (drag.locked) {
++        uint64_t sv[16];
++
++        memcpy(sv, R, sizeof sv);
++        R[1] = 0;
++        if (fle_imp_LockWindowUpdate) fle_imp_LockWindowUpdate();   /* "unlocks the specified window": the one that DragEnter locked */
++        memcpy(R, sv, sizeof sv);
++        drag.locked = 0;
++    }
++    R[0] = 1;
++}
++
++void fle_imp_ImageList_DragShowNolock(void)
++{
++    R[0] = drag_show("ImageList_DragShowNolock", (R[1] & 0xFFFFFFFFu) != 0) ? 1u : 0u;
++}
++
++void fle_imp_ImageList_EndDrag(void)
++{
++    if (drag.active) il_free(drag.slot);
++    free(drag.saved); free(drag.valid);
++    memset(&drag, 0, sizeof drag);
++}
++
++void fle_imp_ImageList_GetDragImage(void)
++{
++    uint64_t ppt = R[1], phs = R[2];
++
++    if (!drag.active) { R[0] = 0; return; }
++    if (ppt) { fle_st(ppt, 4, (uint32_t)drag.x); fle_st(ppt + 4u, 4, (uint32_t)drag.y); }
++    if (phs) { fle_st(phs, 4, (uint32_t)drag.dx); fle_st(phs + 4u, 4, (uint32_t)drag.dy); }
++    R[0] = il_handle(drag.slot);
++}
++
++int fle_il_drag_active(int *shown)
++{
++    if (shown) *shown = drag.shown;
++    return drag.active;
++}
++
++/* ---- named stops ---- */
++void fle_imp_ImageList_Remove(void) { il_stop("ImageList_Remove", "removing images"); }
++void fle_imp_ImageList_SetImageCount(void) { il_stop("ImageList_SetImageCount", "setting the image count"); }
++void fle_imp_ImageList_GetIcon(void) { il_stop("ImageList_GetIcon", "making an icon of an image"); }
++void fle_imp_ImageList_Draw(void) { il_stop("ImageList_Draw", "drawing an image"); }
++void fle_imp_ImageList_DrawEx(void) { il_stop("ImageList_DrawEx", "drawing an image"); }
++void fle_imp_ImageList_Read(void) { il_stop("ImageList_Read", "reading a list from a stream"); }
++void fle_imp_ImageList_Write(void) { il_stop("ImageList_Write", "writing a list to a stream"); }
+--- a/lift/runtime/fle_gdi.c
++++ b/lift/runtime/fle_gdi.c
+@@ -1672,6 +1672,20 @@
+     return 1;
+ }
+ 
++/* Decision 0319 section 14 (alpha1, PROVISIONAL): the pixels of the bitmap `hbm` (a DIB section or a device-dependent bitmap; mt3's design, docs/decisions/0313 section 11.3: ImageList_Add reads its source through this). 1 and the view in *out; 0 when
++ * `hbm` is not a live bitmap. A device-dependent bitmap that was never drawn into has its (zero) pixel block made now (S-ddb-lazy). */
++int fle_gdi_bitmap_view(uint64_t hbm, fle_rsurf *out)
++{
++    gdi_obj *b = live_obj(hbm);
++
++    if (!b || b->kind != FLE_GDI_KIND_BITMAP) return 0;
++    if (b->fmt == FLE_GDI_BMP_DIB) {
++        dib_view((const gdi_dib *)b->ext, out);
++        return 1;
++    }
++    return ddb_view(b, out);
++}
++
+ /* The target of a drawing call: the DC `h` (a memory DC or a window / screen DC). `pre` names the arguments in every stop. */
+ static void apply_app_clip(uint64_t h, target *t);
+ static void get_target0(const char *api, const char *pre, uint64_t h, const char *role, target *t)
+@@ -2146,6 +2160,94 @@
+     blit_call(api, pre, R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
+ }
+ 
++/* Decision 0319 section 14 (alpha1, PROVISIONAL): the 32-bit pixels of a rectangle of a DC, for the drag image of ImageList_DragEnter / DragMove / DragShowNolock (fle_imagelist.c). Device units of the DC (a window DC from
++ * GetDCEx: its origin; a memory DC: its bitmap). Only the part inside what a drawing call reaches through this DC (the visible region, the clip) is read or written: `valid[j * w + i]` = 1 for such a pixel. fle_gdi_dc_blend32:
++ * the pixels are first saved (`saved`, the 32 bits of the surface including the unused fourth byte), then `argb` (B, G, R, A bytes, straight alpha; NULL: nothing is drawn) is laid over them with the alpha A * alpha_const / 255
++ * (src-over: out = (src * a + dst * (255 - a)) / 255 per colour byte); the fourth byte of the surface is kept. fle_gdi_dc_put32 writes `px` (32 bits as they are) where valid is 1: the restore of the saved background. Both
++ * return 0 for a target that is not a 32-bit surface that can be written (the caller stops by name), 1 otherwise (also for a window that is not visible: nothing is read or written, valid is all 0). */
++int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid)
++{
++    target t;
++    char pre[120];
++    int32_t i, j;
++    uint64_t n = 0;
++    fle_rrect bnd = { 0, 0, 0, 0 };
++    int have = 0;
++
++    if (w <= 0 || h <= 0) return 1;
++    snprintf(pre, sizeof pre, "drawing the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
++    get_target(api, pre, hdc, "hdc", &t);
++    if (valid) memset(valid, 0, (size_t)w * (size_t)h);
++    if (!target_live(api, &t)) return 1;
++    if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
++    for (j = 0; j < h; j++) {
++        for (i = 0; i < w; i++) {
++            int64_t sx = (int64_t)x + i + (t.is_window ? t.org[0] : 0), sy = (int64_t)y + j + (t.is_window ? t.org[1] : 0);
++            uint8_t *p;
++            uint32_t d;
++            size_t k = (size_t)j * (size_t)w + (size_t)i;
++
++            if (sx < 0 || sy < 0 || sx >= (int64_t)t.s.width || sy >= (int64_t)t.s.height || !target_has_point(&t, sx, sy)) continue;
++            p = fle_r_row(&t.s, (uint32_t)sy) + 4u * (size_t)sx;
++            memcpy(&d, p, 4);
++            if (saved) saved[k] = d;
++            if (valid) valid[k] = 1;
++            if (argb) {
++                uint32_t a = ((argb[k] >> 24) & 0xFFu) * alpha_const / 255u, c;
++
++                if (a != 0) {
++                    for (c = 0; c < 3; c++) {
++                        uint32_t sv = (argb[k] >> (8u * c)) & 0xFFu, dv = p[c];
++
++                        p[c] = (uint8_t)((sv * a + dv * (255u - a) + 127u) / 255u);
++                    }
++                    n++;
++                    if (!have) { bnd.x0 = sx; bnd.y0 = sy; bnd.x1 = sx + 1; bnd.y1 = sy + 1; have = 1; }
++                    if (sx < bnd.x0) bnd.x0 = sx;
++                    if (sy < bnd.y0) bnd.y0 = sy;
++                    if (sx + 1 > bnd.x1) bnd.x1 = sx + 1;
++                    if (sy + 1 > bnd.y1) bnd.y1 = sy + 1;
++                }
++            }
++        }
++    }
++    if (n) target_wrote(api, &t, bnd, n);
++    return 1;
++}
++
++int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid)
++{
++    target t;
++    char pre[120];
++    int32_t i, j;
++    uint64_t n = 0;
++    fle_rrect bnd = { 0, 0, 0, 0 };
++    int have = 0;
++
++    if (w <= 0 || h <= 0) return 1;
++    snprintf(pre, sizeof pre, "restoring the background of the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
++    get_target(api, pre, hdc, "hdc", &t);
++    if (!target_live(api, &t)) return 1;
++    if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
++    for (j = 0; j < h; j++) {
++        for (i = 0; i < w; i++) {
++            int64_t sx = (int64_t)x + i + (t.is_window ? t.org[0] : 0), sy = (int64_t)y + j + (t.is_window ? t.org[1] : 0);
++            size_t k = (size_t)j * (size_t)w + (size_t)i;
++
++            if (!valid[k] || sx < 0 || sy < 0 || sx >= (int64_t)t.s.width || sy >= (int64_t)t.s.height || !target_has_point(&t, sx, sy)) continue;
++            memcpy(fle_r_row(&t.s, (uint32_t)sy) + 4u * (size_t)sx, &px[k], 4);
++            n++;
++            if (!have) { bnd.x0 = sx; bnd.y0 = sy; bnd.x1 = sx + 1; bnd.y1 = sy + 1; have = 1; }
++            if (sx < bnd.x0) bnd.x0 = sx;
++            if (sy < bnd.y0) bnd.y0 = sy;
++            if (sx + 1 > bnd.x1) bnd.x1 = sx + 1;
++            if (sy + 1 > bnd.y1) bnd.y1 = sy + 1;
++        }
++    }
++    if (n) target_wrote(api, &t, bnd, n);
++    return 1;
++}
++
+ /* gdi32!PatBlt: BOOL f(HDC hdc rcx, int x edx, int y r8d, int w r9d, int h [5], DWORD rop [6]). Learn (PatBlt): "paints the specified rectangle using the brush that is currently selected into the specified device
+  * context. The brush color and the surface color or colors are combined by using the specified raster operation"; PATCOPY, PATINVERT, DSTINVERT, BLACKNESS, WHITENESS; "an operation code that refers to a source
+  * rectangle cannot be used" (failure, 0, with ERROR_INVALID_PARAMETER: S-patblt-source); the return value is nonzero on success. Answered: every ternary code that uses no source (the sixteen of the page's table that
+--- a/lift/runtime/fle_gdi.h
++++ b/lift/runtime/fle_gdi.h
+@@ -214,6 +214,10 @@
+ void fle_imp_PatBlt(void);
+ void fle_imp_FillRect(void);
+ void fle_imp_ScrollDC(void);   /* decision 0319 */
++/* decision 0319 section 14: the pixels of a bitmap handle, and the 32-bit pixels of a rectangle of a DC for the drag image of fle_imagelist.c (see fle_gdi.c) */
++int fle_gdi_bitmap_view(uint64_t hbm, fle_rsurf *out);
++int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid);
++int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid);
+ void fle_imp_GetDIBits(void);
+ void fle_imp_RealizePalette(void);
+ 
+--- a/lift/harness/seeds/ship6-imports.txt
++++ b/lift/harness/seeds/ship6-imports.txt
+@@ -306,3 +306,27 @@
+ user32.dll ScrollWindow fle_imp_ScrollWindow
+ # Decision 0319 (alpha1, PROVISIONAL): user32!ScrollDC (runtime/fle_gdi.c: the bits of a DC move inside its clip, the uncovered area is returned, nothing is invalidated). The engine imports it. Appended LAST (decision 0015: append only).
+ user32.dll ScrollDC fle_imp_ScrollDC
++# Decision 0319 (alpha1, PROVISIONAL; PM 09:1x): comctl32 image lists (runtime/fle_imagelist.c): the drag of an image (O1) with the lists it needs; Remove / SetImageCount / GetIcon / Draw / DrawEx / Read / Write are named stops (the engine and the plug-ins import them; nothing observed calls them). SetDragCursorImage is imported by no module and has no row. Appended LAST (decision 0015: append only).
++comctl32.dll ImageList_Create fle_imp_ImageList_Create
++comctl32.dll ImageList_Destroy fle_imp_ImageList_Destroy
++comctl32.dll ImageList_GetImageCount fle_imp_ImageList_GetImageCount
++comctl32.dll ImageList_GetIconSize fle_imp_ImageList_GetIconSize
++comctl32.dll ImageList_SetIconSize fle_imp_ImageList_SetIconSize
++comctl32.dll ImageList_GetBkColor fle_imp_ImageList_GetBkColor
++comctl32.dll ImageList_SetBkColor fle_imp_ImageList_SetBkColor
++comctl32.dll ImageList_Add fle_imp_ImageList_Add
++comctl32.dll ImageList_Replace fle_imp_ImageList_Replace
++comctl32.dll ImageList_BeginDrag fle_imp_ImageList_BeginDrag
++comctl32.dll ImageList_DragEnter fle_imp_ImageList_DragEnter
++comctl32.dll ImageList_DragMove fle_imp_ImageList_DragMove
++comctl32.dll ImageList_DragLeave fle_imp_ImageList_DragLeave
++comctl32.dll ImageList_DragShowNolock fle_imp_ImageList_DragShowNolock
++comctl32.dll ImageList_EndDrag fle_imp_ImageList_EndDrag
++comctl32.dll ImageList_GetDragImage fle_imp_ImageList_GetDragImage
++comctl32.dll ImageList_Remove fle_imp_ImageList_Remove
++comctl32.dll ImageList_SetImageCount fle_imp_ImageList_SetImageCount
++comctl32.dll ImageList_GetIcon fle_imp_ImageList_GetIcon
++comctl32.dll ImageList_Draw fle_imp_ImageList_Draw
++comctl32.dll ImageList_DrawEx fle_imp_ImageList_DrawEx
++comctl32.dll ImageList_Read fle_imp_ImageList_Read
++comctl32.dll ImageList_Write fle_imp_ImageList_Write

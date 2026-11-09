@@ -1,0 +1,24 @@
+verdicts: match=352, mismatch=161, reference=55, real-only=1559, skipped=17
+not run: 0
+top mismatches:
+ 1. C02031 GetDIBColorTable x34 last error: runtime=unchanged(0)×34 real=set 6
+ 2. C02023 StretchDIBits x24 return: runtime=0x20 real=0x0; last error: runtime=unchanged(0)×24 real=set 87
+ 3. C00630 SetErrorMode x23 return: runtime=0x0/0x8000 real=0x8001
+ 4. C01364 GetFileAttributesW x20 last error: runtime=unchanged(3)×15,set 3×5 real=set 2
+ 5. C00901 GetVersionExW x10 output: OSVERSIONINFO.major: runtime=10 real=6; OSVERSIONINFO.minor: runtime=0 real=2
+ 6. C01460 RegOpenKeyExW x9 return: runtime=0x2 real=0x0
+ 7. C00900 GetVersion x8 return: runtime=0x4a65000a real=0x23f00206
+ 8. C01290 TlsAlloc x6 return: runtime=0x0/0x1/0x2/0x3/0x4/0x5 real=0x9
+ 9. C01468 RegOpenKeyExW x6 return: runtime=0x2 real=0x0
+10. C01472 RegOpenKeyExW x6 return: runtime=0x2 real=0x0
+11. C01359 GetFileAttributesW x5 return: runtime=0xffffffff real=0x20
+12. C01377 GetFileAttributesW x5 last error: runtime=set 2×5 real=set 3
+13. C00004 GetLocaleInfoW x4 output: out2: runtime="0" real="2"
+14. C01132 GetProcAddress x4 return: runtime=0x0 real=OPAQUE
+15. C01366 GetFileAttributesW x4 last error: runtime=unchanged(3)×3,set 3×1 real=set 2
+16. C01367 GetFileAttributesW x4 return: runtime=0xffffffff real=0x20
+17. C01369 GetFileAttributesW x4 last error: runtime=unchanged(3)×3,set 3×1 real=set 2
+18. C01370 GetFileAttributesW x4 last error: runtime=unchanged(3)×3,set 3×1 real=set 2
+19. C00905 VerSetConditionMask x3 return: runtime=0x18 real=OPAQUE
+20. C00906 VerSetConditionMask x3 return: runtime=0x1b real=OPAQUE
+report written to compare-report.md

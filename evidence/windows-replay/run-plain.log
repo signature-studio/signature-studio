@@ -1,0 +1,18 @@
+replay.exe : 
+???? ?:4 ??:1
++ & (Join-Path $RP 'out\replay.exe') --cases (Join-Path $RP 'cases.tsv' ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+replay: 200 cases (C00200)   
+replay: 400 cases (C00400)   
+replay: 600 cases (C00600)   
+replay: 800 cases (C00800)   
+replay: 1000 cases (C01000)   
+replay: 1200 cases (C01200)   
+replay: 1400 cases (C01400)   
+replay: 1600 cases (C01600)   
+replay: 1800 cases (C01800)   
+replay: 2000 cases (C02000)   
+replay: 2144 cases done                

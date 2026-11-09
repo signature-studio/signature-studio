@@ -1,0 +1,1 @@
+-Wl,--wrap=fle_imp_GetCursorPos -Wl,--wrap=fle_imp_WindowFromPoint -Wl,--wrap=fle_imp_ClientToScreen -Wl,--wrap=fle_imp_ScreenToClient -Wl,--wrap=fle_imp_GetWindowRect -Wl,--wrap=fle_imp_GetClientRect -Wl,--wrap=fle_imp_MapWindowPoints   -Wl,--wrap=fle_imp_GetCapture -Wl,--wrap=fle_imp_CompareStringW

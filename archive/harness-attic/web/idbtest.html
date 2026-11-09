@@ -1,0 +1,38 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>IndexedDB as a cache for the wasm bytes</title>
+<script>
+'use strict';
+// fetch the wasm, store the ArrayBuffer in IndexedDB, read it back, compile it; the times of each step
+window.__done = false;
+const idb = (store, mode, f) => new Promise((res, rej) => {
+  const q = indexedDB.open('wasmcache', 1);
+  q.onupgradeneeded = () => q.result.createObjectStore('s');
+  q.onerror = () => rej(q.error);
+  q.onsuccess = () => {
+    const db = q.result; const tx = db.transaction('s', mode); const r = f(tx.objectStore('s'));
+    tx.oncomplete = () => { db.close(); res(r.result); };
+    tx.onerror = () => { db.close(); rej(tx.error); };
+    tx.onabort = () => { db.close(); rej(tx.error || new Error('aborted')); };
+  };
+});
+(async () => {
+  const out = {};
+  const url = new URL('dist/flengine6.wasm', location.href).href + (location.search.includes('br') ? '?enc=br' : '');
+  const lap = (() => { let t = performance.now(); return (k) => { const n = performance.now(); out[k + '_ms'] = Math.round(n - t); t = n; }; })();
+  try {
+    const buf = await (await fetch(url, { cache: 'no-store' })).arrayBuffer(); lap('fetch'); out.bytes = buf.byteLength;
+    await idb('s', 'readwrite', (s) => s.put(buf, 'wasm')); lap('idb_put_arraybuffer');
+    const back = await idb('s', 'readonly', (s) => s.get('wasm')); lap('idb_get_arraybuffer'); out.back_bytes = back.byteLength;
+    await WebAssembly.compile(back); lap('compile');
+    await idb('s', 'readwrite', (s) => s.delete('wasm')); lap('idb_delete');
+    const blob = new Blob([buf]); lap('blob_from_buffer');
+    await idb('s', 'readwrite', (s) => s.put(blob, 'wasmblob')); lap('idb_put_blob');
+    const bb = await idb('s', 'readonly', (s) => s.get('wasmblob')); lap('idb_get_blob'); out.blob_bytes = bb.size;
+    const ab = await bb.arrayBuffer(); lap('blob_to_arraybuffer'); out.blob_back_bytes = ab.byteLength;
+    await idb('s', 'readwrite', (s) => s.delete('wasmblob')); lap('idb_delete_blob');
+    out.estimate = await navigator.storage.estimate();
+  } catch (e) { out.error = String(e && e.stack || e); }
+  window.__result = out; window.__done = true;
+})();
+</script>

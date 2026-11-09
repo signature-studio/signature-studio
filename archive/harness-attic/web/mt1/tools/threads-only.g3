@@ -1,0 +1,6 @@
+# mt1: wizard, Enter, 3 s: every thread the engine creates before the play button is reachable
+snap wiz0
+advance 3000
+tap 13
+advance 3000
+snap e03

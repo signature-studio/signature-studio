@@ -1,0 +1,93 @@
+[
+ {
+  "name": "rtb-v3-delay2",
+  "what": "RT-B V3 (Delay 2 is the third real module): open the reference project; the Problems window must list 5 plugins (6 in cand1) and the engine log must hold LoadLibraryW \"...Fruity Delay 2_x64.dll\" -> 0x7800000 and GetProcAddress(0x7800000, \"CreatePlugInstance\") -> 0x7abf1a0; no \"fle: unsupported\"",
+  "rep": 1,
+  "seconds": 213,
+  "firstIdleMs": 7936.31982421875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "FL Studio 2026",
+  "pics": [
+   {
+    "name": "problems-pic",
+    "windows": [
+     "lid 13 at (0, 0) 1920x1080 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 150 at (614, 392) 691x295 class \"TMissingPluginsForm\" title \"Problems loading the project\""
+    ]
+   }
+  ],
+  "describes": [
+   {
+    "name": "problems-window",
+    "lines": [
+     "lid 13 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 150 at (614, 392) 691x295 alpha 0 key 000000 class \"TMissingPluginsForm\" title \"Problems loading the project\""
+    ]
+   }
+  ],
+  "logs": [
+   {
+    "name": "engine",
+    "lines": 2837
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 51.74500000476837,
+   "manifest_loaded": 66.58500000834465,
+   "download_start": 95.16500000655651,
+   "compile_done": 1227.6850000023842,
+   "download_done": 1383.3100000023842,
+   "pack_source_dll": 1452.184814453125,
+   "pack_source_seed": 1452.2548828125,
+   "glue_loaded": 1464.68994140625,
+   "worker_ready": 1467.5600000023842,
+   "engine_start": 1467.6150000095367,
+   "wasm_instantiated": 1501,
+   "files_ready": 1512.514892578125,
+   "main_start": 1514.3349609375,
+   "idle": 7936.31982421875,
+   "host_files_released": 7936.614990234375,
+   "first_pixel": 7985.64990234375,
+   "filedlg_request": 20051.079833984375,
+   "filedlg_answer": 21199.44482421875
+  },
+  "loadStart": 1.95,
+  "loadEnd": 4.95,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080",
+   "TMissingPluginsForm@614,392 691x295"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

@@ -1,0 +1,37 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -27,6 +27,9 @@
+ let frameTicks = 0;
+ const presentedAt: number[] = [];
+ let lastReport = 0;
++// VARIANT V2 (decision 0311): at most one present per animation frame of this Worker; a scene published after a present in the same frame waits for the next frame
++let presentedThisFrame = false;
++const frameWaiters: (() => void)[] = [];
+ // MEASUREMENT ONLY (decision 0311): how long after the engine Worker stored PUB this Worker's loop got to run (the event-loop latency of Atomics.waitAsync's resolution)
+ const wl8 = { n: 0, over2: 0, over8: 0, over16: 0, sumMs: 0, maxMs: 0 };
+ 
+@@ -81,6 +84,8 @@
+   const next = (): void => { if (g.requestAnimationFrame) g.requestAnimationFrame(tick); else setTimeout(tick, 16); };
+   const tick = (): void => {
+     frameTicks++;
++    presentedThisFrame = false;
++    for (const w of frameWaiters.splice(0)) w();
+     const now = performance.now();
+     L.requestScene();
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+@@ -99,6 +104,7 @@
+     const seq = await L.waitPublished(seen);
+     seen = seq;
+     { const wl = nowAbs() - L.publishAt; wl8.n++; wl8.sumMs += wl; if (wl > 2) wl8.over2++; if (wl > 8) wl8.over8++; if (wl > 16) wl8.over16++; if (wl > wl8.maxMs) wl8.maxMs = wl; }
++    if (presentedThisFrame && !quiet.isAsleep) await new Promise<void>((r) => { frameWaiters.push(r); });
+     let shown = 0;
+     try { shown = pres?.present() ?? 0; } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+     const at = nowAbs();
+@@ -106,6 +112,7 @@
+       presentedAt.push(at);
+       if (quiet.changed(performance.now())) { L.setAsleep(false); nextFrame?.(); }
+     }
++    presentedThisFrame = true;
+     L.markDone(seq, shown, at);
+     report(false);
+   }

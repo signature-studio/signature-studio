@@ -1,0 +1,14 @@
+--- a/lift/runtime/fle_dsound.c
++++ b/lift/runtime/fle_dsound.c
+@@ -1196,9 +1196,9 @@
+     b->silent_until_coop = b->dev->coop == 0;
+     b->playing = 1;
+     restart_geometry(b, b->cursor);
+-    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
+     stats.plays++;
+-    audio_sync();
++    audio_sync();   /* PROPOSAL (0313 section 16, not applied): the first hand-over BEFORE the state becomes PLAYING. While the state is OPEN the output does not read, so the read position stands still and no frame of this hand-over is behind it (fle_js_publish drops what the output has already passed) */
++    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
+     ret(HR_OK);
+ }
+ 

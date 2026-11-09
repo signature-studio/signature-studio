@@ -1,0 +1,1408 @@
+{
+ "name": "mb-bench-coi",
+ "page": "/coi/mb.html?tests=env,bench&opts=O0,O2",
+ "started": "2026-10-28T15:37:01.526Z",
+ "loadavg_before": "1.94 1.59 1.03 11/1441 607217",
+ "url": "http://127.0.0.1:40401/coi/mb.html?tests=env,bench&opts=O0,O2",
+ "loadavg_after": "2.86 1.81 1.11 10/1477 607758",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/mb-bench-coi",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": true,
+   "SharedArrayBuffer": "function",
+   "JSPI": {
+    "Suspending": "function",
+    "promising": "function"
+   },
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  "bench": {
+   "sync_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 6.7,
+      "ns_first": 17.5,
+      "ns_reps": [
+       8.8,
+       6.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 40,
+      "ns_first": 38.4,
+      "ns_reps": [
+       40,
+       44.4
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 152.5,
+      "ns_first": 162.7,
+      "ns_reps": [
+       152.5,
+       154.1
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 628.9,
+      "ns_first": 623.1,
+      "ns_reps": [
+       628.9,
+       679.1
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 12.5,
+      "ns_first": 16.7,
+      "ns_reps": [
+       14,
+       12.5
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 111.6,
+      "ns_first": 113.8,
+      "ns_reps": [
+       113.5,
+       111.6
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 402.9,
+      "ns_first": 394.7,
+      "ns_reps": [
+       402.9,
+       411.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1619.9,
+      "ns_first": 1664.5,
+      "ns_reps": [
+       1634.7,
+       1619.9
+      ]
+     }
+    ]
+   },
+   "asyncify_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 17.1,
+      "ns_first": 27.2,
+      "ns_reps": [
+       18.5,
+       17.1
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 485,
+      "ns_first": 1281.7,
+      "ns_reps": [
+       653.5,
+       485
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4585,
+      "ns_first": 6335,
+      "ns_reps": [
+       5070,
+       4585
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 62.5,
+      "ns_first": 75,
+      "ns_reps": [
+       62.5,
+       68.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 601.3,
+      "ns_first": 720.3,
+      "ns_reps": [
+       684.3,
+       601.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5086.7,
+      "ns_first": 5316.7,
+      "ns_reps": [
+       5623.3,
+       5086.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 250.2,
+      "ns_first": 247.6,
+      "ns_reps": [
+       250.2,
+       275.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1152,
+      "ns_first": 1448.3,
+      "ns_reps": [
+       1152,
+       1301.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4725,
+      "ns_first": 5163.3,
+      "ns_reps": [
+       5353.3,
+       4725
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1027.5,
+      "ns_first": 1060.3,
+      "ns_reps": [
+       1027.5,
+       1090.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 3439,
+      "ns_first": 3550.7,
+      "ns_reps": [
+       3514.5,
+       3439
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 7085,
+      "ns_first": 7531.7,
+      "ns_reps": [
+       7328.3,
+       7085
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 19.2,
+      "ns_first": 24.1,
+      "ns_reps": [
+       19.2,
+       21
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 348,
+      "ns_first": 575.8,
+      "ns_reps": [
+       440.3,
+       348
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3703.3,
+      "ns_first": 3921.7,
+      "ns_reps": [
+       4073.3,
+       3703.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 138.5,
+      "ns_first": 138.1,
+      "ns_reps": [
+       138.5,
+       141.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 609.7,
+      "ns_first": 761,
+      "ns_reps": [
+       609.7,
+       647.5
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3635,
+      "ns_first": 3930,
+      "ns_reps": [
+       4033.3,
+       3635
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 481.5,
+      "ns_first": 504.2,
+      "ns_reps": [
+       497.9,
+       481.5
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1504,
+      "ns_first": 1702.5,
+      "ns_reps": [
+       1687.3,
+       1504
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5465,
+      "ns_first": 5363.3,
+      "ns_reps": [
+       5465,
+       17668.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1916.9,
+      "ns_first": 2044.1,
+      "ns_reps": [
+       1916.9,
+       1948.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 4097,
+      "ns_first": 4211.7,
+      "ns_reps": [
+       4120.5,
+       4097
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 7250,
+      "ns_first": 7960,
+      "ns_reps": [
+       7763.3,
+       7250
+      ]
+     }
+    ]
+   },
+   "jspi_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 11.4,
+      "ns_first": 16.6,
+      "ns_reps": [
+       11.4,
+       11.5
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 137.5,
+      "ns_first": 233.2,
+      "ns_reps": [
+       192.2,
+       137.5
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3471.7,
+      "ns_first": 4283.3,
+      "ns_reps": [
+       3966.7,
+       3471.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 39.3,
+      "ns_first": 31.8,
+      "ns_reps": [
+       39.3,
+       52.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 161.2,
+      "ns_first": 217,
+      "ns_reps": [
+       168.5,
+       161.2
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3716.7,
+      "ns_first": 3895,
+      "ns_reps": [
+       3771.7,
+       3716.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 134.1,
+      "ns_first": 139,
+      "ns_reps": [
+       134.1,
+       134.1
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 261.7,
+      "ns_first": 330.7,
+      "ns_reps": [
+       261.7,
+       287
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3151.7,
+      "ns_first": 3583.3,
+      "ns_reps": [
+       3151.7,
+       3390
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 775,
+      "ns_first": 593.8,
+      "ns_reps": [
+       805.5,
+       775
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 756.5,
+      "ns_first": 843,
+      "ns_reps": [
+       756.5,
+       793.8
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4683.3,
+      "ns_first": 3853.3,
+      "ns_reps": [
+       4683.3,
+       5470
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 14.2,
+      "ns_first": 16.9,
+      "ns_reps": [
+       14.2,
+       16.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 140.5,
+      "ns_first": 186.7,
+      "ns_reps": [
+       165.7,
+       140.5
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3151.7,
+      "ns_first": 2700,
+      "ns_reps": [
+       3461.7,
+       3151.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 103.1,
+      "ns_first": 103.5,
+      "ns_reps": [
+       105.1,
+       103.1
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 251.3,
+      "ns_first": 345,
+      "ns_reps": [
+       284.3,
+       251.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3293.3,
+      "ns_first": 3140,
+      "ns_reps": [
+       3293.3,
+       3301.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 384.9,
+      "ns_first": 393.6,
+      "ns_reps": [
+       384.9,
+       387.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 511.7,
+      "ns_first": 643.8,
+      "ns_reps": [
+       541.8,
+       511.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3713.3,
+      "ns_first": 3246.7,
+      "ns_reps": [
+       3713.3,
+       14156.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1550.9,
+      "ns_first": 1551.6,
+      "ns_reps": [
+       1565.3,
+       1550.9
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1709,
+      "ns_first": 1683.8,
+      "ns_reps": [
+       1709,
+       1743.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4596.7,
+      "ns_first": 4823.3,
+      "ns_reps": [
+       4596.7,
+       5391.7
+      ]
+     }
+    ]
+   },
+   "sync_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 6.8,
+      "ns_first": 10.5,
+      "ns_reps": [
+       6.8,
+       7.2
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 26.9,
+      "ns_first": 24.9,
+      "ns_reps": [
+       32.3,
+       26.9
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 108.1,
+      "ns_first": 108.3,
+      "ns_reps": [
+       117.3,
+       108.1
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 458.1,
+      "ns_first": 460,
+      "ns_reps": [
+       466.1,
+       458.1
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 6.5,
+      "ns_first": 7.1,
+      "ns_reps": [
+       6.6,
+       6.5
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 23.1,
+      "ns_first": 23,
+      "ns_reps": [
+       23.1,
+       26.8
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 89.9,
+      "ns_first": 96.8,
+      "ns_reps": [
+       95.8,
+       89.9
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 435.2,
+      "ns_first": 429,
+      "ns_reps": [
+       435.2,
+       458.4
+      ]
+     }
+    ]
+   },
+   "asyncify_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 7.7,
+      "ns_first": 14.5,
+      "ns_reps": [
+       7.7,
+       7.9
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 306.3,
+      "ns_first": 595.7,
+      "ns_reps": [
+       433.8,
+       306.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3943.3,
+      "ns_first": 4466.7,
+      "ns_reps": [
+       3943.3,
+       4198.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 38.6,
+      "ns_first": 44.8,
+      "ns_reps": [
+       40.4,
+       38.6
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 304,
+      "ns_first": 448.7,
+      "ns_reps": [
+       381.5,
+       304
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3766.7,
+      "ns_first": 3641.7,
+      "ns_reps": [
+       4758.3,
+       3766.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 171.4,
+      "ns_first": 169.3,
+      "ns_reps": [
+       173.8,
+       171.4
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 636.2,
+      "ns_first": 699.8,
+      "ns_reps": [
+       726,
+       636.2
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3831.7,
+      "ns_first": 4306.7,
+      "ns_reps": [
+       3831.7,
+       4331.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 774.9,
+      "ns_first": 771.1,
+      "ns_reps": [
+       776.6,
+       774.9
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 2003.2,
+      "ns_first": 2107.5,
+      "ns_reps": [
+       2144.2,
+       2003.2
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5836.7,
+      "ns_first": 5291.7,
+      "ns_reps": [
+       5888.3,
+       5836.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 7.4,
+      "ns_first": 11.8,
+      "ns_reps": [
+       7.4,
+       8
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 186.2,
+      "ns_first": 287,
+      "ns_reps": [
+       203.7,
+       186.2
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3183.3,
+      "ns_first": 3053.3,
+      "ns_reps": [
+       3183.3,
+       3860
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 36,
+      "ns_first": 41.5,
+      "ns_reps": [
+       36,
+       38.9
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 291.8,
+      "ns_first": 358.2,
+      "ns_reps": [
+       307,
+       291.8
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3050,
+      "ns_first": 3640,
+      "ns_reps": [
+       3050,
+       3820
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 167,
+      "ns_first": 170.8,
+      "ns_reps": [
+       167,
+       178.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 691.3,
+      "ns_first": 739.7,
+      "ns_reps": [
+       691.3,
+       697.8
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3905,
+      "ns_first": 4858.3,
+      "ns_reps": [
+       3905,
+       14615
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 766.5,
+      "ns_first": 783.6,
+      "ns_reps": [
+       766.5,
+       790.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 2295.3,
+      "ns_first": 2310.8,
+      "ns_reps": [
+       2295.3,
+       2300.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4983.3,
+      "ns_first": 5108.3,
+      "ns_reps": [
+       5111.7,
+       4983.3
+      ]
+     }
+    ]
+   },
+   "jspi_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 10.8,
+      "ns_first": 14.7,
+      "ns_reps": [
+       11,
+       10.8
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 165.7,
+      "ns_first": 219,
+      "ns_reps": [
+       184,
+       165.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3291.7,
+      "ns_first": 3865,
+      "ns_reps": [
+       3326.7,
+       3291.7
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 28.6,
+      "ns_first": 30.9,
+      "ns_reps": [
+       32.8,
+       28.6
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 144,
+      "ns_first": 233,
+      "ns_reps": [
+       148.5,
+       144
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3220,
+      "ns_first": 3395,
+      "ns_reps": [
+       3220,
+       4493.3
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 106.6,
+      "ns_first": 110.7,
+      "ns_reps": [
+       106.6,
+       110.1
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 268,
+      "ns_first": 297.5,
+      "ns_reps": [
+       268,
+       318.5
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3591.7,
+      "ns_first": 4366.7,
+      "ns_reps": [
+       3591.7,
+       3710
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 504.4,
+      "ns_first": 515.1,
+      "ns_reps": [
+       543,
+       504.4
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 699.5,
+      "ns_first": 777,
+      "ns_reps": [
+       699.5,
+       746.8
+      ]
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3776.7,
+      "ns_first": 4810,
+      "ns_reps": [
+       3776.7,
+       4416.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 10.7,
+      "ns_first": 11.7,
+      "ns_reps": [
+       10.7,
+       11.4
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 120.3,
+      "ns_first": 218.5,
+      "ns_reps": [
+       142.8,
+       120.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 2848.3,
+      "ns_first": 2900,
+      "ns_reps": [
+       3506.7,
+       2848.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 28.7,
+      "ns_first": 29.6,
+      "ns_reps": [
+       33.3,
+       28.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 138,
+      "ns_first": 228.2,
+      "ns_reps": [
+       231.3,
+       138
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3255,
+      "ns_first": 3133.3,
+      "ns_reps": [
+       3510,
+       3255
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 103.5,
+      "ns_first": 111.2,
+      "ns_reps": [
+       103.5,
+       105.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 236,
+      "ns_first": 287.8,
+      "ns_reps": [
+       276.5,
+       236
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3356.7,
+      "ns_first": 3931.7,
+      "ns_reps": [
+       3356.7,
+       16886.7
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 471,
+      "ns_first": 472.8,
+      "ns_reps": [
+       482.3,
+       471
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 591.3,
+      "ns_first": 568.8,
+      "ns_reps": [
+       591.3,
+       631.3
+      ]
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4678.3,
+      "ns_first": 4048.3,
+      "ns_reps": [
+       4826.7,
+       4678.3
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "chrome_pids_left": 0
+}

@@ -1,0 +1,6 @@
+<!doctype html><meta charset=utf-8><title>mt1 smem</title>
+<script>
+window.__log = []; window.__lines = [];
+window.Module = { print: (s) => { window.__lines.push(s); if (s === 'DONE') { window.__result = window.__lines; window.__done = true; } }, printErr: (s) => window.__log.push('err: ' + s), onAbort: (w) => { window.__error = 'abort ' + w; window.__done = true; } };
+</script>
+<script src="/coi/data/smem/smem.js"></script>

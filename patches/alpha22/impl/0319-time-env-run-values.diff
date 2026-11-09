@@ -1,0 +1,178 @@
+--- a/lift/runtime/fle_time.h
++++ b/lift/runtime/fle_time.h
+@@ -24,7 +24,14 @@
+ 
+ /* The emulated time zone: UTC. Bias is "the difference, in minutes, between UTC and local time"
+  * (UTC = local time + bias), so 0 here and local time equals UTC. No daylight saving time. */
+-#define FLE_TZ_BIAS_MINUTES 0
++/* Decision 0319 (PROVISIONAL, PM 07:2x; O8 'Starting at 12:00:00 AM'): the instant of the virtual clock and the time zone are RUN VALUES the page may pass in the engine environment (like FLE_MONITOR_W/H and
++ * FLE_DWM_HZ: the engine's own configuration, read with getenv in the product too):
++ *     FLE_WALL_FILETIME=<decimal FILETIME, 100 ns since 1601-01-01 UTC>  the UTC instant at which the engine starts (the virtual clock then runs from it; the host clock is read ONCE, by the page)
++ *     FLE_TZ_BIAS_MIN=<decimal minutes, -1440..1440>                     the Windows bias (UTC = local + bias; Japan standard time is -540); no daylight saving time is modelled
++ * Unset or invalid: the fixed boot instant and UTC below (nothing differs from before; every test and every Export keeps its answers). Learn (GetSystemTime / GetLocalTime): the current system time, UTC and
++ * local; the fixed origin was a choice for determinism, not a rule of the pages. */
++int32_t fle_tz_bias_minutes(void);
++#define FLE_TZ_BIAS_MINUTES (fle_tz_bias_minutes())
+ #define FLE_TZ_STANDARD_NAME "UTC"
+ #define FLE_TZ_DAYLIGHT_NAME ""
+ 
+--- a/lift/runtime/fle_time.c
++++ b/lift/runtime/fle_time.c
+@@ -2,6 +2,7 @@
+  * the pages read are listed in docs/investigations/import-proctime-spec.md). The host clock is never read.
+  * A case the pages leave open stops the run through fle_stop (fle_env.h). */
+ #include <stdint.h>
++#include <stdlib.h>
+ #include <string.h>
+ 
+ #include "fle_runtime.h"
+@@ -105,7 +106,53 @@
+     return t;
+ }
+ 
+-uint64_t fle_time_now_filetime(void) { return FLE_TIME_BOOT_FILETIME + fle_clock_read_ticks(); }
++/* Decision 0319: the run values FLE_WALL_FILETIME and FLE_TZ_BIAS_MIN (fle_time.h), read once at the first use. The virtual clock starts at FLE_CLOCK_START_MS, so the boot instant is the wall instant minus that. */
++static uint64_t wall_boot = FLE_TIME_BOOT_FILETIME;
++static int32_t wall_bias = 0;
++static int wall_read_done;
++
++static int wall_parse_u64(const char *e, uint64_t *out)
++{
++    uint64_t v = 0;
++    if (e == NULL || *e == '\0') return 0;
++    for (; *e != '\0'; e++) {
++        if (*e < '0' || *e > '9' || v > UINT64_C(1844674407370955160)) return 0;
++        v = v * 10u + (uint64_t)(*e - '0');
++    }
++    *out = v;
++    return 1;
++}
++
++static void wall_read(void)
++{
++    uint64_t ft = 0;
++    const char *b = getenv("FLE_TZ_BIAS_MIN");
++
++    wall_read_done = 1;
++    if (wall_parse_u64(getenv("FLE_WALL_FILETIME"), &ft) && ft < FLE_TIME_FILETIME_LIMIT && ft >= FLE_CLOCK_START_MS * FLE_TICKS_PER_MS)
++        wall_boot = ft - FLE_CLOCK_START_MS * FLE_TICKS_PER_MS;
++    if (b != NULL && *b != '\0') {
++        const char *p = b;
++        int neg = 0;
++        long v = 0;
++
++        if (*p == '-') { neg = 1; p++; }
++        for (; *p >= '0' && *p <= '9' && v <= 100000; p++) v = v * 10 + (*p - '0');
++        if (*p == '\0' && p != b + neg && v <= 1440) wall_bias = (int32_t)(neg ? -v : v);
++    }
++}
++
++int32_t fle_tz_bias_minutes(void)
++{
++    if (!wall_read_done) wall_read();
++    return wall_bias;
++}
++
++uint64_t fle_time_now_filetime(void)
++{
++    if (!wall_read_done) wall_read();
++    return wall_boot + fle_clock_read_ticks();
++}
+ 
+ static int64_t fle_bias_ticks(int32_t bias_minutes) { return (int64_t)bias_minutes * (int64_t)FLE_TICKS_PER_MINUTE; }
+ 
+--- a/lift/runtime/fle_env.c
++++ b/lift/runtime/fle_env.c
+@@ -90,9 +90,76 @@
+ static fle_env_entry *env_v;
+ static size_t env_n, env_cap;
+ 
++/* Decision 0319 (PROVISIONAL, PM 07:2x; O8 'Temporary folder C:\\Windows\\Image-Line\\...'): the initial environment block of a real Windows process holds TEMP, TMP, USERPROFILE, APPDATA, LOCALAPPDATA, windir,
++ * SystemRoot and others. The block here started EMPTY, so GetTempPathW (Learn: the first non-empty of TMP, TEMP, USERPROFILE, else the Windows directory) fell back to the Windows directory. The values come from the virtual
++ * profile constants of fle_env.h (FLE_VIRTUAL_USER_PROFILE_DIR, FLE_VIRTUAL_WINDOWS_DIR, the computer and user names). A RUN VALUE like FLE_MONITOR_W: FLE_ENV_DEFAULTS=1 in the engine environment (the manifest's
++ * engine.env of the product); unset (every test) the block stays empty as before. The directories named must exist on the virtual volume (the seed lines for C:\\Users\\user\\AppData\\Local\\Temp and its parents). */
++static int env_defaults_done;
++extern int fle_vfs_make_dirs(const uint16_t *wdir) __attribute__((weak));   /* fle_vfs.c (decision 0193): creates the directory chain on the virtual volume; a link without fle_vfs.c skips it */
++static void env_put_ascii(const char *name, const char *value)
++{
++    uint16_t *n = fle_w_from_ascii(name), *v = fle_w_from_ascii(value);
++
++    if (env_n == env_cap) {
++        size_t nc = env_cap ? env_cap * 2 : 16;
++        fle_env_entry *nv = realloc(env_v, nc * sizeof *nv);
++
++        if (!nv) fle_stop("environment", "out of memory");
++        env_v = nv;
++        env_cap = nc;
++    }
++    env_v[env_n].name = n;
++    env_v[env_n].nlen = fle_w_len(n);
++    env_v[env_n].value = v;
++    env_n++;
++}
++static void env_defaults_once(void)
++{
++    const char *e;
++
++    if (env_defaults_done) return;
++    env_defaults_done = 1;
++    e = getenv("FLE_ENV_DEFAULTS");
++    if (e == NULL || e[0] != '1' || e[1] != '\0') return;
++    env_put_ascii("ALLUSERSPROFILE", "C:\\ProgramData");
++    env_put_ascii("APPDATA", FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Roaming");
++    env_put_ascii("CommonProgramFiles", "C:\\Program Files\\Common Files");
++    env_put_ascii("COMPUTERNAME", FLE_VIRTUAL_COMPUTER_NAME);
++    env_put_ascii("ComSpec", FLE_VIRTUAL_SYSTEM_DIR "\\cmd.exe");
++    env_put_ascii("HOMEDRIVE", "C:");
++    env_put_ascii("HOMEPATH", "\\Users\\" FLE_VIRTUAL_USER_NAME);
++    env_put_ascii("LOCALAPPDATA", FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local");
++    env_put_ascii("OS", "Windows_NT");
++    env_put_ascii("Path", FLE_VIRTUAL_SYSTEM_DIR ";" FLE_VIRTUAL_WINDOWS_DIR);
++    env_put_ascii("PATHEXT", ".COM;.EXE;.BAT;.CMD");
++    env_put_ascii("PROCESSOR_ARCHITECTURE", "AMD64");
++    env_put_ascii("ProgramData", "C:\\ProgramData");
++    env_put_ascii("ProgramFiles", "C:\\Program Files");
++    env_put_ascii("SystemDrive", "C:");
++    env_put_ascii("SystemRoot", FLE_VIRTUAL_WINDOWS_DIR);
++    env_put_ascii("TEMP", FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local\\Temp");
++    env_put_ascii("TMP", FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local\\Temp");
++    env_put_ascii("USERDOMAIN", FLE_VIRTUAL_COMPUTER_NAME);
++    env_put_ascii("USERNAME", FLE_VIRTUAL_USER_NAME);
++    env_put_ascii("USERPROFILE", FLE_VIRTUAL_USER_PROFILE_DIR);
++    env_put_ascii("windir", FLE_VIRTUAL_WINDOWS_DIR);
++    if (fle_vfs_make_dirs != NULL) {   /* the directories that TEMP, APPDATA and LOCALAPPDATA name exist on the volume (a real profile has them) */
++        static const char *const dirs[] = { FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local\\Temp", FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Roaming", "C:\\ProgramData" };
++        size_t k;
++
++        for (k = 0; k < sizeof dirs / sizeof dirs[0]; k++) {
++            uint16_t *w = fle_w_from_ascii(dirs[k]);
++
++            (void)fle_vfs_make_dirs(w);
++            free(w);
++        }
++    }
++}
++
+ static long env_find(const uint16_t *name, size_t nlen)
+ {
+     size_t i;
++    env_defaults_once();
+     for (i = 0; i < env_n; i++)
+         if (fle_w_icmp(env_v[i].name, env_v[i].nlen, name, nlen) == 0) return (long)i;
+     return -1;
+@@ -317,6 +384,7 @@
+     size_t i, total = 1, at = 0;
+     uint16_t *blk;
+ 
++    env_defaults_once();
+     for (i = 0; i < env_n; i++) total += env_v[i].nlen + 1 + fle_w_len(env_v[i].value) + 1;
+     blk = malloc(total * sizeof *blk);
+     if (!blk) {
+@@ -406,6 +474,7 @@
+     size_t i, j, total = 1, at = 0;
+     char *blk;
+ 
++    env_defaults_once();
+     for (i = 0; i < env_n; i++) total += env_v[i].nlen + 1 + fle_w_len(env_v[i].value) + 1;
+     blk = malloc(total);
+     if (!blk) {

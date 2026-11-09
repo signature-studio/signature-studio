@@ -1,0 +1,125 @@
+--- a/lift/crates/fe-lift/tests/wall_fr11.rs
++++ b/lift/crates/fe-lift/tests/wall_fr11.rs
+@@ -423,10 +423,12 @@
+ /* the window procedure stub: every message gets the creation answers (WM_NCCREATE 1, WM_NCCALCSIZE 0, WM_CREATE 0) and otherwise the default processing, as the guest's own handler would call DefWindowProcW */
+ #define VA_WP 0x2000
+ static uint32_t wp_count[0x400];
++static uint64_t last_ctx_target, last_ctx_wp, last_ctx_lp;
+ static void wndproc(void)
+ {
+     uint64_t h = R[1], msg = R[2], wp = R[8], lp = R[9], sp = R[4];
+     if (msg < 0x400) wp_count[msg]++;
++    if (msg == 0x007B) { last_ctx_target = h; last_ctx_wp = wp; last_ctx_lp = lp; }
+     if (msg == 0x81) { R[0] = 1; return; }
+     if (msg == 0x83) { R[0] = 0; return; }
+     if (msg == 0x01) { R[0] = 0; return; }
+@@ -1520,6 +1522,87 @@
+ }
+ 
+ #[test]
++fn the_virtual_pointer_keeps_set_cursor_pos_as_a_relative_offset() {
++    // Decision 0319 O20: Windows's pointer is a virtual cursor. SetCursorPos moves it, and the host
++    // (browser) pointer's absolute motion is relative to that new place: the guest position is the
++    // host's latest absolute position plus an offset, clamped to the screen. With no offset this is
++    // the same behaviour as before.
++    let l = lines(
++        "fr11-virtual-pointer",
++        r#"
++    int32_t pt[2], ci[6];
++    void fle_win_host_pointer_set(int32_t, int32_t);
++    void fle_win_pointer_reclamp(void);
++    K(fle_imp_SetCursorPos, 0, 0);
++    fle_win_host_pointer_set(10, 10);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 10 10 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetCursorPos, 100, 200);
++    K(fle_imp_GetCursorPos, A(pt)); printf("set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(20, 10);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 10 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(20, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 20 -> %d %d\n", pt[0], pt[1]);
++    memset(ci, 0, sizeof ci); ci[0] = 24;
++    K(fle_imp_GetCursorInfo, A(ci)); printf("info pos %d %d\n", ci[4], ci[5]);
++    fle_win_host_pointer_set(450, 1079);
++    K(fle_imp_SetPhysicalCursorPos, 450, 17);
++    K(fle_imp_GetCursorPos, A(pt)); printf("wrap set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 21);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 21 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetCursorPos, 1920, 1080);
++    K(fle_imp_GetCursorPos, A(pt)); printf("clamped -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(21, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 21 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(22, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 22 20 -> %d %d\n", pt[0], pt[1]);
++    fle_screen_set(1024, 768);
++    fle_win_pointer_reclamp();
++    K(fle_imp_GetCursorPos, A(pt)); printf("shrunk -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(23, 21);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 23 21 -> %d %d\n", pt[0], pt[1]);
++"#,
++    );
++    assert_eq!(l[0], "host 10 10 -> 10 10");
++    assert_eq!(l[1], "set -> 100 200");
++    assert_eq!(l[2], "host 20 10 -> 20 10");
++    assert_eq!(l[3], "host 20 20 -> 20 20");
++    assert_eq!(l[4], "info pos 20 20");
++    assert_eq!(l[5], "wrap set -> 450 17");
++    assert_eq!(l[6], "host 450 20 -> 450 20");
++    assert_eq!(l[7], "host 450 21 -> 450 21");
++    assert_eq!(l[8], "clamped -> 1919 1079");
++    assert_eq!(l[9], "host 21 20 -> 21 20");
++    assert_eq!(l[10], "host 22 20 -> 22 20");
++    assert_eq!(l[11], "shrunk -> 22 20");
++    assert_eq!(l[12], "host 23 21 -> 23 21");
++}
++
++#[test]
++fn def_window_proc_generates_wm_context_menu_from_right_button_up() {
++    // Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
++    // WM_RBUTTONUP or WM_NCRBUTTONUP message"; wParam is the handle of the window in which the button was
++    // released (a child forwards to the parent), lParam the cursor position in screen coordinates.
++    let l = lines(
++        "fr11-contextmenu",
++        r#"
++    uint64_t top = cw(0x80, "t", POPUP | VIS, 10, 20, 40, 30, 0);
++    uint64_t kid = cw(0, "k", CHILD | VIS, 5, 6, 10, 10, top);
++    uint64_t r;
++    wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
++    r = K(fle_imp_DefWindowProcW, kid, 0x0205, 2, ((uint64_t)2 << 16) | 1);
++    printf("child rbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == kid ? "kid" : "other", U(last_ctx_lp));
++    wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
++    r = K(fle_imp_DefWindowProcW, top, 0x00A5, 1, ((uint64_t)40 << 16) | 30);
++    printf("top ncrbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == top ? "top" : "other", U(last_ctx_lp));
++"#,
++    );
++    assert_eq!(l[0], "child rbuttonup r 0 ctx 1 target top wparam kid lparam 1c0010");
++    assert_eq!(l[1], "top ncrbuttonup r 0 ctx 1 target top wparam top lparam 28001e");
++}
++
++#[test]
+ fn set_thread_error_mode_returns_the_previous_mode_and_accepts_the_alignment_fault_bit() {
+     // Learn SetThreadErrorMode: dwNewMode "can be one or more of the following values": 0 "Use the system default", SEM_FAILCRITICALERRORS 0x0001, SEM_NOGPFAULTERRORBOX 0x0002, SEM_NOOPENFILEERRORBOX 0x8000;
+     // lpOldMode "If the function succeeds, this parameter is set to the thread's previous error mode. This parameter can be NULL"; "If the function succeeds, the return value is nonzero". SEM_NOALIGNMENTFAULTEXCEPT 0x0004
+--- a/lift/crates/fe-lift/tests/sweep1.rs
++++ b/lift/crates/fe-lift/tests/sweep1.rs
+@@ -157,7 +157,7 @@
+ #include "fle_sweep1.h"
+ uint64_t R[16];
+ void fle_win_input_activate(void) {} void fle_win_input_active(void) {} void fle_win_input_capture_any(void) {} void fle_win_input_hit(void) {} void fle_win_input_key_target(void) {}
+-void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {}
++void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
+ void fle_win_input_toplevels(void) {} void fle_win_input_remaximize(void) {} void fle_win_input_showwindow(void) {}
+ void fle_win_input_call_hooks(void) {} void fle_win_input_hit_list(void) {}
+ int main(int argc, char **argv)
+--- a/lift/harness/sweep1/sweep1_cases.c
++++ b/lift/harness/sweep1/sweep1_cases.c
+@@ -31,7 +31,7 @@
+ void fle_win_input_call_hooks(void) {}   /* decision 0323 (WH_MOUSE / WH_KEYBOARD hooks, fle_input.c input_hook_swallows) */
+ void fle_win_input_hit_list(void) {}     /* decision 0324 (fle_input.c hit_walk) */
+ void fle_win_pointer_get(void) {}
+-void fle_win_pointer_set(void) {}
++void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
+ typedef unsigned int UINT, DWORD, BOOL;
+ typedef int INT;
+ typedef uint16_t WCHAR, WORD;

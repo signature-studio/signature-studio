@@ -1,0 +1,1002 @@
+{
+ "name": "mb-coi",
+ "page": "/coi/mb.html?n=10000&opts=O0,O2",
+ "started": "2026-10-28T15:36:24.947Z",
+ "loadavg_before": "1.10 1.45 0.96 6/1408 605977",
+ "url": "http://127.0.0.1:44891/coi/mb.html?n=10000&opts=O0,O2",
+ "loadavg_after": "1.32 1.48 0.98 2/1457 606620",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/mb-coi",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": true,
+   "SharedArrayBuffer": "function",
+   "JSPI": {
+    "Suspending": "function",
+    "promising": "function"
+   },
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  "rtt": [
+   {
+    "variant": "mb_asyncify_O0",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 44.99998688697815,
+     "max": 3875,
+     "mean": 120.42299998998642,
+     "p50": 115.00000953674316,
+     "p95": 174.99998211860657,
+     "p99": 259.99999046325684
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O0",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_asyncify_O0",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 50.000011920928955,
+     "max": 3330.000013113022,
+     "mean": 121.0565000385046,
+     "p50": 115.00000953674316,
+     "p95": 169.99998688697815,
+     "p99": 250
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O0",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_jspi_O0",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 44.99998688697815,
+     "max": 1485.0000143051147,
+     "mean": 114.89699999392033,
+     "p50": 109.99998450279236,
+     "p95": 164.99999165534973,
+     "p99": 260.0000202655792
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O0",
+    "mode": "jspi"
+   },
+   {
+    "variant": "mb_jspi_O0",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 50.000011920928955,
+     "max": 1219.999998807907,
+     "mean": 111.57799997925758,
+     "p50": 104.99998927116394,
+     "p95": 159.9999964237213,
+     "p99": 269.9999809265137
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O0",
+    "mode": "jspi"
+   },
+   {
+    "variant": "mb_asyncify_O2",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 25.000005960464478,
+     "max": 2145.000010728836,
+     "mean": 113.96550001204014,
+     "p50": 109.99998450279236,
+     "p95": 164.99999165534973,
+     "p99": 269.9999809265137
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_asyncify_O2",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 49.99998211860657,
+     "max": 1810.0000023841858,
+     "mean": 111.82799996733665,
+     "p50": 105.00001907348633,
+     "p95": 159.9999964237213,
+     "p99": 245.00000476837158
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "asyncify"
+   },
+   {
+    "variant": "mb_jspi_O2",
+    "depth": 0,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 25.000005960464478,
+     "max": 1505.0000250339508,
+     "mean": 110.08199998140336,
+     "p50": 104.99998927116394,
+     "p95": 155.0000011920929,
+     "p99": 239.99997973442078
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "jspi"
+   },
+   {
+    "variant": "mb_jspi_O2",
+    "depth": 40,
+    "unit": "us",
+    "rtt": {
+     "n": 10000,
+     "min": 30.000001192092896,
+     "max": 2010.0000202655792,
+     "mean": 115.4150000333786,
+     "p50": 110.00001430511475,
+     "p95": 159.9999964237213,
+     "p99": 229.99998927116394
+    },
+    "worker": {
+     "handled": 10200
+    },
+    "opt": "O2",
+    "mode": "jspi"
+   }
+  ],
+  "bench": {
+   "sync_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 10.6
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 42
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 142.9
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 617.8
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 11.5
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 106.3
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 392.8
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1698.7
+     }
+    ]
+   },
+   "asyncify_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 23.5
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 732
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4961.7
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 67.3
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 590.3
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4506.7
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 214
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1196.3
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5448.3
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 958.6
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 3636
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 8676.7
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 26.7
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 385.8
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4973.3
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 129.3
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 727
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5138.3
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 490.9
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1358.5
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4925
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1918.8
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 4553
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 8223.3
+     }
+    ]
+   },
+   "jspi_O0": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 14.4
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 206.3
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4680
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 41.7
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 241.3
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4485
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 129.8
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 319
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3901.7
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 572.1
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 826.7
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5215
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 12.8
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 176.3
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3313.3
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 97.7
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 277
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3460
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 391.7
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 606.7
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4050
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 1581.1
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 1962
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5030
+     }
+    ]
+   },
+   "sync_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 11.8
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 25.9
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 102.8
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 467.8
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 7.5
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 20.5
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 94.3
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 443.8
+     }
+    ]
+   },
+   "asyncify_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 12.1
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 493
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4985
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 45.8
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 443
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4046.7
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 178.3
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 780.8
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5106.7
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 793.5
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 2118.5
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 5758.3
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 9.6
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 267.2
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3501.7
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 40.1
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 379.3
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4160
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 184.8
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 819.8
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4075
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 774.3
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 2605.5
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 6623.3
+     }
+    ]
+   },
+   "jspi_O2": {
+    "rows": [
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 13.7
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 185.5
+     },
+     {
+      "wide": 0,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3760
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 26.4
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 195.3
+     },
+     {
+      "wide": 0,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3741.7
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 106.1
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 274.8
+     },
+     {
+      "wide": 0,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3816.7
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 452.8
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 670.3
+     },
+     {
+      "wide": 0,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 4970
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 12.1
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 185.8
+     },
+     {
+      "wide": 1,
+      "depth": 0,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3500
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 30.2
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 211.2
+     },
+     {
+      "wide": 1,
+      "depth": 10,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3366.7
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 94.1
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 346.5
+     },
+     {
+      "wide": 1,
+      "depth": 40,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3525
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 0,
+      "n": 200000,
+      "ns_per_iter": 414.6
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 1,
+      "n": 20000,
+      "ns_per_iter": 568.8
+     },
+     {
+      "wide": 1,
+      "depth": 160,
+      "kind": 2,
+      "n": 3000,
+      "ns_per_iter": 3921.7
+     }
+    ]
+   }
+  }
+ },
+ "chrome_pids_left": 0
+}

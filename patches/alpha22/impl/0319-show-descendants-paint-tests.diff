@@ -1,0 +1,47 @@
+--- a/lift/harness/alpha3/upd_region.c
++++ b/lift/harness/alpha3/upd_region.c
+@@ -377,6 +377,44 @@
+     (void)fle_api2_call(fle_imp_ShowWindow, win, 8 /* SW_SHOWNA */, 0, 0, 0, 0, 0, 0);
+     yes("a window shown again has its whole client area to repaint even when a part was invalid while hidden", gur(win, rc) == 1 && same_rect(rc, 0, 0, 200, 100));
+ 
++    /* ---- decision 0319 section 23 (alpha1): showing a window gives the whole client area to every visible descendant too (Wine 10.0 server/window.c set_window_pos: redraw_window(..., RDW_ALLCHILDREN)).
++     * h is a hidden child of the visible popup t; g (child of h) gets WS_VISIBLE while h is hidden (VCL: Visible := True before the parent is shown): it has no update region (a window that is not visible
++     * has none). ShowWindow(h) makes both visible: both have the whole client area to paint, whether or not the parent clips its children (t, h with and without WS_CLIPCHILDREN). ---- */
++    {
++        int clip;
++
++        for (clip = 0; clip < 2; clip++) {
++            HWND t = mk(0x10000, WS_POPUP | WS_VISIBLE | (clip ? 0x02000000u : 0u), 700, 700, 300, 300);
++            HWND h = mkp(t, 0, 0x44000000u | (clip ? 0x02000000u : 0u), 20, 20, 200, 200);        /* WS_CHILD | WS_CLIPSIBLINGS, not visible */
++            HWND g = mkp(h, 0, 0x54000000u, 10, 10, 100, 100);                                     /* WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS under the hidden h */
++            HWND gg = mkp(g, 0, 0x54000000u, 5, 5, 40, 40);                                        /* and one more level */
++            char buf[200];
++
++            pump();
++            (void)fle_desk_compose();
++            snprintf(buf, sizeof buf, "show-descendants (%s): g and gg have WS_VISIBLE but their ancestor h is hidden: no update region", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(g, rc) == 0 && gur(gg, rc) == 0);
++            (void)fle_api2_call(fle_imp_ValidateRect, t, 0, 0, 0, 0, 0, 0, 0);
++            (void)fle_api2_call(fle_imp_ShowWindow, h, 5 /* SW_SHOW */, 0, 0, 0, 0, 0, 0);
++            snprintf(buf, sizeof buf, "show-descendants (%s): ShowWindow(h): h has its whole client area (0,0,200,200)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 1 && same_rect(rc, 0, 0, 200, 200));
++            snprintf(buf, sizeof buf, "show-descendants (%s): ... and so has the visible child g (0,0,100,100)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(g, rc) == 1 && same_rect(rc, 0, 0, 100, 100));
++            snprintf(buf, sizeof buf, "show-descendants (%s): ... and the grandchild gg (0,0,40,40)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(gg, rc) == 1 && same_rect(rc, 0, 0, 40, 40));
++            pump();
++            snprintf(buf, sizeof buf, "show-descendants (%s): after the messages are dispatched nothing is left to paint in h, g, gg", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 0 && gur(g, rc) == 0 && gur(gg, rc) == 0);
++            /* the same when the parent is shown by SetWindowPos(SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) instead of ShowWindow */
++            (void)fle_api2_call(fle_imp_ShowWindow, h, 0, 0, 0, 0, 0, 0, 0);
++            pump();
++            (void)fle_api2_call(fle_imp_ValidateRect, t, 0, 0, 0, 0, 0, 0, 0);
++            (void)fle_api2_call(fle_imp_SetWindowPos, h, 0, 0, 0, 0, 0, 0x40u | 0x1u | 0x2u | 0x4u | 0x10u, 0);
++            snprintf(buf, sizeof buf, "show-descendants (%s): SetWindowPos(SWP_SHOWWINDOW) of the hidden h: h, g and gg all have their whole client area", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 1 && same_rect(rc, 0, 0, 200, 200) && gur(g, rc) == 1 && same_rect(rc, 0, 0, 100, 100) && gur(gg, rc) == 1 && same_rect(rc, 0, 0, 40, 40));
++        }
++    }
++
+     printf("checks %d failed %d\n", checks, fails);
+     return fails ? 1 : 0;
+ }

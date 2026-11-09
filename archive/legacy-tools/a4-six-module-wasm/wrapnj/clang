@@ -1,0 +1,17 @@
+#!/bin/bash
+# wasm6 measurement wrapper (disk quota): drops -g; after a successful compile removes the split generated source
+# /tmp/opencode/wasm6/o*/{src,v-*/src}/<label>-NN.c that was compiled. Same idea as lift/out-git/v1-results/tools/wrap/clang.
+args=(); src=""; prev=""
+for a in "$@"; do
+    [ "$a" = "-g" ] && { prev="$a"; continue; }
+    [ "$prev" = "-c" ] && src="$a"
+    args+=("$a"); prev="$a"
+done
+/usr/bin/clang -DFLE_LANDING_NOJUMP "${args[@]}"
+rc=$?
+if [ $rc -eq 0 ] && [ -n "$src" ]; then
+    case "$src" in
+        /tmp/opencode/wasm6/o*/src/*-[0-9][0-9].c|/tmp/opencode/wasm6/o*/v-*/src/*-[0-9][0-9].c) rm -f -- "$src" ;;
+    esac
+fi
+exit $rc

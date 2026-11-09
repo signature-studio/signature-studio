@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>opfs1 stage 3 library test</title>
+<script>
+// window.run(mode, timeout) -> {lines}; window.kill() terminates a running Worker (the persist test kills it without closing anything)
+let w = null;
+window.run = (mode, timeout) => new Promise((res) => { w = new Worker('opfs-test-worker.js'); w.onmessage = (e) => res(e.data); w.onerror = (e) => res({ lines: ['E worker error ' + (e.message || e)] }); w.postMessage({ mode, timeout }); });
+window.kill = () => { if (w) w.terminate(); w = null; return true; };
+window.wipe = async () => { const root = await navigator.storage.getDirectory(); try { await root.removeEntry('s3test', { recursive: true }); } catch (e) { /* none */ } return true; };
+</script>

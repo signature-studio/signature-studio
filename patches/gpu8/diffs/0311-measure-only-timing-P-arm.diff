@@ -1,0 +1,182 @@
+diff -ruN a/app/src/engine/desk-gl.ts b/app/src/engine/desk-gl.ts
+--- a/app/src/engine/desk-gl.ts	2026-11-06 19:44:45.640841339 +0900
++++ b/app/src/engine/desk-gl.ts	2026-11-06 20:59:42.552386851 +0900
+@@ -133,7 +133,7 @@
+ interface Tex { tex: WebGLTexture; w: number; h: number }
+ 
+ export class GlDeskPresenter implements DeskShow {
+-  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0 };
++  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number; slow8: number; slow16: number; slowMs: number; maxMs: number; totalMs: number; slowLog: number[] } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0, slow8: 0, slow16: 0, slowMs: 0, maxMs: 0, totalMs: 0, slowLog: [] };
+   lastState: DeskState | null = null;
+   private gl: Gl;
+   private loc: Record<string, WebGLUniformLocation | null> = {};
+@@ -202,7 +202,14 @@
+     return this.heap.u8;
+   }
+ 
++  /** MEASUREMENT ONLY (decision 0311): how long one present() takes, as the caller sees it (JS and the waits inside the GL calls) */
+   present(): number {
++    const t0 = this.now();
++    const r = this.presentInner();
++    if (r > 0) { const d = this.now() - t0, s = this.stats; s.totalMs += d; if (d > 8) { s.slow8++; s.slowMs += d; s.slowLog.push(performance.timeOrigin + t0, +d.toFixed(2)); if (s.slowLog.length > 1024) s.slowLog.splice(0, 2); } if (d > 16) s.slow16++; if (d > s.maxMs) s.maxMs = d; }
++    return r;
++  }
++  private presentInner(): number {
+     if (!this.memory() || this.lost) return 0;
+     const t0 = this.now();
+     const ptr = this.api.scene();
+diff -ruN a/app/src/engine/desk-link.ts b/app/src/engine/desk-link.ts
+--- a/app/src/engine/desk-link.ts	2026-11-06 20:09:34.953563795 +0900
++++ b/app/src/engine/desk-link.ts	2026-11-06 21:50:01.750571855 +0900
+@@ -22,6 +22,7 @@
+   RESULT: 8,         // P: rectangles shown by the scene DONE names (0: nothing changed)
+   PRESENTS: 9,       // P: presents made
+   RING_READS: 10, WAKES: 11, IDLE_TICKS: 12,   // engine counters P puts into its report
++  A_N: 13, A_SETTLE_PUB_US: 14, A_PUB_DONE_US: 15, A_SKIP_BUSY: 20, A_EARLY_SHOWN: 21,   // MEASUREMENT ONLY: the answering scenes: how many, the time from the guest's settled to the publish and from the publish to the engine's seeing DONE, answer attempts skipped because P was drawing
+ } as const;
+ export const HEADER_BYTES = 128;
+ const AT_INDEX = 8;                       // Float64 index (byte 64): the instant of the last present of P (performance.timeOrigin + performance.now())
+@@ -50,6 +51,8 @@
+   /** written before DONE (sequentially consistent), so a reader that has seen DONE reads the instant of that present */
+   get presentAt(): number { return this.f64[AT_INDEX] as number; }
+   get presents(): number { return this.get(W.PRESENTS); }
++  /** MEASUREMENT ONLY: the instant (performance.timeOrigin + now) the engine Worker stored the last PUB */
++  get publishAt(): number { return this.f64[9] as number; }
+   get modeOn(): boolean { return this.get(W.MODE_ON) !== 0; }
+   get wantSet(): boolean { return this.get(W.WANT) !== 0; }
+   counter(w: number): number { return this.get(w); }
+@@ -63,6 +66,7 @@
+   publish(mem: ArrayBufferLike, ptr: number): number {
+     new Uint8Array(this.buffer, HEADER_BYTES, SCENE_BYTES).set(new Uint8Array(mem, ptr, SCENE_BYTES));
+     const seq = this.get(W.PUB) + 1;
++    this.f64[9] = performance.timeOrigin + performance.now();
+     this.set(W.PUB, seq);
+     Atomics.notify(this.i32, W.PUB);
+     return seq;
+@@ -71,6 +75,7 @@
+   modeRequested(): boolean { return this.get(W.MODE_REQ) !== 0 && this.get(W.MODE_ON) === 0; }
+   setModeOn(): void { this.set(W.MODE_ON, 1); }
+   takeResync(): boolean { return Atomics.compareExchange(this.i32, W.RESYNC_REQ, 1, 0) === 1; }
++  addCounter(w: number, v: number): void { Atomics.add(this.i32, w, Math.round(v)); }
+   setCounters(ringReads: number, wakes: number, idleTicks: number): void { this.set(W.RING_READS, ringReads); this.set(W.WAKES, wakes); this.set(W.IDLE_TICKS, idleTicks); }
+ }
+ 
+diff -ruN a/app/src/engine/desk-worker.ts b/app/src/engine/desk-worker.ts
+--- a/app/src/engine/desk-worker.ts	2026-11-06 20:09:34.953727853 +0900
++++ b/app/src/engine/desk-worker.ts	2026-11-06 21:50:42.237765553 +0900
+@@ -27,6 +27,8 @@
+ let frameTicks = 0;
+ const presentedAt: number[] = [];
+ let lastReport = 0;
++// MEASUREMENT ONLY (decision 0311): how long after the engine Worker stored PUB this Worker's loop got to run (the event-loop latency of Atomics.waitAsync's resolution)
++const wl8 = { n: 0, over2: 0, over8: 0, over16: 0, sumMs: 0, maxMs: 0 };
+ 
+ self.onmessage = (ev: MessageEvent<{ cmd: 'init'; link: SharedArrayBuffer; port: MessagePort }>) => {
+   const m = ev.data;
+@@ -96,6 +98,7 @@
+   for (;;) {
+     const seq = await L.waitPublished(seen);
+     seen = seq;
++    { const wl = nowAbs() - L.publishAt; wl8.n++; wl8.sumMs += wl; if (wl > 2) wl8.over2++; if (wl > 8) wl8.over8++; if (wl > 16) wl8.over16++; if (wl > wl8.maxMs) wl8.maxMs = wl; }
+     let shown = 0;
+     try { shown = pres?.present() ?? 0; } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+     const at = nowAbs();
+@@ -114,7 +117,8 @@
+   if (!force && now - lastReport < 100) return;
+   if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
+   lastReport = now;
+-  post({ t: 'desk', stats: { ...pres.stats, ringReads: L.counter(10), ringFull: 0, wakes: L.counter(11), ticks: frameTicks, idleTicks: L.counter(12), sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), nWindows: 0 });
++  const stats = { ...pres.stats, ringReads: L.counter(10), ringFull: 0, wakes: L.counter(11), ticks: frameTicks, idleTicks: L.counter(12), sleeps: quiet.sleeps, ansN: L.counter(13), ansSettlePubUs: L.counter(14), ansPubDoneUs: L.counter(15), ansSkipBusy: L.counter(20), ansEarlyShown: L.counter(21), wakeN: wl8.n, wakeOver2: wl8.over2, wakeOver8: wl8.over8, wakeOver16: wl8.over16, wakeSumMs: wl8.sumMs, wakeMaxMs: wl8.maxMs };   // MEASUREMENT ONLY: a variable, not a literal, so that the extra counters are allowed
++  post({ t: 'desk', stats, at: presentedAt.splice(0, 64), nWindows: 0 });
+ }
+ 
+ function glRead(kind: 'desk-gl-pixels' | 'desk-dump', windows: string): void {
+diff -ruN a/app/src/engine/worker.ts b/app/src/engine/worker.ts
+--- a/app/src/engine/worker.ts	2026-11-06 21:49:44.704993587 +0900
++++ b/app/src/engine/worker.ts	2026-11-06 21:50:42.237635178 +0900
+@@ -50,7 +50,8 @@
+ let deskApiP: import('./desk.ts').DeskApi | null = null;
+ // decision 0311: the inputs the IdleDriver processed at an idle (not taken inline at a scheduler point) are answered by the first scene published after they were processed, when it shows something (as before: the present right after processing)
+ let idleAnswerSeqs: number[] = [];
+-let pendingScene: { answers: number[]; seq: number; gate: boolean } | null = null;
++let pendingScene: { answers: number[]; seq: number; gate: boolean; tPub: number; tSet: number; early: boolean } | null = null;
++let tSettledAt = 0;   // MEASUREMENT ONLY (decision 0311)
+ 
+ const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
+ 
+@@ -103,6 +104,18 @@
+ }
+ 
+ // ---- input (decision 0141): the page's raw events reach the IdleDriver; the engine takes them at its idle ----
++// MEASUREMENT ONLY (decision 0311): one row per inline-answer episode (from the injection of an input the runtime took inline to the answer or the give-up): when it started, when the guest settled, how many scenes/presents were made before and after settled, when the first one after settled was made, when the engine saw it done, how it ended
++type Ep = { t0: number; settled: number; pubBefore: number; pubAfter: number; gatePub: number; doneSeen: number; res: number; end: number; kind: number };
++let ep: Ep | null = null;
++const epRows: number[][] = [];
++function epEnd(kind: number): void {
++  if (!ep) return;
++  ep.end = nowAbs(); ep.kind = kind;
++  epRows.push([+ep.t0.toFixed(2), +(ep.settled ? ep.settled - ep.t0 : -1).toFixed(2), ep.pubBefore, ep.pubAfter, +(ep.gatePub ? ep.gatePub - ep.t0 : -1).toFixed(2), +(ep.doneSeen ? ep.doneSeen - ep.t0 : -1).toFixed(2), ep.res, +(ep.end - ep.t0).toFixed(2), ep.kind]);
++  if (epRows.length > 400) epRows.shift();
++  ep = null;
++  post({ t: 'mark', name: 'ep-trace', abs: nowAbs(), detail: { cols: 't0,settledAfter,pubBefore,pubAfter,gatePubAfter,doneSeenAfter,result,endAfter,kind', rows: epRows } });
++}
+ let lagCutTicks = 0;
+ let lastLagLog = -1e9;
+ // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
+@@ -167,7 +180,7 @@
+ function inputPoll(ptr: number, max: number): number {
+   const d = driver, mem = fruity?.memory;
+   if (!ring || !d || !d.ready || !mem) { servicePresent(false); return 0; }
+-  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
++  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) { if (ep && !ep.settled) ep.settled = nowAbs(); inlineSettled = true; tSettledAt = performance.now(); }
+   servicePresent(false);   // decision 0311: after the settled word was read, so that a scene published here is the one that may answer the inputs
+   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
+   let i32: Int32Array | null = null;
+@@ -198,7 +211,7 @@
+     else post({ t: 'input-dropped', seq: r.seq, reason: 'the engine refused the event (its input queue is full)' });
+   }
+   inlineStaged = [];
+-  if (done.length > 0) { if (d.awaitingCount === 0) inlineSince = performance.now(); inlineSettled = false; d.injectedInline(done); }
++  if (done.length > 0) { if (d.awaitingCount === 0) { inlineSince = performance.now(); ep = { t0: nowAbs(), settled: 0, pubBefore: 0, pubAfter: 0, gatePub: 0, doneSeen: 0, res: -1, end: 0, kind: -1 }; } inlineSettled = false; d.injectedInline(done); }
+ }
+ // the answer to the inputs the runtime took inline: the first present that changed a pixel after the injection, by whichever path made it (this function, the rAF tick, the idle's fallback present: deskTick calls completeInline when it shows
+ // something and inputs await); this function tries a present every INLINE_TRY_MS, and after INLINE_GIVEUP_MS without a change the inputs are finished without an answer (an input that changes no pixel)
+@@ -207,6 +220,7 @@
+   if (!d || d.awaitingCount === 0 || inlineSince === 0) return;
+   const list = d.takeAwaiting(), at = nowAbs();
+   inlineSince = 0;
++  epEnd(shown ? 1 : 0);
+   inlineSettled = false;
+   post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle: at })) });
+   if (deskHanded) { if (shown && list.length > 0 && deskLink) post({ t: 'desk-answers', answers: list.map((x) => x.seq), at: deskLink.presentAt }); return; }
+@@ -218,7 +232,7 @@
+   const t = performance.now();
+   if (!inlineSettled) { if (t - inlineSince >= INLINE_GIVEUP_MS) completeInline(false); return; }
+   if (t - inlineTryAt < INLINE_TRY_MS) return;
+-  if (deskHanded) { reapPresented(); if (pendingScene || !deskLink?.canPublish()) return; }   // decision 0311: the present Worker is still drawing the last scene: ask again at the next scheduler point, not after INLINE_TRY_MS
++  if (deskHanded) { reapPresented(); if (pendingScene || !deskLink?.canPublish()) { deskLink?.addCounter(20, 1); return; } }   // decision 0311: the present Worker is still drawing the last scene: ask again at the next scheduler point, not after INLINE_TRY_MS
+   inlineTryAt = t;
+   try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+   if (d.awaitingCount > 0 && performance.now() - inlineSince >= INLINE_GIVEUP_MS) completeInline(false);
+@@ -423,8 +437,10 @@
+   const p = pendingScene;
+   pendingScene = null;
+   if (L.result > 0 && p.answers.length > 0) post({ t: 'desk-answers', answers: p.answers, at: L.presentAt });
++  if (ep && p.gate) { ep.doneSeen = nowAbs(); ep.res = L.result; }
++  if (L.result > 0 && p.early) L.addCounter(21, 1);   // MEASUREMENT ONLY: a scene published before the guest settled took the rectangles the input's answer would need
+   if (L.result > 0) {
+-    if (p.gate) completeInline(true);   // decision 0280: the first present that shows something after the guest settled answers the inputs taken inline
++    if (p.gate) { const now = performance.now(); L.addCounter(13, 1); L.addCounter(14, (p.tPub - p.tSet) * 1000); L.addCounter(15, (now - p.tPub) * 1000); completeInline(true); }   // decision 0280: the first present that shows something after the guest settled answers the inputs taken inline
+     if (!firstDeskPixel) { firstDeskPixel = true; mark('first_pixel', { source: 'desktop' }); }
+   }
+ }
+@@ -454,7 +470,8 @@
+   const ptr = api.scene();   // the call can grow the memory: the buffer is read after it
+   const seq = L.publish(mem.buffer, ptr);
+   L.clearWant();
+-  pendingScene = { answers: idleAnswerSeqs.splice(0), seq, gate };
++  if (ep) { if (gate) { ep.pubAfter++; if (!ep.gatePub) ep.gatePub = nowAbs(); } else ep.pubBefore++; }
++  pendingScene = { answers: idleAnswerSeqs.splice(0), seq, gate, tPub: performance.now(), tSet: tSettledAt, early: !!driver && driver.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled };   // early: published while an input waited for its answer and the guest had not settled
+ }
+ /** one present; true when it changed a pixel. `flush`: tell the page about it now unless it was told less than 100 ms ago. With the present Worker the scene is only published here (the answer comes back through pService) and the result is false */
+ function deskTick(flush = true): boolean {

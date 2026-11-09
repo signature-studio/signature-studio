@@ -1,0 +1,5 @@
+{
+ "first": "4f5a5062b25e33c8adf0e1491cb0d489c19d65ac03cc10794888eea59c8951ba",
+ "stop": "b12c8eceb4e86199fe70ccd1d64a8c2e68e23a3e78999616b9832e836bee51db",
+ "note": "RGBA (A=255) SHA-256 of the lid-13 surface (1930x1092) of the NATIVE final configuration of decision 0129: first = at the first non-background pixel (gdb, tools/gdbsurf.py, hit1, 201,380 non-zero pixels), stop = at the wall-16 stop (gdb hit2, 1,917,816 non-zero pixels; equal to the RGBA SHA-256 of docs/investigations/idle1/logs/fruity-on/surface-lid13-at-stop-wall16.png decoded with present1's png.mjs)"
+}

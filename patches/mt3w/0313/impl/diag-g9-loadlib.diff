@@ -1,0 +1,27 @@
+diff -u -r -N a/lift/runtime/fle_load.c b/lift/runtime/fle_load.c
+--- a/lift/runtime/fle_load.c
++++ b/lift/runtime/fle_load.c
+@@ -479,6 +479,11 @@
+     size_t n;
+     read_wide_name("LoadLibraryW", R[1], buf, &n);
+     load_by_name("LoadLibraryW", buf, n);
++    if (name_has_path(buf, n)) {   /* 0313 TEST-ONLY diagnostic (diag-g9-loadlib.diff; not part of the product): the full-path loads and their result */
++        char shown[LOAD_PATH_MAX + 1];
++        ascii_of(buf, shown, sizeof shown);
++        fprintf(stderr, "g9-diag: LoadLibraryW \"%s\" -> %#llx\n", shown, (unsigned long long)R[0]);
++    }
+ }
+ 
+ /* kernel32!LoadLibraryA: the same with an ANSI name. A byte above 0x7F cannot equal a table name. */
+diff -u -r -N a/lift/runtime/fle_modules.c b/lift/runtime/fle_modules.c
+--- a/lift/runtime/fle_modules.c
++++ b/lift/runtime/fle_modules.c
+@@ -437,6 +437,8 @@
+                 if (rname[n] == 0) break;
+             }
+             R[0] = fle_realmod_getproc("GetProcAddress", rm, rname);
++            if (strcmp(rname, "CreatePlugInstance") == 0)   /* 0313 TEST-ONLY diagnostic (diag-g9-loadlib.diff; not part of the product) */
++                fprintf(stderr, "g9-diag: GetProcAddress(%#llx, \"%s\") -> %#llx\n", (unsigned long long)h, rname, (unsigned long long)R[0]);
+             if (R[0] == 0) fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
+             return;
+         }

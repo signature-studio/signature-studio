@@ -1,0 +1,23 @@
+<!doctype html><meta charset=utf-8><title>mt1 jspi overlap</title>
+<script type="module">
+window.__log = [];
+const q = new URLSearchParams(location.search);
+const K = +(q.get('k') || 4), MODE = q.get('mode') || 'jspi', BLOCKS = +(q.get('blocks') || 200), WORK = +(q.get('work') || 3500);
+const SLOT = 64 + 2 * 4096 * 2 * 4;
+(async () => {
+  try {
+    const sabs = [], plugins = [];
+    for (let k = 0; k < K; k++) {
+      const sab = new SharedArrayBuffer(SLOT); sabs.push(sab);
+      const w = new Worker('rtt-worker.js', { type: 'module' });
+      await new Promise((res) => { w.onmessage = () => res(); w.postMessage({ role: 'plugin', sab, mode: 'park' }); });
+      plugins.push(w);
+    }
+    const e = new Worker('jspi-overlap-worker.js', { type: 'module' });
+    const r = await new Promise((res, rej) => { e.onmessage = (ev) => res(ev.data); e.onerror = (ev) => rej(new Error(ev.message)); e.postMessage({ sabs, mode: MODE, blocks: BLOCKS, workUs: WORK }); });
+    window.__result = { K, MODE, BLOCKS, WORK, ...r, hardwareConcurrency: navigator.hardwareConcurrency };
+    for (const p of plugins) p.terminate(); e.terminate();
+  } catch (err) { window.__error = String(err && err.stack || err); }
+  window.__done = true;
+})();
+</script>

@@ -1,0 +1,62 @@
+<!doctype html><meta charset=utf-8><title>mt1 rtt</title>
+<script type="module">
+window.__log = [];
+const q = new URLSearchParams(location.search);
+const K = +(q.get('k') || 1), ROUNDS = +(q.get('rounds') || 5000), WORK = +(q.get('work') || 0), PROD = q.get('prod') || 'worker', MODE = q.get('mode') || 'park', PMODE = q.get('pmode') || MODE;
+const SLOT = 64 + 2 * 4096 * 2 * 4;
+function pct(a, qs = [50, 90, 99, 99.9]) { const s = Float64Array.from(a).sort(); const o = { n: s.length, min: s[0], max: s[s.length - 1], mean: s.reduce((x, y) => x + y, 0) / s.length }; for (const p of qs) o['p' + p] = s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))]; return o; }
+(async () => {
+  try {
+    const sabs = [], plugins = [];
+    for (let k = 0; k < K; k++) {
+      const sab = new SharedArrayBuffer(SLOT); sabs.push(sab);
+      const w = new Worker('rtt-worker.js', { type: 'module' });
+      await new Promise((res) => { w.onmessage = () => res(); w.postMessage({ role: 'plugin', sab, mode: PMODE }); });
+      plugins.push(w);
+    }
+    let lat;
+    if (PROD === 'worker') {
+      const e = new Worker('rtt-worker.js', { type: 'module' });
+      lat = await new Promise((res) => { e.onmessage = (ev) => { if (ev.data.type === 'lat') res(ev.data.lat); }; e.postMessage({ role: 'producer', sabs, rounds: ROUNDS, workUs: WORK, mode: MODE, warm: 200 }); });
+      e.terminate();
+    } else if (PROD === 'main-waitAsync' || PROD === 'main-spin') {
+      // the page's main thread as the producer: it cannot Atomics.wait; waitAsync (a promise) or a spin
+      const ctrls = sabs.map((s) => new Int32Array(s, 0, 16)), ins = sabs.map((s) => new Float32Array(s, 16 * 4, 0));
+      const inF = sabs.map((s) => new Float32Array(s, 64, 8192)), outF = sabs.map((s) => new Float32Array(s, 64 + 32768, 8192));
+      const src = new Float32Array(8192); for (let i = 0; i < 8192; i++) src[i] = Math.sin(i * 0.01);
+      const dst = new Float32Array(8192);
+      for (const c of ctrls) Atomics.store(c, 2, WORK);
+      lat = new Float64Array(ROUNDS);
+      for (let r = 1; r <= ROUNDS + 200; r++) {
+        const t0 = performance.now();
+        for (let k = 0; k < K; k++) { inF[k].set(src); Atomics.store(ctrls[k], 0, r); Atomics.notify(ctrls[k], 0); }
+        for (let k = 0; k < K; k++) {
+          const c = ctrls[k];
+          if (PROD === 'main-spin') { while (Atomics.load(c, 1) !== r) { /* spin */ } }
+          else { for (;;) { const v = Atomics.load(c, 1); if (v === r) break; const w = Atomics.waitAsync(c, 1, v); if (w.async) await w.value; } }
+          dst.set(outF[k]);
+        }
+        const t1 = performance.now();
+        if (r > 200) lat[r - 201] = (t1 - t0) * 1000;
+      }
+      for (const c of ctrls) { Atomics.store(c, 0, -1); Atomics.notify(c, 0); }
+    } else if (PROD === 'postMessage') {
+      // baseline: structured-clone postMessage of the 32 KiB input to a Worker that copies it and answers with a 32 KiB message (K = 1 only)
+      const src = new Float32Array(8192).map((_, i) => Math.sin(i * 0.01));
+      const w = new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>{const o=new Float32Array(e.data);postMessage(o.buffer,[o.buffer])}'], { type: 'text/javascript' })));
+      lat = new Float64Array(ROUNDS);
+      for (let r = 1; r <= ROUNDS + 200; r++) {
+        const t0 = performance.now();
+        const copy = src.slice(); w.postMessage(copy.buffer, [copy.buffer]);
+        await new Promise((res) => { w.onmessage = () => res(); });
+        const t1 = performance.now();
+        if (r > 200) lat[r - 201] = (t1 - t0) * 1000;
+      }
+      w.terminate();
+    }
+    window.__result = { K, ROUNDS, WORK, PROD, MODE, PMODE, hardwareConcurrency: navigator.hardwareConcurrency, us: pct(lat), over1ms: Array.from(lat).filter((x) => x > 1000).length, over5ms: Array.from(lat).filter((x) => x > 5000).length };
+    for (const p of plugins) p.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); }
+  window.__done = true;
+})();
+</script>
