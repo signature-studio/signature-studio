@@ -272,11 +272,14 @@ worker	LIMIT-allow	["rm -rf *"]	rm -rf *
 worker	LIMIT-allow	["rm -rf ./*"]	rm -rf ./*
 worker	LIMIT-allow	["rm -rf $HOME/work/other-project"]	rm -rf $HOME/work/other-project
 worker	LIMIT-allow	["rm -rf /etc/x"]	rm -rf /etc/x
-worker	LIMIT-allow	["git -C /home/ubuntu/work/x push --force origin main"]	git -C /home/ubuntu/work/x push --force origin main
+worker	deny	["git -C /home/ubuntu/work/x push --force origin main"]	git -C /home/ubuntu/work/x push --force origin main
 worker	LIMIT-allow	["bash -c \"git push --force origin main\""]	bash -c "git push --force origin main"
 worker	LIMIT-allow	["python3 -c \"import shutil; shutil.rmtree('/home/ubuntu/x')\""]	python3 -c "import shutil; shutil.rmtree('/home/ubuntu/x')"
 worker	LIMIT-allow	["bash -c \"wrangler whoami\""]	bash -c "wrangler whoami"
 worker	LIMIT-allow	["env wrangler whoami"]	env wrangler whoami
+worker	LIMIT-allow	["sh -c \"wrangler whoami\""]	sh -c "wrangler whoami"
+worker	LIMIT-allow	[]	export -p
+worker	LIMIT-allow	[]	declare -x
 reviewer	allow	["git status --short"]	git status --short
 reviewer	allow	["git diff --stat"]	git diff --stat
 reviewer	allow	["git log --oneline -3"]	git log --oneline -3
@@ -302,3 +305,74 @@ reviewer	deny	["opencode api session.active"]	opencode api session.active
 reviewer	deny	["wrangler whoami"]	wrangler whoami
 reviewer	deny	["scripts/preflight.sh"]	scripts/preflight.sh
 reviewer	deny	["sleep 0"]	sleep 0
+worker	deny	["git -C /x push --force origin main"]	git -C /x push --force origin main
+worker	deny	["git -C /x push -f origin main"]	git -C /x push -f origin main
+worker	deny	["git -C /x push origin main --force"]	git -C /x push origin main --force
+worker	deny	["git -C /x push origin +main"]	git -C /x push origin +main
+worker	deny	["git -C /x push origin HEAD:+main"]	git -C /x push origin HEAD:+main
+worker	deny	["git -C /x push origin :main"]	git -C /x push origin :main
+worker	deny	["git -C /x push origin --delete feat"]	git -C /x push origin --delete feat
+worker	deny	["git -C /x push -d origin feat"]	git -C /x push -d origin feat
+worker	deny	["git -C /x push --mirror origin"]	git -C /x push --mirror origin
+worker	deny	["git -C /x push origin main --no-verify"]	git -C /x push origin main --no-verify
+worker	deny	["git -C /x commit --no-verify -m x"]	git -C /x commit --no-verify -m x
+worker	deny	["git -C /x commit -n -m x"]	git -C /x commit -n -m x
+worker	deny	["git -C /x reset --hard HEAD~1"]	git -C /x reset --hard HEAD~1
+worker	deny	["git -C /x clean -fdx"]	git -C /x clean -fdx
+worker	deny	["git -C /x clean -n"]	git -C /x clean -n
+worker	deny	["git -C /x filter-branch"]	git -C /x filter-branch
+worker	deny	["git -C /x filter-repo --path x"]	git -C /x filter-repo --path x
+worker	deny	["git -C /x update-ref -d refs/heads/main"]	git -C /x update-ref -d refs/heads/main
+worker	deny	["git -C /x worktree add ../x"]	git -C /x worktree add ../x
+worker	deny	["git -c x=y reset --hard HEAD"]	git -c x=y reset --hard HEAD
+worker	deny	["git -c core.hooksPath=/dev/null push --force origin main"]	git -c core.hooksPath=/dev/null push --force origin main
+worker	deny	["git worktree add ../x -b y"]	git worktree add ../x -b y
+worker	deny	["env"]	env
+worker	deny	["printenv GH_TOKEN"]	printenv GH_TOKEN
+worker	deny	["printenv"]	printenv
+worker	deny	["gh auth status --show-token"]	gh auth status --show-token
+worker	deny	["gh auth status -t"]	gh auth status -t
+worker	deny	["gh api repos/a/b -fmessage=x"]	gh api repos/a/b -fmessage=x
+worker	deny	["gh api repos/a/b -Fmessage=x"]	gh api repos/a/b -Fmessage=x
+worker	deny	["gh api repos/a/b -X=PUT"]	gh api repos/a/b -X=PUT
+worker	deny	["gh api repos/a/b -XPUT"]	gh api repos/a/b -XPUT
+worker	deny	["gh api repos/o/r -F page=2"]	gh api repos/o/r -F page=2
+worker	deny	["npm exec -- wrangler whoami"]	npm exec -- wrangler whoami
+worker	deny	["npm exec --package=wrangler -- wrangler whoami"]	npm exec --package=wrangler -- wrangler whoami
+worker	deny	["npm x wrangler whoami"]	npm x wrangler whoami
+worker	deny	["pnpm wrangler whoami"]	pnpm wrangler whoami
+worker	deny	["pnpm dlx tsc"]	pnpm dlx tsc
+worker	deny	["yarn dlx wrangler whoami"]	yarn dlx wrangler whoami
+worker	deny	["bunx --bun wrangler whoami"]	bunx --bun wrangler whoami
+worker	deny	["bun x wrangler whoami"]	bun x wrangler whoami
+worker	deny	["node node_modules/wrangler/bin/wrangler.js whoami"]	node node_modules/wrangler/bin/wrangler.js whoami
+worker	deny	["npx cf whoami"]	npx cf whoami
+worker	deny	["npx -y cf whoami"]	npx -y cf whoami
+worker	deny	["npx --package=wrangler wrangler whoami"]	npx --package=wrangler wrangler whoami
+worker	deny	["corepack pnpm exec wrangler whoami"]	corepack pnpm exec wrangler whoami
+worker	deny	["corepack wrangler whoami"]	corepack wrangler whoami
+worker	deny	["npm exec -- cf whoami"]	npm exec -- cf whoami
+worker	allow	["git -C /x status --short"]	git -C /x status --short
+worker	allow	["git -C /x push origin main"]	git -C /x push origin main
+worker	allow	["git -C /x push --dry-run origin HEAD"]	git -C /x push --dry-run origin HEAD
+worker	allow	["git -C /x commit -m x"]	git -C /x commit -m x
+worker	allow	["git push --dry-run origin HEAD"]	git push --dry-run origin HEAD
+worker	allow	["git ls-remote origin main"]	git ls-remote origin main
+worker	allow	["gwq add feat/x"]	gwq add feat/x
+worker	allow	["gh auth status"]	gh auth status
+worker	allow	["gh api repos/o/fl-x-foo/releases"]	gh api repos/o/fl-x-foo/releases
+worker	allow	["gh api repos/o/r --jq .default_branch"]	gh api repos/o/r --jq .default_branch
+worker	allow	["gh api repos/o/r --paginate"]	gh api repos/o/r --paginate
+worker	allow	["gh api repos/o/r --follow"]	gh api repos/o/r --follow
+worker	allow	["env VAR=x cargo build --release"]	env VAR=x cargo build --release
+worker	allow	["env RUST_LOG=info cargo test -p fe-pe"]	env RUST_LOG=info cargo test -p fe-pe
+worker	allow	["cat app/package.json"]	cat app/package.json
+worker	allow	["npm ci","npm run build","npm test"]	npm ci && npm run build && npm test
+worker	allow	["npm exec -- tsc --version"]	npm exec -- tsc --version
+worker	allow	["npx tsc --version"]	npx tsc --version
+worker	allow	["pnpm install"]	pnpm install
+worker	allow	["node scripts/x.js"]	node scripts/x.js
+worker	LIMIT-allow	[]	export -p
+worker	LIMIT-allow	[]	declare -x
+worker	LIMIT-allow	["sh -c \"wrangler whoami\""]	sh -c "wrangler whoami"
+worker	LIMIT-allow	["git clean -fdx"]	git clean -fdx

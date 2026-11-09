@@ -228,6 +228,29 @@
         { "action": "shell", "resource": "git commit -n*", "effect": "deny" },
         { "action": "shell", "resource": "git push *--no-verify*", "effect": "deny" },
         { "action": "shell", "resource": "git *core.hooksPath*", "effect": "deny" },
+        // S8 D-01 / D-04 (reproduced 2026-11-10): `git -C <dir> <verb>` passed the `git <verb>` denials above, because `*` spans spaces in this matcher.
+        // The -C forms repeat those denials. `git -c` (a one-off config override) is not needed for the work, so it is denied as a whole.
+        { "action": "shell", "resource": "git -c *", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push *--force*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push -f*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push * -f*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push *+*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push * :*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push *--delete*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push -d *", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push * -d *", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push *--mirror*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * push *--no-verify*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * commit *--no-verify*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * commit -n*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * reset --hard*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * clean *", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * filter-branch*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * filter-repo*", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * update-ref *", "effect": "deny" }, // D-01
+        { "action": "shell", "resource": "git -C * worktree *", "effect": "deny" }, // D-01 / D-04
+        // S8 D-04: worktrees are made with gwq (AGENTS.md section 4). `gwq add` stays allowed.
+        { "action": "shell", "resource": "git worktree *", "effect": "deny" }, // D-04
         // V-G05: GitHub writes that change the repository's settings, secrets, variables, workflows or contents. A CI is a design decision, not started by a worker.
         { "action": "shell", "resource": "gh repo delete*", "effect": "deny" },
         { "action": "shell", "resource": "gh repo edit*", "effect": "deny" },
@@ -249,6 +272,13 @@
         { "action": "shell", "resource": "gh api *--field*", "effect": "deny" },
         { "action": "shell", "resource": "gh api *--raw-field*", "effect": "deny" },
         { "action": "shell", "resource": "gh api *--input*", "effect": "deny" },
+        // S8 D-06 (reproduced 2026-11-10): `gh api -fmessage=x`, `-Fmessage=x`, `-X=PUT` and `-XPUT` were allowed. The flag must start a word here.
+        { "action": "shell", "resource": "gh api * -f*", "effect": "deny" }, // D-06
+        { "action": "shell", "resource": "gh api -f*", "effect": "deny" }, // D-06
+        { "action": "shell", "resource": "gh api * -F*", "effect": "deny" }, // D-06
+        { "action": "shell", "resource": "gh api -F*", "effect": "deny" }, // D-06
+        { "action": "shell", "resource": "gh api * -X*", "effect": "deny" }, // D-06
+        { "action": "shell", "resource": "gh api -X*", "effect": "deny" }, // D-06
         // V-G01, V-G02, V-G04: the owner's credentials and identities. `opencode auth export` (no target) wrote every provider's key to a file; `gh auth switch` is an identity change.
         { "action": "shell", "resource": "opencode auth *", "effect": "deny" },
         { "action": "shell", "resource": "gh auth token*", "effect": "deny" },
@@ -256,6 +286,9 @@
         { "action": "shell", "resource": "gh auth login*", "effect": "deny" },
         { "action": "shell", "resource": "gh auth logout*", "effect": "deny" },
         { "action": "shell", "resource": "gh auth refresh*", "effect": "deny" },
+        // S8 D-05 (reproduced 2026-11-10): `gh auth status -t` and `--show-token` print the token.
+        { "action": "shell", "resource": "gh auth status *-t*", "effect": "deny" }, // D-05
+        { "action": "shell", "resource": "gh auth status *--show-token*", "effect": "deny" }, // D-05
         { "action": "shell", "resource": "*GH_CONFIG_DIR=*", "effect": "deny" },
         { "action": "shell", "resource": "*GIT_CONFIG_GLOBAL=*", "effect": "deny" },
         // V-G01, V-G04: the same directories as the read denials, for shell. The scanner does not expand `~`, so the command text is matched.
@@ -267,7 +300,12 @@
         { "action": "shell", "resource": "*.config/gh/*", "effect": "deny" },
         { "action": "shell", "resource": "*.local/share/botid*", "effect": "deny" },
         { "action": "shell", "resource": "*.bash_history*", "effect": "deny" },
-        // 依頼者の決定 2026-11-10。限界: `bash -c "wrangler …"`・`env wrangler …` は先頭語の規則では止まらない(audit-session.sh と reviewer が見る)
+        // S8 D-05 (reproduced 2026-11-10): `env` printed every variable and `printenv GH_TOKEN` printed one. A bare `env` is denied, `env VAR=x cmd` is not.
+        { "action": "shell", "resource": "env", "effect": "deny" }, // D-05
+        { "action": "shell", "resource": "printenv*", "effect": "deny" }, // D-05
+        { "action": "shell", "resource": "export -p*", "effect": "deny" }, // D-05 (scanner gives no command part; see README)
+        { "action": "shell", "resource": "declare -x*", "effect": "deny" }, // D-05 (scanner gives no command part; see README)
+        // 依頼者の決定 2026-11-10。限界: `sh -c "wrangler …"`・`bash -c "wrangler …"`・`env wrangler …`・`python3 -c` の中の wrangler は先頭語の規則では止まらない。audit-session.sh と reviewer が見る(README「限界」)
         { "action": "shell", "resource": "wrangler", "effect": "deny" },
         { "action": "shell", "resource": "wrangler *", "effect": "deny" },
         { "action": "shell", "resource": "cf", "effect": "deny" },
@@ -284,6 +322,20 @@
         { "action": "shell", "resource": "*/.bin/wrangler*", "effect": "deny" },
         { "action": "shell", "resource": "*/.bin/cf *", "effect": "deny" },
         { "action": "shell", "resource": "sudo wrangler*", "effect": "deny" },
+        // S8 D-02 (reproduced 2026-11-10): the same tools through npm, pnpm, yarn, bun, corepack and node. `npm exec -- cf` is the same route as `npx cf`.
+        { "action": "shell", "resource": "npm exec*wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "npm exec* cf *", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "npm x*wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "pnpm *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "pnpm dlx*", "effect": "deny" }, // D-02 (no other pnpm dlx is used)
+        { "action": "shell", "resource": "yarn *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "bunx *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "bun x *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "npx *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "npx cf*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "npx -y cf*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "corepack *wrangler*", "effect": "deny" }, // D-02
+        { "action": "shell", "resource": "node *wrangler*", "effect": "deny" }, // D-02
         // V-A07: timers and services are enabled by the owner. Reading (`systemctl --user list-timers`, `status`) stays allowed; only verbs that change something are denied.
         { "action": "shell", "resource": "systemctl enable*", "effect": "deny" },
         { "action": "shell", "resource": "systemctl * enable*", "effect": "deny" },
