@@ -24,7 +24,7 @@ cd ~/work/signature-studio && sha256sum -c artifacts.sha256        # 全行 OK(a
 
 ## 3 DLL の抽出(インストーラ → 同梱 DLL 8 本)
 
-| 手順 | コマンド(予定: `tools/`・`ci/` は旧資料の持ち込み後に存在) | 確かめ方 |
+| 手順 | コマンド | 確かめ方 |
 |---|---|---|
 | 1 | `python3 tools/extract_nsis2.py <5653.exe> --hash FLEngine_x64.dll` | `22227016 b2c64da4…9496d` |
 | 2 | `python3 ci/lib/extract_fl.py <5653.exe> artifacts/host --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv` | 各ファイルが `extract-dlls.tsv` の sha256 と一致(不一致は exit 2) |
