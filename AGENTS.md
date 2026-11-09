@@ -32,7 +32,7 @@
 | 書きかけた文 | 代わりにやること |
 |---|---|
 | 「依頼者の判断が必要です」「確認させてください」「許可をください」 | 自分で決め、「決定: X。根拠: Y」を 1 行書いて実行 |
-| 「push できません」 | リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` を実行し、出力を貼る(`scripts/preflight.sh` の `push-dry-run` 行でもよい)。通るなら commit して `git push origin main`。`.permissions` を根拠にしない。403 なら identity と作業ディレクトリを確かめ、それでも 403 なら依頼票(§10)を出し、push 以外を続ける |
+| 「push できません」 | worker に、リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` を実行させ、出力を貼らせる(`scripts/preflight.sh` の `push-dry-run` 行でもよい)。通るなら commit して `git push origin main`。`.permissions` を根拠にしない。403 なら identity と作業ディレクトリを確かめ、それでも 403 なら依頼票(§10)を出し、push 以外を続ける |
 | 「wrangler で確認します」「wrangler を実行します」 | 実行しない(deny)。Cloudflare の確認・変更が要るなら依頼票(§10)を出す |
 | 「〜を実行してください」「ブラウザで開いて確認してください」 | 自分でできる物は自分で(`scripts/`・gh・git・headless Chrome)。自分にできない物(実機の画面・音・120 fps・トークンの発行・Secrets の登録)は依頼票(§10)で頼む |
 | 「作業対象がありません」「読めないため停止します」 | 読める物(ローカルの作業木・旧作業ツリー・docs)から次の worker を起動 |

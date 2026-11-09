@@ -36,7 +36,7 @@
 
 ```
 $ gh secret list
-(出力なし。終了コードは未取得)
+(出力なし(0 件)、rc 0)
 $ gh variable list
 failed to get variables: HTTP 403: Resource not accessible by integration (https://api.github.com/repos/signature-studio/signature-studio/actions/variables?per_page=100)
 Exited with code 1

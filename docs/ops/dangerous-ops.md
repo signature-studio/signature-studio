@@ -16,12 +16,12 @@
 
 | 操作 | 依頼者の指示がある場合 | 指示が無い場合 |
 |---|---|---|
-| `opencode auth export` | 対象を限った形(`opencode auth export <対象>`)だけ。実行前に `opencode auth export --help` で引数を確認(対象は省略可で、省略すると全提供元が出る)。ファイルに出す(`umask 077`)。画面に出さない。使ったら直ちに削除 | 実行しない |
-| `gh secret set` | 依頼者が名前を指示した物だけ。入力ファイルは `test -s <file> \|\| exit 1` で存在確認(`&&` の連鎖の末尾の `echo rc=$?` は失敗を `rc=0` と見せる) | 新しい名前の secret を提案しない・設定しない。Secrets の登録は依頼者の権限(依頼票で頼む。`docs/ops/authority.md` §3) |
+| `opencode auth export` | 後任は実行しない。これらは worker の permission で拒否される。依頼者が自分で実行する(依頼票で頼む)。`--help` も同じく拒否される | 実行しない |
+| `gh secret set` | 後任は実行しない。これらは worker の permission で拒否される。依頼者が自分で実行する(依頼票で頼む。`docs/ops/authority.md` §3) | 新しい名前の secret を提案しない・設定しない。Secrets の登録は依頼者の権限(依頼票で頼む。`docs/ops/authority.md` §3) |
 | 別 identity(`GH_CONFIG_DIR`・`GIT_CONFIG_GLOBAL` の切替) | 依頼者が identity を指示した場合のみ | 使わない。404 が出たら「権限外の可能性」と書き、読める手段(ローカルの作業木・旧作業ツリー)で進める。シェル履歴から設定を探さない |
 | 依頼者の設定ファイル(`~/.config/`、`~/.local/share/` の他アプリ) | 編集を指示された場合のみ | 編集しない。壊れていて失敗するなら、失敗を事実として書き、別の経路で進める |
 | `rm -rf` | 対象が指示で特定されているとき: `ls -la <対象>` を先に実行し、最も狭い解釈で実行 | 自分が作った物(作業用の一時ディレクトリ)だけ。依頼者のディレクトリ・リポジトリ・旧作業ツリー内を削除しない |
-| 履歴の書き換え(force push・filter-repo・`gh api` での ref の更新) | 指示が「履歴を書き換えろ」「force push しろ」と明示している場合: 対象のブランチ・コミットを列挙し、先に `git bundle` でバックアップ、`git push --force-with-lease` | 実行しない |
+| 履歴の書き換え(force push・filter-repo・`gh api` での ref の更新) | 後任は実行しない。これらは worker の permission で拒否される(`git push --force-with-lease` を含む)。依頼者が自分で実行する(依頼票で頼む) | 実行しない |
 | main への直接書き込み(`gh api` の contents の PUT など) | 依頼者が「main に反映」と指示した場合のみ | 書き込まない。通常の `git push`(ブランチ)で行う |
 | 環境変数・シェル履歴の列挙 | — | しない。件数の確認は自分のシェルの `env \| grep -c` のみ |
 | Cloudflare の削除系・他の bucket・他の Worker | 指示があっても、対象が `fl-studio-web`・`fl-web-*` 以外なら実行しない | 実行しない |

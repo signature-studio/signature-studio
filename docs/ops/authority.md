@@ -21,7 +21,7 @@
 | Cloudflare の確認・変更 | **実行しない**(`wrangler`・`cf` は読み取りも含め後任の権限外。依頼者の決定 P4)。確認・変更が要るなら依頼票(`docs/ops/requests.md`) | — |
 | 配信(デプロイ) | GitHub Actions(R8)と、依頼者が依頼票に応じて登録する Secrets で行う(P4) | Actions の実行結果(依頼票の確認コマンドで確かめる) |
 | GitHub の読み取り | `gh repo view`、`gh api <GET>`、`git ls-remote origin` | 成功(R1) |
-| push | `git push origin main`(通常の push のみ。scan 通過後。P1)。`git ls-remote origin main` で届いたことを確かめる | 2026-11-10 のリポジトリのディレクトリでの dry-run は rc=1(pre-push フックの PUBLIC 拒否。403 ではない) |
+| push | `git push origin main`(通常の push のみ。scan 通過後。P1)。`git ls-remote origin main` で届いたことを確かめる | 2026-11-10 08:27 JST のリポジトリのディレクトリでの dry-run は rc=0(`To https://github.com/signature-studio/signature-studio.git`、`29966d6..a70e4ef  HEAD -> main`)。[文書・旧] 同日の前の rc=1(PUBLIC の拒否)は前日の誤り(拒否した hook は修正済み) |
 | push の可否の確認 | リポジトリのディレクトリで `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` | 同上。`.permissions` は根拠にしない(P1) |
 | ブラウザでの確認 | headless Chrome(`google-chrome --headless`)。手元の検証に限り、CI に自作スクリプトを置かない | Chrome 156 は存在。headless の起動は未確認(R1) |
 | 追加パッケージ(brotli 等) | まず npm・Python・cargo で足りるか見る。必要なら `sudo -n apt-get install`(必要最小限) | `sudo -n true` が rc=0(R1)。apt の実行は未試験 |
