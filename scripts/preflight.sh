@@ -3,7 +3,7 @@
 # Prints a table: item / result / OK|WARN|FAIL. Exit 1 when any item is FAIL; WARN does not fail.
 # Read-only. It does not read ~/.config/opencode/ (except goal-nudge.sessions) and never prints a token, an account id or an e-mail address.
 # Item 1 is the one that matters most: a typo in opencode.jsonc silently removes every deny (fail-open). It runs `opencode debug agents` in the
-# repository and compares the answer with opencode.jsonc. Items 5 and 6 are WARN only: they are blockers for a human, never a reason to stop.
+# repository and compares the answer with opencode.jsonc. The WARN rows (GitHub, goal) are requests for a human (docs/ops/requests.md), never a reason to stop.
 set -o pipefail
 
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd) || { echo "preflight: cannot resolve the repository root" >&2; exit 2; }
@@ -88,7 +88,7 @@ else
   row git-hooks FAIL "core.hooksPath is '$hooks' (expected .githooks) or a hook is missing/not executable: run scripts/setup-repo.sh"
 fi
 
-# 3-6. GitHub ----------------------------------------------------------------------------------------------------------
+# 3-5. GitHub ----------------------------------------------------------------------------------------------------------
 remote=$(git remote get-url origin 2> /dev/null)
 owner_repo=$(printf '%s' "$remote" | sed -E 's#^(https://github.com/|git@github.com:|ssh://git@github.com/)##; s#\.git$##')
 if ! command -v gh > /dev/null; then
@@ -100,44 +100,24 @@ else
   row gh-identity WARN "gh auth status failed: $(printf '%s' "$gh_status" | head -1 | cut -c1-120)"
 fi
 
-private=""
 if [ -z "$owner_repo" ] || [[ "$owner_repo" != */* ]]; then
   row repo-api WARN "no usable origin remote ($remote)"
-elif api=$(gh api "repos/$owner_repo" --jq '{private,permissions}' 2>&1); then
-  private=$(jq -r '.private' <<< "$api" 2> /dev/null)
-  perms=$(jq -c '.permissions // {}' <<< "$api" 2> /dev/null)
-  row repo-api OK "$owner_repo private=$private permissions=$perms"
+elif api=$(gh api "repos/$owner_repo" --jq .default_branch 2>&1) && [ -n "$api" ]; then
+  row repo-api OK "reachable (default branch $api)"
 else
   row repo-api WARN "gh api repos/$owner_repo failed: $(printf '%s' "$api" | head -1 | cut -c1-120)"
 fi
 
-# --no-verify only for this dry-run: nothing is sent, and without it the pre-push hook (which refuses PUBLIC remotes) would answer before git asks the server about permission.
+# --no-verify only for this dry-run: nothing is sent, and the pre-push scan would otherwise answer before git asks the server about permission.
 if push_out=$(git push --dry-run --no-verify origin HEAD 2>&1); then
-  row push-dry-run OK "git push --dry-run origin HEAD succeeded (permission is there; whether to push is decided by the visibility row)"
+  row push-dry-run OK "\`git push --dry-run origin HEAD\` succeeded: commit, then \`git push origin main\`"
 elif printf '%s' "$push_out" | grep -qE '403|denied|Permission'; then
-  row push-dry-run WARN "403: no push permission. Human-only blocker: add one line to docs/BLOCKERS.md (status, this command, date, effect) and continue everything except push"
-elif printf '%s' "$push_out" | grep -qiE 'no commits|src refspec|does not match any'; then
-  row push-dry-run WARN "nothing to push yet ($(printf '%s' "$push_out" | head -1 | cut -c1-100))"
+  row push-dry-run WARN "403. Check first: are you in the repository directory (identity depends on it)? \`gh auth status\`. If both are right, file a request (docs/ops/requests.md) and continue everything except push"
 else
-  row push-dry-run WARN "dry-run failed: $(printf '%s' "$push_out" | head -1 | cut -c1-140). If the cause is not a 403, record it in docs/BLOCKERS.md"
+  row push-dry-run WARN "dry-run failed: $(printf '%s' "$push_out" | head -1 | cut -c1-140)"
 fi
 
-case "$private" in
-  false) row visibility WARN "repository is PUBLIC: do not git push (lift output, wasm, FL DLLs and investigation excerpts would be published). Commit and continue" ;;
-  true) row visibility OK "repository is private" ;;
-  *) row visibility WARN "visibility unknown (item repo-api failed); treat as PUBLIC: do not git push" ;;
-esac
-
-# 7. wrangler ---------------------------------------------------------------------------------------------------------
-if ! command -v wrangler > /dev/null; then
-  row wrangler WARN "wrangler is not on PATH"
-elif who=$(wrangler whoami 2>&1) && printf '%s' "$who" | grep -qiE 'logged in|associated with'; then
-  row wrangler OK "authenticated (account id and e-mail not shown)"
-else
-  row wrangler WARN "not authenticated or whoami failed ($(printf '%s' "$who" | grep -v '^$' | head -1 | cut -c1-80))"
-fi
-
-# 8. toolchain (after sourcing scripts/env.sh above) --------------------------------------------------------------------
+# 7. toolchain (after sourcing scripts/env.sh above) --------------------------------------------------------------------
 missing=""
 detail=""
 for tool in emcc wasm-opt node cargo clang google-chrome npx; do
@@ -164,7 +144,7 @@ else
   row toolchain OK "${detail# }"
 fi
 
-# 9. disk -----------------------------------------------------------------------------------------------------------
+# 8. disk -----------------------------------------------------------------------------------------------------------
 # Where the work happens: the repository (and TMPDIR from scripts/env.sh, which lives under the home directory). /tmp is checked separately because it is a small tmpfs.
 work_free=$(df -BG --output=avail "$root" 2> /dev/null | tail -1 | tr -dc '0-9')
 tmp_free=$(df -BG --output=avail /tmp 2> /dev/null | tail -1 | tr -dc '0-9')
@@ -179,14 +159,14 @@ else
   row disk OK "repository ${work_free} GiB free; /tmp ${tmp_free:-?} GiB free (${tmp_fs:-?}); TMPDIR=\$HOME/.cache/signature-studio/tmp via scripts/env.sh"
 fi
 
-# 10. forbidden strings -------------------------------------------------------------------------------------------------
+# 9. forbidden strings -------------------------------------------------------------------------------------------------
 if scan=$(bash "$root/scripts/scan-forbidden.sh" 2>&1); then
   row scan OK "$(printf '%s' "$scan" | tail -1)"
 else
   row scan FAIL "$(printf '%s\n' "$scan" | grep -c . | tr -d ' ') line(s) of findings. Run scripts/scan-forbidden.sh; fix the files (values are not printed)"
 fi
 
-# 11. goal and goal-nudge ---------------------------------------------------------------------------------------------
+# 10. goal and goal-nudge ---------------------------------------------------------------------------------------------
 sid="${OPENCODE_SESSION_ID:-}"
 if [ -z "$sid" ]; then
   row goal WARN "OPENCODE_SESSION_ID is not set (run inside a session to see the goal)"

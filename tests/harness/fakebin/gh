@@ -17,5 +17,6 @@ filter=""
 for ((i = 1; i <= $#; i++)); do [ "${!i}" = "--jq" ] && { j=$((i + 1)); filter="${!j}"; }; done
 case "$filter" in
   .private) echo "$priv" ;;
+  .default_branch) echo "main" ;;
   *) echo "{\"private\":$priv,\"permissions\":{\"admin\":false,\"maintain\":false,\"pull\":true,\"push\":false,\"triage\":false}}" ;;
 esac

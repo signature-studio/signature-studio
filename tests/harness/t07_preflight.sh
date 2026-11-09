@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# t07: scripts/preflight.sh row by row. gh, wrangler, opencode (goal rows) and `git push` are test doubles (tests/harness/fakebin*): no GitHub, no Cloudflare, no server.
+# t07: scripts/preflight.sh row by row. gh, opencode (goal rows) and `git push` are test doubles (tests/harness/fakebin*): no GitHub, no server. wrangler's double is a tripwire: preflight must never call it.
 # `opencode debug agents` answers with a file produced once by the real resolver in an isolated sandbox (so item 1 is tested with real output).
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
@@ -27,7 +27,7 @@ git -C "$repo" remote add origin "https://github.com/fake-owner/fake-repo.git"
 echo x > "$repo/a.txt"; git -C "$repo" add . > /dev/null 2>&1; git -C "$repo" commit -q -m init
 
 pf() { # extra env assignments are given as arguments: pf VAR=value ...
-  (cd "$repo" && env FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 "$@" PATH="$FAKEOC:$FAKE:$PATH" FAKE_OC_AGENTS="$sb/agents.json" FAKE_OC_LOG="$sb/oc.log" bash scripts/preflight.sh 2> "$sb/stderr.txt")
+  (cd "$repo" && env FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 FAKE_WRANGLER_LOG="$sb/wrangler.log" "$@" PATH="$FAKEOC:$FAKE:$PATH" FAKE_OC_AGENTS="$sb/agents.json" FAKE_OC_LOG="$sb/oc.log" bash scripts/preflight.sh 2> "$sb/stderr.txt")
 }
 rowof() { awk -v k="$1" '$1 == k' <<< "$2"; }
 status() { rowof "$1" "$2" | awk '{print $2}'; }
@@ -36,7 +36,7 @@ status() { rowof "$1" "$2" | awk '{print $2}'; }
 out=$(pf FAKE_GH=private); rc=$?
 header=$(head -1 <<< "$out")
 expect_contains "the table has a header with ITEM RESULT DETAIL" "$header" "ITEM"
-for item in agents git-identity git-hooks gh-identity repo-api push-dry-run visibility wrangler toolchain disk scan goal goal-nudge; do
+for item in agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan goal goal-nudge; do
   if [ -n "$(rowof "$item" "$out")" ]; then pass "row present: $item"; else fail "row missing: $item"; fi
 done
 fails=$(awk '$2 == "FAIL"' <<< "$out" | wc -l | tr -d ' ')
@@ -47,9 +47,7 @@ expect_eq "git-hooks OK" OK "$(status git-hooks "$out")"
 expect_eq "gh-identity OK" OK "$(status gh-identity "$out")"
 expect_contains "gh-identity shows the active account name" "$(rowof gh-identity "$out")" "fake-bot[bot]"
 expect_eq "repo-api OK" OK "$(status repo-api "$out")"
-expect_contains "repo-api shows private and permissions" "$(rowof repo-api "$out")" 'private=true permissions={"admin":false'
-expect_eq "visibility OK for a private repository" OK "$(status visibility "$out")"
-expect_eq "wrangler OK" OK "$(status wrangler "$out")"
+expect_contains "repo-api says reachable and the default branch" "$(rowof repo-api "$out")" "reachable (default branch main)"
 expect_eq "scan OK on the clean copy" OK "$(status scan "$out")"
 expect_eq "goal is WARN without a session id" WARN "$(status goal "$out")"
 expect_eq "goal-nudge is WARN without a session id" WARN "$(status goal-nudge "$out")"
@@ -63,8 +61,11 @@ done
 # ---------- 403 on push: WARN, not FAIL, tells where to write it
 out=$(pf FAKE_GH=private FAKE_GIT_PUSH=403); rc=$?
 row=$(rowof push-dry-run "$out")
-expect_eq "push 403 -> WARN (never FAIL: a human-only blocker does not stop the agent)" WARN "$(status push-dry-run "$out")"
-expect_contains "the 403 row says docs/BLOCKERS.md" "$row" "docs/BLOCKERS.md"
+expect_eq "push 403 -> WARN (never FAIL: a request does not stop the agent)" WARN "$(status push-dry-run "$out")"
+expect_contains "the 403 row says to check the repository directory" "$row" "repository directory"
+expect_contains "and to run gh auth status" "$row" "gh auth status"
+expect_contains "and where to file a request" "$row" "docs/ops/requests.md"
+expect_not_contains "and does not name the retired ledger" "$row" "BLOCKERS"
 if [ "$(awk '$2=="FAIL"' <<< "$out" | wc -l | tr -d ' ')" -eq 0 ]; then expect_eq "a 403 alone does not make preflight exit 1" 0 "$rc"; else skip "exit code with a 403 (another row is FAIL on this machine: $(awk '$2=="FAIL"{print $1}' <<< "$out" | paste -sd, -))"; fi
 
 # ---------- disk: FAIL under 50 GiB where the repository is, WARN when /tmp (tmpfs) is nearly full, OK otherwise
@@ -77,22 +78,17 @@ expect_contains "disk: and points at TMPDIR from env.sh" "$(rowof disk "$out")" 
 out=$(pf FAKE_GH=private FAKE_DF_REPO_GIB=600 FAKE_DF_TMP_GIB=3)
 expect_eq "disk: 600 GiB and /tmp 3 GiB -> OK" OK "$(status disk "$out")"
 
-# ---------- PUBLIC repository: WARN with the do-not-push note
+# ---------- the repository's settings are not a reason to stop: a PUBLIC repository gives the same rows, and no row shows its settings
 out=$(pf FAKE_GH=public)
-expect_eq "public repo -> visibility WARN" WARN "$(status visibility "$out")"
-expect_contains "and says do not git push" "$(rowof visibility "$out")" "do not git push"
-expect_contains "repo-api shows private=false" "$(rowof repo-api "$out")" "private=false"
+expect_eq "public repo -> repo-api OK (the settings are not read)" OK "$(status repo-api "$out")"
+expect_eq "public repo -> no visibility row (the old row name is gone)" "" "$(status visibility "$out")"
+expect_not_contains "and preflight does not print the settings or the permissions" "$out" "private="
 
-# ---------- gh failing: WARN rows, visibility treated as public
+# ---------- gh failing: repo-api WARN, nothing else changes
 out=$(pf FAKE_GH=fail)
 expect_eq "gh failing -> gh-identity WARN" WARN "$(status gh-identity "$out")"
 expect_eq "gh failing -> repo-api WARN" WARN "$(status repo-api "$out")"
-expect_eq "gh failing -> visibility WARN (unknown is treated as public)" WARN "$(status visibility "$out")"
-expect_contains "and says so" "$(rowof visibility "$out")" "treat as PUBLIC"
-
-# ---------- wrangler logged out
-out=$(pf FAKE_GH=private FAKE_WRANGLER=out)
-expect_eq "wrangler logged out -> WARN" WARN "$(status wrangler "$out")"
+expect_eq "gh failing -> no FAIL row (the WARN rows do not stop the launch)" 0 "$(awk '$2=="FAIL"' <<< "$out" | wc -l | tr -d ' ')"
 
 # ---------- git identity and hooks missing -> FAIL
 bare="$sb/bare"; make_repo_copy "$bare"; git -C "$bare" remote add origin "https://github.com/fake-owner/fake-repo.git"
@@ -139,6 +135,12 @@ rm -f "$reg_home/.config/opencode/goal-nudge.sessions"
 out=$(cd "$repo" && env FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$reg_home" OPENCODE_SESSION_ID="$sid" FAKE_GH=private PATH="$FAKEOC:$FAKE:$PATH" FAKE_OC_AGENTS="$sb/agents.json" bash scripts/preflight.sh 2> /dev/null)
 expect_eq "missing registry file -> WARN, not a crash" WARN "$(status goal-nudge "$out")"
 if grep -q 'sessionID.*ses_OTHER' "$sb/oc.log"; then fail "the goal was read for a session other than OPENCODE_SESSION_ID"; else pass "only the own session's goal is read"; fi
+
+# ---------- wrangler is never called (the tripwire fakebin/wrangler records any call)
+if [ -s "$sb/wrangler.log" ]; then fail "preflight called wrangler: $(head -1 "$sb/wrangler.log")"; else pass "preflight never calls wrangler (the tripwire log is empty)"; fi
+if grep -v '^ *#' "$ROOT/scripts/preflight.sh" | grep -qE '(^|[^a-z_-])wrangler( |$)'; then fail "scripts/preflight.sh contains a wrangler command"; else pass "scripts/preflight.sh contains no wrangler command (static)"; fi
+if grep -qE 'visibility|BLOCKERS|台帳|private' <(grep -v '^ *#' "$ROOT/scripts/preflight.sh"); then fail "preflight still has a visibility, ledger or private reference"; else pass "preflight has no visibility, ledger or private reference (static)"; fi
+if grep -q 'default_branch' "$ROOT/scripts/preflight.sh" && ! grep -q -- '--jq .private\|--jq .*permissions' "$ROOT/scripts/preflight.sh"; then pass "repo-api asks only for the default branch (static)"; else fail "repo-api asks for more than the default branch"; fi
 
 # ---------- static: what preflight may read
 reads=$(grep -n '\.config/opencode' "$ROOT/scripts/preflight.sh" | grep -v '^[0-9]*:#' | cut -d: -f2- | sed 's/^ *//')

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Test double for wrangler. FAKE_WRANGLER=out makes whoami report "not authenticated". Prints a fake account line that preflight must never repeat.
-[ "$1" = whoami ] || { echo "fake wrangler: unexpected call: $*" >&2; exit 64; }
-if [ "${FAKE_WRANGLER:-in}" = out ]; then echo "You are not authenticated. Please run \`wrangler login\`."; exit 0; fi
-echo "You are logged in with an OAuth Token, associated with the email fake.person@example.invalid."
-echo "│ Account Name        │ Account ID                       │"
-echo "│ Fake Person's Account │ $(printf '0123456789abcdef%.0s' 1 2) │"
+# Tripwire, not a double: scripts/preflight.sh must never call wrangler (the Cloudflare checks are retired, 依頼者の決定 2026-11-10).
+# Any call is recorded in $FAKE_WRANGLER_LOG (when set) and fails with 97. t07 checks that the log stays empty.
+[ -n "${FAKE_WRANGLER_LOG:-}" ] && echo "wrangler called: $*" >> "$FAKE_WRANGLER_LOG"
+echo "fake wrangler: called (this must not happen): $*" >&2
+exit 97

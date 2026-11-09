@@ -8,12 +8,12 @@ bats は使わない。試験は `$TMPDIR/opencode/s2-sandbox/tests/` の中だ�
 | ファイル | 対象 | 確かめ方の段階 |
 |---|---|---|
 | `t01_config.sh` | `opencode.jsonc` が JSONC として正しい。**実物の opencode が**解決した agent 一覧とモデルが期待値と一致する。引用符 1 文字を消すと設定が黙って落ちる事実(fail-open)と、`preflight.sh` の `agents` 行がそれを FAIL にすること。`* deny` を消した場合も FAIL | **E1**(隔離した実物の opencode の `debug agents`) |
-| `t02_permissions.sh` | 274 個の shell コマンド(`shell-cases.src`)と 79 個の非 shell 呼び出しの許可/拒否。許可できてはいけない物(main の書き込み、リダイレクト、`preflight.sh` に引数)と、許可されるべき物(worker の通常作業)の両方 | **E2**(opencode 自身のスキャナでコマンドを分割し、評価は `lib/rules.py` による再実装。`t01` が「`rules.py` の規則 = 実物が読んだ規則」を確かめる) |
+| `t02_permissions.sh` | 303 個の shell コマンド(`shell-cases.src`)と 79 個の非 shell 呼び出しの許可/拒否。wrangler・cf の全面 deny(`wrangler …`・`cf …`・`npx`/`bunx`/`pnpm`/`yarn` 経由・`*/wrangler`・`sudo wrangler`)と、文面に語が出るだけの読み取り(`grep wrangler …`)・`npm run test:worker` の許可。許可できてはいけない物(main の書き込み、リダイレクト、`preflight.sh` に引数)と、許可されるべき物(worker の通常作業)の両方 | **E2**(opencode 自身のスキャナでコマンドを分割し、評価は `lib/rules.py` による再実装。`t01` が「`rules.py` の規則 = 実物が読んだ規則」を確かめる) |
 | `t03_plugins.sh` | 3 本の plugin(mock の ctx)。`worker-rules.ts` の自動付与・読めないときの拒否、`model-pin-gate.ts` のピン(設定から読む。`haiku` プロファイルでも追従)、`harness-guard.ts` の `model` 引数・末尾 `&`・接頭辞つきの禁止コマンド。各 40 行以内・状態なしを静的に確認。**実物の loader が 3 本を読み込む**こと | **E3**(mock)+ E1(loader) |
 | `t04_scan.sh` | `scan-forbidden.sh`: 全規則が発火、近い形は発火しない、出力に値を出さない、許可リスト、終了コード、明示パス、未追跡ファイル | 実行 |
-| `t05_hooks.sh` | `pre-commit`(ステージされた内容を検査。作業ツリーでなく)、`pre-push`(PUBLIC・可視性不明・非 GitHub を拒否。**環境変数での回避が無い**ことを 5〜6 種で確認。`--no-verify` は人間の道として通る)、`setup-repo.sh` の冪等性 | 実行(ローカルの bare repo と偽の `gh`) |
+| `t05_hooks.sh` | `pre-commit`(ステージされた内容を検査。作業ツリーでなく)、`pre-push`(スキャンだけ。PUBLIC のリモートでも、スキャンが通れば通す。禁止文字列があれば拒否。**環境変数での回避が無い**ことを 6 種で確認。`gh` を呼ばないことを、呼ぶと失敗する偽物で確かめる。`--no-verify` は人間の道として通る)、`setup-repo.sh` の冪等性 | 実行(ローカルの bare repo と偽の `gh`) |
 | `t06_audit.sh` | `audit-session.sh`: **前任のセッションに対する出力が前回の実測と完全一致**(`expected/audit-prev-session.txt`)。合成 DB で固定外モデル・禁止形のコマンド・DB を書かないこと | 実行(実 DB は読み取りのみ) |
-| `t07_preflight.sh` | `preflight.sh` の各行(OK/WARN/FAIL)、**403 は WARN で FAIL にしない**、PUBLIC は WARN、トークン・アカウント ID・メールを出さない、`~/.config/opencode/` の他のファイルを読まない | 実行(偽の `gh`・`wrangler`・`git push`・`opencode`・`df`) |
+| `t07_preflight.sh` | `preflight.sh` の各行(OK/WARN/FAIL)、**403 は WARN で FAIL にしない**(案内は作業ディレクトリ・`gh auth status`・`docs/ops/requests.md`)、`repo-api` は既定ブランチだけを取り、公開範囲・permissions を出さない、**wrangler を呼ばない**(呼べば記録して失敗する罠の偽物で確かめる)、トークン・アカウント ID・メールを出さない、`~/.config/opencode/` の他のファイルを読まない | 実行(偽の `gh`・`wrangler` の罠・`git push`・`opencode`・`df`) |
 | `t08_scripts.sh` | `set-model-profile.sh`(split⇄haiku の往復がバイト単位で元に戻る。コメント維持。実物の resolver の答えが合わなければ元に戻す。セッション内では書かない)、`launch.sh`(偽の opencode だけ。順序・モデルが `opencode.jsonc` と同じ・登録簿の重複なし・失敗時に何が残るか)、`env.sh` | 実行(偽の opencode、`HOME` を差し替え) |
 
 `shell-cases.tsv` は `shell-cases.src` から `lib/gen-shell-cases.ts` が作る(bun と opencode のソースの clone が要る)。試験の実行時に clone があれば、最新かどうかも確かめる。
@@ -36,6 +36,7 @@ bats は使わない。試験は `$TMPDIR/opencode/s2-sandbox/tests/` の中だ�
 | worker が shell で `opencode.jsonc`・`.opencode/`・`.githooks/` を書き換える | edit の deny は shell に効かない | git の差分(`audit`・reviewer) |
 | shell 経由のファイル読み取り | パスの規則は shell に効かない(文書: best effort)。worker の shell には、`~/.config/opencode`・`opencode.db`・`~/.local/share/opencode/auth*`・`~/.config/botid`・`~/.local/share/botid`・`~/.config/gh/`・`.bash_history` の文字列を含むコマンドの拒否を入れた | **コマンド本文がその文字列を含むだけで拒否される**(コミットメッセージ・ヒアドキュメントも)。そういう本文は edit ツールで書く |
 | `gh api` の書き込み | `-X`・`--method`・`-f`・`-F`・`--field`・`--raw-field`・`--input` を拒否 | `gh api` を別のプログラム経由で呼ぶ形は防げない |
+| worker の `bash -c "wrangler …"`・`env wrangler …`(wrangler・cf の全面 deny の限界) | 先頭語の規則は、別のプログラムに渡された文字列の中の wrangler を見ない | 監査(`audit-session.sh`)と reviewer。依頼者の決定 2026-11-10 |
 | 人間による TUI からのモデル切替 | 切替を禁じる設定が無い | `model-pin-gate.ts` が **tool 呼び出し**を止める。tool を使わない応答は止まらない。`audit-session.sh` が検知 |
 | メインが `oc-msg.sh send` の本文に `>` を含める | main の許可は `oc-msg.sh *`(許可)の後に `*>*`(拒否)を置いた。そうしないと `oc-msg.sh send … > file` で任意のファイルを上書きできる。コマンド本文の `>` は区別できないので、本文に `>` を含む送信は拒否される | 本文に `>` を書かない(`to` か文字の矢印)。ヒアドキュメントの本文も同じ |
 | main の `git diff/log/show` が、worker がリポジトリの設定に書いた外部コマンド(`diff.external`・textconv・pager)を実行しうる | git の読み取りの許可は、リポジトリ内の設定を尊重する。worker は `git config diff.external …` を拒否されていない | 未対策。reviewer が `git config --local -l` の差分を見る。**未検証の推測** |

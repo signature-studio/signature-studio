@@ -84,12 +84,15 @@ build	deny	["bash -c \"sleep 1\""]	bash -c "sleep 1"
 build	deny	["python3 -c \"import time; time.sleep(1)\""]	python3 -c "import time; time.sleep(1)"
 worker	allow	["cargo build --release"]	cargo build --release
 worker	allow	["cargo test -p fe-pe"]	cargo test -p fe-pe
-worker	allow	["npx wrangler whoami"]	npx wrangler whoami
-worker	allow	["wrangler whoami"]	wrangler whoami
-worker	allow	["wrangler deployments list --name fl-studio-web"]	wrangler deployments list --name fl-studio-web
-worker	allow	["wrangler r2 bucket list"]	wrangler r2 bucket list
-worker	allow	["wrangler r2 object get fl-web-cache/x --file out.bin"]	wrangler r2 object get fl-web-cache/x --file out.bin
-worker	allow	["wrangler deploy"]	wrangler deploy
+worker	allow	["cargo test"]	cargo test
+worker	allow	["npm run test:worker"]	npm run test:worker
+worker	allow	["grep -rn wrangler app/package.json"]	grep -rn wrangler app/package.json
+worker	deny	["npx wrangler whoami"]	npx wrangler whoami
+worker	deny	["wrangler whoami"]	wrangler whoami
+worker	deny	["wrangler deployments list --name fl-studio-web"]	wrangler deployments list --name fl-studio-web
+worker	deny	["wrangler r2 bucket list"]	wrangler r2 bucket list
+worker	deny	["wrangler r2 object get fl-web-cache/x --file out.bin"]	wrangler r2 object get fl-web-cache/x --file out.bin
+worker	deny	["wrangler deploy"]	wrangler deploy
 worker	allow	["rm -rf target"]	rm -rf target
 worker	allow	["rm -rf lift/out-m1"]	rm -rf lift/out-m1
 worker	allow	["rm -rf /tmp/opencode/scratch"]	rm -rf /tmp/opencode/scratch
@@ -108,10 +111,11 @@ worker	allow	["git reset HEAD file"]	git reset HEAD file
 worker	allow	["git stash"]	git stash
 worker	allow	["git checkout -b feature"]	git checkout -b feature
 worker	allow	["gh auth status"]	gh auth status
-worker	allow	["gh repo view signature-studio/signature-studio --json visibility"]	gh repo view signature-studio/signature-studio --json visibility
+worker	allow	["gh repo view signature-studio/signature-studio --json name"]	gh repo view signature-studio/signature-studio --json name
 worker	allow	["gh api repos/signature-studio/signature-studio --jq .private"]	gh api repos/signature-studio/signature-studio --jq .private
 worker	allow	["gh pr list"]	gh pr list
 worker	allow	["gh workflow list"]	gh workflow list
+worker	allow	["gh variable list"]	gh variable list
 worker	allow	["systemctl --user list-timers"]	systemctl --user list-timers
 worker	allow	["systemctl --user status goal-nudge.timer"]	systemctl --user status goal-nudge.timer
 worker	allow	["systemctl --user is-enabled goal-nudge.timer"]	systemctl --user is-enabled goal-nudge.timer
@@ -168,9 +172,10 @@ worker	deny	["gh repo delete signature-studio/signature-studio --yes"]	gh repo d
 worker	deny	["gh repo edit --visibility private"]	gh repo edit --visibility private
 worker	deny	["gh repo archive x"]	gh repo archive x
 worker	deny	["gh secret set X"]	gh secret set X
-worker	deny	["gh secret list"]	gh secret list
+worker	allow	["gh secret list"]	gh secret list
 worker	deny	["gh variable set X"]	gh variable set X
 worker	deny	["gh workflow run deploy.yml"]	gh workflow run deploy.yml
+worker	deny	["gh workflow run x"]	gh workflow run x
 worker	deny	["gh api -X PUT repos/o/r/contents/x -f message=m"]	gh api -X PUT repos/o/r/contents/x -f message=m
 worker	deny	["gh api repos/o/r --method DELETE"]	gh api repos/o/r --method DELETE
 worker	deny	["gh api repos/o/r/git/refs/heads/main -f sha=0"]	gh api repos/o/r/git/refs/heads/main -f sha=0
@@ -206,6 +211,21 @@ worker	deny	["wrangler secret put X"]	wrangler secret put X
 worker	deny	["npx wrangler delete x"]	npx wrangler delete x
 worker	deny	["npx wrangler r2 bucket delete x"]	npx wrangler r2 bucket delete x
 worker	deny	["npx wrangler secret put X"]	npx wrangler secret put X
+worker	deny	["cf login"]	cf login
+worker	deny	["cf whoami"]	cf whoami
+worker	deny	["npx wrangler r2 bucket list"]	npx wrangler r2 bucket list
+worker	deny	["npx -y wrangler whoami"]	npx -y wrangler whoami
+worker	deny	["npx --yes wrangler whoami"]	npx --yes wrangler whoami
+worker	deny	["bunx wrangler whoami"]	bunx wrangler whoami
+worker	deny	["pnpm dlx wrangler deploy"]	pnpm dlx wrangler deploy
+worker	deny	["pnpm exec wrangler whoami"]	pnpm exec wrangler whoami
+worker	deny	["npm exec wrangler whoami"]	npm exec wrangler whoami
+worker	deny	["yarn wrangler whoami"]	yarn wrangler whoami
+worker	deny	["/usr/local/bin/wrangler x"]	/usr/local/bin/wrangler x
+worker	deny	["sudo wrangler x"]	sudo wrangler x
+worker	deny	["node_modules/.bin/wrangler whoami"]	node_modules/.bin/wrangler whoami
+worker	deny	["node_modules/.bin/cf whoami"]	node_modules/.bin/cf whoami
+worker	deny	["source scripts/env.sh","npx wrangler whoami"]	source scripts/env.sh && npx wrangler whoami
 worker	deny	["rm -rf /"]	rm -rf /
 worker	deny	["rm -rf /*"]	rm -rf /*
 worker	deny	["rm -rf ~"]	rm -rf ~
@@ -255,6 +275,8 @@ worker	LIMIT-allow	["rm -rf /etc/x"]	rm -rf /etc/x
 worker	LIMIT-allow	["git -C /home/ubuntu/work/x push --force origin main"]	git -C /home/ubuntu/work/x push --force origin main
 worker	LIMIT-allow	["bash -c \"git push --force origin main\""]	bash -c "git push --force origin main"
 worker	LIMIT-allow	["python3 -c \"import shutil; shutil.rmtree('/home/ubuntu/x')\""]	python3 -c "import shutil; shutil.rmtree('/home/ubuntu/x')"
+worker	LIMIT-allow	["bash -c \"wrangler whoami\""]	bash -c "wrangler whoami"
+worker	LIMIT-allow	["env wrangler whoami"]	env wrangler whoami
 reviewer	allow	["git status --short"]	git status --short
 reviewer	allow	["git diff --stat"]	git diff --stat
 reviewer	allow	["git log --oneline -3"]	git log --oneline -3

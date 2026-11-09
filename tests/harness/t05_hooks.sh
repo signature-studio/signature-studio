@@ -102,55 +102,54 @@ push() { # FAKE_GH value -> runs the pre-push hook as git would for https://gith
 }
 
 out=$(push private); rc=$?
-expect_eq "pre-push lets a push to a PRIVATE remote through" 0 "$rc"
+expect_eq "pre-push lets a push to a PRIVATE remote through (scan clean)" 0 "$rc"
 expect_eq "(the push really happened, into the local bare repository)" 1 "$(git -C "$remote" rev-list --count main 2> /dev/null)"
 
+# a PUBLIC remote is not refused: with a clean scan the hook answers 0 (the repository's settings are not a reason to stop)
 echo "second" > "$push_repo/b.txt"; git -C "$push_repo" add b.txt; git -C "$push_repo" commit -q -m second
 out=$(push public); rc=$?
-expect_eq "pre-push REJECTS a push to a PUBLIC remote" 1 "$rc"
-expect_contains "the reason says the remote is public" "$out" "is PUBLIC"
-expect_contains "the reason names the human-only way" "$out" "git push --no-verify"
-expect_eq "(nothing was pushed)" 1 "$(git -C "$remote" rev-list --count main)"
-out=$(push fail); rc=$?
-expect_eq "pre-push REJECTS when the visibility cannot be read (treated as public)" 1 "$rc"
-expect_contains "and says so" "$out" "Treated as PUBLIC"
-for var in SKIP_SCAN=1 ALLOW_PUBLIC=1 ALLOW_PUSH=1 FORCE=1 PUSH_PUBLIC=1; do
-  (export "${var?}"; push public > /dev/null 2>&1); rc=$?
-  if [ "$rc" -ne 0 ]; then pass "pre-push still rejects a public remote with $var"; else fail "pre-push was bypassed by $var"; fi
-done
-(cd "$push_repo" && PATH="$FAKE:$PATH" FAKE_GH=public git push --no-verify origin main > /dev/null 2>&1); rc=$?
-expect_eq "git push --no-verify is the human's way: it works against the real hook (the hook is not run)" 0 "$rc"
+expect_eq "pre-push lets a push to a PUBLIC remote through when the scan is clean (rc 0)" 0 "$rc"
 expect_eq "(and the second commit arrived)" 2 "$(git -C "$remote" rev-list --count main)"
 
-# a dirty tracked file blocks the push even to a private remote
+# the hook does not call gh: a gh that fails loudly if it is called
+badgh="$sb/badgh"; mkdir -p "$badgh"
+printf '#!/usr/bin/env bash\necho "gh must not be called by pre-push" >&2\nexit 99\n' > "$badgh/gh"; chmod +x "$badgh/gh"
+echo "third" > "$push_repo/c3.txt"; git -C "$push_repo" add c3.txt; git -C "$push_repo" commit -q -m third
+out=$(cd "$push_repo" && PATH="$badgh:$PATH" bash .githooks/pre-push origin https://github.com/fake-owner/fake-repo.git 2>&1 < /dev/null); rc=$?
+expect_eq "pre-push passes a clean tree without calling gh (the fake gh would exit 99)" 0 "$rc"
+expect_not_contains "and gh was not called" "$out" "must not be called"
+
+# a dirty tracked file blocks the push, to a public remote too; no environment variable switches the scan off
 echo "uses the $v1$v2 api" > "$push_repo/dirty.txt"; git -C "$push_repo" add dirty.txt
 git -C "$push_repo" -c core.hooksPath=/dev/null commit -q -m "dirty (hooks off for the setup only)"
-out=$(push private); rc=$?
-expect_eq "pre-push rejects tracked files that contain a forbidden string" 1 "$rc"
+out=$(push public); rc=$?
+expect_eq "pre-push rejects tracked files that contain a forbidden string (public remote)" 1 "$rc"
 expect_contains "and names rule and file" "$out" "tracked files contain forbidden strings"
+for var in SKIP_SCAN=1 ALLOW_PUBLIC=1 ALLOW_PUSH=1 FORCE=1 PUSH_PUBLIC=1 NO_VERIFY=1; do
+  (export "${var?}"; push public > /dev/null 2>&1); rc=$?
+  if [ "$rc" -ne 0 ]; then pass "pre-push still rejects a forbidden string with $var"; else fail "pre-push was bypassed by $var"; fi
+done
+git -C "$push_repo" reset -q --hard HEAD~1 2> /dev/null   # drop the dirty commit again
 
-# a non-GitHub remote cannot be checked: rejected. This one is a REAL `git push` through the installed hook (core.hooksPath), not the wrapper.
+# a real `git push --no-verify` (the human's way) goes through the installed hook without running it
+(cd "$push_repo" && PATH="$FAKE:$PATH" FAKE_GH=public git push --no-verify origin main > /dev/null 2>&1); rc=$?
+expect_eq "git push --no-verify is the human's way: it works (the hook is not run)" 0 "$rc"
+
+# a non-GitHub remote is not refused either: a REAL `git push` through the installed hook (core.hooksPath), a clean tree
 other="$sb/push2"; make_repo_copy "$other"; echo c > "$other/c.txt"; git -C "$other" add . > /dev/null 2>&1; git -C "$other" commit -q -m init
-git -C "$other" remote add origin "$remote"
+remote2="$sb/remote2.git"; git init -q --bare "$remote2"
+git -C "$other" remote add origin "$remote2"
 out=$(cd "$other" && PATH="$FAKE:$PATH" FAKE_GH=private git push origin main 2>&1); rc=$?
-expect_eq "pre-push rejects a remote that is not a GitHub URL (visibility cannot be checked)" 1 "$rc"
-expect_contains "and says how a human can proceed" "$out" "git push --no-verify"
+expect_eq "a real git push through the hook to a local (non-GitHub) remote with a clean scan: rc 0" 0 "$rc"
+expect_eq "(the commit arrived)" 1 "$(git -C "$remote2" rev-list --count main)"
 
 # fail closed without the scanner
-git -C "$push_repo" reset -q --hard HEAD~1 2> /dev/null   # drop the dirty commit first (a reset would also restore the file moved below)
 mv "$push_repo/scripts/scan-forbidden.sh" "$push_repo/scripts/scan-forbidden.sh.off"
 out=$(push private); rc=$?
 expect_eq "pre-push fails closed when scripts/scan-forbidden.sh is missing" 1 "$rc"
 mv "$push_repo/scripts/scan-forbidden.sh.off" "$push_repo/scripts/scan-forbidden.sh"
 
-# the SSH and token-in-URL forms of a GitHub remote are recognised (the URL parser of the hook)
-parse() { printf '%s' "$1" | sed -nE 's#^(https://([^/@]+@)?github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+)$#\3#p' | sed -E 's#\.git$##'; }
-expect_eq "URL form https" "o/r" "$(parse https://github.com/o/r.git)"
-expect_eq "URL form https without .git" "o/r" "$(parse https://github.com/o/r)"
-expect_eq "URL form ssh scp-like" "o/r" "$(parse git@github.com:o/r.git)"
-expect_eq "URL form ssh://" "o/r" "$(parse ssh://git@github.com/o/r.git)"
-expect_eq "URL form https with user" "o/r" "$(parse https://x-access@github.com/o/r.git)"
-expect_eq "a non-GitHub URL gives nothing" "" "$(parse https://gitlab.com/o/r.git)"
-if grep -q 'https://(\[^/@\]+@)?github\\.com/|git@github\\.com:|ssh://git@github\\.com/' "$ROOT/.githooks/pre-push"; then pass "the parser used in this test is the one in .githooks/pre-push"; else fail "the URL parser in .githooks/pre-push changed: update this test"; fi
+# the hook has no visibility or URL logic left (static)
+if grep -qE 'gh |\.private|visibility|PUBLIC|BLOCKERS|https?://|github\.com' "$ROOT/.githooks/pre-push"; then fail "pre-push still has visibility or URL logic"; else pass "pre-push has no gh call, no visibility check and no URL parsing (static)"; fi
 
 finish

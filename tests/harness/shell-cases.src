@@ -91,12 +91,15 @@ build	deny	python3 -c "import time; time.sleep(1)"
 # ---- worker: allowed (it must be able to work)
 worker	allow	cargo build --release
 worker	allow	cargo test -p fe-pe
-worker	allow	npx wrangler whoami
-worker	allow	wrangler whoami
-worker	allow	wrangler deployments list --name fl-studio-web
-worker	allow	wrangler r2 bucket list
-worker	allow	wrangler r2 object get fl-web-cache/x --file out.bin
-worker	allow	wrangler deploy
+worker	allow	cargo test
+worker	allow	npm run test:worker
+worker	allow	grep -rn wrangler app/package.json
+worker	deny	npx wrangler whoami
+worker	deny	wrangler whoami
+worker	deny	wrangler deployments list --name fl-studio-web
+worker	deny	wrangler r2 bucket list
+worker	deny	wrangler r2 object get fl-web-cache/x --file out.bin
+worker	deny	wrangler deploy
 worker	allow	rm -rf target
 worker	allow	rm -rf lift/out-m1
 worker	allow	rm -rf /tmp/opencode/scratch
@@ -115,10 +118,11 @@ worker	allow	git reset HEAD file
 worker	allow	git stash
 worker	allow	git checkout -b feature
 worker	allow	gh auth status
-worker	allow	gh repo view signature-studio/signature-studio --json visibility
+worker	allow	gh repo view signature-studio/signature-studio --json name
 worker	allow	gh api repos/signature-studio/signature-studio --jq .private
 worker	allow	gh pr list
 worker	allow	gh workflow list
+worker	allow	gh variable list
 worker	allow	systemctl --user list-timers
 worker	allow	systemctl --user status goal-nudge.timer
 worker	allow	systemctl --user is-enabled goal-nudge.timer
@@ -176,9 +180,10 @@ worker	deny	gh repo delete signature-studio/signature-studio --yes
 worker	deny	gh repo edit --visibility private
 worker	deny	gh repo archive x
 worker	deny	gh secret set X
-worker	deny	gh secret list
+worker	allow	gh secret list
 worker	deny	gh variable set X
 worker	deny	gh workflow run deploy.yml
+worker	deny	gh workflow run x
 worker	deny	gh api -X PUT repos/o/r/contents/x -f message=m
 worker	deny	gh api repos/o/r --method DELETE
 worker	deny	gh api repos/o/r/git/refs/heads/main -f sha=0
@@ -214,6 +219,21 @@ worker	deny	wrangler secret put X
 worker	deny	npx wrangler delete x
 worker	deny	npx wrangler r2 bucket delete x
 worker	deny	npx wrangler secret put X
+worker	deny	cf login
+worker	deny	cf whoami
+worker	deny	npx wrangler r2 bucket list
+worker	deny	npx -y wrangler whoami
+worker	deny	npx --yes wrangler whoami
+worker	deny	bunx wrangler whoami
+worker	deny	pnpm dlx wrangler deploy
+worker	deny	pnpm exec wrangler whoami
+worker	deny	npm exec wrangler whoami
+worker	deny	yarn wrangler whoami
+worker	deny	/usr/local/bin/wrangler x
+worker	deny	sudo wrangler x
+worker	deny	node_modules/.bin/wrangler whoami
+worker	deny	node_modules/.bin/cf whoami
+worker	deny	source scripts/env.sh && npx wrangler whoami
 worker	deny	rm -rf /
 worker	deny	rm -rf /*
 worker	deny	rm -rf ~
@@ -266,6 +286,8 @@ worker	LIMIT-allow	rm -rf /etc/x
 worker	LIMIT-allow	git -C /home/ubuntu/work/x push --force origin main
 worker	LIMIT-allow	bash -c "git push --force origin main"
 worker	LIMIT-allow	python3 -c "import shutil; shutil.rmtree('/home/ubuntu/x')"
+worker	LIMIT-allow	bash -c "wrangler whoami"
+worker	LIMIT-allow	env wrangler whoami
 
 # ---- reviewer: read-only
 reviewer	allow	git status --short
