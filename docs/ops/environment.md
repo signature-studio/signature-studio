@@ -9,31 +9,27 @@
 | 項目 | 事実 | 区分 | 出所・日付 | 確認コマンド |
 |---|---|---|---|---|
 | リポジトリ | `signature-studio/signature-studio`。remote `origin` は HTTPS。履歴は `Initial commit` の 1 つだけ(人間が web で作成)。追跡ファイルは `README.md` のみだった | [実測] | R1、2026-11-09 | `git log --oneline`、`git remote -v` |
-| 公開範囲 | **PUBLIC**。default branch `main`。branch protection・ruleset は見えない(push を妨げる保護は見えない) | [実測] | R1、2026-11-09 | `gh repo view signature-studio/signature-studio --json visibility` |
+| 公開範囲 | **PUBLIC。意図的**(依頼者の決定 P2: GitHub Actions を最大 60 並列で数時間動かすため。private ではその利用量を担えない)。公開されて困る物は git に入れない(`.gitignore`)。default branch `main` | [実測] 2026-11-10 | 依頼者の決定 P2(2026-11-10)、R1 の実測(2026-11-09) | `gh repo view signature-studio/signature-studio --json visibility` |
 | シェル既定の identity | GitHub App の bot(個人ではない)。`gh` 2.103.0。credential helper は `gh auth git-credential` | [実測] | R1、2026-11-09 | `gh auth status` |
-| **push** | **403(bot の installation にこのリポジトリが無い)**。`.permissions` は admin/maintain/push/triage/pull すべて false。`git ls-remote` は成功するが、PUBLIC だからで、push 権限の証拠にならない | [実測] | R1、2026-11-09 | `git push --dry-run origin HEAD`、`gh api repos/signature-studio/signature-studio --jq .permissions` |
-| Secrets・Variables | 一覧は 403。新リポジトリに旧 5 secret があるか不明(旧リポジトリの secret は旧リポジトリと共に消えた) | [実測] / 存在は [未確認] | R1、2026-11-09 | `gh secret list --repo signature-studio/signature-studio` |
+| **push** | identity は作業ディレクトリで決まる(依頼者の決定 P1)。前任期間の「403」はリポジトリ外のディレクトリで測った値で、誤り [文書]。`.permissions` は根拠にしない。**2026-11-10 にリポジトリのディレクトリで `git push --dry-run origin HEAD` を実行: rc=1。出力は 403 ではなく `.githooks/pre-push` の「PUBLIC のため拒否」**(`gh repo view` が PUBLIC)。依頼者の決定 P1 の「rc 0」とは食い違う [実測]。フックの PUBLIC 拒否は P2 と食い違うため、報告で扱う | [実測] | 2026-11-10 | `git push --dry-run origin HEAD`(リポジトリのディレクトリ)、`gh repo view signature-studio/signature-studio --json visibility` |
+| Secrets・Variables | R1(2026-11-09)の一覧は 403。新リポジトリに旧 5 secret があるか不明(旧リポジトリの secret は旧リポジトリと共に消えた)。登録は依頼者の権限(P3)で、依頼票で頼む(`docs/ops/authority.md` §3) | [実測](R1) / 存在は [未確認] | R1、2026-11-09 | `gh secret list --repo signature-studio/signature-studio`(bot に Secrets: read がある場合のみ見える) |
 | workflow | なし(`total_count: 0`) | [実測] | R1、2026-11-09 | `gh workflow list` |
 | commit 用 identity | **未設定**(`Author identity unknown`)。`git config user.name` が空 | [実測] | R1、2026-11-09 | `git var GIT_AUTHOR_IDENT` |
 | 別 identity | 前任は別の identity を使った。**使用禁止**。新リポジトリで push できるかは確認していない | [未確認] | R1 | — |
 
-- 解釈: push の 403 は権限の問題で、`AGENTS.md` §4 の「PUBLIC の間は push しない」とは別の理由で、両方が成立している。どちらか片方が解消しても、もう片方が残れば push しない。
+- 解釈(2026-11-10 更新): 前任の「push は 403。公開範囲を理由に push を止める」は、リポジトリ外のディレクトリで測った値と、古い規則に基づく。依頼者の決定 P1・P2 により、PUBLIC は理由にならず、403 は作業ディレクトリで確かめる。`.githooks/pre-push` が PUBLIC を理由に拒否する現状は P2 と食い違う(フックは別の担当が直す)。
 - 404 や 403 は identity で変わる。**404 を権限の喪失と書く前に `gh auth status`**(前任は identity の違いを権限の喪失と約 48 分誤報した)。
 
 ## 2 Cloudflare
 
 | 項目 | 事実 | 区分 | 出所・日付 | 確認コマンド |
 |---|---|---|---|---|
-| `wrangler` | `~/.local/bin/wrangler` 4.151.0(最新は 4.158.0 と表示)。OAuth でログイン済み。環境変数のトークンは未設定 | [実測] | R1、2026-11-09 | `wrangler whoami` |
+| `wrangler` | **後任は実行しない(deny)**。読み取りも含む(依頼者の決定 P4)。強制は worker・reviewer の permission の deny(`AGENTS.md` §11)。前任期間に `~/.local/bin/wrangler` が OAuth でログイン済みだったのは [文書](R1、2026-11-09) | [文書] | 依頼者の決定 P4(2026-11-10)、R1(2026-11-09) | 確認は GitHub Actions の結果か依頼票(`docs/ops/requests.md`)の確認コマンドで行う。確認コマンドは書かない |
 | `cf` CLI | **無い** | [実測] | R1(再: `command -v cf` 出力なし) | `command -v cf` |
-| OAuth の書き込み可能な範囲 | Workers(scripts・routes・KV・tail)、D1、Pages、Queues、Secrets Store など。**R2・Access・DNS 編集・API トークン管理は一覧に無い** | [実測] | R1、2026-11-09 | `wrangler whoami` のスコープ表 |
-| R2 の読み取り | `wrangler r2 bucket list` と `bucket info` は成功(スコープ一覧に R2 が無いのに成功。理由は不明)。8 バケット中、このプロジェクトの物は `fl-web-artifacts`(4 object)・`fl-web-assets`(191)・`fl-web-cache`(710) | [実測] / 理由は [未確認] | R1、2026-11-09 | `wrangler r2 bucket list` |
-| R2 の書き込み | 試していない | [未確認] | R1 | — |
-| 旧 Worker | `fl-studio-web`。deployments 10 件(最新 2026-11-07 21:40:44Z)。Worker の secret は 0 件 | [実測] | R1、2026-11-09 | `wrangler deployments list --name fl-studio-web`、`wrangler secret list --name fl-studio-web` |
-| 旧公開ホスト | 認証なしの `GET /` が HTTP 302(Access のログインへ)。**Worker と Access は稼働中** | [実測] | R1、2026-11-09 | `scripts/preflight.sh`(ホスト名は旧 CI の定義にある。ここには書かない) |
-| Worker のデプロイ書き込み | スコープ上は可(workers_scripts write)。**未実行**。旧 CI の方式は `wrangler versions upload` + `versions deploy` | [未確認] | R1 | 初回は worker に実行させ、出力を報告 |
-| Access・DNS・custom domain | wrangler で見えない・変えられない | [実測] | R1、2026-11-09 | — |
-| アカウント全体の write | この OAuth はアカウント全体に効く。無関係な bucket(5 つ)が同居する。**触る資源は Worker `fl-studio-web` と R2 `fl-web-*` だけ**。他の bucket・Worker に書かない・削除しない | [実測] | R1、2026-11-09 | `wrangler r2 bucket list` |
+| 旧 Worker と R2 | 前任期間の記録 [文書](R1、2026-11-09): Worker `fl-studio-web`、R2 `fl-web-*`。後任は確認も変更もしない(P4)。**触ってよいのはこの 2 つだけ**(依頼者の方針。他の資源には触らない) | [文書] | R1、2026-11-09、依頼者の決定 P4 | 確認は GitHub Actions の結果か依頼票の確認コマンド |
+| 旧公開ホスト | 前任期間の記録 [文書](R1、2026-11-09): 認証なしの GET が Access のログインへ転送。稼働の確認は依頼票で頼む(後任は確認しない) | [文書] | R1、2026-11-09 | 依頼票(`docs/requests/`)の確認コマンド |
+| Access・DNS・custom domain | 後任の権限外。変更は依頼票で頼む(`docs/ops/authority.md` §3 の 2) | [文書] | 依頼者の決定 P3・P4 | 依頼票 |
+| Cloudflare の API トークン・R2 の S3 キー | 発行・登録は依頼者の権限(依頼票で頼む。`docs/ops/authority.md` §3 の 1) | [文書] | 依頼者の決定 P3 | 依頼票 |
 
 ## 3 ツールチェーンと PATH
 
@@ -78,6 +74,6 @@
 
 | 項目 | 状態 |
 |---|---|
-| `scripts/preflight.sh`、`audit-session.sh`、`scan-forbidden.sh`、`env.sh`、`set-model-profile.sh`、`launch.sh`、`setup-repo.sh` | 作成済み(`ls scripts/` で 2026-11-10 に実在を確認)。存在しなければ `ls scripts/` の出力を報告に貼り、worker に作らせる前に台帳へ |
+| `scripts/preflight.sh`、`audit-session.sh`、`scan-forbidden.sh`、`env.sh`、`set-model-profile.sh`、`launch.sh`、`setup-repo.sh` | 作成済み(`ls scripts/` で 2026-11-10 に実在を確認)。存在しなければ `ls scripts/` の出力を報告に貼り、worker に作らせる |
 | agent: `build`(Sonnet・読み取りと許可リストのみ)、`worker`・`reviewer`(Haiku)。`general`/`explore`/`plan` は無効 | 作成済み(`opencode.jsonc` に定義)。`scripts/preflight.sh` が解決結果を表で出す |
 | モデル ID(参考) | Sonnet 5.5 と Haiku 5.5 は、前任が実際に動かした経路で指定できる(R3、2026-11-09 の調査)。設定ファイルが不正だと全設定が黙って無効になる。**起動前に `opencode debug agents`** で解決された model を確認する |

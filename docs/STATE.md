@@ -10,9 +10,9 @@
 
 | 項目 | 値 | 区分 | 出典・日付 |
 |---|---|---|---|
-| リポジトリ | `~/work/signature-studio`。公開範囲 **PUBLIC**。履歴は `Initial commit` の 1 つだけ(その後の commit は worker が積む) | [実測] | `git log --oneline`、`gh repo view … --json visibility`(R1 2026-11-09) |
-| push | **403**(bot の installation にこのリポジトリが無い)。PUBLIC の間は push しない(`AGENTS.md` §4)。台帳 H1・H2 | [実測] | `git push --dry-run origin HEAD`(R1 2026-11-09) |
-| 既定の入口 | **新アプリはまだ無い**。旧本番 Worker `fl-studio-web` は稼働中(認証なしの `GET /` が 302)。旧本番の中身は未確認(代役を含まないかも未確認) | 稼働は [実測]/中身は [未確認] | `scripts/preflight.sh`(R1 2026-11-09) |
+| リポジトリ | `~/work/signature-studio`。公開範囲 **PUBLIC(意図的。P2)**。履歴は `Initial commit` の 1 つだけ(その後の commit は worker が積む) | [実測](R1 2026-11-09、公開範囲は 2026-11-10 も PUBLIC) | `gh repo view … --json visibility`、`git log --oneline` |
+| push | identity は作業ディレクトリで決まる(P1)。2026-11-10 にリポジトリのディレクトリで `git push --dry-run origin HEAD` は **rc=1**。出力は 403 ではなく `.githooks/pre-push` の「PUBLIC のため拒否」(P2 と食い違う。フックは別の担当)。前任の「403」はリポジトリ外で測った誤り [文書] | [実測] 2026-11-10 | `git push --dry-run origin HEAD`(リポジトリのディレクトリ)、`gh auth status`(トークンの行は除く) |
+| 既定の入口 | **新アプリはまだ無い**。旧本番(前任期間の記録 [文書]: Worker `fl-studio-web`、認証なしの GET が Access へ転送)。中身は [未確認](代役を含まないかも未確認)。後任は Cloudflare を実行しない(P4) | [文書]/[未確認] | R1(2026-11-09)。確認は依頼票 |
 | 持ち込み | `artifacts/`(E13 bundle)・`binaries/win64/FLEngine_x64.dll` は存在。`lift/`・`app/`・`tools/`・`ci/`・`patches/`・`evidence/` は 2026-11-10 02:50 時点で存在しない(別の担当がステージング中) | [実測] | `ls ~/work/signature-studio`(2026-11-10) |
 | ツールチェーン | node v24・emcc 6.0.12(PATH 外、`source scripts/env.sh`)・wasm-opt 133・rustc 1.99.0・Chrome 156(headless 起動は未確認) | [実測] / headless は [未確認] | `docs/ops/environment.md` §3(R1 2026-11-09) |
 
@@ -20,7 +20,7 @@
 
 | 項目 | 値 | 区分 | 出典・日付 |
 |---|---|---|---|
-| E13 bundle `fl-engine-ci-0363b050` の整合 | 9 ファイル全て sha256 が提案の台帳と一致(wasm 143,087,706 B `58ad4a6a…`) | **[実測]**(提案ファイルを `sha256sum -c`)。**ただしこの機械で `artifacts.sha256` はまだ無く、実行は未確認** | `sha256sum -c`(2026-11-10)。計画の記録 [文書] と一致 |
+| E13 bundle `fl-engine-ci-0363b050` の整合 | 9 ファイル全て sha256 が提案の一覧と一致(wasm 143,087,706 B `58ad4a6a…`) | **[実測]**(提案ファイルを `sha256sum -c`)。**ただしこの機械で `artifacts.sha256` はまだ無く、実行は未確認** | `sha256sum -c`(2026-11-10)。計画の記録 [文書] と一致 |
 | `FLEngine_x64.dll` | 22,227,016 B・sha256 `b2c64da4…9496d` が一致 | [実測] | 同上 |
 | 外部入力 6 本(`~/ダウンロード/`) | サイズが提案と一致。zip・OTT・Vital は sha256 先頭 16 桁も一致。FL 5653・5654・Serum 2 の sha256 は未再計算 | サイズ [実測]/一部 [実測]/他 [未確認] | `stat`・`sha256sum`(2026-11-10) |
 
@@ -36,9 +36,9 @@
 | G 段階 | G0 到達・G1〜G3 条件つき・G4 到達(読み A/B)・G5 未到達・G6/G7 数えない(P2/P3 未達)・G8 部分・G9 未到達・G10 部分・G11 未着手。**旧資料は二通りの読みを書く: 最も厳しい読み G0、字義どおり G4** | [文書] | goal-ladder(11-07)、0198・0314 |
 | Export | 基準プロジェクトの WAV 22,863,828 B・sha256 `381cdb5a…f979`(E8〜E13 で同一) | [文書] | 0277-e13 |
 
-## 未適用の差分(台帳 L01〜L26。出典: `~/work/handover/setup/R2-patch-ledger.tsv`、dry-run は旧木で [実測] 2026-11-09)
+## 未適用の差分(パッチ L01〜L26 の一覧。出典: `~/work/handover/setup/R2-patch-ledger.tsv`、dry-run は旧木で [実測] 2026-11-09)
 
-| 優先 | 件 | 台帳 |
+| 優先 | 件 | 対象 |
 |---|---:|---|
 | P0(未適用・未検証・実エンジン実行 0。ROADMAP R1) | 6 | L01〜L06 |
 | P1(R2・R3・R7) | 12 | L07・L08・L09・L11〜L14・L18・L19・L22・L23・L24 |
@@ -46,7 +46,7 @@
 | P3(診断。製品に入れない) | 1 | L20 |
 | 適用済み(旧木で reverse dry-run が rc 0) | 1 | L21 |
 
-合計 26 [実測: `R2-patch-ledger.tsv` の 4 列目を数えた]。うち**差分が存在しない物**(除去実験・未修正の実測)は L22〜L26 の 5 件。**台帳の「当たる」は構文上の適用で、ビルド・試験の成功ではない**。新リポジトリで適用済みの数は 0。
+合計 26 [実測: `R2-patch-ledger.tsv` の 4 列目を数えた]。うち**差分が存在しない物**(除去実験・未修正の実測)は L22〜L26 の 5 件。**一覧の「当たる」は構文上の適用で、ビルド・試験の成功ではない**。新リポジトリで適用済みの数は 0。
 
 ## 依頼者の観察 O1〜O20(旧 `feedback/2026-11-07-owner-observations.md`。依頼者機の観察で、我々の測定ではない。要約・症状のみ)
 
@@ -73,6 +73,6 @@
 
 未解決の物 = 上の全行(新リポジトリで再現・解消を確かめた行は 0)。O15 のみ対応なし(規約: FL 自身の挙動は補わない)。
 
-## ブロッカー・誠実性の記録
-- ブロッカー: `docs/BLOCKERS.md`(H1〜H6)。依頼者機の値: **0 件**(経路は ROADMAP R4-1 で整備)。
+## 依頼・誠実性の記録
+- 依頼: `docs/requests/`(起票済みの依頼票の一覧と状態。`docs/ops/requests.md`)。依頼者機の値: **依頼中**(P5。依頼票が出るまでは 0 件)。
 - 誠実性の記録(`docs/ops/honesty.md` §2 規則 8): 違反した成果が見つかったらここに追記。現在 0 件(新規)。

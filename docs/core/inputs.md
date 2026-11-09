@@ -20,7 +20,7 @@ cd ~/work/signature-studio && sha256sum -c artifacts.sha256        # 全行 OK(a
 (cd ~/ダウンロード && sha256sum -c ~/work/signature-studio/ci/external-inputs.sha256)   # 全行 OK(外部入力 6 行)
 ```
 2 つとも 2026-11-10 に実行し、全行 OK([実測]。bundle・DLL の実行と DLL の中身の解析はしていない)。大きいので `background: true` で実行する(外部入力だけで約 3.6 GB を読む)。
-不一致なら**判断で押し通さず**、`docs/BLOCKERS.md` にも `STATE.md` にも書かず、worker にコマンド出力をそのまま報告させる。
+不一致なら**判断で押し通さず**、`docs/STATE.md` に事実(コマンドと出力)を書き、worker にコマンド出力をそのまま報告させる。外部入力の不足が依頼者の権限に当たるなら依頼票で頼む(`docs/requests/`)。
 
 ## 3 DLL の抽出(インストーラ → 同梱 DLL 8 本)
 

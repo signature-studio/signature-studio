@@ -10,21 +10,21 @@ FL Studio をブラウザ上で動かす(Windows 版 FL Studio のエンジン�
 
 ## 人間(依頼者)が起動前に読む物
 - `docs/ops/launch.md` — 起動前の確認項目と起動手順(`scripts/launch.sh`)
-- `docs/BLOCKERS.md` — 人間にしかできない項目の台帳(現在の状態)
+- `docs/requests/` — 依頼者に頼む作業の依頼票(形式は `docs/ops/requests.md`)
 
 ## 構成
 | パス | 内容 |
 |---|---|
 | `AGENTS.md` | 規約 |
 | `docs/ops/` | 運用規約(権限・環境・役割と手順・報告・誠実性・忠実性と性能・危険操作・辞書・教訓・起動) |
-| `docs/BLOCKERS.md` | 人間限定のブロッカー台帳 |
+| `docs/requests/` | 依頼者に頼む作業の依頼票(形式は `docs/ops/requests.md`) |
 | `prompts/` | 起動プロンプト、worker/reviewer への指示の雛形と規則ブロック |
 | `scripts/` | preflight・audit・scan-forbidden・env・set-model-profile・launch・setup-repo(ハーネス担当が作成) |
 | `docs/ROADMAP.md`、`docs/STATE.md`、`docs/core/` | ロードマップ・現在の状態・技術文書(存在しなければ worker に旧資料から作らせる) |
 
 ## 状態
 - 新リポジトリでの再出発。旧リポジトリは削除済み。旧作業ツリーは参照用に残っている(読み取りのみ)。
-- 公開範囲は PUBLIC(2026-11-09 実測)。`scripts/preflight.sh` が PUBLIC と報告する間、push しない(commit は続ける)。
+- PUBLIC は意図的(GitHub Actions の並列利用のため)。commit したら push する。
 
 ## 注意
 - 成果物(wasm、FL の DLL、インストーラ、調査の抜粋)をこのリポジトリに入れない。入れる前に `scripts/scan-forbidden.sh` を通す。

@@ -26,7 +26,7 @@
 2. <コマンド>   → <期待する出力・終了コード>
 3. scripts/scan-forbidden.sh <変更したファイル>   → 終了コード 0
 ```
-- commit する(メッセージは変更の内容を短く。秘密・識別子・禁止語を書かない)。push は `scripts/preflight.sh` が PRIVATE と報告するときだけ。
+- commit する(メッセージは変更の内容を短く。秘密・識別子・禁止語を書かない)。commit したら `git push origin main` で push し、`git ls-remote origin main` で届いたことを確かめる(scan 通過後。リポジトリは PUBLIC で意図的)。
 
 ## 報告形式
 `prompts/worker-rules.md` の「報告の形式」に従う。追加の項目: <あれば。例: 「測定は n=5 の中央値とマシン・ブラウザを書く」>
@@ -35,6 +35,6 @@
 - main の sessionID: <$OPENCODE_SESSION_ID の値>(中間の報告・ブロッカーは `/opencode-send-message` で。`delivery: queue` を指定しない)
 
 ## 記入例(消して使う)
-- 目的: 「`docs/BLOCKERS.md` の H1 の確認日を実測で更新する」
-- 完了条件: `git push --dry-run origin HEAD` の出力の先頭 3 行を表の「状態」に貼った → `grep -n '2026-' docs/BLOCKERS.md` に今日の日付がある。`scripts/scan-forbidden.sh docs/BLOCKERS.md` が 0。
+- 目的: 「`docs/STATE.md` の push の行を実測で更新する」
+- 完了条件: `git push --dry-run origin HEAD` の出力の先頭 3 行を報告に貼った → `grep -n '2026-' docs/STATE.md` に今日の日付がある。`scripts/scan-forbidden.sh docs/STATE.md` が 0。
 - やらないこと: 他の行を変更しない。push を実行しない(`--dry-run` のみ)。

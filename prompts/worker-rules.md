@@ -21,14 +21,16 @@
 - sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。長い処理は shell の `background: true`。
 - 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。
-- `git push` は、`scripts/preflight.sh` が PRIVATE と報告するときだけ。PUBLIC の間は commit のみ。commit の前に `scripts/scan-forbidden.sh <変更したファイル>` を通す。
+- `git push` は通常の `git push origin main` のみ(force 系・`gh api` による contents の PUT・ref の更新・別 identity は不可)。commit したら push する(scan 通過後)。`git ls-remote origin main` で届いたことを確かめる。リポジトリは PUBLIC で意図的。公開を理由に止めない。「push できない」と書くときは、リポジトリのディレクトリで実行した `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` の出力を貼る。commit の前に `scripts/scan-forbidden.sh <変更したファイル>` を通す。
 - 作業木が要るときは `gwq add <branch>` を使う。`git worktree add` を直接使わない。`~/work` 直下に作業木を作らない。
-- Cloudflare は `wrangler` で触る。対象は Worker `fl-studio-web` と R2 `fl-web-*` だけ。削除系を実行しない。
+- `wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。Cloudflare の確認・変更が要るなら依頼票(`docs/ops/requests.md`)を出す。
 - コミット・ファイル・ログに、秘密・鍵・Cloudflare の識別子(アカウント ID・ホスト名)・ベンダー名を含む文字列を書かない。旧作業ツリーは読み取りのみ。95 MB 超のファイルを commit しない。
 - 一時ファイルは `source scripts/env.sh` が示す `TMPDIR` に置く(`/tmp` は 3.6 GiB の tmpfs。小さな物だけ)。
 
 ## 依頼者に求めてはいけないこと
-- 判断・確認・許可・操作(コマンドの実行・ブラウザでの確認・権限の付与・リポジトリの作成)を依頼者に求めない。「できない」と書く前に、自分で `scripts/`・wrangler・gh・headless Chrome で確かめる。人間限定と実測した物(push 権限・Secrets・公開範囲・Access・DNS)だけを、報告の「ブロッカー」に 1 行(状態・確認コマンド・影響)書き、台帳に依存しない作業を続ける。
+- 自分でできる物は自分で(`scripts/`・gh・git・headless Chrome)。「できない」と書く前に実行して確かめる。
+- 自分にできない物(トークンの発行・Secrets の登録・権限の付与・実機での計測)は、依頼票(`docs/ops/requests.md`、雛形 `docs/requests/TEMPLATE.md`)で、合理的理由・対象・影響範囲を明示して頼む。自分でできる物を頼むのは指示違反。
+- 依頼票を出したら、依頼に依存しない作業を同じターンで続ける。催促しない。
 - 「作業対象がありません」「判断が必要です」と書いて止まらない。
 
 ## 報告の形式(最終報告。日本語。結論 20 行以内 + ファイル)
@@ -37,5 +39,5 @@
 3. 未確認: <確認していない物>
 4. 変えたファイル: `git status --short` と `git diff --stat` の出力(実差分と一致させる)
 5. 完了条件ごとに、実行したコマンドと出力の 1 行
-6. ブロッカー: <あれば。なければ「なし」>。提案: <あれば 1 行>
+6. 依頼: <出した依頼票のパス。無ければ「なし」>。提案: <あれば 1 行>
 長い出力はファイルに書き、パスを書く。完了を自己宣言しない(「完了条件のコマンドが通った」と事実で書く)。

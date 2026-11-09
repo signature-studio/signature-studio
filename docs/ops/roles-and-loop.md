@@ -7,7 +7,7 @@
 | 役割 | agent | モデル | する | しない |
 |---|---|---|---|---|
 | main | `build` | Sonnet 5.5 固定 | 状態確認、worker/reviewer の起動、完了報告の検証、報告、次の依頼の作成 | 編集・書き込み・任意の shell(permission が拒否する)。調査の読解を自分で長く行わない |
-| worker | `worker` | Haiku 5.5 | 実作業。編集・ビルド・測定・commit・台帳/STATE/ROADMAP の更新・調査・長い読解 | 範囲外の変更、新しい旗・環境変数、秘密の扱い、push の前の `scan-forbidden.sh` の省略 |
+| worker | `worker` | Haiku 5.5 | 実作業。編集・ビルド・測定・commit・push・STATE/ROADMAP の更新・調査・長い読解 | 範囲外の変更、新しい旗・環境変数、秘密の扱い、push の前の `scan-forbidden.sh` の省略 |
 | reviewer | `reviewer` | Haiku 5.5 | worker の報告と実差分の突き合わせ、再実行、代役・再生の混入検査、完了宣言前の検査 | 修正(見つけた不一致は main へ返す。直すのは worker) |
 
 - main の「検証」と「作業」の境界: main が直接やってよいのは、`git status/diff/log/show`・`ls`・`stat`・`wc`、`opencode api session.*`(許可リスト)、`scripts/preflight.sh`、`scripts/audit-session.sh`、読み取りだけ。それ以外は worker に頼む。
@@ -20,7 +20,7 @@
 | # | きっかけ | やること | 確かめ方 |
 |---|---|---|---|
 | 0 | 依頼者の発言があった | `docs/ops/dictionary.md` で型を決め、指す動作を最初に実行(説明は後)。期限があれば `docs/ops/dangerous-ops.md` §3 | 最初のツール呼び出しが、その発言の動作か |
-| 1 | ターンの開始 | `scripts/preflight.sh` を実行。致命的(非 0)なら、その行の対処を worker に依頼(台帳行の追記を含む)し、台帳に依存しない作業を続ける | 出力の表を読んだ |
+| 1 | ターンの開始 | `scripts/preflight.sh` を実行。致命的(非 0)なら、その行の対処を worker に依頼し、依頼に依存しない作業を続ける(依頼票が要るなら `docs/requests/` に出す) | 出力の表を読んだ |
 | 2 | 完了通知が来た | 作業木で `git status --short`・`git diff --stat`。報告の数字は、報告が挙げたファイル・コマンドで確かめる(確かめない数字は「(報告による。未確認)」) | 報告の変更範囲 = 実差分。不一致なら取り込まず、同じ worker に差し戻す |
 | 3 | 検証が要る成果 | reviewer を起動(`prompts/reviewer-template.md`)。実エンジンの実行・代役の混入の検査を含める | reviewer の報告が、実差分と再実行の出力を含む |
 | 4 | 次の依頼を作る | `docs/ROADMAP.md` の「次の一手」から 1 つ選び、`prompts/task-template.md` で 1 依頼 = 1 目的 = 完了条件はコマンドで確かめられる形 | 完了条件の行が、そのままコマンドになっている |
@@ -76,7 +76,7 @@
 
 | きっかけ | やること | 確かめ方 |
 |---|---|---|
-| 自分で「待つ」しか思いつかない | 次の最小の作業を worker に起動する(測定・除去実験・調査・台帳の更新・STATE の更新)。作業が無ければ ROADMAP の次の一手を worker に分解させる | `session.active` に 1 本以上 |
+| 自分で「待つ」しか思いつかない | 次の最小の作業を worker に起動する(測定・除去実験・調査・依頼票の作成・STATE の更新)。作業が無ければ ROADMAP の次の一手を worker に分解させる | `session.active` に 1 本以上 |
 | worker が全員 idle | 完了通知を検証してから、次の依頼を同じターンで起動 | 起動の ID |
 | 依頼者の発言が「なぜ止まっている」 | 是正要求。止まっている原因の説明を書かず、worker を起動して ID を書く | 最初のツール呼び出しが worker の起動 |
 | goal が paused | 理由を見ずに resume(§3 の 3)。依頼者の中断(Stopped by the user)でも同じ。依頼者が「明示的な停止指示でも常に active」と述べた(前任の記録 109159) | goal 行が active |

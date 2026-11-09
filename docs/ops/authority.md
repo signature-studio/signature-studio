@@ -1,15 +1,15 @@
 # 責任範囲と能力表
 
-規則の要約は `AGENTS.md` §0・§3・§10。この文書は、何を自分でやり、何が人間限定かの根拠。事実の表は `docs/ops/environment.md`。
+規則の要約は `AGENTS.md` §0・§3・§10。この文書は、何を自分でやり、何を依頼票で頼むかの根拠。事実の表は `docs/ops/environment.md`。
 
 ## 1 責任の線
 
 | 範囲 | 誰が責任を負うか | 失敗したとき |
 |---|---|---|
-| 依頼を受けてから完成までの全作業(調査・実装・ビルド・測定・commit・wrangler/gh の実行・報告) | セッション(main + worker + reviewer) | 罰則(ワークツリー・リポジトリの削除)も含めて、エージェントの責任 |
-| 人間にしかできない物(下の §3) | 依頼者(協力は一定の範囲で行われる) | エージェントの責任にならない。ただし台帳に載せ、台帳に依存しない作業を続けなかった場合はエージェントの責任 |
+| 依頼を受けてから完成までの全作業(調査・実装・ビルド・測定・commit・push・報告) | セッション(main + worker + reviewer) | 罰則(ワークツリー・リポジトリの削除)も含めて、エージェントの責任 |
+| 依頼者にしかできない物(下の §3) | 依頼者(P3 の範囲で協力する) | エージェントの責任にならない。ただし依頼票を出さなかった場合、または依頼に依存しない作業を続けなかった場合はエージェントの責任 |
 
-- 「責任範囲外」と書けるのは、§3 の表の行に当たり、かつ確認コマンドの出力が実測で人間限定を示したときだけ。
+- 「依頼票で頼む」と書けるのは、§3 の表の行に当たり、かつ自分で試した記録(コマンドと出力)が、自分では完了できないことを示すときだけ。
 - 依頼者が協力するのは、責任範囲外の作業だけ。範囲内の作業を頼む・判断を預ける・操作を頼むことは、協力の対象外。
 
 ## 2 エージェントが自分でやること(できるのに「できない」と書いたら違反)
@@ -18,38 +18,37 @@
 |---|---|---|
 | ファイルの編集・ビルド・測定・commit | worker が実行。PATH は `source scripts/env.sh`(emcc・npx・wasm-opt の版) | 道具は存在(R1、2026-11-09) |
 | commit 用の identity の設定 | `scripts/setup-repo.sh`(リポジトリのローカル設定のみ。グローバルは触らない) | 未設定を確認(R1、2026-11-09) |
-| Cloudflare の状態の確認 | `wrangler whoami`、`wrangler deployments list --name fl-studio-web`、`wrangler versions list --name fl-studio-web`、`wrangler r2 bucket list`、`wrangler r2 bucket info <名前>`、`wrangler secret list --name fl-studio-web` | OAuth でログイン済み、読み取り成功(R1、2026-11-09) |
-| Worker のデプロイ | `wrangler versions upload` と `wrangler versions deploy`(旧 CI の方式) | スコープ上は可。実行は未試験(R1)。初回は結果を実測して報告 |
-| R2 の読み取り | `wrangler r2 bucket info`、`wrangler r2 object get`(自分の作業用の置き場へ) | bucket list/info は成功(R1) |
+| Cloudflare の確認・変更 | **実行しない**(`wrangler`・`cf` は読み取りも含め後任の権限外。依頼者の決定 P4)。確認・変更が要るなら依頼票(`docs/ops/requests.md`) | — |
+| 配信(デプロイ) | GitHub Actions(R8)と、依頼者が依頼票に応じて登録する Secrets で行う(P4) | Actions の実行結果(依頼票の確認コマンドで確かめる) |
 | GitHub の読み取り | `gh repo view`、`gh api <GET>`、`git ls-remote origin` | 成功(R1) |
-| push の可否の確認 | `git push --dry-run origin HEAD` | 403(R1、2026-11-09)。`scripts/preflight.sh` が毎回出す |
-| ブラウザでの確認 | headless Chrome(`google-chrome --headless`)。手元の検証に限り、CI に自作スクリプトを置かない | Chrome 156 は存在。起動は未確認(R1) |
+| push | `git push origin main`(通常の push のみ。scan 通過後。P1)。`git ls-remote origin main` で届いたことを確かめる | 2026-11-10 のリポジトリのディレクトリでの dry-run は rc=1(pre-push フックの PUBLIC 拒否。403 ではない) |
+| push の可否の確認 | リポジトリのディレクトリで `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` | 同上。`.permissions` は根拠にしない(P1) |
+| ブラウザでの確認 | headless Chrome(`google-chrome --headless`)。手元の検証に限り、CI に自作スクリプトを置かない | Chrome 156 は存在。headless の起動は未確認(R1) |
 | 追加パッケージ(brotli 等) | まず npm・Python・cargo で足りるか見る。必要なら `sudo -n apt-get install`(必要最小限) | `sudo -n true` が rc=0(R1)。apt の実行は未試験 |
 | 長い処理 | shell の `background: true`。完了は通知に任せる | — |
-| 台帳・STATE・ROADMAP の更新 | worker に頼む(main は書けない) | — |
+| STATE・ROADMAP の更新 | worker に頼む(main は書けない) | — |
 
-## 3 人間にしかできないこと(`docs/BLOCKERS.md` に載せる)
+## 3 依頼票で頼む物(`docs/ops/requests.md` の形式で出す)
 
-| # | 物 | 実測した状態(R1、2026-11-09) | エージェントが続けられる範囲 |
+| # | 頼む物 | 頼む理由・対象・影響範囲の書き方 | 依頼なしで続けられる作業 |
 |---|---|---|---|
-| H1 | push 権限(org の管理者が、使う bot の installation にこのリポジトリを追加し Contents: write を付ける) | `git push --dry-run` が 403。installation の対象にこのリポジトリが無い | commit まで。push 以外の全作業 |
-| H2 | Actions の Secrets の登録 | `gh secret list` が 403。新リポジトリにあるか不明 | CI を前提にしない設計で進める(`AGENTS.md` §4) |
-| H3 | R2 の S3 キー・API トークンの発行 | OAuth のスコープに API トークン管理が無い | wrangler(OAuth)で足りる範囲で進める。CI を足すときだけ必要 |
-| H4 | リポジトリの公開範囲(PUBLIC か PRIVATE か) | PUBLIC。bot は admin ではない | commit は続ける。PUBLIC の間は push しない(`AGENTS.md` §4) |
-| H5 | Cloudflare Access・DNS・custom domain の変更 | wrangler のスコープに無い。旧公開ホストは Access 付きで稼働中 | 旧 Worker 名・旧ホストをそのまま使う設計で進める。新ホストが要る作業だけ待つ |
-| H6 | 依頼者機のブラウザ計測、実機 Windows の画面・音 | この機械では代替できない | この機械の headless Chrome での実測。依頼者機の値は別枠で「0 件」と併記 |
+| 1 | Secrets・トークンの発行と登録(Cloudflare の API トークン、R2 の S3 キー。GitHub Actions で使う) | 理由: トークンの発行と Secrets の登録は依頼者の権限(P3)。対象: Secret の名前(値は書かない)と用途。影響: Secret の追加のみ。取り消し: Secret の削除 | commit・ビルド・測定。配信は Actions の結果を待たず、この機械の headless Chrome の実測で進める |
+| 2 | Access・DNS・custom domain の変更 | 理由: 後任は Cloudflare を実行しない(P4)。対象: `<ホスト名>` のプレースホルダ。影響: 公開の経路 | 旧 Worker 名・旧ホストのまま、ローカルの実測で進める。新ホストが要る作業だけ止まる |
+| 3 | 実機・依頼者機の計測(依頼者機のブラウザ、実機 Windows の画面・音・120 fps) | 理由: headless では代替できない(P5)。手順: 読み取りのみ。返す値の形式。影響: なし | headless の実測で進める。依頼者機の値は「依頼中」と書く(依頼票を出した後) |
+| 4 | org の権限(`.github/workflows/` を push するのに要る権限が足りないとき) | 理由: org の権限は依頼者の権限。対象: 足りない権限の名前。影響: 権限の付与のみ | workflow 以外の commit と push。`.github/workflows/` の変更は、権限が付いた後に push する |
 
-- 表に無い物を人間限定と書くときは、先に §5 の確認を行い、出力を台帳の行に貼る。
-- 状態が変わったら(例: push が通る)、`scripts/preflight.sh` の結果を根拠に、worker に台帳の行を消させる。
+- push 権限と公開範囲の行は、この表に無い(解消・意図的。P1・P2)。
+- 依頼票の必須項目(対象・理由・影響範囲・自分で試した記録・確認コマンド・依頼なしで続ける作業)は `docs/ops/requests.md`。表に無い物を頼むときは、先に `docs/ops/environment.md` の確認コマンドを実行し、結果を依頼票に貼る。
+- 状態が変わったら(例: 権限が付いた)、確認コマンドの出力を根拠に、依頼票の末尾に確認の記録を書く。
 
 ## 4 依頼者の権限に属する物(エージェントは実行しない)
 
 | 物 | 扱い |
 |---|---|
-| リポジトリの作成・削除・公開範囲の変更、org の権限、bot の installation、Secrets の登録 | 実行しない。台帳に 1 行。台帳に依存しない作業を続ける |
+| リポジトリの作成・削除・公開範囲の変更、org の権限、bot の installation、Secrets の登録 | 実行しない(依頼者の権限)。依頼票で頼む(§3)。依頼に依存しない作業を続ける |
 | 履歴の書き換え(filter-repo・force push・`gh api` での ref の更新) | 実行しない。依頼者が指示しているなら `docs/ops/dangerous-ops.md` の手順 |
 | 認証情報の取り出し・表示(`opencode auth export` を含む)、別 identity への切替、依頼者の設定ファイルの編集 | 実行しない |
-| 依頼者の機械・依頼者のブラウザでの操作 | 求めない |
+| 依頼者の機械・依頼者のブラウザでの操作 | 求めない(計測だけ §3 の 3 で依頼票を出す) |
 
 「実行しない」と「聞いて止まる」は別。実行しない物があっても、同じターンに、その物に依存しない作業の worker を起動する。
 
@@ -58,16 +57,16 @@
 | きっかけ | やること | 確かめ方 |
 |---|---|---|
 | 「できない」「権限がない」「見えない」と書きかけた | 該当する §2 の道具を実行する。権限なら `scripts/preflight.sh` を実行 | 出力(エラー全文の先頭 5 行)を報告に貼る |
-| 404・403・空の出力が返った | 原因を切り分ける: identity(`gh auth status`)、リポジトリの公開範囲、権限(`gh api repos/<R> --jq .permissions`)。404 を「権限の喪失」と書かない | 3 つの出力を並べる |
-| 人間限定と実測した | worker に台帳へ 1 行追記させる(状態・確認コマンド・確認日・影響・続けられる範囲) | `grep -n '<番号>' docs/BLOCKERS.md` |
+| 404・403・空の出力・フックの拒否が返った | 原因を切り分ける: identity(`gh auth status`)、作業ディレクトリ(リポジトリの中か)、リポジトリの公開範囲、フックの出力。404 を「権限の喪失」と書かない。`.permissions` は根拠にしない | 3 つの出力を並べる |
+| 依頼票が要ると実測した | 依頼票を出す(`docs/requests/TEMPLATE.md`。必須項目を満たしてから) | `ls docs/requests` に依頼票がある |
 
 ## 6 論理的に破綻した要求(禁止。指示違反として扱う)
 
 | 要求の型 | なぜ破綻か | 代わりにやること |
 |---|---|---|
-| 「GitHub に push できない」(`--dry-run` が通るのに) | 権限が実測であるときを除き、事実に反する | `git push --dry-run origin HEAD` の出力を貼り、通るなら push する(PUBLIC の間は §4 の手順) |
-| 「Cloudflare を確認してください」(wrangler があるのに) | `wrangler` は OAuth 済みで読める | §2 の wrangler 4 行を自分で実行 |
-| 「〜を実行してください」「ブラウザで開いて確認してください」 | 依頼者は操作を引き受けない | `scripts/`・gh・wrangler・headless Chrome で確かめる |
+| 「GitHub に push できない」(`--dry-run` が通るのに) | 権限が実測であるときを除き、事実に反する | リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` の出力を貼る。通るなら `git push origin main` |
+| 「Cloudflare を確認してください」 | 後任は wrangler を実行しない(P4)。依頼者に確認の操作を頼むのは、依頼者の操作の要求 | 確認が要るなら依頼票を出す(`docs/ops/requests.md`) |
+| 「〜を実行してください」「ブラウザで開いて確認してください」 | 依頼者は操作を引き受けない | `scripts/`・gh・git・headless Chrome で確かめる。実機の画面・音は依頼票(§3 の 3) |
 | 「判断してください」「どちらにしますか」 | 判断は main が行う(依頼者は一切の判断を行わない) | 決定と根拠を 1 行書いて実行 |
 | 「作業対象がありません」 | 旧作業ツリー・docs・ローカルの作業木は読める | 読める物から worker を起動 |
-| 「許可をください」(commit・push・設定・wrangler の読み取り) | 許可済みの操作 | 実行して事実を 1 行書く |
+| 「許可をください」(commit・push・設定の変更) | 許可済みの操作 | 実行して事実を 1 行書く |
