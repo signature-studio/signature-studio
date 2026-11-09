@@ -1,0 +1,32 @@
+item	value	note
+song_length_s	129.6	last clip end; 108 bars at 200 BPM, PPQ 96, 4/4 (events 17/18 = 4,4)
+song_first_clip_s	3.92	nothing is placed before this
+blocks_of_4096_frames_at_44100	1395	engine default block 4096 frames = 92.9 ms (task statement)
+playlist_items_total	3565	audio 3089 / pattern 155 / automation 321
+playlist_tracks_used_of_500	30	
+peak_audio_clips	10	average over the song 6.25
+peak_pattern_clips	3	average over the song 1.72
+peak_automation_clips	5	average over the song 1.73
+peak_active_notes	11	average over the song 5.21
+peak_instrument_channels_with_notes	5	average over the song 2.77
+peak_live_inserts	16	average over the song 8.81
+peak_third_party_effect_instances_in_live_inserts	11	average over the song 7.16
+peak_native_effect_instances_in_live_inserts	12	average over the song 6.85
+seconds_with_instrument_notes	115.0	
+seconds_with_5_instrument_channels_sounding	29.1	notes only; release tails of the plugins are not counted
+peak_serum2_channels_with_notes	4	seconds with 4 at once: 31.2
+seconds_with_ge_9_audio_clips	17.2	
+seconds_with_ge_9_third_party_effects_live	30.2	
+plugin_instances_total	46	VST3 20 / VST2 1 / native 25
+plugin_state_event213_bytes	818440	61.9% of the FLP file; VST3 811884, native 5804, VST2 752
+master_chain_always_on	6	kHs Filter[VST3]; Spectral Gate[VST3]; kHs Gain[VST3]; Ozone Imager 2[VST3]; Frequency Shifter[native]; GClip[VST2]
+audio_files	48	
+audio_total_seconds	701.1	
+audio_file_bytes	61424383	
+audio_decoded_float32_bytes	246321476	reading: FL keeps decoded samples as 32-bit float at the file's own rate (not verified in the engine)
+audio_decoded_pcm16_bytes	123160738	if kept as 16-bit instead (not verified)
+audio_mp3_share_of_float32	74.3%	4 files
+mixer_insert_records	127	named 46, with plugins 19
+mixer_params_items	4065	
+channels	70	AudioClip 48, AutomationClip 13, plugin instruments 8, Sampler 1
+pattern_notes_total	425	7 patterns

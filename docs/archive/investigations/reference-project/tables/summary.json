@@ -1,0 +1,118 @@
+{
+ "flp_bytes": 1322619,
+ "fl_version": "26.1.7.5654",
+ "format": 0,
+ "header_channels": 70,
+ "ppq": 96,
+ "tempo_bpm": 200.0,
+ "events": 7021,
+ "channels": 70,
+ "channel_kinds": {
+  "Sampler": 1,
+  "Instrument(plugin wrapper)": 7,
+  "AutomationClip": 13,
+  "AudioClip": 48,
+  "Instrument(native generator)": 1
+ },
+ "patterns": 7,
+ "notes": 425,
+ "arrangements": 1,
+ "playlist_item_size": 88,
+ "playlist_items": 3565,
+ "playlist_kinds": {
+  "audio": 3089,
+  "pattern": 155,
+  "automation": 321
+ },
+ "playlist_tracks_used": 30,
+ "playlist_tracks_total": 500,
+ "song_first_start_tick": 1255,
+ "song_end_tick": 41472,
+ "song_end_s": 129.6,
+ "song_end_bars": 108.0,
+ "inserts_records": 127,
+ "inserts_named": 46,
+ "inserts_with_plugins": 19,
+ "mixer_plugin_instances": 38,
+ "plugin_instances_total": 46,
+ "plugin_formats": {
+  "VST3": 20,
+  "native": 25,
+  "VST2": 1
+ },
+ "plugin_event213_bytes_total": 818440,
+ "plugin_event213_bytes_by_format": {
+  "VST3": 811884,
+  "native": 5804,
+  "VST2": 752
+ },
+ "mixer_params_items": 4065,
+ "events_top": [
+  [
+   213,
+   "PluginData",
+   46,
+   818440,
+   "61.88"
+  ],
+  [
+   233,
+   "Playlist",
+   1,
+   313720,
+   "23.72"
+  ],
+  [
+   225,
+   "MixerParams",
+   1,
+   48780,
+   "3.69"
+  ],
+  [
+   238,
+   "TrackData",
+   500,
+   35000,
+   "2.65"
+  ],
+  [
+   218,
+   "EnvLfo",
+   350,
+   23800,
+   "1.80"
+  ],
+  [
+   196,
+   "SamplePath",
+   48,
+   15194,
+   "1.15"
+  ],
+  [
+   215,
+   "ChanParams",
+   70,
+   11760,
+   "0.89"
+  ],
+  [
+   224,
+   "PatNotes",
+   7,
+   10200,
+   "0.77"
+  ]
+ ],
+ "peak": {
+  "audio": 10,
+  "pattern": 3,
+  "automation": 5,
+  "active_notes": 11,
+  "live_inserts": 16,
+  "vst": 11,
+  "native_fx": 12,
+  "serum2_with_notes": 4
+ }
+}

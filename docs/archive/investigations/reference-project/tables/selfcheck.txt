@@ -1,0 +1,18 @@
+OK   FLdt length == re-encoded size of all events                           1322597 vs 1322597
+OK   trailing bytes after FLdt                                              0 vs 0
+OK   header channel count == NewChan events                                 70 vs 70
+OK   channels in model                                                      70 vs 70
+OK   event 213 (plugin data) bytes == sum over plugin instances             818440 vs 818440
+OK   event 201 non-empty == plugin instances (channels + mixer slots)       46 vs 46
+OK   slot-index events (98) == 10 slots x inserts                           1270 vs 1270
+OK   insert-flags events (236) == inserts                                   127 vs 127
+OK   insert-output events (147) == inserts                                  127 vs 127
+OK   insert names (204) in model                                            46 vs 46
+OK   sample paths (196) == audio-clip channels                              48 vs 48
+OK   automation event 234 == automation channels                            13 vs 13
+OK   pattern note events (224) == patterns with notes                       7 vs 7
+OK   playlist event length == items x item size                             313720 vs 313720
+OK   every playlist item has pattern_base 0x5000                            True vs True
+OK   track data events (238) == 500                                         500 vs 500
+OK   mixer params items * 12 == event 225 length                            48780 vs 48780
+ALL OK

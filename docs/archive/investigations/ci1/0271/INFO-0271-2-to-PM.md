@@ -1,0 +1,10 @@
+# ci1 → PM 決定 0271 info（09:51）: (a) warm の first idle、(b) 再起動後の環境の変化 = Firefox が WebGL を失っていた（DISPLAY が無い）
+
+## 先頭の事実（実測。依頼者の機械は 0 件）
+1. **再起動後の機械では、`DISPLAY`（X サーバー）が無く、Firefox 158（headless）が WebGL を作れなかった**（ページの beacon: 再起動前の Firefox は `webglRenderer = "llvmpipe, or similar"`・`desk.mode = "gl"`、再起動後は `webglRenderer = null`・`desk.mode = "2d"`）。`Xvfb :77` を起動して `DISPLAY=:77` で Firefox を動かすと再起動前と同じ `llvmpipe`・`gl` に戻る（Chrome は DISPLAY なしでも SwiftShader の WebGL で `gl`）。→ **私の報告1 の Firefox の first idle（静か 4.63 s、混む 16.1 s）は WebGL なし（2D 描画）の値**。WebGL あり（Xvfb :77、静か、単独、cold）の 1 回は 5.19 s（1 回のみ）。報告1 の値は『2D の Firefox』として読む。
+2. **同じ原因で、Firefox での sdrive 系の測定が止まっていた**: 2D 描画の Firefox で `window.__app.deskDumpBase64()`（テスト補助）が Worker で `DataCloneError: Shared memory objects must not be in the transfer list` を投げる（wasm メモリは SharedArrayBuffer で、2D 経路は `mem.buffer.slice()` を transfer list に入れる）→ ツールが無限に待つ。WebGL 経路（`readPixels` の複製）は影響しない。**ページ側の欠陥候補**（ユーザーの操作ではなくテスト補助だけ。ただし WebGL が使えない Firefox で `window.__app.deskDumpBase64` が壊れる）。直し案（app/src/engine/worker.ts の deskDump、旗なし、1 行）: `const data = mem.buffer.slice(a, b)` → `new Uint8Array(mem.buffer, a, b - a).slice().buffer`（非共有の ArrayBuffer に複製）。診断用の複製ページ（`dist-dbg`）で確認: `deskDump(peek)` が 75 ms で OK。
+3. **warm（同じプロファイルの 2 回目以降、OPFS の `storage-cache` ヒット）の first idle**（WebGL あり、Xvfb :77、I/O 圧 avg10 ≈ 0、load 3.5〜5.9、1 セッションで 7 回読み込み、`data/` の `warm-*.json`）:
+   - Firefox: cold 6.24 s、warm 5.31 / 6.16 / 5.59 / 5.89 / 5.64 / 6.53 s（中央値 **5.74 s**、n=6）。
+   - Chrome: cold 7.42 s、warm 5.60 / 6.59 / 5.88 / 7.31 / 5.66 / 6.21 s（中央値 **6.05 s**、n=6）。
+   - warm の wasm は `origin = storage-cache`（OPFS）で、取得は 0.09〜0.12 s（download_start）、`compile_done` は Firefox 1.5〜1.7 s・Chrome 0.7〜1.0 s、download_done → first idle（エンジンの初期化）が Firefox 3.8〜5.0 s・Chrome 4.7〜6.4 s。**warm は cold より速い量が小さい（約 0.5 s）**: 取得段は元々短く、支配的なのは wasm のコンパイルとエンジンの初期化。同一セッション内の再読み込みは、新しいプロファイルの単独 run（4.6〜5.2 s）より遅い（前のページの Worker・メモリが残るため。理由は未確認）。
+4. 状況: 入力遅延（Firefox、zip 経由）と Mixer ドラッグ・F9（静かな窓、WebGL あり）を実行中。load が再び 15 前後に上がり他の担当の Chrome run が走っているため、値は load・I/O 圧つきで出す。

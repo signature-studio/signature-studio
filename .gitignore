@@ -1,5 +1,5 @@
 # Not committed: generated, vendor-owned or machine-local. `.opencode/` is NOT ignored on purpose (`.opencode/plugins/` holds the harness).
-# `docs/archive/` is outside git except its README (see the end of this file).
+# 生成物・FL のバイナリ・インストーラは git に入れない(公開以前の問題)。調査の抜粋は公開してよい。
 
 # real engine bundle (wasm 143 MB) and the FL binaries: not our own work, never in git
 artifacts/
@@ -79,9 +79,3 @@ lift/harness/draw1/lifted_*.c
 ci-work/
 app/wrangler.deploy.json
 ci/agents/out/
-
-# docs/archive/ holds the original text of the old documents. It stays in the working tree for the workers to read, but outside git:
-# the repository is PUBLIC, and publishing that text is the owner's decision (docs/BLOCKERS.md, the visibility row).
-# When the visibility is settled, remove these two lines, run scripts/scan-forbidden.sh, then commit.
-docs/archive/*
-!docs/archive/README.md

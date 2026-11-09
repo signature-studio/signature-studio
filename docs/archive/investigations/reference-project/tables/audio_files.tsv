@@ -1,0 +1,49 @@
+file	bytes	container	codec	tag	channels	rate	bits	frames	seconds	float32_bytes	pcm16_bytes	bitrate	mpeg_frames	xing	id3v2_bytes	tail_id3v1	inner	smpl_loops	pages	logical_streams	chunks	channel_iid	playlist_items	error
+AHN1 Sub Drop 2.wav	323688	RIFF/WAVE	PCM	0x0001	2	44100	16	80896	1.834	647168	323584										JUNK,fmt ,data	8	2	
+Bubble Down.wav	992296	RIFF/WAVE	PCM	0x0001	2	44100	16	248063	5.625	1984504	992252										fmt ,data	11	2	
+Charge FX.wav	1282952	RIFF/WAVE	PCM	0x0001	2	44100	24	213818	4.848	1710544	855272										fmt ,data	20	3	
+Gun Shot.wav	33116	RIFF/WAVE	PCM	0x0001	1	22050	8	32968	1.495	131872	65936										fmt ,data,LIST	27	1	
+JC_Clap_04.wav	35660	RIFF/WAVE	PCM	0x0001	2	44100	16	8841	0.200	70728	35364							0			fmt ,data,smpl,inst,acid,strc,cue ,LIST,LIST	30	96	
+JC_KICKS_05.wav	104608	RIFF/WAVE	PCM	0x0001	2	44100	16	26078	0.591	208624	104312							0			fmt ,data,smpl,inst,acid,strc,cue ,LIST,LIST	31	8	
+JC_SNAP_04.wav	23788	RIFF/WAVE	PCM	0x0001	2	44100	16	5873	0.133	46984	23492							0			fmt ,data,smpl,inst,acid,strc,cue ,LIST,LIST	32	16	
+Natsu Fill 172 2.wav	362996	RIFF/WAVE	PCM	0x0001	2	44100	24	60480	1.371	483840	241920										JUNK,fmt ,data,LIST	34	1	
+Other - Dot To Dot Feat. Shully - 174bpm - C#maj.mp3	6766929	MP3	MPEG-1 Layer 3		2	44100		9196416	208.536	73571328	36785664	VBR 32..320 kbps	7983	Xing	45							35	184	
+Pattern 7 (consolidated)_2.wav	3387064	RIFF/WAVE	PCM	0x0001	2	44100	16	846720	19.200	6773760	3386880							1			JUNK,fmt ,data,smpl,LIST	38	3	
+Pattern 8 (consolidated).wav	846904	RIFF/WAVE	PCM	0x0001	2	44100	16	211680	4.800	1693440	846720							1			JUNK,fmt ,data,smpl,LIST	40	1	
+Project_4 - .wav	2376464	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	297025	6.735	2376200	1188100							0			JUNK,fmt ,fact,data,smpl,inst,acid,LIST,LIST	41	171	
+SIREN_4.wav	5942344	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	742771	16.843	5942168	2971084							0			fmt ,data,smpl,inst,acid,LIST,LIST	47	1	
+Sleigh_Bells04-01(Shake-Gentle).mp3	1958445	MP3	MPEG-1 Layer 3		2	44100		4133376	93.727	33067008	16533504	VBR 32..256 kbps	3588	Xing	2048							48	1	
+Synthion Clap Impact.wav	2430134	RIFF/WAVE	PCM	0x0001	2	48000	24	405000	8.438	3240000	1620000										JUNK,fmt ,data,LIST	54	2	
+Synthion Downlifter 2.wav	4187812	RIFF/WAVE	PCM	0x0001	2	48000	24	697941	14.540	5583528	2791764							1			fmt ,data,smpl,LIST	56	2	
+Terraria Magic Mirror Sound.wav	613324	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	76642	1.738	613136	306568							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	58	1	
+WhipCrack_(_Mike_Gip_).wav	105480	RIFF/WAVE	IEEE_FLOAT	0x0003	1	44100	32	26313	0.597	105252	52626							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	65	36	
+[fadr.com] Vocals - Dot To Dot Feat. Shully - 174bpm - C#maj.mp3	6387193	MP3	MPEG-1 Layer 3		2	44100		9196416	208.536	73571328	36785664	VBR 32..320 kbps	7983	Xing	45							7	963	
+[fadr.com] Vocals - クリスマスセリナ　メモリアルロビー　高画質 - ぶるぶるあーかいぶ - 115bpm - Cmin (consolidated).wav	1642908	RIFF/WAVE	PCM	0x0001	2	44100	16	410681	9.312	3285448	1642724							1			JUNK,fmt ,data,smpl,LIST	50	1	
+[fadr.com] Vocals - クリスマスセリナ　メモリアルロビー　高画質 - ぶるぶるあーかいぶ - 115bpm - Cmin (consolidated)_2.wav	54208	RIFF/WAVE	PCM	0x0001	2	44100	16	13506	0.306	108048	54024							1			JUNK,fmt ,data,smpl,LIST	53	1	
+anvil_land.ogg	9210	Ogg	Vorbis		1	44100		33076	0.750	132304	66152	nominal 70 kbps (max 0 min 0)							4	1		9	1	
+bring it back.wav	381300	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	47616	1.080	380928	190464							0			fmt ,fact,data,smpl,inst,acid,strc,cue ,LIST,LIST	10	2	
+car crash and siren.wav	897982	RIFF/WAVE	PCM	0x0001	2	44100	16	224028	5.080	1792224	896112										fmt ,data,LIST,LGWV	12	5	
+car crash and siren_2.wav	897982	RIFF/WAVE	PCM	0x0001	2	44100	16	224028	5.080	1792224	896112										fmt ,data,LIST,LGWV	13	4	
+celtix_Albiorix_Kick_06.wav	68776	RIFF/WAVE	PCM	0x0001	2	44100	24	11340	0.257	90720	45360										fmt ,bext,junk,data	14	254	
+celtix_Albiorix_Kick_7.wav	68776	RIFF/WAVE	PCM	0x0001	2	44100	24	11340	0.257	90720	45360										fmt ,bext,junk,data	15	2	
+celtix_Albiorix_Snare_05.wav	238876	RIFF/WAVE	PCM	0x0001	2	44100	24	39690	0.900	317520	158760										fmt ,bext,junk,data	16	56	
+celtix_Albiorix_Snare_20.wav	124768	RIFF/WAVE	PCM	0x0001	2	44100	24	20672	0.469	165376	82688										fmt ,bext,junk,data	17	25	
+celtix_Albiorix_Sweep_Up_02.wav	2540896	RIFF/WAVE	PCM	0x0001	2	44100	24	423360	9.600	3386880	1693440										fmt ,bext,junk,data	18	3	
+celtix_Albiorix_Sweep_Up_04.wav	6351136	RIFF/WAVE	PCM	0x0001	2	44100	24	1058400	24.000	8467200	4233600										fmt ,bext,junk,data	19	1	
+classic_schnozz_riser.wav	388452	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	48510	1.100	388080	194040							0			fmt ,fact,data,smpl,inst,acid,strc,cue ,LIST,LIST	21	2	
+dariacore snare 2.wav	53276	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	6636	0.150	53088	26544							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	22	29	
+dltzk glass break 1.wav	21068	RIFF/WAVE	OggVorbis(0x674f)	0x674f	1	44100	16	43410	0.984	173640	86820						OggS				fmt ,fact,data,LIST	23	2	
+elwood_fill.wav	105950	RIFF/WAVE	PCM	0x0001	2	44100	16	26460	0.600	211680	105840										fmt ,data,acid,LIST	24	1	
+galil-1.wav	71788	RIFF/WAVE	PCM	0x0001	1	22050	16	35820	1.624	143280	71640										fmt ,data,LIST	25	5	
+guitarhero.wav	1027312	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	128391	2.911	1027128	513564							1			JUNK,fmt ,data,smpl,LIST	26	2	
+hardstyle kick 1.wav	29868	RIFF/WAVE	PCM	0x0001	2	44100	16	7421	0.168	59368	29684							1			JUNK,fmt ,data,smpl,LIST	29	9	
+pryda snare.wav	84516	RIFF/WAVE	PCM	0x0001	2	44100	16	21066	0.478	168528	84264							0			JUNK,fmt ,data,smpl,inst,acid,LIST,LIST	43	5	
+rec_20240918_233440.wav	854288	RIFF/WAVE	PCM	0x0001	2	44100	16	213561	4.843	1708488	854244										fmt ,data	44	1	
+schnozz atmos pad - accidental wii music remake (Gmaj).wav	6588950	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	823590	18.676	6588720	3294360							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	45	181	
+schnozz lazers 9.wav	20398	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	2521	0.057	20168	10084							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	46	52	
+snare1 (consolidated).wav	115948	RIFF/WAVE	PCM	0x0001	2	44100	16	28941	0.656	231528	115764							1			JUNK,fmt ,data,smpl,LIST	69	10	
+snareroll3.wav	62846	RIFF/WAVE	IEEE_FLOAT	0x0003	2	44100	32	7827	0.177	62616	31308							0			fmt ,fact,data,smpl,inst,acid,LIST,LIST	49	14	
+this_the_kinda_beat_that_go_180bpm.wav	120810	RIFF/WAVE	PCM	0x0001	2	44100	16	30166	0.684	241328	120664							1			fmt ,data,smpl,LIST	60	1	
+windchaim.mp3	133340	MP3	MPEG-1 Layer 3		2	44100		354816	8.046	2838528	1419264	CBR 128 kbps	308	Info	4192							66	2	
+xlramen170big.wav	250674	RIFF/WAVE	PCM	0x0001	1	44100	16	124676	2.827	498704	249352							0			fmt ,data,smpl,inst,acid,strc,cue ,LIST,LIST,id3 	67	8	
+zap14.wav	56884	RIFF/WAVE	PCM	0x0001	2	44100	24	9450	0.214	75600	37800							1			JUNK,fmt ,data,smpl,LIST	68	916	

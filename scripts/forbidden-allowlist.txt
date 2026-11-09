@@ -45,3 +45,15 @@ oldpath|tools/verify-kit/|
 oldpath|lift/harness-docs-tools/|
 oldpath|lift/harness/parity/chrome-ops.mjs|
 oldpath|lift/harness/parity/wine-run.py|
+# --- docs/archive: the original text of the old documents (published as it was; the visibility decision is 2026-11-10, see .gitignore history)
+# cfhex: md5/ETag columns, certificate serial numbers, gist ids and session ids in the text (checked by R2-verify.sh 2a: ok)
+cfhex|docs/archive/decisions/|
+cfhex|docs/archive/investigations/|
+cfhex|docs/archive/milestones/|
+# oldpath: the old documents name the old working tree in their text
+oldpath|docs/archive/decisions/|
+oldpath|docs/archive/decisions-unmerged/|
+oldpath|docs/archive/investigations/|
+oldpath|docs/archive/windows-delegation/|
+oldpath|docs/archive/progress.md|
+oldpath|docs/archive/OLD-ROOT-README.md|

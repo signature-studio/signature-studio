@@ -1,0 +1,47 @@
+loc	host_name	internal	format	name	vendor	file	event213	wrapper212	state53	inner3	inner2	inner4	param_list	xfer	guid	ini_file_size	ini_section	native_dll	native_dll_bytes
+channel:1	Serum	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	20908	52	20583	7966	2005	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=28618 zstd_compressed=7758	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:2	Serum #2	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	38898	52	38573	25700	2261	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=39033 zstd_compressed=25492	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:3	Serum 2	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	48200	52	47875	33895	3368	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=454426 zstd_compressed=33687	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:28	Serum #3	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	18680	52	18355	6132	1611	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=17919 zstd_compressed=5924	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:33	Serum #4	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	18622	52	18297	6074	1611	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=28021 zstd_compressed=5866	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:36	Agogo	FLEX	native	Agogo			2707	52										Plugins\Fruity\Generators\FLEX\FLEX_x64.dll	5194752
+channel:37	Serum #5	Fruity Wrapper	VST3	Serum2	Xfer Records	C:\Program Files\Common Files\VST3\Serum2.vst3\Contents\x86_64-win\Serum2.vst3	309918	52	309593	296610	2371	10496	2623	XferJson product=Serum2 productVersion=2.1.5 version=11.0 zstd_uncompressed=378409 zstd_compressed=296402	{56534558-6673-5073-6572-756D20320000}	39121408	Generators\VST3\Serum 2		
+channel:55	Vital	Fruity Wrapper	VST3	Vital	Vital Audio	C:\Program Files\Common Files\VST3\Vital.vst3	267913	52	267623	255583		11936	2983		{56535456-6974-6176-6974-616C00000000}	15571240	Generators\VST3\Vital		
+insert:0/slot:0		Fruity Wrapper	VST3	kHs Filter	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Filter.vst3	9345	52	9011	559		8348	2086		{793F55CB-0050-49A6-00BF-8DAB00B4EFA0}	247296	Effects\VST3\kHs Filter		
+insert:0/slot:1		Fruity Wrapper	VST3	Spectral Gate	Stepwise	C:\Program Files\Common Files\VST3\Spectral Gate.vst3\Contents\x86_64-win\Spectral Gate.vst3	9263	52	8897	433		8360	2089		{ABCDEF01-9182-FAEB-5354-505753505347}	5261824	Effects\VST3\Spectral Gate		
+insert:0/slot:2		Fruity Wrapper	VST3	kHs Gain	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Gain.vst3	9310	52	8980	540		8336	2083		{A7AB1651-0072-44CC-00E3-5A8D00748379}	247296	Effects\VST3\kHs Gain		
+insert:0/slot:3		Fruity Wrapper	VST3	Ozone Imager 2	iZotope	C:\Program Files\Common Files\VST3\iZotope\Ozone Imager 2.vst3	1811	52	1475	1339	0	20	4		{5653545A-4F49-324F-7A6F-6E6520496D61}	2194432	Effects\VST3\Ozone Imager 2		
+insert:0/slot:4		Frequency Shifter	native	Frequency Shifter			52	52										Plugins\Fruity\Effects\Frequency Shifter\Frequency Shifter_x64.dll	3876864
+insert:0/slot:5		Fruity Wrapper	VST2	GClip	GVST	C:\Program Files\Steinberg\VstPlugins\GClip.dll	752	52	439						fourcc:dAyg	843776	Effects\VST\GClip		
+insert:1/slot:0		Fruity Balance	native	Fruity Balance			8	52										Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll	3718656
+insert:2/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:2/slot:1	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:2/slot:2	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:2/slot:3	Fruity Delay 2	Fruity Delay 2	native	Fruity Delay 2			32	52										Plugins\Fruity\Effects\Fruity Delay 2\Fruity Delay 2_x64.dll	3731968
+insert:5/slot:0	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:6/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:6/slot:1		Fruity Wrapper	VST3	kHs Haas	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Haas.vst3	9305	52	8975	535		8336	2083		{74F3503C-00B2-4D4E-000A-6C3100D57595}	247296	Effects\VST3\kHs Haas		
+insert:8/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:10/slot:0		Fruity Wrapper	VST3	kHs Haas	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Haas.vst3	9310	52	8980	540		8336	2083		{74F3503C-00B2-4D4E-000A-6C3100D57595}	247296	Effects\VST3\kHs Haas		
+insert:11/slot:0		Fruity Wrapper	VST3	kHs Pitch Shifter	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Pitch Shifter.vst3	9385	52	9037	581		8352	2087		{043C7027-006F-4760-00F8-C5C20036FD57}	247296	Effects\VST3\kHs Pitch Shifter		
+insert:11/slot:1	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:12/slot:0	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:16/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:16/slot:1	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:16/slot:2		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:17/slot:0	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:17/slot:1		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:17/slot:2		Fruity Wrapper	VST3	OTT	Xfer Records	C:\Program Files\Common Files\VST3\OTT.vst3	583	52	272	80		88	21		{56535458-6654-546F-7474-000000000000}	3244032	Effects\VST3\OTT		
+insert:18/slot:0	Fruity Parametric EQ 2	Fruity Parametric EQ 2	native	Fruity Parametric EQ 2			354	52										Plugins\Fruity\Effects\Fruity Parametric EQ 2\Fruity Parametric EQ 2_x64.dll	4036608
+insert:18/slot:1		Fruity Wrapper	VST3	OTT	Xfer Records	C:\Program Files\Common Files\VST3\OTT.vst3	583	52	272	80		88	21		{56535458-6654-546F-7474-000000000000}	3244032	Effects\VST3\OTT		
+insert:18/slot:2		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:23/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:23/slot:1		Fruity Wrapper	VST3	kHs Filter	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Filter.vst3	9345	52	9011	559		8348	2086		{793F55CB-0050-49A6-00BF-8DAB00B4EFA0}	247296	Effects\VST3\kHs Filter		
+insert:23/slot:2		Fruity Wrapper	VST3	kHs Tape Stop	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\kHs Tape Stop.vst3	9353	52	9013	565		8344	2085		{3625D13E-0062-499B-0008-041B00A15772}	247296	Effects\VST3\kHs Tape Stop		
+insert:24/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:24/slot:1		Fruity Wrapper	VST3	Disperser	Kilohearts	C:\Program Files\Common Files\VST3\kiloHearts\Disperser.vst3	9337	52	9005	557		8344	2085		{418E40E3-0032-4FC9-001F-ED4600B686F0}	247296	Effects\VST3\Disperser		
+insert:25/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:42/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:45/slot:0		Fruity Wrapper	VST3	Ozone Imager 2	iZotope	C:\Program Files\Common Files\VST3\iZotope\Ozone Imager 2.vst3	1815	52	1479	1343	0	20	4		{5653545A-4F49-324F-7A6F-6E6520496D61}	2194432	Effects\VST3\Ozone Imager 2		
+insert:46/slot:0		Soundgoodizer	native	Soundgoodizer			12	52										Plugins\Fruity\Effects\Soundgoodizer\Soundgoodizer_x64.dll	6407680
+insert:47/slot:0		Fruity Filter	native	Fruity Filter			29	52										Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll	3780608
