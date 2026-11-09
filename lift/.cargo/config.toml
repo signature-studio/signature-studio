@@ -1,0 +1,6 @@
+# Decision 0149: every test executable that `cargo test` starts goes through harness/testfast/runner.sh (core-dump limit, caching clang).
+# FLE_TEST_NOCACHE=1 switches the caching off; the core-dump limit stays.
+# CARGO_MANIFEST_DIR is the crate directory (lift/crates/NAME); the script is started with bash so that it does not need the executable bit
+# (a patch does not carry it).
+[target.x86_64-unknown-linux-gnu]
+runner = ["bash", "-c", "exec bash \"$CARGO_MANIFEST_DIR/../../harness/testfast/runner.sh\" \"$@\"", "fle-runner"]

@@ -1,0 +1,30 @@
+{
+  // Private FL Studio web app. NOT for public release. Nothing in this file is a credential.
+  // The operator's steps (wrangler login, R2 bucket, Access application) are in docs/decisions/0135-frontend-app.md and app/README.md.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fl-studio-web", // the Worker deployed by .github/workflows/deploy.yml (same name as its Access application)
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-01",
+  // no account_id here on purpose: wrangler takes it from the logged-in account or CLOUDFLARE_ACCOUNT_ID
+  // Access protects the hostnames you bind; the *.workers.dev name and preview URLs would be extra, separately-protected doors: both are off.
+  "workers_dev": false,
+  "preview_urls": false,
+  // With workers_dev false and no route the Worker has NO URL: add your own hostname before deploying, e.g.
+  // "routes": [{ "pattern": "fl.your-domain.example", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "r2_buckets": [
+    { "binding": "ASSETS_BUCKET", "bucket_name": "fl-studio-web-assets-changeme" }, // placeholder
+    // decision 0224: the measurement beacons (POST /__perf) are kept in this bucket under perf/ (one object per beacon); GET /__perf/summary reads them back. A bucket that is NOT the serving one. Placeholder: ci/lib/wrangler_config.py names the real one.
+    { "binding": "PERF_BUCKET", "bucket_name": "fl-studio-web-perf-changeme" }
+  ],
+  "vars": {
+    // Fail closed: with these two empty the Worker answers 403 to every request.
+    "ACCESS_TEAM_DOMAIN": "", // e.g. "your-team.cloudflareaccess.com"
+    "ACCESS_AUD": "" // the Access application's AUD tag
+  },
+  "observability": { "enabled": false }
+}

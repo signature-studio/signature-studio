@@ -1,0 +1,72 @@
+# parity1 (decision 0226): the operation matrix. Columns (TAB): session, op, category, description, commands (';'-separated G3 commands, lift/harness/fruity_g3.c), kind (D = discrete input, C = continuous activity per virtual second)
+# Every op is followed by `snap <op>` (and, in the native script only, `cpu <op>` before it). Coordinates are those of lift/out-ia2/scripts/ops*.tsv (1920x1080 display, Basic.flp open). THE INPUT IS A HARNESS SIMULATION (G3 script), NOT A USER OPERATION.
+# session ui: Basic.flp opened (prelude), operations in the order below; menus are closed with Escape.
+boot	cal_snap	calibration	nothing between two snapshots (the cost of one snapshot tail)	advance 1	D
+boot	wizard_close	startup	Enter closes the welcome wizard	tap 13 ; advance 3000	D
+boot	idle_empty_30s	idle	30 virtual seconds without input, empty project, wizard closed	advance 30000	C
+boot	play_empty_5s	playback	Space, 5 s of playback in the empty project	tap 0x20 ; advance 5000	C
+boot	stop_empty	playback	Space (stop)	tap 0x20 ; advance 1000	D
+boot	open_basic	file	open Basic.flp (the template) through the application's open request	open C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic\Basic.flp ; advance 1500	D
+boot	idle_basic_60s	idle	60 virtual seconds without input, Basic.flp open	advance 60000	C
+boot	play_basic_10s	playback	Space, 10 s of playback, Basic.flp (pattern mode)	tap 0x20 ; advance 10000	C
+boot	stop_basic	playback	Space (stop)	tap 0x20 ; advance 1000	D
+boot	patsong_song	toolbar	click PAT/SONG (song mode)	click 322 20 L ; advance 700	D
+boot	play_basic_song_10s	playback	Space, 10 s of playback in song mode	tap 0x20 ; advance 10000	C
+boot	stop_basic_song	playback	Space (stop)	tap 0x20 ; advance 1000	D
+boot	patsong_pat	toolbar	click PAT/SONG (pattern mode again)	click 322 20 L ; advance 700	D
+boot	open_sampler	file	open Sampler.flp (Render tests)	open C:\Program Files\Image-Line\FL Studio 21\Data\System\Render tests\Sampler.flp ; advance 3000	D
+boot	idle_sampler_10s	idle	10 virtual seconds without input, Sampler.flp	advance 10000	C
+boot	play_sampler_10s	playback	Space, 10 s of playback, Sampler.flp	tap 0x20 ; advance 10000	C
+boot	stop_sampler	playback	Space (stop)	tap 0x20 ; advance 1000	D
+ui-pl	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-cr	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-cr	cr_led_click	channel rack	click the mute LED of channel 2 twice	click 391 174 L ; advance 400 ; click 391 174 L ; advance 400	D
+ui-cr	cr_vol_drag	channel rack	drag the volume knob of channel 2	move 407 174 ; down L ; advance 80 ; move 407 162 ; advance 80 ; move 407 150 ; advance 80 ; move 407 162 ; advance 80 ; move 407 174 ; advance 80 ; up L ; advance 700	D
+ui-cr	cr_vol_drag_2s	channel rack	drag the volume knob of channel 2, 125 moves at 62.5/s	@drag L 407 174 407 120 125 16	C
+ui-cr	cr_btn_click	channel rack	click the channel button of channel 1	click 522 145 L ; advance 700	D
+ui-cr	tb_tempo_drag	toolbar	drag the tempo box	move 462 21 ; down L ; advance 80 ; move 462 13 ; advance 80 ; move 462 5 ; advance 80 ; move 462 13 ; advance 80 ; move 462 21 ; advance 80 ; up L ; advance 700	D
+ui-cr	tb_metronome	toolbar	click the metronome button	click 683 21 L ; advance 700 ; click 683 21 L ; advance 700	D
+ui-br	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-menu	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-f8	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-pr	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-win	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-pl	pl_wheel_scroll	playlist	wheel x10 over the playlist grid (scroll)	wheel 1300 400 -120 ; advance 120 ; wheel 1300 400 -120 ; advance 120 ; wheel 1300 400 -120 ; advance 120 ; wheel 1300 400 -120 ; advance 120 ; wheel 1300 400 -120 ; advance 120 ; wheel 1300 400 120 ; advance 120 ; wheel 1300 400 120 ; advance 120 ; wheel 1300 400 120 ; advance 120 ; wheel 1300 400 120 ; advance 120 ; wheel 1300 400 120 ; advance 700	D
+ui-pl	pl_zoom	playlist	ctrl+wheel x6 over the playlist grid (zoom)	key down 0x11 ; wheel 1300 400 120 ; advance 150 ; wheel 1300 400 120 ; advance 150 ; wheel 1300 400 120 ; advance 150 ; wheel 1300 400 -120 ; advance 150 ; wheel 1300 400 -120 ; advance 150 ; wheel 1300 400 -120 ; advance 150 ; key up 0x11 ; advance 700	D
+ui-pl	pl_midbutton_drag	playlist	middle button drag over the playlist grid (anim1 owns the fix; measured only)	move 1400 400 ; down M ; advance 60 ; move 1380 400 ; advance 60 ; move 1360 400 ; advance 60 ; move 1340 400 ; advance 60 ; move 1320 400 ; advance 60 ; move 1300 400 ; advance 60 ; move 1280 400 ; advance 60 ; move 1260 400 ; advance 60 ; up M ; advance 700	D
+ui-pl	pl_place_drag	playlist	place a clip, drag it	click 1300 200 L ; advance 400 ; move 1320 205 ; down L ; advance 80 ; move 1380 229 ; advance 80 ; move 1440 253 ; advance 80 ; up L ; advance 700	D
+ui-pl	pl_paint	playlist	drag across the grid (paint a row)	move 1160 300 ; down L ; advance 80 ; move 1216 300 ; advance 80 ; move 1273 300 ; advance 80 ; move 1330 300 ; advance 80 ; move 1386 300 ; advance 80 ; move 1443 300 ; advance 80 ; up L ; advance 700	D
+ui-pl	pl_select	playlist	shift+drag a selection rectangle	key down 0x10 ; move 1160 250 ; down L ; advance 80 ; move 1280 300 ; advance 80 ; move 1400 350 ; advance 80 ; up L ; key up 0x10 ; advance 700	D
+ui-pl	pl_wheel_60hz	playlist	60 wheel events (62.5/s) down over the playlist grid, 60 up	@wheel 1300 400 -120 60 16 ; @wheel 1300 400 120 60 16 ; advance 500	C
+ui-pl	pl_midbutton_drag_3s	playlist	middle button drag, 190 moves at 62.5/s (3 s) over the playlist grid (anim1 owns the fix; measured only)	@drag M 1600 420 1000 420 190 16	C
+ui-pl	pl_leftdrag_paint_2s	playlist	left button drag (paint) 125 moves at 62.5/s along a playlist row	@drag L 1160 300 1800 300 125 16	C
+ui-pl	pl_selectdrag_2s	playlist	shift+left drag a selection rectangle 125 moves at 62.5/s	key down 0x10 ; @drag L 1160 250 1700 600 125 16 ; key up 0x10 ; advance 300	C
+ui-pl	pl_hover_2s	playlist	pointer moves without button over the playlist, 125 moves at 62.5/s	@moves 1160 250 1800 700 125 16	C
+ui-br	br_wheel	browser	wheel x6 in the browser list	wheel 150 300 -120 ; advance 120 ; wheel 150 300 -120 ; advance 120 ; wheel 150 300 -120 ; advance 120 ; wheel 150 300 120 ; advance 120 ; wheel 150 300 120 ; advance 120 ; wheel 150 300 120 ; advance 700	D
+ui-br	br_wheel_60hz	browser	60 wheel events (62.5/s) down in the browser list, 60 up	@wheel 150 300 -120 60 16 ; @wheel 150 300 120 60 16 ; advance 500	C
+ui-br	br_click	browser	click in the browser list	click 150 300 L ; advance 700	D
+ui-menu	menu_file	menu	open the FILE menu, hover three items, Escape	click 18 20 L ; advance 800 ; move 42 67 ; advance 200 ; move 42 86 ; advance 200 ; move 42 112 ; advance 200 ; tap 27 ; advance 400	D
+ui-menu	menu_view	menu	open the VIEW menu, hover three items, Escape	click 160 20 L ; advance 800 ; move 200 83 ; advance 200 ; move 200 102 ; advance 200 ; move 200 121 ; advance 200 ; tap 27 ; advance 400	D
+ui-menu	menu_options	menu	open the OPTIONS menu, Escape	click 203 20 L ; advance 800 ; tap 27 ; advance 400	D
+ui-menu	menu_help	menu	open the HELP menu, Escape	click 283 20 L ; advance 800 ; tap 27 ; advance 400	D
+ui-menu	menu_tools	menu	open the TOOLS menu, Escape	click 247 20 L ; advance 800 ; tap 27 ; advance 400	D
+ui-f8	f8_open	plugin picker	F8 (full-screen plug-in list), 4 virtual seconds open	tap 0x77 ; advance 4000	C
+ui-f8	f8_close	plugin picker	Escape, 3 virtual seconds	tap 27 ; advance 3000	D
+ui-pr	pr_open	piano roll	F7 (piano roll) opens	tap 0x76 ; advance 2500	D
+ui-pr	pr_note_add	piano roll	click in the note grid twice	click 1100 400 L ; advance 300 ; click 1300 440 L ; advance 700	D
+ui-pr	pr_wheel	piano roll	wheel x6 over the note grid	wheel 1100 500 -120 ; advance 120 ; wheel 1100 500 -120 ; advance 120 ; wheel 1100 500 -120 ; advance 120 ; wheel 1100 500 120 ; advance 120 ; wheel 1100 500 120 ; advance 120 ; wheel 1100 500 120 ; advance 700	D
+ui-pr	pr_wheel_60hz	piano roll	60 wheel events (62.5/s) down over the note grid, 60 up	@wheel 1100 500 -120 60 16 ; @wheel 1100 500 120 60 16 ; advance 500	C
+ui-pr	pr_hover_2s	piano roll	pointer moves without button over the note grid, 125 moves at 62.5/s	@moves 1000 300 1800 800 125 16	C
+ui-pr	pr_note_drag	piano roll	drag a note	move 1105 402 ; down L ; advance 80 ; move 1177 371 ; advance 80 ; move 1250 340 ; advance 80 ; up L ; advance 700	D
+ui-pr	pr_close	piano roll	F7 again	tap 0x76 ; advance 1500	D
+ui-win	win_split_drag	window	drag the splitter between channel rack and mixer	move 600 308 ; down L ; advance 80 ; move 600 279 ; advance 80 ; move 600 250 ; advance 80 ; up L ; advance 700	D
+ui-win	win_split_back	window	drag it back	move 600 250 ; down L ; advance 80 ; move 600 279 ; advance 80 ; move 600 308 ; advance 80 ; up L ; advance 700	D
+ui-win	win_split_drag_2s	window	drag the channel-rack/mixer splitter, 125 moves at 62.5/s	@drag L 600 308 600 250 125 16 ; @drag L 600 250 600 308 125 16	C
+ui-mx	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-mx	mx_hover_2s	mixer	pointer moves without button over the mixer, 125 moves at 62.5/s	@moves 540 620 1100 900 125 16	C
+ui-mxd	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-mxd	mx_fader_drag	mixer	drag the fader of insert 2	move 570 802 ; down L ; advance 80 ; move 570 831 ; advance 80 ; move 570 860 ; advance 80 ; move 570 831 ; advance 80 ; move 570 802 ; advance 80 ; up L ; advance 700	D
+ui-mxd	mx_fader_drag_2s	mixer	drag the fader of insert 2, 125 moves at 62.5/s	@drag L 570 802 570 900 125 16	C
+ui-hang1	cal_snap	calibration	nothing between two snapshots	advance 1	D
+ui-hang1	mx_header_click	mixer	click the header of insert 2, then insert 3	click 560 620 L ; advance 500 ; click 604 620 L ; advance 700	D
+ui-hang1	mx_hover_2s	mixer	pointer moves without button over the mixer, 125 moves at 62.5/s	@moves 540 620 1100 900 125 16	C

@@ -1,0 +1,701 @@
+[
+ {
+  "name": "d1-sampler-envelope",
+  "what": "Sampler.flp opened through the file window; the Sampler channel window: Envelope tab, wrench tab, wave tab (DragAcceptFiles)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "openProject"
+   },
+   {
+    "op": "click",
+    "x": 483,
+    "y": 243
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "d1-envelope"
+   },
+   {
+    "op": "click",
+    "x": 526,
+    "y": 243
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "click",
+    "x": 438,
+    "y": 243
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d2-browser-folder",
+  "what": "Browser pane: second tab, then the folder row 'Current project' (LCMapStringW)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "click",
+    "x": 93,
+    "y": 126
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "click",
+    "x": 86,
+    "y": 156
+   },
+   {
+    "op": "wait",
+    "ms": 3500
+   },
+   {
+    "op": "shot",
+    "name": "d2-browser"
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d3-settings-all-tabs",
+  "what": "Options > General settings; every tab: MIDI, Audio, General, File, Theme, Project, Info",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "click",
+    "x": 202,
+    "y": 20
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "click",
+    "x": 232,
+    "y": 101
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TMIDIForm",
+    "visible": true,
+    "ms": 20000
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 27,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 81,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 146,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "shot",
+    "name": "d3-general"
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 203,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 258,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 3500
+   },
+   {
+    "op": "shot",
+    "name": "d3-theme"
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 328,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMIDIForm",
+    "dx": 393,
+    "dy": 48
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "expectWindow",
+    "cls": "TMIDIForm",
+    "visible": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d4-playlist-middle-drag",
+  "what": "Playlist: drag with the middle button (twice, back and forth)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "drag",
+    "button": "middle",
+    "x": 1417,
+    "y": 436,
+    "x2": 1700,
+    "y2": 560,
+    "steps": 12,
+    "stepMs": 50
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "drag",
+    "button": "middle",
+    "x": 1700,
+    "y": 560,
+    "x2": 1417,
+    "y2": 436,
+    "steps": 12,
+    "stepMs": 50
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d5-mixer-front",
+  "what": "Click the Mixer (comes to the front over the Playlist), click the Playlist (comes back), 3 times; the picture at two points that only the Mixer covers",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "pixel",
+    "name": "p0a",
+    "x": 1400,
+    "y": 800
+   },
+   {
+    "op": "pixel",
+    "name": "p0b",
+    "x": 1100,
+    "y": 1000
+   },
+   {
+    "op": "click",
+    "x": 604,
+    "y": 900
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "pixel",
+    "name": "p1a",
+    "x": 1400,
+    "y": 800
+   },
+   {
+    "op": "pixel",
+    "name": "p1b",
+    "x": 1100,
+    "y": 1000
+   },
+   {
+    "op": "shot",
+    "name": "d5-mixer-front"
+   },
+   {
+    "op": "expectPixel",
+    "a": "p0a",
+    "b": "p1a",
+    "differ": true,
+    "tol": 6
+   },
+   {
+    "op": "click",
+    "x": 1500,
+    "y": 300
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "pixel",
+    "name": "p2a",
+    "x": 1400,
+    "y": 800
+   },
+   {
+    "op": "pixel",
+    "name": "p2b",
+    "x": 1100,
+    "y": 1000
+   },
+   {
+    "op": "expectPixel",
+    "a": "p0a",
+    "b": "p2a",
+    "differ": false,
+    "tol": 6
+   },
+   {
+    "op": "click",
+    "x": 604,
+    "y": 900
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "pixel",
+    "name": "p3a",
+    "x": 1400,
+    "y": 800
+   },
+   {
+    "op": "expectPixel",
+    "a": "p1a",
+    "b": "p3a",
+    "differ": false,
+    "tol": 6
+   },
+   {
+    "op": "click",
+    "x": 1500,
+    "y": 300
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "pixel",
+    "name": "p4a",
+    "x": 1400,
+    "y": 800
+   },
+   {
+    "op": "expectPixel",
+    "a": "p2a",
+    "b": "p4a",
+    "differ": false,
+    "tol": 6
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d6-playlist-close",
+  "what": "Playlist: its close box (the x of its title bar)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "click",
+    "x": "W-16",
+    "y": 97
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "shot",
+    "name": "d6-playlist-closed"
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d7-main-close",
+  "what": "The main window's close box: the engine ends by itself (exit code 0), all windows go",
+  "intendedExit": true,
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "click",
+    "x": "W-17",
+    "y": 20
+   },
+   {
+    "op": "wait",
+    "ms": 8000
+   },
+   {
+    "op": "expectExit",
+    "code": 0
+   }
+  ]
+ },
+ {
+  "name": "d8-file-menu-100",
+  "what": "File menu opened and closed with Escape 100 times; the popup's surface is in the page every time (decision 0228)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "menuCycles",
+    "n": 100
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d9-keys",
+  "what": "Keys: F2 rename of the pattern + letters/digits + Enter; arrows in the Playlist; F5 F6 F7 F9 F8 F10 and Escape",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "click",
+    "x": 950,
+    "y": 167
+   },
+   {
+    "op": "wait",
+    "ms": 800
+   },
+   {
+    "op": "key",
+    "code": "F2"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "type",
+    "text": "abc123"
+   },
+   {
+    "op": "wait",
+    "ms": 500
+   },
+   {
+    "op": "key",
+    "code": "Enter"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "shot",
+    "name": "d9-after-rename"
+   },
+   {
+    "op": "click",
+    "x": 1500,
+    "y": 300
+   },
+   {
+    "op": "key",
+    "code": "ArrowDown"
+   },
+   {
+    "op": "key",
+    "code": "ArrowUp"
+   },
+   {
+    "op": "key",
+    "code": "ArrowLeft"
+   },
+   {
+    "op": "key",
+    "code": "ArrowRight"
+   },
+   {
+    "op": "wait",
+    "ms": 1000
+   },
+   {
+    "op": "key",
+    "code": "F5"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F5"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F6"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F6"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F8"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "Escape"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F10"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "Escape"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "F7"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "d9-f7"
+   },
+   {
+    "op": "key",
+    "code": "F12"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d10-pianoroll-f12",
+  "what": "Sampler.flp open; F7 (Piano roll), then F12 (DispatchMessageA)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "openProject"
+   },
+   {
+    "op": "key",
+    "code": "F7"
+   },
+   {
+    "op": "wait",
+    "ms": 3500
+   },
+   {
+    "op": "shot",
+    "name": "d10-pianoroll"
+   },
+   {
+    "op": "key",
+    "code": "F12"
+   },
+   {
+    "op": "wait",
+    "ms": 4000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "d11-menu-hover-escape",
+  "what": "Sampler.flp open; File menu, hover three items, Escape (the parity ui-menu session with real-time input)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "openProject"
+   },
+   {
+    "op": "click",
+    "x": 18,
+    "y": 20
+   },
+   {
+    "op": "wait",
+    "ms": 800
+   },
+   {
+    "op": "move",
+    "x": 42,
+    "y": 67
+   },
+   {
+    "op": "wait",
+    "ms": 200
+   },
+   {
+    "op": "move",
+    "x": 42,
+    "y": 86
+   },
+   {
+    "op": "wait",
+    "ms": 200
+   },
+   {
+    "op": "move",
+    "x": 42,
+    "y": 112
+   },
+   {
+    "op": "wait",
+    "ms": 200
+   },
+   {
+    "op": "key",
+    "code": "Escape"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

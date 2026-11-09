@@ -1,0 +1,23 @@
+[package]
+name = "fe-wasmgen"
+description = "Prototype (decision 0157): x86-64 to WebAssembly, directly, over the fe-decode closure. Registers and status flags are wasm locals chosen per function; the C path (fe-lift) is not touched"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "fe_wasmgen"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fe-wasmgen"
+path = "src/main.rs"
+
+[dependencies]
+fe-pe = { path = "../fe-pe" }
+fe-decode = { path = "../fe-decode" }
+iced-x86 = { version = "=1.21.0", default-features = false, features = ["std", "decoder", "instr_info"] }
+
+[dev-dependencies]
+fe-lift = { path = "../fe-lift" }

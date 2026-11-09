@@ -1,0 +1,64 @@
+[
+ {
+  "name": "rta-open",
+  "what": "ci1 2026-11-07 (PM 10:15): the reference project opened (the same openProject as the Export), then NO key and NO click: the window list (describe) at 15 s, 45 s and 90 s after the open, pictures at 45 s and 90 s, the engine log: is the Problems window (TMissingPluginsForm) there, and what is its rect",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "openProject",
+    "flp": "serina1-serum2.flp",
+    "filesFile": "/home/ubuntu/work/signature-studio-develop/lift/out-gpu2/refproj-names.json"
+   },
+   {
+    "op": "wait",
+    "ms": 15000
+   },
+   {
+    "op": "describe",
+    "name": "at-15s"
+   },
+   {
+    "op": "wait",
+    "ms": 30000
+   },
+   {
+    "op": "describe",
+    "name": "at-45s"
+   },
+   {
+    "op": "shot",
+    "name": "at-45s"
+   },
+   {
+    "op": "wait",
+    "ms": 45000
+   },
+   {
+    "op": "describe",
+    "name": "at-90s"
+   },
+   {
+    "op": "shot",
+    "name": "at-90s"
+   },
+   {
+    "op": "eval",
+    "expr": "({ state: window.__app.state, engine: window.__app.engineStatus().text, hw: navigator.hardwareConcurrency })"
+   },
+   {
+    "op": "saveLog",
+    "name": "engine-log",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

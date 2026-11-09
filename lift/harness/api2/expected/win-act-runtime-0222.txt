@@ -1,0 +1,605 @@
+@@ 1: initial (P2 created last, active)
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 1: SetActiveWindow(P1)
+  P1 WM_WINDOWPOSCHANGING flags=0x13
+  P1 WM_WINDOWPOSCHANGED flags=0x13
+  P2 WM_NCACTIVATE wp=0
+  P2 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=1 other=P2
+  P2 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P2
+= z: P1 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1
+@@ 1: SetForegroundWindow(P2)
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+  P1 WM_NCACTIVATE wp=0
+  P1 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=1 other=P1
+  P1 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P1
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 1: BringWindowToTop(P1)
+  P1 WM_WINDOWPOSCHANGING flags=0x3
+  P2 WM_NCACTIVATE wp=0
+  P2 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=1 other=P2
+  P2 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P2
+  P1 WM_WINDOWPOSCHANGED flags=0x3
+= z: P1 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1
+@@ 1: SetWindowPos(P2, HWND_TOP, NOMOVE|NOSIZE|NOACTIVATE)
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+= z: P2 P1
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1
+@@ 1: SetWindowPos(P2, HWND_BOTTOM, NOMOVE|NOSIZE)
+  P2 WM_WINDOWPOSCHANGING flags=0x3
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+  P1 WM_NCACTIVATE wp=0
+  P1 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=1 other=P1
+  P1 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P1
+  P2 WM_WINDOWPOSCHANGED flags=0x3
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 1: SetWindowPos(P2, HWND_TOP, NOMOVE|NOSIZE)  (activates)
+  P2 WM_WINDOWPOSCHANGING flags=0x3
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 2: initial
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 2: click on the part of P1 that P2 does not cover (80,80)
+  P1 WM_SETCURSOR hit=1 msg=0x200
+  P1 WM_MOUSEACTIVATE top=P1 hit=1 msg=0x201
+  P1 WM_WINDOWPOSCHANGING flags=0x13
+  P1 WM_WINDOWPOSCHANGED flags=0x13
+  P2 WM_NCACTIVATE wp=0
+  P2 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=2 other=P2
+  P2 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P2
+  P1 WM_SETCURSOR hit=1 msg=0x201
+  P1 WM_LBUTTONDOWN x=30 y=30
+  P1 WM_LBUTTONUP x=30 y=30
+= z: P1 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1
+@@ 2: click on P2 (200,200: only P2)
+  P2 WM_SETCURSOR hit=1 msg=0x200
+  P2 WM_MOUSEACTIVATE top=P2 hit=1 msg=0x201
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+  P1 WM_NCACTIVATE wp=0
+  P1 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=2 other=P1
+  P1 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P1
+  P2 WM_SETCURSOR hit=1 msg=0x201
+  P2 WM_LBUTTONDOWN x=150 y=120
+  P2 WM_LBUTTONUP x=150 y=120
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 2: click on P1 again at a point covered by P2 (200,150)
+  P2 WM_SETCURSOR hit=1 msg=0x200
+  P2 WM_SETCURSOR hit=1 msg=0x201
+  P2 WM_LBUTTONDOWN x=50 y=50
+  P2 WM_LBUTTONUP x=50 y=50
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 3: initial (T active)
+= z: T
+= z(T): C1 C2 C3
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 3: BringWindowToTop(C1)
+  C1 WM_WINDOWPOSCHANGING flags=0x3
+= z: T
+= z(T): C1 C2 C3
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 3: SetWindowPos(C2, HWND_TOP, NOMOVE|NOSIZE)
+  C2 WM_WINDOWPOSCHANGING flags=0x3
+  C2 WM_WINDOWPOSCHANGED flags=0x3
+= z: T
+= z(T): C2 C1 C3
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 3: SetWindowPos(C3, HWND_BOTTOM, NOMOVE|NOSIZE|NOACTIVATE)
+  C3 WM_WINDOWPOSCHANGING flags=0x13
+= z: T
+= z(T): C2 C1 C3
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 3: SetWindowPos(C1, after C3, NOMOVE|NOSIZE)
+  C1 WM_WINDOWPOSCHANGING flags=0x3
+  C1 WM_WINDOWPOSCHANGED flags=0x3
+= z: T
+= z(T): C2 C3 C1
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 3: ShowWindow(C2, SW_HIDE)
+  C2 WM_SHOWWINDOW wp=0 lp=0
+  C2 WM_WINDOWPOSCHANGING flags=0x97
+  C2 WM_WINDOWPOSCHANGED flags=0x97
+= z: T
+= z(T): C2 C3 C1
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=0 C3=1
+@@ 3: ShowWindow(C2, SW_SHOW)
+  C2 WM_SHOWWINDOW wp=1 lp=0
+  C2 WM_WINDOWPOSCHANGING flags=0x57
+  C2 WM_WINDOWPOSCHANGED flags=0x57
+= z: T
+= z(T): C2 C3 C1
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1 C3=1
+@@ 4: initial
+= z: T
+= z(T): C1 C2
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1
+@@ 4: click on C1 where C2 does not cover it (80,100)
+  C1 WM_SETCURSOR hit=1 msg=0x200
+  T WM_SETCURSOR hit=1 msg=0x200
+  T WM_PARENTNOTIFY ev=0x201
+  C1 WM_MOUSEACTIVATE top=T hit=1 msg=0x201
+  T WM_MOUSEACTIVATE top=T hit=1 msg=0x201
+  C1 WM_SETCURSOR hit=1 msg=0x201
+  T WM_SETCURSOR hit=1 msg=0x201
+  C1 WM_LBUTTONDOWN x=20 y=40
+  C1 WM_LBUTTONUP x=20 y=40
+= z: T
+= z(T): C1 C2
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1
+@@ 4: click on C1 where C2 covers it (250,100): the click goes to C2
+  C1 WM_SETCURSOR hit=1 msg=0x200
+  T WM_SETCURSOR hit=1 msg=0x200
+  T WM_PARENTNOTIFY ev=0x201
+  C1 WM_MOUSEACTIVATE top=T hit=1 msg=0x201
+  T WM_MOUSEACTIVATE top=T hit=1 msg=0x201
+  C1 WM_SETCURSOR hit=1 msg=0x201
+  T WM_SETCURSOR hit=1 msg=0x201
+  C1 WM_LBUTTONDOWN x=190 y=40
+  C1 WM_LBUTTONUP x=190 y=40
+= z: T
+= z(T): C1 C2
+= active=T foreground=T focus=T capture=none
+= vis: T=1 C1=1 C2=1
+@@ 5: initial (T2 active, above T1)
+= z: T2 T1
+= z(T1): C1
+= z(T2): C2
+= active=T2 foreground=T2 focus=T2 capture=none
+= vis: T1=1 C1=1 T2=1 C2=1
+@@ 5: click on C1 (40,40): inside T1 and outside T2
+  C1 WM_SETCURSOR hit=1 msg=0x200
+  T1 WM_SETCURSOR hit=1 msg=0x200
+  T1 WM_PARENTNOTIFY ev=0x201
+  C1 WM_MOUSEACTIVATE top=T1 hit=1 msg=0x201
+  T1 WM_MOUSEACTIVATE top=T1 hit=1 msg=0x201
+  T1 WM_WINDOWPOSCHANGING flags=0x13
+  T1 WM_WINDOWPOSCHANGED flags=0x13
+  T2 WM_NCACTIVATE wp=0
+  T2 WM_ACTIVATE wp=0 other=T1
+  T1 WM_NCACTIVATE wp=1
+  T1 WM_ACTIVATE wp=2 other=T2
+  T2 WM_KILLFOCUS new=T1
+  T1 WM_SETFOCUS old=T2
+  C1 WM_SETCURSOR hit=1 msg=0x201
+  T1 WM_SETCURSOR hit=1 msg=0x201
+  C1 WM_LBUTTONDOWN x=10 y=10
+  C1 WM_LBUTTONUP x=10 y=10
+= z: T1 T2
+= z(T1): C1
+= z(T2): C2
+= active=T1 foreground=T1 focus=T1 capture=none
+= vis: T1=1 C1=1 T2=1 C2=1
+@@ 6: initial (P3 active)
+= z: P3 P2 P1
+= active=P3 foreground=P3 focus=P3 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 6: SendMessage(P3, WM_SYSCOMMAND, SC_CLOSE)
+  P3 WM_SYSCOMMAND cmd=0xf060
+  P3 WM_CLOSE
+  P3 WM_WINDOWPOSCHANGING flags=0x97
+  P3 WM_WINDOWPOSCHANGED flags=0x97
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+  P3 WM_NCACTIVATE wp=0
+  P3 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=1 other=P3
+  P3 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P3
+  P3 WM_DESTROY
+  P3 WM_NCDESTROY
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1 P3=-1
+@@ 6: PostMessage(P2, WM_CLOSE) while P2 is not the active window
+  P2 WM_CLOSE
+  P2 WM_WINDOWPOSCHANGING flags=0x97
+  P2 WM_WINDOWPOSCHANGED flags=0x97
+  P1 WM_WINDOWPOSCHANGING flags=0x13
+  P1 WM_WINDOWPOSCHANGED flags=0x13
+  P2 WM_NCACTIVATE wp=0
+  P2 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=1 other=P2
+  P2 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P2
+  P2 WM_DESTROY
+  P2 WM_NCDESTROY
+= z: P1
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=-1 P3=-1
+@@ 7: ShowWindow(P3, SW_HIDE)
+  P3 WM_SHOWWINDOW wp=0 lp=0
+  P3 WM_WINDOWPOSCHANGING flags=0x97
+  P3 WM_WINDOWPOSCHANGED flags=0x97
+  P2 WM_WINDOWPOSCHANGING flags=0x13
+  P2 WM_WINDOWPOSCHANGED flags=0x13
+  P3 WM_NCACTIVATE wp=0
+  P3 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=1 other=P3
+  P3 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P3
+= z: P2 P3 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1 P3=0
+@@ 7: DestroyWindow(active window)
+  P2 WM_WINDOWPOSCHANGING flags=0x97
+  P2 WM_WINDOWPOSCHANGED flags=0x97
+  P1 WM_WINDOWPOSCHANGING flags=0x13
+  P1 WM_WINDOWPOSCHANGED flags=0x13
+  P2 WM_NCACTIVATE wp=0
+  P2 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=1 other=P2
+  P2 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P2
+  P2 WM_DESTROY
+  P2 WM_NCDESTROY
+= z: P1 P3
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=-1 P3=0
+@@ 8: initial (X created last, active)
+= z: X W O
+= active=X foreground=X focus=X capture=none
+= vis: O=1 W=1 X=1
+@@ 8: SetActiveWindow(O)
+  O WM_WINDOWPOSCHANGING flags=0x13
+  O WM_WINDOWPOSCHANGED flags=0x13
+  W WM_WINDOWPOSCHANGING flags=0x13
+  X WM_NCACTIVATE wp=0
+  X WM_ACTIVATE wp=0 other=O
+  O WM_NCACTIVATE wp=1
+  O WM_ACTIVATE wp=1 other=X
+  X WM_KILLFOCUS new=O
+  O WM_SETFOCUS old=X
+= z: W O X
+= active=O foreground=O focus=O capture=none
+= vis: O=1 W=1 X=1
+@@ 8: BringWindowToTop(X)
+  X WM_WINDOWPOSCHANGING flags=0x3
+  O WM_NCACTIVATE wp=0
+  O WM_ACTIVATE wp=0 other=X
+  X WM_NCACTIVATE wp=1
+  X WM_ACTIVATE wp=1 other=O
+  O WM_KILLFOCUS new=X
+  X WM_SETFOCUS old=O
+  X WM_WINDOWPOSCHANGED flags=0x3
+= z: X W O
+= active=X foreground=X focus=X capture=none
+= vis: O=1 W=1 X=1
+@@ 8: SetWindowPos(O, HWND_TOP, NOMOVE|NOSIZE|NOACTIVATE)
+  O WM_WINDOWPOSCHANGING flags=0x13
+  O WM_WINDOWPOSCHANGED flags=0x13
+= z: W O X
+= active=X foreground=X focus=X capture=none
+= vis: O=1 W=1 X=1
+@@ 8: SetWindowPos(W, HWND_BOTTOM, NOMOVE|NOSIZE|NOACTIVATE)
+  W WM_WINDOWPOSCHANGING flags=0x13
+= z: W O X
+= active=X foreground=X focus=X capture=none
+= vis: O=1 W=1 X=1
+@@ 8: ShowWindow(O, SW_HIDE)
+  O WM_SHOWWINDOW wp=0 lp=0
+  O WM_WINDOWPOSCHANGING flags=0x97
+  O WM_WINDOWPOSCHANGED flags=0x97
+= z: W O X
+= active=X foreground=X focus=X capture=none
+= vis: O=0 W=1 X=1
+@@ 8: ShowWindow(O, SW_SHOW)
+  O WM_SHOWWINDOW wp=1 lp=0
+  O WM_WINDOWPOSCHANGING flags=0x57
+  O WM_WINDOWPOSCHANGED flags=0x57
+  O WM_WINDOWPOSCHANGING flags=0x13
+  W WM_WINDOWPOSCHANGING flags=0x13
+  X WM_NCACTIVATE wp=0
+  X WM_ACTIVATE wp=0 other=O
+  O WM_NCACTIVATE wp=1
+  O WM_ACTIVATE wp=1 other=X
+  X WM_KILLFOCUS new=O
+  O WM_SETFOCUS old=X
+= z: W O X
+= active=O foreground=O focus=O capture=none
+= vis: O=1 W=1 X=1
+@@ 9: initial (P3 active)
+= z: P2
+= active=P3 foreground=P3 focus=P3 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 9: BringWindowToTop(P1): below the topmost P2
+  P1 WM_WINDOWPOSCHANGING flags=0x3
+  P3 WM_NCACTIVATE wp=0
+  P3 WM_ACTIVATE wp=0 other=P1
+  P1 WM_NCACTIVATE wp=1
+  P1 WM_ACTIVATE wp=1 other=P3
+  P3 WM_KILLFOCUS new=P1
+  P1 WM_SETFOCUS old=P3
+  P1 WM_WINDOWPOSCHANGED flags=0x3
+= z: P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 9: SetWindowPos(P2, HWND_NOTOPMOST, NOMOVE|NOSIZE)
+  P2 WM_WINDOWPOSCHANGING flags=0x3
+  P1 WM_NCACTIVATE wp=0
+  P1 WM_ACTIVATE wp=0 other=P2
+  P2 WM_NCACTIVATE wp=1
+  P2 WM_ACTIVATE wp=1 other=P1
+  P1 WM_KILLFOCUS new=P2
+  P2 WM_SETFOCUS old=P1
+  P2 WM_WINDOWPOSCHANGED flags=0x3
+= z: P2 P1 P3
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 9: SetWindowPos(P3, HWND_TOPMOST, NOMOVE|NOSIZE|NOACTIVATE)
+  P3 WM_WINDOWPOSCHANGING flags=0x13
+  P3 WM_WINDOWPOSCHANGED flags=0x13
+= z: P3
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 10: initial (P1 active)
+= z: P1 P3 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 10: click on P2 (WS_EX_NOACTIVATE) at 300,200
+  P2 WM_SETCURSOR hit=1 msg=0x200
+  P2 WM_MOUSEACTIVATE top=P2 hit=1 msg=0x201
+  P2 WM_SETCURSOR hit=1 msg=0x201
+  P2 WM_LBUTTONDOWN x=150 y=100
+  P2 WM_LBUTTONUP x=150 y=100
+= z: P1 P3 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 10: EnableWindow(P3, FALSE) then click on P3 at 450,150
+  P3 WM_ENABLE wp=0
+= z: P1 P3 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 10: SetActiveWindow(P3) (disabled)
+= z: P1 P3 P2
+= active=P1 foreground=P1 focus=P1 capture=none
+= vis: P1=1 P2=1 P3=1
+@@ 11: initial (T2 active)
+= z: T2 T1
+= z(T1): C1
+= active=T2 foreground=T2 focus=T2 capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: SetFocus(T1): the top-level window is activated
+  T1 WM_WINDOWPOSCHANGING flags=0x13
+  T1 WM_WINDOWPOSCHANGED flags=0x13
+  T2 WM_NCACTIVATE wp=0
+  T2 WM_ACTIVATE wp=0 other=T1
+  T1 WM_NCACTIVATE wp=1
+  T1 WM_ACTIVATE wp=1 other=T2
+  T2 WM_KILLFOCUS new=T1
+  T1 WM_SETFOCUS old=T2
+= z: T1 T2
+= z(T1): C1
+= active=T1 foreground=T1 focus=T1 capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: SetFocus(C1): a child of the active window
+  T1 WM_KILLFOCUS new=C1
+  C1 WM_SETFOCUS old=T1
+= z: T1 T2
+= z(T1): C1
+= active=T1 foreground=T1 focus=C1 capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: SetFocus(T2)
+  T2 WM_WINDOWPOSCHANGING flags=0x13
+  T2 WM_WINDOWPOSCHANGED flags=0x13
+  T1 WM_NCACTIVATE wp=0
+  T1 WM_ACTIVATE wp=0 other=T2
+  T2 WM_NCACTIVATE wp=1
+  T2 WM_ACTIVATE wp=1 other=T1
+  C1 WM_KILLFOCUS new=T2
+  T2 WM_SETFOCUS old=C1
+= z: T2 T1
+= z(T1): C1
+= active=T2 foreground=T2 focus=T2 capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: EnableWindow(T2, FALSE): the focus window is disabled
+  T2 WM_KILLFOCUS new=none
+  T2 WM_ENABLE wp=0
+= z: T2 T1
+= z(T1): C1
+= active=T2 foreground=T2 focus=none capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: SetFocus(T2) while it is disabled
+= z: T2 T1
+= z(T1): C1
+= active=T2 foreground=T2 focus=none capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 11: SetFocus(NULL)
+= z: T2 T1
+= z(T1): C1
+= active=T2 foreground=T2 focus=none capture=none
+= vis: T1=1 C1=1 T2=1
+@@ 12: initial (P2 active)
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 12: SetCapture(P1)
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=P1
+= vis: P1=1 P2=1
+@@ 12: click on P2 (400,150) while P1 has the capture: P1 gets it, in its own client coordinates
+  P1 WM_LBUTTONDOWN x=350 y=100
+  P1 WM_LBUTTONUP x=350 y=100
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=P1
+= vis: P1=1 P2=1
+@@ 12: ReleaseCapture
+  P1 WM_CAPTURECHANGED
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 12: click on P2 (400,150) after the release
+  P2 WM_SETCURSOR hit=1 msg=0x200
+  P2 WM_SETCURSOR hit=1 msg=0x201
+  P2 WM_LBUTTONDOWN x=50 y=50
+  P2 WM_LBUTTONUP x=50 y=50
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=none
+= vis: P1=1 P2=1
+@@ 12: SetCapture(P2), then SetCapture(P1): the first loses it (WM_CAPTURECHANGED)
+  P2 WM_CAPTURECHANGED
+= z: P2 P1
+= active=P2 foreground=P2 focus=P2 capture=P1
+= vis: P1=1 P2=1
+  P1 WM_CAPTURECHANGED
+@@ 13: initial (A active, P owned by A shown with SW_SHOWNOACTIVATE, Q)
+= z: P A Q
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1 Q=1
+@@ 13: ShowWindow(P, SW_SHOWNORMAL) on the visible P
+= z: P A Q
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1 Q=1
+@@ 13: ShowWindow(P, SW_SHOW) on the visible P
+= z: P A Q
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1 Q=1
+@@ 13: ShowWindow(P, SW_RESTORE) on the visible P
+= z: P A Q
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1 Q=1
+@@ 13: ShowWindow(P, SW_SHOWNOACTIVATE) on the visible P
+= z: P A Q
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1 Q=1
+@@ 15: initial (A active)
+= z: A
+= active=A foreground=A focus=A capture=none
+= vis: A=1
+@@ 15: CreateWindowExW(P, WS_POPUP, owner = GetActiveWindow() = A)
+= z: P A
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=0
+@@ 15: SetWindowPos(P, HWND_TOPMOST, NOMOVE|NOSIZE|NOACTIVATE)
+  P WM_WINDOWPOSCHANGING flags=0x13
+  P WM_WINDOWPOSCHANGED flags=0x13
+= z: P
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=0
+@@ 15: SetWindowPos(P, 0, FRAMECHANGED|NOACTIVATE|NOZORDER|NOMOVE|NOSIZE)
+  P WM_WINDOWPOSCHANGING flags=0x37
+  P WM_WINDOWPOSCHANGED flags=0x37
+= z: P
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=0
+@@ 15: SetWindowPos(P, 0, 495, 294, 176, 132, NOZORDER|NOACTIVATE)
+  P WM_WINDOWPOSCHANGING flags=0x14
+  P WM_WINDOWPOSCHANGED flags=0x14
+= z: P
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=0
+@@ 15: ShowWindow(P, SW_SHOWNOACTIVATE)
+  P WM_SHOWWINDOW wp=1 lp=0
+  P WM_WINDOWPOSCHANGING flags=0x57
+  P WM_WINDOWPOSCHANGED flags=0x57
+= z: P
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1
+@@ 15: ShowWindow(P, SW_SHOWNORMAL) (the VCL call, P is visible)
+= z: P
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=1
+@@ 15: click on P (330,250): the harness window procedure uses DefWindowProc, so WM_MOUSEACTIVATE is answered MA_ACTIVATE (FL's pop-up answers MA_NOACTIVATE)
+  P WM_SETCURSOR hit=1 msg=0x200
+  P WM_MOUSEACTIVATE top=P hit=1 msg=0x201
+  A WM_NCACTIVATE wp=0
+  A WM_ACTIVATE wp=0 other=P
+  P WM_NCACTIVATE wp=1
+  P WM_ACTIVATE wp=2 other=A
+  A WM_KILLFOCUS new=P
+  P WM_SETFOCUS old=A
+  P WM_SETCURSOR hit=1 msg=0x201
+  P WM_LBUTTONDOWN x=35 y=56
+  P WM_LBUTTONUP x=35 y=56
+= z: P
+= active=P foreground=P focus=P capture=none
+= vis: A=1 P=1
+@@ 15: GetActiveWindow() is what FL passes as the owner of the next window: CreateWindowExW(L, owner = GetActiveWindow())
+= z: P
+= active=P foreground=P focus=P capture=none
+= vis: A=1 P=1 L=0
+@@ 15: ShowWindow(L, SW_SHOWNORMAL)
+  L WM_WINDOWPOSCHANGING flags=0x57
+  L WM_WINDOWPOSCHANGED flags=0x57
+  P WM_NCACTIVATE wp=0
+  P WM_ACTIVATE wp=0 other=L
+  L WM_NCACTIVATE wp=1
+  L WM_ACTIVATE wp=1 other=P
+  P WM_KILLFOCUS new=L
+  L WM_SETFOCUS old=P
+= z: P
+= active=L foreground=L focus=L capture=none
+= vis: A=1 P=1 L=1
+@@ 15: DestroyWindow(P): the owned L goes with its owner
+  P WM_WINDOWPOSCHANGING flags=0x97
+  P WM_WINDOWPOSCHANGED flags=0x97
+  L WM_WINDOWPOSCHANGING flags=0x97
+  L WM_WINDOWPOSCHANGED flags=0x97
+  A WM_WINDOWPOSCHANGING flags=0x13
+  P WM_WINDOWPOSCHANGING flags=0x13
+  L WM_WINDOWPOSCHANGING flags=0x13
+  L WM_NCACTIVATE wp=0
+  L WM_ACTIVATE wp=0 other=A
+  A WM_NCACTIVATE wp=1
+  A WM_ACTIVATE wp=1 other=L
+  L WM_KILLFOCUS new=A
+  A WM_SETFOCUS old=L
+  L WM_DESTROY
+  L WM_NCDESTROY
+  P WM_DESTROY
+  P WM_NCDESTROY
+= z: A
+= active=A foreground=A focus=A capture=none
+= vis: A=1 P=-1 L=-1

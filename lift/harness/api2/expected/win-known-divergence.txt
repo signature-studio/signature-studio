@@ -1,0 +1,1 @@
+# Decision 0210 (api2), emptied by decision 0214 (present2-runtime-2.diff: GAP-U1 closed). Gaps of the runtime window model found by the update-region cases (Wine line, TAB, runtime line, TAB, reason). A line here is a GAP, not a choice: when the runtime is fixed the line disappears from the output and the test asks for the entry to be removed.

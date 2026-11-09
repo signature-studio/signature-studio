@@ -1,0 +1,99 @@
+[
+ {
+  "name": "o19-keys2",
+  "what": "O19 allhidden check 2 (untimed, no playback): F9 twice, F6, a click on the Playlist close box (1905,97), Alt+F8; a picture after each. F5 is not forwarded by the page (keymap.ts: the browser reloads), so it is not used",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "shot",
+    "name": "k0-open"
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "k1-F9-first"
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "k2-F9-second"
+   },
+   {
+    "op": "key",
+    "code": "F6"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "k3-F6"
+   },
+   {
+    "op": "click",
+    "x": 1905,
+    "y": 97
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "k4-click-playlist-close"
+   },
+   {
+    "op": "key",
+    "code": "F8",
+    "alt": true
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "k5-altF8"
+   },
+   {
+    "op": "describe",
+    "name": "end"
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

@@ -1,0 +1,15 @@
+[package]
+name = "fe-pe"
+description = "Bounds-checked PE32+ (x86-64) reader: headers, sections, exports, imports, RVA mapping"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "fe_pe"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fe-pe"
+path = "src/main.rs"

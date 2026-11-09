@@ -1,0 +1,6 @@
+# NOT FROM THE INSTALLER (decision 0116, a choice without a source; see docs/decisions/0116-fruity-walls.md).
+# The NSIS script of flstudio_win64_26.1.7.5653.exe READS HKCU\Software\Image-Line\Shared\Paths "Shared Data" (entry 402: ReadRegStr, then CreateDirectory + DirectWave files if it is non-empty)
+# and never WRITES it (lift/out-git/fruity3-results/nsis-registry.md). The engine reads "Shared data" (f_652e60, UTF-16 at 0x652fd8), expands environment strings in it and appends a
+# backslash; when it is missing the engine builds <CSIDL_PERSONAL>\Image-Line\ itself (f_653130). The value below is that shape with the CSIDL_PERSONAL of the virtual user (C:\Users\user\Documents).
+# key<TAB>value name<TAB>type<TAB>data
+HKCU\Software\Image-Line\Shared\Paths	Shared data	REG_SZ	C:\Users\user\Documents\Image-Line\

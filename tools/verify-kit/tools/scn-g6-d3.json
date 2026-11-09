@@ -1,0 +1,181 @@
+[
+ {
+  "name": "g6-d3",
+  "what": "G6 (RT-D3): About, Japanese project glyph rendering (Japanese filename FLP opened as serina1-serum2.flp), then 20 s playback",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "F10"
+   },
+   {
+    "op": "wait",
+    "ms": 3500
+   },
+   {
+    "op": "logMark",
+    "name": "m1"
+   },
+   {
+    "op": "click",
+    "x": 1222,
+    "y": 95,
+    "hover": 60,
+    "hold": 50
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "savePic",
+    "name": "about-3s"
+   },
+   {
+    "op": "describe",
+    "name": "about-windows"
+   },
+   {
+    "op": "wait",
+    "ms": 5000
+   },
+   {
+    "op": "savePic",
+    "name": "about-8s"
+   },
+   {
+    "op": "wait",
+    "ms": 20000
+   },
+   {
+    "op": "savePic",
+    "name": "about-28s"
+   },
+   {
+    "op": "describe",
+    "name": "about-windows-28s"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-about",
+    "mark": "m1"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-all",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openProject",
+    "flp": "serina1-serum2.flp",
+    "filesFile": "/home/ubuntu/work/signature-studio-develop/lift/out-gpu2/refproj-names.json"
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TMissingPluginsForm",
+    "visible": true,
+    "ms": 300000
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-problems"
+   },
+   {
+    "op": "describe",
+    "name": "ja-problems"
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMissingPluginsForm",
+    "dx": 370,
+    "hover": 60,
+    "hold": 50,
+    "dyFromBottom": 28
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TMissingPluginsForm",
+    "visible": false,
+    "ms": 120000
+   },
+   {
+    "op": "wait",
+    "ms": 8000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-main-8s"
+   },
+   {
+    "op": "audioSnap",
+    "name": "st-0",
+    "expr": "(() => { const a = window.__app; return { t: Math.round(performance.now()), state: a.state, exit: a.exit, error: a.error, inputEvents: a.inputEvents, idles: a.idles.length, desk: a.deskStats }; })()"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-0",
+    "all": true
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-main-10s"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-ja-all",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   },
+   {
+    "op": "audioMark",
+    "name": "bp"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 20000
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

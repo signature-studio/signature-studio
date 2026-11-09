@@ -1,0 +1,75 @@
+--- a/src/blend2d/pipeline/reference/fetchgeneric_p.h
++++ b/src/blend2d/pipeline/reference/fetchgeneric_p.h
+@@ -1009,6 +1009,16 @@
+   }
+ };
+ 
++// Decision 0195 (b2d3, opt-in -DB2D3_FETCH_FMA=1): the radial and conic gradient fetch of the JIT pipeline uses fused multiply-add where the CPU has it (asmjit: FMA3, i.e. every AVX2 machine); the reference code below uses x * y + a, which is
++// rounded twice. With the macro the multiply-adds of these two fetches are fused (one rounding), which reproduces the JIT's result on an AVX2/FMA CPU (measured, gradient quality DITHER); without it (the default) the result is that of the JIT restricted to SSE2.
++#ifdef B2D3_FETCH_FMA
++static BL_INLINE_NODEBUG float b3_madd(float x, float y, float a) noexcept { return __builtin_fmaf(x, y, a); }
++static BL_INLINE_NODEBUG double b3_madd(double x, double y, double a) noexcept { return __builtin_fma(x, y, a); }
++#else
++static BL_INLINE_NODEBUG float b3_madd(float x, float y, float a) noexcept { return Math::madd(x, y, a); }
++static BL_INLINE_NODEBUG double b3_madd(double x, double y, double a) noexcept { return Math::madd(x, y, a); }
++#endif
++
+ // Fetch - Gradient - Radial
+ // =========================
+ 
+@@ -1087,15 +1097,15 @@
+   BL_INLINE void spanStartX(uint32_t xPos) noexcept {
+     Base::_initGradientX(xPos);
+ 
+-    Vec::f64x2 pt(Math::madd(_yy_yx.x, _y, _tp.x),
+-                  Math::madd(_yy_yx.y, _y, _tp.y));
+-    double b = Math::madd(_y, _by, _b0);
++    Vec::f64x2 pt(b3_madd(_yy_yx.x, _y, _tp.x),
++                  b3_madd(_yy_yx.y, _y, _tp.y));
++    double b = b3_madd(_y, _by, _b0);
+     double sq_dist = Math::square(pt.x) + Math::square(pt.y);
+ 
+     _x = float(int32_t(xPos));
+     _b = float(b * _inv2a);
+-    _d = float(Math::madd(_amul4, (sq_dist - _sq_fr), Math::square(b)) * _sq_inv2a);
+-    _dd = float(Math::madd(_y, _ddy, _dd0) * _sq_inv2a);
++    _d = float(b3_madd(_amul4, (sq_dist - _sq_fr), Math::square(b)) * _sq_inv2a);
++    _dd = float(b3_madd(_y, _ddy, _dd0) * _sq_inv2a);
+   }
+ 
+   BL_INLINE void spanAdvanceX(uint32_t xPos, uint32_t xDiff) noexcept {
+@@ -1115,8 +1125,8 @@
+   BL_INLINE PixelType fetch() noexcept {
+     float sq_x = Math::square(_x);
+ 
+-    float a = Math::sqrt(blAbs(Math::madd(sq_x, _ddd, Math::madd(_x, _dd, _d))));
+-    float v = Math::madd(_x, _bd, _b) + a;
++    float a = Math::sqrt(blAbs(b3_madd(sq_x, _ddd, b3_madd(_x, _dd, _d))));
++    float v = b3_madd(_x, _bd, _b) + a;
+ 
+     uint32_t idx = uint32_t(Math::truncToInt(v));
+ 
+@@ -1229,7 +1239,7 @@
+   }
+ 
+   BL_INLINE PixelType fetch() noexcept {
+-    float x = Math::madd(_x, _xx, _tx);
++    float x = b3_madd(_x, _xx, _tx);
+     float ax = blAbs(x);
+ 
+     float xyMin = blMin(ax, _ay);
+@@ -1239,10 +1249,10 @@
+     float p = xyMin / xyMax;
+     float p_sq = Math::square(p);
+ 
+-    float v = Math::madd(p_sq, _q_coeff[3], _q_coeff[2]);
+-    v = Math::madd(v, p_sq, _q_coeff[1]);
+-    v = Math::madd(v, p_sq, _q_coeff[0]);
+-    v = blAbs(Math::madd(v, p, -s));
++    float v = b3_madd(p_sq, _q_coeff[3], _q_coeff[2]);
++    v = b3_madd(v, p_sq, _q_coeff[1]);
++    v = b3_madd(v, p_sq, _q_coeff[0]);
++    v = blAbs(b3_madd(v, p, -s));
+     v = blAbs(v - Vec::and_(Vec::msbMask(x), _n_div_2));
+     v = blAbs(v - _by) + _angleOffset;
+ 

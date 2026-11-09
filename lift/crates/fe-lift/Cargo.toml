@@ -1,0 +1,20 @@
+[package]
+name = "fe-lift"
+description = "Minimal 1:1 x86-64 to C translation over the fe-decode closure. No flag model; unsupported instructions are emitted as fle_unsupported()"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "fe_lift"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fe-lift"
+path = "src/main.rs"
+
+[dependencies]
+fe-pe = { path = "../fe-pe" }
+fe-decode = { path = "../fe-decode" }
+iced-x86 = { version = "=1.21.0", default-features = false, features = ["std", "decoder", "instr_info"] }

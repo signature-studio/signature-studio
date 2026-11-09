@@ -1,0 +1,6 @@
+out/
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.inflight

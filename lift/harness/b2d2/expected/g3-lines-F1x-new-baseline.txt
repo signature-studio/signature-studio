@@ -1,0 +1,84 @@
+g3-snap: #1 wiz0 clock_ms 3601767 entries 0 pending_events 0
+g3-progress: #1 wiz0 progress 10959562 armed 1 slices 1741 deferred 848 switches 385 ticks 17410000
+g3-surface: lid 8 320x448 nonzero 52082 sha256 1dfa4e23262d2fced8b2db4bd760f1bae02a189247ea9f2f2bb56aaabfb0c3c5
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 f2a3c3cb77de18c4aa5ae595b0b98fca62a6c8354b70f327cc3b010786c9d71e
+g3-surface: lid 48 874x570 nonzero 498180 sha256 2e2823a9b1d207d5c714f6f8063b5ff91d96dbf5f4cd7727d7d1440f4cf77382
+g3-wintable: lines 116 sha256 53fe5ed75f43e3c0e74e021b5c870203eb63c6adf646813f422edd00da050925
+g3-snap: #2 a0250 clock_ms 3602017 entries 0 pending_events 0
+g3-progress: #2 a0250 progress 12358419 armed 1 slices 1752 deferred 1179 switches 396 ticks 17520000
+g3-surface: lid 8 320x448 nonzero 52082 sha256 1dfa4e23262d2fced8b2db4bd760f1bae02a189247ea9f2f2bb56aaabfb0c3c5
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 f9f4dd67deb3e7fdb2c770b093b1ff2b71dbd0d404642e165b2a97c5993dbc57
+g3-surface: lid 48 874x570 nonzero 498180 sha256 796a32b8a288ca14d70d2bf3050c9719a0bfa86620d2af742ac6496fc9e654f2
+g3-wintable: lines 116 sha256 53fe5ed75f43e3c0e74e021b5c870203eb63c6adf646813f422edd00da050925
+g3-snap: #3 a0500 clock_ms 3602267 entries 0 pending_events 0
+g3-progress: #3 a0500 progress 12766229 armed 1 slices 1758 deferred 1272 switches 401 ticks 17580000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 813f9a6a0bcafba30b4ab7c71bcb5b2b90861f17c96b2d84ba6582263d374f12
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #4 a0750 clock_ms 3602517 entries 0 pending_events 0
+g3-progress: #4 a0750 progress 12941822 armed 1 slices 1758 deferred 1315 switches 401 ticks 17580000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 1037d71969e1c2e6da71d23c06098dce2155482243abd165be03ea55faa3f090
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #5 a1000 clock_ms 3602767 entries 0 pending_events 0
+g3-progress: #5 a1000 progress 13030206 armed 1 slices 1759 deferred 1336 switches 401 ticks 17590000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 6447b0464b000a74312885257f29bd337c5b2b9e3c484f7d8a532aca767cd6ce
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #6 a1250 clock_ms 3603017 entries 0 pending_events 0
+g3-progress: #6 a1250 progress 13047336 armed 1 slices 1759 deferred 1340 switches 401 ticks 17590000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 595cf5b983b45bbd9c87948090a61d483ebf0b2bcd1bfb726e5b6bfda76bc890
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #7 a1500 clock_ms 3603267 entries 0 pending_events 0
+g3-progress: #7 a1500 progress 13065428 armed 1 slices 1760 deferred 1343 switches 401 ticks 17600000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 8beb156c01de356e99db4c3882df4e3b12e6ad2f9a65715fd0d140e481871d9e
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #8 a1750 clock_ms 3603517 entries 0 pending_events 0
+g3-progress: #8 a1750 progress 13082918 armed 1 slices 1761 deferred 1346 switches 402 ticks 17610000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 1da68c63005899603929af918207a01eef540081ee4d28db8c97a24808d12983
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #9 a2000 clock_ms 3603767 entries 0 pending_events 0
+g3-progress: #9 a2000 progress 13087523 armed 1 slices 1762 deferred 1347 switches 402 ticks 17620000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 1da68c63005899603929af918207a01eef540081ee4d28db8c97a24808d12983
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #10 a3000 clock_ms 3604767 entries 0 pending_events 0
+g3-progress: #10 a3000 progress 13110798 armed 1 slices 1764 deferred 1350 switches 402 ticks 17640000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 cf92b670c5335b79a20fe1924d6215cfe8b5f1bbe7e09c597bba7e79972b2ea4
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #11 a4000 clock_ms 3605767 entries 0 pending_events 0
+g3-progress: #11 a4000 progress 13137672 armed 1 slices 1770 deferred 1351 switches 402 ticks 17700000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 9b8592d35b267eaa079e73fefd1051a1c3c3757973f501ad0f98a3337646effe
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 ec195b5c104b0227020f6922ab10d2614212bf3d627e8a826c04c5437c35ffed
+g3-snap: #12 e0300 clock_ms 3606069 entries 0 pending_events 0
+g3-progress: #12 e0300 progress 14339387 armed 1 slices 1772 deferred 1642 switches 403 ticks 17720000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 8f120fc3bc3a80fd58634779c076e98bdc8f08a545d9177aac9267f76593f37a
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 da3064906dafc0931b6e6c52eb671515d17ea394e8fb90c22b75cb231614b7b5
+g3-snap: #13 e1300 clock_ms 3607069 entries 0 pending_events 0
+g3-progress: #13 e1300 progress 17141271 armed 1 slices 1783 deferred 2315 switches 409 ticks 17830000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 d72e2e7f9ba184fbe071c3cad0ef6f8081902c7ee9cc9e4ca1214e1c69e35ff4
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 da3064906dafc0931b6e6c52eb671515d17ea394e8fb90c22b75cb231614b7b5
+g3-snap: #14 e2300 clock_ms 3608069 entries 0 pending_events 0
+g3-progress: #14 e2300 progress 19762509 armed 1 slices 1795 deferred 2943 switches 418 ticks 17950000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 d72e2e7f9ba184fbe071c3cad0ef6f8081902c7ee9cc9e4ca1214e1c69e35ff4
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 da3064906dafc0931b6e6c52eb671515d17ea394e8fb90c22b75cb231614b7b5
+g3-snap: #15 e3300 clock_ms 3609069 entries 0 pending_events 0
+g3-progress: #15 e3300 progress 22424193 armed 1 slices 1804 deferred 3584 switches 422 ticks 18040000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 288fd7d3b839d3a9474ed76389f4c0121127a0ce057aa828c876a462c3be5174
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 da3064906dafc0931b6e6c52eb671515d17ea394e8fb90c22b75cb231614b7b5
+g3-snap: #16 end clock_ms 3609069 entries 0 pending_events 0
+g3-progress: #16 end progress 22424193 armed 1 slices 1804 deferred 3584 switches 422 ticks 18040000
+g3-surface: lid 14 1930x1092 nonzero 1917816 sha256 288fd7d3b839d3a9474ed76389f4c0121127a0ce057aa828c876a462c3be5174
+g3-surface: lid 48 874x570 nonzero 498180 sha256 221e46db6a7a3cbd8b04666062a393dd1784f73d485bcac1cc379d7202938004
+g3-wintable: lines 114 sha256 da3064906dafc0931b6e6c52eb671515d17ea394e8fb90c22b75cb231614b7b5
+fruity: == stop: SIGABRT (runtime abort, see runtime message)
+fruity: runtime message: fle: MessageLoop: idle: the host ended the wait (no event came; the session was closed)

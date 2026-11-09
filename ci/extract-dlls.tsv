@@ -1,0 +1,11 @@
+# ci/extract-dlls.tsv - the files of the FL Studio installer (flstudio_win64_26.1.7.5653.exe) that the engine bundle build reads, besides the seed files of lift/harness/seeds/vfs-seed-idle1.tsv.
+# Fields (TAB): name in the installer's NSIS file list (matched as a case-insensitive suffix, like tools/extract_nsis2.py) <TAB> destination under HOST_ROOT <TAB> SHA-256 the extracted bytes must have
+# The SHA-256 values are the ones of docs/investigations/win64-extraction.md (FLEngine) and docs/investigations/bundled-dll-inventory.md (the others).
+FLEngine_x64.dll	binaries/win64/FLEngine_x64.dll	b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d
+dsp_ippv2_x64.dll	lift/out-ext/dsp_ippv2_x64.dll	497dd4f77e859df9e86d999b3811be3c72526b41f86c38b0c3c6e395f691c352
+Blend2D.dll	lift/out-blend2d/Blend2D.dll	66634d24412084b7541b4b27a11be8b0f4cb90d844c87e1ee5e5c3ecd66066c7
+QuickFontCache_x64.dll	lift/out-qfc/quickfontcache_x64.dll	afc5a0ed70eb7e4af3d0f4baf771bd6f53eb014e237f857f23023471047736d2
+freetype_x64.dll	lift/out-wallQ/freetype/freetype_x64.dll	6ea6c106ad2695b5ec75738a0c790bba81dca7866d63254c2c69602973837cb8
+ILTools_x64.dll	lift/out-inventory/extracted/ILTools_x64.dll	20409dcbc5eb5055c476ed663d6e944984281155f15c6b3a5a2961ba061a0f95
+oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084004a5fff5739cafb9f602c66e6466f9
+elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3

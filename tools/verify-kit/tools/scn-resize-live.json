@@ -1,0 +1,87 @@
+[
+ {
+  "name": "resize-live",
+  "what": "the real engine on the page; the wizard closed; the browser viewport shrunk (2260x1116 -> 1500x900) and restored while the engine runs: does the engine stay running, do the canvas bitmap and the compositor's picture follow (ci1, 2026-11-07, PM 09:15 (3-ii))",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "describe",
+    "name": "before-resize"
+   },
+   {
+    "op": "eval",
+    "expr": "(() => { const c = document.querySelector('#desktop canvas'); const r = c.getBoundingClientRect(); return { cw: c.width, ch: c.height, cssW: r.width, cssH: r.height, state: window.__app.state, engine: window.__app.engineStatus().text }; })()"
+   },
+   {
+    "op": "eval",
+    "expr": "window.__app.deskDumpBase64(true).then((d) => ({ w: d.width, h: d.height, windows: d.windows.split('\\n').filter(Boolean).length }))"
+   },
+   {
+    "op": "shot",
+    "name": "before-resize"
+   },
+   {
+    "op": "setViewport",
+    "w": 1500,
+    "h": 900,
+    "dpr": 1
+   },
+   {
+    "op": "wait",
+    "ms": 4000
+   },
+   {
+    "op": "eval",
+    "expr": "(() => { const c = document.querySelector('#desktop canvas'); const r = c.getBoundingClientRect(); return { cw: c.width, ch: c.height, cssW: r.width, cssH: r.height, state: window.__app.state, engine: window.__app.engineStatus().text }; })()"
+   },
+   {
+    "op": "eval",
+    "expr": "window.__app.deskDumpBase64(true).then((d) => ({ w: d.width, h: d.height, windows: d.windows.split('\\n').filter(Boolean).length }))"
+   },
+   {
+    "op": "describe",
+    "name": "after-shrink"
+   },
+   {
+    "op": "shot",
+    "name": "after-shrink"
+   },
+   {
+    "op": "setViewport",
+    "w": 2260,
+    "h": 1116,
+    "dpr": 1
+   },
+   {
+    "op": "wait",
+    "ms": 4000
+   },
+   {
+    "op": "eval",
+    "expr": "(() => { const c = document.querySelector('#desktop canvas'); const r = c.getBoundingClientRect(); return { cw: c.width, ch: c.height, cssW: r.width, cssH: r.height, state: window.__app.state, engine: window.__app.engineStatus().text }; })()"
+   },
+   {
+    "op": "eval",
+    "expr": "window.__app.deskDumpBase64(true).then((d) => ({ w: d.width, h: d.height, windows: d.windows.split('\\n').filter(Boolean).length }))"
+   },
+   {
+    "op": "shot",
+    "name": "after-restore"
+   },
+   {
+    "op": "saveLog",
+    "name": "engine-log",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

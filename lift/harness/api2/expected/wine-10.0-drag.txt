@@ -1,0 +1,20 @@
+DragQueryFileW wide-count = 3
+DragQueryFileW wide-len0 = 12
+DragQueryFileW wide-len2 = 16
+DragQueryFileW wide-copy0 = 12 "C:\a\one.txt" next=7a7a
+DragQueryFileW wide-copy1 = 6 "D:\two" next=7a7a
+DragQueryFileW wide-copy2 = 16 "E:\x y\three.wav" next=7a7a
+DragQueryFileW wide-trunc5 = 4 "C:\a" next=7a7a
+DragQueryFileW wide-exact = 6 "D:\two" next=7a7a
+DragQueryFileW wide-cch1 = 0
+DragQueryFileW wide-cch0-buf = 12
+DragQueryFileW wide-oob = 0
+DragQueryFileW wide-oob-nobuf = 0
+DragQueryFileW ansi-count = 3
+DragQueryFileW ansi-len = 16
+DragQueryFileW ansi-copy = 12 "C:\a\one.txt" next=7a7a
+DragQueryFileW ansi-trunc = 5 "E:\x " next=7a7a
+DragQueryPoint client = 1 (11,22)
+DragQueryPoint ansi = 1 (33,44)
+DragQueryPoint nonclient = 0 (-5,7)
+DragFinish done

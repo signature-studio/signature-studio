@@ -1,0 +1,47 @@
+[
+ {
+  "name": "rta-smoke",
+  "what": "RT-A smoke (ci1, 2026-11-07): first idle, the wizard closed, n = navigator.hardwareConcurrency and the state, the windows, the per-Worker CPU of 5 idle seconds (the number of Workers), the engine log (Filter LoadLibraryW, unsupported)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "eval",
+    "expr": "({ hardwareConcurrency: navigator.hardwareConcurrency, state: window.__app.state, engine: window.__app.engineStatus().text })"
+   },
+   {
+    "op": "describe",
+    "name": "idle"
+   },
+   {
+    "op": "cpuStart",
+    "name": "idle-5s"
+   },
+   {
+    "op": "wait",
+    "ms": 5000
+   },
+   {
+    "op": "cpuStop",
+    "name": "idle-5s"
+   },
+   {
+    "op": "shot",
+    "name": "smoke"
+   },
+   {
+    "op": "saveLog",
+    "name": "engine-log",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

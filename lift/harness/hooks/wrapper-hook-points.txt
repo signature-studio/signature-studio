@@ -1,0 +1,9 @@
+# Inline hook points of Fruity Wrapper_x64.dll (Generators, 5,998,080 B, sha256 372bbc84e85f427d2419d04d548a9b763b96b85975b056f31d807fe480dba472; decision 0183; fe-lift lift --hook-points).
+# Same Delphi unit as FLEngine's unit 314, QuickFontCache's unit 162 and ILTools (decision 0105, qfc-hook-points.txt): the static initialisation f_5ecea0 (VAs at the file's ImageBase 0x400000)
+# constructs three hook objects with f_5e91f0(the class reference at [0x5e23b8...], 1, target, replacement, 0) (calls at 0x5ed017, 0x5ed03f, 0x5ed067; the only callers of f_5e91f0: byte scan of the call sites),
+# which saves the first 5 bytes of the target, builds "e9 rel32" and calls VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE = 0x40, &old). The targets and the replacements (the operands of the "lea r8" / "lea r9"
+# before each call): 0x41b700 -> 0x5e3930    0x439630 -> 0x5e3820    0x439650 -> 0x5e3890. First 5 bytes of the targets: 55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50 (the same three Delphi runtime functions
+# as in FLEngine, QFC and ILTools). Found by: the wrapper's DllMain stopped at VirtualProtect(0x701b700-ish) in the real engine run (walls.tsv W2 of decision 0183).
+rva:0x1b700   # 0x41b700, first 5 bytes 55 56 53 c6 44
+rva:0x39630   # 0x439630, first 5 bytes 53 48 83 ec 20
+rva:0x39650   # 0x439650, first 5 bytes 55 48 83 ec 50

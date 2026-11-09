@@ -1,0 +1,3 @@
+# Decision 0222 (win2, PROVISIONAL, opt-in): the import row of the wall that sweep1 found at user32!DispatchMessageA (thunk 0x4249b0, caller 0x86a1fb; F12 in the piano roll, MSG hwnd = a closed window, message 0xB021). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# NEW row only: pass `cat ship2-imports.txt dec1-imports.txt api2-imports.txt sweep1-imports.txt win2-imports.txt` as --extra-imports (this file LAST, so that the pseudo-VAs of the earlier rows do not move). The response table has to be the same in every module of a build (decision 0171).
+user32.dll DispatchMessageA fle_imp_DispatchMessageA

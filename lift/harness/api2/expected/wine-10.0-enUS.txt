@@ -1,0 +1,62 @@
+CompareStringA eq = 2
+CompareStringA lt = 1
+CompareStringA gt = 3
+CompareStringA icase = 2
+CompareStringA len3 = 2
+CompareStringA len-mixed = 2
+CompareStringA len-second = 2
+CompareStringA len-first-short = 1
+CompareStringA prefix = 1
+CompareStringA empty-len0 = 2
+CompareStringA empty-vs-empty = 2
+CompareStringA digits = 1
+CompareStringA null1 = 0 err=87
+CompareStringA null2 = 0 err=87
+LCMapStringA upper = 17 [48454c4c4f2c20574f524c442031323300]
+LCMapStringA lower = 17 [68656c6c6f2c20776f726c642031323300]
+LCMapStringA upper-size = 6
+LCMapStringA upper-len = 5 [48454c4c4f]
+LCMapStringA upper-len-size = 5
+LCMapStringA small-buffer = 0 err=122
+LCMapStringA exact-buffer = 6 [48454c4c4f00]
+LCMapStringA null-src = 0 err=87
+LCMapStringA empty = 1 [00]
+GetStringTypeA ctype1-ascii = 1 0382 0381 0284 0248 0210 0268
+GetStringTypeA ctype1-nul = 1 0382 0382 0220
+GetStringTypeA ctype1-cp1252 = 1 0302 0301 0248
+GetStringTypeA null-src = 1
+GetLocaleInfoA ILANGUAGE = 5 "0409"
+GetLocaleInfoA SDECIMAL = 2 "."
+GetLocaleInfoA STHOUSAND = 2 ","
+GetLocaleInfoA ANSICP = 5 "1252"
+GetLocaleInfoA ANSICP-number = 4 #1252
+GetLocaleInfoA ANSICP-size = 5
+GetLocaleInfoA ANSICP-small = 0 err=122
+GetLocaleInfoA ILANGUAGE-exact = 5 "0409"
+TzSpecificLocalTimeToSystemTime us-summer = 1 2024-07-01 dow1 16:00:00.000
+TzSpecificLocalTimeToSystemTime us-winter = 1 2024-01-15 dow1 17:00:00.000
+TzSpecificLocalTimeToSystemTime us-ambiguous-0130 = 1 2024-11-03 dow0 05:30:00.000
+TzSpecificLocalTimeToSystemTime us-end-0200 = 1 2024-11-03 dow0 07:00:00.000
+TzSpecificLocalTimeToSystemTime us-invalid-0230 = 1 2024-03-10 dow0 06:30:00.000
+TzSpecificLocalTimeToSystemTime us-before-start-0159 = 1 2024-03-10 dow0 06:59:00.000
+TzSpecificLocalTimeToSystemTime us-start-0200 = 1 2024-03-10 dow0 06:00:00.000
+TzSpecificLocalTimeToSystemTime us-year-rollover = 1 2025-01-01 dow3 03:00:00.000
+TzSpecificLocalTimeToSystemTime us-2025-last-sun-style = 1 2025-03-09 dow0 07:00:00.000
+TzSpecificLocalTimeToSystemTime au-january(dst) = 1 2024-01-10 dow3 01:00:00.000
+TzSpecificLocalTimeToSystemTime au-july(std) = 1 2024-07-10 dow3 02:00:00.000
+TzSpecificLocalTimeToSystemTime au-december(dst) = 1 2024-12-24 dow2 13:30:00.000
+TzSpecificLocalTimeToSystemTime au-ambiguous-0230 = 1 2024-04-06 dow6 15:30:00.000
+TzSpecificLocalTimeToSystemTime absolute-summer = 1 2024-06-01 dow6 11:00:00.000
+TzSpecificLocalTimeToSystemTime absolute-winter = 1 2024-12-01 dow0 12:00:00.000
+TzSpecificLocalTimeToSystemTime no-dst = 1 2024-07-01 dow1 03:00:00.000
+TzSpecificLocalTimeToSystemTime invalid-month = 0 err=87
+TzSpecificLocalTimeToSystemTime invalid-day = 1 2023-03-01 dow3 17:00:00.000
+TzSpecificLocalTimeToSystemTime leap-day = 1 2024-03-01 dow5 04:30:00.000
+TzSpecificLocalTimeToSystemTime year-end-carry = 1 2024-12-31 dow2 11:00:00.000
+TzSpecificLocalTimeToSystemTime null-tz-utc = 1 2024-07-01 dow1 12:00:00.000
+WriteConsoleA null = 0 err=6
+WriteConsoleA invalid = 0 err=6 written=0
+WriteConsoleA bogus = 0 err=6
+ReadConsoleW null = 0 err=6
+GetConsoleCP = 0 err=6
+VirtualQueryEx bogus-handle = 0 err=6

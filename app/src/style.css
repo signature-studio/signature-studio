@@ -1,0 +1,92 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; }
+body { margin: 0; background: #14161a; color: #d8dce2; }
+/* decision 0232: the header is ONE row whatever the manifest says. It used to wrap, and the manifest note of a shipping bundle (several hundred characters) made #bundle-info two lines on a row of its own: the header was 122 px instead of 72, the page 1302 px, and a
+   window of 1300 px could no longer hold the legacy layout (the browser then scrolled it by 2 px). The bundle's text is cut with an ellipsis; all of it is in the title of the element (main.ts). */
+header { box-sizing: border-box; min-height: 44px; padding: 6px 16px; border-bottom: 1px solid #2a2e36; display: flex; gap: 16px; align-items: baseline; flex-wrap: nowrap; }
+header h1 { white-space: nowrap; flex: 0 0 auto; }
+#bundle-info { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#audio-status, #status { flex: 0 0 auto; white-space: nowrap; }
+#display-box { flex: 0 0 auto; white-space: nowrap; }
+h1 { font-size: 16px; line-height: 20px; margin: 0; } h1 small { font-weight: normal; color: #8a93a2; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #8a93a2; margin: 12px 0 4px; }
+.muted { color: #8a93a2; font-size: 12px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; padding: 12px 16px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+#audio-status { font-size: 13px; line-height: 20px; }
+#audio-status[data-state="running"] { color: #8be28b; } #audio-status[data-state="needs-gesture"], #audio-status[data-state="resuming"] { color: #e2d08b; } #audio-status[data-state="blocked"], #audio-status[data-state="error"], #audio-status[data-state="unavailable"] { color: #ff8b8b; }
+#status { font-size: 13px; line-height: 20px; margin-left: auto; }
+#status[data-state="error"] { color: #ff8b8b; } #status[data-state="running"] { color: #8be28b; } #status[data-state="idle"] { color: #e2d08b; } #status[data-state="exited"] { color: #9ec1ff; }
+#error { background: #3a1c1c; border: 1px solid #8b3a3a; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; white-space: pre-wrap; }
+#error .where { color: #c9a0a0; font-size: 12px; display: block; margin-top: 4px; }
+#exit { background: #1c2733; border: 1px solid #3a5a7a; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; white-space: pre-wrap; }
+#exit[data-kind="stopped"], #exit[data-kind="trap"] { background: #2a2418; border-color: #7a6a3a; }
+#exit .note { display: block; margin-top: 4px; color: #d8c89a; }
+#toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 12px; margin-bottom: 8px; color: #aab2c0; }
+#toolbar select, #toolbar button { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 12px; padding: 2px 6px; }
+#desktop-box { overflow: auto; margin-top: 6px; }
+#desktop { position: relative; overflow: hidden; background: #05070a; outline: 1px solid #2a2e36; touch-action: none; user-select: none; -webkit-user-select: none; cursor: default; }
+#desktop canvas { position: absolute; display: block; background: #000; }
+#desktop:focus-visible { outline: 2px solid #5a8ad8; }
+#desktop[data-input="off"] { cursor: not-allowed; }
+#engine-line { font-size: 13px; margin: 4px 0; } #engine-state[data-state="idle"] { color: #8be28b; } #engine-state[data-state="computing"] { color: #e2d08b; } #engine-state[data-state="starting"] { color: #9ec1ff; } #engine-state[data-state="stopped"], #engine-state[data-state="error"] { color: #ff8b8b; }
+#check { margin-top: 6px; } #check.ok { color: #8be28b; } #check.bad { color: #ff8b8b; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+#phases li { font-size: 12px; padding: 3px 0 3px 18px; position: relative; color: #8a93a2; }
+#phases li::before { content: "\25CB"; position: absolute; left: 0; }
+#phases li[data-status="active"] { color: #e8ecf2; } #phases li[data-status="active"]::before { content: "\25B6"; color: #8be28b; }
+#phases li[data-status="done"] { color: #b8e0b8; } #phases li[data-status="done"]::before { content: "\2713"; color: #8be28b; }
+#phases li[data-status="failed"] { color: #ff8b8b; } #phases li[data-status="failed"]::before { content: "\2717"; }
+#phases li small { display: block; color: #8a93a2; }
+#progress { margin-top: 6px; }
+#progress li { font-size: 12px; margin-bottom: 6px; } #progress progress { width: 100%; height: 8px; display: block; }
+details { margin-top: 8px; border-top: 1px solid #2a2e36; padding-top: 6px; } summary { cursor: pointer; font-size: 12px; color: #aab2c0; }
+.scroll { max-height: 260px; overflow: auto; background: #0e1013; }
+#windows { border-collapse: collapse; font-size: 11px; width: 100%; } #windows th, #windows td { text-align: left; padding: 1px 6px; white-space: nowrap; } #windows th { position: sticky; top: 0; background: #1d2128; }
+#windows tr[data-visible="0"] td { color: #6b7380; }
+#log, #engine-log, #threads { font-size: 11px; max-height: 240px; overflow: auto; background: #0e1013; padding: 6px; margin: 4px 0 0; white-space: pre-wrap; }
+
+
+/* decision 0152: the Performance panel. Red = measured and short of the target; green = measured and met; grey = not measured */
+#perf-body { margin-top: 4px; } .perf-table { border-collapse: collapse; font-size: 11px; width: 100%; } .perf-table th, .perf-table td { text-align: left; padding: 2px 6px; vertical-align: top; } .perf-table th { background: #1d2128; }
+.perf-table tr[data-status="miss"] td:nth-child(2) { color: #ff8b8b; font-weight: 700; } .perf-table tr[data-status="met"] td:nth-child(2) { color: #8be28b; } .perf-table tr[data-status="na"] td:nth-child(2) { color: #8a93a2; } .perf-notice { font-size: 11px; line-height: 1.5; background: #1d2128; border-left: 3px solid #5b9bd5; padding: 4px 8px; margin: 4px 0; } .perf-notice p { margin: 3px 0; }
+
+/* decision 0193: the page's answer to the engine's file dialog (src/ui/filedlg.ts). It says that it is the page and that the person chooses. */
+#filedlg { position: fixed; inset: 0; z-index: 2147483000; /* above every engine window: the desktop gives its canvases z-index values from 1001 up */  background: rgba(5, 7, 10, 0.78); display: flex; align-items: center; justify-content: center; }
+#filedlg[hidden] { display: none; }
+.filedlg-box { background: #1b2230; border: 2px solid #5a8ad8; padding: 16px 20px; max-width: 640px; width: 90vw; font-size: 13px; color: #e8ecf2; }
+.filedlg-box h2 { font-size: 16px; margin: 8px 0; }
+.filedlg-tag { background: #26354d; border: 1px solid #3a5a7a; padding: 6px 10px; font-size: 12px; color: #cfe0f8; }
+.filedlg-row { display: block; margin: 8px 0; }
+.filedlg-box input[type="text"], .filedlg-box input[type="file"] { background: #0e1013; color: #e8ecf2; border: 1px solid #3a4150; font-size: 13px; padding: 3px 6px; }
+.filedlg-box button { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 13px; padding: 4px 12px; margin-right: 8px; }
+#filedlg-status { margin-top: 8px; min-height: 1.4em; color: #cfe0f8; } #filedlg-status[data-error="1"] { color: #ff8b8b; }
+#saved-list li { font-size: 12px; margin-bottom: 6px; } #saved-list button { margin-left: 8px; }
+
+/* decision 0212 : the whole page is the viewport; the header is its natural height, the monitor panel is the 340 px column on the right, and EVERYTHING ELSE is the desktop (the guest's screen). The toolbar and the
+   engine's status lines are moved into the panel by main.ts; errors and the exit note float over the top of the desktop. the header button closes the panel. */
+#display-box { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #aab2c0; }
+#display-box[hidden] { display: none; }
+#panel-toggle { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 12px; padding: 2px 6px; cursor: pointer; }
+#display-box select:disabled { cursor: not-allowed; opacity: .7; }
+#resize-note { display: none; }
+body.panel-off aside { display: none; }
+body.panel-off main { grid-template-columns: minmax(0, 1fr); }
+body.screen-fit { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+body.screen-fit header { flex: 0 0 auto; box-sizing: border-box; height: 36px; min-height: 36px; padding: 0 12px; flex-wrap: nowrap; align-items: center; gap: 12px; overflow: hidden; }
+body.screen-fit #status { margin-left: 0; }
+body.screen-fit main { flex: 1 1 auto; min-height: 0; padding: 0; gap: 0; }
+body.screen-fit #stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+body.screen-fit #desktop-box { position: absolute; inset: 0; margin: 0; overflow: hidden; }
+body.screen-fit #desktop { outline: none; }
+body.screen-fit aside { min-width: 0; min-height: 0; overflow: auto; padding: 0 8px 8px; border-left: 1px solid #2a2e36; box-sizing: border-box; }
+body.screen-fit #error, body.screen-fit #exit { position: absolute; top: 0; left: 0; right: 0; z-index: 2147482000; margin: 0; }
+body.screen-fit #resize-note:not([hidden]) { display: block; position: absolute; right: 12px; bottom: 12px; z-index: 2147482000; background: rgba(27, 34, 48, 0.94); border: 1px solid #5a8ad8; color: #e8ecf2; font-size: 13px; padding: 6px 10px; }
+body.screen-fit #taskbar { position: absolute; left: 12px; bottom: 12px; z-index: 2147482000; }
+body.screen-fit #taskbar-restore { background: rgba(27, 34, 48, 0.94); color: #e8ecf2; border: 1px solid #5a8ad8; font-size: 13px; padding: 6px 12px; cursor: pointer; }
+body.screen-fit #taskbar-restore:focus-visible { outline: 2px solid #5a8ad8; outline-offset: 2px; }
+body.screen-fit #resize-note button { margin-left: 8px; background: #26354d; color: #e8ecf2; border: 1px solid #5a8ad8; font-size: 12px; padding: 2px 8px; cursor: pointer; }
+body.screen-fit #check { position: absolute; left: 8px; bottom: 8px; z-index: 2147482000; margin: 0; background: rgba(14, 16, 19, 0.85); padding: 2px 6px; }
+body.screen-fit #check[hidden] { display: none; }
+body.screen-fit #display-section { border-bottom: 1px solid #2a2e36; padding-bottom: 6px; }
+body.screen-fit #display-section #toolbar { margin-bottom: 4px; }
+@media (max-width: 900px) { body.screen-fit main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 30vh); } body.screen-fit aside { border-left: 0; border-top: 1px solid #2a2e36; } body.screen-fit.panel-off main { grid-template-rows: minmax(0, 1fr); } }

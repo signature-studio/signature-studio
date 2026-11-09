@@ -1,0 +1,32 @@
+[workspace]
+members = ["crates/fe-pe", "crates/fe-decode", "crates/fe-lift", "crates/fe-wasmgen"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "UNLICENSED"
+publish = false
+
+# Decision 0149 (test speed). Most of the test time that is left after the core-dump fix is the Rust code of the four crates analysing the 22-40 MB DLLs
+# inside the test processes. They are compiled optimised; overflow-checks and debug-assertions stay on (they belong to the profile, not to opt-level), so a
+# test still panics on an arithmetic overflow. debug = 0 is what every full run so far set by hand (CARGO_PROFILE_DEV_DEBUG=0). The test crates of
+# fe-lift are compiled with fe-lift's setting too (a package override covers all targets of the package), hence opt-level 1 there: 2 would make every
+# edit of a crate source cost 3x more build time.
+[profile.dev]
+debug = 0
+
+[profile.dev.package.iced-x86]
+opt-level = 2
+
+[profile.dev.package.fe-pe]
+opt-level = 2
+
+[profile.dev.package.fe-decode]
+opt-level = 2
+
+[profile.dev.package.fe-lift]
+opt-level = 1
+
+[profile.dev.package.fe-wasmgen]
+opt-level = 1

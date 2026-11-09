@@ -1,0 +1,24 @@
+# Decision 0206 (dec1, PROVISIONAL), LAYER 5: the rows of the kernel32/user32/shell32 imports of the three sample-decoder DLLs of the installer (oggio_x64.dll, wavpackdll_x64.dll, DelZip64.dll; runtime/fle_wall_dec1.c), plus two existing runtime
+# functions that have no row (IsProcessorFeaturePresent, TlsFree: fle_sysinfo.c, fle_imports.c).
+# THIS FILE HOLDS ONLY THE NEW ROWS (18). It is appended AFTER the earlier layers so that their pseudo-VAs do not move:
+#   cat harness/seeds/ship-imports.txt harness/seeds/exp1-imports.txt harness/seeds/dec1-imports.txt [harness/seeds/dec1-acm-imports.txt] > <combined rows file>      (ship-imports.txt = layers 1-3 + the shipping bundle's rows; exp1-imports.txt = layer 4, the Save dialog and the Export walls: needed
+#   for File -> Export; the dec1 unit harness and File -> Open need only ship-imports.txt + this file). Pass the combined file as fe-lift --extra-imports / FLE_EXTRA_IMPORTS: every image of a build gets the same file (the response tables must be equal).
+# Format of decision 0156: <dll> <API> <runtime function>. Adding these rows changes what FLEngine's own GetProcAddress finds for these names; measured on the 16-snapshot start-up: no change (docs/0206-sample-decoders.md section 9).
+kernel32.dll InitializeCriticalSectionEx fle_imp_InitializeCriticalSectionEx
+kernel32.dll GetFileSizeEx fle_imp_GetFileSizeEx
+kernel32.dll GetUserDefaultLCID fle_imp_GetUserDefaultLCID
+kernel32.dll LCMapStringEx fle_imp_LCMapStringEx
+kernel32.dll CompareStringEx fle_imp_CompareStringEx
+kernel32.dll GetLocaleInfoEx fle_imp_GetLocaleInfoEx
+kernel32.dll EnumSystemLocalesW fle_imp_EnumSystemLocalesW
+kernel32.dll IsProcessorFeaturePresent fle_imp_IsProcessorFeaturePresent
+kernel32.dll TlsFree fle_imp_TlsFree
+kernel32.dll CreateFileA fle_imp_CreateFileA
+kernel32.dll GetFileTime fle_imp_GetFileTime
+kernel32.dll InitOnceExecuteOnce fle_imp_InitOnceExecuteOnce
+user32.dll CharNextA fle_imp_CharNextA
+user32.dll CharLowerBuffA fle_imp_CharLowerBuffA
+shell32.dll SHChangeNotify fle_imp_SHChangeNotify
+kernel32.dll CompareFileTime fle_imp_CompareFileTime
+kernel32.dll GetDiskFreeSpaceW fle_imp_GetDiskFreeSpaceW
+kernel32.dll MoveFileWithProgressW fle_imp_MoveFileWithProgressW

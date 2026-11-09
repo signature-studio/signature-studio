@@ -1,0 +1,32 @@
+# perf3: common prefix for the FAST / NOFAST comparison (a) (b): the first idle (wizard shown), 7 snapshots every 250 virtual ms (decision 0142: converged at 1.75 s), three more, then Enter and four snapshots of the closing animation.
+snap wiz0
+advance 250
+snap a0250
+advance 250
+snap a0500
+advance 250
+snap a0750
+advance 250
+snap a1000
+advance 250
+snap a1250
+advance 250
+snap a1500
+advance 250
+snap a1750
+advance 250
+snap a2000
+advance 1000
+snap a3000
+advance 1000
+snap a4000
+tap 13
+advance 300
+snap e0300
+advance 1000
+snap e1300
+advance 1000
+snap e2300
+advance 1000
+snap e3300
+end

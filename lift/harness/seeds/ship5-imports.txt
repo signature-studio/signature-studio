@@ -1,0 +1,299 @@
+# Decision 0230 (ship4, PROVISIONAL): the shipping EXTRA_IMPORTS of SHIP_PRESET=F2xH5 = ship4-imports.txt (decision 0218, 196 rows) UNCHANGED and FIRST + ref1-imports.txt (decision 0229: the 13 msacm32 rows and user32 SendMessageA, 14 rows)
+# LAST, so that the pseudo-VAs of the earlier rows do not move (fe-lift gives a row its pseudo VA by its position). Made by `cat ship4-imports.txt ref1-imports.txt` with this header and a line before each part. 210 rows, no (dll, API) pair twice
+# (checked: ci/test-ship5-imports.sh). The original files are not edited; a change to one of them has to be repeated here.
+
+# ======== ship4-imports.txt (verbatim) ========
+# Decision 0218 (ship3, PROVISIONAL): the shipping EXTRA_IMPORTS of SHIP_PRESET=F1xH4|F2xH4 = the seven row files below, concatenated in this order (format of decision 0156:
+# <dll> <API> <runtime function>; '#' starts a comment). fe-lift lift ... --extra-imports gives a row its pseudo VA by its position, so the order is fixed: a row file may only be appended AFTER
+# the files before it (the rows of an earlier file keep their VA). Checked when this file was made: 196 rows, no (dll, API) pair twice. The rows of wrp1/wrp2/wrp3 (VST3 hosting) and
+# dec1-acm-imports.txt (an exploration) are not included. The original files are not edited; a change to one of them has to be repeated here (lift/harness/seeds/ship4-imports.sh makes this file).
+
+# ======== ship2-imports.txt (verbatim) ========
+# Decision 0208 (ship2, PROVISIONAL): the shipping rows file of SHIP2 = dlg1-imports.txt (layers 1-3, decisions 0171/0178: UNCHANGED and FIRST, so that the pseudo-VAs of the earlier rows do not move)
+# + exp1-imports.txt (layer 4, decision 0188: 5 IFileSaveDialog:: slots + SetThreadExecutionState; ia2-imports.txt LACKS these 6 rows) + the 10 rows that ia2-imports.txt (decision 0191) adds after dlg1-imports.txt.
+# Sets: dlg1 101 rows, exp1 6, ia2-new 10 = 117 rows, no duplicates, no (dll, api) conflicts. NOT included: wrp1/wrp2 rows (not for shipping). Order choice S-ship2-order: chronological by decision (0178, 0188, 0191).
+# Decision 0171 (PROVISIONAL), LAYER 1 + LAYER 2 (layer 1 alone: ia1-imports-l1.txt): the import rows that the user operations of the main window reached (fe-lift lift ... --extra-imports THIS FILE; lift/harness/two/gen_two.sh: FLE_EXTRA_IMPORTS=THIS FILE).
+# Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment. Without the option the generated C is the one of the earlier decisions (the rows are not in TABLE).
+# The rows of delay-loaded imports (LogicalToPhysicalPoint ...) matter through the response table (GetProcAddress, fle_resp_table), which is built from the same rows.
+# wall ia1-W1: the clipboard (runtime/fle_clip.c)
+user32.dll OpenClipboard fle_imp_OpenClipboard
+user32.dll CloseClipboard fle_imp_CloseClipboard
+user32.dll EmptyClipboard fle_imp_EmptyClipboard
+user32.dll IsClipboardFormatAvailable fle_imp_IsClipboardFormatAvailable
+user32.dll CountClipboardFormats fle_imp_CountClipboardFormats
+user32.dll EnumClipboardFormats fle_imp_EnumClipboardFormats
+user32.dll GetClipboardData fle_imp_GetClipboardData
+user32.dll SetClipboardData fle_imp_SetClipboardData
+ole32.dll OleSetClipboard fle_imp_OleSetClipboard
+ole32.dll OleIsCurrentClipboard fle_imp_OleIsCurrentClipboard
+ole32.dll OleFlushClipboard fle_imp_OleFlushClipboard
+# wall ia1-W2: the toolbar's Shift/Ctrl/Alt buttons (runtime/fle_input.c)
+user32.dll SetKeyboardState fle_imp_SetKeyboardState
+# wall ia1-W3: timer-queue timers (runtime/fle_timerq.c)
+kernel32.dll CreateTimerQueueTimer fle_imp_CreateTimerQueueTimer
+kernel32.dll ChangeTimerQueueTimer fle_imp_ChangeTimerQueueTimer
+kernel32.dll DeleteTimerQueueTimer fle_imp_DeleteTimerQueueTimer
+# walls ia1-W4, W5: the system caret, ShowOwnedPopups (runtime/fle_win.c)
+user32.dll CreateCaret fle_imp_CreateCaret
+user32.dll DestroyCaret fle_imp_DestroyCaret
+user32.dll HideCaret fle_imp_HideCaret
+user32.dll ShowCaret fle_imp_ShowCaret
+user32.dll SetCaretPos fle_imp_SetCaretPos
+user32.dll ShowOwnedPopups fle_imp_ShowOwnedPopups
+# wall ia1-W6: shell32 (runtime/fle_shell.c)
+shell32.dll PathCleanupSpec fle_imp_PathCleanupSpec
+# walls ia1-W8, W9: delay-loaded user32 exports (runtime/fle_win.c)
+user32.dll LogicalToPhysicalPoint fle_imp_LogicalToPhysicalPoint
+user32.dll PhysicalToLogicalPoint fle_imp_PhysicalToLogicalPoint
+# LAYER 2 (wall ia1-W13): dwmapi exports that the menu bar and the pop-up menus delay-load (runtime/fle_dwm.c). DwmIsCompositionEnabled is also asked at START-UP: with the row it answers TRUE (FL64.exe's manifest declares Windows 8 / 8.1) and the engine takes the composition path, so the start-up (entries, wizard surface) differs from the recorded baseline
+dwmapi.dll DwmIsCompositionEnabled fle_imp_DwmIsCompositionEnabled
+dwmapi.dll DwmExtendFrameIntoClientArea fle_imp_DwmExtendFrameIntoClientArea
+# wall ia1-W14: WH_CALLWNDPROC (runtime/fle_win.c; SetWindowsHookExW is an old row)
+user32.dll CallNextHookEx fle_imp_CallNextHookEx
+# wall ia1-W15: SetWindowRgn (runtime/fle_win.c, state only)
+user32.dll SetWindowRgn fle_imp_SetWindowRgn
+# Decision 0178 (dlg1, PROVISIONAL): the rows of the file-open dialog COM model (runtime/fle_filedlg.c). This file = harness/seeds/ia1-imports.txt (decision 0171, layers 1 and 2, unchanged and first, so that their
+# pseudo-VAs do not move) + the rows below. Format of decision 0156: <dll> <API> <runtime function>.
+# The 'Interface::Method' names are NOT exports: they are the slots of the vtables of the objects that CoCreateInstance(CLSID_FileOpenDialog) and the shell items return (the precedent is shell32 'IMalloc::Release',
+# decision 0098): rows only so that the lifted code reaches them through fle_dispatch. The vtable orders are those of shobjidl.idl (see fle_filedlg.h).
+shell32.dll SHCreateItemFromParsingName fle_imp_SHCreateItemFromParsingName
+shell32.dll SHGetKnownFolderPath fle_imp_SHGetKnownFolderPath
+shell32.dll ShellObj::QueryInterface fle_imp_ShellObj_QueryInterface
+shell32.dll ShellObj::AddRef fle_imp_ShellObj_AddRef
+shell32.dll ShellObj::Release fle_imp_ShellObj_Release
+shell32.dll IFileOpenDialog::Show fle_imp_IFileOpenDialog_Show
+shell32.dll IFileOpenDialog::SetFileTypes fle_imp_IFileOpenDialog_SetFileTypes
+shell32.dll IFileOpenDialog::SetFileTypeIndex fle_imp_IFileOpenDialog_SetFileTypeIndex
+shell32.dll IFileOpenDialog::GetFileTypeIndex fle_imp_IFileOpenDialog_GetFileTypeIndex
+shell32.dll IFileOpenDialog::Advise fle_imp_IFileOpenDialog_Advise
+shell32.dll IFileOpenDialog::Unadvise fle_imp_IFileOpenDialog_Unadvise
+shell32.dll IFileOpenDialog::SetOptions fle_imp_IFileOpenDialog_SetOptions
+shell32.dll IFileOpenDialog::GetOptions fle_imp_IFileOpenDialog_GetOptions
+shell32.dll IFileOpenDialog::SetDefaultFolder fle_imp_IFileOpenDialog_SetDefaultFolder
+shell32.dll IFileOpenDialog::SetFolder fle_imp_IFileOpenDialog_SetFolder
+shell32.dll IFileOpenDialog::GetFolder fle_imp_IFileOpenDialog_GetFolder
+shell32.dll IFileOpenDialog::GetCurrentSelection fle_imp_IFileOpenDialog_GetCurrentSelection
+shell32.dll IFileOpenDialog::SetFileName fle_imp_IFileOpenDialog_SetFileName
+shell32.dll IFileOpenDialog::GetFileName fle_imp_IFileOpenDialog_GetFileName
+shell32.dll IFileOpenDialog::SetTitle fle_imp_IFileOpenDialog_SetTitle
+shell32.dll IFileOpenDialog::SetOkButtonLabel fle_imp_IFileOpenDialog_SetOkButtonLabel
+shell32.dll IFileOpenDialog::SetFileNameLabel fle_imp_IFileOpenDialog_SetFileNameLabel
+shell32.dll IFileOpenDialog::GetResult fle_imp_IFileOpenDialog_GetResult
+shell32.dll IFileOpenDialog::AddPlace fle_imp_IFileOpenDialog_AddPlace
+shell32.dll IFileOpenDialog::SetDefaultExtension fle_imp_IFileOpenDialog_SetDefaultExtension
+shell32.dll IFileOpenDialog::Close fle_imp_IFileOpenDialog_Close
+shell32.dll IFileOpenDialog::SetClientGuid fle_imp_IFileOpenDialog_SetClientGuid
+shell32.dll IFileOpenDialog::ClearClientData fle_imp_IFileOpenDialog_ClearClientData
+shell32.dll IFileOpenDialog::SetFilter fle_imp_IFileOpenDialog_SetFilter
+shell32.dll IFileOpenDialog::GetResults fle_imp_IFileOpenDialog_GetResults
+shell32.dll IFileOpenDialog::GetSelectedItems fle_imp_IFileOpenDialog_GetSelectedItems
+shell32.dll IShellItem::BindToHandler fle_imp_IShellItem_BindToHandler
+shell32.dll IShellItem::GetParent fle_imp_IShellItem_GetParent
+shell32.dll IShellItem::GetDisplayName fle_imp_IShellItem_GetDisplayName
+shell32.dll IShellItem::GetAttributes fle_imp_IShellItem_GetAttributes
+shell32.dll IShellItem::Compare fle_imp_IShellItem_Compare
+shell32.dll IShellItemArray::BindToHandler fle_imp_IShellItemArray_BindToHandler
+shell32.dll IShellItemArray::GetPropertyStore fle_imp_IShellItemArray_GetPropertyStore
+shell32.dll IShellItemArray::GetPropertyDescriptionList fle_imp_IShellItemArray_GetPropertyDescriptionList
+shell32.dll IShellItemArray::GetAttributes fle_imp_IShellItemArray_GetAttributes
+shell32.dll IShellItemArray::GetCount fle_imp_IShellItemArray_GetCount
+shell32.dll IShellItemArray::GetItemAt fle_imp_IShellItemArray_GetItemAt
+shell32.dll IShellItemArray::EnumItems fle_imp_IShellItemArray_EnumItems
+shell32.dll IFileDialogCustomize::EnableOpenDropDown fle_imp_IFileDialogCustomize_EnableOpenDropDown
+shell32.dll IFileDialogCustomize::AddMenu fle_imp_IFileDialogCustomize_AddMenu
+shell32.dll IFileDialogCustomize::AddPushButton fle_imp_IFileDialogCustomize_AddPushButton
+shell32.dll IFileDialogCustomize::AddComboBox fle_imp_IFileDialogCustomize_AddComboBox
+shell32.dll IFileDialogCustomize::AddRadioButtonList fle_imp_IFileDialogCustomize_AddRadioButtonList
+shell32.dll IFileDialogCustomize::AddCheckButton fle_imp_IFileDialogCustomize_AddCheckButton
+shell32.dll IFileDialogCustomize::AddEditBox fle_imp_IFileDialogCustomize_AddEditBox
+shell32.dll IFileDialogCustomize::AddSeparator fle_imp_IFileDialogCustomize_AddSeparator
+shell32.dll IFileDialogCustomize::AddText fle_imp_IFileDialogCustomize_AddText
+shell32.dll IFileDialogCustomize::SetControlLabel fle_imp_IFileDialogCustomize_SetControlLabel
+shell32.dll IFileDialogCustomize::GetControlState fle_imp_IFileDialogCustomize_GetControlState
+shell32.dll IFileDialogCustomize::SetControlState fle_imp_IFileDialogCustomize_SetControlState
+shell32.dll IFileDialogCustomize::GetEditBoxText fle_imp_IFileDialogCustomize_GetEditBoxText
+shell32.dll IFileDialogCustomize::SetEditBoxText fle_imp_IFileDialogCustomize_SetEditBoxText
+shell32.dll IFileDialogCustomize::GetCheckButtonState fle_imp_IFileDialogCustomize_GetCheckButtonState
+shell32.dll IFileDialogCustomize::SetCheckButtonState fle_imp_IFileDialogCustomize_SetCheckButtonState
+shell32.dll IFileDialogCustomize::AddControlItem fle_imp_IFileDialogCustomize_AddControlItem
+shell32.dll IFileDialogCustomize::RemoveControlItem fle_imp_IFileDialogCustomize_RemoveControlItem
+shell32.dll IFileDialogCustomize::RemoveAllControlItems fle_imp_IFileDialogCustomize_RemoveAllControlItems
+shell32.dll IFileDialogCustomize::GetControlItemState fle_imp_IFileDialogCustomize_GetControlItemState
+shell32.dll IFileDialogCustomize::SetControlItemState fle_imp_IFileDialogCustomize_SetControlItemState
+shell32.dll IFileDialogCustomize::GetSelectedControlItem fle_imp_IFileDialogCustomize_GetSelectedControlItem
+shell32.dll IFileDialogCustomize::SetSelectedControlItem fle_imp_IFileDialogCustomize_SetSelectedControlItem
+shell32.dll IFileDialogCustomize::StartVisualGroup fle_imp_IFileDialogCustomize_StartVisualGroup
+shell32.dll IFileDialogCustomize::EndVisualGroup fle_imp_IFileDialogCustomize_EndVisualGroup
+shell32.dll IFileDialogCustomize::MakeProminent fle_imp_IFileDialogCustomize_MakeProminent
+shell32.dll IFileDialogCustomize::SetControlItemText fle_imp_IFileDialogCustomize_SetControlItemText
+# walls reached while opening a project (runtime/fle_wall_dlg1.c)
+mpr.dll WNetGetUniversalNameW fle_imp_WNetGetUniversalNameW
+kernel32.dll GetFileInformationByHandle fle_imp_GetFileInformationByHandle
+kernel32.dll SetEndOfFile fle_imp_SetEndOfFile
+# Decision 0188 (exp1, PROVISIONAL), LAYER 4: the rows of the file SAVE dialog COM model (runtime/fle_filedlg.c) and of the walls that File -> Export -> Wave file reached (runtime/fle_wall_exp1.c).
+# THIS FILE HOLDS ONLY THE NEW ROWS. It is appended AFTER harness/seeds/dlg1-imports.txt (layers 1-3: decisions 0171 and 0178, unchanged and first, so that the pseudo-VAs of the earlier rows do not move):
+#   cat harness/seeds/dlg1-imports.txt harness/seeds/exp1-imports.txt > <combined rows file>      and pass the combined file as fe-lift --extra-imports / FLE_EXTRA_IMPORTS.
+# Format of decision 0156: <dll> <API> <runtime function>. The 'Interface::Method' names are not exports but vtable slots (the precedent is shell32 'IMalloc::Release', decision 0098).
+# IFileSaveDialog is IFileDialog (the same rows 'IFileOpenDialog::<m>' for the slots 3-26) + five slots of its own (shobjidl.idl; docs/investigations/exp1/tables/vtbl-order-check.txt).
+shell32.dll IFileSaveDialog::SetSaveAsItem fle_imp_IFileSaveDialog_SetSaveAsItem
+shell32.dll IFileSaveDialog::SetProperties fle_imp_IFileSaveDialog_SetProperties
+shell32.dll IFileSaveDialog::SetCollectedProperties fle_imp_IFileSaveDialog_SetCollectedProperties
+shell32.dll IFileSaveDialog::GetProperties fle_imp_IFileSaveDialog_GetProperties
+shell32.dll IFileSaveDialog::ApplyProperties fle_imp_IFileSaveDialog_ApplyProperties
+# walls reached while exporting a wave file (runtime/fle_wall_exp1.c)
+kernel32.dll SetThreadExecutionState fle_imp_SetThreadExecutionState
+# ===== LAYER 4 (decision 0191, PROVISIONAL): the rows that the second wave of user operations reached. The lines above are decision 0178's dlg1-imports.txt (= layers 1-3: decision 0171's ia1-imports.txt, then the file-dialog rows), unchanged. =====
+# wall ia2-W18: File > Save / Save as / Save new version ask the name of the shortcut key (runtime/fle_wall_ia2.c)
+user32.dll GetKeyNameTextW fle_imp_GetKeyNameTextW
+# wall ia2-W23: the playlist's wheel and scroll bars scroll the window's bits (runtime/fle_wall_ia2.c)
+user32.dll ScrollWindowEx fle_imp_ScrollWindowEx
+# wall ia2-W24: dragging a pattern out of the playlist's pattern list (runtime/fle_wall_ia2.c: the drag is answered as cancelled, S-ia2-dragdrop-cancel)
+ole32.dll DoDragDrop fle_imp_DoDragDrop
+# wall ia2-W28: Tools > Riff machine shows a message box (runtime/fle_wall_ia2.c: no window is shown, the default button is answered, S-ia2-msgbox-default)
+user32.dll MessageBoxW fle_imp_MessageBoxW
+# wall ia2-W16 (decision 0171, met again): Help and Tools > Cloud items open a URL (runtime/fle_wall_ia2.c: nothing is started, SE_ERR_NOASSOC is answered, S-ia2-shellexecute-noassoc)
+shell32.dll ShellExecuteW fle_imp_ShellExecuteW
+# wall ia2-W17 (decision 0171, met again): Help > FL Studio tutorials and the other 'Internet links' read their .url files (runtime/fle_wall_ia2v.c: an initialization-file reader on the virtual volume)
+kernel32.dll GetPrivateProfileStringW fle_imp_GetPrivateProfileStringW
+# wall ia2-W30: after reading the .url file the Help "Internet links" write the same file (runtime/fle_wall_ia2v.c: the initialization-file writer on the virtual volume)
+kernel32.dll WritePrivateProfileStringW fle_imp_WritePrivateProfileStringW
+# wall ia2-W21: the channel rack's settings icon reaches a delay-loaded kernel32 export (runtime/fle_wall_ia2t.c; the Python312.dll path of LoadLibraryW is answered "not found")
+kernel32.dll GetTimeZoneInformationForYear fle_imp_GetTimeZoneInformationForYear
+# wall ia2-W31: the engine's scroll helper (f_825d20) invalidates the region ScrollWindowEx filled (Alt+F7) (runtime/fle_wall_ia2w.c)
+user32.dll InvalidateRgn fle_imp_InvalidateRgn
+
+# ======== dec1-imports.txt (verbatim) ========
+# Decision 0206 (dec1, PROVISIONAL), LAYER 5: the rows of the kernel32/user32/shell32 imports of the three sample-decoder DLLs of the installer (oggio_x64.dll, wavpackdll_x64.dll, DelZip64.dll; runtime/fle_wall_dec1.c), plus two existing runtime
+# functions that have no row (IsProcessorFeaturePresent, TlsFree: fle_sysinfo.c, fle_imports.c).
+# THIS FILE HOLDS ONLY THE NEW ROWS (18). It is appended AFTER the earlier layers so that their pseudo-VAs do not move:
+#   cat harness/seeds/ship-imports.txt harness/seeds/exp1-imports.txt harness/seeds/dec1-imports.txt [harness/seeds/dec1-acm-imports.txt] > <combined rows file>      (ship-imports.txt = layers 1-3 + the shipping bundle's rows; exp1-imports.txt = layer 4, the Save dialog and the Export walls: needed
+#   for File -> Export; the dec1 unit harness and File -> Open need only ship-imports.txt + this file). Pass the combined file as fe-lift --extra-imports / FLE_EXTRA_IMPORTS: every image of a build gets the same file (the response tables must be equal).
+# Format of decision 0156: <dll> <API> <runtime function>. Adding these rows changes what FLEngine's own GetProcAddress finds for these names; measured on the 16-snapshot start-up: no change (docs/0206-sample-decoders.md section 9).
+kernel32.dll InitializeCriticalSectionEx fle_imp_InitializeCriticalSectionEx
+kernel32.dll GetFileSizeEx fle_imp_GetFileSizeEx
+kernel32.dll GetUserDefaultLCID fle_imp_GetUserDefaultLCID
+kernel32.dll LCMapStringEx fle_imp_LCMapStringEx
+kernel32.dll CompareStringEx fle_imp_CompareStringEx
+kernel32.dll GetLocaleInfoEx fle_imp_GetLocaleInfoEx
+kernel32.dll EnumSystemLocalesW fle_imp_EnumSystemLocalesW
+kernel32.dll IsProcessorFeaturePresent fle_imp_IsProcessorFeaturePresent
+kernel32.dll TlsFree fle_imp_TlsFree
+kernel32.dll CreateFileA fle_imp_CreateFileA
+kernel32.dll GetFileTime fle_imp_GetFileTime
+kernel32.dll InitOnceExecuteOnce fle_imp_InitOnceExecuteOnce
+user32.dll CharNextA fle_imp_CharNextA
+user32.dll CharLowerBuffA fle_imp_CharLowerBuffA
+shell32.dll SHChangeNotify fle_imp_SHChangeNotify
+kernel32.dll CompareFileTime fle_imp_CompareFileTime
+kernel32.dll GetDiskFreeSpaceW fle_imp_GetDiskFreeSpaceW
+kernel32.dll MoveFileWithProgressW fle_imp_MoveFileWithProgressW
+
+# ======== crash1-imports.txt (verbatim) ========
+# Decision 0209 (crash1, PROVISIONAL): the import rows of the walls that the client's browser reported. Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment (fe-lift lift ... --extra-imports THIS FILE, after the rows
+# of the shipping file ship-imports.txt: a build that wants both passes both files, or `cat ship-imports.txt crash1-imports.txt`). Without these rows the generated C is the one of the earlier decisions. LCMapStringW needs no row (it is in the
+# default table); its fix is runtime/fle_crash1_lcmap.c.
+# wall crash1-W2: the Sampler channel window's Envelope tab (found by ship2 in F2xH2 with Sampler.flp open: `unsupported instruction at 0x592850` = shell32!DragAcceptFiles): the file drag-and-drop family (runtime/fle_crash1_drag.c)
+shell32.dll DragAcceptFiles fle_imp_DragAcceptFiles
+shell32.dll DragQueryFileW fle_imp_DragQueryFileW
+shell32.dll DragQueryPoint fle_imp_DragQueryPoint
+shell32.dll DragFinish fle_imp_DragFinish
+# wall crash1-W3 (a reading, api2's census: the engine imports them, no row): user32's menu family (runtime/fle_crash1_menu.c). Checked against Wine 10.0 on 156 lines (runtime/test/menu_battery.inc)
+user32.dll CreateMenu fle_imp_CreateMenu
+user32.dll CreatePopupMenu fle_imp_CreatePopupMenu
+user32.dll DestroyMenu fle_imp_DestroyMenu
+user32.dll GetMenuItemCount fle_imp_GetMenuItemCount
+user32.dll GetMenuItemID fle_imp_GetMenuItemID
+user32.dll GetMenuItemInfoW fle_imp_GetMenuItemInfoW
+user32.dll GetMenuState fle_imp_GetMenuState
+user32.dll GetMenuStringW fle_imp_GetMenuStringW
+user32.dll GetSubMenu fle_imp_GetSubMenu
+user32.dll InsertMenuItemW fle_imp_InsertMenuItemW
+user32.dll InsertMenuW fle_imp_InsertMenuW
+user32.dll RemoveMenu fle_imp_RemoveMenu
+user32.dll SetMenuItemInfoW fle_imp_SetMenuItemInfoW
+user32.dll TrackPopupMenu fle_imp_TrackPopupMenu
+
+# ======== api2-imports.txt (verbatim) ========
+# Decision 0210 (api2, PROVISIONAL, opt-in): the import rows of the first block of the systematic API coverage (runtime/fle_api2_*.c). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# The file drag-and-drop trio (DragQueryFileW, DragQueryPoint, DragFinish) is provided by crash1 (decision 0209), not here.
+# NEW rows only (none of them is in TABLE or in ship-imports.txt): pass `cat ship-imports.txt api2-imports.txt` as --extra-imports so that the pseudo-VAs of the earlier rows do not move (the way decision 0206 did it).
+# The build also needs lift/runtime/fle_api2_{call,str,sys,shell}.c (build-engine-bundle.sh / a4-multi.sh take the runtime files of a row by name; the rows alone change nothing in the default build).
+kernel32.dll CompareStringA fle_imp_CompareStringA
+kernel32.dll LCMapStringA fle_imp_LCMapStringA
+kernel32.dll GetStringTypeA fle_imp_GetStringTypeA
+kernel32.dll GetLocaleInfoA fle_imp_GetLocaleInfoA
+kernel32.dll TzSpecificLocalTimeToSystemTime fle_imp_TzSpecificLocalTimeToSystemTime
+kernel32.dll GetLargePageMinimum fle_imp_GetLargePageMinimum
+kernel32.dll VirtualQueryEx fle_imp_VirtualQueryEx
+kernel32.dll OutputDebugStringA fle_imp_OutputDebugStringA
+kernel32.dll WriteConsoleA fle_imp_WriteConsoleA
+kernel32.dll ReadConsoleW fle_imp_ReadConsoleW
+kernel32.dll GetConsoleCP fle_imp_GetConsoleCP
+kernel32.dll CreateSymbolicLinkW fle_imp_CreateSymbolicLinkW
+shell32.dll ShellExecuteA fle_imp_ShellExecuteA
+shell32.dll ShellExecuteExW fle_imp_ShellExecuteExW
+
+# ======== act1-imports.txt (verbatim) ========
+# Decision 0213 (act1, PROVISIONAL), LAYER 5: THIS FILE HOLDS ONLY THE NEW ROWS (the style of harness/seeds/exp1-imports.txt). Append it AFTER the rows of the build it is added to, so that the pseudo-VAs of the earlier rows do not move:
+#   cat harness/seeds/ship2-imports.txt harness/seeds/act1-imports.txt > <combined rows file>     (the rows of the shipping bundle SHIP2 + these; NOT generated or tested by act1)
+# act1's own builds (docs/0213-activation.md section 3): A1 = ia2-imports.txt + these rows (logs/rows-A1-combined.txt); A2 = ia2-imports.txt + exp1-imports.txt + these rows (logs/rows-A2-combined.txt).
+# Format of decision 0156: <dll> <API> <runtime function>. Each runtime function is in runtime/fle_act1_net.c. Without these rows the calls stop at the import thunk as before.
+wininet.dll InternetConnectW fle_imp_InternetConnectW
+wininet.dll HttpOpenRequestW fle_imp_HttpOpenRequestW
+wininet.dll HttpAddRequestHeadersW fle_imp_HttpAddRequestHeadersW
+wininet.dll HttpSendRequestExW fle_imp_HttpSendRequestExW
+wininet.dll InternetWriteFile fle_imp_InternetWriteFile
+wininet.dll HttpEndRequestW fle_imp_HttpEndRequestW
+wininet.dll HttpQueryInfoW fle_imp_HttpQueryInfoW
+wininet.dll HttpQueryInfoA fle_imp_HttpQueryInfoA
+wininet.dll InternetReadFile fle_imp_InternetReadFile
+wininet.dll InternetGetLastResponseInfoW fle_imp_InternetGetLastResponseInfoW
+
+# ======== sweep1-imports.txt (verbatim) ========
+# Decision 0215 (sweep1, PROVISIONAL, opt-in): the import rows of the walls that the systematic sweep found (runtime/fle_sweep1_*.c). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# NEW rows only: pass `cat ship2-imports.txt dec1-imports.txt api2-imports.txt sweep1-imports.txt` as --extra-imports (this file LAST, so that the pseudo-VAs of the earlier rows do not move).
+# user32 keyboard-layout family (fle_sweep1_kbd.c). Wall found: VK_RMENU (right Alt) -> GetKeyboardLayoutNameW (caller 0x8433d2). The census (api2) lists the family as: ActivateKeyboardLayout CharNextExA
+# CharToOemBuffW GetKeyboardLayoutList GetKeyboardLayoutNameW LoadKeyboardLayoutW SendInput ToAscii ToUnicode; the A variants are the same pages.
+user32.dll GetKeyboardLayoutNameW fle_imp_GetKeyboardLayoutNameW
+user32.dll GetKeyboardLayoutNameA fle_imp_GetKeyboardLayoutNameA
+user32.dll GetKeyboardLayoutList fle_imp_GetKeyboardLayoutList
+user32.dll LoadKeyboardLayoutW fle_imp_LoadKeyboardLayoutW
+user32.dll LoadKeyboardLayoutA fle_imp_LoadKeyboardLayoutA
+user32.dll ActivateKeyboardLayout fle_imp_ActivateKeyboardLayout
+user32.dll ToUnicode fle_imp_ToUnicode
+user32.dll ToAscii fle_imp_ToAscii
+# the key-translation part of the family (kbdus.c tables); MapVirtualKeyW, GetKeyboardState, SetKeyboardState, GetKeyState, GetAsyncKeyState, GetKeyNameTextW, GetKeyboardLayout already have rows
+user32.dll ToUnicodeEx fle_imp_ToUnicodeEx
+user32.dll ToAsciiEx fle_imp_ToAsciiEx
+user32.dll VkKeyScanW fle_imp_VkKeyScanW
+user32.dll VkKeyScanExW fle_imp_VkKeyScanExW
+user32.dll VkKeyScanA fle_imp_VkKeyScanA
+user32.dll VkKeyScanExA fle_imp_VkKeyScanExA
+user32.dll OemKeyScan fle_imp_OemKeyScan
+user32.dll MapVirtualKeyExW fle_imp_MapVirtualKeyExW
+user32.dll MapVirtualKeyA fle_imp_MapVirtualKeyA
+user32.dll MapVirtualKeyExA fle_imp_MapVirtualKeyExA
+
+# ======== win2-imports.txt (verbatim) ========
+# Decision 0222 (win2, PROVISIONAL, opt-in): the import row of the wall that sweep1 found at user32!DispatchMessageA (thunk 0x4249b0, caller 0x86a1fb; F12 in the piano roll, MSG hwnd = a closed window, message 0xB021). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# NEW row only: pass `cat ship2-imports.txt dec1-imports.txt api2-imports.txt sweep1-imports.txt win2-imports.txt` as --extra-imports (this file LAST, so that the pseudo-VAs of the earlier rows do not move). The response table has to be the same in every module of a build (decision 0171).
+user32.dll DispatchMessageA fle_imp_DispatchMessageA
+
+# ======== ref1-imports.txt (verbatim) ========
+# Decision 0229 (ref1, PROVISIONAL): the rows of the walls that opening and playing the reference project reached. The msacm32 rows of the Audio Compression Manager that the engine's MP3 sample loader (SmpLoader_MP3) and its Vorbis-in-WAV attempt use (runtime/fle_acm.c).
+# Format of decision 0156: <dll> <API> <runtime function>. acmMetrics is an older row (decision 0098, fle_winmm.c) and is not repeated here.
+msacm32.dll acmDriverEnum fle_imp_acm_DriverEnum
+msacm32.dll acmDriverOpen fle_imp_acm_DriverOpen
+msacm32.dll acmDriverClose fle_imp_acm_DriverClose
+msacm32.dll acmDriverDetailsA fle_imp_acm_DriverDetailsA
+msacm32.dll acmFormatChooseW fle_imp_acm_FormatChooseW
+msacm32.dll acmFormatSuggest fle_imp_acm_FormatSuggest
+msacm32.dll acmStreamOpen fle_imp_acm_StreamOpen
+msacm32.dll acmStreamClose fle_imp_acm_StreamClose
+msacm32.dll acmStreamSize fle_imp_acm_StreamSize
+msacm32.dll acmStreamPrepareHeader fle_imp_acm_StreamPrepareHeader
+msacm32.dll acmStreamUnprepareHeader fle_imp_acm_StreamUnprepareHeader
+msacm32.dll acmStreamConvert fle_imp_acm_StreamConvert
+msacm32.dll acmStreamMessage fle_imp_acm_StreamMessage
+# wall W7 (user32!SendMessageA: runtime/fle_win.c)
+user32.dll SendMessageA fle_imp_SendMessageA

@@ -1,0 +1,25 @@
+[
+  {
+    "name": "g3-present-d3",
+    "what": "G3 (RT-D3): the same 60 s shown song window as O19 (project opened as zip, shown condition, Space playback, deskStats presents before/after play)",
+    "ops": [
+      {"op": "closeWizard"},
+      {"op": "wait", "ms": 2500},
+      {"op": "openZipProject"},
+      {"op": "wait", "ms": 10000},
+      {"op": "shot", "name": "before-play"},
+      {"op": "deskSnap", "name": "before-play"},
+      {"op": "audioMark", "name": "start"},
+      {"op": "key", "code": "Space"},
+      {"op": "wait", "ms": 10000},
+      {"op": "deskSnap", "name": "play-start"},
+      {"op": "audioMark", "name": "play"},
+      {"op": "wait", "ms": 60000},
+      {"op": "deskSnap", "name": "play-end"},
+      {"op": "audioDump", "name": "audio-p3"},
+      {"op": "key", "code": "Space"},
+      {"op": "wait", "ms": 2000},
+      {"op": "expectRunning"}
+    ]
+  }
+]

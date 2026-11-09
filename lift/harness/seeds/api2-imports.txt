@@ -1,0 +1,18 @@
+# Decision 0210 (api2, PROVISIONAL, opt-in): the import rows of the first block of the systematic API coverage (runtime/fle_api2_*.c). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# The file drag-and-drop trio (DragQueryFileW, DragQueryPoint, DragFinish) is provided by crash1 (decision 0209), not here.
+# NEW rows only (none of them is in TABLE or in ship-imports.txt): pass `cat ship-imports.txt api2-imports.txt` as --extra-imports so that the pseudo-VAs of the earlier rows do not move (the way decision 0206 did it).
+# The build also needs lift/runtime/fle_api2_{call,str,sys,shell}.c (build-engine-bundle.sh / a4-multi.sh take the runtime files of a row by name; the rows alone change nothing in the default build).
+kernel32.dll CompareStringA fle_imp_CompareStringA
+kernel32.dll LCMapStringA fle_imp_LCMapStringA
+kernel32.dll GetStringTypeA fle_imp_GetStringTypeA
+kernel32.dll GetLocaleInfoA fle_imp_GetLocaleInfoA
+kernel32.dll TzSpecificLocalTimeToSystemTime fle_imp_TzSpecificLocalTimeToSystemTime
+kernel32.dll GetLargePageMinimum fle_imp_GetLargePageMinimum
+kernel32.dll VirtualQueryEx fle_imp_VirtualQueryEx
+kernel32.dll OutputDebugStringA fle_imp_OutputDebugStringA
+kernel32.dll WriteConsoleA fle_imp_WriteConsoleA
+kernel32.dll ReadConsoleW fle_imp_ReadConsoleW
+kernel32.dll GetConsoleCP fle_imp_GetConsoleCP
+kernel32.dll CreateSymbolicLinkW fle_imp_CreateSymbolicLinkW
+shell32.dll ShellExecuteA fle_imp_ShellExecuteA
+shell32.dll ShellExecuteExW fle_imp_ShellExecuteExW

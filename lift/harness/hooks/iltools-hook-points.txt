@@ -1,0 +1,21 @@
+# Inline hook points of ILTools_x64.dll (decision 0105 mechanism, applied to a third module by decision 0106; fe-lift lift --hook-points). One
+# address per line: a VA of the image as lifted, or "rva:" and a hex RVA (relative to the ImageBase, so this file is the same at every base
+# the module is measured at: 0x6000000 in the measurements of decisions 0104 and 0106; the file's own ImageBase is 0x400000). "#" starts a comment.
+#
+# The static initialisation proc of the ILTools unit that stopped the A4 chain at VirtualProtect (ILTools DllMain -> InitLib -> InitUnits; the
+# unit proc is f_61bd9e0 at the base 0x6000000, RVA 0x7d9e0, VA 0x4bd9e0 at the file's ImageBase) constructs three hook objects with
+# f_61bc220(the class reference, 1, target, replacement, 0) (calls at RVA 0x7db57, 0x7db7f, 0x7dba7 = 0x61bdb57, 0x61bdb7f, 0x61bdba7 at 0x6000000;
+# the only callers of f_61bc220 in the image: byte scan for E8/E9 rel32 over .text, and no DIR64 relocation holds its address). It is the same
+# Delphi unit as FLEngine's unit 314 and QFC's unit 162: f_61bc3a0 saves the first 5 bytes of the target, builds "e9 rel32" and calls
+# VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE, &old) through the thunk 0x601d510; f_61bc4b0 (called at 0x61bdc31 unless ParamStr(0) in
+# lower case is one of three names, as in FLEngine) prepares the three objects again, and f_61bc370 (called at 0x61bc4f3, 0x61bc4ff, 0x61bc50b)
+# writes the "e9 rel32" into the target (f_61bc340 writes the saved original 5 bytes back; read, not executed). The targets and
+# the replacements (the operands of the "lea r8" / "lea r9" before each call; all six are .pdata function starts in the image at 0x6000000;
+# at the file's ImageBase 0x400000 the targets are 0x4178d0, 0x431e70, 0x431e90):
+#   0x60178d0 -> 0x61b8f90    0x6031e70 -> 0x61b8e80    0x6031e90 -> 0x61b8ef0
+# The three targets have the same first 5 bytes as the three of FLEngine and of QFC (55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50): the
+# same Delphi runtime functions, in each module's own copy. Nothing else was checked: whether ILTools patches other functions is not known
+# (the runtime stops by name on a VirtualProtect at an address that is not listed here).
+rva:0x178d0   # 0x4178d0 at the file's ImageBase, first 5 bytes 55 56 53 c6 44
+rva:0x31e70   # 0x431e70, first 5 bytes 53 48 83 ec 20
+rva:0x31e90   # 0x431e90, first 5 bytes 55 48 83 ec 50

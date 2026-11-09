@@ -1,0 +1,28 @@
+{
+  "name": "fl-studio-web-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Front end (lane F, stage F1) for the browser build of the lifted FL engine: Vite + TypeScript, an engine bundle loader, an engine Worker that runs the real emscripten engine, and a Cloudflare Worker that serves large assets from R2. Private; not for public release.",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.webworker.json && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p worker/tsconfig.json",
+    "test": "vitest run",
+    "test:worker": "node test/worker/run.mjs",
+    "bundle:engine": "bash scripts/build-engine-bundle.sh"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261101.1",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.0"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "file-selector": "^5.0.2"
+  }
+}

@@ -1,0 +1,6 @@
+# Decision 0206 (dec1), EXPLORATION rows (S-dlg1-acm-none, reused from decisions 0178 and 0190): no ACM driver is installed. Appended after dec1-imports.txt for the runs that open a project with a Vorbis-in-WAV or MP3 sample (the engine asks msacm32 first).
+# The functions are in runtime/fle_wall_dlg1.c (acmDriverEnum returns 0 and calls nothing; acmStreamOpen and acmFormatSuggest fail with ACMERR_NOTPOSSIBLE; acmDriverClose with MMSYSERR_INVALHANDLE).
+msacm32.dll acmDriverEnum fle_imp_acmDriverEnum
+msacm32.dll acmStreamOpen fle_imp_acmStreamOpen
+msacm32.dll acmFormatSuggest fle_imp_acmFormatSuggest
+msacm32.dll acmDriverClose fle_imp_acmDriverClose

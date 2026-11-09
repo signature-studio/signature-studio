@@ -1,0 +1,105 @@
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=300 cy=200
+  ? WM_MOVE x=100 y=100
+create child 5,7 30x20 (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=30 cy=20
+  ? WM_MOVE x=5 y=7
+  child WM_DESTROY
+  child WM_NCDESTROY
+create child 5,7 30x20 (WS_VISIBLE):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=30 cy=20
+  ? WM_MOVE x=5 y=7
+  ? WM_SHOWWINDOW wp=1 lp=0
+  child WM_SHOWWINDOW wp=0 lp=0
+  child WM_DESTROY
+  child WM_NCDESTROY
+create child 0,0 0x0 (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=0 cy=0
+  ? WM_MOVE x=0 y=0
+  child WM_DESTROY
+  child WM_NCDESTROY
+create popup 20,30 60x40 (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=60 cy=40
+  ? WM_MOVE x=20 y=30
+  child WM_DESTROY
+  child WM_NCDESTROY
+create popup 20,30 60x40 (WS_VISIBLE):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=60 cy=40
+  ? WM_MOVE x=20 y=30
+  ? WM_SHOWWINDOW wp=1 lp=0
+  ? WM_WINDOWPOSCHANGING x=0 y=0 cx=0 cy=0 flags=0x43
+  ? WM_ACTIVATEAPP wp=1
+  top WM_ACTIVATEAPP wp=1
+  ? WM_NCACTIVATE wp=1
+  ? WM_ACTIVATE wp=1
+  ? WM_SETFOCUS
+  ? WM_NCPAINT
+  ? WM_ERASEBKGND
+  ? WM_WINDOWPOSCHANGED x=20 y=30 cx=60 cy=40 flags=0x1847
+  child WM_WINDOWPOSCHANGING x=20 y=30 cx=0 cy=0 flags=0x217
+  child WM_PAINT
+  child WM_WINDOWPOSCHANGING x=0 y=0 cx=0 cy=0 flags=0x97
+  child WM_WINDOWPOSCHANGED x=20 y=30 cx=60 cy=40 flags=0x1897
+  child WM_NCACTIVATE wp=0
+  child WM_ACTIVATE wp=0
+  child WM_ACTIVATEAPP wp=0
+  top WM_ACTIVATEAPP wp=0
+  child WM_KILLFOCUS
+  child WM_DESTROY
+  child WM_NCDESTROY
+create overlapped 50,60 100x80 (not visible, WS_OVERLAPPEDWINDOW):
+  ? WM_GETMINMAXINFO
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  child WM_DESTROY
+  child WM_NCDESTROY
+create child of a child 3,4 10x8 (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=30 cy=20
+  ? WM_MOVE x=5 y=7
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=10 cy=8
+  ? WM_MOVE x=3 y=4
+  ? WM_DESTROY
+  child WM_DESTROY
+  child WM_NCDESTROY
+  ? WM_NCDESTROY
+create popup 20,30 60x40 owned by the parent popup (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=60 cy=40
+  ? WM_MOVE x=20 y=30
+  child WM_DESTROY
+  child WM_NCDESTROY
+create child 5,7 30x20 whose WM_CREATE returns -1:
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_NCDESTROY
+  result NULL
+DestroyWindow(parent popup):
+  top WM_DESTROY
+  top WM_NCDESTROY

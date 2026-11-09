@@ -1,0 +1,1302 @@
+[
+ {
+  "name": "o19c-song-shown",
+  "what": "O19 C (PM 14:17, full song): song (all tracks), condition shown; screenshots and window list before play prove the condition; playback from the mark \"play\" to the song end (up to 300 s), audioSnap every 2 s for 10-s windows. shown = the state as opened; allhidden = F9 x2 (Mixer off), F6 (Channel rack off), then the Playlist close box (1905,97).",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w31"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w32"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w33"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w34"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w35"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w36"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w37"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w38"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w39"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w40"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w41"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w42"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w43"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w44"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w45"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w46"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w47"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w48"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w49"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w50"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w51"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w52"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w53"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w54"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w55"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w56"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w57"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w58"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w59"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w60"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w61"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w62"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w63"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w64"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w65"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w66"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w67"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w68"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w69"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w70"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w71"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w72"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w73"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w74"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w75"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w76"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w77"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w78"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w79"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w80"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w81"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w82"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w83"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w84"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w85"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w86"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w87"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w88"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w89"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w90"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w91"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w92"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w93"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w94"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w95"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w96"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w97"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w98"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w99"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w100"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w101"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w102"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w103"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w104"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w105"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w106"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w107"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w108"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w109"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w110"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w111"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w112"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w113"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w114"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w115"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w116"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w117"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w118"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w119"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w120"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w121"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w122"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w123"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w124"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w125"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w126"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w127"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w128"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w129"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w130"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w131"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w132"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w133"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w134"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w135"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w136"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w137"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w138"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w139"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w140"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w141"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w142"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w143"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w144"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w145"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w146"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w147"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w148"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w149"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w150"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "saveLog",
+    "name": "engine-log",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

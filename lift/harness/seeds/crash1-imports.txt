@@ -1,0 +1,23 @@
+# Decision 0209 (crash1, PROVISIONAL): the import rows of the walls that the client's browser reported. Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment (fe-lift lift ... --extra-imports THIS FILE, after the rows
+# of the shipping file ship-imports.txt: a build that wants both passes both files, or `cat ship-imports.txt crash1-imports.txt`). Without these rows the generated C is the one of the earlier decisions. LCMapStringW needs no row (it is in the
+# default table); its fix is runtime/fle_crash1_lcmap.c.
+# wall crash1-W2: the Sampler channel window's Envelope tab (found by ship2 in F2xH2 with Sampler.flp open: `unsupported instruction at 0x592850` = shell32!DragAcceptFiles): the file drag-and-drop family (runtime/fle_crash1_drag.c)
+shell32.dll DragAcceptFiles fle_imp_DragAcceptFiles
+shell32.dll DragQueryFileW fle_imp_DragQueryFileW
+shell32.dll DragQueryPoint fle_imp_DragQueryPoint
+shell32.dll DragFinish fle_imp_DragFinish
+# wall crash1-W3 (a reading, api2's census: the engine imports them, no row): user32's menu family (runtime/fle_crash1_menu.c). Checked against Wine 10.0 on 156 lines (runtime/test/menu_battery.inc)
+user32.dll CreateMenu fle_imp_CreateMenu
+user32.dll CreatePopupMenu fle_imp_CreatePopupMenu
+user32.dll DestroyMenu fle_imp_DestroyMenu
+user32.dll GetMenuItemCount fle_imp_GetMenuItemCount
+user32.dll GetMenuItemID fle_imp_GetMenuItemID
+user32.dll GetMenuItemInfoW fle_imp_GetMenuItemInfoW
+user32.dll GetMenuState fle_imp_GetMenuState
+user32.dll GetMenuStringW fle_imp_GetMenuStringW
+user32.dll GetSubMenu fle_imp_GetSubMenu
+user32.dll InsertMenuItemW fle_imp_InsertMenuItemW
+user32.dll InsertMenuW fle_imp_InsertMenuW
+user32.dll RemoveMenu fle_imp_RemoveMenu
+user32.dll SetMenuItemInfoW fle_imp_SetMenuItemInfoW
+user32.dll TrackPopupMenu fle_imp_TrackPopupMenu

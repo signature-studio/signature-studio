@@ -1,0 +1,12 @@
+# Decision 0188 (exp1, PROVISIONAL), LAYER 4: the rows of the file SAVE dialog COM model (runtime/fle_filedlg.c) and of the walls that File -> Export -> Wave file reached (runtime/fle_wall_exp1.c).
+# THIS FILE HOLDS ONLY THE NEW ROWS. It is appended AFTER harness/seeds/dlg1-imports.txt (layers 1-3: decisions 0171 and 0178, unchanged and first, so that the pseudo-VAs of the earlier rows do not move):
+#   cat harness/seeds/dlg1-imports.txt harness/seeds/exp1-imports.txt > <combined rows file>      and pass the combined file as fe-lift --extra-imports / FLE_EXTRA_IMPORTS.
+# Format of decision 0156: <dll> <API> <runtime function>. The 'Interface::Method' names are not exports but vtable slots (the precedent is shell32 'IMalloc::Release', decision 0098).
+# IFileSaveDialog is IFileDialog (the same rows 'IFileOpenDialog::<m>' for the slots 3-26) + five slots of its own (shobjidl.idl; docs/investigations/exp1/tables/vtbl-order-check.txt).
+shell32.dll IFileSaveDialog::SetSaveAsItem fle_imp_IFileSaveDialog_SetSaveAsItem
+shell32.dll IFileSaveDialog::SetProperties fle_imp_IFileSaveDialog_SetProperties
+shell32.dll IFileSaveDialog::SetCollectedProperties fle_imp_IFileSaveDialog_SetCollectedProperties
+shell32.dll IFileSaveDialog::GetProperties fle_imp_IFileSaveDialog_GetProperties
+shell32.dll IFileSaveDialog::ApplyProperties fle_imp_IFileSaveDialog_ApplyProperties
+# walls reached while exporting a wave file (runtime/fle_wall_exp1.c)
+kernel32.dll SetThreadExecutionState fle_imp_SetThreadExecutionState

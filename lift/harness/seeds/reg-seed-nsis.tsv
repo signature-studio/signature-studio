@@ -1,0 +1,11 @@
+# FROM THE INSTALLER (decision 0116). The values that the NSIS script of flstudio_win64_26.1.7.5653.exe (SHA-256 04393e7946c7369a...) WRITES under
+# Software\Image-Line\Shared\Paths, read with tools/nsis_script_dump.py --registry (entries 128/129/131/132 for HKLM, 288/289/291/292 for HKCU, 59820 "Install path";
+# the table is in docs/decisions/0116-fruity-walls.md and lift/out-git/fruity3-results/nsis-registry.md). The script writes $INSTDIR\FL64.exe, $INSTDIR\FLEngine_x64.dll and $INSTDIR;
+# $INSTDIR here is the virtual install directory C:\Program Files\Image-Line\FL Studio 21 of decisions 0018/0104/0110/0112 (a choice of this environment, not what the
+# script computes for a real machine). It does NOT write "Shared data" (see reg-seed-app.tsv).
+# key<TAB>value name<TAB>type<TAB>data
+HKLM\Software\Image-Line\Shared\Paths	FL Studio	REG_SZ	C:\Program Files\Image-Line\FL Studio 21\FL64.exe
+HKLM\Software\Image-Line\Shared\Paths	FL Studio engine	REG_SZ	C:\Program Files\Image-Line\FL Studio 21\FLEngine_x64.dll
+HKCU\Software\Image-Line\Shared\Paths	FL Studio	REG_SZ	C:\Program Files\Image-Line\FL Studio 21\FL64.exe
+HKCU\Software\Image-Line\Shared\Paths	FL Studio engine	REG_SZ	C:\Program Files\Image-Line\FL Studio 21\FLEngine_x64.dll
+HKCU\Software\Image-Line\Shared\Paths	Install path	REG_SZ	C:\Program Files\Image-Line\FL Studio 21

@@ -1,0 +1,17 @@
+# Decision 0229 (ref1, PROVISIONAL): the rows of the walls that opening and playing the reference project reached. The msacm32 rows of the Audio Compression Manager that the engine's MP3 sample loader (SmpLoader_MP3) and its Vorbis-in-WAV attempt use (runtime/fle_acm.c).
+# Format of decision 0156: <dll> <API> <runtime function>. acmMetrics is an older row (decision 0098, fle_winmm.c) and is not repeated here.
+msacm32.dll acmDriverEnum fle_imp_acm_DriverEnum
+msacm32.dll acmDriverOpen fle_imp_acm_DriverOpen
+msacm32.dll acmDriverClose fle_imp_acm_DriverClose
+msacm32.dll acmDriverDetailsA fle_imp_acm_DriverDetailsA
+msacm32.dll acmFormatChooseW fle_imp_acm_FormatChooseW
+msacm32.dll acmFormatSuggest fle_imp_acm_FormatSuggest
+msacm32.dll acmStreamOpen fle_imp_acm_StreamOpen
+msacm32.dll acmStreamClose fle_imp_acm_StreamClose
+msacm32.dll acmStreamSize fle_imp_acm_StreamSize
+msacm32.dll acmStreamPrepareHeader fle_imp_acm_StreamPrepareHeader
+msacm32.dll acmStreamUnprepareHeader fle_imp_acm_StreamUnprepareHeader
+msacm32.dll acmStreamConvert fle_imp_acm_StreamConvert
+msacm32.dll acmStreamMessage fle_imp_acm_StreamMessage
+# wall W7 (user32!SendMessageA: runtime/fle_win.c)
+user32.dll SendMessageA fle_imp_SendMessageA

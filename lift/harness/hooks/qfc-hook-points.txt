@@ -1,0 +1,16 @@
+# Inline hook points of quickfontcache_x64.dll (decision 0105; fe-lift lift --hook-points). One address per line: a VA of the image as lifted, or
+# "rva:" and a hex RVA (relative to the ImageBase, so this file is the same at every base the module is measured at: 0x1d00000 in the
+# measurements of decisions 0103 and 0105; the file's own ImageBase is 0x400000). "#" starts a comment.
+#
+# Unit 162 (the static initialisation f_5992d0, VAs at the file's ImageBase 0x400000) constructs three hook objects with
+# f_597b10(the class reference at [0x593ad8], 1, target, replacement, 0) (calls at 0x599447, 0x59946f, 0x599497; the only callers of f_597b10 in the image:
+# byte scan of the call sites). It is the same Delphi unit as FLEngine's unit 314 (decision 0105): f_597c90 saves the first 5 bytes of the
+# target, builds "e9 rel32" and calls VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE, &old) through the thunk 0x41dae0; f_597da0 (called at
+# 0x599521 unless ParamStr(0) in lower case is one of three names, as in FLEngine) prepares the three objects again and f_597c60 writes the
+# "e9 rel32". The targets and the replacements (the operands of the "lea r8" / "lea r9" before each call; all six are .pdata function starts):
+#   0x418e80 -> 0x594870    0x430ec0 -> 0x594760    0x430ee0 -> 0x5947d0
+# The three targets have the same first 5 bytes as the three of FLEngine (55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50): the same
+# Delphi runtime functions, in each module's own copy.
+rva:0x18e80   # 0x418e80, first 5 bytes 55 56 53 c6 44
+rva:0x30ec0   # 0x430ec0, first 5 bytes 53 48 83 ec 20
+rva:0x30ee0   # 0x430ee0, first 5 bytes 55 48 83 ec 50

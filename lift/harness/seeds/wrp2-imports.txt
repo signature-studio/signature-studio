@@ -1,0 +1,159 @@
+# Decision 0171 (PROVISIONAL), LAYER 1 + LAYER 2 (layer 1 alone: ia1-imports-l1.txt): the import rows that the user operations of the main window reached (fe-lift lift ... --extra-imports THIS FILE; lift/harness/two/gen_two.sh: FLE_EXTRA_IMPORTS=THIS FILE).
+# Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment. Without the option the generated C is the one of the earlier decisions (the rows are not in TABLE).
+# The rows of delay-loaded imports (LogicalToPhysicalPoint ...) matter through the response table (GetProcAddress, fle_resp_table), which is built from the same rows.
+# wall ia1-W1: the clipboard (runtime/fle_clip.c)
+user32.dll OpenClipboard fle_imp_OpenClipboard
+user32.dll CloseClipboard fle_imp_CloseClipboard
+user32.dll EmptyClipboard fle_imp_EmptyClipboard
+user32.dll IsClipboardFormatAvailable fle_imp_IsClipboardFormatAvailable
+user32.dll CountClipboardFormats fle_imp_CountClipboardFormats
+user32.dll EnumClipboardFormats fle_imp_EnumClipboardFormats
+user32.dll GetClipboardData fle_imp_GetClipboardData
+user32.dll SetClipboardData fle_imp_SetClipboardData
+ole32.dll OleSetClipboard fle_imp_OleSetClipboard
+ole32.dll OleIsCurrentClipboard fle_imp_OleIsCurrentClipboard
+ole32.dll OleFlushClipboard fle_imp_OleFlushClipboard
+# wall ia1-W2: the toolbar's Shift/Ctrl/Alt buttons (runtime/fle_input.c)
+user32.dll SetKeyboardState fle_imp_SetKeyboardState
+# wall ia1-W3: timer-queue timers (runtime/fle_timerq.c)
+kernel32.dll CreateTimerQueueTimer fle_imp_CreateTimerQueueTimer
+kernel32.dll ChangeTimerQueueTimer fle_imp_ChangeTimerQueueTimer
+kernel32.dll DeleteTimerQueueTimer fle_imp_DeleteTimerQueueTimer
+# walls ia1-W4, W5: the system caret, ShowOwnedPopups (runtime/fle_win.c)
+user32.dll CreateCaret fle_imp_CreateCaret
+user32.dll DestroyCaret fle_imp_DestroyCaret
+user32.dll HideCaret fle_imp_HideCaret
+user32.dll ShowCaret fle_imp_ShowCaret
+user32.dll SetCaretPos fle_imp_SetCaretPos
+user32.dll ShowOwnedPopups fle_imp_ShowOwnedPopups
+# wall ia1-W6: shell32 (runtime/fle_shell.c)
+shell32.dll PathCleanupSpec fle_imp_PathCleanupSpec
+# walls ia1-W8, W9: delay-loaded user32 exports (runtime/fle_win.c)
+user32.dll LogicalToPhysicalPoint fle_imp_LogicalToPhysicalPoint
+user32.dll PhysicalToLogicalPoint fle_imp_PhysicalToLogicalPoint
+# LAYER 2 (wall ia1-W13): dwmapi exports that the menu bar and the pop-up menus delay-load (runtime/fle_dwm.c). DwmIsCompositionEnabled is also asked at START-UP: with the row it answers TRUE (FL64.exe's manifest declares Windows 8 / 8.1) and the engine takes the composition path, so the start-up (entries, wizard surface) differs from the recorded baseline
+dwmapi.dll DwmIsCompositionEnabled fle_imp_DwmIsCompositionEnabled
+dwmapi.dll DwmExtendFrameIntoClientArea fle_imp_DwmExtendFrameIntoClientArea
+# wall ia1-W14: WH_CALLWNDPROC (runtime/fle_win.c; SetWindowsHookExW is an old row)
+user32.dll CallNextHookEx fle_imp_CallNextHookEx
+# wall ia1-W15: SetWindowRgn (runtime/fle_win.c, state only)
+user32.dll SetWindowRgn fle_imp_SetWindowRgn
+# Decision 0178 (dlg1, PROVISIONAL): the rows of the file-open dialog COM model (runtime/fle_filedlg.c). This file = harness/seeds/ia1-imports.txt (decision 0171, layers 1 and 2, unchanged and first, so that their
+# pseudo-VAs do not move) + the rows below. Format of decision 0156: <dll> <API> <runtime function>.
+# The 'Interface::Method' names are NOT exports: they are the slots of the vtables of the objects that CoCreateInstance(CLSID_FileOpenDialog) and the shell items return (the precedent is shell32 'IMalloc::Release',
+# decision 0098): rows only so that the lifted code reaches them through fle_dispatch. The vtable orders are those of shobjidl.idl (see fle_filedlg.h).
+shell32.dll SHCreateItemFromParsingName fle_imp_SHCreateItemFromParsingName
+shell32.dll SHGetKnownFolderPath fle_imp_SHGetKnownFolderPath
+shell32.dll ShellObj::QueryInterface fle_imp_ShellObj_QueryInterface
+shell32.dll ShellObj::AddRef fle_imp_ShellObj_AddRef
+shell32.dll ShellObj::Release fle_imp_ShellObj_Release
+shell32.dll IFileOpenDialog::Show fle_imp_IFileOpenDialog_Show
+shell32.dll IFileOpenDialog::SetFileTypes fle_imp_IFileOpenDialog_SetFileTypes
+shell32.dll IFileOpenDialog::SetFileTypeIndex fle_imp_IFileOpenDialog_SetFileTypeIndex
+shell32.dll IFileOpenDialog::GetFileTypeIndex fle_imp_IFileOpenDialog_GetFileTypeIndex
+shell32.dll IFileOpenDialog::Advise fle_imp_IFileOpenDialog_Advise
+shell32.dll IFileOpenDialog::Unadvise fle_imp_IFileOpenDialog_Unadvise
+shell32.dll IFileOpenDialog::SetOptions fle_imp_IFileOpenDialog_SetOptions
+shell32.dll IFileOpenDialog::GetOptions fle_imp_IFileOpenDialog_GetOptions
+shell32.dll IFileOpenDialog::SetDefaultFolder fle_imp_IFileOpenDialog_SetDefaultFolder
+shell32.dll IFileOpenDialog::SetFolder fle_imp_IFileOpenDialog_SetFolder
+shell32.dll IFileOpenDialog::GetFolder fle_imp_IFileOpenDialog_GetFolder
+shell32.dll IFileOpenDialog::GetCurrentSelection fle_imp_IFileOpenDialog_GetCurrentSelection
+shell32.dll IFileOpenDialog::SetFileName fle_imp_IFileOpenDialog_SetFileName
+shell32.dll IFileOpenDialog::GetFileName fle_imp_IFileOpenDialog_GetFileName
+shell32.dll IFileOpenDialog::SetTitle fle_imp_IFileOpenDialog_SetTitle
+shell32.dll IFileOpenDialog::SetOkButtonLabel fle_imp_IFileOpenDialog_SetOkButtonLabel
+shell32.dll IFileOpenDialog::SetFileNameLabel fle_imp_IFileOpenDialog_SetFileNameLabel
+shell32.dll IFileOpenDialog::GetResult fle_imp_IFileOpenDialog_GetResult
+shell32.dll IFileOpenDialog::AddPlace fle_imp_IFileOpenDialog_AddPlace
+shell32.dll IFileOpenDialog::SetDefaultExtension fle_imp_IFileOpenDialog_SetDefaultExtension
+shell32.dll IFileOpenDialog::Close fle_imp_IFileOpenDialog_Close
+shell32.dll IFileOpenDialog::SetClientGuid fle_imp_IFileOpenDialog_SetClientGuid
+shell32.dll IFileOpenDialog::ClearClientData fle_imp_IFileOpenDialog_ClearClientData
+shell32.dll IFileOpenDialog::SetFilter fle_imp_IFileOpenDialog_SetFilter
+shell32.dll IFileOpenDialog::GetResults fle_imp_IFileOpenDialog_GetResults
+shell32.dll IFileOpenDialog::GetSelectedItems fle_imp_IFileOpenDialog_GetSelectedItems
+shell32.dll IShellItem::BindToHandler fle_imp_IShellItem_BindToHandler
+shell32.dll IShellItem::GetParent fle_imp_IShellItem_GetParent
+shell32.dll IShellItem::GetDisplayName fle_imp_IShellItem_GetDisplayName
+shell32.dll IShellItem::GetAttributes fle_imp_IShellItem_GetAttributes
+shell32.dll IShellItem::Compare fle_imp_IShellItem_Compare
+shell32.dll IShellItemArray::BindToHandler fle_imp_IShellItemArray_BindToHandler
+shell32.dll IShellItemArray::GetPropertyStore fle_imp_IShellItemArray_GetPropertyStore
+shell32.dll IShellItemArray::GetPropertyDescriptionList fle_imp_IShellItemArray_GetPropertyDescriptionList
+shell32.dll IShellItemArray::GetAttributes fle_imp_IShellItemArray_GetAttributes
+shell32.dll IShellItemArray::GetCount fle_imp_IShellItemArray_GetCount
+shell32.dll IShellItemArray::GetItemAt fle_imp_IShellItemArray_GetItemAt
+shell32.dll IShellItemArray::EnumItems fle_imp_IShellItemArray_EnumItems
+shell32.dll IFileDialogCustomize::EnableOpenDropDown fle_imp_IFileDialogCustomize_EnableOpenDropDown
+shell32.dll IFileDialogCustomize::AddMenu fle_imp_IFileDialogCustomize_AddMenu
+shell32.dll IFileDialogCustomize::AddPushButton fle_imp_IFileDialogCustomize_AddPushButton
+shell32.dll IFileDialogCustomize::AddComboBox fle_imp_IFileDialogCustomize_AddComboBox
+shell32.dll IFileDialogCustomize::AddRadioButtonList fle_imp_IFileDialogCustomize_AddRadioButtonList
+shell32.dll IFileDialogCustomize::AddCheckButton fle_imp_IFileDialogCustomize_AddCheckButton
+shell32.dll IFileDialogCustomize::AddEditBox fle_imp_IFileDialogCustomize_AddEditBox
+shell32.dll IFileDialogCustomize::AddSeparator fle_imp_IFileDialogCustomize_AddSeparator
+shell32.dll IFileDialogCustomize::AddText fle_imp_IFileDialogCustomize_AddText
+shell32.dll IFileDialogCustomize::SetControlLabel fle_imp_IFileDialogCustomize_SetControlLabel
+shell32.dll IFileDialogCustomize::GetControlState fle_imp_IFileDialogCustomize_GetControlState
+shell32.dll IFileDialogCustomize::SetControlState fle_imp_IFileDialogCustomize_SetControlState
+shell32.dll IFileDialogCustomize::GetEditBoxText fle_imp_IFileDialogCustomize_GetEditBoxText
+shell32.dll IFileDialogCustomize::SetEditBoxText fle_imp_IFileDialogCustomize_SetEditBoxText
+shell32.dll IFileDialogCustomize::GetCheckButtonState fle_imp_IFileDialogCustomize_GetCheckButtonState
+shell32.dll IFileDialogCustomize::SetCheckButtonState fle_imp_IFileDialogCustomize_SetCheckButtonState
+shell32.dll IFileDialogCustomize::AddControlItem fle_imp_IFileDialogCustomize_AddControlItem
+shell32.dll IFileDialogCustomize::RemoveControlItem fle_imp_IFileDialogCustomize_RemoveControlItem
+shell32.dll IFileDialogCustomize::RemoveAllControlItems fle_imp_IFileDialogCustomize_RemoveAllControlItems
+shell32.dll IFileDialogCustomize::GetControlItemState fle_imp_IFileDialogCustomize_GetControlItemState
+shell32.dll IFileDialogCustomize::SetControlItemState fle_imp_IFileDialogCustomize_SetControlItemState
+shell32.dll IFileDialogCustomize::GetSelectedControlItem fle_imp_IFileDialogCustomize_GetSelectedControlItem
+shell32.dll IFileDialogCustomize::SetSelectedControlItem fle_imp_IFileDialogCustomize_SetSelectedControlItem
+shell32.dll IFileDialogCustomize::StartVisualGroup fle_imp_IFileDialogCustomize_StartVisualGroup
+shell32.dll IFileDialogCustomize::EndVisualGroup fle_imp_IFileDialogCustomize_EndVisualGroup
+shell32.dll IFileDialogCustomize::MakeProminent fle_imp_IFileDialogCustomize_MakeProminent
+shell32.dll IFileDialogCustomize::SetControlItemText fle_imp_IFileDialogCustomize_SetControlItemText
+# walls reached while opening a project (runtime/fle_wall_dlg1.c)
+mpr.dll WNetGetUniversalNameW fle_imp_WNetGetUniversalNameW
+kernel32.dll GetFileInformationByHandle fle_imp_GetFileInformationByHandle
+kernel32.dll SetEndOfFile fle_imp_SetEndOfFile
+# Decision 0183 (wrp1, PROVISIONAL): rows for the walls that the Fruity Wrapper reached inside the engine. dlg1-imports.txt (decision 0178, which holds ia1-imports.txt, decision 0171) is the unchanged prefix.
+# wall W2: job objects (runtime/fle_wall_wrp1.c): the wrapper's CreatePlugInstance creates a kill-on-close job object
+kernel32.dll CreateJobObjectW fle_imp_CreateJobObjectW
+kernel32.dll SetInformationJobObject fle_imp_SetInformationJobObject
+# Decision 0183 (wrp1, PROVISIONAL): rows for the build that carries Serum2.vst3 as a real module (S2=1 of tools/cycle.sh). wrp1-imports.txt (whose prefix is dlg1-imports.txt, which holds ia1-imports.txt) is the unchanged prefix.
+# The functions are in harness/two/wrp1_vst3_imp.c (ported from harness/vst3a/vst3a_imp.c, decision 0165) and harness/vst/vst_imp.c (decision 0156). Only APIs that Serum2.vst3 imports statically (the wrapper's GetProcAddress probes of
+# InitializeSRWLock and InitializeConditionVariable are NOT given rows, so their answer stays NULL as before; TryAcquireSRWLockExclusive IS probed by the wrapper and gets a row here: its answer changes from NULL to a function).
+kernel32.dll AreFileApisANSI fle_imp_AreFileApisANSI
+kernel32.dll GetUserDefaultLCID fle_imp_GetUserDefaultLCID
+kernel32.dll LCMapStringEx fle_imp_LCMapStringEx
+kernel32.dll CompareStringEx fle_imp_CompareStringEx
+kernel32.dll GetLocaleInfoEx fle_imp_GetLocaleInfoEx
+kernel32.dll InitOnceBeginInitialize fle_imp_InitOnceBeginInitialize
+kernel32.dll InitOnceComplete fle_imp_InitOnceComplete
+shell32.dll SHCreateDirectoryExW fle_imp_SHCreateDirectoryExW
+kernel32.dll TryAcquireSRWLockExclusive fle_imp_TryAcquireSRWLockExclusive
+kernel32.dll WaitForSingleObjectEx fle_imp_WaitForSingleObjectEx
+kernel32.dll FreeLibraryAndExitThread fle_imp_FreeLibraryAndExitThread
+dwrite.dll DWriteCreateFactory fle_imp_DWriteCreateFactory
+kernel32.dll InitializeCriticalSectionEx fle_imp_InitializeCriticalSectionEx
+ole32.dll CoCreateGuid fle_imp_CoCreateGuid
+user32.dll RegisterClassExW fle_imp_RegisterClassExW
+kernel32.dll FindResourceA fle_imp_FindResourceA
+kernel32.dll TryEnterCriticalSection fle_imp_TryEnterCriticalSection
+kernel32.dll TlsFree fle_imp_TlsFree
+kernel32.dll IsProcessorFeaturePresent fle_imp_IsProcessorFeaturePresent
+gdi32.dll AddFontResourceExW fle_imp_AddFontResourceExW
+gdi32.dll RemoveFontResourceExW fle_imp_RemoveFontResourceExW
+# the MD5-only CryptoAPI (runtime/fle_crypt.c; PM's range of 2026-11-03: Serum 2's string-hash helper f_81bee30 calls CryptAcquireContextA/CryptCreateHash(CALG_MD5)/CryptHashData/CryptGetHashParam/CryptDestroyHash)
+advapi32.dll CryptAcquireContextA fle_imp_CryptAcquireContextA
+advapi32.dll CryptReleaseContext fle_imp_CryptReleaseContext
+advapi32.dll CryptCreateHash fle_imp_CryptCreateHash
+advapi32.dll CryptHashData fle_imp_CryptHashData
+advapi32.dll CryptGetHashParam fle_imp_CryptGetHashParam
+advapi32.dll CryptDestroyHash fle_imp_CryptDestroyHash
+# Decision 0190 (PROVISIONAL), LAYER 6 = layer 5 (wrp1-vst3-imports.txt) + the four msacm32 rows of decision 0178's EXPLORATION layer (dlg1-explore-imports.txt; functions in runtime/fle_wall_dlg1.c):
+# the reference project's .mp3 audio clip reaches msacm32!acmDriverEnum after the plug-in channels (wall W15 of decision 0190). S-dlg1-acm-none: this environment has NO ACM driver (a choice, not Windows).
+msacm32.dll acmDriverEnum fle_imp_acmDriverEnum
+msacm32.dll acmStreamOpen fle_imp_acmStreamOpen
+msacm32.dll acmFormatSuggest fle_imp_acmFormatSuggest
+msacm32.dll acmDriverClose fle_imp_acmDriverClose

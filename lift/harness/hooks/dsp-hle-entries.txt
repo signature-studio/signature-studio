@@ -1,0 +1,7 @@
+# HLE entries of dsp_ippv2_x64.dll (decision 0162, PROVISIONAL, opt-in); format: lift/crates/fe-lift/src/hle.rs. Addresses are RVAs (the file does not depend on the base the module is measured at).
+# Used only when it is passed: fe-lift lift dsp_ippv2_x64.dll ... --hle-entries this-file. Without the option the generated C is the one of the tree without decision 0162, byte for byte.
+# The file is for dsp_ippv2_x64.dll SHA-256 497dd4f77e859df9e86d999b3811be3c72526b41f86c38b0c3c6e395f691c352 (Intel IPP 2021.7) rebased to 0x2000000 only; the runtime checks the base (fle_realmod table) at the first call.
+#
+# RVA 0x13d6e70 (f_33d6e70 at the base 0x2000000): the bilinear affine warp inside ippiWarpAffineQuad_8u_C4R (229 instructions, leaf, double precision).
+# 37% of the CPU of a native start-up (decision 0151). Host function: lift/runtime/fle_hle.c fle_hle_warp_bilin.
+rva:0x13d6e70 warp_bilin

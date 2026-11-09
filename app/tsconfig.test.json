@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "test/**/*.ts",
+    "worker/access.ts",
+    "worker/perf-*.ts",
+    "shared/**/*.ts",
+    "src/bundle/**/*.ts"
+  ],
+  "exclude": []
+}

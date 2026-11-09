@@ -1,0 +1,23 @@
+# Decision 0215 (sweep1, PROVISIONAL, opt-in): the import rows of the walls that the systematic sweep found (runtime/fle_sweep1_*.c). Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment.
+# NEW rows only: pass `cat ship2-imports.txt dec1-imports.txt api2-imports.txt sweep1-imports.txt` as --extra-imports (this file LAST, so that the pseudo-VAs of the earlier rows do not move).
+# user32 keyboard-layout family (fle_sweep1_kbd.c). Wall found: VK_RMENU (right Alt) -> GetKeyboardLayoutNameW (caller 0x8433d2). The census (api2) lists the family as: ActivateKeyboardLayout CharNextExA
+# CharToOemBuffW GetKeyboardLayoutList GetKeyboardLayoutNameW LoadKeyboardLayoutW SendInput ToAscii ToUnicode; the A variants are the same pages.
+user32.dll GetKeyboardLayoutNameW fle_imp_GetKeyboardLayoutNameW
+user32.dll GetKeyboardLayoutNameA fle_imp_GetKeyboardLayoutNameA
+user32.dll GetKeyboardLayoutList fle_imp_GetKeyboardLayoutList
+user32.dll LoadKeyboardLayoutW fle_imp_LoadKeyboardLayoutW
+user32.dll LoadKeyboardLayoutA fle_imp_LoadKeyboardLayoutA
+user32.dll ActivateKeyboardLayout fle_imp_ActivateKeyboardLayout
+user32.dll ToUnicode fle_imp_ToUnicode
+user32.dll ToAscii fle_imp_ToAscii
+# the key-translation part of the family (kbdus.c tables); MapVirtualKeyW, GetKeyboardState, SetKeyboardState, GetKeyState, GetAsyncKeyState, GetKeyNameTextW, GetKeyboardLayout already have rows
+user32.dll ToUnicodeEx fle_imp_ToUnicodeEx
+user32.dll ToAsciiEx fle_imp_ToAsciiEx
+user32.dll VkKeyScanW fle_imp_VkKeyScanW
+user32.dll VkKeyScanExW fle_imp_VkKeyScanExW
+user32.dll VkKeyScanA fle_imp_VkKeyScanA
+user32.dll VkKeyScanExA fle_imp_VkKeyScanExA
+user32.dll OemKeyScan fle_imp_OemKeyScan
+user32.dll MapVirtualKeyExW fle_imp_MapVirtualKeyExW
+user32.dll MapVirtualKeyA fle_imp_MapVirtualKeyA
+user32.dll MapVirtualKeyExA fle_imp_MapVirtualKeyExA

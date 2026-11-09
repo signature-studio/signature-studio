@@ -1,0 +1,86 @@
+[
+ {
+  "name": "c1-ja-names-dyfb",
+  "what": "seed2 O16: serina1-serum2.flp is opt1 variants/ja-names.flp (Japanese channel names); pictures of the main window 8 and 10 s after the Problems window is closed (Channel rack first row, Playlist header), the whole engine log (vfs-miss, font files)",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openProject",
+    "flp": "serina1-serum2.flp",
+    "filesFile": "/home/ubuntu/work/signature-studio-develop/lift/out-gpu2/refproj-names.json"
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TMissingPluginsForm",
+    "visible": true,
+    "ms": 300000
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-problems"
+   },
+   {
+    "op": "describe",
+    "name": "ja-problems"
+   },
+   {
+    "op": "clickIn",
+    "cls": "TMissingPluginsForm",
+    "dx": 370,
+    "hover": 60,
+    "hold": 50,
+    "dyFromBottom": 28
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TMissingPluginsForm",
+    "visible": false,
+    "ms": 120000
+   },
+   {
+    "op": "wait",
+    "ms": 8000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-main-8s"
+   },
+   {
+    "op": "audioSnap",
+    "name": "st-0",
+    "expr": "(() => { const a = window.__app; return { t: Math.round(performance.now()), state: a.state, exit: a.exit, error: a.error, inputEvents: a.inputEvents, idles: a.idles.length, desk: a.deskStats }; })()"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-0",
+    "all": true
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "savePic",
+    "name": "pic-ja-main-10s"
+   },
+   {
+    "op": "saveLog",
+    "name": "log-ja-all",
+    "all": true
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]
