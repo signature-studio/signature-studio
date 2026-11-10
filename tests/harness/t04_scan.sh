@@ -110,7 +110,7 @@ out=$(scan lift evidence tools ci archive zz-new zz_root.txt)
 for f in lift/crates/fe-lift/tests/zz_new_file.rs evidence/windows-replay-new/x.tsv tools/win-replay/zz_new.tsv ci/zz_new.lock archive/other/x.txt zz-new/x.txt zz_root.txt; do
   expect_contains "shipped allowlist: a new file with 32 hex digits is found ($f)" "$out" "cfhex	$f:1"
 done
-bad_entries=$(awk -F'|' '!/^#/ && NF > 0 && !(NF == 3 && $1 ~ /^(vendor|secret|size|oldpath|cfhex|cfhost)$/ && $2 != "" && $2 != "/" && $2 !~ /^\// && $2 !~ /\.\./)' "$ROOT/scripts/forbidden-allowlist.txt" | wc -l)
+bad_entries=$(awk -F'|' '!/^#/ && NF > 0 && !(NF == 3 && $1 ~ /^(vendor|secret|size|oldpath|cfhex|cfhost|term)$/ && $2 != "" && $2 != "/" && $2 !~ /^\// && $2 !~ /\.\./)' "$ROOT/scripts/forbidden-allowlist.txt" | wc -l)
 expect_eq "shipped allowlist: every entry has 3 fields, a known rule name and a relative path (no absolute path, no .., no bare /)" 0 "$bad_entries"
 
 # allowlist: a path ending in "/" is a directory prefix
@@ -147,5 +147,54 @@ expect_eq "the harness files of this repository are clean" 0 "$rc"
 
 # the scan script contains neither the vendor name nor the old tree's name in one piece
 if grep -qiE "$v1$v2|$o1$o2" "$ROOT/scripts/scan-forbidden.sh"; then fail "scan-forbidden.sh contains a forbidden word in one piece"; else pass "scan-forbidden.sh builds the forbidden words from halves"; fi
+
+# term rule (scripts/forbidden-terms.tsv): built from fragments at run time, so this file holds none of the terms as one word
+tv() { local s="" p; for p in "$@"; do s+=$p; done; printf '%s' "$s"; }
+t_bad=$(tv 作業 木); t_ok=$(tv ワーク ツリー)
+mkdir -p "$repo/terms"
+printf 'a line with %s here\n' "$t_bad" > "$repo/terms/bad.md"
+printf 'a line with %s here\n' "$t_ok" > "$repo/terms/good.md"
+printf 'x\n%s\n' "$(tv 試 験)" > "$repo/terms/bad2.txt"
+printf 'y\n%s\n' "$(tv 試 験 的)" > "$repo/terms/exempt.txt"
+printf 'use %s\n' "$(tv ユ ーザー の 判 断)" > "$repo/terms/user.md"
+printf 'use %s\n' "$(tv ユ ーザー)" > "$repo/terms/user-bare.md"
+printf 'use %s\n' "$(tv 依 頼 票)" > "$repo/terms/req.md"
+printf 'a %s line\n' "$(tv 台 帳)" > "$repo/terms/ledger.md"
+printf 'pre %s\n' "$(tv 禁止 文字列)" > "$repo/terms/kinshi-ok.md"
+printf 'pre %s\n' "$(tv 禁止 文)" > "$repo/terms/kinshi-low.md"
+printf '%s\n' "依頼の$(printf '%s' Issue)を出す" > "$repo/terms/sp-bad1.md"
+printf '%s\n' "$(printf '%s' Issue)を作る" > "$repo/terms/sp-bad2.md"
+printf '%s\n' "依頼の $(printf '%s' Issue) を出す" > "$repo/terms/sp-ok.md"
+printf '%s\n' "$(printf '%s' Issue) のとおり" > "$repo/terms/sp-ok2.md"
+printf '%s\n' "\`$(printf '%s' Issue)\`を作る" > "$repo/terms/sp-code.md"
+git -C "$repo" add -A > /dev/null 2>&1
+tout=$(cd "$repo" && bash scripts/scan-forbidden.sh terms 2>&1); trc=$?
+expect_eq "term: a file with a forbidden word exits 1" 1 "$trc"
+expect_contains "term: the finding names the rule, the file and the line" "$tout" "term	terms/bad.md:1"
+expect_contains "term: the output names the replacement word" "$tout" "-> ワークツリー"
+expect_contains "term: a fragment-joined word in a second file is found" "$tout" "term	terms/bad2.txt:2"
+expect_contains "term: the word with the 的 ending is found under its own rule (replacement 実験的)" "$tout" "-> 実験的"
+expect_not_contains "term: the word with the 的 ending is not reported as the test term" "$tout" "T02 -> テスト	terms/exempt.txt"
+expect_not_contains "term: the correct word is not a finding" "$tout" "term	terms/good.md"
+expect_contains "term: a phrase of the high-confidence list is found (user as the owner, judgement)" "$tout" "term	terms/user.md:1"
+expect_not_contains "term: a bare user word is not a finding (it is also the product's user; judged in context)" "$tout" "term	terms/user-bare.md"
+expect_contains "term: the Issue-request word is found" "$tout" "term	terms/req.md:1"
+expect_not_contains "term: a low-confidence coined word is not banned (only the listed terms are)" "$tout" "term	terms/ledger.md"
+expect_not_contains "term: a low-confidence word is not banned (only the listed terms are)" "$tout" "term	terms/kinshi-low.md"
+expect_not_contains "term: the forbidden-string word is not the prohibited-text term" "$tout" "term	terms/kinshi-ok.md"
+expect_contains "spacing: a Japanese word directly before Issue is found" "$tout" "spacing	terms/sp-bad1.md:1"
+expect_contains "spacing: a Japanese word directly after Issue is found" "$tout" "spacing	terms/sp-bad2.md:1"
+expect_not_contains "spacing: 依頼の Issue (with spaces) is not a finding" "$tout" "spacing	terms/sp-ok.md"
+expect_not_contains "spacing: Issue with a space to a Japanese word is not a finding" "$tout" "spacing	terms/sp-ok2.md"
+expect_not_contains "spacing: a backquoted Issue is not matched (code is left alone)" "$tout" "spacing	terms/sp-code.md"
+printf 'term|terms/bad.md|%s\n' "$t_bad" >> "$repo/scripts/forbidden-allowlist.txt"
+tout2=$(cd "$repo" && bash scripts/scan-forbidden.sh terms/bad.md 2>&1)
+expect_not_contains "term: an allowlist entry (fixed text) allows that line" "$tout2" "term	terms/bad.md:1"
+(cd "$repo" && bash scripts/scan-forbidden.sh terms/good.md > /dev/null 2>&1); trc=$?
+expect_eq "term: clean files exit 0" 0 "$trc"
+for w in "$(tv 作業 木)" "$(tv 試 験)" "$(tv 依 頼 票)" "$(tv ユ ーザー)"; do
+  if grep -qF -- "$w" "$ROOT/tests/harness/t04_scan.sh"; then fail "t04_scan.sh contains a term in one piece"; fi
+done
+pass "t04_scan.sh builds the terms from pieces"
 
 finish

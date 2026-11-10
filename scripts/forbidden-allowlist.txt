@@ -1,5 +1,5 @@
 # One exception per line: <rule>|<path>|<fixed text on the line that may match>
-# <rule> is a rule name printed by scan-forbidden.sh (vendor, secret, size, oldpath, cfhex, cfhost). <path> is repository-relative.
+# <rule> is a rule name printed by scan-forbidden.sh (vendor, secret, size, oldpath, cfhex, cfhost, term). <path> is repository-relative.
 # A <path> ending in "/" is a directory prefix: it covers every file below that directory (not a file or directory that merely starts with the same letters).
 # The third field is matched as a plain substring of the matching line (no regex). An empty third field allows the rule for the whole file (or the whole prefix); avoid that.
 # Lines starting with # and empty lines are ignored.
@@ -9,6 +9,9 @@
 #   and the owner handle against the imported tree) was ok with 0 files. The matches are md5/ETag columns, Windows API replay values, certificate columns, test expectations and session ids.
 # oldpath: the imported tree names the old working tree in its records, archive and old tools. Records and archive are kept verbatim (they are evidence). The live tools
 #   marked R7-5 read the old working tree by absolute path; docs/ROADMAP.md row R7-5 removes those entries.
+
+# --- term: one line of a code file (a string the tool shows; not changed, see the report of the term replacement)
+term|tools/verify-kit/tools/mkdoc0277.py|は CI に入れない
 
 # --- cfhex: measurement records and locked inputs
 cfhex|evidence/windows-replay/|

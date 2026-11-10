@@ -41,7 +41,7 @@ make_repo_copy() { # dir
   local d=$1
   mkdir -p "$d/scripts" "$d/.githooks" "$d/.opencode" "$d/prompts" "$d/tests/harness"
   cp "$ROOT/opencode.jsonc" "$ROOT/.gitignore" "$d/"
-  cp "$ROOT"/scripts/*.sh "$ROOT/scripts/forbidden-allowlist.txt" "$d/scripts/"
+  cp "$ROOT"/scripts/*.sh "$ROOT/scripts/forbidden-allowlist.txt" "$ROOT/scripts/forbidden-terms.tsv" "$d/scripts/"
   cp "$ROOT"/.githooks/pre-commit "$ROOT"/.githooks/pre-push "$d/.githooks/"
   cp -r "$ROOT/.opencode/plugins" "$d/.opencode/"
   printf '<!-- worker-rules v1 -->\nrules for the test\n' > "$d/prompts/worker-rules.md"

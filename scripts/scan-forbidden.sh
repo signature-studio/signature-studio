@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # usage: scripts/scan-forbidden.sh [PATH...]
 # Without arguments: every tracked file (`git ls-files`) and every untracked, not-ignored file. With arguments: those files (a directory is walked).
-# Rules (printed by name): vendor secret size oldpath cfhex cfhost. Exit 0 = nothing found, 1 = findings, 2 = bad usage.
-# The output never contains a matched value: only the rule name, the file and the line number.
+# Rules (printed by name): vendor secret size oldpath cfhex cfhost term spacing. Exit 0 = nothing found, 1 = findings, 2 = bad usage.
+# The output never contains a matched value: only the rule name, the file and the line number (the term rule also prints the ID and the replacement word).
 # Exceptions: scripts/forbidden-allowlist.txt (see its header; a path ending in "/" is a directory prefix). With arguments the paths are taken relative to the current directory
 # (so scan an outside tree from inside it: `cd TREE && bash REPO/scripts/scan-forbidden.sh .`; an absolute path never matches an allowlist path).
 set -o pipefail
@@ -36,6 +36,19 @@ if [ -f "$allowlist" ]; then
     case "$r" in ''|'#'*) continue ;; esac
     AL_RULE+=("$r"); AL_PATH+=("$p"); AL_TEXT+=("$t")
   done < "$allowlist"
+fi
+
+# term rule: scripts/forbidden-terms.tsv (ID, fragments, replacement, exception). The fragments are joined here at run time, so no term is written in this file.
+declare -a TM_ID=() TM_PAT=() TM_REP=() TM_EXC=()
+terms_file="$script_dir/forbidden-terms.tsv"
+if [ -f "$terms_file" ]; then
+  while IFS=$'\t' read -r tid frags rep exc || [ -n "$tid" ]; do
+    case "$tid" in ''|'#'*|ID) continue ;; esac
+    TM_ID+=("$tid")
+    TM_PAT+=("$(printf '%s' "$frags" | tr -d '|')")
+    TM_REP+=("$rep")
+    TM_EXC+=("$(printf '%s' "$exc" | tr -d '|')")
+  done < "$terms_file"
 fi
 
 # allowed RULE FILE LINE_TEXT -> 0 when an allowlist entry covers it. An empty text allows the rule for the whole file.
@@ -74,11 +87,11 @@ fi
 
 findings=0
 declare -A SEEN=()
-report() { # rule file line
-  local key="$1 $2:$3"
+report() { # rule file line [extra]
+  local key="$1 $2:$3 ${4:-}"
   [ -n "${SEEN[$key]:-}" ] && return
   SEEN[$key]=1
-  printf '%s\t%s:%s\n' "$1" "$2" "$3"
+  if [ -n "${4:-}" ]; then printf '%s\t%s:%s\t%s\n' "$1" "$2" "$3" "$4"; else printf '%s\t%s:%s\n' "$1" "$2" "$3"; fi
   findings=$((findings + 1))
 }
 
@@ -109,6 +122,30 @@ for rule in "${RULE_ORDER[@]}"; do
     allowed "$rule" "$f" "$text" && continue
     report "$rule" "$f" "$n"
   done < <(xargs -0 -a "$regular" grep "${flags[@]}" -e "${RULE_PATTERN[$rule]}" 2>/dev/null)
+done
+
+# spacing: the English word Issue must have a half-width space to an adjacent Japanese character (a backquote or a URL breaks the adjacency, so code is not matched).
+jpc='\x{3040}-\x{30FF}\x{3005}\x{4E00}-\x{9FFF}'
+while IFS= read -r -d '' f && IFS= read -r rest; do
+  n=${rest%%:*}
+  text=${rest#*:}
+  allowed spacing "$f" "$text" && continue
+  report spacing "$f" "$n" "add a half-width space between Issue and the Japanese word"
+done < <(LC_ALL=C.UTF-8 xargs -0 -a "$regular" grep -nIHZ -P -e "[${jpc}]Issue|Issue[${jpc}]" 2>/dev/null)
+
+# term: a literal match of each term; a line that only has the term inside its exception text is not a finding.
+for ((i = 0; i < ${#TM_PAT[@]}; i++)); do
+  [ -n "${TM_PAT[$i]}" ] || continue
+  while IFS= read -r -d '' f && IFS= read -r rest; do
+    n=${rest%%:*}
+    text=${rest#*:}
+    if [ -n "${TM_EXC[$i]}" ]; then
+      stripped=${text//"${TM_EXC[$i]}"/}
+      [[ "$stripped" == *"${TM_PAT[$i]}"* ]] || continue
+    fi
+    allowed term "$f" "$text" && continue
+    report term "$f" "$n" "${TM_ID[$i]} -> ${TM_REP[$i]}"
+  done < <(xargs -0 -a "$regular" grep -nIHZ -F -e "${TM_PAT[$i]}" 2>/dev/null)
 done
 
 if [ "$findings" -gt 0 ]; then
