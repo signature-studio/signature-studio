@@ -12,7 +12,7 @@
 | 公開範囲 | **PUBLIC。意図的**(依頼者の決定 P2: GitHub Actions を最大 60 並列で数時間動かすため。private ではその利用量を担えない)。公開されて困る物は git に入れない(`.gitignore`)。default branch `main` | [実測] 2026-11-10 | 依頼者の決定 P2(2026-11-10)、R1 の実測(2026-11-09) | `gh repo view signature-studio/signature-studio --json visibility` |
 | シェル既定の identity | GitHub App の bot(個人ではない)。`gh` 2.103.0。credential helper は `gh auth git-credential` | [実測] | R1、2026-11-09 | `gh auth status` |
 | **push** | identity は作業ディレクトリで決まる(依頼者の決定 P1)。前任期間の「403」はリポジトリ外のディレクトリで測った値で、誤り [文書]。`.permissions` は根拠にしない。**2026-11-10 08:27 JST にリポジトリのディレクトリで `git push --dry-run origin HEAD` を実行: rc=0。出力の先頭行は `To https://github.com/signature-studio/signature-studio.git`、次の行は `29966d6..a70e4ef  HEAD -> main`**。[文書・旧] 同日の前の記述「rc=1(PUBLIC のための `.githooks/pre-push` の拒否)」は前日の誤り(拒否した hook は修正済み。2026-11-10 にフックはスキャンだけに直った) | [実測] | 2026-11-10 | `git push --dry-run origin HEAD`(リポジトリのディレクトリ)、`gh repo view signature-studio/signature-studio --json visibility` |
-| Secrets・Variables | R1(2026-11-09)の一覧は 403。新リポジトリに旧 5 secret があるか不明(旧リポジトリの secret は旧リポジトリと共に消えた)。登録は依頼者の権限(P3)で、依頼票で頼む(`docs/ops/authority.md` §3) | [実測](R1) / 存在は [未確認] | R1、2026-11-09 | `gh secret list --repo signature-studio/signature-studio`(bot に Secrets: read がある場合のみ見える) |
+| Secrets・Variables | R1(2026-11-09)の一覧は 403。新リポジトリに旧 5 secret があるか不明(旧リポジトリの secret は旧リポジトリと共に消えた)。登録は依頼者の権限(P3)で、Issue で頼む(`docs/ops/authority.md` §3) | [実測](R1) / 存在は [未確認] | R1、2026-11-09 | `gh secret list --repo signature-studio/signature-studio`(bot に Secrets: read がある場合のみ見える) |
 | workflow | なし(`total_count: 0`) | [実測] | R1、2026-11-09 | `gh workflow list` |
 | commit 用 identity | **未設定**(`Author identity unknown`)。`git config user.name` が空 | [実測] | R1、2026-11-09 | `git var GIT_AUTHOR_IDENT` |
 | 別 identity | 前任は別の identity を使った。**使用禁止**。新リポジトリで push できるかは確認していない | [未確認] | R1 | — |
@@ -24,12 +24,12 @@
 
 | 項目 | 事実 | 区分 | 出所・日付 | 確認コマンド |
 |---|---|---|---|---|
-| `wrangler` | **後任は実行しない(deny)**。読み取りも含む(依頼者の決定 P4)。強制は worker・reviewer の permission の deny(`AGENTS.md` §11)。前任期間に `~/.local/bin/wrangler` が OAuth でログイン済みだったのは [文書](R1、2026-11-09) | [文書] | 依頼者の決定 P4(2026-11-10)、R1(2026-11-09) | 確認は GitHub Actions の結果か依頼票(`docs/ops/requests.md`)の確認コマンドで行う。確認コマンドは書かない |
+| `wrangler` | **後任は実行しない(deny)**。読み取りも含む(依頼者の決定 P4)。強制は worker・reviewer の permission の deny(`AGENTS.md` §11)。前任期間に `~/.local/bin/wrangler` が OAuth でログイン済みだったのは [文書](R1、2026-11-09) | [文書] | 依頼者の決定 P4(2026-11-10)、R1(2026-11-09) | 確認は GitHub Actions の結果か Issue(`docs/ops/requests.md`)の確認コマンドで行う。確認コマンドは書かない |
 | `cf` CLI | **無い** | [実測] | R1(再: `command -v cf` 出力なし) | `command -v cf` |
-| 旧 Worker と R2 | 前任期間の記録 [文書](R1、2026-11-09): Worker `fl-studio-web`、R2 `fl-web-*`。後任は確認も変更もしない(P4)。**触ってよいのはこの 2 つだけ**(依頼者の方針。他の資源には触らない) | [文書] | R1、2026-11-09、依頼者の決定 P4 | 確認は GitHub Actions の結果か依頼票の確認コマンド |
-| 旧公開ホスト | 前任期間の記録 [文書](R1、2026-11-09): 認証なしの GET が Access のログインへ転送。稼働の確認は依頼票で頼む(後任は確認しない) | [文書] | R1、2026-11-09 | 依頼票(`docs/requests/`)の確認コマンド |
-| Access・DNS・custom domain | 後任の権限外。変更は依頼票で頼む(`docs/ops/authority.md` §3 の 2) | [文書] | 依頼者の決定 P3・P4 | 依頼票 |
-| Cloudflare の API トークン・R2 の S3 キー | 発行・登録は依頼者の権限(依頼票で頼む。`docs/ops/authority.md` §3 の 1) | [文書] | 依頼者の決定 P3 | 依頼票 |
+| 旧 Worker と R2 | 前任期間の記録 [文書](R1、2026-11-09): Worker `fl-studio-web`、R2 `fl-web-*`。後任は確認も変更もしない(P4)。**触ってよいのはこの 2 つだけ**(依頼者の方針。他の資源には触らない) | [文書] | R1、2026-11-09、依頼者の決定 P4 | 確認は GitHub Actions の結果か Issue の確認コマンド |
+| 旧公開ホスト | 前任期間の記録 [文書](R1、2026-11-09): 認証なしの GET が Access のログインへ転送。稼働の確認は Issue で頼む(後任は確認しない) | [文書] | R1、2026-11-09 | Issue(`docs/requests/`)の確認コマンド |
+| Access・DNS・custom domain | 後任の権限外。変更は Issue で頼む(`docs/ops/authority.md` §3 の 2) | [文書] | 依頼者の決定 P3・P4 | Issue |
+| Cloudflare の API トークン・R2 の S3 キー | 発行・登録は依頼者の権限(Issue で頼む。`docs/ops/authority.md` §3 の 1) | [文書] | 依頼者の決定 P3 | Issue |
 
 ## 3 ツールチェーンと PATH
 
@@ -60,14 +60,14 @@
 | 作業場所 | `TMPDIR` と作業場所を `/` 側に置く(`source scripts/env.sh`)。**大きな物を作ったら掃除する**。前任は 598 GB の占有を依頼者に是正させられた | [実測] / 掃除の規則は [推奨] | R1、2026-11-09 | `du -sx --block-size=1M <dir>`(background) |
 | メモリ・CPU | 14 GiB(available 約 10 GiB)、swap 4 GiB、`nproc` = 16 | [実測] | R1、2026-11-09 | `free -h`、`nproc` |
 
-## 5 入力と旧作業ツリー
+## 5 入力と旧ワークツリー
 
 | 項目 | 事実 | 区分 | 出所・日付 |
 |---|---|---|---|
 | 所定のプロジェクト | `~/ダウンロード/serina1-serum2.zip`(53,489,451 B)。中身は未解析 | [実測] | R1、2026-11-09 |
 | FL インストーラ | `flstudio_win64_26.1.7.5653.exe`(1,106,033,456 B。旧 `ci/artifacts.lock` のサイズと一致。SHA-256 は旧記録と一致と前任が記録)。別版 5654 もある(lock に無い) | サイズ [実測] / ハッシュは [文書] | R1、2026-11-09 |
 | 他のインストーラ | Serum 2、OTT、Vital(サイズは旧 lock と一致。ハッシュは未照合) | サイズ [実測] / ハッシュ [未確認] | R1、2026-11-09 |
-| 旧作業ツリー | `~/work/` 直下に残っている前任の作業ツリー(約 173 GB。場所は `docs/ops/lessons.md` に 1 回だけ書く)。**`.git` は無い**。参照用。読み取りのみ(複製・移動・削除をしない)。`find`・`du` を前景で回さない | [実測] | R1、2026-11-09 |
+| 旧ワークツリー | `~/work/` 直下に残っている前任のワークツリー(約 173 GB。場所は `docs/ops/lessons.md` に 1 回だけ書く)。**`.git` は無い**。参照用。読み取りのみ(複製・移動・削除をしない)。`find`・`du` を前景で回さない | [実測] | R1、2026-11-09 |
 | 旧 `.github/workflows/` | `deploy.yml` のみ(1,128 行)。必要な Secrets は 5 つ(名前のみ。値は書かない) | [実測] | R1、2026-11-09 |
 
 ## 6 ハーネス(S2 が作る物。作成後に実測で確認)

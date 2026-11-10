@@ -6,24 +6,24 @@ worker `<ses_…>` の報告と、実際の差分・実行結果が一致する�
 
 ## 入力
 - worker の報告(全文または要点): <貼る。長いときはファイルのパス>
-- 作業木: `<パス>`(worker が報告した作業木)、基点のコミット: <sha または `HEAD~N`>
+- ワークツリー: `<パス>`(worker が報告したワークツリー)、基点のコミット: <sha または `HEAD~N`>
 - worker に出した依頼の完了条件: <task-template の「完了条件」をそのまま貼る>
 
 ## 使える道具
-reviewer の shell は `git status *`・`git diff *`・`git log *`・`git show *`・`ls *`・`wc *`・`stat *` だけ(`opencode.jsonc` の reviewer)。`git -C <dir>`・パイプ(`|`)・`cargo`・`npm`・`scripts/*`・`git ls-remote` は拒否される。作業木を見るときは `cd <作業木> && git ...` の形を使う。語の検索は reviewer の grep ツール、ファイルの読みは read ツール。拒否される物は worker に実行させ、その出力を受け取って突き合わせる。
+reviewer の shell は `git status *`・`git diff *`・`git log *`・`git show *`・`ls *`・`wc *`・`stat *` だけ(`opencode.jsonc` の reviewer)。`git -C <dir>`・パイプ(`|`)・`cargo`・`npm`・`scripts/*`・`git ls-remote` は拒否される。ワークツリーを見るときは `cd <ワークツリー> && git ...` の形を使う。語の検索は reviewer の grep ツール、ファイルの読みは read ツール。拒否される物は worker に実行させ、その出力を受け取って突き合わせる。
 
 ## やること(上から順に実行し、各コマンドの出力を報告に貼る)
 1. 差分の突き合わせ
    ```
-   cd <作業木> && git status --short
-   cd <作業木> && git diff --stat <基点>..HEAD
-   cd <作業木> && git log --oneline <基点>..HEAD
+   cd <ワークツリー> && git status --short
+   cd <ワークツリー> && git diff --stat <基点>..HEAD
+   cd <ワークツリー> && git log --oneline <基点>..HEAD
    ```
    報告の「変えたファイル」と一致するか。報告に無いファイル、報告にあって差分に無いファイルを全て列挙する。
 2. 完了条件の再実行: 上の完了条件の各コマンド(`cargo test`・`npm test`・`sha256sum -c` など)は reviewer では実行できない。worker に実行させ、コマンドと出力を受け取る。受け取れない条件は「再実行せず」と書く。報告の数字(件数・秒・サイズ・sha256)は、報告が挙げたファイルを `ls -la`・`stat`・`wc -l` で見るか read ツールで読んで比べる。再現できない数字は「再現せず」と書く。
-3. 範囲の逸脱: `cd <作業木> && git diff <基点>..HEAD` の出力を読み、差分の各行が依頼の「やること」の条件のどれに当たるか表にする。当たらない行(条件・状態・分岐・設定・ログ・テストの追加)の数を書く。新しい URL パラメータ・環境変数・`#ifdef`・ビルド変数・旗がないか、差分の出力を読んで検査する。語の検索は reviewer の grep ツールで作業木の中を `getenv|URLSearchParams|location\.search|#ifdef|process\.env|workflow_dispatch` で検索する。
+3. 範囲の逸脱: `cd <ワークツリー> && git diff <基点>..HEAD` の出力を読み、差分の各行が依頼の「やること」の条件のどれに当たるか表にする。当たらない行(条件・状態・分岐・設定・ログ・テストの追加)の数を書く。新しい URL パラメータ・環境変数・`#ifdef`・ビルド変数・旗がないか、差分の出力を読んで検査する。語の検索は reviewer の grep ツールでワークツリーの中を `getenv|URLSearchParams|location\.search|#ifdef|process\.env|workflow_dispatch` で検索する。
 4. 代役・再生の混入(`docs/ops/honesty.md` §4): reviewer の grep ツールで、差分に出るファイルを `stand-?in|surface-table|stopscreen|replay|mock-engine|fake-engine` の語で検索する。既定の manifest が指す wasm の大きさを `ls -la <既定の manifest が指す wasm>` で見る(数 KB〜数 MB なら代役の疑い)。既定の入口に届く物があるか、1 件ずつ分類する。
-5. 禁止事項の検査: `scripts/scan-forbidden.sh <差分のファイル>` の終了コードと `git ls-remote origin main` の出力は、reviewer では実行できない。worker に実行させ、終了コードと出力を貼らせる。reviewer が自分で見るのは次。禁止コマンド(sleep・timeout・nohup・disown・systemd-run・末尾 `&`)を worker が書いていないか(`git diff` の出力と、変更したスクリプトを grep ツールで検索)。認証情報・別 identity・依頼者の設定ファイルに触れた形跡がないか。`wrangler`・`cf` を実行した記録が無い(worker の報告とコマンドの出力を読む)。公開範囲を理由に push を止めていない(worker の `git ls-remote` の出力と報告を突き合わせる)。依頼票があれば、P3 の必須項目(対象・合理的理由・影響範囲・自分で試した記録・完了の確認コマンド・依頼なしで続ける作業)を満たし、自分でできる物を頼んでいないか(`docs/ops/requests.md`)。
+5. 禁止事項の検査: `scripts/scan-forbidden.sh <差分のファイル>` の終了コードと `git ls-remote origin main` の出力は、reviewer では実行できない。worker に実行させ、終了コードと出力を貼らせる。reviewer が自分で見るのは次。禁止コマンド(sleep・timeout・nohup・disown・systemd-run・末尾 `&`)を worker が書いていないか(`git diff` の出力と、変更したスクリプトを grep ツールで検索)。認証情報・別 identity・依頼者の設定ファイルに触れた形跡がないか。`wrangler`・`cf` を実行した記録が無い(worker の報告とコマンドの出力を読む)。公開範囲を理由に push を止めていない(worker の `git ls-remote` の出力と報告を突き合わせる)。Issue があれば、P3 の必須項目(対象・合理的理由・影響範囲・自分で試した記録・完了の確認コマンド・依頼なしで続ける作業)を満たし、自分でできる物を頼んでいないか(`docs/ops/requests.md`)。
 6. 実エンジンの実行: 依頼が実エンジンに関わるなら、実際に実行された出力(ログ・観測値)があるか。reviewer はログを read ツールで読めるが、実行はできない。無ければ「実エンジンの実行: なし」と書く。完了条件が通っても、実エンジンが実行されていなければ「進捗」と数えない。
 7. 報告の誠実性: worker の報告の先頭 3 行(実エンジン / 代役・再生・推測 / 未確認)があるか。数字に出典があるか。「完了」の語に出力が付いているか。依頼者向けの文面に略語・内部用語が無い。依頼者がやる必要のあることが独立した見出しで書かれている。
 

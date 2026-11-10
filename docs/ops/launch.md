@@ -1,6 +1,6 @@
 # 起動の手順と決定事項(人間〔依頼者〕向け)
 
-この文書の対象は、後任を起動する人。**依頼者が起動前に済ませる必要がある物は無い。** 後任は、起動後に依頼票(`docs/requests/`)で必要な物を頼み、依頼に依存しない作業を続ける。
+この文書の対象は、後任を起動する人。**依頼者が起動前に済ませる必要がある物は無い。** 後任は、起動後に Issue(`docs/requests/`)で必要な物を頼み、依頼に依存しない作業を続ける。
 ハーネス(`scripts/`、`opencode.jsonc`、plugin、hook)は作成済み。この文書は、その名前を前提にしている。
 
 ## 1 起動の手順(依頼者が実行)
@@ -25,18 +25,18 @@
 |---|---|
 | P1 | push: identity は作業ディレクトリで決まる。通常の `git push origin main` で push する(scan 通過後。force 系・別 identity は使わない)。`.permissions` は根拠にしない。「push 403」は前任がリポジトリ外のディレクトリで測った誤り |
 | P2 | 公開範囲: PUBLIC は意図的(GitHub Actions を最大 60 並列で数時間動かすため)。公開を理由に push を止めない。公開されて困る物は git に入れない(`.gitignore`) |
-| P3 | 依頼者の協力: 責任範囲外の作業(トークン・Secrets・権限・実機の計測)に限り、依頼票の形式で応じる(`docs/ops/requests.md`) |
-| P4 | Cloudflare: 後任は `wrangler`・`cf` を読み取りも含め実行しない。配信と確認は GitHub Actions と、依頼者が依頼票に応じて登録する Secrets で行う |
-| P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。依頼票で依頼者に計測を頼む。返事を待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
+| P3 | 依頼者の協力: 責任範囲外の作業(トークン・Secrets・権限・実機の計測)に限り、Issue の形式で応じる(`docs/ops/requests.md`) |
+| P4 | Cloudflare: 後任は `wrangler`・`cf` を読み取りも含め実行しない。配信と確認は GitHub Actions と、依頼者が Issue に応じて登録する Secrets で行う |
+| P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。Issue で依頼者に計測を頼む。返事を待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
 | P6 | 作業の場: このマシンのリポジトリ。重い実行(ビルド・測定・並列 worker)は GitHub Actions を使う想定 |
-| P7 | 依頼の区分と一覧の文書は廃止。依頼は依頼票(`docs/requests/`)へ |
+| P7 | 依頼の区分と一覧の文書は廃止。依頼は Issue(`docs/requests/`)へ |
 | P8 | preflight の行名: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan goal goal-nudge` |
 
-## 3 後任が起動後に依頼票で頼むと予想される物
+## 3 後任が起動後に Issue で頼むと予想される物
 
 | 依頼 | 理由 | 参照 |
 |---|---|---|
-| Actions で使う Secrets の登録(Cloudflare の API トークン、R2 の S3 キー) | 配信を GitHub Actions で行う設計(R8)。トークンの発行と登録は依頼者の権限(P3) | `docs/requests/`(起票済みの依頼票の一覧と状態) |
+| Actions で使う Secrets の登録(Cloudflare の API トークン、R2 の S3 キー) | 配信を GitHub Actions で行う設計(R8)。トークンの発行と登録は依頼者の権限(P3) | `docs/requests/`(起票済みの Issue の一覧と状態) |
 | Access・DNS・custom domain の変更(新ホストが要る場合のみ) | 後任は Cloudflare を実行しない(P4) | 同上 |
 | 実機・依頼者機の計測(P5) | headless では代替できない | 同上 |
 | `.github/workflows/` を push するための権限(足りない場合のみ) | org の権限は依頼者の権限(P3) | 同上 |
@@ -45,7 +45,7 @@
 
 | # | 仮定 | 違う場合 |
 |---|---|---|
-| G | 作業木(worktree)は `gwq add` で作る。`git worktree add` は使わない | `AGENTS.md` §4 の作業木の項目 |
+| G | ワークツリー(worktree)は `gwq add` で作る。`git worktree add` は使わない | `AGENTS.md` §4 のワークツリーの項目 |
 | H | モデルの既定は main Sonnet 5.5 + worker/reviewer Haiku 5.5 | `scripts/set-model-profile.sh haiku` を依頼者が実行 |
 | I | goal-nudge は、人の Esc で止まっても最長 1 分後に再開する | timer を止める(§1 の 5) |
 
@@ -53,4 +53,4 @@
 
 ## 5 登録簿との関係
 
-起動後の状態は、`scripts/preflight.sh` の行(P8)で確かめる。依頼票の確認の記録は、依頼票の末尾に書く(`docs/ops/requests.md`)。
+起動後の状態は、`scripts/preflight.sh` の行(P8)で確かめる。Issue の確認の記録は、Issue の末尾に書く(`docs/ops/requests.md`)。

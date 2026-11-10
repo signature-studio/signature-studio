@@ -35,11 +35,11 @@
 
 ## 4 計測の経路(依頼者機)
 
-ビーコン `POST /__perf`(ページ→同一オリジンの受け口)。本番 Worker は検査して捨て、保存しなかった(`X-Perf-Stored: no`)[文書]。**新アプリでは、受け口が保存することを自分で 1 回送って読み戻して確認する**(ROADMAP R4-1)。依頼者機の値を待たない。報告の未確認欄に「依頼者機の値: 依頼中」(依頼票を出した後)を毎回書く。
+ビーコン `POST /__perf`(ページ→同一オリジンの受け口)。本番 Worker は検査して捨て、保存しなかった(`X-Perf-Stored: no`)[文書]。**新アプリでは、受け口が保存することを自分で 1 回送って読み戻して確認する**(ROADMAP R4-1)。依頼者機の値を待たない。報告の未確認欄に「依頼者機の値: 依頼中」(Issue を出した後)を毎回書く。
 
 ## 5 P3 の手順書の所在(読み取りのみ)
 
-旧 `lift/out-git/ci1-results/0326/S3A-SWEEP-PROCEDURE.md`(`docs/archive/investigations/ci1/0326/` に複写済み)。実スレッド版の Worker 数 2/4/8/16 の掃引。条件: song(5 分・全トラック)と solo12。指標は書き込み率・消費率・underrun・Unlock 間隔・lagCuts。**本番(協調 1 Worker)の P3 は、同じ指標を「再生して放置」と「Mixer 表示・マウス移動」の 2 条件で取る**(依頼者の条件を含める)。
+旧 `lift/out-git/ci1-results/0326/S3A-SWEEP-PROCEDURE.md`(`docs/archive/investigations/ci1/0326/` にコピー済み)。実スレッド版の Worker 数 2/4/8/16 の掃引。条件: song(5 分・全トラック)と solo12。指標は書き込み率・消費率・underrun・Unlock 間隔・lagCuts。**本番(協調 1 Worker)の P3 は、同じ指標を「再生して放置」と「Mixer 表示・マウス移動」の 2 条件で取る**(依頼者の条件を含める)。
 
 ## 6 規則
 

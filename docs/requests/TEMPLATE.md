@@ -1,4 +1,4 @@
-# 依頼票 NNNN: <件名>
+# Issue NNNN: <件名>
 ## 依頼 ID・日付
 NNNN / YYYY-MM-DD
 

@@ -1,6 +1,6 @@
 # G 段階(G0〜G11)
 
-冒頭: (1) **実エンジンがこの機械で実行された記録は、まだ無い**(ROADMAP R0 の前)。下の判定は旧資料の自己判定で、**再測定していない**。 (2) 旧測定は前任の開発機・headless Chrome 156/Firefox 158・模擬入力。実機 Windows との照合は 0 件、依頼者機の値: 依頼中(依頼票。未返答)。代役・再生が混ざった時期があった(`docs/ops/lessons.md`)。 (3) 未確認: 段階の到達は「実エンジンが実行して出した結果の観測」だけで数える(`docs/ops/honesty.md` §1)。**段階の数字を R0 の実測で書き換える**(STATE.md)。
+冒頭: (1) **実エンジンがこの機械で実行された記録は、まだ無い**(ROADMAP R0 の前)。下の判定は旧資料の自己判定で、**再測定していない**。 (2) 旧測定は前任の開発機・headless Chrome 156/Firefox 158・模擬入力。実機 Windows との照合は 0 件、依頼者機の値: 依頼中(Issue。未返答)。代役・再生が混ざった時期があった(`docs/ops/lessons.md`)。 (3) 未確認: 段階の到達は「実エンジンが実行して出した結果の観測」だけで数える(`docs/ops/honesty.md` §1)。**段階の数字を R0 の実測で書き換える**(STATE.md)。
 
 ## 1 定義(旧 `goal-ladder.md` §1。観測はブラウザ側で)
 
@@ -30,11 +30,11 @@
 | G2 | 同上 | 主窓 0,0 1920x1080。`document.title` は前景窓の題を `main.ts` が反映 | 実値の記録 |
 | G3 | 同上 | `dmDisplayFrequency` で UI の刻みが決まる(0299) | 実エンジン自身の `WM_TIMER` の間隔(未測定) |
 | G4 | 到達(読み A・B1・B2) | 窓の合成は runtime の `fle_desk.c` で、ページは画素を作らない(0223) | 読み C = 実機との比較(依頼者の供給) |
-| G5 | 未到達 | 実機のスクリーンショット 0 件。Browser 欄の黒は WebView2 不在 | 実機の起動直後のスクリーンショット(依頼票) |
+| G5 | 未到達 | 実機のスクリーンショット 0 件。Browser 欄の黒は WebView2 不在 | 実機の起動直後のスクリーンショット(Issue) |
 | G6 | 項目は充足・数えない | 再生中の File クリック T 中央値 79→22 ms(E7b→E9)。画面更新 15.6/s(120 の 13%) | P2: T の p95 ≤ 17 ms、120 fps |
 | G7 | 同上 | 純再生の書き込み率 0.985(静かな窓・60 s まで)。重い区間は未検証 | P3: 曲の重い区間を含む再生、耳での確認(記録なし) |
 | G8 | 未到達(部分) | 参照プロジェクトを開いて再生、Export の WAV は参照と一致。**内蔵エフェクト 7 種 25 インスタンスと Fruity Wrapper が開かない** | 同梱デモ `NewStuff.flp`(未確認)、G9 |
-| G9 | 未到達 | 実モジュール化済みは Balance・Filter のみ(push 前の試験 bundle)。Filter を足した変種は Wine と不一致(RMS 5,325.57) | 内蔵 7 種(Balance・Filter・Delay 2 …)を実モジュールに。S1 との両立(B-FLE) |
+| G9 | 未到達 | 実モジュール化済みは Balance・Filter のみ(push 前のテスト bundle)。Filter を足した変種は Wine と不一致(RMS 5,325.57) | 内蔵 7 種(Balance・Filter・Delay 2 …)を実モジュールに。S1 との両立(B-FLE) |
 | G10 | 未到達(部分) | 本番の Export 完走。Save は未認証で「Buy FL Studio」。Split mixer tracks は `WriteFile: out of memory`(2 GiB 上限) | ピアノロール、Split の OPFS、MP3 書き出し |
 | G11 | 未到達(未着手) | 参照プロジェクトの第三者プラグイン 46 個は `could not be opened` | G9 の後。ライセンスの経路 |
 

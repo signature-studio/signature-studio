@@ -1,4 +1,4 @@
-# 依頼票(依頼者への依頼)
+# Issue(依頼者への依頼)
 
 依頼者に頼むのは、自分にできない物だけ。雛形は `docs/requests/TEMPLATE.md`。出す前に `docs/ops/environment.md` の該当コマンドを実行し、結果を「自分で試した記録」に貼る。
 
@@ -24,8 +24,8 @@
 ## 出し方
 1. `docs/requests/NNNN-<slug>.md` を `docs/requests/TEMPLATE.md` から作り、commit して `git push origin main`(scan 通過後)。
 2. 同じ内容を `gh issue create --title "[依頼] <件名>" --body-file docs/requests/NNNN-<slug>.md` でも出す。
-3. issue が拒否されたら、その出力を依頼票の末尾に貼って commit する。
-4. 報告の「依頼」の行に依頼票のパスを書く。
+3. issue が拒否されたら、その出力を Issue の末尾に貼って commit する。
+4. 報告の「依頼」の行に Issue のパスを書く。
 
 ## 例
 | 件名 | 良い依頼の内容 |
@@ -45,4 +45,4 @@
 ## 出した後
 - 止まらない。同じターンで依頼に依存しない worker を起動する。
 - 催促しない。結果は完了の確認コマンドで確かめる。
-- 確認できたら、依頼票の末尾に「確認: YYYY-MM-DD <コマンドの出力 1 行>」を追記して commit する。
+- 確認できたら、Issue の末尾に「確認: YYYY-MM-DD <コマンドの出力 1 行>」を追記して commit する。

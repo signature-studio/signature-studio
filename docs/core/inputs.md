@@ -1,6 +1,6 @@
 # 外部入力と取得手順
 
-冒頭: (1) 下の sha256 は旧作業ツリーでの計算と、2026-11-10 の再計算([実測: `sha256sum -c`])。(2) FL の DLL・インストーラ・bundle は git に入れない(公開される。`.gitignore` 済み)。(3) ホスト名・アカウント・トークンはここに書かない(R2 の資源名は `docs/ops/environment.md`)。
+冒頭: (1) 下の sha256 は旧ワークツリーでの計算と、2026-11-10 の再計算([実測: `sha256sum -c`])。(2) FL の DLL・インストーラ・bundle は git に入れない(公開される。`.gitignore` 済み)。(3) ホスト名・アカウント・トークンはここに書かない(R2 の資源名は `docs/ops/environment.md`)。
 
 ## 1 入力の一覧(正本は `artifacts.sha256`〔リポジトリ直下。2 列 10 行: bundle 9 + `binaries/win64/FLEngine_x64.dll` 1〕と `ci/external-inputs.sha256`〔6 行。パスは `~/ダウンロード/` からの相対名〕)
 
@@ -20,7 +20,7 @@ cd ~/work/signature-studio && sha256sum -c artifacts.sha256        # 全行 OK(a
 (cd ~/ダウンロード && sha256sum -c ~/work/signature-studio/ci/external-inputs.sha256)   # 全行 OK(外部入力 6 行)
 ```
 2 つとも 2026-11-10 に実行し、全行 OK([実測]。bundle・DLL の実行と DLL の中身の解析はしていない)。大きいので `background: true` で実行する(外部入力だけで約 3.6 GB を読む)。
-不一致なら**判断で押し通さず**、`docs/STATE.md` に事実(コマンドと出力)を書き、worker にコマンド出力をそのまま報告させる。外部入力の不足が依頼者の権限に当たるなら依頼票で頼む(`docs/requests/`)。
+不一致なら**判断で押し通さず**、`docs/STATE.md` に事実(コマンドと出力)を書き、worker にコマンド出力をそのまま報告させる。外部入力の不足が依頼者の権限に当たるなら Issue で頼む(`docs/requests/`)。
 
 ## 3 DLL の抽出(インストーラ → 同梱 DLL 8 本)
 
@@ -40,4 +40,4 @@ cd ~/work/signature-studio && sha256sum -c artifacts.sha256        # 全行 OK(a
 
 - `artifacts/`・`binaries/`・`artifacts/host/`・`artifacts/work/` は `.gitignore`。ビルド中間は数 GiB〜(旧 `lift/out-hyb1` 1 つで 18 GiB)。**作業場所は `/` 側**(`source scripts/env.sh`。`/tmp` は tmpfs 3.6 GiB)。作ったら掃除する(`ls -la` の後、自分が作った物だけ)。
 - 旧 R2 の `fl-web-assets` の bundle は取得手順に含めない(旧本番。既定の入口の差し替えは ROADMAP R6)。
-- 旧作業ツリーから複写する物は `docs/ops/lessons.md` の場所から、読み取りで 1 回だけ。複写後は `sha256sum -c`。
+- 旧ワークツリーからコピーする物は `docs/ops/lessons.md` の場所から、読み取りで 1 回だけ。コピー後は `sha256sum -c`。

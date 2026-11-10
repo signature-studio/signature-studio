@@ -30,7 +30,7 @@ FL インストーラ(NSIS) --tools/extract_nsis2.py--> FLEngine_x64.dll + 同�
 
 | 決定 | 要約 | 区分 |
 |---|---|---|
-| 0157 | `fe-wasmgen`: 機械語から wasm を直接生成(試作として書かれたが、**今は本番の段**)。freetype 1,639 関数で C 経路との差分試験 482,464 反復・不一致 0。サイズ 2.73 倍(C 経路 -Oz は 5.20 倍) | [文書] |
+| 0157 | `fe-wasmgen`: 機械語から wasm を直接生成(試作として書かれたが、**今は本番の段**)。freetype 1,639 関数で C 経路との差分テスト 482,464 反復・不一致 0。サイズ 2.73 倍(C 経路 -Oz は 5.20 倍) | [文書] |
 | 0160 | Blend2D は「コア約 41 入口の全置換」が成り立たず、**コンテキストの 18 入口だけ**を上流 no-JIT に置換(`fe-lift --swap-entries`)。libm は DLL の関数へ橋渡し | [文書] |
 | 0162 | dsp の熱い関数 `f_33d6e70`(IPP `ippiWarpAffineQuad_8u_C4R` の内側)を HLE。起動 CPU −29%(native)。**lift したエンジンは IPP の添字 0 の本体(CPUID=SSE2)を走らせ、AVX 系では実 DLL が選ぶ本体と画素が最大 1 違う**(Wine での観測) | [文書] |
 | 0168 | CPUID 固定で選ばれない IPP の CPU 別コード(強 S・中 M)を C から外す。wasm 233.9→155.8 MB(当時) | [文書] |
@@ -48,4 +48,4 @@ FL インストーラ(NSIS) --tools/extract_nsis2.py--> FLEngine_x64.dll + 同�
 ## 5 注意
 
 - 上のサイズ・時間は旧環境の値。S1(wasm が native の 2 倍以下)は `docs/core/performance.md`。
-- 差分(未適用の契約修正・除去)は `docs/ROADMAP.md` の R1〜R3。`FLENGINE_PE` を設定しない `cargo test` は実 DLL の試験が `SKIPPED` で**成功扱い**になる [文書: 旧 README]。必ず設定し、`SKIPPED` を数える。
+- 差分(未適用の契約修正・除去)は `docs/ROADMAP.md` の R1〜R3。`FLENGINE_PE` を設定しない `cargo test` は実 DLL のテストが `SKIPPED` で**成功扱い**になる [文書: 旧 README]。必ず設定し、`SKIPPED` を数える。

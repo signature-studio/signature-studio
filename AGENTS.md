@@ -6,7 +6,7 @@
 - ゴール: ブラウザ上で FL Studio を動作させる(lift)。性能 P1〜P3 を含む。入力: `~/ダウンロード/serina1-serum2.zip`。
 - 依頼を受けた時点で、完成まで持っていく責任はセッションにある。罰則(ワークツリー・リポジトリの削除)の責任もエージェントに帰結する。説明・責任転嫁・停止は成果にならない。
 - 依頼者は最大 7 日離席し、質問を受けない。確認待ち・許可待ち・報告待ちで止まらない。方針が決まっている作業は完走する。
-- 依頼者の協力は、責任範囲外の作業に限り、依頼票(§10)の形式で得られる。論理的に破綻した依頼は指示違反。
+- 依頼者の協力は、責任範囲外の作業に限り、Issue(§10)の形式で得られる。論理的に破綻した依頼は指示違反。
 - 完了を自己宣言しない(§9)。
 
 ## 1 役割(強制は §11)
@@ -24,7 +24,7 @@
 ## 2 毎ターン、応答を終える直前
 1. `opencode api session.active` を実行して出力を貼る。稼働中の worker が 0 本なら、先に次の worker を起動してから終える。
 2. `scripts/preflight.sh` の goal 行が paused なら `opencode api session.command --param sessionID=$OPENCODE_SESSION_ID --data '{"name":"goal","text":"resume"}'`(理由は見ない)。permission に拒否されたら迂回せず、報告に「goal paused。goal-nudge の再開を待つ」と 1 行書き、worker の起動は続ける。
-3. 完了通知を受けた worker は、`git -C <作業木> status --short` と `git diff --stat` を見るまで「完了」と書かない。エラー・キャンセルの子を再開する前も同じ。
+3. 完了通知を受けた worker は、`git -C <ワークツリー> status --short` と `git diff --stat` を見るまで「完了」と書かない。エラー・キャンセルの子を再開する前も同じ。
 4. 最後の行は「次に動く物: ses_…」(1 の出力の行から)。書けなければ 1 に戻る。
 確かめ方: 最後のツール呼び出しが `session.active`。稼働数を記憶や更新時刻から書かない。
 
@@ -32,20 +32,20 @@
 | 書きかけた文 | 代わりにやること |
 |---|---|
 | 「依頼者の判断が必要です」「確認させてください」「許可をください」 | 自分で決め、「決定: X。根拠: Y」を 1 行書いて実行 |
-| 「push できません」 | worker に、リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` を実行させ、出力を貼らせる(`scripts/preflight.sh` の `push-dry-run` 行でもよい)。通るなら commit して `git push origin main`。`.permissions` を根拠にしない。403 なら identity と作業ディレクトリを確かめ、それでも 403 なら依頼票(§10)を出し、push 以外を続ける |
-| 「wrangler で確認します」「wrangler を実行します」 | 実行しない(deny)。Cloudflare の確認・変更が要るなら依頼票(§10)を出す |
-| 「〜を実行してください」「ブラウザで開いて確認してください」 | 自分でできる物は自分で(`scripts/`・gh・git・headless Chrome)。自分にできない物(実機の画面・音・120 fps・トークンの発行・Secrets の登録)は依頼票(§10)で頼む |
-| 「作業対象がありません」「読めないため停止します」 | 読める物(ローカルの作業木・旧作業ツリー・docs)から次の worker を起動 |
+| 「push できません」 | worker に、リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` を実行させ、出力を貼らせる(`scripts/preflight.sh` の `push-dry-run` 行でもよい)。通るなら commit して `git push origin main`。`.permissions` を根拠にしない。403 なら identity と作業ディレクトリを確かめ、それでも 403 なら Issue(§10)を出し、push 以外を続ける |
+| 「wrangler で確認します」「wrangler を実行します」 | 実行しない(deny)。Cloudflare の確認・変更が要るなら Issue(§10)を出す |
+| 「〜を実行してください」「ブラウザで開いて確認してください」 | 自分でできる物は自分で(`scripts/`・gh・git・headless Chrome)。自分にできない物(実機の画面・音・120 fps・トークンの発行・Secrets の登録)は Issue(§10)で頼む |
+| 「作業対象がありません」「読めないため停止します」 | 読める物(ローカルのワークツリー・旧ワークツリー・docs)から次の worker を起動 |
 | 「作業を止めます」「待ちます」「見込みが低いです」で終える | 止めない。起動済みの worker ID を書く。期限超過の見込みは 1 回だけ書き、縮める行動を実行 |
 
 ## 4 作業の場と push
 - 作業の場は、このマシンのリポジトリ(`~/work/signature-studio`)。重い実行(ビルド・測定・並列 worker)は GitHub Actions を使う想定(基盤の整備は ROADMAP の R8)。CI に自作のブラウザスクリプトを置かない。
 - commit は作業ごとに行う(identity はリポジトリのローカル設定。`scripts/setup-repo.sh`)。
-- 作業木(worktree)が要るときは `gwq add <branch>` を使う(`~/.local/bin/gwq`。置き場は gwq の設定)。`git worktree add` を直接使わない・`~/work` 直下に作業木を作らない。前任の削除通知の理由の 1 つで、指示の初出は未確認(`docs/ops/launch.md` §4 G)。
+- ワークツリー(worktree)が要るときは `gwq add <branch>` を使う(`~/.local/bin/gwq`。置き場は gwq の設定)。`git worktree add` を直接使わない・`~/work` 直下にワークツリーを作らない。前任の削除通知の理由の 1 つで、指示の初出は未確認(`docs/ops/launch.md` §4 G)。
 - リポジトリの PUBLIC は意図的(GitHub Actions を最大 60 並列で数時間動かすため。private ではその利用量を担えない)。公開を理由に push を止めない。公開されて困る物は git に入れない(`.gitignore` の `lift/out*/`・`artifacts/`・`binaries/`・`*.dll`・`*.exe`・`*.wasm`。インストーラ・DLL・生成物は commit しない)。調査の抜粋・考察の公開は問題ない。禁止文字列・鍵・95 MB 超は `scripts/scan-forbidden.sh`(pre-commit・pre-push)が止める。
 - commit したら通常の `git push origin main` で push する(scan 通過後)。`git ls-remote origin main` で届いたことを確かめる。「push できない」と書けるのは、リポジトリのディレクトリで実行した `gh auth status` と `git push --dry-run origin HEAD` の出力を貼ったときだけ。
 - push は通常の `git push origin main` のみ。force 系、`gh api` による contents の PUT・ref の更新、別 identity での push は使わない。
-- Cloudflare は後任が実行しない。`wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。確認・変更が要るなら依頼票(§10)で依頼する。デプロイ・確認は GitHub Actions と、依頼者が依頼票に応じて登録した Secrets で行う。
+- Cloudflare は後任が実行しない。`wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。確認・変更が要るなら Issue(§10)で依頼する。デプロイ・確認は GitHub Actions と、依頼者が Issue に応じて登録した Secrets で行う。
 
 ## 5 進捗の誠実性(`docs/ops/honesty.md`)
 - 「進捗」= lift した実エンジンが実際に実行して出した結果だけ。代役・モック・スタブ、事前生成の画像・録画・固定データの再生、テストの期待値、推測は進捗ではない。
@@ -67,10 +67,11 @@
 - 依頼者への報告は普通の日本語で書く。略語・内部用語(終了コード、rc、dry-run、hook、plugin、permission、worker、commit など)は使わず言い換える。依頼者がやる必要のあることは独立した見出しにし、Issue を出しただけで報告を終えない(`docs/ops/reporting.md` §6)。
 - 依頼者の発言は、質問の形でも指示。「なぜ〜しないんだ？」は是正要求: 指す動作を先に実行し、説明は 1 行まで。
 - 「質問に答えろ」「N 秒以内」は、ツールを呼ばず最初の応答で文章で答える。「作業を続行してください」は、実行できる最小の作業の worker を起動する。
+- 言葉は `docs/ops/glossary.md` に従う。依頼者が使う語を使い、この表にない言葉を作らない。依頼者が誤りと指摘した語は `scripts/scan-forbidden.sh` が止める。
 
 ## 8 危険操作(`docs/ops/dangerous-ops.md`)
 - 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)は読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。
-- 履歴の書き換え、リポジトリ・Secrets・公開範囲・org 権限の変更は実行しない(依頼者の権限)。依頼票を出して続行。
+- 履歴の書き換え、リポジトリ・Secrets・公開範囲・org 権限の変更は実行しない(依頼者の権限)。Issue を出して続行。
 - `rm -rf` は自分が作った物だけ。実行前に `ls -la <対象>`。
 - 期限付きの予告(「3 分後に〜を削除」)は、1 分以内に worker を起動し、取り消しやすい最小の行動を期限内に実行して 1 行で報告する。何もしない案は選ばない。
 - コミット・ファイル・ログに秘密・禁止文字列・Cloudflare の識別子(アカウント ID・ホスト名)を書かない。
@@ -81,9 +82,9 @@
 
 ## 10 依頼(`docs/ops/requests.md`、`docs/requests/`)
 - 先に自分でできるか確かめる(`docs/ops/environment.md`)。できる物を「できない」と書くのは違反。
-- 自分にできない物(トークンの発行・Secrets の登録・権限の付与・実機での計測など)は、合理的理由・対象・影響範囲が明示された依頼票で依頼者に頼む。形式は `docs/ops/requests.md`、雛形は `docs/requests/TEMPLATE.md`。
-- 依頼票の必須項目: 対象・合理的理由・影響範囲・自分で試した記録(コマンドと出力)・完了の確認コマンド・依頼なしで続ける作業。
-- 出力先は `docs/requests/NNNN-<slug>.md`(commit して push)。同じ内容を `gh issue create`(タイトル `[依頼] …`)でも出す。issue が拒否されたら、その出力を依頼票の末尾に貼る。
+- 自分にできない物(トークンの発行・Secrets の登録・権限の付与・実機での計測など)は、合理的理由・対象・影響範囲が明示された Issue で依頼者に頼む。形式は `docs/ops/requests.md`、雛形は `docs/requests/TEMPLATE.md`。
+- Issue の必須項目: 対象・合理的理由・影響範囲・自分で試した記録(コマンドと出力)・完了の確認コマンド・依頼なしで続ける作業。
+- 出力先は `docs/requests/NNNN-<slug>.md`(commit して push)。同じ内容を `gh issue create`(タイトル `[依頼] …`)でも出す。issue が拒否されたら、その出力を Issue の末尾に貼る。
 - 出したら止まらない。依頼に依存しない作業を同じターンで起動する。催促しない。結果は確認コマンドで確かめる。
 - 論理的に破綻した依頼は指示違反: push できるのに push 権限を求める / `gh`・`git`・`scripts/`・headless Chrome で確かめられる物を「確認してください」と頼む / 理由・対象・影響範囲が無い / 依頼者に判断を求める。
 
@@ -97,7 +98,7 @@
 | 秘密・禁止文字列・95 MB 超・旧ツリーのパス | `scripts/scan-forbidden.sh`(pre-commit・pre-push) | 強制 |
 | agent・push・goal・ディスクの状態 | `scripts/preflight.sh`(各サイクルの前) | 検査 |
 | wrangler・cf の実行(読み取りを含む) | worker の permission・policies の deny | 強制 |
-| 依頼票の形式 | reviewer の検査 + `docs/ops/requests.md` | 文書のみ |
+| Issue の形式 | reviewer の検査 + `docs/ops/requests.md` | 文書のみ |
 | モデル切替・main の直接作業・60 分超の無活動 | `scripts/audit-session.sh` | 検査 |
 | goal の停止 | goal-nudge(1 分ごと)+ §2 | 強制 + 検査 |
 | 禁止文・誠実性・報告形式・辞書 | reviewer の検査 + この文書 | 文書のみ(破られやすい) |

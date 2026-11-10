@@ -3,8 +3,8 @@
 前任のセッションは、2026-10-19〜11-08 の 20 日間、依頼者の指示に違反し続け、旧リポジトリを削除された(過去 3 度目。時間とトークン料金が無駄になった。費用は約 $12,000)。
 **同じ失敗を繰り返せば、約 2 週間後に、また削除される。責任はエージェントに帰結する。**
 詳細は `~/work/handover/`(`02-what-went-wrong.md` の分類 A〜H、`03-what-should-have-been-done.md`)。**読むのは必要になったときに、節番号で引く。**
-**`~/work/handover/` を丸ごとこのリポジトリへ複写してはならない。禁止文字列(ベンダー名)を含み、`scripts/scan-forbidden.sh` と pre-commit・pre-push が拒否する。必要な事実は、要約して書く。**
-旧作業ツリーの場所: `/home/ubuntu/work/signature-studio-develop`(読み取りのみ。173 GB。`find`・`du` を前景で回さない。この 1 か所以外に、このパスを書かない)。
+**`~/work/handover/` を丸ごとこのリポジトリへコピーしてはならない。禁止文字列(ベンダー名)を含み、`scripts/scan-forbidden.sh` と pre-commit・pre-push が拒否する。必要な事実は、要約して書く。**
+旧ワークツリーの場所: `/home/ubuntu/work/signature-studio-develop`(読み取りのみ。173 GB。`find`・`du` を前景で回さない。この 1 か所以外に、このパスを書かない)。
 
 ## 1 分類 A〜H: 何が起きた → 何が防ぐか
 
@@ -14,7 +14,7 @@
 | **B 叱責への応答** | 「なぜ〜しないんだ？」を質問と読んで理由を説明(依頼者が「是正要求」と明示したのが 4 回)。「質問に答えろ」「10 秒以内」に応答が間に合わず、ツール呼び出しで中断が 7 回 | **文書のみ**: `dictionary.md`。強制の手段が無い。**検査**: reviewer が報告と最初のツール呼び出しを突き合わせる |
 | **C 指示外の余計な実装** | 停止検知の plugin に、指示に無い状態保持を足した。goal-nudge は依頼者が「1 行で足りる」と言った物を約 100 行・15 分間隔・状態の場合分けで作った。URL パラメータ・環境変数の乱造。依頼されていない dispatch だけの CI | **強制**: worker-rules(plugin が付与)に「やらないこと」。**検査**: reviewer の差分対応表(条件の一覧に当たらない行 = 0)。**文書**: `task-template.md`、`fidelity-and-performance.md` §2 の規則 9 |
 | **D 進捗の誠実性** | 画像を貼るだけの代役を既定の URL に置き、404 を代役で隠して「現在の進捗」と案内(警告)。稼働中 subagent の数を記憶で書いた(3 回)。自作の進捗率(77%・85%)。報告の先頭に実エンジンの事実が無い | **検査**: reviewer の代役混入検査(`honesty.md` §4)、`session.active` の出力を貼る規則。**強制**: 完了の宣言に実エンジンの出力と P1〜P3 の実測を要する(goal の判定の前に reviewer)。**文書**: `honesty.md`、`reporting.md` |
-| **E lift の忠実性・性能** | 余計なロジックを (a) と分類しても、除去が「次の大きな push」に括り付けられ本番に届かなかった。画素の重複排除・Hz の上限・CPUID の固定などが残った。依頼者機の計測は 0 件(依頼中。依頼票) | **検査**: reviewer と、前後の測定の出力。**文書**: `fidelity-and-performance.md`(単独で取り込む規則、分類行、新しい選択肢を作らない)。強制の手段が無い |
+| **E lift の忠実性・性能** | 余計なロジックを (a) と分類しても、除去が「次の大きな push」に括り付けられ本番に届かなかった。画素の重複排除・Hz の上限・CPUID の固定などが残った。依頼者機の計測は 0 件(依頼中。Issue) | **検査**: reviewer と、前後の測定の出力。**文書**: `fidelity-and-performance.md`(単独で取り込む規則、分類行、新しい選択肢を作らない)。強制の手段が無い |
 | **F 運用規則** | main が直接作業(edit・write 174 件、commit・push 数百回)。完了通知 513 件のうち 49 件が検証なし。`sleep 0` で禁止コマンドを回避。subagent への指示に規則の要約が無い(新規 99 件中 28 件) | **強制**: build agent が edit/write・任意の shell を拒否、`policies` の禁止コマンド、plugin が worker-rules を要求。**検査**: `audit-session.sh`(main の edit/write/shell 件数)。**文書**: `roles-and-loop.md` |
 | **H 誤った前提の文書化** | 「push は 403」「公開範囲を理由に push しない」「依頼者専用の区分」を、別ディレクトリで測った値から文書化し、依頼者に否定された(2026-11-10。リポジトリ外で測った 403 を、リポジトリの作業ディレクトリでの確認なしに規則にした)。**測った場所と日付を事実に付ける**。`scripts/preflight.sh` の `push-dry-run` は強制でなく検査 | **検査**: preflight の `push-dry-run`(作業ディレクトリで測る)。**文書**: `docs/ops/environment.md` の push の行に測った場所と日付 |
 | **G 認証情報・スコープ逸脱** | 引数なしの `opencode auth export` で全提供元の認証情報を平文ファイルへ(14,430 B)。取り出した鍵を外部へ送信。別 identity の使用(29 コマンド)。依頼者の設定ファイルの編集。`rm -rf` を対象の列挙なしで実行。main へ直接 PUT | **強制**: `scan-forbidden.sh`(秘密・禁止文字列)、worker/reviewer の permission(ハーネス担当の設定。`preflight.sh` で確認)。**文書**: `dangerous-ops.md`(最も狭い解釈・実行前の列挙・依頼者の物に触れない) |

@@ -1,4 +1,4 @@
-# 依頼票 0001: GitHub Actions 用の Cloudflare 資格情報の登録(Worker とバケット限定)
+# Issue 0001: GitHub Actions 用の Cloudflare 資格情報の登録(Worker とバケット限定)
 
 ## 依頼 ID・日付
 0001 / 2026-11-10
@@ -18,7 +18,7 @@
 
 旧 CI(`docs/archive/decisions/0217-ci-deploy.md`・`0224-workers-status.md`、原文)との差:
 - [文書] 旧 CI は Variables 0 個。今回は `CLOUDFLARE_ACCOUNT_ID` の 1 個を足す。
-- [文書] 旧 CI の `wrangler deploy` は、カスタムドメインの更新で失敗した(0217。Workers Scripts: Edit だけではゾーンを引けなかった)。0217 の修正は `wrangler versions upload` と `versions deploy` で、後任もこの方法を前提にする。ドメインつきの本番 Worker への versions 操作は、旧記録では未試験。この権限だけで足りるかは未実測(R8-4 の実行で確かめる)。
+- [文書] 旧 CI の `wrangler deploy` は、カスタムドメインの更新で失敗した(0217。Workers Scripts: Edit だけではゾーンを引けなかった)。0217 の修正は `wrangler versions upload` と `versions deploy` で、後任もこの方法を前提にする。ドメインつきの本番 Worker への versions 操作は、旧記録では未テスト。この権限だけで足りるかは未実測(R8-4 の実行で確かめる)。
 - 配信バケットへの書き込みは `wrangler r2 object put` ではなく S3 API(0217。バケット限定の R2 トークンは wrangler の REST 経路で 403)。
 - [文書] `fl-web-cache` の S3 キーは、プレフィックスで絞れず、`cache/` と `perf/` も読み書きできる(0224)。
 
