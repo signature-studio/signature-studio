@@ -14,7 +14,7 @@
   trace の時刻とページ時計(epoch ms)は trace 内の `console.timeStamp` 2 点(sync-a / sync-b)で対応づけた(2 点のずれ: 11–15 µs)。
 - phase: A=tEvent→tPage(ブラウザ→ページ)、B=tPage→tInject(ページ→UI Worker)、C=tInject→最初の frame(UI Worker の処理)、D=最初の frame→次の rAF(提示)。window = 各入力の tPage ±200 ms。
   **数値は trace 区間内の入力のみ**(File click 12、Escape 11–12。区間の前の入力は除外)。
-- 道具: `tools/sdriveg2-lat-tp.mjs`(syncClock 追加)、`tools/run-tp.sh`、`tools/scn-tp.json`、`tools/tp-analyze{,2,3,4,5}.py`。生 trace は `lift/out-ci1/kit/out/tp-{1,2}-{e13,rtf}/tp.trace.json`(86–113 MB。`0343/` には複写していない: 容量のため。再現手順と解析出力は置いた)。
+- 道具: `tools/sdriveg2-lat-tp.mjs`(syncClock 追加)、`tools/run-tp.sh`、`tools/scn-tp.json`、`tools/tp-analyze{,2,3,4,5}.py`。生 trace は `lift/out-ci1/kit/out/tp-{1,2}-{e13,rtf}/tp.trace.json`(86–113 MB。`0343/` にはコピーしていない: 容量のため。再現手順と解析出力は置いた)。
 
 ## 読み方の注意
 
@@ -93,7 +93,7 @@
 - E13 側の g9_hook 相当の関数の有無と時間(E13 の wasm に名前が無い)。
 - GIL の待ち・保持の分布(`FLE_DIAG_GIL` 0 行 → RT-G 待ち)。RT-G の bundle ができれば、同じ `run-tp.sh` で採り直せる。
 - 区間内の標本が 12 件のため、中央値の差の信頼幅は出していない(run1 と run2 の差で幅を見ること)。
-- 生 trace の `0343/` への複写(容量 約 400 MB。必要なら PM が指示)。
+- 生 trace の `0343/` へのコピー(容量 約 400 MB。必要なら PM が指示)。
 
 ## 保存先
 

@@ -1,6 +1,6 @@
 # 0234j(mt3): B′ 第 2 段スパイクの総括(GO 判断のあとの整理。11:20 JST)
 
-状態: 作業木の試作(旗つき足場)と、その上で測った事実。PM の判断(10:50): **GO**。成果物の差分(段階 B)は未完成のため取り込まない(規則 4)。段階 A(lifter の LOCK 付き命令のアトミック化)は別差分 `mt4-atomics.diff` で先に取り込み可能(`lift/out-git/mt4-results/`)。
+状態: ワークツリーの試作(旗つき足場)と、その上で測った事実。PM の判断(10:50): **GO**。成果物の差分(段階 B)は未完成のため取り込まない(規則 4)。段階 A(lifter の LOCK 付き命令のアトミック化)は別差分 `mt4-atomics.diff` で先に取り込み可能(`lift/out-git/mt4-results/`)。
 
 ## 1. 事実(この機械、node 24、最適化なしの wasm、他の担当による負荷 11〜33)
 | 項目 | 結果 |
@@ -26,6 +26,6 @@
 | runtime の GIL の外の共有状態 | `fle_swap_ctx_*`(Blend2D のアダプタ)、`fle_hle_*`、`fruity_host_slot*`、`fle_hook_*`、`fle_site_store32` の入口に GIL(データ駆動の wrap を『生成 C が直接呼ぶ runtime の関数』へ拡張。x87 と mxcsr は TLS だけなので除く) | 1 日 |
 | export の GIL | `fle_desk_*`、`fle_surface_*`、`fle_av_poll`、`fle_app_*`、`fle_filedlg_*`、`fle_host_post_input` に `fle_gil_enter/leave`(`fle_g3_*` は済み)。I1 の CI の検査(glue に pthread からの同期 proxy が無い) | 半日 |
 | ブラウザ(Chrome 156 / Firefox 158) | 入れ子の pthread のエンジン、`Atomics.waitAsync` の可否、COOP/COEP、起動時間(Worker 11 本の起動と 128 MB の wasm の第 2〜12 インスタンス化)、テンポ(静かな機械・最適化版) | 1〜2 日 |
-| audio ring(段階 C) | 共有メモリ化(aud1 の差分の後)。いまの node 試験は ring を使わない | 別 |
+| audio ring(段階 C) | 共有メモリ化(aud1 の差分の後)。いまの node テストは ring を使わない | 別 |
 | 参照プロジェクトの PCM 照合・テンポ 1.0 | ミキサーの出力 PCM の hash の安定、FLP との対応(tools/tempo) | 半日 |
 合計 4〜6 日(読み)。

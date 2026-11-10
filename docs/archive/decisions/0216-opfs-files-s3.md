@@ -1,4 +1,4 @@
-# 0216 段階 3(追記): OPFS をゲストのファイルの実体にするための『同期アクセスの実測』と部品 — Chrome 156 / Firefox 158 で測り、ライブラリ(JSPI)とパス変換(C)を作って試験した。エンジンの `fle_vfs.c` への配線はまだ。仮の決定
+# 0216 段階 3(追記): OPFS をゲストのファイルの実体にするための『同期アクセスの実測』と部品 — Chrome 156 / Firefox 158 で測り、ライブラリ(JSPI)とパス変換(C)を作ってテストした。エンジンの `fle_vfs.c` への配線はまだ。仮の決定
 
 状態: **仮の決定**。段階 1(コミット dddad9c)・段階 2(a0d658a)に続く段階 3。基準は HEAD 0156065(`patch -p1 --dry-run` clean、`logs/patch-dry-run-s3.txt`)。成果は `opfs1-s3.diff`(**新規ファイル 15 個だけ、HEAD の既存ファイルは 1 行も変えない = 削除行 0**。MERGE-NOTES-S3.md)。
 
@@ -7,12 +7,12 @@
 ## 冒頭の三点
 
 1. **実行した本物と範囲(実測)**:
-   - **段階 3 では実エンジンを 1 回も動かしていない(0 件)**。エンジンのファイル I/O(`fle_vfs.c`)への配線をまだ作っていないので、『エンジンが OPFS をファイルシステムとして使えた』とは言えない。段階 2 の実エンジン試験(Open/Save/Export、50/50)は既報のとおりで、そこではエンジンの仮想ボリュームにページがファイルをコピーして渡している(エンジンは OPFS を直接は触っていない)。
+   - **段階 3 では実エンジンを 1 回も動かしていない(0 件)**。エンジンのファイル I/O(`fle_vfs.c`)への配線をまだ作っていないので、『エンジンが OPFS をファイルシステムとして使えた』とは言えない。段階 2 の実エンジンテスト(Open/Save/Export、50/50)は既報のとおりで、そこではエンジンの仮想ボリュームにページがファイルをコピーして渡している(エンジンは OPFS を直接は触っていない)。
    - **本物のブラウザで測ったもの**: 隔離 Chrome 156.0.8078.47(headless)と Firefox 158.0(headless、geckodriver)の**専用 Worker から本物の OPFS を `createSyncAccessHandle` で同期アクセス**した(`opfs-bench.mjs`、`opfs-lib-test.mjs`)。ファイルを開く・読む・書く・flush・サイズ・ロックの挙動・Worker を殺しての永続、JSPI の中断の費用、SharedArrayBuffer + `Atomics.wait` で別 Worker に橋渡しする費用。
-   - **ライブラリの試験(模擬あり)**: 作ったライブラリ `fle_opfs_lib.js`(emscripten の JSPI ライブラリ)を、**エンジンではない C の試験プログラム `opfs_test.c`**(emscripten、`-sJSPI -sSHARED_MEMORY=1`、エンジンと同じ作り方)から呼び、Chrome と Firefox で各 3 回、**68 件を全回通した**(`logs/s3/lib-*.txt`)。ここでファイル操作を出しているのは試験の C プログラムで、エンジンの実際のアクセスの型(順次かランダムか、件数、大きさ)は**観測していない**(模擬)。
-   - **パス変換の試験(native -O0)**: `fle_opfs_mount.c`(Windows のパス → OPFS のパス、純粋な C)を `wall_opfs1_map.rs` の **125 件**で試験(模擬: 試験の C が UTF-16 のパスを出す)。gcc の ASan + UBSan 付きでも 125/125、指摘 0。変異検査 9 件は全て落ちる(`tables/opfs-s3-mount-mutations.tsv`)。2 つのファイルは `runtime/` ではなく `lift/harness/web/opfs1/` に置いた: `build_nmod_wasm.sh` が `runtime/fle_*.c` を全部エンジンにコンパイルし、多くの試験も全部リンクするので、`runtime/` に置くと配線の前にバンドルが変わる。配線のときに `runtime/` へ移す。(`runtime/` に置いた版で、全部リンクする既存の試験 4 本〔call_iat 3、k32_dsp 14、modules 16、hle_entries 10〕と noreturn_audit〔8〕が通ることは、移す前に確かめた。)
-2. **結論**: (a) **OPFS の同期アクセスは Chrome 156 と Firefox 158 のどちらでも Worker から使える**。一方、**開く操作は非同期**(1〜5 ms)なので、エンジンの Win32 呼び出しの中で使うには JSPI の中断が要る。**JSPI の中断そのものの費用は小さい(Chrome 約 0.2 µs、Firefox 約 1 µs。測定表)**。エンジンはすでに JSPI で作られ、ゲストのスレッドも『1 つの Worker の中の JSPI スタック』で動く(決定 0124、`fle_thread_wasm.h`〔読み〕)ので、**ゲストのスレッドから呼べるか〔`Atomics.wait` の橋渡しが要るか〕という懸念は、読みでは当たらない**(実エンジンの 2 本目のスレッドからは未実行)。(b) **1 回の呼び出しの費用は Chrome が Firefox の約 4〜15 倍**(3 回の中央値: ランダム 4 KiB の読み 630 µs 対 42 µs〔15 倍〕、書き 1.9 ms 対 0.46 ms〔4 倍〕、順次読み 506 対 3,397 MiB/s)。Chrome ではランダムな小さい読みが 5,000 回あると約 3 秒かかる(630 µs × 5,000)。ライブラリのブロックキャッシュは**順次の小さな読みで約 18 倍、小さな書きで約 23 倍速い**(Chrome の中央値 996 → 57 µs、3.0 ms → 0.13 ms)が、**ランダムな読みでは Chrome でも Firefox でも逆に遅い**(Chrome 867 → 1,601 µs、Firefox 38 → 86 µs)。(c) **同期ハンドルは排他的**(2 つ目の `createSyncAccessHandle`・`createWritable`・`removeEntry`・`move` は `NoModificationAllowedError`、`getFile()` の読みは通る。Chrome と Firefox で同じ)ので、エンジンが開いている間は Files 窓から消せず、他のタブとも競合する。(d) 以上から、**最初の配線は『開くときにバイト列を読み込み、最後に閉じるときに書き戻す』方式(設計 B)を勧める**(§5)。ボリュームの node がキャッシュのままで、`ReadFile`/`WriteFile`/`CreateFileMappingW` の今の動きが変わらず、OPFS のハンドルを開きっぱなしにしない。(e) 部品を作った: パス変換(`fle_opfs_mount.*`)、OPFS ライブラリ(大文字小文字を無視した名前の解決、ハンドル共有、ブロックキャッシュ、置換つき rename、`flush_all`)、**act1 の R4 のための『全体を原子的に置き換える状態ファイル』(`fle_opfs_state_put/get`: `.tmp` に書いて fsync して `move` で置換。書きかけで Worker を殺しても古い内容が残ることを試験した)**。
-3. **未確認・未着手**: **エンジンへの配線(`fle_vfs.c`)**: 段階 3 は『設計と測定』の指示で、5 時間の枠の中では着手していない(dec1〔決定 0206〕は merge 済みなので、次の差分で配線できる)。エンジンの実際のファイルアクセスの型。設定(ini など)とレジストリを永続させたとき**Welcome の窓が出なくなるか**(配線が要る)。2 つのタブで同時に開いたときの挙動(同一タブ内のロックだけ測定)。ゲストの 2 本目のスレッドから OPFS を呼ぶ実エンジン試験。電源断・ブラウザの強制終了でのデータ(試験は Worker の `terminate` とページの再読み込みまで)。`navigator.storage.persist()` が許可されなかったときの OPFS の消去(ブラウザの判断)。依頼者の Firefox 159 / Windows 10 での測定(0 件。数字はこの機械のもの)。人による実際の操作(0 件)。
+   - **ライブラリのテスト(模擬あり)**: 作ったライブラリ `fle_opfs_lib.js`(emscripten の JSPI ライブラリ)を、**エンジンではない C のテストプログラム `opfs_test.c`**(emscripten、`-sJSPI -sSHARED_MEMORY=1`、エンジンと同じ作り方)から呼び、Chrome と Firefox で各 3 回、**68 件を全回通した**(`logs/s3/lib-*.txt`)。ここでファイル操作を出しているのはテストの C プログラムで、エンジンの実際のアクセスの型(順次かランダムか、件数、大きさ)は**観測していない**(模擬)。
+   - **パス変換のテスト(native -O0)**: `fle_opfs_mount.c`(Windows のパス → OPFS のパス、純粋な C)を `wall_opfs1_map.rs` の **125 件**でテスト(模擬: テストの C が UTF-16 のパスを出す)。gcc の ASan + UBSan 付きでも 125/125、指摘 0。変異検査 9 件は全て落ちる(`tables/opfs-s3-mount-mutations.tsv`)。2 つのファイルは `runtime/` ではなく `lift/harness/web/opfs1/` に置いた: `build_nmod_wasm.sh` が `runtime/fle_*.c` を全部エンジンにコンパイルし、多くのテストも全部リンクするので、`runtime/` に置くと配線の前にバンドルが変わる。配線のときに `runtime/` へ移す。(`runtime/` に置いた版で、全部リンクする既存のテスト 4 本〔call_iat 3、k32_dsp 14、modules 16、hle_entries 10〕と noreturn_audit〔8〕が通ることは、移す前に確かめた。)
+2. **結論**: (a) **OPFS の同期アクセスは Chrome 156 と Firefox 158 のどちらでも Worker から使える**。一方、**開く操作は非同期**(1〜5 ms)なので、エンジンの Win32 呼び出しの中で使うには JSPI の中断が要る。**JSPI の中断そのものの費用は小さい(Chrome 約 0.2 µs、Firefox 約 1 µs。測定表)**。エンジンはすでに JSPI で作られ、ゲストのスレッドも『1 つの Worker の中の JSPI スタック』で動く(決定 0124、`fle_thread_wasm.h`〔読み〕)ので、**ゲストのスレッドから呼べるか〔`Atomics.wait` の橋渡しが要るか〕という懸念は、読みでは当たらない**(実エンジンの 2 本目のスレッドからは未実行)。(b) **1 回の呼び出しの費用は Chrome が Firefox の約 4〜15 倍**(3 回の中央値: ランダム 4 KiB の読み 630 µs 対 42 µs〔15 倍〕、書き 1.9 ms 対 0.46 ms〔4 倍〕、順次読み 506 対 3,397 MiB/s)。Chrome ではランダムな小さい読みが 5,000 回あると約 3 秒かかる(630 µs × 5,000)。ライブラリのブロックキャッシュは**順次の小さな読みで約 18 倍、小さな書きで約 23 倍速い**(Chrome の中央値 996 → 57 µs、3.0 ms → 0.13 ms)が、**ランダムな読みでは Chrome でも Firefox でも逆に遅い**(Chrome 867 → 1,601 µs、Firefox 38 → 86 µs)。(c) **同期ハンドルは排他的**(2 つ目の `createSyncAccessHandle`・`createWritable`・`removeEntry`・`move` は `NoModificationAllowedError`、`getFile()` の読みは通る。Chrome と Firefox で同じ)ので、エンジンが開いている間は Files 窓から消せず、他のタブとも競合する。(d) 以上から、**最初の配線は『開くときにバイト列を読み込み、最後に閉じるときに書き戻す』方式(設計 B)を勧める**(§5)。ボリュームの node がキャッシュのままで、`ReadFile`/`WriteFile`/`CreateFileMappingW` の今の動きが変わらず、OPFS のハンドルを開きっぱなしにしない。(e) 部品を作った: パス変換(`fle_opfs_mount.*`)、OPFS ライブラリ(大文字小文字を無視した名前の解決、ハンドル共有、ブロックキャッシュ、置換つき rename、`flush_all`)、**act1 の R4 のための『全体を原子的に置き換える状態ファイル』(`fle_opfs_state_put/get`: `.tmp` に書いて fsync して `move` で置換。書きかけで Worker を殺しても古い内容が残ることをテストした)**。
+3. **未確認・未着手**: **エンジンへの配線(`fle_vfs.c`)**: 段階 3 は『設計と測定』の指示で、5 時間の枠の中では着手していない(dec1〔決定 0206〕は merge 済みなので、次の差分で配線できる)。エンジンの実際のファイルアクセスの型。設定(ini など)とレジストリを永続させたとき**Welcome の窓が出なくなるか**(配線が要る)。2 つのタブで同時に開いたときの挙動(同一タブ内のロックだけ測定)。ゲストの 2 本目のスレッドから OPFS を呼ぶ実エンジンテスト。電源断・ブラウザの強制終了でのデータ(テストは Worker の `terminate` とページの再読み込みまで)。`navigator.storage.persist()` が許可されなかったときの OPFS の消去(ブラウザの判断)。依頼者の Firefox 159 / Windows 10 での測定(0 件。数字はこの機械のもの)。人による実際の操作(0 件)。
 
 ## 1. 同期アクセスの比較(実測、Chrome 156 と Firefox 158、各 3 回の最小 / 中央値 / 最大)
 
@@ -103,12 +103,12 @@
 | `lift/harness/web/opfs1/fle_opfs_lib.js`・`fle_opfs.h` | emscripten の JS ライブラリ(`-sJSPI`)と C の宣言。open/close/read/write/flush/truncate/size(同期)、stat/list/list_names/mkdir/remove/rename/set_root(非同期 = JSPI)、`flush_all`。**パスごとに同期ハンドルを 1 つだけ開き、ゲストのハンドル全部で共有**(参照数、最後の close で解放)。名前の解決は『完全一致 → 一覧で大文字小文字無視』。書きは最大 1 ブロックまで溜めて(write-behind)、読み・サイズ・close の前に書き出す。close は書き出して閉じるだけ(fsync は `FlushFileBuffers` と `flush_all` と `fle_opfs_flush`)。rename は置換の旗つき(既定は存在すれば EEXIST、`a.txt` → `A.txt` は許す)。 |
 | `lift/harness/web/opfs1/fle_opfs_state.c`・`.h` | 状態ファイルを**全体で原子的に置き換える** `fle_opfs_state_put`(`.tmp` → fsync → close → `move`)と `fle_opfs_state_get`。act1 の R4(レジストリの部分木 `registrations.bin`)と R3/R5(`/fl/state`、`/fl/license`)の置き場。 |
 | `lift/harness/web/opfs1/fle_opfs_mount.c`・`.h` | **ゲストのパス(UTF-16)→ OPFS のパス(UTF-8)** の変換と、マウント表(最大 16、最長一致)。純粋な C(OS もブラウザも要らない)。`fle_vfs.c` には**まだつないでいない**。規則は §3。 |
-| `lift/harness/web/opfs1/opfs_test.c`・`opfs-test.html`・`opfs-test-worker.js` | ライブラリの試験(68 件)と計測。 |
+| `lift/harness/web/opfs1/opfs_test.c`・`opfs-test.html`・`opfs-test-worker.js` | ライブラリのテスト(68 件)と計測。 |
 | `lift/harness/web/opfs1/bench.html`・`bench-worker.js`・`jspi.wat` | 同期アクセス・JSPI・SAB 橋渡しの計測。 |
 | `app/test/e2e/opfs-lib-test.mjs`・`opfs-bench.mjs` | 上の 2 つを Chrome(CDP)と Firefox(geckodriver)で動かす。 |
-| `lift/crates/fe-lift/tests/wall_opfs1_map.rs` | パス変換の native 試験(125 件)。 |
+| `lift/crates/fe-lift/tests/wall_opfs1_map.rs` | パス変換の native テスト(125 件)。 |
 
-ライブラリの試験 68 件の内訳(Chrome と Firefox で同じ): 順次・ランダムの読み書きのバイト一致、ブロックを跨ぐ読み、1 ハンドルの共有と参照数、開いたままの rename/remove が EBUSY、truncate、300 ファイルの作成と一覧、日本語のパス、大文字小文字を無視した stat/open/list/remove/rename、置換つき rename、`flush_all`、状態ファイル(置換・空・開いているファイルへの put が EBUSY で古い内容を保つ・3 MiB)、Worker を殺しての永続(下の §6)。
+ライブラリのテスト 68 件の内訳(Chrome と Firefox で同じ): 順次・ランダムの読み書きのバイト一致、ブロックを跨ぐ読み、1 ハンドルの共有と参照数、開いたままの rename/remove が EBUSY、truncate、300 ファイルの作成と一覧、日本語のパス、大文字小文字を無視した stat/open/list/remove/rename、置換つき rename、`flush_all`、状態ファイル(置換・空・開いているファイルへの put が EBUSY で古い内容を保つ・3 MiB)、Worker を殺しての永続(下の §6)。
 
 ## 3. パス規則(`fle_opfs_mount.h` に書いた Windows の規則。Learn『Naming Files, Paths, and Namespaces』による**モデル**で、実 Windows との照合は 0 件)
 
@@ -137,9 +137,9 @@
 
 ## 6. 永続(実測、Chrome と Firefox で同じ)
 
-- `write` → `flush` したが `close` していないハンドルを持つ Worker をページから `terminate()` し、ページを再読み込みしても、**中身は残る**。`write` → `close`(fsync なし)も残る。**ライブラリの書き溜め(write-behind)バッファにある分は失われる**(この試験で確認:ディスク上の大きさ 0)。=『タイマーの flush』が要る理由。
-- 状態ファイルの `put` が **`.tmp` を書いたあと `move` の前**で Worker を殺されても、**古い状態が残る**(試験)。
-- **試験していない**: 電源断・ブラウザ自体の強制終了・ディスクが一杯のとき(`QuotaExceededError` は ENOSPC に写すがエンジンへ流していない)・`persist()` が拒否されたときのブラウザによる消去(act1 の R5 の想定。Files 窓は `/fl/state`・`/fl/license` の削除に確認を出す〔段階 2 で実装〕が、ブラウザが消すのは止められない)。
+- `write` → `flush` したが `close` していないハンドルを持つ Worker をページから `terminate()` し、ページを再読み込みしても、**中身は残る**。`write` → `close`(fsync なし)も残る。**ライブラリの書き溜め(write-behind)バッファにある分は失われる**(このテストで確認:ディスク上の大きさ 0)。=『タイマーの flush』が要る理由。
+- 状態ファイルの `put` が **`.tmp` を書いたあと `move` の前**で Worker を殺されても、**古い状態が残る**(テスト)。
+- **テストしていない**: 電源断・ブラウザ自体の強制終了・ディスクが一杯のとき(`QuotaExceededError` は ENOSPC に写すがエンジンへ流していない)・`persist()` が拒否されたときのブラウザによる消去(act1 の R5 の想定。Files 窓は `/fl/state`・`/fl/license` の削除に確認を出す〔段階 2 で実装〕が、ブラウザが消すのは止められない)。
 
 ## 7. 同期ハンドルの排他(実測)と複数タブ
 
@@ -147,7 +147,7 @@
 
 ## 8. スレッド
 
-エンジンのゲストのスレッドは、『1 本目以外は自分の JSPI スタックで動く協調スレッド』で、全部 **1 つの Worker の中**にある(決定 0124、`fle_thread_wasm.h` を読んだ〔読み〕)。したがって OPFS のライブラリはその Worker で動き、`Atomics.wait` の橋渡し(測定表の費用)は**要らない**見込み。プラグインの Worker(別の Worker で動く)が自分のファイルを OPFS から読む場合は別の話で、今回は扱っていない。ライブラリを『ゲストの 2 本目のスレッド』から呼ぶ試験は、配線が要るので**未実施**。
+エンジンのゲストのスレッドは、『1 本目以外は自分の JSPI スタックで動く協調スレッド』で、全部 **1 つの Worker の中**にある(決定 0124、`fle_thread_wasm.h` を読んだ〔読み〕)。したがって OPFS のライブラリはその Worker で動き、`Atomics.wait` の橋渡し(測定表の費用)は**要らない**見込み。プラグインの Worker(別の Worker で動く)が自分のファイルを OPFS から読む場合は別の話で、今回は扱っていない。ライブラリを『ゲストの 2 本目のスレッド』から呼ぶテストは、配線が要るので**未実施**。
 
 ## 9. メモリ
 
@@ -159,9 +159,9 @@
 |---|---|---|
 | R1 保存モードでエンジンの値をそのまま使い、保存したファイルを取り出せる | 段階 2 で実装(提案名・フィルター・既定の拡張子・上書き確認。Files 窓から Download)。**実エンジンの『Unlock with file』の保存は未実行**(実鍵・実フローは依頼者が要る) | 段階 2 の Save as(実エンジン)と同じ経路〔実測〕 |
 | R2 開くモードで OPFS のファイルとローカルのアップロードの両方から選べる | 段階 2 で実装(窓の中に Upload。取り消しはエンジンに『取り消し』を返す) | 段階 2 の Open / Import(実エンジン)〔実測〕 |
-| R3 検証ファイルと鍵をサーバー・ビーコン・ログに載せない | ビーコンの `files` ブロックは数と固定の失敗コードだけ(名前・パス・内容なし)。ページのログも名前を書かない。`/fl/license` は同期もプレビューもしない | 段階 2 の `files-usage` 試験(プライバシーの検査)〔実測〕 |
-| R4 レジストリの永続(`registrations.bin`、`/fl/state/`) | **置き場と読み書き(`fle_opfs_state_put/get`)を用意し、Worker 殺しの試験まで通した。`fle_reg.c` への読み込み(入口の前)と書き出し(`RegFlushKey`・定期)の配線は未実施**。対象の部分木の確定は実鍵の通しが要る(act1) | 本段階の試験〔実測〕 |
-| R5 『全消去』等が `/fl/state`・`/fl/license` を黙って消さない、`persist()` を要求 | 段階 2 で実装(削除・名前変更・移動で警告つきの確認)。`persist()` の要求は段階 1 から。**ブラウザが許可しない場合の消去は止められない**(§6) | 段階 1・2 の試験〔実測〕 |
+| R3 検証ファイルと鍵をサーバー・ビーコン・ログに載せない | ビーコンの `files` ブロックは数と固定の失敗コードだけ(名前・パス・内容なし)。ページのログも名前を書かない。`/fl/license` は同期もプレビューもしない | 段階 2 の `files-usage` テスト(プライバシーの検査)〔実測〕 |
+| R4 レジストリの永続(`registrations.bin`、`/fl/state/`) | **置き場と読み書き(`fle_opfs_state_put/get`)を用意し、Worker 殺しのテストまで通した。`fle_reg.c` への読み込み(入口の前)と書き出し(`RegFlushKey`・定期)の配線は未実施**。対象の部分木の確定は実鍵の通しが要る(act1) | 本段階のテスト〔実測〕 |
+| R5 『全消去』等が `/fl/state`・`/fl/license` を黙って消さない、`persist()` を要求 | 段階 2 で実装(削除・名前変更・移動で警告つきの確認)。`persist()` の要求は段階 1 から。**ブラウザが許可しない場合の消去は止められない**(§6) | 段階 1・2 のテスト〔実測〕 |
 | R6 同名の保存で上書きの確認 | 段階 2 で実装(`FOS_OVERWRITEPROMPT` → 『Replace the file?』、実エンジンで確認) | 段階 2 の Save as〔実測〕 |
 
 ## 11. 未確認と次の手
@@ -179,7 +179,7 @@
 # ブラウザで測る(Chrome は CDP、Firefox は geckodriver)
 cd app; export APP_WORK=<HOME 以下の作業ディレクトリ>
 node test/e2e/opfs-bench.mjs --browser chrome|firefox --out bench.json
-# ライブラリの試験(emscripten でモジュールを作ってから)
+# ライブラリのテスト(emscripten でモジュールを作ってから)
 cd lift/harness/web/opfs1 && emcc opfs_test.c fle_opfs_state.c -O1 -sJSPI -sSHARED_MEMORY=1 -sINITIAL_MEMORY=268435456 -sENVIRONMENT=worker -sMODULARIZE -sEXPORT_NAME=createOpfsTest --js-library fle_opfs_lib.js -o <build>/opfs_test.js
 OPFS_BUILD=<build> node app/test/e2e/opfs-lib-test.mjs --browser chrome|firefox --out lib.txt
 # パス変換(native)
@@ -196,8 +196,8 @@ node tools/opfs-s3-summary.mjs logs/s3 > tables/opfs-s3-measurements.tsv
 
 ## PM の判断と取り込み(2026-11-04)
 
-- **取り込み**: `opfs1-s3.diff`(新規 15 ファイル、`-` 行 0、どのビルドも変えない)を HEAD 0235dff に当てた。clean(offset・fuzz なし)。PM 実測: `wall_opfs1_map` と `wall_opfs1` の Rust 試験 通過(4 + 1)。段階 3 は `app/src` に触れないので vitest・e2e は再実行していない。担当の訂正どおり `wall_opfs1`(4 件)は担当が配置を移した後に再実行しておらず、PM の再実行で通った。
-- **この段階で実エンジンは動かしていない(担当の申告どおり)**: Chrome 156 と Firefox 158 の専用 Worker で本物の OPFS を同期アクセス(createSyncAccessHandle)で測り、作ったライブラリを emscripten(-sJSPI)の C 試験プログラムから 68 件呼んだ。エンジンの実際のアクセスの型は観測していない。したがって『エンジンが OPFS をファイルシステムとして使える』とはまだ言えない。
+- **取り込み**: `opfs1-s3.diff`(新規 15 ファイル、`-` 行 0、どのビルドも変えない)を HEAD 0235dff に当てた。clean(offset・fuzz なし)。PM 実測: `wall_opfs1_map` と `wall_opfs1` の Rust テスト 通過(4 + 1)。段階 3 は `app/src` に触れないので vitest・e2e は再実行していない。担当の訂正どおり `wall_opfs1`(4 件)は担当が配置を移した後に再実行しておらず、PM の再実行で通った。
+- **この段階で実エンジンは動かしていない(担当の申告どおり)**: Chrome 156 と Firefox 158 の専用 Worker で本物の OPFS を同期アクセス(createSyncAccessHandle)で測り、作ったライブラリを emscripten(-sJSPI)の C テストプログラムから 68 件呼んだ。エンジンの実際のアクセスの型は観測していない。したがって『エンジンが OPFS をファイルシステムとして使える』とはまだ言えない。
 - **設計 B を採る**: 『開くときに全部読み、閉じるときに書き戻す』。`fle_vfs.c` のノード(キャッシュ)はそのままで、ReadFile / CreateFileMappingW は変わらず、同期ハンドルを開きっぱなしにしない(他タブ・Files 窓と競合しない)。配置は `C:\Users\user\Downloads` = OPFS のルート(最上位の `fl` は見せない。`/fl/state`・`/fl/license` は保護)。Chrome の 1 回の呼び出しが Firefox の 4〜15 倍重い(ランダム 4 KiB 読み 630 µs 対 42 µs)ことが、設計 B の根拠。
 - **配線(次の作業)**: `fle_vfs.c` への接続、`lift/harness/web/opfs1/` から `lift/runtime/` への移動(移動すると次のバンドルが変わるので ship の流れで行う)、act1 の R4(設定・レジストリ・ライセンスファイルの永続化)の `fle_reg.c` への接続。エンジンの実際のファイルアクセスの型の観測が先。
 - **未確認**: 電源断・ブラウザの強制終了、ディスク一杯、persist() 拒否時の消去、2 タブ、ゲストの 2 本目のスレッドからの OPFS 呼び出し、設定を永続させたとき Welcome ウィザードが出なくなるか、依頼者の Firefox 159 / Windows 10(0)。

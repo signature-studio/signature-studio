@@ -4,7 +4,7 @@
 
 ## 冒頭の三点
 
-1. **何を実測したか**: 実エンジン(FLEngine_x64.dll と同梱 5 DLL を x86-64 → C → wasm にした物。代役・再生は 0)で、(a) fe-wasmgen が lower できない関数とその理由を、HEAD の runtime で作った native -O0 の計数ビルドの実行命令数(Playlist ドラッグ 1920・3240、Settings タブ。起動を引いた操作分)で重みづけて集計し、(b) 足りない SSE2 の packed 整数命令を `fe-wasmgen` に v128 命令として足して(opt-in `--sse-int`)ホスト CPU と差分試験し、(c) 現行の混成 977 関数に『新たに lower できるようになった実行された 32 関数』を足した新リスト(1,009)で S1(混成なし)・Hcur(現行混成)・Hnew(新混成)を作り、(d) node の G3 で画素同一と CPU 秒、Chrome 156 と Firefox 158 で Playlist ドラッグと Settings タブ切替を 1920x1080 と 3240x1946 で測り、(e) Chrome が大きい画面で重くなる理由を切り分けた。
+1. **何を実測したか**: 実エンジン(FLEngine_x64.dll と同梱 5 DLL を x86-64 → C → wasm にした物。代役・再生は 0)で、(a) fe-wasmgen が lower できない関数とその理由を、HEAD の runtime で作った native -O0 の計数ビルドの実行命令数(Playlist ドラッグ 1920・3240、Settings タブ。起動を引いた操作分)で重みづけて集計し、(b) 足りない SSE2 の packed 整数命令を `fe-wasmgen` に v128 命令として足して(opt-in `--sse-int`)ホスト CPU と差分テストし、(c) 現行の混成 977 関数に『新たに lower できるようになった実行された 32 関数』を足した新リスト(1,009)で S1(混成なし)・Hcur(現行混成)・Hnew(新混成)を作り、(d) node の G3 で画素同一と CPU 秒、Chrome 156 と Firefox 158 で Playlist ドラッグと Settings タブ切替を 1920x1080 と 3240x1946 で測り、(e) Chrome が大きい画面で重くなる理由を切り分けた。
 2. **結論**:
    - **足した命令**: PADDUS*/PSUBUS*/PADDS*/PSUBS*・PMULLW/PMULHW/PMULHUW・PMADDWD・PAVG*・PMIN/PMAX{UB,SW}・PSADBW・PINSRW・PSRLQ/PSLLQ(xmm 数)ほか(SSSE3 の PSHUFB/PALIGNR/PABS*)を wasm の命令 1 本ずつに。決定 0181 が `--mx-packed` の裏に置いていた整数/シャッフルの形も旗なしの MXCSR 窓なしで使えるようにした。**ホスト CPU と 100 形 × 1,008,456 組(100,845,600 組)が全てビット一致、16 ビットレーンの 13 形は 2^32 の順序対を全部通して digest 一致、mutation は 100/100 形で検出**。旗なしの出力は HEAD の fe-wasmgen とバイト一致。
    - **被覆**: 3240x1946 ドラッグの操作分(2.09 G 命令)で直接 wasm の割合は **56.25% → 96.73%**(1920x1080: 79.92% → 95.66%、Settings: 66.04% → 88.85%)。lower できなかった物の最大は `f_2a337c0`(dsp、PSUBUSB、17.3%)と `f_6a7b70`(Pshufd、14.3%)で、どちらも現行リストに無かった。
@@ -93,7 +93,7 @@ FLEngine と同梱 5 DLL(dsp_ippv2・Blend2D〔F1x の wrapper seeds〕・QFC・
 
 表: `tables/wl-<操作>-base-*.tsv`(前: 旗なしの census と現行リスト)、`tables/wl-<操作>-after-*.tsv`(後: `--sse-int` の census と新リスト)。`*-functions.tsv` は関数ごとの実行命令数・理由、`*-reasons.tsv` は理由ごとの集計。
 
-## 3. 差分試験(`tests/simd_int_forms.rs`、`hyb5.diff`)
+## 3. 差分テスト(`tests/simd_int_forms.rs`、`hyb5.diff`)
 
 1 命令形ごとに『`movups xmm0,[rcx]; movups xmm1,[rcx+16]; <命令>; 保存; add rcx,32; add rdx,16; dec r8; jnz`』のループ関数を fe-wasmgen で wasm にし、node で N 組の入力に走らせて、結果をホスト CPU(core::arch の同じ命令)とビット比較する(fe-wasmgen の既存の `sse_x2_forms.rs` と同じ形式。ループにして 1e6 組を 1 回の呼びで回す)。
 
@@ -389,10 +389,10 @@ Worker はどちらも 80〜99% 使われていて(Firefox 97〜99%、Chrome 80%
 ## 9. 出典のない選択(`S-hyb5-*`。代替と理由)
 
 1. **S-hyb5-1 旗 `--sse-int` を新設した(opt-in)**。代替: (a) 既存の `--mx-packed` の下に入れる = packed 浮動小数点の窓の helper〔rcgen〕を全部入れてしまい、既定の直接部のバイトが動く; (b) 既定で有効 = 現行の混成の census と生成物が変わりうる。選んだ理由: 既定の挙動を変えない規則、および整数/シャッフルは MXCSR と無関係で別の旗にできる。
-2. **S-hyb5-2 SSSE3 の PSHUFB・PALIGNR・PABS* を足した**(CPUID を SSE2 に固定しているので現エンジンでは届かない見込み)。代替: 足さない。理由: 1 命令 1 行、差分試験で確認できる。
-3. **S-hyb5-3 差分試験の入力の分布**(全バイト対 65,536 を 2 配置、16 ビット境界値 24×24、32 ビット境界値 16×16、シフト数 16 種 × 8、乱数 N〔半分は境界値の混合〕)と N の既定(100,000、速さのため)。ログは N = 1,000,000。
+2. **S-hyb5-2 SSSE3 の PSHUFB・PALIGNR・PABS* を足した**(CPUID を SSE2 に固定しているので現エンジンでは届かない見込み)。代替: 足さない。理由: 1 命令 1 行、差分テストで確認できる。
+3. **S-hyb5-3 差分テストの入力の分布**(全バイト対 65,536 を 2 配置、16 ビット境界値 24×24、32 ビット境界値 16×16、シフト数 16 種 × 8、乱数 N〔半分は境界値の混合〕)と N の既定(100,000、速さのため)。ログは N = 1,000,000。
 4. **S-hyb5-4 16 ビット全対の網羅は digest 比較**(2 本の 32 ビット鎖 + xorshift)。代替: 結果を全部保存して比較(8.6 GB 以上の入出力)。最初の digest(imul だけの鎖)は低位 12 ビットが入力に依存しない弱さがあったので非線形の混ぜを足して全形を取り直し、各形で『壊した版の digest は違う』ことも確認した。
-5. **S-hyb5-5 mutation は生成した wasm 本体の同じ長さの 1 箇所の変更**(opcode・shuffle の lane・定数・lane 番号)。代替: `lower.rs` に環境変数のフックを入れる(製品コードに試験用の分岐が入るので採らない)。
+5. **S-hyb5-5 mutation は生成した wasm 本体の同じ長さの 1 箇所の変更**(opcode・shuffle の lane・定数・lane 番号)。代替: `lower.rs` に環境変数のフックを入れる(製品コードにテスト用の分岐が入るので採らない)。
 6. **S-hyb5-6 新リストの選び方**: 現行 977 + (旗なしでは lower できず `--sse-int` で lower できる + 計数ビルドか V8 プロファイルが 1 回でも実行を見た)− (specials・prune S+M・Blend2D swap・HLE 入口)。代替: 命令数の上位 K 件、被覆率 99% まで、『lower 可能だが現行リストに無い関数』(ドラッグで 1.0〜1.7%、Settings で 3.1%)も足す(指示は『977 + 新しく lower できるようになった関数』なので足していない)。
 7. **S-hyb5-7 F8・Settings の『実行された』を V8 プロファイルのサンプルで代用**(計数ビルドが止まるため)。代替: 計数ビルドに ship2 の import 行を足して作り直す(約 25 分とディスク 3 GB 以上。上限に収まらず採らなかった)。
 8. **S-hyb5-8 操作分の抽出は『前置きだけの走行のカウンタを関数ごとに引く』**。代替: 区間のカウンタを取る(計数ビルドにその口が無い)。
@@ -423,9 +423,9 @@ Worker はどちらも 80〜99% 使われていて(Firefox 97〜99%、Chrome 80%
 
 ## PM の判断と取り込み(2026-11-04)
 
-取り込んだ基準: HEAD 741d626 に `hyb5.diff`(11 ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 2 本(`lower.rs` の `m2 if packed_on()&&is_sse_x2` の条件と、Psrlw/Psraw 系の腕)は読んだ。PM が測った値(この機械、`lift/out-pmchk-h1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **192 results / 2,350 passed / 0 failed**(ignored 1。基準 191 / 2,348 に新しい試験 1 ファイル分が増えた)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。
+取り込んだ基準: HEAD 741d626 に `hyb5.diff`(11 ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 2 本(`lower.rs` の `m2 if packed_on()&&is_sse_x2` の条件と、Psrlw/Psraw 系の腕)は読んだ。PM が測った値(この機械、`lift/out-pmchk-h1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **192 results / 2,350 passed / 0 failed**(ignored 1。基準 191 / 2,348 に新しいテスト 1 ファイル分が増えた)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。
 
-1. **`fe-wasmgen --sse-int`(opt-in)を採る。** x86 の packed 整数命令 1 本を、同じ定義の wasm v128 命令 1 本にする命令の契約の実装(方針 (b))で、HLE でも FL の挙動の補正でもない。旗なしの出力は HEAD とバイト一致(977 関数の混成)。ホスト CPU との差分試験は全一致、mutation は全検出。
+1. **`fe-wasmgen --sse-int`(opt-in)を採る。** x86 の packed 整数命令 1 本を、同じ定義の wasm v128 命令 1 本にする命令の契約の実装(方針 (b))で、HLE でも FL の挙動の補正でもない。旗なしの出力は HEAD とバイト一致(977 関数の混成)。ホスト CPU との差分テストは全一致、mutation は全検出。
 2. **新リスト(1,009 関数 = 現行 977 + 32、`lift/harness/seeds/hyb-sse2-F2x-*.txt`)は、次の bundle(ship3 の構成との組合せ)の候補。** 出荷への採用は、ship3 の F2xH3 と組み合わせた画素同一と速さを測ってから決める(hyb5 は S1 の C 部との組合せで測った。F2xH3 + 新混成そのものは未測定)。
 3. **3240x1946 の Playlist ドラッグは 60 回/s に届かない**(Firefox Hnew 36.4、Chrome Hnew 13.1)。残りは直接 wasm 59%・runtime の C 33%(`fle_r_blit` 9.9% が最大)・その他に平らに散り、1 関数では 10% 未満しか動かない。次の手は C の経路そのものの変換・通信の削減で、局所的な軽量化ではない。
 4. **Chrome が大画面で 1 画素当たり悪化する理由は『なぜ C 経路だけか』が未確認のまま**(段差ではなく滑らかな悪化。tier-up・ページフォルト・メモリ量は原因ではない)。Firefox で Hcur が S1 より遅い理由も未確認。

@@ -1,6 +1,6 @@
 # wasm 移植の実行記録（決定 0045）
 
-日付: 2026-10-21。HEAD 4936d44 + 作業ツリー（他担当の未コミット変更を含む。測定時点で `runtime/fle_mxcsr_flags.h` は純 C 版（決定 0044、md5 6f7f1eb3…）、`fle_x87.c`、`fle_locale.c` は他担当の変更後）。方式と制限は `docs/decisions/0045-wasm-port.md`。「実測」はコマンドの出力、「推測」は未検証の解釈。成果物は `lift/out-wasm2/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE。`out-wasm/` の `emcache` は複製。大きな `out-wasm/` のファイルは複製していない）。
+日付: 2026-10-21。HEAD 4936d44 + ワークツリー（他担当の未コミット変更を含む。測定時点で `runtime/fle_mxcsr_flags.h` は純 C 版（決定 0044、md5 6f7f1eb3…）、`fle_x87.c`、`fle_locale.c` は他担当の変更後）。方式と制限は `docs/decisions/0045-wasm-port.md`。「実測」はコマンドの出力、「推測」は未検証の解釈。成果物は `lift/out-wasm2/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE。`out-wasm/` の `emcache` は複製。大きな `out-wasm/` のファイルは複製していない）。
 
 ## 1. 要約（実測）
 
@@ -81,7 +81,7 @@ diff run-native.txt run-node-base.txt                                           
 
 ## 6. ADR-0005 の A3
 
-- **定義の確認**: `docs/decisions/0005-mxcsr.md` を全文読んだ。本文は「STMXCSR と LDMXCSR の応答」の決定で、「A3」という語は**ない**。`docs/` 全体の `A3` は、`remaining-unsupported.md` と決定 0024 の「A3 = kernel32 グローバルメモリ・アトム・文字列」（API の項目名）だけで、wasm とは別。リポジトリ内に「A3 = 生成 C が emcc でリンクできる」と書いた文書はなく（`docs/`、`README.md`、`git log` のメッセージを grep）、probe の記載（本文に見つからなかった）と同じ。ネイティブ clang の確認だけで A3 を「達成」と記録した箇所も、作業ツリーと `git log` の範囲では見つからなかった（その記録は依頼文の記述で、原文は未確認）。
+- **定義の確認**: `docs/decisions/0005-mxcsr.md` を全文読んだ。本文は「STMXCSR と LDMXCSR の応答」の決定で、「A3」という語は**ない**。`docs/` 全体の `A3` は、`remaining-unsupported.md` と決定 0024 の「A3 = kernel32 グローバルメモリ・アトム・文字列」（API の項目名）だけで、wasm とは別。リポジトリ内に「A3 = 生成 C が emcc でリンクできる」と書いた文書はなく（`docs/`、`README.md`、`git log` のメッセージを grep）、probe の記載（本文に見つからなかった）と同じ。ネイティブ clang の確認だけで A3 を「達成」と記録した箇所も、ワークツリーと `git log` の範囲では見つからなかった（その記録は依頼文の記述で、原文は未確認）。
 - したがって、定義は依頼文と probe の基準（「生成 C が emcc でリンクできる」）を使う。最終ターゲットは「C → emcc → wasm、node 上で実行」。
 - 定義と実測の対応（実測）:
 
@@ -92,7 +92,7 @@ diff run-native.txt run-node-base.txt                                           
 | node で実行できる | 実行した。DllMain 経路を走らせ、停止まで 1.7 秒 |
 | ネイティブと同じ停止点、同じ関数実行数・入口数・深さ・停止レポート | 一致（199 / 1,386 / 9、GetLocaleInfoW LCType 0x37、`rsp` の行だけ違う。§5） |
 
-- 判定: 上の 4 つの基準は、runtime を移植した（shim なし、`-I` やオーバーレイでの差し替えなし。MXCSR は作業ツリーの純 C 版をそのまま使った）ビルドで満たされた。**ネイティブ clang の確認だけでは満たされない基準（emcc でのコンパイルとリンク、node 実行）を、今回初めてリポジトリ内のハーネス（`lift/harness/wasm/build.sh`）で実測した**。ただし次は A3 の外で、満たしていない（未達）: 停止点より先の実行（SSE/x87 の演算が wasm で native と同じ結果になること）、ブラウザ、ページ保護の強制、ゲストが触ってよい領域の完全な検査（決定 0045 d、制限）。「A3 を達成した」と言えるのは、定義を上の 4 つの基準とした場合に限る。定義の原文が見つからないため、PM が基準を確認すること。
+- 判定: 上の 4 つの基準は、runtime を移植した（shim なし、`-I` やオーバーレイでの差し替えなし。MXCSR はワークツリーの純 C 版をそのまま使った）ビルドで満たされた。**ネイティブ clang の確認だけでは満たされない基準（emcc でのコンパイルとリンク、node 実行）を、今回初めてリポジトリ内のハーネス（`lift/harness/wasm/build.sh`）で実測した**。ただし次は A3 の外で、満たしていない（未達）: 停止点より先の実行（SSE/x87 の演算が wasm で native と同じ結果になること）、ブラウザ、ページ保護の強制、ゲストが触ってよい領域の完全な検査（決定 0045 d、制限）。「A3 を達成した」と言えるのは、定義を上の 4 つの基準とした場合に限る。定義の原文が見つからないため、PM が基準を確認すること。
 
 ## 7. `fscale`（probe の native と wasm の不一致）の原因確認
 
@@ -108,7 +108,7 @@ diff run-native.txt run-node-base.txt                                           
 - 新規: `lift/runtime/fle_host.h`、`lift/runtime/fle_host.c`、`lift/harness/wasm/`（`build.sh`、`build_native.sh`、`main.c`、`trace.c`、`run_node.cjs`、`split_c.py`、`interim/fle_mxcsr_flags.h`）、`lift/crates/fe-lift/tests/wasm_port.rs`、`docs/decisions/0045-wasm-port.md`、本書。
 - 変更: `lift/runtime/fle_runtime.h`（`fle_addr`、領域チェック）、`fle_sys.c`、`fle_sys.h`（アリーナ）、`fle_vmap.c`（アリーナ）、`fle_glob.c`、`fle_imports.c`、`fle_ole.c`、`fle_oleaut.c`、`fle_proc.c`、`fle_sysinfo.c`、`fle_vol.c`（tid）、`lift/harness/image.c`（`__EMSCRIPTEN__` の分岐のみ）。
 - 触っていない: `fle_mxcsr_flags.h`、`fle_sse.h`、`fle_x87.c/.h`、`fle_locale.c`、`tests/` の既存ファイル、`lift/harness/trace.c`、`lift/harness/main.c`、crates の `src/`、`docs/investigations/wasm-build-probe.md`。
-- 成果物（`lift/out-wasm2/`）: `bin-{base,chk,nohi,interim}/`、`obj-*`、`log-*`、`out/`（生成 C、約 430 MB）、`native/`、`arena/`、`cost/`、`x87chk/`、`target*`（cargo のビルド）、`test-*.txt`。合計は `du` を取っていない。削除禁止のため、途中の試験ファイルが残っている。
+- 成果物（`lift/out-wasm2/`）: `bin-{base,chk,nohi,interim}/`、`obj-*`、`log-*`、`out/`（生成 C、約 430 MB）、`native/`、`arena/`、`cost/`、`x87chk/`、`target*`（cargo のビルド）、`test-*.txt`。合計は `du` を取っていない。削除禁止のため、途中のテストファイルが残っている。
 
 ## 9. 未確認、限界
 

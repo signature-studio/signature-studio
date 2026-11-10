@@ -3,7 +3,7 @@
 ## 実際に実行した物
 
 - 実 Chrome 156 headless(CDP)で実エンジン。シナリオ `tools/scn-lat-ff.json`(0342 / 0344 と同じ)、解析は `tools/g2-multi.py`(0342 の `g2-analyze.py` と同じ record の選択規則)。run は交互(E13・RT-F・RT-H → RT-A・E13・RT-H・RT-A)。
-- **RT-H の plain 版**: bundle `~/work/mt3w-s1/ci-rth/engine/bundle/fl-engine-ci-b2fdfca0`(SHA256SUMS 9/9 OK、wasm 170,941,858 B、`engine.498095c419b0.wasm`、dll/glue/seed は RT-G と同一)。manifest は **bundle 自身の manifest の複写で、`engine.env` に FLE_DIAG なし**(env = FLE_AUTH_CLAIMS / FLE_FRUITY_MAX_CALLS / FLE_FRUITY_SECONDS / FLE_REG_SEED / FLE_VFS_SEED / FLE_VFS_SEED_ROOT の 6 つだけ)。mt3 の `mk-rth-assets.sh BUNDLE plain` の出力(`assets-rth-plain`)と、私が先に作った `assets-rth`(`mk-bundle-assets.sh`)の manifest は **byte 同一**(`cmp` で確認)。測定には `assets-rth`(port 5143、page-rt1)を使った。bundle 本体は書き換えていない。`ci-` と `test-` の wasm は `cmp` で同一。
+- **RT-H の plain 版**: bundle `~/work/mt3w-s1/ci-rth/engine/bundle/fl-engine-ci-b2fdfca0`(SHA256SUMS 9/9 OK、wasm 170,941,858 B、`engine.498095c419b0.wasm`、dll/glue/seed は RT-G と同一)。manifest は **bundle 自身の manifest のコピーで、`engine.env` に FLE_DIAG なし**(env = FLE_AUTH_CLAIMS / FLE_FRUITY_MAX_CALLS / FLE_FRUITY_SECONDS / FLE_REG_SEED / FLE_VFS_SEED / FLE_VFS_SEED_ROOT の 6 つだけ)。mt3 の `mk-rth-assets.sh BUNDLE plain` の出力(`assets-rth-plain`)と、私が先に作った `assets-rth`(`mk-bundle-assets.sh`)の manifest は **byte 同一**(`cmp` で確認)。測定には `assets-rth`(port 5143、page-rt1)を使った。bundle 本体は書き換えていない。`ci-` と `test-` の wasm は `cmp` で同一。
 - E13 = `assets-fl-engine-ci-0363b050`(port 5053、page-d0447902)、RT-A = `assets-rta`(bundle `fl-engine-test-rt1-91bf78f6`、port 5101、page-rt1)、RT-F = `assets-rtf`(`fl-engine-ci-d45afb0e`、port 5122、page-rt1)。
 - **counted の run 7 本**(全部 ok、停止なし、`state=engine-idle`)。開始前の gate はすべて load≤8、swap si/so 0/0(gate が止めた起動は run していない)、MemAvailable≥8 GB、他 Chrome 0、Wine 0(開始時に `wait-no-wine`、`ps` で FL64 / wineserver 0)。
 
@@ -91,4 +91,4 @@ run 間のばらつき(同じ条件の 2 本の差): E13 は 再生中 File clic
 
 ## 保存先
 
-`lift/out-git/ci1-results/0345/`: この REPORT.md、`g2-all-runs.md`(全 7 run の表)、`lat-chrome-{prev-10,new-11,new-12,new-13,prev-14,new-15,new-16}/`(lat-*.json、report.json、gate.txt)、`tp-5-rth/`(RT-H の trace run の lat-tp-play.json など)、`tp{1,2,3}-5-rth.md`(0343 と同じ解析の出力)、`g2-multi.py`、`run-rta2.sh`、`run-tp.sh`。生 trace(RT-H 約 115 MB)は `lift/out-ci1/kit/out/tp-5-rth/tp.trace.json` にあり、複写していない。
+`lift/out-git/ci1-results/0345/`: この REPORT.md、`g2-all-runs.md`(全 7 run の表)、`lat-chrome-{prev-10,new-11,new-12,new-13,prev-14,new-15,new-16}/`(lat-*.json、report.json、gate.txt)、`tp-5-rth/`(RT-H の trace run の lat-tp-play.json など)、`tp{1,2,3}-5-rth.md`(0343 と同じ解析の出力)、`g2-multi.py`、`run-rta2.sh`、`run-tp.sh`。生 trace(RT-H 約 115 MB)は `lift/out-ci1/kit/out/tp-5-rth/tp.trace.json` にあり、コピーしていない。

@@ -1,6 +1,6 @@
 # 描画面(BGRX)を canvas に出す経路: JS 側の試作と測定(エンジンの wasm なし)
 
-作成: 2026-11-01(基準 HEAD 0c39ffd、ブランチ main)。**何も決めない**(決めるのは PM)。決定 0126(別の作業、実行中)の作業木 `lift/out-fruity11/` は**読み取りだけ**で使った。リポジトリの既存ファイルは編集していない。新規は `lift/harness/web/present/`(コード、契約 `CONTRACT.md`、README、小さな測定結果 `results/`)、この文書、`lift/out-git/present1-results/`(生ログ、PNG、MERGE-NOTES.md)。
+作成: 2026-11-01(基準 HEAD 0c39ffd、ブランチ main)。**何も決めない**(決めるのは PM)。決定 0126(別の作業、実行中)のワークツリー `lift/out-fruity11/` は**読み取りだけ**で使った。リポジトリの既存ファイルは編集していない。新規は `lift/harness/web/present/`(コード、契約 `CONTRACT.md`、README、小さな測定結果 `results/`)、この文書、`lift/out-git/present1-results/`(生ログ、PNG、MERGE-NOTES.md)。
 
 ## 0. 先頭の要約
 
@@ -172,11 +172,11 @@
 
 ### 6.2 複数の top-level 窓(`results/multi.json`)
 
-| 試験 | 結果(実測) |
+| テスト | 結果(実測) |
 |---|---|
 | 窓 2(form_key 7)をポップアップ(`window.open`、512×384)に出す | 方式 A・B・C のすべてで、メインの canvas もポップアップの canvas も画素一致(canvas の読み戻しとスクリーンショットの両方)。ポップアップは `crossOriginIsolated`、`opener` あり |
 | 窓 2 を作り直す(lid 21 → 22、512×384 → 640×480、HWND も変わる)。form_key あり | A・B・C のすべてで**同じ canvas が追従**し、640×480 に変わって画素一致 |
-| 同じ試験で form_key なし(lid だけ) | 新しい lid に canvas が無く、**旧い canvas に旧い画像(512×384)が残った**(`presenter.unbound` 74) |
+| 同じテストで form_key なし(lid だけ) | 新しい lid に canvas が無く、**旧い canvas に旧い画像(512×384)が残った**(`presenter.unbound` 74) |
 
 - ポップアップは CDP の合成クリックの直後に開いた。ポップアップの inner 高さを要求より 1 px 大きく開くと、headless で canvas の寸法とぴったり合う(detach-window.md §4.3(6) の headless の 1 px の差の再確認)。
 - **未測定**: ポップアップを閉じる / 開き直す、複数のポップアップ、`window.open` の拒否(活性切れ)時のフォールバック、ポップアップへの入力の往復(この作業は表示だけ)。
@@ -211,7 +211,7 @@
 ## 8. G4 に対する読み
 
 - **表示経路が成立する**: 実エンジンの停止時の描画面(決定 0126 の PNG)を、wasm の線形メモリの上の BGRX の面として、A・B・C のいずれでも canvas に**画素一致**で出せる。JSPI で中断するエンジンの Worker でも、`Atomics.wait` で塞がった Worker でも(A を除く)出る。
-- **「エンジンが wasm で描いた」ことは別**で、**未達**。この作業の画素は、決定 0126 の **native** の実行が描いた面を PNG にしたものを、代役の wasm が面として持っているだけである。エンジンの wasm はこの作業で一度も動かしていない。C 側の API(`fle_surface_*`)は代役に実装しただけで、決定 0126 の作業木(`fle_raster.c`)には**無い**(実装していない。足し方は `CONTRACT.md` §3)。
+- **「エンジンが wasm で描いた」ことは別**で、**未達**。この作業の画素は、決定 0126 の **native** の実行が描いた面を PNG にしたものを、代役の wasm が面として持っているだけである。エンジンの wasm はこの作業で一度も動かしていない。C 側の API(`fle_surface_*`)は代役に実装しただけで、決定 0126 のワークツリー(`fle_raster.c`)には**無い**(実装していない。足し方は `CONTRACT.md` §3)。
 - G4 の受け入れ条件は「エンジンが描いた画素が canvas に出る(エンジンの GDI 呼び出し結果と画素が一致する)」。**画素一致は「PNG = canvas」であって、「エンジンの GDI 呼び出し結果 = canvas」ではない**。後者は 0126 の native の面(メモリ)と canvas を直接比較して初めて言える(この作業では PNG を経由している: PNG は 8bit RGB のロスレスなので、PNG と面は一致すると読んでいるが、**PNG が面から正しく書かれたことは 0126 の担当の記述(「PNG から数え直しても一致」)を引用しているだけで、再確認していない**)。
 - したがって G4 の状況は「表示経路は先に成立を確かめた。エンジンの wasm 側(FRUITY 有効の wasm ビルド、面の表の実装、共有メモリか JSPI か)が残っている」。
 
@@ -252,7 +252,7 @@
 ## 12. 規則違反の自己申告と、途中の誤り
 
 - **AGENTS.md の「作業は task agent を通じて」**: 私は task ツールを持たないサブエージェントなので、調査・実装・測定・文書をすべて自分で行った。
-- **git の変更系操作はしていない。commit していない。** 既存ファイルは編集していない。決定 0126 の作業木 `lift/out-fruity11/` は読み取りだけ(PNG を `cp` で `lift/out-git/present1-results/png/` にコピーした。元は変更していない)。`lift/runtime`、`lift/crates`、`lift/harness` の C・シェル、`lift/out-diag*`、他の `out-*` は触れていない。
+- **git の変更系操作はしていない。commit していない。** 既存ファイルは編集していない。決定 0126 のワークツリー `lift/out-fruity11/` は読み取りだけ(PNG を `cp` で `lift/out-git/present1-results/png/` にコピーした。元は変更していない)。`lift/runtime`、`lift/crates`、`lift/harness` の C・シェル、`lift/out-diag*`、他の `out-*` は触れていない。
 - **Chrome の遮断**: 最初のスモークテストから `--host-resolver-rules` ほかの遮断フラグを付けた(遮断なしの Chrome は起動していない)。net-log の検査は全フェーズで行った(§9)。
 - **work dir `/tmp/opencode/present1/` が一時的に 300 MB の上限を超えた**: 最初の測定で net-log を `Everything` にしたため 1.6 GB(`rate` の net-log が 992 MB)になった。気づいた時点で net-log とプロファイルを削除し、`Default` に変えた。**その後、`Everything` の再検査で `suspend` の net-log が 225 MB になり、work dir が 279 MB に達した(上限 300 MB 以内)**。検査後に削除。
 - **コマンドの実行**: 最初のスモークテストが `Browser.close` の後も node が終了せず(タイマーが残った)、2 回タイムアウトした。`withTimeout`(タイマーを消す)と `process.exit` で直した。**この 2 回は shell の timeout で止まり、出力が失われた**(`cut` のパイプに出力が溜まったまま。以後は出力をファイルに書いて読んだ)。`sleep`、`timeout`(コマンドとして)、`nohup`、末尾 `&`、`pgrep -f` のループは使っていない。python は標準ライブラリだけで、`PYTHONDONTWRITEBYTECODE` は設定していなかったが、スクリプトの編集にしか使わず(`python3 - <<EOF`)、`__pycache__` / `.pyc` は作られていない(`find` で確認)。標準ライブラリと衝突するファイル名は作っていない。

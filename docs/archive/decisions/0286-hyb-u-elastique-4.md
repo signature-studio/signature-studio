@@ -9,7 +9,7 @@
    - **E7b のコード(REF2 = 0270 無し)との差は、追加が Elastique の 4 関数だけ(0xb1ce5e0・0xb25ce20・0xb2cf0c0・0xb337800)**。ほかのモジュールの追加は 0。**外れる(削除)のは 3 関数**: Elastique 0xb2c8090(`__security_check_cookie`。0270b の守りで C 経路に戻る)と fle の 0x4781f0・0xe936b0(切り口の移動)。REF2 の候補が 4,045、今回が 4,046(+4 −3)。
    - 差分 `0286-hyb-u-elastique-4.diff`(`hyb-U-elastique.txt` に +4 行と注記 1 行、`ci/test-hybrid.sh` の数 2 か所)。b0fe2c11 に `patch --batch -p1 --dry-run` が offset・fuzz なしで通る(`-` は 2 行 = test-hybrid.sh の数の更新だけ)。`ci/test-hybrid.sh` の hyb の検査は **3,875 関数・Elastique 165・oggio 46 で全部 ok**(私の写しでは `.github` が無く『deploy.yml: P_FELIFT lacks fe-wasmgen』の 1 件だけ FAIL = この差分と無関係の、写しの欠け)。
    - Elastique の本番形の wasm(`--hybrid-only` で U の関数だけ): **1,975,962 B → 2,286,607 B(+310,645 B、+15.7%)**。4 関数の wasm_code_bytes の合計 310,464 B(68,619 + 210,913 + 30,509 + 423)。
-   - `boundary_regs.rs`(C ↔ 直 wasm の境界の試験 2 件)は b0fe2c11 で通る。4 関数の caller / callee を静的に出し(§4)、守られた 5 関数との隣接は 0xb2c8090(cookie)だけ。
+   - `boundary_regs.rs`(C ↔ 直 wasm の境界のテスト 2 件)は b0fe2c11 で通る。4 関数の caller / callee を静的に出し(§4)、守られた 5 関数との隣接は 0xb2c8090(cookie)だけ。
 2. **結論**: **追加は予測どおり 4 関数だけ**で採れる。S1 は +310,645 B(E8 の wasm 142,586,692 B に対し +0.22%、線 154,885,888 B の内)。first idle の悲観(0.53 ms/KB)は +160 ms、E7b の ci1 の実測(Chrome −1,432 ms、Firefox −376 ms)の余裕の内。期待する利得は 0265 の 3 関数の C 経路 1,769 ms(ミキサースレッドの 11.7%)で、**推定で未測定**(opt1 の E10 後の確認で見る)。
 3. **未確認**: 実エンジンでの 4 関数の挙動と CPU の効果(opt1 の E10 冷間ビルド後)。first idle の実測の増分。`cargo test -p fe-wasmgen`(b0fe2c11): 31 results・67 passed・0 failed(§5)。
 
@@ -61,8 +61,8 @@
 | 項目 | 結果 | 根拠 |
 |---|---|---|
 | `ci/test-hybrid.sh`(hyb の検査) | 3,875 / 165 / 46 で ok(私の写しでは deploy.yml の 1 件が FAIL = `.github` の欠け。b0fe2c11 の完全な木では ok のはず〔読み〕) | 実測 |
-| `cargo test`(fe-wasmgen / fe-lift) | **変わらない**: どの cargo の試験も `hyb-U-*.txt` を読まない(grep: 参照は `ci/test-hybrid.sh`・`app/scripts/build-engine-bundle.sh`・`lift/harness/hyb/filter-hybrid-list.py` だけ)。fe-wasmgen 全部の結果は下 | 実測 + 読み |
-| `test.sh full` | **変わらない**: `test.sh` の対象の試験は上のとおり `hyb-U` を読まない | 読み |
+| `cargo test`(fe-wasmgen / fe-lift) | **変わらない**: どの cargo のテストも `hyb-U-*.txt` を読まない(grep: 参照は `ci/test-hybrid.sh`・`app/scripts/build-engine-bundle.sh`・`lift/harness/hyb/filter-hybrid-list.py` だけ)。fe-wasmgen 全部の結果は下 | 実測 + 読み |
+| `test.sh full` | **変わらない**: `test.sh` の対象のテストは上のとおり `hyb-U` を読まない | 読み |
 | 既定の FLEngine C の sha | **変わらない**: `hyb-U-*.txt` は fe-wasmgen(`--hybrid-only`)と strip(`strip_units.py`)だけが読む。fe-lift の生成 C には入らない(`gen-direct.sh`・`gen_two.sh` は参照しない) | 読み(grep) |
 | wasm の差 | **8 モジュールのうち Elastique だけ**(リストを変えたのは `hyb-U-elastique.txt` だけ)。+310,645 B | 実測(本番形の単体ビルド。`tables/elastique-prod-like-wasm.txt` に sha と大きさ) |
 | C の部分 | Elastique の C 部分から 4 関数の本体が strip で消える(`strip_units.py`、リストにある関数の本体を除く)。その分 C の部分は小さくなる | 読み |
@@ -81,11 +81,11 @@
 - 守られた 5 関数(Elastique 0xb2c8090・0xb3aa660・0xb3ae300・0xb3b26e0、dsp 0x37ca8f0)のうち、4 関数の隣にあるのは **0xb2c8090 だけ**(0xb1ce5e0 と 0xb25ce20 の callee)。0xb3aa660・0xb3ae300・0xb3b26e0・dsp 0x37ca8f0 は 4 関数の caller にも callee にも無い。
 - **0xb2c8090 の扱い**: 守りが C 経路に残すのは『**C 経路の caller** が戻りのフラグを読む』形で、直 wasm の caller が**要約**(cookie の戻りの ZF=1 という既知値)から読む形は止めない(0270b §6.5)。4 関数のうち 2 本の caller は直 wasm で、要約から読む側。この形は `boundary_regs.rs` の 2 件目(**`the_registers_the_stack_pointer_and_xmm6_to_15_come_back_and_the_je_reads_the_callees_zf`**: 直 wasm の caller が C 経路の callee を呼び、callee-saved・R[4]・xmm6〜15 が戻り、`je` が callee の ZF を読む)が覆い、1 件目(`the_wrapper_of_a_direct_function_leaves_the_flags_of_the_c_path_as_they_were`)が C → 直の wrapper の形を覆う。**b0fe2c11 で 2 件とも通る(実測)**。
 - **C → 直の caller(0xb1bb100 など 17 本)の署名**: 0270 で変わった署名(sig_in)は、新しく直になる callee の署名と一致している(上の表)。署名は fe-wasmgen の 1 回の実行の中で一貫するので、4 関数を足しても署名の食い違いは起きない(読み。実エンジンで見るのは opt1)。
-- **この試験が覆わない物**: 4 関数そのものを使った境界の試験はない(`boundary_regs.rs` は 7 つの実行される関数の形の合成)。C ↔ 直の全レジスタ試験を 4 関数の形(特に 0xb25ce20: 3 本の C 経路 caller と cookie 呼びが同居)で実エンジンで確認するのは opt1(E10 の冷間ビルド後)。
+- **このテストが覆わない物**: 4 関数そのものを使った境界のテストはない(`boundary_regs.rs` は 7 つの実行される関数の形の合成)。C ↔ 直の全レジスタテストを 4 関数の形(特に 0xb25ce20: 3 本の C 経路 caller と cookie 呼びが同居)で実エンジンで確認するのは opt1(E10 の冷間ビルド後)。
 
 ## 5. 実行したテスト
 
-- `cargo test -p fe-wasmgen --no-fail-fast`(b0fe2c11、`CARGO_BUILD_JOBS=3`、nice 15): **31 results・67 passed・0 failed**(`tables/fe-wasmgen-tests-0286.log`)。fe-lift と `test.sh full` は走らせていない(`hyb-U` を読む試験が無いので結果は変わらない: §3)。
+- `cargo test -p fe-wasmgen --no-fail-fast`(b0fe2c11、`CARGO_BUILD_JOBS=3`、nice 15): **31 results・67 passed・0 failed**(`tables/fe-wasmgen-tests-0286.log`)。fe-lift と `test.sh full` は走らせていない(`hyb-U` を読むテストが無いので結果は変わらない: §3)。
 - `boundary_regs`: 2 passed / 0 failed。
 
 ## 6. 限界・自己申告

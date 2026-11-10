@@ -18,7 +18,7 @@
 | `runtime/fle_user_nowin.c` | `LoadLibraryW("Python312.dll")` が『見つからない』と答える条件、PUA の条件を無条件に |
 | `harness/seeds/{ia2,ship2,ship4,ship5}-imports.txt` | marker 行を消す(1 行ずつ)。コメント 1 箇所の『marker row』の言及を消す |
 | `harness/parity-paint/{parity_traceall.c,traceall-wrap-flags.txt}` | `fle_ia2_on` の wrap を消す |
-| `crates/fe-lift/tests/wall_ia2.rs` | `marker` の引数を消す。marker=false の試験を消す/変える。診断の試験は U+00AD 対 'O' に |
+| `crates/fe-lift/tests/wall_ia2.rs` | `marker` の引数を消す。marker=false のテストを消す/変える。診断のテストは U+00AD 対 'O' に |
 | `crates/fe-lift/tests/{locale,wall_dlg1,wall_fr11,wall_fr12,wall_r2,gdi_bulk}.rs` | §4 |
 
 残りの `fle_ia2_on` は 0 件(`grep` で確認: runtime・harness・crates/*/src・ci・app/scripts・tools に無い。docs の過去の記録〔s-choices.tsv の S-ia2-sortw-marker ほか〕は履歴なので変えていない)。
@@ -42,13 +42,13 @@
 ## 3. 同一性の根拠(読み)
 
 - 本番(ship2/4/5)の import 表は marker 行を含む → `fle_ia2_on()` は真 → 重みの経路・PUA・RectVisible・Python312.dll の『見つからない』は有効だった。変更後は無条件に有効。同じ挙動。
-- marker 行の無い構成(試験の一部、`gen_two.sh` の既定など)は、昔は『ia2 無し』だったが、本番では存在しない構成。この変更でそれらも本番と同じ挙動になる(試験の期待値を §4 で書き直した)。
+- marker 行の無い構成(テストの一部、`gen_two.sh` の既定など)は、昔は『ia2 無し』だったが、本番では存在しない構成。この変更でそれらも本番と同じ挙動になる(テストの期待値を §4 で書き直した)。
 
-## 4. 試験の期待値の書き直し(手で導いた値。ランタイムの出力を写していない)
+## 4. テストの期待値の書き直し(手で導いた値。ランタイムの出力を写していない)
 
-| 試験 | 昔 | 今 | 根拠(Microsoft の Sorting Weight Table、`Windows10-SortingWeightTable.txt`、SHA-256 81fcfa1e…) |
+| テスト | 昔 | 今 | 根拠(Microsoft の Sorting Weight Table、`Windows10-SortingWeightTable.txt`、SHA-256 81fcfa1e…) |
 |---|---|---|---|
-| `locale.rs` `compare_string_symbol_outside_rule_aborts` | U+00E9 対 "a"、U+2022 対 "a" は停止 | 停止の行から外し、新しい試験 `compare_string_nonascii_units_by_the_sorting_weight_table` へ: 3 / 1 / 1 / 3 | U+00E9 = 14/33、"a" = 14/2 → 大きい。U+2022 = 11/39(SM 11 < 14)→ 小さい |
+| `locale.rs` `compare_string_symbol_outside_rule_aborts` | U+00E9 対 "a"、U+2022 対 "a" は停止 | 停止の行から外し、新しいテスト `compare_string_nonascii_units_by_the_sorting_weight_table` へ: 3 / 1 / 1 / 3 | U+00E9 = 14/33、"a" = 14/2 → 大きい。U+2022 = 11/39(SM 11 < 14)→ 小さい |
 | `locale.rs` `lcmap_stops_locale_zero_…` のスイープ | 範囲 D の外は全部停止: 4×(65536−284) | 4×(65536−284−6400) 停止、4×(284+6400) 応答 | PUA U+E000..F8FF = 0x1900 = 6,400 単位が、決定 0191 で全 build で写像される |
 | `wall_dlg1.rs` ヒフン規則 | 出力 10 行 + カナで停止 | 12 行(kana-vs-ascii 1、ascii-vs-kana 3)+ 最後の `a-b` 対 `ab-` で停止(メッセージが変わる) | U+30AA = SM 3、"U" = 14 → カナが小さい |
 | `wall_fr11.rs` | 共通の接頭辞の制御文字 0x01 は停止 | `a\x01b` 対 `a\x01c` = 1(逆 3) | U+0001 = 6/3(重みあり)、同じ重み同士は決めず、'b'(14/9)対 'c'(14/10) |
@@ -56,9 +56,9 @@
 | `wall_r2.rs` | `0xe9` 対 "a"、"a b" 対 "a"+U+00E9、`a\x01b` 対 `a\x01c` は停止 | 3、1、1/3 | 上と同じ。**"ABC" 対 "abc"(case-only)は停止のまま**(B の対象ではない。ASCII の大文字小文字のみの差は S- の選択の外で、A で扱う) |
 | `gdi_bulk.rs` | `RectVisible` は名前付き停止(45 行) | 44 行(RectVisible は応答) | |
 
-## 5. 試験結果(実測。`w79`、`CARGO_BUILD_JOBS=3`)
+## 5. テスト結果(実測。`w79`、`CARGO_BUILD_JOBS=3`)
 
-**`harness/test.sh full`**(`tables/0284c-test-full.log`): `212 of 212 test executables selected + doc-tests`、**results=216 passed=2399 failed=0 ignored=1 SKIPPED-lines=1**(SKIPPED は `fe-lift/wall_fr9t` の `FLE_FR9T_CLEAN_RT is not set` の 1 件で、0279 の full と同じ)。executables run=107 **cached=105**(キャッシュされた実行体は、同じ実行体・環境・入力ファイルの最後の合格をそのまま使う=走らせていない。B で変わった物は走っている)、tests run=1680 cached=719。壁時計 161 s。0279 の full(passed=2395)との差 +4 は B が足した/変えた試験。
+**`harness/test.sh full`**(`tables/0284c-test-full.log`): `212 of 212 test executables selected + doc-tests`、**results=216 passed=2399 failed=0 ignored=1 SKIPPED-lines=1**(SKIPPED は `fe-lift/wall_fr9t` の `FLE_FR9T_CLEAN_RT is not set` の 1 件で、0279 の full と同じ)。executables run=107 **cached=105**(キャッシュされた実行体は、同じ実行体・環境・入力ファイルの最後の合格をそのまま使う=走らせていない。B で変わった物は走っている)、tests run=1680 cached=719。壁時計 161 s。0279 の full(passed=2395)との差 +4 は B が足した/変えたテスト。
 
 **a4**(`tools/a4run.sh`: 実モジュール 5 つ〔dsp・blend2d・qfc・freetype・iltools〕+ FLEngine、`FLE_SEEDS=flengine-seeds-thunks.txt`・`FLE_HOOKS=flengine-hook-points.txt`・`FLE_SEH_HANDLERS=0x112c0`、`EXPECT_FLE_SHA=skip`):
 
@@ -80,7 +80,7 @@
 
 ## 7. 疑似 VA の −0x10 のずれは害か(静的な読み。PM の 12:10 の依頼 (a)(b)(c)。コードの変更なし)
 
-**まず何がずれるか(読み。`imports_table.rs:779–861`、決定 0015 の 41–43 行)**: 応答表の行 k(0 始まり)の擬似 VA は `0x7FF900000000 + 0x10 × (k + 1)`。**行の位置で決まる**ので、marker 行を消すと後ろの行の VA が 0x10 ずつ前に詰まる(実測: 101 行、全部ちょうど −0x10。§2)。順序と一意性は保たれる(試験 `dispatch_table_stays_sorted_and_pseudo_vas_are_unique` は full で合格)。この VA は **GetProcAddress の戻り値と、COM の vtable の埋め込みにだけ**使われる(下の (a))。静的にリンクされた import(`jmp_imp:` の行)は fe-lift が直接呼びに解決するので、ゲストの IAT の値としては現れない(読み)。
+**まず何がずれるか(読み。`imports_table.rs:779–861`、決定 0015 の 41–43 行)**: 応答表の行 k(0 始まり)の擬似 VA は `0x7FF900000000 + 0x10 × (k + 1)`。**行の位置で決まる**ので、marker 行を消すと後ろの行の VA が 0x10 ずつ前に詰まる(実測: 101 行、全部ちょうど −0x10。§2)。順序と一意性は保たれる(テスト `dispatch_table_stays_sorted_and_pseudo_vas_are_unique` は full で合格)。この VA は **GetProcAddress の戻り値と、COM の vtable の埋め込みにだけ**使われる(下の (a))。静的にリンクされた import(`jmp_imp:` の行)は fe-lift が直接呼びに解決するので、ゲストの IAT の値としては現れない(読み)。
 
 **(a) runtime が擬似 VA を使う所(読み。`fle_resp_table`・`0x7FF9` を runtime と harness で grep)**
 | 場所 | 使い方 | VA の値への依存 |

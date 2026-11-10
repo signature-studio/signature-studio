@@ -12,7 +12,7 @@
    - **契約と違う点で、3 ブロック周期を説明するものは無い**。照合表の 23 行のうち、書き込みの周期に効くのは『write カーソルのリード』(S-audio-lead = 60 ms、Learn は『typically about 15 ms』)と『ポーリングの間隔』(kernel32 の Sleep、0266)だけで、どちらも C の窓を動かさない(上の測定)。リードが 60 ms であることの実効は、ゲストの underrun 検査が発火する遅れの閾値が 33 ms(15 ms なら 78 ms)になること。
    - **1/3 は『C ≥ 2 ブロック』の崖**: ゲストの `half` の比較は、検知から次のポーリングまでに play が偶数個の境界を越えると変化を見逃し、次の境界まで待つ(C ∈ [2, 3) ブロックなら周期が 3 ブロック)。C が 186 ms を切るだけで書き込み率は 0.334 → 0.502 に跳ねる(階段)。gpu1 の 0〜10 s(0.73)・10〜20 s(0.49)・30〜50 s(0.33)・50〜60 s(0.46)は、この階段の上を C が動いた形に読める。
    - **C の中身は DS モデルではない**(検知 → EnterCriticalSection → ミキサー本体 `f_d0ece0` → Lock → Unlock → 次のポーリング)。gpu1 の測定では、Lock → Unlock の計算は平均 0.5〜0.9 ms(最大 31 ms。`gpu7-results/logs/p3q-base/audio-p3.json` の `unlockCompute` を窓ごとに読み直した)、ミキサースレッド(t18)は 976〜1012 スライス/s・平均 0.54〜0.61 ms で Worker の壁時計の 54〜62%(`tables/p3q-base-unlocks.md`。同じ形の別の run `thread-slices-r60c` では 94,338 スライス/99 s・平均 0.61 ms・57.9%)= ほぼポーリング。**ミキサー本体 `f_d0ece0` の時間(Lock の前)は測られていない**。C が 190 ms を超える内訳(本体の計算、CS の待ち、他スレッドのスライス)は未確認。
-   - 直す差分: **fle_dsound.c / fle_audio_ring.c に契約の逸脱は見つからず、直す差分は無い**。試験用の道具として `audit_mixer` のシナリオ(`0273-ds-audit-scenario.diff`、`lift/harness/audio/ds_scenarios.c` に +77/−1)を添える。
+   - 直す差分: **fle_dsound.c / fle_audio_ring.c に契約の逸脱は見つからず、直す差分は無い**。テスト用の道具として `audit_mixer` のシナリオ(`0273-ds-audit-scenario.diff`、`lift/harness/audio/ds_scenarios.c` に +77/−1)を添える。
 3. **未確認**: (i) ブラウザの C の実測(検知から次のポーリングまで。内訳)。(ii) ~~native N1 で 3 ブロック周期になるか~~ → **alpha1 の native N1(決定 0274、実エンジン・仮想時間)で確認された(§7)**: C(最後のポーリング → Lock)の中央値は再生中 0〜3 ms の間 1 ブロック周期(書き込み率 0.994)、C=165 ms で周期 180 ms(0.49)、C=264 ms で周期 274 ms = 2.95 ブロック(0.34)。私の予測(C ≥ 約 186 ms で 3 ブロック周期)と一致。ブラウザの値は未測定のまま。(iii) ゲストの `lead`([obj+0x3c0])の実行値と、`Buffer length (DS)` の設定の置き場(レジストリ/ini のキー。この監査では特定していない)。(iv) 実機 Windows の write − play の値列(Learn は『typically about 15 ms』しか書かない)。(v) ゲストの underrun の UI メッセージ(`f_bd68e0(1,0)` → `f_666780`)が UI スレッドに足す費用。
 
 ## 1. ゲストのミキサーの判断(`f_12aeec0`)と、そこに入る入力
@@ -114,7 +114,7 @@ LeaveCS; (ループの先頭へ)
 
 ## PM の判断と取り込み(2026-11-06 10:25、docs のみ。差分は製品の木に当てていない)
 
-取り込み: mt3 の 0273 最終(表・道具・シナリオ差分)を `docs/investigations/mt3w/0273/` に置いた(差分 `patches/0273-ds-audit-scenario.diff` は `lift/harness/audio/ds_scenarios.c` への試験用の追加だけ)。測定は runtime のソースと保存した Learn 53 ページの読み、native -O0 の仮想時間のシナリオ(ゲストのミキサーの写し)、gpu1 の既存データの読み直しで、**実エンジン・ブラウザ・実機 Windows・依頼者の機械は 0 件**。
+取り込み: mt3 の 0273 最終(表・道具・シナリオ差分)を `docs/investigations/mt3w/0273/` に置いた(差分 `patches/0273-ds-audit-scenario.diff` は `lift/harness/audio/ds_scenarios.c` へのテスト用の追加だけ)。測定は runtime のソースと保存した Learn 53 ページの読み、native -O0 の仮想時間のシナリオ(ゲストのミキサーの写し)、gpu1 の既存データの読み直しで、**実エンジン・ブラウザ・実機 Windows・依頼者の機械は 0 件**。
 
 判断:
 1. **DirectSound のモデル(`fle_dsound.c` / `fle_audio_ring`)に、書き込みの周期へ効く契約の逸脱は無い**(照合 23 行: 一致 12 / 選択 8 / 小さな逸脱 3)。runtime への修正差分は無い。

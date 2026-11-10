@@ -9,7 +9,7 @@
 - **仮説 / 推測** = 実測や読みから言えそうだが確認していないもの。
 - **未確認** = 確認できていないもの。
 - 入力 DLL は §1 で抽出した `lift/out-blend2d/Blend2D.dll`。ツールは既存の `fe-pe`、`fe-decode`、`fe-lift` を `CARGO_TARGET_DIR=lift/out-blend2d/target` に release ビルドして使った（`lift/crates` は編集していない）。
-- 比較に使った dsp_ippv2 の数は、同じ作業ツリーの同じバイナリで測り直した（`dsp-ref/`）。`dsp-ippv2-lift-feasibility.md` の数は決定 0075〜0079 の前のもので、今は違う（functions 32,162 → 32,648 など）。表では測り直した値を使う。
+- 比較に使った dsp_ippv2 の数は、同じワークツリーの同じバイナリで測り直した（`dsp-ref/`）。`dsp-ippv2-lift-feasibility.md` の数は決定 0075〜0079 の前のもので、今は違う（functions 32,162 → 32,648 など）。表では測り直した値を使う。
 - 到達の調査（§4、§5）は**静的**で、DLL も FLEngine も実行していない。「通る」「届く」は静的な到達の話で、実行で起きるとは言っていない。
 - 作業用の補助スクリプトは `b2d_*.py`（読み取り専用。`PYTHONDONTWRITEBYTECODE=1` で実行し、`__pycache__` は作っていない）。前回の調査の `lift/out-loadlib/llpe.py` と `units.tsv`、`edges-direct.tsv`、`edges-ptr.tsv` を読み取りで再利用した（再生成していない）。
 

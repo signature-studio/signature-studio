@@ -66,7 +66,7 @@
 | r17 | trunc4(チャンネル 0〜2、効果スロット 0) | チャンネル 1・2 は同じく通り(thread CPU 52.7 → 57.9 s)、エンジンは W13 の手前を過ぎて FLP の読み込みを終え、**主窓(`TFruityLoopsMainForm`、`FL Studio 2026`、1930×1092)の上に `TMsgForm` 『Invalid data』(555×182、モーダル。主窓は disabled)**が出る(`snap a1_a`〜`a1_c`、window table 134 行、主窓の surface sha256 は 3 時点で同一 `ca1b08bf…`)。= エンジンが『データが不正』と判断した。**原因は未特定**: 切り詰めた FLP の不整合(プレイリストが無いチャンネルを指す、など)かもしれず、Serum 2 の状態復元の失敗かもしれない。区別できていない。そのため、このダイアログは参照プロジェクトについての主張に使わない |
 | r17(続き)と r18 | 同じ(r18 は a1_a の後すぐ Space) | r17: `a1_c` の後に Space(`tap 32`)を送って 5 秒(仮想)進めると、プローブの子プロセスは thread CPU 約 22 分を使っても次のスナップに届かず、プローブの CPU 上限(30 分)で打ち切られた(報告なし)。**r18**: a1_a から 3 分以上(子プロセスの thread CPU は合計 5:26)で子プロセスへ手で SIGABRT を送り、停止の報告を得た(**壁ではなく手で止めた物。壁 W14**)。**実測**: (1) Space で『Invalid data』が閉じた(`TMsgForm` visible 0)。主窓のタイトルは `serina1-serum2-trunc4.flp - FL Studio 2026`、enabled 1。(2) 最内の frame はエンジンの待ちの輪 `Sleep(1)` ← `f_5264e0` ← `MsgWaitForMultipleObjects` ← `f_526610` ← `f_11cfa00`(主スレッド、エンジンのコード。**Serum 2・ラッパーの frame は無い**)。API の履歴は `Sleep(1)`・`LeaveCriticalSection`/`EnterCriticalSection(0x16b6aa8)` の繰り返し。(3) その間に lifted 入口は約 250 万回しか増えていない(スナップ a1_a の 126,909,561 → 停止時 約 129.4 M)ので、CPU 時間は lifted コードの外(runtime か host 側)で使われた。**何を待っているか・何に CPU を使ったかは未特定**。`setupProcessing` / `setActive` / `process` は観測していない(**到達していない、または見えていない**。区別できない) |
 
-## 5. 壁の台帳(`tables/walls.tsv`、15 行。呼び元は shadow stack の実測、意味は読み)
+## 5. 壁の記録(`tables/walls.tsv`、15 行。呼び元は shadow stack の実測、意味は読み)
 
 | id | 経路・停止(実測) | API | 呼び元(shadow stack)と読み | 実装 | 状態 |
 |---|---|---|---|---|---|
@@ -155,7 +155,7 @@
 2. **起動 P1 への影響**: wasm のインスタンス化はサイズにほぼ比例する(決定 0161: A→D の測定)。**FLP がラッパー系のプラグインを持つときだけ**ラッパー(と QFC の VST3 経路)を読む設計が要る。選択肢: (a) 1 本の wasm に静的に入れる(最も単純。S1 と P1 に直撃)、(b) 決定 0096 の遅延モジュールのように関数本体を初回呼び出しまで取得しない(wasm-split 相当。未測定)、(c) ラッパーを別の wasm インスタンスにする — **不可**: `CreatePlugInstance` はエンジンの linear memory にあるホストオブジェクトを受け取るので、同じメモリに載せる必要がある。推奨は (b)。
 3. **Serum 2 をどこで動かすか**: 決定 0177 の実測で、Serum 2 は 1 インスタンスあたり Worker +約 530 MB、参照プロジェクトの 6 インスタンスを 1 つの wasm メモリに載せると最大 RSS 3.36 GB(ピアノ込み)= エンジン本体の 931 MiB と合わせると wasm32 の 4 GiB を超える。ゆえに **Serum 2 をエンジンの wasm に静的に入れる案は採れず**、決定 0173 の『1 インスタンス = 1 Worker』になる。すると境界は今回の実測の『QFC の `CreateVST3Instance` → `LoadLibraryW`/`GetProcAddress`/`GetPluginFactory`/IPluginFactory/IComponent の各 vtable 呼び出し』の途中に来る: 実測で、VST3 の読み込みと COM 呼び出しは QFC の lift 済み Delphi コード(エンジンの wasm の中)が行い、プラグインの COM オブジェクトを vtable 越しに呼ぶ。この境界を Worker 間の RPC にするには (i) `LoadLibraryW(Serum2.vst3)` が『遠隔モジュール』のハンドルを返し、(ii) `GetProcAddress` が RPC スタブの擬似 VA を返し、(iii) プラグインが返す COM オブジェクト(IPluginFactory、IComponent、IAudioProcessor、IEditController)の vtable の各スロットを RPC スタブにし、(iv) ホスト側の COM オブジェクト(QFC が作る IHostApplication、IComponentHandler、IParameterChanges、IEventList、IBStream など)をプラグインの Worker にプロキシで見せる、が要る。引数のポインタ(ProcessData の音声バッファ、文字列、構造体)の越境が仕事の大部分で、process の 1 ブロックあたりの呼び出し数は十数回(決定 0173 の往復 10〜200 µs の測定に収まる見込み。推測)。**設計の候補**: 『QFC の VST3 経路(`VST3Instance` のユニット)ごとプラグインの Worker に載せ、ラッパー↔QFC の境界(TVST3Instance のメソッド)だけを RPC にする』は境界の呼び出しが粗い(process、setState、getParameter…)ので現実的、と読むが未検討。
 4. **パス付き LoadLibraryW**: `fle_realmod_path_table` はリンク時に生成する表なので、wasm でも同じ(emcc のリンクに生成 C を足す)。VFS(MEMFS)のラッパー DLL の『ファイル』は存在確認用(エンジンが中身を読むかは未確認 → 当面は実物を置く = +6 MB)。
-5. **供給物(利用者側)**: 利用者のプラグインデータベース(`.Plugins.ini`・`VerifiedIDs.nfo`)と VST3 本体(`Serum2.vst3`、19.2 MB)。決定 0178 §8 の取り込み(ページがファイルを選ばせて VFS に置く)と同じ入口。エンジンがデータベースを自分で作る経路(プラグインスキャナ)は今回動かしていない(§8)。**ライセンス認証は迂回しない**(決定 0165 §2.3。認証の経路に入ったら壁として台帳に書いて止める)。
+5. **供給物(利用者側)**: 利用者のプラグインデータベース(`.Plugins.ini`・`VerifiedIDs.nfo`)と VST3 本体(`Serum2.vst3`、19.2 MB)。決定 0178 §8 の取り込み(ページがファイルを選ばせて VFS に置く)と同じ入口。エンジンがデータベースを自分で作る経路(プラグインスキャナ)は今回動かしていない(§8)。**ライセンス認証は迂回しない**(決定 0165 §2.3。認証の経路に入ったら壁として記録に書いて止める)。
 6. **スレッド**: ラッパーは CreatePlugInstance でジョブオブジェクトを作る(実測)が CreateThread は呼んでいない。Serum 2 のピアノは CreateThread を使う(決定 0165)ので JSPI の協調スレッド(決定 0124)が要る。
 
 ## 10. 自己申告(規則違反と逸脱)
@@ -165,7 +165,7 @@
 - shell のコマンドの中で末尾 `&` を 2 回使った。1 回目は background コマンドの中(エンジンの起動と FIFO への送信が競合して空振り。直後に取り消し、2 つの background コマンドに分けて起動し直した)。2 回目は 19:20 ごろ、プローブの出現を待つ `until` の空回りループ(`… & wait`)を前景で書いた(ツールの timeout 5 秒で止まった。CPU を食うループだったので、以後は `tail -f … | grep -m1` の待ちだけにした)。さらに `timeout` コマンドを 1 回使って拒否された(gdb の取得。gdb は ptrace_scope=1 で子孫以外に付けられず失敗)(エンジンの起動と FIFO への送信が競合して空振りした。直後に取り消し、2 つの background コマンドに分けて起動し直した)。
 - **同時の重い処理が 2 本を超えた時間帯がある**(エンジンの起動 2 本 + コンパイル 2 本、または全体テストの途中の起動。load 9〜14)。ビルドの待ち時間を隠すために、1 つ前の run の結果を読む間に次のエンジンを起動する『パイプライン』を使った。
 - **作業ディレクトリの上限(5 GiB)を超えた**: `lift/out-wrp1/` が 17:16 に約 18 GB になった(世代ごとの生成 C と native バイナリ〔577〜755 MB〕を消さずに積んだ)。気づいて整理し(4.4 GB 以下)、以後は『分割直後に生成 C を消す』(`cycle.sh`)・古い世代を消す運用にした。終了時に 500 MB 以内へ整理した(測定値は最終報告)。
-- 利用者の個人ファイル: `~/ダウンロード/FL_STUDIO_.Plugins.ini`・`FL_STUDIO_VerifiedIDs.nfo` を `lift/out-wrp1/inputs/` に複写して種にした(読み取り。元は変更していない)。複写は成果物に入れていない(要約 `tables/plugindb-summary.txt` はプラグイン名・パスを Serum 2 / OTT の項目と件数だけにした)。終了時に複写を消した。
+- 利用者の個人ファイル: `~/ダウンロード/FL_STUDIO_.Plugins.ini`・`FL_STUDIO_VerifiedIDs.nfo` を `lift/out-wrp1/inputs/` にコピーして種にした(読み取り。元は変更していない)。コピーは成果物に入れていない(要約 `tables/plugindb-summary.txt` はプラグイン名・パスを Serum 2 / OTT の項目と件数だけにした)。終了時にコピーを消した。
 - 他の `lift/out-*`(out-plug1、out-vst1、out-srm1、out-qfc、out-ext、out-blend2d、out-wallQ、out-inventory)は読み取りだけ。ラッパー DLL は `dll/` にハードリンクを作った(終了時に外した)。
 - **他の決定のテスト 3 本を変えた**: `wall_dlg1.rs` に 1 テストを足した(`-` 行なし)。さらに最初の全体テストで 2 件が落ちた(自分の差分が原因): `event.rs` の close hook 登録数の固定(5 → 6、決定 0122・0136 が同じ形で更新してきた)と、`wall_fr4.rs`(決定 0117)の『runtime に `crypt` を含む名前のファイルが無い』の固定(`fle_crypt.c/.h` だけを例外にして、代わりに中身が信頼判定の語を含まないことを確かめる形に変えた)。『名前を変えて当たりを避ける』は趣旨を確かめなくなるので採らなかった。許すかどうかは PM の判断(MERGE-NOTES)。最初の全体テストを自分の木の最後の確認にしていなかった(最後に走らせて初めて落ちたことに気づいた)ので、直したあと全体テストをもう一度走らせた。
 - **自分が起動した古いエンジンが 1 時間 56 分、遊んだまま残っていた**(r11 のプローブ。FIFO 待ちで CPU 0%、RSS 283 MB)。19:20 に気づいて `kill` した(自分の PID だけ)。その他の残りは無い。
@@ -176,10 +176,10 @@
 
 ## 11. 再現(opt-in の手順。所要時間は実測、この機械・load 5〜12)
 
-作業木 = HEAD の `git archive` に `wrp1.diff` を当てた木(`lift/out-wrp1/src/`)。`tools/` は `lift/out-git/wrp1-results/tools/` に置いた(絶対パスは `lift/out-wrp1` 前提)。
+ワークツリー = HEAD の `git archive` に `wrp1.diff` を当てた木(`lift/out-wrp1/src/`)。`tools/` は `lift/out-git/wrp1-results/tools/` に置いた(絶対パスは `lift/out-wrp1` 前提)。
 1. `cargo build --release -p fe-pe -p fe-lift -p fe-decode`(`CARGO_TARGET_DIR=lift/out-wrp1/cargo-target`。fe-lift は無変更)。
 2. ラッパーを空白の無い名前で用意: `ln lift/out-plug1/dll/Plugins/Fruity/Generators/'Fruity Wrapper'/'Fruity Wrapper_x64.dll' lift/out-wrp1/dll/FruityWrapper_x64.dll`(`gen_two.sh` の欄に空白が使えない)。
-3. 種: `tools/mk-seed.py BASE_SEED proj OUT EXTRA...`(参照プロジェクトを `proj/` に読み取りで展開、プラグインデータベースを `inputs/` に複写)→ `tables/vfs-seed-wrp1-c.tsv`。
+3. 種: `tools/mk-seed.py BASE_SEED proj OUT EXTRA...`(参照プロジェクトを `proj/` に読み取りで展開、プラグインデータベースを `inputs/` にコピー)→ `tables/vfs-seed-wrp1-c.tsv`。
 4. ビルド: **`S2=1 GEN_N=<n> JOBS=2 bash tools/cycle.sh <n>`**(`S2=1` で Serum2.vst3 を 7 つ目の実モジュールにする。無しで 6 イメージ = ラッパーまで)。段取り: `gen_two.sh rebase gen split merge`(7 モジュールを lift、結合表、分割)→ 内容アドレスのキャッシュで未変更の単位は再コンパイルしない → runtime とハーネスを `-O0 -g` → リンク(`fle_realmod_table` と `fle_realmod_path_table` をリンク時に生成)。**所要時間(実測)**: 6 イメージを白紙から(109 単位)3 分 4 秒(cycle 1、JOBS=2)、Serum2 を足した最初のビルド(56 単位)1 分 16 秒、行を足して全モジュールを作り直し(コンパイル 2 単位)52 秒、runtime だけの再リンク 25〜30 秒。バイナリは 6 イメージで 577 MB、7 イメージ(Serum2 つき)で 755 MB(`-finstrument-functions` つき)。
 5. 実行: `tools/serve.sh RUNDIR BIN BUILDN`(FIFO で待つ follow モード)→ `tools/send.sh RUNDIR < tables/wrp1-open.g3`(File → Open... の選択はハーネス)。エンジンの起動から follow モードまで 2.5〜4 分(プラグインデータベースを種に入れると 4 分前後)、そこから Serum 2 のチャンネルの停止まで 1.5〜2 分。環境変数: `FLE_DLG1_TRACE_FILES=1`・`FLE_WRP1_TRACE=1`・`FLE_CRYPT_TRACE=1`(印字だけ)。
 6. テスト: `cargo test --release -p fe-lift --test wall_wrp1 --test wall_dlg1`(それぞれ 10・29 件)、変異検査 `tools/mutate.sh`(10 件)。

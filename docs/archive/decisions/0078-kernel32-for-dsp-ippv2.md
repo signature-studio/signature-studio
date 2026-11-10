@@ -65,7 +65,7 @@ IsProcessorFeaturePresent の値（CPUID の応答、決定 0009 と 0047: 葉 1
 
 ### dsp_ippv2_x64.dll（`fe-lift lift lift/out-ext/dsp_ippv2_x64.dll /dev/null --pdata`）
 
-「変更前」は、同じ作業ツリーから、この作業で足した行だけを `imports_table.rs` から除いたコピーで測り直した値（`lift/out-w6/base-src`、`dsp-base.stats.txt`）。決定 0077 の 138 → 54 に、他者の変更（functions 32,162 → 32,648）が加わっているため、0077 の表とは直接比べない。
+「変更前」は、同じワークツリーから、この作業で足した行だけを `imports_table.rs` から除いたコピーで測り直した値（`lift/out-w6/base-src`、`dsp-base.stats.txt`）。決定 0077 の 138 → 54 に、他者の変更（functions 32,162 → 32,648）が加わっているため、0077 の表とは直接比べない。
 
 | 項目 | 変更前 | 変更後 |
 |---|---:|---:|

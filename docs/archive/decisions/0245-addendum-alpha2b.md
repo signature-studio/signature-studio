@@ -136,13 +136,13 @@ F8 → 0.8 s → 定常 3 s → Escape → 1.2 s の間の、Worker の CPU ms/s
 - **定常**: compose は **51 → 7.0 ms/s**(−86%)、Worker の CPU は **647 → 593 ms/s(−8%)**。A2b に残る約 590 ms/s はゲスト(FL)自身の全面再描画。**この HEAD では、Chrome の Worker で得られる分は alpha2 の報告時(973 → 585 ms/s)より小さい**(A1 の定常がすでに 647 ms/s で、compose の寄与が 51 ms/s にしかならないため。HEAD の違い〔gpu1 の合成の変更〕と機械の負荷の違いのどちらがどれだけ効いたかは**分けていない**)。native の記録器(`fle_desk_compose` を毎フレーム呼ぶ)の定常 8.9 ms/フレームとは見ている物が違う。
 - フェードイン/アウトの Worker の CPU は A1 と A2b で同等(525 / 560、780 / 785 ms)。2 回ずつなので差は誤差の範囲。
 
-## 5. 試験
+## 5. テスト
 
-| 試験 | 結果 |
+| テスト | 結果 |
 |---|---|
 | `lift/harness/alpha2/wrote_seq.c`(runtime そのものを native で `-DFLE_R_FAST_COPY=1`、`-Wl,--wrap=fle_desk_wrote`) | **80 項目 0 失敗**(alpha2 の 72 に 8 本: 最初の差の後の行も書かれている・後の呼び出しが全体を数える 2 本、矩形の期待を『最初の差の行から呼び出しの終わりまで』に直した分)。HEAD a49391d9 + alpha2.diff + alpha2b.diff の木で実行 |
 | mutation(`tools/mutate-wrote.py`、`logs/mutate-wrote-alpha2b.txt`) | **14 本すべて検出**(alpha2 の 12 本を新しい矩形の規則に直した物 + W13『最初の差の後の呼び出しを全体として数えない』+ W14『最初の差の呼び出しの終わりまでを数えない』) |
-| 費用の性質(最初の差の後は比較しない) | `!ch_any` の守りは**出力に現れない**(消しても矩形・画素は同じ)ので、単体試験では検出できない。§3.1 の `fle_r_blit` 単体の測定(全画素が違うとき A1 並み)で確認した |
+| 費用の性質(最初の差の後は比較しない) | `!ch_any` の守りは**出力に現れない**(消しても矩形・画素は同じ)ので、単体テストでは検出できない。§3.1 の `fle_r_blit` 単体の測定(全画素が違うとき A1 並み)で確認した |
 | cargo `alpha2_changed` | `assert!(n >= 80)` に直した。`cargo test -p fe-lift --test alpha2_changed`(t-a2b の木)は **1 passed**(`logs/cargo-alpha2_changed.log`)。`test.sh full` は今回**走らせていない**(alpha2 の 198 results / 2,395 passed はこの木の runtime の別の経路を含めて通っており、本差分は `fle_r_blit` の比較の経路だけを変える) |
 
 ## 6. 判断が要る点(PM へ)
@@ -157,14 +157,14 @@ F8 → 0.8 s → 定常 3 s → Escape → 1.2 s の間の、Worker の CPU ms/s
 - Chrome の画素の照合は『定常/閉じた状態』の 7 状態、上の帯(y < 40)を除く。フェード中の Chrome の画素、Firefox は照合していない。Chrome の Worker の CPU は A1 と A2b を各 2 回だけ測った(A2 は測っていない)。
 - Settings タブの操作は G3 の操作表に無く、測っていない。
 - 機械の load average は測定の間 8〜17。依頼者の機械・実 GPU・実機 Windows の値は **0 件**。
-- 規則: 重い処理が一時 3 本同時に走った(wasm の link 2 本 + Chrome のシナリオの試験 + 小さな native 実行)。最初の FS 版/A1 版の link は、hard link の共有で互いの link.map を壊して失敗し、作り直した(約 15 分の損失)。`sleep`/`nohup`/`pkill`/`pgrep -f`/末尾 `&` は使っていない(一度 `&` と `sleep` を含む tail の待ちを書いて拒否された。実行されていない)。commit/push 無し。
+- 規則: 重い処理が一時 3 本同時に走った(wasm の link 2 本 + Chrome のシナリオのテスト + 小さな native 実行)。最初の FS 版/A1 版の link は、hard link の共有で互いの link.map を壊して失敗し、作り直した(約 15 分の損失)。`sleep`/`nohup`/`pkill`/`pgrep -f`/末尾 `&` は使っていない(一度 `&` と `sleep` を含む tail の待ちを書いて拒否された。実行されていない)。commit/push 無し。
 
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準: HEAD cbf9d1e5(決定 0245 = alpha2 取り込み済み)に `alpha2b.diff`(42 ファイル:ランタイム `fle_raster.c`/`.h`、試験 `wrote_seq.c`・`alpha2_changed.rs`、文書・道具・表の新規ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 24 本は全部読んだ(いずれも置き換える行)。比較つきのコピーは `cmp` が真のとき `down` が偽(同一面内のコピーでは比較しない)なので、通知矩形『最初の差の行から呼び出しの終わりまで』は行の向きと矛盾しない。PM が測った値(この機械、`lift/out-pmchk-a2b/`): FLEngine の既定の生成 C の sha256 `0130eeee…`(215,805,703 B、決定 0246 以後の値)不変、全体試験 **201 results / 2,400 passed / 0 failed / 1 ignored**(`alpha2_changed` 7.1 s を含む)、a4 FRUITY 無効 942/942・895/895 で基準と一致。
+取り込んだ基準: HEAD cbf9d1e5(決定 0245 = alpha2 取り込み済み)に `alpha2b.diff`(42 ファイル:ランタイム `fle_raster.c`/`.h`、テスト `wrote_seq.c`・`alpha2_changed.rs`、文書・道具・表の新規ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 24 本は全部読んだ(いずれも置き換える行)。比較つきのコピーは `cmp` が真のとき `down` が偽(同一面内のコピーでは比較しない)なので、通知矩形『最初の差の行から呼び出しの終わりまで』は行の向きと矛盾しない。PM が測った値(この機械、`lift/out-pmchk-a2b/`): FLEngine の既定の生成 C の sha256 `0130eeee…`(215,805,703 B、決定 0246 以後の値)不変、全体テスト **201 results / 2,400 passed / 0 failed / 1 ignored**(`alpha2_changed` 7.1 s を含む)、a4 FRUITY 無効 942/942・895/895 で基準と一致。
 
 1. **A2 の代わりに A2b を採る。** 条件 (b)(変わる内容の費用が増えない)に近づき、同一内容の節約と画素の同一性(native 33 組、Chrome 7 状態×2 組の帯の外)は変わらない。通知矩形が広い方に外れるだけで安全側。クラス名分岐 0、新オプション 0。
 2. **Chrome で得られる Worker CPU は小さい(現 HEAD で定常 647 → 593 ms/s、−8%)。** alpha2 の『−40%』は旧 HEAD・高負荷の値で、決定 0245 に PM の訂正を書いた。『通しの測定で A2 と A2b の差の大きさを断定できない』(Playlist の A2 は 457〜751 ms)ことは、この追補の未確認に残る。
 3. **フェードインの節約は減る**(desktop 側の合計 A1 530 → A2 385 → A2b 468 ms)。変わる内容の費用を戻す代わりの代償として受け入れる。
-4. **alpha1 の逸脱**: alpha2b の差分が PM の作業木に直接適用されていた(12:33:25)。PM が `git checkout` と `rm` で戻し、差分から当て直した。
+4. **alpha1 の逸脱**: alpha2b の差分が PM のワークツリーに直接適用されていた(12:33:25)。PM が `git checkout` と `rm` で戻し、差分から当て直した。
 5. 次の担当: ピッカーが全画面を 62.5 Hz で描き直す原因の特定(決定 0247、仮)。

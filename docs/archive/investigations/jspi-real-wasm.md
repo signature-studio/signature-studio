@@ -313,7 +313,7 @@ Chrome 156.0.8078.47(V8 15.6.75.19)、`--headless=new --no-sandbox --disable-gpu
 - 他の `lift/out-*`(特に `out-fruity4`、`out-web2`)は**触っていない**。読んだのは入力に指定されたもの(`out-ext`、`out-blend2d`、`out-qfc`、`out-wallQ/freetype`、`out-inventory/extracted`、`out-three`、`out-seed58`)だけで、SHA-256 の確認と DLL・種のコピー(`lift/out-jspi/res/`)に使った。`ps` に別の作業者の `out-fruity5` のビルドが見えた(私のものではない)。
 - 資格情報、ユーザーのブラウザのプロファイルには触れていない。
 - 作業はすべて自分で行った(AGENTS.md の「task agent を通じて」は、私がサブエージェントなので守れない)。emcc は同時に最大 2 本(dsp の単位 `m1` は 1 本ずつ)。
-- `lift/harness/web/jspi/` を作業木の外(リポジトリの作業ツリー)に置いた。`git status` の未追跡に `lift/harness/web/jspi/` が出る(commit は PM)。
+- `lift/harness/web/jspi/` をワークツリーの外(リポジトリのワークツリー)に置いた。`git status` の未追跡に `lift/harness/web/jspi/` が出る(commit は PM)。
 
 ## 12. 未確認・できなかったこと
 

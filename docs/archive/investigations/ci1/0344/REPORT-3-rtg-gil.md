@@ -2,7 +2,7 @@
 
 ## 実際に実行した物
 
-- 実 Chrome 156 headless(CDP)。RT-G bundle `fl-engine-ci-b083dc31`(wasm 170,941,751 B、SHA256SUMS 9/9 OK)。manifest 複写に `FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1`(`mk-bundle-assets.sh` で作成。mt3 の `mk-rtg-assets.sh` は project の複写と serve の表示が付くので、同じ manifest になる手順を直接使った。bundle 本体は書き換えていない)。`assets-rtg-gil`、port 5142、page-rt1。
+- 実 Chrome 156 headless(CDP)。RT-G bundle `fl-engine-ci-b083dc31`(wasm 170,941,751 B、SHA256SUMS 9/9 OK)。manifest コピーに `FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1`(`mk-bundle-assets.sh` で作成。mt3 の `mk-rtg-assets.sh` は project のコピーと serve の表示が付くので、同じ manifest になる手順を直接使った。bundle 本体は書き換えていない)。`assets-rtg-gil`、port 5142、page-rt1。
 - 診断 ON なので **counted ではない**(非計時の診断 run)。0343 と同じ `run-tp.sh` とシナリオ(再生 → 10 s 後に CDP Tracing + v8 cpu_profiler → File メニュー開閉 12 回 → 停止)。
   | run | 時刻 | 開始前 load | MemAvailable | swap si/so | Wine | 他 Chrome | engine-log |
   |---|---|---|---|---|---|---|---|
@@ -52,4 +52,4 @@
 
 ## 保存先
 
-`0344/`: この REPORT、`gil-table-rtg.md`(全 Worker の表)、`gil-table.py`、`tp-{3,4}-rtg-gil/`(lat-tp-play.json、report.json、gate.txt、sync-*.json、tp-4 は engine-log.log)、`tp{1..4}-{3,4}-rtg.md`(0343 と同じ解析の出力)、`scn-tp-log.json`、`run-tp.sh`。生 trace(各 117 MB)は `lift/out-ci1/kit/out/tp-{3,4}-rtg-gil/tp.trace.json`、複写していない。
+`0344/`: この REPORT、`gil-table-rtg.md`(全 Worker の表)、`gil-table.py`、`tp-{3,4}-rtg-gil/`(lat-tp-play.json、report.json、gate.txt、sync-*.json、tp-4 は engine-log.log)、`tp{1..4}-{3,4}-rtg.md`(0343 と同じ解析の出力)、`scn-tp-log.json`、`run-tp.sh`。生 trace(各 117 MB)は `lift/out-ci1/kit/out/tp-{3,4}-rtg-gil/tp.trace.json`、コピーしていない。

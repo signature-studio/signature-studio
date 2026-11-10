@@ -45,7 +45,7 @@ GetProcAddress の応答表に `kernel32.dll!GetThreadPreferredUILanguages` が�
 ## 6. テスト（実測）
 
 - `cargo test --offline -p fe-lift --test null0`: 6 件通過（`out-null0/test-null0-1.txt`、EXIT=0）。
-- `cargo test --offline --workspace --no-fail-fast`: **256 件通過、0 件失敗**、41 バイナリ（`out-null0/test-workspace-1.txt`、EXIT=0）。前回の 208 件との差は 48 件。私の分は 6 件で、残りは他の担当のテスト（proc.rs、time.rs など、作業ツリーにある未コミットのファイル）と読める（内訳の件数は確かめていない）。
+- `cargo test --offline --workspace --no-fail-fast`: **256 件通過、0 件失敗**、41 バイナリ（`out-null0/test-workspace-1.txt`、EXIT=0）。前回の 208 件との差は 48 件。私の分は 6 件で、残りは他の担当のテスト（proc.rs、time.rs など、ワークツリーにある未コミットのファイル）と読める（内訳の件数は確かめていない）。
 
 ## 7. 生成、clang、リンク（実測）
 

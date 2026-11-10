@@ -29,7 +29,7 @@
 
 ### d. ゲストアドレスの上位ビット（probe D15）
 
-- `fle_runtime.h` に `fle_addr(a, n, store)` を置き、`fle_ld`/`fle_st` がこれを通る。**マクロの変更だけで、生成 C の再生成は不要**（生成 C の `fle_ld`/`fle_st` の呼び出しは変わらない。本作業は生成器 `fe-lift` を変えていない。測定に使った生成 C は、その時点の作業ツリーの `fe-lift`（他担当の変更を含む）が出した 215,539,555 B で、probe の 215,539,533 B、`out-loc` の出力とは別の内容）。
+- `fle_runtime.h` に `fle_addr(a, n, store)` を置き、`fle_ld`/`fle_st` がこれを通る。**マクロの変更だけで、生成 C の再生成は不要**（生成 C の `fle_ld`/`fle_st` の呼び出しは変わらない。本作業は生成器 `fe-lift` を変えていない。測定に使った生成 C は、その時点のワークツリーの `fe-lift`（他担当の変更を含む）が出した 215,539,555 B で、probe の 215,539,533 B、`out-loc` の出力とは別の内容）。
 - `FLE_WASM32`（`__EMSCRIPTEN__` で自動定義）で `FLE_CHECK_HI32` が有効になり、`a >> 32` が非ゼロなら `fle_addr_fault`（`fle_host.c`）が名前付きのメッセージ（`[fle_addr_hi32]`）で `abort()` する。native の SIGSEGV に相当する。ネイティブの既定ビルドでは `fle_addr` は `((uintptr_t)(a))` に展開され、従来のコードと同じ（検査なし）。
 - 領域チェック `FLE_CHECKED_MEM`（任意、既定はオフ、wasm のみ）: 上位ビットの検査に加えて、アクセスが「イメージ [ImageBase, ImageBase + SizeOfImage)」または「モジュールのデータ領域の先頭（`__global_base`）以上」にない場合に `[fle_addr_region]` で止める。データ領域以上には、データ、スタック（ハーネスは malloc）、ヒープ、アリーナ、TEB/TLS（`fle_teb`、`fle_tls_values` は runtime の静的変数）、スクラッチが入る。ImageBase と SizeOfImage は `fle_mem_set_image`（ハーネスの main が呼ぶ）で渡す。
 - 領域チェックが**捕まえるもの**: NULL ページと低いアドレス（0〜ImageBase の手前）、イメージの終わりから `__global_base` までの隙間（GLOBAL_BASE = 256 MiB の下）。**捕まえないもの**: ヒープ、データ内で別のオブジェクトを指すワイルドポインタ、ページ保護の違反。
@@ -45,7 +45,7 @@
 ### f. MXCSR の暫定扱い
 
 - `fle_mxcsr_flags.h` は別担当が純 C 版（決定 0044）に置き換え中。build.sh は、`runtime/fle_mxcsr_flags.h` にインライン asm が残っている間だけ、probe のソフト版（`lift/harness/wasm/interim/fle_mxcsr_flags.h`。probe の `fle_mxcsr_flags_soft.h` の複製。MXCSR の状態ビットを立てず、RC/FTZ/DAZ を無視する）に差し替える（`MXCSR_OVERRIDE=auto`）。`-I` を前に置くだけでは差し替わらない（`fle_sse.h` が `"fle_mxcsr_flags.h"` を引用符で include し、コンパイラはまず `fle_sse.h` と同じディレクトリを探す。実測で確認した）ので、clang の仮想ファイルシステムのオーバーレイ（`-ivfsoverlay`、build.sh が生成）で `runtime/fle_mxcsr_flags.h` を差し替える。
-- 本作業の測定時点で、作業ツリーの `runtime/fle_mxcsr_flags.h`（md5 6f7f1eb3…）はすでに純 C 版で、差し替えは**自動で OFF**になり、本物の純 C 版でビルド、リンク、実行を確かめた。差し替えの経路（`MXCSR_OVERRIDE=1`）も別の VARIANT でビルド、リンク、実行して確かめた（同じ停止点）。本物が入った後は `interim/` とオーバーレイの分岐を削除してよい（それまでは害がない）。純 C 版の等価性は本作業の対象外（0044 の担当）。
+- 本作業の測定時点で、ワークツリーの `runtime/fle_mxcsr_flags.h`（md5 6f7f1eb3…）はすでに純 C 版で、差し替えは**自動で OFF**になり、本物の純 C 版でビルド、リンク、実行を確かめた。差し替えの経路（`MXCSR_OVERRIDE=1`）も別の VARIANT でビルド、リンク、実行して確かめた（同じ停止点）。本物が入った後は `interim/` とオーバーレイの分岐を削除してよい（それまでは害がない）。純 C 版の等価性は本作業の対象外（0044 の担当）。
 
 ## 代替案
 

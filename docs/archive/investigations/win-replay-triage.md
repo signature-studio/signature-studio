@@ -194,7 +194,7 @@ P + X 78 種の実機測定の結果:
 ## 8. 実機測定の追加の要否(`next-issue-draft.md`、投稿しない)
 
 - **現在の VM でできる**: 再生ツールの修正(StretchDIBits の 13 引数、出力バッファの充填 2 通り、実行ファイル名の固定)と `compare.py` の規則(HRESULT の失敗扱い、64 ビット値、出力構造体の比較)。ここは Linux 側の作業と、小さな再測定。
-- **Windows 10 22H2 の en-US の VM が要る**: GetProcAddress の存在確認、LoadLibrary の成否、VerSetConditionMask の bit 63、標準フォント・レジストリの有無、PatBlt/GetObjectW/SetBkColor の既定値。**どれも A2b を閉じる測定ではない**(§6)。用意できるかどうかはユーザーの判断で、**この調査は必要とも不要とも決めない**。必要になった場合の Issue 下書きは next-issue-draft.md。
+- **Windows 10 22H2 の en-US の VM が要る**: GetProcAddress の存在確認、LoadLibrary の成否、VerSetConditionMask の bit 63、標準フォント・レジストリの有無、PatBlt/GetObjectW/SetBkColor の既定値。**どれも A2b を閉じる測定ではない**(§6)。用意できるかどうかは依頼者の判断で、**この調査は必要とも不要とも決めない**。必要になった場合の Issue 下書きは next-issue-draft.md。
 
 ## 9. PM の判断が要る点
 
@@ -217,7 +217,7 @@ P + X 78 種の実機測定の結果:
 
 ## 11. 規則の確認(自己申告)
 
-- 作業ツリーの tracked ファイル、`worklog/1/`、`tools/win-replay/`(`compare.py` を import しただけ)、`lift/runtime/`、テストは変更していない。git の変更系操作はしていない(`git status`、`git log`、`git diff --stat` の読み取りのみ)。commit していない。
+- ワークツリーの tracked ファイル、`worklog/1/`、`tools/win-replay/`(`compare.py` を import しただけ)、`lift/runtime/`、テストは変更していない。git の変更系操作はしていない(`git status`、`git log`、`git diff --stat` の読み取りのみ)。commit していない。
 - **`tools/win-replay/__pycache__/compare.cpython-314.pyc`(2026-10-30 09:24 作成、untracked)が存在する**。私が `PYTHONDONTWRITEBYTECODE=1` を付け忘れた python 呼び出し(`import compare`)で作った可能性が高い(作成時刻は私の作業時間帯。ただし同時に動く別の作業者が作った可能性は否定できない。未確認)。**編集してよい範囲の外なので削除していない**。PM が消す場合は `tools/win-replay/__pycache__/` を削除する(中身は .pyc 1 個)。以降の python 呼び出しには `PYTHONDONTWRITEBYTECODE=1` と、スクリプト内の `sys.dont_write_bytecode = True` を付けた。
 - `/tmp` 直下には書いていない(ネットワークからの取得物は `lift/out-triage/learn/`、`sdkmd/`、`sdkapi-tree.json` に保存した)。外部アクセスは Microsoft Learn、`raw.githubusercontent.com`(MicrosoftDocs/sdk-api、Wine の `version.c` を 1 回)、GitHub API の tree 取得 1 回(認証なし)。資格情報・ブラウザのプロファイルには触れていない。
 - コマンド文字列に `sleep`、`timeout`(コマンドとして)、`nohup`、末尾の `&` は書いていない。

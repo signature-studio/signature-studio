@@ -12,7 +12,7 @@
 
 | ファイル | 変更 |
 |---|---|
-| `lift/crates/fe-wasmgen/src/wasm.rs`(+56 −8) | `Code.hints: Vec<(u32, u8)>`(`if` の opcode の `b` 内 offset と、1=then 腕が likely/0=else 腕が likely)。`Code::if_hint(then_likely)` と `if_ty_hint(ty, then_likely)`(hint を記録して普通の `if` を書く。`b` の中身は従来と同一)。`Module::locals_header`(関数 body 先頭の locals ベクタ。code section と hint の offset の計算が同じ関数を使う)。`Module::encode` が、hint を持つ関数ごとに最終 offset(= locals ベクタの長さ + `b` 内 offset)と関数番号(imports を数える)を書き、`metadata.code.branch_hint` custom section を **code section の直前**に出す。hint が 1 つも無い module には section を書かない。試験用 switch `wasm::HINTS_OFF`(thread-local、既定 false。`lower::MX_FORCE_SLOW`・`locshare::LOCSHARE_OFF` と同じ型の試験用。CLI・環境変数からは届かない) |
+| `lift/crates/fe-wasmgen/src/wasm.rs`(+56 −8) | `Code.hints: Vec<(u32, u8)>`(`if` の opcode の `b` 内 offset と、1=then 腕が likely/0=else 腕が likely)。`Code::if_hint(then_likely)` と `if_ty_hint(ty, then_likely)`(hint を記録して普通の `if` を書く。`b` の中身は従来と同一)。`Module::locals_header`(関数 body 先頭の locals ベクタ。code section と hint の offset の計算が同じ関数を使う)。`Module::encode` が、hint を持つ関数ごとに最終 offset(= locals ベクタの長さ + `b` 内 offset)と関数番号(imports を数える)を書き、`metadata.code.branch_hint` custom section を **code section の直前**に出す。hint が 1 つも無い module には section を書かない。テスト用 switch `wasm::HINTS_OFF`(thread-local、既定 false。`lower::MX_FORCE_SLOW`・`locshare::LOCSHARE_OFF` と同じ型のテスト用。CLI・環境変数からは届かない) |
 | `lift/crates/fe-wasmgen/src/lower.rs`(+21 −19) | 18 箇所の `if_()` / `if_ty()` を `if_hint(…)` / `if_ty_hint(…, true)` に(§3)。`mx_force` の doc に向きの規則を 3 行 |
 | `lift/crates/fe-wasmgen/tests/branch_hint.rs`(新、+599) | §4 |
 | `lift/crates/fe-wasmgen/tests/{c_only_forms,mx_hybrid,mx_rc_wire,opaque_stub,tls_ctx,xabi_passthrough}.rs`(各 +4 −1) | `wasm-validate --enable-all` → `wasm-validate $WABT_FEATURES`(§7: wabt 1.0.36 が正しい hint section を誤って拒否する) |
@@ -23,7 +23,7 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 
 - 意味(**読み**: branch-hinting 提案):hint は助言で、命令の意味(どちらの腕が実行されるか)を変えない。`if` の hint 1 = 条件が真(then 腕)が起きやすい、0 = 偽(else 腕)が起きやすい。
 - section: 名前 `metadata.code.branch_hint`、custom section(id 0)、**code section の直前**(実測: wat2wasm が出す section の位置と、wasm-opt・wasm-merge・V8 の扱いで確認〔info 1〕)。中身: `uleb(関数の数)`、各関数に `uleb(関数番号)`(imports を数えた番号)、`uleb(件数)`、各 hint に `uleb(offset)`、`uleb(1)`(データ長)、`1 byte`(0/1)。関数番号と offset は厳密に増える。
-- **offset は関数 body の先頭(body size の LEB の次の 1 byte 目 = locals ベクタ)から数える**。`Module::encode` で `locals_header(&locals).len() + b 内 offset`。これを忘れると hint は別の命令を指す。V8 13.6 は壊れた offset を黙って受理する(info 1 で実測)ので、正しさは我々の側の試験で保証する(§4)。
+- **offset は関数 body の先頭(body size の LEB の次の 1 byte 目 = locals ベクタ)から数える**。`Module::encode` で `locals_header(&locals).len() + b 内 offset`。これを忘れると hint は別の命令を指す。V8 13.6 は壊れた offset を黙って受理する(info 1 で実測)ので、正しさは我々の側のテストで保証する(§4)。
 
 ## 3. 付ける所(emitter 18 箇所)と向き
 
@@ -39,14 +39,14 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 
 向きの機械検査は §4 の `verify`(全件)。
 
-**alpha1 の件数(5,380)との関係**(alpha1 本人の返事、PM の指示で直接聞いた): alpha1 の 5,380 = 窓検査の if 2,716 + 外側の if 2,664 は、**E9 の試験ビルド(`tw-e15`)の module 全体に、生成側ではなく Python で後付けで注入した数**(`a17-hint-patch3.py`: 26 命令の列の直後の if を『窓検査の if』とし、1 演算 1 段。64 関数。f_b34aca0 は 646 件)。私の 28,100 は生成側が付ける全 mx 形(加減乗除の群は外側 1 + quick 1 + 精密 1 の 3 段)の 8 module 全体(E10/E11 の形)で、範囲も数え方も違う(同じ 2 関数 f_b34aca0・f_b34eaf0 は私の側で各 1,392 件〔全部 1〕= 464 群 × 3)。したがって **28,100 件版の速さは alpha1 の node の 2 関数〔E9 の試験ビルド〕では測れない**。Chrome の A/B のために、同じ手順の完全な bundle 2 つ(hint 入りと plain。§4 の 3b、`tables/bundle93.txt`)を alpha1 に渡した。
+**alpha1 の件数(5,380)との関係**(alpha1 本人の返事、PM の指示で直接聞いた): alpha1 の 5,380 = 窓検査の if 2,716 + 外側の if 2,664 は、**E9 のテストビルド(`tw-e15`)の module 全体に、生成側ではなく Python で後付けで注入した数**(`a17-hint-patch3.py`: 26 命令の列の直後の if を『窓検査の if』とし、1 演算 1 段。64 関数。f_b34aca0 は 646 件)。私の 28,100 は生成側が付ける全 mx 形(加減乗除の群は外側 1 + quick 1 + 精密 1 の 3 段)の 8 module 全体(E10/E11 の形)で、範囲も数え方も違う(同じ 2 関数 f_b34aca0・f_b34eaf0 は私の側で各 1,392 件〔全部 1〕= 464 群 × 3)。したがって **28,100 件版の速さは alpha1 の node の 2 関数〔E9 のテストビルド〕では測れない**。Chrome の A/B のために、同じ手順の完全な bundle 2 つ(hint 入りと plain。§4 の 3b、`tables/bundle93.txt`)を alpha1 に渡した。
 
 **向きの根拠(fle を含む)**: 根拠は『窓検査が外れる = `c.fle_hyb_mx` を呼ぶ = cold』が全 28,100 件で成り立つ、という**機械検査だけ**(`verify`: likely 腕に cold の呼びが無く、cold 腕に呼びが有る)。実際に窓検査がどれだけの割合で通るかは、module ごとに**測っていない**(UI のコード〔fle の 13,075 件、全体の 47%〕で窓検査が通る頻度は、仕込みの走行では測れない。alpha1 の node の測定は elastique の 2 関数だけ)。したがって『hint が速くなる』は elastique の 2 関数でだけ測られていて、fle・oggio・qfc・dsp・b2d・ilt の分は測られていない。窓検査が普段ほとんど外れる関数があれば、その関数では hint は逆効果になりうる(§6)。
 
 ## 4. 検証(PM が再現できる形)
 
-1. **cargo test(fe-wasmgen 全体、`--no-fail-fast`)**: 33 results・**76 passed・0 failed**・2 ignored(`tables/cargo-test-fe-wasmgen.log`。e11-wip の分が 71 passed、新しい branch_hint が 5 passed + 1 ignored)。なお e11-wip の `typed_indirect.rs` は 4 試験で、0285-impl.diff の `two_targets_in_one_slot_are_both_found_through_the_bucket` は e11-wip に入っていない(私の側の記録との差。理由は未確認)。
-2. **`tests/branch_hint.rs` の 5 試験 + ignored 1**:
+1. **cargo test(fe-wasmgen 全体、`--no-fail-fast`)**: 33 results・**76 passed・0 failed**・2 ignored(`tables/cargo-test-fe-wasmgen.log`。e11-wip の分が 71 passed、新しい branch_hint が 5 passed + 1 ignored)。なお e11-wip の `typed_indirect.rs` は 4 テストで、0285-impl.diff の `two_targets_in_one_slot_are_both_found_through_the_bucket` は e11-wip に入っていない(私の側の記録との差。理由は未確認)。
+2. **`tests/branch_hint.rs` の 5 テスト + ignored 1**:
    - `every_window_check_has_a_hint_that_points_at_its_if`: 6 形(cvtsi2ss・addsd・cvttsd2si・ucomisd・addps・sqrtsd)の各関数で、hint の値の列(例: addsd は外側・quick・精密の `[1,1,1]`)、種類(leaf・chain・outer の数)、**全 hint の offset が `if`(0x04)の opcode**、section が code section の直前、関数番号・offset が厳密増加、section が末尾まで消費、を確かめる。`verify` で向きも確かめる。
    - `offsets_count_the_locals_vector_of_a_larger_function`: 6 形を 1 関数に並べた関数(locals の run が 2 つ以上)で offset が locals ベクタを数えていること。
    - `the_module_without_the_section_is_the_module_without_hints`: **`HINTS_OFF` で作った module(hint 無し)と、hint 入りの module から section を取り除いた物が 1 byte も違わない**。
@@ -58,9 +58,9 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 3b. **実アドレスの hybrid 段階(main 9fdc492f = E10 + 0293 の fe-wasmgen)**: E10 の CI 作業ディレクトリ `lift/out-opt2/x16`(hint 無しの E10 の成果物が全段階で残っている)の link map から実アドレス(fle_teb 0x109202a0、fle_mxcsr 0x10209958、fle_hyb_buf 0x109222b0、fle_progress_count 0x1030cc48、TLS 0x40)を `stage_hybrid` と同じ正規表現で読み、同じ DLL・seed・list で 8 module を作り直し、`wasm-opt -Oz`、merge1、merge2(x16 の C 部)を通した(`tools/e10real93.sh`)。**各段階の成果物から hint section を取り除いた物の sha256 が、x16 の同じ段階の成果物の sha256 と全て一致**: fe-wasmgen の出力 8 個、`wasm-opt -Oz` 後の 8 個、direct.wasm、**flengine6.opt.wasm(`4d0019aaa3ee…`、142,776,280 B)**(`tables/e10-real-hybrid-stage-hint-vs-x16.txt`)。つまり CI の経路で、hint 入りの成果物と hint 無しの成果物は section の分だけ違う。(この確認の途中で、x16 の `logs/hyb-addresses.txt` が別の link のアドレスを持っていて、最初に作った物は実アドレスが違っていた。link map から読み直して作り直した物だけを使っている。)
 4. **cargo test を『V8 が hint を読む』node で**: 上と同じ cargo test を、node に `--experimental-wasm-branch-hinting` を付ける wrapper(`tools/nodewrap/node`)を PATH の先頭にして走らせた(wrapper の起動記録で 661 回の node 起動)。33 results・**76 passed・0 failed**・2 ignored(`tables/cargo-test-fe-wasmgen-v8-hinting.log`)。host CPU との突き合わせを含む mx_hybrid・mx_rc_wire・sse_forms ほかが、V8 が hint を読む状態で同じ結果。
 5. **ci/test-hybrid.sh**: 42 ok、all checks hold(`tables/test-hybrid.log`)。
-6. **`harness/test.sh full`**: **results=219・passed=2413・failed=0**・ignored=2(`FLE_TEST_NOCACHE=1 harness/test.sh full --jobs 2`、414 s、`tables/testfull-0293.log`)。基準 e11-wip の 218/2,408/0 に対し、+1 result(branch_hint)・+5 passed(同)。入力は `FLE_INPUT_ROOT` で main の checkout から `test-env.sh --link` で繋ぎ(0 件欠け)、`tools/authenticode_check.py` を木に入れた。**1 回目と 2 回目は木の不備で失敗した**(1 回目: 入力が繋がっておらず fe-lift の 10 試験が失敗、15 件 SKIPPED;2 回目: `tools/` を木に入れ忘れて `authenticode_check` の 14 試験が失敗〔単独では 14 passed〕。2 回目の記録は `tables/testfull-failed-run-tools-missing-14-authenticode.log`)。
+6. **`harness/test.sh full`**: **results=219・passed=2413・failed=0**・ignored=2(`FLE_TEST_NOCACHE=1 harness/test.sh full --jobs 2`、414 s、`tables/testfull-0293.log`)。基準 e11-wip の 218/2,408/0 に対し、+1 result(branch_hint)・+5 passed(同)。入力は `FLE_INPUT_ROOT` で main の checkout から `test-env.sh --link` で繋ぎ(0 件欠け)、`tools/authenticode_check.py` を木に入れた。**1 回目と 2 回目は木の不備で失敗した**(1 回目: 入力が繋がっておらず fe-lift の 10 テストが失敗、15 件 SKIPPED;2 回目: `tools/` を木に入れ忘れて `authenticode_check` の 14 テストが失敗〔単独では 14 passed〕。2 回目の記録は `tables/testfull-failed-run-tools-missing-14-authenticode.log`)。
 7. **a4**: **942/942、runnable_started=895 completed=895 in_progress=0、functions_distinct=5310、function_entries=1009737、started_but_not_entered=0**(期待値と一致、`tables/a4-0293.log`。a4 は native の C 経路で fe-wasmgen を使わない。runtime・fe-lift は変更なし)。`EXPECT_FLE_SHA=skip` で走らせた(a4-multi の既定の期待 sha はこの構成では基準でも合わない。0284c の記載どおり)。
-8. **差分の当たり方(実測、`tables/patch-dry-run-e11.log`・`patch-dry-run-e10.log`)**: e11-wip 799b0417: 9 file とも clean(offset 0)。main 9fdc492f: lower.rs の 18 hunk が `offset −39 lines` で当たる(0285 が lower.rs に足した 39 行の分)。fuzz・reject なし。wasm.rs・試験は e10/e11 で同一。
+8. **差分の当たり方(実測、`tables/patch-dry-run-e11.log`・`patch-dry-run-e10.log`)**: e11-wip 799b0417: 9 file とも clean(offset 0)。main 9fdc492f: lower.rs の 18 hunk が `offset −39 lines` で当たる(0285 が lower.rs に足した 39 行の分)。fuzz・reject なし。wasm.rs・テストは e10/e11 で同一。
 
 ## 5. 保存確認(CI の手順を通して残るか。C1+ で再測定)
 
@@ -83,14 +83,14 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 ## 6. 誤った hint は速度にしか効かない(PM 依頼 (2))
 
 - **読み**: branch-hinting 提案では hint は助言で、意味を変えない。V8 13.6 は offset・関数番号が壊れた hint も黙って受理して正しく動いた(info 1 の実測)。
-- **実測**: **全 hint を反転した fe-wasmgen**(`wasm.rs` の `hint()` を `!then_likely` に変えた使い捨ての木。納品しない)で作った module に対し、V8 が hint を読む node(上の wrapper)で fe-wasmgen の cargo test 全体を走らせた: 33 results・**73 passed・3 failed**・2 ignored(`tables/cargo-test-fe-wasmgen-all-hints-turned-v8-hinting.log`)。失敗した 3 つは branch_hint.rs の『向きと値を確かめる試験』そのもの(`every_window_check_has_a_hint_that_points_at_its_if`・`offsets_count_the_locals_vector_of_a_larger_function`〔`verify` が反転を見つけた〕、`the_direction_check_fails_for_a_turned_hint`〔反転を更に反転すると正しい向きに戻るので『気づかれない』になる〕)。**host CPU との突き合わせを含む mx_hybrid・mx_rc_wire・sse_forms・c_only_forms ほか、他の 73 試験は、向きが全部逆の hint の module でも合格**。つまり hint の向きは結果の値を変えない(変わるのは V8 の機械語の配置だけで、遅くなりうる)。
+- **実測**: **全 hint を反転した fe-wasmgen**(`wasm.rs` の `hint()` を `!then_likely` に変えた使い捨ての木。納品しない)で作った module に対し、V8 が hint を読む node(上の wrapper)で fe-wasmgen の cargo test 全体を走らせた: 33 results・**73 passed・3 failed**・2 ignored(`tables/cargo-test-fe-wasmgen-all-hints-turned-v8-hinting.log`)。失敗した 3 つは branch_hint.rs の『向きと値を確かめるテスト』そのもの(`every_window_check_has_a_hint_that_points_at_its_if`・`offsets_count_the_locals_vector_of_a_larger_function`〔`verify` が反転を見つけた〕、`the_direction_check_fails_for_a_turned_hint`〔反転を更に反転すると正しい向きに戻るので『気づかれない』になる〕)。**host CPU との突き合わせを含む mx_hybrid・mx_rc_wire・sse_forms・c_only_forms ほか、他の 73 テストは、向きが全部逆の hint の module でも合格**。つまり hint の向きは結果の値を変えない(変わるのは V8 の機械語の配置だけで、遅くなりうる)。
 - したがって hint を付ける誤りの影響は『遅くなる(cold 腕を hot と思う)』に限られる。向きの正しさは `verify`(全 27,570 件、違反 0)で担保した。
 
 ## 7. wabt の警告と CI(PM 依頼 (1))
 
 - wabt 1.0.36 の `wasm-objdump`・`wasm-validate --enable-all` は、wasm-opt/wasm-merge/fe-wasmgen の hint section(正しい)に『invalid function index N, only M bytes left in section』を出し、`wasm-validate --enable-all` は **失敗(rc 1)**する。wabt の最新 main の `ReadCodeMetadataSection` は関数番号を `ReadIndex` で読んでおり、1.0.36 の `ReadCount`(値 ≤ section の残りバイト数、を要求)が誤り(**読み**: 最新の main のソースを読んだ。1.0.36 のソースは未確認だが、エラー文は `ReadCount` の形と一致)。V8 は受理し、自作の検査〔`verify`・Python の構造検査〕は正しいと判定する。
-- **CI は wabt を使わない**(実測): `.github`・`ci/`・`app/scripts` を wabt・wasm-validate・wasm-objdump・wat2wasm・wasm2wat で grep → 0 件。CI の試験は `ci/test-hybrid.sh`(42 ok)だけで、cargo test は走らない。wabt を呼ぶのは手元の cargo test(入っていれば。`have("wasm-validate")`)と開発用の `lift/harness/draw1/extract-fn.sh` だけ。
-- 手元の cargo test のうち `--enable-all` を使う 6 試験は、hint 入りの module で落ちるので `--enable-threads --enable-tail-call --enable-exceptions --enable-extended-const --enable-multi-memory`(`WABT_FEATURES`)に置き換えた(code-metadata を有効にしない)。`--enable-all` を使わない他の試験は、wabt が section を無視するので落ちない。
+- **CI は wabt を使わない**(実測): `.github`・`ci/`・`app/scripts` を wabt・wasm-validate・wasm-objdump・wat2wasm・wasm2wat で grep → 0 件。CI のテストは `ci/test-hybrid.sh`(42 ok)だけで、cargo test は走らない。wabt を呼ぶのは手元の cargo test(入っていれば。`have("wasm-validate")`)と開発用の `lift/harness/draw1/extract-fn.sh` だけ。
+- 手元の cargo test のうち `--enable-all` を使う 6 テストは、hint 入りの module で落ちるので `--enable-threads --enable-tail-call --enable-exceptions --enable-extended-const --enable-multi-memory`(`WABT_FEATURES`)に置き換えた(code-metadata を有効にしない)。`--enable-all` を使わない他のテストは、wabt が section を無視するので落ちない。
 - 将来 wabt を CI に入れるなら 1.0.36 では使えない(最新版が必要)。
 
 ## 8. サイズ(実測)
@@ -117,7 +117,7 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 ## 10. 方針との適合(必須の記載)
 
 - **lift の忠実性**: 追加する処理は (c)『通信/変換の削減』でも (a)『余計な処理の除去』でも (b)『外部 API の契約の実装』でもない。**PM の指示(0293)による、性能のための注釈**で、生成された wasm の命令列・意味を一切変えない(hint section を除いた sha が従来と同一、8/8)。FL の挙動を補う・代行する処理、class/窓の種類/アドレスによる分岐は無い。付ける根拠は『この if は MXCSR 窓検査で、C 経路の関数を呼ぶ側が外れ側』という、生成側が持つ事実だけ(§3)。決定文書に明記する。
-- **no-options**: 旗・環境変数・実行時の切り替えは無い。常に出す。試験用の `HINTS_OFF` は `MX_FORCE_SLOW`・`LOCSHARE_OFF` と同じ型の試験用 switch(thread-local。CLI・環境変数から届かない)。
+- **no-options**: 旗・環境変数・実行時の切り替えは無い。常に出す。テスト用の `HINTS_OFF` は `MX_FORCE_SLOW`・`LOCSHARE_OFF` と同じ型のテスト用 switch(thread-local。CLI・環境変数から届かない)。
 - **進捗の誠実性**: 実エンジンが実行された範囲(§0 の 1)と、していない範囲(ブラウザの速さ)を分けて書いた。数は実測だけ。
 
 ## 11. 候補(未実装)
@@ -135,9 +135,9 @@ PM の判断(C2 は付けない)に従い、次は**付けていない**。参�
 
 ## PM の判断と取り込み(2026-11-06 14:35、docs のみ。製品の差分は未投入)
 
-取り込み: mt3 の最終(14:2x)の文書・表・道具と差分 `0293-branch-hint.diff`(9 file、+700/−33)を `docs/investigations/mt3w/0293/` に置いた。PM の dry-run(`git archive` の複製): E11 の e11-wip 799b0417 に offset 0・fuzz なし、E10 の main 9fdc492f に `lower.rs` が offset −39 行・fuzz/reject なし。実行したのは fe-wasmgen を実エンジンの 8 module に当てた生成、wasm-opt -Oz と merge、V8 の検証、node での試験で、**Chrome での速さの測定はこの文書には無い**(alpha1 の 0290 に注入版の Chrome 1 組)。依頼者の機械は 0 件。
+取り込み: mt3 の最終(14:2x)の文書・表・道具と差分 `0293-branch-hint.diff`(9 file、+700/−33)を `docs/investigations/mt3w/0293/` に置いた。PM の dry-run(`git archive` の複製): E11 の e11-wip 799b0417 に offset 0・fuzz なし、E10 の main 9fdc492f に `lower.rs` が offset −39 行・fuzz/reject なし。実行したのは fe-wasmgen を実エンジンの 8 module に当てた生成、wasm-opt -Oz と merge、V8 の検証、node でのテストで、**Chrome での速さの測定はこの文書には無い**(alpha1 の 0290 に注入版の Chrome 1 組)。依頼者の機械は 0 件。
 
 判断:
-1. **hint(C1+、28,100 件、+122,876 B)は E11 の push 条件ではなく、E12 以降の候補**。実 bundle(`~/work/mt3w-bundle93/{h0293,plain}`)の Chrome A/B(自己時間と first idle の +100 ms 以内)が出るまで push しない。誤った hint は速度にだけ効く(全反転で 73 試験が通る)ので正しさの危険は小さいが、速度の根拠が node の 2 関数と Chrome の注入版 1 組(A/other −19.7%、重なりあり)だけで、UI 側(fle の 13,075 件)の向きの根拠は機械検査のみ。
+1. **hint(C1+、28,100 件、+122,876 B)は E11 の push 条件ではなく、E12 以降の候補**。実 bundle(`~/work/mt3w-bundle93/{h0293,plain}`)の Chrome A/B(自己時間と first idle の +100 ms 以内)が出るまで push しない。誤った hint は速度にだけ効く(全反転で 73 テストが通る)ので正しさの危険は小さいが、速度の根拠が node の 2 関数と Chrome の注入版 1 組(A/other −19.7%、重なりあり)だけで、UI 側(fle の 13,075 件)の向きの根拠は機械検査のみ。
 2. 付ける範囲は C1+(窓検査の if + 外側の if)。C2(call のある腕を cold と決め打つ型)は alpha1 の node で UI 側が +18% 悪化したので採らない。
 3. 未確認: Chrome での実 bundle の速さと first idle、fle の 13,075 件の効果、wasm-opt で落ちる 530 件(1.9%)の理由。

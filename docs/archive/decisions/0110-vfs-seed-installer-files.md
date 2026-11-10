@@ -31,7 +31,7 @@
 | `C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILCursors.ilfont` | 7,892 B | `588c4bf43070ebe92e97ef7a317677575ae344f71ef75020f0b13a308adb880b` | インストーラのエントリ 56532 |
 | `C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILGlyphsEx.ilfont` | 102,712 B | `578b46df16da9e98e9fe837b5786ec037b84a91478a46990b0d251d86f58aeb1` | 同 56534 |
 
-- インストーラ: `/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe`（1,106,033,456 B、SHA-256 `04393e79…fc02`。台帳 `lift/out-inventory/installer-sha256.txt` の値。**この作業では再計算していない**。`stat` のサイズは台帳と一致）。
+- インストーラ: `/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe`（1,106,033,456 B、SHA-256 `04393e79…fc02`。記録 `lift/out-inventory/installer-sha256.txt` の値。**この作業では再計算していない**。`stat` のサイズは記録と一致）。
 - 書き出し（実測）: `python3 tools/extract_nsis2.py INSTALLER --write ILCursors.ilfont lift/out-inventory/extracted/fonts/ILCursors.ilfont`、同 `--write ILGlyphsEx.ilfont …`（終了コード 0、書き出し先は `xb` で新規）。`--hash` の出力と `sha256sum` の値が一致。インストーラは読み取りのみ（他の場所に展開していない）。両ファイルとも sfnt `0x00010000`（TrueType、`glyf`）。`ILGlyphsEx.ilfont` は `cvt `／`fpgm`／`prep`（ヒンティングのバイトコード）を持つ。
 - 書き出した 2 ファイルの合計は 110,604 B（`/` の書き込みの許容内）。
 
@@ -55,7 +55,7 @@
 
 | 項目 | 結果 |
 |---|---|
-| `patch -p1 --dry-run` と適用 | F2 の 6 ファイルは**ずれ・拒否・fuzz なし**。G1 の 4 差分とも重ならない（`a4-multi.sh` は F2 が 4 か所、G1 の統合が既定の `EXPECT_FLE_SHA` の 1 行。行が別なので衝突なし）。`resolved-F2G1.diff` を別の clean な `git archive 0c5000f` に `patch -p1` で当て、適用後の木が試験した木と `diff -r` で一致 |
+| `patch -p1 --dry-run` と適用 | F2 の 6 ファイルは**ずれ・拒否・fuzz なし**。G1 の 4 差分とも重ならない（`a4-multi.sh` は F2 が 4 か所、G1 の統合が既定の `EXPECT_FLE_SHA` の 1 行。行が別なので衝突なし）。`resolved-F2G1.diff` を別の clean な `git archive 0c5000f` に `patch -p1` で当て、適用後の木がテストした木と `diff -r` で一致 |
 | `bash -n lift/harness/a4-multi.sh` | OK |
 | `clang -fsyntax-only -Wall -Wextra -Werror -std=gnu11 -O1`: `two/main_two.c`、`census/main_two.c`、`seeds/vfs_seed_selftest.c`（統合した木） | 警告 0・エラー 0 |
 | **自己テスト** `vfs_seed_selftest.c` のビルド（`clang -std=gnu11 -O0 -g -Wall -Wextra -fPIE`、runtime の 6 ファイルとリンク） | 警告 0・エラー 0・**リンク不足なし** |
@@ -174,7 +174,7 @@
 3. 決定 0104 の `FLE_VIRTUAL_SHARED_DIR`（`C:\Program Files\Image-Line\FL Studio 21\Shared\`）が変わったとき、または実機の `Shared` の位置が分かったとき（一覧のパスを更新）。
 4. インストーラ由来の製品データをローカルの検証に使うこと（git に入れず、`lift/out-inventory/extracted/` に保管）に、権利上の問題が指摘されたとき。
 5. 配置の範囲を 2 ファイルより広げるとき（この決定を更新するか、新しい決定にする）。
-6. 決定 0101 の A4 の判定が、環境の内容の追加を「仮の応答」と同様に数えると決めたとき（台帳の扱いを変える）。
+6. 決定 0101 の A4 の判定が、環境の内容の追加を「仮の応答」と同様に数えると決めたとき（記録の扱いを変える）。
 
 ## 実装した場所（`f2-vfs-seed.diff`。6 ファイル、+約 700 行）
 
@@ -204,7 +204,7 @@
 | `bash -n lift/harness/a4-multi.sh` | OK（実測） |
 | SHA-256 の C 実装の**アルゴリズム**: ヘッダのコード（`vs_block`、`vs_sha256_hex`）を 1 行ずつ Python に転記（定数はヘッダから正規表現で読み出し）し、`hashlib` と比較 | 標準ベクトル "abc"・空、長さ 1／54〜57／63〜65／119〜121／127〜129／1000／4096 のランダム 16 件、書き出した 2 ファイルが**すべて一致**（実測。**C の実行ではない**: 符号なし 32 ビットの算術は C の規則で書いたが、コンパイルして動かしてはいない） |
 | ゲストパスの規則 `vs_guest_problem` の Python 転記 | 17 件の期待どおり、既定の一覧の 2 件は受理（実測。転記） |
-| 差分: `patch -p1 --dry-run`（HEAD の木のコピー）、適用後の木と作業木が `diff -r` で一致、リポジトリでの `git apply --check -p1` | OK（実測。リポジトリは変更していない） |
+| 差分: `patch -p1 --dry-run`（HEAD の木のコピー）、適用後の木とワークツリーが `diff -r` で一致、リポジトリでの `git apply --check -p1` | OK（実測。リポジトリは変更していない） |
 | **第 2 段階で実施** | コンパイル、リンク、自己テストの実行（失敗 0）、6 モジュール構成の a4（配置なし／あり）、gdb（ファイル系の呼び出しの差分、最終エラーの門、`fle_last_error` のウォッチ）、全体テスト（1,526 passed・0 failed。F2 は Rust のテストに触れない）。`a4-multi.sh` の `VFS_SEED` の実際の動作（`---- vfs seed` の節、`$RUN/vfs-seed.tsv`、M0 に `VFS_SEED` の行が出ないこと）を確認（`a4-multi-trim.sh` 経由。差は上の 2 の注記のとおり）。runtime の挙動（`CreateFileW`／`WriteFile`／読み戻し）は配置の成功（`done, 2 files, 6 directories created`）で実行された |
 | **未実施** | census（`run_census.sh` の `FLE_VFS_SEED` の扱いを含む）、wasm、実機 Windows との照合（0 件）、配置ありの停止（`HeapReAlloc`）より先 |
 

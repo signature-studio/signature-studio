@@ -70,8 +70,8 @@ VEX の 18 件はすべて VEX.256（ymm）。VEX.128 形は閉包に 0 件だ�
 - #UD / #NM（CR4.OSXSAVE、XCR0、CPUID の AVX ビットが 0 のとき VEX で #UD。Table 2-18、2-25）はモデルにない。ゲストの CPUID が AVX を立てないので、AVX 版に入るゲストは現れない、というのが現状の前提。
 - VEX.vvvv が 1111B でない場合の #UD（SDM の各命令の Other Exceptions）は、`vex.rs` では検査していない。`mov` はオペランド数が 2 でなければ `Err` にするが、iced が vvvv != 1111B の VMOVUPS をどうデコードするかは確認していない（テストにもない）。閉包の 18 件は、すべて vvvv = 1111B のバイト列（`objdump-text.txt`）。
 - #AC（アラインメントチェック）、非正規アドレス、ページフォルト: 既存の SSE と同じく、モデルにない。
-- VMOVAPS/VMOVNTPS の非整列で abort するのは C 側だけを試験（ホストは #GP で SIGSEGV になるので突合しない）。
+- VMOVAPS/VMOVNTPS の非整列で abort するのは C 側だけをテスト（ホストは #GP で SIGSEGV になるので突合しない）。
 
 ## テスト
 
-`cargo test --offline -p fe-lift --test vex`: 13 件、すべて通過（`lift/out-vex/test-vex-1.txt`）。ホスト突合 9,860 ケース、失敗 0。内訳と変異試験は `docs/investigations/vex-run.md`。
+`cargo test --offline -p fe-lift --test vex`: 13 件、すべて通過（`lift/out-vex/test-vex-1.txt`）。ホスト突合 9,860 ケース、失敗 0。内訳と変異テストは `docs/investigations/vex-run.md`。

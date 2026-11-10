@@ -1,6 +1,6 @@
 # mt3: 実スレッド版(ハイブリッド + GIL)のゲストの結果 — 本番の経路にしない(PM 判断 2026-11-05 19:30)
 
-状態: 試験ビルド h6(6eb1737d 基準 + 足場)。**本番 bundle そのものではない。負荷 6〜24 の機械(他の担当のビルドが同居)で、静かな回は無かった。**
+状態: テストビルド h6(6eb1737d 基準 + 足場)。**本番 bundle そのものではない。負荷 6〜24 の機械(他の担当のビルドが同居)で、静かな回は無かった。**
 
 ## 1. 結果(Chrome 156、参照プロジェクト、再生中の 10 秒の区間)
 | 構成 | 書き込み率(エンジンが DirectSound に書いた量 / 実時間) | ミキサー Worker の CPU | 備考 |
@@ -33,11 +33,11 @@
 
 ## PM の判断と取り込み(2026-11-05 20:20、docs のみ)
 
-取り込み: mt3 の最終報告(20:15)の文書 0234n(更新)・0234o〜0234t を `docs/decisions/` に、FINAL-REPORT・INDEX・表・道具・差分(`patches/`)を `docs/investigations/mt3/` に置いた。**製品の木への差分は 0 行**。測定は mt3 のもの(試験ビルド h6 = 6eb1737d 基準 + GIL・CS 保持の統計などの足場、Chrome 156、この機械、他の担当の負荷 6〜28 が常にあり静かな回は無い、実 GPU なし、依頼者の機械は 0 件)。PM は再現していない。
+取り込み: mt3 の最終報告(20:15)の文書 0234n(更新)・0234o〜0234t を `docs/decisions/` に、FINAL-REPORT・INDEX・表・道具・差分(`patches/`)を `docs/investigations/mt3/` に置いた。**製品の木への差分は 0 行**。測定は mt3 のもの(テストビルド h6 = 6eb1737d 基準 + GIL・CS 保持の統計などの足場、Chrome 156、この機械、他の担当の負荷 6〜28 が常にあり静かな回は無い、実 GPU なし、依頼者の機械は 0 件)。PM は再現していない。
 
 判断:
 1. **実スレッド版(ゲストのスレッド = Worker、GIL、ハイブリッド)は本番の経路にしない。** ゲート(Chrome での書き込み率 ≥0.95)に届かない: A 0.27〜0.34、B(GIL の護送の直し)0.36〜0.59、E(B + 同期待ち + 葉の import 無ロック)0.24〜0.54、プロセッサ数 n=1 0.33〜0.52、n=2 0.47〜0.60、n=4 0.42〜0.66。n を増やしても総 CPU が増えない(133〜140% → 144〜159%)。再検討の条件は『ミキサーの 1 スレッドの速度が 1.3 倍以上になった後』(本命は 1 スレッドの生成コードの速さ)。
-2. 採用しない差分: `mt3-semaphore-onto-4f054ecd.diff`(生成 C が変わる。FL は nproc=1 では CreateSemaphoreW を呼ばない)、`mt3-stage-b-prototype-onto-4f054ecd.diff`(足場の旗を含む参照)、GIL の第 2 修正 E((a) 同期待ち + (b) 葉の import)。E は書き込み率で B より良くならず、P2 の入力→応答も一貫した差を示さないが悪化の疑いが残る(113〜150 ms 対 73〜76 ms の回と、E 68/103/125 対 B 122/110/121 の回がある)。作業木の旗(`FLE_GIL` `FLE_TLS_MORE` `FLE_WORKERS` `FLE_PROCESSORS` ほか)は出荷しない。
+2. 採用しない差分: `mt3-semaphore-onto-4f054ecd.diff`(生成 C が変わる。FL は nproc=1 では CreateSemaphoreW を呼ばない)、`mt3-stage-b-prototype-onto-4f054ecd.diff`(足場の旗を含む参照)、GIL の第 2 修正 E((a) 同期待ち + (b) 葉の import)。E は書き込み率で B より良くならず、P2 の入力→応答も一貫した差を示さないが悪化の疑いが残る(113〜150 ms 対 73〜76 ms の回と、E 68/103/125 対 B 122/110/121 の回がある)。ワークツリーの旗(`FLE_GIL` `FLE_TLS_MORE` `FLE_WORKERS` `FLE_PROCESSORS` ほか)は出荷しない。
 3. 準備だけで入れない: `mt3-x87-tls.diff`(`fle_x87.c` の `X` / `keep_snan` を `_Thread_local` に。実スレッド版では必須の修正だが、製品の `fle_x87.o` が 40,463 → 40,359 B に変わり `__tls_base` を import する)。実スレッド版が本番の経路になるまで入れない。
-4. **`mt3-wasmgen-small.diff`(決定 0254、fe-wasmgen の Jecxz/Jrcxz、Cpuid、Fnstcw/Fldcw)は取り込み候補だが、実エンジンでの 84/55/87 行と a4 を経てから**: 現行の一覧に対し直 wasm は 7 モジュールがバイト同一、fle だけ 2 関数で +44 B(JECXZ を含む C 経路の関数の戻り値を呼び出し側が読み戻すようになる。変更前の fe-wasmgen は一般には誤りで、試験 `a_caller_reads_back_the_result_of_a_c_path_function_that_holds_a_jecxz` が変更前で失敗する)。mt3 は実エンジンを走らせていない。opt1 の 0252 も fe-wasmgen を変えているので、2 本を重ねた 1 本の Ω で実エンジンの行を取る(opt1 の担当)。
+4. **`mt3-wasmgen-small.diff`(決定 0254、fe-wasmgen の Jecxz/Jrcxz、Cpuid、Fnstcw/Fldcw)は取り込み候補だが、実エンジンでの 84/55/87 行と a4 を経てから**: 現行の一覧に対し直 wasm は 7 モジュールがバイト同一、fle だけ 2 関数で +44 B(JECXZ を含む C 経路の関数の戻り値を呼び出し側が読み戻すようになる。変更前の fe-wasmgen は一般には誤りで、テスト `a_caller_reads_back_the_result_of_a_c_path_function_that_holds_a_jecxz` が変更前で失敗する)。mt3 は実エンジンを走らせていない。opt1 の 0252 も fe-wasmgen を変えているので、2 本を重ねた 1 本の Ω で実エンジンの行を取る(opt1 の担当)。
 5. 未解析: 現行の一覧の直 wasm が呼ぶ C 経路の関数のうちブロックが切れているもの(dsp 40、elastique 2。いずれも `call` の後に nop の 2 命令・16 バイト。IPP の CPU 振り分けの入口に見える)。害は未解析(Export が native と一致、a4 が通ることが間接の根拠)。opt1/gpu1 の次の担当で確認する。

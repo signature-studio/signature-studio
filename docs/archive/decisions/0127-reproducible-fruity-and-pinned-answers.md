@@ -1,6 +1,6 @@
 # 0127: FRUITY 有効の構成を harness の入口 1 つで再現できるようにする（`DSP_SEEDS`、`a4-fruity.sh`）、決定 0126 の応答をテスト（`wall_fr11.rs`）で固定する、生成 C の本体の変化を数える、`fle_errmsg_table.h` の欠陥の修正
 
-状態: **仮の決定**。依頼は PM。測定・実装・テスト・文書は作業者が行った。作業は HEAD e2b3d50（決定 0126 取り込み済み）の `git archive`（`lift/out-pin1/src/`）で始め、clean な写しを `clean/` に置いた。差分は `pin1.diff`（`diff -ruN clean src`、4 ファイル、2,566 行。HEAD e2b3d50 の clean な archive に `patch -p1` で当たる: dry-run 終了 0、当てた木 = 作業木を `diff -rq` で確認）。
+状態: **仮の決定**。依頼は PM。測定・実装・テスト・文書は作業者が行った。作業は HEAD e2b3d50（決定 0126 取り込み済み）の `git archive`（`lift/out-pin1/src/`）で始め、clean な写しを `clean/` に置いた。差分は `pin1.diff`（`diff -ruN clean src`、4 ファイル、2,566 行。HEAD e2b3d50 の clean な archive に `patch -p1` で当たる: dry-run 終了 0、当てた木 = ワークツリーを `diff -rq` で確認）。
 
 **肯定的に見せる点は限られる。** (1) FRUITY 有効の再現は「harness の入口だけ」では**閉じていない**: 入力ファイル（インストーラ由来の DLL、フォント、`GM_CCs.txt`。git には無い）が要る。`a4-fruity.sh` は `INPUT_LIFT` でそれらの置き場を受ける。clean な archive からインストーラだけで入力を作り直す手順は**試していない**。(2) 全体テストの**数えた通しは最終のファイルの通りの木ではない**: 通しの後に 47 件目のテストとコメントを足し、その後は `wall_fr11` だけを再実行した（下）。通しは合計 3 回走らせた（先の 2 回は入力のリンクが無い・テストが 1 件足りないため数えない）。(3) テストが**実装の欠陥を 1 件見つけた**（`fle_errmsg_table.h`。決定 0126 の生成器が 244 エントリのうち 3 件を落とし、3 件の文言に次のエントリを混ぜていた）。runtime はこの 1 ファイルだけ直した。(4) 決定 0126 の `WM_SETREDRAW` は Learn の文言と**食い違う**まま（`DefWindowProc` が WS_VISIBLE を外すと Learn は書く。runtime は外さない）。直さず、テストが現状を固定し、そう書いてある。(5) 0126 の `S-` 89 名のうち **22 名はどのテストも固定していない**（下）。(6) 作業ディレクトリは一時的に **18 GiB** に達した（上限 12 GiB を超過。自己申告）。
 
@@ -33,7 +33,7 @@
 
 ### `DSP_SEEDS`（`a4-multi.sh`、+30 行）
 
-- `out-fruity11/tools/run6.sh` の `"dsp_ippv2_x64.dll:…:0x2000000:${DSP_SEEDS:-<決定 0113 の seeds>}"` を踏襲。`DSP_SEEDS` が dsp モジュールの SEEDS の欄を**置き換える**（FRUITY 有効だけ）。置き換えは TAG と stamp を作る前に行うので、どちらにも入る。stamp に `DSP_SEEDS=<sha256>|none` の行を足したので、**古い OUT は拒否される**（**読み**。古い OUT で拒否を起こす試験はしていない）。
+- `out-fruity11/tools/run6.sh` の `"dsp_ippv2_x64.dll:…:0x2000000:${DSP_SEEDS:-<決定 0113 の seeds>}"` を踏襲。`DSP_SEEDS` が dsp モジュールの SEEDS の欄を**置き換える**（FRUITY 有効だけ）。置き換えは TAG と stamp を作る前に行うので、どちらにも入る。stamp に `DSP_SEEDS=<sha256>|none` の行を足したので、**古い OUT は拒否される**（**読み**。古い OUT で拒否を起こすテストはしていない）。
 - 拒否（**実測**。a4-multi.sh を直接呼び、OUT を作る前に止まる。ログはこの文書の下に引用）: FRUITY 無効での指定 → `DSP_SEEDS is set without FLE_CALL_FRUITY=1`、相対パス → `DSP_SEEDS must be an absolute path`、読めない → `cannot read DSP_SEEDS=…`、dsp モジュールが無い → `DSP_SEEDS is set but no module is named dsp_ippv2_x64.dll`。**引用符・空白・`;`・`|` を含む指定の拒否は試していない**（`FLE_SEEDS` と同じ `case` の文）。
 
 ### `a4-fruity.sh`（新規、74 行）

@@ -69,7 +69,7 @@ IAT に実在し、W4 の依頼の範囲外のもの（20 thunk、この表に�
 
 ## 4. all-pdata での生成とビルド（実測、混在状態）
 
-**他の担当（x87、sysinfo、indirect-jmp）が未コミットで作業ツリーに混在している**。比較は同じ作業ツリーで、TABLE の W4 の 28 行の有無だけを変えた 2 回の生成（`base-table.sha` の `imports_table.rs` 先頭 `c89be6e39aab` が TABLE 追記前、`after-table.sha` の `ae1aa9146cc1` が追記後）。他担当の未コミット分（`lib.rs`、`x87.rs`、`jumptab.rs`、`tailjmp.rs` ほか）は両方に同じく入っている。seed は `out-pdata/seeds-pdata.txt`（57,816 行）、ツールは `out-pdata/tool` の複製（`out-oleaut/tool`）。
+**他の担当（x87、sysinfo、indirect-jmp）が未コミットでワークツリーに混在している**。比較は同じワークツリーで、TABLE の W4 の 28 行の有無だけを変えた 2 回の生成（`base-table.sha` の `imports_table.rs` 先頭 `c89be6e39aab` が TABLE 追記前、`after-table.sha` の `ae1aa9146cc1` が追記後）。他担当の未コミット分（`lib.rs`、`x87.rs`、`jumptab.rs`、`tailjmp.rs` ほか）は両方に同じく入っている。seed は `out-pdata/seeds-pdata.txt`（57,816 行）、ツールは `out-pdata/tool` の複製（`out-oleaut/tool`）。
 
 | 項目 | W4 追記前（`gen-base.txt`） | W4 追記後（`gen-after.txt`） | 差 |
 |---|---:|---:|---:|
@@ -100,7 +100,7 @@ IAT に実在し、W4 の依頼の範囲外のもの（20 thunk、この表に�
 
 - **W4 の追加で停止点は動かなかった**。停止はどちらも `VerifyVersionInfoW`（`fle_osver.c`、決定 0012）の `dwOSVersionInfoSize` で、W4 の API には届いていない。スタックは `f_423cc0 ← f_454030 ← f_454090 ← f_4120c0 ← f_412160 ← f_41d8f0 ← エントリ`。
 - したがって **W4 の 28 API は all-pdata の実行ではまだ 1 回も呼ばれていない**（`SysFreeString` などは停止点より先にある）。実行の上での検証は無く、確認は単体テストとコード読解のみ。
-- 参考: `out-pdata/bin/flengine-after-pdata-b`（pdata-seeds-run.md §5.3）は `RaiseException(0xc06d007f)` で止まっていた。今回の作業ツリーでは別の担当の変更（GetNativeSystemInfo の delay-load、VerifyVersionInfoW への到達など）で停止点が進んでいる（**推測**: 停止点の文字列の違いからの読み）。
+- 参考: `out-pdata/bin/flengine-after-pdata-b`（pdata-seeds-run.md §5.3）は `RaiseException(0xc06d007f)` で止まっていた。今回のワークツリーでは別の担当の変更（GetNativeSystemInfo の delay-load、VerifyVersionInfoW への到達など）で停止点が進んでいる（**推測**: 停止点の文字列の違いからの読み）。
 
 ## 6. 触ったファイル
 

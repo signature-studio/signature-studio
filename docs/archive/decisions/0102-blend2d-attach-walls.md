@@ -33,7 +33,7 @@ Blend2D の `DllMain(DLL_PROCESS_ATTACH)` は、**決定 0095（swapped 形の M
 
 ## 基準（実測、2026-10-27）
 
-- 木: HEAD `5002d98` + 作業ツリーの決定 0095 の差分（`git diff HEAD -- lift`、SHA-256 `11eebc57…980e`、7 ファイル）+ ハーネス `lift/out-harness-int/patches/harness-int.diff`。census.diff は当てていない。
+- 木: HEAD `5002d98` + ワークツリーの決定 0095 の差分（`git diff HEAD -- lift`、SHA-256 `11eebc57…980e`、7 ファイル）+ ハーネス `lift/out-harness-int/patches/harness-int.diff`。census.diff は当てていない。
 - 3 モジュール構成（FLEngine + 縮小 dsp_ippv2 基底 0x2000000・種 452 + Blend2D 基底 0x4700000・種 58・`--pdata`）。基底・種は測定用で決定ではない。
 - **HEAD 単独（0095 なし）の停止**: `fle: indirect call to 0x489f940 is not a known function entry`（`f_489f7d0`、`jmp r9` = 0x489f8fb）。init_count 150/942、functions 1,069、entries 27,333。
 - **0095 を取り込んだ木の 3 モジュール構成（run-0）**: Blend2D の `DllMain(ATTACH)` は**戻った**（`call_dllmain` の戻り 0x1）。`LoadLibraryW("Blend2D.dll")` は 0x4700000 を返し、`GetProcAddress(0x4700000, "AggCreateInstance")` は 0x4759a60 を返した（読み取り専用 gdb）。init_count 159/942、last unit 158、functions 1,106、entries 27,842。停止は unit 158 の `LoadLibraryW "QuickFontCache_x64.dll"`（`not a virtual module and not a name this environment is defined to lack`）。**Blend2D の ATTACH のために、0095 のほかに直した壁は 0 個**。
@@ -66,7 +66,7 @@ Blend2D の `DllMain(DLL_PROCESS_ATTACH)` は、**決定 0095（swapped 形の M
 
 差分は（B 単独の版）**`lift/out-wallB/patches/wallB-v2.diff`**（`diff -ruN -x target -x 'out-*' base2/lift src/lift`。基準 `base2` = HEAD a951ecc（決定 0095 を含む）の `git archive` + `lift/out-harness-int/patches/harness-int.diff`。`patch -p1` で当たる。27 ファイル、1,967 行）。同じ場所の `wallB.diff` は**古い版**（`resolve_inline` の修正の前。ディスクが満杯で上書きできず、別名にした）。
 
-- **fe-decode**: `src/jumptab.rs`（`Origin::Inline`、`InlineForm`、`recognize_inline`、`resolve_inline`、`verify_inline`。`kind_key` に `jmp:inline_table`）、`src/lib.rs`（`Closure::inline_tables`、認識の分岐は 0036 の注釈と 0079 の stub の後・MSVC の前、`verify` の分岐、取り下げ時の減算）。**決定 0095 の `jumptab.rs` の中身は変えていない**（0095 の差分の途中の版にあった `landings_in_swapped_idioms` の `if false &&`（作業ツリーのスナップショットにだけあった）は、PM がコミットした版では外れており、コミットされた版を土台にした）。
+- **fe-decode**: `src/jumptab.rs`（`Origin::Inline`、`InlineForm`、`recognize_inline`、`resolve_inline`、`verify_inline`。`kind_key` に `jmp:inline_table`）、`src/lib.rs`（`Closure::inline_tables`、認識の分岐は 0036 の注釈と 0079 の stub の後・MSVC の前、`verify` の分岐、取り下げ時の減算）。**決定 0095 の `jumptab.rs` の中身は変えていない**（0095 の差分の途中の版にあった `landings_in_swapped_idioms` の `if false &&`（ワークツリーのスナップショットにだけあった）は、PM がコミットした版では外れており、コミットされた版を土台にした）。
 - **fe-lift**: `src/lib.rs`（`ret 0` を `ret` と同じに lift）、`src/jumptab.rs`（`Origin::Inline` の handler 名 `jmp_ind:inline_table`）、`src/imports_table.rs`（`TABLE` の末尾に 9 行: `GetVersionExA`、`HeapCreate`、`HeapSetInformation`、`GetStartupInfoA`、`GetModuleFileNameA`、`GetEnvironmentStrings`、`FreeEnvironmentStringsA`、`DecodePointer`、`SetHandleCount`。既存の擬似 VA は動かない。`EncodePointer` の行は既存）。
 - **runtime**: `fle_vfs.c`／`.h`（`module_path`、`GetModuleFileNameW` の実在モジュール対応、`GetModuleFileNameA`。**統合後は `module_path` の実在モジュールの値が 0104 の導出**）、`fle_osver.c`／`.h`（`GetVersionExA`）、`fle_sys.c`／`.h`（私的ヒープ、`HeapSetInformation`、`HeapSize` と要求サイズの表）、`fle_env.c`／`.h`（`GetStartupInfoA`、`GetEnvironmentStrings`、`FreeEnvironmentStringsA`）、`fle_proc.c`／`.h`（`EncodePointer`／`DecodePointer`／`SetHandleCount`。`EncodePointer` の名前付き停止を置き換えた）、`fle_spi.c`／`.h`（`0x200C`）。B 単独の差分にあった `fle_realmod.c`／`.h`（`fle_realmod_loaded_name`、`fle_realmod_started_base`）と `fle_res.c` の変更は**統合では取り込まない**（0104 の実装を使う）。**新しい `.c`、`.h` は作っていない**。
 - 決定 0082、0078、0025、0018 の本文は書き換えていない。この文書が 0078 の名前付き停止のうち `EncodePointer` と `HeapSize` を、0082 D6 の保留を、置き換える（読み替える）。

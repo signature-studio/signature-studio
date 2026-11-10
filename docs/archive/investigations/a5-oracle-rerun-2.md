@@ -17,7 +17,7 @@
 | 項目 | 内容 | 区分 |
 |---|---|---|
 | HEAD | `b21d05119ae40486104abfff4cf87a44275a654d`（決定 0085 の直後に調査 1 件のコミットが載った状態） | 実測 |
-| スナップショット | `git archive HEAD \| tar -x -C lift/out-a5-m85/src/`（8.2 MB。`binaries/` は含まれない）。作業ツリーの `lift/` は読んでいない | 実測 |
+| スナップショット | `git archive HEAD \| tar -x -C lift/out-a5-m85/src/`（8.2 MB。`binaries/` は含まれない）。ワークツリーの `lift/` は読んでいない | 実測 |
 | PE | `/home/ubuntu/work/signature-studio-develop/binaries/win64/FLEngine_x64.dll`（22,227,016 B、SHA-256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d`）を `FLENGINE_PE` で絶対パス指定 | 実測 |
 | FLEngine の生成 C | `fe-lift lift … --pdata` の出力 215,707,512 B、SHA-256 **`43985d62321a90f562ce1b8144253e00af13df795e4190d26b6b8ce2537137a1`**（依頼の期待値と**一致**）。functions 59,297、closure_instructions 2,528,030、bad_nodes 0、unsupported_total 525（`Jmp: indirect through IAT slot` 524、`Jmp: indirect target unresolved` 1） | 実測 |
 | 前回の生成 C（d6c24be） | 215,700,245 B、SHA-256 `47e0b1d2e83ece97a0d8f8787459cc477b6e99d4de1e562615b7afaef78b7bfc`、unsupported_total 534（`lift/out-oracle-rerun/stage/lift/out-oracle/gen/` を読んで取った） | 実測 |
@@ -295,4 +295,4 @@ seed 1 の未検出 16 件と重なるものはない。seed 2 では masked が
 - 前回の結果（`lift/out-oracle-rerun/`）は読み取りだけ。変更していない。
 - 規則: `rm`、既存ファイルの全体上書き、git の書き込み系操作、`/tmp`、末尾の `&` は使っていない。TMPDIR は `lift/out-a5-m85/tmp`（ドライバは `src/lift/out-oracle/tmp`）。新規ファイルは `docs/investigations/a5-oracle-rerun-2.md` と `lift/out-a5-m85/` の下だけ。権限拒否はなかった。
 - **規則に対する自己申告（2 点）**: (1) `python3 -c` の短い確認コマンドを 2 回、`PYTHONDONTWRITEBYTECODE=1` を付けずに実行した（最初の環境確認の `import capstone; print(capstone.__version__)` と、pyc の置き場を調べた `import capstone,os; print(os.path.dirname(capstone.__file__))`）。どちらも capstone を import しただけのコマンドで、capstone のディレクトリに今日の日付の `.pyc` が増えていないことは `find -newermt` で確認した。`lift/out-a5-m85/` には `__pycache__` がない。一方、同じ確認で uv の python 標準ライブラリ内に今日の日付の `.pyc` が 1 つ見つかった（`…/cpython-3.14.8-linux-x86_64-gnu/lib/python3.14/encodings/__pycache__/rot_13.cpython-314.pyc`）。これが私の 2 回の実行で作られたものか、他の作業のものかは**未確認**（capstone の import が `rot_13` を読む理由は確かめていない）。私は削除していない（rm 禁止）。リポジトリ内の他の場所（`lift/out-regstop/tools/__pycache__/rdis.cpython-314.pyc`、`lift/out-loadlib/__pycache__/llpe.cpython-314.pyc`）に今日の日付の `.pyc` があるが、私が実行したものではない（並行作業のもの。未確認だが、私はそのディレクトリを触っていない）。(2) 集計用のインライン python（here-document）の中に、`'timeout'`（status の値の文字列）や `timeout_retry`（summary のキー名）という文字列を書いた。`timeout` コマンドは使っていない（長い実行は shell ツールの timeout パラメータで待った）が、「コマンド文字列に timeout を書かない」という規則の文言には触れている。
-- 作業ツリーの未追跡ファイル `lift/harness/wasm/trace.c.new`、`lift/harness/wasm/trace_native.c.new`、`lift/iat-unsup-closure.txt` は、私の作業の前から存在した（作業開始時の `git status --short` に出ていた）。私のものではない。
+- ワークツリーの未追跡ファイル `lift/harness/wasm/trace.c.new`、`lift/harness/wasm/trace_native.c.new`、`lift/iat-unsup-closure.txt` は、私の作業の前から存在した（作業開始時の `git status --short` に出ていた）。私のものではない。

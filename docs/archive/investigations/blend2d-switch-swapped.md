@@ -144,9 +144,9 @@
 ### 6.1 手順（実測）
 
 - 生成: この作業の release の `fe-lift`（`lift/out-swapped/target/release`、決定 0095 の実装）。runtime と harness は HEAD のまま（`git log` で `lift/runtime`・`lift/harness` の最後の変更は決定 0092 のコミット 38df911。前回の 0094 の測定と同じ）。FLEngine の生成 C は `gen_two.sh` の `gen` 段階が**この作業の fe-lift で生成して SHA を検査**（`feb5b908…`、期待どおり）。FLEngine の C を分割した `src/fle-00.c`〜`fle-16.c` は `lift/out-rdefs/three/src/` のものと**全 17 ファイルが `cmp` で一致**、`gen/flengine.c` も一致。そのため FLEngine のオブジェクト（`native/fle/*.o` 17 個、505 MB）は `out-rdefs/three/native/fle` から `cp -a` で再利用した（同じ C・同じフラグ。gdb のスタックの行番号の元ファイル名が `out-srw/three/src/…` になっているのはこのオブジェクトの `-g` の情報）。runtime と harness のオブジェクトはこの作業のビルドで作り直した。
-- 入力: リベース済みの DLL は `out-rdefs/three/dll/` のコピー（`lift/out-swapped/three/dll/`。SHA-256 先頭 `24e01ec9…`（Blend2D、基底 0x4700000）、`4fd25502…`（縮小 dsp_ippv2、基底 0x2000000）、種 `cf664439…`、`ca6439b6…`（Blend2D の種 58 個））。スクリプトは `lift/out-swapped/three/`（`run-gen.sh`、`run-build.sh`、`run-a4.sh`、`harness-two/` は `out-rdefs/three/harness-two/` の複写で、`gen_two.sh` が `EXPECT_FLE_SHA` を検査する）。
+- 入力: リベース済みの DLL は `out-rdefs/three/dll/` のコピー（`lift/out-swapped/three/dll/`。SHA-256 先頭 `24e01ec9…`（Blend2D、基底 0x4700000）、`4fd25502…`（縮小 dsp_ippv2、基底 0x2000000）、種 `cf664439…`、`ca6439b6…`（Blend2D の種 58 個））。スクリプトは `lift/out-swapped/three/`（`run-gen.sh`、`run-build.sh`、`run-a4.sh`、`harness-two/` は `out-rdefs/three/harness-two/` のコピーで、`gen_two.sh` が `EXPECT_FLE_SHA` を検査する）。
 - 生成 C: 縮小 dsp_ippv2（`real.c`）は functions 8,030、closure **3,038,952**（前回 3,038,921）、bad_nodes 0。Blend2D（`blend2d.c`）は functions 2,067、closure **405,705**（前回 405,674）、bad_nodes 0。表の統合: 59,565 + 8,298 + 2,335 → **69,662 行**（前回と同じ。複数の表に在る行 268、`f_<VA>` の衝突 0）。two-native は 612,732,944 B（2 GB 未満）。ビルドの stderr 0 行。
-- a4-survey を 2 回（`out-swapped/three/out-1/`、`out-2/`）。読み取りだけの gdb（`out-swapped/three/gdb/ro_srw3.py` = `out-rdefs/gdb/ro_srw3.py` の複写。`return`、`set var`、`call`、値の書き込みなし）を 2 回（`out-swapped/three/run/`）。
+- a4-survey を 2 回（`out-swapped/three/out-1/`、`out-2/`）。読み取りだけの gdb（`out-swapped/three/gdb/ro_srw3.py` = `out-rdefs/gdb/ro_srw3.py` のコピー。`return`、`set var`、`call`、値の書き込みなし）を 2 回（`out-swapped/three/run/`）。
 
 ### 6.2 a4 の行（2 回。実測）
 

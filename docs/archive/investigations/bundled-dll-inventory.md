@@ -1,10 +1,10 @@
 # 同梱 DLL の所在と入手経路（ILTools_x64.dll が「見つからない」件）
 
-実行日: 2026-10-27。HEAD a951ecc（作業ツリーの追跡ファイルは HEAD と一致。`git status` の未追跡 5 件は他の作業のもの）。**調査のみ。この文書は何も決めない**（決定、runtime、生成器、既存文書、`lift/` の既存ファイルは編集していない）。作業物は `lift/out-inventory/`（新規。`.gitignore` の `lift/out*/` で無視される）。
+実行日: 2026-10-27。HEAD a951ecc（ワークツリーの追跡ファイルは HEAD と一致。`git status` の未追跡 5 件は他の作業のもの）。**調査のみ。この文書は何も決めない**（決定、runtime、生成器、既存文書、`lift/` の既存ファイルは編集していない）。作業物は `lift/out-inventory/`（新規。`.gitignore` の `lift/out*/` で無視される）。
 
 ## 0. 要約
 
-1. **ILTools_x64.dll の PE 実体は、このマシンの上に「単体のファイル」としては無かったが、手元のインストーラの中にある**（実測）。`/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe`（SHA-256 が既存の台帳と一致）の NSIS データにエントリ 56466、3,662,336 B、SHA-256 `20409dcbc5eb5055c476ed663d6e944984281155f15c6b3a5a2961ba061a0f95` が 1 件。今回、`tools/extract_nsis2.py --write` で `lift/out-inventory/extracted/ILTools_x64.dll` に 1 本だけ書き出した（`--hash` と `sha256sum` が一致）。
+1. **ILTools_x64.dll の PE 実体は、このマシンの上に「単体のファイル」としては無かったが、手元のインストーラの中にある**（実測）。`/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe`（SHA-256 が既存の記録と一致）の NSIS データにエントリ 56466、3,662,336 B、SHA-256 `20409dcbc5eb5055c476ed663d6e944984281155f15c6b3a5a2961ba061a0f95` が 1 件。今回、`tools/extract_nsis2.py --write` で `lift/out-inventory/extracted/ILTools_x64.dll` に 1 本だけ書き出した（`--hash` と `sha256sum` が一致）。
 2. 他の同梱 DLL 10 名（webview2loader、beat_tracker、ilsvg_x64、ildsp_x64、oggio_x64、wavpackdll_x64、lameenc_x64、python312、ilvideo_x64、speaker_x64）も**同じインストーラに全部ある**（実測。サイズと SHA-256 は §4）。手元に抽出済みなのは dsp_ippv2、Blend2D、QFC（と FLEngine）だけ。
 3. **入手経路の記録はある**: 3 本とも「インストーラから `tools/extract_nsis2.py --write` で 1 本だけ書き出した」と各調査文書に手順が書かれている（§3）。インストーラのパスは QFC 調査の §2 に書かれ、旧プロジェクトの引き継ぎ資料にも同じパスがある。**記録が無いのは、インストーラを誰がいつどこから置いたか**（ダウンロード元）。
 4. **「ILTools_x64.dll を lift するために実体の入手が要る」わけではない**（実測）。既存の `fe-pe`、`fe-lift` が変更なしで通る（functions 12,526、`bad_nodes` 0、`unsupported_total` 352）。足りないのは実体ではなく、**実在モジュールとして載せるための決定と作業**（基底、`RM_MAX`、0086 に ILTools の個別の方向が無い点、応答など）で、§8 に事実と読みを分けて書く。
@@ -99,7 +99,7 @@
 
 | 項目 | 結果 |
 |---|---|
-| 名前に該当（ホーム配下） | 580 件。内訳: `lift/out-a6/test/` と、過去の HEAD の複写 `lift/out-*/src/lift/out-a6/test/`、`lift/out-git/stage-*/lift/out-a6/test/` の `ext-ILTools-x64-dll-*`、`ext-WebView2Loader-dll-*`、`ext-beat-tracker-dll-*` など計 532 件（**ゲストの `LoadLibraryW` に名前を渡す試験の C とその実行ファイル。DLL の実体ではない**。`lift/out-a6/test/` だけで 400 件）、`lift/out-oracle/old-ref/`（旧リポジトリの `tools/iltools/`、`iltools_native_probe.c`、wavpack の法務メモ。23 件。**スクリプトとメモだけで DLL は無い**）、`lift/out-loadlib/` の読み取りメモ 2 件、今回の `lift/out-inventory/` 13 件（検索時点）、`~/fl-browser` 7 件（下の Mac の dylib）、`work/hsrlog/.cache` の `Unity.CecilTools`（ディレクトリ名の偶然の一致、無関係）3 件 |
+| 名前に該当（ホーム配下） | 580 件。内訳: `lift/out-a6/test/` と、過去の HEAD のコピー `lift/out-*/src/lift/out-a6/test/`、`lift/out-git/stage-*/lift/out-a6/test/` の `ext-ILTools-x64-dll-*`、`ext-WebView2Loader-dll-*`、`ext-beat-tracker-dll-*` など計 532 件（**ゲストの `LoadLibraryW` に名前を渡すテストの C とその実行ファイル。DLL の実体ではない**。`lift/out-a6/test/` だけで 400 件）、`lift/out-oracle/old-ref/`（旧リポジトリの `tools/iltools/`、`iltools_native_probe.c`、wavpack の法務メモ。23 件。**スクリプトとメモだけで DLL は無い**）、`lift/out-loadlib/` の読み取りメモ 2 件、今回の `lift/out-inventory/` 13 件（検索時点）、`~/fl-browser` 7 件（下の Mac の dylib）、`work/hsrlog/.cache` の `Unity.CecilTools`（ディレクトリ名の偶然の一致、無関係）3 件 |
 | 名前に該当（`/opt`、`/mnt`、`/media`、`/srv`、`/usr/local`、wine） | **0 件** |
 | **ILTools_x64.dll と同じサイズ（3,662,336 B）のファイル** | **今回書き出した `lift/out-inventory/extracted/ILTools_x64.dll` だけ**（それ以前から存在する Windows 用の ILTools はこのマシンに無い） |
 | ほかの 10 DLL のサイズ（1,504,256 / 4,197,376 / 1,872,384 / 271,672 / 465,720 / 983,552 / 137,120 / 3,263,488 / 7,003,928 / 1,329,152 B）の一致 | **0 件** |

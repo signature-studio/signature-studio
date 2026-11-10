@@ -1,6 +1,6 @@
 # GetLocaleInfoW の en-US 6 種の実装と harness の再実行の記録
 
-実行日: 2026-10-21（JST）。作業ディレクトリ `signature-studio-develop`、HEAD b7adccb（作業ツリーには他の担当の未コミット変更がある）。決定は `docs/decisions/0048-locale-six.md`、調査は `docs/investigations/locale-6-official-sources.md`。「実測」はツールの出力、「読み」は静的な読み、「推測」は未検証。実機の Windows では確認していない（値は仮）。
+実行日: 2026-10-21（JST）。作業ディレクトリ `signature-studio-develop`、HEAD b7adccb（ワークツリーには他の担当の未コミット変更がある）。決定は `docs/decisions/0048-locale-six.md`、調査は `docs/investigations/locale-6-official-sources.md`。「実測」はツールの出力、「読み」は静的な読み、「推測」は未検証。実機の Windows では確認していない（値は仮）。
 
 ## 1. 結果
 
@@ -52,7 +52,7 @@
 
 - 値はすべて仮（決定 0048）。0x20 は `d` か `dd` か、0x1c は `0` か `1` かが、実機で変わり得る。
 - 日付書式と INEGCURR の後段の使われ方、ゲストが 0x1f 以降（0x1003、0x79、0xc）を呼んだあとの経路は、harness が 0x423220 で止まるまでに 0x1c の次の 5 種を通過した（停止点が進んだこと）まで確認した。`obj+0x10`、`+0x18`、`+0x30`、`+0x38`、`+0x17e` の使用箇所は追っていない。
-- ワークスペース全テストは他の担当の未コミット変更を含む作業ツリーで実行し、0 failed だった。失敗がなかったので、HEAD に自分の変更だけを重ねたコピーでの切り分けは行っていない。
+- ワークスペース全テストは他の担当の未コミット変更を含むワークツリーで実行し、0 failed だった。失敗がなかったので、HEAD に自分の変更だけを重ねたコピーでの切り分けは行っていない。
 - wasm の確認は停止点（1 経路）まで。停止点より先の実行（SSE/x87 の演算の wasm と native の一致など）は未確認。
 
 ## 7. 触ったファイルと制約の遵守

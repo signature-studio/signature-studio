@@ -1,6 +1,6 @@
 # MSVC の switch 表（`jmp reg`）を基底証明つきで解決する（決定 0089）: 95 か所の見積もり、実装、検証、3 モジュールでの停止点の移動（測定のみ）
 
-実行日: 2026-10-24。基準の HEAD は `04f2eed`（作業ツリーの未コミットの変更が本文書の対象）。決定は `docs/decisions/0089-msvc-switch-tables-with-proven-base.md`（PM の決定。仮の決定ではない）。背景は `docs/investigations/blend2d-seed58.md` §6.4、§7、§8 と `docs/investigations/blend2d-lift-feasibility.md` の B3（§3.4、§10.3）。作業物は `lift/out-jtb2d/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086 は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。
+実行日: 2026-10-24。基準の HEAD は `04f2eed`（ワークツリーの未コミットの変更が本文書の対象）。決定は `docs/decisions/0089-msvc-switch-tables-with-proven-base.md`（PM の決定。仮の決定ではない）。背景は `docs/investigations/blend2d-seed58.md` §6.4、§7、§8 と `docs/investigations/blend2d-lift-feasibility.md` の B3（§3.4、§10.3）。作業物は `lift/out-jtb2d/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086 は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。
 
 ## 0. 凡例
 

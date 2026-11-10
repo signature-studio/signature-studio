@@ -43,7 +43,7 @@
 - 現在の接続だけを見るために `wrangler tail fl-studio-web --format json` を、`tools/tail-filter.py` を通して集計した(時刻・メソッド・パス・status・ブラウザの種類・OS・beacon に触れるログ行だけを残し、IP・cookie・Access の識別情報・ヘッダは捨てる)。結果: 20:14〜20:41(27 分、PM の許可は 21:10 まで。待つ手段が無いので 20:41 で止めた)に **Worker に届いたリクエストは 0 件**(`tables/tail-live.txt`。Access が手前で止めた物は見えない)。止めた後、サーバー側の tail 一覧が空になったことを確認。最後にもう一度 `perf/` を一覧して 0 件(全 404 オブジェクトは全部 `cache/`)。
 
 ## 9. beacon2(失敗の痕跡が本番に残るか) → `BEACON2.md`、`beacon2.diff`
-- 今の beacon は first idle・定期(first idle の後)・showError・終了でしか出ず、『固まる』『first idle 前に離れる』『boot の外の uncaught error』『Access 切れ・最初の 4xx で止まる』は何も残さない。最小の失敗 report(1.5 KB、種類ごとに 1 回、旗なし)を足す差分と試験を置いた。詳細・限界は `BEACON2.md`。
+- 今の beacon は first idle・定期(first idle の後)・showError・終了でしか出ず、『固まる』『first idle 前に離れる』『boot の外の uncaught error』『Access 切れ・最初の 4xx で止まる』は何も残さない。最小の失敗 report(1.5 KB、種類ごとに 1 回、旗なし)を足す差分とテストを置いた。詳細・限界は `BEACON2.md`。
 
 ## PM の判断と取り込み(2026-11-05 20:55)
 

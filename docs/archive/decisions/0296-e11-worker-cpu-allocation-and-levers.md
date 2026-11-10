@@ -142,7 +142,7 @@ Worker が idle なのは**全ゲスト thread が眠っているとき**で、�
 
 **順位(測定の裏付けと忠実性で)**: ① L1(H1)— 測定が既にあり、実装は mt3 の 0293 に済み(E12 以降)。② L3(f_863f60、UI の最大の関数)— 0282 の測定が根拠。③ L7((program) の分解)— **見込みが最大(25〜56)で、中身が未分解**なので、まず分解の測定。④ L2(Elastique の他の関数の質)— ミキサーの 39% で最大の的だが、native 比が未測定。⑤ L8、L4、L5、L6 は小さい(各 ≤ 15)。
 
-**x87 の fast path(PM 未決)の分類案**: (1) **bit 一致の別実装**(同じ入力で x87 と同じビットを返す。たとえば fsincos を今の soft の多倍長計算から、範囲縮約の分岐を整理した等価な実装に替える)は A(忠実)。(2) **厳密な前条件の近道**(FPU の制御語が既定〔精度 64 bit、丸め最近〕、入力が例外を起こさない範囲、結果が double で完全に再現できる場合だけ wasm の f64 演算を使い、そうでなければ元の経路)は B で、前条件が『厳密』なら忠実。前条件の検査が厳密であることを、x87 の試験(a4 の fpu 行)で通す。(3) 前条件なしの f64 近似は N。**ただし上限は小さい**: x87 関連の自己時間は E11 で 2.8 ms/ブロック(helper 0.62 + libm の sin/cos 1.78 + fst_m 0.42)= 稼働の 3.2% で、全部消しても (1,1) で 30 core-ms/s(需要の 3%)。
+**x87 の fast path(PM 未決)の分類案**: (1) **bit 一致の別実装**(同じ入力で x87 と同じビットを返す。たとえば fsincos を今の soft の多倍長計算から、範囲縮約の分岐を整理した等価な実装に替える)は A(忠実)。(2) **厳密な前条件の近道**(FPU の制御語が既定〔精度 64 bit、丸め最近〕、入力が例外を起こさない範囲、結果が double で完全に再現できる場合だけ wasm の f64 演算を使い、そうでなければ元の経路)は B で、前条件が『厳密』なら忠実。前条件の検査が厳密であることを、x87 のテスト(a4 の fpu 行)で通す。(3) 前条件なしの f64 近似は N。**ただし上限は小さい**: x87 関連の自己時間は E11 で 2.8 ms/ブロック(helper 0.62 + libm の sin/cos 1.78 + fst_m 0.42)= 稼働の 3.2% で、全部消しても (1,1) で 30 core-ms/s(需要の 3%)。
 
 ## 6. 1 枚: 『合計で何%になれば 1.0 か』と『届かないなら実スレッド版』
 
@@ -281,11 +281,11 @@ wasm 側(E11 の `n-fle.oz.wasm`、wasm-opt -Oz 後。`$1320` = body): 583 行�
 - micro-benchmark は node 24.19(V8 13.6)で、Chrome 156 の V8 とは違う(inline の予算などが違いうる)。形の再現であり、実関数の実測ではない。
 - `n-fle.oz.wat`(108 MB)など `/tmp/opencode/a18` の中間物は最後に消す。
 
-## 12. H1 の node 側の測定(E11 の試験用 wasm、PM 15:40 の依頼)と、Wine による実 x86 測定の方法メモ
+## 12. H1 の node 側の測定(E11 のテスト用 wasm、PM 15:40 の依頼)と、Wine による実 x86 測定の方法メモ
 
-### 12.1 H1 を E11 の試験用ビルドに注入して node で測った(実測)
+### 12.1 H1 を E11 のテスト用ビルドに注入して node で測った(実測)
 
-E11 の試験用ビルド(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abecc01c7b30)に 0290 の注入器(`a17-hint-patch3.py`)で窓検査の if + 外側の if のヒントを注入した(**66 関数 6,291 箇所**、セクション 30,449 B。関数本体は同一)。同じ G3 スクリプト(`ref1-perf-short.g3`、参照プロジェクトの 10 仮想秒の再生と起動、仮想時計で作業量が毎回同一)を node 24.19(`--experimental-wasm-branch-hinting --cpu-prof` 1 ms)で **plain / ヒントを交互に 2 回ずつ**(15:00、load 8〜10)。**node の行 55 / 87 は 4 本とも差 0**(意味は不変)。
+E11 のテスト用ビルド(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abecc01c7b30)に 0290 の注入器(`a17-hint-patch3.py`)で窓検査の if + 外側の if のヒントを注入した(**66 関数 6,291 箇所**、セクション 30,449 B。関数本体は同一)。同じ G3 スクリプト(`ref1-perf-short.g3`、参照プロジェクトの 10 仮想秒の再生と起動、仮想時計で作業量が毎回同一)を node 24.19(`--experimental-wasm-branch-hinting --cpu-prof` 1 ms)で **plain / ヒントを交互に 2 回ずつ**(15:00、load 8〜10)。**node の行 55 / 87 は 4 本とも差 0**(意味は不変)。
 
 | run | f_b34aca0 + f_b34eaf0 ms | 他の wasm ms | 非 idle の合計 ms | (program) ms |
 |---|---|---|---|---|
@@ -295,7 +295,7 @@ E11 の試験用ビルド(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abe
 | hint-2 | 1,464 | 19,686 | 23,095 | 1,498 |
 | **平均 plain → hint** | **2,429 → 1,474(−39.3%)** | 22,256 → 20,419(−8.3%) | **26,870 → 23,844(−11.3%)** | 1,573 → 1,501 |
 
-- **node では 2 関数 −39.3%(E9 の試験用ビルドの −38.6% と同じ)、ヒントを付けた 66 関数の全体で wasm 時間 −11.3%**(同じ作業量のシナリオの CPU 時間)。A/other(2 関数 / 他の wasm)は 0.1091 → 0.0722(−34%)。hint-1 と hint-2 の差が 6% なので、**揺れは ±3% 程度**。
+- **node では 2 関数 −39.3%(E9 のテスト用ビルドの −38.6% と同じ)、ヒントを付けた 66 関数の全体で wasm 時間 −11.3%**(同じ作業量のシナリオの CPU 時間)。A/other(2 関数 / 他の wasm)は 0.1091 → 0.0722(−34%)。hint-1 と hint-2 の差が 6% なので、**揺れは ±3% 程度**。
 - この負荷は起動 + 参照プロジェクトの再生でミキサーが支配的(E11 の Chrome の 30〜50 s の窓とは配分が違う)。**Chrome での率は node の約半分**(2 関数: −19.7% 対 −38.6〜−39.3%)なので、同じ比を仮定すると H1 の全体への効きは **約 −5〜6%**(Chrome、ヒント 66 関数、このシナリオ)。E11 の稼働に占める窓検査関数群は 22.6%(§2)で、第 1 報の L1(2 関数 24、64 関数に Chrome の率で 42、node の率で 83 core-ms/s = 需要の 2.4%/4.2%/8.2%)の幅と一致する。
 - mt3 の実 bundle(production 形)は **この node harness では動かない**(production の glue は `Module.FS` を出さず、harness の `FS.mkdirTree` が TypeError)。そのため mt3 の 27,570 件そのものの node 速度は測れず、**同等の注入(私の 6,291 件)で代用**した。mt3 の実 bundle は f_b34aca0 の TurboFan 機械語が私の注入と同サイズ(§5.4 の第 1 報、661,604 B)なので、node の速さも近いはずだが**測っていない**。
 - first idle / compile 時間: mt3 の実 bundle で Liftoff の機械語は plain / ヒントで同一(104,585 関数、330,597,136 B)、f_b34aca0 の TurboFan 時間は 706/834/749 ms(plain)対 432/852/869 ms(ヒント)で揺れの内、作業メモリ +2.6%(第 1 報)。
@@ -310,12 +310,12 @@ E11 の試験用ビルド(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abe
 
 ### 12.3 (program) の中身の手掛かり(node の `--prof`、実測。L7 の分解の第一歩)
 
-E11 の試験用 wasm(plain)を同じ G3 スクリプトで node の `--prof`(tick 23,609)で走らせ、`--prof-process` で見た(`logs/` には置いていない。再現: `NODE_FLAGS="--prof --logfile=… --no-logfile-per-isolate" a17-g3-run.sh ref tb-plain NAME`)。**非 JS の tick は 8.5%**(node の cpuprofile の (program) は同じ run で 5.9% = Chrome の E11 の 6.4% に近く、node は Chrome の (program) の代用になる)。内訳: **node 本体 5.7%(1,357 tick。node は stripped で C++ の名前が引けず、呼び元は 1% 未満に散る = V8 の runtime / builtin が wasm のあちこちから薄く呼ばれている)、libc 2.7%(640 tick。呼び元は C 部の関数〔`wasm-function[100563]`・`[100682]` ほか〕= memcpy / memset 系)、GC 0.1%、C++ 0.5%**。= **(program) は特定の 1 つの原因でなく、V8 の runtime 呼び(5.7%)と libc の memcpy/memset(2.7%)の薄い集まり**。JSPI の thread 切り替え・`call_indirect` の型検査の stub は node 本体の中に入るが、名前が引けないので分けられない。**L7 の見込み(13〜56 core-ms/s)は、この散り方では『1 つの修正で取る』形にならない**ので、中央を 29 → 15 に下げた(§5 に反映済み)。分けるには symbol 付きの node/Chrome(`--enable-native-code-symbols` 相当)か `perf` が要る。
+E11 のテスト用 wasm(plain)を同じ G3 スクリプトで node の `--prof`(tick 23,609)で走らせ、`--prof-process` で見た(`logs/` には置いていない。再現: `NODE_FLAGS="--prof --logfile=… --no-logfile-per-isolate" a17-g3-run.sh ref tb-plain NAME`)。**非 JS の tick は 8.5%**(node の cpuprofile の (program) は同じ run で 5.9% = Chrome の E11 の 6.4% に近く、node は Chrome の (program) の代用になる)。内訳: **node 本体 5.7%(1,357 tick。node は stripped で C++ の名前が引けず、呼び元は 1% 未満に散る = V8 の runtime / builtin が wasm のあちこちから薄く呼ばれている)、libc 2.7%(640 tick。呼び元は C 部の関数〔`wasm-function[100563]`・`[100682]` ほか〕= memcpy / memset 系)、GC 0.1%、C++ 0.5%**。= **(program) は特定の 1 つの原因でなく、V8 の runtime 呼び(5.7%)と libc の memcpy/memset(2.7%)の薄い集まり**。JSPI の thread 切り替え・`call_indirect` の型検査の stub は node 本体の中に入るが、名前が引けないので分けられない。**L7 の見込み(13〜56 core-ms/s)は、この散り方では『1 つの修正で取る』形にならない**ので、中央を 29 → 15 に下げた(§5 に反映済み)。分けるには symbol 付きの node/Chrome(`--enable-native-code-symbols` 相当)か `perf` が要る。
 
 
 ## PM の判断と取り込み(2026-11-06 15:30、docs のみ。製品の差分なし)
 
-取り込み: alpha1(alpha17)の 0296(第 1 報〜最終〔15:07〕)の文書・表・道具を `docs/investigations/alpha17/0296/` に置いた(node の cpuprofile.gz 4 本を含む `logs/` は入れない。原本は `lift/out-git/alpha17-results/0296/logs/`)。入力は opt1 の Chrome 156 の E11/E10 の cpuprofile(読み取り専用の再集計)と、E11 の試験用 wasm の node 実行(G3 の模擬入力)で、alpha1 自身は Chrome も実 x86 も走らせていない。**依頼者の機械は 0 件**。
+取り込み: alpha1(alpha17)の 0296(第 1 報〜最終〔15:07〕)の文書・表・道具を `docs/investigations/alpha17/0296/` に置いた(node の cpuprofile.gz 4 本を含む `logs/` は入れない。原本は `lift/out-git/alpha17-results/0296/logs/`)。入力は opt1 の Chrome 156 の E11/E10 の cpuprofile(読み取り専用の再集計)と、E11 のテスト用 wasm の node 実行(G3 の模擬入力)で、alpha1 自身は Chrome も実 x86 も走らせていない。**依頼者の機械は 0 件**。
 
 判断:
 1. **作業の目標**: P2/P3 の両立は「仮想 s/実 s ≥ 0.9 かつ書き込み率 ≥ 0.95」(この機械の値)で置く。

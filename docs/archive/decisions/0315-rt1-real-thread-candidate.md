@@ -19,8 +19,8 @@
 | S0 の 3 | `0312-s0-fix17-fruity-diagnostic.diff`(足場の診断ログを除く) | 0312/impl | clean | clean | — |
 | S0 の 4 | `0305-d3-remove-instrumentation.diff`(D3a: 計測の旗を除く) | 0305/impl | clean | clean | — |
 | S1 | `0312-s1-stage-c.diff`: 音声リング・wr・rdHi を wasm の共有メモリへ(`fle_tp_*` を C に) | 0312/impl | clean | clean | **B1 `fl-engine-ci-8301687b`**: 5 分再生 PCM の零 3 区間・790 フレーム(0.036%、協調 0.038%)、distinct 0.978〜1.000、12288 の割合 0〜2%、CPU/Unlock 最大 66/74 ms、UI Worker 平均 0.583、2 Worker 最大 1.34 コア(gpu1、0311・performance-targets 4e)。T: File 28.0 対 協調 18.1、Esc 13.5 対 4.8 ms |
-| S3a | `0312e-s3a-host-cpus-env-kept.diff`: GetSystemInfo/GLPI/affinity が host の `hardwareConcurrency`(1〜32)を返す、Worker 数 `clamp(n−1, 2, 8)`、`FLE_WORKERS`/`FLE_PROCESSORS` は残す | 0312/impl | clean | clean(stack の後) | **B2 `fl-engine-ci-8b2eb5d7`**(wasm 142,986,341 B): ビルド・native・node 試験だけ。**ブラウザでの実行 0 件。env なし = n 16・N 8 は一度も走っていない構成** |
-| S3b | `0312e-s3b-env-removed.diff`(env を除く最終形) | 0312/impl | S3a の後 | 未試験 | 測定の後 |
+| S3a | `0312e-s3a-host-cpus-env-kept.diff`: GetSystemInfo/GLPI/affinity が host の `hardwareConcurrency`(1〜32)を返す、Worker 数 `clamp(n−1, 2, 8)`、`FLE_WORKERS`/`FLE_PROCESSORS` は残す | 0312/impl | clean | clean(stack の後) | **B2 `fl-engine-ci-8b2eb5d7`**(wasm 142,986,341 B): ビルド・native・node テストだけ。**ブラウザでの実行 0 件。env なし = n 16・N 8 は一度も走っていない構成** |
+| S3b | `0312e-s3b-env-removed.diff`(env を除く最終形) | 0312/impl | S3a の後 | 未テスト | 測定の後 |
 | S4 | 旗の除去・協調 scheduler と `rt_mode` の分岐の整理 | **未作成** | — | — | T の関門の後(決定 0312) |
 | E14 | P(present を別 Worker): `0311-present-worker-{src,test}.diff` + `0311-tsconfig.diff` + V7 | gpu8-results/diffs | (page のみ。HEAD の app/ に clean〔offset 2〕) | clean(offset 2) | 協調ページ上: P(修正後)= 純再生 21→34/s、File T 17.8→18.4、Esc 4.2→6.0 ms。P+V7 = File +1.7、Esc +1.0 ms、Esc の late 8/147 対 基準 1/110(基準の『同数』は未達)。E14 の最終の組 = P+V7(V4 は不採用、決定 0311)。**B1+P(V7 なし): B 1.2→0.4 ms、present 21→50/s、File T 10.0 ms(協調 17.6)、Esc 23.7 ms(協調 4.4)、Esc の応答 67/70**。**B1 + P + V7 は未測定** |
 

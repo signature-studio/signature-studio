@@ -214,7 +214,7 @@ node で `tools/g3-bundle.sh`(`cmp-short.g3` の 16 スナップ)。旧形式(gl
 
 ### 6.8 最新の HEAD に差分を当てたページ(`dry/` 相当の木)の smoke(実エンジン・Chrome 156・1 回)
 
-HEAD 29b0b4b の `git archive` に `memfs1.diff` を当て、`vite build` したページ(`logs/vite-build-final.txt`)を `vite preview` で出し、新形式のバンドル(`fl-memfs1-new`)を `tools/measure-start.mjs` で 1 回起動した(`tables/smoke-final-head-new.jsonl`、`logs/smoke-final-head-new.txt`)。結果: first idle に到達(state `running`)、`files_ready` は `how: packs-v1`(DLL 6 ファイル 70,572,928 B、seed 222 ファイル 5,691,421 B)、first idle の `hostFiles` は open 229、stat 218、read 554、98,483,356 B、`failedOpens` 0(他の木と同じ値)、`host_files_released` が出た、Worker の JS は GC 後 19.1 MB、console に error/warn 無し。**これは 1 回の smoke であって性能の測定ではない**(load 48 の下で first idle まで 12.1 s)。AB 測定・e2e・OPFS の試験は 050fa43 の木(§6.4〜6.6)で行い、最新の HEAD の木では繰り返していない。
+HEAD 29b0b4b の `git archive` に `memfs1.diff` を当て、`vite build` したページ(`logs/vite-build-final.txt`)を `vite preview` で出し、新形式のバンドル(`fl-memfs1-new`)を `tools/measure-start.mjs` で 1 回起動した(`tables/smoke-final-head-new.jsonl`、`logs/smoke-final-head-new.txt`)。結果: first idle に到達(state `running`)、`files_ready` は `how: packs-v1`(DLL 6 ファイル 70,572,928 B、seed 222 ファイル 5,691,421 B)、first idle の `hostFiles` は open 229、stat 218、read 554、98,483,356 B、`failedOpens` 0(他の木と同じ値)、`host_files_released` が出た、Worker の JS は GC 後 19.1 MB、console に error/warn 無し。**これは 1 回の smoke であって性能の測定ではない**(load 48 の下で first idle まで 12.1 s)。AB 測定・e2e・OPFS のテストは 050fa43 の木(§6.4〜6.6)で行い、最新の HEAD の木では繰り返していない。
 
 ## 7. 互換と移行
 

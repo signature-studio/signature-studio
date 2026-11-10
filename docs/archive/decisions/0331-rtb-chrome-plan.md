@@ -1,18 +1,18 @@
 # 0331 RT-B の bundle を実 Chrome で回す計画(scenario・読み方・assets の script)— 乾燥の確認まで(gpu1/gpu8、2026-11-07 11:xx JST)
 
-**実際に実行した物**: **Chrome は起動していない**。実 RT-B bundle も無い(mt3 の冷間 build は 11:18:42 に始まり、完了見込み 12:25)。実行したのは(1)`tools/mk-rtb-scenarios.py` で 5 本の scenario を既存の scenario(0313 の g9a、0319 の c1-balance・c1-scroll・c1-o1・c1-o1b)から生成、(2)新しい `tools/scn-lint.py`(静的検査。driver の `sdriveg2.mjs` が実装する op と、各 op が読む field を driver の source から読み出して照合し、`evalPage` の JavaScript は node で構文検査)を 5 本に実行 = **error 0・warning 0**、壊した scenario に実行して 8 errors を検出(負の対照)、(3)`tools/rtb-read.py`(読み取りの script)を **cand1 の実 run のログ**(`0319/logs/cand1-{v3,balance,scroll,drawer5a2,o1}`)に実行して、表が出ることと値が既知の事実に合うことを確認(v3: Balance・Filter PASS、Delay 2 absent、Problems 6。scroll: sha が cand1 と同一、ScrollWindowEx 66 回、scrolled hwnd 0x7f990058 = lid 22 = `TMIDIForm`、CLIPCHILDREN YES。drawer: STOPPED を検出。o1: ULW 0、layered 1)、(4)`tools/mk-assets-rtb.sh` を cand1 の bundle で試して(manifest の複写に env が入り、bundle の manifest は無変更)消した、(5)`tools/serve-rtpage.sh`(vite preview の page-rt1)を実際に起動して manifest を取得できることを確認して止めた、(6)`tools/run-rtb.sh` を `DRY=1` で 5 種とも回した(lint・server の応答・メモリの検査を通り、**Chrome は起動しない**)。RT-B の実 bundle での実測は 0。
+**実際に実行した物**: **Chrome は起動していない**。実 RT-B bundle も無い(mt3 の冷間 build は 11:18:42 に始まり、完了見込み 12:25)。実行したのは(1)`tools/mk-rtb-scenarios.py` で 5 本の scenario を既存の scenario(0313 の g9a、0319 の c1-balance・c1-scroll・c1-o1・c1-o1b)から生成、(2)新しい `tools/scn-lint.py`(静的検査。driver の `sdriveg2.mjs` が実装する op と、各 op が読む field を driver の source から読み出して照合し、`evalPage` の JavaScript は node で構文検査)を 5 本に実行 = **error 0・warning 0**、壊した scenario に実行して 8 errors を検出(負の対照)、(3)`tools/rtb-read.py`(読み取りの script)を **cand1 の実 run のログ**(`0319/logs/cand1-{v3,balance,scroll,drawer5a2,o1}`)に実行して、表が出ることと値が既知の事実に合うことを確認(v3: Balance・Filter PASS、Delay 2 absent、Problems 6。scroll: sha が cand1 と同一、ScrollWindowEx 66 回、scrolled hwnd 0x7f990058 = lid 22 = `TMIDIForm`、CLIPCHILDREN YES。drawer: STOPPED を検出。o1: ULW 0、layered 1)、(4)`tools/mk-assets-rtb.sh` を cand1 の bundle で試して(manifest のコピーに env が入り、bundle の manifest は無変更)消した、(5)`tools/serve-rtpage.sh`(vite preview の page-rt1)を実際に起動して manifest を取得できることを確認して止めた、(6)`tools/run-rtb.sh` を `DRY=1` で 5 種とも回した(lint・server の応答・メモリの検査を通り、**Chrome は起動しない**)。RT-B の実 bundle での実測は 0。
 
 ## 0. bundle ができたら(1 コマンド × 3)
 ```
 cd ~/work/signature-studio-develop/lift/out-gpu2
-bash tools/mk-assets-rtb.sh <RT-B の bundle の dir> rtb          # assets-rtb を作る(bundle の link + manifest の複写に診断の env + proj)
+bash tools/mk-assets-rtb.sh <RT-B の bundle の dir> rtb          # assets-rtb を作る(bundle の link + manifest のコピーに診断の env + proj)
 bash tools/serve-rtpage.sh rtb 4995                             # background:true(page-rt1、COOP/COEP 付き)
 bash tools/run-rtb.sh v3 4995                                   # 続けて balance、scroll、drawer、o1(PM の順。Chrome は 1 つずつ、PM の合図の後)
 ```
-- `mk-assets-rtb.sh` は bundle を書き換えない。manifest の複写の `engine.env` に `FLE_DIAG_WIN=1`(窓の create/destroy・vis・show・paint-msg・BeginPaint/EndPaint・draw-discard・DefWindowProc・ULW)、`FLE_DIAG_SCROLL=1`、`FLE_DIAG_VFS_MISS=1`、`FLE_DIAG_CB=1` を足す(alpha1 の診断は `FLE_DIAG_WIN` に paint と ULW が乗る。PM の言う PAINT/ULW は別の env ではない)。追加は `EXTRA_ENV="K=V,K=V"`。manifest の URL が bundle の directory 名で始まることも検査する。SHA256SUMS に合わない file は警告(試験版の manifest は env を足すので manifest.json だけ違う想定)。日本語名の FLP が要る時は `JA=1`。
-- `run-rtb.sh KIND PORT [TAG]`: lint → server の応答 → **MemAvailable ≥ 8 GB かつ swap の入出力が 0**(満たさなければ起動しない。`FORCE=1` で上書き、その時は報告に書く。この機械では他の担当の負荷で 4〜16 KB/s の標本が出ることがあり、DRY で 5 種中 3 種が『swap 0 でない』で止まった)→ `pre-run-note.sh` → `run-rt.sh` → `rtb-read.py` → 小さい結果を `gpu8-results/0331/logs/<TAG>/` に複写。`DRY=1` なら検査だけ。
+- `mk-assets-rtb.sh` は bundle を書き換えない。manifest のコピーの `engine.env` に `FLE_DIAG_WIN=1`(窓の create/destroy・vis・show・paint-msg・BeginPaint/EndPaint・draw-discard・DefWindowProc・ULW)、`FLE_DIAG_SCROLL=1`、`FLE_DIAG_VFS_MISS=1`、`FLE_DIAG_CB=1` を足す(alpha1 の診断は `FLE_DIAG_WIN` に paint と ULW が乗る。PM の言う PAINT/ULW は別の env ではない)。追加は `EXTRA_ENV="K=V,K=V"`。manifest の URL が bundle の directory 名で始まることも検査する。SHA256SUMS に合わない file は警告(テスト版の manifest は env を足すので manifest.json だけ違う想定)。日本語名の FLP が要る時は `JA=1`。
+- `run-rtb.sh KIND PORT [TAG]`: lint → server の応答 → **MemAvailable ≥ 8 GB かつ swap の入出力が 0**(満たさなければ起動しない。`FORCE=1` で上書き、その時は報告に書く。この機械では他の担当の負荷で 4〜16 KB/s の標本が出ることがあり、DRY で 5 種中 3 種が『swap 0 でない』で止まった)→ `pre-run-note.sh` → `run-rt.sh` → `rtb-read.py` → 小さい結果を `gpu8-results/0331/logs/<TAG>/` にコピー。`DRY=1` なら検査だけ。
 - 所要の目安(cand1 の run から): v3 約 3.5 分、balance 約 4 分、scroll 約 40 秒、drawer 約 1.5 分、o1 約 6 分。合計 約 16 分。
-- 前提: 試験版の bundle(診断の env を読むのは試験版だけ。本番形は無視する)。page は **page-rt1**(RT 用。p0 の page では pthread の worker が作れず『Tried to spawn a new thread … Invalid URL』で落ちる = seed2b で実測)。
+- 前提: テスト版の bundle(診断の env を読むのはテスト版だけ。本番形は無視する)。page は **page-rt1**(RT 用。p0 の page では pthread の worker が作れず『Tried to spawn a new thread … Invalid URL』で落ちる = seed2b で実測)。
 
 ## 1. scenario と読み方
 | # | scenario(`tools/`) | 何をする | 読み(`rtb-read.py KIND RUNDIR`) | 合格の見方 |
@@ -33,8 +33,8 @@ bash tools/run-rtb.sh v3 4995                                   # 続けて bala
 
 ## 3. 規則の確認
 - Chrome は 1 つずつ、私のものだけ。開始は PM の合図の後(ci1 の計時の窓と重ねない)。`pre-run-note.sh` で free / vmstat を記録、swap の入出力 ≠ 0 か MemAvailable < 8 GB なら始めない(`run-rtb.sh` が止める)。
-- 試験版の bundle は本番でも push でもなく、計時に使わない(first idle は診断入りで参考値)。
-- 診断の env を足すのは manifest の**複写**だけ(`mk-assets-rtb.sh`)。bundle 自体は書き換えない。
+- テスト版の bundle は本番でも push でもなく、計時に使わない(first idle は診断入りで参考値)。
+- 診断の env を足すのは manifest の**コピー**だけ(`mk-assets-rtb.sh`)。bundle 自体は書き換えない。
 - scenario の Problems 窓の Ok は『窓の下端から 28 px』(`clickIn.dyFromBottom`)で押す。plugin の数(8/7/6/5)や sample の欠けで窓の高さが変わっても当たる(cand1 の run では 6 plugins の高さ 311 px で Ok は dy 283、ja FLP の 6 + sample 4 の 423 px では dy 395 = どちらも高さ − 28)。`sdriveg2.mjs` に追加した 1 field(driver の他の動作は無変更)。
 
 ## 4. 作った物の一覧(`lift/out-git/gpu8-results/tools/` と `lift/out-gpu2/tools/` の両方)

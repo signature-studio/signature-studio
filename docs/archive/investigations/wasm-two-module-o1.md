@@ -10,7 +10,7 @@
 
 ## 1. 対象と環境
 
-- 作業の基準: ブランチ main、HEAD `c1eefb5b63ec687a7fb607c44a2b03444b07ed88`（`git rev-parse HEAD`。実測）。`git archive HEAD` を `lift/out-wasm2/src/` に展開し、そこからだけビルドした。作業ツリーの `lift/runtime`、`lift/crates` は読んでいない（並行の 0088 の作業は含まない）。
+- 作業の基準: ブランチ main、HEAD `c1eefb5b63ec687a7fb607c44a2b03444b07ed88`（`git rev-parse HEAD`。実測）。`git archive HEAD` を `lift/out-wasm2/src/` に展開し、そこからだけビルドした。ワークツリーの `lift/runtime`、`lift/crates` は読んでいない（並行の 0088 の作業は含まない）。
 - 環境: emcc 6.0.12（`/opt/emsdk`）、node v24.19.0、`wasm-objdump`/`wasm-validate`（wabt）。16 コア、RAM 約 15 GB（`free -m` で total 15,047 MB）、swap 4 GB。
 - 作業物: `lift/out-wasm2/o1two/`（gitignore 対象 `lift/out*/`）。
 

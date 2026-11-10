@@ -86,7 +86,7 @@ PM の「最大 30 壁」は数え方が書かれていない。**この作業�
 
 ## 窓管理モデルの属性（R1〜R10）
 
-| R | 属性 | 実装 | 試験 |
+| R | 属性 | 実装 | テスト |
 |---|---|---|---|
 | R1 | `parent` と `owner` を別の欄で持つ | `win.parent`（`WS_CHILD` の親）、`win.owner_win`（オーナー）。`GetParent` は子なら親、`WS_POPUP` の top-level ならオーナー（オーナーが `WS_POPUP` でないとき。S-getparent）。`GetAncestor(GA_PARENT)` はオーナーを含まない。`GWLP_HWNDPARENT` はオーナーを替える | `r1_…` |
 | R2 | 矩形は親相対、画面座標は親の鎖から計算 | `px/py/pcx/pcy`。`GetWindowRect` は画面座標、`GetClientRect` は (0,0,w,h)。非クライアントは 0（S-nc） | `r2_…`（2 件） |
@@ -203,7 +203,7 @@ PM の「最大 30 壁」は数え方が書かれていない。**この作業�
 - **基準との差（123 → 125 result、1,761 → 1,799 passed）**: **測れたのは次の点だけ**。HEAD 8c8131b の木の `crates/*/tests/*.rs` は 115 ファイル、この作業の木は 116 ファイル（差は新規の `wall_fr9.rs` の 1 つ。29 件）。今回の 125 result の内訳は、テストファイル 116、unittests 6、Doc-tests 3 のうち実行されたもの（行数 125。ファイル数の差と合わない分は、1 ファイルが複数の result 行を作らないことと、`Doc-tests` の行による）。**決定 0122 の基準 123・1,761 は、私が基準の木（8c8131b）で全体を走らせた値ではない**（決定 0122 の作業者の報告値）。したがって「+2 バイナリ・+38 件」のうち、`wall_fr9` の 1 バイナリ・29 件以外の +1 バイナリ・+9 件の原因は**未確認**（決定 0122 の後に HEAD へ入った diag1 の `diag`・`a4_report`・`census` などが基準の木に入っていたかどうかを私は確かめていない）。全体の増減は、既存テストの置換・追加・削除（`window.rs` など）でも動く。この差を説明するには、8c8131b の clean な木で全体を 1 回走らせる必要があるが、この作業では行っていない（約 45 分）。
 - **FRUITY 無効の a4**（`logs/a4/FOFF1`、`FOFF2`。別の OUT、別の `CARGO_TARGET_DIR`、`fe-lift` の SHA-256 は同一 `36c06573…`）: 上の表。2 回とも同一の数字・同一の native SHA。native が基準（`09528ebc…`）から変わった理由は、生成 C の import thunk の本体が `fle_unsupported` から `fle_imp_*` になり（145 本）、応答表と宣言が 73 行ずつ増えたため。functions と entries は動かない。
 - **FRUITY 有効の最終構成**（`logs/a4/FON1`、`FON2`）: 上の表。2 回とも同一の native SHA と同一の停止。1 回の所要は約 1 分 3 秒、最大 RSS 約 2.7 GB。
-- **生成 C の比較**（`logs/gencmp-modules.txt`）: 旧 `fe-lift` f7c33229…（HEAD 8c8131b の木）と新 `36c06573…`（作業木）で、同じ入力と同じ引数（FRUITY 無効の基準の種）から FLEngine と m1〜m5 を生成し、`void f_XXXX(void)` の本体ごとに SHA-256 を比べた。変わった本体は 145、すべて import thunk。
+- **生成 C の比較**（`logs/gencmp-modules.txt`）: 旧 `fe-lift` f7c33229…（HEAD 8c8131b の木）と新 `36c06573…`（ワークツリー）で、同じ入力と同じ引数（FRUITY 無効の基準の種）から FLEngine と m1〜m5 を生成し、`void f_XXXX(void)` の本体ごとに SHA-256 を比べた。変わった本体は 145、すべて import thunk。
 - **変異検査**（`logs/mutations.txt`、`tools/mutate.py`。木のコピー `mut/` で 1 件ずつ変更 → テストを実行 → `src/` から戻す。最後に `diff -rq` が空）: **15 件とも検出**（M1〜M12 は全体テストの 1 回目の前、M13・M13b・M14 は後）。M13（追跡しないアドレスで停止させる）は、最初「`-Werror` でビルドが落ちたので数えない」と書いたが確かめていない推測で、確かめるとビルドは通り挙動で落ちていたため数える（自己申告。`logs/mutations.txt`）。M1 TOPMOST を落とす時に外さない、M2 遅れたタイマーが追いつく、M3 親の `WM_DESTROY` を子の後に、M4 `GetParent` が常にオーナーを返す、M5 フォーカスを大域に、M6 スクロールの nPos 上限から nPage を引かない、M7 領域の右端を含める、M8 実行可能・読み取り可のセクションを PAGE_READONLY にする、M9 `COLOR_HIGHLIGHT` の値、M10 `WM_WINDOWPOSCHANGING` を送らない、M11 空名のエラーを 2 に、M12 `fle_dispatch_miss` のスロットのフックを外す、M13 追跡しないアドレスで停止する、M13b 追跡しないアドレスの State を MEM_COMMIT にする、M14 応答表の最後の行の名前を変える。
 - **diff の dry-run**（`logs/patch-dry-run-at8c8131b.txt`、`logs/patch-dry-run-atHEAD.txt`（HEAD = f1aa1dd））: 8c8131b の clean な写しで終了 0、f1aa1dd の clean な写しでも終了 0。f1aa1dd では `fle_thread.c` の 3 ハンクがオフセット 8・8・15 行で当たる（拒否ハンクなし）。
 

@@ -4,7 +4,7 @@
 
 - **既存の trace の解析のみ。Chrome は起動していない**(08:18 時点で Chrome 0、Firefox 0。計測は PM の指示で止めている)。
 - 入力: `lift/out-ci1/kit/out/tp-5-rth/tp.trace.json`(RT-H、0345 の診断 run、07:54:24–07:56:08)と、0343 の E13 の 2 本 `out/tp-1-e13/`(05:48:09–05:49:42)・`out/tp-2-e13/`(06:06:17–06:07:53)。どれも `run-tp.sh` が採った CDP Tracing(toplevel + devtools.timeline + v8 cpu_profiler)で、同じ手順・同じシナリオ(再生 → 10 s 後に trace 開始 → File メニュー開閉 12 回)。
-- スクリプト: `tools/tp-windows.py`(このディレクトリに複写。原本 `lift/out-ci1/kit/tools/tp-windows.py`)。呼び出し: `python3 tools/tp-windows.py out/tp-5-rth RT-H > out/tpw-rth.md`、`python3 tools/tp-windows.py out/tp-1-e13 E13-run1`、`... out/tp-2-e13 E13-run2`。
+- スクリプト: `tools/tp-windows.py`(このディレクトリにコピー。原本 `lift/out-ci1/kit/tools/tp-windows.py`)。呼び出し: `python3 tools/tp-windows.py out/tp-5-rth RT-H > out/tpw-rth.md`、`python3 tools/tp-windows.py out/tp-1-e13 E13-run1`、`... out/tp-2-e13 E13-run2`。
 - 出力: `tpw-rth.md`、`tpw-e13-run1.md`、`tpw-e13-run2.md`(各 12 入力の行 + 12 入力の合計行)、`spread.md`(各列の最小・中央・最大)。
 
 ## 表の作り方
@@ -85,4 +85,4 @@ E13 run2 の同じ表は `tpw-e13-run2.md`(合計行は上のとおり)。
 
 ## ファイル
 
-`README.md`(この文書)、`tp-windows.py`、`tpw-rth.md`、`tpw-e13-run1.md`、`tpw-e13-run2.md`、`spread.md`。生 trace は複写していない(`lift/out-ci1/kit/out/` 配下)。
+`README.md`(この文書)、`tp-windows.py`、`tpw-rth.md`、`tpw-e13-run1.md`、`tpw-e13-run2.md`、`spread.md`。生 trace はコピーしていない(`lift/out-ci1/kit/out/` 配下)。

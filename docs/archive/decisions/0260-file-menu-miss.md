@@ -10,7 +10,7 @@
 
 ## PM の判断と取り込み(2026-11-06 00:30)
 
-取り込み: ci1 の報告 1・2・3・3b、差分、C 試験の出力、記録器の行、道具を `docs/investigations/ci1/0260/` に置いた。`ci1-recorder-NOT-FOR-PRODUCT-*.diff` は試験専用で製品の木に当てない。`ci1-page-focus.diff`(更新版、sha256 先頭 `e000e626e5bff67b`、2 ファイル: `app/src/input/pointer.ts`、`app/test/unit/pointer-dom.test.ts`)を HEAD 91cbd9b0 の `git archive` に `patch --batch -p1 --dry-run`(offset・fuzz なし)で確かめて PM の木に当てた。`-` 行は 1 本(`pointer.ts` の先頭コメントの 1 行を、続きの項目つきに書き換える)を読んだ。FL のクラス名・窓名・アドレスの分岐は無く、新しいオプションも無い。
+取り込み: ci1 の報告 1・2・3・3b、差分、C テストの出力、記録器の行、道具を `docs/investigations/ci1/0260/` に置いた。`ci1-recorder-NOT-FOR-PRODUCT-*.diff` はテスト専用で製品の木に当てない。`ci1-page-focus.diff`(更新版、sha256 先頭 `e000e626e5bff67b`、2 ファイル: `app/src/input/pointer.ts`、`app/test/unit/pointer-dom.test.ts`)を HEAD 91cbd9b0 の `git archive` に `patch --batch -p1 --dry-run`(offset・fuzz なし)で確かめて PM の木に当てた。`-` 行は 1 本(`pointer.ts` の先頭コメントの 1 行を、続きの項目つきに書き換える)を読んだ。FL のクラス名・窓名・アドレスの分岐は無く、新しいオプションも無い。
 
 PM が測った値(この機械、`app/`、`lift/out-pmchk-pf/`): `npm run typecheck` rc=0; `npx vitest run` rc=0 — **66 files passed + 1 skipped、1,291 passed + 7 skipped**(変更前 1,290); `npm run test:worker` rc=0 — 49 passed; `npm run test:e2e` rc=0 — **190/190 checks passed**。
 
@@ -18,7 +18,7 @@ PM が測った値(この機械、`app/`、`lift/out-pmchk-pf/`): `npm run typec
 1. **採る(ページ側の修正)。** 修正した腕の 0/1,440 と無修正の 19/2,760 の差は偶然では説明できない(P≈0.005%)。「ユーザーの操作が無いのにフォーカスが別のコントロールへ移ったら戻す」はページの入力の契約として自然で、`#desktop` のキー入力が失われる欠陥を直す。依頼者の機械でも、ブラウザが同じようにフォーカスを移せば同じ欠陥が起きうる(未確認)ので、実害を直す変更。app だけの変更で、engine の bundle は変わらない。
 2. **ランタイムの再入ガード(`ci1-input*.diff`)は入れない。** 実エンジンで観測された不具合を直さない(`NESTED-synth` 0 件)変更は足さない。v1 は `translating` が非局所脱出で戻らない欠陥があり、v2(スレッドごとの印と深さ)は保管する。取り込むなら Windows の入力順序の正しさの改善として別の決定にし、`translate_one` からの全ての脱出経路で減算されることの表を付ける。
 3. **副作用の点検**(遅れて開くダイアログが script でボタンへフォーカスを移す形が、1 s の免責の外で奪い返されないか)は ci1 に依頼した。結果は ci1 の最終に入れる。
-4. 試験ツールの欠陥(`waitWindow` の戻り値を無視して Escape が効かなくても次の周期へ進む)は、ci1 が次版で直す。
+4. テストツールの欠陥(`waitWindow` の戻り値を無視して Escape が効かなくても次の周期へ進む)は、ci1 が次版で直す。
 
 ## 副作用の点検(ci1 の報告 4、2026-11-06 00:55)
 

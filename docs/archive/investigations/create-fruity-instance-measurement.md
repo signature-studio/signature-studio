@@ -1,6 +1,6 @@
 # CreateFruityInstance ハーネス 第 2 段階（ビルド、自己テスト、基準の再現、実測）
 
-作業日: 2026-10-28。基準: HEAD **0020f8e** の `git archive`（`/tmp/opencode/fr2/src/`、RAM 上）。作業中に別の作業者のコミット 5345e61 / 4103a6c / 5e8b588 で HEAD が進んだ（`git diff --stat 0020f8e HEAD -- lift ':!lift/harness/web'` は空。docs と `lift/harness/web/` の新規だけで、ビルドに入るファイルは無変更。実測）が、測定は 0020f8e の木のまま行った。作業ツリーと git は読み取りだけ（commit なし）。
+作業日: 2026-10-28。基準: HEAD **0020f8e** の `git archive`（`/tmp/opencode/fr2/src/`、RAM 上）。作業中に別の作業者のコミット 5345e61 / 4103a6c / 5e8b588 で HEAD が進んだ（`git diff --stat 0020f8e HEAD -- lift ':!lift/harness/web'` は空。docs と `lift/harness/web/` の新規だけで、ビルドに入るファイルは無変更。実測）が、測定は 0020f8e の木のまま行った。ワークツリーと git は読み取りだけ（commit なし）。
 
 凡例: **実測** = 今回のコマンドの出力を見た事実／**読み** = コードや逆アセンブルを読んだ上での解釈（その点は実行で確かめていない）／**未確認**。ログは `logs/`、道具は `tools/`、差分は `fruity2.diff`。
 
@@ -18,7 +18,7 @@
 
 ## 1. 手順と環境
 
-- `git archive 0020f8e lift docs` を `/tmp/opencode/fr2/src/` に展開。`fe-lift`／`fe-pe` を `CARGO_TARGET_DIR=/tmp/opencode/fr2/target CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 cargo build --release --offline -p fe-lift -p fe-pe` で作った（4 秒）。SHA-256 は V1 の検証で使われたもの（`/tmp/opencode/v1/target-rel/release`）と**同一**（`fe-lift` `3a6ff3c8…467f6`、`fe-pe` `743e2faf…b570b0`。実測）。V1 の分は消す前に `fr2/febin/` へ複写した。
+- `git archive 0020f8e lift docs` を `/tmp/opencode/fr2/src/` に展開。`fe-lift`／`fe-pe` を `CARGO_TARGET_DIR=/tmp/opencode/fr2/target CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 cargo build --release --offline -p fe-lift -p fe-pe` で作った（4 秒）。SHA-256 は V1 の検証で使われたもの（`/tmp/opencode/v1/target-rel/release`）と**同一**（`fe-lift` `3a6ff3c8…467f6`、`fe-pe` `743e2faf…b570b0`。実測）。V1 の分は消す前に `fr2/febin/` へコピーした。
 - 許可された削除: `/tmp/opencode/{a5f,c1,wasmv,wasm6,m2inv,a4fix,v1}/` の下（合計約 690 MB）を、パスを確認してから `find <dir> -mindepth 1 -maxdepth 1 -exec rm -rf` で消した。他のディレクトリ（`web`、`fruity`、`audit-*` など）は触っていない。
 - 測定の道具: `tools/run6-fruity.sh`（コミット済みのものを**無変更**で使用。`FRUITY_W`、`S`、`FEBIN` を環境変数で渡した）と `tools/wrap/`（`clang` はコミット済みのまま。`python3` は `/usr/bin/python3` を V1 と同じ `/home/ubuntu/.local/bin/python3` に変えた 1 行だけの差。`-g` を外し、コンパイル済みの分割ソースを消す）。OUT の名前はすべて `o*`。
 - 使った木は、コミットされた木に**自己テストの 1 行と docs の 1 行だけを足した**もの（`fruity2.diff`）。この 2 ファイルは `a4-multi.sh` の stamp の対象（`harness/*.c`、`harness/*.h` など）に入らない（読み: スクリプトの `stamp()` の `ls` の列挙）ので、ビルドの入力は 0020f8e のコミットと同じ。実測の裏づけ: 自己テストを直した木の FRUITY 無効のビルド（`o1`）と、直していない 228c78a の木のビルドの native が同一（§2）。なお自己テストの修正は `o1` より前、docs の訂正は全ビルドの後に入れた。
@@ -192,7 +192,7 @@ OUT `o2`、`o3`、`o4` の 3 回のビルド（それぞれ新しい OUT。`o4` 
 1. `lift/harness/seeds/fruity_selftest.c`: `+0x34` の「パディングが 0」の検査（誤った期待）を、`+0x30` のポインタが 0x38 で終わること・`+0x34` が上位半分であることの検査に置換。
 2. `docs/investigations/create-fruity-instance-harness.md` §6 の表の `+0x34〜0x37` の行を訂正。
 
-上の 2 つ以外のソースは変えていない（`diff -rq` で 2 ファイルだけ。`crates/`、`runtime/`、`harness/` の C は無変更）。`fruity2.diff` は 0020f8e の `git archive` に `patch -p1` で当たり、当てた木と作業木は `diff -r` で一致する（実測）。
+上の 2 つ以外のソースは変えていない（`diff -rq` で 2 ファイルだけ。`crates/`、`runtime/`、`harness/` の C は無変更）。`fruity2.diff` は 0020f8e の `git archive` に `patch -p1` で当たり、当てた木とワークツリーは `diff -r` で一致する（実測）。
 
 ## 11. `cargo test` への影響（手順 5。全体テストは走らせていない）
 
@@ -218,7 +218,7 @@ OUT `o2`、`o3`、`o4` の 3 回のビルド（それぞれ新しい OUT。`o4` 
 - 削除は、許可された `/tmp/opencode/{a5f,c1,wasmv,wasm6,m2inv,a4fix,v1}/` の中身と、自分の `/tmp/opencode/fr2/` の中の OUT（`o1`〜`o4`、`oc-*`、`ox` は作られていない）、作業用の一時ディレクトリだけ。他の作業者のディレクトリ（`web`、`fruity`、`audit-*` など）は触っていない。`rm` のパスはすべて事前に確認した。
 - gdb を native に付けた。読み取りとブレークポイント、ハードウェア読み取りウォッチポイントだけの測定のほか、**戻りの経路の合成検査**で `return`、レジスタの設定、`instance_slot` のメモリへの書き込み（使い捨てのプロセス内。成果物や状態には影響しない）と、`SIGALRM` の注入をした。いずれも §4.5 に明記した。
 - ホストの実ファイル・レジストリをゲストに見せていない（種付けは `vfs-seed-fonts.tsv` の 2 ファイルだけ）。依頼者の資格情報・ブラウザには触れていない。値の選択（応答の値）は変えていない。WinVerifyTrust には何も答えていない。
-- 成果物のログのうち、`bytes[N]=<hex>` の行（ゲストのメモリの先頭 32 バイトのプレビュー。今回の停止では `rcx` の指すイメージ内のコードのバイト列を含む）は、公開監査の指摘を考えて**コミット用の複写では 16 桁以上の 16 進列を `<hex omitted from the committed copy>` に置き換えた**（原本は RAM 上 `/tmp/opencode/fr2/logs/`）。`phase-apis.tsv` は、エンジンの UI 文字列を含む呼び出しの文字列欄を空にした（API 名と引数は残した）。
+- 成果物のログのうち、`bytes[N]=<hex>` の行（ゲストのメモリの先頭 32 バイトのプレビュー。今回の停止では `rcx` の指すイメージ内のコードのバイト列を含む）は、公開監査の指摘を考えて**コミット用のコピーでは 16 桁以上の 16 進列を `<hex omitted from the committed copy>` に置き換えた**（原本は RAM 上 `/tmp/opencode/fr2/logs/`）。`phase-apis.tsv` は、エンジンの UI 文字列を含む呼び出しの文字列欄を空にした（API 名と引数は残した）。
 - 作業中に HEAD が 5345e61 → 5e8b588 に進んだ（私の操作ではない）。測定は 0020f8e の `git archive` で行った。`lift/out-git/` は `.gitignore`（`lift/out*/`）の対象で、`git status` には出ない。
 
 ## 14. 成果物（`lift/out-git/fruity2-results/`、約 0.9 MB）

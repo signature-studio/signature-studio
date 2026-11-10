@@ -79,7 +79,7 @@
 | **module slot** | `RM_MAX` 8 → 16 以上(`fle_realmod.c`、`fle_loadimage.h` の cursor handle `base + 0x1000 × (index+1) + …` は 1 MiB の領域に収まる。32 個でも 0x20000 台) | 現在の実モジュールは **7 つ**(dsp_ippv2 0x2000000、blend2d 0x4700000、QFC 0x1d00000、freetype 0x4b00000、ILTools 0x6000000、oggio 0xc000000、elastique 0xb000000)で、空きは 1 つ | 基底: 0x400000 の Delphi は別の基底へ再配置が要る。空き 0x6800000〜0xafffff の 64 MB に 8 MB 刻みで 8 個(plugin の image は 3.8〜6.5 MB)。**PM の『実モジュール 5』は私の読みの 7 と食い違う**(`realmod_table_gen.c` の出力の行数を数えた。FLEngine を除く) |
 | **path table** | 行 `{"plugins\\fruity\\effects\\fruity balance\\fruity balance_x64.dll", "fruity balance_x64.dll"}`(`fle_realmod_path_table`)を生成物に足す。**出荷の生成器 `lift/harness/b2d2/gen-direct.sh` は名前→基底の表(`realmod_table_gen.c`)しか出さず、パス表を出していない**(awk に数行足す) | `fle_realmod_find_path`(suffix 一致、決定 0183)。出荷の既存 7 モジュールは**素の名前**(例: `oggio`)で `LoadLibraryW` されるのでパス表が要らなかった。plugin は**フルパス**で呼ばれる(0183 W0) | wrp1 の W0 の機構。`gen-direct.sh` の `specs` に 9 本目の行 `"fruity balance_x64.dll|<PE>|<基底>|--pdata --hook-points <表>"` を足す(既存 7 本と同じ形。`--seeds` は不要) |
 | **volume のファイル** | `C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll` を volume(seed pack の `vfs-seed-idle1.tsv` の行)に置く。`fle_load.c` の `volume_file` は `fle_vfs_peek_file` で**ファイルの存在だけ**を見る(無ければ NULL + 126)。**DLL の image そのものは別に、モジュールとして bundle の `--dll-dir` に入り、基底に載る**(`build-engine-bundle.sh` の `mods="/data/<dll>:…"`)ので、volume のファイルは存在確認用の小さな stub(数 KB)でよい可能性が高い | 出荷の seed pack は 221 ファイル 7.2 MB(DLL は含まず) | **FL が volume のファイルの中身を読むか(署名検査、PE ヘッダー)は未確認** — 読むなら stub でなく実体(+3.7 MB)か、モジュールの image へのリンクが要る。`Plugin.nfo`(24 B)も置く可能性(未確認) |
-| **import の行** | 74 の行なしのうち、plugin を開く経路で実行される物(未確認)。Wrapper の `CreateJobObjectW` 等は Balance に無い | 469 の行あり。74 は FLEngine の import の部分集合 | 最悪 74 行(user32 24・comctl32 22 …)で、既存の 0210 の見積り(12,000〜30,000 行の全体の一部)。実際に踏む数は G9-a の試験で分かる |
+| **import の行** | 74 の行なしのうち、plugin を開く経路で実行される物(未確認)。Wrapper の `CreateJobObjectW` 等は Balance に無い | 469 の行あり。74 は FLEngine の import の部分集合 | 最悪 74 行(user32 24・comctl32 22 …)で、既存の 0210 の見積り(12,000〜30,000 行の全体の一部)。実際に踏む数は G9-a のテストで分かる |
 | **host vtable** | なし(FLEngine のゲストコード) | `TFruityPlugHost`、インスタンス 0x108 B | 読み。plugin → ホストの呼びは vtable 越しのゲスト間 |
 | **フック点** | Balance 用の 3 つの RVA(`--hook-points`)。バイト走査で自動化できる(0183 W1 の手順) | wrapper-hook-points.txt(Wrapper 用) | `VirtualProtect` を実モジュールの image に対して答える機構 `fle_vmap.c` は既に有る(W1 の修正) |
 | **CI の抽出と lift** | `ci/extract-dlls.tsv` に 1 行(インストーラの NSIS の名前、出力先、SHA-256)、`build-engine-bundle.sh` の `EXTRA_MODULES`(NEXTRA)と `hyb_modargs` の case(PE、`--pdata`、seeds なし)、`HYB_MODS`(混成の対象にするなら `hyb-U-<m>.txt`)、モジュール表(基底) | 8 モジュール構成(dsp・b2d・qfc・ft・ilt・oggio・elastique + FLEngine) | seeds: `.pdata` の 11,736 関数を全部根にする(FLEngine・IPP と同じ `--pdata`)。仮想関数(RTTI の vtable)は `.pdata` に入っている |
@@ -106,11 +106,11 @@
 
 ## 4. (4) 『8 種のうち 1 つを鳴らす』検証の段階表と人日(読み)
 
-**見積りの根拠**: (a) wrp1(0183)は Fruity Wrapper を実モジュールにして、W0〜W3 の 4 つの壁で `CreatePlugInstance` が戻るところまで、4 時間の予算の 6 サイクルで進めた(native -O0、plugin は Wrapper で、Balance より複雑)。(b) wasm の経路は CI の冷間 18 分、node の試験ビルドの増分 約 10 分で、1 サイクルが native より重い。(c) 壁ごとの修正は行 1 本〜数十行(0210: 1 行あたり 12,000〜30,000 行の全体の一部)。**確度は低い**(実行していない)。
+**見積りの根拠**: (a) wrp1(0183)は Fruity Wrapper を実モジュールにして、W0〜W3 の 4 つの壁で `CreatePlugInstance` が戻るところまで、4 時間の予算の 6 サイクルで進めた(native -O0、plugin は Wrapper で、Balance より複雑)。(b) wasm の経路は CI の冷間 18 分、node のテストビルドの増分 約 10 分で、1 サイクルが native より重い。(c) 壁ごとの修正は行 1 本〜数十行(0210: 1 行あたり 12,000〜30,000 行の全体の一部)。**確度は低い**(実行していない)。
 
 | 段階 | 合格の判定(測れる形) | 内容 | 人日 |
 |---|---|---|---|
-| **G9-0 準備** | ビルドが通る(Balance を 9 つ目の実モジュールとして lift・link・bundle) | extract 行(SHA-256)、モジュール表・基底・パス表、`RM_MAX` の拡張、`--hook-points` の走査(3 RVA)、volume のファイル、`build-engine-bundle.sh` の対応、node の試験ビルドの手順 | 1 |
+| **G9-0 準備** | ビルドが通る(Balance を 9 つ目の実モジュールとして lift・link・bundle) | extract 行(SHA-256)、モジュール表・基底・パス表、`RM_MAX` の拡張、`--hook-points` の走査(3 RVA)、volume のファイル、`build-engine-bundle.sh` の対応、node のテストビルドの手順 | 1 |
 | **G9-a** | Problems 窓の行が 1 つ減る(『7 plugin(s) could not be opened』、Balance の行が消える)。node の G3 の窓表で確認。`CreatePlugInstance` が戻る | W0 の相当(パス表・volume)、W1(フック点)、行なし 74 のうち踏む物の実装(コメント: 壁が 3〜10 本と置く)、DllMain と `CreatePlugInstance` の完走 | **2〜4** |
 | **G9-b** | 音が出る: Balance 1 つだけの構成で Export した WAV が、Wine で Balance だけを有効にした構成(opt1 の退避フレームワークで再有効化)の WAV と**ほぼ一致**(規格化相関 ≈1、Elastique の残差を除く) | ミキサー thread が plugin の process を呼ぶ経路で踏む壁、パン/ボリュームの結果の検証 | +1〜3 |
 | **G9-c** | GUI が出る: エフェクトスロットをダブルクリックして plugin の窓が出る(画素が native と一致、または Chrome で目視) | VCL の窓の作成・描画・入力。comctl32 の 22 行(ImageList 等)と user32/gdi32/uxtheme の行。plugin 固有の画像(Blend2D・ILSvg) | +2〜5 |
@@ -140,7 +140,7 @@
 
 ## 5. 未確認と、確かめる最も安い測定
 
-1. Balance を開く経路で実行される行なしの import の数(**node で FLEngine に Balance を実モジュールとして足した試験ビルドを 1 本走らせれば分かる**。G9-0 の一部)。
+1. Balance を開く経路で実行される行なしの import の数(**node で FLEngine に Balance を実モジュールとして足したテストビルドを 1 本走らせれば分かる**。G9-0 の一部)。
 2. FL が plugin の DLL ファイルの中身を読むか(署名検査・PE の読み): FLEngine の `WinVerifyTrust` は **1 関数 `f_1375990`(4 箇所、`CryptQueryObject`・`CertFindCertificateInStore` も同じ関数)だけで、直接の呼び元は 0**(仮想メソッド/関数ポインタ経由。バイト走査の実測)。0118 の gdb では FL64.exe と FLEngine の path で呼ばれた。plugin の path で呼ばれるかは未確認。Wine の trace(opt1)か、wasm の trace で `GetFileAttributesW` の後に `CreateFileW` が同じ path に来るかで分かる。
 3. `ildsp` が PEQ2 などで実行されるか(NULL 許容の分岐)。
 4. 実 wasm の大きさ(Balance を直 wasm 生成・hybrid ありで作った実測)。上の表の『共有なし』は plug1 の倍率(Delphi で DLL の約 3.9 倍)の読みで、E12 の全体(8 モジュール)が実測で 1.85 倍に収まっている(直 wasm 生成・混成の圧縮)ことから、plugin でも倍率が下がる余地がある(下げ幅は未測定。見積りの幅は 1.85〜3.9 倍)。

@@ -106,7 +106,7 @@ loop (0x12aeeda):
 |---|---|---|---|
 | 1 | play cursor は『次に再生されるバイト』を指す(Play and Write Cursors〔ee418744〕) | `play = abs_pos_at(b, fle_audio_consumed())`、ループでは `mod size`(`cursors` 902〜929)。consumed = 出力が読んだ frame 数(native は仮想時計、ブラウザは AudioWorklet の RD) | 一致。分解能 1 frame(ブラウザは 128 frame の量子) |
 | 2 | write cursor は『書いても安全な点』で、play cursor より常に先(ee418744、IDirectSoundBuffer::GetCurrentPosition〔mt708925〕) | `write = abs_pos_at(b, max(pulled, consumed))`、`audio_sync()` が毎回 `consumed + lead` まで出力へ渡すので write − play = lead で一定(トレースの全 G で 2646 frame。§6b の案では play + min(15 ms, 手渡し済み)) | 一致 |
-| 3 | **write cursor は play cursor の『typically about 15 milliseconds』先**(mt708925。『typically』= 契約の数値ではない) | **lead = 60 ms**(`FLE_AUDIO_LEAD_MS` の既定、`fle_audio_ring.h` 23 行 S-audio-lead、PM の決定。native の環境変数 `FLE_AUDIO_LEAD_MS` で 15 にできる) | **違い**(4 倍)。意図した選択(S2 の試験で 60 ms は出力の欠け 0.2%、15 ms は 8.4%)。**FL は Unlock の直後に write を 1 回読み、今書いた半分の中なら underrun の表示を出す**(§2)ので、このリードは FL の検知の頻度を決める(§6: 15 ms で 77/401、60 ms で 108/400、120 ms で 332/400)。ペースと Lock の位置は変えない |
+| 3 | **write cursor は play cursor の『typically about 15 milliseconds』先**(mt708925。『typically』= 契約の数値ではない) | **lead = 60 ms**(`FLE_AUDIO_LEAD_MS` の既定、`fle_audio_ring.h` 23 行 S-audio-lead、PM の決定。native の環境変数 `FLE_AUDIO_LEAD_MS` で 15 にできる) | **違い**(4 倍)。意図した選択(S2 のテストで 60 ms は出力の欠け 0.2%、15 ms は 8.4%)。**FL は Unlock の直後に write を 1 回読み、今書いた半分の中なら underrun の表示を出す**(§2)ので、このリードは FL の検知の頻度を決める(§6: 15 ms で 77/401、60 ms で 108/400、120 ms で 332/400)。ペースと Lock の位置は変えない |
 | 4 | write cursor は play cursor と共に動き、書いたデータでは動かない(ee418744) | 同上(consumed と共に動く) | 一致 |
 | 5 | play cursor と write cursor の間は『すでに再生に回っているかもしれず、触ってはならない』(ee418744、ee418062) | **定義されない所を runtime は寛大にしている**: S-ds-late-write(決定 0241、`rewrite_unread` 337 行〜): Unlock の時点で出力がまだ読んでいない手渡し済みの frame は、現在の内容でもう一度ミックスし直して置き換える(守りの幅 `REWRITE_GUARD_FRAMES` = 256 frame 以内は取り込めず『lost』と数える) | 契約外(選択) |
 | 6 | 分解能: Learn に数値なし。`DSBCAPS_GETCURRENTPOSITION2` で『できるだけ正確に』(ee418744) | 1 frame。FL がこの flag で作るかは**未確認**(トレースは作成の flag を持たない) | 数値なし。非公式の記述: 実機は約 10 ms 刻み(Handmade Network の議論、非公式)。WDK『Prefetch Offsets』〔Learn〕:『DirectSound は hardware-accelerated pin の write cursor を 10 ms 余分に先へ置く』(ページ全体を読んだ。『currently pads … by 10 milliseconds. Note that the amount of padding might change in the future.』) |
@@ -145,7 +145,7 @@ loop (0x12aeeda):
 
 差分は 3 つ(`impl/`)。PM は必要な物を取る:
 1. **`0295-ds-write-cursor.diff`(承認された本体)**: `lift/runtime/fle_dsound.c` の `cursors()` だけ。+8 / −1 行、定数 1 つ。基準 main 7373cd55 に offset 0 で当たる(`tables/verify-patch-0295-on-main-7373cd55.log`)。
-2. `0295-ds-write-cursor-test.diff`(任意): `crates/fe-lift/tests/wall_fr15.rs` に試験を 1 本(+18 行、削除 0)。『write cursor が play + 15 ms〔661 frame〕で、手渡しのリードが 60 ms〔2646〕でも 120 ms〔5292〕でも変わらない』を既存の `play` の scenario で固定する。**変更後のコードで通り、変更前のコードでは落ちる**(変更前は write = (consumed + 2646) mod 882 = 176 バイトで、期待の 2820 バイトに合わない)ことを確認した。既存の試験は修正なしで全て通る(下)。
+2. `0295-ds-write-cursor-test.diff`(任意): `crates/fe-lift/tests/wall_fr15.rs` にテストを 1 本(+18 行、削除 0)。『write cursor が play + 15 ms〔661 frame〕で、手渡しのリードが 60 ms〔2646〕でも 120 ms〔5292〕でも変わらない』を既存の `play` の scenario で固定する。**変更後のコードで通り、変更前のコードでは落ちる**(変更前は write = (consumed + 2646) mod 882 = 176 バイトで、期待の 2820 バイトに合わない)ことを確認した。既存のテストは修正なしで全て通る(下)。
 3. `0295-ds-write-cursor-comments.diff`(任意、コメントだけ): この変更で不正確になる 3 か所のコメント(`fle_dsound.c` の先頭、`fle_audio_ring.h` の 4 行目と 23 行目の『write cursor の lead = 手渡しの lead』)を『手渡しのリード。GetCurrentPosition が返す write cursor は別の量』に直す。`fle_audio_ring.h` に触れるので、C の部分のキャッシュキーが変わる(E12 は冷間ビルドなので影響は無いはず)。取らなくても動作は同じ。
 
 ```c
@@ -158,7 +158,7 @@ loop (0x12aeeda):
     }
 ```
 
-- **変数を共有しない(条件 1)**: 手渡しのリード(`fle_audio_lead_frames()` = `FLE_AUDIO_LEAD_MS` の 60 ms)は `audio_sync()` の中の `lead` / `r->lead_frames` で、差分は `audio_sync` に触らない。`cursors()` の write は `DS_WRITE_CURSOR_MS` と `b->fmt.rate` だけから作り、`fle_audio_lead_frames()` も `r->lead_frames` も読まない(上のコードで確認できる)。手渡しは 60 ms のままなので、S2 の試験の『60 ms は出力の欠け 0.2%』は変わらない。
+- **変数を共有しない(条件 1)**: 手渡しのリード(`fle_audio_lead_frames()` = `FLE_AUDIO_LEAD_MS` の 60 ms)は `audio_sync()` の中の `lead` / `r->lead_frames` で、差分は `audio_sync` に触らない。`cursors()` の write は `DS_WRITE_CURSOR_MS` と `b->fmt.rate` だけから作り、`fle_audio_lead_frames()` も `r->lead_frames` も読まない(上のコードで確認できる)。手渡しは 60 ms のままなので、S2 のテストの『60 ms は出力の欠け 0.2%』は変わらない。
 - **契約の実装であって補正ではない(条件 2・方針)**: Learn の GetCurrentPosition の記述の実装(外部 API の契約。(b) の拡充)。旗・環境変数・class/アドレスによる分岐は無い。FL の挙動を補う・代行する処理ではない。
 - **S-ds-late-write は変わらない**: play と write の間の書き込みは `rewrite_unread`(守りの幅 256 frame)が取り込む。write cursor が手前に来るだけで、取り込める範囲は変わらない。
 - **write を使う他の経路**: `Lock(DSBLOCK_FROMWRITECURSOR)` の offset(1082 行)だけ(FL は使わない。play + 60 ms → play + 15 ms になり、Learn に近づく)。Unlock の `cursors()` の呼び出し(1135 行)は play だけを使う。
@@ -194,9 +194,9 @@ loop (0x12aeeda):
 | `test.sh full` | 積んだ木 | 218 results、**2,410 passed、0 failed**(0284c + 0284b の基準と同数)、壁時計 572.8 s | verify-testfull-stack-0284c-0284b-0295.log |
 | a4 | 積んだ木 | units 942/942、runnable 895/895、distinct 5,310、entries 1,009,737、終了コード 0(同一) | verify-a4-stack-0284c-0284b-0295.log |
 | 積んだ木 + 差分 1 + 2 + 3 | 同上 | `cargo test --no-run` 完走、`wall_fr15` 24 本(既存 23 + 新 1)が全部通る | verify-stack-all3-cargo-and-wall_fr15.log |
-| `test.sh full` | 積んだ木 + 差分 1 + 2 + 3 | 218 results、**2,411 passed(= 2,410 + 新しい試験 1)、0 failed**、壁時計 446.1 s | verify-testfull-stack-all3.log |
+| `test.sh full` | 積んだ木 + 差分 1 + 2 + 3 | 218 results、**2,411 passed(= 2,410 + 新しいテスト 1)、0 failed**、壁時計 446.1 s | verify-testfull-stack-all3.log |
 
-既存の write cursor 参照の試験(PM 15:44 の (2)): `lift/harness/audio/ds_scenarios.c` の `rt_mixer`(587〜639 行)を呼ぶ `wall_fr15.rs` の `the_engines_polling_mixer_runs_against_the_model_in_virtual_time_without_an_underrun`(444〜467 行。リード 15 / 60 の両方で『the engine's underrun check fired 0 times』)と、write cursor の戻り値の手計算を持つ `play_moves_the_play_cursor_..._by_15_ms`・`stop_keeps_the_frames_...`(2992 バイト)・`the_default_lead_is_60_ms_...`(手渡し write_frames = 2646 など)は、**期待値を直さずに全部通る**(`FLE_AUDIO_LEAD_MS=15` で走る試験は、手渡し済みが 661 frame で write = play + 661 と変わらないため。リード 60 の `rt_mixer` は検知が 0 のまま)。変更の効果を固定する試験は差分 2。実機の値でなく Learn の記述『typically about 15 ms』を期待値の根拠にしている。
+既存の write cursor 参照のテスト(PM 15:44 の (2)): `lift/harness/audio/ds_scenarios.c` の `rt_mixer`(587〜639 行)を呼ぶ `wall_fr15.rs` の `the_engines_polling_mixer_runs_against_the_model_in_virtual_time_without_an_underrun`(444〜467 行。リード 15 / 60 の両方で『the engine's underrun check fired 0 times』)と、write cursor の戻り値の手計算を持つ `play_moves_the_play_cursor_..._by_15_ms`・`stop_keeps_the_frames_...`(2992 バイト)・`the_default_lead_is_60_ms_...`(手渡し write_frames = 2646 など)は、**期待値を直さずに全部通る**(`FLE_AUDIO_LEAD_MS=15` で走るテストは、手渡し済みが 661 frame で write = play + 661 と変わらないため。リード 60 の `rt_mixer` は検知が 0 のまま)。変更の効果を固定するテストは差分 2。実機の値でなく Learn の記述『typically about 15 ms』を期待値の根拠にしている。
 
 ## 7. gpu1(0289)・alpha1(0274)との関係
 
@@ -226,4 +226,4 @@ loop (0x12aeeda):
 1. **最初の読み(「FL は遅れを判定しない・write cursor を使わない」)の訂正を受理する**: FL は Unlock 直後に write cursor だけを読み、write cursor が書いた半分の内側にあれば UI の underrun カウンタを進めて通知する。ただしこの検出は Lock の位置・待ち・+3 の数・書き込み率を変えない(無効な write cursor を返しても同一)。pacing は play cursor だけで決まる。「+3 飛び」はミックスが 92.9 ms を超えたときの記録上の結果、という結論は不変。
 2. **runtime の write cursor のリードは 60 ms(S-audio-lead)で、Learn の「typically about 15 ms」の 4 倍**。そのため FL の underrun 検出が実 Windows より頻繁に発火する(native 40 s で 108/400 対 リード 15 ms の 77/401)。UI の通知が画面に出るかは今回の場面で観測できず、CPU への影響は ±0.3% で測れない。実 Windows の値は未測定。
 3. **差分案(FL に見せる write cursor を play + 15 ms にし、内部の 60 ms の受け渡しリードは別変数のまま)は外部 API の契約の実装(忠実)として採る方向**。条件: 旗・環境変数・class/アドレス分岐なし(満たす)、native の A/B で Lock の列・+3・書き込み率は同一(満たす)、検出回数が減る(108 → 80、230 → 181)。mt3 の積み重ね検証(main + 0284c + 0284b-on-0284c + 差分 1)は test.sh full 218/2,410/0 failed、a4 942/942・895/895・5,310・1,009,737。PM は E12b の上に差分 1 + 2 を載せた木(`000091ae`)で `cargo test --no-run`、`test.sh full`(218 results/2,411 passed/0 failed)、a4 を検証する。
-4. E12 に入れるかは (a) PM の a4 の結果、(b) opt1 の FS 付き試験ビルドの node 行(検出頻度が変わるので、underrun 通知の描画があれば g3-surface に出うる)で決める。入れない場合は E13 として別 push。実 Windows の write cursor のリード・粒度は契約の文章だけが根拠(15 ms は「typically」の選択)。
+4. E12 に入れるかは (a) PM の a4 の結果、(b) opt1 の FS 付きテストビルドの node 行(検出頻度が変わるので、underrun 通知の描画があれば g3-surface に出うる)で決める。入れない場合は E13 として別 push。実 Windows の write cursor のリード・粒度は契約の文章だけが根拠(15 ms は「typically」の選択)。

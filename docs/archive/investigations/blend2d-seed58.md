@@ -1,6 +1,6 @@
 # Blend2D の生成 C に「.pdata に無い葉関数 58 個」を種として足したとき、DllMain(ATTACH) の停止はどこへ移るか（測定のみ）
 
-実行日: 2026-10-24。基準の HEAD は作業開始時 `92506ae95f46a0cea3b7cb2a9f0a12dbbecec630`。`git archive` はこのコミットから作った。**作業中に別の作業が 1 コミット進めた**（`925c522` は `docs/investigations/implicit-tls-design.md` の 1 ファイル追加だけ。`git diff --stat 92506ae HEAD` で確認。`lift/` の差分は 0。`lift/runtime` 114 ファイル、`lift/harness` 58 ファイル、`lift/crates` 152 ファイルは、`git show 92506ae:<path>` と作業ツリーで SHA-256 が全部一致。実測）。測定は `92506ae` の木で行ったので、結果は `925c522` にも当てはまる（`lift/` が同一。読み）。**この文書は何も決めない。** 決定 0074（pdata の開始と一致する reloc 値だけを seed にする。開始でない値は種にしない）を変える決定ではない。今回の 58 個は 0074 が種にしないとした値に当たる。この測定は「停止がどこへ移るか」を見るためだけのもの。基底 0x4700000 は測定用の値で、決定ではない（決定 0086 は方向だけを決め、値は決めていない）。種 58 個も決定ではない。
+実行日: 2026-10-24。基準の HEAD は作業開始時 `92506ae95f46a0cea3b7cb2a9f0a12dbbecec630`。`git archive` はこのコミットから作った。**作業中に別の作業が 1 コミット進めた**（`925c522` は `docs/investigations/implicit-tls-design.md` の 1 ファイル追加だけ。`git diff --stat 92506ae HEAD` で確認。`lift/` の差分は 0。`lift/runtime` 114 ファイル、`lift/harness` 58 ファイル、`lift/crates` 152 ファイルは、`git show 92506ae:<path>` とワークツリーで SHA-256 が全部一致。実測）。測定は `92506ae` の木で行ったので、結果は `925c522` にも当てはまる（`lift/` が同一。読み）。**この文書は何も決めない。** 決定 0074（pdata の開始と一致する reloc 値だけを seed にする。開始でない値は種にしない）を変える決定ではない。今回の 58 個は 0074 が種にしないとした値に当たる。この測定は「停止がどこへ移るか」を見るためだけのもの。基底 0x4700000 は測定用の値で、決定ではない（決定 0086 は方向だけを決め、値は決めていない）。種 58 個も決定ではない。
 
 作業物は `lift/out-seed58/`（gitignore 対象の `lift/out*/`）。
 
@@ -58,7 +58,7 @@ python3 out-seed58/analysis/dis_b2d.py <rebased dll> VA N                       
 - `gen_two.sh` の `rebase` 段は、`blend2d`、`dll` ともに `fe-pe rebase` で作った（出力が無かったため。SHA-256 は期待値と一致）。種 58 個ありの OUT（`s58/`）には `ctl/` のリベース済み DLL をコピーしたので「exists」と出て飛ばした（同じファイル）。
 - `s58/` の FLEngine の生成 C（`gen/flengine.c`）と分割 C（`src/fle-*.c`、`fle-tables.txt`）、`native/fle`、`native/rt`、`native/h` の `.o` は `ctl/` からコピーした（同じ HEAD の `git archive` から作ったもの。`gen_two.sh` が SHA-256 `43985d62…37137a1` を検査して一致を確認）。`realmod_table`、`common`、各モジュールのオブジェクトは TAG ごとに作り直した。
 - a4-survey は `lift/out-seed58/src/lift/harness/a4-survey.sh`（HEAD の `git archive`。`lift/out-three/src/lift/harness/a4-survey.sh` と `cmp` で同一）。a4-survey 自体は変えていない。同じ秒に続けて走らせていない（2 回の間は 5〜6 秒）。
-- **gdb なし、仮の値なし、runtime の応答追加なし**。gdb の run は読み取りだけ（§6.3）。値を入れていない。`lift/runtime`、`lift/crates`、`lift/harness` は編集していない（作業ツリーの `git status` は §8）。
+- **gdb なし、仮の値なし、runtime の応答追加なし**。gdb の run は読み取りだけ（§6.3）。値を入れていない。`lift/runtime`、`lift/crates`、`lift/harness` は編集していない（ワークツリーの `git status` は §8）。
 
 ## 3. 58 個のリストと変換の検算（実測）
 

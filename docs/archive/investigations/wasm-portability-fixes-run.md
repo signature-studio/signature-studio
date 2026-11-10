@@ -1,8 +1,8 @@
 # wasm 移植の 3 つの穴を塞いだ実行記録（決定 0049。作成時は 0046 だったが 0046-m1-acceptance.md と重なったため 0049 に改番）
 
-日付: 2026-10-21。HEAD 31d0134 + 作業ツリー。方式は `docs/decisions/0046-wasm-portability-fixes.md`、ゲストアドレスの洗い出しは `docs/investigations/hi32-audit.md`。「実測」はコマンドの出力、「推測」は未検証の解釈。成果物は `lift/out-port2/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE。`wasm/` の `out` は `out-wasm2/out`（生成 C 16 分割、約 430 MB）へのシンボリックリンクで、複製していない）。
+日付: 2026-10-21。HEAD 31d0134 + ワークツリー。方式は `docs/decisions/0046-wasm-portability-fixes.md`、ゲストアドレスの洗い出しは `docs/investigations/hi32-audit.md`。「実測」はコマンドの出力、「推測」は未検証の解釈。成果物は `lift/out-port2/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE。`wasm/` の `out` は `out-wasm2/out`（生成 C 16 分割、約 430 MB）へのシンボリックリンクで、複製していない）。
 
-**作業ツリーの注意（実測）**: 作業開始時の `git status` は `lift/iat-unsup-closure.txt`（未追跡）だけだった。作業の途中で、**別担当**が `lift/crates/fe-lift/src/{cpuid,int_more2,lib,sse_int2,sse_pack}.rs`、`tests/{int_more2,locale}.rs`、`runtime/fle_cpuid.c`、`fle_sse_int2.h`、`fle_locale.c`（0047、0048 の作業）、`fle_rcp.h`、`fle_rcp_table.h`、`tests/rcp/`、`docs/investigations/locale-6-official-sources.md` を変更・追加した。本書の `cargo test --workspace`（§6）は、その変更が入った状態の作業ツリーで走っている（私の変更と他担当の変更を分けた再実行はしていない）。本作業が触ったファイルは §8。
+**ワークツリーの注意（実測）**: 作業開始時の `git status` は `lift/iat-unsup-closure.txt`（未追跡）だけだった。作業の途中で、**別担当**が `lift/crates/fe-lift/src/{cpuid,int_more2,lib,sse_int2,sse_pack}.rs`、`tests/{int_more2,locale}.rs`、`runtime/fle_cpuid.c`、`fle_sse_int2.h`、`fle_locale.c`（0047、0048 の作業）、`fle_rcp.h`、`fle_rcp_table.h`、`tests/rcp/`、`docs/investigations/locale-6-official-sources.md` を変更・追加した。本書の `cargo test --workspace`（§6）は、その変更が入った状態のワークツリーで走っている（私の変更と他担当の変更を分けた再実行はしていない）。本作業が触ったファイルは §8。
 
 ## 1. 要約（実測）
 
@@ -83,7 +83,7 @@
 - emcc の通し（`-msse2 -msimd128` なし、`-O0`、TMPDIR、EM_CACHE は `out-port2/` の中）:
   - runtime の全 `fle_*.c` **32 / 32 成功**（`build.sh rt`、`VARIANT=base`、作業の終わりに別の `VARIANT=rerun` で再実行して 32 / 32）。警告は既存の `fle_proc.c:105` の 1 件。
   - 生成 C 16 分割（`-finstrument-functions`、同時 2 本）**16 / 16 成功**。1 TU 2.9〜7.2 秒、最大 RSS **1,811,384 KB**（part-14）。最初に part-00、part-14 だけを先に通し（3.73 秒 / 947 MB、6.91 秒 / 1,810 MB）、その後 `build.sh gen-c harness link` で 16 本全部。
-  - harness 3 本、リンク成功（5.21 秒、最大 RSS 635 MB）。`flengine.wasm` **115,724,157 B**（0045 の 115,721,618 B より 2,539 B 多い。ほかの担当の変更を含む作業ツリーなので、私の変更だけの差ではない）。
+  - harness 3 本、リンク成功（5.21 秒、最大 RSS 635 MB）。`flengine.wasm` **115,724,157 B**（0045 の 115,721,618 B より 2,539 B 多い。ほかの担当の変更を含むワークツリーなので、私の変更だけの差ではない）。
   - node 実行（`FLEngine_x64.dll`）: 停止は `GetLocaleInfoW: LCType value for en-US is not on the MSDN pages`、関数 **199**、入口 **1,386**、深さ **9**。同じ runtime と生成 C の native との比較は、`calling … rsp=` の 1 行（スタックのアドレス）を除いて**停止レポート全文が一致**（`run-native.txt` と `run-node.txt`）。
 
 ## 5. runtime の幅依存の一覧（wasm32 で意味が変わるもの）
@@ -134,6 +134,6 @@ grep '^test result:' out-port2/test-ws.txt     # 65 行
 - 領域チェック（`FLE_CHECKED_MEM`）と上位ビット検査のコスト増（`fle_ldx` 系の 6,498 か所を加えたぶん）は再測していない。
 - 生成 C の DllMain 経路（停止点より先）で SSE、x87 が実行されたときの native と wasm の一致は未確認（今回の突合は単体のプローブ。0045 の限界のまま）。
 - `realloc` の 64→32 の縮小（§5）は、各表の上限を個別に確かめていない。
-- `cargo test --workspace` は、別担当の変更が入った作業ツリーでの結果。
+- `cargo test --workspace` は、別担当の変更が入ったワークツリーでの結果。
 - ブラウザ、`-O1` 以上の生成 C は未確認（0045 のまま）。
 - 削除禁止のため、`out-port2/fscale/v/` の変種（47 個）、`out-port2/wasm/obj-rerun` などの途中の成果物が残っている。

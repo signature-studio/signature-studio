@@ -390,5 +390,5 @@ SLONGDATE の `dd` と `d` は、Windows の版の違い（古い版が `dd`、W
 - 削除（`rm`）、`>` による既存ファイルの上書き、git 操作、`/tmp` の使用、コマンド文字列の `sleep` と `timeout` は、なし。ソース（`lift/crates`、`lift/runtime`）は変更していない。権限拒否はなし。
 - `objdump` の出力は標準出力だけで、ファイルを作っていない。Python は標準入力から渡し、スクリプトのファイルは作っていない。`lift/out-loc3/` は存在しないので、作らなかった。
 - 取得ツールが自動で保存した出力（`~/.local/share/opencode/tool-output/`）は、リポジトリの外のハーネスの領域で、私が作ったファイルではない。
-- 他の subagent が作業ツリーを変更中（wasm 移植）。私はそれらに触れていない。
+- 他の subagent がワークツリーを変更中（wasm 移植）。私はそれらに触れていない。
 - **触ったファイル（新規 1 つだけ）**: `docs/investigations/locale-6-official-sources.md`

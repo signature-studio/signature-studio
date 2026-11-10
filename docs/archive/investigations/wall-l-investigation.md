@@ -2,7 +2,7 @@
 
 状態: 完成（2026-10-27）。決定は `0100-wall-lift-gaps.md`（仮の決定）。凡例: **実測** = コマンドの出力を見た値、**読み** = 逆アセンブル・生成 C・文書を読んだ結果で実行して確かめていないもの、**未確認** = 確かめていないこと。census の数（ok／stop）は **A4 の進捗ではない**（決定 0046、0060、0097、0101）。
 
-基準: HEAD 5002d98 + census.diff（決定 0097）。作業ツリー: `lift/out-wallL/`（`base/` = `git archive HEAD` + census.diff、`src/` = 編集する複製）。FLEngine の生成 C の旧 C の SHA-256: `feb5b9087f8d7a8a1282900212d7bd1f5b6071b0326e7149642f98c168e8080f`（base の release `fe-lift lift … --pdata` で再生成して一致を確認。実測）。
+基準: HEAD 5002d98 + census.diff（決定 0097）。ワークツリー: `lift/out-wallL/`（`base/` = `git archive HEAD` + census.diff、`src/` = 編集する複製）。FLEngine の生成 C の旧 C の SHA-256: `feb5b9087f8d7a8a1282900212d7bd1f5b6071b0326e7149642f98c168e8080f`（base の release `fe-lift lift … --pdata` で再生成して一致を確認。実測）。
 
 測定の道具（標準ライブラリと衝突しない名前。`lift/out-wallL/py/`）: `pecommon.py`（自作の PE 読み。`.pdata` は pefile でなく 12 バイトずつ全件読む。pefile は決定 0074 の調査で 29,274 件で止まった）、`survey1〜6.py`（隙間と形の走査。capstone 5.0.7）、`callers.py`（`e8`/`e9` の rel32 の全走査）、`disasm_va.py`、`cmpc.py`（生成 C を関数単位で比べる）、`anchor_check.py`。Rust の実装（iced-x86）とは別系統で、数が一致することを確かめた（§1.4）。
 

@@ -52,7 +52,7 @@ python3 out-three/analysis/initializer_table.py … ; python3 out-three/analysis
 ```
 
 - 「手順の 3 モジュールの `gen_two.sh` の `rebase` 段」: `dll`（dsp_ippv2）は「exists」と出ず `fe-pe rebase` で作り直した（出力が無かったため。SHA-256 は `lift/out-avrt88/two/dll/` のものと一致）。`blend2d` は先に `fe-pe rebase` を手で実行してあったので「exists」と出て飛ばした（同じコマンド）。
-- a4-survey は `lift/out-three/src/lift/harness/a4-survey.sh`（HEAD の `git archive`。作業ツリーの同名ファイルと `cmp` で同一）。a4-survey 自体は変えていない（`"$DLL"` だけを渡す。複数ファイルは `two-native-run.sh` の `TWO_REAL` の `:` 区切りで渡す）。
+- a4-survey は `lift/out-three/src/lift/harness/a4-survey.sh`（HEAD の `git archive`。ワークツリーの同名ファイルと `cmp` で同一）。a4-survey 自体は変えていない（`"$DLL"` だけを渡す。複数ファイルは `two-native-run.sh` の `TWO_REAL` の `:` 区切りで渡す）。
 - 同じ秒に続けて走らせていない（秒単位のログ名の衝突を避けた。2 回の間は 6〜8 秒）。
 - ビルドは新しい OUT で runtime のオブジェクトも含めて最初から作った（`build_two_native.sh` は作ったオブジェクトを飛ばす仕様。`lift/out-three/two2/native/` の FLEngine、runtime、harness のオブジェクトは 3 モジュールの OUT にコピーして共有した。ソースは同じ HEAD の `git archive`。コピーしたのは `native/fle`、`native/rt`、`native/h` の `.o` で、`realmod_table` と `common`、各モジュールのオブジェクトは TAG ごとに作り直した）。
 - `gdb` は読み取りだけ（§5.1）。値を入れていない。runtime の応答も足していない。`lift/runtime`、`lift/crates`、`lift/harness` は編集していない（§8 の `git status`）。
@@ -63,7 +63,7 @@ HEAD の `git archive` を `lift/out-three/src/` に展開し、そこから（r
 
 | 項目 | 値 | 区分 |
 |---|---|---|
-| `git archive HEAD` | `lift/out-three/src/`（8,314,880 B のアーカイブ。作業ツリーの runtime、crates は読んでいない。`harness/a4-survey.sh` は作業ツリーと `cmp` で同一） | 実測 |
+| `git archive HEAD` | `lift/out-three/src/`（8,314,880 B のアーカイブ。ワークツリーの runtime、crates は読んでいない。`harness/a4-survey.sh` はワークツリーと `cmp` で同一） | 実測 |
 | fe-pe / fe-lift | `CARGO_TARGET_DIR=lift/out-three/target`、`cargo build --release --offline -p fe-pe -p fe-lift` | 実測 |
 | FLEngine の生成 C（`fe-lift lift … --pdata`） | SHA-256 `43985d62321a90f562ce1b8144253e00af13df795e4190d26b6b8ce2537137a1`（期待値と一致。`gen_two.sh` が検査） | 実測 |
 | リベース済み dsp_ippv2（基底 0x2000000） | SHA-256 `4fd255027525f2a2e56a93fe1cc7f95442861f788179a23ac8b0401b8f4fefc5`（`lift/out-avrt88/two/dll/` のものと一致。この OUT で `fe-pe rebase` から作り直した。DIR64 15,602、ABSOLUTE 22） | 実測 |

@@ -27,7 +27,7 @@
 
 | 基準 | 内容 | 現在の状態 | 一言の根拠 |
 |---|---|---|---|
-| A1 | 素材の SHA-256 が台帳と一致 | **達成** | `sha256sum` が台帳の値と一致（§2） |
+| A1 | 素材の SHA-256 が記録と一致 | **達成** | `sha256sum` が記録の値と一致（§2） |
 | A2a | 命令と制御フローの完全性 | **未達（部分）** | 命令 stub 43、解決不能 jmp 1 が残る |
 | A2b | import 応答の完全性 | **未達** | 応答の無い IAT thunk が 557 |
 | A3 | emcc でリンクし node で native と同じ停止点 | **達成（定義の範囲）** | 199 / 1,386 / 9 が一致（限界あり） |
@@ -43,8 +43,8 @@ M1 完了（A2 + A4 + A5 + A6）は未達。
 |---|---|
 | 判定コマンドと数値 | `sha256sum binaries/win64/FLEngine_x64.dll` が `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d`、`stat -c %s` が 22,227,016 |
 | 現在の状態 | **達成** |
-| 根拠と出典 | 2026-10-21 に上記 2 コマンドを実行し、台帳 `docs/investigations/win64-extraction.md` §2.3 と一致した。台帳はインストーラ `flstudio_win64_26.1.7.5653.exe`（1,106,033,456 B、SHA-256 `04393e79…fc02`）から抽出した値を記す |
-| 未確認・限界 | `binaries/` は `.gitignore` 対象で、実バイナリはリポジトリに無い（台帳の値だけが残る）。インストーラは今回再ハッシュしていない。抽出手順を最初から再実行してはいない |
+| 根拠と出典 | 2026-10-21 に上記 2 コマンドを実行し、記録 `docs/investigations/win64-extraction.md` §2.3 と一致した。記録はインストーラ `flstudio_win64_26.1.7.5653.exe`（1,106,033,456 B、SHA-256 `04393e79…fc02`）から抽出した値を記す |
+| 未確認・限界 | `binaries/` は `.gitignore` 対象で、実バイナリはリポジトリに無い（記録の値だけが残る）。インストーラは今回再ハッシュしていない。抽出手順を最初から再実行してはいない |
 
 ## 3. A2 lift 完全性
 
@@ -87,7 +87,7 @@ A2 は 2 つに分ける。
 | 判定コマンドと数値 | `bash lift/harness/wasm/build.sh` で runtime と生成 C を emcc でコンパイル、リンクし、`node lift/out-wasm2/bin-base/run_node.cjs binaries/win64/FLEngine_x64.dll` を実行。同じ runtime と生成 C の native（`build_native.sh`）と、停止点、関数実行数（distinct）、入口数、深さを比べる |
 | 現在の状態 | **達成（上の定義の範囲）** |
 | 根拠と出典 | `wasm-port-run.md` §1、§5。runtime 32/32、生成 C 16/16 が `emcc -c` に成功、リンク成功（`flengine.wasm` 115,721,618 B）。停止は `GetLocaleInfoW` LCType 0x1c 付近、関数 **199**、入口 **1,386**、深さ **9**。native との差は `calling entry … rsp=` の 1 行（スタックのアドレス）だけ。本書の作業で、既存の `flengine.wasm`（03:42 ビルド）と native バイナリを再実行し、`calling` 行を除いて全文一致することを再確認した（`lift/out-doc/node-rerun.txt`、`native-rerun.txt`）。native のワークスペース全テスト: 65 バイナリ、615 passed、0 failed（`lift/out-wasm2/test-ws.txt`） |
-| 未確認・限界 | (1) 再実行は既存バイナリの再実行で、再ビルドはしていない。作業ツリーに他担当の未コミット変更がある（`lift/runtime/fle_runtime.h`、`fle_sse.h`）。(2) 停止点より先の実行は未確認。この経路で SSE/x87 の演算は 0 回で、wasm 上の演算の等価性の証拠にならない。(3) **fscale の native と wasm の不一致が未修正**: `fle_x87.c` の `long`（wasm32 で 32 bit）が原因で、probe の出力 18,822 行が不一致（`long` → `int64_t` で 0、`wasm-port-run.md` §7）。(4) ブラウザは未対応（`NODERAWFS` は node 限定）。(5) ページ保護の非強制、`fle_ldx` 系が上位ビット検査の外、アリーナ 512 MiB の上限（0045） |
+| 未確認・限界 | (1) 再実行は既存バイナリの再実行で、再ビルドはしていない。ワークツリーに他担当の未コミット変更がある（`lift/runtime/fle_runtime.h`、`fle_sse.h`）。(2) 停止点より先の実行は未確認。この経路で SSE/x87 の演算は 0 回で、wasm 上の演算の等価性の証拠にならない。(3) **fscale の native と wasm の不一致が未修正**: `fle_x87.c` の `long`（wasm32 で 32 bit）が原因で、probe の出力 18,822 行が不一致（`long` → `int64_t` で 0、`wasm-port-run.md` §7）。(4) ブラウザは未対応（`NODERAWFS` は node 限定）。(5) ページ保護の非強制、`fle_ldx` 系が上位ビット検査の外、アリーナ 512 MiB の上限（0045） |
 
 **訂正（事実）**: 以前、A3 をネイティブ clang の確認だけで「達成」と記録していた。この記録の原文は PM の会話記録で、リポジトリには無い（`wasm-port-run.md` §6 も同様に記す）。emcc でのコンパイル、リンク、node 実行は、2026-10-21 の `wasm-port-run.md` が最初の実測である。
 
@@ -127,7 +127,7 @@ A2 は 2 つに分ける。
 | 判定コマンドと数値 | 実測値を `docs/` に記録し、`git log` にコミットがある。push 先の remote が設定され、push が成功する |
 | 現在の状態 | **部分**（記録とコミットは済み。push は未） |
 | 根拠と出典 | 34 コミット（2026-10-20 に 23、2026-10-21 に 11）。各実測は `docs/investigations/*-run.md` と `docs/decisions/` に記録済み。`git remote -v` は出力なし（remote 未設定、2026-10-21 実測） |
-| 未確認・限界 | **push は、依頼者が remote を設定するまで保留**。ユーザーの資格情報には触れない。0046 と本日分の追記はコミット前（コミットは PM が行う）。作業ツリーに未コミットの他担当の変更（`lift/runtime/fle_runtime.h`、`fle_sse.h`）と未追跡の `lift/iat-unsup-closure.txt` がある。`docs/progress.md` は古く（lift 本体は未着手と書く）、現状を反映していない |
+| 未確認・限界 | **push は、依頼者が remote を設定するまで保留**。依頼者の資格情報には触れない。0046 と本日分の追記はコミット前（コミットは PM が行う）。ワークツリーに未コミットの他担当の変更（`lift/runtime/fle_runtime.h`、`fle_sse.h`）と未追跡の `lift/iat-unsup-closure.txt` がある。`docs/progress.md` は古く（lift 本体は未着手と書く）、現状を反映していない |
 
 ## 8. 影響
 
@@ -145,13 +145,13 @@ A2 は 2 つに分ける。
 - §7 の「`docs/progress.md` は古く（lift 本体は未着手と書く）」: `docs/progress.md` を現状に合わせて書き直した（旧版は同文書の「履歴」に残した）。
 - 0046 の本文が「`pm/` ディレクトリは無い」と報告していた点: リポジトリ直下は変わらず `README.md binaries docs lift tools` で、`pm/` は無い（2026-10-22 に `ls` で確認）。
 - §5 の「`init_count` という名前の計数はリポジトリに無い。『survey』の測定ツールも無い」: 決定 0060 と `bash lift/harness/a4-survey.sh` が入った。現在の測定は下の A4。
-- §7 の「作業ツリーに未コミットの他担当の変更」: この更新の時点の `git status` は、未追跡 3 件（`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。最後は 0 行）のみ。
+- §7 の「ワークツリーに未コミットの他担当の変更」: この更新の時点の `git status` は、未追跡 3 件（`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。最後は 0 行）のみ。
 
 ### 9.1 判定の一覧（現在）
 
 | 基準 | §1 の判定（2026-10-21） | **現在の判定（2026-10-22）** | 一言の根拠 |
 |---|---|---|---|
-| A1 | 達成 | **達成** | `sha256sum`、`stat -c %s` が台帳と一致（再実行） |
+| A1 | 達成 | **達成** | `sha256sum`、`stat -c %s` が記録と一致（再実行） |
 | A2a | 未達（部分） | **未達（部分）** | 命令 stub 43 → **0**。解決不能な間接 jmp 1 が残る。Xgetbv は名前付き停止 |
 | A2b | 未達 | **未達** | 応答の無い IAT thunk 557 → **533** |
 | A3 | 達成（定義の範囲） | **達成（定義の範囲）** | native と wasm の a4 測定が一致。限界は §4 のまま、ブラウザ未検証 |
@@ -163,7 +163,7 @@ M1 完了（A2 + A4 + A5 + A6）は**未達**。
 
 ### 9.2 A1 素材
 
-- 実測（2026-10-22）: `sha256sum binaries/win64/FLEngine_x64.dll` = `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d`、`stat -c %s` = 22227016。台帳と一致。判定: **達成**。
+- 実測（2026-10-22）: `sha256sum binaries/win64/FLEngine_x64.dll` = `b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d`、`stat -c %s` = 22227016。記録と一致。判定: **達成**。
 - 限界は §2 のまま（`binaries/` は `.gitignore` 対象、インストーラは再ハッシュしていない、抽出手順の再実行はしていない）。
 
 ### 9.3 A2 lift 完全性
@@ -223,7 +223,7 @@ M1 完了（A2 + A4 + A5 + A6）は**未達**。
 ### 9.7 A6 記録と公開
 
 - `git log`: 58 コミット（2026-10-20 が 23、2026-10-21 が 25、2026-10-22 が 10。`git log --format=%ad --date=format:%Y-%m-%d` の集計）。各実測は `docs/investigations/*.md` と `docs/decisions/` に記録済み。
-- `git remote -v` は出力なし（remote 未設定、2026-10-22 実測）。**push は、依頼者が remote を設定するまで保留**。ユーザーの資格情報には触れない。判定: **部分**。
+- `git remote -v` は出力なし（remote 未設定、2026-10-22 実測）。**push は、依頼者が remote を設定するまで保留**。依頼者の資格情報には触れない。判定: **部分**。
 - 本更新（0046 の本節、`docs/progress.md`、`docs/README.md`、`docs/milestones/M1-remaining-work.md` の追記、`docs/investigations/provisional-decisions.md`）は、コミット前。コミットは PM が行う。
 
 ### 9.8 この更新の限界

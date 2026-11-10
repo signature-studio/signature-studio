@@ -71,7 +71,7 @@ LoadImageW の 21 個の識別子（`esi = -22 … -2`、表 `0x1409038`、Learn
 
 - `cargo test -p fe-lift --test cursor`: **25 件すべて ok**（`lift/out-cur/test-cursor.txt`。66 秒）。内訳: 行と宣言、IDC_ARROW の数値（Learn の表から本文に書いた 16 個 + 追加 13 個。重複なし）、ハンドル領域（0x80000000 未満、0053 と 0054 の領域と重ならない）、答え（0x7FCA0004）、毎回同じ・他の呼び出しに依存しない、状態を持たない・last error に触れない・戻り番地を壊さない・r8/r9 に依存しない、検査関数、停止（hInstance 非 NULL 5 種、ポインタの名前 5 種 + 組み合わせ、ほかの標準カーソル 15 個、追加カーソルとその他 26 個）、ソースがホストを読まない・状態を持たない、ヘッダが plain C、カーソルのハンドルは DeleteObject と ReleaseDC で「発行していない値」として止まる、生成器が thunk を応答に置き換える、DLL 名と API 名が一致の一部、実 DLL（thunk とスロット、7 か所のバイト列、`[0x15ec298]` の書き手、`VT_*` の名前、戻り値の使われ方のバイト列、LoadImageW の次の停止点と 21 個の識別子）。
 - 変異テスト（`lift/out-cur/work/mkmut.py` が `lift/out-cur/mut/` に runtime の複製を作り、`FLE_CUR_SRC_DIR` で指す。`runmut.sh`、`mut/summary.txt`）: **21 変異すべてがテストの失敗で検出された（生き残り 0）**。失敗件数 1〜9 件。別に m07（hInstance の検査を `if (0)` にした）は**コンパイルエラー**（未使用変数 `-Werror`）で落ちただけなので検出に数えず、コンパイルする m07b に置き換えた（3 件失敗）。内訳: m01 識別子が 32513（9）、m02 基底を動かす（5）、m03 基底を GDI 領域に置く（5）、m04 基底が 2 GiB 以上（5）、m05 刻み 8（4）、m06 +1 を外す（4）、m07b hInstance を調べない（3）、m08 hInstance の下位 32 ビットだけ（1）、m09 ポインタ名を調べない（1）、m10 名前の下位 16 ビットだけ（1）、m11 名前の下位 32 ビットだけ（1）、m12 ほかの識別子が NULL（2）、m13 ほかの識別子が ARROW のハンドル（2）、m14 NULL を返す（5）、m15 検査関数が識別子を問わない（1）、m16 検査関数が領域内なら何でも（1）、m17 last error を 0 にする（2）、m18 戻り番地を壊す（2）、m19 hInstance の理由文（3）、m20 名前の理由文（1）、m21 領域サイズが小さい（1）。**同値変異は作っていない**（各変異は観測できる値・分岐・書き込み・理由文を変える）。
-- `cargo test --workspace --no-fail-fast`（`lift/out-cur/test-ws.txt`、終了コード 0）: `test result:` の行 **79 個、passed 802、failed 0、ignored 0**。直前の基準は 76 バイナリ・752 件。増分 +3 バイナリ・+50 件は、`cursor.rs` 25 件（本作業）と、同時に作業中の A4 survey ツール担当の `a4_report.rs` 15 件・`fe-pe/tests/inittable.rs` 10 件（作業ツリーに存在。本作業のものではない）。`spi.rs` 21 件、`gdi.rs` 21 件は変わらず ok。
+- `cargo test --workspace --no-fail-fast`（`lift/out-cur/test-ws.txt`、終了コード 0）: `test result:` の行 **79 個、passed 802、failed 0、ignored 0**。直前の基準は 76 バイナリ・752 件。増分 +3 バイナリ・+50 件は、`cursor.rs` 25 件（本作業）と、同時に作業中の A4 survey ツール担当の `a4_report.rs` 15 件・`fe-pe/tests/inittable.rs` 10 件（ワークツリーに存在。本作業のものではない）。`spi.rs` 21 件、`gdi.rs` 21 件は変わらず ok。
 
 ## 8. harness の再実行（実測）
 
@@ -107,5 +107,5 @@ LoadImageW の 21 個の識別子（`esi = -22 … -2`、表 `0x1409038`、Learn
 
 - 変更: `lift/crates/fe-lift/src/imports_table.rs`（2 行追記）、`lift/crates/fe-lift/tests/spi.rs`、`tests/gdi.rs`（表明の更新）。
 - 新規: `lift/runtime/fle_cursor.h`、`fle_cursor.c`、`lift/crates/fe-lift/tests/cursor.rs`、`docs/decisions/0059-virtual-cursors.md`、本書、`lift/out-cur/`（gitignore 済み）。
-- `lift/harness/` 配下は変更していない（作業ツリーの `harness/` の差分は A4 survey ツール担当のもの）。`lift/iat-unsup-closure.txt` には触っていない。
+- `lift/harness/` 配下は変更していない（ワークツリーの `harness/` の差分は A4 survey ツール担当のもの）。`lift/iat-unsup-closure.txt` には触っていない。
 - `rm`、既存ファイルの `>` 上書き、git の変更操作、`/tmp`、コマンド文字列の `sleep`/`timeout`/`nohup` は使っていない。emcc は `JOBS=2`。

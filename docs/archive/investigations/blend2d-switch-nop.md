@@ -1,6 +1,6 @@
 # MSVC switch 表の認識で `ja` と表引きの間の `nop` の詰め物を許す（決定 0093）: 77 件の見積もり、実装、検証、3 モジュールでの停止点（測定のみ）
 
-実行日: 2026-10-25。基準は HEAD `a64a41c`（`git archive` を `lift/out-nop93/src/` に展開して作業した。途中で HEAD が決定 0092 のコミット `38df911` に進んだ。0093 が変えるファイルは両者でバイト一致）。決定は `docs/decisions/0093-msvc-switch-nop-padding.md`（PM の決定。仮の決定ではない）。前提は決定 0089、0090 と `docs/investigations/blend2d-switch-tables.md`、`blend2d-switch-dominance.md`、`blend2d-srw.md`（以下「前調査」）。作業物は `lift/out-nop93/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086、0089、0090 は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。**作業ツリーのファイルは一切編集していない**。
+実行日: 2026-10-25。基準は HEAD `a64a41c`（`git archive` を `lift/out-nop93/src/` に展開して作業した。途中で HEAD が決定 0092 のコミット `38df911` に進んだ。0093 が変えるファイルは両者でバイト一致）。決定は `docs/decisions/0093-msvc-switch-nop-padding.md`（PM の決定。仮の決定ではない）。前提は決定 0089、0090 と `docs/investigations/blend2d-switch-tables.md`、`blend2d-switch-dominance.md`、`blend2d-srw.md`（以下「前調査」）。作業物は `lift/out-nop93/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086、0089、0090 は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。**ワークツリーのファイルは一切編集していない**。
 
 ## 0. 凡例
 
@@ -144,7 +144,7 @@ FLEngine の生成 C: `fe-lift lift binaries/win64/FLEngine_x64.dll OUT.c --pdat
 
 ### 7.1 手順（実測）
 
-- 生成器: HEAD a64a41c の展開（`src0092/`）に、決定 0092 の `lift/runtime/fle_sys.c`、`fle_sys.h`、`lift/crates/fe-lift/src/imports_table.rs` を**作業ツリーから読み取りでコピー**（`with0092/`。後で、これら 3 つが 38df911 のコミットの内容と `cmp` で一致することを確認）し、0093 の変更を重ねた。release の `fe-lift`、`fe-pe`（`lift/out-nop93/target-0092/release`）。
+- 生成器: HEAD a64a41c の展開（`src0092/`）に、決定 0092 の `lift/runtime/fle_sys.c`、`fle_sys.h`、`lift/crates/fe-lift/src/imports_table.rs` を**ワークツリーから読み取りでコピー**（`with0092/`。後で、これら 3 つが 38df911 のコミットの内容と `cmp` で一致することを確認）し、0093 の変更を重ねた。release の `fe-lift`、`fe-pe`（`lift/out-nop93/target-0092/release`）。
 - FLEngine の生成 C（`--pdata`）の SHA-256 は **`feb5b9087f8d…`**（0092 の基準。`EXPECT_FLE_SHA` で渡した）。縮小 dsp_ippv2（基底 0x2000000、種 452）、Blend2D（基底 0x4700000、`--pdata --seeds seeds58-4700000.txt`。種 58 個）。`lift/out-nop93/three/run-gen.sh`（`out-srw/three/harness-two` の無変更のコピー）。
 - **生成 C は 0092 の測定と同一**: Blend2D の生成 C の SHA-256 `a240ceec…c1068c`（0092 の `out-srw/three/v-b2d58/gen/blend2d.c` と同じ）、縮小 dsp_ippv2 `f2f23c67…e4ed13`。**0093 は生成 C を変えない**ので当然（§6.2）。表の統合: 59,565 + 8,298 + 2,334 → 69,661 行（複数の表に在る行 268、`f_<VA>` の衝突 0）。two-native 612,296,520 B（2 GB 未満）。`build.err` 0 行。
 - a4: `lift/out-nop93/three/run-a4.sh`（`harness/a4-survey.sh`、`two-native-run.sh`）を 2 回。
@@ -196,11 +196,11 @@ funcs  : executed (distinct)=1069  entries=27332
 - 母集団の誤認識の検査は、FLEngine、dsp_ippv2、Blend2D、QFC の 4 つに限る（同梱の他の DLL は未実施）。
 - 実 DLL の site について、**生成 C と native の突き合わせは未実施**（解決されないので生成 C に switch が無い）。native 側だけ（24 通り）と、合成 PE（12 バイトの nop を含む）での native と生成 C の両方（索引 0..N+3）を実施した。
 - `is_padding_nop` は iced-x86 の `InstructionInfo` に依存する（`Nop` の書き込みなし、フラグ変更なしの報告）。nop 以外の命令は許さない。
-- 3 モジュールの測定は gdb の仮の値なし、runtime の応答追加なし。0092 の runtime は作業ツリーからのコピー（38df911 と `cmp` 一致）。実 Windows での挙動は未確認。wasm は使っていない（native のみ）。
+- 3 モジュールの測定は gdb の仮の値なし、runtime の応答追加なし。0092 の runtime はワークツリーからのコピー（38df911 と `cmp` 一致）。実 Windows での挙動は未確認。wasm は使っていない（native のみ）。
 - 到達定義の参考値（§3）は capstone の線形走査と、`jmp r11` の表をエントリが関数内である間だけ読んだ結果。決定の根拠にしたものではない。
 
 ## 10. 作ったファイル
 
-- 新規（追跡対象にする候補。PM が作業ツリーへ移す）: `lift/out-nop93/docs-new/0093-msvc-switch-nop-padding.md`、`lift/out-nop93/docs-new/blend2d-switch-nop.md`（この文書）、`lift/out-nop93/docs-new/README-0093-line.txt`（`docs/README.md` の 0092 の行の次に足す 1 行）。
+- 新規（追跡対象にする候補。PM がワークツリーへ移す）: `lift/out-nop93/docs-new/0093-msvc-switch-nop-padding.md`、`lift/out-nop93/docs-new/blend2d-switch-nop.md`（この文書）、`lift/out-nop93/docs-new/README-0093-line.txt`（`docs/README.md` の 0092 の行の次に足す 1 行）。
 - 差分: `lift/out-nop93/patches/0093.diff`（`38df911` の `docs/README.md`、`lift/crates/fe-decode/src/jumptab.rs`、`fe-decode/tests/msvc_common/mod.rs`、`fe-decode/tests/msvc_switch.rs`、`fe-lift/tests/msvc_switch.rs` との `diff -u`。`patch -p1` と `git apply --check` で確認）。
-- 作業物（`lift/out-nop93/`、gitignore 対象）: `src-orig/`（HEAD a64a41c の展開）、`src/`（+0093）、`src0092/`（+0092 のコピー +0093）、`src-head/`（38df911 の展開。差分の基準）、`with0092/`（作業ツリーから読み取りでコピーした 3 ファイル）、`analysis/`、`logs/`、`stats/`、`stats.sh`、`three/`（3 モジュール）、`run/`、`gdb/`、`target/`、`target-0092/`、`target-base/`、`test-ws.txt`、`test-ws-with0092.txt`、`patch-tree/`。
+- 作業物（`lift/out-nop93/`、gitignore 対象）: `src-orig/`（HEAD a64a41c の展開）、`src/`（+0093）、`src0092/`（+0092 のコピー +0093）、`src-head/`（38df911 の展開。差分の基準）、`with0092/`（ワークツリーから読み取りでコピーした 3 ファイル）、`analysis/`、`logs/`、`stats/`、`stats.sh`、`three/`（3 モジュール）、`run/`、`gdb/`、`target/`、`target-0092/`、`target-base/`、`test-ws.txt`、`test-ws-with0092.txt`、`patch-tree/`。

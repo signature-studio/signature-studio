@@ -1,6 +1,6 @@
 # mt3: ハイブリッド + GIL で見つかった GIL の護送(convoy)と、その直し(PM 2026-11-05 17:20 の指示)
 
-状態: **作業木 h6 での実装・試験・測定。納品物(旗なしの差分)にはまだしない**。測定は §4 に追記する。
+状態: **ワークツリー h6 での実装・テスト・測定。納品物(旗なしの差分)にはまだしない**。測定は §4 に追記する。
 
 ## 1. 症状(ハイブリッド + GIL、旧 GIL、Chrome 156、負荷 3〜6、再生中の 10 秒あたり、2 回)
 - GIL の保持: W0(UI)約 1.0 s、W1(ミキサー)約 0.25 s = 合計 約 13%。待ち: W0 5.8〜6.3 s(60%)、W1 2.8〜4.6 s(28〜46%)。Worker の CPU は UI 57〜59%、ミキサー 41〜54%。ミキサーの書き込み率 0.27〜0.50。
@@ -26,7 +26,7 @@ GIL は Windows の契約ではなく runtime を安全にするための装置�
 | GetTickCount、timeGetTime、QueryPerformanceCounter、QueryPerformanceFrequency(`fle_sys.c`) | 実時計の読み: `performance.timeOrigin + performance.now()` と、Worker 間で単調にするアトミックな最大値(`fle_clock_real_now`)。実時計の起点(`real_origin_ms`、`real_base_elapsed`)は第 2 の Worker が起動する前に書かれる。出力はゲストメモリ | 読みが共有、書きは CAS のみ | 取らない。仮想時計(`clock_real == 0`、1 Worker だけ)では読みが時計を進める(`fle_clock_elapsed` への書き)が、その時は他の Worker が無い |
 | GetCurrentThreadId(`fle_imports.c`) | 自分の Worker の `cur`(thread-local)と `nthr`(増えるだけ。32 ビットの読み) | 無い | 取らない |
 | (取るままのもの) | EnterCriticalSection / LeaveCriticalSection(CS の表とスケジューラ)、Sleep、GetThreadPriority(スレッド表)、SysAllocStringLen(ヒープ)、MultiByteToWideChar(最終エラー)ほか | あり/未確認 | 取る |
-- 試験: `crates/fe-lift/tests/gil_lockfree.rs`(2 件): 一覧の各名前が imports_table の行で、runtime/ の 1 か所で定義されること; **各関数の本体(同じファイルの呼ばれる関数を再帰して)が、読んだ葉の呼び出し(`fle_ld/st`、`fle_stop`、`fle_arg`、アトミック、`fle_clock_real_now`、`fle_thread_current` …)だけを呼ぶこと**(新しい呼び出しが入れば落ちる = 見直しが必要)。実際の多スレッド負荷はブラウザの実エンジンの走行(IntersectRect 約 950 万回/80 s、GetTickCount 約 207 万回)で掛かっている。
+- テスト: `crates/fe-lift/tests/gil_lockfree.rs`(2 件): 一覧の各名前が imports_table の行で、runtime/ の 1 か所で定義されること; **各関数の本体(同じファイルの呼ばれる関数を再帰して)が、読んだ葉の呼び出し(`fle_ld/st`、`fle_stop`、`fle_arg`、アトミック、`fle_clock_real_now`、`fle_thread_current` …)だけを呼ぶこと**(新しい呼び出しが入れば落ちる = 見直しが必要)。実際の多スレッド負荷はブラウザの実エンジンの走行(IntersectRect 約 950 万回/80 s、GetTickCount 約 207 万回)で掛かっている。
 - 協調モード(a4 / 84 / 55 行の同一性): この変更は `GIL=1` のビルドの包み(`fle_gil_wrap.c`)にだけ入り、協調モードのコードには入らない(`FLE_GIL` が無ければ包みは空)ので、それらの同一性は変わらない。再確認は納品物にするときに行う。
 
 ## 5. 残る問題
@@ -47,5 +47,5 @@ GIL は Windows の契約ではなく runtime を安全にするための装置�
 ## 7. プロセッサ数 > 1 の実験と、x87 の共有 static(18:45)
 - 5 分(E 相当、Chrome 350 s 生存): エンジンの書き込み率 0.21〜0.30(10 秒ごと、負荷 16〜26 で他のビルドが同居。ミキサー Worker は CPU 55%・走れるが CPU 無し 22%)。表: `tables/gate-300s-hybrid-gil-E-*.txt`。ゲート(≥0.95)には届かない。
 - 静かな回の読み: ミキサー Worker の CPU 62〜67%、GIL 待ち 2〜5%、Sleep 14〜24%で書き込み率 0.4〜0.5。= 1 本のスレッドが 1 コアを使い切っても 0.5〜0.65 倍の実時間(この参照プロジェクトは 1 秒の音に 1.5〜2 CPU 秒)。(この見積りは CPU の割合と書き込み率の比で、直接測った『CPU 秒/周期』ではない。)
-- → FL 自身の複数スレッドのミキシングを使う実験: `FLE_PROCESSORS=n`(作業木の足場。製品ではページが `navigator.hardwareConcurrency` を事実として渡す)で GetSystemInfo の `dwNumberOfProcessors` / `dwActiveProcessorMask`、GetLogicalProcessorInformation の RelationProcessorCore の記録数、GetProcessAffinityMask のシステムマスクを n にした(`fle_sysinfo.c`、`fle_sys.c`)。セマフォは h6 に実装済み(0234o)。
+- → FL 自身の複数スレッドのミキシングを使う実験: `FLE_PROCESSORS=n`(ワークツリーの足場。製品ではページが `navigator.hardwareConcurrency` を事実として渡す)で GetSystemInfo の `dwNumberOfProcessors` / `dwActiveProcessorMask`、GetLogicalProcessorInformation の RelationProcessorCore の記録数、GetProcessAffinityMask のシステムマスクを n にした(`fle_sysinfo.c`、`fle_sys.c`)。セマフォは h6 に実装済み(0234o)。
 - n = 4: FL は起動途中で `fle: x87: FSINCOS: cosine rounding is not decided at 256 bits [operand se=3ffe m=c90fdaa22168c000]`(= 53 ビットに丸めた π/4)で停止。同じ演算数を native と emcc の -O0/-O2/-Oz の単独のプログラムで流すと正しく丸められる(cos b504f333f9de6614)。= 演算でなく**同時実行**の問題。`fle_x87.c` の `static unsigned X`(その命令の例外ビット)と `keep_snan` が全 Worker 共有で、超越関数の丸めの窓が『`X = 0` にして 2 回丸め、結果と例外ビットまで比べる』ので、間に別の Worker の x87 命令が `X` を書くと 2 つが食い違う。**`_Thread_local` にした**(2 行)。n = 1 でも UI とミキサーの x87 の例外ビットが混ざり得た。

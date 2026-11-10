@@ -20,7 +20,7 @@
 | 6 | パス表 | `fle_realmod_path_table` に `{"plugins\\fruity\\effects\\fruity balance\\fruity balance_x64.dll", "fruity_balance_x64.dll"}`。**行が 1 つも無い構成ではパス表を出さず、B1 の `realmod_table_gen.c` と 1 バイトも違わない**(`test-hybrid.sh` で確認)。awk を `realmod_tables.awk` に切り出した(`gsub` の escape が mawk と gawk で違うため使わない) | `gen-direct.sh`、`lift/harness/b2d2/realmod_tables.awk`(新規) |
 | 7 | volume 上のファイル | 実 DLL を `C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll` へ(`fle_load.c` の `volume_file` が要る。パスはインストーラの展開木で確認) | `lift/harness/seeds/vfs-seed-idle1.tsv` |
 | 8 | 組み込み | `EXTRA_MODULES="oggio elastique fruity_balance"; NEXTRA=3`(他の個数は `NEXTRA` に従う)。コメントのみ: `ci/objkeys.sh`(`m[6-9]` の loop が m8 を既に含む)、`ci/stage-lift.sh`、`ci/stage-bundle.sh` | `app/scripts/build-engine-bundle.sh` 他 |
-| 9 | 試験 | `ci/test-hybrid.sh` に 5 件(抽出行、種、フック点、awk が B1 の表を再現、パス表の形) | `ci/test-hybrid.sh` |
+| 9 | テスト | `ci/test-hybrid.sh` に 5 件(抽出行、種、フック点、awk が B1 の表を再現、パス表の形) | `ci/test-hybrid.sh` |
 
 - **B-FLE の共有本体は G9-a では使わない**(PM の指示)。Balance の C は 35,335,956 B(製品の行で lift した実測。FLEngine の素の lift は 215,741,085 B なので比は 16.4%)。**wasm の増分は未測定**(C のバイト比からの読みは FLEngine 比 十数 %。B-FLE の 0312g〜i の見積りでは共有なしの 1 つ目 約 11.6〜12.3 MB〔読み〕)。
 - **volume のファイルは実 DLL(+3.7 MB の seed pack)**を採る。DLL の中身を FL が読むかが**未確認**なので、stub(先頭だけ)への置換は G9-a の後の最適化(P1/転送量)。
@@ -80,7 +80,7 @@
 **(iii) Problems 窓の件数(alpha1 の返信 01:4x で確定。alpha1 の読みと実績に基づく。私は実行していない)**: 窓の header 『N plugin(s) could not be opened』は描画された画素で、wintable(class/可視/矩形の一覧)の文字列には出ない。node の G3 は **op `dump <tag>`** で、その時点の**全ての窓の面**を `FLE_G8_DUMPDIR` に `<tag>-lid<窓 id>-<幅>x<高さ>.bgrx`(BGRX の生の画素。layered でなくても出る)で書き、stdout に `g8: dump …` を出す。alpha1 の `open-problems.g3`(`/home/ubuntu/work/alpha22w/tools/`。`snap open_b` → `dump open_b` → `dump open_c`)が参照プロジェクトを開いて Problems 窓の面を出す。判定: (a) Problems 窓の面(wintable の class `TMissingPluginsForm` と矩形で絞る)を `bgrx2png.py`(同じ場所)で png にして**目で『N plugin(s)』を読む**(N: 7→6)、(b) Balance 追加前(B1/B2)の同じ窓の面との sha256 の差(必要条件)、(c) 自動読み取りが要るなら、header 領域の画素を基準の面と比較。V3 の Chrome では `sdriveg2.mjs` の `windows()` でも読める。
 **(iv)(v)**: 他の 6 件の plugin、first idle、音の sha は B1/B2 から不変(node の G3 の既存の列で比較)。
 
-**alpha1 の返信(01:4x)で確認できたこと**: (1) 前提 1 の形(nested.tsv + Balance の行の写しを `PARITY_SEED_TSV` にする)で足りる。`PARITY_SEED_TSV` の行は実行時に volume へ載り、bundle の再 build は要らない(alpha1 の tsv 3 本の実績)。(2) 面の観測は上記の `dump` で可能。(3) 診断 diff はテスト bundle のみに同意。(4) 追加の合格条件: 毎回 `grep -a '^fle:' stderr.txt` が 0 行、`g3-lines.txt` に `fruity: == stop` が無い。**注意(alpha1 の観測、E12c の試験 build)**: 実体が**モジュールでないファイル**(stub)を `…\\Fruity Balance.dll` の行に載せると、`LoadLibraryW` が『holds a file … but it is not a module』の名前つき停止になる(`fle_load.c` の path table に無い file の分岐 2.)。**本 patch は実モジュール(8 つ目)の行 + 実 DLL なので該当しない。stub 化(後の最適化)は、path table の行と実モジュールが揃っていれば volume の file の中身は読まれない〔`volume_file` は存在確認だけ〕読みだが、未確認**。
+**alpha1 の返信(01:4x)で確認できたこと**: (1) 前提 1 の形(nested.tsv + Balance の行の写しを `PARITY_SEED_TSV` にする)で足りる。`PARITY_SEED_TSV` の行は実行時に volume へ載り、bundle の再 build は要らない(alpha1 の tsv 3 本の実績)。(2) 面の観測は上記の `dump` で可能。(3) 診断 diff はテスト bundle のみに同意。(4) 追加の合格条件: 毎回 `grep -a '^fle:' stderr.txt` が 0 行、`g3-lines.txt` に `fruity: == stop` が無い。**注意(alpha1 の観測、E12c のテスト build)**: 実体が**モジュールでないファイル**(stub)を `…\\Fruity Balance.dll` の行に載せると、`LoadLibraryW` が『holds a file … but it is not a module』の名前つき停止になる(`fle_load.c` の path table に無い file の分岐 2.)。**本 patch は実モジュール(8 つ目)の行 + 実 DLL なので該当しない。stub 化(後の最適化)は、path table の行と実モジュールが揃っていれば volume の file の中身は読まれない〔`volume_file` は存在確認だけ〕読みだが、未確認**。
 
 **危険・未確認**
 - FL が volume のファイルの**中身**を読むか(`volume_file` は存在確認だけの読み)。読むなら実 DLL で正しい。
@@ -205,7 +205,7 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 | `NEXTRA` | `EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4`(DLL pack は 6+4 = 10 本) | `… fruity_delay2`、`NEXTRA=5`(11 本) |
 | **`RM_MAX`(新しく要る)** | **`lift/runtime/fle_realmod.c:17` の `RM_MAX 8u` → `16u`**(Balance が 8 本目で満杯。9 本目から必須)。停止文面 `:44` の『8 real modules』、コメント `fle_realmod.h:24`・`fle_loadimage.h:49`、census の `MAX_IMAGES 9`(`census.c:41`、census harness のみ)を揃える。カーソル handle の領域は 16 本でも 1 MiB 内(stride 0x1000 × 16 + 0x7fc < 0x100000。読み)。`main_two.c` の `MAIN_REAL_MAX 16` は足りる。**runtime の変更。ただし rt の key は Balance の patch だけでも変わる〔`H_WASM` が `lift/harness` を含むため。下の 10.5 の `ci/plan.sh` の実測〕ので、Filter が新たに起こすわけではない** | 10 本目も 16 以内 |
 | `test-hybrid.sh` | 5 件(Balance と同形)+ 『spec の数と NEXTRA の整合』 | +5 件 |
-| 変更の規模 | **実際に作った(10.5): Balance の上の差分は 17 ファイル・313 行、main に対する合算は 17 ファイル・365 行**(最初の見積り 12 ファイル・+60〜80 行より大きい: フック点の file の改名〔33 行の削除と追加〕、`realmod.rs` の試験、census と `main_two.c` の上限、コメントの数が増えた) | 後の別 build で +20〜30 行 |
+| 変更の規模 | **実際に作った(10.5): Balance の上の差分は 17 ファイル・313 行、main に対する合算は 17 ファイル・365 行**(最初の見積り 12 ファイル・+60〜80 行より大きい: フック点の file の改名〔33 行の削除と追加〕、`realmod.rs` のテスト、census と `main_two.c` の上限、コメントの数が増えた) | 後の別 build で +20〜30 行 |
 | wasm の増分(読み。Balance の実測 +7.76 MB を C のバイト比で補正) | **約 +7.9 MB**(C 36.05 MB 対 35.34 MB) | 約 +7.7 MB |
 | pack の増分(無圧縮) | dll pack・seed とも約 +3.78 MB ずつ(PE の大きさ) | 約 +3.73 MB ずつ |
 | 冷間 build | 約 53 分(C が +16% 増えるため。Balance の 46 分に比例、objects と link が支配。読み) | PM の判断(10.5 の 1.)で**同じ build には足さない**。後の別 build。`ci/objkeys.sh` の `m[6-9]` は 10 本目の m10 を含まないので、Delay 2 のときに `m(6\|[7-9]\|1[0-9])` などへ直す必要がある(読み) |
@@ -224,15 +224,15 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 **PM の判断**: (1) 次は **Fruity Filter 1 本**。Delay 2 は同じ build に足さない(増分を 1 本ずつ測る。後の別 build)。(2) `RM_MAX 8→16` は承認。ただし Split の A0(決定 0312j: close で容量を縮める)は今回の test build に**混ぜない**(増分の帰属を汚さない)。A0 は G9 のモジュール群を push する CI の build に載せる。(3) build の開始条件: (a) Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較 script)が出る、または (b) 判定が長引いても ci1 の counted 窓(E14 の first idle)の後で CPU が空いたとき。それまで私は設計と変更案の dry-run まで。build の窓は PM の info(`CI_JOBS=1`・`BINARYEN_CORES=1`・nice 19、メモリ確認つき)。(4) S1 は毎回 3 つを併記(下)。(5) seed の stub 化は別の宿題(今は入れない)。
 
 **patch(`impl/0313f-filter-on-balance.diff`、Balance の diff の上。`impl/0313-g9a+filter-combined.diff` は main に対する合算)**:
-- 内容: `ci/extract-dlls.tsv` に Filter(sha256 `f4801444…3d6c`)、`vfs-seed-idle1.tsv` に Filter の 1 行、`gen-direct.sh` に 9 本目の spec(基底 `0x7000000`、パス末尾 `plugins/fruity/effects/fruity filter/fruity filter_x64.dll`)、フック点の file を汎用名 `fruity-delphi-effect-hook-points.txt` に改名(Balance と Filter が同じ 3 RVA。Balance の spec も新名へ)、`build-engine-bundle.sh` を `EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4`(DLL pack は 6+4 = 10 本)、`RM_MAX 8u → 16u`(`fle_realmod.c`。停止文面とコメント〔`fle_realmod.h`・`fle_loadimage.h`〕を揃えた)、census の `MAX_IMAGES 17` と `main_two.c` 2 本の `MAIN_REAL_MAX 32`(『runtime の上限より大きく』の意図を保つ)、`realmod.rs` の試験(『9 本で停止』を『17 本で停止、`larger than the 16 real modules`』に)、`ci/test-hybrid.sh` に 3 件(Filter の extract 行、seed の行、`NEXTRA` と `EXTRA_MODULES` の名前の数と spec の数〔5+NEXTRA〕と `RM_MAX` の整合)。
-- 静的検査(実測): `patch --dry-run -p1` が **main HEAD に対する合算で rc=0**、**main + Balance の diff に対する Filter の差分で rc=0**。当てた木で `bash -n` 6 本 ok、`ci/test-hybrid.sh` **54 ok・FAIL 0**(Balance 込みの 51 + 新規 3)。9 モジュール+パス表 2 行の生成 C と `fle_realmod.c`・`fle_load.c`・`fle_loadimage.c` が `clang`/`emcc -fsyntax-only -Wall -Wextra` で rc=0・警告 0。`realmod.rs` は `rustfmt` で構文として読める(整形の差は他の file にもある既存の差)。**`cargo test`(`realmod` の試験)は未実行**(build の窓の外で行う)。ログ: `tables/g9c/0313f-test-hybrid.log`。
-- **`ci/plan.sh` の stage key(実測、git の無い木で比較。`k_app` の変化は `:(exclude)` が効かない non-git の人工物で CI では出ない見込み)**: main → Balance は extract・lift・rt・link・seed・bundle が変わる(felift・b2d は不変)。**Balance → Filter は上に加えて `k_felift` が変わる**: `H_FELIFT` が `lift/crates` 全体(`lift/crates/fe-lift/tests/realmod.rs` を含む)を hash するため、試験の更新だけで CI の fe-lift の cargo build が冷間になる(local の run-ci-build は段を無条件に走らせるので local では差が出ない。CI での cargo の冷間の所要は未測定)。避けるなら試験の更新を別の push に分けるが、`RM_MAX` を上げると試験が落ちるので同じ push が正しい。
+- 内容: `ci/extract-dlls.tsv` に Filter(sha256 `f4801444…3d6c`)、`vfs-seed-idle1.tsv` に Filter の 1 行、`gen-direct.sh` に 9 本目の spec(基底 `0x7000000`、パス末尾 `plugins/fruity/effects/fruity filter/fruity filter_x64.dll`)、フック点の file を汎用名 `fruity-delphi-effect-hook-points.txt` に改名(Balance と Filter が同じ 3 RVA。Balance の spec も新名へ)、`build-engine-bundle.sh` を `EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4`(DLL pack は 6+4 = 10 本)、`RM_MAX 8u → 16u`(`fle_realmod.c`。停止文面とコメント〔`fle_realmod.h`・`fle_loadimage.h`〕を揃えた)、census の `MAX_IMAGES 17` と `main_two.c` 2 本の `MAIN_REAL_MAX 32`(『runtime の上限より大きく』の意図を保つ)、`realmod.rs` のテスト(『9 本で停止』を『17 本で停止、`larger than the 16 real modules`』に)、`ci/test-hybrid.sh` に 3 件(Filter の extract 行、seed の行、`NEXTRA` と `EXTRA_MODULES` の名前の数と spec の数〔5+NEXTRA〕と `RM_MAX` の整合)。
+- 静的検査(実測): `patch --dry-run -p1` が **main HEAD に対する合算で rc=0**、**main + Balance の diff に対する Filter の差分で rc=0**。当てた木で `bash -n` 6 本 ok、`ci/test-hybrid.sh` **54 ok・FAIL 0**(Balance 込みの 51 + 新規 3)。9 モジュール+パス表 2 行の生成 C と `fle_realmod.c`・`fle_load.c`・`fle_loadimage.c` が `clang`/`emcc -fsyntax-only -Wall -Wextra` で rc=0・警告 0。`realmod.rs` は `rustfmt` で構文として読める(整形の差は他の file にもある既存の差)。**`cargo test`(`realmod` のテスト)は未実行**(build の窓の外で行う)。ログ: `tables/g9c/0313f-test-hybrid.log`。
+- **`ci/plan.sh` の stage key(実測、git の無い木で比較。`k_app` の変化は `:(exclude)` が効かない non-git の人工物で CI では出ない見込み)**: main → Balance は extract・lift・rt・link・seed・bundle が変わる(felift・b2d は不変)。**Balance → Filter は上に加えて `k_felift` が変わる**: `H_FELIFT` が `lift/crates` 全体(`lift/crates/fe-lift/tests/realmod.rs` を含む)を hash するため、テストの更新だけで CI の fe-lift の cargo build が冷間になる(local の run-ci-build は段を無条件に走らせるので local では差が出ない。CI での cargo の冷間の所要は未測定)。避けるならテストの更新を別の push に分けるが、`RM_MAX` を上げるとテストが落ちるので同じ push が正しい。
 - **S1 の 3 併記(PM の決定 4。数字は実測の test bundle と見積りを分けて書く)**: (i) wasm の全体の比 = **1.859**(Balance 込み: 150,851,575 ÷ 81,161,600)。Filter 後は**見積り**約 1.87。(ii) モジュール別の wasm 比 = Balance 単独 **7,763,869 ÷ 3,718,656 ≒ 2.09 倍**(共有なしの重複込み。PM の計算と一致)。Filter は**見積り** 約 7.9 MB ÷ 3,780,608 ≒ 2.09 倍。(iii) dll pack と seed の増分 = Balance **+7.44 MB 無圧縮**(+3,718,808 + 3,719,103 B)。Filter も**見積り**約 +7.5 MB。q11 の brotli の転送量は CI の bundle でだけ測る(私の q1 の test bundle は比べない)。(ii)(iii) が 2 倍を超えることは隠さない。
 - **行なし import の増分(alpha1 の表、`lift/out-git/alpha22-results/tables/0310-g9c-extra-imports-by-plugin.tsv`・`…-summary.tsv`)**: Filter・Delay 2・PEQ2・Frequency Shifter は Balance と同じ 74(増分 0)、Soundgoodizer +33、FLEX +14。私の fe-lift の結果(Filter・Delay 2 の thunk の API 集合が Balance と同一)と一致する。
 
 ## 11. comctl32 `ImageList_*`(22 種)の契約の実装案(設計だけ。読みと静的検査のみ。実装・build・実行は 0。PM の宿題 05:3x)
 
-**結論**: 22 種は **5 つの層**に分かれ、新規に要るのは「ImageList の表(host 側の画素配列)」が中心で、描画は既存の raster の blit に乗る。足りない物は (a) HBITMAP の画素を読む入口、(b) 宛先 DC へ surface を描く共通の入口(BitBlt の宛先の解決を再利用)、(c) アルファ合成、(d) 引数が guest の `IStream` の vtable を呼ぶ callback。**規模の目安は新規 C 約 1,200 行(関数 22 + 補助 約 25)+ 既存 file への出口 約 200 行 + 試験 約 600 行**(0210 の見積り 920〜2,300 行と整合)。最初の一手は**状態だけの 7 種(約 200 行)**で、これで次に止まる所が分かる。FL のクラス名・窓の種類での分岐は無く、全部が (b) 外部 API の契約の実装(lift-fidelity)。契約に無い・Learn に書かれない部分は『UNOFFICIAL(Wine 10.0 の `imagelist.c`)』と印を付けて根拠を分ける。
+**結論**: 22 種は **5 つの層**に分かれ、新規に要るのは「ImageList の表(host 側の画素配列)」が中心で、描画は既存の raster の blit に乗る。足りない物は (a) HBITMAP の画素を読む入口、(b) 宛先 DC へ surface を描く共通の入口(BitBlt の宛先の解決を再利用)、(c) アルファ合成、(d) 引数が guest の `IStream` の vtable を呼ぶ callback。**規模の目安は新規 C 約 1,200 行(関数 22 + 補助 約 25)+ 既存 file への出口 約 200 行 + テスト 約 600 行**(0210 の見積り 920〜2,300 行と整合)。最初の一手は**状態だけの 7 種(約 200 行)**で、これで次に止まる所が分かる。FL のクラス名・窓の種類での分岐は無く、全部が (b) 外部 API の契約の実装(lift-fidelity)。契約に無い・Learn に書かれない部分は『UNOFFICIAL(Wine 10.0 の `imagelist.c`)』と印を付けて根拠を分ける。
 
 ### 11.1 22 種の契約(Learn の `nf-commctrl-imagelist_*` を取得して読んだ。原文の抜粋は `tables/g9c/learn/ImageList_*.core`、取得 script は `fetch.py`)
 
@@ -247,7 +247,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | A | `ImageList_SetIconSize` | `BOOL (HIMAGELIST, int cx, int cy)` | 『全画像は同じ大きさ』。UNOFFICIAL(Wine の `ImageList_SetIconSize` で確認): 大きさを変えると画像は全部消え、overlay の index も初期化される | `0x5445e0`・`0x544640`・`0x544cb0`・`0x693670`(4) |
 | A | `ImageList_GetBkColor` | `COLORREF (HIMAGELIST)` | 背景色。失敗=`CLR_NONE` | `0x544d20`・`0x693670`(2) |
 | A | `ImageList_SetBkColor` | `COLORREF (HIMAGELIST, COLORREF)` | 『`CLR_NONE` ならマスクで透過』。戻り=直前の背景色、失敗=`CLR_NONE` | `0x544be0` |
-| B | `ImageList_Add` | `int (HIMAGELIST, HBITMAP hbmImage, HBITMAP hbmMask)`。成功=最初の新しい画像の index、失敗=-1 | 『画像数は**ビットマップの幅から**決める』『内部構造へ**複写**する。`hbmImage`/`hbmMask` は呼び出し側が `DeleteObject`』『マスク無しの list では `hbmMask` は無視』 | `0x544930`(2) |
+| B | `ImageList_Add` | `int (HIMAGELIST, HBITMAP hbmImage, HBITMAP hbmMask)`。成功=最初の新しい画像の index、失敗=-1 | 『画像数は**ビットマップの幅から**決める』『内部構造へ**コピー**する。`hbmImage`/`hbmMask` は呼び出し側が `DeleteObject`』『マスク無しの list では `hbmMask` は無視』 | `0x544930`(2) |
 | B | `ImageList_Remove` | `BOOL (HIMAGELIST, int i)` | 『`i = -1` は全画像を削除。残りの index は詰める(0〜n−1)』 | `0x544b00` |
 | B | `ImageList_SetImageCount` | `BOOL (HIMAGELIST, UINT uNewCount)` | 『拡げたら `ImageList_Replace` で画像を入れる。入れない index の描画は予測できない』『縮めたら切り詰めた画像は解放』 | `0x546340`(`SetCount`) |
 | B | `ImageList_GetIcon` | `HICON (HIMAGELIST, int i, UINT flags)`。失敗=NULL | 『呼び出し側が `DestroyIcon`』。`flags` は `ImageList_Draw` の `fStyle` と同じ | `0x544a60` |
@@ -273,7 +273,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 ### 11.3 契約を満たす最小の実装の置き場(既存の GDI/raster の再利用)
 
-**置き場**: 新規 `lift/runtime/fle_imagelist.c` と `fle_imagelist.h`(22 の `fle_imp_ImageList_*`)。表(ハンドルの slot)は `fle_gdi.c` と別。**画素は host 側の配列に持つ**(Windows と Wine は list の画像を GDI のビットマップ + メモリ DC に持つが、本 runtime の DDB は『最初に描くときに遅延して作る』〔`fle_gdi.c` の `ddb_view`〕で、`CreateBitmap` は 1 ビットの形だけ〔`fle_gdi.h:85-92`〕なので、ImageList を GDI のビットマップの上に載せると壁が増える)。Learn は『`ImageList_Add` は内部の構造へ複写する』と書くので、**画素の持ち方は契約の外**。
+**置き場**: 新規 `lift/runtime/fle_imagelist.c` と `fle_imagelist.h`(22 の `fle_imp_ImageList_*`)。表(ハンドルの slot)は `fle_gdi.c` と別。**画素は host 側の配列に持つ**(Windows と Wine は list の画像を GDI のビットマップ + メモリ DC に持つが、本 runtime の DDB は『最初に描くときに遅延して作る』〔`fle_gdi.c` の `ddb_view`〕で、`CreateBitmap` は 1 ビットの形だけ〔`fle_gdi.h:85-92`〕なので、ImageList を GDI のビットマップの上に載せると壁が増える)。Learn は『`ImageList_Add` は内部の構造へコピーする』と書くので、**画素の持ち方は契約の外**。
 
 | 要る物 | 既存の再利用 | 新規 |
 |---|---|---|
@@ -304,7 +304,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | 6 | `GetIcon`(`fle_gdi_make_icon`)と overlay の状態 | 1 / 約 3 | 約 100 |
 | 7 | ドラッグ 7 種: 状態 + 窓の面への描画/消去(宛先の窓の画素を保存して戻す)。**最初は名前つき停止でよい**(利用者のドラッグ操作でだけ呼ばれる読み) | 7 / 約 6 | 約 150(状態だけなら約 60) |
 | | **合計(1〜6)** | **15 / 約 26** | **約 1,250**(+ 7 を入れて約 1,400) |
-| | 試験(`lift/crates/fe-lift/tests/imagelist.rs`、native。API ごとの契約の試験 + Wine 10.0 との差分) | — | 約 600 |
+| | テスト(`lift/crates/fe-lift/tests/imagelist.rs`、native。API ごとの契約のテスト + Wine 10.0 との差分) | — | 約 600 |
 | | 行の file(`ship7-imports.txt`)+ 宣言 | — | 約 30 |
 
 - **順序の提案**: 段 1 を先に入れ(約 200 行、1 回の build の窓で足りる)、GUI の run で次の停止(= 実際に踏む層)と `Create` の引数を見てから段 2 以降を決める。段 1 の『状態だけ』は画素を持たないので、`Add`/`Draw` は**名前つき停止**のまま(止まる場所が変わるだけ、と 0209 §7 が退けた形だが、**今回は run の観測で次の層を決めるために使う**ので意味がある。PM の判断が要る)。
@@ -314,7 +314,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 - **新しい処理の区分**: 全部が (b) 外部 API の契約の実装。新しい旗・環境変数・クラス名/窓の種類/アドレスによる分岐は無い。
 - **Learn に無い挙動**(`Read`/`Write` の形式、大きさ変更で画像が消える、ブレンドの濃淡)は『UNOFFICIAL(Wine 10.0)』と書き、最初は名前つき停止を優先する。
-- **Wine との差分試験**: 0210 が『headless Wine で窓・更新領域・メッセージ列まで比べられる』と書いた差分試験の道を、API ごとの契約の試験に使う(`ImageList_Read` は Wine が生成した stream と本実装が書いた stream の相互読みを含める)。
+- **Wine との差分テスト**: 0210 が『headless Wine で窓・更新領域・メッセージ列まで比べられる』と書いた差分テストの道を、API ごとの契約のテストに使う(`ImageList_Read` は Wine が生成した stream と本実装が書いた stream の相互読みを含める)。
 - **FL 側の補正・代行は無い**: ImageList の画素を FL の描画に合わせて直す処理は書かない。
 
 ## 12. GUI を踏む scenario の設計(Balance の窓を開く)— sdriveg2 の JSON と G3 の下書き(設計だけ。**実行 0**、座標は他者の run の窓表と画像からの読み。PM の宿題 05:4x)
@@ -431,9 +431,9 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 ### 14.4 `realmod` の cargo test を build と一緒に回すかの提案(**重いので勝手に走らせない**。PM の許可後)
 
-- **何を試すか**: `RM_MAX 8→16` で書き換えた `lift/crates/fe-lift/tests/realmod.rs`(『17 本で停止』の試験を含む)。他に `fle_realmod` を使う試験(`wall_wrp1`・`wall_dec1`・`deferred` ほか 10 前後)は 8 を前提にした文面を持たない(`larger than the 8 real modules` の文字列は `realmod.rs` だけ。grep 済み)が、runtime が変わるので影響の有無は走らせて確かめる。
+- **何を試すか**: `RM_MAX 8→16` で書き換えた `lift/crates/fe-lift/tests/realmod.rs`(『17 本で停止』のテストを含む)。他に `fle_realmod` を使うテスト(`wall_wrp1`・`wall_dec1`・`deferred` ほか 10 前後)は 8 を前提にした文面を持たない(`larger than the 8 real modules` の文字列は `realmod.rs` だけ。grep 済み)が、runtime が変わるので影響の有無は走らせて確かめる。
 - **道**: `bash lift/harness/test.sh full --only 'realmod' --jobs 1 --threads 2`(木 `tree-g9f-build` の中。`full` が mingw と clang で合成 PE を作り runtime をリンクする。所要は**未測定**〔test.sh full 全体は S3a で 223 results・704 s〕)。範囲を広げるなら `affected --base-tree ~/work/mt3w-s1/tree-g9-base`(Balance の main 基準の木と比べた差の影響を受ける実行体だけ)。
-- **提案**: build の `objects` 段(CI_JOBS=1 で 1 コアだけ使う約 23 分)の間に、**nice 19・`--jobs 1`・`CARGO_BUILD_JOBS=2`** で `--only realmod` だけを 1 回(CPU は空いており、メモリは build の objects が約 1.5 GB なので足りる〔読み〕)。gpu1 の Chrome は非計時なので重なってよい。**ci1 の計時の窓とは重ねない**。全体の `full` は push 前の 1 回(窓の外)に回す案。結果が落ちたら試験の更新の誤りか runtime の副作用かを切り分ける。
+- **提案**: build の `objects` 段(CI_JOBS=1 で 1 コアだけ使う約 23 分)の間に、**nice 19・`--jobs 1`・`CARGO_BUILD_JOBS=2`** で `--only realmod` だけを 1 回(CPU は空いており、メモリは build の objects が約 1.5 GB なので足りる〔読み〕)。gpu1 の Chrome は非計時なので重なってよい。**ci1 の計時の窓とは重ねない**。全体の `full` は push 前の 1 回(窓の外)に回す案。結果が落ちたらテストの更新の誤りか runtime の副作用かを切り分ける。
 
 ### 12.6 追記(gpu1 の窓の間の確認 06:12。**gpu1 の報告の引用。私の測定ではない**)
 
@@ -444,7 +444,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 ### 14.5 realmod の cargo test の結果(実測。06:35〜06:38、build の objects 段の間、nice 19・`--jobs 1`・`CARGO_BUILD_JOBS=2`)
 
-`bash lift/harness/test.sh full --only realmod --jobs 1 --threads 2`(木 `tree-g9f-build`、`FLE_INPUT_ROOT` = PM の checkout〔読むだけ〕): **`fe-lift/realmod` 16 tests passed・failed 0・skipped 0**(『17 本で停止、`larger than the 16 real modules`』の更新後の試験を含む)。`cargo test --no-run` は 128.7 s(215 の試験実行体を build)、実行体 19.9 s、全体 148.9 s。doc-tests を含め results=5・SKIPPED-lines=0。ログ: `tables/g9c/0313f-realmod-cargo-test.log`。**範囲の限界**: `--only realmod` の 1 実行体だけ。`fle_realmod` を使う他の試験(`wall_wrp1`・`wall_dec1`・`deferred` ほか)と全体の `full` は**未実行**(push 前に窓の外で 1 回の提案のまま)。
+`bash lift/harness/test.sh full --only realmod --jobs 1 --threads 2`(木 `tree-g9f-build`、`FLE_INPUT_ROOT` = PM の checkout〔読むだけ〕): **`fe-lift/realmod` 16 tests passed・failed 0・skipped 0**(『17 本で停止、`larger than the 16 real modules`』の更新後のテストを含む)。`cargo test --no-run` は 128.7 s(215 のテスト実行体を build)、実行体 19.9 s、全体 148.9 s。doc-tests を含め results=5・SKIPPED-lines=0。ログ: `tables/g9c/0313f-realmod-cargo-test.log`。**範囲の限界**: `--only realmod` の 1 実行体だけ。`fle_realmod` を使う他のテスト(`wall_wrp1`・`wall_dec1`・`deferred` ほか)と全体の `full` は**未実行**(push 前に窓の外で 1 回の提案のまま)。
 
 ## 15. Balance の編集窓で『枠だけ出て client が描かれない』原因の切り分け(静的な読みと観測・診断の設計。**実行 0**。PM の宿題 06:4x、期限 07:30)
 
@@ -595,7 +595,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 2. **SoftSink**(表の 8):『AudioContext が suspended の間も凍結を避ける』という決定 0211 の便宜。契約ではない。『engine が PLAYING と言っているのに worklet が処理していない間は RD を動かさない(transport は止まる)』に戻すと、suspended の間の最初の拍が失われない代わりに、gesture 無しでは song が進まない(決定 0211 が測った凍結)。依頼者の環境(gesture 後に再生)では resume が速いはずで、H3 の観測で影響の大きさを見てから決める。
 3. 『無音で切る』処理は**見つからなかった**(上の 1・2)。依頼者の記憶にある処理が app/ や runtime のどこかにあれば、grep の対象語を教えてほしい。
 
-## 17. 診断入り試験 build の準備(PM の許可 07:0x。patch と dry-run まで。**build は PM の許可後**。試験専用・push しない)
+## 17. 診断入りテスト build の準備(PM の許可 07:0x。patch と dry-run まで。**build は PM の許可後**。テスト専用・push しない)
 
 **積み重ねる diff(main の上、順に)**: `impl/0313-g9a+filter-combined.diff`(Balance + Filter。push する物)→ `impl/diag-g9-loadlib.diff`(LoadLibraryW/GetProcAddress の戻り)→ **`impl/diag-g9-gui.diff`**(新規。下)→ `impl/audio-first-beat-reorder-proposal.diff`(音声の順序の入れ替え 2 行。(a) 我々の順序の除去)。**実測**: 4 本とも新しい `git archive HEAD` に順に `patch --batch -p1` で FAILED 0・offset/fuzz 0、`fle_callback.c`・`fle_dsound.c`・`fle_load.c`・`fle_modules.c` は `emcc -fsyntax-only -Wall -Wextra` rc=0・警告 0、`link-web.sh` は `bash -n` ok。
 
@@ -604,7 +604,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 2. **GUI 系 API の列**: `CreateWindowExW`(style・class・位置・大きさ・親)・`DestroyWindow`・`SetParent`・`ShowWindow`・`SetWindowPos`・`MoveWindow`・`RegisterClassW`・`SetWindowLongPtrW`・`InvalidateRect`・`UpdateWindow`・`BeginPaint`・`EndPaint`・`BitBlt`・`StretchBlt`・`RaiseException`・`FindResourceW`・`LoadResource` の 17 個を、**ゲストの戻り先(`fle_ld(R[4], 8)`)が Balance/Filter の image の中にある呼びだけ**、引数と戻り値と『これまでに破棄された描画呼び出しの数』(`fle_raster_discarded_count()`。**単位は画素ではなく呼び出し**〔`fle_raster.c:810` の `discarded_total++`〕)を最大 600 行まで印字(§15.3 の 2・3)。仕組みはリンカの `--wrap`(`link-web.sh` の既存の `--wrap=fprintf` 等と同じ。他の呼び元は見えず、`fle_win.c` 等の他担当の file は一切触らない)。
 3. 出力先は stderr(`[err] g9-diag:`)。ブラウザでは `window.__app.engineLog()`(§3b、V3 で実測済み)。node の G3 の TEST bundle でも同じ行が stderr に出る。
 
-**区分**: 診断 = 観測だけ(契約の実装でも余計な処理でもなく、試験専用)。`audio-first-beat-reorder-proposal.diff` = **(a) 我々が足した順序の除去**(再生開始: 先に state = PLAYING、後で最初の hand-over → 先に hand-over)。直す仕組み = 再生開始の境界(timeline 方式の開始点)。画面・症状ごとの対症ではない。**push しない**(音声の順序の入れ替えを push するのは後の G9 の push)。
+**区分**: 診断 = 観測だけ(契約の実装でも余計な処理でもなく、テスト専用)。`audio-first-beat-reorder-proposal.diff` = **(a) 我々が足した順序の除去**(再生開始: 先に state = PLAYING、後で最初の hand-over → 先に hand-over)。直す仕組み = 再生開始の境界(timeline 方式の開始点)。画面・症状ごとの対症ではない。**push しない**(音声の順序の入れ替えを push するのは後の G9 の push)。
 
 **使い方(PM の許可後)**: `tools/g9f-test-build.sh` の `tree` の段で 3 本目・4 本目を足す(`$D` の diag を並べる 2 行)。Chrome 1 本(gpu1 の scenario の段 0〜3、段 3 の前後に `logMark`/`saveLog`)で §15.2 の (a)〜(d) を区別し、同じ run で §16.4 の音声の観測(再生を押す前の polling)も取れる(診断 build は 1 回で足りる)。**実行は 0**。
 
@@ -616,8 +616,8 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 - **対象は install tree 全体**: 27,822 ファイル・2,053.3 MiB(Data 785.0 MiB/20,272、Plugins 867.7 MiB/6,414、Shared 205.8 MiB/123、System 128.9 MiB/864、直下 43.4 MiB/14、Artwork 19.7 MiB/80、Help 2.8 MiB/55)、ディレクトリ 1,354、パスの平均 72 B。テーマ(`Artwork\Themes` 39 ファイル)・言語(`System\Languages` 15)・テンプレート(`Data\Templates` 70)は Data/Plugins の外にもあるので**索引は全域**。ファイルの大きさの中央値は約 2.8 KiB、4 KiB 未満が全体の 15,223 個(10.3 MiB)、10 MiB 以上は 12 個(304.9 MiB。Data では 3 個)。VST/VST3/Serum 2 は install tree に無い(別経路)。
 - **guest が見る根**は `C:\Program Files\Image-Line\FL Studio 21\`(seed の名前。原本の実フォルダは `FL Studio 2026`)。同じ相対パスで置く。**今の seed** は 225 エントリ・7,205,523 B(brotli 3.93 MB)で、うち 218 ファイルが原本とバイト一致(opt1 が sha256 照合)。install tree に対し 0.78%(ファイル数)・0.26%(バイト)。
-- **経路(読み)**: guest の `CreateFileW`/`ReadFile`/`FindFirstFileW` 等は `lift/runtime/fle_vfs.c` の**メモリ上の木**(`fle_node`: 名前・親・属性・`data`/`size`/`cap`・時刻 3 つ・子の配列。`fle_vfs.c:59-72`)に当たる。seed は起動時に `FLE_VFS_SEED` の TSV を読み、host ファイル(`HostFiles` の POSIX 系 syscall = `__syscall_openat`/`fd_pread` 等。`hostfiles.ts:1-14, 56-58`。`-sFILESYSTEM=0`)から**線形メモリの heap へ複写**する。`HostFiles` は `ByteSource.readInto(dst, at)` を**同期**で呼ぶ(`hostfiles.ts:18-23`)。実モジュール(lifted plugin)の `LoadLibraryW` は volume 上に『ファイルが在る』ことだけを確認し(`fle_load.c:204-212 volume_file`)、image は別の `dll.flpack` から読む(§6 の『pack に 2 か所入る』の原因)。
-- **制約(実測・設定値)**: 線形メモリは初期 640 MiB・上限 2 GiB(`link-web.sh:23`)。node の G3 の run では使用 1.1〜1.2 GB(alpha1 の `summary.json`)。→ **2.05 GB は heap に載らない**。したがって『seed の延長で全部 heap へ複写』は不可能で、**中身は heap の外(host 側)に置いて必要な範囲だけを読む**設計が要る。`0312j`(大きなファイルの退避)の A1 = 『閉じたファイルの中身を host の OPFS に置く』は、**同じ『node の中身を host 側が持つ』仕組みの書き込み側**なので、一つの記憶の抽象にまとめられる。
+- **経路(読み)**: guest の `CreateFileW`/`ReadFile`/`FindFirstFileW` 等は `lift/runtime/fle_vfs.c` の**メモリ上の木**(`fle_node`: 名前・親・属性・`data`/`size`/`cap`・時刻 3 つ・子の配列。`fle_vfs.c:59-72`)に当たる。seed は起動時に `FLE_VFS_SEED` の TSV を読み、host ファイル(`HostFiles` の POSIX 系 syscall = `__syscall_openat`/`fd_pread` 等。`hostfiles.ts:1-14, 56-58`。`-sFILESYSTEM=0`)から**線形メモリの heap へコピー**する。`HostFiles` は `ByteSource.readInto(dst, at)` を**同期**で呼ぶ(`hostfiles.ts:18-23`)。実モジュール(lifted plugin)の `LoadLibraryW` は volume 上に『ファイルが在る』ことだけを確認し(`fle_load.c:204-212 volume_file`)、image は別の `dll.flpack` から読む(§6 の『pack に 2 か所入る』の原因)。
+- **制約(実測・設定値)**: 線形メモリは初期 640 MiB・上限 2 GiB(`link-web.sh:23`)。node の G3 の run では使用 1.1〜1.2 GB(alpha1 の `summary.json`)。→ **2.05 GB は heap に載らない**。したがって『seed の延長で全部 heap へコピー』は不可能で、**中身は heap の外(host 側)に置いて必要な範囲だけを読む**設計が要る。`0312j`(大きなファイルの退避)の A1 = 『閉じたファイルの中身を host の OPFS に置く』は、**同じ『node の中身を host 側が持つ』仕組みの書き込み側**なので、一つの記憶の抽象にまとめられる。
 - **既存の host 側の部品**: `assetstore.ts` = OPFS の `/fl/cache/assets/<sha256>.<ext>`(内容アドレス、SHA-256 で再検証、Web Locks で他ページの掃除から守る、`navigator.storage.persist()` は要求しない)。R2 の bundle は brotli で**符号化したまま**置き、Worker が `Content-Encoding: br` を付けて返す(`upload-commands.txt`)ので、ブラウザが復号して JS は復号済みの bytes を受ける。
 
 ### 18.2 提案する構成(『Lazy Volume』)
@@ -644,7 +644,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 ### 18.4 起動時間(P1 ≤ 10 s)への影響
 
 - 起動に増えるのは **索引の取得(圧縮して約 0.3〜0.4 MB。上の試算)と骨格 node の構築(約 28,000 個、数十 ms。読み)** だけ。chunk は起動に要る物だけが seed に残り、**新しい取得は起動の経路に入らない**(今の seed が起動に必要な 218 ファイル)。予算(PM: 前の bundle 比 +100 ms)に入る見込みだが**未測定**。索引が大きすぎる場合は、ディレクトリ単位に分割して初回の列挙で取る(同じ blocking 経路。起動はさらに軽い)。
-- **seed の重複の解消**: 今は Balance の PE が `dll.flpack` と seed の 2 か所にある(+7.4 MB/本、§6)。lazy node は『volume に見えるファイル』の裏付けを **`dll.flpack` の同じ bytes に向ける**(sha256 が同じ)ので seed の複写は不要になる(index のエントリだけ)。→ 本件の『stub 化』の宿題(§10.5 の 5)を含む。
+- **seed の重複の解消**: 今は Balance の PE が `dll.flpack` と seed の 2 か所にある(+7.4 MB/本、§6)。lazy node は『volume に見えるファイル』の裏付けを **`dll.flpack` の同じ bytes に向ける**(sha256 が同じ)ので seed のコピーは不要になる(index のエントリだけ)。→ 本件の『stub 化』の宿題(§10.5 の 5)を含む。
 - メモリ: 骨格 約 6〜8 MB(読み)+ 取得中の chunk の一時 buffer(数 MB)。再生中の読み(ストリームの `.wv`/`.wav`)は chunk 単位の逐次読みで、heap に溜めない。
 
 ### 18.5 契約の点検(Learn と照らす。API ごと。実装は許可後)
@@ -656,7 +656,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | `CreateFileW`(読み) | `OPEN_EXISTING`・共有モード・`FILE_FLAG_*` | 存在は索引で判定。開くだけでは取らない |
 | `CreateFileW`(書き)/`WriteFile`/`DeleteFile`/`MoveFileW` | install tree のファイルの変更は guest の私的な複製に | copy-on-write(L2) |
 | `ReadFile`/`SetFilePointerEx` | 逐次・ランダムな読み。EOF での 0 バイト | backing の `pread`(L3)。部分読みを返してよい(Learn: 要求より少なく返ることがある) |
-| `CreateFileMappingW`/`MapViewOfFile`(`fle_vmap.c:721`) | 読み取りの view | 範囲を guest メモリへ**複写して**渡す(wasm にページフォルトは無い)。view の大きさだけ一時的に増える(最大の `.flexpack` 40.3 MiB)。**契約は満たす**が、view が大きいと瞬間的にメモリが増える点を記録 |
+| `CreateFileMappingW`/`MapViewOfFile`(`fle_vmap.c:721`) | 読み取りの view | 範囲を guest メモリへ**コピーして**渡す(wasm にページフォルトは無い)。view の大きさだけ一時的に増える(最大の `.flexpack` 40.3 MiB)。**契約は満たす**が、view が大きいと瞬間的にメモリが増える点を記録 |
 | `LoadLibraryW`(`fle_load.c`) | フルパスの存在 | index だけで存在を答える(§3b の `volume_file`)。lifted module なら実 image は `dll.flpack` から。非 lifted の DLL は今までどおり名前つきの停止 |
 | `GetDiskFreeSpaceW`/`GetVolumeInformationW` | 空き容量・種別・シリアル | 今の仮想ボリュームの値のまま |
 
@@ -676,8 +676,8 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | 段 | 内容 | 規模の目安 |
 |---|---|---|
 | 1 | 索引と chunk の生成ツール(原本の木 → `index.bin` + `vfs/<sha>.chk` + 公開用の一覧。種別の組で分け、brotli は縮む組だけ) | python 約 300 行 |
-| 2 | runtime: `fle_node` に backing を足す(`->data` 15 か所を accessor 経由に: 0312j と共通)+ 起動時の索引読み込み + copy-on-write | C 約 400 行 + 試験 |
-| 3 | host: `ChunkedSource`(OPFS の同期読み、I/O Worker、`Atomics.wait`、検証、LRU、Web Locks)+ `HostFiles` への登録 | TS 約 500 行 + 試験 |
+| 2 | runtime: `fle_node` に backing を足す(`->data` 15 か所を accessor 経由に: 0312j と共通)+ 起動時の索引読み込み + copy-on-write | C 約 400 行 + テスト |
+| 3 | host: `ChunkedSource`(OPFS の同期読み、I/O Worker、`Atomics.wait`、検証、LRU、Web Locks)+ `HostFiles` への登録 | TS 約 500 行 + テスト |
 | 4 | CI: chunk と索引を R2 へ(`wrangler` の既存の仕組みに追加)+ manifest に索引の sha | 約 150 行 |
 | 5 | 先読みの方針(idle の背景取得、再生中の抑制)| 約 150 行 |
 | 6 | lifted module のオンデマンド化(O-2)| **別の設計**(link の変更と dispatch 表の動的登録を含む。1,500 行以上の見込み、未設計) |
@@ -744,28 +744,28 @@ index.bin :=
 **書き込み**: lazy node への書き込み・削除・名前の変更は copy-on-write(runtime の仕事。形式には現れない)。
 
 
-## 20. 遅延 install tree V1(runtime と host)の実装の現状(mt3。**一時停止中**〔PM の 08:0x の判断: P3 が優先〕。実行したのは host の C の自己試験と tsc だけで、**engine(wasm)の実行は 0、ブラウザの実行は 0、vitest の新しい試験は未作成**)
+## 20. 遅延 install tree V1(runtime と host)の実装の現状(mt3。**一時停止中**〔PM の 08:0x の判断: P3 が優先〕。実行したのは host の C の自己テストと tsc だけで、**engine(wasm)の実行は 0、ブラウザの実行は 0、vitest の新しいテストは未作成**)
 
-差分(**適用していない・push しない**): `impl/0314v1-lazy-vfs-runtime.diff`(5 ファイル、1,082 行: `lift/runtime/fle_vfs.c`・`fle_vfs.h`、`lift/harness/vfs_lazy.h`〔新規〕、`vfs_seed.h`、`harness/seeds/vfs_lazy_selftest.c`〔新規〕)、`impl/0314v1-lazy-vfs-host.diff`(782 行: `app/src/engine/{vfs-index,chunk-store,chunk-io,chunk-io-worker,chunked-source,lazy-tree}.ts`〔新規〕、`hostfiles.ts`、`app/test/unit/helpers/{lazy-tree-gen,chunk-io-node-worker}.ts`〔新規〕)。HEAD の複写に `patch --dry-run -p1` rc 0。木: `~/work/mt3w-s1/tree-lazy`。
+差分(**適用していない・push しない**): `impl/0314v1-lazy-vfs-runtime.diff`(5 ファイル、1,082 行: `lift/runtime/fle_vfs.c`・`fle_vfs.h`、`lift/harness/vfs_lazy.h`〔新規〕、`vfs_seed.h`、`harness/seeds/vfs_lazy_selftest.c`〔新規〕)、`impl/0314v1-lazy-vfs-host.diff`(782 行: `app/src/engine/{vfs-index,chunk-store,chunk-io,chunk-io-worker,chunked-source,lazy-tree}.ts`〔新規〕、`hostfiles.ts`、`app/test/unit/helpers/{lazy-tree-gen,chunk-io-node-worker}.ts`〔新規〕)。HEAD のコピーに `patch --dry-run -p1` rc 0。木: `~/work/mt3w-s1/tree-lazy`。
 
-- **runtime(C)**: `fle_node` に `lazy`(stream+1)と `lazy_off`。runtime は host のファイルに触れず、harness が渡す読み関数 1 本(`fle_vfs_lazy_set_reader`)と stream の長さ(`fle_vfs_lazy_add_stream`)だけを持つ。ReadFile は guest の buffer へ直接読む(volume に複写しない)。WriteFile・SetEndOfFile・CreateFileMapping(`fle_vfs_file_info`)・host 側の peek(`fle_vfs_peek_file`・`fle_vfs_file_state`)は先に**ファイル全体を一度読んで ordinary にする(copy-on-write)**。CopyFileW は lazy のまま同じ stream の同じ範囲を指す。CREATE_ALWAYS/TRUNCATE は lazy を捨てる。`fle_vfs_put_lazy_file`・`fle_vfs_put_dir` は仮想時計を進めない(索引の件数でゲストの作るファイルの時刻が変わらない)。**読みの失敗は `fle_stop`(名前つきの停止)**。ERROR_READ_FAULT 等への写像は V2 の判断(読み。出典の無い選択を避けた)。
+- **runtime(C)**: `fle_node` に `lazy`(stream+1)と `lazy_off`。runtime は host のファイルに触れず、harness が渡す読み関数 1 本(`fle_vfs_lazy_set_reader`)と stream の長さ(`fle_vfs_lazy_add_stream`)だけを持つ。ReadFile は guest の buffer へ直接読む(volume にコピーしない)。WriteFile・SetEndOfFile・CreateFileMapping(`fle_vfs_file_info`)・host 側の peek(`fle_vfs_peek_file`・`fle_vfs_file_state`)は先に**ファイル全体を一度読んで ordinary にする(copy-on-write)**。CopyFileW は lazy のまま同じ stream の同じ範囲を指す。CREATE_ALWAYS/TRUNCATE は lazy を捨てる。`fle_vfs_put_lazy_file`・`fle_vfs_put_dir` は仮想時計を進めない(索引の件数でゲストの作るファイルの時刻が変わらない)。**読みの失敗は `fle_stop`(名前つきの停止)**。ERROR_READ_FAULT 等への写像は V2 の判断(読み。出典の無い選択を避けた)。
 - **harness**: seed list の 1 行 `<mount>\<TAB>@lazy:vfs/index.bin<TAB><index.bin の SHA-256>`(新しい旗・環境変数は無い)。索引 FLVFSIX1(§19)を境界つきで読み、**まず dry で全部検査**(上限 stream 16・entries 65,536・chunk 1 B〜8 MiB・stream 名 `[A-Za-z0-9._-]`・パス 259 UTF-16 単位・ファイル群の合計 = stream の論理長・件数の一致・末尾の余りなし)してから volume に置く。stream の host ファイルは「索引の dir/<stream 名>」を open + pread。
 - **host(TS)**: `parseIndex`(stream 表だけ/全 entries)、`FetchChunkStore`(`vfs/<sha>.chk`、復号後の SHA-256 と長さを検証、3 回まで再試行)、`ChunkedSource`(同期の ByteSource、LRU の chunk cache)、`SabChunkClient`+`serveChunkIo`(SharedArrayBuffer の 1 スロット + `Atomics.wait`。I/O Worker は idle の間 Atomics.wait でブロックし、fetch の間は event loop が空く。`Atomics.waitAsync` は使わない〔Firefox〕)、`HostFiles.addPersistent`(first idle の `release()` を生き延びる stream。source の例外は EIO)、`mountLazyTree`。**engine の worker.ts/fruity.ts への配線は未**(V2)。
-- **実測(host の道具)**: C の自己試験 `vfs_lazy_selftest.c`(gcc `-fsanitize=address,undefined`、`-Wall -Wextra` 警告 0): **58 ok・FAIL 0**(索引の全ての prefix が拒否される、1 byte ずつ反転しても読み手が落ちない、COW・Copy・SetEndOfFile・Move・Delete・peek・時刻・属性・seed が勝つ、など)。既存の `vfs_seed_selftest` も 0 failure。`clang -Wall -Wextra` 警告 0。TS: tsc(tsconfig・webworker)rc 0。
-- **vitest(再開後、実測)**: `app/test/unit/lazy-tree.test.ts` **20 tests passed**(3.5 s)。索引 parser(全 prefix の拒否、1 byte 反転で VfsIndexError 以外が出ない、上限、flags bit0)、FetchChunkStore(再試行、hash/長さの検証)、ChunkedSource と LRU、**SAB の client/server を実 worker_threads で**(`Atomics.wait` を両側で、chunk の再訪、store の拒否からの復帰、I/O Worker 不在の timeout、長さの違反)、HostFiles(pread、`release()` 後も stream は読める・index は消える、source の例外は EIO)、**opt1 の試験木(`testtree-out/`、21 ファイル + 日本語名 + 6 MiB の wav + 0 byte)を全ファイル byte 一致**、**opt1 の実物の索引(`run-a/index.9fde21c39f5d.br`、27,822 ファイル・1,522 dir・16 stream)から 202 ファイル(均等 181 + 大きい 20 + 0 byte)を chunk から再構成して原本(Wine prefix の FL Studio 2026)と byte 比較: 202 件一致・398,256,591 B・サイズ違い 0・欠落 0・chunk fetch 210 回**。既存の hostfiles/fruity-engine/loader/pack の試験 72 件も通る。tsc rc 0。**この試験が見つけた parser の誤り**: magic の検査に fatal な TextDecoder を使っていて、壊れた byte で TypeError(VfsIndexError でない)。byte 比較に直した。試験自身の誤り: I/O サーバを main thread で起動して自分を Atomics.wait で止めた(worker に移した)。
-- **C の reader を opt1 の索引に通した(実測、native gcc -O2、`harness/seeds/vfs_lazy_conformance.c` + `lazy-conformance-prep.mjs`)**: prep が chunk(SHA-256 検証つき)から stream ファイルを復元 → seed list の `@lazy:` 行で `vfs_seed_from_env()` → guest 側の `CreateFileW/GetFileSize/ReadFile` で原本と比較。(1) opt1 の試験木: 21 ファイル 8,076,557 B **不一致 0**、読み込み 0.001 s。(2) **実物の索引(27,822 ファイル + 1,522 dir、16 stream、論理 2,153,002,077 B)**: **読み込み 0.038 s(native)**、lazy ファイル 27,822、サンプル 271 ファイル(均等 250 + 大きい 20 + 0 byte)398,841,645 B **不一致 0・原本の欠落 0**、読んだ後も lazy 27,822 のまま(読みは具体化しない)、読み 0.708 s。**wasm の値ではない**(P1 への寄与は wasm で測る。native の数倍までは見込めるが読み)。
+- **実測(host の道具)**: C の自己テスト `vfs_lazy_selftest.c`(gcc `-fsanitize=address,undefined`、`-Wall -Wextra` 警告 0): **58 ok・FAIL 0**(索引の全ての prefix が拒否される、1 byte ずつ反転しても読み手が落ちない、COW・Copy・SetEndOfFile・Move・Delete・peek・時刻・属性・seed が勝つ、など)。既存の `vfs_seed_selftest` も 0 failure。`clang -Wall -Wextra` 警告 0。TS: tsc(tsconfig・webworker)rc 0。
+- **vitest(再開後、実測)**: `app/test/unit/lazy-tree.test.ts` **20 tests passed**(3.5 s)。索引 parser(全 prefix の拒否、1 byte 反転で VfsIndexError 以外が出ない、上限、flags bit0)、FetchChunkStore(再試行、hash/長さの検証)、ChunkedSource と LRU、**SAB の client/server を実 worker_threads で**(`Atomics.wait` を両側で、chunk の再訪、store の拒否からの復帰、I/O Worker 不在の timeout、長さの違反)、HostFiles(pread、`release()` 後も stream は読める・index は消える、source の例外は EIO)、**opt1 のテスト木(`testtree-out/`、21 ファイル + 日本語名 + 6 MiB の wav + 0 byte)を全ファイル byte 一致**、**opt1 の実物の索引(`run-a/index.9fde21c39f5d.br`、27,822 ファイル・1,522 dir・16 stream)から 202 ファイル(均等 181 + 大きい 20 + 0 byte)を chunk から再構成して原本(Wine prefix の FL Studio 2026)と byte 比較: 202 件一致・398,256,591 B・サイズ違い 0・欠落 0・chunk fetch 210 回**。既存の hostfiles/fruity-engine/loader/pack のテスト 72 件も通る。tsc rc 0。**このテストが見つけた parser の誤り**: magic の検査に fatal な TextDecoder を使っていて、壊れた byte で TypeError(VfsIndexError でない)。byte 比較に直した。テスト自身の誤り: I/O サーバを main thread で起動して自分を Atomics.wait で止めた(worker に移した)。
+- **C の reader を opt1 の索引に通した(実測、native gcc -O2、`harness/seeds/vfs_lazy_conformance.c` + `lazy-conformance-prep.mjs`)**: prep が chunk(SHA-256 検証つき)から stream ファイルを復元 → seed list の `@lazy:` 行で `vfs_seed_from_env()` → guest 側の `CreateFileW/GetFileSize/ReadFile` で原本と比較。(1) opt1 のテスト木: 21 ファイル 8,076,557 B **不一致 0**、読み込み 0.001 s。(2) **実物の索引(27,822 ファイル + 1,522 dir、16 stream、論理 2,153,002,077 B)**: **読み込み 0.038 s(native)**、lazy ファイル 27,822、サンプル 271 ファイル(均等 250 + 大きい 20 + 0 byte)398,841,645 B **不一致 0・原本の欠落 0**、読んだ後も lazy 27,822 のまま(読みは具体化しない)、読み 0.708 s。**wasm の値ではない**(P1 への寄与は wasm で測る。native の数倍までは見込めるが読み)。
 - **未**: emcc での `vfs_lazy.h` の構文確認(seed header 経由)、engine への配線(worker.ts/fruity.ts)と engine での実行、V2(OPFS・R2・Chrome)。
 
 ## 21. 診断 build #1 の失敗(--wrap と hybrid の export)と cand1(mt3。08:00〜)
 
-- **Filter の V3(gpu1、実 Chrome)が File→Open の途中で exit 134**: `DestroyCursor: hIcon was not issued by this runtime's GDI table`(fle_gdi.c:2954)。**原因は私の Filter 差分の見落とし**: `fle_cursor.c` の `fle_cursor_is_shared_handle` が module の cursor の index を `off / 0x1000 > 8u` で『1..8』に限っていた(RM_MAX の写し)。realmod の表は 9 行で Filter は idx 8 → k = 9。区分 (b)、機構 = 『real module の数』の定数が 2 か所に別々。修正 `impl/0313f2-cursor-realmod-cap.diff`(65 行)。**red/green(実測、host の cargo test)**: 試験を 0..16 に直して修正前の runtime で FAILED(`all module forms 0`)、修正後 ok。wall_c1 12・cursor 25・loadimage 33 passed。PM が HEAD に実適用 rc 0。
+- **Filter の V3(gpu1、実 Chrome)が File→Open の途中で exit 134**: `DestroyCursor: hIcon was not issued by this runtime's GDI table`(fle_gdi.c:2954)。**原因は私の Filter 差分の見落とし**: `fle_cursor.c` の `fle_cursor_is_shared_handle` が module の cursor の index を `off / 0x1000 > 8u` で『1..8』に限っていた(RM_MAX の写し)。realmod の表は 9 行で Filter は idx 8 → k = 9。区分 (b)、機構 = 『real module の数』の定数が 2 か所に別々。修正 `impl/0313f2-cursor-realmod-cap.diff`(65 行)。**red/green(実測、host の cargo test)**: テストを 0..16 に直して修正前の runtime で FAILED(`all module forms 0`)、修正後 ok。wall_c1 12・cursor 25・loadimage 33 passed。PM が HEAD に実適用 rc 0。
 - **診断 build #1(diag-g9-gui、27 分)は hybrid の merge で失敗**: `build-engine-bundle.sh` が『merged module still imports functions of the module c』。`wasm_c_imports.py merged.wasm c` の出力 = `fle_imp_BitBlt`・`BeginPaint`・`EndPaint`・`SetWindowPos` の 4 個。原因(実測): `--wrap=fle_imp_X` は export の名前を `__wrap_fle_imp_X` に変え(c.opt.wasm の export を比較: 基準にある 4 名が消え、`__wrap_` の 4 名が増えた)、`hyb/exports.rsp` が `--export-if-defined=fle_imp_X` で出す 4 関数だけが重なった(ほかの 13 は export 表に無い)。direct wasm は `c.fle_imp_X` を import するので解決できない。**教訓**: 診断の `--wrap` は export 表(hyb/exports.rsp)と突き合わせてから。代替: runtime の関数の中に直接(alpha1 の diag-g9-fl)、または間接呼びの hook だけ(`impl/diag-g9-hook.diff`、リンカ非依存)。in-source で 4 関数を包む変種 `impl/diag-g9-gui-v2-inline4-unbuilt.diff` は build していない。
 - **cand1**(`tools/g9f-cand1-build.sh`): Filter の木 + 0323-contract-fixes + 0319-scrollwindow-model + 0319-time-env-run-values + 0319-fle-stop-context + d1 + d2 + diag-g9-fl + diag-g9-fl-scroll(getenv に置換、manifest に FLE_DIAG_*=1)+ diag-g9-hook。**見落としを 1 つ直した**: lift 段は gen を作り直す(`onat/gen/flengine.c` の sha が 569989b9… → 2ff75d02…、`ship6-imports.txt` に ScrollWindow の行)が、`resplit` は wsrc/src が在ると『exists, skipped』で古い fle-NN.c を残す。wsrc を消して再 lift し、新旧の fle-NN/mK-NN.c を cmp して **61 ファイルが変わった**ので、その .o と rt/h-fruity 群を消した(残り 2 個)= objects は冷間に近い。build の結果は報告に書く。
-- 自己申告: PM の木で `git pull` を 1 回(HEAD・作業木・reflog は不変、動いたのは refs/remotes/origin/main だけ)。tool 名 `bash` を 1 回(6 回目)。diag-g9-gui の --wrap を export 表と突き合わせずに build #1 に入れた(27 分)。
+- 自己申告: PM の木で `git pull` を 1 回(HEAD・ワークツリー・reflog は不変、動いたのは refs/remotes/origin/main だけ)。tool 名 `bash` を 1 回(6 回目)。diag-g9-gui の --wrap を export 表と突き合わせずに build #1 に入れた(27 分)。
 
 ### 21.1 cand1 の build の結果と、+8.45 MB の原因(私の手順の誤り)
 
-- **cand1 `fl-engine-ci-f7ebcca1`(試験版は `fl-engine-test-g9f-cand1-f7ebcca1`)**: 08:08:46 開始、**rc=0 09:09:14(60 分 28 秒)**。extract 2 s、lift 31 s、b2d 62 s、objects 1681 s(rt 16 s + units 1662 s)、link 1846 s(wasm-opt 1298 s、hyb-merge2 19 s)、seed 0 s、bundle 4 s。SHA256SUMS ok=9。wasm 166,973,591 B(br 41,697,087)、dll pack 84,943,680(Filter と同一)、seed 14,748,394(同一)、glue 741,071。.o の link 数 0/163。free log(2 分おき 31 sample)の MemAvailable の最小 13,084 MB。manifest の engine.env に FLE_DIAG_WIN/SCROLL/VFS_MISS=1。
+- **cand1 `fl-engine-ci-f7ebcca1`(テスト版は `fl-engine-test-g9f-cand1-f7ebcca1`)**: 08:08:46 開始、**rc=0 09:09:14(60 分 28 秒)**。extract 2 s、lift 31 s、b2d 62 s、objects 1681 s(rt 16 s + units 1662 s)、link 1846 s(wasm-opt 1298 s、hyb-merge2 19 s)、seed 0 s、bundle 4 s。SHA256SUMS ok=9。wasm 166,973,591 B(br 41,697,087)、dll pack 84,943,680(Filter と同一)、seed 14,748,394(同一)、glue 741,071。.o の link 数 0/163。free log(2 分おき 31 sample)の MemAvailable の最小 13,084 MB。manifest の engine.env に FLE_DIAG_WIN/SCROLL/VFS_MISS=1。
 - **wasm が Filter(158,438,681 B)より +8,534,910 B(+5.4%)、S1 の比 1.866 → 1.966**: 原因は診断でも差分でもなく、**hybrid strip の印 `$HYB/stripped` が古いまま skip された**こと。私の invalidate 段が wsrc を作り直したのに印を消さず、strip 前の units が compile された(build log:『hybrid strip: done for list ec345f4a4af9d034, skipped』。Filter の build は実際に strip: 『dropped 3875 functions, kept 122279』)。wasm の function section +3,850 ≒ lowered 関数 3,875。確定の根拠(実測): 新しい wsrc に同じ strip を当てると、Filter の strip 済み units との差は FLEngine が +790 B・25 行、module が +1,344 B・44 行だけ。lift に効くのは ship6-imports.txt の ScrollWindow の 1 行だけ(その行なしで lift をやり直すと flengine.c の sha が Filter と一致)。objects の増加は fle 群 +7.55 MB・mod 群 +3.99 MB に対し rt 群は +14.8 KB。**strip した版の S1 は約 1.866(読み)**。影響: 機能の確認には使えるが、C 側が direct 版でなく C 版の lowered 関数を呼ぶので性能・first idle の測定には使えない。RT-A は新しい work dir で strip 済み。是正は `tools/g9f-cand1-build.sh` の invalidate 段(印を消す)。
 
 
@@ -811,7 +811,7 @@ index.bin :=
 
 PM の判断(05:22 に mt3 へ送った内容の記録): (1) 次は Fruity Filter 1 本(Delay 2 は後の別 build。増分を 1 本ずつ測る)。(2) RM_MAX 8→16 は承認(自前の module 表の容量。FL の挙動・契約に触れない)。Split の A0 は今回の test build に混ぜない。(3) build は Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較)が出るか、ci1 の counted 窓の後で CPU が空いたときに、PM の info で開始。(4) S1 は wasm 全体の比(正式な基準)・モジュール別の wasm 比・dll pack と seed を含む配信量と q11 の brotli の 3 つを併記し、2 倍を超える物を隠さない。(5) stub 化は別の宿題。
 
-**mt3 の訂正の記録**: 「RM_MAX で rt の key が変わる」は誤りで、Balance の patch だけで k_rt は変わる(H_WASM が lift/harness を含む)。Filter の追加では **k_felift も変わる**(H_FELIFT が lift/crates を hash し、realmod.rs の試験更新が入る)ので、push すれば CI の fe-lift の cargo build も冷間になる(所要は未測定)。変更規模は最初の見積り(約 12 ファイル・+60〜80 行)より大きい(17 ファイル・313 行)。**押さえる点**: これらは見積り・静的検査で、Filter の実エンジンでの動作は未確認(Filter の到達範囲は直接 call の下限のみ、insert 47 が音を持つか、ildsp が NULL のまま通るかは未確認)。G9 は未到達のまま。
+**mt3 の訂正の記録**: 「RM_MAX で rt の key が変わる」は誤りで、Balance の patch だけで k_rt は変わる(H_WASM が lift/harness を含む)。Filter の追加では **k_felift も変わる**(H_FELIFT が lift/crates を hash し、realmod.rs のテスト更新が入る)ので、push すれば CI の fe-lift の cargo build も冷間になる(所要は未測定)。変更規模は最初の見積り(約 12 ファイル・+60〜80 行)より大きい(17 ファイル・313 行)。**押さえる点**: これらは見積り・静的検査で、Filter の実エンジンでの動作は未確認(Filter の到達範囲は直接 call の下限のみ、insert 47 が音を持つか、ildsp が NULL のまま通るかは未確認)。G9 は未到達のまま。
 
 
 ### 追記(2026-11-07 06:12、mt3 の §11〔ImageList_* 22 種の契約の実装案〕・§12〔Balance の窓を開く scenario〕・§13〔別経路〕・§14〔Filter の test build の手順書〕の取り込みと PM の判断、docs のみ。製品の差分なし)
@@ -828,7 +828,7 @@ PM の判断(05:22 に mt3 へ送った内容の記録): (1) 次は Fruity Filte
 
 ### 追記(2026-11-07 06:53、Balance の GUI の観察〔gpu1 の stage 3〕の記録、docs のみ。製品の差分なし)
 
-**実エンジン・実 Chrome 156・この機械・headless・非計時の観察(代役・再生なし。依頼者の機械は 0 件)**: gpu1 が G9-a の test bundle(`fl-engine-test-g9a-28f6f631`、診断入り)をページ p0(ポート 4969)で、06:38:38〜06:42:42 に走らせた。参照プロジェクトを開き、Problems 窓を閉じ、Mixer の Insert 1 を選択し(Mixer は FL 自身が前面に出した)、スロット 0 の名前(1750,617)を**1 回だけ**クリックした。PM が `03a-1s.png` と `02-insert1-selected.png` を読んで確認した事実: (1) 『Fruity Balance (Insert 1)』と題した窓の**枠**が (482,233)〜(713,406) に出た(最小化・閉じるボタン、『Effect slot 1』の注記)。(2) **client 領域は描かれていない**(背後のチャンネルラックのボタンが透けて見える。02 との差は client 領域で 146 画素、1 s → 3 s で 13 画素、3 s → 10 s で 0)。(3) engine log の増分は 1・3・10 s とも 0 行。`fle: unsupported instruction`・abort・stop の行なし。(4) 窓の一覧は主窓のみのまま(Balance の枠は主窓の面の中に描かれている)。(5) engine-idle のまま、opErrors 空。`pixel` op の fallback(`deskDumpBase64(true)`)は実 Chrome で初めて通った(dist 156)。複写: `lift/out-git/gpu8-results/logs/rt-g9c-s3/`。
+**実エンジン・実 Chrome 156・この機械・headless・非計時の観察(代役・再生なし。依頼者の機械は 0 件)**: gpu1 が G9-a の test bundle(`fl-engine-test-g9a-28f6f631`、診断入り)をページ p0(ポート 4969)で、06:38:38〜06:42:42 に走らせた。参照プロジェクトを開き、Problems 窓を閉じ、Mixer の Insert 1 を選択し(Mixer は FL 自身が前面に出した)、スロット 0 の名前(1750,617)を**1 回だけ**クリックした。PM が `03a-1s.png` と `02-insert1-selected.png` を読んで確認した事実: (1) 『Fruity Balance (Insert 1)』と題した窓の**枠**が (482,233)〜(713,406) に出た(最小化・閉じるボタン、『Effect slot 1』の注記)。(2) **client 領域は描かれていない**(背後のチャンネルラックのボタンが透けて見える。02 との差は client 領域で 146 画素、1 s → 3 s で 13 画素、3 s → 10 s で 0)。(3) engine log の増分は 1・3・10 s とも 0 行。`fle: unsupported instruction`・abort・stop の行なし。(4) 窓の一覧は主窓のみのまま(Balance の枠は主窓の面の中に描かれている)。(5) engine-idle のまま、opErrors 空。`pixel` op の fallback(`deskDumpBase64(true)`)は実 Chrome で初めて通った(dist 156)。コピー: `lift/out-git/gpu8-results/logs/rt-g9c-s3/`。
 
 **読み(未確認)**: プラグインの GUI の生成(client 領域の作成・配置・描画)が行われていないか、行われても表示されていない。候補と切り分けは mt3 の §15(07:30 まで)と alpha1 の node G3 の窓の表(07:20 まで)が担当する。**これは G9 ではない**: 7 種のうち 1 種(Balance)の Export の一致のみ、GUI は枠だけ、他の 6 種と Fruity Wrapper は未着手。新しい runtime の実装(ImageList_* ほか)は PM の許可の後で、他の G9 の変更と同じ push に載せる(共有の行は FLEngine の C も変えるため全段の冷間 build になる)。
 

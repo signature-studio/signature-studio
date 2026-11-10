@@ -6,7 +6,7 @@
 
 1. 3 つのプラグイン DLL(PE パーサは `tools/pe-read.py`)(opt1 の Wine prefix の `Fruity Delay 2.off-0307/Fruity Delay 2_x64.dll` ほか)を **自作の PE パーサ(python、読むだけ)**で読み、Balance・Filter と比較した(§2)。
 2. `ci/lib/extract_fl.py`(本物の抽出器)を installer `flstudio_win64_26.1.7.5653.exe` に対して、Delay 2 の行だけの `--dlls` と `--seed` で走らせた: **『1 DLL + 1 seed file written, all SHA-256 verified』rc 0**(2 つの経路: DLL を名前で探す経路と、seed の guest path を NSIS の install tree で引く経路の両方)。
-3. 差分 `impl/0313g-delay2-on-filter.diff`(9 ファイル、167 行)を作り、Filter の木(`tree-g9f-build`)の複写に実適用し、`bash -n` 6 本 ok、`ci/test-hybrid.sh` **all checks hold**(Delay 2 の新しい 2 行と『NEXTRA = EXTRA_MODULES の名前の数 = gen-direct の spec − 5、RM_MAX ≥ spec』の検査を含む)。cand1 の木・RT-A の木(tree-rt1)にも `patch --dry-run` rc 0(RT-A の木では build-engine-bundle.sh に offset 14/22 行)。
+3. 差分 `impl/0313g-delay2-on-filter.diff`(9 ファイル、167 行)を作り、Filter の木(`tree-g9f-build`)のコピーに実適用し、`bash -n` 6 本 ok、`ci/test-hybrid.sh` **all checks hold**(Delay 2 の新しい 2 行と『NEXTRA = EXTRA_MODULES の名前の数 = gen-direct の spec − 5、RM_MAX ≥ spec』の検査を含む)。cand1 の木・RT-A の木(tree-rt1)にも `patch --dry-run` rc 0(RT-A の木では build-engine-bundle.sh に offset 14/22 行)。
 4. **その木で lift 段を 1 回実行(50 s、nice 19、CI_JOBS=1)**: Delay 2 が module 10 として lift された(§3)。build(objects・link)は走らせていない。
 
 ## 1. 差分 `0313g-delay2-on-filter.diff` の中身(Filter の木の上。適用・push しない)
@@ -88,5 +88,5 @@
 
 ## 7. 自己申告
 
-1. 最初の木 `tree-g9f` は `tools/` を持たないので `extract_fl.py` が動かなかった(import error)。`tree-g9f-build` の複写でやり直した(3 分の無駄)。
+1. 最初の木 `tree-g9f` は `tools/` を持たないので `extract_fl.py` が動かなかった(import error)。`tree-g9f-build` のコピーでやり直した(3 分の無駄)。
 2. 本メモの S1 の予測は、Balance・Filter の 2 点の増分(2.088 / 2.007)からの外挿で、C の大きさに単調には比例しない(Balance 36.63 MB → +7.76 MB、Filter 37.36 MB → +7.59 MB)ので範囲で書いた。実 build の値ではない。

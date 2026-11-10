@@ -85,7 +85,7 @@ gdb（`gdb6.cmds`、`gdb7.cmds`）で 2 回目の呼び出しの R1 の先の si
 - ワークスペース全体（`out-vi/test-ws.txt`、`test-ws.exit` は EXIT=101、`cargo test --offline --workspace --no-fail-fast`）: 62 バイナリ、**549 件 passed、11 件 failed**、0 ignored（`test result` 行の集計）。
   - 失敗 11 件の内訳:
     - **x87（他者の作業）8 件**: `tests/x87.rs` 7 件（`x87_arith_memory_forms`、`x87_arith_register_forms`、`x87_compares`、`x87_integer_stores`、`x87_loads`、`x87_misc`、`x87_stores`。`clang: error: no such file or directory: runtime/fle_x87.c`）、`tests/x87ctl.rs` の `x87_arithmetic_stays_unsupported` 1 件（`lift_body(&[0xd9, 0x07], 0x1000).is_err()` が成り立たない）。
-    - **oleaut_ole 3 件（x87 ではない、私の変更でもない）**: `tests/oleaut_ole.rs` の `sys_alloc_string_len_layout`（C プログラムが SIGSEGV）、`sys_realloc_string_len`（期待値との不一致）、`real_dll_handles_the_rows`（`SysAllocStringLen is a handled thunk`）。`oleaut_ole.rs`、`runtime/fle_ole.c`、`fle_oleaut.c` ほかは作業ツリーの未追跡ファイルで、更新時刻は 23:15〜23:17（私のテスト実行の少し前〜途中。実行中に他の担当が編集していた可能性があるが、確認していない）。私はこれらを触っていない。
+    - **oleaut_ole 3 件（x87 ではない、私の変更でもない）**: `tests/oleaut_ole.rs` の `sys_alloc_string_len_layout`（C プログラムが SIGSEGV）、`sys_realloc_string_len`（期待値との不一致）、`real_dll_handles_the_rows`（`SysAllocStringLen is a handled thunk`）。`oleaut_ole.rs`、`runtime/fle_ole.c`、`fle_oleaut.c` ほかはワークツリーの未追跡ファイルで、更新時刻は 23:15〜23:17（私のテスト実行の少し前〜途中。実行中に他の担当が編集していた可能性があるが、確認していない）。私はこれらを触っていない。
   - 前回（indirect-jmp-run.md §4.3）は 531 passed、8 failed（x87 のみ）。差 +18 passed、+3 failed の増加分のうち、私の分は versioninfo.rs の 3 件（osver.rs への 1 行は既存テストの中の行）。残りは他担当の `oleaut_ole.rs` など（推測を含む。内訳は未確認）。
 
 ## 7. 制約の遵守と残置物

@@ -1,12 +1,12 @@
 # 0330b seed だけの変更一式 S(O3 のロゴ・staff roll、O16 の日本語を本番で出す)— push できる形(gpu1/gpu8、2026-11-07 10:5x JST)
 
-**実際に実行した物**: PM の木は**書いていない**。`git archive HEAD`(d78f3c98)の部分複製を**私の木** `~/work/gpu8w/seedpush-tree`(新しい git repo)に展開して S を作り、(1)`patch --dry-run` / `git apply --check` を新しい `git archive HEAD`(`ci` `lift/harness`)と mt3 の `tree-rtb` の複写に実行、(2)`ci/plan.sh`・`ci/needs.sh` の純関数を base / S / 『S の後の seed だけの変更』で実行、(3)`ci/test-hybrid.sh`・`ci/test-needs.sh`・`ci/test-real-deploy.py` を実行(S に新しい検査 3b を足し、旧 `plan.sh` に対する**負の対照**で FAIL を確認)、(4)repo の `pack_seed.py`(S の重複検査つき)と S の tsv と **mt3 の抽出済みの host**(`ci-rt1s/host`、読み取りのみ)で seed pack を実際に作り、mt3 の native の loader(`vfs_seed.h`)に通した、(5)`.github/workflows/deploy.yml` の build job の各 step の `if:` を読んだ。**build(emcc・wasm)・deploy・実エンジン・ブラウザ・GitHub Actions の実行は 0**。installer からの抽出は私は走らせていない(mt3 の抽出結果を読み取りで使った)。
+**実際に実行した物**: PM の木は**書いていない**。`git archive HEAD`(d78f3c98)の部分複製を**私の木** `~/work/gpu8w/seedpush-tree`(新しい git repo)に展開して S を作り、(1)`patch --dry-run` / `git apply --check` を新しい `git archive HEAD`(`ci` `lift/harness`)と mt3 の `tree-rtb` のコピーに実行、(2)`ci/plan.sh`・`ci/needs.sh` の純関数を base / S / 『S の後の seed だけの変更』で実行、(3)`ci/test-hybrid.sh`・`ci/test-needs.sh`・`ci/test-real-deploy.py` を実行(S に新しい検査 3b を足し、旧 `plan.sh` に対する**負の対照**で FAIL を確認)、(4)repo の `pack_seed.py`(S の重複検査つき)と S の tsv と **mt3 の抽出済みの host**(`ci-rt1s/host`、読み取りのみ)で seed pack を実際に作り、mt3 の native の loader(`vfs_seed.h`)に通した、(5)`.github/workflows/deploy.yml` の build job の各 step の `if:` を読んだ。**build(emcc・wasm)・deploy・実エンジン・ブラウザ・GitHub Actions の実行は 0**。installer からの抽出は私は走らせていない(mt3 の抽出結果を読み取りで使った)。
 **push は私はしない**。PM が検証して push する。
 
 ## 0. 先頭の結論
 1. 変更一式 S = 5 ファイルの差分(`diffs/0330b-seed-only-change.diff`、261 行)+ **バイナリ 1 つ**(TTC、下の表)。`git archive HEAD` に `patch -p1 --dry-run` rc 0・`.rej` 0・`git apply --check` rc 0。mt3 の `tree-rtb`(tsv の末尾に Fruity の DLL 行 3 本が増えた版)の対応する 5 ファイルにも rc 0。
 2. **S 自身を push した時は冷間 build**(lift・wasm objects・link の key が変わる。README: 25〜45 分)。**S の後の seed だけの変更**(tsv の行や os-fonts の font)は extract / seed / bundle / prefix の key しか変えず、`needs.sh` は extract → seed → bundle だけを走らせる(実行して確認)。
-3. seed の数や内容を数えている試験は**見つからなかった**(`git grep`、下 §3)。更新が要るもの 0。代わりに S に**新しい検査(`ci/test-hybrid.sh` の 3b)**を足した(『seed の資材だけの変更は lift・rt・link の key を変えない』を pin。旧 `plan.sh` に対しては FAIL する = 負の対照)。
+3. seed の数や内容を数えているテストは**見つからなかった**(`git grep`、下 §3)。更新が要るもの 0。代わりに S に**新しい検査(`ci/test-hybrid.sh` の 3b)**を足した(『seed の資材だけの変更は lift・rt・link の key を変えない』を pin。旧 `plan.sh` に対しては FAIL する = 負の対照)。
 4. S で作った seed pack は native の loader が受理(rc 0、243 files・47 directories、BigFruit.png・AboutTxt.txt・msgothic.ttc の 3 行が seed される)。
 5. 未確認: GitHub Actions の実行(step の `if:` は読んで needs.sh の出力と 1 対 1 に対応することを確かめただけ)、installer からの本物の抽出(mt3 の抽出結果を使った)、本番の bundle との `compare-bundle.sh`(S の後の最初の push の後で)。
 
@@ -14,7 +14,7 @@
 | ファイル | 変更 | 出どころ |
 |---|---|---|
 | `ci/plan.sh` | +8 −3: `H_EXTRACT_DLL`(tsv 抜き)から `KEXD` を作り `k_lift` はそれを使う。`H_GEN` と `H_WASM` から seed の資材 6 つ〔`vfs-seed-idle1.tsv` `reg-seed-nsis.tsv` `reg-seed-app.tsv` `authenticode-claims.tsv` `os-fonts/` `web/final0129/pack_seed.py`〕を `:(exclude)` で外す | 0330 の差分(gpu1) |
-| `ci/test-hybrid.sh` | +19: 検査 3b(新規。seed の資材を変えた時の key の変わり方を、git repo にした複写で pin) | gpu1 |
+| `ci/test-hybrid.sh` | +19: 検査 3b(新規。seed の資材を変えた時の key の変わり方を、git repo にしたコピーで pin) | gpu1 |
 | `lift/harness/seeds/vfs-seed-idle1.tsv` | +3 行: `Artwork\Skins\Default\BigFruit.png`、`System\Texts\About\AboutTxt.txt`(どちらも installer の中、host path は `lift/out-idle1/inputs/install/…`)、`C:\Windows\Fonts\msgothic.ttc`(os-fonts の font)。**Fruity microfont.ttf は入れていない**。msgothic の行は `arial.ttf` の**前**に置いた(RT-B のように tsv の末尾に行が増えた木にも hunk が当たるため) | 行の SHA は mt3 の抽出(installer の stream から読んで検証済み)と opt1 の font |
 | `lift/harness/seeds/os-fonts/COPYRIGHT-fonts-noto-cjk-jp.txt` | 新規(+105 行、Debian copyright 形式、OFL 1.1 の全文入り) | opt1(`opt2-results/0320/font-seed/`) |
 | `lift/harness/seeds/os-fonts/README.md` | 表に msgothic の行、注意 4 点(modified file、起動時に全部読まれる、Wine で日本語が出る、`make-msgothic.py` で再現可) | opt1 の `os-fonts-README.md.diff` |
@@ -35,14 +35,14 @@
 |---|---|---|
 | 新しい `git archive HEAD`(`ci` `lift/harness`) | `patch -p1 --dry-run -s < 0330b-seed-only-change.diff` | **rc 0、`.rej` 0、`.orig` 0** |
 | 同上 | `git apply --check` | **rc 0** |
-| mt3 の `tree-rtb` の複写(`ci/plan.sh` `ci/test-hybrid.sh` `os-fonts/README.md` `vfs-seed-idle1.tsv` `pack_seed.py`) | `patch -p1 --dry-run -s` | **rc 0**(tsv の末尾に Fruity の DLL 行が増えていても当たる。初版は msgothic を末尾に置いたため hunk 2 が FAILED になり、`arial` の前に移して直した) |
+| mt3 の `tree-rtb` のコピー(`ci/plan.sh` `ci/test-hybrid.sh` `os-fonts/README.md` `vfs-seed-idle1.tsv` `pack_seed.py`) | `patch -p1 --dry-run -s` | **rc 0**(tsv の末尾に Fruity の DLL 行が増えていても当たる。初版は msgothic を末尾に置いたため hunk 2 が FAILED になり、`arial` の前に移して直した) |
 
-## 3. 検証 — seed の数や内容を数えている試験(更新が要るか)
+## 3. 検証 — seed の数や内容を数えているテスト(更新が要るか)
 - 探したもの(`git grep`、私の木): `vfs-seed-idle1` `os-fonts` `pack_seed` `seedpack` `extract_fl` を `lift/crates`・`ci`・`app/test`・`app/scripts`・`tools`・`lift/harness/*.sh`・`lift/harness/web` で、数 `218 222 229 231 232 234 241 243 248` を `seed|guest file|tsv|row` と同じ行で。
-- **tsv の行数・seed の file 数・seed の大きさを pin した試験は無かった**。出た物: ① `ci/README.md` と `lift/harness/a4-fruity.sh` の**コメント**『218 guest files』(文書で、試験ではない。数は S の後で変わる〔installer から +2、repo の font +1〕が、コメントなので S は触っていない)、② `lift/crates/fe-lift/tests/wall_fr12.rs`(loader は 2048 entries まで受け、2049 で名前つきで止まる。tsv は 244 行で余裕)、③ `app/test/unit/pack.test.ts`(『pack_seed.py が書いた pack を読む』。合成の list を使う)、④ `wall_dlg1.rs`(loader の UTF-8 の扱い)。
+- **tsv の行数・seed の file 数・seed の大きさを pin したテストは無かった**。出た物: ① `ci/README.md` と `lift/harness/a4-fruity.sh` の**コメント**『218 guest files』(文書で、テストではない。数は S の後で変わる〔installer から +2、repo の font +1〕が、コメントなので S は触っていない)、② `lift/crates/fe-lift/tests/wall_fr12.rs`(loader は 2048 entries まで受け、2049 で名前つきで止まる。tsv は 244 行で余裕)、③ `app/test/unit/pack.test.ts`(『pack_seed.py が書いた pack を読む』。合成の list を使う)、④ `wall_dlg1.rs`(loader の UTF-8 の扱い)。
 - 『222 ファイル』は PM の記憶の数字と思われ、repo 内では見つからなかった。**更新が要る期待値は 0**。
-- 実行した試験(S の木): `ci/test-hybrid.sh`(`.github` を足して 46 ok + 新しい 3b の 12 ok = 全部 ok)、`ci/test-needs.sh`(128 通り、all invariants hold)、`ci/test-real-deploy.py`(全 ok)。Rust・vitest・cargo は**実行していない**(S は runtime・crates・app を触らない)。
-- **新しい検査 3b**(`ci/test-hybrid.sh`): git repo にした複写で `vfs-seed-idle1.tsv` に 1 行と `os-fonts/` に 1 file を足し、`k_extract` `k_seed` `k_bundle` `prefix` が**変わる**こと、`k_lift` `k_rt` `k_link` `k_felift` `k_b2d` `k_emsdk` `k_vst3` `k_app` が**変わらない**ことを pin。**負の対照**: 旧 `ci/plan.sh` に戻した複写で実行すると `FAIL k_lift / k_rt / k_link depends on the seed data`(= 検査は旧い挙動を検出する)。注意: 既存の検査 3 の複写は `.git` を持たず内容の hash になり、`:(exclude)` が効かない(`find` で代用される)ので、3b は専用の git repo の複写で行った。
+- 実行したテスト(S の木): `ci/test-hybrid.sh`(`.github` を足して 46 ok + 新しい 3b の 12 ok = 全部 ok)、`ci/test-needs.sh`(128 通り、all invariants hold)、`ci/test-real-deploy.py`(全 ok)。Rust・vitest・cargo は**実行していない**(S は runtime・crates・app を触らない)。
+- **新しい検査 3b**(`ci/test-hybrid.sh`): git repo にしたコピーで `vfs-seed-idle1.tsv` に 1 行と `os-fonts/` に 1 file を足し、`k_extract` `k_seed` `k_bundle` `prefix` が**変わる**こと、`k_lift` `k_rt` `k_link` `k_felift` `k_b2d` `k_emsdk` `k_vst3` `k_app` が**変わらない**ことを pin。**負の対照**: 旧 `ci/plan.sh` に戻したコピーで実行すると `FAIL k_lift / k_rt / k_link depends on the seed data`(= 検査は旧い挙動を検出する)。注意: 既存の検査 3 のコピーは `.git` を持たず内容の hash になり、`:(exclude)` が効かない(`find` で代用される)ので、3b は専用の git repo のコピーで行った。
 
 ## 4. 検証 — key の表(`ci/plan.sh` を実行、私の木)
 | 比較 | extract | vst3 | felift | b2d | lift | rt | link | seed | bundle | prefix | app |
@@ -74,7 +74,7 @@
 - deploy は bundle の key が変わるので `deploy` job が `prefix`(= `fl-engine-ci-<k_bundle の末尾 8 桁>`)の新しい bundle を上げ、既定の manifest を最後に切り替える(0330 §2)。
 
 ## 6. 検証 — seed pack を実際に作って seed2b と比べる
-作り方: `lift/harness/web/final0129/pack_seed.py`(S の版)+ S の tsv + reg-seed 2 本 + authenticode-claims を、**root = 私が作った木**(`lift/out-*` は mt3 の `ci-rt1s/host/lift/out-*` への symlink、`lift/harness/seeds/os-fonts/` は S の木の複写)で。比較の対照(同じ root・HEAD の tsv・HEAD の pack_seed.py)も作った。圧縮は `app/scripts/pack-assets.mjs` と同じ streaming の brotli(`LGWIN 24`、size hint)。品質 1 は mt3 の `.br` のサイズを**そのまま再現**した(8,240,342 B と 9,826,130 B)ので方法は合っている。**本番の既定は品質 11**(`BROTLI_QUALITY` の既定)。
+作り方: `lift/harness/web/final0129/pack_seed.py`(S の版)+ S の tsv + reg-seed 2 本 + authenticode-claims を、**root = 私が作った木**(`lift/out-*` は mt3 の `ci-rt1s/host/lift/out-*` への symlink、`lift/harness/seeds/os-fonts/` は S の木のコピー)で。比較の対照(同じ root・HEAD の tsv・HEAD の pack_seed.py)も作った。圧縮は `app/scripts/pack-assets.mjs` と同じ streaming の brotli(`LGWIN 24`、size hint)。品質 1 は mt3 の `.br` のサイズを**そのまま再現**した(8,240,342 B と 9,826,130 B)ので方法は合っている。**本番の既定は品質 11**(`BROTLI_QUALITY` の既定)。
 | pack | files | raw | SHA-256(先頭) | br 品質 11 | br 品質 1 |
 |---|---|---|---|---|---|
 | 対照: HEAD の tsv(同じ root) | 225 | 7,248,243 | `f7726113ae34d52e` | 3,929,989 | 5,189,703 |
@@ -83,19 +83,19 @@
 | (参考)RT-A の実 bundle の seed | 227 | 14,748,394 | `8e8bbd1ea7fe7821` | 5,187,014 | 8,240,342(mt3 の `.br`) |
 | (参考)seed2b の実 bundle の seed | 232 | 17,089,558 | `7d762565049176a2` | 6,475,926 | 9,826,130(mt3 の `.br`) |
 - S が足す 3 file(対照との差、header で確認): `seed/lift/out-idle1/inputs/install/Artwork/Skins/Default/BigFruit.png` 166,508 B(`0a8dab68…`)、`…/System/Texts/About/AboutTxt.txt` 9,228 B(`2e59358c…`)、`seed/lift/harness/seeds/os-fonts/NotoSansCJKjp-subset-msgothic.ttc` 2,123,288 B(`1ab00fd8…`)。変わった既存 file は `vfs-seed-idle1.tsv` だけ。消えた file 0。
-- 対照と RT-A の差(7.5 MB)は、RT-A の tsv に Fruity Balance/Filter の DLL(3,718,656 + 3,780,608 B)の行があるため(mt3 の real-module の変更。HEAD の tsv にはまだ無い)。RT-A + S の差分 = 14,748,394 + 2,300,143 = 17,048,537 に対し seed2b は 17,089,558(差 41,021 B ≈ Fruity microfont の複写 2 つ + tsv の行。S は microfont を入れないのでその分小さい)。
+- 対照と RT-A の差(7.5 MB)は、RT-A の tsv に Fruity Balance/Filter の DLL(3,718,656 + 3,780,608 B)の行があるため(mt3 の real-module の変更。HEAD の tsv にはまだ無い)。RT-A + S の差分 = 14,748,394 + 2,300,143 = 17,048,537 に対し seed2b は 17,089,558(差 41,021 B ≈ Fruity microfont のコピー 2 つ + tsv の行。S は microfont を入れないのでその分小さい)。
 - **本番の起動で増えるのは seed の br で +約 1.30 MB(品質 11)**(0330 §4.4 で品質 1 の 1.59 MB を使っていたのを訂正する値)。
 - **native の loader に S の seed を通した**(mt3 の `seedpack-unpack.py` + `vfs_seed_check.c`、`lift/harness/vfs_seed.h` をそのまま): pack を展開(228 files、各 SHA-256 が header と一致)→ loader `rc=0`、『vfs seed: done, 243 files, 47 directories created』、stderr 0 行、BigFruit.png・AboutTxt.txt・`C:\Windows\Fonts\msgothic.ttc`(`1ab00fd8…`)の 3 行が `vfs seed:` に出る。
-- mt3 の `test-pack-seed-dup.sh`(重複検査の試験)を S の木に実行: (2)(3)(3b)(4) は通り、**(1)は『line 237』を固定した期待値のため FAIL**(S では BigFruit の行が前に入って 238 になる)。これは results の tool であり repo の試験ではない。期待値を 238 にするか行番号を見ない形にする。**注意(自己申告)**: この script は作業用の場所に `~/work/mt3w-s1/tmp/packdup` を固定で使い(`rm -rf` してから作る)、私の実行でその中身を上書きした(mt3 の同名の場所)。
+- mt3 の `test-pack-seed-dup.sh`(重複検査のテスト)を S の木に実行: (2)(3)(3b)(4) は通り、**(1)は『line 237』を固定した期待値のため FAIL**(S では BigFruit の行が前に入って 238 になる)。これは results の tool であり repo のテストではない。期待値を 238 にするか行番号を見ない形にする。**注意(自己申告)**: この script は作業用の場所に `~/work/mt3w-s1/tmp/packdup` を固定で使い(`rm -rf` してから作る)、私の実行でその中身を上書きした(mt3 の同名の場所)。
 
 ## 7. 手順(PM が push する時)と注意
-1. 新しい `git archive HEAD`(または作業木)に `patch -p1 < 0330b-seed-only-change.diff`。
+1. 新しい `git archive HEAD`(またはワークツリー)に `patch -p1 < 0330b-seed-only-change.diff`。
 2. `cp ~/work/signature-studio-develop/lift/out-git/opt2-results/0320/font-seed/NotoSansCJKjp-subset-msgothic.ttc lift/harness/seeds/os-fonts/` し、`sha256sum` が `1ab00fd8ffe15553c16ef441b6a63e539159d560491c70fbc598d26f470eea69` であることを確かめる。
 3. `bash ci/test-hybrid.sh`・`bash ci/test-needs.sh` が通ること。
 4. commit・push。**この push は冷間 build**(§4)。RT-A/RT-B の runtime の変更と一緒に出すなら同じ冷間 build で足りる(0330 の案 C)。
 5. 注意: ① S は mt3 の `0315-pack-seed-duplicate-guest-path.diff` を含む。別に当てるなら片方に。② RT-B の `tree-rtb` の tsv(Fruity の DLL 行 3 本が末尾)にも当たる。③ `os-fonts/README.md` の『The four rows at the end』は、msgothic の行を `arial` の前に置いたため『末尾の 4 行』が少し不正確(文言だけの問題)。④ **正本の font(`1ab00fd8…`)で実 Chrome の表示は未確認**(seed2b は `daa1948f…`)。⑤ 1 回目の push の後、extract の所要・`restore lift` の出力・`compare-bundle.sh`(本番の bundle との比較)を確かめる。
 
-## 8. type B の試験 bundle `fl-engine-test-e13-seed3-7cd2eaec`(PM の指示、10:5x)
+## 8. type B のテスト bundle `fl-engine-test-e13-seed3-7cd2eaec`(PM の指示、10:5x)
 **実際に実行した物**(Chrome・build・deploy は 0): 本番の E13 bundle(`lift/out-ci1/kit/bundles/fl-engine-ci-0363b050`)の wasm・glue・DLL pack(と各 `.br`)を **hard link** し、seed pack と manifest だけを差し替えた。置き場 `~/work/gpu8w/bundles/fl-engine-test-e13-seed3-7cd2eaec/`(README-TEST-BUNDLE.txt、SHA256SUMS〔`sha256sum -c` 全部 OK〕入り。TEST、push しない)。手順の要点は `tools/mk-seed3-bundle.sh`。
 | 見た物 | 結果 |
 |---|---|

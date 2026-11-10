@@ -5,7 +5,7 @@
 ## 1. (ii) GIL の待ち順を『W0 優先』から『待っているゲストスレッドの優先度順』へ(実装済み)
 - 旧: 最初の Worker(UI)が待っている間、他の Worker はロックを取らない(UI が 27 s 飢えた不具合の対症)。
 - 新(`fle_gil.h/.c`): ロックが空いていて待ち手がいなければ CAS 一発。待ち手がいれば、Worker は **自分が走らせているゲストスレッドの優先度**(`fle_thread_gil_prio()` = SetThreadPriority が保持した水準。最初のスレッドは `fle_proc_first_thread_priority`)と到着順の鍵 `((prio+32) << 32) | (0xFFFFFFFF - ticket)` を公開して待つ。離すとき `gil_gen` を上げて全員を起こし、**鍵が最大の者(優先度が高い順、同じなら先着順)だけが取る**。Worker の番号による優遇は無い。エージングは入れていない(Windows の契約: 高い優先度が先、同じ優先度は順番。飢えは同じ優先度の FIFO が防ぐ)。
-- 試験: Chrome 156 で 3 走行。結果は負荷(13〜28)に埋もれ、効果は**判別できない**(下の 3)。FL が音声スレッドに SetThreadPriority を設定しているかは未確認(スレッド表に水準は出していない)。
+- テスト: Chrome 156 で 3 走行。結果は負荷(13〜28)に埋もれ、効果は**判別できない**(下の 3)。FL が音声スレッドに SetThreadPriority を設定しているかは未確認(スレッド表に水準は出していない)。
 
 ## 2. (iii) GIL の保持時間の測定の道具(`FLE_GIL_STATS`、スパイク用。成果物にしない)
 - `fle_gil.h/.c`: Worker ごとの保持時間(合計・回数・平均・最大)と、スローパスの待ち時間(合計・回数・最大・ヒストグラム <10us/<100us/<1ms/<10ms/<100ms/それ以上)。`gen_wrap.py`: import 名ごとの『ラッパー内の時間』。`fle_thread.c`: スレッドごとに『どの API で何 ms 止まっていたか』(`park`)。`FLE_DBG_REPORT_S=n` で n 秒ごとにエンジンのログへ出る。
@@ -18,10 +18,10 @@
 - **ミキサーが実時間に届かない本当の理由**: DS の書き込み量(`unlock_bytes`)から、FL のミキサーは **実時間の 0.56〜0.60 倍**でしか書いていない(20 s あたり 121〜130 ブロック、実時間なら 215.4)。出力側(AudioWorklet)の読み位置は実時間(1.0)で進むので、書き込みが遅れた分は無音で埋まる(非無音 5〜9%)。ミキサーの Worker の CPU は 57〜70%(1 本)で、残りの 3〜4 割は GIL 待ちではない待ち(`Sleep` / イベント)。この内訳は下の 3b。
 - 非ハイブリッドの CPU は UI + ミキサーで 2.1 CPU 秒/秒(測定済み)。ミキサーだけでも 1 本の Worker では足りない見込み。
 
-## 4. セマフォ(`CreateSemaphoreW` / `ReleaseSemaphore`)とプロセッサ数の設計(ランタイムと単体試験は 6eb1737d 基準の作業木で実装済み: 0234o。再 lift と全試験は未)
+## 4. セマフォ(`CreateSemaphoreW` / `ReleaseSemaphore`)とプロセッサ数の設計(ランタイムと単体テストは 6eb1737d 基準のワークツリーで実装済み: 0234o。再 lift と全テストは未)
 - **プロセッサ数**: 今は GetSystemInfo / GetLogicalProcessorInformation が 1 を返す(`fle_sys.c`、`fle_sysinfo.c`。決定 0034 の『選択』)。実スレッド版では、答えは『仮想システムの実際の状態』= Worker を立てられる数にする: ページが `navigator.hardwareConcurrency` を**事実として**エンジンへ渡し(環境変数 `FLE_PROCESSORS=n`。旗ではなく、ページが測った値の伝達)、ランタイムは GetSystemInfo の `dwNumberOfProcessors` / `dwActiveProcessorMask`、GetLogicalProcessorInformation の RelationProcessorCore を n 個の記録(各 1 ビット)にする。`FLE_MAXW` の上限(31)を超えない。
 - 実験(Chrome 156): n を 2 以上にすると、FL が最初に呼ぶ未実装の API は **`CreateSemaphoreW`**(`fle: unsupported instruction at 0x1d1d5a0 [import kernel32.dll!CreateSemaphoreW] [guest return 0x1e84c73]`)。その先で他に止まる API があるかは、セマフォが無いので**まだ見えない**。
-- 実装の形: `fle_event.c` の表に種別『セマフォ』を足す(`count`、`max`)。`CreateSemaphoreW(attrs, initial, max, name)`(max > 0、0 ≦ initial ≦ max、さもなくば ERROR_INVALID_PARAMETER 87、名前付きは今のイベントと同じ扱い)、`ReleaseSemaphore(h, n, *prev)`(count + n > max なら失敗、ERROR_TOO_MANY_POSTS 298)、待ちは `fle_event_wait_state(h, consume)` に『count > 0 / consume で count--』を足し、WaitForSingleObject / WaitForMultipleObjects / CloseHandle は既存の経路に載る。スケジューラ側は `try_wake` が待ち手を起こす(Worker が違えば wake word)。**import 表に無い API なので生成 C が変わる(再 lift が要る)**: opt1 の層 b+c+d の push の後。規模: ランタイム 約 150 行 + 試験(単体 + 4 スレッド) + 再 lift と全試験。
+- 実装の形: `fle_event.c` の表に種別『セマフォ』を足す(`count`、`max`)。`CreateSemaphoreW(attrs, initial, max, name)`(max > 0、0 ≦ initial ≦ max、さもなくば ERROR_INVALID_PARAMETER 87、名前付きは今のイベントと同じ扱い)、`ReleaseSemaphore(h, n, *prev)`(count + n > max なら失敗、ERROR_TOO_MANY_POSTS 298)、待ちは `fle_event_wait_state(h, consume)` に『count > 0 / consume で count--』を足し、WaitForSingleObject / WaitForMultipleObjects / CloseHandle は既存の経路に載る。スケジューラ側は `try_wake` が待ち手を起こす(Worker が違えば wake word)。**import 表に無い API なので生成 C が変わる(再 lift が要る)**: opt1 の層 b+c+d の push の後。規模: ランタイム 約 150 行 + テスト(単体 + 4 スレッド) + 再 lift と全テスト。
 
 ## 3b. ミキサーの待ちの内訳(`park` 計測、非ハイブリッド、最適化版、約 130 s の走行 2 回、負荷 11〜12)
 - ミキサーと見られるスレッド(thread 17、Worker 1。`Sleep(1)` で DS の位置を見に行き、DS バッファへ書く方): 29.1 s 止まっていた。内訳: **`Sleep` 21.4 s / 18,832 回(1 回 1.14 ms)**、**`EnterCriticalSection` 7.7 s / 309 回(1 回 25 ms)**。別の走行では同じ CS を **6.4 s 待った 1 回**を含む(合計 7.2 s / 8 回)。
@@ -30,7 +30,7 @@
 
 ## 5. ハイブリッド + GIL のビルドで見つかった追加の壁(15:20)
 - 『直 wasm → C の呼び出しを GIL の包みへ』は、`--c-imports` の `Name=__wrap_fle_imp_Name` の対応表(既存の機能)で直せた(ビルドスクリプト +6 行、h5 の木)。hybn0・weblink(831 の包み)・wasmopt・C 部の最適化は通った。
-- **壁**: 実スレッド版は MXCSR / x87 / `fle_landing_top` / SEH を Worker ごとのブロック(`fle_ctx`、`FLE_TLS_MORE`)に置く。ハイブリッドの段階は `fle_mxcsr` の番地をリンクマップから読んで直 wasm に定数で埋め込む(`--hybrid-mx MXCSR BUF`、`lower.rs` の `i32.load offset=mx_addr` が 3 か所)ので、TLS 版では番地が無く `an address is missing in link.map` で止まる。直すには fe-wasmgen が MXCSR の番地を `__tls_base + オフセット`(スレッドごと)で出し、ハイブリッドの C 側の接着(`hybrid_glue.c` の `fle_hyb_mx_report`、`fle_mxcsr_load/store` の包み)も TLS の `fle_mxcsr` にする必要がある。規模 約 150 行 + 差分試験(TLS と通常で同じ答え) + ハイブリッドのビルド 40 分: **0.5〜1 日**。これが『ハイブリッド + GIL』の関門測定の前提で、今日の残り時間では終わらない。
+- **壁**: 実スレッド版は MXCSR / x87 / `fle_landing_top` / SEH を Worker ごとのブロック(`fle_ctx`、`FLE_TLS_MORE`)に置く。ハイブリッドの段階は `fle_mxcsr` の番地をリンクマップから読んで直 wasm に定数で埋め込む(`--hybrid-mx MXCSR BUF`、`lower.rs` の `i32.load offset=mx_addr` が 3 か所)ので、TLS 版では番地が無く `an address is missing in link.map` で止まる。直すには fe-wasmgen が MXCSR の番地を `__tls_base + オフセット`(スレッドごと)で出し、ハイブリッドの C 側の接着(`hybrid_glue.c` の `fle_hyb_mx_report`、`fle_mxcsr_load/store` の包み)も TLS の `fle_mxcsr` にする必要がある。規模 約 150 行 + 差分テスト(TLS と通常で同じ答え) + ハイブリッドのビルド 40 分: **0.5〜1 日**。これが『ハイブリッド + GIL』の関門測定の前提で、今日の残り時間では終わらない。
 
 
 ## 6. Worker 1 の 5 ms 周期(audio_sync を周期的に走らせる案)の A/B — 効果が見えず、採らない(15:50)

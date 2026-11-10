@@ -1,7 +1,7 @@
-# tests/harness: ハーネスの試験(S2)
+# tests/harness: ハーネスのテスト(S2)
 
 `bash tests/harness/run.sh` で全部走る。依存は bash・jq・sqlite3・python3・shellcheck。node と opencode があれば、その分も走る(無ければ SKIP と表示される。SKIP は合格ではない)。
-bats は使わない。試験は `$TMPDIR/opencode/s2-sandbox/tests/` の中だけで動く。実リポジトリで git コマンドを実行しない。実物の `gh`・`wrangler`・`opencode api` を呼ばない。セッションを作らない。モデルを呼ばない。
+bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中だけで動く。実リポジトリで git コマンドを実行しない。実物の `gh`・`wrangler`・`opencode api` を呼ばない。セッションを作らない。モデルを呼ばない。
 
 ## 何を確かめるか(ファイル別)
 
@@ -11,12 +11,12 @@ bats は使わない。試験は `$TMPDIR/opencode/s2-sandbox/tests/` の中だ�
 | `t02_permissions.sh` | 377 個の shell コマンド(`shell-cases.src`)と 79 個の非 shell 呼び出しの許可/拒否。wrangler・cf の全面 deny(`wrangler …`・`cf …`・`npx`/`bunx`/`pnpm`/`yarn` 経由・`*/wrangler`・`sudo wrangler`)と、文面に語が出るだけの読み取り(`grep wrangler …`)・`npm run test:worker` の許可。許可できてはいけない物(main の書き込み、リダイレクト、`preflight.sh` に引数)と、許可されるべき物(worker の通常作業)の両方 | **E2**(opencode 自身のスキャナでコマンドを分割し、評価は `lib/rules.py` による再実装。`t01` が「`rules.py` の規則 = 実物が読んだ規則」を確かめる) |
 | `t03_plugins.sh` | 3 本の plugin(mock の ctx)。`worker-rules.ts` の自動付与・読めないときの拒否、`model-pin-gate.ts` のピン(設定から読む。`haiku` プロファイルでも追従)、`harness-guard.ts` の `model` 引数・末尾 `&`・接頭辞つきの禁止コマンド。各 40 行以内・状態なしを静的に確認。**実物の loader が 3 本を読み込む**こと | **E3**(mock)+ E1(loader) |
 | `t04_scan.sh` | `scan-forbidden.sh`: 全規則が発火、近い形は発火しない、出力に値を出さない、許可リスト、終了コード、明示パス、未追跡ファイル | 実行 |
-| `t05_hooks.sh` | `pre-commit`(ステージされた内容を検査。作業ツリーでなく)、`pre-push`(スキャンだけ。PUBLIC のリモートでも、スキャンが通れば通す。禁止文字列があれば拒否。**環境変数での回避が無い**ことを 6 種で確認。`gh` を呼ばないことを、呼ぶと失敗する偽物で確かめる。`--no-verify` は人間の道として通る)、`setup-repo.sh` の冪等性 | 実行(ローカルの bare repo と偽の `gh`) |
+| `t05_hooks.sh` | `pre-commit`(ステージされた内容を検査。ワークツリーでなく)、`pre-push`(スキャンだけ。PUBLIC のリモートでも、スキャンが通れば通す。禁止文字列があれば拒否。**環境変数での回避が無い**ことを 6 種で確認。`gh` を呼ばないことを、呼ぶと失敗する偽物で確かめる。`--no-verify` は人間の道として通る)、`setup-repo.sh` の冪等性 | 実行(ローカルの bare repo と偽の `gh`) |
 | `t06_audit.sh` | `audit-session.sh`: **前任のセッションに対する出力が前回の実測と完全一致**(`expected/audit-prev-session.txt`)。合成 DB で固定外モデル・禁止形のコマンド・DB を書かないこと | 実行(実 DB は読み取りのみ) |
 | `t07_preflight.sh` | `preflight.sh` の各行(OK/WARN/FAIL)、**403 は WARN で FAIL にしない**(案内は作業ディレクトリ・`gh auth status`・`docs/ops/requests.md`)、`repo-api` は既定ブランチだけを取り、公開範囲・permissions を出さない、**wrangler を呼ばない**(呼べば記録して失敗する罠の偽物で確かめる)、トークン・アカウント ID・メールを出さない、`~/.config/opencode/` の他のファイルを読まない | 実行(偽の `gh`・`wrangler` の罠・`git push`・`opencode`・`df`) |
 | `t08_scripts.sh` | `set-model-profile.sh`(split⇄haiku の往復がバイト単位で元に戻る。コメント維持。実物の resolver の答えが合わなければ元に戻す。セッション内では書かない)、`launch.sh`(偽の opencode だけ。順序・モデルが `opencode.jsonc` と同じ・登録簿の重複なし・失敗時に何が残るか)、`env.sh` | 実行(偽の opencode、`HOME` を差し替え) |
 
-`shell-cases.tsv` は `shell-cases.src` から `lib/gen-shell-cases.ts` が作る(bun と opencode のソースの clone が要る)。試験の実行時に clone があれば、最新かどうかも確かめる。
+`shell-cases.tsv` は `shell-cases.src` から `lib/gen-shell-cases.ts` が作る(bun と opencode のソースの clone が要る)。テストの実行時に clone があれば、最新かどうかも確かめる。
 
 ## fail-open の検知(R3 §B.1)
 
@@ -46,7 +46,7 @@ bats は使わない。試験は `$TMPDIR/opencode/s2-sandbox/tests/` の中だ�
 
 ## Canary(親が行う。未検証の物を実セッションで確かめる)
 
-**ここまでの試験は、実セッションを一度も作っていない。** 次の 4 点は mock と読み取りだけの確認で、実環境で効くかは未確認。親が使い捨てのセッション(Haiku で 1〜3 回の呼び出し)で確かめる。モデルを呼ぶので費用が出る(Haiku 5.5 の数回分)。
+**ここまでのテストは、実セッションを一度も作っていない。** 次の 4 点は mock と読み取りだけの確認で、実環境で効くかは未確認。親が使い捨てのセッション(Haiku で 1〜3 回の呼び出し)で確かめる。モデルを呼ぶので費用が出る(Haiku 5.5 の数回分)。
 
 1. **plugin が読み込まれ、`execute.before` が呼ばれる**
 2. **`model-pin-gate.ts` の `ctx.agent.get` と `ctx.session.get` が実セッションで `model` を返す**(隔離サーバーでは、`session.create` で作ったセッションの `get` が `model` を返し、`agent.get` が `{location, data}` を返すことを確認した。tool の `execute.before` の中からの呼び出しは未確認)

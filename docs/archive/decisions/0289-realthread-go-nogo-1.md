@@ -15,7 +15,7 @@
 3. **『3 点セット』(+3 → -1 → +1)**(§4・§9): 遅れた回に FL が書き込み位置の先へ飛び、埋め戻して書き直す。1 回の遅れで新しい frame は 2 ブロック分のうち 1 ブロック(約 93 ms)が無音、書き直しは無駄なミキシング 14〜20%。実スレッドは 12288 が 21%(約 23% の quanta が無音)、**60 s の中では純粋な 3 ブロック周期にはならない**(12288 は 4〜10% から 23〜31% へ時間とともに上がる。両腕とも)。契約の戻り値(play / write cursor)に逸脱は見つからない。
 4. **P2 にも効かない(E9 の速度で)**: UI Worker は 54〜63% の CPU・73% は `WaitMessage`(FL が仕事を持たない待ち)で、UI の起床は 24〜37 回/秒。desk presents は 25〜36/s(協調 11〜14/s)で改善するが、**入力の真の T は協調より悪い**(File クリック 37.2 対 21.5 ms、Esc 18.0 対 4.3 ms。同じ page、交互ではなく 1 本ずつ。B +8 ms 前後)。
 5. **この機械の SwiftShader**: 実スレッドで UI が 2.5 倍描くので、描画の CPU が +1.4 コア。ミキサーの run-queue 待ちは 3〜7% なので、これを除いてもミキサー thread が戻せる時間は小さい(読み、未測定)。
-6. **推奨**: **S2 以降(音声 ring・export の包み・試験の作り直しなど約 17〜19 人日)には、まだ進まない**。**E11 の上の再測定(go/no-go #2)を、5 分の再生(重い区間)を必須にして行う**: E11(0285。opt1 の実測で純再生の書き込み率 0.704 → 0.888、alpha1 の 0296 でミキサー −15%)で実スレッドのミキサー側の CPU / Unlock は 最も重い区間で 118〜128 → 約 100〜109 ms(推定)、**r = 1 の必要時間は 1.08〜1.17 コアで、なお 1 コアを超える**(軽い区間 10〜40 s では 0.7〜0.9 コアで足りる)。= **E11 だけでは足りず、重い区間のさらに約 −12% が要る**(ミキサー側の更なる梃子、または FL の並列ミキシング `FLE_PROCESSORS > 1` の検討。mt3 の 0234s は n を増やしても総 CPU が増えなかった)。**税の内訳のうち『コードの費用』は除外できた**(w1)。残る税(同じ位置で +20〜30%)は実スレッド自体・同居スレッド・環境(§4、§11)。go/no-go #2 の計画と E11 への rebase の dry-run は §11。
+6. **推奨**: **S2 以降(音声 ring・export の包み・テストの作り直しなど約 17〜19 人日)には、まだ進まない**。**E11 の上の再測定(go/no-go #2)を、5 分の再生(重い区間)を必須にして行う**: E11(0285。opt1 の実測で純再生の書き込み率 0.704 → 0.888、alpha1 の 0296 でミキサー −15%)で実スレッドのミキサー側の CPU / Unlock は 最も重い区間で 118〜128 → 約 100〜109 ms(推定)、**r = 1 の必要時間は 1.08〜1.17 コアで、なお 1 コアを超える**(軽い区間 10〜40 s では 0.7〜0.9 コアで足りる)。= **E11 だけでは足りず、重い区間のさらに約 −12% が要る**(ミキサー側の更なる梃子、または FL の並列ミキシング `FLE_PROCESSORS > 1` の検討。mt3 の 0234s は n を増やしても総 CPU が増えなかった)。**税の内訳のうち『コードの費用』は除外できた**(w1)。残る税(同じ位置で +20〜30%)は実スレッド自体・同居スレッド・環境(§4、§11)。go/no-go #2 の計画と E11 への rebase の dry-run は §11。
 7. **未確認 / 取れていない**: 冒頭の三点の 3 に同じ。5 分の再生と T の交互は Chrome の窓(ci1 の counted run が優先)が取れず**未取得**。
 
 
@@ -39,7 +39,7 @@
 ## 2. ビルドと起動(実測)
 
 - 冷間 CI 段階 `extract felift lift b2d objects link seed bundle`(`tools/mk-rt.sh`: `GIL=1`、F2xH7、`CI_JOBS=4`、`BROTLI_QUALITY=1`、nice 15。host / b2d / `engine/in` / cargo-target / emcache は opt1 の冷間ビルド x16 から hardlink): felift+lift 40 s(base の cargo-target の再利用)、b2d 28 s、**objects 406 s、link 777 s**、合計 約 20 分(load 10〜14)。bundle `fl-engine-ci-377215a9`、engine wasm `engine.45b66779f396.wasm` 142,504,057 B(E9: 142,587,278 B)。`GIL=1` は全オブジェクトを `-DFLE_GIL -DFLE_TLS_MORE` で作り直す(53 の lift 単位を含む)ので、E9 からの増分ビルドは使えない。
-- `check_i1.py`(I1: GIL を持ったまま第 1 Worker のイベントループを待つ import が無い)rc=0(`logs/rt-check-i1.txt`)。`cargo test -p fe-wasmgen --test mx_hybrid_tls` は `wrapping_sub` の 1 行の後で通る(`logs/rt-cargo-test-mxtls.log`)。**vitest・C の試験・test.sh full・a4 は走らせていない**(使い捨ての木)。
+- `check_i1.py`(I1: GIL を持ったまま第 1 Worker のイベントループを待つ import が無い)rc=0(`logs/rt-check-i1.txt`)。`cargo test -p fe-wasmgen --test mx_hybrid_tls` は `wrapping_sub` の 1 行の後で通る(`logs/rt-cargo-test-mxtls.log`)。**vitest・C のテスト・test.sh full・a4 は走らせていない**(使い捨ての木)。
 - 起動: マニフェストの guest 環境に `FLE_WORKERS=2`、`FLE_PROCESSORS=1`(`tools/patchglue-rt.py`)。**2 本の DedicatedWorker(UI = Worker 0、他の全スレッド = Worker 1)が走り、参照プロジェクト(serina1-serum2)が開いて再生でき、停止なし**(60 s の run 5 本 + 1 本の smoke、全部 'ok (no stop)')。
 - 音声: 現在の木の音声ホスト側は `globalThis.fleAudioSab`(Worker 0 の JS の状態)で動くので、**ミキサーの pthread Worker(Worker 1)が ring を使えるように、post-link で glue を補修**した(`tools/patchglue-rt.py`。測定専用、製品形ではない。段階 C の代わり): (1) Worker 0 が pthread への 'load' メッセージに `fleAudioSab` と小さな共有ログ `fleUlog` を載せる、(2) 7 か所の `const A = globalThis.__fleAud;` を lazy init に、(3) Worker 1 の `fle_js_unlock` が Unlock(first, n, t)を共有ログに書き、Worker 0 の `fleAudioWorkerState` がそれを自分の配列に流す(page の 1 Hz レポートが従来どおり Unlock を受ける)、(4) Worker 1 が出す 2 Hz の audio-pulse を emscripten の `cmd 9`(`Module.fleRelayPulse`)で Worker 0 経由で page に送る。**この補修の影響**: 音声の `engineGapFrames`(Worker 0 の `A.gapFrames`)は Worker 1 の状態を見ないので**この版では意味が無い**(値 2.5 M は読まない)。underrun・非無音 quanta は AudioWorklet 側の数なので有効。
 
@@ -192,7 +192,7 @@ build: `tools/mk-rts.sh` = 同じ木に `-DFLE_GIL_STATS -DFLE_CS_HOLD_STATS` �
 
 **失敗の形**(0283b §2 を今回の実測に合わせて更新):
 - SAB が無い環境: 入力 ring がすでに SAB 前提で、COOP same-origin / COEP require-corp は全応答に付いている。実スレッド版で**新しく失う物は無い**(『SAB が無いと動かない』が増えない)。
-- 論理 CPU が少ない(≤ 2): 実スレッド版は UI Worker 0.6 + ミキサー Worker 0.9 + ブラウザの他のスレッド(この機械では SwiftShader を除いても compositor・GPU・AudioWorklet)で**3 コア以上**を要る。2 コアでは協調 1 Worker より悪い(GIL のスピンと待ちが付く)。→ 旗なしの『唯一』では『起動時に `navigator.hardwareConcurrency` を見て Worker の数を決める』**実行時の判断**が要る(`FLE_WORKERS=1` の協調を残す = 2 経路の試験が残る。no-options 方針に反するかは PM の判断)。
+- 論理 CPU が少ない(≤ 2): 実スレッド版は UI Worker 0.6 + ミキサー Worker 0.9 + ブラウザの他のスレッド(この機械では SwiftShader を除いても compositor・GPU・AudioWorklet)で**3 コア以上**を要る。2 コアでは協調 1 Worker より悪い(GIL のスピンと待ちが付く)。→ 旗なしの『唯一』では『起動時に `navigator.hardwareConcurrency` を見て Worker の数を決める』**実行時の判断**が要る(`FLE_WORKERS=1` の協調を残す = 2 経路のテストが残る。no-options 方針に反するかは PM の判断)。
 - Firefox 159: 入れ子 Worker + JSPI は 158 までの手元の確認だけ(0234g)。**今回の足場は `Atomics.waitAsync`(`fle_idle_lib.js` の UI の wake word の待ち)を使う。Firefox での対応は未確認**(未対応なら UI の待ちが『ページの deadline だけ』に落ちる設計の確認が要る)。pthread Worker の最初の起動は『親 Worker の最初の idle まで遅れる』(Chrome の実測、0234 系)ので P1(起動 10 s)への影響も未測定。
 - Worker の生成失敗 / 共有メモリの確保失敗: `pthread_create` が返らない。名前つきの停止(I1 の検査の延長)にする。
 
@@ -201,13 +201,13 @@ build: `tools/mk-rts.sh` = 同じ木に `-DFLE_GIL_STATS -DFLE_CS_HOLD_STATS` �
 | 項 | 現状(足場 + 今回の手当) | 唯一の構成にするための変更 | 根拠・注意 |
 |---|---|---|---|
 | ビルド | `GIL=1` の環境変数で全オブジェクトを `-DFLE_GIL -DFLE_TLS_MORE`(53 の lift 単位を含む)。ストップ統計は `SPIKE_CFLAGS` | `GIL=1` を既定に(旗の除去)。`SPIKE_CFLAGS`・`FLE_GIL_STATS`・`FLE_CS_HOLD_STATS`・`FLE_DBG_REPORT_S` を製品から外す | 冷間 20 分(objects 406 s + link 777 s)。E9 からの**増分ビルドは使えない**(全オブジェクト作り直し)。CI の cache key(`ci/plan.sh`)に GIL を入れる |
-| 直 wasm → C | `c-imports-gil.txt`(`__wrap_fle_imp_*`)を `GIL=1` で作る(足場にある) | 既定にする。`--hybrid-mx-tls`・`--tls-ctx` を既定に | `mx_hybrid_tls` の試験は debug で u32 の引き算が panic(`wrapping_sub` 1 行、今回の木で直した) |
-| scheduler | `MYW`・`RT_ON`・`wake_seq_`・`schedule_ex` の `wseq`・`fle_idle_wake_word` | 協調の分岐(`!RT_ON`)を残すか除くか。**除くと** 0279 の課金 k=4・IdleDriver の pacing は不要 | 協調を除くと 84/55/87 行の試験が全部作り直し(0234m: 8〜9 日) |
+| 直 wasm → C | `c-imports-gil.txt`(`__wrap_fle_imp_*`)を `GIL=1` で作る(足場にある) | 既定にする。`--hybrid-mx-tls`・`--tls-ctx` を既定に | `mx_hybrid_tls` のテストは debug で u32 の引き算が panic(`wrapping_sub` 1 行、今回の木で直した) |
+| scheduler | `MYW`・`RT_ON`・`wake_seq_`・`schedule_ex` の `wseq`・`fle_idle_wake_word` | 協調の分岐(`!RT_ON`)を残すか除くか。**除くと** 0279 の課金 k=4・IdleDriver の pacing は不要 | 協調を除くと 84/55/87 行のテストが全部作り直し(0234m: 8〜9 日) |
 | L1c(0280/0281) | `fle_input_ring_poll()` を `MYW == 0` のときだけ | 『Worker 0 のとき』の条件だけにする(`#ifdef FLE_GIL` を外す) | §1 の表 |
 | export | `fle_g3_*`・taskbar・`fle_host_post_input` を `fle_gil_enter/leave` で包む(今回、alpha10 の 3 つを追加) | 同じ。新しい export が増えるたびに `check_i1.py` と包みの一覧を直す | I1 の検査は rc=0 |
 | 音声 | **post-link の glue 補修 4 点**(`patchglue-rt.py`) | **段階 C**(0234l): 音声 ring を wasm 共有メモリへ。Unlock の記録・2 Hz のパルス・`engineGapFrames` の状態を Worker 間で共有メモリのカウンタにする。pthread への `fleAudioSab` の引き渡しを glue の正規の経路に | 約 200 行(0234m)。今の補修は measurement 専用で、`engineGapFrames` が壊れる |
 | ページ | `importGlueFromBlob` が pthread Worker に Blob URL を渡す(足場) | 同じ。CSP の `worker-src blob:` を確認 | UI の `onExit`/`onAbort` の診断ログは外す |
-| 試験 | 実行していない(vitest・C・test.sh full・a4) | 8〜9 日(0234m §2) | — |
+| テスト | 実行していない(vitest・C・test.sh full・a4) | 8〜9 日(0234m §2) | — |
 | 総計 | | **S0 の 1 日(今回の rebase)は終わり。残り S2〜S6 で約 17〜19 人日**(0283b の 20〜22 から rebase の分を引いた) | 今回の S0〜S1 の実績: rebase + ビルド + 起動 約 1.5 時間(半日未満) |
 
 ## 9. 書き込みカーソルとプレイカーソルの戻し方は契約どおりか(PM 14:12 の依頼) — Learn の契約と runtime の戻り値の対応表
@@ -275,12 +275,12 @@ build: `tools/mk-rts.sh` = 同じ木に `-DFLE_GIL_STATS -DFLE_CS_HOLD_STATS` �
 | 上以外の 55 ファイル + `lower.rs`(offset) | 成立 | — | `tests/mx_hybrid_tls.rs` は新規ファイルなので衝突しない |
 
 **意味の衝突(patch には出ない。E11 の rebase の本命)**:
-1. **`fle_landing_top` が TLS_MORE の build ではデータの symbol でなくなる**。`fle_ctx_more.h:14` が `#define fle_landing_top (*(fle_landing **)(fle_ctx + FLE_CTX_LANDTOP))`(thread-local の `fle_ctx` の欄)にするため、link map に `fle_landing_top` の行が無い。E11 の `build-engine-bundle.sh` は `LAND=$(g "…fle_landing_top$")` で link map から番地を取り、`--hybrid-dispatch $LIM $LAND $HOOK` で型付き間接呼びの共有ヘルパー(`lib.rs` 978〜986: landing / hook の検査)に**番地を埋め込む**。→ 実スレッド版では **LAND を `RB + FLE_CTX_LANDTOP`(register page 空間の番地)にして、`reg_base` 経由の TLS 相対の読みにする**変更が要る(`--hybrid-mx-tls` と同じ形の `--hybrid-landing-tls` か、`mx_tls` を landing にも使う)。`typed_indirect.rs` の試験を TLS 版で 1 本足す。
+1. **`fle_landing_top` が TLS_MORE の build ではデータの symbol でなくなる**。`fle_ctx_more.h:14` が `#define fle_landing_top (*(fle_landing **)(fle_ctx + FLE_CTX_LANDTOP))`(thread-local の `fle_ctx` の欄)にするため、link map に `fle_landing_top` の行が無い。E11 の `build-engine-bundle.sh` は `LAND=$(g "…fle_landing_top$")` で link map から番地を取り、`--hybrid-dispatch $LIM $LAND $HOOK` で型付き間接呼びの共有ヘルパー(`lib.rs` 978〜986: landing / hook の検査)に**番地を埋め込む**。→ 実スレッド版では **LAND を `RB + FLE_CTX_LANDTOP`(register page 空間の番地)にして、`reg_base` 経由の TLS 相対の読みにする**変更が要る(`--hybrid-mx-tls` と同じ形の `--hybrid-landing-tls` か、`mx_tls` を landing にも使う)。`typed_indirect.rs` のテストを TLS 版で 1 本足す。
 2. `fle_progress_limit`(`fle_dispatch.h:37`、共有の 64 bit)と `fle_dispatch_hook` は TLS_MORE でも大域のまま(足場の `--hybrid-progress` が `fle_progress_count` を大域のまま使うのと同じ)。**読み・書きの競合は heuristic の範囲**(実スレッド版では RT_ON のとき slice の preemption を使わない〔読み〕が、型付き間接呼びが読む `limit` は E9 までは直 wasm が読まなかった値)。確認が要る。
 3. E11 のアダプタ(`lib.rs` 1255〜1336)は `c.reg_base(…)` で register page に触るので、**TLS 相対の形に既になっている**(良い知らせ)。
 4. 0285 の追加 C(`fle_hyb_dispatch` の変更)があれば GIL の包みの対象外か確認する(`gen_wrap.py` が `fle_imp_*` を拾うので、新しい import だけ確認)。
 
-**見積り**: E11 への rebase = 機械的な 5 hunk(半日未満)+ 意味の衝突 1 と 2 の手当てと試験(0.5〜1 日)+ ビルド(冷間 約 20 分)+ 起動確認 = **1〜1.5 人日**。
+**見積り**: E11 への rebase = 機械的な 5 hunk(半日未満)+ 意味の衝突 1 と 2 の手当てとテスト(0.5〜1 日)+ ビルド(冷間 約 20 分)+ 起動確認 = **1〜1.5 人日**。
 
 ### 11.2 E11 のミキサー速度での 2 コア予算の更新(alpha1 の 0296 との突き合わせ)
 
@@ -321,7 +321,7 @@ build: `tools/mk-rts.sh` = 同じ木に `-DFLE_GIL_STATS -DFLE_CS_HOLD_STATS` �
 
 ## PM の判断と取り込み(2026-11-06 15:40、docs のみ。製品の差分なし)
 
-取り込み: gpu1(gpu7)の最終の文書・表・道具と、使い捨ての足場の差分 `rt-on-e9.diff`(238,688 B、59 ファイル、出荷しない)を `docs/investigations/gpu7/` に置いた。生のログ(約 10 MB)は入れない(原本は `lift/out-git/gpu7-results/0289/logs/`)。測定は実 Chrome 156 headless で実エンジン(実スレッド版の使い捨てビルドと E9 の本番 bundle)。この機械は SwiftShader で load 1.4〜15。**依頼者の機械・実 Windows は 0 件**。vitest・C の試験・test.sh・a4 は走らせていない(測定専用の木)。
+取り込み: gpu1(gpu7)の最終の文書・表・道具と、使い捨ての足場の差分 `rt-on-e9.diff`(238,688 B、59 ファイル、出荷しない)を `docs/investigations/gpu7/` に置いた。生のログ(約 10 MB)は入れない(原本は `lift/out-git/gpu7-results/0289/logs/`)。測定は実 Chrome 156 headless で実エンジン(実スレッド版の使い捨てビルドと E9 の本番 bundle)。この機械は SwiftShader で load 1.4〜15。**依頼者の機械・実 Windows は 0 件**。vitest・C のテスト・test.sh・a4 は走らせていない(測定専用の木)。
 
 判断:
 1. **所見を受理する**。同じ音楽位置で比べると、実スレッドの税は +20〜30%(音楽 0〜10 s は 0〜5%)で、`FLE_WORKERS=1` の腕は協調と同じ(GIL/TLS のコードの費用ではない)。ミキサーが 1 ブロックに間に合わないのは待ちでなく自身の計算量(Sleep(1) 12%、GIL 待ち 3.6%、FL の CS 待ちほぼ 0)。+3 → −1 の書き直しは mt3 の 0295 のとおり記録上の結果。

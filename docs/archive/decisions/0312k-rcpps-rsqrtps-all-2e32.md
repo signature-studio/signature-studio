@@ -7,7 +7,7 @@
 
 ## 方法と最初の版の誤り(自己申告)
 - 最初の版は `_mm_setcsr` と `_mm_rcp_ps` の組込み関数を使ったが、probe に使った `_mm_mul_ps(v, 1.0f)` を**コンパイラが恒等として畳み込み**、MXCSR が効いたことの確認にならなかった(『DAZ in force: no』と出た)。インライン asm(`ldmxcsr`・`rcpps`・`rsqrtps`・`mulps`、`volatile` + `memory`)に直して再実行した。結果(不一致 0)は変わらない。
-- 比べているのは**要素ごとの関数**(`fle_rcp_f32` と `fle_lg_rsqrt_f32`)。`rsqrtss` は同じ関数を使う(`sse_legacy.rs:133`)ので同じ。**`rcpss` と VEX 形(`vrcpps`/`vrsqrtps`)は fe-lift が lift していない**(`grep` で `rcpss`・`vrcpps`・`vrsqrtps` が `crates/fe-lift/src` に無い)ので、この試験の対象外。AVX-512 の `vrcp14ps`・`vrsqrt14ps` は別の命令。
+- 比べているのは**要素ごとの関数**(`fle_rcp_f32` と `fle_lg_rsqrt_f32`)。`rsqrtss` は同じ関数を使う(`sse_legacy.rs:133`)ので同じ。**`rcpss` と VEX 形(`vrcpps`/`vrsqrtps`)は fe-lift が lift していない**(`grep` で `rcpss`・`vrcpps`・`vrsqrtps` が `crates/fe-lift/src` に無い)ので、このテストの対象外。AVX-512 の `vrcp14ps`・`vrsqrt14ps` は別の命令。
 
 ## 含意(読み)
 - **『近似命令(RCPPS/RSQRTPS)』は、この機械(Zen 5)で runtime の C 実装と全入力で bit 一致する**ので、**同じ機械の Wine の出力と wasm の出力の差(Elastique の残差)の原因ではない**(この 2 命令に限る)。Intel の CPU では未検証(`fle_rcp.h`・`fle_sse_int2.h` のコメントのとおり表は AMD 1 機種の測定)。依頼者の機械が Intel なら表が違う可能性は残る(依頼者の機械は 0 件)。

@@ -10,7 +10,7 @@
 
 ## 1. 対象と環境
 
-- 作業の基準: ブランチ main、HEAD `925c5224ae0e28cd55a0059be5c2cf801cff2757`（作業開始時の `git rev-parse HEAD`。実測）。`git archive HEAD` を `lift/out-wasm88/src/` に展開し、そこからだけビルドした。作業ツリーの `lift/runtime`、`lift/crates` は読んでいない。
+- 作業の基準: ブランチ main、HEAD `925c5224ae0e28cd55a0059be5c2cf801cff2757`（作業開始時の `git rev-parse HEAD`。実測）。`git archive HEAD` を `lift/out-wasm88/src/` に展開し、そこからだけビルドした。ワークツリーの `lift/runtime`、`lift/crates` は読んでいない。
 - **作業の途中で別のセッションが HEAD を `04f2eedcfc115c5273834ae0c46e2e24429f5988` に進めた**（私はコミットしていない）。`git diff --stat 925c522 HEAD` は `docs/investigations/blend2d-seed58.md`（312 行追加）だけで、`git diff --stat 925c522 HEAD -- lift` は **空**（実測）。ビルドに使った `lift/` は 2 つの HEAD で同じ。この文書の測定は 925c522 の archive から行った。
 - 決定 0088 は HEAD に入っている（コミット 2e94df2）。`lift/runtime/fle_modules.c` の `fle_modules[]` に `avrt.dll`（N=31）、`powrprof.dll`（N=32）がある（実測。`out-wasm88/two/wasm/rt/fle_modules.o` は、前回 `lift/out-wasm2/o1two/wasm/rt/fle_modules.o` の 6,726 B に対し 6,849 B。前回（c1eefb5）と今回の `.o` の大きさが違うのは、この `.o` だけ。`fle_load.o` ほかの runtime、FLEngine、DLL、`-O1` の 15 個、`common.o` の `.o` の大きさは前回と全部同じ。実測）。
 - 構成: **FLEngine + 縮小 dsp_ippv2（種 452 個、8,030 関数）の 2 モジュール**。Blend2D は載せない（3 モジュールは対象外）。

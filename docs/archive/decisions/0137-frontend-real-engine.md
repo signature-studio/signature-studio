@@ -28,7 +28,7 @@
 | 転送量（brotli q11、実測） | wasm **16,202,012 B** + glue 39,441 + 種 3,326,299 + DLL パック 14,407,894 = **33,975,646 B（約 34.0 MB）**。wasm は生で 317,825,713 B |
 | R2（`contentEncoding: br`）の実測 | 4 つのアセットとも、`Accept-Encoding: br` に**保存したバイトのまま**（`Content-Encoding: br`）。Chrome の `Accept-Encoding` にはローカル workerd が wasm・glue を **gzip に再符号化**（wasm 40,960,571 B）— Chrome は復号して動いた。本番エッジは未確認 |
 | bundle のビルド（Oz） | 生成から bundle まで約 35 分。units 526 s（`JOBS=3`、cgroup ピーク 2.6 GB）、link 8 s、brotli q11 6 分 23 秒。**`gen` 段の native ビルドは `JOBS=2`・3 で 5 GB の cgroup が OOM → `JOBS=1` で通過**。native の結果は決定 0134 と一致（壁 16、141,732,210 入口、新規 5,800 関数） |
-| 変異検査 | **30/30 件すべて検出**（F0 の 18 + F1 の 12。作業木のコピーで 1 件ずつ変更 → 落ちる → 元に戻す） |
+| 変異検査 | **30/30 件すべて検出**（F0 の 18 + F1 の 12。ワークツリーのコピーで 1 件ずつ変更 → 落ちる → 元に戻す） |
 | ネットワーク（net-log `Default`） | 3 構成とも **TCP の非ループバック接続 0、`UDP_BYTES_SENT` 0**（UDP の `connect()` が `[2001:4860:4860::8888]:443` へ 31〜42 回 — 決定 0124 の許容分） |
 | **実測で分かった設計上の事実** | 実エンジンは起動の約 50 秒 Worker のイベントループに戻らない。**OffscreenCanvas（方式 A）はエンジンが終わるまで何も出さない**（最初の画素の時点の非黒画素 0）→ 実エンジンの既定を方式 B に変更（決定 0135 §10-1 の撤回条件の発火）。B では最初の画素の瞬間に canvas に出る |
 | **おまけ（§12b）: SEH を入れた木の bundle** | main が進んだ a78abce の木に `FLE_SEH_HANDLERS=0x112c0` を渡して作った Oz の bundle を、**app を変えずに**開くと、エンジンは壁 16 を越え、最初の画素 16 s・**idle（入力待ち）32 s** に達し、主窓 + 設定ダイアログ（lid 22）+ ウェルカムウィザード（lid 48）の 3 面が描かれた。『End session』で 0.5 秒で終了（2 回観察。idle の面の SHA は native の期待値が無く未照合）。native の SHA は決定 0132 の値と一致 |
@@ -222,10 +222,10 @@ e2e の worker 構成は、bundle の `.br` を `wrangler r2 object put --local 
 - `engine-assets-encoding`: §8。
 - ネットワーク（net-log `Default`）: 3 構成とも **TCP の非ループバック接続 0、`UDP_BYTES_SENT` 0**。UDP の `connect()` が `[2001:4860:4860::8888]:443` へ 31〜42 回（決定 0124 が記述した IPv6 到達性チェックと同じ。許容）。Chrome 自身の URL 要求（`accounts.google.com` ほか）はすべて名前解決失敗（−105）。
 
-### 9.4 変異検査（`test/mutation/run.mjs`、作業木の**コピー**の上で。F0 の 18 + F1 の 12 = 30 件）
-**30/30 件すべて、少なくとも 1 つの層で落ちた。** 全件が元に戻り（`restored=true`）、最後にコピーと作業木が `diff -r` で同一、元のテストが通ることも確認した。層は unit = vitest、worker = `wrangler dev --local` + vitest、e2e = Chrome（preview 構成の部分集合: 変更ごとに 1〜5 シナリオ）。実エンジンの e2e 層は `FL_ENGINE_BUNDLE` つきで走らせた。
+### 9.4 変異検査（`test/mutation/run.mjs`、ワークツリーの**コピー**の上で。F0 の 18 + F1 の 12 = 30 件）
+**30/30 件すべて、少なくとも 1 つの層で落ちた。** 全件が元に戻り（`restored=true`）、最後にコピーとワークツリーが `diff -r` で同一、元のテストが通ることも確認した。層は unit = vitest、worker = `wrangler dev --local` + vitest、e2e = Chrome（preview 構成の部分集合: 変更ごとに 1〜5 シナリオ）。実エンジンの e2e 層は `FL_ENGINE_BUNDLE` つきで走らせた。
 
-| # | 段階 | 変更（1 件ずつ、作業木のコピー上） | id | 落ちた層（失敗した検査の数） |
+| # | 段階 | 変更（1 件ずつ、ワークツリーのコピー上） | id | 落ちた層（失敗した検査の数） |
 |---|---|---|---|---|
 | 1 | F0 | Range の終端を 1 ずらす | `range-end-off-by-one` | unit 10、worker 3 |
 | 2 | F0 | COEP ヘッダを外す | `coep-removed` | unit 2、worker 3、e2e 2 |
@@ -351,7 +351,7 @@ e2e の worker 構成は、bundle の `.br` を `wrangler r2 object put --local 
 ## 15. 規則違反の自己申告
 
 - AGENTS.md の「作業は task agent を通じて」: 私は task ツールを持たないサブエージェントなので、調査・設計・実装・ビルド・テスト・文書をすべて自分で行った（依頼文のとおり）。
-- git の変更系操作はしていない。commit していない。作業木 `/home/ubuntu/work/signature-studio-develop` の追跡ファイルは編集していない（`git archive`・`git rev-parse`・`git log`・`git status` の読み取りのみ）。`lift/runtime/`・`lift/crates/`・`lift/harness/` の既存ファイルは編集していない。`lift/out-seh2/`、`lift/out-g3in/`、`lift/out-git/seh2-results/`、`lift/out-git/g3in-results/` は開いていない。HEAD に入った決定 0132 の文書（`docs/decisions/0132-seh-s1.md`、`docs/investigations/seh2/MERGE-NOTES.md`）と `git diff`（3ddfebc..a78abce の `a4-multi.sh` など）は読んだ（コミット済み）。
+- git の変更系操作はしていない。commit していない。ワークツリー `/home/ubuntu/work/signature-studio-develop` の追跡ファイルは編集していない（`git archive`・`git rev-parse`・`git log`・`git status` の読み取りのみ）。`lift/runtime/`・`lift/crates/`・`lift/harness/` の既存ファイルは編集していない。`lift/out-seh2/`、`lift/out-g3in/`、`lift/out-git/seh2-results/`、`lift/out-git/g3in-results/` は開いていない。HEAD に入った決定 0132 の文書（`docs/decisions/0132-seh-s1.md`、`docs/investigations/seh2/MERGE-NOTES.md`）と `git diff`（3ddfebc..a78abce の `a4-multi.sh` など）は読んだ（コミット済み）。
 - **他の担当の領域の名前が見えた箇所**: `journalctl --user -n 20`（OOM の原因調べ）の出力に、他の担当（`out-g3in`）の systemd scope のコマンド行が含まれた。`ps` の出力にも `lift/out-g3in/…/two-native` のコマンド行が 1〜2 行出た。**中身（ファイル）は開いていない・触れていない。**
 - **規則違反**: (1) コマンドとして `sleep 1` を 1 回書いた。ハーネスが拒否し（`Permission denied: shell`）、実行されていない。(2) コマンド文字列に `nohup true` という何もしない部分を 1 回含めた（実行された。`nohup` は使うなと言われていた。意味のあるコマンドではなく、誤って書いた）。(3) 走っているシェルスクリプトを編集した（§13-3）。
 - 上記以外の `sleep`・`timeout`（コマンドとして）・末尾の `&`・`pgrep -f` のループ・while ループはコマンド文字列に書いていない（スクリプト内の JS の `await sleep(ms)` はコード）。python は `PYTHONDONTWRITEBYTECODE=1`。`/tmp` 直下には書かず `/tmp/opencode/app1/` を使った。ブラウザのプロファイル（`~/.config/google-chrome` 等）には触れず、使い捨てのプロファイルだけを使った。
@@ -362,4 +362,4 @@ e2e の worker 構成は、bundle の `.br` を `wrangler r2 object put --local 
 ## 16. 成果物の場所
 
 - `lift/out-git/app1-results/`: `app1.diff`（`diff -ruN clean src` の差分。`patch -p1` で HEAD 3ddfebc の clean な archive に当たる。dry-run は `logs/patch-dry-run.txt`。main が進んだ a78abce の `app/` にも当たる）、`docs/0137-frontend-real-engine.md`（この文書。リポジトリでは `docs/decisions/0137-frontend-real-engine.md`）、`docs/README-0137-line.txt`、`MERGE-NOTES.md`、`logs/`（`vitest.txt`・`typecheck.txt`・`vite-build.txt`・`worker-test.txt`、e2e の出力と記録（実エンジンつき 2 回の通し `e2e-run1/2-*`、実エンジン無し `e2e-standin-only-output.txt`）、`startup-times.md`、`screenshots/`、`engine-log-dev-engine-B.txt`、`mutation-run.txt`・`mutation-results.json`、`patch-dry-run.txt`、`build/`（3ddfebc の木のビルドの段階・メモリ・native の確認・manifest・SHA256SUMS・upload-commands）、`seh/`（a78abce + SEH の bundle のビルドと観察: §12b））。
-- 作業木: `lift/out-app1/src/`（`app/` ができあがったもの）と `lift/out-app1/clean/`（基準）。終了時に node_modules・ビルド出力・wasm・生成 C・bundle を削除。bundle（wasm など製品由来のバイナリ）は成果物に含めない。
+- ワークツリー: `lift/out-app1/src/`（`app/` ができあがったもの）と `lift/out-app1/clean/`（基準）。終了時に node_modules・ビルド出力・wasm・生成 C・bundle を削除。bundle（wasm など製品由来のバイナリ）は成果物に含めない。

@@ -1,6 +1,6 @@
 # イベント同期 API の実装と harness の再実行の記録（決定 0050）
 
-実行日: 2026-10-21。作業ディレクトリ `signature-studio-develop`、HEAD cc0fbc3（作業ツリーに他担当の未コミット変更は見えなかった: `git status` は本作業のファイルと既存の未追跡 `lift/iat-unsup-closure.txt` だけ）。決定は `docs/decisions/0050-event-sync.md`、調査は `docs/investigations/sync-thread-survey.md`。「実測」はコマンドの出力、「読み」は静的な読み、「推測」は未検証。実機の Windows では確認していない。成果物は `lift/out-event/`。
+実行日: 2026-10-21。作業ディレクトリ `signature-studio-develop`、HEAD cc0fbc3（ワークツリーに他担当の未コミット変更は見えなかった: `git status` は本作業のファイルと既存の未追跡 `lift/iat-unsup-closure.txt` だけ）。決定は `docs/decisions/0050-event-sync.md`、調査は `docs/investigations/sync-thread-survey.md`。「実測」はコマンドの出力、「読み」は静的な読み、「推測」は未検証。実機の Windows では確認していない。成果物は `lift/out-event/`。
 
 ## 1. 結果
 

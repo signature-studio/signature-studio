@@ -1,9 +1,9 @@
 # 0318b O7: 画面のぼやけ(HiDPI)の実装 — 差分のみ(未適用・未 push)。gpu1/gpu8、2026-11-07 08:55
 
 **実エンジンで何を実行したか: 何も実行していない(この作業にブラウザは使っていない)。** 実エンジン上の挙動(『Main GUI scaling factor: 1.75 (system set to 168PPI)』が出るか、画面が鮮明か、Sampler・Settings・File→Open で止まらないか)は **未取得**。cand2 の build が出てからの確認項目は §6。
-**実行したのは**(下に結果。どれも私の作業木 `~/work/gpu8/hidpi/tree`、4b5204c2 の `git archive`):
+**実行したのは**(下に結果。どれも私のワークツリー `~/work/gpu8/hidpi/tree`、4b5204c2 の `git archive`):
 - `emcc -fsyntax-only -Wall -Wextra`(`fle_proc.c` `fle_sysmetrics.c` `fle_appfile.c` `fle_gdc.c`): 警告・エラーなし(HEAD にもある `fle_input.c` の `ev_total` の既存警告のみ)。
-- Rust のネイティブ試験(clang で runtime の C を試験用にコンパイルして実行): §5 の表。
+- Rust のネイティブテスト(clang で runtime の C をテスト用にコンパイルして実行): §5 の表。
 - vitest 全体(`--maxWorkers=1`): 68 files pass / 1 skipped、1318 tests pass / 7 skipped。`tsc --noEmit` 3 設定: エラーなし。
 - **代役・再生・推測**: §4 の表の『投影』の列は**推測**(測定値に画素数の比を掛けた物)。測定値の列は 0311 の `rt-ptv-*`(実 Chrome 156 headless、E13 の実エンジン、1920×1080、dpr 1)の driver snap から。それ以外に代役はない。
 
@@ -17,7 +17,7 @@
 | 差分 | 中身 |
 |---|---|
 | `0318-hidpi-runtime-v2.diff`(12 ファイル) | `fle_screen.h`(`fle_screen_dpi()` が `FLE_SCREEN_DPI` を読む)、`fle_proc.c/.h`(`GetProcessDpiAwareness` を常に PER_MONITOR(2)、`IsProcessDPIAware`、`SetThreadDpiAwarenessContext`、`SetThreadDpiHostingBehavior`)、`fle_sysmetrics.c/.h`(アイコン・カーソルの大きさ)、`fle_appfile.c`(コメントのみ)、`imports_table.rs`(user32 の 3 行、**表の末尾に追記** = decision 0015)、harness の一覧(`hyb/c-imports-engine.txt` `vis1/vis1_apis.inc` `vis1/link-flags.txt` `parity-paint/parity_traceall.c` `parity-paint/traceall-wrap-flags.txt`) |
-| `0318-hidpi-rust-tests-v2.diff`(11 ファイル) | `screen1.rs`(DPI の試験を env 駆動に: 3 本)、`dpi1.rs`(新規 4 本: 3 つの新 API と GetProcessDpiAwareness)、`wall_s.rs`(GetProcessDpiAwareness の期待値)、`rows_0318/mod.rs`(新規)と `wall_fr4,5,13,15,16,19,20.rs`(rows_0267 に倣う行数の更新) |
+| `0318-hidpi-rust-tests-v2.diff`(11 ファイル) | `screen1.rs`(DPI のテストを env 駆動に: 3 本)、`dpi1.rs`(新規 4 本: 3 つの新 API と GetProcessDpiAwareness)、`wall_s.rs`(GetProcessDpiAwareness の期待値)、`rows_0318/mod.rs`(新規)と `wall_fr4,5,13,15,16,19,20.rs`(rows_0267 に倣う行数の更新) |
 | `0318-hidpi-page.diff` | `app/src/ui/screen-fit.ts`、`app/src/main.ts` |
 | `0318-hidpi-page-test.diff` | `app/test/unit/screen-fit.test.ts` |
 - **v1 の `0318-hidpi-runtime.diff` と `0318-hidpi-rust-tests.diff` は使わない**(§7 の自己申告)。
@@ -71,11 +71,11 @@
 - 面 1 枚の大きさ(BGRX 32 bit = 4 B/px、算術): 主窓の面は 1920×1080 で 8.3 MB、3360×1890 で 25.4 MB、3840×2160 で 33.2 MB(実測の裏づけ: cand1 の停止報告に『surface of top-level window lid 14: 2260 x 1080 (BGRX 32-bit top-down)』)。実測の +97 MB(4K、1080p 比)は、主窓の面の増分(+24.9 MB)の約 3.9 倍 = 全画面大の面が数枚ぶん増える計算(読み。どの面かの内訳は未取得)。
 - エンジン側(wasm)の合成(窓 → デスクトップ面)の費用の画素当たりの値は**未取得**(0212 の total−主スレッド−Worker から読めるが、窓の数・大きさが DPI で変わる = 線形ではない)。
 
-## 5. 試験の結果(cargo、fe-lift、私の木)
-**cargo test -p fe-lift --no-fail-fast(私の木、4b5204c2 + 4 本の diff、2 回目、08:52–08:58)**: 162 個の test 結果、**2129 passed / 0 failed / 0 ignored**。実 DLL の試験も走った(`binaries/` と `tools/` を repo から繋ぎ、`lift/out-vfs/seeds-896.txt` を複製。`vcall_thunk_dll` は 31.8 秒かかり、`unsupported_total` は 223 のまま = 追加した 3 行は FLEngine に thunk を持たない delay-load の import)。1 回目(v1 の diff)の失敗は §7。
-- 新規・変更した試験: `screen1`(8 本: env 駆動の DPI〔192 / 168 / 96 / 384〕、範囲外・不正な `FLE_SCREEN_DPI` は 96、アイコン・カーソルの大きさ〔96 / 120 / 144 / 168 / 192 / 288 / 384〕、getenv の名前に `FLE_SCREEN_DPI`)、`dpi1`(新規 4 本: `GetProcessDpiAwareness` が `FLE_SCREEN_DPI` に依らず 2、`IsProcessDPIAware` = 1、`SetThreadDpiAwarenessContext` の保存と戻り値と不正値、`SetThreadDpiHostingBehavior` 同)、`wall_s`(`GetProcessDpiAwareness` の期待値を 2 に)、`wall_fr4,5,13,15,16,19,20`(rows_0318)。
+## 5. テストの結果(cargo、fe-lift、私の木)
+**cargo test -p fe-lift --no-fail-fast(私の木、4b5204c2 + 4 本の diff、2 回目、08:52–08:58)**: 162 個の test 結果、**2129 passed / 0 failed / 0 ignored**。実 DLL のテストも走った(`binaries/` と `tools/` を repo から繋ぎ、`lift/out-vfs/seeds-896.txt` を複製。`vcall_thunk_dll` は 31.8 秒かかり、`unsupported_total` は 223 のまま = 追加した 3 行は FLEngine に thunk を持たない delay-load の import)。1 回目(v1 の diff)の失敗は §7。
+- 新規・変更したテスト: `screen1`(8 本: env 駆動の DPI〔192 / 168 / 96 / 384〕、範囲外・不正な `FLE_SCREEN_DPI` は 96、アイコン・カーソルの大きさ〔96 / 120 / 144 / 168 / 192 / 288 / 384〕、getenv の名前に `FLE_SCREEN_DPI`)、`dpi1`(新規 4 本: `GetProcessDpiAwareness` が `FLE_SCREEN_DPI` に依らず 2、`IsProcessDPIAware` = 1、`SetThreadDpiAwarenessContext` の保存と戻り値と不正値、`SetThreadDpiHostingBehavior` 同)、`wall_s`(`GetProcessDpiAwareness` の期待値を 2 に)、`wall_fr4,5,13,15,16,19,20`(rows_0318)。
 - 期待値は Learn の文と windef.h の値から手で書いた(C の出力を写していない)。
-- 『ランタイムの C を実エンジンで動かした』試験ではない(clang で試験用にコンパイルしたネイティブ実行)。wasm の build(emcc の link)は私の木では行っていない(構文検査のみ)。
+- 『ランタイムの C を実エンジンで動かした』テストではない(clang でテスト用にコンパイルしたネイティブ実行)。wasm の build(emcc の link)は私の木では行っていない(構文検査のみ)。
 
 ## 6. 実エンジン上の確認(cand2 の build の後、未取得)
 1. Chrome で dpr 1.75(`--dpr 1.75`、viewport 2194×1234 など): `canvas.width` = `devicePixelContentBoxSize` の幅、canvas の CSS 幅 = guest/1.75、スクリーンショットが dpr 1 の絵の整数倍拡大ではなく、エッジが鋭いこと(周波数成分で比較)。
@@ -85,7 +85,7 @@
 5. Firefox 159: `device-pixel-content-box` に対応するはず(Firefox 93+)だが、依頼者の機械の版では**未確認**。
 
 ## 7. 自己申告(08:44 に渡した v1 の不備)
-- **何が**: `0318-hidpi-runtime.diff` が `imports_table.rs` の 3 行を表の**途中**(GetDpiForMonitor の直後)に挿入していた。decision 0015(append only、行の位置 = 擬似 VA)に反する(後ろの行の擬似 VA がずれる)。同じ v1 は、`vis1/link-flags.txt` と `parity-paint/traceall-wrap-flags.txt` を更新しておらず、`wall_fr4,5,13,15,16,19,20` が行数・位置を固定している試験(rows_0267 に倣う)も更新していなかった(wall_fr21 は `link-flags.txt` と `vis1_apis.inc` の一致を見る)。
+- **何が**: `0318-hidpi-runtime.diff` が `imports_table.rs` の 3 行を表の**途中**(GetDpiForMonitor の直後)に挿入していた。decision 0015(append only、行の位置 = 擬似 VA)に反する(後ろの行の擬似 VA がずれる)。同じ v1 は、`vis1/link-flags.txt` と `parity-paint/traceall-wrap-flags.txt` を更新しておらず、`wall_fr4,5,13,15,16,19,20` が行数・位置を固定しているテスト(rows_0267 に倣う)も更新していなかった(wall_fr21 は `link-flags.txt` と `vis1_apis.inc` の一致を見る)。
 - **いつ・なぜ**: 08:44、cargo test 全体を回す前に diff を作って渡した(`patch --dry-run` が通ることだけを見ていた)。全体を回して(08:43–08:49 の 1 回目)、行の位置・数を見る 7 件(wall_fr4,5,13,15,16,19,21)の失敗を見て気づいた。ほかに authenticode_check 9 件も落ちたが、私の木に `tools/` が無いためで私の変更とは無関係(2 回目は `tools/` と `binaries/` を繋いだ)。
 - **是正**: 08:51 に PM に info を送り、v2(末尾に追記、rows_0318、一覧の更新)に差し替え。2 回目の全体は §5。
 
@@ -97,7 +97,7 @@
 - `/tmp/opencode` に置いた自分のファイルを `~/work/gpu8/{tmp,msg}` に移した。
 
 ## 8. RT-B の候補での再確認(09:5x、PM の指示)
-- mt3 の `tree-rtb`(`~/work/mt3w-s1/tree-rtb`)には **HiDPI v2 の runtime と Rust 試験が既に入っている**(私の v2 の 2 本を `patch --dry-run` すると全 hunk が『previously applied』)。page の 2 本(main.ts / screen-fit.ts / screen-fit.test.ts)はまだ入っていない。
+- mt3 の `tree-rtb`(`~/work/mt3w-s1/tree-rtb`)には **HiDPI v2 の runtime と Rust テストが既に入っている**(私の v2 の 2 本を `patch --dry-run` すると全 hunk が『previously applied』)。page の 2 本(main.ts / screen-fit.ts / screen-fit.test.ts)はまだ入っていない。
 - 23 ファイルを私の木と1つずつ比べた: runtime(`fle_appfile.c` `fle_proc.h` `fle_screen.h` `fle_sysmetrics.c/.h`)、harness の一覧 5 本、`dpi1.rs` `rows_0318/mod.rs` `screen1.rs` `wall_s.rs` は**同一**。違うのは他の担当の分だけ: `imports_table.rs`(`kernel32!CreateSemaphoreW` / `ReleaseSemaphore` の 2 行〔decision 0234、mt3〕が SetWindowPlacement の後・私の 3 行の前)、`wall_fr4,5,13,15,16,19,20.rs`(`rows_0234` も引く)、`wall_fr15.rs` の他 2 行、`fle_proc.c`(下の 1)。**rows_0318 は表の最後**(`IsProcessDPIAware` `SetThreadDpiAwarenessContext` `SetThreadDpiHostingBehavior` が 781〜783 行)で、decision 0015(append only)を満たす。
 - **1 件の指摘**: `tree-rtb` の `lift/runtime/fle_proc.c` の `fle_imp_ExitProcess` の中(285〜288 行、ファイルの更新時刻は 09:50)に『`extern void fle_dbg_stack(void) __attribute__((weak));   /* spike diagnostic (not for the deliverable): the wasm stack of the caller */ if (fle_dbg_stack) fle_dbg_stack();`』がある。HiDPI の差分ではなく(私の木と HEAD にはない)、コメントが『deliverable ではない』と言っている。RT-B の候補に入れるものかの確認が要る。
-- **cargo の確認(tree-rtb の複写、10:0x)**: `tree-rtb` の `lift/{Cargo.*,crates,runtime,harness}` を複写(`binaries/` `tools/` `out-vfs/seeds-896.txt` は repo から繋ぐ)して、HiDPI に関わる 15 本の試験 binary を実行: `dpi1` `screen1` `sysmetrics` `gdc` `monitor` `wall_s` `wall_fr4` `wall_fr5` `wall_fr13` `wall_fr15` `wall_fr16` `wall_fr19` `wall_fr20` `wall_fr21` `vcall_thunk_dll` = **205 passed / 0 failed**(実 DLL の `vcall_thunk_dll` を含む)。`rows_0234`(semaphore)と `rows_0318` が両方とも数えられた状態で行の位置の試験が通る = rows_0318 を最後に積む順が RT-B の木で成立している。試験の全体(fe-lift の全 binary)は未実行(RT-B の CI に任せる)。
+- **cargo の確認(tree-rtb のコピー、10:0x)**: `tree-rtb` の `lift/{Cargo.*,crates,runtime,harness}` をコピー(`binaries/` `tools/` `out-vfs/seeds-896.txt` は repo から繋ぐ)して、HiDPI に関わる 15 本のテスト binary を実行: `dpi1` `screen1` `sysmetrics` `gdc` `monitor` `wall_s` `wall_fr4` `wall_fr5` `wall_fr13` `wall_fr15` `wall_fr16` `wall_fr19` `wall_fr20` `wall_fr21` `vcall_thunk_dll` = **205 passed / 0 failed**(実 DLL の `vcall_thunk_dll` を含む)。`rows_0234`(semaphore)と `rows_0318` が両方とも数えられた状態で行の位置のテストが通る = rows_0318 を最後に積む順が RT-B の木で成立している。テストの全体(fe-lift の全 binary)は未実行(RT-B の CI に任せる)。

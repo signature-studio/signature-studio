@@ -1,6 +1,6 @@
 # 6 モジュール構成の wasm を実際のブラウザ（headless Chrome 156）で動かす: 実現性の測定
 
-作業日: 2026-10-28。基準: ブランチ main、作業開始時の HEAD **e071fc0**（`git archive HEAD lift docs/investigations/a4-six-module-wasm/tools` を `/tmp/opencode/web/src/` に展開。作業ツリーは読み取りだけ）。作業の途中で HEAD は 228c78a まで進んだ（他の作業者の docs／tools の commit。`git diff --stat e071fc0 HEAD -- lift` は空なので、wasm の入力は変わっていない）。**測定のみ・commit なし**。新規ファイルは本書と `lift/harness/web/`（小さな JS／HTML／MD／TSV のみ、バイナリなし）。
+作業日: 2026-10-28。基準: ブランチ main、作業開始時の HEAD **e071fc0**（`git archive HEAD lift docs/investigations/a4-six-module-wasm/tools` を `/tmp/opencode/web/src/` に展開。ワークツリーは読み取りだけ）。作業の途中で HEAD は 228c78a まで進んだ（他の作業者の docs／tools の commit。`git diff --stat e071fc0 HEAD -- lift` は空なので、wasm の入力は変わっていない）。**測定のみ・commit なし**。新規ファイルは本書と `lift/harness/web/`（小さな JS／HTML／MD／TSV のみ、バイナリなし）。
 
 凡例: **実測**＝コマンド・スクリプトの出力を自分で見た事実／**読み**＝そこからの解釈・外挿（確かめていない）／**未確認**。
 
@@ -234,7 +234,7 @@ Chrome 156 の V8 のフラグ値は `--js-flags=--help`（`runs/v8-help.txt`）
 - COOP/COEP の有無は同一オリジン内だけ（クロスオリジンの subresource は試していない）。
 - `performance.memory` は Worker で無く、V8 のヒープの内訳（wasm コードの大きさ）は直接測っていない（RSS と CDP の `getHeapUsage` のみ）。
 - GC と exnref の wasm 機能はプローブしていない。memory64 は検証のみ。
-- 作業ツリーの `lift/out-*`（コミットされていない素材）に依存する。`wasm-validate` は実行していない（Chrome の受理と実行で代用）。
+- ワークツリーの `lift/out-*`（コミットされていない素材）に依存する。`wasm-validate` は実行していない（Chrome の受理と実行で代用）。
 
 ## 7. 規則違反・逸脱の自己申告
 

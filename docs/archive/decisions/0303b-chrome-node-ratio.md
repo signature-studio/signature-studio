@@ -2,7 +2,7 @@
 
 ## 0. 先頭の三点(実エンジンか代役か、実測か読みか)
 
-1. **実エンジンの実行**: node 側はすべて**新規に実行**した実エンジン(E11 の試験用 wasm `engine.abecc01c7b30` = 本番 `engine.49bbf63df894` と同じソース、node 24.19 = V8 13.6、`ref1-perf-short.g3` の仮想時計 G3)。**Chrome は 0 回起動した**(指示)。Chrome 側の値は**既存の cpuprofile**(opt1 の `ser-e16p`/`ser-e17p`、alpha1 の a14 の 6 本)の**再解析**で、新しい Chrome の実測ではない。代役・画像の再生・モックは**無い**。
+1. **実エンジンの実行**: node 側はすべて**新規に実行**した実エンジン(E11 のテスト用 wasm `engine.abecc01c7b30` = 本番 `engine.49bbf63df894` と同じソース、node 24.19 = V8 13.6、`ref1-perf-short.g3` の仮想時計 G3)。**Chrome は 0 回起動した**(指示)。Chrome 側の値は**既存の cpuprofile**(opt1 の `ser-e16p`/`ser-e17p`、alpha1 の a14 の 6 本)の**再解析**で、新しい Chrome の実測ではない。代役・画像の再生・モックは**無い**。
 2. **読み物・観察・推定の区別**: (i) V8 15.6 の既定値(`wasm_deopt` ほか)は **V8 のソース(github v8/v8 の 15.6-lkgr と 13.6-lkgr の `flag-definitions.h`)を読んだ値**で、稼働中の Chrome 156.0.8078.47 で確かめた値ではない。(ii) Chrome の wasm メモリの配置は、**他の agent が走らせている最中の Chrome の `/proc/PID/maps`・`smaps_rollup` を読んだ**(読むだけ。起動も操作もしていない)。(iii) 『オーバーヘッドを引いた値』『同じ仕事に直した全体比』は**測定値から組み立てた推定**(式を §4 に書いた)。
 3. **未検証**: Chrome 15.6 の V8 の挙動の差(§5 の 9)、V8 sandbox(§5 の 8)、JSPI の差(§5 の 10)。これは Chrome でしか確かめられない。§6 に最小の Chrome 実行案を書いた。
 
@@ -113,7 +113,7 @@ Chrome の窓の内訳(自己、`tables/0303b-chrome-e11-inclusive-and-categorie
 3. **較正の前提**: 落ちた標本が関数に対して偏らない、を仮定した(未検証。窓の組で k が 1.10〜1.21 と揺れ、`f_5287c0` の node 値が窓で 24.2 / 30.9 / 29.6 と ±13% 動くので、較正後の比は ±10% 程度の幅で読む)。
 4. 一時の誤り: 他の agent が走らせている Chrome の `/proc` を**読んだ**(起動・操作なし、読み取りのみ)。集計の一行を雑に書いて **12 万字の出力を端末に出した**(再実行で是正)。`sleep` と末尾 `&` の命令が拒否された(この区間の前半)。
 5. `~/work/mt3w-bundle93` を alpha1 の 16:58 の info を受けて消し、PM の『18:30 まで残す』の決定と行き違った(17:14 に再生成して通知済み)。以後、alpha1 の許可なく消さない。
-6. 第一報の自己申告(body 索引の取り違え、合成の微小試験の過大評価)は据え置き。
+6. 第一報の自己申告(body 索引の取り違え、合成の微小テストの過大評価)は据え置き。
 
 ## 9. 再現(`tools/`、`tables/`)
 
@@ -124,7 +124,7 @@ Chrome の窓の内訳(自己、`tables/0303b-chrome-e11-inclusive-and-categorie
 
 ## PM の判断と取り込み(2026-11-06 18:12、docs のみ。製品の差分なし)
 
-取り込み: mt3 の第一報(文書・表・道具)を `docs/investigations/mt3w/0303/` に置いた(V8 の `flag-definitions.h` の抜粋 2 本〔計 376 KB、V8 のソースの複写〕は入れない。原本は `lift/out-git/mt3w-results/0303/tables/`)。node 側は新規に実行(E11 の試験用 wasm、node 24.19 / V8 13.6、仮想時計 G3)。Chrome 側は既存の cpuprofile(opt1 の ser-e17p ほか)の再解析で、**Chrome は起動していない**。依頼者の機械は 0 件。
+取り込み: mt3 の第一報(文書・表・道具)を `docs/investigations/mt3w/0303/` に置いた(V8 の `flag-definitions.h` の抜粋 2 本〔計 376 KB、V8 のソースのコピー〕は入れない。原本は `lift/out-git/mt3w-results/0303/tables/`)。node 側は新規に実行(E11 のテスト用 wasm、node 24.19 / V8 13.6、仮想時計 G3)。Chrome 側は既存の cpuprofile(opt1 の ser-e17p ほか)の再解析で、**Chrome は起動していない**。依頼者の機械は 0 件。
 
 mt3 の自己是正を受理する: 0303 第 1 報の『Chrome は node の 1.3〜2.0 倍(関数に固有でない)』は、node の通し平均(UI だけの区間約 30 仮想 s を含む)と Chrome の再生窓(曲位置 28.4〜46.3 s)を比べた誤りで、さらに node の `--prof` の tick を 1 ms として扱った誤り(負荷下で 10〜20% 落ちる。tick÷CPU = 0.86 で較正)があった。
 

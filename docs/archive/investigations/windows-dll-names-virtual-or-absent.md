@@ -5,7 +5,7 @@
 ## 0. 基準と凡例
 
 - 実行日: 2026-10-24。**HEAD `c75acc4`**（依頼の HEAD は `8b2fc8e`。その後に別作業が `docs/progress.md` だけを変更するコミットを 1 つ足した。`git diff --stat 8b2fc8e HEAD -- lift/runtime lift/crates docs/decisions docs/investigations/loadlibrary-names-classification.md docs/investigations/external-modules-usage.md` は空。実測）。
-- 入力: `binaries/win64/FLEngine_x64.dll` SHA-256 `b2c64da4…496d`（実測。前回の分類文書と一致）。読んだソースは `lift/runtime/fle_modules.c`、`fle_load.c`、`lift/crates/fe-lift/src/imports_table.rs` で、いずれも HEAD と作業ツリーが一致（`git diff --quiet HEAD -- FILE`。実測）。
+- 入力: `binaries/win64/FLEngine_x64.dll` SHA-256 `b2c64da4…496d`（実測。前回の分類文書と一致）。読んだソースは `lift/runtime/fle_modules.c`、`fle_load.c`、`lift/crates/fe-lift/src/imports_table.rs` で、いずれも HEAD とワークツリーが一致（`git diff --quiet HEAD -- FILE`。実測）。
 - 凡例: **実測** = このセッションで実行したコマンドの出力（出力ファイルは §10）。**読み** = capstone の線形逆アセンブルとソースを読んだ結果で、実行していない。**引用** = 前回の文書（`loadlibrary-names-classification.md`、以下「分類」。コミット 7a9af0f）または決定の記述をそのまま引いたもの。**未確認** = 確認していない。**意見** = §9 だけ。
 - **導出** = Learn の Requirements 欄の DLL 名と最小対応 OS から「Windows 10 にある」と推論したもの。ページが Windows 10 に必ずあると書いているわけではない（決定 0055 と同じ扱い）。
 - 「unit N」は初期化表（`units_ptr` 0x13768e0、942 件、16 バイト/件）の 0 始まりの index。ゲストの InitCount は index + 1（分類 §0）。今回、DLL から表を直接読み直し、前回の `units.tsv` の 895 行と **0 件の不一致**を確認した（`units-own.txt`。実測）。

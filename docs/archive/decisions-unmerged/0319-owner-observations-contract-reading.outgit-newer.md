@@ -54,7 +54,7 @@
 - 仮説 H1(上の S4): Settings → General のスクロールで、スクロール中に直前の描画がまだ終わっていない無効領域が動く画素に混ざる。
 - 仮説 H2(S2): General のページの部品が子窓で、窓が CLIPCHILDREN でないとき、子窓の画素が親のスクロールで一緒に動く(実 Windows では子窓の画素は子窓自身の可視領域で別に扱われ、動かし方も変わる)。
 - 仮説 H3(S5): FL が `SW_SCROLLCHILDREN` を使うと止まる(エンジンが止まる症状 O1/O5 とは別に、描画が崩れる症状と結びつくのは H1/H2)。
-- **検証案(Wine を基準、alpha8 の先例)**: 小さい Win32 の試験プログラム(`harness/alpha8/move_paint.c` の型)で、(1) 窓に無効領域がある状態で ScrollWindowEx を呼び、GetUpdateRgn/GetUpdateRect が動くか、(2) CLIPCHILDREN の子窓があるときに子窓の画素が動くか、(3) prcClip NULL の意味、を Wine 10 で実測し、runtime を同じ試験で比べる。FL 側の確認は、TEST 専用の診断(ScrollWindowEx の引数・戻り・更新矩形を stderr に出す。再 build が要る)で Settings → General のスクロールが実際に何を渡しているかを取る。
+- **検証案(Wine を基準、alpha8 の先例)**: 小さい Win32 のテストプログラム(`harness/alpha8/move_paint.c` の型)で、(1) 窓に無効領域がある状態で ScrollWindowEx を呼び、GetUpdateRgn/GetUpdateRect が動くか、(2) CLIPCHILDREN の子窓があるときに子窓の画素が動くか、(3) prcClip NULL の意味、を Wine 10 で実測し、runtime を同じテストで比べる。FL 側の確認は、TEST 専用の診断(ScrollWindowEx の引数・戻り・更新矩形を stderr に出す。再 build が要る)で Settings → General のスクロールが実際に何を渡しているかを取る。
 - **直す仕組み(全体、(b))**: (i) ScrollWindowEx を、決定 0214 の窓の有効領域のモデル(可視領域 `fle_win_dc_region`、保留中の更新矩形 `unc_pending`)の上に載せる。動かす画素 = 可視領域 ∩ scroll 矩形 ∩ clip から『保留中の無効部分』を除いた物、保留中の無効矩形は動かして clip に切る(H1)、動かせなかった所(可視でない・無効な所)は更新領域に足す(S2)。(ii) `SW_SCROLLCHILDREN` を、決定 0214 の移動(`apply_pos`)と同じ道具で実装(子窓の移動と WM_MOVE)。(iii) ScrollWindow = ScrollWindowEx(SW_INVALIDATE|SW_ERASE 相当)の別名、ScrollDC は契約どおり(無効化しない、hrgnUpdate/lprcUpdate を返す)。(iv) FL のクラス名・窓の種類・位置による分岐は足さない。
 
 ## 2. 文字が横に潰れる(O9)— GetTextExtentPoint32 / GetTextMetrics / DrawText の契約と、ClearType・フォント代替
@@ -87,7 +87,7 @@
 
 | 項目 | 製品(依頼者の観察) | native | 出所(runtime/ページ) | 分類 | 直す仕組み(全体) |
 |---|---|---|---|---|---|
-| Starting at | `12:00:00 AM` | `5:42:38` | FL: Delphi の `Now`(f_442c00)→ FormatDateTime(f_4441c0)。runtime: `fle_time.h`『時計は仮想。起点 2020-12-31T23:00Z + 仮想の ticks、ホストの時計は読まない。タイムゾーンは UTC』。仮想時計の開始 = 3,600,000 ms 後 → 最初の読みは 2021-01-01T00:00:00Z(`FLE_TIME_BOOT_FILETIME`) | (b) 契約の不足。Learn の GetSystemTime/GetLocalTime は『現在の時刻』。起点の固定は決定性のための設計の選択で、契約の範囲外 | 実時刻(FILETIME)とタイムゾーンの差を **run の値**としてページが渡す(FLE_MONITOR_W/H と同じ形、`Date.now()`・`getTimezoneOffset()`)。以後は仮想時計で進める。試験・Export の再現は値の固定で保つ。時刻の 12 時間表記は FL のロケール書式(下の言語)に従う |
+| Starting at | `12:00:00 AM` | `5:42:38` | FL: Delphi の `Now`(f_442c00)→ FormatDateTime(f_4441c0)。runtime: `fle_time.h`『時計は仮想。起点 2020-12-31T23:00Z + 仮想の ticks、ホストの時計は読まない。タイムゾーンは UTC』。仮想時計の開始 = 3,600,000 ms 後 → 最初の読みは 2021-01-01T00:00:00Z(`FLE_TIME_BOOT_FILETIME`) | (b) 契約の不足。Learn の GetSystemTime/GetLocalTime は『現在の時刻』。起点の固定は決定性のための設計の選択で、契約の範囲外 | 実時刻(FILETIME)とタイムゾーンの差を **run の値**としてページが渡す(FLE_MONITOR_W/H と同じ形、`Date.now()`・`getTimezoneOffset()`)。以後は仮想時計で進める。テスト・Export の再現は値の固定で保つ。時刻の 12 時間表記は FL のロケール書式(下の言語)に従う |
 | 64Bit addressing mode / 3DNow! no | 同じ | 同じ(3DNow! no は最近の CPU と同じ) | CPUID 拡張葉は 0 を返す(`fle_cpuid.c`) | 契約の範囲内 | (必要なら拡張葉 0x80000001 の LAHF/LZCNT なども CPUID の表に載せる) |
 | SSE yes / SSE2 yes | 同じ | 同じ | `fle_cpuid.c`: 葉 1 EDX = x86-64 の基準 (CMOV・CX8・FPU・FXSR・MMX・SSE・SSE2) | 契約の範囲内 | — |
 | **SSE3 no / SSSE3 no / AVX no** | no | yes / yes / yes | `fle_cpuid.c`: ECX = 0。理由は『lift が対応しない機能を主張しない』(決定 0009/0032/0075/0118)。lift の対応(読み): SSSE3 は一部(`sse_ssse3.rs`: pshufb・palignr・pabsb あり、pmaddubsw・phaddw/d・psignb・pmulhrsw は無し)、SSE3 は float の水平演算ほか一部あり、SSE4.1(pmulld・ptest・blend・pextr/pinsr・pmovzx など)は**無し**、AVX は `VMOVUPS/VMOVAPS/VMOVNTPS/VZEROUPPER` だけ(`vex.rs`、決定 0032)、XGETBV は名前つきの停止 | **契約の範囲内**(仮想 CPU の能力を正直に答える)。『native と同じ経路』にしたいなら、lift を広げるのが筋(CPUID を偽って立てると、その命令で `fle_unsupported` に落ちる) | CPUID の bit を『lift が実装した命令の表』から機械的に出す一つの出所にする。広げる順: SSSE3 の残り(pmaddubsw・phaddw/d・phsub・psign・pmulhrsw など十前後。grep の概算)→ SSE3 完了 → SSE4.1 → AVX/AVX2/FMA(VEX の全面、XGETBV で XCR0 = 7 を返す)。必要な命令は『CPU 特徴で分岐する DSP の閉包』の census で数える |
@@ -119,10 +119,10 @@ mt3 の `diag-g9-gui.diff` は、**プラグイン画像(0x6800000〜0x7400000)�
 
 ## 6. ScrollWindowEx の契約の実測(Wine 10)と、実装の差分(PM の許可 07:2x。適用・push はしない)
 
-**先頭(何を実行したか)**: Wine 10.0(Ubuntu)の小さい Win32 試験 `tools/wine-scroll-contract.c`(mingw、専用 prefix `~/work/alpha22w/wine-scroll/prefix`、Xvfb、約 5 秒)を**実行した**(実エンジンではない。Wine の API の挙動の測定)。差分は clang の `-fsyntax-only` と `patch --dry-run` だけで確認し、**実行していない**(runtime の C の差分を走らせる検証は未了。下の 6.5)。
+**先頭(何を実行したか)**: Wine 10.0(Ubuntu)の小さい Win32 テスト `tools/wine-scroll-contract.c`(mingw、専用 prefix `~/work/alpha22w/wine-scroll/prefix`、Xvfb、約 5 秒)を**実行した**(実エンジンではない。Wine の API の挙動の測定)。差分は clang の `-fsyntax-only` と `patch --dry-run` だけで確認し、**実行していない**(runtime の C の差分を走らせる検証は未了。下の 6.5)。
 
 ### 6.1 Wine 10 の測定(`tables/0319-wine10-scrollwindowex-probes.txt`)。窓は 300×300、色は 10 px の帯ごと
-| 試験 | 設定 | Wine 10 の結果 | 読み |
+| テスト | 設定 | Wine 10 の結果 | 読み |
 |---|---|---|---|
 | T1/T4 更新領域 | 無効矩形 (0,200)-(300,230) を作り、ScrollWindowEx(dy=+40, prcScroll NULL, SW_INVALIDATE) | 戻り **2 SIMPLEREGION**、prcUpdate (0,0,300,40)(帯だけ)、hrgnUpdate の box **(0,0,300,270)**、窓の更新領域の box (0,0,300,270)・型 COMPLEX、点 (10,215)〔元の位置〕・(10,255)〔元 + 40〕・(10,20)〔帯〕**すべて領域の中** | **動かした無効矩形が更新領域に加わり、元の位置も残る**。Learn の ScrollWindow『invalid (unpainted) areas in the window are also offset』と整合。prcUpdate は帯だけ、hrgnUpdate は帯 + 動いた無効矩形の和 |
 | T3 prcClip NULL | prcScroll = (0,50)-(300,150)、dy=+60、prcClip NULL、flags 0 | 画素 (10,180)〔scroll 矩形の外〕= **band(y=120)**(元は band(y=180))、画素 (10,130) = band(y=70) | **prcClip NULL = クライアント全体**(scroll 矩形ではない)。ScrollDC のページ『NULL = クライアント領域全体』と整合。以前の runtime(clip = scroll 矩形)は不一致 |
@@ -139,29 +139,29 @@ mt3 の `diag-g9-gui.diff` は、**プラグイン画像(0x6800000〜0x7400000)�
 - `fle_wall_ia2w.c`: `fle_imp_ScrollWindowEx` を新しいモデルの入口にし(戻り値は覆われなかった領域の矩形数で NULL/SIMPLE/COMPLEX、hrgnUpdate は矩形領域、prcUpdate は覆われなかった領域の外接矩形)、**以前の簡易版は `fle_win_scroll` が 0 を返す場合の fallback**として残す。新規 **`fle_imp_ScrollWindow`**(= ScrollWindowEx(SW_INVALIDATE | SW_ERASE | lpRect==NULL なら SW_SCROLLCHILDREN))。`fle_wall_ia2.h` に宣言。
 - `harness/seeds/ship6-imports.txt` の**末尾**に `user32.dll ScrollWindow fle_imp_ScrollWindow` を 1 行(append only)。
 - **ScrollDC は未実装**(FLEngine は import するが、DC の画素を動かす経路が fle_gdi.c のモデルに載る必要がある。本差分には含めない。契約は 1.2 の S12 のとおり: lprcClip NULL = クライアント全体、空いた領域を hrgnUpdate/lprcUpdate に返し、無効化はしない)。
-- 確認: `clang -fsyntax-only` が 4 ファイルで通る(runtime の include の下)。`patch --dry-run -p1` が PM の木の複写(HEAD 3969ad31)に通る。診断の差分(`diag-g9-fl.diff`)がこの差分の後にも当たる(offset 187 行つき)。fle_win.c に触れる mt3 の diff は無い(mt3 の積み重ねは fle_callback.c・fle_load.c・fle_modules.c・fle_dsound.c と ci/build 側)。ci1 の ①DefWindowProc(WM_ERASEBKGND)・②HTTRANSPARENT・③フックの差分(0323)と fle_win.c で重なる行は、重なったら ci1 から info を受けて合わせる。
+- 確認: `clang -fsyntax-only` が 4 ファイルで通る(runtime の include の下)。`patch --dry-run -p1` が PM の木のコピー(HEAD 3969ad31)に通る。診断の差分(`diag-g9-fl.diff`)がこの差分の後にも当たる(offset 187 行つき)。fle_win.c に触れる mt3 の diff は無い(mt3 の積み重ねは fle_callback.c・fle_load.c・fle_modules.c・fle_dsound.c と ci/build 側)。ci1 の ①DefWindowProc(WM_ERASEBKGND)・②HTTRANSPARENT・③フックの差分(0323)と fle_win.c で重なる行は、重なったら ci1 から info を受けて合わせる。
 
 ### 6.4 モデルの限界(正直に)
 更新領域は窓ごとに外接矩形 1 つ(S-updregion)なので、`hrgnUpdate` は帯 + 動いた無効矩形の外接矩形になる(Wine の COMPLEX の領域より広いが、広く無効にするだけで正しさには影響しない)。SW_SMOOTHSCROLL は即時。キャレットの扱いは無い。可視領域が `FLE_VISRGN_MAX` を超える窓は fallback(簡易版)に落ちる。子窓自身の更新領域は、SW_SCROLLCHILDREN の `apply_pos` が持つ座標と一緒に動く(窓の相対座標で持つため)と読むが、実機で確認していない。
 
 ### 6.5 検証(未了。許可があれば次)
-alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1〜T4 を足し、Wine の値(上の表)と並べる: 戻り値 2/1、prcUpdate・hrgn の box、(10,180) = band(y=120)、T2a の画素、更新領域の点。実エンジンでは、診断の差分(`diag-g9-fl.diff`)で Settings → General の ScrollWindowEx の引数を取り、同じ引数を native の試験に流す。
+alpha8 の `move_paint.c` の型の native テスト(runtime を直接呼ぶ)に T1〜T4 を足し、Wine の値(上の表)と並べる: 戻り値 2/1、prcUpdate・hrgn の box、(10,180) = band(y=120)、T2a の画素、更新領域の点。実エンジンでは、診断の差分(`diag-g9-fl.diff`)で Settings → General の ScrollWindowEx の引数を取り、同じ引数を native のテストに流す。
 
 ## 7. 時刻・環境ブロックの run の値の差分と、診断の差分(PM の許可 07:2x。適用しない)
 
-**時刻**(`impl/0319-time-env-run-values.diff`、fle_time.h/c): `FLE_WALL_FILETIME`(エンジンが始まる時点の UTC の FILETIME、10 進)と `FLE_TZ_BIAS_MIN`(Windows の bias = UTC − local、日本は −540)を、画面の大きさ(FLE_MONITOR_W/H)や FLE_DWM_HZ と同じ『エンジンの環境に渡す run の値』として読む(`getenv`。製品でも読む配線値)。仮想時計は FLE_CLOCK_START_MS から進むので、起点 = 渡された時刻 − その分。**未設定・不正なら従来の固定起点と UTC のまま**なので、試験・Export・決定性は変わらない(`FLE_TZ_BIAS_MINUTES` は関数呼び出しのマクロになり、GetLocalTime・GetTimeZoneInformation・SystemTimeToTzSpecificLocalTime・`fle_api2_str.c` が同じ値を使う)。ページ側(gpu1): `Date.now()` を FILETIME(ms × 10000 + 116444736000000000)に、`new Date().getTimezoneOffset()`(分。JavaScript も UTC − local で Windows の bias と同じ符号、日本は −540)をそのまま渡す。夏時間・時間帯名(「Tokyo Standard Time」など)は未対応。仮想ボリュームのファイル時刻は別の仮想時計(`FLE_VFS_CLOCK_START`)のまま。
-**環境ブロック**(同じ diff、fle_env.c): `FLE_ENV_DEFAULTS=1` のとき、最初のアクセスで TEMP・TMP・USERPROFILE・APPDATA・LOCALAPPDATA・HOMEDRIVE・HOMEPATH・windir・SystemRoot・SystemDrive・ComSpec・Path・PATHEXT・OS・PROCESSOR_ARCHITECTURE・ProgramData・ProgramFiles・CommonProgramFiles・ALLUSERSPROFILE・COMPUTERNAME・USERDOMAIN・USERNAME を `fle_env.h` の仮想プロファイルの定数から入れ、TEMP・Roaming・ProgramData のディレクトリを仮想ボリュームに作る(`fle_vfs_make_dirs`)。未設定(試験)なら空のまま(`fe-lift/tests/env.rs` などの期待を壊さない)。製品は manifest の engine.env に `FLE_ENV_DEFAULTS=1` を足す。→ `GetTempPathW` は Learn どおり `C:\Users\user\AppData\Local\Temp\` を返し、FL の temp は `…\Temp\Image-Line\<pid>-{GUID}` になる。
+**時刻**(`impl/0319-time-env-run-values.diff`、fle_time.h/c): `FLE_WALL_FILETIME`(エンジンが始まる時点の UTC の FILETIME、10 進)と `FLE_TZ_BIAS_MIN`(Windows の bias = UTC − local、日本は −540)を、画面の大きさ(FLE_MONITOR_W/H)や FLE_DWM_HZ と同じ『エンジンの環境に渡す run の値』として読む(`getenv`。製品でも読む配線値)。仮想時計は FLE_CLOCK_START_MS から進むので、起点 = 渡された時刻 − その分。**未設定・不正なら従来の固定起点と UTC のまま**なので、テスト・Export・決定性は変わらない(`FLE_TZ_BIAS_MINUTES` は関数呼び出しのマクロになり、GetLocalTime・GetTimeZoneInformation・SystemTimeToTzSpecificLocalTime・`fle_api2_str.c` が同じ値を使う)。ページ側(gpu1): `Date.now()` を FILETIME(ms × 10000 + 116444736000000000)に、`new Date().getTimezoneOffset()`(分。JavaScript も UTC − local で Windows の bias と同じ符号、日本は −540)をそのまま渡す。夏時間・時間帯名(「Tokyo Standard Time」など)は未対応。仮想ボリュームのファイル時刻は別の仮想時計(`FLE_VFS_CLOCK_START`)のまま。
+**環境ブロック**(同じ diff、fle_env.c): `FLE_ENV_DEFAULTS=1` のとき、最初のアクセスで TEMP・TMP・USERPROFILE・APPDATA・LOCALAPPDATA・HOMEDRIVE・HOMEPATH・windir・SystemRoot・SystemDrive・ComSpec・Path・PATHEXT・OS・PROCESSOR_ARCHITECTURE・ProgramData・ProgramFiles・CommonProgramFiles・ALLUSERSPROFILE・COMPUTERNAME・USERDOMAIN・USERNAME を `fle_env.h` の仮想プロファイルの定数から入れ、TEMP・Roaming・ProgramData のディレクトリを仮想ボリュームに作る(`fle_vfs_make_dirs`)。未設定(テスト)なら空のまま(`fe-lift/tests/env.rs` などの期待を壊さない)。製品は manifest の engine.env に `FLE_ENV_DEFAULTS=1` を足す。→ `GetTempPathW` は Learn どおり `C:\Users\user\AppData\Local\Temp\` を返し、FL の temp は `…\Temp\Image-Line\<pid>-{GUID}` になる。
 **診断**(`impl/diag-g9-fl.diff`、TEST 専用): `FLE_DIAG_WIN=1`(全ての CreateWindowEx/DestroyWindow の class・title・rect・style・親・呼び出し元、**DefWindowProc の WM_ERASEBKGND・WM_PAINT と祖先の class の鎖**〔ci1 の 0322 の項目①〕)、`FLE_DIAG_SCROLL=1`(ScrollWindowEx の引数・戻り・覆われた領域)、`FLE_DIAG_VFS_MISS=1`(仮想ボリュームの『見つからない要求』)、`FLE_FRUITY_THREAD_TRACE=1` に乗る待ちのログ(api・種類・thread・timeout・呼び出し元)。すべて観測だけで、ゲストの見る値を変えない。製品の wasm では `FLE_TEST_GETENV` が null 定数なので死んだコード。f_a3ae80 の入口・出口は、直接 call の関数に入口を差し込む手段(`-finstrument-functions` 相当)が wasm に無いため、**待ちとスレッドのログで代替**(『終わらない待ち』なら parked のまま出る)。
 
 ## 8. ページ側の差分(engine.env に実時刻・時差・既定の環境ブロックを渡す)と DestroyCursor の stop の診断(PM の許可 07:5x。適用しない)
 
-**先頭(何を実行したか)**: vitest(app のコピー `~/work/alpha22w/app-copy` で、**単体試験の全部**〔69 ファイル、1322 件 passed・7 skipped、新規 9 件を含む〕)と `tsc --noEmit`(tsconfig.json・tsconfig.test.json とも rc 0)を実行した。ブラウザ・エンジン・Wine は実行していない。
+**先頭(何を実行したか)**: vitest(app のコピー `~/work/alpha22w/app-copy` で、**単体テストの全部**〔69 ファイル、1322 件 passed・7 skipped、新規 9 件を含む〕)と `tsc --noEmit`(tsconfig.json・tsconfig.test.json とも rc 0)を実行した。ブラウザ・エンジン・Wine は実行していない。
 
 **差分** `impl/0319-page-wall-clock-env.diff`(192 行、3 ファイル): 新規 `app/src/engine/wall-clock.ts`(純粋な関数: `filetimeOfUnixMs` は Unix ms を 10 進の FILETIME に〔2^53 を超えるので BigInt〕、`biasOfOffsetMin` は `getTimezoneOffset()`〔UTC − local。Windows の bias と同じ符号〕を整数で、`parseWallParam` は URL の `fle_wall`、`applyWallClock` は engine.env に `FLE_ENV_DEFAULTS=1`・`FLE_WALL_FILETIME`・`FLE_TZ_BIAS_MIN` を入れる)、`app/src/main.ts`(`applyWallClockParam(manifest)` を `applyScreenParam(manifest)` の直後、`client.init` の前に 1 行呼ぶ。import 1 行 + 関数 6 行)、新規 `app/test/unit/wall-clock.test.ts`(9 件)。HEAD の main.ts に `patch --dry-run` が通る(gpu1 が main.ts の同じ付近を変えると衝突しうる)。
-**決定性の条件(PM)**: (1)**manifest がすでに持つ値は上書きしない**(固定した run、試験の run がそのまま残る)。(2) URL の `fle_wall=off` で時計の値を入れない(エンジンの固定起点のまま。既定の環境ブロックだけ入る)。`fle_wall=<unix ms>` で起点を固定。(3) Export の harness はこのページを通らないので変わらない。(4) **関門(ci1)**: 製品のページを (a) 既定〔実時刻〕と (b) `?fle_wall=off` で Export し、sha が基準(Balance なしの製品 = 381cdb5a…f979、G9-a の bundle なら 94c93666…4090)と一致するか。一致すれば『ページが実時刻を渡す』と『Export の sha が変わらない』は両立。**一致しない場合の疑い**: 時刻を使う FL の処理(乱数の種、ファイル名に時刻を使う保存、WAV の時刻つき chunk)。読みでは Export の WAV の内容に時刻は入らないと見ているが、未確認。runtime 側(`0319-time-env-run-values.diff`)が入っていない bundle では、渡した値は無視される(読む場所が無い)。
+**決定性の条件(PM)**: (1)**manifest がすでに持つ値は上書きしない**(固定した run、テストの run がそのまま残る)。(2) URL の `fle_wall=off` で時計の値を入れない(エンジンの固定起点のまま。既定の環境ブロックだけ入る)。`fle_wall=<unix ms>` で起点を固定。(3) Export の harness はこのページを通らないので変わらない。(4) **関門(ci1)**: 製品のページを (a) 既定〔実時刻〕と (b) `?fle_wall=off` で Export し、sha が基準(Balance なしの製品 = 381cdb5a…f979、G9-a の bundle なら 94c93666…4090)と一致するか。一致すれば『ページが実時刻を渡す』と『Export の sha が変わらない』は両立。**一致しない場合の疑い**: 時刻を使う FL の処理(乱数の種、ファイル名に時刻を使う保存、WAV の時刻つき chunk)。読みでは Export の WAV の内容に時刻は入らないと見ているが、未確認。runtime 側(`0319-time-env-run-values.diff`)が入っていない bundle では、渡した値は無視される(読む場所が無い)。
 **時刻の渡し方の限界**: 夏時間と Windows の時間帯名は無い(起動時の bias のまま)。ブラウザの `Date.now()` が秒/ms に丸められる設定(privacy)は丸めたまま渡る。
 
-**DestroyCursor の stop(Filter の V3、gpu1 の run)の診断の差分** `impl/0319-fle-stop-context.diff`(18 行、fle_env.c): `fle_stop` の 1 行目はそのままに、2 行目として `fle: stop context: guest return … rsp … rcx … rdx … r8 … r9 …` を出す(rsp が guest の番地に見えるときだけ戻り先を読む)。stop は元から致命なので意味は変わらない。原因は mt3 が読みで特定(fle_cursor.c の `off / STRIDE > 8` が RM_MAX 16 の Filter 差分で残り、Filter = 表の位置 8 = k = 9 の cursor が共有と認められない)。私の読みも同じ(符号化は `fle_loadimage.h`: BASE + STRIDE × (表の位置 + 1) + 4 × slot、表は [dsp, blend2d, qfc, freetype, iltools, oggio, elastique, balance, filter])。**node で hIcon を読む確認は、g9f の試験 bundle が製品の形〔FILESYSTEM=0、getenv なし〕で G3 を読まないため、Filter の木の TEST build が要り、していない**。値の確認は、上の診断を載せた次の build の実 Chrome の stop で出る。
+**DestroyCursor の stop(Filter の V3、gpu1 の run)の診断の差分** `impl/0319-fle-stop-context.diff`(18 行、fle_env.c): `fle_stop` の 1 行目はそのままに、2 行目として `fle: stop context: guest return … rsp … rcx … rdx … r8 … r9 …` を出す(rsp が guest の番地に見えるときだけ戻り先を読む)。stop は元から致命なので意味は変わらない。原因は mt3 が読みで特定(fle_cursor.c の `off / STRIDE > 8` が RM_MAX 16 の Filter 差分で残り、Filter = 表の位置 8 = k = 9 の cursor が共有と認められない)。私の読みも同じ(符号化は `fle_loadimage.h`: BASE + STRIDE × (表の位置 + 1) + 4 × slot、表は [dsp, blend2d, qfc, freetype, iltools, oggio, elastique, balance, filter])。**node で hIcon を読む確認は、g9f のテスト bundle が製品の形〔FILESYSTEM=0、getenv なし〕で G3 を読まないため、Filter の木の TEST build が要り、していない**。値の確認は、上の診断を載せた次の build の実 Chrome の stop で出る。
 
 ## 9. 追補(08:3x): scroll model の native 検証、ScrollDC の差分、diag の置き場所の是正
 
@@ -294,9 +294,9 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 | ImageList_GetIconSize | ○ | 実装 | 不正な handle・両方の出力が NULL は FALSE |
 | ImageList_SetIconSize | ○ | 実装 | Learn『全画像を消す』。不正は FALSE |
 | ImageList_GetBkColor / SetBkColor | ○ | 実装 | 失敗は CLR_NONE、Set は直前の色を返す |
-| ImageList_Add | ○ | **実装(drag の像の素)** | 画像数は bitmap の幅 ÷ cx(Learn)。画素は 32 ビット B,G,R,A に**複写**(bitmap は呼び出し側が消す)。ILC_MASK の list は mask の 1 ビット = 透明。ILC_COLOR32 の 32 ビット DIB に alpha が有ればその alpha |
+| ImageList_Add | ○ | **実装(drag の像の素)** | 画像数は bitmap の幅 ÷ cx(Learn)。画素は 32 ビット B,G,R,A に**コピー**(bitmap は呼び出し側が消す)。ILC_MASK の list は mask の 1 ビット = 透明。ILC_COLOR32 の 32 ビット DIB に alpha が有ればその alpha |
 | ImageList_Replace | ○(FLEngine・Wrapper・Sytrus・Harmor・Edison・FLEX。ILTools 等は無し) | 実装(Add と同じ画素の入口) | i の範囲外は FALSE |
-| ImageList_BeginDrag | ○ | **実装** | himlTrack・iTrack が不正か drag 中なら FALSE(Wine)。像を一時の list に複写 |
+| ImageList_BeginDrag | ○ | **実装** | himlTrack・iTrack が不正か drag 中なら FALSE(Wine)。像を一時の list にコピー |
 | ImageList_DragEnter | ○ | **実装** | hwndLock の窓を LockWindowUpdate して像を (x − dx, y − dy) に表示。座標は窓の左上基準(Learn)。NULL はデスクトップ |
 | ImageList_DragMove / DragShowNolock / DragLeave / EndDrag / GetDragImage | ○ | **実装** | DragMove: 古い場所の画素を戻し、新しい場所の画素を保存して描く。DragShowNolock: 既にその状態なら FALSE(Wine)。DragLeave: 像を消して DragEnter が掛けた lock を外す。GetDragImage: 位置(= 最後の x, y)・hot spot・一時の list |
 | ImageList_Remove / SetImageCount / GetIcon / Draw / DrawEx / Read / Write | ○ | **名前つきの停止**(行あり) | 『今は drag だけ』。FL が呼ぶと API 名つきで止まる(今までは API 名なしの abort) |
@@ -316,7 +316,7 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 
 ### 15.1 結論(先に)
 1. **子窓の単純な移動では崩れない**(PM の仮説〔SetWindowPos / MoveWindow / DeferWindowPos で子を動かしても親の空いた領域が無効化されない〕は、harness では再現しない)。親が WS_CLIPCHILDREN の有無にかかわらず、SetWindowPos・MoveWindow・BeginDeferWindowPos/DeferWindowPos/EndDeferWindowPos で子を 60 px 下げると、古い場所は親の帯が描き直され(M1〜M3、M5〜M7: 古い場所 = 帯、新しい場所 = 赤)、SWP_NOREDRAW を付けた時だけ古い絵が残る(M4・M8。契約どおり)。実装は決定 0214 の `apply_pos` / `unc_end` の一本の経路(3 つの API とも通る)。
-2. **gpu1 のログにある FL の並び**(ScrollWindowEx(flags 0、hrgnUpdate)→ 返った領域を FL が無効化 → 子窓を SetWindowPos で動かす)を面 N で再現した。親が **WS_CLIPCHILDREN なし**の時だけ、子の新しい場所の上半分に『スクロール後の面の古い絵が複写されたもの』が残る(N1: 子の DC (30,20) = 帯(y=90) / (30,50) = 赤)。理由: ScrollWindowEx(flags 0 = 子はスクロールしない)が親の DC(子の面を含む)の画素を 30 px 下に複写し、続く SetWindowPos(子)は SWP_NOCOPYBITS が無いので**その時点の面の旧位置の画素を新位置へ複写し**、子は無効化されない。これは契約の読みどおりの動き(Learn SetWindowPos「bits を複写する」、ScrollWindowEx「子はスクロールしない」)で、実装の抜けではない見込み(Wine での確認は未取得)。**親が WS_CLIPCHILDREN の時は崩れない**(N2: 子の DC は赤、親の DC は子を除くので CLR_INVALID)。
+2. **gpu1 のログにある FL の並び**(ScrollWindowEx(flags 0、hrgnUpdate)→ 返った領域を FL が無効化 → 子窓を SetWindowPos で動かす)を面 N で再現した。親が **WS_CLIPCHILDREN なし**の時だけ、子の新しい場所の上半分に『スクロール後の面の古い絵がコピーされたもの』が残る(N1: 子の DC (30,20) = 帯(y=90) / (30,50) = 赤)。理由: ScrollWindowEx(flags 0 = 子はスクロールしない)が親の DC(子の面を含む)の画素を 30 px 下にコピーし、続く SetWindowPos(子)は SWP_NOCOPYBITS が無いので**その時点の面の旧位置の画素を新位置へコピーし**、子は無効化されない。これは契約の読みどおりの動き(Learn SetWindowPos「bits をコピーする」、ScrollWindowEx「子はスクロールしない」)で、実装の抜けではない見込み(Wine での確認は未取得)。**親が WS_CLIPCHILDREN の時は崩れない**(N2: 子の DC は赤、親の DC は子を除くので CLR_INVALID)。
 3. したがって『FL の画面が崩れる』が O9 の原因なら、候補は (i) 実機の FL のスクロール容器に WS_CLIPCHILDREN が**付いていない**(VCL の記憶: `TWinControl.CreateParams` は `csAcceptsControls` のコントロール〔TPanel・TScrollBox など〕に WS_CLIPCHILDREN を付ける。**未観測**)、(ii) 窓を持たない部品(TGraphicControl)の描画が親の WM_PAINT に載っていて、無効化された領域の外が古い絵のまま、(iii) FL 自身の描画順、のどれか。**harness だけでは決められない**。実行で見る物は 15.3。
 
 ### 15.2 実測(`tables/0319-scroll-harness-M-childmove.out`、`…-N-fl-sequence.out`、`…-diag-paint-sceneP.out`)
@@ -324,7 +324,7 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 |---|---|---|
 | M1〜M4 | 親 WS_CLIPCHILDREN なし。子 (100,100,60×60) を (100,160) へ。SetWindowPos / MoveWindow / DeferWindowPos / SetWindowPos+SWP_NOREDRAW | 古い場所 (130,110)・(105,155) = 帯、新しい場所 = 赤。NOREDRAW だけ古い場所が赤のまま |
 | M5〜M8 | 同じ 4 通りで親が WS_CLIPCHILDREN | 古い場所 = 帯(NOREDRAW だけ赤)。新しい場所は親の DC から読むと CLR_INVALID(子を除く DC。契約) |
-| N1 | 親 WS_CLIPCHILDREN なし。ScrollWindowEx(0,+30,NULL,NULL,hrgn,NULL,0)=1(hrgn の外接 (0,0,300,30))→ InvalidateRgn(hrgn)→ SetWindowPos(子 +30)→ UpdateWindow | 親の古い場所 (130,110)・(130,125) = 帯(描き直し)。**子の DC (30,20) = 帯(y=90)(スクロール後の古い絵の複写)**、(30,50) = 赤 |
+| N1 | 親 WS_CLIPCHILDREN なし。ScrollWindowEx(0,+30,NULL,NULL,hrgn,NULL,0)=1(hrgn の外接 (0,0,300,30))→ InvalidateRgn(hrgn)→ SetWindowPos(子 +30)→ UpdateWindow | 親の古い場所 (130,110)・(130,125) = 帯(描き直し)。**子の DC (30,20) = 帯(y=90)(スクロール後の古い絵のコピー)**、(30,50) = 赤 |
 | N2 | 同じ並びで親が WS_CLIPCHILDREN | hrgn の外接 (0,0,300,190)。子の DC (30,20)・(30,50) = 赤。古い場所 = 帯 |
 
 ### 15.3 診断 `impl/diag-g9-fl-paint.diff`(TEST 専用。`FLE_DIAG_WIN=1` に乗る。製品では出ない)
@@ -338,7 +338,7 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 - 読み方: FL の run で `FLE_DIAG_WIN=1` にして、(1) スクロール容器の `win create` の行の style の 0x02000000(WS_CLIPCHILDREN)の有無、(2) スクロール前後の `draw-discard`(崩れた部品が『見えない窓』への描画として捨てられていないか)、(3) `vis` の変化(出るはずの窓が出ているか)、(4) `paint-msg` / `BeginPaint` の rcPaint(スクロールで返した領域が実際に塗り直されているか)を見る。
 
 ### 15.4 残りの未確認と、次に要る物
-- Wine 10 の M(8 通り)と N の値(合図待ち)。N1 の複写が Wine でも同じなら、N1 は契約どおり = 実装の抜けではない。
+- Wine 10 の M(8 通り)と N の値(合図待ち)。N1 のコピーが Wine でも同じなら、N1 は契約どおり = 実装の抜けではない。
 - FL の run のログ(cand2 の run で `FLE_DIAG_WIN=1`+ 本診断)。
 - 実装の差分は**出していない**(再現した抜けが無いので `0319-childmove-invalidate.diff` は作らない)。
 
@@ -375,7 +375,7 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 - **(a) 余計な処理**(我々の恣意的な上限):16 は Windows の契約ではない。**機構ごと直す**:数の上限をやめ、Windows と同じく**スタックの残りで止める**。
   1. guest のスタック:`rsp − StackLimit(TEB。fle_teb_set_stack が登録した、guest が走っているメモリの下端)< FLE_CB_GUEST_RESERVE(64 KiB)` で、数値つきの名前つき停止。
   2. host のスタック(wasm):走っているスレッドの shadow stack の残り(`fle_thread_wasm_stack_left`:第 1 スレッドは emscripten の stack の残り、他は領域 − canary)`< FLE_CB_HOST_RESERVE(512 KiB)` で名前つき停止。
-  3. `FLE_CB_MAX_DEPTH` は **256 の最後の砦**(host の stack を問えない native の試験で、暴走を止めるため)。実測の通常の連鎖 17 に対し十分に深く、平均 12.3 KB × 256 = 3.1 MB は 8 MiB の範囲内。
+  3. `FLE_CB_MAX_DEPTH` は **256 の最後の砦**(host の stack を問えない native のテストで、暴走を止めるため)。実測の通常の連鎖 17 に対し十分に深く、平均 12.3 KB × 256 = 3.1 MB は 8 MiB の範囲内。
 - **検証(native harness、面 Q。`tables/0319-scroll-harness-Q-callback-nesting.out`)**:窓のメッセージが自分に SendMessage で N 回送る。修正前(t13): N = 100 は **16 段で停止**(`callback nesting is deeper than FLE_CB_MAX_DEPTH (16)`)。修正後(t14):**N = 100 は戻り値 107(= 全 101 段が戻った)**、N = 300 は 256 段で最後の砦が止める、guest の stack の残りを 72 KiB にした面では **8 段目で『the guest stack is used up』で停止**(数値つき)。
 - 未確認:wasm の host 検査の実行(TEST bundle の作り直しと node G3 rz-5。別の info で結果を渡す)。**この修正で 17 段の連鎖が通っても、その先で別の止まりが出る可能性は残る**(rz-5 で確かめる)。
 - **FL へのこの診断の足し方**:`diag-g9-cb.diff` は『修正の後ろ』に積む形に作り直した(host-stack-free をスレッドごとに出し、`LIMIT-guest` / `LIMIT-host` / `LIMIT-count` の 3 つの停止で連鎖を出す)。
@@ -387,7 +387,7 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 
 ## 17. G9 の残り(Delay 2・Parametric EQ 2・Frequency Shifter・Soundgoodizer・FLEX・Fruity Wrapper)の実モジュール化の見積り表と、足す順の提案(PM 10:1x の依頼。期限 10:40)
 
-**先頭(何を実行したか)**: **読みだけ**(Chrome・Wine・wasm の実行は 0 本)。使った物: 原本の DLL(opt1 の prefix の `Plugins\Fruity\{Effects,Generators}\…`、`.off-0307` に退避した物と隠していない `Frequency Splitter\engine_x64.dll`。**読み取りのみ**)の pefile、`lift/out-git/alpha21-results/tools/a23-plugin-imports.py`(0309 の道具。ship5 の行 + fe-lift の表 = 819 行で突き合わせ。今の HEAD の出荷の行と同じ集合)、原 FLP(`serina1-serum2.flp`)の flp_model での読み、決定 0309(私の前の見積り)と 0320(opt1 の台帳〔§8.1・§8.6〕)の引用。**重複を避ける**: 大きさ・lift の実測〔関数数・命令レベルの未対応〕・段階表の人日は 0309 §1.1・§1.3・§4、Wine の段ごとの効果量は 0320 §8.6 を見てください。ここに足したのは (a) 今回新しく読んだ物〔Frequency Splitter の engine_x64.dll の import、FLP の各 module の instance の場所、依存 DLL の大きさ、S1 の ×2.0〜2.1 の再計算〕、(b) 足す順の提案です。表の元データは `tables/0319-g9rest-estimate.tsv`、import の突き合わせは `tables/0319-g9rest-imports-{summary,none}.tsv`(`tools/a22-plugin-imports-ship6.py`)。
+**先頭(何を実行したか)**: **読みだけ**(Chrome・Wine・wasm の実行は 0 本)。使った物: 原本の DLL(opt1 の prefix の `Plugins\Fruity\{Effects,Generators}\…`、`.off-0307` に退避した物と隠していない `Frequency Splitter\engine_x64.dll`。**読み取りのみ**)の pefile、`lift/out-git/alpha21-results/tools/a23-plugin-imports.py`(0309 の道具。ship5 の行 + fe-lift の表 = 819 行で突き合わせ。今の HEAD の出荷の行と同じ集合)、原 FLP(`serina1-serum2.flp`)の flp_model での読み、決定 0309(私の前の見積り)と 0320(opt1 の記録〔§8.1・§8.6〕)の引用。**重複を避ける**: 大きさ・lift の実測〔関数数・命令レベルの未対応〕・段階表の人日は 0309 §1.1・§1.3・§4、Wine の段ごとの効果量は 0320 §8.6 を見てください。ここに足したのは (a) 今回新しく読んだ物〔Frequency Splitter の engine_x64.dll の import、FLP の各 module の instance の場所、依存 DLL の大きさ、S1 の ×2.0〜2.1 の再計算〕、(b) 足す順の提案です。表の元データは `tables/0319-g9rest-estimate.tsv`、import の突き合わせは `tables/0319-g9rest-imports-{summary,none}.tsv`(`tools/a22-plugin-imports-ship6.py`)。
 
 ### 17.1 表(Fruity Delay 2 は mt3 が準備済み。参考として同じ表に載せる)
 | module | native の大きさ(DLL) | 依存 DLL | FLP の instance | CPUID / XGETBV の箇所(opt1 0320 §8.1) | import(全 / 行なし / FLEngine に無い行なし) | Wine の効果(段の差。0320 §8.6) | S1 への寄与(native × 2.0〜2.1 の読み) |
@@ -441,23 +441,23 @@ alpha8 の `move_paint.c` の型の native 試験(runtime を直接呼ぶ)に T1
 **registry の差は『スロットが有効になる/ならない』の原因の候補としては弱い**: ミキサーの枝に効く Settings の値は両側とも未設定(form の既定)で、差は UI・デバイス・探索結果・Export 窓の状態に限られる。ただし**読みであって、E4 の実測で確定する**(下)。
 
 ### 18.3 E4(opt1 に頼む形)
-`tables/0319-wasm-like-registry-minimal.reg`(`General\WAVRenderForm` は残し、`General` の 2 値・`Devices`・`ASIO`・`Shared\General`・`Shared\Plugins` を消す)と `…-full.reg`(`FL Studio 26` の木ごと消す = Export 窓も form の既定。**先に窓の画面で上の 4 の値になることを確かめる**。違えば elog16 と比べられない)。使い方: 参照の prefix の複写に `wine regedit /S FILE.reg`(FL 停止中)→ ins1-lp と原 FLP(基準)の 2 本を Export → `tools/run-filter-cmp.sh`(wasm の cand1 の Export を相手に)。出力が wasm の形(4.778〜4.800 s の厳密な 0、100.58〜100.80 s の無音)に**ならなければ**、registry は原因ではない。
+`tables/0319-wasm-like-registry-minimal.reg`(`General\WAVRenderForm` は残し、`General` の 2 値・`Devices`・`ASIO`・`Shared\General`・`Shared\Plugins` を消す)と `…-full.reg`(`FL Studio 26` の木ごと消す = Export 窓も form の既定。**先に窓の画面で上の 4 の値になることを確かめる**。違えば elog16 と比べられない)。使い方: 参照の prefix のコピーに `wine regedit /S FILE.reg`(FL 停止中)→ ins1-lp と原 FLP(基準)の 2 本を Export → `tools/run-filter-cmp.sh`(wasm の cand1 の Export を相手に)。出力が wasm の形(4.778〜4.800 s の厳密な 0、100.58〜100.80 s の無音)に**ならなければ**、registry は原因ではない。
 
 ### 18.4 診断 diff `impl/diag-g9f-filter-calls.diff` の下書きを更新(build は RT-B の build のあと)
-TEST の木(`~/work/alpha22w/g9f-test-tree`、cand1 の複写、build 済みでない)に、Filter の image(0x7000000〜0x73B2000)への間接呼び出しの全列を `FLE_DIAG_G9F=1` の時だけ出す(`FLE_TEST_GETENV`)。上限: Eff_Render 型の呼び(引数が Length ≤ 16384・2 つの buffer ポインタの形)は累積 Length が 240,000 フレームを超えるまで(約 5.4 s 分 = 4.778〜4.8 s を含む)、それ以外は最初の 3,000 回。source / dest buffer の peak を呼びの前後で読む(Process が 0 を書いたか、素通しか、呼ばれていないかが分かる)。
+TEST の木(`~/work/alpha22w/g9f-test-tree`、cand1 のコピー、build 済みでない)に、Filter の image(0x7000000〜0x73B2000)への間接呼び出しの全列を `FLE_DIAG_G9F=1` の時だけ出す(`FLE_TEST_GETENV`)。上限: Eff_Render 型の呼び(引数が Length ≤ 16384・2 つの buffer ポインタの形)は累積 Length が 240,000 フレームを超えるまで(約 5.4 s 分 = 4.778〜4.8 s を含む)、それ以外は最初の 3,000 回。source / dest buffer の peak を呼びの前後で読む(Process が 0 を書いたか、素通しか、呼ばれていないかが分かる)。
 
-### 16.6 訂正(自己申告): 初版の callback-stack-limit は『自分の差分の欠陥』で native の試験を壊した — 直した版と、実際に回した試験(PM 10:36、mt3 の報告)
+### 16.6 訂正(自己申告): 初版の callback-stack-limit は『自分の差分の欠陥』で native のテストを壊した — 直した版と、実際に回したテスト(PM 10:36、mt3 の報告)
 **欠陥は 3 つ、すべて私の差分**(分類: (a)/(b) でなく**自分の実装の誤り**):
-1. `fle_callback.c` で `fle_teb_cur ? fle_teb_cur : fle_teb` と書いた。非 TLS_MORE では `fle_teb_cur` は**弱い変数**で、リンクされていない試験(fle_callback.c を少数のファイルとだけリンクする callback・window・monitor・wall_r・wall_fr6 ほか)では address 0 を**値として読んで** SIGSEGV。弱い『配列』(`fle_teb[]`)は address が 0 になるだけで安全だが、変数は違う。→ 直し: `&fle_teb_cur != NULL` のときだけ読む(TLS_MORE は fle_ctx のフィールドなので従来どおり)。
-2. guest stack の予約 64 KiB が、試験の guest stack(64 KiB)と同じ大きさで、最初の callback で止まった(wall_fr8・9・9t・10〜12・14〜17・19・20、wall_ia1w、wall_tbl1、present2_uncover、gpu7_ring_poll の 16 executable)。→ 直し: 予約 = **min(64 KiB, スタックの大きさの 1/4)**(スタックの大きさ = StackBase − StackLimit。engine の MiB 級の stack では 64 KiB のまま)。
-3. **決定 0064 の試験 3 件を更新していなかった**: 定数(MAX_DEPTH 16)・『限界ちょうどは通り、もう 1 つで止まる』・『fle_callback.c は素の C で、host に触れない』(`asm` を含む語 `wasm`、`emscripten`、`unsigned long long` の `long` を禁じる)。→ 直し: host の stack の問い合わせを `fle_callback.c` から外し、**`fle_cstack_left()`(弱い宣言。定義は host を知る fle_thread_wasm.c)**にした(fle_callback.c に `wasm`・`emscripten`・スレッドの語は無い)。64 ビットの表示は `PRIx64` / `PRIu64`(`long` を使わない)。試験は『決めた物を変える』形で更新(`impl/0319-callback-stack-limit-tests.diff`)。
+1. `fle_callback.c` で `fle_teb_cur ? fle_teb_cur : fle_teb` と書いた。非 TLS_MORE では `fle_teb_cur` は**弱い変数**で、リンクされていないテスト(fle_callback.c を少数のファイルとだけリンクする callback・window・monitor・wall_r・wall_fr6 ほか)では address 0 を**値として読んで** SIGSEGV。弱い『配列』(`fle_teb[]`)は address が 0 になるだけで安全だが、変数は違う。→ 直し: `&fle_teb_cur != NULL` のときだけ読む(TLS_MORE は fle_ctx のフィールドなので従来どおり)。
+2. guest stack の予約 64 KiB が、テストの guest stack(64 KiB)と同じ大きさで、最初の callback で止まった(wall_fr8・9・9t・10〜12・14〜17・19・20、wall_ia1w、wall_tbl1、present2_uncover、gpu7_ring_poll の 16 executable)。→ 直し: 予約 = **min(64 KiB, スタックの大きさの 1/4)**(スタックの大きさ = StackBase − StackLimit。engine の MiB 級の stack では 64 KiB のまま)。
+3. **決定 0064 のテスト 3 件を更新していなかった**: 定数(MAX_DEPTH 16)・『限界ちょうどは通り、もう 1 つで止まる』・『fle_callback.c は素の C で、host に触れない』(`asm` を含む語 `wasm`、`emscripten`、`unsigned long long` の `long` を禁じる)。→ 直し: host の stack の問い合わせを `fle_callback.c` から外し、**`fle_cstack_left()`(弱い宣言。定義は host を知る fle_thread_wasm.c)**にした(fle_callback.c に `wasm`・`emscripten`・スレッドの語は無い)。64 ビットの表示は `PRIx64` / `PRIu64`(`long` を使わない)。テストは『決めた物を変える』形で更新(`impl/0319-callback-stack-limit-tests.diff`)。
 
-**実際に実行した物(native の試験、本物)**: `git archive HEAD` の複製(`~/work/alpha22w/cbtest/head`)に『0319-callback-stack-limit.diff + 0319-callback-stack-limit-tests.diff』を当て、`harness/test.sh full --jobs 1 --fresh --no-record --only '(callback|window|monitor|wall_r|wall_ref1|wall_fr|present2_uncover|gpu7_ring_poll|wall_tbl1|wall_ia1w|sysinfo|vfs|fruity)'`(CARGO_TARGET_DIR は私の別の場所):
+**実際に実行した物(native のテスト、本物)**: `git archive HEAD` の複製(`~/work/alpha22w/cbtest/head`)に『0319-callback-stack-limit.diff + 0319-callback-stack-limit-tests.diff』を当て、`harness/test.sh full --jobs 1 --fresh --no-record --only '(callback|window|monitor|wall_r|wall_ref1|wall_fr|present2_uncover|gpu7_ring_poll|wall_tbl1|wall_ia1w|sysinfo|vfs|fruity)'`(CARGO_TARGET_DIR は私の別の場所):
 - **初版**(欠陥つき): 30 executable、599 passed、**3 failed**(callback の 3 件〔定数・限界ちょうど・素の C〕)。[mt3 の木では 16 executable が SIGSEGV / 『stack を使い果たした』で落ちた]
-- 途中(host の問い合わせを外し、定数を数値にする前): 601 passed、2 failed(新しい試験の期待値の誤り〔reserve 13312 でなく 13310: 登録した下端が page 境界でない〕と、`def_const` が `(64u * 1024u)` を読めない)。
+- 途中(host の問い合わせを外し、定数を数値にする前): 601 passed、2 failed(新しいテストの期待値の誤り〔reserve 13312 でなく 13310: 登録した下端が page 境界でない〕と、`def_const` が `(64u * 1024u)` を読めない)。
 - **直した版: 32 executable、642 passed、failed 0**(callback 19 件 〔新しい 1 件を含む〕、window 37、monitor 25、wall_r 31、wall_r2 17、wall_ref1 6、wall_fr3〜21 と wall_fr9t、wall_ia1w 7、wall_tbl1 8、present2_uncover、gpu7_ring_poll、sysinfo 16、vfs 23)。SKIPPED 2 件は入力の DLL が複製に無いだけ(wall_fr7 の quickfontcache、wall_fr9t の環境変数。差分と無関係)。
-- tree-rtb(mt3 の最新の木の複写)に『rtb 版の差分 + 試験の差分』を当てた結果は報告に書く(下の run)。
-- **tree-rtb(mt3 の最新の木の複写。`cp -r` で mt3 の木には書いていない)**: 『rtb 版の差分 + 試験の差分』を当てて同じ選択(`…|sysinfo|vfs`)を回した: **635 passed、8 failed**(`tables/0319-callback-native-tests-rtb-with-fix.log`)。比較のため**同じ複写から私の 2 つの差分を戻して**(fle_callback.c・fle_callback.h・fle_thread_wasm.c・callback.rs が mt3 の木と一致することを確認)同じ選択を回した: **634 passed、8 failed、落ちる 8 件も同じ**(`…-baseline-without-fix.log`)。差は『私の新しい試験 1 件が通る』だけ。= **この 8 件は私の差分と無関係(mt3 の木の状態)**: `fe-lift/callback source_is_plain_c…`(`emscripten`: 旧い第 1 形の診断の `#include <emscripten/stack.h>`)、`vfs`・`wall_fr6`・`wall_fr9`・`window`・`wall_fr7`(`getenv`: 診断を getenv にしてある形。製品の形〔FLE_TEST_GETENV〕では通る、と mt3)、`wall_fr14`(`WM_SETCURSOR hit -2` の 3 行。ci1 の 0323b/c の pin)、`wall_fr9t`(scheduler の trace の assertion `left: 8002`。**私は原因を見ていない**。私の差分は native では fle_thread_wasm.c を含まない〔`#ifdef __EMSCRIPTEN__` の中〕ので無関係と読めるが、mt3 の GIL 版の native の挙動の問題かもしれない)。
+- tree-rtb(mt3 の最新の木のコピー)に『rtb 版の差分 + テストの差分』を当てた結果は報告に書く(下の run)。
+- **tree-rtb(mt3 の最新の木のコピー。`cp -r` で mt3 の木には書いていない)**: 『rtb 版の差分 + テストの差分』を当てて同じ選択(`…|sysinfo|vfs`)を回した: **635 passed、8 failed**(`tables/0319-callback-native-tests-rtb-with-fix.log`)。比較のため**同じコピーから私の 2 つの差分を戻して**(fle_callback.c・fle_callback.h・fle_thread_wasm.c・callback.rs が mt3 の木と一致することを確認)同じ選択を回した: **634 passed、8 failed、落ちる 8 件も同じ**(`…-baseline-without-fix.log`)。差は『私の新しいテスト 1 件が通る』だけ。= **この 8 件は私の差分と無関係(mt3 の木の状態)**: `fe-lift/callback source_is_plain_c…`(`emscripten`: 旧い第 1 形の診断の `#include <emscripten/stack.h>`)、`vfs`・`wall_fr6`・`wall_fr9`・`window`・`wall_fr7`(`getenv`: 診断を getenv にしてある形。製品の形〔FLE_TEST_GETENV〕では通る、と mt3)、`wall_fr14`(`WM_SETCURSOR hit -2` の 3 行。ci1 の 0323b/c の pin)、`wall_fr9t`(scheduler の trace の assertion `left: 8002`。**私は原因を見ていない**。私の差分は native では fle_thread_wasm.c を含まない〔`#ifdef __EMSCRIPTEN__` の中〕ので無関係と読めるが、mt3 の GIL 版の native の挙動の問題かもしれない)。
 
 ## 19. 契約レビュー: mt3 の `0315-getmodulefilename-loaded-path.diff`(GetModuleFileNameW が『最初の LoadLibraryW のパス』を返す)— (b) の契約の実装として正しいか(PM 11:3x の依頼。期限 12:15)
 
@@ -473,13 +473,13 @@ TEST の木(`~/work/alpha22w/g9f-test-tree`、cand1 の複写、build 済みで�
 直す点(Learn / Wine との差):
 1. **相対名・名前だけの要求を記録してはいけない**: path table は『tail が要求の末尾と一致し、その前が区切りか**無い**』で一致する(fle_realmod.h のコメント)ので、`LoadLibraryW(L"Fruity Wrapper_x64.dll")` のような名前だけも一致して、**完全修飾でないパスを GetModuleFileNameW に返す**(Learn は完全修飾パス、Wine は検索したディレクトリの絶対パス)。→ ドライブ付き(`X:\` か `X:/`)か UNC(`\\server\`)の絶対パスだけ記録する。それ以外は記録せず、今までの答えに戻る。
 2. **`.`・`..`・連続した区切りを畳む**(Wine は畳む。Windows の `RtlGetFullPathName_U` も同じ)。畳めない/ルートより上に出る `..` は記録しない。今の差分は `/` → `\` だけ。
-3. **接頭辞**: `\\?\C:\…` は Learn では『同じ形式』= そのまま返す。mt3 の ASCII の複写はそのまま返すので Learn どおり(Wine の `\??\` を落とす癖には合わせない)。UNC `\\?\UNC\…` も同様。→ 追加の処理は要らないが**試験の期待に 1 行**(接頭辞つきがそのまま返ること)。
+3. **接頭辞**: `\\?\C:\…` は Learn では『同じ形式』= そのまま返す。mt3 の ASCII のコピーはそのまま返すので Learn どおり(Wine の `\??\` を落とす癖には合わせない)。UNC `\\?\UNC\…` も同様。→ 追加の処理は要らないが**テストの期待に 1 行**(接頭辞つきがそのまま返ること)。
 副作用・確認事項:
 - **Balance / Filter / Delay 2 が見るパスが変わる**(今は `…\FL Studio 21\Shared\<export 名>`、新しくは `…\Plugins\Fruity\Effects\<Name>\<Name>_x64.dll`)。Export の WAV に効く可能性は読みでは低いが(音声の経路はパスを使わない)、**Delphi の RTL / VCL の初期化は `GetModuleFileNameW(HInstance)` を ModuleName として保存し、`ExtractFilePath` で自分のフォルダの資源〔Artwork・`Plugin.nfo`・プリセット〕を探すことがある**ので、新しいパスでは読み取りの先が変わる。volume に在るファイルは読まれて(実機と同じ)、無いものは新しい vfs-miss になる。→ **確認(安い)**: ci1 の cand1 の原 FLP の Export に mt3 の差分を足した build の sha256 が `94c9366687076a41…`(Balance のみ・Filter 入りと全バイト一致、ci1 の 10:2x)と**同じか**。同じなら Export への影響は 0。違えば差の最初のフレームを見る。
 - gpu8 の cand1 の vfs-miss に **名前が空の探索**がある: `…\FL Studio 21\_x64.dll`(220 回)、`…\Fruityplug_x64.dll`、`.nfo`(187 回)。FL が plug-in の名前から `<名前>_x64.dll` / `<名前>.nfo` を組み立てる時に**名前が空**になっている形で、**原因は未確認**(GetModuleFileNameW が返すパスと関係するか、FL の plug-in database の走査の別の入力か)。mt3 の差分の前後で**この数が変わるか**を見ると、関係の有無が分かる(vfs-miss の集計だけで済む)。
 - 返す文字列の長さ: mt3 の記録は 519 文字まで、`module_path` の呼び出し側の `char full[512]` は loaded path を**コピーせずポインタで返す**ので問題ない。`fle_imp_GetModuleFileNameA`/`W` の切り詰めは Learn どおり(NUL つきで nSize、`ERROR_INSUFFICIENT_BUFFER`)。
 
-### 19.3 試験の追加(mt3 の `wall_wrp1.rs` に足すと良い物。runtime の差分と一緒に)
+### 19.3 テストの追加(mt3 の `wall_wrp1.rs` に足すと良い物。runtime の差分と一緒に)
 | 要求した名前 | 記録するか | GetModuleFileNameW の答え |
 |---|---|---|
 | `C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Generators\Fruity Wrapper\Fruity Wrapper_x64.dll` | する | そのまま |
@@ -523,7 +523,7 @@ native の面で見る物: 私の harness は path table を持たないので�
 
 ## 21. 『名前が空の探索』の読み(a)/(b)、Eff_Render の呼び元の静的な読み、診断 build 最終版 — RT-B の木に当たる形(PM 12:0x の依頼)
 
-**先頭(何を実行したか)**: 読み(FLEngine_x64.dll〔binaries/win64〕の capstone による逆アセンブルと call 元の探索。Chrome・Wine・wasm の run は 0 本)+ **本物の cargo の native の試験**(下)。**空の探索の原因は『FL 自身の通常の否定の探索』と読める(未確認。Wine の file trace で確かめる)**。Eff_Render の呼び元は**静的には 1 つに絞れていない**(下に正直に)。
+**先頭(何を実行したか)**: 読み(FLEngine_x64.dll〔binaries/win64〕の capstone による逆アセンブルと call 元の探索。Chrome・Wine・wasm の run は 0 本)+ **本物の cargo の native のテスト**(下)。**空の探索の原因は『FL 自身の通常の否定の探索』と読める(未確認。Wine の file trace で確かめる)**。Eff_Render の呼び元は**静的には 1 つに絞れていない**(下に正直に)。
 
 ### 21.1 gpu8 の cand1 の vfs-miss『名前が空の探索』(`…\FL Studio 21\_x64.dll`、`…\Fruityplug_x64.dll`、`.nfo`)
 読みで分かったこと(FLEngine のアドレスは image の VA):
@@ -539,14 +539,14 @@ native の面で見る物: 私の harness は path table を持たないので�
 - **診断 C の dump の対象は合っている**: Filter の `CreatePlugInstance(Host rcx, Tag rdx)` は基底の構築子へ Tag を渡し、plug-in の object の +0x10 に `TFruityPlugInfo` の組(SDKVersion = 1、名前の pointer、…)を書く(読み: Filter の 0x72cbb10)。TFruityPlug の先頭は [+0 vtable, +8 HostTag, +0x10 Info, …] なので、**a1 の 192 バイト(+0x08 の HostTag と Host の pointer)と、guest の heap を指す最初の 3 pointer の 256 バイト**に、FL が渡した『スロットの tag』(= FL 側のスロットの構造体を指すなら pointer)が入る。HostTag が整数の id なら pointer として追えない(その場合は dump の差が出ない)ので、**診断 A の `caller` で FL の関数が分かった後に、その関数の `[item+…]` の読みで構造体のフィールドを決めて dump を足す**のが二段目(runtime のみの増分 build 1 本)。
 - 『clip の開始のたびにミキサーのスロットが再構築される経路』の有無: **静的には確認できていない**(上の約 10 の関数のうち、スロットの enable・再構築を扱う物を特定するには A の caller が先)。
 
-### 21.3 診断 build の最終版 `impl/diag-g9f-filter-calls.diff`(123 行。RT-B の木に当たる)と、本物の native の試験
+### 21.3 診断 build の最終版 `impl/diag-g9f-filter-calls.diff`(123 行。RT-B の木に当たる)と、本物の native のテスト
 - 当て先: **mt3 の tree-rtb と tree-rtb-build(`FLE_DIAG_*` が getenv の形)の両方に `patch --dry-run` で clean(FAILED 0、offset なし)**。診断の読みは `FLE_TEST_GETENV("FLE_DIAG_G9F")`(tree 側の形)。mt3 の `rtb-tree.sh diag` の `sed 's/FLE_TEST_GETENV("FLE_DIAG_/getenv("FLE_DIAG_/'` が fle_callback.c を含むので、**そのまま getenv に変換される**(build の木で当たるかは、tree-rtb-build が既に変換済みの形でも dry-run で確認した)。plain-C の守り(callback.rs の `long`・emscripten・asm・malloc ほかの禁止語、標準の PRIx64 / PRIu64 だけ)を満たす(コメントを剥がして確認)。
 - **変更点(10 分前の版から)**: 呼び元の VA(`caller`)を A の行に足した。Workers の共有状態を spin lock(`__atomic_exchange_n`)で守る(real-thread 版では複数 Worker から呼ばれる)。出力の上限を 20,000 行に固定。B の表は 5 つの区切り(1・205,000・211,000・213,000・240,000 累積フレーム)で出す。C の pointer 先の dump を 256 バイトに。
-- **本物の cargo の native の試験**(tree-rtb の複写に『この診断』を当てた状態。`--only '(callback|window|monitor|wall_r|wall_ref1|wall_fr|present2_uncover|gpu7_ring_poll|wall_tbl1|wall_ia1w|sysinfo|vfs|time|env|wall_ia2|dwm_timing)'`、--jobs 2): **36 executable、702 passed、0 failed**。`emcc -fsyntax-only -Wall -Wextra -pthread -msimd128 -matomics -mbulk-memory` を GIL なしと `-DFLE_GIL -DFLE_TLS_MORE` の両方で警告 0。
+- **本物の cargo の native のテスト**(tree-rtb のコピーに『この診断』を当てた状態。`--only '(callback|window|monitor|wall_r|wall_ref1|wall_fr|present2_uncover|gpu7_ring_poll|wall_tbl1|wall_ia1w|sysinfo|vfs|time|env|wall_ia2|dwm_timing)'`、--jobs 2): **36 executable、702 passed、0 failed**。`emcc -fsyntax-only -Wall -Wextra -pthread -msimd128 -matomics -mbulk-memory` を GIL なしと `-DFLE_GIL -DFLE_TLS_MORE` の両方で警告 0。
 ### 21.4 診断が出す量(Export 1 本 = 約 5.73M フレーム、約 6 分)
 - 上限: A と D を合わせて **20,000 行**(1 行 約 190 B)= **最大 3.8 MB**。A は累積 240,000 フレームで打ち切る: block 長 64〜1024 フレームの範囲で 234〜3,750 行(0.04〜0.71 MB)。D は 3,000 行まで。B は 5 つの区切りで 64 行以下の表(各 約 7 KB)= 35 KB 以下。C は 2 回の dump = 約 8 KB。**合計は最悪でも約 4 MB**で、wasm の stderr は Export の log(cand1 の engine-log は 2,399 行・約 0.3 MB)に足されても Export の長さ・速度に影響しない量(読み。FL の mixer が呼ぶ度に fprintf するのは最初の 240,000 フレームの間だけで、以降は呼びごとの判定のみ)。ただし **A の `g9f_peak` は 1 呼びごとに Length × 2 個の float を読む**(最大 16384 × 2 × 2 回 = 約 65k 回の読み/呼び)ので、240,000 フレームの間は遅くなる(約 4 秒分の音声の間だけ。以降は `blk` の判定と lock のみ)。
 ### 21.5 出力の読み方 — `tools/a22-diag-read.py` の節 10(A: 前後の peak と ZERO/THROUGH/FILTERED/SILENT-IN の区間、210723〜211680 の近傍の呼び、B: 表の増分と NEW の target、C: dump の差、D)
-固定の見本(手書きの試験データ。**実ログではない**)で出力の形を確認済み。空のログでは 1 行で終わる(壊れない)。
+固定の見本(手書きのテストデータ。**実ログではない**)で出力の形を確認済み。空のログでは 1 行で終わる(壊れない)。
 
 ## 22. Eff_Render の呼び元は FL の『Smart disable』の経路に見える — 二段目の診断の候補(どの構造体のどのオフセット)と、Wine 側の観測の手順書(PM 12:1x の依頼。期限 12:45。読み)
 
@@ -579,7 +579,7 @@ native の面で見る物: 私の harness は path table を持たないので�
 
 ## 23. 子窓に WM_PAINT が届かない — gpu1 の RT-B のログ(Balance・Settings のスクロール)との対応、契約(Wine 10 / Learn)との対照、直しの差分 `0319-show-descendants-paint.diff`(PM 12:2x〜12:5x。期限 12:50→12:55)
 
-**先頭(何を実行したか)**: 読み(gpu8 の `0331/logs/rtb-balance` と `rtb-scroll` の実 Chrome のログ、Wine 10.0 の `server/window.c`〔raw.githubusercontent の wine-10.0〕と `dlls/win32u/window.c`、`lift/runtime/fle_win.c`)+ **native の harness**(面 R。本物の runtime C)+ **本物の cargo の native の試験**(HEAD の複製に私の全差分を当てた全 215 本、結果は下)。**実エンジン・wasm・Chrome は私は走らせていない**。
+**先頭(何を実行したか)**: 読み(gpu8 の `0331/logs/rtb-balance` と `rtb-scroll` の実 Chrome のログ、Wine 10.0 の `server/window.c`〔raw.githubusercontent の wine-10.0〕と `dlls/win32u/window.c`、`lift/runtime/fle_win.c`)+ **native の harness**(面 R。本物の runtime C)+ **本物の cargo の native のテスト**(HEAD の複製に私の全差分を当てた全 215 本、結果は下)。**実エンジン・wasm・Chrome は私は走らせていない**。
 
 ### 23.1 (1) ログとの対応 — 直しが当たる状況かどうか
 gpu8 の `rtb-balance/log-10s.log` の行(行番号つき):
@@ -607,8 +607,8 @@ gpu8 の `rtb-balance/log-10s.log` の行(行番号つき):
 
 ### 23.4 検証(本物)
 - **native の harness**(`tools/scroll0319/scroll_0319.c` の面 R。5 通り: 孫が親の不可視の間に `SetWindowPos(SWP_SHOWWINDOW)` / `ShowWindow` で可視になる、親が plain / WS_CLIPCHILDREN、親を `ShowWindow` / `SetWindowPos(SWP_SHOWWINDOW)` で表示): **修正前は 5 通りとも孫に更新領域が無く『NOT painted』(`tables/0319-scroll-harness-R-show-descendants-before.out` に 4 通り + R5 は面の追加後)、修正後は 5 通りとも孫が WM_PAINT を受けて赤く塗られる**(`…-after.out`)。
-- **permanent な native の試験**: `harness/alpha3/upd_region.c`(`alpha3_updregion` の本体)に『show-descendants』の節を足した(`impl/0319-show-descendants-paint-tests.diff`)。**修正なしの fle_win.c では 52 件中 6 件が FAIL(『表示された h の可視な子 g と孫 gg が全面の更新領域を持つ』と『`SetWindowPos(SWP_SHOWWINDOW)` で h を出した時に h・g・gg が全面を持つ』が plain と WS_CLIPCHILDREN の各 3 件)、修正ありでは 52 件中 0 件 FAIL**(13:0x に実測: 同じ `upd_region.c` と同じ他の .o を、HEAD から私の diff を `patch -R` で外した `fle_win.c`〔`upd_show_descendants` 0 件〕と、head4 の `fle_win.c` の両方にリンクして走らせた)。**以前の本節・報告に書いた『50 件・4 つ FAIL』は、`SetWindowPos(SWP_SHOWWINDOW)` の check を足す前の数字で、今の試験の数ではない**。
-- **本物の cargo の native 全体**(HEAD の `git archive` の複製 + 私の差分〔callback-stack-limit+tests、scrollwindow-model、time-env、run-values-and-scroll-model-tests、show-descendants-paint〕+ 上の試験): 結果は下(§23.6)。
+- **permanent な native のテスト**: `harness/alpha3/upd_region.c`(`alpha3_updregion` の本体)に『show-descendants』の節を足した(`impl/0319-show-descendants-paint-tests.diff`)。**修正なしの fle_win.c では 52 件中 6 件が FAIL(『表示された h の可視な子 g と孫 gg が全面の更新領域を持つ』と『`SetWindowPos(SWP_SHOWWINDOW)` で h を出した時に h・g・gg が全面を持つ』が plain と WS_CLIPCHILDREN の各 3 件)、修正ありでは 52 件中 0 件 FAIL**(13:0x に実測: 同じ `upd_region.c` と同じ他の .o を、HEAD から私の diff を `patch -R` で外した `fle_win.c`〔`upd_show_descendants` 0 件〕と、head4 の `fle_win.c` の両方にリンクして走らせた)。**以前の本節・報告に書いた『50 件・4 つ FAIL』は、`SetWindowPos(SWP_SHOWWINDOW)` の check を足す前の数字で、今のテストの数ではない**。
+- **本物の cargo の native 全体**(HEAD の `git archive` の複製 + 私の差分〔callback-stack-limit+tests、scrollwindow-model、time-env、run-values-and-scroll-model-tests、show-descendants-paint〕+ 上のテスト): 結果は下(§23.6)。
 
 ### 23.5 副作用
 - **コスト**: 可視な子孫の**全面**を無効化する。Wine でも同じ(`redraw_window` が子孫に全面を足す)ので『Windows と同じ量』。FL では『ウィンドウを開く/見せる』時の 1 回だけ(Balance の form で 171〜177 の 6 窓)。ただし**主窓(lid 13)の ShowWindow は子孫が 100 以上**(rtb-scroll のログで 125 の子窓)なので、**起動時の 1 回の全面再描画が『全子孫への WM_PAINT』になる**。FL は元々 1,000 回級の WM_PAINT(lid 13 が 2048 回)を受けているので量の桁は変わらない見込みだが、**P2(起動と UI の fps)への影響は未測定**。
@@ -652,7 +652,7 @@ gpu8 の `rtb-balance/log-10s.log` の行(行番号つき):
 
 ## 26. Insert 1 の出力を作る側の診断(RT-D4 の増分に入る差分) — `impl/diag-g9mix-slot.diff`
 
-**先頭(何を実行したか。実エンジン・実 Chrome・Wine・native の cargo は走っていない)**: 静的な読み(FLEngine_x64.dll の capstone と生成 C の読み)+ RT-D2 の log と fhook4 の表の読み。差分への検証は `clang -fsyntax-only -std=gnu11 -Wall -Wextra` で `lift/runtime/fle_diag_g9mix.c` と `lift/runtime/fle_callback.c` の両方が警告 0、mt3 の `tree-rtd3t` と `tree-rtd3` の両方に `patch --dry-run -p1` で rc=0。**native の cargo 試験は PM の許可が無いので走っていない**(mt3 の `rtd3-build.sh addpatch` が、native 試験が通った後に build の木に当てて FLE_DIAG_* の読みを getenv に変える)。
+**先頭(何を実行したか。実エンジン・実 Chrome・Wine・native の cargo は走っていない)**: 静的な読み(FLEngine_x64.dll の capstone と生成 C の読み)+ RT-D2 の log と fhook4 の表の読み。差分への検証は `clang -fsyntax-only -std=gnu11 -Wall -Wextra` で `lift/runtime/fle_diag_g9mix.c` と `lift/runtime/fle_callback.c` の両方が警告 0、mt3 の `tree-rtd3t` と `tree-rtd3` の両方に `patch --dry-run -p1` で rc=0。**native の cargo テストは PM の許可が無いので走っていない**(mt3 の `rtd3-build.sh addpatch` が、native テストが通った後に build の木に当てて FLE_DIAG_* の読みを getenv に変える)。
 
 これまでの Eff_Render 診断では、区間の Filter の入力が Wine と wasm で 0 だという所まで分かった(私の 14:07 report の訂正 A を別として)。何が分からないか:
 
@@ -717,7 +717,7 @@ Wine hook と揃えるため、Export 開始は **slot ごとに Length 137/138 
 2. `impl/0319-o20-virtual-pointer-contextmenu.diff` + `impl/0319-o20-virtual-pointer-contextmenu-tests.diff`。
 3. `impl/diag-g9mix-slot.diff`(今回の診断。記事は `tools/a22-diag-read.py` 節 11)。
 
-native 試験の手順は `impl/README-RTE1-native-tests.md` にある。実測済みの内訳は: wall_fr11 passed=49 failed=0、sweep1 passed=4 failed=0、callback passed=19 failed=0。
+native テストの手順は `impl/README-RTE1-native-tests.md` にある。実測済みの内訳は: wall_fr11 passed=49 failed=0、sweep1 passed=4 failed=0、callback passed=19 failed=0。
 
 #### 26.5.1 O20 の追加の修正点(2026-11-07 17:25 以後、静的な読み)
 
@@ -750,11 +750,11 @@ native 試験の手順は `impl/README-RTE1-native-tests.md` にある。実測�
 
 ### 26.8 RT-F bundle(18:0x)
 
-mt3 が `fl-engine-test-rtf-d45afb0e` を出した(RT-D3 素の木 + alpha1 の再構築版 RTE 差分。wasm 170,925,746 B、SHA256SUMS ok=9、name section 5,184,047 B、FLE_DIAG_ATOM/GIL/G9F の文字列あり、engine.env に FLE_DIAG_* なし。dll/seed/glue は RT-E と同一)。manifest 複写の手順は 0315/tools/mk-rtf-assets.sh BUNDLE_DIR [NAME=rtf-diag](FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1)。
+mt3 が `fl-engine-test-rtf-d45afb0e` を出した(RT-D3 素の木 + alpha1 の再構築版 RTE 差分。wasm 170,925,746 B、SHA256SUMS ok=9、name section 5,184,047 B、FLE_DIAG_ATOM/GIL/G9F の文字列あり、engine.env に FLE_DIAG_* なし。dll/seed/glue は RT-E と同一)。manifest コピーの手順は 0315/tools/mk-rtf-assets.sh BUNDLE_DIR [NAME=rtf-diag](FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1)。
 
 ### 26.7 RT-E bundle(17:06)
 
-mt3 が `fl-engine-test-rte-87af8f55` を出した(RT-D3 + alpha1 の 0319-rte-combined 統合。wasm 170,925,731 B、SHA256SUMS ok=9、name section 5,184,034 B / 関数名 126,910 件、FLE_DIAG_ATOM/GIL/G9F の文字列あり、engine.env に FLE_DIAG_* なし。dll/seed/glue は RT-D3 と同一)。manifest 複写の手順は `0315/tools/mk-rte-assets.sh BUNDLE_DIR [NAME=rte-diag]`(FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1)。
+mt3 が `fl-engine-test-rte-87af8f55` を出した(RT-D3 + alpha1 の 0319-rte-combined 統合。wasm 170,925,731 B、SHA256SUMS ok=9、name section 5,184,034 B / 関数名 126,910 件、FLE_DIAG_ATOM/GIL/G9F の文字列あり、engine.env に FLE_DIAG_* なし。dll/seed/glue は RT-D3 と同一)。manifest コピーの手順は `0315/tools/mk-rte-assets.sh BUNDLE_DIR [NAME=rte-diag]`(FLE_DIAG_ATOM=1 FLE_DIAG_GIL=1)。
 
 ### 26.8 Wine 側の slot hook の観測(fhook5)
 
@@ -783,7 +783,7 @@ mt3 が `fl-engine-test-rte-87af8f55` を出した(RT-D3 + alpha1 の 0319-rte-c
 
 ### 27.1 実際に実行した物
 - 静的な読み: FLEngine_x64.dll の drag 関数 3 本(VA 0x7f4ca0 / 0x7f4ec0 / 0x7f4e20)を capstone で読み直し(`tools/a22dis.py`)、rip 相対のグローバルの番地を計算した。
-- native 試験(cargo、実機ではない): mt3 の tree-rtd3t の複写(`/home/ubuntu/work/alpha22w/tree-o20d`)に実装を入れ、`bash lift/harness/test.sh full --jobs 1 --no-record --only 'wall_fr11|sweep1|callback'`(nice 19、FLE_INPUT_ROOT=/home/ubuntu/work/signature-studio-develop、私用 CARGO_TARGET_DIR)を回した。
+- native テスト(cargo、実機ではない): mt3 の tree-rtd3t のコピー(`/home/ubuntu/work/alpha22w/tree-o20d`)に実装を入れ、`bash lift/harness/test.sh full --jobs 1 --no-record --only 'wall_fr11|sweep1|callback'`(nice 19、FLE_INPUT_ROOT=/home/ubuntu/work/signature-studio-develop、私用 CARGO_TARGET_DIR)を回した。
 - **Chrome・Wine は実行していない**。実ブラウザでの 522 と drag 3/4 の確認は gpu1 の次の build 後の run が要る(未確認)。
 
 ### 27.2 FL の drag 関数の読み(静的。生の命令の読み)
@@ -815,10 +815,10 @@ FL の move は「**前回の自分の SetPhysicalCursorPos の結果をその�
 - apply_display の丸め直し(`fle_win_pointer_reclamp`、fle_input.c:750): `host_ptr` と `ptr` を新しい画面へ別々に clamp(offset が無いので、再計算する物が無い)。
 - カーソル状態の取り込みは、既にある弱シンボル `fle_gdi_cursor_display_count()`(fle_win.c:53、GetCursorInfo が同じ物で flags を決める)をそのまま使う。**窓名・クラス名・FL 固有の分岐は無い**。リンクされていなければ(弱シンボルが NULL)従来どおり絶対(sweep1 の stub もこの形で通る)。
 - 契約との関係: SetCursorPos の page は「カーソルを指定の座標へ動かす」(fle_win.c 先頭のコメント)。ホストが報告できるのは絶対座標だけだが、**カーソルが隠れている間は、ホストの見える実ポインタが guest のカーソルではない**ので、ホストの動きを「動き」として受ける。表示されている間は、見えているブラウザのポインタが guest のカーソルなので絶対(S-pointer-shown-absolute、**選択**。page がこの区別を書いているわけではない。契約の読みではなく、2 つの観測(522 と drag 3/4)を同時に満たす最小の設計として私が選んだ物)。
-- SetCursorPos が一度も呼ばれなければ、guest = host(隠れている間でも delta の和 = 絶対位置、clamp で端に当たる場合を除く)で、従来(RT-B)と同じ。この一致は試験の `l[0]`・`l[2]`・`l[4]`〜`l[6]` と、offset=0 の試験で確認した。
+- SetCursorPos が一度も呼ばれなければ、guest = host(隠れている間でも delta の和 = 絶対位置、clamp で端に当たる場合を除く)で、従来(RT-B)と同じ。この一致はテストの `l[0]`・`l[2]`・`l[4]`〜`l[6]` と、offset=0 のテストで確認した。
 
-### 27.5 variant 比較(native 試験。`tools/run-variants.sh`。実機ではなく、私のモデルを C の試験にした物)
-同じ新しい 3 試験(wall_fr11 の `the_virtual_pointer_*`)を、`fle_win.c` の 4 つの形に当てた。各形のポインタ部分だけを差し替え、他は同一。`wall_fr11` の passed/failed(1 試験は最初に外れた assertion で止まるので、下の「最初の不一致」はその試験の最初の 1 件だけ):
+### 27.5 variant 比較(native テスト。`tools/run-variants.sh`。実機ではなく、私のモデルを C のテストにした物)
+同じ新しい 3 テスト(wall_fr11 の `the_virtual_pointer_*`)を、`fle_win.c` の 4 つの形に当てた。各形のポインタ部分だけを差し替え、他は同一。`wall_fr11` の passed/failed(1 テストは最初に外れた assertion で止まるので、下の「最初の不一致」はそのテストの最初の 1 件だけ):
 
 | 形 | wall_fr11 | 最初の不一致(left = 実測、right = 期待) |
 |---|---|---|
@@ -827,10 +827,10 @@ FL の move は「**前回の自分の SetPhysicalCursorPos の結果をその�
 | 純 delta(隠れている/表示中を区別しない) | passed=48 failed=3 | RT-E 形と同じ 2 件(110,200 と 450,0)。 |
 | **最終形(delta は隠れている間だけ、表示中は host の絶対点)** | **passed=51 failed=0** | なし |
 
-- 純 delta が S2(drag の end で SetCursorPos(450,17)、ブラウザの実ポインタは y=1079 のまま、次に y=20 へ)で guest = 0 になることは、この節の作業の最初に、私が python の算術(エンジンの測定ではない)で出していた。ここで C の試験になり、gpu1 の RT-E の観測値(0)と一致した。**一致したのは「同じ値が出る」ことまでで、原因が同じだと実機で確認したわけではない**(未確認)。
+- 純 delta が S2(drag の end で SetCursorPos(450,17)、ブラウザの実ポインタは y=1079 のまま、次に y=20 へ)で guest = 0 になることは、この節の作業の最初に、私が python の算術(エンジンの測定ではない)で出していた。ここで C のテストになり、gpu1 の RT-E の観測値(0)と一致した。**一致したのは「同じ値が出る」ことまでで、原因が同じだと実機で確認したわけではない**(未確認)。
 - 純 delta が表示中の set(「set → 100,200」の後の host 20,10 で 110,200)を外すのは、私が選んだ規則 S-pointer-shown-absolute に反するから。FL の実際の挙動の誤りを示す物ではない。純 delta を実機で外す決め手は S2(450,0)の側である。
 
-### 27.6 試験(wall_fr11 の 4 本。実装の最終形で 52 件すべて通過。全セットの結果は 27.8)
+### 27.6 テスト(wall_fr11 の 4 本。実装の最終形で 52 件すべて通過。全セットの結果は 27.8)
 1. `the_virtual_pointer_moves_by_the_host_delta_while_the_cursor_is_hidden`: 表示中は host の絶対点(set の後でも host 20,10 → 20,10、GetCursorInfo の flags 1・pos 20,10)。ShowCursor(FALSE) の後は host の動きが delta になる(20,20 → 21,19 → 450,40)。その後 host 450,32 → 450,31 の後に **SetPhysicalCursorPos(450,1036)**(FL の wrap)。次の host move 450,30 / 29 / 28 で guest = **450,1035 / 1034 / 1033**(= FL の次の move が読む dy は 1 ずつ。RT-B の 522 に当たる「画面の高さ級の dy」は出ない)。ShowCursor の count が -1 のままなら(FALSE・TRUE の組を挟んでも)delta が続き(1032)、count が 0 に戻ると host の絶対点(450,26)。
 2. `the_virtual_pointer_is_the_host_point_again_when_the_cursor_is_shown_after_a_set_cursor_pos`(**RT-E で drag 3・4 が止まったシナリオ**): host (450,1079) で隠し、SetPhysicalCursorPos(450,17)(drag 2 の end)→ ShowCursor(TRUE) → guest 450,17。host move 450,20 → **450,20**(RT-E 形は 450,0)、450,21 → 450,21。続けて 3 回目の drag(隠す → host 22/23 → wrap(1036)→ host 24 = **450,1037** → 終了の set 450,23 → 表示 → host 25 = **450,25**)。
 3. `the_virtual_pointer_is_brought_inside_a_smaller_screen_and_keeps_moving_by_the_delta`(apply_display の丸め直し): 隠れている間に set(1500,900)、fle_screen_set(1024,768) + reclamp → guest 1023,767、host の次の動き 21,19 は host の前回の点(22,20、画面内)からの差 (−1,−1) → **1022,766**、表示後の host 23,21 → 23,21。
@@ -838,16 +838,16 @@ FL の move は「**前回の自分の SetPhysicalCursorPos の結果をその�
 
 ### 27.7 3 経路の扱いと、分かっていないこと
 - 3 経路: (1) host move は `fle_win_host_pointer_set`(fle_input.c:146 は**無変更**)、(2) SetCursorPos/SetPhysicalCursorPos は `set_pointer`(guest のみ)、(3) apply_display の丸め直しは `fle_win_pointer_reclamp`(fle_input.c:750 は**無変更**。ptr と host_ptr を別々に clamp)。変更ファイルは `fle_win.c` 1 つ(65 行の diff)。fle_input.c/h、sweep1 の stub、sweep1.rs は無変更(新しい公開記号が無いため)。
-- **実機で未確認**(gpu1 の実 Chrome が要る): (a) 522 が消え、drag 1〜4 すべてが追随すること。(b) FL が drag の途中で ShowCursor の count を負のまま保つ前提(begin で FALSE、end で TRUE。27.2 の読み)。FL の他の場所で count が負になり、かつ SetCursorPos を呼ぶ経路があれば、そこで delta 動作になる(その場合も SetCursorPos が無ければ guest = host で従来と同じ。試験 4)。(c) `0x424c40` / `0x425490` が GetPhysicalCursorPos / SetPhysicalCursorPos であること(27.2。名前付き import 表に無い)。
+- **実機で未確認**(gpu1 の実 Chrome が要る): (a) 522 が消え、drag 1〜4 すべてが追随すること。(b) FL が drag の途中で ShowCursor の count を負のまま保つ前提(begin で FALSE、end で TRUE。27.2 の読み)。FL の他の場所で count が負になり、かつ SetCursorPos を呼ぶ経路があれば、そこで delta 動作になる(その場合も SetCursorPos が無ければ guest = host で従来と同じ。テスト 4)。(c) `0x424c40` / `0x425490` が GetPhysicalCursorPos / SetPhysicalCursorPos であること(27.2。名前付き import 表に無い)。
 - **delta 方式が解決しない物**: ブラウザの実ポインタは画面の端で止まるので、wrap の後にユーザーがさらに同じ向きへ動かし続けても、host の delta が出なくなる端(0 や 1079)に着いたところで drag は止まる。これは Pointer Lock(`docs/decisions/0319-pointer-lock-stage2.md`、第 2 段)の領分で、この diff は 522 の張り付きと drag 3・4 の停止の 2 つだけを直す。限界の長さは gpu1 の実測が要る(私は測っていない)。
 - S-pointer-shown-absolute(表示中は host の絶対点)は、私が選んだ規則で、SetCursorPos の page が書いている事ではない。ShowCursor の count を使わない形(純 delta)は、表示後の最初の host move で guest が 0 になる(上の表の 450,0)ので採れない。他の選び方(たとえば表示に戻った最初の host move だけを絶対にする)でも 2 観測は満たせるが、「最初の」という状態が増えるので、count だけで決まる今の形を選んだ。
 
 ### 27.8 分類と成果物
 - 分類: (b) 外部 API の契約の実装(SetCursorPos の後の入力は新しい位置からの相対、ホストが絶対しか渡せないので隠れている間は delta で受ける)。ただし表示中の絶対は上記の**選択**。(a) 余計な処理の除去を含む: RT-E の offset と RT-F の再アンカーという「guest の位置を host の絶対点で補正・上書きする処理」を両方除いた。クラス・窓名・FL 固有の分岐は無い(`fle_gdi_cursor_display_count()` は GetCursorInfo が既に使う API 状態)。
-- native 試験(tree-o20d = mt3 の tree-rtd3t の複写 + 本差分): `bash lift/harness/test.sh full --jobs 1 --no-record --only 'wall_fr11|sweep1|callback'`(nice 19): **results=7 passed=75 failed=0**(wall_fr11 52/0、callback 19/0、sweep1 4/0)。
-- 差分(RT-F の tree 形が基準。tree-rtd3t と tree-rtd3 の両方に `patch --batch -p1` を複写へ実適用して rc=0。tree-rtd3t は結果ファイルが試験したファイルと cmp 一致、tree-rtd3 は FLE_TEST_GETENV→getenv の差だけを除いて一致):
+- native テスト(tree-o20d = mt3 の tree-rtd3t のコピー + 本差分): `bash lift/harness/test.sh full --jobs 1 --no-record --only 'wall_fr11|sweep1|callback'`(nice 19): **results=7 passed=75 failed=0**(wall_fr11 52/0、callback 19/0、sweep1 4/0)。
+- 差分(RT-F の tree 形が基準。tree-rtd3t と tree-rtd3 の両方に `patch --batch -p1` をコピーへ実適用して rc=0。tree-rtd3t は結果ファイルがテストしたファイルと cmp 一致、tree-rtd3 は FLE_TEST_GETENV→getenv の差だけを除いて一致):
   - `impl/0319-o20-delta-pointer.diff`(65 行、3,502B。fle_win.c)
-  - `impl/0319-o20-delta-pointer-tests.diff`(198 行、10,534B。wall_fr11.rs。**旧試験 `the_virtual_pointer_keeps_set_cursor_pos_as_a_relative_offset` を置き換え**、新試験 4 本を入れる。runtime の diff と**必ず一緒に**当てること。片方だけだと旧試験か新試験が外れる)
+  - `impl/0319-o20-delta-pointer-tests.diff`(198 行、10,534B。wall_fr11.rs。**旧テスト `the_virtual_pointer_keeps_set_cursor_pos_as_a_relative_offset` を置き換え**、新テスト 4 本を入れる。runtime の diff と**必ず一緒に**当てること。片方だけだと旧テストか新テストが外れる)
 - 先に出した `0319-o20-virtual-pointer-contextmenu.diff`・`0319-rte-combined.diff` のポインタ部分(offset 保持、再アンカー)は、この diff で置き換わる。WM_CONTEXTMENU の wParam 修正と apply_display 以外の部分には触れていない。
 
 ### 26.12 Insert 出力と master の和: 静的な読み(2026-11-08 06:3x–06:45)と、§26.11 の訂正
@@ -974,10 +974,10 @@ FL の move は「**前回の自分の SetPhysicalCursorPos の結果をその�
 
 **先頭(実際に実行した物)**: 読み取りだけ(`cmp`、`diff`、`sed` で build 形に変えた比較、`strings`、`ls`)。Chrome・Wine・cargo は走らせていない。mt3 の木とビルドには触れていない。mt3 が示した木: `mt3w-s1/tmp/ri-pre/tree-rtd3/fle_win.c`(06:41 の写し、RT-H の build 開始 06:46:35 より前)と `mt3w-s1/tree-rtd3/lift/runtime/`(現在。07:18 の 0335 を含む)。
 
-- **fle_win.c**: 06:41 の写しと、私の試験形(tree-o20d の `FLE_TEST_GETENV` → `getenv` に変えたもの)は**完全一致**(diff 0 行)。delta 方式の関数と ShowCursor の条件はこの写しに入っている。
-- **fle_diag_g9mix.c**: 現在の木と、私の試験形(build 形)は**一致**(same)。expos 修正(`g9m_runlen` / `g9m_run_start`)が入っている。
+- **fle_win.c**: 06:41 の写しと、私のテスト形(tree-o20d の `FLE_TEST_GETENV` → `getenv` に変えたもの)は**完全一致**(diff 0 行)。delta 方式の関数と ShowCursor の条件はこの写しに入っている。
+- **fle_diag_g9mix.c**: 現在の木と、私のテスト形(build 形)は**一致**(same)。expos 修正(`g9m_runlen` / `g9m_run_start`)が入っている。
 - **fle_win.c の現在の木との差**: 0335(gpu8 のフォーカス診断)の追加行だけ。私の delta の行は、どちらにも同じ形で残っている。
-- **fle_callback.c**: 現在の木は私の試験形と**違う**。違いは mt3 の RT-H の変更(g9_hook を診断 switch(FLE_DIAG_G9F / ATOM / GIL / CENSUS)が 1 のときだけ設置する `g9_diag_on`)。私の差分は `fle_callback.c` を変えていない。この違いは mt3 の (1) に当たる。
+- **fle_callback.c**: 現在の木は私のテスト形と**違う**。違いは mt3 の RT-H の変更(g9_hook を診断 switch(FLE_DIAG_G9F / ATOM / GIL / CENSUS)が 1 のときだけ設置する `g9_diag_on`)。私の差分は `fle_callback.c` を変えていない。この違いは mt3 の (1) に当たる。
 - **wasm**: `engine.498095c419b0.wasm` のサイズは 170,941,858 B(mt3 の値と一致)。`fle_gdi_cursor_display_count` の文字列は 1 件(私の delta の参照と整合。ただし文字列の有無だけで、関数本体は確認していない)。`fle_win_host_pointer_set` の文字列は 0 件(名前は残っていない)。
 
 **結論**: RT-H に、私の 2 本(expos 修正の `diag-g9mix-expos-fix.diff`、O20 delta の `0319-o20-delta-pointer.diff`)が入っていることは、build 形の比較で確認した。ただし、wasm の中身の確認は名前の有無と大きさだけで、関数本体の一致は未確認。RT-H の実機(Chrome)での挙動は、gpu1 の run が要る。

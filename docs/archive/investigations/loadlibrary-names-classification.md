@@ -1,6 +1,6 @@
 # LoadLibrary 系が受け取る名前の分類（FLEngine_x64.dll と dsp_ippv2_x64.dll）
 
-実行日: 2026-10-23〜24。HEAD c68dbce。`lift/runtime/fle_load.c` と `fle_modules.c` は HEAD と作業ツリーが一致（`git show HEAD:… | diff` で確認）。**調査のみ。この文書は何も決めない**（意見は §8 に別枠で置く）。`lift/` 配下のファイルは読み取りだけで、編集していない。作業物は `lift/out-loadlib/`（`git status` に出ていない。ルートの `.gitignore` にこのディレクトリを名指しする行は無く、どの規則で無視されているかは確認していない）。
+実行日: 2026-10-23〜24。HEAD c68dbce。`lift/runtime/fle_load.c` と `fle_modules.c` は HEAD とワークツリーが一致（`git show HEAD:… | diff` で確認）。**調査のみ。この文書は何も決めない**（意見は §8 に別枠で置く）。`lift/` 配下のファイルは読み取りだけで、編集していない。作業物は `lift/out-loadlib/`（`git status` に出ていない。ルートの `.gitignore` にこのディレクトリを名指しする行は無く、どの規則で無視されているかは確認していない）。
 
 この作業は 1 回目がレート制限で途中終了している。前回の途中成果物（`lift/out-loadlib/` の約 100 ファイル）は読み取って再利用したが、**結論に使う事実は今回自分で取り直した**（§0.2）。
 

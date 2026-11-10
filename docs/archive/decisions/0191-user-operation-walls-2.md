@@ -118,13 +118,13 @@
 
 **操作の実行**(実測): 決定 0171 の fork プローブ(`probe NAME … probe-end`。最初の idle の同じ状態から 1 操作ごとに fork した子で動かし、終了コード・停止の記録〔runtime のメッセージ、import の thunk、影の呼び出し列〕・描画面の SHA-256・窓表の SHA を集める)をそのまま使った。ハーネスへの追加は `wheel X Y DELTA`(ホイール、`fle_input_host_mouse(FLE_IN_WHEEL…)`)の 1 コマンドだけ(`harness/fruity_g3.c` +6 行)。プローブは `tools/ops1.py`〜`ops7.py` が書く。座標は主窓の面の PNG(`tools/cropgrid.py` で画面座標の格子を重ねた物。画面 = 面 − (5,6))とメニュー窓の PNG を読んだ値(±3 px の読み。S-ia2-coordinates)。開始の状態は 2 通り: 『Basic.flp を `open` コマンドで開いた状態』(`ops1/2/3/5/7`、ダイアログの選択は使っていない=`open` はハーネスの直接要求)と『ウィザードを Enter で閉じただけの空のプロジェクト』(`ops4`)。
 
-**分類**(S-ia2-classification): **停止** = 子の終了コードが 0 でない(`fle:` のメッセージが名前をつける)。**変化あり** = 子の最後の snapshot で、主窓の面のハッシュ・描画のある面の集合・窓表のハッシュ・見える窓の一覧のどれかが、同じ走行の `noop`(何も入力しない)、メニューと右クリックメニューの項目は『開いて無地で閉じた』基準 `base_*` と違う。**変化なし** = 全部同じ。『変化なし』は『座標が合っていない可能性』と『本当に何も起きない』を区別しない(台帳に注記)。最初の 3 回の走行(D3 の ops1・ops2、D4 の ops3a)はポインタを戻さず基準も無かったので、ホバーの差と右クリックによる選択の差も『変化あり』に入る(上限)。
+**分類**(S-ia2-classification): **停止** = 子の終了コードが 0 でない(`fle:` のメッセージが名前をつける)。**変化あり** = 子の最後の snapshot で、主窓の面のハッシュ・描画のある面の集合・窓表のハッシュ・見える窓の一覧のどれかが、同じ走行の `noop`(何も入力しない)、メニューと右クリックメニューの項目は『開いて無地で閉じた』基準 `base_*` と違う。**変化なし** = 全部同じ。『変化なし』は『座標が合っていない可能性』と『本当に何も起きない』を区別しない(記録に注記)。最初の 3 回の走行(D3 の ops1・ops2、D4 の ops3a)はポインタを戻さず基準も無かったので、ホバーの差と右クリックによる選択の差も『変化あり』に入る(上限)。
 
 **修正の方針**: runtime の新規ファイル(`fle_wall_ia2.c/.h`、`fle_wall_ia2w.c`〔窓表と画素を使う物〕、`fle_wall_ia2v.c`〔仮想ボリュームを読み書きする物〕、`fle_ia2_sortw.inc`)と opt-in の行(`harness/seeds/ia2-imports.txt`の層 4)。既存の runtime ファイルには**行が無い構築の挙動を変えない弱い参照の呼び出し**だけを足した(`fle_locale.c`・`fle_load.c`・`fle_ole.c`・`fle_user_nowin.c`・`fle_gdi.c`。`-` の行は全部読んだ)。有効にするのは marker 行 `kernel32.dll CompareStringW::ia2-sort-weights`(決定 0178 の `IFileOpenDialog::Show` と同じ型の仕掛け)。診断のための環境変数 `FLE_IA2_TRACE`・`FLE_LOADLIB_TRACE`(opt-in。既定は無出力)を足した。`lift/crates` は W22 の fe-lift の加法的な差分(`ia2-felift.diff`)以外に触っていない。
 
 ## 2. 結果の読み方
 
-台帳 `tables/sum-before.tsv`・`tables/sum-after.tsv`(1 操作 1 行。操作の説明・結果・停止の API・メッセージ・thunk・呼び元・影のスタック・面のハッシュ)と、走行ごとの `tables/ledger-*.tsv`。操作の総数 859(重複を除いた名前。基準の `noop`・`base_*` は数えない)。**『変化あり』は窓・面・窓表の変化を指す。操作が意図どおりに働いたことは意味しない**(表の『変化あり』の多くは、メニューを開いて閉じるなどの視覚的な変化)。
+記録 `tables/sum-before.tsv`・`tables/sum-after.tsv`(1 操作 1 行。操作の説明・結果・停止の API・メッセージ・thunk・呼び元・影のスタック・面のハッシュ)と、走行ごとの `tables/ledger-*.tsv`。操作の総数 859(重複を除いた名前。基準の `noop`・`base_*` は数えない)。**『変化あり』は窓・面・窓表の変化を指す。操作が意図どおりに働いたことは意味しない**(表の『変化あり』の多くは、メニューを開いて閉じるなどの視覚的な変化)。
 
 ## 3. 壁の一覧(W16〜W32。全文は `tables/walls.tsv`)
 
@@ -180,7 +180,7 @@
 
 **W29 `shell32!PathCleanupSpec`(thunk 0x593420、呼び元 0x81a280)**: Tools > Dump to audio editor。pszSpec は『Audiolog-1/1/2021 12:00:10 AM…』のように日付時刻の `/` と `:` を含む。**Learn の頁は無効文字を列挙している**(『\ / : * ? " < > |』と制御文字。『`\` は削除される』とも書く)が、**どれを置換しどれを削除するか、置換の文字は何か**は書いていない。戻り値の PCS_REPLACEDCHAR(1)と PCS_REMOVEDCHAR(2)のどちらを立てるかも決まらない。推測で埋めず、**名前つき停止のまま**(出典なし)。対応する decision 0171 の記述(『頁は無効文字を挙げない』)は誤りで、頁は挙げている(置換・削除の別が無いだけ)。
 
-**W30 の追記(最終走行で見つけて直した)**: D8-S1 の再確認で、Help の Internet links が `WritePrivateProfileStringW` を lpAppName・lpKeyName・lpString がすべて NULL で呼び(頁: 『If all parameters are NULL, the function flushes the cache』。設定の手順の例も同じ形)、最初の実装が NULL の lpAppName で止まった。**修正**: すべて NULL のときはキャッシュのフラッシュとして 0 を返し、何も書かない(S-ia2-ini-flush-lasterror)。D8-R1(再リンク後の実エンジン)で Help の 5 項目と My account・What's new・Cloud が停止しなくなった。単体試験に 2 件足した。
+**W30 の追記(最終走行で見つけて直した)**: D8-S1 の再確認で、Help の Internet links が `WritePrivateProfileStringW` を lpAppName・lpKeyName・lpString がすべて NULL で呼び(頁: 『If all parameters are NULL, the function flushes the cache』。設定の手順の例も同じ形)、最初の実装が NULL の lpAppName で止まった。**修正**: すべて NULL のときはキャッシュのフラッシュとして 0 を返し、何も書かない(S-ia2-ini-flush-lasterror)。D8-R1(再リンク後の実エンジン)で Help の 5 項目と My account・What's new・Cloud が停止しなくなった。単体テストに 2 件足した。
 
 **W32 `user32!SendMessageA`(thunk 0x4253a0、呼び元 0x869dd0 ← 0x86a0f0 ← 0x86a250。未修正)**: 空のプロジェクトの『Save as』ダイアログで Enter、または名前を打って Enter を押すと、行の無い ANSI 版の thunk に入り `fle: unsupported instruction at 0x4253a0`(exit 134)。Save ボタンのクリックでは起きない。**修正の設計(未実装)**: 層 4 に `user32 SendMessageA` の行と `fle_imp_SendMessageA`(文字列・ポインタを運ばないメッセージだけ `SendMessageW` へ渡し、文字列を運ぶメッセージ〔WM_SETTEXT・WM_GETTEXT・EM_*・LB_*・CB_* など〕と 0x80 以上の文字は名前つきで止める)を足す。行を足すと全体の再生成(約 8 分)が要るので、期限内に回せなかった。
 
@@ -275,9 +275,9 @@
 - **新規 `fe-lift/tests/wall_ia2.rs` 17 件(合格)**: GetKeyNameTextW(名前の表・停止)、CompareStringW の重み(表が決める組・決めない組・marker なしは従来どおり・共通部分の非 ASCII)、LCMapStringW の私用領域、Python312.dll の『無い』、ScrollWindowEx(画素の移動・覆われない領域・停止)、InvalidateRgn、DoDragDrop(CANCEL)、MessageBoxW・ShellExecuteW、GetPrivateProfileStringW・WritePrivateProfileStringW(読み・書き・**フラッシュ**)、GetTimeZoneInformationForYear。
 - **更新 `fe-lift/tests/gdi_bulk.rs`**: `GDI_STOP(` の個数 38 → 37(RectVisible が関数になったため。コメントつき)。
 - **W22(取り込み済み)**: `fe-lift/tests/mxcsr_flags.rs::sse3_ia2_matches_host`(192,000 入力、不一致 0。変異検査 3/3)、`fe-lift/sse_shuf` 17 件。
-- **全試験(最後の木。`logs/fulltest-ia2-final.txt`)**: <!--FT-->**172 件の結果(実行ファイル 168/168、`--fresh --jobs 2`)で合格 2229、失敗 0**(rc=0)。 基準(私の変更の前)は 171 件・合格 2,211・失敗 0 で、差は +1 件(実行ファイル `wall_ia2`)と +18 試験(`wall_ia2` の 17 と `mxcsr_flags` の `sse3_ia2_matches_host` 1。後者は W22 で、取り込み済み)。第 1 回の全試験(直す前の木)は 172 件・合格 2,227・失敗 2 だった(§12 の 4)。prune_list の 6 件も合格(`fe-lift/prune_list`)。<!--/FT-->
+- **全テスト(最後の木。`logs/fulltest-ia2-final.txt`)**: <!--FT-->**172 件の結果(実行ファイル 168/168、`--fresh --jobs 2`)で合格 2229、失敗 0**(rc=0)。 基準(私の変更の前)は 171 件・合格 2,211・失敗 0 で、差は +1 件(実行ファイル `wall_ia2`)と +18 テスト(`wall_ia2` の 17 と `mxcsr_flags` の `sse3_ia2_matches_host` 1。後者は W22 で、取り込み済み)。第 1 回の全テスト(直す前の木)は 172 件・合格 2,227・失敗 2 だった(§12 の 4)。prune_list の 6 件も合格(`fe-lift/prune_list`)。<!--/FT-->
 
-- 第 1 回の全試験(`logs/fulltest-ia2.txt`)では 2 件が落ちた(`gdi_bulk`・`oleaut_ole`)。原因は上の変更(§12 の 4)で、直した。
+- 第 1 回の全テスト(`logs/fulltest-ia2.txt`)では 2 件が落ちた(`gdi_bulk`・`oleaut_ole`)。原因は上の変更(§12 の 4)で、直した。
 
 ## 9. 設計メモ: OLE のドラッグ&ドロップ(DoDragDrop)を本当に動かすには(実装していない。見積りは読み)
 
@@ -319,16 +319,16 @@
 
 ## 11. 再現の手順と成果物
 
-`lift/out-git/ia2-results/`: `ia2.diff`(本体)、`MERGE-NOTES.md`、`docs/`(この決定の本文と README の行)、`tables/`(台帳・壁の表・選択の表・測定の表)、`logs/`(走行の記録)、`tools/`・`scripts/`(プローブの生成とハーネス用のスクリプト)。W22 の fe-lift の差分は `lift/out-git/ia2felift-results/`(HEAD に取り込み済み)。
+`lift/out-git/ia2-results/`: `ia2.diff`(本体)、`MERGE-NOTES.md`、`docs/`(この決定の本文と README の行)、`tables/`(記録・壁の表・選択の表・測定の表)、`logs/`(走行の記録)、`tools/`・`scripts/`(プローブの生成とハーネス用のスクリプト)。W22 の fe-lift の差分は `lift/out-git/ia2felift-results/`(HEAD に取り込み済み)。
 
 ```
-# 作業木(HEAD 8ea7607 の git archive)と構築(tools/gen-native.sh。層 4 = harness/seeds/ia2-imports.txt)
+# ワークツリー(HEAD 8ea7607 の git archive)と構築(tools/gen-native.sh。層 4 = harness/seeds/ia2-imports.txt)
 git archive 8ea7607 | tar -x -C lift/out-ia2/src
 bash tools/gen-native.sh D8 ...          # 層 1〜4 の native -O0 の fork プローブ版(約 8 分)
 bash tools/relink.sh D8                  # runtime だけ変えたときの再リンク(約 10 秒)
 # プローブの実行(1 走行 = 起動約 5 分 + 1 プローブ約 20 秒)
 BIN=$PWD/D8/fp2/two-native-fp PROBE_CPU=240 SECONDS_LIMIT=6000 COV=0 bash tools/run-g3.sh D8 RUNDIR scripts/S1.g3
-python3 tools/ledger.py tables/ops-all.tsv RUNDIR      # 台帳(stop / effect / no-effect)
+python3 tools/ledger.py tables/ops-all.tsv RUNDIR      # 記録(stop / effect / no-effect)
 bash tools/mkruns.sh                                   # 前後の表(tables/sum-*)
 ```
 
@@ -338,17 +338,17 @@ bash tools/mkruns.sh                                   # 前後の表(tables/sum
 
 **規則違反(私の側。事実だけ)**
 
-1. **`lift/out-ia2/` が 5 GiB を超えた**: 最大で `du -sh` 6.7 GiB(内訳: D8 の生成物 2.6 GiB、`src/lift/out-*` ← 全試験が作る試験用の出力 1.7 GiB、`target-ft` 1.0 GiB、D7 0.56 GiB ほか。5.7 GiB の時点も既に超過)。気づいた時点で D7・不要な target・`src/lift/out-*` を消して 4.4 GiB に戻した(その後の上限は守った)。最大値を測っていなかったので、超えていた時間の長さは言えない。
-2. **重い処理が同時に 2 つを超えた時間があった**: 全試験(`--jobs 2`)と fork プローブ 2 本が重なった時間、cargo のリリースビルド(16 秒)とプローブ 2 本が重なった時間。いずれも `nice -n 15〜19`。
+1. **`lift/out-ia2/` が 5 GiB を超えた**: 最大で `du -sh` 6.7 GiB(内訳: D8 の生成物 2.6 GiB、`src/lift/out-*` ← 全テストが作るテスト用の出力 1.7 GiB、`target-ft` 1.0 GiB、D7 0.56 GiB ほか。5.7 GiB の時点も既に超過)。気づいた時点で D7・不要な target・`src/lift/out-*` を消して 4.4 GiB に戻した(その後の上限は守った)。最大値を測っていなかったので、超えていた時間の長さは言えない。
+2. **重い処理が同時に 2 つを超えた時間があった**: 全テスト(`--jobs 2`)と fork プローブ 2 本が重なった時間、cargo のリリースビルド(16 秒)とプローブ 2 本が重なった時間。いずれも `nice -n 15〜19`。
 3. **使えない道具の呼び出し**: 存在しない `bash` ツールを 3 回呼んだ(エラーが返り、副作用なし)。`sleep 1`・`sleep 0` を拒否された(`sleep 0` は 23:40 ごろ、同じコマンドの `kill` ごと実行されず、やり直した。待つ目的の sleep は使っていない)。待ち受けの `tail -f | grep -m1` が 30 分の無駄になった 1 回(出力の無い待ち)。
-4. **第 1 回の全試験で 2 件の試験を壊した**(`fe-lift/gdi_bulk`: RectVisible の `GDI_STOP` 行を消したのに行数を直していなかった、`fe-lift/oleaut_ole`: `fle_ole.c` に `getenv` を入れた)。最終版で直した(`GDI_STOP(` の個数 38 → 37 を試験側で更新、診断を `fle_wall_ia2.c` の弱い関数に移した)。最後の全試験で確認した結果は §8。
+4. **第 1 回の全テストで 2 件のテストを壊した**(`fe-lift/gdi_bulk`: RectVisible の `GDI_STOP` 行を消したのに行数を直していなかった、`fe-lift/oleaut_ole`: `fle_ole.c` に `getenv` を入れた)。最終版で直した(`GDI_STOP(` の個数 38 → 37 をテスト側で更新、診断を `fle_wall_ia2.c` の弱い関数に移した)。最後の全テストで確認した結果は §8。
 5. **最初の 3 回の走行(o1・o2・p3a)には基準の `base_*` もポインタの戻しも無かった**ので、その『変化あり』は上限(ホバーの差・右クリックによる選択の差も含む)。ops1(225 件)は基準を付けた構築で再実行していない。
 6. **D8-R2(空のプロジェクトのチャンネルの歯車)は負荷 50 超のため起動の途中で自分の PID を指定した `kill` で止めた**(結果なし。`w21_gear_empty` 系 2 件は修正前の結果のまま)。**a4 の FRUITY off の再測定は最終の木では回さなかった**(§7)。
 7. **W32(SendMessageA)は最後の Save の走行(D8)で見つけ、直す時間が無かった**。層 4 の行を足すと全体の再生成(約 8 分)と再実行が要る。
 
 **確認できなかったこと(未確認)**
 
-- Chrome(出荷バンドル)での再現と確認。W18・W19・W20 は native では再現せず、W18 の実装は単体試験でしか走っていない。W19 の実装は『Import のサブ項目』の経路では走っていない。
+- Chrome(出荷バンドル)での再現と確認。W18・W19・W20 は native では再現せず、W18 の実装は単体テストでしか走っていない。W19 の実装は『Import のサブ項目』の経路では走っていない。
 - 実機 Windows との照合は 0 件。『停止が消えた』ことだけを主張する。
 - Trial での Save: 認証済みの機械での振る舞い。書かれた 46,579 バイトの内容が .flp として正しいか。
 - W22 の wasm の大きさの増分(関数の標本からの見積りだけ。実際の wasm は作っていない)。
@@ -363,5 +363,5 @@ bash tools/mkruns.sh                                   # 前後の表(tables/sum
 - **出荷構成への扱い:** 出荷バンドルの `EXTRA_IMPORTS` の候補は `lift/harness/seeds/ia2-imports.txt`（dlg1 の層 1〜3 + exp1 の層 4 + ia2 の行）。作業者の cmp-short（16 スナップショット、82 行）は層 1〜3 のビルドと最終ビルドで IDENTICAL。ただし出荷バンドルへの反映と、混成との同一性、Chrome での確認は次の出荷構成の作り直しで行う（既定の入口は変えない）。
 - **採用した選択:** (1) W19 の文字列比較は、Microsoft Download Center の『Windows 10 Sorting Weight Table.txt』（id=10921、21,156,033 B、SHA-256 `81fcfa1e…`）を出典に、marker 行があるときだけ dlg1 の出典のない『ASCII 先』（S-dlg1-cmp-nonascii）を置き換える。一次の重みが同じ組・漢字同士は名前付き停止のまま。(2) W24 のドラッグ&ドロップは `DRAGDROP_S_CANCEL` を即座に返す（S-ia2-dragdrop-cancel）。**パターンをプレイリストへ落とす操作は使えない**（既知の実害。実装は大きな作業なので、別の判断で扱う）。(3) W28 の MessageBoxW は窓を出さず既定ボタンを返す。観測は全走行で 1 件（Riff machine、題 `Error`、本文 `Some required files are missing.`、種類 0x10、返値 IDOK）。既定ボタンはデータ破壊でない。(4) W16 の ShellExecuteW は何も開かない（SE_ERR_NOASSOC）。
 - **限界（そのまま記録）:** 実エンジンの native -O0 の fork プローブの結果だけ。Chrome での再現・確認は 0 件。実機 Windows との照合は 0 件。座標は PNG の読み（±3 px）で、『変化なし』14 件は座標外れと区別できない。最初の 3 走行は基準が無く『変化あり』は上限。Save の認証済み機での挙動と書き込み内容の正しさは未確認。ライセンス判定は偽装していない（『Buy FL Studio』はエンジン自身の窓）。
-- **残った壁:** W29 `PathCleanupSpec`（置換/削除の別の出典が無く名前付き停止。0171 の『頁は挙げない』は誤りだったと訂正済み）、W32 `SendMessageA`（thunk 0x4253a0、呼び元 0x869dd0。空プロジェクトの Save as ダイアログで Enter。層 4 の行追加と再生成が要る）。W18・W19・W20 は native では再現せず（W18 は単体試験のみ）。
+- **残った壁:** W29 `PathCleanupSpec`（置換/削除の別の出典が無く名前付き停止。0171 の『頁は挙げない』は誤りだったと訂正済み）、W32 `SendMessageA`（thunk 0x4253a0、呼び元 0x869dd0。空プロジェクトの Save as ダイアログで Enter。層 4 の行追加と再生成が要る）。W18・W19・W20 は native では再現せず（W18 は単体テストのみ）。
 - **別件（tbl1、決定 0196）:** lat1 が見つけた再生中の FILE メニューの停止は、ia2 の走行には出ず、hook 表の累計 64 個の限界（runtime の別の不具合）。tbl1 が是正と、同種の固定容量の表の網羅を担当している。

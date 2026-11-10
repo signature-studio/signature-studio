@@ -6,9 +6,9 @@
 
 ## 冒頭の三点
 
-1. **何を実測したか**: 実 Firefox 158(pref `browser.privatebrowsing.autostart` の private 窓)で、現行ページ(HEAD 2eea92b1)と修正版を、本番 bundle 5c4b6902 の手元再構築(CI とバイト一致)を載せて対で動かした。現行は Files ボタンが無効になり File>Open はエンジンへ「キャンセル」を返すだけで、ファイルを開く手段が無い。修正版は Files 窓が開き、Sampler.flp を File>Open で開き、名前を付けて保存した物が Files 窓に出て、参照プロジェクトの zip(53.5 MB)を Files に入れて File>Open で zip を二度押しすると、ページが解凍(49 ファイル 62.7 MB)してエンジンが 7.2 秒後に開く。通常窓では OPFS が 16 回中 16 回選ばれ、判定の費用は初回の 1 回だけ(Chrome 中央値 +10 ms、Firefox +74 ms)。単体試験 21 件、mutation 17/17 検出(公式 runner、lift/ 込みの HEAD)。
+1. **何を実測したか**: 実 Firefox 158(pref `browser.privatebrowsing.autostart` の private 窓)で、現行ページ(HEAD 2eea92b1)と修正版を、本番 bundle 5c4b6902 の手元再構築(CI とバイト一致)を載せて対で動かした。現行は Files ボタンが無効になり File>Open はエンジンへ「キャンセル」を返すだけで、ファイルを開く手段が無い。修正版は Files 窓が開き、Sampler.flp を File>Open で開き、名前を付けて保存した物が Files 窓に出て、参照プロジェクトの zip(53.5 MB)を Files に入れて File>Open で zip を二度押しすると、ページが解凍(49 ファイル 62.7 MB)してエンジンが 7.2 秒後に開く。通常窓では OPFS が 16 回中 16 回選ばれ、判定の費用は初回の 1 回だけ(Chrome 中央値 +10 ms、Firefox +74 ms)。単体テスト 21 件、mutation 17/17 検出(公式 runner、lift/ 込みの HEAD)。
 2. **結論**: 直す。判定は `detectRoot()` の 1 か所(実 OPFS で 1 バイトを書いて読んで消せなければ、メモリ上の木)。OpfsFs とその上(Explorer・ops・engine-dialog・zip 解凍)は OPFS 版と同じコードで、違うのは『ハンドル』だけ(経路は 1 本)。利用者に見える変更は、保存行の 1 文と窓の副題だけ。
-3. **未確認**: 依頼者の Firefox 159・実 Windows・実 GPU は 0 件。実ネットワーク越しの起動時間(private では起動資産の stored copy が使えず、1 回の読み込みで brotli 30.6 MB を取り直す。loopback では差が出ない)。Firefox の通常窓でプロファイルのディスクが小さいとき(先の `/tmp` の『Could not create actor』)にメモリ版へ落ちることは単体試験の模擬でだけ確認(実機では先の再現環境に戻して見ていない)。Chrome のシークレット(OPFS が使えるので対象外)。1 GB 級のプロジェクトのメモリ。
+3. **未確認**: 依頼者の Firefox 159・実 Windows・実 GPU は 0 件。実ネットワーク越しの起動時間(private では起動資産の stored copy が使えず、1 回の読み込みで brotli 30.6 MB を取り直す。loopback では差が出ない)。Firefox の通常窓でプロファイルのディスクが小さいとき(先の `/tmp` の『Could not create actor』)にメモリ版へ落ちることは単体テストの模擬でだけ確認(実機では先の再現環境に戻して見ていない)。Chrome のシークレット(OPFS が使えるので対象外)。1 GB 級のプロジェクトのメモリ。
 
 ## 1. 背景
 - Firefox の private 窓では `navigator.storage.getDirectory` は関数として存在するが、呼ぶと `SecurityError: Security error when calling GetDirectory` で失敗する(**実測**、Firefox 158)。通常窓は成功する。geckodriver の `-private` 引数だけでは窓は private にならず、pref `browser.privatebrowsing.autostart=true` が要る。
@@ -44,7 +44,7 @@
 | app/test/mutation/run.mjs | `files-memory-*` 17 本 |
 触らない物: beacon の形式、worker、scripts、ci、assetstore(起動資産の stored copy は OPFS でなくなっても要らない)。
 
-## 5. 試験(`tables/RESULTS.md` に値)
+## 5. テスト(`tables/RESULTS.md` に値)
 - 単体 21 件: メモリ木が OPFS と同じ失敗名・同じ順序規則・複製を返す、その上の OpfsFs の操作(書く・読む・一覧・stat・コピー・移動・削除・du・名前の重複)、`detectRoot` の分岐(getDirectory 無し・SecurityError・書けない・大きさが違う・正常・同時の 2 ページ)、2 つの入口が同じ木を見る、通知文、`roomLeft`。
 - mutation 17 本(公式 runner、`git archive` の HEAD に差分を当てた lift/ 込みの木、APP_WORK はディスク): **17/17 検出**、基準の単体 1,273 通過、戻した後の木は同一。
 - e2e(Files の場面、実 Firefox 158 と Chrome 156、直接 OPFS を読むハーネスの 10 か所だけ『取れなければページの root』に差し替え): Firefox private 101/103(落ちる 2 件は persist と estimate の計数で、メモリ版には無い)、Firefox 通常 55/56(落ちるのは `persist()` の直後の Firefox の許可の問いによる 30 秒の script timeout。現行ページでも同じ所で同じ)、Chrome 通常 105/105。

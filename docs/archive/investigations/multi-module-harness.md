@@ -1,6 +1,6 @@
 # 多モジュール構成の測定ハーネス（`lift/harness/a4-multi.sh`）: 実在モジュールの一覧を与えて、ビルドして a4 の行を出す（取り込み案。何も決めない）
 
-実施日: 2026-10-27（JST。ログの時刻は 2026-10-26T20:0x〜22:xxZ。調査とスクリプトの編集は 2026-10-25 の夜（JST）に始め、ネットワーク障害で中断したあと再開した）。元にした木: `git archive HEAD`（作業開始時の HEAD は `dc27f4d`、再開時は `5002d98`。`git diff --stat dc27f4d 5002d98 -- lift` は空で、差は `docs/investigations/a5-oracle-rerun-3.md` の 1 ファイルだけ。実測）。作業物は `lift/out-harness-int/`（gitignore 対象）。HEAD の作業ツリーには書いていない。
+実施日: 2026-10-27（JST。ログの時刻は 2026-10-26T20:0x〜22:xxZ。調査とスクリプトの編集は 2026-10-25 の夜（JST）に始め、ネットワーク障害で中断したあと再開した）。元にした木: `git archive HEAD`（作業開始時の HEAD は `dc27f4d`、再開時は `5002d98`。`git diff --stat dc27f4d 5002d98 -- lift` は空で、差は `docs/investigations/a5-oracle-rerun-3.md` の 1 ファイルだけ。実測）。作業物は `lift/out-harness-int/`（gitignore 対象）。HEAD のワークツリーには書いていない。
 
 **この文書は何も決めない。** 基底（dsp_ippv2 0x2000000、Blend2D 0x4700000）と種（452 個、58 個）は、過去の測定（`two-module-after-0088.md`、`blend2d-seed58.md`）で使った**測定用の値**で、決定ではない。スクリプトに既定値として埋めていない（引数で与える）。
 

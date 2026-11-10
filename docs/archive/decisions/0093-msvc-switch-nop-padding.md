@@ -5,8 +5,8 @@
 事実の出典（節番号は各文書のもの）:
 
 - `docs/decisions/0089-msvc-switch-tables-with-proven-base.md`（コミット d87e0ad）、`docs/decisions/0090-msvc-switch-base-dominance.md`（コミット b0dc3ab）。
-- `docs/investigations/blend2d-srw.md`（決定 0092 の作業。この作業を始めたときは作業ツリーの未コミット・未追跡、終わりの時点ではコミット 38df911）§6（3 モジュールの a4 の停止 `fle: indirect call to 0x48a20ff is not a known function entry`、top of stack `f_48a2060`）。
-- この作業は HEAD a64a41c の `git archive` で始めた。途中で HEAD が 38df911（決定 0092 のコミット）に進んだ。**0093 が変えるファイル（`jumptab.rs`、`msvc_common/mod.rs`、`fe-decode/tests/msvc_switch.rs`、`fe-lift/tests/msvc_switch.rs`）は a64a41c と 38df911 でバイト一致**（`cmp`）。差分ファイル `lift/out-nop93/patches/0093.diff` はこの 4 ファイルと `docs/README.md`（0092 の行の次に 0093 の行）で、`git apply --check` は現在の作業ツリーに対して通る（確認だけ。適用していない）。
+- `docs/investigations/blend2d-srw.md`（決定 0092 の作業。この作業を始めたときはワークツリーの未コミット・未追跡、終わりの時点ではコミット 38df911）§6（3 モジュールの a4 の停止 `fle: indirect call to 0x48a20ff is not a known function entry`、top of stack `f_48a2060`）。
+- この作業は HEAD a64a41c の `git archive` で始めた。途中で HEAD が 38df911（決定 0092 のコミット）に進んだ。**0093 が変えるファイル（`jumptab.rs`、`msvc_common/mod.rs`、`fe-decode/tests/msvc_switch.rs`、`fe-lift/tests/msvc_switch.rs`）は a64a41c と 38df911 でバイト一致**（`cmp`）。差分ファイル `lift/out-nop93/patches/0093.diff` はこの 4 ファイルと `docs/README.md`（0092 の行の次に 0093 の行）で、`git apply --check` は現在のワークツリーに対して通る（確認だけ。適用していない）。
 - `docs/investigations/blend2d-switch-tables.md` §3（95 か所の分類）、`docs/investigations/blend2d-switch-dominance.md` §2、§4（`msvc_rejected` の内訳）。
 
 ## 決定（PM。内容を変えない）

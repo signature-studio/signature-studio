@@ -35,7 +35,7 @@
 
 - 作業開始時の HEAD は `8771100`（依頼の記載と一致。フル SHA `877110073bbb56941c2692ecce6ab7e6b505244a`、ブランチ main）。**作業中に main が進んだ**: 終了時の HEAD は `9b65b6696af583bbd5edfa50bda693bdc32e0dba`（途中のコミット: f8b5e6d、47118ac、d43db3e、27c8068、9b65b66）。27c8068 より後の 9b65b66 は docs 1 ファイル（`quickfontcache-lift-feasibility.md`）だけで、runtime、crates、harness は変えていない（`git diff --stat 27c8068 HEAD`）。以下の行番号は 27c8068 で確認したもので、9b65b66 でも同じ（根拠にしたファイルは両方で差が無い）。
 - `git diff --stat 8771100 HEAD -- lift/runtime lift/crates lift/harness` は 4 ファイルだけ: `lift/runtime/fle_locale.c`（+26）、`lift/crates/fe-lift/tests/locale.rs`、`lift/runtime/test/cp1252_expect.txt`、`lift/runtime/test/gen_cp1252_expect.py`（コミット 27c8068、決定 0084。**私の作業ではない**）。
-- この調査が根拠にする `fle_load.c`、`fle_modules.c`、`fle_imports.c`、`fle_sys.c`、`imports_table.rs` は、8771100 と HEAD で差が無く、作業ツリーも HEAD と同じ（`git diff --stat` が空。確認時点）。行番号は 27c8068（= 9b65b66 の runtime）のもの。`fle_locale.c` だけは 0084 を含む（`fle_imp_GetStringTypeW` :150、`fle_imp_IsValidCodePage` :160、`fle_imp_GetLocaleInfoW` :412、`fle_imp_MultiByteToWideChar` :546、`fle_imp_WideCharToMultiByte` :658、`fle_imp_LCMapStringW` :746）。
+- この調査が根拠にする `fle_load.c`、`fle_modules.c`、`fle_imports.c`、`fle_sys.c`、`imports_table.rs` は、8771100 と HEAD で差が無く、ワークツリーも HEAD と同じ（`git diff --stat` が空。確認時点）。行番号は 27c8068（= 9b65b66 の runtime）のもの。`fle_locale.c` だけは 0084 を含む（`fle_imp_GetStringTypeW` :150、`fle_imp_IsValidCodePage` :160、`fle_imp_GetLocaleInfoW` :412、`fle_imp_MultiByteToWideChar` :546、`fle_imp_WideCharToMultiByte` :658、`fle_imp_LCMapStringW` :746）。
 - **測定に使った実行ファイルは 0084 の前の runtime で作られている**（§2.2）。HEAD の runtime で作り直した実行ファイルではない。
 
 ### 2.2 入力（実測）

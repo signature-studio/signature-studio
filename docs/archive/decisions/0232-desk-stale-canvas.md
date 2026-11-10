@@ -5,7 +5,7 @@
 ## 結論
 
 - **どちらが古かったか: どちらも古くなかった。** Worker が canvas から読み戻した画素(getImageData)= コンポジタが保持する絵(peek)= 窓表から描き直した絵(dump)。メーターの箱の外で 0 画素(出荷構成 bundle、実エンジン、Chrome 156、5 回の run・約 25 サンプルと e2e)。(A)(B) は否定。(C)『時刻差の競合』でもない(5 s 後・10 s 後も同じ差が続く)。
-- **原因: 検査の座標。** `Page.captureScreenshot` の `clip` は**文書座標**、検査が渡した `getBoundingClientRect()` は**ビューポート座標**で、ページがスクロールしていない間だけ一致する。出荷構成ではページが 1302 px で試験窓 1300 px より 2 px 高く、Chrome が 2 px スクロールすることがあり(`scrollY=2`)、スクリーンショットは絵を 2 px 下にずらした像(約 29 万画素が違う)になった。スクリーンショットを 2 行ずらすと絵と 0 画素差(他のずれは 28 万〜54 万画素)。スクロールを `window.scrollTo` で 0/2/0/2/1 に変える介入では、前任の clip は scrollY 0 で 0 画素、2 で 29 万画素、1 で 33 万画素、文書座標の clip はいずれも 0(`tables/scroll-intervention.md`)。
+- **原因: 検査の座標。** `Page.captureScreenshot` の `clip` は**文書座標**、検査が渡した `getBoundingClientRect()` は**ビューポート座標**で、ページがスクロールしていない間だけ一致する。出荷構成ではページが 1302 px でテスト窓 1300 px より 2 px 高く、Chrome が 2 px スクロールすることがあり(`scrollY=2`)、スクリーンショットは絵を 2 px 下にずらした像(約 29 万画素が違う)になった。スクリーンショットを 2 行ずらすと絵と 0 画素差(他のずれは 28 万〜54 万画素)。スクロールを `window.scrollTo` で 0/2/0/2/1 に変える介入では、前任の clip は scrollY 0 で 0 画素、2 で 29 万画素、1 で 33 万画素、文書座標の clip はいずれも 0(`tables/scroll-intervention.md`)。
 - **出荷構成だけ落ちた理由**: manifest の説明(`bundle.description`、393 字)が長く、`#bundle-info` が単独の行で 2 行に折り返し、header が 122 px(D8 の bundle は 284 字・1 行・72 px)。文書が 1302 px(D8 は 1300 px ちょうど=スクロール不能)になる(`tables/layout-header.md`)。
 - **ユーザーの画面(既定の入口、`?screen=` なし)は影響を受けていなかった**: `100vh` + `overflow: hidden` + 1 行 36 px の header で、説明の長さに依らず文書は窓にちょうど収まる(測定: 文書 2400x1300 = 窓、scrollY 0、ゲストの画面 = 窓 − 340 − 36)。出荷構成 bundle の既定の入口でも canvas・絵・スクリーンショットは一致。はみ出していたのは legacy 配置(`?scale=` / `?screen=legacy`。実エンジンの検査が使う)だけ。
 - **直し(検査を弱めない)**: (1) 検査: `shotOf`(engine-desk)と `page.shot`(browser.mjs)が毎回 `#desktop` の位置を読み直して `scrollX/Y` を足す。閾値・比較は変えない。(2) 製品側: header を 1 行に固定(`flex-wrap: nowrap`、`#bundle-info` は省略記号で切り、全文は title 属性)。FL・窓・クラスに依存しない CSS だけ。(3) 検査を足す: engine-desk に『文書が窓より高くなく、ページが先頭にある』、run.mjs の `screen-legacy` と `screen-default` に『長い manifest の説明でも header・文書の高さ・desktop の位置が変わらない』。
@@ -42,7 +42,7 @@ PM の依頼: 出荷構成 bundle の engine-desk で『ページの canvas の�
 
 `Page.captureScreenshot` の `clip` は**文書座標**で、`getBoundingClientRect()` は**ビューポート座標**。ページがスクロールしていなければ同じだが、スクロールしている間は clip がスクロール量だけ上にずれる。
 
-**なぜ出荷構成だけ落ちたか**(`tables/layout-header.md`): 出荷構成 bundle の manifest の説明(`bundle.description`、393 字)が長く、`#bundle-info` が単独の行で 2 行に折り返し、header が 122 px、文書が 1302 px(試験窓は 1300 px)になって 2 px の縦スクロール範囲ができた。D8 の bundle の説明は 284 字で 1 行、header 72 px、文書 1300 px ちょうどでスクロールできない。スクロールは run ごとに起きたり起きなかったりする(旧 CSS・修正した検査での 10 run: scrollY 2 が 7 回、0 が 3 回。どちらも 50 検査すべて通る)。前任の `ident3.mjs` が通ったのは、その run が scrollY 0 だったからと読む(記録なし)。
+**なぜ出荷構成だけ落ちたか**(`tables/layout-header.md`): 出荷構成 bundle の manifest の説明(`bundle.description`、393 字)が長く、`#bundle-info` が単独の行で 2 行に折り返し、header が 122 px、文書が 1302 px(テスト窓は 1300 px)になって 2 px の縦スクロール範囲ができた。D8 の bundle の説明は 284 字で 1 行、header 72 px、文書 1300 px ちょうどでスクロールできない。スクロールは run ごとに起きたり起きなかったりする(旧 CSS・修正した検査での 10 run: scrollY 2 が 7 回、0 が 3 回。どちらも 50 検査すべて通る)。前任の `ident3.mjs` が通ったのは、その run が scrollY 0 だったからと読む(記録なし)。
 
 **ユーザーの画面への影響**(PM の問い): 既定の入口(`?screen=` なし = `screen-fit`)は `body { height: 100vh; overflow: hidden }` と 1 行 36 px の header で、説明の長さに依らず文書は窓にちょうど収まる(`tables/layout-default-entry.md`: 文書 2400x1300 = 窓、scrollY 0、ゲストの画面 = 窓 − 340 − 36 と一致)。出荷構成 bundle の既定の入口で canvas・絵・スクリーンショットは一致(`tables/default-entry-four-way.md`)。2 px のはみ出しは legacy 配置だけ。
 
@@ -71,7 +71,7 @@ PM の依頼: 出荷構成 bundle の engine-desk で『ページの canvas の�
 | tsc(4 構成) | エラーなし |
 | Worker(`test/worker/run.mjs`) | 50/50 |
 | mutation(e2e 層、追加 3 件) | 3/3 検出(`tables/mutation.md`) |
-| runtime・生成 C・フル試験・a4 | 触っていないので再実行していない(影響する経路が無いという読み) |
+| runtime・生成 C・フルテスト・a4 | 触っていないので再実行していない(影響する経路が無いという読み) |
 
 
 ## 6. 点検表(`docs/policies/lift-fidelity.md` §2)
@@ -85,7 +85,7 @@ PM の依頼: 出荷構成 bundle の engine-desk で『ページの canvas の�
 |---|---|---|
 | S-desk3-header | legacy 配置の header を 1 行にして `#bundle-info` を省略記号で切る | 出典なし(ページ自身の見た目)。代替: (a) legacy 配置も `100vh` + `overflow: hidden`(却下: 1920x1080 の desktop が小さい窓で切れる)、(b) manifest の説明を短くする(却下: ビルドの記録)、(c) 折り返しを許し高さを予約(却下: 説明の長さに依存し続ける)。撤回条件: legacy 配置を使わなくなったとき |
 | S-desk3-title | 切った説明の全文を `title` 属性に | 代替: クリックで開く(却下: 操作が増える)。撤回条件: なし |
-| S-desk3-fit | engine-desk の『文書が窓より高くない・ページが先頭にある』の検査 | 試験窓 2400x1300 が legacy 配置の高さに収まることを守る。撤回条件: 試験窓の大きさを変えるとき |
+| S-desk3-fit | engine-desk の『文書が窓より高くない・ページが先頭にある』の検査 | テスト窓 2400x1300 が legacy 配置の高さに収まることを守る。撤回条件: テスト窓の大きさを変えるとき |
 | S-desk3-rereads | `shotOf` が毎回位置を読み直す | 最初に一度だけ読んだ rect は、その後のスクロールで古くなる。撤回条件: なし |
 
 ## 8. 自己申告・見つけたこと

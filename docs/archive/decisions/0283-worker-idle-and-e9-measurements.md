@@ -20,7 +20,7 @@
 
 ### 1.1 再現(E9 の製品形 bundle、k=4、場面 b を 60 s 再生。開始 load 8.7 → 5.5)
 
-CPU 律速の形が出る(仮想 s / 実 s が 0.52〜0.58、lag cut 14〜17 回/s、timer の待ち 0)が、**Worker の V8 の idle が 11〜12%** 残る(= 前報の 16384 回の試験の 12〜14% と同じ)。
+CPU 律速の形が出る(仮想 s / 実 s が 0.52〜0.58、lag cut 14〜17 回/s、timer の待ち 0)が、**Worker の V8 の idle が 11〜12%** 残る(= 前報の 16384 回のテストの 12〜14% と同じ)。
 
 | 区間(s) | 書き込み率 | idle() /s | bounces /s | timerWakes /s | lagCuts /s | Worker の event-loop idle(回/s、ms/s、1 回の平均 ms) | Worker 稼働 % |
 |---|---|---|---|---|---|---|---|

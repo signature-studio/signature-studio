@@ -25,7 +25,7 @@
 | ファイル | 内容 |
 |---|---|
 | `app/src/audio/ring-layout.ts`(新規) | 決定 0139 の SharedArrayBuffer リング(版 1)のレイアウト。0139 の語 0〜16 はエンジンの EM_JS が使う(**読み書きする語は変えない**)。語 17〜26 をこのフロントエンドが足した(エピソード数、最長の連続、非無音 quanta、warm-up、warm-up 後の数) |
-| `app/src/audio/fle-out.worklet.js`(新規。AudioWorklet のソース。Vite は生のまま asset として出す) | `fle-out` プロセッサ。PLAYING の間、1 quantum(128 frame)ごとにリングから読み、**足りない frame は 0 にして数える**(出力は時間軸)。欠けた quantum 数・frame 数・連続(episode と最長)・非無音 quanta・50 ms ごとの peak/Σ²/最小の fill を数える。要求されたとき最初の非ゼロ出力から N frame を複写して 1 回だけ port に出す(`capture`)。`delayFrames` があれば RD より delay 前の位置を鳴らす |
+| `app/src/audio/fle-out.worklet.js`(新規。AudioWorklet のソース。Vite は生のまま asset として出す) | `fle-out` プロセッサ。PLAYING の間、1 quantum(128 frame)ごとにリングから読み、**足りない frame は 0 にして数える**(出力は時間軸)。欠けた quantum 数・frame 数・連続(episode と最長)・非無音 quanta・50 ms ごとの peak/Σ²/最小の fill を数える。要求されたとき最初の非ゼロ出力から N frame をコピーして 1 回だけ port に出す(`capture`)。`delayFrames` があれば RD より delay 前の位置を鳴らす |
 | `app/src/audio/page-audio.ts`(新規) | `AudioContext({sampleRate:44100})`、`audioWorklet.addModule`、`AudioWorkletNode`、リング(`SharedArrayBuffer`)、Worker からの `audio-pulse`・`aud2-worker` の記録、`detail()`(デバイスの状態別の quanta、first idle 以後・最初の音以後・直近 60 秒の欠け、最後の欠けからの秒、peak/RMS) |
 | `app/src/audio/underrun.ts`(新規) | カウンタから P3 の数と秒・割合を作る(`p3` = warm-up 後の欠け quanta) |
 | `app/src/audio/install.ts`(新規) | `?audio=1`(`audiolead=` `audiodelay=` `audiorate=` `audiocap=`)を読み、`name==='fl-engine'` の Worker だけを包んでリングを渡す。最初のジェスチャで `resume()` |
@@ -161,7 +161,7 @@ Web Audio / DirectSound の仕様が値を決めていないもの、または�
 | S-ur-report(Worker の報告) | Worker が 1,000 ms ごとに `aud2-worker`(Unlock の時刻、waits、publishes ほか)を postMessage する | エンジンの `fleAudioWorkerState` を読むだけ | 無し | |
 | S-ur-play(再生の判定) | 運転手が Space を送り、窓の更新が 3 回/秒以上になったら再生中とみなす | 決定 0166 の方法 | トランスポートの状態の読み(S-ur-window) | |
 | S-ur-metro(メトロノーム) | 仮想画面 (750,21) のクリック。FL のツールバーのメトロノームのボタン(画面の説明ヒントが "Metronome Ctrl+M" と出る。クリック後にボタンが点灯し、再生で非無音の quantum が出る) | 決定 0166 の play (354,20) と同じ座標系(主窓 (−5,−6) のずれ) | Ctrl+M(キー表に無いので未試行) | UI の配置が変わったとき |
-| S-ur-capture | 再生開始後の最初の非ゼロ出力サンプルから N frame(既定 65,536)を worklet が複写し、先頭 1,024〜65,536 frame の SHA-256 を比べる。欠けがあれば最初の欠けまでの prefix だけを使う | エンジン自身が出した音の同一性(2 回の運転で同じ値か)を、位相をそろえて見るため | 画面と同期した位置/音のスペクトル | |
+| S-ur-capture | 再生開始後の最初の非ゼロ出力サンプルから N frame(既定 65,536)を worklet がコピーし、先頭 1,024〜65,536 frame の SHA-256 を比べる。欠けがあれば最初の欠けまでの prefix だけを使う | エンジン自身が出した音の同一性(2 回の運転で同じ値か)を、位相をそろえて見るため | 画面と同期した位置/音のスペクトル | |
 | S-ur-settle | Enter の後、エンジンが静かになるのを待ち(idle の回数が 6 秒続けて 20/秒を超える)、さらに `--post-enter-s` 秒(既定 30)待ってから測定窓を始める | 起動の描画アニメーションの後の欠けを窓に入れない | 無し | |
 | S-ur-schedstat | Worker スレッドの `/proc/<pid>/task/<tid>/schedstat`(CPU に乗った ns と run queue の待ち ns)を 5 ms ごとに読む | 負荷の高い機械で、壁時計の欠けと CPU 時間の欠けを分ける | CDP のトレース | |
 
@@ -187,7 +187,7 @@ Web Audio / DirectSound の仕様が値を決めていないもの、または�
 | Worker 統合(`node test/worker/run.mjs`、wrangler dev --local) | **43/43**(`logs/test-worker.log`) |
 | e2e(`node test/e2e/run.mjs --target dev,preview,worker`、スタンドイン) | **691/691**(`logs/test-e2e.log`、load 15〜20、nice 15) |
 | 変異検査(`node test/mutation/run.mjs --layers unit --only audio-*`) | **14/14 検出**(`logs/mutation-unit.log`)。最初の 12 件の走行で 1 件生き残り(`audio-hook-takes-any-message`: `cmd` を見なくても `sab` が無いので false になる)、テストに『別の cmd に SAB が付いていても false』を足して検出させ、delay の 2 件を足して 14 件でやり直した |
-| `patch -p1 --dry-run`(`logs/patch-dry-run.txt`) | 61aa1a4 と 75cfbbf(確認した時点の最新 HEAD)の `git archive` に fuzz・offset・reject なしで当たる。実際に当てた木は作業木と一致(`.wrangler` 以外) |
+| `patch -p1 --dry-run`(`logs/patch-dry-run.txt`) | 61aa1a4 と 75cfbbf(確認した時点の最新 HEAD)の `git archive` に fuzz・offset・reject なしで当たる。実際に当てた木はワークツリーと一致(`.wrangler` 以外) |
 | 差分の『-』行 | 5 行、全部意図した置き換え(MERGE-NOTES) |
 | **全体テスト(`bash lift/harness/test.sh full`)・a4(FRUITY 無効)・FLEngine 既定の生成 C の sha256** | **`lift/` を 1 行も変更していないので走らせていない**(差分の対象は `app/` と新規の `docs/`)。基準は 154 results・2,129 passed・0 failed、a4 942/942・895/895・functions 5,310・entries 1,009,731、FLEngine 既定の sha256 `cd9107ce…`(215,811,678 B)のまま、と読む(**測っていない**) |
 

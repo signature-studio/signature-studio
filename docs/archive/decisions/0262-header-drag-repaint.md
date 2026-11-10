@@ -2,7 +2,7 @@
 
 **依頼者の機械・実機 Windows・実 GPU・ブラウザ・本番 bundle(afd46e67 / 251dfabc / df0512b0)での測定は 0 件。** 以下は、b42fad36 の生成 C(PM の計測で既定の生成 C は不変)から作った native N1 に、HEAD の runtime(+ 環境変数で切る診断トレース `diag/a8-trace.diff`)を載せ、G3 の模擬入力(Mixer ヘッダードラッグ 40 手、`scripts/mxmove.g3`。**ユーザーの操作ではない**)で測った値。native N1 の行は本番 bundle の行ではない。Wine 10.0 の結果と私の読みは UNOFFICIAL(Wine は Windows ではない)。代役・再生・推測は含まない。
 
-状態: **仮の決定**。作業者 `alpha1`、2026-11-05 JST 22:03〜。基準 HEAD は e4954229(0258 の alpha7 取り込み済み)。`alpha8.diff`(sha256 ea70232c…)は HEAD e4954229 の `git archive` に `git apply --check` が通り、`patch -p1 --dry-run` もオフセット・fuzz なしで通る(PM の木には既に当たっている。runtime と試験 4 ファイルは私の検証用の複製と同一で、違うのは試験ツール `move_paint.c` だけ: 後から足した `nohid` 引数は `optional/move_paint-nohid.diff`、27 行・追加のみ)。
+状態: **仮の決定**。作業者 `alpha1`、2026-11-05 JST 22:03〜。基準 HEAD は e4954229(0258 の alpha7 取り込み済み)。`alpha8.diff`(sha256 ea70232c…)は HEAD e4954229 の `git archive` に `git apply --check` が通り、`patch -p1 --dry-run` もオフセット・fuzz なしで通る(PM の木には既に当たっている。runtime とテスト 4 ファイルは私の検証用の複製と同一で、違うのはテストツール `move_paint.c` だけ: 後から足した `nohid` 引数は `optional/move_paint-nohid.diff`、27 行・追加のみ)。
 
 ## 結論(先頭の数行)
 
@@ -15,9 +15,9 @@
 
 ## 冒頭の三点(正直さ)
 
-1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C にした b42fad36 の生成 C)を native N1 として動かし、G3 の模擬入力で Mixer のヘッダードラッグ(guest (715,564) → (1015,564) → 戻り、20 歩 × 往復、16 ms 間隔)を 7 回の trace 付き走行(作業ディレクトリの `runs/mx1〜mx9`。要約は `tables/`、drag の A8 行は `logs/drag-traces/`)と 15 回の時間測定走行で測った。1 手 = `SetWindowPos(lid 64, flags 0x14)` 1 回(39 手)。Wine 10.0(mingw、headless)と runtime に同じ C 試験 `harness/alpha8/move_paint.c` を走らせて比べた。**本番 bundle のバイト列での測定ではない。**
+1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C にした b42fad36 の生成 C)を native N1 として動かし、G3 の模擬入力で Mixer のヘッダードラッグ(guest (715,564) → (1015,564) → 戻り、20 歩 × 往復、16 ms 間隔)を 7 回の trace 付き走行(作業ディレクトリの `runs/mx1〜mx9`。要約は `tables/`、drag の A8 行は `logs/drag-traces/`)と 15 回の時間測定走行で測った。1 手 = `SetWindowPos(lid 64, flags 0x14)` 1 回(39 手)。Wine 10.0(mingw、headless)と runtime に同じ C テスト `harness/alpha8/move_paint.c` を走らせて比べた。**本番 bundle のバイト列での測定ではない。**
 2. **結論**: 上のとおり。FL 自身の呼び出しが支配。runtime の過剰が 2 件(小)。
-3. **未確認**: 依頼者の機械・実 Windows・ブラウザでの 1 手の ms(8〜10.5 ms)に対する効果。node(wasm)の 84 / 55 / 87 行、a4、全体試験(`test.sh full`)。FL の `RedrawWindow` の輪が Windows でも同じ頻度で出るか(私は Windows を持たない: FL の呼び出しはタイマー駆動で、runtime が返す値には依存しないと読んだが、確かめてはいない)。どちらの画が実 Windows に近いか(§6.3)。
+3. **未確認**: 依頼者の機械・実 Windows・ブラウザでの 1 手の ms(8〜10.5 ms)に対する効果。node(wasm)の 84 / 55 / 87 行、a4、全体テスト(`test.sh full`)。FL の `RedrawWindow` の輪が Windows でも同じ頻度で出るか(私は Windows を持たない: FL の呼び出しはタイマー駆動で、runtime が返す値には依存しないと読んだが、確かめてはいない)。どちらの画が実 Windows に近いか(§6.3)。
 
 ## 1. 問い
 
@@ -62,13 +62,13 @@ PM の問い: Mixer ヘッダードラッグの CPU 8〜10.5 ms/手の鎖のう�
 
 直し方(`lift/runtime/fle_win.c` の `unc_pending` の先頭に `if (!is_visible(w)) return q;`、注釈つき): 見えない窓の更新矩形は『保留中の領域』として数えない。S-0247-hidden(`upd_add` が見えない窓に足さない)と同じ規則を、窓が見える間に持った矩形の扱いに揃える。HIDEWINDOW で矩形を消す(Wine の挙動)ことは、隠した後の `SWP_SHOWWINDOW`(全面無効にならない隙間)で窓が空白のまま残る危険があるので、今回は入れなかった。
 
-試験: `harness/alpha8/hidden_move.c`(24 項目、`crates/fe-lift/tests/alpha8_hidden_move.rs`)。HEAD: 13 通過 / 11 FAIL(移動 3 回 × {MIX が無効、CAP・PANA・PANB が無効、WP 以外が描かれる} と RDW の 2 項目)、alpha8: 24 通過。
+テスト: `harness/alpha8/hidden_move.c`(24 項目、`crates/fe-lift/tests/alpha8_hidden_move.rs`)。HEAD: 13 通過 / 11 FAIL(移動 3 回 × {MIX が無効、CAP・PANA・PANB が無効、WP 以外が描かれる} と RDW の 2 項目)、alpha8: 24 通過。
 
 ## 5. 見つけた B: RedrawWindow の定数の取り違え
 
 `fle_win.c` の `RDW_NOFRAME_ 0x0040`、`RDW_NOCHILDREN_ 0x0800`。SDK は `RDW_NOCHILDREN 0x0040`、`RDW_NOFRAME 0x0800`(`tables/rdw-flags.tsv`)。関数コメントにも『NOFRAME 0x40 … NOCHILDREN 0x4000…』と誤った数字があった。FL は `RedrawWindow` を 1 手に 4.8 回 0x41 で呼ぶ(= INVALIDATE | NOCHILDREN)。HEAD は 0x41 を INVALIDATE | NOFRAME と読み、WS_CLIPCHILDREN の無い lid 64 / 17 の子へ無効化を進めた(`upd_children`)。ドラッグ中 `RedrawWindow` 由来の update_rect 追加は lid 85(Mixer の caption)に 86 回、lid 96 / 98(rack)に 272 / 168 回、lid 50 に 2 回。直すとこれらが消え、追加は lid 14 / 17 / 64(FL が名指しする窓)だけになる(1 手 32.77 → 19.21)。子の WM_PAINT(`ValidateRgn` で答えるだけ)は 1 手 5.92 → 1.51。
 
-`present2_uncover.rs` の試験 `redrawwindow_invalidate_follows_the_same_default_and_rdw_nochildren_leaves_the_children_alone` は NOCHILDREN を 0x800 と書いていた(`harness/api2/win_upd.c` の Wine の答えと照合した試験で、数字だけが誤り)。0x40 に直した。期待値(`p 1 0 0 200 200` / `c 0 0 0 0 0`)は変えていない。
+`present2_uncover.rs` のテスト `redrawwindow_invalidate_follows_the_same_default_and_rdw_nochildren_leaves_the_children_alone` は NOCHILDREN を 0x800 と書いていた(`harness/api2/win_upd.c` の Wine の答えと照合したテストで、数字だけが誤り)。0x40 に直した。期待値(`p 1 0 0 200 200` / `c 0 0 0 0 0`)は変えていない。
 
 ## 6. 効果
 
@@ -104,15 +104,15 @@ native、gdb の batch、`g3-cpu` の user + sys(1 ms 分解能、19 手): HEAD 
 4. 新規作成された見える窓の最初の WM_PAINT(Wine は描く、runtime は描かない)。
 どれもドラッグの CPU には出ない。1 と 2 は対にして入れる必要がある(1 だけ入れると、隠れた窓を `SWP_SHOWWINDOW` で見せたとき、偶然残っていた矩形による描画も失う)。
 
-## 8. 変更と試験
+## 8. 変更とテスト
 
-- `alpha8.diff`(5 ファイル): `lift/runtime/fle_win.c`(`unc_pending`、RDW の 2 つの #define と関数コメント)、`lift/harness/alpha8/hidden_move.c`(新規、24 項目)、`lift/harness/alpha8/move_paint.c`(新規、Wine と runtime の両方で動く試験ツール)、`lift/crates/fe-lift/tests/alpha8_hidden_move.rs`(新規)、`lift/crates/fe-lift/tests/present2_uncover.rs`(0x800 → 0x40)。`-` の行は 5 行(試験の古い注釈 1、試験の古い呼び出し行 1、関数の古い注釈 1、`#define` 2)で、いずれも上の理由。wall_fr* の期待値の変更はなかった。
-- cargo(`git archive` した HEAD + alpha7 の複製 `~/work/a7-cargo` に alpha8 を載せたもの。PM の木ではない): `alpha8_hidden_move` 1 passed、`present2_uncover` 16 passed、`alpha3_updregion` 1 passed。runtime / 窓に触る 45 試験ファイル(alpha7 の 44 + `alpha8_hidden_move`、`--no-fail-fast`)は **741 件通過・失敗 0・rc=0**(alpha7 のときの 44 ファイルは 740 件。+1 は新しい試験)。`logs/cargo-pack-alpha8.txt`。
+- `alpha8.diff`(5 ファイル): `lift/runtime/fle_win.c`(`unc_pending`、RDW の 2 つの #define と関数コメント)、`lift/harness/alpha8/hidden_move.c`(新規、24 項目)、`lift/harness/alpha8/move_paint.c`(新規、Wine と runtime の両方で動くテストツール)、`lift/crates/fe-lift/tests/alpha8_hidden_move.rs`(新規)、`lift/crates/fe-lift/tests/present2_uncover.rs`(0x800 → 0x40)。`-` の行は 5 行(テストの古い注釈 1、テストの古い呼び出し行 1、関数の古い注釈 1、`#define` 2)で、いずれも上の理由。wall_fr* の期待値の変更はなかった。
+- cargo(`git archive` した HEAD + alpha7 の複製 `~/work/a7-cargo` に alpha8 を載せたもの。PM の木ではない): `alpha8_hidden_move` 1 passed、`present2_uncover` 16 passed、`alpha3_updregion` 1 passed。runtime / 窓に触る 45 テストファイル(alpha7 の 44 + `alpha8_hidden_move`、`--no-fail-fast`)は **741 件通過・失敗 0・rc=0**(alpha7 のときの 44 ファイルは 740 件。+1 は新しいテスト)。`logs/cargo-pack-alpha8.txt`。
 
 ## 9. 再現
 
 - Wine との比較: `tools/build-movepaint.sh TREE OUTDIR`(native.out / wine.out と、`top` 引数の native-top.out / wine-top.out)。HEAD 側は runtime を元に戻した木で。
-- C 試験: `tools/build-hiddenmove-test.sh TREE OUTDIR`。
+- C テスト: `tools/build-hiddenmove-test.sh TREE OUTDIR`。
 - ドラッグ: `tools/build-n1b.sh`(GENOBJ = b42fad36 のコンパイル済み生成 C、RMC = realmod_ref.c、NO_COPY=1、TAG)に診断トレースを足した木(`diag/a8-trace.diff`)を渡し、`tools/run-gdb.sh BIN scripts/mxmove.g3 scripts/pk70.gdb OUT`(`A8_TRACE=1 A5_MSGTAB=1 A5_WINTRACE=1`)。集計は `tools/a8-drag-stats.py OUT/gdb.err`。
 
 ## 10. 次の手
@@ -123,7 +123,7 @@ native、gdb の batch、`g3-cpu` の user + sys(1 ms 分解能、19 手): HEAD 
 
 ## PM の判断と取り込み(2026-11-05 23:02)
 
-取り込み: `alpha8.diff`(5 ファイル: `lift/runtime/fle_win.c`、`lift/crates/fe-lift/tests/present2_uncover.rs`、新規 `alpha8_hidden_move.rs`、新規 `lift/harness/alpha8/{hidden_move.c,move_paint.c}`)を全体 e4954229(opt1-f + mt3 の 0254/0259 + opt1-f-lists +40 + alpha7)の上に `patch --batch -p1`(`git archive` の写しで dry-run も rc=0、offset・fuzz なし)。`-` 行 5 本をすべて読んだ: 旧試験コメント 1、旧試験の呼び出し `0x1u | 0x800u`(NOCHILDREN として 0x800 を使っていた)を 0x40 に、旧関数コメント 1、`#define RDW_NOFRAME_ 0x0040u` / `#define RDW_NOCHILDREN_ 0x0800u` の入れ替え(SDK の winuser.h は NOCHILDREN 0x0040、NOFRAME 0x0800)。追加は `unc_pending` が不可視の窓を数えない 1 行(`if (!is_visible(w)) return q;`)とコメント。FL のクラス名・窓種・アドレスの分岐、新オプションは無い。
+取り込み: `alpha8.diff`(5 ファイル: `lift/runtime/fle_win.c`、`lift/crates/fe-lift/tests/present2_uncover.rs`、新規 `alpha8_hidden_move.rs`、新規 `lift/harness/alpha8/{hidden_move.c,move_paint.c}`)を全体 e4954229(opt1-f + mt3 の 0254/0259 + opt1-f-lists +40 + alpha7)の上に `patch --batch -p1`(`git archive` の写しで dry-run も rc=0、offset・fuzz なし)。`-` 行 5 本をすべて読んだ: 旧テストコメント 1、旧テストの呼び出し `0x1u | 0x800u`(NOCHILDREN として 0x800 を使っていた)を 0x40 に、旧関数コメント 1、`#define RDW_NOFRAME_ 0x0040u` / `#define RDW_NOCHILDREN_ 0x0800u` の入れ替え(SDK の winuser.h は NOCHILDREN 0x0040、NOFRAME 0x0800)。追加は `unc_pending` が不可視の窓を数えない 1 行(`if (!is_visible(w)) return q;`)とコメント。FL のクラス名・窓種・アドレスの分岐、新オプションは無い。
 
 PM が測った値(この機械、`lift/out-pmchk-a8/`):
 - FLEngine の既定の生成 C の sha256 **`34a376dbf23a30c62df5ce6d04c07ed9beb5b651dd82d608cf5bcc59af78062a`**(215,740,414 B)不変。
@@ -136,14 +136,14 @@ PM が測った値(この機械、`lift/out-pmchk-a8/`):
 1. **採る(alpha8)。** 契約(winuser.h の RDW_* の値、Learn の不可視窓には更新領域が無いこと)に対する我々側の 2 つの誤りの修正で、native N1 で測った実測は、ランタイムが起こす無効化 840,710 → 88,033 画素/移動(−90%)、BitBlt の書き込み 399,959 → 80,763 画素/移動(−80%)、BeginPaint の領域 440,934 → 122,095 画素/移動(−72%)、TVectorPanel の WM_PAINT 4.05 → 0.97/移動。Wine 10.0 と同じ形(不可視窓の無い純粋な移動では HEAD も Wine と一致、不可視窓がある場合は alpha8 が Wine と一致)。
 2. **効果の読み**: Mixer のヘッダードラッグで毎移動パネル全面(1514x500)が描き直される主因は **FL 自身の RedrawWindow**(QFC のタイマー連鎖 f_1e858e0 → … → f_820f10、1 移動あたり 6.97 回。決定 0247 §2.1)で、ランタイム側の過剰は 2 つとも直した。native の CPU は 1 移動あたり約 0.4〜0.9 ms(4〜8%)でノイズの水準。ブラウザ(wasm)の 8〜10.5 ms/移動への効果は未測定で、P2 を満たしたとは言わない。
 3. 画素: 起動直後の主窓 約 65 画素(CPU メーターの桁、時間依存)と、ドラッグ後の Mixer 右部 約 2,000 画素(最大 10/255)が変わる。どちらが実機の Windows に近いかは未決。
-4. node 84/55/87 行は opt1 の E6(E5 + alpha8)の FS 試験ビルドで、種類と原因で比べる(更新領域・WM_PAINT の数に関わる surface/wintable/progress/snap の変化は想定内、停止・g3-win・timers の変化は想定外)。結果が出る前に push する場合は、デプロイ後に ci1 がブラウザで確かめる。
+4. node 84/55/87 行は opt1 の E6(E5 + alpha8)の FS テストビルドで、種類と原因で比べる(更新領域・WM_PAINT の数に関わる surface/wintable/progress/snap の変化は想定内、停止・g3-win・timers の変化は想定外)。結果が出る前に push する場合は、デプロイ後に ci1 がブラウザで確かめる。
 5. 直さなかった Wine との差(表 `tables/wine-vs-runtime-move-paint.tsv`): (1) 不可視窓の更新矩形を消す、(2) SetWindowPos(SWP_SHOWWINDOW) 単独では全面を無効化しない(ShowWindow は無効化する)— (1) と (2) は対で直す必要がある、(3) リサイズの無効化が CS_HREDRAW|CS_VREDRAW を見ない、(4) 新しく作った可視窓の最初の WM_PAINT。いずれもドラッグの CPU に効かない。
 
 ### 追記(2026-11-05 23:25): opt1 の E6(= E5 + alpha8)の実エンジンの確認(push 後に届いた。CI 42043420797 は b00932ec で開始済み)
 
-出典: opt1 の報告(23:20、23:22)と `docs/investigations/alpha8/tables/0265-e6-alpha8-node-rows-vs-e5.txt`(PM が表を読んだ)。E6 は HEAD e4954229 の冷間 CI ビルド(wasm 142,380,705 B、sha256 `ed049a99167f…` = E5 と byte 同一)を製品側の作業ディレクトリにして、`rt/fle_win.o` だけ alpha8 で作り直した FS 付き試験ビルド(製品形ではない)。
+出典: opt1 の報告(23:20、23:22)と `docs/investigations/alpha8/tables/0265-e6-alpha8-node-rows-vs-e5.txt`(PM が表を読んだ)。E6 は HEAD e4954229 の冷間 CI ビルド(wasm 142,380,705 B、sha256 `ed049a99167f…` = E5 と byte 同一)を製品側の作業ディレクトリにして、`rt/fle_win.o` だけ alpha8 で作り直した FS 付きテストビルド(製品形ではない)。
 - node の行 E6 − E5: 起動 84 は 29 行(g3-progress 16/16、g3-snap 5/16〔clock_ms −2〕、g3-surface lid 14 8/16〔sha256 のみ、nonzero 不変〕)、参照 55 と 87 は各 26 行(progress 10/10、snap 9/10〔clock_ms −1、87 の再生中 3 スナップは −25〕、lid 14 7/10〔sha256 のみ〕)。**不変**: g3-wintable、g3-win の 23 行、lid 48・lid 8・lid 139 の surface、timers、fruity。**停止・想定外の種類の変化は 0**。progress の差は最大 −0.23%(多くは 0.01% 台)。
-- 参照プロジェクトは開き、node の参照 run は最後まで走る。Export(Chrome 156、FS 付き試験 bundle、参照プロジェクトを開いて Ctrl+R)は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で、本番・E2〜E5 と一致。1 本。
+- 参照プロジェクトは開き、node の参照 run は最後まで走る。Export(Chrome 156、FS 付きテスト bundle、参照プロジェクトを開いて Ctrl+R)は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で、本番・E2〜E5 と一致。1 本。
 - 未確認のまま: lid 14 の sha256 だけが変わる画素差(alpha1 の native では「CPU メーターの数字」約 65 画素)の画素単位の確認、Mixer ドラッグ場面(node の行には無い)、製品形の E6 bundle のブラウザ確認(デプロイ後に ci1)。
 
 ### 訂正(2026-11-05 23:40、alpha1 の決定 0266 第 1 報による)

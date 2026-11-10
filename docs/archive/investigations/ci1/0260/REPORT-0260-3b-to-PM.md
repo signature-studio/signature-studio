@@ -6,7 +6,7 @@
 - 実ブラウザでの決定的な確認（`tools/scn-focus5.json`）: 最後の #desktop へのクリックの 0.4 s 後に (a) `panel-toggle.focus()`、(b) `activeElement.blur()` → 300 ms 後の `activeElement` は、案5 のページで (a) desktop (b) desktop、案4 のページで desktop / BODY、無修正のページで panel-toggle / BODY。
 - **引き金は未特定**（止めてよいとの指示に従い『未特定』）。記録した 16 件（時刻付き）: 移動は最後のポインタ上げの 82〜1,535 ms 後（中央値 749 ms）、最後のキーからは 52〜1,441 ms 後で、周期内の決まった位相ではない。直前 1.5 s の DOM 変更（MutationObserver）は `engine-log` / `log-count` / `pointer-info` / `cursor-info` / `engine-metrics` / `audio-status` の**状態表示の定期更新だけ**（`panel-toggle` や `#desktop` の属性・子の変更は 0）で、16/16 に主スレッドの long task（150〜200 ms）があるが、このページは常時 long task があり区別できない。移動先は常に `panel-toggle`（n=26）、`document.hasFocus()` は真、`visibilityState` は visible、スクリプトの `focus()` 呼び出しは `#desktop` へのものだけ。→ ブラウザ（headless Chrome）が主スレッドの混み合いの中で『フォーカスされた要素を失う → 文書内の最初のコントロールを選ぶ』ように見える（推測。未確認）。実機の Firefox / 通常の Chrome で起きるかは**未確認**。
 
-## 修正案 `ci1-page-focus.diff`（更新版 sha256 `e000e626e5bff67b…`、app/src/input/pointer.ts + 単体試験 1 件。旗なし、`-` 行 1）
+## 修正案 `ci1-page-focus.diff`（更新版 sha256 `e000e626e5bff67b…`、app/src/input/pointer.ts + 単体テスト 1 件。旗なし、`-` 行 1）
 - `#desktop` の `focusout` で、(1) 行き先が別コントロール → 次のタスクでその要素がまだ active なら `#desktop` に戻す、(2) 行き先なし（body へ落ちた）→ active が body/null なら戻す。ただし直近 1 s に『その行き先（または外側のページ）へのポインタ押下』か Tab があった場合（ユーザーの移動）と、行き先がテキスト入力の場合は戻さない。`#desktop` 自身へのクリックは免責にしない（案3 の欠陥）。
 - 確認: HEAD `91cbd9b0` の `git archive` に `git apply --check` ok、適用後 vitest `pointer-dom` 18 件 ok、`npm run typecheck` ok。
 - 注意: 案1〜3 は効かなかった（報告3 の表 B・C・D）。案4 は身体の一部（body へ落ちる型）が残った。PM の再検証（typecheck・vitest・worker・e2e）は案5 の版で必要。

@@ -9,7 +9,7 @@
 >
 > 本文の「何も実行していない」「第 2 段階で測る」「予想される」は、この更新の時点では上のとおり実行済みまたは外れた記述。
 
-作業日: 2026-10-28。基準: HEAD **86439bc**（作業中に別の作業者の docs だけのコミット 228c78a が入り、HEAD は 228c78a に進んだ。差分は両方の clean な `git archive` に当たることを確認した。§9）。作業木は `git archive 86439bc` の展開（`/tmp/opencode/fruity/src/`、RAM 上）だけを変えた。作業ツリーと git は読み取りだけ（commit なし、`git status` は作業の前後で同じ未追跡 2 件）。
+作業日: 2026-10-28。基準: HEAD **86439bc**（作業中に別の作業者の docs だけのコミット 228c78a が入り、HEAD は 228c78a に進んだ。差分は両方の clean な `git archive` に当たることを確認した。§9）。ワークツリーは `git archive 86439bc` の展開（`/tmp/opencode/fruity/src/`、RAM 上）だけを変えた。ワークツリーと git は読み取りだけ（commit なし、`git status` は作業の前後で同じ未追跡 2 件）。
 
 **この文書は何も決めない**。決める必要がある点は §12 に列挙した。凡例: **実測** = 今回のコマンドの出力を見た事実／**読み** = 命令やコードを読んだ上での解釈（実行していない）／**未確認** = 調べていない、または調べられない／**引用** = 既存文書の記述（再測定していない）／**出典なし** = 出典がなく、この作業の選択。
 
@@ -57,7 +57,7 @@
 | スロット 2 | `id - 2 == 0` なら 0。`id - 2 != 1`（= `id != 3`）なら 0。`cmp r8, 1; ja` で **`index`（r8）が 64 ビット符号なしで 1 より大きければ 0**。それ以外は 1。`value`（r9）は読まない | **細部が増えた**: 「`index <= 1`」は符号なし比較。負の `index` は 0 になる（スロット 0 経由なら `r8d = -1` が 0xFFFF…FFFF に拡張される） |
 | 製品名（0x140069710） | `"FL Studio\0"` | 一致 |
 | 空文字（0x140069820） | 1 バイトの NUL。+0x20 と +0x28 は**同じ**これを指す | 一致 |
-| ベースディレクトリ | `0x140001330` は `std::wstring::find_last_of(L"\\/")` の後に `substr(0, pos + 1)`（区切りを**含む**）。区切りがなければ空文字。これを UTF-8 にして `strcpy_s(buf, 0x8000, …)` で 32 KB のグローバルに複写（0x140006f00〜0x140006f0c）。UTF-16→UTF-8 の変換関数（0x140002940）の中身は読んでいない（**未確認**。このパスは ASCII） | 「末尾が区切り」が確定 |
+| ベースディレクトリ | `0x140001330` は `std::wstring::find_last_of(L"\\/")` の後に `substr(0, pos + 1)`（区切りを**含む**）。区切りがなければ空文字。これを UTF-8 にして `strcpy_s(buf, 0x8000, …)` で 32 KB のグローバルにコピー（0x140006f00〜0x140006f0c）。UTF-16→UTF-8 の変換関数（0x140002940）の中身は読んでいない（**未確認**。このパスは ASCII） | 「末尾が区切り」が確定 |
 | `instance` | 呼ぶ前に 0（0x14000764d） | **新規**。ハーネスも FL64.exe と同じく 0 から始める |
 | 戻り値の振り分け | `test ebx,0xfffffffd; je` で 0 か 2 なら `instance->vtable[0](instance)`。−2 なら `MessageBoxA`。他は何もしない | 一致（記録だけ。§8） |
 
@@ -292,7 +292,7 @@ SIGABRT／SIGSEGV は gdb が先に止まる。上限での停止は `FLE_FRUITY
 
 | ファイル | 内容 |
 |---|---|
-| `fruity.diff` | 本体（79,614 バイト）。`git archive 86439bc` と `228c78a` の両方に `patch -p1` が当たる。適用した木と作業木の `diff -r` は空（`logs/patch-and-static.txt`） |
+| `fruity.diff` | 本体（79,614 バイト）。`git archive 86439bc` と `228c78a` の両方に `patch -p1` が当たる。適用した木とワークツリーの `diff -r` は空（`logs/patch-and-static.txt`） |
 | `create-fruity-instance-harness.md` | この文書（`docs/investigations/` に置く内容） |
 | `MERGE-NOTES.md` | 統合の注意、stamp、規則違反の自己申告 |
 | `tools/` | `fl64_read.py`（メモリ上でだけ FL64.exe を読む）、`cfi_calls.py`、`reach.py`（静的な到達可能性）、`merge_check.sh`、`run6-fruity.sh`、`wrap/clang`、`wrap/python3` |

@@ -1,6 +1,6 @@
 # 0284(mt3w、仮): `CompareStringW` の名前つき停止 — 停止の診断を良くし、Microsoft の Sorting Weight Table から導ける範囲(ASCII の制御文字、ハイフン/アポストロフィと任意の文字)を既定で実装した
 
-基準: **e8-wip a1e96d92 + 0279**(作業木 `lift/out-mt3y/w79`)。差分は main c74b9194 にも `patch --batch -p1 --dry-run` が通る。PM の木には書いていない。区分: **実測**＝このセッションの出力を見た事実、**読み**＝解釈、**未確認**、**出典なしの選択**＝`S-…`。
+基準: **e8-wip a1e96d92 + 0279**(ワークツリー `lift/out-mt3y/w79`)。差分は main c74b9194 にも `patch --batch -p1 --dry-run` が通る。PM の木には書いていない。区分: **実測**＝このセッションの出力を見た事実、**読み**＝解釈、**未確認**、**出典なしの選択**＝`S-…`。
 
 ## 冒頭の 3 点
 
@@ -50,12 +50,12 @@ fle: CompareStringW: lcid=0x409 flags=0x1 len1=4 len2=3 string1="\u001B[\u0022q"
 
 **実装していない物(停止のまま)**: NUL(表は『重み無し = 無視』と書くが、無視した後の等価/長さの規則は表にない)、重みの無い単位 U+00AD・U+FEFF・U+200B 系、SM が同じ非 ASCII 記号 対 ASCII 記号(ビルドに AW が無い。ジェネレータの拡張で足せる = データの追加、§7)、2 つのハイフン/アポストロフィの数が等しい場合、同じ主要な重みの別の単位(副次・三次の重みが要る)。
 
-## 3. 試験(`tests/wall_ia2.rs`、実測)
+## 3. テスト(`tests/wall_ia2.rs`、実測)
 
 - **旧い 1 件を直した**: `compare_string_leaves_the_pairs_the_table_does_not_decide_to_the_stop` の末尾『ハイフン × かな = 停止』(`-` 5 行)は新しい規則で答えになった(『"-" は空として 'あ' より小さい』)。下の新しいテストに移した。
 - **新しい 3 件**(期待値は表の行から手で導出した。理由はテストのコメントに): ① `compare_string_orders_the_ascii_control_units_by_the_primary_weights_of_the_table`(ESC 対 'O' → 1/3、LF < CR、BEL < ESC、DEL > ESC、TAB > ESC、ESC > かな、共通の接頭辞の ESC。標識行なしでは従来どおり停止)。② `compare_string_takes_the_hyphen_out_against_any_unit`(`-` 対 かな、`-x` 対 ESC `x`、`a-` 対 `a` かな、`'` 対 ESC、`-` 対 `-` は 2)。③ `a_stop_of_compare_string_names_the_two_strings_the_flags_and_the_first_difference`(2 行目の形、160 単位で切る、引用符・ESC の表示)。
-- **結果(実測)**: `wall_ia2` 20 passed(旧 17 + 新 3)。既存の CompareStringW の試験が全部通った: `locale` 35、`wall_dlg1` 29、`wall_fr11` 47、`wall_fr12` 32、`wall_fr14` 26、`wall_ia1` 19、`wall_crash1` 14、`wall_r2`(`tables/compare-string-tests-first-run-before-test-fix.log` は旧い `wall_ia2` の 1 件が落ちた最初の実行。直した後に再実行)。
-- **`test.sh affected`(a1e96d92 + 0279 + 0284、`--jobs 3`、nice 15、`--fresh`)**: `140 of 212 test executables selected`、**`results=140 passed=1242 failed=0 ignored=1 SKIPPED-lines=1`**(SKIPPED は `fe-lift/wall_fr9t` の `FLE_FR9T_CLEAN_RT` 未設定の 1 件。`tables/test-affected-0284.log`)。最初の実行は SKIPPED 7 件(`out-qfc`・`out-blend2d`・`out-ext` の実 DLL の入力が無い)だった: 0279 の後片付けで作業木の入力のシンボリックリンクを消していたため(自分の不備)。`test-env.sh --link` で戻して再実行し、1 件になった。a4 は走らせていない(`fle_locale.c` のみ。FRUITY 無効の a4 が `CompareStringW` の新しい経路に入るかは未実測 = 影響範囲外と読むが、必要なら走らせる)。
+- **結果(実測)**: `wall_ia2` 20 passed(旧 17 + 新 3)。既存の CompareStringW のテストが全部通った: `locale` 35、`wall_dlg1` 29、`wall_fr11` 47、`wall_fr12` 32、`wall_fr14` 26、`wall_ia1` 19、`wall_crash1` 14、`wall_r2`(`tables/compare-string-tests-first-run-before-test-fix.log` は旧い `wall_ia2` の 1 件が落ちた最初の実行。直した後に再実行)。
+- **`test.sh affected`(a1e96d92 + 0279 + 0284、`--jobs 3`、nice 15、`--fresh`)**: `140 of 212 test executables selected`、**`results=140 passed=1242 failed=0 ignored=1 SKIPPED-lines=1`**(SKIPPED は `fe-lift/wall_fr9t` の `FLE_FR9T_CLEAN_RT` 未設定の 1 件。`tables/test-affected-0284.log`)。最初の実行は SKIPPED 7 件(`out-qfc`・`out-blend2d`・`out-ext` の実 DLL の入力が無い)だった: 0279 の後片付けでワークツリーの入力のシンボリックリンクを消していたため(自分の不備)。`test-env.sh --link` で戻して再実行し、1 件になった。a4 は走らせていない(`fle_locale.c` のみ。FRUITY 無効の a4 が `CompareStringW` の新しい経路に入るかは未実測 = 影響範囲外と読むが、必要なら走らせる)。
 
 ## 4. 表と既存の S- 選択の食い違い(実装していない。PM の判断材料。`tables/ascii-table-vs-s-choices.txt`)
 
@@ -75,9 +75,9 @@ ASCII の 1 単位同士の最初の違いで、現在のコードが S- 選択(
 
 ## 5. `fle_ia2_on()` の整理案(no-options。PM の判断。実装していない)
 
-- 実態: `fle_ia2_on()` は『応答表に標識行 `CompareStringW::ia2-sort-weights` がある構成だけ真』。**ship2/ship4/ship5 の imports に標識行がある**(`lift/harness/seeds/ship{2,4,5}-imports.txt`)ので、**本番は常に真**。偽は標識行の無い構成(試験の合成 PE と、旧い ia1 だけの構成)にだけ存在する。no-options の 2(a)『有効側を唯一の経路にして旗と無効側のコードを削除する』に当たる。
-- 触る所: `fle_locale.c`(`fle_ia2_on` と呼び出し 4 か所)、`fle_wall_ia2.c`(`fle_ia2_cmp_active`、標識の `fle_imp_ia2_marker`)、`fle_gdi.c:4079〜4091`(領域の `fle_ia2_cmp_active` 検査)、`fle_user_nowin.c:26〜30`(PUA)、imports の seeds 4 ファイル(標識行の削除)、試験: `wall_ia2.rs` の標識行なしの 4 件(`marker = false`: 旧い停止を確かめる)は削除か『答える』への書き換え、標識行を前提にするハーネス(`wall_*` の合成 PE)は `fle_wall_ia2.c` を一緒にリンクする必要。
-- 影響: 本番の挙動は変わらない(常に真だったので)。試験とハーネスのリンク構成が変わる。実エンジンの行は変わらない見込み(読み)。
+- 実態: `fle_ia2_on()` は『応答表に標識行 `CompareStringW::ia2-sort-weights` がある構成だけ真』。**ship2/ship4/ship5 の imports に標識行がある**(`lift/harness/seeds/ship{2,4,5}-imports.txt`)ので、**本番は常に真**。偽は標識行の無い構成(テストの合成 PE と、旧い ia1 だけの構成)にだけ存在する。no-options の 2(a)『有効側を唯一の経路にして旗と無効側のコードを削除する』に当たる。
+- 触る所: `fle_locale.c`(`fle_ia2_on` と呼び出し 4 か所)、`fle_wall_ia2.c`(`fle_ia2_cmp_active`、標識の `fle_imp_ia2_marker`)、`fle_gdi.c:4079〜4091`(領域の `fle_ia2_cmp_active` 検査)、`fle_user_nowin.c:26〜30`(PUA)、imports の seeds 4 ファイル(標識行の削除)、テスト: `wall_ia2.rs` の標識行なしの 4 件(`marker = false`: 旧い停止を確かめる)は削除か『答える』への書き換え、標識行を前提にするハーネス(`wall_*` の合成 PE)は `fle_wall_ia2.c` を一緒にリンクする必要。
+- 影響: 本番の挙動は変わらない(常に真だったので)。テストとハーネスのリンク構成が変わる。実エンジンの行は変わらない見込み(読み)。
 
 ## 6. 静的な見当 — ゲストで `CompareStringW` を比べる関数と、d11 の経路で比べうる文字列(読み)
 
@@ -115,13 +115,13 @@ ASCII の 1 単位同士の最初の違いで、現在のコードが S- 選択(
 ## 8. 限界・自己申告
 
 - 実エンジンの `CompareStringW` の呼び出しではなく、**runtime の関数を native で直接呼んだ**(1 単位 × 1 単位)。実機 Windows との照合は 0 件(決定 0191 と同じ限界: 表の主要な重みの順が実機の `CompareStringW` と一致するかは未確認)。ESC が d11 の停止の原因であることは**読み**(ci1 の文字列を待つ)。
-- 列挙は 1 単位の文字列だけ。複数単位で最初の違いが後ろにある組は、最初の違いの 1 単位対と同じ規則を通る(共通の接頭辞の規則は別に試験した)。
+- 列挙は 1 単位の文字列だけ。複数単位で最初の違いが後ろにある組は、最初の違いの 1 単位対と同じ規則を通る(共通の接頭辞の規則は別にテストした)。
 - 旧い停止 8,800 組の多くは制御文字 × 何か。ゲストが実際にそれらを比べるのは Esc などのキー文字が主、と読むが未確認。
 - 規則: `sleep` を 1 回呼んだ(0279 で申告)。列挙の最初の版は `abort()` の core dump が apport を起こして 1 件 1.8 秒かかったので止め、`abort` を子プロセスの `_exit(99)` に差し替えた(`/var/crash` に自分の物は残っていない)。cargo は `nice -n 15`、`CARGO_BUILD_JOBS=3`、`--jobs 3`。
 
 ## PM の判断と取り込み(2026-11-06 12:30、docs のみ)
 
-取り込み: mt3 の第 1 報(診断 + ASCII 制御文字の重み + ハイフン/アポストロフィ × 任意の単位)の文書・表・道具と、差分 `0284-compare-string.diff`・`0284-gen_ia2_sortw-docs.diff` を `docs/investigations/mt3w/` に置いた。実行したのは runtime の `fle_locale.c` を native で直接呼ぶ列挙(1 単位 × 1 単位の全組 22,650 × 4 構成)・cargo の試験・`test.sh affected`(140/212)。**実エンジン(ゲスト)の走行・実機 Windows・ci1 の実際の文字列は 0 件**。『d11 の停止は TMsgForm への Esc 文字(U+001B)』は読みで、検証していない(ci1 の d11 の停止は、キットの proj に Sampler.flp が無く 404 本文を FLP として開いた入力欠落が原因だった)。
+取り込み: mt3 の第 1 報(診断 + ASCII 制御文字の重み + ハイフン/アポストロフィ × 任意の単位)の文書・表・道具と、差分 `0284-compare-string.diff`・`0284-gen_ia2_sortw-docs.diff` を `docs/investigations/mt3w/` に置いた。実行したのは runtime の `fle_locale.c` を native で直接呼ぶ列挙(1 単位 × 1 単位の全組 22,650 × 4 構成)・cargo のテスト・`test.sh affected`(140/212)。**実エンジン(ゲスト)の走行・実機 Windows・ci1 の実際の文字列は 0 件**。『d11 の停止は TMsgForm への Esc 文字(U+001B)』は読みで、検証していない(ci1 の d11 の停止は、キットの proj に Sampler.flp が無く 404 本文を FLP として開いた入力欠落が原因だった)。
 判断:
 1. **診断(停止メッセージの 2 行目に lcid・flags・両方の長さ・2 つの文字列・最初の違いの位置・ゲストの戻りアドレス)と、表(Windows 10 Sorting Weight Table、決定 0191 の入力と同一 SHA)から導ける ASCII 制御文字・ハイフン/アポストロフィの規則を E10 に載せる**。旧コードが答えていた組の答えは 0 組変わらず、停止 8,800 → 1,502 組。新しい旗・S- 選択なし(lift 忠実性の (b) 契約の表の実装)。
 2. A(表で S-cmp-symbol-vs-symbol と S-cmp-control を置換、111 組の最初の違いが変わる)は P2/P3 に直接効かないので、0285 の実装の後に回す。B は 0284c(別文書)。

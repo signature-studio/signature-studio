@@ -1,7 +1,7 @@
 # 描画面の契約案: wasm(C)が JS に出す最小の API と、JS 側の責務
 
 状態: **案**(何も決めない。決めるのは PM)。決定 0126(仮)の取り込み前に、JS 側を先に作って測るための取り決め。
-凡例: **実測** = この harness で動かして確かめた。**読み** = 決定 0126 の作業木 `lift/out-fruity11/`(読み取りのみ)のコードを読んだ解釈で、実行していない。**未確認** = 確かめていない。
+凡例: **実測** = この harness で動かして確かめた。**読み** = 決定 0126 のワークツリー `lift/out-fruity11/`(読み取りのみ)のコードを読んだ解釈で、実行していない。**未確認** = 確かめていない。
 この契約を満たす「エンジンの代役」(`engine.c`。FL のコードではない)に対して、JS 側(`core.js`、`engine-worker.js`、`main.js`)を動かして測った。実エンジンの wasm には C 側の API がまだ無い(決定 0126 は native)。
 
 ## 1. 責務の分け方
@@ -75,7 +75,7 @@ JS は表の語を直接読んでもよい(`core.js` の `SurfaceTable`。上の
 
 エンジン側の更新(0126 のコードへの足し方。**この harness は実装していない。読みで書く**):
 
-| 場所(0126 の作業木) | 足すもの |
+| 場所(0126 のワークツリー) | 足すもの |
 |---|---|
 | `fle_raster_window_surface()`(面を作る・大きさを変える) | 欄を作る / `width`, `height`, `stride`, `pixels` を更新し `layout_gen++`(lseq の中)。大きさが変わったら `pixels` は変わる(`calloc` し直して旧を `free`)ので、全面ダーティ |
 | `fle_raster_window_destroyed()` | `flags` を 0 にする(lseq の中) |
@@ -127,4 +127,4 @@ BGRX → RGBA の変換は 3 通りを実装した: 1 バイトずつの JS、`U
 
 ## 8. この harness の「エンジンの代役」について
 
-`engine.c` は FL のコードではない。面の表と上の API を実装した小さな wasm(約 250 行)で、1 枚の面(実エンジンの PNG を BGRX にしたもの)を持ち、毎フレーム矩形を 1 つ書き換えて `present(seq)` を呼ぶ。`present` は JS の import で、JSPI の `Suspending`(中断)にも、`Atomics.wait`(ブロック)にもなる。`fle_test_*` は試験用で、契約の一部ではない。
+`engine.c` は FL のコードではない。面の表と上の API を実装した小さな wasm(約 250 行)で、1 枚の面(実エンジンの PNG を BGRX にしたもの)を持ち、毎フレーム矩形を 1 つ書き換えて `present(seq)` を呼ぶ。`present` は JS の import で、JSPI の `Suspending`(中断)にも、`Atomics.wait`(ブロック)にもなる。`fle_test_*` はテスト用で、契約の一部ではない。

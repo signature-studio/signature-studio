@@ -353,7 +353,7 @@ C 経路のままでは、昇格の利得 4 割の 6〜7 割を呼び出し境�
 - 末尾の `&` の変形 `( … &)` での背景起動を計 3 回行った(scanB のビルド、bB の node 走行、final5 の全体テスト)。`background:true` を使うべきだった。`sleep 0` を 1 回書いて拒否された(実行されていない)。
 - `pkill -f` を 2 回使い、自分のシェルが巻き込まれて落ちた(他の担当のプロセスには作用していない)。
 - 同時に走らせた処理が PM の 4 本の目安を超えた時間帯がある(最大 7〜8 本、すべて `nice -n 15`)。`lift/out-size1/` が 21 GB を超えた時間帯があった(20 GiB の制限。生成物を削除して 12〜17 GB に戻した)。
-- 作業ツリーの tracked ファイルは直接編集していない(`lift/out-size1/src/` の展開物だけ)。git の変更系操作・commit なし。`rm` は `lift/out-size1/` と `/tmp/opencode/size1/` の自分の物だけ。`lift/out-hle1` ほか他の `out-*` は読み取りのみ(hle1 の生成 C・名前つき wasm・`out-app4` の wasm を読んだ)。
+- ワークツリーの tracked ファイルは直接編集していない(`lift/out-size1/src/` の展開物だけ)。git の変更系操作・commit なし。`rm` は `lift/out-size1/` と `/tmp/opencode/size1/` の自分の物だけ。`lift/out-hle1` ほか他の `out-*` は読み取りのみ(hle1 の生成 C・名前つき wasm・`out-app4` の wasm を読んだ)。
 - `bash` ツール(存在しない)を計 3 回呼んだ(拒否され、shell に切り替わった。副作用なし)。
 - 最初の全体テストは archive に `tools/` を入れ忘れて 14 件落ちた(手順の誤り。再走行で解消)。他の担当の処理が final5 直後の走行を SIGTERM で止めた(rc 143)。final6 として再走行し、145 / 2,090 / 0 を確認した。
 

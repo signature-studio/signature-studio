@@ -29,7 +29,7 @@
 | 一致(実測) | D と、native -O0 の 16 スナップ g3 71 行が S・S+M とも**全行同一**(クロック・面 SHA・擬似プリエンプション・HLE)。S+M の wasm(wasm-opt 済み)を node で走らせた 82 行は D と同一。S の wasm(node)も同一。 |
 | 止まる事象 | 正規ビルド(S・S+M)の 16 スナップ・起動で **0 件**。陰性対照(入口に入る関数を除去リストに足す)は 15,728 入口で VA つきの abort。「IPP の全 export 呼び出し」は**未実施** |
 | 起動・compile(Chrome 156、この機械、D と交互) | D と PSM を交互に、set 1 の 8 対 + set 2 の 6 対 = **14 対(28 走行)**。load は全走行で 24〜44(load ≤ 8 は 0 件)なので**壁時計は主張しない**。Chrome の CPU 秒の中央値 D 17.88 → PSM 16.82(−5.9%)、対の差(D − PSM)は **14 対すべて PSM が小さい**(中央値 1.24 s)。ダウンロード+展開の段 4.46 → 3.40 s(−24%)。**起動(P1)への効きはほぼ無い**(V8 は呼ばれた関数を遅延コンパイルするので起動 CPU は実行される関数で決まる)。node の 16 スナップの CPU 秒は D 21.28、PS 19.95、PSM 19.94(ノイズ内) |
-| テスト | 全体 **results=153 passed=2128 failed=0**(基準 152/2118/0 + 新しい `prune_list` 実行ファイル 6 試験 + `prune.rs` 単体 4)。入力をつないで再実行した 11 実行ファイルは SKIPPED-lines=1(基準と同じ)。FRUITY 無効の a4: **942/942、895/895、functions 5,310、entries 1,009,731 で基準と全部一致**(`a4-fruity.sh off`、パッチ済みの fe-lift とパッチ済みの木。gen は同じ OUT の再利用、build 66 s。`logs/a4off.txt`) |
+| テスト | 全体 **results=153 passed=2128 failed=0**(基準 152/2118/0 + 新しい `prune_list` 実行ファイル 6 テスト + `prune.rs` 単体 4)。入力をつないで再実行した 11 実行ファイルは SKIPPED-lines=1(基準と同じ)。FRUITY 無効の a4: **942/942、895/895、functions 5,310、entries 1,009,731 で基準と全部一致**(`a4-fruity.sh off`、パッチ済みの fe-lift とパッチ済みの木。gen は同じ OUT の再利用、build 66 s。`logs/a4off.txt`) |
 | 他の根・環境の前提 | プラグイン 134 個(Fruity)は FLEngine と同じ 420 名を引くだけ(増分 0)。VST3 は dsp_ippv2 に触れない。S は『CPUID 固定』と『`ippSetCpuFeatures` 不呼び出し』に依存し、崩れれば stub が abort(§7) |
 | PM の決定 | S だけ(B)か S+M(C)か(§9)。推奨(読み): 既定は B、S1 の距離を詰めるなら C を検定つきで |
 
@@ -147,7 +147,7 @@
 
 - `lift/harness/wasm/trace_native.c`(native のトレース。**opt-in**): `FLE_COV_FILE=<path>` で関数の入口回数(`F va 回数`)と(呼び出し元, 呼び出し先)の辺(`E 元 先 回数`)を 4M 入口ごとと終了時に書く。`FLE_COV_PEEK=hex,hex,…` で終了時にゲストの 32 ビット値(`V addr 値`)も書く。未設定なら何も記録しない。
 - `app/scripts/build-engine-bundle.sh`: opt-in の環境変数 `PRUNE_LIST=<絶対パス>`(dsp_ippv2 のモジュールだけ `--prune-list` を付ける包み。`SIZE_OPTS=1` の有無を問わない)。バンドルの説明に ` prune-list=<ファイル名>` が付く。無指定なら説明も手順も従来と同じ。
-- テスト: `lift/crates/fe-lift/tests/prune_list.rs`(合成 PE。既定の出力一致、stub と先の消滅、名指されない関数は出ない、`--outline-shared`/`--dead-flags` との併用、エラー、生成 C のコンパイル)と `prune.rs` の単体試験。
+- テスト: `lift/crates/fe-lift/tests/prune_list.rs`(合成 PE。既定の出力一致、stub と先の消滅、名指されない関数は出ない、`--outline-shared`/`--dead-flags` との併用、エラー、生成 C のコンパイル)と `prune.rs` の単体テスト。
 
 ## 5. 測定(この機械: 16 コア、Linux VM、SwiftShader。他担当の負荷あり。**依頼者の PC の値ではない**)
 
@@ -223,7 +223,7 @@ compile の CPU は wasm の大きさにほぼ比例して減る(PSM は D の �
 
 ### 5.5 テスト
 
-- **全体テスト**(`bash lift/harness/test.sh full --jobs 1 --threads 2 --no-record`、`FLE_TEST_NOCACHE=1`、cargo の target は private の `lift/out-prune1/target-test`、`FLE_INPUT_ROOT` = 本体のチェックアウト): 149 実行ファイル + doc-test → **results=153 passed=2128 failed=0**(`logs/test-full.txt`)。基準の 152 results・2,118 passed・0 failed に対し、増えたのは新しい試験の実行ファイル `fe-lift/prune_list`(合成 PE、6 試験)と `prune.rs` の単体試験 4 だけ(+1 result・+10 passed = 153・2,128)。**この木には `out-*` の入力が無かったので** SKIPPED-lines=15 だった(skip は pass に数えられる)。`test-env.sh --link` で入力をつないで、skip した 11 実行ファイルを再実行: **results=11 passed=204 failed=0 SKIPPED-lines=1**(`fe-lift/wall_fr9t` の 1 つ。基準と同じ。`logs/test-rerun-linked.txt`)。所要: ビルド 178 s、実行 841 s(1 並列)。
+- **全体テスト**(`bash lift/harness/test.sh full --jobs 1 --threads 2 --no-record`、`FLE_TEST_NOCACHE=1`、cargo の target は private の `lift/out-prune1/target-test`、`FLE_INPUT_ROOT` = 本体のチェックアウト): 149 実行ファイル + doc-test → **results=153 passed=2128 failed=0**(`logs/test-full.txt`)。基準の 152 results・2,118 passed・0 failed に対し、増えたのは新しいテストの実行ファイル `fe-lift/prune_list`(合成 PE、6 テスト)と `prune.rs` の単体テスト 4 だけ(+1 result・+10 passed = 153・2,128)。**この木には `out-*` の入力が無かったので** SKIPPED-lines=15 だった(skip は pass に数えられる)。`test-env.sh --link` で入力をつないで、skip した 11 実行ファイルを再実行: **results=11 passed=204 failed=0 SKIPPED-lines=1**(`fe-lift/wall_fr9t` の 1 つ。基準と同じ。`logs/test-rerun-linked.txt`)。所要: ビルド 178 s、実行 841 s(1 並列)。
 - **FRUITY 無効の a4**(942/942、895/895、functions 5,310、entries 1,009,731): **942/942、895/895、functions 5,310、entries 1,009,731 で基準と全部一致**(`a4-fruity.sh off`、パッチ済みの fe-lift とパッチ済みの木。gen は同じ OUT の再利用、build 66 s。`logs/a4off.txt`)
 - **生成 C の既定の同一性**(上記テストとは別に直接確認): dsp(`--seeds` のみ)491,094,508 B・SHA-256 `2c88057609b1574d…`(最初の素のビルドと `cmp` 一致。最終の fe-lift で再確認)。FLEngine(`fe-lift lift FLEngine_x64.dll out.c --pdata`)215,811,678 B・SHA-256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(PM の基準と一致。`keep-logs/default-identity.txt`)。
 

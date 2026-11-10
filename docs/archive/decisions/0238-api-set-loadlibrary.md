@@ -4,14 +4,14 @@
 
 ## 冒頭の三点
 
-1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 5 DLL + `oggio_x64.dll` + `Elastique_x64.dll` を x86-64 → C → wasm にした物。代役・再生・画像・期待値の貼り付けは 0)を、**CI の段スクリプト**(objects → link → seed → bundle、F2xH6、ハイブリッド込み)で作った bundle で動かした。(a) node(JSPI・仮想時計)で ref1 の G3(File>Open で参照プロジェクトを選ぶ・Enter・idle 30 s・Space・再生 30 s・Space)を、診断トレース付きの bundle 3 本(t1・t2・t4、`NO_FS=0`)で、(b) 隔離 Chrome 156(CDP の実時間入力、出荷形 `NO_FS=1` のクリーンな bundle c3)で File>Open → Problems 窓 → Enter → Space → 30 秒再生 → Space、(c) 起動 16 スナップを F2xH5 の FS bundle で変更前(b1)・変更後(a1)、(d) native 試験・cargo 全体・a4・mutation を実際に走らせた。この機械(16 コア、load 2〜26 で他の担当と共用)で、依頼者の機械ではない。入力はすべて模擬(CDP・G3)で人の操作ではない。
+1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 5 DLL + `oggio_x64.dll` + `Elastique_x64.dll` を x86-64 → C → wasm にした物。代役・再生・画像・期待値の貼り付けは 0)を、**CI の段スクリプト**(objects → link → seed → bundle、F2xH6、ハイブリッド込み)で作った bundle で動かした。(a) node(JSPI・仮想時計)で ref1 の G3(File>Open で参照プロジェクトを選ぶ・Enter・idle 30 s・Space・再生 30 s・Space)を、診断トレース付きの bundle 3 本(t1・t2・t4、`NO_FS=0`)で、(b) 隔離 Chrome 156(CDP の実時間入力、出荷形 `NO_FS=1` のクリーンな bundle c3)で File>Open → Problems 窓 → Enter → Space → 30 秒再生 → Space、(c) 起動 16 スナップを F2xH5 の FS bundle で変更前(b1)・変更後(a1)、(d) native テスト・cargo 全体・a4・mutation を実際に走らせた。この機械(16 コア、load 2〜26 で他の担当と共用)で、依頼者の機械ではない。入力はすべて模擬(CDP・G3)で人の操作ではない。
 2. **結論**:
    - **壁は 2 個だけだった**(§4): (1) `LoadLibraryExW` に渡る API set の契約名(oggio の CRT 初期化)、(2) oggio の CRT のファイルを開く処理(`_wsopen_nolock`: `CreateFileW` の直後)が呼ぶ `GetFileType`(名前つき停止、決定 0078)。契約実装の後、F2xH6 の bundle は**参照プロジェクトを停止なしで最後まで通る**(node: 10 スナップ全部。『Elastique DLL couldn't be opened』の MessageBox は 0 回〔F2xH5 では出る〕。`oggio_x64.dll`・`Elastique_x64.dll` は各 1 回の `LoadLibraryW` で実モジュール〔0xc000000・0xb000000〕になり、`OggioLoadFile` / `OggioLoadFileW` / `OggioFreeInfo` / `ElAllocator_SetFunctions` が実 export に解決)。
    - **Chrome 156 の Problems 窓は『8 plugin(s) could not be opened / and the plugin(s) will be ignored.』だけになり、『2 sample(s) required by this project could not be located』の行が消えた**(スクリーンショットを目で読んだ。同じ手順の F2xH5 の bundle〔ref3 の `assets-A`〕では、自分の実行で『8 plugin(s) could not be opened / 2 sample(s) required by this project could not be located. / This is not a serious error, the project will continue to load normally / and the plugin(s) will be ignored.』と 4 行出た〔`shots/h5-1-problems.png`〕。F2xH6 では『2 sample(s)』の行と『This is not a serious error …』の行がともに無い)。2 本の Vorbis(`anvil_land.ogg`・`dltzk glass break 1.wav`)は oggio の CRT が `CreateFileW` → `GetFileType`(戻り 1 = DISK)→ `SetFilePointerEx` ×18 で実際に開いて読んだ(node のトレース、§5.2)。
    - **実装は契約のみ**(§2、すべて (b) 外部 API の契約の実装。FL のクラス名・窓・DLL 名・アドレスによる分岐なし): API set スキーマ(Wine 10.0 の `apisetschema.spec` 511 行、UNOFFICIAL、データ)と `fle_apiset_resolve`(バージョン末尾を除いたキーで引く)、`LoadLibrary*` はホストが仮想モジュールならそのハンドル +1 参照、ホストなしの項は NULL/126、ホストが仮想モジュールに無い契約名は名前つき停止(ホスト名つき)、`GetModuleHandle*` はホストが読み込み済みならそのハンドル。仮想モジュール `kernelbase.dll`(N=40)と `combase.dll`(N=41)を追加(export の行なし = GetProcAddress は NULL/127)。決定 0206(dec1)が opt-in の harness wrap でだけ答えていた `GetFileType` / `SetFilePointerEx` / `FlushFileBuffers` / `FindFirstFileExW` を runtime の契約実装に昇格。
-   - **検証(実エンジン・実測)**: 起動 16 スナップは F2xH5 の FS bundle で変更前後が **84 行全行一致**。FLEngine の既定の生成 C の sha256 は **`cd9107ce…e50`(215,811,678 B)で不変**(`lift/crates/*/src` は 1 行も変えていない)。cargo 全体 `test.sh full` は **194 results / 2,381 passed / 0 failed**(基準 193 / 2,369 → +1 result〔`load2_files.rs`〕、+12 passed)。a4 FRUITY 無効は **942/942・895/895・functions 5,310・entries 1,009,737 で不変**。F2xH6 の wasm は **146,033,464 B**(ref3 の基準 146,011,644 B + 21,820 B。S1 の線 154,885,888 B より 8,852,424 B 下 = ネイティブ 77,442,944 B の 1.886 倍)。mutation 10 本はすべて試験が落ちて検出。
+   - **検証(実エンジン・実測)**: 起動 16 スナップは F2xH5 の FS bundle で変更前後が **84 行全行一致**。FLEngine の既定の生成 C の sha256 は **`cd9107ce…e50`(215,811,678 B)で不変**(`lift/crates/*/src` は 1 行も変えていない)。cargo 全体 `test.sh full` は **194 results / 2,381 passed / 0 failed**(基準 193 / 2,369 → +1 result〔`load2_files.rs`〕、+12 passed)。a4 FRUITY 無効は **942/942・895/895・functions 5,310・entries 1,009,737 で不変**。F2xH6 の wasm は **146,033,464 B**(ref3 の基準 146,011,644 B + 21,820 B。S1 の線 154,885,888 B より 8,852,424 B 下 = ネイティブ 77,442,944 B の 1.886 倍)。mutation 10 本はすべてテストが落ちて検出。
    - **決定 0233 §10 の訂正**(§8): 『Elastique を使うクリップは出荷構成〔F2xH5〕では鳴らない』は、この参照プロジェクトでは成り立たない。F2xH5 でも Elastique 系のチャンネルのミキサーメーターは動く(エンジンが別の経路で鳴らす読み)。
-3. **未確認**: ① Elastique の**出力が正しい音か**は実機 Windows と比べていない(PCM の F2xH5 / F2xH6 の A/B は位置が合わず〔相関 0.09〕判別に使えなかった。Elastique が動く証拠は、MessageBox が出ない・実 export の解決・node の再生 CPU が 49.6 → 97.7 s・Chrome の Elastique 系インサートのメーター、の間接のみ)。② スキーマは Wine 10.0 の表で、実機 Windows 10 のスキーマそのものではない(S-load2-schema-data)。表に無い契約名は『ファイル探索 → 126』になる(S-load2-absent)。③ 契約名のうち実際に引かれたのは string / datetime / localization-obsolete(→ kernelbase)の 3 つ。file・processthreads・sysinfo・xstate・winrt・ntuser・security・kernel32-package は oggio の文字列にあるが、この再生では CRT が引かなかった(試験でのみ確認)。④ 依頼者の機械・Firefox 159・実マウスでは未実施。⑤ ReadFile の末尾読み(決定 0206 §9)は触っていない。⑥ F2xH7 ベースへの載せ替え(PM の言う F2xH9 相当)は未実施。⑦ **出荷 bundle がランタイムの静的配置によって Chrome の起動直後に `CreateIconIndirect` の名前つき停止になりうる**(§9、別文書 0238b。この差分も配置を変えるが、c3 は 21/21 で停止なし = 運のよい配置の可能性)。
+3. **未確認**: ① Elastique の**出力が正しい音か**は実機 Windows と比べていない(PCM の F2xH5 / F2xH6 の A/B は位置が合わず〔相関 0.09〕判別に使えなかった。Elastique が動く証拠は、MessageBox が出ない・実 export の解決・node の再生 CPU が 49.6 → 97.7 s・Chrome の Elastique 系インサートのメーター、の間接のみ)。② スキーマは Wine 10.0 の表で、実機 Windows 10 のスキーマそのものではない(S-load2-schema-data)。表に無い契約名は『ファイル探索 → 126』になる(S-load2-absent)。③ 契約名のうち実際に引かれたのは string / datetime / localization-obsolete(→ kernelbase)の 3 つ。file・processthreads・sysinfo・xstate・winrt・ntuser・security・kernel32-package は oggio の文字列にあるが、この再生では CRT が引かなかった(テストでのみ確認)。④ 依頼者の機械・Firefox 159・実マウスでは未実施。⑤ ReadFile の末尾読み(決定 0206 §9)は触っていない。⑥ F2xH7 ベースへの載せ替え(PM の言う F2xH9 相当)は未実施。⑦ **出荷 bundle がランタイムの静的配置によって Chrome の起動直後に `CreateIconIndirect` の名前つき停止になりうる**(§9、別文書 0238b。この差分も配置を変えるが、c3 は 21/21 で停止なし = 運のよい配置の可能性)。
 
 ## 1. 契約の出典(原文は `tables/contracts/`、対応は `tables/contracts.tsv`)
 
@@ -107,29 +107,29 @@ GetFileType  ret=c07a825 a1=7ffa0000054c -> 1
 
 F2xH5(ref3 の `ciA`)の FS bundle を、変更前の木(`git archive HEAD`)と変更後の木で作り、node で `cmp-short.g3` を走らせた: b1(変更前)と a1(変更後)の `g3-snap` / `g3-progress` / `g3-surface` / `g3-wintable` と `fruity: == stop` / `runtime message` の **84 行が全行一致**(`cmp` rc=0、`tables/g3-lines-b1-84.txt`)。ユーザー CPU 13.83 s / 13.69 s。F2xH5 の bundle には kernelbase・combase の追加でモジュールのハンドルが変わる所があるが、スナップに出る値は変わらなかった。
 
-### 5.5 生成 C・全体試験・a4・mutation
+### 5.5 生成 C・全体テスト・a4・mutation
 
 | 項目 | 結果 |
 |---|---|
-| FLEngine の既定の生成 C(`fe-lift lift FLEngine_x64.dll X --pdata`、HEAD の CI `felift` 段の fe-lift) | sha256 **`cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`**、215,811,678 B — **不変**(`logs/felift-default.sha256`)。`lift/crates/*/src` は 1 行も変えていない(試験だけ) |
+| FLEngine の既定の生成 C(`fe-lift lift FLEngine_x64.dll X --pdata`、HEAD の CI `felift` 段の fe-lift) | sha256 **`cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`**、215,811,678 B — **不変**(`logs/felift-default.sha256`)。`lift/crates/*/src` は 1 行も変えていない(テストだけ) |
 | `bash lift/harness/test.sh full --jobs 3`(cargo、`logs/test-full-1.log`・`test-full-2.log`) | **194 results(190 test executables + doc-tests 4)/ 2,381 passed / 0 failed**(基準 193 / 2,369)。1 回目に `wall_fr8` の仮想モジュール数の期待(39 → 41)が 1 本落ちたので期待を直して再実行(キャッシュ済みの 189 executable + 再実行 1 = 全部緑) |
 | a4 FRUITY 無効(`lift/harness/a4-fruity.sh off`、`logs/a4-off.log`) | `init_count=942 / 942`、`run_rank=895/895`、functions executed (distinct) **5,310**、function entries **1,009,737**、`== stop: returned from entry`、harness exit 0 — **不変** |
 | F2xH6 の wasm(クリーン、`NO_FS=1`、c3) | **146,033,464 B**(ref3 の基準 146,011,644 B + 21,820 B)。S1 の線(ネイティブ 77,442,944 B の 2 倍 = 154,885,888 B)より **8,852,424 B 下**(1.886 倍) |
-| native 試験 | `load.rs`: 新 8 本(`load2_*`)+ 旧試験の期待の更新。`load2_files.rs`: 新 4 本。関連 15 binary が 0 failed(§6) |
-| mutation(`tools/mutation.sh`、`tables/mutation.tsv`) | 10 本すべて、試験が落ちて検出(キーがサブバージョンを持つ・ホストなしを成功にする・接頭辞が `api-` だけ・参照を足さない・ホストなしを停止にする・GetModuleHandle が契約名を無視する・ホスト名の前方一致・4 文字以下を契約名にする・LoadLibrary がスキーマを見ない・ホストの無い契約名を失敗にする) |
+| native テスト | `load.rs`: 新 8 本(`load2_*`)+ 旧テストの期待の更新。`load2_files.rs`: 新 4 本。関連 15 binary が 0 failed(§6) |
+| mutation(`tools/mutation.sh`、`tables/mutation.tsv`) | 10 本すべて、テストが落ちて検出(キーがサブバージョンを持つ・ホストなしを成功にする・接頭辞が `api-` だけ・参照を足さない・ホストなしを停止にする・GetModuleHandle が契約名を無視する・ホスト名の前方一致・4 文字以下を契約名にする・LoadLibrary がスキーマを見ない・ホストの無い契約名を失敗にする) |
 
-## 6. 試験(`load2.diff`)
+## 6. テスト(`load2.diff`)
 
 新: `load.rs` に `load2_*` 8 本(契約名 → ホストのハンドルと参照、サブバージョン・大文字小文字・拡張子なし、表に無い名前・ホストなしの失敗とファイルのある場合の停止、ホストが仮想モジュールに無い契約名の停止とメッセージ、GetModuleHandle、GetProcAddress は NULL/127、スキーマの形〔昇順・一意・小文字・CRT が引く契約のホスト〕、`fle_apiset_resolve` の 4 値)、`load2_files.rs` に 4 本(GetFileType / SetFilePointerEx / FlushFileBuffers / FindFirstFileExW)。
 
-旧試験の期待の更新(`-` 行は全部読んだ。意味を消した物は無い。停止の期待が応答の期待に変わった物、モジュール数 39 → 41、除去した宣言):
+旧テストの期待の更新(`-` 行は全部読んだ。意味を消した物は無い。停止の期待が応答の期待に変わった物、モジュール数 39 → 41、除去した宣言):
 
-| 試験 | 旧 | 新 |
+| テスト | 旧 | 新 |
 |---|---|---|
-| `load.rs` `windows_dlls_that_are_not_virtual_modules_and_api_set_names_stop_by_name` | 契約名 4 つも停止 | 契約名は新試験へ。名簿の 8 名は停止のまま |
+| `load.rs` `windows_dlls_that_are_not_virtual_modules_and_api_set_names_stop_by_name` | 契約名 4 つも停止 | 契約名は新テストへ。名簿の 8 名は停止のまま |
 | `load.rs`・`deferred.rs`・`msctf.rs` の『表の末尾より先』 | M(39)・M(40) など | モジュール数 41 に合わせて +2 |
 | `modules.rs` `name_rows` ほか 3 本 | `api-ms-win-core-libraryloader-l1-1-0.dll`・`api-ms-win-core-synch-l1-2-1.dll` は『無い』 | kernelbase のハンドル(表に無い名前はスキーマに行く) |
-| `modules.rs` の表の試験、`wall_fr5.rs`・`wall_fr6.rs`・`wall_s.rs`・`wall_fr8.rs` | count 39 | count 41(kernelbase.dll・combase.dll) |
+| `modules.rs` の表のテスト、`wall_fr5.rs`・`wall_fr6.rs`・`wall_s.rs`・`wall_fr8.rs` | count 39 | count 41(kernelbase.dll・combase.dll) |
 | `k32_dsp.rs` | `STOPPED` に GetFileType ほか 4 | `ANSWERED` へ(21 本) |
 | `noreturn_audit.rs` と `allow.tsv` | GetFileType の宣言を『plain にした』変異と、fle_vol.h を include の閉包に入れる変異 | 同じ構造のまま、対象を RtlPcToFileHeader / fle_proc.h に変更。4 関数の `allow.tsv` 10 行を除去 |
 
@@ -141,7 +141,7 @@ F2xH5(ref3 の `ciA`)の FS bundle を、変更前の木(`git archive HEAD`)と�
 4. **export の行が無い**(GetProcAddress は NULL/127)ことの意味: 実機の kernelbase・combase は多くの関数を export する。CRT は NULL のときの代替の経路を使う(決定 0081 の 4 契約モジュールと同じ形で、dsp_ippv2 の起動で既に起きている)。この環境で『export がある』ことを答えるには応答表に kernelbase / combase の行を足す(S-load2-kernelbase-combase)。
 5. 契約名の既存の仮想モジュール 5 個(N=2、27〜30)は**スキーマを通らず自分のハンドルを返す**まま(同じ契約の別の sub-version はスキーマ → kernelbase、という非対称が残る: `api-ms-win-core-synch-l1-2-0` は N=27、`-l1-2-1` は kernelbase)。N=27〜30 を表から外すとモジュールのハンドルが後ろにずれる(append only)ので触っていない。
 6. `GetFileType` / `SetFilePointerEx` / `FlushFileBuffers` / `FindFirstFileExW` の既定が『停止』から応答になった(opt-in の harness wrap は残る)。`ReadFile` の末尾読み(決定 0206 §9、FLAC が欠ける)は**触っていない**。
-7. F2xH7 ベースへの載せ替え(PM の言う F2xH9 相当): load2 の差分は preset に依存しない(runtime・試験・データ)ので、`ship4-h6.diff` と同じ手順で当てられる。**実機確認はしていない**。
+7. F2xH7 ベースへの載せ替え(PM の言う F2xH9 相当): load2 の差分は preset に依存しない(runtime・テスト・データ)ので、`ship4-h6.diff` と同じ手順で当てられる。**実機確認はしていない**。
 
 ## 8. 決定 0233 §10 の訂正(PM が 0233 に追記する)
 
@@ -186,7 +186,7 @@ PM の追加依頼(『診断 bundle の停止 3/3 とクリーン bundle の 0/N
 
 | 項目 | コマンド | 出力 |
 |---|---|---|
-| 作業木 | `git archive HEAD` を `src-base/`、`+ ship4-h6.diff` を `src-h6base/`、そこに load2 の変更を足した物を `src/` | - |
+| ワークツリー | `git archive HEAD` を `src-base/`、`+ ship4-h6.diff` を `src-h6base/`、そこに load2 の変更を足した物を `src/` | - |
 | スキーマの表 | `python3 docs/investigations/load2/tools/mk-apiset.py docs/investigations/load2/tables/wine10-apisetschema.spec lift/runtime/fle_apiset_schema.inc` | `fle_apiset_schema.inc`(511 行) |
 | F2xH6 の bundle(node 用・診断) | `tools/mk-trace-tree.sh` で `src-trace/`(診断のオーバーレイ)を作り `tools/iter.sh t2 $PWD/src-trace 0 fle_load fle_modules fle_env fle_vol fle_vfs` | `t2/engine/bundle/`(`NO_FS=0`) |
 | F2xH6 の bundle(Chrome 用・クリーン) | `tools/iter.sh c3 $PWD/src 1 fle_load fle_modules fle_env fle_vol fle_vfs` | `c3/engine/bundle/`(`NO_FS=1`、wasm 146,033,464 B) |
@@ -195,18 +195,18 @@ PM の追加依頼(『診断 bundle の停止 3/3 とクリーン bundle の 0/N
 | Chrome の手順 | `node tools/sdrive-ref3.mjs --browser chrome --url http://127.0.0.1:PORT/?debug=1 --proj-dir <49 files> --out DIR --scenarios tools/scn-ref3.json --viewport 2176x1224 --app app-run` | `1-problems.png` ほか |
 | 起動 16 スナップ A/B | `tools/fsv.sh b1 <src-base>`(変更前)/ `tools/fsv.sh a1 <src> fle_load fle_modules fle_env fle_vol fle_vfs`(変更後)→ `tools/g3bundle.sh <bundle> b1` / `a1` → `cmp` | `tables/g3-lines-b1-84.txt` |
 | 生成 C | `ciH6base/engine/cargo-target/release/fe-lift lift binaries/win64/FLEngine_x64.dll X --pdata` → `sha256sum X` | `logs/felift-default.sha256` |
-| 全体試験 | `cd src && FLE_INPUT_ROOT=<main checkout> CARGO_TARGET_DIR=... bash lift/harness/test.sh full --jobs 3` | `logs/test-full-1.log`・`test-full-2.log` |
+| 全体テスト | `cd src && FLE_INPUT_ROOT=<main checkout> CARGO_TARGET_DIR=... bash lift/harness/test.sh full --jobs 3` | `logs/test-full-1.log`・`test-full-2.log` |
 | a4 | `OUT=... bash lift/harness/a4-fruity.sh off` | `logs/a4-off.log` |
 | mutation | `tools/mutation.sh` | `tables/mutation.tsv` |
 | 差分 | `tools/mkdiff.sh load2.diff` | `load2.diff` |
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準(第 1 回): HEAD 6c60cc22 に `load2.diff`(22 ファイル、`-` 89 行は全部読んだ: `is_apiset_name` の旧実装と、停止を固定していた試験の期待値、4 関数が停止しなくなったことによる `allow.tsv` の noreturn 許可行の除去。offset・fuzz・reject なし)を `patch -p1`。PM が測った値(この機械、`lift/out-pmchk-l2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **194 results / 2,381 passed / 0 failed / ignored 1**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。app には触れていない。
+取り込んだ基準(第 1 回): HEAD 6c60cc22 に `load2.diff`(22 ファイル、`-` 89 行は全部読んだ: `is_apiset_name` の旧実装と、停止を固定していたテストの期待値、4 関数が停止しなくなったことによる `allow.tsv` の noreturn 許可行の除去。offset・fuzz・reject なし)を `patch -p1`。PM が測った値(この機械、`lift/out-pmchk-l2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **194 results / 2,381 passed / 0 failed / ignored 1**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。app には触れていない。
 
 1. **API set の契約名の解決(Wine 10.0 の apisetschema.spec 由来のデータ、UNOFFICIAL)、仮想モジュール kernelbase.dll(N=40)・combase.dll(N=41)(export 行なし = GetProcAddress は NULL/127)、GetFileType・SetFilePointerEx・FlushFileBuffers・FindFirstFileExW の runtime の契約実装(決定 0206 の harness wrap の昇格)を採る。** すべて (b) 外部 API の契約の実装。推測の値(FlushFileBuffers の 5/6 など)は S-load2-* 13 件に撤回条件つき。
 2. **F2xH6(oggio と Elastique を 7・8 番目のモジュールにした構成)で参照プロジェクトが停止なしに開いて再生でき、Chrome の Problems 窓から『2 sample(s)』の行が消える**(担当の実測。wasm 146,033,464 B、8 モジュールの S1 の線 154,885,888 B の下 8.85 MB)。F2xH6 のプリセット(ship4-h6.diff)は本取り込みに含まれない。決定 0239(ship6)が F2xH7 ベースで作る。
 3. **決定 0233 §10 の訂正:** 『Elastique を使うクリップは出荷構成では鳴らない』は、この参照プロジェクトでは成り立たない(F2xH5 でも Elastique 系のチャンネルのメーターが動く)。
-4. **決定 0238b(CreateIconIndirect の停止)は原因確定: ビルド方式の事故。ランタイムの静的配置への依存ではない。** 初回のコミットメッセージ(4977340a)と、この文書の以前の版の『the guest depends on the static layout of the runtime』は**誤り**で、PM が訂正する。停止したバンドルの直接 wasm(ハイブリッド)に焼き込まれた `fle_teb`・`fle_mxcsr`・`fle_hyb_buf`・`fle_progress_count` の番地が、同じバンドルの C 部分の番地と違っていた(診断ビルドの作業ディレクトリが `cp -al` で `hyb/` を共有し、2 本同時のビルドが兄弟の link.map を読んだ)。正しい番地で作り直した c5 は 8/8 停止なし(c4 は 6/6 停止)。CI の単独ビルドは影響を受けない。安全網 `load2-guard.diff`(焼き込む番地が C 部分でも使われていること、link.map の sha256 が一致することを検査し、食い違えばビルドを失敗させる。出荷 wasm のバイトは不変、`ci/test-hybrid.sh` に 13 試験)を採る。
+4. **決定 0238b(CreateIconIndirect の停止)は原因確定: ビルド方式の事故。ランタイムの静的配置への依存ではない。** 初回のコミットメッセージ(4977340a)と、この文書の以前の版の『the guest depends on the static layout of the runtime』は**誤り**で、PM が訂正する。停止したバンドルの直接 wasm(ハイブリッド)に焼き込まれた `fle_teb`・`fle_mxcsr`・`fle_hyb_buf`・`fle_progress_count` の番地が、同じバンドルの C 部分の番地と違っていた(診断ビルドの作業ディレクトリが `cp -al` で `hyb/` を共有し、2 本同時のビルドが兄弟の link.map を読んだ)。正しい番地で作り直した c5 は 8/8 停止なし(c4 は 6/6 停止)。CI の単独ビルドは影響を受けない。安全網 `load2-guard.diff`(焼き込む番地が C 部分でも使われていること、link.map の sha256 が一致することを検査し、食い違えばビルドを失敗させる。出荷 wasm のバイトは不変、`ci/test-hybrid.sh` に 13 テスト)を採る。
 5. **`align.diff`(HeapAlloc・GlobalAlloc 等を 16 バイト整列に。契約 (b)、Emscripten の malloc は 2,000 ブロック中 986 が非整列)は、まだ取り込まない。** ゲストのヒープの番地が変わるので、起動 84 行・参照プロジェクトの行の同一性と F2xH7 の起動を実エンジンで測ってから取り込む(次の ship の作業に入れる)。停止の原因ではない。
 
 追記(第 2 回の取り込み、HEAD 52034ca9 + `load2-guard.diff` + `rt1.diff`): 決定 0238b の最終版と本文 §9 の訂正を置き換えた。`load2-guard.diff` は `app/scripts/build-engine-bundle.sh`・`ci/plan.sh`・`ci/test-hybrid.sh` の 3 ファイル(出荷 wasm のバイトは不変)。PM が測った値(この機械、`lift/out-pmchk-r2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、`ci/test-hybrid.sh` 全 ok、全体テスト **196 results / 2,386 passed / 0 failed / ignored 1**。

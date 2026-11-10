@@ -1,6 +1,6 @@
-# 0315d(仮): RT-B の木(tree-rtb)の native 試験 `harness/test.sh full` の結果と、落ちた物の分類(mt3。PM の instruction 10:2x〜10:36、期限 11:15)
+# 0315d(仮): RT-B の木(tree-rtb)の native テスト `harness/test.sh full` の結果と、落ちた物の分類(mt3。PM の instruction 10:2x〜10:36、期限 11:15)
 
-状態: **仮**。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**、**未確認**。**実エンジン・Chrome・Wine の実行は 0**(native の試験だけ)。
+状態: **仮**。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**、**未確認**。**実エンジン・Chrome・Wine の実行は 0**(native のテストだけ)。
 
 ## 0. 実際に実行した物
 
@@ -10,15 +10,15 @@
 |---|---|---|---|
 | 1 | 09:50〜10:0x | 最初の構成。72/219 で止めた(最終の構成を決める前だった) | 4〜8 件が落ちるのを見た時点 |
 | 2 | 10:14〜10:28 | + alpha1 の callback-stack-limit-rtb(10:43 版でなく 10:0x の初版)+ diag-g9-fl-paint / -ulw + 領域・語の修正 + ci1 の 0323c は **無し** | **passed=2183 failed=253**、落ちた executable 41。SEGV が 16 executable 以上 |
-| 3 | 10:30〜10:46 | callback の差分を外した(NOCB)+ ci1 0323c + 私の試験の更新 | **passed=2420 failed=16**(13 executable。SEGV 0) |
+| 3 | 10:30〜10:46 | callback の差分を外した(NOCB)+ ci1 0323c + 私のテストの更新 | **passed=2420 failed=16**(13 executable。SEGV 0) |
 | 4 | 10:57〜11:12 | alpha1 の 10:5x の `-rtb-full` + tests、診断を FLE_TEST_GETENV の形に | **passed=2428 failed=9**(7 executable) |
-| 5 | 11:15:39〜11:33:05 | 下記の試験側の更新(ci1 の 0323d、alpha1 の run-values・scroll-model の試験、私の `g9_hook`・fle_win.c 診断の `long` の書き換え)をすべて入れた最終の構成 | **results=224 passed=2437 failed=0**(rc=0。executables run=220) |
+| 5 | 11:15:39〜11:33:05 | 下記のテスト側の更新(ci1 の 0323d、alpha1 の run-values・scroll-model のテスト、私の `g9_hook`・fle_win.c 診断の `long` の書き換え)をすべて入れた最終の構成 | **results=224 passed=2437 failed=0**(rc=0。executables run=220) |
 
 ## 1. run 2 の 253 件の原因(初版の callback-stack-limit-rtb。alpha1 の差分の欠陥 = 実装の誤り)
 
-1. **SIGSEGV(fle_callback.c:101)**: `fle_teb_cur ? fle_teb_cur : fle_teb` — 非 TLS_MORE の `fle_teb_cur` は weak な**変数**で、リンクされていない試験では値を読もうとして address 0 を参照した。再現(実測): tests/callback.rs の DRIVER を取り出して clang -O0 -g で作る → `./drv nest` が SIGSEGV、gdb の bt が 101 行目。101 行目だけ `&fle_teb_cur != NULL && fle_teb_cur` に変えた一時の複写では rc=0 で正しい出力。
-2. **guest stack の予約 64 KiB = 試験の guest stack(64 KiB)**: 『guest stack is used up (rsp …, StackLimit …, reserve 65536)』で最初の callback で止まる(16 executable)。
-alpha1 の 10:43 版は、(1) アドレスの検査、(2) 予約 = min(64 KiB, StackBase − StackLimit の 1/4)、(3) 決定 0064 の試験 3 件の更新と新しい試験 1 件を入れた(HEAD の複製で全 215 executable が通る、と alpha1 が実測)。**分類: (a) 我々が足した余計な処理の欠陥**(外部 API の契約の不足ではない)。
+1. **SIGSEGV(fle_callback.c:101)**: `fle_teb_cur ? fle_teb_cur : fle_teb` — 非 TLS_MORE の `fle_teb_cur` は weak な**変数**で、リンクされていないテストでは値を読もうとして address 0 を参照した。再現(実測): tests/callback.rs の DRIVER を取り出して clang -O0 -g で作る → `./drv nest` が SIGSEGV、gdb の bt が 101 行目。101 行目だけ `&fle_teb_cur != NULL && fle_teb_cur` に変えた一時のコピーでは rc=0 で正しい出力。
+2. **guest stack の予約 64 KiB = テストの guest stack(64 KiB)**: 『guest stack is used up (rsp …, StackLimit …, reserve 65536)』で最初の callback で止まる(16 executable)。
+alpha1 の 10:43 版は、(1) アドレスの検査、(2) 予約 = min(64 KiB, StackBase − StackLimit の 1/4)、(3) 決定 0064 のテスト 3 件の更新と新しいテスト 1 件を入れた(HEAD の複製で全 215 executable が通る、と alpha1 が実測)。**分類: (a) 我々が足した余計な処理の欠陥**(外部 API の契約の不足ではない)。
 
 ## 2. run 3(NOCB)の 16 件と、直した者・差分(分類つき)
 
@@ -34,12 +34,12 @@ alpha1 の 10:43 版は、(1) アドレスの検査、(2) 予約 = min(64 KiB, S
 | callback | `must not use emscripten` | 第 1 形の FLE_DIAG_CB の診断 | 診断 | alpha1 の `-rtb-full`(第 2 形、emscripten なし) |
 | time | `fle_time.c must not use getenv` | alpha1 の 0319-time-env-run-values(run 値 2 つを getenv で読む=意図) | 守りの更新漏れ | alpha1 `0319-run-values-and-scroll-model-tests.diff` |
 | vfs | `fle_env.c mentions getenv`(FLE_ENV_DEFAULTS) | 同上 | 同上 | 同上 |
-| vfs / wall_fr6 / wall_fr7 / wall_fr9 / window | `getenv`(FLE_DIAG_WIN / VFS_MISS の読み) | cand1 の木で診断を getenv に変えてある(wasm で生かすため) | 診断 | 試験を走らせる木では FLE_TEST_GETENV の形に戻し(`rtb-tree.sh tree`)、build の直前に `rtb-tree.sh diag` で getenv に |
-| wall_ia2 | 3 件、`undefined reference to fle_win_scroll` | alpha1 の scroll-model が旧い経路を置き換えた | 試験の stub 不足 | alpha1 の同上(SCROLL_PRE の stub) |
-| sweep1 | link: `fle_win_input_call_hooks`、`fle_win_input_hit_list` | ci1 の 0323b / 0324(fle_input.c の新しい参照) | 部分リンクの試験 | mt3 `0315-rtb-test-expectations.diff`(他の fle_win_input_* stub の前例どおり link stub) |
+| vfs / wall_fr6 / wall_fr7 / wall_fr9 / window | `getenv`(FLE_DIAG_WIN / VFS_MISS の読み) | cand1 の木で診断を getenv に変えてある(wasm で生かすため) | 診断 | テストを走らせる木では FLE_TEST_GETENV の形に戻し(`rtb-tree.sh tree`)、build の直前に `rtb-tree.sh diag` で getenv に |
+| wall_ia2 | 3 件、`undefined reference to fle_win_scroll` | alpha1 の scroll-model が旧い経路を置き換えた | テストの stub 不足 | alpha1 の同上(SCROLL_PRE の stub) |
+| sweep1 | link: `fle_win_input_call_hooks`、`fle_win_input_hit_list` | ci1 の 0323b / 0324(fle_input.c の新しい参照) | 部分リンクのテスト | mt3 `0315-rtb-test-expectations.diff`(他の fle_win_input_* stub の前例どおり link stub) |
 | dwm_timing | ship6 の行数 240 ≠ 210 | 0319 の 4 つの差分が ship6 の末尾に行を足した | pin の更新漏れ | 同上(dwmti は ship5 の次の最初の行、以降は後続の決定の行を許す) |
 | wall_dec1 | `RM_MAX must stay 8` | mt3 の 0313(G9-c の段で RM_MAX 16) | 期待の更新漏れ(**私の更新漏れ**) | 同上(16u) |
-| wall_fr9t | stderr の行数 8002 ≠ 4003 | alpha1 の diag-g9-fl が `fle-thread: wait` の行を trace に足した(cand1 の木から。HEAD 4003、cand1・rt1・rtb 8002 を実測) | 診断が試験の数に入る | 同上(wait の行を数えない) |
+| wall_fr9t | stderr の行数 8002 ≠ 4003 | alpha1 の diag-g9-fl が `fle-thread: wait` の行を trace に足した(cand1 の木から。HEAD 4003、cand1・rt1・rtb 8002 を実測) | 診断がテストの数に入る | 同上(wait の行を数えない) |
 
 ## 3. 前に見つけて直した物
 
@@ -48,7 +48,7 @@ alpha1 の 10:43 版は、(1) アドレスの検査、(2) 予約 = min(64 KiB, S
 - num-cpu の文字列の "environment" が sysinfo.rs の `environ` の部分一致に当たった → "machine"(alpha1)。
 ## 4. 最終の run(run 5。実測)
 
-`harness/test.sh full --jobs 1`(nice 19)を `tree-rtb`(= build の木 `tree-rtb-build` から『診断を getenv にする』1 工程を除いた物。`diff -r -x 'out-*' -x target` で差 0 を確認してから diag を当てた)で 11:15:39〜11:33:05、**rc=0、results=224 passed=2437 failed=0 ignored=1 SKIPPED-lines=15**(SKIPPED は入力の DLL・seed が無い試験の自己 skip。run 3・4 と同じ数)。
+`harness/test.sh full --jobs 1`(nice 19)を `tree-rtb`(= build の木 `tree-rtb-build` から『診断を getenv にする』1 工程を除いた物。`diff -r -x 'out-*' -x target` で差 0 を確認してから diag を当てた)で 11:15:39〜11:33:05、**rc=0、results=224 passed=2437 failed=0 ignored=1 SKIPPED-lines=15**(SKIPPED は入力の DLL・seed が無いテストの自己 skip。run 3・4 と同じ数)。
 = RT-B の build の入力は『失敗 0』の木。build は `tree-rtb-build`(= 上 + `rtb-tree.sh diag`)で 11:18:42 に開始。
 
 ## 4.1 RT-B の build の実測(最終 run のあと。bundle `fl-engine-test-rtb-0a33cda7`)
@@ -67,6 +67,6 @@ alpha1 の 10:43 版は、(1) アドレスの検査、(2) 予約 = min(64 KiB, S
 
 ## 5. 教訓・自己申告
 
-- 「runtime の差分を build の入力にする条件 = 該当の native の試験が通る」を、私は alpha1 の初版の callback の差分(dry-run と emcc の構文確認だけで『検証済み』)で守っていなかった。PM と alpha1 も同じ穴だった。以後、runtime の差分は該当の試験の実行を先に確かめる。
+- 「runtime の差分を build の入力にする条件 = 該当の native のテストが通る」を、私は alpha1 の初版の callback の差分(dry-run と emcc の構文確認だけで『検証済み』)で守っていなかった。PM と alpha1 も同じ穴だった。以後、runtime の差分は該当のテストの実行を先に確かめる。
 - 診断の第 1 形の再構成が、alpha1 の差分の更新で壊れる作りだった(原本を保存していなかった)。alpha1 の `-rtb-full`(自己完結)で解消。
 - run 1・2 を最終構成を決める前に始めて無駄にした(約 25 分)。

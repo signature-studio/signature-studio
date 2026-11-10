@@ -16,7 +16,7 @@
 
 | 項目 | 値 |
 |---|---|
-| HEAD | b5159667307636c0e1fffc218e167ba7abfba143（b515966）。`git archive HEAD` を `lift/out-a3-m86/src/` に展開し、そこからだけビルド。作業ツリーの lift/runtime と lift/crates は読んでいない |
+| HEAD | b5159667307636c0e1fffc218e167ba7abfba143（b515966）。`git archive HEAD` を `lift/out-a3-m86/src/` に展開し、そこからだけビルド。ワークツリーの lift/runtime と lift/crates は読んでいない |
 | DLL | `/home/ubuntu/work/signature-studio-develop/binaries/win64/FLEngine_x64.dll`、22,227,016 B、SHA-256 b2c64da4…9496d |
 | 生成 C の SHA-256（**最初に確認**） | **43985d62321a90f562ce1b8144253e00af13df795e4190d26b6b8ce2537137a1**（基準と一致）。215,707,512 B。`functions 59297`、`unsupported_total 525`（内訳: `Jmp: indirect through IAT slot (not lifted)` 524、`Jmp: indirect target unresolved` 1）、`bad_nodes 0` |
 | ツール | emcc 6.0.12、clang 21.1.8（Ubuntu）、rustc 1.99.0、node v24.19.0。マシン: 16 コア、RAM 14 GB |

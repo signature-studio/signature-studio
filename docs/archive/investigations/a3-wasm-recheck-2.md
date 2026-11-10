@@ -18,7 +18,7 @@
 
 | 項目 | 値 |
 |---|---|
-| HEAD | `0d58b0f019b232c7fba56b346287a8b658075e24`（`git rev-parse HEAD`）。`git archive HEAD` を `lift/out-a3-head/src/` に展開し、そこからだけビルド。作業ツリーの lift/ は読んでいない |
+| HEAD | `0d58b0f019b232c7fba56b346287a8b658075e24`（`git rev-parse HEAD`）。`git archive HEAD` を `lift/out-a3-head/src/` に展開し、そこからだけビルド。ワークツリーの lift/ は読んでいない |
 | lift/ の不変 | `git diff --stat d618380 HEAD -- lift` の出力が空（依頼の「lift/ 配下は d618380 から不変」と一致） |
 | DLL | `/home/ubuntu/work/signature-studio-develop/binaries/win64/FLEngine_x64.dll`、22,227,016 B、SHA-256 b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d（依頼の値と一致） |
 | 生成 C（**最初に確認**） | `out/wasm-pdata.c`、215,709,232 B、SHA-256 **feb5b9087f8d7a8a1282900212d7bd1f5b6071b0326e7149642f98c168e8080f**。`functions 59297`、`bad_nodes 0`、`unsupported_total 525`（`Jmp: indirect through IAT slot (not lifted)` 524、`Jmp: indirect target unresolved` 1）、`register_jmp_sites 20`、`msvc_tables 0`、`msvc_rejected 0`。`gen-pdata.err` 0 B |

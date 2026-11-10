@@ -4,7 +4,7 @@
 
 ## 変更
 
-`app/src/engine/hz.ts` の `STANDARD_HZ` を `[60, 75, 90, 120, 144, 165, 240]` から **`[60, 75, 90, 120]`** にする。測定した rAF の中央値が 120 を超える画面(144 / 165 / 240 / 360 Hz …)は、これまでの 144 / 165 / 240 でなく **120** を `FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` に渡す。1 箇所の定数で、旗・URL パラメータ・環境変数・ビルド変数は足していない。`roundToStandardHz` の規則(比の意味で最も近い標準の値、両端はその値)は変わらず、上端が 240 から 120 になっただけ。ファイル先頭のコメント、`S-hz-standard` の注釈、`S-hz-round` の注釈を実装に合わせた。`test/unit/hz.test.ts` を同時に直した(標準の一覧、丸めの表、`measureFrameRate` の 144 / 240 Hz の行、±15% の揺れの試験、`applyHz` の例。新しい試験: 『どの測定値も 120 を超えず、120 を超える測定値はちょうど 120』)。ほかに 144 / 165 / 240 の渡し値を期待している試験は無い(`grep` 済み。`perf-display.test.ts` の 144 / 240 は画面側の計測器と `hzClass` の分類で、エンジンに渡す値ではない)。
+`app/src/engine/hz.ts` の `STANDARD_HZ` を `[60, 75, 90, 120, 144, 165, 240]` から **`[60, 75, 90, 120]`** にする。測定した rAF の中央値が 120 を超える画面(144 / 165 / 240 / 360 Hz …)は、これまでの 144 / 165 / 240 でなく **120** を `FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` に渡す。1 箇所の定数で、旗・URL パラメータ・環境変数・ビルド変数は足していない。`roundToStandardHz` の規則(比の意味で最も近い標準の値、両端はその値)は変わらず、上端が 240 から 120 になっただけ。ファイル先頭のコメント、`S-hz-standard` の注釈、`S-hz-round` の注釈を実装に合わせた。`test/unit/hz.test.ts` を同時に直した(標準の一覧、丸めの表、`measureFrameRate` の 144 / 240 Hz の行、±15% の揺れのテスト、`applyHz` の例。新しいテスト: 『どの測定値も 120 を超えず、120 を超える測定値はちょうど 120』)。ほかに 144 / 165 / 240 の渡し値を期待しているテストは無い(`grep` 済み。`perf-display.test.ts` の 144 / 240 は画面側の計測器と `hzClass` の分類で、エンジンに渡す値ではない)。
 
 ## 根拠(決定 0263 §10 の表。この機械、headless Chrome 156、実 GPU なし、各 1 回)
 
@@ -43,18 +43,18 @@
 
 **P3 が達成されたとき**(ミキサーの書き込み率が 0.95 を超えて予算に余裕ができたとき)に、144 / 165 / 240 を戻して同じ測定(0263 §10 の方法: 60 / 120 / 144 / 240 の書き込み率と UI・ミキサーの CPU)を取り直す。それまでは 120。
 
-## 試験の結果
+## テストの結果
 
-自分の複製(`git archive 1c78f3c5` の `app/`、`lift/runtime`、`lift/harness/web`。単体試験が `../lift/…` を読むため。`app/node_modules` は PM の木への読み取りのシンボリックリンク)で、`app/` から、PATH に `/opt/emsdk/node/24.19.0_64bit/bin`、`TMPDIR` は `lift/out-gpu2/tmp`:
+自分の複製(`git archive 1c78f3c5` の `app/`、`lift/runtime`、`lift/harness/web`。単体テストが `../lift/…` を読むため。`app/node_modules` は PM の木への読み取りのシンボリックリンク)で、`app/` から、PATH に `/opt/emsdk/node/24.19.0_64bit/bin`、`TMPDIR` は `lift/out-gpu2/tmp`:
 
-| 試験 | 結果(変更あり) | 比較: 変更なし(同じ複製、同じ HEAD) |
+| テスト | 結果(変更あり) | 比較: 変更なし(同じ複製、同じ HEAD) |
 |---|---|---|
 | `npm run typecheck`(4 つの tsc) | rc=0 | ― |
-| `npx vitest run` | 66 files passed + 1 skipped、**1,290 passed** + 7 skipped | 1,288 passed + 7 skipped(+2 は新しい試験『どの測定値も 120 を超えない』と `measureFrameRate` の 165 Hz の行) |
+| `npx vitest run` | 66 files passed + 1 skipped、**1,290 passed** + 7 skipped | 1,288 passed + 7 skipped(+2 は新しいテスト『どの測定値も 120 を超えない』と `measureFrameRate` の 165 Hz の行) |
 | `npm run test:worker` | 49 passed(1 file)、rc=0 | ― |
 | `npm run test:e2e`(エンジンなし) | **143/143 checks passed**、rc=0 | ― |
 
-`hz.test.ts` だけでは 53 passed。ログは `logs/0268-*.log`。ミューテーション試験(`test/mutation/run.mjs`)の hz 関連 3 本(1 変数だけ渡す、比でなく差で丸める、中央値でなく平均)は、書き換える行を変えていない(`const d = Math.abs(Math.log(measured / s));` ほか)ので有効なまま(実行はしていない)。
+`hz.test.ts` だけでは 53 passed。ログは `logs/0268-*.log`。ミューテーションテスト(`test/mutation/run.mjs`)の hz 関連 3 本(1 変数だけ渡す、比でなく差で丸める、中央値でなく平均)は、書き換える行を変えていない(`const d = Math.abs(Math.log(measured / s));` ほか)ので有効なまま(実行はしていない)。
 
 
 ## PM の判断と取り込み(2026-11-06 00:18)

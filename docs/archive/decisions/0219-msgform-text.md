@@ -67,17 +67,17 @@ Wine 10.0 の実測(mingw + wine。`harness/txt1/create_seq.c`、`tools/build-cr
 
 **修正**(PM 判断: 既定 ON): `lift/runtime/fle_win.c` の `fle_imp_CreateWindowExW`、`WM_CREATE` が -1 以外を返した直後に、窓が生きていて、メッセージ専用窓でなく、`WS_CHILD` か `WS_POPUP` で、`WS_MINIMIZE` / `WS_MAXIMIZE` でないとき、`WM_SIZE`(wParam `SIZE_RESTORED` 0、lParam = クライアントの幅(下位 16 ビット)と高さ(上位 16 ビット))、続けて `WM_MOVE`(lParam = クライアントの原点: 子は親のクライアント座標、ポップアップは画面座標。非クライアント領域は 0 なので窓の位置と同じ)を送る。逆スイッチ: ビルド時マクロ `-DFLE_NO_CREATE_SIZE_MOVE`(getenv は使わない。窓表は環境を読まない約束)。`txt1-createwindow.diff`(`-` 行 0、追加 22 行)。
 
-## 5. 試験(Wine 10.0 との差分)
+## 5. テスト(Wine 10.0 との差分)
 
-- 試験 `lift/crates/fe-lift/tests/txt1_createsize.rs`(2 件。期待値 `lift/harness/txt1/expected/create-seq-wine-10.0.txt` は Wine 10.0 の出力〔mingw 版の `create_seq.c`、`API2_WINE`〕で、**Wine は試験の実行に要らない**): ①runtime の出力が Wine の出力の部分列で、Wine にあって runtime にない行が `expected/known-gaps.txt` の 21 行と**ちょうど一致**する。WM_SIZE / WM_MOVE の行数が Wine の行数と等しい。②`-DFLE_NO_CREATE_SIZE_MOVE` では WM_SIZE / WM_MOVE が 1 行も出ない(逆スイッチが効く)。
+- テスト `lift/crates/fe-lift/tests/txt1_createsize.rs`(2 件。期待値 `lift/harness/txt1/expected/create-seq-wine-10.0.txt` は Wine 10.0 の出力〔mingw 版の `create_seq.c`、`API2_WINE`〕で、**Wine はテストの実行に要らない**): ①runtime の出力が Wine の出力の部分列で、Wine にあって runtime にない行が `expected/known-gaps.txt` の 21 行と**ちょうど一致**する。WM_SIZE / WM_MOVE の行数が Wine の行数と等しい。②`-DFLE_NO_CREATE_SIZE_MOVE` では WM_SIZE / WM_MOVE が 1 行も出ない(逆スイッチが効く)。
 - 窓の種類(子・子の子・ポップアップ・所有者つきポップアップ・WS_OVERLAPPEDWINDOW)× 可視/不可視 × 親の有無 × WM_CREATE が -1 を返す場合の 9 通り(`tables/create-seq-table.tsv`)。
-- 変異試験(試験が本当に守っているか): ①WM_SIZE の lParam の幅と高さを入れ替える → 失敗。②WS_OVERLAPPEDWINDOW にも送る → 失敗。③WM_MOVE を WM_SIZE の前に送る → 失敗。戻すと 2 件とも合格。
+- 変異テスト(テストが本当に守っているか): ①WM_SIZE の lParam の幅と高さを入れ替える → 失敗。②WS_OVERLAPPEDWINDOW にも送る → 失敗。③WM_MOVE を WM_SIZE の前に送る → 失敗。戻すと 2 件とも合格。
 - `known-gaps.txt` の 21 行は**この決定が直さない別の穴**(可視のポップアップを作るときの活性化メッセージ群、WS_OVERLAPPEDWINDOW の WM_GETMINMAXINFO、可視の子を壊すときの WM_SHOWWINDOW(0)、WM_CREATE が -1 を返した後の WM_NCDESTROY)で、決定 0210 の穴の表に足す材料。
 - 実機 Windows との照合は 0 件。Learn は作成時の WM_SIZE / WM_MOVE を述べていない(WM_SIZE: 「Sent to a window after its size has changed」、WM_MOVE: 「Sent after a window has been moved」。WM_MOVE の lParam は「The parameters are given in screen coordinates for overlapped and pop-up windows and in parent-client coordinates for child windows」)。Wine の実測は『実機は未確認』。
 - 新規: `txt1_createsize`(2 件)。既存の期待値を更新: `window`(11 件)・`wall_fr6`(1)・`wall_fr8`(2)・`wall_fr9`(1)= **15 件**の『作成時のメッセージ数 3 → 5』(`txt1-createwindow.diff` に入れた。`-` 行 28、全部読んだ: 件数と lg[] の添字の置き換えと WM_SIZE / WM_MOVE の行の追加だけで、assert を弱めた行はない)。
-- 全体試験(`bash lift/harness/test.sh full --jobs 2 --threads 2`): 1 回目(HEAD 0156065 の木 + txt1 の 2 試験 + 修正、期待値は未更新)は 185 results・2,301 passed・**15 failed**(上の 15 件。全部『作成時のメッセージ数』の壁)。期待値更新後の**最終**(`git archive` HEAD f90b31f + `txt1-createwindow.diff` + `txt1.diff`、`logs/fulltest-txt1-final.txt`): **186 results・2,317 passed・0 failed**(182 実行ファイル + doc-tests 4、cached=0、wall 917 s)。1 回目より 1 results 多いのは、基準 HEAD が 0156065 → f90b31f で `wall_opfs1_map`(他者の追加、1 件)が増えたため。
-- **最後の確認の時点の HEAD は 050fa43**: 88c7809 から `lift/runtime/fle_win.c`・`lift/crates/fe-lift/tests`・`lift/harness` に変更なし(`git diff --stat 88c7809 HEAD` が空)。2 つの diff は 050fa43 の `git archive` にも dry-run が当たる(`logs/patch-dry-*.txt`)。試験は 88c7809 の木で行った(050fa43 では走らせていない)。
-- **基準 HEAD が途中で 88c7809 に進んだ**(3e11dc1 の screen1 が `fle_win.c` に 24 行足した)。2 つの diff は 88c7809 の `git archive` に `patch -p1 --dry-run` が当たる(オフセット 0、`logs/patch-dry-*.txt`)。88c7809 + 2 diff の木(`chkG`、新しい cargo target)では、まず関係する試験だけ(`window`・`wall_fr6`・`wall_fr8`・`wall_fr9`・`txt1_createsize`・`screen1`)を走らせた: 6 実行ファイル・152 tests 全部 passed、0 failed(`logs/fulltest-txt1-head88c7809-subset.txt`)。続けて 88c7809 の**全体試験**(同じ木): 1 回で通せず、4 回に分かれた(1 回目は私が止めた〔`-full-killed-partial.txt`、10 実行ファイル ok〕、2 回目の前景走行は shell の 50 分の上限に当たって**最後の集計行が出ないまま**終わった〔`-full.txt`、170 実行ファイル ok・FAIL 0。他者の重い走行で 1 回目の f90b31f の 15 分より遅かった〕、残りの `fe-wasmgen/rc_helpers` と doc-tests 4 件は別走行〔`-rc_helpers.txt`〕)。4 つのログの `[ok]` の和集合は 183 実行ファイル全部(基準 f90b31f の 182 + `screen1`)で、**failed は 0**。ただし**1 回の通しの集計行〔results=… passed=…〕は無い**(実行ファイルごとに `[ok]` を読んだ)。
+- 全体テスト(`bash lift/harness/test.sh full --jobs 2 --threads 2`): 1 回目(HEAD 0156065 の木 + txt1 の 2 テスト + 修正、期待値は未更新)は 185 results・2,301 passed・**15 failed**(上の 15 件。全部『作成時のメッセージ数』の壁)。期待値更新後の**最終**(`git archive` HEAD f90b31f + `txt1-createwindow.diff` + `txt1.diff`、`logs/fulltest-txt1-final.txt`): **186 results・2,317 passed・0 failed**(182 実行ファイル + doc-tests 4、cached=0、wall 917 s)。1 回目より 1 results 多いのは、基準 HEAD が 0156065 → f90b31f で `wall_opfs1_map`(他者の追加、1 件)が増えたため。
+- **最後の確認の時点の HEAD は 050fa43**: 88c7809 から `lift/runtime/fle_win.c`・`lift/crates/fe-lift/tests`・`lift/harness` に変更なし(`git diff --stat 88c7809 HEAD` が空)。2 つの diff は 050fa43 の `git archive` にも dry-run が当たる(`logs/patch-dry-*.txt`)。テストは 88c7809 の木で行った(050fa43 では走らせていない)。
+- **基準 HEAD が途中で 88c7809 に進んだ**(3e11dc1 の screen1 が `fle_win.c` に 24 行足した)。2 つの diff は 88c7809 の `git archive` に `patch -p1 --dry-run` が当たる(オフセット 0、`logs/patch-dry-*.txt`)。88c7809 + 2 diff の木(`chkG`、新しい cargo target)では、まず関係するテストだけ(`window`・`wall_fr6`・`wall_fr8`・`wall_fr9`・`txt1_createsize`・`screen1`)を走らせた: 6 実行ファイル・152 tests 全部 passed、0 failed(`logs/fulltest-txt1-head88c7809-subset.txt`)。続けて 88c7809 の**全体テスト**(同じ木): 1 回で通せず、4 回に分かれた(1 回目は私が止めた〔`-full-killed-partial.txt`、10 実行ファイル ok〕、2 回目の前景走行は shell の 50 分の上限に当たって**最後の集計行が出ないまま**終わった〔`-full.txt`、170 実行ファイル ok・FAIL 0。他者の重い走行で 1 回目の f90b31f の 15 分より遅かった〕、残りの `fe-wasmgen/rc_helpers` と doc-tests 4 件は別走行〔`-rc_helpers.txt`〕)。4 つのログの `[ok]` の和集合は 183 実行ファイル全部(基準 f90b31f の 182 + `screen1`)で、**failed は 0**。ただし**1 回の通しの集計行〔results=… passed=…〕は無い**(実行ファイルごとに `[ok]` を読んだ)。
 
 ## 6. 効果
 
@@ -190,22 +190,22 @@ Wine 10.0 の実測(mingw + wine。`harness/txt1/create_seq.c`、`tools/build-cr
 
 | 点検表の問い | この決定の答え |
 |---|---|
-| 外部 API の文書上の契約の実装か | **はい**: 窓の作成(CreateWindowExW)で窓手続きに届く WM_SIZE / WM_MOVE。出典は Wine 10.0 の実測(Learn は作成時を述べない = S-txt1-create-size)。Wine 差分の試験 `txt1_createsize` を付けた。残す |
+| 外部 API の文書上の契約の実装か | **はい**: 窓の作成(CreateWindowExW)で窓手続きに届く WM_SIZE / WM_MOVE。出典は Wine 10.0 の実測(Learn は作成時を述べない = S-txt1-create-size)。Wine 差分のテスト `txt1_createsize` を付けた。残す |
 | FL の観測(診断・ログ・計測)だけか | いいえ。診断(gdb の Python、`--wrap` のログ、`FLE_COV_FILE` の差、WM_SIZE だけ/WM_MOVE だけの変種)は製品に入れず `tools/` にだけ置いた |
 | FL の lift 済みコードのやるべきことの代行・補正・上書きか | **いいえ**: メモのスクロールバーの再配置は、runtime が値を決めず、ゲスト自身の WM_SIZE 処理に任せる。窓の大きさ・位置は変えない(メッセージを送るだけ) |
 | FL のクラス名・窓の種類・位置・文言での分岐か | **いいえ**: 条件は窓のスタイルビット(WS_CHILD / WS_POPUP、WS_MINIMIZE / WS_MAXIMIZE)とメッセージ専用窓だけ |
 | 性能のための局所的な近道か | いいえ(コストは +1.5%〜2%) |
 | 仮の実装(PROVISIONAL)か | 作成時の WM_SIZE / WM_MOVE の出典が Wine だけの点は『仮』。実機で違えば `-DFLE_NO_CREATE_SIZE_MOVE` |
 
-**その他の点検**: この決定の変更は (b) 外部 API の契約の実装(CreateWindowExW の作成時メッセージ)で、出典は Wine 10.0 の実測と Learn(WM_SIZE・WM_MOVE の引数の定義)、Wine 差分の試験を付けた。FL のクラス名・窓の種類・位置・文言での分岐はない(条件は窓のスタイルビットとメッセージ専用窓だけ)。FL の挙動を代行・補正していない(メモのスクロールバーは runtime が整えるのではなく、ゲスト自身の WM_SIZE 処理に任せる)。診断(gdb の Python、`--wrap` のログ、`FLE_COV_FILE` の差)は製品に入れず `tools/` にだけ置いた。**余計な処理の疑い(私は変更していない、申し送り)**: 決定 0132 の `S-swp-unchanged-geometry`(大きさ・位置が変わらない SetWindowPos では WM_WINDOWPOSCHANGED に SWP_NOSIZE / SWP_NOMOVE を立てて WM_SIZE / WM_MOVE を出さない)は『ゲストの再入を避ける』ための出典のない選択で、api2 の Wine 実測では同じ大きさ・位置の SetWindowPos に Wine は WM_WINDOWPOSCHANGING だけで WM_WINDOWPOSCHANGED を出さない(`harness/api2/expected/win-seq-wine-10.0.txt` の『SetWindowPos(top, same position and size)』)のに対し runtime は WM_WINDOWPOSCHANGED(flags=0x17)を出す。窓の担当(win2・present2)が契約に照らして見直す候補(読み)。
+**その他の点検**: この決定の変更は (b) 外部 API の契約の実装(CreateWindowExW の作成時メッセージ)で、出典は Wine 10.0 の実測と Learn(WM_SIZE・WM_MOVE の引数の定義)、Wine 差分のテストを付けた。FL のクラス名・窓の種類・位置・文言での分岐はない(条件は窓のスタイルビットとメッセージ専用窓だけ)。FL の挙動を代行・補正していない(メモのスクロールバーは runtime が整えるのではなく、ゲスト自身の WM_SIZE 処理に任せる)。診断(gdb の Python、`--wrap` のログ、`FLE_COV_FILE` の差)は製品に入れず `tools/` にだけ置いた。**余計な処理の疑い(私は変更していない、申し送り)**: 決定 0132 の `S-swp-unchanged-geometry`(大きさ・位置が変わらない SetWindowPos では WM_WINDOWPOSCHANGED に SWP_NOSIZE / SWP_NOMOVE を立てて WM_SIZE / WM_MOVE を出さない)は『ゲストの再入を避ける』ための出典のない選択で、api2 の Wine 実測では同じ大きさ・位置の SetWindowPos に Wine は WM_WINDOWPOSCHANGING だけで WM_WINDOWPOSCHANGED を出さない(`harness/api2/expected/win-seq-wine-10.0.txt` の『SetWindowPos(top, same position and size)』)のに対し runtime は WM_WINDOWPOSCHANGED(flags=0x17)を出す。窓の担当(win2・present2)が契約に照らして見直す候補(読み)。
 
 **規則違反・逸脱の自己申告**
 - 最初に FIFO へコマンドを送るタイミングを誤り(サーバーがまだ FIFO を開く前)、約 8 分を失った。
 - 存在しない `bash` ツールを 2 回呼んだ(2 回目は最後の整理中。ハーネスが `shell` として実行した)。`sleep` を約 5 回(拒否された)、`timeout` をコマンドとして 1 回(Wine の試走)使った。
 - 自分の gdb 3 台と fork プローブ 1 台を PID 指定の kill で止めた(PM は許可)。
 - /tmp/opencode/txt1 が 1.2 GB になった(Wine の prefix。PM の指摘で 8.6 MB に整理)。作業ディレクトリは一時 7.4 GB(5 GiB を超えた)になり、終了時に整理した。
-- 自分の `mkdiff.sh` が走行中の試験の木 `chk4` を消し、1 回目の最終全体試験を壊した(`chk5` に写して再実行したが、cargo が `chk4` の道筋で作った試験実行ファイルを再利用して 2 回目も失敗し、3 回目を新しい target で `chkF` に写して走らせた)。**`chkF`(全体試験の木)と納品物の差**は `txt1_createsize.rs` のコメント 2 行だけ(コードは同一。納品物の方が新しい。開示)。最初の試験の後にコメントだけを変えた編集がある。
-- `tools/mkdiff.sh` は作業木 `src3`(基準 0156065)から diff を作る。基準 HEAD が 88c7809 に進んで `fle_win.c` が変わったため、**そのまま再実行すると他者の変更を逆向きに含む diff になる**。納品の 2 つの diff は再生成せず、88c7809 の `git archive` に当たることだけ確認した(`logs/patch-dry-*.txt`)。
+- 自分の `mkdiff.sh` が走行中のテストの木 `chk4` を消し、1 回目の最終全体テストを壊した(`chk5` に写して再実行したが、cargo が `chk4` の道筋で作ったテスト実行ファイルを再利用して 2 回目も失敗し、3 回目を新しい target で `chkF` に写して走らせた)。**`chkF`(全体テストの木)と納品物の差**は `txt1_createsize.rs` のコメント 2 行だけ(コードは同一。納品物の方が新しい。開示)。最初のテストの後にコメントだけを変えた編集がある。
+- `tools/mkdiff.sh` はワークツリー `src3`(基準 0156065)から diff を作る。基準 HEAD が 88c7809 に進んで `fle_win.c` が変わったため、**そのまま再実行すると他者の変更を逆向きに含む diff になる**。納品の 2 つの diff は再生成せず、88c7809 の `git archive` に当たることだけ確認した(`logs/patch-dry-*.txt`)。
 - 同時に走らせた重い処理は 4〜6 本になった時間がある(上限 4)。load は 10〜52。壁時計の速度は主張しない。
 - Sampler の Envelope タブ・General タブのクリック、メニューの窓、可視な WS_OVERLAPPEDWINDOW の作成は測っていない。
 
@@ -213,7 +213,7 @@ Wine 10.0 の実測(mingw + wine。`harness/txt1/create_seq.c`、`tools/build-cr
 
 ## PM の判断と取り込み(2026-11-04)
 
-- **取り込み**: `txt1-createwindow.diff`(`fle_win.c` +22 行・削除 0、試験 4 本の期待値更新)と `txt1.diff`(新規 4 ファイル)を HEAD 050fa43 に適用した(dry-run はオフセット・fuzz とも 0、`-` 行 28 本を読んだ。期待値の更新と `fle_win.c` の追記だけ)。PM の測定: FLEngine の既定生成 C の sha256 は `cd9107cef4cb...47029e50`(215,811,678 B)のまま、全体テスト 187 results / 2,323 passed / 0 failed(050fa43 の 186/2,321 に `txt1_createsize` を加えた値)。a4(FRUITY 無効): init_count 942/942、run_rank 895/895、functions 5,310 は不変。**function entries は 1,009,731 → 1,009,737(+6)**。取り込み前の HEAD(050fa43)を `git worktree` に取り出して同じ a4 を回し 1,009,731 を再現したので、+6 は txt1 の作成時 WM_SIZE/WM_MOVE によるもの(担当は a4 の数字を報告していなかった)。以後の a4(FRUITY 無効)の基準値は entries 1,009,737 とする(古い 1,009,731 は上書きせず、この記録に残す)。
+- **取り込み**: `txt1-createwindow.diff`(`fle_win.c` +22 行・削除 0、テスト 4 本の期待値更新)と `txt1.diff`(新規 4 ファイル)を HEAD 050fa43 に適用した(dry-run はオフセット・fuzz とも 0、`-` 行 28 本を読んだ。期待値の更新と `fle_win.c` の追記だけ)。PM の測定: FLEngine の既定生成 C の sha256 は `cd9107cef4cb...47029e50`(215,811,678 B)のまま、全体テスト 187 results / 2,323 passed / 0 failed(050fa43 の 186/2,321 に `txt1_createsize` を加えた値)。a4(FRUITY 無効): init_count 942/942、run_rank 895/895、functions 5,310 は不変。**function entries は 1,009,731 → 1,009,737(+6)**。取り込み前の HEAD(050fa43)を `git worktree` に取り出して同じ a4 を回し 1,009,731 を再現したので、+6 は txt1 の作成時 WM_SIZE/WM_MOVE によるもの(担当は a4 の数字を報告していなかった)。以後の a4(FRUITY 無効)の基準値は entries 1,009,737 とする(古い 1,009,731 は上書きせず、この記録に残す)。
 - **既定 ON で採る理由**: これは lift の忠実性の方針の (b) 外部 API の契約の実装(CreateWindowExW が作成時に WM_SIZE / WM_MOVE を配る)である。FL 側の分岐も代行もない。条件は窓のスタイルビットとメッセージ専用窓の除外だけで、`-DFLE_NO_CREATE_SIZE_MOVE` で従来に戻せる。出典は Wine 10.0 の実測(9 作成ケース)と Learn の引数の定義。実機 Windows との比較は 0 件で、仮(PROVISIONAL)のまま。
 - **起動 16 スナップの期待値**: 全 16 スナップが変わる(ウィザード 874x570 → 874x573 ほか、エントリ +1.5%)。新しい native の期待表 `tables/g3-lines-txt1-createsize-native.txt` を基準にする。node(wasm)側の期待表は ship3 の再構築で作り直す。古い期待表は上書きしない。
 - **残った課題**: 左の Browser パネル(TEdgeBrowser = WebView2)は全面黒のまま。WebView2 のローダ/COM の契約(外部 API の拡充)として次の作業に回す。Sampler の Envelope タブ・General タブの測定は crash1/sweep1 側。

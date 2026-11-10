@@ -135,7 +135,7 @@ MMX 形、VEX 形、bswap の 16 ビット形は未対応のまま（`bswap_16bi
 ## 8. テストの実測
 
 - `cargo test --offline -p fe-lift --test a2a_remaining`: 13 件、全通過（`out-a2a/test-a2a-3.txt`）。
-- ワークスペース全体（`cargo test --offline --workspace`、`out-a2a/test-ws.txt`）: 66 バイナリ、**629 passed、0 failed**、0 ignored（他担当の未コミット変更が作業ツリーに残る状態。HEAD は 5e7d7e6）。0046 の記録（HEAD 31d0134）は 65 バイナリ 615 passed。差は +1 バイナリ、+14 件。本作業の `a2a_remaining` が 1 バイナリ 13 件で、残りの +1 件の出所は確認していない（HEAD が 31d0134 から 5e7d7e6 に進んだ分の可能性。推測）。失敗 0 なので、他担当の未コミット変更との切り分け（自分の変更を HEAD に重ねたコピーでの実行）は行っていない。
+- ワークスペース全体（`cargo test --offline --workspace`、`out-a2a/test-ws.txt`）: 66 バイナリ、**629 passed、0 failed**、0 ignored（他担当の未コミット変更がワークツリーに残る状態。HEAD は 5e7d7e6）。0046 の記録（HEAD 31d0134）は 65 バイナリ 615 passed。差は +1 バイナリ、+14 件。本作業の `a2a_remaining` が 1 バイナリ 13 件で、残りの +1 件の出所は確認していない（HEAD が 31d0134 から 5e7d7e6 に進んだ分の可能性。推測）。失敗 0 なので、他担当の未コミット変更との切り分け（自分の変更を HEAD に重ねたコピーでの実行）は行っていない。
 - 既存テストの編集: `tests/int_more2.rs` の `unsupported_stay_unsupported` から、xgetbv と high-byte の「未対応のまま」を外した（xgetbv は名前付き停止、`rol ah,cl` は対応済み）。`git diff` で +4/-4 行。
 
 ## 9. 変異テスト（`out-a2a/mut-*.txt`）

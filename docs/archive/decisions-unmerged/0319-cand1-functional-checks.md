@@ -84,7 +84,7 @@
 3. HiDPI(0318b)は cand2 の build が出てから。
 
 ## 追補: seed2b(mt3 の実験用 bundle)での O3・O16 の確認(10:00〜10:13、実 Chrome 156)
-bundle: `fl-engine-test-rt1-seed2-8128f5be`(RT-A と wasm・glue・DLL pack が byte 同一〔hard link〕、seed pack 17,089,558 B と manifest だけ違う。TEST、push しない)。私の複写の manifest に `FLE_DIAG_WIN=1` `FLE_DIAG_VFS_MISS=1` を足した(bundle は無変更)。**page は ci1 の `page-rt1`(real-thread 用)**: p0 の page で開くと『Tried to spawn a new thread … TypeError: Invalid URL』で落ちた(私の page の選び間違い)。最初の版 `…-184136ac` は seed の表に同じ guest path が 2 回あり engine が exit 2(mt3 に報告、作り直された)。保存: `0319/logs/seed2b-about`、`seed2b-ja`、`seed2b-ja-try1`。
+bundle: `fl-engine-test-rt1-seed2-8128f5be`(RT-A と wasm・glue・DLL pack が byte 同一〔hard link〕、seed pack 17,089,558 B と manifest だけ違う。TEST、push しない)。私のコピーの manifest に `FLE_DIAG_WIN=1` `FLE_DIAG_VFS_MISS=1` を足した(bundle は無変更)。**page は ci1 の `page-rt1`(real-thread 用)**: p0 の page で開くと『Tried to spawn a new thread … TypeError: Invalid URL』で落ちた(私の page の選び間違い)。最初の版 `…-184136ac` は seed の表に同じ guest path が 2 回あり engine が exit 2(mt3 に報告、作り直された)。保存: `0319/logs/seed2b-about`、`seed2b-ja`、`seed2b-ja-try1`。
 | 項目 | cand1(seed なし) | seed2b | 区分 |
 |---|---|---|---|
 | O3 About: layered 窓(lid 141) | 3×3 | **246×345**(3 s)/ 245×343(28 s)。ロゴ・歯車・staff roll が出る | (C) 資材。BigFruit.png と AboutTxt.txt の vfs-miss が消えた |

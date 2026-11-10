@@ -1,6 +1,6 @@
 # 0130: FRUITY 有効の wasm の大きさと待ち時間の測定。計測用フックの除去、-O1/-O2/-Oz、wasm-opt の効果。ブラウザ(headless Chrome 156)でページを開いてから面の最初の画素が出るまでと idle 停止までの時間。すべて仮の決定
 
-状態: **仮の決定(すべての選択)**。依頼は PM(決定 0130 の番号は PM の割り当て)。測定・実装・文書は作業者が行った。作業は HEAD **1d7173f** の `git archive`(`lift/`、`docs/`)で始め、clean な写しを `clean/` に置いた(作業中に HEAD は dcf64cb に進んだが、測定は 1d7173f の木)。差分は `perf1.diff`(24 ファイル、約 100 KB、`diff -ruN` で `patch -p1` で当たる: 1d7173f の clean な写しに dry-run 終了 0、当てた木 = 作業木(`diff -rq` 差異 0)。最終確認時の HEAD 3ce8e7f(途中の dcf64cb でも)の `lift/harness` にも dry-run 終了 0、fail/reject/fuzz/offset なし)。**runtime(`lift/runtime/`)・crates・tests は編集していない。** **実機 Windows との照合は 0 件。** Firefox・Safari・headed の Chrome・GPU・HiDPI・実回線(遅延・TCP の動特性)は未測定。音声・文字描画なし。
+状態: **仮の決定(すべての選択)**。依頼は PM(決定 0130 の番号は PM の割り当て)。測定・実装・文書は作業者が行った。作業は HEAD **1d7173f** の `git archive`(`lift/`、`docs/`)で始め、clean な写しを `clean/` に置いた(作業中に HEAD は dcf64cb に進んだが、測定は 1d7173f の木)。差分は `perf1.diff`(24 ファイル、約 100 KB、`diff -ruN` で `patch -p1` で当たる: 1d7173f の clean な写しに dry-run 終了 0、当てた木 = ワークツリー(`diff -rq` 差異 0)。最終確認時の HEAD 3ce8e7f(途中の dcf64cb でも)の `lift/harness` にも dry-run 終了 0、fail/reject/fuzz/offset なし)。**runtime(`lift/runtime/`)・crates・tests は編集していない。** **実機 Windows との照合は 0 件。** Firefox・Safari・headed の Chrome・GPU・HiDPI・実回線(遅延・TCP の動特性)は未測定。音声・文字描画なし。
 
 区分の凡例: **実測**＝このセッションのコマンドの出力を見た事実。**計算**＝実測した大きさからの算術(測定ではない)。**読み**＝コードや出力からの解釈(確かめていない)。**未確認**。
 

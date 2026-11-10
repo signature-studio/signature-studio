@@ -1,6 +1,6 @@
 # X2: JIT 無効の Blend2D（`Agg2D`）の全スロット走査、wasm との一致、基準の SHA の切り分け
 
-実行日: 2026-10-30〜31。基準 HEAD `018ba73`（`git archive` を `lift/out-x2/src/` に展開。作業ツリーは読み取りのみ。HEAD は途中で 167a1db に進んだが、変更したファイルは同一）。決定文書: `docs/decisions/0120-blend2d-no-jit.md`（仮の決定）。差分は `lift/out-git/x2-results/x2.diff`、ログと道具は同じ場所の `logs/`、`tools/`。
+実行日: 2026-10-30〜31。基準 HEAD `018ba73`（`git archive` を `lift/out-x2/src/` に展開。ワークツリーは読み取りのみ。HEAD は途中で 167a1db に進んだが、変更したファイルは同一）。決定文書: `docs/decisions/0120-blend2d-no-jit.md`（仮の決定）。差分は `lift/out-git/x2-results/x2.diff`、ログと道具は同じ場所の `logs/`、`tools/`。
 
 **実機の Windows との照合は 0 件**。凡例: **実測**＝コマンドの出力を見た事実、**読み**＝逆アセンブルとコードを読んだ解釈（実行して確かめていない）、**未確認**。
 

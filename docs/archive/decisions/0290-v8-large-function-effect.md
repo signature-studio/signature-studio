@@ -2,7 +2,7 @@
 
 決定 0290(仮)。基準 HEAD = main 38efb398(fe-wasmgen は e9-wip b0fe2c11 と同一)。日付 2026-11-06。出力 `lift/out-git/alpha17-results/`。**実装はしない**(候補と見込みまで)。
 
-**実エンジンの実行について**: 本書の測定は node 24.19(V8 13.6)で、E9(b0fe2c11)の**試験用ビルド**(`lift/out-opt2/tw-e15/bundle/fl-test-e15`、実エンジン = FLEngine_x64.dll と同梱 DLL の lift 結果の wasm、0243 の試験用ビルド)を gpu3 の `g3-run2.sh` 相当(`lift/harness/mt2/node-bundle-run-sh.mjs`、JSPI、G3 スクリプト `ref1-perf-short.g3`、仮想時計)で走らせた。入力は harness の模擬で利用者の操作ではない。**仮想時計なので作業量が毎回同一**(g3 の 55 行が全 run で一致)で、V8 の設定・wasm の形だけを変えた比較ができる。代役・再生・期待値の貼り付けはない。**Chrome 156 の速さの測定は 1 組(plain 1 本 + ヒント 1 本、E7b の本番 wasm、各 4 分 52 秒、他の Chrome が 1〜2 本同時に走っていた=『参考(重なり)』)**。mt3 の実装(0293)の実 bundle 2 つでの Chrome A/B は **0 組**(ci1 の Chrome の予約で窓が無い。§7)。node の結果が Chrome にそのまま当てはまるとは限らない(§5.3 で実測: 2 関数 node −38.6% に対し Chrome は A/other −19.7%)。
+**実エンジンの実行について**: 本書の測定は node 24.19(V8 13.6)で、E9(b0fe2c11)の**テスト用ビルド**(`lift/out-opt2/tw-e15/bundle/fl-test-e15`、実エンジン = FLEngine_x64.dll と同梱 DLL の lift 結果の wasm、0243 のテスト用ビルド)を gpu3 の `g3-run2.sh` 相当(`lift/harness/mt2/node-bundle-run-sh.mjs`、JSPI、G3 スクリプト `ref1-perf-short.g3`、仮想時計)で走らせた。入力は harness の模擬で利用者の操作ではない。**仮想時計なので作業量が毎回同一**(g3 の 55 行が全 run で一致)で、V8 の設定・wasm の形だけを変えた比較ができる。代役・再生・期待値の貼り付けはない。**Chrome 156 の速さの測定は 1 組(plain 1 本 + ヒント 1 本、E7b の本番 wasm、各 4 分 52 秒、他の Chrome が 1〜2 本同時に走っていた=『参考(重なり)』)**。mt3 の実装(0293)の実 bundle 2 つでの Chrome A/B は **0 組**(ci1 の Chrome の予約で窓が無い。§7)。node の結果が Chrome にそのまま当てはまるとは限らない(§5.3 で実測: 2 関数 node −38.6% に対し Chrome は A/other −19.7%)。
 
 ## 0. 結論(先頭 3 点)
 
@@ -86,7 +86,7 @@
 
 ## 5. 分岐ヒント(H1 の根拠)
 
-**lowering の形**(E9 の試験用ビルドの `f_b34aca0` の 1 箇所を wasm から読んだ。`--mx-rc --mx-packed` のパックド add/sub/mul):
+**lowering の形**(E9 のテスト用ビルドの `f_b34aca0` の 1 箇所を wasm から読んだ。`--mx-rc --mx-packed` のパックド add/sub/mul):
 ```
 local.get mx_rcl
 if                                   ;; 外側: mx_rcl != 0(RC = 1..3 または PE/PM がガード外)
@@ -102,7 +102,7 @@ end
 
 **付けたヒント**(`tools/a17-hint-patch.py` = 窓検査の if のみ 2,716 箇所 〔64 関数、f_b34aca0 は 646 箇所〕、`tools/a17-hint-patch3.py` = それに外側の if を足した 5,380 箇所 〔窓検査の if = 『then が起きやすい』、外側の if = 窓検査を含む腕のほうが起きやすい向き〕)。関数本体は変更なし、セクションは `metadata.code.branch_hint` 25,962 B(ヒント 5,380 のとき)。**意味は変わらない**: node の行 55 / 87 が全版で差 0。
 
-**node の速さ**(`--experimental-wasm-branch-hinting`、同じ E9 試験用ビルド、3 回ずつ交互、2 関数の自己時間 ms、`tables/0290-node-hint-interleaved.md`):
+**node の速さ**(`--experimental-wasm-branch-hinting`、同じ E9 テスト用ビルド、3 回ずつ交互、2 関数の自己時間 ms、`tables/0290-node-hint-interleaved.md`):
 
 | 版 | 3 回 | 平均 | 既定比 |
 |---|---|---|---|
@@ -124,7 +124,7 @@ end
 
 検出に使えなかった物(記録): 不正なヒント(`if` でない命令を指す)を含む小さな wasm は、フラグ有無・node/Chrome を問わずコンパイルが通る(V8 は不正なヒントを黙って捨てる)ので『読むか』の検出器にならない(`tools/a17-hint-probe.py`)。ホットなループの微小ベンチ(`tools/a17-hint-micro.py`)は node でも差が出ない(0.97〜1.00)=この効果は小さな関数では出ず、巨大関数でレジスタ割り当てが効く形のときに出る。**検出は機械語の大きさの比較**(上の表)で行った。
 
-**費用**(node の試験用ビルドの全昇格関数、`tables/0290-hint-cost.txt`): TurboFan の機械語の合計 16.73 MB(既定)→ 16.87(+0.9%、窓検査の if のみ)→ **17.11 MB(+2.3%、+窓検査の外側の if)**。2 関数の TurboFan のコンパイル時間(`--wasm-eager-tier-up-function` の probe を 4 回ずつ交互、中央値): 既定 517 ms、ヒント(窓のみ)495 ms、ヒント(外側も)535 ms = **揺れの内(+3% 程度)**。作業メモリ(合計)202.6 → 204.0(+0.7%)→ 207.9 MB(+2.6%)。Liftoff のコードはヒントで変わらない(`codesize` 964,848 B のまま)ので **first idle は動かない**。昇格の遅れはコンパイル時間の増分(数十 ms/関数)以内。
+**費用**(node のテスト用ビルドの全昇格関数、`tables/0290-hint-cost.txt`): TurboFan の機械語の合計 16.73 MB(既定)→ 16.87(+0.9%、窓検査の if のみ)→ **17.11 MB(+2.3%、+窓検査の外側の if)**。2 関数の TurboFan のコンパイル時間(`--wasm-eager-tier-up-function` の probe を 4 回ずつ交互、中央値): 既定 517 ms、ヒント(窓のみ)495 ms、ヒント(外側も)535 ms = **揺れの内(+3% 程度)**。作業メモリ(合計)202.6 → 204.0(+0.7%)→ 207.9 MB(+2.6%)。Liftoff のコードはヒントで変わらない(`codesize` 964,848 B のまま)ので **first idle は動かない**。昇格の遅れはコンパイル時間の増分(数十 ms/関数)以内。
 
 **Chrome 156 の速さ(5.3)**(`tables/0290-chrome156-ab-pair1.md`、`logs/0290-chrome-ui-*`、`tools/a17-run-chrome2.sh`、シナリオ `tools/scn-ui.json`): E7b の本番 wasm(`engine.d6e3b018accb`、fl-engine-ci-d9c160aa)対 同じ wasm に注入ヒント 5,380 箇所(`a17-hint-patch3.py`、`engine.67e976f33ed8`、関数本体は同一)。実エンジンの run(参照プロジェクトを開き、Space で再生、V8 プロファイルの 30〜50 s の窓)。plain → ヒントの順に 1 本ずつ(2 組目は窓が無く 0)。**各 run で別の sdriveg2 の Chrome が 1〜2 本同時に走っていた(ci1 の pure/lat と他 agent)ので『参考(重なり)』**。指標は同一実行内の比なので負荷に強い(過去の plain 3 本は load 3.8〜18 で 0.1734 / 0.1875 / 0.2005)。
 
@@ -139,13 +139,13 @@ end
 
 | 項目 | plain | mt3 の実ヒント |
 |---|---|---|
-| f_b34aca0 の TurboFan 機械語 | 557,844 B | **661,604 B(+18.6%)** — 私の注入(窓検査 + 外側、E9 の試験用ビルド)の 661,604 B と**1 バイトまで同一** |
+| f_b34aca0 の TurboFan 機械語 | 557,844 B | **661,604 B(+18.6%)** — 私の注入(窓検査 + 外側、E9 のテスト用ビルド)の 661,604 B と**1 バイトまで同一** |
 | 作業メモリ(合計) | 202,558,592 B | 207,891,768 B(+2.6%、私の注入と同一値) |
 | TurboFan のコンパイル時間(3 回) | 706 / 834 / 749 ms | 432 / 852 / 869 ms(揺れの内、中央値 749 → 852) |
 | Liftoff(104,585 関数)の機械語の合計 | 330,597,136 B | 330,597,136 B(**同一** = first idle の Liftoff は動かない見込み) |
 | wasm | 142,776,280 B(br 18,790,260) | 142,899,156 B(br 18,852,715。+0.33%) |
 
-= 件数は f_b34aca0 で mt3 の実ヒント 1,392 件、私の注入 1,292 件(窓検査 646 + 外側 646。注入のセクションを読んで数えた。module 全体は 5,380 / mt3 は wasm-opt 後 27,570)と**100 件違う**のに、V8 が作る f_b34aca0 の機械語は**サイズも作業メモリも 1 バイトまで同じ**(661,604 B、207,891,768 B)。つまり V8 の挙動を変えているヒントは両者で同じ組と見てよい(余分な 100 件は機械語に影響しない)。E9 の試験用ビルドの node で出た −38.6%(2 関数)は mt3 の実 bundle の f_b34aca0 でも出る見込みだが、**実行して確かめてはいない**(機械語のサイズの一致は同一性の証明ではない)。
+= 件数は f_b34aca0 で mt3 の実ヒント 1,392 件、私の注入 1,292 件(窓検査 646 + 外側 646。注入のセクションを読んで数えた。module 全体は 5,380 / mt3 は wasm-opt 後 27,570)と**100 件違う**のに、V8 が作る f_b34aca0 の機械語は**サイズも作業メモリも 1 バイトまで同じ**(661,604 B、207,891,768 B)。つまり V8 の挙動を変えているヒントは両者で同じ組と見てよい(余分な 100 件は機械語に影響しない)。E9 のテスト用ビルドの node で出た −38.6%(2 関数)は mt3 の実 bundle の f_b34aca0 でも出る見込みだが、**実行して確かめてはいない**(機械語のサイズの一致は同一性の証明ではない)。
 
 ## 6. 候補(3 つ以内、実装はしない、見込みは式つき)
 
@@ -195,9 +195,9 @@ end
 | `tables/0290-mt3-bundle-compile-probe.txt` | mt3 の実 bundle の f_b34aca0 の TurboFan(plain 対 ヒント、3 回ずつ) |
 | `tools/a17-run-chrome2.sh`、`tools/scn-ui.json` | Chrome の run の包み(開始前に HTTP 200 確認、同時の他の Chrome の数を記録)とシナリオ |
 
-## 付録(15:05、0296 で追加した node 側の測定): E11 の試験用 wasm にも同じ効き
+## 付録(15:05、0296 で追加した node 側の測定): E11 のテスト用 wasm にも同じ効き
 
-E11 の試験用ビルド(`tw-e17/bundle/fl-test-e17`)に本書の注入器(`tools/a17-hint-patch3.py`)で 6,291 箇所(66 関数)のヒントを入れ、同じ G3 スクリプトを node 24.19(`--experimental-wasm-branch-hinting --cpu-prof` 1 ms)で plain / ヒントを交互に 2 回ずつ: **f_b34aca0 + f_b34eaf0 は 2,429 → 1,474 ms(−39.3%)、wasm 全体(非 idle)は 26,870 → 23,844 ms(−11.3%)**、node の行 55/87 は 4 本とも差 0(`0296/tables/0296-h1-node-e17-test.txt`、`0296/docs/0296-e11-worker-cpu-allocation-and-levers.md` §12.1)。E9 の試験用ビルドの −38.6% と同じ。Chrome の率は node の約半分(1 組、−19.7%)。mt3 の実 bundle(production 形)は node の harness では動かない(production の glue は `Module.FS` を出さない)ので代用。
+E11 のテスト用ビルド(`tw-e17/bundle/fl-test-e17`)に本書の注入器(`tools/a17-hint-patch3.py`)で 6,291 箇所(66 関数)のヒントを入れ、同じ G3 スクリプトを node 24.19(`--experimental-wasm-branch-hinting --cpu-prof` 1 ms)で plain / ヒントを交互に 2 回ずつ: **f_b34aca0 + f_b34eaf0 は 2,429 → 1,474 ms(−39.3%)、wasm 全体(非 idle)は 26,870 → 23,844 ms(−11.3%)**、node の行 55/87 は 4 本とも差 0(`0296/tables/0296-h1-node-e17-test.txt`、`0296/docs/0296-e11-worker-cpu-allocation-and-levers.md` §12.1)。E9 のテスト用ビルドの −38.6% と同じ。Chrome の率は node の約半分(1 組、−19.7%)。mt3 の実 bundle(production 形)は node の harness では動かない(production の glue は `Module.FS` を出さない)ので代用。
 
 ## 付録2(16:57): mt3 の実 bundle(0293)の Chrome 156 の A/B — **A/other は −17% だが、系の書き込み率と v は下がった**
 

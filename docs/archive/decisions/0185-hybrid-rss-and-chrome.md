@@ -32,7 +32,7 @@
 
 ## 1. 方法
 
-- 作業木: `git archive HEAD` を `lift/out-hyb4/src/` に展開(fe-wasmgen の差分は §3)。再現の道具は `tools/`(下の表)。hyb3 の p1000 は `tools/mk-prod.sh p1000 t1000 c.opt_sc.wasm link.map bin_sc/flengine6.js "--static-calls --sync-saved"`(hyb1 の C 部 `H/t1000`、新しい fe-wasmgen の直接部)で再生成し、`flengine6.wasm` 237,074,175 B = hyb3 と一致。
+- ワークツリー: `git archive HEAD` を `lift/out-hyb4/src/` に展開(fe-wasmgen の差分は §3)。再現の道具は `tools/`(下の表)。hyb3 の p1000 は `tools/mk-prod.sh p1000 t1000 c.opt_sc.wasm link.map bin_sc/flengine6.js "--static-calls --sync-saved"`(hyb1 の C 部 `H/t1000`、新しい fe-wasmgen の直接部)で再生成し、`flengine6.wasm` 237,074,175 B = hyb3 と一致。
 - 製品型の C 部の再構築: hyb1 の `hyb-build.sh`(stage strip → n0 → build → opt)を `h1/` に写し、出力先だけ `out-hyb4/H/<名前>` にした(入力の D/census/src は hyb1 の物を読み取り)。strip 後の単位が hyb1 の t1000/t50 の単位と cmp で同一なら、その `.o` をハードリンクで再利用(`logs/` の `reuse.txt` 相当)。そのため 5 個を戻す p1000x は、変わった 3 単位(fle-05/17/20)の再コンパイル約 35 秒 + リンク + wasm-opt -Oz(約 4 分)で作れた。C 部は hyb1 のコミット(b07659a)の `src` で作った物で、HEAD の `lift/runtime` ではない(hyb3 と同じ前提)。
 - 同一性: `tools/run-eng.sh TAG`(16 スナップ 82 行を `lift/harness/b2d2/expected/g3-lines-D-default.txt` と比較)。
 - node の RSS 系列: `tools/rsshook.cjs`(`--require`。WebAssembly.compile 前後、インスタンス化後、各 g3-snap で VmRSS/VmHWM/smaps 上位/`v8.getHeapStatistics()`)。コンパイル Zone: `--trace-wasm-compilation-times`(`tools/compsum.py`)。node の A/B: `tools/ab4.sh`(7 構成を 4 組交互。load0 は 5.7〜9.8)。
@@ -142,7 +142,7 @@ c1+c2(D/p1000/p1000x 各 8、p200x 4。load 8.6〜17)と c3(各 4。load 5.9〜1
 
 ## 8. TailIndirect と `--tail-all`(hyb2 からの依頼)
 
-- `fe-wasmgen` の TailIndirect(`jmp reg` / `jmp [mem]` で解決も jumptab もされない物)を、診断用に出力する差分(提出しない作業木の改造 `scratch/`)で数えた(`tables/tailindirect-all.tsv`): **N=1000 の選択(1000 関数)では 1 個だけ**(freetype 0x4b12d90、`jmp [mem]`、demoted でない、実行命令 1,288,217 = steady+起動の約 0.012%)。**register 形は 0 個**。『全部』の 90,418 関数では 500 個(fle 57、dsp 224、b2d 54、qfc 6、ft 45、ilt 114)。内訳: demoted でない register 形 439(RAX 268、RCX 32、RDX 7、**R11 6**、RSP 2、RDI 2、R9 2、RBX 1、R10 1…)、demoted 61(dsp の IPP スタブ)、メモリ形 118。うち起動+steady で実行されるのは 30 関数(R11 は b2d 0x48a2060 の 3 個)。
+- `fe-wasmgen` の TailIndirect(`jmp reg` / `jmp [mem]` で解決も jumptab もされない物)を、診断用に出力する差分(提出しないワークツリーの改造 `scratch/`)で数えた(`tables/tailindirect-all.tsv`): **N=1000 の選択(1000 関数)では 1 個だけ**(freetype 0x4b12d90、`jmp [mem]`、demoted でない、実行命令 1,288,217 = steady+起動の約 0.012%)。**register 形は 0 個**。『全部』の 90,418 関数では 500 個(fle 57、dsp 224、b2d 54、qfc 6、ft 45、ilt 114)。内訳: demoted でない register 形 439(RAX 268、RCX 32、RDX 7、**R11 6**、RSP 2、RDI 2、R9 2、RBX 1、R10 1…)、demoted 61(dsp の IPP スタブ)、メモリ形 118。うち起動+steady で実行されるのは 30 関数(R11 は b2d 0x48a2060 の 3 個)。
 - p1000r に `--tail-all` を付けた(996bd2d の fe-wasmgen): 直接部 2,663,644 → 2,679,684 B(**+16,040 B、+0.60%**)、merged wasm 236,630,859 → 236,646,712 B(+15,853 B)、**82 行一致 ×2**、node(3 組): steady 2.16 → 2.25 s(+4%)、wiz0 3.65 → 3.82 s、RSS e63 960 → 892 MB・peak_malloced 253 → 249 MB(差なし、`tables/ab4-ta-summary.txt`)。**結論: N≤1000 のエンジンでは --tail-all は必須でない(register 形 0 個)が、付けても害は小さい(+4% の CPU)。『全部』や N を増やすときは付ける**。
 
 ## 9. fin1 の束(F1x/F2x)の上での確認(**ビルドは未実施**)

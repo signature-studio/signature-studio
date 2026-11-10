@@ -240,7 +240,7 @@ git push -u origin "worklog-issue-$ISSUE"
 - **ネットワークへ測定結果以外を送らない**: 送ってよいのは、`git push`（`worklog-issue-<ISSUE>` ブランチ）と Issue コメントだけ。ダウンロードしてよいのは、`git clone` と、Step 3 のコンパイラ（必要なときだけ）。ツールにネットワーク機能は無い。
 - **`replay.c`・`cases.tsv`・`compare.py`・`replay-win10.manifest` を書き換えない**（測定の同一性のため）。どうしても直す必要があるときは、元のファイルをそのまま残し、直した版を別名で `worklog/<ISSUE>/` に置いて、diff と理由を `notes.md` に書く。
 - `--no-mask` を使わない。コンピュータ名・ユーザー名・メールアドレス・IP アドレスを、`env.md`・`notes.md`・コメントのどこにも書かない。
-- 管理者として実行しない。`main` に push しない。force push しない。他の Issue・PR・ブランチを変更しない。
+- 管理者として実行しない。`main` に push しない。force push しない。他の Issue ・PR・ブランチを変更しない。
 - 禁止事項に触れそうになったら、その操作はしないで `notes.md` に書き、できる範囲で続行する。
 
 ## 6. 提出物

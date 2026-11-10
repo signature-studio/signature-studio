@@ -1143,7 +1143,7 @@ memory series of the 15 s timer: 15s:1033.9MB(wizard) 30s:1033.9MB(play) 45s:103
 | 項目 | 結果 | 記録 |
 |---|---|---|
 | `npm run typecheck`(4 つの tsconfig) | クリーン | `logs/typecheck-vitest.txt` |
-| vitest(単体) | 824 passed + 7 skipped(基準 7757f60)→ **955 passed + 7 skipped**(+131、作業木) | `logs/vitest-final.txt` |
+| vitest(単体) | 824 passed + 7 skipped(基準 7757f60)→ **955 passed + 7 skipped**(+131、ワークツリー) | `logs/vitest-final.txt` |
 | ・`hz.test.ts` | 79: `?hz=` の解釈(受理 5、拒否 21〔空・0・23・1001・小数・符号・先頭の 0・空白・16 進・`Auto`・2 回〕)、標準値への丸め(32 点。境界の 67/68、82/83、103/105、131/132、154/155、198/201 を含む)、偽のフレーム時計での測定(60・75・120・144・240 Hz・30 fps→60、遅いフレームが混じる、±15% のゆらぎ、rAF が止まる、5 fps に絞られる、間隔 0)、環境への書き込み(要求なし → 何も変えない、両変数に同じ値、`?env=` の上書き、食い違いの警告) | |
 | ・`surface-sync.test.ts` | 21: `fruity_surface.c` の書き込みを写した JS のモデル(新規面、サイズ変更、移動、非表示、layer 変更、解放、idle の layer_sync、ピクセル、背圧、後から来る canvas の bind)で 2,000 idle × 12 シード、stamp あり/なしが通知・bind・描画列まで完全一致(静かな idle のスキップが 100 回以上あることも確認)。個別: 静かな表のスキップ、変化の検出、背圧で見送った矩形を忘れない、後から bind した canvas に全面、スタンドインは stamp なし、`lseq` が奇数のとき記録しない。変異 4 件を検出 | |
 | ・`appview-poll.test.ts` | 27: 既定は毎 idle 読む(間引きは opt-in)、最初の 1 回、`enable(40)` 後の 40 ms の間隔、入力が処理中・表が変わった・面のイベントで待たずに読む、静かなエンジンが 1,000 idle/s で 250 回/10 s、入力の連続、`?poll=` の解釈(受理 4、拒否 14) | |
@@ -1151,7 +1151,7 @@ memory series of the 15 s timer: 15s:1033.9MB(wizard) 30s:1033.9MB(play) 45s:103
 | 変異検査(`test/mutation/run.mjs --only <22 件> --layers unit`) | **22/22 検出**(最初の版は 11/12 で、先頭の 0 を許す変異が生き残ったためテストを足した) | `logs/mutation-p2a.txt` |
 | Worker のテスト(`test/worker/run.mjs`、wrangler dev --local) | 43/43(`app/worker/` は無変更) | `logs/worker-tests.txt` |
 | e2e(`node test/e2e/run.mjs`、dev・preview・worker、スタンドイン) | **853/853**(dev 289・preview 289・worker 275。失敗 0。`record:` の記録 26 件は数えない。基準は 691/691 で +162。load 約 13、2 分で完走) | `logs/e2e-final.txt` |
-| 差分を HEAD の `git archive` に当てて(`patch -p1`)typecheck と vitest | HEAD 996bd2d の `git archive HEAD app` に `patch -p1 --dry-run` が rc=0(fuzz・offset・reject なし)→ `patch` rc=0 → typecheck(4 つの tsconfig)クリーン → vitest(`APP_REPO_ROOT` をリポジトリに向ける。app だけの archive には `lift/` のファイルが無く、読む 3 つのテストが落ちるため)**954 passed + 8 skipped**。同じ HEAD の素の `app/` は 823 passed + 8 skipped なので **+131**(新しいテストの数と一致)。作業木では 955 passed + 7 skipped で、1 件の pass/skip が入れ替わる(素の HEAD でも 7757f60 の 824 + 7 から 823 + 8 になっており、私の差分と無関係。どのテストかは特定していない) | `logs/apply-check.txt` |
+| 差分を HEAD の `git archive` に当てて(`patch -p1`)typecheck と vitest | HEAD 996bd2d の `git archive HEAD app` に `patch -p1 --dry-run` が rc=0(fuzz・offset・reject なし)→ `patch` rc=0 → typecheck(4 つの tsconfig)クリーン → vitest(`APP_REPO_ROOT` をリポジトリに向ける。app だけの archive には `lift/` のファイルが無く、読む 3 つのテストが落ちるため)**954 passed + 8 skipped**。同じ HEAD の素の `app/` は 823 passed + 8 skipped なので **+131**(新しいテストの数と一致)。ワークツリーでは 955 passed + 7 skipped で、1 件の pass/skip が入れ替わる(素の HEAD でも 7757f60 の 824 + 7 から 823 + 8 になっており、私の差分と無関係。どのテストかは特定していない) | `logs/apply-check.txt` |
 | lift の全体テスト | 回していない(`lift/` を変えていない) | |
 
 **変異検査で見つかった穴**: 最初の版では『先頭の 0 を許す』変異(`/^[1-9][0-9]{0,3}$/` → `/^[0-9]{1,4}$/`)が生き残った(`'012'` は範囲で弾かれるため)。`'0120'`・`'024'`・`'00060'` を拒否するテストを足して検出するようにした。

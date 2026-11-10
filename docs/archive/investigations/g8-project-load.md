@@ -21,7 +21,7 @@
 
 ## 1. 手順・出典・実行環境
 
-- 作業木は読み取り専用（新規の docs ファイルのみ）。`PYTHONDONTWRITEBYTECODE=1` と `sys.dont_write_bytecode`。FLEngine は `binaries/win64/FLEngine_x64.dll`（SHA-256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e…`、22,227,016 B。`lift/out-idle1/inputs/install/` のものと同一）、FL64.exe は `lift/out-fruity6/inputs/FL64.exe`（597,064 B、SHA-256 `4c839f24da13885fef7190d81c792fe2a2e0248dcfce9cb5f400a48ae0520c65`）。
+- ワークツリーは読み取り専用（新規の docs ファイルのみ）。`PYTHONDONTWRITEBYTECODE=1` と `sys.dont_write_bytecode`。FLEngine は `binaries/win64/FLEngine_x64.dll`（SHA-256 `b2c64da40921cf262c15c5b25c2b0422e4d1851e…`、22,227,016 B。`lift/out-idle1/inputs/install/` のものと同一）、FL64.exe は `lift/out-fruity6/inputs/FL64.exe`（597,064 B、SHA-256 `4c839f24da13885fef7190d81c792fe2a2e0248dcfce9cb5f400a48ae0520c65`）。
 - 索引: `docs/investigations/goal-ladder/fle_index.py`（既存。7 秒、RSS 0.69 GB）の pickle を `/tmp/opencode/g8in/fle.pkl` に作り、本調査の `fle_query.py`／`fle_closure_table.py` で問い合わせた。
 - インストーラ `/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe`（SHA-256 `04393e79…5fc02`）は `lift/harness/seeds/gen_install_tree.py` の `walk`（決定 0129。'FL Studio (required)' の節、**27,402 ファイル**）と `tools/extract_nsis2.py` で**読み取りのみ**。`/tmp/opencode/g8in/` に抽出した .flp 165 本（87,694,538 B）・サンプル 12 個・DLL 10 個（合計 113 MB）。**終了時に全削除**（§11）。
 - 抽出の再現: `python3 docs/investigations/g8-project-load/g8_extract.py INSTALLER OUTDIR MANIFEST.tsv '\.flp$'`（以下同様）。表の再生成: `flp_tables.py` → `sample_sniff.py` → `g8_trim_tables.py`（README は §12）。
@@ -128,7 +128,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 ### 4.3 165 本の概要（`demos.tsv` が全行。`flp_tables.py`）
 
 - 内訳: Demo projects 46（デモ曲 20、製品デモ 10、Performance 6、Visual 9、NewStuff 1。`NewStuff.flp` は `Ookay - Thief.flp` と同一）、Templates 35、`Data\System\Render tests` 82、`Data\System` 直下 2（`Empty.flp`、`FL Mobile\Song.flp`）。FL のバージョンは 10.9〜26.1（`flp_tables.py` の `FLVersion` 列）と幅広い。`Render tests` は 11.1.1〜24.2（53 本が FL 11.x、9 本が 12.x、9 本が 20.x、7 本が 21.x、4 本が 24.x）。
-- **「Render tests」82 本**は、各プラグインに 1 本（生成器の試験はその生成器、エフェクトの試験は `3x Osc` + そのエフェクト）。IL 自身の回帰試験用と読める（**実機の書き出し WAV は無い**）。`render-tests.tsv`。
+- **「Render tests」82 本**は、各プラグインに 1 本（生成器のテストはその生成器、エフェクトのテストは `3x Osc` + そのエフェクト）。IL 自身の回帰テスト用と読める（**実機の書き出し WAV は無い**）。`render-tests.tsv`。
 - **エンジン内蔵だけで開けるプロジェクト（プラグイン DLL もエフェクトも VST も無い）は 12 本**: `Empty`（SHA-256 一致の 4 本: `Data\System\Empty.flp`、`Templates\Empty\Empty.flp`、`Templates\Minimal\Empty\Empty.flp`、`Templates\Utility\Launch loop starter\…`）、`FL Mobile\Song.flp`、`Render tests\Sampler.flp`、`Basic.flp`、`Empty with 4 sends`、`All MIDI CC`、`Blocks.flp`、`Record Audio.flp`、`Remix a song`（独立の照合: 12 本とも 201〔プラグイン内部名〕が空、213〔プラグイン状態〕0 B）。**再生ボタンだけで音が出るのは `Render tests\Sampler.flp`（ノート 7）と `Blocks.flp`（プレイリスト 260 = パターン 208 + サンプルのクリップ 52、サンプル 4）の 2 本**。`Basic.flp`／`Record Audio.flp` はサンプル 4 を持つがパターンもプレイリストも空（チャンネルを手で叩けば鳴る）。`Empty with 4 sends` はセンドの経路だけでプラグインは空。（`Minimal\Delay and reverb` は `Fruity Delay Bank` と `Fruity Reeverb 2` を持つので対象外。）
 - 同梱のデモ・テンプレートに**外部 VST（Fruity Wrapper の実体が VST）は 0**（`external_vst` 列）。古い版の「Fruity Wrapper」はネイティブのプラグイン DLL 名（例 `Fruity Fast LP.dll`）を包んでいる。
 
@@ -223,7 +223,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 ### 6.2 見積もりと配信の論点（短く。決定 0134／0137 の知見と合わせる）
 
 - **ベースライン**（実測、決定 0134／0137）: wasm 667,115,949 B（brotli q11 26,525,655 B、V8 の単一 wasm 1 GiB の 62.1%）、線形メモリの最終値 930 MiB（974,848,000 B）、種のパック 5,733,627 B（brotli 3.3 MB、FLSEEDP1 を MEMFS に書き、C 側の VFS が起動時に中身を読み込む）、DLL パック 6 個 70.6 MB（brotli 14.5 MB）、合計 brotli 約 34 MB。種の配信は「(a) パック」を採用、**遅延読み込みは範囲外（未実装）**。
-- **ユーザーの .flp とサンプルは実行時に来る**ので、種のパックには入れられない。MEMFS と C 側の VFS（`fle_vfs.c`、ファイルは C ヒープのノート）の**二重保持**が起きる（`vfs_seed.h` は `FS.writeFile` したものを C の VFS に `WriteFile` で複写し、1 ファイル 64 MiB 以下の制限）。930 MiB の線形メモリ（`lift/harness/wasm/build.sh`: 初期 640 MiB、ゲストの VirtualAlloc アリーナ 512 MiB、`ALLOW_MEMORY_GROWTH`。**上限の設定は読んでいない〔未確認〕**）に 100 MB 級のデモを足すと余裕が減る（Chrome の renderer RSS は 0138 で 1.9〜2.0 GB）。
+- **ユーザーの .flp とサンプルは実行時に来る**ので、種のパックには入れられない。MEMFS と C 側の VFS（`fle_vfs.c`、ファイルは C ヒープのノート）の**二重保持**が起きる（`vfs_seed.h` は `FS.writeFile` したものを C の VFS に `WriteFile` でコピーし、1 ファイル 64 MiB 以下の制限）。930 MiB の線形メモリ（`lift/harness/wasm/build.sh`: 初期 640 MiB、ゲストの VirtualAlloc アリーナ 512 MiB、`ALLOW_MEMORY_GROWTH`。**上限の設定は読んでいない〔未確認〕**）に 100 MB 級のデモを足すと余裕が減る（Chrome の renderer RSS は 0138 で 1.9〜2.0 GB）。
 - 配信の候補（意見）: ① 最小デモ（約 90 KB）は種のパックに足すだけ（5.7→5.8 MB）。② デモ全体は R2 に Range で置き、**エンジンが `CreateFileW`／`FindFirstFileW` で開いた時に JSPI で取りに行く遅延読み込み**（0137 の (c)）か、ページが先に必要なファイルをまとめて取って `fle_app_put_file` で足す。③ プラグイン DLL（524 MB）は今の「1 つの wasm に全部」では 1 GiB を超える（m2-inventory §6）ので別モジュール化が先で、G8 の範囲外。
 - **`Data\Patches` 全体**（圧縮後 Packs 283.0 MB、Misc 77.7 MB、Plugin presets 49.1 MB、Impulses 42.8 MB）は G8 には要らない。デモ曲が参照するのは 889 サンプル（約 102 MB）。
 
@@ -245,7 +245,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 
 ## 8. アプリ側（`app/`）に要るもの（項目 7、F5 の入口）
 
-現状（実測: `app/src/engine/fruity.ts`、`app/README.md`）: エンジンは Worker で動き、種のパックを MEMFS（`/data/seed/…`）に書き、ハーネスが起動時に C 側の VFS へ複写する。入力は `fle_input` の生イベントのキューに入り、エンジンの idle で配られる。**実行中に VFS へファイルを足す export は無い**。
+現状（実測: `app/src/engine/fruity.ts`、`app/README.md`）: エンジンは Worker で動き、種のパックを MEMFS（`/data/seed/…`）に書き、ハーネスが起動時に C 側の VFS へコピーする。入力は `fle_input` の生イベントのキューに入り、エンジンの idle で配られる。**実行中に VFS へファイルを足す export は無い**。
 
 最小の経路の案:
 
@@ -259,7 +259,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 | **B. `WM_COPYDATA`（dwData=10）** | Worker が `fle_app_open(path)` を呼ぶ → C が UTF-16 のパスと `COPYDATASTRUCT`（`dwData=10`、`cbData=(len+1)*2`）をゲストのメモリに作り、`FindWindowW` と同じ窓表の探索で `TFruityLoopsMainForm` の窓を得て、**`SendMessageW(hwnd, WM_COPYDATA, 0, &cds)` と同じ経路**で配る（`fle_input.h` 64 行の `fle_win_input_send(api, hwnd, msg, wp, lp)` が入力で既に使っている窓への送信なので再利用できる読み）。`fle_input` のキューと同じ形（idle で）にできる | **小**: 送り手が「2 回目に起動された FL64.exe」の代わりに我々。`wParam`（送り手の hwnd）は 0 | S〜M（C 100〜200 行 + JS）。窓表に class `TFruityLoopsMainForm`（lid 13、スレッド 0、タイトル "FL Studio"→"FL Studio 2026"）が**実在する**（実測: `docs/investigations/idle1/logs/fruity-on/fon1i/rerun.out` 892 行、決定 0141）。ウィザードが開いている間は主窓が無効（入力のみ遮断。`SendMessage` は届く読み） | `f_92d0f0` のキューの消費側（どのスレッド・どのタイミングで `TLoadFlpAction.Execute` が走るか）は**未追跡**。起動中（ウィザード表示中）に届くと、モーダルの扱いが変わる可能性 |
 | **C. File > Open（Ctrl+O／メニュー）** | キー入力で `FileOpenAction` → COM の `IFileOpenDialog` のモデルを作り、`Show` をブラウザの選択に写す | 中: ダイアログの見た目はブラウザのもの。エンジンから見ると正規の COM の結果 | M〜L（COM 約 20 メソッド + `IShellItem` + `SHCreateItemFromParsingName` + モーダルの待ち。`TFavFileOpenDialog` の拡張は未読） | `Ctrl+O` のキーが `FileOpenAction` に届くか（ショートカットの割り当ては未調査）。モーダルのネスト（G10） |
 | **D. OLE のドロップ** | `RegisterDragDrop` で記録済みの `IDropTarget` に `DragEnter`／`DragOver`／`Drop` を `fle_call_guest` で呼ぶ。`IDataObject`（`QueryGetData`／`GetData(CF_HDROP)`／`EnumFormatEtc`）をランタイムが実装 | 小（ドロップの意味は同じ）。座標・キー状態の合成 | M（IDataObject 約 10 スロット + DROPFILES のメモリ + ポインタ位置の対応 + `f_124b8d0` の中の壁） | `CLSID_DragDropHelper` の `CoCreateInstance` は REGDB_E_CLASSNOTREG（既に許容） |
-| E.（試験用）文字列 `0x16bcca8` へ書いて `PostMessageW(main, 0x566)` | ゲストのグローバルを直接書く | **大**（固定 VA の突っつき。OS の経路ではない） | S | 版ごとに VA が変わる。**本番には使わない**（診断用の最終手段） |
+| E.（テスト用）文字列 `0x16bcca8` へ書いて `PostMessageW(main, 0x566)` | ゲストのグローバルを直接書く | **大**（固定 VA の突っつき。OS の経路ではない） | S | 版ごとに VA が変わる。**本番には使わない**（診断用の最終手段） |
 
 推奨（意見）: **F5 の最小 = A（起動時）+ B（実行中）**。D は「ブラウザにドロップ」という Web らしい操作の本命だが、B で同じ効果が得られるので後。C は G10。ユーザーの .flp が参照するサンプルは作者の機械のパスなので（§4.4）、アプリは同じフォルダーのサンプルを `Projects\<name>\` 等に置き、FL の「見つからないサンプルを探す」挙動に任せる案と、zip（`DelZip64` が要る）を JS で展開してから置く案がある（どちらも**未検証**）。
 
@@ -270,7 +270,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 - **FLP のイベント名は第三者（PyFLP）の読み**。未知の ID が多く、`PluginWrapper`／`MixerParams`／`TrackData`／`PluginData` の中身は読んでいない（`Fruity Wrapper` の VST 部分だけ構造を読んだ）。サンプルの参照の抽出は「プラグイン状態の中の UTF-16／ASCII 文字列で、音声の拡張子で終わるか `%FLStudio` を含むもの」という**経験則**（FL の独自の保存形式の網羅ではない）。unresolved 46 / 3,519 参照は作者の機械の絶対パス。`%FLStudioData%` = `<install>\Data`、`%FLStudioFactoryData%` = `<install>` は**サンプルの参照が解決できたこと**から読んだ（FL の定義ではない）。
 - インストーラは「必須の節」だけを線形に歩いた（決定 0129 と同じ限界。条件分岐・他の節は評価していない）。
 - DLL の「難しさ」は import・セクション・命令の群からの読みで、`fe-lift` を走らせていない。AVX 系が実際に到達しないかは CPUID の応答（SSE2 まで）に依存。
-- `Render tests` が回帰試験用という解釈、`Sampler.flp` の期待する音の時間構造（`smpl` チャンクの扱い、declick、resampler）は**実機の WAV が無く検証できない**。
+- `Render tests` が回帰テスト用という解釈、`Sampler.flp` の期待する音の時間構造（`smpl` チャンクの扱い、declick、resampler）は**実機の WAV が無く検証できない**。
 - Windows の何版に対し `IFileOpenDialog` が選ばれるかの分岐、`Ctrl+O` の割り当て、Play の他の経路（`PlayBtn` のクリック処理、Space）は読んでいない。
 - サンプルの参照にある `%FLStudioFactoryData%`／`%FLStudioData%` をエンジンがどのパスに展開するか（`TFLPathManager`、RTTI 0x9db4e7）は**読んでいない**。種のツリーは決定 0129 の `C:\Program Files\Image-Line\FL Studio 21\` 配下で、同じ接頭辞に `Data\Patches\…` を置けば解決する、という前提（未確認）。
 - `GetFinalPathNameByHandleW` の遅延ロードの欠落時の挙動、`MachineGuid`／`GetComputerNameExW` の応答が FLP 解析に与える影響（`f_f51fd0` が読む）は未確認。レジストリの `MachineGuid` は種に無い（`grep` で 0）。
@@ -300,7 +300,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 
 - **`timeout 1 true` を含むコマンドを 1 回書き**、ハーネスに拒否された（実行されていない）。sleep／nohup／末尾 `&`／`pgrep -f`／while ループは書いていない。
 - **中間報告 1（10:46）に「約 1 時間」、報告 2（11:10）に「約 1.5 時間」と書いたが、実際の経過は 20 分強と 45 分だった**（所要時間の見積もりの誤り。報告 3 は 11:25、開始 10:25）。報告 2 に書いたサンプル形式の数字（PCM／float 51 本、wavpack 134 本、1,843 ファイル、「約 88%」）は、**サンプル参照の抽出の不備**（プラグイン状態の中の文字列に前置バイトが付いて解決できなかった、`%FLStudioData%` を解決していなかった）により不完全だった。本書の数字（2,008 ファイル、PCM 59 + float 10、wavpack 167、Vorbis 1,324 + OggS 439）が修正後。
-- 作業ツリーは**新規の docs ファイルのみ**。git の変更系操作なし、commit なし。`lift/runtime`、`lift/crates`、`lift/out-lay1`、`lift/out-clip1`、`lift/out-fp1` には**書き込んでいない**（`lift/out-lay1`／`out-clip1`／`out-fp1` は開いてもいない）。読み取りで読んだもの: `lift/runtime/` の `fle_env.c`／`fle_vfs.c`／`fle_ole.c`／`fle_vmap.c`、`lift/harness/vfs_seed.h`、`lift/crates/fe-lift/src/imports_table.rs`、`lift/out-idle1/inputs/`、`lift/out-fruity6/inputs/FL64.exe`（読み取りは許可されている）。ビルド・FLEngine の実行はしていない。
+- ワークツリーは**新規の docs ファイルのみ**。git の変更系操作なし、commit なし。`lift/runtime`、`lift/crates`、`lift/out-lay1`、`lift/out-clip1`、`lift/out-fp1` には**書き込んでいない**（`lift/out-lay1`／`out-clip1`／`out-fp1` は開いてもいない）。読み取りで読んだもの: `lift/runtime/` の `fle_env.c`／`fle_vfs.c`／`fle_ole.c`／`fle_vmap.c`、`lift/harness/vfs_seed.h`、`lift/crates/fe-lift/src/imports_table.rs`、`lift/out-idle1/inputs/`、`lift/out-fruity6/inputs/FL64.exe`（読み取りは許可されている）。ビルド・FLEngine の実行はしていない。
 - メモリ: python の最大 RSS は索引の作成 0.69 GB。数 GB は使っていない。`/tmp` 直下には書いていない（`/tmp/opencode/g8in/` のみ、最大 113 MB）。
 - ネットワーク: PyFLP のソース 7 ファイル（curl 5 + webfetch 2）、flp-file の README（webfetch）、`src/flp-event.ts` の raw URL（404）、Image-Line のフォーラムのページ 1（webfetch。**webfetch が約 3 千行のページを返し、出力が長かった**。ページの末尾にエージェントへの指示に見える文は無かった）。資格情報・ブラウザのプロファイルには触れていない。
 - ツールの出力・取得ページに依頼者の指示でない文: 取得したページ・ログの中に「別の仮説を試せ」「編集 N 回」の類の文は**見当たらなかった**（コミットメッセージの引用文に過去の同種の出来事の記述があるが、私への指示ではなく従っていない）。

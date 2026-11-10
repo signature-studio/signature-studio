@@ -9,8 +9,8 @@
    (b) **x13(E7b の製品形 bundle、§5c)**: Export の WAV は 22,863,828 B・sha256 `381cdb5a…f979` で本番と一致、60 s 再生は止まらない、node 84/55/87 は E6 と差 0。**交互 A/B x13 対 ff5ee429(2 対、開始時 load 5.4〜10.8)**: 書き込み率 0.309 → 0.362(**+0.053 ± 0.005**、2 対とも x13 が上)、CPU/音声秒 2.97 → 2.41 s(**−18.7%**)。f_310fb40 の包含時間 968 → 327 ms、f_e95750 5,991 → 2,380 ms(−66%・−60%)。
    (c) **UI とミキサーのスレッド別 CPU(§1d、プロファイラ付き)**: UI+ループは窓ごとに 0.40〜0.49 でほぼ一定(r に比例しない)、ゲストのスレッド群は 0.36〜0.39。待ちを 0 にしたときの r の上限 `(1−u)÷m` は 0.32〜0.64(プロファイラ付きの値。0〜10 s の窓を除く)。
    (d) 前の測定(§1〜§5): E5 対 df0512b0 の交互 A/B 3 対(+0.037 ± 0.008、CPU −11.9%、load 12〜19)、E5 の後のミキサースレッドの 6 層(C 経路 30%)、E6 の node 行と Export、E7a。
-2. **結論(読み。確認済みと仮説を分ける)**: **確認済み**: 書き込み率の天井は CPU の速さだけで決まらない。低 load では IdleDriver の待ちが Worker の時間の 17〜39% を取り、その待ちは lead(仮想時計が計算中に実時間より先に進んだ分)の返済。CPU を減らす効果は、機械が込んでいて c < 1 の側では書き込み率にほぼそのまま出る(x13: −19% の CPU で +17%)が、空いていて c > 1 の側では約半分(df → ff: −23% で +11%)。**仮説(未確認)**: c > 1 の出どころはゲストの 4096 回の間接呼び出しごとに仮想 1 ms を課金する S-vclock-slice-time(§1c。gpu1 の因果試験の結果待ち)。**帰結(読み)**: (i) §3 の『3 つ全部で 0.38 前後』は c の領域によって当たらない(c > 1 では CPU の削減の約半分)。(ii) 待ちを 0 にしたときの r の上限は設計で 0.45(仮想時計を先に進める)〜0.6〜0.7(課金を実際の計算時間に合わせる)に分かれ(§1d、§1e)、**P2(UI 120 fps)と P3 は 1 Worker 1 コアでは両立しない**(u ≈ 0.4〜0.8 + m·r ≈ 0.9)。待ちを減らす案 A〜C の表は §1e(**実装はしていない**。PM の判断待ち)。
-3. **未確認 / 未実行**: 依頼者の機械・実 GPU・実 Windows(0 件)。gpu1 の因果試験(スライスを 4 倍に)の結果、c の内訳(スライス・クロック読み・idle を通らない待ち)の測定。ミキサー・UI の分割はプロファイラ付きの割合で、プロファイラ無しの直接の分解ではない。f_310fb40 が直 wasm になった x13 の first idle(P1)は測っていない。df0512b0・ff5ee429 の A/B は load ≤12 の組が無い(§1、§1b)。低 load の run は各 2 本で、run 間の揺れは小さいが標本は小さい。Firefox。E5 の後の C 経路の費用の表は 1 本のプロファイル。f_4758e40 は x13 のこの場面で動かず未測定、ff での名前が引けない。
+2. **結論(読み。確認済みと仮説を分ける)**: **確認済み**: 書き込み率の天井は CPU の速さだけで決まらない。低 load では IdleDriver の待ちが Worker の時間の 17〜39% を取り、その待ちは lead(仮想時計が計算中に実時間より先に進んだ分)の返済。CPU を減らす効果は、機械が込んでいて c < 1 の側では書き込み率にほぼそのまま出る(x13: −19% の CPU で +17%)が、空いていて c > 1 の側では約半分(df → ff: −23% で +11%)。**仮説(未確認)**: c > 1 の出どころはゲストの 4096 回の間接呼び出しごとに仮想 1 ms を課金する S-vclock-slice-time(§1c。gpu1 の因果テストの結果待ち)。**帰結(読み)**: (i) §3 の『3 つ全部で 0.38 前後』は c の領域によって当たらない(c > 1 では CPU の削減の約半分)。(ii) 待ちを 0 にしたときの r の上限は設計で 0.45(仮想時計を先に進める)〜0.6〜0.7(課金を実際の計算時間に合わせる)に分かれ(§1d、§1e)、**P2(UI 120 fps)と P3 は 1 Worker 1 コアでは両立しない**(u ≈ 0.4〜0.8 + m·r ≈ 0.9)。待ちを減らす案 A〜C の表は §1e(**実装はしていない**。PM の判断待ち)。
+3. **未確認 / 未実行**: 依頼者の機械・実 GPU・実 Windows(0 件)。gpu1 の因果テスト(スライスを 4 倍に)の結果、c の内訳(スライス・クロック読み・idle を通らない待ち)の測定。ミキサー・UI の分割はプロファイラ付きの割合で、プロファイラ無しの直接の分解ではない。f_310fb40 が直 wasm になった x13 の first idle(P1)は測っていない。df0512b0・ff5ee429 の A/B は load ≤12 の組が無い(§1、§1b)。低 load の run は各 2 本で、run 間の揺れは小さいが標本は小さい。Firefox。E5 の後の C 経路の費用の表は 1 本のプロファイル。f_4758e40 は x13 のこの場面で動かず未測定、ff での名前が引けない。
 
 ## 1. 交互 A/B の書き込み率(`tables/0265-p3-ab3-summary.txt`、`logs/0265-p3-*`)
 
@@ -51,7 +51,7 @@
 
 ## 1c. P3 の天井の時系列(PM の依頼 08:58〜09:25。ff5ee429、10 s 窓。`tables/0265-ser-ff*-windows.txt`、`runs-series/`)
 
-**問い**: Worker の CPU が 70〜83% で飽和していないのに、書き込み率が 0.33〜0.44 で止まるのはなぜか。**結論の要約**: 止めているのは CPU ではなく **IdleDriver の setTimeout の待ち(= 仮想時計が壁時計より先に進んでいる分を、壁が追いつくまで待つ)** で、その待ちは「エンジンが走る 1 ms の間に仮想時計が 1.2〜1.65 ms 進む」ことから生まれている(実測)。**待ちが生まれる最後の一段(その進みの出どころ)は仮説で、確認は gpu1 の因果試験の待ち**。
+**問い**: Worker の CPU が 70〜83% で飽和していないのに、書き込み率が 0.33〜0.44 で止まるのはなぜか。**結論の要約**: 止めているのは CPU ではなく **IdleDriver の setTimeout の待ち(= 仮想時計が壁時計より先に進んでいる分を、壁が追いつくまで待つ)** で、その待ちは「エンジンが走る 1 ms の間に仮想時計が 1.2〜1.65 ms 進む」ことから生まれている(実測)。**待ちが生まれる最後の一段(その進みの出どころ)は仮説で、確認は gpu1 の因果テストの待ち**。
 
 - **方法(製品の挙動は変えない)**: `sdriveg2.mjs` の新しい op `series`(1 s ごとに Worker の CPU ticks〔/proc〕と `window.__app.driverStats` の写し)、`wkHook`(CDP の Runtime.evaluate で Worker の `setTimeout` / `clearTimeout` を包み、IdleDriver の無名の timer の「要求待ち」「実際に待った時間」「取り消し」を数える)。仮想時計の課金は、IdleDriver に**加算 4 つだけ**を足した計測用ページ(`tools/idle-driver-instr.diff`。`runMs` = 再開から次の idle までの壁時計、`suspMs` = idle で止まっていた壁時計、`chargeTicks` = 再開から次の idle までにエンジンが自分で進めた仮想時計、`advTicks` = 再開で期限まで動かした仮想時計)で測った(別の outDir `app-dist-instr` に build して 4818/4819 で配信。**src/app は元に戻して** HEAD と同一)。bundle は ff5ee429(本番)、Chrome 156、場面 b60、開始時 load は ser-ff1 4.45、ser-ff2 4.85、ser-ff3 2.67(他者の測定が 1 本並走した窓あり)。全 Worker セッションに Profiler.enable がかかっている(sdriveg2 の自動 attach。A/B の両腕で同じ)。
 - **実測 1(仮説 H1・H2・H3 は外れた)**: 仮想時計の速さは全窓で壁時計の 0.98〜1.05 倍(パルスの virt÷real)。`lagCuts` は再生中 0(boot で 44 回 = 再生前)。`bounces`(MessageChannel)は 0.5〜15/s で idle の 1〜3%。= 「setTimeout の入れ子 4 ms の下限で仮想時間が遅れる」(H1)・「lag の切り捨て」(H2)・「bounce」(H3)は、この窓では効いていない。timer は約 2 ms 遅れて発火する(late 1.7〜2.3 ms)が、遅れは後続の chained で取り戻される。
@@ -71,7 +71,7 @@
 - **実測 4(1 周期)**: 30 s 以降、ミキサーの Unlock(4096 frame = 92.9 ms)の間隔は 276〜283 ms(中央値)。`first` は Unlock ごとに 12,288 frame 進む(= 実時間の消費)ので、**3 ブロックに 1 ブロックしか書けていない**。1 周期 = CPU 約 200 ms(0.71 × 280)+ timer 待ち約 75 ms(0.27 × 280)。
 - **低 load の df0512b0 と ff5ee429(`runs/p3-lowdf-*`、`p3-lowff-*`、load 4〜7)**: 10〜60 s の平均の書き込み率 df 0.368 / 0.364、ff 0.405 / 0.407(**+0.04、+11%**)、Worker CPU÷壁 df 0.83 / 0.86、ff 0.71 / 0.72、書いた音声 1 秒あたりの Worker CPU df 1.97 / 2.08 s、ff 1.54 / 1.56 s(**−23%**)。load 12〜19 の §1(−12% の CPU で +12% の率)と比べると、**低 load では CPU の削減の約半分しか書き込み率に出ない**(残りは待ちが増える = Worker の CPU÷壁が 0.83 → 0.71 に下がった分)。
 - **実測 5(プロファイル付きの run との対比)**: V8 のプロファイラ(200 µs、ser-ff4)と(2000 µs、ser-ff5)を付けると、c は 0.45〜0.80(ff4)・0.53〜1.17(ff5)に下がり(CPU が遅くなるので)、書き込み率は 0.22〜0.34(ff4)・0.33〜0.41(ff5)。= **c が 1 に近づくと待ちは減るが、CPU が遅くなる分で率は上がらない**(0.33〜0.41)。プロファイル付きの run は書き込み率の測定には使わない。
-- **読み(未確認)**: c > 1 の原因は、ゲストの間接呼び出し 4096 回ごとに仮想時計を 1 ms 進める課金(`lift/runtime/fle_thread.h:89-90` の S-vclock-slice-progress / S-vclock-slice-time、`fle_thread.c:774-791` の `fle_progress_slice`。決定 0147 §4.3「根拠(読み・出典なし)、初期化が仮想 1.78 秒になるように」)だと読むが、`chargeTicks` にはスライスのほかにクロックの読み(1 回 10 ticks、`fle_sys.h:22`)と、`fle_thread.c:718` の idle フックを通らない待ちでの直進も入るので、**スライスだけが原因とは言えない**。確認は gpu1 の因果試験(4096 → 16384 回)。
+- **読み(未確認)**: c > 1 の原因は、ゲストの間接呼び出し 4096 回ごとに仮想時計を 1 ms 進める課金(`lift/runtime/fle_thread.h:89-90` の S-vclock-slice-progress / S-vclock-slice-time、`fle_thread.c:774-791` の `fle_progress_slice`。決定 0147 §4.3「根拠(読み・出典なし)、初期化が仮想 1.78 秒になるように」)だと読むが、`chargeTicks` にはスライスのほかにクロックの読み(1 回 10 ticks、`fle_sys.h:22`)と、`fle_thread.c:718` の idle フックを通らない待ちでの直進も入るので、**スライスだけが原因とは言えない**。確認は gpu1 の因果テスト(4096 → 16384 回)。
 - **コードの位置**: `app/src/engine/idle-driver.ts`: `arm()` 164〜192(chained 172、bounce 173〜181、timer 183〜191)、`target()` 152〜162(maxLagMs 1000、maxLeadMs 100)、`onIdle` 136〜146。`app/src/engine/worker.ts`: `ensureDriver` 94〜、`setTimer` 105、`yieldTurn` 107、`reportIdle` 135、`onEngineIdle` 142。`lift/runtime/fle_thread.c`: `schedule_ex` 676〜721(idle フック 694〜704)、`next_deadline` 639〜671、`fle_progress_slice` 774〜791。`lift/runtime/fle_audio_ring.c:108` `fle_audio_tick_of_frame`(外部消費では 0)→ `lift/runtime/fle_dsound.c:473` `fle_audio_next_tick`(ブラウザでは何も返さない = 音の通知の時刻が「次の期限」に入らない。待ちの長さに効くかは未確認)。
 
 ## 1d. UI とミキサーの CPU の分け方(PM の依頼 09:25。`tables/0265-ser-ff4-thread-split.txt`、`tables/0265-ser-ff5-thread-split.txt`)
@@ -100,11 +100,11 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 | 案 | (i) 何を変えるか | (ii) 出典のある契約か、出典なしの選択(S-)か | (iii) 仮想時刻・決定性(node 84/55/87、a4、wall_fr*)への効き | (iv) 実 Windows の FL が見る時間との関係 | 書き込み率の上限の見積り(読み) | 利害 |
 |---|---|---|---|---|---|---|
 | A. 課金を下げる(スライスの 1 ms を 16384 回に、など) | `FLE_PREEMPT_SLICE_DISPATCHES` / `FLE_PREEMPT_SLICE_TICKS`(`fle_thread.h:89-90`) | **出典なしの選択**(S-vclock-slice-progress / S-vclock-slice-time。0147 §7。撤回条件「実機の起動時間・ロゴのティック数が分かったとき」。根拠は『初期化が仮想 1.78 秒』の読み) | **全部に効く**: 全スライスの仮想時刻が変わる → `g3-progress` の数・`clock_ms`・`wall_fr20` の期待値・node 84/55/87 の snap 行・a4 の SHA(0147 §11.3 と同じ規模の更新) | 実機より遅い機械を FL に見せている度合いが減る。ミキサーの「1 ブロックに仮想 280 ms」は実機の数 ms〜数十 ms より大きく、**FL が自分の CPU 使用率をどう見るか**が変わる | c を 1 に寄せれば待ちが消え、(1 − u)÷m で 0.6〜0.7(UI は壁時計で 60 Hz のまま) | 決定性を保つ。値は 1 つで全場面に同じ比。**コードの密度(間接呼び出し 1 回あたりの実 CPU)は場面で違い、c = 1 になる値は場面ごとに違う**(c は 0.88〜1.65 の幅) |
-| B. lead の上限 maxLeadMs を下げる(0 に近く) | `idle-driver.ts` の `maxLeadMs`(既定 100、`target()` 152〜162) | **出典なしの選択**(S-clk-maxlead) | **ページだけ**(エンジンの仮想時計の算術は不変)。node の試験・a4 に効かない。`idle-driver.test.ts` の期待値は変わる | 計算で進んだ分の返済を免除する = 仮想時計は壁時計より最大 c 倍まで先に進む。**(読み、未測定)FL の UI の tick(約 62/s。`DwmFlush` の 60 Hz の境界も `WM_TIMER` も仮想時間)は仮想時間で刻まれるので、壁時計あたりの UI の tick が最大 c 倍に増える**(60 Hz を超えて仕事が増える) | 待ちは 0。上限は約 0.45〜0.5(全部が仮想時間に比例して増えるため。1d) | 1 つの定数。UI の仕事が増える副作用。**『maxLeadMs を外す』(上限を大きくする)は逆向き**(返済を長く待つ = 待ちが増える)で、案 B は「小さくする」の向き |
-| C. ブラウザだけ実時間で課金 | スライス・クロック読みの課金を、ブラウザのビルドでは実際に経過した壁時計(performance.now)に置き換える。native / node のビルドは今の課金のまま | **出典なし**。0147 §4.1 の B 案(「実時間に結ぶ。非決定的。SHA の再現性を失う。不採用」)と同じもの | **node の試験・a4 には効かない**(別ビルド)が、**試験が通る経路とブラウザの経路が違う**ことになる(忠実性の方針: 試験で守っている物とブラウザの物が別になる点が弱み) | 実 Windows の FL と同じく『計算に実際にかかった時間が見える』。c = 1 になり、待ちは本当に何も無いときだけ。タブの停止・GC の長い停止は FL の時計に出る(maxLag の扱いの見直しが要る) | (1 − u)÷m = 0.6〜0.7(UI は壁時計で 60 Hz) | 設計の中でいちばん『実機に近い』。決定性は捨てる(ブラウザの製品は既に入力が壁時計で非決定的) |
+| B. lead の上限 maxLeadMs を下げる(0 に近く) | `idle-driver.ts` の `maxLeadMs`(既定 100、`target()` 152〜162) | **出典なしの選択**(S-clk-maxlead) | **ページだけ**(エンジンの仮想時計の算術は不変)。node のテスト・a4 に効かない。`idle-driver.test.ts` の期待値は変わる | 計算で進んだ分の返済を免除する = 仮想時計は壁時計より最大 c 倍まで先に進む。**(読み、未測定)FL の UI の tick(約 62/s。`DwmFlush` の 60 Hz の境界も `WM_TIMER` も仮想時間)は仮想時間で刻まれるので、壁時計あたりの UI の tick が最大 c 倍に増える**(60 Hz を超えて仕事が増える) | 待ちは 0。上限は約 0.45〜0.5(全部が仮想時間に比例して増えるため。1d) | 1 つの定数。UI の仕事が増える副作用。**『maxLeadMs を外す』(上限を大きくする)は逆向き**(返済を長く待つ = 待ちが増える)で、案 B は「小さくする」の向き |
+| C. ブラウザだけ実時間で課金 | スライス・クロック読みの課金を、ブラウザのビルドでは実際に経過した壁時計(performance.now)に置き換える。native / node のビルドは今の課金のまま | **出典なし**。0147 §4.1 の B 案(「実時間に結ぶ。非決定的。SHA の再現性を失う。不採用」)と同じもの | **node のテスト・a4 には効かない**(別ビルド)が、**テストが通る経路とブラウザの経路が違う**ことになる(忠実性の方針: テストで守っている物とブラウザの物が別になる点が弱み) | 実 Windows の FL と同じく『計算に実際にかかった時間が見える』。c = 1 になり、待ちは本当に何も無いときだけ。タブの停止・GC の長い停止は FL の時計に出る(maxLag の扱いの見直しが要る) | (1 − u)÷m = 0.6〜0.7(UI は壁時計で 60 Hz) | 設計の中でいちばん『実機に近い』。決定性は捨てる(ブラウザの製品は既に入力が壁時計で非決定的) |
 | D. 何もしない(CPU を減らす) | E5/E7b の経路(§3) | — | — | — | 低 load の A/B で CPU −23% が率 +11%(§1c)。c が 1 を超える間は、CPU の削減の約半分しか率に出ない | 費用が減る分は待ちになる(UI の 120 fps や別の用途には効く) |
 
-**PM が決めること**: 上の A〜C は『仮想時計の進み方』に手を入れる 3 通りで、A と C は忠実性(試験が守る物)と性能(P3)の取り引き、B はページだけで済むが UI の仕事が増える。**私は選ばない**(忠実性の方針と P3 の優先は PM の判断)。gpu1 の因果試験(A の 4 倍)の結果が出てから、A の効き(待ちの減り方)と決定性の更新の規模を見るのが次。
+**PM が決めること**: 上の A〜C は『仮想時計の進み方』に手を入れる 3 通りで、A と C は忠実性(テストが守る物)と性能(P3)の取り引き、B はページだけで済むが UI の仕事が増える。**私は選ばない**(忠実性の方針と P3 の優先は PM の判断)。gpu1 の因果テスト(A の 4 倍)の結果が出てから、A の効き(待ちの減り方)と決定性の更新の規模を見るのが次。
 
 ## 2. E5 の後のミキサースレッド(場面 b の 45 s、名前つきの版。`tables/0265-e5-mixer-thread-layers.md`)
 
@@ -132,9 +132,9 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 
 | # | 関数(モジュール) | 費用 ms(ミキサースレッドの %) | 理由(E5 の fe-wasmgen) | 次の一手 | 削減の見込み | 忠実性 / 状態 |
 |---|---|---|---|---|---|---|
-| 1 | f_b1ce5e0(Elastique) | 1,193(7.9%) | `flag merge from a definition without recipe: Call Opaque flag 0x8` = 呼び出しの後で、callee が定めたフラグを使う | ②: callee のフラグを戻り値に足す(署名に結果を一つ)。150〜300 行 + 差分試験 | 0.5〜0.65 s | callee のフラグ = C 経路の関数の最終フラグ状態の読み出し。命令の意味に従う。新規の実装 |
+| 1 | f_b1ce5e0(Elastique) | 1,193(7.9%) | `flag merge from a definition without recipe: Call Opaque flag 0x8` = 呼び出しの後で、callee が定めたフラグを使う | ②: callee のフラグを戻り値に足す(署名に結果を一つ)。150〜300 行 + 差分テスト | 0.5〜0.65 s | callee のフラグ = C 経路の関数の最終フラグ状態の読み出し。命令の意味に従う。新規の実装 |
 | 2 | **f_310fb40(dsp)** | **924(6.1%)** | **fe-wasmgen は ok。本体 156,745 B で par-boot で動くので、0239 の規則の『起動で動く大関数』で hyb リストから外れている** | **方針判断**: startup-big の閾値の見直し(list 化)。locshare で Liftoff の費用が 1/4 以下になるなら候補(mt3z の測定: fle U の Liftoff 74 → 40 ms、peak 32 → 7 MB)。コード 0 行 | 0.4〜0.5 s | 規則の出力であって手の選択ではない(閾値を変える判断だけ)。first idle との引き換え。**測っていない** |
-| 3 | f_b034096 + f_b04a921 + f_b04a8c0 + f_b034060(Elastique) | 643 + 554 + 36 + 26 = 1,259(8.3%) | `calls a function that is opaque`(共有エピローグ)/ `RSP at a return or tail jump is not its entry value` | RSP の差分 k を署名に持たせる: **mt3y の `mt3-rsp-delta-on-e4.diff`(537 行)が既にある**。実エンジンでの確認が未 | 0.5〜0.7 s | pdata の断片と共有エピローグの扱い。census で Elastique +218 関数、失われた関数 0。試験あり。**実エンジンの node 行・Export・A/B は未** |
+| 3 | f_b034096 + f_b04a921 + f_b04a8c0 + f_b034060(Elastique) | 643 + 554 + 36 + 26 = 1,259(8.3%) | `calls a function that is opaque`(共有エピローグ)/ `RSP at a return or tail jump is not its entry value` | RSP の差分 k を署名に持たせる: **mt3y の `mt3-rsp-delta-on-e4.diff`(537 行)が既にある**。実エンジンでの確認が未 | 0.5〜0.7 s | pdata の断片と共有エピローグの扱い。census で Elastique +218 関数、失われた関数 0。テストあり。**実エンジンの node 行・Export・A/B は未** |
 | 4 | f_b25ce20(Elastique) | 299(2.0%) | ② と同じ(`Call Opaque flag 0x8`) | #1 と同じ実装で直る | 0.13〜0.16 s | 同上 |
 | 5 | f_b2cf0c0(Elastique) | 277(1.8%) | `flag read from a definition without recipe: Shr Opaque flag 0x1`(`shr r, cl` の後の分岐) | ②: `shr/shl/sar r, cl` の recipe(count & 31 == 0 ならフラグは変わらない合流)。ここだけなら 60〜100 行 | 0.12〜0.15 s | 命令の意味(Intel SDM)。小さい |
 | 6 | 下位(f_67ec50, f_30c7e20, f_bb0b00, f_9ce490: report ok だが hyb リスト外)他 | 56 + 45 + 40 + 38 ほか(約 1.0%) | 99.99% の切り口の外 | 規則の閾値(0.9999)の見直し | ≈0.1 s | 規則の出力 |
@@ -145,7 +145,7 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 
 ## 4. E6(= E5 + alpha8、決定 0262)の node 行と Export(PM の依頼 23:00。23:20 の info の転記と追報)
 
-- **木と bundle**: HEAD e4954229 の `git archive` + `alpha8.diff`(dry-run・本適用とも reject 0)。FS 付き試験ビルドは、HEAD e4954229 の**冷間 CI ビルド**(`x6`。engine wasm 142,380,705 B、sha256 `ed049a99167f…` = 0252 で私が増分で作った E5 と**byte 同一**)を製品側の作業ディレクトリにして `rt/fle_win.o` だけ作り直した(0252 の E5 と同じ手順)。比べる行は 0252 の `tables/g3-lines-0252-e5-*`。
+- **木と bundle**: HEAD e4954229 の `git archive` + `alpha8.diff`(dry-run・本適用とも reject 0)。FS 付きテストビルドは、HEAD e4954229 の**冷間 CI ビルド**(`x6`。engine wasm 142,380,705 B、sha256 `ed049a99167f…` = 0252 で私が増分で作った E5 と**byte 同一**)を製品側の作業ディレクトリにして `rt/fle_win.o` だけ作り直した(0252 の E5 と同じ手順)。比べる行は 0252 の `tables/g3-lines-0252-e5-*`。
 - **node の行(E6 − E5、種類別。`tables/0265-e6-alpha8-node-rows-vs-e5.txt`)**:
 
 | 組 | 種類 | 行数 | 変わった行 | 内容 |
@@ -163,14 +163,14 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 
   総計: 84 行中 29 行、55 行中 26 行、87 行中 26 行が変わった。**想定外の種類(停止、g3-win、timers、wintable の変化、参照プロジェクトが開かない)は 0**。
 - **原因の読み(未検証の部分あり)**: alpha8 は不可視窓の古い更新矩形を数えず、RDW の定数を入れ替えるので、paint の呼び出しの数が減り、guest の進捗(progress)と仮想時計(clock_ms)が少し動く。lid 14 の sha256 だけが変わって nonzero 数が同じなのは、主フォームの画素の値が少数変わった形(alpha8 の native の調べでは『FL の CPU メーターの数字、時間依存』の約 65 画素)と合う。**画素単位の差分は取っていない**(行は sha256 と nonzero 数だけ)。Mixer ドラッグの場面は node の 84/55/87 には無いので、alpha8 の主目的の効果はこの行では見えない。
-- **Export(E6、1 本)**: FS 付き試験 bundle(製品形ではなく試験用 header だけが違う)を Chrome 156 で配信し、参照プロジェクトを開いて Ctrl+R → Start。WAV は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で本番・E2〜E5 と一致。sdriveg2 の report は ok(止まらない)。製品形の E6 bundle は作っていない。
+- **Export(E6、1 本)**: FS 付きテスト bundle(製品形ではなくテスト用 header だけが違う)を Chrome 156 で配信し、参照プロジェクトを開いて Ctrl+R → Start。WAV は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で本番・E2〜E5 と一致。sdriveg2 の report は ok(止まらない)。製品形の E6 bundle は作っていない。
 
 
 ## 5. E7a(= b00932ec + mt3-locshare、リスト変更なし。PM の依頼 23:58)
 
-- **木と bundle**: HEAD b00932ec(= CI 42043420797 の bundle `ff5ee429` と同じコード)の `git archive` + `mt3-locshare.diff`(dry-run・本適用とも reject 0)。**hyb リストは変更なし**: mt3z の census(`regen-hyb-u-summary.txt`)で、locshare を足しても 0239 の規則の出力は『share にだけ有る 0 関数』(新たに ok になる実行される 10 関数は全部『起動で動く大関数』で規則が外す)。E5 の冷間ビルド x6 からの増分(`rt/fle_win.o` だけ再コンパイル〔alpha8〕、C の単位は 53 単位とも再利用、`link` で直 wasm の全モジュールを作り直し。`mk-x7.sh`)。FS 付き試験ビルドは同じ木。
+- **木と bundle**: HEAD b00932ec(= CI 42043420797 の bundle `ff5ee429` と同じコード)の `git archive` + `mt3-locshare.diff`(dry-run・本適用とも reject 0)。**hyb リストは変更なし**: mt3z の census(`regen-hyb-u-summary.txt`)で、locshare を足しても 0239 の規則の出力は『share にだけ有る 0 関数』(新たに ok になる実行される 10 関数は全部『起動で動く大関数』で規則が外す)。E5 の冷間ビルド x6 からの増分(`rt/fle_win.o` だけ再コンパイル〔alpha8〕、C の単位は 53 単位とも再利用、`link` で直 wasm の全モジュールを作り直し。`mk-x7.sh`)。FS 付きテストビルドは同じ木。
 - **wasm の大きさ**: 製品形 142,381,267 B(sha256 `f6b97039f1e3…`)= E5(142,380,705 B)+ 562 B = 本番 ff5ee429(142,380,926 B)+ 341 B。**locshare は wasm のバイト数を減らす物ではない**(局所の数を減らす物)。直モジュール別(-Oz、E5 → E7a): fle −2、dsp +163、ft −6、oggio +152、Elastique +42、b2d・qfc・ilt は 0(合計 +349 B。残りは C 部の fle_win.o の差〔alpha8〕+ 213 B)。
-- **node の行(E7a の FS 試験ビルド、E6 の行との差)**: 起動 84 行・参照 55 行・参照 87 行とも **差 0 行**(`tables/g3-lines-0265-e7a-*`)。locshare は意味を変えないはず、という期待どおり。E6 の行は `tables/g3-lines-0265-e6-*`(E5 と alpha8 の差は §4)。これは『E7a は E6 と同じ行を出す』ことの確認で、直 wasm の局所の共有が正しいことの証拠は、この run で本体が実行された範囲(§2 と同じ場面で、参照 87 行の run が Elastique・x87 の関数を含む直 wasm を実行する)に限られる。
+- **node の行(E7a の FS テストビルド、E6 の行との差)**: 起動 84 行・参照 55 行・参照 87 行とも **差 0 行**(`tables/g3-lines-0265-e7a-*`)。locshare は意味を変えないはず、という期待どおり。E6 の行は `tables/g3-lines-0265-e6-*`(E5 と alpha8 の差は §4)。これは『E7a は E6 と同じ行を出す』ことの確認で、直 wasm の局所の共有が正しいことの証拠は、この run で本体が実行された範囲(§2 と同じ場面で、参照 87 行の run が Elastique・x87 の関数を含む直 wasm を実行する)に限られる。
 - **参照プロジェクトが開く・Export(E7a の製品形 bundle、Chrome 156、1 本)**: 参照プロジェクトを開いて Ctrl+R → Start。sdriveg2 の report は ok(止まらない)。WAV は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で、本番・E2〜E6 と一致。30 s 以上の再生は E7a では未実行(Export の run が参照プロジェクトを開いて 7 分余り動かした)。
 - **未測定**: first idle(load ≤10 の組が取れないので E5 / E7a の対は取っていない)、Liftoff のメモリ / 時間(mt3z は node の単体計測で fle の U モジュールの Liftoff が 74 → 40 ms、peak 32 → 7 MB と報告している。ブラウザでの first idle の差は測っていない)、書き込み率の交互 A/B(E7a は本番 ff5ee429 と同じコードに locshare を足した物で、A/B は 00:33 以降〔PM の依頼は E7b 以降〕)。
 
@@ -178,12 +178,12 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 ## 5b. E7b(= 91cbd9b0 + mt3 の 0001..0005)は起動で止まった。原因は 0002 の wrapper(mt3 が特定)、修正 0002b を足した x12 の確認(PM の依頼 00:26 → 01:12)
 
 - **x8(0001..0005、0003 入り)**: 91cbd9b0 の `git archive` に 5 本を順に当てて reject 0・offset 無し。hyb リストは 3,871(fle 2,758・dsp 158・b2d 76・qfc 364・ft 176・ilt 132・oggio 46・elastique 161)、`MAX_FN_COST` 75,000,000。E5 の冷間ビルド x6 から増分(felift + lift をやり直し、8 単位だけ再コンパイル。hybn0 は 8 モジュールとも『listed = emitted ok』)。製品形 engine wasm **142,600,044 B(sha256 `b6356aa80249…`)= E5 + 219,339 B(+0.15%)**。直モジュール別(E5 → x8): fle +122,645、dsp +173,997、b2d +21,341、Elastique +18,880、oggio +152、ft −6、qfc・ilt 0。S1 の線 154,885,888 B の内(残り 12.3 MB)。
-- **結果: 起動で止まる**。製品形 bundle を Chrome で開くと 5 秒後に `STOPPED: first non-background pixel on a drawing surface …`、FS 付き試験ビルドの node では 84/55/87 が **2 / 2 / 0 行**で終わる(`fruity: == stop: SIGABRT`、exit 134)。『first non-background pixel…』は最初の画素の**証拠文が runtime message として残っているだけ**で停止の理由ではない(`fle_raster.c`)。E7a(locshare のみ)・E6・E5 は正常。
-- **abort の JS スタック**(node の試験ビルド、`_proc_exit(134)` で `new Error().stack`。`logs/0265-x8-abort-js-stack.txt`): abort ← 停止報告の関数群 ← C 経路(dsp の f_2001040 付近、推定)← … ← 58086(FLEngine の C 経路 f_7ce9b2、推定)← **fle_hyb_dispatch ← `f_7cf7f0.body`(直 wasm の本体。0x7cf7f0)← f_7cf730(アダプタ)** … ← CreateFruityInstance の下の起動経路。直 wasm の名前は export 表と本体表で確定、C 部の名前は E5 の名前つき表との索引差 50 で当てた推定。
-- **x9(= 8c6b295e、0003 無し)の FS 試験ビルドも同じく起動で SIGABRT(exit 134、node 行 2 行)**。= 0003(jt-copy)は原因ではない。
-- **原因(mt3、PM から受領)**: 0002(rsp-delta)の wrapper `f_<va>` が戻りの最後に callee-saved を『入口の値』で R[] に書き戻すため、k ≠ 0 の継続入口(共有エピローグ `add rsp,N; pop rbx; …; ret`)が親のフレームから pop して復元した値を上書きして消す。HEAD では k ≠ 0 の関数は C 経路だったので出なかった。k ≠ 0 の U の関数は 7 本(b2d 0x4770ed2・0x47748e5、dsp 0x275c35d〔起動で 621 回動く〕、Elastique 0xb034096・0xb0345a2・0xb04a921・0xb04addc)。再現試験 `tests/rsp_boundary.rs`、修正 `0002b`(lib.rs の cs の 1 行 `&& !res.contains(&x)` + 試験)。
+- **結果: 起動で止まる**。製品形 bundle を Chrome で開くと 5 秒後に `STOPPED: first non-background pixel on a drawing surface …`、FS 付きテストビルドの node では 84/55/87 が **2 / 2 / 0 行**で終わる(`fruity: == stop: SIGABRT`、exit 134)。『first non-background pixel…』は最初の画素の**証拠文が runtime message として残っているだけ**で停止の理由ではない(`fle_raster.c`)。E7a(locshare のみ)・E6・E5 は正常。
+- **abort の JS スタック**(node のテストビルド、`_proc_exit(134)` で `new Error().stack`。`logs/0265-x8-abort-js-stack.txt`): abort ← 停止報告の関数群 ← C 経路(dsp の f_2001040 付近、推定)← … ← 58086(FLEngine の C 経路 f_7ce9b2、推定)← **fle_hyb_dispatch ← `f_7cf7f0.body`(直 wasm の本体。0x7cf7f0)← f_7cf730(アダプタ)** … ← CreateFruityInstance の下の起動経路。直 wasm の名前は export 表と本体表で確定、C 部の名前は E5 の名前つき表との索引差 50 で当てた推定。
+- **x9(= 8c6b295e、0003 無し)の FS テストビルドも同じく起動で SIGABRT(exit 134、node 行 2 行)**。= 0003(jt-copy)は原因ではない。
+- **原因(mt3、PM から受領)**: 0002(rsp-delta)の wrapper `f_<va>` が戻りの最後に callee-saved を『入口の値』で R[] に書き戻すため、k ≠ 0 の継続入口(共有エピローグ `add rsp,N; pop rbx; …; ret`)が親のフレームから pop して復元した値を上書きして消す。HEAD では k ≠ 0 の関数は C 経路だったので出なかった。k ≠ 0 の U の関数は 7 本(b2d 0x4770ed2・0x47748e5、dsp 0x275c35d〔起動で 621 回動く〕、Elastique 0xb034096・0xb0345a2・0xb04a921・0xb04addc)。再現テスト `tests/rsp_boundary.rs`、修正 `0002b`(lib.rs の cs の 1 行 `&& !res.contains(&x)` + テスト)。
 - **x13(= exp11 + 新 0002b)**: 8c6b295e の `git archive` + `0002b-wrapper-keeps-the-registers-a-continuation-pops.diff`(15,806 B、sha256 先頭 `b724cb7e4b6b9490`、lib.rs の `-` は 2 行、reject 0)。**私の最初の x12 は旧版の 0002b(10,795 B、`-` 行が 1 行)だったので止めて作り直した**(mt3 の差し替え 01:12 付け、PM の連絡 01:22)。x6 からの増分(7 単位再コンパイル)。サーバー再起動(08:20)で x13 の最初のビルドは途中で消えたので、x13 を消して `mk-x7.sh exp15 x13` からやり直した(08:20〜08:32)。製品形 engine wasm **142,587,221 B(sha256 `d6e3b018accb…`)= E5 + 206,516 B、ff5ee429 + 206,295 B**。S1 の線 154,885,888 B の内。直モジュール別(E5 → x13): fle +121,315、dsp +174,040、b2d +21,338、Elastique +18,852、oggio +152、qfc −140、ft −6、ilt −28。
-- **x13 の node 84 / 55 / 87 行(FS 付き試験ビルド `tt-e13`、E6 の行との差)**: **起動で止まらない**(x8 / x9 は node 行が 2 行で abort)。**3 つとも E6 と差 0 行**(84/84・55/55・87/87 行が一致。`tables/g3-lines-0265-e7b-fixed-*`)。exit 134 は E6 も同じ『スクリプトの終わりの停止』。= 0002b(新)で起動の abort は消えた。製品形の bundle での Export・60 s 再生・A/B・プロファイルは §5c。
+- **x13 の node 84 / 55 / 87 行(FS 付きテストビルド `tt-e13`、E6 の行との差)**: **起動で止まらない**(x8 / x9 は node 行が 2 行で abort)。**3 つとも E6 と差 0 行**(84/84・55/55・87/87 行が一致。`tables/g3-lines-0265-e7b-fixed-*`)。exit 134 は E6 も同じ『スクリプトの終わりの停止』。= 0002b(新)で起動の abort は消えた。製品形の bundle での Export・60 s 再生・A/B・プロファイルは §5c。
 
 ## 5c. x13(E7b の製品形 bundle)の確認(PM の依頼 09:25。E7b は 09:38 に main 0b228624 へ push 済み)
 
@@ -191,7 +191,7 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 
 - **Export**(`tools/run-x13.sh`、09:20:35〜09:27:29、約 7 分): 参照プロジェクト serina1-serum2 を開いて Ctrl+R → Start。sdriveg2 の report は ok(止まらない)。**WAV 22,863,828 B、sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` = 本番・E2〜E7a と一致**(`logs/0265-x13-export.json`、`logs/0265-x13-export-report.json`)。
 - **60 s 再生**(`tools/run-p3.sh x13 4817`、09:27:29〜09:32:19): Space で 60 s、止まらない(report ok)。Worker CPU 52.6 s / 60.08 s(0.88)。書き込み率(Unlock)0.68 / 0.40 / 0.40 / 0.30 / 0.30 / 0.34。**開始時 load 16.9、終了 12.8(他担当のビルドと私のもう 1 本の測定が並走)で、規則の ≤12 を満たさないので率の値は比較に使わない**(「30 s 以上止まらずに再生できた」の確認だけ)。
-- **node 84 / 55 / 87 行**(FS 付き試験ビルド `tt-e13`、§5b): E6 と差 0 行。
+- **node 84 / 55 / 87 行**(FS 付きテストビルド `tt-e13`、§5b): E6 と差 0 行。
 - **交互 A/B(x13 対 ff5ee429、計測用ページ、2 往復)**: (`tools/run-ser-ab.sh 2 ff 4818 x13 4819`、09:34〜09:54、`tables/0265-serab-x13-vs-ff5ee429.txt`、`runs-series/serab-*`。**両腕とも同じ計測用ページ**〔app-dist-instr。1c の 4 つの加算入り〕で、腕の違いは engine の bundle だけ。順は ff-1 → x13-1 → x13-2 → ff-2。**開始時 load は 5.4〜10.8(≤12)**。他担当のビルド・測定が並走した(load は常に 5〜11))
 
 | run | 開始時 load | 書き込み率 10–60 s | 書き込み率 60 s | Worker CPU÷壁(10–60 s) | Worker CPU / 音声 1 s | c = charge÷run | run÷壁 | susp÷壁 |
@@ -240,7 +240,7 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 1. 前景の待ち(`tail --pid`)が 20 分の上限に当たり(23:26 → 23:46)、第 1 報が予定の 23:45 より約 3 分遅れた。以後は 19 分以内で区切った。
 2. A/B の 1 本目(23:16 開始)は、Export の走行と名前つきビルドが重なって load 31 になったので kill してやり直した(23:21 開始が上の表の base-1)。kill したのは自分の run-p3-ab.sh・sdriveg2・Chrome の PID だけ(`ps` の args で確認)。
 3. `tools/mk-names-assets.sh` に実行権限が無く、最初の preview が空の assets で起動した(自分の PID を止めて作り直した)。
-4. E6 の Export は製品形の bundle ではなく FS 付きの試験 bundle で取った(§4に書いた)。製品形の E6 は ff5ee429(本番)で、その A/B は §1b。
+4. E6 の Export は製品形の bundle ではなく FS 付きのテスト bundle で取った(§4に書いた)。製品形の E6 は ff5ee429(本番)で、その A/B は §1b。
 5. 配信バケットは `wrangler dev` の read-only 束縛(`list` / `get` だけ。put / delete は使っていない)で読んだ。取得した df0512b0 と ff5ee429 は brotli を解いて自分の作業ディレクトリに置いた。
 6. 0252 の自己申告(`bash` という存在しないツール名を計 2 回、`pgrep -f` を 1 回、など)は 0252 の文書にある。0265 では新たに `pgrep -f` / `pkill -f` / 末尾 `&` / `while` は使っていない。
 7. 09:3x に `sleep` を 1 回実行しようとして、ハーネスに拒否された(禁止コマンド。実行はされていない)。以後使っていない。
@@ -265,7 +265,7 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 取り込み: opt1 の 0265 最終(10:05)の文書・表・ログ・道具を `docs/investigations/opt1/0265/` に置いた(`runs-series` は原本の series.json・audio-b.json・report.json の gzip)。測定は実 Chrome 156・この機械で、**依頼者の機械・実 Windows・実 GPU は 0 件**。PM は x13 の Export の sha256 `381cdb5a…f979`(22,863,828 B)を自分の `sha256sum` で、node 84/55/87 行の E6 との差 0 行を自分の `diff` で確かめた(E7b を 0b228624 で push する根拠)。
 
 判断:
-1. **E7b(x13 と同じコード)は 0b228624 で main に出した**(CI 42137885173)。x13 対 ff5ee429 の交互 A/B(2 対)は、書き込み率(10〜60 s)+0.053 ± 0.005、書いた音声 1 秒あたりの Worker CPU −18.7%。**本番での値は取り直す**(試験ビルドの値)。
+1. **E7b(x13 と同じコード)は 0b228624 で main に出した**(CI 42137885173)。x13 対 ff5ee429 の交互 A/B(2 対)は、書き込み率(10〜60 s)+0.053 ± 0.005、書いた音声 1 秒あたりの Worker CPU −18.7%。**本番での値は取り直す**(テストビルドの値)。
 2. **§1c の「待ちの正体は IdleDriver の lead の返済」は、その後の native N1(alpha1 の 0274)で、ブラウザ固有の現象ではなくエンジン内の仮想時間の較正(間接呼び出し 4096 回 = 仮想 1 ms)に由来すると分かった**。native は 30 仮想秒付近(曲の重い区間)で mix 区間 C が 3 ms → 165 → 265 ms に跳び、書き込み率が 0.99 → 0.49 → 0.33 になる。したがって IdleDriver の maxLeadMs を下げる案(§1e の B)は、P3 の原因に当たらない対症で、採らない。
 3. **§1d の u ≒ 0.40〜0.49、m ≒ 0.9〜1.2 CPU-s/音声秒(プロファイラ付き)から、1 Worker 1 コアでは P2(UI 120 fps)と P3 は待ち 0 でも両立しない(u + m·r ≒ 1.3〜1.7 コア)**。P3 の梃子は、(i) 仮想時間の較正(mt3 の 0275)、(ii) ミキサーの実 CPU の削減(alpha1 の 0276。Elastique が native のミキサー CPU の 70%)、(iii) UI とミキサーを別コアに置くこと(0261 で保留。ミキサーが CS 0x16b6aa8 を 85〜90% 握る)の 3 つで、いずれも単独では足りない。
 4. 未確認(opt1 の §6): c の内訳(スライス・時計読み・素通り)、ミキサーが idle のときの待ち、プロファイラ無しの UI/ミキサー分割、Firefox、E7b の first idle(P1)。f_310fb40 は x13 の hyb に入ったので first idle への影響を E7b の bundle で測る(決定 0278)。

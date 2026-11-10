@@ -1,13 +1,13 @@
 # 決定 0322(ci1): lift 忠実性の静的点検
 
-**実エンジンの実行は 0(読みだけ)。** 実行したのは `grep`・`sed`・`awk`・python(S 印の集計)・`git archive` + `patch --dry-run`(差分案 2 本)だけ。Chrome・Firefox・Wine・clang・rustc・wasm-opt・emcc・node の書き出し・試験・cargo・vite build は 0 回。測定値は 0 件(下の数字はすべて「数えた件数」か「決定文書から転記した値」で、後者は決定番号を付けた)。依頼者の機械の値は 0 件。
+**実エンジンの実行は 0(読みだけ)。** 実行したのは `grep`・`sed`・`awk`・python(S 印の集計)・`git archive` + `patch --dry-run`(差分案 2 本)だけ。Chrome・Firefox・Wine・clang・rustc・wasm-opt・emcc・node の書き出し・テスト・cargo・vite build は 0 回。測定値は 0 件(下の数字はすべて「数えた件数」か「決定文書から転記した値」で、後者は決定番号を付けた)。依頼者の機械の値は 0 件。
 
 基準: HEAD `3969ad31`(`git archive` の木)。期限 08:30(機械の時計)。
 範囲: `app/src`(78 ファイル、11,435 行)、`lift/runtime/*.c *.h`(204 ファイル、57,486 行。`third_party/` は除く)、`app/worker` `app/shared` `app/tools` `app/scripts`(製品の経路にある物だけ見出しを確認)。音の経路(`audio/*`、`fle_dsound.c`、`fle_audio*`)は mt3 の担当なので表に入れない(件数だけ付録に載せる)。
 
 ## 0. 結論(先頭の数行)
 
-1. **FL のクラス名・窓の種類・題名・位置による分岐は、製品の経路に 0 件。** ページ(`app/src`)に FL のクラス名の分岐はない(`TFruity…` は `engine/os-state.ts:2` のコメント 1 件だけ)。ランタイムの `"TFruityLoopsMainForm"`(`fle_appfile.h:13`)は試験用の入口(`fle_appfile_open`)でしか使われず、製品のページは呼ばない(`app/src` に該当の語 0 件)。合成器(`fle_desk.c`)はクラス名・題名を診断の文字列にだけ使い、描画の判断には読まない(コメントと grep の両方で確認)。
+1. **FL のクラス名・窓の種類・題名・位置による分岐は、製品の経路に 0 件。** ページ(`app/src`)に FL のクラス名の分岐はない(`TFruity…` は `engine/os-state.ts:2` のコメント 1 件だけ)。ランタイムの `"TFruityLoopsMainForm"`(`fle_appfile.h:13`)はテスト用の入口(`fle_appfile_open`)でしか使われず、製品のページは呼ばない(`app/src` に該当の語 0 件)。合成器(`fle_desk.c`)はクラス名・題名を診断の文字列にだけ使い、描画の判断には読まない(コメントと grep の両方で確認)。
 2. **「余計な処理」と読めた物は 3 群。** (A) 診断を製品の描画経路で毎回作っている(`fle_desk.c` の `names_of` + `build_desc`、毎 compose・毎 scene)。(B) 死んだ設定: ページが `FLE_SCREEN_REMAXIMIZE=1` を渡すが、ランタイムは誰も読まない(決定 0243 が読む側を消した)。コメントはまだ「opt-in」と言う。(C) 入力の間引きが 2 段(ページの `IdleDriver` と ランタイムの `S-mousemove-coalesce`)。差分案は (A) と (B) の 2 本、**適用していない**(`diffs/`)。
 3. **「契約の不足(外部 API の実装不足)」と読めた物が上位 6 件**(表 6): (i) `WH_MOUSE` / `WH_KEYBOARD` のフックを記録するだけで呼ばない(前提「入力が無い」は決定 0136 で崩れた。再検討の条件が満たされたまま)、(ii) `HTTRANSPARENT` で入力を捨てる(Learn は「同じスレッドの下の窓へ送る」と書く)、(iii) `DefWindowProc(WM_ERASEBKGND)` が何も描かない(クラス表は `WNDCLASS` の全バイトを保存する〔`fle_class.c:74-85`〕が、背景ブラシを消去に使う所は 0 件)、(iv) 最大化窓の再配置が差分(dw, dh)の加算で、`WM_GETMINMAXINFO` を通らない(推測と明記済み: S-screen1-12)、(v) 合成器が最上位から 64 個で切る(65 個目以降の可視窓は描かれない)、(vi) タスクバーのボタンが 1 個。
 4. **「成功を返す」既定は多いが、ほとんどは文書の契約(Learn が値を書いている場合)か、Learn が沈黙している所での選択(S 印)で、止める(`fle_stop`)方針が一貫している。** 画素規則の未実装(模様ブラシ・太い線・破線・帯状の `StretchDIBits`)は黙って通さず、名前を付けて止める。
@@ -32,14 +32,14 @@
 
 | ID | 場所 | 内容 | 区分 | 根拠 | 除くと何が壊れる(仮説) |
 |---|---|---|---|---|---|
-| 1-1 | `lift/runtime/fle_appfile.h:13`、`fle_appfile.c:107-115` | クラス `TFruityLoopsMainForm` の最上位窓を探して `WM_COPYDATA` を送る(FL64.exe の二重起動の経路をホストが演じる) | (d)。試験・ホストの入口。製品のページは呼ばない | 0144 | G3 の `open` コマンドと g8 の試験が -1 を返す。製品への影響は無い(読み。呼び出し元は `lift/harness/fruity_g3.c:556` と `lift/harness/web/g8/g8_scenarios.c` だけ) |
+| 1-1 | `lift/runtime/fle_appfile.h:13`、`fle_appfile.c:107-115` | クラス `TFruityLoopsMainForm` の最上位窓を探して `WM_COPYDATA` を送る(FL64.exe の二重起動の経路をホストが演じる) | (d)。テスト・ホストの入口。製品のページは呼ばない | 0144 | G3 の `open` コマンドと g8 のテストが -1 を返す。製品への影響は無い(読み。呼び出し元は `lift/harness/fruity_g3.c:556` と `lift/harness/web/g8/g8_scenarios.c` だけ) |
 | 1-2 | `app/src/engine/appview.ts:34-52`、`lift/runtime/fle_appview.c:89` | 窓一覧のクラス名(32 バイト)と題名(64 バイト)を、一覧が変わるたびに全窓分 latin1 で文字列にする | (d) を製品の経路で行っている / (c) の余地 | 0141、0170(seq が同じなら読まない) | 製品が使うのは「active かつ visible で題名が空でない最初の窓」の題名だけ(`os-state.ts:14-17`)。クラス名は診断パネル(`ui/panels.ts:11`)だけ。除くとパネルの「class」列が空になる |
-| 1-3 | `lift/runtime/fle_desk.c:46,310-320,340,416-432,476,703` | 毎回の compose と scene で、可視の窓ごとに `names_of`(窓の表を引いてクラス名と題名を ASCII 化)と `build_desc`(最大 64 行の `snprintf`)を実行する。`dwin` に 128 バイトの文字列が入り、`memset` と `memcpy(prev, cur)` で毎回動く | (d) を製品の描画経路に置いている。**(a) に近い**。コメントが「診断のみ。合成器は読まない」と認めている | 0223、0244 | `fle_desk_describe`(試験の補助)を呼ぶ試験が影響を受ける。描画は変わらない(読み)。コストは**未測定** → 差分案 D2 |
+| 1-3 | `lift/runtime/fle_desk.c:46,310-320,340,416-432,476,703` | 毎回の compose と scene で、可視の窓ごとに `names_of`(窓の表を引いてクラス名と題名を ASCII 化)と `build_desc`(最大 64 行の `snprintf`)を実行する。`dwin` に 128 バイトの文字列が入り、`memset` と `memcpy(prev, cur)` で毎回動く | (d) を製品の描画経路に置いている。**(a) に近い**。コメントが「診断のみ。合成器は読まない」と認めている | 0223、0244 | `fle_desk_describe`(テストの補助)を呼ぶテストが影響を受ける。描画は変わらない(読み)。コストは**未測定** → 差分案 D2 |
 | 1-4 | `app/src/engine/os-state.ts:14-17`、`worker.ts:396-402` | `document.title` を「active・可視・題名が空でない最初の窓」の題名にする。空題名の窓(メニュー・ツールチップ)で題名が消えないよう、直前の題名を保つ | (?)。ページが窓の一覧を読む点は方針「ページは窓の知識を持たない」に触れる。FL の挙動には影響しない(ブラウザのタブの題名だけ) | 0199、0223 | タブの題名が FL の前面窓の題名に追従しなくなる。FL 自身の挙動は変わらない。置き換え案: ランタイムが「前面窓の題名」を 1 本の export で返す(GetForegroundWindow + GetWindowText の契約)。空題名を飛ばす規則は、その場合ランタイムかページのどちらかに必要か要検討 |
 | 1-5 | `app/src/ui/screen-fit.ts:6`、`input/events.ts:10`、`ui/desktop.ts` | 画面の大きさの既定 1920×1080(窓ではなく画面) | (?)。分岐ではなく既定値。エンジンが画面の大きさを報告するまでの仮の値 | 0098、0212 | 報告前のキャンバスの大きさ。報告後は無関係 |
 | 1-6 | `lift/runtime/fle_vfs.c:1688`、`fle_env.h:40,45` | 仮想ボリュームの路 `C:\Program Files\Image-Line\FL Studio 21\…`(インストールの配置のデータ) | (b)。環境のデータ。分岐ではない | コメントのみ(決定番号は未確認) | FL の起動が資源を見つけられない |
 
-確認の方法: `grep -nE "className|\.cls\b|TFruity|isMain|mainWindow" app/src/engine/{worker,desk,desk-gl,idle-driver,fruity}.ts app/src/input/*.ts app/src/ui/{taskbar,desktop,cursor}.ts app/src/main.ts` は題名・`className` の使用 4 件(1-2、1-4、main.ts の DOM の `className`)だけを返した。`strcmp|wcscmp` を `fle_win.c fle_desk.c fle_input.c fle_layered.c fle_dwm.c fle_appview.c fle_visrgn.c fle_gdc.c fle_monitor.c` に掛けた結果は、窓の分岐に使う比較 0 件(診断の複写だけ)。
+確認の方法: `grep -nE "className|\.cls\b|TFruity|isMain|mainWindow" app/src/engine/{worker,desk,desk-gl,idle-driver,fruity}.ts app/src/input/*.ts app/src/ui/{taskbar,desktop,cursor}.ts app/src/main.ts` は題名・`className` の使用 4 件(1-2、1-4、main.ts の DOM の `className`)だけを返した。`strcmp|wcscmp` を `fle_win.c fle_desk.c fle_input.c fle_layered.c fle_dwm.c fle_appview.c fle_visrgn.c fle_gdc.c fle_monitor.c` に掛けた結果は、窓の分岐に使う比較 0 件(診断のコピーだけ)。
 
 ## 3. 表 2: FL の窓管理の代行(前面化・閉じる・配置・可視・窓ごとの canvas の順序)
 
@@ -106,7 +106,7 @@
 
 | 順 | 表の ID | 疑い | 読みの強さ | 確かめる方法(私は実行していない) |
 |---|---|---|---|---|
-| 1 | 4-2 | フック(`WH_MOUSE` `WH_KEYBOARD`)を呼ばない | 強い(コード上、前提の崩れを確認) | FL が入れるフックの型と手続を G3 の fork プローブで見る(決定 0171 W14 の手順)。呼ぶ実装を入れて差分試験(Wine 10.0) |
+| 1 | 4-2 | フック(`WH_MOUSE` `WH_KEYBOARD`)を呼ばない | 強い(コード上、前提の崩れを確認) | FL が入れるフックの型と手続を G3 の fork プローブで見る(決定 0171 W14 の手順)。呼ぶ実装を入れて差分テスト(Wine 10.0) |
 | 2 | 2-3 | `HTTRANSPARENT` で入力を捨てる | 強い(Learn の原文と実装が食い違う) | `WM_NCHITTEST` が `HTTRANSPARENT` を返す窓があるかを窓表のログで探す。下の窓を試す実装を入れる(決定 0136 の再検討条件) |
 | 3 | 4-1 | `DefWindowProc(WM_ERASEBKGND)` が背景を塗らない、`hbrBackground` を読まない | 強い(コード上) / 影響は未確認 | `RegisterClass` で `hbrBackground` が NULL でない窓を窓表から数える。Balance の GUI の段階 3 の窓のクラスを見る |
 | 4 | 2-10 | 合成器が上の 64 窓で切る | 強い(コード上) / 発生は未確認 | 実走行の最大の最上位窓数を `fle_desk_describe` の行数か窓表で数える(窓の指示待ち) |
@@ -116,14 +116,14 @@
 
 ## 8. 差分案(提出のみ・適用していない)
 
-`diffs/` に 2 本。どちらも `git archive HEAD` の複製で `patch -p1 --dry-run` が **rc 0**(D1 は実適用も別の複製で rc 0。D2 は dry-run だけ)。**どちらもコンパイル・型検査・試験を実行していない**(窓の指示待ち)。
+`diffs/` に 2 本。どちらも `git archive HEAD` の複製で `patch -p1 --dry-run` が **rc 0**(D1 は実適用も別の複製で rc 0。D2 は dry-run だけ)。**どちらもコンパイル・型検査・テストを実行していない**(窓の指示待ち)。
 
 | 差分 | 内容 | 区分 | 変わる挙動 | 検査していない物 |
 |---|---|---|---|---|
-| `diffs/d1-dead-remaximize-env.diff`(47 行、sha256 先頭 `00fc23c43bde4aba`) | 死んだ環境変数 `FLE_SCREEN_REMAXIMIZE: '1'` をページから渡さない(`app/src/main.ts:343`)。コメント 3 箇所(`main.ts:322`、`ui/screen-fit.ts:4`、`fle_win.c:6748`)の「opt-in」を事実に合わせる | (a)(死んだ設定。決定 0243 [commit 6eb1737d] が読む側を消した。`grep REMAXIMIZE` の出現は `main.ts`・`screen-fit.ts`・`fle_win.c`・docs だけで、ランタイムの `getenv` は 0 件) | 0(ランタイムは読まない) | 型検査(`tsc`)。manifest の env の内容を主張する試験は `app/test` に無い(`grep` 0 件) |
-| `diffs/d2-desk-describe-lazy.diff`(sha256 先頭 `9996c00d7aa4aaaf`) | `fle_desk.c`: `dwin` から `cls[48]` `title[80]` を外して `hwnd` を持たせ、`names_of` を `build_desc` の中(= `fle_desk_describe` が呼ばれたとき)に移す。compose と scene から `build_desc()` を除く | (d) を製品の経路から切り離す(点検表の「診断→製品の経路から切り離す」) | 描画は変えない(読み)。`fle_desk_describe` は呼ばれた時点で窓の表を引くので、compose 後に壊された窓の行は題名が空になる | **C のコンパイル**、`harness/alpha1/glass_seq.c` `app/test/e2e/desk-synth/desk_synth.c` `app/test/e2e/*.mjs`(`describe` を読む試験)、コスト(`names_of` + `snprintf` の µs。測っていない) |
+| `diffs/d1-dead-remaximize-env.diff`(47 行、sha256 先頭 `00fc23c43bde4aba`) | 死んだ環境変数 `FLE_SCREEN_REMAXIMIZE: '1'` をページから渡さない(`app/src/main.ts:343`)。コメント 3 箇所(`main.ts:322`、`ui/screen-fit.ts:4`、`fle_win.c:6748`)の「opt-in」を事実に合わせる | (a)(死んだ設定。決定 0243 [commit 6eb1737d] が読む側を消した。`grep REMAXIMIZE` の出現は `main.ts`・`screen-fit.ts`・`fle_win.c`・docs だけで、ランタイムの `getenv` は 0 件) | 0(ランタイムは読まない) | 型検査(`tsc`)。manifest の env の内容を主張するテストは `app/test` に無い(`grep` 0 件) |
+| `diffs/d2-desk-describe-lazy.diff`(sha256 先頭 `9996c00d7aa4aaaf`) | `fle_desk.c`: `dwin` から `cls[48]` `title[80]` を外して `hwnd` を持たせ、`names_of` を `build_desc` の中(= `fle_desk_describe` が呼ばれたとき)に移す。compose と scene から `build_desc()` を除く | (d) を製品の経路から切り離す(点検表の「診断→製品の経路から切り離す」) | 描画は変えない(読み)。`fle_desk_describe` は呼ばれた時点で窓の表を引くので、compose 後に壊された窓の行は題名が空になる | **C のコンパイル**、`harness/alpha1/glass_seq.c` `app/test/e2e/desk-synth/desk_synth.c` `app/test/e2e/*.mjs`(`describe` を読むテスト)、コスト(`names_of` + `snprintf` の µs。測っていない) |
 
-適用するなら PM の窓で: D1 は型検査だけ、D2 は clang の build + `describe` を読む試験 + 前後の Worker CPU(ci1 の純粋 6 組)で、効果が見えなければ見送り。
+適用するなら PM の窓で: D1 は型検査だけ、D2 は clang の build + `describe` を読むテスト + 前後の Worker CPU(ci1 の純粋 6 組)で、効果が見えなければ見送り。
 
 除去の実験として**差分を出していない**物(壊れる物が出たら (b) の不足として API を拡充する、の方針で、窓の指示待ちの実験):
 - 5-1 ページ側の移動の合流(2-2 と二重): ランタイムの `S-mousemove-coalesce` だけにして、`maxQueue` を超えない取り込みの速さが出るか(G3 の移動洪水、`rejected` の数を見る)。
@@ -136,11 +136,11 @@
 読んだ(全文または該当の範囲):
 - ページ: `engine/idle-driver.ts`(全)、`engine/worker.ts`(全)、`engine/desk.ts`(全)、`engine/desk-gl.ts`(前 60 行と grep)、`engine/desk-sleep.ts` `os-state.ts` `taskbar-report.ts` `report-throttle.ts` `appview.ts`(全)、`engine/hz.ts`(前 40 行)、`input/{events,pointer,tracker,keymap,ring}.ts`(全)、`ui/{screen-fit,taskbar,desktop,cursor,panels}.ts`(全)、`main.ts`(grep と 320-352 行)。
 - ランタイム: S 印の全箇所の文脈(各 200 字。`census-S-markers.tsv`)、`fle_win.c` の窓管理・フック・`WM_ERASEBKGND`・`BeginPaint`・`fle_win_input_*` の該当、`fle_input.c` 668-760 行と 509・828-1007 行の該当、`fle_desk.c` 28-125・300-345・405-480・484-720 行、`fle_screen.h`(全)、`fle_thread.c` 810-860 行、`fle_appfile.h`(前 40 行)。
-- 決定・表: 0245、0262(冒頭)、0222(冒頭)、0143/0154(試験の記述のみ)、`docs/investigations/screen1/tables/s-choices.tsv` の 2 行、`docs/investigations/g3in/logs/S-table.md` の 1 行。
+- 決定・表: 0245、0262(冒頭)、0222(冒頭)、0143/0154(テストの記述のみ)、`docs/investigations/screen1/tables/s-choices.tsv` の 2 行、`docs/investigations/g3in/logs/S-table.md` の 1 行。
 
 読んでいない(「問題なし」とは言わない):
 - `fle_win.c` 7,000 行余のうち、上に挙げた以外の大部分。`fle_gdi.c` の画素規則の実装本体、`fle_raster.c`。`fle_filedlg.c`(32 箇所)、`fle_vfs.c`、`fle_locale.c`、`fle_seh.c`、`fle_sweep1_kbd.c`、`fle_wall_*.c`、`fle_ole.c`、`fle_clip.c` ほか。S 印の約 300 件は文脈を一覧にしただけで、一件ずつの区分は付けていない。
-- `fle_x87.c` / `fle_mxcsr*.h` / `fle_sse*.h`: 命令の意味の近道。`fle_mxcsr_flags.h` は「RC=0 のとき float/double の高速経路、外れたら整数の経路」で、方針の点検表 (B)(厳密な前条件 + 元の経路へ戻る)の形。決定 0143(55 種 × 10^8 = 5.5×10^9 回、不一致 0、変異 36 件中 33 検出、3 件は等価と読む)と 0154(9.18×10^9 件、不一致 0、変異 39 件中 38 検出)に試験の記述がある。私は試験を再実行していない。`fle_x87.c` は 80 ビットの自前実装(f64 近似ではない)と読んだ(`from_f64` は f64 の入力を f80 に変換する関数で、演算を f64 で行っていない: 1461 行のうち 300-390 行を見ただけ。**未確認**)。
+- `fle_x87.c` / `fle_mxcsr*.h` / `fle_sse*.h`: 命令の意味の近道。`fle_mxcsr_flags.h` は「RC=0 のとき float/double の高速経路、外れたら整数の経路」で、方針の点検表 (B)(厳密な前条件 + 元の経路へ戻る)の形。決定 0143(55 種 × 10^8 = 5.5×10^9 回、不一致 0、変異 36 件中 33 検出、3 件は等価と読む)と 0154(9.18×10^9 件、不一致 0、変異 39 件中 38 検出)にテストの記述がある。私はテストを再実行していない。`fle_x87.c` は 80 ビットの自前実装(f64 近似ではない)と読んだ(`from_f64` は f64 の入力を f80 に変換する関数で、演算を f64 で行っていない: 1461 行のうち 300-390 行を見ただけ。**未確認**)。
 - lift 側(`crates/fe-lift`、`fe-wasmgen` の生成 C): 範囲外。
 - `app/src` の `perf/*`、`ui/latency.ts`、`audio/*`、`engine/{fruity,hostfiles,filedlg,client}.ts`、`ui/filedlg.ts`、`files/*`、`plugins/*`、`bundle/*`: 計測・入出力・ファイル・音で、窓や画素を決める所ではないと読んだが、全文は読んでいない。
 - `app/worker/*`(Cloudflare Worker)と `app/shared/*`: サーバー側で、FL の挙動に触れない(見出しのみ)。
@@ -153,7 +153,7 @@
 2. 点検の途中で、PM から「Chrome の順番」の info が来た(Filter の V3 → ci1 の Chrome の Export WAV → opt1 の Wine → ci1 の E14 e2e)。私は Chrome を一度も使っていない。
 3. 行番号は `grep -n` の出力から転記した。ページの `*.ts` の一部(`hz.ts` `pointer.ts` `keymap.ts` `tracker.ts` の範囲)は読んだ出力から数えた概数で、±数行ずれる可能性がある。表の「除くと何が壊れる」は読みの予想で、実行していない。
 4. D2 は C の差分で、**コンパイルしていない**。`patch --dry-run` が通ることだけを確認した。
-5. 表中の「決定文書から転記した値」(0245 の 8.87 → 0.016 ms/フレーム、973 → 585 ms/s、0143/0154 の試験件数)は再測定していない。5-3 の `lagCuts 18.2 → 3.8` は私の E14 の純粋 6 組の値(`0277/e14/RESULTS-E14-pure.md`)。
+5. 表中の「決定文書から転記した値」(0245 の 8.87 → 0.016 ms/フレーム、973 → 585 ms/s、0143/0154 のテスト件数)は再測定していない。5-3 の `lagCuts 18.2 → 3.8` は私の E14 の純粋 6 組の値(`0277/e14/RESULTS-E14-pure.md`)。
 6. 4-4(メニュー)と 4-6(`VirtualProtect`)は、FL が実際にその経路を通るかを確認していない。4-1 の Balance GUI との関係は読みだけの仮説。
 7. 区分 (a)/(b)/(c)/(d)/(?) は私の判断。(a) と書いた行も、除去の実験をしていないので「余計」と断定していない。
 
@@ -174,5 +174,5 @@ PROVISIONAL の行数が多いファイル: `fle_win.c` 53、`fle_gdi.c` 29、`f
 
 取り込み: ci1 の 0322(本文)と表・差分案(`docs/investigations/ci1/0322/`)、0321 の再現シナリオと道具(`docs/investigations/ci1/0321/`)。**実エンジンの実行は 0(読みだけ)、依頼者の機械は 0 件**。差分案 2 本は適用していない。
 
-**PM の判断**: (1) FL のクラス名・窓の種類・題名・位置による分岐は製品の経路に 0 件(ci1 の grep)。依頼者の問い『全体の仕組みを直す方針は徹底されているか』への根拠にする。読んだ範囲はランタイム 57k 行のうち数千行で、読んでいない所の『問題なし』は言っていない。(2) D1(死んだ `FLE_SCREEN_REMAXIMIZE` の除去、挙動 0)は採る。D2(診断の文字列を compose から切り離す)も方向として採る(診断は製品の描画経路に置かない。条件: clang の型検査、describe を読む試験、Worker の CPU の前後)。どちらも runtime の C とページに触れるので、push は後の G9 の push に載せる(全段の冷間 build)。入力の合流 2 段などの除去の実験は窓で行う候補として記録(今は実験しない)。(3) 契約の不足(b)の 6 件は ci1 が差分を作る(0323。①`DefWindowProc(WM_ERASEBKGND)` の背景消去 ②`HTTRANSPARENT` ③`WH_MOUSE`/`WH_KEYBOARD`。④⑤⑥ は後)。①は Balance の GUI が『枠だけ・client が透ける』ことと関係する疑い(読みだけの仮説)。
+**PM の判断**: (1) FL のクラス名・窓の種類・題名・位置による分岐は製品の経路に 0 件(ci1 の grep)。依頼者の問い『全体の仕組みを直す方針は徹底されているか』への根拠にする。読んだ範囲はランタイム 57k 行のうち数千行で、読んでいない所の『問題なし』は言っていない。(2) D1(死んだ `FLE_SCREEN_REMAXIMIZE` の除去、挙動 0)は採る。D2(診断の文字列を compose から切り離す)も方向として採る(診断は製品の描画経路に置かない。条件: clang の型検査、describe を読むテスト、Worker の CPU の前後)。どちらも runtime の C とページに触れるので、push は後の G9 の push に載せる(全段の冷間 build)。入力の合流 2 段などの除去の実験は窓で行う候補として記録(今は実験しない)。(3) 契約の不足(b)の 6 件は ci1 が差分を作る(0323。①`DefWindowProc(WM_ERASEBKGND)` の背景消去 ②`HTTRANSPARENT` ③`WH_MOUSE`/`WH_KEYBOARD`。④⑤⑥ は後)。①は Balance の GUI が『枠だけ・client が透ける』ことと関係する疑い(読みだけの仮説)。
 

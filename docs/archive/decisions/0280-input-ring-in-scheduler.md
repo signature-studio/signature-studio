@@ -4,7 +4,7 @@
 
 ## 冒頭の三点
 
-1. **何を実行したか**: (a) C の試験(native、本物の runtime〔`fle_thread.c`、`fle_input.c`、`fle_win.c` ほか 29 個〕+ スタブのゲスト関数。`harness/gpu7/ring_poll.c`、`tests/gpu7_ring_poll.rs`: L1 v3 の木で 4 本、L1c の木で 6 本 + 既存 `wall_fr9t` 18 本)、(b) app の試験(**積んだ木 = e8-wip a1e96d92 + `gpu7-L1-LC.diff`**: typecheck rc=0、vitest 1,310 passed + 7 skipped、test:worker 49、test:e2e 229/229〔1 回目は load 30 前後で 175/177、taskbar の Tab / Enter の timeout 2 件〕)、(c) 試作を入れた bundle の増分ビルド(`ciL` = L1、`ciLC` = L1 + 答えの規則)、(d) **実 Chrome 156 headless で実エンジンを動かした入力遅延 T の測定**: 低 load の交互 3 往復(§6.1。T の列は下限)、**同時 2 Chrome の対 2 回(本番 ff5ee429 対 測定専用ページ。真の T)**(§6.3)、idle の交互 3 往復(§6.4)、L1c の対(§6.5)。**代役・再生なし。ただし測定専用ページ `srcLB`(答えの条件にクラス名を含む)は製品ではなく、`gpu7-L1*.diff` に入っていない。**
+1. **何を実行したか**: (a) C のテスト(native、本物の runtime〔`fle_thread.c`、`fle_input.c`、`fle_win.c` ほか 29 個〕+ スタブのゲスト関数。`harness/gpu7/ring_poll.c`、`tests/gpu7_ring_poll.rs`: L1 v3 の木で 4 本、L1c の木で 6 本 + 既存 `wall_fr9t` 18 本)、(b) app のテスト(**積んだ木 = e8-wip a1e96d92 + `gpu7-L1-LC.diff`**: typecheck rc=0、vitest 1,310 passed + 7 skipped、test:worker 49、test:e2e 229/229〔1 回目は load 30 前後で 175/177、taskbar の Tab / Enter の timeout 2 件〕)、(c) 試作を入れた bundle の増分ビルド(`ciL` = L1、`ciLC` = L1 + 答えの規則)、(d) **実 Chrome 156 headless で実エンジンを動かした入力遅延 T の測定**: 低 load の交互 3 往復(§6.1。T の列は下限)、**同時 2 Chrome の対 2 回(本番 ff5ee429 対 測定専用ページ。真の T)**(§6.3)、idle の交互 3 往復(§6.4)、L1c の対(§6.5)。**代役・再生なし。ただし測定専用ページ `srcLB`(答えの条件にクラス名を含む)は製品ではなく、`gpu7-L1*.diff` に入っていない。**
 2. **結論**: 下の『結論』。
 3. **未確認**: 依頼者の機械・実 GPU の値(0 件)。実エンジンでの node 84/55/87 行と a4(PM が回す)。Firefox。長時間(5 分以上)の再生での安定。入力の種類(ホイール・ドラッグ・複数ボタン)の網羅。高 load(15 以上)での試作(同時 2 Chrome で load 10〜15 までは測った)。UI が別スレッドに描画を非同期に任せる経路の有無(L1c の限界)。
 
@@ -13,21 +13,21 @@
 1. **L1(スケジューラの点で入力 ring を読む)は、再生中の入力の待ち B を取る**: 同時 2 Chrome の対 2 回(load 10〜15)で、**File クリックの真の T の中央値 201 → 30 ms(p90 401 → 40)、Esc 86 → 10 ms**、B の中央値 122 → 3.8 ms、書き込み率は同じ(§6.3)。製品の答えの規則 **L1c(settled)** の実エンジンでの対(load 17〜33): File クリック 275 → 36 ms、Esc 176 → 12 ms、物理的に速すぎる答え 0、答えなし 0、書き込み率は同じ(§6.5)。**P2 の再生中の入力遅延に対する最大の梃子**で、残りの C(UI の処理)は変わらない(P3 の課金・CPU の側。0281)。
 2. **最初に出した『File クリックの T 59 → 17 ms』は撤回する**: 試作の答えの帰属の誤り(再生ヘッドなど別の変化の提示を答えにした)で下限にしかならなかった。最小 T 1.7 ms が idle の最小 5.7 ms より速いことが証拠(§6.2)。有効なのは B の短縮(122 → 3.8 ms)と書き込み率の不変。
 3. **差分は 2 つ**: `gpu7-L1.diff`(L1 v3。T が下限になる答えの規則のまま)と `gpu7-L1-LC.diff`(L1 v3 + L1c = 製品の答えの規則)。**L1c を載せる**のを勧める。どちらも e8-wip a1e96d92・d6926b4d・main 93e12685 に `patch -p1 --batch --dry-run` rc=0。`-` の行は `ring.ts` の 2 行だけ。**E9(E8 + L1c + 課金の見直し)に載せる前提**(PM 10:30)。
-4. **決定性**: 入力のない走行では、scheduler の点の poll と settled の語の書き込みは何も変えない(C の試験 6: 仮想時計・スレッドの順が一致)。入力のあるとき、新経路は仮想時計を進めずに積む(§3)ので、入力の仮想時刻が idle 経路より早くなりうる。node の 84/55/87 行・a4 は PM が回す。
+4. **決定性**: 入力のない走行では、scheduler の点の poll と settled の語の書き込みは何も変えない(C のテスト 6: 仮想時計・スレッドの順が一致)。入力のあるとき、新経路は仮想時計を進めずに積む(§3)ので、入力の仮想時刻が idle 経路より早くなりうる。node の 84/55/87 行・a4 は PM が回す。
 5. **未確認**: 依頼者の機械・実 GPU(0 件)、高 load(15 以上)の試作の再現、他の入力(ドラッグ・ホイール・複数ボタン)、長時間の再生、Firefox、syscmd の復元ボタンの実エンジンでの動作、UI が別スレッドに描画を非同期に任せる経路(L1c の限界)。
 
 ## 1. 何を変えたか(ファイル別)
 
 | ファイル | 変更 | 行数 |
 |---|---|---|
-| `lift/runtime/fle_thread.c` | `schedule_ex()` のループの先頭(`poll_waiters()` の前)で、弱い関数 `fle_input_ring_poll()` があれば呼ぶ。wasm ビルド(`__EMSCRIPTEN__`)か、試験の `-DFLE_RING_POLL_HOOK` のときだけ(native の `fle_thread.o` は不変: `wall_fr9t.rs` の同一性試験が通る) | +8 |
+| `lift/runtime/fle_thread.c` | `schedule_ex()` のループの先頭(`poll_waiters()` の前)で、弱い関数 `fle_input_ring_poll()` があれば呼ぶ。wasm ビルド(`__EMSCRIPTEN__`)か、テストの `-DFLE_RING_POLL_HOOK` のときだけ(native の `fle_thread.o` は不変: `wall_fr9t.rs` の同一性テストが通る) | +8 |
 | `lift/harness/fruity_idle.c` | `fle_input_ring_poll()`: JS の import `fle_js_input_poll(buf, 16)` でページのリングの記録を最大 16 件、wasm のメモリ上の固定バッファ(8 語 × 16)に写させ、**runtime が** `fle_input_host_mouse` / `fle_input_host_key` / `fle_input_host_display`(idle 経路の export `fle_g3_*` と同じ関数)で `evq` に積み、結果(1 = 積んだ、0 = 断った)を語 6 に書き、`fle_js_input_done` で Worker に知らせる | +30 |
 | `lift/harness/web/fruity/fle_idle_lib.js` | 同期の import 2 つ(`fle_js_input_poll`、`fle_js_input_done`)。`Module.fleInputPoll` / `fleInputDone` を呼ぶだけ(方針なし) | +6 |
 | `app/src/input/ring.ts` | `RingReader.drainN(max, fn)`(最大 max 件。`drain` は `drainN(Infinity)`) | +6 |
 | `app/src/engine/idle-driver.ts` | `injectedInline(done)`(idle 経路の `apply()` が付ける帳簿と同じ: `stats.injected`、`awaiting`、`hooks.injected`。仮想時計は動かさない)、`takeAwaiting()` | +14 |
 | `app/src/engine/fruity.ts` | `fleInputPoll` / `fleInputDone` を Module のオプションに(host が持つときだけ) | +6 |
 | `app/src/engine/worker.ts` | `inputPoll`(リングから最大 16 件を staging へ。エンジンが最初の idle に達するまでは何もしない = 従来どおり idle で捨てられる)、`inputDone`(結果を帳簿へ)、`answerInline`(積んだ入力の答えの提示を 6 ms ごとに試し、画素が変わったら `input-done` と `desk` の `answers` を送る。150 ms 変わらなければ答えなしで終える) | +60 |
-| 試験 | `harness/gpu7/ring_poll.c`、`tests/gpu7_ring_poll.rs`(L1 v3: 4 本)、`input-ring.test.ts`(+1)、`idle-driver.test.ts`(+1) | |
+| テスト | `harness/gpu7/ring_poll.c`、`tests/gpu7_ring_poll.rs`(L1 v3: 4 本)、`input-ring.test.ts`(+1)、`idle-driver.test.ts`(+1) | |
 
 **差分は 2 つ**(どちらも d6926b4d と、PM の e8-wip a1e96d92 の該当ファイルに `patch -p1 --batch --dry-run` が通る。`-` の行は `app/src/input/ring.ts` の 2 行だけ〔`drain(fn: ...) {` を `drainN` に置き換える行と、tail の更新と `fn(rec)` の順序を入れ替える `fn(rec);` の行〕。ほかはすべて追加):
 - **`gpu7-L1.diff`(L1 v3)**: 上の表。v2 からの変更は (a) 『注入のとき `awaiting` が空なら `inlineSince` を今にする』の 1 行(§6.2 の欠陥)、(b) **mouse / key / display 以外の kind(task bar の syscmd)を ring に残す**(§6.5 の最後。`drainN` が `fn` の `false` で止まる)。答えの規則は v2 と同じ(『注入のあとの最初の画素が変わる提示』)なので、**T の測定で下限になる**(§6.2)。
@@ -48,7 +48,7 @@
 
 - idle 経路: `IdleDriver.apply()` の `moveClock()` が、**エンジンが待っていた**実時間ぶんだけ仮想時計を進めてから(`idle` の `next` を越えない、目標は `target()`: 遅れの上限 `maxLagMs` / 先行の上限 `maxLeadMs` で切る)入力を積む。入力の時刻 `e->ticks` は積んだ瞬間の仮想時計(`clk()`)。
 - 新(スケジューラの点): **仮想時計を動かさない**。エンジンは待っておらず走っている(仮想時計はエンジン自身の実行で進む: 1 スライス = 仮想 1 ms、`Sleep` の待ち)ので、『待っていた実時間』は存在しない。入力の `e->ticks` は積んだ瞬間のエンジンの仮想時計(`fle_input_host_*` が `clk()` を取る、idle 経路と同じ式)。= 実時間に歩調を合わせる役目は従来どおり idle 経路が持ち、スケジューラの点は仮想時計に触れない(『仮想時間は飛ばさない』の方針のまま)。`idle` の `next` を越える心配はない(時計を動かさないので)。
-- 試験: `an_input_queued_by_the_hook_reaches_...` が『フックによる積み込みで仮想時計は 0 tick しか動かない』を確かめる。入力どうしの順序は FIFO(`evq`)で、idle 経路と新経路が混ざっても到着順(リングの順)。
+- テスト: `an_input_queued_by_the_hook_reaches_...` が『フックによる積み込みで仮想時計は 0 tick しか動かない』を確かめる。入力どうしの順序は FIFO(`evq`)で、idle 経路と新経路が混ざっても到着順(リングの順)。
 - 帰結(読み): idle 経路は入力の前に仮想時計を実時間の目標まで(次の期限を越えない範囲で)進めていた。新経路は進めないので、エンジンが実時間より遅れている間は、入力の仮想時刻が従来より**最大でその進め分だけ早く**なりうる(FL が入力どうしの時間差を見るのは仮想時間なので、入力どうしの整合は保たれる。タイマーとの相対関係は変わりうる)。= 差が出うる点として明記する(実エンジンで 84/55/87 行と a4 は入力を使わない行が不変であることを PM が確かめる)。
 
 ## 4. エンジンの実行中に入力を積む再入の安全性(PM の条件 (a)(d))
@@ -57,9 +57,9 @@
 - **注入点は `schedule_ex` の先頭だけ**(`fle_thread.c` の『切替の判断の点』)。`fle_progress_slice` の『コールバックの深さ > 1 ではスキップ』の規則は `schedule_ex` を通る前の話で、注入点にはかからない(待つ・譲る関数の中は常に切替の点)。runtime の関数の途中で注入することはない。
 - 呼び出しの頻度: スケジューラの点ごと(再生中に約 2,000 回/s)。1 回は JS の import 1 回 + `Atomics.load` 2 回(リングが空なら即 0 を返す)で、約 0.1〜0.3 µs の見込み。
 
-## 5. 試験
+## 5. テスト
 
-| 試験 | 内容 | 結果(実測) |
+| テスト | 内容 | 結果(実測) |
 |---|---|---|
 | `gpu7_ring_poll.rs` 1 | フックはスケジューラの点でだけ呼ばれる: `CreateThread` の前は 0 回、ミキサー役のスレッド(`Sleep(1)` を 6 回)が走る間は少なくとも 1 切替に 1 回、スレッドが 2 つ未満のときの呼び出しは 0 | passed |
 | 2 | フックが `evq` に積んだ入力(visible な窓 300×300 の (100,100) への左ボタン押下)が、`GetMessageW` で待つ『UI スレッド』に**同じ切替で**届く(`WM_LBUTTONDOWN` 0x201、wParam 1)。ミキサー役の `Sleep(1)` ループの 0 周後(idle 経路なら 20 周)。積み込みで仮想時計は 0 tick 動く | passed |
@@ -78,7 +78,7 @@
 | | `test:worker` | 49 passed |
 | | `test:e2e` | **190/190** |
 
-注意: `GetKeyState` / `GetAsyncKeyState` の整合は『直接積んだ状態との一致』(試験 3)で見ている。`GetKeyState`(メッセージ処理済みの状態)は `evq` を取り出す側の挙動で、新経路は取り出しに触れない。
+注意: `GetKeyState` / `GetAsyncKeyState` の整合は『直接積んだ状態との一致』(テスト 3)で見ている。`GetKeyState`(メッセージ処理済みの状態)は `evq` を取り出す側の挙動で、新経路は取り出しに触れない。
 
 ## 6. 測定
 
@@ -191,7 +191,7 @@ pooled:
 | `lift/runtime/fle_thread.c` / `.h` | `fle_thread_in_message_wait(idx)`: そのスレッドが `W_MSG_GET` / `W_MSG_WAIT`(と msg 付きの `W_OBJECTS`)で待っているとき 1 |
 | `lift/harness/fruity_idle.c` | `fle_input_ring_poll()` が、scheduler の点ごとに settled を record 領域の直後の 1 語に書いてから import を呼ぶ(import の署名は不変) |
 | `app/src/engine/worker.ts` | `inputPoll` がその語を読む。注入のあとの scheduler の点で 1 を見てから(`inlineSettled`)始まった提示だけが答え(`deskTick` は提示の**前**に旗を読む)。150 ms で settled にならなければ答えなしで終える |
-| 試験 | C: `an_injected_input_is_settled_only_when_the_thread_that_handled_it_waits_in_its_message_loop_again`(注入前 1、直後 0、メッセージを持っている間 0、UI が GetMessage に戻ると 1)、`a_hook_with_nothing_queued_changes_neither_the_virtual_clock_nor_the_thread_order`(入力のないときのフックは仮想時計もスレッドの順も変えない) |
+| テスト | C: `an_injected_input_is_settled_only_when_the_thread_that_handled_it_waits_in_its_message_loop_again`(注入前 1、直後 0、メッセージを持っている間 0、UI が GetMessage に戻ると 1)、`a_hook_with_nothing_queued_changes_neither_the_virtual_clock_nor_the_thread_order`(入力のないときのフックは仮想時計もスレッドの順も変えない) |
 
 **限界の 2 点(PM 10:18 の (5))の確認**:
 1. **効果が settled より前の提示で既に出ていた場合**: settled のあとの提示は変化なし → 答えなし(150 ms であきらめる)。FL の実際の入力経路で起こりにくい根拠: 入力の処理(WM_LBUTTONDOWN など)は UI スレッドが message ループの中で同期に描くので、効果は『UI が待ちに戻る』より前には画面状態に完成しているが、**提示(ブラウザへ見せる)は別の経路(rAF・idle)で、settled の前に出ることがある**。この場合は答えなしになる(測定で率を見る)。
@@ -212,7 +212,7 @@ pooled:
 - 書き込み率: 本番 0.263、L1c 0.255(同じ)。load が高いので本番の T は §6.3 より大きい(275 ms)。この表の本番の値は §6.3 と直接比べない。
 - **まだ見ていない**: 効果が settled より前の提示で出て答えなしになる場合(この run では 0)、他の入力(ドラッグ・ホイール・複数ボタン)、syscmd の復元ボタンが実エンジンで動くか。
 
-**task bar の syscmd との関係(PM 10:30 の (1)(a))**: e8-wip の ring には syscmd(`#taskbar-restore`、kind 8)が入る。v2/v3 の `inputPoll` は『mouse / key 以外は display』として積んでいたので、**syscmd が display(0×0)として誤って取り出され、失われる**ところだった(PM の問いで見つけた)。直した: `worker.ts` の `inputPoll` の callback が mouse / key / display 以外で `false` を返し、`ring.ts` の `drainN` は `fn` が `false` を返した記録を取り出さずに止まる(その記録と後ろの記録は順序どおり ring に残る)。syscmd は従来どおり idle で `IdleDriver.apply` が処理する。ring に syscmd が残っていても、それまでに取った入力の答え(`answerInline`)は止まらない。vitest 1 本を足した。**積んだ木(e8-wip a1e96d92 + `gpu7-L1-LC.diff`)**: C 6 本 + `wall_fr9t` 18 本 passed、typecheck rc=0、vitest 1,310 passed + 7 skipped、test:worker 49 passed、test:e2e は 1 回目 175/177(load 30 前後の窓で `taskbar-restore` の Tab / Enter の waitFor が 2 件 timeout。DOM のフォーカスの試験で ring と無関係。その後の group は走らなかった)、2 回目 **229/229**(taskbar-restore を含む)。
+**task bar の syscmd との関係(PM 10:30 の (1)(a))**: e8-wip の ring には syscmd(`#taskbar-restore`、kind 8)が入る。v2/v3 の `inputPoll` は『mouse / key 以外は display』として積んでいたので、**syscmd が display(0×0)として誤って取り出され、失われる**ところだった(PM の問いで見つけた)。直した: `worker.ts` の `inputPoll` の callback が mouse / key / display 以外で `false` を返し、`ring.ts` の `drainN` は `fn` が `false` を返した記録を取り出さずに止まる(その記録と後ろの記録は順序どおり ring に残る)。syscmd は従来どおり idle で `IdleDriver.apply` が処理する。ring に syscmd が残っていても、それまでに取った入力の答え(`answerInline`)は止まらない。vitest 1 本を足した。**積んだ木(e8-wip a1e96d92 + `gpu7-L1-LC.diff`)**: C 6 本 + `wall_fr9t` 18 本 passed、typecheck rc=0、vitest 1,310 passed + 7 skipped、test:worker 49 passed、test:e2e は 1 回目 175/177(load 30 前後の窓で `taskbar-restore` の Tab / Enter の waitFor が 2 件 timeout。DOM のフォーカスのテストで ring と無関係。その後の group は走らなかった)、2 回目 **229/229**(taskbar-restore を含む)。
 
 ## 7. 残るリスクと、この試作が確かめていない点
 
@@ -223,8 +223,8 @@ pooled:
 | R3 | **答えの帰属**: v2 の規則(『注入のあとの最初の画素が変わる提示』)は、エンジンが処理する前の提示を答えにして T を過小評価する(§6.2: 最小 T 1.7 ms < idle の最小 5.7 ms)。v3 は `inlineSince` の欠陥だけ直した。**製品の規則は L1c の settled**(§6.5)。測定専用ページ(クラス名を含む)で真の T を出した(§6.3) | 実測。v3 は T を下限にする。L1c の実測は §6.5 |
 | R4 | **提示の頻度**: 入力が待つ間の 6 ms ごとの提示の試行(最大 150 ms = 25 回)は、再生中の UI の仕事を増やす。書き込み率は 0.414 → 0.408(−1.4%)で、雑音(±0.013)と同程度 | 実測、3 往復。有意ではないが、増えてはいない |
 | R5 | **高 load**: 低 load(4〜12)の交互(§6.1)に加えて、同時 2 Chrome で load 10〜15 の対(§6.3: 本番の File クリックの T は 201 ms)で測った。load 15〜37(本番が 185〜298 ms の窓)の試作は未測定。B はエンジンの idle の間隔に比例していたので、さらに高い load では差が大きくなる見込み(読み) | 15 以上は未測定 |
-| R6 | **長時間**: 5 分以上の再生、入力の種類(ホイール、ドラッグ、複数ボタン、キーの自動リピート)の網羅、Firefox | 未確認。キーの自動リピートと範囲外の座標は C の試験 3 の範囲 |
-| R7 | **試験用のマクロ**: `FLE_RING_POLL_HOOK` は native の C 試験でフックを有効にするコンパイル時の定義(`__EMSCRIPTEN__` の代わり)。製品の設定項目ではない。製品の wasm ビルドは `__EMSCRIPTEN__` で有効 | 事実 |
+| R6 | **長時間**: 5 分以上の再生、入力の種類(ホイール、ドラッグ、複数ボタン、キーの自動リピート)の網羅、Firefox | 未確認。キーの自動リピートと範囲外の座標は C のテスト 3 の範囲 |
+| R7 | **テスト用のマクロ**: `FLE_RING_POLL_HOOK` は native の C テストでフックを有効にするコンパイル時の定義(`__EMSCRIPTEN__` の代わり)。製品の設定項目ではない。製品の wasm ビルドは `__EMSCRIPTEN__` で有効 | 事実 |
 | R8 | **idle の退行**: idle の入力は新経路を通らない(エンジンが idle の間は従来の `onEngineIdle`)。ただし idle 経路でも `schedule_ex` の先頭でフックが呼ばれる | §6.4: 悪化は見えない(File クリックの中央値 本番 7 / 8 / 9、試作 11 / 12 / 8 ms。load が往復で 4〜23 と揃わず雑音が大きい) |
 | R9 | **L2(動的ブースト)は勧めない**: C の主因が『ミキサーの描画ロックの待ち』なら、保持者(ミキサー)が走らない限り UI の優先度は効かない(Windows の CS に優先度継承はない)。C を縮めるのは P3(ミキサーの速さ)の側 | 読み(0234 の測定から。この build では未確認) |
 | R10 | **L1c(settled)の限界**: (a) 効果が settled より前の提示で出ていると答えなし(150 ms)、(b) UI が別スレッドに描画を非同期に任せる経路があると settled が早すぎる。FL のウィンドウとメッセージは UI スレッドが処理する(0234 の測定。読み) | §6.5 |
@@ -250,7 +250,7 @@ pooled:
 
 ## PM の判断と取り込み(2026-11-06 10:55、docs のみ。差分は製品の木に当てていない)
 
-取り込み: 差分 3 本(`gpu7-L1.diff`、`gpu7-L1-LC.diff`、`gpu7-LC-over-L1.diff`)を `docs/investigations/gpu7/patches/` に置いた。`gpu7-L1-LC.diff` は e8-wip(a1e96d92)の `git archive` に `patch --batch -p1` が rc=0(offset 12、fuzz 2、reject 0)で当たることを PM が確認した。PM は C の試験・app の連鎖・a4・node 行をこの差分ではまだ走らせていない(gpu1 の積んだ木での試験: C 24 本、vitest 1,310 + 7 skip、worker 49、e2e 229/229〔1 回目は load 30 前後で 175/177、focus の waitFor 2 件の timeout〕)。
+取り込み: 差分 3 本(`gpu7-L1.diff`、`gpu7-L1-LC.diff`、`gpu7-LC-over-L1.diff`)を `docs/investigations/gpu7/patches/` に置いた。`gpu7-L1-LC.diff` は e8-wip(a1e96d92)の `git archive` に `patch --batch -p1` が rc=0(offset 12、fuzz 2、reject 0)で当たることを PM が確認した。PM は C のテスト・app の連鎖・a4・node 行をこの差分ではまだ走らせていない(gpu1 の積んだ木でのテスト: C 24 本、vitest 1,310 + 7 skip、worker 49、e2e 229/229〔1 回目は load 30 前後で 175/177、focus の waitFor 2 件の timeout〕)。
 判断:
 1. **L1c(スケジューラの点で入力 ring を読む + 製品の答えの規則)は E9 の部品にする**(E8 には入れない: 停止の切り分けが効かなくなるため)。実エンジンの対(load 17〜33、同時 2 Chrome): File クリック 275 → 36 ms、Esc 176 → 12 ms、B 75.6 → 1.9 ms、物理的に速すぎる答え 0、答えなし 0/70、書き込み率は不変(0.263 → 0.255)。load が高い窓の値は参考で、採用判断は E9 の低 load の窓の値で行う。
 2. **必須の修正を含める**: v2/v3 の `inputPoll` は mouse/key 以外を display として取り、alpha11 の復元ボタン(`syscmd`)を失う欠陥があった。gpu1 が自分で見つけ、scheduler の点が取る kind は mouse/key/display だけとし、それ以外は ring に残して IdleDriver が処理する形に直した(`drainN` が false で止まる)。復元ボタンの実エンジンでの動作は E8 の bundle の上で gpu1 が確認する。

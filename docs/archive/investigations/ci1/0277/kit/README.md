@@ -1,6 +1,6 @@
 # ci1 の検証キット（決定 0277）: 新しい本番 bundle の実ブラウザ確認
 
-実エンジン（本番配信バケットの bundle）を実ブラウザ（Chrome 156 / Firefox 158）で動かす。代役・再生・推測なし。CI には載せない（ブラウザ試験は CI に入れない方針）。
+実エンジン（本番配信バケットの bundle）を実ブラウザ（Chrome 156 / Firefox 158）で動かす。代役・再生・推測なし。CI には載せない（ブラウザテストは CI に入れない方針）。
 
 ## 使い方（順番）
 環境: `kit/` で作業する。`export NEW=<bundle> REF=<ページの git ref（= Worker のビルドの headSha）> WORKER=<Worker version>`、比較の相手は `PREV`（既定 `fl-engine-ci-ff5ee429`）。

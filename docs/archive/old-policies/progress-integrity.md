@@ -6,7 +6,7 @@
 
 - **進捗**とは、lift した実エンジン（`FLEngine_x64.dll` と同梱 DLL を x86-64→C→wasm にした物）が**実際に実行されて出した結果**だけを指す。G 段階表（`docs/investigations/goal-ladder.md`）の到達は、この結果の観測でだけ数える。
 - 次の物は進捗ではない（「代役等」と呼ぶ）:
-  - 代役（stand-in）、モック、スタブ。`engine.kind: surface-table-v1`（`lift/harness/web/present/engine.c`、決定 0135）はこれに当たる。画面を作らず、保存した PNG の画素を窓の面として出すだけの、表示経路の試験用エンジンである。
+  - 代役（stand-in）、モック、スタブ。`engine.kind: surface-table-v1`（`lift/harness/web/present/engine.c`、決定 0135）はこれに当たる。画面を作らず、保存した PNG の画素を窓の面として出すだけの、表示経路のテスト用エンジンである。
   - 事前に生成した画像・録画・固定データの再生（PNG の貼り付けを含む）。
   - テスト用の期待値（例: 実エンジンの native 出力の PNG とその SHA-256。実エンジンの wasm の出力と照合する側の基準であって、画面として見せる物ではない）。
   - 実エンジン以外が出した画面・音、実機の挙動の推測。
@@ -38,8 +38,8 @@
 |---|---|
 | AGENTS.md の節「進捗の誠実性」 | 2026-11-03 に追加済み |
 | 本文書、`docs/README.md` の索引、`docs/milestones/roadmap-to-goal.md` §9、`docs/investigations/goal-ladder.md` の冒頭、`app/README.md` の注意 | 2026-11-03 に追加済み |
-| アプリ: `engine.kind` が `surface-table-v1` のとき、ページに常時の帯「STAND-IN: 試験用の代役です。FL Studio のエンジンは動いていません」を出す（`window.__app.engineKind` も出す） | 決定 0150 の担当（app4）へ指示済み。取り込み後に完了 |
-| 配信側（`vite dev`・`vite preview`・Cloudflare Worker）が、`surface-table-v1` の manifest を既定のパス `/assets/manifest.json` で返さない（返す場合は 409 とメッセージ） | **実施済み**（決定 0152、作業者 web1 の差分 `web1.diff`。PM の取り込みと、配信中のサーバー〔`lift/out-websrv`〕の再起動で有効になる）。`shared/manifest-guard.ts` が復号・正規化（`//`・`./`・`%2e`・大文字小文字・NFKC・末尾の `.`）後のキーが `manifest.json` のとき、中身の `engine.kind` を見て、`surface-table-v1` は 409、未知の kind も 409（許可リスト `emscripten-fruity-v1`）、壊れた JSON は 500、無ければ 404。`tools/assets-middleware.ts`（dev・preview）と `worker/index.ts`（R2 のキー `manifest.json`）が同じ規則を使う。試験: 単体・Worker 結合・e2e（3 配信先）・変異検査 |
+| アプリ: `engine.kind` が `surface-table-v1` のとき、ページに常時の帯「STAND-IN: テスト用の代役です。FL Studio のエンジンは動いていません」を出す（`window.__app.engineKind` も出す） | 決定 0150 の担当（app4）へ指示済み。取り込み後に完了 |
+| 配信側（`vite dev`・`vite preview`・Cloudflare Worker）が、`surface-table-v1` の manifest を既定のパス `/assets/manifest.json` で返さない（返す場合は 409 とメッセージ） | **実施済み**（決定 0152、作業者 web1 の差分 `web1.diff`。PM の取り込みと、配信中のサーバー〔`lift/out-websrv`〕の再起動で有効になる）。`shared/manifest-guard.ts` が復号・正規化（`//`・`./`・`%2e`・大文字小文字・NFKC・末尾の `.`）後のキーが `manifest.json` のとき、中身の `engine.kind` を見て、`surface-table-v1` は 409、未知の kind も 409（許可リスト `emscripten-fruity-v1`）、壊れた JSON は 500、無ければ 404。`tools/assets-middleware.ts`（dev・preview）と `worker/index.ts`（R2 のキー `manifest.json`）が同じ規則を使う。テスト: 単体・Worker 結合・e2e（3 配信先）・変異検査 |
 | 実エンジンの既定バンドルが無いときの表示を、404 ではなく「実エンジンのバンドルが未配置です」という明示のメッセージにする | **実施済み**（決定 0152）。配信側が 404 の本文に「実エンジンのバンドルが未配置です。…」を返し、ページ（`src/bundle/loader.ts`）が manifest の HTTP エラーの text/plain の本文をそのままエラー欄に出す。代役へは切り替えない（e2e で、パラメータ無しのページに canvas・帯・エンジン種が無く、`/assets/` への要求が manifest.json の 1 件だけであることを確認） |
 | 性能パネルと計測ビーコン（`POST /__perf`）が、代役の数字を達成のように見せない | **実施済み**（決定 0152）。代役の行は赤にも緑にもならず（`standin`）、見出しに「STAND-IN: …FL Studio の数字ではない」を出す。ビーコンの `bundle.standIn` と `engineKind` で、ログの側でも代役の記録を区別できる |
 

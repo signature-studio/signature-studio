@@ -2,15 +2,15 @@
 
 日付: 2026-10-20。決定は `docs/decisions/0030-apis-a9-a10.md`。出力は `lift/out-a9/`（`tmp/` が TMPDIR）。前回の記録は `docs/investigations/sse-shuf-run.md`（`unsupported_total` 385、停止点 0x407030）。手順は同記録 §4、§5 と同じ（生成器の複製、`build.sh`、実行）。
 
-**作業ツリーには他の担当の未コミットの変更が混在していた**（§0）。数値の変化は、この作業だけによるものではない。内訳は §3 に分けた。
+**ワークツリーには他の担当の未コミットの変更が混在していた**（§0）。数値の変化は、この作業だけによるものではない。内訳は §3 に分けた。
 
-## 0. 計測時の作業ツリー
+## 0. 計測時のワークツリー
 
 `git status --short` を計測の直前に `out-a9/git-status-at-measure.txt` に保存した。自分が触ったのは `imports_table.rs`、`runtime/fle_user_nowin.*`、`runtime/fle_winmm.*`、`tests/a9_a10.rs`、`docs/` の 2 文書、`out-a9/`。それ以外に次が混在していた（自分は触っていない）:
 
 - 変更: `fe-decode/src/lib.rs`、`fe-decode/src/main.rs`、`fe-lift/src/main.rs`、`fe-pe/src/lib.rs`、`fe-pe/src/main.rs`、`runtime/fle_sys.c`、`fle_sys.h`、`fle_vfs.c`、`fle_vfs.h`（`imports_table.rs` には他の担当の行も入っている）。
 - 新規: `fle_imagehlp.*`、`fle_load.*`（決定 0029）、`tests/glob.rs`、`tests/load.rs`、`fe-decode/tests/pdata_seeds.rs`、`fe-pe/tests/pdata.rs`。
-- 作業中に `fle_res.*`、MMX（`mmx.rs`、`fle_mmx.h`）、決定 0025、0028、0029、0031 が作業ツリーに現れた（計測時には `git status` の一覧に出ないものもある。コミットされた可能性。確認していない）。
+- 作業中に `fle_res.*`、MMX（`mmx.rs`、`fle_mmx.h`）、決定 0025、0028、0029、0031 がワークツリーに現れた（計測時には `git status` の一覧に出ないものもある。コミットされた可能性。確認していない）。
 
 ## 1. 一覧と閉包内の実測（実装前）
 

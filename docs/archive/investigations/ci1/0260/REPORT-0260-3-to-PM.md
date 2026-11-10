@@ -17,16 +17,16 @@
 | E. 案4（その行き先への押下か Tab のみ免責）= `ci1-page-focus.diff` | 4 | 240 | 0 (0.00%) | 23:49 時点。続行中 |
 - hold 時間別（ページ無修正）: hold 0 ms 420 周期 3 件、50 ms 1,260 周期 13 件、300 ms 360 周期 0 件（300 ms の 0 件は期待 2.8 件に対し偶然の範囲: P≈6%）。MSG.time の差（DOWN→UP）は 0 / 52 / 304 ms 中央値で期待どおり。
 
-## ページ側の修正 `ci1-page-focus.diff`（app/src/input/pointer.ts + 単体試験。旗なし）
+## ページ側の修正 `ci1-page-focus.diff`（app/src/input/pointer.ts + 単体テスト。旗なし）
 - 内容: `#desktop` の `focusout` で `relatedTarget`（行き先）が別のコントロールのとき、**ユーザーの操作（直近 1 s のポインタ押下か Tab）が無く、行き先がテキスト入力でなければ**、次のタスクで `#desktop` にフォーカスを戻す。ユーザーがボタンを押した／Tab で移した場合、ファイル窓の入力欄、行き先なし（body へ）は触らない。`-` 行は 1 行（先頭コメントの句点を続きに変えるだけ）。免責は『行き先のコントロール自身（またはその内側）へのポインタ押下』か Tab のみ、1 s 以内。
 - 先の 3 案は**効かなかった**: 案1・2（ウィンドウの blur/focus を鍵にした）は、私の `window` キャプチャ付き `blur`/`focus` の記録が要素の blur/focus も拾っていて、ウィンドウの blur/focus を鍵にしたこと自体が誤読（ウィンドウ単位の blur/focus が起きたかは記録から確認できない）。案3（要素の focusout を鍵にした）は、『直近 1 s のポインタ押下』を**どの要素への押下でも**免責にしていたため、メニューを開いた #desktop 自身へのクリックで免責され、効かなかった（表の D）。案4 は免責を『その行き先への押下か Tab』に限った。
 - 決定的な確認（実ブラウザ）: 最後の #desktop へのクリックから 0.4 s 後にスクリプトで `panel-toggle.focus()` → 300 ms 後の `activeElement` は、案4 のページで **desktop**、案3 のページと無修正のページでは **panel-toggle のまま**（観測された失敗の形そのもの）。
-- 単体試験: `app/test/unit/pointer-dom.test.ts` に 1 件（自発的な移動は戻す、#desktop 自身へのクリック直後でも戻す、その行き先への押下・Tab・テキスト入力・行き先なしは戻さない）。vitest 18 件 ok、`npm run typecheck` ok。
+- 単体テスト: `app/test/unit/pointer-dom.test.ts` に 1 件（自発的な移動は戻す、#desktop 自身へのクリック直後でも戻す、その行き先への押下・Tab・テキスト入力・行き先なしは戻さない）。vitest 18 件 ok、`npm run typecheck` ok。
 - `b00932ec` の `git archive` に `git apply --check` ok。
 - 検証の結果: 案4 は 4 セッション 240 周期で取りこぼし 0 件（対して無修正側の割合は 19/2760 = 0.69%。この周期数で『効いた』と言える数ではない: 割合が同じなら 1.7 件期待、0 件の確率は 19%）。**検証は続行中**（案4 の腕を 2 本、各 12 セッションまで回す）で、結果は追加報告で出す。
 
 ## ランタイムの修正案 `ci1-input-v2.diff`（保管。23:10 のビルドには載せない件の続き）
-v1（カウンタ）には PM の指摘どおりの穴があった: ゲストの例外の巻き戻し（`fle_seh.c` の `_longjmp`）が `fle_input_synth` のフレームを跨ぐと、カウンタが減らず**以後の入力が止まる**。C 試験 case 3（MOUSEACTIVATE のハンドラが `longjmp` で外へ出る）で再現: v1 は FAIL（以後の UP が来ない）、v2 は PASS。v2 は『スレッド別の印 + 開始時のコールバック深さ』で、**次の呼び出しが開始時以下の深さなら古い印とみなして解除**する（呼び出しは入れ子でしか深くならない）。
+v1（カウンタ）には PM の指摘どおりの穴があった: ゲストの例外の巻き戻し（`fle_seh.c` の `_longjmp`）が `fle_input_synth` のフレームを跨ぐと、カウンタが減らず**以後の入力が止まる**。C テスト case 3（MOUSEACTIVATE のハンドラが `longjmp` で外へ出る）で再現: v1 は FAIL（以後の UP が来ない）、v2 は PASS。v2 は『スレッド別の印 + 開始時のコールバック深さ』で、**次の呼び出しが開始時以下の深さなら古い印とみなして解除**する（呼び出しは入れ子でしか深くならない）。
 | 経路 | 場所 | `fle_input_synth` の C フレームを跨ぐか | v1（カウンタ） | v2（スレッド別 + 深さ） |
 |---|---|---|---|---|
 | 正常終了（`translate_mouse` の早期 return、MA_ACTIVATEANDEAT を含む） | `translate_one` に戻る | いいえ | 減算 | 解除 |
@@ -36,7 +36,7 @@ v1（カウンタ）には PM の指摘どおりの穴があった: ゲストの
 | `ExitThread`（第 1 スレッド） | `fle_stop` | — | — | — |
 | `ExitThread`（第 2 以降） | 窓を持つのはスレッド 0 だけで入力は来ない | — | 影響なし | 影響なし |
 - 残り: 例外の着地が深さ D0 で、その後 D0 以下の呼び出しが無いまま D0+1 の入れ子の待ち（モーダルループ）が始まると、その 1 回は「入力なし」になる。実エンジンでは観測なし（`NESTED-synth` 0 件）。
-- 試験: `build.sh reenter`、`fe-lift/tests/input_reenter.rs`（checks 5 failed 0）。HEAD の clean な複製で `cargo test -p fe-lift` の 10 ファイル 46 テスト ok。fle_input.c を HEAD に戻すと FAIL（負の確認）。`b00932ec` に `git apply --check` ok。`-` 行は fle_input.c の 2 行のみ。
+- テスト: `build.sh reenter`、`fe-lift/tests/input_reenter.rs`（checks 5 failed 0）。HEAD の clean な複製で `cargo test -p fe-lift` の 10 ファイル 46 テスト ok。fle_input.c を HEAD に戻すと FAIL（負の確認）。`b00932ec` に `git apply --check` ok。`-` 行は fle_input.c の 2 行のみ。
 
 ## 報告6（df0512b0）の残り
 - 実測済み（c8 = df0512b0 と同一バイトの局所再ビルド）: 11 シーン Chrome / Firefox とも ok（d7 は意図した終了）、File メニュー ×100 は Chrome 100/100・Firefox ok、フェード 3 本ほか ok（黒の p0 0 枚）、ピッカーの定常 CPU は Chrome 280 / Firefox 330 ms/s（251dfabc の 320 / 327 と同程度）、Firefox 再読込 8 回 ok、beacon の `audio.detail` は通常の beacon 76/76（77 件目は『最初のアイドル前に離れた』の失敗 beacon）、第一アイドルは単独で Chrome 中央値 7.3 s（251dfabc と同じ）・Firefox 6.0 s、16.6 s の外れ値は Chrome 10 回で再現せず。

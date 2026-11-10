@@ -4,7 +4,7 @@
 
 この文書の状態: 完成（読み取りと静的解析だけ。何も実行していない。決めない）。
 
-- HEAD: `b0dc3ab`（ブランチ main）。作業ツリーに決定 0091（`GetModuleHandleA`）の未コミット変更あり（この作業のものではない）。
+- HEAD: `b0dc3ab`（ブランチ main）。ワークツリーに決定 0091（`GetModuleHandleA`）の未コミット変更あり（この作業のものではない）。
 - この作業が作ったもの: この文書と `lift/out-imp14/`（`tmp/` と解析スクリプト、出力、Learn の取得物）だけ。`lift/` で `cargo build` / `cargo test` は実行していない。
 - 対象: Blend2D の行なし import のうち、`GetModuleHandleA`（決定 0091 で実装）の残り 14 名（ATTACH から静的に届く名前）+ 2 名（`WakeAllConditionVariable`、`GetLargePageMinimum`。ATTACH では届かない）= 16 名。原本 `lift/out-blend2d/Blend2D.dll`（SHA-256 `66634d24…66c7`）とリベース済み `lift/out-seed58/s58/dll/Blend2D.4700000.dll`（`24e01ec9…b4cb`）。
 
@@ -69,7 +69,7 @@
 | Learn | `curl -sS -L`（19 ページ。HTTP 200）。本文抽出 `python3 learn_text.py` | `learn/*.html`、`learn/*.txt` |
 | 既存ログ（読み取り） | `lift/out-gmh/run/m3-ro1-imports.txt`（決定 0091 の調査の gdb ログ）を `grep`・`sed` で読んだだけ。**gdb は起動していない** | — |
 
-### 2.2 読んだ文書、ソース（行番号は作業ツリー。実測は「読んだ」ことだけ）
+### 2.2 読んだ文書、ソース（行番号はワークツリー。実測は「読んだ」ことだけ）
 
 - `docs/investigations/blend2d-getmodulehandlea.md` §1、§2.3、§7.2〜§7.4、§8、§9（`GetModuleHandleA` の測定と今回の停止点）。
 - `docs/investigations/blend2d-lift-feasibility.md` §3.3、§5.2（226〜233 行）、§6（234〜253 行。247 行が `CreateThread`、`ExitThread`、`FreeLibraryAndExitThread`）、§7（261〜270 行。267 行が ATTACH の 59 か所）、§10.3 の B4（335 行）と B8（339 行）、§10.4（355〜357 行）。
@@ -389,7 +389,7 @@ URL: `sync/condition-variables`（`updated_at` 2025-03-11）、`api/synchapi/nf-
 - **dsp_ippv2 は `IsProcessorFeaturePresent`（5 か所 `call [IAT]`）と `TlsFree`（1 か所 `jmp [IAT]`）を import している**（実測: `scan-dsp.txt`、縮小前の `lift/out-ext/dsp_ippv2_x64.dll`（SHA-256 `497dd4f7…`）。pefile の import 表）。**この 2 つの行を足すと、dsp_ippv2 の生成 C の関数が変わる**（5 か所の `fle_unsupported` が `call_imp` に、1 か所が `jmp_imp` に。決定 0078 §3 が「行にしなかった」理由）。dsp_ippv2 は上の SRW、条件変数、スレッド、`GetFileSizeEx`、`OutputDebugStringA`、`WaitForSingleObjectEx`、`GetLargePageMinimum` を import していない（実測）。縮小版（種 `seeds-idx0-plus-initterm2.txt`）では `TlsFree`、`IsProcessorFeaturePresent` の呼び出し点が含まれるかは**未確認**。
 - 3 モジュール構成の `two-native` では、FLEngine（`gen_two.sh` は `EXPECT_FLE_SHA` で基準の SHA を検査する。既定は `43985d62…`。0091 の後は `eb9d8e7f…` を環境変数で渡している）、縮小 dsp_ippv2、Blend2D の 3 つの生成 C の応答表が同じ行を持つ（`merge_tables.py` が 69,654 行に統合。「複数の表に在る行 261」）。**行を足すと 3 つとも表が変わる**。
 
-### 8.2 `IsProcessorFeaturePresent` と `TlsFree` の行を足すときに更新が要る既存テスト（**読み。行番号は HEAD + 0091 の作業ツリー**）
+### 8.2 `IsProcessorFeaturePresent` と `TlsFree` の行を足すときに更新が要る既存テスト（**読み。行番号は HEAD + 0091 のワークツリー**）
 
 | ファイル | 行 | 表明している内容 | 行を足すと |
 |---|---|---|---|
@@ -416,7 +416,7 @@ URL: `sync/condition-variables`（`updated_at` 2025-03-11）、`api/synchapi/nf-
 
 ### 8.4 テストを走らせていない
 
-この調査は `cargo build` / `cargo test` を実行していない（PM の全体テストと作業ツリーを汚さないため）。§8.2 は `grep` と読みで、実際に落ちるかは実行で確かめていない。
+この調査は `cargo build` / `cargo test` を実行していない（PM の全体テストとワークツリーを汚さないため）。§8.2 は `grep` と読みで、実際に落ちるかは実行で確かめていない。
 
 ## 9. 次に届く API の順の見込み（任意。**読み**。実行していない）
 
@@ -444,7 +444,7 @@ URL: `sync/condition-variables`（`updated_at` 2025-03-11）、`api/synchapi/nf-
 - **SRWLOCK の中身の読み書き**は、静的な 2 本（`0x1802f4700`、`0x1802f4800`）では「`lea` とゼロの書き込みだけ」を確認したが、**ヒープ上のオブジェクトのロックは確認していない**（構造体の型を復元していない）。
 - `Learn` の 19 ページは 2026-10-25 に取得（実測）。**`SRWLOCK_INIT` の値、`ERROR_TIMEOUT` の数値、`CONDITION_VARIABLE_LOCKMODE_SHARED` の値は Learn の該当ページに書かれておらず、他の Learn ページ（`Using Condition Variables`、System Error Codes、`synchapi.h` のリファレンスなど）は取得していない**（確認していない）。実機の Windows での挙動は未確認（ホストは Linux）。非公式の出典は使っていない。
 - **実在の Windows の SRW の実装**（ロックが「ポインタ 1 個の値」でどう状態を持つか）は、この調査では使っていない（Learn が内部を書かない）。
-- `GetModuleHandleA` の決定 0091 は**未コミット**（作業ツリー）。PM の全体テスト（`lift/out-git/target-m91`、`test-ws-m91.txt`）には触れていない。**行番号は 0091 の変更を含む作業ツリーのもの**で、コミット後に変わりうる。
+- `GetModuleHandleA` の決定 0091 は**未コミット**（ワークツリー）。PM の全体テスト（`lift/out-git/target-m91`、`test-ws-m91.txt`）には触れていない。**行番号は 0091 の変更を含むワークツリーのもの**で、コミット後に変わりうる。
 - §8.2 の「失敗する」は**読み**（`grep` と該当行の読み）。実際にテストを走らせていない。
 - **縮小 dsp_ippv2 に `TlsFree`、`IsProcessorFeaturePresent` の呼び出し点が含まれるか**は未確認（縮小前の `out-ext` の DLL では含まれる）。
 - `OutputDebugStringA`、`GetFileSizeEx` の呼び出し元の鎖が実行で届くかは未確認（B のみ）。`ExitThread` などが戻らないことは Learn に「戻らない」の明記が無い（直後の `int3` からの読み）。

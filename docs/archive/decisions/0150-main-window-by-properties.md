@@ -15,7 +15,7 @@
 - **実エンジンの e2e(`engine-desktop`、preview)**: 3 回実行(44/50、45/50、最終版のスクリプトで **44/47**)。最終版の失敗 3 件は**どれも logo の検査**(Enter でウィザードは消えるが、302 s 待っても logo が可視にならなかった。原因は未調査。同じ bundle で Enter だけの流れでは 7.0 s で可視になる、§8)。**窓をクラスで引く部分は全部通った**(主窓・ウィザード・ロゴ・Settings の検索、`__app.mainWindow()` = lid 14 の class、Z 順・位置・スクリーンショットとの照合、ウィザード面の SHA-256 の 3 値)。
 - 実エンジンのページに STAND-IN の帯は**出ない**(`hidden`・空・`display:none`、`engineKind` = `emscripten-fruity-v1`。上の e2e の 1 件)。
 
-**(2) 代役・合成データ・再生の範囲**: (a) `vitest` の単体テスト(この変更で +102 件)は**合成データ**: `WebAssembly.Memory` に本物の `SurfaceTable` と `fle_av_poll` の構造を手で書いたもので、FL の窓の大きさ・クラス名・オーナーは決定 0145 の実エンジンのログから写した。(b) エンジン無しの e2e(dev・preview・Worker)は**代役のエンジン(`surface-table-v1`、PNG の画素を窓の面として出すだけ)**で、表示経路と manifest の扱いの試験。実エンジンではない。いずれも『進捗』ではなく、この変更の回帰の確認である。(c) 『d8aacf4 の最終構成(主窓 lid 13)の bundle で同じアプリが動く』は、**その bundle が無いので実エンジンでは確かめていない**。確かめたのは、その構成の窓リストを写した合成データでの規則の答え(§6)。
+**(2) 代役・合成データ・再生の範囲**: (a) `vitest` の単体テスト(この変更で +102 件)は**合成データ**: `WebAssembly.Memory` に本物の `SurfaceTable` と `fle_av_poll` の構造を手で書いたもので、FL の窓の大きさ・クラス名・オーナーは決定 0145 の実エンジンのログから写した。(b) エンジン無しの e2e(dev・preview・Worker)は**代役のエンジン(`surface-table-v1`、PNG の画素を窓の面として出すだけ)**で、表示経路と manifest の扱いのテスト。実エンジンではない。いずれも『進捗』ではなく、この変更の回帰の確認である。(c) 『d8aacf4 の最終構成(主窓 lid 13)の bundle で同じアプリが動く』は、**その bundle が無いので実エンジンでは確かめていない**。確かめたのは、その構成の窓リストを写した合成データでの規則の答え(§6)。
 
 **肯定的に見せる点は限られる。**
 
@@ -194,7 +194,7 @@
 
 ## 9. 追加依頼: STAND-IN の帯
 
-PM の依頼(依頼者が既定のページに出ていた代役を実エンジンと取り違えかけた)。`engine.kind` が `surface-table-v1` のとき、ページ最上部に常時の帯『STAND-IN: 試験用の代役です。FL Studio のエンジンは動いていません(画像の再生)』(`index.html` の `#standin-banner`、`src/ui/standin-banner.ts`、`style.css` の `position: sticky`)。`emscripten-fruity-v1` では出ない(hidden・空)。`window.__app.engineKind` に manifest の `engine.kind`。stand-in の bundle は名前が `standin-` で始まり、説明が `STAND-IN, not the real engine:` で始まる(`pack-assets.mjs --standin`)。単体 3 + 1 件、e2e: animate-A・stopscreen-A・layered-A で存在(位置 top < 100 px、高さ 40 px)、実エンジンの e2e で不在、変異 4 件。
+PM の依頼(依頼者が既定のページに出ていた代役を実エンジンと取り違えかけた)。`engine.kind` が `surface-table-v1` のとき、ページ最上部に常時の帯『STAND-IN: テスト用の代役です。FL Studio のエンジンは動いていません(画像の再生)』(`index.html` の `#standin-banner`、`src/ui/standin-banner.ts`、`style.css` の `position: sticky`)。`emscripten-fruity-v1` では出ない(hidden・空)。`window.__app.engineKind` に manifest の `engine.kind`。stand-in の bundle は名前が `standin-` で始まり、説明が `STAND-IN, not the real engine:` で始まる(`pack-assets.mjs --standin`)。単体 3 + 1 件、e2e: animate-A・stopscreen-A・layered-A で存在(位置 top < 100 px、高さ 40 px)、実エンジンの e2e で不在、変異 4 件。
 
 **限界**: 帯は DOM のテキストなので、画面の画像を撮った場合は写る(位置が最上部)が、manifest を直接読む道具には出ない。配信側(`vite dev`/`preview`/Worker が `surface-table-v1` の manifest を既定のパスで返さない)は**この変更に含まれない**(PM の別担当)。
 

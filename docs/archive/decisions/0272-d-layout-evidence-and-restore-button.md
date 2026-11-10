@@ -2,7 +2,7 @@
 
 **依頼者の機械・実機 Windows・実 GPU・ブラウザの本番(bundle `fl-engine-ci-ff5ee429`、Worker `a3fc8c43-a3a9-48a2-b9cf-86b1dbf5cfca`)での測定は 0 件。** 以下は、b42fad36 の生成 C から作った native N1(HEAD の runtime = b00932ec と同一 / + alpha10.diff / + alpha10.diff + alpha10b.diff〔`f_425500` の thunk は表の行が無い生成 C なのでリンク時の `--wrap` で `fle_imp_SetWindowPlacement` に繋いだ〕)に、G3 の模擬入力(**ユーザーの操作ではない**)と gdb を使って測った値、Chrome 156 の e2e(エンジン無し)、vitest。性能の測定ではない(構造の測定だけ: 窓表、API の呼び出し列、画素の違いの有無)。測定中の load average は 6〜10(他の担当と共有)。native N1 の行は本番 bundle の行ではない。Wine・私の逆アセンブルの読みは UNOFFICIAL。代役・再生・推測は含まない。
 
-状態: **仮の決定**。作業者 `alpha1`、2026-11-06 JST 08:15〜。成果: (a) 根拠の表と原因の確定(docs / tables)、(b) `alpha11-app.diff`(`app/` のみ。HEAD d6926b4d に `git apply --check` と `patch -p1 --dry-run` が通る)、(c) 実 FLEngine の生成 C の通し(lifter 水準)の任意の試験 `optional/`。
+状態: **仮の決定**。作業者 `alpha1`、2026-11-06 JST 08:15〜。成果: (a) 根拠の表と原因の確定(docs / tables)、(b) `alpha11-app.diff`(`app/` のみ。HEAD d6926b4d に `git apply --check` と `patch -p1 --dry-run` が通る)、(c) 実 FLEngine の生成 C の通し(lifter 水準)の任意のテスト `optional/`。
 
 ## 結論(先頭の数行)
 
@@ -19,7 +19,7 @@
 
 1. **何を実測したか**: native N1(HEAD / A+B+C / D / D に診断のマスクを足した変種)を G3 の模擬入力で走らせ、(i) 起動 16 スナップ(`cmp-short.g3` = node 84 行系)と参照プロジェクト 10 スナップ(55 / 87 行系)の g3 行と窓表、(ii) 最小化クリックの API 列、(iii) gdb で FL の `GetWindowPlacement` の全呼び出し(呼び出し元の戻り番地、答え、`showCmd`、`rcNormalPosition`)と最初のゴミ `SetWindowPos` のバックトレース、を取った。ページは vitest と Chrome(エンジン無し)で検査した。
 2. **結論**: 上のとおり。
-3. **未確認**: 実 Windows での FL の起動時配置(契約からの推論)、ブラウザ(wasm)での最小化 → 復元の通し(エンジンの export は emscripten で未コンパイル、ページの Worker の経路は単体試験とエンジン無しの e2e だけ)、node の 84 / 55 / 87 行(予測のみ)、CI の全面ビルドでの `SetWindowPlacement` 行入りの生成 C の実行、`f_8076c0` が枠の幅を 0 にする呼び出し(vtable +0x300)の中身(+0x690 の 4 語が 6 → 0 になることは gdb で確認したが、その関数自体は読んでいない)、0x617f10 以外の検査しない 6 か所(0xba5814、0x1037673、0x10410c8、0x616cd9、0x862ab1、0x863cee。どのシーンでも到達しなかったので、動かしていない)。
+3. **未確認**: 実 Windows での FL の起動時配置(契約からの推論)、ブラウザ(wasm)での最小化 → 復元の通し(エンジンの export は emscripten で未コンパイル、ページの Worker の経路は単体テストとエンジン無しの e2e だけ)、node の 84 / 55 / 87 行(予測のみ)、CI の全面ビルドでの `SetWindowPlacement` 行入りの生成 C の実行、`f_8076c0` が枠の幅を 0 にする呼び出し(vtable +0x300)の中身(+0x690 の 4 語が 6 → 0 になることは gdb で確認したが、その関数自体は読んでいない)、0x617f10 以外の検査しない 6 か所(0xba5814、0x1037673、0x10410c8、0x616cd9、0x862ab1、0x863cee。どのシーンでも到達しなかったので、動かしていない)。
 
 ## 1. FL の `GetWindowPlacement` の呼び出し元(`tables/gwp-call-sites.tsv`、`logs/gwp/`)
 
@@ -89,10 +89,10 @@ D の `GetWindowPlacement` が、環境変数で、特定の `showCmd` を 1(通
 - **キーボードで押せる(a11y)**: `<button type="button">`。Tab で desktop から着き(e2e)、Enter・Space が押下になり(e2e)、押した後フォーカスは desktop に戻る(e2e)。非表示のボタンは Tab 順に入らない(e2e)。出現は `role="status"` の領域で通知される(`hidden` の解除)。
 - **最小化したまま閉じられない**: 解釈 2 つを確認した。(i) ページの『Stop engine / End session』は復元ボタンと無関係に効く(この変更は触らない)。エンジンが終わったら `exit` のハンドラがボタンを消す(`TaskbarRestore.clear()`)。(ii) ゲストの窓を最小化したまま閉じる入口(`SC_CLOSE` 0xF060)はホスト API にあるが、**ページには配線していない**(依頼は復元だけ)。必要なら同じ型の raw 入力でそのまま足せる。
 
-**試験**
+**テスト**
 
-- vitest: 新規 `test/unit/taskbar.test.ts` 14 件(`TaskbarRestore` 5、`TaskbarReport` 3、`IdleDriver` の syscmd 4、マークアップ 2)、`input-ring.test.ts` +1、`fruity-engine.test.ts` +1(計 16 件)。全体 67 ファイル 1,307 passed、7 skip(元からの 1 ファイル)、0 failed(`lift/` を足した d6926b4d の複製で。`lift/` が無いと 5 ファイルが落ちる: それらは lift/runtime の C ヘッダを読む試験で、変更と無関係)。`typecheck` の 3 設定は通過(`tsconfig.json`、`tsconfig.webworker.json`、`tsconfig.test.json`)。`test:worker`・`test:e2e` の全体は走らせていない(app の連鎖は PM)。
-- e2e(Chrome 156、エンジン無し): 新規 `test/e2e/taskbar.mjs`(`run.mjs` に group `taskbar-restore` を追加)、`node test/e2e/run.mjs --target dev --only taskbar-restore` で 15 / 15 通過。Worker のメッセージは `window.__app.taskbar.update(N)`(EngineClient が `{t:'taskbar'}` を受けて呼ぶ関数)で擬似した。**Worker が実際の export を読んで投稿する経路は e2e では通していない**(`FruityEngine.taskbarIconic` と `TaskbarReport` を単体試験で固定)。
+- vitest: 新規 `test/unit/taskbar.test.ts` 14 件(`TaskbarRestore` 5、`TaskbarReport` 3、`IdleDriver` の syscmd 4、マークアップ 2)、`input-ring.test.ts` +1、`fruity-engine.test.ts` +1(計 16 件)。全体 67 ファイル 1,307 passed、7 skip(元からの 1 ファイル)、0 failed(`lift/` を足した d6926b4d の複製で。`lift/` が無いと 5 ファイルが落ちる: それらは lift/runtime の C ヘッダを読むテストで、変更と無関係)。`typecheck` の 3 設定は通過(`tsconfig.json`、`tsconfig.webworker.json`、`tsconfig.test.json`)。`test:worker`・`test:e2e` の全体は走らせていない(app の連鎖は PM)。
+- e2e(Chrome 156、エンジン無し): 新規 `test/e2e/taskbar.mjs`(`run.mjs` に group `taskbar-restore` を追加)、`node test/e2e/run.mjs --target dev --only taskbar-restore` で 15 / 15 通過。Worker のメッセージは `window.__app.taskbar.update(N)`(EngineClient が `{t:'taskbar'}` を受けて呼ぶ関数)で擬似した。**Worker が実際の export を読んで投稿する経路は e2e では通していない**(`FruityEngine.taskbarIconic` と `TaskbarReport` を単体テストで固定)。
 
 ## 7. 直していないもの / 逸脱 / 限界
 
@@ -104,7 +104,7 @@ D の `GetWindowPlacement` が、環境変数で、特定の `showCmd` を 1(通
 
 ## 8. (c) 実 FLEngine の生成 C(lifter 水準)
 
-任意の試験 `optional/alpha11-flengine-thunk.diff`(`lift/crates/fe-lift/tests/alpha11_flengine_thunk.rs` 新規): 実 `FLEngine_x64.dll` を lifter に通し(本物の 59,000 関数の生成。C を書く先は関数ごとのハッシュと 2 関数のテキストだけ)、`f_425500` と `f_425510` の本文が `{ void fle_imp_SetWindowPlacement(void); fle_imp_SetWindowPlacement(); return; }` で `fle_unsupported` を含まないこと、`handled["jmp_imp:SetWindowPlacement"] == 2`、`unsupported_total == 223` を固定する。結果(実 DLL、`FLENGINE_PE=…/binaries/win64/FLEngine_x64.dll`、1 passed、8 s): `f_425500` と、**同じ IAT スロット 0x1970ed8 を使うもう 1 本の thunk `f_425510`** の両方が `fle_imp_SetWindowPlacement` を呼ぶ(`fle_unsupported` なし)、`handled["jmp_imp:SetWindowPlacement"] == 2`、`unsupported_total == 223`(行の前は 225)。**これにより alpha10b.diff の `vcall_thunk_dll.rs` の期待 224 は誤りで 223 が正しい**(第 1 報の訂正。MERGE-NOTES)。native N1 の `--wrap=f_425500` は 0x425500 だけを繋ぐ。FL が呼ぶのは 0x425500(ra 0xba5328)で、0x425510 は呼ばれていない(gdb の SWP 2 回はどちらも ra 0xba5328)
+任意のテスト `optional/alpha11-flengine-thunk.diff`(`lift/crates/fe-lift/tests/alpha11_flengine_thunk.rs` 新規): 実 `FLEngine_x64.dll` を lifter に通し(本物の 59,000 関数の生成。C を書く先は関数ごとのハッシュと 2 関数のテキストだけ)、`f_425500` と `f_425510` の本文が `{ void fle_imp_SetWindowPlacement(void); fle_imp_SetWindowPlacement(); return; }` で `fle_unsupported` を含まないこと、`handled["jmp_imp:SetWindowPlacement"] == 2`、`unsupported_total == 223` を固定する。結果(実 DLL、`FLENGINE_PE=…/binaries/win64/FLEngine_x64.dll`、1 passed、8 s): `f_425500` と、**同じ IAT スロット 0x1970ed8 を使うもう 1 本の thunk `f_425510`** の両方が `fle_imp_SetWindowPlacement` を呼ぶ(`fle_unsupported` なし)、`handled["jmp_imp:SetWindowPlacement"] == 2`、`unsupported_total == 223`(行の前は 225)。**これにより alpha10b.diff の `vcall_thunk_dll.rs` の期待 224 は誤りで 223 が正しい**(第 1 報の訂正。MERGE-NOTES)。native N1 の `--wrap=f_425500` は 0x425500 だけを繋ぐ。FL が呼ぶのは 0x425500(ra 0xba5328)で、0x425510 は呼ばれていない(gdb の SWP 2 回はどちらも ra 0xba5328)
 
 CI の全面ビルド(生成 C 全体の clang 〔native〕または emscripten 〔wasm〕でのコンパイル、実行)は走らせていない。
 
@@ -115,13 +115,13 @@ CI の全面ビルド(生成 C 全体の clang 〔native〕または emscripten 
 - 表: `tools/a11-wintable.py BASE DNEW N`、`tools/a11-27.py`、`tools/a11-g3rows.py`。マスク: `diag/diag-mask_showcmd-NOT-FOR-MERGE.diff` を D の `fle_win.c` に当て、`A11_MASK_MAX=1` / `A11_MASK_MIN=1` / `A11_MASK_RA=0x8077b4`。
 - ページ: `cd app && node node_modules/vitest/vitest.mjs run`、`node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json`(`.webworker.json`、`.test.json`)、`APP_WORK=/tmp/x node test/e2e/run.mjs --target dev --only taskbar-restore`。
 
-## 10. cargo(私の作業木 `~/work/a7-cargo` = HEAD の複製 + alpha10 + alpha10b-v2。PM の木ではない)— SKIPPED を併記
+## 10. cargo(私のワークツリー `~/work/a7-cargo` = HEAD の複製 + alpha10 + alpha10b-v2。PM の木ではない)— SKIPPED を併記
 
-- 0267 の報告の cargo は、作業木に実 `FLEngine_x64.dll` が無く、実 DLL 試験が `SKIPPED` で早期 return して pass と数えられていた。今回、`binaries/` と `tools/` を PM の木への symlink にし、`out-blend2d` と `out-qfc` はコピーして、`--nocapture` 付きで再走した(SKIPPED の通知が見える)。
+- 0267 の報告の cargo は、ワークツリーに実 `FLEngine_x64.dll` が無く、実 DLL テストが `SKIPPED` で早期 return して pass と数えられていた。今回、`binaries/` と `tools/` を PM の木への symlink にし、`out-blend2d` と `out-qfc` はコピーして、`--nocapture` 付きで再走した(SKIPPED の通知が見える)。
 - 実 DLL を読む 35 ファイル: **780 passed、0 failed、0 ignored**。SKIPPED の通知 1(`out-qfc` なし → 上の再走で解消)。
 - 残り 63 ファイル(0267 の 48 ファイルの通し、表を読む 36 ファイル、`alpha11_flengine_thunk`、`vcall_thunk_dll` ほか): **782 passed、0 failed、0 ignored**。SKIPPED の通知 3(`out-blend2d`、`out-qfc` は解消、残りは `wall_fr9t` の任意の比較 `FLE_FR9T_CLEAN_RT` 未設定)。
 - `deferred` と `wall_fr7` の再走(データのコピー後): 33 passed、0 failed、SKIPPED 0。
-- 走らせたのは fe-lift の試験 158 ファイル中 98(重複なし)。残りは走らせていない。全体試験(`test.sh full`)、a4、node の 84 / 55 / 87 行も走らせていない。
+- 走らせたのは fe-lift のテスト 158 ファイル中 98(重複なし)。残りは走らせていない。全体テスト(`test.sh full`)、a4、node の 84 / 55 / 87 行も走らせていない。
 - 訂正: `vcall_thunk_dll` の期待は 223(224 は誤り)。`alpha10b-v2.diff` / `alpha10b-fix.diff`。
 
 ## PM の判断と取り込み(2026-11-06 09:45、docs のみ)

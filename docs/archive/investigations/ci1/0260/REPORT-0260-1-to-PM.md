@@ -29,13 +29,13 @@ Learn の契約との差の読み: GetMessageTime（"the time the message was cr
 - 製品のリンクには入れない。c9（c8 = 4f054ecd の `git archive` の複製）の `fle_input.c` / `fle_win.c` の **先頭に `#define FLE_TEST_RECORDER 1`** を足した複製だけで有効。定義が無い製品ビルドでは `REC` は空（`((void)0)`）。PM の木は触っていない。
 - 記録する物（`write(2)` で標準エラー → ページのエンジンログ、行頭 `REC`）: `inj`（注入: ボタンの ms/ticks・`key_async`/`key_sync`・キュー長）、`tr-begin`/`tr-end`（変換の入れ子の深さ）、`target`、`push`（`MSG.time`・`key_*`）、`get`（ゲストが取り出した順序・`MSG.time`・時計・`key_*`）、`ks`（`GetKeyState`/`GetAsyncKeyState(VK_LBUTTON)` の値の変化）、`NESTED-synth`、`mouseactivate`、`DOWN-EATEN`、`no-target-drop`、`OUTQ-FULL`。
 - 差分は `ci1-recorder-NOT-FOR-PRODUCT.diff`（次の報告に付ける。製品の木に当てない）。
-- 試験の道具: `menuCycles` に `hold`（ボタンを押している時間）を足し、各周期の `REC` 行を `report.json` に保存（`tools5/sdrive-a1.mjs`）。周期ごとの要約は `rec-analyze.py`（成功周期と失敗周期の並び）。
+- テストの道具: `menuCycles` に `hold`（ボタンを押している時間）を足し、各周期の `REC` 行を `report.json` に保存（`tools5/sdrive-a1.mjs`）。周期ごとの要約は `rec-analyze.py`（成功周期と失敗周期の並び）。
 
 ## 進捗と次
-- c9 のビルド: 記録器入りの 2 オブジェクト（`fle_input.o`/`fle_win.o`）を再コンパイル → リンク完了 22:32（wasm sha256 `410db7f1692b…`、製品 4f054ecd の `4ca5ba4eeca5…` とは別。差はオブジェクト 2 つだけ）。これから配信して周期試験に入る。期限 22:30 を過ぎての送信（上のリンクに時間がかかった）。
+- c9 のビルド: 記録器入りの 2 オブジェクト（`fle_input.o`/`fle_win.o`）を再コンパイル → リンク完了 22:32（wasm sha256 `410db7f1692b…`、製品 4f054ecd の `4ca5ba4eeca5…` とは別。差はオブジェクト 2 つだけ）。これから配信して周期テストに入る。期限 22:30 を過ぎての送信（上のリンクに時間がかかった）。
 - 次: (c) hold 0 / 50 / 300 ms を各 10 回（1 回 = 新しいセッション 60 周期）、負荷は他の作業者の負荷のまま（各回の負荷を記録）。(d) 失敗周期の `REC` 行で、FL の TPopupMenu の問題か、ランタイムの時刻・順序の問題かを判定。ランタイムの逸脱が出れば `ci1-input.diff`（HEAD 基準・dry-run・フラグ無し・クラス名／アドレス分岐無し）。
 
 ## 自己申告の逸脱
 - 1 回目のリンク（22:10〜22:17）は、既存の出力（`flengine6.opt.wasm` ほか）があり「skipped」になって、記録器の入らない製品と同一の wasm（sha `4ca5ba4e…`）を作っただけだった。sha を見て気づき、出力を消して再リンク（847 s）。約 15 分の空費。
 - 背景のシェルに `( … ) &` の形（末尾 `&`）でコピーを起動した（禁止の形。コピーは `cp -a` で副作用は c9 の複製のみ、実害無し。以後 `exec` の背景実行のみ）。
-- 前の区間で、失敗する連鎖編集でセット試験が空回りした／依存する 2 つの呼び出しを並列に出した（報告6に記載予定）。
+- 前の区間で、失敗する連鎖編集でセットテストが空回りした／依存する 2 つの呼び出しを並列に出した（報告6に記載予定）。

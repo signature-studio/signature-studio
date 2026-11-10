@@ -1,6 +1,6 @@
 # 0128: FRUITY 有効の 6 モジュール構成を wasm で動かす(node と headless Chrome)。窓の描画面(lid 13)を canvas に出す(G4 の最初の達成の判定)。idle で JS に制御を返す最小実装(G3)。すべて仮の決定
 
-状態: **仮の決定(すべての選択)**。依頼は PM(決定 0128 の番号は PM の割り当て。pin1 が 0127 を使う)。測定・実装・文書は作業者が行った。作業は HEAD 9574cb5 の `git archive`(`lift/`、`docs/`)で始め、clean な写しを `clean/` に置いた。差分は `wasmfruity1.diff`(`diff -ruN clean src`、14 ファイル、約 100 KB、clean な写しに `patch -p1` で当たる: dry-run 終了 0、当てた木 = 作業木)。**実機 Windows との照合は 0 件。Firefox・Safari・headed の Chrome・GPU・HiDPI は未測定。音声・文字描画なし。**
+状態: **仮の決定(すべての選択)**。依頼は PM(決定 0128 の番号は PM の割り当て。pin1 が 0127 を使う)。測定・実装・文書は作業者が行った。作業は HEAD 9574cb5 の `git archive`(`lift/`、`docs/`)で始め、clean な写しを `clean/` に置いた。差分は `wasmfruity1.diff`(`diff -ruN clean src`、14 ファイル、約 100 KB、clean な写しに `patch -p1` で当たる: dry-run 終了 0、当てた木 = ワークツリー)。**実機 Windows との照合は 0 件。Firefox・Safari・headed の Chrome・GPU・HiDPI は未測定。音声・文字描画なし。**
 
 区分の凡例: **実測**＝このセッションのコマンドの出力を見た事実。**読み**＝コードや出力からの解釈(確かめていない)。**未確認**。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者が選んだ値(`S-…`、撤回条件つき)。
 

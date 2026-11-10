@@ -123,7 +123,7 @@ SDM は結果の下限（精度）と特殊値だけを規定する（RCPPS と�
 ## 7. 回帰の確認
 
 - FLEngine（`binaries/win64/FLEngine_x64.dll` を `fe-lift lift ... --pdata`）: `unsupported_total` **531**（基準は 531 以下）、命令 stub 0、`bad_nodes` 0、`functions` 59,297、`emitted_instructions` 2,528,830。**生成 C は実装前の `lift/out-ipp/flengine-pdata.c` とバイト単位で同一**（`cmp`）。FLEngine にこの 25 ニーモニックは出現しないため。
-- 全体テスト: `cd lift && CARGO_TARGET_DIR=.../lift/out-w8/target FLENGINE_PE=.../binaries/win64/FLEngine_x64.dll cargo test --workspace --no-fail-fast`: **`test result` 行 87、1,040 件成功、失敗 0**（`lift/out-w8/test-all.txt`。基準は 85 バイナリ・996 件）。増分は +2 行、+44 件。本作業の `sse_legacy` が 1 行・37 件。残りの +1 行・+7 件は他の作業者の追加（作業ツリーに `fe-decode/tests/multisec.rs` が未追跡で存在する。内訳は未確認）。
+- 全体テスト: `cd lift && CARGO_TARGET_DIR=.../lift/out-w8/target FLENGINE_PE=.../binaries/win64/FLEngine_x64.dll cargo test --workspace --no-fail-fast`: **`test result` 行 87、1,040 件成功、失敗 0**（`lift/out-w8/test-all.txt`。基準は 85 バイナリ・996 件）。増分は +2 行、+44 件。本作業の `sse_legacy` が 1 行・37 件。残りの +1 行・+7 件は他の作業者の追加（ワークツリーに `fe-decode/tests/multisec.rs` が未追跡で存在する。内訳は未確認）。
 - 実行の確認: `lift/out-w8/after/ipp-idx0.c`（42.9 MB）を `clang -fsyntax-only -std=gnu11 -I runtime` に通し、エラー 0。
 
 ## 8. 限界と未確認

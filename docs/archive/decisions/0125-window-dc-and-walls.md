@@ -1,6 +1,6 @@
 # 0125: 窓の DC の状態モデル（GetDC／GetWindowDC／GetDCEx／ReleaseDC／BeginPaint）、hdc=0 の属性呼び出し、Blend2D の JIT 無効、`LoadCursorW` の名前引きと `CreateFruityInstance` の壁 52〜55。停止条件 (d)（壁 55 `FillRect`）で停止。すべて仮の決定
 
-状態: **仮の決定（すべての応答と選択）**。依頼は PM（決定 0125 の内容は PM の仮の決定。番号 0125 は PM の割り当て）。測定・実装・テスト・文書は作業者が行った。作業は HEAD 4ff4f33 の `git archive`（`src/`）で始め、clean な写しを `clean/` に置いた。作業の途中でリポジトリの HEAD は 7149a62（検証担当の文書だけ。ソースの変更なし）まで進んだ。差分 `fruity10.diff` は 4ff4f33 と 7149a62 の両方の clean な写しに `patch -p1` で当たる（dry-run、オフセットなし、拒否なし。「検証」）。
+状態: **仮の決定（すべての応答と選択）**。依頼は PM（決定 0125 の内容は PM の仮の決定。番号 0125 は PM の割り当て）。測定・実装・テスト・文書は作業者が行った。作業は HEAD 4ff4f33 の `git archive`（`src/`）で始め、clean な写しを `clean/` に置いた。作業の途中でリポジトリの HEAD は 7149a62（検証用サブエージェントの文書だけ。ソースの変更なし）まで進んだ。差分 `fruity10.diff` は 4ff4f33 と 7149a62 の両方の clean な写しに `patch -p1` で当たる（dry-run、オフセットなし、拒否なし。「検証」）。
 
 **肯定的に見せる点は限られる。** 壁 52〜55 の 4 壁を通し、`CreateFruityInstance` は 8,651,367 入口から **11,445,924 入口**まで進んだ（新規の関数 2,671 → 3,049）。しかし **(a)（`CreateFruityInstance` が戻る）にも (b)（空キューのメッセージ待ち）にも到達していない**。止まったのは停止条件 **(d)**（最初の新しい描画）で、**G2（主窓 "FL Studio" の可視化）は未達成**（主窓は visible 0 のまま、`ShowWindow`／`SetWindowPos(SWP_SHOWWINDOW)` は 1 回も呼ばれずに壁 55 に着いた）。実機 Windows との照合は 0 件。wasm・ブラウザは未測定。
 
@@ -24,7 +24,7 @@
 
 - 前段（決定 0123）: 壁 22〜51 の 30 壁を直し、壁 52 `gdi32!SetWindowOrgEx(hdc=0)` を直さずに停止条件 (g)（30 壁）で止めた。
 - PM の決定 0125（仮、決定 0123 を引き継ぐ）: 出典のない値で止まらない。壁 52 の原因を特定し、DC の取得・解放を窓の DC として**状態だけ**でモデル化し、最初の実際の描画呼び出し（(d)）で止まる。止まる条件は (a)〜(e) と (g)（40 壁または 8 時間）。窓の DC は描画面を top-level 窓単位で持つ（`detach-window.md` R10）。PM の追加の判断（作業中に確認）: (d) の読みは「宛先が窓の DC である最初の描画呼び出し」と「決定 0111／0113 の DIB セクションの画素操作で足りない、新しい画素モデルが要る最初の描画」。既に答えているメモリ DC の DIB セクション宛ての `PatBlt`／`StretchDIBits` は答えたまま進めてよい。壁 52 の hdc=0 は戻り値 0・last error 6 で通す（last error 6 は出典なしの選択）。スレッド数の基準は 4（指示の 3 は誤り）。native SHA は `fle_thread_wasm.o` を外して再リンクしたとき `aba87edb…`（決定 0124 の受け入れ）。
-- 土台の再現（実測。`logs/a4/base-off`、`base-on`。OUT は削除済み）: FRUITY 無効 942/942、895/895、5,308、1,009,189、native `b96f754b…`（`fle_thread_wasm.o` を外して同じ `.o` を再リンクすると `aba87edb…` に一致）。FRUITY 有効は壁 52（8,651,367 入口、新規の関数 2,671、スレッド 4）。検証担当（HEAD 7149a62 の文書）の値と同じ。
+- 土台の再現（実測。`logs/a4/base-off`、`base-on`。OUT は削除済み）: FRUITY 無効 942/942、895/895、5,308、1,009,189、native `b96f754b…`（`fle_thread_wasm.o` を外して同じ `.o` を再リンクすると `aba87edb…` に一致）。FRUITY 有効は壁 52（8,651,367 入口、新規の関数 2,671、スレッド 4）。検証用サブエージェント（HEAD 7149a62 の文書）の値と同じ。
 
 ## 壁の表
 
@@ -132,9 +132,9 @@
 - **全体テスト**（`logs/full/`、`start.txt`／`end.txt`／`rc.txt`／`test-result-lines.txt`）: `CARGO_TARGET_DIR=lift/out-fruity10/target-full`（変異検査の `target-mut` とは別）。環境変数は `tools/env.sh`（`FLENGINE_PE`／`FLENGINE_DLL`／`ILTOOLS_DLL`／`BLEND2D_PE`（リベース済み）／`DSP_IPPV2_PE`（原本の un-rebased dsp）／`DSP_IPPV2_PE_2000000`／`FREETYPE_PE`／`FL64_EXE`）。ログの `test result` 行を自分で集計: **127 result・1,839 passed・0 failed・ignored 0**（`test result: FAILED` 0、終了 0、終了時に残った `cargo test` のプロセス 0）。**有効な通しは 1 回**。差の内訳（バイナリごとの突き合わせ）は「先に結論」。
 - **FRUITY 無効の a4**（`logs/a4/FOFF1`、`FOFF2`。別の OUT、同じ最終の木）: 942/942、895/895、5,308、1,009,189、`returned from entry`、終了 0、native `d12809ae…77f63`（同一）。基準（clean の木、`base-off`）は `b96f754b…` で、差は生成 C の import thunk 2 本と runtime の変更による。**`fle_thread_wasm.o` を外した再リンクの SHA（`aba87edb…` 系）の再確認は、この最終の木では行っていない**（runtime が変わったので `aba87edb…` とは一致しない）。
 - **FRUITY 有効の最終構成**（`logs/a4/FON1`、`FON2`）: 上の表。2 回とも同一の native SHA と同一の停止。1 回の所要は約 1 分 6 秒、最大 RSS 約 2.7 GB。functions 5,332、entries 1,009,338（a4 の部分）。
-- **生成 C の比較**（`logs/gencmp-flengine.txt`、`gencmp-modules.txt`）: 旧 `fe-lift`（clean の木）と新 `fe-lift`（作業木。SHA `4e4b2b10…`。旧は `36c06573…`）で、同じ入力・同じ引数から FLEngine と m1〜m5 を生成し、`void f_XXXX(void)` の本体ごとに SHA-256 を比べた。変わった本体は FLEngine 2、m5（ILTools）2、他 0。**注意**: m1〜m5 の比較は FRUITY 無効の基準の種と c1 で行った（FRUITY 有効の Blend2D 964 の種と c2 の構成では比べていない）。
+- **生成 C の比較**（`logs/gencmp-flengine.txt`、`gencmp-modules.txt`）: 旧 `fe-lift`（clean の木）と新 `fe-lift`（ワークツリー。SHA `4e4b2b10…`。旧は `36c06573…`）で、同じ入力・同じ引数から FLEngine と m1〜m5 を生成し、`void f_XXXX(void)` の本体ごとに SHA-256 を比べた。変わった本体は FLEngine 2、m5（ILTools）2、他 0。**注意**: m1〜m5 の比較は FRUITY 無効の基準の種と c1 で行った（FRUITY 有効の Blend2D 964 の種と c2 の構成では比べていない）。
 - **変異検査**（`logs/mutations.txt`、`tools/mutate.py`。M1 hdc=NULL が 1 を返す、M2 last error を 5 に、M3 private DC が毎回新しいハンドル、M4b class DC を窓ごとに、M5 common DC を解放しない、M6 `ReleaseDC` が窓を見ない、M7 DCX_CACHE が OWNDC を上書きしない、M8 面を窓自身に、M9 `LoadCursorW` の名前引きを無効に、M10 破棄が private DC を残す、M11 すべてのクラスを CS_OWNDC 扱い）: **12 件とも検出**（変異ごとの失敗したテスト名つき）。最後に `diff -rq` で `mut/` と `src/` の `lift/` が同じ（`out-wallFR10`、`target` を除く）ことを確認した。
-- **diff の dry-run**（4ff4f33 と 7149a62 の clean な `git archive` で `patch -p1 --dry-run`）: どちらも終了 0、21 ファイルとも当たる（オフセット・拒否・fuzz なし）。実際に当てた木の `lift/` は作業木 `src/lift/` と `diff -rq` で差異 0（`docs/` は検証担当の `verify-0122-0123-0124` が HEAD 側にだけあるため、`docs/` は差異がそれだけ）。
+- **diff の dry-run**（4ff4f33 と 7149a62 の clean な `git archive` で `patch -p1 --dry-run`）: どちらも終了 0、21 ファイルとも当たる（オフセット・拒否・fuzz なし）。実際に当てた木の `lift/` はワークツリー `src/lift/` と `diff -rq` で差異 0（`docs/` は検証用サブエージェントの `verify-0122-0123-0124` が HEAD 側にだけあるため、`docs/` は差異がそれだけ）。
 
 ### 規則違反と誤りの自己申告
 

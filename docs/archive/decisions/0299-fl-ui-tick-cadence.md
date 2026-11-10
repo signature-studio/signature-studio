@@ -2,7 +2,7 @@
 
 作業者 `alpha1`(成果物名 alpha18)、2026-11-06 JST 15:07〜。依頼: PM 15:12(決定 0299 仮、node/native のみ。Chrome は起動していない。第 1 報 16:00、最終 16:45)。基準: main 7373cd55(E11、CI 実行中)。区分: **実測**=本書の run の出力、**読み**=逆アセンブル・文書からの解釈、**未確認**。**この機械(16 vCPU の VM、load 8〜12)の値で、依頼者の機械・実 Windows の値は 0 件。**
 
-**実エンジンの実行について**: §3 の実験は E11 の**試験用 wasm**(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abecc01c7b30 = FLEngine_x64.dll と同梱 DLL の lift 結果)を node 24.19 の harness(JSPI、仮想時計、G3 スクリプト `ref1-perf-short.g3`)で走らせた物。入力は harness の模擬(利用者の操作ではない)。仮想時計なので作業量が毎回同一(2 本の同条件の run で数値が一致)。**N1(native)のバイナリは 0291 の後始末で消してあり、本件では使っていない**(node の wasm で代用)。代役・再生・期待値の貼り付けは無い。
+**実エンジンの実行について**: §3 の実験は E11 の**テスト用 wasm**(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.abecc01c7b30 = FLEngine_x64.dll と同梱 DLL の lift 結果)を node 24.19 の harness(JSPI、仮想時計、G3 スクリプト `ref1-perf-short.g3`)で走らせた物。入力は harness の模擬(利用者の操作ではない)。仮想時計なので作業量が毎回同一(2 本の同条件の run で数値が一致)。**N1(native)のバイナリは 0291 の後始末で消してあり、本件では使っていない**(node の wasm で代用)。代役・再生・期待値の貼り付けは無い。
 
 ## 0. 先頭の結論
 
@@ -16,7 +16,7 @@
 
 - (a) 逆アセンブル: `lift/out-opt2/x17/engine/in/dll/` の FLEngine_x64.dll・quickfontcache_x64.1d00000.dll・ILTools_x64.6000000.dll(`objdump -d`、`pefile` + `capstone`〔`tools/a19-qfc-xrefs.py`: import の jmp stub を拾い、呼び元の関数を `.pdata` で当てる〕)。
 - (b) runtime の読み: `lift/runtime/fle_thread.c`(`fle_display_hz`・`fle_display_settings_hz`・`fle_imp_DwmFlush`)、`fle_monitor.c/.h`(EnumDisplaySettingsW)、`fle_gdc.c`(GetDeviceCaps)、`fle_winmm.c`(timeBeginPeriod)、`fle_sys.c`(QPC)、`fle_dwm.c`、`fle_modules.c`(dwmapi の行)。
-- (c) 実験: §3。E11 の試験用 wasm、node、`FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` を harness の env(manifest の `engine.env` と同じ経路。**再 build なし**、製品の runtime が既に持つ env)で変えた。各設定 1〜2 本(同条件の 2 本は数値が一致)。
+- (c) 実験: §3。E11 のテスト用 wasm、node、`FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` を harness の env(manifest の `engine.env` と同じ経路。**再 build なし**、製品の runtime が既に持つ env)で変えた。各設定 1〜2 本(同条件の 2 本は数値が一致)。
 - 先行の決定: 0166(E5 の頃、runtime の 2 つの定数を 60 → 120 に build し直して比べた。UI の周期 2.00 倍、CPU 1.62 倍/仮想 s)、0268(ページが rAF を測って 60/75/90/120 を渡す)、0122(DwmFlush)、0098(EnumDisplaySettings)。**本書は E11 の上で env だけを変え、2 つの値を別々に動かして『どちらが刻みを決めるか』を分けた**のが新しい点。
 
 ## 2. 表 1・2 — 刻みに関わる API の表(関数名つき)と、『リフレッシュ』の値の契約対応
@@ -73,9 +73,9 @@
 
 = **刻みの発行源は、この場面では QFC の投函(量は dmDisplayFrequency 由来のフレーム時間で量子化)が確認できた唯一の経路**。VCL の窓 proc 側のメッセージ(6.25 ms/ブロック)の出どころは追跡できていない。
 
-## 3. 実験 — 2 つの値を別々に動かす(E11 の試験用 wasm、node、`tables/0299-hz-experiment.tsv`)
+## 3. 実験 — 2 つの値を別々に動かす(E11 のテスト用 wasm、node、`tables/0299-hz-experiment.tsv`)
 
-E11 の試験用ビルド(engine.abecc01c7b30、再 build なし)に env だけを与えた。シナリオ `ref1-perf-short.g3`: 起動 → 参照プロジェクトを開く → 『欠けたプラグイン』の窓を Enter で閉じる → **アイドル 8 仮想 s** → Space で**再生 10 仮想 s** →停止。計測 = harness の `g3-progress`(間接呼び出しの数 = `fle_progress_count`、課金 ticks、スライス、thread 切り替え)の差を各区間の仮想秒数で割った値(仮想時計なので毎回同一)。
+E11 のテスト用ビルド(engine.abecc01c7b30、再 build なし)に env だけを与えた。シナリオ `ref1-perf-short.g3`: 起動 → 参照プロジェクトを開く → 『欠けたプラグイン』の窓を Enter で閉じる → **アイドル 8 仮想 s** → Space で**再生 10 仮想 s** →停止。計測 = harness の `g3-progress`(間接呼び出しの数 = `fle_progress_count`、課金 ticks、スライス、thread 切り替え)の差を各区間の仮想秒数で割った値(仮想時計なので毎回同一)。
 
 | FLE_DWM_HZ(DwmFlush) | FLE_DISPLAYSETTINGS_FREQUENCY(dmDisplayFrequency) | アイドル M/仮想 s | 再生 M/仮想 s | アイドルの thread 切替/s | 再生の thread 切替/s |
 |---|---|---|---|---|---|
@@ -101,7 +101,7 @@ E11 の試験用ビルド(engine.abecc01c7b30、再 build なし)に env だけ�
 
 ### 3.3 `DwmGetCompositionTimingInfo` の行を足す実験(PM 15:38 の (2)、実測。製品には入れない、差分案のみ)
 
-**build**: E11 の試験用 work dir の複製(`/home/ubuntu/work/alpha18w`、PM の木の外)に、runtime の `fle_dwm.c` へ `fle_imp_DwmGetCompositionTimingInfo`(hwnd ≠ NULL は `E_INVALIDARG`、`cbSize` < 12 は `E_INVALIDARG`、それ以外は `rateRefresh` = `{dmDisplayFrequency, 1}` を +4・+8 に書いて `S_OK`。他のメンバは触らない)を足し、生成 C の 2 つの表(dispatch の表と `fle_resp_table`)に `dwmapi.dll / DwmGetCompositionTimingInfo` の行を足した。`wasm weblink wasmopt hybrid seed bundle` の段階を E11 と同じ設定で回した(15:45〜15:58、nice 19、`BINARYEN_CORES=3`)。engine.62dd2c67b877。差分案: `tables/0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff`。**同じ build で env `FLE_EXP_NO_DWMTI=1` を渡すと関数が `E_NOTIMPL` を返す = 行が無いのと同じ**(QFC 自身の wrapper が NULL のとき返す値と同じ)ので、1 つの build で『行なし(base)』『行あり(row)』の 2 つの腕を比べた。
+**build**: E11 のテスト用 work dir の複製(`/home/ubuntu/work/alpha18w`、PM の木の外)に、runtime の `fle_dwm.c` へ `fle_imp_DwmGetCompositionTimingInfo`(hwnd ≠ NULL は `E_INVALIDARG`、`cbSize` < 12 は `E_INVALIDARG`、それ以外は `rateRefresh` = `{dmDisplayFrequency, 1}` を +4・+8 に書いて `S_OK`。他のメンバは触らない)を足し、生成 C の 2 つの表(dispatch の表と `fle_resp_table`)に `dwmapi.dll / DwmGetCompositionTimingInfo` の行を足した。`wasm weblink wasmopt hybrid seed bundle` の段階を E11 と同じ設定で回した(15:45〜15:58、nice 19、`BINARYEN_CORES=3`)。engine.62dd2c67b877。差分案: `tables/0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff`。**同じ build で env `FLE_EXP_NO_DWMTI=1` を渡すと関数が `E_NOTIMPL` を返す = 行が無いのと同じ**(QFC 自身の wrapper が NULL のとき返す値と同じ)ので、1 つの build で『行なし(base)』『行あり(row)』の 2 つの腕を比べた。
 
 | 腕 | Hz(DWM = SET) | アイドル M/仮想 s | 再生 M/仮想 s | アイドルの thread 切替/s | 再生の thread 切替/s | g3 の行(55 行)のうち base と違う行 |
 |---|---|---|---|---|---|---|
@@ -110,7 +110,7 @@ E11 の試験用ビルド(engine.abecc01c7b30、再 build なし)に env だけ�
 | base | 120 | **20.478** | 27.585 | 6 | 450 | — |
 | row | 120 | **19.664(−4.0%)** | 26.765(−3.0%) | 3 | 432 | **29 / 55**(snap 10/10、progress 10/10、surface 9/23、wintable 0/10) |
 
-(`tables/0299-dwm-row-experiment.tsv`。base の腕は、行を足していない既存の E11 の試験用 wasm の数(10.31 / 16.81 / 20.48 / 27.58)を**再現**している。)
+(`tables/0299-dwm-row-experiment.tsv`。base の腕は、行を足していない既存の E11 のテスト用 wasm の数(10.31 / 16.81 / 20.48 / 27.58)を**再現**している。)
 
 **結果(実測)**:
 1. **行を足すと QFC の分岐が実際に変わる**(進捗の数が違う)が、**フレーム時間が同じでも UI の仕事は同じにならない**: アイドルで **−3.9%(60 Hz)/ −4.0%(120 Hz)**、再生で −2.5% / −3.0%。120 Hz の 2 倍の比は保たれる(20.48 / 10.31 = 1.99 → 19.66 / 9.90 = 1.99)。
@@ -166,7 +166,7 @@ E11 の試験用ビルド(engine.abecc01c7b30、再 build なし)に env だけ�
 
 ## PM の判断と取り込み(2026-11-06 16:19、docs のみ。製品の差分なし)
 
-取り込み: alpha1(alpha18)の最終の文書・表・道具を `docs/investigations/alpha18/` に置いた(生のログは入れない。原本は `lift/out-git/alpha18-results/logs/`)。実行したのは E11 の試験用 wasm とその複製 build を node(JSPI、仮想時計、G3 の模擬入力)で走らせた実験と逆アセンブルで、**Chrome・N1・実 Windows・依頼者の機械は 0 件**。`0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff` は実験用で、製品には入れない。
+取り込み: alpha1(alpha18)の最終の文書・表・道具を `docs/investigations/alpha18/` に置いた(生のログは入れない。原本は `lift/out-git/alpha18-results/logs/`)。実行したのは E11 のテスト用 wasm とその複製 build を node(JSPI、仮想時計、G3 の模擬入力)で走らせた実験と逆アセンブルで、**Chrome・N1・実 Windows・依頼者の機械は 0 件**。`0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff` は実験用で、製品には入れない。
 
 事実として受け取る:
 1. **UI の刻みの量を決めるのは `EnumDisplaySettingsW` の dmDisplayFrequency**(QuickFontCache の `f_1e857b0` が「n+1 フレームの時間」を作り、タイマ間隔をフレームに量子化)。DwmFlush の周期(FLE_DWM_HZ)は刻みの量に無関係(4 通りの分離実験)。120 Hz と伝えれば FL の UI は 1.99 倍で追従し、UI だけの CPU は κ = 1.92。FL は GetDeviceCaps(VREFRESH) を問い合わせない。WM_TIMER の配送は 0 件。確認できた刻みの発行源は QFC の投函だけで、VCL 側の窓 proc のメッセージ(6.25 ms/ブロック)の出どころは未追跡。

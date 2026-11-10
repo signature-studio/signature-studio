@@ -123,7 +123,7 @@
 | S-b1-load8 | 『load 8 以下』= 実行の idle 時と終了時の 1 分値の両方が 8 以下。1 分値は私自身の実行を含み、遅れて動く | PM が別の定義(開始時の値、5 分値、他のプロセスを除いた値)を指定したとき |
 | S-b1-chrome-cold | 実行ごとに新しいブラウザ、キャッシュ無効、2400x1300、`?bundle=` 明示。2 回目(キャッシュ)は別に C・D だけ 3 組ずつ | 構成ごとの 2 回目を測る指示 |
 | S-b1-rt-o0 | A〜C の runtime は `RT_OPT` 既定の -O0。D の `fle_hle.o` だけ -O2(hle2 の手順) | `RT_OPT=O2` で全体が速くなると測ったとき(測っていない) |
-| S-b1-install | 配置時にバンドルの説明の `HEAD <hash>`(アーカイブが入っている作業木の HEAD)を『git archive of 765999c / 071c53f』に書き換え、`SHA256SUMS` の manifest の行を更新した | 説明の書き換えを避けたいとき(スクリプトの `git rev-parse` を直す) |
+| S-b1-install | 配置時にバンドルの説明の `HEAD <hash>`(アーカイブが入っているワークツリーの HEAD)を『git archive of 765999c / 071c53f』に書き換え、`SHA256SUMS` の manifest の行を更新した | 説明の書き換えを避けたいとき(スクリプトの `git rev-parse` を直す) |
 | S-b1-shim | `systemd-run` の shim(cgroup の上限なしで前景に実行) | PM が cgroup つきの再実行を求めたとき |
 | S-b1-node3 | node の CPU は交互 3 回の中央値 | 回数を増やす指示 |
 
@@ -153,7 +153,7 @@
 - 他の担当と同じマシンで走らせたので、load が 8 を超えた時間が長い(ビルド中は私の分が主因)。Chrome の測定は私のビルドが無い時間に行った。
 - `pkill`・`pgrep`・`sleep`・`timeout` コマンドは使っていない。待ちは前景のコマンドと `tail --pid` で行った。
 - 自分の `brsize.mjs`(PID 指定)を kill した。
-- 既存の `lift/out-git/*`・`lift/out-*`・リポジトリの作業木は編集していない。`lift/out-websrv/assets/` に新しい名前のディレクトリ 4 つを足し、既定の `manifest.json` は触っていない。
+- 既存の `lift/out-git/*`・`lift/out-*`・リポジトリのワークツリーは編集していない。`lift/out-websrv/assets/` に新しい名前のディレクトリ 4 つを足し、既定の `manifest.json` は触っていない。
 
 ## 13. 成果物
 

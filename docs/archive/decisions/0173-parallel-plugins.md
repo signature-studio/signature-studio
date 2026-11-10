@@ -3,14 +3,14 @@
 **冒頭の三点**
 
 1. **何を実測したか**(Chrome 156.0.8078.47 headless、この機械 16C/32T・load 13〜43・`nice` 15 が主〔一部 nice 0 と明記〕): ①lift 済み OTT VST3(決定 0164 の既存 wasm 2 種)を、`WebAssembly.Module` を共有した 1・2・4・8・16 個の Worker で同時に動かした 1 ブロックの時間と Worker あたり CPU(§3.1)②SAB の往復(Worker↔Worker、メインスレッド `Atomics.waitAsync`、`postMessage` 比較、K=1〜16 のファンアウト、実 OTT を別 Worker に置いたパイプライン〔nice 15 / 0〕)(§3.2)③emscripten pthread の共有 `Memory` に lift 風のカーネルを 2 スレッドで走らせたときの壊れ方と TLS のコスト、JSPI + pthread、`lock` 命令の非アトミックさ(§3.3)④105 MB の SAB を 4 Worker から読む RSS と時間(§6.1)⑤Chrome 156 の機能検出(§2.1)⑥プロキシの `process` を JSPI の中断 import にしたときの、1 本の Worker の複数のゲストスレッドによる複数プラグインの同時利用(§3.2 (c))。⑦**S1 の試作**(外部入力版 OTT wasm + SAB プロトコル + 再利用できるプラグイン Worker、node と Chrome 156、§5.4)⑧**駆動方式の前提の確認**: lift したエンジンの再生中の `CreateThread`(native -O0 + gdb)、FL の PDC・マルチスレッド設定の文字列、参照プロジェクトの FLP の『Allow threaded processing』の静的な読み(§6.4)。
-2. **結論**(**読みを含む。Serum 2・FL 本体の並列実行は測っていない**): 方式 **(B)/(C)**: 重いサードパーティ VST3 から順にプラグイン 1 インスタンス = 1 Worker に出し、`process` の境界(バッファ + IParameterChanges + IEventList + ProcessContext = 値で複写できるデータ)を SAB のスロットで受け渡す。(A) 共有 Memory のスレッド化は採らない(PM 判断済み)。(D) AudioWorklet は出力側専用。P3 に届くかは **コード生成の改善(rz1 + 直接生成)が前提**で、Worker 分割はそれを核の数だけ拡げる(中心の前提で直接生成なら `hardwareConcurrency` 8 以上で届く。C 経路のままではピアノ 1 インスタンスが締め切りを超える)。**S1 は実装した**(PM の第 2 報): 4 本の out_hash が単独実行と一致、4 インスタンス同時、実時間ペースで遅れ 0、ウォームアップ専用インスタンスで最初のブロックの費用を取り除く(同じインスタンスの pre-roll は出力が変わるので不可)。**前提の確認**: 再生中の `CreateThread` は 0 本、共有スレッドバンクのスレッドは無い(空のプロジェクト)、FL の PDC は『ミキサートラック』単位、参照プロジェクトの VST/VST3 21 個は per-plugin の 2 条件が全部オン(Audio 設定の既定は未確認)。残りの作業の桁(読み): S2 数日、S3 3〜6 週間、S4 2〜4 週間、S5 2〜4 週間、合計 約 2〜4 か月(GUI を除く)。
-3. **未確認**: Serum 2・Vital・Kilohearts の wasm での Worker 実行(速度・メモリ・初期化)/ 依頼者の機械の核数 / 実 FL の VST3 ホストが `process` 中に `IComponentHandler` を呼ぶか・`getLatencySamples` を PDC に使うか / lift したエンジンが QFC のスレッドバンク(`Multithreaded … processing`)を実際に作るか / プラグインの GUI / Serum 2 が音色データを `ReadFile` で読むかマッピングか / nice 15 でない静かな機械での値。受け渡し試験の 32 KiB は代役データ(DSP と受け渡し・起床・スケジューリングは実物)。 駆動方式の前提: 所定のプロジェクトでスレッドバンクが作られるか(FLP を開く経路が無い)、FL の PDC が楽器にも効くか・VST3 の `getLatencySamples` を読むか、Audio 設定のマルチスレッドの既定値。混成(直接 wasm 生成)の外部入力ビルド、オーディオ以外(パラメータ・イベント・状態)の運搬。
+2. **結論**(**読みを含む。Serum 2・FL 本体の並列実行は測っていない**): 方式 **(B)/(C)**: 重いサードパーティ VST3 から順にプラグイン 1 インスタンス = 1 Worker に出し、`process` の境界(バッファ + IParameterChanges + IEventList + ProcessContext = 値でコピーできるデータ)を SAB のスロットで受け渡す。(A) 共有 Memory のスレッド化は採らない(PM 判断済み)。(D) AudioWorklet は出力側専用。P3 に届くかは **コード生成の改善(rz1 + 直接生成)が前提**で、Worker 分割はそれを核の数だけ拡げる(中心の前提で直接生成なら `hardwareConcurrency` 8 以上で届く。C 経路のままではピアノ 1 インスタンスが締め切りを超える)。**S1 は実装した**(PM の第 2 報): 4 本の out_hash が単独実行と一致、4 インスタンス同時、実時間ペースで遅れ 0、ウォームアップ専用インスタンスで最初のブロックの費用を取り除く(同じインスタンスの pre-roll は出力が変わるので不可)。**前提の確認**: 再生中の `CreateThread` は 0 本、共有スレッドバンクのスレッドは無い(空のプロジェクト)、FL の PDC は『ミキサートラック』単位、参照プロジェクトの VST/VST3 21 個は per-plugin の 2 条件が全部オン(Audio 設定の既定は未確認)。残りの作業の桁(読み): S2 数日、S3 3〜6 週間、S4 2〜4 週間、S5 2〜4 週間、合計 約 2〜4 か月(GUI を除く)。
+3. **未確認**: Serum 2・Vital・Kilohearts の wasm での Worker 実行(速度・メモリ・初期化)/ 依頼者の機械の核数 / 実 FL の VST3 ホストが `process` 中に `IComponentHandler` を呼ぶか・`getLatencySamples` を PDC に使うか / lift したエンジンが QFC のスレッドバンク(`Multithreaded … processing`)を実際に作るか / プラグインの GUI / Serum 2 が音色データを `ReadFile` で読むかマッピングか / nice 15 でない静かな機械での値。受け渡しテストの 32 KiB は代役データ(DSP と受け渡し・起床・スケジューリングは実物)。 駆動方式の前提: 所定のプロジェクトでスレッドバンクが作られるか(FLP を開く経路が無い)、FL の PDC が楽器にも効くか・VST3 の `getLatencySamples` を読むか、Audio 設定のマルチスレッドの既定値。混成(直接 wasm 生成)の外部入力ビルド、オーディオ以外(パラメータ・イベント・状態)の運搬。
 
 状態: **仮の決定**。依頼は PM(番号 0173)。調査・設計・試作・測定・文書は担当 `mt1`(2026-11-03 11:44〜)。基準 HEAD **d9af868**(ブランチ main)の `git archive`(`lift/out-mt1/src/`)。**既存ファイルの編集は 0 個**。差分 `mt1.diff` は `lift/harness/web/mt1/` の新規ファイルだけ。実エンジンの既定の動作・生成 C・既存のテスト・`lift/out-websrv/assets`・既定の入口・`app/` には触れていない。
 
 区分の凡例: **実測** = この担当のコマンドの出力。**記録** = 既存の決定・調査の引用(再測定していない)。**読み** = コード・文字列・文書の解釈。**推測** = 根拠が弱い算術。**未確認**。**出典なしの選択** = `S-mt1-…`(§7)。
 
-**進捗の誠実性**: (1) **実行された機械語**: lift 済みの OTT VST3(Xfer OTT 1.37)の x86-64 → C → wasm / 直接 wasm 生成の混成が Chrome の Worker で実際に走った。出力ハッシュは決定 0164 と同じ。**FLEngine は動かしていない**。(2) **代役**: 受け渡し試験(§3.2 (b))の 32 KiB は代役データ。プラグイン側のホスト(`vst-host.js`)は 22 個の import をブラウザ向けに自作したもの(emscripten の glue を使っていない)。共有メモリ試験(§3.3)は lift 風に書いた**合成カーネル**(プラグインのコードではない)。(3) **G 段階表の到達には数えない**。音は一度も出していない(headless)。(4) 数字はこの機械(依頼者の機械ではない)の値で、load を併記した。
+**進捗の誠実性**: (1) **実行された機械語**: lift 済みの OTT VST3(Xfer OTT 1.37)の x86-64 → C → wasm / 直接 wasm 生成の混成が Chrome の Worker で実際に走った。出力ハッシュは決定 0164 と同じ。**FLEngine は動かしていない**。(2) **代役**: 受け渡しテスト(§3.2 (b))の 32 KiB は代役データ。プラグイン側のホスト(`vst-host.js`)は 22 個の import をブラウザ向けに自作したもの(emscripten の glue を使っていない)。共有メモリテスト(§3.3)は lift 風に書いた**合成カーネル**(プラグインのコードではない)。(3) **G 段階表の到達には数えない**。音は一度も出していない(headless)。(4) 数字はこの機械(依頼者の機械ではない)の値で、load を併記した。
 
 ## 0. 先に結論(表)
 
@@ -50,21 +50,21 @@
 
 - ホスト側の部品はすべて **FLEngine 本体**(Delphi)にある: `TVST3Plugin`(読み込み)、`TVST3HostInstance`(`IHostApplication`)、`TVST3ComponentHandler`/2/3、`TVST3EventList`(`IEventList`)、`TVST3ParameterChanges` + `TVST3ParamValueQueue`、`TVST3BStream`、`TVST3Message` + `TVST3AttributeList`、`TVST3UnitHandler`、`TVST3EditorFrame`(`IPlugFrame`)、`TVST3ContextMenu`。QFC は **モジュールの読み込みとファクトリの取得**(`CreateVST3Instance`: `LoadLibraryW` → `InitDll` → ファクトリ)だけ。(**読み**、`vst3-hosting.md` §3.1)
 - 呼び出しの順序(公開資料 + 読み): `InitDll` → `GetPluginFactory` → `createInstance` → `initialize(IHostApplication)` → (controller が別クラスなら)別 `createInstance` + `IConnectionPoint::connect` → `setBusArrangements` → `setupProcessing` → `setActive(true)` → `setProcessing(true)` → **オーディオスレッドで `IAudioProcessor::process(ProcessData)`**(Steinberg の Audio Processor Call Sequence: `process` は Audio Thread、そのほかは UI Thread)。
-- `process` の引数(**実測**: lift 済みの VST3 ハーネス `lift/harness/vst3a/main_vst3a.c` の `proc_data`、80 B。FL が渡す形と同じ ABI): `AudioBusBuffers`(チャンネル数、`float**` 〔4096 フレーム × チャンネル〕)の入出力、`IParameterChanges`(入力: 自動化の点列。出力: プラグインが `addParameterData` で返す)、`IEventList`(入力: ノート・MIDI。出力)、`ProcessContext`(112 B: テンポ、拍位置、サンプル位置、状態)。= **`process` の境界を越えるものは、すべて値として複写できるデータ**(バッファ 32 KiB + 数百 B〜数 KiB の点列・イベント列)。
+- `process` の引数(**実測**: lift 済みの VST3 ハーネス `lift/harness/vst3a/main_vst3a.c` の `proc_data`、80 B。FL が渡す形と同じ ABI): `AudioBusBuffers`(チャンネル数、`float**` 〔4096 フレーム × チャンネル〕)の入出力、`IParameterChanges`(入力: 自動化の点列。出力: プラグインが `addParameterData` で返す)、`IEventList`(入力: ノート・MIDI。出力)、`ProcessContext`(112 B: テンポ、拍位置、サンプル位置、状態)。= **`process` の境界を越えるものは、すべて値としてコピーできるデータ**(バッファ 32 KiB + 数百 B〜数 KiB の点列・イベント列)。
 - `process` の最中にプラグインからホストへのコールバックは、**ホストが渡した `IParameterChanges` / `IEventList` の関数の呼び出し**(`getEventCount`/`getEvent`、`getParameterCount`/`getParameterData`、`addParameterData`/`addPoint`)に限られる(Serum 2 の 40 ブロックの実行は『止まった所は無い』〔決定 0165〕としか言えず、`process` 中のホスト呼び出しの全数は取っていない。**`IComponentHandler::performEdit` / `restartComponent` が `process` 中に呼ばれるかは未確認**〔VST3 の規則では UI スレッドから呼ぶ〕)。
 - プラグイン→ホストの**非同期のコールバック**(`IComponentHandler::beginEdit`/`performEdit`/`endEdit`/`restartComponent`、`IPlugFrame::resizeView`、`IUnitHandler`、`IHostApplication::createInstance(IMessage)`)は UI・制御経路で、GUI の操作と読み込み時に起きる(`process` と同じスレッドではない)。
 
 ### 1.3 現在の wasm の並行性(JSPI の協調スレッド)
 
 - スケジューラの決定は C(`lift/runtime/fle_thread.c`: 作成順のラウンドロビン、優先度無視、切り替えは待ち・譲りの API の中だけ + 決定 0147 の擬似プリエンプション〔間接呼び出し 4096 回 = 仮想 1 ms〕)。**手段だけが違う**: native は `swapcontext`、wasm は `fle_thread_wasm.c` が `__stack_pointer` を保存し、JS(`WebAssembly.Suspending` の import)が次のスレッドの `WebAssembly.promising` スタックを再開する。1 ゲストスレッド = 1 JSPI スタック + 1 MiB(層状窓のレーンは 8 MiB が要った〔決定 0139〕)の C シャドウスタック領域。(`fle_thread_wasm.c` を読んだ。決定 0124)
-- **ゲストの「コンテキスト」**(`fle_thread.c` の `save_ctx` / `load_ctx` が値でコピーする物): `R[16]`、`X[16]`(XMM)、`YH[16]`(YMM 上位)、`FL`(eflags)、`MM[]`、x87 のレジスタと状態、`mmx_active`、`fle_mxcsr`、`fle_landing_top`、`fle_seh_top`、`fle_seh_cur`、コールバック深さ、トレース深さ、そして `fle_teb_cur` / `fle_tls_cur`。**切り替えのたびに約 1.6 kB を各方向へ複写する**ので、実並列では「複写」でなく「スレッドごとの置き場」が要る(§4)。
+- **ゲストの「コンテキスト」**(`fle_thread.c` の `save_ctx` / `load_ctx` が値でコピーする物): `R[16]`、`X[16]`(XMM)、`YH[16]`(YMM 上位)、`FL`(eflags)、`MM[]`、x87 のレジスタと状態、`mmx_active`、`fle_mxcsr`、`fle_landing_top`、`fle_seh_top`、`fle_seh_cur`、コールバック深さ、トレース深さ、そして `fle_teb_cur` / `fle_tls_cur`。**切り替えのたびに約 1.6 kB を各方向へコピーする**ので、実並列では「コピー」でなく「スレッドごとの置き場」が要る(§4)。
 - 構成 D は `-DFLE_LOWREGS`: `R` と `FL` が線形メモリの固定の低いアドレス(0x2000、0x2100)に置かれる(決定 0155)。**共有メモリで 2 つのスレッドが同じ生成 C を走らせると、このアドレスが共有される**。
 - lift した `lock` 付き命令(`xadd`、`cmpxchg`、`xchg [mem]`)は **非アトミックな読み・演算・書き**に変換される(`fe-lift/src/int_more.rs`、`int_more2.rs` を読んだ。`lock` 接頭辞は無視される)。協調スレッドでは正しいが、実並列では壊れる(§3.3 の実測)。
 - ブラウザの配信は `COOP: same-origin` + `COEP: require-corp` + `CORP: same-origin` を **すでに付けている**(`app/shared/headers.ts` の `ISOLATION_HEADERS`。dev サーバー、`vite preview`、Cloudflare Worker、`app/vite.config.ts` が使う)。= `SharedArrayBuffer` と wasm の共有メモリは、配信の変更なしで使える(§2 の機能検出)。
 
 ### 1.4 音声出力の現在の経路
 
-- ゲスト → **DirectSound のモデル**(`lift/runtime/fle_dsound.c`、決定 0139 / audio1。`DirectSoundEnumerateA` が "Browser Audio Output" を 1 台返す。2 × 4096 フレーム = 32768 B のセカンダリバッファ)→ 「デバイス」がバッファを読んで float32 にし、**線形メモリ内のリング**(`fle_audio_ring.c`: 32768 フレーム = 0.74 s、ステレオ、`write_frames`/`read_frames`)へ追記(再生カーソルの `lead` フレーム先。**既定 60 ms**、S-audio-lead)→ 同期 import(`fleAudioSab`)が **SharedArrayBuffer のリング**へ複写 → **AudioWorklet**(`lift/harness/web/audio/audio-worklet.js`)が 128 フレームの量子ごとに読む。読み位置(`RD`)は PLAYING の間、エンジンが公開したかどうかにかかわらず 128 ずつ進む(デバイスの時間軸)。足りない量子は無音 + 計数(`ur`、`urf`)。
+- ゲスト → **DirectSound のモデル**(`lift/runtime/fle_dsound.c`、決定 0139 / audio1。`DirectSoundEnumerateA` が "Browser Audio Output" を 1 台返す。2 × 4096 フレーム = 32768 B のセカンダリバッファ)→ 「デバイス」がバッファを読んで float32 にし、**線形メモリ内のリング**(`fle_audio_ring.c`: 32768 フレーム = 0.74 s、ステレオ、`write_frames`/`read_frames`)へ追記(再生カーソルの `lead` フレーム先。**既定 60 ms**、S-audio-lead)→ 同期 import(`fleAudioSab`)が **SharedArrayBuffer のリング**へコピー → **AudioWorklet**(`lift/harness/web/audio/audio-worklet.js`)が 128 フレームの量子ごとに読む。読み位置(`RD`)は PLAYING の間、エンジンが公開したかどうかにかかわらず 128 ずつ進む(デバイスの時間軸)。足りない量子は無音 + 計数(`ur`、`urf`)。
 - 決定 0139 の実測(Chrome 156、再ベース前の木、**実エンジン**): 60 秒で再生クォンタ 19,053 のうち 98.1% がアンダーラン(仮想時計が実時間の 0.5% しか進まなかった。メインスレッドの 1 スライス最大 11.3 秒)。C のシナリオ `rt_mixer`(DS モデル + リング + JSPI スレッド + 1:1 の実時間ペース、リード 60 ms)は 0 / 3,098 クォンタ、`Unlock` から Worklet が読むまで中央値 84.3 ms。
 - **アプリ(`app/`)は AudioWorklet に未接続**(`app/src/main.ts:324` `underruns: null, // no AudioWorklet in this build`)。決定 0170(clk1)が仮想時計を実時間に追従させる駆動を入れた(`pace: catchup`、遅れの上限 1000 ms)。音声の P3 の測定(AudioWorklet の枯渇回数)は**未接続のため未測定**(`performance-targets.md` §4a)。
 
@@ -74,7 +74,7 @@
 
 | | (A) wasm 共有メモリのスレッド | (B) プラグイン 1 インスタンス = 1 Worker(別 wasm インスタンス、別アドレス空間) | (C) ハイブリッド(FL 本体 + 軽い物は 1 スレッド、重いプラグインだけ別 Worker) | (D) AudioWorklet の中で処理 |
 |---|---|---|---|---|
-| **届く見込みの根拠** | 1 スレッドで足りない CPU(6 Serum ≒ 1 コアの数倍)を、同じアドレス空間で複数コアに載せられる。ポインタがそのまま通る(COM のオブジェクトを複写しない) | 実測: 同じコンパイル済みモジュールを N 個の Worker で動かすと、Worker あたりの CPU 時間は N = 2〜16 で +11〜15%、1 ブロックの中央値は N=4 まで +6%(3.44 → 3.66 ms)、最良の Worker は N=16 でも +10%(§3.1。load 13〜16)。受け渡しの往復は SAB で p50 10 µs 前後(§3.2)。VST3 の `process` の境界は値で複写できるデータだけ(§1.2) | (B) と同じ根拠。FL 本体の部分は今の構成のまま(新規の作業が最小) | 根拠なし: AudioWorklet は 1 本のレンダリングスレッド上で 128 フレーム(2.9 ms)ごとの同期処理。`Atomics.wait` は投げる、`Worker` も `fetch` も `performance` も無い(§2.1 の実測) |
+| **届く見込みの根拠** | 1 スレッドで足りない CPU(6 Serum ≒ 1 コアの数倍)を、同じアドレス空間で複数コアに載せられる。ポインタがそのまま通る(COM のオブジェクトをコピーしない) | 実測: 同じコンパイル済みモジュールを N 個の Worker で動かすと、Worker あたりの CPU 時間は N = 2〜16 で +11〜15%、1 ブロックの中央値は N=4 まで +6%(3.44 → 3.66 ms)、最良の Worker は N=16 でも +10%(§3.1。load 13〜16)。受け渡しの往復は SAB で p50 10 µs 前後(§3.2)。VST3 の `process` の境界は値でコピーできるデータだけ(§1.2) | (B) と同じ根拠。FL 本体の部分は今の構成のまま(新規の作業が最小) | 根拠なし: AudioWorklet は 1 本のレンダリングスレッド上で 128 フレーム(2.9 ms)ごとの同期処理。`Atomics.wait` は投げる、`Worker` も `fetch` も `performance` も無い(§2.1 の実測) |
 | **最大の障害** | (1) 生成 C が共有メモリで壊れる: `R[]`/`FL`/`X[]`/x87/MXCSR/SEH・TEB のスレッドごとの置き場(§3.3 の実測で 2 スレッドが同じ `R[]` を使うと結果が壊れる)、`lock` 付き命令が非アトミック、ランタイムの大域状態(dispatch キャッシュ、仮想時計、VFS、ヒープ)。(2) **全部が 1 つの 4 GiB の共有メモリ**: 6 Serum だけで約 3 GB(決定 0165)。(3) JSPI と pthread の併用は動く(§3.3)が二重化の設計が要る。全モジュールを `-pthread -matomics` で作り直し | COM インタフェース(VST3 の IComponent / IAudioProcessor / IEditController / IConnectionPoint / IBStream / IMessage ほか)の **RPC プロキシ**を新しく作る(オブジェクトのハンドル表、呼び出しの直列化、コールバックの逆向きの経路)。プラグインの GUI(窓モデルが別の Worker になる)。モジュール内の大域状態を共有するプラグイン(Kilohearts の `HeartCore`、Serum 2 のデータベース等)を別のアドレス空間に置いてよいか | (B) と同じ + どこで線を引くかの規則(重さの測定、チェーンの順序) | 1 量子 2.9 ms 以内に 4096 フレームの 1/32 を処理する必要(Serum の 1 ブロック 36〜64 ms 以上が 32 分割でも 1.1〜2 ms + 呼び出しの固定費)、**並列にならない**(1 スレッド) |
 | **必要な作業の桁(読み)** | **数か月**: fe-lift の `lock` 命令(wasm のアトミック RMW)、`R`/`FL`/`X`… の TLS 化(または複数メモリ)、ランタイム全体のスレッド安全化(`lift/runtime/fle_*.c` 61 ファイル)、全モジュール再ビルド(wasm 234 MB)、スケジューラ(JSPI)との併用、4 GiB の壁の解決(wasm64) | **数週間**: VST3 RPC 層(1〜2 週間 = 最小の `process` 経路〔OTT 1 個〕、数週間 = 全インタフェース + 状態 + パラメータ)+ Worker 側のハーネス(既存の `vst`/`vst3a` ハーネスを土台に)+ 配布(プラグインごとの wasm) | **(B) より 1〜2 週間短い**(最初の段階 = OTT 1 個を別 Worker で) | 数日で試せるが、届かない |
 | **失敗の兆候** | 共有メモリ版の生成 C が単独スレッドで通っても、2 スレッドで出力ハッシュが揺れる。`WebAssembly.Memory` の max を超える `memory.grow` の失敗。JSPI を使う import が pthread で止まる | プラグイン Worker の `process` の往復が 92.88 ms の半分を超える頻度が上がる(受け渡しではなく OS の CPU 不足)。プラグインが `performEdit` を `process` 中に呼んで往復が積み上がる。大域状態を共有するプラグインの出力が単独実行と違う | (B) と同じ。さらに「FL 本体のスレッドが重いプラグインを待つ間に UI が止まる」 | 量子の途中でアンダーラン、`process()` の実行時間が 2.9 ms に近づく |
@@ -133,9 +133,9 @@
 
 ### 3.1b 静かな機械(load 3〜11)での取り直し(S1 の作業中、2026-11-03 13:00〜13:10)
 
-他の担当の load が下がった時間に、同じ試験(`run-scale.mjs`、`run-pipe.mjs`、`nice` 15)を取り直した。**§3.1 と §3.2 (b) の表(load 13〜43)の悪化の大半は他の担当の load だった**ことが分かる。`tables/scale-sc2.tsv`(混成)、`scale-sc3.tsv`(C 経路)、`pipe2.tsv`:
+他の担当の load が下がった時間に、同じテスト(`run-scale.mjs`、`run-pipe.mjs`、`nice` 15)を取り直した。**§3.1 と §3.2 (b) の表(load 13〜43)の悪化の大半は他の担当の load だった**ことが分かる。`tables/scale-sc2.tsv`(混成)、`scale-sc3.tsv`(C 経路)、`pipe2.tsv`:
 
-| 試験 | N / K | 1 ブロック(中央値、反復の中央値) | 最良の Worker | Worker あたり CPU | load |
+| テスト | N / K | 1 ブロック(中央値、反復の中央値) | 最良の Worker | Worker あたり CPU | load |
 |---|---:|---:|---:|---:|---|
 | 混成(OTT、300 ブロック × 3 反復) | N=1 | **3.24 ms** | 3.19 | 1240 ms | 3〜10 |
 | | 2 | 3.58 | 3.44 | 1385 | |
@@ -160,7 +160,7 @@
 
 ### 3.2 SharedArrayBuffer の受け渡し
 
-**(a) 往復の素の時間**(`rtt.html`、`rtt-worker.js`、`run-rtt.mjs`。32 KiB の入力を生産者が複写 → 要求 → 相手が出力へ複写 → 応答 → 生産者が 32 KiB を読む。3000 ラウンド × 3 反復、warm-up 200。load 24〜43、`nice` 15。`tables/rtt1.tsv`):
+**(a) 往復の素の時間**(`rtt.html`、`rtt-worker.js`、`run-rtt.mjs`。32 KiB の入力を生産者がコピー → 要求 → 相手が出力へコピー → 応答 → 生産者が 32 KiB を読む。3000 ラウンド × 3 反復、warm-up 200。load 24〜43、`nice` 15。`tables/rtt1.tsv`):
 
 | 生産者 ↔ プラグイン | K | p50 | p90 | p99 | p99.9 | 最大 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -253,7 +253,7 @@
                                                        プロキシ(Atomics.wait で待つ)を呼ぶ                             入力)
                                                        ↓ ミキサーが 4096 フレームを作る(PCM16 / float32)
                                                  DS モデル(fle_dsound.c): バッファ → float32 → 線形メモリのリング(32768 フレーム)
-                                                       ↓ 同期 import(fleAudioSab)で SAB リングへ複写                                   ┌─ 128 フレームの量子ごとに
+                                                       ↓ 同期 import(fleAudioSab)で SAB リングへコピー                                   ┌─ 128 フレームの量子ごとに
                                                  [SAB リング: 32768 フレーム × 2ch float32 = 256 KiB + 32 カウンタ]  ──────────────→  │ Atomics.load(wr/rd)、読む、
                                                        ↑ RD(AudioWorklet が進める)= `fle_audio_consumed()` = デバイスの時計        │ RD += 128、足りなければ
                                                  ゲストの GetCurrentPosition / Sleep(1) のポーリングがこの RD から再生位置を得る    └─ 無音 + ur++, urf += 欠け
@@ -261,7 +261,7 @@
 
 - **リングの大きさ**: 既存の 32768 フレーム(0.74 s = 7.9 ブロック)で足りる。要るのは「目標の充填量」(下)であって容量ではない。256 KiB の SAB。
 - **サンプルレート**: プロジェクトとエンジンの既定は 44.1 kHz(DS の `SetFormat(44100/16/2)`)。`new AudioContext({ sampleRate: 44100 })` を要求すると、ブラウザが出力デバイスの周波数へ変換する(自前の変換は要らない)。headless の Chrome 156 では 48000 の指定が通る(§2.1)。**headless では 44100 も 48000 も指定どおりに通る(実測)。実機の出力周波数への変換は未確認**。
-- **ブロック 4096 を 128 フレームの量子に刻む**: 刻みは AudioWorklet の仕事ではなくリングの仕事。エンジンは 4096 フレームを 1 回で追記し(`write_frames += 4096`)、Worklet は 128 ずつ `rd` を進める(32 量子 = 1 ブロック = 92.88 ms)。Worklet の `process()` は、ロードも分岐もほぼ無い 128 フレームの複写 + 数個の `Atomics` で、アロケーションが無い(既存の `audio-worklet.js`)。
+- **ブロック 4096 を 128 フレームの量子に刻む**: 刻みは AudioWorklet の仕事ではなくリングの仕事。エンジンは 4096 フレームを 1 回で追記し(`write_frames += 4096`)、Worklet は 128 ずつ `rd` を進める(32 量子 = 1 ブロック = 92.88 ms)。Worklet の `process()` は、ロードも分岐もほぼ無い 128 フレームのコピー + 数個の `Atomics` で、アロケーションが無い(既存の `audio-worklet.js`)。
 - **遅延**: リード 60 ms(S-audio-lead)+ ブロック周期。audio1 の C シナリオの実測は、`Unlock` から Worklet が読むまで中央値 84.3 ms。並列プラグインの追加分(往復 p50 5〜200 µs + `process` の壁時計)は、ミキサーの 1 ブロックの計算時間に加わる。
 
 ### 4.2 アンダーランの検出(決定 0152 のビーコンの AudioWorklet underrun)
@@ -283,7 +283,7 @@
 
 ### 4.3a 段階 1 の接続の設計(未実装。作業の桁: 数日)
 
-- ページ: `AudioContext({ sampleRate: 44100, latencyHint: 'interactive' })`(Chrome 156 headless で 44100 が通る〔実測〕)、`audioWorklet.addModule`(既存の `lift/harness/web/audio/audio-worklet.js` と `ring.js` が原型。`app/` へは複写して持ち込む)、SAB のリング(256 KiB + 32 語のカウンタ)を作り、Worklet とエンジンの Worker に渡す。ユーザー操作(再生ボタン等)で `ctx.resume()`(自動再生の規則)。
+- ページ: `AudioContext({ sampleRate: 44100, latencyHint: 'interactive' })`(Chrome 156 headless で 44100 が通る〔実測〕)、`audioWorklet.addModule`(既存の `lift/harness/web/audio/audio-worklet.js` と `ring.js` が原型。`app/` へはコピーして持ち込む)、SAB のリング(256 KiB + 32 語のカウンタ)を作り、Worklet とエンジンの Worker に渡す。ユーザー操作(再生ボタン等)で `ctx.resume()`(自動再生の規則)。
 - エンジンの Worker: init メッセージで SAB を受け、エンジンの `EM_JS` 経路(`fle_js_publish` ほか。`Module.fleAudioSab`)に渡す。**関連ファイル**: `app/src/engine/{worker.ts,client.ts,protocol.ts,fruity.ts}`、`app/src/main.ts`、新規 `app/src/audio/*.ts`。バンドル(wasm)側は決定 0139 で入っているので**生成 C・ランタイムの変更は無い**。
 - 計数: Worklet の `ur`、`urf`、`q`、`qp`、`fmin`/`fmax` を 50 ms ごとに受け取り、`PerfRecorder`/ビーコンに `underruns = ur`、`audio.frames_missing = urf`、`audio.fill_min = fmin` を足す。P3 の合格は『所定のプロジェクトを Song Mode で最後まで再生して `ur == 0` かつ `qp` が再生時間と一致』。
 - 注意: ビーコンの `underruns` は PLAYING の間の量子だけを数える(`state == 2`)。再生していない間の無音は数えない(既存の Worklet の仕様)。
@@ -395,23 +395,23 @@
 **設計**:
 
 1. **ボリュームの持ち主**: ページ(または専用の VFS Worker)が、必要なファイルを 1 つの `SharedArrayBuffer`(読み取り専用の約束)に集める(入手: HTTP 取得 → OPFS/IndexedDB のキャッシュ。FLAC は brotli が効かない)。ファイル表 `{パス → (オフセット, 大きさ)}` を JSON で持つ。SAB と表を全プラグイン Worker へ `postMessage`(SAB は複製でなく共有)。
-2. **Worker 側(`lift/runtime/fle_vfs.c` の opt-in 拡張、読み)**: ノードの種類に「外部ファイル」を足す(データを線形メモリに持たず、`ext_id` と大きさだけ)。`CreateFileW` は表を引く、`GetFileSize`/`SetFilePointer` は大きさから、`ReadFile` は新しい import `fle_js_vfs_read(ext_id, offset, dst, len)` を呼ぶ。JS 側の実体は `HEAPU8.set(sabView.subarray(off, off + len), dst)`(1 回の複写。**読んだ分だけ**が Worker の私有メモリに来る)。import は同期で、`Atomics` を使わない(SAB は書き込まれない)。
-3. **`fle_vfs_file_info()` を使う他の経路**(ファイルのデータ領域へ直接ポインタを取る用途: ファイルマッピング、`LoadResource` 等)は外部ファイルでは「初回に要求範囲を私有メモリに具体化する」経路が要る。Serum 2 が FLAC を `ReadFile` で読むか、マッピングで読むかは**未確認**(決定 0165 は CreateFileW のトレースだけ)。マッピングなら具体化の複写(ファイルの大きさ分)が起きる。
+2. **Worker 側(`lift/runtime/fle_vfs.c` の opt-in 拡張、読み)**: ノードの種類に「外部ファイル」を足す(データを線形メモリに持たず、`ext_id` と大きさだけ)。`CreateFileW` は表を引く、`GetFileSize`/`SetFilePointer` は大きさから、`ReadFile` は新しい import `fle_js_vfs_read(ext_id, offset, dst, len)` を呼ぶ。JS 側の実体は `HEAPU8.set(sabView.subarray(off, off + len), dst)`(1 回のコピー。**読んだ分だけ**が Worker の私有メモリに来る)。import は同期で、`Atomics` を使わない(SAB は書き込まれない)。
+3. **`fle_vfs_file_info()` を使う他の経路**(ファイルのデータ領域へ直接ポインタを取る用途: ファイルマッピング、`LoadResource` 等)は外部ファイルでは「初回に要求範囲を私有メモリに具体化する」経路が要る。Serum 2 が FLAC を `ReadFile` で読むか、マッピングで読むかは**未確認**(決定 0165 は CreateFileW のトレースだけ)。マッピングなら具体化のコピー(ファイルの大きさ分)が起きる。
 4. **SAB の大きさの上限(実測、Chrome 156)**: `new SharedArrayBuffer(n)` は 256 MiB・1 GiB・2 GiB・4 GiB−64 KiB・**4 GiB まで成功、8 GiB は `Array buffer allocation failed`**(`tables/features-coi1.json`)。共有 `WebAssembly.Memory` も初期 4 GiB まで成功。Serum 2 の内容 1.41 GB 全体でも 1 つの SAB に入るが、通信量と RAM は別問題(S2)。
 5. **起動時間(P1)**: ボリュームの取得はプロジェクトを開くとき(エンジンの起動後)。Worker ごとの初期コピーが無くなる(下の実測: Worker あたり 90〜400 ms)。**ピアノ状態の復元は native -O2 で 23〜24 秒**(FLAC 110 個の復号、決定 0165)で、これは共有では縮まない(復号済みの float は私有)。Worker に出す利点は、この間エンジンが止まらないこと。プロジェクトを開いて再生可能になるまでの待ち(状態 2 の準備完了)は必要。
 
-**最小の試作(実測)** — `lift/harness/web/mt1/vfs.html`(105 MB の SAB を 4 Worker から読む。各 Worker が 64 KiB のランダムな範囲を 4000 回読んで私有バッファへ複写 = 約 250 MB 読む。Chrome 156、load 23〜29、`nice` 15)。`tables/vfs.tsv`:
+**最小の試作(実測)** — `lift/harness/web/mt1/vfs.html`(105 MB の SAB を 4 Worker から読む。各 Worker が 64 KiB のランダムな範囲を 4000 回読んで私有バッファへコピー = 約 250 MB 読む。Chrome 156、load 23〜29、`nice` 15)。`tables/vfs.tsv`:
 
 | 方式 | Worker | Chrome 全体の RSS の増え | 開始時のコピー(Worker あたり) | 読み出し(Worker あたり、4000 回) |
 |---|---:|---:|---:|---:|
 | **shared**(SAB を直接読む) | 4 | **+17〜62 MB** | 0 ms | 158〜168 ms(約 1.9〜2.2 GB/s) |
-| private(各 Worker が全体を自分の ArrayBuffer に複写 = 現在のハーネスの形) | 4 | **+441〜447 MB** | 116〜122 ms | 28〜57 ms(私有メモリから) |
+| private(各 Worker が全体を自分の ArrayBuffer にコピー = 現在のハーネスの形) | 4 | **+441〜447 MB** | 116〜122 ms | 28〜57 ms(私有メモリから) |
 | shared | 1 | +12〜41 MB | 0 ms | 123〜175 ms |
 | private | 1 | +142〜159 MB | 90〜400 ms | 18〜72 ms |
 
-= **共有で RSS の増えは 105 MB × Worker 数 の複製が無くなる(4 Worker で約 −400 MB)**。代償は、読み出しが私有メモリ上の複写より遅い(約 1.9〜2.2 GB/s。ピアノの 104 MB を読むのに約 50 ms)こと。
+= **共有で RSS の増えは 105 MB × Worker 数 の複製が無くなる(4 Worker で約 −400 MB)**。代償は、読み出しが私有メモリ上のコピーより遅い(約 1.9〜2.2 GB/s。ピアノの 104 MB を読むのに約 50 ms)こと。
 
-**この共有の効き目の見積り(読み)**: 参照プロジェクトでは、FLAC を読むのは 1 インスタンスだけなので、**インスタンスごとに必要なファイルだけを置く**運用(状態の参照パスから決める)なら複製は元々ほぼ無く、効き目は「Worker ごとの初期コピーが無い」「ファイル表を状態から作らなくてよい(読んだ分だけ複写)」ことに限られる。全ボリュームを全 Worker に置く単純な運用なら、5 Worker × 105 MB = 約 525 MB の節約。
+**この共有の効き目の見積り(読み)**: 参照プロジェクトでは、FLAC を読むのは 1 インスタンスだけなので、**インスタンスごとに必要なファイルだけを置く**運用(状態の参照パスから決める)なら複製は元々ほぼ無く、効き目は「Worker ごとの初期コピーが無い」「ファイル表を状態から作らなくてよい(読んだ分だけコピー)」ことに限られる。全ボリュームを全 Worker に置く単純な運用なら、5 Worker × 105 MB = 約 525 MB の節約。
 
 ### 6.2 B/C の GUI 側の未解決(G11 の別作業として切り出す)
 
@@ -509,20 +509,20 @@
 
 | 名前 | 内容 | 理由・代替 | 撤回条件 |
 |---|---|---|---|
-| S-mt1-nice | 測定の主は `nice` 15(指示)。パイプラインの一部(`pipe0`、nice A/B)と JSPI の同時利用の試験(§3.2 (c))は `nice` 0 | 指示は nice 15。nice 15 は他の担当に CPU を奪われる最悪側と分かったので、並列効率の見え方を分けるために nice 0 を短時間(各 3〜15 秒、K ≤ 16)走らせた | 静かな機械で再測定できたとき |
+| S-mt1-nice | 測定の主は `nice` 15(指示)。パイプラインの一部(`pipe0`、nice A/B)と JSPI の同時利用のテスト(§3.2 (c))は `nice` 0 | 指示は nice 15。nice 15 は他の担当に CPU を奪われる最悪側と分かったので、並列効率の見え方を分けるために nice 0 を短時間(各 3〜15 秒、K ≤ 16)走らせた | 静かな機械で再測定できたとき |
 | S-mt1-block | 1 ブロック = 4096 フレーム = 92.88 ms(44.1 kHz)、32 KiB = 4096 × 2ch × float32 | 指示と決定 0165 の値 | — |
 | S-mt1-slot | SAB スロット: 先頭 64 B の `Int32` 制御語(要求通番・応答通番・仕事量)+ 入力 32 KiB + 出力 32 KiB。通番方式(リングではない) | 最小の同期。1 スロット 1 ブロックの往復だけを測る。代替: 深さ 2〜4 のリング(先行レンダリング用) | S1 で先行レンダリングを実装するとき |
 | S-mt1-warm | 往復の統計は先頭 200 ラウンド(rtt)/先頭 5 ブロック(pipe)を除く。スケーリングはブロック 0 を除いた中央値 | 最初のブロックが 40〜600 ms と遅い(別表に記録) | — |
 | S-mt1-late | 『遅れ』= 要求から全応答までが 92.88 ms を超えたブロック | 先行レンダリング 1 ブロック分の余裕での締め切り | — |
 | S-mt1-blocks | スケーリングは混成 300 ブロック × 3 反復、C 経路 120 ブロック × 2 反復。pipe は 150 ブロック × 2 | 負荷の軽さ(指示)。中央値で外れ値を除く | — |
-| S-mt1-vfs | 共有 VFS の試験: 105 MB、64 KiB × 4000 回のランダム読み、Worker 1・4 | 決定 0165 の音色データ約 105 MB。読みの粒度は ReadFile の典型を仮定 | Serum 2 の実際の読み方を測ったとき |
+| S-mt1-vfs | 共有 VFS のテスト: 105 MB、64 KiB × 4000 回のランダム読み、Worker 1・4 | 決定 0165 の音色データ約 105 MB。読みの粒度は ReadFile の典型を仮定 | Serum 2 の実際の読み方を測ったとき |
 | S-mt1-rz1 | rz1 の改善倍率 5.8 倍を Serum 2 の全状態に当てる(旧い中間値 3.4 倍も別シナリオ) | PM の連絡は状態 3 の 190 → 33 ms だけ | rz1 後の全状態の実測 |
 | S-mt1-others | Serum 以外の VST3 14 個 + VST2 は 1 ブロック 2〜10 ms(中心 5) | OTT 混成の実測 3.4 ms 以外は未測定 | 各プラグインの測定 |
 | S-mt1-capacity | プラグイン Worker に使える核 = (`hardwareConcurrency` − 2) × e(e = 0.6 / 0.8 / 1.0) | エンジンの Worker(約 1.0〜1.2 コア、ui1)+ ページ・ブラウザ・GPU・AudioWorklet(約 0.5 コア)を引く。e は SMT・他の負荷 | 依頼者の機械の実測 |
 | S-mt1-lead / S-mt1-rebuffer | 先行レンダリングの充填目標 2〜4 ブロック、P-rebuffer の下限 2 量子・再開 3 ブロック | §4.4 の分布からの選択 | Serum 2 の Worker 実測の遅れの分布 |
 | S-mt1-thread | Worker のスレッド CPU は /proc のスレッド名に `Worker` を含む物 | Chrome の Worker のスレッド名は `DedicatedWorker` | — |
 | S-mt1-s1-frames | S1 の harness は `--frames` 固定(4096)で、別の長さのブロックは `FAILED` で返す。`maxBlocks` の既定は統計配列の容量 65536(約 100 分) | harness は `pd->nsamples` を固定で process する。可変長は S3 | S3 で可変長を足すとき |
-| S-mt1-s1-preroll | 試験の pre-roll は 6〜8 ブロック、ウォームアップ専用インスタンスは 12 ブロック | 最初のブロックの費用が消える最小(Chrome で 5 ブロックで定常) | Serum 2 の Worker 実測 |
+| S-mt1-s1-preroll | テストの pre-roll は 6〜8 ブロック、ウォームアップ専用インスタンスは 12 ブロック | 最初のブロックの費用が消える最小(Chrome で 5 ブロックで定常) | Serum 2 の Worker 実測 |
 | S-mt1-host | OTT の harness を glue なしで動かすための 22 import の自作(`vst-host.js`): 時計は全て壁時計、`ioctl(TIOCGWINSZ)` は端末と答える、`environ` は `FLE_VFS_SEED` と `VST_BLOCKS` だけ | 既存の wasm を再ビルドしない(指示)。node(NODERAWFS)専用ビルドをブラウザで動かすため | — |
 
 ### 7.2 未確認(確かめていない)
@@ -544,7 +544,7 @@
 - tracked ファイルは直接編集していない。作業は `lift/out-mt1/src/`(`git archive d9af868`)の新規ファイルだけ。`mt1.diff` は新規ファイルのみ(既存ファイルの変更 0)。
 - 自己申告: ①12:02 頃 `( … &)` の末尾 & で rtt の最初の計測を起動した(`background: true` を使うべきだった)。その計測は期待値の取り方の誤りで 1 件止まったため中止し、直して全部やり直した ②`timeout`、`pkill` を 1 回ずつ呼んで拒否された(実行されず) ③yabridge の README を webfetch して約 800 行を端末に出した、wasm の import/export 一覧を 1 回端末に出した ④最初のターンを『待っています』で終え、PM に指摘された ⑤rtt 計測の途中に smem のビルド(emcc 1 本)を並走した ⑥nice 0 のパイプライン(`pipe0`)・nice A/B・JSPI の同時利用(`jo1`)(各 2〜15 秒、K ≤ 16)を走らせた(`jotry` の 1 回は nice を付け忘れて nice 0 になった)(§7.1 S-mt1-nice。重い処理ではないと判断したが、指示は nice 15)。
 - 第 2 報の指示後の追加の自己申告: ⑦存在しない `bash` ツールを 1 回呼んだ(実行されず)⑧`( … )` で括ったサブシェルのバックグラウンド起動を `background: true` と併用した(括弧は不要)⑨ui1 の build を読み取りで実行(書き込みなし。gdb も nice 15)。
-- 同時プロセス: Chrome 1 つ + node 1 つ(+ 一時的に emcc 1 つ)。ただし Chrome の中の Worker は最大 17 本(試験の内容そのもの)。
+- 同時プロセス: Chrome 1 つ + node 1 つ(+ 一時的に emcc 1 つ)。ただし Chrome の中の Worker は最大 17 本(テストの内容そのもの)。
 - 生成 C・テスト基準(152 results・2,118 passed・0 failed、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731)への影響: **無し**(生成 C・ランタイム・fe-lift・テストに触れていない。全体テストは走らせていない)。
 
 ## 8. 成果物
@@ -561,4 +561,4 @@
 3. **駆動方式**(B-sync + スレッドバンク / B-async + PDC)は S4 の前まで保留。材料: 空のプロジェクトの再生中に `CreateThread` は 0 本(プラグイン無しの場合のみ)、FL の PDC はミキサートラック単位(文字列)、**参照プロジェクトの VST/VST3 21 個すべてで FLP の AllowThreaded(ラッパー側)が立ち、`event 212` の ThreadedProcessing も 108 件すべて立っている**(静的な読み。ビット位置は第三者の PyFLP から。Audio 設定の既定と、所定のプロジェクトでスレッドバンクが実際に作られるかは未確認)。
 4. **HC ≤ 4 の制約を記録**: P3 は、直接 wasm 生成 + rz1 を前提にした音色の軽いプロジェクトに限り、それ以外は届かない(必要 2.08 コア〔直接生成・中心〕に対し HC=4 の capacity は 1.2〜2.0 コア)。Serum 2 の数字は算術(推測)で、実測は決定 0177(srm1)が行う。
 5. 次の作業: S2(AudioWorklet のアンダーランの接続。決定 0175 aud2 と連携)、S3(VST3 COM プロキシ)、混成(fe-wasmgen)の外部入力ビルド(決定 0169 hyb1 の取り込み後)。
-6. 担当の自己申告(nice 0 の短い試験、サブシェルの括弧)は記録のみ。
+6. 担当の自己申告(nice 0 の短いテスト、サブシェルの括弧)は記録のみ。

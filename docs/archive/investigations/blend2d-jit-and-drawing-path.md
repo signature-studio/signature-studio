@@ -1,6 +1,6 @@
 # X1: Blend2D は描画に JIT を使うか。使わないなら描画の本体はどの関数で、どのバッファにどの形式で画素を書くか
 
-実行日: 2026-10-30。基準 HEAD `b8ed117`（`git archive` を `lift/out-x1/src/` に展開。作業ツリーは読み取りのみ）。**測定のみ。何も決めない**（推奨は書く。決めるのは PM）。ハーネスの差分は `lift/out-git/x1-results/x1.diff`（`lift/harness/` の 5 ファイル。`lift/runtime`、`lift/crates` は変えていない）、ログは `lift/out-git/x1-results/logs/`。
+実行日: 2026-10-30。基準 HEAD `b8ed117`（`git archive` を `lift/out-x1/src/` に展開。ワークツリーは読み取りのみ）。**測定のみ。何も決めない**（推奨は書く。決めるのは PM）。ハーネスの差分は `lift/out-git/x1-results/x1.diff`（`lift/harness/` の 5 ファイル。`lift/runtime`、`lift/crates` は変えていない）、ログは `lift/out-git/x1-results/logs/`。
 
 ## 0. 凡例
 
@@ -256,7 +256,7 @@ JIT の問題が片付いても、G4 には goal-ladder §3.3・§3.8 の **M-1�
 ## 10. 規則違反の自己申告
 
 - AGENTS.md の「作業は task agent を通じて」: task ツールを持たないサブエージェントなので、調査・実装・測定・文書をすべて自分で行った。
-- 作業ツリーへの書き込みは `lift/out-x1/`（`src/` に `git archive` の展開）と `lift/out-git/x1-results/` だけ。git の変更系操作はしていない。commit していない。引数なしの `git checkout` もしていない。
+- ワークツリーへの書き込みは `lift/out-x1/`（`src/` に `git archive` の展開）と `lift/out-git/x1-results/` だけ。git の変更系操作はしていない。commit していない。引数なしの `git checkout` もしていない。
 - **`lift/out-x1/` の下の自分の物の削除**（`rm -rf` の対象はすべて `lift/out-x1/` の下の OUT ディレクトリ `o1`〜`o5` と `o3`／`o4` の古い TAG、`diffwork`、`patchtest`、`chk`、`pt`、`cmp`、`cmpwork`、`oX`）。他の作業者の `lift/out-*`（`out-fruity5` を含む）は読み取りのみ。
 - Python は `PYTHONDONTWRITEBYTECODE=1`（`tools/x1_*.py` は環境変数つきで実行）。`__pycache__` は 0 件（`find` で確認）。標準ライブラリと衝突する名前のファイルは作っていない。sleep／timeout／nohup／末尾の `&` は使っていない。emcc／wasm は使っていない。`lift/out-cs/` を cwd にしていない。他の作業の `CARGO_TARGET_DIR` は指定していない（`lift/out-x1/target` と、`a4-multi.sh` が OUT 内に作る target）。
 - `/tmp/opencode` の下に小さな一時ファイルを 2 回作って、その場で削除した（`x1_before.txt`、`x1_sec42.md`。数 KB。`/tmp` 直下には書いていない）。作業と成果物は `lift/out-x1/` と `lift/out-git/x1-results/` にある。

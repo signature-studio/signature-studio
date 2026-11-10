@@ -1,20 +1,20 @@
-# 0210: Windows API 層(ゲストが呼ぶ OS の面)の現状の実測(census)と方式の再評価、体系的網羅の最初の一歩(14 API + Wine 差分試験 + crash1 の D&D の Wine 照合)。仮の決定
+# 0210: Windows API 層(ゲストが呼ぶ OS の面)の現状の実測(census)と方式の再評価、体系的網羅の最初の一歩(14 API + Wine 差分テスト + crash1 の D&D の Wine 照合)。仮の決定
 
-状態: **仮の決定**(作業者 `api2`。判断は PM)。基準は HEAD 6f5801c の `git archive`(作業木 `lift/out-api2/src/`。census は 9a08d07 で一度測り、出荷の既定が SHIP2〔決定 0208〕に切り替わった 6f5801c で測り直した。fe-lift と import 表は 2 つの HEAD で無変更)。**実エンジンは 1 度も実行していない**(静的な表、fe-lift の生成 C、runtime ソースの文面解析、Wine 10.0 とのテスト用 C プログラムの差分、emcc のコンパイル試験)。**進捗ではない**。代役・モック・画像の再生・事前生成は無い。数字は全て本作業の実測で、読み(解釈)は『読み』と書く。ロードは 35〜50 と高かったので時間は主張しない。
+状態: **仮の決定**(作業者 `api2`。判断は PM)。基準は HEAD 6f5801c の `git archive`(ワークツリー `lift/out-api2/src/`。census は 9a08d07 で一度測り、出荷の既定が SHIP2〔決定 0208〕に切り替わった 6f5801c で測り直した。fe-lift と import 表は 2 つの HEAD で無変更)。**実エンジンは 1 度も実行していない**(静的な表、fe-lift の生成 C、runtime ソースの文面解析、Wine 10.0 とのテスト用 C プログラムの差分、emcc のコンパイルテスト)。**進捗ではない**。代役・モック・画像の再生・事前生成は無い。数字は全て本作業の実測で、読み(解釈)は『読み』と書く。ロードは 35〜50 と高かったので時間は主張しない。
 
 ## 0. 冒頭の三点
 
-**(1) 何を実測したか。** (a) FLEngine と同梱 5 DLL(dsp_ippv2・Blend2D・FreeType・QFC・ILTools)、Fruity Wrapper、Delphi 製プラグイン 7 本(Sytrus・Harmor・Edison・Fruity Compressor・Fruity Parametric EQ 2・DirectWave・FLEX)、Serum2.vst3 の 15 画像の import 表(静的 + 遅延)から **993 distinct の (DLL, API)** を取り、各 API の runtime の状態を 4 構成(既定 TABLE・出荷 ship-imports・出荷予定 ship2〔決定 0208〕・全 seeds 合算)で文面解析した。さらに fe-lift で FLEngine と 7 画像を実際に lift し、生成 C の `fle_unsupported` を数えて『閉包の中で行が無い呼び出し』を出した。(b) 窓の仕組みの網羅性を、runtime のソース、実エンジンの窓表(`docs/investigations/clip1` の実走の記録)、Wine 10.0 の headless 実行との差分で調べた。(c) 方式 A〜D を Wine 10.0 のソース(取得して数えた)とコンパイル試験、ReactOS のソース(sparse clone して数えた)で比べた。(d) 14 API を新規ファイルで実装し、Wine 差分試験を付けた(D&D の 3 API は crash1 が持つので外し、crash1 の実装を Wine と照合した)。
+**(1) 何を実測したか。** (a) FLEngine と同梱 5 DLL(dsp_ippv2・Blend2D・FreeType・QFC・ILTools)、Fruity Wrapper、Delphi 製プラグイン 7 本(Sytrus・Harmor・Edison・Fruity Compressor・Fruity Parametric EQ 2・DirectWave・FLEX)、Serum2.vst3 の 15 画像の import 表(静的 + 遅延)から **993 distinct の (DLL, API)** を取り、各 API の runtime の状態を 4 構成(既定 TABLE・出荷 ship-imports・出荷予定 ship2〔決定 0208〕・全 seeds 合算)で文面解析した。さらに fe-lift で FLEngine と 7 画像を実際に lift し、生成 C の `fle_unsupported` を数えて『閉包の中で行が無い呼び出し』を出した。(b) 窓の仕組みの網羅性を、runtime のソース、実エンジンの窓表(`docs/investigations/clip1` の実走の記録)、Wine 10.0 の headless 実行との差分で調べた。(c) 方式 A〜D を Wine 10.0 のソース(取得して数えた)とコンパイルテスト、ReactOS のソース(sparse clone して数えた)で比べた。(d) 14 API を新規ファイルで実装し、Wine 差分テストを付けた(D&D の 3 API は crash1 が持つので外し、crash1 の実装を Wine と照合した)。
 
 **(2) 結論。**
 - **『エンジン+同梱 5 DLL が import していて、出荷構成〔SHIP2、決定 0208〕で未実装』は 300 distinct(行なし 242 + 名前付き停止のみ 58)。** 母数は distinct の import 853(静的 264 + 遅延のみ 36 が未実装)。行なしのうち 233 は runtime に関数が一つも無く、9 は関数はあるが出荷の行が無い。DLL 別: user32 67、kernel32 56、gdi32 54、comctl32 23、msacm32 13、ole32 13、winmm 13、shell32 12、wininet 10、imm32 7 ほか。ファミリーで 42 の塊。見積り 12,000〜30,000 コード行(中央 14k 行)。旧出荷(F1xH/F2xH)は 310、既定の生成 C は 343。
 - **行なしの呼び出しは『API 名なしの abort』になる**(`fle: unsupported instruction at 0x…`。`fle_stop` の名前付きですらない)。fe-lift の閉包で実際にそこへ届く箇所(FLEngine)は、既定 225 箇所/220 distinct、旧出荷 197/193、**SHIP2 187/184**、全 seeds 合算 181/178。SHIP2 に api2 の行を足すと 178。
 - partial 437(FLEngine の SHIP2 の静的 import 738 のうち)の多数は『NULL・定義外の入力で止まる』だけで、機能そのものの欠けは 67 API(エンジン+同梱の partial/stop 523 API 中。SHIP2 構成)。
 - 窓の仕組み: 実エンジンの窓表 31 クラスは**全て Delphi 製のカスタムクラス**で標準コントロール(Button・Edit…)は 0。エンジンの 4 画像に標準クラス名の文字列は 0/40。**欠けは次の点に集中**している: (i) 枠の無い窓モデル(DefWindowProc の非クライアント処理、WM_SYSCOMMAND の SC_MOVE/SIZE/MAXIMIZE/MINIMIZE、モーダルな移動・サイズ変更ループが無い)、(ii) 更新領域が窓ごとに矩形 1 つで親→子の伝播が無い(WS_CLIPCHILDREN の無い親で Wine と食い違うことを実測)、(iii) HTTRANSPARENT で兄弟へ再試行しない、(iv) ScrollWindow・ScrollDC は関数が無い(ScrollWindowEx は旧出荷に行が無く SHIP2 で解消)、(v) メニュー(14 API)・ImageList(23 API)・ダイアログマネージャが無い、(vi) WM_SIZE/WM_MOVE を CreateWindowEx の後で送らない・WM_NCCALCSIZE の wParam・WM_NCPAINT/WM_ERASEBKGND の順序が Wine と違う(Wine との差分の実測)。
-- **方式の推奨(決めるのは PM)**: **A(仕様から体系的に網羅)+ D(停止を soft にする安全網)を主軸にし、Wine 10.0 を『差分試験の基準』と『挙動の仕様書』として使う。Wine のソースの丸ごとの流用(B)・ReactOS(C)は採らない。例外として、窓から独立した自己完結のライブラリ(ImageList、ACM、MIDI の入力の枠組み)は、Wine の C を runtime に取り込む小さな B' を、ファミリー単位で評価する価値がある**(§7)。
+- **方式の推奨(決めるのは PM)**: **A(仕様から体系的に網羅)+ D(停止を soft にする安全網)を主軸にし、Wine 10.0 を『差分テストの基準』と『挙動の仕様書』として使う。Wine のソースの丸ごとの流用(B)・ReactOS(C)は採らない。例外として、窓から独立した自己完結のライブラリ(ImageList、ACM、MIDI の入力の枠組み)は、Wine の C を runtime に取り込む小さな B' を、ファミリー単位で評価する価値がある**(§7)。
 - 14 API(新規ファイル、行 14 本)は、Wine 差分で 63 行中不一致 0(意図した相違 3 件は理由つき)。窓の更新領域の 12 行は Wine と 2 行が違い、**これは runtime の窓モデルの欠け(GAP-U1)として固定した**。D&D の 3 API は crash1(決定 0209)が既に持つので api2 から外し、**crash1 の実装を Wine と照合**した(20 行中 19 行一致。違うのは `cch == 0` でバッファありの 1 行: Wine は必要長 12、crash1 は 0。ページは無言)。
 
-**(3) 未確認。** 実エンジンで各 API が実際にいつ呼ばれるか(静的な閉包は上限)。『impl/partial』が文書の挙動を網羅している証明(サンプルの 14 API を除き未検証)。窓の症状(ドラッグ中に描画されない・ホバーで順に更新)の原因の確定(仮説 H1〜H4 と確認方法だけ)。Wine のソースを wasm にして**実行**した結果(コンパイルとリンクの試験だけ)。wasm64 化の性能への影響。実機 Windows との照合は 0 件。動的に引く名前の網羅(リテラル引数の静的読みだけ)。
+**(3) 未確認。** 実エンジンで各 API が実際にいつ呼ばれるか(静的な閉包は上限)。『impl/partial』が文書の挙動を網羅している証明(サンプルの 14 API を除き未検証)。窓の症状(ドラッグ中に描画されない・ホバーで順に更新)の原因の確定(仮説 H1〜H4 と確認方法だけ)。Wine のソースを wasm にして**実行**した結果(コンパイルとリンクのテストだけ)。wasm64 化の性能への影響。実機 Windows との照合は 0 件。動的に引く名前の網羅(リテラル引数の静的読みだけ)。
 
 ## 1. 凡例と方法
 
@@ -27,7 +27,7 @@
   - **stub** = 引数を読まず、他を呼ばず、停止せず、8 行以下(canned な答え)。
   - **partial** = 本体または呼ぶ runtime の helper から到達する `fle_stop` が 1 つ以上。
   - **impl** = 到達する `fle_stop` が無く、stub でもない。**『文書の挙動を網羅』の証明ではない**(表の列名は `impl`、『完全』と呼ばない)。
-  - 試験: 表の `tests_word_hits` は『API 名が試験ソースに現れた回数』(弱い指標。エンジン+同梱の 614 API〔impl/partial/stub/stop〕のうち 602 に出現)。
+  - テスト: 表の `tests_word_hits` は『API 名がテストソースに現れた回数』(弱い指標。エンジン+同梱の 614 API〔impl/partial/stub/stop〕のうち 602 に出現)。
 - runtime(api2 の追加分を除く): 3,128 関数を索引(harness を含む)、runtime の .c の `fle_imp_*` の定義 663(マクロ定義の名前付き停止を足して索引では `fle_imp_*` が約 700)、`fle_stop(` の呼び出し 1,287(理由の文字列つき 1,245)、コード 32,008 行(コメント・空行を除く)。
 - **構成**: default = `TABLE`、ship = TABLE + `ship-imports.txt`(旧出荷 SHIP_PRESET F1xH/F2xH、決定 0189)、**ship2 = TABLE + `ship2-imports.txt`(決定 0208。117 行。HEAD 6f5801c の既定の入口)**、max = TABLE + 全 seeds(ia1/ia2/dlg1/exp1/wrp1/wrp2 など。api2 の行は含めない)。
 - **Learn の URL**: mingw-w64 のヘッダー名(SDK のヘッダー分割と同じ)から `…/api/<header>/nf-<header>-<api>` を作り、866 distinct を GET で確認した(**200 が 826、404 が 40**。console 系などはヘッダー名が違う)。URL の無い行 126(序数 import・COM メソッド・索引に無い名前)。404 は表の `learn_http` 列に残した。
@@ -136,7 +136,7 @@ SHIP2 で閉包に届く物の例: user32 の CreateMenu・CreatePopupMenu・Tra
 ### 5.1 数字(実測は全て本作業)
 
 - **Wine 10.0**(git `wine-10.0`、374 MB): user32 129,029 行、win32u 93,940、gdi32 83,398、comctl32 133,788、ole32 72,081、shell32 85,667(6 つで 598k 行)、kernelbase 44,952、kernel32 95,882、ntdll 178,366、oleaut32 80,425、wininet 40,615、winmm 27,314、server/ 55,574(窓・キュー・フック・クラス・winstation・clipboard・region・timer・user で 11,302)。win32u の server 要求の呼び出し箇所 158、server の要求 292 種、win32u の syscall 表 862 エントリ(NtUser と NtGdi。`win32syscalls.h`)、`struct user_driver_funcs` の関数ポインタのメンバー 61。
-- **コンパイル試験**(`tools/wine_compile_try.sh`): `./configure --enable-win64` と `make __tooldeps__`、`make -C include` で widl 生成ヘッダーを作り(bison/flex は deb をユーザー領域へ展開)、`emcc -c -O1 -sMEMORY64=1 -fshort-wchar -D__x86_64__`(CONTEXT 用に CPU を偽装、winnt.h の x86 inline asm 3 か所を `!__wasm__` で無効にした scratch 木)で 16 ディレクトリの 301 ファイル中 **285 が単体で通る**(95%、オブジェクト合計 8.75 MB。初回は 268〔89%〕で、ole32 の `dcom.h`〔`make -C dlls/ole32 dcom.h`〕と `-include winternl.h`〔`struct _TEB` の定義〕で 17 本増えた)。win32u 39/41(落ちる 2 本は clang のクラッシュと winstation.c)、comctl32 35/35、user32 37/38〔png.h が無い 1 本〕、shell32 44/44、gdi32 9/9、kernelbase 13/16〔x86 inline asm〕、ole32 26/27、oleaut32 11/15、wininet 6/9。server/ 36/42(落ちるのは Linux 依存の fd・sock・process・change・ptrace・unicode)。**wasm32 では通らない**(`unsigned long` が 4 バイトで winnt.h の 64 ビットのビットフィールドが崩れる)。
+- **コンパイルテスト**(`tools/wine_compile_try.sh`): `./configure --enable-win64` と `make __tooldeps__`、`make -C include` で widl 生成ヘッダーを作り(bison/flex は deb をユーザー領域へ展開)、`emcc -c -O1 -sMEMORY64=1 -fshort-wchar -D__x86_64__`(CONTEXT 用に CPU を偽装、winnt.h の x86 inline asm 3 か所を `!__wasm__` で無効にした scratch 木)で 16 ディレクトリの 301 ファイル中 **285 が単体で通る**(95%、オブジェクト合計 8.75 MB。初回は 268〔89%〕で、ole32 の `dcom.h`〔`make -C dlls/ole32 dcom.h`〕と `-include winternl.h`〔`struct _TEB` の定義〕で 17 本増えた)。win32u 39/41(落ちる 2 本は clang のクラッシュと winstation.c)、comctl32 35/35、user32 37/38〔png.h が無い 1 本〕、shell32 44/44、gdi32 9/9、kernelbase 13/16〔x86 inline asm〕、ole32 26/27、oleaut32 11/15、wininet 6/9。server/ 36/42(落ちるのは Linux 依存の fd・sock・process・change・ptrace・unicode)。**wasm32 では通らない**(`unsigned long` が 4 バイトで winnt.h の 64 ビットのビットフィールドが崩れる)。
 - **-Oz でリンクした実測**: win32u 0.69 MB(オブジェクト 1.71 MB)、comctl32 0.67 MB(1.24 MB)、gdi32 0.16 MB(0.27 MB)。残りは同じ比(0.4〜0.57)の外挿で、16 ディレクトリ合計 **約 3.5〜5.0 MB(読み)**。出荷予定 SHIP2 の S1 の余裕は 10.9 MB(決定 0208)なので、コードの大きさだけなら収まる。server・ntdll の一部は別。
 - **Wine の PE を lift する案(B2)**: Wine の組み込み PE のコード部 comctl32 705 KB、shell32 552 KB、user32 560 KB、gdi32 314 KB、ole32 332 KB、oleaut32 365 KB、win32u 55 KB(Unix 側への syscall の薄い殻だけ)。comctl32.dll の import は 381(user32 181、gdi32 89、kernelbase 53、ucrtbase 29 …)で、**現行 runtime に行が無い物が 159**(`tables/wine-pe-imports-coverage.tsv`)。上位の DLL を lift しても下位(user32/gdi32/kernel32)の網羅が要る。
 - **ReactOS**(sparse clone): win32ss 371,789 行(user/ntuser 79k、user/user32 62k、gdi/ntgdi 45k、gdi/gdi32 35k)、comctl32 87k、shell32 95k、kernel32 81k。win32ss は GPL-2.0-or-later の NT カーネルモード(win32k.sys)で、ntoskrnl の Ob/Ke/Mm に依存し、ユーザーモードのライブラリとしては取り出せない。
@@ -164,11 +164,11 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 | `lift/runtime/fle_api2_call.c/.h` | runtime 内から別の `fle_imp_*` をゲスト ABI で呼ぶ小さな道具(ゲストのスタックの下に枠を作る) |
 | `lift/harness/seeds/api2-imports.txt` | 14 行(新しい行だけ。`cat ship2-imports.txt api2-imports.txt` を `--extra-imports` に) |
 
-**Wine 差分試験**(`lift/harness/api2/`): `api2_cases.c` を (a) mingw(`-mwindows`、コンソール無し)で作って Wine 10.0 の本物の API に、(b) native で runtime の関数に通し、1 ケース 1 行の出力を比べる(`build.sh diff`)。TZ=UTC・en-US の Wine。**63 行を比べて不一致 0**。意図した相違 3 件(`expected/known-divergence.txt`、理由つき): GetStringTypeA の NULL 入力(文書: ERROR_INVALID_PARAMETER、Wine は成功)、TzSpecific の存在しない日付 2023-02-29(Wine は正規化、runtime は失敗 87)、WriteConsoleA 失敗時の `*lpNumberOfCharsWritten`(runtime は触らない、Wine は 0)。Wine が基準にならない 6 件(大ページ・シンボリックリンク・ShellExecute・OutputDebugString)は `expected/native-only.txt` に文書から手書き。Wine との最初の相違から直した物が 1 件: GetLocaleInfoA の LOCALE_RETURN_NUMBER の戻り値(バイト数 4: S-api2-8、UNOFFICIAL)。
+**Wine 差分テスト**(`lift/harness/api2/`): `api2_cases.c` を (a) mingw(`-mwindows`、コンソール無し)で作って Wine 10.0 の本物の API に、(b) native で runtime の関数に通し、1 ケース 1 行の出力を比べる(`build.sh diff`)。TZ=UTC・en-US の Wine。**63 行を比べて不一致 0**。意図した相違 3 件(`expected/known-divergence.txt`、理由つき): GetStringTypeA の NULL 入力(文書: ERROR_INVALID_PARAMETER、Wine は成功)、TzSpecific の存在しない日付 2023-02-29(Wine は正規化、runtime は失敗 87)、WriteConsoleA 失敗時の `*lpNumberOfCharsWritten`(runtime は触らない、Wine は 0)。Wine が基準にならない 6 件(大ページ・シンボリックリンク・ShellExecute・OutputDebugString)は `expected/native-only.txt` に文書から手書き。Wine との最初の相違から直した物が 1 件: GetLocaleInfoA の LOCALE_RETURN_NUMBER の戻り値(バイト数 4: S-api2-8、UNOFFICIAL)。
 
 **D&D の Wine 照合(crash1 の実装に対して)**: `api2_drag.c`(HDROP を GlobalAlloc(GMEM_FIXED) で作り、DragQueryFileW 16 ケース・DragQueryPoint 3 ケース・DragFinish 1 行の計 20 行)を Wine 10.0 と、crash1 の `fle_crash1_drag.c` にそれぞれ通した(`build.sh drag WORKDIR IMPL.c`、`DRAG_RT` と `DRAG_REG` で crash1 の木と `fle_drop_register` を指定)。**20 行中 19 行が一致**。違う 1 行: `DragQueryFileW wide-cch0-buf`(有効な添字、バッファあり、cch 0)は Wine が必要長 12 を返し、crash1 は 0 を返す。ページは cch 0 を書かない(S-api2-7、UNOFFICIAL)。crash1 の ANSI リストは 0x80 以上のバイトで停止する(CP_ACP 変換は未実装)。Wine の出力は `expected/wine-10.0-drag.txt`。
 
-**Rust テスト**(新規 `crates/fe-lift/tests/api2.rs`、4 件): 行が新しくて宣言・定義がある、Wine の出力と一致(意図した相違を除く)、定義外の入力は名前付きで停止、窓の更新領域の 12 行が Wine と一致(GAP-U1 の 2 行を除く。直ると『エントリを消せ』で落ちる)。変異 13 本中 10 本を検出(`logs/mutation-api2.txt`。M1〜M7 は D&D を api2 から外す前の変異〔M3 と M6 は今は crash1 側の関数〕、M8〜M13 は最終の木)。生き残り 3 本: M4 LCMapStringA のサイズ問い合わせの UTF-16 数(単一バイトの code page で常に等しい〔等価〕)、M7 CompareStringA の第 2 長さを無視する(未終端の確保の後ろが 0 のとき区別できない〔不安定〕)、M13 LCMapStringA の LCMAP_SORTKEY の分岐(ケースが無い=**試験していない経路**)。
+**Rust テスト**(新規 `crates/fe-lift/tests/api2.rs`、4 件): 行が新しくて宣言・定義がある、Wine の出力と一致(意図した相違を除く)、定義外の入力は名前付きで停止、窓の更新領域の 12 行が Wine と一致(GAP-U1 の 2 行を除く。直ると『エントリを消せ』で落ちる)。変異 13 本中 10 本を検出(`logs/mutation-api2.txt`。M1〜M7 は D&D を api2 から外す前の変異〔M3 と M6 は今は crash1 側の関数〕、M8〜M13 は最終の木)。生き残り 3 本: M4 LCMapStringA のサイズ問い合わせの UTF-16 数(単一バイトの code page で常に等しい〔等価〕)、M7 CompareStringA の第 2 長さを無視する(未終端の確保の後ろが 0 のとき区別できない〔不安定〕)、M13 LCMapStringA の LCMAP_SORTKEY の分岐(ケースが無い=**テストしていない経路**)。
 
 **wasm32 での実行**: `api2_cases.c` と runtime の 13 ファイル(api2 の 4 本を含む)を emcc(wasm32、-O1)でビルドし node 24.19 で実行した出力が、native の出力と 68 行すべて一致した(`logs/wasm-node-api2.txt`)。= 新しい C はゲストのポインタ=ホストのポインタ(同一視の地図、32 ビット)の下でも同じ答えを返す。
 
@@ -189,7 +189,7 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 
 **D の対象 300 の戻り値の型**(`tools/ret_types.py`、mingw ヘッダー。`tables/api-return-types.tsv`): BOOL/BOOLEAN 114、ハンドル/ポインタ 40、HRESULT 15、整数/コード 70、LRESULT 7、COLORREF 4、void 6 + 戻らない 2、ヘッダー外で型不明 39(msacm の MMRESULT 13、propsys・uxtheme・wininet など)。= **約 170(57%)が FALSE/NULL/失敗 HRESULT という通常の失敗値を持つ**ので、『文書で失敗が定義された呼び出しは停止でなく失敗を返す』道が使える。void の 8 は失敗を返せず、呼び出し側が結果を見ない API(多くの描画補助)では失敗が黙って無視される=画面が欠けるだけで気づけない(読み)。
 
-**推奨**: (1) **A を主軸にする**。census が『300 の未実装』と『42 ファミリー』を有限の作業にした。ファミリー順(§8)に、文書から実装し、Wine を差分の基準にする。差分試験は実測で成立した(headless Wine で窓・更新領域・メッセージ列まで比べられる)。(2) **D を安全網として並行**(crash1)。停止を失敗に変えるだけでは UI は壊れたままなので A の代わりにならない。ERROR_CALL_NOT_IMPLEMENTED(120)は System Error Codes にある『この関数はこのシステムでは未対応』で、行なしの呼び出しに返す文書上の失敗値の候補(読み。偽の成功を返さない規則と矛盾しない)。(3) **B・C は採らない**: 598k 行 + server の全体を持ち込むと、検証済みの窓層 15k 行を捨て、wasm64 化(エンジン全体の memory64 化は性能に影響しうる)と server の同一プロセス化という未測定の大工事を負う。(4) 自己完結のライブラリ(ImageList 3,849 行、ACM 7k 行、MIDI 入力の枠組み)は、Wine の C をそのまま runtime に取り込み、下位 API は逆向きの shim(`fle_imp_*` を C から呼ぶ)で受ける B' が安い可能性がある。ImageList の公開 API は整数と不透明ハンドルが中心で構造体の幅の問題が小さい(読み)。**実測(`tools/wine_deps.py`、`tables/wine-deps-imagelist.txt`)**: `comctl32/imagelist.c`(3,849 行)を wasm64 でコンパイルした物の未定義シンボル 57 のうち、Win32 API は 41(runtime に関数がある 36〔impl 4・partial 31・stop 1〕、無い 3〔CopyImage・GetBkColor・GetTextColor〕、census の外 2〔GdiAlphaBlend・GetNearestColor〕)、Wine 内部・libc・GUID が 14、他 2。= **ImageList は Wine の C で動かせるが、下の gdi32(BitBlt・CreateDIBSection・GetDIBits・StretchDIBits・CreateIconIndirect …)の partial が ImageList の使い方に耐えるかが本当の仕事**(下位の穴が移るだけで消えない)。**ファミリー単位に評価**してから採否を決める。
+**推奨**: (1) **A を主軸にする**。census が『300 の未実装』と『42 ファミリー』を有限の作業にした。ファミリー順(§8)に、文書から実装し、Wine を差分の基準にする。差分テストは実測で成立した(headless Wine で窓・更新領域・メッセージ列まで比べられる)。(2) **D を安全網として並行**(crash1)。停止を失敗に変えるだけでは UI は壊れたままなので A の代わりにならない。ERROR_CALL_NOT_IMPLEMENTED(120)は System Error Codes にある『この関数はこのシステムでは未対応』で、行なしの呼び出しに返す文書上の失敗値の候補(読み。偽の成功を返さない規則と矛盾しない)。(3) **B・C は採らない**: 598k 行 + server の全体を持ち込むと、検証済みの窓層 15k 行を捨て、wasm64 化(エンジン全体の memory64 化は性能に影響しうる)と server の同一プロセス化という未測定の大工事を負う。(4) 自己完結のライブラリ(ImageList 3,849 行、ACM 7k 行、MIDI 入力の枠組み)は、Wine の C をそのまま runtime に取り込み、下位 API は逆向きの shim(`fle_imp_*` を C から呼ぶ)で受ける B' が安い可能性がある。ImageList の公開 API は整数と不透明ハンドルが中心で構造体の幅の問題が小さい(読み)。**実測(`tools/wine_deps.py`、`tables/wine-deps-imagelist.txt`)**: `comctl32/imagelist.c`(3,849 行)を wasm64 でコンパイルした物の未定義シンボル 57 のうち、Win32 API は 41(runtime に関数がある 36〔impl 4・partial 31・stop 1〕、無い 3〔CopyImage・GetBkColor・GetTextColor〕、census の外 2〔GdiAlphaBlend・GetNearestColor〕)、Wine 内部・libc・GUID が 14、他 2。= **ImageList は Wine の C で動かせるが、下の gdi32(BitBlt・CreateDIBSection・GetDIBits・StretchDIBits・CreateIconIndirect …)の partial が ImageList の使い方に耐えるかが本当の仕事**(下位の穴が移るだけで消えない)。**ファミリー単位に評価**してから採否を決める。
 
 ## 8. ファミリー別の着手順の提案(`tables/api-families.tsv`)
 
@@ -230,7 +230,7 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 - S-api2-6/7: (D&D 3 API は api2 から外したが、照合の結果として残す)DragQueryFileW の範囲外の添字は 0、`cch == 0` でバッファありは Wine が必要長を返す(UNOFFICIAL)。crash1 は 0 を返す。
 - S-api2-8: GetLocaleInfoA の LOCALE_RETURN_NUMBER の戻り値は 4(Wine、UNOFFICIAL)。
 - S-api2-9: WriteConsoleA 失敗時に `*written` を触らない。S-api2-10: GetStringTypeA の NULL 入力は 87(ページ)で、Wine と相違。
-- S-api2-11: コンパイル試験で `__x86_64__` を偽装し、winnt.h の x86 inline asm を scratch 木で無効にした(Wine のソースの意味は変えない試験用の改変。成果物には含めない)。
+- S-api2-11: コンパイルテストで `__x86_64__` を偽装し、winnt.h の x86 inline asm を scratch 木で無効にした(Wine のソースの意味は変えないテスト用の改変。成果物には含めない)。
 - S-api2-12: census の『impl』を『到達する fle_stop が無い』と定義した(『完全』と呼ばない)。
 
 ## 10. 規則違反の自己申告と確認できなかったこと
@@ -242,7 +242,7 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 
 ## 11. 成果物
 
-`lift/out-git/api2-results/`: `api2.diff`(新規ファイルのみ)、`MERGE-NOTES.md`、`docs/0210-api-layer-survey.md`(本文)、`docs/README-0210-line.txt`、`tables/`(api-coverage ほか)、`tools/`(census の道具、Wine のコンパイル試験)、`logs/`。作業: `lift/out-api2/`。
+`lift/out-git/api2-results/`: `api2.diff`(新規ファイルのみ)、`MERGE-NOTES.md`、`docs/0210-api-layer-survey.md`(本文)、`docs/README-0210-line.txt`、`tables/`(api-coverage ほか)、`tools/`(census の道具、Wine のコンパイルテスト)、`logs/`。作業: `lift/out-api2/`。
 
 ---
 
@@ -251,5 +251,5 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 - **取り込み**: `api2.diff`(20 ファイル、新規のみ、削除 0 行)を当てた。FLEngine の既定の生成 C は `cd9107ce…` のまま。PM 実測: 全体テスト 183 results / 2,307 passed / 0 failed(基準は 180 / 2,287。+api2 + dec1 wall_dec1 7 + act1_net 9)、a4 FRUITY 無効 942/942、895/895、関数 5,310、入口 1,009,731(不変)(dec1・act1 と同時の 1 回)。census の数字(993 distinct、SHIP2 の未実装 300、42 ファミリー)は担当の実測(PE の import と生成 C の静的読み、実エンジン未実行)。
 - **方式の判断**: 担当の推奨(A: 仕様から網羅 + D: 停止を soft に、Wine は差分の基準のみ)を採る。B(Wine の C を wasm に)・C(ReactOS)は採らない。依頼者の『個別のケースに個々に対応しているのは不自然だ』への答えとして、次の作業はファミリー単位(ImageList 23、user32 の menu 14、gdi32 の描画 13、msacm32 13、winmm 13、ole32 14…)で、文書(Learn)の挙動と Wine 差分を根拠に進める。ImageList は自己完結のライブラリなので、Wine の `imagelist.c` を取り込む案(B')を評価する価値がある(担当の読み。実行は未確認)。
 - **D&D の 3 API は crash1(`fle_crash1_drag.c`)に任せる**(api2 から外してある)。crash1 の実装を担当の Wine 出力つきオラクルに通すと 20 行中 19 行が一致し、違うのは `cch == 0` でバッファありの 1 行(Wine は必要長 12、crash1 は 0)。crash1 に伝える。
-- **出荷の行**: `api2-imports.txt` を ship3 の EXTRA_IMPORTS に足すと FLEngine の閉包の『行なし』が 184 から 178 に減る。足してよい(試験は ship3 の 16 スナップで確認)。
+- **出荷の行**: `api2-imports.txt` を ship3 の EXTRA_IMPORTS に足すと FLEngine の閉包の『行なし』が 184 から 178 に減る。足してよい(テストは ship3 の 16 スナップで確認)。
 - **限界**: 各 API が実エンジンで実際に呼ばれる時機は閉包の上限。impl / partial が文書の挙動を網羅している証明ではない。窓の症状の原因(H1〜H4)のうち GAP-U1 は present2 が runtime に反映する。

@@ -180,7 +180,7 @@ Space は窓リストを変えなかった(ウィザードは開いたまま)。
 | vitest(`npm test`) | **308 passed**(24 ファイル。F1 のコミット時は 207。この差分で新規 9 ファイル(keymap・tracker・pointer-dom・idle-driver・appview・desktop・cursor・latency・stop-message)+ `fruity-engine.test.ts` に 3 件、`pointer.test.ts` の 9 件は削除) |
 | Worker 統合(`npm run test:worker`) | 29 passed(F1 と同じ。この差分で Worker は変えていない) |
 | e2e | §3 の表 |
-| `cargo test --offline -p fe-lift --test …`(`lift/runtime` の `fle_*.c` を全部コンパイルして試験用 main とリンクするテスト 16 本 + `wall_fr14`、この差分を入れた木で) | **17 本 240 件すべて通った**: wall_fr14 24、srw 17、k32_dsp 14、callback 18、event 16、hook_points 17、modules 16、wall_b 13、load 22、sysinfo 16、uilang 4、null0 6、msctf 12、site_override 11、deferred 15、realmod 16、call_iat 3。**cargo のワークスペース全体のテスト(約 50 分、135 本)は走らせていない**(残りの約 118 本は未確認) |
+| `cargo test --offline -p fe-lift --test …`(`lift/runtime` の `fle_*.c` を全部コンパイルしてテスト用 main とリンクするテスト 16 本 + `wall_fr14`、この差分を入れた木で) | **17 本 240 件すべて通った**: wall_fr14 24、srw 17、k32_dsp 14、callback 18、event 16、hook_points 17、modules 16、wall_b 13、load 22、sysinfo 16、uilang 4、null0 6、msctf 12、site_override 11、deferred 15、realmod 16、call_iat 3。**cargo のワークスペース全体のテスト(約 50 分、135 本)は走らせていない**(残りの約 118 本は未確認) |
 | 型検査(4 つの tsconfig) | 通る |
 
 **変異検査**(`node test/mutation/run.mjs`。`app/` の写しの 1 か所を書き換え、テストが落ちることを確かめ、元に戻す): 単体層 **48/48 検出**(F0・F1 の 30 件のうち単体層を持つ 24 件 + この差分の 24 件。写しは終了後に木と同一、単体テストは緑)。この差分の 24 件: 座標の y 反転(`screen-y-flipped`)、ボタンの右と中の取り違え(`mouse-buttons-right-and-middle-swapped`)、修飾キー(Shift)が表に無い(`shift-key-not-in-the-table`)、フォーカス喪失でキーを離さない(`blur-leaves-keys-down`)、pointercancel でボタンを離さない(`cancel-leaves-buttons-down`)、ホイールの向き(`wheel-direction-flipped`)、矢印キーの拡張フラグ落ち(`extended-flag-lost-on-arrows`)、Tab を送って抑止する(`tab-is-forwarded-and-suppressed`)、F5 を抑止する(`f5-is-suppressed`)、移動をまとめない(`consecutive-moves-not-merged`)、時計が期限を飛び越す(`clock-may-pass-the-deadline`)、最初の idle の前の入力を捨てずに溜める(`input-before-the-first-idle-is-queued`)、期限のタイマーが早い(`deadline-timer-too-early`)、Z 順の逆転(`z-order-reversed`)、窓の位置を面の表から取る(`window-position-from-the-surface-not-the-engine`)、破棄された窓が残る(`destroyed-window-stays-on-the-desktop`)、SIZEWE が縦(`sizewe-cursor-is-vertical`)、可視と有効のビット入れ替え(`appview-visible-and-enabled-bits-swapped`)、窓配列の開始位置のずれ(`appview-window-array-starts-at-the-wrong-offset`)、捨てた入力が保留に数えられる(`dropped-events-counted-as-pending`)、計算中を idle と言う(`engine-called-idle-while-computing`)、起動中でも入力を受け付けると言う(`input-accepted-while-starting`)、停止で『壁』と言わない/最後の入力を言わない(`stop-wall-not-named`、`stop-message-forgets-the-last-input`)。e2e 層の変異 2 件(`worker-drops-all-input`: Worker が入力を全部捨てる → 『all input processed』が出ず落ちる、`canvas-placed-at-the-origin`: 窓の canvas を全部原点に置く → 配置・スクリーンショットの 4 check が落ちる)も 2/2 検出(各 4〜8 分)
@@ -229,7 +229,7 @@ F1(決定 0137 §12)からの変更点:
 ## 9. 失敗・やり直し・不備(正直に)
 
 - **e2e の最初の版は順序を間違えた**: 『No thanks』の前に右クリック(ボタン R)・キー A・Tab・Shift を入れたため、ウィザードの面の SHA が決定 0136 の値(`f285760a56…`)に一致せず、押している間の面が `720a1d4106…`(離した後の途中の絵)になった。原因は特定していない(前の入力がウィザードの状態を変えた、と読むが未確認)。決定 0136 と同じ順(移動 → 押下 → 離す)を最初に行う順序に直すと一致した。
-- **Shift キーの試験の誤り**: Tab を押した後にフォーカスがデスクトップから出ており、Shift が届いていなかった(試験側の誤り)。Tab の後でフォーカスを戻すようにした。
+- **Shift キーのテストの誤り**: Tab を押した後にフォーカスがデスクトップから出ており、Shift が届いていなかった(テスト側の誤り)。Tab の後でフォーカスを戻すようにした。
 - **preview の全シナリオ 1 回目の異常**(§3): 押下の 3.45 s 後にページが『離した』を送った。原因は特定できていない。`blur`(ウィンドウの)・`visibilitychange`・`pointercancel` のいずれでも同じ結果になる(`releaseAll`/`pointerCancel` が離す)ので、これらのどれかと読むが、**その時の記録に発生源が無かった**ので、各入力の記録に発生源(DOM イベントの名前)を加え、押している間の面の変化を時系列で残すようにした。その後の preview(engine-desktop だけ)・preview の全シナリオ 2 回・dev・Worker では再現していない。**棄却した仮説**: 『レイアウトが変わると Blink が `buttons` 0 の偽の `pointermove` を出し、それをボタンの解放と読んだ』— CDP で押したままの要素に canvas の追加・大きさの変更・`display` の切り替えを 6 回行っても、`pointermove` は 1 つも出なかった(`pointerdown` の後は `pointerup` まで何も来ない: 実験は `/tmp` の使い捨てスクリプト。記録は本文のこの 1 行だけ)。同時にこの機械で別の負荷(vitest・tsc)を走らせていたことが関係するかもしれないが、因果は確かめていない。
 - **デスクトップの方式の測定の最初の版は無意味だった**(§2.1): 描画命令の記録時間だけを測っていた。`getImageData` で実行を強制する形に直した。
 - 窓リストの z の表示が『下から数えた順位』(29 枚中)で分かりにくかった(カードのラベル)。表示は直していない。
@@ -239,7 +239,7 @@ F1(決定 0137 §12)からの変更点:
 
 ## 10. 限界(測れなかったこと)
 
-- 実機 Windows との照合 0 件。Firefox・Safari・headed Chrome・実 GPU・HiDPI の実機・タッチ・IME・非 US 配列・複数ボタン(右・中の押下は右クリックを 1 回だけ実エンジンに送った)・ドラッグ・ダブルクリック・ホイール(実エンジンでは未試験)は未測定。
+- 実機 Windows との照合 0 件。Firefox・Safari・headed Chrome・実 GPU・HiDPI の実機・タッチ・IME・非 US 配列・複数ボタン(右・中の押下は右クリックを 1 回だけ実エンジンに送った)・ドラッグ・ダブルクリック・ホイール(実エンジンでは未テスト)は未測定。
 - 応答が 0.5〜3 s のフレームに律速される(§4.3)。局面が 3 つある原因(最初の約 50 s が約 3 s、その後約 0.5 s、約 145 s 以降約 1 s)は調べていない(V8 のコンパイル段階か、エンジン側の作業の変化か)。局面の境目の位置は 1 回の 9 分間の観察と e2e 数回のもの。O2 の bundle は作っていない。
 - カーソルは作成カーソルを矢印にしか出せない(§1、§7)。標準カーソルの変換は実エンジンでは未確認。
 - Enter の後の停止は決定 0140(レイヤード窓)がコミットされると変わる。この e2e はその壁を前提にしている。

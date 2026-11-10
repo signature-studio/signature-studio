@@ -24,7 +24,7 @@
 - 生成器: `out-a2/tool`（`out-int2/tool` の複製、`Cargo.toml` の説明の `out-uilang` を `out-a2` に置換）を `out-a2/target-tool` にビルド（`build-tool.txt`、EXIT=0）。seed は `out-a2/seeds-896.txt`（896 件、`out-int2` の複製）。
 - 生成: EXIT=0（`gen-a2-896.txt`、`.err` は空）。`out/after-a2-896.c`（42,537,358 バイト）。functions 8427、closure_instructions 497367、emitted_instructions 497527（前回と同じ）、c_lines 548457（前回 548442）。`fle_resp_count` は 116、`fle_dispatch_count` は 8543。
 - 5 つの API は `jmp_imp:FindResourceW`、`LoadResource`、`LoadStringW`、`LockResource`、`SizeofResource` が各 1 件（閉包に各 1 か所のサンク）。
-- **`unsupported_total`: 502 → 380**（−122）。`Jmp: indirect through IAT slot (not lifted)` は 304 → 299（**−5、これが A2 の分**）。残りの −117 は、同時に作業していた他の担当の作業（作業ツリーの `sse_int2.rs`、`sse_shuf.rs`、`mmx.rs` の追加。`fle_sse.h` の変更。`Packssdw`、`Shufps`、`Psllw`、`Pshuflw` などの SSE/MMX の件数が減っている。`gen-a2-896.txt` と `../out-int2/gen-int2-896.txt` の「unsupported」の一覧の diff）で、私の作業の結果ではない。`unsupported` の種類は 39 → 21。
+- **`unsupported_total`: 502 → 380**（−122）。`Jmp: indirect through IAT slot (not lifted)` は 304 → 299（**−5、これが A2 の分**）。残りの −117 は、同時に作業していた他の担当の作業（ワークツリーの `sse_int2.rs`、`sse_shuf.rs`、`mmx.rs` の追加。`fle_sse.h` の変更。`Packssdw`、`Shufps`、`Psllw`、`Pshuflw` などの SSE/MMX の件数が減っている。`gen-a2-896.txt` と `../out-int2/gen-int2-896.txt` の「unsupported」の一覧の diff）で、私の作業の結果ではない。`unsupported` の種類は 39 → 21。
 - clang -O0 とリンク: `out-a2/build.sh`（`out-int2/build.sh` の複製）、`EXTRA_RT="fle_int_more fle_sse_more fle_locale fle_sys fle_x87ctl fle_vfs fle_reg fle_env fle_uilang fle_proc fle_time fle_uipref fle_res"`（int-more2-run.md §4 の指定に `fle_res` を足した）、EXIT=0（`build-896.txt`）。`bin/flengine-after-a2-896`。
 
 ## 4. 実行
@@ -59,4 +59,4 @@
 - 拒否はなし。
 - 失敗: §2 の 1 回目のテスト失敗（テストコードと期待値の誤り。runtime のコードの失敗ではない）。
 - 外部への通信は、Microsoft Learn のページの取得（`learn.microsoft.com`）のみ。
-- 触ったファイル（作業ツリー、`lift/out-a2/` の生成物は除く）: `lift/crates/fe-pe/src/lib.rs`（M）、`lift/crates/fe-pe/tests/resources.rs`（新規）、`lift/crates/fe-lift/src/imports_table.rs`（M、5 行追記）、`lift/crates/fe-lift/tests/res.rs`（新規）、`lift/runtime/fle_res.c`、`lift/runtime/fle_res.h`（新規）、`docs/decisions/0025-resource-apis.md`、`docs/investigations/a2-resources-run.md`（新規）。`lift/out-a2/` 全体（work、tool、build.sh、seeds、out、bin、各ログ）は新規。
+- 触ったファイル（ワークツリー、`lift/out-a2/` の生成物は除く）: `lift/crates/fe-pe/src/lib.rs`（M）、`lift/crates/fe-pe/tests/resources.rs`（新規）、`lift/crates/fe-lift/src/imports_table.rs`（M、5 行追記）、`lift/crates/fe-lift/tests/res.rs`（新規）、`lift/runtime/fle_res.c`、`lift/runtime/fle_res.h`（新規）、`docs/decisions/0025-resource-apis.md`、`docs/investigations/a2-resources-run.md`（新規）。`lift/out-a2/` 全体（work、tool、build.sh、seeds、out、bin、各ログ）は新規。

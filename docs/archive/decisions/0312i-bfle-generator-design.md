@@ -1,4 +1,4 @@
-# 0312i: B-FLE(方式 B)の生成器の変更の設計の読み — 差分の単位・順序・試験(file:line)と、手で `va_lit` を適用する 2 関数の候補(mt3。PM 指示 23:10。仮。**コードを読んだだけ。cargo build・wasm・Chrome は 0。数は python(nice 19)の出力か『読み』と書く**)
+# 0312i: B-FLE(方式 B)の生成器の変更の設計の読み — 差分の単位・順序・テスト(file:line)と、手で `va_lit` を適用する 2 関数の候補(mt3。PM 指示 23:10。仮。**コードを読んだだけ。cargo build・wasm・Chrome は 0。数は python(nice 19)の出力か『読み』と書く**)
 
 ## 0. 冒頭の四点
 
@@ -30,22 +30,22 @@
 | 単位 | 内容 | 触る場所 | その単位の確認 |
 |---|---|---|---|
 | **U0** | 参照の記録の通り道: `Cx`(`lib.rs:163`)に『関数ごとの参照リスト』、`ea()`・`imm_lit`・戻りアドレス・`f_` の出力を `Cx::va(kind, value) -> String` に集める。**既定の `va()` は今と同じ文字列を返す(リファクタのみ)** | 上の表の約 30 か所(14 ファイル) | **既定の FLEngine の C: `fe-lift lift binaries/win64/FLEngine_x64.dll OUT.c --pdata` が不変**(E13 の木: **215,740,699 B・sha256 `e798422c203ee0cdd5f3f8b1950df15c8443b4f9c39dd03bc89b6e1b9fc35c26`**。S0+S1 の木: 足場の 2 import 行が入って **215,741,085 B・`6c9d92b8…`**。U0 の前後で同じこと)。`cargo test` の fe-lift 全部。a4 の基準(942/895/5,310/1,009,737、生成 C の sha は S0+S1 の木で `1d5d368d…`)。 |
-| **U1** | `shared` モードの本体の出力: 共有する関数は `static void S_<hash>(const uint32_t *T)`(`T` は引数)、そのモジュールの `void f_<va>(void) { S_<hash>(T_<va>); }` を wrapper とする。`va()` が `T[k]`(データ/コードの参照)、戻りアドレスは `T[0] + <offset>`、呼び先は `((void (*)(void))T[n+j])()`(関数表の index)。表は `static const uint32_t T_<va>[] = { ... }`(guest の VA は 32 bit に収まる) | `lib.rs:1251,1283,1286` 周辺(宣言・関数頭)、`indirect.rs`、`dispatch.rs`、`jumptab.rs`(**ジャンプ表を持つ関数は共有しない**〔Balance で `case` 9 個〕) | **展開試験**(§3 の T1): 共有モードの出力を表で展開した結果が、既定の出力と**ラベル名を除いて一致**する |
+| **U1** | `shared` モードの本体の出力: 共有する関数は `static void S_<hash>(const uint32_t *T)`(`T` は引数)、そのモジュールの `void f_<va>(void) { S_<hash>(T_<va>); }` を wrapper とする。`va()` が `T[k]`(データ/コードの参照)、戻りアドレスは `T[0] + <offset>`、呼び先は `((void (*)(void))T[n+j])()`(関数表の index)。表は `static const uint32_t T_<va>[] = { ... }`(guest の VA は 32 bit に収まる) | `lib.rs:1251,1283,1286` 周辺(宣言・関数頭)、`indirect.rs`、`dispatch.rs`、`jumptab.rs`(**ジャンプ表を持つ関数は共有しない**〔Balance で `case` 9 個〕) | **展開テスト**(§3 の T1): 共有モードの出力を表で展開した結果が、既定の出力と**ラベル名を除いて一致**する |
 | **U2** | 共有の選択: 本体の正規化 hash(= U1 の本体のテキストの hash)が **2 つ以上のモジュールに現れる/FLEngine の集合にある**関数を共有、それ以外はモジュール固有(今の形)。`--shared-index IDX.tsv`(hash → 共有本体の ID)を読み書きして**複数の plugin の lift で同じ共有本体を指す**。共有本体は 1 つの C(`shared-*.c`)に出す | `main.rs:229〜265` の旗の読み、`lib.rs`(`generate_full`、`:1105`) | 2 つの plugin(Balance・Flanger)で `IDX` が一致、共有本体の合計の C の大きさが §0 の見積り(18.95 + 11.35 MB)に近い |
 | **U3** | build: `app/scripts/build-engine-bundle.sh` に plugin のモジュール(`EXTRA_MODULES`・`NEXTRA`〔`:48`〕、`seq 1 $((5 + NEXTRA))`〔`:113`〕、`:430,442`〕と共有本体の group(`ci/objkeys.sh`・`ci/stage-lift.sh`)、`RM_MAX`(`fle_realmod.c:18`)を拡げる。共有本体は **plugin のモジュールが 1 つ以上ある bundle にだけ**入る | 0309 §4b の 9 行の変更に重なる | bundle の wasm の大きさ(Balance 1 つ、Balance + Flanger)を alpha1 の 0310 の実 wasm と突き合わせる |
 | **U4**(保留) | A 案(FLEngine 自身を共有本体にする)。S1 の比が実測で 2 に近づいてから | — | — |
 
-**順序**: U0(既定の出力が不変であることの証明)→ U1(展開試験)→ U2 → U3。U0 と U1 は cargo の試験だけで検証でき、wasm にも Chrome にも依らない。**窓の後でないと cargo build は走らせない**。
+**順序**: U0(既定の出力が不変であることの証明)→ U1(展開テスト)→ U2 → U3。U0 と U1 は cargo のテストだけで検証でき、wasm にも Chrome にも依らない。**窓の後でないと cargo build は走らせない**。
 
-## 3. 試験(PM の挙げた 3 つ + 追加 2 つ)
+## 3. テスト(PM の挙げた 3 つ + 追加 2 つ)
 
-| # | 試験 | 通る条件 |
+| # | テスト | 通る条件 |
 |---|---|---|
 | T0a | **既定の FLEngine の C が不変** | 上の sha256・バイト数(木ごとの値)。U0〜U2 のどの時点でも |
 | T0b | **a4 の基準が変わらない** | 942 units・895/895・distinct 5,310・関数入口 1,009,737・exit 0(生成 C の sha は `1d5d368d…`〔S0+S1 の木〕) |
-| T0c | **既存の native 試験が通る** | `test.sh full` 223 results・2,430 passed・0 failed(S0+S1 の木の値) |
-| **T1(新)** | **展開試験**: `shared` モードの出力(wrapper + 表 + 共有本体)を、表の値で `T[k]` を展開し wrapper を inline して、**既定モードの出力と一致するか**(関数ごと、`L_` ラベルと関数名を除いて) | Balance・Flanger・(参考に)FLEngine の `--pdata` 全部で一致。**実行を伴わない純粋な変換の等価性の証明**になる(誤分類は効率を落とすだけで意味を保つ、の確認) |
-| **T2(新)** | **2 モジュールの意味試験(native の小さな C)**: 同じ共有本体を、異なる表で 2 つのモジュールが使い、**それぞれ自分のデータを読み書きする**(Delphi の RTL が DLL ごとに状態を持つことの再現)。呼び先が表経由であること、戻りアドレスが `T[0] + off` で guest の `ret` に正しく戻ること | clang で native に作って走る。`lift/crates/fe-lift/tests/` に 1 本(`shared_bodies.rs`)。 |
+| T0c | **既存の native テストが通る** | `test.sh full` 223 results・2,430 passed・0 failed(S0+S1 の木の値) |
+| **T1(新)** | **展開テスト**: `shared` モードの出力(wrapper + 表 + 共有本体)を、表の値で `T[k]` を展開し wrapper を inline して、**既定モードの出力と一致するか**(関数ごと、`L_` ラベルと関数名を除いて) | Balance・Flanger・(参考に)FLEngine の `--pdata` 全部で一致。**実行を伴わない純粋な変換の等価性の証明**になる(誤分類は効率を落とすだけで意味を保つ、の確認) |
+| **T2(新)** | **2 モジュールの意味テスト(native の小さな C)**: 同じ共有本体を、異なる表で 2 つのモジュールが使い、**それぞれ自分のデータを読み書きする**(Delphi の RTL が DLL ごとに状態を持つことの再現)。呼び先が表経由であること、戻りアドレスが `T[0] + off` で guest の `ret` に正しく戻ること | clang で native に作って走る。`lift/crates/fe-lift/tests/` に 1 本(`shared_bodies.rs`)。 |
 | T3 | 手で表経由にした 1 関数の **wasm の大きさと呼び出し時間**(§4) | 大きさ: 表経由 − 絶対リテラル。時間: 1 回の呼びの差(ns) |
 
 ## 4. 手で `va_lit` を適用する 2 関数の候補(`tools/bfle_pick.py` の出力。`tables/0312i/pick.txt`)
@@ -80,7 +80,7 @@
 
 `tools/va_lit_rewrite.py GEN.c HEXVA OUTDIR`: 1 関数を取り出し、(i) ラベル `L_<va>` を関数先頭からの相対 `L_<off>` に、コメントの VA を消す、(ii) call の戻りアドレスの push `fle_st(R[4], 8, UINT64_C(<va>))` を `(uint64_t)T[0] + UINT64_C(<off>)` に、(iii) 範囲内の `UINT64_C(0x…)` を `(uint64_t)T[k]` に(同じ値は同じ k)、(iv) 呼び先 `f_<va>` を `((fle_fn_t)T[n])` に書き換える。出力は `S_<hash>(const uintptr_t *T)`(`noinline`・外部リンク = 呼び側の表が畳み込まれない)と、そのモジュールの表 `T_<va>[]`・wrapper `f_<va>(void){ S_<hash>(T_<va>); }`。
 
-- **T1(展開試験)を python で実施**: 表で展開し戻すと元の本体と一致するか(コメントの VA を除き行単位) — **3 関数とも一致 True**(`tables/0312i/rewrite-prototype.txt`)。
+- **T1(展開テスト)を python で実施**: 表で展開し戻すと元の本体と一致するか(コメントの VA を除き行単位) — **3 関数とも一致 True**(`tables/0312i/rewrite-prototype.txt`)。
 - **変換**(実測): `0x40e800`: 本体 2,548 → 2,227 B、表 2 エントリ(自身 1・呼び先 1)、戻りアドレス 1 を `T[0]+off`。`0x4076b0`: 11,998 → 10,018 B、表 5 エントリ(自身 1・参照 3・呼び先 1)。`0x5a3d00`: 282,529 → 251,670 B、表 847 エントリ(自身 1・参照 842・呼び先 4)、**戻りアドレス 426 を `T[0]+off`**。
 - **emcc -c -Oz(`-DFLE_GIL -DFLE_TLS_MORE -pthread`)で原型も共有形もエラー 0 でコンパイル**。wasm object の section の大きさ(code = section 10、data = section 11。.o にはヘッダ由来の分が共通に入る): `0x40e800` code +28 B(+0.1%)・data +15 B、`0x4076b0` code +21 B(+0.1%)・data +27 B、**`0x5a3d00` code +7,388 B(+9.2%)・data +3,396 B(表 847 × 4 B)**。= **表経由にする費用は参照の数に比例し(1 参照あたり code 約 +6 B + 表 4 B)、小さい関数ではほぼ 0、参照が 1,000 を超える巨大関数で +10%強**。共有で一度だけ払うので、plugin ごとの重複(§0)に比べて小さい。
 - **注意(発見)**: 最初の版は表と本体を同じ TU・`static` にしたら、**LLVM が S_ を inline して定数の表を畳み込み、原型と同じ大きさ(1 バイトも違わない)になった**。= 共有形の費用は、表と本体が別の module になって初めて現れる(上の 3 つは本体を外部リンク・noinline にして測った)。**共有本体を呼ぶ側(各 plugin の wrapper)は最適化で特殊化されない**ので、呼び出しのコスト(間接の 1 段)は避けられない。
@@ -133,7 +133,7 @@
 事実として受け取る:
 1. 0312h §3 の訂正: 「最初 4.5 MB・7 つで約 11 MB」は方式 A の数字で、方式 B では共有の RTL/VCL の本体(C 18.95 MB → 最終 5.9 MB)+ plugin 共通の枠 3.5 MB = 9.4 MB を 1 度だけ持ち、plugin ごとに約 1.0 MB。1 つ目 ≈10.4 MB(共有なしの 12.3 MB と大差なし)、2 つ目以降は各 ≈1.0 MB、7 つで ≈16.4 MB。B の利得は 2 つ目から。
 2. 共有本体の VA リテラル 39,396 個のうち 27,373 個(69.5%)は呼び出しの戻り番地 = 関数の開始 VA + 定数で、表には関数自身の VA だけがあればよい。本物の表参照は 12,023 個(30.5%)、表は 46,062 項目 × 4 B ≈ 0.18 MB/module。
-3. 生成器の変更の単位: U0 `Cx::va()` の refactor(既定の出力は byte 同一)→ U1 shared 方式の本体 `S_<hash>(const uint32_t *T)` + 薄い wrapper → U2 共有の選択(生成器の入力であり製品の旗ではない)→ U3 build の統合(`RM_MAX` の拡張)。試験: T0a 既定の FLEngine の C が不変(E13 の木で 215,740,699 B・sha256 e798422c…c35c26)、T0b a4(942/895/5,310/1,009,737)、T0c native 2,430、T1 展開試験、T2 2 module の意味試験。
+3. 生成器の変更の単位: U0 `Cx::va()` の refactor(既定の出力は byte 同一)→ U1 shared 方式の本体 `S_<hash>(const uint32_t *T)` + 薄い wrapper → U2 共有の選択(生成器の入力であり製品の旗ではない)→ U3 build の統合(`RM_MAX` の拡張)。テスト: T0a 既定の FLEngine の C が不変(E13 の木で 215,740,699 B・sha256 e798422c…c35c26)、T0b a4(942/895/5,310/1,009,737)、T0c native 2,430、T1 展開テスト、T2 2 module の意味テスト。
 4. 実行された共有本体の命令は FLEngine の記録 95.9 M のうち 2.2 M(2.3%): 共有部分は枠で、熱い DSP ではない(plugin の実行時の割合は G9 の測定が要る)。
 
 判断:
@@ -145,7 +145,7 @@
 
 ## PM の追記(2026-11-06 23:29、§7 書き換え script の試作の取り込み、docs のみ)
 
-取り込み: mt3 の試作(`tools/va_lit_rewrite.py`、`tables/0312i/rewrite-prototype.txt` と `rewrite/`)を置いた。**実エンジン・Chrome は 0。測ったのは python の展開試験と emcc -c -Oz の object の大きさだけ**。
+取り込み: mt3 の試作(`tools/va_lit_rewrite.py`、`tables/0312i/rewrite-prototype.txt` と `rewrite/`)を置いた。**実エンジン・Chrome は 0。測ったのは python の展開テストと emcc -c -Oz の object の大きさだけ**。
 
 事実として受け取る(mt3 の実測):
 1. T1(表で展開し戻すと元の本体と一致するか)は Balance の 3 関数(`0x40e800`・`0x4076b0`・`0x5a3d00`)とも一致。本体は 2,548→2,227 B、11,998→10,018 B、282,529→251,670 B。`0x5a3d00` は表 847 エントリ(参照 842、呼び先 4)で戻りアドレス 426 個が `T[0]+off`。

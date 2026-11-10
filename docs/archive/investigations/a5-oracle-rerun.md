@@ -10,7 +10,7 @@ run5 と同じ手順・同じパラメータ（1,000 関数 × 16 ケース、se
 
 ## 2. 実行コマンド
 
-スナップショットは `lift/out-oracle-rerun/stage/`（`git archive HEAD | tar -x`。`binaries` は展開から除外し、`FLENGINE_PE` で作業ツリーの PE を指す）。作業ツリーの `lift/` は読んでいない。
+スナップショットは `lift/out-oracle-rerun/stage/`（`git archive HEAD | tar -x`。`binaries` は展開から除外し、`FLENGINE_PE` でワークツリーの PE を指す）。ワークツリーの `lift/` は読んでいない。
 
 ```
 R=/home/ubuntu/work/signature-studio-develop/lift/out-oracle-rerun
@@ -45,13 +45,13 @@ python3 $H/run_diff2.py --pe $FLENGINE_PE --pure results/pure.json --argptr resu
 
 | 項目 | run5.sh（当時） | 今回 |
 |---|---|---|
-| 生成 C | `lift/out-mxcsr/pd/out/new-part-NN.c`（当時の作業ツリーから生成） | HEAD のスナップショットから `fe-lift lift --pdata` で再生成（`rerun-build.sh`） |
-| runtime | 当時の作業ツリー | HEAD のスナップショット（0044 の純 C 版 `fle_mxcsr_flags.h` を含む。ヘッダ冒頭に "No asm, no <emmintrin.h>, no <fenv.h>" とある） |
-| native_drv2 | run4 のバイナリを複写 | HEAD のソースから再ビルド |
-| `argptr.json`、`exclude-stats.json` | run4 のものを複写 | 再生成（件数は run4 の記録と一致。ファイルのバイト比較はしていない） |
+| 生成 C | `lift/out-mxcsr/pd/out/new-part-NN.c`（当時のワークツリーから生成） | HEAD のスナップショットから `fe-lift lift --pdata` で再生成（`rerun-build.sh`） |
+| runtime | 当時のワークツリー | HEAD のスナップショット（0044 の純 C 版 `fle_mxcsr_flags.h` を含む。ヘッダ冒頭に "No asm, no <emmintrin.h>, no <fenv.h>" とある） |
+| native_drv2 | run4 のバイナリをコピー | HEAD のソースから再ビルド |
+| `argptr.json`、`exclude-stats.json` | run4 のものをコピー | 再生成（件数は run4 の記録と一致。ファイルのバイト比較はしていない） |
 | `pure.json` | 既存を再利用 | `select_pure.py` で再生成 |
 
-`build5.sh`/`run5.sh` はそのままでは使っていない（`out-mxcsr`、`out-oracle`、`out-pdata` の作業ツリー側の生成物に依存するため）。
+`build5.sh`/`run5.sh` はそのままでは使っていない（`out-mxcsr`、`out-oracle`、`out-pdata` のワークツリー側の生成物に依存するため）。
 
 ## 3. 結果の比較（実測）
 
@@ -174,7 +174,7 @@ role 別: opcode は detected_core 65、native fault のみ 38、等価 6、途�
 - 比較しないもの: 未定義の EFLAGS（AF が 2,842 ケース）、GS/TEB、MM レジスタの値、x87 の 80 ビットレジスタの内容、MXCSR の RC/FTZ/DAZ が非既定の状態（native は 0x1F80 で入る。0038 §7）。
 - 確認は AMD Ryzen 9 9950X の 1 台のみ。Intel 実機との比較はしていない。
 - **今回の再実行で確認できた範囲**: 0042（ロケール）、0043（x87 の f2xm1/fsincos）、0044（MXCSR の純 C 版）、0047、0049 などを含む HEAD の lifter と runtime で、上の対象に限って run5 と同じ結果になった。これらの変更が対象外の関数に与える影響は、このオラクルでは測れない。
-- run5 の個別ケース（`results/run5/a5-cases.json` など）との case 単位の突き合わせは、作業ツリーの `lift/` を読まない条件のためしていない。比較は、決定文書と調査記録に書かれた run5 の数値との集計レベルの一致である。
+- run5 の個別ケース（`results/run5/a5-cases.json` など）との case 単位の突き合わせは、ワークツリーの `lift/` を読まない条件のためしていない。比較は、決定文書と調査記録に書かれた run5 の数値との集計レベルの一致である。
 
 ## 6. 試行錯誤・注意
 

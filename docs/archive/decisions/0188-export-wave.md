@@ -64,7 +64,7 @@ Basic.flp を開いた状態で Ctrl+R(キー Ctrl 0x11 と R 0x52 の down/up �
 - **SetThreadExecutionState**(`fle_wall_exp1.c`):Learn どおり『前の状態を返す』『ES_CONTINUOUS の呼び出しだけが状態を保つ』『ES_USER_PRESENT を他と組むと失敗(NULL)』。初期状態 ES_CONTINUOUS(S-exp1-ste-initial)、プロセスに 1 つ(S-exp1-ste-thread)。何も眠りを止めない。
 - **計測用(モデルではない)**: G3 スクリプトに `vfsdump GUESTPATH HOSTFILE`(エンジンが VFS に書いたファイルをホストに書き出し、大きさと SHA-256 を `g3-vfsdump:` で印字。`fle_vfs_peek_file`)と `cpu LABEL`(`getrusage` の CPU 時間・仮想時計・関数入口数を `g3-cpu:` で印字)を足した(native のみ、読み取りだけ)。プローブごとの coverage(`cov-per-probe.patch`、決定 0184 の道具)を、`trace_native.c` が無いリンクでも通るよう弱い参照にして取り込んだ。
 
-## 5. 壁の台帳(`tables/walls.tsv`。実測。呼び元の特定は gdb の backtrace と静的な逆アセンブルの読み)
+## 5. 壁の記録(`tables/walls.tsv`。実測。呼び元の特定は gdb の backtrace と静的な逆アセンブルの読み)
 
 | id | 経路 | 症状(実測) | 止まった API | 最小の実装 | 状態 |
 |---|---|---|---|---|---|
@@ -242,6 +242,6 @@ Basic.flp を開いた状態で Ctrl+R(キー Ctrl 0x11 と R 0x52 の down/up �
 1. `IFileSaveDialog` の `RemoveControlItem` が未知の項目で `E_INVALIDARG` を返す点は、出典を確認できていない選択(S-exp1-removeitem-unknown)として受け入れる。エンジンがこの戻り値を分岐に使っているかは未確認。
 2. 層 4 の行(`seeds/exp1-imports.txt`)は 16 スナップショットの 82 行を変えない(§に実測)。出荷用の `EXTRA_IMPORTS` は、`dlg1-imports.txt` の後ろに層 4 を連結した 1 ファイルにする(次の出荷組み立てで ship1 の `ship-imports.txt` と合わせる)。まだ既定の入口のバンドルには入っていない。
 3. `build_two_native.sh` の `GEN_OPT`/`GEN_INSTR` は opt-in として受け入れる(指定が無ければ従来と同一)。
-4. 書き出しの結果は「エンジンが WAV を最後まで書き出した」事実であり、**正しい音が出ているという主張ではない**。Sampler.flp の 77,574 個の非ゼロフレーム、決定性(7/5 回で同一)、-O2 と -O0 の WAV が同一であることまでが実測。選択・キー・クリックは試験用の入力の模擬(ユーザー操作の代わり)で、ブラウザでの書き出しは未実施(出荷バンドルに層 4 の行が無い)。ミキサー・Fruity・Serum を含むプロジェクトの書き出しは未実施。MP3(LAMEenc)・OGG(oggio)・M4A(ILVideo)は未 lift のため止まる。
+4. 書き出しの結果は「エンジンが WAV を最後まで書き出した」事実であり、**正しい音が出ているという主張ではない**。Sampler.flp の 77,574 個の非ゼロフレーム、決定性(7/5 回で同一)、-O2 と -O0 の WAV が同一であることまでが実測。選択・キー・クリックはテスト用の入力の模擬(ユーザー操作の代わり)で、ブラウザでの書き出しは未実施(出荷バンドルに層 4 の行が無い)。ミキサー・Fruity・Serum を含むプロジェクトの書き出しは未実施。MP3(LAMEenc)・OGG(oggio)・M4A(ILVideo)は未 lift のため止まる。
 5. ゴール段階表は **G0 のまま**。この作業は『ユーザー操作の壁を 1 つ越えた』観測であり、G 段階の到達に数えない。
 6. 作業中の逸脱(`bash` ツール 2 回、`sleep` 2 回、重い処理 2 本超の時間帯、子の `node` の kill、`-O1` 前景 11 分)は §13 のとおり。再発防止は担当への指示で足りると判断した。

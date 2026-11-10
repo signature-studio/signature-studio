@@ -411,7 +411,7 @@ stored object size: min 3372 median 1048576 max 4194320
 
 - **読み**: (1) 保存の総量の標本の概算(913.6 MiB、§4)に対し実測は 937.2 MiB(+2.6%)。差は PCM の `.wav` を brotli にしても率 0.87 であること、`.png`/`.jpg` を identity にしたこと、chunk 単位の独立圧縮による損、の合計と読む(未分解)。(2) **アーティスト向けの塊の取り出し**: `Kicks` の `.wv` 349 本(6.9 MiB)は identity の 7 chunk(7.0 MiB)で、1 往復あたり 1 MiB。`Templates`(70 ファイル、29.4 MiB)は 11 chunk、保存 6.5 MiB。`Artwork/Themes`(39 ファイル、17.1 MiB)は画像が identity で、8 chunk・22.2 MiB(隣のディレクトリの画像が chunk に混じる)。**現在の seed の 218 ファイル(5.4 MiB)は 22 chunk・19.4 MiB に散る**ので、seed は chunk に置き換えず eager のまま(mt3 の L4(i) のとおり)。(3) **Plugins のプラグイン 1 個**: Fruity Balance(2 ファイル、3.5 MiB)= 3 chunk・2.5 MiB、Filter = 2 chunk・1.4 MiB。
 
-**試験用の木(V1 の vitest 用)**: `vfs-out/testtree-src/`(21 ファイル、空ディレクトリ 2 個、6 MiB の `.wav`〔4 MiB の chunk 2 個にまたがる〕、日本語のディレクトリ名とファイル名、`Noël`、0 バイトのファイル、NTFS の順で `a_b.txt` が `ab.txt` の後ろ、1.5 MiB の DLL、`.wv` 2 個)から作った索引と chunk = `vfs-out/testtree-out/`(`index.bbec64e4bd14.br`、chunk 10 個、manifest)。往復の検証は問題 0。mt3 に場所を連絡済み。
+**テスト用の木(V1 の vitest 用)**: `vfs-out/testtree-src/`(21 ファイル、空ディレクトリ 2 個、6 MiB の `.wav`〔4 MiB の chunk 2 個にまたがる〕、日本語のディレクトリ名とファイル名、`Noël`、0 バイトのファイル、NTFS の順で `a_b.txt` が `ab.txt` の後ろ、1.5 MiB の DLL、`.wv` 2 個)から作った索引と chunk = `vfs-out/testtree-out/`(`index.bbec64e4bd14.br`、chunk 10 個、manifest)。往復の検証は問題 0。mt3 に場所を連絡済み。
 
 **OPEN / 未確認**: (a) 属性: 原本の写しは Wine の prefix なので READONLY・HIDDEN・SYSTEM は取れず、ファイルは ARCHIVE のみで出した(実機の値は 0 件)。(b) 時刻: ファイルは原本の mtime(2026-09 のインストーラ由来)、作成・アクセスは mtime と同じ、ディレクトリは `FL64.exe` の mtime(実機の install 時刻は不明)。(c) 短い名前(8.3): 生成しない(§6)。(d) R2 に上げたときの `Content-Encoding: br` の扱い・CDN のキャッシュ・Worker の経由(R2 の 4 MiB のオブジェクトを 1 往復で取る費用)は未測定。(e) brotli q9 を q11 にしたときの保存量(3〜5% 小さい見込み〔未測定〕)と生成時間(q11 は q9 の 20〜50 倍遅い見込み)。(f) chunk の SHA-256 が復号後なので、`identity` と `brotli` の流れに同じ論理 bytes が出ると名前が衝突する(生成器は検出して止まる。今回は 0 件)。
 
@@ -437,7 +437,7 @@ stored object size: min 3372 median 1048576 max 4194320
 ### 8.2 prefix-e3 を作る方法(複製の大きさの問題への答え)
 
 - prefix-e2 は 4.2 GB(`du`。`drive_c/windows` 1.2 GB、`Program Files (x86)` 868 MB〔WebView2〕、`Program Files/Image-Line` 2.1 GB)。ext4 なので reflink は使えない。**全部を複製(`cp -a`)すると 4.2 GB・約 1 分の I/O**。
-- **提案(採用して作成済み): hard link の複製 + 書かれる物だけ実体の複製**(`tools/mk-prefix-e3.sh hybrid`)。根拠(実測): prefix-e2 を作った後の約 20 回の run で変わったファイルは **81 個だけ**(`find -newer`): 3 つの `.reg`(system.reg 3.7 MB ほか)、`drive_c/users/ubuntu/AppData`(WebView2 のキャッシュ ほか 73 個)、`drive_c/ProgramData`(1)、FL のフォルダの中は私が書き換えた `wintrust.dll` と patch した DLL 2 つだけ。したがって `cp -al`(hard link、データを写さない、0.02 秒)で作り、`users`・`ProgramData`・`dosdevices`・3 つの `.reg`・`.update-timestamp`・FL のフォルダの `wintrust.dll`/`.stub`/`wintrust_real.dll` だけを実体で複製(合計 約 17 MB)。**patch する DLL は `cp --remove-destination` で新しい inode にしてから書く**(`g9-prep.sh`)ので、prefix-e2 や原本の DLL には届かない(試験で、e3 側の inode が別になり、e2 側と原本の DLL の sha が不変なことを確認)。
+- **提案(採用して作成済み): hard link の複製 + 書かれる物だけ実体の複製**(`tools/mk-prefix-e3.sh hybrid`)。根拠(実測): prefix-e2 を作った後の約 20 回の run で変わったファイルは **81 個だけ**(`find -newer`): 3 つの `.reg`(system.reg 3.7 MB ほか)、`drive_c/users/ubuntu/AppData`(WebView2 のキャッシュ ほか 73 個)、`drive_c/ProgramData`(1)、FL のフォルダの中は私が書き換えた `wintrust.dll` と patch した DLL 2 つだけ。したがって `cp -al`(hard link、データを写さない、0.02 秒)で作り、`users`・`ProgramData`・`dosdevices`・3 つの `.reg`・`.update-timestamp`・FL のフォルダの `wintrust.dll`/`.stub`/`wintrust_real.dll` だけを実体で複製(合計 約 17 MB)。**patch する DLL は `cp --remove-destination` で新しい inode にしてから書く**(`g9-prep.sh`)ので、prefix-e2 や原本の DLL には届かない(テストで、e3 側の inode が別になり、e2 側と原本の DLL の sha が不変なことを確認)。
 - **作成の結果(07:48)**: ディスクの増加は約 17 MB(空き 584 → 583 GB)、prefix-e3 と prefix-e2 のファイル一覧(種別・大きさ・mtime)の差 0、書き込み対象の 225 ファイルは link 数 1(別 inode)、残り 30,902 ファイルは hard link。`tools/guard.sh`(prefix と prefix-e2 の一覧。link 数を除いて比較)で、複製の前後に**原本の prefix と prefix-e2 に変化なし**を確認。
 - **リスクと守り**: (1) hard link の共有ファイルが e3 の run で書き換えられると e2/原本も変わる。守り = run の前後に `guard.sh snap/diff` を自動実行(`queue-run.sh`)し、サイズか mtime が変わったら止まる。(2) 上の『書かれる物』の一覧が漏れていた場合も、同じ守りで検出される。(3) 心配なら `mk-prefix-e3.sh full`(実体の複製、4.2 GB)に切り替えられる。
 
@@ -449,7 +449,7 @@ stored object size: min 3372 median 1048576 max 4194320
 | elog12(読み込みが遅い日) | 165.8 s | Problems 窓 100.2 s |
 | elog15b(窓を認識できず fallback) | 221.2 s | fallback まで 150 s の待ち、Start まで +23 s、Export 36.0 s |
 
-- **新しい窓の件数の run の見積もり**: 参照が無い件数(R3〜R6 は 5・4・3・1)では窓を認識できない。**待ちを短くする変更を入れた(未試験)**: driver が hook のログ(`e3/elog.txt.<pid>`)の `ELOG a97930x`(project の読み込みの終わり)を見て、**その 15 秒後に参照に合わなければ fallback(Return)**にする(`OPT1_PROB_ELOG_DIR`、`tools/wine-export-run.py`、`elog-run-pfx.sh` が自動で設定)。pad の終わりから Problems 窓までは elog14 で約 8 s なので、15 s は余裕がある(読み込みが極端に遅い日に窓が 15 s 以上遅れる場合だけ、窓が出る前に Return を押す恐れ〔その場合は FL のメインに Return が入るだけで害は未確認〕)。見積もり: 読み込み 30〜45 s + 15 s + Start まで +23 s + Export 27〜41 s + 停止 5 s = **約 2〜2.5 分**(遅い日は 3 分)。ELOG の変更が効かなければ 150 s の待ちで **約 3.7 分**。
+- **新しい窓の件数の run の見積もり**: 参照が無い件数(R3〜R6 は 5・4・3・1)では窓を認識できない。**待ちを短くする変更を入れた(未テスト)**: driver が hook のログ(`e3/elog.txt.<pid>`)の `ELOG a97930x`(project の読み込みの終わり)を見て、**その 15 秒後に参照に合わなければ fallback(Return)**にする(`OPT1_PROB_ELOG_DIR`、`tools/wine-export-run.py`、`elog-run-pfx.sh` が自動で設定)。pad の終わりから Problems 窓までは elog14 で約 8 s なので、15 s は余裕がある(読み込みが極端に遅い日に窓が 15 s 以上遅れる場合だけ、窓が出る前に Return を押す恐れ〔その場合は FL のメインに Return が入るだけで害は未確認〕)。見積もり: 読み込み 30〜45 s + 15 s + Start まで +23 s + Export 27〜41 s + 停止 5 s = **約 2〜2.5 分**(遅い日は 3 分)。ELOG の変更が効かなければ 150 s の待ちで **約 3.7 分**。
 - **1 段あたりの前後作業**(prep〔rename + cpuid の位置の抽出 + patch〕+ 一覧 4 回 + guard 2 回): 約 1 分(Wine なし)。R3〜R7 の 5 段で **Wine の時間 約 10〜12 分 + 前後 約 5 分 = 約 15〜17 分**(ELOG の変更が効かないと約 23 分)。R2(elog16)は別に 約 2.5〜4 分。
 
 ### 8.4 窓の要求と段取り
@@ -460,7 +460,7 @@ stored object size: min 3372 median 1048576 max 4194320
 
 ### 8.5 準備済みの物(Wine なし)
 
-- `tools/mk-prefix-e3.sh`(実行済み、prefix-e3 あり)、`env-e3.sh`、`tools/g9-prep.sh`(複数の DLL に対応、`PFX=prefix-e3`、patch の失敗で止まる、`prep`/`undo` の往復を e3 で試験済み: 一覧とシャが元に戻る)、`tools/e2-patch-one.py`(prefix-e3 も許す)、`tools/e2-state.sh`(全プラグインの DLL の sha を含む。`PFX` 対応)、`tools/guard.sh`、`tools/elog-run-pfx.sh`(prefix 汎用の ELOG run。ELOG 起点の fallback つき)、`tools/queue-run.sh STEP TAG [prep-only]`(段ごとの前後の確認 + 実行 + 後の確認)、`tools/step-effect.py`(段の効果の大きさ)。`elog16-run.sh` も `elog-run-pfx.sh` に切り替えた(prefix-e2 の構成 A のまま)。
+- `tools/mk-prefix-e3.sh`(実行済み、prefix-e3 あり)、`env-e3.sh`、`tools/g9-prep.sh`(複数の DLL に対応、`PFX=prefix-e3`、patch の失敗で止まる、`prep`/`undo` の往復を e3 でテスト済み: 一覧とシャが元に戻る)、`tools/e2-patch-one.py`(prefix-e3 も許す)、`tools/e2-state.sh`(全プラグインの DLL の sha を含む。`PFX` 対応)、`tools/guard.sh`、`tools/elog-run-pfx.sh`(prefix 汎用の ELOG run。ELOG 起点の fallback つき)、`tools/queue-run.sh STEP TAG [prep-only]`(段ごとの前後の確認 + 実行 + 後の確認)、`tools/step-effect.py`(段の効果の大きさ)。`elog16-run.sh` も `elog-run-pfx.sh` に切り替えた(prefix-e2 の構成 A のまま)。
 - **未実行・未確認**: 各段の Wine の実行そのもの、ELOG 起点の fallback の動作、新しい窓の件数での Return の効き方(7 件では確認済み)、FLEX(約 5 MB の DLL 3 個)・Fruity Wrapper を戻したときの project の読み込み時間、全部有効の完全版の Problems 窓の形。
 
 ### 8.6 08:00 の窓の実行結果(実測。11/07 07:59〜08:35)
@@ -696,7 +696,7 @@ native の Windows の既定(Yu Gothic UI・Meiryo UI・MS UI Gothic)は**再配
 
 ## 13. Wine の窓が出た時の手順書: J4(msgothic.ttc の有無)・P0(起動時の file trace)・J0〜J3(準備のみ。Wine は起動していない)
 
-**実際に実行した物**: Wine は起動していない。作った道具の Wine を使わない試験だけ: (1) `tools/make-ja-names-flp.py`(日本語のチャンネル名の FLP を作り、再解析で『違うイベントは 2 つだけ』を assert)、(2) `tools/e3-font.sh put/rm/status` の往復(prefix-e3 の `C:\windows\Fonts` に `msgothic.ttc` を置いて sha を確認 → 取り除いて空に戻す)、(3) 条件の判定式(MemAvailable・load1・swap)を実測値で、(4) 構文の確認(`bash -n`、`ast.parse`)、(5) host の fontconfig から CJK を外した設定(`scratch/fontconfig-nocjk/fonts.conf`)で `fc-list ':charset=3042'`(あ)と `:charset=65e5`(日)の保持者が 0 になること、(6) `tools/ja-compare.py` を既存の 2 枚のスクリーンショットで試験。**run は 1 本も実行していない**。PM の条件(Wine 可の info の後。開始時 MemAvailable ≥ 12 GB、load ≤ 12、swap の入出力 0。Chrome との重なりは可。Export 級の長い run は重ねない)は `ja-run.sh` が自動で確認して止まる。
+**実際に実行した物**: Wine は起動していない。作った道具の Wine を使わないテストだけ: (1) `tools/make-ja-names-flp.py`(日本語のチャンネル名の FLP を作り、再解析で『違うイベントは 2 つだけ』を assert)、(2) `tools/e3-font.sh put/rm/status` の往復(prefix-e3 の `C:\windows\Fonts` に `msgothic.ttc` を置いて sha を確認 → 取り除いて空に戻す)、(3) 条件の判定式(MemAvailable・load1・swap)を実測値で、(4) 構文の確認(`bash -n`、`ast.parse`)、(5) host の fontconfig から CJK を外した設定(`scratch/fontconfig-nocjk/fonts.conf`)で `fc-list ':charset=3042'`(あ)と `:charset=65e5`(日)の保持者が 0 になること、(6) `tools/ja-compare.py` を既存の 2 枚のスクリーンショットでテスト。**run は 1 本も実行していない**。PM の条件(Wine 可の info の後。開始時 MemAvailable ≥ 12 GB、load ≤ 12、swap の入出力 0。Chrome との重なりは可。Export 級の長い run は重ねない)は `ja-run.sh` が自動で確認して止まる。
 
 ### 13.1 道具(全部 `~/work/opt1-wine/tools/` とその周辺)
 
@@ -761,7 +761,7 @@ native の Windows の既定(Yu Gothic UI・Meiryo UI・MS UI Gothic)は**再配
 
 ## 14. font-seed: `C:\Windows\Fonts\msgothic.ttc` を eager な seed の行にする素材(PM の判断 O16 (a)、09:3x。適用はしていない)
 
-**実際に実行した物**(Wine 以外): (1) 再現できる版のフォント(`recalcTimestamp=False`、2 回作って同一)の最終確認(FreeType 2.13.2 で開く・字・JIS X 0208 6,878/6,879)と、一語のチャンク/索引の生成(`vfs-build.py --mount 'C:\Windows\Fonts'`)。(2) 素材一式の作成 `lift/out-git/opt2-results/0320/font-seed/`。(3) 2 つの diff を、作業ツリーに `patch --dry-run -p1`(クリーン)、2 ファイルの一時コピーに本当に `patch -p1`、コピー後のフォントの SHA-256 を新しい行の値と照合(一致)。(4) seed の機構(`ci/lib/extract_fl.py`・`lift/harness/web/final0129/pack_seed.py`・`ci/plan.sh`)の読み。リポジトリには何も書いていない。
+**実際に実行した物**(Wine 以外): (1) 再現できる版のフォント(`recalcTimestamp=False`、2 回作って同一)の最終確認(FreeType 2.13.2 で開く・字・JIS X 0208 6,878/6,879)と、一語のチャンク/索引の生成(`vfs-build.py --mount 'C:\Windows\Fonts'`)。(2) 素材一式の作成 `lift/out-git/opt2-results/0320/font-seed/`。(3) 2 つの diff を、ワークツリーに `patch --dry-run -p1`(クリーン)、2 ファイルの一時コピーに本当に `patch -p1`、コピー後のフォントの SHA-256 を新しい行の値と照合(一致)。(4) seed の機構(`ci/lib/extract_fl.py`・`lift/harness/web/final0129/pack_seed.py`・`ci/plan.sh`)の読み。リポジトリには何も書いていない。
 
 **素材(`font-seed/`)** — コピー先は PM が新しい `git archive HEAD` に当てる。バイナリは diff に含めない。
 
@@ -788,13 +788,13 @@ README の追記の中身: 代用であること(MS Gothic ではない)、由�
 
 - **事実**: (1) r2・r3 とも events は `Return pressed` → `Ctrl+R` → `Save dialog TIMEOUT` → 固定位置の OK クリック → `Ctrl+R (second try)` → `TIMEOUT` → 終了。chain の終了コードは 4(3 本目の ins1-bp は swap の事前確認で始まらなかった)。(2) `after-return` の画像は `problems-unrecognized` と同一(窓の領域〔610,385,700x60〕で、基準の『窓が消えた』画像との差分画素 18,5xx = 窓が残っている。成功した elog16・elog16-ins1-lp・elog23 は差 0)。= **Return で Problems 窓が閉じていない**。(3) r3 の画像の窓は『6 plugin(s) could not be opened』の通常の窓(691x308、Ok は y=667)。『sample(s) could not be located』の項は無く、PM が挙げた ci1 の wasm の run のように大きくならない(Wine では WAV を差し替えて揃えているため)。固定 y の 683・723・703 は 6 件の窓の Ok(667)に当たらないが、これは二次的で、最初の Return が効けば要らなかった。(4) **:88 に Chrome の窓**: `"Are you enjoying your FL Studio Trial? [EN] - Google Chrome"` 1402x1060+0+0(pid 851868、cwd = 私の prefix-e2 の FL のフォルダ、環境の DISPLAY=:88、起動 08:48 台)。`XGetInputFocus` = その窓(0xC00002、revert_to PointerRoot)。(5) 08:49:03 は、Settings の 2 本目で FL を右上の × で**正常終了**させた時刻。
 - **読み**: FL は試用版を正常終了すると『アンケート』の URL を開く(Wine の winebrowser → ホストの `google-chrome-stable`)。その Chrome が :88 に残ってフォーカスを持ち、WM の無い Xvfb ではキー入力がその窓に行った。FL の Problems 窓(モーダル)への Return、メイン窓への Ctrl+R は FL に届かなかった。08:49 以後の run(j4-none・j4-font・p0-none・p0-font・r2・r3)はすべてこの状態。Export をしない 4 本(J4・P0)は、日本語の描画と file trace の結果に影響しない(Return が届いたかは未確認)。08:00〜08:34 の Export 12 本は Chrome が出る前で影響なし。**『窓が大きい/Ok の位置』の説は、この Wine の run には当たらない**。
-- **対処(実施)**: (1) pid 851868 とその子(私の Wine が開いた Chrome)を `kill` で閉じた(09:57)。:88 の窓 0、`XGetInputFocus` = PointerRoot。gpu1/ci1 の headless Chrome には触れていない。(2) `tools/x88-check.sh`(新設): Wine が走っていない時に :88 に窓があれば停止。`elog16-run.sh`・`elog16-variant-run.sh`・`queue-run.sh`・`ja-run.sh`・`trace3-begin.sh` の事前確認に入れた。(3) 以後 FL は `wineserver -k` でしか終わらせない(正常終了させると Chrome が開く)。(4) ドライバ `wine-export-run.py`・`wine-ja-run.py`: Return の前にポインタを窓の中央(960,556)へ動かす、Return の後に窓が残っていれば `xwininfo` で窓の位置を取って OK を相対位置(窓の左から 369、下から 28。6 件の窓で (983,665)、ci1 の 423 高の窓で +395 に一致)でクリックする。**この変更は Wine で未試験**。(5) `ALLOW_CHROME=1`(ci1 の Chrome Export と Wine の Export の重なりを許す PM の指示のため、`busy-check.sh` が chrome を無視する)は、:88 の Chrome を見逃した原因の一つ。x88-check は ALLOW_CHROME の影響を受けない。
+- **対処(実施)**: (1) pid 851868 とその子(私の Wine が開いた Chrome)を `kill` で閉じた(09:57)。:88 の窓 0、`XGetInputFocus` = PointerRoot。gpu1/ci1 の headless Chrome には触れていない。(2) `tools/x88-check.sh`(新設): Wine が走っていない時に :88 に窓があれば停止。`elog16-run.sh`・`elog16-variant-run.sh`・`queue-run.sh`・`ja-run.sh`・`trace3-begin.sh` の事前確認に入れた。(3) 以後 FL は `wineserver -k` でしか終わらせない(正常終了させると Chrome が開く)。(4) ドライバ `wine-export-run.py`・`wine-ja-run.py`: Return の前にポインタを窓の中央(960,556)へ動かす、Return の後に窓が残っていれば `xwininfo` で窓の位置を取って OK を相対位置(窓の左から 369、下から 28。6 件の窓で (983,665)、ci1 の 423 高の窓で +395 に一致)でクリックする。**この変更は Wine で未テスト**。(5) `ALLOW_CHROME=1`(ci1 の Chrome Export と Wine の Export の重なりを許す PM の指示のため、`busy-check.sh` が chrome を無視する)は、:88 の Chrome を見逃した原因の一つ。x88-check は ALLOW_CHROME の影響を受けない。
 - **自己申告**: 08:49 に Settings の run を正常終了させた後、:88 の窓を確認しなかった。r2・r3 を始める前の事前確認にも :88 を入れていなかった。
 - **付記(製品に効くかもしれない)**: FL は試用版の終了で URL を開く。製品(ブラウザ)で FL の窓を閉じる操作が起きると同じ呼び出しが起きる。呼び出しの API(ShellExecuteW など)は今回の log には無く未確認。
 
 ## 16. P1〜P4 の file trace の手順書(Wine は PM の合図の後。ins1-lp ×2 + ins1-bp ×1 が先)
 
-**実際に実行した物**: Wine は起動していない。道具の作成と、既存の `p0-font.fl.log` での試験: `trace3-begin.sh`・`trace3-run-fl.sh`・`trace3-mark.sh`・`trace3-end.sh`・`e3-unhide-all.sh`・`e3-font.sh putall`(begin → 取り消しの往復は 09:45 に 1 回実行し、状態が config A に戻ることを確認: `state-after-p4` = `state-before-elog17`、guard 差 0、Fonts 空)、`trace3-phase.py`(フェーズごとの集計)の試験。**P0 の既存ログ(p0-none・p0-font)の集計**を `exports/trace/p0-font-summary.txt` に出した(下)。
+**実際に実行した物**: Wine は起動していない。道具の作成と、既存の `p0-font.fl.log` でのテスト: `trace3-begin.sh`・`trace3-run-fl.sh`・`trace3-mark.sh`・`trace3-end.sh`・`e3-unhide-all.sh`・`e3-font.sh putall`(begin → 取り消しの往復は 09:45 に 1 回実行し、状態が config A に戻ることを確認: `state-after-p4` = `state-before-elog17`、guard 差 0、Fonts 空)、`trace3-phase.py`(フェーズごとの集計)のテスト。**P0 の既存ログ(p0-none・p0-font)の集計**を `exports/trace/p0-font-summary.txt` に出した(下)。
 
 - **構成**: prefix-e3、プラグインは全部見える(`e3-unhide-all.sh unhide`、config A に戻すのは `rehide`)、Fonts は製品の想定(arial・tahoma・lucon の代用 3 つ + seed の msgothic.ttc)。project なし。`WINEDEBUG=-all,+file,+timestamp`。ログは `exports/trace/tr3-TAG.log`(/tmp ではない)。終了は `wineserver -k` のみ。
 - **手順**(attended。1 コマンドずつ、各段で `trace3-mark.sh p4 NAME` を打つ):
@@ -848,7 +848,7 @@ README の追記の中身: 代用であること(MS Gothic ではない)、由�
 ### 18.2 差の内訳(RT-A − E13 = +3.4 s。beacon)
 | 区間 | RT-A − E13 | 割合 | 読み(事実と仮説を分ける) |
 |---|---|---|---|
-| main_start まで | +269 ms | 8% | 事実: download_done +253、compile_done +265、その後(instantiate〜main_start)は同じ。原因は取得量: 3 資産の wire は E13 43.7 MB 対 RT-A 81.7 MB(wasm の br 19.8 対 39.5 MB、DLL pack 19.4 対 33.9 MB、seed 4.4 対 8.2 MB)。loopback で +0.25 s。**実網では +38 MB が効く**。仮説: 試験 bundle の brotli の品質が低い(未確認) |
+| main_start まで | +269 ms | 8% | 事実: download_done +253、compile_done +265、その後(instantiate〜main_start)は同じ。原因は取得量: 3 資産の wire は E13 43.7 MB 対 RT-A 81.7 MB(wasm の br 19.8 対 39.5 MB、DLL pack 19.4 対 33.9 MB、seed 4.4 対 8.2 MB)。loopback で +0.25 s。**実網では +38 MB が効く**。仮説: テスト bundle の brotli の品質が低い(未確認) |
 | main_start→idle | +3,160 ms | 92% | 下の 2 段 |
 | 〃 ① E13 → cand1(協調のまま) | +2,007 ms | 約 63% | **RT でない部分が過半**。cand1 は 7→9 module の bundle |
 | 〃 ② cand1 → RT-A | +1,153 ms | 約 37% | RT 固有。cand1 の 4 本が 5,057〜6,136 と広く、report.json の組(下)では +0.5〜+1.7 s の幅 |
@@ -875,7 +875,7 @@ RT でない ①(+2.0 s)について: (a) Filter module の init / plugin scan �
 ### 18.5 緩和案(提案だけ。lift の忠実性の方針に従い、局所の特例でなく『通信・変換・待ちを減らす』形)
 - **M1 GIL の定常費用を減らす**(1 が確定したら): 『Worker が 1 本のあいだ lock を取らない』近道は、lock の不変条件(Worker をまたぐ共有状態の保護)を mt3 が確認してからでないと入れない。代案: wrapper の粒度を粗く(密な呼び出しの連続を 1 回の取得にまとめる)。
 - **M2 pthread の pool の前もっての生成**(`-sPTHREAD_POOL_SIZE=N-1`、または page が download / compile の 1.2 s の待ちの間に Worker を作る): 生成を first idle の経路から外す。3 の通り今の効果は小さい見込みだが、『pool is exhausted』(deadlock の警告)の危険を除く。
-- **M3 試験 bundle の br の品質を製品と同じに**: wire 81.7 → 約 44 MB(実網の P1 に効く。loopback で約 −0.25 s)。engine でなく build の道具の話。
+- **M3 テスト bundle の br の品質を製品と同じに**: wire 81.7 → 約 44 MB(実網の P1 に効く。loopback で約 −0.25 s)。engine でなく build の道具の話。
 - **M4 module 数に対する費用の確認**: 製品は module がこの先も増える。Balance +0、Filter(+他)+約 1〜2 s という段差が module ごとに出るなら P1 の 10 s を割る(RT-A の最大 8,847 で余裕は約 1.2 s)。実験 1 の結果で、module 1 つあたりの費用を先に数にする。
 - **M5 wasm の compile の共有**(compiled Module / code cache の共有): compile_done は 1.0〜1.2 s で download と並行なので first idle の主因ではない(主因は main_start 以後)。優先度は低い。
 

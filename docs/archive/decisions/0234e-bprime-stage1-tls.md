@@ -24,7 +24,7 @@
 `cargo test --release -p fe-wasmgen -p fe-decode`: **37 results / 188 passed / 0 failed**(前は 36 / 187。新しい `tests/tls_ctx.rs` 1 本: A を既定の形と `tls_ctx` の形で lower し、C 経路を JS が演じて node で走らせ、どちらもホスト CPU の答えと一致する。tls の形は `c.__tls_base` のグローバル import を持ち、既定の形は持たない)。**既定の出力はバイト同一**(ILTools の混成 1,342 関数の直 wasm、1,248,347 B を `cmp`)。`--tls-ctx 0x0` の直 wasm は `wasm-opt` の検証を通り、1,210,190 B(既定より −3.1%)。
 
 ### 2.2 同一性(g3 の行。`tables/tls-stage1-identity.txt`)
-| 試験 | v0 / v1 / v2 |
+| テスト | v0 / v1 / v2 |
 |---|---|
 | 起動 16 スナップ(`cmp-short.g3`) | **84 行、全行一致**(v0 = v1 = v2) |
 | 参照プロジェクト(`ref1-perf-short.g3`、nested の seed) | **55 行、全行一致** |
@@ -63,4 +63,4 @@ fe-wasmgen の `lower()` の先頭で `__tls_base` を 1 つの i32 ローカル
 成功条件 (a) 同一性: 満たす(84 / 55 / 552 行、v0 = v1 = v2)。(b) 生成 C の sha: fe-lift・fe-pe・fe-decode 不変(PM が走らせる)。(c) 1 スレッドの CPU: **再生の窓で +3.3%(load 8〜12)/ +4.5%(load 13〜20)= 5% 以内。run 全体は +5.0〜5.6% で境目**。大きさ: −4.3%(S1 の線の下)。PM の判断点: (1) TLS の +3〜4.5% を許すか、(2) 許さないなら R/X の一部だけを TLS にする案(直 wasm が触る頻度の低い物から。FL と X の XMM 退避 / 復帰は C 経路との境界だけ)。
 
 ## 3. 未確認
-Chrome / Firefox の実ページでの TLS 版(NO_FS=1・host files)、実スレッド(第 2 段)、残りの 13 変数、全体試験・a4・生成 C の sha の再実行(PM)。
+Chrome / Firefox の実ページでの TLS 版(NO_FS=1・host files)、実スレッド(第 2 段)、残りの 13 変数、全体テスト・a4・生成 C の sha の再実行(PM)。

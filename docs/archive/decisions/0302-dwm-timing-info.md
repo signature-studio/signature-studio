@@ -4,15 +4,15 @@
 
 ## 0. 冒頭の三点(正直さ)
 
-1. **何をしたか**: 実装(runtime と import 行と試験)と、E12c の木での `cargo test --no-run` / `test.sh full`(キャッシュなし)/ a4 の実行だけ。**実エンジン(wasm/ブラウザ/G3 の実行)の結果は 0 件**。QFC がこの関数をどう呼ぶかは alpha1 の逆アセンブル(`0299-qfc-f_1e857b0-disasm.txt`)を**読んで**確かめた(§2.1)。g3 の行の動きは alpha1 の実測(node/実エンジン、`rateRefresh` だけを埋める版)を引用する。**全メンバを埋めたこの版での g3 の行は、測っていない**(§5)。
+1. **何をしたか**: 実装(runtime と import 行とテスト)と、E12c の木での `cargo test --no-run` / `test.sh full`(キャッシュなし)/ a4 の実行だけ。**実エンジン(wasm/ブラウザ/G3 の実行)の結果は 0 件**。QFC がこの関数をどう呼ぶかは alpha1 の逆アセンブル(`0299-qfc-f_1e857b0-disasm.txt`)を**読んで**確かめた(§2.1)。g3 の行の動きは alpha1 の実測(node/実エンジン、`rateRefresh` だけを埋める版)を引用する。**全メンバを埋めたこの版での g3 の行は、測っていない**(§5)。
 2. **実 Windows の値は 0 件**。Learn に載るのは各メンバの一行の説明だけで、値の規則(特に GPU の無い機械での各カウンタ)は載っていない。決めた物は全て **S-dwm-ti-\*** の選択として明記した(§3)。実 Windows でこれらがどう見えるかは未測定。
 3. **保留**: この差分は『別の変更として保留』(PM の指示)。E12 には入れない。入れる場合は基準の更新(§5)を伴う。
 
 ## 1. 結論
 
 1. `DwmGetCompositionTimingInfo(NULL, &info)` を、**Learn の DWM_TIMING_INFO の全 40 メンバ**を仮想時計と表示 Hz から埋めて `S_OK` を返す形で実装した(`runtime/fle_dwm.c`、約 90 行)。hwnd ≠ NULL は E_INVALIDARG(Learn)、cbSize ≠ 0x124 は E_INVALIDARG(選択)、NULL の出力先は名前つきで停止(Learn に挙動が無い。同じファイルの `DwmIsCompositionEnabled` と同じ扱い)。
-2. **構造体は 1 byte 詰めの 292 byte(0x124)**。Learn は順序だけを載せ詰めを載せないが、実際の呼び元(QuickFontCache)が渡す cbSize = 0x124 は『40 メンバの大きさの和を 1 byte 詰めで足した値』に一致し、自然な整列なら 0x140 になる(試験で再計算している)。
-3. **仮想 DWM は DwmFlush が待つ表示と同一**: 表示は `fle_display_hz()` Hz の 1 本、vblank k は `ceil(k × 10^7 / hz)` tick(`fle_thread.c`)。QueryPerformanceCounter は tick 数そのもの(`FLE_QPF_HZ` = 10^7)。→ **DwmFlush が返った tick で呼べば、cRefresh = k、qpcVBlank = その tick**(境界ごとに試験で確認)。
+2. **構造体は 1 byte 詰めの 292 byte(0x124)**。Learn は順序だけを載せ詰めを載せないが、実際の呼び元(QuickFontCache)が渡す cbSize = 0x124 は『40 メンバの大きさの和を 1 byte 詰めで足した値』に一致し、自然な整列なら 0x140 になる(テストで再計算している)。
+3. **仮想 DWM は DwmFlush が待つ表示と同一**: 表示は `fle_display_hz()` Hz の 1 本、vblank k は `ceil(k × 10^7 / hz)` tick(`fle_thread.c`)。QueryPerformanceCounter は tick 数そのもの(`FLE_QPF_HZ` = 10^7)。→ **DwmFlush が返った tick で呼べば、cRefresh = k、qpcVBlank = その tick**(境界ごとにテストで確認)。
 4. **製品への配線**: 基本の `imports_table.rs` には触らず(`DwmFlush` だけが基本表。`DwmIsCompositionEnabled` 等は `--extra-imports` の行)、`dwmti-imports.txt`(1 行)を新設し、`ship6-imports.txt = ship5 + dwmti`(ship5 は変更なし・先頭、新しい行は最後 = 疑似 VA は動かない)を `EXTRA_IMPORTS` にした。`ci/test-hybrid.sh` に ship6 の検査(行数 = ship5 + 1、先頭 209 行は ship5 と同一、最後は dwmti、組の重複なし)を足した。
 5. **基準の更新(§5)**: cargo の既存の期待値は動かない(基本表に行を足さないため。`test.sh full` 2,417 passed / 0 failed。ただし `wall_ia1` の DWM の単体 link の 2 本は、新しい関数の依存を満たすスタブ 2 つの追加が要った。§6)。動くのは製品の生成 C(表が +1 行)、wasm、CI のキー、**製品の行を渡した a4(5,312 / 1,009,745 → 5,310 / 1,009,743。標準の a4 は不変)**、そして **実エンジンの g3 の行と画素 sha**(alpha1 の実測: 55 行中 29〜33 行。理由の種類は §5 の表)。
 6. **count/limit(§7)**: 実スレッド版で `fle_progress_count` を大域のまま共有すると、E11 の型付き間接呼びの hot path が 2 つの Worker から同じ cache line を書く。測った(§7)。推奨は『TLS(fle_ctx の欄)にする』。
@@ -105,9 +105,9 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 
 - `lift/runtime/fle_dwm.{c,h}`: 関数と宣言(+約 90 行)。
 - 行: `lift/harness/seeds/dwmti-imports.txt`(`dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo`、1 行)。`ship6-imports.txt = ship5 + dwmti`。`app/scripts/build-engine-bundle.sh` の `EXTRA_IMPORTS` を ship6 に。疑似 VA は行の位置で決まる(決定 0015)ので、**最後に足す** = 既存の疑似 VA は動かない。
-- `lift/crates/fe-lift/src/imports_table.rs`(基本表)は**触らない**: 基本表の dwmapi は `DwmFlush` だけで、`DwmIsCompositionEnabled`・`DwmExtendFrameIntoClientArea` も `--extra-imports` の行(ship*-imports.txt)。基本表に足すと、基本表の長さを固定する 0267 型の試験(`rows_0267` を引く `wall_fr4/5/6/9/13/15/16/17/19/20`・`window`・`vcall_thunk_dll` の期待)が全部動く(0267 の先例: 14 ファイル)。extra-imports にすれば動かない。
+- `lift/crates/fe-lift/src/imports_table.rs`(基本表)は**触らない**: 基本表の dwmapi は `DwmFlush` だけで、`DwmIsCompositionEnabled`・`DwmExtendFrameIntoClientArea` も `--extra-imports` の行(ship*-imports.txt)。基本表に足すと、基本表の長さを固定する 0267 型のテスト(`rows_0267` を引く `wall_fr4/5/6/9/13/15/16/17/19/20`・`window`・`vcall_thunk_dll` の期待)が全部動く(0267 の先例: 14 ファイル)。extra-imports にすれば動かない。
 - `ci/test-hybrid.sh`: ship6 = ship5(先頭・不変)+ dwmti(最後)、行の重複なし、の検査を足した。`ci/plan.sh` は `lift/harness/seeds` を丸ごとハッシュする(`H_SEED`)ので、seed・lift・bundle の段のキーが変わる(E12 は冷間)。
-- 試験: `tests/dwm_timing.rs` の 6 本(構造体の大きさ、全メンバ、vblank の一致、増分、エラー、行の配線)。
+- テスト: `tests/dwm_timing.rs` の 6 本(構造体の大きさ、全メンバ、vblank の一致、増分、エラー、行の配線)。
 
 ## 5. 基準の更新の一覧(動く理由の『種類』つき)
 
@@ -115,8 +115,8 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 
 | 基準 | 動くか | 理由の種類 |
 |---|---|---|
-| 基本表の行を固定する cargo 試験(`wall_fr4/5/6/9/10/11/12/13/15/16/17/19/20`、`window`、`vcall_thunk_dll`、`sweep1`、`deferred`、`srw`) | **動かない**(`test.sh full` で確認: 0 failed、§6) | 行は extra-imports で、基本表の長さと位置は不変 |
-| **`wall_ia1` の DWM の単体 link の試験**(`fle_dwm.c` だけを link する 2 本) | **動いた**(link 失敗)→ スタブ 2 つを足して直した | **link 依存の追加**: 新しい関数が仮想時計の 2 関数を参照する。契約の値ではなく、試験の足場(スタブ)の更新 |
+| 基本表の行を固定する cargo テスト(`wall_fr4/5/6/9/10/11/12/13/15/16/17/19/20`、`window`、`vcall_thunk_dll`、`sweep1`、`deferred`、`srw`) | **動かない**(`test.sh full` で確認: 0 failed、§6) | 行は extra-imports で、基本表の長さと位置は不変 |
+| **`wall_ia1` の DWM の単体 link のテスト**(`fle_dwm.c` だけを link する 2 本) | **動いた**(link 失敗)→ スタブ 2 つを足して直した | **link 依存の追加**: 新しい関数が仮想時計の 2 関数を参照する。契約の値ではなく、テストの足場(スタブ)の更新 |
 | `test-hybrid.sh` の ship5 = ship4 + ref1 の検査 | 動かない(ship5 は不変) | ship6 の検査を**足す**(既存の検査は変えない) |
 | 生成 C(`--extra-imports ship6` の製品の呼び出し)の `common.c` | 動く: 原型 +1、`fle_dispatch_table` +1 行、`fle_resp_table` +1 行、`fle_dispatch_count` / `fle_resp_count` +1(alpha1 の E11 の数: 101,584 → 101,585、819 → 820)。**全 module で同じ表**(merge_tables)。既定の呼び出し(`--extra-imports` なし)の sha は不変 | 契約から導ける(表の長さ + 1) |
 | wasm / bundle の sha、C 部分の大きさ | 動く(C 部分に関数が増える。E12 は冷間ビルドなので E12 の sha は変わる) | 関数の追加 |
@@ -139,8 +139,8 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 |---|---|---|---|
 | 差分の適用 | E12c(000091ae)/ main a977401d(E12) | `patch --dry-run` rc=0、offset も fuzz も無し(8 ファイル、736 行) | verify-patch-on-E12c-000091ae.log、verify-patch-on-main-a977401d.log |
 | `cargo test --no-run` | E12c + 差分 | rc=0(215 test executables = 214 + `dwm_timing`) | verify-cargo-test-no-run.txt |
-| `test.sh full`(`FLE_TEST_NOCACHE=1 --jobs 2`) | E12c + 差分 | **219 results、2,417 passed、0 failed**(E12 の基準 218 / 2,411 + 新しい試験 6 本)、壁時計 471.9 s | verify-testfull.log |
-| (同、最初の走り) | 〃(`wall_ia1` の link 用スタブを足す前) | 219 results、2,415 passed、**2 failed**(`wall_ia1` の DWM の 2 本: 新しい関数が `fle_sys_clock_ticks` / `fle_sys_clock_advance_to` を参照し、`fle_dwm.c` だけを link する単体試験が link に失敗)→ `DWM_PRE` にスタブ 2 つを足して解消 | testfull-run1-before-wall_ia1-fix.log |
+| `test.sh full`(`FLE_TEST_NOCACHE=1 --jobs 2`) | E12c + 差分 | **219 results、2,417 passed、0 failed**(E12 の基準 218 / 2,411 + 新しいテスト 6 本)、壁時計 471.9 s | verify-testfull.log |
+| (同、最初の走り) | 〃(`wall_ia1` の link 用スタブを足す前) | 219 results、2,415 passed、**2 failed**(`wall_ia1` の DWM の 2 本: 新しい関数が `fle_sys_clock_ticks` / `fle_sys_clock_advance_to` を参照し、`fle_dwm.c` だけを link する単体テストが link に失敗)→ `DWM_PRE` にスタブ 2 つを足して解消 | testfull-run1-before-wall_ia1-fix.log |
 | a4(build 段階まで、5 module、**標準 = `--extra-imports` なし**) | E12c + 差分 | units 942/942、runnable 895/895、distinct **5,310**、entries **1,009,737**、終了コード 0(**基準と同一**) | verify-a4-standard.log、a4run.sh |
 | a4(`FLE_EXTRA_IMPORTS=ship5`、製品の行) | 〃 | distinct **5,312**、entries **1,009,745**、終了コード 0 | a4-with-extra-imports-ship5.log |
 | a4(`FLE_EXTRA_IMPORTS=ship6` = ship5 + dwmti) | 〃 | distinct **5,310**、entries **1,009,743**、終了コード 0 | a4-with-extra-imports-ship6.log |
@@ -169,9 +169,9 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 | 案 | 内容 | 厳密さ | hot path への影響(命令・メモリ) | 変更量 |
 |---|---|---|---|---|
 | A | 今のまま(大域・非 atomic) | 総数は欠ける(lost update)、診断用なら許容 | 命令 0 増。**2 コアで line を奪い合う**(上の費用) | 0 |
-| B(推奨) | **count と limit を fle_ctx の欄(TLS)にする**。アダプタが `reg_base` 経由で読み書きする | **Worker ごとに厳密**(書くのは持ち主だけ)。総数は各 block の和(診断の読み出しは持ち主の書き込みと競合するが 1 語ずつの torn なし) | 命令数は同じ(`i32.const 0` → tls base の `local.get`、同じバイト数)。アダプタは別 function なので tls base を取る `global.get __tls_base` が 1 回増える(L1 hit、1 ns 未満の読み)か、型付き呼びの共有ヘルパーの引数に tls base を足す(7 → 8 引数)。**line の奪い合いは無くなる**(上の表の最下行) | `fle_lowregs.h` に 2 欄(count、limit)、`fle_ctx_more.h` に 2 マクロ(C の `fle_dispatch` と `fle_thread.c` が使う名前のまま)、`lib.rs` のアダプタと `lower.rs` の demoted の補正を `reg_base` に(`hybrid_mx_tls` のとき。新しい旗なし)、g3 の `progress` は各 block の和(thread 登録簿を読む関数)、`hyb_guard cpart` の PRG を TLS では 0x0 に、試験: `typed_indirect.rs` の TLS 版に『別 Worker の count が動かない』を足す。約 100 行 + 試験、0.5〜1 人日 |
+| B(推奨) | **count と limit を fle_ctx の欄(TLS)にする**。アダプタが `reg_base` 経由で読み書きする | **Worker ごとに厳密**(書くのは持ち主だけ)。総数は各 block の和(診断の読み出しは持ち主の書き込みと競合するが 1 語ずつの torn なし) | 命令数は同じ(`i32.const 0` → tls base の `local.get`、同じバイト数)。アダプタは別 function なので tls base を取る `global.get __tls_base` が 1 回増える(L1 hit、1 ns 未満の読み)か、型付き呼びの共有ヘルパーの引数に tls base を足す(7 → 8 引数)。**line の奪い合いは無くなる**(上の表の最下行) | `fle_lowregs.h` に 2 欄(count、limit)、`fle_ctx_more.h` に 2 マクロ(C の `fle_dispatch` と `fle_thread.c` が使う名前のまま)、`lib.rs` のアダプタと `lower.rs` の demoted の補正を `reg_base` に(`hybrid_mx_tls` のとき。新しい旗なし)、g3 の `progress` は各 block の和(thread 登録簿を読む関数)、`hyb_guard cpart` の PRG を TLS では 0x0 に、テスト: `typed_indirect.rs` の TLS 版に『別 Worker の count が動かない』を足す。約 100 行 + テスト、0.5〜1 人日 |
 | C | atomic add(`i64.atomic.rmw.add`) | 総数は厳密 | lock 付きの RMW。奪い合いの中で 1 回 100 ns 級(A より悪い)。値を使う `count >= limit` の判断も要る | 小さいが **却下**(hot path に最悪) |
-| D | RT の構成では count をやめる(アダプタに count/limit の load/store を出さない) | 診断の数が無くなる(g3 の `progress`、`progress` に依る基準は RT では取り直し) | 最小(1 呼びあたり load 2・store 1 が減る) | アダプタの生成を条件付きに。『唯一の構成』が RT になるなら旗ではなく結果。協調経路を残す間は 2 経路の試験が要る |
+| D | RT の構成では count をやめる(アダプタに count/limit の load/store を出さない) | 診断の数が無くなる(g3 の `progress`、`progress` に依る基準は RT では取り直し) | 最小(1 呼びあたり load 2・store 1 が減る) | アダプタの生成を条件付きに。『唯一の構成』が RT になるなら旗ではなく結果。協調経路を残す間は 2 経路のテストが要る |
 
 **推奨**: 実スレッドを『唯一の構成』にするなら **B**(診断を保ち、奪い合いが無く、命令数が同じ)。D は B よりさらに速いが診断を失う。**判断が要る点**: (1) 協調の経路(`FLE_WORKERS=1` 相当)を残すか(残すなら B の limit は Worker ごとで、疑似 preemption の limit を設定する側は『自分の block』だけを触る)、(2) g3 の `progress` を RT でどう定義するか(各 block の和でよいか)。**E11 の hot path への影響**: B は命令数を変えない。測定は gpu1 の Chrome の A/B(count を TLS にした build と大域の build、同じ音楽位置)が要る(私は build しない)。
 
@@ -195,12 +195,12 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 
 ## PM の判断と取り込み(2026-11-06 18:54、docs のみ。製品の差分なし)
 
-取り込み: mt3 の最終(`DwmGetCompositionTimingInfo` の 40 メンバ実装の文書、Learn の写し、表)を `docs/investigations/mt3w/0302/`、差分を `docs/investigations/mt3w/patches/0302-dwm-timing-info.diff` に置いた。実エンジンの wasm・ブラウザ・実 Windows の実行は 0 件(cargo 試験・a4 のみ)。**依頼者の機械は 0 件**。
+取り込み: mt3 の最終(`DwmGetCompositionTimingInfo` の 40 メンバ実装の文書、Learn の写し、表)を `docs/investigations/mt3w/0302/`、差分を `docs/investigations/mt3w/patches/0302-dwm-timing-info.diff` に置いた。実エンジンの wasm・ブラウザ・実 Windows の実行は 0 件(cargo テスト・a4 のみ)。**依頼者の機械は 0 件**。
 
-事実として受け取る(mt3 の実測): 差分は E12c と main a977401d に `patch --dry-run` rc=0・offset/fuzz なし(8 ファイル 736 行)。構造体は 1 byte 詰めの 292 byte(0x124)で、QuickFontCache が渡す cbSize と一致。`test.sh full` 219 results / 2,417 passed / 0 failed(E12 の基準 218 / 2,411 + 新しい試験 6)。標準の a4 は 942/942・895/895・5,310・1,009,737 で不変。`FLE_EXTRA_IMPORTS` を ship5 から ship6 に替えた a4 は 5,312 / 1,009,745 → 5,310 / 1,009,743。
+事実として受け取る(mt3 の実測): 差分は E12c と main a977401d に `patch --dry-run` rc=0・offset/fuzz なし(8 ファイル 736 行)。構造体は 1 byte 詰めの 292 byte(0x124)で、QuickFontCache が渡す cbSize と一致。`test.sh full` 219 results / 2,417 passed / 0 failed(E12 の基準 218 / 2,411 + 新しいテスト 6)。標準の a4 は 942/942・895/895・5,310・1,009,737 で不変。`FLE_EXTRA_IMPORTS` を ship5 から ship6 に替えた a4 は 5,312 / 1,009,745 → 5,310 / 1,009,743。
 
 判断:
 1. **関数の契約(Learn の記述 + 選択 S-dwm-ti-cbsize / S-dwm-ti-hz)を採る**。値は `fle_display_hz()`(DwmFlush と同じ表示)から作る。製品では `FLE_DWM_HZ` と `dmDisplayFrequency` が同値なので、私の『dmDisplayFrequency から』との差は許容する(両方を別の値にする分岐設定の差は文書に残す)。分類 A(外部 API の契約の実装)で、FL の挙動の補正・代行・class/アドレス分岐は無い。
-2. **この差分は E13 に入れる(まだ push しない)**。g3 の行(参照再生の 55 行中、alpha1 の rateRefresh だけの版で 60 Hz で 33 行・120 Hz で 29 行)・wasm/bundle の sha・CI の鍵が動くため、0284b-gp-extension(156 の逆順の対)と同じ冷間ビルドにまとめる。opt1 が FS 付きの試験ビルド tt-e20 で node 行 84/55/87 の動く種類を取る(E13 の基準更新の準備)。
+2. **この差分は E13 に入れる(まだ push しない)**。g3 の行(参照再生の 55 行中、alpha1 の rateRefresh だけの版で 60 Hz で 33 行・120 Hz で 29 行)・wasm/bundle の sha・CI の鍵が動くため、0284b-gp-extension(156 の逆順の対)と同じ冷間ビルドにまとめる。opt1 が FS 付きのテストビルド tt-e20 で node 行 84/55/87 の動く種類を取る(E13 の基準更新の準備)。
 3. count/limit の案 B(`fle_ctx` の欄に移す。約 100 行、0.5〜1 人日)は、実スレッドの go/no-go #2 が『続ける』になるまで着手しない(決定 0305 の見積りも参照)。
 4. 未確認: この全メンバ版での実エンジンの g3 の行、P1・P3 への効き、実 Windows の各メンバの値。

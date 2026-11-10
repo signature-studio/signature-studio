@@ -23,7 +23,7 @@
 
 - `fe-lift lift binaries/win64/FLEngine_x64.dll OUT.c --pdata` の出力 SHA-256 は変更前も変更後も `67827424301459e6f2da1ccb46a5fd081b7de9a38c64e1bca44ba9bf5d15584d`（`lift/out-w5/flengine-base.c`、`flengine-after.c`）。functions 59,297、unsupported_total 531。
 - 理由: FLEngine の `import_calls` は 0（IAT は `jmp [IAT]` の thunk からだけ使われる。調査文書 §6）。`Call: indirect through IAT slot` は FLEngine の統計に出ない（`lift/out-w5/flengine-base.stats.txt`。`Jmp: indirect through IAT slot` が 530 件）。
-- この比較の間、他の subagent の `fe-lift/src/vex.rs` などの変更が作業ツリーにあったが、SHA は一致したまま（切り分けの必要は出なかった）。
+- この比較の間、他の subagent の `fe-lift/src/vex.rs` などの変更がワークツリーにあったが、SHA は一致したまま（切り分けの必要は出なかった）。
 
 ## 4. dsp_ippv2_x64.dll への影響
 
@@ -38,7 +38,7 @@
 | `call_imp:*`（新規ハンドラ） | 0 | 84 |
 | `Jmp: indirect through IAT slot (not lifted)` | 7 | 7（変更なし） |
 
-（注）最後に再実行した時点（他の subagent の `vex.rs` / `fle_vex.h` の変更が作業ツリーにある状態）では unsupported_total が 973,919 だった（上の表の 973,920 は作業の途中の実測）。`Call` / `Jmp` の IAT の件数は 54 と 7 のままで、差の 1 は gs 関連の他者の変更による（`gs:` の未対応が 3 か所とあったもの。原因の切り分けは未実施、推測）。この作業の数値は「138 → 54、`call_imp` 84」。
+（注）最後に再実行した時点（他の subagent の `vex.rs` / `fle_vex.h` の変更がワークツリーにある状態）では unsupported_total が 973,919 だった（上の表の 973,920 は作業の途中の実測）。`Call` / `Jmp` の IAT の件数は 54 と 7 のままで、差の 1 は gs 関連の他者の変更による（`gs:` の未対応が 3 か所とあったもの。原因の切り分けは未実施、推測）。この作業の数値は「138 → 54、`call_imp` 84」。
 
 `call [IAT]` の 138 か所は fe-decode の `import_calls` 138（`fe-decode closure ... --pdata`）と一致。API 名別（`lift/out-w5/dsp-by-api.txt`。テスト `call_iat_dll.rs` が出す）:
 
@@ -65,4 +65,4 @@
 - 未応答 API は名前付きの停止ではなく `fle_unsupported(VA)`（jmp 形 thunk の未応答と同じ。VA から API 名を引ける）。調査文書 §9 W6 の「呼ばれたら名前付きで止まる」にするには、`fle_stop` 系の runtime が要る。この作業では行わなかった。
 - `call [reg+disp]` で IAT でないテーブル、スロットの値を書き換える DLL（遅延ロードのヘルパなど）の形は変えていない。
 - `jmp [IAT]`（DLL に 19 か所。うち 7 か所が行なしで未応答）、間接 jmp の表（W3(d)）は対象外。
-- 他の subagent が同時に編集した `vex.rs`、`fle_vex.h`、`harness/main.c`、`harness/wasm/main.c`、`tests/gs_stacklimit.rs` は、この作業と無関係（触っていない）。FLEngine の SHA（`vex.rs` の変更が作業ツリーにある状態で再計算して一致）には影響が見えなかった。全体テストの実行時点では `tests/gs_stacklimit.rs` はまだ無く、実行結果（1,044 件）にはそのテストを含まない（`vex.rs` などの変更が全体テストの実行時点で作業ツリーにあったかは確認していない）。
+- 他の subagent が同時に編集した `vex.rs`、`fle_vex.h`、`harness/main.c`、`harness/wasm/main.c`、`tests/gs_stacklimit.rs` は、この作業と無関係（触っていない）。FLEngine の SHA（`vex.rs` の変更がワークツリーにある状態で再計算して一致）には影響が見えなかった。全体テストの実行時点では `tests/gs_stacklimit.rs` はまだ無く、実行結果（1,044 件）にはそのテストを含まない（`vex.rs` などの変更が全体テストの実行時点でワークツリーにあったかは確認していない）。

@@ -221,7 +221,7 @@
 
 - 既定の入口: パネルの P2 の行 `34 ms (p50 23 ms; 78 sent, 0 pending; the old number (page listener -> putImageData, which leaves out the browser's waits): p95 16 ms, p50 4.6 ms)`(判定 miss = 17 ms 超)。段階の行 `browser wait for the event 0.7 + page 0.1 + to the Worker 0.2 + engine and Worker 2.4 + back to the page 0.1 + draw 0.1 + wait for the next animation frame 15 ms (20 events; the medians do not add up to the median of the sum)`。実エンジンが送って `perf-log.jsonl` に入った版 3 のビーコンは 5.0 KB、`beaconProblems` は空。
 - `?dedupe=1`: P2 の行 `364 ms (p50 9.2 ms; 78 sent, 0 pending; the old number (page listener -> putImageData, which leaves out the browser's waits): p95 357 ms, p50 4.2 ms)`(§4.3: 『放す』13 回が次の無関係なフレームで閉じるため p95 が 364 ms)。
-- `perf-real-engine.mjs`(cbeacon1 の実エンジンの道具。最終の木、`runs/perf-real-engine2`、`logs/perf-real-engine2.txt`): **16/16 通過**。最初の idle 6.1 秒〔P1 の読みではない。1 回の値〕、版 3 のビーコンが形の検査を通る、試験入力 8 個〔DOM イベントなし〕では eventToRaf が空で stages が null、旧い値は入る、画面の測定は **バースト**(mode burst、2 秒/60 秒、n=120 ≈ 1 バースト。連続のとき同じ道具は n=1,801)。
+- `perf-real-engine.mjs`(cbeacon1 の実エンジンの道具。最終の木、`runs/perf-real-engine2`、`logs/perf-real-engine2.txt`): **16/16 通過**。最初の idle 6.1 秒〔P1 の読みではない。1 回の値〕、版 3 のビーコンが形の検査を通る、テスト入力 8 個〔DOM イベントなし〕では eventToRaf が空で stages が null、旧い値は入る、画面の測定は **バースト**(mode burst、2 秒/60 秒、n=120 ≈ 1 バースト。連続のとき同じ道具は n=1,801)。
 
 
 ### 3.7 段階の内訳(SHIPH、app 自身の記録の p50、cbeacon2 の最初のビルド)
@@ -252,7 +252,7 @@
 | `npx vitest run` | **1,255 passed / 7 skipped**(53 ファイル + 1 スキップ)。基準 1,209 のうち 7 スキップ以外全通過 = 1,202 から **+53**(入力の測定 +44: `latency` 11・`perf-beacon` 16・`pointer-dom` 6・`perf-log-summary` 5・`perf-stats` 4・`perf-panel` 2。画面のバースト +9: `perf-display` 8・`perf-panel` 1)。失敗 0 |
 | `npm run test:worker` | 43/43(`shared/perf.ts` を変えた後に再実行) |
 | `npm run test:e2e` | **1,028/1,028**(基準 1,017 + 11: 入力の測定の 3 チェック × dev・preview・worker = 9、画面のバーストの 1 チェック × dev・preview = 2〔worker の対象はログを持たないので飛ばす〕)。失敗 0。ログ `logs/e2e-full2.txt` |
-| 変異検査(`test/mutation/run.mjs`、unit 層) | 触れたファイルに関わる**既存・新規 110 件が全部検出**: (1) `latency.ts`・`stats.ts`・`panel.ts`・`beacon.ts`・`shared/perf.ts`・`pointer.ts`・`perf-log-summary.mjs`・`main.ts` の 77 件〔新規 17 を含む〕(`logs/mutation-touched-files.txt` は 76/77、1 件は find 文字列が版 2 → 3 で見つからず更新して 1/1)、(2) `display.ts`・`display-host.ts` の 33 件〔新規 9 を含む〕(`logs/mutation-display.txt` は 30/33、3 件は find 文字列が変わって見つからず更新して 3/3、`logs/mutation-burst.txt` は新規 9/9)。復元後に作業木とコピーの差分なし |
+| 変異検査(`test/mutation/run.mjs`、unit 層) | 触れたファイルに関わる**既存・新規 110 件が全部検出**: (1) `latency.ts`・`stats.ts`・`panel.ts`・`beacon.ts`・`shared/perf.ts`・`pointer.ts`・`perf-log-summary.mjs`・`main.ts` の 77 件〔新規 17 を含む〕(`logs/mutation-touched-files.txt` は 76/77、1 件は find 文字列が版 2 → 3 で見つからず更新して 1/1)、(2) `display.ts`・`display-host.ts` の 33 件〔新規 9 を含む〕(`logs/mutation-display.txt` は 30/33、3 件は find 文字列が変わって見つからず更新して 3/3、`logs/mutation-burst.txt` は新規 9/9)。復元後にワークツリーとコピーの差分なし |
 | `test/e2e/perf-real-engine.mjs`(実エンジン、フックなし、cbeacon1 の道具に 2 チェック追加) | 結果は §3.6 |
 
 ## 4. 見つかったこと(合わなかった所と、その原因)
@@ -329,7 +329,7 @@ lat1(決定 0194)は、`?dedupe=1` でホバー 30.0 → 15.5 ms、クリック 
 - 変異検査の最初の 1 回を前景の既定の 120 秒のタイムアウトで回し、打ち切られた(残プロセスなし。タイムアウトを伸ばして取り直した)。
 - 作業の始めに `npx tsc` と書いてしまい、`node_modules` のない木で npm が別物の `tsc@2.0.4`(typescript ではない)を npx のキャッシュに取り込んだ(リポジトリの外。使っていない。以後 `npm run typecheck`)。
 - 重い処理(Chrome、e2e)は同時に 2 つまでの規則に対し、`cost-series.sh` の最後の run がまだ走っている間に `series-ctl.sh` を始めたため、約 1 分間 3 本の Chrome が同時に走った(e2e と main1 の系列が重なった間は 2 本)。
-- 変異検査のコピーでは vitest が 1,245 passed / 8 skipped(作業木 1,246 / 7)で、1 件のスキップの差がある。原因は調べていない(コピーはリポジトリの根の外にあり、根を要るテストが 1 件スキップされるのだろう〔読み〕)。
+- 変異検査のコピーでは vitest が 1,245 passed / 8 skipped(ワークツリー 1,246 / 7)で、1 件のスキップの差がある。原因は調べていない(コピーはリポジトリの根の外にあり、根を要るテストが 1 件スキップされるのだろう〔読み〕)。
 - 最終の木のコスト測定(`runs/cost2`)の `new-beacon0-stream-r2` が 3 分たっても最初の idle に達せず(ログが空)、私が PID を指定して打ち切った(終了 143)。その run の Chrome も PID で止めた。原因は調べていない(同じ構成の r1 と、ほかの 11 run は通った。一過性の起動の失敗か、バーストと関係があるのかは 1 件では言えない〔未確認〕)。表はその run を除いた値。
 - 重い処理が一時的に 3 本になった(バースト版の系列 2 本 + e2e の最初の 1 分間。そのほかは 2 本以内)。
 - `lift/out-lat1/` は読み取りだけ(`docs/investigations/lat1/tables/tables.md` の公表値を読んだ)。5173 のサーバーには触っていない。git の変更系操作・commit・push はしていない。

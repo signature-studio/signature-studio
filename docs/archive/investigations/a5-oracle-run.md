@@ -17,7 +17,7 @@ lift/harness/oracle/run.sh
 ## 2. 作ったもの（すべて新規）
 
 - `lift/harness/oracle/`: `oracle_common.h`、`oracle_common.c`（case ファイルの読み込み、case ごとの fork、入力の敷設、3 領域の差分、JSON 出力）、`ms_call.S`（MS x64 の thunk）、`native_drv.c`、`lift_drv.c`、`build.sh`、`select_pure.py`、`run_diff.py`、`run.sh`。
-- `lift/out-oracle/`: `bin/`、`obj/`、`rt/`（out-pdata の runtime オブジェクトの複写）、`results/`、`tmp/`、`old-ref/repo/`（旧リポジトリの shallow clone、103 MB、読み取り用）。
+- `lift/out-oracle/`: `bin/`、`obj/`、`rt/`（out-pdata の runtime オブジェクトのコピー）、`results/`、`tmp/`、`old-ref/repo/`（旧リポジトリの shallow clone、103 MB、読み取り用）。
 
 ## 3. 選別（`select_pure.py`、実測）
 

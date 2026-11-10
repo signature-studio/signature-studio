@@ -162,18 +162,18 @@
 
 | 名前 | Requirements の DLL | 最小の Windows（client / server） | 現行応答表（`TABLE`）の行 | NULL のときの DLL の分岐（読み） | ATTACH の直線上か |
 |---|---|---|---|---|---|
-| `FlsAlloc` | Kernel32.dll | Vista / Server 2003 | HEAD: **無い**。作業ツリー（他者の未コミット変更）: 行あり（`fle_imp_FlsAlloc`） | `TlsAlloc` に落ちる。DLL は **Fls と Tls の両方を静的 import している**（IAT に FlsAlloc/FlsFree/FlsGetValue/FlsSetValue/TlsAlloc/TlsGetValue/TlsSetValue がある。実測）。FlsAlloc の成否で CRT の TLS 方式が変わるだけ | **はい**（0x17cd59c。実測: 1 回目の `FlsAlloc` 照会） |
-| `FlsFree` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / 作業ツリー有り | `TlsFree`（HEAD の runtime に `fle_imp_TlsFree` は無い（`git grep`）。作業ツリーには実装が出ているが応答表の行ではない（`imports_table.rs` のコメント）） | 失敗・DETACH の経路（0x17cd5e4）。ATTACH の成功経路には無い（読み） |
-| `FlsGetValue` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / 作業ツリー有り | `TlsGetValue`（行あり） | 静的な到達範囲にある（0x17cd470、0x17cd4dc）。**実行されるかは未確認** |
-| `FlsSetValue` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / 作業ツリー有り | `TlsSetValue`（行あり） | **はい**（実測: 2 回目の照会） |
-| `InitializeCriticalSectionEx` | Kernel32.dll | Vista / Server 2008 | **無い**（HEAD も作業ツリーも） | `InitializeCriticalSectionAndSpinCount`（HEAD: 行も runtime も無い → NULL 側に落ちた直後に `fle_unsupported(0x37d0a4f)`（実測）。作業ツリーは行あり） | **はい**（A5: 最初の照会。実測）。B3 は初期化関数表から（静的到達。実行は未確認） |
-| `InitializeCriticalSectionAndSpinCount` | Kernel32.dll | XP / Server 2003 | HEAD **無い** / 作業ツリー有り | （代替の側。DLL は IAT でも静的に import する） | はい（上の代替先） |
+| `FlsAlloc` | Kernel32.dll | Vista / Server 2003 | HEAD: **無い**。ワークツリー（他者の未コミット変更）: 行あり（`fle_imp_FlsAlloc`） | `TlsAlloc` に落ちる。DLL は **Fls と Tls の両方を静的 import している**（IAT に FlsAlloc/FlsFree/FlsGetValue/FlsSetValue/TlsAlloc/TlsGetValue/TlsSetValue がある。実測）。FlsAlloc の成否で CRT の TLS 方式が変わるだけ | **はい**（0x17cd59c。実測: 1 回目の `FlsAlloc` 照会） |
+| `FlsFree` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / ワークツリー有り | `TlsFree`（HEAD の runtime に `fle_imp_TlsFree` は無い（`git grep`）。ワークツリーには実装が出ているが応答表の行ではない（`imports_table.rs` のコメント）） | 失敗・DETACH の経路（0x17cd5e4）。ATTACH の成功経路には無い（読み） |
+| `FlsGetValue` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / ワークツリー有り | `TlsGetValue`（行あり） | 静的な到達範囲にある（0x17cd470、0x17cd4dc）。**実行されるかは未確認** |
+| `FlsSetValue` | Kernel32.dll | Vista / Server 2003 | HEAD 無し / ワークツリー有り | `TlsSetValue`（行あり） | **はい**（実測: 2 回目の照会） |
+| `InitializeCriticalSectionEx` | Kernel32.dll | Vista / Server 2008 | **無い**（HEAD もワークツリーも） | `InitializeCriticalSectionAndSpinCount`（HEAD: 行も runtime も無い → NULL 側に落ちた直後に `fle_unsupported(0x37d0a4f)`（実測）。ワークツリーは行あり） | **はい**（A5: 最初の照会。実測）。B3 は初期化関数表から（静的到達。実行は未確認） |
+| `InitializeCriticalSectionAndSpinCount` | Kernel32.dll | XP / Server 2003 | HEAD **無い** / ワークツリー有り | （代替の側。DLL は IAT でも静的に import する） | はい（上の代替先） |
 | `AreFileApisANSI` | Kernel32.dll | XP / Server 2003 | **無い** | **1 を返す**（ANSI）。DLL は止まらない | 0x17d6340（ATTACH の直線上の関数）内の 0x17d63ed から。**その分岐に入るかは未確認** |
 | `LCMapStringEx` | Kernel32.dll | Vista / Server 2008 | **無い**（`LCMapStringW` は HEAD に行あり） | `LocaleNameToLCID` を照会（B5）して `LCMapStringW` を呼ぶ | 静的な到達範囲（0x17d9a94 ← 0x17d9e20）。実行は未確認 |
 | `LocaleNameToLCID` | Kernel32.dll | Vista / Server 2008 | **無い** | DLL 内の 0x17d9f1c を呼ぶ（**未精査**） | LCMapStringEx の代替の中 |
 | `AppPolicyGetProcessTerminationMethod` | **Api-ms-win-appmodel-runtime-l1-1-2.dll**（Requirements の DLL 欄。kernel32 ではない） | **Requirements 表に最小 OS の行が無い**（一次に無い） | **無い** | `STATUS_NOT_FOUND`（0xc0000225）を返し、呼び元 0x17d5730 は結果が 1 でないとき 1 を返す。DLL は止まらない | **いいえ**（終了処理 0x17d1a54 の経路。読み） |
-| `CorExitProcess` | `mscoree.dll`（api_location。Requirements に OS の行なし） | 一次に無い | **無い**（`GetModuleHandleExW` は HEAD に行無し。作業ツリー: 行あり、呼ばれたら abort） | 到達しない: `GetModuleHandleW(NULL)` が返すイメージの DataDirectory[14] が 0（FLEngine）で、0x17d198c が 0x17d1ab8 に進まない | **いいえ**（終了処理） |
-| `GetModuleHandleExW`（`L"mscoree.dll"`） | Kernel32.dll | XP / Server 2003 | HEAD 無し / 作業ツリー有り（呼ばれたら abort） | 0 を返せば DLL は続行（`CorExitProcess` を飛ばす）。上の理由で通常は呼ばれない | いいえ |
+| `CorExitProcess` | `mscoree.dll`（api_location。Requirements に OS の行なし） | 一次に無い | **無い**（`GetModuleHandleExW` は HEAD に行無し。ワークツリー: 行あり、呼ばれたら abort） | 到達しない: `GetModuleHandleW(NULL)` が返すイメージの DataDirectory[14] が 0（FLEngine）で、0x17d198c が 0x17d1ab8 に進まない | **いいえ**（終了処理） |
+| `GetModuleHandleExW`（`L"mscoree.dll"`） | Kernel32.dll | XP / Server 2003 | HEAD 無し / ワークツリー有り（呼ばれたら abort） | 0 を返せば DLL は続行（`CorExitProcess` を飛ばす）。上の理由で通常は呼ばれない | いいえ |
 
 「最小の Windows」は Requirements 表の値のまま。**Windows 10 22H2（決定 0014）にこれらがあることは、Vista/XP 以降という記述から導ける（決定 0055 と同じ導き方）が、Learn が「Windows 10 に存在する」と書いているわけではない**。`AppPolicyGetProcessTerminationMethod` はその導出もできない（最小 OS の記載なし）。
 
@@ -243,7 +243,7 @@
 
 | DLL の名前（使う添字） | (a) 仮想モジュール | (b) absent | (c) 停止のまま |
 |---|---|---|---|
-| `api-ms-win-core-synch-l1-2-0`（A 添字 1、B 添字 6）→ `InitializeCriticalSectionEx` | **実測**（`all_ok`）: `GetProcAddress(…, "InitializeCriticalSectionEx")` が NULL → `kernel32` は試されない → `InitializeCriticalSectionAndSpinCount` に落ちる（HEAD は runtime に無く `fle_unsupported(0x37d0a4f)`。作業ツリーの未コミット変更で応答表に行あり） | **実測**（`null_ms`）: `LoadLibraryExW` が NULL → リストの次の `kernel32` で `GetProcAddress` が NULL → 同じく `InitializeCriticalSectionAndSpinCount` に落ちる。結果は (a) と同じ代替 | **実測**: 停止（exit 5）。ATTACH が完走しない |
+| `api-ms-win-core-synch-l1-2-0`（A 添字 1、B 添字 6）→ `InitializeCriticalSectionEx` | **実測**（`all_ok`）: `GetProcAddress(…, "InitializeCriticalSectionEx")` が NULL → `kernel32` は試されない → `InitializeCriticalSectionAndSpinCount` に落ちる（HEAD は runtime に無く `fle_unsupported(0x37d0a4f)`。ワークツリーの未コミット変更で応答表に行あり） | **実測**（`null_ms`）: `LoadLibraryExW` が NULL → リストの次の `kernel32` で `GetProcAddress` が NULL → 同じく `InitializeCriticalSectionAndSpinCount` に落ちる。結果は (a) と同じ代替 | **実測**: 停止（exit 5）。ATTACH が完走しない |
 | `api-ms-win-core-fibers-l1-1-1`（A 添字 0）→ `FlsAlloc`、`FlsFree`、`FlsGetValue`、`FlsSetValue` | **実測**: `GetProcAddress` NULL → `Tls*` に落ちる。`FlsSetValue` の代替は `call [IAT TlsSetValue]`。HEAD は `TlsSetValue` に行ありだが、**ATTACH の続きで `f_37d7570`（`jmp [IAT 0x1ebd048]` の FlsSetValue の薄いスタブ）が `fle_unsupported(0x37d7570)`**（実測: §7.3 の呼び元の鎖） | **実測**: NULL → `kernel32` を試す → `GetProcAddress("FlsAlloc")` が NULL（応答表に行なし）→ 同じ代替 | 停止 |
 | `api-ms-win-core-localization-l1-2-1`（B 添字 2）→ `LCMapStringEx`、`LocaleNameToLCID` | `GetProcAddress` NULL → LCMapStringEx の代替（`LocaleNameToLCID` を探して `LCMapStringW`）。**`LCMapStringW` は HEAD に行あり**（`fle_locale.c`）。ATTACH で実行されるかは**未確認** | NULL → `kernel32` で NULL → 同じ代替 | 呼ばれれば停止。呼ばれるかは未確認 |
 | `api-ms-win-appmodel-runtime-l1-1-2`（B 添字 17）→ `AppPolicyGetProcessTerminationMethod` | `GetProcAddress` NULL → `STATUS_NOT_FOUND` を返し DLL は止まらない。**終了経路でだけ** | NULL → リストはこの 1 つだけ → 同じ | 呼ばれれば停止。終了経路なので ATTACH では呼ばれない（読み） |

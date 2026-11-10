@@ -1,4 +1,4 @@
-# FLEngine_x64.dll 抽出台帳
+# FLEngine_x64.dll 抽出記録
 
 実測値のみを記す。推測は「推測」と明記する。実バイナリはリポジトリに含めない（`binaries/` は .gitignore 済み）。
 

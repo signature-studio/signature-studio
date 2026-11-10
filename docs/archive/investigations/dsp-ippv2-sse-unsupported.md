@@ -1,6 +1,6 @@
 # dsp_ippv2_x64.dll のレガシー SSE 未対応命令の実測（W8）
 
-実行日: 2026-10-23。HEAD 6e1bc06 に、本作業の変更（決定 0075）を加えた作業ツリー。入力は調査文書 `dsp-ippv2-lift-feasibility.md` §4、§5.5、§9 W8 と同じ測定の再実行。決定は `docs/decisions/0075-legacy-sse-forms-for-dsp-ippv2.md`。作業物は `lift/out-w8/`（§6）。
+実行日: 2026-10-23。HEAD 6e1bc06 に、本作業の変更（決定 0075）を加えたワークツリー。入力は調査文書 `dsp-ippv2-lift-feasibility.md` §4、§5.5、§9 W8 と同じ測定の再実行。決定は `docs/decisions/0075-legacy-sse-forms-for-dsp-ippv2.md`。作業物は `lift/out-w8/`（§6）。
 
 ## 0. 凡例
 

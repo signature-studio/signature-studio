@@ -1,4 +1,4 @@
-# 0178: File → Open... の COM モデル(IFileOpenDialog)で、実エンジンが FLP を開いた — Sampler.flp は開いて描画・サンプル読み込みまで、参照プロジェクトの FLP は読み込みを始めて最初のプラグイン(チャンネル 1 の Fruity Wrapper)の DLL で止まる。壁は台帳 17 件(修正 9、開いた 1、確定した次の壁 2〔Fruity Wrapper の DLL、.zip 経路の DelZip64.dll〕、探索 5〔MP3 は ACM、失敗すると ilvideo〕)。仮の決定
+# 0178: File → Open... の COM モデル(IFileOpenDialog)で、実エンジンが FLP を開いた — Sampler.flp は開いて描画・サンプル読み込みまで、参照プロジェクトの FLP は読み込みを始めて最初のプラグイン(チャンネル 1 の Fruity Wrapper)の DLL で止まる。壁は記録 17 件(修正 9、開いた 1、確定した次の壁 2〔Fruity Wrapper の DLL、.zip 経路の DelZip64.dll〕、探索 5〔MP3 は ACM、失敗すると ilvideo〕)。仮の決定
 
 状態: **仮の決定(すべての選択)**。依頼は PM(番号 0178、担当 dlg1、2026-11-03 13:37〜、予算 4 時間)。作業と測定は HEAD **b4f1d3c** の `git archive` した木(`lift/out-dlg1/src/`)で行い、`dlg1.diff` は **HEAD 912a2ca**(docs だけが 7757f60 から進んだ)の `git archive` に `patch -p1 --dry-run` が当たることを確かめた。生成 C の基準には、同じ生成 C(決定 0171 の層 1+2 の行を足した D')の leak1 の native -O0 オブジェクトをハードリンクで借りた(読み取りのみ)。
 
@@ -54,7 +54,7 @@ SHGetKnownFolderPath {FDD39AD0-238F-46AF-ADB4-6C85480369C7} (Documents) ×2
 - **Show()**: 設定(オプション、フィルター、タイトル、フォルダ、カスタマイズのコントロール)を `FLE_FILEDLG_TRACE` で印字し、ピッカー(`fle_filedlg_set_picker` で差し替え。既定はハーネスの環境変数)に渡す。選択が無ければキャンセル。FOS_FILEMUSTEXIST で VFS に無いパスは**名前つき停止**(実機はダイアログが閉じない = ハーネスの誤り)。選択後に結果を保持し、登録されたイベント受けの `OnFileOk(pfd)`(vtable スロット 3)を `fle_call_guest` で呼ぶ。
 - **CoCreateInstance への接続**: `fle_ole.c` の `fle_imp_CoCreateInstance` に弱い参照の呼び出しを 1 か所足しただけ(`fle_filedlg.c` をリンクしない既存テストは無変更)。
 
-## 5. 壁の台帳(`tables/walls.tsv`、17 行。呼び元は shadow stack の実測、意味は読み)
+## 5. 壁の記録(`tables/walls.tsv`、17 行。呼び元は shadow stack の実測、意味は読み)
 
 | id | 経路 | 停止(実測) | 呼び元と読み | 必要な物 | 最小の実装 | 状態 |
 |---|---|---|---|---|---|---|

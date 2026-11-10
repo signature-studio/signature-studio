@@ -7,7 +7,7 @@
 - **退行ではない:** 本番の bundle(main 15540a0)でも旧 SHIP2 でも、5 回目までは popup が描かれ、40 回の開閉の後は描かれない。
 - **FL 固有ではない:** 面の表はハーネスの登録簿で、クラス名・窓の種類での分岐はない。layered の経路でもない(popup の exstyle は 0x10008)。
 - **直し:** 新しい view は、まず空き欄(`flags & 1 == 0` の最小の欄)を再利用し、無ければ表を伸ばす。欄が死ぬとき `view_of[k] = NULL`(解放されたアドレスに来た新しい view が死んだ欄に一致して書き込みが全部捨てられる別の欠陥も直る)。
-- **試験:** 新規の単体試験 `lift/harness/web/present/test_fruity_surface_slots.c`(20 項目)。元の `fruity_surface.c` は 11 項目が失敗(33 枚目の窓で `no entry for lid 33`)、直した版は 20/20、既存の `test_fruity_surface_layer.c` は 27/27。
+- **テスト:** 新規の単体テスト `lift/harness/web/present/test_fruity_surface_slots.c`(20 項目)。元の `fruity_surface.c` は 11 項目が失敗(33 枚目の窓で `no entry for lid 33`)、直した版は 20/20、既存の `test_fruity_surface_layer.c` は 27/27。
 - **残る制限(直さない):** 同時に生きている窓が 32 枚を超える場合の 33 枚目は出ない。`LID_SCAN_MAX 4096`: lid が 4095 を超える窓は lid 0xFFFFFFFF で記録される(メニューを約 4,000 回開くセッション)。
 
 ## PM の判断と取り込み(2026-11-04)

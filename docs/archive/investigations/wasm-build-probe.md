@@ -1,6 +1,6 @@
 # wasm ビルド調査（ADR-0005 A3「生成 C が emcc でリンクできる」の初の実測）
 
-日付: 2026-10-21。HEAD 1f88ad5（作業ツリーには他担当の未コミット変更あり。`lift/runtime/fle_locale.c` の変更を含む状態で実測した。`lift/runtime` のスナップショットを `lift/out-wasm/snap/runtime`（fle_locale.c の md5 abfb27fa…）に取り、`diff -rq runtime out-wasm/rt-wasm` で、`rt-wasm` は `fle_mxcsr_flags.h` 以外 `runtime` と同一であることを確認した）。**調査の途中（リンク、実行、difftest の後）に、他担当が `lift/runtime/fle_x87.c`、`fle_x87.h`、`lift/crates/fe-lift/src/x87.rs` を変更した**（`git status` で確認。x87 超越関数の作業と推測）。本書の数値は、それより前の `runtime`（`snap/runtime` と `rt-wasm/`）と、そのとき生成した C（`out/wasm-pdata.c`）に対するもの。変更後の runtime での再測定はしていない。成果物はすべて `lift/out-wasm/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE）。`runtime`・`harness`・crates は変更していない。再現は `bash lift/out-wasm/run.sh`（§8）。
+日付: 2026-10-21。HEAD 1f88ad5（ワークツリーには他担当の未コミット変更あり。`lift/runtime/fle_locale.c` の変更を含む状態で実測した。`lift/runtime` のスナップショットを `lift/out-wasm/snap/runtime`（fle_locale.c の md5 abfb27fa…）に取り、`diff -rq runtime out-wasm/rt-wasm` で、`rt-wasm` は `fle_mxcsr_flags.h` 以外 `runtime` と同一であることを確認した）。**調査の途中（リンク、実行、difftest の後）に、他担当が `lift/runtime/fle_x87.c`、`fle_x87.h`、`lift/crates/fe-lift/src/x87.rs` を変更した**（`git status` で確認。x87 超越関数の作業と推測）。本書の数値は、それより前の `runtime`（`snap/runtime` と `rt-wasm/`）と、そのとき生成した C（`out/wasm-pdata.c`）に対するもの。変更後の runtime での再測定はしていない。成果物はすべて `lift/out-wasm/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE）。`runtime`・`harness`・crates は変更していない。再現は `bash lift/out-wasm/run.sh`（§8）。
 
 「実測」はコマンドの出力、「推測」は未検証の解釈。判断は PM が行う。
 
@@ -60,7 +60,7 @@
 
 ## 3. x86 依存の一覧
 
-行番号は `lift/runtime`（HEAD 1f88ad5 + 作業ツリー）。「規模」は**推測**。
+行番号は `lift/runtime`（HEAD 1f88ad5 + ワークツリー）。「規模」は**推測**。
 
 ### 3.1 一覧
 
@@ -207,5 +207,5 @@ bash lift/out-wasm/run.sh gen split gen-asis gen-shim gen-inst harness link run-
 ## 9. 残置物、触ったファイル
 
 - 新規: `docs/investigations/wasm-build-probe.md`（本書）、`lift/out-wasm/` 以下すべて。主要: `run.sh`、`run_node.cjs`、`shim/`、`harness/`、`difftest/`、`rt-wasm/`、`snap/`、`out/`（生成 C と 16 分割 = 約 430 MB）、`obj-*`、`bin/`（`.wasm` 3 本 = 約 332 MB）、`probe/`、`target/`（fe-lift の release ビルド）、`emcache/`、`tmp/`。合計約 1.2 GB。
-- 削除禁止のため残っているもの: `lift/out-wasm/run.sh.new`（`run.sh` を直すために途中で作った一時コピー。内容は古い `run.sh` の一部の修正版。不要）、`difftest/` の途中版（`int_x87.c`、`int_x87_b.c`、`int_x87_c.c`: テストの誤りを直した前の版。`int_x87_d.c` が最終）、`hash_b.c`、`hash_c.c`、`fscale_probe.c`（`fscale_probe2.c` が最終）、`bin/flengine-mm.*`、`bin/flengine-mm3.*`（ログ版）、`out/wasm-pdata.c`（分割の元）、`probe/` の試験用ファイル。
+- 削除禁止のため残っているもの: `lift/out-wasm/run.sh.new`（`run.sh` を直すために途中で作った一時コピー。内容は古い `run.sh` の一部の修正版。不要）、`difftest/` の途中版（`int_x87.c`、`int_x87_b.c`、`int_x87_c.c`: テストの誤りを直した前の版。`int_x87_d.c` が最終）、`hash_b.c`、`hash_c.c`、`fscale_probe.c`（`fscale_probe2.c` が最終）、`bin/flengine-mm.*`、`bin/flengine-mm3.*`（ログ版）、`out/wasm-pdata.c`（分割の元）、`probe/` のテスト用ファイル。
 - 変更していない: `lift/runtime`、`lift/harness`、`lift/crates`、他の `lift/out-*`。`git` 操作はしていない（`git status` と `git log` の参照のみ）。

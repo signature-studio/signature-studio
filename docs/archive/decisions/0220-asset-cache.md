@@ -1,6 +1,6 @@
 # 決定 0220(cache1): 『wasm が毎回ダウンロードされる』の測定と、ページ自身の永続コピー(OPFS)+WebCrypto 検証
 
-**状態: 実装済み(`cache1.diff`)。HEAD 88c7809 に 3 方向マージ済みの木で typecheck・単体・e2e・Worker 試験を実行。測定はすべてこの機械(Linux・16 コア・SwiftShader・load 10〜35)で、依頼者の機械(Windows 10 + Firefox 159)ではない。依頼者の機械での値は 0 件。**
+**状態: 実装済み(`cache1.diff`)。HEAD 88c7809 に 3 方向マージ済みの木で typecheck・単体・e2e・Worker テストを実行。測定はすべてこの機械(Linux・16 コア・SwiftShader・load 10〜35)で、依頼者の機械(Windows 10 + Firefox 159)ではない。依頼者の機械での値は 0 件。**
 
 ## 0. 三点
 
@@ -150,7 +150,7 @@ HEAD の木の実ページ(5 サイクルの中央値): Firefox 冷 4,575 ms(4,1
 
 ## 7. Worker 側(仕事 5): 現状の維持と提案
 
-- **維持を確認した物**: ETag(強い、R2 の MD5)・`If-None-Match`→304・Range/If-Range・`Cache-Control` の R2 優先・immutable。Worker 試験 43 件(`test/worker`)は変更なしで通る(下記)。
+- **維持を確認した物**: ETag(強い、R2 の MD5)・`If-None-Match`→304・Range/If-Range・`Cache-Control` の R2 優先・immutable。Worker テスト 43 件(`test/worker`)は変更なしで通る(下記)。
 - **提案(決めない。PM の判断)**:
   1. **変更不要**。HTTP キャッシュが効かない原因は Worker にない(シークレット/プライベートの上限、DevTools の設定、強制再読み込み)。
   2. Worker の Cache API は**入れない**: 効果を測れない(ブラウザの HTTP キャッシュが主、利用者は 1 人、R2 の転送は無料、Access の背後で本番の効果を測れない)。
@@ -165,17 +165,17 @@ HEAD の木の実ページ(5 サイクルの中央値): Firefox 冷 4,575 ms(4,1
 
 保存形式は展開後の 1 ファイル(上記)。`LoadedPack.stored: { path, size, sha256 } | null` を足した(保存コピーを検証して使ったときだけ non-null。冷たい経路はコミット前なのでバイト列を使う)。Worker 側の `OpfsSource` / `MemorySource` / `openPackSource` は memfs1 が `hostfiles.ts` に書く。プロトコルの assets の形(`Uint8Array`)は変えていない。`FileSystemSyncAccessHandle` は排他なので、別タブが開いている場合は MemorySource に落ちる設計を依頼した。
 
-## 10. 試験
+## 10. テスト
 
 測定は最新 HEAD 88c7809 に 3 方向マージした木(`lift/out-cache1/src2`)。
 
-| 試験 | 結果 | 備考 |
+| テスト | 結果 | 備考 |
 |---|---|---|
 | `npm run typecheck`(4 つの tsconfig) | rc=0 | |
 | vitest 単体 | **1,505 passed + 7 skipped**(68 ファイル、うち 1 ファイル skipped) | 変更前の同じ HEAD の木: 1,463 passed + 7 skipped(65 ファイル)。増えたのは本変更の 42 件(`assetstore.test.ts` 21、`assets-report.test.ts` 16、`assets-summary.test.ts` 5)。`loader.test.ts` ほか既存は無変更で通る |
 | e2e 全体(`node test/e2e/run.mjs`、dev/preview/worker、スタンドインのバンドル。実エンジンのバンドルは指定せず) | **1,256 / 1,256** | `logs/e2e-full.log`。既定で保存コピーが ON のページで通る(保存の経路を通る) |
-| Worker 試験(`node test/worker/run.mjs`) | **43 / 43** | `logs/worker-tests.log`。Worker は無変更 |
-| 本変更の e2e(`test/e2e/asset-cache.mjs`、Chrome + Firefox の実 OPFS、スタンドインの小さなバンドルで保存の仕組みを試験。エンジンの試験ではない) | **29 / 29**(2 回、別の実行でも 29/29) | 冷→温(サーバーに資産の要求 0)、1 バイト変えたコピーは捨てて取り直し、`?cache=0`、`?hash=stream`、別の版の掃除、2 タブの Web Lock(Chrome)。途中で 2 件落ちた(テストの仮定の誤り 2 件: 破損したコピーの再取得は HTTP キャッシュが答える/掃除の完了を待たずに報告を読んだ)を直して、各 2 回通した |
+| Worker テスト(`node test/worker/run.mjs`) | **43 / 43** | `logs/worker-tests.log`。Worker は無変更 |
+| 本変更の e2e(`test/e2e/asset-cache.mjs`、Chrome + Firefox の実 OPFS、スタンドインの小さなバンドルで保存の仕組みをテスト。エンジンのテストではない) | **29 / 29**(2 回、別の実行でも 29/29) | 冷→温(サーバーに資産の要求 0)、1 バイト変えたコピーは捨てて取り直し、`?cache=0`、`?hash=stream`、別の版の掃除、2 タブの Web Lock(Chrome)。途中で 2 件落ちた(テストの仮定の誤り 2 件: 破損したコピーの再取得は HTTP キャッシュが答える/掃除の完了を待たずに報告を読んだ)を直して、各 2 回通した |
 | 変異検査(本変更の 11 件、unit 層) | **11 / 11 検出** | `logs/mutation-0220.log`(10/11 検出。1 件目 `store-write-uses-a-view-not-a-copy` は書き込みが即時に走るフェイクでは検出できず MISSED → フェイクの書き込みに遅延を足してテストを直し、`logs/mutation-0220-b.log` で DETECTED、コピーと木は同一・単体は緑)。変異: 保存ブロックを view で渡す/保存コピーのハッシュ未検査/網経路のハッシュ不一致の無視/保存コピーのサイズ未検査/他ページのロックの無視/現行版の削除/容量未検査/従来経路のメンバー検査の省略/`fail` に任意の文字列/保存由来を network と報告/割り当て失敗の未処理。既存の変異検査の全体は再実行していない |
 | 実エンジンのページ(5173 以外の自分の preview) | 全 84 回の読み込み(§6 の表 60 回 + 最終ビルドの smoke 24 回)が first idle に到達、保存の失敗 0 | §6。ビーコンの `assets` ブロックは 57 件すべて `beaconProblems` を通る(`tools/check-beacons.mjs`) |
 
@@ -208,7 +208,7 @@ HEAD の木の実ページ(5 サイクルの中央値): Firefox 冷 4,575 ms(4,1
 - **ブラウザを閉じる前に保存のコミットが終わらないと、次回は冷たい**(冷たい読み込みで書き込み約 2〜5 s。コミットは起動をブロックしない)。
 - 保存は使ったバイトの完全性(SHA-256)を守るが、OPFS の中のファイルを他のコードが書き換える攻撃は防がない(同一オリジンの任意コードは元から何でもできる)。照合は毎回行う。
 - 計測用の道具(preview のアクセスログ、プローブサーバー)は `app/test/e2e/` に置いた。本番の経路には入っていない。
-- **自己申告**: (1) 存在しない `bash` ツールを 1 回呼んだ(shell として実行され、副作用なし)。(2) `sleep` を 2 回打って拒否された(実行されていない)。(3) 作業の途中で、`git diff --no-index` の全ファイル名一覧(数百行)を端末に出してしまった(`head` で切るべきだった。副作用なし)。(4) 中間報告 2 の『デッドな原因の候補』は『有力な原因の候補』の誤記。(5) 作業の開始時に基準とした HEAD(0235dff)が途中で進んだため、3 方向マージ(衝突 2 件、両方とも同じ位置への追記で両方を残した)をして、マージ後の木で試験をやり直した。測定(§6 の表)はマージ前の木(HEAD 0235dff + 本変更)のビルドで、最終ビルドでは smoke(§6 の追記)だけを取り直した。(6) 掃除を忘れて `lift/out-cache1/work` が一時 1.3 GB になった(終了時に整理)。
+- **自己申告**: (1) 存在しない `bash` ツールを 1 回呼んだ(shell として実行され、副作用なし)。(2) `sleep` を 2 回打って拒否された(実行されていない)。(3) 作業の途中で、`git diff --no-index` の全ファイル名一覧(数百行)を端末に出してしまった(`head` で切るべきだった。副作用なし)。(4) 中間報告 2 の『デッドな原因の候補』は『有力な原因の候補』の誤記。(5) 作業の開始時に基準とした HEAD(0235dff)が途中で進んだため、3 方向マージ(衝突 2 件、両方とも同じ位置への追記で両方を残した)をして、マージ後の木でテストをやり直した。測定(§6 の表)はマージ前の木(HEAD 0235dff + 本変更)のビルドで、最終ビルドでは smoke(§6 の追記)だけを取り直した。(6) 掃除を忘れて `lift/out-cache1/work` が一時 1.3 GB になった(終了時に整理)。
 
 ---
 

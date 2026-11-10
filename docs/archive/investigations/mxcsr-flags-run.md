@@ -10,7 +10,7 @@
 
 ## 2. 実測
 
-### 2.1 生成 C（全 pdata、`fe-lift lift --pdata`、現在の作業ツリー）
+### 2.1 生成 C（全 pdata、`fe-lift lift --pdata`、現在のワークツリー）
 
 | | 変更前 | 変更後 |
 |---|---|---|
@@ -20,7 +20,7 @@
 | 分割 C（16 分割、3,700 関数/ファイル）合計 | 236,713,829 | 234,300,124 |
 | 分割 .o（clang -O0 -g、16 並列）合計 | 526,770,560 | **531,380,416**（+4,609,856、+0.9%） |
 
-依頼文の「215MB」は、他の担当の変更が入る前の `out-pdata` の値（215,649,724）。変更前の値は、今の作業ツリーのまま MXCSR の変更だけを外して再生成した（`out-mxcsr/out/base.c`）ものを使った。生成 C に `fle_mx_` を含む行は 49,997 行、4,245,954 バイト。減ったのは、旧ハンドラの C 式（`fle_addsd(X[0].u64[0], fle_ld(…))` の形）より新しい呼び出しの方が短いため（推測。行ごとの比較はしていない）。
+依頼文の「215MB」は、他の担当の変更が入る前の `out-pdata` の値（215,649,724）。変更前の値は、今のワークツリーのまま MXCSR の変更だけを外して再生成した（`out-mxcsr/out/base.c`）ものを使った。生成 C に `fle_mx_` を含む行は 49,997 行、4,245,954 バイト。減ったのは、旧ハンドラの C 式（`fle_addsd(X[0].u64[0], fle_ld(…))` の形）より新しい呼び出しの方が短いため（推測。行ごとの比較はしていない）。
 
 未対応の減少（`unsupported`）: Mulpd 25、Addpd 13、Cvtdq2ps 9、Subpd 8、Prefetcht0 5、Cvtpd2ps 2、Cvtps2pd 2（計 64）と、IAT の `Jmp` が 588 → 557（−31、他の担当の変更の分で、今回の作業とは無関係）。ハンドルされた命令数（生成 C の `handled` 表）で今回の対象に当たるのは 50,002 件。
 
@@ -48,7 +48,7 @@
 
 ### 2.4 オラクル v2 の再実行（run5、`lift/out-oracle/results/run5/`）
 
-再現: `lift/harness/oracle/build5.sh`（lift 側のみ再ビルド: `fe-lift lift --pdata` → `out-pdata/split_c.py` → clang。19 秒）、`lift/harness/oracle/run5.sh`（`ORACLE_BIN=lift/out-mxcsr/oracle/bin` を設定して `run_diff2.py`）。run2.sh は `out-oracle/bin` を使い、lift 側は `out-pdata/parts/*.o`（古い生成 C）を使うので、そのままでは新しい runtime とレクサを使わない。run5 の native 側は run4 と同じバイナリ（複写）、選別・seed・入力・比較は run4 と同じ（1,000 関数、16 case、seed 1、ネガコン 200）。
+再現: `lift/harness/oracle/build5.sh`（lift 側のみ再ビルド: `fe-lift lift --pdata` → `out-pdata/split_c.py` → clang。19 秒）、`lift/harness/oracle/run5.sh`（`ORACLE_BIN=lift/out-mxcsr/oracle/bin` を設定して `run_diff2.py`）。run2.sh は `out-oracle/bin` を使い、lift 側は `out-pdata/parts/*.o`（古い生成 C）を使うので、そのままでは新しい runtime とレクサを使わない。run5 の native 側は run4 と同じバイナリ（コピー）、選別・seed・入力・比較は run4 と同じ（1,000 関数、16 case、seed 1、ネガコン 200）。
 
 | 判定 | run4 | **run5** |
 |---|---|---|

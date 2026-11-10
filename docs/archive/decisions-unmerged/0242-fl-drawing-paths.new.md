@@ -119,7 +119,7 @@
 - 修正後に残る 67 の分類: **E 27**(WS_EX_NOACTIVATE / disabled: runtime は Learn に従い、Wine は活性化する。win-act-known-divergence.txt の既知の class E)、**M 26**(最小化・最大化の状態遷移の活性化とフォーカス。未検討)、**V 14**(隠れた窓: Wine は活性化する、runtime は見える窓だけ〔決定 0222 の読み〕)。**見えていて通常状態で有効な窓の活性化の食い違いは修正後に 0**(修正前は 6 = b1 のセル)。メッセージだけが違うセルは、`WM_WINDOWPOSCHANGING` の旗(0x97 / 0x57 と 0x83 / 0x43 など、既知)、隠れた窓の z 位置、`WM_SHOWWINDOW`(`SW_SHOWNORMAL` は Learn どおり送らない / Wine は送る、`SW_SHOWNA` は見えていても Wine は送る)。V と M は Wine だけでは実 Windows の答えを決められないので**変えていない**。
 - scenario 15 は FL の popup の呼び出し列(create 所有=GetActiveWindow、TOPMOST、FRAMECHANGED、size、SHOWNOACTIVATE、SHOWNORMAL)を再現する。active / foreground / focus と活性化メッセージは **11 ステップすべて Wine と一致**(b2 の修正後)。残る差は既知の class G(topmost の `GetWindow(GW_HWNDNEXT)`)、H(隠れた窓の WM_WINDOWPOSCHANGED の旗)、W、F、L で、`win-act-known-divergence.txt` に理由つきで足した。
 
-**試験**: `cargo test -p fe-lift --test win2_act` = 2 通過(pinned の runtime 出力は既存 12 scenario が不変、13・15 を追加。Wine 10.0 との全ステップ一致)。全体テスト(`cargo test --locked --offline --workspace --no-fail-fast -- --test-threads=2`、HEAD c8cdfd07 の木 + 本件の runtime の 2 変更)= **196 結果 / 2,387 通過 / 0 失敗 / 1 ignored**(`logs/cargo-test-modal-full.log`。pick1 の SPI 採用後と同数。scenario 13・15 は既存のテストの入力に足したので件数は増えない)。最新 HEAD bf929554 に載せ替えた木で `win2_act` 2・`window` 37・`wall_ia1w` 7・`present2_uncover` 16 が通過(`logs/cargo-win2_act-rebased.log`)。**a4 FRUITY-off**(`a4-fruity.sh off`、載せ替えた木): init_count 942/942、関数 5,310、関数入口 1,009,737、harness 終了コード 0 = 基準と一致(`logs/a4-off-modal.log`)。
+**テスト**: `cargo test -p fe-lift --test win2_act` = 2 通過(pinned の runtime 出力は既存 12 scenario が不変、13・15 を追加。Wine 10.0 との全ステップ一致)。全体テスト(`cargo test --locked --offline --workspace --no-fail-fast -- --test-threads=2`、HEAD c8cdfd07 の木 + 本件の runtime の 2 変更)= **196 結果 / 2,387 通過 / 0 失敗 / 1 ignored**(`logs/cargo-test-modal-full.log`。pick1 の SPI 採用後と同数。scenario 13・15 は既存のテストの入力に足したので件数は増えない)。最新 HEAD bf929554 に載せ替えた木で `win2_act` 2・`window` 37・`wall_ia1w` 7・`present2_uncover` 16 が通過(`logs/cargo-win2_act-rebased.log`)。**a4 FRUITY-off**(`a4-fruity.sh off`、載せ替えた木): init_count 942/942、関数 5,310、関数入口 1,009,737、harness 終了コード 0 = 基準と一致(`logs/a4-off-modal.log`)。
 
 **alpha1(決定 0244)・win2(0222)との重なり**: alpha1 の `fle_win.c` の変更は `hit_test` / `hit_visible`・`win` の欄・`SetWindowRgn` の後ろの関数で、`ShowWindow`(約 3350〜3420 行)と `DestroyWindow`(約 4170 行)から離れている(衝突は hunk の近接だけ)。win2 の前面化・閉じる・配置のコードの条件を変えたのは `ShowWindow` の活性化の 1 行の条件と、`DestroyWindow` の所有窓の再帰だけ。
 
@@ -164,7 +164,7 @@
 - 同じ行: B01〜B04、B06、B20〜B28、B41、B42 は我々の答えが典型と同じ。
 
 ### 4.3 修正(`pick1-spi.diff`、旗なし)と PM の判断
-**採った変更(1 件)**: `lift/runtime/fle_spi.c`/`.h`: `SPI_GETANIMATION` の `iMinAnimate` の初期値 1、`SPI_SETANIMATION`(0x49)を実装(`ANIMATIONINFO` を保持。cbSize/uiParam≠8・pvParam NULL は従来どおり名前付き停止、fWinIni は無視〔ユーザープロファイルに書かない〕)。試験 `spi.rs` を更新(35 通過)。**FL 固有の分岐は足していない**(SPI の戻り値だけ)。分類: 外部 API の契約(Learn の SPI_SETANIMATION の記述)の実装 + 既定値の選択(S-pick1-spi-2、Learn に値は無く、Windows と Wine 10.0 の既定が 1)。効果: 窓表・画素は 0 件変化(起動 16 スナップ・操作 29 スナップの g3 行の差分 0)。
+**採った変更(1 件)**: `lift/runtime/fle_spi.c`/`.h`: `SPI_GETANIMATION` の `iMinAnimate` の初期値 1、`SPI_SETANIMATION`(0x49)を実装(`ANIMATIONINFO` を保持。cbSize/uiParam≠8・pvParam NULL は従来どおり名前付き停止、fWinIni は無視〔ユーザープロファイルに書かない〕)。テスト `spi.rs` を更新(35 通過)。**FL 固有の分岐は足していない**(SPI の戻り値だけ)。分類: 外部 API の契約(Learn の SPI_SETANIMATION の記述)の実装 + 既定値の選択(S-pick1-spi-2、Learn に値は無く、Windows と Wine 10.0 の既定が 1)。効果: 窓表・画素は 0 件変化(起動 16 スナップ・操作 29 スナップの g3 行の差分 0)。
 **PM の判断(2026-11-05): 残り 2 件は採らない**。理由(PM): (1) `SPI_GETFONTSMOOTHINGTYPE` を ClearType にする変更と (3) `SPI_GETCURSORSHADOW` を TRUE にする変更は、根拠が『典型の Windows の既定』だけで契約にない。問い合わせの答えは**我々の仮想システムの実際の状態**を述べるものにする。ClearType は副画素の並び(RGB/BGR)を前提とした描画で、ブラウザの canvas は拡大縮小され(DPR が整数でない)並びが保証されないので、色つきの縁が出る。リモート接続の Windows もグレースケールを答える。全 34 + 68 面の画素が変わる費用に見合う利益の実測が無い。カーソルの影は、我々のカーソルはホストの CSS カーソルで影を描かないので実際の状態は FALSE。
 - 試作の測定(参考、`tables/spi-cleartype-effect-NOT-ADOPTED.tsv`): ClearType にすると窓表は変わらず、文字の画素だけが変わる(QFC が副画素の被覆の経路に切り替わる)。CPU は load のゆれの内(全体 0.965 倍)。
 
@@ -196,13 +196,13 @@
 
 ## 7. 自己申告と未確認
 
-- 規則違反/逸脱: (1) `pkill -x gdb` を 2 回実行した(自分の gdb を止めるため。**同じユーザーの他の担当の gdb を止めた可能性があり、確認していない**)。PM の指示後は、自分が起動した PID だけを `kill` している(cargo の全体テストを止めたとき、`/proc/<pid>/cwd` が自分の作業ディレクトリであることを確認した)。(2) 同時に 5 プロセスの時間があった(native-build の 4 ジョブ + gdb の実行)。以後は 4 以下。(3) `sleep 0` を 1 回書いて拒否された。(4) `/tmp/opencode` に一時ファイル(`.o` 2 個、逆アセンブル 1 個)を作り、削除した。(5) cargo の試験が木の中に `lift/out-*`・`lift/target` を作った(削除、差分に入っていない)。
+- 規則違反/逸脱: (1) `pkill -x gdb` を 2 回実行した(自分の gdb を止めるため。**同じユーザーの他の担当の gdb を止めた可能性があり、確認していない**)。PM の指示後は、自分が起動した PID だけを `kill` している(cargo の全体テストを止めたとき、`/proc/<pid>/cwd` が自分の作業ディレクトリであることを確認した)。(2) 同時に 5 プロセスの時間があった(native-build の 4 ジョブ + gdb の実行)。以後は 4 以下。(3) `sleep 0` を 1 回書いて拒否された。(4) `/tmp/opencode` に一時ファイル(`.o` 2 個、逆アセンブル 1 個)を作り、削除した。(5) cargo のテストが木の中に `lift/out-*`・`lift/target` を作った(削除、差分に入っていない)。
 - 確認できなかったこと: 上の結論 6、ピッカーの 62.5 回/s の停止条件(機械語)、b1 / b2(§2.5)が実 Windows でも Wine 10.0 と同じか(Wine は参照であって Windows ではない)、`warp_bilin` の HLE が FL の挙動の『代行』に当たるか(PM の判断点。既存の仕組みで、本調査は変えていない)、ClearType の副画素が実 Windows と同じ画素になるか(採らないので測っていない)。
 - 出典の無い選択(S-): S-pick1-spi-2 `iMinAnimate` の初期値 1 と SET の保持(採用)、S-pick1-spi-1/3(ClearType、カーソルの影。試作のみ、PM が不採用)、S-pick1-meth-1 『典型の答え』の根拠が調査者の知識であること、S-pick1-meth-2 IPP の関数名を『最寄りの export』で近似(内部関数は名前が無い)、S-pick1-meth-3 CPU 秒を load 12〜30 で測った(±30%)、S-pick1-ops-1 操作の座標(1920x1080、Basic.flp)。
-- 試験: 採用した状態(SPI_GETANIMATION / SETANIMATION のみ)で全体テストを実行した。結果は下の §7.1。試作の 3 変更の状態での個別実行(spi 35、wall_q 5、wall_b 13)は、この採用後の全体実行に置き換わった。
+- テスト: 採用した状態(SPI_GETANIMATION / SETANIMATION のみ)で全体テストを実行した。結果は下の §7.1。試作の 3 変更の状態での個別実行(spi 35、wall_q 5、wall_b 13)は、この採用後の全体実行に置き換わった。
 
 ### 7.1 全体テストと a4
-- **全体テスト**(実行した): `cargo test --locked --offline --workspace -- --test-threads=2`(HEAD 703bafba + 本件の採用した変更 3 ファイル、`CARGO_INCREMENTAL=0`、`nice 15`)= **196 結果 / 2,387 通過 / 0 失敗 / 1 ignored**(`logs/cargo-test-full.log`)。個別: `spi` 35 通過、`wall_b` 13 通過、`wall_q` 5 通過。以前の決定が記録する基準値は『194 結果 / 2,373 通過』で、**今回は +2 結果・+14 通過**。この差の原因は調べていない(HEAD の進みか、基準値の数え方か。0 失敗なので判定には影響しない)。ignored の 1 件は SIMD の試験(`simd_int_*` の組)で、本件と無関係。
+- **全体テスト**(実行した): `cargo test --locked --offline --workspace -- --test-threads=2`(HEAD 703bafba + 本件の採用した変更 3 ファイル、`CARGO_INCREMENTAL=0`、`nice 15`)= **196 結果 / 2,387 通過 / 0 失敗 / 1 ignored**(`logs/cargo-test-full.log`)。個別: `spi` 35 通過、`wall_b` 13 通過、`wall_q` 5 通過。以前の決定が記録する基準値は『194 結果 / 2,373 通過』で、**今回は +2 結果・+14 通過**。この差の原因は調べていない(HEAD の進みか、基準値の数え方か。0 失敗なので判定には影響しない)。ignored の 1 件は SIMD のテスト(`simd_int_*` の組)で、本件と無関係。
 - **a4 FRUITY-off**(実行した): `lift/harness/a4-fruity.sh off`(`JOBS=3`、native、src の採用した状態の runtime、生成 C は `ci/stage-lift.sh` の出力)= init_count **942/942**、run_rank **895/895**(started 895・completed 895・in_progress 0)、実行した異なる関数 **5,310**、関数入口 **1,009,737**、`stop: returned from entry`、harness の終了コード 0(gen 20 s、build 220 s)。基準値(942/942、895/895、5,310、1,009,737)と**一致**(`logs/a4-off.log`)。
 
 ## 8. 期待値が変わる物
@@ -217,7 +217,7 @@
 
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準: HEAD 33349a3d に `pick1.diff`(新規 49 ファイルだけ、`-` 行 0)と `pick1-spi.diff`(runtime + 試験の 3 ファイル、`-` 行 10 本は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-p1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体試験 **196 results / 2,387 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
+取り込んだ基準: HEAD 33349a3d に `pick1.diff`(新規 49 ファイルだけ、`-` 行 0)と `pick1-spi.diff`(runtime + テストの 3 ファイル、`-` 行 10 本は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-p1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **196 results / 2,387 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
 
 1. **SPI は SPI_GETANIMATION(iMinAnimate の初期値 1)と SPI_SETANIMATION(保持)だけを採る。** 窓表・g3 行の変化 0。
 2. **SPI_GETFONTSMOOTHINGTYPE を ClearType にする変更と SPI_GETCURSORSHADOW を TRUE にする変更は採らない**(PM の判断): 根拠が『典型の Windows の既定』だけで契約に値がない。問い合わせの答えは、我々の仮想システムの実際の状態を述べるものにする。ClearType は副画素の並びを前提とした描画で、ブラウザの canvas は非整数 DPR で拡縮されるので並びが保証されず色つきの縁が出る(リモート接続の Windows もグレースケールを答える)。起動 16 スナップ全 34 件と操作 29 スナップの 68 件の画素が変わる費用に見合う利益の測定がない。カーソルは host の CSS カーソルで影を描かない(実際の状態は FALSE)。

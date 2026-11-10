@@ -4,7 +4,7 @@
 
 「実測」はツールの出力、「推測」は未検証の解釈。
 
-**混在の注意**: 作業ツリーには他担当の変更（x87 の F2XM1/FSINCOS: `fe-lift/src/x87.rs`、`runtime/fle_x87.c`、`fle_x87.h`、`tests/x87_trans*`。MXCSR: `runtime/fle_mxcsr_flags.h`。ETXTBSY 修正: `tests/` の多数）が混在し、**私の作業中にも書き換えられた**（§6）。私が触ったのは §8 のファイルだけ。
+**混在の注意**: ワークツリーには他担当の変更（x87 の F2XM1/FSINCOS: `fe-lift/src/x87.rs`、`runtime/fle_x87.c`、`fle_x87.h`、`tests/x87_trans*`。MXCSR: `runtime/fle_mxcsr_flags.h`。ETXTBSY 修正: `tests/` の多数）が混在し、**私の作業中にも書き換えられた**（§6）。私が触ったのは §8 のファイルだけ。
 
 ## 1. 現在の runtime が答える LCType と abort する LCType（実測、読み）
 

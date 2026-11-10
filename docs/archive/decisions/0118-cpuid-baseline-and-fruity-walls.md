@@ -184,7 +184,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: UuidC
 
 - **gdb**（`logs/c2on/gdb-wintrust-paths.txt`）: `WinVerifyTrust` の 4 回の呼び出しのパスは #1・#2 が `…\FLEngine_x64.dll`、#3・#4 が `…\FL64.exe`（決定 0117 では 4 つとも DLL）。`GetModuleFileNameW/A` は FRUITY 無効の a4（DllMain まで）で 42 回呼ばれ、hModule が NULL のものが 27 回、0x400000 が 6 回、実在モジュール（0x1d00000 = QFC、0x6000000 = ILTools）が 9 回（`logs/gdb-fxsr/gdb-gmfn.txt`。gdb のブレークポイントで数えた）。NULL の 27 回が D2 で答えが変わった呼び出し。
 - **決定 0105 のフック有効化**: `f_8e0ef0`（有効化の呼び出し、戻り先 0x8e4af6）が FL64.exe でも呼ばれる（入口列に 1 回。`0x414e70`（文字列比較）の呼び出し数は 203 で、D2 の前後で不変）。
-- **差分の当たり方**: `patch -p1 --dry-run` は成果物の `fruity5.diff` を HEAD b8ed117（c76a7c3 の後に他の作業者の docs だけが入った。`lift/` は同じ）の clean な archive に当てて、終了 0、33 ファイルとも当たり、当てた木の 33 ファイルが作業木と `cmp` で一致することを確認した（`logs/patch-verify.txt`、`logs/patch-apply.txt`）。
+- **差分の当たり方**: `patch -p1 --dry-run` は成果物の `fruity5.diff` を HEAD b8ed117（c76a7c3 の後に他の作業者の docs だけが入った。`lift/` は同じ）の clean な archive に当てて、終了 0、33 ファイルとも当たり、当てた木の 33 ファイルがワークツリーと `cmp` で一致することを確認した（`logs/patch-verify.txt`、`logs/patch-apply.txt`）。
 
 ## 解釈が分かれた点
 

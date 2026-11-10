@@ -15,7 +15,7 @@
 | # | 問い | 答え | 区分 |
 |---|---|---|---|
 | 1 | 計画『Blend2D のコア約 41 入口を上流 wasm に置換』は成り立つか | **そのままでは成り立たない**。ラッパー(Agg2D)は Blend2D オブジェクトの impl を直接読み書きし(refcount/flags、context の virt と state の中身、画像の format)、既定オブジェクトは Blend2D の runtime init が `.data` に書く。上流 wasm32 の impl は配置が違う。→ **オブジェクトモデルは lift のまま、置換はコンテキストだけ(18 入口)**のハイブリッドに変更(PM が承認) | 読み(静的)+実測(gdb) |
-| 2 | 置換の機構 | `fe-lift lift … --swap-entries FILE`(`ADDR NAME`)。指定した入口は関数入口として閉包に入るが本体はデコードせず先も辿らず、C は `fle_swap_NAME()` を呼ぶスタブ。**オプション無しの生成 C は HEAD の fe-lift と byte 同一**(FLEngine と 5 DLL)。単体試験 6+4 件 pass | 実測 |
+| 2 | 置換の機構 | `fe-lift lift … --swap-entries FILE`(`ADDR NAME`)。指定した入口は関数入口として閉包に入るが本体はデコードせず先も辿らず、C は `fle_swap_NAME()` を呼ぶスタブ。**オプション無しの生成 C は HEAD の fe-lift と byte 同一**(FLEngine と 5 DLL)。単体テスト 6+4 件 pass | 実測 |
 | 3 | 閉包の大きさ(Blend2D) | 現行(`--pdata`+seeds964): 3,093 関数・432,647 命令・C 101,445,366 B。置換版(ラッパー+init+CRT+オブジェクトモデル+必要な分岐先の種 575 個): **733 関数・45,729 命令・C 4,084,565 B**(約 1/25) | 実測 |
 | 4 | wasm の大きさ(Blend2D のモジュール全体: lift 部+アダプタ+上流 no-JIT、デッドコード除去を止めて測定) | lift 部 -Oz: **2,344,334 B(brotli 386,046)**、lift 部 -O2: 3,826,426 B(brotli 480,067)。上流部分は常に -O2 でビルド(stock の CMake が -O2 を足す)。現行 lift の Blend2D は 44.0 MB(-Oz)/19.5 MB(outline-shared 後)(**PM の値、再測定していない**)→ 約 1/19、約 1/8 | 実測(置換版)/PM の値(現行) |
 | 5 | 置換の同一性(native、lift 版 vs 置換版、同じオブジェクト群) | 走査 142 本: RESULT/CHECK/VALUE と、各呼び出しの後のコンテキスト state(0x120 バイト)のハッシュ 230,331 行が**バイト一致**。fuzz 種 41〜300: 288,648 行一致。swap1 の 20,000 手のハッシュ `e4b385310d0fca08` 一致。実エンジン 16 スナップ(progress 分離構成): **84 行一致**(面 SHA 34 行を含む) | 実測 |
@@ -70,12 +70,12 @@
 - `fe-decode`: `analyze_with_swap(pe, extra, specs, opts, &swap)`(`analyze_with_options` は空集合で呼ぶだけ)。置換入口は seed として関数入口になるが、デコードも先の辿りもしない。他の関数からの `call`/`jmp` はその入口への呼び出し/tail call になる(直接 `jmp` が入口に向かうとき、その本体を呼び元のブロックとして辿らない)。
 - `fe-lift`: `GenOptions.swap`(`generate_full` の引数は不変)。出力は関数ごとに `void f_<va>(void) { extern void fle_swap_<name>(void); fle_swap_<name>(); }`。dispatch 表には入る(仮想関数表からの間接呼び出しが届く)。`--outline-shared`・`--dead-flags` とは併用不可(明示のエラー)。入口が `.text` に無い/重複は名前つきエラー。
 - 呼び出し規約: ホスト実装は入口時点のゲスト状態(引数 R[1] R[2] R[8] R[9] と X[1..3]、戻りアドレスが [R[4]])から読み、結果を R[0] に書く。callee-saved と R[4] は変えない。volatile レジスタ・フラグは lift した本体が残す値とは違う値になる(ABI に従う呼び出し元には見えない: 読み)。
-- 試験(`tests/swap_entries.rs` 6 件、`src/swap.rs` 単体 4 件、期待値は命令の意味と上の規則から書いた): 置換入口は stub になり callee は閉包に入らない/入口は dispatch 表に残る/tail call/オプション無しは旧出力と byte 同一/不正入口はエラー/併用不可はエラー/生成 C がコンパイルできる。
+- テスト(`tests/swap_entries.rs` 6 件、`src/swap.rs` 単体 4 件、期待値は命令の意味と上の規則から書いた): 置換入口は stub になり callee は閉包に入らない/入口は dispatch 表に残る/tail call/オプション無しは旧出力と byte 同一/不正入口はエラー/併用不可はエラー/生成 C がコンパイルできる。
 
 ## 4. 生成 C の不変(オプション無し)
 
 HEAD 071c53f の fe-lift と、載せ直した fe-lift の出力を、オプション無しで比べた(同じ入力):
-FLEngine(本番の seeds・hook・SEH 付き)の C SHA-256 `6d39d04fc58d80b52ec1f39ba1aa15ba378aecd6e99cd757b9ce90dc8fd8904d`(両方同じ)、Blend2D(`--pdata`+seeds964+sites)`9600514f702a22d6f0737714df89d8183b0ced28050bb2cbf3fb1b2ab7da5f4b`(両方同じ)。HEAD 291060b の fe-lift に対しても 6 画像(FLEngine と 5 DLL)で同一(`logs/gen-cmp-sha.txt`)。**既存の全体テスト(`bash lift/harness/test.sh full`、基準 142 results・2,083 passed)と FRUITY 無効 a4 は走らせていない**。生成 C が同一であること(任務が許した代替)に拠る。新しい差分が既存テストの対象に触れるのは `lift/harness/b2d_scan.c`・`b2d_scan_table.h`(試験を足しただけ。環境変数が無ければ既存の試験の出力は同じ)だけ。
+FLEngine(本番の seeds・hook・SEH 付き)の C SHA-256 `6d39d04fc58d80b52ec1f39ba1aa15ba378aecd6e99cd757b9ce90dc8fd8904d`(両方同じ)、Blend2D(`--pdata`+seeds964+sites)`9600514f702a22d6f0737714df89d8183b0ced28050bb2cbf3fb1b2ab7da5f4b`(両方同じ)。HEAD 291060b の fe-lift に対しても 6 画像(FLEngine と 5 DLL)で同一(`logs/gen-cmp-sha.txt`)。**既存の全体テスト(`bash lift/harness/test.sh full`、基準 142 results・2,083 passed)と FRUITY 無効 a4 は走らせていない**。生成 C が同一であること(任務が許した代替)に拠る。新しい差分が既存テストの対象に触れるのは `lift/harness/b2d_scan.c`・`b2d_scan_table.h`(テストを足しただけ。環境変数が無ければ既存のテストの出力は同じ)だけ。
 
 ## 5. 閉包の種(`--pdata` を外すと必要になるもの)
 
@@ -109,7 +109,7 @@ FLEngine(本番の seeds・hook・SEH 付き)の C SHA-256 `6d39d04fc58d80b52ec1
 
 分離構成での結果(`tables/g3lines-*.txt`、`logs/`): **lift 版と置換版の 84 行が全部バイト一致**(snap 16、progress 16、surface 34、layered 2、wintable 16)。置換版は `B2D1_CHECK=1` で 8,016 回の attach、35,172 回の描画を通した(`runs/engine-swap-p.stats`)。分離構成での lift 版の面 SHA 34 行は、既定の構成の基準と**同じ位置で 22 行が一致し 12 行が違う**(最初の idle `a970cb0a…` は一致。数え方の変更だけで、画素を変えたのではない: Blend2D の単位の間接呼び出しが 16 スナップ全体で 518,346 回、従来の progress に入っていた〔既定 18,284,440 − 分離 17,766,094〕)。Blend2D の呼び出し 1 回あたりに直すと、描画 1 回(attach・初期化の分を含めて割った粗い値)あたり約 14.7 回の間接呼び出し(518,346 / 35,172)で、最初の idle までは 202,030 回(10,881,831 − 10,679,801)。置換版は Blend2D 内部(ラスタ化・パイプライン)の間接呼び出しが無く、ラッパー・init・CRT・オブジェクトモデルの分だけ残る(既定の数え方での置換版の progress 18,085,771 − 分離 17,766,094 = 319,677)。分離構成の基準 SHA は `tables/g3lines-split-count.txt`(lift 版)、`tables/g3lines-split-count-swap.txt`(置換版。同一)。
 
-### 6.4 アダプタの単体試験(ポインタ幅に依存する経路)
+### 6.4 アダプタの単体テスト(ポインタ幅に依存する経路)
 
 `test_adapter.cpp`: 『ゲスト』は素のメモリで、ゲスト配置の画像 impl・パス impl(command/vertex 配列)・`{u64 data, u64 size}` の配列ビューを手で作り、R[]/X[] に引数を入れてスタブを呼び、同じ描画を上流の C++ API で直接行った結果と画素ハッシュを比べる(40 ラウンド×60 手: 矩形・楕円・ポリゴン塗り・折れ線ストローク・ストローク幅・結合・塗りルール・平行移動・パス塗り)。**native と wasm32(emscripten、node 24、-Oz と -O2)で全ラウンド一致**。wasm32 の実行は、ゲスト配置と上流の配置が実際に違う条件での実行である(native は 64 ビットで両者が一致する)。
 
@@ -117,7 +117,7 @@ FLEngine(本番の seeds・hook・SEH 付き)の C SHA-256 `6d39d04fc58d80b52ec1
 
 `b2d_swap.cpp` を `-DB2D1_MUTANT=n` で 1 件ずつ壊し、走査を決めた順序で走らせ、lift 版と違う行(または停止)が出たら検出(`harness/b2d1/mutate.sh`、`logs/mutation-*.txt`)。
 
-| n | 変異 | 検出した試験 |
+| n | 変異 | 検出したテスト |
 |---|---|---|
 | 1 | setCompOp の値に +1 | clear |
 | 2 | 鏡の userTransform を更新しない | rotprobe(state ハッシュ) |
@@ -207,7 +207,7 @@ FLEngine(本番の seeds・hook・SEH 付き)の C SHA-256 `6d39d04fc58d80b52ec1
 ## 11. 推奨(採用の判断は PM)
 
 - **採る価値がある条件**: wasm の大きさ(Blend2D 44.0 MB → 2.34 MB〔lift 部 -Oz、約 1/19。outline-shared 後の 19.5 MB 比で 1/8〕。lift 部 -O2 は 3.83 MB)が目的なら、このハイブリッドは native で lift 版と同じ画素・同じ state を出し(§6)、速さも落ちない(描画は約 2 倍速い、起動は同程度)。採用すると『Blend2D の単位が生成する Blend2D 内部の間接呼び出しが progress に入らなくなる』ので、**既定の構成の基準 SHA(従来の 84 行)は変わる**。変えるなら、新しい基準(§6.3 の分離構成。または置換版の既定の構成で新たに取り直した SHA)に更新する決定が要る。
-- **条件**: (1) wasm でのエンジン実行(§9)を先に通す。アダプタ単体は wasm32 で通ったが、エンジンの経路・時間は未確認。(2) libm の橋渡しを維持する(上流の更新・別の libm では不一致が戻る)。(3) 種の不足は名前つき停止なので、本番の経路(曲再生など)の網羅試験が要る。(4) 合成演算: 16 スナップでは SRC_OVER のみ。OVERLAY 等を使う場面があれば swap1 のテンプレートを上流に足す。
+- **条件**: (1) wasm でのエンジン実行(§9)を先に通す。アダプタ単体は wasm32 で通ったが、エンジンの経路・時間は未確認。(2) libm の橋渡しを維持する(上流の更新・別の libm では不一致が戻る)。(3) 種の不足は名前つき停止なので、本番の経路(曲再生など)の網羅テストが要る。(4) 合成演算: 16 スナップでは SRC_OVER のみ。OVERLAY 等を使う場面があれば swap1 のテンプレートを上流に足す。
 - **やめる条件**: wasm でのエンジン実行で時間や正しさに問題が出る、または progress を既定のままで置換の前後を一致させる必要が決まった(本作業の範囲では不可能と分かった: §6.3)。
 - **試す価値が残る**: progress を『置換した関数が lift 版なら数えたはずの回数』だけ進める(アダプタが固定値や実測の統計で足す)案は、入力依存で厳密にならない(読み)ので試していない。
 

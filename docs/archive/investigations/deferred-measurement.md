@@ -1,6 +1,6 @@
 # 決定 0096 の遅延モジュールの実装と測定: 遅延構成（診断）の a4 は 159/942、次の停止は shell32!SHGetFolderPathW（未応答の import）。この数は A4 の進捗ではない（測定のみ、決めない）
 
-実行日: 2026-10-25（JST。a4 の測定とテスト、変異検査）と 2026-10-27（JST。前回の中断後の再開。3 モジュールの回帰、全体テストのやり直し）。基準の HEAD は `0ddcbf1`（`git archive 0ddcbf1` を `lift/out-deferred/src/` に展開。`lift/` はその後の HEAD `5002d98` と同一で、`diff -rq` で確認した）。作業ツリーの決定 0095 の未コミットの編集（`fe-decode/src/jumptab.rs` ほか）には**触れていない**（この作業の差分に入らない）。作業物は `lift/out-deferred/`（gitignore 対象）。決定は `docs/decisions/0096-deferred-modules.md`（仮の決定。この文書は何も決めない）。
+実行日: 2026-10-25（JST。a4 の測定とテスト、変異検査）と 2026-10-27（JST。前回の中断後の再開。3 モジュールの回帰、全体テストのやり直し）。基準の HEAD は `0ddcbf1`（`git archive 0ddcbf1` を `lift/out-deferred/src/` に展開。`lift/` はその後の HEAD `5002d98` と同一で、`diff -rq` で確認した）。ワークツリーの決定 0095 の未コミットの編集（`fe-decode/src/jumptab.rs` ほか）には**触れていない**（この作業の差分に入らない）。作業物は `lift/out-deferred/`（gitignore 対象）。決定は `docs/decisions/0096-deferred-modules.md`（仮の決定。この文書は何も決めない）。
 
 **この文書の a4 の数（159/942）は「遅延構成（診断）」の数であり、A4 の進捗ではない**（決定 0096 の 6、決定 0046 は変えない）。遅延モジュールは `blend2d.dll` と `quickfontcache_x64.dll` の DllMain を実行せず、メモリ像も作らないので、実機と同じ挙動とは主張できない。M1 の A4 は、両 DLL を lift して実在モジュールにしてからの数で判定する。
 
@@ -204,5 +204,5 @@ funcs  : executed (distinct)=1069  entries=27333
 
 ## 9. 作ったファイル
 
-- 追跡対象にするもの: `docs/decisions/0096-deferred-modules.md`、`docs/investigations/deferred-measurement.md`（この文書）、`docs/README.md` の 0096 の行（作業ツリーの README は編集していない）、`lift/out-deferred/patches/deferred.diff`（`lift/runtime/fle_modules.{c,h}`、`fle_realmod.{c,h}`、`lift/crates/fe-lift/src/imports_table.rs`、`lift/crates/fe-lift/tests/{deferred,modules,msctf,load,event,glob,vfs,vol}.rs`）。
+- 追跡対象にするもの: `docs/decisions/0096-deferred-modules.md`、`docs/investigations/deferred-measurement.md`（この文書）、`docs/README.md` の 0096 の行（ワークツリーの README は編集していない）、`lift/out-deferred/patches/deferred.diff`（`lift/runtime/fle_modules.{c,h}`、`fle_realmod.{c,h}`、`lift/crates/fe-lift/src/imports_table.rs`、`lift/crates/fe-lift/tests/{deferred,modules,msctf,load,event,glob,vfs,vol}.rs`）。
 - 作業物（`lift/out-deferred/`）: `src/`（スナップショット）、`base0/`（`git archive 0ddcbf1`）、`base/`（その後の HEAD の `git archive`）、`verify/`（`git archive 0ddcbf1` に `patches/deferred.diff` を `patch -p1` で当てた結果。`src/` と全ファイルが一致）、`patches/`（`deferred.diff` 1,188 行、`patch -p1 --dry-run` と適用のログ）、`gen/`（FLEngine の新旧 C の diff）、`a4single/`、`deferred-cfg/`（遅延構成と 3 モジュールの回帰。スクリプト、ログ、gdb）、`mut/`（変異検査）、`test-ws.txt`、`test-ws2.txt`（打ち切り）、`test-ws3.txt`、`tmp/`、`target/`。

@@ -28,7 +28,7 @@
 - `cargo test --offline -p fe-lift --test sse_shuf`: **17 件、すべて通過**（`test-sse_shuf-2.txt`、EXIT=0。`test-sse_shuf-1.txt` は同じ内容の 1 回目、17 件通過）。内訳: ホスト突合 13、ケース集合の範囲確認 1、m128 境界外が abort する 1（6 命令）、m64 の境界外が abort しない 1（4 命令のロード/ストア）、VEX 形が未対応のまま 1。
 - ホスト突合のケース数の合計: 8,352（`cases N failures 0` の和）。Shufps 1,112、Shufpd 1,112、Unpck 4 命令が各 800、Movhlps 600、Movlhps 600、Movlps/Movhps/Movlpd/Movhpd が各 342、閉包のレジスタ形エンコード 9 種 360。失敗 0。imm8 は Shufps、Shufpd とも 256 通り全部。ホストが xmm かメモリを変えたケースは全命令で 97.6% 以上（Shufpd 1,085/1,112、Unpcklpd 799/800、Movhlps/Movlhps と閉包のレジスタ形 599/600 または 359/360、他は全件）。
 - 変異テスト: `fle_shufps` の `(imm >> 4)` を `(imm >> 5)` にすると shufps のテストは 1,112 ケース中 813 件が失敗（EXIT=101、`test-sse_shuf-mutant.txt`）。元へ戻して再実行し 17 件通過。なお変異の 1 回目の実行は通過してしまった（原因は推測: 取り消しの編集とテストの実行を同じ並列ブロックで発行したため。確認していない）。2 回目で失敗を確認した。決定 0027 に記載。
-- `cargo test --offline --workspace --no-fail-fast`（`test-ws.txt`、`test-ws.exit` は EXIT=0）: **45 バイナリ、320 件 passed、0 failed、0 ignored**（`test result` 行の集計）。前回（sse-int2-run.md）の 43 バイナリ、294 件に対し +2 バイナリ、+26 件。+17 は今回の `sse_shuf` で、残りの +9 件、+1 バイナリ（`fe-lift/tests/res.rs`）などは他の担当の変更（`fe-pe/tests/resources.rs`、`fe-lift/tests/res.rs`、`runtime/fle_res.*` は作業ツリーにあるが私は触っていない）によるものと**推測**する（内訳は確認していない）。
+- `cargo test --offline --workspace --no-fail-fast`（`test-ws.txt`、`test-ws.exit` は EXIT=0）: **45 バイナリ、320 件 passed、0 failed、0 ignored**（`test result` 行の集計）。前回（sse-int2-run.md）の 43 バイナリ、294 件に対し +2 バイナリ、+26 件。+17 は今回の `sse_shuf` で、残りの +9 件、+1 バイナリ（`fe-lift/tests/res.rs`）などは他の担当の変更（`fe-pe/tests/resources.rs`、`fe-lift/tests/res.rs`、`runtime/fle_res.*` はワークツリーにあるが私は触っていない）によるものと**推測**する（内訳は確認していない）。
 
 ## 4. 生成、clang、リンク
 

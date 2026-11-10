@@ -1,6 +1,6 @@
 # 0319 補遺: diag-g9-fl(cand1)の診断ログの読み方(gpu1 の run を読む準備。alpha1、08:3x)
 
-**実際に実行した物**: `tools/a22-diag-read.py`(Python、依存なし)を (1) native の harness(`~/work/alpha22w/scroll0319/scroll_0319.c` を、HEAD ed125d09 + 0323 + scroll-model + time-env + stop-context + diag-g9-fl + diag-g9-fl-scroll を実適用した runtime C にリンクし、`FLE_DIAG_WIN=1 FLE_DIAG_SCROLL=1` で実行)が出した **本物の診断行**(window create/destroy 16 行・ScrollWindowEx 6 行)に対して、(2) 診断の printf の書式から**手で書いた fixture**(`tables/0319-diag-fixture-HANDWRITTEN-not-a-run.log`。**run の出力ではない**。DefWindowProc・vfs-miss・thread wait・stop context の行の読み取り試験用)に対して実行した。**wasm の bundle・Chrome・実エンジンの FL では実行していない**(cand1 の bundle はまだ無い)。以下の『期待』『読み』は仮説で、gpu1 の実 run の出力で確かめる。
+**実際に実行した物**: `tools/a22-diag-read.py`(Python、依存なし)を (1) native の harness(`~/work/alpha22w/scroll0319/scroll_0319.c` を、HEAD ed125d09 + 0323 + scroll-model + time-env + stop-context + diag-g9-fl + diag-g9-fl-scroll を実適用した runtime C にリンクし、`FLE_DIAG_WIN=1 FLE_DIAG_SCROLL=1` で実行)が出した **本物の診断行**(window create/destroy 16 行・ScrollWindowEx 6 行)に対して、(2) 診断の printf の書式から**手で書いた fixture**(`tables/0319-diag-fixture-HANDWRITTEN-not-a-run.log`。**run の出力ではない**。DefWindowProc・vfs-miss・thread wait・stop context の行の読み取りテスト用)に対して実行した。**wasm の bundle・Chrome・実エンジンの FL では実行していない**(cand1 の bundle はまだ無い)。以下の『期待』『読み』は仮説で、gpu1 の実 run の出力で確かめる。
 
 ## 1. 有効にする(コード変更なし)
 

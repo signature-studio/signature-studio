@@ -4,7 +4,7 @@
 
 ## 0. 作業環境と方法
 
-- 作業ツリーの `lift/` は読んでいない。`git archive HEAD` を `lift/out-u114/stage` に展開したコピーだけを使った。コピーでの a4-survey は既存の記録と同じ停止を再現した: `fle: unsupported instruction at 0x425780`、init_count 115 / 942、最後の unit は index 114（proc 0x623840、in_progress）、started 111 / completed 110、関数実行数 645、入口数 13,910（`lift/out-u114/build/a4/20261022T124356Z-*`）。
+- ワークツリーの `lift/` は読んでいない。`git archive HEAD` を `lift/out-u114/stage` に展開したコピーだけを使った。コピーでの a4-survey は既存の記録と同じ停止を再現した: `fle: unsupported instruction at 0x425780`、init_count 115 / 942、最後の unit は index 114（proc 0x623840、in_progress）、started 111 / completed 110、関数実行数 645、入口数 13,910（`lift/out-u114/build/a4/20261022T124356Z-*`）。
 - コピーで `fe-lift lift ... --pdata` を実行し（生成 C は 59,297 関数、215 MB）、README の build_native.sh でネイティブの harness を作った。ランタイムとテーブルはコピーのまま。変更なし。
 - 静的解析: `lift/out-u114/work/{pelib,closure,dump,tail}.py`（pefile と capstone。`.pdata` の関数範囲を使い、直接 call と `jmp [rip+x]` の IAT thunk を辿る閉包。間接呼び出しは辿れず、件数だけ数えた）。
 - **探り（probe）**: ネイティブの harness を gdb で動かし、未実装の IAT thunk に当たったら**仮の値**を R[0] に入れて `return` し、続きを実行した（`lift/out-u114/probe/`、`lift/out-u114/work/probe*.py`）。実装ではない。ランタイムとテーブルのソースは変えていない。仮の値で得た結果は、ゲストが「どの API の後に何を要求するか」の測定であって、実機の値ではない。
@@ -162,7 +162,7 @@ GetModuleHandleW(L"USER32")（0x620e3f）→ 仮想 user32 のハンドル 0x7ff
 - unit 114 の「完了」は、`f_623840` から戻って unit 116 が始まったこと（`UNIT-START index=116`）と、a4 の started / completed の増加で確認した。
 - 145 以降は調べていない（§6 の停止の先は未測定）。
 - 名前（AllocateHWnd、StdWndProc、IsLibrary、TApplication など）は Delphi の知識からの**仮説**で、DLL にシンボルは無い。
-- 他の作業者が編集中の `lift/` の作業ツリーと決定 0071、`window-design.md` は読んでいない。ここでの「仮想ウィンドウ表が要る」の分類は、API の意味からの分類で、その設計への賛否ではない。
+- 他の作業者が編集中の `lift/` のワークツリーと決定 0071、`window-design.md` は読んでいない。ここでの「仮想ウィンドウ表が要る」の分類は、API の意味からの分類で、その設計への賛否ではない。
 
 ## 8. 成果物（`lift/out-u114/`、gitignore 済み）
 

@@ -1,6 +1,6 @@
 # 0234i(mt3): 段階 B(本物のスレッドでの実行)の設計の確定と、export の表・GIL の外の共有状態の表
 
-状態: 作業木の試作(旗つき足場)で測った事実と、そこから決めた設計。成果物の差分はまだ無い(規則 4: 未完成の物は取り込まない)。測定はこの機械(負荷 18〜30)・node 24 の worker_threads・最適化なしの wasm で、client の機械の値ではない。
+状態: ワークツリーの試作(旗つき足場)で測った事実と、そこから決めた設計。成果物の差分はまだ無い(規則 4: 未完成の物は取り込まない)。測定はこの機械(負荷 18〜30)・node 24 の worker_threads・最適化なしの wasm で、client の機械の値ではない。
 
 ## 1. 測ったこと(実エンジン)
 - 構成: F2xH7 の非ハイブリッド NO_FS=0、共有メモリ、R/FL/X と YH/MM/x87/MXCSR/SEH/コールバック深さ/TEB・TLS ポインタ/dispatch キャッシュの TLS、GIL、cmpxchg/xadd/xchg[mem] の本物のアトミック、実時計、**1 スレッド 1 Worker**(CreateThread のたびに pthread を 1 本起動。最大 31)。
@@ -20,7 +20,7 @@ JS(ページの Worker)が wasm の export を呼ぶ経路。第 1 Worker では
 |---|---|---|---|
 | fle_g3_mouse / key / display | 入力のキューへ積む(fle_input_host_*) | runtime の入力キュー(書く) | GIL を取る。積んだら入力待ちスレッドの Worker へ起床(`try_wake` が notify) |
 | fle_g3_pending / fle_g3_ticks / fle_g3_clock_to | キューの長さ・時計の読み・時計の前進 | 時計は実時計(読むだけ。`clock_to` は実時計では何もしない) | ticks は GIL なしでよい(原子的に読む)。clock_to は不要になる |
-| fle_g3_snapshot / probe_timer / timers | 面の hash・タイマーの記録(試験用) | 窓表・面(読む) | GIL を取る(試験用の入口。製品のコードに置かない方向) |
+| fle_g3_snapshot / probe_timer / timers | 面の hash・タイマーの記録(テスト用) | 窓表・面(読む) | GIL を取る(テスト用の入口。製品のコードに置かない方向) |
 | fle_host_post_input | 窓へ WM_ メッセージを積む | スレッドのキュー(書く) | GIL を取る |
 | fle_desk_compose / resync / describe | 窓を 1 枚の画像に合成 | 窓表・面(読む)、`need_full`(書く) | GIL を取る(合成は数 ms。その間は他の Worker の runtime 呼び出しが待つ: 測定が要る。ダブルバッファ化は第 3 段) |
 | fle_av_poll、fle_filedlg_saved_poll、fle_app_open / open_state | ファイル選択・アプリのビュー | 小さな状態 | GIL を取る |
@@ -50,7 +50,7 @@ JS(ページの Worker)が wasm の export を呼ぶ経路。第 1 Worker では
 ## 5. 未着手・残り
 - ミキサーが専用 Worker で走ることの確認(CPU の内訳。Worker ごとのスレッド CPU 時間)、テンポ 1.0(静かな機械・最適化版・Chrome/Firefox の実ブラウザ)。
 - ブラウザの駆動: ネストした Worker での pthread(emscripten の glue がそのまま使う)。Chrome 156 / Firefox 158 の確認は玩具(jn)まで。エンジン本体は未確認。
-- audio ring の共有メモリ化(段階 C)。いまの node 試験は ring を使わない(外部の消費者が無い)。
+- audio ring の共有メモリ化(段階 C)。いまの node テストは ring を使わない(外部の消費者が無い)。
 - 旗の除去: FLE_GIL / FLE_TLS_MORE は `tools5/strip_ifdef.py` で畳める。環境変数 FLE_WORKERS は定数(1 スレッド 1 Worker)にする。診断(fle_dbg*、ノートのリング、DBG1、スライスごとの JS スタック)は成果物に入れない。
 
 ## 6. GIL の取り方の変更(17:30、0234q)で守られる不変条件と、GIL を取らない import

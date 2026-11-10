@@ -6,7 +6,7 @@
 
 ## 冒頭の三点
 
-1. **何を実測したか**: (a) 書いたコード(Worker のビーコン保存、`/__perf/summary`、集計ライブラリの共通化、ci のスクリプト)を、型検査・vitest・Worker 試験(`wrangler dev --local` のローカル R2)・e2e(Chrome 156、ページの実ビーコン → Worker → R2 のオブジェクト)・変異検査で測った。(b) HEAD のページ + SHIP2 の wasm の組を実エンジンで first idle まで動かした(6.18 s、load 17.7)。(c) 本番に対して、ライフサイクル規則の追加 1 回、Worker の配備 1 回(version `b1823d09-dbb8-40d6-a922-0e99b708d556`)、一時トークンの作成と失効 7 本を行い、配備の前後に認証なしの 16 件が全部 Access の 302 であることを確かめた。(d) R2 の読み取りの手順(バケット限定の読み取りトークン → `perf/` だけの一時資格情報)を一時トークンで試した。
+1. **何を実測したか**: (a) 書いたコード(Worker のビーコン保存、`/__perf/summary`、集計ライブラリの共通化、ci のスクリプト)を、型検査・vitest・Worker テスト(`wrangler dev --local` のローカル R2)・e2e(Chrome 156、ページの実ビーコン → Worker → R2 のオブジェクト)・変異検査で測った。(b) HEAD のページ + SHIP2 の wasm の組を実エンジンで first idle まで動かした(6.18 s、load 17.7)。(c) 本番に対して、ライフサイクル規則の追加 1 回、Worker の配備 1 回(version `b1823d09-dbb8-40d6-a922-0e99b708d556`)、一時トークンの作成と失効 7 本を行い、配備の前後に認証なしの 16 件が全部 Access の 302 であることを確かめた。(d) R2 の読み取りの手順(バケット限定の読み取りトークン → `perf/` だけの一時資格情報)を一時トークンで試した。
 2. **結論**: Workers の Worker は、ページのビーコンを **1 ビーコン = 1 オブジェクト**(`fl-web-cache` の `perf/<UTC 日付>/<sid>-<seq>.json`、中身は `{t, remote:"workers", perf}` の JSONL 1 行)で保存し(IP・Access のメール・Cookie・トークンは保存しない)、`GET /__perf/summary`(Access の背後)で集計を日本語の見出し付きのテキストで返す。保存期間は `perf/` を 180 日で失効。最新の main(050fa43)+ この差分のアプリを Worker `fl-studio-web` に配備した。依頼者が一度ページを開けば、以後は依頼者もエージェントも Workers 上の実測を読める。**本番の Worker が実際に R2 へ書くことは、ローカルの R2 では確認したが本番では未確認**(Access の背後)。
 3. **未確認**: 本番の Worker から R2 への書き込み(依頼者のブラウザの最初のビーコン後に作業者が `perf/` を読んで確認する)、依頼者の Access 経由の表示、`ci/deploy-manual.sh bundle --execute`(本番の配信バケットは変更していない)、GitHub 上のワークフローとの結合(`workers1-ci.diff` はブランチ上で `ci/test-wrangler-config.sh` と `deploy --dry-run` を通しただけ)、`tools/perf-sync.sh` の『オブジェクトがある場合』の経路(本番に `perf/` のオブジェクトがまだ無い)。
 
@@ -14,8 +14,8 @@
 
 | 問い | 答え | 根拠 |
 |---|---|---|
-| ビーコンは Workers で失われなくなったか | **ローカルでは保存される**(11 件の Worker 試験 + e2e 33/33)。本番の保存は**未確認**(依頼者の最初のビーコン待ち) | §1、§6 |
-| 保存するもの/しないもの | 時刻・`workers`・ビーコン本体のみ。IP・`Cf-Access-Authenticated-User-Email`・Cookie・`Cf-Access-Jwt-Assertion`・User-Agent ヘッダーは保存しない(それらを付けて送った試験で、保存物に含まれないことを確認) | §1、試験 `keeps neither the IP address…` |
+| ビーコンは Workers で失われなくなったか | **ローカルでは保存される**(11 件の Worker テスト + e2e 33/33)。本番の保存は**未確認**(依頼者の最初のビーコン待ち) | §1、§6 |
+| 保存するもの/しないもの | 時刻・`workers`・ビーコン本体のみ。IP・`Cf-Access-Authenticated-User-Email`・Cookie・`Cf-Access-Jwt-Assertion`・User-Agent ヘッダーは保存しない(それらを付けて送ったテストで、保存物に含まれないことを確認) | §1、テスト `keeps neither the IP address…` |
 | 失敗したらページは壊れるか | 壊れない。204 + `X-Perf-Stored: no`、失敗は Worker のログへ(キーと原因のみ) | §1 |
 | 費用 | 1 ページ読み込みで最大 22 回の PUT(Class A)≒ **$0.0001**。無料枠内(月 100 万 Class A) | §1.4 |
 | 保持期間 | `perf/` を 180 日で失効(本番に追加。既存の 2 規則は残った) | §1.5 |
@@ -31,21 +31,21 @@
 ### 1.1 設計(読みと実測)
 
 - 保存先: R2 バケット **`fl-web-cache` の `perf/` 接頭辞**(S-workers1-1)。新しいバケットは作っていない。配信バケット `fl-web-assets` には入れない(`/assets/*` の配信経路に混ざらない)。`cache/` の 60 日失効規則とは別に `perf/` の規則を足した(§1.5)。Worker の R2 束縛は `PERF_BUCKET`(`app/wrangler.jsonc`)。
-- キー: `perf/<UTC 日付>/<sid>-<seq>.json`(S-workers1-2)。`sid` はページが読み込みごとに作る 12 桁の 16 進、`seq` はビーコンの通し番号。**ページの文字列がキーに入らない**: `sid` が 12 桁の小文字 16 進でなければ `nosid-<8 桁乱数>`、`seq` が 0〜999,999,999 の整数でなければ 0(`perfObjectKey`、単体試験 21 件)。日付は Worker が受け取った時刻の UTC。
+- キー: `perf/<UTC 日付>/<sid>-<seq>.json`(S-workers1-2)。`sid` はページが読み込みごとに作る 12 桁の 16 進、`seq` はビーコンの通し番号。**ページの文字列がキーに入らない**: `sid` が 12 桁の小文字 16 進でなければ `nosid-<8 桁乱数>`、`seq` が 0〜999,999,999 の整数でなければ 0(`perfObjectKey`、単体テスト 21 件)。日付は Worker が受け取った時刻の UTC。
 - 中身: ローカルのログと同じ JSONL の 1 行 `{"t": ISO 時刻, "remote": "workers", "perf": <ビーコン>}`(`perfLine`)。`cat` した複数オブジェクトがそのままログになる。`remote` は固定の語 `workers`(S-workers1-5: 従来の `loopback|lan|tailnet|other` は Workers 経由では Cloudflare のアドレスの分類になり意味を失い、アドレスは個人情報なので保存しない)。
-- サイズ: 従来どおり 1 ビーコン 16 KB 以内(検査は変更なし: 405/403/415/413/400)。保存されるオブジェクトは時刻と `workers` の分だけ少し大きい(16 KB ちょうどの本文で保存できることを試験)。実測の大きさ: 本番に出たビーコンはまだ無いので、これまでのローカルのログ 184 件の 1 行は中央値 5,003 B、p95 7,478 B、最大 8,262 B。
+- サイズ: 従来どおり 1 ビーコン 16 KB 以内(検査は変更なし: 405/403/415/413/400)。保存されるオブジェクトは時刻と `workers` の分だけ少し大きい(16 KB ちょうどの本文で保存できることをテスト)。実測の大きさ: 本番に出たビーコンはまだ無いので、これまでのローカルのログ 184 件の 1 行は中央値 5,003 B、p95 7,478 B、最大 8,262 B。
 - 失敗時: `put` の例外は捕まえ、`console.error`(キーと原因のみ。ビーコンの中身は出さない)を残して **204 + `X-Perf-Stored: no`**。束縛が無い Worker も 204/no(ログは出さない: 設定であって故障ではない)。ページは `X-Perf-Stored` を読んで『保存された/されなかった』を表示する(ページは変更していない)。
-- 『検査を通ったものだけ保存』: 415/413/400/403/405 のどれでも保存されない(試験で前後のオブジェクト数を比べる)。
+- 『検査を通ったものだけ保存』: 415/413/400/403/405 のどれでも保存されない(テストで前後のオブジェクト数を比べる)。
 - 置いた場所: `app/worker/perf-store.ts`(`storeBeacon`)、`app/shared/perf.ts`(`perfObjectKey`、`PERF_PREFIX`)、`app/worker/index.ts`(呼び出しと `X-Perf-Stored`)。
 
-### 1.2 試験(実測)
+### 1.2 テスト(実測)
 
 | 層 | 結果 |
 |---|---|
 | 単体(`test/unit/worker-perf-store.test.ts`、メモリ上の偽 R2) | 40 件 passed: キーの組み立て 21、保存(中身・プライバシー・束縛なし・失敗・Error でない拒否)5、集計(窓・上限 600・同時 6 以下・カーソル・欠けたオブジェクト・rows・machine・json・読めないオブジェクト・パラメータ検査)10、結合順序・`--dir` の CLI・`machineOf` 4 |
 | Worker(`npm run test:worker`、`wrangler dev --local` のローカル R2) | 50/50(これまで 43。旧『保存しない』4 件を、保存と集計の 11 件に置き換え)。ローカル R2 の中身は miniflare の sqlite とブロブファイルを**直接**読んで確かめた(Worker の API を通さない独立の読み) |
 | e2e(Worker 対象、perf-beacon 群) | 33/33: ページの実ビーコン(スタンドインのバンドル)が Worker に届き、ローカル R2 に新しいオブジェクトが 1 つ、キー形式・content type・1 行の JSONL・`remote: "workers"`・IP 無し・`beaconProblems` が空、`/__perf/summary` にその記録が STAND-IN と印を付けて出る |
-| 変異検査(新 20 件、unit + worker 層) | **20/20 検出**(1 回目は 19/20。見逃した `perf-store-without-a-binding-crashes` は、束縛が無いまま進んでも `try/catch` が false を返すので結果が同じになる等価変異で、『束縛が無いときは失敗として記録しない』を試験に足して再実行し検出)。検出の理由は試験名で確認(`logs/mutation-0224.log`、`mutation-0224-rerun.log`)。注意: worker 層は load 40〜70 の間の実行で、runner は非ゼロ終了を『検出』と数えるため、1 件は無関係の既存の Worker 試験の失敗、1 件は失敗試験 0 件の終了(harness の失敗)が混ざった。unit 層でも検出した変異はそれで確かな検出。worker 層だけが頼りの 3 件(`perf-worker-always-says-stored`、`perf-worker-stores-before-checking-the-body`、`perf-summary-route-answers-post`)は、失敗した試験の名前が狙いどおり |
+| 変異検査(新 20 件、unit + worker 層) | **20/20 検出**(1 回目は 19/20。見逃した `perf-store-without-a-binding-crashes` は、束縛が無いまま進んでも `try/catch` が false を返すので結果が同じになる等価変異で、『束縛が無いときは失敗として記録しない』をテストに足して再実行し検出)。検出の理由はテスト名で確認(`logs/mutation-0224.log`、`mutation-0224-rerun.log`)。注意: worker 層は load 40〜70 の間の実行で、runner は非ゼロ終了を『検出』と数えるため、1 件は無関係の既存の Worker テストの失敗、1 件は失敗テスト 0 件の終了(harness の失敗)が混ざった。unit 層でも検出した変異はそれで確かな検出。worker 層だけが頼りの 3 件(`perf-worker-always-says-stored`、`perf-worker-stores-before-checking-the-body`、`perf-summary-route-answers-post`)は、失敗したテストの名前が狙いどおり |
 | 型検査 | rc=0 |
 | vitest 全体 | 1,545 passed + 7 skipped(これまで 1,505 + 7) |
 | e2e 全体(dev + preview + worker) | **1,262/1,262**(dev 426 + preview 426 + worker 410。これまで 1,256。増えた 6 件は Worker 対象の保存の確認〔perf-beacon 群 4、perf-endpoint 群 2〕。`logs/e2e-full.log`。load 40〜70 の間の実行) |
@@ -70,9 +70,9 @@
 
 ### 2.1 (i) `GET /__perf/summary`(依頼者がブラウザで見る)
 
-- Access の背後(Worker の `checkAccess` の後、他のすべてのルートと同じ。認証なし/不正トークンは 403、試験済み)。FL の挙動にも窓にも関係しない。
+- Access の背後(Worker の `checkAccess` の後、他のすべてのルートと同じ。認証なし/不正トークンは 403、テスト済み)。FL の挙動にも窓にも関係しない。
 - 返すもの: 先頭に日本語の見出し(保存の説明、範囲、範囲内のオブジェクト件数と読んだ件数、パラメータの一覧)、続けて既存の集計(`shared/perf-summary.mjs` の `format`: P1/P2/P3 の行、エンジンの停止メッセージの表〔決定 0209〕、Files の使用〔0216〕、起動アセットの由来〔0220〕、機械/ブラウザ/画面周波数ごとの表)。記録ごとの 1 行表示は最後の 30 件(`?rows=all` で全部)。
-- 見え方(ローカルの Worker に 1 件送った試験の先頭 3 行。実測):
+- 見え方(ローカルの Worker に 1 件送ったテストの先頭 3 行。実測):
   ```
   計測の集計(Workers が R2 の perf/ に保存したビーコン。保存するのはこのWorkerが受け取った記録だけで、IP アドレス・メール・Cookie は保存していません)
   範囲: UTC 2026-11-03 〜 2026-11-03(1 日)。範囲内のオブジェクト 1 件、読んだ 1 件
@@ -95,7 +95,7 @@
 
 Cloudflare ダッシュボード → 左メニュー『R2 オブジェクト ストレージ』(R2 object storage)→ 『概要』(Overview)→ 『アカウントの詳細』(Account Details)の『API トークン』の『管理』(Manage)→ 『アカウント API トークンを作成』(Create Account API token)→ トークン名(任意、例 `r2-read-fl-web-cache`)→ 権限『オブジェクト読み取りのみ』(Object Read only)→ 『特定のバケットのみに適用』(Apply to specific buckets only)で **`fl-web-cache` だけ**を選ぶ → TTL は任意(例 30 日)→ 作成。画面に出る **Access Key ID** と **Secret Access Key**(一度しか表示されない)を控える。(メニュー名の日本語表記は読みの推測。英語表記は https://developers.cloudflare.com/r2/api/tokens/ のとおり。)
 
-- 実測(作業者が同じ権限のトークンを API で作って試験): このトークンは S3 資格情報として `fl-web-cache` を読める(`perf/` 0 件、`cache/` 32 件)、他のバケット(`fl-web-assets`)は AccessDenied。**R2 の資格情報はバケット単位で、プレフィックスでは絞れない**: このトークンは `cache/`(CI の段階キャッシュ)も読める(中身は我々のビルド成果物の層で、個人情報ではない)。
+- 実測(作業者が同じ権限のトークンを API で作ってテスト): このトークンは S3 資格情報として `fl-web-cache` を読める(`perf/` 0 件、`cache/` 32 件)、他のバケット(`fl-web-assets`)は AccessDenied。**R2 の資格情報はバケット単位で、プレフィックスでは絞れない**: このトークンは `cache/`(CI の段階キャッシュ)も読める(中身は我々のビルド成果物の層で、個人情報ではない)。
 - 渡し方(選択肢のみ): (1) 依頼者が、エージェントを起動する端末の環境変数 `<CREDENTIAL-NAME>`・`<CREDENTIAL-NAME>` に設定する(リポジトリの外。GitHub の Secrets ではない: Secrets は GitHub Actions からしか読めず、エージェントには届かない)。(2) 端末のホームの設定ファイル(リポジトリ外)に書く。いずれも、チャットや文書に値を貼らない。
 - 使い方: `AWS_DEFAULT_REGION=auto aws s3 sync s3://fl-web-cache/perf/ <dir> --endpoint-url <CF-VALUE-REMOVED>` → `node app/scripts/perf-log-summary.mjs --dir <dir>`。
 
@@ -103,7 +103,7 @@ Cloudflare ダッシュボード → 左メニュー『R2 オブジェクト ス
 
 R2 の『一時資格情報』(https://developers.cloudflare.com/r2/api/s3/temporary-credentials/)は、親トークンから**プレフィックスと有効期限を絞った**資格情報(Access Key ID・Secret・Session Token の 3 つ)を作る。`cf r2 temporary-credentials create --bucket fl-web-cache --parent-access-key-id <A の Access Key ID> --permission object-read-only --prefixes perf/ --ttl-seconds 604800`(最長 7 日)。3 つの値を環境変数 `<CREDENTIAL-NAME>`・`<CREDENTIAL-NAME>`・`AWS_SESSION_TOKEN` で渡す。
 
-- 実測(作業者が一時トークンで試験): この資格情報は `perf/` を読め、`cache/` と全体の list は AccessDenied、書き込み(PutObject)も AccessDenied。親トークンを失効すると派生物も即失効する(文書の記述)。作成の直後は親トークンの反映待ちで、1〜2 回の再試行が要った(`logs/prod/r2-read-token-check3.txt`)。
+- 実測(作業者が一時トークンでテスト): この資格情報は `perf/` を読め、`cache/` と全体の list は AccessDenied、書き込み(PutObject)も AccessDenied。親トークンを失効すると派生物も即失効する(文書の記述)。作成の直後は親トークンの反映待ちで、1〜2 回の再試行が要った(`logs/prod/r2-read-token-check3.txt`)。
 
 **C. 何も作らない**: §2.2 の 1(この機械の既存ログイン)。依頼者の作業ゼロ。広いスコープのログインを使うことになる点だけが違い。
 
@@ -135,15 +135,15 @@ R2 の『一時資格情報』(https://developers.cloudflare.com/r2/api/s3/tempo
 `app/worker/index.ts`・`access.ts` と、Worker が import する `shared/{headers,range,manifest-guard,perf}.ts` を点検表で全行読んだ。**FL のクラス名・窓の種類・位置・文言による分岐は 0 行、FL の挙動の代行・補正も 0 行**。除去の差分は無い。候補:
 
 1. 観測(ビーコン)の既定 ON — 点検表は『観測は製品の経路から切り離す』だが、ビーコンは依頼者の明示の要求(決定 0152/0192: 実機の P1/P2 を質問なしで集める)で既定 ON。別パス `/__perf` で、ページが `?beacon=0` で止められ、FL の挙動に触れない。本決定の保存と集計も観測だけで、新しい処理の三分類(API の契約・余計な処理の除去・変換/通信の削減)のどれにも当たらない。足した理由は §0: 依頼者の『Workers で状態を確認する』(性能要件は測定値だけを書く)に応える基盤。**PM の判断点**。
-2. `shared/headers.ts cacheControlFor` — 名前から不変かどうかを当てる推測規則。R2 に Cache-Control が保存されていればそちらが使われ(本番は全オブジェクト保存済み)、この規則は使われない。保存が無いときは `no-cache` に倒す方が安全。変更していない(試験が依存)。
+2. `shared/headers.ts cacheControlFor` — 名前から不変かどうかを当てる推測規則。R2 に Cache-Control が保存されていればそちらが使われ(本番は全オブジェクト保存済み)、この規則は使われない。保存が無いときは `no-cache` に倒す方が安全。変更していない(テストが依存)。
 
 ## 8. 規則の自己申告
 
 - 08:55 に `( … &)` 形式で e2e を起動(ツールは拒否しなかった。気づいて kill し、`background: true` で再実行)。
-- 変異検査の runner を誤って `node -e "import(run.mjs)"` で実行し、2 分のツール期限で中断(コピーの木だけを触る設計で作業木に損害無し)。
+- 変異検査の runner を誤って `node -e "import(run.mjs)"` で実行し、2 分のツール期限で中断(コピーの木だけを触る設計でワークツリーに損害無し)。
 - 最初のライフサイクル用トークンの失効にスクリプトの不備(`--force` 無し)で失敗し、約 2 分後に手動で失効した。
 - **トークン値の露出 1 件**: R2 読み取りの手順確認スクリプトの不備(bash の `${3:+VAR=$3}` 展開)で、15 分有効の一時資格情報(`perf/` の読み取り専用)のセッショントークンの先頭約 100 文字がエラーメッセージとしてツール出力に出た。ログの 1 ファイルからは削除済み(`<scrubbed>`)。その資格情報の親トークンは同じ実行の終了時に失効済みで、現時点で有効な物ではない。以後の実行では env 渡しに直し、出力に値は出ていない。
-- 開始時に `git fetch -q origin` を 1 回実行(リモート追跡参照の更新のみ。作業木・ブランチは変更していない)。
+- 開始時に `git fetch -q origin` を 1 回実行(リモート追跡参照の更新のみ。ワークツリー・ブランチは変更していない)。
 
 ## 9. 出典なしの選択(S-workers1-)
 
@@ -182,7 +182,7 @@ R2 の『一時資格情報』(https://developers.cloudflare.com/r2/api/s3/tempo
 
 取り込み先: HEAD 67d60b8(crash1 〔決定 0209〕の取り込み後)。`workers1.diff` の当たり: 3e4f540 には fuzz・offset なしで当たったが、crash1 が `app/scripts/perf-log-summary.mjs` と `.d.mts` に足した soft stops の表と型(約 20 行)と衝突した。ライブラリの移動(`app/scripts/perf-log-summary.mjs` の本体 → `app/shared/perf-summary.mjs`)は `workers1.diff` のまま行い、crash1 の追加は移動先 `app/shared/perf-summary.mjs` と `.d.mts` に同じ hunk を当てて移した(`git diff 3e4f540 67d60b8` の該当 2 ファイルを移動先に当てた。offset 2〜5 行)。crash1 の `.d.mts` に `SummarySoft` の宣言が 2 回入っていたので 1 回にした(型の内容は同じ)。`-` 402 行はこの移動(本体の削除 348 行ほか)で、読んだ。
 
-PM が測った値(取り込み後の作業木): typecheck 4/4 rc=0、vitest 1,551 passed + 7 skipped(1,545 + crash1 の soft-stops 6)、Worker 試験 50/50、e2e 1,262/1,262(rc=0。crash1 取り込み後の 1,256 から +6 は workers1 の追加分)。
+PM が測った値(取り込み後のワークツリー): typecheck 4/4 rc=0、vitest 1,551 passed + 7 skipped(1,545 + crash1 の soft-stops 6)、Worker テスト 50/50、e2e 1,262/1,262(rc=0。crash1 取り込み後の 1,256 から +6 は workers1 の追加分)。
 
 判断(workers1 の判断点 1〜6 への答え):
 1. PR の順序: 本文のとおり main が先。`workers1-ci.diff` は ci1 のブランチで当てる(ci1 に伝えた)。

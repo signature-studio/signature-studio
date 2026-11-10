@@ -11,7 +11,7 @@
    - **サイズ(S1)**: 出荷と同じ 6 モジュールで、混成なし 128,132,521 B(ship3 の F2xH4 128,066,973 と +0.05%)→ **L5(13,133 関数)136,136,175 B = native の 1.929 倍、S1 の線 141,145,856 B の下 5.0 MB(+8.0 MB、+6.2%)**。1.2 倍の目標(84.69 MB)は未達。直接 wasm は C から作った wasm より 1 関数当たり大きく(b 類 1.34 倍、c 類 14 倍)、全単位 always_inline は +38〜44 MB で線を超える(§6、§7)。ビルド時間は単位が cache 済みなら約 10〜13 分(§6.3)。
    - **見つけたこと**: **サイズの上限(決定 0185 の `WASMGEN_MAX_FN_COST=30000000`)を掛けずに『全部 lower』すると、本体 1.1 MB・ローカル 14,644 個の関数ができ、V8 のコンパイルで node の RSS が 1.4 GB → 13.3 GB になる**。リストは上限つきで作ってあるが、ship4 の機構はこの変数を設定しないので、ビルド側にも 1 行要る(§8、§11)。
    - **見通し**: 最良(RSS 1.5 GB に収まる範囲)は再生 平均 1.33(1.25〜1.52)CPU 秒/仮想秒で、**1 コア実時間(1.0)には届かない**。残りの内訳は FLEngine の直接部のゲストコード 43%、Elastique 22%、C 経路のエミュレーション補助 18% ほか(§9)。次の手と、IntersectRect の 1 か所(3%)など『効かない』物の数字は §9。
-3. **未確認**: 依頼者の機械・Chrome・Firefox の値は 0 件(この決定は node の仮想時計だけ。V8 のコンパイルメモリが Chrome のタブのメモリにどう効くかも未確認)。実機 Windows の FL との照合は 0 件。first idle(P1)の変化は未測定。フル試験・a4・生成 C の sha は走らせていない(コード無変更)。ship3 の期待表との 48 行の差の原因は推測(§4)。CPU 秒は load で 10〜25% 動き、表は交互の繰り返しの幅と同周回の w2 に対する比で示した。fe-wasmgen の命令の追加(`hyb6-wasmgen.diff`)は作っていない — 理由は §9。
+3. **未確認**: 依頼者の機械・Chrome・Firefox の値は 0 件(この決定は node の仮想時計だけ。V8 のコンパイルメモリが Chrome のタブのメモリにどう効くかも未確認)。実機 Windows の FL との照合は 0 件。first idle(P1)の変化は未測定。フルテスト・a4・生成 C の sha は走らせていない(コード無変更)。ship3 の期待表との 48 行の差の原因は推測(§4)。CPU 秒は load で 10〜25% 動き、表は交互の繰り返しの幅と同周回の w2 に対する比で示した。fe-wasmgen の命令の追加(`hyb6-wasmgen.diff`)は作っていない — 理由は §9。
 
 ## 0. 先に書くこと(進捗の誠実性。AGENTS.md / `docs/policies/progress-integrity.md` に従う)
 
@@ -392,7 +392,7 @@ ship4(決定 0230)が F2xH5(6 モジュール、混成 1,009)と F2xH6(oggio + e
 
 ## 12. 再現手順(すべて `lift/out-hyb6/tools/`、結果は `lift/out-git/hyb6-results/tools/` に同じ物)
 
-前提: HEAD 36b1873e の `git archive`、`PATH` に `/opt/emsdk/node/24.19.0_64bit/bin:/opt/emsdk:/opt/emsdk/upstream/emscripten`、混成の機構として ship4 の作業木(`lift/out-ship4/src`)の `app/scripts/build-engine-bundle.sh`(sha256 6c8749af…)・`lift/harness/two/build_nmod_wasm.sh`・`lift/harness/hyb/*`・`seeds/ship5-imports.txt` を使う(まだ HEAD に無い)。
+前提: HEAD 36b1873e の `git archive`、`PATH` に `/opt/emsdk/node/24.19.0_64bit/bin:/opt/emsdk:/opt/emsdk/upstream/emscripten`、混成の機構として ship4 のワークツリー(`lift/out-ship4/src`)の `app/scripts/build-engine-bundle.sh`(sha256 6c8749af…)・`lift/harness/two/build_nmod_wasm.sh`・`lift/harness/hyb/*`・`seeds/ship5-imports.txt` を使う(まだ HEAD に無い)。
 
 1. `cargo build --release --offline -p fe-pe -p fe-lift -p fe-wasmgen`(`CARGO_TARGET_DIR=lift/out-hyb6/cargo-target`)。
 2. `ELQ=1 bash tools/gen-ref1.sh g1`(8 イメージの生成 C、31 s)と `bash tools/gen-6.sh g0`(出荷の 6 イメージ)。`lowregs.py` を当てた複製 `g/g?/wsrc-lr`。
@@ -417,7 +417,7 @@ ship4(決定 0230)が F2xH5(6 モジュール、混成 1,009)と F2xH6(oggio + e
 **確認できなかったこと**:
 - 依頼者の機械(Firefox 159 / Windows / 実マウス)の値は 0 件。**Chrome / Firefox の実時間の測定は 0 件**(この決定は node の仮想時計だけ)。Chrome の Worker は V8 の背景コンパイルが別スレッドで走るため、node の RSS(§8)が Chrome のメモリにそのまま対応するかは未確認。first idle(P1)の変化は未測定(node の起動 16 スナップの user CPU は w2 16.4 s → 混成 11〜15 s 程度だが load の影響が大きい)。
 - 実機 Windows の FL との照合は 0 件。『FL が同じ回数の全面再描画をするか』は未確認(ref2 から継続)。
-- フル試験(`bash lift/harness/test.sh full --jobs 3`)・a4・FLEngine の既定の生成 C の sha: **コードも生成 C も変えていないので走らせていない**(基準値は変わらない見込み。未確認)。fe-wasmgen を変えていないので差分試験・mutation も無い。`hyb6-wasmgen.diff` は作っていない(§9: d 類の命令を足しても参照シーンの命令の 3.1% 以下で、残りの時間の主因ではない)。
+- フルテスト(`bash lift/harness/test.sh full --jobs 3`)・a4・FLEngine の既定の生成 C の sha: **コードも生成 C も変えていないので走らせていない**(基準値は変わらない見込み。未確認)。fe-wasmgen を変えていないので差分テスト・mutation も無い。`hyb6-wasmgen.diff` は作っていない(§9: d 類の命令を足しても参照シーンの命令の 3.1% 以下で、残りの時間の主因ではない)。
 - CI(2 vCPU)でのビルド時間、brotli のサイズ(S1 は生のサイズ)、混成の wasm の V8 での tier-up の時間は未測定。
 - CPU 秒の絶対値は load で 10〜25% 動く。比(w2 に対する比)は同じセッション内の交互の繰り返しの平均で示したが、セッション間の差(A / B / L / S)は区間の幅として扱うこと。
 - `hL56e` / `hL56cat`(サイズ上限 50M で Elastique の 2 カーネルを入れた版)は、再生 1.2〜1.25 まで下がるが node の RSS が約 +1 GB(2.5〜3.0 GB)になる。Chrome のタブのメモリでの可否は未確認なので、出荷の推奨は上限 30M(RSS 1.6 GB)のまま。
@@ -425,7 +425,7 @@ ship4(決定 0230)が F2xH5(6 モジュール、混成 1,009)と F2xH6(oggio + e
 
 ## PM の判断と取り込み(2026-11-04 23:00)
 
-取り込み: 文書・表・道具・リスト(`lift/harness/seeds/hyb-L5-*.txt`・`hyb-L6-*.txt`・`hyb-L5.flags`)だけ。コード・テスト・生成 C には触れない(`hyb6.diff` なし)ので、フル試験・a4 は回していない。400 KB 超の `fe-wasmgen-reports-selected.tgz` は取り込まない(作業場にある)。
+取り込み: 文書・表・道具・リスト(`lift/harness/seeds/hyb-L5-*.txt`・`hyb-L6-*.txt`・`hyb-L5.flags`)だけ。コード・テスト・生成 C には触れない(`hyb6.diff` なし)ので、フルテスト・a4 は回していない。400 KB 超の `fe-wasmgen-reports-selected.tgz` は取り込まない(作業場にある)。
 1. **直接 wasm の範囲の拡大の実測を採る。** 実行された関数 15,412 のうち、`--mx-packed --mx-rc` を足して lower できる c 類 37 関数と、出荷の旗で lower できる b 類 12,087 関数を、`WASMGEN_MAX_FN_COST=30000000`（決定 0185）を掛けて混成にすると（L5、13,133 関数）、参照プロジェクトの再生（7 モジュール）は混成なし 3.8〜4.1 → 1.80 CPU 秒/仮想秒（×0.46）、出力は全行一致（起動 16 スナップ・参照 55 行・UI 49 行・parity 552 行）、6 モジュールの wasm は 136,136,175 B（native の 1.929 倍、S1 の線の下 5.0 MB）。**関数数を 1,309 から 13,096 に増やしても効かず、効くのは c 類 37 関数と Elastique。**
 2. **上限 `WASMGEN_MAX_FN_COST` は必須**（無いと node の RSS が 1.4 → 13.3 GB）。出荷の機構（ship4）に設定を足す必要がある。
 3. **最良（hL56at: L5 + L6 + always_inline 20 単位、7 モジュール 160.2 MB、RSS 1.5〜1.6 GB）でも再生は 1.25〜1.5 で 1.0 に届かない。** 残りは UI スレッド 62.7%（≈0.83）・ワーカー 36.4%（≈0.48、うち Elastique 22%）。ワーカーを別の実 CPU に出す案を mt2（決定 0234）が調べる。fe-wasmgen に足せる命令は 0.18% しか無く、`hyb6-wasmgen.diff` は作らない。

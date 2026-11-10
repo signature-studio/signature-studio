@@ -32,7 +32,7 @@ docs/
   README.md              文書の索引（決定 0001〜0070 の一覧を含む）
   progress.md            現状、受け入れ基準 A1〜A6 の判定、既知の限界
   decisions/             決定（番号つき）
-  investigations/        調査と実行記録（抽出台帳 win64-extraction.md、A4 の測定 a4-survey-tool.md ほか）
+  investigations/        調査と実行記録（抽出記録 win64-extraction.md、A4 の測定 a4-survey-tool.md ほか）
   milestones/            M1 の残作業
 binaries/                実バイナリ置き場（.gitignore 済み）
 ```
@@ -41,7 +41,7 @@ binaries/                実バイナリ置き場（.gitignore 済み）
 
 ## 実バイナリは同梱しない
 
-`FLEngine_x64.dll`（22,227,016 B）とインストーラはリポジトリに含めない。`.gitignore` で `binaries/`、`*.dll`、`*.exe`、`target/` を除外している。リポジトリに残すのは、抽出手順（スクリプト）と台帳（サイズ、SHA-256、PE の実測値）だけ。
+`FLEngine_x64.dll`（22,227,016 B）とインストーラはリポジトリに含めない。`.gitignore` で `binaries/`、`*.dll`、`*.exe`、`target/` を除外している。リポジトリに残すのは、抽出手順（スクリプト）と記録（サイズ、SHA-256、PE の実測値）だけ。
 
 ## 手順
 
@@ -84,7 +84,7 @@ cargo build --release --offline -p fe-lift
 
 ### wasm のビルドと A4 の測定
 
-- wasm: `bash lift/harness/wasm/build.sh [gen split rt gen-c harness link]`（既定は全段）。emcc が要る。生成物は `OUT`（既定 `lift/out-wasm2`）の下に作られ、既にある出力の段は飛ばす。実行は `node run_node.cjs <dll>`（`bin-base/` に複写される）。ビルド時のメモリ、環境変数は `build.sh` の冒頭のコメントを参照。
+- wasm: `bash lift/harness/wasm/build.sh [gen split rt gen-c harness link]`（既定は全段）。emcc が要る。生成物は `OUT`（既定 `lift/out-wasm2`）の下に作られ、既にある出力の段は飛ばす。実行は `node run_node.cjs <dll>`（`bin-base/` にコピーされる）。ビルド時のメモリ、環境変数は `build.sh` の冒頭のコメントを参照。
 - native 版: `OUT=... bash lift/harness/wasm/build_native.sh`（`build.sh gen split` の生成 C を再利用）。
 - A4 の測定（DllMain → InitUnits がどこまで進むか）:
 

@@ -1,10 +1,10 @@
 # 0259(mt3x、仮): x87 命令を含む関数を直 wasm に載せる — 同じ fle_x87 のヘルパを直 wasm から呼ぶ
 
-基準 HEAD: 2ca825ff(差分は c0a256bf の `git archive` に `patch -p1 --dry-run` が通る)。成果物: `mt3-x87-lower.diff`(731 行: `src/x87.rs` 新規 + `lower.rs` に 5 行 + `lib.rs` に 約 20 行 + `Cargo.toml`/`Cargo.lock` の dev-dependency + 試験 `tests/x87_hybrid.rs`)。この機械(負荷 5〜20)、FL Studio の実物の `FLEngine_x64.dll` を `fe-wasmgen` に通した census と試験の結果。**実エンジンをブラウザや node で走らせた測定は 0 件**(下の 2)。
+基準 HEAD: 2ca825ff(差分は c0a256bf の `git archive` に `patch -p1 --dry-run` が通る)。成果物: `mt3-x87-lower.diff`(731 行: `src/x87.rs` 新規 + `lower.rs` に 5 行 + `lib.rs` に 約 20 行 + `Cargo.toml`/`Cargo.lock` の dev-dependency + テスト `tests/x87_hybrid.rs`)。この機械(負荷 5〜20)、FL Studio の実物の `FLEngine_x64.dll` を `fe-wasmgen` に通した census とテストの結果。**実エンジンをブラウザや node で走らせた測定は 0 件**(下の 2)。
 
 ## 冒頭の 3 点
 1. **作った物(事実)**: fe-wasmgen は x87 命令を一つも直 wasm にしていなかった(`Fld` 等は『mnemonic F*』で関数ごと C 経路)。新しい `src/x87.rs`(約 290 行)は、x87 の各命令を、**fe-lift の C が同じ命令で呼ぶ `fle_x87_*` 関数への呼び出し(同じ関数名・同じ定数引数、メモリ演算子は実効アドレス)**にする。演算は wasm でしない(f64 の近似は無い)。x87 の状態(レジスタ 8 本、TOP、制御・状態・タグ語、例外ビット)は C のグローバル 1 か所のままなので、**結果は C 経路と定義上同じ**で、直 wasm と C 経路の関数が交互に呼ばれても状態は 1 つ。FLEngine 全体の census で **63 関数(3,049 命令、wasm +44 KB)が直る**(8 関数は制御語 = 決定 0254、4 関数は Rcpps、2 関数 55 命令は FCOMI/FUCOMI で残る)。
-2. **確かめたこと / 確かめていないこと**: 確かめた = D8〜DF の**全 ModRM の符号化**(レジスタ形、`[rdi]`、`[rdi+disp8]`)と WAIT について、直 wasm が呼ぶ関数・定数引数が fe-lift の C のそれと**文字列で一致**(`tests/x87_hybrid.rs`、変異 4 つを検出)。演算そのものの host の x87 命令との bit 一致は fe-lift の既存の x87 試験(`x87.rs`、`x87_trans.rs`、`x87ctl.rs`)に依る(同じ C 関数を呼ぶので)。**確かめていない = 実エンジンの 84/55/87 行・a4・参照プロジェクト・wasm サイズの実測・CPU の短縮**(全面ビルドが要る。PM の判断で opt1 の E4 で重ねて回す)。
+2. **確かめたこと / 確かめていないこと**: 確かめた = D8〜DF の**全 ModRM の符号化**(レジスタ形、`[rdi]`、`[rdi+disp8]`)と WAIT について、直 wasm が呼ぶ関数・定数引数が fe-lift の C のそれと**文字列で一致**(`tests/x87_hybrid.rs`、変異 4 つを検出)。演算そのものの host の x87 命令との bit 一致は fe-lift の既存の x87 テスト(`x87.rs`、`x87_trans.rs`、`x87ctl.rs`)に依る(同じ C 関数を呼ぶので)。**確かめていない = 実エンジンの 84/55/87 行・a4・参照プロジェクト・wasm サイズの実測・CPU の短縮**(全面ビルドが要る。PM の判断で opt1 の E4 で重ねて回す)。
 3. **効果の見積りは条件つき**: x87 だけでは小さい(ミキサーの自己時間で f_6a1750 44 ms + f_6a3990 24 ms = 0.5%、直 wasm の平均利得 1.6× を当てても約 25 ms = 0.2%)。ミキサーの本命 **f_67a160(1,537 ms = ミキサー約 11%)は x87 に加えて `rcpps` があり、そこで止まる**。opt1 の WIP(`opt1-f-wip.diff`、Rcpps を C の関数 `fle_hyb_mx` の kind 63 で呼ぶ)を**重ねた census で f_67a160 は ok(直 wasm 14,752 B)**になり、同じ一族の 8 関数(0x679340 ほか)が全部 ok。見積りは 1,550 ms × 0.375 ≈ 580 ms(ミキサーの約 4%、約 1.04 倍)だが、これは**平均の 1.6× を当てただけの未測定の値**で、f_67a160 の内側ループの `rcpps` が毎回 C の関数の呼び出しになる費用と、x87 の呼び出し(softfloat は変わらない)を含まない。**E4 の関数ごとの CPU 測定で確かめる**。
 
 ## 1. 現状の把握(HEAD 2ca825ff)
@@ -28,7 +28,7 @@
 - `lib.rs`: 乾式の `c_imp` に全ヘルパ名を入れ(乾式は呼び出しの添字を使わない)、本番の import は**そのモジュールの関数が実際に使うヘルパだけ**(`helpers_of`)を `c.fle_x87_*` で宣言し、`c_imp` に入れる。x87 の無いモジュールの import は 0。`Ctx` に欄を足さない(`c_imp` の写像を使う)。
 - 副作用: `FNCLEX` は C 経路の hybrid(`c_mode`)で従来『何もしない』腕に落ちていた(`M::Fnclex => Ok(())`)が、本差分で `fle_x87_clex` の呼び出しになる(状態語の例外ビットを実際に消す。C 経路の関数が立てたビットが直 wasm で消えない食い違いが、これまで x87 を含む直 wasm が無かったので表に出ていなかった)。
 
-## 4. 試験(`tests/x87_hybrid.rs`、3 件。`dev-dependencies` に `fe-lift`)
+## 4. テスト(`tests/x87_hybrid.rs`、3 件。`dev-dependencies` に `fe-lift`)
 1. `every_x87_encoding_makes_the_call_the_lifted_c_makes`: D8〜DF × 全 ModRM(レジスタ形 + `[rdi]` + `[rdi+disp8]`)+ WAIT = 641 の符号化(390 が一致、lifter だけが取る 4 種のヘルパ、151 はどちらも取らない)。直 wasm の呼び出し(`call_text`)と `fe_lift::lift_body` の C の呼び出しが**文字列で一致**(メモリ引数は ADDR)。lifter が取らない形は wasm も取らない。wasm が取らず lifter だけが取る形は **FCOMI/FUCOMI/FCMOV/FNSTCW/FLDCW の 4 種(`fle_x87_comi`・`fcmov`・`store_cw`・`load_cw`)に限る**。表の全ヘルパが少なくとも 1 つの符号化の答えになっている。
 2. 生成したコードを node で: 実効アドレス(`[rdi+rsi*8+0x10]` ほか)、引数の順、`FNSTSW AX` が RAX の下位 16 ビットだけを置き換える(helper が上位に垃圾を返しても切る)、FWAIT は何も出さない。
 3. import は使うヘルパだけ(`fld1; fstp qword [rdi]` → `fld_const` と `fst_m` の 2 つ)。x87 の無い関数は 0。`FUCOMI` を含む関数は C 経路に残る。
@@ -57,7 +57,7 @@
 - 『opt1 に返す不足の表』(PM の指示 1): **不足は無い**(f_67a160 の `rcpps xmm7,xmm4` は opt1 の Rcpps の腕を通る)。表 `tables/rcpps-functions-with-opt1-wip.tsv`。
 
 ## 7. 衝突の回避と取り込み
-- lower.rs に触る所は 2 か所(`pub mod x87;` と `match m` の直前の 5 行)。**重ねの確認(この機械、cargo のみ。実エンジンでは未実施)**: ①本差分 + opt1 の `opt1-f-wip.diff`(`lift/target/*` を除く): opt1 の差分は `lower.rs` に offset 7 行で当たり、`cargo test -p fe-wasmgen --no-fail-fast` は 23 本ok・29 通過・失敗 0・無視 1、census は表のとおり。②さらに mt3 の `mt3-wasmgen-small.diff`(0254)を重ねた木: `patch -p1` は通る(`lib.rs` の最初の hunk が **fuzz 2・offset 51 行**、他は offset のみ。`.orig` が出る)、`cargo test -p fe-wasmgen --no-fail-fast` は 24 本ok・38 通過・失敗 0・無視 1。fuzz 2 の hunk は `lib.rs` の乾式の `Ctx` 付近(位置から読んだだけで、原因は確かめていない)。試験は通るが、**fuzz のあるパッチなので E3/E4 では当て方を目で確認する**。0254 の Fnstcw/Fldcw の腕とは別の場所で、本差分はそれを置き換えない(`is_x87` に Fnstcw/Fldcw を含めない)。
+- lower.rs に触る所は 2 か所(`pub mod x87;` と `match m` の直前の 5 行)。**重ねの確認(この機械、cargo のみ。実エンジンでは未実施)**: ①本差分 + opt1 の `opt1-f-wip.diff`(`lift/target/*` を除く): opt1 の差分は `lower.rs` に offset 7 行で当たり、`cargo test -p fe-wasmgen --no-fail-fast` は 23 本ok・29 通過・失敗 0・無視 1、census は表のとおり。②さらに mt3 の `mt3-wasmgen-small.diff`(0254)を重ねた木: `patch -p1` は通る(`lib.rs` の最初の hunk が **fuzz 2・offset 51 行**、他は offset のみ。`.orig` が出る)、`cargo test -p fe-wasmgen --no-fail-fast` は 24 本ok・38 通過・失敗 0・無視 1。fuzz 2 の hunk は `lib.rs` の乾式の `Ctx` 付近(位置から読んだだけで、原因は確かめていない)。テストは通るが、**fuzz のあるパッチなので E3/E4 では当て方を目で確認する**。0254 の Fnstcw/Fldcw の腕とは別の場所で、本差分はそれを置き換えない(`is_x87` に Fnstcw/Fldcw を含めない)。
 - `Cargo.lock` が変わる(fe-wasmgen の dev-dependency に fe-lift)。`--locked` のビルドでは差分に含めたこの変更が要る。
 
 ## 8. 限界
@@ -67,7 +67,7 @@
 
 ## PM の判断と取り込み(2026-11-05 21:35、docs のみ)
 
-- 文書・表・道具・差分(`docs/investigations/mt3x/patches/mt3-x87-lower.diff`)を置いた。**製品の木にはまだ当てていない。** PM は mt3 の census・試験を再現していない。mt3 の測定: HEAD 69c2ea2e の `git archive` に `patch -p1 --dry-run` が通る(offset/fuzz 0)。`cargo test -p fe-wasmgen` 21 本 ok・27 通過・失敗 0(x87 のみ)、opt1 の WIP を重ねた木で 23 本・29 通過、さらに `mt3-wasmgen-small.diff` を重ねた木で 24 本・38 通過。重ねた木では lib.rs の最初の hunk が fuzz 2・offset 51 になるので、E3/E4 で重ねる opt1 は当て方を目で確認すること。
+- 文書・表・道具・差分(`docs/investigations/mt3x/patches/mt3-x87-lower.diff`)を置いた。**製品の木にはまだ当てていない。** PM は mt3 の census・テストを再現していない。mt3 の測定: HEAD 69c2ea2e の `git archive` に `patch -p1 --dry-run` が通る(offset/fuzz 0)。`cargo test -p fe-wasmgen` 21 本 ok・27 通過・失敗 0(x87 のみ)、opt1 の WIP を重ねた木で 23 本・29 通過、さらに `mt3-wasmgen-small.diff` を重ねた木で 24 本・38 通過。重ねた木では lib.rs の最初の hunk が fuzz 2・offset 51 になるので、E3/E4 で重ねる opt1 は当て方を目で確認すること。
 - 実エンジン(ブラウザ/node)の 84/55/87 行・a4・参照プロジェクト・wasm サイズ・CPU の測定は 0 件。取り込み(製品の木への適用)は、opt1 の E4(E3 + 本差分)で次を確認してから: node の 84/55/87 行が変わらない(変わる行は関数ごとに説明)、参照プロジェクトが開き 30 s 再生で止まらない、Export の出力同一、wasm のサイズ(S1 線 154,885,888 B)、`f_67a160`(ミキサーの本命、自己 1,537 ms)の関数ごとの自己時間(前後)と書き込み率。
 - 見積りは条件つき: x87 だけではミキサーの 0.5% 未満。`f_67a160` は `rcpps` の C 呼び出し(opt1 の `mx_c_only` → `fle_hyb_mx`)が内側ループの毎反復に 1 回通るので、反復あたりの呼び出し費用が利得(1.6×)を食う/逆転する可能性がある。**E4 で前後の自己時間を取って判定する。**逆転するなら Rcpps の腕は採らない。
 - 副作用の記録: C 経路の hybrid で `FNCLEX` が従来『何もしない』腕だった食い違いを `fle_x87_clex` の呼び出しにした(これまで x87 を含む直 wasm が無く表に出ていなかった)。

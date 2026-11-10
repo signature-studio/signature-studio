@@ -9,7 +9,7 @@
 ## 壁と外部 API の契約実装(`ref1.diff`)
 | 壁 | 内容 | 扱い |
 |---|---|---|
-| W1 | `CompareStringW`(`\Backup\` 対 `-serum2\`)がハイフンで停止 | Learn『Handling Sorting in Your Applications』の語ソート(ハイフンとアポストロフィを特別扱い、`coop` と `co-op` が並ぶ)を既定にした。表にない対の値は私たちの読み(S-ref1-cmp-hyphen-default)。旧試験の停止の期待(決定 0072/0129/0132)を、出典つきで結果の期待に更新。ASCII より大きい単位の規則は出典なしのまま `FLE_CMP_EXTEND` の opt-in |
+| W1 | `CompareStringW`(`\Backup\` 対 `-serum2\`)がハイフンで停止 | Learn『Handling Sorting in Your Applications』の語ソート(ハイフンとアポストロフィを特別扱い、`coop` と `co-op` が並ぶ)を既定にした。表にない対の値は私たちの読み(S-ref1-cmp-hyphen-default)。旧テストの停止の期待(決定 0072/0129/0132)を、出典つきで結果の期待に更新。ASCII より大きい単位の規則は出典なしのまま `FLE_CMP_EXTEND` の opt-in |
 | W2 | `LoadLibraryW("")`(プラグイン DLL が無いとき 46 回) | Learn『If the function cannot find the module, the function fails』: NULL と ERROR_MOD_NOT_FOUND(126)(コードは S-ref1-loadlib-empty-code)。探索スイッチ `FLE_LOADLIB_MISSING` は除去 |
 | W3 | oggio の UCRT が `api-ms-win-*` を `LoadLibraryExW` | 見つからない名前は NULL(文書どおり)。`FLE_SOFT_STOP=1`(決定 0209)の下で通る。**出荷 bundle がこの設定を持つかは未確認(ship3 / ref2 で確認)** |
 | W4 | msacm32(MP3 の復号)の行が無い | 13+2 行と `lift/runtime/fle_acm.c`(契約どおり MPEG Layer-3 → PCM16、minimp3 CC0)。選択は S-ref1-acm-* |
@@ -30,7 +30,7 @@ minimp3: https://github.com/lieff/minimp3 の `minimp3.h`(master、2026-11-04 �
 **P3 の 1 コア実時間に対し、native でも 1.6 倍、wasm で 7.1 倍不足する(プラグイン 46 個が無い状態で)。** アイドルの 0.30 / 1.73 も、本物の FL なら桁違いに小さいはずで、原因は『我々の余計な処理』か『外部 API の実装の重さ』のどちらか(ref2 が内訳を出す)。UI の 1 イベント: Playlist のホイール 1 ノッチ native 50 ms / wasm 217 ms、中ボタンドラッグ 24 / 96 ms、Mixer のフェーダー 37 / 155 ms。native の最大 RSS は 541 MB。
 
 ## PM の判断と取り込み(2026-11-04)
-取り込んだ基準: HEAD 3d99fe0 に `ref1.diff`(17 ファイル、ref2 が出し直した 17:36 版)を `patch -p1`(offset・fuzz・reject なし)。`-` 行はランタイムの領域実装の置き換え(`fle_gdi.c` の固定長配列の除去)と、探索スイッチの除去、旧試験の期待の更新。`fle_acm.c` の `getenv` は 0 件(診断は `-DFLE_ACM_DEBUG` のコンパイル時のみ)、runtime の `getenv` は増えていない。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **193 results / 2,359 passed / 0 failed**(ignored 1)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。最初に当てた中間版(16:53)は、守りの試験 4 件(診断の `getenv`)と旧期待 3 件で 7 件失敗したので取り込まず、直した版を取り込んだ。
+取り込んだ基準: HEAD 3d99fe0 に `ref1.diff`(17 ファイル、ref2 が出し直した 17:36 版)を `patch -p1`(offset・fuzz・reject なし)。`-` 行はランタイムの領域実装の置き換え(`fle_gdi.c` の固定長配列の除去)と、探索スイッチの除去、旧テストの期待の更新。`fle_acm.c` の `getenv` は 0 件(診断は `-DFLE_ACM_DEBUG` のコンパイル時のみ)、runtime の `getenv` は増えていない。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **193 results / 2,359 passed / 0 failed**(ignored 1)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。最初に当てた中間版(16:53)は、守りのテスト 4 件(診断の `getenv`)と旧期待 3 件で 7 件失敗したので取り込まず、直した版を取り込んだ。
 1. **外部 API の契約実装(W1・W2・W4・W5・W6・W7)を採る。** いずれも Learn の記述に出典があり、FL のクラス名・窓の種類での分岐はない。出典のない選択は S-ref1-… として列挙してある。
 2. **P3 の不足(再生 1.6 / 7.1)は進捗ではなく、構造的な不足の測定。** 内訳(スレッド別・層別・Win32 API 別の呼び出し回数)と、余計な処理があれば除去の差分を ref2 が出す。
 3. W8 は未調査、W3 の `FLE_SOFT_STOP` が出荷 bundle に要るかは未確認。
@@ -136,7 +136,7 @@ wasm の線形メモリの内訳(malloc の使用量・VirtualAlloc の合計・
 
 ## PM の判断と取り込み(2)(2026-11-04 19:00): ref2 の追記(`ref1-perf.diff`)
 
-取り込み: `ref1-perf.diff`(HEAD 25e01e2、49 ファイルの新規/追記、`-` 行 0)。コード・テスト・生成 C に触れない(決定 0229 の末尾の追記、`docs/investigations/ref1/`、`lift/harness/seeds/hyb-ref1-*.txt` 8 ファイル 203 行)ので、フル試験・a4 は回していない。ref2 の訂正(アイドルの IntersectRect は毎周期約 11 回で、~190 回は誤り)は、文書側には入っていない(表だけ)。
+取り込み: `ref1-perf.diff`(HEAD 25e01e2、49 ファイルの新規/追記、`-` 行 0)。コード・テスト・生成 C に触れない(決定 0229 の末尾の追記、`docs/investigations/ref1/`、`lift/harness/seeds/hyb-ref1-*.txt` 8 ファイル 203 行)ので、フルテスト・a4 は回していない。ref2 の訂正(アイドルの IntersectRect は毎周期約 11 回で、~190 回は誤り)は、文書側には入っていない(表だけ)。
 1. **出荷構成の wasm(混成なし)の参照プロジェクトの再生は 3.70 CPU 秒/仮想秒**(アイドル 0.461、開く 4.01。native -O2 は 1.51〜1.74 / 0.29〜0.34 / 1.22)。**P3 は 1 コア実時間に 3.7 倍不足**。『我々の余計な処理』は runtime 層に見つかっていない(アイドルの 94.6% はゲスト自身。60 Hz の周期の起点はゲストの `Sleep(16)` → `PostMessageW(0x8ffc)`。runtime は起こしていない)。
 2. **再生の層(出荷構成の wasm)**: ゲスト FLEngine 42.7%、**x86 命令エミュレーション 30.2%(`fle_ld` ほかが呼び出しのまま。native の 6.3 倍)**、dsp 8.4%、Elastique 6.3%。単独最大は `f_6becc0` 10.8%(`--mx-packed` でだけ lower できる)。混成候補 203 関数(173 + `--mx-packed` の 30)が覆うのはゲスト自己時間の 27.5% で、それだけでは 3.7 → 2 台後半。**構造的な短縮が要る**: (a) 直接 wasm にする範囲の拡大(実行された関数すべて。`fle_ld` の呼び出しを無くす)、(b) 再描画の回数と量(ゲストが 882×963 を 51 回/s 要求。94% の IntersectRect は 1 か所の可視判定で、見える割合 0.0%)。ここは次の `hyb6`(直接 wasm の範囲の拡大の実現可能性)で測る。
 3. **Chrome 156(出荷構成、load 12〜16 の間)**: first idle 7.54 s(10 s 以内)。File>Open から『Problems loading』まで 15.8 s。再生中の窓の更新 7.3/s(P2 の 120 に届かない)、audio underrun『最初の音以降』27 quanta(P3 未達)。

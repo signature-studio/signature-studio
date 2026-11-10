@@ -1,19 +1,19 @@
 # 0192: 依頼者のブラウザの「画面側」の実測(rAF の周波数・canvas の実更新・長いタスク・遅い入力・機械の情報)をビーコンに足し、P2 の基準と並べて性能パネルに出し、`tailscale serve` 越しの依頼者を `tailnet` と分類する。仮の決定
 
-状態: **仮の決定(すべての選択)**。依頼は PM(番号 0192、担当 cbeacon1)。実装・試験・測定・文書は作業者 cbeacon1(2026-11-03 20:44〜、予算 2.5 時間)。作業と測定は HEAD **8c10f48** の `git archive`(`lift/out-cbeacon1/src/app`)から。成果物は `lift/out-git/cbeacon1-results/`。`cbeacon1.diff` は `app/` の 24 ファイル(`README.md` を含む)だけを変え、最新の HEAD f2dded6 の `git archive` に `patch -p1 --dry-run` で当たる(`lift/`・wasm・生成 C・ランタイム・既定のバンドル・`lift/out-websrv/`・5173 のサーバーは 0 行・触っていない)。
+状態: **仮の決定(すべての選択)**。依頼は PM(番号 0192、担当 cbeacon1)。実装・テスト・測定・文書は作業者 cbeacon1(2026-11-03 20:44〜、予算 2.5 時間)。作業と測定は HEAD **8c10f48** の `git archive`(`lift/out-cbeacon1/src/app`)から。成果物は `lift/out-git/cbeacon1-results/`。`cbeacon1.diff` は `app/` の 24 ファイル(`README.md` を含む)だけを変え、最新の HEAD f2dded6 の `git archive` に `patch -p1 --dry-run` で当たる(`lift/`・wasm・生成 C・ランタイム・既定のバンドル・`lift/out-websrv/`・5173 のサーバーは 0 行・触っていない)。
 
 区分の凡例: **実測**＝このセッションのコマンドの出力を見た事実。**読み**＝コードや出力を読んで得た解釈で、確かめていない。**未確認**＝確かめていない。**出典なしの選択**＝`S-cbeacon1-…`(§6)。**実機(依頼者の機械・実機 Windows)との照合は 0 件**。この機械は SwiftShader の 16 コアで、他の担当の仕事で load が 3〜16(各表に併記。壁時計の速度は主張しない)。G 段階は変えない。
 
 ## 冒頭の三点(正直さ)
 
-1. **何を実測したか(実行した本物と範囲)**: (a) **実エンジン**を、`lift/out-websrv/assets` の既定のマニフェストを**読み取りだけ**して自分の `vite preview`(別ポート、`FL_PERF_LOG` は自分のファイル)に載せ、隔離した headless Chrome 156 で開いた。作業の始めの既定の入口 **F1xn**(`16bd5d9fe402`)と、作業中に PM が切り替えた今の既定の入口 **SHIPH**(決定 0189、`cc975e05e136`)のそれぞれを、パラメータ無しの既定の入口で 1 回、`?hz=120` を付けて 1 回(計 4 run、すべて 14/14 checks)。ビーコン(first-idle・periodic・exit)がサーバーのログに届き、新しい項目(rAF の間隔と Hz、canvas の実更新、client、hz、sid)が埋まることを見た。ヘッドレスの rAF は 60 Hz の仮想 vsync なので、**「rAF の Hz が 60 と出る = 画面が 60 Hz 相当」が正しく出ること**の確認であって、120 fps を達成した主張ではない。(b) 測定を止めたとき(`?beacon=0`)と既定のときのページの CPU を、`/proc` のスレッド別 CPU 秒で、F1xn と SHIPH のそれぞれ、既定の入口と `?dedupe=1` の静止アイドルを、交互の 5 組ずつ(計 20 組)測った。(c) 主窓の面の SHA-256(仮想時刻 a3000・a4000・入力後 2 点)とゲストの idle の時刻列のハッシュを、測定あり/なしで 2 回ずつ(A1 B1 A2 B2)、F1xn と SHIPH で比べた。(d) 単体・Worker・e2e の試験と、ミューテーション検査。**代役(surface-table)は、既定の入口には置いていない**。e2e の perf-beacon 群・perf-beacon-off 群は代役 `surface-table-v1`(`/assets/animate/…`、明示のパス)で走り、その記録は `standIn: true`、ページには STAND-IN の帯と、パネルの見出し「STAND-IN: …FL Studio の数字ではない」が出る(維持を e2e が検査する)。**依頼者の機械の値は、まだ 1 つも無い**(この文書の数字は全部この機械の headless Chrome のもの)。
+1. **何を実測したか(実行した本物と範囲)**: (a) **実エンジン**を、`lift/out-websrv/assets` の既定のマニフェストを**読み取りだけ**して自分の `vite preview`(別ポート、`FL_PERF_LOG` は自分のファイル)に載せ、隔離した headless Chrome 156 で開いた。作業の始めの既定の入口 **F1xn**(`16bd5d9fe402`)と、作業中に PM が切り替えた今の既定の入口 **SHIPH**(決定 0189、`cc975e05e136`)のそれぞれを、パラメータ無しの既定の入口で 1 回、`?hz=120` を付けて 1 回(計 4 run、すべて 14/14 checks)。ビーコン(first-idle・periodic・exit)がサーバーのログに届き、新しい項目(rAF の間隔と Hz、canvas の実更新、client、hz、sid)が埋まることを見た。ヘッドレスの rAF は 60 Hz の仮想 vsync なので、**「rAF の Hz が 60 と出る = 画面が 60 Hz 相当」が正しく出ること**の確認であって、120 fps を達成した主張ではない。(b) 測定を止めたとき(`?beacon=0`)と既定のときのページの CPU を、`/proc` のスレッド別 CPU 秒で、F1xn と SHIPH のそれぞれ、既定の入口と `?dedupe=1` の静止アイドルを、交互の 5 組ずつ(計 20 組)測った。(c) 主窓の面の SHA-256(仮想時刻 a3000・a4000・入力後 2 点)とゲストの idle の時刻列のハッシュを、測定あり/なしで 2 回ずつ(A1 B1 A2 B2)、F1xn と SHIPH で比べた。(d) 単体・Worker・e2e のテストと、ミューテーション検査。**代役(surface-table)は、既定の入口には置いていない**。e2e の perf-beacon 群・perf-beacon-off 群は代役 `surface-table-v1`(`/assets/animate/…`、明示のパス)で走り、その記録は `standIn: true`、ページには STAND-IN の帯と、パネルの見出し「STAND-IN: …FL Studio の数字ではない」が出る(維持を e2e が検査する)。**依頼者の機械の値は、まだ 1 つも無い**(この文書の数字は全部この機械の headless Chrome のもの)。
 2. **結論**: (i) ビーコンの版 2 で、依頼者がページを開くと、依頼者の機械の rAF の間隔(中央値・p95・最大・遅いフレーム・度数分布、直近 10 秒/最初の idle 以降/起動から)と推定した画面の Hz、1 秒あたりの rAF 回数、canvas が実際に更新された画面フレームの数/割合・描画回数・受信→描画の時間、長いタスク、遅い入力、見えていた時間、ブラウザ・OS・表示領域・色深度・コア数(論理)・`?hz=` の値と一致判定が `perf-log.jsonl` に届く仕組みができた。物理コア数は取れないので、項目で「取れない」と理由を明示した。(ii) パネルは同じ値を P2 の基準(120 Hz・p95 ≤ 8.3 ms・遅いフレーム・描画 ≤ 4.2 ms)と並べ、基準を満たさない値を赤にし、rAF が 60 Hz 付近なら「この画面は 60 Hz 相当です: 120 fps は原理的に出せません」と注記する。案内文(送る項目・送らないもの・止め方)が表の上に出る。`?beacon=0` は送信もメーターも止める。(iii) **`tailscale serve` は 127.0.0.1:5173 への逆プロキシなので、依頼者の https の経路では、ソケットの相手が常に loopback になり、これまでは依頼者の記録が「この機械」と区別できなかった**。`X-Forwarded-For`(tailscale が送信元の tailnet アドレスを入れる)で分類する `classifyPeer` を足した。配信中の 5173 の再起動と `dist/` の再ビルドで有効になる。(iv) 測定の負担: 既定の入口(F1xn・SHIPH とも、アイドルでも主窓を毎フレーム描き直す)では、ページ主スレッドの差の中央値は F1xn で −0.006 コア、SHIPH で −0.003 コア(測定ありのほうが小さい。差は雑音の範囲)。**静止したアイドル(`?dedupe=1`)では、rAF のループが Chrome にフレームを作らせるので、ページ主スレッド +0.014 コア(F1xn 0.021 → 0.035、5/5 組。SHIPH 0.022 → 0.040、5/5 組)、Chrome 全体で +0.026〜+0.032 コア**。メーターの JavaScript 自体は 1 フレームあたり 33〜43 ns。(v) 測定ありとなしで、入力前の主窓の面(a3000 `cf92b670c533`・a4000 `9b8592d35b26`)とゲストの idle の時刻列のハッシュ(idle 500〜4500 の 9 点)は、F1xn・SHIPH の 8 回とも同一。入力後は、**Enter が同じ仮想時刻(4613〜4617 ms)に届いた SHIPH の 3 回は、測定あり/なしを問わず面 4 点も idle の時刻列 20 点も同一**で、違った 1 回(測定あり、Enter が 4604 ms)は、対照(同じ構成の別の回)とも同じだけ違う。つまり入力後の違いは、この 4 回では Enter の仮想時刻で分かれ、測定の有無では分かれなかった(4 回なので統計的な主張ではない。F1xn の 4 回は Enter の仮想時刻が全部違い、入力後は比較できない)。
-3. **未確認**: **依頼者の機械の値(0 件)**、実際の `tailscale serve` 経由での tailnet の判定(ソースとバイナリの文字列と単体試験まで。PM が 5173 を再起動して確かめる)、120 Hz 以上の実ディスプレイ・可変リフレッシュ・複数ディスプレイ、Firefox・Safari・Edge、隠れた実ブラウザのタブ、GPU のラスタ時間(ページからは見えない)、`?hz=` を読まないバンドルでの `hz.engineHz`、所定のプロジェクトでの値、再生中(窓の更新 120/s)のメーターの費用。
+3. **未確認**: **依頼者の機械の値(0 件)**、実際の `tailscale serve` 経由での tailnet の判定(ソースとバイナリの文字列と単体テストまで。PM が 5173 を再起動して確かめる)、120 Hz 以上の実ディスプレイ・可変リフレッシュ・複数ディスプレイ、Firefox・Safari・Edge、隠れた実ブラウザのタブ、GPU のラスタ時間(ページからは見えない)、`?hz=` を読まないバンドルでの `hz.engineHz`、所定のプロジェクトでの値、再生中(窓の更新 120/s)のメーターの費用。
 
 ## 0. 先に書くこと(進捗の誠実性、AGENTS.md / `docs/policies/progress-integrity.md`)
 
-**(1) 実エンジンが実行された事実(実測)**: 自分の作業木の `vite preview`(別ポート、`dist/` は自分のビルド)で、`FL_ASSETS_DIR=<abs>/lift/out-websrv/assets`(読み取りだけ)、`FL_PERF_LOG=<自分の jsonl>`、**パラメータ無しの既定の入口 `/`** を隔離した headless Chrome 156(TCP の非ループバック 0)で開いた(`app/test/e2e/perf-real-engine.mjs`)。**今の既定の入口 SHIPH**(`logs/ship1-manifest-at-measurement.txt`: bundle `fl-engine-Oz` `cc975e05e136`、`/assets/fl-engine-ship1-SHIPH/engine.cc975e05e136.wasm`、`engine.kind` = `emscripten-fruity-v1`)の結果(`logs/real-ship1-default/`、`tables/real-ship1-default.md`): 最初の idle まで **6.1 s**(load 5 の機械。P1 の主張ではない)、STAND-IN の帯なし、サーバーのログに 3 行(first-idle・periodic・exit)、periodic の beacon は 4,831 B。新しい項目: 最初の idle 以降の rAF 間隔 1,801 個、中央値 16.68 ms・p95 16.68 ms・最大 16.67 ms、**推定 60.0 Hz**、遅いフレーム 0;直近 10 秒では窓の矩形の描画 62.5 /s・**canvas が更新された画面フレーム 57.5 /s(600 フレーム中 575、95.8%)**・1 フレームあたり 1.09 回・受信→描画 p95 0.14 ms;`hz.fit` = `match`。`?hz=120`(`logs/real-ship1-hz120/`、`tables/real-ship1-hz120.md`):直近 10 秒の窓の矩形は **124.9 /s**、しかし画面の rAF は 60 回/s なので canvas が更新された画面フレームは **60 /s(600 フレーム全部、1 フレームに 2.08 回描画)**、`hz.fit` = `display-slower`「エンジンは 120 Hz で描画しますが、この画面の rAF は 60 回/s なので、見えるのは最大 60 fps です」。作業の始めの既定の入口 **F1xn** でも同じ手順で 2 run(`logs/real-default/`・`logs/real-hz120b/`、`tables/real-default.md`・`tables/real-hz120.md`)走らせ、同じ形の結果だった(最初の idle 8.5 s、60.0 Hz、canvas 更新 57.5/60、`?hz=120` で 125.0 /s・60 /s・2.08 回)。この 2 つの対が、「窓の更新/s が 120 を超えても、画面が 60 Hz なら見える fps は 60」を数字で分けられることの例になっている。
-**(2) 代役・再生・推測を含む範囲**: e2e の perf-beacon 群と perf-beacon-off 群、パネルの単体試験の一部は代役 `surface-table-v1`(または made-up の数字)を使う(上のとおり、STAND-IN の表示を維持し、代役の数字は緑にも赤にもしない)。単体試験の 60 / 120 / 144 Hz は made-up のタイムスタンプ(偽の時計)で、実機の値ではない。tailscale の動作は**ソースの読みと文字列の確認**(実機の serve 経由では未実測)。**これらの数字を G 段階表の到達や性能の達成として読んではならない。P1〜P3 はどれもこの決定で達成されていない。**
+**(1) 実エンジンが実行された事実(実測)**: 自分のワークツリーの `vite preview`(別ポート、`dist/` は自分のビルド)で、`FL_ASSETS_DIR=<abs>/lift/out-websrv/assets`(読み取りだけ)、`FL_PERF_LOG=<自分の jsonl>`、**パラメータ無しの既定の入口 `/`** を隔離した headless Chrome 156(TCP の非ループバック 0)で開いた(`app/test/e2e/perf-real-engine.mjs`)。**今の既定の入口 SHIPH**(`logs/ship1-manifest-at-measurement.txt`: bundle `fl-engine-Oz` `cc975e05e136`、`/assets/fl-engine-ship1-SHIPH/engine.cc975e05e136.wasm`、`engine.kind` = `emscripten-fruity-v1`)の結果(`logs/real-ship1-default/`、`tables/real-ship1-default.md`): 最初の idle まで **6.1 s**(load 5 の機械。P1 の主張ではない)、STAND-IN の帯なし、サーバーのログに 3 行(first-idle・periodic・exit)、periodic の beacon は 4,831 B。新しい項目: 最初の idle 以降の rAF 間隔 1,801 個、中央値 16.68 ms・p95 16.68 ms・最大 16.67 ms、**推定 60.0 Hz**、遅いフレーム 0;直近 10 秒では窓の矩形の描画 62.5 /s・**canvas が更新された画面フレーム 57.5 /s(600 フレーム中 575、95.8%)**・1 フレームあたり 1.09 回・受信→描画 p95 0.14 ms;`hz.fit` = `match`。`?hz=120`(`logs/real-ship1-hz120/`、`tables/real-ship1-hz120.md`):直近 10 秒の窓の矩形は **124.9 /s**、しかし画面の rAF は 60 回/s なので canvas が更新された画面フレームは **60 /s(600 フレーム全部、1 フレームに 2.08 回描画)**、`hz.fit` = `display-slower`「エンジンは 120 Hz で描画しますが、この画面の rAF は 60 回/s なので、見えるのは最大 60 fps です」。作業の始めの既定の入口 **F1xn** でも同じ手順で 2 run(`logs/real-default/`・`logs/real-hz120b/`、`tables/real-default.md`・`tables/real-hz120.md`)走らせ、同じ形の結果だった(最初の idle 8.5 s、60.0 Hz、canvas 更新 57.5/60、`?hz=120` で 125.0 /s・60 /s・2.08 回)。この 2 つの対が、「窓の更新/s が 120 を超えても、画面が 60 Hz なら見える fps は 60」を数字で分けられることの例になっている。
+**(2) 代役・再生・推測を含む範囲**: e2e の perf-beacon 群と perf-beacon-off 群、パネルの単体テストの一部は代役 `surface-table-v1`(または made-up の数字)を使う(上のとおり、STAND-IN の表示を維持し、代役の数字は緑にも赤にもしない)。単体テストの 60 / 120 / 144 Hz は made-up のタイムスタンプ(偽の時計)で、実機の値ではない。tailscale の動作は**ソースの読みと文字列の確認**(実機の serve 経由では未実測)。**これらの数字を G 段階表の到達や性能の達成として読んではならない。P1〜P3 はどれもこの決定で達成されていない。**
 
 ## 1. 何を足したか(`app/` だけ。`lift/`・生成 C・エンジンは 0 行)
 
@@ -36,7 +36,7 @@
 | `display.events` | Event Timing: 16 ms 以上かかった入力イベントの数と、その入力遅延・所要時間の p50/p95/最大、最初の入力(`first-input`)、ページが送った入力の総数。使えなければ `supported: false` |
 | `hz` | `?hz=` の値、エンジンへ渡した `FLE_DWM_HZ` 相当、`?hz=auto` の測定値、画面の rAF の Hz・最速の Hz、比、判定(`match`/`engine-slower`/`display-slower`/`page-behind`/`unknown`)と日本語の説明 |
 
-1 件の大きさ: 実エンジンの既定の入口の periodic で 4,848 B(上限 16 KB。`beaconText` は 15.5 KB を超えるときだけ、長い文字列を切る → 画面の測定の「最初の idle 以降」の窓と度数分布を落とす → タイムラインを落とす、の順に削る)。最悪の場合(UA 300 字・GPU 名 200 字・タイムライン 600 件・長いエラー)も上限内に収まる試験がある。
+1 件の大きさ: 実エンジンの既定の入口の periodic で 4,848 B(上限 16 KB。`beaconText` は 15.5 KB を超えるときだけ、長い文字列を切る → 画面の測定の「最初の idle 以降」の窓と度数分布を落とす → タイムラインを落とす、の順に削る)。最悪の場合(UA 300 字・GPU 名 200 字・タイムライン 600 件・長いエラー)も上限内に収まるテストがある。
 
 ### 1.2 画面のメーター(`src/perf/display.ts`、DOM にも網にも触らない純関数+`DisplayMonitor`)
 
@@ -50,7 +50,7 @@
 
 ### 1.4 サーバー側
 
-- `shared/perf.ts`: `classifyPeer(socket, X-Forwarded-For)`、`beaconProblems(beacon)`(版 2 の新しいブロックの型・範囲・整合〔ビンの合計=n、描画数≤受信数 など〕を検査する純関数。**サーバーは拒否に使わない**: 試験・summary・読み手用)。
+- `shared/perf.ts`: `classifyPeer(socket, X-Forwarded-For)`、`beaconProblems(beacon)`(版 2 の新しいブロックの型・範囲・整合〔ビンの合計=n、描画数≤受信数 など〕を検査する純関数。**サーバーは拒否に使わない**: テスト・summary・読み手用)。
 - `tools/perf-middleware.ts`: `remote` の分類に `classifyPeer` を使う。**依頼者の https の経路(`tailscale serve` → 127.0.0.1:5173)では、ソケットの相手は常に 127.0.0.1(loopback)**になり、これまでは依頼者の記録が `remote: loopback` と出て、この機械の headless Chrome と区別できなかった(決定 0152 の読みどおり)。tailscale のソース(`ipn/ipnlocal/serve.go` の `addProxyForwardedHeaders`: `X-Forwarded-For` = 送信元アドレスだけ、`X-Forwarded-Proto`、`X-Forwarded-Host`、Host はそのまま)と、手元の `/usr/sbin/tailscaled`(1.104.4)のバイナリにこれらのヘッダ名の文字列があることを確認した。**ソケットの相手が loopback のときだけ**、`X-Forwarded-For` の先頭のアドレスの種類で分類する(読めなければ loopback のまま)。アドレスは保存しない。
 - `scripts/perf-log-summary.mjs`: 記録を「ページ 1 回」(`sid`)にまとめ、**機械 × ブラウザ × 画面の Hz の種類**ごとに P1(最初の idle の min/中央値/max、10 秒を満たした回数)・P2(窓の更新/s、rAF の Hz、canvas を更新した画面フレーム/s と 120 を満たした回数、遅いフレームの割合、rAF の間隔の p95、描画時間の p95、入力→更新の p95 の最良、長いタスク、遅い入力、`?hz=` と画面の一致)を出す。`tailnet`(依頼者)と `loopback, headless`(この機械の自動測定)と `loopback, not headless`(古いサーバーの `tailscale serve` 越しかもしれない)を別の組にする。`--machine tailnet|loopback|lan|other` で絞る。版 1 の記録も読む(画面の列は `-`)。
 
@@ -84,7 +84,7 @@
 
 ### 3.2 `?hz=120` を付けたとき(`tables/real-ship1-hz120.md`、F1xn: `tables/real-hz120.md`)
 
-SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s**)、headless の rAF は 60.0 Hz のまま。直近 10 秒で canvas が更新された画面フレームは **60 /s(600 フレーム全部)、1 フレームに平均 2.08 回の描画**(= 描いた矩形の半分は、次の rAF までに上書きされて画面に出ない)。`hz-fit` は赤の `display-slower`。**既存の `p2-rate` 行(窓の更新/s)はこの run で「120 /s(1197 updates)」と言う**(開いた時点の窓では 119.7 /s で、表示は 120 だが比較は数値なので赤)——**60 Hz の画面で見える fps は 60 なのに、既存の行だけを見れば 120 にほぼ届いて見える**。新しい `canvas-fps` 行(58 /s、1 フレームに 2.1 回描画)と `hz-fit` 行(「見えるのは最大 60 fps」)がそれを分ける。F1xn の run も同じ形(125.0 /s・60 /s・2.08 回)。**これは 60 Hz の画面の模擬ではなく、headless の 60 Hz の仮想 vsync**。120 Hz の実画面では `display-hz` が緑、`hz-fit` が「合っている」になるはず(読み。made-up の 120 / 144 Hz のタイムスタンプでの単体試験まで)。
+SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s**)、headless の rAF は 60.0 Hz のまま。直近 10 秒で canvas が更新された画面フレームは **60 /s(600 フレーム全部)、1 フレームに平均 2.08 回の描画**(= 描いた矩形の半分は、次の rAF までに上書きされて画面に出ない)。`hz-fit` は赤の `display-slower`。**既存の `p2-rate` 行(窓の更新/s)はこの run で「120 /s(1197 updates)」と言う**(開いた時点の窓では 119.7 /s で、表示は 120 だが比較は数値なので赤)——**60 Hz の画面で見える fps は 60 なのに、既存の行だけを見れば 120 にほぼ届いて見える**。新しい `canvas-fps` 行(58 /s、1 フレームに 2.1 回描画)と `hz-fit` 行(「見えるのは最大 60 fps」)がそれを分ける。F1xn の run も同じ形(125.0 /s・60 /s・2.08 回)。**これは 60 Hz の画面の模擬ではなく、headless の 60 Hz の仮想 vsync**。120 Hz の実画面では `display-hz` が緑、`hz-fit` が「合っている」になるはず(読み。made-up の 120 / 144 Hz のタイムスタンプでの単体テストまで)。
 
 ### 3.3 測定の負担(CPU)(`tables/cost-default.md`・`cost-dedupe1.md`〔F1xn〕、`tables/cost-ship1-default.md`・`cost-ship1-dedupe.md`〔SHIPH〕)
 
@@ -114,7 +114,7 @@ SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s*
 - 既存の e2e が保証している範囲(この決定の e2e 1008 件は**測定が既定で動いている状態**で走る): 代役(surface-table)の再生の画素が期待値と一致、停止画面の SHA-256 `b12c8ece…`、`stopscreen`/`animate`/`layered` の各表示方式。**実エンジンの 16 スナップショットの比較は e2e に無い**(native のハーネスの基準。ブラウザ側は上の面 4 点と時刻列 20 点まで)。
 - 設計上の理由(読み): メーターは `performance.now()` と整数の加算・配列の追加だけで、エンジン・Worker・canvas・仮想時計に触らない。`EngineClient.onFrame` に足したのは時計の読み 2 回と、結果を捨てるイベントの呼び出し 2 回。
 
-### 3.5 試験
+### 3.5 テスト
 
 | 層 | 結果(基準 → 本差分) | 備考 |
 |---|---|---|
@@ -126,10 +126,10 @@ SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s*
 
 ### 3.6 ミューテーション検査(`tables/mutation.md`:ユニット層 96 行+e2e 層 8 行。コピーの木で 1 つずつ壊す→落ちる→戻す)
 
-コピーの木(`work/mut/app`)で 1 つずつ壊す→試験を走らせる→戻す(`test/mutation/run.mjs`)。
+コピーの木(`work/mut/app`)で 1 つずつ壊す→テストを走らせる→戻す(`test/mutation/run.mjs`)。
 
 - **ユニット層**: この決定の新規 53 件(Hz の推定を中央値→平均/p95、隠れた区間を数える、隠れている間の tick を数える、見えている時間を経過時間にする、新しい絵の数を描画回数にする、遅いフレームの係数、窓の長さ、ヒストグラムの幅と範囲、リングを捨てない、最初の idle の窓に起動を含める、一致判定の比や許容、周波数の名前の帯、パネルの 60 Hz の注記・赤/緑の閾値・案内文の項目・停止の案内、`?beacon=` の解釈、ビーコンの大きさ上限〔×4〕、版、`X-Forwarded-For` を loopback 以外の相手でも信じる/無視する、スキーマ検査〔物理コア数の数値、ビンの合計〕、ブラウザ名の順序、4 つの数字の版、物理コア数の理由の欠落、ホスト名の漏れ、summary の機械の混同・sid の無視・ソフトウェア GPU・代役の混入)+既存の perf 系 43 件(決定 0152 以降。うち 2 件は `find` を新しい行に合わせた)=**96/96 検出**(`tables/mutation-unit.md`、`logs/mutation-unit-final.log`)。
-- 最初の実行(`logs/mutation-unit-run1.log`)では**新規のうち 7 件が検出されなかった**: 2 件は等価な変異だった(`display-gap-tick-counts-fresh`: 隠れた後の最初の tick は間隔を持たないので、描画回数の持ち越しは統計に出ない。`hzclass-throttled-page-named-a-screen`: 周波数の名前の帯は最低でも 56.5 Hz なので 50 Hz の下限は冗長)→ 変異の一覧から外し、ここに記録した。残り 5 件は試験が足りなかった(最速の塊と中央値の取り違え、最初の idle より前に始まった長いタスクが後から届く場合、同じブラウザの 2 つのページの記録が交互に並ぶ場合、UA が普通でも GPU がソフトウェアの場合、代役だけのページ)→ 試験を足して検出された(`logs/mutation-unit-run2.log`)。
+- 最初の実行(`logs/mutation-unit-run1.log`)では**新規のうち 7 件が検出されなかった**: 2 件は等価な変異だった(`display-gap-tick-counts-fresh`: 隠れた後の最初の tick は間隔を持たないので、描画回数の持ち越しは統計に出ない。`hzclass-throttled-page-named-a-screen`: 周波数の名前の帯は最低でも 56.5 Hz なので 50 Hz の下限は冗長)→ 変異の一覧から外し、ここに記録した。残り 5 件はテストが足りなかった(最速の塊と中央値の取り違え、最初の idle より前に始まった長いタスクが後から届く場合、同じブラウザの 2 つのページの記録が交互に並ぶ場合、UA が普通でも GPU がソフトウェアの場合、代役だけのページ)→ テストを足して検出された(`logs/mutation-unit-run2.log`)。
 - **e2e 層**: ページの配線(`src/main.ts`)を壊す 8 件(新規 5〔描画をメーターに渡さない、`?beacon=0` でも送る、`?beacon=0` でメーターを起動する、パネルを開いてもメーターを起動しない、案内文を出さない〕+既存の perf 系 3 件〔1 件は `find` を新しい行に合わせた〕)を、代役の e2e 群(preview、`--only perf-beacon` / `perf-beacon-off` / `default-manifest`)で=**8/8 検出**。検出した検査は意図した物(例: 描画を渡さない → 「received = drawn = ui.updates の合計」の検査が落ちる、`?beacon=0` でも送る → perf-beacon-off の 5 検査が落ちる)(`tables/mutation.md`、`logs/mutation-e2e-final.log`)。
 - **等価で外した変異 2 件**と**既存の 3 件**(`find` の文字列が HEAD の時点でソースに無い)は上のとおり。
 
@@ -144,17 +144,17 @@ SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s*
 ## 5. 未確認・限界
 
 1. **依頼者の機械の値は 1 つも無い**。この決定が示すのは「依頼者が https の名前でページを開けば、依頼者のブラウザの rAF の周波数・canvas の実更新・長いタスク・遅い入力・コア数などが `lift/out-websrv/perf-log.jsonl` に届く仕組みが動くこと」だけで、P2(120 fps)が達成されたかどうかは何も言っていない。ヘッドレス Chrome の rAF は 60 Hz の仮想 vsync(`?hz=` に依らない。決定 0182)で、「rAF の Hz が 60 と出る = 画面が 60 Hz 相当」が正しく出ることの確認であり、**120 fps を達成した主張ではない**。
-2. **`tailscale serve` 越しの `X-Forwarded-For` による tailnet の判定は、実際の serve 経由では未実測**。確認したのは (a) Go のソース(`serve.go`)に `r.Out.Header.Set("X-Forwarded-For", c.SrcAddr.Addr().String())` があること、(b) 手元の `tailscaled` のバイナリに `X-Forwarded-For`・`X-Forwarded-Proto`・`X-Forwarded-Host` の文字列があること、(c) そのヘッダを付けた要求を中間ウェアに通す単体試験(`perf-server.test.ts`)。serve の設定は触っていない(依頼者の経路を変えうるため)。PM が 5173 を再起動して依頼者が開いた後、`perf-log-summary.mjs --machine tailnet` に行が出れば確認される。出なければ `remote` が `loopback` のままで、`loopback, not headless` の組に入る。
+2. **`tailscale serve` 越しの `X-Forwarded-For` による tailnet の判定は、実際の serve 経由では未実測**。確認したのは (a) Go のソース(`serve.go`)に `r.Out.Header.Set("X-Forwarded-For", c.SrcAddr.Addr().String())` があること、(b) 手元の `tailscaled` のバイナリに `X-Forwarded-For`・`X-Forwarded-Proto`・`X-Forwarded-Host` の文字列があること、(c) そのヘッダを付けた要求を中間ウェアに通す単体テスト(`perf-server.test.ts`)。serve の設定は触っていない(依頼者の経路を変えうるため)。PM が 5173 を再起動して依頼者が開いた後、`perf-log-summary.mjs --machine tailnet` に行が出れば確認される。出なければ `remote` が `loopback` のままで、`loopback, not headless` の組に入る。
 3. **物理コア数は取れない**。論理コア数(`hardwareConcurrency`)だけ。SMT の有無は分からない(参考: 決定 0186 は「この機械は 8 物理コア × SMT」だが、依頼者の機械は不明)。
 4. **画面に実際に出たフレームは、ページからは見えない**。`requestAnimationFrame` の回数は「ブラウザがページに描画の機会を与えた回数」で、ディスプレイが実際に表示した回数ではない(合成や GPU の遅れは見えない)。canvas の「実際に更新された」は「そのフレームの間に `putImageData`/レイヤー描画が呼ばれた」で、GPU がラスタした時刻ではない。`display.canvas.drawMs` は JavaScript の呼び出しの時間。
 5. **Event Timing は 16 ms 未満のイベントを報告しない**ので、入力遅延の p50/p95 は「遅かった入力の中」の値。全入力の入力→更新の遅延は版 1 の `input` ブロック(決定 0141)。Firefox・Safari には `longtask` が無い(`supported: false`)。
-6. **他のブラウザ**(Firefox・Safari・Edge)と、120 Hz 以上の実ディスプレイ、可変リフレッシュ(VRR)、省電力モード、複数ディスプレイ(ウィンドウが別のディスプレイに動いたときの rAF の変化)は未確認。`parseBrowser` は UA 文字列の試験だけ。
+6. **他のブラウザ**(Firefox・Safari・Edge)と、120 Hz 以上の実ディスプレイ、可変リフレッシュ(VRR)、省電力モード、複数ディスプレイ(ウィンドウが別のディスプレイに動いたときの rAF の変化)は未確認。`parseBrowser` は UA 文字列のテストだけ。
 7. **`?hz=` を読まないバンドル**(構成 D など)では `hz.engineHz` が実際のエンジンの描画周波数と合わない(`S-cbeacon1-25`)。今の既定の入口(F1xn)は読む。
-8. **実エンジンで `display-hz` が緑になる経路は試験していない**(ヘッドレスは 60 Hz)。120 Hz の rAF での緑/赤は、パネルの単体試験(rAF 120 / 144 の made-up 値)と、`DisplayMeter` に 120 Hz のタイムスタンプを与える試験が保証する範囲。
-9. 隠れたタブでの挙動は、偽のホストと偽のタイムスタンプで試験した(rAF が止まる・1 秒に 1 回来る)。実ブラウザの隠れたタブ(e2e の `hidden-timers.mjs` の経路)では、この決定では測っていない。
+8. **実エンジンで `display-hz` が緑になる経路はテストしていない**(ヘッドレスは 60 Hz)。120 Hz の rAF での緑/赤は、パネルの単体テスト(rAF 120 / 144 の made-up 値)と、`DisplayMeter` に 120 Hz のタイムスタンプを与えるテストが保証する範囲。
+9. 隠れたタブでの挙動は、偽のホストと偽のタイムスタンプでテストした(rAF が止まる・1 秒に 1 回来る)。実ブラウザの隠れたタブ(e2e の `hidden-timers.mjs` の経路)では、この決定では測っていない。
 10. ミューテーション検査の既存の 3 件(`expected-surface-sha-mismatch-ignored`・`client-poll-not-sent-to-the-worker`・`destroyed-window-stays-on-the-desktop`)は HEAD の時点で変異を作れない(`find` の文字列がソースに無い)。この差分の前から。
 11. **SHIPH(今の既定の入口、決定 0189、f2dded6)**: 作業中に既定の入口が F1xn から SHIPH に切り替わったので、実エンジンの run(既定と `?hz=120`)・CPU の費用(既定と `?dedupe=1`)・同一性を SHIPH でも取り直した(§3)。コードは `client.ts` の 3 つの hunk が行番号のずれで当たるだけ。測り直さなかった物: SHIPH の `?hz=auto`、再生中(窓の更新 120/s)の費用。F1xn の表は残し、どちらの構成の数字かを表に書いた。
-12. e2e の stand-in 群は、`surface-table-v1` の試験用の表示。実エンジンで `FL_ENGINE_BUNDLE` を使う既存の e2e(F1 の停止画面の SHA 比較)は、この決定では走らせていない(bundle を用意していない)。
+12. e2e の stand-in 群は、`surface-table-v1` のテスト用の表示。実エンジンで `FL_ENGINE_BUNDLE` を使う既存の e2e(F1 の停止画面の SHA 比較)は、この決定では走らせていない(bundle を用意していない)。
 
 ## 6. 出典のない選択(`S-cbeacon1-N`。理由、代替、撤回の条件)
 
@@ -177,9 +177,9 @@ SHIPH: エンジンは 120 Hz で描画(直近 10 秒の窓の矩形 **124.9 /s*
 | S-cbeacon1-15 | ビーコンの版を 2 にした。`sid`(ページを開くたびの乱数 12 桁。ブラウザに保存しない)を足した | 版 1 の全項目は不変だが新しいブロックがあるので版で区別する。記録を「ページ 1 回」にまとめるのに ID が要る(ログには相手のアドレスも無い) | 版 1 のまま(区別が付かない)。sid 無し(まとめは seq 0 の位置で推定、複数の同時ページで誤る) |
 | S-cbeacon1-16 | ブラウザの版は `major.minor` の 2 つだけ(`156.0`)。4 つの数字(`156.0.0.0`)は送らない | 4 つの数字はアドレスに見え(ログの「アドレスが無い」の機械検査に引っ掛かる)、縮約された Chrome の UA では情報が無い | 全部(UA に同じ文字列は既にある) |
 | S-cbeacon1-17 | 逆プロキシ(`tailscale serve`)の背後では、ソケットの相手が loopback のときだけ `X-Forwarded-For` の先頭のアドレスの種類で分類 | 依頼者の https の経路は 127.0.0.1:5173 への逆プロキシで、ソケットの相手は常に loopback になり、`tailnet` の行が出ない。tailscale のソース(`ipn/ipnlocal/serve.go addProxyForwardedHeaders`)と、手元の `tailscaled` のバイナリの文字列で `X-Forwarded-For` を確認した(実際の serve 経由では未実測) | ヘッダを見ない(依頼者と手元が区別できない)。loopback 以外の相手のヘッダは見ない(相手が種類を選べない) |
-| S-cbeacon1-18 | サーバーは新ブロックの形を検査して**拒否しない**(`beaconProblems` は試験・summary・読み手が使う) | 拒否するとページは以後送らなくなる(決定 0152)。変な記録でも 1 件あるほうがよい | 400 で拒否 |
+| S-cbeacon1-18 | サーバーは新ブロックの形を検査して**拒否しない**(`beaconProblems` はテスト・summary・読み手が使う) | 拒否するとページは以後送らなくなる(決定 0152)。変な記録でも 1 件あるほうがよい | 400 で拒否 |
 | S-cbeacon1-19 | `?beacon=0` は送信と画面メーターの両方を止める。パネルを開いたときだけメーターが動く(表示のため、何も送らない) | 「止める」と書いて測り続けるのは不誠実。メーターの rAF はアイドルでもフレームを作らせる | 送信だけ止める |
-| S-cbeacon1-20 | 新しい行と案内文は日本語。既存の行(英語)は変えていない | PM の指示は「日本語で既存に合わせる」だったが、既存のパネルは英語。依頼者は日本語 | 全部英語 / 既存も日本語に(既存の試験が多数落ちる) |
+| S-cbeacon1-20 | 新しい行と案内文は日本語。既存の行(英語)は変えていない | PM の指示は「日本語で既存に合わせる」だったが、既存のパネルは英語。依頼者は日本語 | 全部英語 / 既存も日本語に(既存のテストが多数落ちる) |
 | S-cbeacon1-21 | メーターはページを開いた時点で始める(起動の間も測る) | 起動中の rAF(主スレッドが忙しい)も見える。「最初の idle 以降」の窓で定常を別に読める | エンジン開始 / 最初の idle から |
 | S-cbeacon1-22 | summary の「この機械」(loopback・headless)は UA の `HeadlessChrome` か、GPU 名に SwiftShader / llvmpipe / Software を含むもの | 古いサーバーの `tailscale serve` 越しの依頼者の記録が loopback と出るので、それとの区別 | UA だけ |
 | S-cbeacon1-23 | summary の「1 ページ」の値は、そのページの**最後の**記録の値。画面の Hz の分類もその値 | 最後が定常に一番近い。最初の idle の記録は窓が空 | 全記録の中央値 / 最大 |

@@ -1,4 +1,4 @@
-# 0312g: (1) B-FLE の設計の読み(plugin の wasm を FLEngine とどう共有するか。G9 の前提、決定 0309 §3 の『2 つ目で 2.03 倍』の解消)、(2) S3a の clamp の node 試験(mt3。PM 指示 22:46。仮。**build・test・Chrome は 0。(1) は現在の bundle B1 の link map・wasm の section・plug1 の表からの読み、(2) は書いただけで未実行**)
+# 0312g: (1) B-FLE の設計の読み(plugin の wasm を FLEngine とどう共有するか。G9 の前提、決定 0309 §3 の『2 つ目で 2.03 倍』の解消)、(2) S3a の clamp の node テスト(mt3。PM 指示 22:46。仮。**build・test・Chrome は 0。(1) は現在の bundle B1 の link map・wasm の section・plug1 の表からの読み、(2) は書いただけで未実行**)
 
 ## 0. 冒頭の三点
 
@@ -96,7 +96,7 @@
 2. **PM の判断**: S1 を『固定の絶対値 154,885,888 B』とするか『plugin のネイティブも分母に入れる比』とするか。前者なら静的結合は Delphi 3 つまでで、4 つ目以降は別 module 化(②)が必須になり、その場合は ②の loader の設計(§4 の ①〜⑤)を B-FLE と並行して始める必要がある。
 3. **未確認**: (a) 7.74 が pre-opt の係数か(最終の plugin の wasm は 0.765 倍になるか)、(b) plugin の hybrid(direct wasm)の割合、(c) Balance を開く経路で実行される import の数、(d) ②の loader の工数(見積もっていない)、(e) ③の PIC の増分(読み。未測定)。
 
-## 7. (2) S3a の clamp の node 試験(書いた。**未実行**)
+## 7. (2) S3a の clamp の node テスト(書いた。**未実行**)
 
 - 置き場: `lift/harness/sysinfo_wasm/{run.sh,hc_test.c,hc_test.mjs}`(`impl/sysinfo_wasm/` に写し)。`tp_wasm` と同じ形: `run.sh` が `fle_sys.c` の**実際の文**(`EM_JS fle_js_hardware_concurrency` から `fle_sys_processors` の終わりまで)を awk で切り出して `hc_extract.inc` にし、小さな C から emcc で wasm にして node で動かす(runtime の他の部分は要らない)。切り出しは S3a・S3b の両方で確認済み(awk のみ、emcc は未実行)。
 - 検査(`hc_test.mjs`): `hardwareConcurrency` が **undefined・null・0・負(-1、-3)・NaN・Infinity・0.5 → 1**、**1・1.9 → 1**、**2・2.9 → 2**、4、**文字列 "8" → 8**、16、31、**32 → 32、33・33.9・64・1e9 → 32**、**2^31 → 1**(`|0` が負に回る。実在しない値)、**`navigator` が無い環境 → 1**。**1 回だけ読む**(最初の呼び出しの値が後の navigator の変更・消失に関わらず保たれる)、instance ごとに独立。S3a のときは `fle_cfg_processors`(FLE_PROCESSORS)の優先(4 が 8 に勝つ、16 が 2 に勝つ、64 → 32、0・負 = なし)も検査。
@@ -106,7 +106,7 @@
 
 ## PM の判断と取り込み(2026-11-06 22:59、docs のみ)
 
-取り込み: mt3 の 0312g(B-FLE の設計の読み、S3a の `fle_sys_processors` の clamp の node 試験の下書き)を置いた。(1) は B1 の link map・wasm の section・plug1 の表からの**読み**、(2) は**書いただけで未実行**(emcc も未実行)。ビルド・Chrome・依頼者の機械は 0 件。
+取り込み: mt3 の 0312g(B-FLE の設計の読み、S3a の `fle_sys_processors` の clamp の node テストの下書き)を置いた。(1) は B1 の link map・wasm の section・plug1 の表からの**読み**、(2) は**書いただけで未実行**(emcc も未実行)。ビルド・Chrome・依頼者の機械は 0 件。
 
 事実として受け取る(mt3 の集計): B1 の最終 wasm 142,986,125 B = code 140,254,002(106,214 関数)+ data 2,229,452 + elem 307,297 ほか。link 直後の code 172.07 MB は FLEngine の C 75.83 MB(43.9%)・他 7 モジュールの C 93.78 MB(54.3%)・runtime 0.70 MB(0.4%)。wasm-opt -Oz が C 部を 0.764 倍にする。**plug1 の係数 7.74 は pre-opt の値**(FLEngine の関数 10,677,239 B に対し B1 の pre-opt 82.10 MB = 7.69 倍)で、最終 wasm 基準なら Balance は共有なし 約 11.6 MB・B-FLE 約 2.6 MB(0309 の 14.6 / 3.3 より約 3 割小さい可能性、読み。Balance を wasm にした実測は 0 件)。Balance の共有なし 14.59 MB の内訳(plug1 の実測 × 係数): FLEngine に無い plugin 本体 2.80 MB、FLEngine と同一で共有できる関数 10.09 MB(78.3%)、データ 1.69 MB(固有 0.47)。runtime の C 部は静的結合なら追加 0(runtime は 1 つしか持てない: fle_realmod.c の `mods[RM_MAX]`、SRW・CS・時計、`fle_gil_word` が状態を持つため)。
 
@@ -114,5 +114,5 @@
 1. **S1 の基準は『対応するネイティブの 2 倍以下(モジュールごと、全体で)』という比(performance-targets §4b の定義)を正式な基準とする**。154,885,888 B は現行 8 モジュールのネイティブ合計 77,442,944 B の 2 倍であって、plugin を足すと分母(plugin のネイティブ)も増える。ただし絶対値の余白(残り 11.90 MB)も併記する: B-FLE でも Delphi を足せるのは 3 つ(Balance + Filter + Delay 2 = +10.2 MB で 153.2 MB、PEQ2 で 157.8 MB)という読みは、plugin の分母を入れる比の基準では全体比を下げる(限界比 0.88〜1.45 < 2)。**4 つ目以降は絶対値の基準なら別 module 化が必須、比の基準なら不要**。実測(Balance を wasm にする)が出るまで、どちらも読みのままにする。
 2. **B-FLE は 2 つ目の plugin の前に必須**(共有なしは 2 つ目で全体比 2.03 倍)。packaging は mt3 の推薦を採る: **plugin は今の方式のまま FLEngine と同じ 1 つの wasm に静的に結合**(`RM_MAX 8` を拡げる)。**Emscripten の dynamic linking は採らない**(PIC 化で主 module の code が +10〜25%〔読み・未測定〕、pthread + JSPI + 143 MB の実績が無い)。別 module 化は B-FLE の後、S1/P1 が実際に効いたときだけ(新しい仕組みが大きい: dispatch 表の動的登録、全 Worker への instantiate の配布、module ごとの data base と再配置、import の export、表 index の割当)。
 3. **B-FLE の最小の確かめを採る**(mt3 の次の仕事、窓の後に fe-lift の小さい実験として。plug1 の推奨 2): Flanger と Balance の 2 つで、データ参照を表経由にした生成 C がモジュール間で同じになるか(wasm にする前に C の一致だけ、約 1〜2 人日〔読み〕)。難所は mt3 の整理どおり: 関数の 72% がデータに触れる、Delphi の RTL が DLL ごとに自分の状態(heap manager・例外のフック)を持つので共有した関数が FLEngine のデータを触ると忠実性が壊れる、FLEngine 側も表経由にする必要(再 lift の可能性)、データ参照の 1 段間接の性能。**lift の忠実性の方針に照らして、B-FLE は『FL の挙動の代行』ではなく生成物の共有(通信/変換の削減ではなく大きさの削減)**で、区分は新設せず『S1 の達成のための生成器の変更』として決定文書に書く。
-4. node 試験(`lift/harness/sysinfo_wasm/`)は S3a のビルドの窓で走らせる(emcc の警告・EM_JS の書き方の誤りが残っている可能性がある)。
-5. 未確認: Balance の wasm の実測の大きさ、B-FLE の C の一致、node 試験の実行、依頼者の機械。
+4. node テスト(`lift/harness/sysinfo_wasm/`)は S3a のビルドの窓で走らせる(emcc の警告・EM_JS の書き方の誤りが残っている可能性がある)。
+5. 未確認: Balance の wasm の実測の大きさ、B-FLE の C の一致、node テストの実行、依頼者の機械。

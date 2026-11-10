@@ -63,7 +63,7 @@
 
 ### O10 コアなデータ（テーマ・言語・テンプレート等）が無い（C。判断済み: 全体を遅延 VFS）
 - **再現（仕様が決まった後）**: Settings → Theme タブで項目数、General の言語のドロップダウン、File → New from template の一覧、をそれぞれ `savePic`。
-- **合格**: ネイティブの台帳（opt1 の census）と同数のテーマ・言語・テンプレートが出る。FindFirstFile/GetFileAttributes が `Data` 全域で効く（engine ログの trace か Browser の一覧で、台帳の件数・サイズと一致）。**P1 を壊さない**: first idle ≤ 10 s（Chrome、静かな窓）かつ前の bundle + 100 ms の基準（索引と seed を先に読む設計）。**失敗**: 件数の不足、first idle の劣化。**未確認**: 遅延 VFS は未実装（PM の判断 1）なので、本 scenario は仕様待ち。
+- **合格**: ネイティブの記録（opt1 の census）と同数のテーマ・言語・テンプレートが出る。FindFirstFile/GetFileAttributes が `Data` 全域で効く（engine ログの trace か Browser の一覧で、記録の件数・サイズと一致）。**P1 を壊さない**: first idle ≤ 10 s（Chrome、静かな窓）かつ前の bundle + 100 ms の基準（索引と seed を先に読む設計）。**失敗**: 件数の不足、first idle の劣化。**未確認**: 遅延 VFS は未実装（PM の判断 1）なので、本 scenario は仕様待ち。
 - 測れる指標: HTTP の Range 要求の数と bytes（`preview-logged.mjs` の access log）、OPFS の使用量（`navigator.storage.estimate()`）、背景の先読みの進み。
 
 ### O11 FL 内蔵のサンプルが使えない（`Data\Patches\Packs\Drums (ModeAudio)\Kicks` に `*.wv` 349 個。C + B: WavPack の復号）

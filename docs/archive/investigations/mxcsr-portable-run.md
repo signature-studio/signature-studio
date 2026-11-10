@@ -1,6 +1,6 @@
 # MXCSR 状態ビット・RC/FTZ/DAZ の標準 C 実装（0044）の実行記録
 
-日付: 2026-10-21。判断は `docs/decisions/0044-mxcsr-flags-portable.md`（0038 の改訂）。「実測」はコマンドの出力、「推測」は未検証の解釈。HEAD 1f88ad5、作業ツリーには他担当の未コミット変更あり（wasm 移植: `fle_sys.c` 他、`fle_runtime.h` の `fle_addr`/`FLE_CHECK_HI32`、`fle_host.c`/`fle_host.h`、x87 超越関数 `fle_x87.c` と `x87.rs`、ロケールなど）。それらは触っていない。成果物は `lift/out-mxsoft/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE）。
+日付: 2026-10-21。判断は `docs/decisions/0044-mxcsr-flags-portable.md`（0038 の改訂）。「実測」はコマンドの出力、「推測」は未検証の解釈。HEAD 1f88ad5、ワークツリーには他担当の未コミット変更あり（wasm 移植: `fle_sys.c` 他、`fle_runtime.h` の `fle_addr`/`FLE_CHECK_HI32`、`fle_host.c`/`fle_host.h`、x87 超越関数 `fle_x87.c` と `x87.rs`、ロケールなど）。それらは触っていない。成果物は `lift/out-mxsoft/`（`tmp/` = TMPDIR、`emcache/` = EM_CACHE）。
 
 ## 1. stmxcsr 3 か所の静的確認（`lift/objdump-text.txt`、FLEngine_x64.dll）
 

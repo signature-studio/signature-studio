@@ -12,7 +12,7 @@
    - **P + V7 + V4(製品の形、§3x)**: pv74s 3 本対 p0mt 3 本で、File T +0.4 ms、Esc T +1.9 ms(縁)、p90 +0.5 / +5.1、仮想 s/実 s 0.90〜1.00 対 0.65〜0.74、再生中の Esc の late 2/105 対 1/105(P + V7 だけは 8/140)= E14 の基準を満たす(Esc の T は縁)。**PM の判断(05:47): E14 の最終の組は P + V7(desk-worker.ts のみ +4/−1)。V4 は worker.ts の追加の差分で、P + V7 でも late の差が統計的に有意でない(両側 0.08)うえ、Esc の中央値の差が大きい(+1.9 対 +1.0 ms)ので採らない(記録に残す)。**
    - **B1(実スレッド、製品の形)**: 5 分再生で数の基準を全て満たす(PCM の零 0.036%、CPU/Unlock 最大 74 ms、UI Worker 0.58、合計 ≤ 1.43、書き込み ≥ 0.978)。**入力 T は協調より +10 ms(B +4.8・C +5.5)で未達**。**B1 + P**: B は消え(6.6 → 0.4 ms)、UI Worker 0.58 → 0.40、File の T 中央値は協調より速い(10.0 対 17.6 ms、p90 45.8 対 25.1)が、Esc の T が 23.7 ms。V5(P が port で engine の event loop を起こす)は効かず不採用(§3o)。
    - **機能(§3p)**: Firefox 158 で P は動いた(画面が正しく、再生 30 s)。P の能力判定が偽になる 2 経路(WebGL2 無し、`Atomics.waitAsync` 無し〔Worker の探針で模擬〕)は旧経路で動いた。
-3. **未取得**: B1 + P + V7(実スレッド版の製品の形、page `app-dist-b1p7s` を用意済み、計時は未)、Esc の late の原因の確認(scene 単位の記録つきの V7)、再生前の Esc が P 側で late になる run が 2 回(原因未調査)、Firefox で p3 と pv7s の速さの比較(pv7s は p0・p3 より約 11% 遅い 1 本、§3v)、実際の Firefox < 145、first idle、Hz 120、実機(GTX 980)、e2e の desk 系試験、再現。
+3. **未取得**: B1 + P + V7(実スレッド版の製品の形、page `app-dist-b1p7s` を用意済み、計時は未)、Esc の late の原因の確認(scene 単位の記録つきの V7)、再生前の Esc が P 側で late になる run が 2 回(原因未調査)、Firefox で p3 と pv7s の速さの比較(pv7s は p0・p3 より約 11% 遅い 1 本、§3v)、実際の Firefox < 145、first idle、Hz 120、実機(GTX 980)、e2e の desk 系テスト、再現。
 
 ## 1. 設計の確定(現在の page の present 経路を実コードで読んだ)
 
@@ -28,7 +28,7 @@
 - page(`client.ts`)が P を作る(`new Worker(new URL('./desk-worker.ts', import.meta.url), { type: 'module', name: 'fl-desk' })`、Vite が別 chunk にする)。共有 SAB の link(6.4 KB)と MessageChannel を作り、canvas・input ring・link・port1 をエンジン Worker に、link・port2 を P に渡す。
 - エンジン Worker は**最初の idle**(`ensureDesk`)で、engine が scene の export を持ち、`webgl2Usable()`(今と同じ『platform が決める』条件)が真なら、`OffscreenCanvas`(まだ context なし)とエンジンの `WebAssembly.Memory`(共有)を port で P に**移す**(canvas は transfer、memory は共有のまま clone)。偽なら今までどおり(2D の `DeskPresenter`、または link の無い構成)。
 - P は `GlDeskPresenter`(**既存のコードを再利用**。変更は `sceneMemory`〔description の読み先を link の slot にする〕と `deferred`〔`resync()` が要求になる〕の 2 点だけ)を作り、context ができてから `sceneMode(1)` を**要求**する(エンジン Worker が次の scheduler 点で `fle_desk_scene_mode(1)` を呼ぶ = 『GL context ができてから runtime を scene に切り替える』順序を保つ)。
-- 起点は P: **P の rAF**(P の event loop は空なので毎 frame 配られる)が `WANT` を立てる。エンジン Worker は**すでに ring を見ている点**(`inputPoll` = scheduler 点、約 2,000 回/s、と `onEngineIdle`)で `WANT` を見て、`fle_desk_scene` を呼び、返った description(6,464 B)を link の slot に**複写**して `PUB` を進め `Atomics.notify` する。P は `Atomics.waitAsync(PUB)` で起き、`present()` し、`DONE`・結果(画素を変えた矩形数)・時刻を書く。
+- 起点は P: **P の rAF**(P の event loop は空なので毎 frame 配られる)が `WANT` を立てる。エンジン Worker は**すでに ring を見ている点**(`inputPoll` = scheduler 点、約 2,000 回/s、と `onEngineIdle`)で `WANT` を見て、`fle_desk_scene` を呼び、返った description(6,464 B)を link の slot に**コピー**して `PUB` を進め `Atomics.notify` する。P は `Atomics.waitAsync(PUB)` で起き、`present()` し、`DONE`・結果(画素を変えた矩形数)・時刻を書く。
 - **in-flight 1**: エンジンは `PUB === DONE` のときだけ公開する(`fle_desk_scene` が返す『書かれた矩形』は呼び出しで消費されるので、P が描いていない scene を次で上書きすると矩形が失われる。P が忙しい間、runtime は矩形を溜め続け、次の呼び出しでまとめて返す)。slot は 1 枚で足りる(0306 §9 の『2 枚』は不要だった)。
 - 答え(L1c): エンジン Worker が公開時に `inlineSettled`(gate)を覚え、`DONE` が追いついたとき `result > 0` かつ gate なら `completeInline(true)`。page には `input-done`(今と同じ)と新しい `desk-answers`(seq の一覧と、P が書いた present の時刻)を送る。P は自分の `desk` 統計(`at` = present の時刻)を page に**直接**送る(エンジン Worker を経由しない)。
 - sleep: `QuietClock` は P に移った。P の frame loop が眠ると `ASLEEP` を立て、エンジン Worker の idle の fallback(`DESK_FALLBACK_MS` 20 ms)が**眠っている間だけ**次の変化を探す。画素が変わった present が P を起こす。
@@ -39,13 +39,13 @@
 | 無くなる(エンジン Worker から) | 増える |
 |---|---|
 | present の GL 呼び出し(`texSubImage2D`・draw・uniform…)と、その直後の GPU 待ちの idle(1 present 約 12〜14 ms、Worker の 14〜21%、0306 §9) | P Worker 1 本(生成、module 読み込み、GL context と shader の作成が P に移る。CPU は present の分 ≒ 0.10〜0.20 コア) |
-| Worker の rAF の loop(`startDeskLoop`)と `QuietClock`(P へ)、rAF が配られない問題 | link の SAB 6.4 KB、公開ごとの複写 6,464 B(≒ 1 μs 台)と `Atomics.notify` 1 回、scheduler 点ごとの `Atomics.load` 数回 |
+| Worker の rAF の loop(`startDeskLoop`)と `QuietClock`(P へ)、rAF が配られない問題 | link の SAB 6.4 KB、公開ごとのコピー 6,464 B(≒ 1 μs 台)と `Atomics.notify` 1 回、scheduler 点ごとの `Atomics.load` 数回 |
 | idle の fallback による present の**常時**の試行(17.7/s):awake の間は P の WANT が起点になる(rAF 数 = 最大で表示の Hz) | `fle_desk_scene` は rAF ごと(≤ Hz)に呼ばれる(今は idle ごと ≤ 50/s) |
 | **残るもの**: 20 ms の gate(`DESK_FALLBACK_MS`)は P が眠っている間の『最初の変化を見つける』ためにだけ残る(静かな間は Worker が空いているので費用は無視できる) | P の frame loop が起きる/眠る信号(link の 2 語) |
 
 ### 自己点検(`docs/policies/lift-fidelity.md` と PM の指示)
 
-- **ピクセルを postMessage しない**(オーナーの 2026-11-04 の指示): P はエンジンの共有メモリから `texSubImage2D` する(今と同じ)。postMessage は初期化(canvas・memory の handover)と test aid の読み戻しだけ。link の複写は 6.5 KB の description で、ピクセルではない。
+- **ピクセルを postMessage しない**(オーナーの 2026-11-04 の指示): P はエンジンの共有メモリから `texSubImage2D` する(今と同じ)。postMessage は初期化(canvas・memory の handover)と test aid の読み戻しだけ。link のコピーは 6.5 KB の description で、ピクセルではない。
 - **FL の class/窓の分岐なし**: `desk-gl.ts` は窓を知らないまま(description のとおりに描く)。追加した物は link・P・handover だけで、窓の種類・位置・名前を見る所はない。
 - **旗・環境変数・URL パラメータの追加なし(No-options)**: P を使うか否かは**platform の能力**(`webgl2Usable()` と engine の scene export)が決める(今の GL/2D の選択と同じ規則)。
 - **FL の挙動の代行なし**: P は description を描くだけ。『settled』の判定・応答の規則(L1c)は変えていない(エンジン Worker が gate を覚える)。
@@ -62,9 +62,9 @@
 | `app/src/engine/worker.ts` | +95 −18 | `ensureDesk`(引き渡しの判断)、`pService`/`reapPresented`/`publishScene`(P との契約)、答え(L1c)の経路、test aid の転送 |
 | `app/src/engine/desk-gl.ts` | +8 −3 | `sceneMemory`(description の読み先)と `deferred`(resync が要求になる)の 2 点だけ |
 | `app/src/engine/client.ts`・`protocol.ts`・`main.ts` | +24 −4 | P を作る、port を渡す、`desk-answers` |
-| 試験 | +76(desk-link)+ 約 90(desk-gl-link)+ 1(worker-diag の fake) | link の契約(1 scene in flight、複写、wake、要求)、GlDeskPresenter が link の slot から読み engine memory から upload する・size 変更で再帰しない |
+| テスト | +76(desk-link)+ 約 90(desk-gl-link)+ 1(worker-diag の fake) | link の契約(1 scene in flight、コピー、wake、要求)、GlDeskPresenter が link の slot から読み engine memory から upload する・size 変更で再帰しない |
 
-単体試験 1320 passed / 8 skipped / 0 failed(追加は desk-link 5 件と desk-gl-link 3 件、worker-diag の fake を 1 行直した)、`tsc` の 3 構成 clean。**runtime の C は変えていない**。新規の option・環境変数・URL パラメータなし。
+単体テスト 1320 passed / 8 skipped / 0 failed(追加は desk-link 5 件と desk-gl-link 3 件、worker-diag の fake を 1 行直した)、`tsc` の 3 構成 clean。**runtime の C は変えていない**。新規の option・環境変数・URL パラメータなし。
 
 ## 3. 測定(実測。`tables/pt-presents-cpu.md`・`tables/pt-true-T.md`・`logs/`)
 
@@ -99,7 +99,7 @@
 - 次の検証(計器): `GlDeskPresenter.present()` の所要時間の累積計数(> 8 ms・> 16 ms の回数と合計)を足し、p0 と p を比べる。長い present が Esc の悪い記録と同じ時刻にあるかを、`lat` の記録の時刻と突き合わせる(次の窓、約 12 分)。**直す道の候補**: (a) P の present の間隔を表示の Hz 以下にする(今は publish ごとに即描画。frame に揃えて 1 frame 1 回)、(b) 入力を待っている間(`inlineSince ≠ 0`)は P の WANT 起点の publish を止め、答えの scene だけを出す、(c) `OffscreenCanvas` の frame を `commit()` で明示し、前の frame の確認を待たない。
 
 ### 3c. 未取得
-first idle(P の生成が起動を遅らせないか: ci1 の方法で交互 10 組を依頼する)、Hz 120、`P` の再現(p 2 本・p2 1 本)、実機(GTX 980: SwiftShader の『1 frame in flight』の待ちは実 GPU で小さいはず〔読み〕)、Firefox(`waitAsync` のある 145 以降は P の経路に入る、未実行)、e2e の desk 系試験(Chrome を要する。未実行)。
+first idle(P の生成が起動を遅らせないか: ci1 の方法で交互 10 組を依頼する)、Hz 120、`P` の再現(p 2 本・p2 1 本)、実機(GTX 980: SwiftShader の『1 frame in flight』の待ちは実 GPU で小さいはず〔読み〕)、Firefox(`waitAsync` のある 145 以降は P の経路に入る、未実行)、e2e の desk 系テスト(Chrome を要する。未実行)。
 
 ### 3d. 『答えの出ない入力』の定義(PM 20:58 (a))
 
@@ -218,7 +218,7 @@ p0mt-1 → pmw-2 → pmw-3 → p0mt-4(pmw = P + 計器 + 穴の修正 `idleAnswe
 
 = 修正後の P は (3)(答えの出ない 5 件)以外の基準に届く。(3) の残りの原因は未特定(in-episode の late)。43/s の状態(Esc の T が +5〜6 ms)は ③ では出なかったので、**2 状態が出る確率**を知るには ABBA をさらに重ねる必要がある(各状態で基準を満たすかが E14 の判断)。
 
-### 3n. ④ B1 + P(mt3 の B1 の木に P の差分を当てた `srcB1P`〔tsc clean、単体試験 1322 passed、`app-dist-b1p`〕)の ABBA(22:57〜23:18、開始 load 0.9〜1.2。`tables/b1p-table.md`・`b1p-true-T.md`)
+### 3n. ④ B1 + P(mt3 の B1 の木に P の差分を当てた `srcB1P`〔tsc clean、単体テスト 1322 passed、`app-dist-b1p`〕)の ABBA(22:57〜23:18、開始 load 0.9〜1.2。`tables/b1p-table.md`・`b1p-true-T.md`)
 
 | run | 開始 load | 純再生 present/s | Workers (UI / P / mixer, コア) | File T 中央値 / p90 | Esc T 中央値 / p90 (答え/35) |
 |---|---|---|---|---|---|
@@ -463,12 +463,12 @@ FL 全体の画面が出た、プロジェクト読み込み・Ok・Space で 30
 6. 窓の規則: PM の info『window gpu1』を待って chain を始めた。ただし 21:18 に opt1 の Wine の batch が走っていたため、PM の指示で待ち、21:20:11 の終了と ps の確認の後に始めた。
 7. Firefox の機能の確認 3 本(`ffsmoke-p0`・`ffsmoke2-p3`・`ffsmoke3-p3`、各 約 6 分)は私の click の座標の誤り(スクリーンショット上の座標を使った)でダイアログの Ok を押せず、再生まで行かなかった(p0 でも同じなので P のせいではない)。4 本目で `clickIn`(ダイアログ基準)に直して通った。Firefox 約 15 分を無駄にした。
 8. 後退経路の確認の 1 本目(`--disable-3d-apis`)は後退経路を通っていなかった(Worker の OffscreenCanvas の WebGL2 は使える)。`--disable-software-rasterizer` と Worker の探針に替えた。
-9. 00:16:10 に V6(2 frame に 1 回の present の試験)の Chrome run を、PM の『batch の窓は Chrome なし』の info を読む前に始め、00:16:50 に自分の PID だけを止めた(run のディレクトリは削除、結果は使っていない)。PM に報告済み。
+9. 00:16:10 に V6(2 frame に 1 回の present のテスト)の Chrome run を、PM の『batch の窓は Chrome なし』の info を読む前に始め、00:16:50 に自分の PID だけを止めた(run のディレクトリは削除、結果は使っていない)。PM に報告済み。
 10. PM への info『状態を決める物』の見出しの時刻を 02:05 と書いたが、実際は 01:53(時計を見ずに書いた誤記)。内容の数値は logs/ と tables/ の実測。
 11. V4 の計時の chain 開始時の loadavg は 2〜4 本目が 3.42・4.44・3.49 で、PM の『開始 load ≤ 3』を満たさなかった(chain の中で自分の前の run の loadavg が残るため。run 間で load を見て待つ仕組みを入れていない)。PM に報告済み。
 12. 03:12:31 に Firefox 158 の pv7s の機能確認を、PM の元の手順 (4)(ABBA の後に Firefox)に従って始めたが、03:13 の PM の info(Firefox は延長 ABBA の後)を読む前だった。Chrome とは重ねていない(03:17:06 終了、03:17:20 に Chrome 開始)。PM に報告済み。
 13. 時刻の誤記: PM への info『状態を決める物』の見出し 02:05(実際 01:53)。ほかに、V4 の chain の 2〜4 本目の開始 load が 3 を超えた件(11)。
-14. `vitest` を最初に木の外の `../lift` を読む試験が失敗する形(10 件失敗)で実行した。一時的に `srcP/lift` → 本体の `lift` の symlink を張って 1321 passed に直し、実行後に削除した(失敗は木の配置の問題で、V7 の差分とは無関係)。
+14. `vitest` を最初に木の外の `../lift` を読むテストが失敗する形(10 件失敗)で実行した。一時的に `srcP/lift` → 本体の `lift` の symlink を張って 1321 passed に直し、実行後に削除した(失敗は木の配置の問題で、V7 の差分とは無関係)。
 15. 03:2x に `sleep 0` と末尾 `&` を含むコマンドを 1 回投げた(ハーネスに拒否され、実行されていない。禁止コマンド)。
 
 

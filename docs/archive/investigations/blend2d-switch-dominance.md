@@ -1,6 +1,6 @@
 # MSVC switch 表の基底証明を dominance にする（決定 0090）: 実装前の見積もり、実装、検証、3 モジュールでの停止点の移動（測定のみ）
 
-実行日: 2026-10-24。基準の HEAD は `d87e0ad`（作業ツリーの未コミットの変更が本文書の対象）。決定は `docs/decisions/0090-msvc-switch-base-dominance.md`（PM の決定。仮の決定ではない）。前提は決定 0089 と `docs/investigations/blend2d-switch-tables.md`（以下「前調査」。節番号はその文書のもの）。作業物は `lift/out-jtb2d90/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086、0089 の他の項目は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。
+実行日: 2026-10-24。基準の HEAD は `d87e0ad`（ワークツリーの未コミットの変更が本文書の対象）。決定は `docs/decisions/0090-msvc-switch-base-dominance.md`（PM の決定。仮の決定ではない）。前提は決定 0089 と `docs/investigations/blend2d-switch-tables.md`（以下「前調査」。節番号はその文書のもの）。作業物は `lift/out-jtb2d90/`（gitignore 対象）。**この文書は何も決めない**。決定 0074、0079、0080、0086、0089 の他の項目は変えていない。基底 0x4700000 と種 58 個は測定用で、決定ではない。
 
 ## 0. 凡例
 

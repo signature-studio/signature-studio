@@ -10,7 +10,7 @@
 
 ## 第 2 段階の結果（実測）
 
-作業場所は RAM（`/tmp/opencode/m2/src/` = HEAD `d3be2a3` の `lift/` と一致することを `diff -r` で確認した前回の統合の木、ビルドは `/tmp/opencode/m2/target`）。作業ツリーと `/` には書いていない。
+作業場所は RAM（`/tmp/opencode/m2/src/` = HEAD `d3be2a3` の `lift/` と一致することを `diff -r` で確認した前回の統合の木、ビルドは `/tmp/opencode/m2/target`）。ワークツリーと `/` には書いていない。
 
 ### 統合とコンパイル
 
@@ -212,7 +212,7 @@ TSV の列: `dll`、`api`、`scope`（`closure` = gdi32／user32 の閉包、`im
 
 ## 実装した場所
 
-差分は **`resolved-W6.diff`**（HEAD `d3be2a3` の `lift/` の clean な `git archive` に `patch -p1` で当たる。7 ファイル、2,605 行。ずれ・拒否・fuzz なし。当てた木は試験した木と `diff -r` で一致）。第 1 段階の `w6-gdi.diff` との違いは、`imports_table.rs` の追記位置が shfolder の行の後ろであること、`vcall_thunk_dll.rs` の期待値が 513 → 494 であること、`harness/a4-multi.sh` の既定 `EXPECT_FLE_SHA` の更新だけ:
+差分は **`resolved-W6.diff`**（HEAD `d3be2a3` の `lift/` の clean な `git archive` に `patch -p1` で当たる。7 ファイル、2,605 行。ずれ・拒否・fuzz なし。当てた木はテストした木と `diff -r` で一致）。第 1 段階の `w6-gdi.diff` との違いは、`imports_table.rs` の追記位置が shfolder の行の後ろであること、`vcall_thunk_dll.rs` の期待値が 513 → 494 であること、`harness/a4-multi.sh` の既定 `EXPECT_FLE_SHA` の更新だけ:
 
 - `lift/runtime/fle_gdi.c`（+902 −16。構造体 `gdi_dc`、`gdi_dib`、`gdi_obj` の拡張、補助関数、19 の `fle_imp_*`、`DeleteObject` と `GetObjectW` の拡張）、`fle_gdi.h`（+102。種類 8〜11、形式、定数、宣言、検査関数）。**新しい .c／.h は作っていない**。`slot_get` の新しい枠の初期化を「状態と種類だけ」から全体のゼロ化に変えた（挙動は同じ）。
 - `lift/crates/fe-lift/src/imports_table.rs`（+21。末尾に 19 行とコメント）。

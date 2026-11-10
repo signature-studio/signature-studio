@@ -50,7 +50,7 @@
 - 測れるのは、トレースにある呼び出しの形と、その周辺を面で標本にしたもの（probe）だけ。ゲストが戻り値でどの枝に進んだかは、この方法では分からない。
 - VM は Hyper-V 上の仮想環境で、物理ハードウェアの画面・GPU・フォントとは違いうる。1 つの OS ビルド・1 つのロケールの値である。
 - Windows 上のエージェント（LLM）は手順を読み違えることがある。結果を機械的に検証できる形（行数、ハッシュ、compare の再実行）にしてあるのはそのため。
-- リポジトリ `signature-studio/signature-studio-develop` は **private**（2026-10-28 に `gh repo view signature-studio/signature-studio-develop --json isPrivate,visibility` で `isPrivate: true`、`visibility: PRIVATE` を確認）。private であっても、Issue とコミットに個人情報を入れさせない作りにしてある。公開範囲を広げる場合は、先に既存の Issue・コミットと `worklog/<n>/` の内容を PM が確認すること。
+- リポジトリ `signature-studio/signature-studio-develop` は **private**（2026-10-28 に `gh repo view signature-studio/signature-studio-develop --json isPrivate,visibility` で `isPrivate: true`、`visibility: PRIVATE` を確認）。private であっても、Issue とコミットに個人情報を入れさせない作りにしてある。公開範囲を広げる場合は、先に既存の Issue ・コミットと `worklog/<n>/` の内容を PM が確認すること。
 
 ## 次の Issue を作るとき
 

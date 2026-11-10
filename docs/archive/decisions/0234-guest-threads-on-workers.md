@@ -175,7 +175,7 @@ PM の第 1 報への返信 1 が挙げた未測定の場合。操作列は、�
 
 **推奨は B′**: 効果の本体(UI とミキサーの CPU の分離)を A の約 7 割の作業で得られ、**検査の対象が小さく**(非決定は 2 本の間だけ)、割り当て規則が一般(最初のスレッドか否か)で FL 固有の分岐が無い。A への道は塞がない(割り当ての関数を『スレッド番号 → Worker 番号』に一般化するだけ)。
 
-**B′ の作業量の内訳(読み)**: S0 共有メモリ版の opt-in 化とページ側 4 か所(この調査で作った。取り込みと CI 0.5 人週)/ S1 文脈の TLS 化(fe-lift の生成 C のマクロ + fe-wasmgen の直接 wasm の `R`/`X` の基底を `global.get` に)+ アトミック RMW の生成(fe-lift の C 経路、fe-wasmgen の本当のアトミック、`cmpxchg16b` の代替)+ 全再生成と a4/全体試験の更新 = 2〜3 人週 / S2 ランタイムの必須部分のスレッド安全化 + Worker 間のスケジューラ(`schedule()` の外側に `Atomics` の待ち)+ 実時計 = 2〜3 人週 / S3 窓・メッセージのスレッド別化(Worker 1 の窓を作るスレッド向け)= 1〜2 人週 / S4 ゲートと非決定な実行の試験(§6)、ネイティブの `-fsanitize=thread` ビルド = 1〜2 人週 / S5 DirectSound の再生カーソルを AudioWorklet の消費位置に結ぶ(実時間。§8.3)= 0.5〜1 人週。
+**B′ の作業量の内訳(読み)**: S0 共有メモリ版の opt-in 化とページ側 4 か所(この調査で作った。取り込みと CI 0.5 人週)/ S1 文脈の TLS 化(fe-lift の生成 C のマクロ + fe-wasmgen の直接 wasm の `R`/`X` の基底を `global.get` に)+ アトミック RMW の生成(fe-lift の C 経路、fe-wasmgen の本当のアトミック、`cmpxchg16b` の代替)+ 全再生成と a4/全体テストの更新 = 2〜3 人週 / S2 ランタイムの必須部分のスレッド安全化 + Worker 間のスケジューラ(`schedule()` の外側に `Atomics` の待ち)+ 実時計 = 2〜3 人週 / S3 窓・メッセージのスレッド別化(Worker 1 の窓を作るスレッド向け)= 1〜2 人週 / S4 ゲートと非決定な実行のテスト(§6)、ネイティブの `-fsanitize=thread` ビルド = 1〜2 人週 / S5 DirectSound の再生カーソルを AudioWorklet の消費位置に結ぶ(実時間。§8.3)= 0.5〜1 人週。
 
 ## 4. 共有メモリ版の実測(出荷構成の wasm を共有メモリで作れるか)
 
@@ -192,7 +192,7 @@ PM の第 1 報への返信 1 が挙げた未測定の場合。操作列は、�
 
 ### 4.2 同一性と CPU(node 24、実測。`tables/alt-cmp-short.tsv`、`tables/alt-ref1-perf.tsv`)
 
-| 試験 | 結果 |
+| テスト | 結果 |
 |---|---|
 | 16 スナップ(`cmp-short.g3`、84 行)の同一性 | 共有版(最適化後)と非共有版(最適化後)で **6/6 同一**(3 往復 × 2)。共有版の最適化前でも同一。84 行は hyb6 の記述(HEAD の runtime + ship5-imports で 84 行)と行数が同じ |
 | 起動〜16 スナップの user CPU(3 組、交互、load 12〜25) | 非共有 23.95 / 21.97 / 21.28 s(平均 22.4)、共有 22.53 / 21.35 / 22.26 s(平均 22.1)= **悪化なし**(平均の差 −1.6%、ばらつきの内) |
@@ -218,7 +218,7 @@ PM の第 1 報への返信 1 が挙げた未測定の場合。操作列は、�
 
 = この 1 組では**共有版が 24% 速かった**(上の 9 組の再生の平均は逆向きの +8.8%。この 1 組は外れ値)(user CPU 142.4 s 対 116.9 s)。**全層が同じ比で動いた**ので、層ごとの特定の遅さ(libc のロック、`fle_ld` など)は無く、差は load・SMT の競合による一様な伸び縮み(±20〜25%)と読める。= この 1 組の層別比較からは、共有メモリ化による再生の CPU の増減は**決められない**(9 組の平均の差は上のとおり)(層の構成比は ±1 ポイントで一致)。系統的な差の有無は、静かな専用の機械での長い測定が要る(未確認)。
 
-**メカニズムの候補の検証(実測。`tables/memcpy-var-plain-vs-shared.txt`、`tools/memcpy-plain-vs-shared.js`)**: 共有メモリでは V8 の `memory.copy` が遅いのではないかを疑い、§14 の `ldbench.c`(可変 n の `memcpy` と `switch (n)`、n ∈ {8,4,2,1})を、非共有(`-O2`)と共有(`-O2 -pthread -matomics -mbulk-memory`、import 共有メモリ)で node 24 に交互に 5 ラウンド(1 億回ずつ。最初の 2 ラウンドは load 24 で外れ、後半 3 ラウンドは落ち着いた): 可変 n の `memcpy` は非共有 5.29〜5.51 ns/回、共有 5.21〜5.32 ns/回、`switch` は非共有 1.35〜1.49、共有 1.27〜1.33。**共有メモリで遅くなる兆候は無い**(読み。8 バイト以下の短い複写だけの測定。長い複写・`memory.fill` は未測定)。再生の +8.8% の原因は特定できていない。
+**メカニズムの候補の検証(実測。`tables/memcpy-var-plain-vs-shared.txt`、`tools/memcpy-plain-vs-shared.js`)**: 共有メモリでは V8 の `memory.copy` が遅いのではないかを疑い、§14 の `ldbench.c`(可変 n の `memcpy` と `switch (n)`、n ∈ {8,4,2,1})を、非共有(`-O2`)と共有(`-O2 -pthread -matomics -mbulk-memory`、import 共有メモリ)で node 24 に交互に 5 ラウンド(1 億回ずつ。最初の 2 ラウンドは load 24 で外れ、後半 3 ラウンドは落ち着いた): 可変 n の `memcpy` は非共有 5.29〜5.51 ns/回、共有 5.21〜5.32 ns/回、`switch` は非共有 1.35〜1.49、共有 1.27〜1.33。**共有メモリで遅くなる兆候は無い**(読み。8 バイト以下の短いコピーだけの測定。長いコピー・`memory.fill` は未測定)。再生の +8.8% の原因は特定できていない。
 
 ### 4.3 Chrome 156 と Firefox 158 の実ページ(実測。`tables/idle-ab.tsv`)
 
@@ -234,13 +234,13 @@ Chrome 156 も Firefox 158 も、**共有メモリ(SharedArrayBuffer)の view �
 | 場所 | 問題 | 修正(opt-in の差分。通常のメモリでは動作が変わらない) |
 |---|---|---|
 | `src/engine/fruity.ts:143` | `instance.exports.memory` を要求。import メモリのバイナリには無い | `ex.memory ?? imports.env.memory` |
-| `fruity.ts:207`、`:231`(`TextDecoder`)、`appview.ts:47`(`LATIN1.decode`) | 共有メモリの view を decode できない | 共有のときだけ `slice()` で複写 |
-| `src/engine/desk.ts` | **『エンジンのメモリ上の画面の view で ImageData を作り putImageData(JS のコピー無し)』**(決定 0223)。共有メモリでは `ImageData` が拒否する | 共有のときだけ、dirty 矩形の行ごとに非共有の `ImageData` へ複写してから `putImageData`。**コピーが増える**(dirty 矩形の面積分。全画面 3240×1946 で約 25 MB の `memcpy`、通常の dirty 矩形は小さい) |
-| `convert.ts` / `worker.ts` | 既に変換先の独自メモリへ複写している経路 | 変更不要 |
+| `fruity.ts:207`、`:231`(`TextDecoder`)、`appview.ts:47`(`LATIN1.decode`) | 共有メモリの view を decode できない | 共有のときだけ `slice()` でコピー |
+| `src/engine/desk.ts` | **『エンジンのメモリ上の画面の view で ImageData を作り putImageData(JS のコピー無し)』**(決定 0223)。共有メモリでは `ImageData` が拒否する | 共有のときだけ、dirty 矩形の行ごとに非共有の `ImageData` へコピーしてから `putImageData`。**コピーが増える**(dirty 矩形の面積分。全画面 3240×1946 で約 25 MB の `memcpy`、通常の dirty 矩形は小さい) |
+| `convert.ts` / `worker.ts` | 既に変換先の独自メモリへコピーしている経路 | 変更不要 |
 
-= **依頼者の方針『wasm→JS の変換と複写を減らす』と、共有メモリ化は衝突する点がある**(デスク合成のゼロコピー表示)。代替: dirty 矩形の複写を Worker の中の OffscreenCanvas の前に 1 回だけ(上の修正)/ `texImage2D`(WebGL)は共有メモリの view を受け付けるが、このプロジェクトは 2D canvas(本書では試していない。**未確認**)。
+= **依頼者の方針『wasm→JS の変換とコピーを減らす』と、共有メモリ化は衝突する点がある**(デスク合成のゼロコピー表示)。代替: dirty 矩形のコピーを Worker の中の OffscreenCanvas の前に 1 回だけ(上の修正)/ `texImage2D`(WebGL)は共有メモリの view を受け付けるが、このプロジェクトは 2D canvas(本書では試していない。**未確認**)。
 
-**共有メモリでの dirty 矩形の複写の費用(実測。`tables/shcopy-chrome.json`、`tables/shcopy-firefox.json`、`mp1/shcopy-worker.js`、`mp1/shcopy-run.mjs`。PM の第 2 報への返信 (1a))**: Worker の中の `OffscreenCanvas` の 2d コンテキストで、1 矩形あたりの時間(ms。呼び出しの合計 / 回数。flush 付きも同程度)。cur = 決定 0223 の現行(非共有メモリの view で `ImageData`、コピー無し)。rowcopy = 共有メモリの矩形の各行を、非共有の `ImageData` に `.set` してから `putImageData(…, dirty)`(`desk.ts` の差分の形)。compact = 矩形ぶんの小さな `ImageData` へ複写して `putImageData(x0, y0)`。fullcopy = 画面全体を複写。gl = 共有 view から WebGL2 の `texSubImage2D`(アップロードのみ、描画なし。headless のソフトウェア GL なので参考値)。load 7〜9、各 40〜1000 回の平均。
+**共有メモリでの dirty 矩形のコピーの費用(実測。`tables/shcopy-chrome.json`、`tables/shcopy-firefox.json`、`mp1/shcopy-worker.js`、`mp1/shcopy-run.mjs`。PM の第 2 報への返信 (1a))**: Worker の中の `OffscreenCanvas` の 2d コンテキストで、1 矩形あたりの時間(ms。呼び出しの合計 / 回数。flush 付きも同程度)。cur = 決定 0223 の現行(非共有メモリの view で `ImageData`、コピー無し)。rowcopy = 共有メモリの矩形の各行を、非共有の `ImageData` に `.set` してから `putImageData(…, dirty)`(`desk.ts` の差分の形)。compact = 矩形ぶんの小さな `ImageData` へコピーして `putImageData(x0, y0)`。fullcopy = 画面全体をコピー。gl = 共有 view から WebGL2 の `texSubImage2D`(アップロードのみ、描画なし。headless のソフトウェア GL なので参考値)。load 7〜9、各 40〜1000 回の平均。
 
 | 矩形 | Chrome 156 cur | rowcopy | compact | fullcopy | gl | Firefox 158 cur | rowcopy | compact | fullcopy | gl |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -249,8 +249,8 @@ Chrome 156 も Firefox 158 も、**共有メモリ(SharedArrayBuffer)の view �
 | 全面 1920×1080 | 0.220 | 1.000 | 0.957 | 0.883 | 2.627 | 0.293 | 0.937 | 0.764 | 0.727 | 6.490 |
 | 全面 3240×1946 | 3.170 | 7.715 | 8.267 | 9.281 | 18.861 | 3.228 | 6.042 | 6.322 | 7.657 | 22.479 |
 
-= **増分(rowcopy − cur)は 64×64 で 0.001〜0.003 ms、512×512 で 0.04〜0.05 ms、1920×1080 の全面で 0.64〜0.78 ms(1 ms 台に収まる)、3240×1946 の全面で 2.8〜4.5 ms(1 ms を超える。全面の提示は初回・resize・resync のときだけ)**。決定 0223 の D の全面提示 4.6〜4.8 ms(Chrome)/ 6.4〜6.7 ms(Firefox)に対し、1920×1080 の全面で +13〜17%、通常の dirty 矩形(≲ 512×512)で +1% 未満。矩形が小さいときは行ごとの複写が `fullcopy` より 1〜2 桁安い。WebGL2 の `texSubImage2D`(共有 view を受け付ける)は、このソフトウェア GL では 2D の複写より遅い(512×512 で 0.3〜3.4 ms)。実 GPU での値は**未測定**(headless にはソフトウェア GL しか無い)。ほかにコピーを避ける経路は見つからなかった(`ImageData`・`Blob`・`TextDecoder` は共有 view を拒否。`createImageBitmap` は `ImageData` か `Blob` が要る)。
-**結論: 通常の提示ではコピーの費用は無視できる(≤ 0.05 ms)。全面の提示だけ +0.6〜4.5 ms。依頼者の『複写を減らす』方針との衝突は許容範囲だが、3240×1946 級の全面提示が頻繁に起きる使い方(全面を再描画するプレイリストのドラッグなど)では、そのたびに +3〜4.5 ms が乗る(読み)。**
+= **増分(rowcopy − cur)は 64×64 で 0.001〜0.003 ms、512×512 で 0.04〜0.05 ms、1920×1080 の全面で 0.64〜0.78 ms(1 ms 台に収まる)、3240×1946 の全面で 2.8〜4.5 ms(1 ms を超える。全面の提示は初回・resize・resync のときだけ)**。決定 0223 の D の全面提示 4.6〜4.8 ms(Chrome)/ 6.4〜6.7 ms(Firefox)に対し、1920×1080 の全面で +13〜17%、通常の dirty 矩形(≲ 512×512)で +1% 未満。矩形が小さいときは行ごとのコピーが `fullcopy` より 1〜2 桁安い。WebGL2 の `texSubImage2D`(共有 view を受け付ける)は、このソフトウェア GL では 2D のコピーより遅い(512×512 で 0.3〜3.4 ms)。実 GPU での値は**未測定**(headless にはソフトウェア GL しか無い)。ほかにコピーを避ける経路は見つからなかった(`ImageData`・`Blob`・`TextDecoder` は共有 view を拒否。`createImageBitmap` は `ImageData` か `Blob` が要る)。
+**結論: 通常の提示ではコピーの費用は無視できる(≤ 0.05 ms)。全面の提示だけ +0.6〜4.5 ms。依頼者の『コピーを減らす』方針との衝突は許容範囲だが、3240×1946 級の全面提示が頻繁に起きる使い方(全面を再描画するプレイリストのドラッグなど)では、そのたびに +3〜4.5 ms が乗る(読み)。**
 
 ### 4.5 混成(fe-wasmgen の直接 wasm)と共有メモリ(実測)
 
@@ -313,7 +313,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 | 往復 最大 | 3.9 / 0.23 ms | 0.6 / 0.15 ms | 0.5 / 2.2 ms |
 | 同じカーネル 1 億反復 × 2 を **同時に** 2 つの Worker で(合計時間 / 1 本の時間) | 63〜85 ms / 60 ms | 59〜101 ms / 60 ms | 81〜122 ms / 78 ms |
 | 結果が単独実行と一致(TLS 版) | 6/6 | 6/6 | 6/6 |
-| **比較: R が大域変数(今の形)** で同じ試験 | 結果が壊れる(0/3 一致)、115〜295 ms | 壊れる(0/3)、273〜296 ms | — |
+| **比較: R が大域変数(今の形)** で同じテスト | 結果が壊れる(0/3 一致)、115〜295 ms | 壊れる(0/3)、273〜296 ms | — |
 
 = **同じ module・同じ共有メモリの上で、TLS 化した文脈なら 2 本の Worker は互いに干渉せずに 2 倍のスループット**。起床の遅れは数十 µs、結果の受け渡しは 1 往復で済む。大域のままだと壊れる(mt1 の smem の再現)。
 
@@ -325,9 +325,9 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 ゲストの `Sleep(1)` を実 Worker の `Atomics.wait(…, 1 ms)` にすると、1 回あたり **22 µs の CPU**(user 14.6 + sys 7.4)、壁 1.09 ms(node 24、load 38)。協調スレッドの切り替えは約 1 µs(決定 0124: 1.0〜1.9 M 回/s)。再生中の Sleep 系は MIDI 991 + ミキサー 195 + タイマー 62 = **約 1,250 回/s → Worker 1 の約 2.7%**(読み)。MIDI の 1 kHz ポーリング(`TMIDIThread`)が 8 割を占める。B′ では Worker 1 の中が協調スケジューラなので、全スレッドが待つときだけ 1 回の `Atomics.wait`(次の期限まで)で足りる(= 実際は 1 回/ms を下回る)。
 
-## 6. 再現性(G3 の決定的な試験をどう保つか)
+## 6. 再現性(G3 の決定的なテストをどう保つか)
 
-- **協調モードを残す**: 同じバイナリが `FLE_THREADS=coop`(既定。今の動作そのもの)と `real`(B′/A)を持ち、G3 の 84 行・parity 10 セッション・全体試験・a4 は**協調モードで今のまま走らせる**。共有メモリ版が協調モードで今と同一であることは §4.2 で実測した(16 スナップ 6/6、参照プロジェクトの再生 55 行も一致)。
+- **協調モードを残す**: 同じバイナリが `FLE_THREADS=coop`(既定。今の動作そのもの)と `real`(B′/A)を持ち、G3 の 84 行・parity 10 セッション・全体テスト・a4 は**協調モードで今のまま走らせる**。共有メモリ版が協調モードで今と同一であることは §4.2 で実測した(16 スナップ 6/6、参照プロジェクトの再生 55 行も一致)。
 - **実スレッドの run は非決定**: 2 本の Worker の相互作用(CS の取り合い、`Sleep` の起床、メッセージ)の順序が実行ごとに変わる。**ゲートが比べるもの**(案):
   1. 起動〜ウィザード〜idle の安定した画面(UI スレッドだけが走り、他は待機): 協調モードと**画素・窓表が同一**(スナップ行のうち clock を除く部分)。
   2. 再生の**音声 PCM**(AudioWorklet のリングに書かれた最初の N ブロックのハッシュ): ミキサーはブロック単位(4096 フレーム)で決まった入力から描画するので、ブロックの境界が時間でなくサンプル数で決まる限り、協調モードと一致するはず(**読み。未確認**。UI の入力が無い再生セッションで比べる)。
@@ -387,7 +387,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 | S1 文脈の TLS 化、アトミック RMW の生成、全再生成と期待値の更新 | 2〜3 | 2〜3 |
 | S2 ランタイムのスレッド安全化 + スケジューラ + 実時計 | 2〜3 | 4〜5(89 ファイルの全面。`fle_call_guest` 29 点) |
 | S3 窓・メッセージ・GDI のスレッド別化 | 1〜2 | 2〜3 |
-| S4 ゲート・非決定な実行の試験・ネイティブ TSan | 1〜2 | 2〜3 |
+| S4 ゲート・非決定な実行のテスト・ネイティブ TSan | 1〜2 | 2〜3 |
 | S5 DirectSound の再生カーソルを実時間に | 0.5〜1 | 0.5〜1 |
 | 合計 | **6〜9.5 人週** | **9〜13.5 人週** |
 
@@ -413,7 +413,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 | 擬似プリエンプション(決定 0147: 間接呼び出し 4,096 回で 1 ms) | **除去の候補** | 実スレッドでは OS が決める。協調モードにだけ残る |
 | ランタイムロック・CS/イベント/SList の表のアトミック化 | (b) | Windows の CS・Event・SList は複数スレッドから使える契約 |
 | 割り当て規則『最初のスレッドは Worker 0、他は Worker 1』 | 設計(FL 固有の分岐なし) | クラス名・VMT・アドレスを見ない。A は『スレッド番号 → Worker 番号』の一般化 |
-| ページ側の共有メモリ対応(§4.4) | 変換・通信の削減に**反する**点あり | デスク合成のゼロコピーが dirty 矩形の複写 1 回に。PM の判断点 |
+| ページ側の共有メモリ対応(§4.4) | 変換・通信の削減に**反する**点あり | デスク合成のゼロコピーが dirty 矩形のコピー 1 回に。PM の判断点 |
 
 **FL の挙動を補う処理は足していない。** 計測コード(`mt2_trace.c`)は製品に入らない。
 
@@ -421,7 +421,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 1. B′ を段階導入の目標にするか(S1 から。S1 だけでも opt-in で単独に価値がある: 生成 C の LOCK の欠落の修正)。
 2. 共有メモリ版を CI のビルドの変種として持つか(ビルド 2 倍)。既定は変えない。
-3. デスク合成のゼロコピーを共有メモリ版で手放す(dirty 矩形の複写)ことを受け入れるか。**実測(§4.4): 通常の矩形(≲ 512×512)で +0.001〜0.05 ms、1920×1080 の全面で +0.64〜0.78 ms、3240×1946 の全面で +2.8〜4.5 ms**。WebGL2 の `texSubImage2D` はソフトウェア GL で遅く(実 GPU は未測定)、複写を避ける経路は見つからなかった。
+3. デスク合成のゼロコピーを共有メモリ版で手放す(dirty 矩形のコピー)ことを受け入れるか。**実測(§4.4): 通常の矩形(≲ 512×512)で +0.001〜0.05 ms、1920×1080 の全面で +0.64〜0.78 ms、3240×1946 の全面で +2.8〜4.5 ms**。WebGL2 の `texSubImage2D` はソフトウェア GL で遅く(実 GPU は未測定)、コピーを避ける経路は見つからなかった。
 4. 混成(特に Elastique・oggio を含む L5 + L6)の拡大を分割の前提として先に進めるか(§8.2)。
 5. 実スレッドのモードの音声ゲート(PCM のハッシュ)を合格線にするか(§6)。
 6. プロセッサ数の応答(現行 1、決定 0017)を、実スレッドが動いた後で上げて FL 自身のスレッドバンク(`TSTBThread`)を使わせるか(別の決定)。
@@ -437,13 +437,13 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 | S-mt2-5 | トレース窓 = 再生中の 1 仮想秒を 10 秒おきに 3 回 | トレースの量(14.3 万行 + 6.5 千切り替え)を抑える | 連続 30 秒(約 150 万行) |
 | S-mt2-6 | 『1 コアに収まる』の目安 = ミキサー ≤ 0.8、UI ≤ 1.0 | ブラウザの他の負荷(§8.1)と tier-up・GC の余地を 20% | 0.7 / 0.9 など |
 | S-mt2-7 | mp1 のカーネル = レジスタ配列を毎反復で読み書きする 1 億反復 | 生成 C の形に近い最小の例 | 実エンジンの関数(R が TLS でないと呼べない) |
-| S-mt2-8 | デスク合成の共有メモリ版 = dirty 矩形の行ごとの複写 | `ImageData` が共有メモリの view を拒否する | 全体を 1 回複写 / WebGL の `texImage2D` |
+| S-mt2-8 | デスク合成の共有メモリ版 = dirty 矩形の行ごとのコピー | `ImageData` が共有メモリの view を拒否する | 全体を 1 回コピー / WebGL の `texImage2D` |
 | S-mt2-9 | `--mem-shared` の最大 = 32768 ページ | C 部分のリンクの最大(2 GiB)と同じ | 引数で指定 |
 | S-mt2-10 | スレッドのクラス名は VMT のアドレスと mt1 の RTTI の読みの対応表で付けた | 計測コードのコメント・表示用(製品のコードは名前を持たない) | RTTI をランタイムで読む |
 | S-mt2-11 | トレース run は wasm-opt 前の wasm(`flengine6.wasm`)で実行 | wasm-opt が 5 分かかる。同期の計数に最適化は関係しない | 最適化後(プロファイル版 w2tn はこちら) |
 | S-mt2-12 | CPU 比較は user CPU(`/usr/bin/time`)と load の併記、往復の交互 | 壁時計は load で動く | 専用の静かな機械 |
 | S-mt2-13 | 衝突の見積りの u は『3 つの窓』と『30 仮想秒全体の保持の合計』の両方を出す | 窓は 3 秒で短く、全体の合計は保持中の Sleep を含まない | 連続 30 秒のトレースのリプレイ |
-| S-mt2-14 | 共有メモリでの提示の複写の測定: 矩形 64×64 / 512×512 / 全面 1920×1080 / 全面 3240×1946、回数 1000 / 200 / 100 / 40、ランダムな画素、Worker の `OffscreenCanvas` 2d | PM の指定(64×64、512×512、1920×1080)+ 依頼者の画面に近い大きさ | 実エンジンの提示の中での測定 |
+| S-mt2-14 | 共有メモリでの提示のコピーの測定: 矩形 64×64 / 512×512 / 全面 1920×1080 / 全面 3240×1946、回数 1000 / 200 / 100 / 40、ランダムな画素、Worker の `OffscreenCanvas` 2d | PM の指定(64×64、512×512、1920×1080)+ 依頼者の画面に近い大きさ | 実エンジンの提示の中での測定 |
 | S-mt2-15 | 共有メモリ + 混成の memory は C 部分に `-Wl,--export-memory`、直接部分は `c.memory` を import(`--mem-shared` はこの import の型を共有にするだけ) | wasm-merge は同じ `env.memory` の 2 つの import を統合せず memory が 2 つになる(コード部 +9%) | C 部分が memory を定義する構成(`INITIAL_MEMORY` を glue でなく wasm に) |
 
 ## 13. 未確認
@@ -456,15 +456,15 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 - 依頼者の機械(Windows の Firefox 159)、Safari、`hardwareConcurrency` が 4 以下の機械。
 - 共有メモリ版の first idle と再生 CPU を**静かな専用の機械**で(この機械の load 5〜40 とノイズ ±10〜25% では、first idle の差は検出できなかっただけで、無いとは言えない。再生 CPU は 9 組で共有版が +8.8%、t = 2.0 で有意と言えず、原因も特定できていない)。
 - 参照プロジェクトの再生を**混成 + 共有メモリ**で(hyb6 の `HYB_RENAME` を HEAD のスクリプトに入れる必要)。混成最良 hL56at の共有メモリ版の再生 CPU。
-- **出荷の `NO_FS=1`(host files 経路。`hostfiles.ts`)の共有メモリ版**。本書のブラウザ・node の試験は `NO_FS=0`(glue のファイルシステム)の bundle で行った。
+- **出荷の `NO_FS=1`(host files 経路。`hostfiles.ts`)の共有メモリ版**。本書のブラウザ・node のテストは `NO_FS=0`(glue のファイルシステム)の bundle で行った。
 - 実 GPU での WebGL2 `texSubImage2D`(共有 view から)の費用。ページの JS の経路〔`-sGROWABLE_ARRAYBUFFERS=2` の警告〕の遅さ。
 - Elastique が FL 自身のスレッドバンクで並列化できるか(プロセッサ数の応答を上げた場合。読みのみ)。
 - 『LOCK の無視』が現在の協調モードで実害を出していないことの根拠は『単一の JS スレッド』であって、検証したわけではない(実スレッド化の前に直すべき欠落)。
 
 ## 14. 付随して見つけた物(担当外。方針『余計な処理は見つけ次第報告』による)
 
-1. **`fle_ld` / `fle_st` の可変サイズ `memcpy` が wasm の `memory.copy` になる**。`lift/runtime/fle_runtime.h` の `fle_ld(a, n)` / `fle_st(a, n, v)` は `memcpy(&v, ptr, n)` で、`n` が定数でない(インライン化されない)呼び出しでは emcc 6.0.12 が `memory.copy` を出す(`-matomics` の有無によらない。小さな C で確認)。非混成の参照プロジェクトの再生のプロファイルで `fle_ld` の自己時間は 7.7〜7.8%、`fle_st` は 1.7%(層『x86 命令の模倣』28.6% の中)。n ∈ {1,2,4,8} の単独の測定(node 24、2 億回)で、可変 n の `memcpy` は **4.4〜5.0 ns/回**、`switch (n)` + 定数サイズの `memcpy` は **0.9〜1.5 ns/回**(約 4 倍。`tables/memcpy-var-vs-switch.txt`、`lift/harness/mt2/mp1/ldbench.c`)。`FLE_ALWAYS_INLINE` の単位では `n` が定数になって問題にならない。**`fle_ld`/`fle_st` を n の switch にすると、非混成の再生の約 7% が取れる見込み(読み。混成の直接 wasm はこの関数を使わない)**。これは `lift/runtime` の変更になるので、この担当では差分を作っていない(変更するなら 84 行の同一性・全体試験・a4・生成 C の sha の確認が要る)。
-2. **共有メモリ版のリンクの警告**: `-pthread + ALLOW_MEMORY_GROWTH may run non-wasm code slowly, consider -sGROWABLE_ARRAYBUFFERS=2`(emscripten 6.0.12)。成長する共有メモリの上の JS の typed array(ページ側の `new Uint8Array(memory.buffer)` など)が遅くなりうる、という警告。wasm の側ではない。ページの JS の経路(表面の複写・文字列の読み出し)への影響は**未測定**。
+1. **`fle_ld` / `fle_st` の可変サイズ `memcpy` が wasm の `memory.copy` になる**。`lift/runtime/fle_runtime.h` の `fle_ld(a, n)` / `fle_st(a, n, v)` は `memcpy(&v, ptr, n)` で、`n` が定数でない(インライン化されない)呼び出しでは emcc 6.0.12 が `memory.copy` を出す(`-matomics` の有無によらない。小さな C で確認)。非混成の参照プロジェクトの再生のプロファイルで `fle_ld` の自己時間は 7.7〜7.8%、`fle_st` は 1.7%(層『x86 命令の模倣』28.6% の中)。n ∈ {1,2,4,8} の単独の測定(node 24、2 億回)で、可変 n の `memcpy` は **4.4〜5.0 ns/回**、`switch (n)` + 定数サイズの `memcpy` は **0.9〜1.5 ns/回**(約 4 倍。`tables/memcpy-var-vs-switch.txt`、`lift/harness/mt2/mp1/ldbench.c`)。`FLE_ALWAYS_INLINE` の単位では `n` が定数になって問題にならない。**`fle_ld`/`fle_st` を n の switch にすると、非混成の再生の約 7% が取れる見込み(読み。混成の直接 wasm はこの関数を使わない)**。これは `lift/runtime` の変更になるので、この担当では差分を作っていない(変更するなら 84 行の同一性・全体テスト・a4・生成 C の sha の確認が要る)。
+2. **共有メモリ版のリンクの警告**: `-pthread + ALLOW_MEMORY_GROWTH may run non-wasm code slowly, consider -sGROWABLE_ARRAYBUFFERS=2`(emscripten 6.0.12)。成長する共有メモリの上の JS の typed array(ページ側の `new Uint8Array(memory.buffer)` など)が遅くなりうる、という警告。wasm の側ではない。ページの JS の経路(表面のコピー・文字列の読み出し)への影響は**未測定**。
 3. **wasm-merge は共有メモリの import を統合しない**(§4.5): 同じ `env.memory` を import する 2 つのモジュールを足すと memory が 2 つになり、コード部が約 9% 増える。C 部分に `-Wl,--export-memory` を足して直接部分が `c.memory` を import する形にすると 1 つになる。
 
 ## 15. B′ の実装に要る変更の一覧(ファイルと行数の見積り。**読み**。PM の第 2 報への返信 2。この調査では実装していない)
@@ -484,7 +484,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 | 再入の確認 | `fle_call_guest` の 29 箇所(15 ファイル) | ロックを保持したままゲストを呼ばない・呼ぶ前に離す規則の確認(読む作業が中心) | 50〜100 |
 | ページ側 | `app/src/engine/fruity.ts`(282)、`worker.ts`、`protocol.ts`、新規 `thread-worker.ts` | Worker 1 の起動(`WebAssembly.Module` と共有 Memory の送付、glue の `import()`、同じ imports で `instantiateWasm`)。共有メモリ対応の 4 か所は**この調査で作成済み** | 300〜500 + vitest 200 |
 | ビルド・CI | `build-engine-bundle.sh`(`MT2_SHARED` は作成済み)、`ci/lib/effective_env.sh`(`CONFIG_VARS`)、キャッシュキー、`link-web.sh`(`__wasm_init_tls` ほかの export) | 共有メモリ版を CI の変種に | 50 |
-| ゲート | §6 | 実スレッドの PCM ハッシュ試験、繰り返し試験、ネイティブ `-fsanitize=thread` のビルド | 400 |
+| ゲート | §6 | 実スレッドの PCM ハッシュテスト、繰り返しテスト、ネイティブ `-fsanitize=thread` のビルド | 400 |
 | **合計** | | | **約 2,700〜4,300 行 + テスト 約 700〜1,000 行**(§9 の 6〜9.5 人週と整合) |
 
 **順序**: (1) 文脈の TLS 化とアトミック(生成部。協調モードで 84 行・55 行・parity 552 行が不変であることを確認)→ (2) ランタイムの共有表と Worker 1 の起動 → (3) 窓・メッセージ → (4) ゲート。(1) は単独で価値がある(LOCK の欠落は x86 の仕様からの逸脱で、`fle_ld` の `memory.copy` の問題と同様に、実スレッドとは別に直せる)。
@@ -498,13 +498,13 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 2. load が 30 を超えている間に新しい重い処理を始めた(第 1 報の自己申告のとおり。23:07〜23:44 に最大 load 52)。CPU 秒の比較には load を併記し、往復の交互で緩和した。ただしその時間帯の first idle の値は参考値。
 3. 実行中のスクリプトの書き換えを避けるため、`build-engine-bundle.sh` を 5 回、`strip_glue_stubs.py` を 1 回、別ファイル + `mv` で置き換えた(走行中の bash は旧 inode を読み続ける。旧版に依存する走行はその間に無かった)。**`lift/out-mt2` の使用量は 2026-11-05 00:42 に 9.8 GB で、作業中の上限 8 GiB を超えていた**(混成 2 種の bundle と中間物が積み上がった。上限の確認を怠った)。00:45 に不要な物(中間のビルド物・キャッシュ・bundle の変種)を消して 3.0 GB に戻し、00:58 に全測定の後始末(run の出力・bundle・`base/`・`head/`・展開した参照プロジェクトの削除。`src/` の木だけを残した)で **180 MB**(上限 500 MB 以下)にした。測定の run の出力は消したので、再現にはビルドからやり直す(§17)。
 4. 最初の計数コード(`mt2_trace.c`)のバグ(CS の Enter と Leave を別のキーで数えた)と、保持時間の解析のバグ(`0` を `0x0` と書かない書式を正規表現が取りこぼし、UI の Enter を落とした)は、結果を読んで矛盾に気づいて直した(第 1 報の保持時間は 0.0 だった)。mp1 の最初の版は、カーネルがインライン化されて 2 倍遅く見えた(§5.2)。いずれも本書の数字は直した後の値。
-5. PM の第 1 報への返信 2(`_Thread_local` の位置づけ)は §10、第 2 報への返信 1〜4 は §4.4(複写の費用)、§4.5(単一メモリの hs)、§15(B′ の変更の一覧)、冒頭(分割だけでは足りない)、§14 と `tools/memcpy-bench.sh`(memcpy のベンチ)で答えた。B′ の端から端までの試作は始めていない(PM の指示)。
+5. PM の第 1 報への返信 2(`_Thread_local` の位置づけ)は §10、第 2 報への返信 1〜4 は §4.4(コピーの費用)、§4.5(単一メモリの hs)、§15(B′ の変更の一覧)、冒頭(分割だけでは足りない)、§14 と `tools/memcpy-bench.sh`(memcpy のベンチ)で答えた。B′ の端から端までの試作は始めていない(PM の指示)。
 
 ## 17. 成果物と再現手順
 
 `lift/out-git/mt2-results/`: `mt2.diff`(opt-in のみ。`patch -p1 --dry-run` が HEAD 86ae7d85 と最新の HEAD ba85d14b の `git archive` の両方に、offset・fuzz なしで当たる。`logs/dry-run-head.txt`)、`MERGE-NOTES.md`、`docs/0234-guest-threads-on-workers.md`(本書)、`docs/README-0234-line.txt`、`tables/`、`logs/`、`tools/`。
 
-再現: `tools/mt2-prep.sh`(g1 の lowregs 複写、realmod 表、dec1_imp.o、Blend2D upstream)→ `ELQ=1 bash tools/gen-ref1.sh g1` → `bash tools/mt2-var.sh NAME`(`SHARED=1` で共有メモリ版、`mt2-vart.sh` で計数コード + 名前つき、`mt2-varh2.sh` で混成)→ `bash tools/mk-bundle.sh NAME` → `bash tools/nrun.sh NAME g3/ref1-perf-wasm.g3`(共有版は `NODE_RUNNER=<mt2/node-bundle-run-sh.mjs>`)→ `tools/mt2-sum.py`(同期 API の表)・`tools/mt2-hold.py`(CS の保持時間)・`tools/mt2-thr-prof.py`(スレッド別 CPU)。ブラウザ: `app/` を `vite build` し `vite preview`(`FL_ASSETS_DIR`)、`tools/mt2-idle-ab.sh`。mp1: `lift/harness/mt2/mp1/`(`build.sh`、`mp1.mjs`、`mp1-chrome.mjs`、`mp1-firefox.mjs`、`shcopy-run.mjs`、`sabapi.mjs`、`pingasync*`、`sleepcost.mjs`、`ldbench.c`)。
+再現: `tools/mt2-prep.sh`(g1 の lowregs コピー、realmod 表、dec1_imp.o、Blend2D upstream)→ `ELQ=1 bash tools/gen-ref1.sh g1` → `bash tools/mt2-var.sh NAME`(`SHARED=1` で共有メモリ版、`mt2-vart.sh` で計数コード + 名前つき、`mt2-varh2.sh` で混成)→ `bash tools/mk-bundle.sh NAME` → `bash tools/nrun.sh NAME g3/ref1-perf-wasm.g3`(共有版は `NODE_RUNNER=<mt2/node-bundle-run-sh.mjs>`)→ `tools/mt2-sum.py`(同期 API の表)・`tools/mt2-hold.py`(CS の保持時間)・`tools/mt2-thr-prof.py`(スレッド別 CPU)。ブラウザ: `app/` を `vite build` し `vite preview`(`FL_ASSETS_DIR`)、`tools/mt2-idle-ab.sh`。mp1: `lift/harness/mt2/mp1/`(`build.sh`、`mp1.mjs`、`mp1-chrome.mjs`、`mp1-firefox.mjs`、`shcopy-run.mjs`、`sabapi.mjs`、`pingasync*`、`sleepcost.mjs`、`ldbench.c`)。
 
 ## PM の判断と取り込み(2026-11-05)
 
@@ -519,7 +519,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 追加文書: `0234c-priority-scheduling.md`(ゲストスケジューラの優先度)、`0234d-bprime-stage1-estimate.md`(B′ 第 1 段の見積り)、`0234e-bprime-stage1-tls.md`(第 1 段の結果)、`0234f-bprime-stage2-design.md`(第 2 段の設計メモ。実装も測定もまだ)。調査資料は `docs/investigations/mt3/`(ミキサー 1 ブロックの計測道具は `tools/README.md` と `tools/mt3-measure.diff`〔計測用の木の差分。マージしない〕)。
 
-取り込んだ基準: HEAD 4977340a に `mt3.diff`(4 ファイル、`-` 12 行)と `mt3-tls.diff`(11 ファイル、`-` 41 行)を `patch -p1`(offset・fuzz・reject なし、`-` 行は全部読んだ。fe-wasmgen の置換は TLS のときだけの経路)。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、全体テストは 195 results / 2,381 passed / 1 failed:失敗は `fe-lift/wall_fr9t` の『スレッドの試験シナリオが 36 本』という期待で、mt3.diff が `priority_yield`・`priority_slice` の 2 本を足して 38 本になったため。PM が期待を 38 に更新し、2 本を必須の名前に足した(単独で 20 passed)。
+取り込んだ基準: HEAD 4977340a に `mt3.diff`(4 ファイル、`-` 12 行)と `mt3-tls.diff`(11 ファイル、`-` 41 行)を `patch -p1`(offset・fuzz・reject なし、`-` 行は全部読んだ。fe-wasmgen の置換は TLS のときだけの経路)。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、全体テストは 195 results / 2,381 passed / 1 failed:失敗は `fe-lift/wall_fr9t` の『スレッドのテストシナリオが 36 本』という期待で、mt3.diff が `priority_yield`・`priority_slice` の 2 本を足して 38 本になったため。PM が期待を 38 に更新し、2 本を必須の名前に足した(単独で 20 passed)。
 
 1. **優先度つき選択(`fle_thread_set_priorities(int)`、opt-in、既定 0 = 現行の巡回)は契約(Learn の優先度)の実装として取り込むが、既定にしない。** 効果が出なかった(同じ load でテンポ 0.83〜0.86 のまま。律速はミキサー自身の計算量と CPU の空き)。有効にすると起動 16 スナップが 84 行から 83 行になる。
 2. **ミキサーの 1 ブロック(92.88 ms)の CPU(Chrome、静かな周、各構成 3 回): F2xH7 は平均 58〜63 ms〔周期の 63〜68%〕でテンポ 1.00〜1.02、F2xH5 は 60.7〜73.8 ms でテンポ 0.66〜0.99、Elastique が動く F2xH6 は平均 138〜142 ms〔149〜153%〕で commit が実時間の約 26%。** 1 つの Worker では Elastique が動くとき原理的に足りない。
@@ -528,12 +528,12 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 ## PM の追記(2026-11-05 16:10): mt3 の段階 A〜B の追加文書(取り込みは文書だけ。コードの取り込みは 0246 = mt4-atomics のみ)
 
-追加文書(mt3 の作業中の版。mt3 が更新したら置き換える): `0234g-gil-audit-and-go-no-go.md`(GIL の監査と go/no-go)、`0234h-stage2-spike-log.md`、`0234i-stage-b-design-tables.md`(export の扱い・GIL の外で動く runtime の関数)、`0234j-stage2-spike-summary.md`、`0234k-stageB-browser-findings.md`(実 Chrome での欠陥)、`0234l-stageC-audio-ring-design.md`(音声リングを共有メモリへ。旗なし)、`0234m-realthread-default-changes.md`(実スレッドを唯一の経路にする場合の変更と試験の見積り)、`0234n-gil-order-and-measurement.md`(GIL 待ちの優先度順と測定)。
+追加文書(mt3 の作業中の版。mt3 が更新したら置き換える): `0234g-gil-audit-and-go-no-go.md`(GIL の監査と go/no-go)、`0234h-stage2-spike-log.md`、`0234i-stage-b-design-tables.md`(export の扱い・GIL の外で動く runtime の関数)、`0234j-stage2-spike-summary.md`、`0234k-stageB-browser-findings.md`(実 Chrome での欠陥)、`0234l-stageC-audio-ring-design.md`(音声リングを共有メモリへ。旗なし)、`0234m-realthread-default-changes.md`(実スレッドを唯一の経路にする場合の変更とテストの見積り)、`0234n-gil-order-and-measurement.md`(GIL 待ちの優先度順と測定)。
 
 要点(mt3 の測定。この機械、Chrome 156 / Firefox 158、依頼者の機械は 0 件):
 1. **実スレッド版(ゲストのスレッド 1 本 = Worker 1 本、GIL、最適化済み wasm、非ハイブリッド)は参照プロジェクトを 300 秒再生でき、デッドロックしない。** ただし PCM の 9 割以上が無音で、テンポの当てはめ値は 0.19〜0.56(単一 Worker の本番は 0.27〜0.35)。当てはめが退化していて P3 の判定には使えない。UI の Worker は 92〜94% 忙しく、ミキサーの Worker は 57〜72%。GIL の保持は約 11%(平均 0.9 µs)で律速ではない。
 2. **(訂正済み。16:25 の mt3 の再測定で撤回)** 先に書いた『ミキサーのスレッドは 130 秒のうち 29 秒止まる。Sleep(1) 21.4 秒、EnterCriticalSection 7.7 秒/309 回〔1 回 約 25 ms〕が UI の保持する CS 0x16b6aa8 を待つ。ミキサーの遅れの有力な原因は UI の描画時間〕は誤読だった: 7.7 秒は『プロジェクトを開く区間』の 1 回 6.4 秒を含む合計を回数で割った平均で、残りの 308 回は合計約 1.3 秒(130 秒の約 1%)。**再生中の区間では、CS 0x16b6aa8 を保持しているのはミキサー自身(thread 17)で、10 秒のうち 8.4〜9.0 秒(85〜90%)**、1 回 150〜240 ms を約 5 回/秒、保持中の内訳は『ゲストコード』94〜95%、runtime の import 3.5〜5%。UI が CS を長く握るのは『プロジェクトを開く区間』(1.4・1.5・7.2〜11.3 秒)だけで、再生中にミキサーが UI を待った回数は 3 走行 × 3 区間でほぼ 0(多くて 1 回、78 ms 以下)。**『UI の描画を速くすればミキサーが速くなる』という含みは取り下げる。** ミキサーの遅れ(エンジンの書き込み率 0.43〜0.85、負荷 16〜22 の機械)の説明として残るのは、(i) ミキサー自身のゲストコードの実行時間(SSE エミュレーション主体)、(ii) GIL の待ち(ミキサーの Worker で 10 秒に 0.76〜1.2 秒 = 8〜12%、UI の Worker は 1.6〜2.1 秒 = 16〜21%)、(iii) 負荷のある機械での OS の割り当て(ミキサー Worker の CPU 48〜61%/コア)。**最も効くはずの手はミキサーのゲストコードを速くすること(ハイブリッド = 直 wasm、約 1.6 倍)で、ハイブリッド + GIL の測定が決定的。** 単一 Worker の本番(協調)では、ミキサーが 150〜240 ms の CS 保持を 1 秒に約 5 回するので、UI がこの CS を要求した瞬間にその分待たされ得る(P2 の操作遅延の仮説)。実スレッド版では UI→ミキサーの待ちが稀なので、UI がこの CS を要する頻度自体が低いと読めるが、**本番(協調)の構成では未測定**。
-3. **ハイブリッド+GIL の実スレッド版は今日は作れない**: 実スレッドは MXCSR・x87・fle_landing_top・SEH を Worker ごとの fle_ctx(TLS_MORE)に置くので、ハイブリッド段が `an address is missing in link.map`(fle_mxcsr)で失敗する。直しは fe-wasmgen が MXCSR のアドレスを `__tls_base + offset` で出すこと(約 150 行 + 差分試験 + 40 分のハイブリッドビルド、0.5〜1 日)。これが通るまで、**ゲート(ハイブリッド+GIL の実スレッド版で Chrome の 5 分のテンポ ≥ 0.95 かつ first idle ≤ 10 秒)は不通過として扱う**。
-4. 実スレッドを唯一の経路にする見積りは 8〜9 日(84 行の決定的な同一性が失われ、試験の作り直しが要る)。ゲストが通ってから始める。
-5. 直した欠陥(コードは mt3 の作業木。製品には未取り込み): ローダーロック(DllMain をクリティカルセクションで直列化。起動時の ExitProcess が 1/4 から 0/6)、fd_write の proxy、keep-alive、GIL 待ちの優先度順、IFileOpenDialog_Show が GIL を 2.5 秒保持していた件。5 ms 周期の audio_sync と DS 通知の予測は効果なし(FL は通知ではなくポーリング)で破棄。
+3. **ハイブリッド+GIL の実スレッド版は今日は作れない**: 実スレッドは MXCSR・x87・fle_landing_top・SEH を Worker ごとの fle_ctx(TLS_MORE)に置くので、ハイブリッド段が `an address is missing in link.map`(fle_mxcsr)で失敗する。直しは fe-wasmgen が MXCSR のアドレスを `__tls_base + offset` で出すこと(約 150 行 + 差分テスト + 40 分のハイブリッドビルド、0.5〜1 日)。これが通るまで、**ゲート(ハイブリッド+GIL の実スレッド版で Chrome の 5 分のテンポ ≥ 0.95 かつ first idle ≤ 10 秒)は不通過として扱う**。
+4. 実スレッドを唯一の経路にする見積りは 8〜9 日(84 行の決定的な同一性が失われ、テストの作り直しが要る)。ゲストが通ってから始める。
+5. 直した欠陥(コードは mt3 のワークツリー。製品には未取り込み): ローダーロック(DllMain をクリティカルセクションで直列化。起動時の ExitProcess が 1/4 から 0/6)、fd_write の proxy、keep-alive、GIL 待ちの優先度順、IFileOpenDialog_Show が GIL を 2.5 秒保持していた件。5 ms 周期の audio_sync と DS 通知の予測は効果なし(FL は通知ではなくポーリング)で破棄。
 6. 本番の `crossOriginIsolated` はページが COOP same-origin / COEP require-corp / CORP を送る設計で、ビーコンが `window.crossOriginIsolated` を読む(`app/src/perf/browser-info.ts`)。依頼者の値はまだ見えていない。

@@ -6,7 +6,7 @@
 
 1. **実エンジンが実行されたか**: (1) は CI の stage スクリプトそのもの(`ci/stage-wasm.sh link` = hybn0 → weblink → wasmopt → hybrid)を E11 の木で 1 回走らせた(emscripten の link、wasm-opt -Oz、fe-wasmgen、wasm-merge の実物。C 部の objects は E10 の冷間ビルドの物を再利用: C のソースは E10 と E11 で同じ)。(2) は native の C 経路(`enum_cmp` = ランタイムの `fle_imp_CompareStringW` を 1 対ずつ呼ぶ駆動)と `test.sh full`・a4。**ブラウザ・node での実エンジンの走行は 0 件**。代役・再生・推測の画面や音は使っていない。
 2. **(1) の結論**: **PM の e11-wip は冷間 CI の link 段で落ちない**。link map の 3 つの新しい行の形式・export 一覧(`fle_hyb_slice` の 1 行増)・`hyb_guard` の 5 検査(record / map / cpart / map / merged)は、実物の stage スクリプトを E11 の木で走らせて全部通った(§1)。最終の `flengine6.opt.wasm` は E10 の 142,776,280 B から **+310,318 B**(143,086,598 B)で、**0285 の報告の +197,374 B より大きい**(§1.5 で訂正)。`hyb_guard cpart` の 4 アドレスを 7 アドレスに広げる差分 `0285b` も作り、実物の走行で通した(採否は PM)。
-3. **(2) の結論**: A は答えが変わる順序対を 116(記号 106 + TAB〜CR 対 空白 10)に限り、停止↔答えの増減は 0。A は fle_locale.c +20 行・wall_ia2.rs +97 行・`-` 0 行。新しい試験は突然変異の確認(e10-wip の runtime では落ちる)つき、`test.sh full` と a4 は §2.5。一般句読点の置換は別の差分 `0284b-gp-extension.diff`(156 順序対が変わる)にして、採否を PM に任せる。
+3. **(2) の結論**: A は答えが変わる順序対を 116(記号 106 + TAB〜CR 対 空白 10)に限り、停止↔答えの増減は 0。A は fle_locale.c +20 行・wall_ia2.rs +97 行・`-` 0 行。新しいテストは突然変異の確認(e10-wip の runtime では落ちる)つき、`test.sh full` と a4 は §2.5。一般句読点の置換は別の差分 `0284b-gp-extension.diff`(156 順序対が変わる)にして、採否を PM に任せる。
 
 ## 1. E11 の冷間 CI で初めて通る物のローカル再現(依頼 (1))
 
@@ -91,22 +91,22 @@ hybn0 が fe-wasmgen を `--hybrid-dispatch 0x3308 0x3310 0x3318`(仮)で走ら�
 | first idle | 動かない | 比較は起動の主な経路ではない(A は条件が 1 つ増えるだけ)|
 opt1 が E-次で上の 5 行を E10 と比べる。**動いた行があれば、その行の画面の一覧に 53 対のどれかが入っている**。
 
-### 2.5 試験(手導出の再基準化)
-- 新しい試験 `wall_ia2.rs` `compare_string_orders_the_ascii_symbols_by_the_table_and_not_by_the_code_point_with_the_marker`(マーカーあり): 表と code point 順が違う **53 + 5 の対**(全部、1 向きずつ)と、両方の順が一致する 12 対の期待値を、`Windows10-SortingWeightTable.txt`(SHA-256 81fcfa1e…)の (SM, AW) の行から導いた(python、ランタイムの出力は使っていない)。マーカー無しでは旧(`+` 対 `,` = 1、TAB 対 空白 = 1)。
-- **突然変異の確認**: `FLE_IA2_RT_DIR` で e10-wip の `fle_locale.c` に差し替えると、この試験は落ちる(`u2b-u2c` で 1 と 3 が逆)。A の下では通る。
-- **既存の試験は期待値の書き直しが 0 件**(A は ia2 が有効な構成でだけ答えを変え、その構成の試験は `wall_ia2.rs` だけで、そこの既存の記号対は表と code point が一致する対だけを使っていた): `wall_ia2` 21 passed(新 1 + 既存 20)。`test.sh full`: (キャッシュなしの走行は進行中。結果は最終報告)。経緯: 1 回目は /tmp の tmpfs が満杯(私の作業ファイルが 2.3 GB)で `Disk quota exceeded`(24 件の失敗、`tables/testfull-A-run1-tmpfull.log`)、2 回目は私の部分的な export(lift だけ)に repo の `tools/` が無くて authenticode_check が落ちた(14 件)。どちらも A と無関係の環境の問題で、/tmp を空け `tools/` を足した 3 回目は results=217 passed=2405 failed=0
+### 2.5 テスト(手導出の再基準化)
+- 新しいテスト `wall_ia2.rs` `compare_string_orders_the_ascii_symbols_by_the_table_and_not_by_the_code_point_with_the_marker`(マーカーあり): 表と code point 順が違う **53 + 5 の対**(全部、1 向きずつ)と、両方の順が一致する 12 対の期待値を、`Windows10-SortingWeightTable.txt`(SHA-256 81fcfa1e…)の (SM, AW) の行から導いた(python、ランタイムの出力は使っていない)。マーカー無しでは旧(`+` 対 `,` = 1、TAB 対 空白 = 1)。
+- **突然変異の確認**: `FLE_IA2_RT_DIR` で e10-wip の `fle_locale.c` に差し替えると、このテストは落ちる(`u2b-u2c` で 1 と 3 が逆)。A の下では通る。
+- **既存のテストは期待値の書き直しが 0 件**(A は ia2 が有効な構成でだけ答えを変え、その構成のテストは `wall_ia2.rs` だけで、そこの既存の記号対は表と code point が一致する対だけを使っていた): `wall_ia2` 21 passed(新 1 + 既存 20)。`test.sh full`: (キャッシュなしの走行は進行中。結果は最終報告)。経緯: 1 回目は /tmp の tmpfs が満杯(私の作業ファイルが 2.3 GB)で `Disk quota exceeded`(24 件の失敗、`tables/testfull-A-run1-tmpfull.log`)、2 回目は私の部分的な export(lift だけ)に repo の `tools/` が無くて authenticode_check が落ちた(14 件)。どちらも A と無関係の環境の問題で、/tmp を空け `tools/` を足した 3 回目は results=217 passed=2405 failed=0
 - a4: (進行中)
 
 ### 2.6 一般句読点(S-cmp-general-punctuation)の扱い — 拡張を別の差分に
-依頼は記号対記号と control の 2 つだったので、**一般句読点(U+2000〜U+206F)対 ASCII 記号の規則は A に入れていない**。表と比べると、この規則も code point 順で、**156 順序対(78 の無順序対)で表と逆**(en/em ダッシュ U+2013/U+2014 は SM 6 で、空白と SM 7 の記号より小さい。`+` 対 U+200B なども)。`0284b-gp-extension.diff`(15 行、A の上)がその置換で、答えが変わる順序対は A と合わせて 272(= 116 + 156)。既存の試験の期待値(`wall_fr12` の 4 行: `-` 対 U+2013 = 1、` ` 対 U+2026 = 1、`'` 対 U+2019 = 1 ほか)は拡張でも変わらない(実測: `./enum_A one` で確認)。**採否は PM の判断**。
+依頼は記号対記号と control の 2 つだったので、**一般句読点(U+2000〜U+206F)対 ASCII 記号の規則は A に入れていない**。表と比べると、この規則も code point 順で、**156 順序対(78 の無順序対)で表と逆**(en/em ダッシュ U+2013/U+2014 は SM 6 で、空白と SM 7 の記号より小さい。`+` 対 U+200B なども)。`0284b-gp-extension.diff`(15 行、A の上)がその置換で、答えが変わる順序対は A と合わせて 272(= 116 + 156)。既存のテストの期待値(`wall_fr12` の 4 行: `-` 対 U+2013 = 1、` ` 対 U+2026 = 1、`'` 対 U+2019 = 1 ほか)は拡張でも変わらない(実測: `./enum_A one` で確認)。**採否は PM の判断**。
 
 ### 2.7 3 つの旧規則の本体の扱い
-A の下で、本番(`fle_ia2_on()` が常に真)では 3 つの規則に到達する対は『表が決められない対』(U+0000 と、primary weight が等しい 2 単位)に限られる。ASCII の記号・空白・TAB〜CR の全対では表が決めるので(§2.2 の 0 件の増減)、**実質は死んだコード**になる。本体を消すのは、0284c(B = ia2 の無条件化)の後が妥当(マーカー無しの構成が消えるため)。今は消さない(消すと B 無しの構成の試験が停止を期待する形に変わる)。
+A の下で、本番(`fle_ia2_on()` が常に真)では 3 つの規則に到達する対は『表が決められない対』(U+0000 と、primary weight が等しい 2 単位)に限られる。ASCII の記号・空白・TAB〜CR の全対では表が決めるので(§2.2 の 0 件の増減)、**実質は死んだコード**になる。本体を消すのは、0284c(B = ia2 の無条件化)の後が妥当(マーカー無しの構成が消えるため)。今は消さない(消すと B 無しの構成のテストが停止を期待する形に変わる)。
 
 ## 3. 後片付け(依頼 (3))
 
 - 削除済み(`readlink -f` で確認してから): N1 のバイナリ(188 MB。`tools/build85.sh` で再生成可)、`w86`、`ct86`(`~/work/mt3w-ct86` 854 MB)、`tmp/regen`、w87 の複製 docs(192 MB)、生成 wasm(`a85/impl/*.wasm`)。
-- 作業の終わりに削除(実施済み、`readlink -f` で確認してから): `~/work/mt3w-ci11`(CI の作業ディレクトリ、約 1.9 GB)、`~/work/mt3w-e11`、`~/work/mt3w-w88`、`~/work/mt3w-ct88`・`ct87`・`ct79`(cargo の target、計 4.3 GB)、`~/work/mt3w-gen`(1.7 GB)、`lift/out-mt3y/{w79,w87,a73,a75,a84,a85,a92,tmp,dll}` とそれらへのリンク(ct87・w88)。結果は `lift/out-git/mt3w-results/` にある。`/tmp/opencode/m85` は 8 MB(私の作業ファイルが /tmp の tmpfs を 2.3 GB 使い、他の担当の試験が `Disk quota exceeded` になりうる状態だった〔私の A の試験が 1 回それで落ちた: §2.5〕ので、早めに空けた)。
+- 作業の終わりに削除(実施済み、`readlink -f` で確認してから): `~/work/mt3w-ci11`(CI の作業ディレクトリ、約 1.9 GB)、`~/work/mt3w-e11`、`~/work/mt3w-w88`、`~/work/mt3w-ct88`・`ct87`・`ct79`(cargo の target、計 4.3 GB)、`~/work/mt3w-gen`(1.7 GB)、`lift/out-mt3y/{w79,w87,a73,a75,a84,a85,a92,tmp,dll}` とそれらへのリンク(ct87・w88)。結果は `lift/out-git/mt3w-results/` にある。`/tmp/opencode/m85` は 8 MB(私の作業ファイルが /tmp の tmpfs を 2.3 GB 使い、他の担当のテストが `Disk quota exceeded` になりうる状態だった〔私の A のテストが 1 回それで落ちた: §2.5〕ので、早めに空けた)。
 - `lift/out-mt3y` は現在 140K(上限 500 MB 内)。
 
 ## 4. 未確認
@@ -121,7 +121,7 @@ A の下で、本番(`fle_ia2_on()` が常に真)では 3 つの規則に到達�
 
 判断:
 1. (1) **E11 の冷間 CI で初めて通る段(link map の新 3 行、exports.rsp の `fle_hyb_slice`、hyb_guard)はローカルで通った**。最終 wasm は E10 + 310,318 B(143,086,598 B、+0.217%)。0285 の報告の +197,374 B は module 単独の −Oz の合計で、CI の merge を通すと +310 KB(Code +295,855、Elem +13,598)。S1 の線の内。`0285b`(hyb_guard を 7 番地に)は採用済み(e11-wip aa56ac4c)。
-2. (2) **0284b(A)を採る**: 表(Windows 10 Sorting Weight Table)の primary weight で決めるブロックが `fle_ia2_on()` かつ記号どうし/空白どうし/TAB〜CR 対 ASCII の対だけに働き、表が決められない対は旧規則が答える。順序が変わる対は 116(記号 106 + TAB〜CR 対 空白 10)、停止 → 答え / 答え → 停止は 0。期待値は表から手で導出し、突然変異(旧 fle_locale.c に差し替え)で落ちる。test.sh full 217 results/2,405 passed/0 failed(キャッシュなし、213 実行体)、a4 942/942・895/895・5,310・1,009,737。**E12 に 0284c と一緒に載せる前に、opt1 が FS 付き試験ビルドで 0284c と 0284b を別々に node の行へ当て、動く行の原因を分ける**。
+2. (2) **0284b(A)を採る**: 表(Windows 10 Sorting Weight Table)の primary weight で決めるブロックが `fle_ia2_on()` かつ記号どうし/空白どうし/TAB〜CR 対 ASCII の対だけに働き、表が決められない対は旧規則が答える。順序が変わる対は 116(記号 106 + TAB〜CR 対 空白 10)、停止 → 答え / 答え → 停止は 0。期待値は表から手で導出し、突然変異(旧 fle_locale.c に差し替え)で落ちる。test.sh full 217 results/2,405 passed/0 failed(キャッシュなし、213 実行体)、a4 942/942・895/895・5,310・1,009,737。**E12 に 0284c と一緒に載せる前に、opt1 が FS 付きテストビルドで 0284c と 0284b を別々に node の行へ当て、動く行の原因を分ける**。
 3. **`0284b-gp-extension`(一般句読点、表と逆の順序対 156)は保留**(E13。A の node 行が安定した後)。事実として記録: en/em ダッシュは SM 6 で空白より小さい、など、code point 順の source 無しの選択が表と逆。
 4. 順序: E10(0286 + 0284、opt1 の実測待ち)→ E11(0285 + 0285b)→ E12(0284c + 0284b)→ E13(gp-extension)。
 5. 未確認: 冷間の C 部の再 link(objects の key、cache の復元)、実エンジンでの 0285 の行(opt1 の E11)、0284b の node 行(g3-surface が「一覧に 53 対のどれかがある」ときだけ動きうる、という予測は読み)、最終 wasm の増分が module の −Oz の合計(+201,235 B)より 109 KB 多い原因。

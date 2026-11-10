@@ -1,6 +1,6 @@
 # 0148: エンジンが描いた画面の『明らかな欠け』の切り分け — GetClipBox がクリップ領域を無視していた(チャンネルラックの名前ボタン・プレイリスト左上の箱・起動ウィザードの題ほか)、Missing ダイアログの一覧の字(OS フォントの入力不足)、Browser の黒・勾配・Settings の読み。仮の決定
 
-状態: **仮の決定**。依頼は PM(番号 0148)。調査・実装・ビルド・測定・テスト・文書は作業者(`vis1`、2026-11-02 17:04 JST〜、`date` で測った経過)。作業は HEAD **cd8c6d9**(`lift/` のコードは 1404f45 = 決定 0144 の取り込み後)の `git archive`(`lift/`・`docs/`・`tools/`・`app/`)で始め、最後まで同じ HEAD で行った。clean な写し(`clean/`)と作業木(`src/`)の `diff -ruN`(`out-*` と cargo の target は除く)が `vis1.diff`(`patch -p1` の形、**9 ファイル**。HEAD cd8c6d9 の clean archive に `patch -p1 --dry-run` が fuzz・offset・reject なしで当たる〔終了 0〕)。**実機 Windows との照合は 0 件**。wasm・ブラウザの実行は測っていない(§8.6)。**この決定のすべての数値(全体テスト・a4・on-seh・面の SHA・音声・画像)は『HEAD cd8c6d9 + `vis1.diff` のみ』の木のもの**で、別担当 vclock1(決定 0147)が取り込まれた後の木のものではない(取り込み後は主窓の lid・idle の面 SHA・窓表の行数が変わる見込み。表の『前』は決定 0144 の runtime と種の値)。
+状態: **仮の決定**。依頼は PM(番号 0148)。調査・実装・ビルド・測定・テスト・文書は作業者(`vis1`、2026-11-02 17:04 JST〜、`date` で測った経過)。作業は HEAD **cd8c6d9**(`lift/` のコードは 1404f45 = 決定 0144 の取り込み後)の `git archive`(`lift/`・`docs/`・`tools/`・`app/`)で始め、最後まで同じ HEAD で行った。clean な写し(`clean/`)とワークツリー(`src/`)の `diff -ruN`(`out-*` と cargo の target は除く)が `vis1.diff`(`patch -p1` の形、**9 ファイル**。HEAD cd8c6d9 の clean archive に `patch -p1 --dry-run` が fuzz・offset・reject なしで当たる〔終了 0〕)。**実機 Windows との照合は 0 件**。wasm・ブラウザの実行は測っていない(§8.6)。**この決定のすべての数値(全体テスト・a4・on-seh・面の SHA・音声・画像)は『HEAD cd8c6d9 + `vis1.diff` のみ』の木のもの**で、別担当 vclock1(決定 0147)が取り込まれた後の木のものではない(取り込み後は主窓の lid・idle の面 SHA・窓表の行数が変わる見込み。表の『前』は決定 0144 の runtime と種の値)。
 
 区分の凡例は決定 0121〜0146 と同じ。**実測**＝このセッションのコマンドの出力を見た事実。**読み**＝逆アセンブル・ログ・文書の解釈(確かめていない部分を含む)。**Learn**＝今回取得した Microsoft Learn の頁(§12)。**出典なしの選択**＝頁にも実測にも値が無く作業者が選んだもの(`S-…`、§6 に撤回条件つきで一覧)。**未確認**＝確かめていない。
 
@@ -134,7 +134,7 @@
 |---|---|
 | `lift/runtime/fle_gdi.c` | `fle_imp_GetClipBox` を作り直した(局所 1 関数。コメントも)。`blit_call` に診断の呼び出し 1 行(弱い参照)と宣言 1 行 |
 | `lift/runtime/fle_visrgn.c` / `.h` | 診断 `fle_visrgn_srcdump`、`fle_visrgn_init_fill`(どちらも opt-in) |
-| `lift/runtime/fle_raster.c` | 窓の面の作成で `fle_visrgn_init_fill` を弱い参照で聞く 6 行(`getenv` は持たない。既存の『画素モデルは host の状態を読まない』の試験を保つ) |
+| `lift/runtime/fle_raster.c` | 窓の面の作成で `fle_visrgn_init_fill` を弱い参照で聞く 6 行(`getenv` は持たない。既存の『画素モデルは host の状態を読まない』のテストを保つ) |
 | `lift/harness/vis1_probe.c`、`lift/harness/vis1/vis1_apis.inc`、`link-flags.txt` | API プローブ(既定のビルドにはリンクされない)。605 名(`g8_probe.c` が wrap する 5 名を除く)。`tools/gen-vis1-wrap.py` が `nm` から作る |
 | `lift/harness/seeds/vfs-seed-vis1.tsv` | 決定 0144 の種 + OS フォント 3 行(ホストパス + SHA。製品ファイルでなく代用フォント) |
 | `lift/crates/fe-lift/tests/wall_fr21.rs` | 新規、9 件(§7) |
@@ -178,7 +178,7 @@
 8. `the_vis1_seed_is_the_decision_0144_list_plus_three_operating_system_fonts`: 種の先頭が決定 0144 の種の全体、足した 3 行の窓のパス・相対ホストパス・SHA-256(ファイルがあれば実体のハッシュも)。
 9. `the_api_probe_lists_agree_and_leave_out_the_five_names_of_the_g8_probe`: `vis1_apis.inc` と `link-flags.txt` の一致・重複なし・`g8_probe.c` の 5 名が無いこと。
 
-既存のテストの期待値の更新: **0 件**(`gdi_bulk.rs` の GetClipBox の試験は領域なしの値を固定していて、そのまま通る)。1 回目の全体テストで落ちた `raster.rs::the_source_of_the_pixel_model_reads_no_host_state` は、私の `getenv` を `fle_raster.c` に入れたせいの**実装の欠陥**で、診断を `fle_visrgn.c` に移して直した(§8.1)。
+既存のテストの期待値の更新: **0 件**(`gdi_bulk.rs` の GetClipBox のテストは領域なしの値を固定していて、そのまま通る)。1 回目の全体テストで落ちた `raster.rs::the_source_of_the_pixel_model_reads_no_host_state` は、私の `getenv` を `fle_raster.c` に入れたせいの**実装の欠陥**で、診断を `fle_visrgn.c` に移して直した(§8.1)。
 
 ## 8. 検証
 
@@ -279,7 +279,7 @@ wasm・ブラウザ(Chrome)は走らせていない。`emcc -c -O1` で変更し
 - 最終の通しと on-seh の終了待ちに `tail --pid=<pid> -f /dev/null`(プロセスが終わるまで待つ。sleep ではない)を使った。ポーリングの繰り返しではないが、『前景で待つ』の趣旨とは別の待ち方である。
 - 別担当 `out-vclock1` のオブジェクト(`obj-base`)を**読み取りのみ**で写して使った(同一性を確かめた。§1)。ほかの `out-*` は読み取りのみ。
 - **作業ディレクトリが指示の 12 GiB を超えた**。最大は約 27 GB(`src` 3.7 GB〔テストの一時物〕、a4 の 4 つが 2.2〜3.2 GB ずつ、生成 C 3 つが 1.8 GB ずつ、`o1` 2.0 GB ほか)。`du` を途中で測らなかった。終了時に cargo target・生成 C・.o・ELF・一時物を消して 33 MB にした(`inputs/fonts` の写し 1.5 MB は種が指すので残した)。
-- 診断のため `fle_raster.c` に入れた `getenv` が既存の試験を破った(§8.1)。
+- 診断のため `fle_raster.c` に入れた `getenv` が既存のテストを破った(§8.1)。
 - 取得した Learn の頁・道具の出力に、依頼者でない指示は**見つからなかった**(気づかなかっただけの可能性は残る)。
 
 ## 12. 出典(Microsoft Learn、2026-11-02 取得)

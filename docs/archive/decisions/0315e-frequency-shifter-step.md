@@ -1,14 +1,14 @@
 # 0315e(仮): Frequency Shifter を 4・5 番目の実モジュール(m11 本体 + m12 の Engine_x64.dll)に足す準備(0313h 型の差分)と、GetModuleFileNameW の契約の穴(mt3。PM の instruction 11:0x)
 
-状態: **仮**。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**、**未確認**。**実エンジン(wasm)の実行 0・Chrome 0・Wine 0**。実行したのは host の道具(PE の読み、find-hook-points、本物の抽出器 `extract` 段、lift 段 1 回、`ci/test-hybrid.sh`、native の cargo 試験の一部)だけ。適用・push はしない。
+状態: **仮**。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**、**未確認**。**実エンジン(wasm)の実行 0・Chrome 0・Wine 0**。実行したのは host の道具(PE の読み、find-hook-points、本物の抽出器 `extract` 段、lift 段 1 回、`ci/test-hybrid.sh`、native の cargo テストの一部)だけ。適用・push はしない。
 
 ## 0. 実際に実行した物
 
 1. 2 つの DLL の PE を読んだ(pefile / capstone / 自作の読み手): `Frequency Shifter_x64.dll`(3,876,864 B、SHA-256 `35784e53…81cd`)と `Engine_x64.dll`(263,168 B、SHA-256 `1e14656b…7980`)。installer `flstudio_win64_26.1.7.5653.exe` の NSIS の install tree で、`Plugins\Fruity\Effects\Frequency Shifter\{Frequency Shifter_x64.dll, Engine_x64.dll, Plugin.nfo}` があり、**ストリームを読んで SHA-256 が上と一致**(実測)。
 2. `docs/investigations/alpha20/tools/node-export/find-hook-points.py` を本体 DLL に: VirtualProtect の呼び元 0x5c3610、hook constructor 0x5c3490、3 つの target RVA **0x17e90 / 0x320b0 / 0x320d0**(先頭 5 byte は Balance・Filter・Delay 2 と同じ 3 つの Delphi runtime 関数。RVA は別。既存の `fruity-delphi-effect-hook-points.txt` のコメントにある値と一致)。
-3. 差分 `0313/impl/0313h-frequency-shifter-on-delay2.diff`(7 hunk、74 行)を、RT-B の build の木 `tree-rtb-build` の複写 `tree-shf` に作った(`0315/tools/shifter-step.sh`)。`ci/test-hybrid.sh` **all checks hold**(Shifter の extract 行 2・seed 行 2 の検査と、『NEXTRA = EXTRA_MODULES の名前の数 = gen-direct の spec − 5、RM_MAX ≥ spec』を含む)。
+3. 差分 `0313/impl/0313h-frequency-shifter-on-delay2.diff`(7 hunk、74 行)を、RT-B の build の木 `tree-rtb-build` のコピー `tree-shf` に作った(`0315/tools/shifter-step.sh`)。`ci/test-hybrid.sh` **all checks hold**(Shifter の extract 行 2・seed 行 2 の検査と、『NEXTRA = EXTRA_MODULES の名前の数 = gen-direct の spec − 5、RM_MAX ≥ spec』を含む)。
 4. その木で本物の CI の段 **`extract felift lift`**(`run-ci-build.sh`、nice 19、CI_JOBS=1、別の work dir `ci-shf`): **rc=0、lift 段 55 s**。RT-B の build(`ci-rtb`・`tree-rtb-build`)には触れていない。
-5. native の cargo 試験(別の target dir): GetModuleFileNameW の runtime 差分(§4)のあとで `wall_wrp1`(新しい試験を含む 11 件)、`load`(38)、`load2_files`(4)、`loadimage`(33)、`modules`(17)、`realmod`(16)、`vfs`(22 pass + 1 fail:tree-shf は診断を getenv にした build 用の木なので `fle_vfs.c mentions getenv` の守りが落ちる=想定どおり、差分と無関係)。
+5. native の cargo テスト(別の target dir): GetModuleFileNameW の runtime 差分(§4)のあとで `wall_wrp1`(新しいテストを含む 11 件)、`load`(38)、`load2_files`(4)、`loadimage`(33)、`modules`(17)、`realmod`(16)、`vfs`(22 pass + 1 fail:tree-shf は診断を getenv にした build 用の木なので `fle_vfs.c mentions getenv` の守りが落ちる=想定どおり、差分と無関係)。
 
 ## 1. 差分 `0313h-frequency-shifter-on-delay2.diff` の中身(Delay 2 の上。適用・push しない)
 
@@ -42,7 +42,7 @@
 - Shifter の本体は、Engine を次のように読む(逆アセンブルして確認、実測): 初期化で `GetModuleFileNameW(HInstance, buf, 0x104)`(RVA 0x2d41c0〜)→ `ExtractFilePath` → 大域の変数、後で(RVA 0x2de590)`その変数 + 'Engine_x64.dll'` を `LoadLibraryW`(Delphi の `SafeLoadLibrary` 相当)→ `GetProcAddress(h, "dispatch")` → 呼ぶ。
 - **今の runtime**:real module の `GetModuleFileNameW` は `FLE_VIRTUAL_SHARED_DIR` + **export directory の Name**(決定 0104、provisional)。つまり Balance・Filter・Delay 2・Shifter は **`C:\Program Files\Image-Line\FL Studio 21\Shared\<ファイル名>`** を自分の path として見る。FL が実際に渡した path は `…\Plugins\Fruity\Effects\<名前>\<名前>_x64.dll`(決定 0183)。**Learn(GetModuleFileNameW): そのモジュールを含むファイルの完全な path** = FL が `LoadLibraryW` に渡した path。
 - 影響(読み・一部は実測の裏づけ):(i) Shifter は Engine の path を `…\Shared\Engine_x64.dll` と作り、path 表の suffix(`…\frequency shifter\engine_x64.dll`)に**当たらない**(= LoadLibraryW が失敗するか、別の経路〔search_volume〕に落ちる)。(ii) 回避策の `shared/engine_x64.dll` の行は PEQ2(`Frequency Splitter\engine_x64.dll`)など次の engine と**衝突する**ので採らない。(iii) 実測の裏づけ: gpu1 の cand1 の log に **`Shared\Artwork\Fonts\Fruity microfont.ttf` を探す miss**(plug-in が自分の folder の Artwork を探しているのに、folder が Shared になっている)がある。
-- **直し案**(runtime のみ、`0315/impl/0315-getmodulefilename-loaded-path.diff`、119 行、tree-rtb-build に `patch --dry-run` rc 0):`fle_realmod_set_loaded_path(idx, u, n)`(`fle_load.c` の path 表に当たった `LoadLibraryW` で、volume の確認のあと、最初の 1 回だけ ASCII の path を '/'→'\' で記録)と `fle_realmod_loaded_path(idx)`。`fle_vfs.c` の `module_path` は記録があればそれを返し、無ければ従来どおり(名前で読んだ real module は変わらない)。native 試験: `wall_wrp1` に新しい 1 件(最初の path が勝つ・'/'→'\'・非 ASCII と範囲外は記録しない)、`wall_wrp1`11・`load`・`modules`・`realmod`・`loadimage` が通る。**wasm では未確認**。
+- **直し案**(runtime のみ、`0315/impl/0315-getmodulefilename-loaded-path.diff`、119 行、tree-rtb-build に `patch --dry-run` rc 0):`fle_realmod_set_loaded_path(idx, u, n)`(`fle_load.c` の path 表に当たった `LoadLibraryW` で、volume の確認のあと、最初の 1 回だけ ASCII の path を '/'→'\' で記録)と `fle_realmod_loaded_path(idx)`。`fle_vfs.c` の `module_path` は記録があればそれを返し、無ければ従来どおり(名前で読んだ real module は変わらない)。native テスト: `wall_wrp1` に新しい 1 件(最初の path が勝つ・'/'→'\'・非 ASCII と範囲外は記録しない)、`wall_wrp1`11・`load`・`modules`・`realmod`・`loadimage` が通る。**wasm では未確認**。
 - この直しを入れると、既存の 3 plug-in(Balance・Filter・Delay 2)が見る自分の path も `Plugins\…` になる(= Windows と同じ)。**plug-in が自分の folder の物(`Artwork\`、`Plugin.nfo` など)を探す先が変わる**ので、miss の path が変わる(seed に足す物の見立ても変わる)。入れる時は runtime のみの増分 build(型 C)。
 
 ## 5. 未確認 / 次

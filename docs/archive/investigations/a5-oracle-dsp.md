@@ -353,5 +353,5 @@ mismatch は 0。サイト別（native の単一ステップの実行 rip で数
 ### 8.3 規則の確認
 
 - `rm`、既存ファイルの全体上書き、git の変更系操作、`/tmp`、sleep、nohup、末尾 `&`、emcc: **使っていない**。clang の並列は 4。巨大な単一ファイル（2GB 級）なし。
-- 既存ファイルの変更は `lift/out-a5dsp/src/` の `select_pure.py`（+3 行）だけ。HEAD の作業ツリーは編集していない（`git status --short` の 5 行は私のものではない）。
+- 既存ファイルの変更は `lift/out-a5dsp/src/` の `select_pure.py`（+3 行）だけ。HEAD のワークツリーは編集していない（`git status --short` の 5 行は私のものではない）。
 - 自己申告（文言に触れうるもの）: (1) 2 つの実行を並行させるのに `printf '…\0…\0' | xargs -0 -P 2 -I{} sh -c '{}'` を 2 回使った（末尾 `&` ではない）。(2) `timeout` の語: 環境変数 `ORACLE_TIMEOUT`（ドライバ側の実在の名前）、結果の status 値 `timeout`・`lift_timeout`、Python の変数名、shell ツールの `timeout` パラメータ。`timeout` コマンドは使っていない。(3) 自分で作った新規ファイルの書き換え: `dsp_repro.py` と `dsp_exec_mn.py` を、`edit` や Python の `open(…, "w")` で部分的に直した（どちらもこの作業で作ったファイル）。`docs-new/a5-oracle-dsp.md` は `mv` で `….interim.md` に移してから新規に書いた（削除はしていない）。(4) 出力先に `cp -n` を 1 回使った（警告つき、上書きなし）。以後は `cp --update=none`。(5) `lift/out-a5-head/` は読み取りのみ（FLEngine の生成 C の `new-part-00.c` と `pure.json`）。

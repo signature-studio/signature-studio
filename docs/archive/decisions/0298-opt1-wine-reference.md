@@ -113,7 +113,7 @@
 
 - `docs/0298-opt1-wine-reference.md`(この文書)、`docs/README-0298-line.txt`。
 - `tables/`: `0298-play2-class-summary.txt`、`0298-play2-class-per10s.txt`、`0298-export1-class-summary.txt`、`0298-wav-wasm-e12-vs-wine-original.txt`、`0298-play1-asio-per-thread-REFERENCE-ONLY.txt`。
-- `logs/`: `play1/`・`play2/`・`export1/`(スレッド別 CPU の 1 秒標本 TSV、イベント時刻、Linux tid ↔ Win TID の対応表、WAV の大きさの推移)、`misc/`(validity ダイアログ、Export ダイアログ、WirePlumber 無しの WASAPI 試験、stackscan の出力)。
+- `logs/`: `play1/`・`play2/`・`export1/`(スレッド別 CPU の 1 秒標本 TSV、イベント時刻、Linux tid ↔ Win TID の対応表、WAV の大きさの推移)、`misc/`(validity ダイアログ、Export ダイアログ、WirePlumber 無しの WASAPI テスト、stackscan の出力)。
 - `tools/`: 起動(`run-fl.sh`、`env.sh`)、入力(`xt.py`)、標本(`thrsample.py`、`play60.py`、`exportwatch.py`、`startup-watch.py`)、集計(`thr-summary.py`、`class-summary.py`、`mapthreads.py`、`wavcmp.py`)、`wine-stub/`(`wintrust_stub.c` / `.def` / `names.txt`、`thrinfo.c`、`stackscan.c`、`wasapi_test.c`)。
 
 ## 8. 追記(18:45〜19:45): FL 内蔵 8 種を退避した構成 = wasm に近い仕事量の参照

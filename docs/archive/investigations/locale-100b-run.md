@@ -4,7 +4,7 @@
 
 「実測」はツールの出力、「推測」は未検証の解釈。
 
-**混在の注意**: 作業ツリーには他担当の未コミット変更（MXCSR 状態ビット: `fe-lift/src/sse_fp_flags.rs`、`prefetch.rs`、`sse_more.rs`、`runtime/fle_mxcsr_flags.h`、`fle_sse.h`、`tests/mxcsr_flags.rs`。ETXTBSY 競合修正: `tests/` 配下の多数のテストとヘルパ）が混在している。生成・ビルド・実行・テストはその混在状態で行った。私が触ったのは §6 のファイルだけ。
+**混在の注意**: ワークツリーには他担当の未コミット変更（MXCSR 状態ビット: `fe-lift/src/sse_fp_flags.rs`、`prefetch.rs`、`sse_more.rs`、`runtime/fle_mxcsr_flags.h`、`fle_sse.h`、`tests/mxcsr_flags.rs`。ETXTBSY 競合修正: `tests/` 配下の多数のテストとヘルパ）が混在している。生成・ビルド・実行・テストはその混在状態で行った。私が触ったのは §6 のファイルだけ。
 
 ## 1. 0x100b の同定（実測・取得した出典）
 
@@ -66,7 +66,7 @@
 | 閉包の命令 / 関数 | 2,526,826 / 58,695 | 2,526,826 / 58,695（不変） |
 | `c_lines` | 2,880,419 | 2,880,419 |
 
-- **`unsupported_total` が 667 → 603 に減ったのは、今回の変更（runtime のみ）の効果ではない**。runtime の変更は生成に影響しない。作業ツリーの別担当（SSE、prefetch の未コミット変更）の lift の変更による（推測。内訳の差: `Mulpd` 25、`Addpd` 13、`Cvtdq2ps` 9、`Subpd` 8、`Prefetcht0` 5、`Cvtpd2ps` 2、`Cvtps2pd` 2 が一覧から消えた）。残り: `Jmp: indirect through IAT slot` 557、`Psubw` 10、`Pcmpgtd` 8、`Rcpps` 8、`Bswap` 7、`Test: high-byte register` 7、`And: high-byte register` 1、`Andnpd` 1、`F2xm1` 1、`Fsincos` 1、`Jmp: indirect target unresolved` 1、`Xgetbv` 1。
+- **`unsupported_total` が 667 → 603 に減ったのは、今回の変更（runtime のみ）の効果ではない**。runtime の変更は生成に影響しない。ワークツリーの別担当（SSE、prefetch の未コミット変更）の lift の変更による（推測。内訳の差: `Mulpd` 25、`Addpd` 13、`Cvtdq2ps` 9、`Subpd` 8、`Prefetcht0` 5、`Cvtpd2ps` 2、`Cvtps2pd` 2 が一覧から消えた）。残り: `Jmp: indirect through IAT slot` 557、`Psubw` 10、`Pcmpgtd` 8、`Rcpps` 8、`Bswap` 7、`Test: high-byte register` 7、`And: high-byte register` 1、`Andnpd` 1、`F2xm1` 1、`Fsincos` 1、`Jmp: indirect target unresolved` 1、`Xgetbv` 1。
 - 0x100b の通過の確認（gdb、`gdb-loc2.cmds`、`gdb-loc2.txt`。`fle_imp_GetLocaleInfoW` の全呼び出しを記録）: LCType の順は 0x5c、0x59、0x5c、0x59、0x3、**0x100b**、**0x37**（7 回。最後が abort）。つまり 0x100b は通過し、次の呼び出しが 0x37。
 - 0x100b の後の経路（実測は `run.txt` の呼び出し鎖、他は読み）: 新しい停止点の鎖は `f_423560 ← f_446370 ← f_447df0（0x447e02 の call）← f_4473f0（戻り番地 0x44747a）← f_446400 ← f_44bb70 ← f_455790 ← f_4120c0 ← f_412160 ← f_41d8f0 ← 入口 f_1376820`。前の停止点の鎖では `f_446400` の下が `f_447860`（0x100b の呼び出し元）だった。`f_446400` は 0x44650c で `f_447860`、0x446518 で `f_4473f0` を続けて呼ぶので（objdump）、`f_447860` は最後まで戻り、次の `f_4473f0` に進んだ。`EnumCalendarInfoW` の枝を通らなかったことは、停止が `EnumCalendarInfoW` の未実装停止ではなく 0x37 の `GetLocaleInfoW` になったことからの間接的な確認（`EnumCalendarInfoW` 到達の有無を直接見る gdb の確認は取っていない）。
 

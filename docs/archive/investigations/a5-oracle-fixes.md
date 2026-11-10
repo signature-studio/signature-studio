@@ -28,7 +28,7 @@
 
 | 項目 | 内容 | 区分 |
 |---|---|---|
-| HEAD | `144a70381315545c4d8dc7fbfd709f7eaf1775f1`（作業ツリーは未変更。`git status` は着手時と同じ未追跡 5 件） | 実測 |
+| HEAD | `144a70381315545c4d8dc7fbfd709f7eaf1775f1`（ワークツリーは未変更。`git status` は着手時と同じ未追跡 5 件） | 実測 |
 | 着手後の HEAD | 作業の終わりに HEAD は `8f63bda`（wasm 6 モジュールの commit）に進んでいた（他の作業者）。`a5f.diff` はその HEAD の `git archive` にも `patch -p1 --dry-run` で当たる（実測）。**`8f63bda` で生成 C の SHA を再確認していない（未確認）**。ゲートと測定は `144a703` の木 | 実測／未確認 |
 | PE | `binaries/win64/FLEngine_x64.dll` SHA-256 `b2c64da4…9496d`（確認済み） | 実測 |
 | ゲート | HEAD の生成 C（`fe-lift lift DLL OUT.c --pdata`）SHA-256 **`f6d3a9715ddb92d734577fc1e87a381142c722aa17562a22a72c565599cbb08c`**（215,773,171 B。指示の値と一致）。functions 59,380、unsupported_total 390。前回 C（0d58b0f）との関数本体の比較: 共通 59,297、本体が変わったもの 136、**純計算 9,901 のうち 0**、HEAD で増えたもの 83。`GATE OK: no pure function body changed` | 実測（`results/examples/`） |
@@ -273,8 +273,8 @@ native_fault の原因別の改善（7 バッチ、最初の fault の原因 →
 
 1. `sleep`、`timeout` コマンド、`nohup`、末尾の `&` は使っていない。語 `timeout` は環境変数名・status 値・シェルツールの `timeout` パラメータ・出力の文字列としてだけ。ループ用に `echo "######## …"` の区切りを数回使った（ハーネスの注意「区切り用の echo を連ねない」に反する。結果の読みやすさを損ねた）。
 2. 存在しない `bash` ツールを 1 回呼んだ。`write` ツールが 1 回、引数が空で失敗した（ファイルは作られていない）。
-3. `rm` は `/tmp/opencode/a5f/` の下だけ: `oracle/gen/head-pdata.c`（ゲートで作った 215 MB。SHA を記録して削除）、各実行の `work/`、リング・回ごとの中間ファイル（`a5f_repair.py` が回ごとに消す）、試験用の `r5`、`r6`、`r7`、`rsmoke`、`dbg`、`t_rep_work`、`r394`（旧版）、`bin/lift_drv2`（最初の PREV へのシンボリックリンクと、再リンク前の版）。リポジトリ、`lift/out-*` の既存物、他の作業者のディレクトリは読み取りのみ。
-4. `git` は `rev-parse`、`archive`、`status` だけ。commit なし。作業ツリーは未変更（`git status` は着手時と同じ未追跡 5 件）。
+3. `rm` は `/tmp/opencode/a5f/` の下だけ: `oracle/gen/head-pdata.c`（ゲートで作った 215 MB。SHA を記録して削除）、各実行の `work/`、リング・回ごとの中間ファイル（`a5f_repair.py` が回ごとに消す）、テスト用の `r5`、`r6`、`r7`、`rsmoke`、`dbg`、`t_rep_work`、`r394`（旧版）、`bin/lift_drv2`（最初の PREV へのシンボリックリンクと、再リンク前の版）。リポジトリ、`lift/out-*` の既存物、他の作業者のディレクトリは読み取りのみ。
+4. `git` は `rev-parse`、`archive`、`status` だけ。commit なし。ワークツリーは未変更（`git status` は着手時と同じ未追跡 5 件）。
 5. python は `PYTHONDONTWRITEBYTECODE=1` を付けた（`env.sh` で export）。着手直後の `python3 -c "import capstone…"` の 1 回は `env.sh` を読む前（`.pyc` の確認は最後に実施: 新しい `.pyc` は 0 件）。
 6. 書き込み: `/` へは `lift/out-git/a5f-results/` だけ（約 2〜3 MB）。tmpfs: `du` で確認した最大は `/tmp/opencode/a5f/` が約 0.55 GB（`lift_drv2` 258 MB と実行の `work/` を含む）、`/tmp/opencode` 全体が約 1.97 GB（他の作業者の `wasm6` が約 1.1 GB を使っていた時）で、2.3 GB を超えていない（各段階の前後で `du -sm /tmp/opencode` を確認）。
 7. 同時に重い作業を走らせないようにし、負荷は他の作業者の分が同居（バッチの再実行の所要時間は前回と同程度）。

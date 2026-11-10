@@ -60,7 +60,7 @@ fe-lift を `out-sysinfo/target`（`CARGO_TARGET_DIR`）にビルドして使っ
 | 生成の所要、最大 RSS | 2.64 秒、320 MB | 2.77 秒、320 MB |
 
 - `unsupported_total` -3 は、GlobalMemoryStatus、GetProcessAffinityMask、SetProcessAffinityMask の 3 つの `jmp [IAT]` が処理済み（`jmp_imp:*` 各 1）に変わったもの。他の 3 つ（delay 版）は、IAT thunk ではなく GetProcAddress 経由なので `unsupported_total` に影響しない（実測: `jmp_imp:GetNativeSystemInfo` などは出力に現れない）。
-- 前回の記録（pdata-seeds-run.md §5.3）の 2,991 との差（-47）は、その後の作業ツリーの更新による（他の担当の変更。私は未確認）。この作業の `base`（実装前の同じツリー）との差だけが私の変更。
+- 前回の記録（pdata-seeds-run.md §5.3）の 2,991 との差（-47）は、その後のワークツリーの更新による（他の担当の変更。私は未確認）。この作業の `base`（実装前の同じツリー）との差だけが私の変更。
 - 分割（`out-pdata/split_c.py` 3,700 関数、16 個）、ビルド（`out-sysinfo/build-parts.sh`、`out-pdata/build-parts.sh` の出力先を `out-sysinfo/` に変えた複製、`EXTRA_RT` は生成 C が参照する `fle_imp_*` 173 個の定義元 21 ファイル）: **44.0 秒、最大 RSS 1,203 MB、EXIT=0**。2 GB 級の中間ファイルなし（最大の C は 216 MB、`out-sysinfo/` 全体は `target` を含めて 3.8 GB）。生成 C が参照する `fle_imp_*` は 173 個すべてが runtime のどれかに定義されていることを確認してからビルドした（`UNDEFINED` の出力なし）。
 
 ## 5. 実行（実測）

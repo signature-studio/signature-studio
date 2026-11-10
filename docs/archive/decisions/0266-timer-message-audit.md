@@ -2,7 +2,7 @@
 
 **依頼者の機械・実機 Windows・実 GPU・ブラウザ・本番 bundle(afd46e67 / 251dfabc / df0512b0)での測定は 0 件。** 以下は、b42fad36 の生成 C から作った native N1 に、HEAD aa70edb9(runtime は b00932ec と同一)の runtime + 環境変数で切る診断トレース(`diag/a9-trace.diff`)を載せ、G3 の模擬入力(`scripts/mxmove.g3` のドラッグ 40 手と `scripts/a9-idle10.g3` の 10 秒 idle。**ユーザーの操作ではない**)で測った値。native N1 の行は本番 bundle の行ではなく、native の CPU は wasm の CPU ではない。Wine 10.0 の結果と私の読みは UNOFFICIAL(Wine は Windows ではない)。代役・再生・推測は含まない。
 
-状態: **仮の決定**。作業者 `alpha1`、2026-11-05 JST 23:00〜。基準 HEAD は aa70edb9(PM の木。runtime と試験は b00932ec と同じ)。**違反は見つからなかったので `alpha9.diff` は無い**(PM の規則: 違反が無ければ『FL 自身の挙動』として表に残して止める)。契約の表を固定する試験だけを `optional/alpha9-tests.diff` に置いた(追加のみ、runtime 変更なし)。
+状態: **仮の決定**。作業者 `alpha1`、2026-11-05 JST 23:00〜。基準 HEAD は aa70edb9(PM の木。runtime とテストは b00932ec と同じ)。**違反は見つからなかったので `alpha9.diff` は無い**(PM の規則: 違反が無ければ『FL 自身の挙動』として表に残して止める)。契約の表を固定するテストだけを `optional/alpha9-tests.diff` に置いた(追加のみ、runtime 変更なし)。
 
 ## 結論(先頭の数行)
 
@@ -17,7 +17,7 @@
 
 ## 冒頭の三点(正直さ)
 
-1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C にした b42fad36 の生成 C)の native N1 を G3 の模擬入力で走らせ、(a) Mixer ヘッダードラッグ 40 手(窓 3608283〜3608945 ms の仮想時間)と (b) 起動から 6 秒後の 10 秒 idle を、env で切る診断トレース(post・取得・dispatch・timer・Sleep・待ち・時計読み出し)で数え、(c) 表示 Hz を 60 / 90 / 120 / 240 に変えた idle 10 秒の CPU(トレースなし 2 回ずつ)、(d) 待ちの期限を tick 境界に丸める診断(`A9_TICK_US`)を測った。(e) 同じ C 試験(`harness/alpha9/msg_timer.c`)を Wine 10.0(mingw、headless、3 回)と runtime に走らせて順序・合体・レートを比べた。**本番 bundle のバイト列での測定ではない。**
+1. **何を実測したか**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C にした b42fad36 の生成 C)の native N1 を G3 の模擬入力で走らせ、(a) Mixer ヘッダードラッグ 40 手(窓 3608283〜3608945 ms の仮想時間)と (b) 起動から 6 秒後の 10 秒 idle を、env で切る診断トレース(post・取得・dispatch・timer・Sleep・待ち・時計読み出し)で数え、(c) 表示 Hz を 60 / 90 / 120 / 240 に変えた idle 10 秒の CPU(トレースなし 2 回ずつ)、(d) 待ちの期限を tick 境界に丸める診断(`A9_TICK_US`)を測った。(e) 同じ C テスト(`harness/alpha9/msg_timer.c`)を Wine 10.0(mingw、headless、3 回)と runtime に走らせて順序・合体・レートを比べた。**本番 bundle のバイト列での測定ではない。**
 2. **結論**: 上のとおり。ランタイムは timer・優先順位・時間で FL の連鎖を Windows(Wine で代用)より多く回していない。連鎖の速さは FL のタイマースレッドが読む表示 Hz で決まる。
 3. **未確認**: 実 Windows での Sleep / WM_TIMER の解像度と、FL のタイマースレッドが Windows でも同じ式(Sleep(1000 / Hz))であること(native N1 では Hz を変えて因果を確かめたが、Windows では未確認)。ページが実際に FL へ渡す Hz(本番のビーコン値は 0 件)。ブラウザ(wasm)での 1 tick の費用。FL の tick を減らしたとき FL の見え方(アニメーション)がどうなるか。
 
@@ -57,7 +57,7 @@ Wine との比較(`logs/wine-vs-runtime/`、`tables/` の表): S1(ポスト 2 + 
 2. `Sleep(n)` / 待ちを tick 境界に丸めること。範囲内で、効果は idle の 3〜15%(60 Hz)、影響が読めない(オーディオ)。
 3. 表示 Hz の扱い(ページ側)。`hz.ts` が FLE_DISPLAYSETTINGS_FREQUENCY と FLE_DWM_HZ に同じ値を渡す。FL の tick を 60〜120 に抑えて DwmFlush の拍だけ表示 Hz にする案は、FL のアニメーションの滑らかさと引き換えで、PM の判断。
 
-## 7. 試験(任意)
+## 7. テスト(任意)
 
 `optional/alpha9-tests.diff`(2 ファイル、追加のみ): `lift/harness/alpha9/msg_timer.c`(Wine と runtime の両方で動く)と `lift/crates/fe-lift/tests/alpha9_msg_timer.rs`(runtime の順序・合体・飢え・レートを固定。`cargo test -p fe-lift --test alpha9_msg_timer` 1 passed、`~/work/a7-cargo` の複製〔HEAD の runtime〕)。HEAD の木に `git apply --check` が通る。
 
@@ -75,9 +75,9 @@ Wine との比較(`logs/wine-vs-runtime/`、`tables/` の表): S1(ポスト 2 + 
 
 ## PM の判断と取り込み(2026-11-05 23:45、docs のみ)
 
-取り込み: alpha1 の最終報(23:40)の文書・表・道具・診断差分を `docs/investigations/alpha9/` に、決定文書を本ファイルに置いた。**製品の木に当てた差分は無い**(`alpha9.diff` は作られていない)。測定は alpha1 の native N1 と Wine 10.0 の C 試験で、PM は再現していない。ブラウザ(wasm)・実 Windows・依頼者の機械は 0 件。
+取り込み: alpha1 の最終報(23:40)の文書・表・道具・診断差分を `docs/investigations/alpha9/` に、決定文書を本ファイルに置いた。**製品の木に当てた差分は無い**(`alpha9.diff` は作られていない)。測定は alpha1 の native N1 と Wine 10.0 の C テストで、PM は再現していない。ブラウザ(wasm)・実 Windows・依頼者の機械は 0 件。
 判断:
-1. **runtime は変えない。** 17 項目の契約の表と Wine 10.0 との C 試験で、順序・最低優先度・合体・最小周期・レートが一致し、違反が無い。`optional/alpha9-tests.diff`(試験のみ、追加 2 ファイル)は取り込まない(製品への影響が無く、表は docs に残る)。必要になれば `docs/investigations/alpha9/optional/` から取る。
+1. **runtime は変えない。** 17 項目の契約の表と Wine 10.0 との C テストで、順序・最低優先度・合体・最小周期・レートが一致し、違反が無い。`optional/alpha9-tests.diff`(テストのみ、追加 2 ファイル)は取り込まない(製品への影響が無く、表は docs に残る)。必要になれば `docs/investigations/alpha9/optional/` から取る。
 2. **Sleep の tick の丸め(診断 A9_TICK_US)は入れない。** スレッド 18 は FL の DirectSound ミキサースレッド `TMixerThread_DS`(CreateThread の ThreadRec のクラス表で確認)の見張りで、992 回/s の Sleep(1) はバッファ補充の間隔を決める。丸めると P3 に影響する。idle の CPU への寄与は 10 s で約 51 ms(0.5%)で小さい。
 3. **FL の描画の輪の速さは、ページが渡す表示 Hz で決まる**(`Sleep(floor(1000/Hz))`、native の idle CPU は 60/90/120/240 Hz で 976/1,334/1,786/3,621 ms/10 s)。ページは実測の表示 Hz を FL に渡す(Windows の FL と同じ式で忠実)。P2 の目標は 120 fps で、120 を超える Hz は費用だけが増える。ブラウザでの費用は gpu1 の決定 0263(Hz 別の費用表)の結果を待ち、`app/src/engine/hz.ts` の `STANDARD_HZ` の上端を 120 にする案を PM が判断する(app/src の小変更、旗なし)。
 4. 決定 0262 の「1 手あたり」の表は、この調べで run の最後までの数え方だったと分かり、訂正を 0262 に追記した(結論は不変)。

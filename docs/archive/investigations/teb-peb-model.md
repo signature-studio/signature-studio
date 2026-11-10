@@ -158,7 +158,7 @@ URL は 2026-10-23 に取得した。原文は引用の範囲で示す。
 | wasm の boot | `malloc(16 MiB)`、`R[4]` の計算は native と同じ | `harness/wasm/main.c` 48〜65 行目（読み） |
 | `fle_call_guest` | **専用のスタックは持たない**。呼び出し時の `R[4]` から `(R[4] − 32) & ~15` を呼び出し点の rsp とし、同じスタックを下へ使う。入れ子は 16 段まで（`FLE_CB_MAX_DEPTH`、決定 0064） | `fle_callback.c` 23〜70 行目（読み） |
 | 「unit のスタック」 | 専用のものは見つからなかった。`R[4] =` を代入する箇所は harness の main 2 つ、`fle_callback.c`、`fle_win.c`、`fle_monitor.c`、`fle_ole.c`（C のローカル配列を一時的に `R[4]` にする）、オラクルのドライバだけ（grep）。unit は boot のスタックの上で回ると読める | grep（読み） |
-| オラクル（別系統の試験用） | `OR_STACK` 0x30000000、サイズ 0x100000、`OR_STACK_TOP` は +0xC0000 | `harness/oracle/oracle_common.h`（読み） |
+| オラクル（別系統のテスト用） | `OR_STACK` 0x30000000、サイズ 0x100000、`OR_STACK_TOP` は +0xC0000 | `harness/oracle/oracle_common.h`（読み） |
 | wasm の C スタック | `-sSTACK_SIZE=8MB`（emscripten の C 側のスタック）。**ゲストの `R[4]` のスタックとは別物** | `harness/wasm/build.sh` 92 行目（読み） |
 
 - native の mmap は下端がページ境界。wasm の `malloc` の戻りは、ホストの glibc で 16 MiB を確保した実測が下位 12 ビット 0x10（`malloc_align.c`）。**wasm（emscripten の malloc）の下端がページ境界かは未確認**。境界でなければ §2.2 のとおり、StackLimit を下端にした場合に「触る必要が出たとき」ループが終わらない。
@@ -199,7 +199,7 @@ URL は 2026-10-23 に取得した。原文は引用の範囲で示す。
 | **A** | StackLimit（と StackBase）= ゲストのスタックの**実際の下端（と上端）**。`fle_teb` の +0x10、+0x8 に置き、`gs:[0x10]`、`gs:[0x30]` 経由のどちらでも同じ値が読める | 値は環境の事実（boot が確保した領域）。「下端」が StackLimit の意味と合うかは一次に無い（§4）が、Learn の `!teb` 例（StackBase 0x01100000 > StackLimit 0x01001000）と、`GetCurrentThreadStackLimits` の「lower boundary」の語とは整合（導出）。**仮**の部分: 下端をページに揃えるか、boot のスタックだけを正とするか | フレームが下端をまたがない限り触るページ 0（実測）。またぐと下端の下へ 1 バイトの 0（隣が未マップなら fault、そうでなければ黙って壊す）。boot が mmap のため下端はページ境界 | フレームが収まる限り同じ（実測）。またぐと**黙って隣の線形メモリに 0 を書く**。下端がページ境界でないと、またいだときループが終わらず走り続ける（読み）。現行 `FLE_CHECKED_MEM` はスタックを含む領域を通すので止めない | probe/oracle の流儀: 限界をスタック下端にして、収まる / またぐ / ページ未整列 / 確保 0 を native で比較。DLL を載せた実行では ATTACH の完走 | **fail-closed ではない**（またぐと黙って壊れるか、native で運が良ければ fault）。ただし現行の FLEngine は `__chkstk` の形を持たず（プロローグのバイト列の検索 0 件。`flengine-chkstk-pattern.txt`。ほかの形の確認はしていない）、`gs:[0x10]` も読まない（`gs-sites-flengine.txt`）ので、この穴は今は表に出ていない |
 | **B** | 十分低い固定値（0、または 0x10000 など） | **値は創作**（一次にも環境の事実にもならない）。「StackLimit より下を触る」ループを起こさない、という効果だけが根拠 | 触るページ 0（実測）。**フレームが下端をまたいでも検知しない** | native と同じ | 限界を 0 にして `__chkstk` が戻ることと、フラグ・レジスタが保たれることを oracle 流で | fail-open（検知なし）。他の読み手（0x17d06f7 が StackBase と比べる範囲検査）に対しては、下側の検査が常に通る。StackBase を別途決めないと上側の検査（`rcx <= [TEB+8]`）が通らない（§3.4。読み） |
 | **C** | `__chkstk`（VA 0x17daba0）を**名前付きの検査関数に置換**: 「`rsp − rax` がゲストのスタックの下端以上か」を見て、足りなければ `fle_stop`（名前付き）。TEB には依らない | 根拠は「`__chkstk` の目的は新しい rsp が確保済みの範囲に入ることの確認」（§2.2 の読み + Learn の `_chkstk` ページ）。`gs:[0x10]` は読まない | 同じ | 同じ。**wasm でも検知できる唯一の案**（`fle_st` のガードに頼らない） | 置換した関数を oracle 流で「収まる / またぐ」を比較。ただし DLL のバイト列を lift しない箇所ができる | **fail-closed**。ただし、検索した範囲では**生成器に VA 指定の置換・上書きの仕組みは見つからなかった**（`grep` で `override`、`replace` 系を検索して 0 件。網羅ではない）ので、新規の仕組み。置換は r10、r11、rax を保ち、フラグが `add rsp, 0x10` の結果になることまで合わせないと元と違う（呼び出し側が読むかは未確認） |
-| **D** | A に加えて、native の boot のスタックの下にガード（`PROT_NONE`）を置く | 環境側の追加 | またぐと SIGSEGV（fail-closed） | **効かない**（ガードの概念が無い。§4） | native だけ追加で試験 | native のみ fail-closed。wasm との差が残る |
+| **D** | A に加えて、native の boot のスタックの下にガード（`PROT_NONE`）を置く | 環境側の追加 | またぐと SIGSEGV（fail-closed） | **効かない**（ガードの概念が無い。§4） | native だけ追加でテスト | native のみ fail-closed。wasm との差が残る |
 
 ### 7.1 推奨（決めない）
 

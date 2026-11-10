@@ -4,7 +4,7 @@
 
 ## 冒頭の三点
 
-1. **何を調べたか**: `docs/investigations/goal-ladder.md` §1 の表の「ブラウザで観測できる受け入れ条件」を字義どおりに読み、G0〜G11 を **69 個の判定項目**に分解した(`tables/ladder-items.tsv`。曖昧な語は読みを併記)。各項目について、決定 0116〜0193、`docs/investigations/**`、`docs/milestones/performance-targets.md`、`lift/out-git/*-results/` の実測を探し、**どの環境(native / node / Chrome)で、実エンジンか、既定の入口か、いつ**観測されたかを付けた。観測の無い項目は「未観測」、native/node だけの項目は「native/node のみ」、代役・保存した画像の再生・試験用の刺激・推測・P1〜P3 規則に当たる物は「数えない」、実機の画面・音が要る項目は「依頼者の供給が必要」とした。さらに、既定の入口の実エンジンを隔離 Chrome で **R1〜R5(窓の一覧・画素・入力・メニュー・ホイール・ドラッグ・再生・File>Open を 1〜3 回ずつ)と A1・A2(AudioWorklet)**で再観測した(`tables/ladder-reobserve.tsv`)。
+1. **何を調べたか**: `docs/investigations/goal-ladder.md` §1 の表の「ブラウザで観測できる受け入れ条件」を字義どおりに読み、G0〜G11 を **69 個の判定項目**に分解した(`tables/ladder-items.tsv`。曖昧な語は読みを併記)。各項目について、決定 0116〜0193、`docs/investigations/**`、`docs/milestones/performance-targets.md`、`lift/out-git/*-results/` の実測を探し、**どの環境(native / node / Chrome)で、実エンジンか、既定の入口か、いつ**観測されたかを付けた。観測の無い項目は「未観測」、native/node だけの項目は「native/node のみ」、代役・保存した画像の再生・テスト用の刺激・推測・P1〜P3 規則に当たる物は「数えない」、実機の画面・音が要る項目は「依頼者の供給が必要」とした。さらに、既定の入口の実エンジンを隔離 Chrome で **R1〜R5(窓の一覧・画素・入力・メニュー・ホイール・ドラッグ・再生・File>Open を 1〜3 回ずつ)と A1・A2(AudioWorklet)**で再観測した(`tables/ladder-reobserve.tsv`)。
 
 2. **結論**: (a) **最も厳しい読み**(段階の全項目が、ブラウザ・実エンジン・既定の入口で観測され、下位の全段階が到達で、P1〜P3 規則を適用し、曖昧語は不利な読み)の最高到達段階は **G0**(しかも G0 の根拠は 2026-10-28 の FRUITY 無効 wasm の観測で、出荷構成は a4 の行を出せない)。(b) **字義どおりの読み**(ladder §1 自身が「厳密な直列ではない」と書くので、段階ごとに自分の項目で判定し、曖昧語は読み A〔能力〕を採る)は **G4**。ただし G1・G2・G3 に**各 1 項目の記録の欠け**があり(G1-7: Worker ログ上の Run 入口〔未観測。G1-5・G1-6 は native のみ〕、G2-7: `document.title` への反映〔読みで分かれる〕、G3-4: 実エンジン自身の `WM_TIMER`〔未観測〕)、「G1〜G3 を通過した」と書くならこの 3 項目を明記する必要がある。連続性を要求する字義なら G0 のまま。(c) 従来の報告「最高 G0、G1〜G4 は観測のみ」は**過大ではない**。ただし G2・G4 はほぼ充足、G1・G3 は各 1 項目の欠けと**具体化できる**。逆に G7「未達」、G8・G10「未測定」は 2026-11-03 の観測と合わず**古い**(G6・G7 は項目をほぼ充足するが、P2・P3 が未達なので ladder の注記により「達成」と数えない)。(d) 依頼者の供給が要るのは G4 の読み C、G5 の比較、G8 の書き出しの比較。
 
@@ -19,11 +19,11 @@
 | 記号 | 意味 |
 |---|---|
 | `OBS-B-DEF` | ブラウザ(Chrome 156 ヘッドレス)・実エンジン・**既定の入口**で観測済み(本監査の再観測を含む) |
-| `OBS-B-OTH` | ブラウザ・実エンジンで観測済みだが、既定の入口以外の構成(opt-in のパラメータ、過去の構成、試験用バンドル・manifest) |
+| `OBS-B-OTH` | ブラウザ・実エンジンで観測済みだが、既定の入口以外の構成(opt-in のパラメータ、過去の構成、テスト用バンドル・manifest) |
 | `NATIVE-ONLY` | native(または node)だけ。ブラウザ未観測 |
 | `INDIRECT` | 直接の記録は無く、下流の観測・同一コードの同一出力からの間接 |
 | `NOT-OBS` | 未観測 |
-| `EXCLUDED` | 数えない規則に該当(試験用の刺激、代役、推測、ladder 冒頭の P1〜P3 の注記) |
+| `EXCLUDED` | 数えない規則に該当(テスト用の刺激、代役、推測、ladder 冒頭の P1〜P3 の注記) |
 | `OWNER` | 依頼者の供給が必要(実機の画面・音) |
 | `AMBIG` | 曖昧語の読みで判定が分かれる(両方の読みを併記) |
 
@@ -38,14 +38,14 @@
 | G0 | 到達(条件つき: ブラウザの観測は 2026-10-28 の FRUITY 無効 wasm。現行 HEAD の Chrome では未再観測) | 4 項目: NATIVE-ONLY 1 OBS-B-DEF 1 OBS-B-OTH 2 | 現行 HEAD の FRUITY 無効 wasm を Chrome の Worker で 1 回走らせ、a4 の 7 行を native と diff する(別ビルド。決定 0128 の見積もりで約 27 分、RSS 8.8 GB)。または PM が「FRUITY 有効の出荷構成で DllMain が戻り CreateFruityInstance が走る」を G0 の充足と読む。 |
 | G1 | 部分(欠け: G1-7 Worker ログ上の Run 入口〔未観測〕。G1-5・G1-6 は native のみ。G1-1〜G1-3 は下流からの間接) | 7 項目: INDIRECT 3 NATIVE-ONLY 2 NOT-OBS 1 OBS-B-DEF 1 | Run(f_86a660 の入口)で 1 行を出す opt-in の runtime フックを wasm に入れ、Chrome の Worker ログに Run 入口が出ることを見る(出荷構成の再ビルドが要る)。 |
 | G2 | 部分(欠け: G2-7 document.title〔読み A=JS が題を読める、なら充足〕。G2-3 のメッセージ列は結果からの間接) | 7 項目: AMBIG 1 INDIRECT 1 OBS-B-DEF 5 | PM が G2-7 の読み(能力か実反映か)を決める。実反映なら app/src/main.ts:593 の近くで appView の主窓の題を document.title に反映(数行)し、R1 と同じ手順で確認する。 |
-| G3 | 部分(欠け: G3-4 実エンジン自身の WM_TIMER。G3-3 はホスト作成の試験用タイマーで数えない) | 6 項目: EXCLUDED 1 NOT-OBS 1 OBS-B-DEF 3 OBS-B-OTH 1 | 実エンジンの SetTimer が生きる場面(再生中、ダイアログ、Settings など)を探し、fle_win_timer_log の配送時刻を Chrome の Worker に出して間隔を測る。 |
+| G3 | 部分(欠け: G3-4 実エンジン自身の WM_TIMER。G3-3 はホスト作成のテスト用タイマーで数えない) | 6 項目: EXCLUDED 1 NOT-OBS 1 OBS-B-DEF 3 OBS-B-OTH 1 | 実エンジンの SetTimer が生きる場面(再生中、ダイアログ、Settings など)を探し、fle_win_timer_log の配送時刻を Chrome の Worker に出して間隔を測る。 |
 | G4 | 読み A で到達 / 読み B1〔Chrome == node の基準〕で到達 / 読み B2〔== native〕は出荷系の構成で突き合わせ記録なし / 読み C は依頼者の供給 | 6 項目: NOT-OBS 1 OBS-B-DEF 3 OBS-B-OTH 1 OWNER 1 | 出荷系の構成(F1x/SHIPH)を native -O0/-O2 でも同じ仮想時刻(a3000: lid 14 cf92b670…、lid 48 221e46db…)まで走らせ、面の SHA が Chrome・node と一致するかを見る(G4-4b)。 |
 | G5 | 未到達(G5-4 実機との比較は依頼者の供給。既知の欠けあり) | 4 項目: OBS-B-DEF 3 OWNER 1 | 依頼者が実機(Windows、DPI 100%、1920x1080)の起動直後のスクリーンショットを供給する。並行して Browser 欄の黒い領域の原因を調べる(決定 0134 の PM 注記は WebView2 なしと読む)。 |
 | G6 | 項目は充足(マウス・キー・ホイール・ホバー・メニュー・ドラッグ)。数えない規則(P2 未達)に該当 | 8 項目: EXCLUDED 1 OBS-B-DEF 7 | P2(120 fps、入力→更新 p95 ≤ 17 ms)を満たす。ホイール・ドラッグは画素の差でなく画面上の値(テンポ、フェーダー)の変化として読む。 |
 | G7 | 項目は ?audio=1(opt-in)で条件つきに充足(再生中 30 s で 5 quanta の欠け、無音 10 s は 0)。数えない規則(P3 未達)に該当 | 6 項目: EXCLUDED 1 OBS-B-OTH 5 | PM が「一定時間」の数値を決める(例: 300 s で欠け 0)。?audio=1 を既定にするか。P3。300 s 欠け 0 の独立再現(決定 0175 は 300 s で欠けあり)。 |
-| G8 | 未到達(部分: ブラウザで .flp を開くのは試験用バンドルのみ。既定の入口では File>Open が何も起こさない。再生→AudioWorklet、デモ、実機比較が無い) | 7 項目: EXCLUDED 1 NATIVE-ONLY 1 NOT-OBS 2 OBS-B-OTH 2 OWNER 1 | 出荷 SHIPH にブラウザのファイル橋(-DFLE_FILEDLG_BROWSER、決定 0193 の Not done)を載せ、Sampler.flp を開いて再生し、AudioWorklet の非ゼロを Chrome で測る。同梱デモ NewStuff.flp も開く。 |
+| G8 | 未到達(部分: ブラウザで .flp を開くのはテスト用バンドルのみ。既定の入口では File>Open が何も起こさない。再生→AudioWorklet、デモ、実機比較が無い) | 7 項目: EXCLUDED 1 NATIVE-ONLY 1 NOT-OBS 2 OBS-B-OTH 2 OWNER 1 | 出荷 SHIPH にブラウザのファイル橋(-DFLE_FILEDLG_BROWSER、決定 0193 の Not done)を載せ、Sampler.flp を開いて再生し、AudioWorklet の非ゼロを Chrome で測る。同梱デモ NewStuff.flp も開く。 |
 | G9 | 未到達(native で Fruity Wrapper の load のみ) | 3 項目: NATIVE-ONLY 1 NOT-OBS 2 | Serum を使わない Fruity Wrapper の GUI、または同梱ジェネレーターを 1 つ lift して、Chrome で GUI と音を出す(native では Serum 2 の最初の process の SIGSEGV〔決定 0190〕が先)。 |
-| G10 | 未到達(部分: メニュー・モーダル・ドラッグ。Settings・ピアノロール・保存・MP3 が無い。WAV は native と試験構成のみ) | 8 項目: NOT-OBS 3 OBS-B-DEF 3 OBS-B-OTH 2 | Settings・ピアノロールを開く、プロジェクトを保存する、出荷構成で Export を完走させる(b2d3〔決定 0195〕待ち)。 |
+| G10 | 未到達(部分: メニュー・モーダル・ドラッグ。Settings・ピアノロール・保存・MP3 が無い。WAV は native とテスト構成のみ) | 8 項目: NOT-OBS 3 OBS-B-DEF 3 OBS-B-OTH 2 | Settings・ピアノロールを開く、プロジェクトを保存する、出荷構成で Export を完走させる(b2d3〔決定 0195〕待ち)。 |
 | G11 | 未到達(Serum 2/OTT は FL の外の単体のみ) | 3 項目: NOT-OBS 3 | native の実エンジンの中で Serum 2 の最初の process の SIGSEGV(決定 0190)を解いて出力を見る。ライセンスの経路と、サードパーティ VST3 の FL の中での Chrome での実行。 |
 
 項目名に「(参考)」を付けた物(G0-3、G0-4、G6-7)と G5-3(既知の欠け)は ladder の字義の外で、記録のために表に入れた(内訳の数には含まれるが、段階の判定には使っていない)。G8-6(所定のプロジェクト)も字義の外。
@@ -58,7 +58,7 @@
 | **字義どおり** | 段階ごとに自分の項目で判定する(ladder §1「厳密な直列ではない」)。ブラウザの実エンジンの観測なら構成を問わず数える(`OBS-B-OTH` も可)。曖昧語は PM が決めるまで読み A(能力)を採り、読み B を併記。ladder 注記の P1〜P3 は適用 | **G4**(読み A)。G5 は依頼者の供給で止まる | G1-7、G2-7(読み B なら)、G3-4、G4-4b(読み B2 なら) |
 | (参考)字義どおり + 連続を要求 | 上に加えて G0〜G(k-1) を全項目で要求 | **G0** | G1-7 |
 
-感度(PM が決める点): (i) G1-7(と native のみの G1-5・G1-6)を「下流の観測(主窓・入力応答・同一コードの idle)で代える」なら G1 が到達。(ii) G2-7 を能力読み(JS が題を読める)にするなら G2 が到達。(iii) G3-3 の試験用タイマーを数えるなら G3 が到達(私は数えなかった: ホスト作成の刺激で、実エンジンのタイマーではない)。(iv) 3 つを認めると連続で **G4(読み A)**。認めなければ G0。**G6・G7 は項目をほぼ満たすが、P2・P3 を満たすまで「達成」と数えない**(ladder の注記)。
+感度(PM が決める点): (i) G1-7(と native のみの G1-5・G1-6)を「下流の観測(主窓・入力応答・同一コードの idle)で代える」なら G1 が到達。(ii) G2-7 を能力読み(JS が題を読める)にするなら G2 が到達。(iii) G3-3 のテスト用タイマーを数えるなら G3 が到達(私は数えなかった: ホスト作成の刺激で、実エンジンのタイマーではない)。(iv) 3 つを認めると連続で **G4(読み A)**。認めなければ G0。**G6・G7 は項目をほぼ満たすが、P2・P3 を満たすまで「達成」と数えない**(ladder の注記)。
 
 従来の報告との照合: PM が書いてきた「最高 G0、G1〜G4 は観測のみ」(roadmap-to-goal.md の区分表、progress.md)は、連続・全項目の読みと一致し**過大ではない**。「観測のみ」を具体化すると、G2・G4 はほぼ充足、G1・G3 は各 1 項目の欠け(G1-7、G3-4)。**古い**ラベルは、progress.md/roadmap の G7「未達」(本監査 A2 は項目をほぼ満たす)、G8「未測定」(決定 0144・0178・0193)、G10「未測定」(決定 0171・0188・0193)。
 
@@ -103,7 +103,7 @@
 |---|---|---|---|---|
 | G3-1 | エンジンが PeekMessageW/WaitMessage/MsgWaitForMultipleObjects で待つ(idle に入る) | `OBS-B-DEF` | Chrome Worker; 既定の入口 | R1,R2,R3,A1 |
 | G3-2 | 待つ間もタブが応答する(別スレッドの rAF が維持される) | `OBS-B-DEF` | Chrome; 既定の入口 | R1,R2,R5 |
-| G3-3 | WM_TIMER が等間隔で届く — (a) ホストが窓に付けた試験用タイマー | `EXCLUDED` | native/node/Chrome; 試験用タイマー | No |
+| G3-3 | WM_TIMER が等間隔で届く — (a) ホストが窓に付けたテスト用タイマー | `EXCLUDED` | native/node/Chrome; テスト用タイマー | No |
 | G3-4 | WM_TIMER が等間隔で届く — (b) 実エンジン自身のタイマー | `NOT-OBS` | native; — | No(出荷構成の Worker ログに配送の記録は出ない) |
 | G3-5 | アイドルで CPU を使い切らない | `OBS-B-OTH` | Chrome; 既定の入口 + ?audio=1 | A1,A2 |
 | G3-6 | エンジンのメッセージ配送が回る(入力が WndProc に届く) | `OBS-B-DEF` | Chrome; 既定の入口 | R1,R2 |
@@ -156,9 +156,9 @@
 
 | 項目 | 字義の項目 | 判定 | 環境・構成 | 本監査の再観測 |
 |---|---|---|---|---|
-| G8-1 | .flp を読み込む(ファイル I/O。OPFS または MEMFS) | `OBS-B-OTH` | native + Chrome(既定外); 試験用バンドル(出荷 SHIPH に -DFLE_FILEDLG_BROWSER は未搭載。既定の入口で File>Open... は何も起こさない: R4) | R4(既定の入口では開けないことの確認のみ) |
+| G8-1 | .flp を読み込む(ファイル I/O。OPFS または MEMFS) | `OBS-B-OTH` | native + Chrome(既定外); テスト用バンドル(出荷 SHIPH に -DFLE_FILEDLG_BROWSER は未搭載。既定の入口で File>Open... は何も起こさない: R4) | R4(既定の入口では開けないことの確認のみ) |
 | G8-2 | 同梱デモを読み込む | `NOT-OBS` | —; — | No |
-| G8-3 | 画面に反映される | `OBS-B-OTH` | Chrome; 試験用バンドル | No |
+| G8-3 | 画面に反映される | `OBS-B-OTH` | Chrome; テスト用バンドル | No |
 | G8-4 | 再生すると AudioWorklet に非ゼロのサンプルが出る(読み込んだプロジェクトで) | `NATIVE-ONLY` | native; — | No |
 | G8-5 | レンダリング結果を実機の書き出しと比較できる | `OWNER` | —; — | — |
 | G8-6 | 所定のプロジェクト(serina1-serum2.zip)を開く | `NOT-OBS` | native; — | No |
@@ -178,11 +178,11 @@
 |---|---|---|---|---|
 | G10-1 | メニュー | `OBS-B-DEF` | Chrome; 既定の入口 | R1,R2 |
 | G10-2 | モーダル | `OBS-B-DEF` | Chrome; 既定の入口 | R1,R2 |
-| G10-3 | ファイルダイアログ | `OBS-B-OTH` | Chrome; 試験用バンドル(既定の入口では不可) | R4 |
+| G10-3 | ファイルダイアログ | `OBS-B-OTH` | Chrome; テスト用バンドル(既定の入口では不可) | R4 |
 | G10-4 | ドラッグ | `OBS-B-DEF` | Chrome; 既定の入口 | R2 |
 | G10-5 | ミキサー・ピアノロール・設定を一通り操作 | `NOT-OBS` | Chrome; 既定の入口 | R2(フェーダーのみ) |
 | G10-6 | プロジェクトの保存 | `NOT-OBS` | Chrome(描画のみ); — | No |
-| G10-7 | WAV の書き出し | `OBS-B-OTH` | native + Chrome(試験構成); 試験用 manifest | No |
+| G10-7 | WAV の書き出し | `OBS-B-OTH` | native + Chrome(テスト構成); テスト用 manifest | No |
 | G10-8 | MP3 の書き出し | `NOT-OBS` | —; — | No |
 
 ### G11
@@ -233,7 +233,7 @@
 | L41 | §1 表 G5 | 未測定（実機のスクリーンショットも未入手） | 部分的に古い: 画面は描かれ文字・アイコンもある(本監査 R1 の画像)。実機のスクリーンショットが無い点は今も同じ(G5-4)。既知の欠け(Browser 欄が黒い等)を追記すべき。 |
 | L42 | §1 表 G6 | 未測定 | 古い: マウス・キー・ホイール・ホバー・メニュー・ドラッグが Chrome で届き画面が変わる(決定 0136・0141・0171、本監査 R2・R5)。P2 規則で「達成」とは数えない。 |
 | L43 | §1 表 G7 | 未測定（AudioWorklet 側の受け皿は JS 試作で実測。エンジン側の音声経路は未実行） | 古い: 決定 0139・0175、本監査 A1・A2(エンジンのブロックを AudioWorklet が連続受領、無音)。P3 規則で「達成」とは数えない。progress.md の「G7 未達」も本監査の項目とは合わない。 |
-| L44 | §1 表 G8 | 未測定 | 古い: native で .flp を開いて再生(決定 0144)、Chrome で .flp を開く(決定 0193、試験用バンドル)。既定の入口では File>Open が何も起こさない(R4)。 |
+| L44 | §1 表 G8 | 未測定 | 古い: native で .flp を開いて再生(決定 0144)、Chrome で .flp を開く(決定 0193、テスト用バンドル)。既定の入口では File>Open が何も起こさない(R4)。 |
 | L45 | §1 表 G9 | 未測定（棚卸しだけ） | 部分的に古い: native で Fruity Wrapper の DllMain と CreatePlugInstance(決定 0183)。GUI・音は未。 |
 | L46 | §1 表 G10 | 未測定 | 古い: メニュー・モーダル・ドラッグ・native の WAV 書き出し(決定 0171・0188・0193)。 |
 | L47 | §1 表 G11 | 未測定 | 部分的に古い: Serum 2/OTT の単体の実行(決定 0156・0165・0177・0186)、FL の中の native(決定 0183・0190: Serum 2 の setupProcessing/setActive と最初の process の呼び出し、その中で SIGSEGV)。FL の中のブラウザ実行は 0 件。 |
@@ -265,7 +265,7 @@
 | S-ladder-readA | G4 の「エンジンの GDI 呼び出し結果と画素が一致」を読み A(canvas の読み戻し == Worker が書いた面)で判定し、読み B(== native の同状態の面)・読み C(== 実機 GDI)を別項目にした | 文言に比較対象が書かれていない。代替: B を必須(G4 は部分)、C を必須(G4 は未到達) |
 | S-ladder-g1log | G1 の「Worker のログ(診断フック)」を出荷構成の Worker ログ(`window.__app.engineLog()`)と読んだ | 診断フック付きの H ビルドを Chrome で走らせた記録が無い。代替: H ビルドの測定を要求(同じく未観測)/ 下流の観測で代える |
 | S-ladder-g2title | 「`document.title` に反映できる」を、能力(読み A)と実反映(読み B)の両方で示し、判定は `AMBIG` | 「できる」の解釈が分かれる。PM が決める |
-| S-ladder-g3timer | ホスト作成の試験用 `WM_TIMER`(決定 0136)を数えない | ゲストの `SetTimer` ではない刺激。代替: 配送の機構の検査として数える(G3 が到達に近づく) |
+| S-ladder-g3timer | ホスト作成のテスト用 `WM_TIMER`(決定 0136)を数えない | ゲストの `SetTimer` ではない刺激。代替: 配送の機構の検査として数える(G3 が到達に近づく) |
 | S-ladder-g7time | 「一定時間」に数値を決めず、窓ごとの数(10 s・30 s・60 s・300 s)を報告した | 文書に数値が無い。代替: PM が 60 s か 300 s に決める |
 | S-ladder-hover | 「ホバーの強調」を、ポップアップ窓の項目へ移動した後の窓 SHA の変化(対照が安定)で判定した | 強調の見た目を特定できない。代替: 目視、特定の色 |
 | S-ladder-region | ホイール・ドラッグ・再生の判定を、スクリーンショット(1897x1067)の矩形領域の画素差 > 0(無入力の対照が 0)で行った。矩形は私が決めた(時計 [495,0,120,40]、テンポ [428,5,62,32]、フェーダー [430,580,70,430]、再生ボタン [338,0,30,40]) | 値(テンポの数字など)を読む手段が無い。代替: OCR、エンジンの内部状態 |
@@ -293,6 +293,6 @@
 
 - **取り込み範囲:** 文書だけ（決定文書、`docs/investigations/ladder2/` の表・ログ・道具・画像 3 枚〔400 KB 超の 2 枚は除外〕、`goal-ladder.md` への追記 `ladder-update-proposal.diff`〔`-` 行 0、`+` 27 行。古い記述は消さない〕）。コード・テストの変更なし。
 - **報告の書式（恒久。PM の判断）:** 各ターンの最高到達段階は **2 通りで書く**。(1) 『最も厳しい読み』= 連続・全項目・ブラウザ・実エンジン・既定の入口・P 規則・曖昧語は不利 = **G0**。(2) 『字義どおりの読み』= 段階ごとに自分の項目で判定、曖昧語は読み A（能力）= **G4**。ただし **G1・G2・G3 に各 1 項目の記録の欠け**（G1-7 Worker ログ上の Run 入口、G2-7 `document.title` への反映、G3-4 実エンジン自身の `WM_TIMER`）があり、『G1〜G3 を通過』と書くならこの 3 項目を明記する。ladder2 の評価では従来の『最高 G0、G1〜G4 は観測のみ』は過大ではなかった。逆に G7『未達』・G8『未測定』・G10『未測定』のラベルは 2026-11-03 の観測と合わず古い（`progress.md` と `roadmap-to-goal.md` の更新は docs の作業で行う）。
-- **欠けている観測を埋める（小さな作業。起動する）:** (a) G0: 現行 HEAD の FRUITY 無効 wasm を Chrome の Worker で走らせ、a4 の 7 行を native と diff する（10-28 の観測は別構成）。(b) G1: Run（`f_86a660` の入口）で 1 行を出す opt-in のフックを wasm に入れ、Chrome の Worker ログに Run 入口が出ることを見る。(c) G2: **PM の読みは『実反映』を採る**（アプリは主窓の題を `document.title` に反映するのが自然で、manifest 名のままでは『エンジンの窓が反映される』という条件を字義どおりには満たさない）。`app/src/main.ts` の数行で、エンジンの主窓の題を `document.title` に反映する（開始前は従来の名）。(d) G3: 実エンジンの `SetTimer` が生きる場面で配送時刻を Chrome の Worker に出して間隔を測る（決定 0136 の試験用タイマーは数えない）。(e) G4: 出荷系の構成を native でも同じ仮想時刻まで走らせ、面の SHA（lid 14 `cf92b670…`、lid 48 `221e46db…`）を Chrome・node と突き合わせる。
+- **欠けている観測を埋める（小さな作業。起動する）:** (a) G0: 現行 HEAD の FRUITY 無効 wasm を Chrome の Worker で走らせ、a4 の 7 行を native と diff する（10-28 の観測は別構成）。(b) G1: Run（`f_86a660` の入口）で 1 行を出す opt-in のフックを wasm に入れ、Chrome の Worker ログに Run 入口が出ることを見る。(c) G2: **PM の読みは『実反映』を採る**（アプリは主窓の題を `document.title` に反映するのが自然で、manifest 名のままでは『エンジンの窓が反映される』という条件を字義どおりには満たさない）。`app/src/main.ts` の数行で、エンジンの主窓の題を `document.title` に反映する（開始前は従来の名）。(d) G3: 実エンジンの `SetTimer` が生きる場面で配送時刻を Chrome の Worker に出して間隔を測る（決定 0136 のテスト用タイマーは数えない）。(e) G4: 出荷系の構成を native でも同じ仮想時刻まで走らせ、面の SHA（lid 14 `cf92b670…`、lid 48 `221e46db…`）を Chrome・node と突き合わせる。
 - **依頼者にしか出せないもの:** 実機の起動直後のスクリーンショット（G5 の比較、G4 の読み C）、実機の書き出し WAV（G8 の比較）、耳での確認。
 - **限界の再掲:** 再観測は load 16〜57 の機械の隔離 Chrome 156 ヘッドレス（速度は主張しない）。依頼者の機械の値は 0 件。実機 Windows との照合は 0 件。

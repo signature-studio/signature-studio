@@ -87,7 +87,7 @@ act は本物の GitHub ランナーではない(標準ランナーの実機、`
 
 並列度は `ci/lib/common.sh` の `jobs_default`(CPU 数と RAM/3 GB の小さい方)が決める。2 vCPU / 8 GB では 2。`wasm-opt` は 1 スレッドで CPU 21.5 分かかるので、2 vCPU の壁時計はスレッドの並列化の効き次第で約 11〜22 分(並列化の効きは未測定)。
 
-ジョブの最初の `ci/preflight.sh` が `nproc`・`free`・`df` を表示し、RAM+swap が 10 GB 未満なら swap ファイルを作り(`/mnt` が別のファイルシステムで空きがあればそこへ)、作業領域の空きが 10 GB 未満なら(`/mnt` が別のファイルシステムなら)`/mnt` を使い、それでも足りなければ未使用の事前インストール物(.NET、Android、GHC、CodeQL、Swift)を消し、それでも足りなければ原因の分かる文面で失敗する。第三者のアクションは使わない。**標準ランナーで OOM・ディスク不足・6 時間超過が実際に起きた場合の larger runner などは『依頼者が選ぶ選択肢』として Issue に一言書いただけで、導入していない。** GitHub 上のビルドは私には走らせられない(dispatch が 403)ので、『初回の冷たいビルドが試験になる』と Issue に書いた。
+ジョブの最初の `ci/preflight.sh` が `nproc`・`free`・`df` を表示し、RAM+swap が 10 GB 未満なら swap ファイルを作り(`/mnt` が別のファイルシステムで空きがあればそこへ)、作業領域の空きが 10 GB 未満なら(`/mnt` が別のファイルシステムなら)`/mnt` を使い、それでも足りなければ未使用の事前インストール物(.NET、Android、GHC、CodeQL、Swift)を消し、それでも足りなければ原因の分かる文面で失敗する。第三者のアクションは使わない。**標準ランナーで OOM・ディスク不足・6 時間超過が実際に起きた場合の larger runner などは『依頼者が選ぶ選択肢』として Issue に一言書いただけで、導入していない。** GitHub 上のビルドは私には走らせられない(dispatch が 403)ので、『初回の冷たいビルドがテストになる』と Issue に書いた。
 
 費用(GitHub Actions): 標準 Linux 2 コアは $0.006/分、ジョブごとに分単位で切り上げ(https://docs.github.com/en/billing/reference/actions-runner-pricing)。private リポジトリは契約の『含まれる計算使用量』(Free $12、Pro・Team $18、Enterprise $300 / 月)から引かれる(https://docs.github.com/en/billing/concepts/product-billing/github-actions)。冷たいビルド 1 回(build 約 70〜100 分 + plan・app・vst3・deploy 約 15 分)は約 $0.51〜0.69、全部 hit の実行は約 10 分で約 $0.06(見積り)。
 
@@ -119,7 +119,7 @@ act は本物の GitHub ランナーではない(標準ランナーの実機、`
 * **デプロイジョブ(ドライラン)**: バンドルと `app/dist` の復元、アップロード計画(6 オブジェクト 28,733,518 B、`engine.kind` が `emscripten-fruity-v1` であることの検査)、`wrangler deploy --dry-run`(バインディングを一覧、Total Upload 21.77 KiB)が成功。19〜28 秒。配信バケットへは何も書いていない。
 * **決定性(GitHub のランナーとこの機械)**: 生成 C 7 本の SHA-256 が GitHub のランナーとこの機械で**全一致**。同じ木(コミット 811031f の `git archive`)をこの機械で段階スクリプト(`CI_JOBS=2`)で作ると、**最終 wasm `cf384a1c0695a19a563cd736e674ad7862278b6a9c3a2919fa32860adf8dc750`(130,237,776 B)、glue(`19be80e762cb…`)、seed pack、DLL pack、それぞれの brotli が、ランナーの物とバイト単位で一致**した(`manifest.json` だけが時刻・prefix のため違う)。
 
-**3. 本番デプロイの条件(式の落とし穴と試験)**: 式 `inputs.dry_run == false` は、`workflow_dispatch` 以外のイベントでは `inputs` が空で、**`null == false` が真になる**(式の型変換)。そのままだと、push で本番デプロイの step が走る条件を満たしてしまう。そこで本番デプロイの 3 つの step(配信バケットへのアップロード、`wrangler deploy`、Access の到達確認)の条件は、イベントと ref を名指しする: `(push && ref == main) || (dispatch && dry_run == false && ref == main)`。『main 以外の ref で `dry_run=false` は拒否』の step は `dispatch && dry_run == false && ref != main`。`ci/test-real-deploy.py` が、これらの式をワークフローから読み出し、GitHub の式の意味(`&&`/`||` は被演算子を返す、型が違う `==` は数値で比べる)で、イベント・ref・入力の 10 通りを評価する(main への push → 本番、別ブランチの push → ドライラン、pull_request・schedule → ドライラン、main の dispatch は `dry_run` による、別ブランチの dispatch は `dry_run=false` なら拒否)。plan ジョブの静的検査で毎回走る。実行 1〜7 は、ブランチの push が本番に進まないことをこの設計で確かめた: 3 つの step と拒否の step は全実行で skipped だった(API で確認)。
+**3. 本番デプロイの条件(式の落とし穴とテスト)**: 式 `inputs.dry_run == false` は、`workflow_dispatch` 以外のイベントでは `inputs` が空で、**`null == false` が真になる**(式の型変換)。そのままだと、push で本番デプロイの step が走る条件を満たしてしまう。そこで本番デプロイの 3 つの step(配信バケットへのアップロード、`wrangler deploy`、Access の到達確認)の条件は、イベントと ref を名指しする: `(push && ref == main) || (dispatch && dry_run == false && ref == main)`。『main 以外の ref で `dry_run=false` は拒否』の step は `dispatch && dry_run == false && ref != main`。`ci/test-real-deploy.py` が、これらの式をワークフローから読み出し、GitHub の式の意味(`&&`/`||` は被演算子を返す、型が違う `==` は数値で比べる)で、イベント・ref・入力の 10 通りを評価する(main への push → 本番、別ブランチの push → ドライラン、pull_request・schedule → ドライラン、main の dispatch は `dry_run` による、別ブランチの dispatch は `dry_run=false` なら拒否)。plan ジョブの静的検査で毎回走る。実行 1〜7 は、ブランチの push が本番に進まないことをこの設計で確かめた: 3 つの step と拒否の step は全実行で skipped だった(API で確認)。
 
 **4. 段階ごとの時間(標準ランナー、冷たい build ジョブ)**: 実行 2 と 5 は同じ入力でキャッシュが空(実行 5 は `cache_salt` で冷たくした)。ランナーの個体差で 20% ほど違う。
 
@@ -150,12 +150,12 @@ act は本物の GitHub ランナーではない(標準ランナーの実機、`
 * **事実**: build ジョブは成功(41m16s)。deploy ジョブが `wrangler deploy` で失敗した。Worker は `Uploaded fl-studio-web` で上がり(版 `ba41b917-1e08-46b9-96db-b43027074914`、100%、02:24:38Z)、続くトリガー(カスタムドメイン)の更新で `The zone "<CF-VALUE-REMOVED>" does not exist on your account. [code: 10084]`(`Trigger configuration ... was only partially updated`)。依頼者が作った API トークン(Workers Scripts: Edit だけ)では、ドメインのゾーンを引けず、ドメインを付け替えられない。この push の前に、bundle のアップロード(6 オブジェクト、既定の `manifest.json` が最後)は成功していた。Access の到達確認の step は skipped になった。
 * **その時点の本番(読み取りで確認)**: Worker は新しい版(app は main 15540a0)、既定 manifest は新しい bundle(`fl-engine-ci-F2xH2-88235937`、wasm sha256 `8cabc3a3…8a3`)。この wasm と glue は、同じ木をこの機械で作った物とバイト単位で一致。認証なしの 16 件(GET/POST/HEAD/Range、アプリ・/assets/・/__perf・manifest の 4 アセット)はすべて Access の 302(失敗で skipped になった step と同じ検査を手元で実行)。つまり本番は整合しており、赤かったのはドメインの更新の 1 点だけ。同じ push が続くたびに同じ失敗が繰り返される状態だった。
 * **修正**: `wrangler deploy` をやめ、トリガーに触れない `wrangler versions upload` + `wrangler versions deploy <id>@100%` にした(`ci/stage-deploy.sh worker`。`versions upload` は『トリガーの変更は `wrangler triggers deploy` で』と出し、route つきの設定でも触れない)。カスタムドメインは既に付いているので触らない。
-* **試験(権限を足さずに)**: Workers Scripts: Edit だけの一時トークンで、本番とは別名の使い捨て Worker(ルートもドメインも無い)を使った: (a) 新規の Worker には `versions upload` できない(先に `deploy` が要る=本番の Worker は既にある)。(b) route つき(存在しないホスト名)の設定でも `versions upload` は成功し、トリガーは変わらない。(c) `versions deploy <id>@100% --yes` と `ci/stage-deploy.sh worker` は成功。終わって使い捨ての Worker を削除し(`This Worker does not exist` を確認)、トークンを失効した(`ci1-tmp` 0 本)。本番の Worker・ドメイン・バケットには触れていない。**ドメインが付いた本番の Worker に対する `versions upload`/`versions deploy` は未試験**(次の push が最初)。
+* **テスト(権限を足さずに)**: Workers Scripts: Edit だけの一時トークンで、本番とは別名の使い捨て Worker(ルートもドメインも無い)を使った: (a) 新規の Worker には `versions upload` できない(先に `deploy` が要る=本番の Worker は既にある)。(b) route つき(存在しないホスト名)の設定でも `versions upload` は成功し、トリガーは変わらない。(c) `versions deploy <id>@100% --yes` と `ci/stage-deploy.sh worker` は成功。終わって使い捨ての Worker を削除し(`This Worker does not exist` を確認)、トークンを失効した(`ci1-tmp` 0 本)。本番の Worker・ドメイン・バケットには触れていない。**ドメインが付いた本番の Worker に対する `versions upload`/`versions deploy` は未テスト**(次の push が最初)。
 * **順序**: 『bundle のファイル(既定 manifest 以外)→ Worker の版 → 既定 manifest(最後)』にした。理由: (i) Worker の版が失敗しても既定 manifest は古いままで、本番は変わらず整合する(今回のような『Worker だけ新しい』一部更新にならない)。(ii) 以前の順(manifest まで上げてから Worker)では、『古いページ + 新しい manifest』の窓がアップロードの終わりから `wrangler deploy` の終わりまで(この失敗では約 8 秒)あった。新しい順の窓は、Worker の版の deploy から manifest の PUT(1 リクエスト)までの『新しいページ + 古い manifest』で、数秒以内。**結論: ページが新旧どちらの bundle とも動く期間は保証できない(schema が合わなければ止まる)ので、窓を最短にし、失敗時に整合が残る新しい順を採った。**
 
 ## 5. クリーンな木からの段階実行(実測。この機械、`CI_JOBS=4`、load 30〜55 の間。壁時計は参考値)
 
-方法: `git archive` で作った木 + 依頼者の `~/ダウンロード` のインストーラー(`CI_INSTALLER_DIR`)。HOST_ROOT は CI が抽出した木(PM の作業木ではない)。`SHIP_PRESET=F2xH`(rebase 前の main 7c0e9cc + 本ブランチ)。`NO_CGROUP=1`。
+方法: `git archive` で作った木 + 依頼者の `~/ダウンロード` のインストーラー(`CI_INSTALLER_DIR`)。HOST_ROOT は CI が抽出した木(PM のワークツリーではない)。`SHIP_PRESET=F2xH`(rebase 前の main 7c0e9cc + 本ブランチ)。`NO_CGROUP=1`。
 
 | 段階 | 実測 | 備考 |
 |---|---|---|
@@ -171,7 +171,7 @@ act は本物の GitHub ランナーではない(標準ランナーの実機、`
 
 出力: wasm raw **138,866,442 B**(ネイティブ 70,572,928 B の 1.968 倍)、brotli 11,032,150 B。`engine.ec7efc8e72ca.wasm`。`dll.50206405ba5f.flpack`(sha256 `50206405…`)と `seed.0f4b547e6656.flpack`(`0f4b547e…`)は ship2 の bundle の同名の物と**バイト同一**(= CI の抽出と PM の木の入力から作った seed pack が同じ)。wasm と glue に作業ディレクトリのパス(`/home/ubuntu`、`ciwork` ほか)は含まれない(`grep -c` 0)。
 
-**生成 C の決定性・入力の同一性**(F2xH、gen + resplit のみ、各 約 80 秒): CI の入力での 2 回の実行と、HOST_ROOT だけを PM の作業木にした実行で、`flengine.c`、`m1.c`〜`m5.c`、`common.c` の SHA-256 7 本が**全一致**(`tables/generated-c-sha256.txt`)。ship1 の F1xH の参照(HEAD d425abd、`docs/investigations/ship1/logs/generated-c-sha256-A.txt`)とは `flengine.c`(`95e68e97…`)・`m2.c`・`m4.c`・`m5.c` が一致、`m1.c` は prune S と S+M の違い、`m3.c` と `common.c` の差は参照の HEAD からの差と読む(**未検証**)。FLEngine の既定構成(a4)の生成 C `cd9107ce…` は**再実行していない**(本ブランチは `lift/crates`・`lift/runtime` を変えていないので変わらないという読み)。
+**生成 C の決定性・入力の同一性**(F2xH、gen + resplit のみ、各 約 80 秒): CI の入力での 2 回の実行と、HOST_ROOT だけを PM のワークツリーにした実行で、`flengine.c`、`m1.c`〜`m5.c`、`common.c` の SHA-256 7 本が**全一致**(`tables/generated-c-sha256.txt`)。ship1 の F1xH の参照(HEAD d425abd、`docs/investigations/ship1/logs/generated-c-sha256-A.txt`)とは `flengine.c`(`95e68e97…`)・`m2.c`・`m4.c`・`m5.c` が一致、`m1.c` は prune S と S+M の違い、`m3.c` と `common.c` の差は参照の HEAD からの差と読む(**未検証**)。FLEngine の既定構成(a4)の生成 C `cd9107ce…` は**再実行していない**(本ブランチは `lift/crates`・`lift/runtime` を変えていないので変わらないという読み)。
 
 **キャッシュ項目の大きさ**(`tables/cache-sizes.tsv`。tar | zstd -3、アクションと同じ): extract 22.7 MB、felift 0.8 MB、b2d 1.5 MB、lift 64.9 MB、wasm objects 計 33.2 MB(fle 18.1、dsp 7.7、Blend2D 0.4、QFC 1.4、FreeType 0.9、ILTools 2.6、runtime 2.1)、link 17.8 MB、seed 22.6 MB、bundle 27.5 MB。**1 組で約 191 MB**。emsdk(`/opt/emsdk`)は 1.9 GB → 507 MB。
 
@@ -223,7 +223,7 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 | S-ci1-8 | ランナーは標準の GitHub-hosted `ubuntu-24.04` に固定(第三者のランナーも larger runner も使わない)。`ci/preflight.sh` の閾値: RAM+swap 10 GB、作業領域の空き 10 GB(初版は 12 GB だったが、実ランナーの初回で、swap ファイルが作業領域の空きを食って失敗した〔§4c〕。実測のピーク約 7 GB に対する余裕) | **誤りの訂正**: 初版は RunsOn と 16 vCPU の大きいランナーを前提にしていた(依頼にも根拠にも無い私の決定)。閾値の根拠は §4b の実測(wasm-opt 最大 5.2 GB + OS、ディスクのピーク約 7 GB)。代替: 環境変数 `CI_NEED_MEM_MB`・`CI_NEED_DISK_MB` |
 | S-ci1-9 | 本番デプロイは `main` への push、または `main` での dispatch の `dry_run=false`。dispatch の既定は `dry_run=true` | 依頼者の決定(push で動かす)。ほかのブランチの push は動かさず、ブランチの dispatch で `dry_run=false` は拒否する。代替: Environment の承認者(private でのプラン条件は未確認) |
 | S-ci1-10 | ツールのバージョンの固定値(emsdk rev、rust 1.99.0、python 3.14、node 24) | この機械で参照のバンドルを作った環境の値 |
-| S-ci1-11 | 本番デプロイの条件を `(github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')` にした(3 か所の step + 要約)。式は `ci/test-real-deploy.py` で全組み合わせを試験する | 実測で得た知識: dispatch 以外のイベントでは `inputs` が空で `inputs.dry_run == false` が真になる(実行 1〜7 で `push` を足すときに気づいた)。イベントと ref を名指しする。代替: `inputs.dry_run != true`(これも空で真になる)ので不可 |
+| S-ci1-11 | 本番デプロイの条件を `(github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')` にした(3 か所の step + 要約)。式は `ci/test-real-deploy.py` で全組み合わせをテストする | 実測で得た知識: dispatch 以外のイベントでは `inputs` が空で `inputs.dry_run == false` が真になる(実行 1〜7 で `push` を足すときに気づいた)。イベントと ref を名指しする。代替: `inputs.dry_run != true`(これも空で真になる)ので不可 |
 | S-ci1-12 | `on: push` は `branches: [main]` と `paths-ignore: [docs/**, **/*.md]` | 依頼者の決定(push で動かす。docs だけの変更では動かさない)。`ci/**`・`app/**`・`lift/**`・`.github/workflows/deploy.yml` などは動かす(`paths-ignore` なので、無視の表に無い物はすべて動かす) |
 | S-ci1-13 | ブランチの検証用の一時的な `push` トリガー(ブランチ名を `branches` に足す commit)は別 commit にして PR の前に外す | PM の指示。bot は dispatch できない(403)。条件がイベントと ref を名指しするので、そのブランチの push は必ずドライラン |
 | S-ci1-11 | `lift` のキャッシュは gen の生成 C(`onat/gen`)を持たず、resplit 後の `wsrc` と DLL・realmod 表・モジュール表を持つ(64.9 MB) | 後段が読む物だけ(クリーンな木の実行で確認)。代替: 全部(約 4 倍) |
@@ -277,7 +277,7 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 **この push 配備が一度も走っていないこと**: `main` への push による本番デプロイ(配信バケットへのアップロード、`wrangler deploy`、Access の到達確認)は、GitHub 上で一度も走っていない。ブランチのドライランでは、これらの step は skipped で、アップロード計画と `wrangler deploy --dry-run` までが通った。この PR のマージが最初の実行になる。
 ## PM の判断と取り込み(2026-11-04)
 
-- **依頼者の指摘への対応は妥当と判断した**: ランナーは標準の GitHub-hosted `ubuntu-24.04` に固定(第三者ランナーの RunsOn と大きいランナーは依頼に無く、担当=エージェントが決めたのは誤り。撤回)。Variables は 0 個、Secrets は 5 個(`<CREDENTIAL-NAME>`、`R2_ARTIFACT_*` 読み取りのみ、`R2_CACHE_ASSETS_*` キャッシュ+配信バケットの読み書き)。Worker 名は `fl-studio-web`(旧 `-private` の名は公開版が予定されているように読めるため)。Issue #3 は日本語。標準ランナー(private: 2 vCPU / 8 GB / 14 GB SSD、6 時間)で足りる根拠は担当の実測と GitHub の文書(`wasm-opt` のピーク RSS 5.19 GB、ディスクのピーク約 7 GB)だが、**GitHub 上での実行は 0 回**(dispatch が 403)なので、初回の冷たいビルド(見積り 70〜100 分)が試験になる。
+- **依頼者の指摘への対応は妥当と判断した**: ランナーは標準の GitHub-hosted `ubuntu-24.04` に固定(第三者ランナーの RunsOn と大きいランナーは依頼に無く、担当=エージェントが決めたのは誤り。撤回)。Variables は 0 個、Secrets は 5 個(`<CREDENTIAL-NAME>`、`R2_ARTIFACT_*` 読み取りのみ、`R2_CACHE_ASSETS_*` キャッシュ+配信バケットの読み書き)。Worker 名は `fl-studio-web`(旧 `-private` の名は公開版が予定されているように読めるため)。Issue #3 は日本語。標準ランナー(private: 2 vCPU / 8 GB / 14 GB SSD、6 時間)で足りる根拠は担当の実測と GitHub の文書(`wasm-opt` のピーク RSS 5.19 GB、ディスクのピーク約 7 GB)だが、**GitHub 上での実行は 0 回**(dispatch が 403)なので、初回の冷たいビルド(見積り 70〜100 分)がテストになる。
 - **ブランチの `app/scripts/build-engine-bundle.sh` の変更(+7 行、`NO_CGROUP=1` で systemd-run を使わない)**: AGENTS.md が systemd-run を禁止しているため。ship3 の担当が同じ変更を足す予定だったので、PR の方を正とし、ship3 では取り込まない(重複させない)。
 - **lift の忠実性の方針との関係**: ランタイム・ページ・Worker のコードへの追加は無い(Worker 名 1 行を除く)。配信の Worker `serveAsset` の点検(余計なロジックの有無)は読んだ範囲のみで、Worker 全体は未点検。
 
@@ -285,14 +285,14 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 
 ## ci1 の追記(PR 作成時。GitHub 上のドライランの結果と、依頼者の決定を受けて)
 
-- 上の『GitHub 上での実行は 0 回』『初回の冷たいビルド(見積り 70〜100 分)が試験』は、その後の実行で置き換わった: 標準ランナーで **冷たい build ジョブ 37.5〜45.7 分で成功**、温かい実行は約 1 分 20 秒(§4c)。ブランチの検証は、トピックブランチだけの一時的な `push` トリガー(必ずドライラン)で行った。そのトリガーは PR に入れていない。
+- 上の『GitHub 上での実行は 0 回』『初回の冷たいビルド(見積り 70〜100 分)がテスト』は、その後の実行で置き換わった: 標準ランナーで **冷たい build ジョブ 37.5〜45.7 分で成功**、温かい実行は約 1 分 20 秒(§4c)。ブランチの検証は、トピックブランチだけの一時的な `push` トリガー(必ずドライラン)で行った。そのトリガーは PR に入れていない。
 - 依頼者の決定で、ワークフローは `main` への push で動き、本番へデプロイする(docs だけの変更と他のブランチの push は動かさない)。dispatch は `main` での `dry_run=false` 以外ドライラン。費用の事実は §10b。
 - 残る未確認は GitHub 上の本番デプロイの step(§9)。
 
 ## PM の判断(2026-11-04、PR #4 のマージ時)
 
 - 依頼者の決定に従い、**main への push が本番デプロイを起こす**(docs/**・*.md だけの変更は除く)。PM が先に決めた『dispatch のみ』は撤回した(依頼された形は push での継続デプロイで、止めておく決定点を PM が作ったのが誤り。docs/policies/owner-contact.md)。
-- **CI に実ブラウザの操作・自作の playwright スクリプトは置かない**(依頼者が拒否)。CI の検査は、ワークフローの式の試験(`ci/test-real-deploy.py`)、静的検査、Worker のテスト、アップロード計画の検査、`wrangler deploy --dry-run`、デプロイ後の Access の到達確認。bundle の中身の動作確認は CI の外(手元)で PM が行う。
+- **CI に実ブラウザの操作・自作の playwright スクリプトは置かない**(依頼者が拒否)。CI の検査は、ワークフローの式のテスト(`ci/test-real-deploy.py`)、静的検査、Worker のテスト、アップロード計画の検査、`wrangler deploy --dry-run`、デプロイ後の Access の到達確認。bundle の中身の動作確認は CI の外(手元)で PM が行う。
 - 初回の本番デプロイは PR のマージで起きる(実行 41755825673)。ブランチ上の本番 step はドライランで skipped だったため、**本番 step が GitHub 上で動くのはこの実行が最初**。
 
 ## PM の判断(2026-11-04、最初の本番デプロイの失敗と修正)

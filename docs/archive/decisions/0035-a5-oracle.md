@@ -19,7 +19,7 @@
 | 要素 | 内容 |
 |---|---|
 | native 側 `native_drv` | `harness/image.c`（既存）が PE をセクション表どおりに ImageBase 0x400000 へ mmap。`ms_call.S`（新規、約 100 行）が全 GPR と XMM0-15 を入力どおりに設定し、オラクル用スタックへ切り替えて `call`、戻りで全 GPR/XMM を保存する。 |
-| lift 側 `lift_drv` | 同じ `image.c`、同じ `oracle_common.c`。`fle_dispatch_table` で VA から `f_XXXXXX` を引き、`R[]`/`X[]` を入力どおり設定して呼ぶ。生成 C は `lift/out-pdata/parts/after-pdata-b-part-*.o`（all-pdata の split ビルド、参照のみ）。runtime オブジェクトは `out-pdata/fle_*.o` を `out-oracle/rt/` に複写（未存在のときだけ）。 |
+| lift 側 `lift_drv` | 同じ `image.c`、同じ `oracle_common.c`。`fle_dispatch_table` で VA から `f_XXXXXX` を引き、`R[]`/`X[]` を入力どおり設定して呼ぶ。生成 C は `lift/out-pdata/parts/after-pdata-b-part-*.o`（all-pdata の split ビルド、参照のみ）。runtime オブジェクトは `out-pdata/fle_*.o` を `out-oracle/rt/` にコピー（未存在のときだけ）。 |
 | 比較スクリプト | `run_diff.py`。case ファイルを 16 分割して両ドライバを並列に走らせ、case ID で結合する。 |
 | 選別 | `select_pure.py`（capstone）。下の条件。 |
 | case ごとのプロセス | case ごとに `fork`。fault、abort、2 秒のタイムアウトは子の signal handler が結果ページ（共有メモリ）に書いて終了する。子が死んでも親は次の case を続ける。 |

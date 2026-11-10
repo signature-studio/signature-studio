@@ -90,7 +90,7 @@ node の効き(−14.0% / −38.6%、交互 3 回)は node の測定として残
 ## 3. 追加の Chrome(実施した物と、取らなかった物)
 
 - (a) **実施**: 順序を入れ替えた 4 本 = hint-3 → plain-3(17:15〜17:25、ci1 の枠)、hint-4 → plain-4(18:02〜18:12、ci1 の非 counted 枠)。同じ page・bundle(mt3 が再生成、sha256 一致)。開始 load 1.7〜8.0、同時の他の Chrome は 0〜1 本。1 本ずつ。thread 別 CPU(`tools/a21-threadcpu.mjs`、5 s ごと)を同時に採取。
-- (b) **取らなかった**: トレース付き 2 本(`tools/scn-ui-trace2.json`)。**悪化が再現しなかった**ので PM の判断(18:15)で優先度を下げ、(program) の分解は gpu1 の 0297 の設計課題に任せる。`tools/a21-trace-sum.py`(trace の thread・イベント別の集計)は**実トレースで未試験**(取れれば使える)。
+- (b) **取らなかった**: トレース付き 2 本(`tools/scn-ui-trace2.json`)。**悪化が再現しなかった**ので PM の判断(18:15)で優先度を下げ、(program) の分解は gpu1 の 0297 の設計課題に任せる。`tools/a21-trace-sum.py`(trace の thread・イベント別の集計)は**実トレースで未テスト**(取れれば使える)。
 - 最初の 17:03 の 1 本は mt3 の bundle が消えていて起動直後に止まった(404、4 秒、ディレクトリ削除)。
 
 ## 4. 後続の見積り(PM 依頼の (4)。**H1 は見送りで閉じたので実施しない。再開する場合の材料**)
@@ -116,7 +116,7 @@ hint の件数を絞る(窓検査の if + 外側の if の 2 関数 × 約 1,300
 4. 同じ値を `FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` の**両方**に渡す(`hzEnv`)。測るまでエンジンは既定の 60 で動く。runtime の許容は 24〜1000。
 5. 結果: 依頼者のモニタが **67 Hz 以上なら FL の刻みが 75/90/120 に増える**(60 Hz の画面は 60 のまま)。0299 のとおり、刻みの量は `dmDisplayFrequency` に追従する。
 
-### A.2 κ(Hz)の曲線(node、E11 の試験用 wasm、`tables/0304-hz-curve.tsv`)
+### A.2 κ(Hz)の曲線(node、E11 のテスト用 wasm、`tables/0304-hz-curve.tsv`)
 
 | Hz(DWM = SET) | 間接呼び出し/仮想 s(アイドル) | κ(間接呼び出し) | UI のアイドル CPU(core、プロファイラ無し、60 仮想 s の差) | **κ(CPU)** | 再生中の CPU(UI + ミキサー + 他、core)|
 |---|---|---|---|---|---|

@@ -40,7 +40,7 @@ D2 は『診断を製品の描画経路から切り離す』(決定 0322 の方�
 | 段 | 内容 | 費用 |
 |---|---|---|
 | S1 上限の見積り(読み。今) | UI Worker の CPU の 80% は FL 自身のゲスト関数で、runtime の GDI・合成・present は 5〜10%(決定 0282)。D2 が消すのは compose 一回ごとの『可視窓ごとの `names_of` + `build_desc` の `snprintf`』で、5〜10% の内の一部。可視の最上位窓は参照プロジェクトで数個〜十数個の見込み(**未確認**: `fle_desk_describe` の行数で数える)。1 窓あたり数 µs とすると、1 compose で数十〜百数十 µs、present 30〜60/s で 0.1〜1% の 1 コア(**推定**) | 0 |
-| S2 同じ機能試験(今のe2e) | `compositor-synth` 群は `APP_REPO_ROOT/lift/runtime/fle_desk.c` を emcc でビルドして `fle_desk_describe` を読む(`desk-synth.mjs` 20〜78 行)。**D2 を載せた木を `APP_REPO_ROOT` にして `run.mjs --only compositor-synth` を実行**すれば、D2 のコンパイルと『describe が壊れていない』が分かる(今の e2e は HEAD の木なので D2 は含まない) | 約 数分(Chrome 1 本) |
+| S2 同じ機能テスト(今のe2e) | `compositor-synth` 群は `APP_REPO_ROOT/lift/runtime/fle_desk.c` を emcc でビルドして `fle_desk_describe` を読む(`desk-synth.mjs` 20〜78 行)。**D2 を載せた木を `APP_REPO_ROOT` にして `run.mjs --only compositor-synth` を実行**すれば、D2 のコンパイルと『describe が壊れていない』が分かる(今の e2e は HEAD の木なので D2 は含まない) | 約 数分(Chrome 1 本) |
 | S3 ネイティブの微小測定(推奨) | `lift/harness/alpha1/glass_seq.c` と同じ作りの harness で、窓を K 個(K = 5・20・64)作り、`fle_desk_compose()` を N = 2×10^5 回呼んで ns/compose を before(D2 なし)/after(D2 あり)で測る。clang -O0 の native は wasm の約 3 倍速いので **wasm の値は 3 倍して読む(推定)** | clang -O0(nice 19、1 つずつ)で 1 分未満。PM の窓 |
 | S4 全体の A/B(推奨しない) | D2 あり/なしの cand1 を 2 本 build して、純再生の Worker の CPU(6 組)を比べる。E12 対 E13 の純再生の Worker CPU は 49.42 対 49.53 s(差 0.2%、0277-e13)で区別できず、同じ bundle でも窓の静けさで書き込み率が約 2% 動いた例(0.963 対 0.985、同)があるので、S1 の見積り(< 1%)の差は A/B では**見えない見込み**(推定) | build 2 本 + Chrome 数時間。費用が見合わない |
 

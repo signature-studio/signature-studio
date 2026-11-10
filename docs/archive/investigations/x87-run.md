@@ -30,7 +30,7 @@
 | `unsupported_total` | **2,991** | **667** |
 | F で始まる未対応 | 2,193 | **2**（F2xm1 1、Fsincos 1） |
 
-差 −2,324 の内訳: x87 −2,191、`Jmp: indirect through IAT slot` 618→557（−61）、`Jmp: indirect target unresolved` 62→1（−61）、Vmovups −12 など VEX（−18）、`Lea/Mov: FS/GS segment` −2、Bswap +2、`Test: high-byte register` +7 など。x87 以外の差は、前回の生成の後に作業ツリーへ入った他の担当の変更（`imports_table.rs`、`vex.rs` など）によるもの（**推測**。個別には確認していない）。閉包の命令が +3,632 増えているのも同じ理由と推測。
+差 −2,324 の内訳: x87 −2,191、`Jmp: indirect through IAT slot` 618→557（−61）、`Jmp: indirect target unresolved` 62→1（−61）、Vmovups −12 など VEX（−18）、`Lea/Mov: FS/GS segment` −2、Bswap +2、`Test: high-byte register` +7 など。x87 以外の差は、前回の生成の後にワークツリーへ入った他の担当の変更（`imports_table.rs`、`vex.rs` など）によるもの（**推測**。個別には確認していない）。閉包の命令が +3,632 増えているのも同じ理由と推測。
 
 ## 5. ビルドと実行
 

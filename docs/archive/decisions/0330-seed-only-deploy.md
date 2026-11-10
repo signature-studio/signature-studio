@@ -41,7 +41,7 @@ seed の行 2 本(BigFruit.png と msgothic.ttc)を `vfs-seed-idle1.tsv` に足�
 - **未確認**: deploy.yml の build job の各 step の `if:` が needs.sh の出力に正しく従って、extract・seed・bundle だけで通るか(workflow は実行していない。コメントの規則は読んだが、step の定義は全部は読んでいない)。差分を入れる push の後の最初の seed-only push で確かめる。extract stage の所要時間(installer の取得 + 展開)は未測定。
 
 ### 1.4 mt3 の seed2 の作り方との対応
-mt3 の `seed2-build.sh` は RT-A の work dir の複写(wasm・glue・DLL pack は hard link)に対して CI の `seed` と `bundle` の段だけを走らせた(= 上の『軽い経路』を手で再現)。**これは workstation の試験版で、本番に出す経路ではない**(`ci/README.md`: 『There is no deploy from a workstation: the workflow is the one path (decision 0243)』)。
+mt3 の `seed2-build.sh` は RT-A の work dir のコピー(wasm・glue・DLL pack は hard link)に対して CI の `seed` と `bundle` の段だけを走らせた(= 上の『軽い経路』を手で再現)。**これは workstation のテスト版で、本番に出す経路ではない**(`ci/README.md`: 『There is no deploy from a workstation: the workflow is the one path (decision 0243)』)。
 
 ## 2. 本番がどの bundle を使うか、新しい bundle が出るまで
 - 既定は **delivery bucket(`fl-web-assets`)の key `manifest.json`**(Worker は `/assets/*` を R2 から返す)。bundle の files は prefix `fl-engine-ci-<k_bundle の末尾 8 桁>/` の下(`plan.sh` の `prefix=`)。manifest の URL がその prefix を指す。
@@ -61,14 +61,14 @@ mt3 の `seed2-build.sh` は RT-A の work dir の複写(wasm・glue・DLL pack 
 | file | 出どころ | repo に置くか |
 |---|---|---|
 | `Artwork\Skins\Default\BigFruit.png`(166,508 B)、`System\Texts\About\AboutTxt.txt`(9,228 B) | installer の中(extractor が `vfs-seed-idle1.tsv` の行〔guest path・host path・SHA-256〕で取り出す。今ある 218 個と同じ。mt3 の実行: 『9 DLL + 229 seed file written, all SHA-256 verified』) | **置かない**(tsv に行を足すだけ。host path は `lift/out-idle1/inputs/install/…`) |
-| `C:\Windows\Fonts\msgothic.ttc`(2,123,288 B、SHA-256 `daa1948fcd6cddc9549249d79ef075f6001c3693bf2a61ad8717679d7fb80b2f`) | Noto Sans CJK JP Regular の subset(7,171 glyph、cu2qu で TrueType 輪郭に変換、1 face の TTC に包む)。**MS Gothic ではない**(opt1 の `fonts-pkg`、FreeType 2.13.2 で開いて確認済み) | **置く**: `lift/harness/seeds/os-fonts/msgothic.ttc`(既存の DejaVu・Liberation と同じ置き場。`extract_fl.py` が `os-fonts/` の行を checkout から複写し SHA-256 を検査する) |
+| `C:\Windows\Fonts\msgothic.ttc`(2,123,288 B、SHA-256 `daa1948fcd6cddc9549249d79ef075f6001c3693bf2a61ad8717679d7fb80b2f`) | Noto Sans CJK JP Regular の subset(7,171 glyph、cu2qu で TrueType 輪郭に変換、1 face の TTC に包む)。**MS Gothic ではない**(opt1 の `fonts-pkg`、FreeType 2.13.2 で開いて確認済み) | **置く**: `lift/harness/seeds/os-fonts/msgothic.ttc`(既存の DejaVu・Liberation と同じ置き場。`extract_fl.py` が `os-fonts/` の行を checkout からコピーし SHA-256 を検査する) |
 ### 4.2 licence(OFL 1.1)
 - Noto Sans CJK JP は SIL OFL 1.1。opt1 の `fonts-pkg/COPYRIGHT.txt` に、元の font(Version 2.004、Adobe)・Reserved Font Name は**宣言なし**・変更点(subset、outline 変換、hinting と layout tables の削除、TTC 化)・商標(Noto は Google)が書いてある。font の name table の nameID 0・7・9・10・13・14(著作権・商標・ライセンス)は**変えていない**(同 doc)。
 - 置き方(既存の `os-fonts/README.md` の形): ① `os-fonts/msgothic.ttc`、② `os-fonts/COPYRIGHT-msgothic-substitute.txt`(opt1 の `COPYRIGHT.txt`)、③ `os-fonts/OFL-noto-sans-cjk-jp.txt`(opt1 の `OFL.txt`、Sans/LICENSE の verbatim)、④ README の表に 1 行(guest path・file・font・SHA-256・選択のラベル。『substitute であり MS Gothic ではない』を明記。DejaVu・Liberation と同じ書き方)。
 - **配布する copy(seed pack で利用者のブラウザに届く font)にも licence を付けるか**は PM/依頼者の判断: OFL は『each copy contains the above copyright notice and this license』を求め、機械可読の metadata(name table)でよいとされる〔読み。法務の判断ではない〕。念のため seed pack に OFL 全文を guest から見えない path(例: seed の中の `licenses/`)で同梱するか、サイトの licence 表示に載せる案がある。
 ### 4.3 `Fruity microfont.ttf` は入れない方がよい
-- Image-Line の font(installer の中)。seed2 の実験で入れた 3b・3c(`Shared\Artwork\Fonts\` と `C:\Windows\Fonts\` に同じ bytes を置く)は **repo の `os-fonts/Fruity_microfont.ttf` の複写**を経由した(mt3 の doc)= **Image-Line の font を repo に入れることになる**(既存の `os-fonts/README.md` は『`Fruity microfont.ttf` はあえて代用しない』と書いている)。
-- **O3・O16 の解決にはこの 3 行は要らない**(O3 = BigFruit.png + AboutTxt.txt、O16 = msgothic.ttc。私の確認では 3 つ全部を入れた bundle で両方直ったが、microfont の寄与は切り分けていない)。効果が測れていない行は本番の変更から外すのが安全。入れるなら、installer の path(3a)だけを使い、別 path への複写は extractor に『同じ install tree の member を別の guest path に置く』行を足してから(repo に font を置かない)。
+- Image-Line の font(installer の中)。seed2 の実験で入れた 3b・3c(`Shared\Artwork\Fonts\` と `C:\Windows\Fonts\` に同じ bytes を置く)は **repo の `os-fonts/Fruity_microfont.ttf` のコピー**を経由した(mt3 の doc)= **Image-Line の font を repo に入れることになる**(既存の `os-fonts/README.md` は『`Fruity microfont.ttf` はあえて代用しない』と書いている)。
+- **O3・O16 の解決にはこの 3 行は要らない**(O3 = BigFruit.png + AboutTxt.txt、O16 = msgothic.ttc。私の確認では 3 つ全部を入れた bundle で両方直ったが、microfont の寄与は切り分けていない)。効果が測れていない行は本番の変更から外すのが安全。入れるなら、installer の path(3a)だけを使い、別 path へのコピーは extractor に『同じ install tree の member を別の guest path に置く』行を足してから(repo に font を置かない)。
 - もう一つ: mt3 の seed2 の最初の版は `Default news.rss`・`Layout Piano.scr` の guest path を重複して足し、loader が拒否した(engine が exit 2)。**mt3 の `0315-pack-seed-duplicate-guest-path.diff`(pack_seed.py に重複検査、8 行)を seed の変更と一緒に入れる**のがよい。§1.3 の差分は `pack_seed.py` を lift/wasm の key から外してあるので、その差分を入れても冷間 build にならない(差分を入れない場合は `pack_seed.py` の変更も H_WASM に入っていて冷間 build になる)。
 ### 4.4 P1(first idle)への影響の見積り
 - **訂正(0330b §6)**: 下の +1.59 MB は mt3 の品質 1 の値。**本番の既定は品質 11**で、S の seed は +1,300,446 B(品質 11、実際に pack を作って測定)。

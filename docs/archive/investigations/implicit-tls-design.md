@@ -19,7 +19,7 @@
 
 ## 1. 作業環境（実測）
 
-- 作業ツリー: `/home/ubuntu/work/signature-studio-develop`、ブランチ `main`、HEAD `2e94df2`（`git rev-parse --short HEAD`）。調査の開始時の `git status --short` は未追跡 3 件だけ（`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。**他の作業のもの。触っていない**）。
+- ワークツリー: `/home/ubuntu/work/signature-studio-develop`、ブランチ `main`、HEAD `2e94df2`（`git rev-parse --short HEAD`）。調査の開始時の `git status --short` は未追跡 3 件だけ（`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。**他の作業のもの。触っていない**）。
 - 対象 DLL: `lift/out-blend2d/Blend2D.dll`、2,065,920 B、SHA-256 `66634d24412084b7541b4b27a11be8b0f4cb90d844c87e1ee5e5c3ecd66066c7`（`sha256sum`。依頼の値と一致）。読み取りのみ。
 - ツール: python 3.14、pefile 2024.8.26、capstone 5.0.7、objdump（未使用）。`PYTHONDONTWRITEBYTECODE=1`、`TMPDIR=lift/out-tls/tmp`、cwd は `lift/out-tls/`（`lift/out-cs/` は使っていない）。
 - 作ったもの（`lift/out-tls/` のみ。すべて新規）:

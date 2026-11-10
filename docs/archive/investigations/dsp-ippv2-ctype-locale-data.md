@@ -2,7 +2,7 @@
 
 調査日: 2026-10-24（JST）。作業の基準は `git archive` で展開した **9b65b6696af583bbd5edfa50bda693bdc32e0dba**（作業開始時の HEAD。決定 0084 まで）。記録時の HEAD は `c75acc48727a83d94a482d21ca9304be8f509eab`（別の作業が 3 コミット進めた）。`git diff 9b65b66 HEAD` は `lift/runtime/fle_locale.c`、`fle_locale.h`、`fle_imports.c`、`fle_realmod.c`、`tests/locale.rs`、`tests/k32_dsp.rs`、`lift/crates/fe-lift/src`、`lift/harness/two`、`a4-survey.sh` について空（この調査が使ったファイルは HEAD でも同じ）。差が出たのは `fle_reg.c`、`reg.rs` など決定 0085 の実装で、この調査と無関係。**この文書は何も決めない**。ソース、決定、既存の docs は編集していない。
 
-作業物は `lift/out-ctype/`（gitignore 対象。`src/` が `git archive` の展開）。runtime、fe-lift、fe-decode、fe-pe は `lift/out-ctype/src/` のものだけを使い、作業ツリーの `lift/runtime`、`lift/crates` は読んでいない。
+作業物は `lift/out-ctype/`（gitignore 対象。`src/` が `git archive` の展開）。runtime、fe-lift、fe-decode、fe-pe は `lift/out-ctype/src/` のものだけを使い、ワークツリーの `lift/runtime`、`lift/crates` は読んでいない。
 
 ## 0. 凡例
 
@@ -275,7 +275,7 @@ IAT スロットへの `call`/`jmp [rip+disp]` の参照を、capstone で復号
 - gdb の仮の値は ATTACH の通過だけを測った。**DllMain が戻った後に IPP の関数を実行して表の値が効くかは測っていない**。
 - UCD の版: 取得した 16.0.0 を主に使った。5.2.0、6.0.0、6.1.0、8.0.0 は U+00AA、U+00BA の General_Category の確認だけ。
 - Blend2D の `GetStringTypeW` の 2 つ目の呼び出し元（0x1abbb4）の呼び出し元は 1 つ（0x1a5df1）のみ確認し、その先は追っていない。
-- 決定 0085、api-set の調査の作業ツリーの変更には触れていない。`dsp-ippv2-apiset-gpa.md` は読んだ（HEAD c75acc4 の追跡下のファイル。この調査の範囲の外の判断は引いていない）。
+- 決定 0085、api-set の調査のワークツリーの変更には触れていない。`dsp-ippv2-apiset-gpa.md` は読んだ（HEAD c75acc4 の追跡下のファイル。この調査の範囲の外の判断は引いていない）。
 
 ## 8. 決定が要る点（決めない。選択肢と事実）
 

@@ -15,13 +15,13 @@
 ## 2. テスト
 
 - `cargo test --offline --workspace --no-fail-fast`（`out-pdata/test-ws.txt`、`test-ws.exit` は EXIT=0）: **49 バイナリ、374 件 passed、0 failed、0 ignored**（`test result` 行の集計）。前回（a2-resources-run.md）の 339 件との差 +35 のうち、私の分は 21 件（fe-pe 18、fe-decode 3）。残りは同時に作業していた他の担当のテスト（私は確認していない）。
-- 作業ツリー更新後の再実行（`test-ws3.txt`、`test-ws3.exit` は EXIT=0）: **54 バイナリ、489 件 passed、0 failed、0 ignored**。件数が 374 → 489 に増えたのは、同時に作業していた他の担当のテストが加わったため（私の分は 21 件のまま）。途中の `test-ws2.txt` は、他の担当の `cargo test` 3 本が同時に走っていて 900 秒のタイムアウトで打ち切られた（29 バイナリまで。失敗なし。集計には使っていない）。
+- ワークツリー更新後の再実行（`test-ws3.txt`、`test-ws3.exit` は EXIT=0）: **54 バイナリ、489 件 passed、0 failed、0 ignored**。件数が 374 → 489 に増えたのは、同時に作業していた他の担当のテストが加わったため（私の分は 21 件のまま）。途中の `test-ws2.txt` は、他の担当の `cargo test` 3 本が同時に走っていて 900 秒のタイムアウトで打ち切られた（29 バイナリまで。失敗なし。集計には使っていない）。
 - 実 DLL の数字（57,816 件、2,523,194 命令など）は `FLENGINE_PE` なしの既定パスで検証された（DLL あり、SKIPPED なし）。
 - 1 回目の `pdata.rs` で 1 件失敗（`multi_level_chain_resolves_to_the_primary`、`Malformed("unwind info address has the low bit set")`）: テストの合成データの誤り。UNWIND_INFO（0x2070、code 1 個 = 4 + 2×2 + 12 = 20 バイト）の親エントリ領域が、次に置いた UNWIND_INFO 0x2080 の先頭と重なっていて、0x2080 のバイトが親エントリで上書きされ、読んだ unwind アドレスの下位ビットが立った（推測: 失敗メッセージと配置からの解釈。バイト列は未ダンプ）。実装の誤りではない。テストの配置を 0x2090、0x20c0 に移して通過（`pdata.rs` 18 件）。
 
 ## 3. seed と閉包（実測）
 
-| 項目 | 896 seed（現在の作業ツリー） | all-pdata |
+| 項目 | 896 seed（現在のワークツリー） | all-pdata |
 |---|---|---|
 | 関数 | 8,427 | **58,695** |
 | 基本ブロック | 73,234 | 345,466 |
@@ -75,7 +75,7 @@
 - **0x410320（f_410320）は通過した。0x40f960（f_40f960）も呼ばれた。** 根拠: gdb（`gdb-pass.cmds`、`gdb-pass.txt`）で `f_410320` と `f_40f960` にブレークポイントを置いて continue した結果、どちらも **2 回**ヒット。`fle_dispatch_miss` は発生していない（abort の種類は `fle_unsupported`）。
 - 停止: SIGABRT、`fle: unsupported instruction at 0x41cf90`、`abort kind: fle_unsupported`。実行 0.01 秒、最大 RSS 30 MB。
 
-| 項目 | 896 seed（今回の作業ツリーで再実行） | all-pdata |
+| 項目 | 896 seed（今回のワークツリーで再実行） | all-pdata |
 |---|---|---|
 | 停止点 | 0x410320（f_410320 の間接 call、先 0x40f960）`fle_dispatch_miss`（a2-resources-run.md と同じ） | **0x41cf90**（f_41cf90）`fle_unsupported` |
 | 関数実行数（distinct） | 125 | **137** |
@@ -86,9 +86,9 @@
 
 - スタック（実行ログ、gdb の `bt` と一致）: `#0 0x41cf90`、`#1 0x41d9a0`、`#2 0x41cfc0`、`#3 0x4236f0`、`#4 0x454090`、`#5 0x4120c0`、`#6 0x412160`、`#7 0x41d8f0`、`#8 0x1376820`（エントリ）。gdb の `bt` では `#4 f_454090` が `fle_dispatch`（f_4120c0 内、表のループ 0x412126 の間接 call）から呼ばれている。
 
-### 5.3 3 回目（作業ツリーの更新後。他の担当の LoadLibrary 系などが入った fe-lift と runtime で再生成）
+### 5.3 3 回目（ワークツリーの更新後。他の担当の LoadLibrary 系などが入った fe-lift と runtime で再生成）
 
-5.2 の後、作業ツリーに他の担当の変更（`imports_table.rs` に LoadLibraryA/W/ExW、FreeLibrary ほか、`runtime/fle_load.c`、`fle_imagehlp.c`、`fle_user_nowin.c`、`fle_winmm.c` など）が入った。それを含めて all-pdata を再生成（`out/after-pdata-b.c`、`gen-pdata-b.txt`）、再分割、再ビルド（`EXTRA_RT` に `fle_load fle_imagehlp fle_user_nowin fle_winmm` を追加。生成 C が参照する `fle_imp_*` 144 個がすべて runtime のどれかに定義されていることを確認してからビルド）、再実行した。
+5.2 の後、ワークツリーに他の担当の変更（`imports_table.rs` に LoadLibraryA/W/ExW、FreeLibrary ほか、`runtime/fle_load.c`、`fle_imagehlp.c`、`fle_user_nowin.c`、`fle_winmm.c` など）が入った。それを含めて all-pdata を再生成（`out/after-pdata-b.c`、`gen-pdata-b.txt`）、再分割、再ビルド（`EXTRA_RT` に `fle_load fle_imagehlp fle_user_nowin fle_winmm` を追加。生成 C が参照する `fle_imp_*` 144 個がすべて runtime のどれかに定義されていることを確認してからビルド）、再実行した。
 
 - 生成: 関数 58,695、命令 2,523,194（不変）、`c_lines` 2,876,616、`c_bytes` 215,649,724、**`unsupported_total` 2,991**（54 種類）、2.51 秒、最大 RSS 320 MB。同じツリーでの 896 seed は `unsupported_total` **309**（9 種類、`gen-896-b.txt`、`c_lines` 548,541）。→ 差は +2,682。
 - ビルド: 35.9 秒、最大 RSS 1,202 MB、EXIT=0（`build-pdata-b.txt`）。`bin/flengine-after-pdata-b`。
@@ -104,7 +104,7 @@
 - VA **0x41cf90**。命令は `ff 25 82 44 55 01`（`jmp QWORD PTR [rip+0x1554482]`、スロット VA 0x1971418、RVA 0x1571418）、生成 C は `L_41cf90: { /* 0x41cf90 Jmp */ fle_unsupported(...) }`（`Jmp: indirect through IAT slot (not lifted)`）。
 - そのスロットのインポートは **kernel32.dll!LoadLibraryA**（fe-pe のインポートの再計算で確認。独立の Python で RVA 0x1571418 を引いた）。つまり、IAT 経由のサンク（LoadLibraryA）が表に無い。
 - 呼び出し元の関数 f_41d9a0 → f_41cfc0 → f_4236f0 → f_454090。f_454090 は表 0x13768b0 のループ（0x412126）の要素として dispatch 経由で呼ばれた。
-- 関連: 作業ツリーには `lift/runtime/fle_load.c`、`fle_load.h`（未追跡、他の担当の作業）がある。LoadLibrary 系の実装と見られるが、`imports_table.rs` の表への追記が私のこの生成の時点であったかは確認していない（私は読み取りのみで、この生成は現在の作業ツリーの fe-lift で行った）。範囲外なので実装していない。
+- 関連: ワークツリーには `lift/runtime/fle_load.c`、`fle_load.h`（未追跡、他の担当の作業）がある。LoadLibrary 系の実装と見られるが、`imports_table.rs` の表への追記が私のこの生成の時点であったかは確認していない（私は読み取りのみで、この生成は現在のワークツリーの fe-lift で行った）。範囲外なので実装していない。
 - 次に出る未対応の規模（推測を含む）: `Jmp: indirect through IAT slot` 654 件、x87 の F* 命令 2,193 件、が all-pdata の閉包に入っている。LoadLibraryA の次にも、IAT 経由のサンクで止まる可能性が高い（推測。実際の到達順は未確認）。
 
 ## 7. 制約の遵守と残置物
@@ -112,5 +112,5 @@
 - `rm`、`>` による既存ファイルの上書き、git 操作、`/tmp`、sleep/timeout は使っていない。TMPDIR は `lift/out-pdata/tmp`。権限拒否はなし。外部通信は Microsoft Learn（x64 exception handling）の取得 1 回。
 - 既存ファイルの変更は編集ツールの局所変更のみ。`lib.rs`（fe-lift）、`imports_table.rs`、runtime は触っていない。
 - 後始末できていないもの（削除禁止のため）: `lift/out-pdata/build-parts.sh.bak`（`sed -i.bak` が作ったバックアップ。内容は旧 `trace.c` パスの版）、`out/cli-pdata.c`（`out/after-pdata.c` と同一の 216 MB の重複）、`build-pdata.txt` と `build-pdata.err`（1 回目のビルドのログ）、`single-tu.*`（1 つの翻訳単位の失敗ログ）。`lift/out-pdata/` 全体で約 1.8 GB（`out` 676 MB、`parts` 502 MB、`bin` 286 MB、`target-tool` 25 MB など）。
-- 触ったファイル（作業ツリー、`lift/out-pdata/` 配下の生成物は除く）: `lift/crates/fe-pe/src/lib.rs`（M、追記のみ）、`lift/crates/fe-pe/src/main.rs`（M）、`lift/crates/fe-pe/tests/pdata.rs`（新規）、`lift/crates/fe-decode/src/lib.rs`（M、追記）、`lift/crates/fe-decode/src/main.rs`（M）、`lift/crates/fe-decode/tests/pdata_seeds.rs`（新規）、`lift/crates/fe-lift/src/main.rs`（M）、`docs/decisions/0031-pdata-seeds.md`、`docs/investigations/pdata-seeds.md`、`docs/investigations/pdata-seeds-run.md`（新規）。`lift/out-pdata/` 全体は新規（`pdata_probe.py`、`split_c.py`、`build.sh`、`build-parts.sh`、`trace.c`、`tool/`、`seeds-*.txt`、`out/`、`parts/`、`bin/`、各ログ）。
+- 触ったファイル（ワークツリー、`lift/out-pdata/` 配下の生成物は除く）: `lift/crates/fe-pe/src/lib.rs`（M、追記のみ）、`lift/crates/fe-pe/src/main.rs`（M）、`lift/crates/fe-pe/tests/pdata.rs`（新規）、`lift/crates/fe-decode/src/lib.rs`（M、追記）、`lift/crates/fe-decode/src/main.rs`（M）、`lift/crates/fe-decode/tests/pdata_seeds.rs`（新規）、`lift/crates/fe-lift/src/main.rs`（M）、`docs/decisions/0031-pdata-seeds.md`、`docs/investigations/pdata-seeds.md`、`docs/investigations/pdata-seeds-run.md`（新規）。`lift/out-pdata/` 全体は新規（`pdata_probe.py`、`split_c.py`、`build.sh`、`build-parts.sh`、`trace.c`、`tool/`、`seeds-*.txt`、`out/`、`parts/`、`bin/`、各ログ）。
 - 5.3 で追加した生成物: `out/after-pdata-b.c`、`out/after-pdata-b-part-*.c`、`out/after-896-b.c`、`bin/flengine-after-pdata-b`、`gen-*-b.txt`、`run-pdata-b.*`、`gdb-*.cmds` と `gdb-*.txt`、`imps-b.txt`、`imp-defs.txt`。`lift/out-pdata/` 全体は約 2.3 GB に増えた（`du` で未再計測）。

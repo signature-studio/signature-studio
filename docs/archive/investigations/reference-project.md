@@ -43,7 +43,7 @@
 
 ## 1. 手順・出典・環境
 
-- 作業木は読み取り専用(自分の出力は `lift/out-git/proj1-results/`〔新規〕、展開物は `lift/out-proj1/x/`〔新規。62,747,002 B、`git` に入れない〕、一時物は `/tmp/opencode/proj1/`)。元の zip は変更・移動していない。`unzip -q` で `lift/out-proj1/x/` に展開(49 ファイル。サブディレクトリ無し)。
+- ワークツリーは読み取り専用(自分の出力は `lift/out-git/proj1-results/`〔新規〕、展開物は `lift/out-proj1/x/`〔新規。62,747,002 B、`git` に入れない〕、一時物は `/tmp/opencode/proj1/`)。元の zip は変更・移動していない。`unzip -q` で `lift/out-proj1/x/` に展開(49 ファイル。サブディレクトリ無し)。
 - 自作のパーサー: `tools/flp_model.py`(標準ライブラリのみ。`PYTHONDONTWRITEBYTECODE=1`)。表の生成 `tools/flp_report.py`、音声 `tools/audio_probe.py`、不変条件の検査 `tools/selfcheck.py`(17 項目すべて OK。`tables/selfcheck.txt`)、予算の入力 `tools/budget.py`。
 - エンジン側の静的な読み: `docs/investigations/goal-ladder/fle_index.py` で索引(`/tmp/opencode/proj1/fle.pkl`、3.97 MB)を作り、`g8-project-load/fle_query.py`/`fle_disasm.py` で問い合わせた(いずれも読み取りのみ)。`binaries/win64/FLEngine_x64.dll`(SHA-256 `b2c64da4…`、22,227,016 B)。
 - 公開資料(取得 2026-11-03):

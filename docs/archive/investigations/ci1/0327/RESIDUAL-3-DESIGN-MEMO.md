@@ -4,7 +4,7 @@
 
 | 実行した | 内容 |
 |---|---|
-| ランタイムの読み | `lift/out-ci1/w0323/new5/lift/runtime/fle_input.c`(= HEAD + 0323 + 0323b + 0325 の作業木)の `translate_mouse`・`fle_input_synth`・`out_push`・`fle_input_defproc`。決定 0136、0323 の REPORT §4・§6 |
+| ランタイムの読み | `lift/out-ci1/w0323/new5/lift/runtime/fle_input.c`(= HEAD + 0323 + 0323b + 0325 のワークツリー)の `translate_mouse`・`fle_input_synth`・`out_push`・`fle_input_defproc`。決定 0136、0323 の REPORT §4・§6 |
 | Wine 10.0 の原本の読み | `dlls/win32u/message.c` の `process_mouse_message`(2443〜2655 行)と `process_hardware_message` を curl で取得して読んだ(UNOFFICIAL。作業用の複製は `lift/out-ci1/kit/out/wine-src/`) |
 
 **実エンジンの実行 0。Chrome・Wine・clang・emcc・cargo も 0。コードの変更 0**(メモだけ)。この文書の『Wine の順序』は原本を読んだ事実、『FL への影響』は読みまたは未確認。
@@ -53,7 +53,7 @@
 
 **推奨: M1**(Wine の順序との差 D1〜D4 を消す。変更は `fle_input.c` 中心で約 150 行の見込み〔読み〕)。M2 は D3 の『毎回ヒットテスト』が FL に効くと分かったときだけ。
 
-## 5. 試験(受け入れ)
+## 5. テスト(受け入れ)
 
 - `lift/harness/c0323/`(シナリオ H: H1〜H6)の Wine との差 13 行が 0 になる(Wine 10.0 の出力が oracle。`WM_SETCURSOR` の位置・フックが 1 を返したときの `WM_SETCURSOR` なし・peek の副作用なし)。
 - 追加するシナリオ: (i) 範囲の外の `PeekMessage` で副作用が出ない(D2)、(ii) `PM_NOREMOVE` を 2 回呼んでから `PM_REMOVE` で `WM_SETCURSOR` が 1 回だけ(D3)、(iii) button up の `WM_SETCURSOR`(D4)、(iv) ダブルクリックの状態が peek で変わらない。

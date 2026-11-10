@@ -4,7 +4,7 @@
 
 この文書の状態: 実装・テスト・統計・3 モジュールの測定まで記入済み（下の「作業の状態」）。
 
-- HEAD: `a64a41c`（ブランチ main）。作業ツリーに決定 0092 の未コミット変更（この作業のもの）。
+- HEAD: `a64a41c`（ブランチ main）。ワークツリーに決定 0092 の未コミット変更（この作業のもの）。
 - 決定: `docs/decisions/0092-srw-locks-and-condition-variables.md`（**仮の決定**）。調査（前提）: `docs/investigations/blend2d-remaining-imports.md`（コミット a64a41c）。
 - 作業物: `lift/out-srw/`（`.gitignore` の `lift/out*/` で追跡されない）。`TMPDIR=lift/out-srw/tmp`、`CARGO_TARGET_DIR=lift/out-srw/target`。
 - 3 モジュールの基底（`0x2000000`、`0x4700000`）と Blend2D の種 58 個は**測定用の値で、決定ではない**（決定 0086）。

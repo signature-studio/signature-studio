@@ -281,7 +281,7 @@ a4: all_units_done=no functions_distinct=3411 function_entries=134085
 
 ## 実装した場所
 
-差分は **`g1-gdi-bulk.diff`**（HEAD `3a1050a` の `lift/` の `git archive` に `patch -p1` で当たる。6 ファイル、3,149 行。HEAD の木で `patch -p1` を試し、適用後の木が作業木と `diff -r` で一致することを確認した）と、**`g1-gdi-bulk-extra-tests.diff`**（`tests/gdc.rs`、`tests/cursor.rs`、`tests/loadimage.rs` の「行が無い」リストの更新だけ。依頼が変更を許したパスの外なので別にした。3 ファイル、48 行）。
+差分は **`g1-gdi-bulk.diff`**（HEAD `3a1050a` の `lift/` の `git archive` に `patch -p1` で当たる。6 ファイル、3,149 行。HEAD の木で `patch -p1` を試し、適用後の木がワークツリーと `diff -r` で一致することを確認した）と、**`g1-gdi-bulk-extra-tests.diff`**（`tests/gdc.rs`、`tests/cursor.rs`、`tests/loadimage.rs` の「行が無い」リストの更新だけ。依頼が変更を許したパスの外なので別にした。3 ファイル、48 行）。
 
 - `lift/runtime/fle_gdi.c`（`gdi_dc` と `gdi_dcsave`、`FLE_GDI_KIND_PEN` の選択・削除、`CreateCompatibleDC` の初期値 4 行、画素の補助関数（`dib_fill`、`dib_row`、`dev_rect`、`rect_clip`、`pixel_stop`、`pixel_dc`、`pixel_dib`、`pixel_brush_color`）、`BitBlt`／`PatBlt`／`FillRect` の本体の置き換え、新しい `fle_imp_*` 27 と名前付き停止 69（マクロ `GDI_STOP`）、検査関数 6）。`fle_gdi.h`（定数、宣言、検査関数）。**新しい .c／.h は作っていない。**
 - `lift/crates/fe-lift/src/imports_table.rs`（末尾に 96 行とコメント 2 行）。
@@ -378,7 +378,7 @@ a4: all_units_done=no functions_distinct=3411 function_entries=134085
 
 ## 検証（実施したこと。実施していないこと）
 
-- **実施した（第 1 段階）**: (1) `clang -fsyntax-only -Wall -Wextra -Werror` を `fle_gdi.c`（-O0 と -O2）、`fle_gdc.c`、`fle_cursor.c` で。警告 0。(2) テストの C プログラム 206 本（optional の分を含めて 213 本）の `clang -fsyntax-only -Wall`。(3) `rustfmt --check --edition 2021` による構文の確認（`gdi_bulk.rs`、`gdi.rs`、`gdc.rs`、`cursor.rs`、`loadimage.rs`、`vcall_thunk_dll.rs`、`imports_table.rs`。構文エラー 0。整形の差は既存の行にもあり、見ていない）。(4) 既存の `tests/gdi.rs` 節 7 の禁止語・`long` の検査の Python での再現（0 件）。(5) HEAD の木への `patch -p1`（主差分と extra）と、作業木との `diff -r` の一致。任意の差分 2 つが作業木に当たることと、当てた `fle_gdi.c`／`fle_gdc.c` の構文。(6) Learn の取得と読み（約 100 ページ。新規 70 ページ前後）、ILTools の逆アセンブル、静的な閉包の計算（L1、L2）、FLEngine／ILTools／QFC の import と thunk の走査。
+- **実施した（第 1 段階）**: (1) `clang -fsyntax-only -Wall -Wextra -Werror` を `fle_gdi.c`（-O0 と -O2）、`fle_gdc.c`、`fle_cursor.c` で。警告 0。(2) テストの C プログラム 206 本（optional の分を含めて 213 本）の `clang -fsyntax-only -Wall`。(3) `rustfmt --check --edition 2021` による構文の確認（`gdi_bulk.rs`、`gdi.rs`、`gdc.rs`、`cursor.rs`、`loadimage.rs`、`vcall_thunk_dll.rs`、`imports_table.rs`。構文エラー 0。整形の差は既存の行にもあり、見ていない）。(4) 既存の `tests/gdi.rs` 節 7 の禁止語・`long` の検査の Python での再現（0 件）。(5) HEAD の木への `patch -p1`（主差分と extra）と、ワークツリーとの `diff -r` の一致。任意の差分 2 つがワークツリーに当たることと、当てた `fle_gdi.c`／`fle_gdc.c` の構文。(6) Learn の取得と読み（約 100 ページ。新規 70 ページ前後）、ILTools の逆アセンブル、静的な閉包の計算（L1、L2）、FLEngine／ILTools／QFC の import と thunk の走査。
 - **第 2 段階で実施**: `cargo build`、リンク、全体テスト（1,526 passed）、変異検査 20 件、FLEngine の生成 C の作り直しと SHA、他モジュールの関数単位の比較、6 モジュール構成の a4 と gdb。**まだ実施していない**: 変異検査の残り 20 件、census、実機 Windows との照合（0 件）、wasm のビルド。
 - **既知の弱点**: ① `fork` を使うテストは、子が `abort` するときの標準エラーを読む。コアダンプの設定で時間がかかる可能性（`ulimit -c 0` を使うかは第 2 段階の判断）。② `tests/gdi_bulk.rs` の期待値は手で追った（第 2 段階の初回で外れた 13 件は、実装でも決定でもなく、テスト コードの欠陥 3 つだった）。③ 閉包の計算は vtable を辿らない下限。
 

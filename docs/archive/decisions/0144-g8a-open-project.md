@@ -1,6 +1,6 @@
 # 0144: G8 — FLEngine に『プロジェクトを開かせ』、再生して、非ゼロの音声ブロックを出す(native)。入口 A(起動時のコマンドライン)と B(WM_COPYDATA)。G8a-0 / G8a / G8b / G8c の観測と、直した壁 4 件。仮の決定
 
-状態: **仮の決定**。依頼・番号 0144 は PM(「決定 0144、仮」)。調査・設計・実装・ビルド・測定・テスト・文書は作業者(`g8a1`、2026-11-02 11:38〜 JST、`date` で測った経過)。作業は HEAD **cf3965e** の `git archive`(`lift/`・`docs/`・`tools/`・`app/`)で始め、PM の通知(306aaf6 = 決定 0140、5e48202 = 決定 0142、a1711c2 / d8aacf4 = 決定 0143)に従って **HEAD d8aacf4 の `git archive` に付け替えた**。clean な写しと作業木の `diff -ruN`(`out-*` と cargo の target は除く)が `g8a1.diff`(`patch -p1` の形、22 ファイル)。**測定の木**は d8aacf4 + 差分 v3(19 ファイル。native の各ステージ・a4・on-seh・変異検査。最終の差分 v5 との違いはテスト 3 ファイル `monitor.rs` `wall_s.rs` `vcall_thunk_dll.rs` だけで、runtime・crates・harness は同じ)で、**最終工程で HEAD が aee8877(決定 0145 = `lift/harness` の表示まわりと `app/` だけ。`lift/runtime/`・`lift/crates/` は d8aacf4 と同一)、さらに 7b82424(文書 1 ファイルだけ)に進んだので、全体テストは aee8877 + 差分(1 回目)、7b82424 + 差分(最終の通し)で走らせた**(`patch --dry-run` は最終の HEAD **27561e7**(決定 0146。7b82424 との差は文書のみ)に fuzz・offset・reject なしで当たる)。**実機 Windows との照合は 0 件。wasm・ブラウザは測っていない**(範囲外。`emcc -c` で変更した 4 つの runtime ファイルがコンパイルできることだけ確かめた)。
+状態: **仮の決定**。依頼・番号 0144 は PM(「決定 0144、仮」)。調査・設計・実装・ビルド・測定・テスト・文書は作業者(`g8a1`、2026-11-02 11:38〜 JST、`date` で測った経過)。作業は HEAD **cf3965e** の `git archive`(`lift/`・`docs/`・`tools/`・`app/`)で始め、PM の通知(306aaf6 = 決定 0140、5e48202 = 決定 0142、a1711c2 / d8aacf4 = 決定 0143)に従って **HEAD d8aacf4 の `git archive` に付け替えた**。clean な写しとワークツリーの `diff -ruN`(`out-*` と cargo の target は除く)が `g8a1.diff`(`patch -p1` の形、22 ファイル)。**測定の木**は d8aacf4 + 差分 v3(19 ファイル。native の各ステージ・a4・on-seh・変異検査。最終の差分 v5 との違いはテスト 3 ファイル `monitor.rs` `wall_s.rs` `vcall_thunk_dll.rs` だけで、runtime・crates・harness は同じ)で、**最終工程で HEAD が aee8877(決定 0145 = `lift/harness` の表示まわりと `app/` だけ。`lift/runtime/`・`lift/crates/` は d8aacf4 と同一)、さらに 7b82424(文書 1 ファイルだけ)に進んだので、全体テストは aee8877 + 差分(1 回目)、7b82424 + 差分(最終の通し)で走らせた**(`patch --dry-run` は最終の HEAD **27561e7**(決定 0146。7b82424 との差は文書のみ)に fuzz・offset・reject なしで当たる)。**実機 Windows との照合は 0 件。wasm・ブラウザは測っていない**(範囲外。`emcc -c` で変更した 4 つの runtime ファイルがコンパイルできることだけ確かめた)。
 
 区分の凡例は決定 0121〜0143 と同じ。**実測**＝このセッションのコマンドの出力を見た事実。**読み**＝逆アセンブルやログの解釈(確かめていない部分を含む)。**公式文書**＝今回取得した Microsoft Learn の頁(§9)。**出典なしの選択**＝頁にも実測にも値が無く作業者が選んだもの(`S-g8a-…`、§8 に撤回条件つきで一覧)。**未確認**＝確かめていない。
 
@@ -239,7 +239,7 @@ FRUITY 有効の最終構成(`a4-fruity.sh on-seh`、独立 2 回 + HEAD d8aacf4
 | M18 | 要求番号が戻る | 検出(1) |
 | M19 | 空の `FLE_CMDLINE` を有効とみなす | 検出(1) |
 | M20 | 処理済みのスロットを再利用しない | 検出(1) |
-| M21 | メッセージを窓の所有スレッドでなくスレッド 0 に送る | **最初の版では生存**(試験の主窓がスレッド 0 の所有だったため等価)。シナリオ `open_other_thread`(主窓を別のゲストスレッドが持つ)とテストを足して**検出(1)** |
+| M21 | メッセージを窓の所有スレッドでなくスレッド 0 に送る | **最初の版では生存**(テストの主窓がスレッド 0 の所有だったため等価)。シナリオ `open_other_thread`(主窓を別のゲストスレッドが持つ)とテストを足して**検出(1)** |
 | M22 | 未知の要求番号を『待ち』と返す | 検出(1) |
 | M23 | `GetCommandLineA` が `FLE_CMDLINE` を無視 | 検出(2) |
 | M24 | `UnionRect` の両空が (1,1,1,1) | 検出: `a9_a10` の `rect_functions_match_the_model_on_a_grid_of_small_values`(runtime のコピーを持つ木のコピー + `cargo test` で) |

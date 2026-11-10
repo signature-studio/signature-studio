@@ -1,6 +1,6 @@
 # adjustor thunk の seed 追加と harness の再実行の記録（決定 0051）
 
-実行日: 2026-10-21。作業ディレクトリ `signature-studio-develop`、HEAD 7ea4b34、作業ツリーに本作業の変更（`git status` は本作業のファイルと既存の未追跡 `lift/iat-unsup-closure.txt` だけ）。DLL は `binaries/win64/FLEngine_x64.dll`（22,227,016 B、md5 3d7f97c3a1f9cabfa2ebb4b049146141）。調査は `adjustor-thunks.md`、決定は `docs/decisions/0051-adjustor-thunks.md`。「実測」はコマンドの出力、「読み」は静的な読み、「推測」は未検証。成果物は `lift/out-adj/`（`TMPDIR=lift/out-adj/tmp`、`EM_CACHE=lift/out-adj/emcache`、`CARGO_TARGET_DIR=lift/out-adj/target`）。
+実行日: 2026-10-21。作業ディレクトリ `signature-studio-develop`、HEAD 7ea4b34、ワークツリーに本作業の変更（`git status` は本作業のファイルと既存の未追跡 `lift/iat-unsup-closure.txt` だけ）。DLL は `binaries/win64/FLEngine_x64.dll`（22,227,016 B、md5 3d7f97c3a1f9cabfa2ebb4b049146141）。調査は `adjustor-thunks.md`、決定は `docs/decisions/0051-adjustor-thunks.md`。「実測」はコマンドの出力、「読み」は静的な読み、「推測」は未検証。成果物は `lift/out-adj/`（`TMPDIR=lift/out-adj/tmp`、`EM_CACHE=lift/out-adj/emcache`、`CARGO_TARGET_DIR=lift/out-adj/target`）。
 
 ## 1. 結果
 

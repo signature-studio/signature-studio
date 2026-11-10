@@ -170,7 +170,7 @@ Counter definition: `window.__app.audio.detail()` of the page: `underrunQuanta` 
 6. `bash` ツールを今回も 1 回呼んだ（無いツール。`shell` で再実行）。`sleep` / `&` / `pkill -f` は使っていない。
 
 ## 8 検証キット（`ci1-results/0277/kit/`、README に順番と判定基準）
-`verify-bundle.sh` のモード: fetch / proj / page / preflight / scenes / alpha7 / idle / export / play / ab / report / clean。`NEW`・`REF`（ページの git ref）・`WORKER` を環境変数で渡し、`PREV` は既定 ff5ee429。preflight は Firefox の beacon が `webglRenderer` 非 null かつ `desk.mode` = gl でなければ rc 2 で止まる。結果は `out/RESULTS.md`（1 つの表、各値に load と I/O 圧）。ブラウザ試験は CI に入れない。
+`verify-bundle.sh` のモード: fetch / proj / page / preflight / scenes / alpha7 / idle / export / play / ab / report / clean。`NEW`・`REF`（ページの git ref）・`WORKER` を環境変数で渡し、`PREV` は既定 ff5ee429。preflight は Firefox の beacon が `webglRenderer` 非 null かつ `desk.mode` = gl でなければ rc 2 で止まる。結果は `out/RESULTS.md`（1 つの表、各値に load と I/O 圧）。ブラウザテストは CI に入れない。
 
 ## PM 記入欄（ci1 は書かない）
 

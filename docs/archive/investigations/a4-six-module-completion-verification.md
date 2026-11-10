@@ -17,7 +17,7 @@
 
 ## 1. 環境と手順の制約
 
-- 作業は `/tmp/opencode/v1/`（tmpfs）。`/` は空き約 51 MB で、成果物のテキストだけを書く。作業ツリー（`/home/ubuntu/work/signature-studio-develop`）は読み取りと `git archive`／`log`／`status`／`show`／`diff` だけ。作業の前後で `git rev-parse HEAD` = `32848f0478bfd9c93eccac6b03ae9551055e8ab4`、`git status --short` は同じ 5 件の未追跡（`docs/investigations/.tmp-readme-kari`、`README-0101-line.txt`、`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。私が作ったものではない）。
+- 作業は `/tmp/opencode/v1/`（tmpfs）。`/` は空き約 51 MB で、成果物のテキストだけを書く。ワークツリー（`/home/ubuntu/work/signature-studio-develop`）は読み取りと `git archive`／`log`／`status`／`show`／`diff` だけ。作業の前後で `git rev-parse HEAD` = `32848f0478bfd9c93eccac6b03ae9551055e8ab4`、`git status --short` は同じ 5 件の未追跡（`docs/investigations/.tmp-readme-kari`、`README-0101-line.txt`、`lift/harness/wasm/trace.c.new`、`trace_native.c.new`、`lift/iat-unsup-closure.txt`。私が作ったものではない）。
 - ディスク（tmpfs quota）: `/tmp/opencode` の使用量（`du -sm`）の観測値: 着手時 868 MB、o1 のビルド中 1,124／1,512／1,540／1,913 MB、o1 完了＋M0＋gdb 後 1,956 MB、o2 完了時 **2,081 MB（観測した最大）**、o3（単独）完了時 1,744 MB。2.3 GB は超えていない（連続監視はしていない。サンプルした時点の値）。quota 超過・`No space left` は 0 回。
 - 測定の道具: **コミットされた `lift/harness/a4-multi.sh`（32848f0）を一切変更せずに**使った。変えたのは PATH だけ（`tools/wrap/clang`、`tools/wrap/python3`。ディスク対策）:
   - `clang` ラッパー: `-g` を外す。コンパイルに成功した分割ソース（`/tmp/opencode/v1/o*/{src,v-*/src}/<label>-NN.c`）を消す（worker の `tools/wrap/clang` と同じ考え方）。
@@ -193,7 +193,7 @@ VFS 種付けリスト `harness/seeds/vfs-seed-fonts.tsv`（SHA `127a4471…`）
 - テスト一式・変異検査は再実行していない。個々の応答（S1〜S13 の出典なしの選択）の正しさは検証していない。
 - 5 モジュールが個別に必要かの切り分け、どの仮の決定が実行で使われたかの対応づけ、`depth 12` の実行時の読み（読みのみ）、Delphi RTL のソースとの照合、VFS 種付けの 2 ファイルとインストーラの一致（インストーラが無い）は**未確認**。
 - 単独 a4 は註釈なしのみ（註釈あり・なしの両方を測る必要はないと判断。progress.md は両方同一と書く。未確認）。
-- 入力 DLL・種の一部（`lift/out-*`）はコミットされていない（gitignore）ので、コミットだけでは再現できない。このセッションでは worker と同じファイル（TAG が一致）が作業ツリーにあった。
+- 入力 DLL・種の一部（`lift/out-*`）はコミットされていない（gitignore）ので、コミットだけでは再現できない。このセッションでは worker と同じファイル（TAG が一致）がワークツリーにあった。
 
 ## 11. 成果物
 

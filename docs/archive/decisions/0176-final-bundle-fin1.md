@@ -35,7 +35,7 @@
 
 (x = EXTRA_IMPORTS あり、n = b0f989d の runtime。PS・EE は大きさの内訳のための中間構成で、バンドルにしていない〔raw と 16 スナップだけ〕。)
 
-作り方は MERGE-NOTES。F の dsp の always_inline の単位は決定 0168 の `ai_ps_dsp.txt`(S: m1-01 m1-22、S+M: m1-01 m1-06)、ほかは決定 0167 の E の表(`S-fin1-ai`)。上流 Blend2D a7f9476 は b2d1 の作業木の tarball(SHA-256 391a57ad…を確認、ネットワーク不使用)から `-O2`(SIMD なし)で作った。
+作り方は MERGE-NOTES。F の dsp の always_inline の単位は決定 0168 の `ai_ps_dsp.txt`(S: m1-01 m1-22、S+M: m1-01 m1-06)、ほかは決定 0167 の E の表(`S-fin1-ai`)。上流 Blend2D a7f9476 は b2d1 のワークツリーの tarball(SHA-256 391a57ad…を確認、ネットワーク不使用)から `-O2`(SIMD なし)で作った。
 
 時間(この機械、load 10〜39): F1 の単位 627 s(JOBS=3)、node リンク + `wasm-opt -Oz` 258〜861 s(RSS 5.2〜8.5 GB)、バンドル(brotli q11)3〜6 分。b0f989d の runtime への切り替え(F2xn)は単位を作り直さず(runtime の .c 3 本と h-fruity だけ)、wasm-opt 258 s。
 
@@ -225,13 +225,13 @@ b2d2 が報告した種類の失敗(Worker の error イベント、idle に達�
 - **実行中のスクリプトを編集した**: F2xn のバンドル段が走っている間に `src3/app/scripts/build-engine-bundle.sh` に SHIP_PRESET を差し込んだため、その実行の終わりで bash が構文エラー(行 333)で終了した。バンドルのファイル群はその前に完成し、`sha256sum -c SHA256SUMS` が全部 OK だったので、手で `lift/out-websrv/assets/` に置いた。ほかに `tools/bb.sh`・`tools/nodelink.sh` を走行中に書き換えたが、`sed -i`/新しい inode なので走行中の bash には影響しなかった。
 - **作業ディレクトリが 5 GiB の上限を超えた**: `lift/out-fin1/` は最大 約 32 GB(8 構成の objects・生成 C を hard link で共有しても)。終了時に構成ごとの作業ディレクトリ・archive・cargo-target を全部削除し、現在は 10 MB(tools・logs・results の小さな物だけ)。バンドル 7 つ(約 1.8 GB)は `lift/out-websrv/assets/` に残してある。ディスクは 666 GB 空きだった。
 - **自分の Chrome ループを `kill` した**(rel-b、rel-b2。load が 8 を超え続けて 1 走行 90 秒待つため。PID 指定)。他の担当のプロセスは触っていない。
-- 他の担当の作業ディレクトリは読み取りだけ(`lift/out-b1`・`out-b2d1`・`out-prune1`・`out-b2d2` の tarball/表を読み、`out-b2d1/up5` の Blend2D の tarball を自分の作業木にコピーした)。tracked ファイル・既存の `lift/out-*`・`lift/out-websrv/assets/manifest.json` は編集していない。`lift/out-websrv/assets/` に新しい名前のディレクトリ 7 つ(`fl-engine-fin1-*`)を足した。自前の `vite preview`(4231)は終了時に止めた。
+- 他の担当の作業ディレクトリは読み取りだけ(`lift/out-b1`・`out-b2d1`・`out-prune1`・`out-b2d2` の tarball/表を読み、`out-b2d1/up5` の Blend2D の tarball を自分のワークツリーにコピーした)。tracked ファイル・既存の `lift/out-*`・`lift/out-websrv/assets/manifest.json` は編集していない。`lift/out-websrv/assets/` に新しい名前のディレクトリ 7 つ(`fl-engine-fin1-*`)を足した。自前の `vite preview`(4231)は終了時に止めた。
 - 手違い: `nodelink.sh` の EXTRA の判定が x/EE を見落としていて F1x と EE のリンクをやり直した(10 分)。`attrib-units.sh` の最初の版は emcc の wrapper が PATH で負けて効かず(全 flag で同じ大きさ)、作り直した。最初の F1 は a3002ba の runtime で作ったが、PM の通知で b4f1d3c に取り直し、a3002ba 版の wasm-opt(860 s)は 16 スナップの予備確認(82/82)にだけ使った。
 - **予測を外した**: §7 の表(wasm メモリの値 1,029.7 MiB → 実測 930.9 MiB、Chrome CPU 0.25〜0.4 → 0.513)。当たった予測も外した予測も走行前の文書のまま残した。
 
 ## 12. 成果物
 
-`lift/out-git/fin1-results/`: `fin1.diff`、`MERGE-NOTES.md`、`docs/0176-final-bundle-fin1.md`、`docs/README-0176-line.txt`、`tables/`、`logs/`、`tools/`。バンドル: `lift/out-websrv/assets/fl-engine-fin1-{Dp,F1,F2,F1x,F2x,F1xn,F2xn}/`(各 約 250〜470 MB。plain の wasm と `.br`。**既定の入口ではない**。確認は `?bundle=/assets/fl-engine-fin1-<X>/manifest.json`)。作業木 `lift/out-fin1/`(終了時に整理)。
+`lift/out-git/fin1-results/`: `fin1.diff`、`MERGE-NOTES.md`、`docs/0176-final-bundle-fin1.md`、`docs/README-0176-line.txt`、`tables/`、`logs/`、`tools/`。バンドル: `lift/out-websrv/assets/fl-engine-fin1-{Dp,F1,F2,F1x,F2x,F1xn,F2xn}/`(各 約 250〜470 MB。plain の wasm と `.br`。**既定の入口ではない**。確認は `?bundle=/assets/fl-engine-fin1-<X>/manifest.json`)。ワークツリー `lift/out-fin1/`(終了時に整理)。
 
 ## PM の判断と取り込み(2026-11-03、追記)
 

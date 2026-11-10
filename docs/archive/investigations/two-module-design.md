@@ -1,6 +1,6 @@
 # dsp_ippv2_x64.dll を 2 つ目のモジュールとして載せる設計（選択肢の比較）
 
-実行日: 2026-10-23。HEAD c99a0f6（作業ツリーには他の subagent の未コミット変更があるため、測定は `git archive HEAD` を `lift/out-design/stage` に展開したコピーで行った）。**調査と設計のみ**。`lift/` の既存ファイル、runtime、生成器、テストは変更していない。決定 0073〜0077、`dsp-ippv2-lift-feasibility.md`（以下「実現性調査」）の続き。**この文書は何も決めない**。推奨は理由つきで書くが、決めるのは PM。作業物は `lift/out-design/`（gitignore 対象の `lift/out*/`）。
+実行日: 2026-10-23。HEAD c99a0f6（ワークツリーには他の subagent の未コミット変更があるため、測定は `git archive HEAD` を `lift/out-design/stage` に展開したコピーで行った）。**調査と設計のみ**。`lift/` の既存ファイル、runtime、生成器、テストは変更していない。決定 0073〜0077、`dsp-ippv2-lift-feasibility.md`（以下「実現性調査」）の続き。**この文書は何も決めない**。推奨は理由つきで書くが、決めるのは PM。作業物は `lift/out-design/`（gitignore 対象の `lift/out*/`）。
 
 ## 0. 凡例
 
@@ -210,7 +210,7 @@ S の実現方法（生成器の側）:
 **推奨（PM が決める）**: 当面は縮小 DLL（SSE2 系統のみ）で進め、全部入りは W8（AVX の方針）の決定後に再検討する。理由: 全部入りは今の生成器のままでは wasm として実行できない（実測）。縮小は FLEngine と同じツールチェーンで動き、DllMain の途中まで実行できた（§5.4）。縮小の前提は「選択値が 0 になる」仮説（実現性調査 §5.4）で、**未確認**。
 ## 5. LoadLibraryW / GetProcAddress / FreeLibrary / GetModuleHandleW / GetModuleFileNameW の接続
 
-### 5.1 「FLE_EXE_HANDLE = ゲスト自身（0x400000）」前提の箇所（`lift/runtime` の grep。HEAD の作業ツリーの行番号）
+### 5.1 「FLE_EXE_HANDLE = ゲスト自身（0x400000）」前提の箇所（`lift/runtime` の grep。HEAD のワークツリーの行番号）
 
 `FLE_EXE_HANDLE` を使う箇所:
 

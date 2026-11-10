@@ -62,13 +62,13 @@
 | F で始まる未対応（F2xm1、Fsincos） | 2 | **0**（生成 C の `/* 0x… F… */` の `fle_unsupported` 行数。`grep` で 0） |
 
 - `0x6a2a53 F2xm1` と `0x6a39ad Fsincos` は `fle_x87_f2xm1();`、`fle_x87_fsincos();` に生成された（`out/after-x87c.c`）。
-- 差 −66 の内訳（`gen-x87.txt` との比較）: F2xm1 −1、Fsincos −1、Mulpd −25、Addpd −13、Cvtdq2ps −9、Subpd −8、Prefetcht0 −5、Cvtpd2ps −2、Cvtps2pd −2（計 −66）。x87 以外の −64 は、前回の生成の後に作業ツリーへ入った他の担当の変更（SSE2 の packed 命令の対応）によるものと**推測**する（個別には確認していない）。この作業の寄与は 2 件。
+- 差 −66 の内訳（`gen-x87.txt` との比較）: F2xm1 −1、Fsincos −1、Mulpd −25、Addpd −13、Cvtdq2ps −9、Subpd −8、Prefetcht0 −5、Cvtpd2ps −2、Cvtps2pd −2（計 −66）。x87 以外の −64 は、前回の生成の後にワークツリーへ入った他の担当の変更（SSE2 の packed 命令の対応）によるものと**推測**する（個別には確認していない）。この作業の寄与は 2 件。
 - 閉包の x87 以外の未対応: `Jmp: indirect through IAT slot` 557、Psubw 10、Pcmpgtd 8、Rcpps 8、Bswap 7、`Test: high-byte register` 7、`And: high-byte register` 1、Andnpd 1、`Jmp: indirect target unresolved` 1、Xgetbv 1（計 601）。
 - ビルド・実行（harness）は指示により行っていない。生成 C を `clang` でリンクしての確認は未実施。ランタイムの `fle_x87.c` は単体で `clang -O0` と wasm32 でコンパイルでき、テストの C プログラムでリンク済み。
 
 ## 7. ワークスペース全体のテスト
 
-`cargo test --offline --workspace --no-fail-fast`（`test-ws.txt`、`test-ws.exit` は EXIT=0、フォアグラウンド）: **64 バイナリ、609 passed、0 failed、0 ignored**。`x87.rs` 14、`x87_trans.rs` 9、`x87ctl.rs` 7 を含む。この数は作業ツリーにある他の担当のテスト（ETXTBSY 修正後のもの、ロケール）を含む。x87-run.md 時点の 588 件・1 失敗（ETXTBSY）との差 +21 のうち、私の分は 9 件（`x87_trans`）、残りは他の担当の変更。
+`cargo test --offline --workspace --no-fail-fast`（`test-ws.txt`、`test-ws.exit` は EXIT=0、フォアグラウンド）: **64 バイナリ、609 passed、0 failed、0 ignored**。`x87.rs` 14、`x87_trans.rs` 9、`x87ctl.rs` 7 を含む。この数はワークツリーにある他の担当のテスト（ETXTBSY 修正後のもの、ロケール）を含む。x87-run.md 時点の 588 件・1 失敗（ETXTBSY）との差 +21 のうち、私の分は 9 件（`x87_trans`）、残りは他の担当の変更。
 
 ## 8. F 系 stub の残数
 

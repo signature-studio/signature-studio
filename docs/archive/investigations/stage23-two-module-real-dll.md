@@ -167,7 +167,7 @@ gdb が `fle_imp_*` の入口で、**runtime が名前付きで止まる入力�
 | （どの変数にも属さない） | — | 14 / 12（`ippMalloc`、`ippFree`、`ippGetLibVersion`、`ippGetNumThreads`、`AggCreateInstance` ほか） | — |
 
 - 決定 0080 D8 の仮説「選択値が 0 になる」は、**変数 0x4541000 についてだけ成立**（実測）。残り 3 変数（export 57 個、ゲストが引いた 51 名）は DllMain 後も −1 のまま。
-- gdb からスタブを直接呼んだ測定（DllMain 後の状態。引数はレジスタに残っていた値で、IPP 関数の試験ではない）:
+- gdb からスタブを直接呼んだ測定（DllMain 後の状態。引数はレジスタに残っていた値で、IPP 関数のテストではない）:
   - `ippiAddC_8u_C3RSfs`（0x4541000）: 停止せず戻った。
   - `ippsConv_32f`（0x455d050）、`ippiFilterBox_8u_C1IR`（0x45410a0）、`ippsDeinterleave_16s`（0x454f270）: **`fle: jump table at 0x… : selector 0x… is outside the table`**（`fle_jumptab_miss`。名前付き停止）。決定 0079 §3 が予告した挙動（選択値 −1 は停止）。
 - −1 のときの実機の経路（`call 初期化関数; nop; スタブ`。決定 0079 §1）の初期化関数 3 つ（`0x37e08c0`、`0x3cb9f80`、`0x3b30cb0`）は、**生成 C に無い**（表の添字 −1 は `switch` の外で、種にもならない。`f_37e08c0` などは存在しない）。したがって今の生成器の出力では、−1 の経路は実行できない（読み）。

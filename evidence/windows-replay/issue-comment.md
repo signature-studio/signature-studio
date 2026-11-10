@@ -73,7 +73,7 @@
 - ブランチ: `worklog-issue-1`（push 済み。`main` には触れていない）
 - 1 回目のコミット: `b143e059820be84390b84a3d7e75dab360da2a46`（`worklog: Windows API replay results (issue #1)`）
 - 2 回目のコミット: `issue-comment.md` の追加と、`notes.md`・`artifacts-sha256.txt` の更新。**このコメント自身が 2 回目のコミットに含まれるので、その SHA はここに書けない**（`origin/worklog-issue-1` の先頭を見てください）。
-- `worklog/1/` のファイル（この VM の作業ツリーでのバイト数）:
+- `worklog/1/` のファイル（この VM のワークツリーでのバイト数）:
 
 | ファイル | バイト |
 |---|---|
@@ -104,14 +104,14 @@ aa4c040e1ec64f06ec53c264c898db3821fde4cbb38c961215b8927fa3988156  worklog/1/comp
 ```
 
 - ビルドした exe はコミットしていない（SHA-256 は `artifacts-sha256.txt` に記録。`replay.exe` と `replay-m10.exe` は同一内容で `8907e0e1...0443ab7`）。
-- **改行コードの注意**: この VM の git は `core.autocrlf=true`（既存の設定）。作業ツリーが CRLF の `compare-report.md`、`compare-stdout.txt`、`run-*.log`（6 ファイル）は、コミット内では LF になり、`artifacts-sha256.txt` のハッシュと一致しない（改行だけの違い。`observed*.tsv` は無加工でハッシュも一致）。詳細は `notes.md` §8。
+- **改行コードの注意**: この VM の git は `core.autocrlf=true`（既存の設定）。ワークツリーが CRLF の `compare-report.md`、`compare-stdout.txt`、`run-*.log`（6 ファイル）は、コミット内では LF になり、`artifacts-sha256.txt` のハッシュと一致しない（改行だけの違い。`observed*.tsv` は無加工でハッシュも一致）。詳細は `notes.md` §8。
 
 ### 6. 禁止事項の確認
 
 守った。FL Studio のファイルは探しても入手してもいない。資格情報は見ていない（`gh auth status` を 1 回実行。トークンは出力側で伏せられていた）。レジストリ・システム設定・環境変数・ロケール・DPI は変更していない。管理者として実行しておらず、昇格は一度も要求していない。`replay.c`・`cases.tsv`・`compare.py`・`replay-win10.manifest` は無改変、`--no-mask` は未使用。`main` へ push せず、force push もしていない。ユーザー名・コンピュータ名・メール・IP が出力に無いことを走査して確認した（一致 0 件）。
 
 守れたか迷う点を正直に書く:
-- `git clone` はしなかった（作業ディレクトリが既にこのリポジトリで、`main` = 159a42e、作業ツリーは clean だった）。
+- `git clone` はしなかった（作業ディレクトリが既にこのリポジトリで、`main` = 159a42e、ワークツリーは clean だった）。
 - `worklog-issue-1` というローカルブランチが既にあり、`git switch -c` が失敗した。`main` と同一で、リモートに無いことを確認してから、既存ブランチに `git switch` して使った。
 - `Get-Command gh` と `gh auth status` で認証状態を見た。
 

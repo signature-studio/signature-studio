@@ -79,7 +79,7 @@
 選択(S-): **S-0247-pieces** = 互いに素な矩形で持つ(領域の代数は `fle_visrgn` の既存の subtract/intersect)。**S-0247-fold** = 32 矩形を超えたら外接矩形(過大なのは従来と同じ向き)。**S-0247-show** = 上の表。UNOFFICIAL は無い(Windows の実測は 0 件)。
 
 
-## 3. 何を直したか(`alpha3.diff`。コードと試験の差分は 1300 行〔文書・表・道具を含めた全体は約 1.9 万行〕、`-` の行は 49 行で、すべて旧い外接矩形の直接代入・拡張の置き換え)
+## 3. 何を直したか(`alpha3.diff`。コードとテストの差分は 1300 行〔文書・表・道具を含めた全体は約 1.9 万行〕、`-` の行は 49 行で、すべて旧い外接矩形の直接代入・拡張の置き換え)
 
 | ファイル | 変更 |
 |---|---|
@@ -96,7 +96,7 @@
 
 1. **外部 API の契約の実装(b)であり、我々の単純化(a)の除去**: Learn の更新領域は『領域』で、矩形 1 つに潰す規則は契約にない。潰していたのは決定 0126 の S-updregion という我々の選択だった。FL の描画を代行・補正する処理は足していない。
 2. クラス名・窓の種類・位置・大きさによる分岐は 0、新しいオプション・環境変数・フラグは 0(`docs/policies/no-options.md`、`lift-fidelity.md` の点検表)。
-3. 畳み(S-0247-fold)は安全側(外接矩形 ⊇ 正確な領域)で、起動以外の操作では 0 回。性質は §5 の乱数試験で確認。
+3. 畳み(S-0247-fold)は安全側(外接矩形 ⊇ 正確な領域)で、起動以外の操作では 0 回。性質は §5 の乱数テストで確認。
 
 ## 4. 契約との照合(Learn と Wine 10.0)
 
@@ -111,7 +111,7 @@
 
 A1 が違う 11 行: GetUpdateRgn の戻り値(常に SIMPLEREGION)と領域の中身(隙間も覆う)、ValidateRect/ValidateRgn の一部除去が効かない、隠れた窓の無効化が残る、ShowWindow の後に client 全体にならない。A3b で違う 1 行: 40 個の小矩形(畳みの過大。Wine は正確な領域を持つ)。**注意**: Wine は Windows の実測ではない(出典としての強さは Learn より下)。
 
-### 4.2 『畳みは安全側』の性質(`upd_region.c` の乱数試験)
+### 4.2 『畳みは安全側』の性質(`upd_region.c` の乱数テスト)
 
 6 回の試行(各 16 または 400 回の InvalidateRect/ValidateRect を乱数で。`ValidateRect` は 10% で最大 60×40)。厳密な画素のモデルと比べる: (1) どの試行でも**更新領域は厳密な和が持つ画素を 1 つも落とさない**(0 画素)、(2) 16 回の 3 試行は畳まれず**領域が和と完全に一致**(違い 0 画素)、(3) 400 回の 3 試行は畳みが走る。実行: A3b 30 項目 0 失敗。HEAD の runtime では 30 項目中 13 が失敗(§5)。
 
@@ -257,7 +257,7 @@ F9 の帯の調べ(`tools/run-n1.sh` + `A1_CROP="1880,548,40,472"`、`scripts/pk
 
 **何を実測したか**: 実エンジン(FLEngine と同梱 DLL)の native -O2 の N1 に、窓の移動(`SetWindowPos`)・露出の無効化・`BeginPaint`・`WM_PAINT` の配送・窓/DC を引数に取る API の呼び出しを時系列で出す一時の記録(成果物には入れない)を足して、Mixer のヘッダーを G3 でドラッグしたあと F9 で隠して見せる一連(`mxrep.g3`)を走らせ、帯の 1 画素へのウォッチポイントと突き合わせた(alpha3b)。決定 0214 の `present2_uncover` の 3 つの場面と、親・子・兄弟の場面(`win_unc.c`)を Wine 10.0 でこの機械で実走し、期待と比べた。直しの前後で、全 G3 スクリプトの最後の絵と『全 top-level 窓へ RedrawWindow を 1 回呼んだあとの絵』を画素で比べた。
 
-**結論**: (1) 帯の原因は**我々の側の欠落**(ゲストが描かないのではない)。ドラッグの最後の一歩(Mixer `lid 64` が x=32→16)で、Mixer の下から現れた Playlist(`lid 53` TEventEditForm、WS_CLIPCHILDREN なし)の右端の帯のうち、**子窓 `lid 93`(TNumBar)の上の幅 10 の部分は `lid 93` にだけ無効領域が入り、Playlist 自身には入っていなかった**。TNumBar は `WM_PAINT` に `ValidateRgn(hwnd, NULL)` で答えるだけで描かない(BeginPaint も DefWindowProc も呼ばない。Mixer の子 86・83 も同様)。Playlist が TNumBar の見た目を描く作りと読めるが、誰もその 10×500 画素(と Mixer 下端の鍵盤状の帯)を描かず、古い像が残った。HEAD(A1)にも同じ帯が最初からあり、A1 は F9 の外接矩形が偶然覆っていた(alpha3 が作った不具合ではない)。(2) 直し: `unc_end` で、**子をクリップしない窓(WS_CLIPCHILDREN なし)の更新領域に、『子をクリップしない可視領域(兄弟はクリップ)』の旧→新の増加分も足す**(動いた窓自身と、その窓と一緒に動く子孫には、コピーで残るビットを引いた増加分)。これまでの『子をクリップした増加分』は残す。`unc_invalidate` は**変えない**(領域の外接矩形を入れる。矩形ごとに入れる版は起動直後の絵を壊した。§10.5.3)。(3) 効果: 全 top-level 窓へ RedrawWindow を 1 回呼んだ前後の絵の差(画素 全 / ≥16 段階 / 最大)は、Mixer のドラッグのあと(mxmove)A1(HEAD)10,897 / 5,679 / 165、A3b(alpha3r)13,308 / 6,406 / 165 → **A3b+fix 3,778 / 5 / 37**(帯 4,485 画素 → **0**)。F9 のあと(mxrep)A3b 8,362 / 4,647 / 165(帯 4,485)→ **A3b+fix 3,362 / 5 / 37**(帯 0)。HEAD の A1 の mxrep は F9 の外接矩形が覆うので 241 / 0 / 15 で帯は出ない。Mixer 下端の鍵盤状の帯(y1022〜1040)も同じ原因で消えた。他の G3(ui-pl・ui-menu・ui-win・ui-f8・steady)は A3b と A3b+fix が一致し、**A3b+fix の ≥16 段階は全スクリプトで 7 画素以下**(最大差 37、上の帯のメーター・時計の周り)。起動の 16 スナップは A3b と A3b+fix で g3 の 94 行も g3-surface 34 行も合成画面 15 点も**全て一致**(§10.5.4)。 (4) 試験: `present2_uncover` 16/16(期待は変更なし)、`upd_region.c` 40 項目、`win2_act`、`window`、`wall_ia1w` が通る(§10.4)。
+**結論**: (1) 帯の原因は**我々の側の欠落**(ゲストが描かないのではない)。ドラッグの最後の一歩(Mixer `lid 64` が x=32→16)で、Mixer の下から現れた Playlist(`lid 53` TEventEditForm、WS_CLIPCHILDREN なし)の右端の帯のうち、**子窓 `lid 93`(TNumBar)の上の幅 10 の部分は `lid 93` にだけ無効領域が入り、Playlist 自身には入っていなかった**。TNumBar は `WM_PAINT` に `ValidateRgn(hwnd, NULL)` で答えるだけで描かない(BeginPaint も DefWindowProc も呼ばない。Mixer の子 86・83 も同様)。Playlist が TNumBar の見た目を描く作りと読めるが、誰もその 10×500 画素(と Mixer 下端の鍵盤状の帯)を描かず、古い像が残った。HEAD(A1)にも同じ帯が最初からあり、A1 は F9 の外接矩形が偶然覆っていた(alpha3 が作った不具合ではない)。(2) 直し: `unc_end` で、**子をクリップしない窓(WS_CLIPCHILDREN なし)の更新領域に、『子をクリップしない可視領域(兄弟はクリップ)』の旧→新の増加分も足す**(動いた窓自身と、その窓と一緒に動く子孫には、コピーで残るビットを引いた増加分)。これまでの『子をクリップした増加分』は残す。`unc_invalidate` は**変えない**(領域の外接矩形を入れる。矩形ごとに入れる版は起動直後の絵を壊した。§10.5.3)。(3) 効果: 全 top-level 窓へ RedrawWindow を 1 回呼んだ前後の絵の差(画素 全 / ≥16 段階 / 最大)は、Mixer のドラッグのあと(mxmove)A1(HEAD)10,897 / 5,679 / 165、A3b(alpha3r)13,308 / 6,406 / 165 → **A3b+fix 3,778 / 5 / 37**(帯 4,485 画素 → **0**)。F9 のあと(mxrep)A3b 8,362 / 4,647 / 165(帯 4,485)→ **A3b+fix 3,362 / 5 / 37**(帯 0)。HEAD の A1 の mxrep は F9 の外接矩形が覆うので 241 / 0 / 15 で帯は出ない。Mixer 下端の鍵盤状の帯(y1022〜1040)も同じ原因で消えた。他の G3(ui-pl・ui-menu・ui-win・ui-f8・steady)は A3b と A3b+fix が一致し、**A3b+fix の ≥16 段階は全スクリプトで 7 画素以下**(最大差 37、上の帯のメーター・時計の周り)。起動の 16 スナップは A3b と A3b+fix で g3 の 94 行も g3-surface 34 行も合成画面 15 点も**全て一致**(§10.5.4)。 (4) テスト: `present2_uncover` 16/16(期待は変更なし)、`upd_region.c` 40 項目、`win2_act`、`window`、`wall_ia1w` が通る(§10.4)。
 
 **未解消の差・未確認**: Wine 10.0 との差が 3 点残る(PM の判断で、描き残しが出ない向きの 0214 の期待を保った。§10.2.2): (a) sibling を HWND_BOTTOM にしたとき、Wine は下から現れた窓に無効領域を渡さない(0214 は渡す)、(b) Wine は最上位窓にも露出の矩形を渡す(こちらは渡さない)、(c) Wine は WS_CLIPCHILDREN ありの親にも子の上の露出を渡す(こちらは渡さない)。実機 Windows で同じか(Wine は Windows の実測ではない。UNOFFICIAL)。Playlist の `WM_PAINT` が TNumBar の見た目を描く、という読みの直接確認(Playlist の BitBlt の宛先と中身を窓ごとに見ていない)。Chrome・Firefox・node の 84 行・55 行(FS 版の bundle が無い)と CPU は alpha3b2 では**測っていない**。`a4` は走らせていない(PM が取り込み時に回す)。
 
@@ -313,7 +313,7 @@ F9 の帯の調べ(`tools/run-n1.sh` + `A1_CROP="1880,548,40,472"`、`scripts/pk
 - **S1・S3 は Wine = 0214 の期待 = 本修正の結果**。S1.1(NOCOPYBITS)で Wine の親は動いた子の旧い場所 (10,20,110,70) だけを受け取り、子の新しい場所は受け取らない — 『移動した窓の新しい場所も祖先に入れる』広い版(alpha3b)は Wine と違ったため捨てた。
 - **食い違い 3 点(未解消)**: (a) **S2**: Wine は sibling を HWND_BOTTOM にしても下から現れた窓 a に無効領域を渡さない(0214 の期待は a に (40,40,100,100) を渡す。0214 のテストの注は Learn を挙げ、Wine とは書いていない)。(b) **U1/U2 の T**: Wine は最上位窓にも露出の矩形 (150,0,300,150) を渡す(本修正は渡さない)。(c) **U2 の P**: Wine は WS_CLIPCHILDREN ありの親にも子の上の露出を渡す(本修正は渡さない)。PM の判断(『過剰な無効化は契約上安全、渡さない側は描き残しの危険』)で、今回は 0214 の期待を保ち、(a) は渡す側のまま、(b)(c) は渡さない側のままにした。最上位窓や CLIPCHILDREN ありの親に渡さないことで描き残しが出る場面が実エンジンで見つかったら、渡す側に変える。実エンジンの G3 では描き残しは出ていない(§10.5)。
 
-### 10.3. 直し(`alpha3b2.diff`。`lift/runtime/fle_win.c` 1 ファイル + 試験)
+### 10.3. 直し(`alpha3b2.diff`。`lift/runtime/fle_win.c` 1 ファイル + テスト)
 
 `unc_end` / `unc_begin`: 窓ごとの『新しく見えるようになった部分』(子をクリップした可視領域〔CLIPCHILDREN | CLIPSIBLINGS〕の旧→新の増加分。決定 0214)はそのまま。**さらに、WS_CLIPCHILDREN の無い窓について、子をクリップしない可視領域(CLIPSIBLINGS だけ)の旧→新の増加分も足す**(`v0n`)。動いた窓自身と、その窓と一緒に動く子孫(Mixer と、その子 86・83 など)では、増加分から『コピーで残るビット』(`valid0n` を動かし量だけずらして `copied` と重ねた物)を引く。`unc_invalidate` は変えない。クラス名・窓の種類・位置による分岐 0、新しいオプション 0。S-0214-erase(露出は背景の消去つき)はそのまま。
 
@@ -321,7 +321,7 @@ PM の指示は『各窓の更新領域に足すのは、その窓自身の可�
 
 この直しが **(b)(外部 API = SetWindowPos/WM_PAINT の契約の実装)に当たる理由**: 移動で露出した部分の `WM_PAINT` が誰にも行かないのは、我々が窓ごとの露出を『その窓だけが見える領域』で数え、子をクリップしない窓が子の上にも描ける分を数えていなかったため。FL の挙動の代行・補正ではない(FL は TNumBar の `WM_PAINT` に何もせず、Playlist の `WM_PAINT` で描いている)。
 
-### 10.4. 試験
+### 10.4. テスト
 
 - **`test.sh full`(最終の木: HEAD 84e17206 + alpha3r.diff + 本修正、`harness/test.sh full --jobs 2`、`logs/test-full-t4-final.log`)**: **200 results / 2,347 passed / 0 failed / 1 ignored、SKIPPED-lines=1(既知の `FLE_FR9T_CLEAN_RT` の 1 件)、rc=0**。(最初の実行は `binaries/` の無い木で 94 行が skip されたので、`binaries` を足してやり直した値。)alpha3r.diff だけの `test.sh full` はこの HEAD では走らせていない。
 - 個別: `present2_uncover` **16/16(期待は変更なし)**、`alpha3_updregion`(`upd_region.c` 40 項目)、`win2_act` 2/2、`window` 37/37、`wall_ia1w` 7/7 が通る。
@@ -391,7 +391,7 @@ PM の指示は『各窓の更新領域に足すのは、その窓自身の可�
 
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準: HEAD 26a7cf4e に、`alpha3r.diff`(107 ファイル。`-` は fle_win.c の旧い外接矩形の代入・拡張 49 行だけ)を `patch -p1`(offset・fuzz・reject なし)で当ててコミット 2bb41c27(第 1 部)にし、続けて `alpha3b2.diff`(54 ファイル。`-` は 3 行で全部試験: `upd_region.c` の `mk`→`mkp` 2 行と `alpha3_updregion.rs` の `n >= 30` 1 行)を `patch -p1`(offset・fuzz・reject なし)で当てた(第 2 部)。`alpha3b.diff`(第 1 案)は取り込まない。それが 3 件の `present2_uncover` を落とした(決定 0214 の S-p2-9 との衝突)ので、alpha1 に作り直させたのが `alpha3b2`(各窓の更新領域に足すのは、その窓自身の可視領域〔自分の WS_CLIPCHILDREN 旗で計算〕の増加分、という定式化。クラス名・窓種・位置の分岐 0、新しいオプション 0)。
+取り込んだ基準: HEAD 26a7cf4e に、`alpha3r.diff`(107 ファイル。`-` は fle_win.c の旧い外接矩形の代入・拡張 49 行だけ)を `patch -p1`(offset・fuzz・reject なし)で当ててコミット 2bb41c27(第 1 部)にし、続けて `alpha3b2.diff`(54 ファイル。`-` は 3 行で全部テスト: `upd_region.c` の `mk`→`mkp` 2 行と `alpha3_updregion.rs` の `n >= 30` 1 行)を `patch -p1`(offset・fuzz・reject なし)で当てた(第 2 部)。`alpha3b.diff`(第 1 案)は取り込まない。それが 3 件の `present2_uncover` を落とした(決定 0214 の S-p2-9 との衝突)ので、alpha1 に作り直させたのが `alpha3b2`(各窓の更新領域に足すのは、その窓自身の可視領域〔自分の WS_CLIPCHILDREN 旗で計算〕の増加分、という定式化。クラス名・窓種・位置の分岐 0、新しいオプション 0)。
 
 PM が測った値(この機械、`lift/out-pmchk-a3/`):
 - FLEngine の既定の生成 C(`fe-lift lift … --pdata`)の sha256 は `34a376db…78062a`(215,740,414 B)のまま(lifter 不変)。

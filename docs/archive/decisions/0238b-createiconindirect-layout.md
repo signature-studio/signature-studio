@@ -8,7 +8,7 @@
 2. **結論**:
    - 停止したバンドル c4 は、**直接 wasm(hybrid の direct modules)に焼き込まれた `fle_teb`・`fle_mxcsr`・`fle_hyb_buf`・`fle_progress_count` の 4 つの番地が、同じバンドルの C 部分(`flengine6.c.opt.wasm`)が使う番地と違っていた**。ハイブリッド段(`stage_hybrid`、build-engine-bundle.sh)は 4 つの番地を `$HYB/link.map` から読んで直接 wasm に焼き込む。c4 の直接 wasm は兄弟ビルド(tAfix)の番地(c4 の C 部分より +0x40)を持っていた。直接コードは C 部分とは別の変数を読み書きする(MXCSR 1,234 回、hyb_buf 2,333 回)。
    - **対照実験**: c4 と**同一の C 部分**に、C 部分が実際に使う番地で直接 wasm を作り直して統合し直したバンドル c5(`tools/rehybrid.sh`、hyb/ と web/ は私有コピー)は、**Chrome で 8/8 起動して停止 0**(load 12.2〜17.4)。c4 は同じ C 部分で **6/6 停止**(load 9.5〜10.4)。差は直接 wasm の番地だけ。
-   - 原因は**ビルド方式**: 診断用に作った `tools/iter.sh` は作業ディレクトリ `ciH6base` を `cp -al`(ハードリンク)で複製し、`hyb/`(`link.map`、`dir/n-*.wasm`、`direct.wasm`)が全ビルドで**同じ inode**(リンク数 5)だった。重い build を 2 本同時に走らせたので、兄弟が `link.map` と `n-*.wasm` を上書きし、先に走っていたビルドが兄弟の `link.map` を読んだ。CI の段スクリプトは 1 ビルド 1 作業木なので、この事故は起きない(§5)。ランタイムの欠陥ではなく、**ゲストが配置に依存するわけでもない**(決定 0238 の本文と、コミット 4977340a のメッセージの『the guest depends on the static layout of the runtime』は誤り。PM が訂正する)。
+   - 原因は**ビルド方式**: 診断用に作った `tools/iter.sh` は作業ディレクトリ `ciH6base` を `cp -al`(ハードリンク)で複製し、`hyb/`(`link.map`、`dir/n-*.wasm`、`direct.wasm`)が全ビルドで**同じ inode**(リンク数 5)だった。重い build を 2 本同時に走らせたので、兄弟が `link.map` と `n-*.wasm` を上書きし、先に走っていたビルドが兄弟の `link.map` を読んだ。CI の段スクリプトは 1 ビルド 1 ワークツリーなので、この事故は起きない(§5)。ランタイムの欠陥ではなく、**ゲストが配置に依存するわけでもない**(決定 0238 の本文と、コミット 4977340a のメッセージの『the guest depends on the static layout of the runtime』は誤り。PM が訂正する)。
 3. **安全網**を足した(§5): 直接 wasm の番地が C 部分でも同じ番地として使われていることと、link.map が C 部分を作った link のものであることを、hybrid 段で検査し、食い違えばビルドを失敗させる。**c4 を実際に失敗させる**(§5 の表)。出荷 bundle の語義は変えない(検査だけで、wasm のバイトは変わらない: §5)。
 
 ## 2. 実測(Chrome 156、ページだけ、`tools/boot-n.sh`、`tables/boot-*.tsv`、`tables/icon-stop.tsv`)
@@ -38,10 +38,10 @@
 
 ## 4. 副産物: 契約の点検で見つけた違反(停止の原因ではない)
 
-- HeapAlloc は 16 バイト整列を約束する(Learn: 『The alignment of memory returned by HeapAlloc is MEMORY_ALLOCATION_ALIGNMENT』、x64 で 16)。ランタイムは host の malloc を使い、Emscripten の malloc は 8 か 0 mod 16 を返す(**2,000 ブロックのうち 986 が 16 整列でない**、`tools/align-wasm.sh`、`fle_guest_alloc` は 0/2000)。HeapAlloc・HeapReAlloc・GlobalAlloc・LocalAlloc・CoTaskMemAlloc を `aligned_alloc(16)` に直した(`align.diff`、試験 `load2_align.rs`、全体試験 195 結果 / 2,382 通過 / 0 失敗)。**これは停止の原因ではない**(c4 = クリーン + この修正は止まり、c5 = c4 と同じ C 部分で直接 wasm の番地だけ直したものは通る)。別の差分(`align.diff`)にして、load2.diff に混ぜていない。
+- HeapAlloc は 16 バイト整列を約束する(Learn: 『The alignment of memory returned by HeapAlloc is MEMORY_ALLOCATION_ALIGNMENT』、x64 で 16)。ランタイムは host の malloc を使い、Emscripten の malloc は 8 か 0 mod 16 を返す(**2,000 ブロックのうち 986 が 16 整列でない**、`tools/align-wasm.sh`、`fle_guest_alloc` は 0/2000)。HeapAlloc・HeapReAlloc・GlobalAlloc・LocalAlloc・CoTaskMemAlloc を `aligned_alloc(16)` に直した(`align.diff`、テスト `load2_align.rs`、全体テスト 195 結果 / 2,382 通過 / 0 失敗)。**これは停止の原因ではない**(c4 = クリーン + この修正は止まり、c5 = c4 と同じ C 部分で直接 wasm の番地だけ直したものは通る)。別の差分(`align.diff`)にして、load2.diff に混ぜていない。
 - 点検して違反が見つからなかったもの: VirtualAlloc の 64 KB 粒度とゼロ埋め、スレッドスタックのゼロ埋め(tZ0 と tZ1 は同じ結果)。
 
-## 5. 安全網(`load2-guard.diff`。HEAD 4977340a に dry-run 通過。HEAD 52034ca9 の checkout には実際に当てて `ci/test-hybrid.sh` と `bash -n` が通る。未コミットの作業木にも dry-run 通過)
+## 5. 安全網(`load2-guard.diff`。HEAD 4977340a に dry-run 通過。HEAD 52034ca9 の checkout には実際に当てて `ci/test-hybrid.sh` と `bash -n` が通る。未コミットのワークツリーにも dry-run 通過)
 
 `app/scripts/build-engine-bundle.sh` に関数 `hyb_guard`(record / map / cpart / merged の 4 つの検査。中は python)を足し、weblink 段と hybrid 段が呼ぶ。`ci/plan.sh` の SP_WASM の関数の一覧に `hyb_guard` を足した。**ファイルでなく関数にした理由**: `lift/harness` に新しいファイルを足すと `H_GEN`(`git ls-files -s -- lift/harness`)が変わり、**lift 段の鍵(`k_lift`)が変わって CI の lift 段が作り直しになる**。スクリプトの先頭のコメントも全部の鍵の前置き(`script_preamble`)に入るので触っていない。
 
@@ -56,8 +56,8 @@
 記録がないとき(古い作業ディレクトリ、weblink を飛ばした部分実行)は『検査できない』という注記を出し、失敗にしない(`cpart` は必ず効く)。
 
 **効くこと(実測)**:
-- `ci/test-hybrid.sh` に 13 の試験を足した。合成した wasm(`0x41 + sleb128` を 16 進で書き下し、guard の関数に頼らない)で: 通る場合、兄弟の配置(+0x40)の C 部分、逆の食い違い、1 つの番地が使われていない場合、直接コードが別の配置のもの、link.map の上書き、記録なし、build-engine-bundle.sh が 4 つの検査を呼んでいること(hybrid 段に 4 回、weblink 段に 1 回)、`ci/plan.sh` の SP_WASM に `hyb_guard` が入っていること、`lift/harness` に新しいファイルがないこと。**全て通る**(`bash ci/test-hybrid.sh` → all checks hold)。
-- **変異 4/4 を殺す**: `cpart` が失敗しない(3 試験が落ちる)、`map` が失敗しない(1)、`merged` が失敗しない(1)、hybrid 段が `cpart` を呼ばない(1)。`tables/guard-mutation.tsv`。
+- `ci/test-hybrid.sh` に 13 のテストを足した。合成した wasm(`0x41 + sleb128` を 16 進で書き下し、guard の関数に頼らない)で: 通る場合、兄弟の配置(+0x40)の C 部分、逆の食い違い、1 つの番地が使われていない場合、直接コードが別の配置のもの、link.map の上書き、記録なし、build-engine-bundle.sh が 4 つの検査を呼んでいること(hybrid 段に 4 回、weblink 段に 1 回)、`ci/plan.sh` の SP_WASM に `hyb_guard` が入っていること、`lift/harness` に新しいファイルがないこと。**全て通る**(`bash ci/test-hybrid.sh` → all checks hold)。
+- **変異 4/4 を殺す**: `cpart` が失敗しない(3 テストが落ちる)、`map` が失敗しない(1)、`merged` が失敗しない(1)、hybrid 段が `cpart` を呼ばない(1)。`tables/guard-mutation.tsv`。
 - **実物に対して**: c4 の C 部分に対する `cpart` は **失敗**(4 つとも 0 回)。c3・tAfix・c5 は通る。他の 6 本(out-rt1 ciA5・ciA7-n・ciB7、out-ship6 ci9・ci9m・ci-h7m〈F2xH7〉)は `cpart`・`merged` とも**通る**(偽陽性 0。ciA7 は持ち主が作り直し中で測れなかった)。`tables/guard-on-bundles.txt`、`tables/guard-on-other-bundles.txt`。
 - **ビルドの段で**(`tools/rehybrid.sh`、ガード入りの木 `src-g`〈最終の load2-guard.diff を当てた木〉、c4 と同じ C 部分): 兄弟の番地(0x1091ba90…)を与えると数秒で `hybrid failed`(c9。`cpart` が 4 つとも 0 回と報告)。記録を別の link.map のものにすると `map` で失敗(c10)。正しい番地と正しい記録では最後まで通る(c11: §5.1)。ログは `logs/rehybrid-c*.log`。
 - **CI の鍵**(`ci/plan.sh` を F2xH7 で、ガードのない HEAD 4977340a の木とガード入りの木で走らせて比べた): `k_lift`・`k_extract`・`k_felift`・`k_seed`・`k_b2d`・`k_app`・`k_vst3`・`k_emsdk`・`cfg_sha` は**変わらない**。`k_rt`・`k_link`・`k_bundle` と bundle の接頭辞(`fl-engine-ci-F2xH7-…`)は**変わる**(SP_WASM がスクリプトの関数 `stage_weblink`・`stage_hybrid`・`hyb_guard` の本文を含むため。CI では rt の objects・link・bundle の段が 1 回作り直しになる。ガードを足せば必ずそうなる)。link.map の内容そのものは鍵の入力ではない(link の出力で、鍵は入力から決まる)。P_LINK のキャッシュは `flengine6.opt.wasm`・`.js`・`.wasm` の 3 つで、link.map と `hyb/dir` は入っていない。キャッシュヒットなら hybrid 段は走らず、ミスなら weblink から全部走る = link.map と C 部分は同じ実行で作られる。**部分実行**(weblink を飛ばして hybrid だけ)だけが事故の入口で、そこを `map` と `cpart` が守る。
@@ -79,4 +79,4 @@
 - **作り直し**: `tools/rehybrid.sh SRC_WORK NEW_WORK TREE TEB MXCSR HYBBUF PROGRESS`(hyb/ と web/ を私有コピーにして hybrid 段 + seed + bundle をやり直す)。
 - **iter.sh の方式を使うなら**: `hyb/` と `emcache/` を `cp -a`(ハードリンクにしない)、重い build を同じ `hyb/` 起点で 2 本同時に走らせない。
 - **対照実験 c5 の再現**: (1) 停止するバンドル(c4)の作業ディレクトリから `tools/rehybrid.sh c4 c5 TREE 1091ba50 102054f4 1091da60 10308188`(番地は `tools/scan-addr.py` で C 部分の参照が最も多い値を探して決める。`tools/chk-baked.sh` の `refs in the C part` が 0 でない番地)。(2) `FL_ASSETS_DIR=assets-c5` で `vite preview --outDir dist-c5`(dist-c5 = `app-run/dist` + assets のシンボリックリンク)を起動し、`tools/boot-n.sh PORT c5 8`(Chrome 156 を 8 回、`tables/boot-c5.tsv`)。
-- 試験: `bash ci/test-hybrid.sh`(`load2-guard.diff` を当てた木で、13 試験が足される)。
+- テスト: `bash ci/test-hybrid.sh`(`load2-guard.diff` を当てた木で、13 テストが足される)。

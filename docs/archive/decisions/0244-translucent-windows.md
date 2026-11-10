@@ -24,7 +24,7 @@
 
 ## 2. 観測(実エンジン)
 
-方法: native -O2 の N1(production 形 F2xH7 の生成 C を pick1〔決定 0242〕が clang -O2 でビルドした物を無改変で流用 + この木の runtime を `-O2 -DFLE_DESKTOP -DFLE_R_FAST_COPY=1` で自前ビルド + Blend2D)に、試験道具 `tools/alpha1_rec.c`(リンク時の `--wrap` で全 `fle_imp_*` を数え、半透明に関わる API の引数・戻り値・BitBlt のソースのアルファ統計を記録し、`cpu LABEL` のたびに `fle_desk_compose` の画素を取る。runtime は変えない)を付け、`scripts/*.g3` を走らせた。**入力はハーネスの模擬(ユーザー操作ではない)**。G3 の `advance 16` + `cpu fNN` で 1 フレームずつ記録した。
+方法: native -O2 の N1(production 形 F2xH7 の生成 C を pick1〔決定 0242〕が clang -O2 でビルドした物を無改変で流用 + この木の runtime を `-O2 -DFLE_DESKTOP -DFLE_R_FAST_COPY=1` で自前ビルド + Blend2D)に、テスト道具 `tools/alpha1_rec.c`(リンク時の `--wrap` で全 `fle_imp_*` を数え、半透明に関わる API の引数・戻り値・BitBlt のソースのアルファ統計を記録し、`cpu LABEL` のたびに `fle_desk_compose` の画素を取る。runtime は変えない)を付け、`scripts/*.g3` を走らせた。**入力はハーネスの模擬(ユーザー操作ではない)**。G3 の `advance 16` + `cpu fNN` で 1 フレームずつ記録した。
 
 ### 2.1 窓とその呼び出し(`tables/glass-calls-timeline.tsv`、`tables/api-call-counts-pick1s.tsv`)
 
@@ -100,12 +100,12 @@ Learn: `DwmExtendFrameIntoClientArea`(『フレームをクライアント領域
 
 変更の分類(lift の忠実性の点検表): 外部 API の契約の実装 = 上の 4 点すべて。FL の観測だけ = 道具(`alpha1_rec.c`)は製品の外。代行・補正・クラス名分岐 = 0。新しいオプション = 0。生成 C の変化 = 0(`lift/crates/*/src` は 0 行)。
 
-## 6. 試験
+## 6. テスト
 
-| 試験 | 結果 |
+| テスト | 結果 |
 |---|---|
 | `glass_seq.c`(runtime そのものを native で動かす。cargo の `alpha1_glass`、通常と `-DFLE_R_FAST_COPY=1`) | **256 項目 0 失敗**: ガラスのシートの 16 種の画素 × 2 つの下(背景・赤い窓)、余白(左・右・上・下)、4 バイト目の保持/非保持、`SetWindowRgn`(内側・4 辺の外側・窓より大きいリージョン・説明行)、ヒットテスト(WindowFromPoint と入力)、フェード、ULW(AC_SRC_ALPHA + SCA 128/77、SCA 100 の定数アルファ、OPAQUE、COLORKEY)・SLWA(ALPHA / COLORKEY / 両方)・2 窓の重なり・明るい下の窓、同一内容の再描画は報告なし、最後の行列の 1 画素・A だけの変更の報告。期待値は `tools/mk-expect.py` が Learn の式から厳密有理数で作ったリテラル(C のコードは読まない) |
-| mutation(`tools/mutate-glass.py`、`logs/mutate-glass.txt`) | **27 本すべて検出**(余白を保持しない・A を運ばない・拡張を無視・リージョンの左/右/下・ヒットテスト 2 本・丸め・(1−A) 無し・内外の取り違え・負の余白・右/上/下の余白・加算・クランプ・ゼロ余白・余白の辺の取り違え・LWA_ALPHA の補数・LWA_COLORKEY の青・ULW_OPAQUE の α・COLORKEY の 1 バイト・AC_SRC_ALPHA 無しで A を使う・SCA を無視・Z 順)。最初の 3 本(リージョンの左端・右の余白・窓より大きいリージョン)は生き残り、試験を足して検出 |
+| mutation(`tools/mutate-glass.py`、`logs/mutate-glass.txt`) | **27 本すべて検出**(余白を保持しない・A を運ばない・拡張を無視・リージョンの左/右/下・ヒットテスト 2 本・丸め・(1−A) 無し・内外の取り違え・負の余白・右/上/下の余白・加算・クランプ・ゼロ余白・余白の辺の取り違え・LWA_ALPHA の補数・LWA_COLORKEY の青・ULW_OPAQUE の α・COLORKEY の 1 バイト・AC_SRC_ALPHA 無しで A を使う・SCA を無視・Z 順)。最初の 3 本(リージョンの左端・右の余白・窓より大きいリージョン)は生き残り、テストを足して検出 |
 | 実エンジンのフェード列(`lift/harness/alpha1/run-fade.sh`、`check-fade.py`) | 修正後 0 違反 / 修正前 132 違反(Add メニュー)。View メニュー(22 フレーム)・コンボは 0 違反 |
 | `test.sh full --jobs 3`(cargo) | **197 results / 2,388 passed / 0 failed / 1 ignored**(193 test executables + doc-tests 4) |
 | a4 FRUITY 無効(`a4-fruity.sh off`、`logs/a4-off.log`) | `init_count=942 / 942`、`run_rank=895/895`、functions executed (distinct) **5,310**、function entries **1,009,737**、`== stop: returned from entry`、exit 0 — **不変** |
@@ -174,7 +174,7 @@ wall は pull1 が 18.6 s、メモリ 1.08 GB。`fle_desk_compose` の時間(nod
 
 定常状態の 1 フレームあたり(62.5 回/s と仮定): 約 2.0 ms → 約 7.7 ms。1 フレーム 16 ms の中には収まるが、Worker の CPU が 443 → 847 ms/s に増える(ピッカーを開いている間だけ)。フェードアウトの 799 ms/1.26 s(1 回あたり約 32 ms)は他の測定より大きく、機械の load(20〜25)の影響が大きいと読む(再測定していない)。
 
-**同一内容の再描画の扱い(dirty)の検討**: ゲストは定常状態でもピッカーの窓へ毎フレーム `BitBlt (0,0 1920x1080)`(と、メインの `1930x1092` と子窓の矩形)を同じ内容で書く。`fle_desk_compose` はこの再描画を合成し直してから『変化した画素だけ』を報告する(報告は 0 画素)ので、**定常状態でも合成の費用がかかる**。試した案: `fle_desk_wrote` で窓の面を影(最後に合成したときのバイト列)と比べ、変わらなければダメージを足さない(4 バイト目も比べる。結果の画素は同じ)。native の測定(1 回、同じ条件): 定常状態は合成 8.6 ms → 0.02 ms に減るが、比較に 5.5 ms(8 バイトずつの比較。最初の素朴な比較は 9〜14 ms)かかり、**差し引き 10 → 5.5 ms**。フェード中(全面が変わる)は比較と複写が余計になり **10 → 15 ms に悪化**。画素の結果は同一(試験は通る)。**取り込んでいない**: 窓ごとの影のメモリ(窓の面と同じ大きさ)と、比較の費用が合成の費用を超える場面があるため。この案は `alpha1-dirty.diff` に置いた(`fle_desk.c` への差分、未適用・無効で出荷しない)。より良い案(未実装): `fle_r_blit` の無変換コピー(`bytes` 経路)の中で書く前に比べ(読み 2 本・書き 0〜1 本=追加の 1 周なし)、変化が無かった書き込みは `fle_raster_wrote` を呼ばない。ホットパスを変えるので PM の判断を待つ。
+**同一内容の再描画の扱い(dirty)の検討**: ゲストは定常状態でもピッカーの窓へ毎フレーム `BitBlt (0,0 1920x1080)`(と、メインの `1930x1092` と子窓の矩形)を同じ内容で書く。`fle_desk_compose` はこの再描画を合成し直してから『変化した画素だけ』を報告する(報告は 0 画素)ので、**定常状態でも合成の費用がかかる**。試した案: `fle_desk_wrote` で窓の面を影(最後に合成したときのバイト列)と比べ、変わらなければダメージを足さない(4 バイト目も比べる。結果の画素は同じ)。native の測定(1 回、同じ条件): 定常状態は合成 8.6 ms → 0.02 ms に減るが、比較に 5.5 ms(8 バイトずつの比較。最初の素朴な比較は 9〜14 ms)かかり、**差し引き 10 → 5.5 ms**。フェード中(全面が変わる)は比較とコピーが余計になり **10 → 15 ms に悪化**。画素の結果は同一(テストは通る)。**取り込んでいない**: 窓ごとの影のメモリ(窓の面と同じ大きさ)と、比較の費用が合成の費用を超える場面があるため。この案は `alpha1-dirty.diff` に置いた(`fle_desk.c` への差分、未適用・無効で出荷しない)。より良い案(未実装): `fle_r_blit` の無変換コピー(`bytes` 経路)の中で書く前に比べ(読み 2 本・書き 0〜1 本=追加の 1 周なし)、変化が無かった書き込みは `fle_raster_wrote` を呼ばない。ホットパスを変えるので PM の判断を待つ。
 画素の演算の簡約(SCA = 255 のとき `Dst' = c + ((Dst × (255 − A) + 128 + …) >> 8)` の 1 回の割り算に相当する式)は **16,777,216 通りすべてで元の式と一致**したが、native で 5〜10% しか速くならなかったので入れていない(演算がスカラーで、ベクトル化されないため。SIMD 化は別の作業)。
 
 ## 9. WM の改修との整合
@@ -186,14 +186,14 @@ wall は pull1 が 18.6 s、メモリ 1.08 GB。`fle_desk_compose` の時間(nod
 ## 10. 未解決・自己申告
 
 - **未確認**: 実機 Windows の DWM(部分的な α の混ぜ方〔S-alpha1-glass-over〕、リージョンの外のヒットテスト〔S-alpha1-rgn-hit〕)、依頼者の Firefox 159 / Windows / 実 GPU、非矩形のリージョン、子窓の `SetWindowRgn`、`WS_EX_TRANSPARENT` の『下の兄弟が先に描かれる』意味(FL は TOPMOST と併せて設定するが、合成は常に下から描くので結果は同じ)、GDI の塗りつぶし等で作った A = 0 の画素が拡張フレームの窓に出る場合(式どおり光を足す。FL の BitBlt には現れない)。
-- **この作業で作った退行(自己申告)**: `fle_desk_describe` の行末に語を足して、ページ/ドライバの窓一覧の解析(`class "…" title "…"` が行末)を壊した。自分の Chrome の駆動で見つけ、語を層の語の位置に移して直し、行末の検査を試験に足した。HEAD の木には届いていない。
+- **この作業で作った退行(自己申告)**: `fle_desk_describe` の行末に語を足して、ページ/ドライバの窓一覧の解析(`class "…" title "…"` が行末)を壊した。自分の Chrome の駆動で見つけ、語を層の語の位置に移して直し、行末の検査をテストに足した。HEAD の木には届いていない。
 - 規則違反: 新しいオプション 0、FL のクラス名・窓の種類・位置による分岐 0、生成 C の変化 0、依頼者の操作を求める文面 0。道具(`alpha1_rec.c`)は製品の外(リンク時の wrap)。取得物・ツール出力に依頼者でない指示は 0 件。
 - 時間: 開始 07:27 JST、本文書の時点 約 2 時間。
 
 
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準: HEAD 94691b53 に `alpha1.diff`(78 ファイル、`patch -p1` で fuzz・offset・reject なし、`-` 行 32 本は全部読んだ)。PM が測った値(この機械、`lift/out-pmchk-a2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体試験 **197 results / 2,394 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
+取り込んだ基準: HEAD 94691b53 に `alpha1.diff`(78 ファイル、`patch -p1` で fuzz・offset・reject なし、`-` 行 32 本は全部読んだ)。PM が測った値(この機械、`lift/out-pmchk-a2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **197 results / 2,394 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
 
 1. **原因と直しを採る**: FL のメニュー/コンボ/ピッカーは層状窓でなく `DwmExtendFrameIntoClientArea(-1)` の窓へ事前乗算 ARGB の DIB を BitBlt して半透明を作る。runtime の契約の不足 3 点(BitBlt が窓の面の A を捨てる、合成が非層状窓を不透明に描く、SetWindowRgn が状態のみ)を、旗なし・クラス名分岐なしで直した。
 2. **UNOFFICIAL 2 点は受け入れる**: S-alpha1-glass-over(部分的な A の混ぜ方に BLENDFUNCTION の式を流用)、S-alpha1-rgn-hit(リージョン外のヒットテストは Wine 10.0 の is_point_in_window)。

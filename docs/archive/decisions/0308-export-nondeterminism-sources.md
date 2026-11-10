@@ -226,13 +226,13 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 | MXCSR(FTZ/DAZ/RC) | 未判別。ガード付きの遅い経路で実機の規則を再現 | §12 |
 
 - **変種 FLP(作成済み、`/home/ubuntu/work/alpha22w/flp-variants/`、元と同じ 1,322,619 B、`tools/a22-flp-nostretch.py`)**: ev215 の time・pitch・mult・mode(i32、オフセット 96/100/104/108)をゼロにした。`nostretch-all.flp`(伸縮/ピッチが設定された 13 チャンネル全部)、`nostretch-mp3pad.flp`(チャンネル 7・35・45 = Vocals・Other・atmos pad)、`nostretch-pad.flp`(45 のみ、3 バイトの差)。**両側(隠した構成の Wine と wasm)で Export して、wasm 対 Wine の差を元と比べる**: 差の rms が下がり、特に残差が大きい区間(5〜19 s、44〜61 s、82〜96 s、122 s〜)で下がれば Elastique の伸縮/ピッチが主因。下がらなければリサンプリング・x87・MXCSR の側。伸縮が無くなると音は変わる(同じ変種を両側に与えるので比較は成立する)。
-- **Split mixer tracks(wasm 側。手順)**: Rendering ダイアログ(Ctrl+R → 保存先の確認 → ダイアログ)で『Split mixer tracks』は座標 (938, 647)、Start は (1135, 832)(Chrome の Export の場面と node の G3 の `click` は同じ座標系: 元の Export の場面 `scn-export.json` の Start のクリックが (1135, 832))。**Chrome の sdriveg2 の `exportSha` は `window.__app.saved[0]`(保存ダイアログで選んだ 1 ファイル)だけを取る**ので、Split で FL が書く複数ファイルは取れない(ページに一覧を出す変更が要る)。**node の G3 が現実的**: 場面 = Ctrl+R(`key down 0x11`・`tap 0x52`・`key up 0x11`)→ ダイアログを環境変数(`FLE_FILEDLG_SAVE_FILE`)が答える → `click 938 647 L`(Split)→ `click 1135 832 L`(Start)→ `advance 200000` → 書かれたファイルの回収。回収の `vfsdump GUESTPATH HOSTFILE` は**空白を含むパスを渡せない**ので、ディレクトリ単位で書き出す `vfsdumpdir` を node の試験ビルドの harness(`fruity_g3.c`・`fle_vfs.c`)に足す必要がある(使い捨ての木、wasm の試験ビルド 1 回 = 約 15 分)。ファイル名の規則は Wine 側(opt1)の Split の結果から。**私が用意できる**: `vfsdumpdir` の追加と node の場面(0310 の保留の間にできる)。
+- **Split mixer tracks(wasm 側。手順)**: Rendering ダイアログ(Ctrl+R → 保存先の確認 → ダイアログ)で『Split mixer tracks』は座標 (938, 647)、Start は (1135, 832)(Chrome の Export の場面と node の G3 の `click` は同じ座標系: 元の Export の場面 `scn-export.json` の Start のクリックが (1135, 832))。**Chrome の sdriveg2 の `exportSha` は `window.__app.saved[0]`(保存ダイアログで選んだ 1 ファイル)だけを取る**ので、Split で FL が書く複数ファイルは取れない(ページに一覧を出す変更が要る)。**node の G3 が現実的**: 場面 = Ctrl+R(`key down 0x11`・`tap 0x52`・`key up 0x11`)→ ダイアログを環境変数(`FLE_FILEDLG_SAVE_FILE`)が答える → `click 938 647 L`(Split)→ `click 1135 832 L`(Start)→ `advance 200000` → 書かれたファイルの回収。回収の `vfsdump GUESTPATH HOSTFILE` は**空白を含むパスを渡せない**ので、ディレクトリ単位で書き出す `vfsdumpdir` を node のテストビルドの harness(`fruity_g3.c`・`fle_vfs.c`)に足す必要がある(使い捨ての木、wasm のテストビルド 1 回 = 約 15 分)。ファイル名の規則は Wine 側(opt1)の Split の結果から。**私が用意できる**: `vfsdumpdir` の追加と node の場面(0310 の保留の間にできる)。
 - **E2 が残差を動かさなかったので、(PM の指示 2) Elastique 単体の harness(3〜5 人日)の前に、上の変種 FLP と Split を先にする**のが安い(変種は FLP の 3 バイトの差、両側の Export は各 1〜2 分)。
 
 ## 14. 追加(PM 19:46〜20:35): wasm 側の node の Export、変種 FLP と Split の run
 
-- **試験 build**(使い捨て、`/home/ubuntu/work/alpha22w/{tt-split,tw-split}` = E12c の試験木 `tt-e19` と作業木 `tw-e19` の複製 + 試験専用の 3 ファイルの変更: `lift/runtime/fle_vfs.c`・`fle_vfs.h` に `fle_vfs_walk_dir`、`lift/harness/fruity_g3.c` に G3 の op `vfsdumpdir GUESTDIR`〔空白を含むパスを許し、ディレクトリの全ファイルを `$FLE_G8_DUMPDIR/NN-<名前>` に書く〕。製品の木・PM の木には書いていない)。`tools/build-split.sh`(nice 19、JOBS 1): 2 つのオブジェクトの再コンパイル + 再リンク + wasm-opt + 混成 + bundle で **7 分**(19:48〜19:55)。bundle の wasm は `engine.3e57f055ea7f.wasm`。
-- **node の Export**(`export-plain.g3`: File→Open→Problems を Enter→Ctrl+R→Start `click 1135 832`→`advance 190000`→`vfsdumpdir C:\Users\user\Downloads`。保存先は `FLE_FILEDLG_SAVE`): **1 本 約 2 分半**(wall 142 s、RSS 1.2 GB)。**exp-orig(元の FLP)の WAV は 22,863,828 B・sha256 381cdb5a…f979 = 製品(E2〜E12)の Export と一致**(試験 build が製品と同じ出力を出す検証。PM の sha256 でも一致)。終了時の `exitCode 134 /『stop: SIGABRT』`は Export の途中でなく G3 の `end` 後の通常の終わり方(既存の G3 の行 `g3-lines-base-84.txt` も同じ)。
+- **テスト build**(使い捨て、`/home/ubuntu/work/alpha22w/{tt-split,tw-split}` = E12c のテスト木 `tt-e19` とワークツリー `tw-e19` の複製 + テスト専用の 3 ファイルの変更: `lift/runtime/fle_vfs.c`・`fle_vfs.h` に `fle_vfs_walk_dir`、`lift/harness/fruity_g3.c` に G3 の op `vfsdumpdir GUESTDIR`〔空白を含むパスを許し、ディレクトリの全ファイルを `$FLE_G8_DUMPDIR/NN-<名前>` に書く〕。製品の木・PM の木には書いていない)。`tools/build-split.sh`(nice 19、JOBS 1): 2 つのオブジェクトの再コンパイル + 再リンク + wasm-opt + 混成 + bundle で **7 分**(19:48〜19:55)。bundle の wasm は `engine.3e57f055ea7f.wasm`。
+- **node の Export**(`export-plain.g3`: File→Open→Problems を Enter→Ctrl+R→Start `click 1135 832`→`advance 190000`→`vfsdumpdir C:\Users\user\Downloads`。保存先は `FLE_FILEDLG_SAVE`): **1 本 約 2 分半**(wall 142 s、RSS 1.2 GB)。**exp-orig(元の FLP)の WAV は 22,863,828 B・sha256 381cdb5a…f979 = 製品(E2〜E12)の Export と一致**(テスト build が製品と同じ出力を出す検証。PM の sha256 でも一致)。終了時の `exitCode 134 /『stop: SIGABRT』`は Export の途中でなく G3 の `end` 後の通常の終わり方(既存の G3 の行 `g3-lines-base-84.txt` も同じ)。
 - **変種 FLP の wasm 側 Export**: nostretch-pad の WAV(sha256 11d96d21…9be5)を回収済み。**元の wasm の Export との差は rms 5,759(−11.0 dB)、一致フレーム 23.1%**(atmos pad の pitch 650・mode 5 を外すと音が大きく変わる = pad は大きな成分)。nostretch-mp3pad・nostretch-all・Split は PM の合図(静かな窓の後)で実行する。Wine 側の同名変種は opt1 が `~/work/opt1-wine/exports/runs/<変種名>.wav` に置く。比較: `tools/a22-wavcmp2.py`(2 つの WAV の差)、`a22-isolate.py`(変種が取り除く成分を両側で取り出して比べる = P_wasm = wasm_orig − wasm_var と P_wine = wine_orig − wine_var の差)、`/home/ubuntu/work/alpha22w/tools/compare-all.sh`。
 - **x87 の追加所見(読み)**: runtime の x87 の初期制御語は 0x037F(FNINIT の値 = 仮数 64 ビット)。Win64 のスレッドの初期は 0x027F(仮数 53 ビット)と記憶している(Wine の `init_thread_context`、未確認)ので、FL のコードが `FLDCW` で設定しない経路の x87 は精度が違いうる。ただし **Elastique には x87 の超越関数命令(fsin・fcos・fptan・fpatan・fyl2x・f2xm1・fscale)が 0 件**(x87 らしい命令は 1,548、うち fldcw 149・fnstcw 66・frstor 48 は丸めモードと状態の保存で、fld/fmul/faddp が算術)、dsp_ippv2 は fprem/fprem1 が 7 件、FLEngine は fsin 2・fcos 3・fsincos 1・f2xm1 1・fyl2x 3・fyl2xp1 4・fscale 2・fprem 2。= **Elastique の出力に x87 の超越関数の実装差が効く余地は小さい**(線形走査なのでデータの誤デコードを含む)。
 
@@ -240,7 +240,7 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 
 - **wasm の Export の WAV(sha256 先頭)**: orig 381cdb5a(製品と一致)、nostretch-pad 11d96d21、nostretch-mp3pad 92f88128、nostretch-all(`/home/ubuntu/work/alpha22w/runs/exp-<変種>/dump/00-serina1-serum2-export.wav`)。**wall: orig 142 s、nostretch-pad 146 s、nostretch-all 74 s**(mp3pad は SIGSTOP を挟んだので無効)。**伸縮/ピッチを外すと wasm の Export の CPU が約半分 = Elastique とその周辺が Export の CPU の約半分**(0296 の Elastique 79% と整合。性能の梃子の候補)。mp3pad・all は伸縮が無くなりクリップが曲の終わりを越えるので長さが +32,524 フレーム(5,748,435)。元の wasm との差は pad −11.0 dB、mp3pad −2.9 dB、all −1.3 dB(一致フレーム 23% / 15% / 13%)。= 変種の比較は、Wine 側が同じ FLP の変種を処理した WAV(opt1 が `~/work/opt1-wine/exports/runs/<変種名>.wav` に置く)と比べて初めて意味を持つ。**未着**。
 - **wasm 側の Split は OOM で失敗**: Export 中に `fle: WriteFile: out of memory`(`fle_vfs` の確保)。wasm の線形メモリの最大が 2 GiB(`-sMAXIMUM_MEMORY=2147483648`、wasm の import も max 32768 ページ)で、基底の使用(約 1 GB)に Split の全トラックの WAV(使用中のミキサー 47 本 × 22.8 MB ≈ 1.07 GB、realloc の余裕を含めるともっと)が載らない。**Chrome でも同じ上限**なので、利用者が Split を選ぶと製品でも同じ OOM(製品側の課題: 書き出しの逐次ファイル化〔OPFS・File System Access〕または memory64。優先度は G9 の後でよい、PM)。
-- **対処(試験 build のみ)**: `-sMAXIMUM_MEMORY=4294967296`(`link-web.sh`)+ 書き出しを低位アドレスの作業バッファ経由(2 GiB 超のポインタを JS のファイル系へ渡さない)。再ビルドは混成の `wasm-merge` で失敗: **`fe-wasmgen` が直 wasm のメモリ import の max を 32768 ページに固定している**(`crates/fe-wasmgen/src/lib.rs` の `import_memory_shared(…, 32768)` 2 箇所)ため、C 部の max 65536 と不一致(`Type mismatch when importing memory`)。`lib.rs` の 2 箇所を 65536 にして `fe-wasmgen` を再ビルドしてから混成をやり直す(未実施 — gpu1 の窓の後)。差分は `tools/node-export/*.test-only.diff`(a977401d に対する試験専用の変更 5 ファイル)。
+- **対処(テスト build のみ)**: `-sMAXIMUM_MEMORY=4294967296`(`link-web.sh`)+ 書き出しを低位アドレスの作業バッファ経由(2 GiB 超のポインタを JS のファイル系へ渡さない)。再ビルドは混成の `wasm-merge` で失敗: **`fe-wasmgen` が直 wasm のメモリ import の max を 32768 ページに固定している**(`crates/fe-wasmgen/src/lib.rs` の `import_memory_shared(…, 32768)` 2 箇所)ため、C 部の max 65536 と不一致(`Type mismatch when importing memory`)。`lib.rs` の 2 箇所を 65536 にして `fe-wasmgen` を再ビルドしてから混成をやり直す(未実施 — gpu1 の窓の後)。差分は `tools/node-export/*.test-only.diff`(a977401d に対するテスト専用の変更 5 ファイル)。
 
 ## 15. 決め手(21:20、変種 FLP の wasm 対 Wine)— **残差の原因は、チャンネル 7 または 35 の MP3 クリップのストレッチ/ピッチ処理**
 
@@ -264,9 +264,9 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 - **遅れ・ゲインではない**: 10 s 区間ごとの最適な遅れ(中央 mid、±400 サンプル)は**全区間で 0**、最適ゲインは 0.972〜1.000、遅れ・ゲインを補正した後の rms は元の差とほぼ同じ(例 80〜90 s: 4114.7 → 4086.1)。1 サンプル未満の遅れ(導関数への最小二乗)も 0.000〜0.017 サンプルで、補正後の残差は元の 1.000 倍。= **時間のずれ・音量の差・微小な遅れでは説明できない**。
 - **帯域**: 差は 1〜16 kHz に集まる(信号のその帯域に対して −8〜−19 dB。80〜90 s は 2〜16 kHz で −1.5〜−3.4 dB)。1 kHz 未満は −26〜−60 dB。= ボーカル/Other の中高域の音が、同じ時刻・同じ大きさで、**位相や細部だけ違う**形。差は M(L+R)側が大きい(M 3882 対 S 1363、80〜90 s)= 中央定位のボーカル。
 - **STFT(窓 2048、hop 1024、中央)**: 差が大きい区間で、**振幅**の差は信号に対して −21.5〜−26 dB(`logmag` の rms 1.0〜1.9 dB)、**位相**の差は振幅で重みをつけた rms で 0.17〜0.49 rad(80〜90 s が最大の 0.486 rad)。差の小さい区間(20〜40 s、100〜120 s)は振幅 −43〜−49 dB・位相 0.007〜0.013 rad。= 完全に無関係な信号(位相が一様にばらつく)ではなく、**同じ信号の位相が 0.2〜0.5 rad 程度ずれた**形。位相ボコーダ型の伸縮器で、位相の積算や位相ロックの『判定』が分かれた時の典型と読める(推測。裏づけは Elastique の引数と PCM の記録待ち)。
-- **含意(読み、未検証)**: (1) CPU 経路・時刻・乱数・MP3・補間は既に棄却済みで、残るのは『Elastique に渡る引数が違う』か『同じ引数で Elastique の出力が違う(= lift した算術のどこかが実機と違う)』のどちらか。前者なら §5(0308b)の記録で見える。後者なら Elastique 単体の差分テスト(同じ合成入力を Wine〔mingw の試験 exe〕と lift の両方で処理)が要る。(2) 差が長いクリップで大きく、短い切り刻みで小さいのは、再帰的な位相の積算が時間とともに差を広げる形と合う(読み)。
+- **含意(読み、未検証)**: (1) CPU 経路・時刻・乱数・MP3・補間は既に棄却済みで、残るのは『Elastique に渡る引数が違う』か『同じ引数で Elastique の出力が違う(= lift した算術のどこかが実機と違う)』のどちらか。前者なら §5(0308b)の記録で見える。後者なら Elastique 単体の差分テスト(同じ合成入力を Wine〔mingw のテスト exe〕と lift の両方で処理)が要る。(2) 差が長いクリップで大きく、短い切り刻みで小さいのは、再帰的な位相の積算が時間とともに差を広げる形と合う(読み)。
 
-## 17. 変種の結果(23:3x。2 GiB の試験 build の wasm Export 5 本〔exp-orig は sha256 381cdb5a…f979 で製品と一致〕対 opt1 の Wine〔隠した構成〕の同名の変種。`tables/0308-variants-compare-2337.txt`、PM が `a22-wavcmp2.py` で独立に同じ値を確認)
+## 17. 変種の結果(23:3x。2 GiB のテスト build の wasm Export 5 本〔exp-orig は sha256 381cdb5a…f979 で製品と一致〕対 opt1 の Wine〔隠した構成〕の同名の変種。`tables/0308-variants-compare-2337.txt`、PM が `a22-wavcmp2.py` で独立に同じ値を確認)
 
 | 変種(消した物) | 差の rms | dB | 最大差 | 一致フレーム | 形 |
 |---|---:|---:|---:|---:|---|
@@ -280,9 +280,9 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 | nostretch-ch35(ch 35 全部 0) | 1925.3 | −20.6 | 34,776 | 27.2% | ch 7 の分(0〜20 s、40〜60 s、80〜100 s が大。20〜40 s、70〜80 s、100〜120 s は 2〜20 でほぼ一致) |
 
 - **読み**: (1) **pitch だけでは差は出ない**(time・mult・mode を 0 にすると pitch 50 を残しても一致 = mode 0〔Resample〕は Elastique を通らない)。(2) **time/mode ≠ 0 のストレッチ(ResampleSource)が原因**で、pitch を足すと差が増える(712.9 → 2031.2)。(3) ch 7 と ch 35 は別々の区間で独立に効き、電力は √(1925² + 634²) = 2026 ≒ 2031。**ch 7 が約 90%(4.12M のうち 3.71M)、ch 35 が約 10%**(PM の計算)。(4) ch 7(mode −2)と ch 35(mode −1)は同じ経路(`ElResampleSource_CreateInstance`)で、共通の原因は『ResampleSource の処理』(入力が違うか、同じ入力で出力が違うか)。
-- 道具: `/home/ubuntu/work/alpha22w/tools/{run-queue4.sh,compare-all.sh}`(`tools/node-export/` に複写)。wasm の run は `runs/exp-<変種>-b2/`。
+- 道具: `/home/ubuntu/work/alpha22w/tools/{run-queue4.sh,compare-all.sh}`(`tools/node-export/` にコピー)。wasm の run は `runs/exp-<変種>-b2/`。
 
-## 18. ELOG 第 1 版の結果(23:5x。wasm = 2 GiB の試験 build に `a22-make-elog.py` の記録を足した物の node Export、Wine = opt1 の shim〔INT3 + VEH〕の Export、どちらも元の FLP・隠した構成)
+## 18. ELOG 第 1 版の結果(23:5x。wasm = 2 GiB のテスト build に `a22-make-elog.py` の記録を足した物の node Export、Wine = opt1 の shim〔INT3 + VEH〕の Export、どちらも元の FLP・隠した構成)
 
 - **記録は出力を動かさない**: wasm の Export の WAV は 22,863,828 B・sha256 `381cdb5a…f979`(製品と同一)。Wine の WAV も hide1 と 5,715,911 フレーム中 5,715,906 一致(最大差 1、opt1)。ELOG は `logs/elog1-wasm-orig-export.txt`(1,257 行)と `logs/elog1-wine-hide8-export-2.txt`。比較: opt1 の `tools/elog-compare.py`。
 - **呼び出し数**: `a981f0`・`a97780`・`677fb0`・`a97930`(と出口 `a97930x`)は両側で各 **1 回**(Auto〔mode 5〕の atmos pad だけ)。`677f60`(v2)は 0 回。`678010`(ElResampleSource_CreateInstance)は **Wine 1,254 回・wasm 1,252 回**(edx = ch = 2 が 1,210 対 **1,208**、1 が 44 対 44。f2 = 44100.0f は全部同じ)。**wasm の方が 2 回少ない**(原因は未確認。呼び出しの順序は thread で入れ替わるので seq 対 seq の比較は無効、分布で比べた)。
@@ -297,7 +297,7 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 - **宿題 B(数学関数)**: `elastique_x64.dll` の import は KERNEL32 77 件と WS2_32 の ntohl/htonl だけで**数学関数の import は 0 件**。MSVC の CRT は DLL に静的に入っていて lift した命令列として実行される。= 『外部 API の数学関数の実装差』の経路はこの DLL には無い。`.text` 601,479 命令・`IPPCODE` 233,582 命令の census: VEX 205,257(+19,416)、FMA 25,302(+884)、rcpps 16(+102)、rsqrtps 0(+731)、rsqrtss(+48)、**ldmxcsr 88・stmxcsr 61**、fldcw 145・fnstcw 62・frstor(+48)、x87 計 1,305(+243)で、x87 の超越関数は 0。`tables/0308-elastique-census.txt`。差の候補: lift した命令の意味、MXCSR(FTZ/DAZ/丸め)・x87 制御語(精度)の扱い。
 - **次**: 第 3 版 ELOG(f_67de50 の戻りアドレス、ResampleSource の process = RVA 0x284e60 の出力ハッシュ、最初の 20 呼びのダンプ)と、Elastique の入口での MXCSR・x87 制御語の記録(wasm と Wine)。
 
-## 20. ELOG 第 3〜5 版の結果(01:2x。wasm = alpha1 の試験 build〔WAV の sha256 = 381cdb5a…f979〕、Wine = opt1 の shim〔elog8〜12〕)— **残差の入口は MP3 の復号結果(clip の int16 PCM)の違い**
+## 20. ELOG 第 3〜5 版の結果(01:2x。wasm = alpha1 のテスト build〔WAV の sha256 = 381cdb5a…f979〕、Wine = opt1 の shim〔elog8〜12〕)— **残差の入口は MP3 の復号結果(clip の int16 PCM)の違い**
 
 - **ResampleSource の process(`b284e60` = wrapper vtable +0x20 → 内部実装 RVA 0x2abc20)**: `(this, float** out〔チャンネルごとのポインタ〕, n フレーム)`。外側の呼びは wasm 10,000・Wine 8,000(上限)。(inst, ic) で対応づく 7,270 個で **n(フレーム数)は全部一致**(PM)= ブロック長の列の違いは棄却。**出力のハッシュは 0/7,270 一致**(最初の呼びから違う)。最初の 20 呼びの出力ダンプ(`tables/0308-rs-compare-elog8-vs-elog3.txt`、inst の番号は wasm の ElProV3 登録の分と Wine の先頭の余分な 1 つで相殺するので同じ番号で比較): **stereo の inst 1,2 は最初の呼びから相対 1.5e-4〜4.9e-3 違い、呼びごとに増える**(inst 1: ic 0 = 2.25e-5〔0.74 LSB〕、ic 10 = 4.3e-3〔約 140 LSB〕)。最適な小数サンプルの遅れ 0.0、ゲイン 0.9999〜1.0002 = 位相の遅れでも振幅でもなく、雑音のような差。**mono の inst 3 は相対 7e-7 で float 丸め級に一致**。
 - **Init(`f_67de50` = プロバイダの初期化。呼び元は 0xd283c1 = `f_d27cf0` の 1 箇所)**: `[prov+0x38] = (mode >= 0) ? 0 : -mode`(`mode = [chan+0x2f0]`)。m38 = 1(mode −1)なら作成〔s5 = 1〕、2(mode −2)なら作成〔s5 = 0〕、0 は作らない。Wine の Init は 3,091 回(m38 = 0 が 1,837、1 が 291、2 が 963)、wasm は 3,089 回(m38 = 1・stereo・int16 が 189 対 187)。ResampleSource の作成 1,254 回 = Wine の m38 ≥ 1 の Init 291 + 963。provider は 14 個を使い回す(プール)。Wine にだけ最初と最後に mode −1 の項目の開始が 1 回ずつ多い(原因は未確認)。
@@ -325,7 +325,7 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 ## 11. 逸脱・自己申告
 
 - 18:2x に shell でなく `bash` という名前のツールを 1 回呼んだ(`echo test`、『bash ツールは無い』と返って実行は shell に回された。副作用なし)。
-- 0304 の後片付け(PM の了解 18:3x の後): vite preview 2 本の停止(`kill 2831148 2831150`)、`/tmp/opencode/a14・a15・a17・a19・a20` の削除(`readlink -f` で実体を確認、`find -type l` で mt3 の bundle へのリンク 5 本を確認〔削除はリンクだけ〕)。必要な物は alpha19-results に複写済み。
+- 0304 の後片付け(PM の了解 18:3x の後): vite preview 2 本の停止(`kill 2831148 2831150`)、`/tmp/opencode/a14・a15・a17・a19・a20` の削除(`readlink -f` で実体を確認、`find -type l` で mt3 の bundle へのリンク 5 本を確認〔削除はリンクだけ〕)。必要な物は alpha19-results にコピー済み。
 - 23:51 に `compare-all.sh` を nice なしで 1 回流した(numpy 1 スレッド、約 1 分、ELOG 第 1 版の node Export と同時。gpu1 の Chrome 窓の開始〔23:54〕の前)。
 - 22:5x〜23:3x: 窓の間の `wait-until` を長く取りすぎ、PM の info を受け取る間隔が長くなった(1 回 SIGTERM で終了した)。
 - 0308b §6・§7 の初版で『ch 7/35 は ElProV3・旗 0』『オフラインの事前レンダリング』と**誤って**書いた(opt1 の Wine の ELOG で訂正。§0・0308b §6 に訂正を明記)。
@@ -354,7 +354,7 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 
 ### 追記(2026-11-06 22:33、alpha1 の §14〜§16 と 0308b の取り込み)
 
-取り込み: 最終 22:26 版(§13〜§16 と 0308b)に差し替え、`docs/investigations/alpha20/` の表・道具を更新した。実行は node の Export(試験 build、`vfsdumpdir` 付き)と numpy の解析で、Chrome・依頼者の機械は 0 件。
+取り込み: 最終 22:26 版(§13〜§16 と 0308b)に差し替え、`docs/investigations/alpha20/` の表・道具を更新した。実行は node の Export(テスト build、`vfsdumpdir` 付き)と numpy の解析で、Chrome・依頼者の機械は 0 件。
 
 事実として受け取る(wasm の Export と、Wine 上の原版 FL〔内蔵 8 種を退避した構成〕の Export の比較):
 1. **同名の変種 FLP の差の RMS**: 元 2,031.2(−20.0 dB、一致 21.1%、最大 36,664)、atmos pad〔ch45〕だけ伸縮/ピッチを外す 2,030.8、ch7・35・45 を外す(nostretch-mp3pad)**2.1**(−79.9 dB、一致 38.0%、最大 31)、13 チャンネルを外す(nostretch-all)**2.1**(−80.0 dB、一致 39.1%、最大 20)。opt1 の再計算も同値。= **残差の原因は ch7〔Vocals の MP3〕または ch35〔Other の MP3〕の伸縮/ピッチ処理(Elastique)**。−80 dB は 16 bit の丸め。MP3 の復号・ミキサー・補間・MXCSR・x87 には残差がない。wasm の Export の壁時計は伸縮を外すと 142 s → 74 s で、Elastique が wasm の Export CPU の約半分。
@@ -387,13 +387,13 @@ PM が自分で再計算して alpha1 の数字と一致した物(numpy 1 スレ
 判断:
 1. **`elastique_x64.dll` の import に数学関数は 0 件**(KERNEL32 77 件と WS2_32 の 2 件だけ。MSVC の CRT は DLL に静的で lift 済み)。= 差の原因は外部 API の数学関数の実装差ではない。候補は、lift した命令の意味、MXCSR〔ldmxcsr 88・FTZ/DAZ/丸め〕・x87 制御語〔fldcw 145・精度制御〕の扱い、近似命令〔rcpps 16〔+102〕・rsqrtps 0〔+731〕〕。
 2. **次の一手は FPU 状態の比較を最優先にする**: Elastique の入口〔f_a97930、RVA 0x285320、RVA 0x284e60〕で x87 制御語と MXCSR を両側で記録する(Wine は opt1 の shim で CONTEXT から、wasm は alpha1 の第 4 版〔差分・構文検査済み、build は PM の info 後〕)。**違えば、OS が thread に与える初期状態〔x87 CW・MXCSR〕の契約の不足 = lift の忠実性の方針の (b) 外部契約で、私が直す。FL の代行ではない**。違わなければ、pad の出力の最初の違うブロックを process 呼びの粒度まで絞る(第 3 版 ELOG と最初の 20 呼びのダンプ)。ch7 の残差(約 90%)は pad ではなく ResampleSource の process 内部のはずで、pad は 'lift した Elastique ≠ Wine' の陽性対照。
-3. 区分: ELOG の計器は test-only の差分で、製品に入れない。wasm の node 試験の `SIGABRT` 終了は G3 の Export の終わり方で、既知。
+3. 区分: ELOG の計器は test-only の差分で、製品に入れない。wasm の node テストの `SIGABRT` 終了は G3 の Export の終わり方で、既知。
 4. 未確認: FPU 状態の比較、最初に違う process 呼び、実 Windows の出力(Wine は『もう一つの実装』で正解ではない)、`f_67de50` が 2 回続く理由(wasm は 1 回)。
 
 
 ## PM の追記(2026-11-07 02:38、alpha1 の最終報告〔§20〜§22〕の取り込み、docs のみ。製品の差分なし)
 
-取り込み: alpha1 の 0308 の最終版(§0 最終、§14〜§22)・表・道具・ELOG の写し(`docs/investigations/alpha20/`。400 KB を超える ELOG の本文 3 本〔elog2・elog3・elog5〕は `lift/out-git/alpha20-results/logs/` に残し、docs には入れない)。**実エンジンの実行(wasm の試験 build の node G3 の Export 約 20 本と Wine 10 上の元の x86 FL の Export)の実測と既存ログの解析で、代役・再生・期待値の貼り付けは無い。依頼者の機械は 0 件。**
+取り込み: alpha1 の 0308 の最終版(§0 最終、§14〜§22)・表・道具・ELOG の写し(`docs/investigations/alpha20/`。400 KB を超える ELOG の本文 3 本〔elog2・elog3・elog5〕は `lift/out-git/alpha20-results/logs/` に残し、docs には入れない)。**実エンジンの実行(wasm のテスト build の node G3 の Export 約 20 本と Wine 10 上の元の x86 FL の Export)の実測と既存ログの解析で、代役・再生・期待値の貼り付けは無い。依頼者の機械は 0 件。**
 
 PM の検証(自分で numpy 1 スレッド・nice 19 と `a22-wavcmp2.py`、`elog-compare.py` を走らせた):
 1. wasm の入力統一(mp3wav-all)の Export は sha256 `381cdb5a…f979` で ACM 経路の Export と bit 同一(5,715,911 フレームの最大差 0)。

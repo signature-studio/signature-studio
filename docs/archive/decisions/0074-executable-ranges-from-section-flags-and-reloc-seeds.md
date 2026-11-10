@@ -86,7 +86,7 @@ fe-lift lift lift/out-ext/dsp_ippv2_x64.dll /dev/null --pdata --seeds lift/out-w
 
 - 新規 `lift/crates/fe-decode/tests/multisec.rs`（7 件。合成 PE。`.text`、`IPPCODE`、CNT_CODE だけの `NOEXEC`、`.pdata`、`.reloc`）: セクション特性で決まること（名前ではない）、範囲が実行セクションごと・VA 昇順であること、2 つ目の実行セクションの関数が閉包に入り、実行属性の無いセクション（CNT_CODE のみ、または `.text` という名前でも MEM_EXECUTE なし）が入らないこと、実行セクションが無いとエラー、`pdata_seeds` が実行範囲内の開始だけであること、reloc seed が「`.pdata` 開始と一致するもの」だけを加えること（一致しない値は seed にならず `not_function` に数えられる。関数にもならない）、再配置ディレクトリが無いときは seed 0。
 - 既存テストの表明は弱めていない（`tests/adjustor.rs` は `Text { va, bytes }` を `Text::single(va, bytes)` に置き換えただけ）。
-- `cargo test --workspace --no-fail-fast`（`FLENGINE_PE` を指定、`CARGO_TARGET_DIR=lift/out-w3/target`）: **失敗 0、通過 1,003 件、`Running` 83 個 + Doc-tests 3 個 = 結果行 86 個**。数の上では基準（996 件）+ 本件の新規 7 件 = 1,003 だが、実行時点の作業ツリーには他の subagent の未コミットの変更（`sse_legacy.rs`、`tests/sse_legacy.rs` など）もあったので、差分の内訳が全部本件の 7 件だと確かめてはいない（バイナリ数の数え方も基準と同じか未確認）。落ちたものは無く、切り分けは不要だった。ログは `lift/out-w3/test-workspace.log`。
+- `cargo test --workspace --no-fail-fast`（`FLENGINE_PE` を指定、`CARGO_TARGET_DIR=lift/out-w3/target`）: **失敗 0、通過 1,003 件、`Running` 83 個 + Doc-tests 3 個 = 結果行 86 個**。数の上では基準（996 件）+ 本件の新規 7 件 = 1,003 だが、実行時点のワークツリーには他の subagent の未コミットの変更（`sse_legacy.rs`、`tests/sse_legacy.rs` など）もあったので、差分の内訳が全部本件の 7 件だと確かめてはいない（バイナリ数の数え方も基準と同じか未確認）。落ちたものは無く、切り分けは不要だった。ログは `lift/out-w3/test-workspace.log`。
 
 ## 確認できていないこと
 

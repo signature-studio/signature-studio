@@ -21,7 +21,7 @@
 - 『送られていない』側(S07、S08、S18、S26、S32、S33)は §3(S49 は §3b)。PM の問い(WM_GETMINMAXINFO が到達するか)の答え: 実機の Windows は作成・最大化・サイズ変更で送るが、**この runtime は送らず、ゲストも要求しない**(12 場面で 0 件)。FL は起動で `ShowWindow(主フォーム, SW_SHOWMAXIMIZED)` を 2 回呼ぶが、主フォームの矩形 `(-5, -6, 1930 x 1092)` は FL 自身が `SetWindowPos`(`ra=0x616c9a`、VCL の UpdateBounds)で決めており、GETMINMAXINFO の応答ではない。`DefWindowProc(WM_GETMINMAXINFO)` の停止にゲストが到達するのは、ゲストが自分でこのメッセージを送ったときだけで、実測で 0 件。
 - **WM_CONTEXTMENU(S49): 第 1・2 報の『FL は DefWindowProc(WM_RBUTTONUP)に到達しない』は誤りだった(是正)**。DefWindowProcW への呼び出しを gdb で記録したところ、実エンジンは右クリック 5 回のうち 4 回で `WM_RBUTTONDOWN` と `WM_RBUTTONUP`(TWPControl 2 回、TEdgeBrowser、TVectorPanel。TEventEditForm は DOWN だけ)を、キーボードでは `WM_KEYUP VK_APPS` と `WM_SYSKEYUP F10`(Shift 押下中)を、焦点のあった 3 窓すべてで DefWindowProc に渡す(`logs/ctx-*-base-defproc.txt`)。契約(Learn)ではここで DefWindowProc が WM_CONTEXTMENU を作るが、runtime は作らない。**作る変更を入れた A/B の native N1 で効果を測った**: メッセージは FL の VCL ハンドラ(TControl / TWinControl の WMContextMenu)に届くが、`CreatePopupMenu` / `TrackPopupMenu` は呼ばれず、窓表は完全一致(窓の作成・表示・非表示なし)、停止なし。画は 1 回の右クリックなら**完全一致**、5 回の右クリックとキー場面では時間依存の表示(アニメする要素の 1 画素幅の縁 13 画素、カウンタの数字、Shift ボタンの淡い光彩)だけが違う(§3b)。**『契約との差、効果なし』**。
 - **WM_SIZE の SIZE_MAXIMIZED(S18)は、効果が実エンジンで測れた(向きは不明)**: FL の `TCustomForm.WMSize`(f_85a440)は WM_SIZE の wParam を WindowState(通常 / 最小化 / 最大化)に写して `SetWindowState` を呼ぶ。runtime は `ShowWindow(SW_SHOWMAXIMIZED)` で zoomed 旗を立てる(IsZoomed は TRUE)のに WM_SIZE を作らず、WM_SIZE の wParam は全場面で 0 のみ(`empirical-messages.tsv`)。『ShowWindow 直後に SIZE_MAXIMIZED の WM_SIZE を 1 回送る』実験(A/B。修正ではない)で主フォームの画が **29,885 画素**変わる(bbox (5,6)-(1923,216)。上部ツールバー全体のレイアウトが左半分は 1 画素左へ、右半分は 1 画素右へ)。**どちらが実機の Windows の画かは不明**(実機の参照がない)。契約上は SIZE_MAXIMIZED が来る側。矩形の決め方(WM_GETMINMAXINFO と最大化の矩形)も要るため、**直さずに表と §4 に残した**。
-- **`alpha6.diff`(必須の修正)は作っていない**。理由: PM の規則(実エンジンでゲストが止まる/描き誤る根拠がある物だけ直す)に照らし、(a) S49 は効果なし、(b) S18 は効果が測れたが『契約側の画』が実機で確かめられず、しかも本番の画(主フォームの上部 3 万画素)を動かす。**任意の差分**として `optional/alpha6-optional-ctxmenu.diff`(S49 の契約どおりの実装 + C 試験 + fe-lift 試験)を付けた。取り込むかは PM の判断(§4)。
+- **`alpha6.diff`(必須の修正)は作っていない**。理由: PM の規則(実エンジンでゲストが止まる/描き誤る根拠がある物だけ直す)に照らし、(a) S49 は効果なし、(b) S18 は効果が測れたが『契約側の画』が実機で確かめられず、しかも本番の画(主フォームの上部 3 万画素)を動かす。**任意の差分**として `optional/alpha6-optional-ctxmenu.diff`(S49 の契約どおりの実装 + C テスト + fe-lift テスト)を付けた。取り込むかは PM の判断(§4)。
 
 **未確認**
 
@@ -75,13 +75,13 @@
 
 ## 4. 直す候補(必須の修正は無し。順位は『実機で見える害が出たら』)
 
-1. **DefWindowProc が WM_RBUTTONUP / VK_APPS / Shift+F10 から WM_CONTEXTMENU を作る**(Learn 公式、FL 9 クラスが処理)。**実装・試験・A/B の測定まで済み**(`optional/alpha6-optional-ctxmenu.diff`: 5 行の追加 case + 試験 17 項目。HEAD で 11 項目が FAIL、変更後 17/17、`git apply --check` 通過)。契約の欠落(外部 API の不足 (b))の穴埋めで、効果は測れなかった。**推奨: 今は取り込まない**(効果が見えない上、FL の VCL ハンドラの経路が新たに走る = 他の場面での停止の可能性が増える。10 場面で停止 0 は確かめたが、全場面ではない)。FL が実機でメニューを開くのに我々で開かない、という報告が出たら取り込む。
+1. **DefWindowProc が WM_RBUTTONUP / VK_APPS / Shift+F10 から WM_CONTEXTMENU を作る**(Learn 公式、FL 9 クラスが処理)。**実装・テスト・A/B の測定まで済み**(`optional/alpha6-optional-ctxmenu.diff`: 5 行の追加 case + テスト 17 項目。HEAD で 11 項目が FAIL、変更後 17/17、`git apply --check` 通過)。契約の欠落(外部 API の不足 (b))の穴埋めで、効果は測れなかった。**推奨: 今は取り込まない**(効果が見えない上、FL の VCL ハンドラの経路が新たに走る = 他の場面での停止の可能性が増える。10 場面で停止 0 は確かめたが、全場面ではない)。FL が実機でメニューを開くのに我々で開かない、という報告が出たら取り込む。
 2. **owner の最小化・復元で owned window を隠し、SW_PARENTCLOSING / SW_PARENTOPENING を送る**(Learn 公式、FL が lParam を読む)。必要な根拠: FL の最小化の経路(SC_MINIMIZE がモデルで無効)と、依頼者の画面でどう見えるか。
 3. `ShowWindow(SW_MAXIMIZE)` が WM_GETMINMAXINFO・矩形・WM_SIZE(SIZE_MAXIMIZED) を作る。**効果が実エンジンで測れた(上部ツールバー 29,885 画素の 1 画素ずれ)が、どちらが実機の画かが不明**。必要な根拠: 実機の FL の同じ場所の画(依頼者の機械)。実験の変更は 3 行(`fle_imp_ShowWindow` の `apply_pos` の後で、zoomed でなかった窓に `send_to(WM_SIZE, 2, 現在の client 幅高さ)`)だが、契約の全体(最大化の矩形)ではない。**この項目が本番の画に最も効く**ので、依頼者の実機の画との照合を優先する。
 
 ## 5. 逸脱の開示
 
-- **逸脱 2 件(開示)**: (1) 背景コマンドの中で `( … ) &` と `wait` を 1 回使った(AGENTS.md は末尾 `&` を拒否と定めるが、受理されて走った。以後は別の背景シェルに分けた)。(2) `rm -rf work/t6b/lift/harness/alpha6` が、`t6b/lift/harness` が `out-alpha3/t6/lift/harness` へのシンボリックリンクであるため **共有の試験ソース `ctxmenu.c` を消した**(自分の木。PM の木ではない)。同じ内容を作り直して HEAD 側・変更側の試験をやり直した(11 FAIL / 17 OK を再取得)。
+- **逸脱 2 件(開示)**: (1) 背景コマンドの中で `( … ) &` と `wait` を 1 回使った(AGENTS.md は末尾 `&` を拒否と定めるが、受理されて走った。以後は別の背景シェルに分けた)。(2) `rm -rf work/t6b/lift/harness/alpha6` が、`t6b/lift/harness` が `out-alpha3/t6/lift/harness` へのシンボリックリンクであるため **共有のテストソース `ctxmenu.c` を消した**(自分の木。PM の木ではない)。同じ内容を作り直して HEAD 側・変更側のテストをやり直した(11 FAIL / 17 OK を再取得)。
 - sleep・timeout・pkill -f・while は使っていない。cargo は走らせていない。
 - 第 1・2 報の『FL は DefWindowProc に到達しない』(S49)と『VCL の WindowState は IsZoomed で読めるので状態は一致』(S18)は誤りだった。上に是正した。
 - `lift/out-alpha3` は 500 MB 以下に保った(途中で 601 MB になった時点で runs / 古い木を削除)。
@@ -89,7 +89,7 @@
 
 ## 6. 成果物
 
-`docs/`(この文書、`README-0255-line.txt`)、`optional/alpha6-optional-ctxmenu.diff`(任意。取り込み判断は PM)、`tables/`(`message-contract.tsv`、`fl-dynamic-method-ids.tsv`、`fl-handled-not-sent.tsv`、`runtime-stops-on-guest-results.tsv`、`empirical-messages*.tsv`、`learn/`)、`logs/`(B1 の注入結果、`ctx-*-defproc.txt` = DefWindowProc 到達の記録、`pixel-ab.txt` = A/B の画素比較、`ct-before.log` / `ct-after.log` = C 試験、`pics/` = 差の拡大)、`scripts/`、`tools/`(`learn-fetch.py`、`dmt-scan.py`、`a6-msgtab.py`、`a6-mk-table.py`、`a6-mk-notsent.py`、記録器)。
+`docs/`(この文書、`README-0255-line.txt`)、`optional/alpha6-optional-ctxmenu.diff`(任意。取り込み判断は PM)、`tables/`(`message-contract.tsv`、`fl-dynamic-method-ids.tsv`、`fl-handled-not-sent.tsv`、`runtime-stops-on-guest-results.tsv`、`empirical-messages*.tsv`、`learn/`)、`logs/`(B1 の注入結果、`ctx-*-defproc.txt` = DefWindowProc 到達の記録、`pixel-ab.txt` = A/B の画素比較、`ct-before.log` / `ct-after.log` = C テスト、`pics/` = 差の拡大)、`scripts/`、`tools/`(`learn-fetch.py`、`dmt-scan.py`、`a6-msgtab.py`、`a6-mk-table.py`、`a6-mk-notsent.py`、記録器)。
 
 ## PM の判断と取り込み(2026-11-05 20:50、docs のみ)
 
@@ -97,6 +97,6 @@
 
 判断:
 1. **採る: 49 行の表(一致 37 / 不一致 4 / 不明 2 / 未送信 6)と、「0253 の後、ゲストを止める/描き誤らせる引数の不一致は見つからない」という結論。** S11・S19・S46 は FL が値を使わない、または場面で 0 件なので、今は直さない。
-2. **取り込まない: `optional/alpha6-optional-ctxmenu.diff`(S49 WM_CONTEXTMENU)。** 契約との差は本物(FL は DefWindowProc に WM_RBUTTONUP / WM_KEYUP VK_APPS を渡し、Windows ならそこで WM_CONTEXTMENU が作られる)だが、A/B で CreatePopupMenu / TrackPopupMenu の呼び出しは 0、窓表は完全一致、画の差は時間の位相だけで、効果が無い。FL の VCL の経路が新たに走る費用(wall_fr* の形の試験、全 84/55/87 行の確認)に見合わない。差分は保管する(`docs/investigations/alpha6/optional/`)。実機で見える害(右クリックでメニューが出ない)が出たときに取り込む。`ab-experiment-NOT-FOR-MERGE.diff` は実験用で取り込まない。
+2. **取り込まない: `optional/alpha6-optional-ctxmenu.diff`(S49 WM_CONTEXTMENU)。** 契約との差は本物(FL は DefWindowProc に WM_RBUTTONUP / WM_KEYUP VK_APPS を渡し、Windows ならそこで WM_CONTEXTMENU が作られる)だが、A/B で CreatePopupMenu / TrackPopupMenu の呼び出しは 0、窓表は完全一致、画の差は時間の位相だけで、効果が無い。FL の VCL の経路が新たに走る費用(wall_fr* の形のテスト、全 84/55/87 行の確認)に見合わない。差分は保管する(`docs/investigations/alpha6/optional/`)。実機で見える害(右クリックでメニューが出ない)が出たときに取り込む。`ab-experiment-NOT-FOR-MERGE.diff` は実験用で取り込まない。
 3. **S18(最大化で WM_SIZE(SIZE_MAXIMIZED) が来ない)は直す。** 契約(Learn の ShowWindow / WM_SIZE)は SW_SHOWMAXIMIZED で WM_SIZE(SIZE_MAXIMIZED) を作ると定める。実エンジンで主フォームの画が 29,885 画素(上部ツールバーの寄りが 1 画素)動く。「どちらが実機の画か要実機」は、依頼者に頼めないので待たない。lift の忠実性の方針では、外部 API の契約を実装していないことが不具合の原因の 2 つのうちの 1 つであり、契約に書いてある挙動を欠いたまま画を比べない。次の担当(決定 0258 仮、alpha1)に回す。
 4. alpha1 の是正 2 件(S49 の「FL は DefWindowProc に到達しない」は誤り、S18 の「WindowState は IsZoomed で読める」は誤り)を、そのまま事実として記録する。

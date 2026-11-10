@@ -23,7 +23,7 @@
 
      Chrome: S1 は 1920x1080 で B0 の約 13.7 倍・出荷の約 9 倍、2060x1264 で 11.6 倍。**3240x1946 では Chrome は約 2 倍**(B0 2.1 → S1 4.2 回/s)にとどまる。**Firefox の 3240x1946 では B0 が 0.7 回/s(0.2〜1.1)で依頼者の『≈2 fps』に桁が合い、S1 は 20.2 回/s**(約 30 倍。B0 は Worker が CPU 飽和で、更新が溜まってから出る)。同じ wasm の 1 更新当たりの Worker CPU は 3240x1946 で Chrome 197 ms・Firefox 38 ms と 5 倍違い、**ブラウザ間の差の原因は調べていない**(§2.2 (e))。起動直後の最初の数秒(JIT の tier-up 前)はどの構成も遅い(§2.2 (b))。Settings のタブ切替のアニメーション(1920x1080、ウォームアップ後)の fps の中央値は **B0 19.1 → V3 31.5 → S1 38.4**(最大 49〜61)、仮想時計の node で 1 クリックの正味 CPU **0.894 s → 0.398 s(−55%)**。F8 は 42.1 s → 9.3 s(−78%、HLE なし)。**60 回/s・120 回/s**: 1920x1080 のドラッグは S1 が 36.8〜63.2 回/s で入力 57 件/s にほぼ張り付き(1 更新 12 ms は Worker だけなら 約 80 回/s が上限)、中央値は 60 に届かない・120 は不可。2060x1264(37 回/s)・3240x1946(4.2 回/s)・タブ切替(中央値 38 fps)は届かない。
    - **何が効いたか(寄与の内訳。Chrome、上の表と §2.3)**: ドラッグの 13 倍は **B0 → V3(= 決定 0203 の opt-in 〔fast copy、`fle_raster`・`fle_sse_more` を -O2〕 + runtime のみ `-msimd128`)で 4.2 → 55.2 回/s** と、ほぼ全部がここで起きる(V3 の中の内訳は、V1 をブラウザで測っていないので分けていない。プロファイルでは B0 の BitBlt の画素経路 53% が V1 で 3% に減る)。**本決定の新規の変更(packed 整数ヘルパーの wasm SIMD + 全ユニット `-msimd128`)の上乗せは V3 → S1 で小さい**:1920x1080 のドラッグは 55.2 → 57.4(誤差内)、Firefox の 1920x1080 は 44.0 → 37.7(重なる範囲内で、むしろ下)、2060x1264 は 31.2 → 37.0(+19%)、3240x1946 は Chrome 3.8 → 4.2(+10%)・Firefox 19.6 → 20.2(+3%、誤差内)、**タブ切替のアニメーションは 31.5 → 38.4 fps(+22%)**、node の F8 は 42.1 s → 9.3 s(−78%)。仮想時計の node(CPU 秒、ブラウザの JIT の影響なし)での内訳は、タブ 1 クリック 0.894 s(B0)→ 0.549(V1 = 0203 の opt-in のみ)→ 0.503(V3)→ **0.398(S1)**、ドラッグ 120 手 1.49 → 1.06 → 0.90 → **0.74 s**:**0203 の部分が 30〜40%、本決定の SIMD が更に約 20% を減らす**(node の数字は寄与の順序づけに使い、Chrome の倍率とは結びつけない:node の B0 は 1 手 12 ms、Chrome の B0 は 1 更新 194 ms で桁が合わない。理由は調べていない)。出荷の SHIP2(F2xH2)は 0203 の opt-in を含まない(B0 と同じ runtime)ので、**出荷に効くのはまず `F2xH3` に含まれる 0203 の部分**と読む(出荷の混成との組み合わせは未測定)。
-   - **(C)変更**: (1) `anim1.diff`(opt-in `FLE_WASM_SIMD=1` / `SHIP_PRESET=F1xH3\|F2xH3`):SSE2 の packed 整数ヘルパー(22 のレーン演算 + 20 の関数)を `-msimd128` のとき WebAssembly SIMD の命令 1 本にする。**画素同一**(起動 16 スナップ・操作列 5 本が B0 と差 0 行〔G3〕、Chrome の画面写真でも差 0 画素〔§5.1b〕)、**差分試験 49 演算を網羅**(16 ビットレーンは全 2^32 組)で一致、`-msimd128` なしではオブジェクトがバイト一致、wasm は **−1.76%**(wasm-opt 後 127,951,499 B。S1 の線 141,145,856 B に 13.2 MB の余裕)。(2) `anim1-shchange.diff`(§4.3)。(3) 入力の WM_MOUSEMOVE の契約を読んで確認:**契約の不足は無い**。『入力が速いと更新が減る』はゲストが paint を飢えさせているのではなく(WM_PAINT は 125〜430 回/s を受けている)、**Worker → メインの提示のバックプレッシャ(3 フレームが未確認で保留)とメインスレッドの限界**(§2.6)。
+   - **(C)変更**: (1) `anim1.diff`(opt-in `FLE_WASM_SIMD=1` / `SHIP_PRESET=F1xH3\|F2xH3`):SSE2 の packed 整数ヘルパー(22 のレーン演算 + 20 の関数)を `-msimd128` のとき WebAssembly SIMD の命令 1 本にする。**画素同一**(起動 16 スナップ・操作列 5 本が B0 と差 0 行〔G3〕、Chrome の画面写真でも差 0 画素〔§5.1b〕)、**差分テスト 49 演算を網羅**(16 ビットレーンは全 2^32 組)で一致、`-msimd128` なしではオブジェクトがバイト一致、wasm は **−1.76%**(wasm-opt 後 127,951,499 B。S1 の線 141,145,856 B に 13.2 MB の余裕)。(2) `anim1-shchange.diff`(§4.3)。(3) 入力の WM_MOUSEMOVE の契約を読んで確認:**契約の不足は無い**。『入力が速いと更新が減る』はゲストが paint を飢えさせているのではなく(WM_PAINT は 125〜430 回/s を受けている)、**Worker → メインの提示のバックプレッシャ(3 フレームが未確認で保留)とメインスレッドの限界**(§2.6)。
 3. **未確認**: 依頼者の PC(測定 0 件)、出荷の**混成**(`fe-wasmgen` p1000r)+ wasm-opt + `F2xH3` の組み合わせ(混成は再生成していない。B0/S1 は非混成なので VCL 木の走査は出荷より悪い側。出荷の wasm は 1920x1080 固定なので 3240x1946 では測れない)、画素の行カーネルの混成化/HLE(3240x1946 で 60 回/s に要る。§2.2 (d))、PSHUFLW の lowering、`?present=D`(desk1)での再測定、Settings の『General』で落ちた本当の原因、wasm-opt 後の画素同一の G3 による確認(Chrome の画面写真は 0 差)、全体の Rust テスト・a4 の再実行。
 
 ## 0. 先に書くこと(進捗の誠実性、AGENTS.md / `docs/policies/progress-integrity.md` に従う)
@@ -49,7 +49,7 @@
 | **X1** = B0 で `fle_ia2_cmp_active()` を常に 0 にした(= ia2 のマーカー行が無い構成と同じ) | — | **Theme タブで停止**。SHIPH と**同じ**メッセージ | — |
 | **X2** = B0 から決定 0196 の runtime 変更(d764db1)を戻した | — | — | **32 回目のメニューで停止**。SHIPH と**同じ**メッセージ |
 
-SHIPH の追加試験(すべて停止なし): メニュー 30 回 → F10 → General、メニュー 31 回 → F10 → General(31 回 = 62 個のフック)、F10 → 各タブへ 120 ms 刻みでポインタを運び 2.5 秒ホバーしてからクリック(ヒントの経路)。
+SHIPH の追加テスト(すべて停止なし): メニュー 30 回 → F10 → General、メニュー 31 回 → F10 → General(31 回 = 62 個のフック)、F10 → 各タブへ 120 ms 刻みでポインタを運び 2.5 秒ホバーしてからクリック(ヒントの経路)。
 
 ### 1.2 結論
 
@@ -332,9 +332,9 @@ F8(全画面のプラグイン一覧、決定 0203。node の G3、user CPU 秒)
 | `lift/runtime/fle_sse_int2.h` | `FLE_I2_LANES_S`(SIMD 式つきのレーン演算マクロ。`FLE_WASM_SIMD` が無ければ従来の `FLE_I2_LANES` と同じ展開)を足し、22 演算の行を `FLE_I2_LANES(…)` から `FLE_I2_LANES_S(…, wasm 式)` に変えた(1 行ずつの置換。`-` 行 22、`+` 行 22)。`paddq`・`psubq`・`packsswb`・`packssdw`・`pmaddwd`・`psraw`・`psrad` は関数の先頭に `#ifdef FLE_WASM_SIMD return …; #endif`、論理シフト 6 種は `#ifdef FLE_WASM_SIMD` で別定義(count が幅以上なら 0)に分ける |
 | `lift/runtime/fle_sse_more.c` | `fle_packuswb`・`fle_paddw` の先頭に `#ifdef FLE_WASM_SIMD return …; #endif` |
 | `app/scripts/build-engine-bundle.sh` | (1) 環境 `FLE_WASM_SIMD=1` のとき `EMCC_CFLAGS` に `-msimd128`(+1 行)。(2) 新しい opt-in プリセット `SHIP_PRESET=F1xH3\|F2xH3` = `F1xH2\|F2xH2` に、`RT_O2_EXTRA="fle_raster fle_sse_more"`・`RT_DEFS=-DFLE_R_FAST_COPY=1`(決定 0203 の opt-in)・`FLE_WASM_SIMD=1` を(未設定のときだけ)与える(+6 行)。既存のプリセット名の動作は変わらない |
-| `lift/harness/anim1/`(新規) | 差分試験 `sse_simd_difftest.c`(乱数 49 演算 × 1,500,000 件)と `sse_simd_exhaustive.c`(網羅)、`README.md` |
+| `lift/harness/anim1/`(新規) | 差分テスト `sse_simd_difftest.c`(乱数 49 演算 × 1,500,000 件)と `sse_simd_exhaustive.c`(網羅)、`README.md` |
 
-**対応表(x86 命令 → wasm 命令)と、その出典**: x86 側は Intel SDM Vol. 2 の擬似コード(従来の `fle_sse_int2.h` の冒頭が引いているもの)。wasm 側は WebAssembly SIMD の仕様(`i8x16.add_sat_s/u`、`i8x16.sub_sat_s/u`、`i16x8.add_sat_s/u`、`i16x8.sub_sat_s/u`、`i16x8.min_s/max_s`、`i8x16.min_u/max_u`、`i16x8.mul`、`i32x4.dot_i16x8_s`〔PMADDWD。0x8000×0x8000 の 2 つ和が 0x80000000 に巻く点も仕様どおり〕、`i8x16.narrow_i16x8_s/u`〔PACKSSWB/PACKUSWB〕、`i16x8.narrow_i32x4_s`〔PACKSSDW〕、`i32x4.extmul_{low,high}_i16x8_{s,u}` + `i8x16.shuffle`〔PMULHW/PMULHUW:各 32 ビット積の上位 16 ビットのバイトを取る〕、`*.shl/shr_s/shr_u`〔count を幅で打ち切る処理は従来どおり C 側〕、`i8x16.shuffle`〔PUNPCK〕)。**Learn に無い x86 の振る舞いを足していない**(従来のスカラー版と結果が同じであることを §5 の試験で確かめた)。
+**対応表(x86 命令 → wasm 命令)と、その出典**: x86 側は Intel SDM Vol. 2 の擬似コード(従来の `fle_sse_int2.h` の冒頭が引いているもの)。wasm 側は WebAssembly SIMD の仕様(`i8x16.add_sat_s/u`、`i8x16.sub_sat_s/u`、`i16x8.add_sat_s/u`、`i16x8.sub_sat_s/u`、`i16x8.min_s/max_s`、`i8x16.min_u/max_u`、`i16x8.mul`、`i32x4.dot_i16x8_s`〔PMADDWD。0x8000×0x8000 の 2 つ和が 0x80000000 に巻く点も仕様どおり〕、`i8x16.narrow_i16x8_s/u`〔PACKSSWB/PACKUSWB〕、`i16x8.narrow_i32x4_s`〔PACKSSDW〕、`i32x4.extmul_{low,high}_i16x8_{s,u}` + `i8x16.shuffle`〔PMULHW/PMULHUW:各 32 ビット積の上位 16 ビットのバイトを取る〕、`*.shl/shr_s/shr_u`〔count を幅で打ち切る処理は従来どおり C 側〕、`i8x16.shuffle`〔PUNPCK〕)。**Learn に無い x86 の振る舞いを足していない**(従来のスカラー版と結果が同じであることを §5 のテストで確かめた)。
 
 **この変更が方針のどれに当たるか**(`docs/policies/lift-fidelity.md` の点検表): FL の挙動の代行・補正ではない。命令の意味(SDM)を、より少ない wasm 命令で実装するだけ(§3 の『変換の削減』= 16 レーンのスカラー ループ → 1 命令)。クラス名・窓・位置による分岐はない。HLE(関数ごとのホスト実装)でもない:関数単位の近道ではなく、全ての生成コードの同じ命令に効く。
 
@@ -342,8 +342,8 @@ F8(全画面のプラグイン一覧、決定 0203。node の G3、user CPU 秒)
 
 | 案 | 何をする | 効く範囲 | 出力同一の確認 | 方針との相性 |
 |---|---|---|---|---|
-| HLE(決定 0162/0203。`f_6a77b0` はこれ) | 関数全体をホスト関数で置き換える(入口に guard) | その関数だけ。関数ごとにレジスタ・XMM・フラグ・スタックの最終状態まで合わせる必要 | `FLE_HLE=check`(lifted と両方走らせて全部比較)+差分試験 | 近道。関数ごとに増える。guest が実際に踏む引数(k=256 の恒等など)を見込んだ最適化に流れやすい |
-| fe-wasmgen の lowering を足す(PSHUFLW など) | 混成(直接 wasm)に入れられる関数を増やす | 混成のリストに入れた関数(`f_6a73a0` は PSHUFLW のため入れられない) | 既存の hyb の 82 行・1,009,731 エントリの試験 | 生成の拡充で方針に合う。ただし混成の再生成・再ビルド・試験が要り(Rust の変更)、C 経路に残る関数(ユニット、dsp)には効かない |
+| HLE(決定 0162/0203。`f_6a77b0` はこれ) | 関数全体をホスト関数で置き換える(入口に guard) | その関数だけ。関数ごとにレジスタ・XMM・フラグ・スタックの最終状態まで合わせる必要 | `FLE_HLE=check`(lifted と両方走らせて全部比較)+差分テスト | 近道。関数ごとに増える。guest が実際に踏む引数(k=256 の恒等など)を見込んだ最適化に流れやすい |
+| fe-wasmgen の lowering を足す(PSHUFLW など) | 混成(直接 wasm)に入れられる関数を増やす | 混成のリストに入れた関数(`f_6a73a0` は PSHUFLW のため入れられない) | 既存の hyb の 82 行・1,009,731 エントリのテスト | 生成の拡充で方針に合う。ただし混成の再生成・再ビルド・テストが要り(Rust の変更)、C 経路に残る関数(ユニット、dsp)には効かない |
 | **SIMD ヘルパー(本差分)** | 生成 C 側の packed 命令の実装を wasm SIMD にする | C 経路の全ての packed 整数命令(混成に入らない関数、dsp を含む)。F8 の `f_6a77b0`、Playlist の `f_2a337c0`/`f_6a7b70`、タブ切替の `f_6a73a0`(PSHUFLW 以外) | 49 演算の網羅 + 乱数 + 画素同一 | 命令の意味の実装。関数を数えない |
 | 三者は排他でない | lowering は混成側(直接 wasm)の、SIMD ヘルパーは C 側の同じ改善。PSHUFLW の lowering を fe-wasmgen に足せば `f_6a73a0` を混成に入れられる(未実施) | | | |
 
@@ -354,7 +354,7 @@ F8(全画面のプラグイン一覧、決定 0203。node の G3、user CPU 秒)
 PM の指示(『Learn の SHChangeNotifyRegister / SHChangeNotifyEntry に NULL pidl の記述が本当に無いか一次資料で確認、原文を引用』)に従って、2026-11-04 に Microsoft Learn を取得した:
 - SHChangeNotifyEntry(ns-shlobj_core-shchangenotifyentry、updated_at 2024-02-22): 「`pidl` Type: PCIDLIST_ABSOLUTE — PIDL for which to receive notifications.」「`fRecursive` … A flag indicating whether to post notifications for children of this PIDL.」→ **NULL の記述は無い**。
 - SHChangeNotifyRegister(nf-shlobj_core-shchangenotifyregister、updated_at 2025-07-01): 「Returns a positive integer registration ID. Returns 0 if out of memory or in response to invalid parameters.」「This array should always be set to one…」「Otherwise, if the pshcne parameter is not NULL, then that notification entry is used.」「The two PIDLIST_ABSOLUTE pointers can be NULL, depending on the event being sent.」(これは通知の中身の説明で、登録の pidl ではない)→ **登録の NULL pidl の記述は無い**。
-- 副次の出典(Learn ではない。本プロジェクトの差分試験の基準 Wine 10.0):`dlls/shell32/changenotify.c`(github.com/wine-mirror/wine、タグ wine-10.0)の `SHChangeNotifyRegister` は `item->apidl[i].pidl = ILClone(lpItems[i].pidl)`(NULL は NULL のまま)で登録し **`item->id`(InterlockedIncrement の正の値)を返す**。`SHChangeNotify` は登録の pidl が NULL のとき `if( !pidl ) /* all ? */ notify = TRUE;`(全通知)。→ **Wine 10.0 では NULL pidl は失敗ではなく、正の ID の登録**。
+- 副次の出典(Learn ではない。本プロジェクトの差分テストの基準 Wine 10.0):`dlls/shell32/changenotify.c`(github.com/wine-mirror/wine、タグ wine-10.0)の `SHChangeNotifyRegister` は `item->apidl[i].pidl = ILClone(lpItems[i].pidl)`(NULL は NULL のまま)で登録し **`item->id`(InterlockedIncrement の正の値)を返す**。`SHChangeNotify` は登録の pidl が NULL のとき `if( !pidl ) /* all ? */ notify = TRUE;`(全通知)。→ **Wine 10.0 では NULL pidl は失敗ではなく、正の ID の登録**。
 
 したがって決定 0191 の『NULL pidl は 0(無効なパラメータ)を返す』(S-ia2-shchange-nullpidl)は **Learn の記述に無く、Wine 10.0 とも食い違う選択**。PM の (a)/(b) のどちらでもなく、(c) **Learn は沈黙・Wine 10.0 は受理**。差分(`anim1-shchange.diff`)は、(c) に従って NULL pidl を普通の登録(正の ID、通知は届かない〔S-shchange-no-events〕)として受け、marker 行を見ないようにする: `fle_ole.c`(`-` 行 9 = 弱参照の宣言 1・Decision 0191 のコメント 3・`if (pidl == 0 && marker) { R[0]=0; return; }` の 5 行・pidl の検査 1 行〔`pidl != 0 &&` を足して置換〕、`+` 行 7)と、テスト `wall_fr11.rs`(`-` 行 3 = 添字がずれる期待。NULL pidl の登録が ID 4・live 1・解除 1 を返す。**この新しい期待は、変更前の runtime では停止して失敗する**ことを実測)。PM の判断点: (c) を採るか、(b) の『停止のまま』に戻すか(`ship3` で ship2-imports.txt のマーカー行を持つ限り、現行でも Theme タブは止まらない)。
 
@@ -391,16 +391,16 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 
 (`ct-*` の画面写真は清掃で削除した。この表の数値はその前に `pngdiff.mjs` で取った物。残っているのは `cto-*`〔wasm-opt 版〕と `ctw-*` の `02-tabs-end.png` と `00-main.png`。)
 
-注: 2060x1264 の S1 の 2 実行は、タブ操作の最初の F10 で Settings が開かなかったか、開いた後の状態が違う(601,916 は Settings 窓が無い写真)。**この種の失敗は構成を選ばない**:§2.3 の 37 実行のうち 9 クリックのうち 3 以上でアニメーションを測れなかった(= Settings が開いていない等)実行が B0o 1・V3 3(うち 1 は 0 件)・V3o 1・S1 2 あった(B0 は wasm-opt なしで 0)。F10 の送り方のタイミングによる試験側の取りこぼしと読んでいる(**原因は特定していない**。再試行は入れていない)。S1 でだけ起きる、という証拠は無いが、サンプルが小さいので『S1 では起きない』とも言えない。その実行の fps は表の『測定できたクリック数』に入らない。
+注: 2060x1264 の S1 の 2 実行は、タブ操作の最初の F10 で Settings が開かなかったか、開いた後の状態が違う(601,916 は Settings 窓が無い写真)。**この種の失敗は構成を選ばない**:§2.3 の 37 実行のうち 9 クリックのうち 3 以上でアニメーションを測れなかった(= Settings が開いていない等)実行が B0o 1・V3 3(うち 1 は 0 件)・V3o 1・S1 2 あった(B0 は wasm-opt なしで 0)。F10 の送り方のタイミングによるテスト側の取りこぼしと読んでいる(**原因は特定していない**。再試行は入れていない)。S1 でだけ起きる、という証拠は無いが、サンプルが小さいので『S1 では起きない』とも言えない。その実行の fps は表の『測定できたクリック数』に入らない。
 
-### 5.2 packed 整数ヘルパーの差分試験(`lift/harness/anim1/`、§4.1)
+### 5.2 packed 整数ヘルパーの差分テスト(`lift/harness/anim1/`、§4.1)
 
-| 試験 | 内容 | 結果 |
+| テスト | 内容 | 結果 |
 |---|---|---|
 | 乱数(49 演算 × 1,500,000 件。バイトの 5/8 が 0x00/0x7f/0x80/0xff) | gcc のレーンループ(基準)と emcc `-msimd128` の演算ごとの FNV ハッシュ | **49/49 一致** |
 | 網羅(`sse_simd_exhaustive.c`) | 8 ビットレーン 10 演算 = 全 65,536 組、16 ビットレーン 13 演算 = **全 2^32 組**、PACKUSWB/PACKSSWB = 全 65,536 語、PACKSSDW = 2^26 個の等間隔 + 飽和境界の近傍 ±40、PMADDWD = 境界 27 語の 4 レーン全組(27^4)、32/64 ビットレーン演算 = 境界 27 値の全組、シフト = 全 65,536 語 × count 0..130 と 2^32 以上の count、PUNPCK 8 種 = 全バイト対 | **49/49 一致**(gcc 97 s、node の wasm SIMD 16 s) |
-| HEAD 40d4f64 に 2 本を当てた木での再実行 | 乱数の試験(49 演算 × 1,500,000 件)を gcc と emcc `-msimd128` で再実行 | **一致**(`# path:` の 1 行だけが違う) |
-| 欠陥の検出 | PADDSW を飽和減算に、PACKUSWB を符号つき pack に変えた版 | 乱数の試験が 2 件とも検出 |
+| HEAD 40d4f64 に 2 本を当てた木での再実行 | 乱数のテスト(49 演算 × 1,500,000 件)を gcc と emcc `-msimd128` で再実行 | **一致**(`# path:` の 1 行だけが違う) |
+| 欠陥の検出 | PADDSW を飽和減算に、PACKUSWB を符号つき pack に変えた版 | 乱数のテストが 2 件とも検出 |
 
 ### 5.3 テスト基準への影響
 
@@ -412,7 +412,7 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 
 | 足した/残した物 | 問い | 答え |
 |---|---|---|
-| packed 整数ヘルパーの wasm SIMD(§4.1) | 外部 API の契約の実装か | いいえ(API ではなく命令の意味)。SDM の擬似コードどおりの実装を、より少ない wasm 命令にするだけ(変換の削減)。FL の挙動の代行・補正・特別扱いではない。クラス名・窓・位置の分岐なし。網羅試験つき |
+| packed 整数ヘルパーの wasm SIMD(§4.1) | 外部 API の契約の実装か | いいえ(API ではなく命令の意味)。SDM の擬似コードどおりの実装を、より少ない wasm 命令にするだけ(変換の削減)。FL の挙動の代行・補正・特別扱いではない。クラス名・窓・位置の分岐なし。網羅テストつき |
 | 同上 | 局所的な近道か | いいえ。関数・窓を選ばず、全ての生成コードの同じ命令に効く |
 | fast copy(BitBlt、決定 0203)+ raster/sse を -O2 | 近道か | 同じ画素を書く実装(BitBlt の SRCCOPY の 32bpp 直接形式の画素ループを語単位に)。API の結果(画素)は同一。画素同一の確認は §5.1。**既定では入れない**(`F1xH3\|F2xH3` の opt-in プリセットのみ) |
 | `SHChangeNotifyRegister` の NULL pidl(§4.3) | 契約の実装か | Learn は沈黙、Wine 10.0 は受理(正の ID)。Wine 準拠への変更で、ia2 のマーカー行への依存を外す。PM の判断点 |
@@ -428,7 +428,7 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 | S-anim1-2 | 速度の比較は**同じ負荷帯で交互に回した複数ラウンド**の Chrome(1 更新当たりの Worker CPU)と、仮想時計の node(CPU 秒)の両方 | この機械は他担当で負荷が 7〜70 に揺れる。壁時計の fps は load ≤ 8 のときしか主張できない | 専用機 | 負荷が下がったとき |
 | S-anim1-3 | タブ切替の『fps』= クリック直後の最初の連続した大きな変化(窓の 5% 以上の画素が変わる 10 万画素以上の描画)の間隔から求めた | アニメーションは 9 フレーム固定で、その後の小さな変化(カーソル点滅など)を除くため | 全描画の平均 | — |
 | S-anim1-4 | Playlist の『ドラッグ』= 中ボタンを押し、1920x1080 では (1395,594) を中心に x ±160・y ±90 のジグザグ(周期 3.0 s/4.8 s)を 4〜12 ms 間隔で動かす | 依頼者の操作(Playlist をホイール押下でドラッグ)を再現する具体的な形がないため。座標は依頼者のクリックの推測 | 実機で録画した列 | 依頼者の列が得られたとき |
-| S-anim1-5 | SIMD の対象は 22 のレーン演算 + 7 の関数 + シフト 6 + 論理 4(PADDD 等)+ PMULHUW + PUNPCK + PACKUSWB + PADDW。PSHUFLW/PSHUFHW・PMOVMSKB・PSADBW・x87・浮動小数は対象外 | 試験で網羅できる、命令 1 本に写る、プロファイルに出る物を優先 | 全 SSE2 | 他の packed 命令がプロファイルに出たとき |
+| S-anim1-5 | SIMD の対象は 22 のレーン演算 + 7 の関数 + シフト 6 + 論理 4(PADDD 等)+ PMULHUW + PUNPCK + PACKUSWB + PADDW。PSHUFLW/PSHUFHW・PMOVMSKB・PSADBW・x87・浮動小数は対象外 | テストで網羅できる、命令 1 本に写る、プロファイルに出る物を優先 | 全 SSE2 | 他の packed 命令がプロファイルに出たとき |
 | S-anim1-6 | `F1xH3\|F2xH3` という新しいプリセット名 | 既存のプリセット名の動作を変えずに ship3 が 1 語で選べるようにするため | 環境変数 3 つを毎回指定 | PM が ship3 の構成を決めたとき |
 | S-anim1-7 | ドラッグは『10 s のウォームアップのあとに 6 s × 3 回』、タブ切替は『9 クリックを 2 周し、1 周目を捨てる』、Firefox は『1 プロセス 4 回のうち 1 回目を捨てる』 | 170 MB のモジュールは起動直後に JIT が tier-up していない。最初の数秒は遅く、構成間の差を過大にする(ウォームなしの表は §2.2 (b) に残した) | ウォームなしの 1 回 | — |
 | S-anim1-8 | 『入力 約 55 件/s』を測定の入力速度にした(CDP の往復で決まる値。実際のマウスは 125 Hz 前後) | 入力を増やすと提示経路(§2.6)の上限が先に効いて、エンジンの能力が見えなくなる。『更新/s』が入力/s に近い行は入力律速で、エンジンの能力は『1 更新当たりの Worker CPU』から 1000/CPU(ms) で見積もる | `?present=D` で入力を 120 件/s 以上 | desk1 の提示経路の再測定 |
@@ -458,7 +458,7 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 
 取り込んだ基準: HEAD 164e81a に `anim1.diff`(7 ファイル、offset 2、`-` 22 行)と `anim1-shchange.diff`(2 ファイル、`-` 12 行)を `patch -p1` で当てた。`-` 行は全部読んだ(SIMD 側は『`-msimd128` のときだけ置き換える』形で、`-msimd128` なしではランタイムの C が変わらない)。PM が測った値(この機械、`lift/out-pmchk-a1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、全体テスト 190 results / 2,344 passed / 2 failed:失敗は `noreturn_audit` の 2 件だけで、負荷 約 58 のときに 491 秒かかった時間切れで、単独の再実行(負荷 約 10)は 8/8 通った(15.5 秒)。
 
-1. **SIMD ヘルパー(S1、`FLE_WASM_SIMD=1` の opt-in)を採る。** 出力ビットは C 経路と同一(49 演算の差分試験、16 ビットの全 2^32 組の網羅)。変換の削減で、FL の挙動は変えない(方針に合う)。
+1. **SIMD ヘルパー(S1、`FLE_WASM_SIMD=1` の opt-in)を採る。** 出力ビットは C 経路と同一(49 演算の差分テスト、16 ビットの全 2^32 組の網羅)。変換の削減で、FL の挙動は変えない(方針に合う)。
 2. **`anim1-shchange.diff` を採る。** Learn に NULL pidl の記述はなく、Wine 10.0 の挙動(正の ID を返す)に合わせる(UNOFFICIAL の根拠として明記)。ia2 のマーカー行への依存を外す。
 3. **SHIP_PRESET `F1xH3|F2xH3`(fast copy + `fle_raster`/`fle_sse_more` を -O2 + wasm SIMD)を採る。** ship3 の既定の候補。parity1 の `RT_OPT=O2`(runtime 全体を -O2)との優劣は ship3 で測って決める。
 4. **効果の帰属を正しく書く**: ドラッグの 13 倍(Chrome 1920x1080)は、ほぼ全部が決定 0203 の opt-in(fast copy + raster -O2)による。本決定の SIMD の上乗せは、タブ切替 +22%、2060x1264 のドラッグ +19%、1920 のドラッグは誤差内。

@@ -36,7 +36,7 @@
 
 **アイドル 15 s の putImageData の計測**(F1xn、`tools/idle-run.mjs --hook 1`、CPU 計測とは別 run): 941 回の更新のうち **932 回が主窓(1930x1092)の同じ矩形 x=377, y=152, 幅 1, 高さ 870、画素のハッシュは 932 回すべて同一**(`tables/chrome-hook-putimagedata-F1xn.txt`)。残り 9 回はウィザードを閉じた直後の別の矩形(ハッシュ 4 通り)。
 
-## 3. 原因の台帳(native -O0 の実エンジンでの実測と、FLEngine_x64.dll の読み)
+## 3. 原因の記録(native -O0 の実エンジンでの実測と、FLEngine_x64.dll の読み)
 
 1 秒(仮想)あたりの面への書込(`tables/native-surface-writes-per-virtual-second.tsv`、Enter の 6 s 後からの区間): 行あり 62〜64 回/s(すべて lid 14 = TFruityLoopsMainForm)、行なし 0〜1 回/s、行あり+DwmIsCompositionEnabled だけ FALSE 0〜1 回/s。1 秒間の全 API 呼び出し(`tables/api-calls-rows-vs-norows-1s.tsv`、仮想 3618〜3619 s)の差: 行ありに RedrawWindow・GetUpdateRgn・BeginPaint・GetDC・BitBlt・EndPaint・ReleaseDC が各 +62、SendMessageW +1,008、IsWindowVisible +756、IntersectRect +740 ほか(WM_PAINT の走査)。PostMessageW は行あり・行なしとも 63/s で同じ。
 
@@ -480,7 +480,7 @@ page console errors: []
 
 ## 8. PM の判断点
 
-1. **`?dedupe=1` を既定 ON にするか**。材料: (a) 正しさ: 語単位の厳密比較で、省略した矩形の画素は canvas の現在の内容と同一(単体の性質試験〔12 シード×1,500 手〕、実 `Presenter` との統合試験〔方式 A/B、16 本×1,500 手〕、変異検査、実エンジンの自己検証 §7.5)。(b) 効果: ページ主スレッド −0.057 コア(−78%)、Chrome 全体 −0.106 コア、窓の更新 62.5/s → 0.85/s(§7.1)。Worker は変わらない。(c) 入力の応答: §7.3。(d) 既定 ON の前に要る物: Chrome の 2D canvas の `contextlost`/`contextrestored`(GPU のリセットで canvas の内容が消えると、エンジンが画素を変えない限り戻らない=従来はアイドルの毎フレーム再描画で自然に直っていた)への対応(page→Worker の再同期メッセージ。未実装・未テスト)。(e) 『1 画素でも差が出たら ON にしない』という条件に対し、§7.5 の自己検証は**比較 549 回(約 13.7 分、再生 300 s を含む)で差分 0**。ただし File > Save / Save as ではエンジンが終了する(§11)ので、その2 つのダイアログは見ていない。
+1. **`?dedupe=1` を既定 ON にするか**。材料: (a) 正しさ: 語単位の厳密比較で、省略した矩形の画素は canvas の現在の内容と同一(単体の性質テスト〔12 シード×1,500 手〕、実 `Presenter` との統合テスト〔方式 A/B、16 本×1,500 手〕、変異検査、実エンジンの自己検証 §7.5)。(b) 効果: ページ主スレッド −0.057 コア(−78%)、Chrome 全体 −0.106 コア、窓の更新 62.5/s → 0.85/s(§7.1)。Worker は変わらない。(c) 入力の応答: §7.3。(d) 既定 ON の前に要る物: Chrome の 2D canvas の `contextlost`/`contextrestored`(GPU のリセットで canvas の内容が消えると、エンジンが画素を変えない限り戻らない=従来はアイドルの毎フレーム再描画で自然に直っていた)への対応(page→Worker の再同期メッセージ。未実装・未テスト)。(e) 『1 画素でも差が出たら ON にしない』という条件に対し、§7.5 の自己検証は**比較 549 回(約 13.7 分、再生 300 s を含む)で差分 0**。ただし File > Save / Save as ではエンジンが終了する(§11)ので、その2 つのダイアログは見ていない。
 2. **エンジンの応答(層 2 の DwmIsCompositionEnabled=TRUE)は変えていない**(PM の方針)。『FALSE を返す opt-in』は native の実エンジンで効果を測っただけ(アイドルのゲストの関数入口 8.78 → 4.54 M/s、書込 63 → 0〜1 /s)で、実装していない。実装するなら `lift/runtime/fle_dwm.c` に環境変数の opt-in 1 本(忠実性の観点で PM が見送り)。
 3. **ゲスト CPU(アイドルで +0.06 コア相当)を下げる最短の道は直接 wasm の混成 p1000r の採用**(§5。再描画の追加入口の 99.6% が lower 済み)。F1xn の上での測定は未実施。
 4. 行(層 2)の取捨は変えない。起動の基準表は変わらない(新しい基準表は作っていない)。
@@ -490,16 +490,16 @@ page console errors: []
 - **成果物・作業ディレクトリの名前の衝突**: 指示の `lift/out-git/idle1-results/` と `lift/out-idle1/` は、11-01 の別の(古い)idle1 作業(決定 0129 前後)の物として既に存在した。`idle1-results/` には `tools/` と `tables/` を作って自分のツールを 20 ファイルコピーしてしまったが、気づいてすぐ、自分が作った 2 ディレクトリ(birth 時刻 18:31 で確認)だけを消し、元の内容は無傷(`MERGE-NOTES.md`・`docs`・`*.diff`・`learn`・`logs`・`seeds`・`tools-idle1`・`wall-log.md`)。成果物は新しい名前 `idle1b-results/`。`lift/out-idle1/` は古い物(`clean/`〔27 MB〕・`inputs/`〔74 MB〕・`learn/`・`logs/`・`tools/` の古いスクリプト・`wall-log.md`)の上に自分の物を足す形で使った(birth 時刻で、古いファイルを上書きしていないことを確認)。終了時は自分の足した物だけを消し、古い物は消さない。
 - 背景起動のコマンドの末尾に `&` を付けた(1 回。`background: true` との二重で、シェルは拒否しなかった。以後付けていない)。`sleep 1`(1 回)と `timeout`(1 回)を試して拒否された。存在しない `bash` ツールを 2 回呼んだ。
 - 作業ディレクトリの du が一時 8.1 GB(5 GiB の上限超え)になった(native の計数リンク済みバイナリ 7 本が各 512 MB と生成 C)。気づいて余分なバイナリと生成 C を消し 3.6 GB にした。同時に重い処理が 3 本以上走った時間がある(native 2 本 + Chrome 1 本 + vitest)。**Chrome を同時に 2 本動かした時間がある**(長時間の自己検証と全 e2e を重ねた。どちらも CPU の測定ではない)。**入力応答の系列 L1 の途中に native の peek 2 本が重なった**(`runs/pk_n`・`pk_r`。L1 の on3 前後。load は 9〜14 で、表に併記)。load は他の担当の分も含めて 5〜23。
-- 最初の `?dedupe=1` の版に不具合があった(§6): layout 世代だけが変わった窓の全面送り直しを省略しうる。統合試験を書く過程で見つけて修正した。**CPU の交互測定(§7.1、60 Hz)は修正前の版で行った**(アイドルの経路は同じで、`resetShadow` は layout/layer/size の変化のときだけ働く)。120 Hz・入力応答・長時間の自己検証は修正後の版。
+- 最初の `?dedupe=1` の版に不具合があった(§6): layout 世代だけが変わった窓の全面送り直しを省略しうる。統合テストを書く過程で見つけて修正した。**CPU の交互測定(§7.1、60 Hz)は修正前の版で行った**(アイドルの経路は同じで、`resetShadow` は layout/layer/size の変化のときだけ働く)。120 Hz・入力応答・長時間の自己検証は修正後の版。
 - 中間報告 2 で『e2e の新規場面 +36 チェック』と書いたが、数え直すと **99 チェック(1 target あたり 33 × dev・preview・worker の 3 target。全 e2e は基準の 853/853 から 952/952 checks passed)**(§7.4)。
 
 ## 10. 成果物
 
-`lift/out-git/idle1b-results/`: `idle1b.diff`、`MERGE-NOTES.md`、`docs/0187-idle-redraw.md`(本書)、`docs/README-0187-line.txt`、`tables/`(Chrome・native の表、台帳、自己検証)、`logs/`、`tools/`(`README.md`)。
+`lift/out-git/idle1b-results/`: `idle1b.diff`、`MERGE-NOTES.md`、`docs/0187-idle-redraw.md`(本書)、`docs/README-0187-line.txt`、`tables/`(Chrome・native の表、記録、自己検証)、`logs/`、`tools/`(`README.md`)。
 
 ## 11. 副次的な発見(本作業の範囲外・原因は調べていない)
 
-- **Chrome の F1xn(既定の入口)で、File メニューの『Save』(画面 (40,111))または『Save as...』(画面 (40,130))を押すと、エンジンが `fle: unsupported instruction at 0x424d40` で停止する**(`exit` = stopped、コード 134 = SIGABRT、`TNewProjForm` が見えている)。**停止の記録(実測、`tools/check-long.mjs` が取った engine のログ)**: `fle: unsupported instruction at 0x424d40`(`fle_unsupported`、SIGABRT)。0x424d40 は `user32.dll!GetKeyNameTextW` の import サンクで、行が無い(`docs/investigations/ia1/tables/thunks.tsv` の 509 行目も『unsup』)。= File > Save / Save as が(ショートカットキーの名前の表示などで)`GetKeyNameTextW` を呼び、行が無くて壁になる。**新しい壁 W18 の候補**(ia1 の壁の台帳〔W1〜W17〕にない)。 再現: Save は 2 回(`tools/check-long.mjs` の最初の版と診断 run)、Save as は 2 回(長時間の run 〔再生 300 s の後〕と診断 run `runs/long2` = `tables/check-long-diag-save-as-abort.json`)。native の ia1 の fork プローブでは同じ操作(`file_save`・`file_saveas`)が停止しない記録(`docs/investigations/ia1/tables/ops-after-final.tsv`)なので、構成の差(行・prune S・Blend2D 置換・wasm)による可能性がある(読み。確かめていない)。本作業の長時間検証は、この 2 項目を最後に回して、その前を比較した。
+- **Chrome の F1xn(既定の入口)で、File メニューの『Save』(画面 (40,111))または『Save as...』(画面 (40,130))を押すと、エンジンが `fle: unsupported instruction at 0x424d40` で停止する**(`exit` = stopped、コード 134 = SIGABRT、`TNewProjForm` が見えている)。**停止の記録(実測、`tools/check-long.mjs` が取った engine のログ)**: `fle: unsupported instruction at 0x424d40`(`fle_unsupported`、SIGABRT)。0x424d40 は `user32.dll!GetKeyNameTextW` の import サンクで、行が無い(`docs/investigations/ia1/tables/thunks.tsv` の 509 行目も『unsup』)。= File > Save / Save as が(ショートカットキーの名前の表示などで)`GetKeyNameTextW` を呼び、行が無くて壁になる。**新しい壁 W18 の候補**(ia1 の壁の記録〔W1〜W17〕にない)。 再現: Save は 2 回(`tools/check-long.mjs` の最初の版と診断 run)、Save as は 2 回(長時間の run 〔再生 300 s の後〕と診断 run `runs/long2` = `tables/check-long-diag-save-as-abort.json`)。native の ia1 の fork プローブでは同じ操作(`file_save`・`file_saveas`)が停止しない記録(`docs/investigations/ia1/tables/ops-after-final.tsv`)なので、構成の差(行・prune S・Blend2D 置換・wasm)による可能性がある(読み。確かめていない)。本作業の長時間検証は、この 2 項目を最後に回して、その前を比較した。
 - 同じ run で、F5/F6/F9(窓の開閉のキー)の直後に Welcome wizard(`TWelcomeWizard`)が再び現れた(2〜3 回の run で再現。run によっては `TLightweightLayeredControl` が出た)。モーダルなので、その間の入力は主窓に届かない。原因は調べていない。
 - p2a(決定 0182)が F1xn で測った『入力→次の更新』は、窓が毎フレーム更新されているため、無関係な更新で短く出ていた(本書 §7.3)。`?dedupe=1` なしの値は応答時間として使えない。
 - パス C(File > Import → サブメニューの最初の項目)で、エンジンが `fle: CompareStringW: character other than an ASCII letter or digit in unequal strings (not defined by the MSDN page or outside the emulated locale; not implemented)` で停止した(exit 134、`TMsgForm` が見えている)。決定 0178(dlg1)の『S-dlg1-cmp-nonascii: 仮名と ASCII の順序に出典がない』と同じ壁と読める(確かめていない)。File > Export の 4 つのサブメニュー項目は停止せず比較できた。

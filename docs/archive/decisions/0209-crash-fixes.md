@@ -46,7 +46,7 @@
 | (d) Playlist の中ボタンドラッグ | 同上 | 停止しない | − |
 | Sampler のつまみをドラッグ | SHIP2(Chrome)、native | **停止** | `LoadLibraryW: module "elastique_x64.dll" is not a virtual module …`(依頼者の 4 件の外。同じ操作の途中で実際に当たる壁) |
 | TOOLS > Dump to audio editor | SHIP2(Chrome)、native | **停止** | `PathCleanupSpec: pszSpec holds an illegal character …`(soft にできない: §5) |
-| HELP > Homepage/Mobile/Forum | SHIP2(Chrome) | 停止しない | native の ia2 台帳では WritePrivateProfileStringW で止まる(Chrome では出ない) |
+| HELP > Homepage/Mobile/Forum | SHIP2(Chrome) | 停止しない | native の ia2 記録では WritePrivateProfileStringW で止まる(Chrome では出ない) |
 
 停止は、ゲストの未初期化メモリに依存する場合がある(LCMapStringW の NUL 以降)。そのため native では再現しない・SHIP2 では出なくなる停止がある。
 
@@ -76,8 +76,8 @@
 - 方法: `-DFLE_SOFT_STOP`(コンパイル時)または環境変数 `FLE_SOFT_STOP=1`(ページ: `?env=FLE_SOFT_STOP=1`)。既定は従来どおり名前付きの停止。マクロ `FLE_SOFT_OR_STOP(api, why, stopfn, err, ret)`(`fle_crash1_soft.h`)。soft のときは文書化された失敗値を返し、`fle-soft: <api>: <why> [xN] [guest return 0x…]` を出す(N が 2 のべきのとき)。weak 参照なので、新しいファイルをリンクしないテストは従来の停止のまま。
 - 変えた箇所(今は 11): LCMapStringW(フラグ 1004、ロケール 87)、CompareStringW(フラグ 1004)、GetLocaleInfoW(LCType 1004)、GetCPInfo(87)、IsValidCodePage(FALSE、最終エラーは触らない)、MultiByteToWideChar/WideCharToMultiByte(コードページ 87)、WritePrivateProfileStringW(2 か所、87)、LoadLibraryW(仮想ボリュームに無い製品 DLL → NULL / 126)。
 - app 側: 受け取った soft stop を beacon の `engine.softStops`(任意の追加項目)、パネルの `soft-stops` 行、perf-log-summary の「Soft stops」表に出す(`src/perf/soft-stops.ts`)。
-- 測定(native -O0、src3、NC1、S1s.g3): S1.g3 で停止があった 6 プローブ(Dump to audio editor + Help 5 項目)に対照 4 本を足した 11 プローブを、soft 無し/有りで native 実行(NC1、`tables/native-soft-s1s.tsv`): **exit も lid14 の画面の sha も 11 本とも同一**(Dump to audio editor だけ両方 134 = PathCleanupSpec で、soft にできない箇所)。ia2 の台帳では WritePrivateProfileStringW で止まった Help の 5 項目は、この木では soft 無しでも止まらない(ShellExecuteW が『実行せず』で先に答える)。soft 有りの実行で `fle-soft:` の行は 0 行。soft が効いたのは 1 件: Sampler のつまみのドラッグ(elastique_x64.dll の LoadLibraryW、`tables/native-soft-knob.tsv`)。soft 有りでは LoadLibraryW が NULL / 126 を返し、ゲストはハンドルを調べずに GetProcAddress(NULL, …) を呼び、runtime の次の停止に当たる。**結果の分類: 続く 0 件、次の停止 1 件、同じ停止 1 件(Dump)、ハング 0 件。** この操作の本当の修正は DLL そのもの(zplane の elastique_x64.dll。リポジトリに無い)で、soft stop ではない。v2.g3 は soft 有りでは実行していない(soft 無しの停止は Dump の 1 件だけで、soft にできない箇所なので同じ結果になると見ている: 推測)
-- 停止の台帳(`tables/stop-sites.tsv`、heuristic の分類): 1,273 か所。soft 済み 8、keep-security 86、keep-model 190、keep-silent 401、candidate 136、review 452。**candidate 136 か所は全部「正しい入力だが未モデル」**(`tables/stop-candidates.tsv`): ここで失敗値を返すと合法な呼び出しを失敗にする(偽の失敗)。soft を既定にするなら、ページが失敗値を決めている「不正な入力」の 96 か所(`tables/stop-review-undocumented.tsv`、ほとんどは「ページがエラーコードを名指ししない」ので値の選択が要る)から選ぶのがよい。ライセンス・ネットワーク・セキュリティの呼び出しは止まったままにする(偽の成功を返さない)。
+- 測定(native -O0、src3、NC1、S1s.g3): S1.g3 で停止があった 6 プローブ(Dump to audio editor + Help 5 項目)に対照 4 本を足した 11 プローブを、soft 無し/有りで native 実行(NC1、`tables/native-soft-s1s.tsv`): **exit も lid14 の画面の sha も 11 本とも同一**(Dump to audio editor だけ両方 134 = PathCleanupSpec で、soft にできない箇所)。ia2 の記録では WritePrivateProfileStringW で止まった Help の 5 項目は、この木では soft 無しでも止まらない(ShellExecuteW が『実行せず』で先に答える)。soft 有りの実行で `fle-soft:` の行は 0 行。soft が効いたのは 1 件: Sampler のつまみのドラッグ(elastique_x64.dll の LoadLibraryW、`tables/native-soft-knob.tsv`)。soft 有りでは LoadLibraryW が NULL / 126 を返し、ゲストはハンドルを調べずに GetProcAddress(NULL, …) を呼び、runtime の次の停止に当たる。**結果の分類: 続く 0 件、次の停止 1 件、同じ停止 1 件(Dump)、ハング 0 件。** この操作の本当の修正は DLL そのもの(zplane の elastique_x64.dll。リポジトリに無い)で、soft stop ではない。v2.g3 は soft 有りでは実行していない(soft 無しの停止は Dump の 1 件だけで、soft にできない箇所なので同じ結果になると見ている: 推測)
+- 停止の記録(`tables/stop-sites.tsv`、heuristic の分類): 1,273 か所。soft 済み 8、keep-security 86、keep-model 190、keep-silent 401、candidate 136、review 452。**candidate 136 か所は全部「正しい入力だが未モデル」**(`tables/stop-candidates.tsv`): ここで失敗値を返すと合法な呼び出しを失敗にする(偽の失敗)。soft を既定にするなら、ページが失敗値を決めている「不正な入力」の 96 か所(`tables/stop-review-undocumented.tsv`、ほとんどは「ページがエラーコードを名指ししない」ので値の選択が要る)から選ぶのがよい。ライセンス・ネットワーク・セキュリティの呼び出しは止まったままにする(偽の成功を返さない)。
 
 ## 4. テレメトリ(`crash1-telemetry.diff` は PM が取り込み済み)
 
@@ -94,7 +94,7 @@
 | S-crash1-5 | `fle_locale.c` の soft の値(1004、87、IsValidCodePage は FALSE で最終エラーは触らない) |
 | S-crash1-6 | ドラッグ族: 不正な HDROP と ANSI の ASCII 限定は Wine/ReactOS の読み。WM_DROPFILES は送らない |
 | S-crash1-7 | `runtime message:` の行に `[import dll!Name]` を足した |
-| S-crash1-8 | 停止の台帳の分類(heuristic。手で確かめたのは soft にした箇所だけ) |
+| S-crash1-8 | 停止の記録の分類(heuristic。手で確かめたのは soft にした箇所だけ) |
 | S-crash1-9 | WritePrivateProfileStringW の NULL 引数は soft のとき 0 と ERROR_INVALID_PARAMETER |
 | S-crash1-10 | LoadLibraryW で仮想ボリュームに無い製品 DLL: soft のとき NULL と 126 |
 | S-crash1-11 | メニュー族の最終エラーと癖は Wine 10.0 の写し(UNOFFICIAL)、ハンドルの基底 0x7F900000 |
@@ -112,14 +112,14 @@
 
 ## 8. ファイル
 
-`MERGE-NOTES.md`(適用の手順、衝突、ship3 向けの手順)、`crash1.diff`、`crash1-telemetry.diff`、`tables/`(Chrome の報告、Wine との差分、native のプローブ、停止の台帳、soft の台帳)、`tools/`(drive.mjs、do.sh、drive-ff.mjs、シナリオ、gen-native.sh 等)、`logs/`(全体テスト、vitest、a4、native の g3 行)。
+`MERGE-NOTES.md`(適用の手順、衝突、ship3 向けの手順)、`crash1.diff`、`crash1-telemetry.diff`、`tables/`(Chrome の報告、Wine との差分、native のプローブ、停止の記録、soft の記録)、`tools/`(drive.mjs、do.sh、drive-ff.mjs、シナリオ、gen-native.sh 等)、`logs/`(全体テスト、vitest、a4、native の g3 行)。
 
 ## PM の判断と取り込み(2026-11-04)
 
 - **取り込み**: `crash1.diff`(30 ファイル、`-` 行 21 本を全部読んだ。app は型・組み立て・パネル文字列を追加項目で置き換えたもの、runtime は `fle_stop` を `FLE_SOFT_OR_STOP`〔既定は同じ停止〕に置き換えた箇所、LCMapStringW のフラグ検査の差し替え、CharUpper の 0x80 停止の除去)を HEAD 3e4f540 に適用した。fle_win.c にはオフセット付きで当たった(txt1 の +22 行の後ろ)。PM の測定: FLEngine の既定生成 C の sha256 は `cd9107ce...47029e50` のまま、全体テスト 188 results / 2,338 passed / 0 failed。a4・app のテストの結果は取り込みコミットの記録に従う。
 - **原因を確定して直した 2 件は採る**: LCMapStringW(cchSrc 個を全部写像する契約への修正。UCD 16.0 の単純な大文字小文字写像、Wine 10.0 と全 1,112,064 コードポイント × 4 フラグ集合で差 0)、shell32 の Drag 4 関数(DragAcceptFiles ほか)。これらは方針の (b) 外部 API の契約の実装で、FL 側の分岐は無い。user32 のメニュー 14 関数も同じ(Wine 156 行一致)。
 - **(b) General タブ・(d) Playlist 中ボタンドラッグは再現できず、原因は未確定**。依頼者に『API 拡充で直った』とは言わない。CharUpper 系の修正が効いた可能性は推測にとどめる。anim1(決定 0225)が SHIPH と SHIP2 の両方で同じ手順を実行して決める。
-- **soft stop は opt-in のまま**: 既定を変えない。担当の自己点検(5 行)で、返す値はページが失敗と定義した値だけ、FL のクラス名・窓・アドレスで分岐しない、と確認した。注意: `elastique_x64.dll` の LoadLibraryW は soft で隠せない(外部モジュールの不足)。soft stop を既定にするかは、停止の台帳(`tables/stop-sites.tsv`、1,273 箇所: 保持するセキュリティ 86・保持するモデル 190・保持する無音 401・候補 136・要確認 452)の見直し後に PM が決める。
+- **soft stop は opt-in のまま**: 既定を変えない。担当の自己点検(5 行)で、返す値はページが失敗と定義した値だけ、FL のクラス名・窓・アドレスで分岐しない、と確認した。注意: `elastique_x64.dll` の LoadLibraryW は soft で隠せない(外部モジュールの不足)。soft stop を既定にするかは、停止の記録(`tables/stop-sites.tsv`、1,273 箇所: 保持するセキュリティ 86・保持するモデル 190・保持する無音 401・候補 136・要確認 452)の見直し後に PM が決める。
 - **配信への取り込み**: `lift/harness/seeds/crash1-imports.txt`(18 行)は、ship3 の `EXTRA_IMPORTS`(ship2-imports + dec1-imports + crash1-imports)に入れる。runtime は測定時の木(0a3ab9a + crash1)で native 16 スナップを見たので、ship3 で 050fa43 以降の runtime に対して 16 スナップ(新しい期待表を別名で)を再測定する。**wasm はまだ作り直していないので、依頼者のブラウザでは Browser フォルダ展開・Sampler Envelope タブの停止は直っていない**(配信中の SHIP2 のまま)。
 - **新しい壁**: 依頼者のセッションの停止メッセージに `user32.dll!ToAscii`(ゲスト戻り先 0xa0c2c6)が出た。キーボード変換の API 群を sweep1 に依頼済み。次の API 族: comctl32 の ImageList_*(23)。
 - 担当の自己申告(前回の `sleep`/`timeout` の試行、一時的なディスク超過など)は記録として残す。

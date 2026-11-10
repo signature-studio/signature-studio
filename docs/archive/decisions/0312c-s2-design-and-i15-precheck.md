@@ -27,7 +27,7 @@
 | # | 仮説 | コードの根拠 | 反証/確認 |
 |---|---|---|---|
 | C1 | **UI スレッドが GIL を取るとき、mixer が持っていると spin 2,000 回(約 20 µs〔読み〕)で眠り、起床に数十〜100 µs**。1 入力の処理で『持ち主が違う』取り直しが数十回あれば +数 ms | GIL は『guest が runtime 関数を呼ぶたび』に取る(`fle_gil.h:1〜11` の不変条件、生成される `fle_gil_wrap.c`)。取れなければ `fle_gil.c:71` の spin → `memory.atomic.wait32`(`:90`) | `-DFLE_GIL_STATS`: Worker ごとの『slow acquire の数・待ち時間の合計・ヒストグラム(<10 µs/<100 µs/<1 ms/<10 ms)』。File クリックの 35 回の区間の差分で、UI Worker の slow acquire 数 × 平均待ち が約 5 ms/入力か |
-| C2 | mixer の GIL の保持が長い(heavy window の Unlock、`fle_tp_publish` が GIL 下で 100 frames を書く〔S1 で JS から C へ移り、1 公開あたりの複写は短くなった〕) | `FLE_CS_HOLD_STATS` の『import ごとの hold 時間 top10』(`fle_gil_wrap_report`) | hold の max/平均を import 別に |
+| C2 | mixer の GIL の保持が長い(heavy window の Unlock、`fle_tp_publish` が GIL 下で 100 frames を書く〔S1 で JS から C へ移り、1 公開あたりのコピーは短くなった〕) | `FLE_CS_HOLD_STATS` の『import ごとの hold 時間 top10』(`fle_gil_wrap_report`) | hold の max/平均を import 別に |
 | C3 | 『答えの present の機会』(`INLINE_TRY_MS = 6 ms` ごと、`worker.ts` の `answerInline`)の待ち。B と同じ原因で settled の検出が遅れる | 0306 §11 C の 1 | P が直す(present が別 Worker になると `answerInline` の待ちが変わる) |
 | C4 | TLS・Worker 間の同期の固定費 | `FLE_WORKERS=1` の腕は協調と同じだった(0289)ので、コードの費用ではなく待ち | C1 で説明がつくか |
 

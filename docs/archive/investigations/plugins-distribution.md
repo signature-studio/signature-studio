@@ -267,7 +267,7 @@
 **R2**(https://developers.cloudflare.com/r2/platform/limits/、https://developers.cloudflare.com/r2/pricing/):
 - 1 オブジェクト 4.995 TiB、単一 PUT 4.995 GiB、バケットの容量・オブジェクト数は無制限。**egress は無料**。Standard の保存は $0.015/GB-月、Class B(読み出し)$0.36/百万回、無料枠は保存 10 GB・Class A 100 万回・Class B 1,000 万回(月)。→ 全部を A の形で置いても brotli で 0.28 GB、生で 2.9 GB(月 $0.04 以下)。**費用は問題にならない**。
 - Range GET は対応(Workers API の `range`、S3 の `Range`。リリースノート: 206 を返す)。ただし**`Content-Encoding: br` を付けたオブジェクトの Range は圧縮後のバイト列に対する物**で、ブラウザは途中からは復号できない。D のチャンクは**チャンクごとに別オブジェクト**(または gzip の独立ブロックで索引)にするのが無難(読み)。
-- 公開は `r2.dev` が試験用(数百 req/s で 429、帯域も制限)、本番はカスタムドメイン。Worker を介すと Free の 1 日 10 万リクエストに数えられる。D では 1 プロジェクトで数百リクエストになり得る。
+- 公開は `r2.dev` がテスト用(数百 req/s で 429、帯域も制限)、本番はカスタムドメイン。Worker を介すと Free の 1 日 10 万リクエストに数えられる。D では 1 プロジェクトで数百リクエストになり得る。
 
 **ブラウザ側の保存**(決定 0130、`browser-feasibility.md` の実測。Chrome 156、隔離プロファイル):
 - HTTP キャッシュ: **1 つの応答が 6 MB までは 2 回目にキャッシュから出る、7 MB 以上は毎回サーバーへ**(5/6 MB が hit、7/8/16 MB が miss)。→ プラグインのモジュールを「brotli で 6 MB 以下」に分ければ標準のキャッシュが効く(A/C の 1 プラグインは 0.1〜5.4 MB)。

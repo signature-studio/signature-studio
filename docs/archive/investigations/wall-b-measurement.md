@@ -6,12 +6,12 @@
 
 | # | 項目 | 結果 |
 |---|---|---|
-| 1 | 木 | `lift/out-wallB/base` = `git archive HEAD`（5002d98）+ 決定 0095 の作業ツリー差分（`git diff HEAD -- lift`、SHA-256 `11eebc57f8867fd9e362c0f44d2c049f98c1c9716c27697c1885b83a097d980e`）+ `harness-int.diff`。`src` = 複製（編集用） |
+| 1 | 木 | `lift/out-wallB/base` = `git archive HEAD`（5002d98）+ 決定 0095 のワークツリー差分（`git diff HEAD -- lift`、SHA-256 `11eebc57f8867fd9e362c0f44d2c049f98c1c9716c27697c1885b83a097d980e`）+ `harness-int.diff`。`src` = 複製（編集用） |
 | 2 | 3 モジュール構成の a4（`run-0`、`src` を変えない状態） | **init_count 159 / 942**、last unit 158（proc 0x66d1a0）、functions **1,106**、entries **27,842**、停止 `LoadLibraryW "quickfontcache_x64.dll"`（外部モジュールは M2。名前付き停止） |
 | 3 | HEAD の基準（0095 なし）| init_count 150、functions 1,069、entries 27,333、停止 `indirect call to 0x489f940`（`harness-int` の文書 §4.3 と同じ） |
 | 4 | Blend2D の ATTACH | 戻った。読み取り専用 gdb（`run/g0-imports.txt`）: `call_dllmain entered idx=1 reason=1` → ATTACH 内の import 188 回（通し番号 1526〜1713）→ `DLLMAIN-RETURN reason=1: call_dllmain returned 0x1` → `fle_realmod.c:144` 到達 → `LoadLibraryW` が **0x4700000** を返す → `GetProcAddress(0x4700000, "AggCreateInstance")` が **0x4759a60** を返す（通し番号 1717）→ unit 150 以降へ |
 
-補足（この文書の最初の版を書いた時点との違い）: HEAD は `5002d98` から `a951ecc`（決定 0095 のコミット）に進み、以後の差分はこちらを基準にした（`base2` = `a951ecc` の `git archive` + `harness-int.diff`）。最初の測定（`run-0`）に使った 0095 は作業ツリーのスナップショットで、`landings_in_swapped_idioms` の条件に `if false &&` が入った途中の版だった。コミットされた版（`false &&` なし）で測り直し（`run-10`）、**同じ結果（3 モジュール 159／942、functions 1,106、entries 27,842）**。
+補足（この文書の最初の版を書いた時点との違い）: HEAD は `5002d98` から `a951ecc`（決定 0095 のコミット）に進み、以後の差分はこちらを基準にした（`base2` = `a951ecc` の `git archive` + `harness-int.diff`）。最初の測定（`run-0`）に使った 0095 はワークツリーのスナップショットで、`landings_in_swapped_idioms` の条件に `if false &&` が入った途中の版だった。コミットされた版（`false &&` なし）で測り直し（`run-10`）、**同じ結果（3 モジュール 159／942、functions 1,106、entries 27,842）**。
 
 ## 2. 最終の測定（実測。`run-10`、4 構成を同じ OUT で。`EXPECT_FLE_SHA=skip`）
 
@@ -73,7 +73,7 @@
 
 ## 6. テスト（正直な記録）
 
-- 追加したテスト: `fe-lift/tests/wall_b.rs` 13 件、`fe-decode/tests/inline_table.rs` 6 件、`fe-lift/tests/realmod.rs` に 1 件追加 + 1 件更新、`k32_dsp.rs` の表の更新（0102 の「テスト」の節）。個別の実行で、`wall_b` 13／13、`inline_table` 6／6（実 QFC のテストは `QFC_PE` を指定して実行。作業ツリーの `lift/out-qfc/` には無い `git archive` の木では SKIPPED）が通った。`realmod` の 2 件（W1、W2）は**まだ実行していない**（`windres` と mingw を使う長い構築。ディスクが満杯で実行できなかった）。
+- 追加したテスト: `fe-lift/tests/wall_b.rs` 13 件、`fe-decode/tests/inline_table.rs` 6 件、`fe-lift/tests/realmod.rs` に 1 件追加 + 1 件更新、`k32_dsp.rs` の表の更新（0102 の「テスト」の節）。個別の実行で、`wall_b` 13／13、`inline_table` 6／6（実 QFC のテストは `QFC_PE` を指定して実行。ワークツリーの `lift/out-qfc/` には無い `git archive` の木では SKIPPED）が通った。`realmod` の 2 件（W1、W2）は**まだ実行していない**（`windres` と mingw を使う長い構築。ディスクが満杯で実行できなかった）。
 - **全体テストは完走していない**。1 回目（`test-ws.txt`、949 行で切れている）も 2 回目（`test-ws-2.txt`、約 920 行で切れている）も、`locale` の途中でディスクが満杯になり（`No space left on device`、リンカの `デバイスに空き領域がありません`）、以降の binary（`mmx` から後）は実行されていない。**この結果は基準（98 binaries／1,228 passed／0 failed）との比較には使えない**。
 - 2 回目で最後まで走った binary は 42 個が ok（passed の合計は約 499。私が `test result` の行から足した数で、機械で集計していない）、**2 個が失敗**（fe-decode の `jt_cpu` 2 件: `a_jump_with_a_displacement_is_not_a_stub`、`dsp_ippv2_has_434_stubs`。fe-lift の `jt_cpu` 2 件: `real_stub_selector_k_reaches_table_k_natively_and_lifted`、`real_stub_selector_outside_the_table_stops_by_name`）。**原因は私の変更**: W3 の認識が `lea B,[rip+k]; jmp [B+I*8+d]` の形のすべてに当たり、表が関数の外にある site を `jumptab_rejected` に報告した（これらのテストは実 dsp_ippv2 で `jumptab_rejected` が空であることを確かめる）。**直した**: 表が関数の外、再配置なし、`.pdata` なし、は認識せず何も報告しない（`resolve_inline` は `Option`）。直した後の確認: fe-decode の `inline_table` 6／6 と `jt_cpu` 6／6（`log/test-fix-2.txt`）。fe-lift の `jt_cpu` は**直した後の実行ができなかった**（ディスク満杯で出力が空）。
 - 3 回目（`test-ws-3.txt`、`resolve_inline` を直した後、HEAD は docs だけ進んだ `f1bcba7`）は、開始直後にディスクが満杯になり、`a2a_remaining` 以降の binary の大半が 0.00 秒で失敗した（C の作業ファイルを作れない）。**無効**。fe-decode の binary（lib、adjustor、dataflow、dump_tmp、extra_seed、inline_table、jt_cpu、jumptab、msvc_switch 78）は 3 回目も通っている（passed のみ確認）。

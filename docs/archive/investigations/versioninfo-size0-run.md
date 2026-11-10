@@ -4,7 +4,7 @@
 
 「実測」はツールの出力、「推測」は未検証の解釈。
 
-**混在の注意**: 作業ツリーには x87 担当の未コミット変更（`fe-lift/src/x87.rs`、`runtime/fle_x87.c/.h`、`lib.rs` の x87 部分ほか）が混在している。今回は `runtime/fle_x87.c` が作業ツリーに存在し、ビルドできたので、前任のスタブ（`out-ijmp/fle_x87_stub.c`）は**使わなかった**（実際の `fle_x87.c`、`fle_x87ctl.c` をリンクした）。生成・ビルド・実行・テストはすべてその混在状態（作業開始時の HEAD は ab58ed4。作業中に x87 担当が 8ccbfa5 をコミットして HEAD が進んだ。他担当の未コミット + 私の変更）で行った。どの時点のツリーで生成・テストしたかは、コミットの前後を区別して記録していない。また、作業ツリーには x87 以外の担当（SSE、mxcsr、prefetch など）の未コミット変更も多数あり、`git status` で `fe-lift/tests/*.rs` の多くが M になっている。
+**混在の注意**: ワークツリーには x87 担当の未コミット変更（`fe-lift/src/x87.rs`、`runtime/fle_x87.c/.h`、`lib.rs` の x87 部分ほか）が混在している。今回は `runtime/fle_x87.c` がワークツリーに存在し、ビルドできたので、前任のスタブ（`out-ijmp/fle_x87_stub.c`）は**使わなかった**（実際の `fle_x87.c`、`fle_x87ctl.c` をリンクした）。生成・ビルド・実行・テストはすべてその混在状態（作業開始時の HEAD は ab58ed4。作業中に x87 担当が 8ccbfa5 をコミットして HEAD が進んだ。他担当の未コミット + 私の変更）で行った。どの時点のツリーで生成・テストしたかは、コミットの前後を区別して記録していない。また、ワークツリーには x87 以外の担当（SSE、mxcsr、prefetch など）の未コミット変更も多数あり、`git status` で `fe-lift/tests/*.rs` の多くが M になっている。
 
 ## 1. 変更（実測）
 
@@ -31,7 +31,7 @@
 | `c_lines` | 2,880,335 | 2,880,419 |
 
 - ビルド: 24.07 秒、最大 RSS 1,203,628 KB、EXIT=0。生成 C は 216,076,847 バイト。
-- **`unsupported_total` が 698 → 667 に減ったのは、この変更の効果ではない**（runtime の変更は生成に影響しない）。作業ツリーの x87 担当の未コミットの lift 変更（x87 の命令が lift されるようになった）による変化と読める（推測。内訳の一覧の差は取っていない）。前の 698 は x87 を含まない時点の生成。
+- **`unsupported_total` が 698 → 667 に減ったのは、この変更の効果ではない**（runtime の変更は生成に影響しない）。ワークツリーの x87 担当の未コミットの lift 変更（x87 の命令が lift されるようになった）による変化と読める（推測。内訳の一覧の差は取っていない）。前の 698 は x87 を含まない時点の生成。
 - 生成の一覧に残る未対応（実測）: `Jmp: indirect through IAT slot (not lifted)` 557、`Mulpd` 25、`Addpd` 13、`Psubw` 10、`Cvtdq2ps` 9、`Pcmpgtd` 8、`Rcpps` 8、`Subpd` 8、`Bswap` 7、`Test: high-byte register` 7、`Prefetcht0` 5 ほか。x87 は `F2xm1` 1、`Fsincos` 1 が残る。
 
 ### VerifyVersionInfoW の通過の確認（gdb、`gdb-vi4.cmds`、`gdb-vi4.txt`）
@@ -52,7 +52,7 @@
 - ワークスペース全体（`cargo test --offline --workspace --no-fail-fast`、`out-vi3/test-ws.txt`、`test-ws.exit` = EXIT=101）: 62 バイナリ、**589 passed、1 failed**、0 ignored。
   - 失敗 1 件は `fe-lift/tests/null0.rs` の `runtime_answers`（`Os { code: 26, kind: ExecutableFileBusy, message: "Text file busy" }`）。既知の競合。**単独再実行（`test-null0-rerun.txt`）は 6 件すべて passed**。再実行を含めると失敗は 0。
   - x87 担当の未完成分の失敗は、今回は**出なかった**（`fle_x87.c` が存在し、x87 のテストは通過した。前任の記録の x87 の失敗 8 件とは状況が違う）。
-  - 前任（`indirect-jmp-run.md` §4.3）の 531 件・8 失敗とは作業ツリーの状態が違うので、件数の比較は意味がない（他担当のテストが増えている）。
+  - 前任（`indirect-jmp-run.md` §4.3）の 531 件・8 失敗とはワークツリーの状態が違うので、件数の比較は意味がない（他担当のテストが増えている）。
 
 ## 5. 制約の遵守と残置物
 

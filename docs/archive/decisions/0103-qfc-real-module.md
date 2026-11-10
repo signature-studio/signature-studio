@@ -34,7 +34,7 @@
 
 ## 土台（実測）
 
-- 作業木 `lift/out-wallQ/src/`: HEAD `0e9b703` の `git archive` に、作業ツリーの 0095 差分（`git diff HEAD -- lift`、SHA-256 `6c9204c6…`）とハーネス取り込み `lift/out-harness-int/patches/harness-int.diff` を当てたもの（`base/`）の複製。PM が 0095 とハーネスをコミットした後の木が基準になるので、`patches/wallQ.diff` はそれに当たる形（`diff -u -r -N -x 'out-*' -x target base src`、25 ファイル。`patch -p1 --dry-run` が `base/` の複製で通る。コミット後の HEAD への当て直しは未実施）。
+- ワークツリー `lift/out-wallQ/src/`: HEAD `0e9b703` の `git archive` に、ワークツリーの 0095 差分（`git diff HEAD -- lift`、SHA-256 `6c9204c6…`）とハーネス取り込み `lift/out-harness-int/patches/harness-int.diff` を当てたもの（`base/`）の複製。PM が 0095 とハーネスをコミットした後の木が基準になるので、`patches/wallQ.diff` はそれに当たる形（`diff -u -r -N -x 'out-*' -x target base src`、25 ファイル。`patch -p1 --dry-run` が `base/` の複製で通る。コミット後の HEAD への当て直しは未実施）。
 - 入力の SHA-256: FLEngine `b2c64da4…9496d`、QFC `afc5a0ed70eb7e4af3d0f4baf771bd6f53eb014e237f857f23023471047736d2`、dsp_ippv2 `497dd4f7…c352`、Blend2D `66634d24…066c7`、**freetype_x64.dll `6ea6c106ad2695b5ec75738a0c790bba81dca7866d63254c2c69602973837cb8`**（607,032 B。インストーラ `flstudio_win64_26.1.7.5653.exe` から `tools/extract_nsis2.py --write` で取り出した。読み取りのみ）。
 - 3 モジュール（dsp + Blend2D）の再現（0095 込み）: **159 / 942**、last unit 158（proc 0x66d1a0）、functions 1,106、entries 27,842、停止 `LoadLibraryW "quickfontcache_x64.dll"`（`not a virtual module and not a name this environment is defined to lack`）。
 - QFC を `fe-pe rebase` で 0x1d00000 に載せて lift: `--pdata` で functions 6,712、closure_instructions 209,259、`bad_nodes 0`、unsupported_total 104（調査の値と一致）。種なし（entry と export だけ）は functions 547、unsupported 12。非 pdata の reloc 値 9,293 は種にしない（調査: `bad_nodes` が 17,541）。
@@ -93,7 +93,7 @@ DLL ごとの統計（最終）: FLEngine functions 59,297／unsupported 523（�
 
 **全体テスト（`cargo test --workspace --no-fail-fast --offline`、最終のソース、`test-ws.txt`）: 101 binaries、1,275 passed、0 failed、0 ignored、exit 0**（基準 98 binaries／1,228 + 0095 の 26 = 1,254 に、新規 21 件と 3 binaries が加わった数に一致）。1 回目（`test-ws-partial-enospc.txt`）と 3 回目の直前（`test-ws-partial2-enospc.txt`、`test-ws-partial3-realmod-link-error.txt`）は途中経過で、失敗は `No space left on device` と上の undefined reference だけだった。
 
-**HEAD が進んだ**（作業中に `0e9b703` → `a951ecc`（0095）→ … → `d56f42f`（決定 0096: deferred modules））。`patches/wallQ.diff` は **`d56f42f` の `git archive` に当たる形に作り直した**（28 ファイル。`patch -p1` で `imports_table.rs` の 1 hunk だけが文脈の衝突で当たらなかったので、行を表の**最後**（0096 の行の後）に足した。既存の行の擬似 VA は動かない）。旧基準（`0e9b703` + 0095 の作業ツリー差分 + ハーネス）向けは `patches/wallQ-on-0e9b703-base.diff`。`d56f42f` + 本差分で、fe-lift の 18 binaries（modules、deferred、load、k32_dsp、imports_table、realmod、wall_q、wall_q_lift、spi、res、vfs、msctf、event、glob、vol、env、reg、loadimage）と fe-decode／fe-pe の 23 binaries（208 passed）は 0 failed。**新しい HEAD での全体テストと a4 の再測定はしていない**（ディスク）。決定 0096 は「同名の実在モジュールが仮想モジュールに勝つ」と定めていて（`fle_realmod.c` の `table_check`）、この作業と衝突しない（読み。a4 は未測定）。
+**HEAD が進んだ**（作業中に `0e9b703` → `a951ecc`（0095）→ … → `d56f42f`（決定 0096: deferred modules））。`patches/wallQ.diff` は **`d56f42f` の `git archive` に当たる形に作り直した**（28 ファイル。`patch -p1` で `imports_table.rs` の 1 hunk だけが文脈の衝突で当たらなかったので、行を表の**最後**（0096 の行の後）に足した。既存の行の擬似 VA は動かない）。旧基準（`0e9b703` + 0095 のワークツリー差分 + ハーネス）向けは `patches/wallQ-on-0e9b703-base.diff`。`d56f42f` + 本差分で、fe-lift の 18 binaries（modules、deferred、load、k32_dsp、imports_table、realmod、wall_q、wall_q_lift、spi、res、vfs、msctf、event、glob、vol、env、reg、loadimage）と fe-decode／fe-pe の 23 binaries（208 passed）は 0 failed。**新しい HEAD での全体テストと a4 の再測定はしていない**（ディスク）。決定 0096 は「同名の実在モジュールが仮想モジュールに勝つ」と定めていて（`fle_realmod.c` の `table_check`）、この作業と衝突しない（読み。a4 は未測定）。
 
 ## 止まった条件と選択肢
 
@@ -114,7 +114,7 @@ DLL ごとの統計（最終）: FLEngine functions 59,297／unsupported 523（�
 - **ディスクが満杯に近い**（`/` 使用率 100%、空き 0.1〜2.7 GB で、他の作業と共有）。自分の作業物（`lift/out-wallQ/` 約 40 GB）は `rm` 禁止の規則のため消せなかった。空きが少ない間は、シェルツールが出力を返さなくなり（`(no output)`）、全体テストが ENOSPC で失敗した。PM は `lift/out-wallQ/run-0`〜`run-4`、`fast/`、`exp-src/`、`chk/` を消してよい（再現は `run-5` と `env.sh`／`run-multi.sh` で足りる）。
 - すべての応答は実機の Windows と照合していない。創作の値: D1 のパスの大文字小文字と置き場所、D5 の SetHandleCount の戻り値、D6 の秘密、D9c の orientation（RGB）。D9b（STANDARD）は SET の項の既定に基づく。
 - freetype の種 160 個は測定用。`FT_Init_FreeType` が通ったあとの freetype の実行（`FT_New_Face` など）は未到達。
-- a4 の測定（上の前後の表）は旧基準（`0e9b703` + 0095 の作業ツリー差分 + ハーネス）の木で行った。`d56f42f`（0096 など）での a4 の再測定はしていない（ディスク。`run-5` 一式が 7 GB）。最終のランタイム（`fle_realmod_total`／`name`／`base` のアクセサを足した後）での 5 モジュール構成の再確認は `fast/final-check`（`run-5` の生成物に再リンク）で行い、159／942、functions 1,912、entries 77,849、停止 `VirtualProtect` は同じ。単独・2・3 モジュールの再測定は、アクセサの変更が実在モジュールのハンドルに対する経路にしか触れないので省いた（推測）。
+- a4 の測定（上の前後の表）は旧基準（`0e9b703` + 0095 のワークツリー差分 + ハーネス）の木で行った。`d56f42f`（0096 など）での a4 の再測定はしていない（ディスク。`run-5` 一式が 7 GB）。最終のランタイム（`fle_realmod_total`／`name`／`base` のアクセサを足した後）での 5 モジュール構成の再確認は `fast/final-check`（`run-5` の生成物に再リンク）で行い、159／942、functions 1,912、entries 77,849、停止 `VirtualProtect` は同じ。単独・2・3 モジュールの再測定は、アクセサの変更が実在モジュールのハンドルに対する経路にしか触れないので省いた（推測）。
 - wasm（`emcc`）は使っていない。QFC の `f_522e50`（dsp の 420 名を引く）が wasm の locals 上限を超えるかは未測定。
 - `patches/wallQ-first-with-test-artifacts.diff` と `patches/wallQ-files.txt` は途中の出力（前者はテストが `src/lift/target/` に書いた 5 ファイルを含む。後者は空の整形に失敗した出力）で、使わない。
 

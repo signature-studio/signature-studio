@@ -2,7 +2,7 @@
 
 日付: 2026-10-20。決定は `docs/decisions/0029-apis-a6-a12.md`。出力はすべて `lift/out-a6/`（`tmp/` は TMPDIR、`work/` は新規 runtime の作業場と計測の道具）。比較の相手は `docs/investigations/a2-resources-run.md`（`out-a2`。停止点 0x410320、`unsupported_total` 380）と `sse-shuf-run.md`（385）。
 
-**この計測は、作業ツリーに他の担当の未コミットの変更が混ざった状態で行った**（git の stash、checkout は禁止なので、自分の変更だけを HEAD b464d45 に重ねた状態は作れていない）。混在の内容は §5。
+**この計測は、ワークツリーに他の担当の未コミットの変更が混ざった状態で行った**（git の stash、checkout は禁止なので、自分の変更だけを HEAD b464d45 に重ねた状態は作れていない）。混在の内容は §5。
 
 ## 1. 実装した API と、止めた入力
 
@@ -53,7 +53,7 @@
 
 - **停止点は変わらなかった**。私の 6 API は、実行の停止点（0x410320、0x40f960 への間接呼び出しが `fle_dispatch_miss`）の手前では呼ばれていない。根拠: 実行の統計（関数実行数 125、エントリ数 658、深さ 8、停止点）が `out-a2` と一致する。ただし、トレースの入口ログは「658 件のうち先頭 256 件」だけで、残りの 402 件は個別に見ていない。256 件の中には、10 本のローダ thunk（0x423990、0x4239a0、0x407090、0x41cf90、0x407020、0x41cf10、0x421920、0x4233d0、0x423b40、0x4262a0）の入口は 0 件（`grep` で確認）。したがって「実行で踏まれて動作を確かめた」ことは言えない。**実装の検証の根拠は §3 の単体テストだけ**。
 - 停止点 0x40f960 は A6、A12 の外。今回の変更では動かせない。
-- 混在の内容（作業ツリー、`git status` の読み取り）: 計測の時点で、私の変更（`imports_table.rs` に 6 行、`runtime/fle_load.*`、`fle_imagehlp.*`、`tests/load.rs`、`docs/decisions/0029-*.md`、この文書）のほかに、他の担当による未コミットの変更が作業ツリーにあった。例: `fe-lift/src/lib.rs`、`fe-decode`、`fe-pe` の変更、`runtime/fle_imports.c`、`fle_sys.*`、`fle_vfs.*`、`fle_sse.h` の変更、新規の `runtime/fle_glob.*`、`fle_vol.*`、`fle_vmap.*`、`fle_winmm.*`、`fle_user_nowin.*`、`fle_res.*`、`fle_vex.h`、`fle_mmx.h`、`src/mmx.rs`、`src/vex.rs`、`imports_table.rs` の他の行（A2、A3、A9、A10、A13 の応答行）。これらを私は読んでいない部分が多く、内容の正しさは確認していない。
+- 混在の内容（ワークツリー、`git status` の読み取り）: 計測の時点で、私の変更（`imports_table.rs` に 6 行、`runtime/fle_load.*`、`fle_imagehlp.*`、`tests/load.rs`、`docs/decisions/0029-*.md`、この文書）のほかに、他の担当による未コミットの変更がワークツリーにあった。例: `fe-lift/src/lib.rs`、`fe-decode`、`fe-pe` の変更、`runtime/fle_imports.c`、`fle_sys.*`、`fle_vfs.*`、`fle_sse.h` の変更、新規の `runtime/fle_glob.*`、`fle_vol.*`、`fle_vmap.*`、`fle_winmm.*`、`fle_user_nowin.*`、`fle_res.*`、`fle_vex.h`、`fle_mmx.h`、`src/mmx.rs`、`src/vex.rs`、`imports_table.rs` の他の行（A2、A3、A9、A10、A13 の応答行）。これらを私は読んでいない部分が多く、内容の正しさは確認していない。
 - そのため、`unsupported_total` が「私の変更だけを HEAD に重ねた場合に何になるか」は測れていない。**算術で言えるのは、私の寄与が −8**（HEAD からの 385 に対して、他の変更がなければ 377 になる、という計算。HEAD で実測したものではない）。
 
 ## 6. 作業中に拒否・失敗した操作

@@ -6,15 +6,15 @@
 
 ## 冒頭の三点(正直さ)
 
-1. **何を実測したか(実行した本物と範囲)**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C → wasm にした物)を隔離 headless Chrome 156 で動かし、`?dedupe=check`(shadow が『不変』と判定した矩形だけ参照 canvas に描かず、実 canvas と全窓・全画素を比べる自己検証)で、(c) **配信中の既定の入口 SHIPH**(パラメータ無しと同じ内容)の 5 セッション・合計 62.1 分(うち 1 本は 29.6 分)・2,437 回の比較、(b) **試験バンドル F1xH + ia2**(自分でビルド。混成なし)の Save as/Save/Save new version/Ctrl+S 系のダイアログと『Buy FL Studio』窓を含む 4 セッション・677 回の比較、を取った。(a) の実 Chrome の GPU クラッシュ(`Browser.crashGpuProcess`)と、canvas を空にして `contextlost`/`contextrestored` を dispatch する模擬を、stand-in と実エンジンで。遅延(§6)は lat1 の測定器で、既定の入口と `?dedupe=0`、さらに `beacon=0` の対。**代役・モック・画像の再生・事前生成は使っていない**(stand-in の e2e 場面は『stand-in の STAND-IN の帯つき』で、進捗には数えない)。
-2. **結論**: (a) **再同期を実装しテストした**(contextlost/restored のどちらでもページが Worker に通知 → 全窓を全面送信 + shadow を消去。単体 +22、e2e +54 チェック〔全体 1071/1071〕、変異 9/9)。(b) **Save as/Save/Save new version などのダイアログの区間で差分 0**(試験バンドル、677 回の比較)。(c) **長時間(再生 300 s 超・窓の開閉・F8/F10・ダイアログ・右クリックメニュー)で差分 0**(有効 5 セッションの合計 62.1 分、2,437 回)。→ 条件 (a)(b)(c) を上の範囲で満たしたので、**既定 ON の差分 `dd1-default.diff` を別ファイルに作った**(`?dedupe=0` で OFF。vitest 1225、e2e 1071/1071、変異 5/5)。**ただし 既定 ON の『遅延が下がる』根拠は、既定のページ(ビーコン ON)では再現しなかった**: 既定 ON と `?dedupe=0` の event→次の rAF の中央値は同じ範囲(§6.2)。PM の指摘(cbeacon2)どおり、ビーコンが待機中も rAF を回してページがフレームを作り続けると利点が消える。`?beacon=0` の対(各 2 組、n=24 前後)では、クリック 24.2 → 7.1、ホバー 30.2 → 15.2、ホイール 46.4 → 30.2 ms などで**決定 0194 の改善が再現した**(メニューを閉じる・Space の停止は差なし/逆。§6.3)。**既定 ON の根拠として確実に言えるのは『画素が同一(差分 0)』と『ページ主スレッド CPU の減少』(アイドル: ビーコン ON で 0.113〜0.158 → 0.035〜0.056 コア、ビーコン OFF で 0.168〜0.169 → 0.020〜0.023 コア。CPU 秒、全 7 セル・2 組で同じ向き)**。遅延の利点はビーコン OFF でだけ出るので、ビーコン ON の既定のページでは cbeacon2 の修正後に再確認が要る。
-3. **未確認**: (i) **実 Chrome での『復元後の画素』**(この Chrome は GPU クラッシュの後 `contextrestored` を出さず、元の canvas は戻らない。復元後は合成イベント + 空の canvas の模擬だけ)。復元されない canvas の差し替えは未実装。(ii) 実機の GPU・ディスプレイ・120 Hz 以上、依頼者の機械、所定のプロジェクト。(iii) `?dedupe=check` の比較は 0.7〜1.5 s 間隔(フレームの間だけ現れて消える差は見えない)、方式 B のみ。(iv) 試験バンドルは SHIPH と同一の構成ではない(混成なし、`ia2-imports.txt` は exp1 の 6 行を含まない)。出荷の SHIPH には ia2 の行がないので、SHIPH で File>Save 系を押すと GetKeyNameTextW で停止する(未修正)。(v) File>Open のダイアログ区間(ブラウザのファイル橋のない構成)、Save as template を閉じる操作(`SendMessageA` の壁で停止)。(vi) ビーコン ON のページの遅延(cbeacon2 の修正後に再確認)。(vii) `LatencyTracker`/ビーコンの数字への既定 ON の影響(読み)。
+1. **何を実測したか(実行した本物と範囲)**: 実エンジン(`FLEngine_x64.dll` と同梱 DLL を x86-64 → C → wasm にした物)を隔離 headless Chrome 156 で動かし、`?dedupe=check`(shadow が『不変』と判定した矩形だけ参照 canvas に描かず、実 canvas と全窓・全画素を比べる自己検証)で、(c) **配信中の既定の入口 SHIPH**(パラメータ無しと同じ内容)の 5 セッション・合計 62.1 分(うち 1 本は 29.6 分)・2,437 回の比較、(b) **テストバンドル F1xH + ia2**(自分でビルド。混成なし)の Save as/Save/Save new version/Ctrl+S 系のダイアログと『Buy FL Studio』窓を含む 4 セッション・677 回の比較、を取った。(a) の実 Chrome の GPU クラッシュ(`Browser.crashGpuProcess`)と、canvas を空にして `contextlost`/`contextrestored` を dispatch する模擬を、stand-in と実エンジンで。遅延(§6)は lat1 の測定器で、既定の入口と `?dedupe=0`、さらに `beacon=0` の対。**代役・モック・画像の再生・事前生成は使っていない**(stand-in の e2e 場面は『stand-in の STAND-IN の帯つき』で、進捗には数えない)。
+2. **結論**: (a) **再同期を実装しテストした**(contextlost/restored のどちらでもページが Worker に通知 → 全窓を全面送信 + shadow を消去。単体 +22、e2e +54 チェック〔全体 1071/1071〕、変異 9/9)。(b) **Save as/Save/Save new version などのダイアログの区間で差分 0**(テストバンドル、677 回の比較)。(c) **長時間(再生 300 s 超・窓の開閉・F8/F10・ダイアログ・右クリックメニュー)で差分 0**(有効 5 セッションの合計 62.1 分、2,437 回)。→ 条件 (a)(b)(c) を上の範囲で満たしたので、**既定 ON の差分 `dd1-default.diff` を別ファイルに作った**(`?dedupe=0` で OFF。vitest 1225、e2e 1071/1071、変異 5/5)。**ただし 既定 ON の『遅延が下がる』根拠は、既定のページ(ビーコン ON)では再現しなかった**: 既定 ON と `?dedupe=0` の event→次の rAF の中央値は同じ範囲(§6.2)。PM の指摘(cbeacon2)どおり、ビーコンが待機中も rAF を回してページがフレームを作り続けると利点が消える。`?beacon=0` の対(各 2 組、n=24 前後)では、クリック 24.2 → 7.1、ホバー 30.2 → 15.2、ホイール 46.4 → 30.2 ms などで**決定 0194 の改善が再現した**(メニューを閉じる・Space の停止は差なし/逆。§6.3)。**既定 ON の根拠として確実に言えるのは『画素が同一(差分 0)』と『ページ主スレッド CPU の減少』(アイドル: ビーコン ON で 0.113〜0.158 → 0.035〜0.056 コア、ビーコン OFF で 0.168〜0.169 → 0.020〜0.023 コア。CPU 秒、全 7 セル・2 組で同じ向き)**。遅延の利点はビーコン OFF でだけ出るので、ビーコン ON の既定のページでは cbeacon2 の修正後に再確認が要る。
+3. **未確認**: (i) **実 Chrome での『復元後の画素』**(この Chrome は GPU クラッシュの後 `contextrestored` を出さず、元の canvas は戻らない。復元後は合成イベント + 空の canvas の模擬だけ)。復元されない canvas の差し替えは未実装。(ii) 実機の GPU・ディスプレイ・120 Hz 以上、依頼者の機械、所定のプロジェクト。(iii) `?dedupe=check` の比較は 0.7〜1.5 s 間隔(フレームの間だけ現れて消える差は見えない)、方式 B のみ。(iv) テストバンドルは SHIPH と同一の構成ではない(混成なし、`ia2-imports.txt` は exp1 の 6 行を含まない)。出荷の SHIPH には ia2 の行がないので、SHIPH で File>Save 系を押すと GetKeyNameTextW で停止する(未修正)。(v) File>Open のダイアログ区間(ブラウザのファイル橋のない構成)、Save as template を閉じる操作(`SendMessageA` の壁で停止)。(vi) ビーコン ON のページの遅延(cbeacon2 の修正後に再確認)。(vii) `LatencyTracker`/ビーコンの数字への既定 ON の影響(読み)。
 
 ## 1. 方法
 
-- **作業木**: HEAD 26eb04d の `git archive`(`lift/out-dd1/src/`)。作業中に HEAD が 7f024d7(lat1 の取り込み)まで進んだが、`app/`・`lift/runtime`・`lift/crates` は 26eb04d と同じ(`git diff --stat 26eb04d HEAD -- app lift/runtime lift/crates` が空)。`dd1.diff` は最後に最新の `git archive HEAD` に `patch -p1 --dry-run` が当たることを確認した(`logs/patch-dry-run.txt`)。試験バンドルの `bundle.description` が `HEAD 7f024d7` と書くのは、`build-engine-bundle.sh` が親リポジトリの HEAD を読むため(木の中身は 26eb04d の archive)。
-- **試験バンドル(b 用)**: `app/scripts/build-engine-bundle.sh` を `SHIP_PRESET=F1xH`(= 出荷の SHIPH の C 経路:F1x〔prune S + Blend2D 置換〕+ 層 1〜3)で、`EXTRA_IMPORTS=lift/harness/seeds/ia2-imports.txt`(139 行 = `dlg1-imports.txt`〔層 1〜3〕+ ia2 の層 4 の行〔`CompareStringW::ia2-sort-weights` の marker 行を含む〕。**exp1 の層 4 の行のうち `SetThreadExecutionState` と `IFileSaveDialog::*` 5 行は `ia2-imports.txt` に入っていない**〔依頼文は『dlg1 + exp1 + ia2』と書いたが、ファイルは ia2 の MERGE-NOTES どおり dlg1 + ia2 だけ〕。= ブラウザの保存ダイアログの COM モデルは入っていない)に替えて作った(`tools/bb.sh`)。**混成 p1000r は入っていない**(SHIPH ではなく F1xH + ia2 の構成)。`lift/out-dd1/B/bundle/fl-engine-dd1-F1xH-ia2/`(wasm 177,182,569 B、SHIPH は 171,302,606 B、+5.9 MB。ia2felift の SSE3 命令と ia2 の runtime)。圧縮は gzip(ローカルの vite preview 用)。**配信中の `lift/out-websrv/assets/` には置かず、触っていない**。上流 Blend2D の wasm ライブラリ(-O2、SIMD なし)は `out-b2d1/up6` の tarball からオフラインで作り直した(出来た `libblend2d.a` の md5 は `out-b2d1/up5・up6` の物と同じ)。ビルド: cargo 19 s、gen 112 s、wasm の単位コンパイル 1,672 s(他担当の負荷の中)、wasm-opt 588 s。
-- **実エンジンの走行**: 隔離 headless Chrome 156(`app/test/e2e/browser.mjs`、プロファイル使い捨て)、自前の `vite preview`(ポート 4610〜、`--outDir` はこの木の `vite build`)。(c) は**配信中の既定の入口と同じ内容**(`lift/out-websrv/assets/manifest.json` → SHIPH を、`lift/out-dd1/serve/assets/` の読み取り専用の symlink で)、URL は `?pace=catchup&dedupe=check` だけ(`pace=catchup` は idle1 の check-long と同じ)。(b) は試験バンドルを `?bundle=` で指す。入力はすべて **CDP の模擬**(`Input.dispatchMouseEvent`/`dispatchKeyEvent`)で人の操作ではない。ツール: `tools/dd-check.mjs`(idle1 の `check-long.mjs` の発展)。
+- **ワークツリー**: HEAD 26eb04d の `git archive`(`lift/out-dd1/src/`)。作業中に HEAD が 7f024d7(lat1 の取り込み)まで進んだが、`app/`・`lift/runtime`・`lift/crates` は 26eb04d と同じ(`git diff --stat 26eb04d HEAD -- app lift/runtime lift/crates` が空)。`dd1.diff` は最後に最新の `git archive HEAD` に `patch -p1 --dry-run` が当たることを確認した(`logs/patch-dry-run.txt`)。テストバンドルの `bundle.description` が `HEAD 7f024d7` と書くのは、`build-engine-bundle.sh` が親リポジトリの HEAD を読むため(木の中身は 26eb04d の archive)。
+- **テストバンドル(b 用)**: `app/scripts/build-engine-bundle.sh` を `SHIP_PRESET=F1xH`(= 出荷の SHIPH の C 経路:F1x〔prune S + Blend2D 置換〕+ 層 1〜3)で、`EXTRA_IMPORTS=lift/harness/seeds/ia2-imports.txt`(139 行 = `dlg1-imports.txt`〔層 1〜3〕+ ia2 の層 4 の行〔`CompareStringW::ia2-sort-weights` の marker 行を含む〕。**exp1 の層 4 の行のうち `SetThreadExecutionState` と `IFileSaveDialog::*` 5 行は `ia2-imports.txt` に入っていない**〔依頼文は『dlg1 + exp1 + ia2』と書いたが、ファイルは ia2 の MERGE-NOTES どおり dlg1 + ia2 だけ〕。= ブラウザの保存ダイアログの COM モデルは入っていない)に替えて作った(`tools/bb.sh`)。**混成 p1000r は入っていない**(SHIPH ではなく F1xH + ia2 の構成)。`lift/out-dd1/B/bundle/fl-engine-dd1-F1xH-ia2/`(wasm 177,182,569 B、SHIPH は 171,302,606 B、+5.9 MB。ia2felift の SSE3 命令と ia2 の runtime)。圧縮は gzip(ローカルの vite preview 用)。**配信中の `lift/out-websrv/assets/` には置かず、触っていない**。上流 Blend2D の wasm ライブラリ(-O2、SIMD なし)は `out-b2d1/up6` の tarball からオフラインで作り直した(出来た `libblend2d.a` の md5 は `out-b2d1/up5・up6` の物と同じ)。ビルド: cargo 19 s、gen 112 s、wasm の単位コンパイル 1,672 s(他担当の負荷の中)、wasm-opt 588 s。
+- **実エンジンの走行**: 隔離 headless Chrome 156(`app/test/e2e/browser.mjs`、プロファイル使い捨て)、自前の `vite preview`(ポート 4610〜、`--outDir` はこの木の `vite build`)。(c) は**配信中の既定の入口と同じ内容**(`lift/out-websrv/assets/manifest.json` → SHIPH を、`lift/out-dd1/serve/assets/` の読み取り専用の symlink で)、URL は `?pace=catchup&dedupe=check` だけ(`pace=catchup` は idle1 の check-long と同じ)。(b) はテストバンドルを `?bundle=` で指す。入力はすべて **CDP の模擬**(`Input.dispatchMouseEvent`/`dispatchKeyEvent`)で人の操作ではない。ツール: `tools/dd-check.mjs`(idle1 の `check-long.mjs` の発展)。
 - **自己検証 `?dedupe=check`**(決定 0187 §6): 方式 B で、全矩形を従来どおり送って描き、shadow が『不変』と判定した矩形だけ**参照 canvas** に描かない。`window.__app.dedupeCheck()` が窓ごとに canvas と参照 canvas の違う画素数を返す。(c) は 1.5 s ごと、(b) は 0.7 s ごとに**全窓・全画素**を比べる。差が出たら最初の差の窓・画素・外接矩形・crop と直前 40 件の入力を `first-diff-*.json` に保存する(`dedupeCheck()` に足した)。1 セッションのメニューは 28 個まで(runtime の hook 表の累計 64 個の限界、決定 0194)。
 - **限界**: 比較は『ある時点の canvas の状態』(フレームの間だけ現れて消える差は見えない)。方式 B のみ。この機械は 16 コアの SwiftShader で load 7〜45(他担当と共有)。依頼者の機械ではない。実機 Windows との照合は 0 件。
 
@@ -26,7 +26,7 @@
 
 | 場所 | 内容 |
 |---|---|
-| `ctx-resync.ts`(新) | `watchContextLoss(target, {lost, restored})`: `contextlost` を **`preventDefault()`**(HTML の規則は WebGL と同じ: 取り消すと復元が許される。取り消さない場合の動きは未試験)して `lost()`、`contextrestored` で `restored()`。HTMLCanvasElement と OffscreenCanvas の両方に使える |
+| `ctx-resync.ts`(新) | `watchContextLoss(target, {lost, restored})`: `contextlost` を **`preventDefault()`**(HTML の規則は WebGL と同じ: 取り消すと復元が許される。取り消さない場合の動きは未テスト)して `lost()`、`contextrestored` で `restored()`。HTMLCanvasElement と OffscreenCanvas の両方に使える |
 | `client.ts` | 方式 B(実エンジンの既定): ページの各 canvas(`?dedupe=check` では参照 canvas も)を監視。どちらのイベントでも LayerPainter のステージング canvas を作り直し、Worker に `{cmd:'resync', why}` を送り、ページのログに warn を出す |
 | `worker.ts` | 方式 A: OffscreenCanvas は Worker 内なので `doBind` でリスナーを付ける。`{cmd:'resync'}` と合わせて `resync(why)`: `SurfaceSync.resync()` + 全シンクの LayerPainter を作り直し + ログ + その場で `pumpAll()` |
 | `surface-sync.ts` / `surface-table.ts` | `SurfaceSync.resync()` = `Presenter.forgetSeen()`(`seen` を消す = 次の pump で全シンクが `Sink.resize`〔canvas の消去と dedupe shadow の `resetShadow`〕+ 窓全体の矩形)+ table stamp の無効化(変化がなくても次の look が完全になる) |
@@ -57,9 +57,9 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 - 実エンジンでの実 loss(`gpucrash` 走行、`runs/c-gpucrash/`): `crashGpuProcess` の後、ページ canvas(`l8`・`l14`・`l48` とその参照 canvas)で『2D context lost; the Worker is asked to send every window whole again』がログに出て、Worker が『every window is sent whole again (the dedupe shadows are cleared)』を返し、**例外なし**、エンジンは動き続け(その後 Edit メニューを開いて idle 10 s)。canvas は 10 s 後も `isContextLost() == true`(上と同じ)。
 - 実エンジンでの**模擬の loss**(`ctxloss` 走行〔canvas を空にして `contextlost`/`contextrestored` を dispatch〕、`runs/c-ctxloss/`): 窓 2 つ(主窓 `l14` と `l48`)を空にして resync 後 4 s で読み戻すと、**1 回目は前と画素まで同一**(`differingPixels` 0)、2 回目は主窓の 13 画素(x=1042、y=12〜24 の 1 画素幅の縦線)だけ違った。同じ canvas を loss なしで 4.2 s 間隔で読んだ対照でも**同じ 13 画素**が変わった(エンジンの主窓が自分で書き換えている縦線。メーター様)。= resync は主窓の 1930x1092 全体を元どおりに戻した。その後の `?dedupe=check` の比較は 0。
 
-## 3. (b) File > Save / Save as / Save new version のダイアログの区間(試験バンドル F1xH + ia2、実エンジン、`?dedupe=check`)
+## 3. (b) File > Save / Save as / Save new version のダイアログの区間(テストバンドル F1xH + ia2、実エンジン、`?dedupe=check`)
 
-試験バンドル(§1)を自前の vite preview(ポート 4610〜)で `?bundle=/assets/fl-engine-dd1-F1xH-ia2/manifest.json&pace=catchup&dedupe=check`。空のプロジェクト(ウィザードを Enter で閉じただけ)。入力は CDP の模擬(座標は決定 0191 の表の仮想画面座標)。比較は 0.7 s ごとの全窓・全画素。**偽装なし**: 『Buy FL Studio』窓(`TInAppShopForm`)はエンジン自身の窓で、Trial 状態の Save が開く(決定 0191 §6 と同じ)。表の全文は `tables/dd-check-b-dialogs.md`。
+テストバンドル(§1)を自前の vite preview(ポート 4610〜)で `?bundle=/assets/fl-engine-dd1-F1xH-ia2/manifest.json&pace=catchup&dedupe=check`。空のプロジェクト(ウィザードを Enter で閉じただけ)。入力は CDP の模擬(座標は決定 0191 の表の仮想画面座標)。比較は 0.7 s ごとの全窓・全画素。**偽装なし**: 『Buy FL Studio』窓(`TInAppShopForm`)はエンジン自身の窓で、Trial 状態の Save が開く(決定 0191 §6 と同じ)。表の全文は `tables/dd-check-b-dialogs.md`。
 
 | セッション | 操作(順) | 見えた窓(エンジンの窓一覧の className) | 比較回数 | 差分ピクセル最大 | 最大窓数 | メニュー |
 |---|---|---|---|---|---|---|
@@ -70,7 +70,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 **合計: 4 セッション、677 回の比較(各回すべての窓の全画素。1 回に比べた窓は最大 7〜21)で、違う画素は最大 0**。dedupe の Worker の数(セッション終了時): 省略した矩形 4,454 / 6,124 / 6,009 / 5,219、送った 1,072 / 918 / 1,746 / 922(= 77〜87% が省略)。比較の対象になった区間: ダイアログの出現・ホバー・消去、Buy 窓(別の `TInAppShopForm`、484x636 の灰色)の出現・ホバー・消去、閉じた後の主窓の再描画(窓ごとの canvas を全画素)。
 
-**範囲(正直に)**: (1) 試験バンドルは SHIPH ではなく F1xH + ia2(混成なし)。(2) Ctrl+S 系は save-2 では修飾キーがフラグだけでダイアログが出なかった(そのセッションの Ctrl 系の比較は『何も起きない区間』の比較にすぎない)。save-4 で直した版を別セッションで取った。(3) Open は何も開かないので『Open のダイアログの区間』は**見ていない**(このバンドルにはブラウザのファイル橋 `-DFLE_FILEDLG_BROWSER` がない)。(4) Export の 4 項目はエンジンの窓を開かなかった(メニューの閉じ方だけ)。(5) 比較は 0.7 s 間隔。
+**範囲(正直に)**: (1) テストバンドルは SHIPH ではなく F1xH + ia2(混成なし)。(2) Ctrl+S 系は save-2 では修飾キーがフラグだけでダイアログが出なかった(そのセッションの Ctrl 系の比較は『何も起きない区間』の比較にすぎない)。save-4 で直した版を別セッションで取った。(3) Open は何も開かないので『Open のダイアログの区間』は**見ていない**(このバンドルにはブラウザのファイル橋 `-DFLE_FILEDLG_BROWSER` がない)。(4) Export の 4 項目はエンジンの窓を開かなかった(メニューの閉じ方だけ)。(5) 比較は 0.7 s 間隔。
 
 ## 4. (c) 長時間の自己検証(既定の入口 SHIPH、`?pace=catchup&dedupe=check`、実エンジン、隔離 headless Chrome 156)
 
@@ -86,7 +86,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 **合計: 有効な 5 セッション、約 62.1 分(3,725 s)、2,437 回の比較で、違う画素は最大 0**。そのうち **`c-long-4` は 1 本で 1,774 s(29.6 分。『30 分以上』に 26 s 足りない)のセッション**(同じ engine を 1 回起動したまま 4 周: 周ごとにメニュー 5 個〔計 20 個、上限 28〕、窓の開閉、F8 開閉、F10 設定窓、クリック、再生 300 s〔再生中に窓の開閉・掃引・F7〕、idle。比較 1,169 回で差分 0)。他の 4 本はメニューの上限のためのセッション分割。有効 5 セッションの合計は 62.1 分。再生は 5 セッションとも開始時・終了時の両方でエンジンの idle 率 > 1,500/s(再生中の判定。決定 0182)を確認(再生の区間の合計 約 2,470 s: 318 + 246〔150 s と 60 s の 2 回と窓の開閉〕+ 312 + 324〔long-1〕+ 318×4〔long-4〕= 2,472 s)。**F8 の全画面一覧(`TPlugListForm`)の開閉は計 8 回〔c-long-1: 1、c-long-2: 2、c-long-3: 1、c-long-4: 4〕、F10 の設定窓(`TMIDIForm`)の開閉は計 7 回〔1+1+1+4〕、Welcome wizard の再出現、最大 14 窓**が同時に見えた区間を含む。dedupe の Worker の数(セッション終了時): 省略 18,044 / 1,475 / 2,705 / 17,905 に対し、変化があったため送った 4,910 / 3,710 / 917 / 4,729。**再生中は省略が少ない**(c-long-3: 再生 309 s で省略 1,955・送信 17,209。c-long-1: 再生 315 s で省略 14,285・送信 3,903。**読み、未確認**: 再生ヘッドなどの更新と 1 画素幅の無効化が同じ pump の dirty 矩形に合流すると『不変の矩形』にならない。c-long-1 は F5/F6/F9 を開閉した後に再生したので画面の更新が少ないのかもしれない)。
 
-**差分が出たときの保存**(`first-diff-*.json` + crop)の経路は用意し、1 つの自己検知試験(§2)で動作を確かめた。**本番の run では保存すべき差は出なかった**(出た 1 件は下)。
+**差分が出たときの保存**(`first-diff-*.json` + crop)の経路は用意し、1 つの自己検知テスト(§2)で動作を確かめた。**本番の run では保存すべき差は出なかった**(出た 1 件は下)。
 
 **除外した 1 件(自分のスクリプトの人工物)**: 最初の版の `long-2`(`runs/long-2/`)は、『模擬 context loss』の段階で 2,106,690 画素(主窓 1930x1092 全体)の差を記録した。原因は私のスクリプト: ページの canvas を空にした(`canvas.width = canvas.width`)のに参照 canvas(DOM にない)は空にしていないので、その間の比較は構造的に違う。以後の版は loss の区間は比較を止める。その run の他の段階はすべて 0 で、loss の後 resync が済むと比較は 0 に戻った。`first-diff-long-2.json` はこの人工物の記録で、**実際の差ではない**。
 
@@ -98,7 +98,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 |---|---|
 | `src/engine/dedupe.ts` | `resolveDedupeParam(v)` を追加: 値が無い・`1`・`1/0/check` 以外 → ON(`true`)、`0` → `false`、`check` → `'check'`。冒頭の説明を『既定 ON(決定 0201)』に |
 | `src/main.ts` | `const dedupe = resolveDedupeParam(dedupeParam)`(以前は `check` 以外は `=== true`)。ページのログ: 値が無いとき『unchanged window rectangles are not sent (the default since decision 0201; ?dedupe=0 sends every one)』、`?dedupe=0` は『every rectangle is sent』、未知の値は警告つきで ON |
-| `test/unit/dedupe.test.ts` | `resolveDedupeParam` の試験(値なし・1・0・check・未知の値 8 通り) |
+| `test/unit/dedupe.test.ts` | `resolveDedupeParam` のテスト(値なし・1・0・check・未知の値 8 通り) |
 | `test/e2e/run.mjs` | 4c の期待値: `dedupe-standin-default` と `dedupe-standin-bad`(`?dedupe=2`)は ON(Worker が省略/送信の数をログに出す)、`dedupe-standin-zero` だけ『Worker が dedupe について何も言わない』。context loss の『dedupe なし』場面は `&dedupe=0` を付ける |
 | `test/mutation/run.mjs` | `worker-dedupe-flag-ignored` の対象場面を `dedupe-standin-zero` に。新規 2 件: 既定を OFF に戻す、`0` を無視する |
 
@@ -110,12 +110,12 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 | 項目 | 結果 |
 |---|---|
-| 当て方 | 最新の `git archive HEAD`(26eb04d と 7f024d7 は `app/` が同じ)に `dd1.diff` → `dd1-default.diff` の順に当てた木が作業木 `src-default/` と一致(`diff -r` が空) |
+| 当て方 | 最新の `git archive HEAD`(26eb04d と 7f024d7 は `app/` が同じ)に `dd1.diff` → `dd1-default.diff` の順に当てた木がワークツリー `src-default/` と一致(`diff -r` が空) |
 | typecheck | 通過(`logs/default-typecheck.txt`) |
 | vitest | **1225 passed + 7 skipped**(`dd1.diff` の木 1224 + `resolveDedupeParam` の 1 件。`logs/default-vitest.txt`) |
 | e2e(dev・preview・worker) | **1071/1071**(`logs/e2e-full-default.txt.gz`)。最初の版では、私が足した context loss の『dedupe なし』場面のチェック 3 件(各 target に 1 件)が落ちた(既定が ON になったので `&dedupe=0` が要った。上の e2e の行で直した)。**既存の 1017 チェックのうち期待値を変えたのは 4c の `default`・`bad` 場面のチェックだけ**で、他は変更なしで通る |
 | 変異検査(既定の部分) | **5/5 検出**(`logs/default-mutation.txt`: 既定を OFF に戻す、`0` を無視、未知の値を受け入れる、`check` を失う、Worker の flag を無視) |
-| 最新の HEAD(48cec69)に当てた木 | `dd1.diff` → `dd1-default.diff` の順に `patch -p1` で当てた木: typecheck 通過、vitest **1235 passed + 7 skipped**(HEAD 側の試験が増えている)、e2e **1098/1098**(`logs/combined-on-head-48cec69.txt`、`logs/e2e-full-head48cec69-dd1-plus-default.txt.gz`) |
+| 最新の HEAD(48cec69)に当てた木 | `dd1.diff` → `dd1-default.diff` の順に `patch -p1` で当てた木: typecheck 通過、vitest **1235 passed + 7 skipped**(HEAD 側のテストが増えている)、e2e **1098/1098**(`logs/combined-on-head-48cec69.txt`、`logs/e2e-full-head48cec69-dd1-plus-default.txt.gz`) |
 
 ## 6. 既定 ON で『入力 → 次の rAF』の遅延は下がるか(決定 0194 の表との照合)
 
@@ -190,7 +190,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 1. **`?dedupe` を既定 ON にするか**(`dd1-default.diff`)。**既定 ON の根拠は『画素が同一(差分 0)』と『ページ主スレッド CPU 約半分』に限る**。遅延の改善は、ビーコン OFF(`?beacon=0`)の測定で確認(§6.3)、**ビーコン ON(既定のページ)は PM の指摘〔cbeacon2: ビーコンが待機中も rAF を回してページがフレームを作り続け、Chrome がポインタ移動の配信を次のフレームまで持つ〕のとおり利点を失っていて、cbeacon2 の修正後に再確認**。条件 (a)(b)(c) の充足: (a) は実装・単体・e2e・変異まで済み。ただし**実 Chrome での『復元後の画素』は検証できていない**(この Chrome は `contextrestored` を出さず、合成イベント + canvas 消去の模擬で見た)。(b)(c) は上の範囲で差分 0。既定 ON の差分は `?dedupe=0` で OFF に戻せる。`dd1-default.diff` は cbeacon2 の統合後に当てる想定で、作り直していない(PM の指示)。残るリスク = 依頼者の GPU・実 Chrome での復元後、フレームの間だけ現れる差(比較は 0.7〜1.5 s 間隔)、120 Hz 以上の画面。**取り込みの判断は PM**。
 2. **復元されない canvas の扱い**(S-dd1-no-replace)。この Chrome は GPU クラッシュの後 `contextlost` を出したきり `contextrestored` を出さず(最長 約 19 s 観測)、元の canvas は永久に描けない(新しい canvas は使える)。= dedupe の有無に関わらず、そうなるとその窓は空のまま。ページが canvas を作り直す(`DesktopView` に差し替えの API を足す、約 30 行)かは未実装。実機でこの状況が起きるかも未確認。
-3. **出荷バンドルに ia2 の行を載せるか**。SHIPH(配信中の既定の入口)には ia2 の行がなく、`File > Save / Save as / Save new version` は `user32!GetKeyNameTextW` で停止する(決定 0187 §11 の W18)。本作業の試験バンドル(F1xH + ia2、+5.9 MB)では、Chrome で Save as ダイアログ、Save(『Buy FL Studio』窓)、Ctrl+S、Ctrl+Shift+S、Import の 4 項目が**停止せずに**動いた(ia2 の native 観測と一致。Chrome での再現は初めて)。残る壁: `File > Save as template` の名前窓を Esc で閉じると `user32!SendMessageA`(0x4253a0、ia2 の W32)で停止。ia2 を SHIPH に載せる(行の追加・再生成・wasm 化・サイズ測定)は別の作業。
+3. **出荷バンドルに ia2 の行を載せるか**。SHIPH(配信中の既定の入口)には ia2 の行がなく、`File > Save / Save as / Save new version` は `user32!GetKeyNameTextW` で停止する(決定 0187 §11 の W18)。本作業のテストバンドル(F1xH + ia2、+5.9 MB)では、Chrome で Save as ダイアログ、Save(『Buy FL Studio』窓)、Ctrl+S、Ctrl+Shift+S、Import の 4 項目が**停止せずに**動いた(ia2 の native 観測と一致。Chrome での再現は初めて)。残る壁: `File > Save as template` の名前窓を Esc で閉じると `user32!SendMessageA`(0x4253a0、ia2 の W32)で停止。ia2 を SHIPH に載せる(行の追加・再生成・wasm 化・サイズ測定)は別の作業。
 4. **Space の停止の遅れ**(決定 0194 §4.5 の例外: dedupe1 の方が 17.8 → 24.8 ms)。§6.3 の再測定(ビーコン OFF の対)では Space の停止は ON 22.2 vs OFF 21.0 ms で差なし、右クリックのメニューを閉じるは ON 18.2 vs OFF 13.6 ms で ON が長い(n=14、組で逆転)。『メニューを閉じる/Space の停止では dedupe の利点が出ない』が、この n では『逆効果』とも言えない。
 5. **既定 ON はアプリ自身の遅延の測定(`LatencyTracker`、決定 0192 のビーコン)の意味を変える**(決定 0187 §7.3 の L2 と同じ現象。読み、この作業では再測定していない): 画素を変えない入力(ボタンの押下だけで見た目が変わらないクリックなど)には『次の更新』が来ないので、`input → 次のフレーム` は次の無関係な更新まで伸びる。応答が遅くなったのではなく、毎フレームの同一矩形が『フレーム』として数えられていた人工的な短さが消える。依頼者のブラウザから届くビーコン(`perf-log.jsonl`)の p95 は既定 ON の後で大きく見えうる。P2 の『遅延』は `event.timeStamp` から『変化の描画の次の rAF』までで測る(決定 0194 の勧告)。
 6. **`?dedupe=check` は方式 B のみ**(`?present=A` ではページが canvas を持たない)。実エンジンの既定は B。
@@ -208,7 +208,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 | S-dd1-check-crop | `dedupeCheck()` が差のある窓に出す物: 最初の画素、外接矩形、256×256 以内の crop | 調査用の情報。本番の経路では使わない |
 | S-dd1-menu-budget | 1 セッションのメニューは 28 個まで(スクリプトが超えると止まる) | runtime の hook 表の累計 64 個・メニュー 31 個目で停止(決定 0194、tbl1 が是正中)の手前。代替: 他の値 |
 | S-dd1-poll | 比較の間隔: (c) は 1.5 s、(b) は 0.7 s | 決定 0187 は 1.5 s。ダイアログの区間は短くした。フレーム単位ではなく、フレームの間だけ現れて消える差は見えない |
-| S-dd1-test-bundle | (b) の試験バンドルは F1xH + `ia2-imports.txt`(混成 p1000r なし)、配信用の圧縮は gzip(ローカルの vite preview 用。brotli q11 は遅いので使わない) | 混成の手順(2 段リンク・wasm-opt 2 回目・merge)は別で時間がかかる。混成は 16 スナップ 82 行で F1xH と一致している(決定 0189)ので、描画の列は同じはず(読み)。**SHIPH 同一の構成ではない**。代替: 混成も作る |
+| S-dd1-test-bundle | (b) のテストバンドルは F1xH + `ia2-imports.txt`(混成 p1000r なし)、配信用の圧縮は gzip(ローカルの vite preview 用。brotli q11 は遅いので使わない) | 混成の手順(2 段リンク・wasm-opt 2 回目・merge)は別で時間がかかる。混成は 16 スナップ 82 行で F1xH と一致している(決定 0189)ので、描画の列は同じはず(読み)。**SHIPH 同一の構成ではない**。代替: 混成も作る |
 | S-dd1-default-invalid | 既定 ON の版では、1/0/check 以外の値(`?dedupe=2`)は無視して(警告つき)ON | 以前は OFF だった。『壊れた URL でも既定に従う』を選んだ。代替: 警告して OFF |
 | S-dd1-sim-loss | e2e と実エンジンの『復元後の画素』は、canvas を空にして `contextlost`/`contextrestored` を dispatch する**模擬**で見る | この Chrome は実際の GPU クラッシュで `contextrestored` を出さない。実機 GPU・実 Chrome での復元後は未確認 |
 | S-dd1-lat-cells | 遅延は待機(idle)の 6 セル(クリック・ホバー・ホイール・FILE メニュー・右クリックメニュー・Space)× 12 反復 × 2 組。F8・ドラッグ・再生中は測らない | 時間(総計 3.5 時間)のため。決定 0194 の表の主要な 4 入力 + Space。n が小さく、p95 は粗い。代替: 全セル・3 組以上 |
@@ -224,7 +224,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 - **最初の版の run は古いビルドで走った**: `long-1`・`long-2`(最初の版)・`smoke-idle` は `dedupeCheck()` に『最初の差の画素・外接矩形』を足す前の `dist-dd1` を使った(差が出なかったので、結果には影響しない。`long-2` の人工物の記録に位置が無いのはそのため)。以後は `dist-dd1b`。
 - **F8 が効かなかった run**: `long-1`(最初の版)は F5/F6/F9 の後の Welcome wizard が F8 を受けて、F8 の窓が開かなかった。スクリプトを直して(エンジンが idle になるのを待って wizard を閉じる)から `c-long-1` などで F8(`TPlugListForm`)の開閉を確認した。`long-1` は『F8 なし』の run として数えている(§4 の表に注記)。
 - **save-2 の Ctrl+S 系の入力は修飾キーを『フラグ』としてだけ送ったので、ダイアログが出なかった**。save-4 で修飾キーのキーイベントを先に送る形に直して取り直した。save-2 のその段階は『何も起きない区間の比較』にすぎない(§3 に注記)。
-- **試験バンドルは SHIPH と同一の構成ではない**(混成 p1000r なし、`ia2-imports.txt` に exp1 の行のうち 6 行が入っていない)。依頼文は『SHIPH の構成に ia2 の行を足す』と書いたが、混成の手順は別で、このセッションでは作っていない。
+- **テストバンドルは SHIPH と同一の構成ではない**(混成 p1000r なし、`ia2-imports.txt` に exp1 の行のうち 6 行が入っていない)。依頼文は『SHIPH の構成に ia2 の行を足す』と書いたが、混成の手順は別で、このセッションでは作っていない。
 - **稼働中の run（`c-long-4`）のプロファイルと netlog を、整理のとき誤って消した**(`runs/*/profile-*` を一括で消した)。Chrome は消えたファイルを開いたまま動き続け、run は最後まで走って結果が出た(1,169 回の比較、例外なし)が、その run の `netlog` は無い。
 - **`tools/mkdiff.sh` の最初の版は基準を『最新の HEAD』にしていた**ため、HEAD が進んだ(48cec69)後に作った `dd1.diff` が他担当の変更の逆を含んでいた。気づいて基準を 26eb04d に固定して作り直した(dry-run は最新の HEAD に対して)。出した `dd1.diff` は直した後の物。
 - **`python` の出力を大きく画面に出した**(セルの `draws` の配列、約 100 KB)。
@@ -236,9 +236,9 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 ## 10. 成果物
 
-`lift/out-git/dd1-results/`(3 MB 以内): `dd1.diff`(a の実装・テスト・変異 + `dedupeCheck` の詳細。既定は変えない)、`dd1-default.diff`(既定を ON にする。`dd1.diff` の後に当てる)、`MERGE-NOTES.md`、`docs/0201-dedupe-default.md`(本書)、`docs/README-0201-line.txt`、`tables/`(check 走行の表・遅延・新規 e2e)、`logs/`(試験の出力、バンドルのビルド、patch の dry-run)、`tools/`(走行・集計・差分作成のスクリプト)、`tools-lat1/`(遅延の測定。`lift/harness/web/lat1/` の写しに `dedupe0` の構成と `DD_DIST` を足した物)。
+`lift/out-git/dd1-results/`(3 MB 以内): `dd1.diff`(a の実装・テスト・変異 + `dedupeCheck` の詳細。既定は変えない)、`dd1-default.diff`(既定を ON にする。`dd1.diff` の後に当てる)、`MERGE-NOTES.md`、`docs/0201-dedupe-default.md`(本書)、`docs/README-0201-line.txt`、`tables/`(check 走行の表・遅延・新規 e2e)、`logs/`(テストの出力、バンドルのビルド、patch の dry-run)、`tools/`(走行・集計・差分作成のスクリプト)、`tools-lat1/`(遅延の測定。`lift/harness/web/lat1/` の写しに `dedupe0` の構成と `DD_DIST` を足した物)。
 
-作業ディレクトリ `lift/out-dd1/`: `src/`(`dd1.diff` の木)、`B/bundle/fl-engine-dd1-F1xH-ia2/`(**試験バンドル**、gzip。配信中の `lift/out-websrv/assets/` には置いていない)、`runs/`(各走行の JSON・first-diff・crop。netlog は消した)、`serve/assets/`(symlink だけ)。生成 C・オブジェクト・wasm の中間物・cargo-target・emcache・`src-default/`・`dist-*` は終了時に消した。
+作業ディレクトリ `lift/out-dd1/`: `src/`(`dd1.diff` の木)、`B/bundle/fl-engine-dd1-F1xH-ia2/`(**テストバンドル**、gzip。配信中の `lift/out-websrv/assets/` には置いていない)、`runs/`(各走行の JSON・first-diff・crop。netlog は消した)、`serve/assets/`(symlink だけ)。生成 C・オブジェクト・wasm の中間物・cargo-target・emcache・`src-default/`・`dist-*` は終了時に消した。
 
 ## PM の判断と取り込み(2026-11-04)
 

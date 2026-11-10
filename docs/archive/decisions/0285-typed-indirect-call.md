@@ -92,7 +92,7 @@ adapter_<va>(rsp, rcx, rdx, r8, r9, rax, tt):         ; 検索が hit した後�
 
 0270b との整合: 0270b の guard は『直接呼びの callee が立てたフラグを caller が読む』の場合だけ関係する。間接呼びのフラグは未定義(§2)で、adapter は rax しか返さないので、census の lowerable/not の判定は**変わらない**。0286 の 4 関数は、適合すれば adapter を持つ(特別扱いなし)。
 
-0002b の教訓(C→wasm の wrapper が callee-saved を壊した): 新経路には C の wrapper がない。ただし**同じ形の試験(`boundary_regs`: callee-saved・xmm6〜15・フラグ・R[4])を新経路にも走らせる**(§7 の工程 3)。
+0002b の教訓(C→wasm の wrapper が callee-saved を壊した): 新経路には C の wrapper がない。ただし**同じ形のテスト(`boundary_regs`: callee-saved・xmm6〜15・フラグ・R[4])を新経路にも走らせる**(§7 の工程 3)。
 
 ## 6. 利得の式と見積り(**見積り**。実装前は実測が無い)
 
@@ -121,7 +121,7 @@ adapter_<va>(rsp, rcx, rdx, r8, r9, rax, tt):         ; 検索が hit した後�
 
 1. **診断だけ**: c_mode でも標準の adapter の述語を評価し、`indirect_fit`・`indirect_nonfit`・`nonconf_reasons`・xmm の条件を report に出す(生成物は変えない)。hyb-U 4,046 関数の『述語の真の数』が出る。
 2. 表 + adapter + 束ね関数の生成(§3)と `call r/m64` の枝(§4)。`TailIndirect` は触らない。
-3. 試験: (a) fe-wasmgen の単体試験 — 表の索引・束ね関数・miss・landing・hook の各枝、(b) `boundary_regs` の形を新経路で(callee-saved・xmm6〜15・フラグ・R[4])、(c) `wall_fr20`(進捗の count と slice の位置)、(d) 生成の決定性(regen 2 回の sha256)、(e) `test.sh full` と a4(新旧の一致: 942/942、895/895、5,310、1,009,737、started_but_not_entered 0)。
+3. テスト: (a) fe-wasmgen の単体テスト — 表の索引・束ね関数・miss・landing・hook の各枝、(b) `boundary_regs` の形を新経路で(callee-saved・xmm6〜15・フラグ・R[4])、(c) `wall_fr20`(進捗の count と slice の位置)、(d) 生成の決定性(regen 2 回の sha256)、(e) `test.sh full` と a4(新旧の一致: 942/942、895/895、5,310、1,009,737、started_but_not_entered 0)。
 4. 診断: 既存の境界カウンタ `fle_hyb_cnt`(`hybrid_glue.c`)で、実装前後の `fle_hyb_dispatch` の回数を比べる ⇒ **φ = 1 − (後 ÷ 前)**。
 
 **opt1 が実エンジン(node とブラウザ)で見る物**:

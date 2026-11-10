@@ -11,7 +11,7 @@
 
 | # | 状況 | 判断 | 理由 |
 |---|---|---|---|
-| 1 | Step 2 の `git clone` | **clone しなかった**。作業ディレクトリが既にこの Issue のリポジトリ（`origin` = `https://github.com/signature-studio/signature-studio-develop.git`、`main` = `159a42e2f6376df21bbe8b481af31a962d521f48`）だった | 同じ内容を再 clone する意味が無い。`replay.c`・`cases.tsv`・`compare.py`・`replay-win10.manifest`・`gen_cases.py` は全て存在（Test-Path = True）。作業ツリーは clean だった |
+| 1 | Step 2 の `git clone` | **clone しなかった**。作業ディレクトリが既にこの Issue のリポジトリ（`origin` = `https://github.com/signature-studio/signature-studio-develop.git`、`main` = `159a42e2f6376df21bbe8b481af31a962d521f48`）だった | 同じ内容を再 clone する意味が無い。`replay.c`・`cases.tsv`・`compare.py`・`replay-win10.manifest`・`gen_cases.py` は全て存在（Test-Path = True）。ワークツリーは clean だった |
 | 2 | Step 2 の `git switch -c worklog-issue-1` | `fatal: a branch named 'worklog-issue-1' already exists` となった。**既存のローカルブランチに `git switch` した** | 調べたところ、そのブランチは `main` と同じコミット（159a42e）を指し、`main` との差は 0/0、リモートには存在しない（`git ls-remote --heads origin` は `main` のみ）。誰かの作業を上書き・破棄する恐れが無いと確認してから使った。ブランチは作り直していない |
 | 3 | コンパイラ | VM に既にある **Visual Studio 2022 Community**（17.14.44、`cl` 19.44.35229 x64）を `vcvars64.bat` 経由で使った。w64devkit などは取得していない（`toolchain.md` は無し） | Issue の Step 3 の第 1 候補。`cl` は PATH に無かったので、`vswhere` で場所を探して `vcvars64.bat` を呼んだ。ビルド用の一時 .bat は `%TEMP%` に置いた（リポジトリ外）。環境変数・レジストリは変更していない |
 | 4 | 実行 C（`--dpi-aware`、任意） | **実行した** | Issue は「拡大が 100% でない場合は任意」としている。後で分かったが、この VM は約 175% と推測されるので（env.md）、実行して損は無いと判断した |
@@ -109,7 +109,7 @@
 - レジストリ・システム設定・環境変数は変更していない（PATH も。`vcvars64.bat` は一時的な `cmd` の中だけで使った）。インストーラは使っていない。ロケール・DPI・解像度・タイムゾーンは変更していない。レジストリは読み取りだけ。
 - ネットワーク: `git push`（`worklog-issue-1`）と Issue コメントだけ。コンパイラのダウンロードはしていない。`git ls-remote`（読み取り）を 1 回使った。
 - `replay.c`・`cases.tsv`・`compare.py`・`replay-win10.manifest` は無改変。`--no-mask` は未使用。
-- 管理者として実行していない。`main` へは push しない。force push しない。他のブランチ・Issue・PR には触れない。
+- 管理者として実行していない。`main` へは push しない。force push しない。他のブランチ・ Issue ・PR には触れない。
 - **正直に書く点**: 既存の `worklog-issue-1` ブランチを使った（判断 2。`main` と同一で、リモートに無いことを確認済み）。`git clone` はしなかった（判断 1）。`git config` は変更していない（コミットは `-c` で作者を指定する）。
 
 ## 8. コミットの構成（`artifacts-sha256.txt` について）
@@ -120,9 +120,9 @@
 
 ### 改行コードの変換（git の `core.autocrlf=true`）
 
-- この VM の git は `core.autocrlf=true`（私が設定したものではなく、既存の設定。`git config` は変更していない）。そのため、作業ツリーで CRLF のファイルは、コミット時に LF に変換された。
-- `artifacts-sha256.txt` のハッシュは、**この VM の作業ツリーにあるファイル**のもの。次の 6 ファイルは、コミットされた中身（LF）のハッシュが、記録したハッシュと**一致しない**（改行コードの違いだけ。`git ls-files --eol` と、コミットされた blob のハッシュの照合で確認した）:
+- この VM の git は `core.autocrlf=true`（私が設定したものではなく、既存の設定。`git config` は変更していない）。そのため、ワークツリーで CRLF のファイルは、コミット時に LF に変換された。
+- `artifacts-sha256.txt` のハッシュは、**この VM のワークツリーにあるファイル**のもの。次の 6 ファイルは、コミットされた中身（LF）のハッシュが、記録したハッシュと**一致しない**（改行コードの違いだけ。`git ls-files --eol` と、コミットされた blob のハッシュの照合で確認した）:
   `compare-report.md`、`compare-stdout.txt`、`run-plain.log`、`run-repeat.log`、`run-manifest.log`、`run-dpiaware.log`。
   （`artifacts-sha256.txt` 自身は、ハッシュ一覧に含まれないので照合の対象外。）
-- `observed.tsv`、`observed-repeat.tsv`、`observed-manifest.tsv`、`observed-dpiaware.tsv`、`env.md`、`notes.md`、`build.log` は、コミットされた中身のハッシュが記録と一致する（`observed*.tsv` は作業ツリーでも LF だった）。つまり、測定結果の `.tsv` は無加工でコミットされている。
+- `observed.tsv`、`observed-repeat.tsv`、`observed-manifest.tsv`、`observed-dpiaware.tsv`、`env.md`、`notes.md`、`build.log` は、コミットされた中身のハッシュが記録と一致する（`observed*.tsv` はワークツリーでも LF だった）。つまり、測定結果の `.tsv` は無加工でコミットされている。
 - 対処: 変換を止めるために `git config` や `.gitattributes` を変えるのは、禁止事項（`git config` を変更しない。`worklog/1/` 以外を変えない）に触れるので、していない。上の 6 ファイルを照合するときは、改行を CRLF にそろえてから計算する。

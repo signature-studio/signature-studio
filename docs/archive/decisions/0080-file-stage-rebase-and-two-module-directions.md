@@ -87,7 +87,7 @@ fe-pe rebase FILE NEWBASE OUT
 | (d) fe-lift の統計 | 同じ `fe-lift lift FILE /dev/null --pdata` を元とリベース後（0x2000000）の両方に実行。出力 8 行目の `c_bytes` を除き**全行が同一**（`diff`）。**functions 32,648**、closure_instructions 6,464,799、emitted_instructions 6,511,234、bad_nodes 0、tail_calls 22,594、gotos 450,886、c_lines 6,707,823、unsupported_total 974,582。差は `c_bytes` のみ: 566,289,705 → 536,731,303（−5.2%。VA の即値の桁が短くなるため。設計文書 §3.4 の傾向と同じ） |
 | (e) `0x18…` の即値 | 生成 C を書き出していないので**再測定していない**（任意。設計文書 §3.4 の実測: 1,135,257 → 0） |
 
-functions は設計文書の 32,162 でなく 32,648。作業ツリーの他の変更（決定 0075、0079 の SSE と表の解決など）で閉包が変わったためで、元とリベース後を同じツールで測って比較した（依頼文の想定どおり）。
+functions は設計文書の 32,162 でなく 32,648。ワークツリーの他の変更（決定 0075、0079 の SSE と表の解決など）で閉包が変わったためで、元とリベース後を同じツールで測って比較した（依頼文の想定どおり）。
 
 ### 実 DLL の副次的な確認
 
@@ -114,7 +114,7 @@ functions は設計文書の 32,162 でなく 32,648。作業ツリーの他の�
 
 失敗した 1 件は fe-pe と無関係で、他者の変更によるもの（読み）:
 
-- `fe-lift` の `tests/sysinfo.rs` の `source_uses_no_host_processor_memory_time_or_file_state`。`fle_sysinfo.c`（runtime。作業ツリーで変更中）が `environ` を使うとして落ちる（`sysinfo.rs:953`）。
+- `fe-lift` の `tests/sysinfo.rs` の `source_uses_no_host_processor_memory_time_or_file_state`。`fle_sysinfo.c`（runtime。ワークツリーで変更中）が `environ` を使うとして落ちる（`sysinfo.rs:953`）。
 - 原因の読み: `fle_sysinfo.c:103` の `snprintf` の文字列リテラル「…this environment decides it」の `environment` が、テストの禁止語 `environ` に部分一致する（テストは `/* */` のコメントだけを除くので、文字列リテラルは対象に残る）。他の `environ` の出現（2、39、171 行）はコメント内。テストを読み、`fle_sysinfo.c` を検索して得た読みで、HEAD の状態でこのテストが通るかは確かめていない（git 操作をしていない）。
 - 他者のファイルなので直していない。
 

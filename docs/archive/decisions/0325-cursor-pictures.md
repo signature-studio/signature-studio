@@ -1,4 +1,4 @@
-# O18(マウスカーソルがホバーで変わらない): カーソルの絵と hot spot をブラウザの CSS カーソルへ渡す — 差分と試験(ci1)
+# O18(マウスカーソルがホバーで変わらない): カーソルの絵と hot spot をブラウザの CSS カーソルへ渡す — 差分とテスト(ci1)
 
 決定番号は PM が付ける。差分のコメントに入れた「decision 0325」は**仮の番号**(④ S-disabled-drops の差分は仮 0324)。確定したら `sed -i 's/decision 0325/decision NNNN/g'` を差分の適用後の木に 1 回掛ける(対象: 差分に入る 10 ファイル。`grep -rl "decision 0325"` で一覧)。
 
@@ -6,12 +6,12 @@
 
 | 実行した | 内容 |
 |---|---|
-| clang -O0(nice 19、1 回に 1 つ)で ランタイム 34 ファイル(.o)と新しい試験を native ビルド、`-Wall -Wextra -fsyntax-only` | `fle_gdi.c` `fle_res.c` `fle_appview.c` で警告 0 |
-| native 試験 `lift/harness/c0325/cursor_img.c` | シナリオ I(`CreateIconIndirect`)・M(メモリ上に作った PE の資源)・S(絵が無い handle)で **PASS 38 / FAIL 0** |
+| clang -O0(nice 19、1 回に 1 つ)で ランタイム 34 ファイル(.o)と新しいテストを native ビルド、`-Wall -Wextra -fsyntax-only` | `fle_gdi.c` `fle_res.c` `fle_appview.c` で警告 0 |
+| native テスト `lift/harness/c0325/cursor_img.c` | シナリオ I(`CreateIconIndirect`)・M(メモリ上に作った PE の資源)・S(絵が無い handle)で **PASS 38 / FAIL 0** |
 | **実物の FLEngine_x64.dll の 56 個のカーソル**(`binaries/win64/FLEngine_x64.dll`、序数 32762〜32767 と名前つき 50 個)を、ランタイムの C(`LoadImageW` / `LoadCursorW` → `fle_av_cursor_image`)と、独立に書いた python の復号(pefile + numpy、`real-cursors.py`)で読み、幅・高さ・hot spot・RGBA の FNV-1a を比べた | **56 行すべて一致** |
 | 実物の 56 個の絵を並べた PNG(`logs/real-cursors-contact.png`、hot spot はマゼンタ) | 向き(上下)・色・形が正しいことを目で確認(砂時計 SQL、ドラッグのコピー/移動、ペン、ブラシ、ズーム、リサイズ矢印など) |
 | vitest(`nice -n 19`、node)`test/unit` 全体、`tsc --noEmit`(`tsconfig.json` `tsconfig.webworker.json` `tsconfig.test.json`) | 新しい 14 件を含め通過。全体は HEAD と同じ 18 件が落ちる(私の抜き出した木に `scripts/` などが無いため。HEAD の木で同じ 18 件)、新たな失敗 0、型検査の新しい誤り 0 |
-| `patch -p1 --dry-run` と実適用(`git archive HEAD` の複製) | rc 0、適用後の木 = 作業木 |
+| `patch -p1 --dry-run` と実適用(`git archive HEAD` の複製) | rc 0、適用後の木 = ワークツリー |
 
 **実行していない物**: ブラウザ(Chrome・Firefox)は 0 回 = **CSS カーソルが実際に変わる所は未確認**。実エンジン(G3 / N1 / wasm)は 0 回。emcc の build は 0 回。ミューテーション検査は 0 回(このリポジトリの慣習にある物。窓の指示待ち)。依頼者の機械の値は 0 件。
 
@@ -30,11 +30,11 @@
 | `lift/runtime/fle_appview.c` `fle_appview.h` | `fle_av_state.cursor_serial`(予約領域の先頭、オフセット 56。サイズ不変)。新しい export `fle_av_cursor_image(handle)`(32 バイトの構造体 + 静的な 64 KB の RGBA。標準カーソルと絵の無い handle は NULL) |
 | `app/src/engine/appview.ts` `fruity.ts` `os-state.ts` `protocol.ts` `worker.ts` `client.ts` | `cursorSerial` を osstate の鍵に含める。Worker は osstate が変わったとき、標準でないカーソルの絵を**(handle, serial)ごとに 1 回だけ**、osstate より**前**に `cursor-image` で送る(RGBA を transfer)。export を呼ぶのも 1 回だけ(`cursorsSent` で先に判定) |
 | `app/src/ui/cursor.ts` `main.ts` | `CursorPictureStore`: 受けた絵を canvas の PNG にして `cursor: url(...) hx hy, default`。device pixel ratio > 1 の画面のため、幅高さが 2 倍して 128 以下なら最近傍で 2 倍の絵も作り `image-set(url 1x, url 2x)`(`CSS.supports` で使えるときだけ。無効な値は直前のカーソルを残すため)。絵が届く前・無いときは矢印(従来どおり) |
-| `lift/harness/c0325/` `app/test/unit/` | native 試験(`cursor_img.c`、`build.sh`、実物比較の `real-cursors.py`)、vitest `cursor-picture.test.ts`(14 件)と既存 2 本の更新 |
+| `lift/harness/c0325/` `app/test/unit/` | native テスト(`cursor_img.c`、`build.sh`、実物比較の `real-cursors.py`)、vitest `cursor-picture.test.ts`(14 件)と既存 2 本の更新 |
 
 通信と変換: 絵は(handle, serial)ごとに Worker → ページへ 1 通(32×32 なら 4 KB。最大 64 KB)。毎フレームの通信は増えない。osstate の中身は serial が 1 つ増えただけ。ピクセルのコピーは wasm → Worker で 1 回(export が返す静的バッファ)、Worker → ページは transfer(コピーなし)。
 
-## 3. 試験の内容
+## 3. テストの内容
 
 - **I(native、`CreateIconIndirect`)**: カラー版 4×4(mask 0 で色、mask 1 と黒で透明、mask 1 と黒以外で色、hot spot)、単色版 8×4(mask 8 行の AND / XOR の 4 通り)、icon の中心の hot spot、`DestroyCursor` で絵が消える、作り直すと serial が変わる。
 - **M(native、メモリ上の PE を 0x400000 に置く)**: 1 bit の名前つきカーソル(`LoadCursorW(L"MYCUR")`)、32 bit alpha つき(序数 32762)、24 bit + AND mask(序数 32763)。
@@ -52,7 +52,7 @@
 
 ## 5. 自己申告
 
-1. 試験の初版で、(a) 試験用 PE の先頭を自分で 0 にして MZ 署名を消す、(b) `uint32_t rgba` に 64 bit のアドレスを入れて native で落ちる、という 2 つの誤りがあった。(b) は構造体を `uint64_t rgba`(オフセット 24、サイズ 32 のまま)に直した(JS は下位 32 bit を読む)。
+1. テストの初版で、(a) テスト用 PE の先頭を自分で 0 にして MZ 署名を消す、(b) `uint32_t rgba` に 64 bit のアドレスを入れて native で落ちる、という 2 つの誤りがあった。(b) は構造体を `uint64_t rgba`(オフセット 24、サイズ 32 のまま)に直した(JS は下位 32 bit を読む)。
 2. 決定番号は仮(冒頭)。
 3. vitest 全体の 18 件の失敗は私の抜き出した木の不足で、HEAD でも同じ(差 0)。PM の木での全体の確認は未実施。
 
@@ -70,4 +70,4 @@ bash T/lift/harness/c0325/build.sh T W R D/flat.bin D/names.txt          # 実�
 
 ## PM の判断と取り込み(2026-11-07 08:39、docs のみ。製品の差分なし)
 
-取り込み: ci1 の 0325(O18: カーソルの絵と hot spot をブラウザの CSS カーソルへ渡す)、差分(`docs/investigations/ci1/0325/diffs/`)、実物のカーソルの復号の証拠(`evidence/`)。**PM の検証**: `0325-cursor-pictures.diff`(1270 行)を cand1 の積み(HEAD + 0323 + 0313f2 + scroll-model + time-env + stop-context + d1 + d2 + diag-g9-fl + diag-g9-fl-scroll)+ 0323b + alpha1 の scrolldc の複写に実適用して rc 0・FAILED 0・.rej 0、`emcc -fsyntax-only -Wall -Wextra` で fle_gdi.c・fle_res.c・fle_appview.c は警告 0。ci1 の報告(私は再実行していない): 実物の FLEngine_x64.dll のカーソル 56 個を C と独立の python で復号して幅・高さ・hot spot・RGBA が一致、native の試験 38 PASS。**ブラウザで CSS カーソルが実際に変わるかは未確認**(RT-A の bundle ができてから gpu1 が確認)。区分 (b)。RT-A の bundle に載せる。依頼者の機械は 0 件。
+取り込み: ci1 の 0325(O18: カーソルの絵と hot spot をブラウザの CSS カーソルへ渡す)、差分(`docs/investigations/ci1/0325/diffs/`)、実物のカーソルの復号の証拠(`evidence/`)。**PM の検証**: `0325-cursor-pictures.diff`(1270 行)を cand1 の積み(HEAD + 0323 + 0313f2 + scroll-model + time-env + stop-context + d1 + d2 + diag-g9-fl + diag-g9-fl-scroll)+ 0323b + alpha1 の scrolldc のコピーに実適用して rc 0・FAILED 0・.rej 0、`emcc -fsyntax-only -Wall -Wextra` で fle_gdi.c・fle_res.c・fle_appview.c は警告 0。ci1 の報告(私は再実行していない): 実物の FLEngine_x64.dll のカーソル 56 個を C と独立の python で復号して幅・高さ・hot spot・RGBA が一致、native のテスト 38 PASS。**ブラウザで CSS カーソルが実際に変わるかは未確認**(RT-A の bundle ができてから gpu1 が確認)。区分 (b)。RT-A の bundle に載せる。依頼者の機械は 0 件。

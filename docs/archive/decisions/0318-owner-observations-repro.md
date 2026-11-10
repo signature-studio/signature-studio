@@ -5,7 +5,7 @@
 ## 冒頭の三点
 1. **実エンジンで何を実行し何を観測したか(実測)**: 実 Chrome 156 headless と実 Firefox 158(DISPLAY=:77、llvmpipe)で、**製品の E13 bundle**(`fl-engine-ci-0363b050`、wasm 無変更、協調)と**main の page**(p0、display method D)を、依頼者の観察に近い条件(Monitor を畳む、project を開く、Settings → General/About、playlist のドラッグ)で動かし、page の状態(`window.__app`)、engine log、画面の画素、canvas・peek(エンジンの compositor)・dump(窓表から描き直し)の sha を取った。代役・再生・モックなし。依頼者の機械の値は 0 件。
 2. **結論**: (a) **O9(General のスクロールで描画が壊れる)は Chrome と Firefox の両方で再現し、壊れた絵は page の描画ではなくエンジンの窓の面そのもの**(canvas・peek・dump の sha が一致)= 契約 (b) の側(ScrollWindowEx の画素モデル、または FL の再描画の更新矩形)。(b) **O3(About)**: 歯車は描かれ動く。ロゴの浮遊に当たる layered 窓が **4×3(Chrome)/3×3(Firefox)** で 1 枚あるだけで、ロゴとスタッフロールは出ない(engine log の増分は 0 行)。(c) **O5(Monitor を畳むとエンジンが止まる)は再現しなかった**: Chrome(5 条件)と Firefox で、畳むと page が guest 画面の大きさをエンジンへ送り、エンジンは追従して 30〜60 s engine-idle のまま、メモリも増えない。(d) 別件の発見: 診断経路の『非 peek の dump の 2 回目(画面の大きさ変更をまたぐ)』でエンジンが落ちる(2/2)。(e) 画面のぼやけ(O7)の機構の候補: dpr 1.75 で guest 画面が CSS px のまま(物理 px と一致しない)。(f) O1: playlist の既存の clip のドラッグは始まり、離すと移るが、**ドラッグ中にカーソルに付いて動く clip の絵が描かれない**(layered 窓も出ない)。engine は死ななかった。
-3. **未取得**: 起動のフェードの present 時刻列(O2。`--page-init` の driver と sampler を用意、未実行)、コード進行ツール・Sampler の落ち(O13)、画面のぼやけの物理 px の測定(O7)、1 拍目(O13 の 8)の armCapture、Filter の V3(試験 bundle が参照プロジェクトを開く途中で止まる)。
+3. **未取得**: 起動のフェードの present 時刻列(O2。`--page-init` の driver と sampler を用意、未実行)、コード進行ツール・Sampler の落ち(O13)、画面のぼやけの物理 px の測定(O7)、1 拍目(O13 の 8)の armCapture、Filter の V3(テスト bundle が参照プロジェクトを開く途中で止まる)。
 
 ## 1. 条件
 - 共通: page = p0(`app-dist-p0` = main d0447902 の app、display method D)、port 4967、assets = `assets-e13`(ci1 の E13 bundle `fl-engine-ci-0363b050`)。driver = `tools/sdriveg2.mjs`(`--dpr` を足した、`pixel` の fallback を足した)、`tools/run-fb.sh`(Chrome)、`tools/run-ff.sh`(Firefox)。各 run の前に `tools/pre-run-note.sh`(free・vmstat の si/so)を `logs/memnote.txt` に残した。
@@ -50,7 +50,7 @@
 ## 6. 画面のぼやけ(O7)の先取りの事実
 - dpr 1.75 の viewport(2194×1234)で、guest 画面は **CSS px のまま**(1854×1198、`canvas-info` の『scale 1.0000, device pixel ratio 1.75』)。canvas の物理 px は guest と一致せず、ブラウザが 1.75 倍に引き伸ばす = ぼやけの機構の候補。ゲストには実 DPI も物理画面の大きさも見せていない(ゲストは 96 PPI)。設計メモは別途。
 
-## 7. Filter の V3(試験 bundle `fl-engine-test-g9f-7b2e3014`)
+## 7. Filter の V3(テスト bundle `fl-engine-test-g9f-7b2e3014`)
 - 2/2 本で、参照プロジェクトを開く途中に `fle: DestroyCursor: hIcon was not issued by this runtime's GDI table … the page defines no result for it` でエンジンが止まる(exit 134)。Balance の `LoadLibraryW → 0x6800000`・`GetProcAddress → 0x6abdde0` の後。Filter の LoadLibraryW の行は出ない。Problems 窓の件数は未取得。区分: 外部 API の契約の不足 (b)(DestroyCursor の戻り値の定義)。run = `logs/rt-g9f-1`・`rt-g9f-2`。
 
 ## 8. 区分(全体の仕組みの側)

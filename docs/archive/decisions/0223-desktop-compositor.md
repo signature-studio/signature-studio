@@ -8,13 +8,13 @@
 - **午後の測り直し(§11。HEAD 741d626 の runtime の D8、Chrome 156 と Firefox 158)**: アプリの不具合を 1 件見つけて直した(`DeskPresenter.present()` が compose の前に取ったメモリの ArrayBuffer を読み、compose の malloc によるメモリ増加で detach されて例外になり、報告された矩形が失われた。HEAD 95759fe に取り込み済み)。測定側の不具合も 1 件(`closeWizard` の余分な Enter。D だけが B の約 3 倍に見えていた件の原因)。**直した後は、Chrome と Firefox のどちらでも、画素は旧経路と同一(箱の外 0)、CPU は D が B 以下(全セル 3/3 ラウンド)、入力→絵の遅延は Chrome で D 8.6〜15.5 ms 対 B 38.5〜42.1 ms(p50)、Firefox で同等、Firefox の起動は負荷の下で修正後 80/80**。画面側の上限(P2): 典型で Worker の 1〜3%、全面が毎フレーム変われば 58〜80%(120 回/s)。残る前提は、旧 e2e 単独スクリプト 14 本の扱い(移行 7・削除 7)と、出荷用 wasm・実機での再確認。D を既定にするかは PM の判断。
 - 状態: 仮の決定。`desk1.diff`(追加のみ・opt-in)は HEAD 741d626 として取り込み済み。残る差分は `desk1-fix-detached-buffer.diff`(不具合の修正。取り込み済みの場合は HEAD にある)、`desk1-remove.diff`(旧経路の抹消。HEAD 741d626 基準。適用の判断は PM)、`desk1-docs.diff`(この文書・MERGE-NOTES・tools・tables・logs)。画素同一性・レイヤード・入力→絵の遅延の定義・テストの移行は §4・§6、午後の測り直しは §11。
 
-状態: **仮の決定(すべての選択)**。依頼は PM(決定 0223、依頼者の 2026-11-04 の指示)。調査・実装・測定・文書は作業者 `desk1`(2026-11-04 JST 07:19〜、総計 6 時間)。作業木は HEAD c728f44 の `git archive`(`lift/out-desk1/src/`)で始め、PM の連絡で HEAD 050fa43(screen1・cache1・aud3・opfs1 を含む)の `git archive` に載せ替え(`src2/`)、その後も HEAD が進むたびに差分(050fa43 → 67d60b8〔crash1〕→ 29b0b4b〔workers1〕→ 825fa28〔memfs1〕→ eb0de5c〔sweep1 ほか〕→ 40d4f64〔win2 と optional-audio-report。164e81a は ci のみで app と lift は同じ〕→ 6f3a6f8d〔anim1・parity1: runtime の `fle_sse*`・`fle_ole.c` と harness の追加。衝突なし〕)を木に当てて載せ替えた(衝突は `beacon.ts` の 1 行・`client.ts`・`protocol.ts`・`main.ts`・`fruity.ts` の各 1〜2 箇所と、40d4f64 の `worker.ts` の `startFruity` の 1 hunk を手で解決)。最終の diff は HEAD **95759fe6** の `git archive` に `patch -p1 --dry-run` が当たることを確認した。
+状態: **仮の決定(すべての選択)**。依頼は PM(決定 0223、依頼者の 2026-11-04 の指示)。調査・実装・測定・文書は作業者 `desk1`(2026-11-04 JST 07:19〜、総計 6 時間)。ワークツリーは HEAD c728f44 の `git archive`(`lift/out-desk1/src/`)で始め、PM の連絡で HEAD 050fa43(screen1・cache1・aud3・opfs1 を含む)の `git archive` に載せ替え(`src2/`)、その後も HEAD が進むたびに差分(050fa43 → 67d60b8〔crash1〕→ 29b0b4b〔workers1〕→ 825fa28〔memfs1〕→ eb0de5c〔sweep1 ほか〕→ 40d4f64〔win2 と optional-audio-report。164e81a は ci のみで app と lift は同じ〕→ 6f3a6f8d〔anim1・parity1: runtime の `fle_sse*`・`fle_ole.c` と harness の追加。衝突なし〕)を木に当てて載せ替えた(衝突は `beacon.ts` の 1 行・`client.ts`・`protocol.ts`・`main.ts`・`fruity.ts` の各 1〜2 箇所と、40d4f64 の `worker.ts` の `startFruity` の 1 hunk を手で解決)。最終の diff は HEAD **95759fe6** の `git archive` に `patch -p1 --dry-run` が当たることを確認した。
 
 区分の凡例は決定 0121〜0152 と同じ。**実測**＝このセッションのコマンドの出力を見た事実。**読み**＝コード・文書を読んだ解釈。**推測**＝実機 Windows・実 GPU・依頼者の機械についての言明。**未確認**。**出典なしの選択**＝`S-desk-…`(§9)。**この機械(16 コア、Linux VM、隔離 headless Chrome 156〔SwiftShader、実 GPU なし〕、Firefox 158 headless〔WebGL2 なし〕、load 11〜65 で他担当と共有)の値で、依頼者の機械(Firefox 159 / Windows / GTX 980)ではない。入力はすべて CDP / WebDriver の合成で、人の操作ではない。**
 
 ## 冒頭の三点(正直さ)
 
-1. **何を実測したか(実行した本物と範囲)**: **実エンジンを動かして観測した物**: FL Studio の本物の lift(FLEngine を x86-64→C→wasm にした SHIP2 F2xH2 を、ランタイムの `fle_desk.c` を足して `-DFLE_DESKTOP` でビルドした試験バンドル D2〔trim なし〕・D3〔trim あり〕。非ハイブリッド・wasm-opt なし・174 MB)を、隔離 Chrome 156 headless(SwiftShader、実 GPU なし)と Firefox 158 headless(geckodriver)で起動し、ウィザード・メニュー・F6/F8/F9・ドラッグ・再生・Enter・End session・画面サイズの変更を CDP / WebDriver の合成入力で操作した。測定値はすべてそのエンジンが実行して出した画面・CPU・時刻の実測。**代役・画像の再生・事前に作った固定データ・テスト用の期待値を進捗として数えた物は無い。** スタンドイン(`surface-table-v1`、試験用の代役)は e2e の旧経路の検査(方式 A)にだけ使い、バナーで代役と表示される。合成データ(窓の面を JS が作って合成器の wasm に渡す)を使った検査は、実エンジンの外の『合成器単体』の検査で、そう書いた箇所(`compositor-synth`、`desk1_compose.rs`)だけ。**この機械は 16 コア・Linux VM・SwiftShader・load 11〜65(他担当と共有)で、依頼者の機械(Firefox 159 / Windows / GTX 980)ではない。実 GPU・実 Windows・Wine は 0 件。**
+1. **何を実測したか(実行した本物と範囲)**: **実エンジンを動かして観測した物**: FL Studio の本物の lift(FLEngine を x86-64→C→wasm にした SHIP2 F2xH2 を、ランタイムの `fle_desk.c` を足して `-DFLE_DESKTOP` でビルドしたテストバンドル D2〔trim なし〕・D3〔trim あり〕。非ハイブリッド・wasm-opt なし・174 MB)を、隔離 Chrome 156 headless(SwiftShader、実 GPU なし)と Firefox 158 headless(geckodriver)で起動し、ウィザード・メニュー・F6/F8/F9・ドラッグ・再生・Enter・End session・画面サイズの変更を CDP / WebDriver の合成入力で操作した。測定値はすべてそのエンジンが実行して出した画面・CPU・時刻の実測。**代役・画像の再生・事前に作った固定データ・テスト用の期待値を進捗として数えた物は無い。** スタンドイン(`surface-table-v1`、テスト用の代役)は e2e の旧経路の検査(方式 A)にだけ使い、バナーで代役と表示される。合成データ(窓の面を JS が作って合成器の wasm に渡す)を使った検査は、実エンジンの外の『合成器単体』の検査で、そう書いた箇所(`compositor-synth`、`desk1_compose.rs`)だけ。**この機械は 16 コア・Linux VM・SwiftShader・load 11〜65(他担当と共有)で、依頼者の機械(Firefox 159 / Windows / GTX 980)ではない。実 GPU・実 Windows・Wine は 0 件。**
 2. **結論**: (測った事実。この機械・合成入力・上記の範囲。)
 
 - **(a)** **ページのメインスレッドに、ピクセルは 0、窓の知識は 0。Worker→ページの窓更新の中継(HEAD の既定 B の再生で 81 MB/s、`putImageData` 54 回/s)は 0。** ページのメイン CPU は再生で B 0.132 → D 0.040 core、ホバーで 0.141 → 0.052。ページが窓を持つ物(窓ごとの canvas・配置・Z 順・主窓の選択・題の選択・dedupe・レイヤード合成・窓の一覧のポーリング・三者照合)は `desk1-remove.diff` が抹消する(−4,118 行)。
@@ -63,7 +63,7 @@
 
 読み: HEAD の既定(方式 B。dedupe 既定 ON)では、アイドルの窓更新は少ない(2 MB/s)が、**再生で Worker→ページ 84 MB/s・ページの putImageData 56 回/s・メインスレッド 0.15 core**。方式 A(`?present=A`)はメインを 0.05 core に下げるが、Worker が窓ごとの OffscreenCanvas へ putImageData する(窓ごとの canvas とページ側の配置は残る)。present2 の測定(dedupe が既定 OFF だった時点)より B のアイドルの転送が小さいのは、決定 0201 で dedupe が既定 ON になったため。
 
-### 2.2 同じ wasm での B / A / D(`-DFLE_DESKTOP` つきの試験バンドル。HEAD 050fa43 の runtime)
+### 2.2 同じ wasm での B / A / D(`-DFLE_DESKTOP` つきのテストバンドル。HEAD 050fa43 の runtime)
 
 **最終の構成(S-desk-trim 既定 ON。バンドル D3)**。交互に 5 ラウンド(B → A → D を 1 ラウンドとして 5 回)、各セル 10 秒。**load は 31〜65(他担当と共有、PM の注意どおり速度の主張には使わない)**。値は CPU 秒/壁 1 秒。
 
@@ -395,7 +395,7 @@ Firefox 158.0 headless(geckodriver、この機械の snap 版)。実エンジン
 - **修正**: `src/engine/start-state.ts` の `stateAfterFirstPixel`: `first_pixel` は状態が `loaded` か `running` のときだけ `running` にし、`engine-idle`・`exited`・`error` は変えない(単体テスト 3 件、mutation 1 件〔`first-pixel-after-idle-takes-the-page-back-to-running`〕、検出済み)。
 - **修正後**(同じ負荷〔別プロセス 28 本〕を 2 系列): `ffload3`(開始時の load 1 分平均 57.36〜66.75)**20/20 回**、`ffload4`(load 61.45〜66.19)**20/20 回** idle に届いた(それぞれ 8.7〜11.5 秒〔中央値 9.4〕、8.4〜9.4 秒〔中央値 9.1〕)。
 - **以前の 3 回が同じ原因だった**かは**推測**(失敗時の状態を記録していなかった。ブラウザが CPU 0% に見えたのは、エンジンが idle で入力待ちだった場合と合う)。同じ順序が方式 B・A で起きるかは**未確認**(B・A の Worker は `first_pixel` を最初の idle より前に投稿するとコードから読んだ)。
-- 注意: 負荷あり 20 回で 0 失敗は、1 回のこの試験での事実で、Windows の Firefox 159 の起動を保証するものではない(この機械の Firefox 158 headless)。
+- 注意: 負荷あり 20 回で 0 失敗は、1 回のこのテストでの事実で、Windows の Firefox 159 の起動を保証するものではない(この機械の Firefox 158 headless)。
 
 **Firefox での D の全試行**(`tools/ff-run.sh` / `ffp2.mjs`。`tools/ff_attempts.py` が各 run のログから作った表):
 
@@ -768,7 +768,7 @@ cbeacon2 の定義: DOM イベントの時刻から、その入力に答える�
 
 | 足した物・消す物 | 問い(点検表) | 答え |
 |---|---|---|
-| `fle_desk.c`(合成器) | 外部 API の文書上の契約の実装か | **はい**(DWM 相当。Learn の Z-Order・Layered Windows・SetLayeredWindowAttributes・BLENDFUNCTION の式を、出典つきで実装。Wine 差分の試験: Wine は DWM を持たないので窓の合成の答えは取れない=**Wine との照合は未実施**。代わりに手計算の単体テスト 45 項目と、旧経路・理想の算術との比較〔§4.1〕) |
+| `fle_desk.c`(合成器) | 外部 API の文書上の契約の実装か | **はい**(DWM 相当。Learn の Z-Order・Layered Windows・SetLayeredWindowAttributes・BLENDFUNCTION の式を、出典つきで実装。Wine 差分のテスト: Wine は DWM を持たないので窓の合成の答えは取れない=**Wine との照合は未実施**。代わりに手計算の単体テスト 45 項目と、旧経路・理想の算術との比較〔§4.1〕) |
 | 同上 | FL の lift 済みコードがやるべきことを代行・補正・上書きしているか | **いいえ**。窓の Z 順・位置・可視・レイヤードは窓表と `fle_layered_query` のとおりに描く。窓を動かさない・前面化しない・閉じない |
 | 同上 | FL のクラス名・窓の種類・位置・文言で分岐しているか | **いいえ**(`grep` で FL の名前・クラス名・lid の数値が無いことを確認: `desk1_compose.rs` は lid を番号で持つが、それはスタブの窓表の ID) |
 | `desk.ts` / `ring.ts` / Worker の提示 | 性能のための局所的な近道か | **いいえ**。変換と通信の削減(JS のピクセルコピー・変換 0、ページへのピクセル 0、イベントごとの postMessage 0) |
@@ -785,7 +785,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 
 | 層 | desk1 の前(6f3a6f8d) | HEAD 95759fe(`desk1.diff` + 不具合の修正。旧経路は残る) | `desk1-remove.diff` 後 |
 |---|---|---|---|
-| 単体 vitest(通過 + skip) | 1591 + 7(72 ファイル。PM の測定値で、私も src2 − 28 で整合を確認) | 1624 + 7(+33。追加 3 ファイル・変更 4 ファイル。実測。src2 の作業木で。HEAD 95759fe の `app/` と同一) | 1354 + 7(desk1 の前から −237 = −270 + 33。実測。−270: 削除 8 ファイル 234 件〔`appview-poll` 27、`dedupe-presenter` 38、`dedupe` 27、`layer` 46、`main-window-engine` 42、`main-window` 31、`page-title` 10、`surface-table-v2` 13〕+ 変更 6 ファイル 36 件) |
+| 単体 vitest(通過 + skip) | 1591 + 7(72 ファイル。PM の測定値で、私も src2 − 28 で整合を確認) | 1624 + 7(+33。追加 3 ファイル・変更 4 ファイル。実測。src2 のワークツリーで。HEAD 95759fe の `app/` と同一) | 1354 + 7(desk1 の前から −237 = −270 + 33。実測。−270: 削除 8 ファイル 234 件〔`appview-poll` 27、`dedupe-presenter` 38、`dedupe` 27、`layer` 46、`main-window-engine` 42、`main-window` 31、`page-title` 10、`surface-table-v2` 13〕+ 変更 6 ファイル 36 件) |
 | tsc(`tsconfig.json` `tsconfig.test.json` `tsconfig.webworker.json`) | エラーなし | エラーなし | エラーなし |
 | Rust `desk1_compose` | – | 2 テスト通過(45 項目 + 差分テスト 1500 手) | 同左 |
 | e2e の群(`run.mjs`) | 68 | 73(+5: `compositor-synth` `engine-desk` `engine-desk-keys` `engine-desk-end-session` `engine-desk-resize`) | 49(−24 を削除、+5) |
@@ -804,7 +804,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 | `dedupe-standin-*`(on-A/on-B/default/zero/bad/check-A/check-B/check-detects)・`dedupe-standin-contextloss-*`・`dedupe-standin-gpucrash-*` | ページに既にある画素の矩形を送らない(dedupe)、2D コンテキストを失ったときの全送り直し | 削除 | dedupe は合成器の trim(画素が違う所だけ報告)に代わった: `compositor-synth`(同じ画素を書き直しても矩形 0、1 画素の変化は 1×1 の矩形)と C の差分テスト(trim あり/なしの面が 1500 手で毎手同一)。コンテキストの喪失は `compositor-synth`(canvas を空にして `resync` すると全面が戻る)と単体テスト `ctx-resync`(Worker の 1 枚の canvas)。GPU プロセスを実際に落とす検査(`gpucrash`)は**移していない**(未確認として残す) |
 | `engine-desktop`(実エンジン、FL_ENGINE_BUNDLE) | 起動の段階、窓の重なり、実ポインタのクリックで窓の面が goldens の SHA-256 になる、右ボタン・キー方針・ホバーのカーソル・HiDPI・Enter でウィザードが閉じる・ロゴ(レイヤード)の画素 | **移行**(`engine-desk`) | 窓の canvas の SHA-256 → 『コンパイラが持つ面の、窓の領域』の SHA-256(窓はサイズ 874×570 で特定)と canvas のスクリーンショットの比較。ページが窓を知らない検査(banner・ポインタの信頼性・キー・遅延・HiDPI の座標)はそのまま。ロゴの canvas の検査は、コンポジタの窓の一覧で『レイヤードの窓が黒い箱でない』に置き換えた |
 | `engine-keys` / `engine-end-session` | Space/Enter/Esc が WM_KEYDOWN になる(エンジンの trace)、End session | **移行**(`engine-desk-keys` / `engine-desk-end-session`) | 窓の一覧(appView)の代わりにコンポジタの窓の一覧を使う。trace の行にクラス名が出るのでクラスの絞り込みはそのまま |
-| (新) `engine-desk-resize` | ゲストの画面がビューポートの大きさに追従し、ピクチャとキャンバスが新しい大きさになり、画面がピクチャと一致する | 追加 | 2400×1300 の窓で fit の画面(2060×1264)・キャンバス=ピクチャ・スクリーンショット=ピクチャ。**実行中の変更(`?follow=live`)は『未検査』**: 試験バンドルのエンジンに表示変更の入口 `fle_g3_display` が無い(ページが `engineFollows: false` と答える)ので、代わりに 1500×900 の窓で開いた別ページが小さい画面になること、画面=ピクチャを検査。実行中の表示変更に対するコンポジタ・プレゼンタの側は `compositor-synth`(1920×1080→1280×800→戻す)と `desk1_compose.rs`(ランダム 1500 手の中の表示変更 2 回)で検査 |
+| (新) `engine-desk-resize` | ゲストの画面がビューポートの大きさに追従し、ピクチャとキャンバスが新しい大きさになり、画面がピクチャと一致する | 追加 | 2400×1300 の窓で fit の画面(2060×1264)・キャンバス=ピクチャ・スクリーンショット=ピクチャ。**実行中の変更(`?follow=live`)は『未検査』**: テストバンドルのエンジンに表示変更の入口 `fle_g3_display` が無い(ページが `engineFollows: false` と答える)ので、代わりに 1500×900 の窓で開いた別ページが小さい画面になること、画面=ピクチャを検査。実行中の表示変更に対するコンポジタ・プレゼンタの側は `compositor-synth`(1920×1080→1280×800→戻す)と `desk1_compose.rs`(ランダム 1500 手の中の表示変更 2 回)で検査 |
 | `engine-stop-button` `engine-nojspi` `err-engine-*` `engine-assets-encoding` | 停止ボタン、JSPI なし、ローダーのエラー、配信のエンコード | **残す**(変更なし) | ページ・ローダーの性質 |
 | 単独スクリプト: `layered-engine` `file-dialog-engine` `files-engine-dialog` `files-engine-firefox` `p2a-run` `p2a-sha` `sha-at-virtual` `clock-follow` `screen-run` `screen-run-ff` `screen-cost` `explore-engine` `audio-default` `audio-g7` | 実エンジンでの個別の測定・探索(`appView.windows` のクラス検索、窓ごとの canvas の SHA-256、`mainWindow()`、窓の canvas の CSS 配置) | **未移行(動かない)** | 各行の理由は MERGE-NOTES §4.1。いずれも `npm run test:e2e` の一部ではなく、依頼者の指示で個別に実行する測定用 |
 
@@ -858,7 +858,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 
 - 合成器は `lift/runtime/fle_desk.c`(新規)。`build_nmod_wasm.sh` の `stage_rt` は `lift/runtime/fle_*.c` を全部コンパイルするので、**`-DFLE_DESKTOP` なしでは空の翻訳単位**(出力のバイナリは変わらない)。有効にするには `RT_EXTRA_CFLAGS="-DFLE_FILEDLG_BROWSER -DFLE_DESKTOP"`(ship2 の既定の `-DFLE_FILEDLG_BROWSER` に足す)と、**`RT_O2_FILES="fle_desk"`**(ランタイムの既定は -O0 で、画素ループが約 10 倍遅くなる〔推測〕。`fle_hle` が既に使う仕組み)。
 - エクスポート: `fle_desk_compose`・`fle_desk_resync`・`fle_desk_describe`(`EMSCRIPTEN_KEEPALIVE`。リンクの `-sEXPORTED_FUNCTIONS` は変えない)。
-- 試験バンドルの作り方(実測): 既存の objects(`B/w-Oz/obj` を `cp -al`)から `rt/*.o` だけ消し、`tools/bb.sh wasm weblink`(1 分)→ `seed bundle`(`COMPRESS=none`)。非ハイブリッド・wasm-opt なしの ship2 F2xH2(174 MB)。wasm の大きさ: engine.113d6359ee4c.wasm 174.2 MB。
+- テストバンドルの作り方(実測): 既存の objects(`B/w-Oz/obj` を `cp -al`)から `rt/*.o` だけ消し、`tools/bb.sh wasm weblink`(1 分)→ `seed bundle`(`COMPRESS=none`)。非ハイブリッド・wasm-opt なしの ship2 F2xH2(174 MB)。wasm の大きさ: engine.113d6359ee4c.wasm 174.2 MB。
 - 既定の入口(SHIP2)の wasm には入っていない。`?present=D` はこの wasm でないと『compositor が無い』とログに出て止まる。
 
 ## 8. 旧経路の抹消(`desk1-remove.diff`)と Detached の境界
@@ -866,7 +866,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 `desk1-remove.diff` が消す物(ページが窓を知っていたことの全部):
 
 - 方式 B(Worker が RGBA の矩形を `postMessage` し、ページが `putImageData` する)、窓ごとの `<canvas>` の配置(Z 順・位置・可視・レイヤードの印)、dedupe(ページに既にある画素の矩形を送らない)とその自己検査、窓の一覧のページ側のポーリング(`?poll=`、`?stamp=`)、主窓の選択(`main-window.ts`。クラス名 `TFruityLoopsMainForm`)、窓の題の選択(`page-title.ts`)、『最初の画素・停止』の窓イベントの振り分けと三者照合(`surface-events.ts`)、レイヤード窓のページ側の合成(`layer.ts`)、窓ごとの再送(`ctx-resync` の B 側)、`window-diff.ts`。
-- 実エンジンは方式 D だけになる。**スタンドイン(`surface-table-v1`、試験用の代役)は方式 A のまま**残す(窓ごとの OffscreenCanvas。ページに配置は残るが、実エンジンの経路ではない)。
+- 実エンジンは方式 D だけになる。**スタンドイン(`surface-table-v1`、テスト用の代役)は方式 A のまま**残す(窓ごとの OffscreenCanvas。ページに配置は残るが、実エンジンの経路ではない)。
 - **同時に起きる実害**: (1) `?present=B` の戻り道が無い。(2) 実エンジンは OffscreenCanvas と SharedArrayBuffer(cross-origin isolated)が必須(従来 B は OffscreenCanvas の無い環境へ戻った)。(3) バンドルのランタイムが `-DFLE_DESKTOP` でビルドされていなければ、ページは『コンポジタが無い』とログに出して止まる(MERGE-NOTES §2)。
 - 『バケツリレー』の経路(エンジン → Worker → `postMessage` → メイン → `putImageData`)は D には無く、抹消後はコード上も存在しない。`report-throttle.ts`(idle/resume の報告の間引き)は Worker→ページの**メッセージ数を減らす物**なので残した。
 
@@ -934,7 +934,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 11. **レイヤード窓の唯一の仕様差**(A=0 かつ色≠0): 旧経路は透明、Learn の式は加算(§4.1 の表)。実エンジンに現れた観測は無い。
 12. **以前の中間報告の『D3 の合成が 1 回あたり 3〜4 倍』は撤回**: load が 50 台の run の値で、同じページで D2 と D3 を交互に測ると差が無かった(再生 0.260→0.241 ms/回)。
 13. Rust の差分テストが `lift/out-desk1/test`(リポジトリ内)へ書いていた → `CARGO_TARGET_TMPDIR` に変更した。
-14. **試験バンドルのエンジンには表示変更の入口 `fle_g3_display` が無い**(`?follow=live` で『この版には入口が無い』とページが答える)。実行中の画面サイズ変更を実エンジンで確かめることができなかった(未検査)。ship3 の構成(HEAD の runtime でリンクし直した wasm)では確かめる。
+14. **テストバンドルのエンジンには表示変更の入口 `fle_g3_display` が無い**(`?follow=live` で『この版には入口が無い』とページが答える)。実行中の画面サイズ変更を実エンジンで確かめることができなかった(未検査)。ship3 の構成(HEAD の runtime でリンクし直した wasm)では確かめる。
 15. **`DeskPresenter.present()` の detached buffer**(§11.2 の 2): compose() の前に取った ArrayBuffer を compose() の後で読んでいた。メモリが伸びると例外になり、報告された矩形が失われた。画素同一性の 2 回に 1 回の失敗(画面の端 29,175 画素)と、方式 B での状態ダンプの失敗から見つけた。直して HEAD 95759fe に取り込み済み。Firefox の起動失敗の DIAG60 にも同じ例外が付随していた。
 16. **測定側の `closeWizard` の余分な Enter**(§11.2 の 1): D だけを B の約 3 倍に見せた。私は先の報告で『D のドラッグは未解決』と書いたが、入力列を比べる前の結論だった(取り消した)。
 17. **ORDER 行の読み(誤りの訂正)**: 中間報告で、D8 では first_pixel が毎回 idle の後に届くので first_pixel の状態の修正が必須だと書いた。時刻は Worker が付ける物で、送信順ではない。修正を入れていないページでも負荷なしの 5 回は engine-idle に届いた。撤回した(§11.4)。
@@ -947,7 +947,7 @@ PM の条件: 旧 API(appView・`present=B`・dedupe)を使う e2e(32 参照)と
 
 - **ビルド D8**: HEAD 741d626 の runtime と harness(win2・anim1〔`fle_sse*.h`〕・parity1・決定 0228 の `fruity_surface.c` を含む)に `-DFLE_DESKTOP`・`fle_desk` を -O2 で足し、units 全 44 本を再コンパイルした(`wasm-Oz-units` 499 秒、JOBS=3、load 8〜21。朝の D2〜D4 は units が朝のまま、runtime のオブジェクトだけを作り直した物だった)。wasm の SHA-256 は `5d50b2434f72…`、非ハイブリッド・wasm-opt なし。ページは HEAD 95759fe の `app/`(`dist-d8`、不具合の修正入り)。
 - 実エンジンの e2e(Chrome 156、`FL_ENGINE_DESK=1`、D8): `engine-desk` 48・`end-session` 5・`keys` 9・`resize` 7 = **69/69**(修正前の dist)。`?follow=live` の画面サイズ変更は実エンジンで通っている(D4 以降)。
-- この機械(16 コア、SwiftShader、他担当と共有 load 4〜40、燃焼の負荷の試験では 34〜37)の値で、依頼者の機械(Windows の Firefox 159)ではない。入力は合成。
+- この機械(16 コア、SwiftShader、他担当と共有 load 4〜40、燃焼の負荷のテストでは 34〜37)の値で、依頼者の機械(Windows の Firefox 159)ではない。入力は合成。
 
 ### 11.2 見つけた不具合 2 件(どちらも測定の食い違いから)
 
@@ -1140,7 +1140,7 @@ P2 は『UI を 120 fps で動作させ、UI 操作への遅延がほとんど�
 
 ## 12. 続き(desk2、2026-11-04 午後): D を既定にし、旧経路を抹消した(`desk2.diff`)
 
-**この節の区分(冒頭の凡例どおり)**: 実エンジンを動かして観測した物 = §12.4・§12.5 の表の値。§12.4 は D8(HEAD 741d626 の runtime に `-DFLE_DESKTOP` を足した試験バンドル、非ハイブリッド・wasm-opt なし、wasm sha256 `5d50b243…`)、§12.5 は **出荷構成 F2xH4 に `-DFLE_DESKTOP` を足し、CI の段スクリプトそのままで作った bundle**(`fl-engine-ci-F2xH4-4646ef5c`、wasm 128 MB、wasm-opt あり、混成なし)。どちらも隔離 Chrome 156・Firefox 158 headless、入力は CDP / WebDriver の合成。代役・画像の再生・事前に作った固定データは使っていない。スタンドインの群は『ページとローダーの検査』であってエンジンの進捗ではない。この機械は共用で依頼者の機械ではない。測定中の load は各表に書いた(CPU の比較は交互に測った対で見ており、load が高い run の小さな差は主張していない)。**未確認**: CI がこの構成の bundle を作ったときのバイト一致(CI が構成を作ってから)、実機(Windows の Firefox 159・実 GPU)の値、`desk2-ci.diff` を ship4 の変更と合わせたときの結果。
+**この節の区分(冒頭の凡例どおり)**: 実エンジンを動かして観測した物 = §12.4・§12.5 の表の値。§12.4 は D8(HEAD 741d626 の runtime に `-DFLE_DESKTOP` を足したテストバンドル、非ハイブリッド・wasm-opt なし、wasm sha256 `5d50b243…`)、§12.5 は **出荷構成 F2xH4 に `-DFLE_DESKTOP` を足し、CI の段スクリプトそのままで作った bundle**(`fl-engine-ci-F2xH4-4646ef5c`、wasm 128 MB、wasm-opt あり、混成なし)。どちらも隔離 Chrome 156・Firefox 158 headless、入力は CDP / WebDriver の合成。代役・画像の再生・事前に作った固定データは使っていない。スタンドインの群は『ページとローダーの検査』であってエンジンの進捗ではない。この機械は共用で依頼者の機械ではない。測定中の load は各表に書いた(CPU の比較は交互に測った対で見ており、load が高い run の小さな差は主張していない)。**未確認**: CI がこの構成の bundle を作ったときのバイト一致(CI が構成を作ってから)、実機(Windows の Firefox 159・実 GPU)の値、`desk2-ci.diff` を ship4 の変更と合わせたときの結果。
 
 ### 12.1 何を変えたか(`desk2.diff`。基準 HEAD 36b1873e)
 
@@ -1280,7 +1280,7 @@ PM の決定(依頼者の『multiple canvas 廃止+レンダリングフロー�
 6. **新 pace の仮想時計の切り捨て**: 新しい pace は最初の数秒に仮想時計を切り捨てる(待ち受け wizard 段階で 68〜79 回、仮想時計/実時間 0.6)ので、`clock-follow-check` の idle ハッシュの旧 pace との比較は最初の checkpoint から合わない(0/9〜0/11)。D とは無関係。
 7. **眠る提示ループは Firefox では効果が測れない**(§12.4)。依頼者のブラウザは Firefox 159。
 8. **File メニューの MIDI の 2 件**(`savemidi` と `midi`)は、元のスクリプト+旧経路でも落ちる(§12.3)。原因は未調査。
-9. **解決済み(決定 0232。以下は当時の記述): 出荷構成の bundle で `engine-desk` の『スクリーンショット = コンポジタが保持した絵』の 4〜5 検査が再現して落ちる**(19:20 の run は 48/48 通過)。落ちるのは『アイドルでスクリーンショットと絵の差がメーターだけ』『wizard の領域がスクリーンショットと絵で同じ』『主窓の領域が同じ』『No thanks の後の wizard の領域』『wizard を閉じた後の差』。**ハッシュが毎回同じ**(スクリーンショットの wizard の crop `52520ae83297`、絵 `da1d1697dd1f`、差 290,877 画素)で、**絵のほうは通った run と同じ値**(`da1d1697dd1f` `b0970252ddc3`)。つまり絵(コンポジタが持つ画素)は変わらず、ページの canvas のスクリーンショットが決まった別の像になる。確かめたこと: 眠らない版(`DESK_SLEEP_AFTER_MS = 1e12`)でも落ちる、load 5 でも落ちる、D8 では常に通る(50/50)、同じ bundle・同じページで `ident3.mjs`(同じ比較を 18 ステップで行う)は箱の外 0 画素で通る、デスクトップの位置を撮影の瞬間に読み直しても(1 回通り 1 回落ちた)直らない。スクリーンショットは idle の wizard に『Help us improve FL Studio』の確認が重なった像で、ヒント欄に `(Trial) There were no updates for Loop Starter scripts.` が出ている(wizard の起動後に出る要素。その像と絵の食い違いの原因は未特定)。**これを眠る提示ループの責任とも D の責任とも言えないが、取り込みの前に PM の判断が要る**(テストの競合か、canvas に更新が届いていないかを切り分けていない)。 **決定 0232 で閉じた**: canvas(Worker の getImageData)= 絵(peek)= 窓表から描き直した絵で、どれも古くなかった。原因は検査の座標系(`Page.captureScreenshot` の clip は文書座標、検査は `getBoundingClientRect` のビューポート座標)と、出荷構成の bundle の manifest の説明が長く header が折り返してページが 1302 px になり、試験窓 1300 px の中で Chrome が 2 px スクロールしたこと(スクリーンショットは絵を 2 px 下にずらした像)。検査(位置を毎回読み直して scrollX/Y を足す)と header(1 行に固定)を直した(`desk3.diff`)。
+9. **解決済み(決定 0232。以下は当時の記述): 出荷構成の bundle で `engine-desk` の『スクリーンショット = コンポジタが保持した絵』の 4〜5 検査が再現して落ちる**(19:20 の run は 48/48 通過)。落ちるのは『アイドルでスクリーンショットと絵の差がメーターだけ』『wizard の領域がスクリーンショットと絵で同じ』『主窓の領域が同じ』『No thanks の後の wizard の領域』『wizard を閉じた後の差』。**ハッシュが毎回同じ**(スクリーンショットの wizard の crop `52520ae83297`、絵 `da1d1697dd1f`、差 290,877 画素)で、**絵のほうは通った run と同じ値**(`da1d1697dd1f` `b0970252ddc3`)。つまり絵(コンポジタが持つ画素)は変わらず、ページの canvas のスクリーンショットが決まった別の像になる。確かめたこと: 眠らない版(`DESK_SLEEP_AFTER_MS = 1e12`)でも落ちる、load 5 でも落ちる、D8 では常に通る(50/50)、同じ bundle・同じページで `ident3.mjs`(同じ比較を 18 ステップで行う)は箱の外 0 画素で通る、デスクトップの位置を撮影の瞬間に読み直しても(1 回通り 1 回落ちた)直らない。スクリーンショットは idle の wizard に『Help us improve FL Studio』の確認が重なった像で、ヒント欄に `(Trial) There were no updates for Loop Starter scripts.` が出ている(wizard の起動後に出る要素。その像と絵の食い違いの原因は未特定)。**これを眠る提示ループの責任とも D の責任とも言えないが、取り込みの前に PM の判断が要る**(テストの競合か、canvas に更新が届いていないかを切り分けていない)。 **決定 0232 で閉じた**: canvas(Worker の getImageData)= 絵(peek)= 窓表から描き直した絵で、どれも古くなかった。原因は検査の座標系(`Page.captureScreenshot` の clip は文書座標、検査は `getBoundingClientRect` のビューポート座標)と、出荷構成の bundle の manifest の説明が長く header が折り返してページが 1302 px になり、テスト窓 1300 px の中で Chrome が 2 px スクロールしたこと(スクリーンショットは絵を 2 px 下にずらした像)。検査(位置を毎回読み直して scrollX/Y を足す)と header(1 行に固定)を直した(`desk3.diff`)。
 10. **私の確認の漏れ(compositor-synth)**: 最初の報告の『e2e 412/412』は、`--target preview` だけ、かつ PATH に `emcc` を入れずに実行した値で、`compositor-synth` は『emcc が無いので SKIPPED』を通過として数えた(この群は emcc が無いと検査を行わずに通過する作り)。PM の全 target の run で、`fle_desk.c` に足した `fle_win_get` と `fle_class_name_of` を `desk_synth.c` のスタブが定義しておらず、リンクで落ちた。スタブを足し(class と title を UTF-16 で持つ `synth_names`)、`window.describeText` で『class と title が行に出る』『引用符・バックslash・非 ASCII は ? になり 79 文字で切れる』『名前を付けても絵は同じ』を検査する 6 検査を足した。名前を読まない変更(`names_of` を消す)を入れた木では、そのうち 3 検査が落ちることを確かめた。全 target・全群を `emcc` ありで実行して **887/887**(dev 333 + preview 285 + worker 269)。590/591 との差: PM の run は `compositor-synth` のビルドの例外が dev の残りの群を止めた可能性が高い(推測。私の run の総数は上のとおり)。
 
 ### 12.7 出典のない選択(S-desk2-…、撤回条件つき)
@@ -1304,7 +1304,7 @@ PM の決定(依頼者の『multiple canvas 廃止+レンダリングフロー�
 
 ## PM の判断と取り込み(2)(2026-11-04): detached ArrayBuffer の不具合の修正
 
-desk1 が D の画素同一性の測定(2 回に 1 回、最初のステップで 29,175 画素違い、画面の端が黒)と、旧方式での `deskDumpBase64()` による Worker の停止から見つけた不具合を、`desk1-fix-detached-buffer.diff`(4 ファイル、`-` 4 行を読んだ)で直した。`DeskPresenter.present()` は `compose()` を呼ぶ前に取った wasm メモリの ArrayBuffer で結果を読んでいた。`compose()` はエンジンのメモリに確保するので、メモリが伸びる(memory.grow)と古い ArrayBuffer が detach され、`DataView` が TypeError を投げ、`compose()` が書き換えた絵の報告矩形が失われて、canvas にその画素が来なかった。`worker.ts` の `deskDump` も同じ形だった。直し: `compose()` の後でメモリを読む。読み取りが失敗したら `resync()`(次の `compose()` が全面を報告)して例外を再送出する。単体テスト 2 件(`compose()` が ArrayBuffer を detach する、読み取り失敗で resync)と mutation 1 件(`desk_reads-the-memory-before-compose`)を足した。PM が測った値: typecheck rc=0、vitest 1,624 passed + 7 skipped、Worker 50/50、e2e 1,313/1,313。runtime は変わらない。Firefox の起動失敗の記録にも同じ例外が出ていたが、起動失敗への寄与は未確認(desk1 が修正後の負荷下の起動試験で測る)。
+desk1 が D の画素同一性の測定(2 回に 1 回、最初のステップで 29,175 画素違い、画面の端が黒)と、旧方式での `deskDumpBase64()` による Worker の停止から見つけた不具合を、`desk1-fix-detached-buffer.diff`(4 ファイル、`-` 4 行を読んだ)で直した。`DeskPresenter.present()` は `compose()` を呼ぶ前に取った wasm メモリの ArrayBuffer で結果を読んでいた。`compose()` はエンジンのメモリに確保するので、メモリが伸びる(memory.grow)と古い ArrayBuffer が detach され、`DataView` が TypeError を投げ、`compose()` が書き換えた絵の報告矩形が失われて、canvas にその画素が来なかった。`worker.ts` の `deskDump` も同じ形だった。直し: `compose()` の後でメモリを読む。読み取りが失敗したら `resync()`(次の `compose()` が全面を報告)して例外を再送出する。単体テスト 2 件(`compose()` が ArrayBuffer を detach する、読み取り失敗で resync)と mutation 1 件(`desk_reads-the-memory-before-compose`)を足した。PM が測った値: typecheck rc=0、vitest 1,624 passed + 7 skipped、Worker 50/50、e2e 1,313/1,313。runtime は変わらない。Firefox の起動失敗の記録にも同じ例外が出ていたが、起動失敗への寄与は未確認(desk1 が修正後の負荷下の起動テストで測る)。
 
 ## PM の判断と取り込み(3)(2026-11-04 16:15): 午後の追試(`desk1-docs.diff`)と D を既定にする計画
 

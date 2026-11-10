@@ -8,7 +8,7 @@
 
 **(1) 実エンジンが実行された事実(実測)**: lift した実 FLEngine_x64.dll と同梱 DLL 5 つ(dsp_ippv2・Blend2D・QFC・FreeType・ILTools)の生成 C(FLEngine の SHA-256 `6d39d04f…`、HEAD の fe-lift、FRUITY on、SEH on)を、旧実装と新実装のそれぞれで native -O2(clang)と wasm -Oz の全単位にコンパイルして実際に実行した。実行したのは `cmp-short.g3`(最初の idle → 収束 → Enter → 閉じるアニメ。16 スナップ)と `steady-main.g3`(最初の idle → 3 仮想秒 → Enter → 3 仮想秒 → 主ウィンドウ 60 仮想秒)。宛先分布は、旧実装のビルドに計数プローブ(`fle_dispatch_hook` 経由)を足して `steady-main.g3` を 3 回実行して取った。**所定のプロジェクト(`serina1-serum2.zip`)は開いていない**(アプリに FLP を開く経路が無い。`docs/milestones/performance-targets.md` §3)。
 
-**(2) 代役・再生・推測が含まれる範囲**: エンジンの数字(§3 の分布、§5 の同一性、§6 の速さ)に代役・再生・事前生成物は無い。**§4 の「リプレイ微ベンチ」だけは別物**: 実エンジンの走行から録った宛先の列(定常 30M 件・起動 10.7M 件)を、同じ表に対する各探索方式に流す微測定で、エンジン全体の速さではない(エンジンのキャッシュ圧が無いので、旧の二分探索の実エンジンでの費用より小さく出る)。**差分試験**(§5)は表の VA の集合に対する関数の比較で、エンジンの実行ではない(生成 C の表の VA は実の統合テーブルから取り、各行に別々の stub 関数を付けた)。
+**(2) 代役・再生・推測が含まれる範囲**: エンジンの数字(§3 の分布、§5 の同一性、§6 の速さ)に代役・再生・事前生成物は無い。**§4 の「リプレイ微ベンチ」だけは別物**: 実エンジンの走行から録った宛先の列(定常 30M 件・起動 10.7M 件)を、同じ表に対する各探索方式に流す微測定で、エンジン全体の速さではない(エンジンのキャッシュ圧が無いので、旧の二分探索の実エンジンでの費用より小さく出る)。**差分テスト**(§5)は表の VA の集合に対する関数の比較で、エンジンの実行ではない(生成 C の表の VA は実の統合テーブルから取り、各行に別々の stub 関数を付けた)。
 
 **(3) HLE**: 無し(旧も新も。決定 0162 の dsp の HLE は入っていない。HEAD d33d2cd の基準)。
 
@@ -23,7 +23,7 @@
 | wasm -Oz: 最初の idle までの主スレッド CPU | 21.30 s | 21.02 s | -1%(ラン間の幅の内) |
 | wasm -Oz の大きさ | 320,882,760 B | 320,891,437 B | +8,677 B(+0.003%) |
 | native -O2 の text | 314,166,573 B | 324,198,301 B | +10.0 MB(+3.2%。インライン化) |
-| 差分試験(旧 vs 新、実の統合テーブル 112,801 行) | - | 54,560,245 件ずつ(native -O2、wasm -O2)ほか | 不一致 **0** |
+| 差分テスト(旧 vs 新、実の統合テーブル 112,801 行) | - | 54,560,245 件ずつ(native -O2、wasm -O2)ほか | 不一致 **0** |
 | 16 スナップ(`cmp-short.g3`) | 84 行(native)/ 82 行(wasm -Oz) | 同一 | バイト一致(hle1 の基準 84 行とも一致) |
 | `test.sh full`(FLE_TEST_NOCACHE=1、142 executables を実際に実行) | (旧は実行していない。PM が示した基準 145 results・2,090 passed・0 failed) | **145・2,090・0**(SKIPPED 1 行は基準と同じ) | 基準と同一 |
 | FRUITY 無効 a4 | (旧は実行していない。基準 942/942・895/895・functions 5,310・entries 1,009,731) | 同じ値 | 基準と同一 |
@@ -87,7 +87,7 @@
 
 「結果が同一」＝同じ VA に対して、同じ関数、または同じ miss(`fle_dispatch_miss` に同じ VA が渡る)。加えて進捗カウンタの増分(見つかったときだけ 1)・slice 関数の呼び出し・hook が受ける `(va, fn)`・hook 無しの呼び出しも同一。
 
-**(a) 差分試験**(`tools/disp1/difftest/`): 旧(`-DFLE_DISPATCH_BSEARCH`)と新を同じプログラムに入れ、各 VA を両方に通し、独立な `bsearch` の結果とも比べる。表は実の統合テーブルの VA 112,801 行(各行に別々の stub)。入力: 全入口(昇順・降順・再)、入口 ±1〜64 の全部、入口の 64 ビットそれぞれの反転(キャッシュの同じラインに落ちる別 VA)、0・1・UINT64_MAX・2^32・表の両端の前後、入口の乱択を 3 回(競合による追い出し)、64 入口の hot set を乱択の割り込み付きで 2×10^6、**一様な 64 ビット乱数 10^7、画像範囲の乱数 10^7、入口 ± 3 の乱数 10^7**。
+**(a) 差分テスト**(`tools/disp1/difftest/`): 旧(`-DFLE_DISPATCH_BSEARCH`)と新を同じプログラムに入れ、各 VA を両方に通し、独立な `bsearch` の結果とも比べる。表は実の統合テーブルの VA 112,801 行(各行に別々の stub)。入力: 全入口(昇順・降順・再)、入口 ±1〜64 の全部、入口の 64 ビットそれぞれの反転(キャッシュの同じラインに落ちる別 VA)、0・1・UINT64_MAX・2^32・表の両端の前後、入口の乱択を 3 回(競合による追い出し)、64 入口の hot set を乱択の割り込み付きで 2×10^6、**一様な 64 ビット乱数 10^7、画像範囲の乱数 10^7、入口 ± 3 の乱数 10^7**。
 
 | 構成 | 件数 | 不一致 |
 |---|---|---|
@@ -97,11 +97,11 @@
 | キャッシュ 2 / 256 / 65,536 ライン(-O2) | 各 33,560,245 | **0** |
 | エッジ表(VA 0 の行・`fn==NULL` の行・UINT64_MAX の行・高い擬似 VA。native -O2、10^5) | 2,301,245 | **0** |
 
-キャッシュの後ろに番兵のライン 8 本を置き、試験の終わりに変わっていないことも確かめる(範囲外書き込みの検出)。**この表の全構成は最終版のヘッダでやり直した結果**(`logs/difftest-real-O2-final.txt`・`difftest-edge-O2-final.txt`・`difftest-configs-final.txt`)。最初のヘッダ版〔末尾を共有する前〕の結果も同じ件数・不一致 0 だった(`logs/difftest-configs.txt`・`difftest-wasm-O2.txt`)。
+キャッシュの後ろに番兵のライン 8 本を置き、テストの終わりに変わっていないことも確かめる(範囲外書き込みの検出)。**この表の全構成は最終版のヘッダでやり直した結果**(`logs/difftest-real-O2-final.txt`・`difftest-edge-O2-final.txt`・`difftest-configs-final.txt`)。最初のヘッダ版〔末尾を共有する前〕の結果も同じ件数・不一致 0 だった(`logs/difftest-configs.txt`・`difftest-wasm-O2.txt`)。
 
 **(b) 実エンジンの 16 スナップ**(`cmp-short.g3`): native -O2 の新は旧と 84 行でバイト一致、かつ hle1 の基準 `native-base-84lines.txt` ともバイト一致(面 SHA: idle `a970cb0a…`、収束 `4fa213b0…`、Enter 後 `dd416725…` を含む)。wasm -Oz(node)の新は旧と 82 行でバイト一致で、native 新の 84 行から `g3-layered` の 2 行(node には無い)を除いた物と差 0。wasm -O2 の 16 スナップは未実施(§10)。 ログ: `logs/native-O2-new-cmp-short-84lines.txt`・`native-O2-base-…`・`wasm-Oz-new-cmp-short-82lines.txt`・`wasm-Oz-base-…`。
 
-**(c) 変異検査**(`tools/disp1/difftest/mutants.sh`。ヘッダの複製に sed で 1 か所ずつ壊し、差分試験が不一致または異常終了を出すか): 16 件のうち **14 件を検出**(タグを下位 32 ビットだけで比較 / `fn≠0` の検査の削除 / 埋める関数を 1 つ前の行にする / 埋めるタグを `va|1` にする / キャッシュの添字の上限が 1 つ多い〔番兵で検出〕/ miss を判定しない〔異常終了〕/ hit で進捗を飛ばす / hit で hook を飛ばす / miss を握りつぶす / 命中条件の `&&` を `||` にする / 二分探索が行 0 を飛ばす / 上限を 2 減らす / 見つかる前に埋める / 埋める関数を 1 つ後の行にする)。**2 件は等価変異で検出されない**: 二分探索の `hi = count-1`(`lo` の下限の探索なので結果が変わらない)、NULL 関数の行も埋める(命中条件が `fn≠0` なので結果が変わらない)。1 件(添字の上限)は、最初の差分試験(番兵なし)では**見逃し**、番兵を足して検出した。ASan は `libclang_rt.asan` が無く使えなかった。表: `tables/mutants.tsv`、ログ: `logs/mutants*.txt`。
+**(c) 変異検査**(`tools/disp1/difftest/mutants.sh`。ヘッダの複製に sed で 1 か所ずつ壊し、差分テストが不一致または異常終了を出すか): 16 件のうち **14 件を検出**(タグを下位 32 ビットだけで比較 / `fn≠0` の検査の削除 / 埋める関数を 1 つ前の行にする / 埋めるタグを `va|1` にする / キャッシュの添字の上限が 1 つ多い〔番兵で検出〕/ miss を判定しない〔異常終了〕/ hit で進捗を飛ばす / hit で hook を飛ばす / miss を握りつぶす / 命中条件の `&&` を `||` にする / 二分探索が行 0 を飛ばす / 上限を 2 減らす / 見つかる前に埋める / 埋める関数を 1 つ後の行にする)。**2 件は等価変異で検出されない**: 二分探索の `hi = count-1`(`lo` の下限の探索なので結果が変わらない)、NULL 関数の行も埋める(命中条件が `fn≠0` なので結果が変わらない)。1 件(添字の上限)は、最初の差分テスト(番兵なし)では**見逃し**、番兵を足して検出した。ASan は `libclang_rt.asan` が無く使えなかった。表: `tables/mutants.tsv`、ログ: `logs/mutants*.txt`。
 
 **(d) 既存テスト**: `bash lift/harness/test.sh full`: **results=145 passed=2090 failed=0 SKIPPED-lines=1**(基準と同じ。`FLE_TEST_NOCACHE=1`、142 executables を実際に実行、`logs/fulltest3-nocache.txt`)。**最初の実行は 1 件失敗した**(`fe-lift/wall_fr20::the_progress_counter_is_in_the_one_inline_function_that_every_indirect_call_ends_in`。ヘッダに `++fle_progress_count` が 2 つあったため。テストは変えず、ヘッダの形を直した。§11、`logs/fulltest-run1-before-restructure.txt`)。。FRUITY 無効 a4: `OUT=… bash lift/harness/a4-fruity.sh off`(gen 13 s、build 201 s): init_count 942/942、run_rank 895/895、functions 5,310、entries 1,009,731(基準と同じ。`logs/a4-off.txt`)。。
 
@@ -164,7 +164,7 @@ bash <disp1>/tools/ab_native.sh 9 runs/ab base=$W/obj-base/two-native-base new=$
 # SIGPROF: link_variant.sh $W/obj-base two-native-prof disp_prof.o (obj-new2 も); ENVX="DISP_PROF_FILE=... DISP_PROF_HZ=500"; prof_report.py <binary> <samples> 3601776,3607800
 # wasm -Oz: SRCTREE=$W/src WB=$W/wb-base NAT=gen WASM_OPT=Oz JOBS=4 bash $W/tools/wasm.sh rt harness units link   (新は SRCTREE=$W/work WB=$W/wb-new2)
 #           SCRIPT=$W/tools/scripts/steady-main.g3 bash $W/tools/hle1/wasm-ab.sh 3 wab base:wb-base new:wb-new2 ; python3 <disp1>/tools/wasm_summary.py wab base,new
-# 差分試験: python3 difftest/gen_table.py $W/gen/v-base/src/common.c table_real.c ; RT=$W/work/lift/runtime OUTD=$W/dt bash difftest/build.sh real-O2 ; $W/dt/real-O2 10000000
+# 差分テスト: python3 difftest/gen_table.py $W/gen/v-base/src/common.c table_real.c ; RT=$W/work/lift/runtime OUTD=$W/dt bash difftest/build.sh real-O2 ; $W/dt/real-O2 10000000
 #           mutants: RT=... OUTD=... TABLE_OBJ=<table.o> bash difftest/mutants.sh
 # テスト: FLE_INPUT_ROOT=$R bash $W/work/lift/harness/test-env.sh --link ; (cd $W/work && FLE_TEST_NOCACHE=1 FLE_INPUT_ROOT=$R bash lift/harness/test.sh full --jobs 2)
 # a4: OUT=$W/a4off INPUT_LIFT=$R/lift FEBIN=$W/target/release JOBS=2 bash $W/work/lift/harness/a4-fruity.sh off
@@ -187,7 +187,7 @@ bash <disp1>/tools/ab_native.sh 9 runs/ab base=$W/obj-base/two-native-base new=$
 - **所定のプロジェクト(`serina1-serum2.zip`)での宛先分布・miss 率・速さ**: 未測定(アプリに FLP を開く経路が無い)。§3 の分布は `steady-main.g3`(ウィザードを出して Enter、空の主ウィンドウ)のもの。プロジェクトを開くと宛先が増え、4096 ラインの miss 率が上がる可能性がある(撤回条件 S-disp1-1)。
 - **ブラウザ(Chrome)での測定**: 無い。wasm の数字は node(V8、`process.threadCpuUsage()`)の主スレッド CPU。
 - **起動(P1)への効き**: native の最初の idle までの CPU 秒は旧と新で差が読み取れなかった(§6。ラン間の幅が ±0.3 s で、見込みの効果 0.1 s 前後は雑音に埋もれる)。wasm も −1% で幅の内。起動のうち `fle_dispatch` の割合は SIGPROF で 4.0〜4.6% と測れているが、新での削減が CPU 秒の差として確認できていない。
-- **wasm -O2 の全体ビルド・A/B**: 未実施(時間。全 92 単位の wasm -O2 は約 25 分かかる見込みで、基準だけ 26 単位まで作って止めた)。wasm -O2 で行ったのは差分試験(54,560,245 件、不一致 0)とリプレイ微ベンチだけ。-O2 では小さくなった `fle_dispatch` がインライン化され、wasm の大きさが増える可能性がある(native -O2 は text +3.2%)。
+- **wasm -O2 の全体ビルド・A/B**: 未実施(時間。全 92 単位の wasm -O2 は約 25 分かかる見込みで、基準だけ 26 単位まで作って止めた)。wasm -O2 で行ったのは差分テスト(54,560,245 件、不一致 0)とリプレイ微ベンチだけ。-O2 では小さくなった `fle_dispatch` がインライン化され、wasm の大きさが増える可能性がある(native -O2 は text +3.2%)。
 - **`fle_dispatch` を noinline にした版**(native text の増加を避ける代わりに速さを削る): 未測定。
 - **HLE 入り(決定 0162)・`-DFLE_LOWREGS`・`--swap-entries`・`--outline-shared` との組み合わせの全ビルド**: 未実施。ヘッダが `-DFLE_LOWREGS`・`-Wall -Wextra -Werror` で 1 ファイルとして通ることだけ確認した。
 - **実スレッドが同時に走る場合の安全性**: 設計の対象外(§4)。
@@ -203,7 +203,7 @@ bash <disp1>/tools/ab_native.sh 9 runs/ab base=$W/obj-base/two-native-base new=$
 - **第1報が約 7 分遅れた**(期限 07:52、送信 約 08:00)。ベースの native 全 92 単位のコンパイルが load 14〜20 で約 38 分かかった。
 - 存在しないツール名の呼び出しが 3 回(`bash_placeholder` 系。エラーのみで副作用なし)。拒否された `sleep` が 1 回。
 - **待ち方**: コンパイル待ちに `tail --pid=<xargs の PID> -f /dev/null` で最大 25 分ブロックした(08:06〜08:31)。通知を待てばよかったが、その間に他の作業を進められなかった。while ループ・sleep・pkill -f・nohup は使っていない(`pkill -P <PID>` を 1 回: 自分が起動した wasm -O2 ビルドの子プロセスを止めるため)。
-- **同時プロセスが 4 本を超えた時間がある**: コンパイル 3〜4 本に、単発の clang/emcc(designs.c、差分試験のビルド、SIGPROF 走行 25 秒を数回、リプレイ微ベンチ)が重なって 5 本になった。後半はテスト 2 本・wasm 2 本・a4 の JOBS=2 で 6 本前後になった時間がある。
+- **同時プロセスが 4 本を超えた時間がある**: コンパイル 3〜4 本に、単発の clang/emcc(designs.c、差分テストのビルド、SIGPROF 走行 25 秒を数回、リプレイ微ベンチ)が重なって 5 本になった。後半はテスト 2 本・wasm 2 本・a4 の JOBS=2 で 6 本前後になった時間がある。
 - **途中でやり直した**: (1) 07:59 に、新ビルドを作り始めて 5 分で kill し、ハッシュ関数を `va>>2` から `va>>4` に変えて全部作り直した(obj-new を消した)。(2) 08:48 に、最初の `test.sh full` が `wall_fr20::the_progress_counter_is_in_the_one_inline_function_that_every_indirect_call_ends_in` で**失敗した**(ヘッダに `++fle_progress_count` が 2 つ〔新と BSEARCH〕あり、このテストは 1 つを要求する)。テストは弱めず、`fle_dispatch` を「ランドing → 探索(新: キャッシュ + 二分探索 / BSEARCH: 二分探索)→ 進捗 → hook → 呼び出し」の 1 本にして末尾を共有する形に直した。その後に native 92 単位・wasm -Oz 92 単位をもう一度全部作り、16 スナップ・A/B・テストをやり直した。最初の失敗したログは `logs/fulltest-run1-before-restructure.txt`。
 - **報告の訂正**: 第1報の「58,608 の呼び出し点に二分探索が展開される」は誤り(旧は翻訳単位ごとに 1 本の static 関数)。第2報の変異検査「15 件のうち 13 件」は誤り(16 件のうち 14 件検出、2 件等価)。第2報で M07〜M09 を検出としたのはヘッダの旧形の sed で、最終版のヘッダでは sed が当たらず(M09 は旧側の呼び出しに当たっていた)、最終版の sed に直して 16 件を全部やり直した。
 - `test-env.sh --link` で、作業用の木 `lift/out-disp1/work/` にだけ入力ファイルへのシンボリックリンクを作った(リポジトリには作っていない)。`disp1.diff` は変更したファイルだけから作ったので、リンクは入っていない。

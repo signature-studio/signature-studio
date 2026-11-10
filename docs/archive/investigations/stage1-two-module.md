@@ -1,6 +1,6 @@
 # 段階 1: 合成 PE による 2 モジュール機構の検証
 
-実行日: 2026-10-23。リポジトリ HEAD ef9f72f（作業開始時に指示された 7719a50 から進んでいた。作業ツリーには W6 などの未コミット変更がある）。決定 0080 と `docs/investigations/two-module-design.md`（以下「設計文書」。§4、§6、§7、§7.1）の続き。**この文書は何も決めない**。決定が要る点は §8 に列挙した。作業物は `lift/out-stage1/`（gitignore 対象の `lift/out*/`。約 45 MB）。
+実行日: 2026-10-23。リポジトリ HEAD ef9f72f（作業開始時に指示された 7719a50 から進んでいた。ワークツリーには W6 などの未コミット変更がある）。決定 0080 と `docs/investigations/two-module-design.md`（以下「設計文書」。§4、§6、§7、§7.1）の続き。**この文書は何も決めない**。決定が要る点は §8 に列挙した。作業物は `lift/out-stage1/`（gitignore 対象の `lift/out*/`。約 45 MB）。
 
 **範囲**: native のみ。合成 PE だけを使い、実 `dsp_ippv2_x64.dll` と FLEngine は使っていない。したがって**この文書の数値はすべて合成 PE の値で、実 DLL の値ではない**。`lift/runtime/` と `lift/crates/*/src/` は編集していない（§7）。
 

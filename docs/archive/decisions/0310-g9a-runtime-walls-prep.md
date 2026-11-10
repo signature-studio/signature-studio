@@ -1,6 +1,6 @@
 # 0310(仮)G9-a: Fruity Balance を開くための runtime 側の準備(行なし 74 の import と plugin の実行時の壁)— 読みと設計のみ(alpha1 = alpha22)
 
-作業者 `alpha1`(成果物名 alpha22)、2026-11-07 JST 02:2x。分担(PM 01:2x): Balance を実モジュールとして足す手続き(build の行・基底・フック点・volume/pack・patch)は mt3(0313)。alpha1 は **runtime の未実装 import(0309 の『行なし 74』)の扱い**と、**plugin の実行時の壁(最初の process までの node 試験)の前提**。**この文書は新しい build も実行も含まない**(Elastique の追跡が優先で、G9-a の build は mt3 の bundle ができた後〔PM の info、約 03:10〜〕)。
+作業者 `alpha1`(成果物名 alpha22)、2026-11-07 JST 02:2x。分担(PM 01:2x): Balance を実モジュールとして足す手続き(build の行・基底・フック点・volume/pack・patch)は mt3(0313)。alpha1 は **runtime の未実装 import(0309 の『行なし 74』)の扱い**と、**plugin の実行時の壁(最初の process までの node テスト)の前提**。**この文書は新しい build も実行も含まない**(Elastique の追跡が優先で、G9-a の build は mt3 の bundle ができた後〔PM の info、約 03:10〜〕)。
 
 **実エンジンについて(先頭)**: 本書に実エンジンの実行結果は無い。入力は (a) 0309 の表(`alpha21-results/tables/0309-imports-none.tsv`、fe-lift が lift した Fruity Balance の『行なしの import』)、(b) Win32 の契約の記憶(Learn の記述の要約。未照合の箇所は『読み』)。
 
@@ -24,7 +24,7 @@ Fruity Balance の import のうち runtime に実装の行が無い物は 74 �
 ## 2. 最初の反復の見込み(読み、未検証)
 
 0309 の見積りと mt3 の 0313 の手続きで bundle ができたら、node の G3(`tools/open-problems.g3` の形: File → Open → Problems が出る → `dump`)で次を観測する: (1) `LoadLibraryW`(フルパス)が実モジュールを返すか(mt3 の診断 diff で `g9-diag: LoadLibraryW … -> 0x6800000`)、(2) `GetProcAddress("CreatePlugInstance")`、(3) `fle: unsupported`・`pruned`・`onAbort` が 0 行、(4) Problems 窓の件数が 7 → 6。最初の壁は **init の 3 行(memset・EnumCalendarInfoW・GetCPInfoExW)か、フックの無い経路(フック点の漏れ)か、plugin の ホスト vtable(TFruityPlugHost)の未実装の呼び**のどれか(読み)。壁ごとの反復は 12〜17 分(build 10〜13 + node 2〜3)。
-**準備済み**: 私の tree(`/home/ubuntu/work/alpha22w/tree`、a977401d + Balance 用の編集)・x20 の複写(`prodwork`)・Balance の stub 行入りの seed(`seed-g3.tsv`)・`tools/open-problems.g3`(0310 の初回作業の残り。mt3 の 0313 の patch と重複する部分は mt3 を正とする)。
+**準備済み**: 私の tree(`/home/ubuntu/work/alpha22w/tree`、a977401d + Balance 用の編集)・x20 のコピー(`prodwork`)・Balance の stub 行入りの seed(`seed-g3.tsv`)・`tools/open-problems.g3`(0310 の初回作業の残り。mt3 の 0313 の patch と重複する部分は mt3 を正とする)。
 
 ## 2b. mt3 の 0313 との分担(重複しない)と、最初に当たる壁の契約の設計
 
@@ -50,7 +50,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 - **V2b**(`tools/v2b-run.sh`、seed = nested + Balance 行): `LoadLibraryW "…\Fruity Balance\Fruity Balance_x64.dll" -> 0x6800000`、`GetProcAddress(0x6800000,"CreatePlugInstance") -> 0x6abdde0`、`fle:` 行は act1-net の `InternetOpenUrlW` 2 行 + 通常の `MessageLoop: idle` のみ(unsupported・abort 無し)。Problems 窓は対照(E12c TEST bundle = Balance 無し)の「8 plugin(s)」691x343 から G9-a の「7 plugin(s)」691x327 に減った(Balance が 1 件、読み込めたと FL が見た、と読める。件数の差は実測、理由は推測)。表と PNG は `tables/0310-v2b-g9a-vs-control.txt`、`tables/v2b-problems-*.png`。
 - **G9-b**(Export、`tools/g3-run-nested.sh` + `export-plain.g3` / `export-g9b.g3`): 2 回とも約 151 秒で `done` まで到達。`fle:` は act1-net の 2 行 + diag 行のみ、unsupported・abort 無し。**WAV は取り出せていない**(下記)。
 - **`vfsdump` が出力しない理由**: main の `lift/harness/fruity_g3.c` では `vfsdump` が `#if !defined(__EMSCRIPTEN__)`(517–545 行)の中にあり**ネイティブ限定**。wasm の TEST bundle ではその op は未知の op として読み飛ばされる。0308 で wasm から WAV を取り出した `vfsdumpdir` は私の TEST 専用 patch で、mt3 の tree(main 基点)には無い。
-- **再基点した TEST 専用 diff**: `tools/0310-g9b-vfsdumpdir.test-only.diff`(`fle_vfs.c` に `fle_vfs_walk_dir`、`fle_vfs.h` に宣言、`fruity_g3.c` に `vfsdumpdir GUESTDIR` を `#if` の外に追加。g9a-test-tree の原本の複写に対し `patch -p1 --dry-run` 成功)。製品の木には当てない(push しない)。スクリプトは `tools/export-g9b-v2.g3`(末尾が `vfsdumpdir C:\Users\user\Downloads`)。
+- **再基点した TEST 専用 diff**: `tools/0310-g9b-vfsdumpdir.test-only.diff`(`fle_vfs.c` に `fle_vfs_walk_dir`、`fle_vfs.h` に宣言、`fruity_g3.c` に `vfsdumpdir GUESTDIR` を `#if` の外に追加。g9a-test-tree の原本のコピーに対し `patch -p1 --dry-run` 成功)。製品の木には当てない(push しない)。スクリプトは `tools/export-g9b-v2.g3`(末尾が `vfsdumpdir C:\Users\user\Downloads`)。
 - **FLP の読み**(`serina1-serum2.flp` のイベント列を読んだ): Fruity Balance は **Insert 1 の slot 1**(event 212 の先頭 2 DWORD = insert 1 / slot 0)に 1 つだけ(event 212 の構造は FL の公開仕様を確認していない読み。未検証)。
 - **Balance が呼ばれたことの証拠の取り方**: (A) mt3 の `diag-g9-count.diff`(`fle_callback.c` のみ。g9a-test-tree に `patch --dry-run` 成功)で、image 枠への間接呼び出しの数を stderr に出す。(B) 再 build 無しの UI 証拠: node の G3 でミキサー(F9)を開き Insert 1 の slot 1 を開いて Balance の窓の面を `dump`(反復が要る)。(C) WAV の一致は呼び出しの証拠にならない: 0308 で Wine の原本(Balance あり)と wasm(Balance 無し)の Export が rms 0.0(CPUID 揃え後、1 LSB の差 4/11.4M)だったので、この project の Balance は出力に対して透過。G9-b の WAV は『壊していない』の回帰確認。
 
@@ -97,7 +97,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 - **道具**: `tools/a22-balance-compare.py WINE.wav G9A.wav [--base BASE.wav] [--eps N] [--csv-prefix P]`(読み専用、numpy 1 スレッド。G9A の既定 = `lift/out-ci1/kit/out/export-g9a/export.wav`〔sha 94c93666…〕、BASE の既定 = `…/export/export.wav`〔Balance なしの wasm、sha 381cdb5a…〕。FLP は `~/ダウンロード/serina1-serum2.zip` から、クリップは `proj1-results/tables/playlist_items.tsv` から読む。WAV は PCM 16/24/32 と float32 を読み、16 ビット相当に揃える)。
 - **見出しは固定**: 0 入力(frames・形式・sha256)/ 1 全体(組 = WINE-G9A〔核〕・BASE-WINE・BASE-G9A の、差のフレーム数・同一フレーム・全標本の RMS・最大差)/ 2 10 s 別(差の割合と RMS を 3 組)/ 3 クリップの内側・尾・それ以外 / 4 クリップ終了後の尾(直前のクリップの終端からのフレーム数)/ 5 立ち上がり(クラスごとの最初の差のフレーム)/ 6 クラスごとのクリップ揃えの平均 r(t)(r_WINE と r_G9A を並べる)/ 7 Wine と G9-a の形の相関(クラス平均の相関・最大差・クリップごとの相関の中央値と RMS の中央値、FLP の形との相関)/ 8 clip していない標本だけの差 / 9 判定の案(J1〜J5)。
 - **判定の案(決めるのは PM)**: J1 全フレーム一致(核。PASS なら faithful)/ J2 尾の外に差が無い / J3 clip していない標本の最大差が 2 LSB 以下 / J4 立ち上がりの中央値の差が 2 フレーム以内 / J5 クラス平均の r の最大差が 0.01 以下。J1 が FAIL でも J2〜J5 が PASS で J1 の差が 2 LSB 級なら『CPUID 級の差のみ』(`--eps 2` で J2・J4 を再計算)。J2・J4・J5 が FAIL なら Balance の実装(または automation の受け方)の差。
-- **自己試験**(実測。Wine の結果ではない): WINE の位置に (a) G9-a のコピーを渡す → J1〜J5 すべて PASS、(b) G9-a に 1/10,000 の標本へ ±1 LSB の雑音を足した物を渡す → J1 FAIL、`--eps 2` で J2〜J5 PASS、(c) 基準(Balance なし)を渡す → J1・J3・J4・J5 FAIL。出力の見本 = `tables/0310-compare-SELFTEST-standin-not-wine.txt`(先頭に『Wine の結果ではない』と書いてある)。
+- **自己テスト**(実測。Wine の結果ではない): WINE の位置に (a) G9-a のコピーを渡す → J1〜J5 すべて PASS、(b) G9-a に 1/10,000 の標本へ ±1 LSB の雑音を足した物を渡す → J1 FAIL、`--eps 2` で J2〜J5 PASS、(c) 基準(Balance なし)を渡す → J1・J3・J4・J5 FAIL。出力の見本 = `tables/0310-compare-SELFTEST-standin-not-wine.txt`(先頭に『Wine の結果ではない』と書いてある)。
 - 旧 `a22-balance-diff.py` / `a22-balance-shape.py` はこの script に統合済み(結果の再現用に残す)。
 
 ## 8. G9-c 用: 残り 6 種の『行なし import』の増分(Balance の 74 に無い物だけ。05:3x、読みと CPU 軽い python のみ)
@@ -208,7 +208,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 
 **判定の案**(決めるのは PM): **F1** 帯の中で WINE_AB と WASM_AB が一致(J1 相当)/ **F2** 帯と尾の外に差が無い(既知の残差を除く)/ F3 WINE_AB-WASM_AB の最大差 ≤ 2 LSB / **F4** cutoff automation の窓で差が 0(読みの確認)/ F5 r(t) の最大差 ≤ 0.01 / **F6** 帯の中で BASE と違う(Filter が出力に効いている。0 なら Filter が読めていない/効いていない側がある = 比較は空)。`--eps N` で F1・F2・F4 と立ち上がりを |diff| > N LSB で数える(1 LSB 級の揺れの扱い、§9 と同じ)。
 
-**自己試験**(実測。**Wine でも Filter でもない代役**。`tables/0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`): BASE は実物(G9-a の Export)。WASM_AB の位置に『Agogo の帯だけを 2 タップで平滑化した G9-a の WAV』(Filter ではない代役)、WINE_AB に (a) そのコピー → F1〜F6 すべて PASS、(b) 代役 + 60 s(帯の中)・100 s(帯の外)・125 s(cutoff の窓)に +1 LSB → F1 FAIL・F2 FAIL・F4 FAIL、F3 PASS、`--eps 2` で全 PASS、(c) BASE と同じ(Filter が効いていない側)→ F6 FAIL・F1 FAIL・F3 FAIL・F5 FAIL。
+**自己テスト**(実測。**Wine でも Filter でもない代役**。`tables/0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`): BASE は実物(G9-a の Export)。WASM_AB の位置に『Agogo の帯だけを 2 タップで平滑化した G9-a の WAV』(Filter ではない代役)、WINE_AB に (a) そのコピー → F1〜F6 すべて PASS、(b) 代役 + 60 s(帯の中)・100 s(帯の外)・125 s(cutoff の窓)に +1 LSB → F1 FAIL・F2 FAIL・F4 FAIL、F3 PASS、`--eps 2` で全 PASS、(c) BASE と同じ(Filter が効いていない側)→ F6 FAIL・F1 FAIL・F3 FAIL・F5 FAIL。
 
 **注意(読み、未確認)**
 1. **Filter の静的な効果が小さいかもしれない**: 保存状態は cutoff = 1024(最大)、resonance = 205 と読んだ。cutoff が最大のとき Fruity Filter がどれだけ音色を変えるかは未確認で、変化が 1 LSB 未満なら F6 が FAIL する(比較が空になる)。その場合は次の変種が有効。
@@ -231,7 +231,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 2. **cutoff の automation(118.8〜129.56 s)は判別力が無い**: その区間に Insert 47 へ入る信号が無いので、cutoff の法則(1.0 → 0.355 → 0、tension)の正否は WAV の差に出ない。使い方は『差が 0 であることの確認(F4)』だけ。0 でなければ『Insert 47 の入力は Agogo だけ』の読み(routing と pattern の clip)が誤り。
 3. **先に F6(Filter が効いているか)**: BASE と違うフレームが帯の中に無ければ(静的な設定 cutoff = 1024〔最大〕・resonance = 205 が 1 LSB 未満しか変えない場合)、比較は空で何も言えない。その場合は変種 FLP(cutoff の automation クリップを帯の中、例 62.4 s = 19968 tick へ動かす。Wine と wasm の両方に同じ変更)に切り替える。
 4. **判定**: F1(帯の中で WINE_AB = WASM_AB)が本体。1 LSB 級の揺れは `--eps 2` で F1・F2・F4 を数え直す(Balance の §9 と同じ『CPUID 級の差のみ』の扱い)。**既知の Wine の残差**(5,333,434・5,333,941・5,422,135 = 120.9 s 以降)は、WINE_AB でも同じ位置に出るなら外す(`--known-residue`)。出る位置は run ごとに変わりうる(§11)。
-5. **既知の限界**: 帯の読みは FLP の routing と pattern の clip から(WAV では未確認)。Filter の効果の大きさは未測定。自己試験は代役で行った(`tables/0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。
+5. **既知の限界**: 帯の読みは FLP の routing と pattern の clip から(WAV では未確認)。Filter の効果の大きさは未測定。自己テストは代役で行った(`tables/0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。
 
 
 ## PM の判断と取り込み(2026-11-07 02:38、docs のみ。製品の差分なし)
@@ -239,20 +239,20 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 取り込み: alpha1 の 0310(G9-a: Fruity Balance を開くための runtime 側の準備)と表 `docs/investigations/alpha22/tables/0310-g9a-missing-import-rows-74.tsv`。**読みと設計のみ。build も実行も無く、実エンジン・Chrome は 0 件。依頼者の機械は 0 件。** 数字は 0309 の表(fe-lift が lift した Balance の『行なしの import』)と Win32 の契約の記憶(未照合の箇所は『読み』)。
 
 判断:
-1. **分担を確定する**: Balance を 8 つ目の実モジュールとして足す手続き(build の行・基底・フック点・volume・pack・patch)は mt3 の 0313(diff `0313-g9a-balance-module.diff`、10 ファイル・224 行、main に dry-run rc 0、静的な検査だけ)。runtime の『行なし 74』の扱いと plugin の実行時の壁(最初の process までの node 試験)は alpha1 の 0310。**実装は壁に当たってから**(Win32 の契約で `ship6-imports.txt` の末尾に追記、黙って成功を返す既定は置かない。呼ばれたら VA 名つきで停止する `fle_unsupported` の現行の規則のまま)。FLEngine の lift も同じ集合を抱えていて実行されなければ停止しないので、74 個を先回りで全部実装しない。
-2. 最有力の壁(読み): init の `memset`・`EnumCalendarInfoW`・`GetCPInfoExW`。`ImageList_*`(22)はフォームが画像リストを持つ場合のみ。MDI は不要の見込み。いずれも **mt3 の冷間 build(約 03:10 以降、PM の info)の後の V2b**(alpha1 の node 試験で LoadLibraryW → GetProcAddress("CreatePlugInstance") の期待 (i)〜(v))で確かめる。
+1. **分担を確定する**: Balance を 8 つ目の実モジュールとして足す手続き(build の行・基底・フック点・volume・pack・patch)は mt3 の 0313(diff `0313-g9a-balance-module.diff`、10 ファイル・224 行、main に dry-run rc 0、静的な検査だけ)。runtime の『行なし 74』の扱いと plugin の実行時の壁(最初の process までの node テスト)は alpha1 の 0310。**実装は壁に当たってから**(Win32 の契約で `ship6-imports.txt` の末尾に追記、黙って成功を返す既定は置かない。呼ばれたら VA 名つきで停止する `fle_unsupported` の現行の規則のまま)。FLEngine の lift も同じ集合を抱えていて実行されなければ停止しないので、74 個を先回りで全部実装しない。
+2. 最有力の壁(読み): init の `memset`・`EnumCalendarInfoW`・`GetCPInfoExW`。`ImageList_*`(22)はフォームが画像リストを持つ場合のみ。MDI は不要の見込み。いずれも **mt3 の冷間 build(約 03:10 以降、PM の info)の後の V2b**(alpha1 の node テストで LoadLibraryW → GetProcAddress("CreatePlugInstance") の期待 (i)〜(v))で確かめる。
 3. **未確認**: 74 個のうち実際に Balance の生成までに実行される物、plugin の実行時の壁の順序、実 wasm の大きさ(B-FLE は 0312g〜i のとおり 2 つ目の前)。
 
 ### 追記(2026-11-07 05:15、alpha1 の 0310 の最終〔§5 V2b・§6 G9-b の自動化の解析〕の取り込み、docs のみ。製品の差分なし)
 
-取り込み: alpha1 の 0310 の最終版と表・道具(`docs/investigations/alpha22/`。PNG 2 枚〔各 15 KB〕を含む)。**実エンジン(wasm の試験 bundle の node G3 と ci1 の Chrome の Export の WAV)に対する numpy の実測と FLP の読み。** V2b(node G3)では Problems の面が 7 件(Balance の行なし、691×327)で、対照の E12c の 8 件(691×343)と異なり、LoadLibraryW → 0x6800000 と GetProcAddress → 0x6abdde0 が出た。G9-b の node Export は WAV が dump に出なかった(`vfsdump` が native の fruity_g3.c にしか無いため)ので、Chrome の Export で代えた(0313 の PM の追記を参照)。alpha1 の解析の読み(自動化 clip の 256 個、差は clip の中と 3.11 ms の尾だけ)は PM が `a22-wavcmp2.py` で見た 10 s 別の差の分布と矛盾しない。**私(PM)が以前に伝えた「ゲイン 0.93〜0.99」は私の粗い最小二乗(飽和フレームを含む)で根拠ではなく、alpha1 の実測が優先する**(alpha1 に訂正を通知済み)。Balance の出力が正しいかは Wine の参照との比較で判定する(未実施)。
+取り込み: alpha1 の 0310 の最終版と表・道具(`docs/investigations/alpha22/`。PNG 2 枚〔各 15 KB〕を含む)。**実エンジン(wasm のテスト bundle の node G3 と ci1 の Chrome の Export の WAV)に対する numpy の実測と FLP の読み。** V2b(node G3)では Problems の面が 7 件(Balance の行なし、691×327)で、対照の E12c の 8 件(691×343)と異なり、LoadLibraryW → 0x6800000 と GetProcAddress → 0x6abdde0 が出た。G9-b の node Export は WAV が dump に出なかった(`vfsdump` が native の fruity_g3.c にしか無いため)ので、Chrome の Export で代えた(0313 の PM の追記を参照)。alpha1 の解析の読み(自動化 clip の 256 個、差は clip の中と 3.11 ms の尾だけ)は PM が `a22-wavcmp2.py` で見た 10 s 別の差の分布と矛盾しない。**私(PM)が以前に伝えた「ゲイン 0.93〜0.99」は私の粗い最小二乗(飽和フレームを含む)で根拠ではなく、alpha1 の実測が優先する**(alpha1 に訂正を通知済み)。Balance の出力が正しいかは Wine の参照との比較で判定する(未実施)。
 
 
 ### 追記(2026-11-07 05:37、alpha1 の 0310 最終〔§7 比較 script、§8 残り 6 種の行なし import の増分〕の取り込み、docs のみ。製品の差分なし)
 
 取り込み: 本文を alpha1 の最終版に差し替え(私の 02:38 の節と 05:15 の追記は残す)。表・道具: `docs/investigations/alpha22/`(`a22-balance-compare.py`、`a22-g9c-extra-imports.py`、`0310-g9c-extra-imports-by-plugin.tsv`・`-summary.tsv`、`0310-compare-SELFTEST-standin-not-wine.txt`)。
 
-事実と限界(PM が読んだ範囲): (1) **比較 script `a22-balance-compare.py` の自己試験は代役の入力(G9-a のコピー、雑音を足した物、Balance なしの基準)で行われ、Wine の結果ではない**(ファイル名と先頭に明記)。実エンジンの結果は ci1 の Chrome の Export の WAV(sha256 `94c93666…4090`)だけで、Wine の「Balance のみ有効」の WAV(opt1 の elog15b、窓の後)が出るまで、Balance の忠実性は未判定。判定の案 J1〜J5 は案で、決めるのは PM(Wine と wasm の r(t) の一致が核)。(2) **行なし import の増分は静的な数え方**(PE の import 表と現行の行の集合の突き合わせ): Fruity Filter・Delay 2・Parametric EQ 2・Frequency Shifter は Balance の 74 と集合が同一(増分 0)、Soundgoodizer +33、FLEX +14(FLEX の補助 engine DLL は +102/+103、FLEngine にも無い物 95。生成までに読まれるかは未確認)。用途の分類(ui/init/process)は API の用途からの読みで、踏んだ観測ではない。mt3 の G9-c の設計(Filter を次の 1 本)と矛盾しない。
+事実と限界(PM が読んだ範囲): (1) **比較 script `a22-balance-compare.py` の自己テストは代役の入力(G9-a のコピー、雑音を足した物、Balance なしの基準)で行われ、Wine の結果ではない**(ファイル名と先頭に明記)。実エンジンの結果は ci1 の Chrome の Export の WAV(sha256 `94c93666…4090`)だけで、Wine の「Balance のみ有効」の WAV(opt1 の elog15b、窓の後)が出るまで、Balance の忠実性は未判定。判定の案 J1〜J5 は案で、決めるのは PM(Wine と wasm の r(t) の一致が核)。(2) **行なし import の増分は静的な数え方**(PE の import 表と現行の行の集合の突き合わせ): Fruity Filter・Delay 2・Parametric EQ 2・Frequency Shifter は Balance の 74 と集合が同一(増分 0)、Soundgoodizer +33、FLEX +14(FLEX の補助 engine DLL は +102/+103、FLEngine にも無い物 95。生成までに読まれるかは未確認)。用途の分類(ui/init/process)は API の用途からの読みで、踏んだ観測ではない。mt3 の G9-c の設計(Filter を次の 1 本)と矛盾しない。
 
 
 ### 追記(2026-11-07 05:59、alpha1 の 0310 最終〔§9 Wine『Balance のみ有効』対 wasm の G9-a の比較〕の取り込みと PM の確認、docs のみ。製品の差分なし)
@@ -274,14 +274,14 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 
 ### 追記(2026-11-07 06:23、alpha1 の 0310 最終〔§12 Filter 用の比較 script `a22-filter-compare.py`〕の取り込み、docs のみ。製品の差分なし)
 
-取り込み: alpha1 の §12 と `tools/a22-filter-compare.py`、自己試験の表(`0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。**自己試験は Wine でも Filter でもない代役の入力での script の動作確認で、実エンジンの結果ではない。** PM の判断: (1) script を受理する(WINE_AB・WASM_AB・BASE の 3 入力、Agogo の帯 45.3〜81.6 s +3 s の尾、cutoff の automation 窓 118.8〜129.56 s、F1〜F6)。(2) 読みの注意を引き継ぐ: Filter の静的な効果が小さい場合は F6(帯が BASE と違うか)が FAIL し比較が空になりうる。その場合だけ、同じ変更を Wine と wasm の両方に入れた変種 FLP(cutoff の automation clip を Agogo の帯へ移す)を作る。判断は elog16 の F6 を見てから。(3) Insert 47 への入力が Agogo だけという読みは FLP の配線とパターンの clip による読みで、WAV では未確認(F2 が帯の外の差で FAIL したらここを疑う)。(4) Wine の実行は Filter の bundle ができ、ci1 の Chrome の Export が取れた後(Wine と Chrome は重ねない)。依頼者の機械は 0 件。G9 は未到達のまま。
+取り込み: alpha1 の §12 と `tools/a22-filter-compare.py`、自己テストの表(`0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。**自己テストは Wine でも Filter でもない代役の入力での script の動作確認で、実エンジンの結果ではない。** PM の判断: (1) script を受理する(WINE_AB・WASM_AB・BASE の 3 入力、Agogo の帯 45.3〜81.6 s +3 s の尾、cutoff の automation 窓 118.8〜129.56 s、F1〜F6)。(2) 読みの注意を引き継ぐ: Filter の静的な効果が小さい場合は F6(帯が BASE と違うか)が FAIL し比較が空になりうる。その場合だけ、同じ変更を Wine と wasm の両方に入れた変種 FLP(cutoff の automation clip を Agogo の帯へ移す)を作る。判断は elog16 の F6 を見てから。(3) Insert 47 への入力が Agogo だけという読みは FLP の配線とパターンの clip による読みで、WAV では未確認(F2 が帯の外の差で FAIL したらここを疑う)。(4) Wine の実行は Filter の bundle ができ、ci1 の Chrome の Export が取れた後(Wine と Chrome は重ねない)。依頼者の機械は 0 件。G9 は未到達のまま。
 
 
 ### PM の追記(07:07、alpha1 の §13〔node の G3、Balance の窓〕の取り込み、docs のみ。製品の差分なし)
 
-本文を alpha1 の最終版(§13 まで)に差し替え、上の私の節(02:38 ほか)は残した。表・道具: `docs/investigations/alpha22/tables/0310-balance-gui-node-g3.txt`、`tables/bgui/`(窓の表 2 本と g3 の行。PNG は複写しない)、`tools/{balance-gui.g3, bgui-run.sh, a22-chrome-node-pixels.py}`。
+本文を alpha1 の最終版(§13 まで)に差し替え、上の私の節(02:38 ほか)は残した。表・道具: `docs/investigations/alpha22/tables/0310-balance-gui-node-g3.txt`、`tables/bgui/`(窓の表 2 本と g3 の行。PNG はコピーしない)、`tools/{balance-gui.g3, bgui-run.sh, a22-chrome-node-pixels.py}`。
 
-**PM が読んだ事実(alpha1 の §13、実エンジン〔G9-a の試験 bundle〕を node の G3 で 1 本実行、06:49:26〜06:49:44、依頼者の機械は 0 件)**: (1) node でも Chrome(gpu1 の stage 3)と同じく『Balance の窓の枠は出るが client は描かれない』が出た。1920×1080 で全面の 99.87% が Chrome と一致、Balance の枠(237×179)と client(227×148)は 100% 一致。(2) 窓の表: `TPluginForm`『Fruity Balance (Insert 1)』(lid 164)と、client の入れ物の `TWPControlForm`(lid 168、visible で 227×148)は**ある**が、その中に**子窓が 0**。クリックの間に 17 個の窓が作られ、8 個は作られた後で破棄された(class は不明)。(3) unsupported・abort・名前つき停止は 0 行(mt3 の §15 の読みと合う: ImageList は失敗の経路にない)。
+**PM が読んだ事実(alpha1 の §13、実エンジン〔G9-a のテスト bundle〕を node の G3 で 1 本実行、06:49:26〜06:49:44、依頼者の機械は 0 件)**: (1) node でも Chrome(gpu1 の stage 3)と同じく『Balance の窓の枠は出るが client は描かれない』が出た。1920×1080 で全面の 99.87% が Chrome と一致、Balance の枠(237×179)と client(227×148)は 100% 一致。(2) 窓の表: `TPluginForm`『Fruity Balance (Insert 1)』(lid 164)と、client の入れ物の `TWPControlForm`(lid 168、visible で 227×148)は**ある**が、その中に**子窓が 0**。クリックの間に 17 個の窓が作られ、8 個は作られた後で破棄された(class は不明)。(3) unsupported・abort・名前つき停止は 0 行(mt3 の §15 の読みと合う: ImageList は失敗の経路にない)。
 
-**PM の判断**: Balance の GUI が描かれない原因の切り分け(FL が ShowEditor を呼ぶか、親付け・可視化の契約、描画の破棄、Delphi の例外の握りつぶし)には、診断入りの試験 build が要る(mt3 の §15.3 と alpha1 の §13 の提案を 1 回に束ねる: CreateWindowEx/DestroyWindow/SetParent/ShowWindow の class・title・親・rect と呼び出し元、Balance の image への間接呼びの最初の 64 回、破棄された画素数)。**許可の条件**: mt3 の Filter の build が終わり、その成果物の検証が済んだ後に 1 回だけ。試験専用・push しない。**これは G9 ではない**(7 種のうち 1 種の Export の一致のみ、GUI は枠だけ)。lift の忠実性の分類は『契約の不足(外部 API の窓の親子・可視・更新領域の伝播)か、FL が呼ばない』のどちらかで、画面ごとの対症は足さない。
+**PM の判断**: Balance の GUI が描かれない原因の切り分け(FL が ShowEditor を呼ぶか、親付け・可視化の契約、描画の破棄、Delphi の例外の握りつぶし)には、診断入りのテスト build が要る(mt3 の §15.3 と alpha1 の §13 の提案を 1 回に束ねる: CreateWindowEx/DestroyWindow/SetParent/ShowWindow の class・title・親・rect と呼び出し元、Balance の image への間接呼びの最初の 64 回、破棄された画素数)。**許可の条件**: mt3 の Filter の build が終わり、その成果物の検証が済んだ後に 1 回だけ。テスト専用・push しない。**これは G9 ではない**(7 種のうち 1 種の Export の一致のみ、GUI は枠だけ)。lift の忠実性の分類は『契約の不足(外部 API の窓の親子・可視・更新領域の伝播)か、FL が呼ばない』のどちらかで、画面ごとの対症は足さない。
 

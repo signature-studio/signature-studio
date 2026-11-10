@@ -15,7 +15,7 @@
 
 ## 1. 再現と作り直し
 
-- 作業木は `git archive HEAD`(5a87839)の `lift/` と `docs/`。`tools/run-cycle.sh N` = wrp2 の `cycle.sh`(`tools/cycle.sh`)に 8 イメージの設定(`S2=1`、層 6 の `wrp2-imports.txt`、Elastique を m8 = 0xb000000)を渡す。cargo(fe-pe / fe-lift の release)27 秒、gen(FLEngine + 7 DLL)と 170 単位のコンパイルが 15 分(load 17〜35)。2 回目以降は内容アドレスのキャッシュで 7 単位(Elastique)だけ。バイナリは 800,525,512 B(build 1)〜800,530,768 B(build 3)。
+- ワークツリーは `git archive HEAD`(5a87839)の `lift/` と `docs/`。`tools/run-cycle.sh N` = wrp2 の `cycle.sh`(`tools/cycle.sh`)に 8 イメージの設定(`S2=1`、層 6 の `wrp2-imports.txt`、Elastique を m8 = 0xb000000)を渡す。cargo(fe-pe / fe-lift の release)27 秒、gen(FLEngine + 7 DLL)と 170 単位のコンパイルが 15 分(load 17〜35)。2 回目以降は内容アドレスのキャッシュで 7 単位(Elastique)だけ。バイナリは 800,525,512 B(build 1)〜800,530,768 B(build 3)。
 - **fe-lift は変更していない**(HEAD の fe-lift)。FLEngine の既定の生成 C を `fe-lift lift binaries/win64/FLEngine_x64.dll OUT.c --pdata` で作り直した: functions 59,380、c_bytes 215,811,678、**sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(不変)**(`logs/gen-default-wrp3.txt`)。
 - 入力(依頼者のファイル。コミットしない): 参照プロジェクト `~/ダウンロード/serina1-serum2.zip`(FLP sha256 `d6783e08…`)、プラグインデータベース 2 ファイル、`flstudio_win64_26.1.7.5653.exe` から `tools/extract_nsis2.py` で取り出した Elastique_x64.dll(sha256 `8551e922…89c3`、wrp2 と一致)。探索 FLP trunc5(`tools/mk-trunc-flp.py --no-slots --drop-clips`、sha256 `e5aec5cf…`)は参照プロジェクトではない。
 
@@ -100,7 +100,7 @@ fe-lift には**加算していない**。理由: 参照プロジェクトの ru
 - 新規 `crates/fe-lift/tests/wall_wrp3.rs` 3 件: (1) ソースの固定(フックは weak、`FLE_THREAD_NO_DLL_NOTIFY` の早期 return より前、`fle_thread.c` は無変更); (2) 合成モジュール(TLS ディレクトリつき PE ヘッダ)+ 実際の `fle_thread.c`/`fle_realmod.c`/`wrp1_vst3.c` で、ロード前と後に始まった各スレッドがテンプレート `aabbccdd11223344` + ゼロ埋め 8 バイトのブロックを持つ、ブロックはスレッド毎に別、TLS callback と DllMain の順序〔callback(1), DllMain(1) / callback(2), DllMain(2) / callback(3), DllMain(3)〕、ロード前のスレッドには callback も DllMain も無い; (3) `FLE_THREAD_NO_DLL_NOTIFY=1` でもブロックはある、`WRP3_TLS_THREADS=0` ではブロックが無い(decision 0190 の状態)。期待値は Learn の文言と本決定の選択から書いた。
 - 変異検査(`tools/mutate-wrp3.sh`、`logs/mutate-wrp3.txt`): フックの削除、`NO_DLL_NOTIFY` の後ろへの移動、weak の削除、ロード済みのときだけブロックを作る、callback を常に呼ぶ、DETACH の callback を省く、テンプレートのコピーを省く、`WRP3_TLS_THREADS=0` を無視する、callback の reason を固定する、の **9/9 を検出**。
 - 隣接する fe-lift テスト 11 本(wall_fr8・realmod・wall_wrp1/2/3・deferred・wall_fr7/10/12/16・wall_q): 全て通った(`logs/test-neighbours.txt`)。
-- 全体テスト(`bash lift/harness/test.sh full --jobs 2 --fresh`、HEAD e7af37b の `git archive` + `wrp3.diff`〔PEB 追加前の版〕、load 12〜35、`logs/fulltest-w3.txt`): **results=179(175 実行ファイル + doc-tests 4)、passed=2,267、failed=10、SKIPPED-lines=15**。failed の 10 は全て `fe-lift/authenticode_check`: 私の試験木が `git archive HEAD lift docs` でトップの `tools/`(`tools/authenticode_check.py`)を含めなかったための環境の不備(`python3: can't open file …/tools/authenticode_check.py`)。`tools/` を足して単独で再実行すると **14 passed / 0 failed**。つまり『1 本の連続した実行』としては failed 10 で、再実行を足した合計の読みは passed 2,277 / failed 0(連続した 1 回の値ではない)。SKIPPED の 15 行は試験木に `lift/out-ext/` などの製品の入力が無いことによる(基準の木での SKIPPED と同じ性質。HEAD e7af37b 単独の値は測っていない)。`wall_wrp3` の 3 件は PEB の追加前の版でこの実行に入っている。最終版(PEB の表明つき)は src 木で単独で通した(3 passed、変異 12/12)。基準の件数(176 results / 2,258)との差は HEAD が進んだ分と私の追加分で、内訳は未確認。
+- 全体テスト(`bash lift/harness/test.sh full --jobs 2 --fresh`、HEAD e7af37b の `git archive` + `wrp3.diff`〔PEB 追加前の版〕、load 12〜35、`logs/fulltest-w3.txt`): **results=179(175 実行ファイル + doc-tests 4)、passed=2,267、failed=10、SKIPPED-lines=15**。failed の 10 は全て `fe-lift/authenticode_check`: 私のテスト木が `git archive HEAD lift docs` でトップの `tools/`(`tools/authenticode_check.py`)を含めなかったための環境の不備(`python3: can't open file …/tools/authenticode_check.py`)。`tools/` を足して単独で再実行すると **14 passed / 0 failed**。つまり『1 本の連続した実行』としては failed 10 で、再実行を足した合計の読みは passed 2,277 / failed 0(連続した 1 回の値ではない)。SKIPPED の 15 行はテスト木に `lift/out-ext/` などの製品の入力が無いことによる(基準の木での SKIPPED と同じ性質。HEAD e7af37b 単独の値は測っていない)。`wall_wrp3` の 3 件は PEB の追加前の版でこの実行に入っている。最終版(PEB の表明つき)は src 木で単独で通した(3 passed、変異 12/12)。基準の件数(176 results / 2,258)との差は HEAD が進んだ分と私の追加分で、内訳は未確認。
 - a4 FRUITY 無効: **再実行していない**(fe-lift と runtime の既定の挙動を変えていないため。基準 942/942・895/895・functions 5,310・entries 1,009,731 の見込みは推測)。FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)は作り直して一致を確認した(§1)。
 
 ## 8. 出典なしの選択(S- 番号。`tables/s-choices.tsv`)
@@ -111,17 +111,17 @@ S-wrp3-tls-per-thread、S-wrp3-tls-callback-order、S-wrp3-tls-index-shared、S-
 
 - 存在しない `bash` ツールを 1 回呼んだ(shell に読み替えられた)。`sleep` を含むコマンドを 3 回出して拒否された(`sleep 0` ×2 の背景コマンドと `sleep 1` ×1)。
 - 最初の report は 45 分以内に出した(00:45)が、第 2 報は予定の 01:45 より遅れた(02:00。45 分の待ちコマンドがタイムアウトした)。
-- 作業ディレクトリ `lift/out-wrp3/` が 5 GiB を超えた(最大 11 GB: 世代ごとのビルドの `build/two1`〔3.0G〕などが原因)。気づいて古い世代を消し、4.9 GB に戻した。終了時は 500 MB 以内に整理する(最終報告に実測)。全体テストは別の試験木 `lift/out-wrp3t/`(終了時に削除)で走らせた。
+- 作業ディレクトリ `lift/out-wrp3/` が 5 GiB を超えた(最大 11 GB: 世代ごとのビルドの `build/two1`〔3.0G〕などが原因)。気づいて古い世代を消し、4.9 GB に戻した。終了時は 500 MB 以内に整理する(最終報告に実測)。全体テストは別のテスト木 `lift/out-wrp3t/`(終了時に削除)で走らせた。
 - 同時に走らせた重い処理が 2 本を超えた時間がある(エンジン 2 本 + ビルド、エンジン 2 本 + 全体テストなど。load 7〜35。壁時計の速度は主張していない)。
 - 取り込み前の gdb 観測で 2 本の gdb をまとめて止めた際、最初の実行のプロセスの片付けを PID で行った(`pkill -f` は使っていない)。
-- 試験木が `tools/` を欠いて全体テストの `authenticode_check` が 10 件落ちた(§7)。
+- テスト木が `tools/` を欠いて全体テストの `authenticode_check` が 10 件落ちた(§7)。
 - 参照プロジェクトの zip を `lift/out-wrp3/proj/`(60 MB)に展開し、プラグインデータベースを `inputs/` にコピーした(終了時に削除)。
 
 確認できなかったこと: 出力の正しさ(波形・音色)/ ライセンスの影響 / 参照プロジェクトの最後までの読み込み(W23 の修正後の再走が時間内に終わらなかった場合は §4.2 の通り)/ SSE4.1 の実行 / W13 / ピアノ FLAC / ワーカースレッドの条件変数 / MP3(別担当)/ ZIP(別担当)/ wasm ビルドへの影響(1 比較)/ a4 / 実機 Windows との照合(0 件)。
 
 ## PM の判断と取り込み(2026-11-04)
 
-取り込み: `wrp3.diff`(`lift/runtime/fle_realmod.c` に weak フックの宣言と呼び出し 1 行、`lift/harness/two/wrp1_vst3.c`〔opt-in の harness〕、新規 `lift/crates/fe-lift/tests/wall_wrp3.rs`。'-' 行 0)を HEAD 7c0e9cc に当てた(offset・fuzz・reject なし)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**(SKIPPED 行 1。基準 178・2,274 に `wall_wrp3` の 3 件が加わった数)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731 **不変**。担当の全体テストの報告にあった `authenticode_check` の 10 件の失敗は、担当の試験木に `tools/` が無かったことによるもので、PM の木では出ない。
+取り込み: `wrp3.diff`(`lift/runtime/fle_realmod.c` に weak フックの宣言と呼び出し 1 行、`lift/harness/two/wrp1_vst3.c`〔opt-in の harness〕、新規 `lift/crates/fe-lift/tests/wall_wrp3.rs`。'-' 行 0)を HEAD 7c0e9cc に当てた(offset・fuzz・reject なし)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**(SKIPPED 行 1。基準 178・2,274 に `wall_wrp3` の 3 件が加わった数)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731 **不変**。担当の全体テストの報告にあった `authenticode_check` の 10 件の失敗は、担当のテスト木に `tools/` が無かったことによるもので、PM の木では出ない。
 
 判断:
 

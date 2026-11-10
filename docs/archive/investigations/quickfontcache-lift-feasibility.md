@@ -1,6 +1,6 @@
 # quickfontcache_x64.dll を 3 つ目のモジュールとして lift できるか（実現性調査）
 
-実行日: 2026-10-24。HEAD: 作業開始時 `f8b5e6df`、文書作成時 `27c8068`（この間に `lift/crates/*/src` と `imports_table.rs` は変わっていない。`git diff f8b5e6d HEAD -- 'lift/crates/*/src'` と作業ツリーの `git diff` がどちらも空。測定に使ったバイナリは 03:19 のビルド）。**調査のみ。この文書は何も決めない**（決定が要る点は §8、意見は §9 に別枠）。fe-lift・fe-decode・fe-pe のソース、`lift/runtime`、`docs/decisions`、既存のテスト、既存の docs は編集していない。新規ファイルはこの文書と `lift/out-qfc/`（`.gitignore` の `lift/out*/` で追跡されない）の下だけ。
+実行日: 2026-10-24。HEAD: 作業開始時 `f8b5e6df`、文書作成時 `27c8068`（この間に `lift/crates/*/src` と `imports_table.rs` は変わっていない。`git diff f8b5e6d HEAD -- 'lift/crates/*/src'` とワークツリーの `git diff` がどちらも空。測定に使ったバイナリは 03:19 のビルド）。**調査のみ。この文書は何も決めない**（決定が要る点は §8、意見は §9 に別枠）。fe-lift・fe-decode・fe-pe のソース、`lift/runtime`、`docs/decisions`、既存のテスト、既存の docs は編集していない。新規ファイルはこの文書と `lift/out-qfc/`（`.gitignore` の `lift/out*/` で追跡されない）の下だけ。
 
 背景は `registry-unit153.md` §6.3（FLEngine の unit 158 が `quickfontcache_x64.dll` の `LoadLibraryW` で止まる）、`loadlibrary-names-classification.md` §2.2 #5・§6.2、決定 0073（dsp_ippv2 を「無い」と定義せず 2 つ目のモジュールとして lift）、0080（基底 0x2000000、ファイル段階のリベース）、0081、0082。先例は `dsp-ippv2-lift-feasibility.md`、`blend2d-lift-feasibility.md`（HEAD に入っているもの。読み取りだけ）、`dll-nonpdata-reloc-seeds.md`。
 
@@ -359,7 +359,7 @@ FLEngine で `QuickFontCache` の文字列を持つのは、DLL 名 `QuickFontCa
 
 ## 7. 比較表（項目 7）
 
-dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdata-reloc-seeds.md`、`blend2d-lift-feasibility.md` §3.2・§10.1 にある数（dsp_ippv2 は決定 0075〜0079 の後の値で、Blend2D の調査が同じ作業ツリーで測り直したもの。functions 32,648 など）を引いた（再測定していない。**他者の実測**）。Blend2D は HEAD（`47118ac`）に入っている調査文書の数。QFC は今回の実測。
+dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdata-reloc-seeds.md`、`blend2d-lift-feasibility.md` §3.2・§10.1 にある数（dsp_ippv2 は決定 0075〜0079 の後の値で、Blend2D の調査が同じワークツリーで測り直したもの。functions 32,648 など）を引いた（再測定していない。**他者の実測**）。Blend2D は HEAD（`47118ac`）に入っている調査文書の数。QFC は今回の実測。
 
 | 項目 | quickfontcache_x64.dll | Blend2D.dll | dsp_ippv2_x64.dll | 区分 |
 |---|---|---|---|---|
@@ -483,7 +483,7 @@ dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdat
 - FLEngine 側（読み取り・逆アセンブルのみ）: `fle/`（`f_665bd0.txt`、`f_66d050.txt`、`f_66cfa0.txt`、`f_668d30.txt`、`refs-*.txt`、`reach-*.txt`、`xrefs-export-names.txt`、`index.tsv` ほか）。
 - スクリプト（`py/`。すべて読み取り専用。`PYTHONDONTWRITEBYTECODE=1`）: `qfc_peinfo.py`、`qfc_imports.py`、`qfc_callsites.py`、`qfc_loadsites.py`、`qfc_dump.py`、`qfc_graph.py`、`qfc_graph_union.py`、`qfc_rev.py`、`qfc_cfuncs.py`、`qfc_feat.py`、`qfc_mix.py`、`qfc_nonpdata.py`、`qfc_leafcand.py`、`qfc_strings.py`、`fle_dump.py`、`fle_xrefs.py`、`fle_refs.py`、`fle_reach.py`、`fle_index.py`。再利用（読み取りのみ）: `lift/out-loadlib/llpe.py`、`units.tsv`、`edges-direct.tsv`、`edges-ptr.tsv`、`lift/out-blend2d/b2d_impclass.py`、`b2d_nsis_ctx.py`、`lift/out-ext/ipp_names.txt`、`lift/out-design/tools/wasm_locals.py`、`lift/out-blend2d/blend2d-pdata.c`（Blend2D の生成 C。`qfc_feat.py` の比較のために読んだ）。
 
-## 12. 作業ツリーの確認（規則への適合）
+## 12. ワークツリーの確認（規則への適合）
 
 完了時（HEAD `27c8068`）の `git status --short` と `git diff --stat`:
 
@@ -511,6 +511,6 @@ dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdat
 
 - **この作業が追跡ファイルを変更したものは 0 件**。新規は `docs/investigations/quickfontcache-lift-feasibility.md`（この文書。`??`）だけで、`lift/out-qfc/` は `.gitignore` の `lift/out*/` で `git status` に出ない。
 - 上の `M` の 5 件と `??` の `docs/decisions/0085-hklm-software-initial-key.md` は**並行して走っている別の作業**（決定 0085。`HKLM\Software` の初期キー。`registry-unit153.md` の続き）のもので、この作業のものではない。`lift/harness/wasm/trace*.c.new` と `lift/iat-unsup-closure.txt` は作業開始時から未追跡で残っていたもの（最初の `git status` に出ていた）。
-- 作業中に HEAD は `f8b5e6d` から `27c8068` に進んだ（他者のコミット `47118ac`（Blend2D の調査）、`d43db3e`（決定 0079 の訂正）、`27c8068`（決定 0084））。`lift/crates/*/src` と `imports_table.rs` は `f8b5e6d` から HEAD と作業ツリーまで**変更なし**（`git diff` が空）なので、測定したバイナリの前提は変わっていない。runtime は決定 0084 などで変わったが、この文書の runtime の記述（`fle_modules.c` の 30 名、`fle_load_absent[]` の 9 名、`fle_host.c` の 1 範囲）は文書作成時の HEAD で読み直して確かめた。
+- 作業中に HEAD は `f8b5e6d` から `27c8068` に進んだ（他者のコミット `47118ac`（Blend2D の調査）、`d43db3e`（決定 0079 の訂正）、`27c8068`（決定 0084））。`lift/crates/*/src` と `imports_table.rs` は `f8b5e6d` から HEAD とワークツリーまで**変更なし**（`git diff` が空）なので、測定したバイナリの前提は変わっていない。runtime は決定 0084 などで変わったが、この文書の runtime の記述（`fle_modules.c` の 30 名、`fle_load_absent[]` の 9 名、`fle_host.c` の 1 範囲）は文書作成時の HEAD で読み直して確かめた。
 - 規則: `rm` を使っていない。既存ファイルの全体上書き（`>`）は無い（新規ファイルへの `>` と `create_new` の書き出しだけ。`lift/out-qfc/logs/nonpdata.txt` は修正前のスクリプトの出力で、修正後は別名 `nonpdata-strict.txt` に保存した。前者は「不正バイトを検出できない設定」の出力なので結論に使っていない）。git の変更系操作は無い（`rev-parse`、`log`、`status`、`diff` のみ）。`/tmp` は使っていない（`TMPDIR=lift/out-qfc/tmp`）。コマンドに `sleep`、`timeout`、`nohup`、末尾の `&` は無い。emcc と wasm は使っていない。2 GB 級のファイルは作っていない（最大の保存物は `lift/out-qfc/target/`（ビルドの成果物）と `fle/index.tsv`（FLEngine の線形走査の索引 435,383 行）。`lift/out-qfc` の合計は約 52 MB）。python の名前は標準ライブラリと衝突しない（`qfc_*.py`、`fle_*.py`）。`lift/out-cs/` を cwd にしていない。`__pycache__` は作っていない。
 

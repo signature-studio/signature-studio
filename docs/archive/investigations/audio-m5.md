@@ -20,7 +20,7 @@
 
 ## 1. 手順
 
-作業は `/tmp/opencode/aud/work/`(RAM)。スクリプトは `docs/investigations/audio-m5/` に複写した。**ビルド・実行・git の変更系操作はしていない**。
+作業は `/tmp/opencode/aud/work/`(RAM)。スクリプトは `docs/investigations/audio-m5/` にコピーした。**ビルド・実行・git の変更系操作はしていない**。
 
 1. `scan_audio_sites.py`: import(通常と遅延)の IAT スロットを引き、`.text` の `FF 25`(thunk)、`E8/E9 rel32` が thunk に向かうもの、`FF 15` を拾い、`.pdata` の関数に属するかと、関数の先頭からの capstone 線形掃引で命令境界に一致するかを検査する(`docs/investigations/thread-model/scan_sites.py` と同じ方法。**対象 API の集合を音声・COM・レジストリ・待ち系に広げた**)。出力は `api-sites.tsv`(FLEngine、488 行)、`bundled-dll-sites.tsv`(同梱 5 DLL、153 行)、`api-summary.tsv`。`make_tables.py` が表を再生成する(同一出力を確認)。
 2. `fdis.py`(関数単位の逆アセンブル、IAT 呼び出しと短い文字列の注釈、`--vcalls` で `call [reg+disp]` 一覧)、`xref_str.py`(文字列とその `lea` 参照)、`xref_data.py`(データ番地への rip 相対参照、全関数を capstone で掃引)、`callers.py`(直接呼び元)、`funclist.py`、`mustpass.py`(関数内の基本ブロック CFG で「ある呼び出しが関数の全経路上にあるか」を判定。例外経路は模していない)。

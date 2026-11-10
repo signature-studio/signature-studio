@@ -2,12 +2,12 @@
 
 状態: **仮の決定(すべての選択)**。依頼は PM(番号 0172 は PM の割り当て、仮)。調査・実装・測定・文書は作業者(`rz1`、2026-11-03 10:39〜)。HEAD **b07659a** の `git archive`(`lift docs`)に対する差分 `rz1.diff`(runtime、テスト、道具)と `rz1-wasmgen.diff`(fe-wasmgen。新ファイル中心)。**生成 C は変わらない**(`lift/crates/fe-lift` は無変更。FLEngine の生成 C の SHA-256 は `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B))。**実機 Windows との照合は 0 件**(この作業が示すのは『ホスト CPU の実命令と同じ』と『従来の整数実装と同じ』で、ゲストの正しさではない)。
 
-区分の凡例は決定 0143・0154 と同じ。**実測**＝このセッションのコマンドの出力を見た事実(この機械の値。16 コア、他の担当 6〜7 本と自分の差分試験・ビルドが稼働していて load は 12〜46 だった)。**計算**。**読み**＝確かめていない解釈。**未確認**。**出典なしの選択**＝名前つき(`S-rz1-…`、§9 に撤回条件つき)。
+区分の凡例は決定 0143・0154 と同じ。**実測**＝このセッションのコマンドの出力を見た事実(この機械の値。16 コア、他の担当 6〜7 本と自分の差分テスト・ビルドが稼働していて load は 12〜46 だった)。**計算**。**読み**＝確かめていない解釈。**未確認**。**出典なしの選択**＝名前つき(`S-rz1-…`、§9 に撤回条件つき)。
 
 ## 0. 先に書くこと(進捗の誠実性)
 
 **(1) 実エンジンが実行された事実(実測)**: lift した **Serum2.vst3**(サードパーティの VST3、`binaries` の PE を fe-lift で C にして clang -O2 で native 実行する vst3a のハーネス。決定 0165)を、この決定の runtime でビルドし直して実際に実行した。状態 3(FLP から取り出した実パッチ)、保持した C4 1 音、4096 フレーム/ブロック × 40 ブロック。Serum 2 は process の頭で MXCSR=0xffc0(FTZ|DAZ|RC=3|全例外マスク)にして終わりで 0x1f80 に戻す。この条件で新旧の `out_hash` が一致(ビット同一)。**FLEngine_x64.dll(FL Studio 本体)の 16 スナップ**: 実エンジンを実行した: FLEngine の native 16 スナップ(`cmp-short.g3`、FRUITY 有効、全 92 ユニット -O2 + この決定の runtime)の面 SHA・窓表・クロック・進捗 143 行が基準の digest と**完全に一致**(§4)。
-**(2) 代役・再生・推測が含まれる範囲**: Serum 2 の実行は vst3a の代役(Direct2D/DirectWrite の失敗応答、音色データの一部の仮想ボリュームなど。決定 0165 §5)の上での実行で、**進捗の到達ではない測定**。差分試験は、ホスト CPU の実命令との比較(乱数と端の値。ゲストの実演算ではない)と、Serum 2 の遅い経路に落ちた演算のオペランドの再生(§3 の `replay128`。値の再生で画面・音の再生ではない)。wasm の数字は node(V8)のもの。
+**(2) 代役・再生・推測が含まれる範囲**: Serum 2 の実行は vst3a の代役(Direct2D/DirectWrite の失敗応答、音色データの一部の仮想ボリュームなど。決定 0165 §5)の上での実行で、**進捗の到達ではない測定**。差分テストは、ホスト CPU の実命令との比較(乱数と端の値。ゲストの実演算ではない)と、Serum 2 の遅い経路に落ちた演算のオペランドの再生(§3 の `replay128`。値の再生で画面・音の再生ではない)。wasm の数字は node(V8)のもの。
 
 ## 先に結論(実測)
 
@@ -75,30 +75,30 @@ packed(`ps` 4 レーン、`pd` 2 レーン)はclang のベクトル拡張(`fle_v
 - f32 の mul/div/sqrt は double の積・余りが厳密なので、最も軽い。
 - 表引き+RC ごとの関数にしたのは、RC を定数にして 1 ulp のステップを 1 つの式にするため(RZ は『符号が逆なら −1』の 3 命令)。呼び出し点への展開(`FLE_MXR_DIRECT`)は、トランポリンの約 10 命令を減らす代わりに呼び出し点ごとに約 15 命令増える(opt-in)。
 
-## 3. 一致(核): ホスト CPU の実命令との差分試験
+## 3. 一致(核): ホスト CPU の実命令との差分テスト
 
-道具: `lift/harness/fp1/mxfp_diff.c`(決定 0143・0154 の差分試験)に副コマンドを足した。ホスト CPU の実命令は `crates/fe-lift/tests/ref/fle_mxcsr_flags_host.h`(`ldmxcsr` で RC・FTZ・DAZ を設定し、全例外をマスクして実行、`stmxcsr` で旗を読む)。比べるのは結果の XMM 128 ビット・汎用レジスタ・MXCSR 全体・COMIS の旗 6 つ。
+道具: `lift/harness/fp1/mxfp_diff.c`(決定 0143・0154 の差分テスト)に副コマンドを足した。ホスト CPU の実命令は `crates/fe-lift/tests/ref/fle_mxcsr_flags_host.h`(`ldmxcsr` で RC・FTZ・DAZ を設定し、全例外をマスクして実行、`stmxcsr` で旗を読む)。比べるのは結果の XMM 128 ビット・汎用レジスタ・MXCSR 全体・COMIS の旗 6 つ。
 
-| 試験 | 内容 | 結果 |
+| テスト | 内容 | 結果 |
 |---|---|---|
 | `rc`(核) | 全演算 × RC=1,2,3 × FTZ/DAZ 4 通り = 12 組。MXCSR は全マスク、PE は 90% で既立ち、旗は 1/8 でランダム。オペランドは窓の縁・端の値・丸め境界・2^24/2^53 超・非正規・Inf・NaN を含む(既存の生成器)。ホスト CPU の実命令と比較 | 46 演算 × RC 3 × FTZ/DAZ 4 = 12 組、合計 **25,200,000,000 件、不一致 0**(`tables/difftest-native-rc.tsv`、組ごとの件数は `logs/difftest/rc-*.txt`、`logs/difftest3/rc-*.txt`)。**10^8 件/組(= 1.2×10^9 件/演算)の演算: addps・addsd・addss・cvtsd2ss・divsd・mulps・mulsd・mulss・subpd・subsd・subss**。その他は 2.5×10^7 件/組(= 10^8 件/演算・RC)以上 |
 | `mxall` | RC(4)× FTZ × DAZ × 5 つのマスク × PM × PE の既立ち = 1,024 状態の MXCSR。新 と 従来の整数実装で『同じ結果・同じ abort』。全マスクの状態ではホスト CPU も | `TOTAL mxall cases 129024000 host_cases 4032000 path_hits 35023751 aborts 48632516 mismatches 0`(各演算 × 1,024 状態 × 3,000 件、新と従来の整数実装で 同じ結果・同じ abort。ホスト CPU は全マスクの状態のみ) |
 | `rand`(既存) | 全演算、MXCSR は既定 35%・FTZ/DAZ 20%・RC≠0 16%… の混合、新 / nofast / 従来 / ホスト。ガード違反の計数(ベクトル経路・RC 経路は PE と PM が要る) | `TOTAL rand cases 91800000 mismatches 0 guard_violations 0` |
 | `unmasked`(既存) | マスクをランダムにして、旗が立つときの abort が従来と同じ | `TOTAL unmasked cases 26100000 aborts 5550497 mismatches 0` |
 | `grid32`(既存) | float の符号 × 指数 256 × 仮数 24 クラスの全組み合わせ(stride 4) | `TOTAL grid32 cases 415358976 mismatches 0` |
-| wasm(node、`emcc -O2` と `-Oz`)の `rc` | 同じ試験を wasm にして、従来の整数実装(ホスト CPU の実命令は wasm にない)と比較。`-msimd128` ありも | O2: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`、Oz: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`(2.5×10^6 件/組 = 10^7 件/演算・RC、従来の整数実装と比較)。`-msimd128` ありの O2: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`。最終既定(wasm は変換の slow を展開)の Oz 再試験: 1.656×10^8 件で不一致 0 |
+| wasm(node、`emcc -O2` と `-Oz`)の `rc` | 同じテストを wasm にして、従来の整数実装(ホスト CPU の実命令は wasm にない)と比較。`-msimd128` ありも | O2: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`、Oz: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`(2.5×10^6 件/組 = 10^7 件/演算・RC、従来の整数実装と比較)。`-msimd128` ありの O2: `TOTAL rc cases 1380000000 mismatches 0 low_coverage 0`。最終既定(wasm は変換の slow を展開)の Oz 再テスト: 1.656×10^8 件で不一致 0 |
 | 建て方の行列 | `-O0 -O2 -Oz -O3`、`-O3 -march=native -ffp-contract=fast`(FMA あり)、`-DFLE_MXV_LANES=1`、`-DFLE_MXV_SLOWBYVAL=1`、`-DFLE_MX_FAST_CTL=0xE040u`(厳格な守り)、`-DFLE_MXR_STATIC`、`-DFLE_MXR_DIRECT`、gcc(packed は整数経路に落ちる)。各 `rc` 全演算 × 12 組 × 2 万件 + `rand` | 不一致 0(`logs/matrix.txt`) |
 | Serum 2 のオペランドの再生(`replay128`) | process 1 ブロックで遅い経路に落ちた演算(算術・cvtsd2ss・cvttsd2si64・cvttss2si32・cvtsd2si32)の実オペランドを gdb で 29 回に 1 回採って、記録した MXCSR のまま(と PE 既立ちで)新・従来・ホスト CPU に流す | `TOTAL serum cases 109200 mismatches 0`(54,600 件の実オペランド〔addps 17,716、mulps 16,442、cvtsd2ss 3,975、addsd 3,805、mulss 2,904、mulsd 2,455、addss 1,887、subsd 1,837、cvttsd2si64 1,724、cvttss2si32 865、subss 613、subps 301、subpd 71、divsd 4、divss 1〕を、記録した MXCSR〔0xffe4 = RC=3・FTZ・DAZ・PE|ZE 既立ち〕の旗を消した状態と PE 既立ちの状態の 2 通りで)。**PE 既立ちの状態では 全演算が RC 経路・ベクトル経路に入った(窓の外れ 0)** |
 | wasm の補助関数(`rc_helpers`) | `rcgen.rs` の 4 関数を node で、ホスト CPU の実命令(add/sub/mul、f32・f64、RC 3 通り、FTZ/DAZ ランダム)と比較(各 300 万件) | 不一致 0、窓の判定の不一致 0(`tables/wasm-helpers.txt`) |
 | 変異検査(`mutate.py`、27 件) | step の向き、ゼロの符号、TwoSum/TwoProduct の項、除数の符号、split 定数、窓の拡大、変換の誤差の符号、f2i の floor/ceil、守りの PE/PM を外す … | `MUTANTS built 27 caught 25`(未検出は窓の縁を変える 2 件:結果が同じで経路だけが変わる等価な変異。ゼロを窓に入れない) |
 
-**RC 経路に入る率**(`rc` の rc_hit。窓の外・守りの外を含む乱数なので、実走行の率ではない): 算術 20〜68%、変換 10〜93%。窓の外のケースは従来の整数実装で同じ結果になる(同じ試験でそれも比べている)。
+**RC 経路に入る率**(`rc` の rc_hit。窓の外・守りの外を含む乱数なので、実走行の率ではない): 算術 20〜68%、変換 10〜93%。窓の外のケースは従来の整数実装で同じ結果になる(同じテストでそれも比べている)。
 
 ## 4. 既存のテストと不変の確認
 
 | 項目 | 結果 |
 |---|---|
-| 全体テスト(`harness/test.sh full --jobs 2`、この木、`FLE_INPUT_ROOT` は主チェックアウト) | `harness/test.sh full --jobs 2`(この木、キャッシュなし)**results=154、passed=2,121、failed=0**(基準 153 / 2,119 / 0〔決定 0164 後〕に、新規の `fe-wasmgen/rc_helpers` 1 results・2 件が加わった)。SKIPPED-lines=15 は作業木に `lift/out-*` の入力が無かったため(基準は 1)。入力を `harness/test-env.sh --link` でリンクし、skip した 10 の実行ファイルと runtime を直接建てる `mxcsr_flags`・`wall_fr18`・`fe-wasmgen` を `--fresh` で再実行: 18 実行ファイル、results=22、passed=209、failed=0、**SKIPPED-lines=0**(`logs/test-full.txt`、`logs/test-linked.txt`)。所要は 708 s(負荷 25〜40) |
+| 全体テスト(`harness/test.sh full --jobs 2`、この木、`FLE_INPUT_ROOT` は主チェックアウト) | `harness/test.sh full --jobs 2`(この木、キャッシュなし)**results=154、passed=2,121、failed=0**(基準 153 / 2,119 / 0〔決定 0164 後〕に、新規の `fe-wasmgen/rc_helpers` 1 results・2 件が加わった)。SKIPPED-lines=15 はワークツリーに `lift/out-*` の入力が無かったため(基準は 1)。入力を `harness/test-env.sh --link` でリンクし、skip した 10 の実行ファイルと runtime を直接建てる `mxcsr_flags`・`wall_fr18`・`fe-wasmgen` を `--fresh` で再実行: 18 実行ファイル、results=22、passed=209、failed=0、**SKIPPED-lines=0**(`logs/test-full.txt`、`logs/test-linked.txt`)。所要は 708 s(負荷 25〜40) |
 | fe-lift の `mxcsr_flags`(ホスト CPU との比較。runtime のヘッダを直接建てる) | 11 件通過 |
 | a4 FRUITY 無効(`harness/a4-multi.sh`、5 モジュール、この木の runtime) | init_count **942/942**、run_rank **895/895**、functions **5,310**、entries **1,009,731**、`returned from entry`(`logs/a4-off-rz1.txt`) |
 | FLEngine の生成 C の SHA-256(この木で建てた `fe-lift lift FLEngine_x64.dll --pdata`) | `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`、215,811,678 B(期待値と同じ) |
@@ -107,7 +107,7 @@ packed(`ps` 4 レーン、`pd` 2 レーン)はclang のベクトル拡張(`fle_v
 
 ## 5. Serum 2 の実 process(核)
 
-**測定の対**: 同じ木(b07659a の runtime + 本パッチ)で、`-DFLE_MX_NORC` の有無だけを変えた 2 つの native -O2 ビルド(vst3a の `build_vst3a_native.sh` を `LIFT=この木` で。生成 C は vst3a の `src/s2g-*.c`、clang -O2、JOBS=1)。旧 = `-DFLE_MX_NORC`(決定 0154 の runtime と同じ守りと窓・変換・比較。違いは `fle_mx_do2_slow_p` の引数が (op, f64, scalar, …) から id 1 つになっただけで、中身は従来の整数実装)。ハーネスは vst3a の `--blocks 40 --note --state N`(保持した C4 1 音、4096 フレーム/ブロック)。交互に走らせ(状態 3 は 5 往復 + 3 往復、他は 2 往復)、`cpu_ms_min`(median)。この機械、load 21〜35(他の担当が稼働)。**測ったビルドは最終の木の一つ前の凍結版**で、最終との差は、コメント、`fle_mxcsr_vec.h` 内の共有ブロックの位置、守りを `FLE_MXV_NP0X` で書き直した箇所(既定の `FLE_MX_FAST_CTL` では同値)、wasm で変換の slow を展開する既定、opt-in の `FLE_MXR_DIRECT` だけ(native の既定のコードは同じ。最終の木でも差分試験・全体テスト・a4 は通した)。
+**測定の対**: 同じ木(b07659a の runtime + 本パッチ)で、`-DFLE_MX_NORC` の有無だけを変えた 2 つの native -O2 ビルド(vst3a の `build_vst3a_native.sh` を `LIFT=この木` で。生成 C は vst3a の `src/s2g-*.c`、clang -O2、JOBS=1)。旧 = `-DFLE_MX_NORC`(決定 0154 の runtime と同じ守りと窓・変換・比較。違いは `fle_mx_do2_slow_p` の引数が (op, f64, scalar, …) から id 1 つになっただけで、中身は従来の整数実装)。ハーネスは vst3a の `--blocks 40 --note --state N`(保持した C4 1 音、4096 フレーム/ブロック)。交互に走らせ(状態 3 は 5 往復 + 3 往復、他は 2 往復)、`cpu_ms_min`(median)。この機械、load 21〜35(他の担当が稼働)。**測ったビルドは最終の木の一つ前の凍結版**で、最終との差は、コメント、`fle_mxcsr_vec.h` 内の共有ブロックの位置、守りを `FLE_MXV_NP0X` で書き直した箇所(既定の `FLE_MX_FAST_CTL` では同値)、wasm で変換の slow を展開する既定、opt-in の `FLE_MXR_DIRECT` だけ(native の既定のコードは同じ。最終の木でも差分テスト・全体テスト・a4 は通した)。
 
 | 状態 | 旧 min(median) ms | 新 min(median) ms | 比(min) | out_hash(新旧同一・vst3a の基準と一致) |
 |---|---|---|---|---|
@@ -236,20 +236,20 @@ wasm の RC=3 / RC=0 は scalar の add/sub/mul で約 3〜4.5 倍(div 約 2 倍
 
 ## 8. wasm 側(直接 wasm 生成部 fe-wasmgen。`rz1-wasmgen.diff`、作れた範囲)
 
-**C 経路の wasm**(本決定の runtime。`emcc -O2`/`-Oz`、`-msimd128` なし〔出荷の構成〕と あり)は、上の差分試験(node)と §6 のマイクロベンチで測った。**直接 wasm 生成部(`mx_form` の窓)は RC≠0 に対応していない**(窓の守りが RC=0・PE・PM で、外れると C 経路の関数 `fle_hyb_mx` を呼ぶ)。したがって RC≠0 のとき、スカラの add/sub/mul/div/sqrt の直接 wasm の関数も、**窓を外れた C 呼び出しの先で本決定の C 経路が速くなる**だけ。packed の形は元々直接 wasm 生成部の対象外(`mx_form` が『MXCSR の窓の規則がない』として関数を C 経路に残す)なので、Serum 2 の支配的な packed `addps/mulps`(RC≠0 の命令の約 70%)は C 経路の本決定の経路で走る。
+**C 経路の wasm**(本決定の runtime。`emcc -O2`/`-Oz`、`-msimd128` なし〔出荷の構成〕と あり)は、上の差分テスト(node)と §6 のマイクロベンチで測った。**直接 wasm 生成部(`mx_form` の窓)は RC≠0 に対応していない**(窓の守りが RC=0・PE・PM で、外れると C 経路の関数 `fle_hyb_mx` を呼ぶ)。したがって RC≠0 のとき、スカラの add/sub/mul/div/sqrt の直接 wasm の関数も、**窓を外れた C 呼び出しの先で本決定の C 経路が速くなる**だけ。packed の形は元々直接 wasm 生成部の対象外(`mx_form` が『MXCSR の窓の規則がない』として関数を C 経路に残す)なので、Serum 2 の支配的な packed `addps/mulps`(RC≠0 の命令の約 70%)は C 経路の本決定の経路で走る。
 
 試作として `crates/fe-wasmgen/src/rcgen.rs`(新規)に、スカラの RC≠0 用の wasm 補助関数 4 つを作った(`rc_addsub64`、`rc_mul64`、`rc_addsub32`、`rc_mul32`。引数 `(a, b, rc)`、結果 `(ビット列, 窓の内か)` の多値)。本体は C の `fle_mxrc_*` と同じ式(TwoSum/Dekker/二重積)を wasm の命令で出したもの。`tests/rc_helpers.rs` が node で実行し、ホスト CPU の実命令と比べる: 各 300 万件(RC 3 通り、FTZ/DAZ ランダム、add と sub、窓の内外)で不一致 0・窓の判定の不一致 0(`tables/wasm-helpers.txt`)。補助関数 1 回の費用(node、wasm のループで `f64.add` 1 命令の同じループと比べる): `f64.add` 1 命令だけのループ 1.0 ns に対し、補助関数(窓の検査込み)の add は RC=1 で 4.0 ns・RC=3 で 3.8 ns、mul は 3.6・3.4 ns(3 回の実行で ±0.05 ns。ループは operand の生成を含むので補助関数の正味は約 2.5〜3 ns。C 経路の wasm -O2 の RC=3 は addsd 5.6 ns・mulsd 6.0 ns〔§6、nop 差引〕で、約 2 倍)。`lower.rs` へは繋いでいない(hyb1 が同じファイルを編集中)。繋ぐ手順:
 1. `lib.rs` の補助関数の追加箇所(`mulhu` と同じ所)で `rcgen::add_rc_helpers(&mut module)` を呼び、返った関数インデックスを `Ctx`(または `static` の `OnceLock`)に持たせる。
 2. `lower.rs` の `mx_guard_refresh` に、守り『RC≠0 かつ PE が立ち PM がマスク』(`(mx & 0x1020) == 0x1020 && (mx & 0x6000) != 0`)の局所変数 `mx_rcg` と、RC の値の局所変数を足す。
 3. `mx_form` の `W::Arith`(addss/addsd/subss/subsd/mulss/mulsd)の『else』側(窓の外か守りの外で `mx_slow` を呼ぶ前)で、`mx_rcg` のとき補助関数を呼ぶ(sub は第 2 オペランドの符号を反転して渡す)。結果が 1 なら `d` の下位レーンを書き、0 なら `mx_slow`。div と sqrt は補助関数を作っていない(C 経路)。
-4. 試験: OTT のパイロット(決定 0164)の `--mx-force-slow` と同様に、RC を 3 にした MXCSR で既存のハッシュ(4 シナリオ)が C 経路と一致することを確かめる。
+4. テスト: OTT のパイロット(決定 0164)の `--mx-force-slow` と同様に、RC を 3 にした MXCSR で既存のハッシュ(4 シナリオ)が C 経路と一致することを確かめる。
 これで呼び出し 1 回あたり、C 呼び出し(`fle_hyb_mx` の往復+本決定の C 経路)から補助関数 1 回(下の費用)になる。**繋いだ版の測定はない**。
 
 ## 9. 出典なしの選択(撤回条件つき)
 
 | 名前 | 内容 | 理由 | 撤回条件 |
 |---|---|---|---|
-| S-rz1-default | 既定で on(`-DFLE_MX_NORC` で戻す) | PM の判断(結果がビット同一な速度だけの変更) | 差分試験の不一致、生成コードの大きさが問題になったとき |
+| S-rz1-default | 既定で on(`-DFLE_MX_NORC` で戻す) | PM の判断(結果がビット同一な速度だけの変更) | 差分テストの不一致、生成コードの大きさが問題になったとき |
 | S-rz1-guard | 守りから RC を外した(PE が立ち PM がマスク)。FTZ・DAZ・他のマスクは見ない | 窓が非正規・tiny を除く。1,024 状態の確認(§3) | 窓が非正規を除かない形に変わったとき |
 | S-rz1-win64 | f64 の mul/div/sqrt の窓は 2^-400..2^400(add/sub は 2^±510) | Dekker の部分積が非正規になると誤差項が壊れる(`exp(a)+exp(b) ≥ -970`)。変異 M16 が窓を 2^520 にすると検出される | Serum 2 のオペランドに 2^-510..2^-400 が多いと分かったとき(窓の外れの計数 `fle_mx_rcstat[2]` で見る) |
 | S-rz1-table | トランポリン+表+命令×RC ごとの関数 | 呼び出し点のコードを増やさずに、RC を定数にできる | `FLE_MXR_DIRECT`(呼び出し点から表を呼ぶ。コード増) |
@@ -264,7 +264,7 @@ wasm の RC=3 / RC=0 は scalar の add/sub/mul で約 3〜4.5 倍(div 約 2 倍
 
 ## 10. PM が決めること
 
-1. **既定 on の最終確認**(PM の条件: ≥10^8 件/組の本走行で mismatch 0〔§3〕、全体テスト・a4 FRUITY 無効・FLEngine の生成 C の SHA-256 不変、16 スナップの面 SHA 不変〔native〕〔§4〕)。**すべて満たした**: 16 スナップ 143 行が基準の digest と完全一致(FLEngine の全 92 ユニットを native -O2 で建て直して実行)。RC=0 の既定の動作が変わるのは『切り捨て変換の窓が広がる』『COMIS の守りから RC が外れる』『呼び出しの形がトランポリン経由になる』の 3 点で、差分試験・a4・16 スナップのいずれも同一。
+1. **既定 on の最終確認**(PM の条件: ≥10^8 件/組の本走行で mismatch 0〔§3〕、全体テスト・a4 FRUITY 無効・FLEngine の生成 C の SHA-256 不変、16 スナップの面 SHA 不変〔native〕〔§4〕)。**すべて満たした**: 16 スナップ 143 行が基準の digest と完全一致(FLEngine の全 92 ユニットを native -O2 で建て直して実行)。RC=0 の既定の動作が変わるのは『切り捨て変換の窓が広がる』『COMIS の守りから RC が外れる』『呼び出しの形がトランポリン経由になる』の 3 点で、差分テスト・a4・16 スナップのいずれも同一。
 2. **packed のインライン化(`-DFLE_MXR_DIRECT`)を採るか**。命令数(`icount`)で RC=3/RC=0 は scalar 約 2.0 倍、packed 約 2.1 倍にまで来ており(§6)、残りのコストは窓の検査(約 20 命令)と TwoSum/ステップ(約 15 命令)で、呼び出しの 3 段ではない。DIRECT は 1 ユニット(s2g-03、5 MB)の native -O2 の text が 1,681,657 → 1,851,089 B(+10.1%、+169 KB)で、命令数は約 9% 減(addsd 90.3 → 82.2)。採らないことを勧める(Serum 2 の次に支配する物は §7)。ただし scalar が支配する状態 1・5 ではトランポリンが 6.6% を占めるので、その状態を重視するなら再検討の余地がある。
 3. **fe-wasmgen の補助関数を `lower.rs` に繋ぐか**(§8)。hyb1 が `lower.rs` を編集中なので、取り込みの後に別の作業で。Serum 2 の RC≠0 の命令の約 70% は packed で、直接 wasm 生成部の対象外(C 経路)。繋いで効くのはスカラ約 30%(状態 3 の 1 ブロックで addsd 0.30M・mulss 0.23M・mulsd 0.19M・addss 0.15M・subsd 0.15M ほか 約 106 万命令)で、1 命令あたり 約 3 ns(補助関数の正味 約 2.8 ns と C 経路の wasm の約 5.6〜6.0 ns の差)≒ 約 3 ms/ブロック(推定、繋いだ版は未測定)。scalar が支配する状態 1・5 ではもっと効く。
 4. **次の P3 の手**: §7 の内訳。
@@ -276,7 +276,7 @@ wasm の RC=3 / RC=0 は scalar の add/sub/mul で約 3〜4.5 倍(div 約 2 倍
 - FLEngine の 16 スナップの基準は fplow1(決定 0154)の旧 runtime の run の digest で、同じ木の `-DFLE_MX_NORC` の run との比較ではない(HEAD の他の決定の影響があれば不一致になるはずだが一致した)。FLEngine の wasm 実行・Chrome は未実施。
 - **Serum 2 の測定は native のみ**(wasm の Serum 2 は走らせていない)。状態は 0・1・3・4・5(2 は 800 ms 超で除外)、1 インスタンス。6 インスタンスは未測定。vst3a の代役(Direct2D/DirectWrite の失敗応答など)の上。
 - 速さはこの機械(16 コア、load 15〜35、他の担当 6〜7 本が稼働)の値で、CPU 時間の最小/中央値。ns/命令は ±30%。命令数(ptrace の単一ステップ)は負荷に依らない。依頼者の機械の値ではない。
-- wasm は node(V8)のみ。Chrome・Firefox・Safari は未測定。`-msimd128` ありの wasm は差分試験と micro のみ(Serum は走らせていない)。
+- wasm は node(V8)のみ。Chrome・Firefox・Safari は未測定。`-msimd128` ありの wasm は差分テストと micro のみ(Serum は走らせていない)。
 - gcc では packed の RC 経路が無効(整数実装に落ちる。結果は同じ)。ARM などの非 x86 ホストは未確認(IEEE 754 最近接偶数の host 演算に依存。x86-64 SSE と wasm で確認)。
 - 窓の外の f64 mul/div/sqrt(2^±400 の外、2^±510 の内)は RC≠0 では整数実装のまま(Serum 2 の実オペランド 54,600 件では、PE 既立ちの状態で窓の外れ 0〔§3〕)。
 - wasm の補助関数は `lower.rs` に繋いでいない(§8)。
@@ -284,12 +284,12 @@ wasm の RC=3 / RC=0 は scalar の add/sub/mul で約 3〜4.5 倍(div 約 2 倍
 
 ## PM 追記(取り込み時、2026-11-03)
 
-**取り込んだ範囲**: `rz1.diff`(runtime の MXCSR 経路、差分試験、道具。21 ファイル)と `rz1-wasmgen.diff`(fe-wasmgen の新ファイル `rcgen.rs`・`tests/rc_helpers.rs` と `lib.rs` の 1 行)。PM の検証: 両方の差分は HEAD 61aa1a4 に fuzz・offset・reject なしで当たる。適用後の `fe-lift` で FLEngine の生成 C を再生成した SHA-256 は `cd9107ce…`(215,811,678 B)で不変。全体テスト(`test.sh full --jobs 4`、81.7 秒): **155 results・2,131 passed・0 failed**(基準 154/2,129/0 + `fe-wasmgen/rc_helpers` 1 実行ファイル・2 テスト)、SKIPPED 1 行(wall_fr9t の既存)。a4 FRUITY 無効: init_count 942/942、run_rank 895/895、functions 5,310、entries 1,009,731(不変)。
+**取り込んだ範囲**: `rz1.diff`(runtime の MXCSR 経路、差分テスト、道具。21 ファイル)と `rz1-wasmgen.diff`(fe-wasmgen の新ファイル `rcgen.rs`・`tests/rc_helpers.rs` と `lib.rs` の 1 行)。PM の検証: 両方の差分は HEAD 61aa1a4 に fuzz・offset・reject なしで当たる。適用後の `fe-lift` で FLEngine の生成 C を再生成した SHA-256 は `cd9107ce…`(215,811,678 B)で不変。全体テスト(`test.sh full --jobs 4`、81.7 秒): **155 results・2,131 passed・0 failed**(基準 154/2,129/0 + `fe-wasmgen/rc_helpers` 1 実行ファイル・2 テスト)、SKIPPED 1 行(wall_fr9t の既存)。a4 FRUITY 無効: init_count 942/942、run_rank 895/895、functions 5,310、entries 1,009,731(不変)。
 
 **決めたこと**:
-1. **既定 on を承認**。条件(1 組あたり 10^8 件以上の差分試験で不一致 0、全体テスト、a4、生成 C の SHA、16 スナップの面 SHA)は担当が満たし、PM がテストと a4 と SHA を再実測した。巻き戻しは `-DFLE_MX_NORC`(RC≠0 経路と、RC 非依存の 2 変更〔切り捨て変換の守り・COMIS の守り〕をまとめて切る)。
+1. **既定 on を承認**。条件(1 組あたり 10^8 件以上の差分テストで不一致 0、全体テスト、a4、生成 C の SHA、16 スナップの面 SHA)は担当が満たし、PM がテストと a4 と SHA を再実測した。巻き戻しは `-DFLE_MX_NORC`(RC≠0 経路と、RC 非依存の 2 変更〔切り捨て変換の守り・COMIS の守り〕をまとめて切る)。
 2. **`FLE_MXR_DIRECT` は採らない**(命令数 −9% の代わりに Serum の 1 ユニットで text +10.1%)。scalar が支配する状態 1・5 を重視する場合に再検討。
-3. **差分試験の基準はホスト CPU(Ryzen 9 9950X)の実命令**で、実機 Windows の命令との照合は 0 件。丸めと FTZ/DAZ の挙動が Intel と AMD で異なる箇所が無いことは、IEEE 754 と Intel SDM の範囲での読み。別の CPU での差分試験は未実施。
+3. **差分テストの基準はホスト CPU(Ryzen 9 9950X)の実命令**で、実機 Windows の命令との照合は 0 件。丸めと FTZ/DAZ の挙動が Intel と AMD で異なる箇所が無いことは、IEEE 754 と Intel SDM の範囲での読み。別の CPU での差分テストは未実施。
 4. **P3 の見方**: Serum 2 の状態 3 は 1 インスタンスで process 1 ブロック 約 34 ms(実時間 92.88 ms の約 36%)。ただし 4 音和音は 130.5 ms で実時間を超え、**native -O2 の値**。wasm の Serum 2 は未測定で、C 経路の wasm は native の 2〜3 倍以上かかると読む(OTT の C 経路 wasm -O2 は native -O2 builtin 9.5 ms に対し 9.92 ms と測っている〔決定 0164〕が、Serum の packed 経路では未測定)。次の測定: Serum 2 の C 経路 wasm を node と Chrome Worker で実測する。
 5. **fe-wasmgen の補助関数(`rcgen.rs`)の `lower.rs` への接続**は hyb1(決定 0169)の取り込み後に別作業とする(Serum の RC≠0 命令の約 70% が packed で、直接 wasm 生成の対象外のため効果は限定的〔担当の見積りで約 3 ms/ブロック、未測定〕)。
 6. 担当の自己申告(同時プロセス 6〜8、作業ディレクトリ一時 6.3 GB)は、PM の負荷規則への違反として記録する。成果物には影響しない。

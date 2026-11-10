@@ -4,7 +4,7 @@
 
 区分の凡例は決定 0123〜0129 と同じ。**実測**＝このセッションのコマンドの出力を見た事実。**読み**＝コードや出力からの解釈(走らせていない)。**未確認**。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者が選んだ値(`S-…`、撤回条件つき)。
 
-**肯定的に見せる点は限られる。** (1) 「入力 1 周」の入力は**ダイアログの OK ボタンとキーボード**で、押した先でゲストは**次の壁**(`user32!UpdateLayeredWindow`)まで進むだけで、FL Studio が使える状態には届いていない。(2) 項目 (5) の WM_TIMER は、**実エンジンが idle で持つ窓タイマーが 0**(ゲスト自身が 600 s のタイマーを起動直後に殺す)ため、**ホストが窓に付けた試験用タイマー**(`fle_win_host_timer`、ゲストの呼び出しではない)の配送時刻で示した。(3) wasm は **-Oz**(-O2 ではない)で、native は計装つき -O0。native が idle に着くのに約 53 秒、Chrome が約 18〜19 秒(node は idle までを測っていない。実行全体で 1 分 08 秒)。(4) 実エンジンの面の SHA は**同じ生成 C から作った同じ runtime の画素モデル**の結果の一致であり、Windows の GDI との一致ではない。(5) ウィザード上のオレンジの『Buy』ボタンへの押下は、ゲストが `WS_DISABLED` を付けた窓にあたり、**捨てられる**(S-disabled-drops。Learn の WindowFromPoint の頁を文字どおり読むと、捨てずに有効な祖先へ渡す読みもある)。(6) 全体テストの 1 回目は 4 件の期待値(他の決定の『この名前に行は無い』『フックは 4 個まで』の固定)の直し漏れで落ち、直して 2 回走らせた(9 節、13 節)。
+**肯定的に見せる点は限られる。** (1) 「入力 1 周」の入力は**ダイアログの OK ボタンとキーボード**で、押した先でゲストは**次の壁**(`user32!UpdateLayeredWindow`)まで進むだけで、FL Studio が使える状態には届いていない。(2) 項目 (5) の WM_TIMER は、**実エンジンが idle で持つ窓タイマーが 0**(ゲスト自身が 600 s のタイマーを起動直後に殺す)ため、**ホストが窓に付けたテスト用タイマー**(`fle_win_host_timer`、ゲストの呼び出しではない)の配送時刻で示した。(3) wasm は **-Oz**(-O2 ではない)で、native は計装つき -O0。native が idle に着くのに約 53 秒、Chrome が約 18〜19 秒(node は idle までを測っていない。実行全体で 1 分 08 秒)。(4) 実エンジンの面の SHA は**同じ生成 C から作った同じ runtime の画素モデル**の結果の一致であり、Windows の GDI との一致ではない。(5) ウィザード上のオレンジの『Buy』ボタンへの押下は、ゲストが `WS_DISABLED` を付けた窓にあたり、**捨てられる**(S-disabled-drops。Learn の WindowFromPoint の頁を文字どおり読むと、捨てずに有効な祖先へ渡す読みもある)。(6) 全体テストの 1 回目は 4 件の期待値(他の決定の『この名前に行は無い』『フックは 4 個まで』の固定)の直し漏れで落ち、直して 2 回走らせた(9 節、13 節)。
 
 ## 1. 先に結論
 
@@ -14,7 +14,7 @@
 | (2) ゲストの WndProc に WM_MOUSEMOVE / LBUTTONDOWN / LBUTTONUP / KEYDOWN として届く | **達成**。native と node(wasm)の C 側のトレース(`FLE_G3_TRACE=1`)は同一: `WM_MOUSEMOVE 0x200`(wp 0、lp 0x10000f = クライアント (15,16))、`WM_LBUTTONDOWN 0x201`(wp MK_LBUTTON 0x1)、`WM_LBUTTONUP 0x202`、すべて **lid 120 `TQuickFocusBtn`**(OK ボタン)へ。キーは `WM_KEYDOWN 0x100`(Space: wp 0x20 lp 0x390001、Enter: wp 0xd lp 0x1c0001)が lid 120 へ、`WM_KEYUP 0x101`(lp 0xc0390001 / 0xc01c0001)はダイアログが閉じた後のフォーカス窓 lid 48 `TWelcomeWizard` へ。ヒットテストは窓の矩形、NCHITTEST の答えは HTCLIENT(1)。時刻は仮想時計の 3,600,008 / 3,600,058 / 3,600,138 ms |
 | (3) ゲストが反応して窓表・面が変わる | **達成**。押下で OK ボタンが押された形に描き直される(lid 115 の面が変わる)。離すと **`TMsgForm "Error"`(lid 115)が窓表から消え**、主窓の題が "FL Studio" → "FL Studio 2026" になり、`TWelcomeWizard`(lid 48、874x570、(523,255)、有効)と `TMIDIForm "Settings - Audio devices / mixer"`(lid 22、668x900、(626,90)、無効)が現れる。主窓は無効のまま(ウィザードがモーダルなので)。ウィザードで Enter を押すとウィザードが閉じ、主窓・Settings・TApplication が**有効**になる(native で壁の位置に gdb で止めて読んだ窓表。その先は `UpdateLayeredWindow` の壁で止まる: 7 節) |
 | (4) 読み戻し SHA が入力前と違い、native の同じ入力列の SHA と等しい | **達成**。例: OK ボタンの面(lid 115)は移動後 `ddf0c73cef…` → 押下後 `3e74f6ca3e…`(入力なしの対照は同時刻で `16598b71c3…`)。窓が替わった後は lid 13 `c72502143a…`・lid 22 `48e40a0948…`・lid 48 `b34167ed1d…`(対照の lid 13 は `7b86253f86…`、lid 115 `1a7e63767c…` が残る)。**native ×2 / node ×2 / Chrome ×2 がクリック・Space・Enter・対照の 4 つの列のすべてのスナップショットで一致**(`logs/final-compare.txt`)。Chrome は canvas 読み戻しの SHA が Worker の送った RGBA の SHA と等しく(不一致 0)、native の SHA とも等しい(不一致 0、各 12〜16 枚)。本物の初回起動の idle(§6)でも node ↔ Chrome が全点一致 |
-| (5) WM_TIMER が仮想時計で等間隔、配送時刻の系列を記録 | **試験用タイマーで達成(実エンジンの窓タイマーでは達成していない)**。250 ms のホスト作成の窓タイマー(id 0x4d、隠しユーティリティ窓 lid 10)が 3.43 仮想秒に **13 回**、配送時刻の間隔は **12 区間すべてちょうど 250.0 ms**(遅れ 0 tick)で、native・node・Chrome の 6 実行で同一(§4.4)。**実エンジンは idle で窓タイマーを持たない**: 起動直後の 600 s のタイマー(id 1、TPUtilWindow)は 50 仮想 ms 以内にゲスト自身が殺す |
+| (5) WM_TIMER が仮想時計で等間隔、配送時刻の系列を記録 | **テスト用タイマーで達成(実エンジンの窓タイマーでは達成していない)**。250 ms のホスト作成の窓タイマー(id 0x4d、隠しユーティリティ窓 lid 10)が 3.43 仮想秒に **13 回**、配送時刻の間隔は **12 区間すべてちょうど 250.0 ms**(遅れ 0 tick)で、native・node・Chrome の 6 実行で同一(§4.4)。**実エンジンは idle で窓タイマーを持たない**: 起動直後の 600 s のタイマー(id 1、TPUtilWindow)は 50 仮想 ms 以内にゲスト自身が殺す |
 | (6) idle 中に JS の制御が返り続ける | **達成**(2 回)。壁時計モード 30 s(固定時計で 5 仮想秒進めた後): idle の起床 **1,510 / 1,517 回**(50.3 / 50.6 回/s)、ping **120 / 120** が往復、RTT 中央値 **0.21 / 0.20 ms**、p95 4.29 / 4.05 ms、最大 4.82 / 5.08 ms、ページの 50 ms ハートビートの最大間隔 70.6 / 50.3 ms(機械の負荷平均 4〜5 の最中)(§4.5) |
 
 **ダイアログは閉じる**。PM の仮説(仮想時間 0 の down→up は押下とみなされない)は**否定**: down と up を同じ仮想時刻に置いても同じく閉じる(窓表は同一、`logs/runs/explore-s2.txt`)。
@@ -41,7 +41,7 @@
 | ファイル | 変更 |
 |---|---|
 | `lift/crates/fe-lift/src/imports_table.rs` | **末尾に 10 行を追記**(決定 0132 の 7 行(581〜587)の後ろ、588〜597): comctl32!_TrackMouseEvent、user32!GetMessageTime / GetMessagePos / GetMessageExtraInfo / GetDoubleClickTime / GetKeyboardState / MapVirtualKeyW / MessageBeep、advapi32!OpenProcessToken / GetTokenInformation。既存の行・擬似 VA は動かない |
-| `lift/runtime/fle_win.c` | 窓表のアクセサ(`fle_win_input_*`、ファイル末尾)、`GetKeyState` / `GetAsyncKeyState` / ポインタ setter / `DefWindowProcW` の default / `fill_msg` / `PeekMessageW` の qs / `TranslateMessage` / `WM_TIMER` の配送ログ(`fle_win_timer_log_*`)と、ホストが窓にタイマーを付ける試験用入口 `fle_win_host_timer`(S-host-timer-probe) |
+| `lift/runtime/fle_win.c` | 窓表のアクセサ(`fle_win_input_*`、ファイル末尾)、`GetKeyState` / `GetAsyncKeyState` / ポインタ setter / `DefWindowProcW` の default / `fill_msg` / `PeekMessageW` の qs / `TranslateMessage` / `WM_TIMER` の配送ログ(`fle_win_timer_log_*`)と、ホストが窓にタイマーを付けるテスト用入口 `fle_win_host_timer`(S-host-timer-probe) |
 | `lift/runtime/fle_thread.c` | idle フック `int fle_thread_idle_hook(uint64_t now, uint64_t next, uint64_t *advance_to)`(0 = 終了、1 = 事象あり、2 = 時計を `*advance_to` まで進める。**期限 `next` を超える要求は `next` に切り詰める**: 期限を飛ばさない)、`msg_ready` が `fle_input_has_event` を聞く |
 | `lift/runtime/fle_class.c` | `fle_class_hcursor_of(atom)`(クラスの hCursor、WM_SETCURSOR の既定の答え) |
 | `lift/runtime/fle_vfs.c` | CloseHandle のフック表 4 → 8(`fle_token.c` が 5 つ目) |
@@ -182,7 +182,7 @@ a78abce の木で、OK ボタンの先に進むまでに出会った壁と、そ
 | `S-no-target` | 窓のないイベントは捨てる | Windows はデスクトップへ | 実機測定 |
 | `S-idle-clock-wall` | wall モード: idle の間、仮想時計は次の期限まで実時間(rate)で進み、期限に達したら期限ちょうどに動く。入力イベントは idle に入ってからの実経過時間(期限を超えない範囲)だけ進めてから入れる | 0128 の設計 B の具体化。エンジンの計算時間では仮想時計は進まない | 設計の見直し |
 | `S-idle-clock-fixed` | fixed モード: 仮想時計は `advance` でしか進まず、1 回の `advance` は期限ごとに(スケジューラが期限を飛ばさない)進める | ネイティブ・node・Chrome で同じ入力列から同じ面を得るため | wall モードに一本化するとき |
-| `S-host-timer-probe` | ホストが窓のタイマーを作る試験用の入口(`fle_win_host_timer`)は G3 の記録のための器具で、ゲストの呼び出しではない | 実エンジンの idle には窓タイマーが無い(下) | 実エンジンに短周期のタイマーが現れたら不要 |
+| `S-host-timer-probe` | ホストが窓のタイマーを作るテスト用の入口(`fle_win_host_timer`)は G3 の記録のための器具で、ゲストの呼び出しではない | 実エンジンの idle には窓タイマーが無い(下) | 実エンジンに短周期のタイマーが現れたら不要 |
 | `S-token-not-elevated` | `GetTokenInformation(TokenElevation)` は `TokenIsElevated = 0`(昇格していない標準ユーザー)、ReturnLength = 4。トークンは自プロセスの疑似ハンドルから TOKEN_QUERY(0x8)だけで開ける | TOKEN_ELEVATION の頁は構造体(DWORD)と「昇格していれば非 0」だけで、プロセスのトークンが何かは言わない。最も権限の低い選択 | セキュリティのモデルを作るとき |
 | `S-token-short-buffer` | バッファが 4 バイト未満(または NULL)なら ReturnLength = 4、失敗、最後のエラー 122(ERROR_INSUFFICIENT_BUFFER) | GetTokenInformation の頁は「必要なバイト数を ReturnLength に入れ、失敗する」とだけ言い、コードは言わない | 実機測定 |
 | `S-cmp-control` | CompareStringW の最初の差が空白類の制御文字(0x09〜0x0d)と ASCII の可視文字なら符号位置順(制御文字が小さい) | ゲストが Enter の文字 "\r" とボタンのアクセラレータ "O" を比べる。「Handling Sorting in Your Applications」は種別の順(句読点・非英数字が英数字の前)だけで、制御文字の重みは言わない。決定 0132 の S-cmp-general-punctuation と同じ読み | ソート表を作るとき |
@@ -283,7 +283,7 @@ PM の裁定(3 時間目の報告への返信)どおり、**項目 (1)〜(6) は
 - **実機 Windows との照合は 0 件**。メッセージの順序・既定の戻り値・押下の判定は、Learn の頁と S- 選択だけを根拠にしている。
 - ブラウザは **Chrome 156 の headless・1 台・loopback だけ**。Firefox・Safari・headed・GPU・HiDPI・実ネットワークは未測定。
 - wasm は **-Oz**(-O2 でない)、フック無し(`HOOKS=0`、入口数は数えられない)。
-- 項目 (5): 実エンジンの窓タイマーを使った系列は無い(試験用タイマー)。実エンジンが後で `SetTimer` を呼ぶ状態は未到達。
+- 項目 (5): 実エンジンの窓タイマーを使った系列は無い(テスト用タイマー)。実エンジンが後で `SetTimer` を呼ぶ状態は未到達。
 - 本物の初回起動の idle(§4.6)は **node ↔ Chrome だけ**(native は idle に着かない)。ウィザードの先は `UpdateLayeredWindow` で止まる。
 - 壁時計モードの測定(項目 (6))は機械の負荷平均 4〜5 の最中で、RTT の裾はその影響を受ける。ping は 250 ms ごと・30 s・2 回だけ。ページのハートビートの最大間隔 70.6 ms は『JS の制御が 100 ms 以上途切れない』の証拠で、フレーム落ちの測定ではない。
 - 入力の列は 3 種類(クリック、Space、Enter)と対照、本物の idle の押下 2 種類だけ。Esc、ドラッグ、右クリック、ダブルクリック(実エンジン上)は走らせていない。

@@ -13,7 +13,7 @@
 
 1. **実エンジンが実行された事実と範囲**: 『実エンジン』の数値は、HEAD f2dded6 の生成 C(FLEngine と同梱 5 DLL、FRUITY 有効)を **wasm にした実物**(F1xH = prune S + Blend2D 置換〔決定 0167〕+ 層 1〜4 の行〔`extra-imports-l4.txt` = `ship-imports.txt` + `exp1-imports.txt`〕+ `FLE_FILEDLG_BROWSER`〔決定 0193〕、ハイブリッド無し)を、隔離 headless Chrome 156(自分の vite preview、使い捨てプロファイル、この機械〔16 コア、SwiftShader、load 8〜49〕)と node 24 で**実際に走らせて**得た。Wine の数値は、Image-Line の実 `Blend2D.dll`(SHA-256 `66634d24…`)を Wine 10.0 で走らせて得た。
 2. **代役・再生・推測を含む範囲**: 代役・モック・画像の再生・事前生成・期待値の貼り付けは使っていない。**模擬**として明記するもの: (a) Chrome での Open・Export・メニュー・ツールバー・右クリック・再生の**クリックとキー**は CDP の信頼された入力イベントによるテストの操作で、人の操作の代わり(座標は決定 0171/0178・ia1 の表から)。(b) 『実 DLL』は Wine 上の実 DLL で、実機 Windows ではない。Wine の DLL が見る CPU は host(Ryzen 9 9950X、AVX-512 あり)で、**制限できない**。(c) 『JIT の SSE2 変種』は上流 Blend2D の JIT を `BL_CONTEXT_CREATE_FLAG_ISOLATED_JIT_RUNTIME | OVERRIDE_CPU_FEATURES` で制限したもので、ゲストが見る CPU〔決定 0118: SSE2 まで〕の代理。(d) census の呼び元は、ゲストのスタックを走査して『call の直後を指す語』を拾った**読み**(古い語が混じりうる)。(e) 静的な blendMode の呼び出し箇所は逆アセンブルの**読み**で、実行していない。
-3. **既定の入口**: `lift/out-websrv/assets/` には何も置いていない。試験用バンドルは `lift/out-b2d3/build/B3/bundle/fl-engine-b2d3-B3/`(私設ポート)だけ。**既存の既定動作は変えていない**(adapter の census と許可リストは既定 OFF、パッチは `build_upstream.sh` の opt-in `PATCH=`、FMA 版は別のパッチ + `-D`)。
+3. **既定の入口**: `lift/out-websrv/assets/` には何も置いていない。テスト用バンドルは `lift/out-b2d3/build/B3/bundle/fl-engine-b2d3-B3/`(私設ポート)だけ。**既存の既定動作は変えていない**(adapter の census と許可リストは既定 OFF、パッチは `build_upstream.sh` の opt-in `PATCH=`、FMA 版は別のパッチ + `-D`)。
 
 ## 1. 先に結論(表)
 
@@ -65,7 +65,7 @@
 | 53 | 0 | RECTD | GRADIENT | 放射 | DITHER | PRGB32 | 17 | 0x7a896a |
 
 読み: (1) **非 SRC_OVER は Export の OVERLAY だけ**(4 回、`rc=0`、`B2D2_STRICT=0` でもテンプレートが描いた)。(2) 描画先は全部 PRGB32、グラデーションの品質は全部 DITHER、extend は全部 PAD、globalAlpha は全部 1。(3) 放射グラデは多用(slot 53 の放射が 25,000 回以上)。(4) **OVERLAY の描画が変える画素**(CHANGE 行): 走行によって 0 画素(4 回とも)、144・264・351 画素、2,833・2,988・3,079 画素(最終バンドル。外接矩形は (7,559)〜(128,583) と (0,0)〜(125,24)、約 120×25 画素の帯)と変わる。主窓 lid 14(1930×1092 = 2,107,560 画素)の **0.15% 以下**。宛先が黒だと OVERLAY は恒等になる、アニメーションの時刻で変わる、が理由と読む(確認していない)。**書き出し窓 `TWAVRenderForm` ではなく主窓が宛先**。(5) 同じバンドルの 2 走行の全画面スクリーンショットは 12 万画素違う(アニメーション)ので、画面全体の比較は雑音が大きく、置換なしとの面の比較には使えない。CHANGE 行(描画の前後)が測りである。(6) 品質が DITHER だけなので、線形グラデの NEAREST/SMOOTH で固定パイプラインと JIT がずれる問題(§4.2)はエンジンに当たらない。
-**制限(未確認)**: 窓がほとんど開かない(F6〜F9 は効かず、F11/F12 で Welcome wizard が再出現した、メニューは 1 つ〔Tools〕しか窓として見えなかった)。ピアノロール・ミキサー・プレイリストの操作・プラグインの画面・Song mode の再生の描画は**測れていない**。決定 0171 の ia1/ia2 の操作の台帳は native の fork プローブ(`probe … probe-end`)で、wasm には fork が無いので再生できない(個別の Chrome 走行で置き換えた範囲が上の (b))。
+**制限(未確認)**: 窓がほとんど開かない(F6〜F9 は効かず、F11/F12 で Welcome wizard が再出現した、メニューは 1 つ〔Tools〕しか窓として見えなかった)。ピアノロール・ミキサー・プレイリストの操作・プラグインの画面・Song mode の再生の描画は**測れていない**。決定 0171 の ia1/ia2 の操作の記録は native の fork プローブ(`probe … probe-end`)で、wasm には fork が無いので再生できない(個別の Chrome 走行で置き換えた範囲が上の (b))。
 
 ## 3. 実装
 
@@ -74,13 +74,13 @@
 - `src/blend2d/pipeline/reference/compopgeneric_p.h`: `CompOp_Overlay_Op`、`CompOp_HardLight_Op`、`CompOp_Screen_Op` を追加(PLUS の `CompOp_Plus_Op` は上流にもともとある)。**出典**: OVERLAY の算術は swap1(決定 0159)が JIT の `compoppart.cpp`(「VMaskProc - RGBA32 - Overlay」の `useSa` 分岐)から書き起こしたもの(`docs/investigations/swap-survey/tables/b2d-fixedpipe-plus-overlay.diff`)で、私は式を変えずにコメントだけ書き直した。HARD_LIGHT は同じ算術で条件を `2.Sca < Sa` にしたもの(JIT の「HardLight」の節の条件に対応)。SCREEN は JIT の x86 の枝(`Dca' = Sca + Dca.(1 - Sca)`、各レーンで `div255` は JIT と同じ丸め)。マスク付き(`m`)の形は『`s` を各チャネル `div255(s*m)` にしてから無マスクの式』(JIT は `hasMask` のとき同じ前処理をする)。
 - `src/blend2d/pipeline/reference/fixedpiperuntime.cpp`: PRGB32 の solid とグラデーションの関数表を 2 要素から 6 要素(SRC_OVER, SRC_COPY, PLUS, OVERLAY, SCREEN, HARD_LIGHT)に。選択は添字 2〜5。**swap1 のパッチにあった範囲外参照を直した**: pattern の表と A8 の表は 2 要素のまま、添字 2〜5 が届かないよう `basicOp`(SRC_COPY/SRC_OVER)のときだけ引く(PLUS/OVERLAY/SCREEN/HARD_LIGHT × pattern・A8 は `fillFunc` が null → `BL_ERROR_NOT_IMPLEMENTED`)。**OVERLAY × XRGB32 × グラデーションは登録しない**(JIT と ±1 で違うことを実測: §4.2)。
 - `lift/harness/b2d1/b2d3-fetch-fma.patch`(opt-in。`-DB2D3_FETCH_FMA=1` と一緒に当てたときだけ何かが変わる): 参照フェッチの放射・円錐の multiply-add 13 か所を `__builtin_fma`/`__builtin_fmaf` に(§4.3)。マクロ無しでは元の `Math::madd` と同じ式で、パッチを当てても出力は変わらない。
-- ビルド: `PATCH=<file>[:<file>…] OPT="-O2 [-DB2D3_FETCH_FMA=1]" lift/harness/b2d1/build_upstream.sh`(`build_upstream.sh` に opt-in の `PATCH` を足した。未設定なら従来どおり)。当てた後の木(スクリプトが tarball から展開してパッチを当てた物)が私の作業木と一致することを `diff -r` で確かめた(`logs/patched-trees-check.txt`)。上流のソースはリポジトリに入れない(パッチ = 差分だけ)。ライブラリの大きさ: wasm の `libblend2d.a` は 2,796,398 B(パッチ無し、b2d1/b2d2 の流儀のビルド)→ 3,046,676 B(SCREEN/HARD_LIGHT を含む最終版)。node 用の未最適化のリンクの wasm は『HEAD のアダプタ + パッチ無し上流』217,866,118 B に対し、最終版(アダプタ + SCREEN/HARD_LIGHT を含むパッチ)218,084,440 B で **+218,322 B(+0.10%)**(`tables/sizes.txt`)。wasm-opt 後のバンドルの wasm は 176,914,882 B(パッチ無しの wasm-opt 後は作っていない)。
+- ビルド: `PATCH=<file>[:<file>…] OPT="-O2 [-DB2D3_FETCH_FMA=1]" lift/harness/b2d1/build_upstream.sh`(`build_upstream.sh` に opt-in の `PATCH` を足した。未設定なら従来どおり)。当てた後の木(スクリプトが tarball から展開してパッチを当てた物)が私のワークツリーと一致することを `diff -r` で確かめた(`logs/patched-trees-check.txt`)。上流のソースはリポジトリに入れない(パッチ = 差分だけ)。ライブラリの大きさ: wasm の `libblend2d.a` は 2,796,398 B(パッチ無し、b2d1/b2d2 の流儀のビルド)→ 3,046,676 B(SCREEN/HARD_LIGHT を含む最終版)。node 用の未最適化のリンクの wasm は『HEAD のアダプタ + パッチ無し上流』217,866,118 B に対し、最終版(アダプタ + SCREEN/HARD_LIGHT を含むパッチ)218,084,440 B で **+218,322 B(+0.10%)**(`tables/sizes.txt`)。wasm-opt 後のバンドルの wasm は 176,914,882 B(パッチ無しの wasm-opt 後は作っていない)。
 
 ### 3.2 アダプタ(`lift/harness/b2d1/b2d_swap.cpp`)の変更(すべて既定 OFF)
 
 - 描画の仮想関数 5 つの `DRAW_RET` に前後の呼び出し(`b2d3_pre`/`b2d3_census_draw`)を足した。`B2D3_CENSUS` も `B2D3_ALLOW` も未設定なら、`getenv` を 1 回ずつして戻るだけ。`die()` に至る経路の直前に、停止する描画の (slot, compOp, 幾何の型, スタイルの型, グラデ型・extend, 形式) を 1 行出す(**停止の文言は変えていない**)。
 - **許可リスト**(`B2D3_ALLOW=1` または `-DB2D3_ALLOW_DEFAULT=1`): 描画の**前**に、(演算 ∈ {SRC_OVER, SRC_COPY, PLUS, OVERLAY, SCREEN, HARD_LIGHT}、形式 = PRGB32、スタイル = 単色〔RGBA/RGBA32/RGBA64〕または線形/放射グラデ、幾何 ∈ {RECTD, ELLIPSE, ROUND_RECT, PATH}、fillAll)でない描画は `fle: b2d3 (decision 0195): a draw outside the allow list …` を出して `die`(= abort。走査の node では rc=5)。上流の `NOT_IMPLEMENTED` による停止(STRICT、描いた後に判定)とは別で、**実装されているが census に出ていない組**(円錐グラデ、XRGB32 の描画先など)も止める。演算の面で census だけでは足りない分は、実 DLL と一致を確かめた演算(PLUS、SCREEN、HARD_LIGHT)を足した。
-- 追加の試験道具(エンジンにはリンクされない): `b2d3_diff.cpp`(§4.2)、`b3scene.h`・`b3_wine.c`・`b3_scan_test.h`(§4.1)。`lift/harness/b2d_scan.c` に 1 行(`#include "b2d1/b3_scan_test.h"`)、`lift/harness/b2d_scan_table.h` に 1 行(`T(b3ov, …)`)。他のテストの出力には影響しない。
+- 追加のテスト道具(エンジンにはリンクされない): `b2d3_diff.cpp`(§4.2)、`b3scene.h`・`b3_wine.c`・`b3_scan_test.h`(§4.1)。`lift/harness/b2d_scan.c` に 1 行(`#include "b2d1/b3_scan_test.h"`)、`lift/harness/b2d_scan_table.h` に 1 行(`T(b3ov, …)`)。他のテストの出力には影響しない。
 
 ## 4. 検証
 
@@ -267,7 +267,7 @@
 | S-b2d3-xrgb32-overlay | OVERLAY × XRGB32 × グラデは登録しない(JIT と違うので) | 原因を調べて JIT の枝に合わせる | 原因が分かったら |
 | S-b2d3-fma-optin | FMA 版は既定にせず opt-in(マクロ + 別パッチ) | 既定にする | PM が決める |
 | S-b2d3-callers | 呼び元は『スタックの最初の 1024 語のうち FLEngine の範囲で call の直後を指す語』 | shadow call stack(出荷バンドルには無い) | 出荷バンドルで関数入口を数える方式が入ったら |
-| S-b2d3-ops | ia1/ia2 の操作の台帳は fork プローブなので再生せず、座標だけを借りて Chrome で個別に操作した | wasm に fork を作る | — |
+| S-b2d3-ops | ia1/ia2 の操作の記録は fork プローブなので再生せず、座標だけを借りて Chrome で個別に操作した | wasm に fork を作る | — |
 | S-b2d3-no-hybrid | 混成 p1000r 無しのバンドルで測定 | SHIPH | 混成の同一性の確認が済んだとき |
 | S-b2d3-scan-edit | `b2d_scan.c`(+1 行)と `b2d_scan_table.h`(+1 行)を触った(置換の変更を b2d1/b2d2 配下に閉じる、の例外) | 別のハーネスを丸ごと複製 | PM の判断 |
 
@@ -302,8 +302,8 @@ PATCH=…/b2d3-compop.patch:…/b2d3-fetch-fma.patch OUTDIR=<dir> TARGET=wasm OP
 - `b2d3.diff`(f2dded6 に対して作り、最新の HEAD〔7f024d7〕の `git archive` に `patch -p1 --dry-run` が当たる〔10 ファイル、`logs/patch-dry-run-HEAD.txt`〕)、`MERGE-NOTES.md`、`docs/0195-blend2d-compop-coverage.md`(本書)、`docs/README-0195-line.txt`。
 - `tables/`: `census-dynamic.txt`(動的 census の集計)、`census-final-export.txt`、`static-blendmode-sites.txt`(FLEngine の blendMode 呼び出し箇所の静的な読み)、`strict-blendmode-final.tsv`(`blendmode:N` 走査、STRICT)、`cpu-variants*.txt`(JIT の CPU 変種別の差の数値)、`wine-*.txt/.tsv/.md`(Wine の実 DLL との比較の元の行と集計)、`level1-summary.md`・`tools/sweep5-*.txt`(JIT 代理との Level-1)、`g3/`(16 スナップの 82 行と比較)、`sizes.txt`。
 - `logs/`: `flengine-default.sha`(既定の生成 C の sha256)、`fulltest.txt`・`fulltest2.txt`(全体テスト。最初は入力のリンク無し〔SKIPPED 15〕、2 回目はリンクあり〔SKIPPED 1〕)、`a4off.txt`、`patch-dry-run-HEAD.txt`、`chrome/`(最終バンドルの Export の run.log、census の行〔gz〕)、`allow/`(許可リストと STRICT の stderr)。
-- `tools/`: 試験の道具(`bb.sh`〔バンドルのビルド〕、`node-link.sh`・`scan-run.sh`・`g3run.sh`、`b3cmp2.sh`・`matrix*.sh`・`summ.py`・`assemble.py`〔Wine との比較〕、`fpick-e2e.mjs`・`ops-census.mjs`・`census_agg.py`〔Chrome の実エンジン〕、`sweep*.sh`・`cmpf.py`〔Level-1〕、`mkdiff.sh`・`pack.sh`)。`inputs/Sampler-project`(`Sampler.flp` と音声)は製品由来で git に無い(決定 0188/0193)。
-- 作業ディレクトリ `lift/out-b2d3/` は 500 MB 以内に整理した(残すもの: 最終バンドル `build/B3/bundle/fl-engine-b2d3-B3/`〔wasm-opt 済み、3 つのマニフェスト付き〕、パッチ済みライブラリ `up-wasm4*/build-wasm/libblend2d.a`、試験の道具の実行ファイル `diff/`、`runs/` の記録)。
+- `tools/`: テストの道具(`bb.sh`〔バンドルのビルド〕、`node-link.sh`・`scan-run.sh`・`g3run.sh`、`b3cmp2.sh`・`matrix*.sh`・`summ.py`・`assemble.py`〔Wine との比較〕、`fpick-e2e.mjs`・`ops-census.mjs`・`census_agg.py`〔Chrome の実エンジン〕、`sweep*.sh`・`cmpf.py`〔Level-1〕、`mkdiff.sh`・`pack.sh`)。`inputs/Sampler-project`(`Sampler.flp` と音声)は製品由来で git に無い(決定 0188/0193)。
+- 作業ディレクトリ `lift/out-b2d3/` は 500 MB 以内に整理した(残すもの: 最終バンドル `build/B3/bundle/fl-engine-b2d3-B3/`〔wasm-opt 済み、3 つのマニフェスト付き〕、パッチ済みライブラリ `up-wasm4*/build-wasm/libblend2d.a`、テストの道具の実行ファイル `diff/`、`runs/` の記録)。
 
 ## PM の判断と取り込み(2026-11-04)
 
@@ -320,4 +320,4 @@ PATCH=…/b2d3-compop.patch:…/b2d3-fetch-fma.patch OUTDIR=<dir> TARGET=wasm OP
 
 ## PM の判断(進捗の読み)
 
-G 段階表の到達は変わらない(厳格な読み G0、字義どおりの読み G4)。これは Export の停止の原因の解消であり、ブラウザでの書き出しの完走は作業者の試験用バンドルで観測した事実。既定の入口ではまだ停止する。
+G 段階表の到達は変わらない(厳格な読み G0、字義どおりの読み G4)。これは Export の停止の原因の解消であり、ブラウザでの書き出しの完走は作業者のテスト用バンドルで観測した事実。既定の入口ではまだ停止する。

@@ -1,10 +1,10 @@
-# 0305d(仮): E13 の clean な再ビルドと試験、E13 の上に実スレッドの足場 + 16 件の修正 + D3 の除去を載せた木(E14 候補)の dry-run、受け入れ条件を早く測れる着手順、人日の合計と担当案(mt3。0305 の最終)
+# 0305d(仮): E13 の clean な再ビルドとテスト、E13 の上に実スレッドの足場 + 16 件の修正 + D3 の除去を載せた木(E14 候補)の dry-run、受け入れ条件を早く測れる着手順、人日の合計と担当案(mt3。0305 の最終)
 
 状態: **仮**(0305 の最終)。作業者 mt3、2026-11-06 JST。依頼: PM(18:55・19:10・19:18・19:25 の info)。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**=コード・文書の解釈と見積り、**未確認**。**Chrome は起動していない。実エンジン(wasm)の実行は 0 件。** 重い job は nice 19・2 jobs で、gpu1 の sdriveg2 が居ない時に始めた(19:25 に ps で確認。gpu1 の『Chrome 終了』の info は私が始めた時点では来ていなかった。PM の『ps で確認して始めてよい』に従った)。
 
-## 1. E13(main 6f690d38 + 0302 の Dwm + 0284b-gp-extension)の clean な再ビルドと試験
+## 1. E13(main 6f690d38 + 0302 の Dwm + 0284b-gp-extension)の clean な再ビルドとテスト
 
-**経緯(自己申告)**: 1 回目と 2 回目の run は**無効**だった。cargo の target dir を実スレッドの足場の木と共有し(1 回目)、2 回目は target dir を複製したが、**複製した target dir の fe-lift の統合試験が `CARGO_BIN_EXE_fe-lift` を『複製元の `ct/debug/fe-lift`(別の木が最後に作った fe-lift)』に焼き込んだまま**で、試験が足場の `imports_table.rs`(`CreateSemaphoreW`/`ReleaseSemaphore` の行つき)の fe-lift を使い、46 失敗と a4 の link 失敗(`undefined reference to fle_imp_CreateSemaphoreW`)になった。PM から教わった既定の C の照合(215,740,699 B・e798422c…)が私の再現(215,741,085 B・6c9d92b8…)と合わなかったのも、**同じ汚染された fe-lift** が原因だったと読める(コマンドは同じ)。3 回目は専用の target dir で `cargo clean -p fe-pe -p fe-decode -p fe-lift -p fe-wasmgen` してから作り直した。
+**経緯(自己申告)**: 1 回目と 2 回目の run は**無効**だった。cargo の target dir を実スレッドの足場の木と共有し(1 回目)、2 回目は target dir を複製したが、**複製した target dir の fe-lift の統合テストが `CARGO_BIN_EXE_fe-lift` を『複製元の `ct/debug/fe-lift`(別の木が最後に作った fe-lift)』に焼き込んだまま**で、テストが足場の `imports_table.rs`(`CreateSemaphoreW`/`ReleaseSemaphore` の行つき)の fe-lift を使い、46 失敗と a4 の link 失敗(`undefined reference to fle_imp_CreateSemaphoreW`)になった。PM から教わった既定の C の照合(215,740,699 B・e798422c…)が私の再現(215,741,085 B・6c9d92b8…)と合わなかったのも、**同じ汚染された fe-lift** が原因だったと読める(コマンドは同じ)。3 回目は専用の target dir で `cargo clean -p fe-pe -p fe-decode -p fe-lift -p fe-wasmgen` してから作り直した。
 
 (結果は下の表。run 3、`mt3w-e13/e13.txt`)
 
@@ -13,7 +13,7 @@
 | 積み重ね | main 6f690d38 に 0302(8 ファイル)と gp-extension(`fle_locale.c` 1 ファイル)を適用: rc=0、offset・fuzz・FAILED なし(実測)。hi-check form(0303)も dry-run で clean |
 | `cargo test --workspace --no-run` | **rc=0**(19:25:30 → 19:27:39、2 分 9 秒。215 test executables)。実測 |
 | 既定の FLEngine の C(PM のコマンド: `fe-lift lift binaries/win64/FLEngine_x64.dll OUT.c --pdata`、fe-lift は E13 の木のビルド〔debug〕) | **215,740,699 B・sha256 `e798422c203ee0cdd5f3f8b1950df15c8443b4f9c39dd03bc89b6e1b9fc35c26`** = PM の記録(E11/E12)と**一致**(E13 の既定の C は不変。実測)。1・2 回目の 215,741,085 B・`6c9d92b8…` は汚染された fe-lift の出力 |
-| `test.sh full`(`FLE_TEST_NOCACHE=1 --jobs 2`、nice 19) | **219 results、2,417 passed、0 failed**、1 ignored(wall 476 s、build 117 s)。E12c + 0302 の私の検証(0302 §6)と同じ数。**ただし SKIPPED 15 行**(0302 の run は 1 行): E13 の木は main の追跡ファイルだけで作ったため、**追跡されていない入力 DLL 4 つ**(`lift/out-ext/dsp_ippv2_x64.dll`、`out-qfc/quickfontcache_x64.dll`、`out-blend2d/Blend2D.dll`、`out-jtb2d90/three/dll/dsp_ippv2_x64.2000000.dll`)が無く、それを使う 14 行の試験が skip(= 早期 return で pass)した。**4 つを main のワークツリーから複写し、該当の 10 binaries を再実行: 全部通った**(fe-pe `rebase` 15、fe-lift `wall_fr7` 18・`k32_dsp` 14〔60 s〕・`jt_cpu` 5・`gs_stacklimit` 6・`deferred` 15・`call_iat_dll` 1〔59 s〕、fe-decode `msvc_switch` 72・`jt_cpu` 9・`inline_table` 6。`mt3w-e13/targeted-rerun.txt`)。skip の行が他にも別の入力で隠れている可能性は、log の『e.g.』が 1 binary 1 つだけなので**完全には確かめていない** |
+| `test.sh full`(`FLE_TEST_NOCACHE=1 --jobs 2`、nice 19) | **219 results、2,417 passed、0 failed**、1 ignored(wall 476 s、build 117 s)。E12c + 0302 の私の検証(0302 §6)と同じ数。**ただし SKIPPED 15 行**(0302 の run は 1 行): E13 の木は main の追跡ファイルだけで作ったため、**追跡されていない入力 DLL 4 つ**(`lift/out-ext/dsp_ippv2_x64.dll`、`out-qfc/quickfontcache_x64.dll`、`out-blend2d/Blend2D.dll`、`out-jtb2d90/three/dll/dsp_ippv2_x64.2000000.dll`)が無く、それを使う 14 行のテストが skip(= 早期 return で pass)した。**4 つを main のワークツリーからコピーし、該当の 10 binaries を再実行: 全部通った**(fe-pe `rebase` 15、fe-lift `wall_fr7` 18・`k32_dsp` 14〔60 s〕・`jt_cpu` 5・`gs_stacklimit` 6・`deferred` 15・`call_iat_dll` 1〔59 s〕、fe-decode `msvc_switch` 72・`jt_cpu` 9・`inline_table` 6。`mt3w-e13/targeted-rerun.txt`)。skip の行が他にも別の入力で隠れている可能性は、log の『e.g.』が 1 binary 1 つだけなので**完全には確かめていない** |
 | a4(5 モジュール、nice 19、JOBS=2、fe-lift は E13 の木) | **units 942、runnable 895/895 完走、実行された関数 distinct 5,310、関数入口 1,009,737、終了コード 0**(gen 27 s、build 228 s)= 基準と同一。生成 C `gen/flengine.c` の sha256 `2715c3f3401bc17727b3ab5927ca08beb348b483b2f81334c3124b9b8c783933` = **E12 の a4(0284b-on-0284c の私の表)の値と一致**(1 回目の a4 の `1d5d368d…` は汚染された fe-lift の出力)。実測 |
 
 **wasm の大きさの見積り(ビルド無し、3 構成)**:
@@ -48,7 +48,7 @@ PM の判断材料として: hi-check は +241 KB(+0.17%)で UI の `f_863f60` �
 
 | 段 | 内容 | 人日 | 出す中間 bundle(gpu1 が測る物) | 測る受け入れ条件 | 備考 |
 |---|---|---|---|---|---|
-| **S0** | I1 + I2: E13 の上に 足場 + 16 件の修正(= §2 の木) | 0.75 | (bundle 無し。cargo の試験と a4 だけ) | — | §2 で dry-run は実測済み。cargo の試験は上の表 |
+| **S0** | I1 + I2: E13 の上に 足場 + 16 件の修正(= §2 の木) | 0.75 | (bundle 無し。cargo のテストと a4 だけ) | — | §2 で dry-run は実測済み。cargo のテストは上の表 |
 | **S1** | **I6 段階 C(最短の形)**: 音声リングを wasm の共有メモリへ、`wr`・`rdHi` を共有、`fle_tp_*` を C に。page の `audio-ring`。足場の旗・環境変数は**まだ残す**(`FLE_WORKERS` ほか) | 1.5 | **B1** = E13 + 足場 + 16 件 + 段階 C | **PCM の零(0305c の直しを製品の形で)・T・UI Worker・重い区間・5 分の書き込み**を、gpu1 の glue 補修 **無し**で測る | これが無いと製品の形の測定ができない(gpu1 の glue は測定専用)。env の `FLE_WORKERS`/`FLE_PROCESSORS` が残るので、**B1 のままで n = 2/4/8 の先行測定ができる**(I15c・I15e のリスクを早く見る) |
 | **S2** | **T の B/C の梃子**(gpu1 の B/C 設計 → mt3 が実装): B = page → エンジンの起床(+5 ms): 入力 ring を書いた直後に page が wake word を `Atomics.notify`(今は IdleDriver の経路も待つ)、C = エンジンの処理(+5 ms): UI の export/import ごとの GIL の取り直し・FL の CS の待ち(0289 §5 では CS の待ちはほぼ 0)の内訳を計測 build(D3a の `patch -R`)で出す | 2〜4(分析 1〜2 + 実装 1〜2。読み。結果次第) | **B2** = B1 + T の梃子 | **T**(+2 ms 以内) | 梃子は『通信/変換の削減』に当たる形に限る(新しい特別扱いを足さない)。B/C の内訳が出るまで工数は不確実 |
 | **S3** | **I15a/b/c/d**: n を host import から、Worker 数を n から。FL が n ≥ 2〜32 で最後まで走るか(新しい壁) | 2〜3 | **B3** = B2 + N 本 | **重い区間の CPU/Unlock(G9 の前後)**・n = 2/4/8 | リスク項目。環境変数 `FLE_WORKERS`/`FLE_PROCESSORS` を除く(I3 の一部) |
@@ -73,7 +73,7 @@ PM の判断材料として: hi-check は +241 KB(+0.17%)で UI の `f_863f60` �
 | **opt1(Wine 参照)** | Wine 上の FL が n(論理 CPU 数)に応じてどのスレッドを何本作るか(作業スレッドプール 32 本中 15 本が稼働)の参照。I15c(FL が n ≥ 2〜32 で最後まで走るか、どの API を呼ぶか)の期待値を出す | 約 0.5〜1 |
 | **ci1(本番確認)** | E13 のデプロイ後の確認(first idle のゲート、Export の一致)、E14 系列の CI の cold build の費用の確認、S5 の Firefox 等の確認の一部 | 約 1〜2 |
 
-**判断が要る点(PM)**: (1) D1 = a' の確定(go のとき)。(2) S2 の T の梃子は、B/C の内訳が出るまで工数が不確実。S1 の直後に gpu1 が B1 で T の内訳(B・C)を測るのが最短。(3) hi-check form を E13 に入れるか(+241 KB・効き −1.8〜−2.9%)。(4) 協調の決定的試験の test tree(`fle_sched_mode.h` 1 ファイルの差し替え)の方式でよいか(S5 の I12 の前提)。
+**判断が要る点(PM)**: (1) D1 = a' の確定(go のとき)。(2) S2 の T の梃子は、B/C の内訳が出るまで工数が不確実。S1 の直後に gpu1 が B1 で T の内訳(B・C)を測るのが最短。(3) hi-check form を E13 に入れるか(+241 KB・効き −1.8〜−2.9%)。(4) 協調の決定的テストの test tree(`fle_sched_mode.h` 1 ファイルの差し替え)の方式でよいか(S5 の I12 の前提)。
 
 ## 5. 自己申告(0305 の最終の区間)
 

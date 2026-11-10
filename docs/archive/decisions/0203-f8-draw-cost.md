@@ -59,7 +59,7 @@ Win64 の引数: rcx = src、rdx = dst、r8 = 画素数 n、r9d の下位 16 ビ
 | 名前 | 内容 | 有効にする方法 |
 |---|---|---|
 | VA | `fle_raster.c` と `fle_sse_more.c` を -O2 でコンパイル(runtime の既定は -O0) | ビルドの環境 `RT_O2_EXTRA="fle_raster fle_sse_more"`(build-engine-bundle.sh の 1 行) |
-| VB | VA + `fle_r_blit` の近道: 32bpp direct → 32bpp direct の SRCCOPY(`bytes` に入らない場合)は 1 画素 = `src & 0x00FFFFFF` のワード単位の複写(面内の重なりは下から上/右から左の規則を保つ)。get/put はマスクを見ずに バイト 0〜2 を読み書きし バイト 3 を 0 にするので、結果は元の経路と同一 | コンパイルの `-DFLE_R_FAST_COPY=1`(ビルドの環境 `RT_DEFS=-DFLE_R_FAST_COPY=1`) |
+| VB | VA + `fle_r_blit` の近道: 32bpp direct → 32bpp direct の SRCCOPY(`bytes` に入らない場合)は 1 画素 = `src & 0x00FFFFFF` のワード単位のコピー(面内の重なりは下から上/右から左の規則を保つ)。get/put はマスクを見ずに バイト 0〜2 を読み書きし バイト 3 を 0 にするので、結果は元の経路と同一 | コンパイルの `-DFLE_R_FAST_COPY=1`(ビルドの環境 `RT_DEFS=-DFLE_R_FAST_COPY=1`) |
 | VC | HLE のみ: `f_6a77b0` の入口に guard(`fe-lift --hle-entries`、`lift/harness/hooks/flengine-draw1-entries.txt` の `0x6a77b0 pixscale`)、ホスト実装 `fle_hle_pixscale`(fle_hle.c)。出力は out = tab[in](tab[b] = 符号つき飽和((b·k)>>8))、レジスタ(R1、R2、R4、R8)・XMM(X0〜X5 は最後のブロック/画素から、X7 は不変)・フラグ(最後の `add rsp,0x18`)・退避の 2 か所のスタックを lifted 本体と同じに残す。引き受けない条件は §3.4 | 生成時の環境 `FLE_HLE_ENTRIES=<そのファイル>`。実行時は `FLE_HLE=0`(guard が即 0 を返す)/ 既定 on / `FLE_HLE=check`(lifted と両方を走らせ全部を比較、不一致は exit 99) |
 | VD | VB + VC | 両方 |
 | VE | VD + HLE の k = 256 の省略(`(b·256)>>8 = b`: 恒等なので in place なら何もしない、src≠dst なら memmove)。F8 の呼び出しの 96.6% | VD と同じ(fle_hle.c の 5 行) |
@@ -70,7 +70,7 @@ Win64 の引数: rcx = src、rdx = dst、r8 = 画素数 n、r9d の下位 16 ビ
 |---|---|---|
 | 16 スナップ 82 行(node、`g3cmp.py`) | VB・VC・VD・VE を `lift/harness/b2d2/expected/g3-lines-F1x-layer3-baseline.txt` と比べる | **4 つとも IDENTICAL**(82 行: snap 16、progress 16、surface 34、wintable 16) |
 | F8 のスクリプト `f8.g3`(F8 → 100/250/500/750/1000/1500/2000/3000/4000 ms のスナップ → Escape → 4 点。**アニメーション途中の面**を含む)98 行 | 基準と全行一致(`diff` 空) | VB・VC・VD・VE とも一致 |
-| 近道の差分テスト(`tools/test_blit_fast.*`): fle_r_blit を FLE_R_FAST_COPY=1 と 0 で、ランダムな面(32bpp BI_RGB / 8-8-8 マスク、24bpp、8bpp、top-down / bottom-up、keep_x、X バイトを含む乱数、幅高さずれクリップ、面内の重なり、ROP 乱数) | 3 seeds × 400,000 = **1,200,000 件で差 0**(32bpp SRCCOPY の近道に入った件 約 439,000、面内の複写 約 300,000)。意図的な欠陥(X バイトを残す、右→左を忘れる)は 100,000 件で 7,735 / 360 件の差として検出される | 差 0 |
+| 近道の差分テスト(`tools/test_blit_fast.*`): fle_r_blit を FLE_R_FAST_COPY=1 と 0 で、ランダムな面(32bpp BI_RGB / 8-8-8 マスク、24bpp、8bpp、top-down / bottom-up、keep_x、X バイトを含む乱数、幅高さずれクリップ、面内の重なり、ROP 乱数) | 3 seeds × 400,000 = **1,200,000 件で差 0**(32bpp SRCCOPY の近道に入った件 約 439,000、面内のコピー 約 300,000)。意図的な欠陥(X バイトを残す、右→左を忘れる)は 100,000 件で 7,735 / 360 件の差として検出される | 差 0 |
 | HLE の差分テスト(`tools/difftest_pixscale.*`): 乱数の R/X/フラグ・画素・k・n・src=dst/離れた/部分重なり・退避との重なり・不整列。ホストが引き受けた場合は lifted 関数と R[16]・X[16]・フラグ・メモリ全体を比較。拒否した場合は 何も触っていないこと | 3 seeds × 300,000 = **900,000 件で差 0**(ホストが引き受けた 467,900 件。これは k=256 の省略を入れる**前**の版)。省略を入れた版で 100,000 件を再度: 差 0(引き受け 52,048 件)。意図的な欠陥(符号つき飽和、X5、フラグ)は検出される | 差 0 |
 | HLE のガード込みの差分テスト(`tools/difftest_pixscale_guard.*`): 生成 C と同じ guard つきの lifted 関数 と guard なしの lifted を比べる。**ホストが引き受けられる呼び出しも 確率で拒否する**(`-DFLE_HLE_TEST_FALLBACK`、permille 0 / 500 / 1000) | 3 × 80,129 件で差 0(引き受け 52,405 / 26,108 / 0、拒否 27,724 / 54,021 / 80,129。省略を入れる前の版)。省略後の版で 48,173 件(permille 500): 差 0(引き受け 15,553、拒否 32,620) | 拒否したときは lifted が走り 同じ結果 |
 | `FLE_HLE=check`(実エンジン、node) | F8 のスクリプト(約 30 万回、5.6 億画素)、起動 16 スナップ(10,176 回、323 万画素)、メニュー・右クリックメニュー・F7・F8(約 20 万回超)、Space 再生 60 s(呼び出しは起動と同じ 10,176 回) | **mismatch 0、fallback 0**(`logs/hlecheck-scenarios.txt`) |
@@ -101,7 +101,7 @@ Win64 の引数: rcx = src、rdx = dst、r8 = 画素数 n、r9d の下位 16 ビ
 
 読み: Chrome の Worker はどの構成でも 0.9〜1 コアで**飽和**(load が高く 1 コアに届かない)ので、CPU 秒では差が出ない。差は『同じ 1 コアで何フレーム描けるか』に出る: 静止中の F8 窓の再描画は基準 14.7 → VD 44.2 回/秒(3.0 倍)で、1 フレームの Worker CPU は 68 ms(= 1.00 コア ÷ 14.7)→ 20.6 ms(0.91 ÷ 44.2)。アニメーションの終わりは 2.8 s → 1.2 s(2.3 倍速い。変化フレーム数が 32 → 22 に減るのは 時間基準で進むため)。node の費用の比(1/10)より小さい(1/3.3)のは、Chrome には node にない費用が残るため(下の VD のプロファイル)。
 
-**VD の Chrome のプロファイル(`tables/prof-VD-*.txt`、残る費用)**: `(program)` 24%(ブラウザ内部。8 MB のフレームの postMessage の構造化複製などと読むが、分けていない)、`pix_exec`(HLE の表引きループ)16%、`fle_r_blit`(複写)7%、ゲストの f_6a7d20・f_6a7b70(各 4%)…。**pix_exec の 16% は k=256 の恒等が 96.6% を占めるのに表引きをしていた**ためで、VE で省いた。
+**VD の Chrome のプロファイル(`tables/prof-VD-*.txt`、残る費用)**: `(program)` 24%(ブラウザ内部。8 MB のフレームの postMessage の構造化複製などと読むが、分けていない)、`pix_exec`(HLE の表引きループ)16%、`fle_r_blit`(コピー)7%、ゲストの f_6a7d20・f_6a7b70(各 4%)…。**pix_exec の 16% は k=256 の恒等が 96.6% を占めるのに表引きをしていた**ためで、VE で省いた。
 
 ### 3.4 HLE が引き受けない条件(拒否は何も触らない)
 
@@ -113,7 +113,7 @@ n ≥ 2^24、`S−0x18` が 16 バイトに揃わない(lifted の movdqa が止
 
 ## 4. `draw1.diff` の中身(削除行 1 本)
 
-`draw1.diff` は 新規ファイル + 既存 7 ファイルへの追記。**削除行は 1 本**: `lift/harness/two/build_nmod_wasm.sh` の `CFLAGS_RT="..."` の 1 行を、行末に `${RT_DEFS:+ $RT_DEFS}` を足した形に置き換える(空の `RT_DEFS` では同じ文字列)。ほかは追加のみ(`fle_raster.c`:マクロ既定 0 と `#if FLE_R_FAST_COPY` の近道、`fle_hle.c/.h`:`fle_hle_pixscale` と `FLE_HLE_TEST_FALLBACK` の試験用分岐〔定義しなければ無い〕、`build-engine-bundle.sh`:`RT_O2_EXTRA`・`RT_DEFS` の 2 行、`hooks/flengine-draw1-entries.txt`、`lift/harness/draw1/`)。既定のビルド(上の環境変数なし)では runtime の fle_raster.c の近道は `#if 0` 相当で、fle_hle.c の新しい関数は guard が生成 C に無いので呼ばれない。生成 C は `--hle-entries` を渡さない限り 1 バイトも変わらない(§5 で FLEngine の既定の生成 C の sha256 を確かめた)。
+`draw1.diff` は 新規ファイル + 既存 7 ファイルへの追記。**削除行は 1 本**: `lift/harness/two/build_nmod_wasm.sh` の `CFLAGS_RT="..."` の 1 行を、行末に `${RT_DEFS:+ $RT_DEFS}` を足した形に置き換える(空の `RT_DEFS` では同じ文字列)。ほかは追加のみ(`fle_raster.c`:マクロ既定 0 と `#if FLE_R_FAST_COPY` の近道、`fle_hle.c/.h`:`fle_hle_pixscale` と `FLE_HLE_TEST_FALLBACK` のテスト用分岐〔定義しなければ無い〕、`build-engine-bundle.sh`:`RT_O2_EXTRA`・`RT_DEFS` の 2 行、`hooks/flengine-draw1-entries.txt`、`lift/harness/draw1/`)。既定のビルド(上の環境変数なし)では runtime の fle_raster.c の近道は `#if 0` 相当で、fle_hle.c の新しい関数は guard が生成 C に無いので呼ばれない。生成 C は `--hle-entries` を渡さない限り 1 バイトも変わらない(§5 で FLEngine の既定の生成 C の sha256 を確かめた)。
 
 ## 5. 既定への影響(PM の判断点)
 
@@ -153,7 +153,7 @@ n ≥ 2^24、`S−0x18` が 16 バイトに揃わない(lifted の movdqa が止
 
 ## 7. 成果物
 
-`lift/out-git/draw1-results/`: `draw1.diff`(`patch -p1 --dry-run` が HEAD 48cec69 の `git archive` に当たる)、`MERGE-NOTES.md`、`docs/0203-f8-draw-cost.md`(これ)、`docs/README-0203-line.txt`、`docs/design-memo-close-wait.md`、`tables/`(プロファイル、数え上げ、Chrome・node の表、fe-wasmgen の判定)、`logs/`(差分テスト、check、g3 の cmp)、`tools/`(`lift/harness/draw1/` と同じ物 + ビルドの補助)。作業木 `lift/out-draw1/`(終了時に 500 MB 以内に整理)。
+`lift/out-git/draw1-results/`: `draw1.diff`(`patch -p1 --dry-run` が HEAD 48cec69 の `git archive` に当たる)、`MERGE-NOTES.md`、`docs/0203-f8-draw-cost.md`(これ)、`docs/README-0203-line.txt`、`docs/design-memo-close-wait.md`、`tables/`(プロファイル、数え上げ、Chrome・node の表、fe-wasmgen の判定)、`logs/`(差分テスト、check、g3 の cmp)、`tools/`(`lift/harness/draw1/` と同じ物 + ビルドの補助)。ワークツリー `lift/out-draw1/`(終了時に 500 MB 以内に整理)。
 
 ## 8. 自己申告(規則違反・逸脱)
 
@@ -169,7 +169,7 @@ n ≥ 2^24、`S−0x18` が 16 バイトに揃わない(lifted の movdqa が止
 
 ## PM の判断と取り込み(2026-11-04)
 
-取り込み: `draw1.diff`(`fle_raster.c`〔マクロ `FLE_R_FAST_COPY`、既定 0〕、`fle_hle.c/.h`〔`fle_hle_pixscale` と試験用 `FLE_HLE_TEST_FALLBACK`〕、`build_nmod_wasm.sh`〔`CFLAGS_RT` に `${RT_DEFS:+ $RT_DEFS}`、空では同じ文字列。'-' 行はこの 1 行だけ〕、`build-engine-bundle.sh`〔`RT_O2_EXTRA`/`RT_DEFS` の 2 行〕、`hooks/flengine-draw1-entries.txt`、`lift/harness/draw1/`)を HEAD に当てた(clean)。**製品由来の C である `lifted_6a77b0.c` と `lifted_6a77b0_guarded.c`(fe-lift が FLEngine の f_6a77b0 から生成した各 約 4 KB)はコミットしない**(`.gitignore` に追加。差分テスト `difftest_pixscale*.sh` を使うときは fe-lift で再生成して `tools/` 相当の場所に置く)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**、a4 FRUITY 無効 942/942・895/895・5,310・1,009,731 **不変**(いずれも既定の挙動を変えない opt-in であることの確認)。
+取り込み: `draw1.diff`(`fle_raster.c`〔マクロ `FLE_R_FAST_COPY`、既定 0〕、`fle_hle.c/.h`〔`fle_hle_pixscale` とテスト用 `FLE_HLE_TEST_FALLBACK`〕、`build_nmod_wasm.sh`〔`CFLAGS_RT` に `${RT_DEFS:+ $RT_DEFS}`、空では同じ文字列。'-' 行はこの 1 行だけ〕、`build-engine-bundle.sh`〔`RT_O2_EXTRA`/`RT_DEFS` の 2 行〕、`hooks/flengine-draw1-entries.txt`、`lift/harness/draw1/`)を HEAD に当てた(clean)。**製品由来の C である `lifted_6a77b0.c` と `lifted_6a77b0_guarded.c`(fe-lift が FLEngine の f_6a77b0 から生成した各 約 4 KB)はコミットしない**(`.gitignore` に追加。差分テスト `difftest_pixscale*.sh` を使うときは fe-lift で再生成して `tools/` 相当の場所に置く)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**、a4 FRUITY 無効 942/942・895/895・5,310・1,009,731 **不変**(いずれも既定の挙動を変えない opt-in であることの確認)。
 
 判断:
 

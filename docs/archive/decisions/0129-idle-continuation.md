@@ -1,6 +1,6 @@
 # 0129: idle の先への続行（`CreateFruityInstance` の壁 16 個、停止条件 (e)/(d) = SEH で停止）。すべて仮の決定
 
-状態: **仮の決定（すべての応答と選択）**。依頼は PM（番号 0129 は PM の割り当て。最終の停止は PM の決定 (C) = 18:35 JST、壁 16 で停止して最終手順へ）。測定・実装・テスト・文書は作業者が行った。作業は HEAD **9574cb5** の `git archive`（`src/`）で始め、clean な写しを `clean/` に置いた。差分は `idle1.diff`（`diff -ruN clean src`、43 ファイル、約 493 KB。9574cb5 の clean な archive に `patch -p1` で当たる: dry-run 終了 0、fuzz・offset なし、当てた木 = 作業木）。現在の HEAD（36218f1）に当てる版は `idle1-on-head.diff`（0127 の `wall_fr11.rs` の期待値 1 か所の修正入り。MERGE-NOTES.md）。
+状態: **仮の決定（すべての応答と選択）**。依頼は PM（番号 0129 は PM の割り当て。最終の停止は PM の決定 (C) = 18:35 JST、壁 16 で停止して最終手順へ）。測定・実装・テスト・文書は作業者が行った。作業は HEAD **9574cb5** の `git archive`（`src/`）で始め、clean な写しを `clean/` に置いた。差分は `idle1.diff`（`diff -ruN clean src`、43 ファイル、約 493 KB。9574cb5 の clean な archive に `patch -p1` で当たる: dry-run 終了 0、fuzz・offset なし、当てた木 = ワークツリー）。現在の HEAD（36218f1）に当てる版は `idle1-on-head.diff`（0127 の `wall_fr11.rs` の期待値 1 か所の修正入り。MERGE-NOTES.md）。
 
 区分の凡例は決定 0123・0125・0126 と同じ。**実測**＝コマンドの出力を見た事実。**読み**＝逆アセンブルやコードを読んだ上での解釈。**Learn**＝Microsoft Learn のページ（取得日 2026-11-01、ページと SHA-256 は `learn/index.tsv`）。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者または PM が選んだ値（名前は `S-…`。撤回条件つき）。**未確認**。
 

@@ -4,7 +4,7 @@
 
 「実測」はツールの出力、「推測」は未検証の解釈。
 
-**混在の注意**: 作業ツリーには他の担当（x87、sysinfo、a5 oracle v2）の未コミット変更が混在している（`crates/fe-lift/src/x87.rs`、`runtime/fle_x87.h`、`tests/x87.rs`、`runtime/fle_sysinfo.c`、`imports_table.rs`、`fle_mmx.h` ほか）。以下の生成・ビルド・実行・テストは、すべてその混在状態の作業ツリー（HEAD fe9a1f6 + 他担当の未コミット + 私の変更）で行った。
+**混在の注意**: ワークツリーには他の担当（x87、sysinfo、a5 oracle v2）の未コミット変更が混在している（`crates/fe-lift/src/x87.rs`、`runtime/fle_x87.h`、`tests/x87.rs`、`runtime/fle_sysinfo.c`、`imports_table.rs`、`fle_mmx.h` ほか）。以下の生成・ビルド・実行・テストは、すべてその混在状態のワークツリー（HEAD fe9a1f6 + 他担当の未コミット + 私の変更）で行った。
 
 ## 1. 範囲の導出（objdump、実測）
 
@@ -39,7 +39,7 @@
 
 - 62 → 1: 実装した jmp は **61**（`jmp reg` の tail dispatch 57 + switch の表 3 + `f_40d210` の表 1）。残る 1 は `f_4126f0`（W3、名前付き abort のまま。生成 C の `L_412752: fle_unsupported`）。
 - 「register 形 jmp」は 20 箇所（遅延ロードヘルパの `jmp rax` 17 + switch 3）で、occurrence は 60（17 か所が 57 thunk に展開 + switch 3）。`jmp [mem]` は含まない。A2 の盲点（閉包に `jmp reg` が何件あるか）は **20 箇所**。
-- 「前」の `unsupported_total` 2,991 は、他担当の変更（x87、VEX など）が入る前の生成 C（`gen-pdata-b.txt`）。2,991 → 698 の差は私の変更だけではない: 他担当の変更（x87 の 2,193 行、SSE の packed など。x87 は `src/x87.rs` が作業ツリーにある）も含み、私の分だけは分離できない。私の変更だけの効果は、同じツリーで specs の有無だけを切り替えた測定（`baseline.txt`）で見る: 
+- 「前」の `unsupported_total` 2,991 は、他担当の変更（x87、VEX など）が入る前の生成 C（`gen-pdata-b.txt`）。2,991 → 698 の差は私の変更だけではない: 他担当の変更（x87 の 2,193 行、SSE の packed など。x87 は `src/x87.rs` がワークツリーにある）も含み、私の分だけは分離できない。私の変更だけの効果は、同じツリーで specs の有無だけを切り替えた測定（`baseline.txt`）で見る: 
   - specs なし（`jmp reg` は tail dispatch される）→ あり: `Jmp: unresolved` 2 → 1、表の 3 件の `jmp reg` は `reg_dispatch` から `table` へ（60 → 57 + 3）、閉包 +3,632 命令。
   - 「specs なし」でも switch の 3 件の `jmp reg` は W1 で tail dispatch されるので、**W1 単独の効果**（Jmp unresolved 62 → 2。うち 60 が `jmp reg`）は、この測定の「specs なし」の列から読める。2 の内訳は `f_4126f0` の `jmp [rcx]` と `f_40d210` の `jmp [r10+rdx*8+0x40]`（`jmp reg` でなく、メモリ形）。ただし switch の `jmp reg` 3 件は specs なしでは tail dispatch で `fle_dispatch_miss` になる（移動先が関数入口でない）ので、specs なしの生成 C は実行すると switch で止まる。
 - specs あり: `unsupported_total` が 690 → 698（**+8**）。内訳（実測、`baseline.txt` と `gen-pdata.txt` の一覧の差）: 表の移動先が新しく閉包に入れた命令のうち未対応のもの +9（`Test: high-byte register` 0 → 7、`Bswap` 5 → 7。すべて `f_5e8da0` 内）と、`Jmp: indirect target unresolved` 2 → 1（−1、`f_40d210` の表 jmp が解決された分）。+9 − 1 = +8。
@@ -67,7 +67,7 @@
 ### 4.3 ワークスペース全体（`out-ijmp/test-ws.txt`、`cargo test --offline --workspace --no-fail-fast`、EXIT=101）
 
 - 60 バイナリ、**531 件 passed、8 件 failed**、0 ignored。
-- 失敗 8 件はすべて他担当の x87 のテスト: `fe-lift/tests/x87.rs` の 7 件（`clang: error: no such file or directory: runtime/fle_x87.c`。作業ツリーに `runtime/fle_x87.c` がまだ無い）、`fe-lift/tests/x87ctl.rs` の `x87_arithmetic_stays_unsupported` 1 件（`lift_body(&[0xd9, 0x07]).is_err()` が成り立たない。x87 の命令が lift されるようになったため）。私の変更に起因するものはない（根拠: 失敗の原因が上記で、私が触っていないファイルと機能。**推測を含む**: 私の変更を外した状態では未測定）。
+- 失敗 8 件はすべて他担当の x87 のテスト: `fe-lift/tests/x87.rs` の 7 件（`clang: error: no such file or directory: runtime/fle_x87.c`。ワークツリーに `runtime/fle_x87.c` がまだ無い）、`fe-lift/tests/x87ctl.rs` の `x87_arithmetic_stays_unsupported` 1 件（`lift_body(&[0xd9, 0x07]).is_err()` が成り立たない。x87 の命令が lift されるようになったため）。私の変更に起因するものはない（根拠: 失敗の原因が上記で、私が触っていないファイルと機能。**推測を含む**: 私の変更を外した状態では未測定）。
 - その後、tailjmp.rs の T1 の変更とその変異の確認のあとで、`tailjmp` と `jumptab`（fe-lift）が 4 件・5 件、`fe-decode` 全体が 22 件で通過することを再確認した。ワークスペース全体は再実行していない。
 - 私の追加分: tailjmp 4 + fe-lift/jumptab 5 + fe-decode/jumptab 5 = 14 件。
 
@@ -76,7 +76,7 @@
 ### 5.1 生成・ビルド
 
 - `fe-lift lift ... --pdata`（`gen-pdata.txt`）→ `split_c.py`（16 分割、3,700 関数/ファイル。`out-pdata` のスクリプトの複製）→ `build-parts.sh`（`out-ijmp/build-parts.sh`。`out-pdata` の複製に、x87 のスタブのリンクを追加）。`fle_imp_*` 173 個はすべて `runtime/*.c` のどれかに定義されている（`imp-defs.txt`、MISSING 0）。
-- **x87 のランタイム `runtime/fle_x87.c` が作業ツリーに無い**ため、生成 C が呼ぶ `fle_x87_*` の未定義を埋めるスタブ（`out-ijmp/fle_x87_stub.c`、呼ばれたら abort して名前を出す）を測定用にリンクした。x87 の命令を実行する経路に着くとスタブで止まる。製品のコードではない。
+- **x87 のランタイム `runtime/fle_x87.c` がワークツリーに無い**ため、生成 C が呼ぶ `fle_x87_*` の未定義を埋めるスタブ（`out-ijmp/fle_x87_stub.c`、呼ばれたら abort して名前を出す）を測定用にリンクした。x87 の命令を実行する経路に着くとスタブで止まる。製品のコードではない。
 - ビルド 32.8 秒、最大 RSS 1,201 MB、EXIT=0（`build.txt`、`build.err`）。生成 C は 217,968,523 バイト、2,880,335 行。
 
 ### 5.2 停止点（実測、`run.txt`）

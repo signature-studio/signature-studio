@@ -20,8 +20,8 @@
 
 - bundle: 出荷の形(`NO_FS=1`)。`SHIP_PRESET=F2xH5`(F2xH4 + ship5 の import 210 行 + 混成 1,009 関数)。**L5s** = HEAD `ba85d14b` に `ship5.diff`(F2xH7 の preset、決定 0235)と ship5 の `hyb-L5s-*.txt` 6 本(L5 の 13,133 関数から本体 20,000 B 以上の新規 119 関数を除いた物)を当て、`SHIP_PRESET=F2xH7 HYBRID_SETS=L5s`(wasm 133,901,826 B)。ship5 が渡した bundle は HEAD 86ae7d85 の物で決定 0233 が入っておらず、参照プロジェクトが `LoadLibraryW("oggio_x64.dll")` で止まるため使わなかった。
 - ページ: HEAD の `app/` を `vite build` し、`vite preview`(`FL_ASSETS_DIR` = bundle + `proj/` = 参照プロジェクトの 49 ファイル〔読み取り専用〕)。ポートは 5236〜5241(自分の分)。`?debug=1` つき(窓表の読み取りに必要)。
-- 計測は**ページ既存の仕組み**: `window.__app.audio`(`detail()`: underrun 量子・エピソード・無音でない量子・peak/rms・エンジンの gap フレーム、`pulses`: 実時計/仮想時計/書き込み/消費)。CPU は `/proc/<pid>/task/<tid>/stat` のスレッド別(ブラウザのプロセス木)。PCM は既存の `armCapture`(AudioWorklet の消費側の read-only の複写、timeline モード)。出荷の差分に入れた計測フックは 0。
-- 診断版: `tools/diag-vfs-lookup.diff`(`fle_vfs.c` の `lookup` を包み、全ての経路探索を `ref3-lookup API PATH -> STATUS` として stderr に出す。結果は変えない)。**差分に入れない**(試験用)。
+- 計測は**ページ既存の仕組み**: `window.__app.audio`(`detail()`: underrun 量子・エピソード・無音でない量子・peak/rms・エンジンの gap フレーム、`pulses`: 実時計/仮想時計/書き込み/消費)。CPU は `/proc/<pid>/task/<tid>/stat` のスレッド別(ブラウザのプロセス木)。PCM は既存の `armCapture`(AudioWorklet の消費側の read-only のコピー、timeline モード)。出荷の差分に入れた計測フックは 0。
+- 診断版: `tools/diag-vfs-lookup.diff`(`fle_vfs.c` の `lookup` を包み、全ての経路探索を `ref3-lookup API PATH -> STATUS` として stderr に出す。結果は変えない)。**差分に入れない**(テスト用)。
 
 ## 2. 『2 sample(s) could not be located』の原因
 
@@ -190,8 +190,8 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 
 ## 6. OS フォントの差分 `ref3-fonts.diff`(PM の指示 (3))
 
-- 内容: `lift/harness/seeds/vfs-seed-idle1.tsv` に 3 行(`C:\Windows\Fonts\arial.ttf` = Liberation Sans Regular、`tahoma.ttf` = DejaVu Sans、`lucon.ttf` = DejaVu Sans Mono。決定 0148 と同じ代用)、`ci/lib/extract_fl.py`(host path が `lift/harness/seeds/os-fonts/` の行をリポジトリから HOST_ROOT へ複写して SHA-256 を確認する、追加 20 行)、`lift/harness/seeds/os-fonts/README.md` とライセンス文 2 本。**`-` 行 0**。ttf 3 本(1,513,680 B)は diff に載らないので results の `os-fonts/` に別置(当て方は MERGE-NOTES)。
-- 出典とライセンス: ttf は Ubuntu のパッケージ `fonts-dejavu-core 2.37-8build1` と `fonts-liberation 1:2.1.5-3build1` のファイルとバイト一致(SHA-256 は README と TSV)。DejaVu = Bitstream Vera / Arev / パブリックドメインの追加(再配布可)、Liberation = SIL OFL 1.1(再配布可。予約フォント名は改変版の話で、ここでは改変せず、`arial.ttf` は仮想 volume 上のファイル名にすぎない)。ライセンス文はパッケージの copyright を複写。バイナリのコミットは、リポジトリに OS フォントが無く、installer にも無い(vfs-seed-fonts.tsv の FL 自身のフォントは installer から抜く)ため、ほかに道が無い(代案: CI で `apt-get install fonts-dejavu-core fonts-liberation` して SHA-256 を固定 → runner の image が変わると build が落ちる)。**S-ref3-fonts-commit**。`segoeui.ttf` は足さない(決定 0148 D2。PM: ヒントバーが折り返す)。
+- 内容: `lift/harness/seeds/vfs-seed-idle1.tsv` に 3 行(`C:\Windows\Fonts\arial.ttf` = Liberation Sans Regular、`tahoma.ttf` = DejaVu Sans、`lucon.ttf` = DejaVu Sans Mono。決定 0148 と同じ代用)、`ci/lib/extract_fl.py`(host path が `lift/harness/seeds/os-fonts/` の行をリポジトリから HOST_ROOT へコピーして SHA-256 を確認する、追加 20 行)、`lift/harness/seeds/os-fonts/README.md` とライセンス文 2 本。**`-` 行 0**。ttf 3 本(1,513,680 B)は diff に載らないので results の `os-fonts/` に別置(当て方は MERGE-NOTES)。
+- 出典とライセンス: ttf は Ubuntu のパッケージ `fonts-dejavu-core 2.37-8build1` と `fonts-liberation 1:2.1.5-3build1` のファイルとバイト一致(SHA-256 は README と TSV)。DejaVu = Bitstream Vera / Arev / パブリックドメインの追加(再配布可)、Liberation = SIL OFL 1.1(再配布可。予約フォント名は改変版の話で、ここでは改変せず、`arial.ttf` は仮想 volume 上のファイル名にすぎない)。ライセンス文はパッケージの copyright をコピー。バイナリのコミットは、リポジトリに OS フォントが無く、installer にも無い(vfs-seed-fonts.tsv の FL 自身のフォントは installer から抜く)ため、ほかに道が無い(代案: CI で `apt-get install fonts-dejavu-core fonts-liberation` して SHA-256 を固定 → runner の image が変わると build が落ちる)。**S-ref3-fonts-commit**。`segoeui.ttf` は足さない(決定 0148 D2。PM: ヒントバーが折り返す)。
 - キャッシュ: `ci/plan.sh` の seed の key は `lift/harness/seeds` 全体のハッシュを含むので ttf の変更で変わる。extract の key は `vfs-seed-idle1.tsv` を含むので TSV の変更で extract 以降が再実行される(いつもの TSV 変更と同じ)。
 - **影響(実測、出荷の形)**:
 
@@ -209,7 +209,7 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 
 ## 7. 差分・基準の確認
 
-- `ref3.diff`: **作らない**(出荷経路に契約の不足が無い)。`ref3-fonts.diff` は上の §6。診断の差分 `tools/diag-vfs-lookup.diff` は試験用で採らない。
+- `ref3.diff`: **作らない**(出荷経路に契約の不足が無い)。`ref3-fonts.diff` は上の §6。診断の差分 `tools/diag-vfs-lookup.diff` はテスト用で採らない。
 - `ref3-fonts.diff`: HEAD `ba85d14b` の `git archive` に `patch -p1 --dry-run` rc=0(offset・fuzz・reject なし)。`-` 行 0。CI の静的検査: `python3 -m py_compile ci/lib/extract_fl.py` OK、`ci/test-needs.sh`(256 通り、不変条件すべて成立)、`ci/test-hybrid.sh`(all checks hold)、`ci/test-wrangler-config.sh`(all cases behaved)。CI の段スクリプト(extract→seed→bundle)で bundle が作れることを確認(extract_fl: 6 DLL + 221 seed file〔218 + 3〕、すべて SHA-256 確認)。
 - 生成 C・`test.sh full`・a4: 変えたのは `ci/lib/extract_fl.py`、`vfs-seed-idle1.tsv`、新規 `lift/harness/seeds/os-fonts/` だけで、`lift/crates`・`lift/runtime` は HEAD の `git archive` と byte 一致(`diff -rq`)。よって FLEngine の既定の生成 C の sha256 `cd9107ce…e50` は構成上不変(lift の入力に差が無い)。`lift/harness/testfast/deps.tsv`(501 行。strace で記録した各テスト実行体が読むファイル)に `vfs-seed-idle1`・`os-fonts`・`extract_fl` は 0 件、`lift/crates` の `*.rs` にも 0 件で、どのテスト実行体も今回の変更を読まない。a4 の FRUITY 無効(942/942・895/895・5,310・1,009,737)は seed を読まない。**`test.sh full --jobs 3` と a4 は再実行していない**(静かな機械の時間を曲の速さの測定に回し、変更が lift に及ばないため)。PM が当てた後の確認を前提にする。
 
@@ -227,13 +227,13 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 | S-ref3-l5s-build | L5s を HEAD `ba85d14b` + ship5.diff + ship5 の 6 リストで自分で build(ship5 の bundle は load1 無し) | ship5 の bundle(参照プロジェクトが開かない) |
 | S-ref3-h6-control | F2xH6 の陽性対照は HEAD + ship4-h6.diff(未達) | — |
 | S-ref3-fonts-commit | 代用フォント 3 本をリポジトリにコミット(`lift/harness/seeds/os-fonts/`) | CI で apt して SHA-256 固定 |
-| S-ref3-fonts-extract | extract_fl.py が `lift/harness/seeds/os-fonts/` の行をリポジトリから複写 | pack_seed.py に第 2 の root、別の TSV |
+| S-ref3-fonts-extract | extract_fl.py が `lift/harness/seeds/os-fonts/` の行をリポジトリからコピー | pack_seed.py に第 2 の root、別の TSV |
 | S-ref3-p3-window | P3 の数は Space 後の 30 秒(sampleAudio)とその前の読み込み中に分ける | 全期間 |
 
 ## 9. PM の判断点
 
 1. **F2xH5 の再生は曲の速さが実時間の 0.6〜0.9 倍、L5s は 0.7〜1.04(平均 Chrome 0.95、Firefox 0.87)**。ship5/mt の判断材料。L5s の追加反復は静かな時間帯に(必要なら続ける)。
-2. 代用 3 フォントの出荷 seed への追加(`ref3-fonts.diff` + `os-fonts/*.ttf` の複写)の採否。seed pack +1.5 MB(brotli +0.6 MB)、wasm 不変。
+2. 代用 3 フォントの出荷 seed への追加(`ref3-fonts.diff` + `os-fonts/*.ttf` のコピー)の採否。seed pack +1.5 MB(brotli +0.6 MB)、wasm 不変。
 3. oggio を入れる F2xH6 は API set 名の LoadLibrary(決定 0238)が先。
 
 ## 10. 再現表(作業ディレクトリ `lift/out-ref3/` の相対。`tools/` はこの結果の `tools/`)
@@ -256,7 +256,7 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 
 ## PM の判断と取り込み(2026-11-05)
 
-取り込んだ基準: HEAD d5b78566 に `ref3-fonts.diff`(5 ファイル、`-` 0 行、offset・fuzz・reject なし)を `patch -p1`。差分に載らない ttf 3 本(DejaVuSans.ttf 759,720 B、DejaVuSansMono.ttf 343,140 B、LiberationSans-Regular.ttf 410,820 B)を `lift/harness/seeds/os-fonts/` に置き、SHA-256 が `vfs-seed-idle1.tsv` の行と一致することを確認した。PM が測った値(この機械): `ci/test-needs.sh` 256 組み合わせ ok、`ci/test-hybrid.sh` 全項目 ok、`ci/test-wrangler-config.sh` ok、vitest 1,377 passed + 7 skipped、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。lift/crates と lift/runtime は変えていないので、生成 C の sha256 とフル試験は再実行していない(ref3 の報告どおり、HEAD と byte 一致)。
+取り込んだ基準: HEAD d5b78566 に `ref3-fonts.diff`(5 ファイル、`-` 0 行、offset・fuzz・reject なし)を `patch -p1`。差分に載らない ttf 3 本(DejaVuSans.ttf 759,720 B、DejaVuSansMono.ttf 343,140 B、LiberationSans-Regular.ttf 410,820 B)を `lift/harness/seeds/os-fonts/` に置き、SHA-256 が `vfs-seed-idle1.tsv` の行と一致することを確認した。PM が測った値(この機械): `ci/test-needs.sh` 256 組み合わせ ok、`ci/test-hybrid.sh` 全項目 ok、`ci/test-wrangler-config.sh` ok、vitest 1,377 passed + 7 skipped、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。lift/crates と lift/runtime は変えていないので、生成 C の sha256 とフルテストは再実行していない(ref3 の報告どおり、HEAD と byte 一致)。
 
 1. **代用フォント 3 種(arial=Liberation Sans〔SIL OFL 1.1〕、tahoma=DejaVu Sans・lucon=DejaVu Sans Mono〔Bitstream Vera 系〕)を出荷の seed に足す。** Problems 窓の一覧の文字が空だった原因(OS フォントの入力不足、決定 0148 S-font-lucon)の解消。字形は実機の Lucida Console・Tahoma・Arial ではない(出典なしの選択、決定 0148 の S-font-*)。seed pack は +1,514,616 B、wasm は不変、起動 16 スナップ 84 行は基準と全行一致、プロジェクト読み込み後の画面の差は 89 画素/2.18M。
 2. **『2 sample(s) required by this project could not be located』の原因は、出荷構成に oggio_x64.dll が無いこと**(契約の不足ではない)。oggio と Elastique を入れる構成は決定 0238(load2)が進めている。

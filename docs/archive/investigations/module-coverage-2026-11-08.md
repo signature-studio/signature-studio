@@ -38,7 +38,7 @@
 
 git（読み取りのみ）:
 
-- `sed -n '48p' app/scripts/build-engine-bundle.sh`（作業ツリー。HEAD と同じ行）: `EXTRA_MODULES="oggio elastique"; NEXTRA=2`
+- `sed -n '48p' app/scripts/build-engine-bundle.sh`（ワークツリー。HEAD と同じ行）: `EXTRA_MODULES="oggio elastique"; NEXTRA=2`
 - `ci/extract-dlls.tsv` の数: 全 11 行、コメント 3 行、本体 8 行（`grep -v -E '^\s*(#|$)' | wc -l` = 8）。Fruity / Soundgoodizer / FLEX / Frequency / Parametric を grep: 0 件
 - `git grep HEAD` で 7 種の名前を `app/scripts`・`ci`・`lift/harness/seeds`・`lift/harness/b2d2/gen-direct.sh` から検索: 0 件（ヒットは無関係なフォントのバイナリだけ）
 

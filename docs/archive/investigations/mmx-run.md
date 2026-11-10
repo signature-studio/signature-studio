@@ -47,7 +47,7 @@
 - **`unsupported_total`: 411 → 340**（−71）。`unsupported` の種類は 25 → 9。差の内訳（`u-sse2.txt` と `u-mmx.txt` の diff、および `out-shuf/gen-shuf-896.txt` との diff）:
   - MMX と Emms の 40 件（12 mnemonic）が handled に移った（`mmx_*` の handled 件数: movd 10、punpcklbw 5、packuswb 4、paddw 4、pxor 4、pmulhuw 3、emms 3、movq 2、psllw 2、pmulhw 1、pshufw 1、psubsw 1 = 40）。**今回の変更による減少は 40 件。**
   - 0027（`sse_shuf`、別担当、すでにコミット済みの HEAD b464d45）の 26 件（Shufps 13、Movlps 8、Movhlps 3、Movlhps 2）。直前の生成 `out-shuf/gen-shuf-896.txt` は 385 で、411 − 26 = 385。
-  - 残りの −5: `Jmp: indirect through IAT slot` が 304 → 299。作業ツリーの `imports_table.rs` と `runtime/fle_res.c`（別担当の未コミットの変更）が FindResourceW、LoadResource、LoadStringW、LockResource、SizeofResource の 5 つを解決したため（生成 C の 0x407030 が `fle_imp_LoadStringW` を呼ぶ形になり、`fle_res.o` なしのリンクが上の 5 シンボルの未定義で失敗したことから）。**今回の変更によるものではない。** 385 − 40 − 5 = 340 で算術は一致。
+  - 残りの −5: `Jmp: indirect through IAT slot` が 304 → 299。ワークツリーの `imports_table.rs` と `runtime/fle_res.c`（別担当の未コミットの変更）が FindResourceW、LoadResource、LoadStringW、LockResource、SizeofResource の 5 つを解決したため（生成 C の 0x407030 が `fle_imp_LoadStringW` を呼ぶ形になり、`fle_res.o` なしのリンクが上の 5 シンボルの未定義で失敗したことから）。**今回の変更によるものではない。** 385 − 40 − 5 = 340 で算術は一致。
 - clang -O0 とリンク: `out-mmx/build.sh`（`out-sse2/build.sh` の複製）。`EXTRA_RT` は int-more2-run.md §4 と同じ一覧に `fle_res` を足した（上記の別担当の変更で必要）。1 回目は `fle_res` なしで 5 シンボルの未定義参照でリンク失敗、2 回目は EXIT=0（`build-896.txt`）。`fle_mmx.h` は header only で、runtime に `.o` は増えていない（`fle_x87ctl.o` は既存の `EXTRA_RT` に入っている）。
 
 ## 5. 実行

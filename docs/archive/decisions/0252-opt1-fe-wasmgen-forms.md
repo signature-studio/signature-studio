@@ -11,8 +11,8 @@
    - **書き込み率(60 s、各 1 本)**: エンジンの率(unlock の列)は、10〜60 s の平均で 本番 0.322 → E4 0.384(+19%)、60 s 全体で 0.373 → 0.430(+15%)。**各 1 本で、同じ bundle の run 間の揺れ(0.282 と 0.322)と同程度なので、差が雑音を超えているとは言えない。P3(1.0)には遠い**(§5b)。
    - cargo test -p fe-wasmgen: opt1-f の木で 22 結果・26 成功・0 失敗、E4 の木で 24 結果・38 成功・0 失敗(§6)。`opt1-f.diff`・`opt1-f-lists.diff` は HEAD 62ca650b の `git archive` に `patch -p1 --dry-run` が通る。
    - **first idle**: Chrome の交互 8 組は load 15〜17 で、規則の『load ≤10』を満たす組が無く集計していない(参考: 中央値差 E4−本番 −354 ms、標準誤差 312 ms。§5b)。
-2. **未確認 / 未実行**: (a) **f_b39dc10(Rcpps)と f_b1c44c0 の実エンジンでの出力の同一性**(Export・node の参照 87 行のどちらでも実行されなかった。差分試験のみ)。(b) ネイティブとの一致(この参照プロジェクトにネイティブの基準が無い。決定 0208 の `f5c6a08b…` は別プロジェクトの値)。(c) a4(PM が回す)、Worker CPU の交互 A/B、C 経路:直の命令比、4 層(直 / C 経路 / SSE 補助 / ヘルパ)の表(C 部の名前つきの版が要る。作っていない)、Firefox。(d) +40 のリスト以外の組(手書きの 9 関数の E2 は規則の出力ではない)。(e) unbalanced(RSP)と ② の実装(設計と見積りだけ、§7)。(f) 依頼者の機械・実 Windows・実 GPU(0 件)。
-3. **判断(PM の取り込みを待つ)**: `opt1-f.diff`(fe-wasmgen 3 ファイル + `hybrid_glue.c` + 試験 4 本。既定の FLEngine の生成 C は変えない)を取り込み、続けて mt3 の二本、`opt1-f-lists.diff`(+40 と試験の件数)の順。リストは手で足さず 0239 の規則の再実行の差分(§8)。取り込む順は PM の乾式確認と同じ。書き込み率・first idle の差は雑音との区別がついていないので、P3 の達成の根拠にはしない。
+2. **未確認 / 未実行**: (a) **f_b39dc10(Rcpps)と f_b1c44c0 の実エンジンでの出力の同一性**(Export・node の参照 87 行のどちらでも実行されなかった。差分テストのみ)。(b) ネイティブとの一致(この参照プロジェクトにネイティブの基準が無い。決定 0208 の `f5c6a08b…` は別プロジェクトの値)。(c) a4(PM が回す)、Worker CPU の交互 A/B、C 経路:直の命令比、4 層(直 / C 経路 / SSE 補助 / ヘルパ)の表(C 部の名前つきの版が要る。作っていない)、Firefox。(d) +40 のリスト以外の組(手書きの 9 関数の E2 は規則の出力ではない)。(e) unbalanced(RSP)と ② の実装(設計と見積りだけ、§7)。(f) 依頼者の機械・実 Windows・実 GPU(0 件)。
+3. **判断(PM の取り込みを待つ)**: `opt1-f.diff`(fe-wasmgen 3 ファイル + `hybrid_glue.c` + テスト 4 本。既定の FLEngine の生成 C は変えない)を取り込み、続けて mt3 の二本、`opt1-f-lists.diff`(+40 とテストの件数)の順。リストは手で足さず 0239 の規則の再実行の差分(§8)。取り込む順は PM の乾式確認と同じ。書き込み率・first idle の差は雑音との区別がついていないので、P3 の達成の根拠にはしない。
 
 ## 1. 何を変えたか(すべて fe-wasmgen と hybrid_glue.c。lifter・runtime は変えない)
 
@@ -22,9 +22,9 @@
 | Cvtpd2dq | `mx_packed2` に追加。窓は指数 513..1053、`f64x2.nearest` + `trunc_sat_zero` と select(NaN・範囲外は 0x80000000)。窓の外は C の `fle_mx_cvtpd2dq`(kind 60) | 同上 |
 | Movsldup / Movshdup | 素の shuffle(`is_sse_x2`) | 命令の意味 |
 | Rsqrtps / Rsqrtss / Rcpps / Roundps / Roundpd | `mx_c_only`: 常に C の関数を呼ぶ(kind 61..65)。XMM は X[] 経由。Roundps / Roundpd は呼んだ後にガードを更新 | 近似値の下位ビットは実装依存なので C の関数と同じ結果を保つ(命令の意味)。C 経路の関数全体を C に残さず、この命令だけ C を呼ぶ = 変換の削減 |
-| opaque callee stub(0181 の `--opaque-stub` の健全な形。旗なし) | フロー解析が『recipe の無いフラグ』だけで失敗した関数(`flag read/merge from a definition without recipe`・`reads AF`)で、`abi_helper` が真の物を、呼び出し側が stub として呼ぶ。`solve` の**前に**保存レジスタと入出力の署名を与える(`nocfg`) | 0181 は署名を `solve` の**後**に入れたため、呼び出し側が持っていないレジスタを 0 で書き戻した(試験 `opaque_stub.rs` で再現: 出力が全部 0)。= 余計な(誤った)処理の除去と Windows x64 の呼び出し規約の実装。フラグを呼び出し元に渡す必要がある関数・デコードできない関数は opaque のまま |
+| opaque callee stub(0181 の `--opaque-stub` の健全な形。旗なし) | フロー解析が『recipe の無いフラグ』だけで失敗した関数(`flag read/merge from a definition without recipe`・`reads AF`)で、`abi_helper` が真の物を、呼び出し側が stub として呼ぶ。`solve` の**前に**保存レジスタと入出力の署名を与える(`nocfg`) | 0181 は署名を `solve` の**後**に入れたため、呼び出し側が持っていないレジスタを 0 で書き戻した(テスト `opaque_stub.rs` で再現: 出力が全部 0)。= 余計な(誤った)処理の除去と Windows x64 の呼び出し規約の実装。フラグを呼び出し元に渡す必要がある関数・デコードできない関数は opaque のまま |
 
-試験(新規 2 本・既存 2 本の拡張): `opaque_stub.rs`(0181 の挿入順は出力 0、修正版はホストの算術と一致)、`c_only_forms.rs`(kind・レーン・imm の変異 3 つを検出)、`mx_rc_wire.rs`(Cvtps2dq / Cvtpd2dq の窓の内外と特殊値)、`sse_forms.rs`(Cvtpd2dq と f64 の tie)。変異検査: `nearest` を外す(999 値が違う)、上限の定数を変える(2 値が違う)ことを検出。
+テスト(新規 2 本・既存 2 本の拡張): `opaque_stub.rs`(0181 の挿入順は出力 0、修正版はホストの算術と一致)、`c_only_forms.rs`(kind・レーン・imm の変異 3 つを検出)、`mx_rc_wire.rs`(Cvtps2dq / Cvtpd2dq の窓の内外と特殊値)、`sse_forms.rs`(Cvtpd2dq と f64 の tie)。変異検査: `nearest` を外す(999 値が違う)、上限の定数を変える(2 値が違う)ことを検出。
 
 ## 2. 実エンジンの測定(場面 b = 参照プロジェクトを開き Problems を閉じて Space、45 s 再生。Chrome 156、V8 の CPU プロファイル、各 1 回、load 12〜20。A = 本番 251dfabc、E2 = §0 のバイト列)
 
@@ -83,7 +83,7 @@
 
 - WAV は本物: 44.1 kHz stereo 16 bit、ピーク 32767、ゼロ標本 3.0%、10 s 窓の rms 11,343〜23,841(最後の窓 13,758)。
 - **Export 中に実行された直 wasm の本体**(E2 のプロファイル。`tables/0252-export-e2-profile-functions.txt`): f_b2f3650 自己 8.3 s・包含 26.7 s、f_b2cebc0 1.1 s、f_b301c10 自己 1.0 s・包含 2.3 s、f_b2c8320 0.2 s、f_6a74a0 0.17 s。直 Elastique の合計は busy の 28.6%(61.8 s)。
-- **実行されなかった物**: f_b39dc10(Rcpps)、f_6c7ae0、f_6c8910、f_48b2de0(b2d の Cvtpd2dq)の本体は Export で 0 サンプル。この 4 関数の出力の正しさは、この Export の一致からは言えない(試験 `mx_rc_wire.rs`・`c_only_forms.rs`・`sse_forms.rs` の差分試験と、場面 b の再生で止まらなかったことだけ)。
+- **実行されなかった物**: f_b39dc10(Rcpps)、f_6c7ae0、f_6c8910、f_48b2de0(b2d の Cvtpd2dq)の本体は Export で 0 サンプル。この 4 関数の出力の正しさは、この Export の一致からは言えない(テスト `mx_rc_wire.rs`・`c_only_forms.rs`・`sse_forms.rs` の差分テストと、場面 b の再生で止まらなかったことだけ)。
 - 限界: ネイティブの基準は無い(決定 0208 の `f5c6a08b…` は別プロジェクトの値)。A と E2 の一致は『この変更が出力を変えなかった』ことの証拠で、『出力が正しい』ことの証拠ではない。各 1〜2 本。Firefox は未実行。
 
 ## 5b. E4(opt1-f + mt3-wasmgen-small + mt3-x87-lower、リスト +40)
@@ -93,8 +93,8 @@
 - **wasm**: 142,379,044 B。モジュール別(-Oz の直 wasm、ciQ → E4): fle +59,240・dsp +13,823・oggio +162,129・Elastique +645,055(1,183,785 → 1,828,840 B)・他 4 モジュール 0。直モジュールの合計 +880,247 B、**C 部 −304,410 B**(40 関数の C の本体を strip が取った分)。差し引き +575,837 B(+0.41%)。S1 の線 154,885,888 B の内。
 - **cargo test**(exp4 の木): 24 結果・38 成功・0 失敗(mt3 の `small_ops_hybrid`・`x87_hybrid` を含む。`logs/0252-cargo-test-fe-wasmgen-e4.txt`)。
 - **場面 b の関数別**(`tables/0252-scene-b-45s-functions-base-vs-e4.txt`、各 1 本、自己 / 包含 ms): f_67a160 310/1,969(C 経路)→ 354/1,171(body)、f_6a1e50 208/531 → 88/88、f_3ac7790 222/263 → 38/38、f_b1bb1c0 80/149 → 105/105、f_b2f3650 1,077/4,905 → 783/2,406。Worker busy 40.5 s(A)/ 39.9 s(E2)/ 40.0 s(E4)。
-- **Rcpps の腕**(PM の質問): f_67a160 の body の包含 1,171 ms の内訳は、x87 ヘルパ 710 ms(fle_x87_arith_st 283・fst_m 217・arith_m 138・fld_m 35・com_st 31・fld_st 6)と、**Rcpps の C 呼び出し fle_hyb_mx 102 ms(8.7%)**。C 経路(310 / 1,969)に対して自己 +44 ms、包含 −798 ms(−41%)。**利得を食っていない。逆転しない**。表引きのインライン化(fle_rcp_table.h の 4,096 エントリを直 wasm のデータセグメントに置く)の上限は 0.1 s / 45 s(Worker の 0.2%)で、50〜80 行 + 試験。今回は実装しない。
-- **Export の同一性**(E4、プロファイル付き 1 本、171 s): 22,863,828 B・sha256 `381cdb5a…f979`、A とバイト一致。Export 中に実行された本体(包含 ms): f_67a160 4,233・f_679800 730・f_679340 195・f_6a1e50 647・f_3ac7790 199・f_b1bb1c0 1,566・f_b2f3650 23,441・f_b301c10 1,807・f_b2cebc0 902・f_b2c8320 204・f_6a74a0 152・f_38b7570 102・f_b2fd570 107(`tables/0252-export-e4-profile-functions.txt`)。Export で 0 サンプル: f_b39dc10・f_6c7ae0・f_6c8910・f_69a130・f_b1c44c0・f_32e9c00(ほぼ 0)。**この 6 関数の実エンジンでの出力の同一性**: f_6c8910・f_69a130・f_32e9c00・f_6c7ae0 は E4 の node 参照 87 行の run で実行され(自己 85・7・9・1 ms)、行は基準と一致(= 画素・ウィンドウ表・進捗の行。音は比べていない)。**f_b39dc10(Rcpps)と f_b1c44c0 は実エンジンで実行された run が無い(場面 b の再生では f_b39dc10 が E2 で 52 ms 実行されたが、その出力は比べていない)。この 2 関数は『実エンジンでは未確認』で、差分試験のみ**。
+- **Rcpps の腕**(PM の質問): f_67a160 の body の包含 1,171 ms の内訳は、x87 ヘルパ 710 ms(fle_x87_arith_st 283・fst_m 217・arith_m 138・fld_m 35・com_st 31・fld_st 6)と、**Rcpps の C 呼び出し fle_hyb_mx 102 ms(8.7%)**。C 経路(310 / 1,969)に対して自己 +44 ms、包含 −798 ms(−41%)。**利得を食っていない。逆転しない**。表引きのインライン化(fle_rcp_table.h の 4,096 エントリを直 wasm のデータセグメントに置く)の上限は 0.1 s / 45 s(Worker の 0.2%)で、50〜80 行 + テスト。今回は実装しない。
+- **Export の同一性**(E4、プロファイル付き 1 本、171 s): 22,863,828 B・sha256 `381cdb5a…f979`、A とバイト一致。Export 中に実行された本体(包含 ms): f_67a160 4,233・f_679800 730・f_679340 195・f_6a1e50 647・f_3ac7790 199・f_b1bb1c0 1,566・f_b2f3650 23,441・f_b301c10 1,807・f_b2cebc0 902・f_b2c8320 204・f_6a74a0 152・f_38b7570 102・f_b2fd570 107(`tables/0252-export-e4-profile-functions.txt`)。Export で 0 サンプル: f_b39dc10・f_6c7ae0・f_6c8910・f_69a130・f_b1c44c0・f_32e9c00(ほぼ 0)。**この 6 関数の実エンジンでの出力の同一性**: f_6c8910・f_69a130・f_32e9c00・f_6c7ae0 は E4 の node 参照 87 行の run で実行され(自己 85・7・9・1 ms)、行は基準と一致(= 画素・ウィンドウ表・進捗の行。音は比べていない)。**f_b39dc10(Rcpps)と f_b1c44c0 は実エンジンで実行された run が無い(場面 b の再生では f_b39dc10 が E2 で 52 ms 実行されたが、その出力は比べていない)。この 2 関数は『実エンジンでは未確認』で、差分テストのみ**。
 - **node の行(E4 の FS test ビルド)**: 起動 84 行・参照 55 行・参照 87 行とも基準との差 **0 行**(`tables/g3-lines-0252-e4-*`)。参照 87 行の run で実行された本体は §3。
 - **書き込み率(E4 と本番、Chrome 156、場面 b を 60 s、各 1 本、10 s ごと。`tools/p3-rate.py`、`tables/0252-p3-write-rate-{e4,base}.txt`)**: 定義は gpu1 / mt3 と同じ(ゲストのミキサーが DirectSound の Unlock で書いたフレーム数 / 実時間のフレーム数、1.0 = 実時間)。『pulse』の列(ring の write_frames)はページが無音で埋めるので 1.00 に張り付き、エンジンの率ではない。『unlock』の列がエンジンの率:
 
@@ -114,7 +114,7 @@
 
 ## 5c. E5 = E4 + alpha7(決定 0258。runtime の `fle_win.c` だけ。PM の依頼 22:12)
 
-- **木と bundle**: HEAD 62ca650b の `git archive` + opt1-f → opt1-f-lists(+40)→ mt3-wasmgen-small → mt3-x87-lower → `alpha7.diff`(dry-run・本適用とも reject 0)= `exp5`。E4 の CI 作業ディレクトリ x4 は 3d91b2b3 の runtime で作った物なので、`lift/runtime` の 3d91b2b3 → HEAD の差が `fle_win.c` だけ(`git diff --stat` で確認)であることを使い、`rt/fle_win.o` だけを作り直して link → seed → bundle(`tools/0252/mk-x5.sh`。製品形の E5)。FS 付き試験ビルドは同じ木 + `rt/fle_win.o` を消して作り直し(`build_test5.sh`)。**E5 の engine wasm は 142,380,705 B(sha256 `ed049a99167f…`)= E4 + 1,661 B**(alpha5 + alpha7 の runtime の差)。
+- **木と bundle**: HEAD 62ca650b の `git archive` + opt1-f → opt1-f-lists(+40)→ mt3-wasmgen-small → mt3-x87-lower → `alpha7.diff`(dry-run・本適用とも reject 0)= `exp5`。E4 の CI 作業ディレクトリ x4 は 3d91b2b3 の runtime で作った物なので、`lift/runtime` の 3d91b2b3 → HEAD の差が `fle_win.c` だけ(`git diff --stat` で確認)であることを使い、`rt/fle_win.o` だけを作り直して link → seed → bundle(`tools/0252/mk-x5.sh`。製品形の E5)。FS 付きテストビルドは同じ木 + `rt/fle_win.o` を消して作り直し(`build_test5.sh`)。**E5 の engine wasm は 142,380,705 B(sha256 `ed049a99167f…`)= E4 + 1,661 B**(alpha5 + alpha7 の runtime の差)。
 - **node の行(E5 − E4、行ごとの差を種類別に数えた。`tables/0252-e5-alpha7-node-rows-vs-e4.txt`)**:
 
 | 組 | 種類 | 行数 | 変わった行 | 内容 | alpha1 の予測 |
@@ -136,7 +136,7 @@
 - **参照プロジェクトが開き、再生で止まらない(E5、Chrome 156、製品形の bundle、1 本)**: 開く → Problems を閉じる → Space → 45 s 再生。sdriveg2 の report は ok(opErrors なし、`expectRunning` 通過)。Worker の CPU は 38.07 s / 45.07 s(別のブラウザの Export と node の行を同時に走らせた最中で、他の測定と比べる値ではない)。
 - **Export の同一性(E5、1 本)**: WAV は 22,863,828 B・sha256 `381cdb5acf891a160e0286aab6b4822d08f661bcfd4f44f4f7184eda00d1f979` で、本番 251dfabc の WAV と**バイト一致**(E4 と同一)。= alpha7(ウィンドウの最大化・復元の契約)は音の出力を変えていない。ネイティブとの一致は未確認。
 
-## 6. 試験とパッチ
+## 6. テストとパッチ
 
 - `cargo test --release -p fe-wasmgen`: opt1-f の木で **22 結果・26 件成功・0 失敗**(rc=0。`logs/0252-cargo-test-fe-wasmgen.txt`)。E4 の木(+ mt3 の二本)で **24 結果・38 成功・0 失敗**(rc=0。mt3 の `small_ops_hybrid`・`x87_hybrid` を含む。`logs/0252-cargo-test-fe-wasmgen-e4.txt`)。
 - 乾式の適用(HEAD 62ca650b の `git archive`、リポジトリの根から `patch -p1 --dry-run`): `opt1-f.diff`(8 ファイル、offset なし・reject 0)→ `opt1-f-lists.diff` → `mt3-wasmgen-small.diff`(offset のみ)→ `mt3-x87-lower.diff`(lib.rs の最初の hunk が fuzz 2・offset 45。E4 の木で当てた後の差分を目で確認した)。reject 0。
@@ -146,8 +146,8 @@
 
 | 項目 | 原因 | 設計 | 行数(読み) | 直る関数の場面 b の自己時間 | 直ったときの削減(E2 の直/C の実測比 −40%〜−60% を当てた読み) |
 |---|---|---|---|---|---|
-| unbalanced の断片 | Elastique の f_b034096・f_b04a921 は、同じ関数(b034060..b0345c0 など)が pdata で複数の RUNTIME_FUNCTION に分かれた断片(unwind は CHAININFO でなく、各断片が自前の unwind コードを持つ)。末尾の `add rsp,N; ret` の共有エピローグへ jmp する。dsp の f_38e6d90 も同型(共有エピローグ 0x38e760c) | 『どの call からも呼ばれず(call 先・解決済みの間接 call 先・種に無い)、`pres` の解析で RSP が入口値にならない断片』を、jmp 元の関数の CFG に取り込む(`ir::traverse` の境界から外す。不動点まで繰り返す)。断片自体の関数としての出力は残す(C 側からの入口のため) | lib.rs 60〜90 + ir.rs 6 + 試験 100 | 421 + 388 + 429 + Blend2D 343 = 1,581 ms(うち Elastique 809) | 0.6〜0.9 s / 45 s |
-| ②(recipe の無いフラグ) | `shr r,cl` 後の jae / adc(cl == 0 でフラグが変わらない)、call が返すフラグ | `shr/shl/sar r,cl` の recipe(cl&31==0 なら前の定義を保つ合流)と、フラグを返す callee のための戻り値の追加 | 150〜300 + 試験 150 | 722 + 152 + 160 = 1,034 ms | 0.4〜0.6 s |
+| unbalanced の断片 | Elastique の f_b034096・f_b04a921 は、同じ関数(b034060..b0345c0 など)が pdata で複数の RUNTIME_FUNCTION に分かれた断片(unwind は CHAININFO でなく、各断片が自前の unwind コードを持つ)。末尾の `add rsp,N; ret` の共有エピローグへ jmp する。dsp の f_38e6d90 も同型(共有エピローグ 0x38e760c) | 『どの call からも呼ばれず(call 先・解決済みの間接 call 先・種に無い)、`pres` の解析で RSP が入口値にならない断片』を、jmp 元の関数の CFG に取り込む(`ir::traverse` の境界から外す。不動点まで繰り返す)。断片自体の関数としての出力は残す(C 側からの入口のため) | lib.rs 60〜90 + ir.rs 6 + テスト 100 | 421 + 388 + 429 + Blend2D 343 = 1,581 ms(うち Elastique 809) | 0.6〜0.9 s / 45 s |
+| ②(recipe の無いフラグ) | `shr r,cl` 後の jae / adc(cl == 0 でフラグが変わらない)、call が返すフラグ | `shr/shl/sar r,cl` の recipe(cl&31==0 なら前の定義を保つ合流)と、フラグを返す callee のための戻り値の追加 | 150〜300 + テスト 150 | 722 + 152 + 160 = 1,034 ms | 0.4〜0.6 s |
 | 小さい理由 | 32 ビットアドレス 138、メモリへのビットテスト 74、サイズ上限 260 | それぞれ 20〜40 行 | | 472 ms | 0.2 s |
 
 **読み**: 実装すると scene b の Worker で 1〜2 s / 45 s(2〜4%)。ミキサーの本命の x87(1,581 + 1,110 ms)は mt3 の領域。
@@ -161,7 +161,7 @@
   - **規則の再現の検証**: 0239 の入力(hyb-Ufull の 14,065 関数)に規則を当てると、99.99% の切り口は **3,942 関数で 0239 と一致**、LOCK 66 関数も一致、最終は 3,808 関数で現リスト 3,813 と 9 関数違う(現リストにだけある 7、再生成にだけある 2。9 関数とも直 wasm の本体が 20,000 B 付近の『起動で動く大関数』の判定。元の判定は hyb6 の古い report のサイズを使い、保存データからは完全には復元できなかった)。
   - fe-wasmgen の古い版(gpu1 の木のバイナリ = HEAD の版)と E4 の版に同じ規則を回して差を取った: 4,037 → 4,056 関数(**+40 / −21**)。+40 = fle 15・dsp 5・oggio 4・Elastique 16(§5b)。−21 は 99.99% の分母が増えて切り口の末尾が外れた物で、リストには残す。実行された関数の status の変化は §5b。
   - 規則を今の fe-wasmgen でそのまま回すと現リストから大きく増える(E2 の版で +239 / −7、pre-opt の wasm +約 0.83 MB。0239 以降に別の変更で直るようになった関数、例えば fle の 0xdd5a80 の 206 KB が混ざる)。これは採らず、**古い版との差だけ**を採った。
-  - **差分 `opt1-f-lists.diff`**: `hyb-U-{fle,dsp,oggio,elastique}.txt` に 40 行 + `ci/test-hybrid.sh` の件数。`ci/test-hybrid.sh` は件数を固定する試験なので、**規則の出力の件数に合わせて更新した(更新の理由 = リストが規則の再実行の出力に変わったから)**: 合計 3,813 → 3,853、elastique 139 → 155、oggio 42 → 46(fle 2,740 → 2,755 と dsp 151 → 156 は試験が固定していない)。HEAD 62ca650b の `git archive` に `patch -p1 --dry-run` が通る。適用後の件数は 3,853、重複 0。
+  - **差分 `opt1-f-lists.diff`**: `hyb-U-{fle,dsp,oggio,elastique}.txt` に 40 行 + `ci/test-hybrid.sh` の件数。`ci/test-hybrid.sh` は件数を固定するテストなので、**規則の出力の件数に合わせて更新した(更新の理由 = リストが規則の再実行の出力に変わったから)**: 合計 3,813 → 3,853、elastique 139 → 155、oggio 42 → 46(fle 2,740 → 2,755 と dsp 151 → 156 はテストが固定していない)。HEAD 62ca650b の `git archive` に `patch -p1 --dry-run` が通る。適用後の件数は 3,853、重複 0。
   - **E4 のリスト(= この +40)で bundle を作って測った**(§5b)。E2 の実験リスト(手書きの 9 関数)は `tables/0252-experimental-hyb-lists.diff` に記録しただけで、採らない。
 - CI のキーへの影響: `ci/plan.sh` の `H_WASM` / `H_GEN` / `H_SEED` は `lift/harness`(seeds を含む)をハッシュするので、リストの変更は lift・link・seed のキーを変え、全段が作り直しになる。`ci/test-hybrid.sh` は件数(合計 3,813、elastique 139)を固定しているので、リストを変えるなら件数の更新が要る。
 
@@ -197,5 +197,5 @@ opt1 の実エンジンの測定(PM は再現していない):
 判断:
 1. **採る**: `opt1-f.diff`(fe-wasmgen の Cvt*/Movsldup/Movshdup/Rsqrt/Rcp/Round の C 呼び出しと、0181 の `--opaque-stub` の署名を `solve` の前に入れた健全な形。**既定の生成 C は変えない**)、`opt1-f-lists.diff`(+40: fle 15、dsp 5、oggio 4、Elastique 16 = 規則〔決定 0239〕の再実行の出力のうち、本決定と mt3 の二本の変更に帰する差だけ。`ci/test-hybrid.sh` の件数 3,813 → 3,853、elastique 139 → 155、oggio 42 → 46)。mt3 の `mt3-wasmgen-small.diff`(0254)と `mt3-x87-lower.diff`(0259)も、この順で同じコミットに入れる。alpha7(0258)も同じコミットに入れる(判断は 0258 の PM 節)。リストを変えるので `ci/plan.sh` の H_WASM / H_GEN / H_SEED が動き、**1 回の全面の冷間ビルド**になる。
 2. **P3 の達成とは言わない**: 書き込み率は 10〜60 s の平均で本番 0.322 → E4 0.384(+19%)だが各 1 本で、同じ bundle の run 間の揺れ(0.282 と 0.322)と同程度。first idle は ≤10 の load の組が無く未測定(参考: 中央値差 −354 ms、標準誤差 312 ms)。直 wasm 化の効果(場面 b の `f_b2f3650` 包含 4,905 → 2,406 ms、`f_67a160` 1,969 → 1,171 ms、`f_6a1e50` 531 → 88 ms、`f_3ac7790` 263 → 38 ms)は関数単位で確かだが、ミキサーが CPU 律速のため Worker の busy には出ない(節約は書き込み量に回る)。本番に出てから、書き込み率を 10 s 刻みで繰り返し測る(ci1 と gpu1)。
-3. **未確認として残す**: Export・node の参照 87 行のどちらでも実行されなかった 6 関数(`f_b39dc10`〔Rcpps〕、`f_6c7ae0`、`f_6c8910`、`f_69a130`、`f_b1c44c0`、`f_32e9c00`)は、実エンジンでの出力の同一性が無い(差分試験のみ)。ネイティブとの一致(この参照プロジェクトにネイティブの基準が無い)、Firefox、依頼者の機械は 0 件。
+3. **未確認として残す**: Export・node の参照 87 行のどちらでも実行されなかった 6 関数(`f_b39dc10`〔Rcpps〕、`f_6c7ae0`、`f_6c8910`、`f_69a130`、`f_b1c44c0`、`f_32e9c00`)は、実エンジンでの出力の同一性が無い(差分テストのみ)。ネイティブとの一致(この参照プロジェクトにネイティブの基準が無い)、Firefox、依頼者の機械は 0 件。
 4. gpu1 の `gpu4-p1.diff` / `gpu4-p2.diff`(決定 0256)は、CPU/block の差が雑音内のため今回は入れない。mt3 の `mt3-rsp-delta*.diff` / `mt3-jt-copy.diff`(決定 0261)も入れない。

@@ -1,6 +1,6 @@
 # 0156: 最初のサードパーティ VST3 プラグイン(Xfer OTT 1.37)を lift して native と wasm で実際に実行した(DllMain から process まで)。process 1 ブロック(4096 フレーム = 92.88 ms)の CPU 時間は native -O2 で約 9.7 ms、wasm -O2 で約 11.6 ms、wasm -Oz で約 48 ms。実行された原命令は 1 ブロック 7.82M。実機との照合は無い。すべて仮の決定
 
-状態: **仮の決定(すべての選択)**。依頼は PM(番号 0156 は PM の割り当て、仮)。調査・実装・ビルド・測定・文書は作業者(vst2)が行った(2026-11-03 03:43〜。HEAD **0991f92** の `git archive` に対する差分 `vst2.diff`。`patch -p1 --dry-run` は 0991f92 から進んだ作業木〔HEAD 83006a9〕にも当たる)。**編集した既存ファイルは 4 つだけ**(いずれも `lift/crates/fe-lift/src/`): `imports_table.rs`・`lib.rs`・`main.rs`(opt-in の `--extra-imports ROWS.txt`。指定が無いときの生成 C は 1 バイトも変わらない)、`prefetch.rs`(PREFETCHW を他の prefetch と同じ本体で足した)。`lift/runtime/` は**無変更**。新規ファイルは `lift/harness/vst/` の下だけ。OTT のバイナリ・生成 C は成果物に入れていない。
+状態: **仮の決定(すべての選択)**。依頼は PM(番号 0156 は PM の割り当て、仮)。調査・実装・ビルド・測定・文書は作業者(vst2)が行った(2026-11-03 03:43〜。HEAD **0991f92** の `git archive` に対する差分 `vst2.diff`。`patch -p1 --dry-run` は 0991f92 から進んだワークツリー〔HEAD 83006a9〕にも当たる)。**編集した既存ファイルは 4 つだけ**(いずれも `lift/crates/fe-lift/src/`): `imports_table.rs`・`lib.rs`・`main.rs`(opt-in の `--extra-imports ROWS.txt`。指定が無いときの生成 C は 1 バイトも変わらない)、`prefetch.rs`(PREFETCHW を他の prefetch と同じ本体で足した)。`lift/runtime/` は**無変更**。新規ファイルは `lift/harness/vst/` の下だけ。OTT のバイナリ・生成 C は成果物に入れていない。
 
 > **これは lift した OTT の機械語を native(と wasm)で実行した最初の実測である。実機の OTT(Windows)との照合は無い**(Windows 実機なし、Wine は禁止)。出力が『正しい』ことは示していない。示したのは (i) 実行できたこと、(ii) 出力が有限・決定的・入力とパラメータに依存すること、(iii) native と wasm とコンパイル構成が違っても出力が 1 ビットも違わないこと、(iv) 時間と実行命令数。
 
