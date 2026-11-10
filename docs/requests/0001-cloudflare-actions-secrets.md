@@ -47,12 +47,14 @@ Exited with code 1
 ## 完了の確認コマンド
 ```
 gh secret list                                        → 5 名(上の Secrets の名前と一致)
-gh variable list                                      → CLOUDFLARE_ACCOUNT_ID が 1 件
-gh run list --workflow cloudflare-check.yml --limit 1 → success
+gh run list --workflow cloudflare-check.yml --limit 1 → success(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)
 ```
+
+注: 後任の identity では `gh variable list` が 403 になる(2026-11-10 の実測。上の「自分で試した記録」)。そのため Variable の有無は一覧では見られない。上の実行結果で確かめる。
 
 ## 依頼なしで続ける作業
 R0 の全行、R1〜R3、R4-2〜R4-4、R5 の測定系(Actions を使わない物)。
 
 ## 確認の記録
+2026-11-10: issue を作成 → https://github.com/signature-studio/signature-studio/issues/1
 (確認後に追記: 日付・コマンドの出力 1 行)

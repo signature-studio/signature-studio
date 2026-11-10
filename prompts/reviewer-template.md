@@ -25,7 +25,7 @@ reviewer の shell は `git status *`・`git diff *`・`git log *`・`git show *
 4. 代役・再生の混入(`docs/ops/honesty.md` §4): reviewer の grep ツールで、差分に出るファイルを `stand-?in|surface-table|stopscreen|replay|mock-engine|fake-engine` の語で検索する。既定の manifest が指す wasm の大きさを `ls -la <既定の manifest が指す wasm>` で見る(数 KB〜数 MB なら代役の疑い)。既定の入口に届く物があるか、1 件ずつ分類する。
 5. 禁止事項の検査: `scripts/scan-forbidden.sh <差分のファイル>` の終了コードと `git ls-remote origin main` の出力は、reviewer では実行できない。worker に実行させ、終了コードと出力を貼らせる。reviewer が自分で見るのは次。禁止コマンド(sleep・timeout・nohup・disown・systemd-run・末尾 `&`)を worker が書いていないか(`git diff` の出力と、変更したスクリプトを grep ツールで検索)。認証情報・別 identity・依頼者の設定ファイルに触れた形跡がないか。`wrangler`・`cf` を実行した記録が無い(worker の報告とコマンドの出力を読む)。公開範囲を理由に push を止めていない(worker の `git ls-remote` の出力と報告を突き合わせる)。依頼票があれば、P3 の必須項目(対象・合理的理由・影響範囲・自分で試した記録・完了の確認コマンド・依頼なしで続ける作業)を満たし、自分でできる物を頼んでいないか(`docs/ops/requests.md`)。
 6. 実エンジンの実行: 依頼が実エンジンに関わるなら、実際に実行された出力(ログ・観測値)があるか。reviewer はログを read ツールで読めるが、実行はできない。無ければ「実エンジンの実行: なし」と書く。完了条件が通っても、実エンジンが実行されていなければ「進捗」と数えない。
-7. 報告の誠実性: worker の報告の先頭 3 行(実エンジン / 代役・再生・推測 / 未確認)があるか。数字に出典があるか。「完了」の語に出力が付いているか。
+7. 報告の誠実性: worker の報告の先頭 3 行(実エンジン / 代役・再生・推測 / 未確認)があるか。数字に出典があるか。「完了」の語に出力が付いているか。依頼者向けの文面に略語・内部用語が無い。依頼者がやる必要のあることが独立した見出しで書かれている。
 
 ## やらないこと
 - 修正しない。差分を作らない(読み取りと実行だけ)。commit・push しない。
