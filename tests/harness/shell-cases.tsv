@@ -375,4 +375,8 @@ worker	allow	["node scripts/x.js"]	node scripts/x.js
 worker	LIMIT-allow	[]	export -p
 worker	LIMIT-allow	[]	declare -x
 worker	LIMIT-allow	["sh -c \"wrangler whoami\""]	sh -c "wrangler whoami"
-worker	LIMIT-allow	["git clean -fdx"]	git clean -fdx
+worker	deny	["git clean -fdx"]	git clean -fdx
+worker	deny	["git clean -fd"]	git clean -fd
+worker	allow	["git clean -n"]	git clean -n
+worker	allow	["git clean -nd"]	git clean -nd
+worker	deny	["git -C /x clean -n"]	git -C /x clean -n

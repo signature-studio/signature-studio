@@ -392,4 +392,10 @@ worker	allow	node scripts/x.js
 worker	LIMIT-allow	export -p
 worker	LIMIT-allow	declare -x
 worker	LIMIT-allow	sh -c "wrangler whoami"
-worker	LIMIT-allow	git clean -fdx
+
+# ---- S13 (2026-11-10): git clean. -fdx deletes the ignored bundles (artifacts/, binaries/). The dry-run forms are allowed.
+worker	deny	git clean -fdx
+worker	deny	git clean -fd
+worker	allow	git clean -n
+worker	allow	git clean -nd
+worker	deny	git -C /x clean -n

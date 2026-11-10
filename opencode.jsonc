@@ -245,6 +245,11 @@
         { "action": "shell", "resource": "git -C * commit -n*", "effect": "deny" }, // D-01
         { "action": "shell", "resource": "git -C * reset --hard*", "effect": "deny" }, // D-01
         { "action": "shell", "resource": "git -C * clean *", "effect": "deny" }, // D-01
+        // S13: `git clean -fdx` deletes the ignored bundles (artifacts/, binaries/); regenerating them is expensive. The dry-run forms stay allowed
+        // (the last matching rule wins, so the allows come after the deny).
+        { "action": "shell", "resource": "git clean *", "effect": "deny" },
+        { "action": "shell", "resource": "git clean -n*", "effect": "allow" },
+        { "action": "shell", "resource": "git clean --dry-run*", "effect": "allow" },
         { "action": "shell", "resource": "git -C * filter-branch*", "effect": "deny" }, // D-01
         { "action": "shell", "resource": "git -C * filter-repo*", "effect": "deny" }, // D-01
         { "action": "shell", "resource": "git -C * update-ref *", "effect": "deny" }, // D-01
