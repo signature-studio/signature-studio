@@ -35,8 +35,9 @@
 
 ## 4 代役・再生の混入検査(reviewer 用。出力を報告に貼る)
 
+語の検索は reviewer の grep ツールで、`stand-?in|surface-table|stopscreen|replay|mock-engine|fake-engine` を <差分のファイル・既定の入口から参照される物> に対して行う(reviewer の shell の grep は拒否される)。
+
 ```
-grep -rniE 'stand-?in|surface-table|stopscreen|replay|mock-engine|fake-engine' <差分のファイル・既定の入口から参照される物>
 ls -la <既定の manifest が指す wasm>   # 数 KB〜数 MB なら代役の疑い
 git diff --stat <基点>..HEAD -- <既定の入口に関わるパス>
 ```
