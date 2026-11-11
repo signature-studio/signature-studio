@@ -65,7 +65,7 @@
 | 要求の型 | なぜ破綻か | 代わりにやること |
 |---|---|---|
 | 「GitHub に push できない」(`--dry-run` が通るのに) | 権限が実測であるときを除き、事実に反する | リポジトリのディレクトリで `gh auth status` と `git push --dry-run origin HEAD` の出力を貼る。通るなら `git push origin main` |
-| 依頼者に Cloudflare の操作を回す文 | 後任は wrangler を実行しない(P4)。依頼者に操作を回すのは、依頼者の操作の要求 | 確認が要るなら Issue を出す(`docs/ops/requests.md`) |
+| 依頼者に Cloudflare の操作を回す文 | 後任は wrangler を実行しない(P4)。依頼者に操作を回すのは、依頼者の操作の要求 | Cloudflare の確かめが要るなら Issue を出す(`docs/ops/requests.md`) |
 | 依頼者に操作を回す文(実行・ブラウザでの操作) | 依頼者は操作を引き受けない | `scripts/`・gh・git・headless Chrome で確かめる。実機の画面・音は Issue(§3 の 3) |
 | 決定を依頼者に回す文(判断の委任・選択肢の提示) | 判断は main が行う(依頼者は判断を行わない) | 決定と根拠を 1 行書いて実行 |
 | 「作業対象がありません」 | 旧ワークツリー・docs・ローカルのワークツリーは読める | 読める物から worker を起動 |
