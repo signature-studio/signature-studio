@@ -2,6 +2,8 @@
 
 状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用ワークフロー `cloudflare-check.yml` は存在し、実行結果は `evidence/R8-2.md` に置いてある)
 
+現状: 登録された Variable `CLOUDFLARE_ACCOUNT_ID` は、ワークフローが使っていない(Variable の値は公開ログに出るため。アカウント ID は実行時に API トークンから得る。`e33f3bc`)。
+
 依頼 ID・日付: 0001 / 2026-11-10
 
 ## 依頼者にお願いしたい作業
@@ -32,7 +34,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 - 変わる物: GitHub の Secrets が 5 つ、Variables が 1 つ増える。Cloudflare 側に、API トークン 1 つと R2 のアクセスキー 2 組(合計 3 つ)が増える。
 - 変わらない物: 他のバケット、他の Worker、ドメインの設定などの Cloudflare の他の設定。最初に動かすワークフローは読み取りだけで、Cloudflare の中身を書き換えるのは後から作るワークフローです。その変更は、GitHub の履歴と実行ログに残ります。
 - 取り消し方: Cloudflare の画面で、作ったトークンとアクセスキーを削除(失効)する。GitHub の画面で、Secrets 5 つと Variable 1 つを削除する。
-- GitHub Actions の実行ログには、値は表示されません。
+- GitHub Actions の実行ログで、Variable の値は伏せられず、ワークフローが使うとログに出ます。2026-11-12 の初回と 2 回目の実行で、アカウント ID が出ました(`evidence/R8-2.md`)。実行の時刻は、削除済みのため確かめられません。ワークフローのコミットは 2026-11-12 04:46〜05:00 JST(出典: `git log --format='%h %ci' -- .github/workflows/cloudflare-check.yml`)。そのため、ワークフローは Variable を使いません。Secrets の値がログでどう表示されるかは、この記録では実測していません([未確認])。ワークフローは Secrets の値を表示しません。
 
 ## 登録しなくても進む作業
 
@@ -48,7 +50,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 
 ### 旧 CI との差
 
-- [文書] 旧 CI は Variables 0 個。今回は `CLOUDFLARE_ACCOUNT_ID` の 1 個を足す。
+- [文書] 旧 CI は Variables 0 個。今回は `CLOUDFLARE_ACCOUNT_ID` の 1 個を足した。現在は未使用(下の「現状」)。
 - [文書] 旧 CI の `wrangler deploy` は、カスタムドメインの更新で失敗した(0217。Workers Scripts: Edit だけではゾーンを引けなかった)。0217 の修正は `wrangler versions upload` と `versions deploy` で、エージェントもこの方法を前提にする。ドメインつきの本番 Worker への versions 操作は、旧記録では未確認。この権限だけで足りるかは未実測(R8-4 の実行で確かめる)。
 - 配信バケットへの書き込みは `wrangler r2 object put` ではなく S3 API(0217。バケット限定の R2 トークンは wrangler の REST 経路で 403)。
 - [文書] `fl-web-cache` の S3 キーは、プレフィックスで絞れず、`cache/` と `perf/` も読み書きできる(0224)。
@@ -68,7 +70,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 確認は次の 2 つで行う。
 
 - 依頼者の連絡(Issue を閉じること)。2026-11-12 に閉じた。
-- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)。実行の結果は `evidence/R8-2.md` に置いてある。
+- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`。実行の結果は `evidence/R8-2.md` に置いてある。
 
 エージェントは Secrets と Variables の中身も一覧も確認しない(禁止。`opencode.jsonc` の deny、`prompts/worker-rules.md`)。
 
