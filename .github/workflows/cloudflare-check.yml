@@ -12,13 +12,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: 0 アカウント ID を伏せる
-        env:
-          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -n "$ACCOUNT_ID" ]; then
-            echo "::add-mask::$ACCOUNT_ID"
+          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::add-mask::$CLOUDFLARE_ACCOUNT_ID"
           fi
 
       - name: リポジトリを取得する
