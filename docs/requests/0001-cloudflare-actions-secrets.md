@@ -61,7 +61,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 
 ### 自分で試した記録
 
-2026-11-10 に、依頼者の許可なく Secrets と Variables の一覧を実行した。2026-11-12 に禁止した(`opencode.jsonc`)。
+2026-11-10 に、Secrets と Variables の一覧を実行した。許可されていない操作だった。2026-11-12 に禁止した(`opencode.jsonc`)。
 
 [文書] 旧 CI の記録(0217。この Issue の実測ではない): Workers Scripts: Edit だけで Worker の deploy は通った。バケット限定の R2 トークンは `wrangler r2 object put` が 403、S3 API では書けた。
 

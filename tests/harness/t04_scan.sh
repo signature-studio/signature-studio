@@ -217,6 +217,24 @@ expect_contains "term T10g: the T10g phrase is found" "$tout3" "term	terms/t10g.
 expect_contains "term T10h: the T10h phrase is found" "$tout3" "term	terms/t10h.md:1"
 expect_contains "term T10k: the T10k phrase is found" "$tout3" "term	terms/t10k.md:1"
 expect_not_contains "term T10: a sentence without the phrase is not a finding" "$tout3" "terms/t10-ok.md"
+printf 'a %s here\n' "$(tv 判 断 が 要 る)" > "$repo/terms/t10l.md"
+printf 'a %s here\n' "$(tv 判 断 を 委 ね る)" > "$repo/terms/t10n.md"
+printf 'a %s here\n' "$(tv 判 断 に 任 せ る)" > "$repo/terms/t10o.md"
+printf 'a %s here\n' "$(tv P M) $(tv の)$(tv 判 断)" > "$repo/terms/t10p.md"
+printf 'a %s here\n' "$(tv 依 頼 者 に 質 問)" > "$repo/terms/t10r.md"
+printf 'a %s here\n' "$(tv 許 可 を 求 め る)" > "$repo/terms/t10s.md"
+printf 'a %s here\n' "$(tv 許 可 が 必 要)" > "$repo/terms/t10t.md"
+printf 'a %s here\n' "$(tv 承 認 が 必 要)" > "$repo/terms/t10u.md"
+printf 'a %s here\n' "$(tv ご 確 認)" > "$repo/terms/t10v.md"
+printf 'a %s here\n' "$(tv 依 頼 者 の 許 可)" > "$repo/terms/t10w.md"
+printf 'a %s here\n' "$(tv 依 頼 者 に 判 断)" > "$repo/terms/t10y.md"
+printf 'a %s here\n' "$(tv 確 認 し て く だ さ い)" > "$repo/terms/nonterm-confirm.md"
+printf 'a %s here\n' "$(tv 確 か め て く だ さ い)" > "$repo/terms/nonterm-verify.md"
+git -C "$repo" add -A > /dev/null 2>&1
+tout4=$(cd "$repo" && bash scripts/scan-forbidden.sh terms 2>&1)
+for id in t10l t10n t10o t10p t10r t10s t10t t10u t10v t10w t10y; do expect_contains "term $id: the phrase is found" "$tout4" "term	terms/$id.md:1"; done
+expect_not_contains "term: a plain 'please confirm' with a different word is not a finding" "$tout4" "terms/nonterm-confirm.md"
+expect_not_contains "term: 'please verify yourself' is not a finding" "$tout4" "terms/nonterm-verify.md"
 expect_contains "term T10j: the T10j phrase is found" "$tout3" "term	terms/t10j.md:1"
 for w in "$(tv 作業 木)" "$(tv 試 験)" "$(tv 依 頼 票)" "$(tv ユ ーザー)"; do
   if grep -qF -- "$w" "$ROOT/tests/harness/t04_scan.sh"; then fail "t04_scan.sh contains a term in one piece"; fi
