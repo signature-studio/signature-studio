@@ -31,7 +31,7 @@ X1（`docs/investigations/blend2d-jit-and-drawing-path.md`）の結論: FLEngine
 | 1 | 方針 | 「この環境には実行可能メモリが無い（wasm は実行時に生成した機械語を実行できない）。**Blend2D には、ライブラリに組み込み済みの移植可能なパイプラインを使うよう指示する**」を、**環境の定義**とする。ゲストの DLL は書き換えない（バイトパッチ A1 は採らない）。Blend2D の他の関数は 1 バイトも変えない |
 | 2 | 機構 | `fe-lift lift ... --site-overrides FILE`。ファイルの 1 行 = 1 つの上書き: `ADDR store32 REG[+DISP|-DISP] EXPECT NEW`（`ADDR` は VA または `rva:` + 16 進 RVA、`REG` は 64 ビットレジスタ名、`EXPECT`／`NEW` は 32 ビットの 16 進）。生成 C は、その VA の命令の**ブロックの先頭**に `{ fle_site_store32(VA, R[REG] + DISP, EXPECT, NEW); }` を出す（関数のコピーが複数あれば、すべてのコピー）。`fle_site_store32`（`runtime/fle_vmap.c`）は 32 ビットの語が `EXPECT` なら `NEW` を書き、すでに `NEW` なら何もせず、**それ以外の値なら名前付きで停止**する（ゲストの値が違うなら、注釈の前提が崩れている） |
 | 3 | 注釈 | `lift/harness/hooks/blend2d-no-jit-sites.txt`: `rva:0x56ce9 store32 r8 0x0 0x1`。RVA 0x56ce9 は `call blContextInitAs`、直前の `lea r8,[rsp+0x60]`（RVA 0x56cdb）で r8 は `BLContextCreateInfo` を指し、attach が 2 つの 16 バイトの 0 書き込み（RVA 0x56cc7、0x56ccc）で作った。`[r8+0]` が `flags`（読み） |
-| 4 | 付け方（方針） | **opt-in**。`a4-multi.sh` のモジュール指定の第 7 欄 `SITES`（`NAME:DLL:BASE[:SEEDS[:OPTS[:HOOKS[:SITES]]]]`）。Blend2D を載せる構成（G4）で PM がこの欄を常に付けるかは PM の判断。**付けない構成は現行と生成 C がバイト不変**（「検証」）。付けた構成も a4 は変わらない |
+| 4 | 付け方（方針） | **opt-in**。`a4-multi.sh` のモジュール指定の第 7 欄 `SITES`（`NAME:DLL:BASE[:SEEDS[:OPTS[:HOOKS[:SITES]]]]`）。Blend2D を載せる構成（G4）で PM がこの欄を常に付けるかは未決。**付けない構成は現行と生成 C がバイト不変**（「検証」）。付けた構成も a4 は変わらない |
 | 5 | 範囲外 | 下の「範囲外」 |
 
 ## 機構の選択（推奨）と理由

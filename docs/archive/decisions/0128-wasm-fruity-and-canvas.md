@@ -58,7 +58,7 @@
 
 **実測**(`chrome-g3`、`chrome-g3click`。`FLE_FRUITY_NO_IDLE_STOP=1` で idle 停止を切り、フックを呼ぶ): idle のイベント(Worker 時間 316.6〜317.9 秒、入口 135,889,417)で面の SHA は停止時と同じ。**実マウス入力 1 つ**(CDP `mouseMoved` / `mousePressed`、ブラウザの入力経路 → page の pointer イベント → `postMessage` → C の `fle_host_post_input`)→ ack **r = 1** → 第 1 スレッドが起き、**窓手続きが走る**。WM_MOUSEMOVE は 43 入口で `fle: unsupported instruction at 0x592470` = `comctl32.dll!_TrackMouseEvent` の import thunk(lift に無い)。WM_LBUTTONDOWN は 51 入口で `fle: DefWindowProcW: message 0x201: the default processing is not answered`。どちらも画素は変わらない。**この 1 本ずつで「ブラウザの入力 → エンジンのキュー → ゲストの窓手続き」が通ることは実測、「エンジンが応答して再び idle になる」は未達。**
 **足していない理由**: `_TrackMouseEvent`(Learn: 「マウスポインタがウィンドウを離れる、または一定時間ホバーしたときにメッセージを post する」。`TME_LEAVE` は「マウスが窓の上にないなら離脱通知を直ちに生成」)は WM_MOUSELEAVE/HOVER を runtime が作る応答で、ブラウザのポインタに結ぶ設計が要る。`DefWindowProcW` の 0x201 も同様。いずれも新しい壁(決定 0126 の (g) の枠)で、出典なしの選択を伴う。
-**ブラウザでの扱い(設計案、PM の判断)**: (A) 現在の実装 = idle で中断・実入力で再開。(B) idle の間にも時間が進む必要がある(ゲストの 16 ms の Sleep と 600 秒の SetTimer が期限になり、WM_TIMER が作られる)場合は、仮想時計を実時間に結ぶ(`performance.now` の経過分だけ進める。**設計のみ。作っていない**)。ただし idle 停止を切った native が 586,745 入口先で lift の穴に当たるので、(B) は先に `0x33d6e70` の穴を直す必要がある。(C) rAF/タイマーで JS 側から `WM_PAINT` の契機を作る必要は無い(runtime が更新領域から作る)。
+**ブラウザでの扱い(設計案、未決)**: (A) 現在の実装 = idle で中断・実入力で再開。(B) idle の間にも時間が進む必要がある(ゲストの 16 ms の Sleep と 600 秒の SetTimer が期限になり、WM_TIMER が作られる)場合は、仮想時計を実時間に結ぶ(`performance.now` の経過分だけ進める。**設計のみ。作っていない**)。ただし idle 停止を切った native が 586,745 入口先で lift の穴に当たるので、(B) は先に `0x33d6e70` の穴を直す必要がある。(C) rAF/タイマーで JS 側から `WM_PAINT` の契機を作る必要は無い(runtime が更新領域から作る)。
 
 ## 出典なしの選択(S-…)と、読み
 

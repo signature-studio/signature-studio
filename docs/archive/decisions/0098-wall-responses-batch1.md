@@ -15,7 +15,7 @@
 
 | # | 項目 | 決定 |
 |---|---|---|
-| 1 | 応答の方針 | 8 件のすべてに仮の値で答える（下の API ごとの節）。**ただし SM_DIGITIZER と同じ関数が続けて問う SM_TABLETPC（86）、SM_CONVERTIBLESLATEMODE（0x2003）、SM_SYSTEMDOCKED（0x2004）と隣の SM_MAXIMUMTOUCHES（95）は決めず、名前付き停止のまま**にする（値の根拠がなく、0x2003 は PM の判断が要る。8 節）。値は仮想で固定し、ホスト依存の応答は無い |
+| 1 | 応答の方針 | 8 件のすべてに仮の値で答える（下の API ごとの節）。**ただし SM_DIGITIZER と同じ関数が続けて問う SM_TABLETPC（86）、SM_CONVERTIBLESLATEMODE（0x2003）、SM_SYSTEMDOCKED（0x2004）と隣の SM_MAXIMUMTOUCHES（95）は決めず、名前付き停止のまま**にする（値の根拠がなく、0x2003 は未決。8 節）。値は仮想で固定し、ホスト依存の応答は無い |
 | 2 | 実装の場所 | 新しい `.c`、`.h` は作らない。既存の `fle_winmm.c`（acmMetrics）、`fle_ole.c`（SHGetMalloc と IMalloc）、`fle_monitor.c`（EnumDisplaySettingsW）、`fle_cursor.c`（GetClipCursor）、`fle_gdi.c`（EnumFontFamiliesExW）、`fle_vfs.c`（GetFileVersionInfoSizeW）、`fle_spi.c`（SPI_GETWORKAREA）、`fle_sysmetrics.c`（SM_DIGITIZER） |
 | 3 | 応答表 | `imports_table.rs` の `TABLE` の**末尾に 10 行**を足す（6 つの API と、IMalloc の vtable の 4 行）。既存の擬似 VA は動かない（0015） |
 | 4 | 答える形の範囲 | ゲストが使う形だけに答える。ページが結果を定めない形、ゲストが使わない形は、**名前付きで停止**する（`fle_stop`。値を作らない） |
@@ -126,7 +126,7 @@
 | 呼び出し元の読み | `f_80e360` の 0x80e377（census が止めた呼び出し）。戻り値が 0 ならデジタイザの 2 つの bool（bit 0 = NID_INTEGRATED_TOUCH、bits 2、3 = ペン）を立てずに、非 0 なら立てて保存する。どちらの場合も続けて **SM_TABLETPC（86）、SM_CONVERTIBLESLATEMODE（0x2003）、SM_SYSTEMDOCKED（0x2004）**を問う（0057 が決めていない index） |
 | 仕様（Learn） | [GetSystemMetrics](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getsystemmetrics) の SM_DIGITIZER（94）: 「Nonzero if the current operating system is Windows 7 or Windows Server 2008 R2 and the Tablet PC Input service is started; otherwise, 0. The return value is a bitmask that specifies the type of digitizer input supported by the device」。Remarks の表（Learn が値を書く）: NID_INTEGRATED_TOUCH 0x01、NID_EXTERNAL_TOUCH 0x02、NID_INTEGRATED_PEN 0x04、NID_EXTERNAL_PEN 0x08、NID_MULTI_INPUT 0x40、NID_READY 0x80 |
 | 決定 | **0**。この環境にはマウス（0057 の SM_MOUSEPRESENT = 1）だけで、タッチ・ペンのデジタイザはない（ビットが 1 つも立たない）。ページの文言（Windows 7 + Tablet PC Input service 以外は 0）にも、この環境の OS（Windows 10。0014）にも当てはまる読み。last error は触れない。rcx の下位 32 ビットが index。**同じ関数の 86、0x2003、0x2004 と隣の 95（SM_MAXIMUMTOUCHES）は決めず、名前付き停止のまま** |
-| 帰結（実測） | unit 276 は 94 を通り、**次の壁は SM_TABLETPC（86）**。86 はページの文言（Windows XP Tablet PC edition、または Vista/7 + サービス、それ以外は 0）で 0 になると読めるが、その先の **0x2003（0 のときゲストはスレートモードの経路へ入る）と 0x2004（ドッキング）は値の根拠がなく PM の判断が要る**ので、86 だけ決めても unit は ok にならない。そのため本決定では 86 以降に触れない |
+| 帰結（実測） | unit 276 は 94 を通り、**次の壁は SM_TABLETPC（86）**。86 はページの文言（Windows XP Tablet PC edition、または Vista/7 + サービス、それ以外は 0）で 0 になると読めるが、その先の **0x2003（0 のときゲストはスレートモードの経路へ入る）と 0x2004（ドッキング）は値の根拠がなく未決**ので、86 だけ決めても unit は ok にならない。そのため本決定では 86 以降に触れない |
 | 撤回条件 | (1) タッチ・ペンのデジタイザを持つ環境にする決定、(2) 実機の値が示されて整合しない、(3) 95 や 86 に実行が届き、94 = 0 との整合が要る（95 = 0 が自然） |
 | テスト | `wall_r.rs`: `sm_digitizer_*`、`the_other_metrics_of_the_same_guest_function_*`。既存の `sysmetrics.rs` の `ANSWERED`（14 → 15）、`UNDECIDED`（22 → 21）を更新 |
 
@@ -174,7 +174,7 @@
 1. **SHGetMalloc の成功・失敗**: 失敗（HRESULT エラー）で済ませる案は実装が小さいが、ページは常に成功しうる API として書き、実機では失敗しない。**成功 + IMalloc の実体**を採った。実体のために応答表に vtable の 4 行を足す（API 名でない行が表に入る）のが、この決定の最大の設計上の持ち出し。
 2. **EnumFontFamiliesExW の family**: 1 family に決めたことで、ゲストがフォントの一覧を使う次の段階（リストの並び替え、検索）が実行される。family 名に空白があることで 0072 の枠に当たった（次の壁）。名前を変える選択はしなかった（0066 と矛盾する）。
 3. **GetFileVersionInfoSizeW の失敗番号**: 2 か 3 かはページに無い。仮想ファイルシステムの検索の結果（ディレクトリが無ければ 3、あれば 2）にした。
-4. **SM_TABLETPC（86）を一緒に決めなかった理由**: 86 は 0 と読めるが、同じ関数の 0x2003 と 0x2004 が決まらないので unit は ok にならない（PM の判断が要る）。値を増やさないために 94 だけにした。
+4. **SM_TABLETPC（86）を一緒に決めなかった理由**: 86 は 0 と読めるが、同じ関数の 0x2003 と 0x2004 が決まらないので unit は ok にならない（未決）。値を増やさないために 94 だけにした。
 5. **dmDisplayFrequency = 60**: 古い Learn の「0 または 1 は既定」という記憶は、今のページで確認できなかったので使わない。
 
 ## 限界

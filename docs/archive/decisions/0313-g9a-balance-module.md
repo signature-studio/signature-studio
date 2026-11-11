@@ -62,7 +62,7 @@
 
 **前提 1 — volume の種(実測で見つけた穴)**: `node-bundle-run-sh.mjs` は `PARITY_SEED_TSV` を与えると `FLE_VFS_SEED` をその list に**置き換える**(`:71-75`)。`a19-g3-run.sh ref` は `lift/out-ref3/tables/vfs-seed-nested.tsv`(idle1 の volume + 参照プロジェクトの files。**本 patch の Balance の行が入る前に作られた**)を渡すので、そのままだと **bundle の seed pack に Balance の DLL があっても volume に載らず**、`LoadLibraryW(フルパス)` は `volume_file` で NULL + 126(`fle_load.c:204-212`、`load_with_path` の path table の分岐 `fle_load.c:322-330`: 『file が volume に無ければ NULL / 126』)になる。→ **`tools/mk-nested-balance-seed.sh` が nested.tsv に patch の行を 1 行足した写し(289 行)を作る**(行は diff から取る。nested.tsv 自体は読むだけ)。その写しを `SEED=` にして走らせる。ブラウザ(V3)は bundle 自身の seed(idle1)を使うので不要。
 
-**前提 2 — 観測の手段**: 製品の bundle には `LoadLibraryW` の戻り値・`GetProcAddress` の戻り値を出す trace が**無い**(`ref3-lookup` は ref3 の診断 diff で製品外)。(i)(ii) を字義どおり観測するには、**テスト専用の小さな診断 diff**(`impl/diag-g9-loadlib.diff`、`fle_load.c` と `fle_modules.c` の 2 か所・計 7 行。フルパスの `LoadLibraryW` の結果と、実モジュールへの `GetProcAddress("CreatePlugInstance")` の結果を stderr に `g9-diag:` で印字。main に `patch --dry-run` rc=0、`clang`/`emcc -fsyntax-only` rc=0・警告 0)を**テスト bundle にだけ**載せる。製品の bundle には載せない。診断 diff を載せるかは PM の判断(載せると冷間 build は 1 回で済むが、この bundle は『製品の bundle』ではなくなる。載せないと (i)(ii) は間接の観測〔(iii)(iv)〕だけになる)。
+**前提 2 — 観測の手段**: 製品の bundle には `LoadLibraryW` の戻り値・`GetProcAddress` の戻り値を出す trace が**無い**(`ref3-lookup` は ref3 の診断 diff で製品外)。(i)(ii) を字義どおり観測するには、**テスト専用の小さな診断 diff**(`impl/diag-g9-loadlib.diff`、`fle_load.c` と `fle_modules.c` の 2 か所・計 7 行。フルパスの `LoadLibraryW` の結果と、実モジュールへの `GetProcAddress("CreatePlugInstance")` の結果を stderr に `g9-diag:` で印字。main に `patch --dry-run` rc=0、`clang`/`emcc -fsyntax-only` rc=0・警告 0)を**テスト bundle にだけ**載せる。製品の bundle には載せない。診断 diff を載せるかは未決(載せると冷間 build は 1 回で済むが、この bundle は『製品の bundle』ではなくなる。載せないと (i)(ii) は間接の観測〔(iii)(iv)〕だけになる)。
 
 **診断 diff は挙動を変えない(PM の条件 ①。コードを読んだ確認。実行はしていない)**: `LoadLibraryW` 側は `name_has_path(buf, n)`(読むだけ)、`ascii_of(buf, shown, …)`(書き先は局所の `shown` だけ)、`fprintf(stderr, …)`、`R[0]` の読みだけ。`load_by_name` は `const uint16_t *` を受けるので `buf` は変わらず、`R`・ゲストメモリ・last error・runtime の状態への書き込みは 0 行。局所配列 `shown` は `LOAD_PATH_MAX + 1 = 353` B の C スタック(Worker の C スタック 512 KiB に対し無視できる)。`GetProcAddress` 側は `strcmp(rname, "CreatePlugInstance")` と `fprintf` と `R[0]`・`h` の読みだけで、直後の `fle_set_last_error` の前に置いたので順序も変わらない。**変わるのは stderr への出力と、その分の数マイクロ秒だけ**(印字は フルパスの LoadLibraryW ごとと CreatePlugInstance の解決ごと。数十回の見込み〔未確認〕)。→ **この bundle で first idle や性能を測らない**(PM の条件 ④。P1 の値は CI が作る本番の bundle で後に取る)。
 **扱い(PM の決定 01:31)**: 診断 diff は**push しない**(テスト専用)。push する diff は `0313-g9a-balance-module.diff`(224 行)だけ。診断を載せた bundle は名前に `test` を入れる(`fl-engine-test-g9a-<hash>`。**ただし単純な改名ではブラウザで 404 になる。§6 の rename を見よ**)。V2b と V3 は同じテスト bundle。製品の bundle は main に push したときの CI が作る(ローカルの 2 回目の build は不要)。
@@ -165,7 +165,7 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 
 ## 10. G9-c の設計の第 1 稿 — 次に実モジュール化する 1 つの選定(読みと静的検査のみ。build・Chrome・node の実行は 0。PM の宿題 05:15)
 
-**結論**: 次は **Fruity Filter 1 本**(PM の判断 05:2x で確定。10.5)。理由は下記。**Fruity Delay 2 は Filter と同じ費用・同じ壁だが、増分を 1 本ずつ測るため同じ build には足さない(後の別 build)**。Frequency Shifter・PEQ2・Soundgoodizer は ildsp などの別の前提があり後に回す。Fruity Wrapper は VST3/Serum 2 を含むので最後。数字は表(`tables/g9c/`、alpha1 の `0309-plugin-sizes.tsv`・`0309-imports-summary.tsv`、私の fe-lift 1 回〔各 1.1 s・nice 19〕と python の読み)から。
+**結論**: 次は **Fruity Filter 1 本**(PM の決定 05:2x で確定。10.5)。理由は下記。**Fruity Delay 2 は Filter と同じ費用・同じ壁だが、増分を 1 本ずつ測るため同じ build には足さない(後の別 build)**。Frequency Shifter・PEQ2・Soundgoodizer は ildsp などの別の前提があり後に回す。Fruity Wrapper は VST3/Serum 2 を含むので最後。数字は表(`tables/g9c/`、alpha1 の `0309-plugin-sizes.tsv`・`0309-imports-summary.tsv`、私の fe-lift 1 回〔各 1.1 s・nice 19〕と python の読み)から。
 
 ### 10.1 候補の比較(6 種。参照プロジェクトの個数と位置は `reference-project.md:26`、`mt1/tables/flp-threaded.tsv`)
 
@@ -191,7 +191,7 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 1. **新しい Win32 の壁が無い見込み**(読み): 行なし import の集合・直接 call で届く import・未対応 thunk・フック点が Balance と同一なので、V3/V2b で Balance が通った道(`LoadLibraryW` → `CreatePlugInstance`)は Filter でも同じ。Frequency Shifter はフック点が違い、`Engine_x64.dll`(別の MSVC 製 DLL。VEX 692 箇所は lift の前提条件。0309 §1)と ildsp が要る。
 2. **検証力が Balance より高い**: 参照プロジェクトの insert 47 には**『Filter - Insert 47 - Cutoff frequency』のオートメーション**があり、Export の WAV が**時間変化するカットオフ**を含む。Balance(音量とパン)より浮動小数の演算(scalar SSE の IIR)とホスト→プラグインのパラメータ経路(オートメーション)を強く試せる。Wine の『Filter のみ有効』の Export との比較(G9-b の方式)で、sha 一致または高い相関が出れば、DSP の演算の一致の強い証拠になる。
 3. **ildsp を避けられる**: PEQ2(×8)・Soundgoodizer(×12)・Frequency Shifter は DLL に ildsp の文字列があり、ildsp は未 lift(x87 944・AVX-512 23,929 命令、`LoadLibraryW("ildsp")` を NULL 許容の分岐で呼ぶ〔決定 0113〕。0309 §1)。これらの個数が多い(PEQ2 8、SG 12)ので音への寄与は大きいが、**ildsp の扱い(NULL のまま通るか、lift するか)の決定が先**。Filter と Delay 2 はそれに依存しない。
-4. **Filter を先に選ぶ**: Delay 2 はオートメーションが無く、出力の検証力が Filter より低い。固有の C は小さい(0.67 MB 対 1.06 MB)が、PM の判断で増分を 1 本ずつ測るため Delay 2 は後の別 build とする。
+4. **Filter を先に選ぶ**: Delay 2 はオートメーションが無く、出力の検証力が Filter より低い。固有の C は小さい(0.67 MB 対 1.06 MB)が、増分を 1 本ずつ測るため Delay 2 は後の別 build とする。
 
 ### 10.3 変更案(Balance と同じ手順。最初は見積りとして書き、10.5 で patch を作って静的検査した。build はしていない)
 
@@ -208,9 +208,9 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 | 変更の規模 | **実際に作った(10.5): Balance の上の差分は 17 ファイル・313 行、main に対する合算は 17 ファイル・365 行**(最初の見積り 12 ファイル・+60〜80 行より大きい: フック点の file の改名〔33 行の削除と追加〕、`realmod.rs` のテスト、census と `main_two.c` の上限、コメントの数が増えた) | 後の別 build で +20〜30 行 |
 | wasm の増分(読み。Balance の実測 +7.76 MB を C のバイト比で補正) | **約 +7.9 MB**(C 36.05 MB 対 35.34 MB) | 約 +7.7 MB |
 | pack の増分(無圧縮) | dll pack・seed とも約 +3.78 MB ずつ(PE の大きさ) | 約 +3.73 MB ずつ |
-| 冷間 build | 約 53 分(C が +16% 増えるため。Balance の 46 分に比例、objects と link が支配。読み) | PM の判断(10.5 の 1.)で**同じ build には足さない**。後の別 build。`ci/objkeys.sh` の `m[6-9]` は 10 本目の m10 を含まないので、Delay 2 のときに `m(6\|[7-9]\|1[0-9])` などへ直す必要がある(読み) |
+| 冷間 build | 約 53 分(C が +16% 増えるため。Balance の 46 分に比例、objects と link が支配。読み) | 10.5 の 1. の決定で**同じ build には足さない**。後の別 build。`ci/objkeys.sh` の `m[6-9]` は 10 本目の m10 を含まないので、Delay 2 のときに `m(6\|[7-9]\|1[0-9])` などへ直す必要がある(読み) |
 
-- **S1 の再確認(実測の基準で)**: 基準 = `performance-targets.md:141` の『wasm 対 ネイティブ合計』。E13 の wasm 143,087,706 B ÷ ネイティブ合計 77,442,944 B = 1.848。Balance 込みの test bundle は wasm 150,851,575 B ÷ (77,442,944 + 3,718,656 = 81,161,600 B) = **1.859**。Filter を足すと約 158.7 MB ÷ 84.94 MB = **約 1.87**、さらに Delay 2 で約 166.4 MB ÷ 88.67 MB = 約 1.88(推定)。**2 倍以内を満たす**(1 本ごとに 2 倍の許容枠が 7.5 MB 増え、wasm の増分が約 7.8 MB なので、枠は約 0.3 MB ずつ減る)。**0309 の『共有なしで入れてよいのは Balance 1 つだけ』は、plugin 1 本 14.6 MB の見積り(wasm 12.9 MB + データ)に基づくが、実測は wasm +7.76 MB だった**(見積りは約 1.7〜1.9 倍の過大。理由は未確認: 混成〔direct wasm〕の小ささ、`-Oz`、`7.74 × code` の係数が FLEngine 向けなど)。ただし**この比は wasm だけの比**で、dll pack と seed の +7.4 MB/本(無圧縮)は含まない。S1 の定義(『wasm と、エンジンが読むデータ』。`performance-targets.md:152`)にデータを入れるなら 1 本ごとの増分は約 15 MB で枠(約 7.5 MB)を超える。**どちらで測るかは PM の判断が要る**。brotli の転送量は q11 の bundle(CI)で測る必要がある(私の q1 の数字は比べられない)。
+- **S1 の再確認(実測の基準で)**: 基準 = `performance-targets.md:141` の『wasm 対 ネイティブ合計』。E13 の wasm 143,087,706 B ÷ ネイティブ合計 77,442,944 B = 1.848。Balance 込みの test bundle は wasm 150,851,575 B ÷ (77,442,944 + 3,718,656 = 81,161,600 B) = **1.859**。Filter を足すと約 158.7 MB ÷ 84.94 MB = **約 1.87**、さらに Delay 2 で約 166.4 MB ÷ 88.67 MB = 約 1.88(推定)。**2 倍以内を満たす**(1 本ごとに 2 倍の許容枠が 7.5 MB 増え、wasm の増分が約 7.8 MB なので、枠は約 0.3 MB ずつ減る)。**0309 の『共有なしで入れてよいのは Balance 1 つだけ』は、plugin 1 本 14.6 MB の見積り(wasm 12.9 MB + データ)に基づくが、実測は wasm +7.76 MB だった**(見積りは約 1.7〜1.9 倍の過大。理由は未確認: 混成〔direct wasm〕の小ささ、`-Oz`、`7.74 × code` の係数が FLEngine 向けなど)。ただし**この比は wasm だけの比**で、dll pack と seed の +7.4 MB/本(無圧縮)は含まない。S1 の定義(『wasm と、エンジンが読むデータ』。`performance-targets.md:152`)にデータを入れるなら 1 本ごとの増分は約 15 MB で枠(約 7.5 MB)を超える。**どちらで測るかは未決**。brotli の転送量は q11 の bundle(CI)で測る必要がある(私の q1 の数字は比べられない)。
 - **検証(G9-b と同じ形)**: V3 = Problems 窓が 7 → 6 件(Delay 2 も足せば 5 件)で Filter の行が消える。診断 diff の `g9-diag` は Balance のパスだけを出すので、Filter 用には『フルパスの LoadLibraryW』の行が出る(パスが `Fruity Filter` のものになるだけで diff は無変更)。`GetProcAddress` の診断は `CreatePlugInstance` の行が Filter でも 1 行増える。V2b は Balance と同じ。G9-b = alpha1 の `export-plain.g3` を元の FLP で回し、sha を Balance 単独の Export と比較して Filter の効果(カットオフのオートメーション)が出ているか、Wine の『Filter のみ有効』の Export(opt1)と比べる。入口カウンタ(`diag-g9-count.diff`)の対象範囲は 0x6800000..0x6c00000 なので、Filter(0x7000000〜)を数えるには範囲を広げる(1 行)。
 
 ### 10.4 未確認・危険
@@ -219,9 +219,9 @@ alpha1 の TEST bundle `fl-engine-test-g9a`(wasm `engine.26da53796d0f.wasm`)で 
 - 参照プロジェクトで insert 47 が音を持つか、Filter が効いた Export が基準 WAV と実際に変わるかは未確認(Balance の G9-b と同じ未確認)。
 - ildsp に依存する 3 種(Frequency Shifter・PEQ2・Soundgoodizer)の扱いは本稿の範囲外。ildsp が NULL のまま通るかの確認(`LoadLibraryW("ildsp")` の NULL 許容の分岐。決定 0113)は、実モジュール化の前に **PEQ2 を 1 つ読み込む実験**(Balance と同じ手順で足し、NULL 許容の分岐に入るかを `g9-diag` で見る)で分かる。
 
-### 10.5 PM の判断(05:2x)の反映と、変更案の dry-run の結果(**実装した patch を作って静的検査まで。build・cargo test・Chrome は 0**)
+### 10.5 PM の決定(05:2x)の反映と、変更案の dry-run の結果(**実装した patch を作って静的検査まで。build・cargo test・Chrome は 0**)
 
-**PM の判断**: (1) 次は **Fruity Filter 1 本**。Delay 2 は同じ build に足さない(増分を 1 本ずつ測る。後の別 build)。(2) `RM_MAX 8→16` は承認。ただし Split の A0(決定 0312j: close で容量を縮める)は今回の test build に**混ぜない**(増分の帰属を汚さない)。A0 は G9 のモジュール群を push する CI の build に載せる。(3) build の開始条件: (a) Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較 script)が出る、または (b) 判定が長引いても ci1 の counted 窓(E14 の first idle)の後で CPU が空いたとき。それまで私は設計と変更案の dry-run まで。build の窓は PM の info(`CI_JOBS=1`・`BINARYEN_CORES=1`・nice 19、メモリ確認つき)。(4) S1 は毎回 3 つを併記(下)。(5) seed の stub 化は別の宿題(今は入れない)。
+**PM の決定**: (1) 次は **Fruity Filter 1 本**。Delay 2 は同じ build に足さない(増分を 1 本ずつ測る。後の別 build)。(2) `RM_MAX 8→16` は承認。ただし Split の A0(決定 0312j: close で容量を縮める)は今回の test build に**混ぜない**(増分の帰属を汚さない)。A0 は G9 のモジュール群を push する CI の build に載せる。(3) build の開始条件: (a) Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較 script)が出る、または (b) 判定が長引いても ci1 の counted 窓(E14 の first idle)の後で CPU が空いたとき。それまで私は設計と変更案の dry-run まで。build の窓は PM の info(`CI_JOBS=1`・`BINARYEN_CORES=1`・nice 19、メモリ確認つき)。(4) S1 は毎回 3 つを併記(下)。(5) seed の stub 化は別の宿題(今は入れない)。
 
 **patch(`impl/0313f-filter-on-balance.diff`、Balance の diff の上。`impl/0313-g9a+filter-combined.diff` は main に対する合算)**:
 - 内容: `ci/extract-dlls.tsv` に Filter(sha256 `f4801444…3d6c`)、`vfs-seed-idle1.tsv` に Filter の 1 行、`gen-direct.sh` に 9 本目の spec(基底 `0x7000000`、パス末尾 `plugins/fruity/effects/fruity filter/fruity filter_x64.dll`)、フック点の file を汎用名 `fruity-delphi-effect-hook-points.txt` に改名(Balance と Filter が同じ 3 RVA。Balance の spec も新名へ)、`build-engine-bundle.sh` を `EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4`(DLL pack は 6+4 = 10 本)、`RM_MAX 8u → 16u`(`fle_realmod.c`。停止文面とコメント〔`fle_realmod.h`・`fle_loadimage.h`〕を揃えた)、census の `MAX_IMAGES 17` と `main_two.c` 2 本の `MAIN_REAL_MAX 32`(『runtime の上限より大きく』の意図を保つ)、`realmod.rs` のテスト(『9 本で停止』を『17 本で停止、`larger than the 16 real modules`』に)、`ci/test-hybrid.sh` に 3 件(Filter の extract 行、seed の行、`NEXTRA` と `EXTRA_MODULES` の名前の数と spec の数〔5+NEXTRA〕と `RM_MAX` の整合)。
@@ -307,7 +307,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | | テスト(`lift/crates/fe-lift/tests/imagelist.rs`、native。API ごとの契約のテスト + Wine 10.0 との差分) | — | 約 600 |
 | | 行の file(`ship7-imports.txt`)+ 宣言 | — | 約 30 |
 
-- **順序の提案**: 段 1 を先に入れ(約 200 行、1 回の build の窓で足りる)、GUI の run で次の停止(= 実際に踏む層)と `Create` の引数を見てから段 2 以降を決める。段 1 の『状態だけ』は画素を持たないので、`Add`/`Draw` は**名前つき停止**のまま(止まる場所が変わるだけ、と 0209 §7 が退けた形だが、**今回は run の観測で次の層を決めるために使う**ので意味がある。PM の判断が要る)。
+- **順序の提案**: 段 1 を先に入れ(約 200 行、1 回の build の窓で足りる)、GUI の run で次の停止(= 実際に踏む層)と `Create` の引数を見てから段 2 以降を決める。段 1 の『状態だけ』は画素を持たないので、`Add`/`Draw` は**名前つき停止**のまま(止まる場所が変わるだけ、と 0209 §7 が退けた形だが、**今回は run の観測で次の層を決めるために使う**ので意味がある。この点は未決)。
 - **工数の不確かさ**: (a) 32 ビットのアルファ(段 5)の要否は Balance の `Create` の `flags` 次第。(b) `Read` の stream が v6 の形(32 ビット)か v5(24 ビット + マスク)かは DLL を作った Delphi の版で決まる(未確認)。(c) `fle_gdi.c` の宛先の解決の再利用(`fle_gdi_blit_surface`)は `blit_call` の内部の構造に依存し、他担当の `fle_gdi.c` の編集と衝突し得る(0215 の注意と同じ)。
 
 ### 11.6 方針の点検(lift-fidelity)
@@ -535,7 +535,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | 5 | `fle_audio_transport.c:60-61` | `fle_js_publish`: 出力が既に通り過ぎた frame は書かない(`skipped`、header 語 16) | 選択(timeline) | 同上(H1 の直接の欠落点) | 同上 |
 | 6 | `fle_audio_transport.c:62-67` | publish 間の穴を 0 で埋める(`gapFrames`) | 選択 | 古い内容を再生しないための 0。**必要** | 残す |
 | 7 | `fle_audio_ring.c:158-160` | リングが満杯なら新しい frame を捨てる(`overruns`)。容量 32,768 frame = 743 ms | 選択(容量) | 通常は起きない | 残す(観測だけ: `overruns`) |
-| 8 | `app/src/audio/soft-sink.ts:27-42`、`page-audio.ts:146` | worklet が量子を処理していない間(AudioContext が suspended)、10 ms ごとに RD をページ時計で進める(`GRACE_MS` 100 ms の猶予後)。**その間 engine の frame は上書きされ聞こえない** | 選択(決定 0211: 凍結を避ける) | **AudioContext が suspended の間に再生を始めると、最初の拍が聞こえずに過ぎる**(H3) | 判断が要る(下) |
+| 8 | `app/src/audio/soft-sink.ts:27-42`、`page-audio.ts:146` | worklet が量子を処理していない間(AudioContext が suspended)、10 ms ごとに RD をページ時計で進める(`GRACE_MS` 100 ms の猶予後)。**その間 engine の frame は上書きされ聞こえない** | 選択(決定 0211: 凍結を避ける) | **AudioContext が suspended の間に再生を始めると、最初の拍が聞こえずに過ぎる**(H3) | 未決(下) |
 | 9 | `fle_audio_ring.c:120-139`、`fle_dsound.c:903` | hand-over の先読み `lead` 60 ms(`S-audio-lead`)と、guest に見せる write cursor の先行 15 ms(`S-ds-write-cursor`)を**別の値**にしている | 選択(Learn は『write cursor は play cursor の約 15 ms 先』) | 先読みの 60 ms は late write の `rewrite` で救う(下の 10) | 残す |
 | 10 | `fle_audio_ring.c:179`、`fle_audio_transport.c:76-85` | 遅い書き込み(`rewrite`): 読み位置 + 256 frame(5.8 ms)より前は変えられず `lost` に数える | 選択(`S-ds-rewrite-guard`) | 開始直後の Unlock が 256 frame 以内なら失われる(H4) | 数だけ観測 |
 | 11 | `fle-out.worklet.js:36-87` | timeline: PLAYING の間は engine が出していなくても RD を 128 ずつ進め、無い frame は 0 | 選択(声カードの時間軸と同じ) | 聞こえ方は実機と同型。ただし開始時の競合と組むと 1 拍目を失う | 残す(順序の入れ替えで足りる) |
@@ -667,7 +667,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
   - **O-1(静的のまま、選ぶ)**: G9 で実際に使う少数(参照プロジェクトの 7 種)だけを静的に載せ、残りは**名前つきの停止**のまま(今の挙動)。S1・P1 の定義が変わらない。plugin を増やす度に build が重くなる。
   - **O-2(side module)**: plugin ごとの wasm を別 module にして、`LoadLibraryW` の中で取得・compile・instantiate。**必要な物**: (1) module が runtime の関数(`fle_imp_*` ほか 約 1,000)とグローバル(`R`・`X`・`FL`・TEB 等)を**エンジンの instance の export から import**する、(2) 間接呼びの表 `fle_dispatch_table`(VA → 関数)へ module の関数を**登録**する API(今は C の静的配列)、(3) 線形メモリ・関数表を共有する(`-sMAIN_MODULE`/`SIDE_MODULE` の PIC 化は『主 module の code +10〜25%』と 0312g が読んだが**未測定**、pthread + JSPI との組み合わせの実績なし)。取得中の待ちは、**I/O Worker が fetch して `WebAssembly.compile` し、`Module` をエンジンの Worker へ渡し、エンジンの Worker は `Atomics.wait` で待って同期の `new WebAssembly.Instance` で組み立てる**(JSPI を使わない道。同期 instantiate は Worker で大きさに制限が無い)。JSPI で `LoadLibraryW` 全体を suspend する道もあるが、**どの guest thread の深い C スタックでも suspend できる保証が無い**(エンジンの JSPI は今 `fle_js_wait` の pacing だけ〔`fle_audio_transport.c:108`〕)ので推奨しない。
   - **O-3(インタプリタ・JIT)**: 検討しない。
-- **S1 の定義が変わる点**: 静的結合では『wasm 全体 ÷ native 全体』(現在 1.859)。O-2 では **(i) 核の wasm(FLEngine + 常駐 module)の比**と**(ii) plugin module ごとの比**(Balance 単独 ≒ 2.09、共有なしの重複込み)と**(iii) 起動時の取得量**に分かれ、plugin は『使うときだけ』取得・compile する(P1 にも効く: 起動の wasm が小さくなる)。**PM の判断が要る**: S1 を『起動に取る量』と『module ごと』のどちらで測るか(§10.5 の 3 併記の延長)。B-FLE の共有(方式 B、§10 以前の 0312g〜i)は module 間の重複を減らすので O-2 と併用できる。
+- **S1 の定義が変わる点**: 静的結合では『wasm 全体 ÷ native 全体』(現在 1.859)。O-2 では **(i) 核の wasm(FLEngine + 常駐 module)の比**と**(ii) plugin module ごとの比**(Balance 単独 ≒ 2.09、共有なしの重複込み)と**(iii) 起動時の取得量**に分かれ、plugin は『使うときだけ』取得・compile する(P1 にも効く: 起動の wasm が小さくなる)。**未決**: S1 を『起動に取る量』と『module ごと』のどちらで測るか(§10.5 の 3 併記の延長)。B-FLE の共有(方式 B、§10 以前の 0312g〜i)は module 間の重複を減らすので O-2 と併用できる。
 - **取得中に FL を止める時**: guest の `LoadLibraryW` は同期の API(実機でもディスク読みと DllMain の実行の間は戻らない)なので、止めて待つ形は契約に合う。長さは plugin wasm 約 1.4 MB(brotli、読み)の取得 + compile(読み: 約 75 ms/MB × 8 MB wasm = 0.6 s)で、ネットが遅いと数秒。**FLP を開く時にページが FLP の plugin 名を見て先に取得を始める hint**(正しさに要らない)で隠す。
 - **VST/VST3/Serum 2(Fruity Wrapper の内側)**は install tree に無く別経路(本メモの範囲外)。
 
@@ -686,9 +686,9 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 
 測る物: (1) 索引の実際の大きさと brotli 後(opt1 の `0320-install-tree-files.tsv.gz` から python で作れる。実行は私の許可後ではなく読みのみなので、次の宿題で可)、(2) chunk の取得の往復(R2 + Worker + CDN、1 MiB・4 MiB)、(3) OPFS の `FileSystemSyncAccessHandle` の同期読みの速度と、chunk 数 2,000 個の open の費用、(4) `Atomics.wait` で待つ guest thread と GIL の挙動(実スレッド版)、(5) Firefox・Safari の quota、(6) 骨格 node 28,000 個の起動費用と heap。
 
-**PM の判断が要る点**: (a) P-C(chunk を R2 の不変オブジェクト)で進めるか。(b) 待ちは `Atomics.wait` + I/O Worker(JSPI に依存しない)で進めるか。(c) 全 tree を索引で見せ、中身は要求時 + 背景先読みにするか(起動に新しい取得を入れない方針)。(d) S1 の定義(O-2 を選ぶ場合)。(e) install tree の既存ファイルへの書き込みを overlay にする(copy-on-write)か。
+**未決の点**: (a) P-C(chunk を R2 の不変オブジェクト)で進めるか。(b) 待ちは `Atomics.wait` + I/O Worker(JSPI に依存しない)で進めるか。(c) 全 tree を索引で見せ、中身は要求時 + 背景先読みにするか(起動に新しい取得を入れない方針)。(d) S1 の定義(O-2 を選ぶ場合)。(e) install tree の既存ファイルへの書き込みを overlay にする(copy-on-write)か。
 
-## 19. 遅延 install tree の索引・chunk の形式(V0 の生成器 = opt1、V1 の読み手 = mt3 の runtime(C)と host(TS)。**規範**。PM の判断 07:2x を反映。細部は opt1 と直接詰めた)
+## 19. 遅延 install tree の索引・chunk の形式(V0 の生成器 = opt1、V1 の読み手 = mt3 の runtime(C)と host(TS)。**規範**。PM の決定 07:2x を反映。細部は opt1 と直接詰めた)
 
 opt1 の既定(info 07:24)に **3 点の変更と 5 点の追加**を求める。以下を V1 の読み手が実装する形式とする(opt1 の生成器が異なる細部を使うなら、この節を直してから実装する)。
 
@@ -805,16 +805,16 @@ index.bin :=
 判断: (1) 診断を載せた bundle の作り直し(vfsdumpdir・entry counter)は今は行わない(Chrome の経路で WAV が取れる)。(2) 判定は opt1 の Wine の参照(Balance だけ有効、mp3wav-all、SSE2 cpuid の構成)の WAV との比較で行う(窓の後)。(3) 32-bit float の Export・Split mixer tracks の Export は、Wine の比較で説明がつかない場合に限り、私の許可の後。(4) 06:15 までに mt3 が G9-c(次の 1 モジュール)の設計を §10 に出す。
 
 
-### 追記(2026-11-07 05:30、mt3 の §10〔G9-c の設計の最終版: 次の実モジュールは Fruity Filter 1 本〕の取り込みと PM の判断、docs のみ。製品の差分は push していない)
+### 追記(2026-11-07 05:30、mt3 の §10〔G9-c の設計の最終版: 次の実モジュールは Fruity Filter 1 本〕の取り込みと PM の決定、docs のみ。製品の差分は push していない)
 
 取り込み: §10.1〜10.5、`impl/0313f-filter-on-balance.diff`(Balance の上、17 ファイル・313 行)と `impl/0313-g9a+filter-combined.diff`(main に対する合算、365 行)、`tables/g9c/`(`*.log` は `.txt` に改名)。**静的検査のみ(`patch --dry-run` rc 0、`bash -n`、`test-hybrid.sh` 54 ok・FAIL 0、clang/emcc `-fsyntax-only` 警告 0)。build・実エンジンの実行は 0。依頼者の機械は 0 件。**
 
-PM の判断(05:22 に mt3 へ送った内容の記録): (1) 次は Fruity Filter 1 本(Delay 2 は後の別 build。増分を 1 本ずつ測る)。(2) RM_MAX 8→16 は承認(自前の module 表の容量。FL の挙動・契約に触れない)。Split の A0 は今回の test build に混ぜない。(3) build は Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較)が出るか、ci1 の counted 窓の後で CPU が空いたときに、PM の info で開始。(4) S1 は wasm 全体の比(正式な基準)・モジュール別の wasm 比・dll pack と seed を含む配信量と q11 の brotli の 3 つを併記し、2 倍を超える物を隠さない。(5) stub 化は別の宿題。
+PM の決定(05:22 に mt3 へ送った内容の記録): (1) 次は Fruity Filter 1 本(Delay 2 は後の別 build。増分を 1 本ずつ測る)。(2) RM_MAX 8→16 は承認(自前の module 表の容量。FL の挙動・契約に触れない)。Split の A0 は今回の test build に混ぜない。(3) build は Balance の忠実性の判定(opt1 の Wine 参照 elog15b と alpha1 の比較)が出るか、ci1 の counted 窓の後で CPU が空いたときに、PM の info で開始。(4) S1 は wasm 全体の比(正式な基準)・モジュール別の wasm 比・dll pack と seed を含む配信量と q11 の brotli の 3 つを併記し、2 倍を超える物を隠さない。(5) stub 化は別の宿題。
 
 **mt3 の訂正の記録**: 「RM_MAX で rt の key が変わる」は誤りで、Balance の patch だけで k_rt は変わる(H_WASM が lift/harness を含む)。Filter の追加では **k_felift も変わる**(H_FELIFT が lift/crates を hash し、realmod.rs のテスト更新が入る)ので、push すれば CI の fe-lift の cargo build も冷間になる(所要は未測定)。変更規模は最初の見積り(約 12 ファイル・+60〜80 行)より大きい(17 ファイル・313 行)。**押さえる点**: これらは見積り・静的検査で、Filter の実エンジンでの動作は未確認(Filter の到達範囲は直接 call の下限のみ、insert 47 が音を持つか、ildsp が NULL のまま通るかは未確認)。G9 は未到達のまま。
 
 
-### 追記(2026-11-07 06:12、mt3 の §11〔ImageList_* 22 種の契約の実装案〕・§12〔Balance の窓を開く scenario〕・§13〔別経路〕・§14〔Filter の test build の手順書〕の取り込みと PM の判断、docs のみ。製品の差分なし)
+### 追記(2026-11-07 06:12、mt3 の §11〔ImageList_* 22 種の契約の実装案〕・§12〔Balance の窓を開く scenario〕・§13〔別経路〕・§14〔Filter の test build の手順書〕の取り込みと PM の決定、docs のみ。製品の差分なし)
 
 取り込み: mt3 の 0313 の現行版(§11〜§14)と表・道具・差分(`docs/investigations/mt3w/0313/`。`*.log` は `.txt` に改名、PNG と 400 KB 超は含めない)。**§11〜§14 は読みと静的検査(patch --dry-run、bash -n、test-hybrid)だけで、実エンジンの実行は 0。**
 

@@ -289,12 +289,12 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 - 依頼者の決定で、ワークフローは `main` への push で動き、本番へデプロイする(docs だけの変更と他のブランチの push は動かさない)。dispatch は `main` での `dry_run=false` 以外ドライラン。費用の事実は §10b。
 - 残る未確認は GitHub 上の本番デプロイの step(§9)。
 
-## PM の判断(2026-11-04、PR #4 のマージ時)
+## PM の決定(2026-11-04、PR #4 のマージ時)
 
 - 依頼者の決定に従い、**main への push が本番デプロイを起こす**(docs/**・*.md だけの変更は除く)。PM が先に決めた『dispatch のみ』は撤回した(依頼された形は push での継続デプロイで、止めておく決定点を PM が作ったのが誤り。docs/policies/owner-contact.md)。
 - **CI に実ブラウザの操作・自作の playwright スクリプトは置かない**(依頼者が拒否)。CI の検査は、ワークフローの式のテスト(`ci/test-real-deploy.py`)、静的検査、Worker のテスト、アップロード計画の検査、`wrangler deploy --dry-run`、デプロイ後の Access の到達確認。bundle の中身の動作確認は CI の外(手元)で PM が行う。
 - 初回の本番デプロイは PR のマージで起きる(実行 41755825673)。ブランチ上の本番 step はドライランで skipped だったため、**本番 step が GitHub 上で動くのはこの実行が最初**。
 
-## PM の判断(2026-11-04、最初の本番デプロイの失敗と修正)
+## PM の決定(2026-11-04、最初の本番デプロイの失敗と修正)
 
 最初の本番デプロイ(実行 41755825673)は、bundle のアップロードまで成功し、`wrangler deploy` がカスタムドメインの更新(ゾーンを引けない、code 10084)で失敗した。依頼者の API トークンは Workers Scripts: Edit だけで、権限の追加は求めない。修正(`fix-versions.diff`)を採る: トリガーに触れない `wrangler versions upload` + `versions deploy`、順序は『bundle の中身 → Worker の版 → 既定 manifest(最後)→ Access 到達確認』。本番(カスタムドメインつき)への `versions upload/deploy` は、この修正の push が最初の実地の検証になる。

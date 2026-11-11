@@ -2,7 +2,7 @@
 
 状態: **仮の決定（すべての応答と選択）**。依頼は PM（決定 0122 の内容は PM の仮の決定。番号 0122 は PM の仮の割り当て）。測定・実装・テスト・文書は作業者が行った。**作業は HEAD c6ac416 の `git archive`（`src/`）で始め、clean な写しを `clean/` に置いた。作業の途中でリポジトリの HEAD は進んだ。9f2d9c9 は c6ac416 と `lift/` の tree が同一（`a74faf8f…`）。その後の 6c8bbfb（diag1）は `lift/harness/fruity.c`・`a4-multi.sh` などを変えており、193b5c2 まで進んでいる。この作業の測定・テストはすべて c6ac416 + 差分の木のもので、diag1 を含む木では行っていない。** 差分 `fruity8.diff` は `clean/`（c6ac416）と 193b5c2 の `git archive` の両方に `patch -p1 --dry-run` が当たる（`MERGE-NOTES.md`。193b5c2 では `fruity.c` の hunk が数十行ずれて当たる。当てた後のコンパイル・テストは未実施）。**実機 Windows との照合は 0 件。wasm・ブラウザは未測定（native のみ。S3 は作っていない）。**
 
-**肯定的に見せる点は少ない。** 壁 21（`kernel32!CreateThread`）は**通した**（スレッド 3 本が作られる）。しかし `CreateFruityInstance` は**戻らない**。メッセージ待ちにも**入っていない**（目的 (a)、(b) のどちらにも到達していない）。次の停止は壁 22 `GetFileAttributesW("")`（51,529 入口目）で、これは**スレッドの壁ではない**。停止の理由は「出典のない値（PM の判断）」で、止まる条件 (c)／(f) と読む。壁 23〜25 は、偽の答えを入れた**実験**（差分に入れない）で見えただけで、直していない。
+**肯定的に見せる点は少ない。** 壁 21（`kernel32!CreateThread`）は**通した**（スレッド 3 本が作られる）。しかし `CreateFruityInstance` は**戻らない**。メッセージ待ちにも**入っていない**（目的 (a)、(b) のどちらにも到達していない）。次の停止は壁 22 `GetFileAttributesW("")`（51,529 入口目）で、これは**スレッドの壁ではない**。停止の理由は「出典のない値（未決）」で、止まる条件 (c)／(f) と読む。壁 23〜25 は、偽の答えを入れた**実験**（差分に入れない）で見えただけで、直していない。
 
 区分の凡例は決定 0121 と同じ。**実測**＝コマンドの出力を見た事実。**読み**＝逆アセンブルやコードを読んだ上での解釈。**Learn**＝Microsoft Learn のページ（取得日 2026-10-30。取得した 41 ページと SHA-256 は `learn/index.tsv`）。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者または PM が選んだ値。**非公式**＝Microsoft 以外の出典（mingw-w64 などの値）。**未確認**。
 
@@ -100,7 +100,7 @@
 | S14 | E4 | 投稿メッセージの `time` は仮想時計の ms | ゲストが `MSG.time` を使ったとき |
 | S15 | E2 | スレッド終了時の仮想時計は進めない。`STILL_ACTIVE` 259 の使い方はページどおり | — |
 
-壁 22 の `GetFileAttributesW("")` の答え（INVALID_FILE_ATTRIBUTES＋3）、`GetSysColor` の色、`IsWindowVisible` などの窓の答え、`VirtualQuery` の答えは、**選択として入れていない**。PM の判断（下）。
+壁 22 の `GetFileAttributesW("")` の答え（INVALID_FILE_ATTRIBUTES＋3）、`GetSysColor` の色、`IsWindowVisible` などの窓の答え、`VirtualQuery` の答えは、**選択として入れていない**。未決（下）。
 
 ## テスト
 

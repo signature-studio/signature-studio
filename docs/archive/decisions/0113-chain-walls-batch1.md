@@ -2,7 +2,7 @@
 
 状態: **仮の決定（すべての応答と選択）**。依頼は PM（2026-10-28。「壁ごとに直す→再測定」を 1 本の作業の中で連続して回す。番号 0113 は PM の仮の割り当て）。決定と実装は作業者（サブエージェント C1）が行い、書いた。**HEAD 5a39f6b に E1（決定 0112）と、この決定の差分を当てた木で、コンパイル（警告・エラーなし）、全体テスト（115 test result・1,575 passed・0 failed。グループ分けの合算で、1 回の通しではない）、生成 C の関数単位の比較、変異検査 12 件（12 件検出）、6 モジュール構成の a4 の測定（M1 を独立な 2 回のビルドで、M0 を 1 回）まで実施した。実機 Windows との照合は無い。wasm は未確認。**
 
-**測定用の基底・種・註釈（dsp 0x2000000、Blend2D 0x4700000、QFC 0x1d00000、freetype 0x4b00000、ILTools 0x6000000）と、仮の応答を含む構成での値である。** 決定 0101 の表記に従えば「A4 完走（仮の応答 N 件を含む）」の形で報告する値で、達成の判定は PM が行う（「PM の判断が要る点」1）。
+**測定用の基底・種・註釈（dsp 0x2000000、Blend2D 0x4700000、QFC 0x1d00000、freetype 0x4b00000、ILTools 0x6000000）と、仮の応答を含む構成での値である。** 決定 0101 の表記に従えば「A4 完走（仮の応答 N 件を含む）」の形で報告する値で、達成の判定は PM が行う（「未決の点」1）。
 
 区分の凡例: **実測**＝コマンドの出力を見た事実。**読み**＝そこからの解釈。**Learn**＝Microsoft Learn のページに書かれていること（取得日 2026-10-28）。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者が選んだ値。**未確認**。
 
@@ -11,7 +11,7 @@
 | 項目 | 内容 |
 |---|---|
 | **6 モジュール構成・M1（フォント配置あり）の a4** | **`init_count=942 of 942`**、`last_unit index=940 run_rank=895 of 895 proc=0x13751d0 state=returned`、`runnable_started=895 completed=895 in_progress=0 of 895`、`units_outside_image=0`、`entry_check started_but_not_entered=0 runnable_entered_beyond_init_count=0`、**`all_units_done=yes`**、functions **5,306**、entries **1,007,942**、`== stop: returned from entry`（停止メッセージなし）、**終了コード 0**。独立な 2 回のビルドで同一（native の SHA-256 `9c76bc6a…a23785` も同じ）。変更前の基準: 246/942、functions 3,386、entries 134,274、停止 `HeapReAlloc`、終了コード 134 |
-| M0（配置なし） | **246 / 942 のまま**。停止 `fle: StretchDIBits: pixel transfer from a DIB (StretchDIBits rop 0xcc0020, iUsage 0, 1 x 1 to (0, 0) from 1 x 1 at (0, 0)): the bitmap of hdc is a device-dependent bitmap (or the 1-by-1 placeholder): it keeps no pixels (decision 0106) (decision 0111)`、functions 3,411、entries 134,085、depth 32、終了コード 134（s3 の記録と functions／entries／depth が同じ）。**A4 の完走は配置（決定 0110）に依存する**（「PM の判断が要る点」2） |
+| M0（配置なし） | **246 / 942 のまま**。停止 `fle: StretchDIBits: pixel transfer from a DIB (StretchDIBits rop 0xcc0020, iUsage 0, 1 x 1 to (0, 0) from 1 x 1 at (0, 0)): the bitmap of hdc is a device-dependent bitmap (or the 1-by-1 placeholder): it keeps no pixels (decision 0106) (decision 0111)`、functions 3,411、entries 134,085、depth 32、終了コード 134（s3 の記録と functions／entries／depth が同じ）。**A4 の完走は配置（決定 0110）に依存する**（「未決の点」2） |
 | 直した壁 | **8**（下の表）+ 測定の道具の欠陥 1（a4 の最後の読みが 0 になる） |
 | ループを止めた理由 | `init_count` が 246 を超えて 10 unit 以上進んだ（246 → 942）。壁の数は 8（< 10）、PM の決定が要る壁・設計が大きい壁には当たらなかった（壁 4 は認識器の変更だが局所。決定 0114） |
 | 全体テスト | **115 test result・1,575 passed・0 failed**（基準 113・1,526。+49 = E1 の `wall_e1` 24 + `wall_c1` 12 + 他の 13） |
@@ -34,7 +34,7 @@
 | 2 | `fle: indirect call to 0x4b40e10 is not a known function entry` | freetype の TT_Face の関数ポインタ（`access_glyph_frame` ほか）の指す先 `TT_Load_Glyph_Header` が `.pdata` に無い葉関数で、それを指す `lea` が、同じく `.pdata` に無い葉関数 0x4b41500 の中にあった。決定 0102 の種 160 個の作り方（`lea_code.py`）は `.pdata` の関数の中だけを掃く（実測） | 測定用の種を作り直した（新規 `harness/seeds/ft-seeds-4b00000-c1.txt` 170 行 = 旧 160 + 10、作り方は新規 `harness/seeds/lea_leaf_candidates.py`）。**認識器は変えない**。旧ファイルは変えない（テストが 160 行を固定） | functions 3,695、entries 152,333、depth 34。次: 壁 3 |
 | 3 | `fle: unsupported instruction at 0x38b76eb` | dsp の `ippsCopy` 系 memcpy の `lddqu xmm0,[rdi]`（SSE3、`F2 0F F0 /r`）。非整列の元の経路（実測。dsp に 975 か所） | `LDDQU`（メモリ形）を lift（`fe-lift/src/sse_pack.rs`。MOVDQU の読み込みと同じ）。CPUID は変えない | functions 3,739、entries 156,601、depth 36。次: 壁 4 |
 | 4 | `fle: jump table at 0x3363e4e: selector 0x3363df0 is outside the table` | CPU 振り分けスタブの選択値の変数が初期値 −1 のまま。決定 0079 が「停止にした」添字 −1（スタブ自身の遅延初期化の `call`）の経路 | **決定 0114**: 4 条件がそろったときだけ添字 −1 のスロットを case にする（`fe-decode/src/jumptab.rs`） | functions 3,781、entries 165,636、depth 33。次: 壁 5 |
-| 5 | `fle: GetObjectW: handle is a DIB section and c asks for a DIBSECTION: …(decision 0108)` | ILTools の Delphi の `CopyBitmap` 相当が `GetObjectW(hbm, 0x68, &ds)` を呼ぶ（実測）。決定 0108 の PM の判断 7「到達するまで停止のまま」の到達 | `GetObjectW(DIBSECTION)`（c = 104）を実装。dsBmih はゲストが渡したヘッダ（biSizeImage は `|biHeight|×stride`）、dsBitfields、0 の部分は**出典なしの選択**。24 ビット BI_RGB は名前付き停止（`fle_gdi.c`） | functions 3,829、entries 165,939、depth 32。次: 壁 6 |
+| 5 | `fle: GetObjectW: handle is a DIB section and c asks for a DIBSECTION: …(decision 0108)` | ILTools の Delphi の `CopyBitmap` 相当が `GetObjectW(hbm, 0x68, &ds)` を呼ぶ（実測）。決定 0108 の PM の決定 7「到達するまで停止のまま」の到達 | `GetObjectW(DIBSECTION)`（c = 104）を実装。dsBmih はゲストが渡したヘッダ（biSizeImage は `|biHeight|×stride`）、dsBitfields、0 の部分は**出典なしの選択**。24 ビット BI_RGB は名前付き停止（`fle_gdi.c`） | functions 3,829、entries 165,939、depth 32。次: 壁 6 |
 | 6 | `fle: StretchDIBits: this pixel transfer or read-back is not one of FillRect, PatBlt and BitBlt(SRCCOPY) between DIB sections: …(decision 0111)` | `StretchDIBits(hdc, 0,0,32,32, 0,0,32,32, lpBits, lpbmi, DIB_RGB_COLORS, SRCCOPY)`（実測。ILTools の `TBitmap` 描画）。転送先は DIB セクション | **指示の許す形だけ**: 転送先が DIB セクションで、同形式（24／32 ビット RGB）の 1:1 SRCCOPY（`fle_gdi.c`）。ほかは引数つきの名前付き停止 | functions 3,830、entries 165,953、depth 32。次: 壁 7 |
 | 7 | `fle: SelectPalette: hPal is not a live palette of this runtime (NULL, …)` | `SelectPalette(hdc, 0, FALSE)`（StretchDIBits の後の「保存したパレットを戻す」。保存値が 0。戻り値は使わない。実測と読み） | メモリ DC で hPal が NULL のとき NULL を返し何も変えない（**出典なしの選択**）（`fle_gdi.c`） | functions 3,860、entries 495,411、depth 31。次: 壁 8 |
 | 8 | `fle: DestroyCursor: hIcon was not issued by this runtime's GDI table (a shared cursor, …)` | Delphi の `TScreen.DeleteCursor` が `DestroyCursor` を呼ぶ（戻り値は使わない）。ハンドルは 2 種: 0x7fca021c（標準カーソル IDC_SIZEALL）と 0x7fda5008（ILTools の RT_GROUP_CURSOR 32763 を `LoadImageW(LR_SHARED)` で読んだもの） | 共有カーソル（標準カーソルと `LoadImageW` の形のハンドル）への `DestroyCursor` は 1 を返して何もしない（**出典なしの選択**）。判定の純関数 `fle_cursor_is_shared_handle` を `fle_cursor.c`／`.h` に追加（`fle_gdi.c` は弱参照） | 1 つ目のハンドルのみ: functions 3,860、entries 617,967、同じ停止（ハンドルが 2 つ目に変わった）。両方: **停止なし**。functions 5,306、entries 1,007,942、終了コード 0 |
@@ -66,7 +66,7 @@
 | S12 | 決定 0114 | 添字 −1 のスロットを case にする 4 条件 | 実バイトの確認（434 スタブ） |
 | S13 | a4 のサンプル | 関数入口ごとに読み、ヘッダが 0 でない間の最大の InitCount を使う | 測定の道具の設計（ゲストから見えない） |
 
-LDDQU（壁 3）は SDM に従う（出典なしの選択ではない）。**CPUID は SSE3 を名乗らないまま、ゲストは SSE3 の `lddqu`（と決定 0106 の `haddpd`）を実行する**（「PM の判断が要る点」5）。
+LDDQU（壁 3）は SDM に従う（出典なしの選択ではない）。**CPUID は SSE3 を名乗らないまま、ゲストは SSE3 の `lddqu`（と決定 0106 の `haddpd`）を実行する**（「未決の点」5）。
 
 ## テスト
 
@@ -175,7 +175,7 @@ dsp の +449 の内訳は読み（434 の `S − 16` の入口と、4 つの ini
 2. **壁 2 を「種」で直したこと**: 認識器（`lea` の指す先を自動で種にする）にする案は設計が大きく（決定 0102 以来の「種は測定用の入力」の扱いを変える）、指示は認識器を最後の手段とした。種の追加で直した。自動化の判断は PM（下 7）。
 3. **壁 3 の LDDQU**: CPUID が SSE3 を名乗らない（決定 0075）のに実装した。決定 0106 が HADDPD を CPUID を変えずに実装した前例に従った。
 4. **壁 4 は認識器の変更**で、指示は「最後の手段。設計が大きくなりそうなら止めて報告」。約 40 行・1 ファイル・実バイトの 4 条件・実行での証明が可能、として進めた（決定 0114）。
-5. **壁 5 の DIBSECTION を答えにしたこと**: 決定 0108 の PM の判断 7 は「到達するまで停止のまま」で、今回到達した。ページに無い値は S5〜S7 の「出典なしの選択」として答えにした。停止のまま報告する選択肢もあった（その場合は壁 5 でループが止まる）。
+5. **壁 5 の DIBSECTION を答えにしたこと**: 決定 0108 の PM の決定 7 は「到達するまで停止のまま」で、今回到達した。ページに無い値は S5〜S7 の「出典なしの選択」として答えにした。停止のまま報告する選択肢もあった（その場合は壁 5 でループが止まる）。
 6. **壁 7、8 の戻り値**: ページが結果を定義しない呼び出し（NULL の hPal、共有カーソルの DestroyCursor）に、ゲストが戻り値を使わないことを理由に答えを選んだ。
 7. **T1（a4 の測定の道具）を直したこと**: 完走後に 0 と報告されるのはハーネスの欠陥で、gdb で独立に確認した。報告のコードに「サンプル」を足した（ヘッダが 0 でないときの出力は変わらない）。
 8. **`a4-multi.sh` の複製**: 実際の `a4-multi.sh` ではなく、RAM の複製（`a4-multi-c1.sh`）で測定した。差は `HERE` の固定、`RELINK`／`SHARE_FLE`、生成 C の削除、clang のラッパー（`-g` を外し、分割した生成 C をコンパイル後に消す）。最終の 2 回のビルドは gen／build を通しで実行した。
@@ -184,7 +184,7 @@ dsp の +449 の内訳は読み（434 の `S − 16` の入口と、4 つの ini
 ## 未決の点(PM)
 
 1. **これを「A4 完走（仮の応答 N 件を含む）」と数えるか**（決定 0101 の表記）。判定コマンドの数値条件（`completed 895 / 895`、`all_units_done=yes`、`returned from entry` で終了コード 0）は native で満たした。N は README の「仮」の行の数: HEAD で 43、この作業の 0112、0113、0114 を足すと **46**。ただし (a) モジュールの基底・種・註釈は測定用の値（決定 0101 は基底を決定にしていない）、(b) 決定 0046 の判定は native と wasm の両方を求めるが、wasm は未確認、(c) 応答に実機 Windows との照合が無い（この作業の S1〜S13 を含む）。
-2. **決定 0110（決定 0018 の緩和。製品データ 2 ファイルの種付け）の承認**。M0（配置なし）は 246/942 のまま StretchDIBits で止まる。完走は配置に依存する。承認しない場合、フォントの無い `TBitmap`（1×1 の DDB）への StretchDIBits をどうするかが次の壁（選択肢: DDB への書き込みを受けて捨てる（決定 0108 の PM の判断 4 は採らなかった）／ゲストが読まない経路かを調べる／名前付き停止のまま）。**推奨**: 0110 を承認し、M1 を A4 の判定構成にする。
+2. **決定 0110（決定 0018 の緩和。製品データ 2 ファイルの種付け）の承認**。M0（配置なし）は 246/942 のまま StretchDIBits で止まる。完走は配置に依存する。承認しない場合、フォントの無い `TBitmap`（1×1 の DDB）への StretchDIBits をどうするかが次の壁（選択肢: DDB への書き込みを受けて捨てる（決定 0108 の PM の決定 4 は採らなかった）／ゲストが読まない経路かを調べる／名前付き停止のまま）。**推奨**: 0110 を承認し、M1 を A4 の判定構成にする。
 3. **S5〜S11 の出典なしの選択の確認**（特に S6 の BI_RGB 32 ビットのマスク、S10、S11）。実機との照合は 0 件。連鎖でゲストがこれらの値を使ったか（`CopyBitmap` が dsBmih を読んで何をするか）は追っていない（読み）。
 4. **決定 0114（認識器の変更）を入れてよいか**。
 5. **CPUID は SSE3 を名乗らないのに、ゲストが SSE3 の命令（`lddqu`、`haddpd`）を実行する**。IPP の CPU 振り分けがなぜ SSE3 の経路を選ぶのか（読み: 振り分けの変数と CPUID 以外の入力）は調べていない。CPUID に SSE3 を足すか、実装のままにするか。

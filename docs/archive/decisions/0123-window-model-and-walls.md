@@ -13,7 +13,7 @@
 | 全体テスト | `cargo test --workspace --no-fail-fast --offline` を**有効な 1 回の通し**（2026-10-31T07:41:46Z〜08:26:09Z、44 分 23 秒、終了 0）で **125 test result・1,799 passed・0 failed・ignored 0**。基準（決定 0122）は 123・1,761・0 failed。差: +2 バイナリ・+38 件（`wall_fr9` の 1 バイナリ・29 件は新規。残りの内訳は**未確認**。「検証」）。**1 回目の通し（06:52:09Z〜07:37:06Z。125・1,796・3 failed）は「更新漏れ」の 3 件で落ちたので無効とし、直してから最初からやり直した**（「検証」） |
 | FRUITY 無効の a4（独立 2 回） | 942/942、895/895、`returned from entry`、終了 0、functions **5,308**（不変）、entries **1,009,189**（基準と同じ。**動いていない**）、native `aba87edb9fb9b167acb686567e5f459dd65a6548f669c07361db6b05e854076a`（2 回とも同一。基準 `09528ebc…8b48a9` からの変化は、生成 C の import thunk の本体が変わったため。「検証」） |
 | FRUITY 有効の最終構成（独立 2 回） | 停止 `fle: SetWindowOrgEx: hdc is not a DC of this runtime`（thunk `f_424660`）、**8,651,367 入口目**、新規の関数 **2,671**、終了 134、**スレッド 4**（0x1001 実行中、0x1002 は `done`、0x1003 は `waiting`、0x1004 は `ready (not started)`）、native `18387d469ce422ecd1d8735d65a634bf5df630de5b2c58f48bf4cd3b4b7a4809`（2 回とも同一） |
-| G2 の部品の証拠（**G2 の達成ではない**） | 最初の可視の最上位窓が表に現れた（関数入口 7,059,458）。可視になったのは 16×16 の透明・レイヤード・最上位・非アクティブ化のツール窓 `0x7f990048`（スレッド 2 が作成）。**PM の判断: これを「G2 の達成」とは数えない。G2 の達成はメインフォーム `0x7f990034`（"FL Studio"）が可視になった時点とする。** 最終構成ではメインフォームは **visible 0 のまま（`ShowWindow` 未呼出）**。したがって **G2 は未達成**。表は `logs/g2/g2-evidence-FON1.txt` |
+| G2 の部品の証拠（**G2 の達成ではない**） | 最初の可視の最上位窓が表に現れた（関数入口 7,059,458）。可視になったのは 16×16 の透明・レイヤード・最上位・非アクティブ化のツール窓 `0x7f990048`（スレッド 2 が作成）。**PM の決定: これを「G2 の達成」とは数えない。G2 の達成はメインフォーム `0x7f990034`（"FL Studio"）が可視になった時点とする。** 最終構成ではメインフォームは **visible 0 のまま（`ShowWindow` 未呼出）**。したがって **G2 は未達成**。表は `logs/g2/g2-evidence-FON1.txt` |
 | 直した壁 | **30 壁**（壁 22〜51）。壁 52 で停止条件 (g) |
 | 到達していないもの | (a)、(b)。いずれも未到達。スレッド 0x1003 は空キューの `GetMessageW` で待っているが、他のスレッドが全員待ちではない（0x1001 が走っている）ため (b) ではない |
 | 生成 C | FLEngine と m1〜m5 を旧新の `fe-lift` で比較: 変わった本体は **145**（FLEngine 74、dsp 0、Blend2D 0、QFC 2、FreeType 0、ILTools 69）。145 のすべてが import thunk の `fle_unsupported(…)` → `fle_imp_<名前>()`。関数の追加・削除は 0 |
@@ -76,7 +76,7 @@
 
 壁 24 の API 49 本: `IsWindowVisible`、`ShowWindow`、`SetWindowPos`、`MoveWindow`、`GetWindowRect`、`GetClientRect`、`ClientToScreen`、`ScreenToClient`、`MapWindowPoints`、`EnableWindow`、`IsWindowEnabled`、`IsWindow`、`GetParent`、`GetWindow`、`SetParent`、`GetAncestor`、`GetWindowThreadProcessId`、`SetFocus`、`GetFocus`、`SetActiveWindow`、`GetActiveWindow`、`GetForegroundWindow`、`SetForegroundWindow`、`SetCapture`、`GetCapture`、`ReleaseCapture`、`WindowFromPoint`、`GetCursorPos`、`FindWindowW`、`UnregisterClassW`、`SetTimer`、`KillTimer`、`InvalidateRect`、`ValidateRect`、`UpdateWindow`、`BeginPaint`、`EndPaint`、`EnumWindows`、`DestroyWindow`、`IsChild`、`IsIconic`、`IsZoomed`、`GetDesktopWindow`、`GetTopWindow`、`BringWindowToTop`、`GetWindowTextW`、`EnumChildWindows`、`EnumThreadWindows`、`GetUpdateRect`。
 
-### 壁の数え方（PM の判断点 1）
+### 壁の数え方（未決の点 1）
 
 PM の「最大 30 壁」は数え方が書かれていない。**この作業で直した壁の数**と読んだ（壁 22〜51 = 30）。通し番号が 30 に達することと読むと、壁 30（`SetPropW`）を直した時点で上限だった。決定 0122 の「最大 12 壁」の自己報告（壁 21 から数えて 1 壁）と同じ数え方。
 
@@ -179,9 +179,9 @@ PM の「最大 30 壁」は数え方が書かれていない。**この作業�
 | S-vq-gap | `fle_vmap.c` | セクションの隙間のページは MEM_COMMIT・PAGE_NOACCESS・MEM_IMAGE | 同上 |
 | S-vq-heap | `fle_vmap.c` | ヒープの `malloc` ブロックは追跡せず MEM_FREE | 追跡しない |
 | S-err | `fle_win.c` ほか | 失敗コード 1400（無効な窓）、1408（他スレッド）、1406（トップレベルの子）、1411／1412（クラス）、87、8、6 | System Error Codes から条件に合うものを選んだ。API のページは名前を挙げない |
-| S-seeds | `harness/seeds/`、`tools/run6.sh` | **FRUITY 有効の構成だけ** Blend2D の種 964 個と FreeType の種 c2。FRUITY 無効の基準は 58 個と c1 | 壁 27・50〜51。`fe-lift` の変更なし。**PM の判断点** |
+| S-seeds | `harness/seeds/`、`tools/run6.sh` | **FRUITY 有効の構成だけ** Blend2D の種 964 個と FreeType の種 c2。FRUITY 無効の基準は 58 個と c1 | 壁 27・50〜51。`fe-lift` の変更なし。**未決の点** |
 
-件数: 上の表は **39 項目**。撤回条件は「実機測定」が主。S-parentnotify・S-flatsb は **Learn との食い違い**があり、PM の判断が要る。
+件数: 上の表は **39 項目**。撤回条件は「実機測定」が主。S-parentnotify・S-flatsb は **Learn との食い違い**があり、未決。
 
 ## テスト
 
@@ -220,7 +220,7 @@ PM の「最大 30 壁」は数え方が書かれていない。**この作業�
 
 停止条件 (g)（30 壁）。壁 22〜51 の 30 壁を直し、壁 52 `SetWindowOrgEx(hdc=0)` は直していない（直せば 31 個目）。(a)・(b) には到達していない。(c)・(d)・(e) にも当たっていない（壁 27・31・50・51 は lift の穴だが `fe-lift`／`fe-decode` の変更は要らなかった）。
 
-## 解釈が分かれた点・PM の判断が要る点
+## 解釈が分かれた点・未決の点
 
 1. **「最大 30 壁」の数え方**: 直した壁の数と読んだ（上）。通し番号なら壁 30 で止まっていた。
 2. **FRUITY 有効の構成だけ Blend2D の種 964 個と FreeType の種 c2**: 基準（FRUITY 無効）は 58 個と c1 のまま。FRUITY 有効の最終構成と無効の基準で種が違う。
@@ -231,7 +231,7 @@ PM の「最大 30 壁」は数え方が書かれていない。**この作業�
 7. **非 NULL のメニューは名前付き停止のまま**（メニューは別の大きなモデル）。
 8. **`WM_PARENTNOTIFY` を送らない**（S-parentnotify。Learn の別のページと食い違う）。
 9. **a4 の entries 1,009,189 を基準として受け入れた**（PM の決定 5）。
-10. **G2 の扱い**（PM の判断で確定）: 16×16 の部品窓が可視になった証拠は「G2 の部品の証拠」で、G2 の達成とは数えない。達成はメインフォーム（"FL Studio"）の可視化。最終構成では未達成（`ShowWindow` 未呼出）。
+10. **G2 の扱い**（PM の決定で確定）: 16×16 の部品窓が可視になった証拠は「G2 の部品の証拠」で、G2 の達成とは数えない。達成はメインフォーム（"FL Studio"）の可視化。最終構成では未達成（`ShowWindow` 未呼出）。
 11. **スレッドの `fle_thread.c` の変更**: S3 の担当と衝突しないよう小さなフック 2 本（弱参照）に限った。MERGE-NOTES に記載。0124 を含む木では当てて測っていない。
 12. **wasm・ブラウザは未測定**。
 

@@ -192,7 +192,7 @@ build: `tools/mk-rts.sh` = 同じ木に `-DFLE_GIL_STATS -DFLE_CS_HOLD_STATS` �
 
 **失敗の形**(0283b §2 を今回の実測に合わせて更新):
 - SAB が無い環境: 入力 ring がすでに SAB 前提で、COOP same-origin / COEP require-corp は全応答に付いている。実スレッド版で**新しく失う物は無い**(『SAB が無いと動かない』が増えない)。
-- 論理 CPU が少ない(≤ 2): 実スレッド版は UI Worker 0.6 + ミキサー Worker 0.9 + ブラウザの他のスレッド(この機械では SwiftShader を除いても compositor・GPU・AudioWorklet)で**3 コア以上**を要る。2 コアでは協調 1 Worker より悪い(GIL のスピンと待ちが付く)。→ 旗なしの『唯一』では『起動時に `navigator.hardwareConcurrency` を見て Worker の数を決める』**実行時の判断**が要る(`FLE_WORKERS=1` の協調を残す = 2 経路のテストが残る。no-options 方針に反するかは PM の判断)。
+- 論理 CPU が少ない(≤ 2): 実スレッド版は UI Worker 0.6 + ミキサー Worker 0.9 + ブラウザの他のスレッド(この機械では SwiftShader を除いても compositor・GPU・AudioWorklet)で**3 コア以上**を要る。2 コアでは協調 1 Worker より悪い(GIL のスピンと待ちが付く)。→ 旗なしの『唯一』では『起動時に `navigator.hardwareConcurrency` を見て Worker の数を決める』**実行時の判断**は未決(`FLE_WORKERS=1` の協調を残す = 2 経路のテストが残る。no-options 方針に反するかは PM の未決)。
 - Firefox 159: 入れ子 Worker + JSPI は 158 までの手元の確認だけ(0234g)。**今回の足場は `Atomics.waitAsync`(`fle_idle_lib.js` の UI の wake word の待ち)を使う。Firefox での対応は未確認**(未対応なら UI の待ちが『ページの deadline だけ』に落ちる設計の確認が要る)。pthread Worker の最初の起動は『親 Worker の最初の idle まで遅れる』(Chrome の実測、0234 系)ので P1(起動 10 s)への影響も未測定。
 - Worker の生成失敗 / 共有メモリの確保失敗: `pthread_create` が返らない。名前つきの停止(I1 の検査の延長)にする。
 

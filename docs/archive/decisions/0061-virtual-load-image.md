@@ -73,7 +73,7 @@ harness は `fle: unsupported instruction at 0x425100`（`user32.dll!LoadImageW`
 
 - 別の一次資料が LoadCursorW と LoadImageW（LR_SHARED）のキャッシュが別だと示す。決定 1 を逆にする。
 - ゲストが HCURSOR を 32 ビットに切り詰める、ポインタとして検査する、GetIconInfo や DrawIcon 系にハンドルを渡す。領域と種類を見直す。
-- 32649 の扱い（PM の判断）。実 Windows で失敗時の GetLastError が確認できる、または PM が NULL を許可する。
+- 32649 の扱い（PM の未決）。実 Windows で失敗時の GetLastError が確認できる、または PM が NULL を許可する。
 - ゲストが DestroyCursor に標準カーソル・DLL のカーソルを渡して止まる。共有物の破棄の規則（About Cursors は LoadCursor 由来の共有カーソルに DestroyCursor を呼ばないと書く。LoadImage の LR_SHARED は「the system will destroy the resource when it is no longer needed」）を決める。
 - ゲストがカーソルの画像・ホットスポットを読む API（GetIconInfo、DrawIconEx、CopyImage の LR_COPYFROMRESOURCE など）に届く。RT_CURSOR のデータ（実測した形: 308 バイト、32×64 の 1bpp、ホットスポットあり）を読む。
 

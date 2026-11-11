@@ -118,7 +118,7 @@ Chrome の壁時計モード(`S-idle-clock-wall`)30 s、固定時計で 5 仮想
 
 構成: `a4-fruity.sh on-0129` に `FLE_SEH_HANDLERS=0x112c0`(決定 0132 の opt-in)を渡して生成した C から作った wasm -Oz(`HOOKS=0`、`THREADS=1 JSPI=1 SJLJ=wasm VAR=force FRUITY=1`、10 MB で切ったユニット)。VFS の種は `vfs-seed-idle1.tsv`(218 のホストファイル、5.6 MB)で、Worker は `data/seed/manifest.json` からそれを読む(`tools/make-seed-pack.sh`)。**エラーダイアログは出ず、ウェルカムウィザード(lid 48、874x570、(523,255))、Settings(lid 22)、主窓(lid 13)が描かれた idle**(F1 の担当が観測した状態と同じ。主窓の面 SHA `721b792e1c7729a2…` が F1 の報告 `721b792e…` と一致)。node の `snap` だけの実行が全体で 30.6 s、Chrome の最初の idle が 29.4〜29.8 s。この構成では文字も描かれる(種にフォントがある)。
 
-**そのままでは仮想時計を進められなかった**: スレッド 2(IPP の描画)の C フレームが wasm の既定の 1 MiB(`FLE_THREAD_WASM_CSTACK_BYTES`)を超え、`scheduler: the canary at the low end of the shadow stack of thread 2 was overwritten` で `advance 50` の途中に落ちた(入力なしの対照でも同じ)。runtime だけのコンパイルフラグで 8 MiB にして解決した(`RT_EXTRA_CFLAGS=-DFLE_THREAD_WASM_CSTACK_BYTES=8388608`、`build_nmod_wasm.sh` に 1 行。runtime のソースは変えていない)。決定 0132 の担当・F1 の担当がこの構成で仮想時間を進めるときに同じ壁に当たるはずなので、PM の判断点に書く(11 節)。
+**そのままでは仮想時計を進められなかった**: スレッド 2(IPP の描画)の C フレームが wasm の既定の 1 MiB(`FLE_THREAD_WASM_CSTACK_BYTES`)を超え、`scheduler: the canary at the low end of the shadow stack of thread 2 was overwritten` で `advance 50` の途中に落ちた(入力なしの対照でも同じ)。runtime だけのコンパイルフラグで 8 MiB にして解決した(`RT_EXTRA_CFLAGS=-DFLE_THREAD_WASM_CSTACK_BYTES=8388608`、`build_nmod_wasm.sh` に 1 行。runtime のソースは変えていない)。決定 0132 の担当・F1 の担当がこの構成で仮想時間を進めるときに同じ壁に当たるはずなので、未決の点に書く(11 節)。
 
 入力の列(`b-press`: 「No thanks」(画面 (1036,561)、`TVectorPanel` lid 123)に移動 → 50 ms → 押下 → 80 ms → 300 ms 押したまま。`b-release`: さらに離す → 300 ms → 3 s):
 
@@ -152,7 +152,7 @@ a78abce の木で、OK ボタンの先に進むまでに出会った壁と、そ
 - **idle の `WaitMessage` が空回りした**(最初の版): 時計を進める人がいなかった。idle フック(`fle_thread_idle_hook`)で、次の期限まで時計を進めるか、事象を待つかをホストが決めるようにした。
 - **dsp の種 `jt` は仮想時計が進むと 0x33d6e70 の lift の穴に当たる**: idle1 の種(16,133 行)で作り直した(OUT `nmod`/`nmod2`)。種の追加は fe-lift / fe-decode の変更ではない。
 - **wasm のスレッド 2 の C スタック**(§4.6)。
-- **ウィザードのオレンジの『Buy』ボタンへのクリックが捨てられる**: そこにはゲストが `WS_DISABLED` を付けた `TWPControl`(lid 129)があり、その中の `TUnlockBuyModule`(lid 153)がヒットテストの結果で、無効なので捨てる(S-disabled-drops)。ウィザードの本当のボタンは中央の 2 つ(884,554)・(1036,554)(エラーダイアログ経由の状態)と、本物の idle の『I'm in』(884,561)・『No thanks』(1036,561)。**Learn の WindowFromPoint の頁は「無効な窓は返さない」と言う**ので、文字どおり読むと、ヒットテストは無効な子を飛ばして有効な祖先(ウィザード)を返す。この実装は『捨てる』を選んだ(頁は入力の配送を言わない)。向きを変えるなら `mouse_target` の 1 か所(PM の判断点)。
+- **ウィザードのオレンジの『Buy』ボタンへのクリックが捨てられる**: そこにはゲストが `WS_DISABLED` を付けた `TWPControl`(lid 129)があり、その中の `TUnlockBuyModule`(lid 153)がヒットテストの結果で、無効なので捨てる(S-disabled-drops)。ウィザードの本当のボタンは中央の 2 つ(884,554)・(1036,554)(エラーダイアログ経由の状態)と、本物の idle の『I'm in』(884,561)・『No thanks』(1036,561)。**Learn の WindowFromPoint の頁は「無効な窓は返さない」と言う**ので、文字どおり読むと、ヒットテストは無効な子を飛ばして有効な祖先(ウィザード)を返す。この実装は『捨てる』を選んだ(頁は入力の配送を言わない)。向きを変えるなら `mouse_target` の 1 か所(未決の点)。
 
 ## 6. 出典なしの選択(S-…)
 
@@ -200,7 +200,7 @@ a78abce の木で、OK ボタンの先に進むまでに出会った壁と、そ
 | なぜ 0 番地か(読み) | 呼び出し先はコードに直接書かれた import ではなく、グローバルのセル(`[rip+0xec20fc]` が指す先)から読んだ関数ポインタ。VCL の遅延束縛で `GetProcAddress(user32, "UpdateLayeredWindow")` の結果をそこに入れたと読める(**`GetProcAddress` の呼び出し自体は追っていない**)。仮想 user32 のエクスポート表(応答表 `imports_table.rs`)に `UpdateLayeredWindow` の行が無いので 0 を返す。0 を返すこと自体は正しい動作で、ゲストがそれを検査せずに呼ぶ |
 | ウィザードが閉じた後の窓表(`g3_snapshot` を gdb で呼んだ。仮想 3,600,440 ms) | lid 18 TLightweightLayeredControl 有効、**lid 22 TMIDIForm 有効、lid 13 TFruityLoopsMainForm 有効("FL Studio 2026")**、lid 5 TApplication 有効。TWelcomeWizard(lid 48)は窓表から消えた(面は最後に描いた `b34167ed1d…` が残る)。面: lid 13 `8db0690f7f…`、lid 22 `708d1857351a…` |
 
-選択肢と規模(PM の判断):
+選択肢と規模(未決の点):
 
 1. **状態だけの stub**(`ShowScrollBar` と同じ流儀): `UpdateLayeredWindow` の行 1 本+約 30 行(hWnd が WS_EX_LAYERED の生きた窓、`hdcDst` NULL、`dwFlags` が ULW_ALPHA か ULW_COLORKEY か ULW_OPAQUE のどれか、位置・大きさを窓表に反映、成功を返す)。この呼び出しは 2x2 の窓の位置合わせで、見える画素は無い。行を足すので生成 C が全ユニット変わり、native 約 10 分+wasm 約 10 分の再ビルドが要る。**推奨はこれを先にやり、その先の壁を見る**。
 2. **画素の合成**: メモリ DC の画素(AC_SRC_ALPHA は premultiplied alpha)を窓の面に写し、`BLENDFUNCTION` と ULW_ALPHA / ULW_COLORKEY / ULW_OPAQUE に従って合成する。決定 0126 の画素モデルを DC → 窓の面に広げることになり、**大きなモデル**(S- の選択が増える: 丸め、premultiplied の扱い、`hdcDst` が非 NULL のとき、`pptDst` を NULL にしたときの位置)。切り出して別のレーンが持つのが妥当(PM の裁定どおり)。
@@ -266,7 +266,7 @@ a78abce の木で、OK ボタンの先に進むまでに出会った壁と、そ
 
 ## 10. 止めた理由
 
-PM の裁定(3 時間目の報告への返信)どおり、**項目 (1)〜(6) はクリックで達成と読む**。`user32!UpdateLayeredWindow` は大きなモデル(停止条件 (d))として止め、別のレーンに切り出す。そのほか fe-lift / fe-decode の変更は要らなかった((e) に当たらない)。PM の判断値で止まったものは 11 節に挙げた。時間: 23:45Z までの 6 時間の枠のうち、提出は最終報告の時刻(全体テストの 2 回目の終了後。PM の目標は付け替え指示から 2 時間以内)。
+PM の裁定(3 時間目の報告への返信)どおり、**項目 (1)〜(6) はクリックで達成と読む**。`user32!UpdateLayeredWindow` は大きなモデル(停止条件 (d))として止め、別のレーンに切り出す。そのほか fe-lift / fe-decode の変更は要らなかった((e) に当たらない)。未決の値で止まったものは 11 節に挙げた。時間: 23:45Z までの 6 時間の枠のうち、提出は最終報告の時刻(全体テストの 2 回目の終了後。PM の目標は付け替え指示から 2 時間以内)。
 
 ## 11. PM の未決の点
 

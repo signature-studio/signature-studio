@@ -95,7 +95,7 @@
 | S-default-surface-size | `fle_win.c` | デスクトップの DC の大きさは仮想ディスプレイ（1920×1080） | 決定 0053 の値 |
 | S-shared-cursor-setcursor | `fle_gdi.c`、`fle_cursor.c` | `LoadCursorW(hInstance, 名前)` が返した共有ハンドルは `SetCursor` と `DestroyCursor`（1 を返す。決定 0113 の選択）で受ける | Learn `SetCursor`「loaded by either the LoadCursor or the LoadImage function」。`DestroyCursor` の戻りは決定 0113 の選択のまま |
 
-件数: 上の表は **18 項目**（S-hdc-null、S-b2d-nojit、S-loadcursor-handle、S-loadcursor-missing、S-windc-common、S-owndc-life、S-common-after-destroy、S-release-mismatch、S-release-thread、S-release-owndc、S-gdcex-bits、S-gdcex-window、S-gdcex-parentdc、S-paintdc、S-err、S-surface、S-default-surface-size、S-shared-cursor-setcursor）。**S-gdcex-parentdc は Learn の 2 つのページが食い違う**ので PM の判断が要る。
+件数: 上の表は **18 項目**（S-hdc-null、S-b2d-nojit、S-loadcursor-handle、S-loadcursor-missing、S-windc-common、S-owndc-life、S-common-after-destroy、S-release-mismatch、S-release-thread、S-release-owndc、S-gdcex-bits、S-gdcex-window、S-gdcex-parentdc、S-paintdc、S-err、S-surface、S-default-surface-size、S-shared-cursor-setcursor）。**S-gdcex-parentdc は Learn の 2 つのページが食い違う**ので未決。
 
 ## 既存のテストの更新（旧 → 新と理由。通すために弱めたものは無い）
 
@@ -146,7 +146,7 @@
 
 ## 止まった理由
 
-停止条件 **(d)**（最初の実際の描画呼び出し）。ただし、**窓の DC を宛先とする描画ではなく**、メモリ DC の 9×9 カラーのデバイス依存ビットマップへの `FillRect` で止まった。PM の判断（作業中に確認）: これは新しい画素モデル（デバイス依存ビットマップに画素領域を持たせる）が要る描画で、この作業では作らない。(a)・(b)・(c)・(e)・(g) には当たっていない（壁 4 件は、40 壁にも 8 時間にも遠い）。
+停止条件 **(d)**（最初の実際の描画呼び出し）。ただし、**窓の DC を宛先とする描画ではなく**、メモリ DC の 9×9 カラーのデバイス依存ビットマップへの `FillRect` で止まった。判定（作業中）: これは新しい画素モデル（デバイス依存ビットマップに画素領域を持たせる）が要る描画で、この作業では作らない。(a)・(b)・(c)・(e)・(g) には当たっていない（壁 4 件は、40 壁にも 8 時間にも遠い）。
 
 ## 未決の点(PM)
 
@@ -155,7 +155,7 @@
 3. **S-hdc-null の last error 6**: 出典なしの選択。
 4. **S-b2d-nojit**: FRUITY 有効の構成は Blend2D を JIT 無効で使う（決定 0120 の注釈を付けた）。FRUITY 無効の基準は注釈なし。構成によって Blend2D の振る舞いが違う。
 5. **G2 は未達成**: 主窓は壁 55 まで一度も `ShowWindow` されない。壁 55 より先に進むのは描画レーンの後になる。
-6. **native SHA**: FRUITY 無効の最終の native は `d12809ae…`。基準 `b96f754b…`（clean）、`aba87edb…`（`fle_thread_wasm.o` を外した 0123 の値）とは別。次の基準にするかは PM の判断。
+6. **native SHA**: FRUITY 無効の最終の native は `d12809ae…`。基準 `b96f754b…`（clean）、`aba87edb…`（`fle_thread_wasm.o` を外した 0123 の値）とは別。次の基準にするかは未決。
 
 ## 撤回条件
 

@@ -145,7 +145,7 @@ adapter_<va>(rsp, rcx, rdx, r8, r9, rax, tt):         ; 検索が hit した後�
 | 全 VA の表(標準の adapter の方式: `target − text_lo` を索引にする)| FLEngine の text は約 14 MB。1 byte 単位の funcref の表は数十〜100 MB。 |
 | 線形メモリに hash(key, slot)を置く | config にアドレスが 1 つ増え、共有メモリの予約が要る。funcref の表 + 束ね関数ならデータが無い(§3)。 |
 | C 側の direct-mapped cache(0163)を wasm から読む | C の関数ポインタ(C 側の表の索引)を指す。境界が残る。 |
-| site ごとの inline cache(プロファイルで最頻の target を 1〜3 個、直接呼びに)| 最も速いが、site の VA と target の VA を表に持つ(アドレスによる分岐)。プロファイルの入力も無い。**Phase 2 として別の決定にする**(PM の判断)。 |
+| site ごとの inline cache(プロファイルで最頻の target を 1〜3 個、直接呼びに)| 最も速いが、site の VA と target の VA を表に持つ(アドレスによる分岐)。プロファイルの入力も無い。**Phase 2 として別の決定にする**(未決)。 |
 | すべての body を一様な型にする | 直接呼びが遅くなる。 |
 
 ## 10. 私の読みで、まだ確かめていない物(未確認の一覧)

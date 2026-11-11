@@ -1,4 +1,4 @@
-# 0116: `CreateFruityInstance` の壁 — 登録の種付け（`Shared data`）、`SHGetSpecialFolderLocation`／`SHGetPathFromIDListW`、`GetCPInfo(CP_UTF8)`。4 つ目の壁 `WinVerifyTrust` で停止（署名検査の判断が要る）。すべて仮の決定
+# 0116: `CreateFruityInstance` の壁 — 登録の種付け（`Shared data`）、`SHGetSpecialFolderLocation`／`SHGetPathFromIDListW`、`GetCPInfo(CP_UTF8)`。4 つ目の壁 `WinVerifyTrust` で停止（署名検査は未決）。すべて仮の決定
 
 状態: **仮の決定（すべての応答と選択）**。依頼は PM（2026-10-28。「壁を 1 つずつ『原因の特定 → 最小の実装 → 再測定』で連続して進める。最大 12 壁。止まる条件に当たったら止める」。番号 0116 は PM の仮の割り当て）。測定・実装・テスト・文書は作業者（サブエージェント）が行った。**HEAD f5e9552 の clean な `git archive` に差分 `fruity3.diff` を当てた木で、コンパイル（警告・エラーなし）、全体テスト（116 test result・1,594 passed・0 failed）、生成 C の関数単位の比較、変異検査 10 件（10 件検出）、6 モジュール構成の FRUITY 有効の測定（独立な 2 回のビルド）と無効のビルド 1 回まで実施した。実機 Windows との照合は 0 件。wasm は未確認（native だけ）。**
 
@@ -57,7 +57,7 @@
 
 - 木のコピー `src-exp`（`fruity3.diff` の木 + `runtime/fle_exp.c` + 応答表の 9 行 + `fle_imports.h` の宣言）、環境変数 `FLE_EXP_WVT=fail|ok` で切り替え。
 - **B（fail）**: `WinVerifyTrust` が `0x800B0100`。`logs/expB/native.txt`: `fruity: rax=0xfffffffe instance=0`、`CreateFruityInstance RETURNED (eax=-2) after 35101 lifted entries`、終了コード 0。
-- **A（ok）**: `WinVerifyTrust` = 0、`CryptQueryObject`（偽のハンドル 2 つ）、`CryptMsgGetParam`（0x40 バイトの 0）、`CertFindCertificateInStore`（偽のコンテキスト）、`CertGetNameStringW`（`Image Line NV`）、`CertFreeCertificateContext`、`CertCloseStore`、`CryptMsgClose`。次の停止（実測）: `fle: RaiseException: exception code 0xc06d007f ...`（35,597 入口。遅延ロードの補助が `GetProcAddress(kernel32, "GetUserPreferredUILanguages")` で 0 を得た = `ERROR_PROC_NOT_FOUND` の VcppException）。これに en-US を答えると（実験コード 25 行）、次は **`user32!GetActiveWindow`**（38,238 入口。呼び出し元 `f_86c890` ← `f_86a920` ← `f_818d30` ← `f_13755b0` ← `CreateFruityInstance`。Delphi の `TApplication` の初期化の領域 0x86xxxx。読み）。ここからウィンドウ・メッセージ・メッセージループの領域（判断が要る壁）に入る。
+- **A（ok）**: `WinVerifyTrust` = 0、`CryptQueryObject`（偽のハンドル 2 つ）、`CryptMsgGetParam`（0x40 バイトの 0）、`CertFindCertificateInStore`（偽のコンテキスト）、`CertGetNameStringW`（`Image Line NV`）、`CertFreeCertificateContext`、`CertCloseStore`、`CryptMsgClose`。次の停止（実測）: `fle: RaiseException: exception code 0xc06d007f ...`（35,597 入口。遅延ロードの補助が `GetProcAddress(kernel32, "GetUserPreferredUILanguages")` で 0 を得た = `ERROR_PROC_NOT_FOUND` の VcppException）。これに en-US を答えると（実験コード 25 行）、次は **`user32!GetActiveWindow`**（38,238 入口。呼び出し元 `f_86c890` ← `f_86a920` ← `f_818d30` ← `f_13755b0` ← `CreateFruityInstance`。Delphi の `TApplication` の初期化の領域 0x86xxxx。読み）。ここからウィンドウ・メッセージ・メッセージループの領域（未決の点を含む壁）に入る。
 
 ## Learn／一次資料の取得記録（2026-10-28。curl で取得、タグを除いたテキスト）
 

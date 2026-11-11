@@ -156,7 +156,7 @@
 | extra_refs=3 | 15,288 | 3,201 | 64.1 MB | 14.86 MB | 146.59 MB | **+5.44 MB(超過)** |
 | **prune-SM2(extra_refs=1 と 26 export の両方)** | 16,223 | 2,266 | 39.2 MB | 6.31 MB | **140.84 MB** | **−0.30 MB(ほぼ余裕なし)** |
 
-**推計の方法(読み。ビルドしていない)**: 戻る関数の `wasm_oz_A`(prune1 が -Oz の単体で測った関数ごとの bytes)の合計に 0.672 を掛けた(S → S+M で実測した wasm-opt 後の減少 34,135,973 B ÷ M だけの wasm_oz_A 合計 50,782,094 B)。F2 の hot-units 表(`ship-hot-units-F2.tsv`)も M 側の関数の一部を含むので、実測は誤差がある。実測するなら `SHIP_PRESET=F2x PRUNE_LIST=<abs>/prune-SM2.tsv` を fin1 の道具で 1 本ビルドする(本決定では**ビルドしていない**: 結果が出ていないリストのために 50 分のビルドを足すより、PM の判断を先に求めるため)。
+**推計の方法(読み。ビルドしていない)**: 戻る関数の `wasm_oz_A`(prune1 が -Oz の単体で測った関数ごとの bytes)の合計に 0.672 を掛けた(S → S+M で実測した wasm-opt 後の減少 34,135,973 B ÷ M だけの wasm_oz_A 合計 50,782,094 B)。F2 の hot-units 表(`ship-hot-units-F2.tsv`)も M 側の関数の一部を含むので、実測は誤差がある。実測するなら `SHIP_PRESET=F2x PRUNE_LIST=<abs>/prune-SM2.tsv` を fin1 の道具で 1 本ビルドする(本決定では**ビルドしていない**: 結果が出ていないリストのために 50 分のビルドを足すより、判定の方針を先に置くため)。
 
 **prune 以外の大きさの削減候補(列挙だけ。測っていない。読み)** — S+M をそのまま出荷しなくても S1 に届く可能性があるもの:
 
@@ -229,7 +229,7 @@ PM 連絡(決定 0183 の新情報): Fruity Wrapper の DllMain は `LoadLibrary
 
 取り込み: `prune2.diff`(新規ファイルのみ 104 本: `docs/investigations/prune2/` と `tools/prune2/`。`-` 行 0、`patch -p1 --dry-run` は HEAD 4f23c01 に offset・fuzz・reject なしで当たる)。fe-lift・runtime・harness・app には触れていない(既存の 2 ファイルへの小さな opt-in の追加 `cov-per-probe.patch` は**適用していない**: `fruity_g3.c` が `trace_native.c` の新しい関数を参照する形で、`trace_native.c` を含まないビルドがあればリンクが落ちる。必要になったら弱い参照にして別の担当で入れる)。コード変更が無いので全体テストは再実行していない(基準 169 results / 2,199 passed / 0 failed のまま)。PM は結果を再実行していない。
 
-PM の判断:
+PM の決定:
 
 1. **S は安全(定義上)。S+M は『条件つき』のまま**。確認した範囲(起動・Basic/Sampler の再生と操作・206 プローブ・空プロジェクト 370 仮想秒・ダイアログ経由の FLP・参照プロジェクトの Fruity Wrapper の壁まで)で刈った関数のエントリは S も S+M も 0、PSM3 の abort 0、出荷物 F2xn の node 実行 206 走行で abort 0、負の対照 PX3 で検出が働いた。しかし検定できた dsp は閉包 25,370 関数のうち 355(1.4%)で、**所定プロジェクトの実 DSP(Fruity プラグイン、Serum 2、エフェクト、書き出し、サンプルの復号)は 1 本も走っていない**。これらが走る経路(wrp1 の Fruity Wrapper→Serum 2、書き出し用の IFileSaveDialog、MP3 の ACM)が動いた時点で、prune2 の道具(`tools/prune2/`、PSM3/D3 の手順)で再判定する。それまで、出荷する構成は **S(F1 系: 2.43 倍で S1 は未達)**。F2 系(S+M、1.936 倍)は、abort が『名前つきの安全側の失敗』であることを理解した上での**候補**に留め、既定の入口にしない。
 2. S1 の余裕: F2 の推計 140.84 MB(prune-SM2)は余裕 0.3 MB、`extra_refs=1` だけなら 139.69 MB(余裕 1.46 MB、推計=未ビルド)。S+M を出荷する場合は、保守的な代替の実ビルドと S1 の実測が要る。prune 以外の削減候補(wasm-opt の追加パス 0.5〜2%、FreeType の上流置換 約 −2.5 MB、always-inline 単位の縮小〔P2 と引き換え〕)は測っていない。

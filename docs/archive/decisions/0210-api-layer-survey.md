@@ -172,7 +172,7 @@ PM の指示に従い **kernel32/shell32 の文字列・ロケール・時刻・
 
 **wasm32 での実行**: `api2_cases.c` と runtime の 13 ファイル(api2 の 4 本を含む)を emcc(wasm32、-O1)でビルドし node 24.19 で実行した出力が、native の出力と 68 行すべて一致した(`logs/wasm-node-api2.txt`)。= 新しい C はゲストのポインタ=ホストのポインタ(同一視の地図、32 ビット)の下でも同じ答えを返す。
 
-**生成 C への影響**: 既定の生成 C は不変(fe-lift 無変更、新規 runtime 4 ファイルは行が無ければ呼ばれない)。FLEngine の既定 sha256 `cd9107ce…` を再現(`logs/gen-default.sha256`)。SHIP2 + api2 では閉包の『行なし』が 184 → 178(CompareStringA・GetConsoleCP・ShellExecuteA・ShellExecuteExW・TzSpecificLocalTimeToSystemTime・VirtualQueryEx の 6)。他の 8 行は FLEngine の閉包には届かない(同梱 DLL や動的名の側)。**出荷の import 行に加えるのは PM の判断**(行を加えるビルドは `fle_api2_*.c` を runtime のファイルとして取り込む必要がある)。
+**生成 C への影響**: 既定の生成 C は不変(fe-lift 無変更、新規 runtime 4 ファイルは行が無ければ呼ばれない)。FLEngine の既定 sha256 `cd9107ce…` を再現(`logs/gen-default.sha256`)。SHIP2 + api2 では閉包の『行なし』が 184 → 178(CompareStringA・GetConsoleCP・ShellExecuteA・ShellExecuteExW・TzSpecificLocalTimeToSystemTime・VirtualQueryEx の 6)。他の 8 行は FLEngine の閉包には届かない(同梱 DLL や動的名の側)。**出荷の import 行に加えるかは未決**(行を加えるビルドは `fle_api2_*.c` を runtime のファイルとして取り込む必要がある)。
 
 ## 7. 方式の比較と推奨(決めるのは PM)
 

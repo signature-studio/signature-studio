@@ -59,7 +59,7 @@ IsProcessorFeaturePresent の値（CPUID の応答、決定 0009 と 0047: 葉 1
 - GetStringTypeW（`fle_locale.c`）: 文字ごとのクラスは Unicode のデータで、ページに無い。
 - GetModuleHandleExW（`fle_modules.c`）: exit 系と DETACH でだけ。ページのフラグ（PIN、UNCHANGED_REFCOUNT、FROM_ADDRESS）は仮想モジュール表が持たない参照数とアドレス検索を使う。
 
-**実装したが応答表の行にしなかった 2 名**: TlsFree と IsProcessorFeaturePresent。既存のテストが「行が無い」ことを表明している（`tests/imports_table.rs` は TlsFree を「表に無い名前」の例に使い、`tests/sysinfo.rs` 918 行は `GetProcAddress("IsProcessorFeaturePresent")` が NULL と 127 を返すことを表明する。決定 0034）。この依頼では既存テストを編集しない。結果、DLL の `call [IAT]` 5 か所（IsProcessorFeaturePresent）と `jmp [IAT]` 1 か所（TlsFree）は従来どおり `fle_unsupported(VA)` のまま（`Call: indirect through IAT slot (not lifted)` 5、`Jmp: indirect through IAT slot (not lifted)` 1）。どちらも runtime 関数はあり、`tests/k32_dsp.rs` が直接呼んで確かめている。行を足すには、その 2 つのテストの期待値を PM の判断で更新する必要がある（実行される経路がエラー経路と DETACH だけなので、緊急ではない）。
+**実装したが応答表の行にしなかった 2 名**: TlsFree と IsProcessorFeaturePresent。既存のテストが「行が無い」ことを表明している（`tests/imports_table.rs` は TlsFree を「表に無い名前」の例に使い、`tests/sysinfo.rs` 918 行は `GetProcAddress("IsProcessorFeaturePresent")` が NULL と 127 を返すことを表明する。決定 0034）。この依頼では既存テストを編集しない。結果、DLL の `call [IAT]` 5 か所（IsProcessorFeaturePresent）と `jmp [IAT]` 1 か所（TlsFree）は従来どおり `fle_unsupported(VA)` のまま（`Call: indirect through IAT slot (not lifted)` 5、`Jmp: indirect through IAT slot (not lifted)` 1）。どちらも runtime 関数はあり、`tests/k32_dsp.rs` が直接呼んで確かめている。行を足すには、その 2 つのテストの期待値は、更新の採否が未決（実行される経路がエラー経路と DETACH だけなので、緊急ではない）。
 
 ## 4. 生成物への影響（実測）
 

@@ -189,7 +189,7 @@ Basic.flp を開いた状態で Ctrl+R(キー Ctrl 0x11 と R 0x52 の down/up �
 5. **a4 FRUITY 無効**(`a4-fruity.sh off`、本木): `init_count=942/942`、`run_rank=895/895`、`functions_distinct=5310`、`function_entries=1009731` = **基準と一致**(`logs/a4off.txt`。`INPUT_LIFT=<本木の lift/> OUT=… FEBIN=<本木の target/release> JOBS=6 bash src/lift/harness/a4-fruity.sh off`、gen 14 s・build 96 s、harness exit 0)。
 6. **diff の `-` 行**: `grep -n '^-[^-]' exp1.diff` の 18 行を**全部読んだ**: `build_two_native.sh` の `GEN=` の 1 行(`${GEN_OPT:--O0 -g}` と `${GEN_INSTR--finstrument-functions}` への置換。未設定なら従来と同じ文字列)、`fle_filedlg.c` の 17 行(`vt_*` の宣言 2 行に `vt_save` を足す、`iid_is` → `iid_is_save` の 3 行、`RemoveControlItem` の先頭 3 行〔`ctl_get`/`item_get` を『無ければ E_INVALIDARG』に〕、`env_picker` の変数名・`(void)rq;`・stderr の 3 行、`GetOptions` の既定オプション 1 行、`Show` の既定オプションと分岐の 2 行、`CoCreateInstance` の 3 行)。**他の決定の追加の巻き戻しは無い**(決定 0178 の Open の経路は `save == 0` で同じ挙動)。`lift/crates/**` のソースは無変更。
 
-## 12. 未着手・未確認・PM の判断点
+## 12. 未着手・未確認・未決の点
 
 **未確認(確認していない物)**
 - **実機の Windows / FL Studio との照合は 0 件**。WAV の『正しさ』(音、ディザの雑音の値、ヘッダの細部、`smpl`/`LIST` の中身)、ダイアログの呼び出しの順序とイベント(OnFolderChange ほか)、`SetThreadExecutionState` の初期値、`RemoveControlItem` の戻り値は、どれも実機で確かめていない。
@@ -202,7 +202,7 @@ Basic.flp を開いた状態で Ctrl+R(キー Ctrl 0x11 と R 0x52 の down/up �
 - **ディザ乱数のシードの出どころ**: 0x454edcae の出どころは特定していない(DLL の定数ではなく、ここで試した仮想時計のずらしでは変わらない)。2 回目のディザが別の雑音になる理由(状態の継続か、別のシードでの再シードか)は gdb で見ていない。
 - **起動の基準に対する層 4 の影響**: HEAD cdae0b9 での D4(層 1〜4)対 D5(層 1〜3)は一致を測った。最新の HEAD(88a4dfe の wrp1 の行など)を足した木での再測定はしていない。
 
-**PM の判断点**
+**未決の点**
 1. **層 4(`exp1-imports.txt`)を出荷バンドルの `EXTRA_IMPORTS` に足すか**: 足すと File → Export → Wave file... が成立する(Save ダイアログ + `SetThreadExecutionState`)。起動の基準への影響は §11。
 2. **`RemoveControlItem` の選択(S-exp1-removeitem-unknown)** を採るか: 採らないと『2 回目のファイルダイアログ』(2 回目の書き出し、Open の後の Export など)で止まる。値の出典が無い選択。
 3. **`harness/exp1/wall_wraps.c` と `seed_probe.c`** は探索専用(リンク時 `--wrap`)。出荷には使わない。
@@ -229,7 +229,7 @@ Basic.flp を開いた状態で Ctrl+R(キー Ctrl 0x11 と R 0x52 の down/up �
 - 保存先の与え方: `setenv FLE_FILEDLG_SAVE_FILE /tmp/opencode/exp1/sv.txt`(中身 `C:\Users\user\Documents\exp1-out.wav`)。
 - ログ: `logs/`(生成・judge・全体テスト・a4・パッチの dry-run・止まりの出力)。
 
-## 15. PM の判断と取り込み(2026-11-03)
+## 15. PM の決定と取り込み(2026-11-03)
 
 取り込み前の PM の実測(HEAD 8ea7607 に `exp1.diff` を当てた木、13 ファイル。`fle_filedlg.c` は offset 9 の hunk があったが fuzz・reject は無し。`-` の行 18 本を読んだ。すべて `fle_filedlg.c` を Open 専用から Open/Save の共通実装へ一般化する置換):
 

@@ -1,4 +1,4 @@
-# 0315g(仮): RT-D3 の build の手順(固定。mt3、PM の判断 14:1x)と、build 前に確かめた物
+# 0315g(仮): RT-D3 の build の手順(固定。mt3、PM の決定 14:1x)と、build 前に確かめた物
 
 状態: **仮**。区分: **実測**=この作業のコマンドの出力を見た事実、**読み**、**未確認**。**実エンジン(wasm)の実行・Chrome・Wine は 0**。
 
@@ -14,7 +14,7 @@ RT-D2(= RT-B + alpha1 の Filter 診断の第 3 版。`fl-engine-test-rtd2-297e2
 
 ## 1. 木とテスト(実測)
 - `tree-rtd3`(build の形:FLE_DIAG_* は getenv)と `tree-rtd3t`(テストの形:FLE_TEST_GETENV。native テストはこちら)。**build の形 = テストの形 + `FLE_TEST_GETENV("FLE_DIAG_` → `getenv("FLE_DIAG_` の sed だけ**を、`rtd3-build.sh tree` が 5 ファイル(fle_diag_rtd3.c/.h、fle_gil.c/.h、fle_glob.c)の sha で照合する(OK)。link-web.sh 不変。
-- native テスト(実 cargo、nice 19、JOBS 1、テストの形の木): **43 binary、passed 646、failed 0**(14:05:37〜14:08:45)。= fle_gil.h または fle_diag_rtd3.c を include する runtime ファイルを compile するテスト(PM の判断:全体の `test.sh full` は不要)。先に出した『46』は数え違い。
+- native テスト(実 cargo、nice 19、JOBS 1、テストの形の木): **43 binary、passed 646、failed 0**(14:05:37〜14:08:45)。= fle_gil.h または fle_diag_rtd3.c を include する runtime ファイルを compile するテスト(PM の決定:全体の `test.sh full` は不要)。先に出した『46』は数え違い。
 - native で fle_glob.c + fle_diag_rtd3.c を本物のまま驅動(Add/Find/GlobalAdd):行が出る・整数 atom は行なし・スイッチ OFF とファイル無しのリンクは無出力で動作同一。emcc `-Wall -Wextra`(GIL あり/なし)警告 0。
 - 失敗から学んだ 2 点: (1) 診断を `fle_glob.c` の中に書くと、同じテストが `_exit` の語を禁じ、link に `fle_callback_depth` が無く、glob のテストを 17 件壊した → 別ファイル + 弱い参照。(2) build の形の木でテストを回すと callback の守りが `getenv` で落ちる(コードの欠陥ではない)→ テストはテストの形の木(別の target dir)で回す。
 

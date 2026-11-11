@@ -18,9 +18,9 @@
 
 | 壁 | unit | census の分類 | 原因（区分） | この決定 |
 |---|---|---|---|---|
-| W1 | 276 | d: `GetSystemMetrics` index 86 | `f_80e360` が SM_DIGITIZER の次に **86、0x2003、0x2004** を続けて問い（**読み**）、f_80e3f0 がその後で **95** を問う（**読み**）。census は最初の 86 で止まった（**実測**）。**0x2003、0x2004 は SPI の uiAction ではなく GetSystemMetrics の index**（`mov ecx, 0x2003; call 0x424ee0` = GetSystemMetrics の thunk。**読み**。依頼文の「SPI 0x2003、0x2004」は誤記。0098 自身は SM_CONVERTIBLESLATEMODE、SM_SYSTEMDOCKED と書いている） | 4 つとも答える: **86 → 0、95 → 0、0x2003 → 1、0x2004 → 0**。0x2003 と 0x2004 は一次資料が値を決めない**選択**（PM の判断の点 1）。SM_DIGITIZER = 0 の間、ゲストの分岐はこの 2 つの値に依存しない（**読み**） |
+| W1 | 276 | d: `GetSystemMetrics` index 86 | `f_80e360` が SM_DIGITIZER の次に **86、0x2003、0x2004** を続けて問い（**読み**）、f_80e3f0 がその後で **95** を問う（**読み**）。census は最初の 86 で止まった（**実測**）。**0x2003、0x2004 は SPI の uiAction ではなく GetSystemMetrics の index**（`mov ecx, 0x2003; call 0x424ee0` = GetSystemMetrics の thunk。**読み**。依頼文の「SPI 0x2003、0x2004」は誤記。0098 自身は SM_CONVERTIBLESLATEMODE、SM_SYSTEMDOCKED と書いている） | 4 つとも答える: **86 → 0、95 → 0、0x2003 → 1、0x2004 → 0**。0x2003 と 0x2004 は一次資料が値を決めない**選択**（未決の点 1）。SM_DIGITIZER = 0 の間、ゲストの分岐はこの 2 つの値に依存しない（**読み**） |
 | W2 | 283 | d: `CompareStringW` 「ASCII の英数字以外」 | Delphi の `CompareText`（`f_4399e0`）が `CompareStringW(0x400, NORM_IGNORECASE, "Default", 7, "Segoe UI", 8)` を呼ぶ（**読み**。引数の組はコールバック `0x8650c0` の読みと 0098 の記録）。`fle_locale.c` は**両方の文字列の全ユニット**が ASCII の英数字であることを要求し、"Segoe UI" の空白で止まっていた。順序は位置 0 の 'D' と 'S' で決まる | **最初に違うユニットで決める**: その位置より前のユニットが ASCII の英数字（両側で等しい）で、その位置で両方が英字または両方が数字なら、その順序で答える。**その位置より後は見ない**。それ以外は停止のまま |
-| W3 | 830、880 | e: null 関数ポインタ呼び（census は「二次の疑い」） | **一次**。`LoadLibraryW(L"SHFolder.dll")` → `GetProcAddress(h, "SHGetFolderPathW")` の結果を NULL 検査せずに `(0, CSIDL_APPDATA 0x1a, NULL, 0, buf)` で呼ぶ。応答表に `shfolder.dll!SHGetFolderPathW` の行が無く、GetProcAddress が NULL と 127 を返す（unit 830: **実測**（他の担当の gdb）と読み。unit 880: 読み） | 応答表に `shfolder.dll!SHGetFolderPathW` の**行を 1 つ足し**（`shell32.dll!SHGetFolderPathW` と**同じ関数**を共有）、その関数に **CSIDL_APPDATA (0x1a) = `C:\Users\user\AppData\Roaming`** を足す。ユーザー名 "user" は選択（PM の判断の点 3） |
+| W3 | 830、880 | e: null 関数ポインタ呼び（census は「二次の疑い」） | **一次**。`LoadLibraryW(L"SHFolder.dll")` → `GetProcAddress(h, "SHGetFolderPathW")` の結果を NULL 検査せずに `(0, CSIDL_APPDATA 0x1a, NULL, 0, buf)` で呼ぶ。応答表に `shfolder.dll!SHGetFolderPathW` の行が無く、GetProcAddress が NULL と 127 を返す（unit 830: **実測**（他の担当の gdb）と読み。unit 880: 読み） | 応答表に `shfolder.dll!SHGetFolderPathW` の**行を 1 つ足し**（`shell32.dll!SHGetFolderPathW` と**同じ関数**を共有）、その関数に **CSIDL_APPDATA (0x1a) = `C:\Users\user\AppData\Roaming`** を足す。ユーザー名 "user" は選択（未決の点 3） |
 
 census の上位の壁の残り（ILTools の `LoadLibraryW "iltools_x64.dll"`（unit 245、280、659）は別の担当）。単独構成の `LoadLibraryW "dsp_ippv2_x64.dll"`（unit 144）と null 呼びの unit 170、833、935 は本決定で扱わない（理由は「d」の節）。
 
@@ -60,15 +60,15 @@ Windows-hardware の Learn（OEM 向け）:
 |---|---|---|---|---|
 | 86 | SM_TABLETPC | **0** | ページの 2 つの条件（XP Tablet PC edition、Vista／7 で Tablet PC Input service 起動）に、エミュレート OS（Windows 10。0014）はどちらも当たらず、ページの「otherwise, 0」。デジタイザが無い（SM_DIGITIZER = 0）環境とも整合 | Learn の文言からの導出。ただしページは Windows 10 を書かない（実機の Windows 10 の値は**未確認**） |
 | 95 | SM_MAXIMUMTOUCHES | **0** | 「Nonzero if there are digitizers in the system; otherwise, 0」。この環境にデジタイザは無い（0098 の SM_DIGITIZER = 0） | Learn の文言と 0098 からの導出 |
-| 0x2003 | SM_CONVERTIBLESLATEMODE | **1** | 「0 for Slate Mode and non-zero otherwise」。この環境はスレートでない（マウスあり、デジタイザなし）。OEM の Learn が Desktop には ConvertibleSlateMode = 1 を勧める。**ページが「デスクトップ PC には適用されない」と書くので、デスクトップの値は一次資料が決めない** | **選択**（上の 2 つの Learn ページからの推論。0 と 1 の選択は PM の判断の点 1） |
-| 0x2004 | SM_SYSTEMDOCKED | **0** | 「0 for Undocked Mode and non-zero otherwise」。ドッキングは模擬しない。デスクトップ PC の値は一次資料が書かない | **選択**（PM の判断の点 1。ゲストは読まない） |
+| 0x2003 | SM_CONVERTIBLESLATEMODE | **1** | 「0 for Slate Mode and non-zero otherwise」。この環境はスレートでない（マウスあり、デジタイザなし）。OEM の Learn が Desktop には ConvertibleSlateMode = 1 を勧める。**ページが「デスクトップ PC には適用されない」と書くので、デスクトップの値は一次資料が決めない** | **選択**（上の 2 つの Learn ページからの推論。0 と 1 の選択は未決の点 1） |
+| 0x2004 | SM_SYSTEMDOCKED | **0** | 「0 for Undocked Mode and non-zero otherwise」。ドッキングは模擬しない。デスクトップ PC の値は一次資料が書かない | **選択**（未決の点 1。ゲストは読まない） |
 
 実装: `fle_sysmetrics.c` の `undecided[]` から 4 件を外し、`case` を 4 つ足す。名前は `fle_sysmetrics.h` の `FLE_SM_IDX_*` と `FLE_SM_*`。index は int なので rcx の下位 32 ビットだけを見る（従来どおり）。last error は触れない。
 
 ### 選択肢
 
 - A. 採用（上）。
-- B. 0x2003 を 0（スレート）にする: **不採用**。この環境をスレートモードと名乗る根拠が無い。ただし SM_DIGITIZER = 0 の間はゲストの分岐が同じなので、実装への影響は無い（PM の判断の点 1）。
+- B. 0x2003 を 0（スレート）にする: **不採用**。この環境をスレートモードと名乗る根拠が無い。ただし SM_DIGITIZER = 0 の間はゲストの分岐が同じなので、実装への影響は無い（未決の点 1）。
 - C. 86 を 1 にする: **不採用**（Tablet PC edition でも Vista／7 でもない。デジタイザも無い）。
 - D. 4 つとも名前付き停止のまま: **不採用**。値は決められる（86、95）か、ゲストの分岐に影響しない選択で足りる（0x2003、0x2004）。0098 が「86 だけ決めても unit は ok にならない」としたのは、残りの 3 つが決まらなかったから。
 
@@ -112,7 +112,7 @@ Windows-hardware の Learn（OEM 向け）:
 
 **停止のまま残るもの（理由）**:
 
-- 最初の差より**前**に空白・記号・ハイフン・アポストロフィ・非 ASCII がある組（"a b" と "a c" など）。ページは空白の重みを書かず、ハイフンとアポストロフィは word sort で別扱いと書くだけ。**同じユニットが両側にあれば順序に効かない、という読みは自然だが、ページに書かれていない**ので広げない（PM の判断の点 4）。
+- 最初の差より**前**に空白・記号・ハイフン・アポストロフィ・非 ASCII がある組（"a b" と "a c" など）。ページは空白の重みを書かず、ハイフンとアポストロフィは word sort で別扱いと書くだけ。**同じユニットが両側にあれば順序に効かない、という読みは自然だが、ページに書かれていない**ので広げない（未決の点 4）。
 - 最初の差の位置で、記号（0072 の位置 0 以外）、空白、ハイフン、アポストロフィ、非 ASCII のどれかが片方でもあるもの。英字と数字の組。
 - 接頭辞（一方が他方の頭）、大文字小文字だけの差（flags 0）、空文字列と非空。
 - flags が 0 と NORM_IGNORECASE 以外（**SORT_STRINGSORT 0x1000、NORM_IGNORENONSPACE を含む**）。ページは SORT_STRINGSORT でハイフンとアポストロフィを他の記号と同じに扱うと書くが、本決定は ASCII の英数字の順序にしか答えず、フラグを広げる根拠が無い。
@@ -123,7 +123,7 @@ Windows-hardware の Learn（OEM 向け）:
 
 - A. 採用（上）。
 - B. 新しく決めるのは位置 0 の差だけにする（最も狭い。unit 283 には足りる）: 次点。差が位置 0 にあれば「前のユニット」が無いので、読みの余地が最小。位置 1 以降の差は従来の「全ユニットが英数字」の規則のまま（従来の答えは変えない）。実装は、従来の 2 つの全走査の前に「位置 0 が英字どうし・数字どうしで違えば答える」を足すだけ。位置 1 以降の差で同じ壁が再び出る（"Segoe UI" と "Segoe Print" などは、前に空白があるので本決定でも停止する）。
-- C. 最初の差より前の**同一の**ユニットは何でもよい（空白・記号・非 ASCII を含む）: 「文字ごとに評価する」の文と、同じユニットは同じ重みという前提だけから導けるが、(i) ハイフン・アポストロフィの word sort の扱いが前提に入る、(ii) 複数文字の要素が前の記号に絡まない、という読みが増える。**不採用**（PM の判断の点 4）。
+- C. 最初の差より前の**同一の**ユニットは何でもよい（空白・記号・非 ASCII を含む）: 「文字ごとに評価する」の文と、同じユニットは同じ重みという前提だけから導けるが、(i) ハイフン・アポストロフィの word sort の扱いが前提に入る、(ii) 複数文字の要素が前の記号に絡まない、という読みが増える。**不採用**（未決の点 4）。
 - D. 近似（常に LESS、など）: **不採用**。戻り値は API の仕様として正しくなければならない（0072）。ゲストの鎖では結果は等しいか否かにしか使われない（`sub eax, 2` の後の `test`）が、他の呼び出し点は順序を使う（0072 の調査）。
 
 ### 撤回条件
@@ -170,14 +170,14 @@ Windows-hardware の Learn（OEM 向け）:
 
 1. 応答表の**末尾に 1 行**: `("shfolder.dll", "SHGetFolderPathW", "fle_imp_SHGetFolderPathW", "jmp_imp:SHFolder.SHGetFolderPathW")`。runtime の関数は `shell32.dll!SHGetFolderPathW` と**同じ** `fle_imp_SHGetFolderPathW`（疑似 VA は別。統計の名前は別にして、2 つの thunk を別々に数える）。shfolder.dll は既に仮想モジュール N = 17（決定 0015。モジュールの表は**変えない**）。`SHGetFolderPathA` など他の export には行を足さない（FLEngine は使わない）。
 2. `fle_imp_SHGetFolderPathW` に **CSIDL_APPDATA (0x1a)** を足す: S_OK（0）と `C:\Users\user\AppData\Roaming`（29 文字。末尾に `\` なし。NUL を含めて書く）。hToken は NULL、dwFlags は 0 か 1（同じパス）、pszPath 非 NULL（0103 と同じ条件）。それ以外の csidl（CSIDL_FLAG_CREATE 0x8000 と CSIDL_FLAG_DONT_VERIFY 0x4000 を足した値を含む）は従来どおり名前付き停止（メッセージは `csidl 0x.. is not answered (only CSIDL_FONTS 0x14 and CSIDL_APPDATA 0x1a are)`。冒頭の `csidl 0x24 is not answered` は既存テストの部分一致が通る）。CSIDL_FONTS（0103）の答えは変えず、shfolder.dll の行からも答える。
-3. パスの組み立て: `fle_env.h` に `FLE_VIRTUAL_USER_PROFILE_DIR "C:\\Users\\user"` を足し、`fle_env.c` が `\AppData\Roaming`（`FLE_APPDATA_SUBDIR`）を足す。**ユーザー名 "user" は選択**（出典なし。この環境に他のユーザー名はない。PM の判断の点 3）。
-4. フォルダの**存在は確かめない**（仮想ボリュームにこのフォルダを作らない）。0103 の `C:\Windows\Fonts`、0018 の `GetWindowsDirectoryW`（`GetFileAttributesW("C:\Windows")` は 2 で失敗する）と同じ扱い。実機では存在しない場合に S_FALSE（旧ページの記述）になりうるが、この環境が「プロファイルのフォルダが無い」と主張するのは避ける（0073 の方針）。結果として、ゲストが `CreateDirectoryW(APPDATA + "\\Image-Line")` を呼べば 0018 の規則で ERROR_PATH_NOT_FOUND になる（親が仮想ボリュームに無い）。これが問題になる実行に届いたときは別の決定（PM の判断の点 5）。
+3. パスの組み立て: `fle_env.h` に `FLE_VIRTUAL_USER_PROFILE_DIR "C:\\Users\\user"` を足し、`fle_env.c` が `\AppData\Roaming`（`FLE_APPDATA_SUBDIR`）を足す。**ユーザー名 "user" は選択**（出典なし。この環境に他のユーザー名はない。未決の点 3）。
+4. フォルダの**存在は確かめない**（仮想ボリュームにこのフォルダを作らない）。0103 の `C:\Windows\Fonts`、0018 の `GetWindowsDirectoryW`（`GetFileAttributesW("C:\Windows")` は 2 で失敗する）と同じ扱い。実機では存在しない場合に S_FALSE（旧ページの記述）になりうるが、この環境が「プロファイルのフォルダが無い」と主張するのは避ける（0073 の方針）。結果として、ゲストが `CreateDirectoryW(APPDATA + "\\Image-Line")` を呼べば 0018 の規則で ERROR_PATH_NOT_FOUND になる（親が仮想ボリュームに無い）。これが問題になる実行に届いたときは別の決定（未決の点 5）。
 
 ### 選択肢
 
 - A. 採用（行を足し、関数を共有、CSIDL_APPDATA に成功と仮想パス）。
 - B. APPDATA に失敗（E_FAIL など）か S_FALSE（空のパス）を返す: **不採用**。ゲストは HRESULT を見ず空のパスで続けるので止まらないが、実機の Windows 10 では常に成功する API に「フォルダが無い」と答えることになる（0073、0103 の方針）。
-- C. サービス アカウントのプロファイル（`C:\Windows\System32\config\systemprofile\AppData\Roaming` など）: 0018 の GetTempPathW が `C:\Windows\` になる（環境変数が空）ことと整合するが、出典（Learn）が無く、対話ユーザーの典型例（CSIDL の表、KNOWNFOLDERID）から離れる。**不採用**（PM の判断の点 3 に残す）。
+- C. サービス アカウントのプロファイル（`C:\Windows\System32\config\systemprofile\AppData\Roaming` など）: 0018 の GetTempPathW が `C:\Windows\` になる（環境変数が空）ことと整合するが、出典（Learn）が無く、対話ユーザーの典型例（CSIDL の表、KNOWNFOLDERID）から離れる。**不採用**（未決の点 3 に残す）。
 - D. shfolder.dll の行を足さず、ゲストの `GetProcAddress` を NULL のまま（現状）: 止まる。または shfolder.dll を `fle_load_absent[]` に足す（`LoadLibraryW` が NULL を返し、ゲストは NULL で `GetProcAddress`、さらに NULL を呼ぶ）: **不採用**。FLEngine が通常の import で読む DLL を「無い」とは言えない（0015、0073）。
 - E. 別の実装（shfolder 専用）: **不採用**。旧 MSDN の転載は shfolder が現行の実装を呼ぶと書き、現行の Learn も SHGetKnownFolderPath の wrapper と書く。2 つの入り口は同じ答えであるべき。
 
@@ -196,7 +196,7 @@ Windows-hardware の Learn（OEM 向け）:
 | `LoadLibraryW "iltools_x64.dll"` | 245、280、659 | **別の担当**。触らない |
 | `LoadLibraryW "dsp_ippv2_x64.dll"`（単独構成） | 144 | **扱わない**。単独構成の定義は dsp_ippv2_x64.dll を載せないこと（0101: 単独は下位指標）。応答する対象ではなく、「無い」と定義する（`fle_load_absent[]`）のは 0073、0086、0101 に反する |
 | null 関数ポインタ呼び（単独構成だけ） | 170、833、935 | **扱わない**。dsp 構成では ok、単独では放棄（census の比較: `report.md`「測定した依存」）。読み: 833 の proc `f_10d79f0` は `sub [0x16bc6ec], 1; cmp [0x16bc6ec], -1; jne skip` の後で `mov rax, [0x15e0a48]; call [rax]`（`0x10d7a10`〜`0x10d7a17`）を呼び、170 の `f_675290`（カウンタ `[0x15f47f0]`）が呼ぶ `f_672600` も `mov rax, [0x15e0a48]; call [rax]`（`0x672644`〜`0x67264b`）を持つ。カウンタが -1 になる（0 のまま 1 回引かれた）ときだけ入る経路で、カウンタと `[0x15e0a48]` の先の設定は、放棄された前の unit が行うはず、という読みだが、**設定する unit は特定していない**（**未確認**）。935 は `0x13709d0`（Delphi のコンストラクタ風）で、同じ型かは調べていない |
-| 830、880 の次の壁 | — | census は 1 unit 1 壁しか見せない。**読みの予測**（実測でない）: 上の「呼び出し後のゲスト」のとおり、次は **`kernel32!GetComputerNameExW`**（応答表に行が無い。`jmp [IAT]` の thunk `0x423430` は `fle_unsupported`）。その先は `RegOpenKeyExA(HKLM, "SOFTWARE\Microsoft\Cryptography")`（仮想レジストリは `HKLM\Software` だけ空のキーとして存在する（0085）ので、`Microsoft` が無く ERROR_FILE_NOT_FOUND のはずで、ゲストは MachineGuid の読みを飛ばす）。`GetComputerNameExW` は**環境の主張**（コンピュータ名）なので、本決定では答えない（0034 が同じ理由で未対応のまま。PM の判断の点 6） |
+| 830、880 の次の壁 | — | census は 1 unit 1 壁しか見せない。**読みの予測**（実測でない）: 上の「呼び出し後のゲスト」のとおり、次は **`kernel32!GetComputerNameExW`**（応答表に行が無い。`jmp [IAT]` の thunk `0x423430` は `fle_unsupported`）。その先は `RegOpenKeyExA(HKLM, "SOFTWARE\Microsoft\Cryptography")`（仮想レジストリは `HKLM\Software` だけ空のキーとして存在する（0085）ので、`Microsoft` が無く ERROR_FILE_NOT_FOUND のはずで、ゲストは MachineGuid の読みを飛ばす）。`GetComputerNameExW` は**環境の主張**（コンピュータ名）なので、本決定では答えない（0034 が同じ理由で未対応のまま。未決の点 6） |
 
 ## 実装した場所
 

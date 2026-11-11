@@ -51,7 +51,7 @@
 - Cmpxchg8b、Cmpxchg16b（対象外。依頼どおり）。
 - Shufps、Pshuflw、Pshufhw、Pshufw、Psllw、Psrlw、Psraw、Psrld、Psrad、Pmulhw、Pmullw、Pmulhuw（既に対応済みの pmulhuw を除く）、Paddusb、Paddsw、Psubsw、Psubusb、Pminsw、Pmaxsw、Packssdw、Punpcklbw（SSE 形）、Movhlps、Movlhps、Movlps、Movd（MMX 形と SSE 形の混在）、Movq（MMX 形）、Pxor（mm 形）、Paddq、Emms、Xchg、Bts、Btr、Bsf、Rol、Ror、Vmovups、Vmovaps、Vmovntps、Vzeroupper、Sfence、Pause、Xgetbv、Fldcw、Fnstcw、Fnclex、Fninit、Fnstsw、Psrld、Jecxz、Cmpxchg16b、Minps（ただし上の 8 で実装済み）。
 
-上記のうち Bts、Btr、Bsf、Xchg、Rol、Ror、Movhlps、Movlhps は、今回は仕様を確認していない（実装していない。次の作業で確認する対象）。Vmovups、Vmovaps、Vzeroupper は VEX 符号化で、本ワークの範囲外。Xgetbv、Fldcw、Fnstcw などは x87 とシステム命令で、別の判断が要る。
+上記のうち Bts、Btr、Bsf、Xchg、Rol、Ror、Movhlps、Movlhps は、今回は仕様を確認していない（実装していない。次の作業で確認する対象）。Vmovups、Vmovaps、Vzeroupper は VEX 符号化で、本ワークの範囲外。Xgetbv、Fldcw、Fnstcw などは x87 とシステム命令で、扱いは未決。
 
 ## テスト（ホスト突合）
 

@@ -4,7 +4,7 @@
 
 ## 背景
 
-`docs/investigations/hinstance-caller.md` §0〜§5。harness は `fle: LoadIconW: lpIconName is not IDI_APPLICATION (MAKEINTRESOURCE(32512)): not answered` で止まっていた。引数は `LoadIconW(hInstance = NULL, lpIconName = L"MAINICON")`（0x867934、`f_867710` の中）。hInstance の 0 は `[[0x15e15c8]] = *(u64*)0x15e6078 = 0` で、これは Delphi の `MainInstance`（DLL では 0 が設計どおり）。本物の `HInstance`（0x15ec298）は 0x400000。lift、harness、runtime のどの欠陥でもない（分類 (c)）。判断が要るのは LoadIconW の答え方だけだった。
+`docs/investigations/hinstance-caller.md` §0〜§5。harness は `fle: LoadIconW: lpIconName is not IDI_APPLICATION (MAKEINTRESOURCE(32512)): not answered` で止まっていた。引数は `LoadIconW(hInstance = NULL, lpIconName = L"MAINICON")`（0x867934、`f_867710` の中）。hInstance の 0 は `[[0x15e15c8]] = *(u64*)0x15e6078 = 0` で、これは Delphi の `MainInstance`（DLL では 0 が設計どおり）。本物の `HInstance`（0x15ec298）は 0x400000。lift、harness、runtime のどの欠陥でもない（分類 (c)）。未決なのは LoadIconW の答え方だけだった。
 
 ## 決定
 

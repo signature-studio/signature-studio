@@ -5,7 +5,7 @@
 ## 冒頭の三点
 
 1. **何を実測したか**: (a) lift した実エンジン(FLEngine と同梱 5 DLL、F1xH〔prune S + Blend2D 置換 + 層 1〜4 の行〕のハイブリッド無し + `FLE_FILEDLG_BROWSER`)を、Blend2D の置換アダプタに opt-in の census を足して wasm で作り直し、**隔離 headless Chrome 156 で** 起動 → File > Open(Sampler.flp)→ Ctrl+R → Start を走らせて、描画 53,000 回以上の (描画の入口 × 合成演算 × 幾何 × スタイル × グラデーションの型 × 品質 × 描画先の形式 × 呼び元) を数えた。(b) 同じ Agg2D の呼び出し列を **Wine 上の実 Blend2D.dll(JIT 付き)** と、**置換経路(lift したラッパー + アダプタ + パッチ済みの上流、wasm、node)** に実行させ、シーンごとの画素ハッシュを比べた(合計 7,820,000 シーン)。(c) 上流の JIT(CPU を SSE2/SSE4.1/AVX2/host に制限)と固定パイプラインを、ネイティブで 1 描画/シーンの差分テストにかけた(組ごとに 20,000〜100,000)。(d) 16 スナップ(node、wasm)の 82 行を、変更の前後で比べた。(e) Export が STRICT のまま完走し WAV がネイティブとバイト一致するか、Chrome で確かめた。
-2. **結論**: 出荷構成(STRICT 既定)の Export の停止は、**上流の固定パイプラインに OVERLAY(と PLUS・SCREEN・HARD_LIGHT)のテンプレートを足すだけで消える**(Export の停止の解消に要るのは OVERLAY だけ。SCREEN・HARD_LIGHT は FLEngine に静的な呼び出し箇所があるので足した)(WAV 353,904 B、sha256 `f5c6a08b…`、決定 0188 のネイティブと一致)。エンジンが実際に使う唯一の非 SRC_OVER の組(slot 53 fillGeometry × OVERLAY × PATH × 線形グラデーション PAD/DITHER × PRGB32)は、実 DLL(Wine)と**画素が一致**(OVERLAY × 線形グラデ × {矩形, 折れ線パス, 曲線パス} 各 100,000 シーンで差 0、OVERLAY × 線形グラデの合計 1,560,000 シーンで差 0、放射以外の全走行 4,680,000 シーンで差 0)。放射グラデ(エンジンが多用)は既定では実 DLL と 0.3〜3.7% のシーンで違うが、**原因は JIT の CPU 変種**: 固定パイプライン = SSE2 JIT = SSE4.1 JIT(全シーン一致)で、AVX2/AVX-512(FMA)の JIT だけが違う。参照フェッチの multiply-add を融合にする opt-in(`-DB2D3_FETCH_FMA=1`)で、実 DLL と **放射グラデも 1,360,000 シーンで差 0**。既定は変えていない(PM の判断点)。エンジン未出現の組は、アダプタ側の許可リスト(opt-in `B2D3_ALLOW=1`)と上流の `NOT_IMPLEMENTED`(STRICT)で、名前つきで止まる。
+2. **結論**: 出荷構成(STRICT 既定)の Export の停止は、**上流の固定パイプラインに OVERLAY(と PLUS・SCREEN・HARD_LIGHT)のテンプレートを足すだけで消える**(Export の停止の解消に要るのは OVERLAY だけ。SCREEN・HARD_LIGHT は FLEngine に静的な呼び出し箇所があるので足した)(WAV 353,904 B、sha256 `f5c6a08b…`、決定 0188 のネイティブと一致)。エンジンが実際に使う唯一の非 SRC_OVER の組(slot 53 fillGeometry × OVERLAY × PATH × 線形グラデーション PAD/DITHER × PRGB32)は、実 DLL(Wine)と**画素が一致**(OVERLAY × 線形グラデ × {矩形, 折れ線パス, 曲線パス} 各 100,000 シーンで差 0、OVERLAY × 線形グラデの合計 1,560,000 シーンで差 0、放射以外の全走行 4,680,000 シーンで差 0)。放射グラデ(エンジンが多用)は既定では実 DLL と 0.3〜3.7% のシーンで違うが、**原因は JIT の CPU 変種**: 固定パイプライン = SSE2 JIT = SSE4.1 JIT(全シーン一致)で、AVX2/AVX-512(FMA)の JIT だけが違う。参照フェッチの multiply-add を融合にする opt-in(`-DB2D3_FETCH_FMA=1`)で、実 DLL と **放射グラデも 1,360,000 シーンで差 0**。既定は変えていない(PM の未決点)。エンジン未出現の組は、アダプタ側の許可リスト(opt-in `B2D3_ALLOW=1`)と上流の `NOT_IMPLEMENTED`(STRICT)で、名前つきで止まる。
 3. **未確認**: 実機 Windows との照合(0 件)。Wine の実 DLL の CPU は制限できず host(AVX-512)のまま: 『SSE2 に制限した実 DLL』との直接の比較は無い(JIT の上流で代用)。census は起動 + Open + Export + メニュー/ツールバー/右クリック/再生の範囲で、窓がほとんど開かない(F6〜F9 が効かず、wizard が再出現する)ので、**曲再生〔Song Mode〕・ピアノロール・ミキサー・プラグイン画面の描画は未測定**。ネイティブの fork プローブ(決定 0188 の方法)は未実施(ネイティブの目的ファイルを作り直していない)。ハイブリッド(p1000r)を載せた SHIPH での確認は未実施。パターン・A8・XRGB32 × OVERLAY × グラデ・他の 21 演算は実装していない(名前つき停止)。
 
 
@@ -199,7 +199,7 @@
 
 読み: **固定パイプライン = SSE2 JIT = SSE4.1 JIT**(全品質・全組でビット一致)で、**AVX2 以上の JIT(FMA あり)だけが違う**。host(AVX-512)と AVX2 は一致する(host を指定した結果と avx2 の結果が同じ)。参照フェッチは `Math::madd(x, y, a)` を `x*y+a`(2 回丸め)で書いてあり、JIT は FMA のある CPU で融合する(`pipeline/jit/fetchgradientpart.cpp` の `v_madd_f32/f64`)。出荷済みの置換は『ゲストが見る CPU(SSE2 固定、決定 0118)の JIT』と同じ結果であり、決定 0120 の lift 済みの固定パイプラインも同じ。**実機で FL を AVX2 の PC で動かすと、実 FL は FMA 版の見え方になる**(Wine の実 DLL との照合〔host AVX-512〕で放射が 1.7% のシーンで違うことと整合: 推測を含む)。
 
-**是正(opt-in)**: `b2d3-fetch-fma.patch` + `-DB2D3_FETCH_FMA=1` で、放射・円錐のフェッチの `madd` 13 か所を `__builtin_fma(f)` にする。結果: 上流の AVX2/host JIT との比較で、放射・円錐 × 品質 DITHER × N=30,000 の全組で**差 0**(`fma-vs-avx2`)。品質 NEAREST では放射が 36/30,000 で残る(上と同じ『NO_JIT ビルド』の差、エンジン未使用)。**Wine の実 DLL(host)との比較**: 放射 × {SRC_OVER, PLUS, OVERLAY} × {矩形, 折れ線, 曲線, 線} × ramp 2 種 × 不透明 2 種 = 48 本 × 20,000 = **960,000 シーンで差 0**(既定は同じ走行で 16,096 シーン〔1.68%〕が違う)最終版(SCREEN・HARD_LIGHT を含むライブラリ 4、FMA 版)でも、SRC_OVER・PLUS・SCREEN・OVERLAY・HARD_LIGHT × {折れ線, 曲線} × ramp 2 種 × 20,000 シーン = 20 本、**400,000 シーンで差 0**。。ただし『実機が AVX2 以上か SSE2 のみか』は不明で、FMA 版を既定にするかは PM の判断点(§6)。
+**是正(opt-in)**: `b2d3-fetch-fma.patch` + `-DB2D3_FETCH_FMA=1` で、放射・円錐のフェッチの `madd` 13 か所を `__builtin_fma(f)` にする。結果: 上流の AVX2/host JIT との比較で、放射・円錐 × 品質 DITHER × N=30,000 の全組で**差 0**(`fma-vs-avx2`)。品質 NEAREST では放射が 36/30,000 で残る(上と同じ『NO_JIT ビルド』の差、エンジン未使用)。**Wine の実 DLL(host)との比較**: 放射 × {SRC_OVER, PLUS, OVERLAY} × {矩形, 折れ線, 曲線, 線} × ramp 2 種 × 不透明 2 種 = 48 本 × 20,000 = **960,000 シーンで差 0**(既定は同じ走行で 16,096 シーン〔1.68%〕が違う)最終版(SCREEN・HARD_LIGHT を含むライブラリ 4、FMA 版)でも、SRC_OVER・PLUS・SCREEN・OVERLAY・HARD_LIGHT × {折れ線, 曲線} × ramp 2 種 × 20,000 シーン = 20 本、**400,000 シーンで差 0**。。ただし『実機が AVX2 以上か SSE2 のみか』は不明で、FMA 版を既定にするかは PM の未決点(§6)。
 
 ### 4.4 16 スナップ(`cmp-short.g3`、wasm、node 24 `--experimental-wasm-jspi`)
 
@@ -269,7 +269,7 @@
 | S-b2d3-callers | 呼び元は『スタックの最初の 1024 語のうち FLEngine の範囲で call の直後を指す語』 | shadow call stack(出荷バンドルには無い) | 出荷バンドルで関数入口を数える方式が入ったら |
 | S-b2d3-ops | ia1/ia2 の操作の記録は fork プローブなので再生せず、座標だけを借りて Chrome で個別に操作した | wasm に fork を作る | — |
 | S-b2d3-no-hybrid | 混成 p1000r 無しのバンドルで測定 | SHIPH | 混成の同一性の確認が済んだとき |
-| S-b2d3-scan-edit | `b2d_scan.c`(+1 行)と `b2d_scan_table.h`(+1 行)を触った(置換の変更を b2d1/b2d2 配下に閉じる、の例外) | 別のハーネスを丸ごと複製 | PM の判断 |
+| S-b2d3-scan-edit | `b2d_scan.c`(+1 行)と `b2d_scan_table.h`(+1 行)を触った(置換の変更を b2d1/b2d2 配下に閉じる、の例外) | 別のハーネスを丸ごと複製 | PM の未決 |
 
 ## 8. 規則違反・つまずきの自己申告
 
@@ -318,6 +318,6 @@ PATCH=…/b2d3-compop.patch:…/b2d3-fetch-fma.patch OUTDIR=<dir> TARGET=wasm OP
 5. ハイブリッド p1000r 上の同一性は未確認。ship2 で 16 スナップと Export の両方を確かめる。
 6. 作業者の自己申告(末尾 `&`、`sleep`/`nohup` の拒否、存在しない `bash` ツール、`~/.wine` の誤作成〔削除済み〕、作業ディレクトリ一時 5.8 GiB、重い処理が 2 本超)は記録する。census は窓がほとんど開かない範囲(曲再生・ピアノロール・ミキサー・プラグイン画面の描画は未測定)。
 
-## PM の判断(進捗の読み)
+## PM の決定(進捗の読み)
 
 G 段階表の到達は変わらない(厳格な読み G0、字義どおりの読み G4)。これは Export の停止の原因の解消であり、ブラウザでの書き出しの完走は作業者のテスト用バンドルで観測した事実。既定の入口ではまだ停止する。

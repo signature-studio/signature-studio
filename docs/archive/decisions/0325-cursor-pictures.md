@@ -17,7 +17,7 @@
 
 ## 1. 原因と直す仕組み(全体)
 
-- **原因**(PM の判断どおり): ページ(`ui/cursor.ts`)は IDC の標準カーソルだけを CSS に変換し、FL 自作のカーソル(`CreateIconIndirect`)とモジュールから読んだカーソル(`LoadImage` / `LoadCursor`、名前つき)は**矢印**で表示していた(S-module-cursor-default / S-created-cursor-default)。ランタイムは絵を持っていない(`CreateIconIndirect` は「ピクセルを保持しない」、`LoadImageW` は「絵と hot spot は読まない」と各関数のコメントが明記)。区分 **(b)**: カーソルは「絵 + hot spot」(Learn About Cursors / ICONINFO / `SetCursor`)なのに、絵がブラウザに渡っていなかった。
+- **原因**(PM の決定どおり): ページ(`ui/cursor.ts`)は IDC の標準カーソルだけを CSS に変換し、FL 自作のカーソル(`CreateIconIndirect`)とモジュールから読んだカーソル(`LoadImage` / `LoadCursor`、名前つき)は**矢印**で表示していた(S-module-cursor-default / S-created-cursor-default)。ランタイムは絵を持っていない(`CreateIconIndirect` は「ピクセルを保持しない」、`LoadImageW` は「絵と hot spot は読まない」と各関数のコメントが明記)。区分 **(b)**: カーソルは「絵 + hot spot」(Learn About Cursors / ICONINFO / `SetCursor`)なのに、絵がブラウザに渡っていなかった。
 - **実物の数**: FLEngine_x64.dll には RT_GROUP_CURSOR が **57 個**(序数 32761〜32767 の 7 個と名前つき 50 個: `EEPEN` `EEBRUSH` `EEZOOM` `EESLIP` `DRAGCOPY` `HAND2` `SIZEL` `VT_MOVE*` など = ピアノロール・プレイリストの道具のカーソル)。すべて 32×32、深さは 1 / 4 / 32 bit、`BITMAPINFOHEADER` 40 バイト・`BI_RGB`。**この読みは実物 56 個(32761 は LoadImage の対象外)で一致を確認した**。
 - **直す仕組み**: 『HCURSOR の絵と hot spot をブラウザの CSS カーソルへ渡す』全体。(1) ランタイムが現在のカーソルの絵(RGBA)と hot spot を取り出す口を持つ、(2) Worker が(handle, serial)ごとに 1 回だけページへ送る、(3) ページが PNG の `url()` カーソルにする。FL のクラス名・窓の種類・カーソルの種類による分岐は 0。
 

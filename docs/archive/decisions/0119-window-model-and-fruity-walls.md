@@ -4,7 +4,7 @@
 
 **測定用の基底・種・註釈（dsp 0x2000000、Blend2D 0x4700000、QFC 0x1d00000、freetype 0x4b00000、ILTools 0x6000000、フォント 2 ファイル、レジストリの種、署名の主張の表）と、仮の応答を含む構成での値である。** 決定 0101 の表記では「A4 完走（仮の応答 N 件を含む）」の形の値で、達成の判定は PM が行う。
 
-**肯定的に見せる点は少ない。** `CreateFruityInstance` は**戻らない**。メッセージループにも**入っていない**（目的 (a)、(b) のどちらにも到達していない）。壁 9〜17 の 9 壁を直し、**40,512 関数入口目で `gdi32!SetMapMode(GetDC(NULL), MM_LOMETRIC)`（壁 18）に止まる**（決定 0118 の 38,913 入口目から +1,599 入口）。壁 18 は停止条件 (i)（描画・GDI の大きなモデル）と (iii)（PM の判断が要る値）の両方に当たるので、ここで止めた。止めたとき、予算 12 壁のうち 10 壁目（9 壁を直し、10 壁目で停止）で、2 壁を残している。壁 18 の先の見通し（実験 X18）も、メッセージループではなく、スプラッシュ画面のフォームの作成（TBitmap／PNG、QFC の `AcquireSharedAnimTimer`）の途中である。
+**肯定的に見せる点は少ない。** `CreateFruityInstance` は**戻らない**。メッセージループにも**入っていない**（目的 (a)、(b) のどちらにも到達していない）。壁 9〜17 の 9 壁を直し、**40,512 関数入口目で `gdi32!SetMapMode(GetDC(NULL), MM_LOMETRIC)`（壁 18）に止まる**（決定 0118 の 38,913 入口目から +1,599 入口）。壁 18 は停止条件 (i)（描画・GDI の大きなモデル）と (iii)（未決の値）の両方に当たるので、ここで止めた。止めたとき、予算 12 壁のうち 10 壁目（9 壁を直し、10 壁目で停止）で、2 壁を残している。壁 18 の先の見通し（実験 X18）も、メッセージループではなく、スプラッシュ画面のフォームの作成（TBitmap／PNG、QFC の `AcquireSharedAnimTimer`）の途中である。
 
 区分の凡例: **実測**＝コマンドの出力を見た事実。**読み**＝逆アセンブルやコードを読んだ上での解釈。**Learn**＝Microsoft Learn のページに書かれていること（取得日 2026-10-30。タグを除いたテキストを `learn/` に保存。ページごとの URL・取得時刻・HTML の SHA-256 は各ファイルの先頭 3 行）。**出典なしの選択**＝ページにも実測にも根拠が無く、作業者または PM が選んだ値。**未確認**。
 
@@ -22,7 +22,7 @@
 ## 背景
 
 - 前段（決定 0118）: `CreateFruityInstance(0xC0, 0xEDE95A, 偽ホスト, &instance)` は 38,913 関数入口目の `user32!SendMessageW(NULL, WM_SETICON, ICON_BIG, hIcon)` で止まった（壁 9）。実験 E5 で NULL の hWnd に 0 と last error 1400 を答えると、次の壁 10 は `CreateWindowExW` の dwStyle 0x84ca0000（`TApplication`。決定 0071 の「隠れた WS_POPUP の道具ウィンドウ」の範囲外）だった。
-- PM の仮の決定（0119、変えない）: (1) NULL の hWnd（窓表に無い hWnd）への `SendMessageW`・`SetClassLongPtrW`（と同系の `PostMessageW`/`GetWindowLongPtrW`/`SetWindowLongPtrW`）は 0 と last error 1400。出典なしの選択として列挙し、撤回条件は「実機 Windows の測定で値が違うと分かったとき」。(2) `IsProcessorFeaturePresent` を CPUID と食い違わない値に（PF 2・3 = 1）。(3) 決定 0071 のウィンドウ表を**必要最小限だけ**拡張し、`CreateWindowExW("TApplication", 0x84ca0000)` を決定 0071 の流儀で通し、その先の窓まわりの API を Learn の仕様から導ける範囲で実装する。メッセージキューは最初のブロッキング待ちに届くのに必要な最小の形まで。ブロッキング待ちそのものは実装しない。(4) 偽らない。創作値は出典なしの選択として列挙。(5) 止まる条件: (i) 描画・グリフ・音声・スレッド生成・ネットワーク・COM の大きなモデル、(ii) lift の穴で設計が大きいもの、(iii) PM の判断が要る値、(iv) (a) か (b) に到達、(v) 12 壁。
+- PM の仮の決定（0119、変えない）: (1) NULL の hWnd（窓表に無い hWnd）への `SendMessageW`・`SetClassLongPtrW`（と同系の `PostMessageW`/`GetWindowLongPtrW`/`SetWindowLongPtrW`）は 0 と last error 1400。出典なしの選択として列挙し、撤回条件は「実機 Windows の測定で値が違うと分かったとき」。(2) `IsProcessorFeaturePresent` を CPUID と食い違わない値に（PF 2・3 = 1）。(3) 決定 0071 のウィンドウ表を**必要最小限だけ**拡張し、`CreateWindowExW("TApplication", 0x84ca0000)` を決定 0071 の流儀で通し、その先の窓まわりの API を Learn の仕様から導ける範囲で実装する。メッセージキューは最初のブロッキング待ちに届くのに必要な最小の形まで。ブロッキング待ちそのものは実装しない。(4) 偽らない。創作値は出典なしの選択として列挙。(5) 止まる条件: (i) 描画・グリフ・音声・スレッド生成・ネットワーク・COM の大きなモデル、(ii) lift の穴で設計が大きいもの、(iii) 未決の値、(iv) (a) か (b) に到達、(v) 12 壁。
 - 土台（実測。HEAD 9013ad5 の `git archive`）: 入力 DLL・フォントはすべて実在し SHA が一致（再抽出は不要）。FRUITY 無効の基準を独立 2 回で再現（TAG `t2331d00e8ebb`、942/942、895/895、functions 5,308、entries 1,007,947、native `27cdf764…3f6d`）。FRUITY 有効（種 = nsis + app、主張の表あり）で決定 0118 の停止（`unsupported instruction at 0x425390`、38,913 入口、新規の関数 379、native `48a81021…4259`）を再現した。
 
 ## PM の決定 1 の前提の確認（実測。Learn、取得 2026-10-30）
@@ -37,7 +37,7 @@ PM の決定 1 は「Learn のこれらの API のページは NULL／無効な 
 | **`PostMessageW`**（…/nf-winuser-postmessagew） | 「[in, optional] hWnd … **NULL: The function behaves like a call to PostThreadMessage with the dwThreadId parameter set to the identifier of the current thread.**」 | **成り立たない**（NULL の結果が明記されている） |
 | System Error Codes 1300–1699（…/debug/system-error-codes--1300-1699-） | 「ERROR_INVALID_WINDOW_HANDLE 1400 (0x578) Invalid window handle.」（どの API が返すかは書かれていない） | 定義は確認 |
 
-扱い: 決定 1 は `SendMessageW`・`SetClassLongPtrW`・`GetWindowLongPtrW`・`SetWindowLongPtrW`（と、同系として `SetWindowTextW`）の「窓表に無い hWnd」（NULL、未発行、作成に失敗した窓）に適用した。**`PostMessageW` は実装していない**（この作業の実行が届かなかった。実装するときは、NULL を 1400 にせず Learn どおりに現スレッドのスレッドメッセージとして扱う必要がある。PM の決定からの逸脱になる。「PM の判断が要る点」）。
+扱い: 決定 1 は `SendMessageW`・`SetClassLongPtrW`・`GetWindowLongPtrW`・`SetWindowLongPtrW`（と、同系として `SetWindowTextW`）の「窓表に無い hWnd」（NULL、未発行、作成に失敗した窓）に適用した。**`PostMessageW` は実装していない**（この作業の実行が届かなかった。実装するときは、NULL を 1400 にせず Learn どおりに現スレッドのスレッドメッセージとして扱う必要がある。PM の決定からの逸脱になる。「未決の点」）。
 
 ## 決定（仮）
 
@@ -80,9 +80,9 @@ PM の決定 1 は「Learn のこれらの API のページは NULL／無効な 
 | 15 | `fle: SetClassLongPtrW: a live window of the table: the class memory (GCLP_*) is not modelled (decision 0119)` | `f_867e10` の 0x868065: `SetClassLongPtrW(hwnd, GCLP_HICON, hIcon)` | 名前付き停止（窓表の拡張） | D10（`fle_class_set_hicon`） | 38,957／390 → **38,958／391**（次の停止: `GetSystemMenu`） |
 | 16 | `fle: unsupported instruction at 0x424ed0`（`user32.dll!GetSystemMenu`） | `f_867e10` が `GetSystemMenu(hwnd, 0)` → `DeleteMenu(hMenu, SC_MAXIMIZE 0xf030 / SC_SIZE 0xf000 / SC_MOVE 0xf010, MF_BYCOMMAND)` | 未応答 import（小さなメニュー表） | D13 | 38,958／391 → **38,964／394**（次の停止: `GetWindowLongPtrW`） |
 | 17 | `fle: unsupported instruction at 0x425970`（`user32.dll!GetWindowLongPtrW`） | `f_86ccd0`（`TApplication` の可視／不可視の切り替えと読む）が `GetWindowLongPtrW(hwnd, GWL_EXSTYLE)` → `SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex \| 0x80)` → `SetWindowTextW(hwnd, NULL)` | 未応答 import | D3、D4（WM_SETTEXT）、D14 | 38,964／394 → **40,512／485**（次の停止: 壁 18。+1,548 入口／+91 関数。VCL の初期化を通る） |
-| 18 | `fle: SetMapMode: hdc is a DC of GetDC(NULL): its attributes are not modelled (only memory DCs are)` | `f_6f6410`（論理 0.1 mm の点をデバイス単位へ。`GetDC(NULL)` → `SetMapMode(hdc, MM_LOMETRIC)` → `LPtoDP` → `ReleaseDC`）。`f_13751e0` → `f_11b3810` → `f_13734d0` → `f_136cba0`（スプラッシュ画面の作成と読む）→ … の経路 | **大きなモデル・PM の判断が要る値（停止条件 (i)(iii)）** | なし（**ここで止めた**） | 40,512／485 で停止 |
+| 18 | `fle: SetMapMode: hdc is a DC of GetDC(NULL): its attributes are not modelled (only memory DCs are)` | `f_6f6410`（論理 0.1 mm の点をデバイス単位へ。`GetDC(NULL)` → `SetMapMode(hdc, MM_LOMETRIC)` → `LPtoDP` → `ReleaseDC`）。`f_13751e0` → `f_11b3810` → `f_13734d0` → `f_136cba0`（スプラッシュ画面の作成と読む）→ … の経路 | **大きなモデル・未決の値（停止条件 (i)(iii)）** | なし（**ここで止めた**） | 40,512／485 で停止 |
 
-壁の種類の件数（この作業の壁 9〜18。各壁を主な種類 1 つに数える）: 環境の主張・出典なしの選択 1（壁 9）、窓表の拡張・名前付き停止 3（壁 10、14、15）、未応答 import 4（壁 11、12、16、17）、lift の穴に近いもの 1（壁 13）、大きなモデル・PM の判断 1（壁 18）、メッセージループ 0。計 10。決定 0116〜0118 の壁 1〜8 と合わせて壁 18 まで。数え方: 壁 9〜17 の 9 壁を直し、壁 18 が 10 壁目で停止（上限 12 壁のうち 2 壁を残した）。
+壁の種類の件数（この作業の壁 9〜18。各壁を主な種類 1 つに数える）: 環境の主張・出典なしの選択 1（壁 9）、窓表の拡張・名前付き停止 3（壁 10、14、15）、未応答 import 4（壁 11、12、16、17）、lift の穴に近いもの 1（壁 13）、大きなモデル・未決の値 1（壁 18）、メッセージループ 0。計 10。決定 0116〜0118 の壁 1〜8 と合わせて壁 18 まで。数え方: 壁 9〜17 の 9 壁を直し、壁 18 が 10 壁目で停止（上限 12 壁のうち 2 壁を残した）。
 
 ## 止まった壁（壁 18）の内容・選択肢・推奨
 
@@ -90,15 +90,15 @@ PM の決定 1 は「Learn のこれらの API のページは NULL／無効な 
 
 **読み**: `f_13751e0` は `[0x15e0638]->[+0xc]` のフラグの bit 2 が 0 なら `f_11b3810` を呼ぶ。`f_11b3810` はレジストリ `General\MIDIForm`／`SplashBox` を読み、条件が揃えば `f_13734d0` → `f_136cba0` を呼ぶ。`f_136cba0` は **スプラッシュ画面の作成**（`[0x196ee28]` = スプラッシュのフォームを `TForm` のコンストラクタ `f_7222a0` で作り、`General\SplashImage` が空なら内蔵の `Title.png`、あればファイルから画像を読む。`f_6ba1f0` で `TBitmap` を作る）。`f_6f6410` は `hdc = GetDC(NULL); SetMapMode(hdc, MM_LOMETRIC); pt.y = -pt.y; LPtoDP(hdc, &pt, 1); ReleaseDC(NULL, hdc)` で、論理 0.1 mm の点をピクセルに換算する（TBitmap／TPicture の DPI からピクセルサイズへの換算と読む）。
 
-**分類**: 停止条件 **(iii) PM の判断が要る値**（画面 DC の `LPtoDP` は MM_LOMETRIC の規則（Learn Mapping Modes: 「Each unit in page space is mapped to 0.1 millimeter in device space ... y increases from bottom to top」）に、画面の物理寸法（HORZSIZE／VERTSIZE。決定 0053 は「値の根拠がない」として停止のままにした）か「96 DPI からの逆算」を要る）と **(i) 描画・GDI の大きなモデル**（決定 0108/0111 は画面 DC の属性を「メモリ DC だけ」に区切った。壁 18 の先は、スプラッシュ画面のフォームの作成の途中で、PNG の読み込み・TBitmap・GDI の描画経路の入口）に当たる。
+**分類**: 停止条件 **(iii) 未決の値**（画面 DC の `LPtoDP` は MM_LOMETRIC の規則（Learn Mapping Modes: 「Each unit in page space is mapped to 0.1 millimeter in device space ... y increases from bottom to top」）に、画面の物理寸法（HORZSIZE／VERTSIZE。決定 0053 は「値の根拠がない」として停止のままにした）か「96 DPI からの逆算」を要る）と **(i) 描画・GDI の大きなモデル**（決定 0108/0111 は画面 DC の属性を「メモリ DC だけ」に区切った。壁 18 の先は、スプラッシュ画面のフォームの作成の途中で、PNG の読み込み・TBitmap・GDI の描画経路の入口）に当たる。
 
 **選択肢**
 
 | 案 | 内容 | 結果（実測／読み） | 注意 |
 |---|---|---|---|
 | Y1. 止まる（推奨。この作業の選択） | 何も足さない | 40,512／485 で停止 | 到達点は動かない |
-| Y2. 画面 DC に `SetMapMode` の保存と、MM_LOMETRIC の `LPtoDP`（96 DPI からの逆算 = 論理 1 単位 = 96 / 254 ピクセル、y 反転）を答える | **実験 X18**（`experiment-x18.diff`。差分に入れない。`fle_gdi.c` の 2 関数） | 壁 18 を越え、次の停止は `GetClassInfoW(hInstance = 0x1d00000, "TSharedAnimTimerWindow")`（QFC の `AcquireSharedAnimTimer`、窓クラスの登録、スプラッシュのフォームの作成の中）。**41,150／559** | 物理寸法を 96 DPI から逆算するのは**出典なしの選択**（決定 0053 の PM の判断）。メッセージループには近づかない（フォームの作成の途中） |
-| Y3. スプラッシュの経路を避ける（`General\SplashImage` や `MIDIForm\SplashBox` の種で `f_136cba0` を呼ばない） | 未測定。`f_11b3810` の条件（レジストリ `General\MIDIForm`／`SplashBox`）と、`[0x15e0638]->[+0xc]` のフラグの bit 2 で決まる（読み） | 未測定。**どの値がエンジンの通常の動作かは未確認** | 環境の主張（レジストリの種）であり、偽の成功ではない。ただし「ユーザーが SplashBox を切った構成」を選ぶことになる。PM の判断 |
+| Y2. 画面 DC に `SetMapMode` の保存と、MM_LOMETRIC の `LPtoDP`（96 DPI からの逆算 = 論理 1 単位 = 96 / 254 ピクセル、y 反転）を答える | **実験 X18**（`experiment-x18.diff`。差分に入れない。`fle_gdi.c` の 2 関数） | 壁 18 を越え、次の停止は `GetClassInfoW(hInstance = 0x1d00000, "TSharedAnimTimerWindow")`（QFC の `AcquireSharedAnimTimer`、窓クラスの登録、スプラッシュのフォームの作成の中）。**41,150／559** | 物理寸法を 96 DPI から逆算するのは**出典なしの選択**（決定 0053 で未決として残した値）。メッセージループには近づかない（フォームの作成の途中） |
+| Y3. スプラッシュの経路を避ける（`General\SplashImage` や `MIDIForm\SplashBox` の種で `f_136cba0` を呼ばない） | 未測定。`f_11b3810` の条件（レジストリ `General\MIDIForm`／`SplashBox`）と、`[0x15e0638]->[+0xc]` のフラグの bit 2 で決まる（読み） | 未測定。**どの値がエンジンの通常の動作かは未確認** | 環境の主張（レジストリの種）であり、偽の成功ではない。ただし「ユーザーが SplashBox を切った構成」を選ぶことになる。未決 |
 
 **推奨**: Y1（止まる）か Y3（レジストリの種の判断を PM が決める）。理由: Y2 は物理寸法という出典なしの値を足すうえ、次の壁（QFC の窓クラスの登録、そのモジュールの窓表への組み込み）も描画前の準備段階で、(a)(b) に近づく見込みを示せない（X18 は 41,150 入口で止まる）。Y3 は PM が構成（スプラッシュの有無）を決める必要があり、この作業者は決められない。
 
@@ -242,7 +242,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: NULL�
 
 ## 解釈が分かれた点
 
-1. **壁 18 で止める判断**: 依頼は「導けない値は出典なしの選択として列挙して進む」と「PM の判断が要る値、(i) 描画・GDI の大きなモデルは止める」の両方を書く。壁 18 の答え（画面 DC の `LPtoDP`）は、物理寸法という決定 0053 が PM の判断に残した値を要り、しかも先はスプラッシュ画面のフォームの作成（PNG・TBitmap）で、(a)(b) に近づく見込みを示せない。**止める側**に倒した。進める側に倒すなら実験 X18 の差分がそのまま使える。
+1. **壁 18 で止める判断**: 依頼は「導けない値は出典なしの選択として列挙して進む」と「未決の値、(i) 描画・GDI の大きなモデルは止める」の両方を書く。壁 18 の答え（画面 DC の `LPtoDP`）は、物理寸法という決定 0053 が未決として残した値を要り、しかも先はスプラッシュ画面のフォームの作成（PNG・TBitmap）で、(a)(b) に近づく見込みを示せない。**止める側**に倒した。進める側に倒すなら実験 X18 の差分がそのまま使える。
 2. **`PostMessageW` を PM の決定 1 の対象にしなかったこと**: Learn は `PostMessageW` の NULL の hWnd の結果を明記する（PostThreadMessage と同じ）。決定 1 は「同系」として `PostMessageW` を挙げるが、前提（Learn が書いていない）が成り立たないので、実装しなかった（実行も届かなかった）。実装するときは PM の決定からの逸脱になる。
 3. **`SetWindowTextW` を決定 1 の「同系」に含めたこと**: 決定 1 は `PostMessageW`/`GetWindowLongPtrW`/`SetWindowLongPtrW` を挙げる。`SetWindowTextW` は挙げていないが、同じ種類（hWnd を窓表から引く API）なので同じ規則（0 と 1400）にした。範囲を広げた判断なので、PM が戻すと言えば戻せる。
 4. **`SetWindowLongPtrW` の扱い（途中で訂正）**: 最初の実装は決定 0071 のままで、窓表に無い hWnd を名前付き停止にしていた。決定 1 が `SetWindowLongPtrW` を挙げているので、最終工程の途中で 0 と 1400 に直し、測定・全体テスト・変異検査をやり直した。

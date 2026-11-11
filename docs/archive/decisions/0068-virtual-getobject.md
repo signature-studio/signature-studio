@@ -59,7 +59,7 @@ harness は `fle: unsupported instruction at 0x424280`（gdi32!GetObjectW の th
 ## 撤回条件
 
 - ゲストが c = 0x5c で、パレット、ブラシ、ペン、stock のフォントに GetObjectW を呼ぶ（名前付きの停止が出る。そのとき決める）。
-- ゲストが `GetObjectW(hfont, 0, NULL)`（0x5c1739）や c ≠ 0x5c の呼び出しに届く（同上。ページがバイト数を返すと書く形は、判断が要る）。
+- ゲストが `GetObjectW(hfont, 0, NULL)`（0x5c1739）や c ≠ 0x5c の呼び出しに届く（同上。ページがバイト数を返すと書く形は未決）。
 - Microsoft の文書が、c が構造体より小さい・大きいときの結果、または失敗の条件を書いた。
 - 0066/0067 の LOGFONTW の値が更新された（複製は CreateFontIndirectW に渡された値なので、SPI の値の変更は自動で追従する）。
 

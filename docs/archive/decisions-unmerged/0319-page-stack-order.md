@@ -17,5 +17,5 @@
 - 2 を HEAD に単独で当てても rc 0・.rej 0(offset −1〜−8 行、呼び出しの hunk だけ fuzz 2)。1 → 2 の順なら fuzz も無い。
 
 ## 注意
-- `FLE_NUM_CPU` は『要求した bundle だけ』に入る: manifest の `engine.env` に `"FLE_NUM_CPU": "auto"` を書いた bundle(RT-A 側が書く)か、URL の `fle_cpu=auto`。何も無い bundle(今の協調版)には何も足さない。`fle_cpu=<n>`(1〜32)で固定、`fle_cpu=off` で外す。n = clamp(navigator.hardwareConcurrency − 1, 2, 8)(PM の判断 Y。runtime 側の `0319-num-cpu.diff` は RT-A の木〔mt3 の tree-rt1〕に当てる)。
+- `FLE_NUM_CPU` は『要求した bundle だけ』に入る: manifest の `engine.env` に `"FLE_NUM_CPU": "auto"` を書いた bundle(RT-A 側が書く)か、URL の `fle_cpu=auto`。何も無い bundle(今の協調版)には何も足さない。`fle_cpu=<n>`(1〜32)で固定、`fle_cpu=off` で外す。n = clamp(navigator.hardwareConcurrency − 1, 2, 8)(PM の決定 Y。runtime 側の `0319-num-cpu.diff` は RT-A の木〔mt3 の tree-rt1〕に当てる)。
 - gpu1 の hidpi を 2 の後ろに載せるための rebase 版は不要だった(そのまま当たる)ので作っていない。

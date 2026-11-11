@@ -26,7 +26,7 @@
 ## 背景
 
 - 前段（決定 0117、`docs/investigations/fruity4/`）: `CreateFruityInstance(0xC0, 0xEDE95A, 偽ホスト, &instance)` は 38,241 関数入口目の `user32!GetActiveWindow`（`MessageBoxW` の所有者探し）で止まった。原因はエンジンの CPU 検査で、`f_639a20` が `CPUID` leaf 1 の EDX から作る機能語の bit 0x10（EDX bit 15 = CMOV）が、決定 0009 の答え（SSE と SSE2 の 2 ビットだけ）では立たないこと。選択肢 A1（CMOV だけ）、A2（x86-64 の基準）、A3（FRUITY のときだけ）を PM に挙げ、実験 E1〜E4 で A1 と A2 の先を見た。
-- PM の仮の決定（0118、変えない）: (1) CPUID は x86-64 の基準を答える（A2）。FPU・CX8・CMOV・MMX・FXSR を足し、AVX／SSE3 以降は決定 0075／0032 のまま名乗らない。a4 の +2 の原因を特定する。(2) `GetModuleFileNameW/A(NULL)` はホスト exe FL64.exe。(3) 仮想時計と署名者証明書の有効期間の食い違いは今は直さない。(4) CPU 検査を通した後の壁を最大 12 壁まで連続して進め、(a) `CreateFruityInstance` が戻る、または (b) エンジンが初めてブロッキングのメッセージループに入るまで。Learn から導ける応答だけを実装し、導けない値は出典なしの選択として列挙。「検証成功」を偽らないと進めない壁、PM の判断が要る値、大きなモデル、設計の大きい lift の穴では止める。(5) FRUITY 無効の既定ビルドの挙動は CPUID と `GetModuleFileNameW(NULL)` の変更を除いて変えない。
+- PM の仮の決定（0118、変えない）: (1) CPUID は x86-64 の基準を答える（A2）。FPU・CX8・CMOV・MMX・FXSR を足し、AVX／SSE3 以降は決定 0075／0032 のまま名乗らない。a4 の +2 の原因を特定する。(2) `GetModuleFileNameW/A(NULL)` はホスト exe FL64.exe。(3) 仮想時計と署名者証明書の有効期間の食い違いは今は直さない。(4) CPU 検査を通した後の壁を最大 12 壁まで連続して進め、(a) `CreateFruityInstance` が戻る、または (b) エンジンが初めてブロッキングのメッセージループに入るまで。Learn から導ける応答だけを実装し、導けない値は出典なしの選択として列挙。「検証成功」を偽らないと進めない壁、PM の未決の値、大きなモデル、設計の大きい lift の穴では止める。(5) FRUITY 無効の既定ビルドの挙動は CPUID と `GetModuleFileNameW(NULL)` の変更を除いて変えない。
 - 方針（PM、前の決定から継続）: ふり（fail-soft）で進めない。応答表は末尾追記のみ（決定 0015）。新しい `.c`／`.h` を runtime に作らない（`tests/modules.rs` が全 `fle_*.c` をリンクする）。
 - 土台（実測。HEAD c7d65bf の `git archive`）: FRUITY 無効の基準を再現した（TAG `t2331d00e8ebb`、a4 942/942、895/895、functions 5,306、entries 1,007,942、native `ab6c6be6…f187`）。FRUITY 有効（種 = nsis + app、主張の表あり）で決定 0117 の停止（`unsupported instruction at 0x424b60`、38,241 入口、新規の関数 348、native `15ab0a8e…8845`）を再現した。
 
@@ -47,7 +47,7 @@
 | D4 | `runtime/fle_modules.c`、`fle_load.c` | `rpcrt4.dll` を仮想モジュール N = 36（末尾追記。ハンドル `0x7FF800240000`）にし、`fle_load_absent[]` から外す（8 → 7 名）。決定 0099 の `shcore.dll` と同じ形 |
 | D5 | `runtime/fle_proc.c`／`.h`、応答表の末尾 1 行 | `rpcrt4.dll!UuidCreate`: RFC 4122 §4.4 の version 4 の UUID を、固定 seed `0x5555555555555555` の SplitMix64 から作る。戻り値 `RPC_S_OK`（0）。n 回目の呼び出しは n 番目の値（毎回の実行で同じ）。NULL ポインタは名前付き停止 |
 | D6 | `runtime/fle_res.c`／`.h`（`fle_icon_group_pick`）、`runtime/fle_gdi.c` | `LoadIconW(hInstance = 0x400000 または実在モジュール, name)`: そのイメージの `RT_GROUP_ICON`（整数 id か文字列）から LookupIconIdFromDirectoryEx の規則で 1 エントリを選び、共有アイコンのハンドル（GDI 表の `FLE_GDI_KIND_ICON`、フラグ `GF_MODICON`）を返す。同じグループには同じハンドル。`GetIconInfo` はこの共有アイコンに限り答える（fIcon TRUE、ホットスポット = 中心、新しい 2 つのビットマップ） |
-| D7 | `runtime/fle_sysinfo.c` | **コメントだけ**（オブジェクトは同一）。PF_COMPARE_EXCHANGE_DOUBLE（2）と PF_MMX_INSTRUCTIONS_AVAILABLE（3）は 0 のまま。CPUID が CX8・MMX を報告するのに 0 を答える（決定 0078 の「CPUID が報告しない機能はここでも報告しない」は一方向だけ）。PM の判断点 |
+| D7 | `runtime/fle_sysinfo.c` | **コメントだけ**（オブジェクトは同一）。PF_COMPARE_EXCHANGE_DOUBLE（2）と PF_MMX_INSTRUCTIONS_AVAILABLE（3）は 0 のまま。CPUID が CX8・MMX を報告するのに 0 を答える（決定 0078 の「CPUID が報告しない機能はここでも報告しない」は一方向だけ）。PM の未決点 |
 
 ## 壁の表
 
@@ -75,7 +75,7 @@
 |---|---|---|---|
 | X1. 止まる（推奨。この作業の選択） | 何も足さない | 38,913／379 で停止。実装は出典なしの値を増やさない | 到達点は動かない |
 | X2. NULL の hWnd の `SendMessageW`／`SetClassLongPtrW` に 0 と last error 1400 を答える | **実験 E5**（`docs/investigations/fruity5/experiment-e5.diff`。差分に入れない） | 次は壁 10（`CreateWindowExW` の dwStyle 0x84ca0000、38,928／384）。0 は失敗なので「成功を偽る」ことにはならないが、0 と 1400 は**出典なしの選択** | 壁 10 は (iii) なので、(a)(b) には近づかない |
-| X3. X2 + 仮想ウィンドウ表の拡張（トップレベル・可視・キャプション付き、`WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS`、`WM_GETMINMAXINFO`、`WM_SIZE`、…） | 決定 0071 の拡張。メッセージキューが要るかは未調査 | 未測定 | 大きなモデル。**PM の判断**（決定 0071 の範囲の改訂） |
+| X3. X2 + 仮想ウィンドウ表の拡張（トップレベル・可視・キャプション付き、`WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS`、`WM_GETMINMAXINFO`、`WM_SIZE`、…） | 決定 0071 の拡張。メッセージキューが要るかは未調査 | 未測定 | 大きなモデル。**PM の未決**（決定 0071 の範囲の改訂） |
 
 **推奨**: X1（止まる）。理由: X2 の 2 つの値は出典がなく、実装しても壁 10 が (iii) で必ず止まる。X3 に進む場合は、PM がウィンドウ表の範囲（可視性、フレーム、メッセージの流れ、メッセージキュー）を決めてから。
 
@@ -149,7 +149,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: UuidC
 | S7 | D6 | グループが無い名前、全エントリが要求サイズを超える、同サイズ・同深度が 2 つ、PNG 圧縮の RT_ICON、BITMAPINFOHEADER と RESDIR の不一致: **停止**（NULL や last error を創作しない） | 設計 |
 | S8 | D6 | `GetIconInfo` のホットスポット = (幅/2, 高さ/2)（Learn は「アイコンの中心」、値は書かない。「アイコンでは無視される」とも書く）、`hbmColor` = 仮想ディスプレイの形式（32 bit、1 plane）、新しいビットマップを毎回作る | 出典なしの選択（読み） |
 | S9 | D6 | 共有アイコンのハンドル値 = GDI 表の `0x7FBA0000 + 4 × (slot + 1)`（決定 0054）。同じイメージの同じグループには同じ値 | 設計 |
-| S10 | D7 | `IsProcessorFeaturePresent(2)`・`(3)` は 0 のまま（CPUID は CX8・MMX を報告する） | PM の判断点（下） |
+| S10 | D7 | `IsProcessorFeaturePresent(2)`・`(3)` は 0 のまま（CPUID は CX8・MMX を報告する） | PM の未決点（下） |
 
 ## テスト
 
@@ -189,7 +189,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: UuidC
 ## 解釈が分かれた点
 
 1. **a4 の `entries +3`（D2）**: 依頼は「FRUITY 無効の a4 の functions／entries／native SHA を測り、942/942 が保たれること」で、+3 の予想はなかった。原因を実験で切り分けた（FL64.exe のパスを DLL と同じ 57 文字にすると +3 が消える）。パスの長さに依存する Delphi のメモリマネージャの経路の違いと読み、不具合とは扱わない。新しい FL64.exe のパス（PM の値）が別の長さになれば、entries はまた変わる。
-2. **壁 9 で止める判断**: 依頼は「導けない値は出典なしの選択として列挙して進む」と「PM の判断が要る値（仕様から導けず選択肢が分かれるもの）は止める」の両方を書く。壁 9 の答え（NULL の hWnd への `SendMessageW`／`SetClassLongPtrW`）は仕様に無く、0 と last error（1400 か不変か）の選択肢が分かれ、しかも実装しても壁 10 が (iii) で止まる。**止める側**に倒した。進める側に倒すなら実験 E5 の差分がそのまま使える。
+2. **壁 9 で止める判断**: 依頼は「導けない値は出典なしの選択として列挙して進む」と「PM が決める値（仕様から導けず選択肢が分かれるもの）は止める」の両方を書く。(引用の語を、決定を求める言い回しから事実の言い回しに直した)壁 9 の答え（NULL の hWnd への `SendMessageW`／`SetClassLongPtrW`）は仕様に無く、0 と last error（1400 か不変か）の選択肢が分かれ、しかも実装しても壁 10 が (iii) で止まる。**止める側**に倒した。進める側に倒すなら実験 E5 の差分がそのまま使える。
 3. **`LoadIconW` の失敗の扱い**: Learn は「失敗は NULL と GetLastError」と書く。グループが無い名前に NULL を答えると、コードと値を創作することになるので停止にした（実機は NULL）。
 4. **`GetIconInfo` の範囲**: 依頼は「資源に実在するアイコンをハンドルで返す」と「`GetIconInfo`・描画は DIB セクションのモデル（決定 0108/0111）で答えられるか名前付き停止か分類」。`GetIconInfo` は、この共有アイコンに限りピクセルを持たないビットマップ 2 つ（0108 の「CreateBitmap の形」）を返すだけにした（`GetObjectW` と `DeleteObject` が使える）。ピクセルの内容を読む呼び出し（`GetDIBits`、`DrawIcon`、`DrawIconEx`）は従来どおり名前付き停止（`DrawIcon`／`DrawIconEx` は `GDI_STOP`）。アイコンを描くには RT_ICON の XOR／AND ビットマップの解釈（DIB の bottom-up、色表、マスクの合成）が要り、決定 0111 の DIB の演算の範囲外。
 4b. **`IsProcessorFeaturePresent(2, 3)`（D7）**: CPUID が CX8・MMX を報告するのに 0 を答える。決定 0078 の方針（CPUID に合わせる）を逆方向にも当てるなら 1 にすべきだが、`fle_sysinfo.c` の挙動を変えると、依頼の「既存応答の変更は表に旧→新を明記」の範囲が広がる。**変えずに、コメントとテストで現状を固定**した。ゲストの呼び出し元が問うのは PF 23 だけ（決定 0078）なので、a4 には影響しない。

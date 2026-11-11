@@ -127,7 +127,7 @@ WM_PAINT 数の Wine との比較は、合成の 16 段の harness(`tools/win_pa
 
 ---
 
-## PM の判断(2026-11-04)
+## PM の決定(2026-11-04)
 
 - **方式 P(`present2-display.diff`)は main に入れない。** 窓ごとの canvas とページ側の配置が前提で、lift の忠実性の方針(`docs/policies/lift-fidelity.md`)に照らすと、ページが窓の知識を持つ設計そのもの。表示経路の本線は desk1(決定 0223)に移した。差分は `lift/out-git/present2-results/present2-display.diff` に残し、desk1 が土台にしてよい。測定(再生中のメインスレッド CPU: B 0.12〜0.14、A/P 約 0.03)は desk1 の物差しとして使う。
 - **GAP-U1(段 1b)は既定 ON のまま**: 費用は起動のウィザード 2 区間だけ(担当の実測)。

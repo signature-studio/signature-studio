@@ -51,7 +51,7 @@
 | 76b | `RaiseException 0x0EEDFADE`(`CreateFileW(...\Plugins\Fruity\Generators\MIDI Out\Data\GM CCs.txt)` が無い) | 20,564,335／4,287 | 製品のファイル(インストーラの 1,434 バイト)を VFS の種に追加(決定 0110 の仕組み。`extract_nsis2.py` で再抽出、SHA-256 照合) |
 | 77 | `user32!GetCursorInfo` | 27,637,958／4,403 | CURSORINFO(24 バイト)を ShowCursor/SetCursor/ポインタ位置から(S-cursorinfo-size) |
 | 78 | `winmm!midiOutGetDevCapsW(MIDI_MAPPER)` | 27,638,717／4,418 | MMSYSERR_NODRIVER(6。番号は非公式)(S-midi-mapper-nodriver) |
-| **79** | **`dsound!DirectSoundEnumerateA(callback 0x12af280, context 0)` で停止 = 停止条件 (d')** | **27,663,945／4,515** | 未修正。呼び元 `f_12af3e0` ← `f_1252bd0` ← `f_1196c00` ← `f_11a57c0` ← `f_11be0a0` ← `f_13751e0` ← CreateFruityInstance。音声デバイスの一覧を作る段(`docs/investigations/audio-m5.md`)。0 件で DS_OK を返すと一覧は "(none)" だけになる(読み)。**PM の判断点** |
+| **79** | **`dsound!DirectSoundEnumerateA(callback 0x12af280, context 0)` で停止 = 停止条件 (d')** | **27,663,945／4,515** | 未修正。呼び元 `f_12af3e0` ← `f_1252bd0` ← `f_1196c00` ← `f_11a57c0` ← `f_11be0a0` ← `f_13751e0` ← CreateFruityInstance。音声デバイスの一覧を作る段(`docs/investigations/audio-m5.md`)。0 件で DS_OK を返すと一覧は "(none)" だけになる(読み)。**未決の点** |
 | 79b | (壁 79 の PM 決定) `DirectSoundEnumerateA` を「仮想マシンには列挙できるデバイスが 0 台」で通す | 28,870,469／4,670(w30 の停止点) | コールバックを呼ばず DS_OK を返す(`fle_dsound.c`。**S-ds-none**: 値 0 台／DS_OK、理由=G2 に届くかの測定と Learn が 0 台について沈黙、撤回条件=音声レーン(audio-m5.md S0–S2)が仮想デバイスを定義したとき)。G7 には数えない。DirectSoundCreate/Create8・waveOut・ASIO は引き続き (d') |
 | 80 | `SHGetFolderPathW(csidl 0x2a)`(PROGRAM_FILESX86) | 28,870,469／4,670 | 行を足さず `fle_env.c` に CSIDL を追加(S-programfiles) |
 | 80b | `SHGetFolderPathW(csidl 0x2c)`(PROGRAM_FILES_COMMONX86 = 0x2c) | 28,870,607／4,671 | 同上(S-programfiles-common。番号は shlobj.h = 非公式) |

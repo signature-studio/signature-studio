@@ -115,7 +115,7 @@
 
 違いは 0 行(10 版 × 4 種 + 上の追加の版)。『全部 lower しても画素は変わらない』ことは、13,143 関数(hE5)でも 552 行の parity で示された。**w2 と native の照合**: 同じ生成 C を native -O0 で計数ビルドした起動 16 スナップの面 SHA(34 面)は w2(wasm)と全て一致した。
 
-**ship3 の期待表との差**: `lift/harness/b2d2/expected/g3-lines-ship3-F2xH4-node.txt`(82 行)は、HEAD 36b1873e の runtime + ship5-imports の w2 の 84 行と、先頭から 48 行違う(wiz0 の clock が 1 ms、面 SHA)。w2 とすべての混成が同じ 84 行なので混成の差ではなく、ref1.diff の取り込み後に期待表が更新されていないためと読む(**推測**。native でこの 84 行を確認したのは『同じ生成 C の native -O0 と w2 の面 SHA が一致』まで)。新しい期待表の作り直しは ship4 / PM の判断。
+**ship3 の期待表との差**: `lift/harness/b2d2/expected/g3-lines-ship3-F2xH4-node.txt`(82 行)は、HEAD 36b1873e の runtime + ship5-imports の w2 の 84 行と、先頭から 48 行違う(wiz0 の clock が 1 ms、面 SHA)。w2 とすべての混成が同じ 84 行なので混成の差ではなく、ref1.diff の取り込み後に期待表が更新されていないためと読む(**推測**。native でこの 84 行を確認したのは『同じ生成 C の native -O0 と w2 の面 SHA が一致』まで)。新しい期待表の作り直しは ship4 / PM の未決。
 
 **注意**: 4 種の操作列は全部、参照プロジェクトを含め『エンジン自身が出力した画面』の sha256 で比べているので、混成が見た目を変えれば検出できる。検出できないのは、G3 の入力(模擬)が通らない経路 — ユーザーの実際の操作・プラグイン 46 個を載せた再生・Export など。
 

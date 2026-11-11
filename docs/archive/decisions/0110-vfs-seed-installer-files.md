@@ -2,7 +2,7 @@
 
 状態: **仮の決定**（PM の指示（2026-10-27。番号 0110 は PM の仮の割り当て）を、作業者（サブエージェント）が設計・実装案・文書にした）。**第 2 段階（統合・検証・測定。別の作業者、2026-10-27／28）を実施した版**: HEAD `0c5000f`（ブランチ main）に F2（この決定）と G1（決定 0111）を統合し、RAM 上でコンパイルし、全体テストを失敗 0 にし、ハーネスの自己テストを**実行**し（失敗 0）、6 モジュール構成の a4 を**配置なし（M0）／配置あり（M1）で測定**した（下の「第 2 段階の結果」）。第 1 段階の本文（設計、読み、副作用の読み、解釈が分かれた点）は、数値と状態の記述以外は書き換えていない。差分は統合後の `resolved-F2G1.diff`（`patch -p1`。F2 と G1 の 4 差分と統合の修正を 1 本にしたもの）に含まれる。**実機の Windows とは照合していない。**
 
-> **これは A4 の達成ではない。** この決定は、ILTools の `CreateCursorFromFont` が QFC に測らせた文字の矩形が空になる原因（フォントのファイルが仮想ボリュームに無い。`lift/out-git/f1-results/createbitmap-zero-cause.md`）に対する、環境の内容の追加を設計する。決定 0018 の原則（初期状態は空）を、範囲を明示して緩める。配置の後に ILTools がどこまで進むかは第 2 段階で実測した（下の「第 2 段階の結果」: 配置は効き、freetype の `FT_Stream_ReadFields` の switch を通り、次の壁は kernel32 の `HeapReAlloc`）。決定 0101 の判定構成が環境の内容の追加をどう数えるかは PM の判断（下の「PM の判断が要る点」）。
+> **これは A4 の達成ではない。** この決定は、ILTools の `CreateCursorFromFont` が QFC に測らせた文字の矩形が空になる原因（フォントのファイルが仮想ボリュームに無い。`lift/out-git/f1-results/createbitmap-zero-cause.md`）に対する、環境の内容の追加を設計する。決定 0018 の原則（初期状態は空）を、範囲を明示して緩める。配置の後に ILTools がどこまで進むかは第 2 段階で実測した（下の「第 2 段階の結果」: 配置は効き、freetype の `FT_Stream_ReadFields` の switch を通り、次の壁は kernel32 の `HeapReAlloc`）。決定 0101 の判定構成が環境の内容の追加をどう数えるかは未決（下の「未決の点」）。
 
 事実の出典: `lift/out-git/f1-results/createbitmap-zero-cause.md`（原因調査。§0、§2、§4 の E2、§5、§7、§8）、決定 0018（VFS の形、初期状態）、0085（`HKLM\Software` だけは初期状態で存在する例外）、0098、0103（`SHGetFolderPathW(CSIDL_FONTS)` = `C:\Windows\Fonts`）、0104（`GetModuleFileNameW` の値、`FLE_VIRTUAL_SHARED_DIR`）、0105（HOOKS 欄。a4-multi.sh の欄の手本）、0106、0108、`docs/investigations/bundled-dll-inventory.md`、`tools/extract_nsis2.py`。ILTools と FLEngine のフォント探索の読みは `iltools-font-search.md`（同じ作業の成果物。要点を下に再掲）。
 
@@ -15,7 +15,7 @@
 | # | 項目 | 決定 |
 |--:|---|---|
 | 1 | 方向 | 決定 0018 の「ファイル系の初期状態は空」を、**インストーラ由来のファイルを、一覧に明示したものだけ**、ハーネスが実行前に書き込めるようにして緩める。**Windows 自体のシステムフォント（Segoe UI など）は含めない**（インストーラに無く、再配布できない）。**ホストの実ファイル（`/usr/share/fonts` など）をゲストに見せない**。ゲストが見るのは一覧のファイルとその親ディレクトリだけ。**未設定なら従来と完全に同じ（空のボリューム）** |
-| 2 | 方式（f1 の M3） | ハーネスが、runtime のゲスト向け API の C 実装（`fle_imp_GetFileAttributesW`、`CreateDirectoryW`、`CreateFileW`、`WriteFile`、`SetFilePointer`、`ReadFile`、`CloseHandle`）を、レジスタ（`R[1]`、`R[2]`、`R[8]`、`R[9]`）と偽のスタック（引数 5 以降を `[rsp+0x28+8*(n-5)]`、`[rsp]` に戻り番地）に積んで、**エントリ（DllMain 相当）の前に**呼ぶ。`tests/fsx_common` が使う呼び方と同じ。**runtime に新しいコードは足さない**（足りない箇所は無い。ただし下の「PM の判断が要る点」の 4 を見よ） |
+| 2 | 方式（f1 の M3） | ハーネスが、runtime のゲスト向け API の C 実装（`fle_imp_GetFileAttributesW`、`CreateDirectoryW`、`CreateFileW`、`WriteFile`、`SetFilePointer`、`ReadFile`、`CloseHandle`）を、レジスタ（`R[1]`、`R[2]`、`R[8]`、`R[9]`）と偽のスタック（引数 5 以降を `[rsp+0x28+8*(n-5)]`、`[rsp]` に戻り番地）に積んで、**エントリ（DllMain 相当）の前に**呼ぶ。`tests/fsx_common` が使う呼び方と同じ。**runtime に新しいコードは足さない**（足りない箇所は無い。ただし下の「未決の点」の 4 を見よ） |
 | 3 | ハーネス側の実装 | **新しい `.c`／`.h` は runtime に作らない**。`lift/harness/vfs_seed.h`（ヘッダのみ、`static`。SHA-256、一覧の解析、書き込み。2 つの `main_two.c` が共有する）を新設し、`lift/harness/two/main_two.c` と `lift/harness/census/main_two.c` が `vfs_seed_from_env()` を 1 回呼ぶ（4 行ずつ）。`lift/harness/a4-multi.sh` に `VFS_SEED` 欄を足す |
 | 4 | 環境変数 | `FLE_VFS_SEED=<一覧のファイル>`（未設定または空なら何もしない）。`FLE_VFS_SEED_ROOT=<絶対ディレクトリ>`（一覧のホストのファイルが相対パスのときの起点。相対パスがあるのに未設定なら名前付きで停止） |
 | 5 | 一覧の書式 | 1 行 1 件、TAB 区切り 3 欄: `ゲストパス<TAB>ホストのファイル<TAB>SHA-256`。空行と `#` で始まる行は無視。ゲストパスは `C:\…` のバックスラッシュ区切り、ASCII、`.`／`..`／空の成分なし、259 文字以内。ホストのファイルは絶対パスか `FLE_VFS_SEED_ROOT` からの相対（`..` を含む相対は拒否）。SHA-256 は 64 桁の 16 進（大文字小文字不問）。最大 256 件、1 ファイル 64 MiB まで。**リポジトリにホストの絶対パスを固定しない** |
@@ -88,7 +88,7 @@
 
 - ILTools の探索（caller 0x61c9cbf。基底 0x6000000 の測定用のアドレス。F2 の読みの `f_5c9c70` の 0x5c9cbf と同じコードと読む）の `GetModuleFileNameW(hModule=0x6000000)` の直後の `GetLastError` は、**M0 でも M1 でも 0** で、直後に `…\Shared\Artwork\Fonts\ILGlyphsEx.ilfont` への `GetFileAttributesW` が出た（M0: 0xffffffff、M1: 0x80）。**門は飛ばされていない**。したがって `fle_set_last_error(0)` を足した変種は**作っていない**（依頼の条件「飛ばされているなら」に当たらない）。
 - 最終エラーが 0 になる理由（実測）: `fle_last_error` へのウォッチポイントで、門の直前の `GetLastError → 2`（`QuickFontCache_x64.dll` の探索の失敗）のあと、**`fle_imp_TlsGetValue`（ILTools の `f_6017d40`。Delphi の threadvar へのアクセスと読む）が最終エラーを 0 に書いていた**（`TlsGetValue` は成功時に最終エラーを ERROR_SUCCESS にする、という Learn の記述どおりの実装）。`GetModuleFileNameW` 自身は成功時に最終エラーを触らない（`fle_vfs.c` のとおり）。つまり門は**`TlsGetValue` が間に入る限り通る**（読み。別の経路では通らない可能性がある: 同じ `GetModuleFileNameW(0x6000000)` でも caller 0x61a4732 の呼び出しの後の `GetLastError` は 0x7f だった）。
-- よって「PM の判断が要る点」の 4（`GetModuleFileNameW` の runtime 変更）は、**この構成では必要なかった**（配置が効いた）。
+- よって「未決の点」の 4（`GetModuleFileNameW` の runtime 変更）は、**この構成では必要なかった**（配置が効いた）。
 
 ### 4. 配置あり／なしのファイル系の呼び出しの差（gdb。`logs/gdb/m0-fs-trace.txt`、`m1-fs-trace.txt`、`fs-diff-m0-m1.txt`）
 
@@ -164,7 +164,7 @@
 
 - Windows のシステムフォント（Segoe UI、Arial、Tahoma など）。ホストの実ファイルの配置。`Shared\Artwork\Fonts` の 36 ファイル全部（案 B）や `OpenSans-Regular.ttf`（UI フォント。候補）。
 - FLEngine のフォント探索を満たす配置（`…\FL Studio 21\Artwork\Fonts\`）。実在しない第 2 候補（`C:\Shared\…`）の配置。QFC の DLL などを仮想ボリュームのファイルにすること。
-- freetype の lift の穴（`FT_Stream_ReadFields` の switch ほか）の修正。runtime の変更（`GetModuleFileNameW` の最終エラーを含む。下の「PM の判断が要る点」の 4）。応答表の行。
+- freetype の lift の穴（`FT_Stream_ReadFields` の switch ほか）の修正。runtime の変更（`GetModuleFileNameW` の最終エラーを含む。下の「未決の点」の 4）。応答表の行。
 - 配置後の実測（6 モジュール構成の a4、gdb、census）。実機との照合。`run_census.sh` の変更（`FLE_VFS_SEED` を `unset` しない。`MERGE-NOTES.md`）。単一モジュールのハーネス（`harness/main.c`、`harness/wasm/main.c`）への実装。
 
 ## 撤回条件（仮の決定）
@@ -225,7 +225,7 @@
 1. **決定 0018 の緩和の承認**（範囲: 一覧に明示した、インストーラ由来のファイル）。撤回条件は上。決定 0101 の A4 の判定が、環境の内容の追加（この 2 ファイル）を「仮の応答」と同様に数えるか／別の欄にするか。`docs/investigations/provisional-decisions.md` と README の「仮」の数（37）に 1 を足すか。
 2. **配置先のパス（`…\FL Studio 21\Shared\Artwork\Fonts\`）は決定 0104 の創作値に依存する**。NSIS のヘッダの読みでは、`Shared` の起点の変数が FLEngine の出力先の変数と別（読み。変数名の対応は未確認）で、実機の `Shared` は `FL Studio 21` の子でなく兄弟（`…\Image-Line\Shared`）の可能性がある。`FLE_VIRTUAL_SHARED_DIR` を変えるなら一覧も変える。変えない場合、この仮のパスのまま進めてよいか。
 3. **FLEngine 自身のフォント探索は満たされない**: FLEngine の同じコードは `…\FL Studio 21\Artwork\Fonts\ILGlyphsEx.ilfont` を見る。同じ 2 ファイルを `…\FL Studio 21\Artwork\Fonts\` にも置く（一覧に 2 行足す。実機の配置とは別の仮の置き方）かどうか。置くと FLEngine の UI フォント（`OpenSans-Regular.ttf` など）の経路も FreeType に入り、freetype の穴に当たる場所が増える。FLEngine 自身の `ILCursors.ilfont` の参照（`f_815050`）が実行されるかは未確認。
-4. **`GetModuleFileNameW`／`A` が成功時に最終エラーを 0 にするか**（runtime の変更）。第 2 段階で、第 1 候補の探索の前の `GetLastError` が 0 でないと分かったとき: `fle_vfs.c` の成功の分岐（`fle_imp_GetModuleFileNameW` の `len < nsize` の枝と、`A` の同じ枝）に `fle_set_last_error(0)` を足す案（2 行）がある。Wine は成功時に `SetLastError(0)` 相当だが、**実機の Windows は未確認**。`tests/vfs.rs`（761〜778 行）と `wall_b.rs`（312〜330 行）の期待値を確認する必要がある。この作業では**入れていない**（runtime に足さない方針）。入れるかは PM の判断。**第 2 段階の実測: 門は通った（`TlsGetValue` が最終エラーを 0 にするため。上の 3）ので、この構成では不要**。
+4. **`GetModuleFileNameW`／`A` が成功時に最終エラーを 0 にするか**（runtime の変更）。第 2 段階で、第 1 候補の探索の前の `GetLastError` が 0 でないと分かったとき: `fle_vfs.c` の成功の分岐（`fle_imp_GetModuleFileNameW` の `len < nsize` の枝と、`A` の同じ枝）に `fle_set_last_error(0)` を足す案（2 行）がある。Wine は成功時に `SetLastError(0)` 相当だが、**実機の Windows は未確認**。`tests/vfs.rs`（761〜778 行）と `wall_b.rs`（312〜330 行）の期待値を確認する必要がある。この作業では**入れていない**（runtime に足さない方針）。入れるかは未決。**第 2 段階の実測: 門は通った（`TlsGetValue` が最終エラーを 0 にするため。上の 3）ので、この構成では不要**。
 5. **`OpenSans-Regular.ttf`（217,360 B）など、UI フォントの追加**。ILTools の UI フォントの測定が劣化したまま残る。追加すると freetype の穴に当たる範囲が広がる。まず 2 ファイルで freetype の穴を直す順序でよいか。
 6. **順序**: 配置を入れて freetype の穴を直す（f1 §8 の 2 の (ii)）か、配置なしで W6 以降へ進む（D）か。この決定は (ii) の準備。
 7. 製品データを、git に入れず、ローカルの検証の入力として使うことの可否（権利の解釈はこの作業では行っていない）。

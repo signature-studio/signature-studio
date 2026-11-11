@@ -1,6 +1,6 @@
 # 0079: CPU 振り分けのスタブ（`movsxd; lea; jmp [r10+rax*8]`）を、再配置から読んだ表の `switch` にする（W3(d)）
 
-状態: 作業者（サブエージェント）が決定。PM の判断は含まない。方向は決定 0073、作業は `docs/investigations/dsp-ippv2-lift-feasibility.md` §5、§9 の W3(d)。仕組みは決定 0036（注釈つき jump table）の `Select::Slot` の `switch` を流用した。**FLEngine_x64.dll の生成 C は変わらない**（SHA-256 一致、下の実測）。
+状態: 作業者（サブエージェント）が決定。PM の決定は含まない。方向は決定 0073、作業は `docs/investigations/dsp-ippv2-lift-feasibility.md` §5、§9 の W3(d)。仕組みは決定 0036（注釈つき jump table）の `Select::Slot` の `switch` を流用した。**FLEngine_x64.dll の生成 C は変わらない**（SHA-256 一致、下の実測）。
 
 ## 1. スタブの形（実バイト列の確認）
 

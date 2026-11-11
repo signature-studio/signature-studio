@@ -38,7 +38,7 @@ hybn0 が fe-wasmgen を `--hybrid-dispatch 0x3308 0x3310 0x3318`(仮)で走ら�
 
 ### 1.4 見つけたこと(PM の懸念への答え)
 - **`hyb_guard cpart` は新しい 3 つのデータの番地も、最適化後の C 部(`flengine6.c.opt.wasm`)の中に `i32.const <番地>` の形で持っている**: `fle_progress_limit` 0x10209708: **7** 回、`fle_landing_top` 0x1030cc54: **23** 回、`fle_dispatch_hook` 0x1030cc40: **5** 回(既存の 4 つ: fle_teb 7、fle_mxcsr 828、fle_hyb_buf 60、fle_progress_count 14)。= 0285 の実装で私が『`i32.const` の数え方では 0 になって誤って落とす恐れがあるため広げなかった』と書いた懸念は、**最適化前の wasm(`flengine6.wasm`)では本当に 0**(memarg の offset で参照される: limit 53、landing 119、hook 51、progress_count 106)だが、**ガードが読む最適化後の C 部では 0 ではない**。⇒ ガードを 7 つに広げても冷間 CI で落ちない(この C 部で確認した)。
-- そこで `0285b-hyb-guard-cpart-seven-addresses.diff`(基準 e11-wip、`patch --batch -p1 --dry-run` が offset・fuzz なしで通る、`-` は 4 行: ガードの docstring・名前の組・長さの条件・呼び出しの引数): `hyb_guard cpart` が 4 つまたは 7 つを受け、hybrid の段階が 7 つ渡す。`ci/test-hybrid.sh` に合成の C 部で 3 項目(7 つ全部使う C 部は通る、`fle_landing_top` を使わない C 部は落ちる、4 つだけの C 部に 7 つを渡すと落ちる)を足した(all checks hold)。**採否は PM の判断**(E11 に載せるなら 0285 の差分の後ろに)。
+- そこで `0285b-hyb-guard-cpart-seven-addresses.diff`(基準 e11-wip、`patch --batch -p1 --dry-run` が offset・fuzz なしで通る、`-` は 4 行: ガードの docstring・名前の組・長さの条件・呼び出しの引数): `hyb_guard cpart` が 4 つまたは 7 つを受け、hybrid の段階が 7 つ渡す。`ci/test-hybrid.sh` に合成の C 部で 3 項目(7 つ全部使う C 部は通る、`fle_landing_top` を使わない C 部は落ちる、4 つだけの C 部に 7 つを渡すと落ちる)を足した(all checks hold)。**採否は PM の未決**(E11 に載せるなら 0285 の差分の後ろに)。
 
 ### 1.5 大きさ(実測。E10 = opt2 の冷間ビルド x16、E11 = この再現。`wasm-opt -Oz` の後の各 module と、最終の `flengine6.opt.wasm`)
 | module | E10 | E11 | 増分 B |
@@ -98,7 +98,7 @@ opt1 が E-次で上の 5 行を E10 と比べる。**動いた行があれば�
 - a4: (進行中)
 
 ### 2.6 一般句読点(S-cmp-general-punctuation)の扱い — 拡張を別の差分に
-依頼は記号対記号と control の 2 つだったので、**一般句読点(U+2000〜U+206F)対 ASCII 記号の規則は A に入れていない**。表と比べると、この規則も code point 順で、**156 順序対(78 の無順序対)で表と逆**(en/em ダッシュ U+2013/U+2014 は SM 6 で、空白と SM 7 の記号より小さい。`+` 対 U+200B なども)。`0284b-gp-extension.diff`(15 行、A の上)がその置換で、答えが変わる順序対は A と合わせて 272(= 116 + 156)。既存のテストの期待値(`wall_fr12` の 4 行: `-` 対 U+2013 = 1、` ` 対 U+2026 = 1、`'` 対 U+2019 = 1 ほか)は拡張でも変わらない(実測: `./enum_A one` で確認)。**採否は PM の判断**。
+依頼は記号対記号と control の 2 つだったので、**一般句読点(U+2000〜U+206F)対 ASCII 記号の規則は A に入れていない**。表と比べると、この規則も code point 順で、**156 順序対(78 の無順序対)で表と逆**(en/em ダッシュ U+2013/U+2014 は SM 6 で、空白と SM 7 の記号より小さい。`+` 対 U+200B なども)。`0284b-gp-extension.diff`(15 行、A の上)がその置換で、答えが変わる順序対は A と合わせて 272(= 116 + 156)。既存のテストの期待値(`wall_fr12` の 4 行: `-` 対 U+2013 = 1、` ` 対 U+2026 = 1、`'` 対 U+2019 = 1 ほか)は拡張でも変わらない(実測: `./enum_A one` で確認)。**採否は PM の未決**。
 
 ### 2.7 3 つの旧規則の本体の扱い
 A の下で、本番(`fle_ia2_on()` が常に真)では 3 つの規則に到達する対は『表が決められない対』(U+0000 と、primary weight が等しい 2 単位)に限られる。ASCII の記号・空白・TAB〜CR の全対では表が決めるので(§2.2 の 0 件の増減)、**実質は死んだコード**になる。本体を消すのは、0284c(B = ia2 の無条件化)の後が妥当(マーカー無しの構成が消えるため)。今は消さない(消すと B 無しの構成のテストが停止を期待する形に変わる)。

@@ -274,7 +274,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 
 ### 追記(2026-11-07 06:23、alpha1 の 0310 最終〔§12 Filter 用の比較 script `a22-filter-compare.py`〕の取り込み、docs のみ。製品の差分なし)
 
-取り込み: alpha1 の §12 と `tools/a22-filter-compare.py`、自己テストの表(`0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。**自己テストは Wine でも Filter でもない代役の入力での script の動作確認で、実エンジンの結果ではない。** PM の判断: (1) script を受理する(WINE_AB・WASM_AB・BASE の 3 入力、Agogo の帯 45.3〜81.6 s +3 s の尾、cutoff の automation 窓 118.8〜129.56 s、F1〜F6)。(2) 読みの注意を引き継ぐ: Filter の静的な効果が小さい場合は F6(帯が BASE と違うか)が FAIL し比較が空になりうる。その場合だけ、同じ変更を Wine と wasm の両方に入れた変種 FLP(cutoff の automation clip を Agogo の帯へ移す)を作る。判断は elog16 の F6 を見てから。(3) Insert 47 への入力が Agogo だけという読みは FLP の配線とパターンの clip による読みで、WAV では未確認(F2 が帯の外の差で FAIL したらここを疑う)。(4) Wine の実行は Filter の bundle ができ、ci1 の Chrome の Export が取れた後(Wine と Chrome は重ねない)。依頼者の機械は 0 件。G9 は未到達のまま。
+取り込み: alpha1 の §12 と `tools/a22-filter-compare.py`、自己テストの表(`0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。**自己テストは Wine でも Filter でもない代役の入力での script の動作確認で、実エンジンの結果ではない。** PM の決定: (1) script を受理する(WINE_AB・WASM_AB・BASE の 3 入力、Agogo の帯 45.3〜81.6 s +3 s の尾、cutoff の automation 窓 118.8〜129.56 s、F1〜F6)。(2) 読みの注意を引き継ぐ: Filter の静的な効果が小さい場合は F6(帯が BASE と違うか)が FAIL し比較が空になりうる。その場合だけ、同じ変更を Wine と wasm の両方に入れた変種 FLP(cutoff の automation clip を Agogo の帯へ移す)を作る。判断は elog16 の F6 を見てから。(3) Insert 47 への入力が Agogo だけという読みは FLP の配線とパターンの clip による読みで、WAV では未確認(F2 が帯の外の差で FAIL したらここを疑う)。(4) Wine の実行は Filter の bundle ができ、ci1 の Chrome の Export が取れた後(Wine と Chrome は重ねない)。依頼者の機械は 0 件。G9 は未到達のまま。
 
 
 ### PM の追記(07:07、alpha1 の §13〔node の G3、Balance の窓〕の取り込み、docs のみ。製品の差分なし)
@@ -283,5 +283,5 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 
 **PM が読んだ事実(alpha1 の §13、実エンジン〔G9-a のテスト bundle〕を node の G3 で 1 本実行、06:49:26〜06:49:44、依頼者の機械は 0 件)**: (1) node でも Chrome(gpu1 の stage 3)と同じく『Balance の窓の枠は出るが client は描かれない』が出た。1920×1080 で全面の 99.87% が Chrome と一致、Balance の枠(237×179)と client(227×148)は 100% 一致。(2) 窓の表: `TPluginForm`『Fruity Balance (Insert 1)』(lid 164)と、client の入れ物の `TWPControlForm`(lid 168、visible で 227×148)は**ある**が、その中に**子窓が 0**。クリックの間に 17 個の窓が作られ、8 個は作られた後で破棄された(class は不明)。(3) unsupported・abort・名前つき停止は 0 行(mt3 の §15 の読みと合う: ImageList は失敗の経路にない)。
 
-**PM の判断**: Balance の GUI が描かれない原因の切り分け(FL が ShowEditor を呼ぶか、親付け・可視化の契約、描画の破棄、Delphi の例外の握りつぶし)には、診断入りのテスト build が要る(mt3 の §15.3 と alpha1 の §13 の提案を 1 回に束ねる: CreateWindowEx/DestroyWindow/SetParent/ShowWindow の class・title・親・rect と呼び出し元、Balance の image への間接呼びの最初の 64 回、破棄された画素数)。**許可の条件**: mt3 の Filter の build が終わり、その成果物の検証が済んだ後に 1 回だけ。テスト専用・push しない。**これは G9 ではない**(7 種のうち 1 種の Export の一致のみ、GUI は枠だけ)。lift の忠実性の分類は『契約の不足(外部 API の窓の親子・可視・更新領域の伝播)か、FL が呼ばない』のどちらかで、画面ごとの対症は足さない。
+**PM の決定**: Balance の GUI が描かれない原因の切り分け(FL が ShowEditor を呼ぶか、親付け・可視化の契約、描画の破棄、Delphi の例外の握りつぶし)には、診断入りのテスト build が要る(mt3 の §15.3 と alpha1 の §13 の提案を 1 回に束ねる: CreateWindowEx/DestroyWindow/SetParent/ShowWindow の class・title・親・rect と呼び出し元、Balance の image への間接呼びの最初の 64 回、破棄された画素数)。**許可の条件**: mt3 の Filter の build が終わり、その成果物の検証が済んだ後に 1 回だけ。テスト専用・push しない。**これは G9 ではない**(7 種のうち 1 種の Export の一致のみ、GUI は枠だけ)。lift の忠実性の分類は『契約の不足(外部 API の窓の親子・可視・更新領域の伝播)か、FL が呼ばない』のどちらかで、画面ごとの対症は足さない。
 

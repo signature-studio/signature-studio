@@ -122,7 +122,7 @@ main.rs・lib.rs は変えていない。旗・環境変数・オプション・
 
 ## 11. 候補(未実装)
 
-PM の判断(C2 は付けない)に従い、次は**付けていない**。参考(**手元の集計**: E10 の n0 8 module で、`c.*` の呼びが if の腕に直接ある数。prototype `tools/prototype/hintcount.py` による。C1+ の hint とは別の数え方):mx(`c.fle_hyb_mx`)31,976、ext(C 経路に残された関数の呼び)2,824、dispatch(`fle_hyb_dispatch`)1,533、import 11。mx 以外は、C 経路の関数を呼ぶ腕が cold とは限らない(ext は C 経路に残された関数で普通に呼ばれる)ので、alpha1 の C2 と同じ種類の誤りになる。typed_indirect の `if done` も §3 のとおり。mx のうち C1+ に入っていない物は、RC の helper の内側の if と、`mx_slow` を直接呼ぶ関数(`mx_c_only`・div/sqrt の packed など if を持たない形)。
+PM の決定(C2 は付けない)に従い、次は**付けていない**。参考(**手元の集計**: E10 の n0 8 module で、`c.*` の呼びが if の腕に直接ある数。prototype `tools/prototype/hintcount.py` による。C1+ の hint とは別の数え方):mx(`c.fle_hyb_mx`)31,976、ext(C 経路に残された関数の呼び)2,824、dispatch(`fle_hyb_dispatch`)1,533、import 11。mx 以外は、C 経路の関数を呼ぶ腕が cold とは限らない(ext は C 経路に残された関数で普通に呼ばれる)ので、alpha1 の C2 と同じ種類の誤りになる。typed_indirect の `if done` も §3 のとおり。mx のうち C1+ に入っていない物は、RC の helper の内側の if と、`mx_slow` を直接呼ぶ関数(`mx_c_only`・div/sqrt の packed など if を持たない形)。
 
 ## 12. 再現手順(tools/)
 

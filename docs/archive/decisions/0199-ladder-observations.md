@@ -12,7 +12,7 @@
    - **G2-7**(実反映): 既定の入口(SHIPH)をこの作業の app で開き、エンジンの主窓が可視になった時点で `document.title` が窓表の主窓の題『FL Studio 2026』になった(タブの題も同じ。それまでは従来の題)。
    - **G3-4**: 実エンジンの `SetTimer` を Chrome の Worker に出した。ポインタを 20 か所に止めた走行で、500 ms のスレッドタイマー 20 本・WM_TIMER **50 回**が、同じタイマーの連続する配送 30 区間すべて**仮想時計で 500.000 ms**(遅れ 0)、wall で 481.8〜506.4 ms で届いた。10 分(600,000 ms)の窓つきタイマー(隠しの `TPUtilWindow`)は、1,400 s の走行で締め切りを 798 s 過ぎても **配送 0 回**(native の最後の報告で `timers (SetTimer): 0 live` =Run の後 2 仮想秒以内に表から消えた)で、等間隔は測れなかった。
    - **G4-4b**: 出荷系の構成を native -O0 でも走らせた。native の 16 スナップ 82 行は基準と全行一致。Chrome の canvas の読み戻し(SHIPH の既定の入口と F1xH-G、各 60 回、主窓とウィザード)は、同じ仮想時刻の native の面と**全回一致**(主窓 58+59 exact・near 計 3、不一致 0)。
-2. **結論**: 欠け 5 件はいずれも観測で埋まった(G0 の再観測、G1-7、G2-7、G3-4、G4-4b)。ただし**G 段階の判定は私の仕事ではなく変えていない**。決定 0198 の読みに当てると: 『字義どおり』は G1・G2・G3 の各 1 項目の欠けが埋まり G4 の B2 も記録が付いたので、G4 まで欠け無し(読み C〔実機〕は依頼者の供給待ち)。『最も厳しい読み』(既定の入口・全項目)には**まだ足りない**: G1-7 と G3-4 は F1xH のバンドル(私の serve ディレクトリ)+ opt-in の環境変数での観測で、**既定の入口(SHIPH)には載っていない**(出荷バンドルに guard を載せるかは PM の判断)。G1-1〜G1-3 は間接のまま。G2-7 は既定の入口で観測したが、この作業の app をマージして配信するまで配信中のサイトでは起きない。
+2. **結論**: 欠け 5 件はいずれも観測で埋まった(G0 の再観測、G1-7、G2-7、G3-4、G4-4b)。ただし**G 段階の判定は私の仕事ではなく変えていない**。決定 0198 の読みに当てると: 『字義どおり』は G1・G2・G3 の各 1 項目の欠けが埋まり G4 の B2 も記録が付いたので、G4 まで欠け無し(読み C〔実機〕は依頼者の供給待ち)。『最も厳しい読み』(既定の入口・全項目)には**まだ足りない**: G1-7 と G3-4 は F1xH のバンドル(私の serve ディレクトリ)+ opt-in の環境変数での観測で、**既定の入口(SHIPH)には載っていない**(出荷バンドルに guard を載せるかは未決)。G1-1〜G1-3 は間接のまま。G2-7 は既定の入口で観測したが、この作業の app をマージして配信するまで配信中のサイトでは起きない。
 3. **未確認**: 実機 Windows との照合(0 件)、依頼者の機械・ブラウザ、Firefox・Safari・headed・GPU・HiDPI。G1-1〜G1-3 の戻り値。KillTimer の記録。10 分のタイマーの 3 回目以降の配送。-O2 の native。SHIPH(ハイブリッド)に guard を載せた wasm。d764db1(tbl1 後の `fle_win.c`)で F1xH を作り直した Chrome での再観測。プロジェクトを開いた後の題(実エンジン)。
 
 
@@ -28,12 +28,12 @@
 
 | 項目 | 設計 | 理由・代替 |
 |---|---|---|
-| G2 の実反映(PM の判断) | `app/src/engine/page-title.ts` の純関数 `pageTitle(kind, base, surfaces, windows)`。実エンジン(`engine.kind` が `emscripten-fruity-v1`)のときだけ、`chooseMainWindow`(決定 0150。クラス `TFruityLoopsMainForm` の可視の窓、無ければ最大の可視の無所有窓)が選んだ窓の、窓表(`fle_av_poll`)の題を `document.title` にする。主窓が可視でない・題が空・窓表が無い・代役のときは従来の題(`${bundle.name} · FL Studio web (private)`)のまま。`main.ts` は `appview` 受信時と 250 ms の `renderStatus` で `syncPageTitle()`(題が変わったときだけ書く=決定 0182 の DOM 書込の規則) | 題は**エンジンの題そのまま**(接尾辞を付けない): 『反映』を `document.title === 主窓の題` の形で確かめられるようにするため。接尾辞(' · FL Studio web (private)')を付ける案は採らなかった(S-obs1-1)。lid は直書きしない(`no-window-numbers.test.ts` が通る) |
+| G2 の実反映(PM の決定) | `app/src/engine/page-title.ts` の純関数 `pageTitle(kind, base, surfaces, windows)`。実エンジン(`engine.kind` が `emscripten-fruity-v1`)のときだけ、`chooseMainWindow`(決定 0150。クラス `TFruityLoopsMainForm` の可視の窓、無ければ最大の可視の無所有窓)が選んだ窓の、窓表(`fle_av_poll`)の題を `document.title` にする。主窓が可視でない・題が空・窓表が無い・代役のときは従来の題(`${bundle.name} · FL Studio web (private)`)のまま。`main.ts` は `appview` 受信時と 250 ms の `renderStatus` で `syncPageTitle()`(題が変わったときだけ書く=決定 0182 の DOM 書込の規則) | 題は**エンジンの題そのまま**(接尾辞を付けない): 『反映』を `document.title === 主窓の題` の形で確かめられるようにするため。接尾辞(' · FL Studio web (private)')を付ける案は採らなかった(S-obs1-1)。lid は直書きしない(`no-window-numbers.test.ts` が通る) |
 | G1 の Run 入口の記録 | fe-lift の既存の `--hle-entries`(決定 0151/0162。関数の最初の命令のブロックに `{ extern int fle_hle_NAME(void); if (fle_hle_NAME()) return; }` を 1 つ置く)で、`CreateFruityInstance` の道の 5 関数(f_13755b0 事前検査・CPU 検査、f_11b32a0 BasicInitialization、f_13751e0 初期化本体、f_1375950 Run、f_86a660 TApplication.Run)に**ログだけの guard**を置く。host 側は `lift/runtime/fle_g1log.c` の `fle_hle_g1_*`: 環境変数 `FLE_G1_RUN_LOG` が 1 のときだけ最初の 4 回について stderr に 1 行(関数名、呼び出し番号、スレッド、戻り番地=ゲストのスタックの [rsp]、仮想時計 ms、ホストの wall ms)を出し、**常に 0 を返す=本体は必ず走る**(レジスタ・フラグ・メモリに触れない)。生成器側は `gen_two.sh` の `FLE_HLE_ENTRIES=<file>`(opt-in、1 語) | **計装 0 の出荷構成への足し方**: 関数入口の計数(`-finstrument-functions`、HOOKS=1)は足さない。足したのは guard 5 個(生成 C の差は 5 行だけ。F1xH の FLEngine で `--hle-entries` 有りと無しを作って `diff` した: 差は 5 行、`<` 5 と `>` 5 で、`>` は guard の行。`logs/gen-diff-hle.txt`)で、5 関数とも Run までに 1 回ずつしか入らない(実測 §3)。ログは 1 行ずつ。環境変数が無ければ 1 回の `getenv` の後は即 `return 0`。代替(採らなかった): (a) `-finstrument-functions` の入口フック(全関数の入口にコスト: 出荷構成の目的に反する)、(b) Run の中で最初に呼ばれる import の runtime 関数にログを出す(Run の入口そのものではなく「Run の中で最初の PeekMessageW」になる)、(c) gdb 的な外部観測(ブラウザでは不可) |
 | G3 の実エンジンの WM_TIMER の記録 | `fle_win.c` の `fle_imp_SetTimer` の末尾と `timer_log_add`(WM_TIMER を配送するときに呼ぶ既存の関数)から、`fle_g1log.c` の `fle_obs_timer_set/fire` を**weak 参照**で呼ぶ。`FLE_G3_TIMER_LOG=1` のとき `g3-timer-set:` / `g3-timer-fire:` を stderr に(スレッド、窓の handle と lid、タイマー id、周期 ms、TIMERPROC の有無、仮想 ms、due、wall ms) | weak なので、`fle_win.c` を数ファイルとだけコンパイルする既存の単体テスト(約 20 本)のリンクは変わらない。ホストが作るテスト用タイマー(`fle_win_host_timer`、決定 0136)も `timer_log_add` を通るが、ブラウザのアプリにはテスト用タイマーを作る経路が無い(`fruity_g3.c` の `probetimer` だけ)ので、Chrome の記録は実エンジンの物だけ |
 | G4 の native 側 | 新しい道具だけ(`tools/run-native-g3.sh`、`g4-compare.py`)。F1xH の生成 C を `build_two_native.sh`(FRUITY=1、`GEN_OPT=-O0`、**`GEN_INSTR=` 空=関数入口計装なし**)で native にし、`b2d_swap.cpp` + 上流 Blend2D(native)とリンク(`link_b2d1.sh` の実行用リンクと同じ構成) | -O2 は採らなかった(コンパイルが長い。-O0 で足りた)。計装なしにした理由: g3 の 82 行は `entries N` を比べない(`g3cmp.py`)ので、入口計数は要らず、速い |
 
-## 2. G2-7「document.title に反映できる」を実反映にした(PM の判断)
+## 2. G2-7「document.title に反映できる」を実反映にした(PM の決定)
 
 ### 2.1 実測(Chrome 156、実エンジン、既定の入口)
 
@@ -83,7 +83,7 @@ F1xH(`SHIP_PRESET=F1xH`、上流 Blend2D、SEH、prune-S、dsp の HLE、層 1�
 
 - 出荷構成は関数入口の計装(`-finstrument-functions`)を持たない(`HOOKS=0`)。G1-7 のために全関数の入口計数を足せば出荷構成の性格(P1〜P3)を変えるので足さない。
 - 足したのは fe-lift の既存機構(HLE の guard、決定 0151/0162)による**5 関数だけの guard**。5 関数は Run までにそれぞれ 1 回ずつしか入らない(実測: 各 `call 1` だけが出て、最初の 4 回以内に 2 回目は出なかった)ので、コストは `getenv("FLE_G1_RUN_LOG")` 1 回 + 関数呼び出し 5 回。時間は測っていない(測れる大きさではない。**未測定**)。大きさは、生成 C で 5 行(+451 B)。wasm の大きさへの影響は、同じ構成の guard なしの wasm を作っていないので**未測定**。
-- 出荷バンドルに常に載せるかは PM の判断: 載せるなら `build-engine-bundle.sh` が `FLE_HLE_ENTRIES` を渡す 1 行を足せばよい(私は触っていない。size2 が触っているため)。載せなくても、`FLE_HLE_ENTRIES=lift/harness/hooks/flengine-g1-entries.txt` を付けた gen でいつでも同じ観測ができる。
+- 出荷バンドルに常に載せるかは未決: 載せるなら `build-engine-bundle.sh` が `FLE_HLE_ENTRIES` を渡す 1 行を足せばよい(私は触っていない。size2 が触っているため)。載せなくても、`FLE_HLE_ENTRIES=lift/harness/hooks/flengine-g1-entries.txt` を付けた gen でいつでも同じ観測ができる。
 - SHIPH(ハイブリッド)にも載せられる: 5 関数は `hyb-p1000r-F1x-fle.txt`(直接 wasm に lower される 714 関数)に**入っていない**ので C 経路にあり、guard が効く。今回は F1xH(C 経路だけ)で観測した。
 
 ## 4. G3-4「実エンジン自身の WM_TIMER が等間隔で届く」を測った

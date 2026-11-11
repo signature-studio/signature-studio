@@ -53,7 +53,7 @@
 **協調 1 Worker に戻れない場合の失敗の仕方**(旗なし = 戻る道がコードに無い):
 | 状況 | 起きること | 対策(旗を足さずに) |
 |---|---|---|
-| 論理 CPU が 1〜2 | 2 Worker + ブラウザの他のスレッド(compositor、GPU、AudioWorklet)が 1 コアを奪い合う。GIL のスピンと待ちが**協調より悪い**(協調の 1 Worker は待ちが無い) | **同じ wasm を `FLE_WORKERS=1` で動かせる**(0234s の対照腕がこの形): `navigator.hardwareConcurrency` を見て起動時に Worker 数を決める**実行時の判断**。旗(利用者の設定)ではないが、**2 つの経路をテストする**費用が残る(§5 の S5)。no-options 方針に反するかは PM の判断 |
+| 論理 CPU が 1〜2 | 2 Worker + ブラウザの他のスレッド(compositor、GPU、AudioWorklet)が 1 コアを奪い合う。GIL のスピンと待ちが**協調より悪い**(協調の 1 Worker は待ちが無い) | **同じ wasm を `FLE_WORKERS=1` で動かせる**(0234s の対照腕がこの形): `navigator.hardwareConcurrency` を見て起動時に Worker 数を決める**実行時の判断**。旗(利用者の設定)ではないが、**2 つの経路をテストする**費用が残る(§5 の S5)。no-options 方針に反するかは未決 |
 | Firefox 159 の入れ子 Worker + JSPI | 手元の 158 では動いた(0234g §1)。159 は未確認。入れ子の Worker の起動が親 Worker のイベントループに依存する(Chrome の実測: pthread Worker は最初の idle まで動き出さない。起動の 10 s 以内〔P1〕への影響は『最初の idle まで CreateThread の先が遅れる』) | 159 の実測を go/no-go に入れる。動かなければ上の `FLE_WORKERS=1` に落とす |
 | Worker の生成に失敗 | `pthread_create` の依頼が返らない | 名前つきの停止(I1 の検査)。協調に落とす経路が無いと**起動できない** |
 | 決定性のテスト | 起動 16 スナップ 84 行・参照 55 行・パリティ 552 行は**同一にならない**(0234m §2) | 時間に依存しない行 + 許容つきの比較に作り直す(S5)。**協調(`FLE_WORKERS=1`)をテストに残せば 84/55/87 行は今のまま使える** = この道が一番安い |

@@ -96,7 +96,7 @@ bundle は CI の段スクリプト(`tools/iter.sh` が基準の `ciA` の objec
 - CI の静的検査(`ci/`)は変えていない。
 
 
-## 7. oggio・Elastique の表(PM の判断用)
+## 7. oggio・Elastique の表(未決の点の判断材料)
 
 | 構成 | volume | oggio | Elastique | 結果 |
 |---|---|---|---|---|

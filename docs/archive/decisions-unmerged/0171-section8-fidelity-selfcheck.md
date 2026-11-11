@@ -11,7 +11,7 @@
 | `fle_win.c`: システムキャレット、ShowOwnedPopups、LogicalToPhysicalPoint / PhysicalToLogicalPoint(恒等)、DefWindowProcW の 3 メッセージ、WH_CALLWNDPROC と CallNextHookEx、SetWindowRgn | 同上 | (b)。**不足が残る物**: キャレットは描かない(契約は描画と点滅)、SetWindowRgn は状態のみ(描画とヒットテストを切り抜かない)。恒等の座標変換は DPI の選択(S-ia1-dpi)に依存 |
 | `fle_seh.c` の診断(遅延ロードの dll・関数名、登録の連鎖) | FL の観測(診断)だけか → はい | 製品の経路には入らない(停止の文に付くだけ。通常の経路では実行されない)が、点検表に厳密に従うならビルドの opt-in へ切り離す候補 |
 | `fruity_g3.c` / `fruity.c` の `probe`・`importlog`・`setenv`(`-DFLE_G3_FORKPROBE`、native 専用)、`a4-multi.sh` / `gen_two.sh` / `build-engine-bundle.sh` の `EXTRA_IMPORTS` | FL の観測 / ビルドの opt-in | 製品の経路から切り離し済み(native 専用か、環境変数で渡したときだけ) |
-| `ia1-imports*.txt`(行ファイル) | opt-in | 既定の生成 C は不変。**既定の入口に入れるかは PM の判断**(MERGE-NOTES) |
+| `ia1-imports*.txt`(行ファイル) | opt-in | 既定の生成 C は不変。**既定の入口に入れるかは未決(PM)**(MERGE-NOTES) |
 
 - **FL のクラス名・窓の種類・位置・文言で分岐する処理: 0 件**(ランタイムの追加行を grep した。クラス名の文字列は無い)。ページ(`app/`)の変更は無い(差分の `app/` は `build-engine-bundle.sh` だけ)。窓の前面化・閉じる・配置・Z 順には介入していない。
 - **余計なロジック(FL の代行・補正・上書き)は、この差分に入れていない。** 探索の途中で使った『soft』ビルド(行の無い import が名前を出して 0 を返す)は検証に使わず、差分にも入れていない。

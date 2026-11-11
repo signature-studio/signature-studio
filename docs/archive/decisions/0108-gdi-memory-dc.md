@@ -151,7 +151,7 @@ TSV の列: `dll`、`api`、`scope`（`closure` = gdi32／user32 の閉包、`im
 | D4 | 選択の状態 | 全オブジェクトが「選択されている DC の数」`sel` を持つ。`SelectObject` は同じ型の前のオブジェクトを返す。**ビットマップは 1 つの DC にだけ**（Learn「A single bitmap cannot be selected into more than one DC」。他の DC に選択中なら NULL）。**画面 DC にビットマップを選ぶと NULL**（Learn「Bitmaps can only be selected into memory DC's」）。`DeleteObject` は選択中なら 0 で何もしない（Learn「currently selected into a DC」）。`DeleteDC` は選択中のオブジェクトを**削除せず選択を外す** | Learn（DeleteDC が削除しないことは「SelectObject: 元のオブジェクトを選び直せ」からの読み） |
 | D5 | ビットマップの 3 つの形式 | `fmt`: **MONO**（0。`CreateBitmap` の形、DC のプレースホルダ。決定 0106）、**COLOR**（1。仮想画面と同じ形式 = 1 プレーン 32 ビット（`fle_gdc.h`）の DDB）、**DIB**（2。`CreateDIBSection`）。DDB は大きさと形式だけで**画素を持たない**（決定 0106 P6 のまま）。DIB セクションだけ、ゲストが書くブロックを持つ | 選択（形式の名前）、32 ビットは決定 0053 |
 | D6 | DIB セクションのメモリ | `calloc` で `stride * abs(biHeight)` バイト（stride = `((((biWidth * biBitCount) + 31) & ~31) >> 3)`。Learn の式）。**ゼロ埋め（出典なしの選択）**。ポインタは `*ppvBits` に書く。**runtime はこのブロックに一度も書かない**。`DeleteObject` で `free`（Learn「The system closes the handle to that memory when you later delete the DIB」）。2 GiB 以上は停止 | 式は Learn、ゼロ埋めは選択 |
-| D7 | 画素の操作 | **BitBlt、PatBlt、FillRect、GetDIBits は常に名前付き停止**（ラスタ演算の「効果」は Learn に文で書かれているが、GDI が DIB／DDB に**書くバイト**（32 ビットの未使用バイト、形式変換、パターン）は書かれていない）。RealizePalette も停止（戻り値の「システム パレットに写った数」を導けない）。引数（rop、大きさ、座標）を停止メッセージに出す。**DDB への書き込みを黙って受ける案（読みは止める）は採っていない**（PM の判断の点 3） | 選択（保守的） |
+| D7 | 画素の操作 | **BitBlt、PatBlt、FillRect、GetDIBits は常に名前付き停止**（ラスタ演算の「効果」は Learn に文で書かれているが、GDI が DIB／DDB に**書くバイト**（32 ビットの未使用バイト、形式変換、パターン）は書かれていない）。RealizePalette も停止（戻り値の「システム パレットに写った数」を導けない）。引数（rop、大きさ、座標）を停止メッセージに出す。**DDB への書き込みを黙って受ける案（読みは止める）は採っていない**（未決の点 3） | 選択（保守的） |
 | D8 | 色表 | ≤ 8 ビットの DIB セクションは `pbmi` の色表（`biClrUsed` 個、0 なら 2^bpp 個）を RGBQUAD として持ち、`GetDIBColorTable`／`SetDIBColorTable` は**選択中の DIB セクション**の表を読み書きする。個数は `min(cEntries, 表の個数 - iStart)`（`iStart` が個数以上なら 0）。DIB が選択されていない／> 8 ビットなら 0（失敗値） | Learn（個数の clamp は読み） |
 | D9 | ブラシ | `CreateBrushIndirect` は `BS_SOLID`（色の上位バイトが 0）と `BS_HOLLOW`（= `BS_NULL`）だけ。ハッチ・パターン系は停止。作ったブラシは `DeleteObject` できる（Learn）。`lbHatch` は読まない | Learn |
 | D10 | 半色調パレット | `CreateHalftonePalette` は**不透明なパレット**（エントリも個数も持たない）。選択と削除はできる。個数・エントリを問うと停止（Learn 2026-08-21 版が「exact color entries are an implementation detail」） | Learn |
@@ -203,7 +203,7 @@ TSV の列: `dll`、`api`、`scope`（`closure` = gdi32／user32 の閉包、`im
 | P2 | 初期のテキスト色 black、背景色 white（D3 c） | 一次資料や実機の値が示されて食い違ったとき。ゲストが `SetTextColor`／`SetBkColor` の戻り値を使うと分かったとき（`TCanvas.Draw` は使わない（読み）） |
 | P3 | `GetSysColor(8)` = 黒（D11） | 一次資料が値を与えたとき。他の index が要るとき（停止が知らせる）。テーマ（高コントラストなど）を考えるとき |
 | P4 | DIB セクションのゼロ埋め（D6） | 一次資料が初期値を与えたとき。ゲストが初期値に依存すると分かったとき |
-| P5 | 画素の操作を止める（D7） | PM が DIB 32 ビットの未使用バイトの値、DDB の書き込みの受け方、BitBlt の SRCCOPY の範囲などを決めたとき（「PM の判断が要る点」の 2、3） |
+| P5 | 画素の操作を止める（D7） | PM が DIB 32 ビットの未使用バイトの値、DDB の書き込みの受け方、BitBlt の SRCCOPY の範囲などを決めたとき（「未決の点」の 2、3） |
 | P6 | 半色調パレットを不透明にする（D10） | 個数・エントリを問う経路が来たとき（停止が知らせる）。Learn の旧版が別の記述を持つと分かったとき |
 | P7 | `GetObjectW` の DDB の `bmBits` = 0（D13） | 一次資料が値を与えたとき |
 | P8 | `CreateIconIndirect` が画素を持たない（D12） | アイコンの描画・複製・`GetIconInfo`・`SetCursor` を答えるとき |
@@ -310,7 +310,7 @@ DDB のメモリ DC への書き込みを受ける案は採っていないので
 ## 解釈が分かれた点
 
 1. **既定の 4 つのオブジェクトをストックと同一視しない**（D3）。Learn は「set of default objects」としか書かない。ストック（WHITE_BRUSH、BLACK_PEN、SYSTEM_FONT、DEFAULT_PALETTE）と同一視すれば実装は小さいが、`GetStockObject(0)` を答えないままその値を見せることになる。4 つの隠しオブジェクトにした（コストは 4 スロット）。
-2. **DDB の書き込みを受ける案を採らなかった**（D7）。DDB に画素を持たないので、書き込みを黙って捨てても読みが全部止まるなら観測されない、という案がある。検討の結果、BitBlt／PatBlt／FillRect を常に止めた: (a) 書き込み先が DIB セクションなら観測される（ゲストが直接読む）、(b) 読み側（`SRCCOPY` の元）が DDB のときは元を読むので止まる、(c) 実装が小さい。この案は PM の判断の点 3。
+2. **DDB の書き込みを受ける案を採らなかった**（D7）。DDB に画素を持たないので、書き込みを黙って捨てても読みが全部止まるなら観測されない、という案がある。検討の結果、BitBlt／PatBlt／FillRect を常に止めた: (a) 書き込み先が DIB セクションなら観測される（ゲストが直接読む）、(b) 読み側（`SRCCOPY` の元）が DDB のときは元を読むので止まる、(c) 実装が小さい。この案は未決の点 3。
 3. **32 ビット DIB の未使用バイト**。BITMAPINFOHEADER のページは 32 ビットの DIB を「blue、green、red」と書き、未使用バイトに触れない（`BitBlt`／`FillRect` が何を書くか不明）。D7 で止める根拠。
 4. **`SetBkColor` の「nearest physical color」**。仮想表示は 32 ビットなのでどの色も表せると読み、保存した色をそのまま返す。メモリ DC の 1 × 1 モノクロのプレースホルダが選択されている間に「表せない」とする読みもありうる（未確認）。
 5. **`DeleteDC` が選択中のオブジェクトを削除しない**（D4）。ページは書かない。`SelectObject` のページの助言（元のオブジェクトを選び直す）からの読み。

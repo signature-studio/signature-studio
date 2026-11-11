@@ -151,7 +151,7 @@ HEAD の木の実ページ(5 サイクルの中央値): Firefox 冷 4,575 ms(4,1
 ## 7. Worker 側(仕事 5): 現状の維持と提案
 
 - **維持を確認した物**: ETag(強い、R2 の MD5)・`If-None-Match`→304・Range/If-Range・`Cache-Control` の R2 優先・immutable。Worker テスト 43 件(`test/worker`)は変更なしで通る(下記)。
-- **提案(決めない。PM の判断)**:
+- **提案(決めない。未決)**:
   1. **変更不要**。HTTP キャッシュが効かない原因は Worker にない(シークレット/プライベートの上限、DevTools の設定、強制再読み込み)。
   2. Worker の Cache API は**入れない**: 効果を測れない(ブラウザの HTTP キャッシュが主、利用者は 1 人、R2 の転送は無料、Access の背後で本番の効果を測れない)。
   3. 任意の小改善: `serveAsset` は `head()` の後に `get()` を呼ぶので 1 リクエストあたり R2 の読み取りが 2 回(304 は 1 回)。`get()` に `onlyIf: { etagDoesNotMatch }` を使えば 1 回にできる。R2 の Class B 操作の単価が小さく(利用者 1 人)、挙動(412 の扱い)が変わるので**入れない**。

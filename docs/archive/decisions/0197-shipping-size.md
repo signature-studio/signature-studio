@@ -160,7 +160,7 @@ K(実行された)341 関数 1.41 MB / **W(モデルでは届くが一度も実�
 5. 保守的な M'(決定 0184 の `prune-SM2.tsv`: 根 = 420 export + 26 export、extra_refs = 1。pruned 16,223 関数): F2xH + 0x1000 で **132,827,884 B(1.8821 倍、余裕 8,317,972 B)**、brotli 9,662,452 B、16 スナップ 82/82。決定 0184 の推定(F2xn の base 136.6 MB に +4.2 MB → 140.84 MB)を今の base(ia2felift 込み 138.36 MB)に足すと上限を超えるはずだった(読み)が、0x1000 により実測で上限内になった。M と M' の差は 3.1 MB。
 6. 起動時の自己検査(opt-in、未実装): 4 変数が {−1, 0} かを最初の dsp 呼び出しの後に確認する案は、`fle_pruned` の abort と実質同じ検出力しか足さないので優先度は低い(読み)。
 
-## 8. 出荷の既定を F2xH にする場合の追加手順(PM の判断)
+## 8. 出荷の既定を F2xH にする場合の追加手順(未決)
 
 1. `SHIP_PRESET=F2xH` + `LOWREGS_BASE=0x1000`(+ 混成は `hyb.sh` が `RB=0x1000 XB=0x1200` を既定にしている)でバンドルを作る。2. `app-fruity-log.diff` を当てる(適用しなければ M の abort の note は出ない)。3. 条件①の残り(参照プロジェクト・Export・F8・プラグイン)を新構成で再走査する(`tools/` の README.txt)。4. 余裕: 11.4 MB(0x1000 のみ)。C(wrp2-felift)は +0.26 MB。
 
@@ -208,7 +208,7 @@ K(実行された)341 関数 1.41 MB / **W(モデルでは届くが一度も実�
 
 `lift/out-git/size2-results/`: `size2.diff`(`build-engine-bundle.sh` の追加 5 行〔`-` 行 0〕+ `docs/investigations/size2/` の新規ファイル)、`app-fruity-log.diff`(`fruity-log.ts` +4 行と新規単体テスト。PM が適用を決める)、`MERGE-NOTES.md`、`docs/0197-shipping-size.md`、`docs/README-0197-line.txt`、`tables/`(`sizes.tsv`、`wopt-variants.tsv`、モジュール別、census、dsp のクラス別、selscan、callers、insnstat、judge、brotli、cpu-ab、chrome-first-idle、ia2felift の関数別差、`funcs-A-F1xH-sizes-by-class.tsv.gz`)、`logs/`(各ビルドの 16 スナップ比較、Chrome の結果 JSON 4 本、stages、patch dry-run)、`tools/`(README.txt に手順)。作業ディレクトリ `lift/out-size2/` は終了時に 500 MB 以内。
 
-## 13. PM の判断と取り込み(2026-11-04)
+## 13. PM の決定と取り込み(2026-11-04)
 
 取り込み: `size2.diff`(`app/scripts/build-engine-bundle.sh` に追加 5 行、`-` 行 0。`docs/investigations/size2/` は新規)と `app-fruity-log.diff`(`fruity-log.ts` +4 行、`-` 行 0、新規単体テスト 3 件)を HEAD c6af3a9 に当てた(offset・fuzz・reject なし)。PM の測定: `bash -n` 合格、`app` の typecheck 合格、`fruity-log*` の単体テスト 11 件合格。fe-lift・runtime は触っていないので、全体テストと a4 は再実行していない(変わらないという読み)。**サイズ(wasm-opt 後の生の大きさ)は PM が再ビルドして測っていない: 本文の数値は作業者の実測**(ship2 の最終バンドルで PM 側の測定に置き換える)。
 

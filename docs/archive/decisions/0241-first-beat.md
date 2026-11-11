@@ -108,7 +108,7 @@
 **実装**(`lift/runtime`、旗なし):
 - `fle_dsound.c` `m_b_unlock`: 外部消費者があり再生中のバッファの Unlock の直後に `rewrite_unread()`。公開済みのフレーム `[consumed, wf0)`(`wf0` = この Unlock の自分の同期の前の公開の終わり)のうち、**書かれた領域に当たるもの**を数え(読み位置からの距離が ガード = 256 フレーム未満 → lost、以上 → applied)、applied > 0 のときだけ `[consumed + ガード, wf0)` を `mix_chunk` で混ぜ直して `fle_audio_ring_rewrite()` で上書きする。`wf0` を使うのは、同期が足すフレームは新しい内容から作られていて直す必要が無いため。
 - `fle_audio_ring.c`: ガード(`REWRITE_GUARD_FRAMES` = 256)、`fle_audio_ring_rewrite`、カウンタ(`fle_audio_rewrite_note` と、ページが読む `fle_audio_rewrite_stat`〔events/applied/lost〕)。
-- `fle_audio_transport.c`(新規): **transport の分離**(PM の判断): EM_JS(wasm)の `fle_js_*` と telemetry を `fle_audio_ring.c` から移し(`fle_tp_*`)、wasm では `fle_js_rewrite`(`rd + ガード` 以降、WR より前だけを SAB に書く。WR とページのカウンタは動かさない)を足した。native は何もしない版。**テストは自分の transport(`lift/harness/audio/sim_transport.c`)をこのファイルの代わりにリンクする**(製品のコードにテスト用の口を置かない)。
+- `fle_audio_transport.c`(新規): **transport の分離**(PM の決定): EM_JS(wasm)の `fle_js_*` と telemetry を `fle_audio_ring.c` から移し(`fle_tp_*`)、wasm では `fle_js_rewrite`(`rd + ガード` 以降、WR より前だけを SAB に書く。WR とページのカウンタは動かさない)を足した。native は何もしない版。**テストは自分の transport(`lift/harness/audio/sim_transport.c`)をこのファイルの代わりにリンクする**(製品のコードにテスト用の口を置かない)。
 - 副作用のあるもの: lead は変えない(60 ms)。生成 C は不変(CI の lift の 44 ユニットが ci-src と byte 一致)。wasm は +1,451 B(F2 のみ)、transport の分離でさらに +105 B(6.4)。
 
 **費用**: Unlock までの最後のスライス(スライス開始〜Unlock、`audio-pulse` の `unlockCompute`)の平均 ms の中央値 A 6.88 / B 6.99(Chrome、14 セッションずつ)、6.51 / 6.69(Firefox、10 ずつ)=**≤ 0.2 ms/Unlock**(Unlock は約 10.8/s)。数えるループは Unlock ごとに約 2,600 反復で、領域が遠い通常の Unlock でも走る。**早期脱出の最適化は入れていない**(実エンジンで測っていない物を入れない)。
@@ -135,7 +135,7 @@ lead を下げると 1 拍目の余裕は増えるが、Worker の一時的な�
 - 外部消費者のときだけ `rewrite_unread` が呼ばれる(ソース検査)。既存の native のテストは不変: `wall_fr15`、`wall_r` 31、`wall_fr11` 47、`fletest` が `fle_audio_ring.c` を読む 29 本(`call_iat callback deferred event hook_points k32_dsp load modules msctf null0 realmod site_override srw sysinfo uilang wall_b wall_c1 wall_e1 wall_fr11 wall_fr15 wall_fr18 wall_fr3 wall_fr4 wall_fr5 wall_fr6 wall_q wall_r wall_r2 wall_s`)を実行(`logs/cargo-affected.txt`)。全体の 152 results・2,118 passed の基準は**実行していない**(PM の統合時に)。
 - **変異 12 件すべて検出**(`tables/mutations-late.tsv`: 呼び出しを無効、`<= guard`、ガード 0、`from = c`、終端、混ぜ直しの 1 フレームのずれ、数える条件の削除、折り返しの無視、applied/lost の入れ替え、旗なしの外部消費者、`wf0`、領域の開始)。M04(`from = c`)は、テスト用 transport が『ガード内のフレームを渡された』ことを数えるまで生き残ったので、その計数を足した。
 
-### 6.2 page(`aud1-page.diff`、PM の判断で採る)
+### 6.2 page(`aud1-page.diff`、PM の決定で採る)
 `worker-hook.ts` が Worker の `fleAudioRewrite()` を 1 Hz の報告に載せ、`page-audio.ts` の `detail()` に `engineLateWrites/Applied/Lost`、`shared/perf.ts` のビーコン検査に同じ 3 項目(数だけ。音声データ・個人情報なし)。単体 +1(1377 passed、8 skipped)、アプリ変異 +1(`audio-late-write-not-reported`、検出)。
 
 ### 6.3 実エンジンの A/B(`tables/p1-ab-summary.tsv`、`tables/cycles-p1all.tsv`)
@@ -159,7 +159,7 @@ A・B は同じ 52034ca9 の木から、CI の段スクリプト(`tools/mk-var.s
 - **PCM の同一性**: 1 拍目が完全で捕捉が途切れなかった周期の、先頭 2.5 s(110,250 フレーム)の sha256 は、**B は 103 周期全部が同一(`06128fd08199…`)、A は 104 周期中 103 が同一**(例外 1 件は Firefox の A の 1 周期で、後ろのブロックの約 390 フレームに最大 0.002 の差=旧実装で後ろのブロックの頭が古い内容だったと読む)。Chrome と Firefox でも同一。F2 で救われた周期(Chrome a の B 5 周期、Firefox の B 3 周期)も同じ sha256=遅れなかった周期とビット一致。**旧実装の欠けた周期の PCM は、古い内容で公開済みだったフレーム数(stale)で決まる**(同じ stale なら同じ sha256: 128 フレームで 1 拍目の峰値 0.556 〔4 周期、Firefox 1 を含む〕、256 フレームで 0.2501 〔2 周期〕、384 フレームで 0.0872 〔1 周期〕、640〜1152 フレームでは 1 拍目が消え、以後は同一〔3 周期〕)=欠けは決定的に『ブロックの頭が無音になる』。
 - 遅れそのもの(Space の後 8 個の Unlock の最大間隔、中央値): Chrome a A 133 / B 124 ms、b 102 / 104、c10 101 / 102、c30 101 / 103。Firefox a 108 / 110、b 103 / 105。
 
-### 6.4 transport の分離の検証(PM の判断 1。B2 = B から `fle_audio_ring.c` の transport を `fle_audio_transport.c` に分けた木)
+### 6.4 transport の分離の検証(PM の決定 1。B2 = B から `fle_audio_ring.c` の transport を `fle_audio_transport.c` に分けた木)
 - **glue はバイト一致**: B と B2 の `engine-glue.824fddaaa68b.js` は同一(sha256 の先頭 12 桁が同じ、`fle_js_*` 11 関数の本文の差 0)=EM_JS の本文と関数の集合は不変。生成 C は不変(lift の 44 ユニットを再利用)。`fle_dsound.o` はバイト一致(sha256 同一)。
 - **wasm の sha256 は一致しない**(B `bef8f676baee…` 133,925,718 B、B2 `77d8ac7af5bb…` 133,925,823 B、**+105 B**。A は 133,924,267 B。S1 の線 141,145,856 B の下であることは変わらない)。セクションの差は 2 つだけ: 関数セクション −1 B(関数が 1 個減)、コードセクション +105 B(データ +1 B)。**差の説明**: ランタイムの定義済みシンボルは、B の `fle_audio_ring.o` に新しい `fle_tp_*` 8 関数が加わっただけ(`tables/syms-b1.txt`・`syms-b2.txt`)。旧 ring の中で同じ翻訳単位内だった薄い `js_*` ラッパが翻訳単位をまたぐ呼び出しになり、link 後の `wasm-opt` のインライン化の結果が変わった(読み。bundle は関数名を持たないので、減った 1 関数の名前は特定していない)。
 - **挙動**(Chrome 156 と Firefox 158 の各 6 セッション、a・b。`tables/cycles-q2.tsv`): Chrome a **6/6 完全**(うち 4 周期は stale 128〜1152 フレームで F2 が効いた)、b 12/12。Firefox a 6/6(stale 256 が 1 周期)、b 12/12。完全な周期の PCM の sha256 は全て `06128fd08199…`(A・B と同一)。F2 のカウンタは動いている(セッション末で events 26〜46、applied 23,653〜60,025 フレーム。lost 112〜3,213 フレームは主に起動時)。
@@ -173,7 +173,7 @@ A・B は同じ 52034ca9 の木から、CI の段スクリプト(`tools/mk-var.s
 | **S-ds-late-lost-count**(新) | 書かれた領域のうち、次の再生が読み位置から ガード未満の距離のフレームを lost とする。周回の手前に戻ったフレーム(すでに古い内容で読まれた)は数えない | `fle_audio_unlock_note` と同じ『領域は次の周回』の規約 | 読まれたフレームも lost に入れる | 診断の見え方が不足したとき |
 | S-audio-lead(既存) | 60 ms | 0139 のまま。**変えない**(PM) | 15/30(5.1) | — |
 
-## 8 未解決・PM の判断点・他の決定との関係
+## 8 未解決・未決の点・他の決定との関係
 
 - **原因は残る**: Space の直後のミキサーの応答の遅れ(1 本の Worker での協調実行)は F2 で隠れるだけ。除去は mt3(B′ 段階 2、ミキサーを別 Worker に)の領域。F2 の効く範囲は、Unlock の間隔が約 180 ms(= 通常の 93 ms + (92.9 − 5.8) ms)以内の遅れまで。それを超える停止(B の 188/340 ms の 2 件)は救えず、worklet の underrun として P3 に現れる。
 - **別の問題(gpu1 のビーコン)**: 依頼者の 1 セッション(e44b7eec4981)は 255 s の再生中ほぼ全部が underrun(10,174 quanta)・非無音 0(エンジンが実時間に追いつけない)。これは P3 の主題で、F2 では直らない。

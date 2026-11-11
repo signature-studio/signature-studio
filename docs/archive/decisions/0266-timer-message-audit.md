@@ -11,7 +11,7 @@
 3. **ランタイムの timer / 優先順位 / 時間は、Learn と Wine 10.0 に対して「より多く・より速く」配っていない。** 17 項目の表(`tables/timer-contract.tsv`)のうち、順序(送信 > ポスト > 入力 > WM_PAINT > WM_TIMER)、WM_TIMER が最低優先度で キューが空にならなければ飢える(S7)、遅れた timer は 1 つに合体し追いつき配信しない(S2 / S4)、複数 timer の別配信(S3)、`USER_TIMER_MINIMUM` 10 ms(S5)、各周期のレート(11 ms: 90.5 対 Wine 90.0〜90.5 回/s、16 / 20 / 33 ms は同数)、忙しいループの 1 回/取得(S6: 39.5 対 38.2〜38.7)は**一致**。違いは 2 件だけで、どちらも runtime のほうが少ないか、Learn の許す範囲:
    - 遅れて配った後の次の期限: runtime は『配信時刻 + 周期』(S-timer、出典なしの選択)、Wine は位相を保つ(旧期限 + 周期)(S8)。runtime が配る数は Wine 以下。
    - `Sleep(n)` は n ms ちょうど(Learn: 「1 tick より長く 2 tick より短ければ 1〜2 tick のどこでもよい」)。範囲の下端で、モデルの選択。
-4. **一番大きなてこは FL の tick の速さ(= ページが渡す Hz)。** idle の CPU は tick にほぼ比例する(最小二乗: 1 tick = 約 1.42 ms、tick に依らない分は 10 s で約 51 ms): 10 秒の idle の native CPU は 60 Hz で 976 ms(10%)、90 Hz で 1,334、120 Hz で 1,786、**240 Hz で 3,621(36%、60 Hz の 3.7 倍)**(`tables/idle-cpu-vs-refresh-rate.tsv`)。1 tick に FL がするのは SendMessageW 32 回、IsWindowVisible 24 回、IntersectRect 12 回、WaitMessage 2 回ほか(`tables/idle-tick-api-calls.tsv`)。実 Windows の FL も同じ式で動くはず(同じ API を読む)が、P1〜P3 の予算には効く。ページが `FLE_DISPLAYSETTINGS_FREQUENCY`(FL の tick を決める)と `FLE_DWM_HZ`(DwmFlush の拍。この測定では 0 回呼ばれた)を別の値にできること(決定 0166 は別の変数)は製品側の選択で、PM の判断。
+4. **一番大きなてこは FL の tick の速さ(= ページが渡す Hz)。** idle の CPU は tick にほぼ比例する(最小二乗: 1 tick = 約 1.42 ms、tick に依らない分は 10 s で約 51 ms): 10 秒の idle の native CPU は 60 Hz で 976 ms(10%)、90 Hz で 1,334、120 Hz で 1,786、**240 Hz で 3,621(36%、60 Hz の 3.7 倍)**(`tables/idle-cpu-vs-refresh-rate.tsv`)。1 tick に FL がするのは SendMessageW 32 回、IsWindowVisible 24 回、IntersectRect 12 回、WaitMessage 2 回ほか(`tables/idle-tick-api-calls.tsv`)。実 Windows の FL も同じ式で動くはず(同じ API を読む)が、P1〜P3 の予算には効く。ページが `FLE_DISPLAYSETTINGS_FREQUENCY`(FL の tick を決める)と `FLE_DWM_HZ`(DwmFlush の拍。この測定では 0 回呼ばれた)を別の値にできること(決定 0166 は別の変数)は製品側の選択で、未決。
 5. **GetTickCount の粒度は FL の動作を変えない**: GetTickCount を 15.625 ms 刻みにしても(`A9_GTC_QUANT=15625`)、ドラッグの 1,621 件の事象(post・取得・dispatch・timer 呼び出し)は**マイクロ秒まで同一**。読んでいるのは主スレッドの 1 箇所(ra 0x1e822d0)だけ(1 手の 16 ms に 24 回)。
 6. **0262 への訂正**(私の誤り。結論は変わらない): 0262 の「1 手あたり」表は、ボタンを離した後の 700 ms の idle tick まで数えていた。lid 14 と lid 17 の値と合計が過大(BeginPaint の合計 6.36 → ドラッグ窓だけでは 4.51、RedrawWindow 6.97 → 5.08、lid 14 の BeginPaint 2.21 → 1.05、lid 17 の BeginPaint 1.74 → 1.05)。lid 64 と lid 16 は不変(1.90 / 0.49)。CPU/手(g3-cpu の m001〜m020)はドラッグだけの区間なので不変。表: `tables/0262-correction-drag-window-counts.tsv`。
 
@@ -55,7 +55,7 @@ Wine との比較(`logs/wine-vs-runtime/`、`tables/` の表): S1(ポスト 2 + 
 
 1. 遅れた配信の後の期限を位相保存にすること(Wine の挙動)。Learn に記述がなく、FL の経路では WM_TIMER が使われないので、変える理由がない。
 2. `Sleep(n)` / 待ちを tick 境界に丸めること。範囲内で、効果は idle の 3〜15%(60 Hz)、影響が読めない(オーディオ)。
-3. 表示 Hz の扱い(ページ側)。`hz.ts` が FLE_DISPLAYSETTINGS_FREQUENCY と FLE_DWM_HZ に同じ値を渡す。FL の tick を 60〜120 に抑えて DwmFlush の拍だけ表示 Hz にする案は、FL のアニメーションの滑らかさと引き換えで、PM の判断。
+3. 表示 Hz の扱い(ページ側)。`hz.ts` が FLE_DISPLAYSETTINGS_FREQUENCY と FLE_DWM_HZ に同じ値を渡す。FL の tick を 60〜120 に抑えて DwmFlush の拍だけ表示 Hz にする案は、FL のアニメーションの滑らかさと引き換えで、未決。
 
 ## 7. テスト(任意)
 

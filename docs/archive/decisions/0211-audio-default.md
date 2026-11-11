@@ -8,7 +8,7 @@
 
 1. **何を実測したか**: 実エンジン(SHIPH)を、パラメータ無しの既定の入口で隔離 Chrome 156 と Firefox 158 に載せ、(a) メトロノーム(Ctrl+M)を入れて Space で再生したときに AudioWorklet が受け取る標本(非ゼロ quanta・peak・RMS・生の捕捉 10〜20 秒のクリックの間隔)、(b) AudioContext が止まったままのときの曲の進み(画面の時間表示)、(c) 最初のジェスチャー(マウスのクリック/キー)で context が running になるまでの状態と、ヘッダーの状態表示・ビーコンの `audio.detail`、(d) エンジンが遅れたときの欠け(worklet が数える underrun と、エンジン自身が数える欠け)を `audiodelay=100`・`audiolead=90` と対にして、(e) 依頼者の 13 セッション分のビーコンから実際の idle 数。
 2. **結論**:
-   - **依頼者に音が出なかった原因は、決定 0175 が音を `?audio=1` の opt-in にして既定の入口に入れなかったこと**(PM の判断の誤り。HEAD の app はパラメータ無しだと `window.__app.audio = null`、エンジンは仮想時計だけで動き、誰も標本を受けない)。実エンジンの側に原因は無い: SHIPH のメトロノームは非無音(Chrome 156 の opt-in で非無音 quanta 369、peak 0.9406、RMS 0.020、クリックの間隔 0.4286 秒 = **140.06 BPM**〔画面のテンポ表示 140.000 と一致〕、4 拍目ごとに peak 0.9304 のアクセント、通常 0.6169、1 クリック約 15〜17 ms)。
+   - **依頼者に音が出なかった原因は、決定 0175 が音を `?audio=1` の opt-in にして既定の入口に入れなかったこと**(PM の決定の誤り。HEAD の app はパラメータ無しだと `window.__app.audio = null`、エンジンは仮想時計だけで動き、誰も標本を受けない)。実エンジンの側に原因は無い: SHIPH のメトロノームは非無音(Chrome 156 の opt-in で非無音 quanta 369、peak 0.9406、RMS 0.020、クリックの間隔 0.4286 秒 = **140.06 BPM**〔画面のテンポ表示 140.000 と一致〕、4 拍目ごとに peak 0.9304 のアクセント、通常 0.6169、1 クリック約 15〜17 ms)。
    - **既定を ON にした**(`?audio=0` で無効)。ただし ON にするだけでは足りなかった: **AudioContext が suspended のまま**(ブラウザは最初のジェスチャーまで suspended にする。Firefox でも同じ。ブロック/デバイス無しなら永久に)だと、リングの読み位置 RD が止まり、エンジンの DirectSound の play cursor が進まず、**曲の位置が進まない**(再生ボタンは再生中の表示、時間表示は 1:01:00 のまま固定、仮想時計が遅れる警告。以前の音なしの既定では起きなかった退行)。→ worklet が動かない間、ページの時計で RD を進める**代役の消費者**(`soft-sink.ts`、無音)を入れた。context を永久に保留した状態でも曲の位置は進む(時間表示が 1:15:14〔r5〕、最終の木では 1:12:17〔FH2〕まで)。
    - **最初のジェスチャーで resume**(クリックでもキーでも。Chrome 156・Firefox 158 とも suspended → running を実測)。ヘッダーに状態表示(`音: 停止中 (クリックまたはキー入力で有効になります)` → `音: 動作中 44.1 kHz · 出力遅延 N ms`、許可されないときは `音: ブラウザが開始を許可していません …`)。ビーコン(版 3)の `audio.detail` に status・ctxState・sampleRate・base/outputLatency・autoplayPolicy・gestures・最後の resume の結果・リングの充足・underrun・代役の時計の量・エンジン側の欠けを運び、スキーマ検査・単体テスト・summary を更新した。
    - **Firefox 158**(headless、合成入力)でも、既定の入口で ctx は suspended → クリックで running、worklet が標本を受け、メトロノームは非無音(非無音 quanta 440、peak 0.9406、10 秒の連続した捕捉でクリック 24 個・間隔 0.424〜0.429 秒・140.06 BPM)。**Chrome の opt-in の捕捉と 441,000 frame 全部がビット一致**(SHA-256 `bf01e925…`)。
@@ -18,7 +18,7 @@
 
 ## 1 原因: 既定の入口に音が入っていなかった(opt-in のまま)
 
-- HEAD の `app/src/audio/install.ts` は `enabled: params.get('audio') === '1'`。パラメータ無し(依頼者が開く入口)では `installAudio` が `null` を返し、`window.__app.audio === null`。エンジン Worker に `globalThis.fleAudioSab`(決定 0139 のリング)が渡らないので、エンジン(`lift/runtime/fle_audio_ring.c` の `fle_audio_external()`)は外部の消費者が無いと見て仮想時計だけで動く。誰も標本を受け取らないので何も鳴らない。決定 0175 の『音は opt-in』は、実機での確認が 0 件のまま既定の入口に入れなかった PM の判断で、依頼者はパラメータを知らない。
+- HEAD の `app/src/audio/install.ts` は `enabled: params.get('audio') === '1'`。パラメータ無し(依頼者が開く入口)では `installAudio` が `null` を返し、`window.__app.audio === null`。エンジン Worker に `globalThis.fleAudioSab`(決定 0139 のリング)が渡らないので、エンジン(`lift/runtime/fle_audio_ring.c` の `fle_audio_external()`)は外部の消費者が無いと見て仮想時計だけで動く。誰も標本を受け取らないので何も鳴らない。決定 0175 の『音は opt-in』は、実機での確認が 0 件のまま既定の入口に入れなかった PM の決定で、依頼者はパラメータを知らない。
 - **実エンジン側は無音ではない**: SHIPH(prune + HLE の入った既定のバンドル)を `?audio=1` で動かし(Chrome 156、run r2)、Ctrl+M でメトロノームを点灯して Space で再生すると、AudioWorklet が受け取る標本は非ゼロ。pruned/HLE の関数でミキサーが壊れてはいない(決定 0188 の WAV 書き出しで Sampler.flp が 77,574 個の非ゼロフレームを出した事実と整合)。
 - **既定 ON にしただけでは足りなかった**(r3、`?audio=1` の旧い木 + `AudioContext.prototype.resume` を永久に保留): context が running にならない間、worklet が動かず RD(リングの読み位置)が止まる。エンジンの DirectSound の play cursor は `fle_audio_consumed()` = RD なので、ゲストのミキサーは次の半分に進めず、**再生ボタンは再生中の表示になるのに曲の位置は進まない**(時間表示 1:01:00 のまま、Master のメーターも動かない、窓の更新は 62/s → 43/s、ページのログに『the virtual clock fell 171 / 4834 / 1471 / 720 ms further behind』)。ブラウザは最初のジェスチャーまで context を suspended にするので、これは**既定 ON なら必ず起きる状態**(起動後ジェスチャー前、ブロック時、出力デバイス無しの機械)。
 
@@ -163,7 +163,7 @@ app が idle をページへ報告するとき `ReportThrottle`(`src/engine/repo
 
 Firefox 158 を `media.autoplay.default = 5`(『音声と動画をブロック』の設定)で起動し、同じ手順(クリック → Enter → Ctrl+M → Space、run FK)を取った。結果: **クリックの後に context は running になった**(`getAutoplayPolicy` は disallowed → allowed、resume() は 46 ms で解決、メトロノームは非無音 432 quanta)。この設定では、ユーザー操作を伴う再生は許可されるので、Firefox で『クリック後も running にならない』状態は再現できなかった。『許可されない』経路(状態表示の赤い行、代役の時計で曲が進む)は、**Chrome で `resume()` を永久に保留した合成**でだけ確かめた(run FH: ヘッダー『音: ブラウザが開始を許可していません (サイトの自動再生の設定を確認してください)』、時間表示は 1:13:14 まで進み、Master のメーターも動く。代役の時計は 2,059,999 frame = 46.7 秒分)。依頼者の機械でどの設定が実際に効くかは未確認。
 
-## 7 既定の動作の変更と PM の判断点
+## 7 既定の動作の変更と未決の点
 
 既定の動作を**変えた**(指示どおり): パラメータ無しの入口で AudioContext・AudioWorklet・リングが作られ、エンジンの DirectSound は外部の消費者(worklet か代役の時計)を持つようになる。`lift/` の生成 C・FLEngine・runtime は 0 行で、`FLEngine` の既定の生成 C の sha256(`cd9107ce…`)・全体テスト・a4 FRUITY 無効の基準には影響しない(再実行はしていない: `lift/` を触っていないため)。変わるもの:
 
@@ -171,7 +171,7 @@ Firefox 158 を `media.autoplay.default = 5`(『音声と動画をブロック�
 - ビーコンの `audio.detail` が既定で付く(+約 0.8 KB。ビーコンは 5〜5.7 KB で上限 16 KB に収まる)。`audio.underruns` はデバイスが 1 quantum 再生するまで `null`。
 - 性能: AudioContext のスレッドが待機 25 秒あたり 0.46〜0.52 CPU 秒(約 2% コア)、ページの 10 ms の時計。**0a3ab9a の木の 3 対(load 32〜40)でエンジン Worker の CPU は待機 6.88 対 6.91、再生 6.17 対 6.11 CPU 秒(OFF 対 ON の中央値)で差は見えず、最初の idle の中央値は OFF 28.2 秒、ON 23.8 秒(load の揺れの方が大きい)**。n = 3 で、P1・P2 の判定値ではない(§5.3)。
 
-PM の判断点:
+未決の点:
 1. **`audiodelay` の既定は変えていない**(指示)。提案するか否かの根拠(§5.2): `audiodelay=100` は P3 を 7/7 走行で 0 にし、エンジンの穴を隣り合う 6 対すべてで小さくする(p = 0.031)が、穴は無くならず(6/7 走行で残る)、標本から数えたクリックの傷の差は有意でない(合計 26 → 18、p = 0.60)。画面のプレイヘッドに対して音が 100 ms 遅れる副作用がある(聞こえ方は未確認)。測ったのは Chrome headless だけ(Firefox・実機は 0)。→ **既定を変える根拠としては弱い**。変えるなら『P3 にエンジンの穴を含める』定義の見直しと同時に(含めないと P3 だけが 0 になる)。`audiolead=90` は悪化(傷 3.7 → 16)なので採らない。
 2. **『idle 23.7/s』を依頼者の機械の遅さの根拠にしている文書がある**(`docs/investigations/client-feedback-20261104.md` や担当への指示)。訂正のうえ『idle の総数で約 1,000/s』に直すこと(§5.0)。
 3. AudioContext の作る時点(S-aud3-9): 今は `fl-engine` の Worker を作った 1 タスク後(ジェスチャーの前)。最初のジェスチャーまで作らない方式なら Chrome のコンソール警告は出ないが、addModule がジェスチャーの後になる。
@@ -226,7 +226,7 @@ PM の判断点:
 
 ## PM の決定と取り込み(2026-11-04)
 
-- **決定 0175 の誤り(PM の判断)を訂正する**: 音を `?audio=1` の opt-in にして既定の入口に入れなかったのは誤りだった(依頼者の『音が出ていない』の原因)。**既定 ON** を採る(`?audio=0` で無効)。
+- **決定 0175 の誤り(PM の決定)を訂正する**: 音を `?audio=1` の opt-in にして既定の入口に入れなかったのは誤りだった(依頼者の『音が出ていない』の原因)。**既定 ON** を採る(`?audio=0` で無効)。
 - **取り込み**: `aud3.diff`(21 ファイル、`lift/` は 0 行、`-` 行 43 本はすべて置換か、旧仕様〔`?audio=1` が必要〕を前提にしたテストの更新で、PM も全部読んだ)を HEAD 0156065 に当てた。clean(offset・fuzz なし)。PM 実測: 型検査 rc=0、vitest 1,437 passed + 7 skipped(基準 1,409 + 7)、Worker 43/43、e2e 1,127/1,127(基準 1,109 + audio-default 18)。`lift/` を触っていないので全体テスト・a4・FLEngine の sha は再実行していない。
 - **e2e の緩和を承認**: `default-manifest-none/standin` の 1 検査を『not-started か error』に緩めた(250 ms の状態描画との競合で、素の HEAD でも高負荷で落ちる。同種の失敗は PM の取り込み時にも perf-beacon で一度出た)。検査の意味は弱めない(エンジンの未起動を見る検査は別にある)。
 - **AudioContext が suspended のとき曲の位置が進まない問題の対処(`soft-sink.ts`)を承認**: worklet が動かない間はページの時計で読み位置を進める。音は出ないが時間が進む。ヘッダーに状態(『音: 停止中 (クリックまたはキー入力で有効になります)』→『音: 動作中 44.1 kHz · 出力遅延 N ms』、許可されないときは赤字)を出す。

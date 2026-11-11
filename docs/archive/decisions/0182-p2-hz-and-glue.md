@@ -1199,7 +1199,7 @@ memory series of the 15 s timer: 15s:1033.9MB(wizard) 30s:1033.9MB(play) 45s:103
 - **所定のプロジェクト(`serina1-serum2.zip`)は開いていない**(アプリに FLP を開く経路が無い)。すべての値は**空のプロジェクト**の主窓のもの。木の歩きはコントロール数に比例して増える(読み。ui1)ので、所定のプロジェクトでの 120 fps は未測定。
 - **依頼者の機械・実ディスプレイ(120 Hz 以上)・実 GPU・実機 Windows**: 未測定。この機械は 16 コア、SwiftShader、headless Chrome 156。headless の `requestAnimationFrame` の周期は §5 で実測した値で、**120 Hz のディスプレイでの `?hz=auto` は未実測**。
 - 他のブラウザ(Firefox、Safari)、隠れたタブでの `?hz=auto`(測定不能 → 60 Hz のフォールバックは単体テストのみ、ブラウザでは未確認)。
-- `?hz=` を既定の入口で効かせること(既定の構成 D の wasm は `FLE_DWM_HZ` を読まない。構成 Dp 以降への切替は PM の判断)。
+- `?hz=` を既定の入口で効かせること(既定の構成 D の wasm は `FLE_DWM_HZ` を読まない。構成 Dp 以降への切替は未決)。
 - ゲストの関数単位の CPU(ui1 の木歩き 7 関数 = 60%)を 120 Hz の構成 Dp で測り直すこと(名前つきの wasm と node の `--cpu-prof` が要る。ゲストの wasm は変えない指示だった)。
 - 音(P3)。AudioWorklet(`?audio=1`)を付けた状態の 120 Hz。
 - `fle_idle_lib.js`(エンジン側の idle のグルー)の削減(エンジンの再リンクが要る)。

@@ -14,7 +14,7 @@
 
 `CreateCompatibleDC` のページは「all attributes are set to normal default values」と書く。**この決定は、その「normal default values」をこの表の値と読む**（読み。メモリ DC に固有の差は「Bitmap」＝ 1 × 1 のモノクロ（Learn の CreateCompatibleDC）と、クリップ領域と原点の欄だけ）。新しい属性の初期値（背景モード OPAQUE、描画モード R2_COPYPEN、マッピング モード MM_TEXT、ストレッチ モード BLACKONWHITE、現在位置・ブラシ原点・ウィンドウ原点・ビューポート原点 (0,0)）はこの表から取り、**選択ではなく読みの区分**にする。
 
-**決定 0108 への影響（0108 は書き換えない）**: 0108 の D3 (b)（既定の 4 オブジェクトの正体）と (c)（初期色）、P1、P2 は「Learn に無い」としていたが、この表は**表示 DC について**ブラシ = WHITE_BRUSH、ペン = BLACK_PEN、フォント = SYSTEM_FONT、パレット = DEFAULT_PALETTE、背景色「typically, white」、文字色「typically, black」と書く。0108 の選択（黒の文字色、白の背景色）はこの表と矛盾しない。**既定ブラシの色**はこの決定の `PatBlt(PATCOPY)` が必要とする（既定ブラシのまま PATCOPY する経路）が、0108 の既定ブラシは隠しオブジェクトで色が無いので、この決定では**名前付きで止める**。0108 の D3 をこの表で正式化するかは PM の判断（「PM の判断が要る点」の 3）。
+**決定 0108 への影響（0108 は書き換えない）**: 0108 の D3 (b)（既定の 4 オブジェクトの正体）と (c)（初期色）、P1、P2 は「Learn に無い」としていたが、この表は**表示 DC について**ブラシ = WHITE_BRUSH、ペン = BLACK_PEN、フォント = SYSTEM_FONT、パレット = DEFAULT_PALETTE、背景色「typically, white」、文字色「typically, black」と書く。0108 の選択（黒の文字色、白の背景色）はこの表と矛盾しない。**既定ブラシの色**はこの決定の `PatBlt(PATCOPY)` が必要とする（既定ブラシのまま PATCOPY する経路）が、0108 の既定ブラシは隠しオブジェクトで色が無いので、この決定では**名前付きで止める**。0108 の D3 をこの表で正式化するかは未決（「未決の点」の 3）。
 
 ### 2. VCL の TCanvas の経路（読み。ILTools の逆アセンブル）
 
@@ -28,7 +28,7 @@
 
 その後の `graphic.Draw`（vtable）は、`f_6138cd0`／`f_6139290`（`TBitmap.Draw`／`StretchDraw` に近い形と読む）なら次の順に呼ぶ（読み。条件分岐は未確認）: `GetStretchBltMode`、**`GetDeviceCaps(キャンバスの DC, 12)` と `(…, 14)`**、`GetBrushOrgEx`、`SetStretchBltMode`、`SetBrushOrgEx`、`CreateCompatibleDC`、`SelectObject`、**`StretchBlt`**（0x613918e）、`DeleteDC`。
 
-**次の壁の予測（第 1 段階の読み。第 2 段階の実測では外れた: 実際の壁は `GetDeviceCaps` でも `StretchBlt` でもなく `StretchDIBits`）**: この決定の主差分で `MoveToEx`、`SelectObject`、`SetROP2`、`UnrealizeObject`、`SetBkMode`、`GetStretchBltMode`、`SetBrushOrgEx` ほかは通る。続く壁は ① **`GetDeviceCaps` のメモリ DC**（既存の `fle_gdc.c` は画面 DC だけ。主差分では**触らない**。任意の差分 `g1-optional-getdevicecaps.diff` が答える）、② **`StretchBlt`**（主差分では名前付き停止。1:1 の SRCCOPY を BitBlt と同一視する任意の差分 `g1-optional-stretchblt.diff` がある）。この 2 つは**依頼の範囲（既存の関数の応答を変えない、StretchBlt は例外に入っていない）に照らして任意の差分にし、PM の判断に回した**。
+**次の壁の予測（第 1 段階の読み。第 2 段階の実測では外れた: 実際の壁は `GetDeviceCaps` でも `StretchBlt` でもなく `StretchDIBits`）**: この決定の主差分で `MoveToEx`、`SelectObject`、`SetROP2`、`UnrealizeObject`、`SetBkMode`、`GetStretchBltMode`、`SetBrushOrgEx` ほかは通る。続く壁は ① **`GetDeviceCaps` のメモリ DC**（既存の `fle_gdc.c` は画面 DC だけ。主差分では**触らない**。任意の差分 `g1-optional-getdevicecaps.diff` が答える）、② **`StretchBlt`**（主差分では名前付き停止。1:1 の SRCCOPY を BitBlt と同一視する任意の差分 `g1-optional-stretchblt.diff` がある）。この 2 つは**依頼の範囲（既存の関数の応答を変えない、StretchBlt は例外に入っていない）に照らして任意の差分にし、未決のまま残した**。
 
 ### 3. ILTools の静的な閉包（実測ではなく計算）
 
@@ -40,7 +40,7 @@
 | C（名前付き停止）69 | 69 | 6（GetSystemPaletteEntries、CreateDIBitmap、GetBitmapBits、StretchBlt、GetTextMetricsW、CreateIcon） | 9（+ GetTextExtentPointW、DrawIcon、DrawTextW） |
 | D（行を足さない）180 | 180 | 11 | 54（user32 48、comctl32 6） |
 
-D のうち L2 に入る 54 は `fle_unsupported`（`unsupported instruction at 0x…`）の形で止まる。**停止の API 名は分類表 `gdi-bulk-classification.tsv` の `iltools_thunk_va_rebased`（基底 0x6000000）から引ける。** 名前付き停止の行を足すかは PM の判断（「PM の判断が要る点」の 4）。
+D のうち L2 に入る 54 は `fle_unsupported`（`unsupported instruction at 0x…`）の形で止まる。**停止の API 名は分類表 `gdi-bulk-classification.tsv` の `iltools_thunk_va_rebased`（基底 0x6000000）から引ける。** 名前付き停止の行を足すかは未決（「未決の点」の 4）。
 
 ## 対象 API の確定
 
@@ -81,7 +81,7 @@ ILTools の import 表（標準の import。遅延ロードは別）は gdi32 10
 | D16 | 画素の操作 | **FillRect**: メモリ DC・MM_TEXT・**24 または 32 ビットの DIB セクション**・ソリッド ブラシ（`CreateBrushIndirect`／`CreateSolidBrush`）または `COLOR_WINDOWTEXT + 1`（= 9。色は 0108 D11 の黒）。論理矩形 [left,right)×[top,bottom) を原点で変換し、**ビットマップの外の部分は書かない**。right ≤ left または bottom ≤ top は何も描かず 1（ページが定める半開区間が空）。**PatBlt**: 上と同じ DIB・MM_TEXT で、rop が PATCOPY（選択中のソリッド ブラシ。**既定のブラシ、中空、ストックのブラシは停止**）、BLACKNESS（0x000000）、WHITENESS（0xFFFFFF）。w, h が負は停止、0 は何も描かず 1。**BitBlt**: rop = SRCCOPY、ソースもデスティネーションもメモリ DC の DIB セクションで**同じ形式**（ビット数 8／16／24／32、圧縮、マスク、8 ビットは色表）、MM_TEXT、cx, cy は負なら停止・0 なら何もせず 1、ソース矩形はソースのビットマップの内側（外は停止: ページ「BitBlt only does clipping on the destination DC」）。画素のバイトをそのままコピー（32 ビットの未使用バイトも）。同じビットマップ内は memmove（行の順序を重なりの向きで選ぶ）。**書き込みはこの 2 か所（`dib_fill` と BitBlt の `memmove`）だけ**。DDB（画素を持たない）、他のビット数、クリップ領域（作れない）、他の rop、画面 DC はすべて名前付き停止（メッセージの先頭に 0108 と同じ引数の文字列） | Learn（バイト順は読み、未使用バイトは選択） |
 | D17 | 名前付き停止 69 | 下の表。呼ぶと `fle: <API>: <理由> (decision 0111)` で止まる。**停止関数はスレッドを調べない**（状態に触れない）。新しい .c／.h は作らない（`fle_gdi.c`／`.h` に追記） | PM の方針 |
 | D18 | 応答表 | **96 行を末尾に追記**（答え 27 → 名前付き停止 69 の順。順序は下）。既存の行の関数名・応答は変えない | 決定 0015 |
-| D19 | 任意の差分 | ① `g1-optional-getdevicecaps.diff`（`fle_gdc.c` に弱い参照 1 本。メモリ DC の `GetDeviceCaps(12／14)` が選択中のビットマップのビット数とプレーン数を返す。他の index は停止。既存のテスト 1 行を変える）。② `g1-optional-stretchblt.diff`（`StretchBlt` の幅・高さが等しいときは BitBlt と同じ。BitBlt の本体を `blit()` に出す）。**どちらも主差分には入れていない**（既存の関数の応答を変える／例外に入っていない）。適用するかは PM の判断 | 選択 |
+| D19 | 任意の差分 | ① `g1-optional-getdevicecaps.diff`（`fle_gdc.c` に弱い参照 1 本。メモリ DC の `GetDeviceCaps(12／14)` が選択中のビットマップのビット数とプレーン数を返す。他の index は停止。既存のテスト 1 行を変える）。② `g1-optional-stretchblt.diff`（`StretchBlt` の幅・高さが等しいときは BitBlt と同じ。BitBlt の本体を `blit()` に出す）。**どちらも主差分には入れていない**（既存の関数の応答を変える／例外に入っていない）。適用するかは未決 | 選択 |
 | D20 | 作らないもの | 新しい .c／.h。`GetObjectW` の拡張（ブラシ、ペン）。`SetTextAlign`、`GetBkMode` ほかの照会（ILTools は import しない）。ペンでの描画、領域、クリップ、メタファイル。`CreateIcon`（ビット列を持たない）。D の 180 の行 | 範囲 |
 
 ### 出典の補足（Learn のページと取得できた文言）
@@ -427,7 +427,7 @@ a4: all_units_done=no functions_distinct=3411 function_entries=134085
 5. **32 ビットの未使用バイト**: 既定の 0（FillRect、PatBlt）と BitBlt のコピーでよいか。
 6. **RestoreDC の保守的な停止**でよいか（色・位置・ブラシ原点が違えば停止）。
 7. **`GetTextMetricsW` を A に上げるか**。L1 の深さ 3 で届く（読み）ので、unit 初期化の経路が実際に踏むかもしれない。上げるには、仮想フォントのメトリクスの出どころ（フォント ファイルの hhea／OS/2 から計算するなど）と丸めの規則を PM が決める必要がある。
-8. **次の壁の予測**（第 1 段階の読み）: `GetDeviceCaps`（メモリ DC）→ `StretchBlt` → その先（`GetTextMetricsW` は L1 の深さ 3 で届く: フォントのメトリクスが要る）。**実測は外れ**: 次の壁は `StretchDIBits`（上の「第 2 段階の結果」の 5、6）。`StretchDIBits` を答えるか、名前付き停止のままにするかは PM の判断（新しい項目）。
+8. **次の壁の予測**（第 1 段階の読み）: `GetDeviceCaps`（メモリ DC）→ `StretchBlt` → その先（`GetTextMetricsW` は L1 の深さ 3 で届く: フォントのメトリクスが要る）。**実測は外れ**: 次の壁は `StretchDIBits`（上の「第 2 段階の結果」の 5、6）。`StretchDIBits` を答えるか、名前付き停止のままにするかは未決（新しい項目）。
 
 ## 限界
 

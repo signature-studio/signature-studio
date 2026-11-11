@@ -19,7 +19,7 @@
 
 - 依頼者の 4 件のうち、**(c) は原因を確定して直した**(LCMapStringW が、cchSrc 個の UTF-16 単位をすべて写像するのではなく、0x80 以上の単位で止まっていた。Browser の文字列は cchSrc=30 で、NUL の後ろのゲストの未初期化メモリが 0x80 以上だった)。**(a) も原因を確定して直した**(shell32 の DragAcceptFiles 等の 4 関数に import の行が無く、thunk が「未対応の命令」で止まっていた)。
 - **(b)、(d) は再現できず、原因は未確定。** 推測(根拠は薄い: 同じ族の `CharUpperW` 系も 0x80 以上の単位で止まる実装だった)で、確かめていない。CharUpper/CharLower の 4 関数も同じ表で直した(Wine 10.0 と全 65,536 単位で差 0)ので、もし (b) の原因がそれなら直っている。
-- 「停止(fle_stop)」は既定のまま変えていない。**opt-in** の soft stop を作った(`FLE_SOFT_STOP=1`、ページでは `?env=FLE_SOFT_STOP=1`)。ページが文書化された失敗値を返せる箇所だけが変わる。既定にするかは PM の判断(§3 に測定と判断材料)。
+- 「停止(fle_stop)」は既定のまま変えていない。**opt-in** の soft stop を作った(`FLE_SOFT_STOP=1`、ページでは `?env=FLE_SOFT_STOP=1`)。ページが文書化された失敗値を返せる箇所だけが変わる。既定にするかは未決(§3 に測定と判断材料)。
 - API の族としては、DragAcceptFiles/DragQueryFileW/DragQueryPoint/DragFinish(shell32、4 関数)と user32 のメニュー(14 関数)を、文書どおりに実装して Wine 10.0 と照合した。comctl32 の ImageList_*(23 関数)は**実装していない**(§7)。
 
 **3. 未確認**

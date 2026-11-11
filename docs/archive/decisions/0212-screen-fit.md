@@ -276,7 +276,7 @@ DPI の動的な変更(ブラウザのズームで DPR が変わる)は未実装
 `tables/s-choices.tsv`(21 件。代替案と撤回条件つき)。要点: 範囲 640x480〜7680x4320、環境変数名、不正値は無視、header-only + weak 変数(リンク行を変えない)、appview の予約語 2 つ(version 据え置き)、`rcWork = rcMonitor`、HORZSIZE の DPI 一般化、`WM_DISPLAYCHANGE` の送り先・順序・DefWindowProc の 0、GUI スレッド = thread 0、最大化窓の置き直しは**推測**、DPI > 96 で PER_MONITOR、room の静止時間 300 ms、`fit` 既定・ヘッダー 36 px・パネル 340 px。
 
 - 決定 0065(仮想モニター)・0053(仮想画面 DC)・0057(GetSystemMetrics)・0121(HORZSIZE): 値の既定は不変(`_Static_assert` で既定値を検査)。『ページは値を渡さない』は変わった(opt-in の環境変数)。
-- 決定 0099・0171(S-ia1-dpi): `GetProcessDpiAwareness` の UNAWARE は既定のまま。`FLE_SCREEN_DPI` > 96 のときだけ PER_MONITOR。0099 の撤回条件『ホスト exe の DPI 宣言が分かったとき』は ia1 で成立済みだが、PM の判断(起動経路を変えない)に従った。
+- 決定 0099・0171(S-ia1-dpi): `GetProcessDpiAwareness` の UNAWARE は既定のまま。`FLE_SCREEN_DPI` > 96 のときだけ PER_MONITOR。0099 の撤回条件『ホスト exe の DPI 宣言が分かったとき』は ia1 で成立済みだが、PM の決定(起動経路を変えない)に従った。
 - 決定 0182(`?hz=`)と同じ仕組み(`engine.env`)。決定 0201(`?dedupe` 既定 ON)の後の HEAD で費用を測り直した(§7)。
 
 ## 10. PM の未決の点と、見つかったこと

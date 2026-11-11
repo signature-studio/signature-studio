@@ -129,7 +129,7 @@
 
 ### 追記(2026-11-07 00:42、mt3 の 0312 最終の取り込み、docs のみ。製品の差分なし)
 
-取り込み: mt3 の 0312 最終(本文を差し替え、上の PM の判断の節は残した)と `0312e` の最新版、表・道具(`docs/investigations/mt3w/0312/`。原本の `*.log` は `.txt` に改名)。**実エンジン(lift した FLEngine の wasm)のブラウザでの実行は mt3 の手では 0 件**(B1 の PCM の零・T は gpu1 の Chrome の測定)。
+取り込み: mt3 の 0312 最終(本文を差し替え、上の PM の決定の節は残した)と `0312e` の最新版、表・道具(`docs/investigations/mt3w/0312/`。原本の `*.log` は `.txt` に改名)。**実エンジン(lift した FLEngine の wasm)のブラウザでの実行は mt3 の手では 0 件**(B1 の PCM の零・T は gpu1 の Chrome の測定)。
 
 PM の検証(実測):
 1. **積み重ね**: `apply-stack-0312.sh check`(main `fa0c5cc0` の PM の木、81 ファイル): 5 本すべて rc=0、rejects: 0(offset は 2 本目の 1 hunk〔19 行〕のみ)。mt3 の報告と一致。

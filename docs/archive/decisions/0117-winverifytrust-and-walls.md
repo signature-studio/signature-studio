@@ -1,4 +1,4 @@
-# 0117: `WinVerifyTrust` の方針 D — 検証を実行前のオフライン検査に移し、その結果の主張の表から固定の応答を返す（検査した範囲と、していない範囲を明記）。その先の壁 5（`GetUserPreferredUILanguages`）を直し、壁 6 で停止: エンジンの CPU 検査が `CPUID` の応答（決定 0009）で落ちる（PM の判断が要る環境の主張）。すべて仮の決定
+# 0117: `WinVerifyTrust` の方針 D — 検証を実行前のオフライン検査に移し、その結果の主張の表から固定の応答を返す（検査した範囲と、していない範囲を明記）。その先の壁 5（`GetUserPreferredUILanguages`）を直し、壁 6 で停止: エンジンの CPU 検査が `CPUID` の応答（決定 0009）で落ちる（未決の環境の主張）。すべて仮の決定
 
 状態: **仮の決定（すべての応答と選択）**。依頼は PM（2026-10-29。決定 0117 の方針 D は PM の仮の決定。番号 0117 は PM の仮の割り当て）。測定・実装・テスト・文書は作業者（サブエージェント）が行った。**HEAD 159a42e の clean な `git archive` に差分 `fruity4.diff` を当てた木（作業は HEAD acf69cf で始め、途中で HEAD が 159a42e に進んだ。差は docs の 1 本と `lift/harness/web/eventloop/*` の追加だけで、差分と重ならない。測定の 2 回と生成 C の比較は 159a42e の追加分を足す前の木で行い、全体テストは足した後の木で、変異検査は足す前の木のコピーで行った。追加分はビルドに入らないので、native の SHA は同じと読む）で、コンパイル（警告・エラーなし）、全体テスト（118 test result・1,632 passed・0 failed）、生成 C の関数単位の比較、変異検査 19 件（19 件検出。変更なしの対照は通る）、6 モジュール構成の FRUITY 有効の測定（独立な 2 回のビルド、同一）と無効のビルド 1 回まで実施した。実機 Windows との照合は 0 件。wasm・ブラウザは未測定（native のみ）。**
 
@@ -25,7 +25,7 @@
 
 ## 背景
 
-- 前段（決定 0116、`docs/investigations/create-fruity-instance-measurement.md`、`create-fruity-instance-harness.md`、`host-engine-boundary.md`）: 6 モジュール構成の DllMain／InitUnits 完走（942/942）の後に `CreateFruityInstance(0xC0, 0xEDE95A, 偽ホスト, &instance)` を呼ぶハーネス（`FLE_CALL_FRUITY=1`／`FRUITY=1`／`-DFLE_FRUITY`）は、3 つの壁を直したあと 35,096 関数入口目の `wintrust.dll!WinVerifyTrust`（`unsupported instruction at 0x4256d0`、呼び元 0x1375bce、戻り先 0x1375bd3）で止まった。決定 0116 は案 A（失敗を答える）、B（実際に検証する）、C（嘘の成功）、D（検証の層を移す）を挙げ、PM の判断を求めた。
+- 前段（決定 0116、`docs/investigations/create-fruity-instance-measurement.md`、`create-fruity-instance-harness.md`、`host-engine-boundary.md`）: 6 モジュール構成の DllMain／InitUnits 完走（942/942）の後に `CreateFruityInstance(0xC0, 0xEDE95A, 偽ホスト, &instance)` を呼ぶハーネス（`FLE_CALL_FRUITY=1`／`FRUITY=1`／`-DFLE_FRUITY`）は、3 つの壁を直したあと 35,096 関数入口目の `wintrust.dll!WinVerifyTrust`（`unsupported instruction at 0x4256d0`、呼び元 0x1375bce、戻り先 0x1375bd3）で止まった。決定 0116 は案 A（失敗を答える）、B（実際に検証する）、C（嘘の成功）、D（検証の層を移す）を挙げ、採否は未決のまま残した。
 - PM の仮の決定（0117、変えない）: **案 D「検証を実行前のオフライン検査に移し、その結果として固定の応答を返す。ただし何を検査し何を検査していないかを明記する」**。案 C（無条件の「検証成功」）は採らない。(1) オフライン検査ツール `tools/authenticode_check.py`（標準ライブラリだけ）、(2) runtime の `WinVerifyTrust` は主張の表にあって行が成立のときに限り 0（表は FRUITY ビルド以外では空）、(3) `WinVerifyTrust` の後の署名者名の比較に使う crypt32 には表の署名者 CN を返す、(4) 表記と撤回条件。
 - 方針（PM、前の決定から継続）: ふり（fail-soft）で進めない。仕様から導ける応答だけを実装し、導けないものは名前付き停止。応答表は末尾追記のみ（決定 0015）。新しい `.c`／`.h` を runtime に作らない。既存の関数の本体・応答の値は変えない。
 - 土台（実測。HEAD acf69cf の `git archive`）: 専用の `CARGO_TARGET_DIR`。FRUITY 無効の基準を再現した（TAG `t2331d00e8ebb`、a4 942/942、895/895、functions 5,306、entries 1,007,942、`returned from entry`、終了 0、native `8855bff4…2590e`）。FRUITY 有効（種 = nsis + app）で、決定 0116 の記録どおり `WinVerifyTrust` の `unsupported instruction at 0x4256d0`（**35,096 関数入口目**、新規の関数 312、native `d361c921bd9fbfd7811473a9fe997940c986222823cedd6187a70fe3a0390723`）で停止することを再現した。
@@ -61,7 +61,7 @@
 
 | # | 停止メッセージ | 原因（区分） | 種類 | 修正（場所） | 測定（呼び出しの入口数／新規の関数） |
 |---|---|---|---|---|---|
-| 4 | `fle: unsupported instruction at 0x4256d0`（`wintrust.dll!WinVerifyTrust`） | エンジンが自分の DLL の Authenticode 署名を検査（`CreateFruityInstance` の 0x1375bce）。0 でなければ −2 で戻る。0 なら `CryptQueryObject` → `CryptMsgGetParam`（2 回）→ `CertFindCertificateInStore` → `CertGetNameStringW`（2 回）→ `CertFreeCertificateContext` → `CertCloseStore`／`CryptMsgClose` で `Image Line NV` と比較し、さらに `Flags` のビット 0 が 0 のときホスト exe にも同じ（読み + 実測）。**停止条件 (a) に近いが、方針 D で扱う** | 未応答 import（PM の判断を含む主張の表で答える） | 上の「決定」の 1〜3（`fle_vfs.c`、`fle_vfs.h`、`imports_table.rs` の 8 行、ハーネス、ツール） | 35,096／312 → **35,600／330**（次の停止） |
+| 4 | `fle: unsupported instruction at 0x4256d0`（`wintrust.dll!WinVerifyTrust`） | エンジンが自分の DLL の Authenticode 署名を検査（`CreateFruityInstance` の 0x1375bce）。0 でなければ −2 で戻る。0 なら `CryptQueryObject` → `CryptMsgGetParam`（2 回）→ `CertFindCertificateInStore` → `CertGetNameStringW`（2 回）→ `CertFreeCertificateContext` → `CertCloseStore`／`CryptMsgClose` で `Image Line NV` と比較し、さらに `Flags` のビット 0 が 0 のときホスト exe にも同じ（読み + 実測）。**停止条件 (a) に近いが、方針 D で扱う** | 未応答 import（PM の決定を含む主張の表で答える） | 上の「決定」の 1〜3（`fle_vfs.c`、`fle_vfs.h`、`imports_table.rs` の 8 行、ハーネス、ツール） | 35,096／312 → **35,600／330**（次の停止） |
 | 5 | `fle: RaiseException: exception code 0xc06d007f, flags 0, 1 argument(s) raised; no structured exception handling is modelled, stopped here` | 遅延ロードの補助が `GetProcAddress(kernel32, "GetUserPreferredUILanguages")` で 0 を得て `ERROR_PROC_NOT_FOUND` の VcppException を上げる。呼び元は Delphi の補助 `f_9df190`（`MUI_LANGUAGE_NAME`、まず NULL バッファで長さ、次に取得、先頭の名前を使う）（読み + 実測） | 未応答 import（遅延ロード） | `fle_imp_GetUserPreferredUILanguages`（`fle_uipref.c`）、応答表の 9 行目 | 35,600／330 → **38,241／348** |
 | 6 | `fle: unsupported instruction at 0x424b60`（`user32.dll!GetActiveWindow`） | **エンジンの CPU 検査の失敗**: `f_13755b0` が `record+0x12` の bit 0x10 を見て、無いので `This computer's CPU won't run %s`（`FL Studio`）を `f_818d30` で表示しようとし、補助が `GetActiveWindow` を呼ぶ。その先は `MessageBoxW`（モーダル）。機能語は `f_639a20` が `CPUID` から作る（実測 + 読み） | **環境の主張**（停止条件 (b)）。`GetActiveWindow` 自体は症状 | （なし。下「止まった壁」） | 38,241 で停止 |
 
@@ -185,7 +185,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: `WinV
 
 ## 解釈が分かれた点
 
-1. **ホスト exe の検査**: 依頼は「エンジンが同じ WinVerifyTrust で検査するホスト exe（FL64.exe）」と「実際にエンジンが WinVerifyTrust に渡すパスを gdb／トレースで特定して表のキーにする」。測定すると 2 回目の検査（`Flags` のビット 0 が 0 のとき）のパスは `GetModuleFileNameW(NULL)` の応答で、**この環境ではそれが DLL のパス**（決定 0018: NULL も 0x400000 も DLL のパス）。表のキーは実測どおり DLL のパスだけが使われ、FL64.exe の行は登録されるが使われない。`GetModuleFileNameW(NULL)` を FL64.exe にするのは既存の応答の値の変更（DllMain の `ParamStr(0)` などに及ぶ）なので**しなかった**。PM の判断（点 3）。
+1. **ホスト exe の検査**: 依頼は「エンジンが同じ WinVerifyTrust で検査するホスト exe（FL64.exe）」と「実際にエンジンが WinVerifyTrust に渡すパスを gdb／トレースで特定して表のキーにする」。測定すると 2 回目の検査（`Flags` のビット 0 が 0 のとき）のパスは `GetModuleFileNameW(NULL)` の応答で、**この環境ではそれが DLL のパス**（決定 0018: NULL も 0x400000 も DLL のパス）。表のキーは実測どおり DLL のパスだけが使われ、FL64.exe の行は登録されるが使われない。`GetModuleFileNameW(NULL)` を FL64.exe にするのは既存の応答の値の変更（DllMain の `ParamStr(0)` などに及ぶ）なので**しなかった**。PM の決定（点 3）は未決。
 2. **表の追加の 2 列**（issuer の DER と serial）: 依頼の列に足した。値は同じ証明書から読んだ実値。足さなければ `CMSG_SIGNER_INFO` の Issuer／SerialNumber に創作の値を入れることになる。
 3. **ダイジェストの形式**: `<alg>:<hex>`（例 `sha256:16a7…`）。依頼は「authenticode ダイジェスト」とだけ。
 4. **主張より多い要求の扱い**: 失効確認や `dwProvFlags` の追加は、表が持たない検査の要求なので停止にした（0 を返すと「検査した」ことになる）。Learn にそれを禁じる文言はなく、作業者の安全側の選択。
@@ -201,7 +201,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: `WinV
 3. **`GetModuleFileNameW(NULL)` の値**: DLL のパス（現状）か FL64.exe か。後者なら、ホスト exe の検査は FL64.exe の行で行われ、表の 2 行がどちらも使われる。
 4. **FL64.exe の取り扱い**: インストーラから取り出した 597,064 バイトの `FL64.exe`（`FL64 (scaled).exe` は別ファイルで SHA-256 が違う、署名者・有効期間は同じ）。どちらをホスト exe とするか。表は `FL64.exe` だけ。
 5. **A2 を入れたあとの壁**（実験 E1 + E2 + E3 の範囲）: `rpcrt4.dll`（モジュールの追加 + `UuidCreate` の乱数＝環境の主張）、`LoadIconW(MAINICON)`、`GetIconInfo`（アイコン資源のモデル）、その先はウィンドウ・描画・メッセージループの領域。どこまでを範囲とするか。
-6. 決定 0116 の PM の判断点のうち、`Shared data` の値（S1）、`ILSetup.dll` の確認、種付けの位置、`$INSTDIR` の食い違いは**この作業では扱わなかった**（未変更）。
+6. 決定 0116 の未決の点のうち、`Shared data` の値（S1）、`ILSetup.dll` の確認、種付けの位置、`$INSTDIR` の食い違いは**この作業では扱わなかった**（未変更）。
 
 ## 撤回条件
 

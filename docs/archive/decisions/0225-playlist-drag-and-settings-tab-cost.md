@@ -56,7 +56,7 @@ SHIPH の追加テスト(すべて停止なし): メニュー 30 回 → F10 →
 1. **『General タブのクリック』単体の停止は、SHIPH でも再現しなかった**(上の 5 通り)。依頼者の『General タブで落ちた』が何だったかは**原因不明。再現しない**。PM が依頼者に伝えた『General タブを直した API 拡充は特定できていない』は事実と一致する。
 2. SHIPH で**実際に再現した 2 つの停止**は SHIP2 では起きない。**直した物を、その 1 行を戻すと SHIPH と同じメッセージで停止する実験(X1、X2)で特定できた**:
    - **フック表(FILE メニュー 32 回目)**: 決定 0196(tbl1、d764db1。SHIPH の HEAD d425abd より後)= 固定容量の表が『生存数』でなく『作成数』を数えていた(解放しても枠が戻らない)修正。Learn UnhookWindowsHookEx(『フックを外す』)の契約どおりに枠を返す実装 = 方針の (b)。FL の窓・クラスを見ていない。
-   - **Theme タブ(SHChangeNotifyRegister)**: `ship2-imports.txt` にあり `ship-imports.txt` に無い、ia2(決定 0191)のマーカー行 `kernel32.dll CompareStringW::ia2-sort-weights` が `fle_ia2_cmp_active()` を真にし、`fle_ole.c` が NULL の pidl(ILCreateFromPathW が存在しないフォルダに返した NULL)を『0』で返す。**これは API 拡充ではなく、決定 0191 の『選択』(S-ia2-shchange-nullpidl)**で、**Learn に記述が無い**(§4.3 に原文)。Wine 10.0 は受理(正の ID)なので食い違いでもある。差分 `anim1-shchange.diff` で marker に依存しない形にした(PM の判断点)。
+   - **Theme タブ(SHChangeNotifyRegister)**: `ship2-imports.txt` にあり `ship-imports.txt` に無い、ia2(決定 0191)のマーカー行 `kernel32.dll CompareStringW::ia2-sort-weights` が `fle_ia2_cmp_active()` を真にし、`fle_ole.c` が NULL の pidl(ILCreateFromPathW が存在しないフォルダに返した NULL)を『0』で返す。**これは API 拡充ではなく、決定 0191 の『選択』(S-ia2-shchange-nullpidl)**で、**Learn に記述が無い**(§4.3 に原文)。Wine 10.0 は受理(正の ID)なので食い違いでもある。差分 `anim1-shchange.diff` で marker に依存しない形にした(PM の未決点)。
 3. **『場当たり』の点検**: runtime・seeds・app のコードに `TMIDIForm`・`Settings`・`General` を名指しした分岐は 0(`grep`)。上の 2 件はどちらも窓やタブを狙った処置ではない。ただし 2 件目は『出典のない選択』であり、方針の点検表では出典を付けるか契約どおりに直す対象のまま残っていた。
 
 ### 1.3 依頼者のセッションの停止メッセージ(`lift/out-websrv/perf-log.jsonl`、remote=tailnet。**どの操作で起きたかの推測**)
@@ -356,7 +356,7 @@ PM の指示(『Learn の SHChangeNotifyRegister / SHChangeNotifyEntry に NULL 
 - SHChangeNotifyRegister(nf-shlobj_core-shchangenotifyregister、updated_at 2025-07-01): 「Returns a positive integer registration ID. Returns 0 if out of memory or in response to invalid parameters.」「This array should always be set to one…」「Otherwise, if the pshcne parameter is not NULL, then that notification entry is used.」「The two PIDLIST_ABSOLUTE pointers can be NULL, depending on the event being sent.」(これは通知の中身の説明で、登録の pidl ではない)→ **登録の NULL pidl の記述は無い**。
 - 副次の出典(Learn ではない。本プロジェクトの差分テストの基準 Wine 10.0):`dlls/shell32/changenotify.c`(github.com/wine-mirror/wine、タグ wine-10.0)の `SHChangeNotifyRegister` は `item->apidl[i].pidl = ILClone(lpItems[i].pidl)`(NULL は NULL のまま)で登録し **`item->id`(InterlockedIncrement の正の値)を返す**。`SHChangeNotify` は登録の pidl が NULL のとき `if( !pidl ) /* all ? */ notify = TRUE;`(全通知)。→ **Wine 10.0 では NULL pidl は失敗ではなく、正の ID の登録**。
 
-したがって決定 0191 の『NULL pidl は 0(無効なパラメータ)を返す』(S-ia2-shchange-nullpidl)は **Learn の記述に無く、Wine 10.0 とも食い違う選択**。PM の (a)/(b) のどちらでもなく、(c) **Learn は沈黙・Wine 10.0 は受理**。差分(`anim1-shchange.diff`)は、(c) に従って NULL pidl を普通の登録(正の ID、通知は届かない〔S-shchange-no-events〕)として受け、marker 行を見ないようにする: `fle_ole.c`(`-` 行 9 = 弱参照の宣言 1・Decision 0191 のコメント 3・`if (pidl == 0 && marker) { R[0]=0; return; }` の 5 行・pidl の検査 1 行〔`pidl != 0 &&` を足して置換〕、`+` 行 7)と、テスト `wall_fr11.rs`(`-` 行 3 = 添字がずれる期待。NULL pidl の登録が ID 4・live 1・解除 1 を返す。**この新しい期待は、変更前の runtime では停止して失敗する**ことを実測)。PM の判断点: (c) を採るか、(b) の『停止のまま』に戻すか(`ship3` で ship2-imports.txt のマーカー行を持つ限り、現行でも Theme タブは止まらない)。
+したがって決定 0191 の『NULL pidl は 0(無効なパラメータ)を返す』(S-ia2-shchange-nullpidl)は **Learn の記述に無く、Wine 10.0 とも食い違う選択**。PM の (a)/(b) のどちらでもなく、(c) **Learn は沈黙・Wine 10.0 は受理**。差分(`anim1-shchange.diff`)は、(c) に従って NULL pidl を普通の登録(正の ID、通知は届かない〔S-shchange-no-events〕)として受け、marker 行を見ないようにする: `fle_ole.c`(`-` 行 9 = 弱参照の宣言 1・Decision 0191 のコメント 3・`if (pidl == 0 && marker) { R[0]=0; return; }` の 5 行・pidl の検査 1 行〔`pidl != 0 &&` を足して置換〕、`+` 行 7)と、テスト `wall_fr11.rs`(`-` 行 3 = 添字がずれる期待。NULL pidl の登録が ID 4・live 1・解除 1 を返す。**この新しい期待は、変更前の runtime では停止して失敗する**ことを実測)。PM の未決点: (c) を採るか、(b) の『停止のまま』に戻すか(`ship3` で ship2-imports.txt のマーカー行を持つ限り、現行でも Theme タブは止まらない)。
 
 ## 5. 出力(画素)が変わらないことの確認
 
@@ -415,7 +415,7 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 | packed 整数ヘルパーの wasm SIMD(§4.1) | 外部 API の契約の実装か | いいえ(API ではなく命令の意味)。SDM の擬似コードどおりの実装を、より少ない wasm 命令にするだけ(変換の削減)。FL の挙動の代行・補正・特別扱いではない。クラス名・窓・位置の分岐なし。網羅テストつき |
 | 同上 | 局所的な近道か | いいえ。関数・窓を選ばず、全ての生成コードの同じ命令に効く |
 | fast copy(BitBlt、決定 0203)+ raster/sse を -O2 | 近道か | 同じ画素を書く実装(BitBlt の SRCCOPY の 32bpp 直接形式の画素ループを語単位に)。API の結果(画素)は同一。画素同一の確認は §5.1。**既定では入れない**(`F1xH3\|F2xH3` の opt-in プリセットのみ) |
-| `SHChangeNotifyRegister` の NULL pidl(§4.3) | 契約の実装か | Learn は沈黙、Wine 10.0 は受理(正の ID)。Wine 準拠への変更で、ia2 のマーカー行への依存を外す。PM の判断点 |
+| `SHChangeNotifyRegister` の NULL pidl(§4.3) | 契約の実装か | Learn は沈黙、Wine 10.0 は受理(正の ID)。Wine 準拠への変更で、ia2 のマーカー行への依存を外す。PM の未決点 |
 | ページの窓の知識・dedupe・report-throttle など提示経路 | — | **触っていない**(desk1 の担当) |
 | (7) 不要な再描画を契約どおりにする(InvalidateRect/ValidateRect/BeginPaint の rcPaint/GetUpdateRect/クリップ領域) | 契約違反による二重描画・過大な矩形があるか | **見つからなかった**(測った範囲)。タブ切替の 1 フレームで `BeginPaint` と `BitBlt` は同数(約 3 回ずつ)、変化の無い描画は、ゲストが idle で行う約 60 回/s の定期描画(API 回数:main-idle の 2 s で `BeginPaint` 126 回)だけで、ページに届く更新は `?dedupe`(既定 ON)で約 1 回/s(idle の表)。更新領域が『1 つの外接矩形』(`S-updregion`)であることは Windows の領域より広い矩形を返す選択だが、この 2 操作の BeginPaint の矩形は Settings 窓の内側 658x831 で全面ではなく、費用の主因でもない。Playlist のドラッグは 1 更新 1520x963(Playlist の領域)で、変化画素は約 7%(ゲストが領域全体を描き直す)。ゲストの描き直しはエンジン側では省けない(省くと『同一内容の再描画の間引き』= 方針の抹消対象) |
 | 『ホバー → ヒント』『General タブ』のための分岐 | — | 無い。A の結論は『原因不明』 |

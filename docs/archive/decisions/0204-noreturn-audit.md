@@ -70,7 +70,7 @@
 - `lift/runtime`、`lift/crates/fe-lift/src`、既存のテスト、既存の harness は変更なし。追加は新規 3 ファイル(`harness/noreturn-audit/noreturn_audit.py`、`harness/noreturn-audit/allow.tsv`、`crates/fe-lift/tests/noreturn_audit.rs`。`noret1.diff` はこの 3 本だけ)と、文書(本ファイル、README の 1 行)。
 - FLEngine の既定の生成 C: この HEAD の fe-lift で `fe-lift lift FLEngine_x64.dll out.c --pdata` を再実行して sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)(`logs/gen-default.sha256`)。
 - a4(FRUITY 無効 942/942、895/895、functions 5,310、entries 1,009,731): **再実行していない**。fe-lift・runtime・既存の harness に触れていないので動く理由が無い(読み)。
-- 全体テスト: §結果の節(本ファイル末尾)に実測値を書く。新テスト単体は 8 件 passed(約 18 秒)。`harness/testfast/deps.tsv` は触っていない(記録の無い実行ファイルは `affected` で常に対象になる)。`harness/test.sh record` で入力集合を記録し直すのは PM の判断。
+- 全体テスト: §結果の節(本ファイル末尾)に実測値を書く。新テスト単体は 8 件 passed(約 18 秒)。`harness/testfast/deps.tsv` は触っていない(記録の無い実行ファイルは `affected` で常に対象になる)。`harness/test.sh record` で入力集合を記録し直すのは PM の未決。
 
 ## 6. 扱えない範囲(『未対応』の明記)
 

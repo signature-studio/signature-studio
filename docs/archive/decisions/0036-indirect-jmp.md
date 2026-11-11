@@ -1,6 +1,6 @@
 # 0036: 解決不能な間接 jmp（`jmp r64` の tail dispatch と、注釈つき jump table）
 
-状態: 作業者（サブエージェント）が決定。PM の判断は含まない。計測と実行は `docs/investigations/indirect-jmp-run.md`。仕様は `docs/investigations/unsupported-inventory-pdata.md` §1.1、§6 W1/W2。
+状態: 作業者（サブエージェント）が決定。PM の決定は含まない。計測と実行は `docs/investigations/indirect-jmp-run.md`。仕様は `docs/investigations/unsupported-inventory-pdata.md` §1.1、§6 W1/W2。
 
 注意: `docs/decisions/0036-a5-oracle-v2.md`（別の担当、未追跡）と番号が重なっている。依頼で指定されたファイル名を使った。
 

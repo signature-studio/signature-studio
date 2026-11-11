@@ -72,7 +72,7 @@
 
 `tables/sizes.tsv`。ネイティブ 6 モジュールは 70,572,928 B。brotli は q11・lgwin 24(size1 の `brsize.mjs` と同じ。バンドルの `.br` はこの値と一致する〔A で確認〕)。
 
-- **ネイティブ 6 モジュールの brotli 合計を私が測ったら 14,494,211 B** だった(FLEngine 5,744,217、dsp 6,397,437、ILTools 945,167、Blend2D 655,292、QFC 482,009、freetype 270,089)。**決定 0155 / performance-targets の『17.6 MB(PM の記録)』と合わない**。17.6 MB の出所は確認できなかった(gzip -9 の合計は 23.5 MB)。この文書の brotli の比は**測った 14.49 MB に対して**書き、17.6 MB に対する比は `tables/sizes.tsv` の別の欄に並べた(A 0.86、B 0.80、C 0.94、D 0.94)。PM の判断点 1。
+- **ネイティブ 6 モジュールの brotli 合計を私が測ったら 14,494,211 B** だった(FLEngine 5,744,217、dsp 6,397,437、ILTools 945,167、Blend2D 655,292、QFC 482,009、freetype 270,089)。**決定 0155 / performance-targets の『17.6 MB(PM の記録)』と合わない**。17.6 MB の出所は確認できなかった(gzip -9 の合計は 23.5 MB)。この文書の brotli の比は**測った 14.49 MB に対して**書き、17.6 MB に対する比は `tables/sizes.tsv` の別の欄に並べた(A 0.86、B 0.80、C 0.94、D 0.94)。未決の点 1。
 - 転送量(バンドル全体、brotli): wasm の .br + `dll.50206405ba5f.flpack.br` 14.4 MB(エンジンがデータとして読む元の DLL 6 個)+ seed 3.3 MB。A 32.8 MB、B 31.8 MB、C 34.3 MB、D 34.3 MB。
 - **S1 は未達**。生の大きさは B で 2.85 倍(最良)。2 倍には C 経路では届かない(決定 0155 §結論)。起動を速くする C・D は B より生で +16%、brotli で +18%。
 

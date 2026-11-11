@@ -1,6 +1,6 @@
 # 0302(仮): DwmGetCompositionTimingInfo の行の差分化(Learn の全メンバ)、基準の更新の一覧、count/limit の見積り(mt3)
 
-状態: **仮**(第 1 報。差分は保留 = push は PM の判断、実スレッド版の結果の後)。作業者 mt3、2026-11-06 JST。依頼: PM(0302)。基準: **E12c = 000091ae**(`git archive 000091ae` = E11 + 0284c + 0284b-on-0284c + 0295 の 2 つの差分)。出発点: alpha1 の 0299 の実験(`docs/investigations/alpha18/tables/0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff`)。区分: **実測**=この作業の出力を見た値、**読み**=資料・コードを読んだ推論、**未確認**。
+状態: **仮**(第 1 報。差分は保留 = push は未決、実スレッド版の結果の後)。作業者 mt3、2026-11-06 JST。依頼: PM(0302)。基準: **E12c = 000091ae**(`git archive 000091ae` = E11 + 0284c + 0284b-on-0284c + 0295 の 2 つの差分)。出発点: alpha1 の 0299 の実験(`docs/investigations/alpha18/tables/0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff`)。区分: **実測**=この作業の出力を見た値、**読み**=資料・コードを読んだ推論、**未確認**。
 
 ## 0. 冒頭の三点(正直さ)
 
@@ -38,7 +38,7 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 
 ### 2.3 仮想 DWM の世界(S-dwm-ti-hz、S-dwm-ti-values)
 
-- 表示は 1 本で、`fle_display_hz()`(DwmFlush が使う値。環境 `FLE_DWM_HZ` か 60。製品ではページが `FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` を同じ値で渡す)。**EnumDisplaySettingsW の dmDisplayFrequency(`fle_display_settings_hz()`)と同じ値**だが、両方を別の値にする既存の設定(`fle_thread.c` が stderr に警告を出す)では、この関数は **DwmFlush の側**(DWM の表示)に従い、dmDisplayFrequency には従わない(**S-dwm-ti-hz**。理由: 同じ呼び出しの中で period と vblank の間隔を矛盾させない。PM の依頼は『dmDisplayFrequency から』だったので、PM の判断で `fle_display_settings_hz()` に替えられる = 1 語。ただし分岐設定では period と DwmFlush の間隔が食い違う)。
+- 表示は 1 本で、`fle_display_hz()`(DwmFlush が使う値。環境 `FLE_DWM_HZ` か 60。製品ではページが `FLE_DWM_HZ` と `FLE_DISPLAYSETTINGS_FREQUENCY` を同じ値で渡す)。**EnumDisplaySettingsW の dmDisplayFrequency(`fle_display_settings_hz()`)と同じ値**だが、両方を別の値にする既存の設定(`fle_thread.c` が stderr に警告を出す)では、この関数は **DwmFlush の側**(DWM の表示)に従い、dmDisplayFrequency には従わない(**S-dwm-ti-hz**。理由: 同じ呼び出しの中で period と vblank の間隔を矛盾させない。PM の依頼は『dmDisplayFrequency から』だったので、未決のまま `fle_display_settings_hz()` に替える場合は 1 語の変更。ただし分岐設定では period と DwmFlush の間隔が食い違う)。
 - vblank k は `ceil(k × 10^7 / hz)` tick。`now` 以前の最後の vblank は `k = floor(now × hz / 10^7)`(`ceil(k × 10^7 / hz) ≤ now ⇔ k ≤ now × hz / 10^7`)。QPC = tick、QPF = 10^7。
 - 時計を読む API として、呼び出しごとに仮想時計を `FLE_CLOCK_READ_TICKS` = 10 tick(1 µs)進める(決定 0017、`S-ds-pos-read-tick` と同じ。これで『この関数だけをポールするループ』が終わる)。
 - 『合成は毎 refresh に 1 回、合成した frame は直ちに submit・confirm・display され、遅れも drop も無く、DirectX の present は無い』(**S-dwm-ti-values**。Learn は各メンバを一行で説明するだけで、GPU の無い仮想機械の値は載せていない)。『valid only after a second call』のメンバと『new』の数は前回の呼び出しからの増分(**S-dwm-ti-delta**、最初の呼び出しは 0)。
@@ -173,7 +173,7 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 | C | atomic add(`i64.atomic.rmw.add`) | 総数は厳密 | lock 付きの RMW。奪い合いの中で 1 回 100 ns 級(A より悪い)。値を使う `count >= limit` の判断も要る | 小さいが **却下**(hot path に最悪) |
 | D | RT の構成では count をやめる(アダプタに count/limit の load/store を出さない) | 診断の数が無くなる(g3 の `progress`、`progress` に依る基準は RT では取り直し) | 最小(1 呼びあたり load 2・store 1 が減る) | アダプタの生成を条件付きに。『唯一の構成』が RT になるなら旗ではなく結果。協調経路を残す間は 2 経路のテストが要る |
 
-**推奨**: 実スレッドを『唯一の構成』にするなら **B**(診断を保ち、奪い合いが無く、命令数が同じ)。D は B よりさらに速いが診断を失う。**判断が要る点**: (1) 協調の経路(`FLE_WORKERS=1` 相当)を残すか(残すなら B の limit は Worker ごとで、疑似 preemption の limit を設定する側は『自分の block』だけを触る)、(2) g3 の `progress` を RT でどう定義するか(各 block の和でよいか)。**E11 の hot path への影響**: B は命令数を変えない。測定は gpu1 の Chrome の A/B(count を TLS にした build と大域の build、同じ音楽位置)が要る(私は build しない)。
+**推奨**: 実スレッドを『唯一の構成』にするなら **B**(診断を保ち、奪い合いが無く、命令数が同じ)。D は B よりさらに速いが診断を失う。**未決の点**: (1) 協調の経路(`FLE_WORKERS=1` 相当)を残すか(残すなら B の limit は Worker ごとで、疑似 preemption の limit を設定する側は『自分の block』だけを触る)、(2) g3 の `progress` を RT でどう定義するか(各 block の和でよいか)。**E11 の hot path への影響**: B は命令数を変えない。測定は gpu1 の Chrome の A/B(count を TLS にした build と大域の build、同じ音楽位置)が要る(私は build しない)。
 
 ## 8. 方針との適合(必須の記載)
 
@@ -184,7 +184,7 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 ## 9. 自己申告(0302 の区間)
 
 - 最初の版は `fle_sys_clock_ticks` / `fle_sys_clock_advance_to` を新しく参照し、`wall_ia1.rs` の DWM の単体 link(`fle_dwm.c` だけを link する)を壊した。`test.sh full` を走らせて初めて分かった(先に `cargo test -p fe-lift --test wall_ia1` を走らせなかった)。`DWM_PRE` に 2 つのスタブを足して直し、全体をもう一度走らせた(最初の走り: 219 results / 2,415 passed / 2 failed、ログは `tables/testfull-run1-before-wall_ia1-fix.log`)。
-- PM の依頼は『dmDisplayFrequency から』だったが、`fle_display_hz()`(DwmFlush の表示)から作った(S-dwm-ti-hz)。理由は書いたが、依頼からの逸脱なので PM の判断で替えられる。
+- PM の依頼は『dmDisplayFrequency から』だったが、`fle_display_hz()`(DwmFlush の表示)から作った(S-dwm-ti-hz)。理由は書いたが、依頼からの逸脱なので、替えるかは未決。
 - g3 の行の動きは alpha1 の実測の引用で、全メンバ版では測っていない(N1 の再構築は、gen3 に common.c が無く、E12c 用の再生成が要るため見送った)。
 - 実 Windows の値は 0 件。Learn の写し(`docs/learn/`)は HTML から機械的に取ったテキストで、ナビゲーションの文字が混ざる。
 - count/limit のマイクロベンチ: 最初の版(不透明な呼び出しなし)は V8 が load/store をループの外に出して 0.6 ns/回になり、意味が無かった(`tables/count-bench/bench-run1.txt`、捨てた run)。呼び出しを足した版(`bench2-run1.txt`)が本体。1 回の run、node の合成で、実エンジンの率ではない。ベンチは私の固定コア(8〜15)の外の 6・7 で 15 秒走らせた(gpu1 の Chrome の窓の終わり近く)。

@@ -57,11 +57,11 @@ NameType はすべて 0（NetBIOS）。25 箇所は 0x2000 TCHAR のバッファ
 ## 選択肢
 
 - A. 採用（上）。
-- B. NameType 2、6（DNS ドメイン）に空文字列と成功、3、7 にホスト名だけの完全修飾名を返す: **不採用**。ドメイン未参加の機械が何を返すかを Learn は書かない（"If the local computer is not configured to use DNS names, GetComputerNameEx will not return DNS information" は失敗か空かを言わない）。FLEngine は NameType 0 しか使わないので、答えなくても進捗に差が無い。PM が決められる（PM の判断の点 2）。
+- B. NameType 2、6（DNS ドメイン）に空文字列と成功、3、7 にホスト名だけの完全修飾名を返す: **不採用**。ドメイン未参加の機械が何を返すかを Learn は書かない（"If the local computer is not configured to use DNS names, GetComputerNameEx will not return DNS information" は失敗か空かを言わない）。FLEngine は NameType 0 しか使わないので、答えなくても進捗に差が無い。PM が決められる（PM の未決の点 2）。
 - C. 失敗を返して「名前が無い」と言う: **不採用**。25 箇所は戻り値を見ずバッファを読み、**直前の AppData のパスをコンピュータ名として読む**ことになる。実機の Windows 10 でこの API が常に成功することとも合わない。
 - D. VerQueryValueW に 0 を返す: **不採用**（Learn の "or the specified resource is not valid, the return value is zero" を使って「ゲストの自作の block」も無効と言うことになる。FLEngine の 4 箇所は GetFileVersionInfoW の成功を条件にしているので、停止は実害がない）。
 - E. GetFileVersionInfoW のホストのファイルの版情報を返す: **不採用**（依頼の方針。ホストの実ファイルを見せない）。
-- F. 5 つ（DestroyWindow ほか）にも名前付き停止の行を今足す: **今回は足さない**（PM の判断の点 4）。それぞれが窓・メッセージキュー・スレッド・クリップボードのレーンの前提で、census では呼ばれていない。足す場合の機械的な変更は `api-table.md` §3 の末尾。
+- F. 5 つ（DestroyWindow ほか）にも名前付き停止の行を今足す: **今回は足さない**（PM の未決の点 4）。それぞれが窓・メッセージキュー・スレッド・クリップボードのレーンの前提で、census では呼ばれていない。足す場合の機械的な変更は `api-table.md` §3 の末尾。
 
 ## 範囲
 
@@ -191,7 +191,7 @@ unit 830（proc `f_10d50d0`）と unit 880（proc `f_1263540`）の**静的な�
 | 1 | コンピュータ名の値・形・大文字小文字 | `DESKTOP-0000001`、DNS ホスト名と同じ大文字 | 別の固定値（形は 15 文字以内、大文字・数字・ハイフン、数字だけは不可）、DNS ホスト名を小文字にする。名前から機械識別子を作るゲストの出力が決定的になる（毎回同じ）ことは副作用 |
 | 2 | NameType 2、3、6、7（ドメイン、完全修飾名） | 名前付き停止 | 空文字列＋成功（ドメイン無し）、完全修飾名＝ホスト名。実機の挙動の確認が先（Learn は書かない）。FLEngine は NameType 0 しか使わない |
 | 3 | GetUserNameW と GetComputerNameExA の行 | 足した（最後の 2 行。どのモジュールも import しない） | 外す（−2 行。`wall_e1.rs` の `E1_ROWS` と 2 つのテストを直す） |
-| 4 | 5 つ（DestroyWindow、GetWindowLongPtrW、PostMessageW、ResumeThread、SetClipboardData）と EnumSystemLocalesW | 行を足さない（レーンに任せる） | 名前付き停止の行を今足す（−1 thunk／行）。EnumSystemLocalesW は「サポートするロケールは 1 つ」と答えるか（IsValidLocale と整合）の判断が要る |
+| 4 | 5 つ（DestroyWindow、GetWindowLongPtrW、PostMessageW、ResumeThread、SetClipboardData）と EnumSystemLocalesW | 行を足さない（レーンに任せる） | 名前付き停止の行を今足す（−1 thunk／行）。EnumSystemLocalesW は「サポートするロケールは 1 つ」と答えるか（IsValidLocale と整合）は未決 |
 | 5 | GetFileVersionInfoW の失敗コード、VerQueryValueW を必ず停止 | 決定 0098 と同じ 2／3、停止 | VerQueryValueW に 0 を返す（不採用の理由は選択肢 D） |
 | 6 | 実機の測定 | しない | Windows 10 の実機で NameType 0〜8 の戻り値・小さいバッファ・GetFileVersionInfoW の存在しないパスの GetLastError を測れれば、S5、S7、点 2 が閉じる |
 

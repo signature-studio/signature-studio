@@ -78,7 +78,7 @@ A2 は 2 つに分ける。
 | 判定コマンドと数値 | 生成 C の `unsupported_total` から IAT 経由 jmp を除いた数が 0（現在 44 = 命令 43 + jmp 1）。`grep -c fle_unsupported OUT.c` も同じ数を出す | 閉包の IAT thunk 557 のうち、実行で踏まれるものが 0 件の応答なし。応答は `imports_table.rs` の TABLE（201 行）と `runtime/fle_*.c` が持つ |
 | 現在の状態 | **未達（部分）**。x87 と大半の命令、解決可能な間接 jmp は完了（stub 0）。ただし 44 か所が残る | **未達**。557 thunk、536 API、23 DLL に応答が無い |
 | 根拠と出典 | 上の表（実測）。x87: `x87-trans-run.md`。間接 jmp: `indirect-jmp-run.md`（62 → 1） | 実測: user32 221 thunk（209 API）、gdi32 129（126）、kernel32 58（55）、comctl32 31（30）、shell32 24（22）、ole32 19、wininet 15、msacm32 14、winmm 13、crypt32 7、他。分類と実装単位 W0〜W12 は `unsupported-inventory-pdata.md` §2〜§6（推測を含む） |
-| 未確認・限界 | 44 か所のうち、InitTable とエントリの直接閉包（U、6,297 関数）に入るのは Xgetbv などごく一部（`unsupported-inventory-pdata.md` §2.5、§4。生成 C が古い時点の測定で、再計測していない）。Xgetbv は CPUID ECX=0 で守られているとされる（0032、未検証） | 実行で踏まれる thunk の数は未測定（静的閉包は過大見積もり。`unsupported-inventory-pdata.md` §4.1）。遅延 import の 27 API（9 DLL）は仮想モジュール表に無い DLL で、M2 の判断が要る。「仕様確認済み」の判定には、仮の決定（A4 の表）が入る |
+| 未確認・限界 | 44 か所のうち、InitTable とエントリの直接閉包（U、6,297 関数）に入るのは Xgetbv などごく一部（`unsupported-inventory-pdata.md` §2.5、§4。生成 C が古い時点の測定で、再計測していない）。Xgetbv は CPUID ECX=0 で守られているとされる（0032、未検証） | 実行で踏まれる thunk の数は未測定（静的閉包は過大見積もり。`unsupported-inventory-pdata.md` §4.1）。遅延 import の 27 API（9 DLL）は仮想モジュール表に無い DLL で、M2 で未決。「仕様確認済み」の判定には、仮の決定（A4 の表）が入る |
 
 ## 4. A3 wasm
 
@@ -182,7 +182,7 @@ M1 完了（A2 + A4 + A5 + A6）は**未達**。
 
 **A2a**（生成 C の `unsupported_total` から IAT 経由 jmp を除いた数が 0）: 現在 534 − 533 = **1**（解決不能 jmp）。命令 stub は 0 になった。判定: **未達（部分）**。残る 1 か所は `f_4126f0` の `jmp [rcx]`（setjmp/longjmp 風、呼び出し元は終了またはエラー経路に見える。**推測**、`unsupported-inventory-pdata.md` §6 W3）。
 
-- **Xgetbv の扱い**: Xgetbv は生成 C で `fle_xgetbv_stop`（名前付きの停止。`runtime/fle_cpuid.c`）として出力され、`unsupported_total` と `fle_unsupported` の計数には**含まれない**（`gen-pdata.txt` の `handled` に `xgetbv_stop 1`）。0047 は「A2a の判定にこの除外を使うかは PM が決める」と書いた。**本書は、Xgetbv を『命令 stub 0』の数に含めない扱い（= 0 件）で現在の数字を書いたが、その除外が A2a の定義に合うかは PM の判断である**。根拠（0047 §5）: SDM は XCR0 の値を決めない（値を返す実装を作れない）、ランタイムの CPUID が OSXSAVE を主張しないので `xgetbv` の手前の分岐を必ず通らせない（単体実行で確認）、到達すれば命令と VA を名前に出して止まる。ただし、harness の実行でこの経路が実際に実行されるかは確認していない。除外を認めない場合、A2a の「命令 stub」は 1（Xgetbv）で、判定は同じく未達である。
+- **Xgetbv の扱い**: Xgetbv は生成 C で `fle_xgetbv_stop`（名前付きの停止。`runtime/fle_cpuid.c`）として出力され、`unsupported_total` と `fle_unsupported` の計数には**含まれない**（`gen-pdata.txt` の `handled` に `xgetbv_stop 1`）。0047 は「A2a の判定にこの除外を使うかは PM が決める」と書いた。**本書は、Xgetbv を『命令 stub 0』の数に含めない扱い（= 0 件）で現在の数字を書いたが、その除外が A2a の定義に合うかは未決である**。根拠（0047 §5）: SDM は XCR0 の値を決めない（値を返す実装を作れない）、ランタイムの CPUID が OSXSAVE を主張しないので `xgetbv` の手前の分岐を必ず通らせない（単体実行で確認）、到達すれば命令と VA を名前に出して止まる。ただし、harness の実行でこの経路が実際に実行されるかは確認していない。除外を認めない場合、A2a の「命令 stub」は 1（Xgetbv）で、判定は同じく未達である。
 - 0046 の A2a の「解決不能な間接 jmp が 0」は満たしていない（1 か所）。したがって A2a が**達成**になる日は、この 1 か所の扱い（W3）が決まるまで来ない。
 
 **A2b**（閉包の IAT thunk のうち、実行で踏まれるものが全て仕様確認済みの応答を持つ）: 応答の無い IAT thunk は **533 thunk、514 API、23 DLL**（0046 の時点は 557 thunk、536 API）。判定: **未達**。
