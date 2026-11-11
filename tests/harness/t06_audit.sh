@@ -59,7 +59,7 @@ python3 - "$db" << 'PY'
 import json, sqlite3, sys
 db = sqlite3.connect(sys.argv[1])
 db.executescript("""
-create table session_v2 (id text primary key, parent_id text, cost real default 0);
+create table session_v2 (id text primary key, parent_id text, cost real default 0, time_created integer not null default 0);
 create table session_message (id text primary key, session_id text not null, type text not null, seq integer not null, time_created integer not null, time_updated integer not null, data text not null);
 """)
 SON = {"providerID": "console-cloudflare-ai-gateway-custom", "id": "claude-sonnet-5-5"}
@@ -72,10 +72,10 @@ def msg(sid, typ, t, data):
     db.execute("insert into session_message values (?,?,?,?,?,?,?)", ("msg_%d" % n[0], sid, typ, n[0], t, t, json.dumps(data)))
 def asst(sid, t, model, tools=()):
     msg(sid, "assistant", t, {"model": model, "content": [{"type": "tool", "name": nm, "state": {"status": "completed", "input": inp}} for nm, inp in tools]})
-db.execute("insert into session_v2 values ('ses_MAIN',null,0)")
-db.execute("insert into session_v2 values ('ses_KID1','ses_MAIN',0)")
-db.execute("insert into session_v2 values ('ses_KID2','ses_MAIN',0)")
-db.execute("insert into session_v2 values ('ses_OTHER',null,0)")
+db.execute("insert into session_v2 values ('ses_MAIN',null,0,?)", (T0,))
+db.execute("insert into session_v2 values ('ses_KID1','ses_MAIN',0,?)", (T0,))
+db.execute("insert into session_v2 values ('ses_KID2','ses_MAIN',0,?)", (T0 + 2 * 3600_000,))
+db.execute("insert into session_v2 values ('ses_OTHER',null,0,?)", (T0,))
 asst("ses_MAIN", T0, SON, [("read", {"path": "x"})])
 asst("ses_MAIN", T0 + 60_000, SON, [("subagent", {"agent": "worker", "prompt": "p"}), ("subagent", {"agent": "worker", "prompt": "q", "model": "x/y"})])
 asst("ses_MAIN", T0 + 120_000, HAI, [("edit", {"path": "a"}), ("write", {"path": "b"}), ("shell", {"command": "env sleep 1"}), ("shell", {"command": "opencode auth export"})])
@@ -140,5 +140,44 @@ open(p, "w").write(s)
 PY
 out=$(HOME="$home" bash "$repo/scripts/audit-session.sh" ses_MAIN 2>&1)
 expect_contains "the main pin is read from the copy's opencode.jsonc (agents.build.model)" "$out" "main=console-cloudflare-ai-gateway-custom/claude-haiku-5-5"
+
+# --since (JST): the children by creation time, the main session's rows by message time. T0 is the first row; ses_KID1 was created at T0, ses_KID2 at T0 + 2 h.
+since_of() { python3 -c 'import sys; from datetime import datetime, timedelta, timezone; print((datetime.fromtimestamp(int(sys.argv[1]) / 1000, timezone.utc) + timedelta(hours=9)).strftime("%Y-%m-%d %H:%M"))' "$1"; }
+sec_of() { awk -v s="$2" 'index($0, s) == 1 {on=1; next} on && /^## / {exit} on {print}' <<< "$1"; }
+t_early=$(since_of $((1800000000000 - 3600000)))
+t_mid=$(since_of $((1800000000000 + 3600000)))
+t_late=$(since_of $((1800000000000 + 36000000)))
+expect_eq "--since: the test times are the JST minutes we expect" "2027-01-15 16:00 2027-01-15 18:00 2027-01-16 03:00" "$t_early $t_mid $t_late"
+early_out=$(run ses_MAIN --since "$t_early"); rc=$?
+expect_eq "--since before every row: exit 0" 0 "$rc"
+if [ "$(run ses_MAIN)" = "$(grep -v '^# since' <<< "$early_out")" ]; then pass "--since before every row: the output equals the one without --since (apart from the since line)"; else fail "--since before every row: the output differs from the one without --since"; fi
+mid_out=$(run --since "$t_mid" ses_MAIN); rc=$?
+expect_eq "--since after the first child (the option may come before the id): exit 0" 0 "$rc"
+expect_contains "--since after the first child: only the later child is counted" "$mid_out" "(children: 1)"
+expect_contains "--since prints the window in the header" "$mid_out" "# since (JST): $t_mid"
+expect_eq "--since: the main session's model switch (at T0 + 110 s) is not counted" "0" "$(sec_of "$mid_out" '## 1. main' | awk 'NR==3 {print $1}')"
+expect_eq "--since: the later child's switch is counted (1 row, 1 child)" "1 1" "$(sec_of "$mid_out" '## 1c' | awk 'NR==3 {print $1" "$2}')"
+expect_not_contains "--since: the earlier child (on Haiku) has no rows in section 2" "$(sec_of "$mid_out" '## 2.')" "claude-haiku-5-5"
+expect_contains "--since: the later child's Sonnet row is in section 2" "$(sec_of "$mid_out" '## 2.')" "child  console-cloudflare-ai-gateway-custom/claude-sonnet-5-5"
+expect_eq "--since: the later child's Sonnet row is off the pin (1)" "1" "$(sec_of "$mid_out" '## 5.' | awk '$1=="child" && $2 ~ /sonnet/ {print $3}')"
+expect_eq "--since: the main session's direct work after the window is 0" "0" "$(sec_of "$mid_out" '## 3b' | awk 'NR==3 {print $1}')"
+expect_eq "--since: the main session's subagent calls after the window are 0" "0 0" "$(sec_of "$mid_out" '## 6.' | awk 'NR==3 {print $1" "$2}')"
+expect_eq "--since: gaps are counted only inside the window (none)" "0" "$(sec_of "$mid_out" '## 4. gaps' | awk 'NR==3 {print $1}')"
+late_out=$(run ses_MAIN --since "$t_late"); rc=$?
+expect_eq "--since after every row: exit 0" 0 "$rc"
+expect_contains "--since after every row: no child is counted" "$late_out" "(children: 0)"
+expect_eq "--since after every row: section 2 has no assistant rows" "0" "$(sec_of "$late_out" '## 2.' | awk 'NR>2 && NF' | wc -l | tr -d ' ')"
+for bad in "2026-11-10" "2026-11-10 04:48:00" "2026/11/10 04:48" "2026-13-01 00:00" "2026-02-30 00:00" "garbage" "" "2026-11-10 4:48"; do
+  err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "$bad" 2>&1 > /dev/null); rc=$?
+  expect_eq "--since '$bad' exits 2" 2 "$rc"
+  expect_eq "--since '$bad' writes one line to stderr" 1 "$(printf '%s\n' "$err" | wc -l | tr -d ' ')"
+done
+err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since 2>&1 > /dev/null); rc=$?
+expect_eq "--since without a value exits 2" 2 "$rc"; expect_contains "and says so in Japanese" "$err" "--since"
+err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "2026-02-30 00:00" 2>&1 > /dev/null)
+expect_contains "a date that does not exist is named as such" "$err" "存在しません"
+err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "2026-11-10" 2>&1 > /dev/null)
+expect_contains "a wrong format is named as such" "$err" "書式が不正"
+expect_eq "--since: the database file is still byte-identical after these runs (read-only)" "$before" "$(md5sum "$db" | cut -d' ' -f1)"
 
 finish
