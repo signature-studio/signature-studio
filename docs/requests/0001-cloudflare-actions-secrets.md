@@ -67,7 +67,7 @@ failed to get variables: HTTP 403: Resource not accessible by integration (https
 Exited with code 1
 ```
 
-[文書] 旧 CI の記録(0217。この票の実測ではない): Workers Scripts: Edit だけで Worker の deploy は通った。バケット限定の R2 トークンは `wrangler r2 object put` が 403、S3 API では書けた。
+[文書] 旧 CI の記録(0217。この Issue の実測ではない): Workers Scripts: Edit だけで Worker の deploy は通った。バケット限定の R2 トークンは `wrangler r2 object put` が 403、S3 API では書けた。
 
 ### 完了の確認コマンド
 
