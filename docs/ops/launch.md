@@ -1,6 +1,6 @@
 # 起動の手順と決定事項(依頼者向け)
 
-この文書の対象は、後任者を起動する人。**依頼者が起動前に済ませる必要がある物は無い。** 後任者は、起動後に Issue(`docs/requests/`)で必要な物を頼み、依頼に依存しない作業を続ける。
+この文書の対象は、後任者を起動する人。**依頼者の権限でしかできない作業(Cloudflare の登録・トークンの発行など)は、起動前に残っていない。起動に要るのは、下の表の手順 1〜6 の操作だけ。** 後任者は、起動後に Issue(`docs/requests/`)で必要な物を頼み、依頼に依存しない作業を続ける。
 設定の仕組み(`scripts/`、`opencode.jsonc`、拡張機能、自動の検査)は作成済み。この文書は、その名前を前提にしている。
 
 ## 1 起動の手順(依頼者が実行)
@@ -10,7 +10,7 @@
 | 1 | リポジトリを最新にする(`~/work/signature-studio`) | `cd ~/work/signature-studio && git log --oneline -3` | 設定と規約のコミットがある |
 | 2 | 設定の仕組みを整える(アカウント・自動の検査) | `scripts/setup-repo.sh` | `git config --local user.name` が出る。`git config core.hooksPath` が出る |
 | 3 | モデルの構成を選ぶ(既定は `split`) | `scripts/set-model-profile.sh split`(全 Haiku なら `haiku`) | 出力が選択を示す |
-| 4 | 起動前の検査 | `opencode debug agents` でモデルの割り当てを確認。`scripts/preflight.sh` | 割り当ての名前は `build`・`worker`・`reviewer`(コマンドの表示のまま)。`scripts/preflight.sh` の結果に FAIL の行が無い |
+| 4 | 起動前の検査 | `opencode debug agents` でモデルの割り当てを確認。`scripts/preflight.sh` | 割り当ての名前は `build`・`compaction`・`reviewer`・`summary`・`title`・`worker`(コマンドの表示のまま。`scripts/preflight.sh` の agents 行と同じ 6 つ)。`scripts/preflight.sh` の結果に FAIL の行が無い |
 | 5 | goal-nudge を有効化 | `systemctl --user daemon-reload` → `systemctl --user enable --now goal-nudge.timer`。登録簿(`~/.config/opencode/goal-nudge.sessions`)には `scripts/launch.sh` が起動後の ID を追加する | `systemctl --user list-timers goal-nudge.timer` に NEXT が出る |
 | 6 | 起動 | `scripts/launch.sh`(preflight → メインセッション作成 → goal-nudge の登録簿へ追加 → `prompts/START.md` を送る → `/goal` を設定) | 出力に新しいセッション ID。`opencode api session.active` に出る |
 | 7 | 最初の確認(起動後 10 分) | `opencode api session.active`、`scripts/audit-session.sh <ID>` | 稼働中のサブエージェント(作業用)が 1 本以上。メインセッションがファイルを編集した件数が 0 |
@@ -32,11 +32,11 @@
 | P7 | 依頼の区分と一覧の文書は廃止。依頼は Issue(`docs/requests/`)へ |
 | P8 | 起動前の自動確認(`scripts/preflight.sh`)の表の行の名前: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan consistency goal goal-nudge` |
 
-## 3 後任者が起動後に Issue で頼むと予想される物
+## 3 後任者が Issue で頼んだ物・頼むと予想される物
 
 | 依頼 | 理由 | 参照 |
 |---|---|---|
-| GitHub Actions で使う Secrets の登録(Cloudflare の API トークン、R2 の S3 キー) | 配信を GitHub Actions で行う設計(作業計画〔`docs/ROADMAP.md`〕の配信の項目)。トークンの発行と登録は依頼者の権限(P3) | `docs/requests/`(起票済みの Issue の一覧と状態) |
+| GitHub Actions で使う Secrets の登録(Cloudflare の API トークン、R2 の S3 キー) | 配信を GitHub Actions で行う設計(作業計画〔`docs/ROADMAP.md`〕の配信の項目)。トークンの発行と登録は依頼者の権限(P3)。**完了**(2026-11-12 に依頼者が登録し、Issue 1 を閉じた) | `docs/requests/0001-cloudflare-actions-secrets.md`(状態: 完了) |
 | Access・DNS・custom domain の変更(新ホストが要る場合のみ) | 後任者は Cloudflare を実行しない(P4) | 同上 |
 | 実機・依頼者機の計測(P5) | headless では代替できない | 同上 |
 
@@ -48,7 +48,7 @@
 | H | モデルの既定は、メインセッションが Sonnet 5.5、サブエージェント(作業用・検証用)が Haiku 5.5 | `scripts/set-model-profile.sh haiku` を依頼者が実行 |
 | I | goal-nudge は、人の Esc で止まっても最長 1 分後に再開する | timer を止める(§1 の 5) |
 
-- `docs/archive/` は、近く Git に入れる方針に変わった。Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` の `docs/archive/*` の 2 行は、入れる作業のコミットで外す。
+- `docs/archive/` は、Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` に `docs/archive/` の除外は無い。追跡されているファイルは 880 件(`git ls-files docs/archive | wc -l`)。
 
 ## 5 登録簿との関係
 
