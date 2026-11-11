@@ -1,3 +1,4 @@
+# vars の値は公開ログに出る。ここでは使わない。アカウント ID は実行時に得て、すぐ伏せる。
 name: cloudflare-check
 
 on:
@@ -12,41 +13,53 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - name: 0 アカウント ID を伏せる
-        run: |
-          if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::add-mask::$CLOUDFLARE_ACCOUNT_ID"
-          fi
-
       - name: リポジトリを取得する
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: 1 アカウント ID の設定を確かめる(値は出さない)
+      - name: 1 アカウント ID を実行時に得て、すぐ伏せる
         id: acct
         continue-on-error: true
         env:
-          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          if [ -z "$ACCOUNT_ID" ]; then
-            echo "アカウント ID の設定: なし"
+          WR=app/node_modules/.bin/wrangler
+          if ! npm ci --prefix app --ignore-scripts --no-audit --no-fund > npm-ci.log 2>&1; then
+            echo "依存関係の準備: 失敗"
+          fi
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts > accounts.json 2>/dev/null || true
+          python3 -c 'import json; d=json.load(open("accounts.json")); [print(a["id"]) for a in d.get("result", [])]' > ids.txt 2>/dev/null || true
+          grep -E '^[0-9a-f]{32}$' ids.txt 2>/dev/null | sort -u > cand.txt || true
+          if [ "$(wc -l < cand.txt | tr -d ' ')" -ne 1 ]; then
+            "$WR" whoami > who.txt 2>&1 || true
+            grep -oE '(^|[^0-9a-f])[0-9a-f]{32}([^0-9a-f]|$)' who.txt 2>/dev/null | grep -oE '[0-9a-f]{32}' | sort -u > cand.txt || true
+          fi
+          n=$(wc -l < cand.txt | tr -d ' ')
+          if [ "$n" -ne 1 ]; then
+            echo "アカウント ID を 1 つに決められない(件数: $n)"
             exit 1
           fi
-          echo "アカウント ID の設定: あり"
+          id=$(cat cand.txt)
+          echo "::add-mask::$id"
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+          echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
 
       - name: 2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)
         id: token
         continue-on-error: true
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          WR=app/node_modules/.bin/wrangler
+          if [ ! -x "$WR" ]; then
+            echo "wrangler が無い(依存関係の準備が失敗)"
             exit 1
           fi
           mask() {
@@ -55,12 +68,6 @@ jobs:
               -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[メール伏せ]/g' \
               -e 's/[A-Za-z0-9.-]+\.workers\.dev/[ホスト伏せ]/g'
           }
-          if ! npm ci --prefix app --ignore-scripts --no-audit --no-fund > npm-ci.log 2>&1; then
-            echo "依存関係の準備: 失敗"
-            mask < npm-ci.log | tail -n 20
-            exit 1
-          fi
-          WR=app/node_modules/.bin/wrangler
           echo "wrangler の版: $(node -p "require('./app/node_modules/wrangler/package.json').version")"
           if "$WR" whoami > /dev/null 2>&1; then
             echo "wrangler whoami(参考): 成功"
@@ -81,7 +88,6 @@ jobs:
         id: r2_artifact
         continue-on-error: true
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
         run: |
@@ -108,7 +114,6 @@ jobs:
         id: r2_cache_assets
         continue-on-error: true
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         run: |
@@ -151,7 +156,7 @@ jobs:
           }
           echo "| 確認 | 結果 |"
           echo "|---|---|"
-          line "1 アカウント ID の設定" "$R_ACCT"
+          line "1 アカウント ID を実行時に得た" "$R_ACCT"
           line "2 API トークン(Worker fl-studio-web の一覧)" "$R_TOKEN"
           line "3a R2 のキー 1 組目(fl-web-artifacts の読み取り)" "$R_ART"
           line "3b R2 のキー 2 組目(fl-web-cache・fl-web-assets の読み取り)" "$R_CACHE"
