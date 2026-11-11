@@ -15,6 +15,8 @@ bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中�
 | `t06_audit.sh` | `audit-session.sh`: **前任のセッションに対する出力が前回の実測と完全一致**(`expected/audit-prev-session.txt`)。合成 DB で固定外モデル・禁止形のコマンド・DB を書かないこと。`--since "YYYY-MM-DD HH:MM"`(JST)で子を作成時刻で絞る(前後で分けて数える) | 実行(実 DB は読み取りのみ) |
 | `t07_preflight.sh` | `preflight.sh` の各行(OK/WARN/FAIL)、**403 は WARN で FAIL にしない**(案内は作業ディレクトリ・`gh auth status`・`docs/ops/requests.md`)、`repo-api` は既定ブランチだけを取り、公開範囲・permissions を出さない、**wrangler を呼ばない**(呼べば記録して失敗する罠の偽物で確かめる)、トークン・アカウント ID・メールを出さない、`~/.config/opencode/` の他のファイルを読まない | 実行(偽の `gh`・`wrangler` の罠・`git push`・`opencode`・`df`) |
 | `t08_scripts.sh` | `set-model-profile.sh`(split⇄haiku の往復がバイト単位で元に戻る。コメント維持。実物の resolver の答えが合わなければ元に戻す。セッション内では書かない)、`launch.sh`(偽の opencode だけ。順序・モデルが `opencode.jsonc` と同じ・登録簿の重複なし・失敗時に何が残るか)、`env.sh` | 実行(偽の opencode、`HOME` を差し替え) |
+| `t10_consistency.sh` | `scripts/check-consistency.sh` を合成の文書(偽の木)で確かめる。**検出する**: 存在しないパス(バッククォート・リンク)、`docs/index.md` に載っていない `docs/core`・`docs/ops` の文書、README の表に載っていないテスト、どの文書にも載っていない `scripts/`、150 行の AGENTS.md。**検出しない**: 旧資料(`docs/archive`・`lift/`)のパス、他の場所を名指す行、作成予定の出力、コマンドの引数、裸の名前、ROADMAP の todo 行 | 実行 |
+| `t09_provider.sh` | `set-model-profile.sh --provider gateway\|bedrock`(モデルの設定を切り替える。文字列は部品から組む)と、`preflight.sh` の agents 行(ローカルの上書きつき)。偽の opencode で確かめる | 実行 |
 
 `shell-cases.tsv` は `shell-cases.src` から `lib/gen-shell-cases.ts` が作る(bun と opencode のソースの clone が要る)。テストの実行時に clone があれば、最新かどうかも確かめる。
 

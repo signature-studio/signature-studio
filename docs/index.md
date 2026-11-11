@@ -12,6 +12,15 @@
 | `ops/successor-risks.md` | 後任者が陥る型の表(依頼者の発言が指した失敗を、後任者の言葉で。起動直後に読む) |
 | `ops/intent.md` | 依頼者の指示の読み方(字義どおりに読まない。依頼者への確認はしない) |
 | `ops/requests.md` | Issue の規則(依頼者に頼むのは責任範囲外の物だけ。いつ出すか・必須項目・出し方) |
+| `ops/authority.md` | 責任範囲と能力表(何を自分でやり、何を Issue で頼むか) |
+| `ops/environment.md` | この機械の能力の事実表(道具・資源・GitHub の状態。値は確認コマンドで取り直す) |
+| `ops/launch.md` | 起動前の確認項目と起動手順(依頼者が端末から実行する) |
+| `ops/dangerous-ops.md` | 危険操作の規則(取り消せない操作、認証情報、期限つきの予告) |
+| `ops/dictionary.md` | 依頼者の発言の型と応答の対応 |
+| `ops/honesty.md` | 進捗の誠実性(代役・モック・推測を進捗にしない。完了の宣言の条件) |
+| `ops/fidelity-and-performance.md` | lift の忠実性・性能・オプションの規則 |
+| `ops/reporting.md` | 依頼者への報告の形式 |
+| `ops/roles-and-loop.md` | 役割(main・worker・reviewer)と作業の回し方 |
 | `requests/` | Issue(`NNNN-<slug>.md`)と雛形 `TEMPLATE.md`。依頼の一覧と状態 |
 | `core/` | 技術文書 7 ページ(各 100 行以内。旧資料の要点。区分つき) |
 | `decisions/` | 新しい決定(0346〜。1 本 1 ページ)。書き方は `decisions/README.md` |

@@ -30,7 +30,7 @@
 | P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。Issue で依頼者に計測を頼む。依頼の返りを待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
 | P6 | 作業の場: このマシンのリポジトリ。重い実行(ビルド・測定・並列のサブエージェント)は GitHub Actions を使う想定 |
 | P7 | 依頼の区分と一覧の文書は廃止。依頼は Issue(`docs/requests/`)へ |
-| P8 | 起動前の自動確認(`scripts/preflight.sh`)の表の行の名前: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan goal goal-nudge` |
+| P8 | 起動前の自動確認(`scripts/preflight.sh`)の表の行の名前: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan consistency goal goal-nudge` |
 
 ## 3 後任者が起動後に Issue で頼むと予想される物
 
