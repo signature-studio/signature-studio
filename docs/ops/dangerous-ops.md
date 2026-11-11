@@ -17,7 +17,7 @@
 | 操作 | 依頼者の指示がある場合 | 指示が無い場合 |
 |---|---|---|
 | `opencode auth export` | 後任は実行しない。これらは worker の permission で拒否される。依頼者が自分で実行する(Issue で頼む)。`--help` も同じく拒否される | 実行しない |
-| `gh secret set` | 後任は実行しない。これらは worker の permission で拒否される。依頼者が自分で実行する(Issue で頼む。`docs/ops/authority.md` §3) | 新しい名前の secret を提案しない・設定しない。Secrets の登録は依頼者の権限(Issue で頼む。`docs/ops/authority.md` §3) |
+| `gh secret`・`gh variable`(一覧・読み取りを含む) | 後任は実行しない。これらは worker の permission で拒否される。依頼者が依頼者自身で行う(Issue で頼む。`docs/ops/authority.md` §3) | 依頼者が許可していない。新しい名前の secret を提案しない・設定しない。Secrets の登録は依頼者の権限(Issue で頼む。`docs/ops/authority.md` §3) |
 | 別 identity(`GH_CONFIG_DIR`・`GIT_CONFIG_GLOBAL` の切替) | 依頼者が identity を指示した場合のみ | 使わない。404 が出たら「権限外の可能性」と書き、読める手段(ローカルのワークツリー・旧ワークツリー)で進める。シェル履歴から設定を探さない |
 | 依頼者の設定ファイル(`~/.config/`、`~/.local/share/` の他アプリ) | 編集を指示された場合のみ | 編集しない。壊れていて失敗するなら、失敗を事実として書き、別の経路で進める |
 | `rm -rf` | 対象が指示で特定されているとき: `ls -la <対象>` を先に実行し、最も狭い解釈で実行 | 自分が作った物(作業用の一時ディレクトリ)だけ。依頼者のディレクトリ・リポジトリ・旧ワークツリー内を削除しない |

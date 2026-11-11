@@ -21,6 +21,7 @@
 - sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。長い処理は shell の `background: true`。
 - 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。
+- Secrets・Variables を、読む(一覧も含む)・書く・消す・API で読まない(`gh secret`・`gh variable`・`gh api` の `secrets`・`variables`)。依頼者が許可していない。
 - `git push` は通常の `git push origin main` のみ(force 系・`gh api` による contents の PUT・ref の更新・別 identity は不可)。commit したら push する(scan 通過後)。`git ls-remote origin main` で届いたことを確かめる。リポジトリは PUBLIC で意図的。公開を理由に止めない。「push できない」と書くときは、リポジトリのディレクトリで実行した `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` の出力を貼る。commit の前に `scripts/scan-forbidden.sh <変更したファイル>` を通す。
 - ワークツリーが要るときは `gwq add <branch>` を使う。`git worktree add` を直接使わない。`~/work` 直下にワークツリーを作らない。
 - `wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。Cloudflare の確認・変更が要るなら Issue(`docs/ops/requests.md`)を出す。

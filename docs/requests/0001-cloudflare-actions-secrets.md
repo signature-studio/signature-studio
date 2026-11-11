@@ -57,6 +57,8 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 
 ### 自分で試した記録
 
+注: 以下の確認は、依頼者の許可を得ずに実行した。以後、エージェントは Secrets と Variables を一覧も含めて確認しない。
+
 実測 2026-11-10。リポジトリのディレクトリで実行。作業用のアカウントは `gh auth status` の active account(名前は書かない)。
 
 ```
@@ -71,12 +73,12 @@ Exited with code 1
 
 ### 完了の確認コマンド
 
-```
-gh secret list                                        → 5 名(上の Secrets の名前と一致)
-gh run list --workflow cloudflare-check.yml --limit 1 → success(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)
-```
+確認は次の 2 つで行う。
 
-注: `gh variable list` は作業用のアカウントでは 403 になる(2026-11-10 の実測)。そのため Variable の有無は一覧では見られない。上の実行結果で確かめる。
+- 依頼者の連絡(Issue を閉じること)。
+- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)。
+
+エージェントは Secrets と Variables の中身も一覧も確認しない。
 
 ### 依頼なしで続ける作業
 
@@ -85,4 +87,5 @@ R0 の全行、R1〜R3、R4-2〜R4-4、R5 の測定系(Actions を使わない�
 ### 確認の記録
 
 2026-11-10: Issue を作成(Issue 1)
+2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 は閉じた状態(この確認で `gh issue list --state all` が CLOSED を返した。閉じる操作は、この記録の作業では行っていない)。エージェントは Secrets と Variables を確認していない。
 (確認後に追記: 日付・コマンドの出力 1 行)

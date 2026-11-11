@@ -30,7 +30,7 @@
 ## 例
 | 件名 | 良い依頼の内容 |
 |---|---|
-| Secrets の登録 | 対象: Cloudflare の Worker `<Worker名>` 向けのトークンを Secret `<SECRET名>` に登録。理由: トークンの発行と Secrets の登録は依頼者の権限。影響: Secret 1 件の追加のみ。最小の権限(対象バケットの読み書き)。確認: `gh secret list` に `<SECRET名>` が 1 件 |
+| Secrets の登録 | 対象: Cloudflare の Worker `<Worker名>` 向けのトークンを Secret `<SECRET名>` に登録。理由: トークンの発行と Secrets の登録は依頼者の権限。影響: Secret 1 件の追加のみ。最小の権限(対象バケットの読み書き)。確認: 依頼者の連絡。Secrets と Variables の中身も一覧も、エージェントは確認しない |
 | 依頼者機での計測 | 対象: 依頼者の Windows 機とブラウザ、所定プロジェクト(`~/ダウンロード/serina1-serum2.zip`)。理由: 120 fps と音切れは実機でしか測れない。手順: `<計測手順のパス>` を読み取りのみで実行し、返された結果ファイルを `docs/evidence/` に置く。確認: `grep -c 'fps' <結果ファイル>` が 1 以上 |
 | push が 403(リポジトリのディレクトリで測った場合に限る) | 対象: `git push origin main`。理由: リポジトリのディレクトリで `git push --dry-run origin HEAD` が 403。影響: push のみ停止、コミットは続ける。自分で試した記録: リポジトリのディレクトリで実行した `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` の出力(両方貼る)。確認: `git push --dry-run origin HEAD` が成功する |
 
