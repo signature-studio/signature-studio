@@ -115,7 +115,7 @@ A の下で、本番(`fle_ia2_on()` が常に真)では 3 つの規則に到達�
 3. A の実エンジンの行への影響(§2.4 は読み)。インストール済み製品のファイル名の一覧が無く、53 対に当たる 2 名があるかは数えていない。
 4. 最終の wasm の増分が module の計より 109 KB 多い原因(§1.5)。
 
-## PM の判断と取り込み(2026-11-06 13:50、docs のみ)
+## PM の決定と取り込み(2026-11-06 13:50、docs のみ)
 
 取り込み: mt3 の決定 0292(first report を兼ねた最終)の文書・表・道具と、差分 `0284b-table-replaces-s-choices.diff`・`0284b-gp-extension.diff`(`0285b` は決定 0285-impl の側に取り込み済み)を `docs/investigations/mt3w/` に置いた。実行したのは CI の `stage-wasm.sh link`(実物のスクリプト)を e11-wip の木で 1 回(C 部の objects は E10 の冷間ビルドを再利用)と、native の C 経路(`enum_cmp`、test.sh full、a4)で、**ブラウザ・node の実エンジンは 0 件**。依頼者の機械は 0 件。
 

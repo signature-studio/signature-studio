@@ -894,7 +894,7 @@ cand1 は n=4(5,057〜6,136 と広い)。E13 の beacon(n=44)と RT-A(n=16〜21)
 - 限界: full の `.reg` と原 FLP の基準は未実行。FL が実行中に registry へ書いた内容は見ていない。後始末: FLP sha d6783e08886b4b48、Wine 0、:88 に残った窓 0、prefix-e3 は設定 A に復元。証拠: `exports/runs/e4-ctl.*`・`e4-reg.*`、`exports/trace/filter-structure-e4-*.txt`、`e4-e4-reg-user.reg.applied`(opt1-wine 側)。
 
 
-## PM の判断と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
 
 取り込み: opt1 の 0320(原本の install tree の棚卸し、索引の契約検査、V0 の生成器、Wine の run 待ち行列)と表・道具。**PM の確認**: 表 `tables/0320-install-tree-files.tsv.gz` は 27,822 行・合計 2,053.26 MiB。V0 の出力 `~/work/opt1-wine/vfs-out/run-a` は 888 ファイル(chunk 885 + index.bin + index.br + manifest)・938.1 MiB、index.br 215,576 B、run-a と run-b で manifest がバイト一致・全ファイルのハッシュの総和が一致。elog16(Wine、Balance+Filter 有効)は 5,715,911 フレーム、elog15b との差 3 サンプル(±1)・wasm G9-a の Export との差 2 サンプル(±1) = この参照プロジェクトでは Fruity Filter の効果が Export にほぼ現れない(変種 FLP が要る)。判断: 対象は install tree 全域、lift していない DLL の中身は配らない(暫定)、配布は chunk の不変オブジェクト(mt3 の 0313 §18・§19)。依頼者の機械は 0 件。
 

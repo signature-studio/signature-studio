@@ -104,7 +104,7 @@
 - 実行は窓の後: `bash lift/harness/sysinfo_wasm/run.sh`(emcc 1 回、数秒〔読み〕)。**emcc の警告・EM_JS の書き方の誤りが残っている可能性は否定できない**(コンパイルしていない)。
 
 
-## PM の判断と取り込み(2026-11-06 22:59、docs のみ)
+## PM の決定と取り込み(2026-11-06 22:59、docs のみ)
 
 取り込み: mt3 の 0312g(B-FLE の設計の読み、S3a の `fle_sys_processors` の clamp の node テストの下書き)を置いた。(1) は B1 の link map・wasm の section・plug1 の表からの**読み**、(2) は**書いただけで未実行**(emcc も未実行)。ビルド・Chrome・依頼者の機械は 0 件。
 

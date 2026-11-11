@@ -234,7 +234,7 @@ Windows-hardware の Learn（OEM 向け）:
 - **生成 C への影響（予測と実測）**: 予測の (1) `fle_dispatch_table` と `fle_resp_table` に 1 行ずつ（`fle_dispatch_count`、`fle_resp_count` が +1）、(2) 宣言 `void fle_imp_SHGetFolderPathW(void);` がもう 1 行、(3) **thunk `0x4262e0` の 1 行**（`fle_unsupported(UINT64_C(0x4262e0))` → `fle_imp_SHGetFolderPathW(); return;`）は、統合した木の FLEngine の C を HEAD の C と関数単位（59,380 関数のハッシュ表）で比べて**そのとおりだった**: 本体が変わった関数は `f_4262e0`（この決定。thunk は `--pdata` の閉包に入っていた）と `f_423f30`（決定 0106 の `CreateBitmap` の thunk）の 2 つだけで、ほかの 59,378 は同一。表と宣言の差は、決定 0106 の分と合わせて 2 行ずつ（個数 59,690 → 59,692、310 → 312）。FLEngine の C の SHA-256（`fe-lift lift FLEngine_x64.dll OUT.c --pdata` のファイル）: HEAD `8789c1a5…`（215,747,179 バイト、`unsupported_total` 515）→ **この決定だけを当てた木 `07e9a86c8252ec4e1b65ea72f4c26f559382d8a32ef75f0c5ce05a5b068b1591`（215,747,411 バイト、514。差は +232 バイト）** → 統合した木 `794d26cb38f6aad5c92390f8fe1bcaa740d7c57f28840382cd4d56898cb0bcdd`（215,747,616 バイト、513）。`harness/a4-multi.sh` の既定の `EXPECT_FLE_SHA` は統合した木の値に更新した。dsp_ippv2、Blend2D、QFC、freetype の C は測っていない（「応答表の 1 行と個数だけが変わるはず」という予測のまま）。
 - **census への影響（予測。未測定）**: unit 276 は 4 つの index を通る（その先は未測定）。unit 283 は CompareStringW を通る（その先は未測定）。unit 830、880 は SHGetFolderPathW を通り、予測では次に `GetComputerNameExW` で止まる。これらの unit が ok になるかは**わからない**。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 | # | 点 | 実装した最小の案 | 他の選択肢 |
 |---|---|---|---|

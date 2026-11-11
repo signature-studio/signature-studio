@@ -159,7 +159,7 @@ F8 → 0.8 s → 定常 3 s → Escape → 1.2 s の間の、Worker の CPU ms/s
 - 機械の load average は測定の間 8〜17。依頼者の機械・実 GPU・実機 Windows の値は **0 件**。
 - 規則: 重い処理が一時 3 本同時に走った(wasm の link 2 本 + Chrome のシナリオのテスト + 小さな native 実行)。最初の FS 版/A1 版の link は、hard link の共有で互いの link.map を壊して失敗し、作り直した(約 15 分の損失)。`sleep`/`nohup`/`pkill`/`pgrep -f`/末尾 `&` は使っていない(一度 `&` と `sleep` を含む tail の待ちを書いて拒否された。実行されていない)。commit/push 無し。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD cbf9d1e5(決定 0245 = alpha2 取り込み済み)に `alpha2b.diff`(42 ファイル:ランタイム `fle_raster.c`/`.h`、テスト `wrote_seq.c`・`alpha2_changed.rs`、文書・道具・表の新規ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 24 本は全部読んだ(いずれも置き換える行)。比較つきのコピーは `cmp` が真のとき `down` が偽(同一面内のコピーでは比較しない)なので、通知矩形『最初の差の行から呼び出しの終わりまで』は行の向きと矛盾しない。PM が測った値(この機械、`lift/out-pmchk-a2b/`): FLEngine の既定の生成 C の sha256 `0130eeee…`(215,805,703 B、決定 0246 以後の値)不変、全体テスト **201 results / 2,400 passed / 0 failed / 1 ignored**(`alpha2_changed` 7.1 s を含む)、a4 FRUITY 無効 942/942・895/895 で基準と一致。
 

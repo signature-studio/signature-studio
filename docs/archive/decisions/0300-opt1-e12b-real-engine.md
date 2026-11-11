@@ -89,7 +89,7 @@
 `lift/out-git/opt2-results/0300/`: `docs/0300-opt1-e12b-real-engine.md`、`docs/README-0300-line.txt`、`tables/`(`g3-lines-0300-e12b-*`、`0300-e12b-vs-e11-kinds-*`、`0300-e12b-play60-*`、`0300-idle-e12b-vs-e11*.tsv`、`0300-serab-*`)、`logs/`(`0300-e12b-*`)、`runs-series/`、`tools/`(mk-x18.sh、mk-rows-e18.sh、run-e18.sh、music-windows.py ほか)。0265〜0294 の道具は `../tools/`・`../0278/tools/`・`../0294/tools/`。
 
 
-## PM の判断と取り込み(2026-11-06 16:45、docs のみ)
+## PM の決定と取り込み(2026-11-06 16:45、docs のみ)
 
 取り込み: opt1 の最終(16:38)の文書・表・道具・series・ログ(64 KB)を `docs/investigations/opt1/0300/` に置いた。測定は Chrome 156 / node の実エンジン(この機械、模擬入力)で、**依頼者の機械・実 Windows は 0 件**。PM は E12b の Export WAV を自分の `sha256sum` で確かめた(`381cdb5a…f979`、22,863,828 B)。
 

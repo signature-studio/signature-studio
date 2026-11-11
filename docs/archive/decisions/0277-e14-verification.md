@@ -269,7 +269,7 @@ result ok; load 5.2→3.0, io 0.0→0.0; seconds 319
 7. **Firefox の 15 シーン・File ×100・Export は E14 では未実施**（時間と mt3 の build との重なりを避けたため。gpu1 の機能確認〔Firefox 158 + P + V7 の first idle 4.3 s ほか〕はある）。
 
 
-## PM の判断と取り込み（2026-11-07 06:36、docs のみ。製品の差分は push していない）
+## PM の決定と取り込み（2026-11-07 06:36、docs のみ。製品の差分は push していない）
 
 ci1 の E14 の実ブラウザ確認（first idle、pure、非計時の確認、e2e の棚卸し）を取り込んだ。生の `*-audio.json`（12 本、約 3.5 MB）・PNG・`*.log` は取り込まない（`*.log` は `.txt` に改名）。**実エンジン・実 Chrome 156 / Firefox 158（WebGL あり）・この機械・headless・模擬入力。依頼者の機械は 0 件。**
 

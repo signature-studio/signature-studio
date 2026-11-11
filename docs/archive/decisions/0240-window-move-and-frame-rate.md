@@ -205,7 +205,7 @@ GL の読み戻し(scene を texture から描き直して readPixels)と CPU �
 
 `tools/` に道具一式(`README.md`)。要点: `bash tools/run-ci-build.sh <git archive HEAD の木> <ciwork> F2xH7` で冷間ビルド、`bash tools/mk-inc.sh NAME TREE` で runtime だけ作り直す増分ビルド、`tools/preview.sh NAME PORT [DIST]` で `vite preview`、`node tools/sdriveg.mjs --browser chrome|firefox --url ... --scenarios tools/scn-*.json --viewport WxH`(`FF_PREFS` に JSON を渡せば Firefox の prefs)、`node tools/gl-layer-test.mjs`、`python3 tools/beacon-tables.py`、`python3 tools/mk-tables.py`、`bash tools/mkdiff.sh`(uncover)、`bash tools/mkdiff-gl.sh`(GL。`srcN3` を既定とする)、`node tools/ff-caveat.mjs APP_DIR WORK_DIR`、`node app/test/e2e/desk-gl-presenter.mjs OUT`(`desk-gl.ts` の presenter を実ブラウザで直接駆動)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 1a6383d2 に `gpu1-uncover.diff`(取り込み済み 1a6383d2)と `gpu1-gl.diff`(`patch -p1`、offset・fuzz・reject なし、`-` 行 22 本は全部読んだ)。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…` 不変、typecheck rc=0、vitest 1,251 passed + 7 skipped、worker 49/49、e2e(エンジン無し)172 checks、全体テスト **198 results / 2,398 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・5,310・1,009,737。
 

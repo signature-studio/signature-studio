@@ -389,7 +389,7 @@ PM の指示は『各窓の更新領域に足すのは、その窓自身の可�
 `alpha3b2.diff`(**alpha3r.diff の上に**、HEAD 84e17206 基準。alpha3b.diff を置き換える)、`docs/0247-update-region-pieces.md`(alpha3 の本文 + 追補の注 + §10 追補〔番号は増やさない〕)、`docs/README-0247-line.txt`、`MERGE-NOTES.md`、`tables/`、`tools/`、`scripts/`、`logs/`。
 
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 26a7cf4e に、`alpha3r.diff`(107 ファイル。`-` は fle_win.c の旧い外接矩形の代入・拡張 49 行だけ)を `patch -p1`(offset・fuzz・reject なし)で当ててコミット 2bb41c27(第 1 部)にし、続けて `alpha3b2.diff`(54 ファイル。`-` は 3 行で全部テスト: `upd_region.c` の `mk`→`mkp` 2 行と `alpha3_updregion.rs` の `n >= 30` 1 行)を `patch -p1`(offset・fuzz・reject なし)で当てた(第 2 部)。`alpha3b.diff`(第 1 案)は取り込まない。それが 3 件の `present2_uncover` を落とした(決定 0214 の S-p2-9 との衝突)ので、alpha1 に作り直させたのが `alpha3b2`(各窓の更新領域に足すのは、その窓自身の可視領域〔自分の WS_CLIPCHILDREN 旗で計算〕の増加分、という定式化。クラス名・窓種・位置の分岐 0、新しいオプション 0)。
 

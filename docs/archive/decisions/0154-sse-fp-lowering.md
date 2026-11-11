@@ -264,7 +264,7 @@ wasm(node、`-O2`、CPU 時間、5 回交互の最小値)の同じ内訳:
 - gcc では packed SQRT が新しい経路に入らない(コンパイラの組み込み関数がない)。
 - 『計数ビルドでの通過率』は -O0 の計数ビルドの値(命令の種類ごとに数えた)で、-O2 の最終ビルドそのものの計数ではない(計数は最適化に依らない)。
 
-## PM の判断点
+## PM の未決の点
 
 1. **ガードと窓の設計**(S-fplow-window、S-fplow-guard、S-fplow-noguard)の採否。撤回は `-DFLE_MX_NOVEC` の 1 マクロ。
 2. **wasm の `-msimd128`**: packed(K1)は -O2 で約 9 倍、-Oz で約 2.4 倍速いが scalar double(K2)が -O2 で +26% 遅い。出荷は『なし』のままを提案(S-fplow-wasm-nosimd)。

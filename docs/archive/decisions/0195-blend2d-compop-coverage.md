@@ -246,7 +246,7 @@
 | 源・先 | PLUS/OVERLAY/SCREEN/HARD_LIGHT × pattern、× A8 の描画先。OVERLAY × XRGB32 × グラデーション(JIT と ±1 で違う)。パターン自体、blit 系の仮想関数(アダプタが元から名前つきで止める) | アダプタ・パッチの表 |
 | 画素が JIT と違うのを知っている組 | (a) 放射・円錐グラデ: 既定は『SSE2 の JIT と同じ』で、AVX2/FMA の JIT(実 DLL を普通の PC で動かしたもの)とは 0.7〜0.8%(放射)/0.02%(円錐)のシーンで違う(opt-in の FMA 版で一致)。(b) 線形グラデの品質 NEAREST/SMOOTH: SSE2 JIT と固定パイプラインが 0.1% のシーンで違う(エンジンは DITHER しか使わない)。(c) 放射の NEAREST 品質: 同じ上流を『JIT を持つビルド』の固定パイプラインと『JIT 無しビルド』で比べると 0.12% のシーンで違う(下の §4.2。エンジン未使用) | §4.2、§4.3 |
 
-## 6. PM の判断点(私は決めていない)
+## 6. PM の未決の点(私は決めていない)
 
 1. **パッチ `b2d3-compop.patch` を出荷のライブラリに採用するか**: 採用すると出荷の Export の停止が消える。作り方は `PATCH=lift/harness/b2d1/b2d3-compop.patch lift/harness/b2d1/build_upstream.sh`(TARGET=wasm)→ `B2D_UPSTREAM_LIB` に渡す。16 スナップの 82 行は不変(実測)、wasm はアダプタ + ライブラリで +約 0.2 MB(未最適化リンクで +218,322 B)。
 2. **FMA 版(`b2d3-fetch-fma.patch` + `OPT="-O2 -DB2D3_FETCH_FMA=1"`)を既定にするか**: 実 DLL を AVX2/AVX-512 の機械で動かしたときの放射・円錐グラデと**ビット一致**(Wine の実 DLL と 1,360,000 シーンで差 0、上流の AVX2 JIT と 30,000 シーン × 数組で差 0)。ただし (a) 16 スナップの主窓の面 SHA が 16 行変わる(基準の取り直し。155 画素、最大差 2)、(b) 『実機がどの CPU か』は不明(SSE2 しか無い機械なら既定のほうが近い)、(c) wasm では `fma` がソフト実装で、走査の放射 20,000 シーンで +5%(CPU 秒、負荷あり)。
@@ -305,7 +305,7 @@ PATCH=…/b2d3-compop.patch:…/b2d3-fetch-fma.patch OUTDIR=<dir> TARGET=wasm OP
 - `tools/`: テストの道具(`bb.sh`〔バンドルのビルド〕、`node-link.sh`・`scan-run.sh`・`g3run.sh`、`b3cmp2.sh`・`matrix*.sh`・`summ.py`・`assemble.py`〔Wine との比較〕、`fpick-e2e.mjs`・`ops-census.mjs`・`census_agg.py`〔Chrome の実エンジン〕、`sweep*.sh`・`cmpf.py`〔Level-1〕、`mkdiff.sh`・`pack.sh`)。`inputs/Sampler-project`(`Sampler.flp` と音声)は製品由来で git に無い(決定 0188/0193)。
 - 作業ディレクトリ `lift/out-b2d3/` は 500 MB 以内に整理した(残すもの: 最終バンドル `build/B3/bundle/fl-engine-b2d3-B3/`〔wasm-opt 済み、3 つのマニフェスト付き〕、パッチ済みライブラリ `up-wasm4*/build-wasm/libblend2d.a`、テストの道具の実行ファイル `diff/`、`runs/` の記録)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `b2d3.diff` は HEAD d764db1 に `patch -p1 --dry-run` が offset・fuzz なしで当たる(10 ファイル、すべて `lift/harness/` 配下で fe-lift・runtime・app には触れない)。`-` の行は 9 行すべて読んだ(`DRAW_RET` の置換 6 行、`live_grad` 1 行、`build_upstream.sh` 2 行。既定の挙動は変わらない)。PM の測定: 全体テスト 177 results・2,266 passed・0 failed(SKIPPED-lines 1 は既知の wall_fr9t)。fe-lift と runtime に触れないので、FLEngine の既定の生成 C の sha256 `cd9107ce…` と a4 FRUITY 無効は作業者の値(942/942・895/895・5,310・1,009,731)を採り、PM は再走していない(未再測定と明記)。
 

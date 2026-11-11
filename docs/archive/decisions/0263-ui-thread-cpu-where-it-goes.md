@@ -207,7 +207,7 @@ PM の指示(『影比較を外す試作はしない。省く画素数/提示を
 7. 第 1 報は提示 1 回の費用を『compose 2.3 + put 1.0 + draw 0.14』とし、compose の大半を影比較と『読み』と書いたが、§8 の測定専用ビルドで確かめた(影なしで compose 0.08 ms)。
 8. Hz の測定(§10)は各 1 回で、ヘッドレス Chrome の rAF は 60 Hz のまま(実ディスプレイの rAF は未測定)。
 
-## PM の判断と取り込み(2026-11-06 00:10、docs のみ。診断用 diff は製品の木に当てていない)
+## PM の決定と取り込み(2026-11-06 00:10、docs のみ。診断用 diff は製品の木に当てていない)
 
 取り込み: gpu1 の最終報告(2026-11-06 00:05)の文書・表・道具・測定専用 diff 2 本(`gpu5-hz-param-measure.diff`、`gpu5-noshadow-measure.diff`)を `docs/investigations/gpu5/` に置いた(`patches/`)。音声ダンプの生ログ(約 0.9 MB)は `lift/out-git/gpu5-results/logs` に残し、リポジトリには入れない。測定は gpu1 のもの(Chrome 156、この機械、実 GPU なし、load 12〜29、n=1〜3、依頼者の機械は 0 件)で、PM は再現していない。
 

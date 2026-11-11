@@ -50,7 +50,7 @@
 **次(窓の後、PM の info で)**: ①emcc/native clang の警告、②native `test.sh full`・a4 を S3a 込みで(n = 1 なので変化なしの見込み)、③`fle_sys_processors` の node テストの追加、④S3a の bundle の冷間 build(gpu1 の Chrome の後)→ n の掃引と first idle・Export sha、⑤`mk-s0s1p-page.sh check`/`build`。
 
 
-## PM の判断と取り込み(2026-11-06 22:43、docs のみ)
+## PM の決定と取り込み(2026-11-06 22:43、docs のみ)
 
 取り込み: mt3 の 0312f(S0+S1+P の手順書、S3a の n の入力の整理、0312 の最終の下書き)を置いた。`tools/mk-s0s1p-page.sh` を `docs/investigations/mt3w/0312/tools/`、prepare の記録を `tables/0312f-prepare-*.txt`(元は .log)に置いた。実行は patch・git・cmp だけで、**ビルド・テスト・Chrome・依頼者の機械は 0 件**。
 

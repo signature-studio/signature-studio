@@ -191,7 +191,7 @@ wall は pull1 が 18.6 s、メモリ 1.08 GB。`fle_desk_compose` の時間(nod
 - 時間: 開始 07:27 JST、本文書の時点 約 2 時間。
 
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 94691b53 に `alpha1.diff`(78 ファイル、`patch -p1` で fuzz・offset・reject なし、`-` 行 32 本は全部読んだ)。PM が測った値(この機械、`lift/out-pmchk-a2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **197 results / 2,394 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
 

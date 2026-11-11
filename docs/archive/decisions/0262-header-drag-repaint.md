@@ -121,7 +121,7 @@ native、gdb の batch、`g3-cpu` の user + sys(1 ms 分解能、19 手): HEAD 
 2. 残りの CPU は FL 自身の描画(lid 64 / 17 / 14 の `BeginPaint` と中身)。ここを減らすには FL の描画コード(guest)の速さ(fe-wasmgen の直 wasm 化)が対象で、更新領域の側にはもう過剰が見つかっていない。
 3. 7 の 1・2 を対で入れるかどうかは、起動時の WM_PAINT の増減を測ってから。
 
-## PM の判断と取り込み(2026-11-05 23:02)
+## PM の決定と取り込み(2026-11-05 23:02)
 
 取り込み: `alpha8.diff`(5 ファイル: `lift/runtime/fle_win.c`、`lift/crates/fe-lift/tests/present2_uncover.rs`、新規 `alpha8_hidden_move.rs`、新規 `lift/harness/alpha8/{hidden_move.c,move_paint.c}`)を全体 e4954229(opt1-f + mt3 の 0254/0259 + opt1-f-lists +40 + alpha7)の上に `patch --batch -p1`(`git archive` の写しで dry-run も rc=0、offset・fuzz なし)。`-` 行 5 本をすべて読んだ: 旧テストコメント 1、旧テストの呼び出し `0x1u | 0x800u`(NOCHILDREN として 0x800 を使っていた)を 0x40 に、旧関数コメント 1、`#define RDW_NOFRAME_ 0x0040u` / `#define RDW_NOCHILDREN_ 0x0800u` の入れ替え(SDK の winuser.h は NOCHILDREN 0x0040、NOFRAME 0x0800)。追加は `unc_pending` が不可視の窓を数えない 1 行(`if (!is_visible(w)) return q;`)とコメント。FL のクラス名・窓種・アドレスの分岐、新オプションは無い。
 

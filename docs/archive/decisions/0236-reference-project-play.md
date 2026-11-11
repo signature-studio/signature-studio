@@ -230,7 +230,7 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 | S-ref3-fonts-extract | extract_fl.py が `lift/harness/seeds/os-fonts/` の行をリポジトリからコピー | pack_seed.py に第 2 の root、別の TSV |
 | S-ref3-p3-window | P3 の数は Space 後の 30 秒(sampleAudio)とその前の読み込み中に分ける | 全期間 |
 
-## 9. PM の判断点
+## 9. PM の未決の点
 
 1. **F2xH5 の再生は曲の速さが実時間の 0.6〜0.9 倍、L5s は 0.7〜1.04(平均 Chrome 0.95、Firefox 0.87)**。ship5/mt の判断材料。L5s の追加反復は静かな時間帯に(必要なら続ける)。
 2. 代用 3 フォントの出荷 seed への追加(`ref3-fonts.diff` + `os-fonts/*.ttf` のコピー)の採否。seed pack +1.5 MB(brotli +0.6 MB)、wasm 不変。
@@ -254,7 +254,7 @@ PM の指示 (3):『競合下で崩れる』理由の読みを実測で 1 つ裏
 - 他担当の処理と共用機のため、load が 1.8〜29 と大きく動いた。測定の表に併記し、壁時計の速度の主張は『曲の速さ』という比にとどめた。最初の報告(第 1・2 報)の『F2xH5 は曲が 0.6〜0.9 倍』は混んだ機械の値だった(訂正済み: §3.3)。SMT の読みも否定された(§3.4)。
 - 確認できなかったこと: 実機 Windows との照合、依頼者の機械、実デバイスでの聴感、Firefox 159、F2xH6 の陽性対照、曲の速さが遅れる機構(読み)、node の決定論的な PCM との照合。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD d5b78566 に `ref3-fonts.diff`(5 ファイル、`-` 0 行、offset・fuzz・reject なし)を `patch -p1`。差分に載らない ttf 3 本(DejaVuSans.ttf 759,720 B、DejaVuSansMono.ttf 343,140 B、LiberationSans-Regular.ttf 410,820 B)を `lift/harness/seeds/os-fonts/` に置き、SHA-256 が `vfs-seed-idle1.tsv` の行と一致することを確認した。PM が測った値(この機械): `ci/test-needs.sh` 256 組み合わせ ok、`ci/test-hybrid.sh` 全項目 ok、`ci/test-wrangler-config.sh` ok、vitest 1,377 passed + 7 skipped、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。lift/crates と lift/runtime は変えていないので、生成 C の sha256 とフルテストは再実行していない(ref3 の報告どおり、HEAD と byte 一致)。
 

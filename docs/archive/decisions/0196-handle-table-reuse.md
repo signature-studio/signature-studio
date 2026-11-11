@@ -115,7 +115,7 @@ lat1 が、実エンジン(隔離 Chrome 156、再生中に FILE メニューを
 * 自分の `r3`・`r4`・`r5`・スクリーニング・`fixops1` の probe を `kill` で止めた(自分のプロセス)。F8 と File→New の中止はこのため。
 * git の変更系操作・commit・push はしていない。
 
-## PM の判断と取り込み（2026-11-04）
+## PM の決定と取り込み（2026-11-04）
 
 - **取り込み範囲:** `tbl1.diff`（`fle_win.c`〔hook 表〕、`fle_thread.c`・`fle_thread_wasm.c`・`harness/web/threads/fle_thread_lib.js`〔スレッド表と JSPI の枠〕、新規テスト `wall_tbl1.rs`）。`-` 行 27 行を全部読み、hook の設置・解除・連鎖〔`hook_older`〕・生存数の数え方、スレッドのハンドル/添字の変換、満杯時の枠選びの書き換えであることを確認した。HEAD 7f024d7 に offset なしで当たった。
 - **PM の実測（HEAD 7f024d7 + 本差分）:** FLEngine の既定の生成 C は sha256 `cd9107ce…`（215,811,678 B）で不変。全体テスト 177 results / 2,266 passed / 0 failed（取り込み前 176 / 2,258。+ `wall_tbl1` の 1 実行ファイル・8 件）。a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731（不変）。

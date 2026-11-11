@@ -179,7 +179,7 @@ lifted C の呼び出し規約は『呼び出し側が `R[4] -= 8` して戻り�
 - node の Liftoff の実測は 1 関数ずつ(全体の中の 1 関数)、eager、1 回。ブラウザの first idle は未測定。-Oz 後の関数別の大きさは、f_310fb40 の 1 モジュールで −9.5%(161,917 → 146,521 B)を測っただけ(概算 ×0.905)。直 wasm は C 部の -Oz の後に結合される読み。
 - 自己申告: (1) 関数ごとの測定ループに `while read` を 1 回使った(待ちのループではないが規則の文面には反する)。実行の直後に気づき、数分後に `kill` で止めて for ループ + 一括の実行に直した。(2) `bash` ツールの誤呼び出しは合計 2 回。(3) 先の info の『Song Mode の最大は f_e95750』は UI スレッドとミキサースレッドを混同した誤りで、00:23 に訂正を送った。
 
-## PM の判断と取り込み(第 1 回、2026-11-05 23:55、docs のみ。下の第 2 回で積みを採った)(2026-11-06 00:05、docs のみ。差分は製品の木に当てていない)
+## PM の決定と取り込み(第 1 回、2026-11-05 23:55、docs のみ。下の第 2 回で積みを採った)(2026-11-06 00:05、docs のみ。差分は製品の木に当てていない)
 
 取り込み: mt3 の最終報告(23:57)の文書・表・道具を `docs/investigations/mt3z/` に、差分 2 本(`mt3-locshare.diff`、`mt3z-diag.diff`)を `docs/investigations/mt3z/patches/` に置いた。`mt3-locshare.diff`(24,380 B、`fe-wasmgen` の `src/lib.rs`・`src/lower.rs`・新規 `src/locshare.rs`・新規 `tests/locshare.rs`)は HEAD(b00932ec 相当)の `git archive` に `patch --batch -p1 --dry-run` が rc=0・offset 0 で通る。`-` 行は `lower.rs` の `new_local` 2 行(`let a = self.new_local(t);`、`let b = self.new_local(t);`)だけで、読んだ。測定は mt3 の census・cargo・node 単体の wasm コンパイル計測・共有あり/なしの無作為標本の差分(実エンジンの走行は 0 件、ホスト x86 との比較は無し)で、PM は再現していない。
 
@@ -191,7 +191,7 @@ lifted C の呼び出し規約は『呼び出し側が `R[4] -= 8` して戻り�
 5. 未確認: 実エンジンの全て(自己時間・first idle)、ブラウザの Liftoff/TurboFan、-Oz 後の関数別サイズ、V8 プロファイル外の 6 関数の ms、(c)(呼び出し側 95 B/命令の共有窓検査)の実装、手順 3 の閾値の効果。無作為標本の差分は検査力が弱い(正常復帰 720 run、残りは両 build で同じ trap)。
 
 
-## PM の判断と取り込み(第 2 回、2026-11-06 00:50。E7b の積み)
+## PM の決定と取り込み(第 2 回、2026-11-06 00:50。E7b の積み)
 
 取り込み: mt3 の最終(00:35)の文書(15〜19 節)・表・道具・差分列 `e7/` を `docs/investigations/mt3z/` に置いた。差分列を HEAD 91cbd9b0 の `git archive` に順に `patch --batch -p1 --dry-run` で確かめ(0001〜0005 すべて rc=0、offset・fuzz なし)、PM の木に当てた。`-` 行を読んだ: `0001`(lower.rs の `new_local` 2 行)、`0002`(`lib.rs` の `Sig` の作成・`solve` の更新・`ret imm16` の検査 18 行、`pres.rs` の `step` / `analyze` の引数)、`0003`(`jumptab.rs` の `sext_source` の注釈 3 行と、`fe-decode/tests/msvc_switch.rs` の既存テスト 2 件の期待〔拒否のまま、理由の文言だけ〕)、`0004`(`MAX_FN_COST` の定数と注釈 2 行)、`0005`(`regen-hyb-u.py` の usage と出力の 2 行)。FL のクラス名・窓名・アドレスの分岐、新しいオプション、旗は無い。hyb 一覧への追加は 18 行(fle 8、dsp 2、b2d 7、Elastique 6〔重なる行を除く〕、何も削らない。規則 0239 の手順 3b = first idle の予算 B=150 ms で選んだ関数)。
 

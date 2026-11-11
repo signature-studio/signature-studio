@@ -266,7 +266,7 @@ Per bundle (all answered records of the counted runs pooled):
 ## PM 記入欄（ci1 は書かない）
 
 
-## PM の判断と取り込み(2026-11-06 16:2x、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 16:2x、docs のみ。製品の差分なし)
 
 取り込み: ci1 の E9 の最終(本番 bundle `fl-engine-ci-62098b85`、Worker 2f390ad3、ページ 38efb398)の文書・結果・画・小さな表を `docs/investigations/ci1/0277/e9/` に置いた(音声の生データ `*-audio.json` 約 3.4 MB は入れない。原本は `lift/out-git/ci1-results/0277/e9/data/`)。実ブラウザ(Chrome 156 / Firefox 158、この機械、模擬入力)で、**依頼者の機械は 0 件**、本番 R2 の `perf/` に beacon は 0 件。
 

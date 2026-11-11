@@ -174,7 +174,7 @@ Counter definition: `window.__app.audio.detail()` of the page: `underrunQuanta` 
 
 ## PM 記入欄（ci1 は書かない）
 
-### PM の判断と取り込み(2026-11-06 11:45、docs のみ)
+### PM の決定と取り込み(2026-11-06 11:45、docs のみ)
 
 取り込み: ci1 の最終(11:28〜11:34)の文書・結果表・キット(`kit/`)・データ(20 KB 以下のファイルのみ)を `docs/investigations/ci1/0277/` に置いた(alpha7 の画 1 枚を含む。他の画像と、400 KB 超のファイル、局所の bundle は入れない)。測定は Chrome 156 と Firefox 158(Xvfb :77、llvmpipe、desk.mode gl)の本番 E7b bundle `fl-engine-ci-d9c160aa`(Worker `51f102d8-a15e-4972-b2fc-0288705a224f`、ページ 0b228624)で、依頼者の機械・実 Windows は 0 件。
 判断:

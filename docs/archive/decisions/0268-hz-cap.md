@@ -57,7 +57,7 @@
 `hz.test.ts` だけでは 53 passed。ログは `logs/0268-*.log`。ミューテーションテスト(`test/mutation/run.mjs`)の hz 関連 3 本(1 変数だけ渡す、比でなく差で丸める、中央値でなく平均)は、書き換える行を変えていない(`const d = Math.abs(Math.log(measured / s));` ほか)ので有効なまま(実行はしていない)。
 
 
-## PM の判断と取り込み(2026-11-06 00:18)
+## PM の決定と取り込み(2026-11-06 00:18)
 
 取り込み: gpu1 の最終(00:11)の文書・表・道具・差分を `docs/investigations/gpu6/` に、決定文書を本ファイルに置いた。`hz-cap-120.diff`(`app/src/engine/hz.ts`、`app/test/unit/hz.test.ts`)を HEAD 1c78f3c5 の `git archive` 写しに `patch --batch -p1 --dry-run`(rc=0、offset・fuzz なし)で確かめて PM の木に当てた。`-` 行 4 本をすべて読んだ: ファイル先頭のコメント 1 行、`S-hz-standard` の注釈と `STANDARD_HZ` の行、`S-hz-round` の注釈 1 行。`roundToStandardHz` の規則・`measureFrameRate`・`applyHz` は変わらない。旗・URL パラメータ・環境変数・ビルド変数は足していない。
 

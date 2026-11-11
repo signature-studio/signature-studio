@@ -164,7 +164,7 @@ e6433b23 の ciQ と、それに hyb-U-fle.txt の 4 行(f_e95750 f_ddf630 f_e7e
 - ①limit study L2 を『非忠実の上限』として作ったが、起動で落ちて上限は測れなかった(callee-saved の保存が必須だったと分かった)。②node の道具が参照する `lift/out-mt2/g3/*.g3` が、他担当の片付けで無くなっていた(`lift/out-git/mt3-results/archive-out-mt2/g3/` へ向け直して実行。最初の TQ/TPC の実行は 0 行で、原因は道具の参照先)。③ `( … &)` で mk-test の TPC を 1 回バックグラウンドに回してしまい(規則違反)、気づいて PID 指定で止めて `background:true` で出し直した。④待機に使った /tmp が割当て超過で patch とテスト 1 本が落ちた(TMPDIR を /tmp 以外にして解決)。⑤『6 往復・load ≤8』は満たせなかった。⑥V8 のフラグ違いは 1 回ずつで、揺れ(±2 s)より小さい差は言えない。⑦compilation hints のテスト(`hints.mjs`)がブラウザを閉じずに終わり、headless Chrome 6 本が 1 時間以上残っていた(終了時に PID 指定で止めた)。⑧最初の arms(Q0/L1/L2 を 4 往復)は L2 が起動で停止したため 1 往復で止め、Q0/L1 の 3 往復に組み直した(最初の 1 往復分は `logs/arms-1-partial.log`)。
 
 
-## PM の判断と取り込み(2026-11-05 22:20、docs のみ。差分は製品の木に当てない)
+## PM の決定と取り込み(2026-11-05 22:20、docs のみ。差分は製品の木に当てない)
 
 取り込み: gpu1 の最終報(22:15)の文書・表・道具・差分を `docs/investigations/gpu4/` に、決定文書を本ファイルに置いた。測定は gpu1 のもの(Chrome 156、この機械、load 11〜26、実 GPU なし、依頼者の機械は 0 件)で、PM は再測定していない。`gpu4-p1.diff`(20,390 B、wasm.rs・lower.rs・tests/addr_facts.rs)と `gpu4-p2.diff`(11,252 B、lib.rs・tests/wrapper_closure.rs)は HEAD 62ca650b の `git archive` に `patch --batch -p1 --dry-run` が通る(offset のみ、reject なし。fe-wasmgen の積み opt1-f → mt3-wasmgen-small → mt3-x87-lower の後にも順に当たることを PM が確認済み)。`-` 行は p1 が wasm.rs の 2 行、p2 が lib.rs の 3 行。
 

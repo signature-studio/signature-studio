@@ -8,7 +8,7 @@
 2. **直したこと**: `app/src/input/pointer.ts` に、`#desktop` の `focusout` で、ユーザーの操作(直近 1 s のその行き先へのポインタ押下、または Tab)が無く、行き先がテキスト入力でなければ、次のタスクで `#desktop` にフォーカスを戻す処理を足した(旗・URL パラメータ・環境変数なし。`ci1-page-focus.diff`)。**修正した腕は 24 セッション・1,440 周期で取りこぼし 0 件**(割合が同じなら 9.9 件の期待、0 件の確率は約 0.005%)。同じ腕でブラウザがフォーカスを `panel-toggle` へ移した 26 回は全て戻され、Escape は全て届いた。実ブラウザの決定的な確認(最後の `#desktop` クリックの 0.4 s 後に `panel-toggle.focus()` または `activeElement.blur()`)も、修正したページでは `#desktop` に戻る。
 3. **未確認**: ブラウザがフォーカスを移す**引き金は未特定**(移動は最後のポインタ上げの 82〜1,535 ms 後、周期内の決まった位相ではない。直前 1.5 s の DOM 変更は状態表示の定期更新だけ)。headless Chrome の挙動と読むが推測。実機の Firefox / 通常の Chrome で起きるか、依頼者の機械で起きるかは 0 件。ランタイムの再入ガード(`ci1-input.diff` v1、`ci1-input-v2.diff`)は本件の原因ではなく、v1 は非局所脱出で入力が止まる欠陥があるため**採らない**(v2 は保管、条件つき)。
 
-## PM の判断と取り込み(2026-11-06 00:30)
+## PM の決定と取り込み(2026-11-06 00:30)
 
 取り込み: ci1 の報告 1・2・3・3b、差分、C テストの出力、記録器の行、道具を `docs/investigations/ci1/0260/` に置いた。`ci1-recorder-NOT-FOR-PRODUCT-*.diff` はテスト専用で製品の木に当てない。`ci1-page-focus.diff`(更新版、sha256 先頭 `e000e626e5bff67b`、2 ファイル: `app/src/input/pointer.ts`、`app/test/unit/pointer-dom.test.ts`)を HEAD 91cbd9b0 の `git archive` に `patch --batch -p1 --dry-run`(offset・fuzz なし)で確かめて PM の木に当てた。`-` 行は 1 本(`pointer.ts` の先頭コメントの 1 行を、続きの項目つきに書き換える)を読んだ。FL のクラス名・窓名・アドレスの分岐は無く、新しいオプションも無い。
 

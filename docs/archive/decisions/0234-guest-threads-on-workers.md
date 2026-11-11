@@ -417,7 +417,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 **FL の挙動を補う処理は足していない。** 計測コード(`mt2_trace.c`)は製品に入らない。
 
-## 11. PM の判断点
+## 11. PM の未決の点
 
 1. B′ を段階導入の目標にするか(S1 から。S1 だけでも opt-in で単独に価値がある: 生成 C の LOCK の欠落の修正)。
 2. 共有メモリ版を CI のビルドの変種として持つか(ビルド 2 倍)。既定は変えない。
@@ -506,7 +506,7 @@ hyb6 の L5(6 モジュール 13,133 関数)と L6(oggio・elastique 931 関数)
 
 再現: `tools/mt2-prep.sh`(g1 の lowregs コピー、realmod 表、dec1_imp.o、Blend2D upstream)→ `ELQ=1 bash tools/gen-ref1.sh g1` → `bash tools/mt2-var.sh NAME`(`SHARED=1` で共有メモリ版、`mt2-vart.sh` で計数コード + 名前つき、`mt2-varh2.sh` で混成)→ `bash tools/mk-bundle.sh NAME` → `bash tools/nrun.sh NAME g3/ref1-perf-wasm.g3`(共有版は `NODE_RUNNER=<mt2/node-bundle-run-sh.mjs>`)→ `tools/mt2-sum.py`(同期 API の表)・`tools/mt2-hold.py`(CS の保持時間)・`tools/mt2-thr-prof.py`(スレッド別 CPU)。ブラウザ: `app/` を `vite build` し `vite preview`(`FL_ASSETS_DIR`)、`tools/mt2-idle-ab.sh`。mp1: `lift/harness/mt2/mp1/`(`build.sh`、`mp1.mjs`、`mp1-chrome.mjs`、`mp1-firefox.mjs`、`shcopy-run.mjs`、`sabapi.mjs`、`pingasync*`、`sleepcost.mjs`、`ldbench.c`)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD ba85d14b に `mt2.diff`(25 ファイル、offset・fuzz・reject なし、`-` 15 行は全部読んだ。変更はすべて opt-in: `fe-wasmgen --mem-shared`、共有メモリのときだけ分岐するページ側〔fruity.ts・appview.ts・desk.ts〕、`MT2_SHARED=1`、`strip_glue_stubs.py` の正規表現)を `patch -p1`。PM が測った値(この機械、`lift/out-pmchk-m1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト 193 results / 2,368 passed / 1 failed(`fe-wasmgen/rc_helpers` の `node run.js` の子プロセスが CPU 0% で 84 分ハング〔futex〕して 5,055 秒でテストが失敗。子を止めた後、`cargo test -p fe-wasmgen -p fe-decode` は 187 passed / 0 failed、`rc_helpers` 単独は 2 passed〔2.12 秒〕。mt2.diff との関係は、fe-wasmgen に触れる差分なので完全には否定できないが、ハングした node の問題と読む。タイムアウトが無いのは別の課題)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、typecheck rc=0、vitest 1,377 passed + 7 skipped、Worker 50/50、e2e 893/893。
 

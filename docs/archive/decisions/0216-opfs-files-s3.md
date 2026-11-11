@@ -194,7 +194,7 @@ node tools/opfs-s3-summary.mjs logs/s3 > tables/opfs-s3-measurements.tsv
 
 ---
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **取り込み**: `opfs1-s3.diff`(新規 15 ファイル、`-` 行 0、どのビルドも変えない)を HEAD 0235dff に当てた。clean(offset・fuzz なし)。PM 実測: `wall_opfs1_map` と `wall_opfs1` の Rust テスト 通過(4 + 1)。段階 3 は `app/src` に触れないので vitest・e2e は再実行していない。担当の訂正どおり `wall_opfs1`(4 件)は担当が配置を移した後に再実行しておらず、PM の再実行で通った。
 - **この段階で実エンジンは動かしていない(担当の申告どおり)**: Chrome 156 と Firefox 158 の専用 Worker で本物の OPFS を同期アクセス(createSyncAccessHandle)で測り、作ったライブラリを emscripten(-sJSPI)の C テストプログラムから 68 件呼んだ。エンジンの実際のアクセスの型は観測していない。したがって『エンジンが OPFS をファイルシステムとして使える』とはまだ言えない。

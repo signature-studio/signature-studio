@@ -68,7 +68,7 @@
 
 
 
-## PM の判断と取り込み(2026-11-06 10:15、docs のみ)
+## PM の決定と取り込み(2026-11-06 10:15、docs のみ)
 
 取り込み: ci1 の報告 1・2・INFO を `docs/investigations/ci1/0271/`(data と tools は 400 KB 超の `audio-bp.json` 2 本を除く。原本は `lift/out-git/ci1-results/0271/` に残す)に置いた。測定は実 Firefox 158・Chrome 156・この機械(headless、WebGL は llvmpipe / SwiftShader)で、**依頼者の機械(Windows の Firefox 159・GTX 980)は 0 件、本番 R2 の `perf/` に beacon は 0 件**。
 

@@ -109,7 +109,7 @@
 
 途中の記録: 最初の全体テストは 7 件版のテストファイルで始め(8 件目の『生成単位の呼び出しブロックの IR』を後から足したため)、36 実行ファイルの時点で自分のプロセスグループごと止めて 8 件版で最初からやり直した(`logs/fulltest-0-killed-7test-version.txt`。最終の値は 2 回目のみ)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `noret1.diff` は新規3ファイルだけ(`lift/harness/noreturn-audit/noreturn_audit.py`、`allow.tsv`、`lift/crates/fe-lift/tests/noreturn_audit.rs`)で、`-` の行は0。HEAD 48cec69 に当たる。PM の測定: 新テスト `noreturn_audit` 8 passed(単体 13.3 秒)。全体テストは作業者の値(178 results・2,274 passed・0 failed)を採り、PM は dd1・cbeacon2 の統合の後にまとめて通しで再走する。runtime・fe-lift・既存テストは変更していないので、FLEngine の既定の生成 C の sha256 と a4 は変わらない(作業者の確認)。
 

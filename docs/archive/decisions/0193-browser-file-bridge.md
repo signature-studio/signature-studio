@@ -208,7 +208,7 @@ cd src2/app && npx vite build && cd ../.. && node tools/fpick-e2e.mjs --assets b
 - `logs/`: `mutation-wall-fpick1.txt`・`mutation-app-filedlg.txt`、`summary-*`(全体テスト/e2e/Worker/vitest の要約)、`a4off.txt`、`felift-default.*`、`patch-dry-run.txt`、`privacy-grep.txt`、`engine-log-*.txt.gz`(停止した 2 実行のエンジンのログ全文)。
 - `tools/`: `bb.sh`(バンドルのビルド)、`fpick-e2e.mjs`(実エンジンの Open/Save/cancel/bigopen)、`activation-probe.mjs`、`mutate.py`、`pngdiff.mjs`、`mkdiff.sh`。
 
-## PM の判断と取り込み（2026-11-03）
+## PM の決定と取り込み（2026-11-03）
 
 - **取り込み範囲:** `fpick1.diff`（20 ファイル）。`-` 行 87 行を全部読んだ。削除は設計スケッチ（`fle_filedlg_web.c` の全削除と `fle_filedlg_lib.js` の置換）だけで、実装済みの既存行を消す変更は無い。0192 を先に取り込んだため、`app/src/style.css` と `app/test/mutation/run.mjs` の 2 か所が衝突した。0192 の内容を残したまま、fpick1 の追加行（CSS 12 行、変異 15 件）を末尾に手で足した（`.rej` は削除。`node --check` 通過）。
 - **PM の実測（HEAD 79043d1 + 本差分）:** FLEngine の既定の生成 C は sha256 `cd9107ce…`（215,811,678 B）で不変。全体テスト 173 results / 2,233 passed / 0 failed（取り込み前 172 / 2,227、+ `wall_fpick1` 6）。a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731（不変）。app: typecheck 通過、vitest 1209 件中 1,201 通過・7 スキップ・**1 失敗**（下記）、Worker 統合 43、e2e 1017/1017（取り込み前 1008）。

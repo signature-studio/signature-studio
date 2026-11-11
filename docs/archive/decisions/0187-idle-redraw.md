@@ -478,7 +478,7 @@ page log (dedupe/warn/error/stop lines):
 page console errors: []
 
 
-## 8. PM の判断点
+## 8. PM の未決の点
 
 1. **`?dedupe=1` を既定 ON にするか**。材料: (a) 正しさ: 語単位の厳密比較で、省略した矩形の画素は canvas の現在の内容と同一(単体の性質テスト〔12 シード×1,500 手〕、実 `Presenter` との統合テスト〔方式 A/B、16 本×1,500 手〕、変異検査、実エンジンの自己検証 §7.5)。(b) 効果: ページ主スレッド −0.057 コア(−78%)、Chrome 全体 −0.106 コア、窓の更新 62.5/s → 0.85/s(§7.1)。Worker は変わらない。(c) 入力の応答: §7.3。(d) 既定 ON の前に要る物: Chrome の 2D canvas の `contextlost`/`contextrestored`(GPU のリセットで canvas の内容が消えると、エンジンが画素を変えない限り戻らない=従来はアイドルの毎フレーム再描画で自然に直っていた)への対応(page→Worker の再同期メッセージ。未実装・未テスト)。(e) 『1 画素でも差が出たら ON にしない』という条件に対し、§7.5 の自己検証は**比較 549 回(約 13.7 分、再生 300 s を含む)で差分 0**。ただし File > Save / Save as ではエンジンが終了する(§11)ので、その2 つのダイアログは見ていない。
 2. **エンジンの応答(層 2 の DwmIsCompositionEnabled=TRUE)は変えていない**(PM の方針)。『FALSE を返す opt-in』は native の実エンジンで効果を測っただけ(アイドルのゲストの関数入口 8.78 → 4.54 M/s、書込 63 → 0〜1 /s)で、実装していない。実装するなら `lift/runtime/fle_dwm.c` に環境変数の opt-in 1 本(忠実性の観点で PM が見送り)。
@@ -504,7 +504,7 @@ page console errors: []
 - p2a(決定 0182)が F1xn で測った『入力→次の更新』は、窓が毎フレーム更新されているため、無関係な更新で短く出ていた(本書 §7.3)。`?dedupe=1` なしの値は応答時間として使えない。
 - パス C(File > Import → サブメニューの最初の項目)で、エンジンが `fle: CompareStringW: character other than an ASCII letter or digit in unequal strings (not defined by the MSDN page or outside the emulated locale; not implemented)` で停止した(exit 134、`TMsgForm` が見えている)。決定 0178(dlg1)の『S-dlg1-cmp-nonascii: 仮名と ASCII の順序に出典がない』と同じ壁と読める(確かめていない)。File > Export の 4 つのサブメニュー項目は停止せず比較できた。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `idle1b.diff`(`app/` の 10 ファイル。基準 HEAD d425abd〔88a4dfe でも `app/` は同じ〕に `patch -p1 --dry-run` が offset・fuzz・reject なしで当たる)。成果物の置き場は `lift/out-git/idle1b-results/`(古い `idle1-results/` は 11-01 の別の作業の物で、PM の番号付けの不注意による名前の衝突。担当は古い物を無傷で処理した)。`-` 行 15 本を読み、既存の 1 行への引数・欄の追加だけと確認した。PM の検証: typecheck rc=0、vitest **1003 passed + 7 skipped**、Worker 43/43、e2e **952/952**(基準 853/853)。`lift/` には触れていない。PM は Chrome の CPU 測定と長時間の自己検証を再現していない(担当の実測)。進捗(G 段階)には数えない。
 

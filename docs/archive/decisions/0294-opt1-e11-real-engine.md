@@ -128,7 +128,7 @@
 `lift/out-git/opt2-results/0294/`: `docs/0294-opt1-e11-real-engine.md`、`docs/README-0294-line.txt`、`tables/`(`g3-lines-0294-e11-*`、`0294-e11-vs-e10-kinds-*`、`0294-e11-adapters-dispatch.txt` / `0294-e10-adapters-dispatch.txt`、`0294-e11-play60-rates.txt`、`0294-e11-play300-*`、`0294-ser-e17p-*`、`0294-idle-e11-vs-e10-{a,b}.tsv`、`0294-serab-*`)、`logs/`(`0294-e11-*`)、`runs-series/`、`tools/`(mk-x17.sh、mk-rows-e17.sh、run-e17.sh、prof-adapters.py、series-rate.py、scn-series300.json、sdriveg2.mjs、serab-summary.py ほか)。0265・0278・0288 の道具は `../tools/`。作業ディレクトリ `lift/out-opt2` は 500 MB 以内に片付ける(作業中は一時的に超える)。
 
 
-## PM の判断と取り込み(2026-11-06 16:15、docs のみ)
+## PM の決定と取り込み(2026-11-06 16:15、docs のみ)
 
 取り込み: opt1 の最終(訂正を含む版、16:01)の文書・表・道具・series・ログ(52 KB)を `docs/investigations/opt1/0294/` に置いた。測定は Chrome 156 / node の実エンジン(この機械)で、**依頼者の機械・実 Windows は 0 件**。PM は E11 の Export WAV を自分の `sha256sum` で確かめた(`381cdb5a…f979`、22,863,828 B)。
 

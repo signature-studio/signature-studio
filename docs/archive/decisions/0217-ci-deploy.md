@@ -239,7 +239,7 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 * FLEngine の既定構成の生成 C `cd9107ce…`・全体テスト 178/2,274/0 は再実行していない(`lift/crates`・`lift/runtime` を変えていない)。
 * 非決定性: 最終 wasm の非決定性は見つからなかった(§5b)。manifest.json は作成時刻と HEAD を含むので毎回違う(設計どおり)
 
-## 10. PM の判断点
+## 10. PM の未決の点
 
 1. `SHIP_PRESET` の既定は `F2xH2`(ワークフローの `env:`。ship2 は main に入っている。選び直せるのは `workflow_dispatch` の入力だけ)。`push` トリガーは依頼者の決定で有効(`main` だけ、docs だけの変更は除く)。事実は §10b。
 2. S-ci1-3(R2 への書き込みを wrangler-action でなく S3 API にした)の承認。
@@ -275,7 +275,7 @@ GitHub の Secrets は私のトークンでは作れない(403)ので、Issue #3
 **ページと bundle の整合**: この設計では**不整合は起きない**。実行ごとに、その実行のコミットのツリー全体の入力から bundle のキーを作り、同じコミットの app と一緒に配信し、既定の manifest を最後に上げる。bundle が app より古い組み合わせは作れない(bundle が hit なら、その bundle はその入力から作った物)。ページと bundle は一緒に出す前提で、これは必要な前提でもある(PM の指摘: memfs1 の新形式の bundle を古いページで開くと、schema メッセージで止まる)。manifest に app のコミットを持たせることは今回は行わない(`app/shared/manifest-guard.ts` が見るのは engine.kind だけ)。小さな窓は、配信バケットへのアップロードと `wrangler deploy` の間の数秒に、新しい bundle の既定の manifest と古い Worker/ページが併存すること(長さと影響は測っていない)。
 
 **この push 配備が一度も走っていないこと**: `main` への push による本番デプロイ(配信バケットへのアップロード、`wrangler deploy`、Access の到達確認)は、GitHub 上で一度も走っていない。ブランチのドライランでは、これらの step は skipped で、アップロード計画と `wrangler deploy --dry-run` までが通った。この PR のマージが最初の実行になる。
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **依頼者の指摘への対応は妥当と判断した**: ランナーは標準の GitHub-hosted `ubuntu-24.04` に固定(第三者ランナーの RunsOn と大きいランナーは依頼に無く、担当=エージェントが決めたのは誤り。撤回)。Variables は 0 個、Secrets は 5 個(`<CREDENTIAL-NAME>`、`R2_ARTIFACT_*` 読み取りのみ、`R2_CACHE_ASSETS_*` キャッシュ+配信バケットの読み書き)。Worker 名は `fl-studio-web`(旧 `-private` の名は公開版が予定されているように読めるため)。Issue #3 は日本語。標準ランナー(private: 2 vCPU / 8 GB / 14 GB SSD、6 時間)で足りる根拠は担当の実測と GitHub の文書(`wasm-opt` のピーク RSS 5.19 GB、ディスクのピーク約 7 GB)だが、**GitHub 上での実行は 0 回**(dispatch が 403)なので、初回の冷たいビルド(見積り 70〜100 分)がテストになる。
 - **ブランチの `app/scripts/build-engine-bundle.sh` の変更(+7 行、`NO_CGROUP=1` で systemd-run を使わない)**: AGENTS.md が systemd-run を禁止しているため。ship3 の担当が同じ変更を足す予定だったので、PR の方を正とし、ship3 では取り込まない(重複させない)。

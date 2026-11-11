@@ -133,7 +133,7 @@ PM の判断(C2 は付けない)に従い、次は**付けていない**。参�
 - prototype(info 1 の保存確認): `hintinject.py`・`hintcount.py`・`hintcheck.py`。
 
 
-## PM の判断と取り込み(2026-11-06 14:35、docs のみ。製品の差分は未投入)
+## PM の決定と取り込み(2026-11-06 14:35、docs のみ。製品の差分は未投入)
 
 取り込み: mt3 の最終(14:2x)の文書・表・道具と差分 `0293-branch-hint.diff`(9 file、+700/−33)を `docs/investigations/mt3w/0293/` に置いた。PM の dry-run(`git archive` の複製): E11 の e11-wip 799b0417 に offset 0・fuzz なし、E10 の main 9fdc492f に `lower.rs` が offset −39 行・fuzz/reject なし。実行したのは fe-wasmgen を実エンジンの 8 module に当てた生成、wasm-opt -Oz と merge、V8 の検証、node でのテストで、**Chrome での速さの測定はこの文書には無い**(alpha1 の 0290 に注入版の Chrome 1 組)。依頼者の機械は 0 件。
 

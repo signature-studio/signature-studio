@@ -206,7 +206,7 @@ b2d2 が報告した種類の失敗(Worker の error イベント、idle に達�
 | S-fin1-negctl | 陰性対照は prune1 の mutant(0x37d09b0)を F2xn の prune リストに足した、wasm-opt なし・brotli q5 の検証用バンドル | wasm-opt 入りで見せる指示 |
 | S-fin1-ship | `SHIP_PRESET=F1x\|F2x`(opt-in)で出荷の既定をまとめた。F2x の S+M は決定 0168 では条件つき | プリセットを入れない判断 |
 
-## 10. PM の判断点
+## 10. PM の未決の点
 
 1. **S1 を F2 系(prune S+M)で満たす採用**(wasm 生 1.936 倍、余裕 3.2%)。決定 0168 の PM 付記は S+M を『条件つき』としているので、条件(CPUID が SSE2 固定の間のみ、到達したら名前つきで abort、所定のプロジェクトの再生・書き出し・プラグインでの確認)を満たしたと見なすか。F1 系(prune S)は 2.43 倍で届かない。
 2. S1 の『データ』の読み(DLL パック 70.6 MB を数えると F2 は 3.02 倍)。
@@ -233,7 +233,7 @@ b2d2 が報告した種類の失敗(Worker の error イベント、idle に達�
 
 `lift/out-git/fin1-results/`: `fin1.diff`、`MERGE-NOTES.md`、`docs/0176-final-bundle-fin1.md`、`docs/README-0176-line.txt`、`tables/`、`logs/`、`tools/`。バンドル: `lift/out-websrv/assets/fl-engine-fin1-{Dp,F1,F2,F1x,F2x,F1xn,F2xn}/`(各 約 250〜470 MB。plain の wasm と `.br`。**既定の入口ではない**。確認は `?bundle=/assets/fl-engine-fin1-<X>/manifest.json`)。ワークツリー `lift/out-fin1/`(終了時に整理)。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `fin1.diff`(基準 HEAD 912a2ca。a640cce〔0178〕でも `patch -p1 --dry-run` が offset・fuzz・reject なしで当たる)。`-` 行は `lift/harness/b2d2/gen-direct.sh` の `MODULES=` の 1 行の置換だけ(EXTRA_IMPORTS を全モジュールに渡すため)と確認。`build-engine-bundle.sh` は追加のみ(`SHIP_PRESET`、opt-in。他の決定の opt-in は落ちていない)。`bash -n` 通過。全体テスト **162 results / 2,192 passed / 0 failed**(0178 取り込み後と同じ)。PM は構成を再ビルドしていない(大きさ・起動・11 分再生の数字は担当の実測)。進捗(G 段階)には数えない。
 

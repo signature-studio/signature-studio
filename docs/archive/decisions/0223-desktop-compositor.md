@@ -1293,7 +1293,7 @@ PM の決定(依頼者の『multiple canvas 廃止+レンダリングフロー�
 | S-desk2-describe | `fle_desk_describe()` に窓のクラスと題を足す(診断の文字だけ) | e2e が窓を見分けるのに要る。合成は読まない。クラス名で分岐するのはテストの側で、ランタイムでもページでもない(lift の忠実性: FL のクラス名による分岐を製品に入れない)。撤回条件: コンポジタの診断が不要になったとき |
 | S-desk2-fallback-id | クラスが無い bundle の窓の見分け(幅 300 以上 = ダイアログ、題は一番上のダイアログに付ける) | D8 のテキストにクラスが無い間の、テストの側だけの弱い方法。撤回条件: クラスのあるビルド(手順 4)で実エンジンの確認が済んだとき |
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 6f3a6f8 に `desk1.diff`(33 ファイル、`-` 35 行は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。`ci1-popup.diff`(決定 0228)と同じ木で PM が測った値(この機械、`lift/out-pmchk-d3/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **191 results / 2,348 passed / 0 failed**(desk1_compose を含む)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、typecheck rc=0、vitest **1,622 passed + 7 skipped**、Worker 50/50、e2e **1,313/1,313**。
 
@@ -1302,11 +1302,11 @@ PM の決定(依頼者の『multiple canvas 廃止+レンダリングフロー�
 3. 合計 CPU が下がるのは trim(報告の絞り込み)による。trim なしは B・A と同等(アイドル・ドラッグは D が大きい)。構造として減るのは、ページが受け取る画素と Worker→ページの転送(再生で 81 MB/s・putImageData 54 回/s → 0)、ページのメイン CPU(再生 0.132 → 0.040 core)。
 4. 依頼者のブラウザは Windows の Firefox 159。この機械の Firefox 158 headless での結果は、その起動を保証しない。
 
-## PM の判断と取り込み(2)(2026-11-04): detached ArrayBuffer の不具合の修正
+## PM の決定と取り込み(2)(2026-11-04): detached ArrayBuffer の不具合の修正
 
 desk1 が D の画素同一性の測定(2 回に 1 回、最初のステップで 29,175 画素違い、画面の端が黒)と、旧方式での `deskDumpBase64()` による Worker の停止から見つけた不具合を、`desk1-fix-detached-buffer.diff`(4 ファイル、`-` 4 行を読んだ)で直した。`DeskPresenter.present()` は `compose()` を呼ぶ前に取った wasm メモリの ArrayBuffer で結果を読んでいた。`compose()` はエンジンのメモリに確保するので、メモリが伸びる(memory.grow)と古い ArrayBuffer が detach され、`DataView` が TypeError を投げ、`compose()` が書き換えた絵の報告矩形が失われて、canvas にその画素が来なかった。`worker.ts` の `deskDump` も同じ形だった。直し: `compose()` の後でメモリを読む。読み取りが失敗したら `resync()`(次の `compose()` が全面を報告)して例外を再送出する。単体テスト 2 件(`compose()` が ArrayBuffer を detach する、読み取り失敗で resync)と mutation 1 件(`desk_reads-the-memory-before-compose`)を足した。PM が測った値: typecheck rc=0、vitest 1,624 passed + 7 skipped、Worker 50/50、e2e 1,313/1,313。runtime は変わらない。Firefox の起動失敗の記録にも同じ例外が出ていたが、起動失敗への寄与は未確認(desk1 が修正後の負荷下の起動テストで測る)。
 
-## PM の判断と取り込み(3)(2026-11-04 16:15): 午後の追試(`desk1-docs.diff`)と D を既定にする計画
+## PM の決定と取り込み(3)(2026-11-04 16:15): 午後の追試(`desk1-docs.diff`)と D を既定にする計画
 
 `desk1-docs.diff`(docs・tools だけ、266 ファイル、`-` 91 行は文書・ツールの書き換えで、`lift/` と `app/` の追跡ファイルは触れない)を HEAD 95759fe に取り込んだ。desk1 の文書の書き換えが上の『PM の判断と取り込み』2 節を落としていたので、PM が戻した。
 
@@ -1314,7 +1314,7 @@ desk1 が D の画素同一性の測定(2 回に 1 回、最初のステップ�
 2. **D を既定にする。** 方針: これは『複数 canvas の廃止とレンダリングフローの改築』(依頼者の指示、2026-11-04)に当たり、lift の忠実性の方針(ページが窓を知らない、Worker→ページの画素のバケツリレーをやめる)に沿う。残る条件を、順に片づける。(a) ship3 の出荷用 wasm(ハイブリッド・wasm-opt つき、`-DFLE_DESKTOP`)で D の起動・画素同一性・遅延を測り直す。(b) 旧 e2e 単独スクリプト 14 本の扱い(移行 7・削除 7、約 5.5 時間)。(c) `desk1-remove.diff`(旧経路の窓ごとの canvas の除去、−4,118 行)を当てる。(d) CI の bundle を `-DFLE_DESKTOP` つきにし、ページの既定を D にする。(e) 実機(Windows の Firefox 159・実 GPU)の値は 0 件のまま。
 3. 120 Hz の全面描き直しの最悪は Worker の 58%(Chrome)・80%(Firefox)で、典型は 1〜3%。エンジンが 120 枚/s の違う絵を描けるかは測れていない(P2 の残り)。リフレッシュを制限しない環境では提示が無駄に回る(変化があるときだけ提示する案は未実施)。
 
-## PM の判断と取り込み(4)(2026-11-04 22:35): D を既定にし、旧経路を抹消する(`desk2.diff` + `desk2-ci.diff` + `desk3.diff`)
+## PM の決定と取り込み(4)(2026-11-04 22:35): D を既定にし、旧経路を抹消する(`desk2.diff` + `desk2-ci.diff` + `desk3.diff`)
 
 取り込んだ基準: HEAD 36b1873 に `desk2.diff`(87 ファイル、+968 −5,077。旧経路の窓ごとの canvas・surface-sync 等の除去、既定を D に、`engine.desk` の印のない bundle は読める文面のエラーで止める、変化があるときだけ提示する眠りの提示ループ〔仮採用〕、旧 e2e 単独スクリプトの移行 7・削除 7)、`desk2-ci.diff`(5 行。全プリセットに `-DFLE_DESKTOP`・`RT_O2_EXTRA += fle_desk`)、`desk3.diff`(6 ファイル、`-` 15 行を全部読んだ。検査のスクリーンショットの座標を文書座標に、legacy 配置の header を 1 行に)。PM が測った値(この機械): typecheck rc=0、vitest 1,377 passed + 7 skipped、Worker 50/50、**e2e 全群・全 target 893/893**、FLEngine の既定の生成 C の sha256 `cd9107ce…` 不変、全体テスト **193 results / 2,361 passed / 0 failed**(`fle_desk.c` の `fle_desk_describe` と `desk1_compose` を含む)。
 

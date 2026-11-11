@@ -421,7 +421,7 @@ Worker はどちらも 80〜99% 使われていて(Firefox 97〜99%、Chrome 80%
 - 他の担当(ship3 の `wasm-opt` ほか)の負荷で load が 10〜22 になった時間がある(14:13〜14:30 の一部)。その時間の Chrome 行(構成の Worker プロファイルなど)は速さの根拠に使っていない(§6.3 の表は load ≤ 9 の行だけ)。Hcur の Firefox 3240x1946 の取り直しは load 10〜13 で、参考値としてだけ書いた。
 - a4 FRUITY 無効の最初の走行(`logs/a4off-attempt1-wrongenv.log`)は、leak1 の `a4off.sh` の module 一覧だけを写し、リポジトリの入口 `a4-fruity.sh off` が設定する `FLE_HOOKS`・`FLE_CALL_FRUITY=0` を入れ忘れた(と読んだ)ため、`VirtualProtect: address is not in a VirtualAlloc region` で 315/942 の所で止まった(基準は 942/942)。入口を `a4-fruity.sh off`(そのまま)に直して取り直したら 942/942 で完走した(上の (2))。どの差(`FLE_HOOKS`・`FLE_CALL_FRUITY=0`)が止まりの原因かは 1 つずつ外して確かめていない(読み)。最初の走行を『不変』の根拠には使っていない。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 741d626 に `hyb5.diff`(11 ファイル)を `patch -p1`(offset・fuzz・reject なし)。`-` 行 2 本(`lower.rs` の `m2 if packed_on()&&is_sse_x2` の条件と、Psrlw/Psraw 系の腕)は読んだ。PM が測った値(この機械、`lift/out-pmchk-h1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **192 results / 2,350 passed / 0 failed**(ignored 1。基準 191 / 2,348 に新しいテスト 1 ファイル分が増えた)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。
 

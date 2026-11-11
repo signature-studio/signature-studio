@@ -256,7 +256,7 @@ FRUITY 有効の最終構成(`a4-fruity.sh on-seh`、独立 2 回 + HEAD d8aacf4
 
 PM の停止条件 **(a) G8c に達した**。壁 4 件は小さい応答(API の行・既定動作・境界の値)で、大きなモデル・lift の穴・PM の判断値の壁には当たっていない(fe-lift / fe-decode は変更していない)。
 
-## 12. PM の判断点
+## 12. PM の未決の点
 
 1. **B はウィザードが出ている間は無視される**(エンジンの前提条件)。アプリの『ファイルを開く』は、(a) 起動時に A で渡す、(b) 通常起動ならウィザード/GDPR を閉じてから B を送る、(c) 『busy なら待つ』を `fle_appfile_state` で見せる、のどれにするか。
 2. `fle_app_open` / `fle_app_open_state` は export したが**ブラウザ(wasm)側は未実装・未測定**。ファイルをブラウザから VFS に入れる `fle_app_put_file` は**作っていない**(PM の決定の範囲外)。

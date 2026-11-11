@@ -68,6 +68,6 @@ bash T/lift/harness/c0325/build.sh T W R D/flat.bin D/names.txt          # 実�
 ```
 
 
-## PM の判断と取り込み(2026-11-07 08:39、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 08:39、docs のみ。製品の差分なし)
 
 取り込み: ci1 の 0325(O18: カーソルの絵と hot spot をブラウザの CSS カーソルへ渡す)、差分(`docs/investigations/ci1/0325/diffs/`)、実物のカーソルの復号の証拠(`evidence/`)。**PM の検証**: `0325-cursor-pictures.diff`(1270 行)を cand1 の積み(HEAD + 0323 + 0313f2 + scroll-model + time-env + stop-context + d1 + d2 + diag-g9-fl + diag-g9-fl-scroll)+ 0323b + alpha1 の scrolldc のコピーに実適用して rc 0・FAILED 0・.rej 0、`emcc -fsyntax-only -Wall -Wextra` で fle_gdi.c・fle_res.c・fle_appview.c は警告 0。ci1 の報告(私は再実行していない): 実物の FLEngine_x64.dll のカーソル 56 個を C と独立の python で復号して幅・高さ・hot spot・RGBA が一致、native のテスト 38 PASS。**ブラウザで CSS カーソルが実際に変わるかは未確認**(RT-A の bundle ができてから gpu1 が確認)。区分 (b)。RT-A の bundle に載せる。依頼者の機械は 0 件。

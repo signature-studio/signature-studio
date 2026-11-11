@@ -203,7 +203,7 @@ Old vs new (exact two-sided permutation test on the means; p < 0.05 would be a d
 ## PM 記入欄（ci1 は書かない）
 
 
-## PM の判断と取り込み(2026-11-06 18:25、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 18:25、docs のみ。製品の差分なし)
 
 取り込み: ci1 の E11(本番 bundle `fl-engine-ci-dc5fae2b`、Worker 00769751、ページ 7373cd55)の確認の文書・結果・画・小さな表を `docs/investigations/ci1/0277/e11/` に置いた(音声の生データ `*-audio.json` は入れない。原本は `lift/out-git/ci1-results/0277/e11/data/`)。実ブラウザ(Chrome 156 / Firefox 158、この機械、模擬入力)で、**依頼者の機械は 0 件**、本番 R2 の `perf/` に beacon は 0 件。
 

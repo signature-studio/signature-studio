@@ -555,7 +555,7 @@ D' の名前つき wasm(wasm-opt 済み)を node で `--cpu-prof`(250 µs)。定
 - `tables/`(TSV。この文書の表)、`logs/`(小さなログ。再現の記録、`disclosures.txt`、全体テストのログ 3 本)、`tools/`(再現のスクリプト。README 付き)、`scripts/`(g3 スクリプト)
 - **作業ディレクトリ `lift/out-ui1/` は終了時に整理した**: バンドル(D' の名前つき 298 MB、env 対応の 2 つ)・オブジェクト・生成 C・プロファイル(`*.cpuprofile` 11〜17 MB が 12 本)・`runs/` は消した(再作成は `tools/` の手順で約 25 分。表と集計済みの TSV は成果物に入れてある)。**残したのは `lift/out-ui1/build/onat/v-ta83db4277231/native/two-native` と `…/dll/` だけ**(合計約 520 MB。別の担当〔leak1〕が実行中にこの native バイナリと DLL を読んでいたため。500 MB の枠を約 20 MB 超えている)。
 
-## 付録 PM の判断(2026-11-03、取り込み時)
+## 付録 PM の決定(2026-11-03、取り込み時)
 
 - **ui1.diff の runtime 変更(`FLE_DWM_HZ` / `FLE_DISPLAYSETTINGS_FREQUENCY` を環境変数で変えられる口)を取り込む。** 既定は 60 のままで、環境変数なしの wasm で `cmp-short.g3` の 82 行(面 SHA 34)が native -O0 の基準とバイト一致している(担当の確認)。
 - **`FLE_DISPLAYSETTINGS_FREQUENCY` を別々に指定できる口は残す。** 食い違ったときは警告 1 行を出す。食い違ったときのゲストの挙動は未確認(S-ui1 の撤回条件に従う)。

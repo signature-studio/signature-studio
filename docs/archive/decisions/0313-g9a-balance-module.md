@@ -682,7 +682,7 @@ Learn は**どの `ImageList_*` についても `GetLastError` の値を定め�
 | 5 | 先読みの方針(idle の背景取得、再生中の抑制)| 約 150 行 |
 | 6 | lifted module のオンデマンド化(O-2)| **別の設計**(link の変更と dispatch 表の動的登録を含む。1,500 行以上の見込み、未設計) |
 
-### 18.8 測定計画(実装の前に測れる物)と PM の判断
+### 18.8 測定計画(実装の前に測れる物)と PM の決定
 
 測る物: (1) 索引の実際の大きさと brotli 後(opt1 の `0320-install-tree-files.tsv.gz` から python で作れる。実行は私の許可後ではなく読みのみなので、次の宿題で可)、(2) chunk の取得の往復(R2 + Worker + CDN、1 MiB・4 MiB)、(3) OPFS の `FileSystemSyncAccessHandle` の同期読みの速度と、chunk 数 2,000 個の open の費用、(4) `Atomics.wait` で待つ guest thread と GIL の挙動(実スレッド版)、(5) Firefox・Safari の quota、(6) 骨格 node 28,000 個の起動費用と heap。
 
@@ -769,7 +769,7 @@ index.bin :=
 - **wasm が Filter(158,438,681 B)より +8,534,910 B(+5.4%)、S1 の比 1.866 → 1.966**: 原因は診断でも差分でもなく、**hybrid strip の印 `$HYB/stripped` が古いまま skip された**こと。私の invalidate 段が wsrc を作り直したのに印を消さず、strip 前の units が compile された(build log:『hybrid strip: done for list ec345f4a4af9d034, skipped』。Filter の build は実際に strip: 『dropped 3875 functions, kept 122279』)。wasm の function section +3,850 ≒ lowered 関数 3,875。確定の根拠(実測): 新しい wsrc に同じ strip を当てると、Filter の strip 済み units との差は FLEngine が +790 B・25 行、module が +1,344 B・44 行だけ。lift に効くのは ship6-imports.txt の ScrollWindow の 1 行だけ(その行なしで lift をやり直すと flengine.c の sha が Filter と一致)。objects の増加は fle 群 +7.55 MB・mod 群 +3.99 MB に対し rt 群は +14.8 KB。**strip した版の S1 は約 1.866(読み)**。影響: 機能の確認には使えるが、C 側が direct 版でなく C 版の lowered 関数を呼ぶので性能・first idle の測定には使えない。RT-A は新しい work dir で strip 済み。是正は `tools/g9f-cand1-build.sh` の invalidate 段(印を消す)。
 
 
-## PM の判断と取り込み(2026-11-07 01:35、docs のみ。製品の差分は push していない)
+## PM の決定と取り込み(2026-11-07 01:35、docs のみ。製品の差分は push していない)
 
 取り込み: mt3 の 0313(G9-a = Fruity Balance を 6 本目の実モジュールとして足す変更案の準備)の文書・差分・表・道具を `docs/investigations/mt3w/0313/` に置いた(生ログは `.txt` に改名)。**実エンジンの実行・wasm の build・Chrome は 0 件。検査は静的だけ**(patch --dry-run、bash -n、ci/test-hybrid.sh 51 ok、clang/emcc -fsyntax-only 警告 0、fe-lift 1 回)。『踏む壁』は読みで、実行の観測ではない。
 

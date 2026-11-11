@@ -268,7 +268,7 @@ S1 の余裕(PM 追記: SHIP2 で 10.9 MB。決定 0197 の F2xH 単独では 11
 
 (全文は `tables/s-choices.tsv`。)
 
-## 14. PM の判断が要る点
+## 14. 未決の点(PM)
 
 1. **`-DFLE_READFILE_EOF_TRUE` を既定にするか**(§9): 末尾読みで ReadFile が TRUE+0 を返す(Learn の『ファイルの終端のテスト』のページ)か、FALSE+ERROR_HANDLE_EOF(ReadFile のページの Remarks)か、Learn のページ同士が食い違う(両方の URL は MERGE-NOTES)。オンにすると起動の 16 スナップで入口数が全部 −28、主窓の表面 1/34 で 13 ピクセル(x=1042, y=12..24、チャンネル差 最大 9)が変わる。エンジンの終端読みが TRUE の経路を取る=FLAC の復号が実 DLL と一致するために要った。**既定はオフのまま**。
 2. **`-DFLE_REALMOD_FREE_RESIDENT` を出荷で使うか**(FreeLibrary の後もモジュールを常駐させる。DelZip64 が FreeLibrary された直後に再び使われても壊れない形)。**既定はオフ**。
@@ -286,7 +286,7 @@ S1 の余裕(PM 追記: SHIP2 で 10.9 MB。決定 0197 の F2xH 単独では 11
 
 ---
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **取り込み**: `dec1.diff`(17 ファイル、削除 4 行〔`fle_vfs.c` の `lpSecurityAttributes` の停止 1 行、`noreturn_audit.rs` の 3 行。いずれも意図した置き換え〕)を HEAD d17b038 に当てた(offset 6 行のみ)。`api2.diff`・`act1.diff` と同時に当てて、1 回の全体テストと a4 で確認した(決定 0210・0213 の PM 欄も同じ数字)。FLEngine の既定の生成 C は sha256 `cd9107ce…`(215,811,678 B)のまま。PM 実測: 全体テスト 183 results / 2,307 passed / 0 failed(基準は 180 / 2,287。+api2 + dec1 wall_dec1 7 + act1_net 9)、a4 FRUITY 無効 942/942、895/895、関数 5,310、入口 1,009,731(不変)。
 - **採る**: 3 つの DLL(oggio_x64、wavpackdll_x64、DelZip64)の lift は、Wine 10.0 上の本物の DLL と 63 ファイル・約 4,830 万サンプルで一致している(担当の実測)。`dec1-imports.txt`(18 行)は ship3 の EXTRA_IMPORTS に `ship2-imports.txt` の後ろへ足す。16 スナップへの影響は 0(担当の実測、85 行)。ship3 で再確認する。

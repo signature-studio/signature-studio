@@ -69,6 +69,6 @@
 4. 先の info(0318 の続報)を `date` と backtick を含む未クォートの heredoc で作り、shell が backtick の中身を実行して文面の一部が抜けた(『command not found』が出た)。訂正の info を送った。以後、メッセージの本文は引用符つきの heredoc で作る。
 
 
-## PM の判断と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
 
 取り込み: gpu1 の 0318(依頼者の観察 O1・O3・O5・O9 の実 Chrome 156 / Firefox 158 での再現、非計時、E13)と HiDPI の設計メモ(`docs/investigations/gpu8/0318-hidpi-design-memo.md`)。要点(gpu1 の観測): O9(Settings→General のスクロールで描画が崩れる)は Chrome・Firefox の両方で再現し、canvas・peek・dump の sha が一致 = **崩れているのはエンジンの面そのもの**(ブラウザに依らない runtime の決定的な挙動)。O5(Monitor を畳む)は Chrome 4 条件・Firefox 1 条件で止まらない(別に、畳んだ後の 2 回目の dump が落ちる診断経路の不具合)。O1 は clip のドラッグは始まり離すと移るが、ドラッグ中にカーソルに付く clip の絵が描かれない。O3 は About の layered 窓が 4×3(Chrome)/3×3(Firefox)で小さいまま。判断は `docs/feedback/2026-11-07-owner-observations.md` に記した。依頼者の機械は 0 件。

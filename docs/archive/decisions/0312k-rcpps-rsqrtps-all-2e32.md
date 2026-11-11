@@ -16,7 +16,7 @@
 `tools/rcp/rcpsqrt_full.c`(`clang -O2 -msse2 -I lift/runtime rcpsqrt_full.c -o rcpsqrt_full`、`./rcpsqrt_full ~/work/opt1-wine/exports/rcpsqrt-wine-zen.txt`)。出力: `tables/0312k/run3.txt`。
 
 
-## PM の判断と取り込み(2026-11-07 01:04、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 01:04、docs のみ。製品の差分なし)
 
 取り込み: mt3 の 0312k(runtime の RCPPS/RSQRTPS の C 実装を、実命令と全 2^32 の float32 ビットパターンで比べた結果)。**native のみ(clang -O2 -msse2、1 スレッド)、実エンジン・Chrome・依頼者の機械は 0 件**。
 

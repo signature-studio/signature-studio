@@ -289,7 +289,7 @@
 
 `docs/0198-ladder-audit.md`(この文書)、`docs/README-0198-line.txt`、`tables/ladder-items.tsv`(項目表)、`tables/ladder-stage-summary.tsv`、`tables/ladder-reobserve.tsv`、`tables/ladder-stale.tsv`、`logs/`(各実行の `result.json`・`reobserve-*.log`・Worker ログ全文・音声の要約)、`images/`(スクリーンショット 5 枚)、`tools/`(再観測の道具と表の生成)、`ladder-update-proposal.diff`(goal-ladder.md の追記。`patch -p1 --dry-run` が HEAD の `git archive` に当たる)、`MERGE-NOTES.md`。作業ディレクトリ `lift/out-ladder2/`。
 
-## PM の判断と取り込み（2026-11-04）
+## PM の決定と取り込み（2026-11-04）
 
 - **取り込み範囲:** 文書だけ（決定文書、`docs/investigations/ladder2/` の表・ログ・道具・画像 3 枚〔400 KB 超の 2 枚は除外〕、`goal-ladder.md` への追記 `ladder-update-proposal.diff`〔`-` 行 0、`+` 27 行。古い記述は消さない〕）。コード・テストの変更なし。
 - **報告の書式（恒久。PM の判断）:** 各ターンの最高到達段階は **2 通りで書く**。(1) 『最も厳しい読み』= 連続・全項目・ブラウザ・実エンジン・既定の入口・P 規則・曖昧語は不利 = **G0**。(2) 『字義どおりの読み』= 段階ごとに自分の項目で判定、曖昧語は読み A（能力）= **G4**。ただし **G1・G2・G3 に各 1 項目の記録の欠け**（G1-7 Worker ログ上の Run 入口、G2-7 `document.title` への反映、G3-4 実エンジン自身の `WM_TIMER`）があり、『G1〜G3 を通過』と書くならこの 3 項目を明記する。ladder2 の評価では従来の『最高 G0、G1〜G4 は観測のみ』は過大ではなかった。逆に G7『未達』・G8『未測定』・G10『未測定』のラベルは 2026-11-03 の観測と合わず古い（`progress.md` と `roadmap-to-goal.md` の更新は docs の作業で行う）。

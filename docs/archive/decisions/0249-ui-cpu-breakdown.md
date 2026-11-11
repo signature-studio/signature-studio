@@ -137,7 +137,7 @@ b の busy 42.2 s に対する割合。『削れる見積り』は『直 wasm �
 
 `tools/` に一式(`README.md`)。要点: `bash tools/run-ci-build.sh <git archive の木> <ciwork> F2xH7` で冷間ビルド、`tools/mk-names-wasm.sh` の流れ(`ciPN`/`ciPN2` の作り方は README)、`python3 tools/mk-funcmap.py` / `mk-idxmap.py` / `pe-ranges.py` で表、`tools/mk-assets.sh NAME BUNDLE` + `tools/preview.sh NAME PORT` で配信、`tools/run-scenes.sh TAG PORT a b c d e` で 5 場面、`python3 tools/prof-analyze.py PROFILE --top 30 --split roots --owners --incl`、`tools/mk-scene-table.py`、`tools/prof-cands.py … --reasons`、`tools/run-ab.sh ROUNDS TAGA PORTA TAGB PORTB`。
 
-## PM の判断と取り込み(2026-11-05 18:35)
+## PM の決定と取り込み(2026-11-05 18:35)
 
 - 文書・表・道具だけの取り込み(製品の木への diff は 0 行)。400 KB 超の `funcmap.tsv.gz`・`idxmap.tsv.gz` は置かず、`tools/README` の作り方で再生成する。PM は gpu1 の測定を再現していない(この機械、Chrome 156、実 GPU なし、依頼者の機械は 0 件)。
 - 採る読み: 再生中の UI Worker は 94% 忙しく、C 経路の関数が引き起こす費用は busy の 32.2%(うち SSE/x87 エミュレーションの 92.7% は C 経路から)。最初の 1 手は「直 wasm にできるのに set U に無い関数」の追加(f_e95750 ほか。実験の 4 関数で wasm +139,096 B、Worker CPU は −0.88 s で run 間のばらつきの内)。次の担当は決定 0251(gpu1、`lift/out-git/gpu3-results/`)。

@@ -142,7 +142,7 @@ native の実エンジン(`tools/k_select.py`、`tables/k-select-native.tsv`、`
 - cargo の `CARGO_TARGET_DIR` は `lift/out-mt3y` の外(`~/work/mt3w-ct79`、約数 GB)に置いた(500 MB の上限のため)。終了後に消す。
 - 規則の逸脱の自己申告(0279): (a) `sleep` を 1 回呼んだ(拒否された)。(b) t2500b の実行を `… &`(末尾 &)で起動した(禁止。結果に影響しないが規則違反)。(c) 存在しない `bash` ツールの呼び出し(0275 の申告済み)。ただし負荷は 13〜28 の窓で走らせた(nice 15、cargo は `CARGO_BUILD_JOBS=4`、`taskset`)。最初の `test.sh full` は cargo の既定(16 ジョブ)で始めて load 28 になったので 1 分で止めてやり直した。
 
-## PM の判断と取り込み(2026-11-06 10:55、docs のみ。差分は製品の木に当てていない)
+## PM の決定と取り込み(2026-11-06 10:55、docs のみ。差分は製品の木に当てていない)
 
 取り込み: mt3 の 0279 の最終の文書・表・道具を `docs/investigations/mt3w/0279/` に、差分 `0279-slice-ticks-k4.diff`(`fle_thread.h` の `FLE_PREEMPT_SLICE_TICKS` 10000u → 2500u と `wall_fr20.rs` の手計算 7 本、古い環境変数の記述の訂正)を `patches/` に置いた。e8-wip(a1e96d92)の `git archive` に dry-run が offset・fuzz なしで通ることを PM が確認した。mt3 の検証(native の実エンジン): `test.sh full` 212 実行ファイルで results=216 passed=2395 failed=0 ignored=1、SKIPPED 1 件(wall_fr9t の `FLE_FR9T_CLEAN_RT` 未設定。別掲)、a4 off は 942/942・895/895・5,310・1,009,737 で E8 と同じ。ブラウザ・node の 84/55/87 行・実機は 0 件。
 判断:

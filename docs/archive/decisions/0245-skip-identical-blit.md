@@ -111,7 +111,7 @@ headless Chrome 156 に、本番と同じページ(HEAD 3688a940 の `app/` を 
 - 機械の load average が 20〜50(他の担当を含む)の中で測った。回ごとのばらつきは ±25%。比(A2/A1)の向きは 3 回で揃っている。
 - 規則の逸脱(自己申告): 一度、`( … ) &` + `wait` を background:true の shell に書いて 2 本の鎖を並べた(末尾 `&` の禁止に触れる書き方。出力・結果への影響は無い)。heavy な処理が一時 3〜4 本同時に走った(ciN の cold build + native 生成 C + wasm 2 本 + test.sh)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD a49391d9 に `alpha2.diff`(`-` 行 0、fle_raster.c/.h・fle_gdi.c の追加と新規のテスト・文書・道具)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械): FLEngine の既定の生成 C の sha256 `cd9107ce…` 不変、全体テスト **199 results / 2,399 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895 で基準と一致。
 

@@ -211,7 +211,7 @@ Wine 10.0 の実測(mingw + wine。`harness/txt1/create_seq.c`、`tools/build-cr
 
 **確認できなかったこと**: 起動 16 スナップ・46 プローブ・CPU の native 測定は runtime が HEAD 0156065 の木で行った。基準 HEAD が 88c7809 に進んだ後(`fle_win.c` に WM_DISPLAYCHANGE / WM_SETTINGCHANGE の既定処理と opt-in の remaximize が増えた)は測り直していない(起動の 16 スナップで通る経路ではないと読むが、測っていない)。実機 Windows の挙動。node 版(wasm)の期待表。Chrome・Firefox での動作(native のみ)。FLEngine の既定の生成 C の sha256(fe-lift に触れていないので同じと読むが、再生成して確認していない)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **取り込み**: `txt1-createwindow.diff`(`fle_win.c` +22 行・削除 0、テスト 4 本の期待値更新)と `txt1.diff`(新規 4 ファイル)を HEAD 050fa43 に適用した(dry-run はオフセット・fuzz とも 0、`-` 行 28 本を読んだ。期待値の更新と `fle_win.c` の追記だけ)。PM の測定: FLEngine の既定生成 C の sha256 は `cd9107cef4cb...47029e50`(215,811,678 B)のまま、全体テスト 187 results / 2,323 passed / 0 failed(050fa43 の 186/2,321 に `txt1_createsize` を加えた値)。a4(FRUITY 無効): init_count 942/942、run_rank 895/895、functions 5,310 は不変。**function entries は 1,009,731 → 1,009,737(+6)**。取り込み前の HEAD(050fa43)を `git worktree` に取り出して同じ a4 を回し 1,009,731 を再現したので、+6 は txt1 の作成時 WM_SIZE/WM_MOVE によるもの(担当は a4 の数字を報告していなかった)。以後の a4(FRUITY 無効)の基準値は entries 1,009,737 とする(古い 1,009,731 は上書きせず、この記録に残す)。
 - **既定 ON で採る理由**: これは lift の忠実性の方針の (b) 外部 API の契約の実装(CreateWindowExW が作成時に WM_SIZE / WM_MOVE を配る)である。FL 側の分岐も代行もない。条件は窓のスタイルビットとメッセージ専用窓の除外だけで、`-DFLE_NO_CREATE_SIZE_MOVE` で従来に戻せる。出典は Wine 10.0 の実測(9 作成ケース)と Learn の引数の定義。実機 Windows との比較は 0 件で、仮(PROVISIONAL)のまま。

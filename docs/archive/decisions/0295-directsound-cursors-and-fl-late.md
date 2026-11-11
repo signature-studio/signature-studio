@@ -218,7 +218,7 @@ loop (0x12aeeda):
 - 追跡(gz): `logs/ds-trace-{base40,base100,lead15-100}.trace.gz`。他の run の追跡は大きいので置かない(要約と表は `tables/`)。
 
 
-## PM の判断と取り込み(2026-11-06 16:15、docs のみ。runtime の差分案は E12 候補で未投入)
+## PM の決定と取り込み(2026-11-06 16:15、docs のみ。runtime の差分案は E12 候補で未投入)
 
 取り込み: mt3 の最終(訂正を含む、16:03)の文書・表(約 1 MB)・道具と、差分 3 本(`0295-ds-write-cursor.diff`、`-test.diff`、`-comments.diff`)を `docs/investigations/mt3w/` に置いた(生のログ 4.6 MB は入れない。原本は `lift/out-git/mt3w-results/0295/logs/`)。実行したのは native N1 に G3 の模擬入力(18 回)で、**ブラウザ・実 Windows・依頼者の機械は 0 件**。
 

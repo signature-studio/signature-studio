@@ -122,7 +122,7 @@
 
 `lift/out-git/opt2-results/0278/`: `docs/0278-opt1-e8-real-engine.md`、`docs/README-0278-line.txt`、`tables/`(`g3-lines-0278-e8-*` / `g3-lines-0278-e9-*`〔node の行〕、`0278-e8-vs-e7b-kinds-*` / `0278-e9-vs-e8-kinds-*`〔種類別の差〕、`0278-e8-play60-rates.txt` / `0278-e9-play60-rates.txt`、`0278-e8-elastique-3fn-status.tsv`、`0278-serab1-e14-vs-e7b-invalid-load.txt`、`0278-idle-ab-ff-vs-d9c160aa-a.tsv` / `-b.tsv`)、`logs/`(`0278-e8-*` / `0278-e9-*`〔Export の json・report・stdout、再生の report・audio〕、`0278-x14-build-tail.txt`、`0278-rows-e14.txt`、`0278-serab1-run.log`)、`runs-series/`(A/B 1 セット目の原本)、`tools/`(mk-x14.sh、mk-x15.sh、mk-rows-e14.sh、mk-rows-e15.sh、rows.sh、build_test5.sh、run-e14.sh、run-e15.sh、run-idle-ab2.sh、idle-ab-summary.py、r2fetch.mjs〔配信バケットを読み取りだけで取る〕、wasm-find-call.py、preview2.sh、serab-summary.py、rows-delta.py、progress-instr-*.diff)。0265 の道具は `../tools/`。作業ディレクトリ `lift/out-opt2` は 12:50 に **437 MB** に片付けた(x14・x15・exp*・tt-*・tw-e14・prod-new の ff5ee429・runs・tmp・assets-*・app-dist*・refproj・r2read を `readlink -f` で確認して削除。自分のプレビューと `wrangler dev` は PID で止めた)。**残したもの**: `prod-new/fl-engine-ci-d9c160aa/`(218 MB。a14 の rig が 13 本のシンボリックリンクで参照)と `tw-e15/bundle/`(E9 の FS 付きテスト bundle、.br を除いて 約 215 MB。a15 の tb-d3 が 4 本のシンボリックリンクで参照)。壊れたリンクは 0 本(/tmp/opencode を確認)。
 
-## PM の判断と取り込み(2026-11-06 12:10、docs のみ)
+## PM の決定と取り込み(2026-11-06 12:10、docs のみ)
 
 取り込み: opt1 の 0278 最終(12:08。E8 対 E7b・E9 対 E8 の交互 A/B と `pst` 直読みの c の内訳は追補〔~12:45〕で更新)の文書・表・ログ・道具・series を `docs/investigations/opt1/0278/` に置いた。測定は Chrome 156 / node の実エンジン(この機械)で、**依頼者の機械・実 Windows・実 GPU は 0 件**。PM は E8 の node 行(E7b との差)と E9 の node 行(E8 との差)、E8・E9 の Export の sha256(`381cdb5a…f979`、22,863,828 B)を自分の `diff` と `sha256sum` で確かめた。
 

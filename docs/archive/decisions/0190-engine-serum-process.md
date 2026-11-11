@@ -116,7 +116,7 @@ S-wrp2-elastique-image、S-wrp2-elastique-seeds、S-wrp2-acm-none(= S-dlg1-acm-n
 
 確認できなかったこと: 参照プロジェクトで process が回るか / process の出力の値 / ピアノの FLAC 復号とワーカースレッド / Serum 2 のライセンス状態(process が呼ばれた先の挙動に届いていない)/ TLS フックが効かなかった理由 / W20 以降の Elastique の壁(SSE4.1 の PINSRD ほか)/ ACM 失敗後に ILVideo へ回るか / Effects 側ラッパー(W13)/ ラッパー・Serum 2・Elastique つきビルドの起動基準 / `rc_helpers` が止まった原因 / 実機 Windows との照合(0 件)。
 
-## PM の判断と取り込み（2026-11-03）
+## PM の決定と取り込み（2026-11-03）
 
 - **取り込み範囲:** `wrp2.diff`（`fle_modules.h` の opt-in マクロ `FLE_GMHEX_RETURNS`、層 6 の行 `lift/harness/seeds/wrp2-imports.txt`、`wall_wrp2.rs`）と `wrp2-felift.diff`（fe-lift に SSSE3 の xmm 形 PALIGNR / PABSB,W,D / PSHUFB を加算。`sse_ssse3.rs`、`fle_ssse3.h`、`sse_ssse3` テスト）。**`wrp2-tls.diff` は取り込まない**（効かなかった試行。理由が特定できていない）。`-` 行は 2 行だけで全部読んだ（noreturn の説明コメント 1 行と、`sse_legacy.rs` の pin 1 行。pin は PSHUFB の xmm 形が lift 可能になったので、未対応のまま残る MMX 形に置き換えた）。
 - **PM の実測（HEAD 504348b + 本 2 差分）:** FLEngine の既定の生成 C は sha256 `cd9107ce…`（215,811,678 B）で不変。全体テスト 175 results / 2,233 → 2,241 passed / 0 failed（取り込み前 173 / 2,233。+ `wall_wrp2` と `sse_ssse3`）。a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731（不変）。作業者の全体テストにあった 2 件の失敗のうち、`sse_legacy` は pin の置換で解消し、`rc_helpers` は PM の実行では通った（作業者の実行では子の `node` が 16 分止まって kill された。原因は未特定の不安定要因として記録）。

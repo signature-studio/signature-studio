@@ -231,7 +231,7 @@ harness/test-env.sh                 # 入力(DLL・種)の自動検出の結果�
 - wasm・ブラウザ・実機 Windows は対象外(今回の対象はホストの `cargo test` だけ)。app/ の TypeScript のテストは対象外。
 - 未実施: 静かな時間帯の再測定。`test.sh` を実リポジトリ(`/home/ubuntu/work/signature-studio-develop` 本体)の木で走らせること(作業は archive の複製だけ。git の差分取得と `git archive HEAD` への `patch --dry-run` だけ、本体の木で読み取りで確かめた)。パッチを当てたあとの実リポジトリでの `record`。
 
-## 8. PM の判断点
+## 8. PM の未決の点
 
 1. **`lift/.cargo/config.toml` の `runner`**: 素の `cargo test` にも効く(RLIMIT_CORE=1・LD_PRELOAD・clang キャッシュ)。他のレーンの通しも自動で速くなり、同時に core-dump 待ちの行列を詰まらせなくなる。反面、全員のテストが**自作のシム**(clang の前置)を通る。外すにはそのファイルを消す。キャッシュを使いたくない人は `FLE_TEST_NOCACHE=1`(core 制限は残る)。
 2. **`lift/Cargo.toml` の opt-level と `debug = 0`**: **PM が採用を了承済み**(fe-pe・fe-decode・iced-x86 を 2、fe-lift を 1、overflow-checks・debug-assertions は dev のまま)。代償は fe-lift/src 編集後のビルド 5.7 → 20 s(コールド 9 → 29 s)。**fe-lift を 2 にするとさらに延びて約 60 s**(テスト: コールド 60.4 s、fe-lift/adjustor など速さは 1 と同じ以下)。debug=0 は Rust のバックトレースの行番号が出なくなる(`CARGO_PROFILE_DEV_DEBUG=2` で戻せる)。

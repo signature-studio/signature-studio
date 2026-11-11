@@ -167,7 +167,7 @@ n ≥ 2^24、`S−0x18` が 16 バイトに揃わない(lifted の movdqa が止
 - 大きな出力: `git log` の長いコミットメッセージを端末に 1 回出した。
 - 他の担当の物の読み取り: `lift/out-ship1/lists/c-imports-engine.txt`、`lift/out-websrv/assets/`(SHIPH と F1xH は symlink で参照)、`lift/out-lat1/runs/`、`lift/out-obs1/tools/`(shim のコピー)。書き換えていない。PM の 5173 と `lift/out-websrv` は触っていない。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `draw1.diff`(`fle_raster.c`〔マクロ `FLE_R_FAST_COPY`、既定 0〕、`fle_hle.c/.h`〔`fle_hle_pixscale` とテスト用 `FLE_HLE_TEST_FALLBACK`〕、`build_nmod_wasm.sh`〔`CFLAGS_RT` に `${RT_DEFS:+ $RT_DEFS}`、空では同じ文字列。'-' 行はこの 1 行だけ〕、`build-engine-bundle.sh`〔`RT_O2_EXTRA`/`RT_DEFS` の 2 行〕、`hooks/flengine-draw1-entries.txt`、`lift/harness/draw1/`)を HEAD に当てた(clean)。**製品由来の C である `lifted_6a77b0.c` と `lifted_6a77b0_guarded.c`(fe-lift が FLEngine の f_6a77b0 から生成した各 約 4 KB)はコミットしない**(`.gitignore` に追加。差分テスト `difftest_pixscale*.sh` を使うときは fe-lift で再生成して `tools/` 相当の場所に置く)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**、a4 FRUITY 無効 942/942・895/895・5,310・1,009,731 **不変**(いずれも既定の挙動を変えない opt-in であることの確認)。
 

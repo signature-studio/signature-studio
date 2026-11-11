@@ -192,7 +192,7 @@ A・B は同じ 52034ca9 の木から、CI の段スクリプト(`tools/mk-var.s
 
 `lift/out-git/aud1-results/`: `aud1.diff`(runtime・テスト・harness)、`aud1-page.diff`(page)、`MERGE-NOTES.md`、`docs/0241-first-beat.md`、`docs/README-0241-line.txt`、`tables/`(上の表の元)、`logs/`、`tools/`(`first-beat.mjs`/`first-beat2.mjs` = テスト運転手、`make-instr-glue-j.py` = テスト用の glue、`mk-var.sh` = bundle の作り方、`run-pairs.sh`、`analyze-cycles.py`/`table.py`/`ab-summary.py`/`timeline.py`/`slices.py`、`mutate-late.py`、`build-scen.sh`、`mkdiff.sh`)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD c8cdfd07 に `aud1.diff`(10 ファイル、`-` 行 153 本のうち `fle_audio_ring.c` の 148 本は新ファイル `fle_audio_transport.c/.h` へ移した行で、担当が行単位の存在をスクリプトで確認、残り 5 本は読んだ)と `aud1-page.diff`(5 ファイル、`-` 行 8 本は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-u1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、typecheck rc=0、vitest 1,228 passed + 7 skipped(+1)、全体テスト **196 results / 2,392 passed / 0 failed / 1 ignored**(+5 は wall_fr15 の新規 5 件)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
 

@@ -313,7 +313,7 @@ E11 のテスト用ビルド(`lift/out-opt2/tw-e17/bundle/fl-test-e17`、engine.
 E11 のテスト用 wasm(plain)を同じ G3 スクリプトで node の `--prof`(tick 23,609)で走らせ、`--prof-process` で見た(`logs/` には置いていない。再現: `NODE_FLAGS="--prof --logfile=… --no-logfile-per-isolate" a17-g3-run.sh ref tb-plain NAME`)。**非 JS の tick は 8.5%**(node の cpuprofile の (program) は同じ run で 5.9% = Chrome の E11 の 6.4% に近く、node は Chrome の (program) の代用になる)。内訳: **node 本体 5.7%(1,357 tick。node は stripped で C++ の名前が引けず、呼び元は 1% 未満に散る = V8 の runtime / builtin が wasm のあちこちから薄く呼ばれている)、libc 2.7%(640 tick。呼び元は C 部の関数〔`wasm-function[100563]`・`[100682]` ほか〕= memcpy / memset 系)、GC 0.1%、C++ 0.5%**。= **(program) は特定の 1 つの原因でなく、V8 の runtime 呼び(5.7%)と libc の memcpy/memset(2.7%)の薄い集まり**。JSPI の thread 切り替え・`call_indirect` の型検査の stub は node 本体の中に入るが、名前が引けないので分けられない。**L7 の見込み(13〜56 core-ms/s)は、この散り方では『1 つの修正で取る』形にならない**ので、中央を 29 → 15 に下げた(§5 に反映済み)。分けるには symbol 付きの node/Chrome(`--enable-native-code-symbols` 相当)か `perf` が要る。
 
 
-## PM の判断と取り込み(2026-11-06 15:30、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 15:30、docs のみ。製品の差分なし)
 
 取り込み: alpha1(alpha17)の 0296(第 1 報〜最終〔15:07〕)の文書・表・道具を `docs/investigations/alpha17/0296/` に置いた(node の cpuprofile.gz 4 本を含む `logs/` は入れない。原本は `lift/out-git/alpha17-results/0296/logs/`)。入力は opt1 の Chrome 156 の E11/E10 の cpuprofile(読み取り専用の再集計)と、E11 のテスト用 wasm の node 実行(G3 の模擬入力)で、alpha1 自身は Chrome も実 x86 も走らせていない。**依頼者の機械は 0 件**。
 

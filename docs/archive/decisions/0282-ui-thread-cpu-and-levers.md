@@ -176,7 +176,7 @@ throwaway の bundle B: E7b の wasm(sha256 `d6e3b018accb…`)に `tools/a14-nom
 - `tools/`: `a14-ui-wasm.py`(UI の分解)、`a14-ui-table.py`、`a14-desk.py`、`a14-bodymap.py`(wasm だけからの body 表)、`a14-nomx-patch.py`(**throwaway、入れない**)、`a14-nomx-compare.py`、`a14-toolbar-calls.py`、`a13-*.py`(0276 から、`--ui` つきの `a13-wasm-adapters.py`)。リグ(`sdriveg2.mjs` に `deskSnap` を足した物と場面 `scn-ui.json`)は `tools/rig/`。
 - runtime / app / ci の差分は無い。cargo・vitest・e2e は走らせていない(SKIPPED の数: 該当なし)。
 
-## PM の判断と取り込み(2026-11-06 11:40、docs のみ。差分は製品の木に無い)
+## PM の決定と取り込み(2026-11-06 11:40、docs のみ。差分は製品の木に無い)
 
 取り込み: alpha1(alpha14)の第 1 報(最終は 12:45 まで。変わればこの節を更新する)の文書・表・道具を `docs/investigations/alpha14/` に置いた。入れていない物: `tools/a14-nomx-patch.py`(wasm の窓検査を常に真にする throwaway)、`tables/diag-*-NOT-FOR-MERGE.*`、生の V8 プロファイル(`logs/`、約 1.1 MB)。測定は Chrome 156 headless の本番 E7b bundle `fl-engine-ci-d9c160aa` と native N1。E8 の bundle のブラウザ測定、実 Windows、依頼者の機械は 0 件。プロファイラ付きの値で、run 間の負荷が違う(A1 load 4、A2 load 15〜18、B load 9〜24)ので比で読む。
 

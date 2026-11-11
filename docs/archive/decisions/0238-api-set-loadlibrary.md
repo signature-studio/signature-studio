@@ -133,7 +133,7 @@ F2xH5(ref3 の `ciA`)の FS bundle を、変更前の木(`git archive HEAD`)と�
 | `k32_dsp.rs` | `STOPPED` に GetFileType ほか 4 | `ANSWERED` へ(21 本) |
 | `noreturn_audit.rs` と `allow.tsv` | GetFileType の宣言を『plain にした』変異と、fle_vol.h を include の閉包に入れる変異 | 同じ構造のまま、対象を RtlPcToFileHeader / fle_proc.h に変更。4 関数の `allow.tsv` 10 行を除去 |
 
-## 7. PM の判断点(既存の動作が変わる所)
+## 7. PM の未決の点(既存の動作が変わる所)
 
 1. **契約名の既定が『名前つき停止』から『ホストが仮想モジュールならそのハンドル』に変わる**(ホストなしは NULL/126、ホストが仮想モジュールに無いときだけ名前つき停止)。決定 0233 の PM の指示(i)『API set の形の名前で仮想モジュールでない物は停止』のうち、ホストが仮想モジュールで解決できる物が成功になった。
 2. **表に無い契約名(接頭辞は `api-` / `ext-`)は停止でなく『ファイル探索 → NULL/126』**(S-load2-absent。Wine の `find_apiset_dll` と同じ。表は Wine の 511 行で実機のスキーマより小さい。元の 0233 の方針〔停止〕に戻すなら `api_set_load` の `default:` を停止にする 1 行)。
@@ -199,7 +199,7 @@ PM の追加依頼(『診断 bundle の停止 3/3 とクリーン bundle の 0/N
 | a4 | `OUT=... bash lift/harness/a4-fruity.sh off` | `logs/a4-off.log` |
 | mutation | `tools/mutation.sh` | `tables/mutation.tsv` |
 | 差分 | `tools/mkdiff.sh load2.diff` | `load2.diff` |
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準(第 1 回): HEAD 6c60cc22 に `load2.diff`(22 ファイル、`-` 89 行は全部読んだ: `is_apiset_name` の旧実装と、停止を固定していたテストの期待値、4 関数が停止しなくなったことによる `allow.tsv` の noreturn 許可行の除去。offset・fuzz・reject なし)を `patch -p1`。PM が測った値(この機械、`lift/out-pmchk-l2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **194 results / 2,381 passed / 0 failed / ignored 1**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。app には触れていない。
 

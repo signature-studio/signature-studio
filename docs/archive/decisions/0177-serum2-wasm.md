@@ -368,7 +368,7 @@ SRM1_OUT=$W node lift/harness/web/srm1/run-serum.mjs mod=O2 states=0,1,3,4,5,3 b
 - **FLEngine の生成 C**: この木で建てた `fe-lift lift FLEngine_x64.dll --pdata` の SHA-256 は **`cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`、215,811,678 B**(基準と同じ。`lift/crates/**` は無変更)。
 - a4(FRUITY 無効の 942/942・895/895・5,310・1,009,731)と FLEngine の 16 スナップ(native・wasm)は**実施していない**。変えたのは runtime の新規 1 ファイル(既定で空の翻訳単位)と vst3a のハーネスだけで、fe-lift と既存の runtime のファイルに触れていないので、a4 の入力(生成 C)は不変。`fle_malloc16.c` を ON にした FLEngine の wasm の 16 スナップは未測定(MERGE-NOTES の判断点 1 に手順)。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `srm1.diff`(既存 3 ファイルの小さな変更 + 新規ファイル。`patch -p1 --dry-run` は HEAD 4aac2d6 に fuzz・offset・reject なしで当たる。`-` 行 5 本〔`patch_shd.py` の SHRD/SHLD 2 箇所、`build_vst3a_native.sh` の一覧 1 行〕を読み、意図どおりと確認)。PM の実測は、取り込み後の全体テストと FLEngine の生成 C の SHA-256 `cd9107ce…`(215,811,678 B、不変)。PM は Serum 2 を実行していない(数字は担当の実測)。調査と測定の道具の取り込みで、**進捗(G 段階)には数えない**。
 

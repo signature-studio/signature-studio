@@ -73,7 +73,7 @@ Wine との比較(`logs/wine-vs-runtime/`、`tables/` の表): S1(ポスト 2 + 
 2. 0262 の文書に、結論の 6 の訂正を一行足す(docs のみ)。
 3. 実 Windows が使えるなら、FL の QFC タイマースレッドの Sleep 引数(Hz との関係)と WM_TIMER の発火の有無を確かめる。
 
-## PM の判断と取り込み(2026-11-05 23:45、docs のみ)
+## PM の決定と取り込み(2026-11-05 23:45、docs のみ)
 
 取り込み: alpha1 の最終報(23:40)の文書・表・道具・診断差分を `docs/investigations/alpha9/` に、決定文書を本ファイルに置いた。**製品の木に当てた差分は無い**(`alpha9.diff` は作られていない)。測定は alpha1 の native N1 と Wine 10.0 の C テストで、PM は再現していない。ブラウザ(wasm)・実 Windows・依頼者の機械は 0 件。
 判断:

@@ -234,7 +234,7 @@ seed は実行時に渡るので bundle の再 build 無しで volume を変え�
 5. **既知の限界**: 帯の読みは FLP の routing と pattern の clip から(WAV では未確認)。Filter の効果の大きさは未測定。自己テストは代役で行った(`tables/0310-filter-compare-SELFTEST-standin-not-wine-not-filter.txt`)。
 
 
-## PM の判断と取り込み(2026-11-07 02:38、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 02:38、docs のみ。製品の差分なし)
 
 取り込み: alpha1 の 0310(G9-a: Fruity Balance を開くための runtime 側の準備)と表 `docs/investigations/alpha22/tables/0310-g9a-missing-import-rows-74.tsv`。**読みと設計のみ。build も実行も無く、実エンジン・Chrome は 0 件。依頼者の機械は 0 件。** 数字は 0309 の表(fe-lift が lift した Balance の『行なしの import』)と Win32 の契約の記憶(未照合の箇所は『読み』)。
 

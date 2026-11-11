@@ -472,7 +472,7 @@ FL 全体の画面が出た、プロジェクト読み込み・Ok・Space で 30
 15. 03:2x に `sleep 0` と末尾 `&` を含むコマンドを 1 回投げた(ハーネスに拒否され、実行されていない。禁止コマンド)。
 
 
-## PM の判断と取り込み(2026-11-06 23:26、docs のみ。製品の差分なし。gpu1 の途中版〔V5 の実測前〕の取り込み。最終版が出たら本文を差し替え、この節は残す)
+## PM の決定と取り込み(2026-11-06 23:26、docs のみ。製品の差分なし。gpu1 の途中版〔V5 の実測前〕の取り込み。最終版が出たら本文を差し替え、この節は残す)
 
 取り込み: gpu1 の 0311(present を別 Worker P に出す案)の文書・表・道具・差分(`docs/investigations/gpu8/{tables,tools,diffs}`、生ログ `logs/` 〔約 21 MB〕は入れない。原本は `lift/out-git/gpu8-results/logs/`)を置いた。実 Chrome 156 headless で実エンジンを動かした実測(E12 本番の wasm 無変更、および mt3 の B1 bundle `fl-engine-ci-8301687b`)。**依頼者の機械は 0 件、本番 R2 の `perf/` に beacon は 0 件。FL 内蔵エフェクト 7 種 25 インスタンスと Fruity Wrapper が無視された負荷(G9 未到達)での値。SwiftShader、各腕 1〜2 本**。
 

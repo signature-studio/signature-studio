@@ -208,7 +208,7 @@ Old vs new (exact two-sided permutation test on the means; p < 0.05 would be a d
 ## PM 記入欄（ci1 は書かない）
 
 
-## PM の判断と取り込み(2026-11-06 21:18、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 21:18、docs のみ。製品の差分なし)
 
 取り込み: ci1 の E13 本番確認(第 1 報、21:18)の文書・結果・画像を `docs/investigations/ci1/0277/e13/` に置いた(`*-audio.json` は入れない)。実エンジン・実 Chrome 156 / Firefox 158 の測定。**依頼者の機械は 0 件、本番 R2 の `perf/` に beacon は 0 件。FL 内蔵エフェクト 7 種 25 インスタンスと Fruity Wrapper が無視された負荷での値(G9 未到達)**。
 

@@ -186,7 +186,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 **範囲**: 待機(idle)のみ、1 セル n=24 前後、2 組、load 6.5〜22、依頼者の機械でも実画面でもない(ヘッドレス Chrome は rAF が 60 Hz)。120 fps については何も言えない。CPU(`tables/lat-b0-cpu-seconds.md`)はビーコン OFF でも ON の方が主スレッドが少ない向き。
 
-## 7. PM の判断点
+## 7. PM の未決の点
 
 1. **`?dedupe` を既定 ON にするか**(`dd1-default.diff`)。**既定 ON の根拠は『画素が同一(差分 0)』と『ページ主スレッド CPU 約半分』に限る**。遅延の改善は、ビーコン OFF(`?beacon=0`)の測定で確認(§6.3)、**ビーコン ON(既定のページ)は PM の指摘〔cbeacon2: ビーコンが待機中も rAF を回してページがフレームを作り続け、Chrome がポインタ移動の配信を次のフレームまで持つ〕のとおり利点を失っていて、cbeacon2 の修正後に再確認**。条件 (a)(b)(c) の充足: (a) は実装・単体・e2e・変異まで済み。ただし**実 Chrome での『復元後の画素』は検証できていない**(この Chrome は `contextrestored` を出さず、合成イベント + canvas 消去の模擬で見た)。(b)(c) は上の範囲で差分 0。既定 ON の差分は `?dedupe=0` で OFF に戻せる。`dd1-default.diff` は cbeacon2 の統合後に当てる想定で、作り直していない(PM の指示)。残るリスク = 依頼者の GPU・実 Chrome での復元後、フレームの間だけ現れる差(比較は 0.7〜1.5 s 間隔)、120 Hz 以上の画面。**取り込みの判断は PM**。
 2. **復元されない canvas の扱い**(S-dd1-no-replace)。この Chrome は GPU クラッシュの後 `contextlost` を出したきり `contextrestored` を出さず(最長 約 19 s 観測)、元の canvas は永久に描けない(新しい canvas は使える)。= dedupe の有無に関わらず、そうなるとその窓は空のまま。ページが canvas を作り直す(`DesktopView` に差し替えの API を足す、約 30 行)かは未実装。実機でこの状況が起きるかも未確認。
@@ -240,7 +240,7 @@ CDP の `Browser.crashGpuProcess` を使った(`tools/ctxloss-probe*.mjs`、`log
 
 作業ディレクトリ `lift/out-dd1/`: `src/`(`dd1.diff` の木)、`B/bundle/fl-engine-dd1-F1xH-ia2/`(**テストバンドル**、gzip。配信中の `lift/out-websrv/assets/` には置いていない)、`runs/`(各走行の JSON・first-diff・crop。netlog は消した)、`serve/assets/`(symlink だけ)。生成 C・オブジェクト・wasm の中間物・cargo-target・emcache・`src-default/`・`dist-*` は終了時に消した。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `dd1.diff` だけを HEAD 48cec69 に当てた(`patch -p1 --dry-run` は offset 2 行のみ、app/ の 11 ファイル、`-` の行 7 本をすべて読んだ: `dedupeCheck()` の定義の書き換え〔比較を窓ごとの画素数に拡張〕と `ModelSink` の1行の拡張で、意図した変更)。**`dd1-default.diff`(既定 ON)は今回は当てない。** PM の測定(`dd1.diff` 適用後の HEAD の木): typecheck 通過、vitest 1,234 passed + 7 skipped、Worker 43/43、e2e の結果は次のコミットメッセージに記載。lift/ には触れていないので全体テストと a4 は再走していない。
 

@@ -58,7 +58,7 @@
 - 倍々の無駄は `fle_vfs.c` 以外(`fle_node` の `kids` など)にもあるが、MB の桁ではない。
 
 
-## PM の判断と取り込み(2026-11-07 00:47、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 00:47、docs のみ。製品の差分なし)
 
 取り込み: mt3 の 0312j(「Split mixer tracks」の `WriteFile: out of memory` の設計の読み)。**コードを読んだだけで、実装・build・Chrome・依頼者の機械は 0 件**。事実(file:line、mt3 の読み): 仮想 volume のファイルの中身は線形メモリの heap(`fle_vfs.c:59〜70`、`node_reserve` が倍々 + memset〔`:162〜176`〕、上限 256 MiB〔`:52`〕、`:172` の `fle_stop("out of memory")`)。線形メモリは `-sINITIAL_MEMORY=640 MiB -sMAXIMUM_MEMORY=2 GiB`(`link-web.sh:23`)。47 トラック × 22.8 MB に倍々の余白を足すと約 2.58 GB で 2.147 GB を超え、倍々を除いても約 2.07 GB で余白は約 70 MB(読み)。
 

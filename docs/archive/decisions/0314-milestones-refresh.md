@@ -71,7 +71,7 @@
 3. 取り込み後、`progress.md`・`roadmap-to-goal.md` の先頭に誤りがあれば本決定 0314 の訂正として直す。
 
 
-## PM の判断と取り込み(2026-11-07 01:23、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 01:23、docs のみ。製品の差分なし)
 
 取り込み: ci1 の第 1 稿 `lift/out-git/ci1-results/0314/0314-docs.patch`(sha256 先頭 5c95a99bbcc33ad9、6 ファイル)を main f0e5a2f5 の木に `patch -p1` で当てた(dry-run rc 0・reject 0・実適用 rc 0)。PM の検証(コマンドの出力を見た事実): `git rev-list --count HEAD` = 507、`docs/decisions/` 356 ファイル、`docs/README.md` の決定の索引の行 334(0314 の行を足して 335)、0314 の索引行は縦線で区切って NF=7。数字は ci1 が決定・§4e・索引から転記した値で、PM は progress.md の先頭の節 §0〜§3 を通読し、P1/P2/P3/S1/Export の主要な値(E13 の first idle 4,320/4,172 ms、wasm 143,087,706 B、線 154,885,888 B、Export 22,863,828 B・sha256 381cdb5a…f979、E14 の ABBA の値)を PM 自身が §4e に書いた値と照合して矛盾がないことを確認した。roadmap-to-goal.md と goal-ladder.md の状況欄は PM が全文を照合してはいない(patch が当たり、G 段階の判定が変わっていないことと、Elastique の行を直したことだけ確認)。再測定はしていない。決定の全文(356 ファイル)を PM が全部読み直したわけではない。
 

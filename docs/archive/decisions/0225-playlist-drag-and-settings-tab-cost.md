@@ -454,7 +454,7 @@ G3(node)は wasm-opt なしの wasm なので、wasm-opt を掛けた版(B0o・V
 - 作業用の木と中間物を、結果の取り込み後に削除する(`lift/out-anim1` を 500 MB 以下にする指示のため)。残すのは B0 と S1 のバンドル(`assets/fl-engine-anim1-{B0,S1}`)、ツール、生の結果。
 - a4 で『Terminated』が出たという PM の連絡について、こちらで kill した覚えはない(原因は調べていない)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 164e81a に `anim1.diff`(7 ファイル、offset 2、`-` 22 行)と `anim1-shchange.diff`(2 ファイル、`-` 12 行)を `patch -p1` で当てた。`-` 行は全部読んだ(SIMD 側は『`-msimd128` のときだけ置き換える』形で、`-msimd128` なしではランタイムの C が変わらない)。PM が測った値(この機械、`lift/out-pmchk-a1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、全体テスト 190 results / 2,344 passed / 2 failed:失敗は `noreturn_audit` の 2 件だけで、負荷 約 58 のときに 491 秒かかった時間切れで、単独の再実行(負荷 約 10)は 8/8 通った(15.5 秒)。
 

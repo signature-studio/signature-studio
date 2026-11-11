@@ -95,7 +95,7 @@
 - census は 18 run の実行関数(E-all)に基づく。
 - 私の `cargo`・regen は `taskset -c 8-15`・`nice -n 15`(regen の census は fe-wasmgen の 2 本並列、cargo は `CARGO_BUILD_JOBS=3`)。`sleep`・`timeout`・末尾 `&` は呼んでいない。
 
-## PM の判断と取り込み(2026-11-06 11:40、docs のみ)
+## PM の決定と取り込み(2026-11-06 11:40、docs のみ)
 
 取り込み: mt3 の第 1 報(12:30 の最終で変われば更新)の文書・表・道具を `docs/investigations/mt3w/0286/` に、差分 `0286-hyb-u-elastique-4.diff`(33 行)を `docs/investigations/mt3w/patches/` に置いた。実エンジンの走行は 0 件、4 関数の CPU の効果・first idle の増分は未測定(mt3)。PM の確認: 差分は E9(`e9-wip` b0fe2c11)に `patch --batch -p1` で rc=0、適用後の `ci/test-hybrid.sh` は 'all checks hold'(hyb-U 合計 3,875 = fle 2758 + dsp 158 + b2d 76 + qfc 364 + ft 176 + ilt 132 + oggio 46 + elastique 165)。
 判断:

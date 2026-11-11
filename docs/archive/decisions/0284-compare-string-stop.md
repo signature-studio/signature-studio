@@ -119,7 +119,7 @@ ASCII の 1 単位同士の最初の違いで、現在のコードが S- 選択(
 - 旧い停止 8,800 組の多くは制御文字 × 何か。ゲストが実際にそれらを比べるのは Esc などのキー文字が主、と読むが未確認。
 - 規則: `sleep` を 1 回呼んだ(0279 で申告)。列挙の最初の版は `abort()` の core dump が apport を起こして 1 件 1.8 秒かかったので止め、`abort` を子プロセスの `_exit(99)` に差し替えた(`/var/crash` に自分の物は残っていない)。cargo は `nice -n 15`、`CARGO_BUILD_JOBS=3`、`--jobs 3`。
 
-## PM の判断と取り込み(2026-11-06 12:30、docs のみ)
+## PM の決定と取り込み(2026-11-06 12:30、docs のみ)
 
 取り込み: mt3 の第 1 報(診断 + ASCII 制御文字の重み + ハイフン/アポストロフィ × 任意の単位)の文書・表・道具と、差分 `0284-compare-string.diff`・`0284-gen_ia2_sortw-docs.diff` を `docs/investigations/mt3w/` に置いた。実行したのは runtime の `fle_locale.c` を native で直接呼ぶ列挙(1 単位 × 1 単位の全組 22,650 × 4 構成)・cargo のテスト・`test.sh affected`(140/212)。**実エンジン(ゲスト)の走行・実機 Windows・ci1 の実際の文字列は 0 件**。『d11 の停止は TMsgForm への Esc 文字(U+001B)』は読みで、検証していない(ci1 の d11 の停止は、キットの proj に Sampler.flp が無く 404 本文を FLP として開いた入力欠落が原因だった)。
 判断:

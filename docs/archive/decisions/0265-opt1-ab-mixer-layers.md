@@ -260,7 +260,7 @@ c = 計算中に仮想時計が進む量 ÷ 実際の計算時間(実測 1.2〜1
 **Mixer ドラッグ測定(E7b 以降の準備。PM の依頼 23:xx)**: `sdriveg2.mjs` の op `dragMeasure`(gpu1)が既にある。場面 `scn-prof-d.json`: `closeWizard` → 8 s 待つ → `profStart` → `dragMeasure {button: left, x: 715, y: 564, x2: 1015, y2: 564, n: 20, secs: 12, settle: 600}` → `profStop` → `expectRunning`。Mixer の見出し(y 564)を左ボタンで押したまま 12 s 往復させ、(1) 1 秒あたりの移動数(ドライバが出せた数)、(2) ページの presenter の計数(presents・rects・pixels・composeMs・putMs の前後差)、(3) /proc の標本による Worker・メインスレッド・その他の CPU、を `report.json` の `measures` に出す。**1 移動あたりの Worker CPU = Worker の CPU ÷ 移動数**。プロファイルを付けない版(`profStart` / `profStop` を外した場面)で交互 A/B にする。f_4776f60 の自己時間はこの場面の V8 プロファイルを名前つきの版(`tools/prof-layers.py` の表づくりと同じ名前表)で読む。この文書の時点では走らせていない(未実行)。
 
 
-## PM の判断と取り込み(2026-11-06 10:15、docs のみ)
+## PM の決定と取り込み(2026-11-06 10:15、docs のみ)
 
 取り込み: opt1 の 0265 最終(10:05)の文書・表・ログ・道具を `docs/investigations/opt1/0265/` に置いた(`runs-series` は原本の series.json・audio-b.json・report.json の gzip)。測定は実 Chrome 156・この機械で、**依頼者の機械・実 Windows・実 GPU は 0 件**。PM は x13 の Export の sha256 `381cdb5a…f979`(22,863,828 B)を自分の `sha256sum` で、node 84/55/87 行の E6 との差 0 行を自分の `diff` で確かめた(E7b を 0b228624 で push する根拠)。
 

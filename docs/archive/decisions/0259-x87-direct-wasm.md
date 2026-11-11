@@ -65,7 +65,7 @@
 - FCOMI/FUCOMI/FCMOV を含む関数(2 関数 55 命令)と、制御語(8 関数)、FSIN/FCOS/FPTAN/FPATAN/FYL2X/FYL2XP1/FPREM/FPREM1/FXTRACT と状態の保存/復元(lifter も未対応)を含む関数は C 経路のまま。
 - dsp・Elastique など FLEngine 以外のモジュールの census は取っていない(この機械に実物の DLL は FLEngine だけ)。x87 の関数が多い dsp の制御語は 0254 の担当。
 
-## PM の判断と取り込み(2026-11-05 21:35、docs のみ)
+## PM の決定と取り込み(2026-11-05 21:35、docs のみ)
 
 - 文書・表・道具・差分(`docs/investigations/mt3x/patches/mt3-x87-lower.diff`)を置いた。**製品の木にはまだ当てていない。** PM は mt3 の census・テストを再現していない。mt3 の測定: HEAD 69c2ea2e の `git archive` に `patch -p1 --dry-run` が通る(offset/fuzz 0)。`cargo test -p fe-wasmgen` 21 本 ok・27 通過・失敗 0(x87 のみ)、opt1 の WIP を重ねた木で 23 本・29 通過、さらに `mt3-wasmgen-small.diff` を重ねた木で 24 本・38 通過。重ねた木では lib.rs の最初の hunk が fuzz 2・offset 51 になるので、E3/E4 で重ねる opt1 は当て方を目で確認すること。
 - 実エンジン(ブラウザ/node)の 84/55/87 行・a4・参照プロジェクト・wasm サイズ・CPU の測定は 0 件。取り込み(製品の木への適用)は、opt1 の E4(E3 + 本差分)で次を確認してから: node の 84/55/87 行が変わらない(変わる行は関数ごとに説明)、参照プロジェクトが開き 30 s 再生で止まらない、Export の出力同一、wasm のサイズ(S1 線 154,885,888 B)、`f_67a160`(ミキサーの本命、自己 1,537 ms)の関数ごとの自己時間(前後)と書き込み率。

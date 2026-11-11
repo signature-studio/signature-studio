@@ -121,7 +121,7 @@ native N1 の自己時間(98 s、2 ms の CPU ごとの標本。上位は 0274 �
 - `tools/`: `a13-native-fn.py`、`a13-wasm-fn.py`、`a13-wasm-adapters.py`、`a13-wasm-body.py`、`a13-join.py`、`a13-table1.py`。
 - runtime / app / ci の差分は無い。cargo・vitest・e2e は走らせていない(SKIPPED の数: 該当なし)。
 
-## PM の判断と取り込み(2026-11-06 10:50、docs のみ。製品の木には何も当てていない)
+## PM の決定と取り込み(2026-11-06 10:50、docs のみ。製品の木には何も当てていない)
 
 取り込み: alpha1(alpha13)の 0276 第 1 報(10:40)を最終として扱い、文書・表・道具を `docs/investigations/alpha13/` に置いた。測定は native N1 の 0274 の標本の再解析と、gpu2 の 09:13 のブラウザの V8 プロファイル(本番 ff5ee429 = E5 + alpha8。E7b の bundle のプロファイルは**取っていない**)の再解析だけで、**新しいブラウザの実行は 0 件、依頼者の機械・実 Windows は 0 件**。
 判断:

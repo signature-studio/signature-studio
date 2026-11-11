@@ -294,7 +294,7 @@ fe-wasmgen の引数: `--mx-window --trap-vex --no-elide --lazy-ext --hybrid-mer
 **整理**: `lift/out-ship1/` は一時 6.4 GB まで増え、終了時は **15 MB**(生成 C・オブジェクト・wasm・HEAD の archive・cargo の target・上流 Blend2D のビルドを消した。`tools/cleanup.sh`)。`tools/*` は `lift/out-ship1/src`(HEAD の archive + 差分)を前提にするので、再現には archive を展開し直す。作業用に起動した `vite preview` 3 本は PID を指定して止めた。Chrome の使い捨てプロファイルは各走行で消えている。
 
 
-## PM の判断と取り込み(2026-11-03)
+## PM の決定と取り込み(2026-11-03)
 
 取り込み前の PM の確認(HEAD 8c10f48 に `ship1.diff` と `worker-diag.diff` を当てた木):
 

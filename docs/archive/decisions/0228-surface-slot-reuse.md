@@ -10,6 +10,6 @@
 - **テスト:** 新規の単体テスト `lift/harness/web/present/test_fruity_surface_slots.c`(20 項目)。元の `fruity_surface.c` は 11 項目が失敗(33 枚目の窓で `no entry for lid 33`)、直した版は 20/20、既存の `test_fruity_surface_layer.c` は 27/27。
 - **残る制限(直さない):** 同時に生きている窓が 32 枚を超える場合の 33 枚目は出ない。`LID_SCAN_MAX 4096`: lid が 4095 を超える窓は lid 0xFFFFFFFF で記録される(メニューを約 4,000 回開くセッション)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 - HEAD 6f3a6f8 に `ci1-popup.diff`(3 ファイル、`-` 2 行を読んだ)を適用。desk1 の変更とは重ならない(`fruity_surface.c`・`web/present/` に触れない)。desk1 が採用された場合(`?present=D`)、この表は読まれなくなる。
 - bundle での 100 回開閉の確認(Chrome 156・Firefox 158)は ci1 が続ける。次の bundle(CD)にこの修正が入る。

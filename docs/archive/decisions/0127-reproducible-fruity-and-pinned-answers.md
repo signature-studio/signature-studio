@@ -185,7 +185,7 @@
 - FRUITY 有効の再現の入力: インストーラからの再抽出（`tools/extract_nsis2.py`）は**試していない**（入力は既存のファイルを使い、SHA-256 を照合した）。`a4-fruity.sh` のネイティブのビルドは clang 21.1.8、この環境のみ。
 - 木の外のファイルを変えていない。決定 0126 の既存の期待値は変えていない。
 
-## PM の判断点
+## PM の未決の点
 
 1. `WM_SETREDRAW` の WS_VISIBLE（上の 2）を実装するか、0126 の選択のまま `S-setredraw-default` に WS_VISIBLE を加えて記録するか。
 2. 固定していない 22 名の `S-` 名のうち、描画の見た目に効くもの（`S-clip-rects`、`S-default-clip`、`S-clip-overlap`）にテストを足すか。

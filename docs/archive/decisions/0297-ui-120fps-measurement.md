@@ -119,7 +119,7 @@
 - 自己申告(続き): (5) ci1 に断って Chrome を 3 窓(16:18〜16:33 の 3 本、16:58〜17:02 の 1 本)で使い、17:03 からのビルドは ci1 の『counted でない run の時間帯』の合意に従った。ビルドの load は 3〜11(自分のビルド + 他の担当)。(6) 後片付けで `runs/*` を消したので、trace の全体は残していない(frame の事象だけを `logs/p2-*/trace-*.frames.json.gz` に残した)。(7) 私の preview server(port 4994、4995)は最後に PID で止める。
 
 
-## PM の判断と取り込み(2026-11-06 17:28、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 17:28、docs のみ。製品の差分なし)
 
 取り込み: gpu1 の最終(17:26)の文書・表・道具を `docs/investigations/gpu7/0297/` に置いた(生のログ約 4.9 MB は入れない。原本は `lift/out-git/gpu7-results/0297/logs/`)。測定は実 Chrome 156 headless の実エンジン(本番 E11 の wasm = `engine.49bbf63df894`、協調 1 Worker)、この機械の SwiftShader、load 3.7〜6.6。各条件 1 本・再現なし。測定専用ページ(`DESK_FALLBACK_MS = 0`)は製品に入れない。**依頼者の機械・実 GPU は 0 件**。
 

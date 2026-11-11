@@ -278,7 +278,7 @@ E9(`b0fe2c11`)のテスト用ビルド(`out-opt2/tw-e15/bundle/fl-test-e15`、wa
 | `logs/micro.txt`、`logs/ui7-Q/`、`logs/ui8-*`、`logs/ui9-*` | 微小ベンチ、Chrome の run(`.cpuprofile` は gzip) |
 | `tools/` | `a15_quick.py`(条件のバイト列)、`a15-quick-patch.py`・`a15-patch-all.py`(書き換え、試作)、`a15-pred-test.py`、`a15-micro.py`、`a15-redundancy.py`、`a15-ab-table.py`、`a15-g3-run.sh` |
 
-## PM の判断と取り込み(2026-11-06 13:05、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 13:05、docs のみ。製品の差分なし)
 
 取り込み: alpha1(alpha15)の最終(12:45)の文書・表・道具(一部)・候補差分を `docs/investigations/alpha15/` に置いた(差分は `patches/0287-fe-wasmgen-merged-window-D3.diff`、**適用していない**)。生の V8 プロファイル(`logs/`、約 1.1 MB)と使い捨ての wasm 書き換え道具(`a15-quick-patch.py` ほか)は入れない。測定は実 Chrome 156 で、E7b の本番 wasm(`fl-engine-ci-d9c160aa`)の窓検査の条件だけをバイト列で書き換えた試作の V8 プロファイル(30〜50 s 窓、1 run ずつ)と、E9 テストビルドの node 行。**E8 / E9 の bundle、依頼者の機械、実 Windows は 0 件**。D3 の Export の sha は未着(続報)。
 

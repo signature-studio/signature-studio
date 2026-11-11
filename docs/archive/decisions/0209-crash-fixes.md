@@ -114,7 +114,7 @@
 
 `MERGE-NOTES.md`(適用の手順、衝突、ship3 向けの手順)、`crash1.diff`、`crash1-telemetry.diff`、`tables/`(Chrome の報告、Wine との差分、native のプローブ、停止の記録、soft の記録)、`tools/`(drive.mjs、do.sh、drive-ff.mjs、シナリオ、gen-native.sh 等)、`logs/`(全体テスト、vitest、a4、native の g3 行)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **取り込み**: `crash1.diff`(30 ファイル、`-` 行 21 本を全部読んだ。app は型・組み立て・パネル文字列を追加項目で置き換えたもの、runtime は `fle_stop` を `FLE_SOFT_OR_STOP`〔既定は同じ停止〕に置き換えた箇所、LCMapStringW のフラグ検査の差し替え、CharUpper の 0x80 停止の除去)を HEAD 3e4f540 に適用した。fle_win.c にはオフセット付きで当たった(txt1 の +22 行の後ろ)。PM の測定: FLEngine の既定生成 C の sha256 は `cd9107ce...47029e50` のまま、全体テスト 188 results / 2,338 passed / 0 failed。a4・app のテストの結果は取り込みコミットの記録に従う。
 - **原因を確定して直した 2 件は採る**: LCMapStringW(cchSrc 個を全部写像する契約への修正。UCD 16.0 の単純な大文字小文字写像、Wine 10.0 と全 1,112,064 コードポイント × 4 フラグ集合で差 0)、shell32 の Drag 4 関数(DragAcceptFiles ほか)。これらは方針の (b) 外部 API の契約の実装で、FL 側の分岐は無い。user32 のメニュー 14 関数も同じ(Wine 156 行一致)。

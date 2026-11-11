@@ -1228,7 +1228,7 @@ memory series of the 15 s timer: 15s:1033.9MB(wizard) 30s:1033.9MB(play) 45s:103
 - **既定の入口の挙動**: `?hz=` が無ければエンジンの環境に何も入れない。ページの DOM は同じ文字列なら書かない(表示される内容は同じ)。Worker は表が変わっていなければ読まない(§3。結果は同じ)。窓一覧は従来どおり毎 idle 読む(opt-in の `?poll=<ms>` を付けたときだけ間引く: S-poll-gap)。ゲストの wasm・時刻列は変わらない(§4.3)。
 - **diff の `-` 行は全部読んだ**: 削除した行は、置き換えた行(`performance.timeOrigin + performance.now()` → `nowAbs()`、`pumpAll`/`syncSurfaces` → `SurfaceSync`、`renderStatus`/`renderPhases` の DOM 書き込みに条件、`main.ts` の先頭コメントと `app` の初期値の 1 行に項目を足した)だけで、意図しない削除は無い。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `p2a.diff`(`app/` の 17 ファイル、基準 HEAD 996bd2d)。PM の検証: `patch -p1 --dry-run` は offset・fuzz・reject なしで当たる。`-` 行 63 本(`init` の引数、`syncSurfaces` の `surface-sync.ts` への移動、`pollAppView` の呼び出し、`now`、URL パラメータの注記、状態表示など)を読み、意図した置換で、aud2〔0175〕・clk1〔0170〕の機能の削除は無いことを確認した。typecheck(rc=0)、vitest **955 passed + 7 skipped**(担当は 954 + 8 skipped と報告。skipped の数の差は mt1 の OTT テストの環境依存で、passed は +1)、Worker 43/43、e2e **853/853**(基準 691/691)。`lift/` には触れていない。PM は Chrome での 60/120 Hz、グルー削減、面の SHA を再測定していない(担当の実測)。進捗(G 段階)には数えない。
 

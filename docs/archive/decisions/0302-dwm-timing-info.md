@@ -193,7 +193,7 @@ Learn は順序だけを載せる。40 メンバの大きさ(UNSIGNED_RATIO = UI
 
 
 
-## PM の判断と取り込み(2026-11-06 18:54、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 18:54、docs のみ。製品の差分なし)
 
 取り込み: mt3 の最終(`DwmGetCompositionTimingInfo` の 40 メンバ実装の文書、Learn の写し、表)を `docs/investigations/mt3w/0302/`、差分を `docs/investigations/mt3w/patches/0302-dwm-timing-info.diff` に置いた。実エンジンの wasm・ブラウザ・実 Windows の実行は 0 件(cargo テスト・a4 のみ)。**依頼者の機械は 0 件**。
 

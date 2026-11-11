@@ -45,7 +45,7 @@
 ## 9. beacon2(失敗の痕跡が本番に残るか) → `BEACON2.md`、`beacon2.diff`
 - 今の beacon は first idle・定期(first idle の後)・showError・終了でしか出ず、『固まる』『first idle 前に離れる』『boot の外の uncaught error』『Access 切れ・最初の 4xx で止まる』は何も残さない。最小の失敗 report(1.5 KB、種類ごとに 1 回、旗なし)を足す差分とテストを置いた。詳細・限界は `BEACON2.md`。
 
-## PM の判断と取り込み(2026-11-05 20:55)
+## PM の決定と取り込み(2026-11-05 20:55)
 
 取り込み: mt3 の締め(20:45)の README を本決定に、`BEACON2.md`・`beacon2.diff`・表・道具を `docs/investigations/beacon1/` に置いた。コードは `beacon2.diff`(4 ファイル: `app/src/main.ts`、`app/src/perf/failure-beacon.ts`〔新規〕、`app/test/e2e/run.mjs`、`app/test/unit/failure-beacon.test.ts`〔新規〕)を HEAD 2ca825ff に `patch -p1 --batch`(offset・fuzz・reject なし)で当てた。`-` 行は `main.ts` の 5 行だけで、`showError` の署名に `kind` を足し、呼び出し 4 か所に種類を渡す変更。旗・URL パラメータ・設定は足していない(`docs/policies/no-options.md`)。
 

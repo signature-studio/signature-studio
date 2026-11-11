@@ -134,7 +134,7 @@ fle_runtime.h 以外は触っていない。この表の『対象外』は ≥1%
 
 `git archive HEAD` の木に `patch -p1 < rt1.diff`。CI の段(`tools/rt1-ci-build.sh TREE CIWORK F2xH7|F2xH5`、`tools/rt1-build-bg.sh` が NO_FS=0 COMPRESS=none を付ける)で bundle を作り、`tools/rt1-g3.sh`(84 行)、`tools/rt1-pair.sh`(新旧の対。`rt1-node.sh` が node を起動)、`tools/rt1-abtable.py`、`tools/rt1-names.sh`(名前付き版)+ `tools/rt1-profs.sh` + `tools/rt1-prof.py`(プロファイル)、`tools/rt1-parity.sh`、`tools/rt1-a4off.sh`、`tools/rt1-wasmdiff.py`、`tools/rt1-objsize.sh`、`tools/rt1-ldst-bench.sh`(microbench)、`tools/rt1-mutation.py`、`tools/rt1-idle.sh`(ブラウザ)。詳細は `tools/README.txt`。microbench(node 24、emcc -O2、n が定数でない noinline 呼び出し、旧 / 新を交互 5 回の中央値): ld(n = 8, 4, 2, 1 の巡回)5.37 → 1.10 ns、st 4.28 → 1.76 ns、ld n = 4 固定 5.53 → 0.41 ns、st n = 4 固定 4.13 → 0.51 ns(`tables/ldst-microbench.txt`)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 52034ca9 に `rt1.diff`(fle_runtime.h 1 か所 + 新規テスト `ldst_switch.rs`、`-` 4 行は全部読んだ: `fle_ld` / `fle_st` の `memcpy(…, n)` の本体だけ。offset・fuzz・reject なし)と `load2-guard.diff`(決定 0238)を `patch -p1`。PM が測った値(この機械、`lift/out-pmchk-r2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **196 results / 2,386 passed / 0 failed / ignored 1**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737。
 

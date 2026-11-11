@@ -90,7 +90,7 @@
 
 `lift/out-git/opt2-results/0288/`: `docs/0288-opt1-e10-real-engine.md`、`docs/README-0288-line.txt`、`tables/`(`g3-lines-0288-e10-*`、`0288-e10-vs-e9-kinds-*`、`0288-e10-play60-rates.txt`、`0288-e10-elastique-incl.txt`、`0288-ser-e16p-thread-split.txt`・`-windows.txt`、`0288-idle-e10-vs-e8.tsv`・`-e9.tsv`、A/B の表)、`logs/`(`0288-e10-export*.json`・`0288-e10-run.log`・`0288-e10-play60-*`・`0288-x16-build-tail.txt`)、`runs-series/`、`tools/`(mk-x16.sh、mk-rows-e16.sh、run-e16.sh、run-idle-ab2.sh、idle-ab-summary.py、prof-incl.py、r2fetch.mjs、r2read/〔wrangler.toml・worker.js〕)。0265・0278 の道具は `../tools/`、`../0278/tools/`。作業ディレクトリ `lift/out-opt2` は 500 MB 以内に保つ(E11 の作業中は一時的に超える)。
 
-## PM の判断と取り込み(2026-11-06 14:00、docs のみ。E10 は main 9fdc492f として push 済み、CI 42163031883 実行中)
+## PM の決定と取り込み(2026-11-06 14:00、docs のみ。E10 は main 9fdc492f として push 済み、CI 42163031883 実行中)
 
 取り込み: opt1 の最終(13:57)の文書・表・ログ・道具・series を `docs/investigations/opt1/0288/` に置いた。測定は Chrome 156 / node の実エンジン(この機械)。**依頼者の機械・実 Windows は 0 件**。PM は E10 の Export WAV を自分の `sha256sum` で確かめた(`381cdb5a…f979`、22,863,828 B)。
 

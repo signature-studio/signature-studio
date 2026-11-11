@@ -319,7 +319,7 @@ B4 は『Settings の 9 タブとメニューの全状態』を全部は再実�
 - **CPU 超過 2 件の原因 API は未特定**(§5.6)。
 - 負荷: 走査中の load は 20〜70。時間(壁時計)の数字は参考値で、速度の主張ではない。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 825fa28 に `sweep1.diff`・`sweep1-layered.diff`・`sweep1-extra.diff` をこの順に `patch -p1` で当てた(offset は extra の 1 hunk だけ、fuzz・reject なし)。`-` 行(3 + 14 + 82)は全部読んだ。PM が測った値(この機械、`lift/out-pmchk-s1/`): `cargo build --release -p fe-lift` 成功、FLEngine の既定の生成 C の sha256 **`cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)のまま**、a4 FRUITY 無効 **init_count 942/942、run_rank 895/895、functions 5,310、entries 1,009,737**(txt1 以後の基準と同じ。再実行できなかったという担当の穴はこれで埋まった)。全体テストは **189 results / 2,340 passed / 2 failed**:失敗は `fe-lift/sweep1` の 2 件だけで、原因は**この差分のテストが、screen1(決定 0212)が `fle_input.c` に足した参照 `fle_win_input_toplevels`・`fle_win_input_remaximize` のリンク用スタブを持たなかったこと**(担当の基準 55e4e83 には無かった参照)。PM が `harness/sweep1/sweep1_cases.c` と `tests/sweep1.rs` のスタブ表に 2 行ずつ足し(挙動なし、スタブのみ)、`cargo test --release -p fe-lift --test sweep1` が **4 passed / 0 failed**。他の 188 結果は失敗 0。
 

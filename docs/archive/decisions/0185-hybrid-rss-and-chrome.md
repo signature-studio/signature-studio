@@ -179,7 +179,7 @@ c1+c2(D/p1000/p1000x 各 8、p200x 4。load 8.6〜17)と c3(各 4。load 5.9〜1
 | S-hyb4-5 | node の steady 区間 = e03→e63(hyb3 と同じ) | 比較のため | — | — |
 | S-hyb4-6 | 速度は D と交互 4 組の中央値(load0 5.7〜9.8) | 他の担当の負荷が下がらなかった | 負荷 8 以下を待つ | 負荷 8 以下で取り直すとき |
 
-## 12. PM の判断が要る点
+## 12. 未決の点(PM)
 
 1. `WASMGEN_MAX_FN_COST` を環境変数のまま入れるか、正式なフラグにするか(S-hyb4-2)。
 2. 出荷構成への `HYBRID_N` の入れ方(MERGE-NOTES の手順)。**既定を変える物ではない(opt-in)**。N は 50〜1000 のどれでも Chrome のワーカー CPU は誤差の範囲なので、保守の観点で小さめ(200〜500)を選ぶか、速度優先で p1000r にするか。
@@ -195,7 +195,7 @@ c1+c2(D/p1000/p1000x 各 8、p200x 4。load 8.6〜17)と c3(各 4。load 5.9〜1
 - fe-wasmgen の probe の巨大な出力(約 100 行)を端末に 1 回出した。wasm-opt `--func-metrics` を 120 秒のタイムアウトで失敗させた(自分のプロセスは残っていない)。
 - 作業ディレクトリは作業中に 5 GiB を超えたか未確認(終了時に整理)。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `hyb4.diff`(`lift/crates/fe-wasmgen/src/lib.rs` の約 15 行と新規テスト `tests/size_limit.rs`。`-` 行 0。HEAD cdae0b9 に `patch -p1 --dry-run` が offset・fuzz・reject なしで当たる)。opt-in の環境変数 `WASMGEN_MAX_FN_BYTES` / `_LOCALS` / `_COST`(dry-run の wasm 本体バイト×ローカル数)で、超えた関数は直接 wasm にせず C 経路に残す。変数が無いと何も変わらない。PM の検証: 全体テスト **170 results / 2,199+1=2,200 passed / 0 failed**(基準 169/2,199 + 新規 `size_limit` の 1 実行ファイル・1 テスト)。PM は RSS・Chrome の CPU を再測定していない(担当の実測)。進捗(G 段階)には数えない。
 

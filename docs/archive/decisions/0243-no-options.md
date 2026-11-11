@@ -57,7 +57,7 @@ MX の計測用マクロは層 e で `FLE_MX_STATS`(命令の種類ごとの命�
 - **再生 CPU/テンポ**(mt3 の道具)は走らせていない。push 後の確認の使い方: ページを `vite preview`(`FL_ASSETS_DIR` に最終 bundle と `proj/`)で出し、`node lift/out-mt2/tools3/sdrive-ref3.mjs --browser chrome --url http://127.0.0.1:PORT/ --proj-dir lift/out-proj1/x --out DIR --scenarios scn-ref3-tempo.json --viewport 2176x1224 --app app`、続いて `tempo-fit.py` `pcm-repeat.py` `summ.py`(ラッパ: `tools/tempo_opt1.sh BROWSER TAG PORT`)。
 - 10 本の parity セッション(`F2xH7-parity-ui-*`)と fonts 差分つきの基準(`ref3/tables/g3-lines-fonts-84.txt`)は新しい値に取り直していない(ReadFile の EOF の影響を受けるはず)。
 
-## PM の判断と取り込み(層 b・c・d、2026-11-05)
+## PM の決定と取り込み(層 b・c・d、2026-11-05)
 
 取り込んだ基準: HEAD e52d024f に、opt1 の `opt1-b.diff`(runtime の C とハーネス、102 ファイル)→ `opt1-d.diff`(fe-lift / fe-wasmgen の旗、31 ファイル)→ ship6 の `ship6.diff`(データとテスト、12 ファイル。`ci/test-hybrid.sh` の hunk #1 は fuzz 2 で当たり、.orig は削除)→ mt4 の除外フィルタ(`filter-hybrid-list.py mt4-atomic-functions.tsv hyb-U-*.txt` で hyb-U から 65 関数を除外、3,879 → 3,813 関数)→ `opt1-c.diff`(ビルドスクリプト・ci・deploy.yml・R2 perf/ の lifecycle の step・8 モジュールの配線、70 ファイル)を、この順に PM のワークツリーへ `patch -p1`(reject なし)。opt1 の複製とは主要ディレクトリの `diff -rq` で同一を確認した。
 
@@ -135,7 +135,7 @@ run 41987198683(a6331e92)は build ジョブが成功した(34 分:link 1,369 �
 ### 5. CI のキャッシュキー(`tables/ci-cache-keys-e.tsv`)
 `ci/plan.sh` を基準と層 e の木で実行: k_felift / k_lift / k_rt / k_link / k_seed / k_bundle / k_app が変わり、k_b2d / k_extract / k_vst3 は変わらない(Blend2D・抽出の restore は正しい)。触った入力ごとの対応表を付けた。
 
-## PM の判断と取り込み(層 e、2026-11-05)
+## PM の決定と取り込み(層 e、2026-11-05)
 
 取り込んだ基準: HEAD 4d70b8f4(runtime は b42fad36 = 本番 bundle afd46e67 と同一)に、opt1 の `opt1-e.diff`(184 ファイル)→ `opt1-e-gdi-gdc.diff`(`fle_gdi.c`・`fle_gdc.c` の死んだ枝、別 hunk)を `patch -p1 -E`(offset・fuzz・reject なし)。`-` 行のうち製品に関わる物(`app/scripts/build-engine-bundle.sh`、fe-wasmgen の `lib.rs`・`rcgen.rs`・`lower.rs`・`main.rs`・`wasm.rs`、`fle_audio_ring.c`、`b2d_swap.cpp`、`fle_hle.c`、`app/src/audio/*`)を読んだ: 無効側の分岐・URL パラメータ・`-D` の削除と、`stage_hybn0` の n0 経路への `--tls-ctx 0x0` の追加だけで、有効側の挙動は変わらない。
 

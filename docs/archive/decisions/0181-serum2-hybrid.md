@@ -269,7 +269,7 @@ NAME=hc1000 bash tools/mkvariant.sh 123            # → hyb/ab/hc1000-123/vst.{
 # 5. 二分探索: python3 tools/hbisect.py hc1000 3 9ef6044e59ca83cd   (LIMIT=123 LO=50)
 ```
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `hyb2.diff`(12 ファイル、基準 HEAD 26478ee。fe-wasmgen の rcgen/lower/lib/main/xabi と 5 つの新しいテスト、`fe-decode/src/jumptab.rs` の 1 か所、`lift/harness/hyb1/hybrid_glue.c`)。PM の検証: `patch -p1 --dry-run` は offset・fuzz・reject なしで当たる。`-` 行 20 本を全て読んだ(fe-wasmgen の内部ロジックの置換、`hybrid_glue.c` の配列サイズ 40、`jumptab.rs` の 1 行)。**共有の fe-decode の変更**(`.text` の外のデータ内の表を、注釈された関数の内側でなくても受け入れる。`.text` 内の表は従来どおり)は fe-lift も使うので、**fe-lift を再ビルドして FLEngine の生成 C を作り直し、sha256 が `cd9107ce…`、215,811,678 B で不変なことを確かめた**。全体テスト **169 results / 2,199 passed / 0 failed**(164/2,194 + 新規 5 実行ファイル、担当の値と一致)。a4(FRUITY 無効)942/942・895/895・functions 5,310・entries 1,009,731 で不変。PM は Serum 2 を実行していない(数字は担当の実測)。実行したのは実エンジンではなく、実プラグイン Serum2.vst3 を vst3a の代役の上で動かした測定で、**P3 の達成でも進捗(G 段階)でもない**。
 

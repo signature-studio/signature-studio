@@ -140,7 +140,7 @@
 2. 上の「FL の起動 → プロジェクトを開き終えるまで」の 6 本は、nice と load が揃っていない(25.8 s は E2a の run〔prefix-e2 でなく元の prefix〕、37.0 s は E2b〔prefix-e2、shim 入り〕、21.3 s は nice 0 の再生 run)。範囲として書いた。
 
 
-## PM の判断と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
 
 取り込み: opt1 の最終(§8 追記つき)の文書・表・道具を `docs/investigations/opt1/0298/` に置いた(WAV と生ログは入れない)。実行は **Wine 10 上の原版 x86-64 FL Studio 26.1.7.5653(Trial)**(専用 WINEPREFIX、環境側の `WinVerifyTrust` の shim だけ、FL のファイルは不変、PipeWire の null sink)。**実 Windows でも lift でもなく、Wine を正解とは言えない**。依頼者の機械は 0 件。
 

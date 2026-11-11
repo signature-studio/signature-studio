@@ -91,7 +91,7 @@
 
 `docs/`(この文書、`README-0255-line.txt`)、`optional/alpha6-optional-ctxmenu.diff`(任意。取り込み判断は PM)、`tables/`(`message-contract.tsv`、`fl-dynamic-method-ids.tsv`、`fl-handled-not-sent.tsv`、`runtime-stops-on-guest-results.tsv`、`empirical-messages*.tsv`、`learn/`)、`logs/`(B1 の注入結果、`ctx-*-defproc.txt` = DefWindowProc 到達の記録、`pixel-ab.txt` = A/B の画素比較、`ct-before.log` / `ct-after.log` = C テスト、`pics/` = 差の拡大)、`scripts/`、`tools/`(`learn-fetch.py`、`dmt-scan.py`、`a6-msgtab.py`、`a6-mk-table.py`、`a6-mk-notsent.py`、記録器)。
 
-## PM の判断と取り込み(2026-11-05 20:50、docs のみ)
+## PM の決定と取り込み(2026-11-05 20:50、docs のみ)
 
 取り込み: alpha1 の最終報告(20:41)の文書・表・道具・任意差分を `docs/investigations/alpha6/` に、決定文書を `docs/decisions/0255-message-audit.md` に置いた。**コードの変更は 0**(`optional/` の 2 本は取り込まない)。測定は alpha1 のもの(native N1、b42fad36 の生成 C、HEAD 4f054ecd の runtime、G3 の模擬入力。依頼者の機械・実機 Windows・実 GPU・本番 bundle の値は 0 件)で、PM は再測定していない。
 

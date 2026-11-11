@@ -323,7 +323,7 @@ alpha1 の変種 FLP 3 つ(`/home/ubuntu/work/alpha22w/flp-variants/{nostretch-p
 - Filter の準備(§2q): `tables/0307-FruityFilter_x64-import-and-instruction-census.txt`、`tables/0307-FruityFilter-cpuid-sites-dryrun.tsv`。
 
 
-## PM の判断と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
 
 取り込み: opt1 の最終(2026-11-06 19:48 の opt1 の報告)の文書・表・道具(`tools/refs` の画像 4 枚 1.4 MB は入れない。原本は `lift/out-git/opt2-results/0307/`)を `docs/investigations/opt1/0307/` に置いた。実行は Wine 10 上の原版 FL(決定 0298 と同じ環境)。**実 Windows・依頼者の機械は 0 件**。
 

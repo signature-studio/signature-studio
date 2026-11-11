@@ -170,7 +170,7 @@ S 印の領域別の件数(箇所/種類): 窓表とメッセージ 114/95、GDI
 PROVISIONAL の行数が多いファイル: `fle_win.c` 53、`fle_gdi.c` 29、`fle_win.h` 20、`fle_locale.c` 18、`fle_vfs.c` 18、`fle_thread.c` 11、`fle_vfs.h` 9、`fle_gdi.h` 7、`fle_ole.c` 7。
 
 
-## PM の判断と取り込み(2026-11-07 07:36、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 07:36、docs のみ。製品の差分なし)
 
 取り込み: ci1 の 0322(本文)と表・差分案(`docs/investigations/ci1/0322/`)、0321 の再現シナリオと道具(`docs/investigations/ci1/0321/`)。**実エンジンの実行は 0(読みだけ)、依頼者の機械は 0 件**。差分案 2 本は適用していない。
 

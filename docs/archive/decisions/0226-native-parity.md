@@ -500,7 +500,7 @@ V0 の bundle(runtime -O0、混成なし)を、V1H の状態 × 2.0 の最終し
 | S-parity1-9 | N2 の時間枠 60 分のうち 25 分で打ち切り | 起動時の検証ダイアログで進めない。回避は禁止 | 別の Wine のバージョン、Windows の実機 | 実機の Windows がある場合 |
 | S-parity1-10 | 『許容』の判定は CPU の比だけで、Chrome の画面更新/s の目標は置かない | Chrome は Worker 飽和で CPU 秒が一定になる | 更新/s ≥ 60 | P2 の再定義が決まったら |
 
-## 11. PM の判断点
+## 11. PM の未決の点
 1. **V1(`RT_OPT=O2 RT_DEFS=-DFLE_R_FAST_COPY=1`。名前つきのプリセットは足さない)を ship3 の既定にするか。anim1 の `F1xH3|F2xH3`〔runtime のうち -O2 にするのは `fle_raster` `fle_sse_more` だけ〕との違いは §5.1 3.**: サイズ中立、画素同一、CPU 合計 −33%(非混成。2.1 の表と Chrome の画面更新/s: Playlist 中ボタンドラッグ 4.7 → 20.4。同条件の node の gate は load が高い間に走ったので未確定)。リスクは runtime -O2 の未定義動作(今回の範囲では不変)。**推奨: 採る**。混成と重ねる手順は ship2 のまま(V1H は V1 に対し CPU 合計 −39%、V0 に対し −59%〔別々の時刻の表〕、V0 に対し −55%〔同じ session で続けて測った gate: 2.26 → 1.02〕、面 SHA 一致を確認)。
 2. **V3(熱い単位を -O2)を採るか**: 非混成で CPU −13%、wasm +4.6 MB(S1 の余裕の 43%)。**混成との組み合わせは未測定**なので推奨は保留。採るなら、混成の選択リスト(`lowered-*.txt`)を作り直す際の熱い単位の再選定とセットで測る。
 3. **V2(AI_UNITS の追加)は採らない**: 連続操作の合計 −1% に対して +7.9 MB。anim1 の SIMD 補助関数(`f_2a337c0` が軽くなる)の結果と合わせて最終的に捨てる。
@@ -514,7 +514,7 @@ V0 の bundle(runtime -O0、混成なし)を、V1H の状態 × 2.0 の最終し
 - 第 1 報の『Chrome の Worker は node の 10〜30 倍』は、seed に Basic.flp が無く Error ダイアログが主窓を disabled にしたまま測った誤りで、第 2 報で訂正した。Wine のプレフィックス(約 4 GB)は N2 失敗の後に削除した。
 - 依頼にない第三者のサービス・依存・課金は導入していない(使った物: clang、emscripten、node、Chrome、Wine〔既存〕、上流 Blend2D の tarball〔`out-b2d3` の物をコピー、SHA-256 を `build_upstream.sh` が確認〕)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 164e81a(+ anim1 の取り込み 959792a)に `parity1.diff`(84 ファイル)と `parity1-paint.diff`(10 ファイル)を `patch -p1` で当てた。どちらも新規ファイルだけ(`-` 行 0)。lift/runtime・crates には触れないので、フルテスト・a4 は不要。
 

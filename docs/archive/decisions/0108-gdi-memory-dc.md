@@ -322,7 +322,7 @@ DDB のメモリ DC への書き込みを受ける案は採っていないので
 11. **`EXPECT_FLE_SHA` の値**: 既定は註釈なしの FLEngine の C の**ファイル**の SHA（`94fe0c85…`）。a4 の測定は `FLE_HOOKS` つき（`ce205cfe…`）なので、`EXPECT_FLE_SHA` を註釈ありの値で渡して測った（`skip` ではない）。
 12. **6 モジュール構成の census の扱い**: 打ち切られた census の数（ok 227 など）をそのまま「census の結果」と書くか、診断として使えないと書くかは解釈が分かれる。上は数と終わり方を並べ、使えないと書いた（原因は推測）。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 1. **次の壁 `gdi32!MoveToEx` を答えるか**。ILTools の `TBitmapCanvas.CreateHandle`（`f_61374a0`）は `CreateCompatibleDC(NULL)` の直後に `MoveToEx(hdc, 0, 0, NULL)` を呼ぶ（実測）。答えるには DC に現在の位置を持たせる必要がある（Learn のページは読んでいない。lppt が非 NULL のときの前の位置の返し方などが論点）。同じ種類の「閉包に無い 82 の gdi32 import」（SaveDC、SetBkMode、LineTo、Rectangle ほか）が続く可能性が高い（読み。測っていない）。今回の連鎖で W6 の他の 13 の応答（`SelectObject`、`GetSysColor(8)`、`SetBkColor` ほか）は一度も呼ばれていない。
 2. **0 × 0 の矩形（決定 0106 の解釈の点 1）を先に直すか**。PM の決定 5 で今回は直していない。0 × 0 のまま、`CreateBitmap(0, 0)` → 1 × 1 の連鎖で進んでいる（実測）。freetype の switch とフォントを置いた後は、`TBitmap` が非 0 × 0 になり `CreateDIBSection` などの経路に入る可能性がある（読み、未測定）。

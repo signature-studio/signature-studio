@@ -225,7 +225,7 @@ PM 連絡(決定 0183 の新情報): Fruity Wrapper の DllMain は `LoadLibrary
 - テスト基準への影響: **なし**(新規ファイルのみ。`cargo test` の対象を触っていない)。**確認**: 本決定のために HEAD の `git archive` から作った `fe-lift`(`cargo build --release --offline -p fe-lift -p fe-pe`、素のオプション)が FLEngine の既定の生成 C を **215,811,678 B・sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`** で出すことを測った(基準と一致。`logs/felift-default.sha`)。全体テストは**走らせていない**(コードを変えていないため。走らせるなら基準は 162 results / 2,192 passed / 0 failed)。
 
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `prune2.diff`(新規ファイルのみ 104 本: `docs/investigations/prune2/` と `tools/prune2/`。`-` 行 0、`patch -p1 --dry-run` は HEAD 4f23c01 に offset・fuzz・reject なしで当たる)。fe-lift・runtime・harness・app には触れていない(既存の 2 ファイルへの小さな opt-in の追加 `cov-per-probe.patch` は**適用していない**: `fruity_g3.c` が `trace_native.c` の新しい関数を参照する形で、`trace_native.c` を含まないビルドがあればリンクが落ちる。必要になったら弱い参照にして別の担当で入れる)。コード変更が無いので全体テストは再実行していない(基準 169 results / 2,199 passed / 0 failed のまま)。PM は結果を再実行していない。
 

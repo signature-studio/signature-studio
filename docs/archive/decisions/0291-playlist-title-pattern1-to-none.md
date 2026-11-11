@@ -105,7 +105,7 @@ alpha10(決定 0267)の Wine 10.0 との比較表(`alpha10-results/tables/syscmd
 | `scripts/` | G3 スクリプト(`a11-restore.g3`、`a16-idle40.g3`、`a16-nomin.g3`、`a16-restore-nowiz.g3`) |
 | `tools/` | gdb の python(`a16-playlist`・`a16-strcall`・`a16-watch`・`a16-msgs`・`a16-memfind`・`a16-settext`・`a16-textout`・`a16-mode`)、`a16-run-gdb.sh`(`out-alpha3/tools/run-gdb.sh` に SEED を足した写し)、表の整形 `a16-msgs-table.py`・`a16-settext-table.py` |
 
-## PM の判断と取り込み(2026-11-06 14:15、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 14:15、docs のみ。製品の差分なし)
 
 取り込み: alpha1(alpha16)の最終の文書・表・画・台本・gdb の道具を `docs/investigations/alpha16/` に置いた(生の gdb ログ約 0.7 MB は入れない。原本は `lift/out-git/alpha16-results/logs/`)。測定は native N1(E8 側の runtime、実エンジン = FLEngine_x64.dll と同梱 DLL の lift)を G3 の模擬入力で走らせた物で、**ブラウザ(E8/E9)・実 Windows・依頼者の機械は 0 件**。ci1 のブラウザでの観測(5 通りの復元で再現)と N1 の再現が一致する。
 

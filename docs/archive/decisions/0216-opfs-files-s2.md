@@ -107,7 +107,7 @@ S-opfs1-guest-map、S-opfs1-siblings、S-opfs1-siblings-limit、S-opfs1-zip-open
 
 ---
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 - **取り込み**: `opfs1-s2.diff`(26 ファイル、`-` 行 41 本はすべて 1 行の置換で PM も全部読んだ)を HEAD 55e4e83 に当てた。clean(offset・fuzz なし)。PM 実測: 型検査 rc=0、vitest 1,409 passed + 7 skipped、Worker 43、e2e 1,109/1,109(1 回目は Rust の全体テストと同時で perf-beacon の 7 件がテスト間の遅れたビーコンの競合で落ち、perf-beacon 単独は 46/46、負荷の少ない状態での全体の再実行は 1,109/1,109。製品の不具合ではなくテスト分離の競合と読む)、Rust 全体テスト 184 results / 2,311 passed / 0 failed(基準 183 / 2,307 + wall_opfs1 4)。FLEngine の既定の生成 C は fe-lift が無変更のため `cd9107ce…` のまま。a4 は runtime の `fle_filedlg.c`(`#ifdef FLE_FILEDLG_BROWSER` の中だけ)以外に触れないので再実行していない。
 - **既定の見え方が変わる**: エンジンの File>Open / Save / Import / Export の選択が、`<input type=file>` の箱でなく OPFS の窓になる(依頼者の『File>Open の選択画面が出ない』『プロジェクトは zip を読む必要がある』への答え)。`?filedlg=box` で従来の箱に戻せる。OPFS が使えないときは窓が『使えない』と言って取り消す(箱へは落ちない。必要になれば `engine-dialog.ts` の失敗側で箱へ戻す)。**現在の既定の入口(SHIP2)の wasm には `-DFLE_FILEDLG_BROWSER` の TYPE 行/フォルダの修正(runtime)が入っていないので、実エンジンでの確認は ship3 で行う**(担当の 50/50 は SHIP2 の wasm にページ側だけの変更を当てた結果)。

@@ -137,7 +137,7 @@ HEAD 側の `wall_fr11.rs`（0127）の 1 か所（行数 577 の確認）は、
 2. ホストファイルの再作成（git に無い、約 74 MB）: インストーラ `flstudio_win64_26.1.7.5653.exe`（SHA-256 `04393e79…5fc02`）から、`python3 lift/harness/seeds/gen_install_tree.py INSTALLER --summary` でツリーを確認し、`gen_vfs_seed_installed.py INSTALLER FILES_TOUCHED HOST_ROOT OUT.tsv`（`FILES_TOUCHED` = `logs/files-touched.tsv`）で抽出して `vfs-seed-installed.tsv` を作る。`Empty.flp` の SHA-256 は `ae67bc83…685d4`（46,361 バイト）。**この再作成の手順を通しで再実行してはいない**（抽出した結果で走った。手順の再実行は未確認）。
 3. FRUITY 有効: `tools-idle1/wall.sh NAME`（`FLE_FRUITY_SECONDS=900`）。FRUITY 無効: `tools-idle1/run-off.sh NAME`。いずれも入力の DLL・seed は git に無い（`INPUT_LIFT` の置き場が要る。決定 0127）。
 
-## PM の判断点
+## PM の未決の点
 
 1. **SEH のレーン**: 壁 16 から先は SEH のモデルが要る。別レーンへ渡した（決定 (C)）。そのレーンが `fle_proc.c` を触るなら、この差分の `GetThreadPriority`（`fle_proc.c`）と衝突し得る。
 2. **FRUITY 無効の a4 の数が変わった**（5,308 → 5,310、1,009,189 → 1,009,721）: 決定 (A) の効果で、FRUITY 無効でもゲストの版取得が進むため。基準の数を 0113〜0127 のまま「不変」と書いている文書（0127、0128）がある。この決定の数を新しい基準にするか。

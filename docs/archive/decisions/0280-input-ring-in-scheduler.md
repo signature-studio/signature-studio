@@ -248,7 +248,7 @@ pooled:
 7. 配信バケットの読み取りは `wrangler dev`(remote の R2 の list / get のみ)。書き込み操作は使っていない。終わったら PID で止めた。
 8. 見つけた文書と実装の食い違い(直していない): 決定 0147 §4.3 と `fle_thread.h` のコメントは『環境変数 `FLE_PREEMPT_DISPATCHES` / `FLE_PREEMPT_TICKS` で 2 つの数を替えられる』『`FLE_PREEMPT=0` で機構を止める』と書くが、d6926b4d の `lift/` にその `getenv` はない(`git grep FLE_PREEMPT` はコメントと `wall_fr20.rs` の `env_remove` だけ)。
 
-## PM の判断と取り込み(2026-11-06 10:55、docs のみ。差分は製品の木に当てていない)
+## PM の決定と取り込み(2026-11-06 10:55、docs のみ。差分は製品の木に当てていない)
 
 取り込み: 差分 3 本(`gpu7-L1.diff`、`gpu7-L1-LC.diff`、`gpu7-LC-over-L1.diff`)を `docs/investigations/gpu7/patches/` に置いた。`gpu7-L1-LC.diff` は e8-wip(a1e96d92)の `git archive` に `patch --batch -p1` が rc=0(offset 12、fuzz 2、reject 0)で当たることを PM が確認した。PM は C のテスト・app の連鎖・a4・node 行をこの差分ではまだ走らせていない(gpu1 の積んだ木でのテスト: C 24 本、vitest 1,310 + 7 skip、worker 49、e2e 229/229〔1 回目は load 30 前後で 175/177、focus の waitFor 2 件の timeout〕)。
 判断:

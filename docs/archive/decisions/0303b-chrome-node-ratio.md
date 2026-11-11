@@ -122,7 +122,7 @@ Chrome の窓の内訳(自己、`tables/0303b-chrome-e11-inclusive-and-categorie
 - 表: `0303b-ratio-table-matched-window.tsv`(§3、最終)、`0303b-ratio-table-matched-window-RAW-superseded.tsv`(生のみの旧表)、`0303b-chrome-runs.tsv`、`0303b-node-window-difference-runs.txt`、`0303b-node-mixer-top-inclusive.txt`、`0303b-chrome-e11-inclusive-and-categories.txt`、`0303b-node-flag-and-smt-runs.tsv`、`0303b-node-plain-cpu.tsv`、`0303b-v8-flag-defaults-13.6-vs-15.6.txt`(+ 両版の `flag-definitions.h`)、`0303b-fl_trace1-wasm-inlining-counts.txt`、`0303b-address-space-thp-observation.txt`。
 
 
-## PM の判断と取り込み(2026-11-06 18:12、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 18:12、docs のみ。製品の差分なし)
 
 取り込み: mt3 の第一報(文書・表・道具)を `docs/investigations/mt3w/0303/` に置いた(V8 の `flag-definitions.h` の抜粋 2 本〔計 376 KB、V8 のソースのコピー〕は入れない。原本は `lift/out-git/mt3w-results/0303/tables/`)。node 側は新規に実行(E11 のテスト用 wasm、node 24.19 / V8 13.6、仮想時計 G3)。Chrome 側は既存の cpuprofile(opt1 の ser-e17p ほか)の再解析で、**Chrome は起動していない**。依頼者の機械は 0 件。
 

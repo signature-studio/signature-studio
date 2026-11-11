@@ -127,7 +127,7 @@ bash T/lift/harness/c0323/regress.sh T W               # win_upd / win_seq / win
 ```
 
 
-## PM の判断と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
 
 取り込み: ci1 の 0323(契約の不足 ①背景の消去 ②HTTRANSPARENT ③WH_MOUSE/WH_KEYBOARD のフック)、差分(`docs/investigations/ci1/0323/diffs/`)、Learn の引用と Wine 10.0 の出力(`evidence/`)。**PM の検証**: `0323-contract-fixes.diff`(1852 行)を HEAD の git archive に実適用して rc 0・FAILED 0・offset 0。alpha1 の 3 本・mt3 の 0313f2・ci1 の d1・d2 と合わせた 7 本を順に当てても FAILED 0・.rej 0。変更した runtime は `emcc -fsyntax-only -Wall -Wextra` で新しい警告 0。Wine 10.0 との差は 130 行から 48 行(ci1 の報告)。実エンジンでの効果は未測定(cand1 の bundle ができてから)。区分 (b)、全体の仕組みはそれぞれ『窓の背景の消去の手順全体』『マウス入力の対象窓を決める手順』『入力の取り出し点でのフック連鎖』。依頼者の機械は 0 件。
 

@@ -115,7 +115,7 @@ Chrome は同じ形で、150 kB のスレッド 1・2 が 1,283（node 1,284）�
 4. **Chrome の隔離が不完全なまま結果を出したこと**（上）。結果は出したが、「遮断が完全」とは書いていない。
 5. **`stack_churn`・`deep_locals`・自己検査・leak 計数は、変異検査の生存を見た後に足した**。したがって、これらがあるから変異が検出できる。最初から持っていた検出器ではない。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 1. **native の SHA の変化**（`09528ebc…` → `5968c889…`）。原因は新規の `fle_thread_wasm.c` が glob `runtime/fle_*.c` に入ること。選択肢: (A) このまま（SHA は変わるが、基準の 47 の runtime オブジェクトと生成物は不変）、(B) `fle_thread_wasm.c` を native の glob の外に置く（例: `harness/web/threads/` に移す。`build_nmod_wasm.sh` が runtime の glob で拾うので、wasm 側のスクリプトの変更が要る）。依頼は `lift/runtime/fle_thread_wasm.c` を指定していたので (A) にした。
 2. **Chrome の遮断を UDP の `connect()` 1〜2 回で許すか**。許さないなら、ネットワーク名前空間（root 権限、または `unshare` の許可）が要る。

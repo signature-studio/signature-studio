@@ -232,7 +232,7 @@ PM の項目: 「デバイス依存ビットマップは画素を持つ。top-le
 
 `logs/mutation.txt`。5 件中 M1（CompareStringW の接頭辞の順序）と M2（SPI_GETANIMATION の iMinAnimate）は検出。M3（`MonitorFrom*` の dwFlags=NULL の分岐）、M4（`PtInRect` の右辺）、M5（`ReadFile` の 0 バイトの戻り値）は**検出できなかった**: 旧テストの「停止」を外しただけで、答えの値を固定していない。`tests/wall_fr11.rs` は書いていない。
 
-## PM の判断点
+## PM の未決の点
 
 1. 停止条件 (b) は「決定 0122 の idle 検出」による。Sleep の 16 ms 後と SetTimer の 600 秒後が残る。続行するなら `FLE_FRUITY_NO_IDLE_STOP=1` の別測定（診断 1 回: 入口 135,466,826 で `indirect call to 0x33d6e70` に当たった）。
 2. (g) の 40 壁を超えた（壁 94 の時点）。止まらず 101 まで進んだ。

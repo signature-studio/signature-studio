@@ -196,7 +196,7 @@ Learn が**書いていない**こと（出典なしの選択の根拠）: UuidC
 5. **決定 3（仮想時計）**: 直さない。決定 0117 の `unverified = chain,revocation,time` が全出力に明記されている。壁 9 までの実行で、署名検査の結果（`WinVerifyTrust` = 0、FL64.exe の行も使われた）は 0117 と同じ意味のまま。
 6. **全体テストの数**: 「基準 118 件・1,632 passed」に新規を足す。新規 15 件の内訳は上のとおり（通しの後に 1 件足したため、通しの値とは 1 件ずれる。下の「検証」の注記）。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 1. **壁 9（`SendMessageW(NULL, …)`／`SetClassLongPtrW(NULL, …)`）**: 案 X1（止まる。推奨）、X2（0 と 1400。実験 E5）、X3（X2 + 仮想ウィンドウ表の拡張）。X2 は出典なしの選択を 2 つ足し、(a)(b) に近づかない（次が壁 10）。
 2. **壁 10 以降の範囲（ウィンドウのモデル）**: `CreateWindowExW(WS_EX_TOOLWINDOW, "TApplication", "FL Studio", 0x84ca0000, X = 画面幅/2, Y = 画面高/2, 幅 0, 高さ 0)` は、決定 0071 の「隠れた WS_POPUP の道具ウィンドウ」を超える（キャプション・システムメニュー、位置が (0, 0) でない）。可視性（`ShowWindow`）、非クライアント領域（`WM_NCCALCSIZE` の `NCCALCSIZE_PARAMS`）、`WM_GETMINMAXINFO`・`WM_SIZE`・`WM_MOVE`・`WM_SHOWWINDOW`、メッセージキュー（`GetMessageW`／`PeekMessageW`）を段階的にどこまで入れるか。目的 (b)（ブロッキングのメッセージループ）に到達するには、このモデルの一部が必要と読む（未測定）。

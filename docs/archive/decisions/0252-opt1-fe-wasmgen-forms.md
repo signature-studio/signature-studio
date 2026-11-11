@@ -180,7 +180,7 @@
 
 `lift/out-git/opt1-results/`: `opt1-f.diff`(8 ファイル)・`opt1-f-lists.diff`(+40 と件数)・`wip/opt1-f-wip.diff`(21:04 の WIP。最終の opt1-f.diff と同一内容)・`docs/0252-opt1-fe-wasmgen-forms.md`・`docs/README-0252-line.txt`・`tables/0252-*`・`tables/g3-lines-0252-*`・`logs/0252-*`・`tools/0252/`(sdriveg2.mjs の追加 op `ctrlKey` / `evalWait` / `eval` / `exportSha`、場面 `scn-export*.json`、prof-cmp.py・prof-children.py・prof-split.py・mk-idxmap-exports.py・mk-bodymap.py、規則の再実行の `regen-hyb-u.py`・`run-census-status.sh`、rows.sh・build_test.sh・mk-x4.sh)。作業ディレクトリ `lift/out-opt2` は 22:40 に 31 MB に減らした(build の中間物・bundle・profile・WAV は削除。結果は上のファイルに保存)。
 
-## PM の判断と取り込み(2026-11-05 22:45)
+## PM の決定と取り込み(2026-11-05 22:45)
 
 取り込んだ物: 本文書、`docs/investigations/opt1/`(`patches/opt1-f.diff`、`patches/opt1-f-lists.diff`、`tables/0252-*`、`logs/0252-*`、`tools/0252/`)。**製品の木には、次の順で当てて検証した**(PM の木、未コミット→この決定と同じコミット): `opt1-f.diff`(8 ファイル、offset・fuzz 0)→ `mt3-wasmgen-small.diff`(決定 0254、4 ファイル、offset のみ)→ `mt3-x87-lower.diff`(決定 0259、6 ファイル。`lib.rs` の最初の hunk は fuzz 2・offset 45 で、PM が目で確認した: `if c_mode { for (n,_,_) in lower::x87::HELPERS { c_imp_dry.insert(...) } }` を `let dry = Ctx{...}` の前に入れる 7 行で、文脈は正しい)→ `opt1-f-lists.diff`(+40、5 ファイル、offset・fuzz 0)→ `alpha7.diff`(決定 0258、5 ファイル、offset・fuzz 0)。`-` 行は読んだ: `fx.rs` の `Cvttpd2dq` の判定 1 行、`lib.rs` の `solve` の宣言と呼び出し 2 行(`nocfg` を足す)、`lower.rs` の `Cvttpd2dq` / `Sqrtpd` / `Cvtps2pd` / `Cvtpd2ps` まわりの `matches!` と match 腕 7 行(`Cvttpd2dq` を新しい経路へ付け替え)、`mx_rc_wire.rs` / `sse_forms.rs` の定数・入力、`hybrid_glue.c` の `fle_hyb_mx_n[64]` → 128、`ci/test-hybrid.sh` の件数 2 行。
 

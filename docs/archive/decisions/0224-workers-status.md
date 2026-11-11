@@ -162,7 +162,7 @@ R2 の『一時資格情報』(https://developers.cloudflare.com/r2/api/s3/tempo
 | S-workers1-11 | 配備の木は main + 本差分 + ci1 のブランチの Worker 名 1 行 | main の名前のままでは別の Worker が作られる。代替: ci1 のブランチの PR を待つ(依頼者はその間、古いアプリを見る) |
 | S-workers1-12 | 範囲内が上限を超えたら『アップロードの新しい順』に読む | 直近の実測が大事。代替: 日付の新しい順/sid ごとの最終 seq のみ(1 ページの読み込みが 1 行になり、記録ごとの表示が消える) |
 
-## 10. PM の判断点
+## 10. PM の未決の点
 
 1. **PR の順序**: `workers1.diff`(main)を先に取り込む。`workers1-ci.diff` はその後(ブランチの `wrangler_config.py` が `PERF_BUCKET` の束縛を要求するため、逆だと app ジョブが落ちる)。main の `app/wrangler.jsonc` の `name` は ci1 のブランチの PR で変わる。
 2. ビーコンの既定 ON と、Worker での保存・集計という観測の基盤が、『観測は製品の経路から切り離す』に反しないか(§7)。
@@ -178,7 +178,7 @@ R2 の『一時資格情報』(https://developers.cloudflare.com/r2/api/s3/tempo
 
 `workers1.diff`(HEAD に当たる)、`workers1-ci.diff`(ブランチ `ci/cloudflare-deploy` の `origin` 811031f に当たる)、`MERGE-NOTES.md`、`docs/`(この文書、`deploy-manual.md`、README の 1 行)、`tables/`、`tools/`(`compat-first-idle.mjs`、`perf-sync.sh`、`r2-read-token-check.sh`、`make-diff.sh`)、`logs/`。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み先: HEAD 67d60b8(crash1 〔決定 0209〕の取り込み後)。`workers1.diff` の当たり: 3e4f540 には fuzz・offset なしで当たったが、crash1 が `app/scripts/perf-log-summary.mjs` と `.d.mts` に足した soft stops の表と型(約 20 行)と衝突した。ライブラリの移動(`app/scripts/perf-log-summary.mjs` の本体 → `app/shared/perf-summary.mjs`)は `workers1.diff` のまま行い、crash1 の追加は移動先 `app/shared/perf-summary.mjs` と `.d.mts` に同じ hunk を当てて移した(`git diff 3e4f540 67d60b8` の該当 2 ファイルを移動先に当てた。offset 2〜5 行)。crash1 の `.d.mts` に `SummarySoft` の宣言が 2 回入っていたので 1 回にした(型の内容は同じ)。`-` 402 行はこの移動(本体の削除 348 行ほか)で、読んだ。
 

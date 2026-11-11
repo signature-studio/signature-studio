@@ -418,7 +418,7 @@ a4: all_units_done=no functions_distinct=3411 function_entries=134085
 10. **書式**: 依頼文の `fle: <API>: <理由>` に `(decision 0111)` を足した（0108 の画素の 3 つの停止は先頭の引数の文字列を保つ）。
 11. **`GetTextMetricsW` を C にした**: 依頼の A の例に「GetTextMetrics」が挙がっていた。TEXTMETRIC の値（tmHeight、tmAscent、tmAveCharWidth ほか）は選択中のフォントのデータと GDI のフォント マッパー（丸めとヒンティング）で決まり、Learn は各メンバーの意味を書くだけで値を導く規則を書かない。仮想フォント（決定 0066 の "Segoe UI"）のファイルからメトリクスを計算する案はあるが、「実機の仕様から導ける範囲」に入らないと読んだ。`SetTextAlign` ほかの照会は ILTools が import しない（行を足さない）。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 1. **`g1-optional-getdevicecaps.diff` を当てるか**（**PM の決定: 当てる。第 2 段階で当てた**。ただし連鎖では**呼ばれなかった**ので効果は未観測）（読みでは `TBitmap.Draw` の経路が最初に踏む壁）。当てなければメモリ DC の `GetDeviceCaps` は 0108 の停止のまま（`not a live DC`）。
 2. **`g1-optional-stretchblt.diff` を当てるか**（**PM の決定: 当てる。第 2 段階で当てた**。連鎖では `StretchBlt` は**呼ばれなかった**）（`StretchBlt` の 1:1 SRCCOPY を BitBlt と同一視する。依頼の例外は「BitBlt（SRCCOPY）」で StretchBlt を含まない）。当てなければ `StretchBlt` は名前付き停止。

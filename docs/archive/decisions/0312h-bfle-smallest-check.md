@@ -99,7 +99,7 @@
 | 方式 A: 1 つ目 / 7 つ | 約 2.4 MB / 約 8.7 MB(+ FLEngine の重複除去 約 −5.5 MB:重複 25.38 MB × 0.311 = 7.9 MB − 表と wrapper 約 2.4 MB) | plug1 の 3.28 MB(1 つ目)と同じ桁 |
 
 
-## PM の判断と取り込み(2026-11-06 23:10、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 23:10、docs のみ。製品の差分なし)
 
 取り込み: mt3 の 0312h(B-FLE の最小の確かめ)の文書・表・道具を `docs/investigations/mt3w/0312/` に置いた。実行は B1 の CI の fe-lift(Balance と Flanger を各 1.2 s)と python(nice 19)の**読み取りだけ**で、**wasm・Chrome・依頼者の機械は 0 件**。大きさの見積りは係数(B1 の FLEngine の実測: C 1 B あたり pre-opt の wasm 0.407、最終 × 0.765)による**読み**で、Balance の wasm を実際に作った値ではない。
 

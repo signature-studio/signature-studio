@@ -124,7 +124,7 @@ CI の全面ビルド(生成 C 全体の clang 〔native〕または emscripten 
 - 走らせたのは fe-lift のテスト 158 ファイル中 98(重複なし)。残りは走らせていない。全体テスト(`test.sh full`)、a4、node の 84 / 55 / 87 行も走らせていない。
 - 訂正: `vcall_thunk_dll` の期待は 223(224 は誤り)。`alpha10b-v2.diff` / `alpha10b-fix.diff`。
 
-## PM の判断と取り込み(2026-11-06 09:45、docs のみ)
+## PM の決定と取り込み(2026-11-06 09:45、docs のみ)
 
 取り込み: alpha1 の最終(09:50 付け)の文書・表・道具を `docs/investigations/alpha11/`(差分は `patches/`、`alpha11-app.diff` = ページ側の復元ボタン〔app のみ、17 ファイル、`d6926b4d` に dry-run 清潔〕)に置いた。生ログ(約 1.5 MB)は `lift/out-git/alpha11-results/logs` に残し、リポジトリには入れない。測定は alpha1 の native N1 と gdb、Chrome 156 の e2e(エンジンなし)、vitest、cargo(実 DLL 入りの 98 ファイルで 1,562 passed / 0 failed、SKIPPED は wall_fr9t の任意の比較 1 件のみ)で、実 Windows・本番 bundle のブラウザ・node 84/55/87 行は 0 件。
 判断:

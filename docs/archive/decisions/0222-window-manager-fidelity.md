@@ -134,7 +134,7 @@
 | S-dispatch-dead-window | 窓がもう無いメッセージの DispatchMessage は 0 を返し何も呼ばない | Learn は書かない。Wine 10.0 dispatch_message(UNOFFICIAL)。以前は停止 | 実機 |
 | S-dispatch-a-passthrough | DispatchMessageA はテキストを運ぶメッセージ以外をそのまま渡す | このモデルの窓手続きは 1 種類。変換が要るメッセージは名前付きで停止 | 変換の実装 |
 
-## 10. PM の判断点
+## 10. PM の未決の点
 
 1. **既定の動作が変わる**(逆スイッチのマクロつき): クリックの契約、SetWindowPos の CHANGED、アクティブ化の契約、プロセス終了の窓破棄、DefWindowProc の 0。16 スナップの期待値(wasm 82 行)は変わる見込み(native では §7)。新しい期待表は wasm で作る必要がある(ship3)。
 2. 窓の契約の残り(`tables/window-conformance.tsv`): CreateWindowEx(WS_VISIBLE) での活性化(Wine のみ)、WM_PARENTNOTIFY の作成/破棄通知(txt1 の CreateWindowExW 差分が入ってから)、ボタン離しの WM_SETCURSOR(Wine のみ)、非クライアント領域(nc_zero、txt1 の指摘)、DefWindowProc クラス A の未実装 24。
@@ -160,7 +160,7 @@
 `lift/out-git/win2-results/`: `win2.diff`、`MERGE-NOTES.md`、`docs/0222-window-manager-fidelity.md`、`docs/README-0222-line.txt`、`tables/`(`window-conformance.tsv` 38 行、`page-window-knowledge.tsv` 15 行、`defwindowproc-messages.tsv` 321 行、`click-trace.tsv`、`snapshot-bisect.tsv`)、`optional-audio-report.diff`(任意、§7b)、`logs/wasm-png/`(wasm の実エンジンの画面 5 枚: 対照版と修理版の『Playlist → Mixer のクリック後』、対照版の『主窓 × のあと』、修理版 + 任意差分の最終ページ、修理版の × 後のデスクトップ)、`tools/`(`bb.sh`〔wasm バンドル〕、`wasm-click.mjs`〔Chrome の合成クリック〕、`build-rt.sh`、`link.sh`、`variant.sh`、`serve.sh`、`send.sh`、`run-g3.sh`、`zsummary.py`、`click-trace.py`、`actdiff.py`、`mk-act-expected.py`、`mk-defproc-table.py`、`fetch-wm-pages.sh`、`mkdiff.sh`、`vmt_dyn.py`〔試みて止めた静的読み〕)、`logs/`。作業ディレクトリ `lift/out-win2/`。
 
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD eb0de5c に `win2.diff`(22 ファイル、`-` 66 行は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-w2/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **190 results / 2,346 passed / 0 failed**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、typecheck rc=0、vitest 1,591 passed + 7 skipped、Worker 50/50、e2e 1,262/1,262。
 

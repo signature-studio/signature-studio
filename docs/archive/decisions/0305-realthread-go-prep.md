@@ -129,7 +129,7 @@
 - `tables/0305-triage-16.tsv`、`0305-failing-messages-from-0301.txt`、`0305-experiment-1-rows-moved-to-the-end.txt`、`0305-experiment-2-all-fixes.txt`、`0305-full-test-with-fixes.log`、`0305-flag-and-env-sites.txt`、`0305-dry-run-rt-on-e11-on-main-25019fd1.log`。
 
 
-## PM の判断と取り込み(2026-11-06 19:45、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 19:45、docs のみ。製品の差分なし)
 
 取り込み: mt3 の最終(0305・0305b・0305c・0305d、19:43)の文書・表・道具を `docs/investigations/mt3w/0305/`、差分 2 本を `docs/investigations/mt3w/patches/` に置いた。実行は fe-lift の cargo テスト・patch の dry-run・grep だけで、**Chrome・wasm の実行・依頼者の機械は 0 件**。人日は読み。
 

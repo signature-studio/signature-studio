@@ -163,7 +163,7 @@
 - B08 SPI_GETWORKAREA(全画面 vs タスクバーを除く)、B34 EnumDisplaySettingsW(60 Hz)、B40 DPI(PROCESS_DPI_UNAWARE、96)、B43 CoCreateInstance(TaskbarList が REGDB_E_CLASSNOTREG)、B44 キーボード配列・コードページ・UI 言語(en-US)— 環境の選択で、描画の分岐は読んでいない。B33(79 名の NULL: Fls*、SRW ロック、COM、Var*、Touch、FlatSB 等)は各モジュールの起動時の RTL が古い実装に切り替える(描画ではない)。
 - 同じ行: B01〜B04、B06、B20〜B28、B41、B42 は我々の答えが典型と同じ。
 
-### 4.3 修正(`pick1-spi.diff`、旗なし)と PM の判断
+### 4.3 修正(`pick1-spi.diff`、旗なし)と PM の決定
 **採った変更(1 件)**: `lift/runtime/fle_spi.c`/`.h`: `SPI_GETANIMATION` の `iMinAnimate` の初期値 1、`SPI_SETANIMATION`(0x49)を実装(`ANIMATIONINFO` を保持。cbSize/uiParam≠8・pvParam NULL は従来どおり名前付き停止、fWinIni は無視〔ユーザープロファイルに書かない〕)。テスト `spi.rs` を更新(35 通過)。**FL 固有の分岐は足していない**(SPI の戻り値だけ)。分類: 外部 API の契約(Learn の SPI_SETANIMATION の記述)の実装 + 既定値の選択(S-pick1-spi-2、Learn に値は無く、Windows と Wine 10.0 の既定が 1)。効果: 窓表・画素は 0 件変化(起動 16 スナップ・操作 29 スナップの g3 行の差分 0)。
 **PM の判断(2026-11-05): 残り 2 件は採らない**。理由(PM): (1) `SPI_GETFONTSMOOTHINGTYPE` を ClearType にする変更と (3) `SPI_GETCURSORSHADOW` を TRUE にする変更は、根拠が『典型の Windows の既定』だけで契約にない。問い合わせの答えは**我々の仮想システムの実際の状態**を述べるものにする。ClearType は副画素の並び(RGB/BGR)を前提とした描画で、ブラウザの canvas は拡大縮小され(DPR が整数でない)並びが保証されないので、色つきの縁が出る。リモート接続の Windows もグレースケールを答える。全 34 + 68 面の画素が変わる費用に見合う利益の実測が無い。カーソルの影は、我々のカーソルはホストの CSS カーソルで影を描かないので実際の状態は FALSE。
 - 試作の測定(参考、`tables/spi-cleartype-effect-NOT-ADOPTED.tsv`): ClearType にすると窓表は変わらず、文字の画素だけが変わる(QFC が副画素の被覆の経路に切り替わる)。CPU は load のゆれの内(全体 0.965 倍)。
@@ -215,7 +215,7 @@
 ## 10. Learn の出典
 `SystemParametersInfoW`(SPI_GETFONTSMOOTHINGTYPE / CONTRAST / ORIENTATION、SPI_GETCURSORSHADOW、SPI_GETANIMATION / SETANIMATION、SPI_GETSELECTIONFADE ほか)、`GetSystemMetrics`、`GetDeviceCaps`、`DwmIsCompositionEnabled`、`DwmExtendFrameIntoClientArea`(『負の余白 = sheet of glass』)、`DwmEnableBlurBehindWindow`、`IsThemeActive`、`BeginBufferedPaint`、`AlphaBlend`、`GradientFill`、`GetDpiForMonitor`、`GetProcessDpiAwareness`、`UpdateLayeredWindow`、`SetLayeredWindowAttributes`、`GetProcAddress`(2026-11-05 に取得、`lift/out-pick1/learn/`)。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 33349a3d に `pick1.diff`(新規 49 ファイルだけ、`-` 行 0)と `pick1-spi.diff`(runtime + テストの 3 ファイル、`-` 行 10 本は全部読んだ)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-p1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **196 results / 2,387 passed / 0 failed / 1 ignored**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737 不変。
 

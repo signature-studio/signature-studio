@@ -98,7 +98,7 @@ export の許可リスト(wasm のリンク行)にこの 2 つを足す必要が
 2. ページ側: §6 の 2 入口で復元ボタン。
 3. 実 Windows が使えるなら、起動時の配置と最小化 → 復元の見え方の照合。
 
-## PM の判断と取り込み(2026-11-06 09:45、docs のみ。差分は製品の木に当てていない)
+## PM の決定と取り込み(2026-11-06 09:45、docs のみ。差分は製品の木に当てていない)
 
 取り込み: alpha1 の最終(0267 + 0272 の訂正)の文書・表・道具・差分を `docs/investigations/alpha10/`(差分は `patches/`)に置いた。`alpha10.diff`(A + B + C: DefWindowProc の SC_MINIMIZE / MAXIMIZE / RESTORE → ShowWindow、最小化した窓の形、ホストの「タスクバー」入口)と `alpha10b-v2.diff`(D: GetWindowPlacement の長さ 60 → 44 と SetWindowPlacement、lifter の表に 1 行)は、e7b-wip(= main 0b228624)の `git archive` に順に dry-run が offset・fuzz なしで通る。D の `vcall_thunk_dll` の期待は 224 でなく **223**(`alpha10b-v2.diff`、alpha1 の訂正。FL の SetWindowPlacement の thunk 2 本が同じ IAT スロットを共有する)。測定は alpha1 の native N1 と Wine 10.0(UNOFFICIAL)で、ブラウザ・実 Windows・依頼者の機械は 0 件。PM は全体テスト・a4・node 行を未実行。
 判断:

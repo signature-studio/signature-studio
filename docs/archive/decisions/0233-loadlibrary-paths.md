@@ -138,7 +138,7 @@ bundle は CI の段スクリプト(`tools/iter.sh` が基準の `ciA` の objec
 | S-load1-trace-removed | `FLE_LOADLIB_TRACE` も除去 | 残す |
 | S-load1-chrome-harness | Chrome ではページのファイル窓に 49 ファイルを渡し File>Open の行を選ぶ(ハーネス = 人の選択の代役)。`FLE_FILEDLG_PICK` は使わない | manifest の env |
 
-## 10. PM の判断点
+## 10. PM の未決の点
 
 1. **名前のみの未知 DLL の既定が『停止』から『NULL/126(名簿にある名前は停止のまま)』に変わる**(従来は `FLE_SOFT_STOP=1` か `FLE_LOADLIB_MISSING=1` の探索だけ)。製品・第三者の DLL(oggio・Elastique・ILVideo・プラグイン)が対象。名簿の網羅は Wine 10.0 の名前に依存(S-load1-roster)。
 2. **`load1-gpa.diff` は参照プロジェクトを出荷構成で開くのに必要**(PM は採る方針)。Elastique が出荷 6 モジュールに無いため、エンジンは自分の箱『Elastique DLL couldn't be opened. Please reinstall the application.』を出し(VM が既定ボタンで返答、画面には出ない)、`GetProcAddress(NULL, "ElAllocator_SetFunctions")` を 9 回呼んで続ける(実機の Windows で Elastique が無ければ同じ道を通ると読む〔推測〕)。**時間伸縮(Elastique)を使うクリップは出荷構成では鳴らない**(F2xH6 まで)。
@@ -170,7 +170,7 @@ bundle は CI の段スクリプト(`tools/iter.sh` が基準の `ciA` の objec
 - `sleep`/`nohup`/`pkill -f`/`pgrep -f`/末尾 `&` は使っていない(`tail --pid` の前景待ちと `ps | grep` を使った)。
 - 確認できなかったこと: 実機 Windows との照合(126・127・名簿)、Firefox 159・依頼者の機械、F2xH6、`run-g3.sh` の ship3 の表との直接比較、`2 sample(s)` の行が出る理由、`GetModuleHandle*` の path 付き、PATH の探索。
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 86ae7d85 に `load1.diff`(11 ファイル、`-` 113 行は全部読んだ。削除は探索スイッチの `getenv` 3 個と `FLE_SOFT_OR_STOP` 1 箇所、旧挙動を固定していたテストの期待値)と `load1-gpa.diff`(3 ファイル、`-` 3 行)を `patch -p1`(offset・fuzz・reject なし)。PM が測った値(この機械、`lift/out-pmchk-l1/`): FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **193 results / 2,369 passed / 0 failed / ignored 1**、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,737、typecheck rc=0、vitest **1,377 passed + 7 skipped**、Worker 50/50、e2e **893/893**。
 

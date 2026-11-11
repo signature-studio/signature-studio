@@ -340,7 +340,7 @@ python3 tools/prune/check_env.py lift/runtime/fle_cpuid.c    # 環境の前提
 
 `lift/out-git/prune1-results/`: `prune1.diff`、`MERGE-NOTES.md`、`docs/`(この文書、README の 1 行)、`tables/`(`prune-S.tsv`・`prune-SM.tsv`〔リスト〕、`functions.tsv.gz`〔関数ごとの区分〕、`summary.txt`、`sensitivity.tsv`、`exports-requested.tsv`、`importers.tsv`、`isa-by-case.tsv`、`sizes.tsv`、`object-identity.tsv`、Chrome・node の表、カバレッジ `cov-*.txt.gz`)、`logs/`、`tools/`(eng.sh ほか、判定ツールは diff に入っている)。
 
-## 付録 PM の判断(2026-11-03、取り込み時)
+## 付録 PM の決定(2026-11-03、取り込み時)
 
 - **取り込み時の PM の確認**: `prune1.diff` は HEAD 83c9dd8(決定 0166 の取り込み後)に `patch -p1 --dry-run` が rc=0・fuzz/offset/reject なしで当たる(担当の確認は d9af868 に対して)。適用後の FLEngine の生成 C の SHA-256 は `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)のままで、オプション無しでは生成 C が変わらない。全体テストは results=154・passed=2,129・failed=0(取り込み前の 153・2,119 に、`prune_list` 6 件と `prune.rs` 単体 4 件、結果 1 件が加わる)。a4 FRUITY 無効は init_count 942/942・run_rank 895/895・functions 5,310・entries 1,009,731 で基準どおり。
 - **既定にするのは S(根拠=環境の定義だけ)**。S+M は『データ表のモデル』を仮定に含み、検定は 16 スナップの 335 関数だけなので、**条件つきの選択肢**として残す。S+M を既定にする条件: 参照プロジェクトの再生・書き出し・プラグインのシナリオを含む `judge.py --cov` の再検定で、モデルの外に入口が出ないこと。失敗の形は名前つきの abort(`fle: pruned function 0x… was executed`)で、静かな誤動作ではない(陰性対照で確認済み)。

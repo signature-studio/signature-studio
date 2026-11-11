@@ -229,7 +229,7 @@ Old vs new (exact two-sided permutation test on the means; p < 0.05 would be a d
 
 ## PM 記入欄（ci1 は書かない）
 
-### PM の判断と取り込み(2026-11-06 13:00、docs のみ)
+### PM の決定と取り込み(2026-11-06 13:00、docs のみ)
 
 取り込み: ci1 の E8 本番 bundle の確認(第 1 報 12:27、ingest 用文書 12:41)の文書・結果表・データ(各 run の report と P3・first idle・minrestore の表。サイズの大きい生の audio JSON は入れない)・画 4 枚を `docs/investigations/ci1/0277/e8/` に置いた。測定は Chrome 156 と Firefox 158(Xvfb :77、WebGL あり)の本番 E8 bundle `fl-engine-ci-875bfd62`(Worker `4a03e043-212d-4392-b35a-a1cbb60fa726`)で、依頼者の機械・実 Windows は 0 件。
 判断:

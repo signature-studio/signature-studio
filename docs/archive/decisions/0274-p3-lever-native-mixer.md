@@ -49,7 +49,7 @@
 
 
 
-## PM の判断と取り込み(2026-11-06 10:15、docs のみ)
+## PM の決定と取り込み(2026-11-06 10:15、docs のみ)
 
 取り込み: alpha1 の 0274 最終(10:05)の文書・表・道具・G3 スクリプトを `docs/investigations/alpha12/` に置いた。8 本の native の追跡ログ(各 700〜1,100 KB の gzip)は 400 KB の上限を超えるので入れず、`lift/out-git/alpha12-results/logs/` に残す。診断差分(`diag-trace-prio-speed-NOT-FOR-MERGE.diff`)は入れない。測定は native N1(b42fad36 の生成 C + HEAD の runtime + 追跡)・G3 の模擬入力・参照プロジェクトで、**ブラウザ・実機 Windows・依頼者の機械は 0 件**。native の仮想時計は壁時計に合わせないので、すべて仮想時間の値。
 

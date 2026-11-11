@@ -77,7 +77,7 @@
 
 `alpha5.diff`、`alpha5c.diff`、`alpha5b.diff`、`docs/`(この文書、`README-0253-line.txt`)、`MERGE-NOTES.md`、`tables/`(scene-matrix、a5b-erase-counts、a5b-injected-repaint)、`logs/`(A1 の停止 bt と窓メッセージ記録、DC 履歴、HEAD の直し前、直し後、cargo の結果、ソースの形の数え直し)、`scripts/`(G3 場面と gdb スクリプト)、`tools/`(記録器、ビルド/実行、`build-erase-test.sh`、`a5b-*.sh`、`source-guard-check.rs`)。
 
-## PM の判断と取り込み(2026-11-05 19:50)
+## PM の決定と取り込み(2026-11-05 19:50)
 
 取り込んだ基準: HEAD ba7619f9(runtime は cd4923f5 = 本番 bundle 251dfabc と同一)に、`alpha5.diff` → `alpha5c.diff` → `alpha5b.diff` の順で `patch --batch`(offset・fuzz・reject なし。git archive の写しで dry-run も rc=0)。`-` 行を読んだ: `fle_win.c` は `(void)send_to(api, i, FLE_WM_ERASEBKGND, 0, 0)` の 1 行(alpha5)と、その置換後の `(void)` を外して戻り値を受ける 1 行(alpha5b)だけ。テストは `wall_fr9.rs`・`wall_fr10.rs` の GetDC/ReleaseDC の件数の期待(1→2)とコメント、ハーネスの 3 行。FL のクラス名・窓名・アドレスの分岐、新しいオプションは無い。
 

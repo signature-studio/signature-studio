@@ -95,7 +95,7 @@ S-opfs1-ui-own(UI を自作)、S-opfs1-zip-names(名前の復号の順、正規�
 - テストデータは `lift/out-opfs1/testdata/`(snap の Firefox が /tmp を読めないため)。作業用 `node_modules`(457 MB)は終了時に消す。
 - 既存の e2e `run.mjs`(`--no-build`、dev・preview・worker の 3 target): **1107/1109**(`logs/e2e-run-mjs.txt`)。失敗 2 件は `default-manifest-standin`(dev)と `default-manifest-none`(worker)の『`engine-state` の data-state が 'not-started' であること』で、実際は 'error'。**素の HEAD(7c0e9cc の `git archive`、私の差分なし)でも同じ検査が落ちる**ことを `--only default-manifest` で確かめた(dev: 1 件、worker: 2 件落ちる。どの検査が落ちるかは実行ごとに違う、読み: 時間依存)。PM の基準 1,109/1,109 はこの機械では再現しなかった。私の差分は原因ではない(`main.ts` の追記は `window.__files` と Files ボタンだけ)。
 
-## PM の判断と取り込み(段階 1、2026-11-04)
+## PM の決定と取り込み(段階 1、2026-11-04)
 
 取り込み: `opfs1-s1.diff`(19 ファイル。`app/src/files/`〔自作の OPFS エクスプローラー〕、`main.ts` に import 1 行と 2 行、`package.json` に dependencies〔fflate ^0.8.3、file-selector ^5.0.2〕、`package-lock.json`、e2e 6 本、単体テスト 2 本。'-' 行 0)を当てた(main.ts は offset 1 行)。PM の測定: `npm install` 後 typecheck rc=0、vitest **1,331 passed + 7 skipped**(1,316 + 15)、Worker 43、`files-opfs.mjs`(隔離 Chrome 156 の実 OPFS、本番ビルドの vite preview、CSP style-src 'self')**60/60**、既存の e2e **1,109/1,109**。担当が報告した『素の HEAD でも default-manifest-* が 2 件落ちる』は PM の環境では再現しない(crash1・aud3 も同様の報告。それぞれの環境で、FL_ASSETS_DIR 等の環境変数や並行負荷が関係する競合の可能性=未調査)。PM のテストは、`testdata-files/`(75 MB。依頼者の zip と FLP のコピーを含む)と `downloads-chrome/` をリポジトリ直下に書いたので、削除し、`.gitignore` に追加した。**段階 2 以降は、テストのデータ置き場を `lift/out-opfs1/` など git 管理外にする**(デフォルトの `--data` を変更すること)。
 

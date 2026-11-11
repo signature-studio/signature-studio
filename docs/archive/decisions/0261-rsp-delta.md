@@ -98,7 +98,7 @@
 - Elastique の f_b2bc5b0 だけを直 wasm にしたモジュール(`--hybrid-only`、7,515 B)は `wasm-validate --enable-all` が通る。**node での実行は 0 件**(この関数は小さく、ミキサーの主要部分でない)。
 - 影響: fe-decode が変わるので、**Blend2D と Elastique の C の生成物が変わる**(Blend2D の復号が 48,362 → 48,727 命令、Elastique が 798,890 → 798,960。FLEngine・dsp・qfc・freetype・ILTools・oggio は前後で同じ)。CI のキャッシュ(m2・m5〜m7 の C)の再生成が要る。採否は PM の判断(性能への効果は 0 に近く、C 経路の欠けているケースを埋める正しさの改善と見るのが妥当と私は考える。未測定)。
 
-## PM の判断と取り込み(2026-11-05 22:50、docs のみ)
+## PM の決定と取り込み(2026-11-05 22:50、docs のみ)
 
 取り込み: mt3 の最終報告(22:36)の文書・表・道具を `docs/investigations/mt3y/` に、差分 3 本(`mt3-rsp-delta.diff`、`mt3-rsp-delta-on-e4.diff`、`mt3-jt-copy.diff`)を `docs/investigations/mt3y/patches/` に置いた。**製品の木には当てていない**(本決定の差分は 1 行も入らない)。測定は mt3 の census と cargo のテスト(実エンジンの走行は 0 件)で、PM は再現していない。
 

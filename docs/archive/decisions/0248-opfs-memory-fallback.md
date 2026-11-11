@@ -77,7 +77,7 @@
 ## README の行(`docs/README.md` の決定の表。列は番号・ファイル・要約・初コミット・仮)
 `| 0248 | [0248-opfs-memory-fallback.md](decisions/0248-opfs-memory-fallback.md) | **ブラウザがページに OPFS を使わせないとき(Firefox の private 窓は getDirectory が SecurityError)、Files 窓・エンジンの File>Open/名前を付けて保存が全部使えなかった。能力検出を detectRoot の 1 か所(実 OPFS で 1 バイトを書いて読んで消せなければ、メモリ上の木)にし、OpfsFs とその上は同じコードのまま、違いは『ハンドル』だけ(経路 1 本、旗・URL・設定なし)。実 Firefox 158 の private で現行と修正版を対で比べた。依頼者の機械・実機 Windows 0 件。** 現行は Files ボタン無効・File>Open はキャンセル。修正版は Sampler.flp が開き、名前を付けて保存した 111,172 B が Files 窓に出て、参照 zip(53.5 MB)を二度押しで 49 ファイル 62.7 MB 解凍して 7.2 秒で開く(通常窓の OPFS は 16.4 秒)。通常窓は OPFS を 16/16 選び、判定の費用は 1 ページ 1 回 Chrome +10 ms・Firefox +74 ms。メモリは 116 MB を持つとタブ +64〜+120 MB。単体 21 件、mutation 17/17 検出、Firefox private の e2e 101/103(落ちる 2 件は persist/estimate の計数)。**実ネットワークでの起動、Firefox 159、1 GB 級は未確認。** | 11-05 | **仮** |`
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD a6331e92 に `ff-opfs.diff`(6 ファイル:`app/src/files/{engine-dialog,explorer,opfs,memory}.ts`、`app/test/unit/files-memory.test.ts`、`app/test/mutation/run.mjs`)を `patch -p1`(offset・fuzz・reject なし、`-` 行は import・OPFS 前提の文言・storageInfo の呼び出しの置き換えだけで全部読んだ)。PM が測った値(この機械、`lift/out-pmchk-ff/`): typecheck rc=0、vitest 65 ファイル通過 / 1 skip、1,274 passed + 7 skipped(基準 1,253 + 21 の新規)、worker 49/49、e2e(エンジン無し)172/172。
 

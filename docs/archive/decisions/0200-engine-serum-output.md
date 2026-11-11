@@ -119,7 +119,7 @@ S-wrp3-tls-per-thread、S-wrp3-tls-callback-order、S-wrp3-tls-index-shared、S-
 
 確認できなかったこと: 出力の正しさ(波形・音色)/ ライセンスの影響 / 参照プロジェクトの最後までの読み込み(W23 の修正後の再走が時間内に終わらなかった場合は §4.2 の通り)/ SSE4.1 の実行 / W13 / ピアノ FLAC / ワーカースレッドの条件変数 / MP3(別担当)/ ZIP(別担当)/ wasm ビルドへの影響(1 比較)/ a4 / 実機 Windows との照合(0 件)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `wrp3.diff`(`lift/runtime/fle_realmod.c` に weak フックの宣言と呼び出し 1 行、`lift/harness/two/wrp1_vst3.c`〔opt-in の harness〕、新規 `lift/crates/fe-lift/tests/wall_wrp3.rs`。'-' 行 0)を HEAD 7c0e9cc に当てた(offset・fuzz・reject なし)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107cef4cbef14f154645749957b7067be7ed7c2b93f5bbe1f72fd47029e50`(215,811,678 B)**不変**、全体テスト **179 results・2,277 passed・0 failed**(SKIPPED 行 1。基準 178・2,274 に `wall_wrp3` の 3 件が加わった数)、a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731 **不変**。担当の全体テストの報告にあった `authenticode_check` の 10 件の失敗は、担当のテスト木に `tools/` が無かったことによるもので、PM の木では出ない。
 

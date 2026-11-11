@@ -60,7 +60,7 @@
 | S-docs2-7 | `tables/` と `tools/` を `docs/investigations/docs2/` として diff に入れた(0180 は結果ディレクトリだけに置いた) | 結果ディレクトリだけ(`lift/out-git/` は gitignore なので、表が消える) | PM が置き場を決める |
 | S-docs2-8 | `stale-labels.tsv` の修正は先頭の 2 ファイル + goal-ladder の注記に限り、README・roadmap の本文・performance-targets などは一覧のみ(依頼どおり) | 本文の注記を足す | — |
 
-## PM の判断点
+## PM の未決の点
 
 1. **決定 0197 は取り込み済みになった**(5f62ed5)。依頼文は 0197・0200・0203・0205 を未取り込みと書いたが、0197 は『取り込み済み(暫定)』として INDEX・progress・roadmap に書いた。**0200・0203・0205 が取り込まれたら**、`tools/newrows.py` の `MISSING` から `ROWS` に移し `tools/build.py` を再実行すれば、INDEX・件数・差分が作り直せる。
 2. 状態の定義(S-docs2-1〜3)と、0116〜0180 の行の状態の見直し。
@@ -84,7 +84,7 @@
 
 `lift/out-git/docs2-results/`: `docs2.diff`、`MERGE-NOTES.md`、`docs/0207-docs-refresh.md`(この文書)、`docs/README-0207-line.txt`、`tables/`(`decisions-index-0116-0205.tsv`、`open-issues.tsv`、`stale-labels.tsv`、`s-choices-count-0178-0204.tsv`)、`tools/`(表と diff を作ったスクリプト)。
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `docs2.diff`(21 ファイル、`-` 行 3 本〔progress.md の見出し 1、roadmap の案内 1 と見出し 1。旧文は新しい行の中に残る〕を全部読んだ)を HEAD 5f62ed5 に当てた(offset・fuzz・reject なし)。PM は progress.md の先頭を読み、状態ブロック(P1〜P3・S1・Export)と二つの読みの G 段階が、決定 0197・0198・0199 の記録と矛盾しないことを確かめた。**数値は PM が再測定していない転記**で、この更新は進捗ではない。
 

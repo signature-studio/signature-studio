@@ -50,7 +50,7 @@
 - **判断**: 除外の費用は小さい(再生区間では検出されない)。**直 wasm のアトミックの実装(節 7 の設計)は、今は着手しない**。ship6 の hyb-U を取り込むとき、その一覧から LOCK 付きの関数を外す(`mt4-hyb-U-filter.tsv`、`filter-hybrid-list.py`)。Elastique・oggio の 182 関数は F2xH6 の lift で表を作り直して判定する。
 
 
-## PM の判断と取り込み(2026-11-05)
+## PM の決定と取り込み(2026-11-05)
 
 取り込んだ基準: HEAD 561d1003 に `mt4-atomics.diff`(32 ファイル、`patch -p1` で fuzz・offset・reject なし)。`-` 行のうち fe-wasmgen の lower.rs(xadd/cmpxchg のメモリ形の lowering と atomic_rmw 旗の削除)、lib.rs、int_more2.rs(メモリ形の非アトミックな『読んで書く』の置換)、test-hybrid.sh の個数の更新は読んだ。残りはハイブリッド一覧の関数名の除外(データ)と rmw_forms.rs のテストの更新。PM が測った値(この機械、`lift/out-pmchk-mt4/`): FLEngine の既定の生成 C の sha256 **`cd9107ce…` → `0130eeee89d3e40c7b2aea3f2b661bf799cdfc84d486241e096cb18cca5c71c6`(215,811,678 → 215,805,703 B)**(LOCK 付き命令と暗黙 LOCK の 629 行だけが変わる=mt3 の計数)、全体テスト 201 results / 2,400 passed(初回の失敗 11 件は `/tmp` の `Disk quota exceeded` による環境要因で、`TMPDIR` をワークツリーに向けた再実行で noreturn_audit 8/8・mx_rc_wire 1/1・simd_int_forms 2/2 通過)/ 0 failed / 1 ignored、a4 FRUITY 無効 942/942・895/895、`ci/test-hybrid.sh` と `ci/test-needs.sh`(256 通り)rc=0。
 

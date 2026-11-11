@@ -238,7 +238,7 @@ HEAD 29b0b4b の `git archive` に `memfs1.diff` を当て、`vite build` した
 
 歴史的ハーネスの扱い(PM の判断。提案): **削除せず `lift/harness/web/README.md` の先頭に『歴史的』と書いた**(この差分に入っている)。消す場合に壊れる物: (1) `final0129/` は丸ごとは消せない — `final0129/pack_seed.py` は `build-engine-bundle.sh` の seed 段階が使う現役の道具、`app/test/unit/pack.test.ts` と `app/src/bundle/pack.ts` の形式の出典。(2) `web/g3/` は `lift/crates/fe-lift/tests/api2.rs`、`wall_fr14.rs`、`lift/harness/api2/win_*.c`、`testfast/deps.tsv` が参照する。(3) `web/jspi/` は `two/build_nmod_wasm.sh` と `web/fp1/build_nmod_wasm_fp1.sh` が参照する。(4) `web/perf2/` は `noreturn-audit/noreturn_audit.py` と `fp1/build_nmod_wasm_fp1.sh`、`app/test/unit/harness-main-lid.test.ts` が参照する。(5) `web/perf1/` は `harness-main-lid.test.ts` だけが参照する。(6) `fruity/fle-fruity-worker.js` は `app/src/engine/fruity.ts` の冒頭コメントが『移植元』として挙げる。(7) `web/fle-worker.js`、`web/fruity/main.js`、`web/fruity/run-chrome.mjs` は参照する物が無い。したがって『MEMFS の語が残る 11 ファイルのうち、参照されずに消せるのは `web/fle-worker.js` と `web/perf1/fle-perf-worker.js`〔テスト 1 件が名前を挙げるだけ〕程度』で、他は参照を直さないと壊れる。語だけを消すなら `memfs_ready` → `files_ready`、『MEMFS』→『the glue's file system』の置換で足りる(機械的、約 30 行)。
 
-## 9. PM の判断点
+## 9. PM の未決の点
 
 1. **新形式のバンドルを既定の入口にするか**(PM 回答: **新形式を既定にする方針で進めてよい**。旧形式は互換として残す。切り替えは ship3 でページとバンドルを同時に出すとき): 既定のバンドルは旧形式のまま(この差分は既定の動作を変えない)。新形式にするには `NO_FS=1` でバンドルを作り直し(wasm は同じ構成で再リンク+wasm-opt。リンク 4 s、wasm-opt 約 5〜8 分)、マニフェストを差し替える。新形式のバンドルは memfs1 のページとセットで出す(旧ページはスキーマの検査で止まる。§7)。Firefox の外れ値は新の腕だけの現象ではないと分かった(§6.4)ので、既定にしない理由は残っていない。
 2. **first idle で pack を手放す既定**(`host_files_released`、`?keepfiles=1` で保つ): Chrome の Worker の JS が 91.4 → 18.2 MB(9 回すべて)。引き換えに『起動後に host のファイルを開く機能』は名前つきで停止する。File > Open / Save / Save as / Export / MIDI / zip の e2e(§6.5)の後でも host の読みは first idle から増えなかった(open 229、read 554、98,483,356 B のまま)ので、現状は安全。ただしこれは**方針の表(a)(b)・通信/変換の削減の外**のメモリ管理(冒頭)。既定にしないなら `FruityHost.keepHostFiles` の既定を反転する 1 行。
@@ -269,7 +269,7 @@ HEAD 29b0b4b の `git archive` に `memfs1.diff` を当て、`vite build` した
 | S-memfs1-16 | 歴史的ハーネスは削除せず、語だけ消す任意の差分を別に出す | PM 承認。`memfs_ready` → `files_ready` の置換で過去の結果ログが集計できなくなる点を明記 |
 | S-memfs1-17 | 全体テスト・a4・FLEngine の既定の生成 C は HEAD 62ac3e9 の木(lift 無変更)で測り、最新の HEAD 29b0b4b では全体テストと a4 の再実行を始めたが load 50 超のため中止した(未完了。最新の HEAD で測ったのは vitest・tsc・`vite build`・実エンジンの first idle の smoke 1 回〔§6.8〕) | 差分は lift/runtime・crates・生成 C に入る C を含まないので、最新の HEAD でも同じはず(推測)。最新の HEAD の `lift/` は他の担当の変更(txt1 の `fle_win.c` 等)で、この差分とは無関係 |
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込んだ基準: HEAD 29b0b4b に `memfs1.diff`(10:11 版、23 ファイル、`-` 79 行を全部読んだ)を `patch -p1` で当てた(offset・fuzz・reject なし)。PM が測った数字(この機械、`lift/out-pmchk-m2/`): `npm run typecheck` rc=0、vitest **1,589 passed + 7 skipped**(素の HEAD は 1,551 + 7)、Worker 50/50、e2e **1,262/1,262**(files-engine-dialog の 2 検査は『`fl/` を除いた集合が元の期待と等しい』形で PASS)。差分は `lift/runtime`・`lift/crates`・生成 C に入るハーネスを含まないので、FLEngine の生成 C と全体テスト・a4 は再実行していない(担当は 62ac3e9 の木で 185/2,315/0・942/942・895/895・5,310・1,009,731 と測った。**最新の HEAD での全体テスト・a4 は ship3 で行う**)。
 

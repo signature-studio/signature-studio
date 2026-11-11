@@ -228,7 +228,7 @@ run ごとの T 中央値(File クリック / Esc): 実 27.9 / 15.3(rt-1)、25.1
 **受け入れ条件(PM): T の中央値が協調 +2 ms 以内(できれば以下)、UI Worker ≤ 0.6** — どちらも P(§9)が第一候補。工数は §9 の約 4.5 人日に含まれる(GIL の優先度は別に 約 1〜2 人日、読み)。
 
 
-## PM の判断と取り込み(2026-11-06 19:35、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 19:35、docs のみ。製品の差分なし)
 
 取り込み: gpu1 の最終(19:34)の文書・表・道具を `docs/investigations/gpu7/0306/` に置いた(生ログ約 18 MB は入れない。原本は `lift/out-git/gpu7-results/gonogo2/logs/`)。実 Chrome 156 headless、この機械の SwiftShader、実エンジン(E11 の実スレッド bundle `fl-engine-ci-03612d9c` = main 7373cd55 + mt3 の `rt-on-e11.diff`、対する相手は本番 E11 の協調 bundle)。実スレッド側は測定専用の音声 glue 補修(`patchglue-rt.py`)つきで製品ではない。各腕 1〜3 本。**依頼者の機械は 0 件、本番 R2 の `perf/` に beacon は 0 件。FL 内蔵エフェクト(7 種 25 インスタンス)と Fruity Wrapper を無視した負荷(G9 未到達)での値**。
 

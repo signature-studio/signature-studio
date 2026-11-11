@@ -164,7 +164,7 @@ E11 のテスト用ビルド(engine.abecc01c7b30、再 build なし)に env だ�
 | `logs/0299-g3-*-g3-all.txt` | 各 run の `g3-` 行(`g3-progress` を含む) |
 | `tools/a19-g3-run.sh`、`a19-qfc-xrefs.py`、`a19-gdc-args.py`、`a19-uitree.py`、`a19-i8.g3`・`a19-i68.g3` | 実験の駆動(`EXTRA_ENV` で env を渡す)、呼び元の探索、GetDeviceCaps の index、UI の呼び出しの木、κ の分離用のスクリプト |
 
-## PM の判断と取り込み(2026-11-06 16:19、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 16:19、docs のみ。製品の差分なし)
 
 取り込み: alpha1(alpha18)の最終の文書・表・道具を `docs/investigations/alpha18/` に置いた(生のログは入れない。原本は `lift/out-git/alpha18-results/logs/`)。実行したのは E11 のテスト用 wasm とその複製 build を node(JSPI、仮想時計、G3 の模擬入力)で走らせた実験と逆アセンブルで、**Chrome・N1・実 Windows・依頼者の機械は 0 件**。`0299-dwm-timing-info-EXPERIMENT-NOT-FOR-MERGE.diff` は実験用で、製品には入れない。
 

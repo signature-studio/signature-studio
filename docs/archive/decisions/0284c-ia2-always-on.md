@@ -100,7 +100,7 @@ runtime に『擬似 VA の範囲(`>= 0x7FF9...`)かどうか』で分岐する�
 
 **結論(読み)**: 静的に、害になりうる形は (1) ゲストが GetProcAddress の値の絶対値でハッシュを作る/辞書の bucket を決める、の 1 つだけで、その形が FL にあるかは未確認。runtime 側に VA の値へ依存する所は見つからなかった。**E11 に単独で載せ、opt1 が node の行(g3-progress/surface/wintable、Export の sha、first idle)を E9/E10 と比べる**のが、残る確認として妥当(差が出なければ害なし、出れば原因は疑似 VA の 1 つに絞れる)。
 
-## PM の判断と取り込み(2026-11-06 12:30、docs のみ)
+## PM の決定と取り込み(2026-11-06 12:30、docs のみ)
 
 取り込み: mt3 の 0284 B の文書・表(生成 C の前後の分類、a4 の前後ログ、test.sh full)・差分 `0284c-ia2-always-on.diff`(18 ファイル +197/-250)を置いた。PM の dry-run: 0286 → 0284 第 1 報 → 0284c の順に e9-push へ rc=0、offset 0、fuzz 0。mt3 の検証は native(test.sh full 216 results / 2,399 passed / 0 failed / 1 SKIPPED〔wall_fr9t〕、a4 942/942・895/895・5,312 関数・1,009,745 entries・started_but_not_entered 0 を標識あり/なしの両方で同じ値、FLEngine の生成 C の sha は変わる)。ブラウザ・wasm の実エンジンの走行は 0 件。
 判断: **本番では `fle_ia2_on()` が常に真なので挙動は変わらない設計だが、import の疑似 VA(0x7FF900000000 + 0x10×(行+1))が標識行の除去で −0x10 ずれる行が 101 行ある**(ScrollWindowEx より後)。mt3 の静的な読みでは疑似 VA は GetProcAddress の戻り値・COM vtable の slot・fle_dispatch の二分探索にしか使われず、ランタイムに範囲やハッシュで分岐する所はないが、ゲストが GetProcAddress の戻りを絶対値でハッシュする可能性は未読。よって **E10 には載せず、E10 の後に単独で(E12)** 出し、opt1 が node の行(g3-progress / surface / wintable)・Export・first idle を E11 と比べる。no-options 違反の除去として方針に沿う(採る)。

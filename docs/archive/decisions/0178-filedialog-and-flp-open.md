@@ -147,7 +147,7 @@ S-dlg1-pick-env、-qi、-opt-default、-fti、-advise-ref、-onfileok-refuse、-
 
 `tools/`(cycle.sh、run-script.sh、serve.sh、send.sh、follow-run.sh、build-rt.sh、build-h.sh、link-native.sh、mk-vfs-seed.py、va2func.py、dlg1_wraps.c、bgrx2png.py、fulltest.sh、mkdiff.sh)と `tables/*.g3`(スクリプト)、`tables/vfs-seed-dlg1-*.tsv`。`MERGE-NOTES.md` に当て方。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `dlg1.diff`(15 ファイル、基準 HEAD 912a2ca)。PM の検証: `patch -p1 --dry-run` は offset・fuzz・reject なしで当たる。`-` 行 14 本(第 3 報の「13 本」は担当の数え間違いで、最終報告で訂正)は `vfs_seed.h` の意図した置換 13 本と `fle_load.c` の空名の 1 行(`FLE_LOADLIB_MISSING` があるときだけ『見つからない』を返す探索専用の形)だけで、他の決定の変更の巻き戻しは無い。FLEngine の既定の生成 C の sha256 は `cd9107ce…`(215,811,678 B)で不変。全体テスト **162 results / 2,192 passed / 0 failed**(+1 実行ファイル、+28 テスト = 担当の値と一致)、a4(FRUITY 無効)942/942・895/895・functions 5,310・entries 1,009,731 で不変。PM は FLP を開く操作を再実行していない(数字は担当の実測)。進捗(G 段階)には数えない: ブラウザでの実行は未実施で、選択はハーネスが与えた。
 

@@ -424,7 +424,7 @@ bash lift/out-pw1/tools/finalize.sh      # tables/
 - **S-pw1-14 HC=4/8 の物理コアでの読み**: `taskset -c 0-3` は物理 2 コア × SMT、`0-7` は物理 4 コア × SMT(この機械の兄弟は cpu0-1、2-3 …)。依頼は 0-3 / 0-7 なのでそのまま測り、物理コアを 1 スレッドずつ使う `0,2,4,6` を補足した。依頼者の機械の HC=4 が『2C/4T』か『4C/4T』かで結論が変わる。
 
 
-## PM の判断と取り込み(2026-11-03)
+## PM の決定と取り込み(2026-11-03)
 
 取り込み: `pw1.diff` は `lift/harness/web/pw1/` の新規 25 ファイルのみ(`-` の行 0、dry-run は offset・fuzz なし)。`lift/runtime` と `fe-lift` は触っていないので、全体テストと a4 は再実行していない(直前の exp1 取り込みの時点で 172/2,226/0 と a4 基準値)。`tables/pw1-rows.jsonl`(400 KB 超)は `docs/investigations/pw1/` に入れていない(原本は `lift/out-git/pw1-results/tables/`)。
 

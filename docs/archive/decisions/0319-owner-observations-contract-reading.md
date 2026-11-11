@@ -651,7 +651,7 @@ gpu8 の `rtb-balance/log-10s.log` の行(行番号つき):
 - **読んだら言うこと**(PM の指示どおり): 『Filter が呼ばれていない / 呼ばれて 0 を書く / 素通し / 通常の処理』のどれか、caller の FLEngine の関数(静的な読みで関数名と役割)。**確認できない時は『確認できない』と言い、推測を事実のように書かない**。
 
 
-## PM の判断と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-07 08:10、docs のみ。製品の差分なし)
 
 取り込み: alpha1 の 0319(依頼者の観察 O7・O8・O9 の契約の読み)と差分群(`docs/investigations/alpha22/impl/`)、Wine 10 の小テストの測定表、道具。判断は `docs/feedback/2026-11-07-owner-observations.md` の PM の判断の追記に記した(ScrollWindowEx = (b) で有効領域のモデルに揃える、時刻と Temp = (b)、DPI = (b)、CPUID の SSE2 固定と Hz 上限 120 は意図した差、Debug タブのログは FL 内部で閉じて engineLog に届かない)。**PM の検証**: 差分 3 本(scrollwindow-model、time-env-run-values、fle-stop-context)と診断 2 本(diag-g9-fl、diag-g9-fl-scroll)を HEAD の git archive に順に実適用して FAILED 0・.rej 0、`emcc -fsyntax-only -Wall -Wextra` で警告 0。実機(実エンジンの wasm)での効果は cand1 の bundle ができてから測る。依頼者の機械は 0 件。
 

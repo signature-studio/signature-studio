@@ -89,7 +89,7 @@
 
 `docs/`(この文書、`README-0258-line.txt`)、`alpha7.diff`、`tables/`(`showwindow-contract.tsv`、`adoption-and-node-predictions.tsv`、`wine-vs-runtime.tsv`、`screen-sizes.tsv`、`nccalcsize-answers.txt`、`expectation-changes.tsv`、`g3-rows-changed*.tsv`、`msg-delta.tsv`、`roundtrip.tsv`、`cpu-events.tsv`、`layout-shift-ref-closed.tsv`、`learn/`)、`logs/`、`scripts/`(G3 場面 `a7-*.g3`、gdb `pk60`〜`pk63.gdb`)、`tools/`(`build-showwin-test.sh`、`build-winact.sh`、`a7-vis-diff.py`、`a7-shot.py`、`learn-fetch.py`)、`pics/`。
 
-## PM の判断と取り込み(2026-11-05 22:15)
+## PM の決定と取り込み(2026-11-05 22:15)
 
 取り込み: alpha1 の最終報告(22:05)の文書・表・道具・差分を `docs/investigations/alpha7/` に、決定文書を本ファイルに置いた。`alpha7.diff`(35,781 B、sha256 `00a9b648…`、5 ファイル: `lift/runtime/fle_win.c`、`lift/crates/fe-lift/tests/{wall_fr9.rs,window.rs,alpha7_showwin.rs}`〔後者は新規〕、`lift/harness/alpha7/showwin.c`〔新規〕)を、HEAD 62ca650b の `git archive` 写しに `patch --batch -p1 --dry-run` で確認(rc=0、offset・fuzz・reject なし)、PM の木に当てた。`-` 行 35 本を読んだ: `wall_fr9.rs` の `stop-defproc-minmax`(1 行)、`window.rs` の `win-abort-def-minmax`(2 行)、`fle_win.c` の 32 行(WS_THICKFRAME に対する WM_WINDOWPOSCHANGING の停止、`case 0x0024`〔WM_GETMINMAXINFO〕の `fle_stop`、ShowWindow の状態ブロック〔iconic/zoomed の旗、`was != now` の可視判定、`apply_pos(0,0,0,0)`、WM_SHOWWINDOW の送出〕を、契約の列〔WM_GETMINMAXINFO → WM_SHOWWINDOW → WM_WINDOWPOSCHANGING → WM_NCCALCSIZE → WM_WINDOWPOSCHANGED → DefWindowProc の WM_MOVE / WM_SIZE〕に置き換える)。FL のクラス名・窓名・アドレスの分岐、新しいオプションは無い。
 

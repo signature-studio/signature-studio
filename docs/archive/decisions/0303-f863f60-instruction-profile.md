@@ -128,7 +128,7 @@ skid の読み: ゲスト memory のロードの**直後の命令**に 48.1%、�
 - 作業 dir: `~/work/mt3w-prof303`(run と patched wasm)、`~/work/mt3w-n303`(N1)。最後に消す。
 
 
-## PM の判断と取り込み(2026-11-06 18:12、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 18:12、docs のみ。製品の差分なし)
 
 取り込み: mt3 の第 1 報(文書・表・道具・差分 1 本)を `docs/investigations/mt3w/0303/`、差分を `docs/investigations/mt3w/patches/0303-hi-check-form.diff` に置いた。実行は node 24.19(V8 13.6)で E11 のテスト用 wasm(`engine.abecc01c7b30`)と native N1(lift した C を native 化した物。**実 x86 ではない**)を G3 の模擬入力で走らせた値と、`--print-wasm-code` の読み。**Chrome・実 Windows・依頼者の機械は 0 件**。
 

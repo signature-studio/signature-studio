@@ -210,7 +210,7 @@ Old vs new (exact two-sided permutation test on the means; p < 0.05 would be a d
 ## PM 記入欄（ci1 は書かない）
 
 
-## PM の判断と取り込み(2026-11-06 20:36、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 20:36、docs のみ。製品の差分なし)
 
 取り込み: ci1 の E12 の本番確認(先頭 3 点・判定表・15 シーン・Export・File ×100・first idle・alpha7・pure)の文書と data(各 run の `*-audio.json` は 300 KB 近いので入れない。原本は `lift/out-git/ci1-results/0277/e12/data/`)を `docs/investigations/ci1/0277/e12/` に置いた。同時に、ci1 の 20:36 の訂正(手書きの重なり記録の取り違えで、E9 の再実行と E11 の pure の最初の run に他 Chrome の重なりがあったとしていた誤り。E8 側を n=5 → 6、E10 側を n=5 → 6 に直した)を `0277-e9-verification.md`・`0277-e11-verification.md` と investigations の e9・e11 に反映した(各 PM の節は残し、末尾に訂正を足した)。実 Chrome 156 と Firefox 158(llvmpipe)、この機械の headless、模擬入力。**依頼者の機械は 0 件、本番 R2 の `perf/` に beacon は 0 件**。
 

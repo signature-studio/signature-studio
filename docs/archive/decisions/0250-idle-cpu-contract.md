@@ -111,7 +111,7 @@ A1+fix で止まらなくなった事実(露出の領域が入ると止まらな
 
 `docs/`(この文書、`README-0250-line.txt`)、`tables/`(`contract-vs-ours.tsv`、`cpu-per-virtual-second.tsv`、`prof-*.txt`、`message-rates-idle.tsv`、`idle-basic-api-rates.tsv`、`hz-sleep-dwm-experiments.tsv`、`experiment-sleep-dwm.diff`)、`logs/`(gdb の bt)、`scripts/`(G3 場面と gdb スクリプト)、`tools/`(記録器、サンプラ、ビルド・実行スクリプト、`realmod_ref.c`)。
 
-## PM の判断と取り込み(2026-11-05、docs のみ)
+## PM の決定と取り込み(2026-11-05、docs のみ)
 
 取り込み: alpha1 の最終報告(18:45)の文書・表・道具を `docs/investigations/alpha4/` に、決定文書を `docs/decisions/0250-idle-cpu-contract.md` に置いた。**差分(alpha4.diff)は無い**。コードは変更しない。測定は alpha1 のもの(native N1、b42fad36 の生成 C、G3 の模擬入力。実機 Windows・依頼者の機械・Chrome の値は 0 件)で、PM は再測定していない。
 

@@ -155,7 +155,7 @@
 5. **壁 21 を (d) と読んだこと**: `CreateThread(CREATE_SUSPENDED)` は「スレッドを作るだけ」で偽らずに済む読みもありうる（Z2 の一部）が、`ResumeThread` と、スレッドが書くフラグをゲストが読む点（デストラクタの `Sleep` ループ）で偽ることになる。PM の決定 4（偽らない）と (d)（スレッド）の両方に当たるので止めた。
 6. **全体テストの与え方**: 依頼の環境変数（`FLENGINE_PE` に原本、`BLEND2D_PE` にリベース済みの像）で通した。`BLEND2D_PE` に原本（`lift/out-blend2d/Blend2D.dll`）を渡すと `msvc_switch` が落ちる（決定 0119 の記録と同じ）。
 
-## PM の判断が要る点
+## 未決の点(PM)
 
 1. **壁 21（スレッド）の扱い**（Z1 止まる／Z2 作ったことにする／Z3 協調スレッド）。推奨は Z1。
 2. **メッセージキューの設計**: この作業の実行はキュー（`PostMessageW`、`GetMessageW`、`PeekMessageW`、`WaitMessage`、`MsgWaitForMultipleObjects`）に**届かなかった**。ゲストの `CreateFruityInstance` の側にメッセージ待ちがあるのかは、壁 21 の先を測るまで分からない（QFC のスレッドの側には `MsgWaitForMultipleObjects`／`PeekMessageW` がある）。キューを実装していないので、(b)（最初のブロッキングなメッセージ待ち）にも到達していない。`PostMessageW` の NULL の扱い（決定 0119 の PM の判断点 3）は未決のまま。

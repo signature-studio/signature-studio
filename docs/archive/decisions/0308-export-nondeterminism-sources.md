@@ -334,7 +334,7 @@ wasm の MP3 経路は、runtime の ACM の模擬(`fle_acm.c`、MPEG Layer-3 �
 - 01:04〜01:10 に elog5 の build を自分で 2 回止めて作り直した(自分の job。孤児の `fe-wasmgen` も kill)。ELOG 第 3 版の build は PM の事後承認(00:38)。
 
 
-## PM の判断と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
+## PM の決定と取り込み(2026-11-06 19:50、docs のみ。製品の差分なし)
 
 取り込み: alpha1 の最終(19:46)の文書・表・道具を `docs/investigations/alpha20/` に置いた(生ログは入れない)。実行は静的な走査(import・命令・cpuid の位置)、node の harness、ffmpeg との MP3 デコード比較、FLP の解析。**Chrome・実 Windows・依頼者の機械は 0 件**。
 

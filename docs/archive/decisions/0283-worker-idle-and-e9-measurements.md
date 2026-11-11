@@ -277,7 +277,7 @@ audio underruns over the whole 60 s window (page audio detail before the Space a
 8. 復元の最初の run は File ボタンを押す座標が +15 px のずれの前のままで外れた(§3.3)。座標を直して取り直した。
 9. E9 の増分ビルドの最初の 3 回は、木に `ci/` `tools/` `docs/investigations/prune1` が無くて失敗した(`git archive` の対象が足りなかった)。足して 4 回目で通った。ciE9 は失敗のたびに `readlink -f` で確認して消した。
 
-## PM の判断と取り込み(2026-11-06 12:55、docs のみ。差分は製品の木に無い)
+## PM の決定と取り込み(2026-11-06 12:55、docs のみ。差分は製品の木に無い)
 
 取り込み: gpu1 の最終(12:41)の文書・表・道具・微小実験を `docs/investigations/gpu7/0283/` に置いた(生ログ約 9 MB と復元の画像は入れない。原本は `lift/out-git/gpu7-results/0283/` に残す)。測定は実 Chrome 156 headless(この機械、16 vCPU、実 GPU なし = SwiftShader)で実エンジンを動かしたもので、代役・再生・モックは無い。**依頼者の機械(GTX 980)は 0 件**。
 

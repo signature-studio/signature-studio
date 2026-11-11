@@ -77,7 +77,7 @@
 | S-p2-7 | トップレベル窓の移動・非表示・破棄は対象外(各自の面があり、ブラウザが合成する) | 面が残るので覗いた窓の再描画は要らない。実機は WM_PAINT が来る |
 | S-p2-8 | SetParent・BringWindowToTop 等、`apply_pos` を通らない z-order 変更は対象外 | 未実装(最大の穴) |
 
-## PM の判断と取り込み(段 1: runtime の修正、2026-11-04)
+## PM の決定と取り込み(段 1: runtime の修正、2026-11-04)
 
 取り込み: `present2-runtime.diff`(`lift/runtime/fle_win.c`〔子窓の SetWindowPos/MoveWindow/ShowWindow(HIDE)/DestroyWindow で、前後の可視領域の差を更新矩形に足し、動いた子窓の有効なビットを新しい位置へコピーしてダーティ矩形に通知〕、`fle_wall_ia2w.c`〔ScrollWindowEx が動かした画素の通知、weak〕、新規 `lift/crates/fe-lift/tests/present2_uncover.rs` 10 件。'-' 行は `fle_imp_DestroyWindow` の `destroy_tree(api, i);` を無効化の囲みの中へ移した 1 行)を HEAD 0a3ab9a に当てた(clean)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)**不変**、全体テスト **180 results・2,287 passed・0 failed**(179・2,277 + `present2_uncover` の 1 結果・10 件)。a4 FRUITY 無効の結果は取り込みコミットに記す。実エンジンでの確認(担当、Chrome と node G3 の同じドラッグ): 基準ではパネルが動いた先に描かれず、修正版では動いた先に描かれ、元の位置が親の灰色で埋まる(画像 `evidence/chrome-drag-{B-baseline,A-patched}-runtime.png`。PM も修正版の画像を確認した)。
 
@@ -88,7 +88,7 @@
 3. **GAP-U1**(親が CLIPCHILDREN を持たないとき、無効化が可視の子に伝わる。Learn の RedrawWindow に明文)は `present2-runtime-2.diff` として別に出る予定。取り込み前に、メインフォームが CLIPCHILDREN を持たないためアイドルの 1 画素幅の再描画(決定 0187)が子の再描画を毎フレーム引き起こさないか(CPU)を測る。
 4. 担当の申告(a4 と sha を再実行していない・hardlink で借りた木の誤り〔最初の『16 スナップ一致』は借り元の runtime を使っていた。やり直して『変わる』が正〕・規則違反)は記録のみ。方式 A の既定化、SAB 入力リング、WebGL2 は段 2 以降。
 
-## PM の判断と取り込み(段 1b: GAP-U1、2026-11-04)
+## PM の決定と取り込み(段 1b: GAP-U1、2026-11-04)
 
 - **取り込み**: `present2-runtime-2.diff`(`fle_win.c` と `present2_uncover.rs`。`-` 行 25 本は『更新矩形を足す外接矩形の合併』の同じ塊 2 つを `upd_add` / `upd_invalidate` の呼びに置き換えたもので、PM が全部読んだ)と `present2-runtime-2-api2-flip.diff`(決定 0210 の `win-known-divergence.txt` から GAP-U1 の 2 行を消す)を HEAD a0d658a に当てた。PM 実測: 全体テスト 184 results / 2,314 passed / 0 failed(a4 は 942/942、895/895、関数 5,310、入口 1,009,731(不変))。
 - **内容**: 窓に更新矩形を足すとき、その窓が WS_CLIPCHILDREN を持たなければ、触れる可視の子窓にも(子の座標で)同じ規則で足す(Learn の RedrawWindow と Window Features / Clipping の記述)。Wine 10.0 の答え付きのテスト(api2 の `win_upd.c`)の出力は、Wine 専用の ScrollWindowEx の 4 行を除いて全行一致。

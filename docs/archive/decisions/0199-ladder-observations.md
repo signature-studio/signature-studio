@@ -231,7 +231,7 @@ F1xH-G を `?env=FLE_G3_TIMER_LOG=1` つきで入力なしに **1,400 s(約 23 �
 - 再現: G2 は app を `vite build` して `FL_ASSETS_DIR=<出荷バンドルの assets>` で `vite preview`、`node docs/investigations/obs1/tools/obs-chrome.mjs --assets … --out …`。G1・G3 は `FLE_HLE_ENTRIES=lift/harness/hooks/flengine-g1-entries.txt SHIP_PRESET=F1xH bash app/scripts/build-engine-bundle.sh`(`tools/bb.sh`)でバンドルを作り、`tools/mk-serve.sh` で既定の入口にして `--query 'env=FLE_G1_RUN_LOG=1&env=FLE_G3_TIMER_LOG=1'`。G4 は同じ生成 C から `build_two_native.sh`(`FRUITY=1 GEN_OPT=-O0 GEN_INSTR=`)+ `b2d_swap.o` + `libblend2d.a`(native)をリンクして `tools/run-native-g3.sh` と `tools/g4-compare.py`。G0 は `tools/measure.sh off1 off`(a4-fruity.sh off)→ `tools/resplit.sh` → `tools/wasm0.sh rt harness units o1` → `tools/g0-link.sh` → `tools/g0-dist.sh` → `tools/g0-chrome-isolated.mjs`。
 
 
-## PM の判断と取り込み(2026-11-04)
+## PM の決定と取り込み(2026-11-04)
 
 取り込み: `obs1.diff` は HEAD 0dec3cd に `patch -p1 --dry-run` が当たる(`fle_win.c` は offset 31 行〔tbl1 の変更の後ろ〕)。`-` の行は2行(`app/src/main.ts` の `document.title` の1行の置換と、`lift/harness/two/gen_two.sh` の `--hle-entries` を渡す1行の拡張)で、どちらも意図した書き換え。`docs/investigations/obs1/tools/shim/systemd-run` は、このセッションで systemd-run を起動できないため、`build-engine-bundle.sh` の `capped` が cgroup 上限なしで前景実行するための pass-through(`exec "$@"`)で、ia1・b1・b2d2・prune1・fin1 と同じ物。リポジトリの実行経路には入らない(PATH に置くのは作業者のビルド時だけ)。PM の測定: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変。app は typecheck クリーン、vitest 1,212 passed + 7 skipped、Worker 43/43。
 

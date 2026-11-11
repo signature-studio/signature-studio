@@ -356,7 +356,7 @@ bash tools/mkruns.sh                                   # 前後の表(tables/sum
 - MessageBoxW: 観測は 1 種類だけで、Yes/No 系の既定のボタンが破壊的かは未観測。
 - lat1 の報告の『FILE メニューを再生中に開くと exit 134(SHIPH)』は native のプローブでは再現しなかった(`pb_menu_file` ほか 28 件の再生中の操作が停止 0)。lat1 が別に特定した原因(`SetWindowsHookExW: more than 64 hooks`、`fle_win.c` の hook 表、tbl1 = 決定 0196 の担当)は私の走行では出ておらず、`fle_win.c` には触っていない。
 
-## PM の判断と取り込み（2026-11-04）
+## PM の決定と取り込み（2026-11-04）
 
 - **取り込み範囲:** `ia2.diff`（17 ファイル。runtime の `fle_wall_ia2.c/.h`・`fle_wall_ia2t.c`・`fle_wall_ia2v.c`・`fle_wall_ia2w.c`・`fle_ia2_sortw.inc`、既存の `fle_gdi.c`・`fle_load.c`・`fle_locale.c`・`fle_ole.c`・`fle_seh.c`・`fle_shell.c`・`fle_user_nowin.c` の加算、`fruity_g3.c`、seeds `ia2-imports.txt`、テスト `wall_ia2.rs` 17 件・`gdi_bulk.rs` の個数の更新）。`-` 行 9 行を全部読んだ。内容は、GDI_STOP の個数の期待値（38→37）、`RectVisible` の GDI_STOP を実装に置き換えた 1 行、`LCMapStringW` の 4 行（私用領域と診断の分岐）、`PathCleanupSpec` の診断追加と停止文の書き換え、`fle_seh.c` の `why[300]`→`why[420]`。**新しい動作は、ia2 の行（層 4。`ia2-imports.txt` の marker 行）を使う構成でだけ有効になる opt-in で、既定の生成と動作は変わらない**（`fle_ia2_cmp_active` などの weak シンボルで切り替え）。ia2felift（SSE3）は決定 0191 の別部分として beeeda9 に取り込み済み。
 - **PM の実測（HEAD 5a87839 + 本差分）:** FLEngine の既定の生成 C は sha256 `cd9107ce…`（215,811,678 B）で不変。全体テスト 176 results / 2,258 passed / 0 failed（取り込み前 175 / 2,241。+ `wall_ia2` 17）。a4 FRUITY 無効 942/942・895/895・functions 5,310・entries 1,009,731（不変。作業者は a4 を回せなかったので PM が測った）。

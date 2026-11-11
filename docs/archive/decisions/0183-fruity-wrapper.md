@@ -184,7 +184,7 @@
 5. 実行: `tools/serve.sh RUNDIR BIN BUILDN`(FIFO で待つ follow モード)→ `tools/send.sh RUNDIR < tables/wrp1-open.g3`(File → Open... の選択はハーネス)。エンジンの起動から follow モードまで 2.5〜4 分(プラグインデータベースを種に入れると 4 分前後)、そこから Serum 2 のチャンネルの停止まで 1.5〜2 分。環境変数: `FLE_DLG1_TRACE_FILES=1`・`FLE_WRP1_TRACE=1`・`FLE_CRYPT_TRACE=1`(印字だけ)。
 6. テスト: `cargo test --release -p fe-lift --test wall_wrp1 --test wall_dlg1`(それぞれ 10・29 件)、変異検査 `tools/mutate.sh`(10 件)。
 
-## PM の判断と取り込み(2026-11-03、追記)
+## PM の決定と取り込み(2026-11-03、追記)
 
 取り込み: `wrp1.diff`(21 ファイル、+1892/−3。基準 HEAD d425abd に `patch -p1 --dry-run` が offset・fuzz・reject なしで当たる)。`-` 行 3 本を全て読んだ: `event.rs` の close hook 数の固定 5→6(`fle_wall_wrp1.c` が 6 つ目を登録するため)、`wall_fr4.rs` の『runtime のファイル名に trust/crypt/auth を含まない』固定を『`fle_crypt.c/.h` だけを例外にし、その中身に WinVerifyTrust・CertVerify・CryptVerify・CryptSign・CryptMsg・trust_claim・Authenticode を含まないことを検査する』形に変更(決定 0117 の『信頼の判定を作らない』方針を、名前でなく中身で守る形。妥当と判断)、`fle_filedlg.c` の KNOWNFOLDERID 停止メッセージの文言。fe-lift のソースは無変更。PM の検証: FLEngine の既定の生成 C の sha256 `cd9107ce…`(215,811,678 B)不変、全体テスト **171 results / 2,211 passed / 0 failed**(基準 170/2,200 + `wall_wrp1.rs` 1 実行ファイル・10 テスト + `wall_dlg1.rs` 1 テスト = 担当の値と一致)、a4(FRUITY 無効)942/942・895/895 で不変。PM はラッパー・Serum 2 つきの実行を再現していない(数字は担当の実測)。進捗(G 段階)には数えない: 参照プロジェクトの FLP は最後の壁 W12 で止まり、`setupProcessing`/`setActive`/`process` と音には届いていない。
 
