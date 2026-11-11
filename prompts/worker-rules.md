@@ -19,7 +19,9 @@
 
 ## 禁止事項
 - 権限・仕様・状態・原因を、実行した出力なしに断定しない。出力か「未確認」のどちらかを書く。
-- sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。長い処理は shell の `background: true`。
+- sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。シェルツールの `timeout` パラメータ(ミリ秒)は使ってよい。
+- 数分で終わる処理(`bash tests/harness/run.sh` など)は `background` を使わず、前面で実行する。`timeout` パラメータに 900000 を指定する。出力が戻るまでツール呼び出しを続ける。
+- `background: true` は 15 分以上かかる処理だけに使う。起動した応答で終えない。同じ応答の中で、他の作業か、状態確認(`opencode api session.active`・出力ファイルの `ls -la`)を続ける。
 - 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。
 - Secrets・Variables を、読む(一覧も含む)・書く・消す・API で読まない(`gh secret`・`gh variable`・`gh api` の `secrets`・`variables`)。依頼者が許可していない。

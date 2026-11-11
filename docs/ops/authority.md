@@ -25,7 +25,7 @@
 | push の可否の確認 | リポジトリのディレクトリで `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` | 同上。`.permissions` は根拠にしない(P1) |
 | ブラウザでの確認 | headless Chrome(`google-chrome --headless`)。手元の検証に限り、CI に自作スクリプトを置かない | Chrome 156 は存在。headless の起動は未確認(R1) |
 | 追加パッケージ(brotli 等) | まず npm・Python・cargo で足りるか見る。必要なら `sudo -n apt-get install`(必要最小限) | `sudo -n true` が rc=0(R1)。apt の実行は未テスト |
-| 長い処理 | shell の `background: true`。完了は通知に任せる | — |
+| 長い処理 | 数分で終わる処理(`bash tests/harness/run.sh` など)は前面で実行し、シェルツールの `timeout` に 900000 を指定する。15 分以上の処理だけ `background: true`。起動した応答で終えず、状態確認のツール呼び出しを続ける | — |
 | STATE・ROADMAP の更新 | worker に頼む(main は書けない) | — |
 
 ## 3 Issue で頼む物(`docs/ops/requests.md` の形式で出す)
