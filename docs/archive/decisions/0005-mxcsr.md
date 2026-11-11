@@ -1,6 +1,6 @@
 # 0005: STMXCSR と LDMXCSR の応答
 
-状態: 作業者（PM）が決定。依頼者の判断は含まない。実装は `lift/crates/fe-lift/src/mxcsr.rs`（振り分けは `lib.rs` の 1 行）、runtime は `lift/runtime/fle_mxcsr.h` と `fle_mxcsr.c`（新規）。
+状態: 作業者（PM）が決定。依頼者の決定は含まない。実装は `lift/crates/fe-lift/src/mxcsr.rs`（振り分けは `lib.rs` の 1 行）、runtime は `lift/runtime/fle_mxcsr.h` と `fle_mxcsr.c`（新規）。
 
 ## 文脈
 

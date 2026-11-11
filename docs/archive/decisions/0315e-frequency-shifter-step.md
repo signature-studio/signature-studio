@@ -48,4 +48,4 @@
 ## 5. 未確認 / 次
 
 - wasm の実行(Shifter の V3、Engine の `dispatch` が呼ばれるか、VEX の 692 箇所に当たるか)は RT-B の bundle のあと。**§4 の runtime の直しが無いと Engine は読めない**(読み)ので、Shifter を build に載せる時は §4 とセット。
-- 判断を仰ぐ点: (1) §4 の直し(契約の穴で、既存 3 plug-in の挙動も Windows に寄る)を RT-B の増分に入れるか。(2) Shifter を RT-B の結果(Delay 2 の V3 と Export が Wine の elog17 に一致するか)のあとに載せる、で良いか(PM の指示どおり)。
+- 未決の点: (1) §4 の直し(契約の穴で、既存 3 plug-in の挙動も Windows に寄る)を RT-B の増分に入れるか。(2) Shifter を RT-B の結果(Delay 2 の V3 と Export が Wine の elog17 に一致するか)のあとに載せる、で良いか(PM の指示どおり)。

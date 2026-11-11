@@ -27,7 +27,7 @@
 - 本番(Access の背後)の応答ヘッダー(特に `Content-Encoding` が br のままか、`Cache-Control` が immutable のままか)と、依頼者の画面で何が起きているか。**ローカルの `wrangler dev` だけの癖**として、`Accept-Encoding` に gzip を含む要求に対し wasm / js / json は『保存された br を展開して gzip で再圧縮』して返す(wasm 21.4 MB、Content-Length なし。octet-stream の flpack は br のまま)。本番のエッジでも同じことが起きるかは不明。
 - 依頼者がシークレット/プライベートで見ていたか、DevTools の『キャッシュを無効化』が入っていたか。
 
-### 依頼者に確認してほしいこと(3 行)
+### 未決のこと(3 行)
 
 1. DevTools の Network を開き、『キャッシュを無効化(Disable cache)』を**外し**、シークレット/プライベートでないウィンドウで通常再読み込み(Ctrl+R。Ctrl+Shift+R ではない)。
 2. wasm の行の Size(Chrome)/Transferred(Firefox)が『(disk cache)』/『cached』なら HTTP キャッシュは効いている(Time が数秒でも展開と SHA-256 の CPU 時間)。『11.3 MB』や『21 MB』と出るなら毎回転送している。

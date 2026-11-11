@@ -28,7 +28,7 @@ status: 設計(読みのみ。実機の run は 0 本)。第 1 段の virtual po
 - **失敗時**: requestPointerLock が Esc を押した後にすぐ指に場合は成功しない(出典の Note)。再要求してはいけない(ユーザーのジェスチャが要る)。その場合は第 1 段の仮想ポインタだけに戻る。
 - **終了の検証**: exitPointerLock の後、pointerlockchange で armed を外す。Esc で出ても同じ。
 
-### 1.3 runtime 側への小さな追加(設計のみ。PM の判断待ち)
+### 1.3 runtime 側への小さな追加(設計のみ。PM の未決)
 - appview(`fle_appview.c`)が `st.flags` か構造体の新フィールドに `cursor display count`(ShowCursor の現在の count)を出すこと。現行の構造体は `fle_gdi_cursor_display_count()` が未 export のため。page はその count < 0 の間だけ Pointer Lock を要求する。**第 1 段の差分には入れない**(変更が必要)。
 
 ### 1.4 検証項目(実機。まだ 0 本)

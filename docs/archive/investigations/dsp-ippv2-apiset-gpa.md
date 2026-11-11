@@ -67,7 +67,7 @@
    | **C2** | 同、`POST_MAX=2` | 上 2 つ + `GetProcAddress`（6 名） | 3 |
    | **D** | 同、`POST_MAX=2`、`GPA_NAMES=__none__` | `MultiByteToWideChar`、`GetStringTypeW` だけ（GPA の規則は何にも当たらない。`two-module-post0083.md` §5.2 の再現） | 2 |
 
-   **段数の注意**: `GetProcAddress` の段は 1 つの API（`GetProcAddress`）に対する 1 つの表引きの規則（名前 → 戻す値）で、B と C2 では名前ごとの分岐が 5、6 ある。数え方を「API ごとに 1 段」（`two-module-post0083.md` §5）にすれば最大 3 段の範囲に収まる。「規則（分岐）ごとに 1 段」と数えるなら B と C2 は 3 段を超える。どちらの数え方かは依頼者の判断に任せる（§9 の未確認にも書いた）。4 つ目の停止（`WideCharToMultiByte`）は書き換えていない。
+   **段数の注意**: `GetProcAddress` の段は 1 つの API（`GetProcAddress`）に対する 1 つの表引きの規則（名前 → 戻す値）で、B と C2 では名前ごとの分岐が 5、6 ある。数え方を「API ごとに 1 段」（`two-module-post0083.md` §5）にすれば最大 3 段の範囲に収まる。「規則（分岐）ごとに 1 段」と数えるなら B と C2 は 3 段を超える。どちらの数え方かは依頼者が決める事項として残す（§9 の未確認にも書いた）。4 つ目の停止（`WideCharToMultiByte`）は書き換えていない。
 5. `check_quotes.py`、`check_doc_quotes.py`: 引用の機械照合（§9）。
 
 ## 3. DLL が `GetProcAddress` で引く名前（実測の走査＋読み）
@@ -434,7 +434,7 @@
 - 非 NULL にしたときの ATTACH の**先**（`WideCharToMultiByte` の後、DllMain が `eax = 1` で戻るまで）。C1、C2 は `LCMapStringEx` の呼び出しで止めたので、その先は測っていない。
 - `FlsFree` と `FlsGetValue` の GPA 照会が実行されるか（ATTACH の 125 回の範囲に無い。0x17cd470、0x17cd4dc、0x17cd5e4 の呼び元は 0x17cb3a0 以降の別経路に見える）。
 - `AreFileApisANSI` の照会（0x17d752f）の到達の確認（ATTACH の先にあると読んだが、実行していない）。
-- 段数の数え方（§2.3）: B と C2 の「GetProcAddress の段」を 1 つと数えるか、名前ごとの分岐と数えるか。**後者なら B は 5 段、C2 は 2 + 6 = 8 段で、依頼の「最大 3 段」を超える**。依頼者の判断に任せる。
+- 段数の数え方（§2.3）: B と C2 の「GetProcAddress の段」を 1 つと数えるか、名前ごとの分岐と数えるか。**後者なら B は 5 段、C2 は 2 + 6 = 8 段で、依頼の「最大 3 段」を超える**。依頼者が決める事項として残す。
 - B のスタンドイン（`InitializeCriticalSectionEx` → ICSASC の行）が、実際の `fle_imp_InitializeCriticalSectionEx` の応答（戻り 1、同じ表の更新）と同じ結果を与えるかは、実装していないので**未確認**（ICSASC の本体は同じ `fle_cs_init` と戻り 1 で、Flags を読まない: `fle_sys.c:193-197`）。
 - `cargo test --workspace` は実行していない。`GetProcAddress` を api-ms ハンドルで呼ぶテストが無いことは grep の結果であり、全文走査ではない。
 

@@ -1,6 +1,6 @@
 # 0019: x87 制御命令（FNSTCW、FLDCW、FNSTSW、FNCLEX、FNINIT、FWAIT）の応答
 
-状態: 作業者が決定。依頼者の判断は含まない。実装は `lift/crates/fe-lift/src/x87ctl.rs`（振り分けは `lib.rs` の mod 宣言 1 行と `if let` 4 行）、runtime は `lift/runtime/fle_x87ctl.h` と `fle_x87ctl.c`（新規）。
+状態: 作業者が決定。依頼者の決定は含まない。実装は `lift/crates/fe-lift/src/x87ctl.rs`（振り分けは `lib.rs` の mod 宣言 1 行と `if let` 4 行）、runtime は `lift/runtime/fle_x87ctl.h` と `fle_x87ctl.c`（新規）。
 
 ## 文脈
 

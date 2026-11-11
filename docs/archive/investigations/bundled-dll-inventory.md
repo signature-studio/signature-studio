@@ -53,7 +53,7 @@
 ### 3.2 インストーラ自体の入手元
 
 - 実測: `stat` で `/home/ubuntu/ダウンロード/flstudio_win64_26.1.7.5653.exe` の更新日時は 2026-10-09 14:43:15 +0900、1,106,033,456 B（`installer-stat.txt`）。同じ `ダウンロード` に Mac 版 `flstudio_mac_26.1.7.5419.dmg` と他社のプラグインのインストーラがある。
-- 引用（旧プロジェクトの引き継ぎ資料 `~/work/signature-studio-dev-handover/docs/06-restart-guide.md` §6.1、2026-10-18 時点）: 「`~/ダウンロード/flstudio_win64_26.1.7.5653.exe`（約 1.1GB）— Win64。NSIS 形式」。「これらは『原資材』であり、利用条件は各社ライセンスと依頼者の判断に従うこと」。
+- 引用（旧プロジェクトの引き継ぎ資料 `~/work/signature-studio-dev-handover/docs/06-restart-guide.md` §6.1、2026-10-18 時点）: 「`~/ダウンロード/flstudio_win64_26.1.7.5653.exe`（約 1.1GB）— Win64。NSIS 形式」。「これらは『原資材』であり、利用条件は各社ライセンスと依頼者が決めた条件に従うこと」。
 - 引用（旧リポジトリの shallow clone `lift/out-oracle/old-ref/repo/docs/REFERENCES.md`）: `[DOWNLOADS]` = `~/ダウンロード/`「元インストーラ・プラグイン素材」。`fl-win64` の bundle（R2 のクラウドストレージ上の tar.zst）には installer と `extracted/` が入っていた。旧プロジェクトの抽出物 `/home/ubuntu/work/analysis/win64/extracted/block*_PE.bin` は**このマシンに無い**（実測: `/home/ubuntu/work/analysis` が存在しない。引き継ぎ資料 §6.1 も「Windows 抽出物一式」を「失われたもの」に挙げる）。R2 は認証情報が要るので見ていない。
 - **文書に書かれていないこと**: インストーラのダウンロード元（URL）、誰が置いたか。分かるのは更新日時と、依頼者のホームの `ダウンロード` にあるという事実まで。
 

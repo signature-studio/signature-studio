@@ -1,6 +1,6 @@
 # 0004: TlsSetValue、TlsGetValue、GetLastError の応答
 
-状態: 作業者（PM）が決定。依頼者の判断は含まない。実装は `lift/runtime/fle_imports.c` と `.h` に追記済み（既存の関数は変更していない）。
+状態: 作業者（PM）が決定。依頼者の決定は含まない。実装は `lift/runtime/fle_imports.c` と `.h` に追記済み（既存の関数は変更していない）。
 
 ## 文脈
 
