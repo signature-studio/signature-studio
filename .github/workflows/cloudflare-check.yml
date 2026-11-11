@@ -1,0 +1,158 @@
+name: cloudflare-check
+
+on:
+  push:
+    paths:
+      - ".github/workflows/cloudflare-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 0 アカウント ID を伏せる
+        env:
+          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$ACCOUNT_ID" ]; then
+            echo "::add-mask::$ACCOUNT_ID"
+          fi
+
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 1 アカウント ID の設定を確かめる(値は出さない)
+        id: acct
+        continue-on-error: true
+        env:
+          ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "アカウント ID の設定: なし"
+            exit 1
+          fi
+          echo "アカウント ID の設定: あり"
+
+      - name: 2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)
+        id: token
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          mask() {
+            sed -E \
+              -e "s/$CLOUDFLARE_ACCOUNT_ID/[アカウント ID 伏せ]/g" \
+              -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[メール伏せ]/g' \
+              -e 's/[A-Za-z0-9.-]+\.workers\.dev/[ホスト伏せ]/g'
+          }
+          if ! npm ci --prefix app --ignore-scripts --no-audit --no-fund > npm-ci.log 2>&1; then
+            echo "依存関係の準備: 失敗"
+            mask < npm-ci.log | tail -n 20
+            exit 1
+          fi
+          WR=app/node_modules/.bin/wrangler
+          echo "wrangler の版: $(node -p "require('./app/node_modules/wrangler/package.json').version")"
+          if "$WR" whoami > /dev/null 2>&1; then
+            echo "wrangler whoami(参考): 成功"
+          else
+            echo "wrangler whoami(参考): 失敗"
+          fi
+          if "$WR" deployments list --name fl-studio-web > deploy.txt 2>&1; then
+            mask < deploy.txt > deploy-masked.txt
+            echo "deployments list: 成功"
+            grep -E 'Version|Created|Deployment|[0-9]{4}-[0-9]{2}-[0-9]{2}' deploy-masked.txt | grep -v -i 'author' || true
+          else
+            echo "deployments list: 失敗"
+            mask < deploy.txt | tail -n 20
+            exit 1
+          fi
+
+      - name: 3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)
+        id: r2_artifact
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          status=0
+          for bucket in fl-web-artifacts; do
+            if aws s3 ls "s3://${bucket}/" --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then
+              echo "バケット ${bucket} の一覧: 成功"
+              head -n 3 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+            else
+              echo "バケット ${bucket} の一覧: 失敗"
+              sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' ls.txt | tail -n 5
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: 3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)
+        id: r2_cache_assets
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          status=0
+          for bucket in fl-web-cache fl-web-assets; do
+            if aws s3 ls "s3://${bucket}/" --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then
+              echo "バケット ${bucket} の一覧: 成功"
+              head -n 3 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+            else
+              echo "バケット ${bucket} の一覧: 失敗"
+              sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' ls.txt | tail -n 5
+              status=1
+            fi
+          done
+          exit $status
+
+      - name: 4 結果の表
+        if: always()
+        env:
+          R_ACCT: ${{ steps.acct.outcome }}
+          R_TOKEN: ${{ steps.token.outcome }}
+          R_ART: ${{ steps.r2_artifact.outcome }}
+          R_CACHE: ${{ steps.r2_cache_assets.outcome }}
+        run: |
+          fail=0
+          line() {
+            if [ "$2" = "success" ]; then
+              r="成功"
+            else
+              r="失敗"
+              fail=1
+            fi
+            echo "| $1 | $r |"
+          }
+          echo "| 確認 | 結果 |"
+          echo "|---|---|"
+          line "1 アカウント ID の設定" "$R_ACCT"
+          line "2 API トークン(Worker fl-studio-web の一覧)" "$R_TOKEN"
+          line "3a R2 のキー 1 組目(fl-web-artifacts の読み取り)" "$R_ART"
+          line "3b R2 のキー 2 組目(fl-web-cache・fl-web-assets の読み取り)" "$R_CACHE"
+          exit $fail
