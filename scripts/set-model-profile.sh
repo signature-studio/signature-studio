@@ -153,7 +153,7 @@ for k, line in enumerate(lines):
         lines[k] = '%s"model": "%s%s' % (indent, want[key], tail)
         done.add(key)
 if done != set(want):
-    sys.exit("設定ファイルの形が想定と違います。モデルの行を 6 か所（最上位、build、worker、reviewer、title、summary）見つける必要がありましたが、%d か所でした: %s" % (len(done), sorted(done)))
+    sys.exit("設定ファイルの形が想定と違います。モデルの行を 6 か所（最上位、メインセッション、作業用・検証用のサブエージェント、表題、要約）見つける必要がありましたが、%d か所でした: %s" % (len(done), sorted(done)))
 result = "\n".join(lines)
 try:
     json.loads(strip(result))

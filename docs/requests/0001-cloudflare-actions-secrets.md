@@ -4,7 +4,7 @@
 
 ## 依頼者にお願いしたい作業
 
-Cloudflare で API トークン 1 つと R2 のアクセスキー 2 組を作り、GitHub の Secrets 5 つと Variables 1 つに登録してください。エージェントは Cloudflare の操作を直接できないため、この登録がないと、ウェブ版の配信と Cloudflare の状態の確認ができません。
+Cloudflare で API トークン 1 つと R2 のアクセスキー 2 組を作り、GitHub の Secrets 5 つと Variables 1 つに登録してください。後任者は Cloudflare の操作を直接できないため、この登録がないと、ウェブ版の配信と Cloudflare の状態の確認ができません。
 
 ## やってほしいこと
 
@@ -23,7 +23,7 @@ Cloudflare で API トークン 1 つと R2 のアクセスキー 2 組を作り
 
 ## なぜ必要か
 
-GitHub Actions で Cloudflare に配信する。エージェントは Cloudflare の操作を直接できないため、この経路でしか配信と確認ができない。
+GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操作を直接できないため、この経路でしか配信と確認ができない。
 
 ## 影響
 
@@ -61,7 +61,7 @@ GitHub Actions で Cloudflare に配信する。エージェントは Cloudflare
 
 ```
 $ gh secret list
-(出力なし(0 件)、rc 0)
+(出力なし(0 件)。コマンドは成功)
 $ gh variable list
 failed to get variables: HTTP 403: Resource not accessible by integration (https://api.github.com/repos/signature-studio/signature-studio/actions/variables?per_page=100)
 Exited with code 1

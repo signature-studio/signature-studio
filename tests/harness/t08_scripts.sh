@@ -154,7 +154,7 @@ expect_contains "--dry-run shows session.create with agent build" "$out" 'sessio
 expect_contains "--dry-run shows the model copied from opencode.jsonc" "$out" '"providerID":"console-cloudflare-ai-gateway-custom","id":"claude-sonnet-5-5","variant":"xhigh"'
 expect_contains "--dry-run shows the repository directory" "$out" "\"location\":{\"directory\":\"$lrepo\"}"
 expect_contains "--dry-run shows the registry step" "$out" "goal-nudge.sessions"
-expect_contains "--dry-run shows that session.prompt is the human's launch" "$out" "the only session.prompt in this project"
+expect_contains "--dry-run shows that session.prompt is the human's launch" "$out" "session.prompt を使うのは、この起動の 1 回だけ"
 expect_contains "--dry-run shows the goal text from START.md" "$out" "make it work"
 expect_eq "--dry-run created no registry file" 0 "$(find "$lhome" -name 'goal-nudge.sessions' | wc -l | tr -d ' ')"
 
@@ -169,7 +169,7 @@ expect_contains "the model in session.create follows agents.build.model (Haiku p
 out=$(cd "$lrepo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$lhome" FAKE_GH=private FAKE_OC_LOG="$log" FAKE_OC_AGENTS="$sb/agents-launch.json" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh 2>&1); rc=$?
 if [ "$rc" -eq 0 ]; then
   pass "launch.sh (against the fake) exits 0"
-  expect_contains "reports the new session id" "$out" "created ses_FAKELAUNCH0001"
+  expect_contains "reports the new session id" "$out" "セッション ses_FAKELAUNCH0001 を作成しました"
   calls=$(jq -r '.args' "$log")
   order=$(grep -oE '^debug agents|^api session\.(create|prompt|command)' <<< "$calls" | sed 's/^api //' | paste -sd' ' -)
   expect_eq "order: preflight's agent check, create, prompt, command" "debug agents session.create session.prompt session.command" "$order"
@@ -187,7 +187,7 @@ if [ "$rc" -eq 0 ]; then
   expect_eq "the new id is in the registry exactly once" 1 "$(grep -c '^ses_FAKELAUNCH0001' "$reg")"
   out2=$(cd "$lrepo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$lhome" FAKE_GH=private FAKE_OC_LOG="$log" FAKE_OC_AGENTS="$sb/agents-launch.json" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh 2>&1)
   expect_eq "a second launch (same fake id) does not duplicate the registry line" 1 "$(grep -c '^ses_FAKELAUNCH0001' "$reg")"
-  expect_contains "and says it is already there" "$out2" "already in"
+  expect_contains "and says it is already there" "$out2" "既に"
 else
   fail "launch.sh against the fake exited $rc: $(printf '%s' "$out" | tail -3 | tr '\n' '|' | cut -c1-300)"
 fi
@@ -196,7 +196,7 @@ fi
 lh2="$sb/lhome2"; mkdir -p "$lh2/.config/opencode"; : > "$log"
 out=$(cd "$lrepo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$lh2" FAKE_OC_LOG="$log" FAKE_OC_AGENTS="/dev/null" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh 2>&1); rc=$?
 expect_eq "preflight FAIL stops the launch (exit 1)" 1 "$rc"
-expect_contains "and says nothing was created" "$out" "nothing was created"
+expect_contains "and says nothing was created" "$out" "何も作っていません"
 expect_eq "no session.create was called" 0 "$(grep -c 'api session.create' "$log")"
 expect_eq "no registry file was written" 0 "$(find "$lh2" -name 'goal-nudge.sessions' | wc -l | tr -d ' ')"
 for step in session.create session.prompt session.command; do
@@ -205,17 +205,17 @@ for step in session.create session.prompt session.command; do
   expect_eq "a failing $step stops the launch with exit 1" 1 "$rc"
   case "$step" in
     session.create) expect_eq "(no registry entry when no session exists)" 0 "$(find "$lh2" -name 'goal-nudge.sessions' | wc -l | tr -d ' ')" ;;
-    *) expect_eq "(the session exists, so it was registered before the failing step)" 1 "$(grep -c '^ses_FAKELAUNCH0001' "$lh2/.config/opencode/goal-nudge.sessions")"; expect_contains "(and the message says the session exists)" "$out" "session ses_FAKELAUNCH0001 exists" ;;
+    *) expect_eq "(the session exists, so it was registered before the failing step)" 1 "$(grep -c '^ses_FAKELAUNCH0001' "$lh2/.config/opencode/goal-nudge.sessions")"; expect_contains "(and the message says the session exists)" "$out" "セッション ses_FAKELAUNCH0001 は作成済み" ;;
   esac
 done
 # argument handling and the in-session guard
 out=$(cd "$lrepo" && OPENCODE_SESSION_ID=ses_abc HOME="$lh2" bash scripts/launch.sh 2>&1); rc=$?
-expect_eq "refuses to launch from inside an opencode session" 1 "$rc"; expect_contains "(says the human runs it)" "$out" "refusing to launch from inside an opencode session"
+expect_eq "refuses to launch from inside an opencode session" 1 "$rc"; expect_contains "(says the human runs it)" "$out" "セッションの中からは起動できません"
 out=$(cd "$lrepo" && OPENCODE_SESSION_ID=ses_abc HOME="$lh2" bash scripts/launch.sh --dry-run 2>&1); expect_eq "--dry-run is allowed inside a session" 0 "$?"
 launch --nothing > /dev/null; expect_eq "an unknown option exits 1 (no options beyond --dry-run)" 1 "$?"
 nogoal="$sb/launch-nogoal"; make_repo_copy "$nogoal"; printf 'start only\n' > "$nogoal/prompts/START.md"
 out=$(cd "$nogoal" && env -u OPENCODE_SESSION_ID HOME="$lh2" PATH="$FAKEOC:$PATH" bash scripts/launch.sh --dry-run 2>&1); rc=$?
-expect_eq "a START.md without a '## GOAL' section is refused" 1 "$rc"; expect_contains "(and says what is missing)" "$out" "has no '## GOAL' section"
+expect_eq "a START.md without a '## GOAL' section is refused" 1 "$rc"; expect_contains "(and says what is missing)" "$out" "「## GOAL」の節がない"
 long="$sb/launch-long"; make_repo_copy "$long"; { printf 'start\n\n## GOAL\n'; head -c 4100 /dev/zero | tr '\0' 'x'; printf '\n'; } > "$long/prompts/START.md"
 out=$(cd "$long" && env -u OPENCODE_SESSION_ID HOME="$lh2" PATH="$FAKEOC:$PATH" bash scripts/launch.sh --dry-run 2>&1); rc=$?
 expect_eq "a goal text over 4000 characters is refused (the /goal limit)" 1 "$rc"
