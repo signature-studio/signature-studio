@@ -39,7 +39,6 @@
 | GitHub Actions で使う Secrets の登録(Cloudflare の API トークン、R2 の S3 キー) | 配信を GitHub Actions で行う設計(作業計画〔`docs/ROADMAP.md`〕の配信の項目)。トークンの発行と登録は依頼者の権限(P3) | `docs/requests/`(起票済みの Issue の一覧と状態) |
 | Access・DNS・custom domain の変更(新ホストが要る場合のみ) | 後任者は Cloudflare を実行しない(P4) | 同上 |
 | 実機・依頼者機の計測(P5) | headless では代替できない | 同上 |
-| `.github/workflows/` を push するための権限(足りない場合のみ) | 組織(org)の権限は依頼者の権限(P3) | 同上 |
 
 ## 4 残る仮定(依頼者が違うと言えば差し替える)
 

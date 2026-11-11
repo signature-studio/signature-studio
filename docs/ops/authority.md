@@ -35,7 +35,6 @@
 | 1 | Secrets・トークンの発行と登録(Cloudflare の API トークン、R2 の S3 キー。GitHub Actions で使う) | 理由: トークンの発行と Secrets の登録は依頼者の権限(P3)。対象: Secret の名前(値は書かない)と用途。影響: Secret の追加のみ。取り消し: Secret の削除 | commit・ビルド・測定。配信は Actions の結果を待たず、この機械の headless Chrome の実測で進める |
 | 2 | Access・DNS・custom domain の変更 | 理由: 後任は Cloudflare を実行しない(P4)。対象: `<ホスト名>` のプレースホルダ。影響: 公開の経路 | 旧 Worker 名・旧ホストのまま、ローカルの実測で進める。新ホストが要る作業だけ止まる |
 | 3 | 実機・依頼者機の計測(依頼者機のブラウザ、実機 Windows の画面・音・120 fps) | 理由: headless では代替できない(P5)。手順: 読み取りのみ。返す値の形式。影響: なし | headless の実測で進める。依頼者機の値は「依頼中」と書く(Issue を出した後) |
-| 4 | org の権限(`.github/workflows/` を push するのに要る権限が足りないとき) | 理由: org の権限は依頼者の権限。対象: 足りない権限の名前。影響: 権限の付与のみ | workflow 以外の commit と push。`.github/workflows/` の変更は、権限が付いた後に push する |
 
 - push 権限と公開範囲の行は、この表に無い(解消・意図的。P1・P2)。
 - Issue の必須項目(対象・理由・影響範囲・自分で試した記録・確認コマンド・依頼なしで続ける作業)は `docs/ops/requests.md`。表に無い物を頼むときは、先に `docs/ops/environment.md` の確認コマンドを実行し、結果を Issue に貼る。

@@ -1,5 +1,7 @@
 # Issue 0001: GitHub Actions 用の Cloudflare 資格情報の登録(Worker とバケット限定)
 
+状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用ワークフロー `cloudflare-check.yml` は存在し、実行結果は `evidence/R8-2.md` に置いてある)
+
 依頼 ID・日付: 0001 / 2026-11-10
 
 ## 依頼者にお願いしたい作業
@@ -57,17 +59,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 
 ### 自分で試した記録
 
-注: 以下の確認は、依頼者の許可を得ずに実行した。以後、エージェントは Secrets と Variables を一覧も含めて確認しない。
-
-実測 2026-11-10。リポジトリのディレクトリで実行。作業用のアカウントは `gh auth status` の active account(名前は書かない)。
-
-```
-$ gh secret list
-(出力なし(0 件)。コマンドは成功)
-$ gh variable list
-failed to get variables: HTTP 403: Resource not accessible by integration (https://api.github.com/repos/signature-studio/signature-studio/actions/variables?per_page=100)
-Exited with code 1
-```
+2026-11-10 に、依頼者の許可なく Secrets と Variables の一覧を実行した。2026-11-12 に禁止した(`opencode.jsonc`)。
 
 [文書] 旧 CI の記録(0217。この Issue の実測ではない): Workers Scripts: Edit だけで Worker の deploy は通った。バケット限定の R2 トークンは `wrangler r2 object put` が 403、S3 API では書けた。
 
@@ -75,17 +67,16 @@ Exited with code 1
 
 確認は次の 2 つで行う。
 
-- 依頼者の連絡(Issue を閉じること)。
-- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)。
+- 依頼者の連絡(Issue を閉じること)。2026-11-12 に閉じた。
+- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`(Variable CLOUDFLARE_ACCOUNT_ID が無いと、この実行は失敗する)。実行の結果は `evidence/R8-2.md` に置いてある。
 
-エージェントは Secrets と Variables の中身も一覧も確認しない。
+エージェントは Secrets と Variables の中身も一覧も確認しない(禁止。`opencode.jsonc` の deny、`prompts/worker-rules.md`)。
 
 ### 依頼なしで続ける作業
 
-R0 の全行、R1〜R3、R4-2〜R4-4、R5 の測定系(Actions を使わない物)。
+(この Issue は完了。残る作業は ROADMAP の行で扱う。)
 
 ### 確認の記録
 
-2026-11-10: Issue を作成(Issue 1)
-2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 は閉じた状態(この確認で `gh issue list --state all` が CLOSED を返した。閉じる操作は、この記録の作業では行っていない)。エージェントは Secrets と Variables を確認していない。
-(確認後に追記: 日付・コマンドの出力 1 行)
+2026-11-10: Issue を作成(Issue 1)。
+2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 を閉じた(`gh issue view 1 --json state,closedAt` が `CLOSED`、closedAt 2026-11-11T19:40:43Z)。確認用ワークフローの最新実行は `success`(実行 ID 43092725843、commit `b3a70b5`)。
