@@ -122,7 +122,7 @@ worker	allow	gh repo view signature-studio/signature-studio --json name
 worker	allow	gh api repos/signature-studio/signature-studio --jq .private
 worker	allow	gh pr list
 worker	allow	gh workflow list
-worker	allow	gh variable list
+worker	deny	gh variable list
 worker	allow	systemctl --user list-timers
 worker	allow	systemctl --user status goal-nudge.timer
 worker	allow	systemctl --user is-enabled goal-nudge.timer
@@ -180,8 +180,15 @@ worker	deny	gh repo delete signature-studio/signature-studio --yes
 worker	deny	gh repo edit --visibility private
 worker	deny	gh repo archive x
 worker	deny	gh secret set X
-worker	allow	gh secret list
+worker	deny	gh secret list
 worker	deny	gh variable set X
+worker	deny	gh secret
+worker	deny	gh variable
+worker	deny	gh api repos/a/b/actions/secrets
+worker	deny	gh api repos/a/b/actions/variables
+worker	deny	gh api repos/a/b/actions/secrets/NAME
+worker	allow	gh api repos/a/b --jq .default_branch
+worker	allow	gh issue list
 worker	deny	gh workflow run deploy.yml
 worker	deny	gh workflow run x
 worker	deny	gh api -X PUT repos/o/r/contents/x -f message=m

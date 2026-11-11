@@ -115,7 +115,7 @@ worker	allow	["gh repo view signature-studio/signature-studio --json name"]	gh r
 worker	allow	["gh api repos/signature-studio/signature-studio --jq .private"]	gh api repos/signature-studio/signature-studio --jq .private
 worker	allow	["gh pr list"]	gh pr list
 worker	allow	["gh workflow list"]	gh workflow list
-worker	allow	["gh variable list"]	gh variable list
+worker	deny	["gh variable list"]	gh variable list
 worker	allow	["systemctl --user list-timers"]	systemctl --user list-timers
 worker	allow	["systemctl --user status goal-nudge.timer"]	systemctl --user status goal-nudge.timer
 worker	allow	["systemctl --user is-enabled goal-nudge.timer"]	systemctl --user is-enabled goal-nudge.timer
@@ -172,8 +172,15 @@ worker	deny	["gh repo delete signature-studio/signature-studio --yes"]	gh repo d
 worker	deny	["gh repo edit --visibility private"]	gh repo edit --visibility private
 worker	deny	["gh repo archive x"]	gh repo archive x
 worker	deny	["gh secret set X"]	gh secret set X
-worker	allow	["gh secret list"]	gh secret list
+worker	deny	["gh secret list"]	gh secret list
 worker	deny	["gh variable set X"]	gh variable set X
+worker	deny	["gh secret"]	gh secret
+worker	deny	["gh variable"]	gh variable
+worker	deny	["gh api repos/a/b/actions/secrets"]	gh api repos/a/b/actions/secrets
+worker	deny	["gh api repos/a/b/actions/variables"]	gh api repos/a/b/actions/variables
+worker	deny	["gh api repos/a/b/actions/secrets/NAME"]	gh api repos/a/b/actions/secrets/NAME
+worker	allow	["gh api repos/a/b --jq .default_branch"]	gh api repos/a/b --jq .default_branch
+worker	allow	["gh issue list"]	gh issue list
 worker	deny	["gh workflow run deploy.yml"]	gh workflow run deploy.yml
 worker	deny	["gh workflow run x"]	gh workflow run x
 worker	deny	["gh api -X PUT repos/o/r/contents/x -f message=m"]	gh api -X PUT repos/o/r/contents/x -f message=m
