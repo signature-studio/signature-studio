@@ -27,7 +27,7 @@
 | P2 | 公開範囲: PUBLIC は意図的(GitHub Actions を最大 60 並列で数時間動かすため)。公開を理由に push を止めない。公開されて困る物は Git に入れない(`.gitignore`) |
 | P3 | 依頼者の協力: 責任範囲外の作業(トークン・Secrets・権限・実機の計測)に限り、Issue の形式で応じる(`docs/ops/requests.md`) |
 | P4 | Cloudflare: 後任者は `wrangler`・`cf` を読み取りも含め実行しない。配信と確認は GitHub Actions と、依頼者が Issue に応じて登録する Secrets で行う |
-| P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。Issue で依頼者に計測を頼む。返事を待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
+| P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。Issue で依頼者に計測を頼む。依頼の返りを待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
 | P6 | 作業の場: このマシンのリポジトリ。重い実行(ビルド・測定・並列のサブエージェント)は GitHub Actions を使う想定 |
 | P7 | 依頼の区分と一覧の文書は廃止。依頼は Issue(`docs/requests/`)へ |
 | P8 | 起動前の自動確認(`scripts/preflight.sh`)の表の行の名前: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan goal goal-nudge` |
@@ -49,7 +49,7 @@
 | H | モデルの既定は、メインセッションが Sonnet 5.5、サブエージェント(作業用・検証用)が Haiku 5.5 | `scripts/set-model-profile.sh haiku` を依頼者が実行 |
 | I | goal-nudge は、人の Esc で止まっても最長 1 分後に再開する | timer を止める(§1 の 5) |
 
-- `docs/archive/` は、近く Git に入れる方針に変わった。Git の管理対象(追跡する)。公開されて困る物は無い(依頼者の判断。P2)。`.gitignore` の `docs/archive/*` の 2 行は、入れる作業のコミットで外す。
+- `docs/archive/` は、近く Git に入れる方針に変わった。Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` の `docs/archive/*` の 2 行は、入れる作業のコミットで外す。
 
 ## 5 登録簿との関係
 

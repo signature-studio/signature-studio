@@ -198,6 +198,26 @@ tout2=$(cd "$repo" && bash scripts/scan-forbidden.sh terms/bad.md 2>&1)
 expect_not_contains "term: an allowlist entry (fixed text) allows that line" "$tout2" "term	terms/bad.md:1"
 (cd "$repo" && bash scripts/scan-forbidden.sh terms/good.md > /dev/null 2>&1); trc=$?
 expect_eq "term: clean files exit 0" 0 "$trc"
+printf 'a %s here\n' "$(tv 依 頼 者 の 判 断 が 必 要 で す)" > "$repo/terms/t10a.md"
+printf 'a %s here\n' "$(tv 判 断 を 仰 ぎ ま す)" > "$repo/terms/t10b.md"
+printf 'a %s here\n' "$(tv 確 認 さ せ て く だ さ い)" > "$repo/terms/t10d.md"
+printf 'a %s here\n' "$(tv 許 可 を く だ さ い)" > "$repo/terms/t10e.md"
+printf 'a %s here\n' "$(tv ど ち ら に し ま す か)" > "$repo/terms/t10g.md"
+printf 'a %s here\n' "$(tv 依 頼 者 に 確 認 し ま す)" > "$repo/terms/t10h.md"
+printf 'a %s here\n' "$(tv 依 頼 者 の 判 断 は 必 要 な い)" > "$repo/terms/t10j.md"
+printf 'a %s here\n' "$(tv 決 め る ま で 待 つ)" > "$repo/terms/t10k.md"
+printf 'a %s here\n' "$(tv 判 断 を 自 分 で 下 す)" > "$repo/terms/t10-ok.md"
+git -C "$repo" add -A > /dev/null 2>&1
+tout3=$(cd "$repo" && bash scripts/scan-forbidden.sh terms 2>&1)
+expect_contains "term T10a: the T10a phrase is found" "$tout3" "term	terms/t10a.md:1"
+expect_contains "term T10b: the T10b phrase is found" "$tout3" "term	terms/t10b.md:1"
+expect_contains "term T10d: the T10d phrase is found" "$tout3" "term	terms/t10d.md:1"
+expect_contains "term T10e: the T10e phrase is found" "$tout3" "term	terms/t10e.md:1"
+expect_contains "term T10g: the T10g phrase is found" "$tout3" "term	terms/t10g.md:1"
+expect_contains "term T10h: the T10h phrase is found" "$tout3" "term	terms/t10h.md:1"
+expect_contains "term T10k: the T10k phrase is found" "$tout3" "term	terms/t10k.md:1"
+expect_not_contains "term T10: a sentence without the phrase is not a finding" "$tout3" "terms/t10-ok.md"
+expect_contains "term T10j: the T10j phrase is found" "$tout3" "term	terms/t10j.md:1"
 for w in "$(tv 作業 木)" "$(tv 試 験)" "$(tv 依 頼 票)" "$(tv ユ ーザー)"; do
   if grep -qF -- "$w" "$ROOT/tests/harness/t04_scan.sh"; then fail "t04_scan.sh contains a term in one piece"; fi
 done
