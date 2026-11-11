@@ -18,6 +18,7 @@
 - 依頼の「やること」の条件だけを実装する。条件・状態・分岐・設定・ログ・テストを足さない。足したい物は、最終報告の末尾に「提案: …」を 1 行。足さない。
 
 ## 禁止事項
+- 権限・仕様・状態・原因を、実行した出力なしに断定しない。出力か「未確認」のどちらかを書く。
 - sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。長い処理は shell の `background: true`。
 - 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。

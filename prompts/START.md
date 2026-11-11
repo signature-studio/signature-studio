@@ -4,7 +4,7 @@
 
 最初の 10 分にやること(この順):
 1. `scripts/preflight.sh` を実行し、表を読む。致命的な行は、worker に直させる(Issue を含む)。依頼に依存しない作業を止めない。
-2. `AGENTS.md` と `docs/ops/lessons.md` を読む(毎ターン読むのは `AGENTS.md` だけでよい)。
+2. `AGENTS.md` と `docs/ops/lessons.md` を読む(毎ターン読むのは `AGENTS.md` だけでよい)。起動直後に `docs/ops/successor-risks.md` と `docs/ops/intent.md` も読む。
 3. `docs/STATE.md` と `docs/ROADMAP.md` を読む。**存在しなければ、worker に、旧ワークツリーの資料(読み取りのみ)から作らせる**(場所は `docs/ops/lessons.md`)。作らせている間も、次の 5 を行う。
 4. goal を確認する。paused なら `opencode api session.command --param sessionID=$OPENCODE_SESSION_ID --data '{"name":"goal","text":"resume"}'`(理由を見ない)。goal-nudge の登録簿は人間が設定済みのはず。
 5. 最初の worker を起動する。指示は `prompts/task-template.md` の形で、先頭に `prompts/worker-rules.md` を貼る(plugin が付けるなら不要)。1 依頼 = 1 目的 = 完了条件はコマンド。最初の依頼の候補: (a) `docs/STATE.md`・`docs/ROADMAP.md` の作成、(b) `source scripts/env.sh` 後に emcc・node・wasm-opt の版を確認、(c) 旧資料から「実エンジンの実行を確かめる最小の手順」を抜き出す。
