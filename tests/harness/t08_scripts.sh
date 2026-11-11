@@ -24,11 +24,11 @@ smp() { (cd "$repo" && env -u OPENCODE_SESSION_ID bash scripts/set-model-profile
 
 out=$(smp --dry-run haiku); rc=$?
 expect_eq "--dry-run exits 0" 0 "$rc"
-expect_contains "--dry-run shows what would change" "$out" "'haiku' changes these lines"
-expect_contains "--dry-run says nothing is written" "$out" "nothing written"
+expect_contains "--dry-run shows what would change" "$out" "次の内容に切り替えます"
+expect_contains "--dry-run says nothing is written" "$out" "何も書き換えていません"
 expect_eq "--dry-run left the file byte-identical" "$orig_hash" "$(md5sum "$repo/opencode.jsonc" | cut -d' ' -f1)"
 out=$(smp --dry-run split); rc=$?
-expect_eq "--dry-run split on a split file: exits 0" 0 "$rc"; expect_contains "(already the split profile)" "$out" "nothing to change"
+expect_eq "--dry-run split on a split file: exits 0" 0 "$rc"; expect_contains "(already the split profile)" "$out" "何も変えません"
 
 # a fake opencode that answers `debug agents` with the REAL resolver's output for the file in the repo copy, and `reload` with success.
 # To get real output for the rewritten file we resolve it in the isolated sandbox first (below), then point FAKE_OC_AGENTS at it.
@@ -60,9 +60,9 @@ if command -v opencode > /dev/null; then
   printf '%s' "[]" > "$sb/current-agents.json"
   out=$(cd "$repo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok PATH="$sb/wrapbin:$FAKE:$PATH" bash scripts/set-model-profile.sh haiku 2>&1); rc=$?
   expect_eq "with a post-check that finds no agents the script FAILS (exit 1)" 1 "$rc"
-  expect_contains "and says the post-check was not OK" "$out" "preflight agents row is not OK"
+  expect_contains "and says the post-check was not OK" "$out" "切り替えを取り消しました"
   expect_eq "and the ORIGINAL file is back, byte for byte" "$orig_hash" "$(md5sum "$repo/opencode.jsonc" | cut -d' ' -f1)"
-  expect_contains "and says it put the original back" "$out" "original opencode.jsonc was put back"
+  expect_contains "and says it put the original back" "$out" "元の状態に戻しました"
 
   # build the haiku file with the script's rewrite (python part), resolve it for real, then let the script run with that answer
   haiku_file="$sb/haiku.jsonc"
@@ -83,7 +83,7 @@ PY
   resolve_real "$haiku_file" > "$sb/current-agents.json"
   out=$(cd "$repo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok PATH="$sb/wrapbin:$FAKE:$PATH" bash scripts/set-model-profile.sh haiku 2>&1); rc=$?
   expect_eq "split -> haiku: exits 0 when the real resolution of the new file matches" 0 "$rc"
-  expect_contains "the post-check row is shown as OK" "$out" "preflight agents row:"
+  expect_contains "the switch is reported in plain words" "$out" "切り替えました"
   expect_eq "after haiku: every model is Haiku (file order: top, build, title, summary, worker, reviewer)" "$HAI $HAI#high $HAI#low $HAI#low $HAI#high $HAI#high" "$(models "$repo/opencode.jsonc")"
   expect_eq "the haiku file is the one predicted (only the model lines changed)" "$(md5sum < "$haiku_file")" "$(md5sum < "$repo/opencode.jsonc")"
   expect_eq "only model lines differ from the original (diff has exactly 2 changed lines: top and build)" 2 "$(diff "$sb/before.jsonc" "$repo/opencode.jsonc" 2> /dev/null | grep -c '^>' || true)"
@@ -115,7 +115,7 @@ fi
 
 # --- refuses inside a session
 out=$(cd "$repo" && OPENCODE_SESSION_ID=ses_abc bash scripts/set-model-profile.sh haiku 2>&1); rc=$?
-expect_eq "refuses to write inside an opencode session" 2 "$rc"; expect_contains "and says the owner runs it" "$out" "refusing to change the model profile from inside an opencode session"
+expect_eq "refuses to write inside an opencode session" 2 "$rc"; expect_contains "and says the owner runs it" "$out" "セッションの中からは切り替えられません"
 expect_eq "(file untouched)" "$orig_hash" "$(md5sum "$repo/opencode.jsonc" | cut -d' ' -f1)"
 out=$(cd "$repo" && OPENCODE_SESSION_ID=ses_abc bash scripts/set-model-profile.sh --dry-run haiku 2>&1); expect_eq "--dry-run is allowed inside a session" 0 "$?"
 # --- bad arguments and bad files
@@ -128,13 +128,13 @@ sed -i '0,/"resource": "sleep \*"/s//resource": "sleep *"/' "$broken/opencode.js
 bh=$(md5sum "$broken/opencode.jsonc" | cut -d' ' -f1)
 out=$(cd "$broken" && env -u OPENCODE_SESSION_ID bash scripts/set-model-profile.sh haiku 2>&1); rc=$?
 expect_eq "a file that is already invalid JSONC is refused (exit 2) before anything is written" 2 "$rc"
-expect_contains "and says it is not valid JSONC" "$out" "not valid JSONC before the change"
+expect_contains "and says it is not valid JSONC" "$out" "設定ファイルの形式が正しくありません"
 expect_eq "(and the file is untouched)" "$bh" "$(md5sum "$broken/opencode.jsonc" | cut -d' ' -f1)"
 odd="$sb/smp-odd"; make_repo_copy "$odd"; sed -i 's/^  "model": /  "mdl": /' "$odd/opencode.jsonc"
 oh=$(md5sum "$odd/opencode.jsonc" | cut -d' ' -f1)
 out=$(cd "$odd" && env -u OPENCODE_SESSION_ID bash scripts/set-model-profile.sh haiku 2>&1); rc=$?
 expect_eq "a layout it does not recognise (a model line is missing) exits 2, untouched" 2 "$rc"
-expect_contains "and says which model lines it expected" "$out" "expected 4 model lines"
+expect_contains "and says which model lines it expected" "$out" "6 か所"
 expect_eq "(untouched)" "$oh" "$(md5sum "$odd/opencode.jsonc" | cut -d' ' -f1)"
 expect_eq "the script reads no environment variable except OPENCODE_SESSION_ID and TMPDIR" "" "$(grep -v '^ *#' "$ROOT/scripts/set-model-profile.sh" | grep -oE '\$\{?[A-Z][A-Z_]{3,}[}:-]?' | tr -d '${}:-' | sort -u | grep -vE '^(OPENCODE_SESSION_ID|TMPDIR|BASH_SOURCE)$' | tr '\n' ' ')"
 

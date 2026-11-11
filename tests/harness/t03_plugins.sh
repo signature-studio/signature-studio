@@ -100,12 +100,12 @@ const gt = await load(gate, {
 const gev = (agent) => ({ tool: "read", agent, sessionID: "ses_x", input: {} })
 for (const [name, agent, model, want] of [
   ["build + Sonnet passes", "build", SON, null],
-  ["build + Haiku is rejected", "build", HAI, "pinned"],
-  ["build + other provider's Sonnet is rejected", "build", { providerID: "other", id: "claude-sonnet-5-5" }, "pinned"],
+  ["build + Haiku is rejected", "build", HAI, "ツールを止めました"],
+  ["build + other provider's Sonnet is rejected", "build", { providerID: "other", id: "claude-sonnet-5-5" }, "ツールを止めました"],
   ["worker + Haiku passes", "worker", HAI, null],
-  ["worker + Sonnet is rejected", "worker", SON, "pinned"],
+  ["worker + Sonnet is rejected", "worker", SON, "ツールを止めました"],
   ["reviewer + Haiku (variant differs) passes", "reviewer", { ...HAI, variant: "default" }, null],
-  ["reviewer + Sonnet is rejected", "reviewer", SON, "pinned"],
+  ["reviewer + Sonnet is rejected", "reviewer", SON, "ツールを止めました"],
   ["no stored session model passes (the agent's own model is used)", "worker", undefined, null],
   ["an ungated agent (compaction) passes", "compaction", SON, null],
 ]) { sessionModel = model; const m = await rejects(gt, gev(agent)); rec("gate: " + name, want === null ? m === null : m !== null && m.includes(want), m ? m.slice(0, 50) : "") }
@@ -117,7 +117,7 @@ rec("gate: profile haiku: build + Sonnet is rejected", (await rejects(gt, gev("b
 agentModels = { build: undefined, worker: HAI, reviewer: HAI }
 sessionModel = SON
 const nomodel = await rejects(gt, gev("build"))
-rec("gate: an agent without a model in the configuration is rejected visibly (config not loaded)", nomodel !== null && nomodel.includes("no model"), nomodel ? nomodel.slice(0, 50) : "passed")
+rec("gate: an agent without a model in the configuration is rejected visibly (config not loaded)", nomodel !== null && nomodel.includes("モデルが設定されていません"), nomodel ? nomodel.slice(0, 50) : "passed")
 
 // ---- statelessness: the same event gives the same answer twice, in any order
 sessionModel = SON; agentModels = { build: SON, worker: HAI, reviewer: HAI }

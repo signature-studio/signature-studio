@@ -29,37 +29,52 @@ if ! command -v opencode > /dev/null; then
 elif ! agents_json=$(opencode debug agents 2> /dev/null) || ! jq -e 'type=="array"' > /dev/null 2>&1 <<< "$agents_json"; then
   row agents FAIL "opencode debug agents failed or returned no list (run it by hand and read the error)"
 else
-  python3 - "$root/opencode.jsonc" << 'PY' > "${TMPDIR:-/tmp}/preflight-expect.$$" 2> /dev/null || echo "{}" > "${TMPDIR:-/tmp}/preflight-expect.$$"
+  # The effective model lines: opencode.jsonc with the local override (.opencode/opencode.jsonc, git-ignored) applied on top.
+  python3 - "$root/opencode.jsonc" "$root/.opencode/opencode.jsonc" << 'PY' > "${TMPDIR:-/tmp}/preflight-expect.$$" 2> /dev/null || echo "{}" > "${TMPDIR:-/tmp}/preflight-expect.$$"
 import json, re, sys
-t = open(sys.argv[1], encoding="utf-8").read()
-out, i, n, ins = [], 0, len(t), False
-while i < n:
-    c = t[i]
-    if ins:
-        out.append(c)
-        if c == "\\":
-            out.append(t[i + 1]); i += 2; continue
-        if c == '"': ins = False
-        i += 1; continue
-    if c == '"': ins = True; out.append(c); i += 1; continue
-    if t.startswith("//", i):
-        while i < n and t[i] != "\n": i += 1
-        continue
-    if t.startswith("/*", i):
-        i = t.index("*/", i + 2) + 2; continue
-    out.append(c); i += 1
-d = json.loads(re.sub(r",(\s*[}\]])", r"\1", "".join(out)))
-print(json.dumps({a: d["agents"][a].get("model", "") for a in ("build", "worker", "reviewer")}))
+def load(path):
+    t = open(path, encoding="utf-8").read()
+    out, i, n, ins = [], 0, len(t), False
+    while i < n:
+        c = t[i]
+        if ins:
+            out.append(c)
+            if c == "\\":
+                out.append(t[i + 1]); i += 2; continue
+            if c == '"': ins = False
+            i += 1; continue
+        if c == '"': ins = True; out.append(c); i += 1; continue
+        if t.startswith("//", i):
+            while i < n and t[i] != "\n": i += 1
+            continue
+        if t.startswith("/*", i):
+            i = t.index("*/", i + 2) + 2; continue
+        out.append(c); i += 1
+    return json.loads(re.sub(r",(\s*[}\]])", r"\1", "".join(out)))
+d = load(sys.argv[1])
+want = {"top": d.get("model", ""), **{a: d["agents"][a].get("model", "") for a in ("build", "worker", "reviewer", "title", "summary")}}
+try:
+    o = load(sys.argv[2])
+    if "model" in o: want["top"] = o["model"]
+    for a, v in (o.get("agents") or {}).items():
+        if isinstance(v, dict) and "model" in v and a in want: want[a] = v["model"]
+except FileNotFoundError:
+    pass
+print(json.dumps(want))
 PY
   expect_file="${TMPDIR:-/tmp}/preflight-expect.$$"
   problems=$(jq -r --slurpfile exp "$expect_file" '
     def m: if .model == null then "" else (.model.providerID + "/" + .model.id + (if .model.variant then "#" + .model.variant else "" end)) end;
     ([.[] | .id] | sort) as $ids
     | ($exp[0]) as $e
+    | ([$e.top, $e.build, $e.worker, $e.reviewer, $e.title, $e.summary] | map(select(. != null and . != "") | split("/")[0]) | unique) as $provs
     | [ (if $ids != ["build","compaction","reviewer","summary","title","worker"] then "agent ids are [" + ($ids | join(",")) + "], expected [build,compaction,reviewer,summary,title,worker]" else empty end),
-        (.[] | select(.id == "build" or .id == "worker" or .id == "reviewer") | . as $a
-          | if ($e[$a.id] // "") == "" then "opencode.jsonc has no model for " + $a.id
-            elif ($a | m) != $e[$a.id] then $a.id + " model is \"" + ($a | m) + "\", opencode.jsonc says \"" + $e[$a.id] + "\"" else empty end),
+        (.[] | select(.id == "build" or .id == "worker" or .id == "reviewer" or .id == "title" or .id == "summary") | . as $a
+          | if ($e[$a.id] // "") == "" then "no model set for " + $a.id
+            elif ($a | m) != $e[$a.id] then $a.id + " model is \"" + ($a | m) + "\", the configuration says \"" + $e[$a.id] + "\"" else empty end),
+        (if ($provs | length) > 1 then "the six model settings use more than one provider (" + ($provs | join(", ")) + ")" else empty end),
+        (if ([$e.worker, $e.reviewer, $e.title, $e.summary] | map((. // "") | test("claude-haiku-5-5")) | all) then empty
+          else "サブエージェントの作業用・検証用、表題、要約のどれかが Haiku 5.5 ではありません" end),
         (.[] | select(.id == "build") | if ([.permissions[] | select(.action == "*" and .effect == "deny")] | length) == 0 then "build has no `* deny` rule (the main session is not restricted)" else empty end),
         (.[] | select(.id == "worker") | if ([.permissions[] | select(.action == "shell" and .resource == "sleep *" and .effect == "deny")] | length) == 0 then "worker has no `sleep *` deny" else empty end),
         (.[] | select(.id == "reviewer") | if ([.permissions[] | select(.action == "edit" and .effect == "deny")] | length) == 0 then "reviewer can edit" else empty end)
@@ -69,7 +84,7 @@ PY
     row agents FAIL "$(printf '%s' "$problems" | paste -sd';' - | cut -c1-300). The configuration may have been silently dropped: check opencode.jsonc for a missing quote or comma."
   else
     summary=$(jq -r '[.[] | select(.id == "build" or .id == "worker" or .id == "reviewer") | .id + "=" + (.model.id // "?") + "#" + (.model.variant // "")] | join(" ")' <<< "$agents_json")
-    row agents OK "ids build,compaction,reviewer,summary,title,worker; $summary; no general/explore/plan"
+    row agents OK "ids build,compaction,reviewer,summary,title,worker; $summary; six settings on one provider; no general/explore/plan"
   fi
 fi
 

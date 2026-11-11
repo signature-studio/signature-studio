@@ -50,6 +50,10 @@ tmp/
 *.msi
 *.tar.gz
 
+# this machine's model override (scripts/set-model-profile.sh --provider bedrock). The plugins under .opencode/ stay tracked.
+.opencode/opencode.jsonc
+.opencode/opencode.json
+
 # environment files (the example is allowed)
 .env
 .env.*
