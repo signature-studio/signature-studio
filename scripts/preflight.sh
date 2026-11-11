@@ -181,6 +181,18 @@ else
   row scan FAIL "$(printf '%s\n' "$scan" | grep -c . | tr -d ' ') line(s) of findings. Run scripts/scan-forbidden.sh; fix the files (values are not printed)"
 fi
 
+# 9b. consistency: documents that disagree with the repository (scripts/check-consistency.sh). A finding is a WARN, never a FAIL.
+if cons=$(bash "$root/scripts/check-consistency.sh" 2> /dev/null); then
+  cons_n=$(printf '%s\n' "$cons" | tail -1 | grep -oE '[0-9]+' | head -1)
+  if [ "${cons_n:-1}" -eq 0 ]; then
+    row consistency OK "0 finding(s) in the documents (scripts/check-consistency.sh)"
+  else
+    row consistency WARN "${cons_n} finding(s): fix them in this round (scripts/check-consistency.sh; first rows: $(printf '%s\n' "$cons" | sed -n '2,3p' | tr -s ' ' | paste -sd';' - | cut -c1-200))"
+  fi
+else
+  row consistency WARN "scripts/check-consistency.sh did not run (see the script)"
+fi
+
 # 10. goal and goal-nudge ---------------------------------------------------------------------------------------------
 sid="${OPENCODE_SESSION_ID:-}"
 if [ -z "$sid" ]; then

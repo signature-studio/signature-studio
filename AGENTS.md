@@ -27,6 +27,7 @@
 2. `scripts/preflight.sh` の goal 行が paused なら `opencode api session.command --param sessionID=$OPENCODE_SESSION_ID --data '{"name":"goal","text":"resume"}'`(理由は見ない)。permission に拒否されたら迂回せず、報告に「goal paused。goal-nudge の再開を待つ」と 1 行書き、worker の起動は続ける。
 3. 完了通知を受けた worker は、`git -C <ワークツリー> status --short` と `git diff --stat` を見るまで「完了」と書かない。エラー・キャンセルの子を再開する前も同じ。
 4. 最後の行は「次に動く物: ses_…」(1 の出力の行から)。書けなければ 1 に戻る。
+5. `scripts/preflight.sh` の consistency 行が WARN なら、その回に、その物を直す worker を起動する。
 確かめ方: 最後のツール呼び出しが `session.active`。稼働数を記憶や更新時刻から書かない。
 
 ## 3 禁止文(書きかけたら、右の行動に置き換える)
