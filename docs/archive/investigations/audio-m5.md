@@ -311,7 +311,7 @@ Execute(this):
    - **`Device name` の既定が `"FL Studio ASIO"`**(0x1252f54。保存設定が無いときの既定値)。**ASIO が一覧に無ければ一致せず添字 0** になる。添字 0 が何か: 一覧の先頭。`f_c55ad0` が 0 件なら先頭は DS の最初のデバイス(`DirectSoundEnumerateA` の最初のコールバック = "Primary Sound Driver"、GUID NULL)。**DirectSoundEnumerateA が 1 件も呼ばなければ一覧は空 + "(none)" 要素のみ**。
    - **`f_1369da0`**: デバイス名が "FL Studio ASIO" のとき "Your audio device is set to FL Studio ASIO. This can cause inaccurate MIDI sync…" の注意を出す(実測の文字列)。FL Studio ASIO が**既定として想定されている製品の挙動**の証拠(読み)。
    - **ASIO が選ばれたときのコードの量**(`f_c589b0` 19.6 KB、`f_c57a00` 3.1 KB、`f_c56ae0` 2.3 KB)は DS(`f_12afb50` 0.6 KB + `f_12af5c0` 0.8 KB + `f_12aeec0` 0.9 KB)の約 10 倍。ASIO を要求すると**ブラウザ側が 2 本目のスレッド(ドライバーのスレッド)と COM のサーバー(`IASIO` の 24 スロットの vtable、`IClassFactory`)を要する**。
-3. **ILWASAPI2ASIO_x64.dll**: `lift/out-inventory/extracted/` には **無い**(`ILTools_x64.dll` と `fonts/` だけ)。インストーラ exe(`flstudio_win64_26.1.7.5653.exe`、1.1 GB、PE)がユーザーのダウンロード先にあるが、**展開は試していない**(`7z l` は型が PE と出ただけで、内部の一覧は出なかった)。**入手できていない**。既存調査(`host-engine-boundary.md` 56 行、`m2-inventory.md` 217 行)が 531,456 B の COM サーバー DLL と記録している(引用)。
+3. **ILWASAPI2ASIO_x64.dll**: `lift/out-inventory/extracted/` には **無い**(`ILTools_x64.dll` と `fonts/` だけ)。インストーラ exe(`flstudio_win64_26.1.7.5653.exe`、1.1 GB、PE)が依頼者のダウンロード先にあるが、**展開は試していない**(`7z l` は型が PE と出ただけで、内部の一覧は出なかった)。**入手できていない**。既存調査(`host-engine-boundary.md` 56 行、`m2-inventory.md` 217 行)が 531,456 B の COM サーバー DLL と記録している(引用)。
 
 ## 5. 協調スレッド(決定 0122)で走らせたときの落とし穴(読み)
 

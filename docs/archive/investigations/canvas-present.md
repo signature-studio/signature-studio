@@ -224,7 +224,7 @@
   - Chrome 自身が他のホスト(`accounts.google.com`、`www.google.com`、`update.googleapis.com`)へ起こした URL 要求は、全部 net error −102(接続拒否)で終わった(名前は `127.0.0.1:9` に写される)。
 - **決定 0124 の PM の基準(TCP 非ループバック 0、UDP の送信パケット 0)は満たした**。**「UDP の `connect()` を 1 回も出さない」は満たしていない**(決定 0124 と同じ状況: `--disable-ipv6` ほか各種のフラグでも消えなかった。この作業で追加の試みはしていない)。
 - **取得モードを `Default` にした理由と限界**: 最初の実行は `Everything` で、`rate` の net-log だけで 992 MB になり(応答の本体まで記録される)、検査スクリプトが文字列に読み込めず落ちた。work dir も 1.6 GB まで膨らんだ。`Default`(応答の本体を取らない)に変えた。`Default` のログは TCP / UDP の接続試行と `UDP_BYTES_SENT` を記録する。**`Everything` との比較**: `pngdecode` と `suspend` の 2 フェーズだけ `Everything` で取り直して同じ検査をした(TCP 非ループバック 0、UDP_BYTES_SENT 0)。`Everything` の `suspend` は 225 MB で、検査後に削除した。
-- **ユーザーのブラウザのプロファイル・資格情報には触れていない**。`~/.config/google-chrome/` を Chrome が更新しうること(決定 0124 の注)は確認していない。`--disable-breakpad` と `--crash-dumps-dir` は使い捨てプロファイルの下に向けた。
+- **依頼者のブラウザのプロファイル・資格情報には触れていない**。`~/.config/google-chrome/` を Chrome が更新しうること(決定 0124 の注)は確認していない。`--disable-breakpad` と `--crash-dumps-dir` は使い捨てプロファイルの下に向けた。
 
 ## 10. 限界・未確認
 
