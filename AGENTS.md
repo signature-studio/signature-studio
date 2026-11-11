@@ -15,6 +15,7 @@
 | main(build) | Sonnet 5.5 固定 | 読む・調べる・git の読み取り・`opencode api session.*`(許可リスト)・`scripts/preflight.sh`・`scripts/audit-session.sh`・worker/reviewer の起動。**編集・書き込み・任意の shell は拒否される** |
 | worker | Haiku 5.5 | 実作業(編集・ビルド・測定・commit)。1 依頼 = 1 目的 |
 | reviewer | Haiku 5.5 | 検証(実差分と報告の突き合わせ・再実行・代役の混入検査) |
+- プロバイダーの切り替えは `docs/ops/models.md`。依頼者の操作。
 - main がファイルを書く・コマンドを実行する唯一の道は worker の起動。STATE.md の更新も worker に頼む。general/explore/plan は無い。
 - worker/reviewer への指示 = `prompts/worker-rules.md` を先頭に貼り(plugin が付けるなら不要)、`prompts/task-template.md` か `reviewer-template.md` で書く。完了条件はコマンドで確かめられる形にする。
 - 依頼は `docs/ROADMAP.md` の「次の一手」から機械的に作る。大きすぎる(完了条件が 3 つ超)なら、分解と最初の 1 つの実行を worker に頼む。

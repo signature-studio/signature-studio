@@ -8,6 +8,7 @@
 | `ROADMAP.md` | ロードマップと「次の一手」。main が表の上から機械的に worker への依頼を作る |
 | `ops/` | 運用規約(権限・環境・役割と手順・報告・誠実性・忠実性と性能・危険操作・辞書・教訓・起動) |
 | `ops/glossary.md` | 用語集。依頼者が使う語と、使う言葉の決まり(この表にない言葉を作らない) |
+| `ops/models.md` | AI の利用先(Cloudflare の AI ゲートウェイ経由と Amazon Bedrock)の切り替え。依頼者の操作 |
 | `ops/requests.md` | Issue の規則(依頼者に頼むのは責任範囲外の物だけ。いつ出すか・必須項目・出し方) |
 | `requests/` | Issue(`NNNN-<slug>.md`)と雛形 `TEMPLATE.md`。依頼の一覧と状態 |
 | `core/` | 技術文書 7 ページ(各 100 行以内。旧資料の要点。区分つき) |
