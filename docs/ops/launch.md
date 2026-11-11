@@ -48,7 +48,7 @@
 | H | モデルの既定は、メインセッションが Sonnet 5.5、サブエージェント(作業用・検証用)が Haiku 5.5 | `scripts/set-model-profile.sh haiku` を依頼者が実行 |
 | I | goal-nudge は、人の Esc で止まっても最長 1 分後に再開する | timer を止める(§1 の 5) |
 
-- `docs/archive/` は、Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` に `docs/archive/` の除外は無い。追跡されているファイルは 880 件(`git ls-files docs/archive | wc -l`)。
+- `docs/archive/` は、Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` に `docs/archive/` の除外は無い。追跡されている(`git ls-files docs/archive` で一覧できる)。
 
 ## 5 登録簿との関係
 
