@@ -259,7 +259,7 @@ gdb の測定は、18:15 ビルドの `lift/out-stage2/two/v-tbl2/native/two-nat
 (b) の (a)（NULL 許容）と (b)（NULL の経路が自然）を満たす Windows の DLL は avrt、powrprof、psapi、iphlpapi、fwpuclnt、normaliz、wship6、idndl の 8 名。ほかの 4 名（riched20、urlmon、ws2_32、mswsock）は (a) か (b) を満たさない。
 
 そのうち (c)（環境の定義との矛盾）:
-- avrt、powrprof、iphlpapi、fwpuclnt、normaliz: Learn の Requirements 欄から Windows 10 にある（導出）。**「無い」と定義すると導出と矛盾する**。これは、決定 0015 の 9 名のうち dwmapi と shcore が、同じ導出では Windows 10 にあることになるのに absent にされている件（`external-modules-usage.md` §2.3 が指摘済み。PM の判断）と同じ形。
+- avrt、powrprof、iphlpapi、fwpuclnt、normaliz: Learn の Requirements 欄から Windows 10 にある（導出）。**「無い」と定義すると導出と矛盾する**。これは、決定 0015 の 9 名のうち dwmapi と shcore が、同じ導出では Windows 10 にあることになるのに absent にされている件（`external-modules-usage.md` §2.3 が指摘済み。未決）と同じ形。
 - psapi: 導出が弱い。しかも到達しない見込み。
 - idndl: Windows 10 の標準ではない（Learn の記述）。「無い」と定義しても Learn と矛盾しないが、「無い」とページが言うわけでもない。
 - wship6: 一次に無い（有る、無いのどちらも言えない）。
@@ -295,7 +295,7 @@ RegCreateKeyExW を過ぎた後の LoadLibrary の順序は**測定していな�
 
 `init_count` 942 のうち、DllMain の後の最初の停止は unit 145。`mswsock` と `ws2_32` は同じ関数群（`f_c079e0`、`f_c12ab0`）で、起動の unit からは lea 経由の辺しか無い。
 
-## 8. 意見（別枠。決めない。PM の判断の材料）
+## 8. 意見（別枠。決めない。PM の決定の材料）
 
 この節は作業者の意見で、事実の節ではない。
 

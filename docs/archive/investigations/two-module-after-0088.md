@@ -166,7 +166,7 @@ funcs  : executed (distinct)=821  entries=15685
 - **ゲストが実機と違う経路を通る**: 実機の Windows 10 では avrt、PowrProf の関数が存在し `GetProcAddress` は非 NULL を返す。この runtime（決定 0088）では NULL なので、ゲストは「機能が無い」経路を通る（決定 0088 の「限界」）。この実行は、その経路で先へ進めることを示すだけで、実機の挙動の再現ではない。
 - 実機 Windows での挙動は未確認（ホストは Linux）。
 - gdb は読み取りだけ。DllMain の戻り（0x1）は 0087 後と同じ値で、決定 0088 は DllMain の前に効かない（avrt は DllMain の後）。
-- a4 の行の 146 → 150 は、unit 145 が完了し 146〜149 が started になったことを示す。**init_count が動いたのは決定 0071（10-23 00:18、115 → 145）以来**という `docs/progress.md` の指標の文脈では、2 モジュール構成の init_count 146 → 150 は「停止点の移動」であり、FLEngine 単独構成（145 のまま）の進捗ではない。PM が progress.md に書くときの扱いは PM の判断（この文書は書かない）。
+- a4 の行の 146 → 150 は、unit 145 が完了し 146〜149 が started になったことを示す。**init_count が動いたのは決定 0071（10-23 00:18、115 → 145）以来**という `docs/progress.md` の指標の文脈では、2 モジュール構成の init_count 146 → 150 は「停止点の移動」であり、FLEngine 単独構成（145 のまま）の進捗ではない。progress.md に書くときの扱いは未決（この文書は書かない）。
 - wasm は使っていない（native のみ）。
 
 ## 8. 作ったファイル

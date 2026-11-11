@@ -121,7 +121,7 @@ user32: MessageBoxA、GetPhysicalCursorPos、SetPhysicalCursorPos、IsProcessDPI
 kernel32: GetLogicalProcessorInformation、GetNativeSystemInfo、GetSystemDefaultLocaleName、GetUserPreferredUILanguages、LocaleNameToLCID、GetFinalPathNameByHandleW、NormalizeString。
 advapi32: RegDeleteKeyExW。wtsapi32: WTSRegisterSessionNotification。rpcrt4: UuidCreate。uxtheme: BufferedPaintInit。DWMAPI: DwmIsCompositionEnabled。Shcore: GetProcessDpiAwareness、GetDpiForMonitor。
 
-delay import は 57 スロットあり、閉包で thunk になっているのは上の 18 件（実測）。delay の扱い方（ヘルパーを実行するか、API ごとに応答するか）は、設計の判断が要る（§5 の D5）。
+delay import は 57 スロットあり、閉包で thunk になっているのは上の 18 件（実測）。delay の扱い方（ヘルパーを実行するか、API ごとに応答するか）は未決（§5 の D5）。
 
 ## 2. IAT 経由 jmp 378 件の系統分類（実測。分類の境界は私の判断）
 
@@ -319,23 +319,23 @@ SSE 117、MMX 40、AVX/VEX 18、整数 34、システム 8。計 217。
 - 例外 1（lib.rs）: 命令の単位は、`lift/crates/fe-lift/src/lib.rs` に `mod` 1 行と `if let` 4 行を足す（既存の 12 モジュール（cpuid、x87ctl など）と同じ形）。これは「新規ファイルのみ」の例外で、複数の命令の単位を同時に起動すると、lib.rs で衝突する。集約者が最後に 1 回で入れるか、先に 1 単位が登録口を作ってから始める必要がある。
 - 例外 2（imports_table.rs）: TABLE は 1 つの定数なので、行の追加は 1 か所に集中する。複数の単位が同時に同じ場所へ追記すると衝突する。各単位は行を自分の新規ファイル（例: `docs/` の提案メモ）に書いて出し、集約者が 1 回で追記するのが安全。
 - 生成 C のビルド（`build.sh` の `EXTRA_RT`）は、出力ディレクトリごとにある。単位ごとに自分の出力ディレクトリを使う。
-- 仕様確認の難しさの区分: 「公式で決まる」＝ Microsoft Learn の API ページ（API）、Intel SDM（命令）で値が決まる。「判断が必要」＝ 仕様が決めない値の選択がある。命令の仕様は、これまでの波では felixcloutier の転載（非公式）を読み、公式 PDF は未取得だった（`x87ctl-run.md` §8）。
+- 仕様確認の難しさの区分: 「公式で決まる」＝ Microsoft Learn の API ページ（API）、Intel SDM（命令）で値が決まる。「未決」＝ 仕様が決めない値の選択がある。命令の仕様は、これまでの波では felixcloutier の転載（非公式）を読み、公式 PDF は未取得だった（`x87ctl-run.md` §8）。
 
 ### 5.1 API の単位（runtime は新規 `fle_<名前>.c/.h`、行の追加は `imports_table.rs`）
 
 | ID | 対象 | API 数 / thunk | 触るファイル | 仕様確認 |
 |---|---|---|---|---|
-| A1 | kernel32 プロセス・スレッドの単純なもの: GetCurrentProcess、GetCurrentProcessId、GetCurrentThread、SetLastError、SetErrorMode、SetThreadErrorMode、SetPriorityClass、SetThreadPriority、SwitchToThread、OutputDebugStringW、ExitProcess、TerminateProcess、RaiseException | 13 / 13 | 新規 `fle_proc.c/.h`、表に 13 行 | 大半は公式で決まる（擬似ハンドル -1、-2 など）。ExitProcess、TerminateProcess、RaiseException は、ホストを止めるか、`fle_stop` で止めるかの判断が要る。ExitProcess（深さ 2）は CRT の終了経路にある可能性（推測） |
+| A1 | kernel32 プロセス・スレッドの単純なもの: GetCurrentProcess、GetCurrentProcessId、GetCurrentThread、SetLastError、SetErrorMode、SetThreadErrorMode、SetPriorityClass、SetThreadPriority、SwitchToThread、OutputDebugStringW、ExitProcess、TerminateProcess、RaiseException | 13 / 13 | 新規 `fle_proc.c/.h`、表に 13 行 | 大半は公式で決まる（擬似ハンドル -1、-2 など）。ExitProcess、TerminateProcess、RaiseException は、ホストを止めるか、`fle_stop` で止めるかが未決。ExitProcess（深さ 2）は CRT の終了経路にある可能性（推測） |
 | A2 | kernel32 リソース: FindResourceW、LoadResource、LockResource、SizeofResource（+ user32 LoadStringW） | 5 / 5 | 新規 `fle_res.c/.h`、表に 5 行 | 公式で決まる（PE のリソースディレクトリ形式は公式の PE 仕様、LoadStringW のテーブル形式は Microsoft Learn と PE 仕様）。イメージはメモリ上に等位置で載っているので、読み取りは実装できる見込み（推測）。入力は 0x400000 の `.rsrc` |
-| A3 | kernel32 グローバルメモリ・アトム・文字列: GlobalAlloc、GlobalFree、GlobalLock、GlobalUnlock、AddAtomW、DeleteAtom、FindAtomW、GlobalAddAtomW、GlobalFindAtomW、MulDiv、lstrlenW | 11 / 11 | 新規 `fle_glob.c/.h`、表に 11 行 | 主に公式で決まる（MulDiv の丸めと -1 の返り方、アトムの範囲 0xC000 以上）。GMEM_MOVEABLE のハンドルの表現は判断が要る（ハンドル値の選び方）。アトムの大文字小文字の扱いは、公式ページで要確認 |
-| A4 | kernel32 時刻・日付: DosDateTimeToFileTime、FileTimeToDosDateTime、FileTimeToSystemTime（変換だけ。公式で決まる）、FileTimeToLocalFileTime、LocalFileTimeToFileTime、SystemTimeToTzSpecificLocalTime、GetTimeZoneInformation、GetLocalTime、GetDateFormatW | 9 / 9 | 新規 `fle_time.c/.h`、表に 9 行 | 変換 3 件は公式で決まる。タイムゾーン、現在時刻の源（`fle_sys` の仮想クロック、`fle_vfs` の仮想時計のどちらか）、日付の書式は判断が要る |
+| A3 | kernel32 グローバルメモリ・アトム・文字列: GlobalAlloc、GlobalFree、GlobalLock、GlobalUnlock、AddAtomW、DeleteAtom、FindAtomW、GlobalAddAtomW、GlobalFindAtomW、MulDiv、lstrlenW | 11 / 11 | 新規 `fle_glob.c/.h`、表に 11 行 | 主に公式で決まる（MulDiv の丸めと -1 の返り方、アトムの範囲 0xC000 以上）。GMEM_MOVEABLE のハンドルの表現は未決（ハンドル値の選び方）。アトムの大文字小文字の扱いは、公式ページで要確認 |
+| A4 | kernel32 時刻・日付: DosDateTimeToFileTime、FileTimeToDosDateTime、FileTimeToSystemTime（変換だけ。公式で決まる）、FileTimeToLocalFileTime、LocalFileTimeToFileTime、SystemTimeToTzSpecificLocalTime、GetTimeZoneInformation、GetLocalTime、GetDateFormatW | 9 / 9 | 新規 `fle_time.c/.h`、表に 9 行 | 変換 3 件は公式で決まる。タイムゾーン、現在時刻の源（`fle_sys` の仮想クロック、`fle_vfs` の仮想時計のどちらか）、日付の書式は未決 |
 | A5 | kernel32 ファイル・ボリュームの残り: GetStdHandle、GetDriveTypeW、GetLogicalDrives、GetLogicalDriveStringsW、GetVolumeInformationW、QueryDosDeviceW、DuplicateHandle | 7 / 7 | 新規 `fle_vol.c/.h`、表に 7 行 | 戻り値の形式は公式で決まる。ドライブ構成（`C:\` だけ）は `fle_vfs.h` の「空の `C:\`」に合わせる判断。DuplicateHandle、GetStdHandle は `fle_vfs.c` のハンドル表（static）に触れる可能性があり、`fle_vfs.c` を触らずに済むかは未確認 |
-| A6 | kernel32 ライブラリロード: LoadLibraryA、LoadLibraryW、LoadLibraryExW、FreeLibrary、SetDllDirectoryW | 5 / 7 | 新規 `fle_load.c/.h`、表に 5 行 | 戻り値は公式で決まるが、どの DLL を「ある」とするかは判断が要る。`fle_modules.c` の仮想モジュール表（決定 0015）と整合させる必要がある（読んでの確認は部分的） |
+| A6 | kernel32 ライブラリロード: LoadLibraryA、LoadLibraryW、LoadLibraryExW、FreeLibrary、SetDllDirectoryW | 5 / 7 | 新規 `fle_load.c/.h`、表に 5 行 | 戻り値は公式で決まるが、どの DLL を「ある」とするかは未決。`fle_modules.c` の仮想モジュール表（決定 0015）と整合させる必要がある（読んでの確認は部分的） |
 | A7 | oleaut32: SysAllocStringLen、SysFreeString、SysReAllocStringLen、VariantInit、VariantClear、VariantCopy、VariantCopyInd、SafeArrayCreate、SafeArrayGetLBound、SafeArrayGetUBound、SafeArrayPtrOfIndex | 11 / 11 | 新規 `fle_oleaut.c/.h`、表に 11 行 | BSTR（長さの前置）と VARIANT、SAFEARRAY の配置は公式に定義がある。VariantClear が COM オブジェクトの Release を呼ぶ形（ゲストの関数ポインタの呼び出し）は、ゲスト関数を runtime から呼ぶ仕組みが要る。**ゲスト呼び出しの設計が要る** |
 | A8 | ole32: CoInitialize、OleInitialize、CoTaskMemFree、IsEqualGUID、CLSIDFromString、StringFromCLSID | 6 / 6 | 新規 `fle_ole.c/.h`、表に 6 行 | 公式で決まる（GUID の文字列形式）。CoTaskMemFree は CoTaskMemAlloc がこの閉包にないので、解放対象の由来を確認する必要がある（未確認） |
-| A9 | user32 の窓なし部分: CharLowerW、CharLowerBuffW、CharUpperW、CharUpperBuffW、CharNextW、SetRect、IntersectRect、OffsetRect、UnionRect、RegisterWindowMessageW、RegisterClipboardFormatW、GetClipboardFormatNameW | 12 / 13 | 新規 `fle_user_nowin.c/.h`、表に 12 行 | RECT 4 件は公式で決まる。登録系 3 件は 0xC000 以上の値の割り当て（公式で範囲が決まる）。CharXxx の ASCII 外の変換は、Windows のロケール依存で、`fle_env.h` は ASCII のみの折り畳みと明記している。ASCII 外をどうするかは判断が要る |
-| A10 | winmm: midiInGetNumDevs、midiOutGetNumDevs、midiInGetDevCapsW、midiOutGetDevCapsW、midiOutGetErrorTextW、midiOutOpen、midiOutShortMsg、timeBeginPeriod、timeEndPeriod、timeGetDevCaps | 10 / 10 | 新規 `fle_winmm.c/.h`、表に 10 行 | 戻り値の名前（MMSYSERR_*）は公式。MIDI デバイスが 0 台、timeGetDevCaps の最小・最大値は判断が要る |
-| A11 | 「仮想環境が何を主張するか」の判断の束: shell（SHGetFolderPathW ×2 スロット、SHGetMalloc、PathCleanupSpec、ShellExecuteW、ShellExecuteExW）、version（3）、advapi32 トークン（2）、wininet（6）、crypt32・wintrust（8）、dsound・msacm32（3）、ロケール系の残り（EnumCalendarInfoW、EnumSystemLocalesW、FormatMessageW、GetComputerNameExW） | 32 / 32（SHGetFolderPathW が 2 スロットで 2 API 分） | 新規ファイル群（系統ごと）、表に行 | 戻り値の形は公式。ただし、「ネットワークなし」「デバイスなし」「署名検証の結果」「フォルダのパス」などの中身は、すべて判断が要る。**PM の判断が先に要る**。EnumCalendarInfoW、EnumSystemLocalesW はコールバックがあり、A7 と同じゲスト呼び出しの仕組みが要る |
+| A9 | user32 の窓なし部分: CharLowerW、CharLowerBuffW、CharUpperW、CharUpperBuffW、CharNextW、SetRect、IntersectRect、OffsetRect、UnionRect、RegisterWindowMessageW、RegisterClipboardFormatW、GetClipboardFormatNameW | 12 / 13 | 新規 `fle_user_nowin.c/.h`、表に 12 行 | RECT 4 件は公式で決まる。登録系 3 件は 0xC000 以上の値の割り当て（公式で範囲が決まる）。CharXxx の ASCII 外の変換は、Windows のロケール依存で、`fle_env.h` は ASCII のみの折り畳みと明記している。ASCII 外をどうするかは未決 |
+| A10 | winmm: midiInGetNumDevs、midiOutGetNumDevs、midiInGetDevCapsW、midiOutGetDevCapsW、midiOutGetErrorTextW、midiOutOpen、midiOutShortMsg、timeBeginPeriod、timeEndPeriod、timeGetDevCaps | 10 / 10 | 新規 `fle_winmm.c/.h`、表に 10 行 | 戻り値の名前（MMSYSERR_*）は公式。MIDI デバイスが 0 台、timeGetDevCaps の最小・最大値は未決 |
+| A11 | 「仮想環境が何を主張するか」の判断の束: shell（SHGetFolderPathW ×2 スロット、SHGetMalloc、PathCleanupSpec、ShellExecuteW、ShellExecuteExW）、version（3）、advapi32 トークン（2）、wininet（6）、crypt32・wintrust（8）、dsound・msacm32（3）、ロケール系の残り（EnumCalendarInfoW、EnumSystemLocalesW、FormatMessageW、GetComputerNameExW） | 32 / 32（SHGetFolderPathW が 2 スロットで 2 API 分） | 新規ファイル群（系統ごと）、表に行 | 戻り値の形は公式。ただし、「ネットワークなし」「デバイスなし」「署名検証の結果」「フォルダのパス」などの中身は、すべて未決。**PM の決定が先に要る点**。EnumCalendarInfoW、EnumSystemLocalesW はコールバックがあり、A7 と同じゲスト呼び出しの仕組みが要る |
 | A12 | imagehlp!ImageNtHeader | 1 / 1 | 新規 `fle_imagehlp.c`、表に 1 行 | 公式で決まる（ベースから IMAGE_NT_HEADERS へのポインタ。e_lfanew を読む） |
 | A13 | kernel32 メモリ保護・ファイルマッピング: VirtualProtect、VirtualQuery、CreateFileMappingW、MapViewOfFile、UnmapViewOfFile | 5 / 5 | 新規 `fle_vmap.c/.h`、表に 5 行 | 戻り値と構造体（MEMORY_BASIC_INFORMATION）は公式で決まる。`fle_sys.c` の VirtualAlloc の領域表（static の `fle_region`）を読む必要があり、`fle_sys.c` を触らずに済むかは未確認。マッピング対象のファイルは `fle_vfs.c` のハンドル（static）に依存する可能性があり、**他の単位と共有状態の整合が要る** |
 
@@ -359,17 +359,17 @@ SSE 117、MMX 40、AVX/VEX 18、整数 34、システム 8。計 217。
 |---|---|---|---|
 | V1 | SSE2 の xmm 整数パック: Pshuflw 16、Psllw 12、Packssdw 10、Psrlw 8、Paddusb 6、Pmaxsw 6、Pminsw 6、Pmulhw 6、Pmullw 6、Psubsw 4、Psubusb 3、Pshufhw 2、Psrad 2、Paddq 1、Paddsw 1、Psraw 1、Psrld 1 | 91（17 種） | SDM の擬似コードで決まる（飽和、シフト幅が大きい場合の結果は SDM に定義がある）。既存の `sse_more.rs`、`sse_pack.rs` と同じ形で、`fle_xmm` を使える |
 | V2 | SSE 浮動小数点のシャッフル・半分移動: Shufps 13、Movlps 8、Movhlps 3、Movlhps 2 | 26 | SDM で決まる。メモリ形（Movlps）はアラインメント規則が `sse_pack.rs` と異なるかの確認が要る（Movlps のメモリ形は 8 バイト） |
-| V3 | MMX: Movd 10、Punpcklbw 5、Packuswb 4、Paddw 4、Pxor 4、Emms 3、Pmulhuw 3、Movq 2、Psllw 2、Pmulhw、Pshufw、Psubsw 各 1 | 40（12 種、関数 3） | 命令の意味は SDM で決まる。mm レジスタの状態（8 本の 64 ビット）を、x87 のスタックと別の配列にするか、重ねるかは判断が要る。この閉包に x87 の演算命令は 0 件（`x87ctl-run.md` §1）なので、別配列でも観測できる差は出ない見込み（推測） |
+| V3 | MMX: Movd 10、Punpcklbw 5、Packuswb 4、Paddw 4、Pxor 4、Emms 3、Pmulhuw 3、Movq 2、Psllw 2、Pmulhw、Pshufw、Psubsw 各 1 | 40（12 種、関数 3） | 命令の意味は SDM で決まる。mm レジスタの状態（8 本の 64 ビット）を、x87 のスタックと別の配列にするか、重ねるかは未決。この閉包に x87 の演算命令は 0 件（`x87ctl-run.md` §1）なので、別配列でも観測できる差は出ない見込み（推測） |
 | V4 | 整数: Xchg 11、Bsf 5、Bts 5、Rol 4、Ror 3、Btr 2、Lea（FS 接頭辞）1 | 31 | SDM で決まる（Rol/Ror のカウントのマスクと、カウント 0 のときフラグ不変、Bt* のレジスタ形のビット位置がメモリのオペランド範囲外を指す場合、Xchg の暗黙の LOCK）。単一スレッドなので LOCK はそのまま実装できる。Lea の FS 接頭辞はアドレス計算に影響しない（SDM の LEA の定義。要確認） |
-| V5 | システム: Pause 3、Sfence 2、Cmpxchg16b 2 | 7 | Pause、Sfence は単一スレッドで何もしない（SDM の定義）。Cmpxchg16b は SDM で決まる（16 バイトの境界に無いときの扱いは `fle_stop` にする判断が要る） |
-| V6 | 制御・セグメント・解決不能: Jecxz 2、`mov rax,gs:0x58` 1、Xgetbv 1、解決不能 jmp 20（`jmp rax` 18、`jmp [r10+rdx*8+0x40]` 1、`jmp [rcx]` 1） | 24 | **lib.rs と fe-decode の変更が要る**（新規ファイルのみでは済まない）。Jecxz は Ctl の扱い（条件分岐）に関わる。`gs:0x58` は TEB の配置に依存し、公式の API ページでは決まらない（判断が要る）。`jmp [r10+rdx*8+0x40]` は、`.text` 内の表（8 個の要素 0x40d260〜0x40d298、飛び先は 0x40d2b6〜0x40d2ce の 8 つ。バイナリを読んで計算）なので解決できる見込み。`jmp [rcx]` は、`longjmp` 相当の形（推測）で、飛び先が実行時にしか決まらない |
+| V5 | システム: Pause 3、Sfence 2、Cmpxchg16b 2 | 7 | Pause、Sfence は単一スレッドで何もしない（SDM の定義）。Cmpxchg16b は SDM で決まる（16 バイトの境界に無いときの扱いは `fle_stop` にするかは未決） |
+| V6 | 制御・セグメント・解決不能: Jecxz 2、`mov rax,gs:0x58` 1、Xgetbv 1、解決不能 jmp 20（`jmp rax` 18、`jmp [r10+rdx*8+0x40]` 1、`jmp [rcx]` 1） | 24 | **lib.rs と fe-decode の変更が要る**（新規ファイルのみでは済まない）。Jecxz は Ctl の扱い（条件分岐）に関わる。`gs:0x58` は TEB の配置に依存し、公式の API ページでは決まらず、未決。`jmp [r10+rdx*8+0x40]` は、`.text` 内の表（8 個の要素 0x40d260〜0x40d298、飛び先は 0x40d2b6〜0x40d2ce の 8 つ。バイナリを読んで計算）なので解決できる見込み。`jmp [rcx]` は、`longjmp` 相当の形（推測）で、飛び先が実行時にしか決まらない |
 | V7 | AVX/VEX: Vmovups 12、Vmovaps 2、Vmovntps 2、Vzeroupper 2 | 18 | SDM で決まるが、ymm の上位半分を持つレジスタモデルが要る。上の §4 のとおり、CPUID が AVX を主張しないので、実行されない見込みがある（推測。0x15e69c0 の出所が未確認）。**着手を後にすることを提案** |
 
 ### 5.4 起動順の提案（推測を含む）
 
 1. 先に、生成器を再実行して、15:41 の対応表（83 行）で C を作り直す。期待は未対応 615 → 563（算術）。実行を進めて、次の停止点を測る。これがないと、A/V の優先順位は実測に基づかない。
 2. A1、A2、A3、A4、A9、A10、A12、V1、V2、V4、V5 は、互いに独立に起動できる。A5、A6、A13 は他の runtime の共有状態（`fle_vfs.c`、`fle_modules.c`、`fle_sys.c`）に触れる可能性があるので、読んで確認してから起動する（新規ファイルのみ。表と lib.rs への追記が集約点）。
-3. A11 は、PM の判断が先に要る。D1〜D6 は、設計文書が先に要る。V3、V6、V7 は、判断または別の変更が要る。
+3. A11 は、PM の決定が先に要る（未決）。D1〜D6 は、設計文書が先に要る。V3、V6、V7 は、判断または別の変更が要る。
 
 ## 6. 失敗・拒否された操作と、作業の限界
 

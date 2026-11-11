@@ -22,7 +22,7 @@
   - **直した後**: DOWN → UP とも外側 `[0]`、`GetKeyState` は DOWN で 0x8000・UP の後 0。checks 4 failed **0**。
   - `cargo test -p fe-lift`（HEAD + diff の clean な複製 c10）: input_reenter ok、さらに fle_input.c を使う既存の 10 ファイル（alpha1_glass, alpha3_updregion, alpha5_erase_dc, alpha7_showwin, api2, kbd, sweep1, wall_fr19, win2_act、計 46 テスト）**すべて ok**。fle_input.c を HEAD に戻すと input_reenter は FAIL（負の確認）。win_act / win_seq / win_upd のネイティブ出力は直す前後でバイト一致。
   - dry-run: HEAD の `git archive` に `git apply --check` ok、`git apply` ok、`patch -p1 -R --dry-run` ok。
-- **推奨**: モデルとしては正しい修正（Windows の入力順序、GetKeyState の整合）だが、実エンジンの観測では再入が起きておらず（`NESTED-synth` 0 件）、File メニューの取りこぼしを直す物ではない。23:10 のビルドに載せるかは PM の判断（載せても File メニューの挙動は変わらない見込み。ネスト待ちで止まる経路は、観測された実エンジンでは通らない）。
+- **推奨**: モデルとしては正しい修正（Windows の入力順序、GetKeyState の整合）だが、実エンジンの観測では再入が起きておらず（`NESTED-synth` 0 件）、File メニューの取りこぼしを直す物ではない。23:10 のビルドに載せるかは未決（PM の決定が要る。載せても File メニューの挙動は変わらない見込み。ネスト待ちで止まる経路は、観測された実エンジンでは通らない）。
 
 ## 次
 1. Escape を失う層の特定（上記の前後記録）。ページ側なら本番の欠陥として診断を出す。

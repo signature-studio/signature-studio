@@ -16,7 +16,7 @@
 | 描画の要点 | 「戻らないループ」の Worker では `OffscreenCanvas` の自動表示が効かない（§7）ので、M-A なら `ImageBitmap` を `postMessage` する経路が要る。M-B（中断の度にイベントループへ戻る）なら通常の `raf` / `setTimeout` 駆動と同じに表示された |
 | 比較表 | §6 |
 | 含意 | §10。`CreateFruityInstance` は戻らない前提で、ブロッキングする Win32 API（`GetMessageW` 1 地点、`WaitMessage` 2、`MsgWaitForMultipleObjects(Ex)` 4、`MessageBox` 10、`TrackPopupMenu` 2、`DoDragDrop` 2、`Sleep` 33 ほか）をどう「待つ」かが論点（引用）。M-C は単独では成立しない（§5） |
-| PM の判断が要る点 | §12 |
+| 未決の点 | §12 |
 
 ## 1. 凡例、手順、環境
 
@@ -227,7 +227,7 @@ lift 済みの関数は、C のローカルが call をまたいで生きてい�
 
 ### 推奨（書くが決めない）
 
-実測と既存の調査（`sync-thread-survey.md`）を合わせて読むと、**M-B の JSPI が最も変更が少なく、COOP/COEP を要求せず、スレッドの案 A1 と同じ機構で伸ばせる**ので、第一候補と読める。ただし (1) 実 wasm（`-O0`、389 MB、巨大な関数）での JSPI のスタックの上限・メモリ・ブロッキング API を通した振る舞いは**未測定**、(2) Firefox / Safari での JSPI の対応は**未確認**。M-A は変換が要らず遅延も最小だが、**ゲストのスレッドを協調で増やせず**、COOP/COEP を要求し、描画と非同期 API の経路が増える。Asyncify は、実 wasm（`-O0`）への外挿で現実的でない。M-C' は Asyncify より軽いという合成コードの数値があるが、生成器の大きな変更で、runtime の手書き C に別の手当てが要る。JSPI が使えないブラウザへの保険として M-A（または Asyncify の縮小版）を持つかどうかは PM の判断（§12）。
+実測と既存の調査（`sync-thread-survey.md`）を合わせて読むと、**M-B の JSPI が最も変更が少なく、COOP/COEP を要求せず、スレッドの案 A1 と同じ機構で伸ばせる**ので、第一候補と読める。ただし (1) 実 wasm（`-O0`、389 MB、巨大な関数）での JSPI のスタックの上限・メモリ・ブロッキング API を通した振る舞いは**未測定**、(2) Firefox / Safari での JSPI の対応は**未確認**。M-A は変換が要らず遅延も最小だが、**ゲストのスレッドを協調で増やせず**、COOP/COEP を要求し、描画と非同期 API の経路が増える。Asyncify は、実 wasm（`-O0`）への外挿で現実的でない。M-C' は Asyncify より軽いという合成コードの数値があるが、生成器の大きな変更で、runtime の手書き C に別の手当てが要る。JSPI が使えないブラウザへの保険として M-A（または Asyncify の縮小版）を持つかどうかは未決（§12）。
 
 ## 7. 描画（実測。`draw-coi.json`。CPU ラスタライズ、実 GPU は未測定）
 
@@ -349,7 +349,7 @@ Worker のメモリ（`WebAssembly.Memory` 16 MiB、共有ではない）上の 
 - M-C は読みのみ（依頼どおり）。M-C' は合成コードの範囲で正しさ（チェックサムの一致）まで確認したが、実コード・runtime の手書き C・ゲストの `longjmp`（決定 0100）との整合は未確認。
 - JSPI の中断中の DevTools の見え方、中断中の Worker のメモリ（スタックごとの割り当て）、多数の中断（数千）は、`sync-thread-survey.md` の probe（node。引用）以外は未測定。
 
-## 12. PM の判断が要る点
+## 12. 未決の点
 
 1. **JSPI（M-B）を第一候補にするか**。実 wasm（`-O0`、389 MB）での JSPI の試作（`CreateFruityInstance` までのどこかのブロッキング API を `Suspending` にして中断・再開できるか、スタックの深さの上限）を次の測定にするか。Firefox / Safari での JSPI の対応を調べるか（`sync-thread-survey.md` の二次情報では出荷済み、未検証）。
 2. **COOP/COEP の配信を許容するか**（M-A、または音声の SAB リングを使う場合）。許容できないなら、音声を `MessagePort` で渡す方式の遅延・ジッタを測る必要がある。

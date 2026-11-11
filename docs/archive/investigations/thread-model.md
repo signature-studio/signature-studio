@@ -233,7 +233,7 @@ loop:
 
 ### 6.3 各選択肢の詳細
 
-**T0 止まる**: 偽りなし。到達点は 41,177 入口、572 関数のまま(決定 0121)。スレッドの扱いは PM の決定待ち。G1 は進まない。
+**T0 止まる**: 偽りなし。到達点は 41,177 入口、572 関数のまま(決定 0121)。スレッドの扱いは未決（PM の決定待ち）。G1 は進まない。
 
 **T1 作ったことにするだけ**(**偽らずに言える範囲は、この壁では無い**と読む):
 
@@ -274,11 +274,11 @@ loop:
 | 目的 | 必要なスレッド | 最小で足りる選択 | 注 |
 |---|---|---|---|
 | 壁 21 を通す(G1 の入口) | `TTimerThread` | **T2 の最小形**(2 本目のスレッドを持てる、`Sleep`/`DwmFlush`/`WaitForSingleObject`/`ResumeThread`/`PostMessageW` に対する切り替え) | T1/T4 では次の壁で止まる(§6.3) |
-| G1〜G2(フォームの表示まで) | `TTimerThread`、`TLayeredControlThread`(スレッド側の窓、`GetMessageW`、窓表のスレッド別化) | T2(窓表・メッセージキューのスレッド別化を含む。§7.4 が最大の部分) | `GetMessageW` の待ちが入るので、**メッセージキューの設計が先に要る**(決定 0119 の PM の判断点 2) |
+| G1〜G2(フォームの表示まで) | `TTimerThread`、`TLayeredControlThread`(スレッド側の窓、`GetMessageW`、窓表のスレッド別化) | T2(窓表・メッセージキューのスレッド別化を含む。§7.4 が最大の部分) | `GetMessageW` の待ちが入るので、**メッセージキューの設計が先に要る**(決定 0119 の未決の点 2) |
 | G3(メッセージループ) | 上に加えてメインスレッドの `PeekMessageW`/`WaitMessage`/`MsgWaitForMultipleObjects` | T2。メインスレッドの待ちを JS に戻す(JSPI)ので、**スレッドの切り替えとブラウザへの制御の戻りが同じ機構** | `browser-event-loop.md` M-B の延長 |
 | G4(最初のフレーム) | 上と同じ(描画スレッドが G4 に必須かは未測定) | T2 | Blend2D の `CreateThread`(#7)は `thread_count` 次第で、**FL Studio が渡すかは未確認** |
 | G7(音声) | `TMixerThread_DS`(`WaitForMultipleObjects(INFINITE)` + DirectSound の通知イベント) | T2(通知イベントを AudioWorklet の消費に結ぶ `SetEvent` を別の起床源として持つ) | 音声スレッドが CPU を使い続けるかは未測定(`browser-event-loop.md` §12 の 5) |
-| G8(再生) | `TMixerThread_DS`、`TWAVStreamingThread`、`TFileDeletionThread`、レンダー(書き出し) | T2。**先取りが無い**ので、ミキサースレッドが長い計算を連続して行うとメインスレッドの UI が止まる(未測定) | T3 が要るかの判断材料は G8 の実測 |
+| G8(再生) | `TMixerThread_DS`、`TWAVStreamingThread`、`TFileDeletionThread`、レンダー(書き出し) | T2。**先取りが無い**ので、ミキサースレッドが長い計算を連続して行うとメインスレッドの UI が止まる(未測定) | T3 が要るかは G8 の実測で決める（未決） |
 
 ## 7. runtime への入口の設計メモ(実装はしない)
 
@@ -349,12 +349,12 @@ thread_ent {
 ### 7.4 窓表とメッセージキューのスレッド別化(T2 の最大の部分)
 
 壁 21 の先で実際に要るもの(§4.3、§5.2):
-- `PostMessageW(hwnd, 0x8ffc, …)`(`TTimerThread` → メインスレッドの窓): **窓を作ったスレッド(main)のキューに積む**。現行は未実装(決定 0119 の PM の判断点 3: `PostMessageW` の NULL の hWnd は Learn が「現在のスレッドへの `PostThreadMessage`」と書き、PM の決定 1(NULL は 0 と 1400)と食い違う)。
+- `PostMessageW(hwnd, 0x8ffc, …)`(`TTimerThread` → メインスレッドの窓): **窓を作ったスレッド(main)のキューに積む**。現行は未実装(決定 0119 の未決の点 3: `PostMessageW` の NULL の hWnd は Learn が「現在のスレッドへの `PostThreadMessage`」と書き、PM の決定 1(NULL は 0 と 1400)と食い違う)。
 - `GetMessageW`(`TLayeredControlThread`): 自分のキューが空なら WAITING。他スレッドの `PostMessageW`/`SendMessageW`/`PostQuitMessage` で起きる。Learn: 「The function dispatches incoming sent messages until a posted message is available」、`WM_QUIT` で 0。
 - `PeekMessageW`(`TLayeredControlThread` の先頭、`TThread.WaitFor`、`TSharedAnimTimer` のデストラクタ): 空なら 0 で即返し(`PM_NOREMOVE` はキューを作るだけ)。
 - `SendMessageW` が**別スレッドの窓**に送るとき(Learn の引用 §6.1): 送り手を WAITING にし、受け手が `GetMessageW`/`PeekMessageW`/`MsgWait…` に入ったときに窓手続きを `fle_call_guest` で受け手のスレッドの文脈で呼び、戻り値を送り手に返して起こす。**現行の `SendMessageW`(`fle_win.c`)は同一スレッドの窓にだけ直接呼ぶ**(決定 0119 D9)。
 - **窓の所有スレッド**を窓表に持たせる(現行の `win` 構造体にない)。`CreateWindowExW` の呼び出しスレッドを記録する。
-- 範囲: **`PostMessageW`/`GetMessageW`/`PeekMessageW`/`WaitMessage`/`MsgWaitForMultipleObjects`/`PostQuitMessage`/`DispatchMessageW`/`TranslateMessage`(`TLayeredControlThread` が使う)**。決定 0119 が「実装しない」とした一群と同じで、**スレッドとは別のワークストリームとして先に設計が要る**(決定 0119 の PM の判断点 2)。
+- 範囲: **`PostMessageW`/`GetMessageW`/`PeekMessageW`/`WaitMessage`/`MsgWaitForMultipleObjects`/`PostQuitMessage`/`DispatchMessageW`/`TranslateMessage`(`TLayeredControlThread` が使う)**。決定 0119 が「実装しない」とした一群と同じで、**スレッドとは別のワークストリームとして先に設計が要る**(決定 0119 の未決の点 2)。
 
 ### 7.5 最小の差分の入口(段階)
 
@@ -362,7 +362,7 @@ thread_ent {
 |---|---|---|---|
 | **E0** | `fle_thread.c` を新設し、スレッド表と `CreateThread`/`ResumeThread`/`GetExitCodeThread`/`ExitThread`/`SuspendThread`/`GetCurrentThreadId`/`SwitchToThread`/`Sleep`/`WaitForSingleObject`(スレッドと既存のイベント)の**行**を `imports_table.rs` の末尾に足す。スケジューラは native では ucontext、wasm は JSPI を後。`CreateThread` はこの段でも `CREATE_SUSPENDED` を保持し、**ResumeThread で READY にして、メインスレッドが最初に待つ(`Sleep`/`Wait`)まで走らせない**(T4 相当の半分) | 決定(PM) | 壁 21 の `CreateThread`/`SetThreadPriority`/`ResumeThread` を通る。直後にメインスレッドが `PostMessageW`/`EnumDisplaySettingsW` の続きを通って、**次の壁**(例: メインスレッドが `TThread.WaitFor`/`Sleep(0)` で待つか、`TLayeredControlThread` の `CreateThread`)に進む |
 | **E1** | `Sleep`/`WaitFor…`/`SetEvent` で**実際に切り替える**(native: swapcontext)。`TTimerThread` の `Execute` が走り、`DwmFlush` の thunk(行なし)で名前付き停止 | `dwmapi.dll` を仮想モジュールにする決定(§5.2) | `TTimerThread` の最初の `Sleep` と `DwmFlush` まで |
-| **E2** | メッセージキューのスレッド別化(§7.4)。`PostMessageW`/`GetMessageW`/`PeekMessageW`/`MsgWaitForMultipleObjects` | 決定 0119 の判断点 2、3 の PM の決定 | `TTimerThread` → main の tick、`TLayeredControlThread` のループ |
+| **E2** | メッセージキューのスレッド別化(§7.4)。`PostMessageW`/`GetMessageW`/`PeekMessageW`/`MsgWaitForMultipleObjects` | 決定 0119 の未決の点 2、3 の PM の決定 | `TTimerThread` → main の tick、`TLayeredControlThread` のループ |
 | **E3** | wasm: JSPI での切り替え(スレッドごとの shadow stack の `stackSave/Restore`、`SUPPORT_LONGJMP=wasm`)。native と wasm の同じ API の別実装 | `jspi-real-wasm.md` の構成 C | ブラウザで同じ停止点 |
 | **E4** | `DLL_THREAD_ATTACH/DETACH` の扱い、暗黙 TLS のスレッド別化、`TlsAlloc` のスレッド別化、FLS | 決定 0080 D9 の変更 | Blend2D のスレッドプールを使う場合 |
 
@@ -386,7 +386,7 @@ thread_ent {
 
 | 段階 | 内容 | 目的 | 切り替え・止まる基準 |
 |---|---|---|---|
-| **S0**(決定前の準備。実装なし) | PM が次を決める: (a) T2 を採るか、(b) `dwmapi.dll` を仮想モジュールにして `DwmFlush` の答えを決めるか、(c) メッセージキューの設計(決定 0119 判断点 2、3)を先に作るか、(d) `DLL_THREAD_ATTACH/DETACH` の扱い、(e) スケジューリングの選択(切り替え点、優先度を無視、仮想時計の進め方)を仮の決定とするか | 決定 | — |
+| **S0**(決定前の準備。実装なし) | PM が次を決める: (a) T2 を採るか、(b) `dwmapi.dll` を仮想モジュールにして `DwmFlush` の答えを決めるか、(c) メッセージキューの設計(決定 0119 の未決の点 2、3)を先に作るか、(d) `DLL_THREAD_ATTACH/DETACH` の扱い、(e) スケジューリングの選択(切り替え点、優先度を無視、仮想時計の進め方)を仮の決定とするか | 決定 | — |
 | **S1** | **native で T2 の最小形(E0〜E1)**: スレッド表、`CreateThread`/`ResumeThread`/`SuspendThread`/`ExitThread`/`GetExitCodeThread`/`SwitchToThread`/`Sleep`/`WaitForSingleObject`/`SetEvent`、スレッドごとの TLS・last error・`R[]` ほかの退避。**メインスレッドが最初に待つまで新スレッドを走らせない**(T4 相当の入口を含む) | 壁 21 を通す。**native の停止点が再現し、独立 2 回で同一**(決定 0121 の検証の流儀) | 壁 21 を通った先で、**`DwmFlush`(thunk、行なし)で止まる**ことが想定される(§5.2)。止まる基準: 名前付き停止(新しい壁)のたびに分類して PM に戻す(決定 0119 の止まる条件を維持) |
 | **S2** | **メッセージキューのスレッド別化(E2)** と、`PostMessageW`/`GetMessageW`/`PeekMessageW`/`WaitMessage`/`MsgWaitForMultipleObjects`。`DwmFlush` の答え(**`requestAnimationFrame` に結ぶか、仮想時計の 16.7 ms にするか**。出典なしの選択) | `TTimerThread` の tick が main の窓に届き、`TLayeredControlThread` のループが回る。G2〜G3 | **ここで `TTimerThread` の購読者コールバックが何を呼ぶか**(描画の要求か)を実測する。**その結果が「本物のスレッドが要るか」の判断材料**(下) |
 | **S3** | **wasm で JSPI(E3)**。`CreateFruityInstance` の入口を wasm に足し、native と同じ停止点が wasm で出るか(`goal-ladder.md` §5 X4 の「小さい」実験)を先に確認 | ブラウザで成立するかの実測(**未実測**。実エンジンの深さの上限が最大の不確実性) | JSPI のスタック不足(`RangeError`)が出たら、(a) `--wasm-stack-switching-stack-size` を増やす、(b) スレッドの深さを測って設計を見直す、(c) T3 に倒す(Worker + `-pthread`)のどれかを PM に戻す |
@@ -417,11 +417,11 @@ thread_ent {
 - **決定論的スケジューラの選択**(ラウンドロビン、優先度無視、仮想時計の進め方)は**出典なしの選択**で、どれも撤回条件つきで列挙する必要がある。
 - **外部文書の取得物は `/tmp/opencode/thr/` に置いたが、終了時に削除する**。本書は取得した文言を短く引用している。URL は §1。
 
-## 10. PM の判断が要る点
+## 10. 未決の点
 
 1. **T2 を最終形として採るか**。採らない場合、壁 21 は T0(止まる)のまま。T1(偽る)は決定 0121 の PM の決定 4 に反するので採らない提案。
 2. **`dwmapi.dll` を仮想モジュールにして `DwmFlush` に答えるか**。`TTimerThread` は毎周回 `DwmFlush` を呼ぶ(§5.2)。答え方の選択: ブラウザの `requestAnimationFrame` に結ぶ(実時間と結びつく。決定論と衝突)か、仮想時計で 1000/60 ms 進める(決定的。実機の Present とは別)。**出典のない選択**。
-3. **メッセージキューを先に設計するか**。`TLayeredControlThread` は `GetMessageW` を持ち、スレッド側の窓を作る。決定 0119 の PM の判断点 2(キューの設計)と 3(`PostMessageW` の NULL の扱い: Learn は PostThreadMessage と同じ)が未決。
+3. **メッセージキューを先に設計するか**。`TLayeredControlThread` は `GetMessageW` を持ち、スレッド側の窓を作る。決定 0119 の未決の点 2（キューの設計）と 3（`PostMessageW` の NULL の扱い: Learn は PostThreadMessage と同じ）が未決。
 4. **スケジューリングの選択を仮の決定とするか**(切り替え点 = 待ちの API のみ、優先度を無視、ラウンドロビン、全員が待ちなら仮想時計を最小の期限まで進める)。
 5. **`DLL_THREAD_ATTACH/DETACH` を呼ぶか**(決定 0080 D9 の変更。実機は呼ぶ)。
 6. **プロセッサ数の応答(現行 1、決定 0017)を維持するか**。維持すれば `AcquireSharedThreadBank` のワーカーは作られない。変えるとスレッドが増える。

@@ -38,7 +38,7 @@ hMonitor の使われ方（読み）:
 - **GetMonitorInfoW**（`updated_at` 2024-11-20）: `BOOL GetMonitorInfoW(HMONITOR hMonitor, LPMONITORINFO lpmi)`。「You must set the cbSize member … to sizeof(MONITORINFO) or sizeof(MONITORINFOEX)」。成功で非 0、失敗で 0。**失敗時の GetLastError は書かれていない。** MONITORINFO のページ（フィールド、MONITORINFOF_PRIMARY の値）は取得していない。cbSize 0x28 と dwFlags `test 1` はゲストのコードの読みだけ。
 - **書かれていないこと**: HMONITOR の値、モニタ矩形の具体的な値、作業領域（rcWork）の値、主モニタのフラグの値（MONITORINFOF_PRIMARY の数値は MONITORINFO のページ）。
 
-## 4. この lift 環境で既にある決定（関係するもの）と、判断が要る点
+## 4. この lift 環境で既にある決定（関係するもの）と、未決の点
 
 - 画面: 単一の仮想ディスプレイ 1920×1080、DPI 96、色深度 32（決定 0053 の `FLE_GDC_*`。**解像度は出典のない仮の選択**）。`GetSystemMetrics`: SM_CMONITORS = 1、SM_CXSCREEN/CYSCREEN = 1920/1080、SM_*VIRTUALSCREEN は原点 (0, 0)（決定 0057）。モニタ矩形は (0, 0, 1920, 1080)、列挙は 1 回で、これらと整合させるのが自然（推測）。
 - 作業領域: `SystemParametersInfoW(SPI_GETWORKAREA = 0x30)` は 0058 が名前付きで**停止**にしている（ゲストの呼び出し 4 か所: 0x8190a6、0x866d1a、0x8673a5、0x11c3cd8。`tests/spi.rs` の SITES）。`GetMonitorInfoW` の rcWork は同じ量なので、一方を決めるともう一方も決まる必要がある（値の整合）。

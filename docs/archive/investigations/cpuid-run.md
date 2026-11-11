@@ -56,6 +56,6 @@
 
 ## 7. 残りの作業量（推測を含む）
 
-- 次の停止点（VerSetConditionMask の thunk）の扱いは PM の判断。未実装。
+- 次の停止点（VerSetConditionMask の thunk）の扱いは未決。未実装。
 - 停止点より後の経路は未確認。今回の結果から、後続の import thunk が他にもあるかどうかは分からない（閉包の 445 件の import_jumps のうち、対応済みは `imports_table.rs` の 6 件）。
 - cpuid の応答が、FLEngine のどの分岐にどう効くかは未確認（前述の決定 0009 の「実測として言えないこと」）。

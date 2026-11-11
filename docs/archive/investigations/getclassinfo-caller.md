@@ -131,5 +131,5 @@ RegisterClassW の**戻り値（アトム）**: f_52a7f0（0x52a859）は検査�
 - 実機で最初に発行されるアトムの値。0xC000 は文書の「string atom の範囲の下限」から取った**仮の値**。
 - クラス名の大文字小文字の扱い（書かれていない。決定 0070 は完全一致のみで、大文字小文字だけが違う名前は停止）。
 - f_611550 と f_6118a0 の呼び出し元（動的な名前）の全部の名前。今回の実行は到達しない。
-- 停止点（CreateWindowExW）より先で、ゲストが UnregisterClassW を呼ぶ経路（`DLL_PROCESS_DETACH` の `0x6d84b3` ほか）に届くか。届けば UnregisterClassW の判断が要る。
+- 停止点（CreateWindowExW）より先で、ゲストが UnregisterClassW を呼ぶ経路（`DLL_PROCESS_DETACH` の `0x6d84b3` ほか）に届くか。届けば UnregisterClassW の扱いが未決。
 - 0x621af4 ほか f_6118a0 の 7 つの呼び出し元の実際のクラス名。

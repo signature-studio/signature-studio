@@ -138,7 +138,7 @@ f_6539e0  : f_653660 で名前を組み立て（dl=1 なら末尾が "_x64.dll" 
 
 ### 2.3 これらの DLL が Windows 10 にあるか（読みと一次資料）
 
-Learn の各 API ページの Requirements（2026-10-23 取得）: `AvSetMmThreadCharacteristicsW` は Windows Vista 以降、DLL は Avrt.dll。`PowerGetActiveScheme` は Windows Vista 以降、PowrProf.dll。`GetDpiForMonitor` は Windows 8.1 以降、Shcore.dll。`DwmIsCompositionEnabled` は Windows Vista 以降、Dwmapi.dll。決定 0014 のエミュレート OS は Windows 10 22H2 なので、**ページから導ける範囲では、4 つとも Windows 10 にある**（0055 と同じ導出。ページが「Windows 10 にある」と書いているわけではない）。一方、決定 0015 / 0029 は dwmapi と shcore を「ロードされていない」（`fle_load_absent[]`）と決めている。同じ導出では dwmapi と shcore も Windows 10 にあることになる。この矛盾の有無は PM の判断（事実としては、0055 の「矛盾する場合は欠いているとは定義しない」の基準を 0015 の 9 名にそのまま当てると矛盾する、までが言える）。
+Learn の各 API ページの Requirements（2026-10-23 取得）: `AvSetMmThreadCharacteristicsW` は Windows Vista 以降、DLL は Avrt.dll。`PowerGetActiveScheme` は Windows Vista 以降、PowrProf.dll。`GetDpiForMonitor` は Windows 8.1 以降、Shcore.dll。`DwmIsCompositionEnabled` は Windows Vista 以降、Dwmapi.dll。決定 0014 のエミュレート OS は Windows 10 22H2 なので、**ページから導ける範囲では、4 つとも Windows 10 にある**（0055 と同じ導出。ページが「Windows 10 にある」と書いているわけではない）。一方、決定 0015 / 0029 は dwmapi と shcore を「ロードされていない」（`fle_load_absent[]`）と決めている。同じ導出では dwmapi と shcore も Windows 10 にあることになる。この矛盾の有無は未決（事実としては、0055 の「矛盾する場合は欠いているとは定義しない」の基準を 0015 の 9 名にそのまま当てると矛盾する、までが言える）。
 
 ## 3. ゲスト全体の LoadLibrary / GetModuleHandle の名前（直接 call で届くもの）
 

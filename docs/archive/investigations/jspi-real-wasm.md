@@ -65,7 +65,7 @@ C と D は `SJLJ`/`JSPI` の環境変数を足して全単位をコンパイル
 
 3 行目が重要: **emscripten 方式の SJLJ + JSPI は、中断を 1 回も要求しなくても壊れうる**。実エンジンの B 構成(SJLJ=emscripten + JSPI + hooks)でも、中断を要求しない記録だけの実行(`mode=0`)が `SuspendError` で止まった(F1。a4 の 27,862 番目の入口、生きている着地 1、`fle_call_guest` 深さ 1)。**原因は読み**: グルーが `invoke_*` をすべて `Suspending` で包む(上のパターン)ので、`invoke_*` の中(JS フレーム)からさらに入れ子の `invoke_*` を呼ぶと「JS フレームをまたいで中断しようとした」ことになる、と読める。直接の確認はしていない(`Suspending` の中の呼び出しが常に中断する仕様なのかは、このセッションでは確かめていない)。
 
-**決定 0100/0115 の landing 方式を変えるか**: 変えていない。`FLE_LANDING_FORCE` のまま、`fle_dispatch.h` などの C コードは**一切変更していない**。変えたのは emcc のフラグ(`-sSUPPORT_LONGJMP=wasm`)だけで、全翻訳単位(`-c`)とリンクに付ける必要がある(`build_nmod_wasm.sh` の `SJLJ=wasm`)。範囲は lifted C 60 単位 + runtime 46 + harness。**決定 0115 項 1 の「追加のフラグは不要」は JSPI 構成では成り立たない**(JSPI なしでは引き続き成り立つ。A は無改造で動いた)。PM の判断(§10)。
+**決定 0100/0115 の landing 方式を変えるか**: 変えていない。`FLE_LANDING_FORCE` のまま、`fle_dispatch.h` などの C コードは**一切変更していない**。変えたのは emcc のフラグ(`-sSUPPORT_LONGJMP=wasm`)だけで、全翻訳単位(`-c`)とリンクに付ける必要がある(`build_nmod_wasm.sh` の `SJLJ=wasm`)。範囲は lifted C 60 単位 + runtime 46 + harness。**決定 0115 項 1 の「追加のフラグは不要」は JSPI 構成では成り立たない**(JSPI なしでは引き続き成り立つ。A は無改造で動いた)。未決(§10)。
 
 **(c) `emscripten_return_address`**: `-finstrument-functions` のフックが `__builtin_return_address` を使うたびに、clang が JS の import `emscripten_return_address`(`new Error().stack` の解析。5.5 µs。`run_node_nmod.cjs` の説明)を呼ぶ。この import は同期の JS 関数で、`Suspending` で包まれない(パターンに合わない。実測: C の `flengine6.js`)。呼ぶ間は JS フレームができるが、すぐ戻るので中断の途中には残らない(実測: 全入口で中断した実行が一致)。**中断の邪魔にはならない**。ただし**性能に影響する**: JSPI 構成だと JS の import 1 回が約 +6〜7 ns になり(トイ `t4.c`、`t6.c`)、a4 の完走は 235,794,450 回呼ぶので完走が約 +1.1 s(§5.5)。この import を wasm 内の関数(`tools/ra0.c`、`return 0`)にすると JSPI の有無で差が出ない(R 表)。ただし高速ドライバーの `() => 0` と同じく、フックの `call_site` を捨てる(`trace.c` は使わない。決定 0115 項 3)。
 
@@ -293,7 +293,7 @@ Chrome 156.0.8078.47(V8 15.6.75.19)、`--headless=new --no-sandbox --disable-gpu
 - `V8 の遅延コンパイル`(`--wasm-lazy-compilation` が既定で有効)の影響は、`compile` の時間が 0.33 s と短いことと合う(読み。無効にした場合は測っていない)。
 - ビルド時間は §1(A、C、D とも units 約 218 s、o1 約 383〜401 s)。SJLJ=wasm や JSPI でコンパイル時間・RSS は変わらない(emcc の `units` 段の最大 RSS 8.83 GB、`o1` 3.64 GB)。
 
-## 10. PM の判断が要る点
+## 10. 未決の点
 
 1. **ブラウザ化の setjmp 方式**: JSPI を使うなら emscripten 既定の SJLJ(JS の `invoke_*`)は使えない(F1、F2)。`-sSUPPORT_LONGJMP=wasm` に変える必要があり、これは `build_nmod_wasm.sh` の全 `emcc` 呼び出しのフラグになる(C コードの変更は無し)。決定 0115 項 1(「追加のフラグは不要」)の更新が要るか。**legacy 符号化(emcc 6.0.12 の既定)と exnref 符号化のどちらを使うか**: 両方とも node と Chrome で通った。exnref は標準化された形だが、wabt 1.0.36 が読めない(F5)。
 2. **JSPI を採るか**: 実 wasm で a4 の経路(681 回の `EnterCriticalSection`、8 回の `WaitForSingleObject`、`LoadLibraryW` の再入、全 1,007,942 入口)の中断・再開が成り立つ(実測)。ただし**実際のメッセージループの経路は未測定**(§12)。JSPI を採らない場合の選択肢(`browser-event-loop.md` の M-A、M-C')との比較は、この測定の範囲外。

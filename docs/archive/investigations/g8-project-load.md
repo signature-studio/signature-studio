@@ -276,7 +276,7 @@ FL 24.2.99.4720（ビルド 4720）、format 0、PPQ 96、FLdt 46,339 B・イベ
 - `GetFinalPathNameByHandleW` の遅延ロードの欠落時の挙動、`MachineGuid`／`GetComputerNameExW` の応答が FLP 解析に与える影響（`f_f51fd0` が読む）は未確認。レジストリの `MachineGuid` は種に無い（`grep` で 0）。
 - 時間: 開始 10:25（JST）。本書の初稿は 11:25 まで、以後は検証と訂正。
 
-## 10. PM の判断が要る点
+## 10. 未決の点
 
 1. **F5 の入口**: A（起動時のコマンドライン）+ B（`WM_COPYDATA`）で進めてよいか。A だけでまず G8a〜c を測る案もある。
 2. **最小の G8 デモの定義**: `Render tests\Sampler.flp`（内蔵のみ、PCM）を「G8 の最小」とし、goal-ladder の「同梱デモ」を『内蔵だけの 12 本の部分集合』に読み替えるか（字義のデモ曲は G9 のプラグイン 88 種を要求する）。

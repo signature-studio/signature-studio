@@ -34,8 +34,8 @@
 | c | `GetProcAddress` by ordinal（`lpProcName 0x10`） | 238 | 序数での `GetProcAddress` は runtime が未対応（`fle_modules.c` の stop） |
 | a | `user32.dll!EnumDisplaySettingsW` | 246 | 目録に既出 |
 | a | `user32.dll!GetClipCursor` | 272 | 目録に既出 |
-| d | `SystemParametersInfoW`: `uiAction 0x30 (SPI_GETWORKAREA)` | 275 | 決定 0058（値が決まっていない）。PM の判断が要る |
-| d | `GetSystemMetrics`: `index 94 (SM_DIGITIZER)` | 276 | 決定 0057（値が決まっていない）。PM の判断が要る |
+| d | `SystemParametersInfoW`: `uiAction 0x30 (SPI_GETWORKAREA)` | 275 | 決定 0058（値が決まっていない）。未決 |
+| d | `GetSystemMetrics`: `index 94 (SM_DIGITIZER)` | 276 | 決定 0057（値が決まっていない）。未決 |
 | a | `gdi32.dll!EnumFontFamiliesExW` | 283 | 目録に既出 |
 | b | `indirect call to 0x477e73 (not a known function entry)` | 296 | **既存の文書に無い壁**。0x477e73 は命令の先頭（`add rcx,-0x10`。`objdump-text.txt`）だが、関数入口の表にない。コード上の関数ポインタか間接 call の行き先が、生成器の閉包に入っていない（読み）。top `f_534b00` ← `f_534eb0` |
 | d | `VirtualProtect`: address is not in a VirtualAlloc region | 314 | VirtualAlloc の領域でないアドレスへの `VirtualProtect`（メッセージ: the runtime does not track other memory） |

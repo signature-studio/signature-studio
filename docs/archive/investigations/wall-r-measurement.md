@@ -27,7 +27,7 @@
 | 246 | `user32.dll!EnumDisplaySettingsW` | **ok** | — |
 | 272 | `user32.dll!GetClipCursor` | **ok** | — |
 | 275 | `SystemParametersInfoW` uiAction 0x30 | **ok** | — |
-| 276 | `GetSystemMetrics` index 94 | stop | `GetSystemMetrics: index 86 (SM_TABLETPC) is used by the guest but no value is decided (decision 0057)`。同じ関数 `f_80e360` が続けて 0x2003（SM_CONVERTIBLESLATEMODE）、0x2004（SM_SYSTEMDOCKED）を問う（読み）。0x2003 は 0 のときゲストがスレートモードの経路へ入るので PM の判断が要る。86 だけ決めても unit は ok にならない |
+| 276 | `GetSystemMetrics` index 94 | stop | `GetSystemMetrics: index 86 (SM_TABLETPC) is used by the guest but no value is decided (decision 0057)`。同じ関数 `f_80e360` が続けて 0x2003（SM_CONVERTIBLESLATEMODE）、0x2004（SM_SYSTEMDOCKED）を問う（読み）。0x2003 は 0 のときゲストがスレートモードの経路へ入るので、値は未決。86 だけ決めても unit は ok にならない |
 | 283 | `gdi32.dll!EnumFontFamiliesExW` | stop | `CompareStringW: character other than an ASCII letter or digit in unequal strings`（決定 0072 の枠）。top `f_4231c0` ← `f_4399e0` ← `f_8650c0`（コールバック）。ゲストのコールバックがリストの "Default" と "Segoe UI" を比べ、空白が枠の外（読み）。**EnumFontFamiliesExW 自体は答えてコールバックまで進んだ**（実測） |
 | 880 | `version.dll!GetFileVersionInfoSizeW` | stop | `indirect call to 0 is not a known function entry`。top `f_125da90` ← unit の proc `f_1263540`。読み: `f_125da90` が `LoadLibraryW(L"SHFolder.dll")`（仮想モジュール）→ `GetProcAddress(…, L"SHGetFolderPathW")`（応答表に行がなく NULL）→ NULL を呼ぶ（CSIDL 0x1a）。census は「二次の疑い」と印を付けたが、読みでは SHGetFolderPathW の未応答という**一次**の壁（`f_125dc16`〜`0x125dc55` を読んだ。実行は未確認） |
 

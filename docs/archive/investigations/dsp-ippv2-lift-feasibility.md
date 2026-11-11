@@ -73,7 +73,7 @@
 - 範囲が重ならないことの検査: 既存の `FLE_CHECKED_MEM` は範囲が 1 つ（§2.1）なので、2 つのイメージを許すには `fle_mem_set_image` を 2 範囲に拡張する必要がある。
 - **メモリの上限**: 現行の最大 2 GiB のうち、アリーナ 512 MiB と、wasm のコードを除くデータを足したものにイメージ 38.1 MiB が加わる。初期メモリ 640 MiB（アリーナ込み）に対して、イメージは `GLOBAL_BASE` より下に置くので、初期メモリの内側にある（0x10000000 = 256 MiB 以下）。追加のヒープは `ALLOW_MEMORY_GROWTH` で足りる見込み（読み。使用量の実測は未確認）。
 - 方式 (ii): 他の方式。
-  - **wasm64（memory64）にして ImageBase のまま置く**: 実測の事実としては、Chrome 133、Firefox 134、Edge 133 が対応済みで、**Safari は未対応**（web-features-explorer と caniuse の検索結果。2026-10-23 取得。Safari の Technology Preview の対応は caniuse の別の表に載っているが、正式版は未対応）。生成 C と runtime の `uintptr_t` の仮定（`long` の幅、`size_t` の変換。決定 0049 c）が広範囲に影響する。決定 0045 の最終目標は「ブラウザ」なので、Safari の扱いは PM の判断。**採るなら大きな変更**（推測）。
+  - **wasm64（memory64）にして ImageBase のまま置く**: 実測の事実としては、Chrome 133、Firefox 134、Edge 133 が対応済みで、**Safari は未対応**（web-features-explorer と caniuse の検索結果。2026-10-23 取得。Safari の Technology Preview の対応は caniuse の別の表に載っているが、正式版は未対応）。生成 C と runtime の `uintptr_t` の仮定（`long` の幅、`size_t` の変換。決定 0049 c）が広範囲に影響する。決定 0045 の最終目標は「ブラウザ」なので、Safari の扱いは未決。**採るなら大きな変更**（推測）。
   - **lowbase 方式（アドレス変換）**: 決定 0045 の代替案が「旧実績の lowbase 方式」を挙げ、`fle_ld` / `fle_st` で `LVA = RVA + GLOBAL_BASE` のように 32 ビットに写す。生成 C の再生成か `fle_ld` の変換が要り、ゲストが 64 ビットのポインタを値として持つこと（VirtualAlloc の戻りなど）と衝突する、というのが 0045 の理由。DLL の `call [rax]` 経由の関数ポインタや、`.data` の絶対ポインタ表（5,488 + 634 件など）を変換する必要が出る。**リベース（i）の方が変更が小さい**（推測）。
   - **イメージを分割して複数の低い領域に置く**: セクションごとに別の基底に置くことは、rip 相対の距離が変わり成り立たない（コードと `.data` の距離が rip 相対に焼き込まれている）。却下する理由が確認できる。
 

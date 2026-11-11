@@ -64,7 +64,7 @@
 
 ## 7. その先の見通し
 
-- **PM の判断が要る点**: `esi = -21`（hInst = モジュール、32649）。DLL に資源が無いので実 Windows では NULL。Learn は GetLastError の値を書かない。選択肢（決定 0061）: A. 停止のまま（今の形）、B. NULL を返し last error を触らない、C. NULL を返し 1814。ゲストは NULL を許容して先へ進み、idx = -21 を引く側が `SetCursor(NULL)`（カーソルを消す）になる（§3）。B か C にすると 1 行で通る。
+- **未決の点**: `esi = -21`（hInst = モジュール、32649）。DLL に資源が無いので実 Windows では NULL。Learn は GetLastError の値を書かない。選択肢（決定 0061）: A. 停止のまま（今の形）、B. NULL を返し last error を触らない、C. NULL を返し 1814。ゲストは NULL を許容して先へ進み、idx = -21 を引く側が `SetCursor(NULL)`（カーソルを消す）になる（§3）。B か C にすると 1 行で通る。
 - そのあと: LoadImageW のループの残り（-20 … -2）は答えられる形（NULL 側 12 回、モジュール側 6 回）。次の停止は `f_865c50` の確保（0x409410 のメモリ確保。既存の応答）の後の、SetCursor（39 か所）か DestroyCursor（4 か所）、GetCursor（3 か所）、ShowCursor（2 か所）、0xa0e3db の DeleteObject（0054 は発行していない値で止まる）。**どれが先に届くかは次の実行で分かる**（32649 の判断を B か C にしたとき）。
 - SetCursor は `HCURSOR SetCursor([in, optional] HCURSOR hCursor)` で、「If this parameter is NULL, the cursor is removed from the screen」「The return value is the handle to the previous cursor」（Learn）。前のカーソルを仮想の状態として持つ（スレッドごとか。決定が要る）。
 

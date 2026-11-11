@@ -166,7 +166,7 @@ OUT `o2`、`o3`、`o4` の 3 回のビルド（それぞれ新しい OUT。`o4` 
 
 ## 8. 実験変種（WinVerifyTrust を 0 で返す）
 
-**実行しなかった**。依頼は「停止点が WinVerifyTrust のとき」の参考値のためで、今回の停止は WinVerifyTrust の手前（壁 1）にある。WinVerifyTrust に届くには、`GetFileAttributesW("")` に何かを答えるか、仮想レジストリに `Shared data` を置く必要があり、どちらも**環境の主張（PM の判断）**で、「停止点は分類するだけで直さない」という依頼の範囲外と読んだ。実行すればよい次の実験の候補（実行していない。判断は PM）: (a) 壁 1 の応答を「失敗（INVALID_FILE_ATTRIBUTES、エラー番号は PM が選ぶ）」にした変種、(b) レジストリに `HKCU\Software\Image-Line\Shared\Paths\Shared data` を置いた変種。どちらも壁 2 以降の確認につながる。
+**実行しなかった**。依頼は「停止点が WinVerifyTrust のとき」の参考値のためで、今回の停止は WinVerifyTrust の手前（壁 1）にある。WinVerifyTrust に届くには、`GetFileAttributesW("")` に何かを答えるか、仮想レジストリに `Shared data` を置く必要があり、どちらも**環境の主張（未決。PM の決定が要る）**で、「停止点は分類するだけで直さない」という依頼の範囲外と読んだ。実行すればよい次の実験の候補（実行していない。判断は PM）: (a) 壁 1 の応答を「失敗（INVALID_FILE_ATTRIBUTES、エラー番号は PM が選ぶ）」にした変種、(b) レジストリに `HKCU\Software\Image-Line\Shared\Paths\Shared data` を置いた変種。どちらも壁 2 以降の確認につながる。
 
 ## 9. 設計の判断点 J1〜J13 のうち、測定で答えが出たもの
 

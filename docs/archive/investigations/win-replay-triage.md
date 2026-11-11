@@ -196,7 +196,7 @@ P + X 78 種の実機測定の結果:
 - **現在の VM でできる**: 再生ツールの修正(StretchDIBits の 13 引数、出力バッファの充填 2 通り、実行ファイル名の固定)と `compare.py` の規則(HRESULT の失敗扱い、64 ビット値、出力構造体の比較)。ここは Linux 側の作業と、小さな再測定。
 - **Windows 10 22H2 の en-US の VM が要る**: GetProcAddress の存在確認、LoadLibrary の成否、VerSetConditionMask の bit 63、標準フォント・レジストリの有無、PatBlt/GetObjectW/SetBkColor の既定値。**どれも A2b を閉じる測定ではない**(§6)。用意できるかどうかは依頼者が決める事項で、**この調査は必要とも不要とも決めない**。必要になった場合の Issue 下書きは next-issue-draft.md。
 
-## 9. PM の判断が要る点
+## 9. 未決の点
 
 1. 決定 0015(GetProcAddress と LoadLibrary の「無い」集合)を維持するか(G0)、Learn が最小 OS を書く 65 名に行を足すか(G1)。
 2. MultiByteToWideChar/WideCharToMultiByte(1252/UTF-8)を「実機 1 点で確認済み」に数えるか(条件付き 2 種、3,589 回)。基準 R4(OS 差)を緩めるかどうかの判断。

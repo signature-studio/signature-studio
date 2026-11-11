@@ -265,7 +265,7 @@
 1. 現行の応答表（`kernel32.dll` の行なし）では、(a) と (b) のどちらでも、DLL は同じ代替（`Tls*`、`InitializeCriticalSectionAndSpinCount`）に落ちる（§6.2、実測）。ATTACH の次の停止点（§7.3）は D4 の選択に依らない。差が出るのは、`kernel32.dll` の下に `InitializeCriticalSectionEx` や `FlsAlloc` の行を足したとき（(b) だけが非 NULL を DLL に渡す）。
 2. 決定 0055 の基準に照らすと、(b) の「無い」は一次資料で確認できない主張。(a) の「ある」は、Learn が書く API セットの性質（契約名で `LoadLibrary` に渡せる）とは矛盾しないが、個別の名前がスキーマにあるかは一次に無い。
 
-**推奨（意見。PM が決める）**: (a)。理由は、環境について新しく主張する量が少ないこと（モジュールの存在だけで、API の存在は応答表の行ごとに別に決められる）と、決定 0055 の流儀（「欠いている」とは定義しない）に沿うこと。弱点も書く: (a) では `api-ms-*` の下の応答表の行を作らない限り、DLL は `kernel32` を試さず代替に落ち続ける（§2.4）。DLL に `InitializeCriticalSectionEx` や `FlsAlloc` を非 NULL で渡したい場合は、`api-ms-win-core-synch-l1-2-0.dll`、`api-ms-win-core-fibers-l1-1-1.dll` の `dll` 欄で応答表に行を足す必要がある（§4.4）。それを望むかは Learn からは決まらず、PM の判断。
+**推奨（意見。PM が決める）**: (a)。理由は、環境について新しく主張する量が少ないこと（モジュールの存在だけで、API の存在は応答表の行ごとに別に決められる）と、決定 0055 の流儀（「欠いている」とは定義しない）に沿うこと。弱点も書く: (a) では `api-ms-*` の下の応答表の行を作らない限り、DLL は `kernel32` を試さず代替に落ち続ける（§2.4）。DLL に `InitializeCriticalSectionEx` や `FlsAlloc` を非 NULL で渡したい場合は、`api-ms-win-core-synch-l1-2-0.dll`、`api-ms-win-core-fibers-l1-1-1.dll` の `dll` 欄で応答表に行を足す必要がある（§4.4）。それを望むかは Learn からは決まらず、未決（PM の決定）。
 
 (a) を選ぶ場合の追加事実: 仮想モジュール表に足すとき、`api-ms-win-core-synch-l1-2-0.dll` などの**ハンドル値は N = 27 以降**（決定 0015 の「追加は末尾」）。既存テストが 26 名を固定している箇所は、今回の確認では `msctf_is_the_26th_virtual_module` と `load.rs` の `N_CRT_STRING` の表（番号は固定済み）。`fle_module_count()` を数に使うテストは `modules.rs`、`msctf.rs` にある（数の期待値を持つかは未精査）。
 

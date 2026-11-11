@@ -367,7 +367,7 @@ URL: `sync/condition-variables`（`updated_at` 2025-03-11）、`api/synchapi/nf-
 2. **条件変数の Wake（待機者なし）の扱い**。何もしない（信号を残さない）か、名前付き停止にするか。Learn が書かないので、(a) を選ぶなら仮の決定。
 3. **`SleepConditionVariableSRW` の INFINITE／有限／0 の扱い**。決定 0050 §C と同じ（仮想時計の窓口が無いので有限は停止）にするか。`ERROR_TIMEOUT`（1460）を使うなら System Error Codes の確認が先に要る。
 4. **スレッド系を応答表に行として足すか**（足すと `GetProcAddress` が非 NULL を返す。足さないと NULL と 127）。案 C（PM 決定済み）は「届いたら名前付き停止」で、**行を足す／足さないは案 C の範囲内で選べる**。ただし**行を足すと FLEngine の生成 C の SHA が変わる**（§8）。FLEngine は `CreateThread`、`ExitThread`、`TlsFree` を既に import している（§8）ので、**FLEngine の thunk が `fle_unsupported` から名前付き停止に変わる**。
-5. **`IsProcessorFeaturePresent`、`TlsFree` の行を足すか**。足すなら既存テストの期待値の更新が要る（PM の判断。決定 0078 の撤回条件にも触れる）。**ATTACH で実行される見込みが低い**ので急がない、とも読める（§4.1）。
+5. **`IsProcessorFeaturePresent`、`TlsFree` の行を足すか**。足すなら既存テストの期待値の更新が要る（未決。PM の決定が要る。決定 0078 の撤回条件にも触れる）。**ATTACH で実行される見込みが低い**ので急がない、とも読める（§4.1）。
 6. **`WaitForSingleObjectEx`**: 決定 0050 §A が「DLL が import していないので実装しない。テストで TABLE に無いことを固定する」と決めている。Blend2D が import するので前提が変わった（この調査の事実）。**0050 の文言を更新する必要がある**。
 7. **`GetLargePageMinimum` の値**。ATTACH では届かないので、必要が出るまで見送れる。
 8. **`WaitOnAddress` 系を答えるか**（c1）。
@@ -377,7 +377,7 @@ URL: `sync/condition-variables`（`updated_at` 2025-03-11）、`api/synchapi/nf-
 ### 7.4 意見（事実ではない。決めない）
 
 - 今回の停止点を通すだけなら c3（SRW を取る・放す 1 対だけの状態機械）で足りる。ただし、`f_18019caa0` の後に実行が続くと `.xc` の初期化子の残り（`0x18019a1d6` 以降。`atexit` 風の登録、vtable の他の関数を呼ぶ `f_1800a9eb0` など。ATTACH で呼ばれるかは未確認）に進むので、SRW 4 名と条件変数 3 名を**同じ種類の 1 つの決定**にして、`WaitOnAddress`（c1）の判断を別に出す、という切り分けが素直に見える。
-- 「ロックを持たない Release」と「待機者のいない Wake」は Learn が書かないので、**停止にする側に倒す**（fail-closed）か、**何もしない側に倒す**かは PM の判断。SRW の Release は全サイトが Acquire → Release の対なので、停止にしても今の経路では起きない読み。Wake は状態を持たないので、何もしない側の方が副作用が小さい（ただし Learn の根拠は無い）。
+- 「ロックを持たない Release」と「待機者のいない Wake」は Learn が書かないので、**停止にする側に倒す**（fail-closed）か、**何もしない側に倒す**かは未決（PM の決定が要る）。SRW の Release は全サイトが Acquire → Release の対なので、停止にしても今の経路では起きない読み。Wake は状態を持たないので、何もしない側の方が副作用が小さい（ただし Learn の根拠は無い）。
 - `IsProcessorFeaturePresent`、`TlsFree` の行は、ATTACH でも通常は届かないので、SRW の決定と一緒にせず別に判断してよく見える。
 
 ## 8. 影響範囲（**読み**。実行していない。テストも走らせていない）

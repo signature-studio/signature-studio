@@ -9,7 +9,7 @@
 - `0x15e6078` は **`HInstance` ではない**。Delphi の **`MainInstance`**（「メインの実行ファイルのインスタンスハンドル」）に当たる（読み + 文書。§3）。DLL では `_InitExe` が走らないので、値は 0 のままになる。
 - ゲストの `HInstance` は **`0x15ec298`**。DllMain の hinstDLL（`rcx = 0x400000`）を `f_41d8f0`（0x41d919）が保存しており、gdb で `0x400000` を実測した（§2）。
 - 前の調査の「`0x15e6078` は `HInstance` に当たる（推測）」は **誤りだった**。§4 の選択肢 B（「HInstance が設定されない理由を調べる」）は成り立たない。
-- LoadIconW の引数 `(NULL, L"MAINICON")` を直すものは無い。hInstance が 0 なのは、ホスト exe が Delphi でない（MainInstance を設定しない）実機でも同じと読める。**判断が要るのは LoadIconW の答え方だけ**（§5）。
+- LoadIconW の引数 `(NULL, L"MAINICON")` を直すものは無い。hInstance が 0 なのは、ホスト exe が Delphi でない（MainInstance を設定しない）実機でも同じと読める。**未決なのは LoadIconW の答え方だけ**（§5）。
 
 ## 1. 書き込み元の調査（最優先の依頼）
 

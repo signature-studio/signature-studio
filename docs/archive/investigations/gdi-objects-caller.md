@@ -117,7 +117,7 @@ f_5d2680（初期化 unit。`getdc-caller.md` §3）は、`sub [0x15f2f70],1` �
 
 ## 7. その先に必要になる API の見通し（読みと推測。実装していない）
 
-1. **`kernel32!LoadLibraryW("Msctf.dll")`**（今回の停止点）。`fle_load.c` は「仮想モジュール」と「欠けていると定義した 9 つの DLL」（dwmapi、imm32、msimg32、propsys、rpcrt4、shcore、uxtheme、windowscodecs、wtsapi32）以外を停止する。msctf.dll をどちらにするかは、決定 0015 の範囲（PM の判断）。ゲストが NULL を許容する形に読める（§6）ので、「欠けている」にするなら変更は小さいが、**決定は PM**。実行はしていない。
+1. **`kernel32!LoadLibraryW("Msctf.dll")`**（今回の停止点）。`fle_load.c` は「仮想モジュール」と「欠けていると定義した 9 つの DLL」（dwmapi、imm32、msimg32、propsys、rpcrt4、shcore、uxtheme、windowscodecs、wtsapi32）以外を停止する。msctf.dll をどちらにするかは、決定 0015 の範囲で未決。ゲストが NULL を許容する形に読める（§6）ので、「欠けている」にするなら変更は小さいが、**決定は PM**。実行はしていない。
 2. 「欠けている」にした場合の次: f_5dea70 → NULL なら 0 を返すスタブ。続く処理は未読。
 3. ゲストが LoadIconW の戻り値（0x15f2f90）、stock のハンドル（0x15f2f78〜0x15f2f88）、標準パレット（0x15f2f68）を使う経路: SelectObject、SelectPalette、RealizePalette、GetPaletteEntries（f_5c4f30）、GetTextMetricsW（f_5d1a60。今回は通らない）、CreateFontIndirectW、CreateSolidBrush、CreatePen、GetObjectW、DeleteDC、CreateCompatibleDC、GetSysColor、DestroyIcon など。いつ届くかは未確認。届いたとき、SelectObject は DC の選択状態を持つ設計（0053 の DC 表の拡張）が要る。DeleteObject の「選択中は 0」（決定 0054 の撤回条件）はそのとき一緒に決める。
 4. ウィンドウ系（RegisterClassW、CreateWindowExW、メッセージ）は、`getdc-caller.md` §3 の閉包の thunk に無い。ただし間接呼び出しの先は追えていない。

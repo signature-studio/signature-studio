@@ -43,7 +43,7 @@ lfWidth、lfEscapement、lfOutPrecision、lfClipPrecision、lfQuality は読ま�
 
 ### 3.1 決定 0066 の仮の値が分岐に効く箇所（実測ではなく読み）
 
-- **lfPitchAndFamily の低位 4 ビット**: 0066 は 0（DEFAULT_PITCH \| FF_DONTCARE）にした。ゲストは 0 を `[obj+0x10] = 0`（不明）に、2 を `1` に写す。**実 Windows 10 の Segoe UI は VARIABLE_PITCH \| FF_SWISS（0x22）と記憶するが出典なし**で、そのとき `[obj+0x10] = 1` になる（推測）。つまり、0066 の仮の値 0 は、ゲストが読む分岐の結果を実機と変えうる。**0x22 に変えるかは PM の判断**（Learn の LOGFONTW は VARIABLE_PITCH と FF_SWISS の定義は書くが、システムフォントの値は書かない）。
+- **lfPitchAndFamily の低位 4 ビット**: 0066 は 0（DEFAULT_PITCH \| FF_DONTCARE）にした。ゲストは 0 を `[obj+0x10] = 0`（不明）に、2 を `1` に写す。**実 Windows 10 の Segoe UI は VARIABLE_PITCH \| FF_SWISS（0x22）と記憶するが出典なし**で、そのとき `[obj+0x10] = 1` になる（推測）。つまり、0066 の仮の値 0 は、ゲストが読む分岐の結果を実機と変えうる。**0x22 に変えるかは未決**（Learn の LOGFONTW は VARIABLE_PITCH と FF_SWISS の定義は書くが、システムフォントの値は書かない）。
 - **lfWeight 400**: 700 以上でないので太字フラグは立たない（caption が太字でないとして実 Windows と同じ可能性が高いが、出典なし）。
 - **lfCharSet 1**: `[obj+0x12]` に入る。DEFAULT_CHARSET の数値 1 は非公式（mingw）。
 - **lfFaceName**: `Segoe UI` を変換して `[obj+0x13]` へ。

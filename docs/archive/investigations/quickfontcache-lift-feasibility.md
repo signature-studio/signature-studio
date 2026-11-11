@@ -447,7 +447,7 @@ dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdat
 
 - ゲスト自身が `MessageBoxW` を出し、そのまま `GetProcAddress(NULL, …)` に進む。`fle_modules.c` は hModule が仮想モジュールのハンドルでなければ abort する（`registry-unit153.md` §6.1 の実測。`modec2`、`moded2` の停止 `unsupported instruction at 0x425180`、`fin-*` の停止 `GetProcAddress with hModule 0 …`）。つまり**停止が移るだけで先に進まない**。Learn の `GetProcAddress` は hModule が NULL のときの戻りを書かない（一次に無い）。
 
-## 9. 意見（別枠。決めない。PM の判断の材料）
+## 9. 意見（別枠。決めない。PM の決定の材料）
 
 この節は作業者の意見で、事実の節ではない。
 
@@ -455,7 +455,7 @@ dsp_ippv2 は `dsp-ippv2-lift-feasibility.md`、`two-module-*.md`、`dll-nonpdat
 2. **(b) 仮想モジュールと (c) absent は、決定 0073 の理由が当てはまり、勧めない**。特に QFC は FLEngine が呼ぶ 8 つの関数の実体（フォント、スレッド、タイマー、VST3、Python）を持つので、応答表の行を作ると 8 つの関数の意味の創作になる。(c) は §5.2 のとおりゲストが NULL で 0 番地を呼ぶ 4 名があり、「NULL 許容」の根拠も立たない。
 3. **QFC は dsp_ippv2 に依存する**（§6.1、Q5）ので、**(a) を採るなら dsp_ippv2 の実在モジュール化（決定 0073、0082。実装は W6 後）が先**になる。QFC だけを先に作る順序は、QFC の ATTACH が `dsp_ippv2.dll` を引くところで、dsp_ippv2 が実在でなければ止まる。
 4. 非 pdata の reloc 値は**種にしない**のが QFC には安全（§4.2。全件 17,541、葉らしい 155 個でも 48 の `bad_nodes`）。`--pdata` だけで起動の関数は足りている。ただし vtable 経由で `.pdata` に無い関数に入る可能性は未確認。
-5. 次の測定の候補（着手は PM の判断）: (1) `f_522e50` の `emcc -O0` による locals（`-c` コンパイルのみ。Blend2D の調査と同じ方法）。(2) `fe-pe rebase` で 0x1d00000 に置いた QFC と、dsp_ippv2（0x2000000）、FLEngine の 3 つをリンクして DllMain まで進める試作（決定 0080 の段階 2・3 の流儀。`gen_two.sh` が 1 つしか取らない点の確認を含む）。(3) 行なしの import のうち ATTACH で届く 10 名の仕様確認。
+5. 次の測定の候補（着手は PM の決定）: (1) `f_522e50` の `emcc -O0` による locals（`-c` コンパイルのみ。Blend2D の調査と同じ方法）。(2) `fe-pe rebase` で 0x1d00000 に置いた QFC と、dsp_ippv2（0x2000000）、FLEngine の 3 つをリンクして DllMain まで進める試作（決定 0080 の段階 2・3 の流儀。`gen_two.sh` が 1 つしか取らない点の確認を含む）。(3) 行なしの import のうち ATTACH で届く 10 名の仕様確認。
 6. **この調査は QFC の ATTACH を実行していない**ので、§6.2 の「unit 88、129 が ATTACH で `LoadLibraryW` する」は読みにとどまる。結論を出す前に、リベース済みの QFC を FLEngine と同じハーネスで DllMain まで走らせる測定が要る（stage23 の手順）。
 
 ## 10. 未確認

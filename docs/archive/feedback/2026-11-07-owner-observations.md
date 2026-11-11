@@ -19,18 +19,18 @@
 | O9 | Settings → General は開くが、**スクロールすると描画が崩れる**(縞、空白帯、行の重なり、一部の文字が横に潰れる。ホバーした要素だけ正しく戻る。以前の window ghosting に似る) | B(ScrollWindowEx/ScrollDC/無効領域の契約、フォントの幅)の疑い | alpha1(契約)、gpu1(再現) | 未調査 |
 | O10 | テーマ・言語・テンプレートなどの**コアなデータが無い**。意図したものか | C(意図ではない。seed は約 222 ファイルのみ) | opt1(記録)、mt3(配信設計) | 判断済み(下) |
 | O11 | FL 内蔵のサンプルが使えない(例: `Data\Patches\Packs\Drums (ModeAudio)\Kicks` に WV Audio *.wv が 349 個) | C+B(WavPack 復号など) | opt1、mt3 | 未着手 |
-| O12 | `FL Studio 2026\Data` は 792 MB、`Plugins` は 867 MB。**これらの資材はすべて製品で使えるべき**。読み込み時期(FL 窓を先に描いて背景で取得するか、全 1.62 GB を OPFS に置いてからエンジンを始めるか)は PM が決める | C | PM 決定(下) | 判断済み |
+| O12 | `FL Studio 2026\Data` は 792 MB、`Plugins` は 867 MB。**これらの資材はすべて製品で使えるべき**。読み込み時期(FL 窓を先に描いて背景で取得するか、全 1.62 GB を OPFS に置いてからエンジンを始めるか)は PM 決定(下) | C | PM 決定(下) | 判断済み |
 | O13 | 機能の大半が使えない: 内蔵楽器が無い、サンプルが無い、OPFS に置いた音声ファイルを FL が認識しない、Sampler に音声ファイルを指定すると落ちる、コード進行ツールをクリックすると落ちる。**メトロノーム以外に『音を出す』最初の一歩ができていない。1 拍目が鳴らない問題が未解決。音声は常時ストリームか。『無音で切る』処理を書いたなら除去する** | A/B/C | mt3(音声経路の点検)、gpu1(再現)、alpha1 | 点検中 |
 | O14 | 変な落ち方がまだある(特定の画面の特定のつまみを回すと落ちる、など)。『動かない物を個別に直さず仕組みを直す』方針は全体に周知・徹底されているか | 方針 | PM | 監査(下) |
 | O15 | (追記 06:51)ネイティブでも、再生中に FL の窓を動かすと window ghosting が起きる。ただし依頼者がギリギリ認識できる短時間で解消する。メーター・音声に資源を割く FL 自身の最適化の帰結で、ghosting が出てもメーターのフレームレートは落ちず、音も途切れない | D(FL 自身の挙動。我々は手を加えない) | alpha1(解消の速さの比較) | 記録 |
 
-## PM の判断(2026-11-07 06:55)
+## PM の決定(2026-11-07 06:55)
 1. 資材: `Data` 792 MB と `Plugins` 867 MB の**全体**を製品で使えるようにする。方式は遅延読み込みの仮想ファイルシステム: 起動時にディレクトリ索引(木・サイズ・属性)だけを読み、FindFirstFile 系と GetFileAttributes が全域で効く。中身は要求時に取得(R2 の pack から HTTP range)し、OPFS に保存、背景で先読みする。エンジンの起動は索引と seed が揃った時点(P1 を保つため。1.62 GB を OPFS に置き終えてから始める方式は P1 を壊すので採らない)。事前の調査(opt1): ディレクトリの記録(件数・サイズ・拡張子)、起動時に FL が開くファイル、ブラウザ/テンプレート/テーマ/言語が開くファイル。
 2. 方針の周知: `docs/policies/lift-fidelity.md` は存在するが、『1 つの API の停止を 1 件ずつ直す』形が続いていたのは事実。全員に依頼者の文面つきで再通知し、『画面ごとの修正』でなく『契約ごとの網羅(import の census)と停止の系統的な扱い』で進める。監査は PM が行い、結果を本書に追記する。
 3. 音声: 『無音で切る』種の処理が app/ や runtime にあるか、1 拍目の欠落の原因を mt3 が点検する(あれば除去)。
 4. O15 は FL 自身の挙動なので、我々は再描画や隠蔽の処理を足さない。比べる物は『解消までの速さ』と『メーターの fps・音が落ちないこと』。
 
-## PM の判断の追記(07:21、worker の第 1 回の報告〔0318 未着、0319 alpha1、0320 opt1、0313 §15〜§18 mt3、0321 ci1〕を読んだ後。docs のみ)
+## PM の決定の追記(07:21、worker の第 1 回の報告〔0318 未着、0319 alpha1、0320 opt1、0313 §15〜§18 mt3、0321 ci1〕を読んだ後。docs のみ)
 
 読んだ範囲は読み・静的解析・原本の読み取り専用の棚卸しで、依頼者の機械の値は 0 件。実エンジンを動かした観察は gpu1 の Balance の窓(stage 3)と alpha1 の node G3 のみ。
 
@@ -50,7 +50,7 @@
 | O17 | 『現在のWorkersにおいて、検証用プロジェクトを読み込むことで再生まで行えましたが、音が途切れる、再生が停滞するなどにより、ほとんどリアルタイムでの再生が滞っています。何度か試しましたが、Track 1-5,7,13,15-17,19,20のみのSoloにすることでギリギリでリアルタイムの再生が成立しています。現在一切のインストゥルメントが提供されていないため、サンプルのみの再生となります。今後内蔵インストゥルメントやSerum 2などの外部インストゥルメント、EQなどを追加していく上で、このパフォーマンスは致命的です。』 | P3(協調 1 Worker の飽和)。我々の測定(曲の重い区間でミキサー 1 周の仮想時間 3 ms→165〜270 ms、書き込み率 1/3。0273・0274)と整合 | mt3(RT-1: 実スレッド版の本番化)、ci1(counted の S3a の掃引) | **最優先に引き上げ** |
 | O18 | 『ウインドウやノートの端をホバーしたり、トラック内やボタン上をホバーしても、マウスカーソルが変化しません。』 | (b): HCURSOR の絵と hotspot をブラウザの CSS カーソルへ渡していない(`app/src/ui/cursor.ts`、S-module-cursor-default / S-created-cursor-default、決定 0141・0322 の 4-7)。IDC の標準カーソルだけが変換される | ci1(runtime + page の差分) | 差分の作成 |
 
-### PM の判断(O16〜O18)
+### PM の決定(O16〜O18)
 1. **P3 を最優先に引き上げる。** 本番(協調 1 Worker)は、依頼者の 16 コア級の機械でもサンプルだけの再生で飽和している(定性的。依頼者の機械の値は我々の測定ではない)。FL は本来 ミキサーを複数スレッドに分けるので、**実スレッド版(B1/B2、S3a の Worker 数)を本番に入れる方向に切り替える**(RT-1)。以前の関門『T が協調 +2 ms 以内になるまで main に入れない』(4e 23:44)を外し、新しい関門にする: ①数の基準(5 分再生で PCM の零の連続・distinct 書き込み・underrun・Unlock 間隔)を満たす、②入力の T の中央値が協調の +10 ms 以内(B1 の実測は File クリック +9.9 ms、Esc +8.7 ms)、③ present の rate が協調より落ちない。T は並行して S2(0312c)で縮める。理由: 音が途切れて再生が成立しないことは製品として致命で、+10 ms の入力遅延(60 Hz の 1 フレーム未満)は耐えられる。
 2. **計測**: 既存の B2 bundle `fl-engine-ci-8b2eb5d7` の `engine.env` の `FLE_WORKERS` を 2・4・8・16 に変える掃引(再 build 不要、0312c §5c)と対照の E13、条件は参照プロジェクトの 5 分再生(全トラック)と『Solo 12 本』(依頼者の条件)。ci1 が counted の Chrome で行う(Wine の窓の後、gpu1 の cand1 の V3 の合間)。
 3. **O18**: 絵と hotspot の受け渡し(CreateIconIndirect の ICONINFO、LoadImage/LoadCursor の resource、ILCursors.ilfont 由来)を runtime が appview に出し、page が handle ごとに CSS の `cursor: url(...) x y` を当てる。サイズ上限と HiDPI(image-set 2x)に注意。FL のクラス名・カーソルの種類による分岐は足さない。
@@ -121,7 +121,7 @@
 |---|---|---|---|---|---|
 | O19 | Solo の限定条件でも、Mixer 表示・マウス移動で再生が破綻する。オーディオと GUI が相互に影響している | P3。協調 1 Worker(E13)の観測として整合する(1 Worker に全部が載る。我々の P3 の run は『play して放置』が主で、依頼者の条件〔Mixer 表示、マウス移動〕を含まず、この違いを測っていない)。RT-A/B(GIL=1、N=8)でも GIL が GUI の重い区間とオーディオ thread を直列化するなら、同じ構造が残る。**未測定: RT で依頼者の条件を再現したか** | P3 の測定の欠落 + 設計(GIL の粒度、audio thread の分離) | ci1(依頼者の条件 4 つ〔放置・Mixer 表示・Mixer 上でマウス往復・Playlist 上でマウス往復〕を E13 と RT で n=2 から。計時の窓で)、mt3(GIL 保持時間の見積り・待ち時間の診断の設計・別 Worker の 3 案。読みのみ、期限 13:20) | 測定と設計の準備中 |
 
-PM の判断: (1) 『オーディオと GUI を別 Worker にする』は、現在の RT(ゲストの thread = 別 Worker)ですでにその形かを実装で確かめるのが先(mt3 の読み)。GIL がオーディオ thread を GUI の重い区間の間止めるなら、別 Worker にしても直列のまま。(2) 測定の目標を『play して放置』から『依頼者の操作を含む条件』に広げる(P3 の gate に追加: Mixer 表示・マウス移動の条件で underrun 0)。(3) これまでの RT-A の『underrun 0』は放置条件のみで、依頼者の条件では未確認。依頼者の機械での値は 0 件のまま。
+PM の決定: (1) 『オーディオと GUI を別 Worker にする』は、現在の RT(ゲストの thread = 別 Worker)ですでにその形かを実装で確かめるのが先(mt3 の読み)。GIL がオーディオ thread を GUI の重い区間の間止めるなら、別 Worker にしても直列のまま。(2) 測定の目標を『play して放置』から『依頼者の操作を含む条件』に広げる(P3 の gate に追加: Mixer 表示・マウス移動の条件で underrun 0)。(3) これまでの RT-A の『underrun 0』は放置条件のみで、依頼者の条件では未確認。依頼者の機械での値は 0 件のまま。
 
 
 ## 依頼者の追加報告 O19 続き・O20(2026-11-07 13:20。**いずれも本番 E13 での依頼者の観測**。我々の測定ではない。記録のみで、原因は未特定)
@@ -133,7 +133,7 @@ PM の判断: (1) 『オーディオと GUI を別 Worker にする』は、現�
 | O20-2 | **Tempo をドラッグで少しでも上下すると、Tempo が確実に 522 になり、以後ドラッグしても 522 から動かない**(一度ドラッグすると二度と動かせない) | 仮説: FL はドラッグ中にカーソルを隠し、毎回 SetCursorPos(中心)で戻して『GetCursorPos − 中心』を増分に使う。runtime の SetCursorPos は静的な位置を持つだけでブラウザの実ポインタは動かない(fle_win.c:5633 `set_pointer`)ため、次の pointermove で増分が大きな一定値になり上限 522 に張り付く、という構造が成り立つか。**この読みは未検証**(alpha1 が Learn/runtime/page を読み、必要なら観測のみの diag を設計) | (b) の疑い(SetCursorPos/GetCursorPos/ShowCursor/ClipCursor とポインタの契約。ブラウザでは Pointer Lock の movementX/Y が候補) | gpu1(再現: 各段の値と pointermove の座標)、alpha1(契約の読み) |
 | O20-3 | マウスカーソルがまだ変化しない | O18 の継続(HCURSOR の絵と hotspot をブラウザの CSS カーソルへ渡していない)。ci1 の差分待ち | (b) | ci1 |
 
-PM の判断: (1) O20-2 は『ドラッグした値が一定値に張り付く』という実害が明確で、以後 Tempo を操作できないため、GUI 操作の基本として優先して調べる(gpu1 の再現 → alpha1 の契約の読み)。(2) 『なぜこれまで漏れたか』: 我々の実 Chrome の確認は Tempo のドラッグを含んでいなかった。操作の網羅(1・2 行目の要素のドラッグ・右クリック)を gpu1 の scenario に足す。(3) 依頼者の機械の値は 0 件のまま。
+PM の決定: (1) O20-2 は『ドラッグした値が一定値に張り付く』という実害が明確で、以後 Tempo を操作できないため、GUI 操作の基本として優先して調べる(gpu1 の再現 → alpha1 の契約の読み)。(2) 『なぜこれまで漏れたか』: 我々の実 Chrome の確認は Tempo のドラッグを含んでいなかった。操作の網羅(1・2 行目の要素のドラッグ・右クリック)を gpu1 の scenario に足す。(3) 依頼者の機械の値は 0 件のまま。
 
 ## PM の追記(2026-11-07 13:24): 12:30〜13:20 の切り分け(実 Chrome 156・Wine 10。依頼者の機械は 0 件)
 
@@ -294,7 +294,7 @@ PM の判断: (1) O20-2 は『ドラッグした値が一定値に張り付く�
   - **G2 overall: NOT PASS。** pointermove queue 自体は同等だが、再生中の button/key の T が +10 ms を大きく超える。
 - **G3(present rate)**: O19 round1/round2 present/s は shown E13 15.2/16.4、RT-A 31.9/30.2、hidden E13 20.6/17.1、RT-A 39.8/38.8、allhidden E13 20.5/19.1、RT-A 45.7/43.2。C full-song mean: shown E13 14.4 / RT-A 27.8、allhidden E13 19.3 / RT-A 41.4。D3 shown 60s: 31.58/s。E13 shown 14.4〜16.4/s を下回らない。**G3 pass**(協調より低下なし。D3 は shown のみ測定)。
 - **G6(Firefox 158)**: 起動 ok(RT-D3 engine-idle、first idle 4,621 ms in report)。About は Settings -> About タブ表示は確認。ただし layered logo は 3x3 のままで、staff roll の About 本文は見えない(seed 資材が無い)。ja-names FLP: Channel rack 1行目と Playlist header が tofu box として描かれる。log に msgothic.ttc の seed が無く(arial/tahoma/lucon のみ)、日本語フォントは未解決と記録。Playback は進んだ(audio-p3 playingSeconds 77.4、nonSilentQuanta 5512、underrun 0)。**G6 は partial：起動/About tab/project/playback は動作するが、About seed assets と日本語フォントは未解決。full pass とはしない。**
-- **PM の判断**: G2 の playback の fail(+28.36 ms / +14.52 ms)は GIL 保持の長時間 API による T の増加と読める(未確認)。S2(0312c 時間計測)の縮小対象は再生中の button/key の T である。G3 の present は協調より落ちない。
+- **PM の決定**: G2 の playback の fail(+28.36 ms / +14.52 ms)は GIL 保持の長時間 API による T の増加と読める(未確認)。S2(0312c 時間計測)の縮小対象は再生中の button/key の T である。G3 の present は協調より落ちない。
 - 依頼者の機械は 0 件。
 
 
@@ -308,7 +308,7 @@ PM の判断: (1) O20-2 は『ドラッグした値が一定値に張り付く�
   - 予測 ③(pointerX 不変): **x=450 のまま全期間**。
   - 予測 ②(y≥32 は回り込まない): drag 2 の y=30(=32 未満)で 1 回だけ 1046(=30+1016)へ回り込み、**y=40,50,…,100 では host の値をそのまま追随**(37,47,…,97。+7 の垂直バイアスあり。値の変化は +80px→−20 で正しい)。
   - PM が trace で確認: `eval-ptr-trace.json` の履歴に回り込みの遷移があり、x は 450 のままです(Browser の実位置 (450,20) の記録も混在)。
-- **目撃した挙動(参考。今回の再検証の要件の外)**: 2 回目の drag の後に guest pointer は (450,17) へ戻り(FL の drag end の end() が drag 開始点へ復帰)、次の host move(450,20)で guest は 0 へ飛び、その後の drag 3・4 の host には応答しなかった(Tempo は 180 のまま)。= 「top edge を含むその後の drag での再アンカー」は Windows っぽい挙動だが、RT-B では drag 3/4 も動いていたので、**RT-E の仮想ポインタで drag 3/4 が効かない**のは要確認の余地がある。PM の判断対象として記録する(検証条件の外)。
+- **目撃した挙動(参考。今回の再検証の要件の外)**: 2 回目の drag の後に guest pointer は (450,17) へ戻り(FL の drag end の end() が drag 開始点へ復帰)、次の host move(450,20)で guest は 0 へ飛び、その後の drag 3・4 の host には応答しなかった(Tempo は 180 のまま)。= 「top edge を含むその後の drag での再アンカー」は Windows っぽい挙動だが、RT-B では drag 3/4 も動いていたので、**RT-E の仮想ポインタで drag 3/4 が効かない**のは要確認の余地がある。未決の点として記録する（検証条件の外）。
 - **右クリック(WM_CONTEXTMENU 差分の検証)** — class (b):
   - **RT-E でも出ない**。6 要素(Tempo (450,20) / Song Position (485,20) / Pattern Selector (615,61) / Channel rack ボタン (520,144) / Playlist 空き (1500,900) / Mixer insert 名 (505,690))の全てで、右クリック後に `TQuickPopupMenuWindow` は現れない(右クリック後の pics の窓一覧は主窓 1 枚だけ)。対照は左クリックの File メニューで **TQuickPopupMenuWindow @4,36 208x333 が出る**(RT-B と同一)。
   - ページの記録(lat-final.json): 6 組の右ボタン down/up は全てエンジンへ送られ、guest の screen 座標も正しい。= 入力自体は届いている。
@@ -357,7 +357,7 @@ PM の判断: (1) O20-2 は『ドラッグした値が一定値に張り付く�
   - **playback key down: E13 3.97、RT-F 17.95、diff +13.98 ms(fail、p90 10.44 vs 27.07)**。
   - **G2 overall: NOT PASS。** RT-D3 の playback +28.36 / +14.52 から若干改善したが、依然 +10 ms を超える。queue insertion 自体は同等(+0.02 ms)なので、劣化は engine 側の処理・frame 提供の待ちにあるとみられる。
 - **G6(Firefox 158)**: 起動 ok(RT-F engine-idle、first idle 約 4.1 s、opErrors なし)。About は Settings → About タブ表示は確認。ただし layered logo は 3x3 のままで、staff-roll の About 本文は見えない(BigFruit/AboutTxt の seed 資材欠落は未解決、RT-D3/RT-E から不変)。ja-names FLP: Channel rack 1行目が tofu box で描かれる。log に msgothic.ttc の seed が無く(arial/tahoma/lucon のみ)、日本語フォントは未解決(RT-D3/RT-E から不変)。Playback は進んだ(audio-p3 playingSeconds 76.9、nonSilentQuanta 5508、underrun 0)。**G6 は partial**。起動/About tab/project/playback は動作するが、About seed assets と日本語フォントは未解決。full pass とはしない。
-- **PM の判断**: G2 の playback の fail(+23.58 ms / +13.98 ms)は engine 側の処理・frame 提供の待ちによる。GIL 保持の長時間 API が有力候補だが、未確認。
+- **PM の決定**: G2 の playback の fail(+23.58 ms / +13.98 ms)は engine 側の処理・frame 提供の待ちによる。GIL 保持の長時間 API が有力候補だが、未確認。
 - 依頼者の機械は 0 件。
 
 
@@ -385,7 +385,7 @@ PM の判断: (1) O20-2 は『ドラッグした値が一定値に張り付く�
   - **playback File click: E13 16.46、RT-F 39.83、diff +23.37 ms(fail、p90 23.12 vs 49.97)**。
   - **playback key down: E13 3.85、RT-F 14.55、diff +10.71 ms(fail、p90 12.10 vs 25.81)**。
   - **G2 overall: NOT PASS。** RT-D3(+28.36 / +14.52)から若干改善したが、まだ +10 ms を超えている。劣化は queue 投入ではなく engine 側の処理・frame 提供の待ちに寄っている。
-- **PM の判断**: G2 の playback の fail(+23.37 ms / +10.71 ms)は engine 側の処理・frame 提供の待ちによる。GIL 保持の長時間 API が有力候補だが、FLE_DIAG_GIL が出ないため未確認。diag-g9mix の expos window 210,000–212,500 に 0 calls は expos 定義の修正が必要です(Export 開始の 24 連続 137/138 の呼びの先頭 scum を expos 0 とする形)。
+- **PM の決定**: G2 の playback の fail(+23.37 ms / +10.71 ms)は engine 側の処理・frame 提供の待ちによる。GIL 保持の長時間 API が有力候補だが、FLE_DIAG_GIL が出ないため未確認。diag-g9mix の expos window 210,000–212,500 に 0 calls は expos 定義の修正が必要です(Export 開始の 24 連続 137/138 の呼びの先頭 scum を expos 0 とする形)。
 - 依頼者の機械は 0 件。
 
 

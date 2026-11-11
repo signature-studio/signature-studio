@@ -23,7 +23,7 @@
 4. **既定のビルドは変わらない（読み。バイナリの SHA は測っていない）**: 新しいコードは `#ifdef FLE_FRUITY` と、`FRUITY=1` のときだけ動く分岐の中にある。`main_two.c` の `#ifdef FLE_FRUITY` ブロック 7 個を取り除くと HEAD の `main_two.c` と**行単位で一致する**（**実測**、python）。`merge_tables_n.py` は `--extra-rows` を付けなければ、合成した表で common.c も出力行も**バイト単位で一致する**（**実測**）。基準の native の SHA-256 `9c76bc6a…a23785` が再現するかは第 2 段階で測る（§10）。**【第 2 段階の結果: 既定のビルドのビットは変わっていないが、基準の値は `9c3244281cd3696c065ebb41ea674b67605c5b8433c8310d0f13719a3ba32f37` に変わっている（d7336ad の `a4.c` による）。冒頭の更新を参照】**
 5. **署名検査（WinVerifyTrust）は何も答えない**。応答表に行がないので、ゲストが `wintrust.dll!WinVerifyTrust` の thunk（VA 0x4256d0）に入ると `fle: unsupported instruction at 0x4256d0` で止まる（読み）。停止レポートがその引数（GUID、`WINTRUST_DATA`、検査対象のパス）を出す。「検証成功」を返す実装は足していない（§8）。
 6. **見つかったこと（静的な読み。§3）**: (a) FL64.exe のスロット 2 の比較は `index` の **64 ビット符号なし**比較（`cmp r8, 1; ja`）。以前の文書の「`index <= 1`」はこの意味で、負の index は 0。(b) FL64.exe は `instance` 変数を呼ぶ前に 0 にする。(c) `CreateFruityInstance` の最初の `WinVerifyTrust` 呼び出し（0x1375bce）より前に、直接の `call` で届く import のうち応答表に行がないのは `advapi32!RegDeleteKeyExW` だけ（下限）。したがって最初の停止は WinVerifyTrust になる**可能性が高いが、確定ではない**。(d) 最初の WinVerifyTrust より後に、直接の `call` で届く未応答の import が **113 個**ある（`PeekMessageW`、`TranslateMessage`、`DispatchMessageW`、`WaitMessage`、`MsgWaitForMultipleObjects`、`ShowWindow`、`DirectSoundCreate`、`CreateThread` など。下限）。**署名検査に答えるだけでは先へ進めない**。
-7. **PM の判断が要る点は §12**（スタブの受け方、署名検査への答え、ブロッキングの扱い、既定バイナリ不変の解釈など）。
+7. **未決の点は §12**（スタブの受け方、署名検査への答え、ブロッキングの扱い、既定バイナリ不変の解釈など）。
 
 ## 1. 入力と手順
 
@@ -151,7 +151,7 @@ D の制約: 結合済み表は実モジュールが 1 つ以上のビルドに�
 - **何も答えない**。`WinVerifyTrust` に応答表の行を足していない。ゲストが `wintrust.dll!WinVerifyTrust` の thunk（VA 0x4256d0）に入ると `fle_unsupported(0x4256d0)` → `fle: unsupported instruction at 0x4256d0` で SIGABRT（決定 0077 §2 の挙動。読み）。停止レポートの 2 と 6 が「どこで・何の引数で」を出す。
 - **呼ばれる場所（読み）**: 自己検査が 0x1375bce（`dwStateAction = 1`）と 0x1375bf8（`= 2`）。`Flags` のビット 0 が 0（FL64.exe の値）なので、ホスト exe の検査が 0x1376023 と 0x137604d。これらの前後に `CryptQueryObject`、`CryptMsgGetParam`、`CertFindCertificateInStore`、`CertGetNameStringW`、`CertFreeCertificateContext`（いずれも応答表に行なし）が続く。
 - **`Flags` を変えて検査を避けることはしていない**（FL64.exe は 0。ビット 0 でも自己検査は残る）。
-- 「検証成功」を返すかどうかは**環境の主張**で、PM の判断（§12 J5）。
+- 「検証成功」を返すかどうかは**環境の主張**で、未決（§12 J5）。
 
 ## 9. 変更したファイル（`fruity.diff`。HEAD の clean な archive に `patch -p1` で当たる）
 
@@ -259,7 +259,7 @@ SIGABRT／SIGSEGV は gdb が先に止まる。上限での停止は `FLE_FRUITY
 
 合計で数百行の変更。時間の見積もりは、測っていないので書かない。
 
-## 12. PM の判断が要る点・解釈が分かれた点（決めていない）
+## 12. 未決の点・解釈が分かれた点（決めていない）
 
 | ID | 内容 | 採った暫定（この実装） | 他の選択 |
 |---|---|---|---|

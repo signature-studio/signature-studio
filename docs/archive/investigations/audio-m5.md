@@ -415,7 +415,7 @@ Execute(this):
 | **S3** | wasm と AudioWorklet(**B: 実時間**、C の混成)。SAB のリング、`AudioContext`(user gesture)、COOP/COEP。`consumed` の源を Worklet の消費フレームに差し替え(`fle_audio_consumed()`) | `browser-event-loop.md` §8 と同じ「定常アンダーラン 0」を**エンジン側のブロックで**再現(48/44.1 kHz、リング ≥ 8192 フレーム)。**G7 の字義を満たす** | M〜L | **実エンジンのミキサーの 1 ブロックの計算が実時間を超える**(アンダーランが出る)。Safari の JSPI/AudioWorklet が未確認(`thread-model.md` の引用) |
 | **S4** | ASIO(**不要が S0 で確認できれば作らない**)。`IASIO` の 24 スロットの vtable、`IClassFactory`、`CoCreateInstance`/`software\asio` の仮想レジストリ、ドライバーのスレッド(AudioWorklet が `bufferSwitch` の呼び元) | — | L | **ILWASAPI2ASIO が音声経路に絡む(ライセンス・認証)と分かったら止まる**(下) |
 
-### 7.2 PM の判断点
+### 7.2 未決の点（PM の決定待ち）
 
 1. **G7 の字義**(`goal-ladder.md` 39 行): 「AudioWorklet が一定のブロックを連続して受け取る」を**エンジンのミキサーが書いたブロックで**要求するか、**DS の状態モデルが通ること(S1+S2)で足りる**とするか。前者は S3 まで、後者は S2 まで。**私は S3 までを推奨**(G7 の「AudioWorklet」の字義)。**S2 までの完了を G7 達成と数えない**(エンジン側の動作に限り、ブラウザへの出力が無い)。
 2. **再生位置の源**: **A(仮想時計)→ C(混成)** を推奨。**B のみ**にするとテストの決定性を失い(決定 0017、A5 のオラクル)、**A のみ**では G7 の「音が出る」を言えない。
