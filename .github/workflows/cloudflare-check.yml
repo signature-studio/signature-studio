@@ -313,6 +313,8 @@ jobs:
             echo "wrangler が無い(依存関係の準備が失敗)"
             exit 1
           fi
+          # wrangler.jsonc の assets.directory(./dist)が無いと dry-run が止まる。空のまま置く(アップロードはしない)
+          mkdir -p app/dist
           if ( cd app && ./node_modules/.bin/wrangler deploy --dry-run --outdir "$G/out" ) > "$G/dry.log" 2>&1; then
             echo "現在のビルド(dry-run): 成功"
           else
@@ -362,10 +364,10 @@ jobs:
                   name = p.get_filename() or p.get_param('name', header='content-disposition') or '?'
                   parts.append((str(name), p.get_content_type(), data))
               print('本文の部品: ' + '; '.join(f'{n} ({t}, {len(d)} B, SHA-256 {sha(d)})' for n, t, d in parts))
-              mods = [x for x in parts if x[1] != 'application/json']
-              if not mods:
-                  fail('本文に module の部品が無い(比べられない)')
-              main = max(mods, key=lambda x: len(x[2]))[2]
+              mods = [x for x in parts if 'javascript' in x[1]]
+              if len(mods) != 1:
+                  fail(f'JavaScript の部品が 1 つでない(件数: {len(mods)})。比べられない')
+              main = mods[0][2]
           else:
               main = body
           outs = sorted(glob.glob(f'{G}/out/*.js'), key=os.path.getsize, reverse=True)
