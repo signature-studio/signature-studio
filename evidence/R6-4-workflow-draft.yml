@@ -1,10 +1,12 @@
 # R6-4 の草案。実行していない。この場所は .github/workflows/ の外(置けば push で走る)。本番の場所への移動は reviewer の検査の後。
 # 書き込み先は R2 fl-web-assets の root の manifest.json と backup/ 以下だけ。Secrets は 3 つだけ。
 # 出すのは段の結果・sha256・大きさ・engine.kind・bundle 名・退避のキー名だけ。アカウント ID は実行時に得て ::add-mask:: する。
+# 一回限り。成功したら、次の commit でこのファイルを削除する(on: push のため、同じファイルの再 push で書き換えが再実行されるのを防ぐ)。段 1 の「sha が E13 の値なら何もしない」が再実行の二重書き込みを防ぐ。
 name: default-entry
 
 on:
   push:
+    branches: [main]
     paths:
       - ".github/workflows/default-entry.yml"
 
@@ -285,6 +287,7 @@ jobs:
           }
           SHA=$(sha256sum "$W/root4.json" | cut -d' ' -f1)
           SIZE=$(stat -c %s "$W/root4.json")
+          [ "$SHA" = "57817472d5a0ea2d07c0859d45ace925086800b98e952107eabc61322e9e12dd" ] || { echo "root の sha256 が E13 の値と違う(段 5 で戻す)"; exit 1; }
           python3 - "$W/root4.json" "$SHA" "$SIZE" <<'PY' || exit 1
           import json, sys
           m = json.load(open(sys.argv[1]))

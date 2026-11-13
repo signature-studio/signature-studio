@@ -31,7 +31,7 @@
 - 取り込み前: `evidence/R1-1-before.log` → 2416・1・1(SKIPPED 0)。
 - 取り込み後(スタブ込み): `cd lift && cargo test --workspace --offline --no-fail-fast`(`FLENGINE_PE` は `binaries/win64/FLEngine_x64.dll`)→ rc 101、通過 2416・失敗 1・無視 1・SKIPPED 0。`grep -c 'undefined reference' evidence/R1-final.log` → 0。ログ `evidence/R1-final.log`(227 KB)。
 - 取り込み件数: L01 = 16 ファイル、L02 = 5、L03 = 2、L04 = 3(`evidence/R1-dryrun.md` の表と一致)。
-- パッチの当て方: dry-run rc 0 → 本適用 rc 0。`.rej` 0。GNU patch の `.orig`(`lift/runtime/fle_input.c.orig`)は作業物として削除。
+- パッチの当て方: dry-run rc 0 → 本適用 rc 0。`.rej` 0。GNU patch が `fle_input.c` の隣に作る `.orig` ファイルは作業物として削除。
 
 ## 未確認
 - 実エンジン(FLEngine)は実行していない。4 本のパッチの意味上の正しさ(Wine との差、実エンジンでの挙動)は未確認。

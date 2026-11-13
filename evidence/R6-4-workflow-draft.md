@@ -1,6 +1,6 @@
 実エンジン: 実行なし(草案。R2・Worker に書き込んでいない)
 書き込み先: root の manifest.json と backup/ 以下だけ
-草案の場所は .github/workflows/ の外(evidence/R6-4-workflow-draft.yml)。置けば push で走るため、本番の場所への移動は reviewer の検査の後
+草案の場所は .github/workflows/ の外(evidence/R6-4-workflow-draft.yml)。置けば push で走るため、本番の場所への移動は reviewer の検査の後。一回限り。成功したら、次の commit でこのファイルを削除する(on: push のため、同じファイルの再 push で書き換えが再実行されるのを防ぐ)。段 1 の「sha が E13 の値なら何もしない」が再実行の二重書き込みを防ぐ
 
 # R6-4 草案の読み合わせ(設計 `evidence/R6-4-design.md` §2 との対応)
 

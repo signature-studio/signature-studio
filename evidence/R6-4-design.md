@@ -14,6 +14,7 @@
 - 決定 B(退避の名前): `backup/manifest-root-<UTC 時刻>.json`。根拠: 依頼の「fl-web-assets の root の外」を優先した。依頼の例 `manifest.backup-<日付>.json` は root に置かれ、文言と食い違うため。時刻を入れるのは、前回の退避を上書きしないため。
 - 決定 C(前提が未確認の間は書かない): §1 の G1 が通るまで `.github/workflows/default-entry.yml` を commit しない。根拠: 手順 4(iv)。`app/worker` が最初に入ったのは `14268c2`(2026-11-10)、版 2cb938be は 2026-11-07 作成(`evidence/R6-1b.md` §2)。
 - 決定 D(一回限り): ワークフローは書き換えを 1 回行い、成功後の次の commit で `default-entry.yml` を削除する。根拠: `on: push` のため、同じファイルを再 push すると書き換えが再実行される。再実行は、root が既に E13 と同じなら何もしない(段 1)。
+- 決定 E(方式の変更): R6-4 の既定の入口の差し替えは、ROADMAP の `wrangler versions deploy`(100%)ではなく、R2 の root `manifest.json` を E13 の manifest と同じバイト列に書き換える 1 件で行う。根拠: Worker は R2 の root を要求ごとに読む(§1)。版 2cb938be の module は現在の `app/worker` のビルドと SHA-256 一致(`evidence/R6-4-g1.md`)。R2 の E13 の 5 件は手元と全桁一致(`evidence/R6-2d.md`)。分類: 通信・変換の削減(Worker の新しい版の作成・配備を避け、データの 1 件の差し替えにする。新しい処理・分岐は足さない)。ROADMAP の R6-4 の行は変えない(文言の差はこの決定に書く)。
 
 ## 1 Worker の配信の読み(`app/worker/index.ts`・`app/shared/headers.ts`・`app/shared/manifest-guard.ts`)
 
@@ -45,7 +46,7 @@
 
 - (i) 書き換えの根拠: E13 は手元で実行確認済み(`evidence/R0-2.md`・`evidence/R0-3.md`)。R2 の中身は手元と同じ(`evidence/R6-2d.md`)。
 - (ii) 書き換えの前後で確かめる物: root の engine.kind・bundle 名・wasm の大きさ(段 1 と段 4 のログ)。
-- (iii) 公開ホストの確認は依頼者機の計測(R4-5)で行う。結果が `engine-idle` でなければ、退避から戻す(§4)。R4-5 の依頼(`docs/requests/0002-owner-machine-measurement.md`)はまだ無い。
+- (iii) 公開ホストの確認は依頼者機の計測(R4-5)で行う。結果が `engine-idle` でなければ、退避から戻す(§4)。R4-5 の依頼は GitHub の issue 3 に出した(`docs/requests/0002-owner-machine-measurement.md`)。
 - (iv) 前提が崩れたら書かない: G1 が未確認の間は commit しない(決定 C)。
 - 残るギャップ(未確認): 公開ホストの応答、Worker 経由の wasm の配信(§1 の最後の行)、版 2cb938be の中身。
 
