@@ -43,7 +43,7 @@ typedef struct {
     int32_t cl, ct, cr, cb;             /* decision 0244: the box of the window region (SetWindowRgn) in the window's own coordinates, inside [0, w] x [0, h]; the whole window when it has none */
     int32_t gx0, gy0, gx1, gy1;         /* decision 0244, LF_GLASS: the inner rectangle of the client area that the extended frame does not reach (the fourth byte is not read there); empty for the sheet of glass */
     const fle_rsurf *surf;
-    char cls[48], title[80];            /* diagnostics only (fle_desk_describe): the window's class name and title as printable ASCII; nothing in the compositor reads them */
+    uint64_t hwnd;                      /* decision 0322: fle_desk_describe (diagnostics only) reads the class name and the title through it when it is called, not at every compose */
 } dwin;
 
 static uint32_t *pic;                   /* the picture, R G B A bytes */
@@ -307,16 +307,16 @@ static void ascii_of(char *out, size_t cap, const uint16_t *u, size_t n)
     out[i] = 0;
 }
 
-static void names_of(uint64_t hwnd, dwin *w)
+static void names_of(uint64_t hwnd, char *cls, size_t cls_cap, char *title, size_t title_cap)
 {
     fle_win_view wv;
     uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
 
-    w->cls[0] = 0;
-    w->title[0] = 0;
+    cls[0] = 0;
+    title[0] = 0;
     if (!fle_win_get(hwnd, &wv)) return;
-    ascii_of(w->title, sizeof w->title, wv.text, wv.text_len < FLE_WIN_TEXT_MAX_UNITS ? wv.text_len : FLE_WIN_TEXT_MAX_UNITS);
-    if (fle_class_name_of(wv.atom, nm, &nl)) ascii_of(w->cls, sizeof w->cls, nm, nl);
+    ascii_of(title, title_cap, wv.text, wv.text_len < FLE_WIN_TEXT_MAX_UNITS ? wv.text_len : FLE_WIN_TEXT_MAX_UNITS);
+    if (fle_class_name_of(wv.atom, nm, &nl)) ascii_of(cls, cls_cap, nm, nl);
 }
 
 static void gather(void)
@@ -337,7 +337,7 @@ static void gather(void)
         w = &cur[ncur];
         memset(w, 0, sizeof *w);
         w->lid = v.lid;
-        names_of(hs[k], w);
+        w->hwnd = hs[k];
         w->x = v.ox;
         w->y = v.oy;
         w->w = s->width;
@@ -420,13 +420,15 @@ static void build_desc(void)
 
     *d = 0;
     for (i = 0; i < ncur; i++) {
-        char gl[40] = "", rg[56] = "";
+        char gl[40] = "", rg[56] = "", cn[48], tt[80];
+
+        names_of(cur[i].hwnd, cn, sizeof cn, tt, sizeof tt);
 
         /* decision 0244: the words of the extended frame (the inner rectangle the frame does not reach) and of the window region, with the other layer words: the line still ends with the class and the title */
         if (cur[i].lflags & LF_GLASS) snprintf(gl, sizeof gl, " glass(%d,%d,%d,%d)", cur[i].gx0, cur[i].gy0, cur[i].gx1, cur[i].gy1);
         if (cur[i].cl != 0 || cur[i].ct != 0 || cur[i].cr != (int32_t)cur[i].w || cur[i].cb != (int32_t)cur[i].h) snprintf(rg, sizeof rg, " region(%d,%d,%d,%d)", cur[i].cl, cur[i].ct, cur[i].cr, cur[i].cb);
         d += snprintf(d, sizeof desc - (size_t)(d - desc), "lid %u at (%d, %d) %ux%u%s%s%s%s%s%s alpha %u key %06x class \"%s\" title \"%s\"\n", cur[i].lid, cur[i].x, cur[i].y, cur[i].w, cur[i].h, cur[i].layered ? " layered" : "", (cur[i].lflags & LF_PREMUL) ? " premultiplied" : "",
-                      (cur[i].lflags & LF_ALPHA) ? " alpha" : "", (cur[i].lflags & LF_KEY) ? " key" : "", gl, rg, cur[i].alpha, cur[i].key, cur[i].cls, cur[i].title);
+                      (cur[i].lflags & LF_ALPHA) ? " alpha" : "", (cur[i].lflags & LF_KEY) ? " key" : "", gl, rg, cur[i].alpha, cur[i].key, cn, tt);
         if ((size_t)(d - desc) >= sizeof desc - 300u) break;
     }
 }
@@ -473,11 +475,14 @@ EMSCRIPTEN_KEEPALIVE const fle_desk_state *fle_desk_compose(void)
     st.n_windows = ncur;
     memcpy(prev, cur, ncur * sizeof cur[0]);
     nprev = ncur;
-    build_desc();
     return &st;
 }
 
-EMSCRIPTEN_KEEPALIVE const char *fle_desk_describe(void) { return desc; }
+EMSCRIPTEN_KEEPALIVE const char *fle_desk_describe(void)
+{
+    build_desc();
+    return desc;
+}
 
 const uint8_t *fle_desk_picture(void) { return (const uint8_t *)(const void *)pic; }
 
@@ -700,7 +705,6 @@ EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
     if (nu || changed || whole) sc.gen++;
     memcpy(prev, cur, ncur * sizeof cur[0]);
     nprev = ncur;
-    build_desc();
     return &sc;
 }
 
