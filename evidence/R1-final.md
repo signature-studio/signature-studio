@@ -61,6 +61,7 @@ cee5cd4 R1-1〜R1-3b: 取り込みの判定を記録(取り込まず。R1-3b 後
 - 戻して当て直した後の `lift/` の中身は、`git diff` の `+` 行で前回と同じことを確かめたが、`cargo test` は再実行していない。
 - `getmodulehandleexw_returns_in_every_build` の失敗の原因は未確認(取り込み前から残っている 1 件。本作業の対象外)。
 - ビルド(`app/scripts/build-engine-bundle.sh`)は走らせていない。push 後の engine-bundle の実行 `43485443530`(headSha `b6dd943`、event push)は、この作業中に `gh run view 43485443530` で status completed・conclusion success(createdAt 2026-11-13T18:43:50Z)を確認した。engine-bundle が作った成果物の中身は、この記録では確かめていない。
+- 詳細は `evidence/R1-engine-bundle.md`(実行の status・conclusion・所要、9 段の結果、wasm の SHA-256、伏せ検査)。
 
 # 6 HEAD での再確認(取り込み後の木 = HEAD の木)
 
