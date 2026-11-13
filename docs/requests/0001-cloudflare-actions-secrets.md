@@ -82,3 +82,5 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 
 2026-11-10: Issue を作成(Issue 1)。
 2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 を閉じた(`gh issue view 1 --json state,closedAt` が `CLOSED`、closedAt 2026-11-11T19:40:43Z)。確認用ワークフローの最新実行は `success`(実行 ID 43092725843、commit `b3a70b5`)。
+
+GitHub の issue: https://github.com/signature-studio/signature-studio/issues/1(2026-11-13 確認)
