@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # mkdoc0277e8.py: docs/0277-e8-verification.md (for the PM's ingest) from RESULTS-E9.md (tables copied, not retyped), out/title/report.json and the prose below
 import re, json, os
-E = '/home/ubuntu/work/signature-studio-develop/lift/out-git/ci1-results/0277/e9'
-K = '/home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit'
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+KIT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+E = REPO + '/lift/out-git/ci1-results/0277/e9'
+K = KIT
 R = open(E + '/RESULTS-E9.md').read()
 
 def section(title, level='##'):

@@ -1,7 +1,7 @@
 #!/bin/bash
 # mk-bundle-assets.sh BUNDLE_DIR NAME [KEY=VALUE ...]   (ci1, 2026-11-07): assets-NAME for serve.sh = the bundle's own manifest with engine.env + each KEY=VALUE (none of them may be there already); proj and proj-solo12 linked. No browser, no build.
 set -eu
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 B=$(readlink -f "$1"); N=$2; shift 2; BID=$(basename "$B"); a=$K/assets-$N
 [ -f "$B/manifest.json" ] || { echo "no manifest in $B"; exit 2; }
 (cd "$B" && sha256sum -c SHA256SUMS | grep -vc ': OK$' | grep -qx 0) || { echo "SHA256SUMS of $B has a non-OK line: stop"; exit 3; }

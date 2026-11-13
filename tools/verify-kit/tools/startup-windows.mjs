@@ -1,5 +1,5 @@
 // startup-windows.mjs --url URL --app APPDIR --out DIR [--for-s 25]: Chrome; from the page load on, the compositor's window list (deskDumpBase64 peek, the windows drawn) every ~300 ms until the first idle + 8 s: which windows appear when, with their rects. E9 check item 6 (lid 8, the logo window, may be 326x460 = time driven). Read only.
-import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+import fs from 'node:fs'; import path from 'node:path';
 const argv = process.argv.slice(2); const opt = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
 const URL0 = opt('url'), APP = path.resolve(opt('app')), OUT = path.resolve(opt('out')), FOR = Number(opt('for-s', '25'));
 fs.mkdirSync(OUT, { recursive: true });

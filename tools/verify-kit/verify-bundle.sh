@@ -21,7 +21,7 @@
 #   report                  out/RESULTS.md from out/*
 #   clean                   removes bundles, builds and profiles (keeps out/)
 # order: (Xvfb: exec ./start-xvfb.sh in the background) fetch NEW; fetch PREV; page REF; (exec ./serve.sh 5040 NEW REF; exec ./serve.sh 5041 PREV REF in the background); preflight; scenes chrome / scenes firefox; alpha7; idle chrome / idle firefox; play; ab; export; report; clean
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 NEW=${NEW:-}; PREV=${PREV:-fl-engine-ci-ff5ee429}; export NEW PREV REF WORKER   # NEW, REF (git ref of the page), WORKER (version) are set by the operator
 mode=${1:-help}; shift
 log() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }

@@ -2,7 +2,7 @@
 # run-resize-live.sh NAME PORT PAGEREF OUTDIR   (ci1, 2026-11-07; PM 09:15 (3-ii); only on the PM's signal; one Chrome)
 # The live-resize check with the wizard closed: scn-resize-live.json on the page PAGEREF served on PORT (assets-NAME). Prints the evals (canvas bitmap, compositor's picture, engine state) at the three points.
 set -u
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 N=$1; P=$2; R=$3; D=$4
 note() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }
 curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:$P/ | grep -q 200 || { echo "server on $P is not up"; exit 3; }

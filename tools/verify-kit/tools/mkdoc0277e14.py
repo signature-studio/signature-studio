@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # mkdoc0277e14.py: docs/0277-e14-verification.md (for the PM's ingest) from the E14 result files (tables copied, not retyped) and the prose below
 import re, os, glob
-E = '/home/ubuntu/work/signature-studio-develop/lift/out-git/ci1-results/0277/e14'
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+E = REPO + '/lift/out-git/ci1-results/0277/e14'
 def rd(p): return open(E + '/' + p).read().strip('\n')
 def section(txt, title, level='##'):
     m = re.search(r'^' + re.escape(level) + ' ' + re.escape(title) + r'.*?$\n(.*?)(?=^#{2,3} |\Z)', txt, re.S | re.M)

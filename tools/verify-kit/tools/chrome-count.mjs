@@ -1,5 +1,8 @@
-// chrome-count.mjs OUTFILE [interval ms]: every interval, one line "epoch_ms<TAB>others<TAB>mine<TAB>total" = the number of Chrome browser processes (those with --remote-debugging-port, i.e. one per automated browser) that are not ci1's (their --user-data-dir is not under lift/out-ci1/kit/), ci1's, and the total. For the overlap column of the pure/lat tables (PM 14:58): a run with 2 or more other Chrome instances is a reference (overlap) run.
+// chrome-count.mjs OUTFILE [interval ms]: every interval, one line "epoch_ms<TAB>others<TAB>mine<TAB>total" = the number of Chrome browser processes (those with --remote-debugging-port, i.e. one per automated browser) that are not ci1's (their --user-data-dir is not under tools/verify-kit/), ci1's, and the total. For the overlap column of the pure/lat tables (PM 14:58): a run with 2 or more other Chrome instances is a reference (overlap) run.
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const KIT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const out = process.argv[2], iv = Number(process.argv[3] ?? 2000);
 function count() {
   let others = 0, mine = 0;
@@ -8,7 +11,7 @@ function count() {
     let c; try { c = fs.readFileSync(`/proc/${d}/cmdline`, 'utf8'); } catch { continue; }
     if (!c.includes('--remote-debugging-port') || c.includes('--type=')) continue;
     if (!c.includes('/chrome')) continue;
-    if (c.includes('/lift/out-ci1/kit/')) mine++; else others++;
+    if (c.includes(KIT + '/')) mine++; else others++;
   }
   return [others, mine];
 }

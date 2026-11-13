@@ -72,6 +72,9 @@ lift/closure-run*.txt
 # measurement beacon of the dev/preview server: user-agent strings and machine specs, not for git
 perf-log*.jsonl
 
+# output of the verify kit (tools/verify-kit/out/: measurement results written by the scripts)
+tools/verify-kit/out/
+
 # generated from FLEngine code (product-derived)
 lift/harness/draw1/lifted_*.c
 

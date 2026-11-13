@@ -4,7 +4,7 @@
 # Each run: wait-quiet (load <= 8, I/O pressure 0, swap traffic 0; a run that did not get a quiet window is marked REFERENCE), entry-check.mjs, beacon.py -> one row of out/idle4.tsv: browser, NAME, round, first idle ms, start load, end load, WebGL renderer, desk.mode.
 # The ports are served by serve.sh PORT ASSETS PAGEREF: e13 5053 (E13 page + E13 bundle), rta 5101 (page-rt1 + RT-A), rta-w1 5108 (page-rt1 + RT-A + FLE_WORKERS=1: the cooperative scheduler of the RT build), cand1-nodiag 5109 (page d0447902 + cand1 without FLE_DIAG_*).
 set -u
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 R=$1; shift; conds=("$@"); N=${#conds[@]}; f=$K/out/idle4.tsv; : > $f
 log() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }
 for i in $(seq 1 $R); do

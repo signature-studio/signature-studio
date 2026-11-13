@@ -1,7 +1,7 @@
 #!/bin/bash
 # run-g6.sh: Firefox 158 functional check for RT-D3 (functional; not the counted P3 gate).
 set -u
-K=/home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit
+K=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 page_for() { echo "page-rt1/app"; }
 run() {
   local variant=$1 port ref

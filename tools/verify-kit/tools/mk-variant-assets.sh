@@ -4,7 +4,7 @@
 # a directory with every file of $K/proj (symlinks) except serina1-serum2.flp, which is VARIANT.flp under that name (the sample paths of the project name it; alpha1's variants are used under that name, PM 2026-11-07).
 # Without VARIANT.flp, proj -> $K/proj (the original). Prints what it made and the sha256 of the .flp the page will open.
 set -eu
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 B=$(readlink -f "$1"); N=$2; V=${3:-}
 A=$K/assets-$N
 [ -f "$B/manifest.json" ] || { echo "no manifest.json in $B"; exit 2; }

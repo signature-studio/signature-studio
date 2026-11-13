@@ -2,7 +2,7 @@
 # mk-rtd2-assets.sh BUNDLE_DIR [NAME=rtd2-g9f]   (ci1, 2026-11-07, PM 13:0x): assets for the RT-D2 bundle (alpha1's third Filter-call diagnostic). The manifest is a COPY with FLE_DIAG_G9F=1 only (the bundle is not written), the project = alpha1's variant ins1-lp under the name serina1-serum2.flp.
 # Makes assets-NAME (port 5118: bash serve.sh 5118 NAME rt1) and prints the command of the Export: PAGE=rt1 ALLOW_OTHER_CHROME=1 SCN=scn-export-g9c.json bash tools/run-cand1-export.sh NAME 5118 OUTDIR
 set -eu
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 [ -n "${1:-}" ] || { echo "usage: mk-rtd2-assets.sh BUNDLE_DIR [NAME]"; exit 2; }
 B=$(readlink -f "$1"); N=${2:-rtd2-g9f}
 [ -f "$B/manifest.json" ] || { echo "no manifest in $B"; exit 2; }

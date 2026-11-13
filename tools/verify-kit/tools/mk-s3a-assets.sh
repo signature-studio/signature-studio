@@ -2,7 +2,7 @@
 # mk-s3a-assets.sh [B2DIR]   (S3a sweep, 0312c 5c; ci1 0326). Makes assets-b2w{2,4,8,16}/ next to the kit's other assets dirs: the manifest of the B2 bundle with ONE change, engine.env FLE_WORKERS = n; the bundle's files are linked, not copied.
 # Reads and writes files only (no browser, no server, no build). The bundle must be the B2 bundle of mt3 (fl-engine-ci-8b2eb5d7); its SHA256SUMS is checked first.
 set -eu
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 B2=${1:-$HOME/work/mt3w-s1/ci-b2/engine/bundle/fl-engine-ci-8b2eb5d7}; BID=$(basename "$B2")
 [ -f "$B2/manifest.json" ] || { echo "no manifest in $B2"; exit 2; }
 (cd "$B2" && sha256sum -c SHA256SUMS >/dev/null) || { echo "SHA256SUMS of $B2 does not verify: stop"; exit 3; }

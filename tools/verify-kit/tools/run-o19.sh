@@ -3,7 +3,7 @@
 #   run-o19.sh solo12 mixmove e13      run-o19.sh solo12 mixmove rta
 # Output out/o19-PROJ-COND-ROUND-VARIANT/ (VARIANT = e13 | rta); the gate of run-rta.sh (other Chrome 0, Wine 0, swap I/O 0, MemAvailable >= 12 GB for this run, load <= 8, I/O pressure 0). Timed: only in the window the PM names.
 set -u
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 PROJ=$1; COND=$2; V=$3; RND=${RND:-1}
 case "$V" in e13) port=5053; ref=d0447902;; rta) port=5101; ref=rt1;; rtb) port=5111; ref=rt1;; rte) port=5121; ref=rt1;; rtf-gil) port=5140; ref=rt1;; rtf-gil2) port=5141; ref=rt1;; *) echo "variant e13|rta|rtb|rte"; exit 2;; esac
 d=$K/out/${OUTTAG:-o19-$PROJ}-$COND-$RND-$V

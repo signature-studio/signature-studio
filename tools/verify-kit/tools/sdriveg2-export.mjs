@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 
 import zlib from 'node:zlib';
@@ -27,7 +27,8 @@ const BROWSER = opt('browser', 'chrome');
 const URL0 = opt('url');
 const OUT = path.resolve(opt('out', '/tmp/opencode/gpu1/drive'));
 const [VW, VH] = opt('viewport', '2176x1224').split('x').map(Number);
-const APP = path.resolve(opt('app', '/home/ubuntu/work/signature-studio-develop/lift/out-gpu2/src/app'));
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const APP = path.resolve(opt('app', path.join(REPO, 'app')));
 const ONLY = opt('only', '') ? opt('only', '').split(',') : null;
 const REPEAT = Number(opt('repeat', '1'));
 // ci1 (0321): --dpr <n> = the page's devicePixelRatio (Playwright/CDP deviceScaleFactor; Chrome only; Firefox ignores it and says so). cmpShot needs 1.
@@ -322,7 +323,7 @@ async function runOp(op0) {
     case 'openProject': {
       // both browsers: the project's files are fetched from this server (/assets/proj/) and put into the page's file manager window with its own "Upload files" input (a DataTransfer stands for the person's choice in a file chooser);
       // then File > Open of the engine, the rows of the window (DOM clicks) and the engine's own title change as the proof
-      const flp = op.flp ?? 'Sampler.flp'; const names = op.filesFile ? JSON.parse(fs.readFileSync(op.filesFile, 'utf8')) : (op.files ?? [flp, 'SHP_Sawing Synth.wav']);
+      const flp = op.flp ?? 'Sampler.flp'; const names = op.filesFile ? JSON.parse(fs.readFileSync(path.resolve(REPO, op.filesFile), 'utf8')) : (op.files ?? [flp, 'SHP_Sawing Synth.wav']);
       await B.ev("(() => { document.querySelector('#files-btn').click(); return true; })()");
       await waitJs("!!window.__files && !!window.__files.explorer && !!document.querySelector('#files-overlay #fx-list')", 20000);
       await sleep(1200);

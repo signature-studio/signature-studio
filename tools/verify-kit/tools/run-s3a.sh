@@ -7,7 +7,7 @@
 #   summary             tools/s3a-summary.py (the table of every out/s3a-r*/)
 #   export COND         the Export of the reference project (Chrome, about 20 minutes) against the condition's server: the sha256 of the WAV (expected 381cdb5a...f979)
 # The gate of a run (any failure: the run does not start, the line stays todo): no other Chrome (the chrome-count observer's last line, fresh), swap in/out 0 and MemAvailable >= 8 GB (vmstat 1 3 and /proc/meminfo, written to out/steps.log), wait-quiet (load <= 8, I/O pressure 0, swap 0).
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 REF=${REF:-d0447902}; PLAN=$K/out/s3a-plan.tsv; DRY=${DRY:-}
 mode=${1:-help}; shift || true
 log() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }

@@ -8,7 +8,7 @@
 set -u
 ECHO=0; if [ "${1:-}" = "--echo" ]; then ECHO=1; shift; fi
 TARGETS=${*:-preview dev worker}
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 PAGEREF=${PAGEREF:-e14-PV7}          # the page to test (page-$PAGEREF); the control page of the production E13 is d0447902
 PAGE=$K/page-$PAGEREF/app
 WQ_LOAD=${WQ_LOAD:-8}                  # the load limit of wait-quiet: 8 for a timed run; the PM allowed <= 12 for this functional (untimed) e2e on 2026-11-07 08:5x

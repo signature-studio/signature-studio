@@ -7,7 +7,7 @@
 #   lat COND              the input latency suite (scn-lat-ff.json: File clicks idle, Mixer drag, Space x32, File clicks during playback), timed
 #   summary               tools/s3a-summary.py
 # COND = e13 (5053, the control: cooperative production) | rta (5101) | rta-w2 (5102) | rta-p2 (5103) | rta-p2w2 (5104); the RT-A conditions use the page of mt3's tree-rt1 (page-rt1: the stack's page changes, REF=rt1); the control e13 must be run with REF=d0447902 (the production page + the E13 bundle)
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 REF=${REF:-rt1}; mode=${1:-help}; cond=${2:-}
 case "$cond" in e13) port=5053;; rta) port=5101;; rta-w2) port=5102;; rta-p2) port=5103;; rta-p2w2) port=5104;; rta-n2) port=5106;; rta-n4) port=5107;; rta-seed2) port=5105;; *) port=;; esac
 log() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }

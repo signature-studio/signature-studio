@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # mkdoc0277.py: docs/0277-e7b-verification.md (for the PM's ingest) from RESULTS-final.md (tables are copied, not retyped) and the prose below
-import re, sys
-D = '/home/ubuntu/work/signature-studio-develop/lift/out-git/ci1-results/0277'
+import os, re, sys
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+D = REPO + '/lift/out-git/ci1-results/0277'
 R = open(D + '/RESULTS-final.md').read()
 
 def section(title, level='##'):

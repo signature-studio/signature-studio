@@ -2,7 +2,7 @@
 # run-tp.sh COND   (ci1, 2026-11-08, PM 05:45: non-timed diagnostic: Chrome trace around File-menu clicks during playback)
 # COND = e13 (5053, page-d0447902) | rtf (5122, page-rt1). Gate (PM relaxed for this diagnostic): load <= 12, swap in/out 0, MemAvailable >= 12 GB, other automated Chrome 0; an opt1 Wine overlap is allowed and recorded.
 set -u
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 V=$1; RND=${RND:-1}
 case "$V" in e13) port=5053; ref=d0447902;; rtf) port=5122; ref=rt1;; rtg-gil) port=5142; ref=rt1;; rth) port=5143; ref=rt1;; *) echo "COND e13|rtf|rtg-gil|rth"; exit 2;; esac
 d=$K/out/tp-$RND-$V

@@ -3,7 +3,7 @@
 # NAME = assets-NAME (cand1-orig = the original FLP, cand1-ins1lp = alpha1's ins1-lp.flp under the name serina1-serum2.flp); the server for PORT is already up (serve.sh PORT NAME d0447902).
 # One Export (Ctrl+R, scn-export-g9a.json: engine log saved too) with the page of the production E13 (page-d0447902) and the cand1 test bundle; then the WAV size, frames and sha256 are printed and noted in out/steps.log.
 set -u
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 N=$1; P=$2; D=$3
 note() { echo "$(date +%T) $* load $(cut -d' ' -f1 /proc/loadavg) io $(io)" | tee -a $K/out/steps.log; }
 [ -d "$K/assets-$N" ] || { echo "no assets-$N"; exit 2; }

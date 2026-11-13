@@ -13,7 +13,7 @@
    {
     "op": "openProject",
     "flp": "serina1-serum2.flp",
-    "filesFile": "/home/ubuntu/work/signature-studio-develop/lift/out-gpu2/refproj-names.json"
+    "filesFile": "lift/out-gpu2/refproj-names.json"
    },
    {
     "op": "waitWindow",

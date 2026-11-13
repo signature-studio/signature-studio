@@ -2,7 +2,7 @@
 # post-pure.sh E: analysis and copy after `verify-bundle.sh pure chrome R` (no browser, light CPU). E = e13 etc.
 # env: NEW PREV REF QUIET_LOAD (as for verify-bundle.sh). Writes out/P3-chrome.md, out/RESULTS.md, then copies the run files to lift/out-git/ci1-results/0277/E/data
 set -u
-E=${1:?e13}; K=$(cd "$(dirname "$0")/.." && pwd); D=/home/ubuntu/work/signature-studio-develop/lift/out-git/ci1-results/0277/$E
+E=${1:?e13}; K=$(cd "$(dirname "$0")/.." && pwd); D=$K/../../lift/out-git/ci1-results/0277/$E
 cd "$K" || exit 1
 export QUIET_LOAD=${QUIET_LOAD:-8}
 python3 tools/p3-win.py chrome "$QUIET_LOAD" > out/P3-chrome.stdout.txt 2>&1; echo "p3-win rc=$?"

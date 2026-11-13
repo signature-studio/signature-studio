@@ -5,7 +5,7 @@
 #   assets-rta-p2  + FLE_PROCESSORS=2       (n = 2; N as the bundle derives it)
 #   assets-rta-p2w2 + FLE_PROCESSORS=2 FLE_WORKERS=2
 set -eu
-. /home/ubuntu/work/signature-studio-develop/lift/out-ci1/kit/env.sh
+. "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 B=${1:-$HOME/work/mt3w-s1/ci-rt1/engine/bundle/fl-engine-test-rt1-91bf78f6}; BID=$(basename "$B")
 [ -f "$B/manifest.json" ] || { echo "no manifest in $B"; exit 2; }
 (cd "$B" && sha256sum -c SHA256SUMS | grep -vc ': OK$' | grep -qx 0) || { echo "SHA256SUMS of $B has a non-OK line: stop"; exit 3; }
