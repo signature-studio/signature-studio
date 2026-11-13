@@ -113,6 +113,9 @@ typedef struct {
     int32_t pp[FLE_GDC_PAINT_PIECES][4];
 } fle_gdc_info;
 int fle_gdc_dc_info(uint64_t h, fle_gdc_info *out);
+/* Decision 0323: 1 when `h` is a live DC of a WINDOW of this table (client area or whole window: any kind but FLE_GDC_K_SCREEN), 0 for the DC of the entire screen, a memory DC and every other handle. fle_win.c: DefWindowProc(WM_ERASEBKGND)
+ * asks it, because GetClipBox answers memory DCs only. */
+int fle_gdc_is_window_dc(uint64_t h);
 /* Decision 0142: BeginPaint / EndPaint set and lift the paint rectangle of the DC (the clipping to the update region). */
 void fle_gdc_set_paint_rect(uint64_t h, int valid, int32_t l, int32_t t, int32_t r, int32_t b);
 /* Decision 0247 (alpha3): after fle_gdc_set_paint_rect(h, 1, ...), the update region of the PAINTSTRUCT when it is not one rectangle: n (2..FLE_GDC_PAINT_PIECES) disjoint rectangles (l, t, r, b). EndPaint's fle_gdc_set_paint_rect(h, 0, ...) clears them. */

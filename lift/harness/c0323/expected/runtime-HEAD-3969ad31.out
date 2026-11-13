@@ -1,0 +1,140 @@
+#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC
+E1 solid brush (class csolid)
+  E WM_ERASEBKGND dc=1 -> 1
+  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+  E WM_ERASEBKGND dc=1 -> 1
+  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+E2 no brush (class cnone)
+  E WM_ERASEBKGND dc=1 -> 1
+  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+  E WM_ERASEBKGND dc=1 -> 1
+  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+E3 COLOR_WINDOW + 1 (class cwin)
+  E WM_ERASEBKGND dc=1 -> 1
+  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+  E WM_ERASEBKGND dc=1 -> 1
+  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+E4 CS_PARENTDC with a brush (class cpar)
+  E WM_ERASEBKGND dc=1 -> 1
+  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+  E WM_ERASEBKGND dc=1 -> 1
+  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+#### scenario P: the erase of a window DC
+P1 default WM_PAINT, class with a brush (window WS, class csolid)
+  WS WM_PAINT (default)
+  after: update rect 0 (0,0,0,0)
+P2 default WM_PAINT, class without a brush (window WN, class cnone)
+  WN WM_PAINT (default)
+  after: update rect 0 (0,0,0,0)
+P3 own BeginPaint, class with a brush (window C1, class csolid)
+  C1 WM_ERASEBKGND dc=1 -> 1
+  C1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P4 own BeginPaint, class without a brush (window C2, class cnone)
+  C2 WM_ERASEBKGND dc=1 -> 1
+  C2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P5 own BeginPaint, bErase FALSE (window C3, class csolid)
+  C3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P6 RDW_ERASENOW then BeginPaint, class with a brush (window C4, class csolid)
+  C4 WM_ERASEBKGND dc=1 -> 1
+  after RDW_ERASENOW: update rect 1 (10,10,50,40)
+  C4 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P7 RDW_ERASENOW then BeginPaint, class without a brush (window C5, class cnone)
+  C5 WM_ERASEBKGND dc=1 -> 1
+  after RDW_ERASENOW: update rect 1 (10,10,50,40)
+  C5 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint) (window Q1, class csolid)
+  Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+  Q1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW) (window Q2, class csolid)
+  Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+  after RDW_ERASENOW: update rect 1 (10,10,50,40)
+  Q2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT) (window Q3, class csolid)
+  Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+  Q3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+  after: update rect 0 (0,0,0,0)
+#### scenario T: WM_NCHITTEST answered HTTRANSPARENT
+T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A):
+ click (160,120): in both:
+  TB WM_NCHITTEST
+  TB WM_NCHITTEST
+  TB WM_NCHITTEST
+ click (280,200): only in TB: nothing beneath:
+  TB WM_NCHITTEST
+  TB WM_NCHITTEST
+  TB WM_NCHITTEST
+ click (60,50): only in A:
+  A WM_NCHITTEST
+  A WM_SETCURSOR hit=1 msg=0x200
+  A WM_MOUSEMOVE x=40 y=30
+  A WM_NCHITTEST
+  A WM_MOUSEACTIVATE hit=1 msg=0x201
+  A WM_SETCURSOR hit=1 msg=0x201
+  A WM_LBUTTONDOWN x=40 y=30
+  A WM_NCHITTEST
+  A WM_LBUTTONUP x=40 y=30
+T2 a transparent child (TC) of a pop-up (P): the click goes to P:
+ click (80,80): in TC:
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P:
+ click (160,120): in C (and in TC):
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+ click (80,80): in TC only:
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+  TC WM_NCHITTEST
+T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it:
+ click (80,80): in D:
+T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event:
+ click (100,80): in DP:
+#### scenario H: WH_MOUSE and WH_KEYBOARD
+H1 click on W with a mouse hook that lets everything pass:
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x200
+  W WM_MOUSEMOVE x=70 y=50
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x201
+  W WM_LBUTTONDOWN x=70 y=50
+  W WM_NCHITTEST
+  W WM_LBUTTONUP x=70 y=50
+H2 the key A down and up with a keyboard hook that lets everything pass:
+  W WM_KEYDOWN vk=0x41 lp=0x1e0001
+  W WM_KEYUP vk=0x41 lp=0xc01e0001
+H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it:
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x200
+  W WM_MOUSEMOVE x=70 y=50
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x201
+  W WM_LBUTTONDOWN x=70 y=50
+  W WM_NCHITTEST
+  W WM_LBUTTONUP x=70 y=50
+H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up:
+  W WM_KEYDOWN vk=0x41 lp=0x1e0001
+  W WM_KEYUP vk=0x41 lp=0xc01e0001
+H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION):
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x200
+  peek(noremove) -> 0x200
+  W WM_MOUSEMOVE x=90 y=60
+  peek(remove) -> 0x200
+H6 the mouse hook is removed: no hook line:
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x200
+  W WM_MOUSEMOVE x=70 y=50
+  W WM_NCHITTEST
+  W WM_SETCURSOR hit=1 msg=0x201
+  W WM_LBUTTONDOWN x=70 y=50
+  W WM_NCHITTEST
+  W WM_LBUTTONUP x=70 y=50

@@ -476,6 +476,57 @@ static void send_parent_notify(uint64_t hwnd, uint32_t event, int32_t sx, int32_
     }
 }
 
+/* the pointer left every window: the leave notification of the window it was in */
+static void pointer_over_nothing(const hwev *e)
+{
+    if (e->kind == FLE_IN_MOVE && cursor_win) {
+        trk *tr = trk_find(cursor_win);
+        fle_win_iview ov;
+
+        if (tr && (tr->flags & FLE_TME_LEAVE) && fle_win_input_view(cursor_win, &ov)) {
+            out_push(ov.owner, cursor_win, (tr->flags & FLE_TME_NONCLIENT) ? FLE_WM_NCMOUSELEAVE : FLE_WM_MOUSELEAVE, 0, 0, e->ticks, e->x, e->y);
+            trk_drop(tr);
+        }
+        cursor_win = 0;
+    }
+}
+
+/* Decision 0323 (replaces S-httransparent of decision 0136, which dropped the event). Learn WM_NCHITTEST, HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to
+ * underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)". The windows that contain the point are walked in the order of Wine 10.0's window_from_point (win32u/window.c,
+ * UNOFFICIAL: the list of fle_win_input_hit_list, a child before its parent, a sibling below after the whole of the one above): each one that belongs to the thread of the first one is sent WM_NCHITTEST; the first
+ * answer that is not HTTRANSPARENT decides the window and the hit-test code; a window of another thread is not asked (Wine: HTCLIENT, "the hit test is only sent to windows of the current thread"). A disabled
+ * window ends the walk with the event dropped, as it does for the first one (S-disabled-drops). When every window answers HTTRANSPARENT there is no window (Wine: the result is NULL). `first` is the window
+ * mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
+#define HIT_LIST_MAX 64u
+static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, int *ht)
+{
+    uint64_t list[HIT_LIST_MAX];
+    unsigned n, k;
+    int r = send_hittest("input", first, x, y);
+
+    *ht = r;
+    if (r != FLE_HTTRANSPARENT) return first;      /* the common case: the first window decides (no list is made) */
+    *ht = FLE_HTNOWHERE;
+    n = fle_win_input_hit_list(x, y, list, HIT_LIST_MAX);
+    for (k = 0; k < n && list[k] != first; k++) {}
+    for (k++; k < n; k++) {                         /* the windows after `first` in the list */
+        fle_win_iview cv;
+
+        if (!fle_win_input_view(list[k], &cv)) continue;          /* a window that went away while an earlier one handled WM_NCHITTEST */
+        if (!cv.enabled) return 0;
+        if (cv.owner != thread) {
+            *ht = FLE_HTCLIENT;
+            return list[k];
+        }
+        r = send_hittest("input", list[k], x, y);
+        if (r != FLE_HTTRANSPARENT) {
+            *ht = r;
+            return list[k];
+        }
+    }
+    return 0;
+}
+
 static void translate_mouse(const hwev *e)
 {
     unsigned tt = 0;
@@ -487,21 +538,18 @@ static void translate_mouse(const hwev *e)
     uint32_t mk = e->mk;
 
     if (!w || !fle_win_input_view(w, &v)) {
-        if (e->kind == FLE_IN_MOVE && cursor_win) {
-            /* the pointer left every window: the leave notification of the window it was in */
-            trk *tr = trk_find(cursor_win);
-            fle_win_iview ov;
-
-            if (tr && (tr->flags & FLE_TME_LEAVE) && fle_win_input_view(cursor_win, &ov)) {
-                out_push(ov.owner, cursor_win, (tr->flags & FLE_TME_NONCLIENT) ? FLE_WM_NCMOUSELEAVE : FLE_WM_MOUSELEAVE, 0, 0, e->ticks, e->x, e->y);
-                trk_drop(tr);
-            }
-            cursor_win = 0;
-        }
+        pointer_over_nothing(e);
         return;
     }
-    ht = send_hittest("input", w, e->x, e->y);
-    if (ht == FLE_HTTRANSPARENT) return;       /* S-httransparent: the window beneath is not tried; the event is dropped */
+    if (cap) {
+        ht = send_hittest("input", w, e->x, e->y);      /* S-capture-client: the answer decides nothing while a window has the capture (below) */
+    } else {
+        w = hit_walk(e->x, e->y, w, tt, &ht);
+        if (!w || !fle_win_input_view(w, &v)) {
+            pointer_over_nothing(e);
+            return;
+        }
+    }
     /* S-capture-client: while a window has the capture it gets the client messages (WM_MOUSEMOVE, WM_LBUTTONDOWN ... with coordinates relative to its client area, negative or beyond its size when the pointer is outside)
      * whatever WM_NCHITTEST answered (Learn WM_MOUSEMOVE: "the message is posted to the window that has captured the mouse"; the page says nothing of a non-client message to it). */
     if (cap) ht = FLE_HTCLIENT;
@@ -710,6 +758,48 @@ static int outq_target_alive(fle_tmsg *m, unsigned t)
     return 0;
 }
 
+/* Decision 0323: the WH_MOUSE and WH_KEYBOARD hooks (fle_win.c fle_win_input_call_hooks has the pages). Called where GetMessage / PeekMessage of thread t is about to return the hardware message *m: a mouse message
+ * (WM_MOUSEMOVE .. WM_MOUSEHWHEEL, and the non-client WM_NCMOUSEMOVE .. WM_NCXBUTTONDBLCLK) calls the WH_MOUSE chain with wParam = the message, lParam = a MOUSEHOOKSTRUCT(Ex) (pt = the screen position, hwnd, wHitTestCode =
+ * the hit-test code [HTCLIENT for a client message, wParam for a non-client one], dwExtraInfo = 0, mouseData = the message's wParam: Wine 10.0 gives the Ex form to every hook, UNOFFICIAL); a key message (WM_KEYDOWN, WM_KEYUP,
+ * WM_SYSKEYDOWN, WM_SYSKEYUP) calls the WH_KEYBOARD chain with wParam = the virtual-key code and lParam = the message's lParam. nCode is HC_ACTION (0) when the message is being removed and HC_NOREMOVE (3) for a peek.
+ * A nonzero answer discards the message (Learn: "to prevent the system from passing the message to the target window procedure"). Returns 1 then. WM_CHAR and the like are made by TranslateMessage from a posted
+ * message and do not pass through a hook (Learn KeyboardProc: WM_KEYUP / WM_KEYDOWN). A hook procedure that retrieves messages itself does not run the hooks again (the guard). */
+#define FLE_WH_KEYBOARD_ 2
+#define FLE_WH_MOUSE_ 7
+#define FLE_HC_ACTION_ 0
+#define FLE_HC_NOREMOVE_ 3
+static int in_input_hook;
+static int input_hook_swallows(unsigned t, const fle_tmsg *m, int remove)
+{
+    uint64_t res = 0;
+    int ncode = remove ? FLE_HC_ACTION_ : FLE_HC_NOREMOVE_, called;
+
+    if (in_input_hook) return 0;
+    if ((m->msg >= 0x0200u && m->msg <= 0x020Eu) || (m->msg >= 0x00A0u && m->msg <= 0x00ADu)) {
+        uint8_t hs[40];
+        uint32_t ht = m->msg >= 0x00A0u && m->msg <= 0x00ADu ? (uint32_t)m->wp : (uint32_t)FLE_HTCLIENT;
+        uint32_t md = (uint32_t)m->wp;
+
+        memset(hs, 0, sizeof hs);
+        memcpy(hs + 0, &m->ptx, 4);
+        memcpy(hs + 4, &m->pty, 4);
+        memcpy(hs + 8, &m->hwnd, 8);
+        memcpy(hs + 16, &ht, 4);
+        memcpy(hs + 32, &md, 4);
+        in_input_hook = 1;
+        called = fle_win_input_call_hooks(FLE_WH_MOUSE_, t, ncode, m->msg, 0, hs, sizeof hs, &res);
+        in_input_hook = 0;
+        return called && res != 0;
+    }
+    if (m->msg >= 0x0100u && m->msg <= 0x0105u && m->msg != 0x0102u && m->msg != 0x0103u) {   /* WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP (not WM_CHAR, WM_DEADCHAR) */
+        in_input_hook = 1;
+        called = fle_win_input_call_hooks(FLE_WH_KEYBOARD_, t, ncode, m->wp & 0xFFFFu, m->lp, NULL, 0, &res);
+        in_input_hook = 0;
+        return called && res != 0;
+    }
+    return 0;
+}
+
 /* Called by GetMessageW and PeekMessageW of thread t after the posted queue found nothing. */
 int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int remove, uint32_t qs, fle_tmsg *out)
 {
@@ -764,6 +854,17 @@ int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int r
 
                 for (j = k; j + 1 < outq.n; j++) outq.m[(outq.head + j) % OUT_MAX] = outq.m[(outq.head + j + 1) % OUT_MAX];
                 outq.n--;
+            }
+            /* decision 0323: the hook runs after the message has left the queue when it is removed (Wine: "if remove is TRUE, remove message first before calling hooks to avoid recursive hook calls") */
+            if (input_hook_swallows(t, out, remove)) {
+                if (!remove) {
+                    unsigned j;
+
+                    for (j = k; j + 1 < outq.n; j++) outq.m[(outq.head + j) % OUT_MAX] = outq.m[(outq.head + j + 1) % OUT_MAX];
+                    outq.n--;
+                }
+                k--;
+                continue;
             }
             return 1;
         }

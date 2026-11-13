@@ -115,6 +115,7 @@ typedef struct {
     int min_set;                                /* decision 0267: the window was minimized once (GetWindowPlacement then reports ptMinPosition (-32000, -32000), not (-1, -1)) */
     int32_t upd_l, upd_t, upd_r, upd_b;         /* the update region as one bounding rectangle in client coordinates (empty = none) */
     int upd_erase;                              /* bErase of some InvalidateRect */
+    int upd_delayed;                            /* decision 0323: WM_ERASEBKGND was sent for this update region and answered 0: it stays marked for erasing, without a second message (Wine 10.0: UPDATE_DELAYED_ERASE): BeginPaint then reports fErase = TRUE */
     fle_visrgn *updr;                           /* decision 0247 (alpha3): the update region when it is more than one rectangle (disjoint pieces, client coordinates; upd_l..upd_b is their bounding box); NULL = the region is the rectangle upd_l..upd_b */
     int paint_internal;                         /* RedrawWindow RDW_INTERNALPAINT (not used) */
     int in_paint;                               /* between BeginPaint and EndPaint */
@@ -401,6 +402,9 @@ uint8_t *fle_r_row(const fle_rsurf *s, uint32_t y) __attribute__((weak));
 int fle_r_direct(const fle_rsurf *s) __attribute__((weak));
 void fle_gdc_set_paint_rect(uint64_t h, int valid, int32_t l, int32_t t, int32_t r, int32_t b) __attribute__((weak));
 void fle_gdc_set_paint_pieces(uint64_t h, const int32_t (*p)[4], uint32_t n) __attribute__((weak));   /* decision 0247 */
+int fle_gdc_is_window_dc(uint64_t h) __attribute__((weak));   /* decision 0323 */
+void fle_imp_FillRect(void) __attribute__((weak));   /* decision 0323: DefWindowProc(WM_ERASEBKGND) fills with the class background brush */
+void fle_imp_GetClipBox(void) __attribute__((weak));
 static void upd_clear_rect(int64_t i);   /* decision 0247 (alpha3): the update region as a set of rectangles; see upd_add */
 static void upd_set_full(int64_t i);
 
@@ -1325,6 +1329,9 @@ void fle_imp_SetWindowTextW(void)
  * Any other message, WM_NCCALCSIZE with wParam TRUE (NCCALCSIZE_PARAMS), a NULL lParam, or a window that is not of this table stops
  * by name. wParam of WM_NCCREATE and WM_CREATE is not used (Learn) and is not looked at. The last error is not touched. */
 static void get_min_max_info(const char *api, int64_t i, int32_t out[8]);
+static uint64_t def_erase_background(const char *api, int64_t wi, uint64_t dc);
+static void erase_now_one(const char *api, int64_t i);
+
 void fle_imp_DefWindowProcW(void)
 {
     static const char api[] = "DefWindowProcW";
@@ -1481,16 +1488,19 @@ void fle_imp_DefWindowProcW(void)
         R[0] = 0;
         return;
     case FLE_WM_ERASEBKGND:
-        /* Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If hbrBackground is NULL, the
-         * application should process the WM_ERASEBKGND message and erase the background." and "An application should return nonzero ... if it erases the background". Nothing is drawn here: the answer is 1 (erased: a choice
-         * without a source; with hbrBackground NULL the page says nonzero is the application's answer, not the default's). */
-        R[0] = 1;
+        /* Decision 0323. Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If hbrBackground is NULL,
+         * the application should process the WM_ERASEBKGND message and erase the background." and "An application should return nonzero ... if it erases the background; otherwise, it should return zero". It filled nothing
+         * and answered 1 before (decision 0123, a choice without a source). Now: the class brush fills the clip box of the DC (wParam) and the answer is 1; a class without a brush answers 0 (Wine 10.0, win32u/defwnd.c
+         * default_window_proc, UNOFFICIAL: the same two answers), so BeginPaint reports fErase = TRUE for it. */
+        R[0] = def_erase_background(api, wi, wp);
         return;
     case FLE_WM_NCPAINT:
     case FLE_WM_PAINT:
         /* Learn WM_PAINT: "The DefWindowProc function validates the update region. The function may also send the WM_NCPAINT message to the window procedure if the window frame must be painted and send the
-         * WM_ERASEBKGND message if the window background must be erased." Nothing is drawn: the update region is validated. */
+         * WM_ERASEBKGND message if the window background must be erased." Decision 0323: the background is erased first when the update region is marked for it (BeginPaint's WM_ERASEBKGND, as Wine 10.0's
+         * default_window_proc does with BeginPaint / EndPaint: UNOFFICIAL); then the update region is validated. Nothing else is drawn. */
         if (msg == FLE_WM_PAINT) {
+            if (tab[wi].upd_erase && tab[wi].upd_r > tab[wi].upd_l && tab[wi].upd_b > tab[wi].upd_t) erase_now_one(api, wi);
             upd_clear_rect(wi);
             tab[wi].upd_erase = 0;
         }
@@ -2324,8 +2334,8 @@ void fle_imp_MonitorFromWindow(void)
  * and the dwThreadId parameter is zero or specifies the identifier of a thread created by another process". Learn UnhookWindowsHookEx: "Removes a hook procedure installed in a hook chain"; nonzero on success, zero on failure
  * (GetLastError).
  * Answered: WH_MOUSE (7) and WH_KEYBOARD (2) (the numbers are on the page) installed for a thread of this process (dwThreadId = the id of a live guest thread: fle_thread_index_of_vid, or the first thread's id 0x1001) with hmod NULL and a
- * non-NULL lpfn. S-hook-no-events: the hook is recorded and NEVER CALLED: no mouse or keyboard message exists in this environment (nothing posts one; GetKeyState / the cursor are stateless inputs), so the events that these two hooks
- * monitor do not occur. Every other hook type stops (WH_CALLWNDPROC, WH_GETMESSAGE, WH_CBT, WH_MSGFILTER, ... would be called by the window messages that do occur: not modelled), as do dwThreadId 0 (a global hook needs a DLL
+ * non-NULL lpfn. (S-hook-no-events of this decision, "recorded and NEVER CALLED: no mouse or keyboard message exists", ended with decision 0323: fle_win_input_call_hooks calls them when GetMessage / PeekMessage is about to return a
+ * mouse or key message.) Every other hook type stops (WH_CALLWNDPROC, WH_GETMESSAGE, WH_CBT, WH_MSGFILTER, ... would be called by the window messages that do occur: not modelled), as do dwThreadId 0 (a global hook needs a DLL
  * and every thread of the desktop), a thread id that is not a thread of this process (no failure code is on the page), hmod not NULL and lpfn NULL. The handle is FLE_HOOK_HANDLE_BASE + 4 * (k + 1), never reused (a choice: the page
  * gives no value); at most 64 live hooks (a limit of the virtual machine: the 65th stops). UnhookWindowsHookEx of a handle that is not a live hook of this table returns 0, the last error left alone (the page names no code). */
 #define FLE_HOOK_HANDLE_BASE UINT64_C(0x7FFA0000)
@@ -2432,7 +2442,7 @@ uint32_t fle_win_hook_live(void)
  * shown to the hook (S-ia1-hook-1: the page lists them as 'sent by the system' only in the CBT hook's text).
  * user32!CallNextHookEx: LRESULT f(HHOOK hhk rcx, int nCode edx, WPARAM wParam r8, LPARAM lParam r9). Learn: "Passes the hook information to the next hook procedure in the current hook chain"; hhk "This parameter is ignored" (Windows
  * 10 era page text); the result is the value of the next procedure, or 0 when the chain ends (S-ia1-hook-2: the page says "The return value is the value returned by the next hook procedure in the chain"; 0 at the end of the chain is a
- * choice). Called outside a hook procedure it stops (the current hook is unknown). A WH_MOUSE / WH_KEYBOARD hook is still never called (S-hook-no-events of decision 0126), so only the WH_CALLWNDPROC chain can be the current one. */
+ * choice). Called outside a hook procedure it stops (the current hook is unknown). A WH_MOUSE / WH_KEYBOARD hook is called since decision 0323 (fle_win_input_call_hooks below), and its procedure walks its chain with this function the same way. */
 #define FLE_HC_ACTION 0
 static int cur_hook[8];
 static unsigned cur_hook_n;
@@ -2502,6 +2512,46 @@ void fle_imp_CallNextHookEx(void)
         R[4] = sp0;
         R[0] = res;
     }
+}
+
+/* Decision 0323 (replaces S-hook-no-events of decision 0126: "the hook is recorded and NEVER CALLED: no mouse or keyboard message exists in this environment"; the input round trip of decision 0136 made them exist, and the
+ * decision's own condition for a second look, "when the input model is built", was met). Learn SetWindowsHookEx: a thread-specific hook procedure is called for the thread it was installed for. Learn MouseProc: "The system
+ * calls this function whenever an application calls the GetMessage or PeekMessage function and there is a mouse message to be processed"; nCode HC_ACTION (0) "The wParam and lParam parameters contain information about
+ * a mouse message", HC_NOREMOVE (3) "...contain information about a mouse message, and the mouse message has not been removed from the message queue (An application called the PeekMessage function, specifying the
+ * PM_NOREMOVE flag.)"; wParam "The identifier of the mouse message"; lParam "A pointer to a MOUSEHOOKSTRUCT structure"; the return value is "If nCode is less than zero, the hook procedure must return the value returned
+ * by CallNextHookEx. If nCode is greater than or equal to zero, and the hook procedure did not process the message, it is highly recommended that you call CallNextHookEx and return the value it returns ... If the hook
+ * procedure processed the message, it may return a nonzero value to prevent the system from passing the message to the target window procedure." Learn KeyboardProc is the same with wParam "the virtual-key code" and
+ * lParam "the repeat count, scan code, extended-key flag, context code, previous key-state flag, and transition-state flag" (the lParam of the key message). The hooks of a thread form a chain, the most recently installed
+ * first (the chain of WH_CALLWNDPROC, above); CallNextHookEx walks it. Called by fle_input.c at the point where GetMessage / PeekMessage is about to return a mouse or key message of `thread` (Wine 10.0, win32u/message.c
+ * process_mouse_message and process_keyboard_message: the same two calls, nCode HC_ACTION for a removal and HC_NOREMOVE for PM_NOREMOVE, the message dropped when the answer is nonzero: UNOFFICIAL).
+ * `blob` (len bytes, NULL = none) is copied onto the guest stack and its address is lParam (the MOUSEHOOKSTRUCT). Returns 1 when the chain of hook `id` for the thread has a hook (the answer of the newest hook is then in
+ * *result), 0 when it has none. */
+int fle_win_input_call_hooks(int id, unsigned thread, int ncode, uint64_t wp, uint64_t lp, const void *blob, unsigned len, uint64_t *result)
+{
+    uint32_t vid;
+    int k, j;
+    uint64_t sp0, res;
+
+    if (hook_count == 0) return 0;
+    vid = fle_thread_vid ? fle_thread_vid(thread) : FLE_EMULATED_TID;
+    for (k = -1, j = 0; j < (int)FLE_HOOK_MAX; j++)
+        if (hooks[j].live && hooks[j].id == id && hooks[j].thread == vid && (k < 0 || hooks[j].order > hooks[k].order)) k = j;
+    if (k < 0) return 0;
+    if (cur_hook_n >= sizeof cur_hook / sizeof cur_hook[0]) fle_stop("WH_MOUSE / WH_KEYBOARD", "hook procedures are nested more than 8 deep (a limit of the virtual machine)");
+    sp0 = R[4];
+    R[4] = (R[4] - ((uint64_t)len + 64u)) & ~UINT64_C(15);
+    if (blob != NULL && len != 0) {
+        unsigned q;
+
+        for (q = 0; q < len; q++) fle_st(R[4] + q, 1, ((const uint8_t *)blob)[q]);
+        lp = R[4];
+    }
+    cur_hook[cur_hook_n++] = k;
+    res = fle_call_guest(hooks[k].proc, (uint64_t)(int64_t)ncode, wp, lp, 0);
+    cur_hook_n--;
+    R[4] = sp0;
+    *result = res;
+    return 1;
 }
 
 /* user32!GetClientRect: BOOL f(HWND rcx, LPRECT rdx). Learn: "The left and top members are zero. The right and bottom members contain the width and height of the window." The non-client area is 0 here (nc_zero). */
@@ -2634,6 +2684,7 @@ uint64_t fle_win_update_folds(void) { return upd_folds; }
 
 static void upd_clear_rect(int64_t i)
 {
+    tab[i].upd_delayed = 0;
     tab[i].upd_l = tab[i].upd_t = tab[i].upd_r = tab[i].upd_b = 0;
     free(tab[i].updr);
     tab[i].updr = NULL;
@@ -2731,7 +2782,7 @@ static void upd_minus_rect(int64_t i, int32_t l, int32_t t, int32_t r, int32_t b
         return;
     }
     upd_put(i, &v);
-    if (v.n == 0) tab[i].upd_erase = 0;
+    if (v.n == 0) { tab[i].upd_erase = 0; tab[i].upd_delayed = 0; }
 }
 
 static void upd_add(int64_t i, int32_t l, int32_t t, int32_t r, int32_t b, int erase)
@@ -5317,7 +5368,7 @@ void fle_imp_BeginPaint(void)
     int64_t i;
     uint64_t dc, sp = R[4];
     int32_t l, t2, r, b;
-    int erase;
+    int erase, delayed;
     uint64_t er = 1;
     uint32_t bp_np = 0;
     int32_t bp_pc[FLE_GDC_PAINT_PIECES][4];
@@ -5351,6 +5402,7 @@ void fle_imp_BeginPaint(void)
     r = tab[i].upd_r;
     b = tab[i].upd_b;
     erase = tab[i].upd_erase;
+    delayed = tab[i].upd_delayed;
     if (!(r > l && b > t2)) {
         l = t2 = r = b = 0;
     }
@@ -5370,16 +5422,18 @@ void fle_imp_BeginPaint(void)
     tab[i].in_paint = 1;
     upd_clear_rect(i);
     tab[i].upd_erase = 0;
+    /* decision 0142: the DC is clipped to the update region until EndPaint (Learn BeginPaint: "automatically sets the clipping region of the device context to exclude any area outside the update region").
+     * Decision 0323: this comes BEFORE the WM_ERASEBKGND below, as in Wine 10.0 (win32u/dce.c send_erase: the DC is made with the update region as its clip, then the message is sent): the erase of the guest's own
+     * procedure, and DefWindowProc's fill, reach the update region only. It was after the message, so an erase that fills "the client area" overpainted pixels that were valid. */
+    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, l, t2, r, b);
+    if (bp_np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])bp_pc, bp_np);
     if (erase && r > l) {
         R[4] = sp;
         er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
         R[4] = sp;
     }
-    /* decision 0142: the DC is clipped to the update region until EndPaint (Learn BeginPaint: "automatically sets the clipping region of the device context to exclude any area outside the update region") */
-    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, l, t2, r, b);
-    if (bp_np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])bp_pc, bp_np);
     fle_st(ps, 8, dc);
-    fle_st(ps + 8, 4, (erase && r > l && er == 0) ? 1u : 0u);
+    fle_st(ps + 8, 4, ((erase && r > l && er == 0) || (delayed && r > l)) ? 1u : 0u);
     put_i32(ps + 12, l);
     put_i32(ps + 16, t2);
     put_i32(ps + 20, r);
@@ -6456,49 +6510,106 @@ static void redraw_tree(int64_t i, int have_rect, int32_t l, int32_t t, int32_t 
     }
 }
 
+/* Decision 0323: DefWindowProc(WM_ERASEBKGND). Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If
+ * hbrBackground is NULL, the application should process the WM_ERASEBKGND message and erase the background." Learn WNDCLASSW hbrBackground: a handle to the class background brush, or a system colour index plus 1 (the
+ * values FillRect takes). Wine 10.0 (win32u/defwnd.c default_window_proc, UNOFFICIAL): no brush: the answer is 0 and nothing is drawn; else the clip box of the DC (a CS_PARENTDC class: the client rectangle, "can't use
+ * GetClipBox with a parent DC or we fill the whole parent") is filled with the brush and the answer is 1. The DC given by BeginPaint / RedrawWindow is clipped to the update region (this file), so filling a
+ * rectangle that covers it paints the update region and nothing else; a DC of a window therefore gets the client rectangle (fle_gdi.c's GetClipBox answers memory DCs only and stops for a window DC). A memory DC
+ * (a test that sends the message with its own DC) gets its clip box. The DC of the entire screen stops by name (its clip box is not modelled). A brush that FillRect cannot take (a pattern brush) stops there. */
+static uint64_t def_erase_background(const char *api, int64_t wi, uint64_t dc)
+{
+    uint64_t hbr = 0, sv[5];
+    uint8_t rc[16];
+    uint64_t prc = (uint64_t)(uintptr_t)rc;
+
+    if (!fle_class_hbrbackground_of(tab[wi].atom, &hbr) || hbr == 0) return 0;
+    if (!fle_imp_FillRect || !fle_imp_GetClipBox || !fle_gdc_is_window_dc) fle_stop(api, "no GDI is linked (fle_gdi.c, fle_gdc.c): the class background brush of the window cannot be filled (decision 0323)");
+    memset(rc, 0, sizeof rc);
+    if (fle_gdc_is_window_dc(dc)) {
+        put_i32(prc + 8, tab[wi].pcx);
+        put_i32(prc + 12, tab[wi].pcy);
+    } else {
+        uint64_t type;
+
+        sv[0] = R[0]; sv[1] = R[1]; sv[2] = R[2]; sv[3] = R[8]; sv[4] = R[9];
+        R[1] = dc;
+        R[2] = prc;
+        fle_imp_GetClipBox();
+        type = R[0];
+        R[0] = sv[0]; R[1] = sv[1]; R[2] = sv[2]; R[8] = sv[3]; R[9] = sv[4];
+        if (type == 0) return 0;      /* ERROR: nothing to fill */
+    }
+    sv[0] = R[0]; sv[1] = R[1]; sv[2] = R[2]; sv[3] = R[8]; sv[4] = R[9];
+    R[1] = dc;
+    R[2] = prc;
+    R[8] = hbr;
+    fle_imp_FillRect();
+    R[0] = sv[0]; R[1] = sv[1]; R[2] = sv[2]; R[8] = sv[3]; R[9] = sv[4];
+    return 1;
+}
+
+/* Decision 0323: the WM_ERASEBKGND of a window whose update region is marked for erasing, as RDW_ERASENOW / RDW_UPDATENOW and the default WM_PAINT send it. wParam is the DC of the window (GetDC(hWnd), released when
+ * the message has been answered), clipped to the update region while the message is handled (Wine 10.0 win32u/dce.c send_erase: GetDCEx with the update region, DCX_INTERSECTRGN | DCX_USESTYLE). The erase request
+ * is cleared when the message was answered with nonzero (Learn WM_ERASEBKGND: "If the application returns zero, the window will remain marked for erasing"). decision 0253 (alpha5) made the DC a real one: a window
+ * procedure that fills with Message.DC (TEdgeBrowser of FL: FillRect(0, ...)) stopped the run at RedrawWindow(RDW_ERASE | RDW_UPDATENOW) when it was 0. */
+static void erase_now_one(const char *api, int64_t i)
+{
+    uint64_t sp = R[4], dc = 0, h = handle_of(i), er;
+    int32_t pc[FLE_GDC_PAINT_PIECES][4];
+    uint32_t np = 0, k;
+    fle_visrgn uv;
+
+    if (!fle_imp_GetDC || !fle_imp_ReleaseDC) fle_stop(api, "no virtual screen DC is linked (fle_gdc.c): the DC of WM_ERASEBKGND is not available");
+    {
+        uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
+
+        R[1] = h;
+        fle_imp_GetDC();
+        dc = R[0];
+        R[0] = sv[0];
+        R[1] = sv[1];
+        R[2] = sv[2];
+        R[8] = sv[3];
+        R[9] = sv[4];
+    }
+    upd_get(i, &uv);
+    if (uv.n > 1 && uv.n <= FLE_GDC_PAINT_PIECES) {
+        np = uv.n;
+        for (k = 0; k < np; k++) {
+            pc[k][0] = (int32_t)uv.r[k].x0;
+            pc[k][1] = (int32_t)uv.r[k].y0;
+            pc[k][2] = (int32_t)uv.r[k].x1;
+            pc[k][3] = (int32_t)uv.r[k].y1;
+        }
+    }
+    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, tab[i].upd_l, tab[i].upd_t, tab[i].upd_r, tab[i].upd_b);
+    if (np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])pc, np);
+    er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
+    R[4] = sp;
+    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 0, 0, 0, 0, 0);
+    {
+        uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
+
+        R[1] = h;
+        R[2] = dc;
+        fle_imp_ReleaseDC();
+        R[0] = sv[0];
+        R[1] = sv[1];
+        R[2] = sv[2];
+        R[8] = sv[3];
+        R[9] = sv[4];
+    }
+    /* Learn WM_ERASEBKGND: nonzero = "no further erasing is required"; zero = "the window will remain marked for erasing" (BeginPaint does the same: fErase is TRUE only when the message returned 0) */
+    tab[i].upd_erase = 0;
+    if (er == 0) tab[i].upd_delayed = 1;
+}
+
 static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)
 {
     uint64_t sp = R[4];
 
     if (tab[i].live && is_visible(i) && tab[i].upd_r > tab[i].upd_l && tab[i].upd_b > tab[i].upd_t) {
-        if ((fl & RDW_ERASENOW_ || fl & RDW_UPDATENOW_) && tab[i].upd_erase) {
-            /* decision 0253 (alpha5): Learn WM_ERASEBKGND: wParam "A handle to the device context." (the same DC as the one BeginPaint gives it: GetDC(hWnd), released when the message has been answered). It was 0 here, so a window
-             * procedure that fills with Message.DC (TEdgeBrowser of FL: FillRect(0, ...)) stopped the run with "hDC is not a DC of this runtime" at RedrawWindow(RDW_ERASE | RDW_UPDATENOW). */
-            uint64_t dc = 0, h = handle_of(i);
-
-            if (!fle_imp_GetDC || !fle_imp_ReleaseDC) fle_stop(api, "no virtual screen DC is linked (fle_gdc.c): the DC of WM_ERASEBKGND is not available");
-            {
-                uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
-
-                R[1] = h;
-                fle_imp_GetDC();
-                dc = R[0];
-                R[0] = sv[0];
-                R[1] = sv[1];
-                R[2] = sv[2];
-                R[8] = sv[3];
-                R[9] = sv[4];
-            }
-            uint64_t er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
-
-            R[4] = sp;
-            {
-                uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
-
-                R[1] = h;
-                R[2] = dc;
-                fle_imp_ReleaseDC();
-                R[0] = sv[0];
-                R[1] = sv[1];
-                R[2] = sv[2];
-                R[8] = sv[3];
-                R[9] = sv[4];
-            }
-            /* Learn WM_ERASEBKGND: "An application should return nonzero ... if it processes the message and erases the background; this indicates that no further erasing is required. If the application returns zero, the window
-             * will remain marked for erasing." (BeginPaint does the same: fErase is TRUE only when the message returned 0.) So the erase request is cleared here when the message was answered with nonzero, and the WM_PAINT
-             * that follows does not erase a second time. */
-            if (er != 0) tab[i].upd_erase = 0;
-        }
+        if ((fl & RDW_ERASENOW_ || fl & RDW_UPDATENOW_) && tab[i].upd_erase) erase_now_one(api, i);
         if (fl & RDW_UPDATENOW_) {
             (void)send_to(api, i, FLE_WM_PAINT, 0, 0);
             R[4] = sp;
@@ -6595,6 +6706,36 @@ static int64_t hit_visible(int64_t parent, int32_t px, int32_t py)
         }
     }
     return -1;
+}
+
+/* Decision 0323: every visible window that contains the screen point, in the order of Wine 10.0's list for window_from_point (server/window.c get_window_children_from_point and all_windows_from_point, UNOFFICIAL): the
+ * siblings from the top of the z-order, and for each the windows below it that contain the point (recursively, the same rule) BEFORE the window itself. The first entry is what fle_win_input_hit gives. Learn WM_NCHITTEST,
+ * HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)":
+ * fle_input.c walks this list. Disabled windows are in it (as in fle_win_input_hit); the same tests as hit_visible. */
+static unsigned hit_list_rec(int64_t parent, int32_t px, int32_t py, uint64_t *out, unsigned max, unsigned n)
+{
+    int64_t idx[SIB_MAX];
+    uint32_t cnt = siblings(parent, idx, SIB_MAX), k;
+
+    for (k = 0; k < cnt && n < max; k++) {
+        int64_t i = idx[k];
+        int32_t ox, oy;
+
+        if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
+        if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
+        else ox = oy = 0;
+        if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
+        if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
+        n = hit_list_rec(i, px, py, out, max, n);
+        if (n < max) out[n++] = handle_of(i);
+    }
+    return n;
+}
+
+unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned max)
+{
+    if (!tab_n || max == 0) return 0;
+    return hit_list_rec(-1, x, y, out, max, 0);
 }
 
 uint64_t fle_win_input_hit(int32_t x, int32_t y)

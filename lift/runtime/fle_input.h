@@ -74,6 +74,8 @@ typedef struct {
     char cls[40];                    /* the class name, ASCII (the trace) */
 } fle_win_iview;
 int fle_win_input_view(uint64_t hwnd, fle_win_iview *v);
+int fle_win_input_call_hooks(int id, unsigned thread, int ncode, uint64_t wp, uint64_t lp, const void *blob, unsigned len, uint64_t *result);   /* decision 0323: the WH_MOUSE / WH_KEYBOARD chain of the thread; 1 = a hook was called */
+unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned max);   /* decision 0323: the visible windows that contain the point, children before their parent, top sibling first (the first one is what fle_win_input_hit gives); the count */
 uint64_t fle_win_input_hit(int32_t x, int32_t y);                 /* the deepest visible window that contains the point (disabled windows are found), 0 = none */
 uint64_t fle_win_input_send(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp, uint64_t lp);
 void fle_win_input_showwindow(const char *api, uint64_t hwnd, int cmd);   /* decision 0267: the ShowWindow that DefWindowProcW makes of WM_SYSCOMMAND SC_MINIMIZE / SC_MAXIMIZE / SC_RESTORE */

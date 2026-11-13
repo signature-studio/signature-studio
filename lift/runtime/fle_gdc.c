@@ -178,6 +178,13 @@ static uint64_t dc_new(const char *api, uint8_t kind, uint64_t hwnd, uint32_t fl
     return FLE_GDC_HANDLE_BASE + 4u * (idx + 1u);
 }
 
+int fle_gdc_is_window_dc(uint64_t h)
+{
+    int64_t i = dc_index(h);
+
+    return i >= 0 && dcs[i].live && dcs[i].kind != FLE_GDC_K_SCREEN;
+}
+
 int fle_gdc_dc_info(uint64_t h, fle_gdc_info *out)
 {
     int64_t i = dc_index(h);

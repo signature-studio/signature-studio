@@ -291,6 +291,18 @@ int fle_class_style_of(uint16_t atom, uint32_t *style)
     return 0;
 }
 
+int fle_class_hbrbackground_of(uint16_t atom, uint64_t *hbr)
+{
+    uint64_t i;
+
+    for (i = 0; i < tab_n; i++) {
+        if (tab[i].atom != atom) continue;
+        memcpy(hbr, tab[i].wc + FLE_CLASS_WC_OFF_HBRBACKGROUND, 8);
+        return 1;
+    }
+    return 0;
+}
+
 /* Decision 0136: the hCursor of the WNDCLASSW that registered `atom` (offset 40 of the layout above), 0 when the atom is not in the table or the class has none. No state moves. */
 uint64_t fle_class_hcursor_of(uint16_t atom)
 {

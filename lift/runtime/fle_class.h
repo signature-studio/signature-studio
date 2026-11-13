@@ -67,6 +67,10 @@ int fle_class_name_of(uint16_t atom, uint16_t *out, uint16_t *len);
 /* Decision 0125 (PROVISIONAL): the `style` member of the WNDCLASSW that registered `atom` (fle_win.c: GetDC and the other DC calls read CS_OWNDC, CS_CLASSDC and CS_PARENTDC from it): 1 and the style when the atom is in the
  * table, 0 otherwise. No state moves. */
 int fle_class_style_of(uint16_t atom, uint32_t *style);
+/* Decision 0323: the `hbrBackground` member of the WNDCLASSW that registered `atom` (offset 48): 1 and the value (a brush handle, a system colour index plus 1, or 0 = none) when the atom is in the table, 0 otherwise.
+ * fle_win.c: DefWindowProc(WM_ERASEBKGND) erases with it. No state moves. */
+#define FLE_CLASS_WC_OFF_HBRBACKGROUND 48
+int fle_class_hbrbackground_of(uint16_t atom, uint64_t *hbr);
 void fle_imp_UnregisterClassW(void);
 /* fle_win.c: the number of live windows that have the class `atom`. A weak reference in fle_class.c: a link without fle_win.c (the unit tests of the class table) has no windows, so the count is 0. */
 uint32_t fle_win_count_of_atom(uint16_t atom) __attribute__((weak));
