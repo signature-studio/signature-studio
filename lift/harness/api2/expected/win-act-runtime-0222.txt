@@ -399,6 +399,9 @@
 = vis: P1=1 P2=1 P3=1
 @@ 10: EnableWindow(P3, FALSE) then click on P3 at 450,150
   P3 WM_ENABLE wp=0
+  P3 WM_SETCURSOR hit=-2 msg=0x200
+  P3 WM_SETCURSOR hit=-2 msg=0x201
+  P3 WM_SETCURSOR hit=-2 msg=0x202
 = z: P1 P3 P2
 = active=P1 foreground=P1 focus=P1 capture=none
 = vis: P1=1 P2=1 P3=1

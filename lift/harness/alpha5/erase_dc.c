@@ -153,11 +153,11 @@ int main(void)
     yes("  the DC is released when the message has been answered (not live any more)", erase_n > n0 && erase_log[n0].wp != 0 && !fle_gdc_is_live(erase_log[n0].wp));
     yes("  the WM_PAINT of UPDATENOW follows", paint_n >= 1);
 
-    /* ---- a window procedure that answers 0 leaves the window marked for erasing (Learn): the BeginPaint of the WM_PAINT erases again and PAINTSTRUCT.fErase is TRUE ---- */
+    /* ---- a window procedure that answers 0 leaves the window marked for erasing (Learn): PAINTSTRUCT.fErase is TRUE. Decision 0323 (1): the erase is a delayed erase (Wine 10.0 UPDATE_DELAYED_ERASE), so BeginPaint does not send the WM_ERASEBKGND a second time ---- */
     erase_result = 0;
     n0 = erase_n;
     redraw(win, 0x0105u);
-    yes("a WM_ERASEBKGND answered with 0 leaves the erase request: BeginPaint sends it again (2 messages in all)", erase_n == n0 + 2);
+    yes("a WM_ERASEBKGND answered with 0 leaves the erase request pending (delayed erase): BeginPaint does not send it again (1 message in all)", erase_n == n0 + 1);
     yes("  and PAINTSTRUCT.fErase is TRUE", last_ps_ferase == 1);
     erase_result = 1;
 
