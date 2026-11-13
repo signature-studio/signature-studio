@@ -1218,12 +1218,17 @@ fn source_uses_no_host_window_display_queue_clock_thread_process_or_file_and_cal
     for bad in [
         "getpid", "getppid", "gettid", "getenv", "environ", "fopen", "open(", "stat(", "/proc", "/etc", "/home", "/dev", "/tmp", "exit(", "_exit",
         "clock_gettime", "gettimeofday", "time(", "clock(", "nanosleep", "usleep", "sleep(", "select(", "<time.h>", "<sys/time.h>", "pthread", "<sys/",
-        "<unistd.h>", "<signal.h>", "fork(", "exec", "syscall", "sched_", "futex", "asm", "__asm__", "uintptr_t", "abort(", "X11", "DISPLAY", "xrandr",
+        "<unistd.h>", "<signal.h>", "fork(", "exec", "syscall", "sched_", "futex", "asm", "__asm__", "abort(", "X11", "DISPLAY", "xrandr",
         "wayland", "fb0", "ioctl", "emscripten", "SDL", "dlopen", "LoadLibrary", "fle_load_", "fle_res_", "GetLastError", "setjmp",
         "longjmp", "fle_dispatch_table", "(void (*)",
     ] {
         assert!(!code.contains(bad), "fle_win.c must not use {bad}");
     }
+    // decision 0323 (1) (old: "uintptr_t" was in the list above): def_erase_background (DefWindowProc(WM_ERASEBKGND) filling with the class background brush) hands the address of its own 16-byte RECT, a local array, to
+    // GetClipBox / FillRect as a guest address (guest addresses are host addresses in this runtime: fle_addr is the identity, or the high-32 check): the one use of uintptr_t in fle_win.c
+    assert_eq!(code.matches("uintptr_t").count(), 1);
+    let at = code.find("uintptr_t").unwrap();
+    assert!(code[..at].rfind("static uint64_t def_erase_background(").is_some_and(|f| !code[f..at].contains("\n}\n")), "the one uintptr_t is inside def_erase_background");
     // decision 0123 (old: "fle_dispatch(" was in the list above): wall 31 adds exactly one call, in fle_win_try_thunk (the guest's own `call [reg+disp]` of the MakeObjectInstance slot, reached from fle_dispatch_miss)
     assert_eq!(code.matches("fle_dispatch(").count(), 1);
     let at = code.find("fle_dispatch(").unwrap();
@@ -1276,7 +1281,8 @@ fn source_uses_no_host_window_display_queue_clock_thread_process_or_file_and_cal
     // Decision 0123 (old: exactly 2): call_wndproc keeps its 2 sites; the other 4 are the timer procedure of a WM_TIMER message with a callback (Learn SetTimer: TIMERPROC) and the three callbacks of EnumWindows,
     // EnumChildWindows and EnumThreadWindows (WNDENUMPROC, Learn), each called with the handle and lParam
     // Decision 0171 (old: 6): +2, the WH_CALLWNDPROC hook procedure (callwndproc_hooks) and the next procedure of the chain (CallNextHookEx)
-    assert_eq!(code.matches("fle_call_guest(").count(), 8);
+    // Decision 0323 (3) (old: 8): +1, the WH_MOUSE / WH_KEYBOARD hook procedure that the input retrieval calls (fle_win_input_call_hooks; Learn MouseProc / KeyboardProc)
+    assert_eq!(code.matches("fle_call_guest(").count(), 9);
     let wndproc_sites = code.matches("return fle_call_guest(proc, h, msg, wp, lp)").count() + code.matches("return fle_call_guest(jump, h, msg, wp, lp)").count();
     assert_eq!(wndproc_sites, 2, "call_wndproc");
     let (a, b2, c) = (code.find("FLE_WM_NCCREATE, 0").unwrap(), code.find("FLE_WM_NCCALCSIZE, 0").unwrap(), code.find("FLE_WM_CREATE, 0").unwrap());

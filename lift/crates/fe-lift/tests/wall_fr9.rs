@@ -1531,9 +1531,14 @@ fn source_of_the_window_model_reads_no_host_state_draws_no_pixel_and_names_each_
         assert!(!win.contains(bad), "fle_win.c must not use {bad}");
     }
     // nothing is drawn: the window model writes no pixel and calls no drawing API of fle_gdi.c
-    for pix in ["BitBlt", "StretchDIBits", "SetDIBitsToDevice", "CreateDIBSection", "PatBlt", "FillRect", "TextOut", "ExtTextOut", "SetPixel", "LineTo", "Rectangle("] {
+    for pix in ["BitBlt", "StretchDIBits", "SetDIBitsToDevice", "CreateDIBSection", "PatBlt", "TextOut", "ExtTextOut", "SetPixel", "LineTo", "Rectangle("] {
         assert!(!win.contains(pix), "fle_win.c must not draw: {pix}");
     }
+    // decision 0323 (1): the one drawing call of the window model is DefWindowProc(WM_ERASEBKGND) filling with the class background brush (Learn WM_ERASEBKGND / WNDCLASS.hbrBackground): the weak fle_imp_FillRect, declared once and
+    // called once, and no other form of the word
+    assert!(win.contains("void fle_imp_FillRect(void) __attribute__((weak));"));
+    assert_eq!(win.matches("FillRect").count(), win.matches("fle_imp_FillRect").count(), "FillRect only as fle_imp_FillRect");
+    assert_eq!(win.matches("fle_imp_FillRect()").count(), 1, "one call of FillRect");
     // the only GDI entries that the window model calls are GetDC and ReleaseDC, both through weak references, in two pairs: BeginPaint / EndPaint, and the DC that RedrawWindow (RDW_ERASENOW / RDW_UPDATENOW) gives to
     // WM_ERASEBKGND (paint_now_tree, decision 0253: Learn WM_ERASEBKGND "wParam: A handle to the device context")
     assert!(win.contains("void fle_imp_GetDC(void) __attribute__((weak));") && win.contains("void fle_imp_ReleaseDC(void) __attribute__((weak));"));
@@ -1542,7 +1547,9 @@ fn source_of_the_window_model_reads_no_host_state_draws_no_pixel_and_names_each_
     for (head, gets, releases) in [
         ("void fle_imp_BeginPaint(void)", 1, 0),
         ("void fle_imp_EndPaint(void)", 0, 1),
-        ("static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)", 1, 1),
+        // decision 0323: the DC of the WM_ERASEBKGND that RedrawWindow gives (GetDC ... ReleaseDC) moved from paint_now_tree into erase_now_one (which clips it to the update region)
+        ("static void erase_now_one(const char *api, int64_t i)\n{", 1, 1),
+        ("static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)", 0, 0),
     ] {
         let at = win.find(head).unwrap_or_else(|| panic!("fle_win.c has no {head}"));
         let rest = &win[at..];

@@ -186,7 +186,19 @@ fn while_a_window_has_the_capture_it_gets_client_messages_with_coordinates_outsi
 fn a_disabled_window_gets_no_mouse_input_and_nothing_goes_to_the_window_beneath() {
     // S-disabled-drops (Learn WindowFromPoint: "does not retrieve a handle to a hidden or disabled window"); EnableWindow(FALSE) sends WM_CANCELMODE (0x1f) and WM_ENABLE (0xa) (decision 0123).
     let o = msgs("disabled", true);
-    assert_eq!(o, ["  A msg 1f wp 0 lp 0", "  A msg a wp 0 lp 0", "A is disabled; click on A at (300,250):", "pump 0"]);
+    // decision 0323b (Wine 10.0 process_mouse_message): the input for a disabled top-level window is dropped, but the window is sent WM_SETCURSOR with HTERROR (-2) and the mouse message (move 0x200, press 0x201, release 0x202)
+    assert_eq!(
+        o,
+        [
+            "  A msg 1f wp 0 lp 0",
+            "  A msg a wp 0 lp 0",
+            "A is disabled; click on A at (300,250):",
+            "  A msg 20 SETCURSOR wp A hit -2 mouse 200",
+            "  A msg 20 SETCURSOR wp A hit -2 mouse 201",
+            "  A msg 20 SETCURSOR wp A hit -2 mouse 202",
+            "pump 0"
+        ]
+    );
 }
 
 #[test]
