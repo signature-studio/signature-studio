@@ -161,7 +161,7 @@ describe('the middleware', () => {
     expect(JSON.parse(l[0] as string)).toEqual({ t: '2026-11-03T05:06:07.000Z', remote: 'loopback', perf: { v: 1, seq: 0, reason: 'first-idle' } });
   });
   it('behind a reverse proxy on this machine (tailscale serve): the visitor\'s class from X-Forwarded-For is recorded, its address is not', async () => {
-    const r = await call(base, { headers: { 'x-forwarded-for': '100.101.102.103', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'agent-workspace-ubuntu.example.ts.net' }, body: JSON.stringify({ v: 2, seq: 0 }) });
+    const r = await call(base, { headers: { 'x-forwarded-for': '100.101.102.103', 'x-forwarded-proto': 'https', 'x-forwarded-host': 'machine.example.ts.net' }, body: JSON.stringify({ v: 2, seq: 0 }) });
     expect(r.status).toBe(204);
     const text = fs.readFileSync(log, 'utf8');
     expect(JSON.parse(text).remote).toBe('tailnet');

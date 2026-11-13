@@ -309,7 +309,7 @@ describe('the beacon of version 2 (decision 0192)', () => {
   it('nothing in it is personal: no address, no URL, no host name, no cookie (the host is a class)', () => {
     const text = beaconText(v2());
     expect(text).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
-    expect(text).not.toMatch(/https?:|cookie|href|"origin"|"url"|"ip"|\.ts\.net|tailb77b86|agent-workspace/i);
+    expect(text).not.toMatch(/https?:|cookie|href|"origin"|"url"|"ip"|\.ts\.net|example-machine/i);
     expect(JSON.parse(text).client.page).toEqual({ secure: true, hostKind: 'ts.net' });
   });
   it('size: the worst case — 300-char user agent, 200-char GPU, 600 timeline marks, long error text, every histogram full — is cut under the limit, and the page-load token survives', () => {
