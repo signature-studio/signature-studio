@@ -1,0 +1,67 @@
+{
+  "startedAt": "2026-11-13T21:47:34.847Z",
+  "chromeVersion": "Chrome/156.0.8078.47",
+  "engineKind": "emscripten-fruity-v1",
+  "timelineIdle": 4178.64990234375,
+  "viewport": {
+    "beforeShrink": {
+      "w": 2260,
+      "h": 1116
+    },
+    "afterShrink": {
+      "w": 1500,
+      "h": 900
+    }
+  },
+  "state": {
+    "beforeShrink": "engine-idle",
+    "afterShrink": "exited"
+  },
+  "engineStatus": {
+    "beforeShrink": "Engine: computing (0.0 s) - input waits for its next idle",
+    "afterShrink": "Engine: stopped (stopped, exit code 134) - it no longer takes input"
+  },
+  "logLengthAtShrink": 310,
+  "logLengthAfterShrink": 654,
+  "restored": "skipped: the engine stopped after the shrink",
+  "callbackNestingLines": {
+    "count": 1,
+    "lines": [
+      "[err] fle: fle_call_guest: callback nesting is deeper than FLE_CB_MAX_DEPTH (16): decision 0064"
+    ]
+  },
+  "logAroundShrink": {
+    "before": [
+      "[err]     handle 0x7f990024 lid 9 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 1 thread 0",
+      "[err]     handle 0x7f99001c lid 7 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 2 thread 0",
+      "[err]     handle 0x7f990014 lid 5 class \"TApplication\" title \"\" rect (960, 540, 0 x 0) style 0x84ca0000 exstyle 0x80 owner 0 visible 0 enabled 1 z 3 thread 0",
+      "[err]     handle 0x7f990010 lid 4 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 4 thread 0",
+      "[err]     handle 0x7f99000c lid 3 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 5 thread 0",
+      "[err]     handle 0x7f990008 lid 2 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 6 thread 0",
+      "[err]     handle 0x7f990004 lid 1 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 7 thread 0",
+      "[err] first drawing call discarded because its window is not visible (decision 0126, S-draw-hidden): BitBlt into the surface of top-level window lid 14; function entries since the program began: 0",
+      "[err] fle: act1-net\t#1\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadnewsrss?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)",
+      "[err] fle: act1-net\t#2\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadversionsxml?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)"
+    ],
+    "after": [
+      "wf1-surface: event=stop lid=14 size=1160x864 stride=4640 pixels=0x33907f60 nonzero=740524 rgba_sha256=a4d946cbd40a4a1982c152260ea35e0f2f8a605f1cce9e108494a4b85cc3aa98 entries_since_program_start=0",
+      "wf1-surface: event=stop lid=48 size=874x573 stride=3496 pixels=0x38e1f140 nonzero=500802 rgba_sha256=877b1c0236d17afcd27b6185028e00fcb9c9a36ac46948a3b0d2a86f62032df8 entries_since_program_start=0",
+      "fruity: == stop: SIGABRT (runtime abort, see runtime message)",
+      "fruity: runtime message: first non-background pixel on a drawing surface (decision 0126): written by UpdateLayeredWindowIndirect into the surface of top-level window lid 8; function entries since the program began: 0",
+      "  surface of top-level window lid 8: 334 x 476 (BGRX 32-bit top-down), calls that wrote 1, non-zero pixels 57324 of 158984, distinct colours 12174; top colours (COLORREF 0xBBGGRR: count): 00000000:101660 0x1b2715:431 0x1c2915:239 0x1b2815:194 0x224b86:184 0x000001:179 0x1e4885:150 0x000002:129",
+      "  window table: 9 entries, 9 live; top-level windows in z-order, top first, each followed by its children (z = position in its group, top first):",
+      "    handle 0x7f990020 lid 8 class \"TLightweightLayeredControl\" title \"\" rect (794, 303, 334 x 476) style 0x90000000 exstyle 0x80800ac owner 0x7f990014 visible 1 enabled 1 z 0 thread 2",
+      "    handle 0x7f990024 lid 9 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 1 thread 0",
+      "    handle 0x7f99001c lid 7 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 2 thread 0",
+      "    handle 0x7f990014 lid 5 class \"TApplication\" title \"\" rect (960, 540, 0 x 0) style 0x84ca0000 exstyle 0x80 owner 0 visible 0 enabled 1 z 3 thread 0"
+    ]
+  },
+  "loadavg": [
+    0.62,
+    0.36,
+    0.64
+  ],
+  "elapsedMs": 17066,
+  "error": null,
+  "engineLogLines": 654
+}
