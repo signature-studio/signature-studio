@@ -29,11 +29,11 @@
 | FL インストーラ 5653 | 1,106,033,456 B、SHA-256 の頭 `04393e79` | `stat`。`ci/artifacts.lock` の行と一致 |
 | `FLEngine_x64.dll` | 22,227,016 B | `stat binaries/win64/FLEngine_x64.dll` |
 | 冷たいビルド(標準ランナー) | build ジョブ 37 分 33 秒・45 分 39 秒(n=2) | 0217 §4c の表、実行 5 と 2(Actions API の step 時刻) |
-| 温かい実行(全部 hit) | 約 1 分 20 秒(n=1) | 0217 §4c の実行 3 |
+| 温かい実行(全部 hit) | 約 1 分 20 秒(n=2)。旧: n=1、実行 3 | 0217 §4c の実行 3 と 8(全 hit) |
 | 同じ木の最終 wasm | GitHub と手元が SHA-256 まで一致 | 0217 §4c(`cf384a1c…`、130,237,776 B) |
 | 別のインストーラ 3 本の取得と抽出(VST3 用。このビルドの入力ではない) | 1 分 13 秒、3 本・1.36 GB | 0217 §4c の実行 1(GitHub 上) |
 | ジョブの上限 | 6 時間 | https://docs.github.com/en/actions/reference/limits(2026-11-13 に読んだ) |
-| 公開リポジトリの標準ランナー | ubuntu-latest: 4 vCPU・16 GB・14 GB | https://docs.github.com/en/actions/reference/runners/github-hosted-runners(2026-11-13 に読んだ。public の表) |
+| 公開リポジトリの標準ランナー | ubuntu-latest: 4 vCPU・16 GB・14 GB(SSD) | https://docs.github.com/en/actions/reference/runners/github-hosted-runners(2026-11-13 に読んだ。public の表の Linux x64 `ubuntu-latest` の行が 4 / 16 GB / 14 GB。旧の出典は 0217 §4b の 14 GB で、これは private の表の値(0217 の 74 行目)。public の SSD の値は、この表で確かめた) |
 | 旧 CI の 17〜22 分 | [文書](16 コア・JOBS=4 の値) | `docs/core/pipeline.md` 27 行。GitHub の実測 37〜46 分とは環境が違う |
 
 ## 読み(解釈。実行していない)
