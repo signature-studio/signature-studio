@@ -8,6 +8,8 @@ RUNTIME = os.path.join(ROOT, "lift", "runtime")
 MARK = "PROVISIONAL"
 DECISION = re.compile(r"(?<![0-9])0[0-9]{3}(?![0-9])")
 DATE = re.compile(r"(?<![0-9])[0-9]{4}-[0-9]{2}-[0-9]{2}(?![0-9])")
+DEADLINE_WORD = re.compile(r"deadline|due|until|expires|expiry|期限", re.I)
+BY_BEFORE = re.compile(r"\bby\s+$", re.I)
 
 
 def comment_flags(lines):
@@ -42,9 +44,11 @@ def deadline(lines, flags, i):
     else:
         span = range(i, i + 1)
     for j in span:
-        m = DATE.search(lines[j])
-        if m:
-            return m.group(0)
+        line = lines[j]
+        for m in DATE.finditer(line):
+            near = line[max(0, m.start() - 40):m.end() + 40]
+            if DEADLINE_WORD.search(near) or BY_BEFORE.search(line[:m.start()]):
+                return m.group(0)
     return "未設定"
 
 

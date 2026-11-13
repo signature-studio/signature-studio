@@ -1,7 +1,7 @@
 file	line	decision	excerpt	deadline
-fle_acm.c	1	0229	/* Decision 0229 (ref1, PROVISIONAL, OPT-IN through the rows of harness/seeds/ref1-imports.txt; without them nothing here is reached): msacm32, the Audio Compre	2026-11-04
+fle_acm.c	1	0229	/* Decision 0229 (ref1, PROVISIONAL, OPT-IN through the rows of harness/seeds/ref1-imports.txt; without them nothing here is reached): msacm32, the Audio Compre	未設定
 fle_acm.h	1	0229	/* Decision 0229 (ref1, PROVISIONAL): msacm32 (Audio Compression Manager) with one driver, an MPEG Layer-3 decoder (see fle_acm.c). */	未設定
-fle_act1_net.c	1	0213	/* Decision 0213 (act1, PROVISIONAL), section 5. WinINet calls of FLEngine's HTTP unit (f_64d520, the account / license / FL Cloud / analytics requests) answere	2026-11-04
+fle_act1_net.c	1	0213	/* Decision 0213 (act1, PROVISIONAL), section 5. WinINet calls of FLEngine's HTTP unit (f_64d520, the account / license / FL Cloud / analytics requests) answere	未設定
 fle_act1_net.h	1	0213	/* Decision 0213 (act1, PROVISIONAL): the rest of the WinINet calls that FLEngine's own HTTP code makes (the unit around f_64d520: license, account, FL Cloud, a	未設定
 fle_api2.h	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): the first small block of the systematic Win32 API coverage. New API answers, written from the Microsoft Learn page	未設定
 fle_api2_call.c	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): runtime-internal call of another fle_imp_* function with the guest ABI (fle_api2.h).	未設定
@@ -25,7 +25,7 @@ fle_class.h	67	0125	/* Decision 0125 (PROVISIONAL): the `style` member of the WN
 fle_comctl.c	1	0136	/* Decision 0136 (PROVISIONAL): comctl32!_TrackMouseEvent (the wall of decision 0128 at WM_MOUSEMOVE). The tracking state and the messages are in fle_input.c; t	未設定
 fle_cpuid.c	12	0118	* - Leaf 1 EDX (decision 0118, PROVISIONAL; decision 0009 answered SSE and SSE2 only): the x86-64 psABI says that "Any program can expect that an	未設定
 fle_crypt.c	1	0183	/* A minimal CryptoAPI for hashing: MD5 only (decision 0183, PROVISIONAL). See fle_crypt.h. */	未設定
-fle_crypt.h	1	0183	/* A minimal CryptoAPI (advapi32) for hashing: MD5 only (decision 0183, PROVISIONAL, PM's range 2026-11-03). Same convention as fle_imports.h: arguments in R[1]	2026-11-03
+fle_crypt.h	1	0183	/* A minimal CryptoAPI (advapi32) for hashing: MD5 only (decision 0183, PROVISIONAL, PM's range 2026-11-03). Same convention as fle_imports.h: arguments in R[1]	未設定
 fle_cursor.c	87	0125	/* Decision 0125 (PROVISIONAL), wall 54: a non-NULL hInstance loads the cursor of the guest's own resources by name or ordinal (fle_res.c; a weak reference: a b	未設定
 fle_cursor.c	110	0098	/* user32!GetClipCursor (decision 0098, PROVISIONAL): BOOL f(LPRECT lpRect rcx). Learn (GetClipCursor): "A pointer to a RECT structure that	未設定
 fle_cursor.h	20	0059	/* Handles of the virtual standard cursors (decision 0059, a PROVISIONAL choice): FLE_CURSOR_HANDLE_BASE + 4 * (idc - 32512 + 1),	未設定
@@ -62,7 +62,7 @@ fle_gdc.c	34	0125	/* Decision 0125 (PROVISIONAL, PM's decision 1 of 0125): a DC 
 fle_gdc.c	89	0174	/* Decision 0174 (PROVISIONAL): the entry of a released DC is reused, after a delay. Before, the table had one entry per GetDC call for good (72 bytes, to FLE_G	未設定
 fle_gdc.h	44	0121	/* The two the guest also asks for (HORZSIZE 4, VERTSIZE 6, millimetres of the physical screen). Decision 0121 (PROVISIONAL, PM's decision 1): the	未設定
 fle_gdc.h	53	0212	/* Decision 0212 (screen1, PROVISIONAL, opt-in): the four numbers above are the DEFAULTS. fle_screen.h makes the names the values of the run (FLE_MONITOR_W / FL	未設定
-fle_gdc.h	80	0125	/* Decision 0125 (PROVISIONAL, PM's decision 1 of 0125): the DCs of a WINDOW, state only (docs/decisions/0125-window-dc-and-walls.md).	2026-10-31
+fle_gdc.h	80	0125	/* Decision 0125 (PROVISIONAL, PM's decision 1 of 0125): the DCs of a WINDOW, state only (docs/decisions/0125-window-dc-and-walls.md).	未設定
 fle_gdi.c	42	0126	/* Decision 0126 (PROVISIONAL): the application-defined clipping region of a DC (Learn GetClipRgn: "an application-defined clipping region is a clipping region 	未設定
 fle_gdi.c	44	0229	/* Decision 0229 (ref1, PROVISIONAL): the clip and the regions are no longer limited to 64 rectangles (decision 0123 and 0126 had a fixed array of 64 per clip a	未設定
 fle_gdi.c	110	0126	/* Decision 0126 (PROVISIONAL): a device-dependent bitmap keeps pixels. A colour one (CreateCompatibleBitmap of the screen or of a DC with a colour bitmap) is a	未設定
@@ -77,7 +77,7 @@ fle_gdi.c	930	0098	/* gdi32!EnumFontFamiliesExW (decision 0098, PROVISIONAL). Le
 fle_gdi.c	991	0108	/* ---- decision 0108 (PROVISIONAL): the memory DC, DIB section, brush and selection answers (the model is described above, before CreatePalette) ---- */	未設定
 fle_gdi.c	1146	0113	* Decision 0113 wall 7 (PROVISIONAL; decision 0108 stopped on it): hPal NULL on a memory DC returns NULL, the page's failure value, and changes nothing. The pag	未設定
 fle_gdi.c	1381	0126	/* Decision 0126 (PROVISIONAL), wall 56: a COLORREF with the high-order byte 2 is a PALETTERGB specifier. Learn (PALETTERGB): "returns a palette-relative red, g	未設定
-fle_gdi.c	1553	0126	/* ---- Decision 0126 (PROVISIONAL): the pixel model of the GDI calls (docs/decisions/0126-pixel-model-and-walls.md). Supersedes the pixel operations of decisio	2026-10-31
+fle_gdi.c	1553	0126	/* ---- Decision 0126 (PROVISIONAL): the pixel model of the GDI calls (docs/decisions/0126-pixel-model-and-walls.md). Supersedes the pixel operations of decisio	未設定
 fle_gdi.c	2277	0111	/* ---- decision 0111 (PROVISIONAL): DC attributes, the DC stack, pens, solid brushes, palette entries, icons and cursors, the named stops (docs/decisions/0111-	未設定
 fle_gdi.c	2283	0121	/* ---- decision 0121 (PROVISIONAL, PM's decision 1): the attributes of a screen DC (GetDC(NULL)) ----	未設定
 fle_gdi.c	2357	0125	/* Decision 0125 (PROVISIONAL), wall 52: an attribute call with hdc NULL FAILS: the return value is the page's failure value (zero for every call that uses attr	未設定
@@ -112,7 +112,7 @@ fle_input.h	35	0267	/* Decision 0267 (alpha10, PROVISIONAL): the TASK BAR of the
 fle_input.h	45	0280	/* Decision 0280, L1c (PROVISIONAL): 1 when every event that the host queued has been taken out of the queue and every message made of it has been retrieved, an	未設定
 fle_input.h	129	0171	/* Decision 0171 (PROVISIONAL): user32!SetKeyboardState: BOOL f(LPBYTE rcx); copies 256 bytes into the table that GetKeyState and GetKeyboardState read. user32!	未設定
 fle_kbd.h	17	0063	/* The high word of the HKL (decision 0063, a PROVISIONAL choice). Learn (GetKeyboardLayout): "the high word contains a device	未設定
-fle_layered.c	1	0140	/* Layered windows (decision 0140, PROVISIONAL; docs/decisions/0140-layered-windows.md). See fle_layered.h for the pixel model.	2026-11-02
+fle_layered.c	1	0140	/* Layered windows (decision 0140, PROVISIONAL; docs/decisions/0140-layered-windows.md). See fle_layered.h for the pixel model.	未設定
 fle_layered.h	1	0140	/* Layered windows (decision 0140, PROVISIONAL; docs/decisions/0140-layered-windows.md): user32!UpdateLayeredWindow, UpdateLayeredWindowIndirect, SetLayeredWind	未設定
 fle_load.c	65	0126	* Decision 0126 wall 86 (PROVISIONAL, S-webview2-absent, a CHOICE WITHOUT A SOURCE): "webview2loader.dll" is added. FLEngine's f_be3520 calls LoadLibraryW(L"Web	未設定
 fle_load.c	75	0233	/* Decision 0233 (load1, PROVISIONAL, UNOFFICIAL roster): the names of the DLLs that a Windows installation ships (fle_win_dll_roster.inc: the directory names o	未設定
@@ -179,7 +179,7 @@ fle_realmod.c	241	0206	/* Decision 0206 (dec1, PROVISIONAL, OPT-IN: -DFLE_REALMO
 fle_realmod.h	85	0183	/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: a link that supplies no path table behaves as before): a module requested by a PATH	未設定
 fle_reg.c	183	0126	/* Decision 0126 (PROVISIONAL), wall 81 (S-wow64-views): KEY_WOW64_64KEY 0x0100 and KEY_WOW64_32KEY 0x0200 (Learn, Accessing an Alternate Registry View and Regi	未設定
 fle_reg.c	387	0126	/* Decision 0126 (PROVISIONAL), wall 73 (S-regcreate-trailing-backslash): the guest creates "Software\Image-Line\Shared\" (a path that ends with ONE backslash: 	未設定
-fle_res.c	326	0123	/* kernel32!FreeResource (Microsoft Learn: FreeResource, read 2026-10-31; decision 0123, PROVISIONAL, wall 26). BOOL f(HGLOBAL hResData rcx). The page: "This fu	2026-10-31
+fle_res.c	326	0123	/* kernel32!FreeResource (Microsoft Learn: FreeResource, read 2026-10-31; decision 0123, PROVISIONAL, wall 26). BOOL f(HGLOBAL hResData rcx). The page: "This fu	未設定
 fle_res.c	548	0125	/* Decision 0125 (PROVISIONAL), wall 54: user32!LoadCursorW(hInstance, lpCursorName) with a non-NULL hInstance, for the cursors of the guest's own resources (th	未設定
 fle_res.c	611	0129	/* Decision 0129 (PROVISIONAL), S-version-info-real-resource: the bytes of the RT_VERSION resource (type 16) of the image mapped at FLE_EXE_HANDLE (the lifted D	未設定
 fle_res.h	47	0123	/* Decision 0123 (PROVISIONAL), wall 26: kernel32!FreeResource: BOOL f(HGLOBAL rcx): always FALSE (0), nothing is freed (Learn FreeResource: "For modern version	未設定
@@ -206,11 +206,11 @@ fle_ssse3.h	1	0190	/* SSSE3 integer helpers for fe-lift output (sse_ssse3.rs, de
 fle_sweep1.h	1	0215	/* Decision 0215 (sweep1, PROVISIONAL, opt-in): API answers written from the Microsoft Learn pages for the walls that the systematic sweep (lift/out-sweep1/tool	未設定
 fle_sweep1_kbd.c	1	0215	/* Decision 0215 (sweep1, PROVISIONAL, opt-in): the user32 keyboard-layout family (fle_sweep1.h). Found by the systematic sweep: pressing the right Alt key (VK_	未設定
 fle_sys.c	225	0126	/* Decision 0126 (PROVISIONAL), wall 82: InterlockedPushEntrySList and InterlockedPopEntrySList are answered, and InterlockedFlushSList returns what the list ho	未設定
-fle_sysinfo.c	47	0119	*    DECISION 0119 (PROVISIONAL, the PM's decision 2) changed PF 2 and PF 3 from 0 to 1: decision 0118 had made the CPUID answer report CX8 and MMX and had left	2026-10-30
+fle_sysinfo.c	47	0119	*    DECISION 0119 (PROVISIONAL, the PM's decision 2) changed PF 2 and PF 3 from 0 to 1: decision 0118 had made the CPUID answer report CX8 and MMX and had left	未設定
 fle_sysmetrics.c	36	0106	*  - SM_CXCURSOR, SM_CYCURSOR: 32, 32 (decision 0106, PROVISIONAL; Learn "About Cursors", Cursor Sizes: 32x32 below 144 DPI at the default cursor size);	未設定
 fle_sysmetrics.c	39	0098	*  - SM_DIGITIZER: 0 (decision 0098, PROVISIONAL: no touch or pen digitizer; the page defines the value as a bitmask of the digitizer types and	未設定
 fle_sysmetrics.c	41	0107	*  - SM_TABLETPC 0, SM_MAXIMUMTOUCHES 0, SM_CONVERTIBLESLATEMODE 1, SM_SYSTEMDOCKED 0 (decision 0107, PROVISIONAL; the reasons are with the	未設定
-fle_sysmetrics.h	49	0106	/* Decision 0106 (PROVISIONAL): SM_CXCURSOR / SM_CYCURSOR (13, 14), asked by ILTools' own initialisation (CreateCursorFromFont). The Learn page "About	2026-09-21
+fle_sysmetrics.h	49	0106	/* Decision 0106 (PROVISIONAL): SM_CXCURSOR / SM_CYCURSOR (13, 14), asked by ILTools' own initialisation (CreateCursorFromFont). The Learn page "About	未設定
 fle_sysmetrics.h	60	0098	/* Decision 0098 (PROVISIONAL): SM_DIGITIZER (94). The page: "The return value is a bitmask that specifies the type of digitizer input supported by the	未設定
 fle_sysmetrics.h	64	0107	/* Decision 0107 (PROVISIONAL): the other four indexes that the guest's f_80e360 asks right after SM_DIGITIZER (unit 276), all consistent with	未設定
 fle_thread.c	1	0122	/* Cooperative guest threads (docs/decisions/0122-cooperative-threads.md, PROVISIONAL; see fle_thread.h). One host thread; the stack of each guest thread is a h	未設定
@@ -233,7 +233,7 @@ fle_thread_wasm.c	1	0124	/* Thread switching by JSPI: the C side (docs/decisions
 fle_thread_wasm.h	1	0124	/* Thread switching by JSPI (docs/decisions/0124-wasm-thread-switching.md, PROVISIONAL). Only the MEANS of switching of decision 0122's cooperative threads (fle	未設定
 fle_token.c	1	0136	/* advapi32!OpenProcessToken and advapi32!GetTokenInformation (decision 0136, PROVISIONAL; the wall of the first-run wizard: after the OK button of the error di	未設定
 fle_token.h	1	0136	/* Decision 0136 (PROVISIONAL): the process access token, only as far as the guest asks (fle_token.c): advapi32!OpenProcessToken and advapi32!GetTokenInformatio	未設定
-fle_uipref.c	149	0117	/* kernel32!GetUserPreferredUILanguages (decision 0117, PROVISIONAL). Learn (GetUserPreferredUILanguages, last updated 2021-10-13): dwFlags "specify the languag	2021-10-13
+fle_uipref.c	149	0117	/* kernel32!GetUserPreferredUILanguages (decision 0117, PROVISIONAL). Learn (GetUserPreferredUILanguages, last updated 2021-10-13): dwFlags "specify the languag	未設定
 fle_uipref.h	15	0117	/* kernel32!GetUserPreferredUILanguages (decision 0117, PROVISIONAL): BOOL f(DWORD dwFlags, PULONG pulNumLanguages, PZZWSTR pwszLanguagesBuffer, PULONG pcchLang	未設定
 fle_user_nowin.c	25	0191	/* Decision 0191 (PROVISIONAL; decision 0284: no longer opt-in; wall ia2-W25): a unit of the Private Use Area U+E000..U+F8FF is not changed (Microsoft's Windows	未設定
 fle_user_nowin.c	228	0126	/* user32!InflateRect: BOOL f(LPRECT lprc rcx, int dx edx, int dy r8d) (decision 0126, PROVISIONAL, wall 98). Learn: "adds -dx units to the left end and dx to t	未設定
@@ -347,7 +347,7 @@ fle_win.h	137	0119	/* Decision 0119 (PROVISIONAL), wall 11: wtsapi32!WTSRegister
 fle_win.h	143	0119	/* Decision 0119 (PROVISIONAL), wall 12: uxtheme!BufferedPaintInit: HRESULT f(void) (uxtheme.dll is virtual module N = 38): S_OK, counted; the other buffered-pa	未設定
 fle_win.h	148	0122	/* Decision 0122 (PROVISIONAL): the message queue of each guest thread (fle_thread.c holds the queues; docs/decisions/0122-cooperative-threads.md). The window t	未設定
 fle_win.h	163	0147	/* Decision 0147 (PROVISIONAL): user32!PostThreadMessageW: BOOL f(DWORD idThread ecx, UINT Msg edx, WPARAM wParam r8, LPARAM lParam r9). The queue of the thread	未設定
-fle_win.h	187	0123	/* ---- Decision 0123 (PROVISIONAL): window management, a STATE-ONLY model (nothing is drawn, no real input) ----	2026-10-31
+fle_win.h	187	0123	/* ---- Decision 0123 (PROVISIONAL): window management, a STATE-ONLY model (nothing is drawn, no real input) ----	未設定
 fle_win.h	276	0125	/* Decision 0125 (PROVISIONAL): what fle_gdc.c asks of the window table to give a DC to a window (GetDC, GetWindowDC, GetDCEx, BeginPaint). `hwnd` is a live win	未設定
 fle_win.h	286	0126	/* Decision 0126 (PROVISIONAL): what the pixel model needs. root_cx, root_cy = the size of the top-level window = the size of its drawing surface (the desktop: 	未設定
 fle_win.h	371	0126	/* Decision 0126 (wall 101, PROVISIONAL; the notes are in fle_win.c): user32!SetWindowsHookExW: HHOOK f(int, HOOKPROC, HINSTANCE, DWORD) for WH_MOUSE and WH_KEY	未設定
