@@ -13,7 +13,13 @@ const repo = path.resolve(kit, '..', '..');
 const appDir = path.join(repo, 'app');
 const bundleDir = path.join(repo, 'artifacts', 'bundles', BUNDLE);
 const zip = path.join(os.homedir(), 'ダウンロード', 'serina1-serum2.zip');
-const outDir = path.join(kit, 'out', 'lat-chrome-new-1');
+// each run gets its own folder: lat-chrome-new-<largest existing number + 1>
+const nextOut = () => {
+  const dir = path.join(kit, 'out');
+  const ns = fs.existsSync(dir) ? fs.readdirSync(dir).map((d) => /^lat-chrome-new-(\d+)$/.exec(d)).filter(Boolean).map((m) => Number(m[1])) : [];
+  return path.join(dir, `lat-chrome-new-${ns.length ? Math.max(...ns) + 1 : 1}`);
+};
+const outDir = nextOut();
 const tail = (s, n) => s.split('\n').slice(-n).join('\n');
 
 async function main() {
