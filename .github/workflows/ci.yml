@@ -1,0 +1,41 @@
+# app/ の build と test を GitHub の標準ランナーで回す。Secrets・Variables は使わない。ブラウザ操作は置かない。
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ci.yml"
+      - "app/**"
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Node 24 を用意する
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: 依存関係を入れる
+        run: npm ci --prefix app --ignore-scripts --no-audit --no-fund
+
+      - name: build(型検査と vite build)
+        run: npm run build --prefix app
+
+      - name: test(vitest)
+        run: npm test --prefix app
+
+      - name: test:worker(wrangler dev --local)
+        run: npm run test:worker --prefix app
