@@ -125,9 +125,21 @@ jobs:
           ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
           status=0
           for bucket in fl-web-cache fl-web-assets; do
-            if aws s3 ls "s3://${bucket}/" --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then
+            opts=""
+            max=3
+            if [ "$bucket" = fl-web-assets ]; then
+              opts="--recursive --human-readable --summarize"
+              max=200
+            fi
+            if aws s3 ls "s3://${bucket}/" $opts --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then
               echo "バケット ${bucket} の一覧: 成功"
-              head -n 3 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+              lines=$(wc -l < ls.txt | tr -d ' ')
+              echo "バケット ${bucket} の行数: ${lines}"
+              head -n "$max" ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+              if [ "$bucket" = fl-web-assets ] && [ "$lines" -gt "$max" ]; then
+                echo "(末尾の集計行)"
+                tail -n 2 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+              fi
             else
               echo "バケット ${bucket} の一覧: 失敗"
               sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' ls.txt | tail -n 5
@@ -136,6 +148,75 @@ jobs:
           done
           exit $status
 
+      - name: 3c Worker fl-studio-web の現在の版を読む(wrangler deployments status・読み取り)
+        id: deploy_status
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          WR=app/node_modules/.bin/wrangler
+          if [ ! -x "$WR" ]; then
+            echo "wrangler が無い(依存関係の準備が失敗)"
+            exit 1
+          fi
+          mask() {
+            sed -E \
+              -e "s/$CLOUDFLARE_ACCOUNT_ID/[アカウント ID 伏せ]/g" \
+              -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[メール伏せ]/g' \
+              -e 's/[A-Za-z0-9.-]+\.workers\.dev/[ホスト伏せ]/g' \
+              -e 's/[A-Za-z0-9.-]+\.cloudflareaccess\.com/[ホスト伏せ]/g'
+          }
+          if "$WR" deployments status --name fl-studio-web > status.txt 2>&1; then
+            echo "deployments status: 成功"
+            mask < status.txt
+          else
+            echo "deployments status: 失敗"
+            mask < status.txt | tail -n 20
+            exit 1
+          fi
+
+      - name: 3d R2 の manifest.json の項目を読む(fl-web-assets・読み取り)
+        id: r2_manifest
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          if aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$RUNNER_TEMP/manifest.json" > get.txt 2> cp.txt; then
+            python3 - "$RUNNER_TEMP/manifest.json" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          e = m.get("engine") if isinstance(m.get("engine"), dict) else {}
+          w = e.get("wasm") if isinstance(e.get("wasm"), dict) else {}
+          o = e.get("options") if isinstance(e.get("options"), dict) else {}
+          p = (w.get("url") or "").split("/")
+          print("manifest.json: 有")
+          print(json.dumps({
+            "engine.kind": e.get("kind"),
+            "engine.wasm.size": w.get("size"),
+            "engine.wasm.url の bundle 名": p[2] if len(p) > 3 and p[1] == "assets" else None,
+            "engine.options のキー": sorted(o.keys()) if o else None,
+            "generated": m.get("generated"),
+          }, ensure_ascii=False, indent=1))
+          PY
+          elif grep -qE '404|Not Found|NoSuchKey' cp.txt; then
+            echo "manifest.json: 直下に無い"
+          else
+            echo "manifest.json: 読めない(エラーの末尾)"
+            sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' cp.txt | tail -n 3
+            exit 1
+          fi
+
       - name: 4 結果の表
         if: always()
         env:
@@ -143,6 +224,8 @@ jobs:
           R_TOKEN: ${{ steps.token.outcome }}
           R_ART: ${{ steps.r2_artifact.outcome }}
           R_CACHE: ${{ steps.r2_cache_assets.outcome }}
+          R_DEP: ${{ steps.deploy_status.outcome }}
+          R_MAN: ${{ steps.r2_manifest.outcome }}
         run: |
           fail=0
           line() {
@@ -160,4 +243,6 @@ jobs:
           line "2 API トークン(Worker fl-studio-web の一覧)" "$R_TOKEN"
           line "3a R2 のキー 1 組目(fl-web-artifacts の読み取り)" "$R_ART"
           line "3b R2 のキー 2 組目(fl-web-cache・fl-web-assets の読み取り)" "$R_CACHE"
+          line "3c Worker fl-studio-web の現在の版(wrangler deployments status)" "$R_DEP"
+          line "3d R2 の manifest.json の項目(fl-web-assets の読み取り)" "$R_MAN"
           exit $fail
