@@ -8,6 +8,8 @@
 
 ## 0 決定
 
+- 分岐の分類: 段 1 の「sha が E13 の値なら何もせず終了 0」は、通信・変換の削減(再 push で二重に書き換えない)。新しい処理の分類はこの 1 行。
+
 - 決定 A(書き換えの中身): root `manifest.json` 1 件だけ。根拠: `evidence/R6-2d.md` の段 3e で、R2 の E13 の 5 件が手元の raw と全 64 桁一致。手元の E13 は engine-idle を 15 回(`evidence/R0-2.md` 5 回、`evidence/R0-3.md` 10 訪問)。
 - 決定 B(退避の名前): `backup/manifest-root-<UTC 時刻>.json`。根拠: 依頼の「fl-web-assets の root の外」を優先した。依頼の例 `manifest.backup-<日付>.json` は root に置かれ、文言と食い違うため。時刻を入れるのは、前回の退避を上書きしないため。
 - 決定 C(前提が未確認の間は書かない): §1 の G1 が通るまで `.github/workflows/default-entry.yml` を commit しない。根拠: 手順 4(iv)。`app/worker` が最初に入ったのは `14268c2`(2026-11-10)、版 2cb938be は 2026-11-07 作成(`evidence/R6-1b.md` §2)。
