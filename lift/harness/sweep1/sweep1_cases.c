@@ -28,6 +28,8 @@ void fle_win_input_view(void) {}
 void fle_win_input_toplevels(void) {}   /* decision 0212 (screen1): fle_input.c apply_display() */
 void fle_win_input_remaximize(void) {}
 void fle_win_input_showwindow(void) {}
+void fle_win_input_call_hooks(void) {}
+void fle_win_input_hit_list(void) {}
 void fle_win_pointer_get(void) {}
 void fle_win_pointer_set(void) {}
 typedef unsigned int UINT, DWORD, BOOL;

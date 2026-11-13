@@ -159,6 +159,7 @@ uint64_t R[16];
 void fle_win_input_activate(void) {} void fle_win_input_active(void) {} void fle_win_input_capture_any(void) {} void fle_win_input_hit(void) {} void fle_win_input_key_target(void) {}
 void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {}
 void fle_win_input_toplevels(void) {} void fle_win_input_remaximize(void) {} void fle_win_input_showwindow(void) {}
+void fle_win_input_call_hooks(void) {} void fle_win_input_hit_list(void) {}
 int main(int argc, char **argv)
 {
     int k = atoi(argv[1]);
