@@ -6,23 +6,23 @@
 
 更新のルール: (1) 数字は実測だけ。条件(マシン・ブラウザ・n・load)を併記。(2) 実測で旧自己判定を置き換えるときは旧値を消さず「旧:」を残す。(3) 食い違いは `evidence/<ID>.md` を指す。
 
-## 環境・リポジトリ(出典: `docs/ops/environment.md`、2026-11-09 の実測)
+## 環境・リポジトリ(出典: `docs/ops/environment.md`、出典は行ごとに記載)
 
 | 項目 | 値 | 区分 | 出典・日付 |
 |---|---|---|---|
-| リポジトリ | `~/work/signature-studio`。公開範囲 **PUBLIC(意図的。P2)**。履歴は `Initial commit` の 1 つだけ(その後のコミットはサブエージェントが積む) | [実測](2026-11-09、公開範囲は 2026-11-10 も PUBLIC) | `gh repo view … --json visibility`、`git log --oneline` |
-| push | アカウントは作業ディレクトリで決まる(P1)。2026-11-10 にリポジトリのディレクトリで `git push --dry-run origin HEAD` は **失敗した**。失敗の内容は 403 ではなく `.githooks/pre-push` の「PUBLIC のため拒否」(P2 と食い違う。自動の検査は別の担当)。前任の「403」はリポジトリ外で測った誤り [文書] | [実測] 2026-11-10 | `git push --dry-run origin HEAD`(リポジトリのディレクトリ)、`gh auth status`(トークンの行は除く) |
-| 既定の入口 | **新アプリはまだ無い**。旧本番(前任期間の記録 [文書]: Worker `fl-studio-web`、認証なしの GET が Access へ転送)。中身は [未確認](代役を含まないかも未確認)。後任者は Cloudflare を実行しない(P4) | [文書]/[未確認] | 2026-11-09 の確認。確認は Issue |
-| 持ち込み | `artifacts/`(旧 bundle)・`binaries/win64/FLEngine_x64.dll` は存在。`lift/`・`app/`・`tools/`・`ci/`・`patches/`・`evidence/` は 2026-11-10 02:50 時点で存在しない(別の担当がステージング中) | [実測] | `ls ~/work/signature-studio`(2026-11-10) |
+| リポジトリ | `~/work/signature-studio`。公開範囲 **PUBLIC(意図的。P2)**。履歴は `Initial commit`(`29966d6`)から始まり、その後のコミットはサブエージェントが積む(2026-11-13 時点で 70 件。旧: 「履歴は `Initial commit` の 1 つだけ」) | [実測](2026-11-09、公開範囲は 2026-11-10 も PUBLIC。履歴の件数は 2026-11-13) | `gh repo view … --json visibility`、`git log --oneline \| wc -l` |
+| push | アカウントは作業ディレクトリで決まる(P1)。リポジトリのディレクトリで `git push --dry-run origin HEAD` は rc=0(2026-11-13、`evidence/R0-0.md` §4 は `Everything up-to-date`。2026-11-10 の `docs/ops/environment.md` §1 は `29966d6..a70e4ef  HEAD -> main`)。`scripts/preflight.sh` の push-dry-run 行は OK(2026-11-13)。`evidence/R0-7.md` §6: `origin/main` への push が reflog に残り、`git ls-remote origin main` と `git rev-parse HEAD` が一致(2026-11-13)。前任の「403」はリポジトリ外で測った誤り [文書]。旧: 「2026-11-10 にリポジトリのディレクトリで `git push --dry-run origin HEAD` は **失敗した**。失敗の内容は 403 ではなく `.githooks/pre-push` の『PUBLIC のため拒否』」。拒否したフックは 2026-11-10 にスキャンだけに直った(`docs/ops/environment.md` §1) | [実測] 2026-11-13 | `git push --dry-run origin HEAD`(リポジトリのディレクトリ)、`scripts/preflight.sh`、`evidence/R0-0.md` §4、`evidence/R0-7.md` §6 |
+| 既定の入口 | **新アプリはまだ無い**。この機械では `tools/boot-check/boot.mjs` で E13 を実エンジンとして起動できる(既定の入口ではない。`evidence/R0-2.md`、2026-11-13 [実測])。旧本番(前任期間の記録 [文書]: Worker `fl-studio-web`、認証なしの GET が Access へ転送)。中身は [未確認](代役を含まないかも未確認)。後任者は Cloudflare を実行しない(P4) | [文書]/[未確認] | 2026-11-09 の確認。確認は Issue |
+| 持ち込み | `app/`・`lift/`・`tools/`・`ci/`・`patches/`・`evidence/` は存在。追跡ファイル数は app 187・lift 925・tools 131・ci 7・patches 114(2026-11-13 の `git ls-files`。`evidence/R0-0.md` §1 の 130 は当時の値)。`artifacts/`・`binaries/` は存在し、`.gitignore` で無視されて追跡 0(`binaries/win64/FLEngine_x64.dll` 22,227,016 B)。旧: 「`lift/`・`app/`・`tools/`・`ci/`・`patches/`・`evidence/` は 2026-11-10 02:50 時点で存在しない(別の担当がステージング中)」 | [実測] 2026-11-13 | `evidence/R0-0.md` §1(`ls -la`・`git ls-files <dir> \| wc -l`) |
 | ツールチェーン | node v24・emcc 6.0.12(PATH 外、`source scripts/env.sh`)・wasm-opt 133・rustc 1.99.0・Chrome 156(headless 起動は [実測] 2026-11-13、`evidence/R0-2.md` の起動の実測。旧: 未確認) | [実測] / headless は [実測] 2026-11-13 | `docs/ops/environment.md` §3(2026-11-09 の確認)、`evidence/R0-2.md` |
 
 ## artifacts と入力
 
 | 項目 | 値 | 区分 | 出典・日付 |
 |---|---|---|---|
-| 旧 bundle `fl-engine-ci-0363b050` の整合 | 9 ファイル全て、照合用の値が提案の一覧と一致(wasm 143,087,706 B `58ad4a6a…`) | **[実測]**(提案ファイルを `sha256sum -c` で照合)。**ただしこの機械で `artifacts.sha256` はまだ無く、実行は未確認** | `sha256sum -c`(2026-11-10)。計画の記録 [文書] と一致 |
+| 旧 bundle `fl-engine-ci-0363b050` の整合 | 9 ファイル全て、照合用の値が提案の一覧と一致(wasm 143,087,706 B `58ad4a6a…`) | **[実測]**(提案ファイルを `sha256sum -c` で照合)。2026-11-13: ルートの `artifacts.sha256` を `sha256sum -c` で照合し 10 行 OK。この機械で実エンジンとして起動した(`evidence/R0-2.md`)。旧: 「ただしこの機械で `artifacts.sha256` はまだ無く、実行は未確認」 | `sha256sum -c`(2026-11-10。2026-11-13 は `evidence/R0-1.md` §1)。計画の記録 [文書] と一致 |
 | `FLEngine_x64.dll` | 22,227,016 B・照合用の値 `b2c64da4…9496d` が一致 | [実測] | 同上 |
-| 外部入力 6 本(`~/ダウンロード/`) | サイズが提案と一致。zip・OTT・Vital は照合用の値の先頭 16 桁も一致。FL 5653・5654・Serum 2 の照合用の値は未再計算 | サイズ [実測]/一部 [実測]/他 [未確認] | `stat`・`sha256sum`(2026-11-10) |
+| 外部入力 6 本(`~/ダウンロード/`) | サイズが提案と一致。2026-11-13: `ci/external-inputs.sha256` の 6 行が全て OK(zip・FL 5653・5654・Serum 2・OTT・Vital)。旧: 「zip・OTT・Vital は照合用の値の先頭 16 桁も一致。FL 5653・5654・Serum 2 の照合用の値は未再計算」 | サイズ [実測]/sha256 [実測] 2026-11-13 | `stat`・`sha256sum -c`(2026-11-10。2026-11-13 は `evidence/R0-1.md` §2) |
 
 ## 性能と段階(旧自己判定。すべて [文書]、再測定していない。値の詳細は `docs/core/performance.md`・`ladder.md`)
 
