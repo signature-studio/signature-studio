@@ -8,14 +8,14 @@
 
 | 設計の段 | 草案の step(行) | 失敗時 | 状態 |
 |---|---|---|---|
-| 段 0 アカウント ID | `0 …`(33 行)`id: acct` | 後続は `if` で止まる | 備えている |
-| 段 1 root を読む・分岐・退避・書き込み前の確認 | `1 …`(56 行)`id: r1` | exit 1(root は書かれない) | 備えている。分岐(sha が E13 なら `skip=true`)は 93 行 |
-| 段 2 E13 の 5 件の確認(書かない) | `2 …`(149 行)`id: r2` | exit 1(root は書かれない) | 備えている(下の注 1) |
-| 段 3 E13 を root に書き、確かめる | `3 …`(226 行)`id: r3` | 段 5 で戻す | 備えている |
-| 段 4 root を読み直し、判定 | `4 …`(266 行)`id: r4` | 段 5 で戻す | 備えている |
-| 段 5 表と戻し | `5 …`(298 行)`if: always()` | 戻しも失敗なら退避のキー名と sha を出し exit 1 | 備えている |
+| 段 0 アカウント ID | `0 …`(36 行)`id: acct` | 後続は `if` で止まる | 備えている |
+| 段 1 root を読む・分岐・退避・書き込み前の確認 | `1 …`(59 行)`id: r1` | exit 1(root は書かれない) | 備えている。分岐(sha が E13 なら `skip=true`)は 95 行(if)・97 行(skip=true) |
+| 段 2 E13 の 5 件の確認(書かない) | `2 …`(152 行)`id: r2` | exit 1(root は書かれない) | 備えている(下の注 1) |
+| 段 3 E13 を root に書き、確かめる | `3 …`(229 行)`id: r3` | 段 5 で戻す | 備えている |
+| 段 4 root を読み直し、判定 | `4 …`(269 行)`id: r4` | 段 5 で戻す | 備えている |
+| 段 5 表と戻し | `5 …`(301 行)`if: always()` | 戻しも失敗なら退避のキー名と sha を出し exit 1 | 備えている |
 
-追加した step: `Node 24 を入れる`(28 行)。段 2 と段 4 の判定関数を node 24 で呼ぶための準備で、設計の段の外の処理ではない(分岐は足していない)。
+追加した step: `Node 24 を入れる`(30 行)。段 2 と段 4 の判定関数を node 24 で呼ぶための準備で、設計の段の外の処理ではない(分岐は足していない)。
 
 ## 2 設計との照合(できている点)
 
@@ -42,6 +42,6 @@
 - 構文: `yaml.safe_load` 解析 ok(8 step)。各 `run:` を取り出して `bash -n` で 6 本とも ok。
 - 禁止形 `workflow_dispatch|schedule:|upload-artifact|wrangler|sleep|nohup|disown`: 0 件。
 - Secrets: `CLOUDFLARE_API_TOKEN` 1 件、`R2_CACHE_ASSETS_ACCESS_KEY_ID` 5 件、`R2_CACHE_ASSETS_SECRET_ACCESS_KEY` 5 件。3 つの名前だけ。
-- 書き込み系(`put-object` 3 行): 124 行(退避。キー `$BK` = `backup/manifest-root-…`)、241 行(root の `manifest.json`)、333 行(戻し。root の `manifest.json`)。root と backup/ 以外へ書く行は 0。`delete-object`・`copy-object`・`s3 rm|cp|sync` は 0 件。
-- `add-mask`: 2 件。1 件は段 0 の `echo "::add-mask::$id"`(52 行)、もう 1 件は草案の先頭の注釈(3 行目)の文字列。
+- 書き込み系(`put-object` 3 行): 126 行(退避。キー `$BK` = `backup/manifest-root-…`)、243 行(root の `manifest.json`)、336 行(戻し。root の `manifest.json`)。root と backup/ 以外へ書く行は 0。`delete-object`・`copy-object`・`s3 rm|cp|sync` は 0 件。
+- `add-mask`: 2 件。1 件は段 0 の `echo "::add-mask::$id"`(54 行)、もう 1 件は草案の先頭の注釈(3 行目)の文字列。
 - 判定関数: 草案の段 2 と段 4 と同じ書き方で、手元の E13 の manifest に対して ok を確かめた。

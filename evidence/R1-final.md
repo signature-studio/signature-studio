@@ -60,4 +60,17 @@ cee5cd4 R1-1〜R1-3b: 取り込みの判定を記録(取り込まず。R1-3b 後
 - 取り込み後の `cargo test` は、スタブを入れた状態で 1 回だけ実行した。途中の commit ごとの実行はしていない(上の 3 は `evidence/R1-1.md` の既存の実測)。
 - 戻して当て直した後の `lift/` の中身は、`git diff` の `+` 行で前回と同じことを確かめたが、`cargo test` は再実行していない。
 - `getmodulehandleexw_returns_in_every_build` の失敗の原因は未確認(取り込み前から残っている 1 件。本作業の対象外)。
-- ビルド(`app/scripts/build-engine-bundle.sh`)は走らせていない。push 後の engine-bundle の結果は、`docs/decisions/0353-l01-l04-and-sweep1-stubs.md` の報告を参照。
+- ビルド(`app/scripts/build-engine-bundle.sh`)は走らせていない。push 後の engine-bundle の実行 `43485443530`(headSha `b6dd943`、event push)は、この作業中に `gh run view 43485443530` で status completed・conclusion success(createdAt 2026-11-13T18:43:50Z)を確認した。engine-bundle が作った成果物の中身は、この記録では確かめていない。
+
+# 6 HEAD での再確認(取り込み後の木 = HEAD の木)
+
+- `git status --short lift` → 空。`git rev-parse HEAD` → `807222f074eff44cb0d395623fc22a7164e8960a`。
+- コマンド: `cd lift && FLENGINE_PE=$HOME/work/signature-studio/binaries/win64/FLEngine_x64.dll cargo test --workspace --offline --no-fail-fast > ../evidence/R1-head.log 2>&1; echo rc=$?` → rc=101。ログ `evidence/R1-head.log`(226,871 B)。
+- `grep -c SKIPPED evidence/R1-head.log` → 0
+- `grep '^test result' evidence/R1-head.log | wc -l` → 219
+- `grep -c 'undefined reference' evidence/R1-head.log` → 0
+- `grep '^test .* FAILED$' evidence/R1-head.log` → `test getmodulehandleexw_returns_in_every_build ... FAILED`(1 件)
+- `awk '/^test result/{p+=$4; f+=$6; i+=$8} END{print p, f, i}' evidence/R1-head.log` → `2416 1 1`
+- 期待との比べ: 一致(失敗 1 件・SKIPPED 0・test result 219 行・undefined reference 0)。
+- この節の実行で、§1 と §5 の「戻して当て直した後の `cargo test` は再実行していない」は解消した(HEAD の木での 1 回)。
+- 未確認: 実エンジン(FLEngine)は実行していない。失敗 1 件の原因は未確認(§5 と同じ)。

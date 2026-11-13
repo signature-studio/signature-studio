@@ -91,4 +91,4 @@ test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; 
 
 ## 7 検査
 
-- `scripts/scan-forbidden.sh evidence/R1-link.md` → 結果は次の行に記録する(push 前)。
+- `scripts/scan-forbidden.sh evidence/R1-link.md` → 結果(2026-11-14 の実行。この行を足す前のファイルに対して実行): `scan-forbidden: 0 findings in 1 file(s)`、rc 0。

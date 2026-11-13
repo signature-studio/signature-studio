@@ -1,5 +1,5 @@
 実エンジン: 実行なし(設計のみ。R2・Worker には書き込んでいない)
-書き換えの対象: R2 root `manifest.json` を E13 の manifest と同じバイト列にする(1 件)。Worker の再デプロイは要らない: 未確認(現コードの読みでは要らないと読める。デプロイ済みの版 2cb938be のコードは未確認。§1)
+書き換えの対象: R2 root `manifest.json` を E13 の manifest と同じバイト列にする(1 件)。Worker の再デプロイは要らない(現コードの読み。G1 は通った: `evidence/R6-4-g1.md`。前段のキャッシュ規則での扱いは未確認。§1)
 退避: R2 の `backup/` 以下の別のキー(時刻入り)。確認できなければ書き換えない
 戻し: 段 3 の後の失敗は自動(§2 段 5)。公開ホストでの確認(R4-5)が失敗なら、退避から戻す(§4)
 後任にできない確認: 公開ホストを開いて実エンジンが動くこと。R4-5 に回す(§3)
@@ -22,7 +22,7 @@
 - 判定: `judgeDefaultManifest`(`index.ts:47-63`)が、`Content-Encoding` が無ければそのまま `judgeManifestBytes`(`index.ts:60`)に渡す。許可リストは `['emscripten-fruity-v1']`(`manifest-guard.ts:6`)。E13 の `engine.kind` は一致する。実行: 手元の node v24.19.0 で `judgeManifestBytes`(E13 の manifest のバイト列)を `--experimental-strip-types` で呼ぶ → `{"ok":true,"kind":"emscripten-fruity-v1"}`(manifest の判定。実エンジンの実行ではない)。
 - 応答の作り: 要求ごとに R2 を読む。Worker のコードに Cache API・`cacheTtl`・`cacheEverything` は無い(`grep -rn 'caches\.\|cacheTtl\|cacheEverything' app/worker` が 0 件)。`Cache-Control` は `head.httpMetadata.cacheControl ?? cacheControlFor(pathname)`(`index.ts:86`)。`cacheControlFor` は manifest を `no-cache` にする(`headers.ts:50`)。ETag は `head.httpEtag`(`index.ts:84`)。書き換えで ETag が変わるので、`If-None-Match` の再確認で新しい内容が返る(`index.ts:89`)。
 - 結論: 書き換えに Worker の再デプロイは要らない、と読める。Worker のコードは毎要求で R2 を読むので、Worker 側で書き換えの反映を遅らせる処理は読み取れない(`index.ts:70-107`)。Cloudflare の前段(キャッシュ規則の有無)での扱いは未確認(Cloudflare の docs 検索は接続が切れて使えなかった)。前段が応答を保持する時間は未確認。
-- G1(未確認): デプロイ済みの版 2cb938be が、この読みと同じコードか。`app/worker` は `14268c2`(2026-11-10 04:48 JST)で初めて入った。版の作成は 2026-11-07。前任のワークツリー(読み取りのみ。ディレクトリ名は書かない)の同じ 4 ファイルは現在と同一(`cmp`)だが、そのツリーが版と同じかは分からない。cloudflare-api の MCP は再認証を要求し、API の仕様を検索できなかった(実行の出力)。確かめ方の案: `cloudflare-check.yml` に読み取りの段を足し、版の script を読んで現在の `app/worker` のビルドと比べる。R6-4 の worker が Cloudflare API の仕様で決める(未確認)。
+- G1(通った。実行 `43455439265`): 版 2cb938be の module は現在の `app/worker` のビルドと SHA-256 一致(`evidence/R6-4-g1.md` §2)。
 - 手元の boot-check(`tools/boot-check/boot.mjs`)は Worker を通らない(`grep` で Worker・wrangler の参照が 0 件)。Worker が wasm に `Content-Encoding: br` を付けて返す経路は、手元の確認に含まれていない。
 
 ## 2 ワークフロー `default-entry.yml`(書かない。設計)
@@ -48,7 +48,7 @@
 - (ii) 書き換えの前後で確かめる物: root の engine.kind・bundle 名・wasm の大きさ(段 1 と段 4 のログ)。
 - (iii) 公開ホストの確認は依頼者機の計測(R4-5)で行う。結果が `engine-idle` でなければ、退避から戻す(§4)。R4-5 の依頼は GitHub の issue 3 に出した(`docs/requests/0002-owner-machine-measurement.md`)。
 - (iv) 前提が崩れたら書かない: G1 が未確認の間は commit しない(決定 C)。
-- 残るギャップ(未確認): 公開ホストの応答、Worker 経由の wasm の配信(§1 の最後の行)、版 2cb938be の中身。
+- 残るギャップ(未確認): 公開ホストの応答、Worker 経由の wasm の配信(§1 の最後の行)。
 
 ## 4 戻し手順
 
@@ -58,7 +58,7 @@
 
 ## 5 commit の順(この依頼では実行しない)
 
-1. G1 を通す(今は未確認)。
+1. G1 は通った(`evidence/R6-4-g1.md`)。
 2. `default-entry.yml` と `evidence/R6-4.md` を commit → `git push origin main` → Actions の結果を表に書く。
 3. 次の commit で `default-entry.yml` を削除する(一回限り)。
 4. R4-5 の依頼を出す(未実施)。

@@ -35,7 +35,7 @@
 
 ## 未確認
 - 実エンジン(FLEngine)は実行していない。4 本のパッチの意味上の正しさ(Wine との差、実エンジンでの挙動)は未確認。
-- 取り込み後の `cargo test` の再実行は、戻して当て直した後にはしていない(最初のスタブ込みの 1 回だけ)。
+- HEAD での再実行は `evidence/R1-head.log`(HEAD `807222f`。期待どおり: 失敗 1 件・SKIPPED 0・test result 219 行・undefined reference 0)。
 - `getmodulehandleexw_returns_in_every_build` の失敗は取り込み前から残る 1 件。原因は未確認(本作業の対象外)。
 - R1-4 以降のパッチ(`patches/alpha22/…`)は取り込んでいない。
 
