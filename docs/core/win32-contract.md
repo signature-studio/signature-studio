@@ -23,7 +23,7 @@ C 89 + ヘッダ 108 ファイル。ゲストが呼ぶ OS API の仮想実装。
 | 6 | 合成器が上から 64 窓で切る | `fle_desk.h:33` | L22 | 差分なし |
 | 7 | タスクバーのボタンが 1 個 | `app/src/ui/taskbar.ts` | — | 差分なし |
 
-- 0323(`0323-contract-fixes.diff` 1,852 行・23 hunk): ①背景消去 ②HTTRANSPARENT ③フック。Wine との差 130→48 行(E 20→0・P 16→0)。残る差は `WM_SETCURSOR` の順序(副作用の発生点を取り出し時へ動かす必要があり 0136 の設計に触れる)。**実エンジン・wasm ビルド・性能は未測定**(0323 §7)。
+- 0323(`0323-contract-fixes.diff` 1,852 行・32 hunk): ①背景消去 ②HTTRANSPARENT ③フック。Wine との差 130→48 行(E 20→0・P 16→0)。残る差は `WM_SETCURSOR` の順序(副作用の発生点を取り出し時へ動かす必要があり 0136 の設計に触れる)。**実エンジン・wasm ビルド・性能は未測定**(0323 §7)。
 - 0222(窓管理): クリックの `WM_PARENTNOTIFY`→`WM_MOUSEACTIVATE`、DefWindowProc の既定 0 表(86 メッセージ)、`SetWindowPos` の不変呼び出しは通知しない、活性化の契約。**原因は (b) だった**(FL の窓は子窓で、OS は何も自動でしない)。決定 0222 の差分は逆スイッチのマクロつき(今は付けない。`AGENTS.md` §6)。
 - 0325(O18 カーソル): 絵と hot spot を CSS カーソルへ。実物 RT_GROUP_CURSOR 57 個 [文書]。L09。
 - 0319(O9 スクロール崩れ): `ScrollWindowEx`・`ScrollDC`・`ScrollWindow` を有効領域の 1 モデルへ。Wine 10 の測定で契約を確定し差分を作成(L11・L12)。**原因は未特定**(PM の仮説は否定された)。

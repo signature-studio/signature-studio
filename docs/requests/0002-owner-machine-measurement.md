@@ -57,6 +57,7 @@ P1 1 回目: <P1_ms> ms / 2 回目: <P1_ms> ms
 Mixer の窓: 出ていた / 出ていなかった
 プラグインの案内: 出た / 出なかった
 使った機械: <機械>
+(式の結果の「機械」はオブジェクト。ブラウザの名前と版を書き写してください。`app/src/perf/browser-info.ts` 68〜70 行の `browser: { name, version, major, os, headless }`)
 
 差し替えの前(今の版): 上の欄すべて
 差し替えの後(版が変わってから、同じ手順で測って貼る欄): (未記入)
@@ -71,6 +72,8 @@ node tools/boot-check/warm.mjs(同じプロファイルの 2 回目・5 回)    
 evidence/R4-2.md §4.2・§4.3(5 回)                                  → マウスを押した入力の遅れ(中央値): 操作なし 5.9 ms・再生中 17.8 ms。frame/s 中央値 54.68。画面の Hz 59.99〜60.00
 evidence/R4-3.md §4(各 3 回)                                       → 5 分放置: 途切れ 2〜4 quanta、書き込み率の最小 0.882〜0.920。マウス移動あり: 566〜909 quanta、書き込み率の最小 0.752〜0.845。耳での確認 0 件
 ```
+
+- 2026-11-14 の `scripts/preflight.sh`(`docs/ops/environment.md` の確認。抜粋): gh-identity OK(active account の表示のみ。トークンは出ない)、repo-api OK(reachable, default branch main)、push-dry-run OK(`git push --dry-run origin HEAD` が通った)。
 
 今回の作業で確かめたこと:
 - 式の項目は `app/src` の公開名を読んで決めた(`evidence/R4-5.md`)。
