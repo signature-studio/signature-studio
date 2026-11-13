@@ -992,7 +992,7 @@ fn script_out(extra_env: &[(&str, &str)], claims: &str) -> (i32, String) {
     let out = dir.join(etxt_common::uniq("a4m-out"));
     let module = format!("m.dll:{}:0x2000000", manifest().join("Cargo.toml").display());
     let mut cmd = Command::new("bash");
-    cmd.arg(harness_dir().join("a4-multi.sh")).arg(&module).env("OUT", &out).env("FLE", manifest().join("Cargo.toml")).env("FEBIN", "/nonexistent").env("TMPDIR", dir.join("tmp")).env_remove("FLE_CALL_FRUITY");
+    cmd.arg(manifest().join("../../../archive/harness-attic/a4-multi.sh")).arg(&module).env("OUT", &out).env("FLE", manifest().join("Cargo.toml")).env("FEBIN", "/nonexistent").env("LIFT", manifest().join("../..").canonicalize().unwrap()).env("TMPDIR", dir.join("tmp")).env_remove("FLE_CALL_FRUITY");
     if !claims.is_empty() {
         cmd.env("AUTH_CLAIMS", claims);
     }
@@ -1031,7 +1031,7 @@ fn a4_multi_refuses_auth_claims_without_the_fruity_build_or_with_a_bad_file() {
 #[test]
 fn a_caller_fle_auth_claims_does_not_vouch_for_a_run_that_did_not_ask_for_it() {
     // the script unsets FLE_AUTH_CLAIMS unless AUTH_CLAIMS asks for it, as it does for FLE_REG_SEED (decision 0116) and FLE_VFS_SEED (decision 0110)
-    let t = std::fs::read_to_string(harness_dir().join("a4-multi.sh")).unwrap();
+    let t = std::fs::read_to_string(manifest().join("../../../archive/harness-attic/a4-multi.sh")).unwrap();
     assert!(t.contains("unset FLE_AUTH_CLAIMS\nAUTH_CLAIMS=${AUTH_CLAIMS:-}"), "a4-multi.sh must unset the caller's FLE_AUTH_CLAIMS before it reads AUTH_CLAIMS");
     assert!(t.contains("export FLE_AUTH_CLAIMS=\"$AUTH_CLAIMS\""));
     // and the 0116 rule for the registry seed is still in place beside it

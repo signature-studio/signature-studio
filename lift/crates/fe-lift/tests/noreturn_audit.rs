@@ -63,9 +63,10 @@ fn mutant_lift(name: &str) -> PathBuf {
             std::fs::copy(&p, root.join("harness").join(p.file_name().unwrap())).unwrap();
         }
     }
-    for d in ["two", "vst", "vst3a", "dec1"] {
+    for d in ["two", "vst3a", "dec1"] {
         copy_dir(&lift.join("harness").join(d), &root.join("harness").join(d));
     }
+    copy_dir(&lift.join("../archive/harness-attic/vst"), &root.join("harness/vst"));
     root
 }
 

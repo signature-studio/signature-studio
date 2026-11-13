@@ -12,7 +12,7 @@ fn manifest() -> PathBuf {
 fn rt() -> PathBuf {
     match std::env::var_os("FLE_OPFS1_RT_DIR") {
         Some(d) => PathBuf::from(d),
-        None => manifest().join("../../harness/web/opfs1"),
+        None => manifest().join("../../../archive/harness-attic/web/opfs1"),
     }
 }
 fn work() -> PathBuf {

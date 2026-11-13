@@ -411,8 +411,8 @@ fn the_vis1_seed_is_the_decision_0144_list_plus_three_operating_system_fonts() {
 #[test]
 fn the_api_probe_lists_agree_and_leave_out_the_five_names_of_the_g8_probe() {
     let h = base_dir().join("harness");
-    let inc = read(&h.join("vis1/vis1_apis.inc"));
-    let flags = read(&h.join("vis1/link-flags.txt"));
+    let inc = read(&base_dir().join("../archive/harness-attic/vis1/vis1_apis.inc"));
+    let flags = read(&base_dir().join("../archive/harness-attic/vis1/link-flags.txt"));
     let names: Vec<&str> = inc.lines().filter_map(|l| l.strip_prefix("V1API(").and_then(|r| r.strip_suffix(')'))).collect();
     let wrapped: Vec<&str> = flags.split_whitespace().filter_map(|f| f.strip_prefix("-Wl,--wrap=fle_imp_")).collect();
     assert_eq!(names.len(), wrapped.len());
