@@ -1,0 +1,344 @@
+# R6-4 の草案。実行していない。この場所は .github/workflows/ の外(置けば push で走る)。本番の場所への移動は reviewer の検査の後。
+# 書き込み先は R2 fl-web-assets の root の manifest.json と backup/ 以下だけ。Secrets は 3 つだけ。
+# 出すのは段の結果・sha256・大きさ・engine.kind・bundle 名・退避のキー名だけ。アカウント ID は実行時に得て ::add-mask:: する。
+name: default-entry
+
+on:
+  push:
+    paths:
+      - ".github/workflows/default-entry.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: default-entry
+  cancel-in-progress: false
+
+jobs:
+  default-entry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Node 24 を入れる(判定関数を node で読む)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 0 アカウント ID を実行時に 1 つ得て、すぐ伏せる
+        id: acct
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -u
+          W="$RUNNER_TEMP/r6"
+          mkdir -p "$W"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts > "$W/accounts.json" 2>/dev/null || true
+          python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); [print(a["id"]) for a in d.get("result", [])]' \
+            "$W/accounts.json" 2>/dev/null | grep -E '^[0-9a-f]{32}$' | sort -u > "$W/cand.txt" || true
+          n=$(wc -l < "$W/cand.txt" | tr -d ' ')
+          if [ "$n" -ne 1 ]; then
+            echo "アカウント ID を 1 つに決められない(件数: $n)"
+            exit 1
+          fi
+          id=$(cat "$W/cand.txt")
+          echo "::add-mask::$id"
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+          echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
+
+      - name: 1 root の manifest.json を読む。E13 と同じなら何もしない。違えば退避し、退避の中身を確かめる
+        id: r1
+        if: steps.acct.outcome == 'success'
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/r6"
+          mkdir -p "$W"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root.json" > "$W/get1.txt" 2>&1 || {
+            echo "root の manifest.json: 読めない(伏せた末尾)"
+            mask < "$W/get1.txt" | tail -n 3
+            exit 1
+          }
+          aws s3api head-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" --output json > "$W/root-head.json" 2> "$W/head1.err" || {
+            echo "root の head: 失敗(伏せた末尾)"
+            mask < "$W/head1.err" | tail -n 3
+            exit 1
+          }
+          SHA=$(sha256sum "$W/root.json" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$W/root.json")
+          python3 - "$W/root.json" "$W/root-head.json" "$SHA" "$SIZE" <<'PY' || exit 1
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          h = json.load(open(sys.argv[2]))
+          e = m.get("engine") if isinstance(m.get("engine"), dict) else {}
+          p = ((e.get("wasm") or {}).get("url") or "").split("/")
+          print(f"root: sha256 {sys.argv[3]}、大きさ {sys.argv[4]} B、ContentEncoding {h.get('ContentEncoding') or '(無し)'}")
+          print(f"root: engine.kind {e.get('kind')}、bundle 名 {p[2] if len(p) > 3 and p[1] == 'assets' else None}")
+          PY
+          if [ "$SHA" = "57817472d5a0ea2d07c0859d45ace925086800b98e952107eabc61322e9e12dd" ]; then
+            echo "root は既に E13 と同じ。何もしない(段 2 以降を飛ばす)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "root は E13 と違う。退避してから書く"
+          echo "ROOT_SHA=$SHA" >> "$GITHUB_ENV"
+          echo "ROOT_SIZE=$SIZE" >> "$GITHUB_ENV"
+          TS=$(date -u +%Y%m%dT%H%M%SZ)
+          BK="backup/manifest-root-${TS}.json"
+          echo "BK=$BK" >> "$GITHUB_ENV"
+          if aws s3api head-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" > "$W/bk0.txt" 2> "$W/bk0.err"; then
+            echo "退避先が既に在る(中止。上書きしない)"
+            exit 1
+          fi
+          grep -qE '404|Not Found|NoSuchKey' "$W/bk0.err" || {
+            echo "退避先の確認: 404 以外の失敗(伏せた末尾)"
+            mask < "$W/bk0.err" | tail -n 3
+            exit 1
+          }
+          cat > "$W/meta.py" <<'PY'
+          import json, sys
+          h = json.load(open(sys.argv[1]))
+          for k, flag in (("ContentType", "--content-type"), ("ContentEncoding", "--content-encoding"), ("CacheControl", "--cache-control")):
+              if h.get(k):
+                  print(flag)
+                  print(h[k])
+          PY
+          python3 "$W/meta.py" "$W/root-head.json" > "$W/meta.txt" || exit 1
+          mapfile -t META < "$W/meta.txt"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          aws s3api put-object --bucket fl-web-assets --key "$BK" --body "$W/root.json" "${META[@]}" --endpoint-url "$ENDPOINT" > "$W/put1.txt" 2>&1 || {
+            echo "退避: 書けない(伏せた末尾)"
+            mask < "$W/put1.txt" | tail -n 3
+            exit 1
+          }
+          aws s3api head-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" --output json > "$W/bk-head.json" 2> "$W/bk1.err" || {
+            echo "退避の head: 失敗(伏せた末尾)"
+            mask < "$W/bk1.err" | tail -n 3
+            exit 1
+          }
+          aws s3api get-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" "$W/bk.json" > "$W/bk2.txt" 2>&1 || {
+            echo "退避の get: 失敗(伏せた末尾)"
+            mask < "$W/bk2.txt" | tail -n 3
+            exit 1
+          }
+          BLEN=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentLength"))' "$W/bk-head.json")
+          BSHA=$(sha256sum "$W/bk.json" | cut -d' ' -f1)
+          BSIZE=$(stat -c %s "$W/bk.json")
+          if [ "$BLEN" != "$SIZE" ] || [ "$BSIZE" != "$SIZE" ] || [ "$BSHA" != "$SHA" ]; then
+            echo "退避の確認: root と一致しない"
+            exit 1
+          fi
+          echo "退避: head と get で大きさ・sha256 が root と一致(大きさ $SIZE B、sha256 $SHA)"
+          echo "退避のキー名: $BK"
+
+      - name: 2 R2 の E13 の manifest を読み、中身と参照先を確かめる(書かない)
+        id: r2
+        if: steps.r1.outcome == 'success' && steps.r1.outputs.skip == 'false'
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/r6"
+          mkdir -p "$W"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          PFX="fl-engine-ci-0363b050"
+          aws s3api get-object --bucket fl-web-assets --key "${PFX}/manifest.json" --endpoint-url "$ENDPOINT" "$W/e13.json" > "$W/g2.txt" 2>&1 || {
+            echo "E13 の manifest: 読めない(伏せた末尾)"
+            mask < "$W/g2.txt" | tail -n 3
+            exit 1
+          }
+          SHA=$(sha256sum "$W/e13.json" | cut -d' ' -f1)
+          echo "E13 の manifest: sha256 $SHA、大きさ $(stat -c %s "$W/e13.json") B"
+          [ "$SHA" = "57817472d5a0ea2d07c0859d45ace925086800b98e952107eabc61322e9e12dd" ] || { echo "E13 の manifest: sha256 が違う(中止)"; exit 1; }
+          ( cd app && node --experimental-strip-types -e "const fs=require('fs');import('./shared/manifest-guard.ts').then(g=>{const v=g.judgeManifestBytes(new Uint8Array(fs.readFileSync(process.argv[1])));console.log(JSON.stringify(v));process.exit(v.ok?0:1)}).catch(()=>{console.log('判定: 例外');process.exit(1)})" "$W/e13.json" ) > "$W/judge2.txt" 2> /dev/null || { echo "E13 の判定: ok でない"; cat "$W/judge2.txt"; exit 1; }
+          cat "$W/judge2.txt"
+          python3 - "$W/e13.json" "$W/keys.txt" "$PFX" <<'PY' || { echo "E13 の参照先: 形が違う(中止)"; exit 1; }
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          pfx = "/assets/" + sys.argv[3] + "/"
+          wasm = m["engine"]["wasm"]["url"]
+          urls = [wasm, m["engine"]["options"]["glue"]["url"], m["seedPack"]["url"], m["dllPack"]["url"]]
+          if not wasm.startswith(pfx) or not all(u.startswith("/assets/") for u in urls):
+              sys.exit(1)
+          with open(sys.argv[2], "w") as f:
+              for u in urls:
+                  f.write(u[len("/assets/"):] + "\n")
+          print(f"E13 の参照先: wasm は {pfx} の下、参照先は {len(urls)} 件")
+          PY
+          WASM=$(sed -n 1p "$W/keys.txt")
+          aws s3api head-object --bucket fl-web-assets --key "$WASM" --endpoint-url "$ENDPOINT" --output json > "$W/wasm-head.json" 2> "$W/h2.err" || {
+            echo "wasm の head: 失敗(伏せた末尾)"
+            mask < "$W/h2.err" | tail -n 3
+            exit 1
+          }
+          python3 - "$W/wasm-head.json" <<'PY' || { echo "wasm の head: ContentEncoding が br でない、または大きさが 15697877 B でない"; exit 1; }
+          import json, sys
+          h = json.load(open(sys.argv[1]))
+          if h.get("ContentEncoding") != "br" or h.get("ContentLength") != 15697877:
+              sys.exit(1)
+          print(f"wasm の head: ContentEncoding {h.get('ContentEncoding')}、大きさ {h.get('ContentLength')} B")
+          PY
+          aws s3api get-object --bucket fl-web-assets --key "$WASM" --endpoint-url "$ENDPOINT" "$W/wasm.br" > "$W/g2w.txt" 2>&1 || {
+            echo "wasm の get: 失敗(伏せた末尾)"
+            mask < "$W/g2w.txt" | tail -n 3
+            exit 1
+          }
+          node -e "const z=require('zlib'),fs=require('fs');fs.writeFileSync(process.argv[2],z.brotliDecompressSync(fs.readFileSync(process.argv[1])))" "$W/wasm.br" "$W/wasm.bin" > /dev/null 2>&1 || { echo "wasm: 展開できない"; exit 1; }
+          rm -f "$W/wasm.br"
+          WSIZE=$(stat -c %s "$W/wasm.bin")
+          WSHA=$(sha256sum "$W/wasm.bin" | cut -d' ' -f1)
+          rm -f "$W/wasm.bin"
+          echo "wasm の展開後: 大きさ $WSIZE B、sha256 $WSHA"
+          if [ "$WSIZE" != "143087706" ] || [ "$WSHA" != "58ad4a6aa720375aa412e6d87d58852688ddfa08ea27571953592d14ee74ccbf" ]; then
+            echo "wasm の展開後が E13 の値と違う(中止)"
+            exit 1
+          fi
+          while read -r key; do
+            aws s3api head-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" --output json > "$W/h2b.json" 2> "$W/h2b.err" || {
+              echo "参照先の head: 無い(伏せた末尾)"
+              mask < "$W/h2b.err" | tail -n 3
+              exit 1
+            }
+          done < "$W/keys.txt"
+          echo "参照先の head: $(wc -l < "$W/keys.txt" | tr -d ' ') 件とも在る"
+
+      - name: 3 E13 の manifest を、読んだバイト列のまま root に書き、中身を確かめる
+        id: r3
+        if: steps.r1.outcome == 'success' && steps.r1.outputs.skip == 'false' && steps.r2.outcome == 'success'
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/r6"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          aws s3api put-object --bucket fl-web-assets --key manifest.json --body "$W/e13.json" --content-type application/json --cache-control no-cache --endpoint-url "$ENDPOINT" > "$W/put3.txt" 2>&1 || {
+            echo "root の書き込み: 失敗(伏せた末尾)"
+            mask < "$W/put3.txt" | tail -n 3
+            exit 1
+          }
+          aws s3api head-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" --output json > "$W/root3-head.json" 2> "$W/h3.err" || {
+            echo "root の head: 失敗(伏せた末尾)"
+            mask < "$W/h3.err" | tail -n 3
+            exit 1
+          }
+          aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root3.json" > "$W/g3.txt" 2>&1 || {
+            echo "root の get: 失敗(伏せた末尾)"
+            mask < "$W/g3.txt" | tail -n 3
+            exit 1
+          }
+          LEN=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentLength"))' "$W/root3-head.json")
+          SHA=$(sha256sum "$W/root3.json" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$W/root3.json")
+          echo "root の書き込み後: 大きさ $SIZE B(head $LEN B)、sha256 $SHA"
+          if [ "$LEN" != "3098" ] || [ "$SIZE" != "3098" ] || [ "$SHA" != "57817472d5a0ea2d07c0859d45ace925086800b98e952107eabc61322e9e12dd" ]; then
+            echo "root が E13 の値と違う(段 5 で戻す)"
+            exit 1
+          fi
+          echo "root の書き込み: E13 と一致(大きさ 3098 B、sha256 一致)"
+
+      - name: 4 root を読み直し、sha・engine.kind・bundle 名を出し、判定関数で ok を確かめる
+        id: r4
+        if: steps.r3.outcome == 'success'
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/r6"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root4.json" > "$W/g4.txt" 2>&1 || {
+            echo "root の get: 失敗(伏せた末尾)"
+            mask < "$W/g4.txt" | tail -n 3
+            exit 1
+          }
+          SHA=$(sha256sum "$W/root4.json" | cut -d' ' -f1)
+          SIZE=$(stat -c %s "$W/root4.json")
+          python3 - "$W/root4.json" "$SHA" "$SIZE" <<'PY' || exit 1
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          e = m["engine"]
+          p = e["wasm"]["url"].split("/")
+          print(f"root: sha256 {sys.argv[2]}、大きさ {sys.argv[3]} B、engine.kind {e['kind']}、bundle 名 {p[2]}")
+          PY
+          ( cd app && node --experimental-strip-types -e "const fs=require('fs');import('./shared/manifest-guard.ts').then(g=>{const v=g.judgeManifestBytes(new Uint8Array(fs.readFileSync(process.argv[1])));console.log(JSON.stringify(v));process.exit(v.ok?0:1)}).catch(()=>{console.log('判定: 例外');process.exit(1)})" "$W/root4.json" ) > "$W/judge4.txt" 2> /dev/null || { echo "root の判定: ok でない"; cat "$W/judge4.txt"; exit 1; }
+          cat "$W/judge4.txt"
+
+      - name: 5 結果の表を出す。段 3 か 4 が失敗していたら、退避を root に戻し、sha で確かめる
+        if: always()
+        env:
+          R_ACCT: ${{ steps.acct.outcome }}
+          R_R1: ${{ steps.r1.outcome }}
+          R_SKIP: ${{ steps.r1.outputs.skip }}
+          R_R2: ${{ steps.r2.outcome }}
+          R_R3: ${{ steps.r3.outcome }}
+          R_R4: ${{ steps.r4.outcome }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID:-}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/r6"
+          echo "| 段 | 結果 |"
+          echo "|---|---|"
+          echo "| 0 アカウント ID を実行時に得た | $R_ACCT |"
+          echo "| 1 root を読み、退避した | $R_R1 |"
+          echo "| 1 の分岐(root が E13 と同じで何もしない = true) | ${R_SKIP:-未設定} |"
+          echo "| 2 E13 の manifest を確かめた(書かない) | $R_R2 |"
+          echo "| 3 E13 を root に書き、確かめた | $R_R3 |"
+          echo "| 4 root を読み直し、判定した | $R_R4 |"
+          fail=0
+          if printf '%s\n' "$R_ACCT" "$R_R1" "$R_R2" "$R_R3" "$R_R4" | grep -qx failure; then
+            fail=1
+          fi
+          RESTORE="対象外"
+          if [ "$R_R1" = success ] && [ "$R_SKIP" = false ] && { [ "$R_R3" = failure ] || [ "$R_R4" = failure ]; }; then
+            fail=1
+            RESTORE="失敗"
+            mapfile -t META < "$W/meta.txt"
+            if aws s3api get-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" "$W/bk-restore.json" > "$W/rs1.txt" 2>&1 \
+              && [ "$(sha256sum "$W/bk-restore.json" | cut -d' ' -f1)" = "$ROOT_SHA" ] \
+              && aws s3api put-object --bucket fl-web-assets --key manifest.json --body "$W/bk-restore.json" "${META[@]}" --endpoint-url "$ENDPOINT" > "$W/rs2.txt" 2>&1 \
+              && aws s3api head-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" --output json > "$W/rs-head.json" 2> "$W/rs-h.err" \
+              && [ "$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentLength"))' "$W/rs-head.json")" = "$ROOT_SIZE" ] \
+              && aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root-restored.json" > "$W/rs3.txt" 2>&1 \
+              && [ "$(sha256sum "$W/root-restored.json" | cut -d' ' -f1)" = "$ROOT_SHA" ]; then
+              RESTORE="成功(退避から戻し、sha256 が退避と一致)"
+            fi
+          fi
+          echo "| 5 戻し(退避 → root、sha で確認) | $RESTORE |"
+          echo "| 退避のキー名 | ${BK:-未設定} |"
+          echo "| 退避の sha256(戻す先の root の元の値) | ${ROOT_SHA:-未設定} |"
+          exit $fail
