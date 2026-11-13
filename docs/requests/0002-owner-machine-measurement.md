@@ -93,3 +93,5 @@ gh issue view <番号> --json comments -q '.comments[-1].body' | grep -c 'P1 1 �
 
 ## 確認の記録
 (依頼の後に追記: 日付・コマンドの出力 1 行)
+
+GitHub の issue: https://github.com/signature-studio/signature-studio/issues/3(2026-11-14)
