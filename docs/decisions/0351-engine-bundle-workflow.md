@@ -14,7 +14,7 @@
 4. 抽出: `python3 ci/lib/extract_fl.py <インストーラ> <HOST_ROOT> --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv`(DLL 8 本と seed。不一致は exit 2)。
 5. 道具: `ci/setup-toolchain.sh emsdk` と `rust`(`ci/versions.env`: emcc 6.0.12、rust 1.99.0)、Python 3.14、Node 24。上流 Blend2D は `lift/harness/b2d1/build_upstream.sh`(固定コミットと tarball の SHA-256 で照合)。
 6. 9 段: `WORK=$RUNNER_TEMP/work HOST_ROOT=<段 4 の出力> B2D_UPSTREAM_LIB=… B2D_UPSTREAM_SRC=… bash app/scripts/build-engine-bundle.sh`(段の既定の順のまま)。
-7. 成果物: GitHub の artifact に上げない(`upload-artifact` を使わない)。ログには段の rc・時間・9 ファイルの SHA-256 だけを出す。
+7. 成果物: GitHub の artifact に上げない(`upload-artifact` を使わない)。ログには段の rc・時間・ファイルの SHA-256 だけを出す。手元の E13 bundle は 9 ファイル。GitHub の実行は 11 ファイル(+`SHA256SUMS`・`upload-commands.txt`。実行 43434252094 の段 7、出典は `evidence/R8-4.md`。`app/scripts/pack-assets.mjs` の 127・143 行が 2 つを書く)。旧: 9 ファイル
 8. 成功の判定: `gh run list --workflow engine-bundle.yml --limit 3` が `success`、かつ段 6 の 9 段の rc が 0。
 
 決定: `paths` の絞り込みは R8-4 で足さない。根拠: 指示は `on: push` のみで、絞り込みは条件を足すことになる(worker-rules の範囲)。
