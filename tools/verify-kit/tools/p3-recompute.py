@@ -69,6 +69,7 @@ def compute(name):
     at_max = next(s['t'] for s in S if (s.get('longestRunQuanta') or 0) == longest)
     return dict(
         music=music, music_snap=music_snap, wall=(last - t0) / 1000.0, longest=longest, at_play=at_play, grew=longest > at_play, longest_at=(at_max - t0) / 1000.0,
+        first_s=(first - t0) / 1000.0,
         empty=empty, part=part, partv=[wins[k]['wr'] for k in part], sum=sum(wins[k]['wr'] for k in data), ndata=len(data), low=low,
         mean=sum(wins[k]['wr'] for k in data) / len(data), kmin=kmin, wmin=wins[kmin]['wr'],
         mean_s3a=sum(w['wr'] for w in wins) / NW, z=z, zmin=wins[z]['wr'],
@@ -80,6 +81,7 @@ def compute(name):
 
 def show(name, cond, r):
     print(f'## {name} (条件 {cond})')
+    print(f"最初の書き込み記録: 再生開始から {r['first_s']:.1f} s(Unlock の最初の t - 再生の mark)")
     print(f"窓 0-300 s(10 s x 30): 記録なし = {spans(r['empty'])} / 記録の途中で始まる窓(部分値・除外) = {spans(r['part'])} {', '.join(f'wr {v:.3f}' for v in r['partv']) or ''} / 記録が全部ある窓 {r['ndata']}")
     print(f"記録が全部ある窓の wr の合計 {r['sum']:.3f}(÷ 30 = {r['sum'] / NW:.3f})")
     print(f"書き込み率(記録が全部ある窓): 平均 {r['mean']:.3f} / 最小 {r['wmin']:.3f}({r['kmin'] * 10}-{r['kmin'] * 10 + 10} s) / 0.95 未満 {len(r['low'])} 窓: 開始 {', '.join(str(k * 10) for k in r['low']) or 'なし'} s")
