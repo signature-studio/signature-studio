@@ -23,3 +23,12 @@
 ## 出典
 - `evidence/R0-6.md`(失敗の表)、`evidence/R0-6.log`(`set but not used` の行)
 - `docs/ops/fidelity-and-performance.md` §2(分類)、`AGENTS.md` §6
+
+## テストの入力パスの修正(`wall_fr3.rs`・`wall_fr4.rs`)の分類
+- 対象: `lift/crates/fe-lift/tests/wall_fr3.rs:575` と `wall_fr4.rs:995` の `.env("LIFT", …)`。スクリプトの場所は `archive/harness-attic/a4-multi.sh`(R0-6b §4)。
+- 出典(`grep -n 'LIFT' archive/harness-attic/a4-multi.sh`、2026-11-14 に実行):
+  - 26 行目: `#        LIFT=<tree with crates/ runtime/ harness/>   (default: the lift/ above this script; a `git archive` tree works)`
+  - 86 行目: `LIFT=${LIFT:-$(cd "$HERE/.." && pwd)}`
+- 実測の注意: 86 行目の既定は「スクリプトの置き場の親」(`$HERE/..`)。`archive/harness-attic/` に在るスクリプトでは既定が `archive/` になり、`harness/fruity-rows.txt` が無いため使えない。そこでテストが子プロセスに `LIFT` = `lift/` を渡す。
+- 分類: (b) 契約の実装に当たらない、テストの入力パスの修正。`LIFT` は `archive/harness-attic/a4-multi.sh` が既定値つきで読む既存のパラメータで、テストが子プロセスに渡す値を、移動先(`archive/`)のスクリプトの既定から `lift/` に直した。新しい環境変数ではない。製品(wasm)に入らない(テスト専用)。
+- 撤回条件: スクリプトを `lift/harness/` に戻したら、この指定を外す。
