@@ -44,3 +44,4 @@
 - `evidence/R1-1.md`(段ごとの結果表)、`evidence/R1-link.md`(リンク失敗の切り分け。案 A・案 B)、`evidence/R1-dryrun.md`(適用可否)、`evidence/R1-final.md`・`evidence/R1-final.log`(最終の検査)
 - `docs/core/win32-contract.md` §3(契約の不足 (b))
 - `docs/decisions/0352-write-only-vars.md`(分類の書き方の前例)
+- FLE_HTERROR の二重定義(0323b が足した重複。値は同じ `(-2)`)を 1 つにした。分類: (a)。`evidence/R1-hterror.log`
