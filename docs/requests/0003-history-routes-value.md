@@ -37,3 +37,5 @@ ROADMAP R6-3・R4-3・R5 系を、ホスト名を使わないローカルの実�
 
 ## 確認の記録
 (依頼の後に追記: 日付・コマンドの出力 1 行)
+
+GitHub の issue: https://github.com/signature-studio/signature-studio/issues/2(2026-11-13)
