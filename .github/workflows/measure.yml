@@ -1,0 +1,27 @@
+# R8-5: 並列実行の骨組み。matrix の 2 項目で echo と資源の実測だけを出す(ブラウザ操作は置かない。AGENTS §4)。
+name: measure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/measure.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: shard を表示する
+        run: echo "shard ${{ matrix.shard }}"
+
+      - name: 資源を表示する(nproc・free・df)
+        run: |
+          nproc
+          free -m
+          df -h /
