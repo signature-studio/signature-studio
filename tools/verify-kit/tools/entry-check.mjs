@@ -14,7 +14,7 @@ const STATE = `JSON.stringify((() => { const a = window.__app; if (!a) return { 
 const res = { browser: B, url: URL0 };
 let ev, goto, close, consoleErrors = () => [];
 if (B === 'chrome') {
-  const { openBrowser } = await imp('test/e2e/browser.mjs');
+  const { openBrowser } = await import('../lib/browser.mjs');
   const br = await openBrowser(OUT, 'entry');
   const page = await br.newPage({ width: 2176, height: 1224, initScript: PATCH });
   res.version = br.version; ev = page.ev; goto = page.goto;

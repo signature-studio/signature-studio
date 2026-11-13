@@ -41,7 +41,7 @@ const CHROME_KEYS = { Enter: [13, '\r'], Space: [32, ' '], Escape: [27], Tab: [9
 const FF_KEYS = { Enter: '\uE007', Escape: '\uE00C', Tab: '\uE004', Space: ' ', Backspace: '\uE003', Delete: '\uE017', ArrowLeft: '\uE012', ArrowRight: '\uE014', ArrowUp: '\uE013', ArrowDown: '\uE015', Home: '\uE011', End: '\uE010', PageUp: '\uE00E', PageDown: '\uE00F', Minus: '-', Comma: ',', Period: '.', ...Object.fromEntries([...Array(12)].map((_, i) => ['F' + (i + 1), String.fromCharCode(0xE031 + i)])) };
 
 async function chromeBackend() {
-  const { openBrowser } = await import(pathToFileURL(path.join(APP, 'test/e2e/browser.mjs')).href);
+  const { openBrowser } = await import('../lib/browser.mjs');
   const browser = await openBrowser(OUT, 'sdrive');
   const page = await browser.newPage({ width: VW, height: VH, dpr: DPR });
   const chooser = [];
@@ -480,7 +480,7 @@ async function runOp(op0) {
     case 'cmpShot': {
       // gpu1: the browser's own picture of the desktop element (CDP clip / WebDriver screenshot) against the compositor's picture as the presenter last read it (peek). Needs a 1:1 scale (viewport width = guest width + 340).
       // Differences are counted by pixel (any of R, G, B), with the bounding box and a 6x8 grid, so that a stale canvas, a stale browser surface or an animated area can be told apart by where they are.
-      const { decodePng, toRgba } = await import(pathToFileURL(path.join(APP, 'scripts/lib/png.mjs')).href);
+      const { decodePng, toRgba } = await import('../lib/png.mjs');
       geo = await geometry();
       const file = path.join(OUT, `${op.name}.png`);
       await B.shot(file, BROWSER === 'chrome' ? { x: geo.x, y: geo.y, width: geo.w, height: geo.h } : undefined);

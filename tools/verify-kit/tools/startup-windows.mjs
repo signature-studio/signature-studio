@@ -3,7 +3,7 @@ import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL }
 const argv = process.argv.slice(2); const opt = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
 const URL0 = opt('url'), APP = path.resolve(opt('app')), OUT = path.resolve(opt('out')), FOR = Number(opt('for-s', '25'));
 fs.mkdirSync(OUT, { recursive: true });
-const { openBrowser } = await import(pathToFileURL(path.join(APP, 'test/e2e/browser.mjs')).href);
+const { openBrowser } = await import('../lib/browser.mjs');
 const br = await openBrowser(OUT, 'startup'); const page = await br.newPage({ width: 2260, height: 1116 });
 const t0 = Date.now(); await page.goto(URL0);
 const seen = new Map(); const log = []; let idleAt = null;
