@@ -14,6 +14,7 @@
 #include "fle_env.h"
 #include "fle_thread.h"
 #include "fle_thread_wasm.h"
+#include "fle_callback.h"
 
 /* The JS library (harness/web/threads/fle_thread_lib.js). `fle_wasm_thread_switch` is an async import (WebAssembly.Suspending under -sJSPI): it returns when another thread has
  * switched back to `from`. `fle_wasm_thread_exit` throws a JS exception that ends the calling JSPI stack and hands over to `to`; it never returns. */
@@ -86,6 +87,15 @@ void fle_thread_wasm_stack_free(unsigned idx)
     free(raw_ptr[idx]);
     raw_ptr[idx] = NULL;
     region[idx] = NULL;
+}
+
+size_t fle_cstack_left(void)
+{
+    uintptr_t sp = (uintptr_t)emscripten_stack_get_current();
+    unsigned idx = fle_thread_current ? fle_thread_current() : 0u;
+
+    if (idx == 0 || idx >= FLE_THREAD_MAX || !region[idx]) return (size_t)emscripten_stack_get_free();
+    return sp > (uintptr_t)region[idx] + CANARY_BYTES ? (size_t)(sp - ((uintptr_t)region[idx] + CANARY_BYTES)) : 0u;
 }
 
 size_t fle_thread_wasm_hiwater(unsigned idx)
