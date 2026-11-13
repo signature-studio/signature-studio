@@ -28,7 +28,7 @@ cd ~/work/signature-studio && sha256sum -c artifacts.sha256        # 全行 OK(a
 |---|---|---|
 | 1 | `python3 tools/extract_nsis2.py <5653.exe> --hash FLEngine_x64.dll` | `22227016 b2c64da4…9496d` |
 | 2 | `python3 ci/lib/extract_fl.py <5653.exe> artifacts/host --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv` | 各ファイルが `extract-dlls.tsv` の sha256 と一致(不一致は exit 2) |
-| 3 | 抽出先は **`artifacts/host/` の 1 か所に統一**(旧 `extract-dlls.tsv` は 6 か所の `lift/out-*` を指し、`oggio`・`elastique` の置き場は旧木に無い [実測])。この書き換えは R0-4 の入力 | `ls artifacts/host` |
+| 3 | 抽出先は **`artifacts/host/` の 1 か所に統一**(旧 `extract-dlls.tsv` は 6 か所の `lift/out-*` を指し、`oggio`・`elastique` の置き場は旧木に無い [実測])。tsv は書き換えず、HOST_ROOT に `artifacts/host` を渡して 1 か所に統一する(R0-4) | `ls artifacts/host` |
 
 対象 DLL: `FLEngine_x64`・`dsp_ippv2_x64`・`Blend2D`・`QuickFontCache_x64`・`freetype_x64`・`ILTools_x64`・`oggio_x64`・`elastique_x64`。`ci/artifacts.lock` はインストーラ 4 本の size・sha256・ETag(旧 R2 前提のヘッダは書き直す)。
 
