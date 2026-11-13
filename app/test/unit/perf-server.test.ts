@@ -68,8 +68,8 @@ describe('checkPerfRequest', () => {
     for (const s of ['cross-site', 'same-site', 'unknown', '']) expect(checkPerfRequest({ ...ok, secFetchSite: s }), s).toMatchObject({ ok: false, status: 403 });
   });
   it('Sec-Fetch-Site: same-origin (set by the browser, not by scripts) decides: a proxy that rewrote Host does not make the page\'s own beacon foreign; without it the Origin must name this host', () => {
-    expect(checkPerfRequest({ ...ok, origin: 'https://machine.tailnet.ts.net', host: '127.0.0.1:5173', secFetchSite: 'same-origin' })).toEqual({ ok: true });
-    expect(checkPerfRequest({ ...ok, origin: 'https://machine.tailnet.ts.net', host: '127.0.0.1:5173' })).toMatchObject({ ok: false, status: 403 });
+    expect(checkPerfRequest({ ...ok, origin: 'https://machine.example.ts.net', host: '127.0.0.1:5173', secFetchSite: 'same-origin' })).toEqual({ ok: true });
+    expect(checkPerfRequest({ ...ok, origin: 'https://machine.example.ts.net', host: '127.0.0.1:5173' })).toMatchObject({ ok: false, status: 403 });
     expect(checkPerfRequest({ ...ok, origin: 'https://evil.example', host: 'a.example:5173', secFetchSite: 'cross-site' })).toMatchObject({ ok: false, status: 403 });
   });
   it('the scheme of Origin is not compared (behind a TLS proxy such as `tailscale serve` the page is https and this server sees http): same host and port passes', () => {

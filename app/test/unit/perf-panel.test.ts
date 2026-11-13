@@ -260,7 +260,7 @@ describe('long tasks, slow input events, the engine rate, visibility, the machin
     expect(r.value).toContain('見えていた 312 s / 隠れていた 41 s');
   });
   it('the machine row names the browser, the logical cores (and that physical cores cannot be read), the screen and the GPU', () => {
-    const client = collectClientInfo({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36' }, screen: { colorDepth: 24 }, innerWidth: 1900, innerHeight: 960, isSecureContext: true, location: { hostname: 'x.ts.net' } });
+    const client = collectClientInfo({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36' }, screen: { colorDepth: 24 }, innerWidth: 1900, innerHeight: 960, isSecureContext: true, location: { hostname: 'machine.example.ts.net' } });
     const browser = { hardwareConcurrency: 16, deviceMemoryGB: 8, userAgent: 'x', screen: { width: 2560, height: 1440 }, devicePixelRatio: 1.5, crossOriginIsolated: true, isSecureContext: true, webglRenderer: 'ANGLE (NVIDIA)', jsHeap: null };
     const r = row(perfRows(view({ client, browser })), 'machine');
     expect(r.status).toBe('na');
