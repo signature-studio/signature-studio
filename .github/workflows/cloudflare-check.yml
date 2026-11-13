@@ -217,7 +217,7 @@ jobs:
             exit 1
           fi
 
-      - name: 3e R2 の E13(fl-engine-ci-0363b050)の 5 件を読み、大きさと SHA-256 を出す(fl-web-assets・読み取り)
+      - name: 3e R2 の E13(fl-engine-ci-0363b050)の 5 件を読み、ContentEncoding・大きさ・展開後の SHA-256 を出す(fl-web-assets・読み取り)
         id: r2_e13
         continue-on-error: true
         env:
@@ -241,25 +241,50 @@ jobs:
           fi
           awk 'NF >= 4 {print $4}' ls-e13.txt > names-e13.txt
           echo "一覧: 成功(件数: $(wc -l < names-e13.txt | tr -d ' '))"
+          E13="$RUNNER_TEMP/e13"
+          mkdir -p "$E13/plain"
           status=0
+          : > head-rows.txt
+          : > sha-rows.txt
           while read -r name; do
-            if aws s3api get-object --bucket fl-web-assets --key "${PREFIX}/${name}" --endpoint-url "$ENDPOINT" "$RUNNER_TEMP/${name}" > get-e13.txt 2> get-e13.err; then
-              echo "| ${name} | $(stat -c %s "$RUNNER_TEMP/${name}") | $(sha256sum "$RUNNER_TEMP/${name}" | cut -d' ' -f1) |"
-            else
-              echo "| ${name} | 読めない | - |"
+            key="${PREFIX}/${name}"
+            raw="$E13/${name}"
+            if ! aws s3api get-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" "$raw" > get-e13.txt 2> get-e13.err; then
+              echo "| ${name} | 読めない | - | - | - |" >> sha-rows.txt
+              echo "| ${name} | 読めない | - | - |" >> head-rows.txt
               mask < get-e13.err | tail -n 3
               status=1
+              continue
             fi
+            if ! aws s3api head-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" --query '{ContentEncoding: ContentEncoding, ContentLength: ContentLength, ContentType: ContentType}' --output json > head-e13.json 2> head-e13.err; then
+              echo "| ${name} | head-object 失敗 | - | - | - |" >> sha-rows.txt
+              mask < head-e13.err | tail -n 3
+              status=1
+              continue
+            fi
+            node -e "const h=JSON.parse(require('fs').readFileSync('head-e13.json','utf8'));console.log(['|',process.argv[1],'|',h.ContentEncoding||'(無し)','|',h.ContentType||'(無し)','|',h.ContentLength,'|'].join(' '))" "$name" >> head-rows.txt
+            enc=$(node -p "(JSON.parse(require('fs').readFileSync('head-e13.json','utf8')).ContentEncoding)||''")
+            plain="$raw"
+            if [ "$enc" = "br" ]; then
+              plain="$E13/plain/${name}"
+              if ! node -e "const z=require('zlib'),fs=require('fs');fs.writeFileSync(process.argv[2],z.brotliDecompressSync(fs.readFileSync(process.argv[1])))" "$raw" "$plain" > dec-e13.txt 2> dec-e13.err; then
+                echo "| ${name} | br | $(stat -c %s "$raw") | 展開できない | - |" >> sha-rows.txt
+                mask < dec-e13.err | tail -n 3
+                status=1
+                rm -f "$raw"
+                continue
+              fi
+            fi
+            echo "| ${name} | ${enc:-(無し)} | $(stat -c %s "$raw") | $(stat -c %s "$plain") | $(sha256sum "$plain" | cut -d' ' -f1) |" >> sha-rows.txt
+            rm -f "$raw"
+            if [ "$plain" != "$raw" ]; then rm -f "$plain"; fi
           done < names-e13.txt
-          wasm=$(grep -E '\.wasm$' names-e13.txt | head -n 1)
-          if aws s3api head-object --bucket fl-web-assets --key "${PREFIX}/${wasm}" --endpoint-url "$ENDPOINT" --query '{ContentEncoding: ContentEncoding, ContentLength: ContentLength}' --output json > head-e13.txt 2> head-e13.err; then
-            echo "head-object(${wasm}):"
-            cat head-e13.txt
-          else
-            echo "head-object: 失敗"
-            mask < head-e13.err | tail -n 3
-            status=1
-          fi
+          echo "| 名前 | ContentEncoding | ContentType | ContentLength(head-object) |"
+          echo "|---|---|---|---:|"
+          cat head-rows.txt
+          echo "| 名前 | ContentEncoding | R2 の大きさ | 展開後の大きさ | 展開後の SHA-256 |"
+          echo "|---|---|---:|---:|---|"
+          cat sha-rows.txt
           exit $status
 
       - name: 4 結果の表
