@@ -45,3 +45,7 @@
 - `docs/core/win32-contract.md` §3(契約の不足 (b))
 - `docs/decisions/0352-write-only-vars.md`(分類の書き方の前例)
 - FLE_HTERROR の二重定義(0323b が足した重複。値は同じ `(-2)`)を 1 つにした。分類: (a)。`evidence/R1-hterror.log`
+
+## ROADMAP の完了条件「`cargo test` の失敗 0」の読み方
+
+R1-1〜R1-4 の完了条件「`cargo test` の失敗 0」は、取り込み前(HEAD。`evidence/R1-head.log`)から残る `getmodulehandleexw_returns_in_every_build` の 1 件(clang 24 で失敗する既知の件。`evidence/R0-6b.md` の 6 節)を除く「新しい失敗 0」で読む。根拠: この 1 件はパッチと無関係に取り込み前から失敗しており、R1 の範囲(R1-3 まで)で直す条件に無い。「失敗 0」の字義は未達で、1 件が残る事実を、この節と `evidence/R1-final.md` に書いた。
