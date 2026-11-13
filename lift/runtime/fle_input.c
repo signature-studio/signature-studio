@@ -116,7 +116,6 @@ typedef struct {
 static hwev evq[EV_MAX];
 static unsigned ev_head, ev_n;
 static unsigned last_consumer = (unsigned)-1;   /* decision 0280, L1c: the thread that last took a host event out of the queue or retrieved a message made of one */
-static unsigned long ev_total;
 
 static int ev_thread(const hwev *e, unsigned *thread);
 
@@ -157,7 +156,6 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
     e->mk = mk_flags();
     e->ticks = clk();
     ev_n++;
-    ev_total++;
     note_changebits(e);
     fle_thread_wake_check();
     return 1;
@@ -180,7 +178,6 @@ int fle_input_host_key(int kind, uint32_t vk, uint32_t scan, int extended)
     e->ticks = clk();
     set_key(key_async, vk, kind == FLE_IN_KDOWN);
     ev_n++;
-    ev_total++;
     note_changebits(e);
     fle_thread_wake_check();
     return 1;
@@ -201,7 +198,6 @@ int fle_input_host_display(uint32_t w, uint32_t h)
     e->y = (int32_t)h;
     e->ticks = clk();
     ev_n++;
-    ev_total++;
     note_changebits(e);
     fle_thread_wake_check();
     return 1;
@@ -223,7 +219,6 @@ int fle_input_host_syscommand(uint64_t hwnd, uint32_t cmd)
     e->data = (int32_t)cmd;
     e->ticks = clk();
     ev_n++;
-    ev_total++;
     note_changebits(e);
     fle_thread_wake_check();
     return 1;

@@ -31,7 +31,6 @@ static clip_item clip_items[CLIP_MAX];
 static unsigned clip_n;
 static int clip_open;
 static uint64_t clip_open_hwnd;
-static uint64_t clip_owner;
 
 /* Learn, Synthesized Clipboard Formats: the formats that the system makes available when the given format is on the clipboard.
  * CF_PALETTE comes with CF_DIB and CF_DIBV5 only when CF_BITMAP's palette is there; it is not synthesized here (S-ia1-clip-2). */
@@ -106,7 +105,6 @@ void fle_imp_EmptyClipboard(void)
         return;
     }
     clip_n = 0;
-    clip_owner = clip_open_hwnd;
     R[0] = 1;
 }
 
@@ -237,7 +235,6 @@ void fle_imp_OleSetClipboard(void)
     if (obj != 0) com_call0(obj, 1);
     ole_obj = obj;
     clip_n = 0;
-    clip_owner = 0;
     if (old != 0) com_call0(old, 2);
     R[0] = FLE_S_OK;
 }
