@@ -86,7 +86,7 @@ ad42f9693e5264d5040478eddcfe12b488d1191b7dcd51501c28bc29889dbb8a  engine.7bf5650
 | engine-glue.js | `07e7646f…`(前回・E13 と一致) | 同左 | 同左 |
 | seed.flpack | `7cd2eaec…`(前回と一致) | 同左 | `f7726113…` |
 
-- 今回の wasm は、前回と手元 R0-5 のどれとも違う。前回(e78f667)と今回(b6dd943)の間は 88 commit で、そのうち `app/`・`ci/`・`lift/` を変えたのは 32 ファイル(`git diff --stat e78f667 b6dd943 -- lift app ci` の出力: 32 files changed, 1830 insertions(+), 108 deletions(-))。wasm の差がこの変更による物かは未確認(commit ごとの比較はしていない)。
+- 今回の wasm は、前回と手元 R0-5 のどれとも違う。前回(e78f667)と今回(b6dd943)の間は 88 commit（出典: `git rev-list --count e78f667e99688d515cee2d625cfea6e0630612b5..b6dd94378e6c4882acec558387c13c6df1548cf9` の出力 88）で、そのうち `app/`・`ci/`・`lift/` を変えたのは 32 ファイル(`git diff --stat e78f667 b6dd943 -- lift app ci` の出力: 32 files changed, 1830 insertions(+), 108 deletions(-))。wasm の差がこの変更による物かは未確認(commit ごとの比較はしていない)。
 - 手元 R0-5 の bundle は取り込み前の木。前回の実行も取り込み前(e78f667)。今回の実行は取り込み後の木(L01〜L04 を含む)。
 
 ## 5 伏せ検査(ログに対して実施。ログは commit していない)
@@ -96,7 +96,7 @@ ad42f9693e5264d5040478eddcfe12b488d1191b7dcd51501c28bc29889dbb8a  engine.7bf5650
 | アカウント ID(32 桁の単独) | `grep -c -E '\b[0-9a-f]{32}\b'` | 0 件 |
 | 32 桁を含む行 | `grep -c -E '[0-9a-f]{32}'` | 28 件。うち 11 件は段 7 の SHA-256(64 桁)の行。残り 17 件は 40 桁の識別子(checkout の commit、action の取得先の commit、emsdk の版の識別子。いずれも公開情報)。40 桁以外で 32 桁以上の並びは 0 件(`grep -v -E '\b[0-9a-f]{40}\b'` の後の件数 0)。32 桁の単独は無いので、アカウント ID の当たりではない |
 | メール形式 | `grep -c -E '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'` | 0 件 |
-| R2 のホスト名(解決後の形) | `grep -c -E 'r2\.cloudflarestorage|cloudflare'` | 3 件。ログのスクリプト本文の `${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`(行 143・145)と、API の URL `https://api.cloudflare.com/client/v4/accounts`(行 120)。どれも変数や URL の形で、解決した値ではない |
+| R2 のホスト名(解決後の形) | ログ内の、ホスト名の形の検査（語は記録しない） | ホスト名の形: 3 件。変数参照と API の URL の形で、解決した値ではない(語の列挙は省略) |
 | トークン・鍵の語 | `grep -c -i -E 'token|secret|bearer|AKIA'` | 7 件。すべて値が `***` で伏せられた行(行 39・134・163・187・204 など)かヘッダ語(行 22・26)。生の値は 0 件 |
 
 伏せ検査で当たった値は無いので、`***` に置き換えた値は無い。
