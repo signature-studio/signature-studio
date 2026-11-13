@@ -113,7 +113,6 @@ uint64_t fle_class_hcursor_of(uint16_t atom);                     /* fle_class.c
 #define FLE_SPI_SETWORKAREA   0x002Fu
 #define FLE_HTERROR           (-2)
 #define FLE_HTTRANSPARENT     (-1)
-#define FLE_HTERROR           (-2)
 #define FLE_HTNOWHERE         0
 #define FLE_HTCLIENT          1
 #define FLE_MA_ACTIVATE       1u
