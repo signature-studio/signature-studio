@@ -1,0 +1,156 @@
+# 0351: 配信用の bundle を GitHub の標準ランナーで 9 段回す(手元の bundle は使わない)。成果物は上げない(公開リポジトリ)。
+# 値は secrets だけ。アカウント ID は実行時に得て、得た直後に伏せる。ログに出すのは段の rc と時間、SHA-256、照合の結果だけ。
+name: engine-bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/engine-bundle.yml"
+      - "app/package.json"
+      - "app/scripts/build-engine-bundle.sh"
+      - "app/scripts/pack-assets.mjs"
+      - "app/scripts/lib/wasm-exports.mjs"
+      - "app/src/bundle/pack.ts"
+      - "app/src/bundle/manifest.ts"
+      - "app/src/bundle/schema.ts"
+      - "app/src/bundle/sha256.ts"
+      - "lift/.cargo/**"
+      - "lift/Cargo.toml"
+      - "lift/Cargo.lock"
+      - "lift/crates/**"
+      - "lift/runtime/**"
+      - "lift/data/**"
+      - "lift/harness/**"
+      - "ci/artifacts.lock"
+      - "ci/extract-dlls.tsv"
+      - "ci/versions.env"
+      - "ci/setup-toolchain.sh"
+      - "ci/lib/**"
+      - "tools/extract_nsis2.py"
+      - "tools/nsis_script_dump.py"
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 2 アカウント ID を実行時に得て、すぐ伏せる
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts > "$RUNNER_TEMP/accounts.json"
+          python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); [print(a["id"]) for a in d.get("result", [])]' \
+            "$RUNNER_TEMP/accounts.json" | grep -E '^[0-9a-f]{32}$' | sort -u > "$RUNNER_TEMP/cand.txt" || true
+          n=$(wc -l < "$RUNNER_TEMP/cand.txt" | tr -d ' ')
+          if [ "$n" -ne 1 ]; then
+            echo "アカウント ID を 1 つに決められない(件数: $n)"
+            exit 1
+          fi
+          id=$(cat "$RUNNER_TEMP/cand.txt")
+          echo "::add-mask::$id"
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+          echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
+
+      - name: 3 インストーラを R2 から取り、ci/artifacts.lock と照合する
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          KEY=installers/flstudio_win64_26.1.7.5653.exe
+          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+          mkdir -p "$RUNNER_TEMP/in"
+          if ! aws s3 cp "s3://fl-web-artifacts/$KEY" "$INST" --only-show-errors \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" > "$RUNNER_TEMP/s3.txt" 2>&1; then
+            echo "インストーラの取得: 失敗(伏せた出力)"
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' "$RUNNER_TEMP/s3.txt" | tail -n 5
+            exit 1
+          fi
+          row=$(awk -F'\t' -v k="$KEY" '$1 == k' ci/artifacts.lock)
+          want_size=$(printf '%s\n' "$row" | cut -f2)
+          want_sha=$(printf '%s\n' "$row" | cut -f3)
+          got_size=$(stat -c %s "$INST")
+          got_sha=$(sha256sum "$INST" | cut -d' ' -f1)
+          if [ -z "$want_sha" ] || [ "$got_size" != "$want_size" ] || [ "$got_sha" != "$want_sha" ]; then
+            echo "照合: 不一致(大きさ $got_size B、期待 $want_size B)"
+            rm -f "$INST"
+            exit 1
+          fi
+          echo "照合: 一致(大きさ $got_size B、SHA-256 一致)"
+
+      - name: 4 インストーラから入力を抽出し、DLL と seed の SHA-256 を照合する
+        run: |
+          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+          if python3 ci/lib/extract_fl.py "$INST" "$RUNNER_TEMP/host" \
+            --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv > "$RUNNER_TEMP/extract.txt" 2>&1; then
+            echo "抽出: 成功(rc=0)"
+          else
+            rc=$?
+            echo "抽出: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/extract.txt"
+            exit 1
+          fi
+          rm -f "$INST"
+
+      - name: 5 Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: 5 Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 5 emscripten 6.0.12(ci/setup-toolchain.sh の固定値)
+        run: bash ci/setup-toolchain.sh emsdk
+
+      - name: 5 rust 1.99.0(ci/setup-toolchain.sh の固定値)
+        run: bash ci/setup-toolchain.sh rust
+
+      - name: 5 cargo の依存を取る(build-engine-bundle.sh の --offline の前)
+        run: cd lift && cargo fetch --locked
+
+      - name: 5 上流 Blend2D を wasm で作る(固定コミットと tarball の SHA-256 で照合)
+        run: |
+          PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:$PATH" \
+          EMCC_CFLAGS="-matomics -mbulk-memory" \
+          OUTDIR="$RUNNER_TEMP/b2d" TARGET=wasm OPT=-O2 \
+          PATCH="$GITHUB_WORKSPACE/lift/harness/b2d1/b2d3-compop.patch" \
+          bash lift/harness/b2d1/build_upstream.sh > "$RUNNER_TEMP/b2d.txt" 2>&1 || { echo "上流 Blend2D: 失敗(末尾 40 行)"; tail -n 40 "$RUNNER_TEMP/b2d.txt"; exit 1; }
+          echo "上流 Blend2D: 成功(rc=0)"
+
+      - name: 6 9 段を既定の順で回す(成果物は作るだけ。上げない)
+        env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+        run: |
+          if bash app/scripts/build-engine-bundle.sh > "$RUNNER_TEMP/build.txt" 2>&1; then
+            echo "9 段: 成功(rc=0)"
+          else
+            rc=$?
+            echo "9 段: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build.txt"
+            exit 1
+          fi
+          cat "$WORK/logs/stages.log"
+
+      - name: 7 バンドルの SHA-256 だけを出す(中身は出さない)
+        env:
+          WORK: ${{ runner.temp }}/work
+        run: |
+          B="$WORK/bundle/fl-Oz"
+          echo "バンドルのファイル数: $(find "$B" -maxdepth 1 -type f | wc -l)"
+          cd "$B" && sha256sum *

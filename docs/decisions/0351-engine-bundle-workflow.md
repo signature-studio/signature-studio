@@ -53,3 +53,8 @@
 
 ## 出典
 docs/decisions/README.md、docs/ROADMAP.md(R6-3・R6-4・R8-3・R8-4、0346〜0350 の予約)、app/scripts/build-engine-bundle.sh(冒頭と 9 段)、ci/artifacts.lock、ci/extract-dlls.tsv、ci/versions.env、ci/lib/extract_fl.py、docs/archive/decisions/0217-ci-deploy.md(§4c・§5)、docs/requests/0001-cloudflare-actions-secrets.md、evidence/R8-2.md、evidence/R0-1.md、docs/core/inputs.md、docs/core/pipeline.md。
+
+## 追記(R8-4a、2026-11-13)
+- 決定: `paths` を足す(本文の「足さない」を改める)。根拠: 証跡の commit ごとに 40 分前後のビルドが走るのを防ぐ。起動条件の絞り込みだけで、入力・旗・分岐は増えない。分類: 整備(0351 の手順。lift の処理ではない)。
+- 一覧と根拠: `app/scripts/build-engine-bundle.sh`(本体)、`app/scripts/pack-assets.mjs`→`app/src/bundle/{pack,manifest,schema,sha256}.ts`、`app/scripts/lib/wasm-exports.mjs`、`app/package.json`(`.ts` を Node が読む際の `type`。**未確認**: 外しても動くかは未実行)、`lift/.cargo`・`lift/Cargo.{toml,lock}`・`lift/crates`(cargo)、`lift/runtime`・`lift/data`(prune-SM.tsv)、`lift/harness`(gen-direct.sh・two・hyb・web・seeds)、`ci/artifacts.lock`・`ci/extract-dlls.tsv`・`ci/versions.env`(`ci/lib/common.sh` が読む)・`ci/setup-toolchain.sh`・`ci/lib`、`tools/extract_nsis2.py`・`tools/nsis_script_dump.py`(`lift/harness/seeds/gen_install_tree.py` が読む)。
+- 上流 Blend2D は本文に無い patch(`lift/harness/b2d1/b2d3-compop.patch`)を当てる。根拠: 出荷の入力(`docs/core/inputs.md` §4、`ci/lib/common.sh` の `B2D_PATCH`)と揃えるため。
