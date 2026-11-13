@@ -92,6 +92,7 @@ const DRIVER: &str = r#"
 
 uint64_t R[16];
 static uint64_t stk[0x2000] __attribute__((aligned(4096)));          /* 64 KiB */
+uint8_t fle_teb[0x2000] __attribute__((aligned(16)));                /* decision 0319: the TEB of the guest thread (fle_callback.c reads StackBase at +8 and StackLimit at +0x10); all zero = no stack registered */
 #define E0 ((uint64_t)(uintptr_t)stk + 0x8000 + 8)                    /* an API's rsp at its entry: 16n+8, [E0] = return address */
 #define TOP ((uint64_t)(uintptr_t)stk + sizeof stk)
 #define RET0 UINT64_C(0xdead0000)
@@ -251,6 +252,12 @@ int main(int argc, char **argv)
         uint64_t r = fle_call_guest(VA_NEST, 0x10, 0, 0, 0);
         printf("outer-result %llx depth-in-outer %llu depth-end %u\n", U(r), U(g_outer_depth), fle_callback_depth());
         printf("outer-sp %llx inner-sp %llx gap %llu inner-mod16 %llu outer-ret %llx inner-ret %llx rsp-kept %d\n", U(g_sp), U(g_sp_inner), U(g_sp - g_sp_inner), U(g_sp_inner % 16), U(g_ret), U(g_ret_inner), (int)(R[4] == E0));
+    } else if (!strcmp(t, "recstack")) {   /* decision 0319: the guest stack registered as [E0 - 20 KiB, TOP): 52 KiB, so the reserve is a quarter of it (13310 bytes) and the nesting stops by the stack, not by the count */
+        uint64_t lo = E0 - 20 * 1024, hi = TOP;
+        memcpy(fle_teb + 8, &hi, 8);
+        memcpy(fle_teb + 0x10, &lo, 8);
+        fle_call_guest(VA_REC, 1000, 0, 0, 0);
+        printf("returned\n");
     } else if (!strcmp(t, "rec")) {      /* argv[2] = nested calls after the first one: levels = argv[2] + 1 */
         uint64_t r = fle_call_guest(VA_REC, u(argv[2]), 0, 0, 0);
         printf("result %llu calls %u depth-end %u rsp-kept %d\n", U(r), g_calls, fle_callback_depth(), (int)(R[4] == E0));
@@ -355,7 +362,10 @@ fn def_const(file: &str, name: &str) -> u64 {
 fn the_constants_are_the_decided_ones() {
     // Learn, x64 calling convention: "The caller must always allocate sufficient space to store four register parameters" (8 bytes each)
     assert_eq!(def_const("fle_callback.h", "FLE_CB_SHADOW_BYTES"), 32);
-    assert_eq!(def_const("fle_callback.h", "FLE_CB_MAX_DEPTH"), 16);
+    // decision 0319 replaces the depth limit 16 of decision 0064 by the stack (the host and guest stack reserves) with a backstop count
+    assert_eq!(def_const("fle_callback.h", "FLE_CB_MAX_DEPTH"), 256);
+    assert_eq!(def_const("fle_callback.h", "FLE_CB_GUEST_RESERVE"), 64 * 1024);
+    assert_eq!(def_const("fle_callback.h", "FLE_CB_HOST_RESERVE"), 512 * 1024);
     // the return address slot value is outside the image (0x400000..0x18C0000) and is no function entry
     let ra = def_const("fle_callback.h", "FLE_CB_RETURN_ADDRESS");
     assert_eq!(ra, 0xCB00_0000);
@@ -515,13 +525,23 @@ fn a_callback_may_make_the_runtime_call_another_callback() {
 
 #[test]
 fn nesting_of_exactly_the_limit_is_allowed_and_one_more_stops() {
-    // levels = argv + 1; FLE_CB_MAX_DEPTH = 16
-    let l = lines(&["rec", "15"]);
-    assert_eq!(l[0], "result 115 calls 16 depth-end 0 rsp-kept 1");
-    let e = stops(&["rec", "16"], "fle: fle_call_guest: callback nesting is deeper than FLE_CB_MAX_DEPTH (16): decision 0064");
-    assert_eq!(e.matches("enter ").count(), 16, "{e}");
-    // the depth is counted inside the callback: 1 in the first, 16 in the sixteenth (the limit); the seventeenth call stops
-    assert!(e.contains("enter 16 depth 16") && !e.contains("enter 17"), "{e}");
+    // levels = argv + 1; FLE_CB_MAX_DEPTH = 256, the backstop of decision 0319 (the build without a host stack query and without a registered guest stack)
+    let l = lines(&["rec", "255"]);
+    assert_eq!(l[0], "result 355 calls 256 depth-end 0 rsp-kept 1");
+    let e = stops(&["rec", "256"], "fle: fle_call_guest: callback nesting is deeper than FLE_CB_MAX_DEPTH (256), the backstop against a runaway recursion: decision 0319");
+    assert_eq!(e.matches("enter ").count(), 256, "{e}");
+    // the depth is counted inside the callback: 1 in the first, 256 in the 256th (the limit); the 257th call stops
+    assert!(e.contains("enter 256 depth 256") && !e.contains("enter 257"), "{e}");
+}
+
+#[test]
+fn nesting_stops_when_the_guest_stack_is_used_up_before_the_count() {
+    // decision 0319: Windows limits the nesting by the stack size only. The registered stack is 52 KiB, so the reserve is a quarter of it: (TOP - lo) / 4 = (65536 - 12296) / 4 = 13310 B;
+    // ~48 bytes of stack per level leave room for about 150 levels, fewer than the 256 of the backstop.
+    let e = stops(&["recstack"], "the guest stack is used up");
+    assert!(e.contains("reserve 13310"), "{e}");
+    let n = e.matches("enter ").count();
+    assert!(n > 50 && n < 256, "{n} levels entered before the stop: {e}");
 }
 
 // ---- 6. Stops ----
