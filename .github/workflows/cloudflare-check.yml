@@ -287,6 +287,99 @@ jobs:
           cat sha-rows.txt
           exit $status
 
+      - name: 3f 版 2cb938be の script を読み、現在の app/worker のビルドと比べる(読み取りだけ。アップロードしない)
+        id: g1
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          VER=2cb938be-e32d-44e4-8268-1824660956fe
+          API="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/scripts/fl-studio-web"
+          G="$RUNNER_TEMP/g1"
+          mkdir -p "$G"
+          mask() {
+            sed -E \
+              -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" \
+              -e 's/[A-Za-z0-9.-]+\.workers\.dev/[ホスト伏せ]/g' \
+              -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          curl -sS -o "$G/version.json" -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/versions/$VER" > "$G/version.code" 2> "$G/version.err" || true
+          curl -sS -D "$G/content.headers" -o "$G/content.bin" -w '%{http_code}' -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "$API/content/v2" > "$G/content.code" 2> "$G/content.err" || true
+          if [ ! -x app/node_modules/.bin/wrangler ]; then
+            echo "wrangler が無い(依存関係の準備が失敗)"
+            exit 1
+          fi
+          if ( cd app && ./node_modules/.bin/wrangler deploy --dry-run --outdir "$G/out" ) > "$G/dry.log" 2>&1; then
+            echo "現在のビルド(dry-run): 成功"
+          else
+            echo "現在のビルド(dry-run): 失敗(末尾 5 行、伏せ済み)"
+            mask < "$G/dry.log" | tail -n 5
+          fi
+          python3 - "$G" "$VER" <<'PY'
+          import glob, hashlib, json, os, sys
+          from email import policy
+          from email.parser import BytesParser
+          G, VER = sys.argv[1], sys.argv[2]
+          def sha(b): return hashlib.sha256(b).hexdigest()
+          def rd(p, mode='rb'): return open(p, mode).read()
+          def fail(msg):
+              print(msg)
+              sys.exit(1)
+          vcode = rd(f'{G}/version.code', 'r').strip()
+          print(f'版の詳細 GET の HTTP ステータス: {vcode}')
+          if vcode != '200':
+              fail('版の詳細が読めない(比べられない)')
+          res = json.load(open(f'{G}/version.json')).get('result') or {}
+          vetag = ((res.get('resources') or {}).get('script') or {}).get('etag')
+          print(f'版の詳細: id が一致={res.get("id") == VER}、script.etag あり={vetag is not None}')
+          ccode = rd(f'{G}/content.code', 'r').strip()
+          print(f'script 本文 GET(content/v2)の HTTP ステータス: {ccode}')
+          if ccode != '200':
+              fail('本文が読めない(比べられない)')
+          hdr = {}
+          for line in open(f'{G}/content.headers', encoding='latin-1'):
+              if ':' in line:
+                  k, _, val = line.partition(':')
+                  hdr[k.strip().lower()] = val.strip()
+          body = rd(f'{G}/content.bin')
+          ctype = hdr.get('content-type', '')
+          print(f'本文の応答: Content-Type {ctype.split(";")[0]}、大きさ {len(body)} B、SHA-256 {sha(body)}')
+          et = hdr.get('etag')
+          if et is None or vetag is None:
+              print('ETag の照合: 未確認(本文の応答か版の詳細に ETag が無い)')
+          else:
+              norm = lambda s: s.strip().removeprefix('W/').strip('"')
+              print(f'ETag の照合(本文の応答と版の script.etag): {"一致" if norm(et) == norm(vetag) else "不一致(照合の方法が同じかは未確認)"}')
+          if ctype.lower().startswith('multipart/'):
+              msg = BytesParser(policy=policy.default).parsebytes(b'Content-Type: ' + ctype.encode('latin-1') + b'\r\n\r\n' + body)
+              parts = []
+              for p in msg.iter_parts():
+                  data = p.get_payload(decode=True) or b''
+                  name = p.get_filename() or p.get_param('name', header='content-disposition') or '?'
+                  parts.append((str(name), p.get_content_type(), data))
+              print('本文の部品: ' + '; '.join(f'{n} ({t}, {len(d)} B, SHA-256 {sha(d)})' for n, t, d in parts))
+              mods = [x for x in parts if x[1] != 'application/json']
+              if not mods:
+                  fail('本文に module の部品が無い(比べられない)')
+              main = max(mods, key=lambda x: len(x[2]))[2]
+          else:
+              main = body
+          outs = sorted(glob.glob(f'{G}/out/*.js'), key=os.path.getsize, reverse=True)
+          if not outs:
+              fail('現在のビルドが無い(比べられない)')
+          cur = rd(outs[0])
+          print(f'現在のビルド: {os.path.basename(outs[0])}、大きさ {len(cur)} B、SHA-256 {sha(cur)}')
+          print(f'大きさ: 版の module {len(main)} B / 現在のビルド {len(cur)} B')
+          print(f'版の module と現在のビルドの SHA-256: {"一致" if sha(main) == sha(cur) else "不一致"}')
+          for pat in [b'manifest.json', b'no-cache', b'caches.default', b'cacheTtl', b'cacheEverything', b'emscripten-fruity-v1']:
+              print(f'{pat.decode()} の件数: 版 {main.count(pat)} / 現在 {cur.count(pat)}')
+          print('比較は完了(一致・不一致は上の行)')
+          PY
+
       - name: 4 結果の表
         if: always()
         env:
@@ -297,6 +390,7 @@ jobs:
           R_DEP: ${{ steps.deploy_status.outcome }}
           R_MAN: ${{ steps.r2_manifest.outcome }}
           R_E13: ${{ steps.r2_e13.outcome }}
+          R_G1: ${{ steps.g1.outcome }}
         run: |
           fail=0
           line() {
@@ -317,4 +411,5 @@ jobs:
           line "3c Worker fl-studio-web の現在の版(wrangler deployments status)" "$R_DEP"
           line "3d R2 の manifest.json の項目(fl-web-assets の読み取り)" "$R_MAN"
           line "3e R2 の E13 の 5 件(fl-web-assets の読み取り)" "$R_E13"
+          line "3f 版 2cb938be の script と現在の app/worker のビルドの比較(読み取り)" "$R_G1"
           exit $fail
