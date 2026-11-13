@@ -271,7 +271,7 @@ function busySnapshot(hz = 120, seconds = 30, drawHz = 125): DisplaySnapshot {
   m.events.add({ name: 'pointermove', startTime: 100, processingStart: 104, duration: 24 });
   return m.snapshot(true, 40);
 }
-const client = collectClientInfo({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36' }, screen: { colorDepth: 24 }, innerWidth: 1900, innerHeight: 960, isSecureContext: true, location: { hostname: '<TAILNET-HOST>' } });
+const client = collectClientInfo({ navigator: { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36' }, screen: { colorDepth: 24 }, innerWidth: 1900, innerHeight: 960, isSecureContext: true, location: { hostname: 'machine.example.ts.net' } });
 const SID = 'a1b2c3d4e5f6';
 const v2 = (over: Partial<BeaconInput> = {}) => buildBeacon({ ...base, sid: SID, client, display: busySnapshot(), hz: hzFit({ engineEnvHz: 120, engineHz: 120, autoMeasuredHz: null }, busySnapshot().raf), ...over });
 
@@ -464,7 +464,7 @@ describe('browser and client info (decision 0192)', () => {
     expect(hostKind('localhost')).toBe('localhost');
     expect(hostKind('127.0.0.1')).toBe('localhost');
     expect(hostKind('[::1]')).toBe('localhost');
-    expect(hostKind('<TAILNET-HOST>')).toBe('ts.net');
+    expect(hostKind('machine.example.ts.net')).toBe('ts.net');
     expect(hostKind('192.168.0.5')).toBe('ip');
     expect(hostKind('[fd7a::1]')).toBe('ip');
     expect(hostKind('example.com')).toBe('other');
