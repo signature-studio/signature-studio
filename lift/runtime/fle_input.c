@@ -376,8 +376,9 @@ static void out_push(unsigned thread, uint64_t hwnd, uint32_t msg, uint64_t wp, 
 }
 
 /* The window that gets the mouse event: the capture window if some window has the capture, else the window at the point. Learn WM_MOUSEMOVE: "If the mouse is not captured, the message is posted to the window that contains
- * the cursor. Otherwise, the message is posted to the window that has captured the mouse." A disabled window (or one with a disabled ancestor) gets no mouse input: the event is dropped (S-disabled-drops: Learn
- * WindowFromPoint "does not retrieve a handle to a hidden or disabled window"; the page of mouse input says nothing about a click on a disabled window, which Windows swallows). */
+ * the cursor. Otherwise, the message is posted to the window that has captured the mouse." Decision 0324 (replaces S-disabled-drops of decision 0136): the window is the first of fle_win_input_hit_list, which skips a
+ * disabled child (the window beneath it gets the event) and finds a disabled pop-up or top-level window itself; translate_mouse answers that one with WM_SETCURSOR(HTERROR) and gives it no mouse message (Wine 10.0,
+ * window_from_point and process_mouse_message, UNOFFICIAL; Learn WindowFromPoint "does not retrieve a handle to a hidden or disabled window"; the page of mouse input says nothing about a click on a disabled window). */
 static uint64_t mouse_target(int32_t x, int32_t y, unsigned *thread, int *captured)
 {
     unsigned ct;
@@ -393,9 +394,6 @@ static uint64_t mouse_target(int32_t x, int32_t y, unsigned *thread, int *captur
     }
     h = fle_win_input_hit(x, y);
     if (!h || !fle_win_input_view(h, &v)) {
-        return 0;
-    }
-    if (!v.enabled) {
         return 0;
     }
     *thread = v.owner;
@@ -495,15 +493,21 @@ static void pointer_over_nothing(const hwev *e)
  * underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)". The windows that contain the point are walked in the order of Wine 10.0's window_from_point (win32u/window.c,
  * UNOFFICIAL: the list of fle_win_input_hit_list, a child before its parent, a sibling below after the whole of the one above): each one that belongs to the thread of the first one is sent WM_NCHITTEST; the first
  * answer that is not HTTRANSPARENT decides the window and the hit-test code; a window of another thread is not asked (Wine: HTCLIENT, "the hit test is only sent to windows of the current thread"). A disabled
- * window ends the walk with the event dropped, as it does for the first one (S-disabled-drops). When every window answers HTTRANSPARENT there is no window (Wine: the result is NULL). `first` is the window
- * mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
+ * window ends the walk with HTERROR (decision 0324: window_from_point checks WS_DISABLED before it sends WM_NCHITTEST, for the first window as for the others). When every window answers HTTRANSPARENT
+ * there is no window (Wine: the result is NULL). `first` is the window mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
 #define HIT_LIST_MAX 64u
 static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, int *ht)
 {
     uint64_t list[HIT_LIST_MAX];
     unsigned n, k;
-    int r = send_hittest("input", first, x, y);
+    fle_win_iview fv;
+    int r;
 
+    if (fle_win_input_view(first, &fv) && !fv.enabled) {
+        *ht = FLE_HTERROR;
+        return first;
+    }
+    r = send_hittest("input", first, x, y);
     *ht = r;
     if (r != FLE_HTTRANSPARENT) return first;      /* the common case: the first window decides (no list is made) */
     *ht = FLE_HTNOWHERE;
@@ -513,7 +517,10 @@ static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, 
         fle_win_iview cv;
 
         if (!fle_win_input_view(list[k], &cv)) continue;          /* a window that went away while an earlier one handled WM_NCHITTEST */
-        if (!cv.enabled) return 0;
+        if (!cv.enabled) {
+            *ht = FLE_HTERROR;
+            return list[k];
+        }
         if (cv.owner != thread) {
             *ht = FLE_HTCLIENT;
             return list[k];
@@ -547,6 +554,15 @@ static void translate_mouse(const hwev *e)
         w = hit_walk(e->x, e->y, w, tt, &ht);
         if (!w || !fle_win_input_view(w, &v)) {
             pointer_over_nothing(e);
+            return;
+        }
+        if (ht == FLE_HTERROR) {
+            /* decision 0324: the window under the pointer is disabled. Wine 10.0 process_mouse_message: "if hittest == HTERROR || HTNOWHERE: send_message(WM_SETCURSOR, hwnd, MAKELONG(hittest, msg->message)); the message is dropped".
+             * The message number is the client message the event would have made (the button's down / up message, WM_MOUSEMOVE). The window the pointer was in gets its leave notification as before. */
+            uint32_t cm = e->kind == FLE_IN_MOVE ? FLE_WM_MOUSEMOVE : btn_down[e->data == (int32_t)FLE_IN_BTN_R ? 1u : e->data == (int32_t)FLE_IN_BTN_M ? 2u : 0u] + (e->kind == FLE_IN_BUP ? 1u : 0u);
+
+            pointer_over_nothing(e);
+            (void)fle_win_input_send("input", w, FLE_WM_SETCURSOR, w, ((uint64_t)cm << 16) | (uint16_t)FLE_HTERROR);
             return;
         }
     }

@@ -6683,35 +6683,14 @@ void fle_imp_RedrawWindow(void)
 
 /* ---- Decision 0136 (PROVISIONAL): what runtime/fle_input.c (the input round trip) needs of the window table ---- */
 
-/* The deepest visible window that contains the screen point, disabled windows included (the mouse input of a disabled window is dropped by fle_input.c, not given to the window beneath it). The same walk as hit_test
- * without the enabled test. */
-static int64_t hit_visible(int64_t parent, int32_t px, int32_t py)
-{
-    int64_t idx[SIB_MAX];
-    uint32_t n = siblings(parent, idx, SIB_MAX), k;
-
-    for (k = 0; k < n; k++) {
-        int64_t i = idx[k];
-        int32_t ox, oy;
-
-        if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
-        if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
-        else ox = oy = 0;
-        if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
-        if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
-        {
-            int64_t c = hit_visible(i, px, py);
-
-            return c >= 0 ? c : i;
-        }
-    }
-    return -1;
-}
-
 /* Decision 0323: every visible window that contains the screen point, in the order of Wine 10.0's list for window_from_point (server/window.c get_window_children_from_point and all_windows_from_point, UNOFFICIAL): the
  * siblings from the top of the z-order, and for each the windows below it that contain the point (recursively, the same rule) BEFORE the window itself. The first entry is what fle_win_input_hit gives. Learn WM_NCHITTEST,
  * HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)":
- * fle_input.c walks this list. Disabled windows are in it (as in fle_win_input_hit); the same tests as hit_visible. */
+ * fle_input.c walks this list.
+ * Decision 0324 (replaces S-disabled-drops of decision 0136, which found the deepest window even when it was disabled and dropped the event): a DISABLED CHILD window (WS_CHILD, not WS_POPUP, WS_DISABLED) is not in the
+ * list, with everything below it, so the window beneath it, its parent, is found (Wine 10.0, server/window.c is_point_in_window: "disabled child"); the children of any other disabled window are not looked at
+ * (get_window_children_from_point: "if point is in client area, and window is not minimized or disabled, check children"), so a disabled pop-up or top-level window is found itself, and fle_input.c answers it
+ * with HTERROR (window_from_point: "If window is minimized or disabled, return at once"). Learn WindowFromPoint: "does not retrieve a handle to a hidden or disabled window". */
 static unsigned hit_list_rec(int64_t parent, int32_t px, int32_t py, uint64_t *out, unsigned max, unsigned n)
 {
     int64_t idx[SIB_MAX];
@@ -6722,11 +6701,12 @@ static unsigned hit_list_rec(int64_t parent, int32_t px, int32_t py, uint64_t *o
         int32_t ox, oy;
 
         if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
+        if ((tab[i].style & (FLE_WS_POPUP | FLE_WS_CHILD | FLE_WS_DISABLED)) == (FLE_WS_CHILD | FLE_WS_DISABLED)) continue;      /* decision 0324: a disabled child, and what is below it */
         if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
         else ox = oy = 0;
         if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
         if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
-        n = hit_list_rec(i, px, py, out, max, n);
+        if (!(tab[i].style & FLE_WS_DISABLED)) n = hit_list_rec(i, px, py, out, max, n);      /* decision 0324: the children of a disabled window are not looked at */
         if (n < max) out[n++] = handle_of(i);
     }
     return n;
@@ -6740,11 +6720,9 @@ unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned ma
 
 uint64_t fle_win_input_hit(int32_t x, int32_t y)
 {
-    int64_t i;
+    uint64_t h = 0;
 
-    if (!tab_n) return 0;
-    i = hit_visible(-1, x, y);
-    return i >= 0 ? handle_of(i) : 0;
+    return fle_win_input_hit_list(x, y, &h, 1) ? h : 0;
 }
 
 int fle_win_input_view(uint64_t h, fle_win_iview *v)
