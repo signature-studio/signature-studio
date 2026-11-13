@@ -18,3 +18,10 @@
 ## 未確認
 - 実機(Windows の FL Studio)での describe の行の内容。
 - ハーネス `glass_seq.c` の実行(`cargo test` の外)。
+
+## 注(reviewer の指摘 `R2-1` 検査)
+- `fle_desk_describe` は `fle_win_get` を呼ぶ: `lift/runtime/fle_desk.c:481-485`(`fle_desk_describe` → `build_desc()`)、`:416-425`(`build_desc` が各窓で `names_of` を呼ぶ)、`:310-317`(`names_of` が `fle_win_get(hwnd, &wv)` を呼び、窓が無ければ `cls`・`title` を空のまま返す)。
+- よって、クラス名・タイトルは **describe が呼ばれた時点の値**で、compose の時点の値ではない。その間に窓のタイトルが変われば、describe の行の `title "…"` は変わりうる。窓が閉じられていれば、その窓の `class ""`・`title ""` になる。
+- 影響の範囲(読み): `names_of` を呼ぶのは `build_desc` だけ、`build_desc` を呼ぶのは `fle_desk_describe` だけ(`grep -n 'names_of(\|build_desc(' lift/runtime/fle_desk.c`)。描画の経路(`paint`・`fle_desk_compose`)は `names_of` も `fle_win_get` も呼ばない。よって、この遅延が変えるのは診断の文字列だけで、描画には使われない。
+- describe の利用側: `app/src/engine/fruity.ts:223-234`(`deskApi.describe`)、`app/src/engine/worker.ts:427,435`(`desk-dump` の `windows` 欄。テスト用の機能)、`lift/harness/alpha1/glass_seq.c:372,403`・`lift/crates/fe-lift/tests/desk1_compose.rs:116-126`(テストが行の中身を読む)。
+- 未確認: 実機(Windows の FL Studio)で、describe の呼び出しの間にタイトルが変わる場面が実際に起きるか。テストは describe を呼ぶ時点の値を読むので、その場面は測っていない。
