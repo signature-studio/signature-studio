@@ -6,7 +6,7 @@
 日付: 2026-11-14   ROADMAP: R2-6   コミット: 除去 `6d95158`(`app/src/main.ts`・`app/src/ui/screen-fit.ts`・`lift/runtime/fle_win.c` の 3 ファイル、5 行の追加・5 行の削除)。記録は `evidence/R2-6.md` と `evidence/R2-6-cargo.log`(commit `e4dc679`)。
 
 ## 決定
-決定: `FLE_SCREEN_REMAXIMIZE: '1'` の送る行を除去する(`app/src/main.ts:343` は `const env = screenEnv(g.width, g.height);`)。`patches/ci1/0322/diffs/d1-dead-remaximize-env.diff` を取り込み、そのコメント 3 箇所(`main.ts:322`、`ui/screen-fit.ts:4`、`lift/runtime/fle_win.c:7125`)を事実に合わせる。
+決定: `FLE_SCREEN_REMAXIMIZE: '1'` の送る行を除去する(`app/src/main.ts:343` は `const env = screenEnv(g.width, g.height);`)。`patches/ci1/0322/diffs/d1-dead-remaximize-env.diff` を取り込み、そのコメント 3 箇所(`main.ts:322`、`ui/screen-fit.ts:4`、`lift/runtime/fle_win.c:7124`)を事実に合わせる。
 
 ## 根拠
 1. **読む側が 0**: `lift/runtime` で `FLE_SCREEN_REMAXIMIZE` を読む `getenv`・`process.env`・`ENV[` は 0 件。`app/` にも名前は残らない(`expire_grep` の結果は `evidence/R2-6.md` の手順 2)。`fle_screen.h:47,53` の `getenv` は `FLE_MONITOR_W/H` だけ、`fle_thread.c:824,847` は `FLE_DWM_HZ`・`FLE_DISPLAYSETTINGS_FREQUENCY` だけを読む。
@@ -23,7 +23,7 @@
 ## 未実施(この決定の範囲外)
 - 実エンジンの確認: wasm のビルド・実行は未実施。push 後に GitHub の engine-bundle のビルドが走る。
 - display change の前後比較(O5 の再現手順)は未実施。P1〜P3 の測定も未実施。撤回条件の『display change の悪化』は、この記録では未確認。
-- 6d95158 の時点では、`lift/runtime/fle_win.c:7124` のコメントに名前が 1 件残っていた(『decision 0243 removed the environment switch FLE_SCREEN_REMAXIMIZE』という説明文)。この直しの commit で名前を消した。直した後の `grep -rn FLE_SCREEN_REMAXIMIZE app lift/runtime`(`node_modules` を除く)は 0 件(実測)。
+- 6d95158 の時点では、`lift/runtime/fle_win.c:7124` のコメントに名前が 1 件残っていた(『decision 0243 removed the environment switch FLE_SCREEN_REMAXIMIZE』という説明文)。この直しの commit(`2e5e0c9`)で名前を消した。直した後の `grep -rn FLE_SCREEN_REMAXIMIZE app lift/runtime`(`node_modules` を除く)は 0 件(実測)。
 
 ## 残る状態
 - `fle_win_input_remaximize`(窓の再配置)は、この除去で変わらない。その挙動の忠実性(Windows が最大化窓を置き直すという推測)は未確認のまま(0322 の群 (C) とは別件)。
@@ -35,4 +35,7 @@
 - 直す前の `fle_win.c:7124` のコメント(直す直前の HEAD `d4be398` で実測。reviewer の 7125 は 1 行ずれ): 「Decision 0212 (PROVISIONAL; S-remaximize; decision 0243 removed the environment switch FLE_SCREEN_REMAXIMIZE, so this always runs; an inference …」。
 - 直した後: 「Decision 0212 (PROVISIONAL; S-remaximize; the page no longer sends an environment switch for it and the runtime reads none, so this always runs; an inference …」(残りの文は変えない)。名前はコメントから消した。コードの行は変えていない(`git diff -U0` が 1 行のコメントだけ)。
 - 記録の commit: 除去 `6d95158`、記録 `e4dc679`(上の 6 行目)。
-- 字義の grep: `grep -rn FLE_SCREEN_REMAXIMIZE app lift/runtime`(`node_modules` を除く)は、6d95158 の時点で 1 件、この直しの commit の後は 0 件(実測)。
+- 字義の grep: `grep -rn FLE_SCREEN_REMAXIMIZE app lift/runtime`(`node_modules` を除く)は、6d95158 の時点で 1 件、この直しの commit(`2e5e0c9`)の後は 0 件(実測)。
+- 直す前の `0362:9`: 「`lift/runtime/fle_win.c:7125`」。直した後は `7124`。実測: `git show 2e5e0c9^:lift/runtime/fle_win.c` の 7124 行目がコメントの開始(`2e5e0c9` の直前の HEAD)。
+- 直す前の `0362:26`: 「この直しの commit で名前を消した。」(直した後は `2e5e0c9` を足した)。
+- 直す前の `0362:38`: 「この直しの commit の後は 0 件(実測)。」(直した後は `2e5e0c9` を足した)。

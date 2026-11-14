@@ -9,7 +9,7 @@ C 89 + ヘッダ 108 ファイル。ゲストが呼ぶ OS API の仮想実装。
 ## 2 結論の範囲(0322 §0)
 
 - **「窓のクラス名・題名・位置による分岐は製品経路に 0 件」は、窓のクラス名に限った結論**。アドレス・DLL 名・ファイル名・仮想パスへの依存は別([文書]。例: `fle_vfs.c` の `C:\Program Files\Image-Line\FL Studio 21\…`、ホストオブジェクトの `0xC0`)。読んでいない所の「問題なし」は言えない。
-- 「余計な処理」の 3 群: (A) 診断を描画経路で毎回作る(`fle_desk.c` の `names_of`+`build_desc`) (B) 死んだ設定 `FLE_SCREEN_REMAXIMIZE`(読む側が無い。`main.ts:343` が今も送る) (C) 入力の合流が 2 段。差分案は A・B の 2 本。
+- 「余計な処理」の 3 群: (A) 診断を描画経路で毎回作る(`fle_desk.c` の `names_of`+`build_desc`) (B) 死んだ設定 `FLE_SCREEN_REMAXIMIZE`(読む側が無かった。`main.ts:343` の送る行は R2-6(`6d95158`)で除去済み。`docs/decisions/0362-remaximize-env.md`) (C) 入力の合流が 2 段。差分案は A・B の 2 本。
 
 ## 3 契約の不足 (b) の上位(0322 表 6)と状態
 
