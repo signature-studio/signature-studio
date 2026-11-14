@@ -1,0 +1,9 @@
+== pre
+lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class "TFruityLoopsMainForm" title "FL Studio 2026"
+== post
+lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class "TFruityLoopsMainForm" title "FL Studio 2026"
+lid 136 at (537, 337) 251x727 glass(0,0,0,0) alpha 0 key 000000 class "TQuickPopupMenuWindow" title ""
+== ctl
+lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class "TFruityLoopsMainForm" title "FL Studio 2026"
+lid 137 at (4, 36) 208x298 glass(0,0,0,0) alpha 0 key 000000 class "TQuickPopupMenuWindow" title ""
+== run: ok=true state=engine-idle opErrors=0 error=null out=o20-work-r24-20
