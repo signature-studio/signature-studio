@@ -382,6 +382,73 @@ jobs:
           print('比較は完了(一致・不一致は上の行)')
           PY
 
+      - name: 3g R2 の fl-web-cache の perf/ を読む(読み取りだけ。ビーコンの保存の確認)
+        id: r2_perf
+        continue-on-error: true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "アカウント ID が未設定のため、この確認は行わない"
+            exit 1
+          fi
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          mask() {
+            sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          status=0
+          if aws s3 ls "s3://fl-web-cache/perf/" --recursive --endpoint-url "$ENDPOINT" > perf-ls.txt 2> perf-ls.err; then
+            echo "perf/ の一覧: 成功"
+            lines=$(wc -l < perf-ls.txt | tr -d ' ')
+            if [ "$lines" -eq 0 ]; then
+              echo "perf/ に保存されたビーコンは 0 件"
+            else
+              echo "perf/ の行数(1 行 = 1 オブジェクト): ${lines}"
+              echo "先頭 5 行(オブジェクト名・大きさ・日時)"
+              head -n 5 perf-ls.txt | mask
+              echo "末尾 5 行(オブジェクト名・大きさ・日時)"
+              tail -n 5 perf-ls.txt | mask
+              key=$(awk 'NF >= 4 {print $4}' perf-ls.txt | sort | tail -n 1)
+              if aws s3 cp "s3://fl-web-cache/${key}" "$RUNNER_TEMP/perf-latest.json" --endpoint-url "$ENDPOINT" > perf-cp.txt 2> perf-cp.err; then
+                echo "キーの辞書順で最後の 1 件を読み戻した: 成功(項目だけ出す)"
+                python3 - "$RUNNER_TEMP/perf-latest.json" <<'PY' || status=1
+          import json, sys
+          d = json.load(open(sys.argv[1], encoding='utf-8'))
+          p = d.get('perf') if isinstance(d.get('perf'), dict) else {}
+          c = p.get('client') if isinstance(p.get('client'), dict) else {}
+          def g(o, *ks):
+              for k in ks:
+                  if not isinstance(o, dict):
+                      return None
+                  o = o.get(k)
+              return o
+          print(json.dumps({
+              't': d.get('t'),
+              'remote': d.get('remote'),
+              'v': p.get('v'),
+              'reason': p.get('reason'),
+              'engineKind': g(p, 'bundle', 'engineKind'),
+              'state': g(p, 'engine', 'state'),
+              'firstIdleSeconds': g(p, 'startup', 'firstIdleSeconds'),
+              'client_keys': sorted(c.keys()),
+          }, ensure_ascii=False, indent=1))
+          PY
+              else
+                echo "最後の 1 件を読み戻す: 失敗"
+                mask < perf-cp.err | tail -n 3
+                status=1
+              fi
+              rm -f "$RUNNER_TEMP/perf-latest.json"
+            fi
+          else
+            echo "perf/ の一覧: 失敗"
+            mask < perf-ls.err | tail -n 5
+            status=1
+          fi
+          exit $status
+
       - name: 4 結果の表
         if: always()
         env:
@@ -393,6 +460,7 @@ jobs:
           R_MAN: ${{ steps.r2_manifest.outcome }}
           R_E13: ${{ steps.r2_e13.outcome }}
           R_G1: ${{ steps.g1.outcome }}
+          R_PERF: ${{ steps.r2_perf.outcome }}
         run: |
           fail=0
           line() {
@@ -414,4 +482,5 @@ jobs:
           line "3d R2 の manifest.json の項目(fl-web-assets の読み取り)" "$R_MAN"
           line "3e R2 の E13 の 5 件(fl-web-assets の読み取り)" "$R_E13"
           line "3f 版 2cb938be の script と現在の app/worker のビルドの比較(読み取り)" "$R_G1"
+          line "3g R2 の fl-web-cache の perf/ の読み取り(ビーコンの保存の確認)" "$R_PERF"
           exit $fail
