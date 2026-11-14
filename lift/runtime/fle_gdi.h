@@ -213,6 +213,7 @@ void fle_imp_CreateIconIndirect(void);
 void fle_imp_BitBlt(void);
 void fle_imp_PatBlt(void);
 void fle_imp_FillRect(void);
+void fle_imp_ScrollDC(void);   /* decision 0319 */
 void fle_imp_GetDIBits(void);
 void fle_imp_RealizePalette(void);
 

@@ -304,3 +304,5 @@ user32.dll SendMessageA fle_imp_SendMessageA
 dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo
 # Decision 0319 (alpha1, PROVISIONAL): user32!ScrollWindow (runtime/fle_wall_ia2w.c: ScrollWindowEx's older form, on the window model of fle_win_scroll). The engine imports it (like ScrollDC, which is not here). Appended LAST (decision 0015: append only).
 user32.dll ScrollWindow fle_imp_ScrollWindow
+# Decision 0319 (alpha1, PROVISIONAL): user32!ScrollDC (runtime/fle_gdi.c: the bits of a DC move inside its clip, the uncovered area is returned, nothing is invalidated). The engine imports it. Appended LAST (decision 0015: append only).
+user32.dll ScrollDC fle_imp_ScrollDC
