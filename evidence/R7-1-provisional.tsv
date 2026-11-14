@@ -1,0 +1,374 @@
+file	line	decision	excerpt	deadline
+fle_acm.c	1	0229	/* Decision 0229 (ref1, PROVISIONAL, OPT-IN through the rows of harness/seeds/ref1-imports.txt; without them nothing here is reached): msacm32, the Audio Compre	未設定
+fle_acm.h	1	0229	/* Decision 0229 (ref1, PROVISIONAL): msacm32 (Audio Compression Manager) with one driver, an MPEG Layer-3 decoder (see fle_acm.c). */	未設定
+fle_act1_net.c	1	0213	/* Decision 0213 (act1, PROVISIONAL), section 5. WinINet calls of FLEngine's HTTP unit (f_64d520, the account / license / FL Cloud / analytics requests) answere	未設定
+fle_act1_net.h	1	0213	/* Decision 0213 (act1, PROVISIONAL): the rest of the WinINet calls that FLEngine's own HTTP code makes (the unit around f_64d520: license, account, FL Cloud, a	未設定
+fle_api2.h	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): the first small block of the systematic Win32 API coverage. New API answers, written from the Microsoft Learn page	未設定
+fle_api2_call.c	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): runtime-internal call of another fle_imp_* function with the guest ABI (fle_api2.h).	未設定
+fle_api2_shell.c	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): shell32 answers (fle_api2.h): ShellExecuteA and ShellExecuteExW. The file drag-and-drop family (DragQueryFileW, Dr	未設定
+fle_api2_str.c	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): kernel32 NLS A variants and TzSpecificLocalTimeToSystemTime (fle_api2.h).	未設定
+fle_api2_sys.c	1	0210	/* Decision 0210 (api2, PROVISIONAL, opt-in): kernel32 system, console and link answers (fle_api2.h). A call whose page defines a failure for this environment r	未設定
+fle_appfile.c	1	0144	/* Decision 0144 (PROVISIONAL): see fle_appfile.h. */	未設定
+fle_appfile.h	1	0144	/* Decision 0144 (PROVISIONAL): how a file reaches the engine. FL64.exe never hands a file to FLEngine (decision 0144's investigation, docs/investigations/g8-pr	未設定
+fle_appview.c	1	0141	/* Decision 0141 (PROVISIONAL): the read-only view of the engine for the browser front end (see fle_appview.h). Reads the window table and the cursor state thro	未設定
+fle_appview.h	1	0141	/* Decision 0141 (PROVISIONAL): what the browser front end (app/) reads from the engine while it is idle, in ONE read-only call. Nothing in it moves a state of 	未設定
+fle_audio_ring.c	1	0139	/* The audio output ring and the single source of the play position (decision 0139, PROVISIONAL). See fle_audio_ring.h. Standard C only (no host clock, no threa	未設定
+fle_audio_ring.h	1	0139	/* The audio output of the virtual machine (decision 0139, PROVISIONAL): ONE ring of stereo float32 frames in the host's linear memory, and ONE counter of consu	未設定
+fle_audio_ring.h	98	0241	/* S-ds-late-write (decision 0241, PROVISIONAL): a region of a playing buffer was written (Unlock) after the device had already handed the frames of that region	未設定
+fle_audio_transport.c	1	0139	/* The transport of the audio output between the engine and the page (decisions 0139 and 0175, PROVISIONAL; split from fle_audio_ring.c by decision 0241): on wa	未設定
+fle_class.c	1	0070	/* The virtual window class table (docs/decisions/0070-virtual-window-classes.md, PROVISIONAL; the pages read and the guest's call	未設定
+fle_class.c	249	0119	/* Added by decision 0119 (wall 15, PROVISIONAL; fle_win.c SetClassLongPtrW): replaces one value of the WNDCLASSW kept for the class `atom`. Learn (SetClassLong	未設定
+fle_class.h	2	-	* PROVISIONAL; the pages read and the guest's call sites are in docs/investigations/getclassinfo-caller.md). Same convention as	未設定
+fle_class.h	28	-	/* Atoms of the registered classes (a PROVISIONAL choice): the n-th class (n = 0, 1, ...) gets 0xC000 + n, never reused. Learn	未設定
+fle_class.h	61	0123	/* Decision 0123 (PROVISIONAL): the name of the class that has `atom` (fle_win.c: FindWindowW compares class names): 1 and the name units when the atom is in th	未設定
+fle_class.h	67	0125	/* Decision 0125 (PROVISIONAL): the `style` member of the WNDCLASSW that registered `atom` (fle_win.c: GetDC and the other DC calls read CS_OWNDC, CS_CLASSDC an	未設定
+fle_comctl.c	1	0136	/* Decision 0136 (PROVISIONAL): comctl32!_TrackMouseEvent (the wall of decision 0128 at WM_MOUSEMOVE). The tracking state and the messages are in fle_input.c; t	未設定
+fle_cpuid.c	12	0118	* - Leaf 1 EDX (decision 0118, PROVISIONAL; decision 0009 answered SSE and SSE2 only): the x86-64 psABI says that "Any program can expect that an	未設定
+fle_crypt.c	1	0183	/* A minimal CryptoAPI for hashing: MD5 only (decision 0183, PROVISIONAL). See fle_crypt.h. */	未設定
+fle_crypt.h	1	0183	/* A minimal CryptoAPI (advapi32) for hashing: MD5 only (decision 0183, PROVISIONAL, PM's range 2026-11-03). Same convention as fle_imports.h: arguments in R[1]	未設定
+fle_cursor.c	87	0125	/* Decision 0125 (PROVISIONAL), wall 54: a non-NULL hInstance loads the cursor of the guest's own resources by name or ordinal (fle_res.c; a weak reference: a b	未設定
+fle_cursor.c	110	0098	/* user32!GetClipCursor (decision 0098, PROVISIONAL): BOOL f(LPRECT lpRect rcx). Learn (GetClipCursor): "A pointer to a RECT structure that	未設定
+fle_cursor.h	20	0059	/* Handles of the virtual standard cursors (decision 0059, a PROVISIONAL choice): FLE_CURSOR_HANDLE_BASE + 4 * (idc - 32512 + 1),	未設定
+fle_cursor.h	50	0098	/* user32!GetClipCursor (decision 0098, PROVISIONAL): BOOL f(LPRECT lpRect). rcx. This environment never confines the cursor (ClipCursor is not	未設定
+fle_desk.c	1	0223	/* Decision 0223 (desk1, PROVISIONAL): the desktop compositor. See fle_desk.h for what it reads, what it draws and the sentences of Microsoft Learn it follows (	未設定
+fle_desk.h	1	0223	/* Decision 0223 (desk1, PROVISIONAL): the desktop compositor, the runtime's part of what Windows calls the Desktop Window Manager. It reads the window table (f	未設定
+fle_desk.h	71	0240	/* ---- Decision 0240 (gpu1, PROVISIONAL): the SCENE (how the browser shows the desktop is decided by what it can do: app/src/engine/worker.ts makeDeskPresenter	未設定
+fle_dispatch.h	26	0123	/* Decision 0123 (PROVISIONAL), wall 31: code that the guest wrote itself at run time (the thunk of Delphi's MakeObjectInstance in a VirtualAlloc block) is call	未設定
+fle_dispatch.h	31	0147	/* Decision 0147 (PROVISIONAL): the progress counter of the deterministic pseudo-preemption of the cooperative threads (fle_thread.c). Every indirect call that 	未設定
+fle_dispatch.h	123	0163	* Decision 0163 (PROVISIONAL): the lookup of the function is a direct-mapped cache in front of the binary search. The result for every `va` is the one of the bi	未設定
+fle_dsound.c	1	0139	/* The DirectSound model of the virtual machine (decision 0139, PROVISIONAL; it replaces the device list of decision 0126, S-ds-none, which this file held: "no 	未設定
+fle_dsound.c	331	0241	/* S-ds-late-write (decision 0241, PROVISIONAL). The device hands the frames up to consumed + lead to the output ahead of time (audio_sync), reading the buffers	未設定
+fle_dsound.h	1	0139	/* The DirectSound model of the virtual machine (decision 0139, PROVISIONAL; replaces decision 0126's "no device", S-ds-none). See fle_dsound.c. Same convention	未設定
+fle_dwm.c	1	0171	/* dwmapi additions of decision 0171 (PROVISIONAL, wall ia1-W13: delay-loaded by the engine at a click on the menu bar). Convention as fle_imports.h: arguments 	未設定
+fle_dwm.c	50	0302	/* dwmapi!DwmGetCompositionTimingInfo (decision 0302, PROVISIONAL): HRESULT f(HWND hwnd rcx, DWM_TIMING_INFO *pTimingInfo rdx). Learn (DwmGetCompositionTimingIn	未設定
+fle_env.c	260	0144	/* Decision 0144 (PROVISIONAL): FLE_CMDLINE (fle_appfile.c, weak: a program that does not link it is as before) replaces the value of GetCommandLineW / GetComma	未設定
+fle_env.c	457	0103	/* shell32!SHGetFolderPathW and shfolder!SHGetFolderPathW (MSDN: SHGetFolderPathW, CSIDL; decisions 0103 and 0107, PROVISIONAL). hwnd rcx	未設定
+fle_env.c	481	0126	/* Decision 0126 (PROVISIONAL), wall 59: CSIDL_WINDOWS (0x0024, shlobj.h: UNOFFICIAL; the page learn/CSIDL.txt lists the name with FOLDERID_Windows and no numbe	未設定
+fle_env.c	484	0126	/* Decision 0126 (PROVISIONAL), wall 60: CSIDL_LOCAL_APPDATA (0x001c, shlobj.h: UNOFFICIAL; FOLDERID_LocalAppData on the page): "The file system directory that 	未設定
+fle_env.c	519	0126	/* Decision 0126 (PROVISIONAL), wall 80 (S-programfiles): CSIDL_PROGRAM_FILES: "The Program Files folder. A typical path is C:\Program Files" (learn/CSIDL.txt).	未設定
+fle_env.c	550	0112	/* ---- computer name and user name (decision 0112, PROVISIONAL) ---- */	未設定
+fle_env.h	41	0118	/* Decision 0118 (PROVISIONAL): the path of the process's executable file, which GetModuleFileNameW/A(NULL) answers (Learn: "If this parameter is NULL,	未設定
+fle_env.h	48	0107	/* Decision 0107 (PROVISIONAL): the profile directory of the virtual user, for SHGetFolderPathW(CSIDL_APPDATA). The Learn pages give the form	未設定
+fle_env.h	51	0112	/* Decision 0112 (PROVISIONAL): the user name and the computer name of the virtual process. No Microsoft page gives a value for either; both are choices of	未設定
+fle_env.h	117	0112	/* Computer name and user name (decision 0112, PROVISIONAL). All four take an in/out size pointer; the name is FLE_VIRTUAL_COMPUTER_NAME or FLE_VIRTUAL_USER_NAM	未設定
+fle_errmsg_module.h	1	0132	/* Decision 0132 (PROVISIONAL, wall 24, S-errmsg-wininet-learn-text): message texts of the message tables of virtual modules, for FormatMessageW(FORMAT_MESSAGE_	未設定
+fle_filedlg.c	1	0178	/* The common item dialog COM model (decision 0178, PROVISIONAL). See fle_filedlg.h for the purpose, the opt-in rule, the vtable orders and the host picker.	未設定
+fle_filedlg.c	79	0183	/* Decision 0183 (wrp1, PROVISIONAL): the Program Files folders (Learn, KNOWNFOLDERID: GUIDs and default paths; for a 64-bit application on a 64-bit system Prog	未設定
+fle_filedlg.c	808	0193	/* ---- the browser picker (decision 0193, fpick1, PROVISIONAL; always compiled since decision 0243) ----	未設定
+fle_filedlg.c	910	0216	/* decision 0216 (opfs1, PROVISIONAL): the answer may also carry `TYPE TAB <n>` (the file type the person picked in the page's window, 1-based; GetFileTypeIndex	未設定
+fle_filedlg.h	1	0178	/* The common item dialog COM model (decision 0178, PROVISIONAL): ole32!CoCreateInstance(CLSID_FileOpenDialog) answers an IFileOpenDialog object, and the shell 	未設定
+fle_filedlg.h	87	0193	/* Decision 0193 (fpick1, PROVISIONAL), see fle_filedlg.c browser_picker: the Worker calls this at the engine's idle. NULL, or a line	未設定
+fle_gdc.c	34	0125	/* Decision 0125 (PROVISIONAL, PM's decision 1 of 0125): a DC has a record. kind SCREEN: the DC of the entire screen (hWnd NULL, as before). The other kinds are	未設定
+fle_gdc.c	89	0174	/* Decision 0174 (PROVISIONAL): the entry of a released DC is reused, after a delay. Before, the table had one entry per GetDC call for good (72 bytes, to FLE_G	未設定
+fle_gdc.h	44	0121	/* The two the guest also asks for (HORZSIZE 4, VERTSIZE 6, millimetres of the physical screen). Decision 0121 (PROVISIONAL, PM's decision 1): the	未設定
+fle_gdc.h	53	0212	/* Decision 0212 (screen1, PROVISIONAL, opt-in): the four numbers above are the DEFAULTS. fle_screen.h makes the names the values of the run (FLE_MONITOR_W / FL	未設定
+fle_gdc.h	80	0125	/* Decision 0125 (PROVISIONAL, PM's decision 1 of 0125): the DCs of a WINDOW, state only (docs/decisions/0125-window-dc-and-walls.md).	未設定
+fle_gdi.c	42	0126	/* Decision 0126 (PROVISIONAL): the application-defined clipping region of a DC (Learn GetClipRgn: "an application-defined clipping region is a clipping region 	未設定
+fle_gdi.c	44	0229	/* Decision 0229 (ref1, PROVISIONAL): the clip and the regions are no longer limited to 64 rectangles (decision 0123 and 0126 had a fixed array of 64 per clip a	未設定
+fle_gdi.c	110	0126	/* Decision 0126 (PROVISIONAL): a device-dependent bitmap keeps pixels. A colour one (CreateCompatibleBitmap of the screen or of a DC with a colour bitmap) is a	未設定
+fle_gdi.c	228	0108	/* ---- decision 0108 (PROVISIONAL): memory DCs, DIB sections, brushes, selection ---------------------------------------------------------	未設定
+fle_gdi.c	244	0174	/* Decision 0174 (PROVISIONAL): the slot of a deleted object is reused, after a delay. Before, every created object took a slot for good (224 bytes in objs[] an	未設定
+fle_gdi.c	567	0106	* (decision 0106, PROVISIONAL). Learn (CreateBitmap): "creates a bitmap with the specified width, height, and color format (color planes and	未設定
+fle_gdi.c	577	0132	/* Decision 0132 (PROVISIONAL), wall 18: CreateBitmap's lpBits (after bitmap_bits below). */	未設定
+fle_gdi.c	610	0108	/* GetObjectW on a bitmap (decision 0108, PROVISIONAL; decision 0106 stopped on every bitmap). Learn (GetObjectW): a bitmap gives a BITMAP; "a bitmap	未設定
+fle_gdi.c	620	0113	* Decision 0113 wall 5 (PROVISIONAL; PM decision 2 of 0108 kept this a stop "until reached", and the guest's Delphi CopyBitmap reached it with c = 104): a DIB	未設定
+fle_gdi.c	853	0118	/* Decision 0118 wall 8 (PROVISIONAL; decision 0069 stopped on it): LoadIconW(hInstance, name) with hInstance the lifted DLL or a real module loads an icon from	未設定
+fle_gdi.c	930	0098	/* gdi32!EnumFontFamiliesExW (decision 0098, PROVISIONAL). Learn (EnumFontFamiliesExW): "enumerates all uniquely-named fonts in the system that match	未設定
+fle_gdi.c	991	0108	/* ---- decision 0108 (PROVISIONAL): the memory DC, DIB section, brush and selection answers (the model is described above, before CreatePalette) ---- */	未設定
+fle_gdi.c	1146	0113	* Decision 0113 wall 7 (PROVISIONAL; decision 0108 stopped on it): hPal NULL on a memory DC returns NULL, the page's failure value, and changes nothing. The pag	未設定
+fle_gdi.c	1381	0126	/* Decision 0126 (PROVISIONAL), wall 56: a COLORREF with the high-order byte 2 is a PALETTERGB specifier. Learn (PALETTERGB): "returns a palette-relative red, g	未設定
+fle_gdi.c	1553	0126	/* ---- Decision 0126 (PROVISIONAL): the pixel model of the GDI calls (docs/decisions/0126-pixel-model-and-walls.md). Supersedes the pixel operations of decisio	未設定
+fle_gdi.c	1676	0319	/* Decision 0319 section 14 (alpha1, PROVISIONAL): the pixels of the bitmap `hbm` (a DIB section or a device-dependent bitmap; mt3's design, docs/decisions/0313	未設定
+fle_gdi.c	2164	0319	/* Decision 0319 section 14 (alpha1, PROVISIONAL): the 32-bit pixels of a rectangle of a DC, for the drag image of ImageList_DragEnter / DragMove / DragShowNolo	未設定
+fle_gdi.c	2335	0319	/* user32!ScrollDC: BOOL f(HDC hDC rcx, int dx edx, int dy r8d, const RECT *lprcScroll r9, const RECT *lprcClip [5], HRGN hrgnUpdate [6], LPRECT lprcUpdate [7])	未設定
+fle_gdi.c	2499	0111	/* ---- decision 0111 (PROVISIONAL): DC attributes, the DC stack, pens, solid brushes, palette entries, icons and cursors, the named stops (docs/decisions/0111-	未設定
+fle_gdi.c	2505	0121	/* ---- decision 0121 (PROVISIONAL, PM's decision 1): the attributes of a screen DC (GetDC(NULL)) ----	未設定
+fle_gdi.c	2579	0125	/* Decision 0125 (PROVISIONAL), wall 52: an attribute call with hdc NULL FAILS: the return value is the page's failure value (zero for every call that uses attr	未設定
+fle_gdi.c	2587	0129	/* Decision 0129 (PROVISIONAL), wall 3 (S-hdc-deleted): an attribute call with the handle of a memory DC that DeleteDC has deleted FAILS in the same way (0, las	未設定
+fle_gdi.c	2788	0121	/* decision 0121 (PROVISIONAL): the extents of the two metric modes of a screen DC, from the physical size of the virtual display (fle_gdc.h): one logical unit 	未設定
+fle_gdi.c	3155	0113	* Decision 0113 wall 8 (PROVISIONAL; decision 0111 stopped on it): DestroyCursor of a standard cursor of the virtual cursor table (fle_cursor.h: LoadCursorW, Lo	未設定
+fle_gdi.c	3200	0118	* Decision 0118 wall 8 (PROVISIONAL): the shared icon of LoadIconW(hInstance, name) (GF_MODICON) is answered: fIcon TRUE, the hot spot (w / 2, h / 2) taken from	未設定
+fle_gdi.c	3763	0132	/* Decision 0132 (PROVISIONAL), wall 18: CreateBitmap with lpBits != NULL (it was a stop: "initial pixels are not implemented"). Learn (CreateBitmap): lpBits "A	未設定
+fle_gdi.c	3791	0132	/* gdi32!CreatePatternBrush: HBRUSH f(HBITMAP hbm rcx). Decision 0132 (PROVISIONAL), wall 19 (the guest makes the 8-by-8 monochrome bitmap of CreateBitmap with 	未設定
+fle_gdi.c	4296	0191	/* gdi32!RectVisible: BOOL f(HDC hdc rcx, const RECT *lprect rdx). Decision 0191 (PROVISIONAL; decision 0284: no longer opt-in -- until then only a build with t	未設定
+fle_gdi.c	4354	0123	/* ---- Regions (decision 0123 walls 46-49, PROVISIONAL; STATE ONLY: nothing is drawn) ----	未設定
+fle_gdi.c	4464	0229	/* Decision 0229 (ref1, PROVISIONAL): the band builder of rgn_combine. Bands are given from top to bottom; each is a list of disjoint, non-touching, left-to-rig	未設定
+fle_gdi.c	4857	0126	/* gdi32!GetRegionData: DWORD f(HRGN hrgn rcx, DWORD nCount edx, LPRGNDATA lpRgnData r8) (decision 0126, PROVISIONAL, wall 94). Learn: "fills the specified buff	未設定
+fle_gdi.c	5022	0126	/* ---- the clipping region of a DC (decision 0126, PROVISIONAL) ----	未設定
+fle_gdi.h	88	0106	/* gdi32!CreateBitmap (decision 0106, PROVISIONAL): HBITMAP f(int nWidth ecx, int nHeight edx, UINT nPlanes r8d, UINT nBitCount r9d, const VOID *lpBits	未設定
+fle_gdi.h	99	0098	/* gdi32!EnumFontFamiliesExW (decision 0098, PROVISIONAL): int f(HDC hdc rcx, LPLOGFONTW lpLogfont rdx, FONTENUMPROCW lpProc r8, LPARAM lParam r9, DWORD	未設定
+fle_gdi.h	137	0108	/* ---- Decision 0108 (PROVISIONAL): memory DCs, DIB sections, brushes, selection (docs/decisions/0108-gdi-memory-dc.md) ----	未設定
+fle_gdi.h	224	0126	/* Decision 0126 (PROVISIONAL): the pixel model (docs/decisions/0126-pixel-model-and-walls.md; fle_raster.h). Every drawing call below writes pixels: a memory D	未設定
+fle_gdi.h	250	0111	/* ---- Decision 0111 (PROVISIONAL): DC attributes, pens, solid brushes, the DC stack, the pixel operations on DIB sections, cursors, named stops ----	未設定
+fle_gdi.h	293	0121	* GdiFlush BOOL f(void), GetClipBox int f(HDC, LPRECT). Memory DCs only; every other handle stops by name. Decision 0121 (PROVISIONAL): a screen DC (GetDC(NULL)	未設定
+fle_gdi.h	318	0132	/* Decision 0132 (PROVISIONAL), wall 19: gdi32!CreatePatternBrush: HBRUSH f(HBITMAP hbm rcx); see fle_gdi.c. */	未設定
+fle_hle.c	1	0162	/* HLE of lifted guest functions (decision 0162, PROVISIONAL; the mechanism is the reference implementation of decision 0151). See fle_hle.h for the contract: t	未設定
+fle_hle.h	1	0162	/* HLE: host implementations of lifted guest functions (decision 0162, PROVISIONAL; the mechanism is decision 0151's reference implementation).	未設定
+fle_imagelist.c	1	0319	/* comctl32 image lists for the drag of an image (decision 0319 section 14, alpha1, PROVISIONAL). See fle_imagelist.h for what is and is not implemented.	未設定
+fle_imagelist.h	1	0319	/* comctl32 image lists, as far as the DRAG of an image needs them (decision 0319 section 14, alpha1, PROVISIONAL; PM 09:1x, O1 'the picture of the clip that is	未設定
+fle_imports.c	69	0126	/* kernel32!FormatMessageW: DWORD f(DWORD dwFlags rcx, LPCVOID lpSource rdx, DWORD dwMessageId r8d, DWORD dwLanguageId r9d, LPWSTR lpBuffer [5], DWORD nSize [6]	未設定
+fle_imports.c	129	0132	/* Decision 0132 (PROVISIONAL, wall 24): FORMAT_MESSAGE_FROM_HMODULE with the handle of a virtual module whose message table this runtime holds (fle_errmsg_modu	未設定
+fle_imports.c	164	0129	/* Decision 0129 (PROVISIONAL, S-errmsg-hresult-learn-text, PM's decision): an HRESULT that Learn's COM Error Codes page holds with a text (only the ones the gu	未設定
+fle_input.c	1	0136	/* Decision 0136 (PROVISIONAL): the input round trip (see fle_input.h). The host queues raw events (fle_input_host_*); the thread that owns the target window tu	未設定
+fle_input.c	1100	0171	/* Decision 0171 (PROVISIONAL, wall ia1-W2: the toolbar's Shift/Ctrl/Alt buttons): user32!SetKeyboardState: BOOL f(LPBYTE lpKeyState rcx). Learn: "Copies an arr	未設定
+fle_input.h	1	0136	/* Decision 0136 (PROVISIONAL): the input round trip. The "system's input thread" of the virtual machine: the hardware events that the host (a script in a nativ	未設定
+fle_input.h	31	0212	/* Decision 0212 (screen1, PROVISIONAL, opt-in): the display changed to w x h pixels (the browser window was resized). Queued with the input; when the GUI threa	未設定
+fle_input.h	35	0267	/* Decision 0267 (alpha10, PROVISIONAL): the TASK BAR of the virtual machine. The host (the page) shows a button for each window that has one and, when the user	未設定
+fle_input.h	45	0280	/* Decision 0280, L1c (PROVISIONAL): 1 when every event that the host queued has been taken out of the queue and every message made of it has been retrieved, an	未設定
+fle_input.h	136	0171	/* Decision 0171 (PROVISIONAL): user32!SetKeyboardState: BOOL f(LPBYTE rcx); copies 256 bytes into the table that GetKeyState and GetKeyboardState read. user32!	未設定
+fle_kbd.h	17	0063	/* The high word of the HKL (decision 0063, a PROVISIONAL choice). Learn (GetKeyboardLayout): "the high word contains a device	未設定
+fle_layered.c	1	0140	/* Layered windows (decision 0140, PROVISIONAL; docs/decisions/0140-layered-windows.md). See fle_layered.h for the pixel model.	未設定
+fle_layered.h	1	0140	/* Layered windows (decision 0140, PROVISIONAL; docs/decisions/0140-layered-windows.md): user32!UpdateLayeredWindow, UpdateLayeredWindowIndirect, SetLayeredWind	未設定
+fle_load.c	65	0126	* Decision 0126 wall 86 (PROVISIONAL, S-webview2-absent, a CHOICE WITHOUT A SOURCE): "webview2loader.dll" is added. FLEngine's f_be3520 calls LoadLibraryW(L"Web	未設定
+fle_load.c	75	0233	/* Decision 0233 (load1, PROVISIONAL, UNOFFICIAL roster): the names of the DLLs that a Windows installation ships (fle_win_dll_roster.inc: the directory names o	未設定
+fle_load.c	176	0233	/* Decision 0233 (load1, PROVISIONAL): a module name WITH A PATH ('\\', '/' or ':'). Pages (Microsoft Learn): LoadLibraryW "If the string specifies a full path,	未設定
+fle_load.c	355	0238	/* Decision 0238 (load2, PROVISIONAL): an API set contract name that is not itself a module of the table. Learn "Windows API sets" / "API set loader operation":	未設定
+fle_load.c	401	0229	/* Decision 0229 (ref1, PROVISIONAL; replaces the exploration switch FLE_LOADLIB_MISSING of decision 0178 for this case): an empty module name names no module, 	未設定
+fle_loadimage.c	47	0062	* failure is not invented), except FLE_LI_MODULE_MISSING: decision 0062 (PROVISIONAL) returns NULL there, the failure value	未設定
+fle_loadimage.h	37	-	* PROVISIONAL: Learn names NULL as the failure value and no GetLastError value). Any other id the DLL lacks still stops. */	未設定
+fle_loadimage.h	40	0061	/* Handles of the cursors loaded from the DLL (decision 0061, a PROVISIONAL choice; no page gives a value):	未設定
+fle_loadimage.h	47	0104	/* Decision 0104 (PROVISIONAL, a token like the ones above): the cursors loaded from a real module (fle_realmod.h; hInst = its base) have	未設定
+fle_loadimage.h	52	0125	/* Decision 0125 (PROVISIONAL, S-loadcursor-handle): the cursors that user32!LoadCursorW(hInstance, L"name") loads from the NAMED RT_GROUP_CURSOR entries of a m	未設定
+fle_locale.c	352	0116	/* Decision 0116 (PROVISIONAL), CP_UTF8 (65001), asked by the Delphi encoding class of FLEngine (f_452960, TEncoding.UTF8). Learn (CPINFO): LeadByte "is not eve	未設定
+fle_locale.c	949	0191	/* Decision 0191 (PROVISIONAL; decision 0284: no longer opt-in): the primary sort weights of Microsoft's published Sorting Weight Table decide a pair of units w	Until decision 0284
+fle_locale.c	1037	0191	/* Decision 0191 (PROVISIONAL; wall ia2-W25): the Private Use Area U+E000..U+F8FF. Microsoft's "Windows 8 Upper Case Mapping Table.txt" (the table of decision 0	未設定
+fle_locale.c	1224	0129	/* Decision 0129 (PROVISIONAL), walls 5 and 6 (S-cmp-digits-flag): SORT_DIGITSASNUMBERS (0x8; Learn CompareStringEx: "Windows 7: Treat digits as numbers during 	未設定
+fle_locale.c	1287	0126	/* Decision 0126 (PROVISIONAL), wall 62 (S-cmp-equal-prefix; the guest compares "Test message processing" with "Test program expiration" and the common prefix h	未設定
+fle_locale.c	1306	0129	/* Decision 0129 (PROVISIONAL), wall 7 (S-cmp-symbol-any-position; the guest sorts the Browser's names: "Minor Natural (Aeolian)" against "Minor Natural Chordma	未設定
+fle_locale.c	1319	0284	/* Decision 0284 (A, PROVISIONAL): the rules below that order two units of the ASCII symbol classes by their CODE POINTS (S-cmp-symbol-vs-symbol, S-cmp-space-as	未設定
+fle_locale.c	1334	0129	/* Decision 0129 (PROVISIONAL), wall 8 (S-cmp-symbol-vs-symbol; "Minor Natural + Chords" against "Minor Natural (Aeolian)": '+' against '('): the order of two D	未設定
+fle_locale.c	1342	0129	/* Decision 0129 (PROVISIONAL), wall 13 (S-cmp-space-as-symbol; "Default.tpr" against "Default (macOS).tpr": '.' against ' ' at position 7): the space (0x20) is	未設定
+fle_locale.c	1350	0132	/* Decision 0132 (PROVISIONAL), wall 25 (S-cmp-general-punctuation; the guest compares "News - FL Studio" with "News \u2013 FL Studio": the hyphen against U+201	未設定
+fle_locale.c	1360	0136	/* Decision 0136 (PROVISIONAL), wall of the Enter key at the error dialog (S-cmp-control, a CHOICE WITHOUT A SOURCE; the guest compares the key character "\r" w	未設定
+fle_locale.c	1368	0178	/* Decision 0178 (PROVISIONAL, OPT-IN: the environment variable FLE_CMP_EXTEND is set; without it the stop below is as before and the 16 snapshots and every ear	未設定
+fle_locale.c	1378	0191	/* Decision 0191 (PROVISIONAL; wall ia2-W19): a pair of which at least one unit is above U+007F, decided by the primary weights (script member, alphabetic weigh	未設定
+fle_locale.c	1380	0284	/* Decision 0284 (PROVISIONAL): the ASCII control units too. The default table of the same file gives U+0001..U+001F and U+007F a primary weight (SM 6 or 7, an 	未設定
+fle_locale.c	1390	0229	/* Decision 0229 (ref1, PROVISIONAL): rule (1) below, the word sort's treatment of the hyphen and the apostrophe, is no longer behind FLE_CMP_EXTEND: it follows	未設定
+fle_locale.c	1425	0171	/* Decision 0171 (PROVISIONAL), wall ia1-W11 (S-ia1-cmp-digit-letter; the mixer's names "Insert 1" ... and a right click on an insert compare a letter with a di	未設定
+fle_locale.c	1432	0126	/* Decision 0126 (PROVISIONAL), wall 72 (S-cmp-prefix; the guest compares ".FLMS" with ".FLM": one is a prefix of the other, the units of the shorter one being 	未設定
+fle_locale.c	1542	0112	/* kernel32!LocaleNameToLCID (decision 0112, PROVISIONAL): LCID LocaleNameToLCID(LPCWSTR lpName rcx, DWORD dwFlags edx). Learn (LocaleNameToLCID): lpName is "a	未設定
+fle_locale.h	58	0112	/* kernel32!LocaleNameToLCID: LCID f(LPCWSTR lpName rcx, DWORD dwFlags edx) (decision 0112, PROVISIONAL). NULL, the system-default name, the emulated locale's n	未設定
+fle_modules.c	108	0238	/* Decision 0238 (load2, PROVISIONAL): the API set schema of this environment. Learn "Windows API sets": "an API set name identifies a contract, not a file. At 	未設定
+fle_modules.c	234	0238	{   /* Decision 0238 (PROVISIONAL): an API set contract name that is not a module of the table is the loader's redirection to the host DLL: the handle of the ho	未設定
+fle_modules.c	361	0126	/* Decision 0126 (wall 87, PROVISIONAL): ILFree frees an ITEMIDLIST of fle_ole.c (the Learn page: the same as CoTaskMemFree on Windows 2000 and later); a build 	未設定
+fle_modules.c	395	0233	/* Decision 0233 (load1, PROVISIONAL): hModule NULL, and the handle of the process image (GetModuleHandleW(NULL), decision 0015: the lifted DLL). The GetProcAdd	未設定
+fle_monitor.c	40	0065	* here is the callback's own BOOL (1 for TRUE, 0 for FALSE): a PROVISIONAL choice (decision 0065; the guest ignores the value).	未設定
+fle_monitor.c	66	0126	/* user32!MonitorFromWindow, MonitorFromPoint, MonitorFromRect (decision 0126, PROVISIONAL, walls 100). The environment has ONE monitor (decision 0065), the rec	未設定
+fle_monitor.c	159	0098	/* user32!EnumDisplaySettingsW (decision 0098, PROVISIONAL). Learn (EnumDisplaySettingsW): lpszDeviceName "is either NULL or a	未設定
+fle_monitor.h	18	0065	/* The handle of the one virtual monitor (decision 0065, a PROVISIONAL choice): FLE_MONITOR_HANDLE_BASE + 4. No page gives a value	未設定
+fle_monitor.h	34	0212	/* Decision 0212 (screen1, PROVISIONAL, opt-in): the right and bottom edges above are the DEFAULTS; fle_screen.h makes them the values of the run (FLE_MONITOR_W	未設定
+fle_monitor.h	43	0065	/* The work area (decision 0065, a PROVISIONAL choice): the whole monitor, because this environment has no task bar. Learn gives	未設定
+fle_monitor.h	66	0126	/* Decision 0126 (wall 100, PROVISIONAL; the notes are in fle_monitor.c): user32!MonitorFromPoint: HMONITOR f(POINT pt rcx, DWORD dwFlags edx), user32!MonitorFr	未設定
+fle_monitor.h	75	0098	/* user32!EnumDisplaySettingsW (decision 0098, PROVISIONAL): BOOL f(LPCWSTR lpszDeviceName rcx, DWORD iModeNum edx, DEVMODEW *lpDevMode r8).	未設定
+fle_monitor.h	99	0166	/* ui1 (decision 0166, PROVISIONAL): FLE_DISPLAYSETTINGS_FREQUENCY is the DEFAULT (60); the number EnumDisplaySettingsW reports is fle_display_settings_hz() of 	未設定
+fle_mxcsr_flags.h	1319	0191	/* Decision 0191 (PROVISIONAL): HADDPS, ADDSUBPS and ADDSUBPD (SSE3; HSUBPS, HSUBPD and LDDQU have no site in the census), with the pattern of HADDPD above (eac	未設定
+fle_ole.c	130	0116	/* ---- shell32!SHGetSpecialFolderLocation and SHGetPathFromIDListW (decision 0116, PROVISIONAL) ----	未設定
+fle_ole.c	153	0132	/* Decision 0132 (PROVISIONAL), wall 17: CSIDL_SYSTEM (0x0025, shlobj.h: UNOFFICIAL, the Learn page CSIDL lists the name with FOLDERID_System and no number). Le	未設定
+fle_ole.c	158	0183	/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN): a link may supply more CSIDLs (harness/two/wrp1_vst3_imp.c: CSIDL_PERSONAL 0x05, which Serum 2 asks for); the defa	未設定
+fle_ole.c	221	0126	/* ---- shell32!ILCreateFromPathW, ILFree, SHChangeNotifyRegister, SHChangeNotifyDeregister (decision 0126, PROVISIONAL, walls 87 to 89) ----	未設定
+fle_ole.c	375	0126	/* ---- ole32!RegisterDragDrop and RevokeDragDrop (decision 0126, PROVISIONAL, wall 90) ----	未設定
+fle_ole.c	674	0129	/* ---- ole32!CoCreateInstance (decision 0129, PROVISIONAL; PM's decision, S-com-registry-empty) ----	未設定
+fle_ole.c	712	0098	/* ---- shell32!SHGetMalloc and the IMalloc it returns (decision 0098, PROVISIONAL) ----	未設定
+fle_ole.h	32	0129	/* Decision 0129 (PROVISIONAL, S-com-registry-empty): ole32!CoCreateInstance: HRESULT f(REFCLSID rcx, LPUNKNOWN rdx, DWORD r8d, REFIID r9, LPVOID *ppv [5]); a C	未設定
+fle_ole.h	37	0098	/* shell32!SHGetMalloc (decision 0098, PROVISIONAL): HRESULT f(IMalloc **ppMalloc). rcx. Returns S_OK and an IMalloc pointer to one object of this	未設定
+fle_ole.h	53	0116	* LPWSTR pszPath) (decision 0116, PROVISIONAL; the notes are in fle_ole.c). CSIDL_FONTS and CSIDL_APPDATA only, the paths of SHGetFolderPathW; the ITEMIDLIST is	未設定
+fle_ole.h	58	0126	/* Decision 0126 (walls 87 to 89, PROVISIONAL; the notes are in fle_ole.c): shell32!ILCreateFromPathW: PIDLIST_ABSOLUTE f(PCWSTR) (NULL for a path that the virt	未設定
+fle_ole.h	67	0126	/* Decision 0126 (wall 90, PROVISIONAL; the notes are in fle_ole.c): ole32!RegisterDragDrop: HRESULT f(HWND, LPDROPTARGET) and ole32!RevokeDragDrop: HRESULT f(H	未設定
+fle_proc.c	92	0126	/* Decision 0126 (PROVISIONAL), wall 67 (S-threaderrormode-alignment): the guest's thread (a thread of FLEngine, 0x819110) passes SEM_NOALIGNMENTFAULTEXCEPT (4)	未設定
+fle_proc.c	326	0126	/* kernel32!IsDebuggerPresent: BOOL f(void) (decision 0126, PROVISIONAL, wall 99; it was a named stop of decision 0078 that assumed a fatal-error path). Learn: 	未設定
+fle_raster.c	1	0126	/* The pixel model (decision 0126, PROVISIONAL; docs/decisions/0126-pixel-model-and-walls.md; fle_raster.h). Pure C: it holds pixels and the drawing surfaces of	未設定
+fle_raster.h	1	0126	/* The pixel model (decision 0126, PROVISIONAL; docs/decisions/0126-pixel-model-and-walls.md). Pure C: no guest memory, no handle, no DC, no fle_* header. fle_g	未設定
+fle_realmod.c	75	0183	/* Decision 0183 (wrp1, PROVISIONAL): see fle_realmod.h. No entry unless the link brings its own table. */	未設定
+fle_realmod.c	172	0183	/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN): the loader's work that precedes the first DllMain(DLL_PROCESS_ATTACH) of a module with a TLS directory (the TLS ca	未設定
+fle_realmod.c	241	0206	/* Decision 0206 (dec1, PROVISIONAL, OPT-IN: -DFLE_REALMOD_FREE_RESIDENT; default = the stop below, decision 0082 D11): FreeLibrary of the last reference keeps 	未設定
+fle_realmod.h	85	0183	/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: a link that supplies no path table behaves as before): a module requested by a PATH	未設定
+fle_reg.c	183	0126	/* Decision 0126 (PROVISIONAL), wall 81 (S-wow64-views): KEY_WOW64_64KEY 0x0100 and KEY_WOW64_32KEY 0x0200 (Learn, Accessing an Alternate Registry View and Regi	未設定
+fle_reg.c	387	0126	/* Decision 0126 (PROVISIONAL), wall 73 (S-regcreate-trailing-backslash): the guest creates "Software\Image-Line\Shared\" (a path that ends with ONE backslash: 	未設定
+fle_res.c	326	0123	/* kernel32!FreeResource (Microsoft Learn: FreeResource, read 2026-10-31; decision 0123, PROVISIONAL, wall 26). BOOL f(HGLOBAL hResData rcx). The page: "This fu	未設定
+fle_res.c	548	0125	/* Decision 0125 (PROVISIONAL), wall 54: user32!LoadCursorW(hInstance, lpCursorName) with a non-NULL hInstance, for the cursors of the guest's own resources (th	未設定
+fle_res.c	611	0129	/* Decision 0129 (PROVISIONAL), S-version-info-real-resource: the bytes of the RT_VERSION resource (type 16) of the image mapped at FLE_EXE_HANDLE (the lifted D	未設定
+fle_res.h	47	0123	/* Decision 0123 (PROVISIONAL), wall 26: kernel32!FreeResource: BOOL f(HGLOBAL rcx): always FALSE (0), nothing is freed (Learn FreeResource: "For modern version	未設定
+fle_res.h	50	0125	/* Decision 0125 (PROVISIONAL), wall 54: user32!LoadCursorW(hInstance non-NULL, name) for a cursor of the lifted DLL or of a real module (the rules are in fle_r	未設定
+fle_res.h	54	0129	/* Decision 0129 (PROVISIONAL, S-version-info-real-resource): the RT_VERSION resource of the image mapped at FLE_EXE_HANDLE: 1 with its VA and size, or 0 when t	未設定
+fle_screen.h	1	0212	/* The size of the virtual screen as a value of the RUN (decision 0212, screen1, PROVISIONAL, opt-in).	未設定
+fle_seh.c	1	0132	/* The guest's structured exception handling: kernel32!RaiseException and ntdll!RtlUnwindEx for lifted code (docs/decisions/0132-seh-s1.md, PROVISIONAL).	未設定
+fle_seh.h	1	0132	/* The guest's structured exception handling (docs/decisions/0132-seh-s1.md, PROVISIONAL). Native; the wasm build compiles it and needs SJLJ=wasm + FLE_LANDING_	未設定
+fle_shell.c	1	0171	/* shell32 additions of decision 0171 (PROVISIONAL, wall ia1-W6). Convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx), R[8] (r8), R[9] (r9); the Wi	未設定
+fle_spi.c	65	0066	*  - SPI_GETICONTITLELOGFONT (0x1f), decision 0066 (PROVISIONAL values): "The uiParam parameter specifies the size of a LOGFONT	未設定
+fle_spi.c	95	0098	/* Decision 0098 (PROVISIONAL; the condition is the one decision 0065 wrote down): the RECT is the work area of the primary monitor,	未設定
+fle_spi.c	120	0106	/* Decision 0106 (PROVISIONAL value, none on the page): a BOOL at pvParam (4 bytes). FALSE (see fle_spi.h). The same argument rules as the	未設定
+fle_spi.c	130	0103	/* Decision 0103 (PROVISIONAL value): "Retrieves the type of font smoothing. The pvParam parameter must point to a UINT that	未設定
+fle_spi.c	142	0103	/* Decision 0103 (PROVISIONAL value, none on the page): "Retrieves the font smoothing orientation. The pvParam parameter must point	未設定
+fle_spi.c	153	0126	/* Decision 0126 wall 92 (PROVISIONAL, S-spi-animation, a CHOICE WITHOUT A SOURCE): Learn SPI_GETANIMATION: "Retrieves the animation effects associated with use	未設定
+fle_spi.h	27	0103	/* Decision 0103 (PROVISIONAL): SPI_GETFONTSMOOTHINGTYPE (0x200A), the Learn table: "Retrieves the type of font smoothing. The pvParam	未設定
+fle_spi.h	35	0103	/* Decision 0103 (PROVISIONAL, a value with NO default on the page): SPI_GETFONTSMOOTHINGORIENTATION (0x2012), the Learn table:	未設定
+fle_spi.h	43	0106	/* Decision 0106 (PROVISIONAL, a value with NO default on the page): SPI_GETCURSORSHADOW (0x101A), the Learn table: "Determines whether the cursor has	未設定
+fle_spi.h	55	0098	/* Decision 0098 (PROVISIONAL): SPI_GETWORKAREA 0x0030 (the Learn table lists the number): "Retrieves the size of the work area on the	未設定
+fle_spi.h	63	0066	/* Decision 0066 (PROVISIONAL): the two font actions. The numbers are the Learn table's (OFFICIAL): SPI_GETICONTITLELOGFONT 0x001F	未設定
+fle_spi.h	88	0066	/* The system font (decision 0066, PROVISIONAL; the table of the five fonts and the source of each field are in the decision). One	未設定
+fle_sse_shuf.h	77	0191	/* Decision 0191 (PROVISIONAL): the SSE3 moves MOVDDUP, MOVSLDUP, MOVSHDUP (Intel SDM Vol. 2, 128-bit Legacy SSE versions). No arithmetic, no flags; the lanes a	未設定
+fle_ssse3.h	1	0190	/* SSSE3 integer helpers for fe-lift output (sse_ssse3.rs, decision 0190, PROVISIONAL): PALIGNR, PABSB, PABSW, PABSD, PSHUFB (xmm forms). Header only (static in	未設定
+fle_sweep1.h	1	0215	/* Decision 0215 (sweep1, PROVISIONAL, opt-in): API answers written from the Microsoft Learn pages for the walls that the systematic sweep (lift/out-sweep1/tool	未設定
+fle_sweep1_kbd.c	1	0215	/* Decision 0215 (sweep1, PROVISIONAL, opt-in): the user32 keyboard-layout family (fle_sweep1.h). Found by the systematic sweep: pressing the right Alt key (VK_	未設定
+fle_sys.c	225	0126	/* Decision 0126 (PROVISIONAL), wall 82: InterlockedPushEntrySList and InterlockedPopEntrySList are answered, and InterlockedFlushSList returns what the list ho	未設定
+fle_sysinfo.c	47	0119	*    DECISION 0119 (PROVISIONAL, the PM's decision 2) changed PF 2 and PF 3 from 0 to 1: decision 0118 had made the CPUID answer report CX8 and MMX and had left	未設定
+fle_sysmetrics.c	36	0106	*  - SM_CXCURSOR, SM_CYCURSOR: 32, 32 (decision 0106, PROVISIONAL; Learn "About Cursors", Cursor Sizes: 32x32 below 144 DPI at the default cursor size);	未設定
+fle_sysmetrics.c	39	0098	*  - SM_DIGITIZER: 0 (decision 0098, PROVISIONAL: no touch or pen digitizer; the page defines the value as a bitmask of the digitizer types and	未設定
+fle_sysmetrics.c	41	0107	*  - SM_TABLETPC 0, SM_MAXIMUMTOUCHES 0, SM_CONVERTIBLESLATEMODE 1, SM_SYSTEMDOCKED 0 (decision 0107, PROVISIONAL; the reasons are with the	未設定
+fle_sysmetrics.h	49	0106	/* Decision 0106 (PROVISIONAL): SM_CXCURSOR / SM_CYCURSOR (13, 14), asked by ILTools' own initialisation (CreateCursorFromFont). The Learn page "About	未設定
+fle_sysmetrics.h	60	0098	/* Decision 0098 (PROVISIONAL): SM_DIGITIZER (94). The page: "The return value is a bitmask that specifies the type of digitizer input supported by the	未設定
+fle_sysmetrics.h	64	0107	/* Decision 0107 (PROVISIONAL): the other four indexes that the guest's f_80e360 asks right after SM_DIGITIZER (unit 276), all consistent with	未設定
+fle_thread.c	1	0122	/* Cooperative guest threads (docs/decisions/0122-cooperative-threads.md, PROVISIONAL; see fle_thread.h). One host thread; the stack of each guest thread is a h	未設定
+fle_thread.c	52	0139	/* Decision 0139 (PROVISIONAL): the audio device of the virtual machine (runtime/fle_dsound.c, fle_audio_ring.c) is a source of events on the virtual clock: a p	未設定
+fle_thread.c	62	0128	/* Decision 0128 (PROVISIONAL, G3), changed by decision 0136: the idle of the embedding host. Provided by harness/fruity_idle.c (wasm) or harness/fruity_g3.c (n	未設定
+fle_thread.c	69	0234	/* Decision 0234 (mt3, PROVISIONAL): the priority level that SetThreadPriority kept for the first thread (fle_proc.c; the other threads keep theirs in `ps`). We	未設定
+fle_thread.c	71	0280	/* Decision 0280 (PROVISIONAL): harness/fruity_idle.c (wasm, FRUITY on): takes the input events that the page has put into its ring since the last look and queu	未設定
+fle_thread.c	172	0280	/* Decision 0280, L1c (PROVISIONAL): 1 when thread idx is blocked in GetMessage / WaitMessage / MsgWaitForMultipleObjects (back at its message loop), not in any	未設定
+fle_thread.c	269	0196	/* Decision 0196 (PROVISIONAL): the table index of the finished thread whose place CreateThread may use again once the table is full (the one that finished long	未設定
+fle_thread.c	498	0234	/* Decision 0234 (mt3, PROVISIONAL): the scheduling priority of a thread. Learn "Scheduling Priorities": "The system treats all threads with the same priority a	未設定
+fle_thread.c	691	0280	/* decision 0280 (PROVISIONAL): the host's input ring is read at every scheduler point, so that an input need not wait for the engine's idle */	未設定
+fle_thread.c	780	0147	/* Decision 0147 (PROVISIONAL). Called by fle_dispatch (fle_dispatch.h) when fle_progress_count reaches fle_progress_limit, i.e. once per slice_dispatches indir	未設定
+fle_thread.c	1304	0126	/* kernel32!WaitForMultipleObjectsEx: DWORD f(DWORD nCount rcx, const HANDLE *lpHandles rdx, BOOL bWaitAll r8d, DWORD dwMilliseconds r9d, BOOL bAlertable [5]) (	未設定
+fle_thread.h	1	0122	/* Cooperative guest threads (docs/decisions/0122-cooperative-threads.md, PROVISIONAL; the static survey is docs/investigations/thread-model.md, option T2).	未設定
+fle_thread.h	73	0166	* ui1 (decision 0166, PROVISIONAL): FLE_DWM_HZ is the DEFAULT (60u); the environment variable FLE_DWM_HZ=<hertz>, which the manifest's	未設定
+fle_thread.h	82	0147	/* ---- decision 0147 (PROVISIONAL): deterministic pseudo-preemption (an exception to decision 0122's "a thread is given up only inside one of the waiting or yi	未設定
+fle_thread.h	202	0280	/* Decision 0280, L1c (PROVISIONAL): 1 when thread idx waits in its message loop (GetMessage, WaitMessage, MsgWaitForMultipleObjects) */	未設定
+fle_thread.h	221	0234	/* Decision 0234 (mt3, PROVISIONAL): 1 = the scheduler orders the ready threads by their scheduling priority (Learn "Scheduling Priorities": the levels SetThrea	未設定
+fle_thread_wasm.c	1	0124	/* Thread switching by JSPI: the C side (docs/decisions/0124-wasm-thread-switching.md, PROVISIONAL; see fle_thread_wasm.h). The scheduling decision is made in f	未設定
+fle_thread_wasm.h	1	0124	/* Thread switching by JSPI (docs/decisions/0124-wasm-thread-switching.md, PROVISIONAL). Only the MEANS of switching of decision 0122's cooperative threads (fle	未設定
+fle_token.c	1	0136	/* advapi32!OpenProcessToken and advapi32!GetTokenInformation (decision 0136, PROVISIONAL; the wall of the first-run wizard: after the OK button of the error di	未設定
+fle_token.h	1	0136	/* Decision 0136 (PROVISIONAL): the process access token, only as far as the guest asks (fle_token.c): advapi32!OpenProcessToken and advapi32!GetTokenInformatio	未設定
+fle_uipref.c	149	0117	/* kernel32!GetUserPreferredUILanguages (decision 0117, PROVISIONAL). Learn (GetUserPreferredUILanguages, last updated 2021-10-13): dwFlags "specify the languag	未設定
+fle_uipref.h	15	0117	/* kernel32!GetUserPreferredUILanguages (decision 0117, PROVISIONAL): BOOL f(DWORD dwFlags, PULONG pulNumLanguages, PZZWSTR pwszLanguagesBuffer, PULONG pcchLang	未設定
+fle_user_nowin.c	25	0191	/* Decision 0191 (PROVISIONAL; decision 0284: no longer opt-in; wall ia2-W25): a unit of the Private Use Area U+E000..U+F8FF is not changed (Microsoft's Windows	未設定
+fle_user_nowin.c	228	0126	/* user32!InflateRect: BOOL f(LPRECT lprc rcx, int dx edx, int dy r8d) (decision 0126, PROVISIONAL, wall 98). Learn: "adds -dx units to the left end and dx to t	未設定
+fle_vfs.c	404	0178	/* Decision 0178 (PROVISIONAL, S-dlg1-handle32): "64-bit versions of Windows use 32-bit handles for interoperability. When sharing a handle between 32-bit and 6	未設定
+fle_vfs.c	520	0206	/* Decision 0206 (dec1, PROVISIONAL): a SECURITY_ATTRIBUTES whose lpSecurityDescriptor is NULL is accepted (Learn SECURITY_ATTRIBUTES: NULL = 'the default secur	未設定
+fle_vfs.c	633	0126	/* Decision 0126 (PROVISIONAL), wall 95, S-readfile-zero (a READING, not a statement of the page): the page does not define nNumberOfBytesToRead = 0. It gives t	未設定
+fle_vfs.c	639	0206	/* Decision 0206 (dec1, PROVISIONAL; always on since decision 0243). Microsoft Learn, 'Testing for the End of a File'	未設定
+fle_vfs.c	730	0178	/* Decision 0178 (PROVISIONAL): what GetFileInformationByHandle and SetEndOfFile (fle_wall_dlg1.c) need of an open file. Additive: no existing function changes.	未設定
+fle_vfs.c	819	0238	/* Decision 0238 (load2, PROVISIONAL): kernel32!SetFilePointerEx, BOOL f(HANDLE hFile rcx, LARGE_INTEGER liDistanceToMove rdx, PLARGE_INTEGER lpNewFilePointer r	未設定
+fle_vfs.c	851	0238	/* Decision 0238 (load2, PROVISIONAL): kernel32!FlushFileBuffers, BOOL f(HANDLE hFile rcx) (stopped by name before; the opt-in harness wrap of decision 0206 ans	未設定
+fle_vfs.c	1089	0238	/* Decision 0238 (load2, PROVISIONAL): kernel32!FindFirstFileExW, HANDLE f(LPCWSTR lpFileName rcx, FINDEX_INFO_LEVELS fInfoLevelId edx, LPVOID lpFindFileData r8	未設定
+fle_vfs.c	1191	0183	/* Decision 0183 (wrp1, PROVISIONAL): see fle_vfs.h. */	未設定
+fle_vfs.c	1214	0126	/* Decision 0126 (PROVISIONAL), wall 70 (S-empty-attrs-ex, the choice of GetFileAttributesW of decision 0123 item 1 applied to the Ex form): the empty name "" f	未設定
+fle_vfs.c	1529	0126	/* Decision 0126 (PROVISIONAL), wall 69 (S-fullpath-empty): GetFullPathNameW with an EMPTY lpFileName (the guest's Delphi ExpandFileName of an empty file name, 	未設定
+fle_vfs.c	1601	0132	/* kernel32!GetTempFileNameW: UINT f(LPCWSTR lpPathName rcx, LPCWSTR lpPrefixString rdx, UINT uUnique r8d, LPWSTR lpTempFileName r9). Decision 0132 (PROVISIONAL	未設定
+fle_vfs.c	1792	0098	/* version!GetFileVersionInfoSizeW (decision 0098, PROVISIONAL; decision 0129 adds the product's own module): DWORD f(LPCWSTR lptstrFilename rcx, LPDWORD lpdwHa	未設定
+fle_vfs.c	1861	0112	/* version!GetFileVersionInfoW (decision 0112, PROVISIONAL; decision 0129 adds the product's own module): BOOL f(LPCWSTR lptstrFilename rcx, DWORD dwHandle edx,	未設定
+fle_vfs.c	1916	0112	/* version!VerQueryValueW (decision 0112, PROVISIONAL; decision 0129 answers it for the block of GetFileVersionInfoW): BOOL f(LPCVOID pBlock rcx, LPCWSTR lpSubB	未設定
+fle_vfs.c	2094	0117	/* ---- wintrust!WinVerifyTrust and the crypt32 calls behind the engine's signer-name check (decision 0117, PROVISIONAL) ----	未設定
+fle_vfs.c	2581	0188	/* Decision 0188 (exp1, PROVISIONAL), for the G3 script command `vfsdump` (harness/fruity_g3.c): the bytes of a file on the virtual volume (a file the guest wro	未設定
+fle_vfs.c	2599	0193	/* Decision 0193 (fpick1, PROVISIONAL), for the browser file dialog bridge (fle_filedlg.c): files that the USER chose in the page are put on the virtual volume 	未設定
+fle_vfs.h	39	0238	/* Decision 0238 (load2, PROVISIONAL): answered for the files of the virtual volume (they stopped by name in fle_vol.c, decision 0078, and were answered only by	未設定
+fle_vfs.h	60	0132	/* Decision 0132 (PROVISIONAL), wall 22: kernel32!GetTempFileNameW: UINT f(LPCWSTR, LPCWSTR, UINT, LPWSTR); only a nonzero uUnique (fle_vfs.c). */	未設定
+fle_vfs.h	68	0098	/* version!GetFileVersionInfoSizeW (decision 0098, PROVISIONAL): DWORD f(LPCWSTR lptstrFilename rcx, LPDWORD lpdwHandle rdx). A path that is not in the	未設定
+fle_vfs.h	72	0112	/* version!GetFileVersionInfoW (decision 0112, PROVISIONAL): BOOL f(LPCWSTR lptstrFilename rcx, DWORD dwHandle edx, DWORD dwLen r8d, LPVOID lpData r9). The fail	未設定
+fle_vfs.h	90	0178	/* Decision 0178 (PROVISIONAL), for fle_wall_dlg1.c: the node (opaque, stable while the file exists), attributes, creation / last access / last write time (FILE	未設定
+fle_vfs.h	95	0183	/* Decision 0183 (wrp1, PROVISIONAL), for fle_load.c: 1 when the UTF-16 path at the guest address names a FILE of the virtual volume (a directory, a missing fil	未設定
+fle_vfs.h	98	0117	/* wintrust!WinVerifyTrust and the crypt32 calls behind the engine's signer-name check (decision 0117, PROVISIONAL; the notes are in fle_vfs.c).	未設定
+fle_vfs.h	138	0188	/* Decision 0188 (PROVISIONAL), for the G3 script command `vfsdump`: the bytes of a file of the virtual volume by its UTF-16 guest path (1 = a file, *data valid	未設定
+fle_vfs.h	141	0193	/* Decision 0193 (fpick1, PROVISIONAL), for the browser file dialog bridge (fle_filedlg.c): the user's file is put on the volume from the host side, and a file 	未設定
+fle_visrgn.c	1	0142	/* Decision 0142 (PROVISIONAL; docs/decisions/0142-window-visible-region.md; fle_visrgn.h). */	未設定
+fle_visrgn.h	1	0142	/* Decision 0142 (PROVISIONAL; docs/decisions/0142-window-visible-region.md): the visible region of a window and the diagnostics of the pixel calls that write i	未設定
+fle_vmap.c	161	0123	/* ---- Decision 0123 (PROVISIONAL), wall 25: images and other registered ranges ---- */	未設定
+fle_vmap.c	377	0123	/* Decision 0123 (PROVISIONAL), wall 25: a loaded image (main module and real modules) answers from its section table, a registered range (the first thread's st	未設定
+fle_vmap.h	25	0123	/* Decision 0123 (PROVISIONAL), wall 25: the loaded images that VirtualQuery describes. The harness registers every image that it mapped (the main module and ea	未設定
+fle_vol.c	69	0238	/* Decision 0238 (load2, PROVISIONAL): kernel32!GetFileType, DWORD f(HANDLE hFile rcx). It stopped by name (decision 0078) while no code reached it; the CRT of 	未設定
+fle_wall_dec1.c	1	0206	/* Walls that the sample-decoder DLLs of the installer reached when they were lifted and run (decision 0206, dec1, PROVISIONAL, OPT-IN: a function here is reach	未設定
+fle_wall_dlg1.c	1	0178	/* Walls that opening a project through File -> Open... reached (decision 0178, PROVISIONAL). See fle_wall_dlg1.h. */	未設定
+fle_wall_dlg1.h	1	0178	/* Walls that opening a project through File -> Open... reached (decision 0178, PROVISIONAL). Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (r	未設定
+fle_wall_exp1.c	1	0188	/* Walls that File -> Export -> Wave file reached (decision 0188, PROVISIONAL). See fle_wall_exp1.h. */	未設定
+fle_wall_exp1.h	1	0188	/* Walls that File -> Export -> Wave file reached (decision 0188, PROVISIONAL). Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx), R[8] (r8)	未設定
+fle_wall_ia2.c	1	0191	/* Walls of the second wave of user operations (decision 0191, PROVISIONAL). See fle_wall_ia2.h. */	未設定
+fle_wall_ia2.h	1	0191	/* Walls of the second wave of user operations (decision 0191, PROVISIONAL). Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx), R[8] (r8), R	未設定
+fle_wall_ia2t.c	1	0191	/* kernel32!GetTimeZoneInformationForYear (wall ia2-W21: the channel rack's settings icon; a DELAY-LOADED import that the virtual kernel32 did not answer: the d	未設定
+fle_wall_ia2v.c	1	0171	/* kernel32!GetPrivateProfileStringW (wall ia2-W17 of decision 0171, met again by Help > FL Studio tutorials; decision 0191, PROVISIONAL). See fle_wall_ia2.h.	未設定
+fle_wall_ia2w.c	1	0191	/* Walls of the second wave of user operations that need the window table and the pixel model (decision 0191, PROVISIONAL): user32!ScrollWindowEx (wall ia2-W23)	未設定
+fle_wall_ia2w.c	161	0319	/* ---- Decision 0319 (PROVISIONAL; PM 07:2x; O9): ScrollWindowEx and ScrollWindow on the window model of decision 0214 (fle_win.c: fle_win_scroll; the contract	未設定
+fle_wall_wrp1.c	1	0183	/* Walls that the Fruity Wrapper reached inside the engine (decision 0183, PROVISIONAL). See fle_wall_wrp1.h. */	未設定
+fle_wall_wrp1.h	1	0183	/* Walls that the Fruity Wrapper (Plugins\Fruity\Generators\Fruity Wrapper\Fruity Wrapper_x64.dll) reached inside the engine (decision 0183, PROVISIONAL). Same 	未設定
+fle_win.c	1	0071	/* The virtual window table (docs/decisions/0071-virtual-windows.md, PROVISIONAL; the pages read and the guest's call sites are in	未設定
+fle_win.c	103	0123	/* Decision 0123 (PROVISIONAL), the window-management state (docs/decisions/0123-window-model-and-walls.md; R1..R10 of docs/investigations/detach-window.md sect	未設定
+fle_win.c	221	0119	/* ---- Decision 0119 (PROVISIONAL): the rest of the window model, appended after the three functions of decision 0071 ---- */	未設定
+fle_win.c	267	0139	/* Decision 0139 (PROVISIONAL, S-com-slot-range): the method slots of the COM objects that fle_dsound.c hands to the guest are pseudo-VAs of a range of their ow	未設定
+fle_win.c	352	0123	/* ---- Decision 0123 (PROVISIONAL): the window-management state. Helpers. ---- */	未設定
+fle_win.c	727	0229	/* user32!SendMessageA (decision 0229, ref1, PROVISIONAL; the wall W32 of decision 0191 that the reference project's first Enter reaches). The A and W functions	未設定
+fle_win.c	799	0119	/* user32!GetSystemMenu: HMENU f(HWND hWnd rcx, BOOL bRevert edx) (decision 0119, wall 16, PROVISIONAL). Learn: "Enables the application to access the window me	未設定
+fle_win.c	828	0119	/* user32!DeleteMenu: BOOL f(HMENU hMenu rcx, UINT uPosition edx, UINT uFlags r8d) (decision 0119, wall 16, PROVISIONAL). Learn: "Deletes an item from the speci	未設定
+fle_win.c	863	0119	/* wtsapi32!WTSRegisterSessionNotification: BOOL f(HWND hWnd rcx, DWORD dwFlags edx) (decision 0119, wall 11, PROVISIONAL). Learn (wtsapi32.h, Windows Vista	未設定
+fle_win.c	887	0119	/* uxtheme!BufferedPaintInit: HRESULT f(void) (decision 0119, wall 12, PROVISIONAL). Learn (uxtheme.h, Windows Vista and later): "Initialize buffered painting f	未設定
+fle_win.c	944	0123	/* Decision 0123 (PROVISIONAL): every form of CreateWindowExW is answered by the rules of the Learn pages instead of the three forms of decisions 0071, 0119 and	未設定
+fle_win.c	1257	0119	/* user32!GetWindowLongPtrW: LONG_PTR f(HWND hWnd rcx, int nIndex rdx) (decision 0119, wall 17, PROVISIONAL). Learn: "If the function succeeds, the return value	未設定
+fle_win.c	1297	0119	/* user32!SetWindowTextW: BOOL f(HWND hWnd rcx, LPCWSTR lpString rdx) (decision 0119, wall 17, PROVISIONAL). Learn: "Changes the text of the specified window's 	未設定
+fle_win.c	1324	0071	* "should return zero" when wParam is FALSE): the results below are PROVISIONAL (decision 0071), chosen so that the default	未設定
+fle_win.c	1361	0119	/* Decision 0119, wall 17 (PROVISIONAL). Learn (WM_SETTEXT): "lParam: A pointer to a null-terminated string that is the window text"; "The DefWindowProc functio	未設定
+fle_win.c	1381	0119	/* Decision 0119, wall 14 (PROVISIONAL). Learn (WM_SETICON): wParam ICON_BIG (1) or ICON_SMALL (0), lParam "A handle to the new large or small icon. If this par	未設定
+fle_win.c	1397	0123	/* Decision 0123 (PROVISIONAL): the default processing of the messages the window model sends. Each answer is the one of the page. */	未設定
+fle_win.c	1481	0126	/* Decision 0126 (PROVISIONAL), wall 65. Learn WM_SETREDRAW: "You send the WM_SETREDRAW message to a window to allow changes in that window to be redrawn, or to	未設定
+fle_win.c	1528	0136	/* Decision 0136 (PROVISIONAL): the mouse and key messages, WM_NCHITTEST, WM_SETCURSOR, WM_MOUSEACTIVATE, WM_SYSCOMMAND: fle_input.c */	未設定
+fle_win.c	1544	0171	/* Decision 0171 (PROVISIONAL), wall ia1-W10 (S-ia1-defproc-1; Tab, the arrow keys and Ctrl+Z/C/V/X reach DefWindowProcW with these messages): WM_CHANGEUISTATE 	未設定
+fle_win.c	1573	0212	/* Decision 0212 (PROVISIONAL, S-displaychange-def: a choice without a source), WM_DISPLAYCHANGE 0x7E and WM_SETTINGCHANGE 0x1A (fle_input.c sends them when the	未設定
+fle_win.c	1584	0122	/* ---- Decision 0122 (PROVISIONAL): the message queues. One FIFO per guest thread (fle_thread.c); a window's posted messages go to the queue of its owner threa	未設定
+fle_win.c	1847	0147	/* user32!PostThreadMessageW: BOOL f(DWORD idThread ecx, UINT Msg edx, WPARAM wParam r8, LPARAM lParam r9) (decision 0147, PROVISIONAL). Learn (PostThreadMessag	未設定
+fle_win.c	1977	0123	* Decision 0123 (PROVISIONAL): window management. STATE ONLY: no pixel is drawn, no real input exists. Every answer below is from a Learn page named in the comm	未設定
+fle_win.c	2295	0126	/* user32!MonitorFromWindow: HMONITOR f(HWND hwnd rcx, DWORD dwFlags edx) (decision 0126, PROVISIONAL, wall 100; the notes are in fle_monitor.c). The bounding r	未設定
+fle_win.c	2330	0126	/* ---- user32!SetWindowsHookExW and UnhookWindowsHookEx (decision 0126, PROVISIONAL, wall 101) ----	未設定
+fle_win.c	2347	0196	/* Decision 0196 (PROVISIONAL; supersedes "never reused" and "at most 64 live hooks" above where they differ): hook_count counts the LIVE hooks (it counted ever	未設定
+fle_win.c	2435	0171	/* ---- Decision 0171 (PROVISIONAL, wall ia1-W14: the engine's own pop-up windows install a WH_CALLWNDPROC hook for the current thread when a menu or context me	未設定
+fle_win.c	2674	0247	/* ---- Decision 0247 (alpha3, PROVISIONAL): the update region of a window is a set of rectangles, not one bounding rectangle (it was S-updregion of decision 01	未設定
+fle_win.c	2705	0319	/* Decision 0319 section 23 (alpha1, PROVISIONAL; O9 / the Balance form: the child windows of a form that was shown never got a WM_PAINT): showing a window give	未設定
+fle_win.c	2881	0214	/* ---- Decision 0214 (present2; PROVISIONAL; docs/0214-present-path.md): what the window manager does around a child window that is moved, sized, shown, hidden	未設定
+fle_win.c	3468	0132	/* Decision 0132 (PROVISIONAL), wall 21 (S-swp-unchanged-geometry). A call that does not change the size (the position) of the window reports SWP_NOSIZE (SWP_NO	未設定
+fle_win.c	3523	0319	/* ---- Decision 0319 (PROVISIONAL; PM 07:2x; O9 'Settings -> General: scrolling breaks the picture, only the hovered element is repaired'): the bits and the up	未設定
+fle_win.c	4894	0125	/* Decision 0125 (PROVISIONAL): see fle_win.h. The root of a child chain is the top-level window (R10); an owned top-level window is its own root (it has its ow	未設定
+fle_win.c	4923	0319	/* Decision 0319 section 13 (alpha1, PROVISIONAL; O1 'the picture of the clip that is dragged is not drawn'): Learn GetDCEx: DCX_LOCKWINDOWUPDATE "Allows drawin	未設定
+fle_win.c	5001	0142	/* Decision 0142 (PROVISIONAL; docs/decisions/0142-window-visible-region.md): the visible region of the DC of window `hwnd` with the clip flags `cf` (fle_visrgn	未設定
+fle_win.c	5440	0126	/* user32!ValidateRgn: BOOL f(HWND rcx, HRGN rdx) (decision 0126, PROVISIONAL, wall 96). Learn: "validates the client area within a region by removing the regio	未設定
+fle_win.c	5508	0126	/* user32!GetUpdateRgn: int f(HWND rcx, HRGN rdx, BOOL bErase r8d) (decision 0126, PROVISIONAL, wall 93). Learn: "retrieves the update region of a window by cop	未設定
+fle_win.c	5714	0126	/* user32!LockWindowUpdate: BOOL f(HWND hWndLock rcx) (decision 0126, PROVISIONAL, wall 64). Learn (LockWindowUpdate): "disables or enables drawing in the speci	未設定
+fle_win.c	5787	0126	/* ---- menus (decision 0126, PROVISIONAL, STATE ONLY: nothing is drawn, nothing is tracked) ----	未設定
+fle_win.c	5826	0126	/* user32!GetKeyState: SHORT f(int nVirtKey ecx) and user32!GetAsyncKeyState: SHORT f(int vKey ecx) (decision 0126, PROVISIONAL, wall 61). Learn (GetKeyState): 	未設定
+fle_win.c	5832	0136	/* Decision 0136 (PROVISIONAL): with fle_input.c linked the key and button state is the one the host fed in (GetKeyState: as of the key messages the thread read	未設定
+fle_win.c	5837	0126	/* The pointer position (decision 0126, PROVISIONAL, wall 74; decision 0123 answered (0, 0) for GetCursorPos and had no setter). Learn (GetCursorPos): "retrieve	未設定
+fle_win.c	5892	0126	/* user32!GetCursorInfo: BOOL f(PCURSORINFO pci rcx) (decision 0126, PROVISIONAL, wall 77). Learn (GetCursorInfo): "Retrieves information about the global curso	未設定
+fle_win.c	6162	0126	/* user32!AdjustWindowRectEx: BOOL f(LPRECT lpRect rcx, DWORD dwStyle edx, BOOL bMenu r8d, DWORD dwExStyle r9d) (decision 0126, PROVISIONAL, wall 84). Learn (Ad	未設定
+fle_win.c	6222	0123	/* ---- scroll bars: the standard ones (SetScrollInfo, GetScrollInfo) and the flat ones (comctl32; decision 0123 walls 36-37, PROVISIONAL, STATE ONLY) ----	未設定
+fle_win.c	6348	0132	/* user32!ShowScrollBar: BOOL f(HWND hWnd rcx, int wBar edx, BOOL bShow r8d). Decision 0132 (PROVISIONAL), wall 20 (STATE ONLY like the rest of this section). L	未設定
+fle_win.c	6508	0123	/* ---- window placement (R2, R8; decision 0123 wall 38, PROVISIONAL) ----	未設定
+fle_win.c	6552	0267	/* user32!SetWindowPlacement: BOOL f(HWND rcx, const WINDOWPLACEMENT *rdx) (decision 0267, alpha10, PROVISIONAL). Learn: "Sets the show state and the restored, 	未設定
+fle_win.c	6603	0123	/* ---- BeginDeferWindowPos, DeferWindowPos, EndDeferWindowPos (decision 0123 wall 39, PROVISIONAL) ----	未設定
+fle_win.c	6942	0136	/* ---- Decision 0136 (PROVISIONAL): what runtime/fle_input.c (the input round trip) needs of the window table ---- */	未設定
+fle_win.c	7111	0141	/* Decision 0141 (PROVISIONAL), read-only for the browser front end (fle_appview.c): the live top-level windows in z-order, top first (the order of the list the	未設定
+fle_win.c	7125	0212	/* Decision 0212 (PROVISIONAL, opt-in FLE_SCREEN_REMAXIMIZE=1; S-remaximize, an inference without a page: a window that was maximized is resized by Windows when	未設定
+fle_win.c	7198	0171	/* ---- Decision 0171 (PROVISIONAL, walls ia1-W4 and ia1-W5): the system caret (state only) and ShowOwnedPopups ---- */	未設定
+fle_win.c	7323	0171	/* user32!LogicalToPhysicalPoint and PhysicalToLogicalPoint: BOOL f(HWND hWnd rcx, LPPOINT lpPoint rdx) (decision 0171, PROVISIONAL, wall ia1-W8: delay-loaded b	未設定
+fle_win.c	7344	0171	/* user32!SetWindowRgn: int f(HWND hWnd rcx, HRGN hRgn rdx, BOOL bRedraw r8d) (decision 0171, PROVISIONAL, wall ia1-W15: the engine's pop-up menu window shapes 	未設定
+fle_win.h	2	0071	* (docs/decisions/0071-virtual-windows.md, PROVISIONAL; the pages read and the guest's call sites are in	未設定
+fle_win.h	18	-	/* The handle of the i-th window (i = 0, 1, ...) is FLE_WIN_HANDLE_BASE + 4 * (i + 1), never reused (a PROVISIONAL choice, in the	未設定
+fle_win.h	45	0119	/* Decision 0119 (PROVISIONAL), wall 10: the second form of CreateWindowExW that is answered: the hidden application window of the guest's	未設定
+fle_win.h	53	0121	/* Decision 0121 (PROVISIONAL), wall 20: the third form of CreateWindowExW that is answered: a message-only window. Learn (CreateWindowExW, hWndParent): "To cre	未設定
+fle_win.h	60	0119	/* Decision 0119 (PROVISIONAL), wall 13: the 8 bytes `41 5B FF 25 00 00 00 00` (pop r11; jmp qword ptr [rip + 0]) read as a little-endian uint64: the template t	未設定
+fle_win.h	65	0119	/* Decision 0119 (PROVISIONAL), wall 16: the window menu (system menu) of a window, user32!GetSystemMenu and user32!DeleteMenu. The handle of the menu of window	未設定
+fle_win.h	81	0119	/* Decision 0119 (PROVISIONAL), wall 17: user32!GetWindowLongPtrW: LONG_PTR f(HWND hWnd rcx, int nIndex rdx); user32!SetWindowTextW: BOOL f(HWND hWnd rcx, LPCWS	未設定
+fle_win.h	127	0119	/* Decision 0119 (PROVISIONAL), wall 9: user32!SendMessageW: LRESULT f(HWND hWnd rcx, UINT Msg rdx, WPARAM wParam r8, LPARAM lParam r9) and	未設定
+fle_win.h	137	0119	/* Decision 0119 (PROVISIONAL), wall 11: wtsapi32!WTSRegisterSessionNotification: BOOL f(HWND hWnd rcx, DWORD dwFlags edx) (wtsapi32.dll is virtual module N = 3	未設定
+fle_win.h	143	0119	/* Decision 0119 (PROVISIONAL), wall 12: uxtheme!BufferedPaintInit: HRESULT f(void) (uxtheme.dll is virtual module N = 38): S_OK, counted; the other buffered-pa	未設定
+fle_win.h	148	0122	/* Decision 0122 (PROVISIONAL): the message queue of each guest thread (fle_thread.c holds the queues; docs/decisions/0122-cooperative-threads.md). The window t	未設定
+fle_win.h	163	0147	/* Decision 0147 (PROVISIONAL): user32!PostThreadMessageW: BOOL f(DWORD idThread ecx, UINT Msg edx, WPARAM wParam r8, LPARAM lParam r9). The queue of the thread	未設定
+fle_win.h	187	0123	/* ---- Decision 0123 (PROVISIONAL): window management, a STATE-ONLY model (nothing is drawn, no real input) ----	未設定
+fle_win.h	276	0125	/* Decision 0125 (PROVISIONAL): what fle_gdc.c asks of the window table to give a DC to a window (GetDC, GetWindowDC, GetDCEx, BeginPaint). `hwnd` is a live win	未設定
+fle_win.h	286	0126	/* Decision 0126 (PROVISIONAL): what the pixel model needs. root_cx, root_cy = the size of the top-level window = the size of its drawing surface (the desktop: 	未設定
+fle_win.h	297	0319	/* Decision 0319 (PROVISIONAL): the bits and the update area of ScrollWindowEx / ScrollWindow (fle_win.c, "fle_win_scroll"). `scroll` / `clip` are client-coordi	未設定
+fle_win.h	384	0126	/* Decision 0126 (wall 101, PROVISIONAL; the notes are in fle_win.c): user32!SetWindowsHookExW: HHOOK f(int, HOOKPROC, HINSTANCE, DWORD) for WH_MOUSE and WH_KEY	未設定
+fle_win.h	406	0132	/* Decision 0132 (PROVISIONAL), wall 20: user32!ShowScrollBar: BOOL f(HWND rcx, int wBar edx, BOOL bShow r8d); state only (fle_win.c). */	未設定
+fle_win.h	463	0171	/* Decision 0171 (PROVISIONAL): the system caret (state only), ShowOwnedPopups, LogicalToPhysicalPoint, PhysicalToLogicalPoint. See fle_win.c. fle_win_caret_sta	未設定
+fle_win.h	474	0171	/* Decision 0171 (PROVISIONAL): user32!CallNextHookEx: LRESULT f(HHOOK rcx, int edx, WPARAM r8, LPARAM r9); calls the next older WH_CALLWNDPROC hook procedure (	未設定
+fle_win.h	477	0171	/* Decision 0171 (PROVISIONAL): user32!SetWindowRgn: int f(HWND rcx, HRGN rdx, BOOL r8d); state only. fle_win_window_rgn: the region handle of a window, 0 = non	未設定
+fle_wininet.c	1	0126	/* wininet!InternetGetConnectedState: BOOL f(LPDWORD lpdwFlags rcx, DWORD dwReserved edx) (decision 0126, PROVISIONAL, wall 85). NOT A NETWORK MODEL: the defini	未設定
+fle_wininet.c	23	0132	/* ---- wininet!InternetOpenW, InternetSetOptionW, InternetOpenUrlW, InternetCloseHandle (decision 0132, PROVISIONAL, wall 23) ----	未設定
+fle_wininet.h	1	0126	/* The virtual machine has no network connection (decision 0126, PROVISIONAL, S-inet-offline): wininet!InternetGetConnectedState returns FALSE with no flag set.	未設定
+fle_wininet.h	9	0132	/* Decision 0132 (PROVISIONAL), wall 23: an OFFLINE session (fle_wininet.c): InternetOpenW makes a handle, InternetSetOptionW keeps the three time-outs, Interne	未設定
+fle_winmm.c	34	0126	/* Decision 0126 (PROVISIONAL), wall 78 (S-midi-mapper-nodriver): the guest asks the capabilities of MIDI_MAPPER (the Microsoft GS Wavetable Synth of a real mac	未設定
+fle_winmm.c	157	0098	/* ---- msacm32!acmMetrics (decision 0098, PROVISIONAL) ----	未設定
+fle_winmm.h	84	0098	/* msacm32!acmMetrics (decision 0098, PROVISIONAL): MMRESULT f(HACMOBJ hao, UINT uMetric, LPVOID pMetric). rcx, edx, r8.	未設定
