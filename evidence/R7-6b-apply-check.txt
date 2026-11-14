@@ -1,0 +1,9 @@
+# 実行: 2026-11-15 04:52:11 JST / HEAD dc05b08
+# コマンド: source scripts/env.sh && git apply --include='lift/runtime/fle_proc.*' --check patches/gpu8/diffs/0318-hidpi-runtime-v2.diff; echo rc=$?
+# 実行の前後で git status --short の出力は同じ。出力に含まれる他の作業の変更: M evidence/R2-7.md・M evidence/R5-2.md、未追跡 evidence/R5-2-recompute.txt・evidence/R0-6-failfast.txt。本記録はそれらに触れていない。
+# 出力(標準エラーと rc をそのまま保存):
+error: patch failed: lift/runtime/fle_proc.c:405
+error: lift/runtime/fle_proc.c: patch does not apply
+error: patch failed: lift/runtime/fle_proc.h:92
+error: lift/runtime/fle_proc.h: patch does not apply
+rc=1

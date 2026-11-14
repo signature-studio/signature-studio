@@ -1,0 +1,4 @@
+# 実行: 2026-11-15 04:52:11 JST / HEAD dc05b08
+# コマンド: source scripts/env.sh && git merge-base --is-ancestor 77e400c 33b676a; echo rc=$?
+# 出力(標準出力は空。rc のみ):
+rc=0
