@@ -24,7 +24,7 @@
 - 挙動: 製品では `e` が NULL になり、888〜891 行の拒否判定は偽になる。製品の manifest はこの名前を渡さないので、今の既定の動作(拒否判定が発火しない)と同じ。`cfg_on` は 893 行で 1 のまま。native は `getenv` のままなので変わらない。
 - 読みの確認(`sed -n '882,896p' lift/harness/fruity.c`): `e` の宣言は 884 行、値の検査は 888〜891 行、`cfg_on` の代入は 892〜896 行(`#ifdef __EMSCRIPTEN__` の枝が 893 行、`#else` の枝が 895 行)。製品では 893 行の枝が通り、`e` は 888 行の拒否判定でだけ使われる(895 行の枝は native のみ)。
 - 今の既定値と同じ値になるか: 同じ。製品の `cfg_on` は現在も 1 で、読みの結果は判定に使われていない。
-- 食い違い(2026-11-14 の直し): `lift/runtime/fle_test_env.h:4-5` のコメントは `FLE_CALL_FRUITY` を manifest かページが渡すパラメータと書くが、現行の manifest は渡さない(E13 の `engine.env`・`build-engine-bundle.sh:436-438`)。コメントが古い。2 段目(`623b9f8`)で 6 の置換と同じ commit に、`fle_test_env.h:4` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ。分類は (a) のまま。§8 参照)。
+- 食い違い(2026-11-14 の直し): `lift/runtime/fle_test_env.h:4` のコメントは `FLE_CALL_FRUITY` を manifest かページが渡すパラメータと書いていたが、現行の manifest は渡さない(E13 の `engine.env`・`build-engine-bundle.sh:436-438`)。コメントが古い。2 段目(`623b9f8`)で 6 の置換と同じ commit に、`fle_test_env.h:4` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ。分類は (a) のまま。§8 参照)。
 - 撤回条件: 製品の manifest に `FLE_CALL_FRUITY` を渡す必要が出たら、この読みを戻す。
 
 ### 注 2: 5 の分類(規則の文面との食い違い)
@@ -61,7 +61,7 @@
 完了条件:
 1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残りが、この表の行に対応すること。想定される残り: `fle_test_env.h:2,3,5`(コメント)と `:12`(マクロ本体)、`fle_thread.c:824,847`、`fle_screen.h:30`、`fruity.c:867,899,1062`。`fruity.c:884` は 6 の差分で消える。
 2. `cargo test` の失敗 0(取り込み前から残る `getmodulehandleexw_returns_in_every_build` を除く)。
-3. 差分の commit は 6 だけ(`fle_test_env.h:4-5` のコメントの直しを含む)。単独の commit にする。
+3. 差分の commit は 6 だけ(`fle_test_env.h:4` のコメントの直しを含む)。単独の commit にする。
 
 ## 7 訂正
 - 2026-11-14 訂正(main の検査): 行番号は 886〜889 → 888〜891。7 行目の『899 行で読まれる』は誤り(897 行の `if (!cfg_on)` に入らない)。
