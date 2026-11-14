@@ -7121,7 +7121,7 @@ unsigned fle_win_input_toplevels(uint64_t *handles, unsigned max)
     return c;
 }
 
-/* Decision 0212 (PROVISIONAL; S-remaximize; decision 0243 removed the environment switch FLE_SCREEN_REMAXIMIZE, so this always runs; an inference without a page: a window that was maximized is resized by Windows when the display changes, and this model does not do it by itself).
+/* Decision 0212 (PROVISIONAL; S-remaximize; the page no longer sends an environment switch for it and the runtime reads none, so this always runs; an inference without a page: a window that was maximized is resized by Windows when the display changes, and this model does not do it by itself).
  * Every live top-level window in the zoomed state (ShowWindow SW_SHOWMAXIMIZED) keeps its position and is given the size it had PLUS the change of the screen (dw, dh): a window that covered the screen with an outset (the guest sets
  * (-5, -6, W + 10, H + 12) on its main form) keeps the outset. Done as the guest's own SetWindowPos would do it (WM_WINDOWPOSCHANGING, the position change, WM_SIZE with SIZE_MAXIMIZED). Returns the number of windows moved. */
 unsigned fle_win_input_remaximize(int32_t dw, int32_t dh)
