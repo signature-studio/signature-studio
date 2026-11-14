@@ -1,7 +1,7 @@
 #!/bin/bash
 # measure.sh CFGDIRNAME... : runs the scenarios on lift/out-vst2/native/<cfg>/vst-native, 3 times each for the default input, once for the health scenarios; the log
 # lines (RESULT ...) go to lift/out-vst2/log/measure-<cfg>.txt with the load average before each run. CPU time is the thread CPU time (clock_gettime THREAD_CPUTIME).
-cd /home/ubuntu/work/signature-studio-develop
+cd "$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"
 OUT=$PWD/lift/out-vst2; FILE=$PWD/lift/out-vst1/bin/OTT.vst3
 export FLE_VFS_SEED=$OUT/edit/lift/harness/vst/vfs-seed-vst.tsv
 for cfg in "$@"; do

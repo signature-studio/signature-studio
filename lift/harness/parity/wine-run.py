@@ -7,7 +7,7 @@ a = sys.argv[1:]
 script, out = a[0], a[1]
 def opt(n, d=None):
     return a[a.index('--' + n) + 1] if '--' + n in a else d
-W = '/home/ubuntu/work/signature-studio-develop/lift/out-parity1'
+W = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'lift', 'out-parity1'))
 prefix = opt('prefix', W + '/wine/prefix'); size = opt('size', '1920x1080'); disp = opt('display', ':77'); project = opt('project')
 os.makedirs(out, exist_ok=True)
 sw, sh = [int(x) for x in size.split('x')]

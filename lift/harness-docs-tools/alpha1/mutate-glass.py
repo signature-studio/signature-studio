@@ -2,7 +2,7 @@
 """alpha1: mutation check of lift/harness/alpha1/glass_seq.c. Each mutation edits one line of a copy of the runtime, rebuilds that one file and runs the test; the test must FAIL (exit status 1 or a build failure is not counted as detected).
 usage: mutate-glass.py [SRC]  -> prints one line per mutation: DETECTED / SURVIVED, and the number of FAIL lines."""
 import os, shutil, subprocess, sys, re
-A = '/home/ubuntu/work/signature-studio-develop/lift/out-alpha1'
+A = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'lift', 'out-alpha1'))
 SRC = sys.argv[1] if len(sys.argv) > 1 else A + '/src'
 BASE = A + '/work/glass'
 MUT = [

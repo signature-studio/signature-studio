@@ -2,7 +2,7 @@
 # gpu1: an incremental build of F2xH7 from ciA (the cold build of HEAD): lift fresh by the CI stage, strip, the objects of ciA whose unit C is byte-identical hard-linked, the runtime objects (rt/ h-fruity/ common.o) compiled again, link, seed, bundle (COMPRESS=none unless set).
 # usage: mk-inc.sh NAME TREE   -> lift/out-gpu1/ciNAME, logs/build-NAME-*.log   (like lift/out-ship5/tools/s5-mk-var2.sh)
 set -eu
-G=/home/ubuntu/work/signature-studio-develop/lift/out-gpu1; R=/home/ubuntu/work/signature-studio-develop/lift/out-alpha1; N=$1; A=${DONOR:-$G/ciA}; T=$R/$2; P=${PRESET:-F2xH7}; D=$R/ci$N
+REPO="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"; G="$REPO/lift/out-gpu1"; R="$REPO/lift/out-alpha1"; N=$1; A=${DONOR:-$G/ciA}; T=$R/$2; P=${PRESET:-F2xH7}; D=$R/ci$N
 export PATH=$PATH:/opt/emsdk/node/24.19.0_64bit/bin
 [ ! -e "$D" ] || { echo "$D exists"; exit 1; }
 mkdir -p "$D/engine/w-Oz" "$D/engine/logs"; cp -a "$A/host" "$D/host"; cp -a "$A/b2d" "$D/b2d"

@@ -4,7 +4,7 @@
 # THE INPUT IS A HARNESS SIMULATION (G3 script), NOT A USER OPERATION.
 set -u -o pipefail
 BIN=$(readlink -f "$1"); SCRIPT=$(readlink -f "$2"); mkdir -p "$3"; OUT=$(readlink -f "$3"); DUMP=${4:-}; [ -n "$DUMP" ] && { mkdir -p "$DUMP"; DUMP=$(readlink -f "$DUMP"); }
-REPO=/home/ubuntu/work/signature-studio-develop
+REPO="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"
 A=$REPO/lift/out-alpha1
 SRC=${SRC:-$A/src}
 DLLD=$A/work/dll

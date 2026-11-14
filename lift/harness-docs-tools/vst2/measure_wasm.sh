@@ -1,6 +1,6 @@
 #!/bin/bash
 # measure_wasm.sh CFG... (e.g. ottw-O2-b1 ottw-Oz-b1): node runs of the wasm builds; log lift/out-vst2/log/measure-wasm-<cfg>.txt with the load before each run.
-cd /home/ubuntu/work/signature-studio-develop
+cd "$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"
 OUT=$PWD/lift/out-vst2
 export FLE_VFS_SEED=$OUT/edit/lift/harness/vst/vfs-seed-vst.tsv
 for cfg in "$@"; do

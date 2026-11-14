@@ -4,11 +4,12 @@
 // usage: node chrome-ops.mjs --out DIR [--ops a,b,c] [--query '?x=y'] [--max-load 12] [--reps 1] [--screen 1920x1080]
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { openServer, openSession, sleep, say, load1, SRC } from '/home/ubuntu/work/signature-studio-develop/lift/harness/web/lat1/lib.mjs';
 const { descendants } = await import(`${SRC}/test/e2e/cdp.mjs`);
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };
-const out = path.resolve(opt('out', '/home/ubuntu/work/signature-studio-develop/lift/out-parity1/runs/chrome-ops'));
+const out = path.resolve(opt('out', path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../lift/out-parity1/runs/chrome-ops')));
 const query = opt('query', '');
 const only = opt('ops', '').split(',').filter(Boolean);
 const maxLoad = Number(opt('max-load', '12')), maxWaitMin = Number(opt('max-wait-min', '10'));

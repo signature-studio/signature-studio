@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """alpha1: the observation tables from the recorder's api.log files (native -O2 N1, G3 scripts; THE INPUT IS A HARNESS SIMULATION). usage: mk-tables.py"""
 import re, collections, os
-R = '/home/ubuntu/work/signature-studio-develop/lift/out-alpha1'
+R = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'lift', 'out-alpha1'))
 def events(run):
     for ln in open('%s/runs/%s/api.log' % (R, run), errors='replace'):
         m = re.match(r'E (\d+) (\w+) cls=(\S*) (.*)$', ln.rstrip('\n'))

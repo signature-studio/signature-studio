@@ -1,7 +1,7 @@
 #!/bin/bash
 # alpha1: the scenario set on one native build with the recorder. usage: run-all.sh TAG   (work/n1-TAG -> runs/<scenario>-TAG)
 set -u
-A=/home/ubuntu/work/signature-studio-develop/lift/out-alpha1; T=$1; B=$A/work/n1-$T
+A="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"/lift/out-alpha1; T=$1; B=$A/work/n1-$T
 cd $A
 export A1_BBSIZE="206x279;113x108" A1_BBPIX="30,262;40,97" A1_PIX="34,298;99,133;100,133" A1_CROP="4,36,208,333;59,36,345,231"
 bash tools/run-n1.sh $B scripts/pull1.g3 runs/pull1-$T runs/pull1-$T/dump

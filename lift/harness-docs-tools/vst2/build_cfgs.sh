@@ -1,6 +1,6 @@
 #!/bin/bash
 # builds the measurement configurations of TAG=ott18 one after the other (JOBS=3), logs to lift/out-vst2/log/build-<cfg>.txt
-cd /home/ubuntu/work/signature-studio-develop
+cd "$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"
 export OUT=$PWD/lift/out-vst2 FILE=$PWD/lift/out-vst1/bin/OTT.vst3
 for cfg in "$@"; do
     IFS=: read opt bi cnt <<< "$cfg"

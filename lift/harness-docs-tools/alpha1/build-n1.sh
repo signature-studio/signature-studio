@@ -5,11 +5,11 @@
 #   * the FRUITY harness, the upstream Blend2D adapter and library (pick1's), and the recorder tools/alpha1_rec.c + the wrappers tools/gen-wrap.py generates.
 # usage: build-n1.sh OUTBIN [SRC (a tree with lift/)]      env: RT_X (extra -D), TAG (object directory suffix), JOBS (default 4)
 set -eu -o pipefail
-A=/home/ubuntu/work/signature-studio-develop/lift/out-alpha1
+REPO="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"; A="$REPO/lift/out-alpha1"
 HERE=$A/tools
 OUTBIN=$(readlink -f "$1"); SRC=${2:-$A/src}; TAG=${TAG:-base}; JOBS=${JOBS:-4}
 LIFT=$SRC/lift; RT=$LIFT/runtime; H=$LIFT/harness
-P=/home/ubuntu/work/signature-studio-develop/lift/out-pick1
+P="$REPO/lift/out-pick1"
 GENOBJ=$A/work/gen-obj
 O=$A/work/obj-$TAG; mkdir -p $O/rt $O/h $O/log $GENOBJ/fle $GENOBJ/mod
 copy_gen() {

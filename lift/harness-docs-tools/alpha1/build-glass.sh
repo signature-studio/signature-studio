@@ -1,7 +1,7 @@
 #!/bin/bash
 # alpha1: build and run lift/harness/alpha1/glass_seq.c on the runtime of $SRC (a tree with lift/). usage: build-glass.sh [SRC] [OUTDIR] [extra clang flags]
 set -eu
-A=/home/ubuntu/work/signature-studio-develop/lift/out-alpha1
+REPO="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"; A="$REPO/lift/out-alpha1"
 SRC=${1:-$A/src}; OUT=${2:-$A/work/glass}; shift 2 2>/dev/null || true
 RT=$SRC/lift/runtime; H=$SRC/lift/harness/alpha1
 mkdir -p $OUT

@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 
 import zlib from 'node:zlib';
@@ -26,7 +26,7 @@ const BROWSER = opt('browser', 'chrome');
 const URL0 = opt('url');
 const OUT = path.resolve(opt('out', '/tmp/opencode/gpu1/drive'));
 const [VW, VH] = opt('viewport', '2176x1224').split('x').map(Number);
-const APP = path.resolve(opt('app', '/home/ubuntu/work/signature-studio-develop/lift/out-gpu1/src/app'));
+const APP = path.resolve(opt('app', path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../lift/out-gpu1/src/app')));
 const ONLY = opt('only', '') ? opt('only', '').split(',') : null;
 const REPEAT = Number(opt('repeat', '1'));
 fs.mkdirSync(OUT, { recursive: true });

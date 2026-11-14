@@ -1,7 +1,7 @@
 #!/bin/bash
 # alpha1: assemble lift/out-git/alpha1-results/ and alpha1.diff from the work tree (src/). usage: mk-results.sh
 set -eu
-R=/home/ubuntu/work/signature-studio-develop; A=$R/lift/out-alpha1; O=${O:-$R/lift/out-git/alpha1-results}
+R="$(readlink -f "$(dirname "${BASH_SOURCE[0]}")/../../..")"; A=$R/lift/out-alpha1; O=${O:-$R/lift/out-git/alpha1-results}
 [ ! -e "$O" ] || { echo "$O exists (new names only)"; exit 1; }
 cd $A; rm -rf work/head2 work/new2; mkdir -p work/head2 work/new2
 (cd $R && git archive HEAD) | tar -x -C work/head2
