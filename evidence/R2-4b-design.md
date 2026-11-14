@@ -16,11 +16,11 @@
 | 旧: 右クリックは 6 要素で窓が出ない | 旧 E13 と RT-B の再現、RT-E でも出ない | `docs/archive/feedback/2026-11-07-owner-observations.md:158`、`:313` |
 | 旧: Tempo の値(開始 200.000、3 px で 522.000) | RT-B(診断入り page)の値。旧 RT-E では 200.000 → 180.000 | 同 `:158`、`:247`、`:306` |
 | 旧: 読み方(数字をどう読んだか) | 読んだ範囲(`:244-251`、`:301-314`)には記述が無い。同じ記録の他の行にあるかは未確認 | 同 `:244`、`:303` の実行の節 |
-| 旧: シナリオ `scn-o20-tempo-ptr.json` | 本リポジトリに無い(`tools/`・`docs/` の grep で 0 件) | 同 `:244` が参照 |
+| 旧: シナリオ `scn-o20-tempo-ptr.json` | 本体(ファイル)は無い。名前は archive の参照(`docs/archive/feedback/2026-11-07-owner-observations.md:244`・`:303`)にだけある(2026-11-14 に `tools/`・`docs/` を grep) | 同 `:244`・`:303` が参照 |
 | 旧: 画・数値の置き場 | `docs/investigations/gpu8/0331/logs/` は無い。`lift/out-git/gpu8-results/0331/` と `lift/out-gpu2/runs/rt-o20-*` も無い | `ls` の結果 |
 | 旧: 測定に使った page | page-rt1 のコピー(worker が `mark('pointer')` を出し、main が `pointerTrace` を残す)。診断入りの改造ページ | 同 `:244`、`:303` |
 | ROADMAP R2-4 | 「3 px ドラッグ→値、80 px ドラッグ→値、6 要素の右クリック→窓表」。完了条件は `evidence/R2-4.md` | `docs/ROADMAP.md:32` |
-| 今回の bundle | `~/.cache/signature-studio/work-r24/` はあるが `bundle/` は無い(別の worker がビルド中) | `ls` の結果 |
+| 今回の bundle | この記録の作成時点(2026-11-14 の `f058835` の後)は `bundle/` が無かった。現在は有る(`~/.cache/signature-studio/work-r24/bundle/fl-Oz/`) | `evidence/R2-4a.md` で起動確認済み |
 
 ## 2 (a) Tempo の値の読み方
 
@@ -28,7 +28,7 @@
 |---|---|---|
 | 窓表から値を読む | 不可。窓表は窓の lid・位置・大きさ・class・title だけ | `lift/runtime/fle_desk.c:422-431`(`build_desc`) |
 | `window.__app` の API から値を読む | 不可。state・engineLog・latency・deskDumpBase64・readbackDesk・deskStats・screen はコントロールの値を返さない | `app/src/main.ts:161-181` |
-| engine log から値を読む | 不可(確認できた範囲)。Tempo の数字を出す行は旧記録にも `tools/` にも無い。522 の出所は記録に無い | `tools/` の grep で 522 と Tempo の該当 0 件 |
+| engine log から値を読む | 不可(確認できた範囲)。Tempo の値を出す行は 0 件(2026-11-14 に `tools/verify-kit/tools` を grep。`tools/verify-kit/tools/scn-o20-start.json:1` に Tempo の語はあるが値ではない)。522 の出所は記録に無い | 同上 |
 | 画像から数字を機械で読む | 不可。OCR の道具は無い | `tools/` の grep(tesseract・ocr)で 0 件 |
 | 画素の差分で「動いた・張り付いた」を見る | 可能 | `tools/verify-kit/tools/pngdiff.py`(画素比較)。`sdriveg2-lat.mjs` の `pixel`・`shot`・`cmpShot`(`tools/verify-kit/tools/sdriveg2-lat.mjs` の case) |
 | 1 点の色を時系列で見る | 可能(`sdrive-a1.mjs` の `series` op。`sdriveg2-lat.mjs` には無い) | `tools/verify-kit/tools/sdrive-a1.mjs:758-775` |
@@ -45,7 +45,7 @@ Tempo の箱の位置: 保存画から測っていない(未実施)。座標の�
 | 左右のボタンの down・up | `sdriveg2-lat.mjs` の `down`・`up`(`button` に `right` を指定可) | `tools/verify-kit/tools/sdriveg2-lat.mjs:220-221`。ボタンの対応は `:176`(`right: 2`) |
 | 右クリック(press と release) | `click` に `button: "right"` | `sdriveg2-lat.mjs:222-230` |
 | ドラッグ(3 px・80 px) | `drag`(`x,y → x2,y2`、`steps` 既定 10、`stepMs` 既定 40) | `sdriveg2-lat.mjs:231-239` |
-| 座標の系 | guest の screen 座標。CSS 座標へ `desktop の rect.x + (sx+0.5)·(rect.w/gw)` | `tools/verify-kit/tools/sdrive-a1.mjs:183`(同じ式を `sdriveg2-lat.mjs` が使うかは未確認。本体を読んでいない) |
+| 座標の系 | guest の screen 座標。CSS 座標へ `desktop の rect.x + (sx+0.5)·(rect.w/gw)` | `tools/verify-kit/tools/sdrive-a1.mjs:183`。`sdriveg2-lat.mjs:159` に同じ式(確認済み。`:159` と `:183` を read) |
 | guest の大きさ | `window.__app.screen.guest`(既定は SCREEN_DEFAULT) | `app/src/main.ts:164` |
 | 送られた入力の記録 | `latDump`(ページ自身の入力の遅延の記録。tEvent・outcome など) | `sdriveg2-lat.mjs:566`、`app/src/ui/latency.ts:17` |
 
@@ -80,7 +80,7 @@ Tempo の箱の位置: 保存画から測っていない(未実施)。座標の�
 ## 5 (d) R2-4c の手順(案)
 
 前提(R2-4c が始める前に満たす):
-- P0. `~/.cache/signature-studio/work-r24/bundle` ができてから始める(今は無い)。`app/` の build は別の worker が行っているので、R2-4c は build しない。
+- P0. `~/.cache/signature-studio/work-r24/bundle` ができてから始める(この記録の作成時点では無かった。現在は有る。`evidence/R2-4a.md`)。`app/` の build は別の worker が行っているので、R2-4c は build しない。
 - P1. bundle の所在: `tools/verify-kit/serve-once-o9.mjs:13` は bundle を `e13` と `head` の 2 つに固定している。R2-4c は bundle の場所を 1 つ足す必要がある(`tools/` の 1 行。製品に触れない。URL パラメータ・環境変数は不要)。
 - P2. 負荷の確認: `tools/verify-kit/tools/wait-quiet.mjs`(load 8 以下、I/O 圧 0 を待つ)を各 run の前に使う。`free -m` と `vmstat 1 3` を記録する。
 
@@ -111,7 +111,6 @@ R2-4c が保存する物: PNG(Tempo 箱の切り出し、各段の全画面)、�
 ## 7 未確認
 
 - 右ボタンの down・up を `sdriveg2-lat.mjs` で実行したこと: コードの読みだけ。
-- `sdriveg2-lat.mjs` の `mouse()` が `sdrive-a1.mjs:183` と同じ座標の式を使うこと: 未確認。
 - Song Position (485,20) と Pattern Selector (615,61) が画のどの部品か: 未確認。
 - `~/.cache/signature-studio/work/bundle` の版と中身: 未確認。
 - 旧の page-rt1 のコピーの所在: 未確認。
@@ -128,4 +127,12 @@ R2-4c が保存する物: PNG(Tempo 箱の切り出し、各段の全画面)、�
 
 除去の理由: この依頼に画像の添付は無かった。記録自身が「出典の保存先は無い」と書いていた。開いたファイルを示せない観測は、AGENTS §5 の誠実性の規則に反するので書かない。
 
-今回の確認(ファイル名の `ls` と `find` だけ。中身は開いていない): `evidence/R1-6b/` には `*-o9-*.png` が 6 枚(`e13-run1-` と `head-run1-` の各 3 枚)、`evidence/R2-2h/` には `r23-run1-o9-*.png` が 3 枚ある。`tools/verify-kit/out/` には名前に `start` を含む `o9-start.png` が 20 枚あり、`evidence/` 直下には該当が無い。これらを開いた目視は、この依頼では未実施。座標の目視は R2-4c で行う。
+今回の確認(ファイル名の `ls` と `find` だけ。中身は開いていない): `evidence/R1-6b/` には `*-o9-*.png` が 6 枚(`e13-run1-` と `head-run1-` の各 3 枚)、`evidence/R2-2h/` には `r23-run1-o9-*.png` が 3 枚ある。`tools/verify-kit/out/o9-*/` の下に名前に `start` を含む `o9-start.png` が 20 枚あり(`find tools/verify-kit/out -name 'o9-start.png'` の結果)、`evidence/` 直下には該当が無い。これらを開いた目視は、この依頼では未実施。座標の目視は R2-4c で行う。
+
+## 追記 2026-11-14(reviewer 指摘の直し)
+
+- 指摘 1: 直す前の :19: 「旧: シナリオ `scn-o20-tempo-ptr.json` | 本リポジトリに無い(`tools/`・`docs/` の grep で 0 件) | 同 `:244` が参照」。直した後: 「本体(ファイル)は無い。名前は archive の参照(`docs/archive/feedback/2026-11-07-owner-observations.md:244`・`:303`)にだけある」。
+- 指摘 2: 直す前の :23: 「`~/.cache/signature-studio/work-r24/` はあるが `bundle/` は無い(別の worker がビルド中)」。直した後: 「この記録の作成時点(2026-11-14 の `f058835` の後)は `bundle/` が無かった。現在は有る(`~/.cache/signature-studio/work-r24/bundle/fl-Oz/`)」。直す前の :39 には該当の文が無かった(読みで確認)。直す前の :83: 「(今は無い)」。直した後: 「(この記録の作成時点では無かった。現在は有る。`evidence/R2-4a.md`)」。
+- 指摘 3: 直す前の :31: 「`tools/` の grep で 522 と Tempo の該当 0 件」。直した後: 「Tempo の値を出す行は 0 件(2026-11-14 に `tools/verify-kit/tools` を grep。`tools/verify-kit/tools/scn-o20-start.json:1` に Tempo の語はあるが値ではない)」。
+- 指摘 4: 直す前の :48: 「(同じ式を `sdriveg2-lat.mjs` が使うかは未確認。本体を読んでいない)」。直した後: 「`sdriveg2-lat.mjs:159` に同じ式(確認済み。`:159` と `:183` を read)」。直す前の :114: 「`sdriveg2-lat.mjs` の `mouse()` が `sdrive-a1.mjs:183` と同じ座標の式を使うこと: 未確認。」は消した。
+- 指摘 5: 直す前の :131: 「`tools/verify-kit/out/` には名前に `start` を含む `o9-start.png` が 20 枚あり」。直した後: 「`tools/verify-kit/out/o9-*/` の下に名前に `start` を含む `o9-start.png` が 20 枚あり」。
