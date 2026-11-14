@@ -94,7 +94,6 @@ void fle_imp_DecodePointer(void);
 /* shcore!GetProcessDpiAwareness: HRESULT f(HANDLE hprocess, PROCESS_DPI_AWARENESS *value). rcx, rdx. Decision 0099 (provisional): the current process
  * (NULL or the GetCurrentProcess pseudo handle) is PROCESS_DPI_UNAWARE (0); a NULL pointer or any other handle is E_INVALIDARG. */
 #define FLE_PROCESS_DPI_UNAWARE 0u
-#define FLE_PROCESS_PER_MONITOR_DPI_AWARE 2u   /* shellscalingapi.h PROCESS_PER_MONITOR_DPI_AWARE; decision 0212: reported instead when FLE_SCREEN_DPI (fle_screen.h) is above 96 */
 void fle_imp_GetProcessDpiAwareness(void);
 
 /* rpcrt4!UuidCreate: RPC_STATUS f(UUID *Uuid rcx). Decision 0118 wall 7 (provisional): writes a version 4 (RFC 4122 section 4.4) UUID made from a fixed-seed

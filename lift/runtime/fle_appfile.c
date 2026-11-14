@@ -236,7 +236,7 @@ void fle_imp_GetDpiForMonitor(void)
         R[0] = 0x80070057u;   /* E_INVALIDARG */
         return;
     }
-    fle_st(px, 4, (uint32_t)FLE_SCREEN_PX_DPI);   /* decision 0212: 96 unless FLE_SCREEN_DPI says another (fle_screen.h) */
+    fle_st(px, 4, (uint32_t)FLE_SCREEN_PX_DPI);   /* fle_screen.h: FLE_SCREEN_DPI_DEFAULT (96); no environment variable sets it */
     fle_st(py, 4, (uint32_t)FLE_SCREEN_PX_DPI);
     R[0] = 0;
 }

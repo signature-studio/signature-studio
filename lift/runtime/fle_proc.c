@@ -405,7 +405,7 @@ void fle_imp_GetProcessDpiAwareness(void)
         R[0] = FLE_HR_E_INVALIDARG;
         return;
     }
-    fle_st(pv, 4, fle_screen_dpi() > FLE_SCREEN_DPI_DEFAULT ? FLE_PROCESS_PER_MONITOR_DPI_AWARE : FLE_PROCESS_DPI_UNAWARE);   /* decision 0212 (opt-in FLE_SCREEN_DPI) */
+    fle_st(pv, 4, FLE_PROCESS_DPI_UNAWARE);
     R[0] = FLE_HR_S_OK;
 }
 
