@@ -5,7 +5,7 @@
 日付: 2026-11-14   ROADMAP: R2-2(1 本目)   一覧: -   コミット: 取り込みは `git log --oneline -2` の 2 本目(`lift:` で始まる commit)。文書は 1 本目の次の commit。
 
 ## 決定
-決定: `patches/alpha22/impl/0319-scrollwindow-model.diff` を取り込む。`fle_win.c` / `fle_win.h` に `fle_win_scroll`(窓モデル)を足し、`fle_wall_ia2w.c` の `ScrollWindowEx` と `ScrollWindow` をそれに載せる。根拠: O9(「スクロールで画面が崩れ、ホバーした部品だけが直る」)の原因は、ScrollWindowEx が画素を動かす範囲と、返す更新領域が Win32 の契約(可視領域・WS_CLIPCHILDREN・更新領域の外接矩形)と合わなかったこと。契約を実装する(分類 (b))。
+決定: `patches/alpha22/impl/0319-scrollwindow-model.diff` を取り込む。`fle_win.c` / `fle_win.h` に `fle_win_scroll`(窓モデル)を足し、`fle_wall_ia2w.c` の `ScrollWindowEx` と `ScrollWindow` をそれに載せる。~~根拠: O9(「スクロールで画面が崩れ、ホバーした部品だけが直る」)の原因は、ScrollWindowEx が画素を動かす範囲と、返す更新領域が Win32 の契約(可視領域・WS_CLIPCHILDREN・更新領域の外接矩形)と合わなかったこと。契約を実装する(分類 (b))。~~ 訂正(main の検査 2026-11-14): O9 の原因は未特定。旧記録(`docs/archive/feedback/2026-11-07-owner-observations.md:76`・`:143`)は、cand1 の ScrollWindowEx のモデル入りでも E13 の絵とビット単位で同一の崩れで、PM の仮説(子窓の移動で親の空いた領域が無効化されない)は alpha1 の harness で否定されたと書く。この決定の根拠は O9 の原因ではなく、Win32 の契約(Learn の ScrollWindowEx・ScrollWindow の記述。`fle_wall_ia2w.c:161-167` の注釈が引く)を実装することそのもの(分類 (b))。1 本目が O9 を直すかは未確認(R1-6b の前後の画は、1 本目を入れる前の bundle)。
 
 分類の根拠(パッチの注釈と出典):
 - `lift/runtime/fle_wall_ia2w.c:161-167` の注釈が、Learn の ScrollWindowEx・ScrollWindow の記述(更新領域は子窓を含む・lpRect が NULL のときだけ子窓と無効領域が動く)を引く。
