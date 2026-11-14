@@ -73,3 +73,13 @@
 - 2026-11-14 訂正(main の検査・reviewer 指摘)E: 表 4 の「`.github` から `fle_test_env_wasm.h` の参照は 0 件」は、reviewer の grep が隠しディレクトリを走査していなかったため未確認だった。直し: `.github`(隠し含む)を grep し 0 件。参照は `make-test-tree.sh:4,24` のみ(`.github` の中身は `workflows`)。
 - 2026-11-14 訂正(main の検査・reviewer 指摘)F: 表 1・表 3 の「`main.ts:721`・`:722` で無条件に呼ぶ」は、「無条件」の根拠が不足していた。`main.ts:669` の boot() の本線で、`:672` の try の中。早期 return(`:694`・`:695`)を通った run だけが 721 行に届く。直し: 「boot() の本線として呼ぶ(条件分岐の外)」に改めた。
 - 2026-11-14 訂正(main の検査・reviewer 指摘)G: 上の A〜F の直しを本文に反映した。元の誤りの文は、この節に引用して残した。
+
+## 8 2 段目の実施(2026-11-14)
+- 実施した commit: `git log --oneline -- lift/harness/fruity.c` で見る(コードの commit は単独。記録の commit は別)。
+- 変更の 2 か所: `lift/harness/fruity.c:884` の `getenv("FLE_CALL_FRUITY")` を `FLE_TEST_GETENV("FLE_CALL_FRUITY")` に替えた。`lift/runtime/fle_test_env.h:4-5` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ)。計 2 行。
+- `cargo test`: 通過 2417・失敗 1・無視 1。失敗名は既知の `getmodulehandleexw_returns_in_every_build` の 1 件のみ(`evidence/R7-2.md`・`evidence/R7-2-cargo.log`)。
+- 未実施: 実エンジンでの確認(wasm のビルド・Chrome での起動・P1〜P3 の測定)。製品の出力が変わらないことは未確認。
+- `## 6` の完了条件の判定:
+  1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残り: 満たす。想定どおり(`evidence/R7-2.md` の 2)。
+  2. `cargo test` の失敗 0(既知の 1 件を除く): 満たす。新しい失敗 0。
+  3. 差分の commit は 6 だけ・単独: 満たす。`lift/` の差分は 2 ファイル・2 行で、コードの commit は記録の commit と分けた。
