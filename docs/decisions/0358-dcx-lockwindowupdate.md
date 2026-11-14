@@ -1,7 +1,7 @@
 # 0358: GetDCEx の DCX_LOCKWINDOWUPDATE を、LockWindowUpdate 中の DC の可視領域に反映する(0319 の 3 本目)
 
 分類: (b)。契約の実装。Win32 の GetDCEx で DCX_LOCKWINDOWUPDATE が立つ DC は、LockWindowUpdate が有効でもこの窓への描画を許す(tracking 中の描画に使う)、という契約を fle_win.c の可視領域の問い合わせに実装する。新しい処理ではない。
-撤回条件: 取り込み後に、P1 の起動・`cargo test` の新しい失敗・P3 の音の書き込みのいずれかが悪化したら、この 3 本目(`lift/runtime/fle_win.c` の `fle_win_dc_query_ex`・`fle_win.h` の宣言・`fle_gdi.c` の 1715 行の呼び出しと weak 宣言 1 行)を外す。
+撤回条件: 取り込み後に、P1 の起動・`cargo test` の新しい失敗・P3 の音の書き込みのいずれかが悪化したら、この 3 本目(`lift/runtime/fle_win.c` の `fle_win_dc_query_ex`・`fle_win.h` の宣言・`fle_gdi.c` の ~~1715 行~~ 1729 行の呼び出しと weak 宣言 1 行)を外す。(HEAD `4f363e2` の値。2 本目の取り込み時の行番号は 3・4 本目でずれた。訂正 reviewer 指摘 2026-11-14)
 日付: 2026-11-14   ROADMAP: R2-2(3 本目)   一覧: -   コミット: 取り込みは `lift:` で始まる commit(下の「コミット」節)。文書と記録は次の commit。
 
 ## 決定
@@ -22,13 +22,13 @@ DCX_LOCKWINDOWUPDATE の値(0x400)は、`lift/runtime/fle_gdc.h:85` の注記ど
 ## 追加の処理・分岐の分類
 - 新しい `#define FLE_DCX_LOCKWINDOWUPDATE_ 0x00000400u` は、フラグの定数(環境変数・ビルド変数・`#ifdef` ではない)。
 - `fle_win_dc_query_ex` は、`fle_win_dc_query` の dcx = 0 の形。既存の問い合わせに、DCX フラグの例外を 1 つ足しただけ(分類 (b))。
-- `fle_gdi.c` の 1715 行は、GetDCEx の DC のときだけ `gi.flags` を渡す。0142 の `gi.from_ex`・`gi.flags`(`fle_gdc.h`)が既にあり、新しい状態は増えない。
+- `fle_gdi.c` の ~~1715 行~~ 1729 行(HEAD `4f363e2` の値。訂正 reviewer 指摘 2026-11-14)は、GetDCEx の DC のときだけ `gi.flags` を渡す。0142 の `gi.from_ex`・`gi.flags`(`fle_gdc.h`)が既にあり、新しい状態は増えない。
 
 ## パッチの `+` 行の検査
 `grep -c -e '^[+].*getenv[(]' -e '^[+]#ifdef FLE_' patches/alpha22/impl/0319-dcx-lockwindowupdate.diff` → 0。`+` 行の `#if`・`#ifdef`・`#ifndef`・`getenv`・`URLSearchParams` は 0 件(`grep -n`)。`+` 行の `FLE_` で始まる名前は `FLE_DCX_LOCKWINDOWUPDATE_`(上の定数)だけ。新しい `#ifdef` は無いので、分類の追加は無い。
 
 ## NULL の扱い
-- `fle_win_dc_query_ex` は `fle_gdi.c` で weak 宣言(1570 行)。呼び出し(1715 行)は `fle_win_dc_query_ex ? ... : fle_win_dc_query(...)` の形で、NULL のときは既存の `fle_win_dc_query` に戻る。その `fle_win_dc_query` は 1714 行の `if (!fle_win_dc_query) pixel_stop(...)` で守られている。したがって、リンクされない場合も NULL の関数は呼ばれない(read で確かめた)。
+- `fle_win_dc_query_ex` は `fle_gdi.c` で weak 宣言(1570 行)。呼び出し(~~1715 行~~ 1729 行。HEAD `4f363e2` の値。同上)は `fle_win_dc_query_ex ? ... : fle_win_dc_query(...)` の形で、NULL のときは既存の `fle_win_dc_query` に戻る。その `fle_win_dc_query` は ~~1714 行~~ 1717 行(HEAD `4f363e2` の値。同上)の `if (!fle_win_dc_query) pixel_stop(...)` で守られている。したがって、リンクされない場合も NULL の関数は呼ばれない(read で確かめた)。
 - 本番の wasm にリンクされるかは未確認。`lift/harness/two/build_nmod_wasm.sh` の `stage_rt`(53〜55 行)は `fle_*.c` を全部 `$OBJ/rt/` にコンパイルすることを確かめたが、このファイル(81 行)にリンクの段階は無く、`app/scripts/build-engine-bundle.sh` は `build_nmod_wasm.sh rt harness units` を呼ぶだけ。リンクを行う箇所は未確認。実エンジンでの確認は未実施。
 
 ## O9 について
