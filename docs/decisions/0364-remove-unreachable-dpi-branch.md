@@ -1,7 +1,7 @@
 # 0364: 到達しない DPI 分岐(fle_proc.c:408)の除去
 分類: (a 除去)
 撤回条件: 0347 の案 B を採り、FL が `GetProcessDpiAwareness` の応答で描画の経路を選ぶと確かめられ、かつ起動時の DPI を 96 より大きく届ける決定が出たとき、その応答を DPI から決める 1 行を (b) で戻す。
-日付: 2026-11-15   ROADMAP: R7-6   一覧: 0347 の決定 5   コミット: 77e400c..(この決定を含む commit)
+日付: 2026-11-15   ROADMAP: R7-6   一覧: 0347 の決定 5   コミット: 33b676a
 
 ## 決定
 決定: `lift/runtime/fle_proc.c:408` の三項演算子を除き、`GetProcessDpiAwareness` の応答を常に `FLE_PROCESS_DPI_UNAWARE`(0)にする。`FLE_PROCESS_PER_MONITOR_DPI_AWARE`(2)は参照が 0 になったので定義ごと除く。根拠: `fle_screen_dpi()` は `lift/runtime/fle_screen.h:59` で常に `FLE_SCREEN_DPI_DEFAULT`(96)を返すため、条件 `96 > 96` は偽で、真の枝には HEAD で届かない(R7-6a §3)。除去の前後とも応答は 0 で、値は変わらない。
