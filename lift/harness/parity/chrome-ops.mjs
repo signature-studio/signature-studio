@@ -5,7 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { openServer, openSession, sleep, say, load1, SRC } from '/home/ubuntu/work/signature-studio-develop/lift/harness/web/lat1/lib.mjs';
+import { openServer, openSession, sleep, say, load1, SRC } from '../../../archive/harness-attic/web/lat1/lib.mjs';
 const { descendants } = await import(`${SRC}/test/e2e/cdp.mjs`);
 const argv = process.argv.slice(2);
 const opt = (n, d) => { const i = argv.indexOf('--' + n); return i < 0 ? d : argv[i + 1]; };

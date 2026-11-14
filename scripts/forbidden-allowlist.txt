@@ -43,8 +43,7 @@ oldpath|archive/harness-attic/parity-paint/|
 oldpath|archive/legacy-tools/wasm-final0129/|
 oldpath|archive/legacy-tools/a4-six-module-wasm/|
 oldpath|archive/legacy-tools/ship1/|
-# --- oldpath: R7-5 live code that reads the old working tree by absolute path (remove these entries when the paths are fixed)
-oldpath|lift/harness/parity/chrome-ops.mjs|
+# --- oldpath: R7-5 live code (0 件。R7-5 で解消)
 # --- docs/archive: the original text of the old documents (published as it was; the visibility decision is 2026-11-10, see .gitignore history)
 # cfhex: md5/ETag columns, certificate serial numbers, gist ids and session ids in the text (checked by R2-verify.sh 2a: ok)
 cfhex|docs/archive/decisions/|
