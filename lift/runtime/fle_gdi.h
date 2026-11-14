@@ -214,6 +214,10 @@ void fle_imp_BitBlt(void);
 void fle_imp_PatBlt(void);
 void fle_imp_FillRect(void);
 void fle_imp_ScrollDC(void);   /* decision 0319 */
+/* decision 0319 section 14: the pixels of a bitmap handle, and the 32-bit pixels of a rectangle of a DC for the drag image of fle_imagelist.c (see fle_gdi.c) */
+int fle_gdi_bitmap_view(uint64_t hbm, fle_rsurf *out);
+int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid);
+int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid);
 void fle_imp_GetDIBits(void);
 void fle_imp_RealizePalette(void);
 

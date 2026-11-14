@@ -1673,6 +1673,20 @@ int fle_gdi_memdc_surface(uint64_t h, fle_rsurf *out)
     return 1;
 }
 
+/* Decision 0319 section 14 (alpha1, PROVISIONAL): the pixels of the bitmap `hbm` (a DIB section or a device-dependent bitmap; mt3's design, docs/decisions/0313 section 11.3: ImageList_Add reads its source through this). 1 and the view in *out; 0 when
+ * `hbm` is not a live bitmap. A device-dependent bitmap that was never drawn into has its (zero) pixel block made now (S-ddb-lazy). */
+int fle_gdi_bitmap_view(uint64_t hbm, fle_rsurf *out)
+{
+    gdi_obj *b = live_obj(hbm);
+
+    if (!b || b->kind != FLE_GDI_KIND_BITMAP) return 0;
+    if (b->fmt == FLE_GDI_BMP_DIB) {
+        dib_view((const gdi_dib *)b->ext, out);
+        return 1;
+    }
+    return ddb_view(b, out);
+}
+
 /* The target of a drawing call: the DC `h` (a memory DC or a window / screen DC). `pre` names the arguments in every stop. */
 static void apply_app_clip(uint64_t h, target *t);
 static void get_target0(const char *api, const char *pre, uint64_t h, const char *role, target *t)
@@ -2145,6 +2159,94 @@ void fle_imp_BitBlt(void)
     fle_gdi_check_thread(api);
     snprintf(pre, sizeof pre, "pixel transfer between DCs (rop 0x%x, %d x %d to (%d, %d) from (%d, %d))", (unsigned)rop, (int)cx, (int)cy, (int)x, (int)y, (int)x1, (int)y1);
     blit_call(api, pre, R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
+}
+
+/* Decision 0319 section 14 (alpha1, PROVISIONAL): the 32-bit pixels of a rectangle of a DC, for the drag image of ImageList_DragEnter / DragMove / DragShowNolock (fle_imagelist.c). Device units of the DC (a window DC from
+ * GetDCEx: its origin; a memory DC: its bitmap). Only the part inside what a drawing call reaches through this DC (the visible region, the clip) is read or written: `valid[j * w + i]` = 1 for such a pixel. fle_gdi_dc_blend32:
+ * the pixels are first saved (`saved`, the 32 bits of the surface including the unused fourth byte), then `argb` (B, G, R, A bytes, straight alpha; NULL: nothing is drawn) is laid over them with the alpha A * alpha_const / 255
+ * (src-over: out = (src * a + dst * (255 - a)) / 255 per colour byte); the fourth byte of the surface is kept. fle_gdi_dc_put32 writes `px` (32 bits as they are) where valid is 1: the restore of the saved background. Both
+ * return 0 for a target that is not a 32-bit surface that can be written (the caller stops by name), 1 otherwise (also for a window that is not visible: nothing is read or written, valid is all 0). */
+int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid)
+{
+    target t;
+    char pre[120];
+    int32_t i, j;
+    uint64_t n = 0;
+    fle_rrect bnd = { 0, 0, 0, 0 };
+    int have = 0;
+
+    if (w <= 0 || h <= 0) return 1;
+    snprintf(pre, sizeof pre, "drawing the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
+    get_target(api, pre, hdc, "hdc", &t);
+    if (valid) memset(valid, 0, (size_t)w * (size_t)h);
+    if (!target_live(api, &t)) return 1;
+    if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
+    for (j = 0; j < h; j++) {
+        for (i = 0; i < w; i++) {
+            int64_t sx = (int64_t)x + i + (t.is_window ? t.org[0] : 0), sy = (int64_t)y + j + (t.is_window ? t.org[1] : 0);
+            uint8_t *p;
+            uint32_t d;
+            size_t k = (size_t)j * (size_t)w + (size_t)i;
+
+            if (sx < 0 || sy < 0 || sx >= (int64_t)t.s.width || sy >= (int64_t)t.s.height || !target_has_point(&t, sx, sy)) continue;
+            p = fle_r_row(&t.s, (uint32_t)sy) + 4u * (size_t)sx;
+            memcpy(&d, p, 4);
+            if (saved) saved[k] = d;
+            if (valid) valid[k] = 1;
+            if (argb) {
+                uint32_t a = ((argb[k] >> 24) & 0xFFu) * alpha_const / 255u, c;
+
+                if (a != 0) {
+                    for (c = 0; c < 3; c++) {
+                        uint32_t sv = (argb[k] >> (8u * c)) & 0xFFu, dv = p[c];
+
+                        p[c] = (uint8_t)((sv * a + dv * (255u - a) + 127u) / 255u);
+                    }
+                    n++;
+                    if (!have) { bnd.x0 = sx; bnd.y0 = sy; bnd.x1 = sx + 1; bnd.y1 = sy + 1; have = 1; }
+                    if (sx < bnd.x0) bnd.x0 = sx;
+                    if (sy < bnd.y0) bnd.y0 = sy;
+                    if (sx + 1 > bnd.x1) bnd.x1 = sx + 1;
+                    if (sy + 1 > bnd.y1) bnd.y1 = sy + 1;
+                }
+            }
+        }
+    }
+    if (n) target_wrote(api, &t, bnd, n);
+    return 1;
+}
+
+int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid)
+{
+    target t;
+    char pre[120];
+    int32_t i, j;
+    uint64_t n = 0;
+    fle_rrect bnd = { 0, 0, 0, 0 };
+    int have = 0;
+
+    if (w <= 0 || h <= 0) return 1;
+    snprintf(pre, sizeof pre, "restoring the background of the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
+    get_target(api, pre, hdc, "hdc", &t);
+    if (!target_live(api, &t)) return 1;
+    if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
+    for (j = 0; j < h; j++) {
+        for (i = 0; i < w; i++) {
+            int64_t sx = (int64_t)x + i + (t.is_window ? t.org[0] : 0), sy = (int64_t)y + j + (t.is_window ? t.org[1] : 0);
+            size_t k = (size_t)j * (size_t)w + (size_t)i;
+
+            if (!valid[k] || sx < 0 || sy < 0 || sx >= (int64_t)t.s.width || sy >= (int64_t)t.s.height || !target_has_point(&t, sx, sy)) continue;
+            memcpy(fle_r_row(&t.s, (uint32_t)sy) + 4u * (size_t)sx, &px[k], 4);
+            n++;
+            if (!have) { bnd.x0 = sx; bnd.y0 = sy; bnd.x1 = sx + 1; bnd.y1 = sy + 1; have = 1; }
+            if (sx < bnd.x0) bnd.x0 = sx;
+            if (sy < bnd.y0) bnd.y0 = sy;
+            if (sx + 1 > bnd.x1) bnd.x1 = sx + 1;
+            if (sy + 1 > bnd.y1) bnd.y1 = sy + 1;
+        }
+    }
+    if (n) target_wrote(api, &t, bnd, n);
+    return 1;
 }
 
 /* gdi32!PatBlt: BOOL f(HDC hdc rcx, int x edx, int y r8d, int w r9d, int h [5], DWORD rop [6]). Learn (PatBlt): "paints the specified rectangle using the brush that is currently selected into the specified device

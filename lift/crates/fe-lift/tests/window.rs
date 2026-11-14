@@ -449,6 +449,8 @@ fn the_handle_region_overlaps_no_other_virtual_handle_region_and_is_below_2_gib(
         ("fle_cursor.h", "FLE_CURSOR_HANDLE_BASE", "FLE_CURSOR_REGION_SIZE"),
         ("fle_loadimage.h", "FLE_LI_MODULE_HANDLE_BASE", "FLE_LI_REGION_SIZE"),
         ("fle_monitor.h", "FLE_MONITOR_HANDLE_BASE", "FLE_MONITOR_REGION_SIZE"),
+        // decision 0319 section 14: the comctl32 image lists, the 64 KiB gap between the DC region and the GDI region
+        ("fle_imagelist.h", "FLE_IL_HANDLE_BASE", "FLE_IL_REGION_SIZE"),
         // decision 0119: the window menus (GetSystemMenu), a region of its own directly before the window handles
         ("fle_win.h", "FLE_MENU_HANDLE_BASE", "FLE_MENU_REGION_SIZE"),
     ];

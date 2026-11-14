@@ -306,3 +306,27 @@ dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo
 user32.dll ScrollWindow fle_imp_ScrollWindow
 # Decision 0319 (alpha1, PROVISIONAL): user32!ScrollDC (runtime/fle_gdi.c: the bits of a DC move inside its clip, the uncovered area is returned, nothing is invalidated). The engine imports it. Appended LAST (decision 0015: append only).
 user32.dll ScrollDC fle_imp_ScrollDC
+# Decision 0319 (alpha1, PROVISIONAL; PM 09:1x): comctl32 image lists (runtime/fle_imagelist.c): the drag of an image (O1) with the lists it needs; Remove / SetImageCount / GetIcon / Draw / DrawEx / Read / Write are named stops (the engine and the plug-ins import them; nothing observed calls them). SetDragCursorImage is imported by no module and has no row. Appended LAST (decision 0015: append only).
+comctl32.dll ImageList_Create fle_imp_ImageList_Create
+comctl32.dll ImageList_Destroy fle_imp_ImageList_Destroy
+comctl32.dll ImageList_GetImageCount fle_imp_ImageList_GetImageCount
+comctl32.dll ImageList_GetIconSize fle_imp_ImageList_GetIconSize
+comctl32.dll ImageList_SetIconSize fle_imp_ImageList_SetIconSize
+comctl32.dll ImageList_GetBkColor fle_imp_ImageList_GetBkColor
+comctl32.dll ImageList_SetBkColor fle_imp_ImageList_SetBkColor
+comctl32.dll ImageList_Add fle_imp_ImageList_Add
+comctl32.dll ImageList_Replace fle_imp_ImageList_Replace
+comctl32.dll ImageList_BeginDrag fle_imp_ImageList_BeginDrag
+comctl32.dll ImageList_DragEnter fle_imp_ImageList_DragEnter
+comctl32.dll ImageList_DragMove fle_imp_ImageList_DragMove
+comctl32.dll ImageList_DragLeave fle_imp_ImageList_DragLeave
+comctl32.dll ImageList_DragShowNolock fle_imp_ImageList_DragShowNolock
+comctl32.dll ImageList_EndDrag fle_imp_ImageList_EndDrag
+comctl32.dll ImageList_GetDragImage fle_imp_ImageList_GetDragImage
+comctl32.dll ImageList_Remove fle_imp_ImageList_Remove
+comctl32.dll ImageList_SetImageCount fle_imp_ImageList_SetImageCount
+comctl32.dll ImageList_GetIcon fle_imp_ImageList_GetIcon
+comctl32.dll ImageList_Draw fle_imp_ImageList_Draw
+comctl32.dll ImageList_DrawEx fle_imp_ImageList_DrawEx
+comctl32.dll ImageList_Read fle_imp_ImageList_Read
+comctl32.dll ImageList_Write fle_imp_ImageList_Write
