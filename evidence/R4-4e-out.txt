@@ -1,5 +1,5 @@
 # r44e-threads: pulses[].threads の窓ごとの並び(既存の生データの再計算。実エンジンの実行なし。測定のやり直しなし)
-# threads[i] = [a, b, c] は累積値(lift/runtime/fle_audio_transport.c:136-156): a = スレッド i の実行 ms の累積(sl_total)、b = スレッド i の 1 回の実行 ms の最大の累積(sl_max。単調増加。起動からの最大)、c = スレッド i の実行回数の累積(sl_n)。
+# threads[i] = [a, b, c] は累積値(lift/runtime/fle_audio_transport.c:136-156): a = スレッド i の実行 ms の累積(sl_total)、b = ~~スレッド i の 1 回の実行 ms の最大の累積(sl_max。単調増加。起動からの最大)~~ 起動からの、スレッド i の 1 回の実行 ms の最大値(sl_max。累積ではない。`if (d > sl_max[from])` で更新。訂正(reviewer の指摘 2026-11-14): 単調非減少)、c = スレッド i の実行回数の累積(sl_n)。
 # 窓: 再生開始(marks[play])から 10 s。gap は r44b-corr.py と同じ(snaps の線形補間)。pulse の値は epoch に対する線形補間(pulse の間隔は 500 ms 以上。p3-chrome-1 の先頭 20 間隔は 500〜902 ms)。
 # 「b 窓内で増えた」= その窓の中で、そのスレッドに新しい最長の 1 回が起きた(b が上がった)。増えない窓では、その窓の最長は前の最大以下で値は不明。
 

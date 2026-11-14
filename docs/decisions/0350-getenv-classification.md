@@ -79,6 +79,7 @@
 - 変更の 2 か所: `lift/harness/fruity.c:884` の `getenv("FLE_CALL_FRUITY")` を `FLE_TEST_GETENV("FLE_CALL_FRUITY")` に替えた。`lift/runtime/fle_test_env.h:4-5` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ)。計 2 行。
 - `cargo test`: 通過 2417・失敗 1・無視 1。失敗名は既知の `getmodulehandleexw_returns_in_every_build` の 1 件のみ(`evidence/R7-2.md`・`evidence/R7-2-cargo.log`)。
 - 未実施: 実エンジンでの確認(wasm のビルド・Chrome での起動・P1〜P3 の測定)。製品の出力が変わらないことは未確認。
+- 製品の wasm で、`FLE_CALL_FRUITY` に `0`・`1` 以外の値を渡したときの拒否判定(`fruity.c:888-891`)は、この除去で効かなくなった(以前は `getenv` が値を返せば効いた)。現行の製品の manifest は `FLE_CALL_FRUITY` を渡さないので、現行の挙動は変わらないが、手で値を渡す経路の確認は未実施。
 - `## 6` の完了条件の判定:
   1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残り: 満たす。想定どおり(`evidence/R7-2.md` の 2)。
   2. `cargo test` の失敗 0(既知の 1 件を除く): 満たす。新しい失敗 0。
