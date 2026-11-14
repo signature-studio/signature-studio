@@ -2702,6 +2702,26 @@ static void upd_set_rect(int64_t i, int32_t l, int32_t t, int32_t r, int32_t b)
 
 static void upd_set_full(int64_t i) { upd_set_rect(i, 0, 0, tab[i].pcx, tab[i].pcy); }
 
+/* Decision 0319 section 23 (alpha1, PROVISIONAL; O9 / the Balance form: the child windows of a form that was shown never got a WM_PAINT): showing a window gives its whole client area to paint AND the whole client
+ * area of every visible descendant, whatever their clip styles. Wine 10.0 (UNOFFICIAL; server/window.c set_window_pos: the exposed region of a window that becomes visible goes to redraw_window(win, ..., RDW_INVALIDATE |
+ * RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN), which recurses into every child that has WS_VISIBLE, WS_CLIPCHILDREN or not: "if ((win->style & WS_CLIPCHILDREN) && !(flags & RDW_ALLCHILDREN)) return" is the only stop and
+ * ALLCHILDREN is set). A descendant that had WS_VISIBLE while an ancestor was hidden had no update region (S-0247-hidden: a window that is not visible has none), so when the ancestor is shown it is now visible and must paint.
+ * Learn BeginPaint: the update region is set "by the system after sizing, moving, creating, scrolling, or any other operation that affects the client area". No class or window-kind test. */
+static void upd_show_descendants(int64_t i)
+{
+    int64_t idx[SIB_MAX];
+    uint32_t n = siblings(i, idx, SIB_MAX), k;
+
+    for (k = 0; k < n; k++) {
+        int64_t c = idx[k];
+
+        if (!tab[c].live || !(tab[c].style & FLE_WS_VISIBLE) || tab[c].iconic || tab[c].pcx <= 0 || tab[c].pcy <= 0) continue;
+        upd_set_full(c);
+        tab[c].upd_erase = 1;
+        upd_show_descendants(c);
+    }
+}
+
 static void upd_get(int64_t i, fle_visrgn *v)
 {
     if (!(tab[i].upd_r > tab[i].upd_l && tab[i].upd_b > tab[i].upd_t)) v->n = 0;
@@ -3489,6 +3509,13 @@ static void apply_pos(const char *api, int64_t i, uint64_t after, int32_t x, int
             upd_set_full(i);
         }
     }
+    if ((nflags & FLE_SWP_SHOWWINDOW) && vis0 == 0 && !(nflags & FLE_SWP_NOREDRAW) && is_visible(i) && tab[i].pcx > 0 && tab[i].pcy > 0) {
+        /* decision 0319 section 23: SetWindowPos(SWP_SHOWWINDOW) on a window that was not visible exposes the whole window and all its visible descendants (Wine 10.0 server/window.c set_window_pos: the old visible
+         * region was empty, so everything is exposed: redraw_window(..., RDW_ALLCHILDREN)). ShowWindow does the same for itself in fle_imp_ShowWindow. */
+        upd_set_full(i);
+        tab[i].upd_erase = 1;
+        upd_show_descendants(i);
+    }
     if (nflags & FLE_SWP_SHOWWINDOW) note_visibility_changed();
     unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS), !(nflags & FLE_SWP_NOREDRAW));
 }
@@ -3899,6 +3926,7 @@ void fle_imp_ShowWindow(void)
         /* a window that becomes visible has its whole client area to paint (Learn BeginPaint: the update region is set "by the system after ... creating"): a choice for the show */
         upd_set_full(i);
         tab[i].upd_erase = 1;
+        upd_show_descendants(i);   /* decision 0319 section 23 */
     }
     if (cmd == FLE_SW_HIDE) input_window_hidden(api, i);
     /* Learn ShowWindow: SW_SHOWNORMAL, SW_SHOWMINIMIZED, SW_SHOWMAXIMIZED, SW_SHOW and SW_RESTORE "Activate" the window; SW_SHOWNOACTIVATE, SW_SHOWMINNOACTIVE and SW_SHOWNA do not (activate_for_swp: a visible, enabled
