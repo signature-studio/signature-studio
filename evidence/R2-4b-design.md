@@ -28,7 +28,7 @@
 |---|---|---|
 | 窓表から値を読む | 不可。窓表は窓の lid・位置・大きさ・class・title だけ | `lift/runtime/fle_desk.c:422-431`(`build_desc`) |
 | `window.__app` の API から値を読む | 不可。state・engineLog・latency・deskDumpBase64・readbackDesk・deskStats・screen はコントロールの値を返さない | `app/src/main.ts:161-181` |
-| engine log から値を読む | 不可(確認できた範囲)。Tempo の値を出す行は 0 件(2026-11-14 に `tools/verify-kit/tools` を grep。`tools/verify-kit/tools/scn-o20-start.json:1` に Tempo の語はあるが値ではない)。522 の出所は記録に無い | 同上 |
+| engine log から値を読む | 不可(確認できた範囲)。Tempo の値を出す行は 0 件(2026-11-14 に `tools/verify-kit/tools` を grep。`tools/verify-kit/tools/scn-o20-start.json:1` と `tools/verify-kit/tools/scn-o20-tempo.json:1` に Tempo の語はあるが値ではない)。522 の出所は記録に無い | 同上 |
 | 画像から数字を機械で読む | 不可。OCR の道具は無い | `tools/` の grep(tesseract・ocr)で 0 件 |
 | 画素の差分で「動いた・張り付いた」を見る | 可能 | `tools/verify-kit/tools/pngdiff.py`(画素比較)。`sdriveg2-lat.mjs` の `pixel`・`shot`・`cmpShot`(`tools/verify-kit/tools/sdriveg2-lat.mjs` の case) |
 | 1 点の色を時系列で見る | 可能(`sdrive-a1.mjs` の `series` op。`sdriveg2-lat.mjs` には無い) | `tools/verify-kit/tools/sdrive-a1.mjs:758-775` |
@@ -127,7 +127,7 @@ R2-4c が保存する物: PNG(Tempo 箱の切り出し、各段の全画面)、�
 
 除去の理由: この依頼に画像の添付は無かった。記録自身が「出典の保存先は無い」と書いていた。開いたファイルを示せない観測は、AGENTS §5 の誠実性の規則に反するので書かない。
 
-今回の確認(ファイル名の `ls` と `find` だけ。中身は開いていない): `evidence/R1-6b/` には `*-o9-*.png` が 6 枚(`e13-run1-` と `head-run1-` の各 3 枚)、`evidence/R2-2h/` には `r23-run1-o9-*.png` が 3 枚ある。`tools/verify-kit/out/o9-*/` の下に名前に `start` を含む `o9-start.png` が 20 枚あり(`find tools/verify-kit/out -name 'o9-start.png'` の結果)、`evidence/` 直下には該当が無い。これらを開いた目視は、この依頼では未実施。座標の目視は R2-4c で行う。
+今回の確認(ファイル名の `ls` と `find` だけ。中身は開いていない): `evidence/R1-6b/` には `*-o9-*.png` が 6 枚(`e13-run1-` と `head-run1-` の各 3 枚)、`evidence/R2-2h/` には `r23-run1-o9-*.png` が 3 枚ある。`tools/verify-kit/out/` の下の 20 ディレクトリ(`o9-e13-1〜11`・`o9-head-1〜3`・`o9b-head-1〜3`・`o9c-head-1〜3`)の各 1 枚に、名前に `start` を含む `o9-start.png` がある(`ls tools/verify-kit/out/*/o9-start.png` の結果)、`evidence/` 直下には該当が無い。これらを開いた目視は、この依頼では未実施。座標の目視は R2-4c で行う。
 
 ## 追記 2026-11-14(reviewer 指摘の直し)
 
@@ -136,3 +136,5 @@ R2-4c が保存する物: PNG(Tempo 箱の切り出し、各段の全画面)、�
 - 指摘 3: 直す前の :31: 「`tools/` の grep で 522 と Tempo の該当 0 件」。直した後: 「Tempo の値を出す行は 0 件(2026-11-14 に `tools/verify-kit/tools` を grep。`tools/verify-kit/tools/scn-o20-start.json:1` に Tempo の語はあるが値ではない)」。
 - 指摘 4: 直す前の :48: 「(同じ式を `sdriveg2-lat.mjs` が使うかは未確認。本体を読んでいない)」。直した後: 「`sdriveg2-lat.mjs:159` に同じ式(確認済み。`:159` と `:183` を read)」。直す前の :114: 「`sdriveg2-lat.mjs` の `mouse()` が `sdrive-a1.mjs:183` と同じ座標の式を使うこと: 未確認。」は消した。
 - 指摘 5: 直す前の :131: 「`tools/verify-kit/out/` には名前に `start` を含む `o9-start.png` が 20 枚あり」。直した後: 「`tools/verify-kit/out/o9-*/` の下に名前に `start` を含む `o9-start.png` が 20 枚あり」。
+- 指摘 1(今回の直し): 直す前の :130(reviewer の指摘は :131 と書いた。実測は :130): 「`tools/verify-kit/out/o9-*/` の下に名前に `start` を含む `o9-start.png` が 20 枚あり(`find tools/verify-kit/out -name 'o9-start.png'` の結果)」。直した後: 「`tools/verify-kit/out/` の下の 20 ディレクトリ(`o9-e13-1〜11`・`o9-head-1〜3`・`o9b-head-1〜3`・`o9c-head-1〜3`)の各 1 枚に、名前に `start` を含む `o9-start.png` がある(`ls tools/verify-kit/out/*/o9-start.png` の結果)」。実測: `ls tools/verify-kit/out` の 20 ディレクトリと、`ls -d tools/verify-kit/out/*/o9-start.png` の 20 件が一致。
+- 指摘 2(今回の直し): 直す前の :31: 「`tools/verify-kit/tools/scn-o20-start.json:1` に Tempo の語はあるが値ではない」。直した後: 「`tools/verify-kit/tools/scn-o20-start.json:1` と `tools/verify-kit/tools/scn-o20-tempo.json:1` に Tempo の語はあるが値ではない」。実測: `expire_grep`(`Tempo`・`tools/verify-kit/tools`)の 2 件。
