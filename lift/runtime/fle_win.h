@@ -291,6 +291,8 @@ typedef struct {
     int32_t clip_l, clip_t, clip_r, clip_b;
 } fle_win_dcq;
 int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out);
+/* decision 0319 section 13: the same for a DC made by GetDCEx with the flags `dcx` (DCX_LOCKWINDOWUPDATE 0x400: the DC ignores LockWindowUpdate); fle_win_dc_query is dcx = 0 */
+int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out);
 
 /* Decision 0319 (PROVISIONAL): the bits and the update area of ScrollWindowEx / ScrollWindow (fle_win.c, "fle_win_scroll"). `scroll` / `clip` are client-coordinate RECTs (l, t, r, b) or NULL; flags are the SW_* flags of
  * ScrollWindowEx. Returns 1 with *res filled (res->invalid: the handle is not a live window; res->parts: the number of rectangles of the uncovered area; res->unc: its bounding rectangle, res->upd: the bounding rectangle of the

@@ -1567,6 +1567,7 @@ void fle_imp_CreateIconIndirect(void)
 void fle_win_lock_attempted(uint64_t hwnd) __attribute__((weak));
 /* weak too (decision 0126): a unit-test link of this file without fle_win.c has no window table, so a window / screen DC stops by name */
 int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out) __attribute__((weak));
+int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out) __attribute__((weak));   /* decision 0319 section 13 */
 int fle_win_frame_margins(uint64_t hwnd, int32_t m[4]) __attribute__((weak));   /* decision 0244 */
 /* weak too (decision 0142): without fle_visrgn.c / the window table's region function a window DC is clipped to its client rectangle and the client rectangles of its parents only, as before */
 int fle_win_dc_region(uint64_t hwnd, uint32_t clip_flags, fle_visrgn *out) __attribute__((weak));
@@ -1711,7 +1712,7 @@ static void get_target0(const char *api, const char *pre, uint64_t h, const char
             ht = q.root_cy;
         } else {
             if (!fle_win_dc_query) pixel_stop(api, pre, "no window table is linked: a window DC has no surface");
-            if (!fle_win_dc_query(gi.hwnd, &q)) pixel_stop(api, pre, "the window of the DC is gone");
+            if (!(fle_win_dc_query_ex ? fle_win_dc_query_ex(gi.hwnd, gi.from_ex ? gi.flags : 0u, &q) : fle_win_dc_query(gi.hwnd, &q))) pixel_stop(api, pre, "the window of the DC is gone");   /* decision 0319 section 13: a GetDCEx DC with DCX_LOCKWINDOWUPDATE draws during LockWindowUpdate */
             t->hwnd = gi.hwnd;
             t->lid = q.root_lid;
             w = q.root_cx;

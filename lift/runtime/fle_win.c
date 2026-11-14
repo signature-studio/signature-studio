@@ -4892,7 +4892,18 @@ int fle_win_layered_rect(uint64_t hwnd, int set_pos, int32_t x, int32_t y, int s
     return 1;
 }
 
+/* Decision 0319 section 13 (alpha1, PROVISIONAL; O1 'the picture of the clip that is dragged is not drawn'): Learn GetDCEx: DCX_LOCKWINDOWUPDATE "Allows drawing even if there is a LockWindowUpdate call in effect that would
+ * otherwise exclude this window. This value is used for drawing during tracking." (0x400, UNOFFICIAL numbers as in fle_gdc.h). A DC of GetDCEx with that flag therefore ignores the lock of LockWindowUpdate; every other DC
+ * of a locked window (or of a child of it) keeps the empty visible region (Learn LockWindowUpdate, decision 0126). FL calls GetDCEx with 0x402 and 0x412 (= DCX_CACHE [| DCX_CLIPSIBLINGS] | DCX_LOCKWINDOWUPDATE) while
+ * it holds LockWindowUpdate (7 call sites): the drawing of a drag was discarded. `dcx` = the raw flags of a GetDCEx DC, 0 for every other DC. */
+#define FLE_DCX_LOCKWINDOWUPDATE_ 0x00000400u
+int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out);
 int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out)
+{
+    return fle_win_dc_query_ex(hwnd, 0u, out);
+}
+
+int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out)
 {
     int64_t i, r, a;
     uint32_t cs = 0;
@@ -4932,7 +4943,7 @@ int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out)
     out->root_cy = tab[r].pcy;
     out->org_x = ox - rx;
     out->org_y = oy - ry;
-    out->visible = is_visible(i) && !is_locked_or_child(i) && !is_no_redraw_chain(i);       /* decision 0126: a locked window's DC has an empty visible region (LockWindowUpdate page) */
+    out->visible = is_visible(i) && ((dcx & FLE_DCX_LOCKWINDOWUPDATE_) != 0u || !is_locked_or_child(i)) && !is_no_redraw_chain(i);       /* decision 0126: a locked window's DC has an empty visible region (LockWindowUpdate page); decision 0319: not for a GetDCEx DC with DCX_LOCKWINDOWUPDATE */
     l = out->org_x;
     t = out->org_y;
     rr = l + tab[i].pcx;
