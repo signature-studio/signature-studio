@@ -11,7 +11,7 @@ const which = process.argv[2];
 const kit = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(kit, '..', '..');
 const bundleDirs = { 'work-r24': path.join(os.homedir(), '.cache', 'signature-studio', 'work-r24', 'bundle', 'fl-Oz'), base: path.join(os.homedir(), '.cache', 'signature-studio', 'work', 'bundle', 'fl-Oz') };
-if (!bundleDirs[which]) { console.error('usage: node serve-once-o20.mjs <work-r24|base> [tempo]'); process.exit(2); }
+if (!bundleDirs[which]) { console.error('usage: node serve-once-o20.mjs <work-r24|base> [tempo|rclick]'); process.exit(2); }
 const bundleDir = bundleDirs[which];
 if (!fs.existsSync(path.join(bundleDir, 'manifest.json'))) { console.error('no manifest.json in ' + bundleDir); process.exit(2); }
 const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, 'manifest.json'), 'utf8'));
@@ -19,7 +19,7 @@ const BUNDLE = /^\/assets\/([^/]+)\//.exec(manifest.engine.wasm.url)?.[1];
 if (!BUNDLE) { console.error('manifest.json: no /assets/<name>/ prefix in engine.wasm.url'); process.exit(2); }
 const appDir = path.join(repo, 'app');
 const zip = path.join(os.homedir(), 'ダウンロード', 'serina1-serum2.zip');
-const scenarios = path.join(kit, 'tools', process.argv[3] === 'tempo' ? 'scn-o20-tempo.json' : 'scn-o20-start.json');
+const scenarios = path.join(kit, 'tools', process.argv[3] === 'tempo' ? 'scn-o20-tempo.json' : process.argv[3] === 'rclick' ? 'scn-o20-rclick.json' : 'scn-o20-start.json');
 // each run gets its own folder: o20-<work-r24|base>-<largest existing number + 1>
 const nextOut = () => {
   const dir = path.join(kit, 'out');
