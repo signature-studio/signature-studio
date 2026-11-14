@@ -14,6 +14,7 @@
 - テスト(名前指定、`FLENGINE_PE` は既存の `binaries/win64/FLEngine_x64.dll`):
   - `get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware`(`wall_s.rs`): ok。1 passed・14 filtered out。rc 0。
   - `the_dpi_is_96_whatever_the_environment_says_and_the_physical_size_follows_it`(`screen1.rs`): ok。1 passed・5 filtered out。rc 0。
+  - 上の 2 件の保存: `evidence/R7-6b-named-tests.txt`(実行 2026-11-15 00:30 JST・HEAD `0d778ae`)。passed・filtered out・rc は上と同じ。元の実行の出力は保存されていなかった。
 - cargo test 全体(`cd lift && FLENGINE_PE=…/binaries/win64/FLEngine_x64.dll cargo test -j 8 --workspace --offline --no-fail-fast -- --test-threads=8`。rc 101): 通過 2422・失敗 1・無視 1。失敗名は `getmodulehandleexw_returns_in_every_build` の 1 件だけ(既知。0353 の読み)。`undefined reference` 0 件。ログは `evidence/R7-6b-cargo.log`。
 
 ## 読み(解釈。実行していない)
