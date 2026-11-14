@@ -881,7 +881,7 @@ static int parse_num(const char *name, uint64_t lo, uint64_t hi, uint64_t *out) 
 int fruity_precheck(void) {
     static const char *const others[] = {"FLE_FRUITY_MAX_CALLS", "FLE_FRUITY_SECONDS", "FLE_FRUITY_STOP_AT", "FLE_FRUITY_TRAP", "FLE_FRUITY_STABLE_SECONDS", "FLE_FRUITY_VIRTUAL_SECONDS", "FLE_FRUITY_PEEK_AT", "FLE_FRUITY_PEEK_FROM", "FLE_FRUITY_PEEK_TO"};
     static void (*const stubs[3])(void) = {fruity_host_slot0, fruity_host_slot1, fruity_host_slot2};
-    const char *e = getenv("FLE_CALL_FRUITY");
+    const char *e = FLE_TEST_GETENV("FLE_CALL_FRUITY");
     const char *s;
     unsigned k;
     size_t i;
