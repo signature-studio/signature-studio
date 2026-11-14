@@ -47,3 +47,8 @@
 - `docs/ROADMAP.md` の R2-9 の行(完了条件)。
 - `docs/decisions/0355-desk-describe-lazy.md`(形式の参照)。
 - `docs/decisions/README.md`(分類の規則)。
+
+## 補い(2026-11-15、reviewer の差し戻し)
+
+- 分類の行(2 行目)は、差分の `lift/runtime/fle_res.c` の hunk(`@@ -640,3 +640,140 @@`、差分 657 行)を除いて読む。この hunk の 694 行(`if (q >= 1u && q <= 6u) kn.id = FLE_LI_MODULE_FIRST + q - 1u;`)は「書けない(場当たり)」。`q` の 1〜6 の分岐が、FL の DLL の資源 ID(32762〜32767。`lift/runtime/fle_loadimage.h` 30〜31 行)に依る。根拠: `evidence/R2-9b.md` の補い(1)。
+- 決定: 適用の判断は、この補いと reviewer の再検査の後の別の依頼で行う。根拠: 分類に「書けない」の部分が残るため。
