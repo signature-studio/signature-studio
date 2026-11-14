@@ -1,16 +1,16 @@
 # 0363: 仮想ポインタを delta 形に置き換える(0319-o20-delta-pointer を取り込む。分類 (b)+(a)。「表示中は絶対」は選択)
 
 分類: (b)+(a)。(b): 表示カウントが負の間(カーソルが隠れている間)に限り、SetCursorPos の後のホストの移動を、設定点からの移動量として届ける。この「隠れている間だけ」は Win32 の契約ではなく選択である(決定 2)。(a): 旧 `virt_off`(offset)と、`set_pointer`・`fle_win_pointer_reclamp` でのホストの位置の上書きを除く。新しい環境変数・旗・`#ifdef`・URL パラメータ・ビルド変数は増やさない。
-撤回条件: 取り込み後に、P1 の起動・`cargo test` の新しい失敗・P3 の音の書き込みのいずれかが悪化したら、取り込み(`527cb67`)を戻す。または、実エンジンで Tempo の 3 px ドラッグが取り込み後も 522.000 に張り付くことが測れ、delta が原因の経路に効いていないと分かったら、取り込みを戻すか、別の決定で選択を見直す。今回は、どちらも測っていない(未実施)。
+撤回条件: 取り込み後に、P1 の起動・`cargo test` の新しい失敗・P3 の音の書き込みのいずれかが悪化したら、取り込み(`527cb67`)を戻す。または、実エンジンで Tempo の 3 px ドラッグが取り込み後も 522.000 に張り付くことが測れたら、取り込みを戻すか、別の決定で選択を見直す。『Tempo が 522 にならない』は期待ではなく、測定の予測。今回は、どちらも測っていない(未実施)。
 
-日付: 2026-11-14   ROADMAP: R2-3c   一覧: -   コミット: 取り込み `527cb67`(`lift/runtime/fle_win.c`・`lift/crates/fe-lift/tests/wall_fr11.rs` のみ)。この文書・0361 の追記・`evidence/R2-3c.md`・`evidence/R2-3c-cargo.log` は 2 段目の commit(sha は `git log --oneline -- docs/decisions/0363-delta-pointer.md` で確認)。
+日付: 2026-11-14   ROADMAP: R2-3c   一覧: -   コミット: 取り込み `527cb67`(`lift/runtime/fle_win.c`・`lift/crates/fe-lift/tests/wall_fr11.rs` のみ)。2 段目の commit は `d4be398`(この文書・0353 と 0361 の追記・`evidence/R2-3c.md`・`evidence/R2-3c-cargo.log` の 5 ファイル。`git show --stat d4be398` で確認)。この直しの commit は `git log --oneline -- docs/decisions/0363-delta-pointer.md` で見る。
 
 ## 決定
 決定: `patches/alpha22/impl/0319-o20-delta-pointer.diff` と `patches/alpha22/impl/0319-o20-delta-pointer-tests.diff` を取り込む(HEAD の `6926320` の上に当てる)。`patches/alpha22/impl/0319-o20-delta-rte-to-rtf*.diff` は当てない。
 
 ## main の決定(転記)
 1. delta-pointer を取り込む。根拠: (i) 取り込み前の `set_pointer` は `virt_off = 0` とし、`fle_win_host_pointer_set` は絶対位置で上書きする(行番号は `evidence/R2-3b.md` §1 の HEAD 上の位置。この作業では、適用の差分の削除行でこの内容を確認した)。0361 の契約(SetCursorPos の後の入力は設定点からの相対で届く)を実装していない。(ii) 実測(main の転記。`evidence/R2-4c2.md`。この作業では未読): 取り込み前も後も、Tempo の 3 px ドラッグで 140.000 → 522.000。(iii) dry-run: HEAD の版への適用は両方 rc 0(`patch -p1 --dry-run`、適用時も rc 0)。取り込み済みテストの**値**は、適用後も同じ(下の 4 節)。(iv) ROADMAP R2-3 の「README が置換すると書く」の README は存在しない(`find patches -iname 'README*'` が 0 件。この作業で確認)。組合せは `cargo test` で検証した(4 節)。
-2. 分類: (b) 契約の実装(隠れている間の相対)と (a) の除去(`virt_off` と上書き)。「表示中は絶対・隠れている間だけ相対」の区別は、Win32 の契約ではなく選択である。旧記録 `docs/archive/decisions/0319-owner-observations-contract-reading.md` の §27.4 が「SetCursorPos の page がこの区別を書いているわけではない」と書く。適用後の注釈も同じ(`lift/runtime/fle_win.c:5840` 付近の「S-pointer-shown-absolute, choice」)。理由の読み(仮説。未検証): ブラウザは表示中のポインタを host の位置に描くので、ゲストの位置が host の位置とずれると、見える位置と届く位置が食い違う。隠れている間(FL の drag 中)は、ずれても見えない。この読みが正しいかは測っていない(未確認)。
+2. 分類: (b)(移動量を設定点に足す部分。契約の実装)と (a) の除去(`virt_off` と上書き)。ただし、それを「隠れている間だけ」に限る区別は、Win32 の契約ではなく選択である。旧記録 `docs/archive/decisions/0319-owner-observations-contract-reading.md` の §27.4 が「SetCursorPos の page がこの区別を書いているわけではない」と書く。適用後の注釈も同じ(`lift/runtime/fle_win.c:5840` 付近の「S-pointer-shown-absolute, choice」)。理由の読み(仮説。未検証): ブラウザは表示中のポインタを host の位置に描くので、ゲストの位置が host の位置とずれると、見える位置と届く位置が食い違う。隠れている間(FL の drag 中)は、ずれても見えない。この読みが正しいかは測っていない(未確認)。
 3. 撤回条件: 上の文頭のとおり。
 4. 0361 との関係: 0361 は変えず、末尾に 1 行の追記を足した(6 節)。食い違いと置換は、この文書の 5 節に書いた。
 5. delta の hunk 1 は `fle_win.c` の先頭コメントを delta の説明に差し替える。コメントに `FLE_` の環境変数名・`getenv` は入っていない(2 節の検査)。
@@ -89,3 +89,12 @@
 - 画面の端で止まったポインタの限界、drag の最後の跳びの実機の挙動: 未確認。
 - P2 の 120 fps は未確認。P3 の音切れは残る(既存の記録のとおり。この取り込みで変わるかは未測定)。O9 は未特定。依頼者機の値は 0 件。
 - O20 の Tempo: 取り込み前も後も、既存の記録(`evidence/R2-4c2.md`、目視)では 522.000。この決定は、その原因を断定しない。
+
+## 追記 2026-11-14(reviewer 指摘の直し)
+
+- 直す前の 0363:6(コミット欄): 「2 段目の commit(sha は `git log --oneline -- docs/decisions/0363-delta-pointer.md` で確認)」(`d4be398` の sha が無かった)
+- 直した後: 「2 段目の commit は `d4be398`(この文書・0353 と 0361 の追記・`evidence/R2-3c.md`・`evidence/R2-3c-cargo.log` の 5 ファイル。`git show --stat d4be398` で確認)。この直しの commit は `git log --oneline -- docs/decisions/0363-delta-pointer.md` で見る」
+- 直す前の 0363:13(決定 2 の分類): 「分類: (b) 契約の実装(隠れている間の相対)と (a) の除去(`virt_off` と上書き)。「表示中は絶対・隠れている間だけ相対」の区別は、Win32 の契約ではなく選択である。」
+- 直した後: 「分類: (b)(移動量を設定点に足す部分。契約の実装)と (a) の除去(`virt_off` と上書き)。ただし、それを「隠れている間だけ」に限る区別は、Win32 の契約ではなく選択である。」
+- 直す前の 0363:4(撤回条件): 「…実エンジンで Tempo の 3 px ドラッグが取り込み後も 522.000 に張り付くことが測れ、delta が原因の経路に効いていないと分かったら、取り込みを戻すか、別の決定で選択を見直す。」
+- 直した後: 「…実エンジンで Tempo の 3 px ドラッグが取り込み後も 522.000 に張り付くことが測れたら、取り込みを戻すか、別の決定で選択を見直す。『Tempo が 522 にならない』は期待ではなく、測定の予測。」(main の決定の文に戻した。張り付きの原因が delta の経路かは、測定の前に決められない)
