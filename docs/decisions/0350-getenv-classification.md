@@ -1,8 +1,8 @@
-# 0350: getenv 8 件の分類(R7-2 の 1 段目。コードは未変更)
-結論: 除去 1・残す 4・テスト専用 3・未確認 0(計 8)。除去の差分は未実施(2 段目で行う)。
+# 0350: getenv 8 件の分類(R7-2 の 1 段目。2 段目は `623b9f8` で実施済み。§8 参照)
+結論: 除去 1・残す 4・テスト専用 3・未確認 0(計 8)。除去の差分は `623b9f8` で実施済み(2 段目。§8 参照)。
 分類: 除去 1 件 = (a)。残す 4 件 = (b) 3 件(1〜3)と、(a)(b)(c) のどれにも当たらないパラメータ 1 件(5。注 2)。テスト専用 3 件(4・7・8)は製品に入らない、または製品で到達しない。
 撤回条件: 2 段目の除去(6)の後に、P1 の起動・`cargo test` の失敗・P3 の音の書き込みのいずれかが悪化したら、その差分を戻す。
-日付: 2026-11-14   ROADMAP: R7-2   一覧: -   コミット: `93acf0e`(1 段目)・`982e0a3`(行番号の訂正)・この直しの commit(`git log --oneline -- docs/decisions/0350-getenv-classification.md` で見る)
+日付: 2026-11-14   ROADMAP: R7-2   一覧: -   コミット: `93acf0e`(1 段目)・`982e0a3`(行番号の訂正)・`623b9f8`(2 段目のコード)・以後の直し(`git log --oneline -- docs/decisions/0350-getenv-classification.md` で見る)
 
 ## 1 分類の表
 
@@ -24,7 +24,7 @@
 - 挙動: 製品では `e` が NULL になり、888〜891 行の拒否判定は偽になる。製品の manifest はこの名前を渡さないので、今の既定の動作(拒否判定が発火しない)と同じ。`cfg_on` は 893 行で 1 のまま。native は `getenv` のままなので変わらない。
 - 読みの確認(`sed -n '882,896p' lift/harness/fruity.c`): `e` の宣言は 884 行、値の検査は 888〜891 行、`cfg_on` の代入は 892〜896 行(`#ifdef __EMSCRIPTEN__` の枝が 893 行、`#else` の枝が 895 行)。製品では 893 行の枝が通り、`e` は 888 行の拒否判定でだけ使われる(895 行の枝は native のみ)。
 - 今の既定値と同じ値になるか: 同じ。製品の `cfg_on` は現在も 1 で、読みの結果は判定に使われていない。
-- 食い違い(2026-11-14 の直し): `lift/runtime/fle_test_env.h:4-5` のコメントは `FLE_CALL_FRUITY` を manifest かページが渡すパラメータと書くが、現行の manifest は渡さない(E13 の `engine.env`・`build-engine-bundle.sh:436-438`)。コメントが古い。2 段目で 6 の置換と同じ commit(単独の commit)に、`fle_test_env.h:4-5` のコメントから `FLE_CALL_FRUITY` を除く直しを含める(コメントだけ。分類は (a) のまま)。
+- 食い違い(2026-11-14 の直し): `lift/runtime/fle_test_env.h:4-5` のコメントは `FLE_CALL_FRUITY` を manifest かページが渡すパラメータと書くが、現行の manifest は渡さない(E13 の `engine.env`・`build-engine-bundle.sh:436-438`)。コメントが古い。2 段目(`623b9f8`)で 6 の置換と同じ commit に、`fle_test_env.h:4` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ。分類は (a) のまま。§8 参照)。
 - 撤回条件: 製品の manifest に `FLE_CALL_FRUITY` を渡す必要が出たら、この読みを戻す。
 
 ### 注 2: 5 の分類(規則の文面との食い違い)
@@ -45,7 +45,8 @@
 - 現木の `lift/runtime` に `getenv("FLE_SCREEN_DPI")` は無い(grep 0 件)。R2-5 の差分で入る予定で、この文書の対象外。
 
 ## 4 未実施・未確認
-- 未実施: 除去の差分(2 段目)。コードの変更。`cargo test`・`npm test` の実行。ビルド(emcc・cargo)。headless Chrome の実行と P1〜P3 の測定。wasm の中身(残る `getenv` の呼び出し)の解析。
+- 実施済み: 除去の差分(2 段目。`623b9f8`。§8 参照)。`cargo test` の実行(§8)。
+- 未実施: `npm test` の実行。ビルド(emcc・cargo)。headless Chrome の実行と P1〜P3 の測定。wasm の中身(残る `getenv` の呼び出し)の解析。
 - 未確認: `emcc` が `__EMSCRIPTEN__` を定義すること(測定中のため emcc を走らせていない。製品の wasm が 4 の `FLE_TEST_GETENV` の枝を通ることは、この読みの前提)。E13 の wasm の中の `getenv` 呼び出しの有無(解析していない)。
 - 読みで確かめた物: `build_nmod_wasm.sh` の `CFLAGS_H`(`-D` は `FLE_FRUITY=1` の `main_two.c` だけ。`fruity.c` には `-D` 無し)、`link-web.sh:21` の `-sEXPORTED_RUNTIME_METHODS=ENV,...`(`getenv` は Module.ENV を読む)、`fruity.ts:127`(manifest の `engine.env` を ENV へ写す)。
 
@@ -56,7 +57,7 @@
 - E13: `artifacts/bundles/fl-engine-ci-0363b050/manifest.json`(`engine.env` のキーと `args`)
 - 既存の書式: `docs/decisions/0352-write-only-vars.md`・`0354-callback-stack-limit.md`(分類と撤回条件の書き方)
 
-## 6 2 段目(除去の差分。測定が終わってから別の依頼で行う)
+## 6 2 段目(除去の差分。`623b9f8` で実施済み。§8 参照)
 完了条件:
 1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残りが、この表の行に対応すること。想定される残り: `fle_test_env.h:2,3,5`(コメント)と `:12`(マクロ本体)、`fle_thread.c:824,847`、`fle_screen.h:30`、`fruity.c:867,899,1062`。`fruity.c:884` は 6 の差分で消える。
 2. `cargo test` の失敗 0(取り込み前から残る `getmodulehandleexw_returns_in_every_build` を除く)。
@@ -76,7 +77,7 @@
 
 ## 8 2 段目の実施(2026-11-14)
 - 実施した commit: `git log --oneline -- lift/harness/fruity.c` で見る(コードの commit は単独。記録の commit は別)。
-- 変更の 2 か所: `lift/harness/fruity.c:884` の `getenv("FLE_CALL_FRUITY")` を `FLE_TEST_GETENV("FLE_CALL_FRUITY")` に替えた。`lift/runtime/fle_test_env.h:4-5` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ)。計 2 行。
+- 変更の 2 か所: `lift/harness/fruity.c:884` の `getenv("FLE_CALL_FRUITY")` を `FLE_TEST_GETENV("FLE_CALL_FRUITY")` に替えた。`lift/runtime/fle_test_env.h:4` のコメントから `FLE_CALL_FRUITY` を除いた(コメントだけ)。計 2 行。
 - `cargo test`: 通過 2417・失敗 1・無視 1。失敗名は既知の `getmodulehandleexw_returns_in_every_build` の 1 件のみ(`evidence/R7-2.md`・`evidence/R7-2-cargo.log`)。
 - 未実施: 実エンジンでの確認(wasm のビルド・Chrome での起動・P1〜P3 の測定)。製品の出力が変わらないことは未確認。
 - 製品の wasm で、`FLE_CALL_FRUITY` に `0`・`1` 以外の値を渡したときの拒否判定(`fruity.c:888-891`)は、この除去で効かなくなった(以前は `getenv` が値を返せば効いた)。現行の製品の manifest は `FLE_CALL_FRUITY` を渡さないので、現行の挙動は変わらないが、手で値を渡す経路の確認は未実施。
@@ -84,3 +85,5 @@
   1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残り: 満たす。想定どおり(`evidence/R7-2.md` の 2)。
   2. `cargo test` の失敗 0(既知の 1 件を除く): 満たす。新しい失敗 0。
   3. 差分の commit は 6 だけ・単独: 満たす。`lift/` の差分は 2 ファイル・2 行で、コードの commit は記録の commit と分けた。
+
+R2-5 の取り込み後(`FLE_SCREEN_DPI` の `getenv` が入る。上の 45 行)に `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の行数が変わるため、この表と `evidence/R7-2.md` の照合を更新する(R2-5 の作業)。
