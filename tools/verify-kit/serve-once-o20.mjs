@@ -10,8 +10,8 @@ import { freePort } from './lib/cdp.mjs';
 const which = process.argv[2];
 const kit = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(kit, '..', '..');
-const bundleDirs = { 'work-r24': path.join(os.homedir(), '.cache', 'signature-studio', 'work-r24', 'bundle', 'fl-Oz'), base: path.join(os.homedir(), '.cache', 'signature-studio', 'work', 'bundle', 'fl-Oz') };
-if (!bundleDirs[which]) { console.error('usage: node serve-once-o20.mjs <work-r24|base> [tempo|rclick|esc|rc1..rc6]'); process.exit(2); }
+const bundleDirs = { 'work-r24': path.join(os.homedir(), '.cache', 'signature-studio', 'work-r24', 'bundle', 'fl-Oz'), 'work-r25': path.join(os.homedir(), '.cache', 'signature-studio', 'work-r25', 'bundle', 'fl-Oz'), base: path.join(os.homedir(), '.cache', 'signature-studio', 'work', 'bundle', 'fl-Oz') };
+if (!bundleDirs[which]) { console.error('usage: node serve-once-o20.mjs <work-r24|work-r25|base> [tempo|rclick|esc|rc1..rc6]'); process.exit(2); }
 const bundleDir = bundleDirs[which];
 if (!fs.existsSync(path.join(bundleDir, 'manifest.json'))) { console.error('no manifest.json in ' + bundleDir); process.exit(2); }
 const manifest = JSON.parse(fs.readFileSync(path.join(bundleDir, 'manifest.json'), 'utf8'));

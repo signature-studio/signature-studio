@@ -1,0 +1,81 @@
+[
+ {
+  "name": "o20-tempo",
+  "what": "R2-4c-2: close the welcome wizard, wait 800 ms, shot o20-start; then drag on the Tempo box from (450,20): 3 px down (o20-3px), 80 px down (o20-80px), 20 px up (o20-20pxup), each followed by wait 800 and shot; describe the compositor's window table o20-end. Every drag starts at (450,20). No right click.",
+  "rep": 1,
+  "seconds": 18,
+  "firstIdleMs": 4468.69482421875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "describes": [
+   {
+    "name": "o20-end",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\""
+    ]
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 44.6599999666214,
+   "manifest_loaded": 59.10999995470047,
+   "download_start": 86.96999996900558,
+   "download_done": 1069.2549999952316,
+   "compile_done": 1069.6549999713898,
+   "pack_source_dll": 1132.914794921875,
+   "pack_source_seed": 1132.974853515625,
+   "glue_loaded": 1140.98486328125,
+   "worker_ready": 1143.1199999451637,
+   "engine_start": 1143.1699999570847,
+   "wasm_instantiated": 1168.9599609375,
+   "files_ready": 1181.294921875,
+   "main_start": 1182.764892578125,
+   "idle": 4468.69482421875,
+   "host_files_released": 4468.94482421875,
+   "first_pixel": 4495.434814453125
+  },
+  "loadStart": 1.68,
+  "loadEnd": 1.94,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]
