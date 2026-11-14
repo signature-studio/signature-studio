@@ -1,0 +1,23 @@
+checking file lift/harness/c0325/build.sh
+checking file lift/harness/c0325/cursor_img.c
+checking file lift/harness/c0325/real-cursors.py
+checking file lift/runtime/fle_appview.c
+checking file lift/runtime/fle_appview.h
+checking file lift/runtime/fle_gdi.c
+Hunk #3 succeeded at 1672 (offset 2 lines).
+Hunk #4 succeeded at 3262 (offset 222 lines).
+checking file lift/runtime/fle_gdi.h
+Hunk #1 succeeded at 241 (offset 5 lines).
+checking file lift/runtime/fle_res.c
+checking file lift/runtime/fle_res.h
+checking file app/src/engine/appview.ts
+checking file app/src/engine/client.ts
+checking file app/src/engine/fruity.ts
+checking file app/src/engine/os-state.ts
+checking file app/src/engine/protocol.ts
+checking file app/src/engine/worker.ts
+checking file app/src/main.ts
+checking file app/src/ui/cursor.ts
+checking file app/test/unit/appview.test.ts
+checking file app/test/unit/cursor-picture.test.ts
+checking file app/test/unit/os-state.test.ts
