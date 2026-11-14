@@ -3,7 +3,7 @@
 分類: (b)。契約の実装。DefWindowProc が WM_RBUTTONUP・WM_NCRBUTTONUP から WM_CONTEXTMENU を生成する、という Win32 の契約を fle_input.c に実装する。SetCursorPos の後の入力が、動かした位置からの相対で届く、という契約を fle_win.c の仮想ポインタに実装する。新しい処理ではなく、契約の不足を埋める物。(a) の除去は含まない。
 撤回条件: 取り込み後に、P1 の起動・`cargo test` の新しい失敗・P3 の音の書き込みのいずれかが悪化したら、`patches/alpha22/impl/0319-o20-virtual-pointer-contextmenu.diff` と `-tests.diff` の 2 本の適用(lift/ の commit)を戻す。
 
-日付: 2026-11-14   ROADMAP: R2-3   一覧: -   コミット: `evidence/R2-3.md` の「commit と push」節
+日付: 2026-11-14   ROADMAP: R2-3   一覧: -   コミット: 取り込みは `6926320`(`lift:` で始まる commit。`lift/` のみ)。記録は `cfbb999`(この文書と `evidence/R2-3.md`)
 
 ## 決定
 決定: `patches/alpha22/impl/0319-o20-virtual-pointer-contextmenu.diff` と `patches/alpha22/impl/0319-o20-virtual-pointer-contextmenu-tests.diff` を取り込む(`lift/runtime/fle_win.c`・`fle_input.c`・`fle_input.h`、テスト `lift/crates/fe-lift/tests/wall_fr11.rs`、`sweep1.rs`・`harness/sweep1/sweep1_cases.c`。行数は `evidence/R2-3.md` の `git diff --stat`)。`0319-o20-delta-pointer` と `0319-o20-delta-rte-to-rtf` は当てない(下の「取り込まなかった差分」)。根拠: 下の契約の読みの要点(分類 (b))。
