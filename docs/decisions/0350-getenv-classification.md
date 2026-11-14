@@ -13,16 +13,16 @@
 | 3 | `lift/runtime/fle_screen.h:30`(`fle_screen_dim`) | `FLE_MONITOR_W` / `FLE_MONITOR_H`(呼び出しは `fle_screen.h:47` と `:53` の 2 件のみ) | `app/src/ui/screen-fit.ts:63-64`(`screenEnv`)→ `app/src/main.ts:339-344`(`applyScreenParam`)。`main.ts:722` で無条件に呼ぶ。native: `lift/crates/fe-lift/tests/screen1.rs:109,135-158` が `run()` の環境で設定 | 入る。`fle_screen.h` は `fle_desk.c`・`fle_input.c` 等から使われ、それらは stage_rt でコンパイルされる | 作業領域と解像度の値。640×480〜7680×4320 の外、または数字でない値は既定 1920×1080(`fle_screen.h` の `fle_screen_dim`) | 残す(部品間パラメータ) | (b) 契約の実装: GetMonitorInfoW の作業領域・EnumDisplaySettings の解像度の出所を、ページが測った部屋の大きさで与える |
 | 4 | `lift/runtime/fle_test_env.h:12`(マクロの `getenv` の枝。製品の枝は `:10`) | `FLE_TEST_GETENV`(マクロ) | 製品の runtime の使用: `fle_filedlg.c:770`・`fle_appfile.c:62`・`fle_audio_ring.c:126`。harness の診断群(`fruity.c` 等) | 製品では `getenv` を呼ばない。`fle_test_env.h:9-10` の `__EMSCRIPTEN__` の枝が `((const char *)0)` を返す。製品の build(`app/scripts`・`lift/harness/two`・`web`・`b2d2`・`.github`)から `fle_test_env_wasm.h` の参照は 0 件 | 動作確認の入口を製品では開けない | テスト専用 | 対象外(動作確認の仕組み) |
 | 5 | `lift/harness/fruity.c:867`(`parse_num`) | `FLE_FRUITY_MAX_CALLS`・`FLE_FRUITY_SECONDS`(呼び出しは `fruity.c:918-919`) | 製品: `app/scripts/build-engine-bundle.sh:438` が `--env FLE_FRUITY_MAX_CALLS=4000000000`・`FLE_FRUITY_SECONDS=$FRUITY_SECONDS`(36000)を渡す。E13 の `manifest.json` の `engine.env` にこの 2 キーがある(実測)。native: `lift/harness/b2d2/run-g3.sh:15`・`lift/harness/parity/run.sh:37-38` が別の値(3000 秒、400000000000 回)を渡す | 入る(`fruity.c` は `build_nmod_wasm.sh:61` でコンパイル。`parse_num` と 918〜919 行に `#ifdef` 無し) | 実行の上限(秒・呼び出し数)。範囲外や数字でない値は拒否して停止(`parse_num`) | 残す(部品間パラメータ。注 2) | 該当なし(パラメータ。注 2 を見る) |
-| 6 | `lift/harness/fruity.c:884` | `FLE_CALL_FRUITY` | 製品: manifest は設定しない(E13 の `engine.env` のキーに無し。`build-engine-bundle.sh:436-438` にも無い)。native: `run-g3.sh:15`・`parity/run.sh:37` が `1` を設定 | 呼び出しは入る(884 行は `#ifdef` の外)。ただし製品では効かない: `fruity.c:892-893` で `__EMSCRIPTEN__` のとき `cfg_on = 1` の固定。読んだ値が効くのは 886〜889 行の拒否判定だけで、製品の manifest に無いので発火しない | 製品: 効果なし。native: `1` で harness の段を有効にする | オプション(除去)。製品側の読みだけを除く | (a) 製品の余計な読み。native の挙動は変えない |
-| 7 | `lift/harness/fruity.c:899`(`others` の loop。配列は `fruity.c:882`) | `FLE_FRUITY_*` の 9 名(`MAX_CALLS`・`SECONDS`・`STOP_AT`・`TRAP`・`STABLE_SECONDS`・`VIRTUAL_SECONDS`・`PEEK_AT`・`PEEK_FROM`・`PEEK_TO`) | 製品は設定しない。native: 設定されていて `FLE_CALL_FRUITY` が 1 でなければ拒否(`fruity.c:900-902`) | 入るが到達しない: 899 行は `if (!cfg_on)`(897 行)の中で、`cfg_on` は製品で 1 固定(892〜893 行)。ただし製品の manifest は `MAX_CALLS`・`SECONDS` を渡すので、その 2 名は 899 行で読まれる(拒否の判定は `cfg_on` が 1 のとき飛ばされる) | 製品: 無し。native: 拒否の判定 | テスト専用 | 対象外(製品で到達しない) |
+| 6 | `lift/harness/fruity.c:884` | `FLE_CALL_FRUITY` | 製品: manifest は設定しない(E13 の `engine.env` のキーに無し。`build-engine-bundle.sh:436-438` にも無い)。native: `run-g3.sh:15`・`parity/run.sh:37` が `1` を設定 | 呼び出しは入る(884 行は `#ifdef` の外)。ただし製品では効かない: `fruity.c:892-893` で `__EMSCRIPTEN__` のとき `cfg_on = 1` の固定。読んだ値が効くのは 888〜891 行の拒否判定だけで、製品の manifest に無いので発火しない | 製品: 効果なし。native: `1` で harness の段を有効にする | オプション(除去)。製品側の読みだけを除く | (a) 製品の余計な読み。native の挙動は変えない |
+| 7 | `lift/harness/fruity.c:899`(`others` の loop。配列は `fruity.c:882`) | `FLE_FRUITY_*` の 9 名(`MAX_CALLS`・`SECONDS`・`STOP_AT`・`TRAP`・`STABLE_SECONDS`・`VIRTUAL_SECONDS`・`PEEK_AT`・`PEEK_FROM`・`PEEK_TO`) | 製品は設定しない。native: 設定されていて `FLE_CALL_FRUITY` が 1 でなければ拒否(`fruity.c:900-902`) | 入るが到達しない: 899 行は `if (!cfg_on)`(897 行)の中で、`cfg_on` は製品で 1 固定(892〜893 行)。製品では 899 行に届かない(`cfg_on` が 893 行で 1)。`FLE_FRUITY_MAX_CALLS`・`FLE_FRUITY_SECONDS` が製品で読まれるのは 5 の `parse_num`(918〜919 行)で、899 行ではない | 製品: 無し。native: 拒否の判定 | テスト専用 | 対象外(製品で到達しない) |
 | 8 | `lift/harness/fruity.c:1062` | `FLE_FRUITY_NO_IDLE_STOP` | 製品は設定しない(E13 に無し)。native: `run-g3.sh:15`・`parity/run.sh:38` が `1` を設定 | 入らない: 1059 行の `#ifdef __EMSCRIPTEN__` の `#else`(1061 行)の中。製品の枝は 1060 行で `fle_thread_set_idle_stop(0)` を直接呼ぶ | 製品: 常に 0。native: `1` で idle 停止を切る | テスト専用 | 対象外(製品に入らない) |
 
 ## 2 注
 
 ### 注 1: 6 の除去(2 段目の差分)
 - 方法: `fruity.c:884` の `getenv("FLE_CALL_FRUITY")` を `FLE_TEST_GETENV("FLE_CALL_FRUITY")` に替える。その行の残りは変えない。
-- 挙動: 製品では `e` が NULL になる。886〜889 行の拒否判定は `e` が非 NULL のときだけ働き、製品の manifest はこの名前を渡さないので発火しない。`cfg_on` は 893 行で 1 のまま。native は `getenv` のままなので変わらない。
-- 読みの確認(`sed -n '882,896p' lift/harness/fruity.c`): `e` の宣言は 884 行、値の検査は 886〜889 行、`cfg_on` の代入は 892〜896 行(`#ifdef __EMSCRIPTEN__` の枝が 893 行、`#else` の枝が 895 行)。製品では 893 行の枝が通り、`e` は 886 行と 895 行のどちらでも使われない。
+- 挙動: 製品では `e` が NULL になり、888〜891 行の拒否判定は偽になる。製品の manifest はこの名前を渡さないので、今の既定の動作(拒否判定が発火しない)と同じ。`cfg_on` は 893 行で 1 のまま。native は `getenv` のままなので変わらない。
+- 読みの確認(`sed -n '882,896p' lift/harness/fruity.c`): `e` の宣言は 884 行、値の検査は 888〜891 行、`cfg_on` の代入は 892〜896 行(`#ifdef __EMSCRIPTEN__` の枝が 893 行、`#else` の枝が 895 行)。製品では 893 行の枝が通り、`e` は 888 行の拒否判定でだけ使われる(895 行の枝は native のみ)。
 - 今の既定値と同じ値になるか: 同じ。製品の `cfg_on` は現在も 1 で、読みの結果は判定に使われていない。
 - 撤回条件: 製品の manifest に `FLE_CALL_FRUITY` を渡す必要が出たら、この読みを戻す。
 
@@ -37,7 +37,7 @@
 - 値の選び方は別に検討する: `hz.ts` の `STANDARD_HZ` の上限 120(decision 0268)は (a) の候補で、ROADMAP R3-3 の行で扱う。この文書は env の読みだけを分類する。
 
 ## 3 食い違い(実測。2 段目の前に直すかは別の判断)
-- `fruity.c:893` のコメント「the manifest passed FLE_CALL_FRUITY=1」と、`fruity.c:1063` の「the manifest passed FLE_FRUITY_NO_IDLE_STOP=1」は、現行の `build-engine-bundle.sh:436-438` と E13 の `manifest.json`(`engine.env` のキーは `FLE_AUTH_CLAIMS`・`FLE_FRUITY_MAX_CALLS`・`FLE_FRUITY_SECONDS`・`FLE_REG_SEED`・`FLE_VFS_SEED`・`FLE_VFS_SEED_ROOT` の 6 件。実測)に無い。コメントが古い。
+- `fruity.c:893` のコメント「the manifest passed FLE_CALL_FRUITY=1」と、`fruity.c:1060` の「the manifest passed FLE_FRUITY_NO_IDLE_STOP=1」は、現行の `build-engine-bundle.sh:436-438` と E13 の `manifest.json`(`engine.env` のキーは `FLE_AUTH_CLAIMS`・`FLE_FRUITY_MAX_CALLS`・`FLE_FRUITY_SECONDS`・`FLE_REG_SEED`・`FLE_VFS_SEED`・`FLE_VFS_SEED_ROOT` の 6 件。実測)に無い。コメントが古い。
 - `lift/runtime/fle_gdc.h:53` と `fle_monitor.h:34` の「opt-in」は、現行の `main.ts:722`(`applyScreenParam` の無条件の呼び出し)のため、製品では常に設定される。
 - E13 の `artifacts/bundles/fl-engine-ci-0363b050/manifest.json` には `FLE_DWM_HZ`・`FLE_DISPLAYSETTINGS_FREQUENCY`・`FLE_MONITOR_W`・`FLE_MONITOR_H` が無い。E13 は既定値(60 Hz・1920×1080)で動いたことになる。現行ページの bundle とは別。
 - 現木の `lift/runtime` に `getenv("FLE_SCREEN_DPI")` は無い(grep 0 件)。R2-5 の差分で入る予定で、この文書の対象外。
@@ -59,3 +59,8 @@
 1. `grep -rn 'getenv' lift/runtime lift/harness/fruity.c` の残りが、この表の行に対応すること。想定される残り: `fle_test_env.h:2,3,5`(コメント)と `:12`(マクロ本体)、`fle_thread.c:824,847`、`fle_screen.h:30`、`fruity.c:867,899,1062`。`fruity.c:884` は 6 の差分で消える。
 2. `cargo test` の失敗 0(取り込み前から残る `getmodulehandleexw_returns_in_every_build` を除く)。
 3. 差分の commit は 6 だけ。単独の commit にする。
+
+## 7 訂正
+- 2026-11-14 訂正(main の検査): 行番号は 886〜889 → 888〜891。7 行目の『899 行で読まれる』は誤り(897 行の `if (!cfg_on)` に入らない)。
+- 2026-11-14 訂正(main の検査): 注 1 の「`e` は 886 行と 895 行のどちらでも使われない」は誤り。製品では `e` は 888 行の拒否判定でだけ使われる。
+- 2026-11-14 訂正(main の検査): 3 の `fruity.c:1063` の「the manifest passed FLE_FRUITY_NO_IDLE_STOP=1」は、1063 行が空行。コメントは 1060 行。
