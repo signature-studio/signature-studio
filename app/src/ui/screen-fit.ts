@@ -1,7 +1,7 @@
 // The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1).
 // The page measures the room it has for the screen (everything below the header and left of the monitor panel), tells the engine that size through the engine's environment (FLE_MONITOR_W / FLE_MONITOR_H:
 // lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room in CSS pixels (1 guest pixel = 1 CSS pixel; the browser scales the canvas by the device pixel ratio).
-// When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE, FLE_SCREEN_REMAXIMIZE=1). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
+// When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE and WM_SETTINGCHANGE; the runtime resizes the maximized windows: S-remaximize). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
 
 export const SCREEN_DEFAULT = { width: 1920, height: 1080 } as const;
 /** the limits of lift/runtime/fle_screen.h (FLE_SCREEN_MIN_* .. FLE_SCREEN_MAX_*): outside them the engine ignores the value */

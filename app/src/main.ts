@@ -319,8 +319,8 @@ function syncGuestScreen(v: Pick<AppView, 'screenW' | 'screenH'>): void {
   if (g.width !== app.screen.guest.width || g.height !== app.screen.guest.height) { app.screen.guest = { width: g.width, height: g.height }; applyDisplay(); }
 }
 
-/** decision 0212: the room settled at a size for which the guest's screen would be another: the engine is told (a display change: WM_DISPLAYCHANGE and WM_SETTINGCHANGE to the guest's windows; FLE_SCREEN_REMAXIMIZE=1 in the
- *  environment makes the runtime resize the maximized windows by the change). */
+/** decision 0212: the room settled at a size for which the guest's screen would be another: the engine is told (a display change: WM_DISPLAYCHANGE and WM_SETTINGCHANGE to the guest's windows; the runtime then resizes the maximized windows
+ *  by the change: fle_win_input_remaximize, S-remaximize, an inference that decision 0322 lists as unverified). */
 function followRoom(room: Room): void {
   const g = chooseGuestScreen(room);
   if (!app.screen.asked) return;
@@ -340,7 +340,7 @@ function followRoom(room: Room): void {
 function applyScreenParam(manifest: Manifest): void {
   const room = measureRoom();
   const g = chooseGuestScreen(room);
-  const env = { ...screenEnv(g.width, g.height), FLE_SCREEN_REMAXIMIZE: '1' };
+  const env = screenEnv(g.width, g.height);
   Object.assign(manifest.engine.env, env);
   app.screen.asked = { width: g.width, height: g.height, env };
   app.screen.guest = { width: g.width, height: g.height };
