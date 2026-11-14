@@ -31,7 +31,7 @@ void fle_win_input_showwindow(void) {}
 void fle_win_input_call_hooks(void) {}
 void fle_win_input_hit_list(void) {}
 void fle_win_pointer_get(void) {}
-void fle_win_pointer_set(void) {}
+void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
 typedef unsigned int UINT, DWORD, BOOL;
 typedef int INT;
 typedef uint16_t WCHAR, WORD;

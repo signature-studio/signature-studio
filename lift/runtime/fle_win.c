@@ -5839,8 +5839,16 @@ void fle_imp_GetAsyncKeyState(void) { R[0] = fle_input_key_state ? fle_input_key
  * the coordinates so that the cursor stays within the rectangle"; "Returns nonzero if successful or zero otherwise"; (GetPhysicalCursorPos) "Retrieves the position of the cursor in physical coordinates",
  * (SetPhysicalCursorPos) its counterpart. There is no input device here and no ClipCursor (no row): the position is a state of the runtime, starting at (0, 0) (S-cursor-start: decision 0123's value), set by the setters
  * to the given point clamped to the virtual screen [0, 1920) x [0, 1080) (S-cursor-screen: the page's "adjusts the coordinates so that the cursor stays within the rectangle" is applied with the screen as the rectangle),
- * and read back by the getters. The physical and the logical position are the same (no DPI virtualisation: fle_gdc.h 96 DPI, S-physical-cursor). */
+ * and read back by the getters. The physical and the logical position are the same (no DPI virtualisation: fle_gdc.h 96 DPI, S-physical-cursor).
+ * Decision 0319 (O20): Windows's "cursor state" is a virtual cursor. SetCursorPos moves it, and the host
+ * (browser) pointer's absolute motion is relative to that new place: the guest position is the host's latest
+ * absolute position plus an offset, clamped to the screen. SetCursorPos/SetPhysicalCursorPos stores the
+ * requested point and re-anchors the host latest to that point (offset = 0); the next host absolute move is
+ * then measured from the new position. The host move records its absolute browser point and derives the
+ * guest point as host + offset clamped to the screen. With no offset this is the same behaviour as before. */
 static int32_t ptr_x, ptr_y;
+static int32_t host_ptr_x, host_ptr_y;
+static int32_t virt_off_x, virt_off_y;
 
 void fle_imp_GetCursorPos(void)
 {
@@ -5864,13 +5872,20 @@ void fle_imp_GetPhysicalCursorPos(void)
     R[0] = 1;
 }
 
+static int32_t clamp_x(int32_t x) { return x < 0 ? 0 : x > FLE_GDC_HORZRES - 1 ? FLE_GDC_HORZRES - 1 : x; }
+static int32_t clamp_y(int32_t y) { return y < 0 ? 0 : y > FLE_GDC_VERTRES - 1 ? FLE_GDC_VERTRES - 1 : y; }
+
 static void set_pointer(const char *api)
 {
     int32_t x = (int32_t)(uint32_t)R[1], y = (int32_t)(uint32_t)R[2];
 
     fle_win_check_thread(api);
-    ptr_x = x < 0 ? 0 : x > FLE_GDC_HORZRES - 1 ? FLE_GDC_HORZRES - 1 : x;
-    ptr_y = y < 0 ? 0 : y > FLE_GDC_VERTRES - 1 ? FLE_GDC_VERTRES - 1 : y;
+    ptr_x = clamp_x(x);
+    ptr_y = clamp_y(y);
+    host_ptr_x = ptr_x;
+    host_ptr_y = ptr_y;
+    virt_off_x = 0;
+    virt_off_y = 0;
     R[0] = 1;
 }
 
@@ -5903,6 +5918,22 @@ void fle_win_pointer_set(int32_t x, int32_t y)
 {
     ptr_x = x;
     ptr_y = y;
+}
+void fle_win_host_pointer_set(int32_t x, int32_t y)
+{
+    host_ptr_x = clamp_x(x);
+    host_ptr_y = clamp_y(y);
+    ptr_x = clamp_x(host_ptr_x + virt_off_x);
+    ptr_y = clamp_y(host_ptr_y + virt_off_y);
+}
+void fle_win_pointer_reclamp(void)
+{
+    host_ptr_x = clamp_x(host_ptr_x);
+    host_ptr_y = clamp_y(host_ptr_y);
+    ptr_x = clamp_x(ptr_x);
+    ptr_y = clamp_y(ptr_y);
+    virt_off_x = ptr_x - host_ptr_x;
+    virt_off_y = ptr_y - host_ptr_y;
 }
 
 void fle_win_pointer_get(int32_t *x, int32_t *y)

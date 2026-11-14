@@ -89,8 +89,13 @@ void fle_win_input_text(uint64_t hwnd, char *out, unsigned cap, uint32_t *owner_
 int fle_win_host_timer(uint64_t hwnd, uint64_t id, uint32_t ms);   /* a timer for a window of the table made by the host (a probe, not a guest call) */
 void fle_win_pointer_set(int32_t x, int32_t y);
 void fle_win_pointer_get(int32_t *x, int32_t *y);
+void fle_win_host_pointer_set(int32_t x, int32_t y);
+void fle_win_pointer_reclamp(void);
 uint64_t fle_class_hcursor_of(uint16_t atom);                     /* fle_class.c */
 
+#define FLE_WM_CONTEXTMENU    0x007Bu
+#define FLE_WM_RBUTTONUP      0x0205u
+#define FLE_WM_NCRBUTTONUP    0x00A5u
 #define FLE_WM_NCHITTEST      0x0084u
 #define FLE_WM_SETCURSOR      0x0020u
 #define FLE_WM_MOUSEACTIVATE  0x0021u

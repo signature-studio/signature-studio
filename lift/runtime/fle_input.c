@@ -142,7 +142,8 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
     if (y < 0) y = 0;
     if (x > FLE_GDC_HORZRES - 1) x = FLE_GDC_HORZRES - 1;
     if (y > FLE_GDC_VERTRES - 1) y = FLE_GDC_VERTRES - 1;
-    fle_win_pointer_set(x, y);
+    fle_win_host_pointer_set(x, y);
+    fle_win_pointer_get(&x, &y);
     if (kind == FLE_IN_BDOWN || kind == FLE_IN_BUP) {
         b = data == (int32_t)FLE_IN_BTN_R ? VK_RBUTTON_ : data == (int32_t)FLE_IN_BTN_M ? VK_MBUTTON_ : VK_LBUTTON_;
         set_key(key_async, b, kind == FLE_IN_BDOWN);
@@ -737,13 +738,11 @@ static void apply_display(const hwev *e)
 {
     uint64_t hs[64];
     unsigned n, k;
-    int32_t px, py;
     uint32_t w = (uint32_t)e->x, h = (uint32_t)e->y, ow = fle_screen_w(), oh = fle_screen_h();
 
     if (w == ow && h == oh) return;
     if (!fle_screen_set(w, h)) return;
-    fle_win_pointer_get(&px, &py);
-    fle_win_pointer_set(px, py);
+    fle_win_pointer_reclamp();
     n = fle_win_input_toplevels(hs, 64);
     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_DISPLAYCHANGE, FLE_GDC_BITSPIXEL, ((uint64_t)h << 16) | w);
     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_SETTINGCHANGE, FLE_SPI_SETWORKAREA, 0);
@@ -971,6 +970,29 @@ int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp,
         if (wp == VK_F4_ && (lp & (1u << 29))) (void)fle_win_input_send(api, hwnd, FLE_WM_SYSCOMMAND, 0xF060u, 0);
         *result = 0;
         return 1;
+    case FLE_WM_RBUTTONUP:
+    case FLE_WM_NCRBUTTONUP: {
+        /* Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
+         * WM_RBUTTONUP or WM_NCRBUTTONUP message". wParam is the handle of the window in which the button was
+         * released; when that window is a child, the message is forwarded to the parent, but wParam keeps
+         * the child handle ("This can be a child window of the window receiving the message"). lParam is the
+         * cursor position in screen coordinates. For WM_RBUTTONUP lParam is client-relative; for
+         * WM_NCRBUTTONUP it is already screen-relative. Return value "If an application processes this
+         * message, it should return zero". */
+        int32_t sx, sy;
+        uint64_t target = v.parent ? v.parent : hwnd;
+
+        if (msg == FLE_WM_RBUTTONUP) {
+            sx = sx16(lp) + v.ox;
+            sy = sx16(lp >> 16) + v.oy;
+        } else {
+            sx = sx16(lp);
+            sy = sx16(lp >> 16);
+        }
+        (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, hwnd, lparam_xy(sx, sy));
+        *result = 0;
+        return 1;
+    }
     default:
         break;
     }
