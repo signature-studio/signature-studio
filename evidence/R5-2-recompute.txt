@@ -1,0 +1,29 @@
+R5-2 の再計算(python3 標準ライブラリで PNG を復号。一時 script は commit していない)
+実行: 2026-11-15T04:48:30+09:00
+HEAD: dc05b08
+
+compositor-run1.png: 780x480  RGBA SHA-256 = 04e2315d412195dfe4c1377b47a0984a88652f386bdc4d3b652fe0a30e1eb4da
+  先頭 8 桁 04e2315d / 非背景画素 124105 / 色数 1034
+  JSON desk の値: nonBackgroundPixels=124105 distinctColours=1034 backgroundPixels=250295
+  JSON readback.sha256 = b27ca2e88fbe881ef5c009c4c6d23fb92fc3c2c0e8b64beea8605a726caed154
+compositor-run2.png: 780x480  RGBA SHA-256 = 126167a56d2e2e7037349cbcbc1e35932d26d6d56f944b903981f25929e82e86
+  先頭 8 桁 126167a5 / 非背景画素 124105 / 色数 1049
+  JSON desk の値: nonBackgroundPixels=124105 distinctColours=1049 backgroundPixels=250295
+  JSON readback.sha256 = b0fdece794d7333a7ca69420b74d10fae15d609b2ee1120455fd8b98cb633151
+compositor-run3.png: 780x480  RGBA SHA-256 = b0fdece794d7333a7ca69420b74d10fae15d609b2ee1120455fd8b98cb633151
+  先頭 8 桁 b0fdece7 / 非背景画素 124105 / 色数 1063
+  JSON desk の値: nonBackgroundPixels=124105 distinctColours=1063 backgroundPixels=250295
+  JSON readback.sha256 = 639f953f3d2b1aaf5148fc045f1d70f53e70fd240d8c8d9edd2c97c317c58e4b
+
+compositor run1 と run2 で RGBA が違う画素: 25732  bbox x 0〜779 y 0〜479
+compositor run1 と run3 で RGBA が違う画素: 25738  bbox x 0〜779 y 0〜479
+
+compositor-run2 の SHA-256 = R5-1 run-2 の readback.sha256(全 64 桁一致)
+compositor-run2 の SHA-256 = R5-1 run-3 の readback.sha256(全 64 桁一致)
+compositor-run3 の SHA-256 = R5-2 run-2 の readback.sha256(全 64 桁一致)
+
+page-run1.png: 780x493  canvas (0,36) 502x309 = 155118 画素 / 色数 1 / 最頻色 (0, 0, 0, 255) が 155118 画素 / 黒 (0,0,0,255) 155118 / 背景 (60, 69, 75, 255) 0
+page-run2.png: 780x493  canvas (0,36) 502x309 = 155118 画素 / 色数 1193 / 最頻色 (60, 69, 75, 255) が 102030 画素 / 黒 (0,0,0,255) 0 / 背景 (60, 69, 75, 255) 102030
+page-run3.png: 780x493  canvas (0,36) 502x309 = 155118 画素 / 色数 1 / 最頻色 (0, 0, 0, 255) が 155118 画素 / 黒 (0,0,0,255) 155118 / 背景 (60, 69, 75, 255) 0
+
+diff の行数(手順 5): 64(< 20、> 30)
