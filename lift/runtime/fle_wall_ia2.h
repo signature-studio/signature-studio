@@ -31,6 +31,7 @@ void fle_imp_ShellExecuteW(void);
 
 /* user32!ScrollWindowEx (wall ia2-W23) and ole32!DoDragDrop (wall ia2-W24): see fle_wall_ia2.c */
 void fle_imp_ScrollWindowEx(void);
+void fle_imp_ScrollWindow(void);   /* decision 0319 */
 /* user32!InvalidateRgn (wall ia2-W31): the region's bounding box is added to the update region; see fle_wall_ia2w.c */
 void fle_imp_InvalidateRgn(void);
 void fle_imp_DoDragDrop(void);

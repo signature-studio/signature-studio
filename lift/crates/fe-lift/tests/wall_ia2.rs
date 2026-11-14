@@ -448,6 +448,8 @@ uint8_t *fle_r_row(const fle_rsurf *s, uint32_t y) { return s->bits + (size_t)y 
 void fle_imp_InvalidateRect(void) { inval_calls++; inval_hwnd = R[1]; inval_erase = R[8]; if (R[2]) memcpy(inval, (const void *)(uintptr_t)R[2], 16); R[0] = 1; }
 void fle_set_last_error(uint32_t e) { last_err = e; }
 static int rgn_calls; static int32_t rgn[5];
+/* decision 0319: the window model (fle_win.c) is not linked here: it "cannot answer" and the former simple path of fle_wall_ia2w.c answers, which is what these tests check */
+int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const int32_t *scroll, const int32_t *clip, uint32_t flags, fle_win_scroll_result *res) { (void)api; (void)hwnd; (void)dx; (void)dy; (void)scroll; (void)clip; (void)flags; (void)res; return 0; }
 void fle_imp_SetRectRgn(void) { rgn_calls++; rgn[0] = (int32_t)R[1]; rgn[1] = (int32_t)R[2]; rgn[2] = (int32_t)R[8]; rgn[3] = (int32_t)R[9]; rgn[4] = (int32_t)((uint64_t *)(uintptr_t)R[4])[5]; R[0] = 1; }
 static int rgnbox_kind = 2; static int32_t rgnbox[4] = { 1, 2, 5, 6 };
 void fle_imp_GetRgnBox(void) { if (rgnbox_kind) memcpy((void *)(uintptr_t)R[2], rgnbox, 16); R[0] = (uint64_t)rgnbox_kind; }

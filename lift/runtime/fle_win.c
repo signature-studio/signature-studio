@@ -3493,6 +3493,194 @@ static void apply_pos(const char *api, int64_t i, uint64_t after, int32_t x, int
     unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS), !(nflags & FLE_SWP_NOREDRAW));
 }
 
+/* ---- Decision 0319 (PROVISIONAL; PM 07:2x; O9 'Settings -> General: scrolling breaks the picture, only the hovered element is repaired'): the bits and the update area of user32!ScrollWindowEx / ScrollWindow on the window model of decision 0214 ----
+ * Learn ScrollWindowEx: scrolls "the contents of the specified window's client area"; "If the window has the WS_CLIPCHILDREN style, the returned areas specified by hrgnUpdate and prcUpdate represent the total area of the
+ * scrolled window that must be updated, including any areas in child windows that need updating"; SW_SCROLLCHILDREN "Scrolls all child windows that intersect the rectangle pointed to by the prcScroll parameter ... The system
+ * sends a WM_MOVE message to all child windows that intersect the prcScroll rectangle, even if they do not move"; SW_INVALIDATE / SW_ERASE invalidate "the area that is scrolled from"; all coordinates are client coordinates.
+ * Learn ScrollWindow (Remarks): "If the lpRect parameter is NULL, the positions of any child windows in the window are offset by the amount specified by the XAmount and YAmount parameters; invalid (unpainted) areas in the window
+ * are also offset. ... If lpRect is not NULL, the positions of child windows are not changed and invalid areas in the window are not offset."
+ * Learn ScrollDC (lprcClip): "If lprcClip is NULL, the entire client area is used."
+ * Where the pages are silent the reference is Wine 10 (UNOFFICIAL; probes in docs/0319 section 1.5, harness scroll_contract.c): (T3) prcClip NULL with a partial prcScroll means the CLIENT AREA, bits are moved beyond the scroll rectangle;
+ * (T2a) a WS_CLIPCHILDREN parent does not move the pixels of a child (they are not its bits) and the destination of bits whose source was hidden by the child is invalid, the update area reported is 0,0..300,190 for a 300x300 window, a
+ * child at 100,100 60x60 and dy 30; (T2b) without WS_CLIPCHILDREN the child's pixels move with the parent's bits; (T1/T4) with a pending update rectangle and prcScroll NULL, the update region afterwards holds the old rectangle, its
+ * moved copy and the uncovered strip; hrgnUpdate's box is the union, prcUpdate is the bounding rectangle of the uncovered strip only; the return value is SIMPLEREGION for one uncovered rectangle.
+ * Model: the window's visible region with its own clip style (CLIPSIBLINGS, and CLIPCHILDREN when the window has WS_CLIPCHILDREN) is the set of bits that exist (decision 0214's fle_win_dc_region); the bits of (scroll rectangle
+ * inside it) move by (dx, dy) into (clip rectangle inside the visible region); what the scroll rectangle held there and the move did not cover is the uncovered area; with prcScroll NULL the pending update rectangle of the
+ * window moves with the bits and stays where it was (Wine). Before this decision the pixels of the whole top-level surface rectangle moved (children and siblings included) and a pending update rectangle was not touched
+ * (S2, S4 of docs/0319). The update area of a window is one bounding rectangle (S-updregion), so each invalidation adds the bounding rectangle of its region. */
+static void scroll_copy_region(const char *api, int64_t root, const fle_visrgn *d, int64_t dx, int64_t dy)
+{
+    const fle_rsurf *surf;
+    fle_visrgn c = *d, s2;
+    uint32_t k, bpp;
+    uint8_t *buf, *p;
+    size_t total = 0;
+    fle_rrect sb;
+
+    if (!fle_raster_surface_peek || !fle_raster_wrote || !fle_r_row || !fle_r_direct) return;
+    surf = fle_raster_surface_peek(tab[root].lid);
+    if (!surf || !fle_r_direct(surf)) return;
+    bpp = surf->bpp / 8u;
+    sb.x0 = 0; sb.y0 = 0; sb.x1 = (int64_t)surf->width; sb.y1 = (int64_t)surf->height;
+    fle_visrgn_intersect_rect(&c, sb);
+    if (!c.n) return;
+    s2 = c;
+    unc_translate(&s2, -dx, -dy);
+    fle_visrgn_intersect_rect(&s2, sb);
+    unc_translate(&s2, dx, dy);
+    fle_visrgn_intersect(&c, &s2);
+    for (k = 0; k < c.n; k++) total += (size_t)(c.r[k].x1 - c.r[k].x0) * (size_t)(c.r[k].y1 - c.r[k].y0) * bpp;
+    if (!total) return;
+    buf = (uint8_t *)malloc(total);
+    if (!buf) return;
+    p = buf;
+    for (k = 0; k < c.n; k++) {   /* gather first, then write: the source and destination may overlap */
+        int64_t y, w = c.r[k].x1 - c.r[k].x0;
+
+        for (y = c.r[k].y0; y < c.r[k].y1; y++) {
+            memcpy(p, fle_r_row(surf, (uint32_t)(y - dy)) + (size_t)(c.r[k].x0 - dx) * bpp, (size_t)w * bpp);
+            p += (size_t)w * bpp;
+        }
+    }
+    p = buf;
+    for (k = 0; k < c.n; k++) {
+        int64_t y, w = c.r[k].x1 - c.r[k].x0;
+
+        for (y = c.r[k].y0; y < c.r[k].y1; y++) {
+            memcpy(fle_r_row(surf, (uint32_t)y) + (size_t)c.r[k].x0 * bpp, p, (size_t)w * bpp);
+            p += (size_t)w * bpp;
+        }
+        fle_raster_wrote(surf, c.r[k], api);
+    }
+    free(buf);
+}
+
+/* the bounding rectangle of `v` in the client coordinates of the window whose client origin is (cx0, cy0) in surface coordinates; 0 when v is empty */
+static int scroll_bounds_client(const fle_visrgn *v, int64_t cx0, int64_t cy0, int32_t out[4])
+{
+    fle_rrect b;
+
+    if (!v->n) return 0;
+    b = fle_visrgn_bounds(v);
+    out[0] = (int32_t)(b.x0 - cx0); out[1] = (int32_t)(b.y0 - cy0); out[2] = (int32_t)(b.x1 - cx0); out[3] = (int32_t)(b.y1 - cy0);
+    return 1;
+}
+
+int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const int32_t *scroll, const int32_t *clip, uint32_t flags, fle_win_scroll_result *res)
+{
+    int64_t i = live_index(hwnd), root;
+    int32_t ox, oy, rx, ry, bb[4];
+    fle_rrect cl, sr, kr, pend;
+    fle_visrgn vis, src, dgeo, geo, mv;
+    uint32_t cf;
+    uint64_t d;
+    int has_pending = 0;
+
+    memset(res, 0, sizeof *res);
+    if (i < 0) { res->invalid = 1; return 1; }
+    if (!fle_visrgn_set_rect || !fle_visrgn_subtract || !fle_visrgn_intersect_rect || !fle_visrgn_intersect || !fle_visrgn_bounds) return 0;
+    root = root_of(i);
+    if (tab[i].msgonly || tab[root].iconic) return 0;
+    rx = tab[root].px; ry = tab[root].py;
+    client_origin(i, &ox, &oy);
+    cl.x0 = (int64_t)ox - rx; cl.y0 = (int64_t)oy - ry; cl.x1 = cl.x0 + tab[i].pcx; cl.y1 = cl.y0 + tab[i].pcy;
+    sr = cl;
+    if (scroll) {
+        fle_rrect s;
+        s.x0 = cl.x0 + scroll[0]; s.y0 = cl.y0 + scroll[1]; s.x1 = cl.x0 + scroll[2]; s.y1 = cl.y0 + scroll[3];
+        if (s.x0 < sr.x0) s.x0 = sr.x0;
+        if (s.y0 < sr.y0) s.y0 = sr.y0;
+        if (s.x1 > sr.x1) s.x1 = sr.x1;
+        if (s.y1 > sr.y1) s.y1 = sr.y1;
+        if (s.x1 < s.x0) s.x1 = s.x0;
+        if (s.y1 < s.y0) s.y1 = s.y0;
+        sr = s;
+    }
+    kr = cl;   /* prcClip NULL: the whole client area (ScrollDC page; Wine probe T3), not the scroll rectangle */
+    if (clip) {
+        fle_rrect c;
+        c.x0 = cl.x0 + clip[0]; c.y0 = cl.y0 + clip[1]; c.x1 = cl.x0 + clip[2]; c.y1 = cl.y0 + clip[3];
+        if (c.x0 < kr.x0) c.x0 = kr.x0;
+        if (c.y0 < kr.y0) c.y0 = kr.y0;
+        if (c.x1 > kr.x1) c.x1 = kr.x1;
+        if (c.y1 > kr.y1) c.y1 = kr.y1;
+        if (c.x1 < c.x0) c.x1 = c.x0;
+        if (c.y1 < c.y0) c.y1 = c.y0;
+        kr = c;
+    }
+    unc_ovf = 0;
+    cf = FLE_VR_CLIPSIBLINGS | ((tab[i].style & FLE_WS_CLIPCHILDREN_) ? FLE_VR_CLIPCHILDREN : 0u);
+    vis.n = 0;
+    if (is_visible(i) && !unc_region(i, cf, &vis) && unc_ovf) return 0;   /* a region needed more rectangles than a fle_visrgn keeps: the caller falls back */
+    /* the bits that exist: (scroll rectangle) inside the visible region */
+    src = vis;
+    fle_visrgn_intersect_rect(&src, sr);
+    /* where they land: moved by (dx, dy), inside the clip rectangle and the visible region */
+    dgeo = src;
+    unc_translate(&dgeo, dx, dy);
+    fle_visrgn_intersect_rect(&dgeo, kr);
+    fle_visrgn_intersect(&dgeo, &vis);
+    /* the uncovered area: what the scroll rectangle held inside the clip rectangle and the move did not cover */
+    geo = src;
+    fle_visrgn_intersect_rect(&geo, kr);
+    unc_minus(&geo, &dgeo);
+    /* the pending update rectangle moves with the bits (ScrollWindowEx: Wine probes U1 with prcScroll NULL and U2 with prcScroll = the client rectangle give the same update region); it stays where it was too (Wine). ScrollWindow with an
+     * lpRect does not offset the invalid areas (Learn ScrollWindow, Remarks): the caller says so with the internal bit 0x80000000 (not an SW_ flag) */
+    mv.n = 0;
+    if (!(flags & 0x80000000u) && is_visible(i)) {
+        pend = unc_pending(i, rx, ry);
+        has_pending = pend.x1 > pend.x0 && pend.y1 > pend.y0;
+        if (has_pending) {
+            fle_visrgn_set_rect(&mv, pend);
+            fle_visrgn_intersect_rect(&mv, sr);
+            unc_translate(&mv, dx, dy);
+            fle_visrgn_intersect_rect(&mv, kr);
+            fle_visrgn_intersect(&mv, &vis);
+        }
+    }
+    /* the bits */
+    if ((dx != 0 || dy != 0) && dgeo.n) scroll_copy_region(api, root, &dgeo, dx, dy);
+    /* the answer */
+    res->parts = (int)geo.n;
+    if (scroll_bounds_client(&geo, cl.x0, cl.y0, bb)) {
+        res->unc[0] = bb[0]; res->unc[1] = bb[1]; res->unc[2] = bb[2]; res->unc[3] = bb[3];
+        res->upd[0] = bb[0]; res->upd[1] = bb[1]; res->upd[2] = bb[2]; res->upd[3] = bb[3];
+    }
+    if (mv.n && scroll_bounds_client(&mv, cl.x0, cl.y0, bb)) {
+        if (res->parts == 0) { res->upd[0] = bb[0]; res->upd[1] = bb[1]; res->upd[2] = bb[2]; res->upd[3] = bb[3]; }
+        else {
+            if (bb[0] < res->upd[0]) res->upd[0] = bb[0];
+            if (bb[1] < res->upd[1]) res->upd[1] = bb[1];
+            if (bb[2] > res->upd[2]) res->upd[2] = bb[2];
+            if (bb[3] > res->upd[3]) res->upd[3] = bb[3];
+        }
+    }
+    /* the invalid areas: the moved pending rectangle always (its bits are stale), the uncovered area with SW_INVALIDATE / SW_ERASE */
+    if (mv.n && scroll_bounds_client(&mv, cl.x0, cl.y0, bb)) upd_invalidate(i, bb[0], bb[1], bb[2], bb[3], 1);
+    if ((flags & 0x6u) != 0 && geo.n && scroll_bounds_client(&geo, cl.x0, cl.y0, bb)) upd_invalidate(i, bb[0], bb[1], bb[2], bb[3], (flags & 0x4u) ? 1 : 0);
+    /* SW_SCROLLCHILDREN: the child windows that intersect the scroll rectangle move with it (WM_WINDOWPOSCHANGED, WM_MOVE; the pixels moved above when the window does not clip its children), and every child that
+     * intersects gets a WM_MOVE even when it does not move (Learn) */
+    if (flags & 0x1u) {
+        for (d = 0; d < tab_n; d++) {
+            fle_rrect cr;
+            uint64_t sv;
+
+            if (!tab[d].live || tab[d].parent != i) continue;
+            cr.x0 = cl.x0 + tab[d].px; cr.y0 = cl.y0 + tab[d].py; cr.x1 = cr.x0 + tab[d].pcx; cr.y1 = cr.y0 + tab[d].pcy;
+            if (!unc_touch(cr, sr)) continue;
+            if (dx == 0 && dy == 0) {
+                (void)send_to(api, (int64_t)d, FLE_WM_MOVE, 0, ((uint64_t)(uint16_t)tab[d].py << 16) | (uint16_t)tab[d].px);
+                continue;
+            }
+            sv = R[4];
+            apply_pos(api, (int64_t)d, 0, tab[d].px + dx, tab[d].py + dy, tab[d].pcx, tab[d].pcy, FLE_SWP_NOSIZE | FLE_SWP_NOZORDER | FLE_SWP_NOACTIVATE | FLE_SWP_NOREDRAW | FLE_SWP_NOCOPYBITS);
+            R[4] = sv;
+            if (cf & FLE_VR_CLIPCHILDREN) upd_invalidate((int64_t)d, 0, 0, tab[d].pcx, tab[d].pcy, 1);   /* the parent's bits did not carry the child's pixels */
+        }
+    }
+    return 1;
+}
+
 /* DefWindowProcW(WM_WINDOWPOSCHANGED) sends WM_MOVE and WM_SIZE (Learn WM_WINDOWPOSCHANGED, WM_SIZE, WM_MOVE). Called from fle_imp_DefWindowProcW. */
 static void defproc_windowposchanged(const char *api, int64_t i, uint64_t wpa)
 {

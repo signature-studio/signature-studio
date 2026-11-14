@@ -254,9 +254,10 @@ fn the_import_row_is_one_appended_row_after_the_rows_of_the_earlier_decisions_an
     let d = rows("dwmti-imports.txt");
     assert_eq!(d, ["dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo"]);
     let (s5, s6) = (rows("ship5-imports.txt"), rows("ship6-imports.txt"));
-    assert_eq!(s6.len(), s5.len() + 1);
+    // the later decisions (0319: ScrollWindowEx, ScrollDC, ImageList drag, the processor count) append their rows after this one (append only, decision 0015): the dwmti row is the first row after ship5's
+    assert!(s6.len() >= s5.len() + 1);
     assert_eq!(s6[..s5.len()], s5[..], "the rows of ship5 are first and unchanged");
-    assert_eq!(s6[s5.len()], d[0], "the new row is the last");
+    assert_eq!(s6[s5.len()], d[0], "the new row is the first after ship5's");
     assert!(!s5.iter().any(|r| r.contains("DwmGetCompositionTimingInfo")), "no earlier file has the row");
     let c = std::fs::read_to_string(rt().join("fle_dwm.c")).unwrap();
     let h = std::fs::read_to_string(rt().join("fle_dwm.h")).unwrap();

@@ -53,7 +53,7 @@ static irect rect_ld(uint64_t p)
     return o;
 }
 
-void fle_imp_ScrollWindowEx(void)
+static void scroll_window_ex_simple(void)
 {
     static const char api[] = "ScrollWindowEx";
     uint64_t hwnd = R[1], prc_scroll = R[9], prc_clip = stack_arg(5), hrgn = stack_arg(6), prc_update = stack_arg(7);
@@ -156,6 +156,86 @@ void fle_imp_ScrollWindowEx(void)
         memcpy(R, saved, sizeof saved);
     }
     R[0] = (uint64_t)type;
+}
+
+/* ---- Decision 0319 (PROVISIONAL; PM 07:2x; O9): ScrollWindowEx and ScrollWindow on the window model of decision 0214 (fle_win.c: fle_win_scroll; the contract, the Wine 10 probes and the model are described there) ----
+ * ScrollWindowEx: the bits that exist (the visible region with the window's clip style) move into the clip rectangle (NULL = the whole client area), the uncovered area is reported (prcUpdate: its bounding rectangle;
+ * hrgnUpdate: a rectangular region = the bounding rectangle of the uncovered area and the moved update area; the return value is NULLREGION / SIMPLEREGION / COMPLEXREGION by the number of rectangles of the uncovered
+ * area) and, with SW_INVALIDATE or SW_ERASE, invalidated; SW_SCROLLCHILDREN moves the child windows (WM_MOVE). ScrollWindow(hWnd, X, Y, lpRect, lpClipRect) = ScrollWindowEx(hWnd, X, Y, lpRect, lpClipRect, NULL, NULL,
+ * SW_INVALIDATE | SW_ERASE | (lpRect == NULL ? SW_SCROLLCHILDREN : 0)) (Learn ScrollWindow: "the area uncovered ... is combined into the window's update region"; with lpRect NULL the child windows and the invalid areas
+ * are offset, with lpRect not NULL they are not); BOOL, nonzero on success. A handle that is not a live window: ERROR / 0 and ERROR_INVALID_WINDOW_HANDLE (1400, as before). When the model cannot answer (fle_win_scroll
+ * returns 0: a build without the region functions, an iconic window) the former simple path answers. */
+static int scroll_run(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, uint64_t prc_scroll, uint64_t prc_clip, uint32_t flags, fle_win_scroll_result *res)
+{
+    int32_t rs[4], rc[4];
+
+    if (prc_scroll != 0) {
+        irect s = rect_ld(prc_scroll);
+        if (s.r < s.l || s.b < s.t) fle_stop(api, "prcScroll has a negative size: the page gives no behaviour");
+        rs[0] = s.l; rs[1] = s.t; rs[2] = s.r; rs[3] = s.b;
+    }
+    if (prc_clip != 0) {
+        irect c = rect_ld(prc_clip);
+        if (c.r < c.l || c.b < c.t) fle_stop(api, "prcClip has a negative size: the page gives no behaviour");
+        rc[0] = c.l; rc[1] = c.t; rc[2] = c.r; rc[3] = c.b;
+    }
+    return fle_win_scroll(api, hwnd, dx, dy, prc_scroll != 0 ? rs : NULL, prc_clip != 0 ? rc : NULL, flags, res);
+}
+
+void fle_imp_ScrollWindowEx(void)
+{
+    static const char api[] = "ScrollWindowEx";
+    uint64_t hwnd = R[1], prc_scroll = R[9], prc_clip = stack_arg(5), hrgn = stack_arg(6), prc_update = stack_arg(7);
+    int32_t dx = (int32_t)R[2], dy = (int32_t)R[8];
+    uint32_t flags = (uint32_t)stack_arg(8);
+    fle_win_scroll_result sr;
+    int type;
+
+    if (!scroll_run(api, hwnd, dx, dy, prc_scroll, prc_clip, flags, &sr)) { scroll_window_ex_simple(); return; }
+    if (sr.invalid) {
+        fle_set_last_error(1400);       /* ERROR_INVALID_WINDOW_HANDLE */
+        R[0] = 0;
+        return;
+    }
+    type = (flags & 0x6u) == 0 || sr.parts == 0 ? 1 : sr.parts == 1 ? 2 : 3;   /* Learn: the type of the INVALIDATED region; without SW_INVALIDATE / SW_ERASE nothing is invalidated (Wine probe U3: NULLREGION, prcUpdate still gives the strip) */
+    if (hrgn != 0) {   /* the region that holds the uncovered area and the moved update area: rectangular (decision 0123's only kind) */
+        uint64_t saved2[16], st2[8] = { 0 };
+        int has = sr.parts > 0 || sr.upd[2] > sr.upd[0];
+
+        memcpy(saved2, R, sizeof saved2);
+        R[1] = hrgn; R[2] = (uint64_t)(uint32_t)(has ? sr.upd[0] : 0); R[8] = (uint64_t)(uint32_t)(has ? sr.upd[1] : 0); R[9] = (uint64_t)(uint32_t)(has ? sr.upd[2] : 0);
+        st2[5] = (uint64_t)(uint32_t)(has ? sr.upd[3] : 0); R[4] = (uint64_t)(uintptr_t)st2;
+        fle_imp_SetRectRgn();
+        memcpy(R, saved2, sizeof saved2);
+    }
+    if (prc_update != 0) {
+        int32_t z[4] = { 0, 0, 0, 0 };
+        const int32_t *u = sr.parts > 0 ? sr.unc : z;
+
+        fle_st(prc_update, 4, (uint32_t)u[0]); fle_st(prc_update + 4, 4, (uint32_t)u[1]); fle_st(prc_update + 8, 4, (uint32_t)u[2]); fle_st(prc_update + 12, 4, (uint32_t)u[3]);
+    }
+    R[0] = (uint64_t)type;
+}
+
+/* user32!ScrollWindow: BOOL f(HWND hWnd rcx, int XAmount edx, int YAmount r8d, const RECT *lpRect r9, const RECT *lpClipRect [rsp+0x28]) */
+void fle_imp_ScrollWindow(void)
+{
+    static const char api[] = "ScrollWindow";
+    uint64_t hwnd = R[1], prc_scroll = R[9], prc_clip = stack_arg(5);
+    int32_t dx = (int32_t)R[2], dy = (int32_t)R[8];
+    fle_win_scroll_result sr;
+    uint32_t flags = 0x2u | 0x4u | (prc_scroll == 0 ? 0x1u : 0x80000000u);   /* SW_INVALIDATE | SW_ERASE | SW_SCROLLCHILDREN when the whole client area is scrolled; with an lpRect the invalid areas are not offset (internal bit) */
+
+    if (!scroll_run(api, hwnd, dx, dy, prc_scroll, prc_clip, flags, &sr)) {
+        /* no model: the same as ScrollWindowEx with a NULL hrgnUpdate and prcUpdate, through the former simple path (its arguments are on the stack: build the call) */
+        fle_stop(api, "the window model for scrolling is not available in this build (fle_win_scroll answered 0)");
+    }
+    if (sr.invalid) {
+        fle_set_last_error(1400);       /* ERROR_INVALID_WINDOW_HANDLE */
+        R[0] = 0;
+        return;
+    }
+    R[0] = 1;
 }
 
 /* ---- user32!InvalidateRgn (wall ia2-W31: the engine's scroll helper f_825d20 calls it after ScrollWindowEx with the region ScrollWindowEx filled; met by Alt+F7) ----

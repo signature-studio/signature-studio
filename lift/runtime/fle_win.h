@@ -291,6 +291,17 @@ typedef struct {
     int32_t clip_l, clip_t, clip_r, clip_b;
 } fle_win_dcq;
 int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out);
+
+/* Decision 0319 (PROVISIONAL): the bits and the update area of ScrollWindowEx / ScrollWindow (fle_win.c, "fle_win_scroll"). `scroll` / `clip` are client-coordinate RECTs (l, t, r, b) or NULL; flags are the SW_* flags of
+ * ScrollWindowEx. Returns 1 with *res filled (res->invalid: the handle is not a live window; res->parts: the number of rectangles of the uncovered area; res->unc: its bounding rectangle, res->upd: the bounding rectangle of the
+ * uncovered area and the moved update area, both in client coordinates and meaningful when parts > 0 or the rectangle is non-empty), or 0 when the model cannot answer (the caller keeps its former simple path). */
+typedef struct {
+    int invalid;
+    int parts;
+    int32_t unc[4];
+    int32_t upd[4];
+} fle_win_scroll_result;
+int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const int32_t *scroll, const int32_t *clip, uint32_t flags, fle_win_scroll_result *res);
 /* Decision 0140: UpdateLayeredWindow moves and resizes a layered window without messages (S-ulw-no-messages); see fle_layered.c. */
 int fle_win_layered_rect(uint64_t hwnd, int set_pos, int32_t x, int32_t y, int set_size, int32_t cx, int32_t cy);
 
