@@ -50,3 +50,5 @@ Learn の `CoInitializeEx` のページ(取得済み。`pilot_webfetch` で取�
 - Learn: `https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-coinitializeex`(取得済み)・`https://learn.microsoft.com/en-us/windows/win32/api/objbase/ne-objbase-coinit`(取得済み)。
 - `docs/decisions/0037`(実体は `docs/archive/decisions/0037-apis-oleaut-ole.md`。STA の決定)。
 - `evidence/R5-3f.md`・`evidence/R5-3g.md`・`evidence/R5-3h.md`。
+
+注(2026-11-15、R5-3i): 上の本文の「テストの更新」の新規ファイル(テスト用の rows の mod 1 件)は、ブランチ `r5-3h-coinitializeex` の `2f1915b` にだけあり、main には無い(`git ls-tree -r --name-only 2f1915b` を、そのテスト用の場所で引くと 1 件、`HEAD` で引くと 0 件)。0373 の観測は `2f1915b` から作った bundle で行った(`evidence/R5-3i.md`)。
