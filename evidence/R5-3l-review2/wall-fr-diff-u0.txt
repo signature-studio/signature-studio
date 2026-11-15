@@ -1,0 +1,66 @@
+diff --git a/lift/crates/fe-lift/tests/wall_fr13.rs b/lift/crates/fe-lift/tests/wall_fr13.rs
+index ec58159..ba1c067 100644
+--- a/lift/crates/fe-lift/tests/wall_fr13.rs
++++ b/lift/crates/fe-lift/tests/wall_fr13.rs
+@@ -16,0 +17 @@ mod rows_0267;
++mod rows_0372;
+@@ -148 +149 @@ fn the_rows_of_decision_0132_are_the_last_rows_in_the_order_given_and_no_pseudo_
+-    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
++    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0372 appends 1 more after those of decision 0267; decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
+diff --git a/lift/crates/fe-lift/tests/wall_fr15.rs b/lift/crates/fe-lift/tests/wall_fr15.rs
+index f3158ef..e8cfd3f 100644
+--- a/lift/crates/fe-lift/tests/wall_fr15.rs
++++ b/lift/crates/fe-lift/tests/wall_fr15.rs
+@@ -20,0 +21 @@ mod rows_0267;
++mod rows_0372;
+@@ -147 +148 @@ fn the_three_dsound_rows_are_the_last_rows_after_the_588_and_no_pseudo_va_moved(
+-    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
++    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
+diff --git a/lift/crates/fe-lift/tests/wall_fr16.rs b/lift/crates/fe-lift/tests/wall_fr16.rs
+index 58bd3fa..9597c8f 100644
+--- a/lift/crates/fe-lift/tests/wall_fr16.rs
++++ b/lift/crates/fe-lift/tests/wall_fr16.rs
+@@ -21,0 +22 @@ mod rows_0267;
++mod rows_0372;
+@@ -463 +464 @@ fn the_4_rows_of_decision_0140_are_the_last_rows_in_the_order_given_and_no_pseud
+-    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
++    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
+diff --git a/lift/crates/fe-lift/tests/wall_fr19.rs b/lift/crates/fe-lift/tests/wall_fr19.rs
+index fcf64d6..18b6d14 100644
+--- a/lift/crates/fe-lift/tests/wall_fr19.rs
++++ b/lift/crates/fe-lift/tests/wall_fr19.rs
+@@ -11,0 +12 @@ mod rows_0267;
++mod rows_0372;
+@@ -252 +253 @@ fn the_new_import_rows_are_appended_at_the_end_of_the_response_table_in_a_fixed_
+-    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that
++    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that, decision 0372 1 row (tests/rows_0372) after that
+diff --git a/lift/crates/fe-lift/tests/wall_fr20.rs b/lift/crates/fe-lift/tests/wall_fr20.rs
+index 680d786..b7bca75 100644
+--- a/lift/crates/fe-lift/tests/wall_fr20.rs
++++ b/lift/crates/fe-lift/tests/wall_fr20.rs
+@@ -17,0 +18 @@ mod rows_0267;
++mod rows_0372;
+@@ -173 +174 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+-    let n = rows.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one
++    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
+@@ -187 +188 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len()].trim().to_string();
++    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len()].trim().to_string();
+diff --git a/lift/crates/fe-lift/tests/wall_fr4.rs b/lift/crates/fe-lift/tests/wall_fr4.rs
+index b956e0a..ecf2cac 100644
+--- a/lift/crates/fe-lift/tests/wall_fr4.rs
++++ b/lift/crates/fe-lift/tests/wall_fr4.rs
+@@ -23,0 +24 @@ mod rows_0267;
++mod rows_0372;
+@@ -197 +198 @@ fn the_nine_new_rows_are_the_last_nine_in_the_order_they_were_reached_and_no_pse
+-    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
++    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len(); // decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
+diff --git a/lift/crates/fe-lift/tests/wall_fr5.rs b/lift/crates/fe-lift/tests/wall_fr5.rs
+index 4123c24..ca9e0c3 100644
+--- a/lift/crates/fe-lift/tests/wall_fr5.rs
++++ b/lift/crates/fe-lift/tests/wall_fr5.rs
+@@ -22,0 +23 @@ mod rows_0267;
++mod rows_0372;
+@@ -176 +177 @@ fn the_uuid_create_row_is_the_last_row_and_no_pseudo_va_moved() {
+-    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
++    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len(); // decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
