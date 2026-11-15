@@ -11,7 +11,7 @@
 現行 source の seed から作った work-r25(seed に 3 行がある)と、seed に 3 行の無い E13(対照)で、実エンジンの About 画面(ロゴ・staff roll)と日本語の表示、engine log の vfs 行を並べる。
 
 ## 資材の出典(確かめた範囲)
-- `BigFruit.png`: TSV の 24 行目。2 列目 `lift/out-idle1/inputs/install/Artwork/Skins/Default/BigFruit.png`、3 列目(sha256)`0a8dab68…e108`。元は FL Studio 21 のインストール先のファイル。2 列目の入力はリポジトリに無い(`lift/out*/` は gitignore)。この clone では存在を確かめられていない(未確認)。
+- `BigFruit.png`: TSV(`lift/harness/seeds/vfs-seed-idle1.tsv`)の 24 行目の 2 列目に、旧ツリーのパスで書かれている。3 列目(sha256)`0a8dab68…e108`。元は FL Studio 21 のインストール先のファイル。そのパスの入力はリポジトリに無い(`lift/out*/` は gitignore)。この clone では存在を確かめられていない(未確認)。
 - `AboutTxt.txt`: TSV の 240 行目。2 列目 `lift/out-idle1/inputs/install/System/Texts/About/AboutTxt.txt`、sha256 `2e59358c…813c`。同上(未確認)。`~/ダウンロード/` には FL Studio の installer があるが、この 2 つがそこから取られたかは未確認。
 - `msgothic.ttc`: TSV の 241 行目。元は `lift/harness/seeds/os-fonts/NotoSansCJKjp-subset-msgothic.ttc`、sha256 `1ab00fd8…ea69`。**MS Gothic ではない。** Noto Sans CJK JP Regular 2.004 の subset(OFL 1.1。`lift/harness/seeds/os-fonts/COPYRIGHT-fonts-noto-cjk-jp.txt` の License 欄は SIL-OFL-1.1、Copyright 2014-2021 Adobe。README.md の表の 12 行目)。Reserved Font Name は宣言されていない。出典の記述はあり(URL は本書には書かない)。
 
@@ -36,7 +36,7 @@
 - 外れ得る。開示: main は旧記録 O3・O16 の症状を見ていた。
 
 ## 道具(観測の前に決める)
-- `lift/out-gpu2/refproj-names.json` は現在のツリーに無い。そのため `openProject`(旧台本 `scn-g6-d3.json`・`scn-g6-ja-d3.json` の操作)は使わず、P3 の台本と同じ `openZipProject`(`serina1-serum2.zip` を `/assets/proj/` から読む)を使う。
+- `refproj-names.json`(旧ツリーの `out-gpu2` 配下。この clone には無い)は現在のツリーに無い。そのため `openProject`(旧台本 `scn-g6-d3.json`・`scn-g6-ja-d3.json` の操作)は使わず、P3 の台本と同じ `openZipProject`(`serina1-serum2.zip` を `/assets/proj/` から読む)を使う。
 - `serve-once-p3-bundle.mjs` は台本を `scn-p3-mixmove-300.json` に固定しているため、同じ中身で台本だけを差し替えたラッパー `tools/verify-kit/serve-once-r53-bundle.mjs`(新規)を作る。台本は `tools/verify-kit/tools/scn-r53-about-ja.json`(新規)。`tools/verify-kit/serve-once-p3-bundle.mjs` と `tools/boot-check/screen-observe.mjs` は変えない。
 - 台本は再生しない(P3 の測定ではない)。
 
@@ -64,3 +64,5 @@
 - 撤回条件に当たるか: 判定できない。work-r25 の日本語とロゴ・staff roll の目視、vfs-miss の件数が揃っていない。
 - 台本の直し: 位置 1 の初回 run の About の座標を (1222,95) から (1221,137) に直した(直した後の台本で E13 は止まらなかった)。予め書いた「道具」の節の座標は、この直しの前のもの。
 - 未確認: work-r25 の abort の原因。`msgothic.ttc` が work-r25 で読まれるか。`BigFruit.png`・`AboutTxt.txt` の元の所在。
+
+注(2026-11-15): 14 行と 39 行の旧ツリーのパスの書き方を、`scripts/check-consistency.sh` の指摘(この clone に無いパス)に合わせて直した。意味は変えていない。元のパスは commit `90dafcf` の版にある。
