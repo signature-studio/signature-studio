@@ -1,0 +1,76 @@
+[
+ {
+  "name": "r53c-settings-close",
+  "what": "R5-3c (decision 0370): the same start as scn-r53-about-ja.json (close the welcome wizard; F10 opens Settings on its default tab). The About tab is not clicked and the reference project is not opened. Shot, Escape (closes Settings), wait, listWindows, shot. No playback.",
+  "rep": 1,
+  "seconds": 20,
+  "firstIdleMs": 4087.955078125,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "listed": [
+   "14 TFruityLoopsMainForm 'FL Studio 2026' @0,0 1920x1080"
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 43.639999985694885,
+   "manifest_loaded": 55.66500008106232,
+   "download_start": 80.59500002861023,
+   "download_done": 995.0299999713898,
+   "compile_done": 995.4750000238419,
+   "pack_source_dll": 1066.114990234375,
+   "pack_source_seed": 1066.14013671875,
+   "glue_loaded": 1074.81494140625,
+   "worker_ready": 1077.6549999713898,
+   "engine_start": 1077.7000000476837,
+   "wasm_instantiated": 1099.81005859375,
+   "files_ready": 1110.340087890625,
+   "main_start": 1111.554931640625,
+   "idle": 4087.955078125,
+   "host_files_released": 4088.215087890625,
+   "first_pixel": 4112.880126953125
+  },
+  "loadStart": 2.64,
+  "loadEnd": 2.21,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

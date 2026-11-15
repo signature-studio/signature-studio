@@ -1,0 +1,153 @@
+[
+ {
+  "name": "r53-about-ja",
+  "what": "R5-3 (decision 0369): About (F10, then the About tab at 1221,137 on the Settings window, the position found in the first run; scn-g6-d3's 1222,95 hit the title bar) with shots 3 s, 8 s and 28 s after the click; Escape; the reference project (the zip, openZipProject as in scn-p3-mixmove-300) with shots 10 s and 20 s after it opened; the whole engine log. No playback.",
+  "rep": 1,
+  "seconds": 49,
+  "firstIdleMs": 4391.06005859375,
+  "stopped": true,
+  "state": "exited",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "listed": [
+   "14 TFruityLoopsMainForm 'FL Studio 2026' @0,0 1920x1080",
+   "22 TMIDIForm 'Settings - About FL Studio' @626,90 668x900",
+   "141 TLightweightLayeredControl '' @643,137 242x340"
+  ],
+  "describes": [
+   {
+    "name": "about-windows",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 22 at (626, 90) 668x900 alpha 0 key 000000 class \"TMIDIForm\" title \"Settings - About FL Studio\"",
+     "lid 141 at (632, 134) 249x347 layered premultiplied alpha alpha 255 key 000000 class \"TLightweightLayeredControl\" title \"\""
+    ]
+   },
+   {
+    "name": "about-windows-28s",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 22 at (626, 90) 668x900 alpha 0 key 000000 class \"TMIDIForm\" title \"Settings - About FL Studio\"",
+     "lid 141 at (638, 139) 246x343 layered premultiplied alpha alpha 255 key 000000 class \"TLightweightLayeredControl\" title \"\""
+    ]
+   }
+  ],
+  "logs": [
+   {
+    "name": "log-about",
+    "lines": 0
+   }
+  ],
+  "exitText": "The engine stopped at a wall: fle: indirect call to 0 is not a known function entry\nexit code 134 · == stop: SIGABRT (runtime abort, see runtime message)\nLast input sent: key up vk 0x1b scan 0x1 (keyup), 0.0 s before the stop; 2 input events were still pending (never processed).\nThe desktop picture last changed 0.1 s before the stop.\nThe desktop shows the last picture; the engine no longer runs, s",
+  "beaconExit": {
+   "reason": "stopped",
+   "code": 134,
+   "presents": 1576,
+   "message": "fle: indirect call to 0 is not a known function entry [guest return 0x1331c94]"
+  },
+  "tail": [
+   "first non-background pixel on a drawing surface (decision 0126): written by UpdateLayeredWindowIndirect into the surface of top-level window lid 8; function entries since the program began: 0",
+   "  surface of top-level window lid 8: 334 x 476 (BGRX 32-bit top-down), calls that wrote 1, non-zero pixels 57324 of 158984, distinct colours 12174; top colours (COLORREF 0xBBGGRR: count): 00000000:101660 0x1b2715:431 0x1c2915:239 0x1b2815:194 0x224b86:184 0x000001:179 0x1e4885:150 0x000002:129",
+   "  window table: 9 entries, 9 live; top-level windows in z-order, top first, each followed by its children (z = position in its group, top first):",
+   "    handle 0x7f990020 lid 8 class \"TLightweightLayeredControl\" title \"\" rect (794, 303, 334 x 476) style 0x90000000 exstyle 0x80800ac owner 0x7f990014 visible 1 enabled 1 z 0 thread 2",
+   "    handle 0x7f990024 lid 9 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 1 thread 0",
+   "    handle 0x7f99001c lid 7 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 2 thread 0",
+   "    handle 0x7f990014 lid 5 class \"TApplication\" title \"\" rect (960, 540, 0 x 0) style 0x84ca0000 exstyle 0x80 owner 0 visible 0 enabled 1 z 3 thread 0",
+   "    handle 0x7f990010 lid 4 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 4 thread 0",
+   "    handle 0x7f99000c lid 3 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 5 thread 0",
+   "    handle 0x7f990008 lid 2 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 6 thread 0",
+   "    handle 0x7f990004 lid 1 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 7 thread 0",
+   "fruity: the host object is at 0x13121460 (vtable 0x131214a0, base directory \"C:\\Program Files\\Image-Line\\FL Studio 21\\\"); instance slot at 0x1031fb60 holds 0x13a97380",
+   "fruity: exit code 134 (the codes of harness/wasm/trace_native.c: 134 SIGABRT, 139 SIGSEGV, 135 SIGBUS, 132 SIGILL, 136 SIGFPE, 4 wall time, 3 entry limit; 6 = named stop of this file)",
+   "[err] fle: indirect call to 0 is not a known function entry"
+  ],
+  "inputs": [
+   "{\"op\":\"waitIdle\",\"ms\":600000,\"minIdles\":20}",
+   "{\"op\":\"wait\",\"ms\":1500}",
+   "{\"op\":\"closeWizard\"}",
+   "{\"op\":\"click\",\"x\":1379,\"y\":271}",
+   "{\"op\":\"wait\",\"ms\":2500}",
+   "{\"op\":\"key\",\"code\":\"F10\"}",
+   "{\"op\":\"wait\",\"ms\":3500}",
+   "{\"op\":\"logMark\",\"name\":\"m1\"}",
+   "{\"op\":\"click\",\"x\":1221,\"y\":137,\"hover\":60,\"hold\":50}",
+   "{\"op\":\"wait\",\"ms\":3000}",
+   "{\"op\":\"shot\",\"name\":\"about-3s\"}",
+   "{\"op\":\"describe\",\"name\":\"about-windows\"}",
+   "{\"op\":\"wait\",\"ms\":5000}",
+   "{\"op\":\"shot\",\"name\":\"about-8s\"}",
+   "{\"op\":\"wait\",\"ms\":20000}",
+   "{\"op\":\"shot\",\"name\":\"about-28s\"}",
+   "{\"op\":\"describe\",\"name\":\"about-windows-28s\"}",
+   "{\"op\":\"listWindows\"}",
+   "{\"op\":\"saveLog\",\"name\":\"log-about\",\"mark\":\"m1\"}",
+   "{\"op\":\"key\",\"code\":\"Escape\"}",
+   "{\"op\":\"wait\",\"ms\":1500}",
+   "{\"op\":\"listWindows\"}"
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 43.12000000476837,
+   "manifest_loaded": 55.89000004529953,
+   "download_start": 79.71000003814697,
+   "download_done": 1027.1150000095367,
+   "compile_done": 1027.5550000071526,
+   "pack_source_dll": 1102.25,
+   "pack_source_seed": 1102.280029296875,
+   "glue_loaded": 1112.03515625,
+   "worker_ready": 1115.0600000023842,
+   "engine_start": 1115.085000038147,
+   "wasm_instantiated": 1140.43017578125,
+   "files_ready": 1151.340087890625,
+   "main_start": 1152.610107421875,
+   "idle": 4391.06005859375,
+   "host_files_released": 4391.27001953125,
+   "first_pixel": 4418.800048828125,
+   "exit": 46943.25,
+   "worker_done": 46944.260009765625
+  },
+  "loadStart": 3.6,
+  "loadEnd": 3.02,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080",
+   "TMIDIForm@626,90 668x900",
+   "TLightweightLayeredControl@643,137 242x340"
+  ],
+  "intendedExit": false,
+  "ok": false
+ }
+]
