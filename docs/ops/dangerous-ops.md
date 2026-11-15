@@ -25,7 +25,7 @@
 | main への直接書き込み(`gh api` の contents の PUT など) | 依頼者が「main に反映」と指示した場合のみ | 書き込まない。通常の `git push`(ブランチ)で行う |
 | 環境変数・シェル履歴の列挙 | — | しない。件数の確認は自分のシェルの `env \| grep -c` のみ |
 | Cloudflare の削除系・他の bucket・他の Worker | 指示があっても、対象が `fl-studio-web`・`fl-web-*` 以外なら実行しない | 実行しない |
-| `git push origin main`(通常の push。P1) | 指示は不要。scan 通過後に push する。force 系・`gh api` による ref の更新・別 identity は使わない | commit したら push し、`git ls-remote origin main` で届いたことを確かめる。失敗したら dry-run の出力を報告に貼り、push 以外の作業を続ける |
+| `git push origin main`(通常の push。P1) | 指示は不要。scan 通過後に push する。force 系・`gh api` による ref の更新・別 identity は使わない | commit したら push し、worker が `git ls-remote origin main` と `git rev-parse HEAD` を実行して出力を貼る(main は `git status -sb` と `scripts/preflight.sh` の `push-dry-run` 行を読む)。失敗したら dry-run の出力を報告に貼り、push 以外の作業を続ける |
 
 - 復元・巻き戻しの可否は、「依頼者の発言の時刻」で判断する。依頼者が復元を指示する前の探索・巻き戻しは不可。指示の後は可。
 - 削除された後に、削除を理由に作業を止めない。作業は続行の指示がある。

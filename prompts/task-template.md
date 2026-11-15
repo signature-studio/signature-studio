@@ -26,7 +26,7 @@
 2. <コマンド>   → <期待する出力・終了コード>
 3. scripts/scan-forbidden.sh <変更したファイル>   → 終了コード 0
 ```
-- commit する(メッセージは変更の内容を短く。秘密・識別子・禁止語を書かない)。commit したら `git push origin main` で push し、`git ls-remote origin main` で届いたことを確かめる(scan 通過後。リポジトリは PUBLIC で意図的)。
+- commit する(メッセージは変更の内容を短く。秘密・識別子・禁止語を書かない)。commit したら `git push origin main` で push し、worker が `git ls-remote origin main` と `git rev-parse HEAD` を実行して出力を報告に貼る(先頭 40 文字が一致すれば届いている。main と reviewer はこの 2 つを実行できない。scan 通過後。リポジトリは PUBLIC で意図的)。
 
 ## 報告形式
 `prompts/worker-rules.md` の「報告の形式」に従う。追加の項目: <あれば。例: 「測定は n=5 の中央値とマシン・ブラウザを書く」>

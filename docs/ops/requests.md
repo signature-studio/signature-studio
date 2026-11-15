@@ -36,7 +36,7 @@
 
 | 悪い依頼 | 違反 | 直し方 |
 |---|---|---|
-| 「push できるのに push 権限をください」 | `git push --dry-run origin HEAD` が通れば自分で push できる | `git push origin main` し、`git ls-remote origin main` で確かめる |
+| 「push できるのに push 権限をください」 | `git push --dry-run origin HEAD` が通れば自分で push できる | `git push origin main` し、worker が `git ls-remote origin main` と `git rev-parse HEAD` を実行して出力を貼る |
 | 依頼者に `git status` の結果を回す文 | `git` で自分で確かめられる | 実行し、出力を報告に貼る |
 | 「Secrets を追加してください」(理由・対象・影響範囲なし) | 依頼者が内容を特定できない | 必須項目を書く |
 | 「この方針で良いですか」 | 決定を依頼者に回している | 「決定: X。根拠: Y」を書いて実行する |
