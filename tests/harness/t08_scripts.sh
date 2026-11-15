@@ -25,27 +25,12 @@ resolve_real() { # file -> JSON on stdout
 lrepo="$sb/launch"; make_repo_copy "$lrepo"
 lhome="$sb/lhome"; mkdir -p "$lhome/.config/opencode"
 log="$sb/launch.log"
-launch() { (cd "$lrepo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$lhome" FAKE_OC_LOG="$log" FAKE_OC_AGENTS="$sb/agents-launch.json" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh "$@" 2>&1); }
+# one launch in the repository copy $1 (the other arguments go to launch.sh). HOME is $LHOME if set, else $lhome; the fake gives preflight the resolver answer in $FAKE_AGENTS if set, else the good file's
+launch_in() { local d=$1; shift; (cd "$d" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="${LHOME:-$lhome}" FAKE_GH=private FAKE_OC_LOG="$log" FAKE_OC_AGENTS="${FAKE_AGENTS:-$sb/agents-launch.json}" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh "$@" 2>&1); }
+# the model of the last session.create the fake received, as launch.sh sent it
+create_model() { jq -r '.args' "$log" | sed -n 's/^api session\.create --data //p' | tail -1 | jq -c '.model'; }
 # preflight (the first step) needs a resolver answer for the good file
 resolve_real "$ROOT/opencode.jsonc" > "$sb/agents-launch.json"
-
-: > "$log"
-out=$(launch --dry-run); rc=$?
-expect_eq "launch.sh --dry-run exits 0" 0 "$rc"
-expect_eq "--dry-run runs no opencode command at all (not even preflight)" 0 "$(wc -l < "$log" | tr -d ' ')"
-expect_contains "--dry-run shows session.create with agent build" "$out" 'session.create --data'
-expect_contains "--dry-run shows the model copied from opencode.jsonc" "$out" '"providerID":"console-cloudflare-ai-gateway-custom","id":"claude-sonnet-5-5","variant":"xhigh"'
-expect_contains "--dry-run shows the repository directory" "$out" "\"location\":{\"directory\":\"$lrepo\"}"
-expect_contains "--dry-run shows the registry step" "$out" "goal-nudge.sessions"
-expect_contains "--dry-run shows that session.prompt is the human's launch" "$out" "session.prompt を使うのは、この起動の 1 回だけ"
-expect_contains "--dry-run shows the goal text from START.md" "$out" "make it work"
-expect_eq "--dry-run created no registry file" 0 "$(find "$lhome" -name 'goal-nudge.sessions' | wc -l | tr -d ' ')"
-
-# model follows opencode.jsonc (agents.build.model set to Haiku -> the session is created on Haiku)
-hrepo="$sb/launch-haiku"; make_repo_copy "$hrepo"
-sed -i '0,/"model": "console-cloudflare-ai-gateway-custom\/claude-sonnet-5-5#xhigh"/s//"model": "console-cloudflare-ai-gateway-custom\/claude-haiku-5-5#high"/' "$hrepo/opencode.jsonc"
-out=$(cd "$hrepo" && env -u OPENCODE_SESSION_ID HOME="$lhome" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh --dry-run 2>&1)
-expect_contains "the model in session.create follows agents.build.model (set to Haiku)" "$out" '"id":"claude-haiku-5-5","variant":"high"'
 
 # the real launch against the fake
 : > "$log"
@@ -54,6 +39,9 @@ if [ "$rc" -eq 0 ]; then
   pass "launch.sh (against the fake) exits 0"
   expect_contains "reports the new session id" "$out" "セッション ses_FAKELAUNCH0001 を作成しました"
   calls=$(jq -r '.args' "$log")
+  expect_eq "no override: the session is created on agents.build.model of opencode.jsonc (with its variant)" '{"providerID":"console-cloudflare-ai-gateway-custom","id":"claude-sonnet-5-5","variant":"xhigh"}' "$(create_model)"
+  expect_contains "session.create: agent build, in the repository directory" "$(grep 'api session.create' <<< "$calls")" "\"agent\":\"build\",\"model\":{"
+  expect_contains "(and the repository directory)" "$(grep 'api session.create' <<< "$calls")" "\"location\":{\"directory\":\"$lrepo\"}"
   order=$(grep -oE '^debug agents|^api session\.(create|prompt|command)' <<< "$calls" | sed 's/^api //' | paste -sd' ' -)
   expect_eq "order: preflight's agent check, create, prompt, command" "debug agents session.create session.prompt session.command" "$order"
   expect_eq "exactly one session.create" 1 "$(grep -c 'api session.create' <<< "$calls")"
@@ -75,6 +63,46 @@ else
   fail "launch.sh against the fake exited $rc: $(printf '%s' "$out" | tail -3 | tr '\n' '|' | cut -c1-300)"
 fi
 
+# --- the model follows opencode.jsonc (agents.build.model set to Haiku -> the session is created on Haiku; the fake resolver answers accordingly so preflight passes)
+hrepo="$sb/launch-haiku"; make_repo_copy "$hrepo"
+sed -i '0,/"model": "console-cloudflare-ai-gateway-custom\/claude-sonnet-5-5#xhigh"/s//"model": "console-cloudflare-ai-gateway-custom\/claude-haiku-5-5#high"/' "$hrepo/opencode.jsonc"
+jq 'map(if .id == "build" then .model.id = "claude-haiku-5-5" | .model.variant = "high" else . end)' "$sb/agents-launch.json" > "$sb/agents-haiku.json"
+: > "$log"; LHOME="$sb/lhome-haiku" FAKE_AGENTS="$sb/agents-haiku.json" launch_in "$hrepo" > /dev/null; rc=$?
+expect_eq "no override, agents.build.model set to Haiku: exit 0" 0 "$rc"
+expect_eq "(the session is created on Haiku with its variant)" '{"providerID":"console-cloudflare-ai-gateway-custom","id":"claude-haiku-5-5","variant":"high"}' "$(create_model)"
+
+# --- the local override .opencode/opencode.jsonc (set-model-profile.sh bedrock writes it; not in Git): its agents.build.model is the effective pin, so the session is created on it, without a variant.
+# The names are fake Bedrock-like names built here (no vendor word); the fake resolver answers with the override applied, as the real one does.
+BSN=console-aws-bedrock/global.fake.claude-sonnet-5-5; BHN=console-aws-bedrock/global.fake.claude-haiku-5-5
+orepo="$sb/launch-override"; make_repo_copy "$orepo"
+cat > "$orepo/.opencode/opencode.jsonc" << EOF
+// local override: one line per agent, no variant
+{ "model": "$BSN",
+  "agents": {
+    "build": { "model": "$BSN" },
+    "worker": { "model": "$BHN" },
+    "reviewer": { "model": "$BHN" },
+    "title": { "model": "$BHN" },
+    "summary": { "model": "$BHN" } } }
+EOF
+jq --arg p "${BSN%%/*}" --arg s "${BSN#*/}" --arg h "${BHN#*/}" 'map(if .id == "build" then .model = {providerID: $p, id: $s} elif (.id == "worker" or .id == "reviewer" or .id == "title" or .id == "summary") then .model = {providerID: $p, id: $h} else . end)' "$sb/agents-launch.json" > "$sb/agents-override.json"
+: > "$log"; out=$(LHOME="$sb/lhome-override" FAKE_AGENTS="$sb/agents-override.json" launch_in "$orepo"); rc=$?
+expect_eq "override: launch.sh exits 0 (preflight accepts the override's models)" 0 "$rc"
+expect_eq "override: the session is created on the override's agents.build.model, with no variant" '{"providerID":"console-aws-bedrock","id":"global.fake.claude-sonnet-5-5"}' "$(create_model)"
+expect_contains "override: the message names that model" "$out" "モデル $BSN、"
+# an override without agents.build.model (here: only the top-level model) leaves the pin to opencode.jsonc
+nrepo="$sb/launch-override-nobuild"; make_repo_copy "$nrepo"
+printf '{ "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5" }\n' > "$nrepo/.opencode/opencode.jsonc"
+: > "$log"; LHOME="$sb/lhome-nobuild" launch_in "$nrepo" > /dev/null; rc=$?
+expect_eq "override without agents.build.model: exit 0" 0 "$rc"
+expect_eq "(the session is created on agents.build.model of opencode.jsonc)" '{"providerID":"console-cloudflare-ai-gateway-custom","id":"claude-sonnet-5-5","variant":"xhigh"}' "$(create_model)"
+# an override that is not valid JSONC stops the launch before anything is created
+xrepo="$sb/launch-override-broken"; make_repo_copy "$xrepo"
+printf '{ "agents": \n' > "$xrepo/.opencode/opencode.jsonc"
+: > "$log"; out=$(LHOME="$sb/lhome-broken" launch_in "$xrepo"); rc=$?
+expect_eq "a broken override stops the launch (exit 1)" 1 "$rc"; expect_contains "(and says the model cannot be read)" "$out" "メインセッションのモデルを読めません"
+expect_eq "(no opencode command ran)" 0 "$(wc -l < "$log" | tr -d ' ')"
+
 # --- failure paths: nothing is created when preflight FAILs; a failing step is reported with what already exists
 lh2="$sb/lhome2"; mkdir -p "$lh2/.config/opencode"; : > "$log"
 out=$(cd "$lrepo" && env -u OPENCODE_SESSION_ID FAKE_GIT_PUSH=ok FAKE_DF_REPO_GIB=600 HOME="$lh2" FAKE_OC_LOG="$log" FAKE_OC_AGENTS="/dev/null" PATH="$FAKEOC:$FAKE:$PATH" bash scripts/launch.sh 2>&1); rc=$?
@@ -94,20 +122,25 @@ done
 # argument handling and the in-session guard
 out=$(cd "$lrepo" && OPENCODE_SESSION_ID=ses_abc HOME="$lh2" bash scripts/launch.sh 2>&1); rc=$?
 expect_eq "refuses to launch from inside an opencode session" 1 "$rc"; expect_contains "(says the human runs it)" "$out" "セッションの中からは起動できません"
-out=$(cd "$lrepo" && OPENCODE_SESSION_ID=ses_abc HOME="$lh2" bash scripts/launch.sh --dry-run 2>&1); expect_eq "--dry-run is allowed inside a session" 0 "$?"
-launch --nothing > /dev/null; expect_eq "an unknown option exits 1 (no options beyond --dry-run)" 1 "$?"
+out=$(cd "$lrepo" && OPENCODE_SESSION_ID=ses_abc HOME="$lh2" bash scripts/launch.sh extra 2>&1); rc=$?
+expect_eq "an argument is refused before anything else (launch.sh takes none)" 1 "$rc"; expect_contains "(and says so)" "$out" "引数はありません"
+: > "$log"; out=$(launch_in "$lrepo" --dry-run); rc=$?
+expect_eq "--dry-run does not exist any more: it is refused like any argument" 1 "$rc"
+expect_contains "(and names it)" "$out" "引数はありません: --dry-run"
+expect_eq "(no opencode command ran)" 0 "$(wc -l < "$log" | tr -d ' ')"
 nogoal="$sb/launch-nogoal"; make_repo_copy "$nogoal"; printf 'start only\n' > "$nogoal/prompts/START.md"
-out=$(cd "$nogoal" && env -u OPENCODE_SESSION_ID HOME="$lh2" PATH="$FAKEOC:$PATH" bash scripts/launch.sh --dry-run 2>&1); rc=$?
+: > "$log"; out=$(launch_in "$nogoal"); rc=$?
 expect_eq "a START.md without a '## GOAL' section is refused" 1 "$rc"; expect_contains "(and says what is missing)" "$out" "「## GOAL」の節がない"
+expect_eq "(and no opencode command ran)" 0 "$(wc -l < "$log" | tr -d ' ')"
 long="$sb/launch-long"; make_repo_copy "$long"; { printf 'start\n\n## GOAL\n'; head -c 4100 /dev/zero | tr '\0' 'x'; printf '\n'; } > "$long/prompts/START.md"
-out=$(cd "$long" && env -u OPENCODE_SESSION_ID HOME="$lh2" PATH="$FAKEOC:$PATH" bash scripts/launch.sh --dry-run 2>&1); rc=$?
+: > "$log"; out=$(launch_in "$long"); rc=$?
 expect_eq "a goal text over 4000 characters is refused (the /goal limit)" 1 "$rc"
+expect_eq "(and no opencode command ran)" 0 "$(wc -l < "$log" | tr -d ' ')"
 multi="$sb/launch-multi"; make_repo_copy "$multi"; printf 'start\n\n## GOAL\nline one\n\nline three\n\n## NEXT\nignored\n' > "$multi/prompts/START.md"
-out=$(cd "$multi" && env -u OPENCODE_SESSION_ID HOME="$lh2" PATH="$FAKEOC:$PATH" bash scripts/launch.sh --dry-run 2>&1)
-expect_contains "a multi-line goal keeps its inner blank line" "$out" "#   line one
-#   
-#   line three"
-expect_not_contains "and stops at the next heading" "$out" "ignored"
+: > "$log"; LHOME="$sb/lhome-multi" launch_in "$multi" > /dev/null
+goal_call=$(jq -r '.args' "$log" | grep 'api session.command')
+expect_contains "a multi-line goal keeps its inner blank line" "$goal_call" '"text":"line one\n\nline three"'
+expect_not_contains "and stops at the next heading" "$goal_call" "ignored"
 # the launch script never touches the real registry or sessions in these tests
 if [ -e "$HOME/.config/opencode/goal-nudge.sessions" ] && grep -q "FAKELAUNCH" "$HOME/.config/opencode/goal-nudge.sessions" 2> /dev/null; then fail "the REAL registry contains a fake id"; else pass "the real goal-nudge registry was not written by these tests"; fi
 

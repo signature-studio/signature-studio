@@ -3,6 +3,7 @@
 #  (a) against the previous session ses_eafd6e97fffeXSloTmS42jhMt4, read-only: the numbers must equal the previous measurement (R3 section B.10; the model ids contain the
 #      vendor word, so the test replaces it with <V> before comparing, and the expected file is stored that way). That session is closed; its rows no longer change.
 #  (b) against a small synthetic database (HOME is redirected to a sandbox): off-pin detection, errors, and "never writes".
+#  (c) the local override .opencode/opencode.jsonc (not in Git): its models are the pins. Every run uses a COPY of the repository, so the override on the machine running the tests never changes a result.
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh"
 set -o pipefail
@@ -10,12 +11,14 @@ set -o pipefail
 V="anthr""opic"
 prev=ses_eafd6e97fffeXSloTmS42jhMt4
 real_db="$HOME/.local/share/opencode/opencode.db"
+sb=$(new_sandbox t06)
+plain="$sb/plain"; make_repo_copy "$plain"
 
 # ---------------- (a) the previous session
 if [ ! -r "$real_db" ] || [ "$(sqlite3 -readonly "$real_db" "select count(*) from session_v2 where id='$prev';" 2> /dev/null)" != 1 ]; then
   skip "(a) the previous session is not in this machine's database: cannot compare with the previous measurement"
 else
-  out=$(bash "$ROOT/scripts/audit-session.sh" "$prev" 2> "${TMPDIR:-/tmp}/t06.err"); rc=$?
+  out=$(bash "$plain/scripts/audit-session.sh" "$prev" 2> "${TMPDIR:-/tmp}/t06.err"); rc=$?
   expect_eq "audit-session.sh exits 0 on the previous session" 0 "$rc"
   norm=$(printf '%s\n' "$out" | sed "s/$V/<V>/g")
   # numbers measured before (R3 B.10 and 02-what-went-wrong V-F01 / V-F04 / R3 A.4)
@@ -52,7 +55,6 @@ ROWS
 fi
 
 # ---------------- (b) synthetic database
-sb=$(new_sandbox t06)
 home="$sb/home"; mkdir -p "$home/.local/share/opencode"
 db="$home/.local/share/opencode/opencode.db"
 python3 - "$db" << 'PY'
@@ -76,6 +78,10 @@ db.execute("insert into session_v2 values ('ses_MAIN',null,0,?)", (T0,))
 db.execute("insert into session_v2 values ('ses_KID1','ses_MAIN',0,?)", (T0,))
 db.execute("insert into session_v2 values ('ses_KID2','ses_MAIN',0,?)", (T0 + 2 * 3600_000,))
 db.execute("insert into session_v2 values ('ses_OTHER',null,0,?)", (T0,))
+BS = {"providerID": "console-aws-bedrock", "id": "global.fake.claude-sonnet-5-5"}
+BH = {"providerID": "console-aws-bedrock", "id": "global.fake.claude-haiku-5-5"}
+db.execute("insert into session_v2 values ('ses_BMAIN',null,0,?)", (T0,))
+db.execute("insert into session_v2 values ('ses_BKID','ses_BMAIN',0,?)", (T0,))
 asst("ses_MAIN", T0, SON, [("read", {"path": "x"})])
 asst("ses_MAIN", T0 + 60_000, SON, [("subagent", {"agent": "worker", "prompt": "p"}), ("subagent", {"agent": "worker", "prompt": "q", "model": "x/y"})])
 asst("ses_MAIN", T0 + 120_000, HAI, [("edit", {"path": "a"}), ("write", {"path": "b"}), ("shell", {"command": "env sleep 1"}), ("shell", {"command": "opencode auth export"})])
@@ -86,10 +92,15 @@ asst("ses_KID1", T0 + 2000, HAI)
 asst("ses_KID2", T0 + 3000, SON)                       # a child on the wrong model
 msg("ses_KID2", "model-switched", T0 + 2500, {"model": SON, "previous": HAI})
 asst("ses_OTHER", T0, OTHER, [("edit", {"path": "z"})])
+asst("ses_BMAIN", T0, {**BS, "variant": "high"})
+asst("ses_BMAIN", T0 + 1000, BS)
+asst("ses_BMAIN", T0 + 2000, SON)                      # a gateway row in a session whose pin is the override
+asst("ses_BKID", T0 + 3000, {**BH, "variant": "low"})
+asst("ses_BKID", T0 + 4000, BH)
 db.commit()
 PY
 before=$(md5sum "$db" | cut -d' ' -f1)
-run() { HOME="$home" bash "$ROOT/scripts/audit-session.sh" "$@" 2>&1; }
+run() { HOME="$home" bash "$plain/scripts/audit-session.sh" "$@" 2>&1; }
 out=$(run ses_MAIN); rc=$?
 expect_eq "synthetic: exit 0" 0 "$rc"
 expect_contains "synthetic: header counts the 2 children" "$out" "(children: 2)"
@@ -122,11 +133,11 @@ expect_eq "unknown session id exits 2" 2 "$rc"; expect_contains "and names the i
 out=$(run "x'; drop table session_v2;--"); rc=$?
 expect_eq "an id that is not ses_<alnum> exits 2 (no SQL injection through the argument)" 2 "$rc"
 expect_eq "(and the table is still there)" 1 "$(sqlite3 -readonly "$db" "select count(*) from session_v2 where id='ses_MAIN';")"
-out=$(HOME="$home" env -u OPENCODE_SESSION_ID bash "$ROOT/scripts/audit-session.sh" 2>&1); rc=$?
+out=$(HOME="$home" env -u OPENCODE_SESSION_ID bash "$plain/scripts/audit-session.sh" 2>&1); rc=$?
 expect_eq "no argument and no OPENCODE_SESSION_ID exits 2" 2 "$rc"
-out=$(HOME="$home" OPENCODE_SESSION_ID=ses_MAIN bash "$ROOT/scripts/audit-session.sh" 2>&1); rc=$?
+out=$(HOME="$home" OPENCODE_SESSION_ID=ses_MAIN bash "$plain/scripts/audit-session.sh" 2>&1); rc=$?
 expect_eq "no argument uses OPENCODE_SESSION_ID" 0 "$rc"; expect_contains "(and audits that session)" "$out" "# audit of ses_MAIN"
-out=$(HOME="$sb/empty" bash "$ROOT/scripts/audit-session.sh" ses_MAIN 2>&1); rc=$?
+out=$(HOME="$sb/empty" bash "$plain/scripts/audit-session.sh" ses_MAIN 2>&1); rc=$?
 expect_eq "a missing database exits 2" 2 "$rc"; expect_contains "and names the file" "$out" "cannot read the database"
 
 # pins follow opencode.jsonc: with agents.build.model set to Haiku the main session must be on Haiku
@@ -168,16 +179,51 @@ expect_eq "--since after every row: exit 0" 0 "$rc"
 expect_contains "--since after every row: no child is counted" "$late_out" "(children: 0)"
 expect_eq "--since after every row: section 2 has no assistant rows" "0" "$(sec_of "$late_out" '## 2.' | awk 'NR>2 && NF' | wc -l | tr -d ' ')"
 for bad in "2026-11-10" "2026-11-10 04:48:00" "2026/11/10 04:48" "2026-13-01 00:00" "2026-02-30 00:00" "garbage" "" "2026-11-10 4:48"; do
-  err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "$bad" 2>&1 > /dev/null); rc=$?
+  err=$(HOME="$home" bash "$plain/scripts/audit-session.sh" ses_MAIN --since "$bad" 2>&1 > /dev/null); rc=$?
   expect_eq "--since '$bad' exits 2" 2 "$rc"
   expect_eq "--since '$bad' writes one line to stderr" 1 "$(printf '%s\n' "$err" | wc -l | tr -d ' ')"
 done
-err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since 2>&1 > /dev/null); rc=$?
+err=$(HOME="$home" bash "$plain/scripts/audit-session.sh" ses_MAIN --since 2>&1 > /dev/null); rc=$?
 expect_eq "--since without a value exits 2" 2 "$rc"; expect_contains "and says so in Japanese" "$err" "--since"
-err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "2026-02-30 00:00" 2>&1 > /dev/null)
+err=$(HOME="$home" bash "$plain/scripts/audit-session.sh" ses_MAIN --since "2026-02-30 00:00" 2>&1 > /dev/null)
 expect_contains "a date that does not exist is named as such" "$err" "存在しません"
-err=$(HOME="$home" bash "$ROOT/scripts/audit-session.sh" ses_MAIN --since "2026-11-10" 2>&1 > /dev/null)
+err=$(HOME="$home" bash "$plain/scripts/audit-session.sh" ses_MAIN --since "2026-11-10" 2>&1 > /dev/null)
 expect_contains "a wrong format is named as such" "$err" "書式が不正"
 expect_eq "--since: the database file is still byte-identical after these runs (read-only)" "$before" "$(md5sum "$db" | cut -d' ' -f1)"
+
+# ---------------- (c) the local override .opencode/opencode.jsonc (fake Bedrock-like names, built here; no vendor word)
+BSN=console-aws-bedrock/global.fake.claude-sonnet-5-5; BHN=console-aws-bedrock/global.fake.claude-haiku-5-5
+plain_out=$(run ses_BMAIN)
+expect_contains "no override: the header names opencode.jsonc only (as before)" "$plain_out" "# pins from opencode.jsonc: main=console-cloudflare-ai-gateway-custom/claude-sonnet-5-5  children=console-cloudflare-ai-gateway-custom/claude-haiku-5-5"
+expect_not_contains "no override: the header does not mention an override" "$plain_out" "local override"
+expect_eq "no override: the Bedrock-named main rows are off the pin (2 rows)" "2" "$(sec_of "$plain_out" '## 5.' | awk -v m="$BSN" '$1=="main" && $2==m {print $3}')"
+orepo="$sb/override"; make_repo_copy "$orepo"
+cat > "$orepo/.opencode/opencode.jsonc" << EOF
+// local override: one line per agent, no variant
+{ "model": "$BSN",
+  "agents": {
+    "build": { "model": "$BSN" },
+    "worker": { "model": "$BHN" },
+    "reviewer": { "model": "$BHN" },
+    "title": { "model": "$BHN" },
+    "summary": { "model": "$BHN" } } }
+EOF
+o_out=$(HOME="$home" bash "$orepo/scripts/audit-session.sh" ses_BMAIN 2>&1); rc=$?
+expect_eq "override: exit 0" 0 "$rc"
+expect_contains "override: the pins are the override's, and the header says so" "$o_out" "# pins from opencode.jsonc (local override .opencode/opencode.jsonc): main=$BSN  children=$BHN"
+o_off=$(sec_of "$o_out" '## 5.')
+expect_not_contains "override: Bedrock-named main rows (with and without a variant) are not off the pin" "$o_off" "$BSN"
+expect_not_contains "override: Bedrock-named child rows (with and without a variant) are not off the pin" "$o_off" "$BHN"
+expect_eq "override: the row on the gateway model is now off the pin (1 row)" "1" "$(awk '$1=="main" && $2=="console-cloudflare-ai-gateway-custom/claude-sonnet-5-5" {print $3}' <<< "$o_off")"
+expect_eq "override: exactly one line is off the pin" "1" "$(awk 'NR>2 && NF' <<< "$o_off" | wc -l | tr -d ' ')"
+prepo="$sb/override-partial"; make_repo_copy "$prepo"
+printf '{ "agents": { "worker": { "model": "%s#high" } } }\n' "$BHN" > "$prepo/.opencode/opencode.jsonc"
+p_out=$(HOME="$home" bash "$prepo/scripts/audit-session.sh" ses_BMAIN 2>&1)
+expect_contains "partial override: the entry it sets wins (variant dropped), the others stay as in opencode.jsonc" "$p_out" "main=console-cloudflare-ai-gateway-custom/claude-sonnet-5-5  children=$BHN,console-cloudflare-ai-gateway-custom/claude-haiku-5-5"
+brepo="$sb/override-broken"; make_repo_copy "$brepo"
+printf '{ "agents": \n' > "$brepo/.opencode/opencode.jsonc"
+b_out=$(HOME="$home" bash "$brepo/scripts/audit-session.sh" ses_BMAIN 2>&1); rc=$?
+expect_eq "a broken override exits 2" 2 "$rc"; expect_contains "and names the file" "$b_out" "cannot parse $brepo/.opencode/opencode.jsonc"
+expect_eq "(c): the database file is still byte-identical after these runs (read-only)" "$before" "$(md5sum "$db" | cut -d' ' -f1)"
 
 finish

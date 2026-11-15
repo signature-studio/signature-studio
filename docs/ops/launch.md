@@ -12,12 +12,12 @@
 | 3 | AI の利用先を選ぶ(`docs/ops/models.md`。Cloudflare 経由は `gateway`、Amazon Bedrock は `bedrock`) | `scripts/set-model-profile.sh gateway`(Bedrock なら `bedrock`) | 終了コードが 0(出力は無い)。割り当ては次の 4 で確かめる |
 | 4 | 起動前の検査 | `opencode debug agents` でモデルの割り当てを確認。`scripts/preflight.sh` | 割り当ての名前は `build`・`compaction`・`reviewer`・`summary`・`title`・`worker`(コマンドの表示のまま。`scripts/preflight.sh` の agents 行と同じ 6 つ)。`scripts/preflight.sh` の結果に FAIL の行が無い |
 | 5 | goal-nudge を有効化 | `systemctl --user daemon-reload` → `systemctl --user enable --now goal-nudge.timer`。登録簿(`~/.config/opencode/goal-nudge.sessions`)には `scripts/launch.sh` が起動後の ID を追加する | `systemctl --user list-timers goal-nudge.timer` に NEXT が出る |
-| 6 | 起動 | `scripts/launch.sh`(preflight → メインセッション作成 → goal-nudge の登録簿へ追加 → `prompts/START.md` を送る → `/goal` を設定) | 出力に新しいセッション ID。`opencode api session.active` に出る |
+| 6 | 起動 | `scripts/launch.sh`(引数なし。preflight → メインセッション作成 → goal-nudge の登録簿へ追加 → `prompts/START.md` を送る → `/goal` を設定)。メインセッションのモデルは、Bedrock に切り替えてあれば上書きの設定(`.opencode/opencode.jsonc`)の `agents.build.model`、なければ `opencode.jsonc` の同じ項目 | 出力に新しいセッション ID とモデル。`opencode api session.active` に出る |
 | 7 | 最初の確認(起動後 10 分) | `opencode api session.active`、`scripts/audit-session.sh <ID>` | 稼働中のサブエージェント(作業用)が 1 本以上。メインセッションがファイルを編集した件数が 0 |
 
 - goal-nudge は、goal を paused のまま放置せず再開する。人が Esc で止めても、最長 1 分後に再開する。人が止めておきたい間は、timer を止める(`systemctl --user disable --now goal-nudge.timer`)。
 - 起動後、依頼者は指示と期限だけを伝えて離席してよい。後任者は質問しない。
-- 起動後の定期確認(任意): `scripts/audit-session.sh`(モデル別の件数、メインセッションの編集件数、60 分超の無活動)。
+- 起動後の定期確認(任意): `scripts/audit-session.sh`(モデル別の件数、メインセッションの編集件数、60 分超の無活動)。固定のモデルは、上書きの設定(`.opencode/opencode.jsonc`)があれば、その項目を優先して読む(出力の `pins from` の行に「local override」と出る)。
 
 ## 2 決定済みの事項(P1〜P8。依頼者の決定 2026-11-10。これが旧文書の記述に優先する)
 

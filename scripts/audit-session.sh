@@ -4,7 +4,9 @@
 # Read-only audit of one main session and its children, from opencode's database (opened with sqlite3 -readonly; never copied, never written).
 # What it shows: model switches, assistant rows per model (main vs children), the main session's own edit/write/shell calls,
 # gaps of 60 minutes or more without any row, rows whose model is not the pinned one, and a few risky command counts.
-# The pins are read from opencode.jsonc (agents.build.model for the main session, agents.worker/reviewer.model for children).
+# The pins are read from opencode.jsonc (agents.build.model for the main session, agents.worker/reviewer.model for children);
+# a model set in the local override .opencode/opencode.jsonc (set-model-profile.sh bedrock writes it) wins over opencode.jsonc, entry by entry.
+# A pin has no #variant: only provider and model are compared, as the model-pin-gate plugin does.
 # Exit 0 when the audit ran. It reports; it does not decide. A non-zero count under "rows NOT on the pinned model" is a finding to report.
 set -o pipefail
 
@@ -68,6 +70,12 @@ PY
 }
 
 json=$(jsonc_to_json "$config") || die "cannot parse $config as JSONC"
+override="$root/.opencode/opencode.jsonc"; pins_from=""
+if [ -f "$override" ]; then
+  ojson=$(jsonc_to_json "$override") || die "cannot parse $override as JSONC"
+  json=$(jq -c --argjson o "$ojson" '. * $o' <<< "$json") || die "cannot merge $override into $config"
+  pins_from=" (local override .opencode/opencode.jsonc)"
+fi
 # "provider/model#variant" -> "provider/model" (assistant rows carry provider and model separately).
 pin() { jq -r --arg a "$1" '.agents[$a].model // empty | split("#")[0]' <<< "$json"; }
 main_pin=$(pin build)
@@ -85,7 +93,7 @@ exists=$(sqlite3 -readonly "$db" "select count(*) from session_v2 where id='$sid
 children=$(sqlite3 -readonly "$db" "select count(*) from session_v2 where parent_id='$sid'$(tm time_created);")
 
 echo "# audit of $sid (children: $children)"
-echo "# pins from opencode.jsonc: main=$main_pin  children=$child_pins"
+echo "# pins from opencode.jsonc$pins_from: main=$main_pin  children=$child_pins"
 if [ -n "$since_ms" ]; then echo "# since (JST): $since  (children created at or after it; main rows from then on)"; fi
 echo
 echo "## 1. main: model-switched count"

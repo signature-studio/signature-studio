@@ -265,7 +265,7 @@ worker	deny	["GH_CONFIG_DIR=/x gh auth status"]	GH_CONFIG_DIR=/x gh auth status
 worker	deny	["env GH_CONFIG_DIR=/x gh api repos/o/r"]	env GH_CONFIG_DIR=/x gh api repos/o/r
 worker	deny	["GIT_CONFIG_GLOBAL=/x git push origin main"]	GIT_CONFIG_GLOBAL=/x git push origin main
 worker	deny	["scripts/launch.sh"]	scripts/launch.sh
-worker	deny	["bash scripts/launch.sh --dry-run"]	bash scripts/launch.sh --dry-run
+worker	deny	["bash scripts/launch.sh extra"]	bash scripts/launch.sh extra
 worker	deny	["scripts/set-model-profile.sh haiku"]	scripts/set-model-profile.sh haiku
 worker	deny	["git commit -m \"see ~/.config/opencode/AGENTS.md\""]	git commit -m "see ~/.config/opencode/AGENTS.md"
 worker	LIMIT-allow	["env sleep 1"]	env sleep 1

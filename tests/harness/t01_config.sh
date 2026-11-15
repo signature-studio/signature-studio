@@ -9,7 +9,7 @@ set -o pipefail
 # --- the file itself
 if python3 "$HERE/lib/rules.py" "$ROOT/opencode.jsonc" build read x > /dev/null 2>&1; then pass "opencode.jsonc parses as JSONC"; else fail "opencode.jsonc does not parse as JSONC"; fi
 v="anthr"; v2="opic"
-if grep -rqiI "$v$v2" "$ROOT/opencode.jsonc" "$ROOT/.opencode" "$ROOT/.githooks" "$ROOT/scripts" "$ROOT/tests" "$ROOT/.gitignore" 2> /dev/null; then fail "a vendor name is in the harness files"; else pass "no vendor name in opencode.jsonc, plugins, hooks, scripts, tests, .gitignore"; fi
+if grep -rqiI "$v$v2" "$ROOT/opencode.jsonc" "$ROOT/.opencode/plugins" "$ROOT/.githooks" "$ROOT/scripts" "$ROOT/tests" "$ROOT/.gitignore" 2> /dev/null; then fail "a vendor name is in the harness files"; else pass "no vendor name in opencode.jsonc, plugins, hooks, scripts, tests, .gitignore"; fi
 n=$(grep -cE '^ {2}"model": "|^ {6}"model": "' "$ROOT/opencode.jsonc")
 expect_eq "own-line model entries in opencode.jsonc (top, build, worker, reviewer; title and summary are one-liners)" 4 "$n"
 

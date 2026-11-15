@@ -141,7 +141,7 @@ expect_eq "a clean repository exits 0 (the harness files themselves are clean)" 
 expect_contains "and says so" "$out" "0 findings"
 
 # the real harness files are clean (this repository, read-only: no git command is run in it; files are given explicitly)
-real=$(cd "$ROOT" && bash scripts/scan-forbidden.sh opencode.jsonc .gitignore .opencode .githooks scripts tests 2>&1); rc=$?
+real=$(cd "$ROOT" && bash scripts/scan-forbidden.sh opencode.jsonc .gitignore .opencode/plugins .githooks scripts tests 2>&1); rc=$?
 expect_eq "the harness files of this repository are clean" 0 "$rc"
 [ "$rc" -eq 0 ] || echo "$real" | head -5
 
