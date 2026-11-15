@@ -91,6 +91,19 @@ void fle_imp_OleUninitialize(void)
     com_depth--;
 }
 
+/* CoInitializeEx (decision 0372): HRESULT f(LPVOID pvReserved, DWORD dwCoInit). pvReserved is in R[1] (rcx), dwCoInit in
+ * R[2] (rdx; the callee reads its low 32 bits). The engine reaches it through GetProcAddress("ole32.dll", "CoInitializeEx").
+ * Only the value 2 (COINIT_APARTMENTTHREADED alone) is answered, with the answer of CoInitialize (one STA, decision 0037). Every
+ * other value stops, including 6 (2|COINIT_DISABLE_OLE1DDE) and 10 (2|COINIT_SPEED_OVER_MEMORY): the Learn page of COINIT says
+ * only what the flags are, not what the VM does with them (decision 0372). */
+void fle_imp_CoInitializeEx(void)
+{
+    static const char api[] = "CoInitializeEx";
+
+    if ((uint32_t)R[2] != 2) fle_stop(api, "dwCoInit is not COINIT_APARTMENTTHREADED (the guest is a single-threaded STA: decision 0037)");
+    R[0] = com_init(api, 0);
+}
+
 /* ---- Task memory ----
  * CoTaskMemAlloc page: a block of at least cb bytes, undefined contents (zero here, setting: determinism); cb 0 gives a
  * valid pointer to a zero-length item; NULL when memory is insufficient. CoTaskMemFree page: NULL has no effect; the

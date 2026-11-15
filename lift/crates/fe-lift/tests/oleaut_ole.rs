@@ -1197,6 +1197,77 @@ fn com_initialization_inputs_the_pages_leave_open_abort() {
     );
 }
 
+#[test]
+fn co_initialize_ex_apartment_threaded_s_ok_then_s_false_and_balance() {
+    let l = lines(
+        "ole-coinitex",
+        r#"
+    uint32_t hr;
+    hr = (uint32_t)CALL(fle_imp_CoInitializeEx, 0, 2); printf("cx1 %08x depth %u\n", hr, fle_ole_com_depth());
+    /* the same concurrency model again: S_FALSE, and it must be balanced as well (page) */
+    hr = (uint32_t)CALL(fle_imp_CoInitializeEx, 0, 2); printf("cx2 %08x depth %u\n", hr, fle_ole_com_depth());
+    /* CoInitialize is the same STA model (page: equivalent to COINIT_APARTMENTTHREADED): the same count */
+    hr = (uint32_t)CALL(fle_imp_CoInitialize, 0); printf("ci3 %08x depth %u\n", hr, fle_ole_com_depth());
+    CALL(fle_imp_CoUninitialize); printf("un depth %u\n", fle_ole_com_depth());
+    CALL(fle_imp_CoUninitialize); printf("un depth %u\n", fle_ole_com_depth());
+    CALL(fle_imp_CoUninitialize); printf("un depth %u\n", fle_ole_com_depth());
+    /* fully uninitialized: the next call initializes again */
+    hr = (uint32_t)CALL(fle_imp_CoInitializeEx, 0, 2); printf("again %08x depth %u\n", hr, fle_ole_com_depth());
+    CALL(fle_imp_CoUninitialize); printf("end %u\n", fle_ole_com_depth());
+"#,
+    );
+    assert_eq!(
+        l,
+        [
+            format!("cx1 {S_OK} depth 1").as_str(),
+            format!("cx2 {S_FALSE} depth 2").as_str(),
+            format!("ci3 {S_FALSE} depth 3").as_str(),
+            "un depth 2",
+            "un depth 1",
+            "un depth 0",
+            format!("again {S_OK} depth 1").as_str(),
+            "end 0",
+        ]
+    );
+}
+
+#[test]
+fn co_initialize_ex_reads_only_the_low_32_bits_of_dword_argument() {
+    let l = lines(
+        "ole-coinitex-hi",
+        r#"
+    uint32_t hr = (uint32_t)CALL(fle_imp_CoInitializeEx, 0, 0x100000002ull);
+    printf("%08x\n", hr);
+    CALL(fle_imp_CoUninitialize);
+    printf("%u\n", fle_ole_com_depth());
+"#,
+    );
+    assert_eq!(l, [S_OK, "0"]);
+}
+
+#[test]
+fn co_initialize_ex_inputs_the_pages_leave_open_abort() {
+    assert_aborts(
+        "ole-coinitex-abort",
+        "",
+        &[
+            ("coinitex-reserved", "CALL(fle_imp_CoInitializeEx, 1, 2);"),
+            ("coinitex-multithreaded", "CALL(fle_imp_CoInitializeEx, 0, 0);"),
+            ("coinitex-disable-ole1dde", "CALL(fle_imp_CoInitializeEx, 0, 6);"),
+            ("coinitex-speed-over-memory", "CALL(fle_imp_CoInitializeEx, 0, 8);"),
+            ("coinitex-oleuninit-balance", "CALL(fle_imp_CoInitializeEx, 0, 2); CALL(fle_imp_OleUninitialize);"),
+        ],
+    );
+}
+
+#[test]
+fn co_initialize_ex_row_is_in_the_table_and_declared_in_the_header() {
+    let table = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+    let row = "(\"ole32.dll\", \"CoInitializeEx\", \"fle_imp_CoInitializeEx\", \"jmp_imp:CoInitializeEx\")";
+    assert_eq!(table.matches(row).count(), 1, "CoInitializeEx: exactly one row in imports_table.rs");
+    assert!(header_has("fle_ole.h", "void fle_imp_CoInitializeEx(void)"), "CoInitializeEx is declared in fle_ole.h");
+}
+
 // ---- 7. CoTaskMem ----
 
 #[test]

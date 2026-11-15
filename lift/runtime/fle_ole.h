@@ -15,8 +15,10 @@
 #define FLE_COTASK_MAX UINT64_C(0x40000000)
 
 /* ole32!CoInitialize: HRESULT f(LPVOID pvReserved). OleInitialize: HRESULT f(LPVOID pvReserved).
+ * ole32!CoInitializeEx: HRESULT f(LPVOID pvReserved, DWORD dwCoInit) (decision 0372: only dwCoInit 2 is answered).
  * CoUninitialize, OleUninitialize: void f(void). The apartment is always single-threaded (decision 0037). */
 void fle_imp_CoInitialize(void);
+void fle_imp_CoInitializeEx(void);
 void fle_imp_CoUninitialize(void);
 void fle_imp_OleInitialize(void);
 void fle_imp_OleUninitialize(void);

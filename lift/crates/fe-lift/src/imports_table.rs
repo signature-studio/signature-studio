@@ -773,6 +773,8 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     ("user32.dll", "PostThreadMessageW", "fle_imp_PostThreadMessageW", "jmp_imp:PostThreadMessageW"),
     // Decision 0267 (alpha10b; appended: decision 0015, append only): user32!SetWindowPlacement, the show state and the restored rectangle set (runtime/fle_win.c); FL calls it for its main form and one more window when they are created (SW_HIDE and the rectangle) once GetWindowPlacement answers.
     ("user32.dll", "SetWindowPlacement", "fle_imp_SetWindowPlacement", "jmp_imp:SetWindowPlacement"),
+    // Decision 0372 (R5-3h; appended: decision 0015, append only): ole32!CoInitializeEx, reached by GetProcAddress (runtime/fle_ole.c; only dwCoInit 2 is answered).
+    ("ole32.dll", "CoInitializeEx", "fle_imp_CoInitializeEx", "jmp_imp:CoInitializeEx"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of

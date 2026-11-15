@@ -14,6 +14,7 @@ mod rows_0140;
 mod rows_0144;
 mod rows_0147;
 mod rows_0267;
+mod rows_0372;
 
 use fe_lift::generate;
 use std::path::PathBuf;
@@ -145,7 +146,7 @@ fn the_rows_of_decision_0132_are_the_last_rows_in_the_order_given_and_no_pseudo_
     assert_eq!(rows.len(), st.resp_entries);
     let k = rows_0132::ROWS_0132.len();
     // decision 0136 appends 10 rows after these (tests/wall_fr14.rs) and decision 0139 appends 3 more (tests/rows_0139/mod.rs): the table of this test ends where decision 0132's rows end
-    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
+    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0372 appends 1 more after those of decision 0267; decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
     // HEAD 3ce8e7f has 581 rows (544 of decision 0125, 33 of 0126, 4 of 0129); decision 0132 appends k (decision 0015: append only)
     assert_eq!(n, 581 + k, "the 581 rows of HEAD 3ce8e7f and the {k} of decision 0132");
     assert_eq!((rows[n - k - 1].0.as_str(), rows[n - k - 1].1.as_str()), ("ole32.dll", "CoCreateInstance"), "the row before the new ones is the last row of decision 0129");
