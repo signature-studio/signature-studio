@@ -320,6 +320,47 @@ async function runOp(op0) {
       ctx.menuCycles = res;
       break;
     }
+    case 'openZipProject': {
+      // the reference project as a zip (op.dir: the directory of the zip under /assets/, default proj; S3a: proj-solo12 for the project with the 12 tracks soloed): upload it into the Files window, File > Open, double-click the zip (the page unpacks it), the engine opens the .flp inside (decision 0248)
+      const zip = op.zip ?? 'serina1-serum2.zip'; const stem = op.stem ?? 'serina1-serum2';
+      await B.ev("(() => { document.querySelector('#files-btn').click(); return true; })()");
+      await waitJs("!!window.__files && !!window.__files.explorer && !!document.querySelector('#files-overlay #fx-list')", 20000);
+      await sleep(1200);
+      const t0 = Date.now();
+      // 0271: Firefox aborts ("AbortError") when fetch, File, DataTransfer and the input's change event are one execute/async script for the 53 MB zip; the same steps as separate scripts work
+      await B.evAsync(`(async () => { window.__zipBlob = await (await fetch('/assets/' + ${JSON.stringify(op.dir ?? 'proj')} + '/' + encodeURIComponent(${JSON.stringify(zip)}))).blob(); return window.__zipBlob.size; })()`);
+      await B.evAsync(`(async () => { window.__zipDt = new DataTransfer(); window.__zipDt.items.add(new File([window.__zipBlob], ${JSON.stringify(zip)})); return window.__zipDt.files.length; })()`);
+      const up = await B.evAsync(`(async () => { const n = window.__zipDt.files.length; const i = document.querySelector('#files-overlay #fx-input-files'); i.files = window.__zipDt.files; return n; })()`);
+      await B.evAsync(`(async () => { document.querySelector('#files-overlay #fx-input-files').dispatchEvent(new Event('change', { bubbles: true })); return 1; })()`);
+      if (up !== 1) throw new Error('openZipProject: upload ' + JSON.stringify(up));
+      await waitJs(`window.__files.explorer && !window.__files.explorer.busy && [...document.querySelectorAll('#files-overlay #fx-list .fx-row[data-name]')].some((r) => r.dataset.name === ${JSON.stringify(zip)})`, 180000);
+      const uploadMs = Date.now() - t0;
+      await B.ev("(() => { document.querySelector('#files-overlay #fx-close').click(); return true; })()");
+      await sleep(500);
+      for (let k = 0; k < 3; k++) {
+        await runOp({ op: 'click', x: 18, y: 20, hover: 60 });
+        if (await waitWindow('TQuickPopupMenuWindow', true, 4000)) break;
+      }
+      await runOp({ op: 'click', x: 48, y: 85 });
+      await waitJs('window.__app.fileDlg.open === true', 120000);
+      await sleep(800);
+      await waitJs(`[...document.querySelectorAll('#filedlg #fx-list .fx-row[data-name]')].some((r) => r.dataset.name === ${JSON.stringify(zip)})`, 30000);
+      const t1 = Date.now();
+      await B.ev(`(() => { const r = [...document.querySelectorAll('#filedlg #fx-list .fx-row[data-name]')].find((x) => x.dataset.name === ${JSON.stringify(zip)}); r.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 })); return true; })()`);
+      let title = null; const t2 = Date.now();
+      while (Date.now() - t2 < (op.ms ?? 300000)) {
+        title = (await windows()).filter((w) => w.cls === 'TFruityLoopsMainForm').map((w) => w.title)[0] ?? null;
+        if (title && title.startsWith(stem)) break;
+        const miss = (await windows()).find((w) => w.cls === 'TMissingPluginsForm' && w.vis);
+        if (miss) { (ctx.probes ??= []).push({ probe: 'missing-plugins-dialog', at: Date.now() - t2, rect: `${miss.x},${miss.y} ${miss.w}x${miss.h}` }); await runOp({ op: 'shot', name: 'missing-plugins-dialog' }); await runOp({ op: 'click', x: miss.x + Math.round(miss.w / 2) + 24, y: miss.y + miss.h - 28 }); await sleep(2500); }
+        if (await ended()) break;
+        await sleep(300);
+      }
+      ctx.openedTitle = title;
+      (ctx.probes ??= []).push({ probe: 'open-zip', zip, uploadMs, unpackAndOpenMs: Date.now() - t1, title });
+      await sleep(op.settle ?? 4000);
+      break;
+    }
     case 'openProject': {
       // both browsers: the project's files are fetched from this server (/assets/proj/) and put into the page's file manager window with its own "Upload files" input (a DataTransfer stands for the person's choice in a file chooser);
       // then File > Open of the engine, the rows of the window (DOM clicks) and the engine's own title change as the proof
