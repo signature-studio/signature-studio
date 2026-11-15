@@ -129,7 +129,7 @@ expect_eq "no argument uses OPENCODE_SESSION_ID" 0 "$rc"; expect_contains "(and 
 out=$(HOME="$sb/empty" bash "$ROOT/scripts/audit-session.sh" ses_MAIN 2>&1); rc=$?
 expect_eq "a missing database exits 2" 2 "$rc"; expect_contains "and names the file" "$out" "cannot read the database"
 
-# pins follow opencode.jsonc: with the profile `haiku` the main session must be on Haiku
+# pins follow opencode.jsonc: with agents.build.model set to Haiku the main session must be on Haiku
 repo="$sb/repo"; make_repo_copy "$repo"
 python3 - "$repo/opencode.jsonc" << 'PY'
 import sys

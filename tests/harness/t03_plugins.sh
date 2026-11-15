@@ -109,11 +109,11 @@ for (const [name, agent, model, want] of [
   ["no stored session model passes (the agent's own model is used)", "worker", undefined, null],
   ["an ungated agent (compaction) passes", "compaction", SON, null],
 ]) { sessionModel = model; const m = await rejects(gt, gev(agent)); rec("gate: " + name, want === null ? m === null : m !== null && m.includes(want), m ? m.slice(0, 50) : "") }
-agentModels = { build: HAI, worker: HAI, reviewer: HAI }   // the profile `haiku`: the pin follows the configuration with no change in the plugin
+agentModels = { build: HAI, worker: HAI, reviewer: HAI }   // build set to Haiku in the configuration: the pin follows it with no change in the plugin
 sessionModel = HAI
-rec("gate: profile haiku: build + Haiku passes (pin read from the agent definition)", (await rejects(gt, gev("build"))) === null)
+rec("gate: build set to Haiku: build + Haiku passes (pin read from the agent definition)", (await rejects(gt, gev("build"))) === null)
 sessionModel = SON
-rec("gate: profile haiku: build + Sonnet is rejected", (await rejects(gt, gev("build"))) !== null)
+rec("gate: build set to Haiku: build + Sonnet is rejected", (await rejects(gt, gev("build"))) !== null)
 agentModels = { build: undefined, worker: HAI, reviewer: HAI }
 sessionModel = SON
 const nomodel = await rejects(gt, gev("build"))

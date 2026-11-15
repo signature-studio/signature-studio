@@ -20,7 +20,7 @@
 - worker/reviewer への指示 = `prompts/worker-rules.md` を先頭に貼り(plugin が付けるなら不要)、`prompts/task-template.md` か `reviewer-template.md` で書く。完了条件はコマンドで確かめられる形にする。
 - 依頼は `docs/ROADMAP.md` の「次の一手」から機械的に作る。大きすぎる(完了条件が 3 つ超)なら、分解と最初の 1 つの実行を worker に頼む。
 - 調査・長い出力の読解は worker。worker の結論は 20 行以内の要約とファイル。main は要約だけ読む。ただし停止を避けるためのコスト削減は禁止。
-- モデルの切替(`scripts/set-model-profile.sh split|haiku`)は依頼者の操作。自分では行わない。`subagent` に `model` を付けない。`audit-session.sh` が切替を示したら報告に 1 行書く。
+- 利用先の切替(`scripts/set-model-profile.sh gateway|bedrock`、`docs/ops/models.md`)は依頼者の操作。自分では行わない。`subagent` に `model` を付けない。`audit-session.sh` が切替を示したら報告に 1 行書く。
 
 ## 2 毎ターン、応答を終える直前
 1. `opencode api session.active` を実行して出力を貼る。稼働中の worker が 0 本なら、先に次の worker を起動してから終える。

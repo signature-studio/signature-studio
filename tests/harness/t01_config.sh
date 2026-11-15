@@ -11,7 +11,7 @@ if python3 "$HERE/lib/rules.py" "$ROOT/opencode.jsonc" build read x > /dev/null 
 v="anthr"; v2="opic"
 if grep -rqiI "$v$v2" "$ROOT/opencode.jsonc" "$ROOT/.opencode" "$ROOT/.githooks" "$ROOT/scripts" "$ROOT/tests" "$ROOT/.gitignore" 2> /dev/null; then fail "a vendor name is in the harness files"; else pass "no vendor name in opencode.jsonc, plugins, hooks, scripts, tests, .gitignore"; fi
 n=$(grep -cE '^ {2}"model": "|^ {6}"model": "' "$ROOT/opencode.jsonc")
-expect_eq "own-line model entries that set-model-profile.sh rewrites (top, build, worker, reviewer; title and summary are one-liners and stay Haiku)" 4 "$n"
+expect_eq "own-line model entries in opencode.jsonc (top, build, worker, reviewer; title and summary are one-liners)" 4 "$n"
 
 # --- real opencode, isolated
 if ! command -v opencode > /dev/null; then skip "opencode not installed: resolved-agent tests"; finish; exit $?; fi

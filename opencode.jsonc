@@ -4,7 +4,7 @@
   // V-xx = handover/02-what-went-wrong.md. R3 = handover/setup/R3-models.md.
   // A typo in this file silently removes every deny below (R3 B.1: fail-open).
   // scripts/preflight.sh row "agents" compares `opencode debug agents` with this file. Run it every cycle.
-  // scripts/set-model-profile.sh rewrites only the "model" lines of: top level, agents.build, agents.worker, agents.reviewer.
+  // scripts/set-model-profile.sh gateway|bedrock does not edit this file: gateway = the model lines below as they are; bedrock = fixed model lines in the git-ignored .opencode/opencode.jsonc (docs/ops/models.md).
 
   "model": "console-cloudflare-ai-gateway-custom/claude-sonnet-5-5",
   "default_agent": "build",
@@ -368,7 +368,7 @@
         { "action": "shell", "resource": "systemctl link*", "effect": "deny" },
         { "action": "shell", "resource": "systemctl * link*", "effect": "deny" },
         { "action": "shell", "resource": "sudo systemctl *", "effect": "deny" },
-        // launch.sh and set-model-profile.sh change the model profile and create the real session: the owner runs them. Only the invocations are denied (`shellcheck scripts/launch.sh` stays possible); both scripts also refuse to run inside a session.
+        // launch.sh creates the real session and set-model-profile.sh changes the model of a running session: the owner runs them. Only the invocations are denied (`shellcheck scripts/launch.sh` stays possible); launch.sh also refuses to run inside a session.
         { "action": "shell", "resource": "scripts/launch.sh*", "effect": "deny" },
         { "action": "shell", "resource": "./scripts/launch.sh*", "effect": "deny" },
         { "action": "shell", "resource": "/*scripts/launch.sh*", "effect": "deny" },

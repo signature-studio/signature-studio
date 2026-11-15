@@ -9,7 +9,7 @@
 |---|---|---|---|
 | 1 | リポジトリを最新にする(`~/work/signature-studio`) | `cd ~/work/signature-studio && git log --oneline -3` | 設定と規約のコミットがある |
 | 2 | 設定の仕組みを整える(アカウント・自動の検査) | `scripts/setup-repo.sh` | `git config --local user.name` が出る。`git config core.hooksPath` が出る |
-| 3 | モデルの構成を選ぶ(既定は `split`) | `scripts/set-model-profile.sh split`(全 Haiku なら `haiku`) | 出力が選択を示す |
+| 3 | AI の利用先を選ぶ(`docs/ops/models.md`。Cloudflare 経由は `gateway`、Amazon Bedrock は `bedrock`) | `scripts/set-model-profile.sh gateway`(Bedrock なら `bedrock`) | 終了コードが 0(出力は無い)。割り当ては次の 4 で確かめる |
 | 4 | 起動前の検査 | `opencode debug agents` でモデルの割り当てを確認。`scripts/preflight.sh` | 割り当ての名前は `build`・`compaction`・`reviewer`・`summary`・`title`・`worker`(コマンドの表示のまま。`scripts/preflight.sh` の agents 行と同じ 6 つ)。`scripts/preflight.sh` の結果に FAIL の行が無い |
 | 5 | goal-nudge を有効化 | `systemctl --user daemon-reload` → `systemctl --user enable --now goal-nudge.timer`。登録簿(`~/.config/opencode/goal-nudge.sessions`)には `scripts/launch.sh` が起動後の ID を追加する | `systemctl --user list-timers goal-nudge.timer` に NEXT が出る |
 | 6 | 起動 | `scripts/launch.sh`(preflight → メインセッション作成 → goal-nudge の登録簿へ追加 → `prompts/START.md` を送る → `/goal` を設定) | 出力に新しいセッション ID。`opencode api session.active` に出る |
@@ -45,7 +45,7 @@
 | # | 仮定 | 違う場合 |
 |---|---|---|
 | G | 作業場所(ワークツリー)は `gwq add` で作る。`git worktree add` は使わない | `AGENTS.md` §4 のワークツリーの項目 |
-| H | モデルの既定は、メインセッションが Sonnet 5.5、サブエージェント(作業用・検証用)が Haiku 5.5 | `scripts/set-model-profile.sh haiku` を依頼者が実行 |
+| H | モデルの既定は、メインセッションが Sonnet 5.5、サブエージェント(作業用・検証用)が Haiku 5.5 | 依頼者が `opencode.jsonc` のモデルの行を直す(全 Haiku の構成を作るスクリプトは無い) |
 | I | goal-nudge は、人の Esc で止まっても最長 1 分後に再開する | timer を止める(§1 の 5) |
 
 - `docs/archive/` は、Git の管理対象(追跡する)。公開されて困る物は無い(依頼者が決定済み。P2)。`.gitignore` に `docs/archive/` の除外は無い。追跡されている(`git ls-files docs/archive` で一覧できる)。

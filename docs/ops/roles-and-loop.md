@@ -58,18 +58,18 @@
 - 完了条件を書けない依頼は、依頼にしない。先に調査の worker を起動し、結果から完了条件を作る。
 - `docs/ROADMAP.md` と `docs/STATE.md` が存在しない間は、最初の worker に、旧ワークツリーの資料(読み取りのみ)から作らせる。作らせている間も、`docs/ops/` の規則は有効。
 
-## 5 モデルの使い分けと「全 Haiku」への切替
+## 5 モデルの使い分け
 
-| 項目 | 既定(`split`) | 切替(`haiku`) |
-|---|---|---|
-| main | Sonnet 5.5 | Haiku 5.5 |
-| worker / reviewer | Haiku 5.5 | Haiku 5.5 |
-| 切替の方法 | — | 依頼者が `scripts/set-model-profile.sh haiku`(または `split`)を実行 |
-| agent・permission・plugin の構造 | 同じ | 同じ(変わるのは model の 3 か所だけ) |
+| 項目 | 割り当て |
+|---|---|
+| main | Sonnet 5.5 |
+| worker / reviewer | Haiku 5.5 |
+| 利用先の切替 | 依頼者が `scripts/set-model-profile.sh gateway` または `bedrock`(`docs/ops/models.md`)。割り当ては変わらない。全 Haiku の構成は、もうない |
+| agent・permission・plugin の構造 | 利用先が変わっても同じ(変わるのは model の値だけ) |
 
 - 切替は依頼者の操作。main も worker も自分で行わない(`session.switchModel`、設定の編集、`opencode run --model` を使わない)。
 - 切替が起きたら、`scripts/audit-session.sh` の `model-switched` 回数と assistant 行のモデル別件数が示す。示したら、次の報告に「モデル切替を検知: <回数>」を 1 行書き、作業は続ける。
-- 全 Haiku でも守る物: 1 依頼 = 1 目的、完了条件のコマンド化、毎ターンのチェック(§3)、reviewer による検証、完了を自己宣言しない。Haiku でも前進し続けるための手当ては、依頼を小さく具体的にすることと、ROADMAP の「次の一手」から機械的に依頼を作ること。
+- worker・reviewer は Haiku 5.5 なので、次を守る: 1 依頼 = 1 目的、完了条件のコマンド化、毎ターンのチェック(§3)、reviewer による検証、完了を自己宣言しない。Haiku でも前進し続けるための手当ては、依頼を小さく具体的にすることと、ROADMAP の「次の一手」から機械的に依頼を作ること。
 - 前任の記録(R3、2026-11-09)では、停止の割合を動かしたのは goal(ハーネス)で、モデルの切替ではなかった。モデルの固定は、費用と使い分けのために行う。**モデルを戻しても失敗は防げない。規則で止められる物は、強制(permission・plugin・hook)で止める**。
 
 ## 6 stall(停止)の予防
