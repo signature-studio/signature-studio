@@ -38,15 +38,18 @@
 
 ## 実行(run)
 
-- (本文は run の後に更新する)
+- run 43807505570(push。commit 50e21bc。結論 failure。`gh run view 43807505570 --json conclusion,jobs`)。build・test(vitest)・test:worker・版の読み取り・配信設定の検査は success。「公開ホスト名を決める」の段は failure。一覧は `HTTP 403、エラーの番号 10000`(`gh run view --job <id> --log` の該当行)で、Secret PUBLIC_HOSTNAME も無いので、「Cloudflare へは書いていない」と出して止まった。upload・切り替え・probe は skipped。Cloudflare への書き込みは無い。
+- 一覧の 403 は、前回の実行 43784397668 と合わせて 2 回目(同じ権限の資格情報)。公開ドキュメントの権限表と食い違うが、この資格情報では読めないという実測を採る。よって決定 5 の (2) の Secret が要る。依頼は Issue 0008(#8)。
+- ログ検査(run 43807505570 の job のログ 662 行。件数): アカウント ID の形 0、メールの形 0、ホスト名の形 0、キーの形 0、セッション ID の形 0。
+- evidence: `evidence/R6-19.md`、`evidence/R6-20.md`。
 
 ## 未確認
 
-- deploy-worker の run の結果(上の「実行」)。
-- 一覧の読み取りが、Workers Scripts: Edit のトークンで通るか(未確認。ドキュメントと 0379 の 403 が食い違う)。
-- wrangler-action の versions upload・versions deploy が、この Worker の配信の資格情報で通るか(0001 の未確認と同じ。run で確かめる)。
+- Secret PUBLIC_HOSTNAME の登録の後の run(upload・切り替え・確かめ・probe の段の結果)。依頼は Issue 0008(#8)。それまで、wrangler-action の versions upload・versions deploy が、この Worker の配信の資格情報で通るかは未確認(0001 の未確認と同じ)。
+- probe の 12 件の結果(Access の 302 か 401/403 になるか)。未確認。
 - probe が失敗したときに配信を戻すか(旧と同じく戻さない。提案として報告する)。
-- action のログに出るアカウント ID・ホスト名の件数(run のログを grep -c で確かめる)。
+- action のログに出るアカウント ID・ホスト名の件数(upload と切り替えの段のログで、同じ検査をする)。
+- (解決: 一覧の読み取りは、この資格情報では 403。2 回の実行で確かめた。)
 
 ## 出典
 
