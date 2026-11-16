@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# t11: the CI runner's model is chosen from the provider list of the imported login: the one model that a console- provider lists with an id that ends with haiku-5-5 (decision 0399). No Variable is read.
+# t11: the CI runner's model is chosen from the provider list of the imported login: a model that a console- provider lists with an id that ends with haiku-5-5; with two or more, the first in byte order (decision 0399, amended). No Variable is read.
 # runner-config.sh picks it and writes the config; check-agents.sh reads that config and checks the agents (a fake `opencode` answers `models --standalone` and `debug agents`).
 # .github/workflows/agent.yml: the order import -> config -> check; the workflow reads no Variable; every call that starts a server before the config is written is --standalone (decision 0384).
 # The provider and model ids are dummies (console-dummy/...), so no vendor name is written here; the CI files must not contain it. No real opencode, service or model call.
@@ -56,12 +56,14 @@ o=$(rc_of "$sb/models-variant.txt" "$nocfg"); rc=$?
 expect_eq "a candidate with a #variant is not a candidate: runner-config exits 1" 1 "$rc"
 check "no runner config is written by the failing cases" test ! -e "$nocfg"
 
-# ---- 2. runner-config: two console- candidates -> exit 1, nothing written, the count is printed
+# ---- 2. runner-config: two console- candidates -> exit 0; the first in byte order is used (decision 0399, amended); the count is printed, no id
 cfg2="$sb/two/opencode.jsonc"
 o=$(rc_of "$sb/models-two.txt" "$cfg2"); rc=$?
-expect_eq "(c) two haiku-5-5 models under console- providers: runner-config exits 1" 1 "$rc"
-expect_contains "(c) and the count is printed (2 件)" "$o" "候補が 2 件"
-check "(c) no runner config is written" test ! -e "$cfg2"
+expect_eq "(c) two haiku-5-5 models under console- providers: runner-config exits 0" 0 "$rc"
+expect_contains "(c) and the count is printed (2 件)" "$o" "2 件"
+expect_eq "(c) the first in byte order is the model of the five agents" "$fake_model" "$(jq -r '.agents.worker.model' "$cfg2")"
+o_visible=$(printf '%s\n' "$o" | grep -v '^::add-mask::')
+expect_not_contains "(c) the output does not print the second model id" "$o_visible" "second-claude"
 
 # ---- 3. runner-config: one console- candidate -> the five agents use it; the value is not printed
 cfg="$sb/value/opencode.jsonc"

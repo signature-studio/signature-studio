@@ -34,4 +34,4 @@
 - 根拠: (a) 依頼者の指示は Variable で行う(発言 `msg_1e2274299001Wt4h6i62ve8mbb`)。この機械では未確認(`~/work/handover/setup/S16-intent/catalog.md` に 0 件。`opencode api` は policy で拒否)。Variable は GitHub が伏せない(実測: run 43804191981 の行 271。evidence/R9-3.md 3 節)。run 43807885611 では値が空で、env の行は値の無い 1 行(行 499)。(b) `scripts/forbidden-terms.tsv`(55 行)に、提供元の名前に含まれる語(aws・bedrock・console)は 0 件(`grep -ic -E 'aws|bedrock|console' scripts/forbidden-terms.tsv` → 0)。(c) 提供元の名前は認証情報ではない。モデル ID(ベンダー名を含む)は Variable に持たせず、`runner-config.sh` が一覧から選ぶ。選んだ ID はログに出さず、件数だけを出す。
 - 撤回条件: `scripts/forbidden-terms.tsv` に提供元の名前の語が加わったとき。
 - 分類: (b) 契約の実装(上の決定と同じ)。
-- 置き換え(2026-11-16): 決定 0399 で置き換えた。Variable は読まない。候補は、取り込んだ一覧の console- の提供元で末尾 haiku-5-5 の 1 件。2026-11-16 の実測は 2 件で、run は止まる(0399 の実測)。
+- 置き換え(2026-11-16): 決定 0399 で置き換えた。Variable は読まない。候補は、取り込んだ一覧の console- の提供元で末尾 haiku-5-5 の行。2 件以上のときは辞書順で先頭の 1 件(0399 の追記)。
