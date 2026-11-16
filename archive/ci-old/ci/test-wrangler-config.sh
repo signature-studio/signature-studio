@@ -5,7 +5,7 @@ set -u -o pipefail
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 CFG=$REPO/app/wrangler.jsonc
 AUD=$(printf 'a%.0s' $(seq 64))
-export ACCESS_TEAM_DOMAIN=team-x.cloudflareaccess.com ACCESS_AUD=$AUD PUBLIC_HOSTNAME=fl.example.com
+export ACCESS_TEAM_DOMAIN=test-team.example.com ACCESS_AUD=$AUD PUBLIC_HOSTNAME=fl.example.com
 fail=0
 run() { python3 "$CI_DIR/lib/wrangler_config.py" "$1" "$T/out.json" >"$T/log" 2>&1; }
 ok()  { if "$@"; then echo "ok   $DESC"; else echo "FAIL $DESC"; cat "$T/log"; fail=1; fi; }

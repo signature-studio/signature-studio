@@ -27,7 +27,7 @@
   - テストは偽の aws の制御の流れだけを確かめる。R2 の ETag・checksum・権限は確かめていない(下の未確認)。
 
 ## 未確認
-- CI の環境での 9 段の再現。根拠: 旧 `engine-bundle` の run 43687019712(headSha `96107088…`、success)で、CI の wasm の sha256 が手元の work-r53k と全桁一致(`evidence/R5-3l.md` §7)。この workflow の実 run で改めて確かめ、結果は `evidence/R6-7.md` に書く。
+- CI の環境での 9 段の再現。根拠: 旧 `engine-bundle` の run 43687019712(headSha `96107088…`、success)で、CI の wasm の sha256 が手元の work-r53k と全桁一致(`evidence/R5-3l.md` §7)。この workflow の実 run で改めて確かめ、結果は、作成する `evidence/R6-7.md` に書く。
 - R2 への put の挙動(aws-cli の既定の checksum、R2 の ETag)。実 run で確かめる。
 - 一覧は wasm の sha256 だけを見る。同じ wasm で seed・dll が違う bundle は区別できない。About の停止は、E13 の wasm に別の seed を組んだときに観測された(`docs/decisions/0371-seed-swap-about-close.md` の V1)。現在の行 `c963715a…` の bundle の seed は `7cd2eaecbdba`(`evidence/R5-3l.md`)。
 - 公開ホストでの `engine-idle`。Access の配下で、匿名の headless Chrome では開けない。確かめられるのは Actions の出力と R2 の読み直しまで。

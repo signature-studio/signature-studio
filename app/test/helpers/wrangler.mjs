@@ -66,7 +66,7 @@ export async function getPerfObject(workDir, key) {
 // Cloudflare Access in front of the Worker, for the tests (decision 0243: the Worker has no switch that skips the check; a test brings its own team, AUD, signing keys and tokens).
 // startAccessKeys: a throw-away key pair, a JWKS server on 127.0.0.1 (the Worker's ACCESS_CERTS_URL), and the tokens a test needs. startAccessProxy: what Access does in production - every request reaches the
 // Worker with a valid Cf-Access-Jwt-Assertion - so a test that is not about Access asks the proxy's URL, and a test about Access asks the Worker directly (`directUrl`) with the tokens it wants.
-export const ACCESS_TEAM = 'test-team.cloudflareaccess.com';
+export const ACCESS_TEAM = 'test-team.example.com';
 export const ACCESS_AUD = 'aud-tag-0123456789abcdef';
 
 export async function startAccessKeys() {
@@ -75,7 +75,7 @@ export async function startAccessKeys() {
   const tokens = {
     valid: await signJwt(key, claimsFor(ACCESS_TEAM, ACCESS_AUD, now)),
     wrongAud: await signJwt(key, claimsFor(ACCESS_TEAM, 'another-application', now)),
-    wrongIss: await signJwt(key, claimsFor('evil.cloudflareaccess.com', ACCESS_AUD, now)),
+    wrongIss: await signJwt(key, claimsFor('other-team.example.com', ACCESS_AUD, now)),
     expired: await signJwt(key, claimsFor(ACCESS_TEAM, ACCESS_AUD, now - 7200, { exp: now - 3600 })),
     forged: await signJwt(stranger, claimsFor(ACCESS_TEAM, ACCESS_AUD, now)),
     noneAlg: await signJwt(key, claimsFor(ACCESS_TEAM, ACCESS_AUD, now), { alg: 'none' }),

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # usage: scripts/scan-forbidden.sh [PATH...]
 # Without arguments: every tracked file (`git ls-files`) and every untracked, not-ignored file. With arguments: those files (a directory is walked).
-# Rules (printed by name): vendor secret size oldpath cfhex cfhost term spacing. Exit 0 = nothing found, 1 = findings, 2 = bad usage.
+# Rules (printed by name): vendor secret size oldpath cfhex cfhost term spacing choice hostval byok trial. Exit 0 = nothing found, 1 = findings, 2 = bad usage.
 # The output never contains a matched value: only the rule name, the file and the line number (the term rule also prints the ID and the replacement word).
 # Exceptions: scripts/forbidden-allowlist.txt (see its header; a path ending in "/" is a directory prefix). With arguments the paths are taken relative to the current directory
 # (so scan an outside tree from inside it: `cd TREE && bash REPO/scripts/scan-forbidden.sh .`; an absolute path never matches an allowlist path).
@@ -132,6 +132,60 @@ while IFS= read -r -d '' f && IFS= read -r rest; do
   allowed spacing "$f" "$text" && continue
   report spacing "$f" "$n" "add a half-width space between Issue and the Japanese word"
 done < <(LC_ALL=C.UTF-8 xargs -0 -a "$regular" grep -nIHZ -P -e "[${jpc}]Issue|Issue[${jpc}]" 2>/dev/null)
+
+# choice: a request (docs/requests/*.md, not TEMPLATE.md) must not ask the owner to choose, decide or fill in, and must not show the agent's internal words (commands, rc=).
+# The decision group has no exception. The internal and byok groups are not reported on a line that says the agent does not run, use or write the word (a prohibition: 実行しない・使わない・書かない).
+choice_re='依頼者[^。]{0,12}?(選|判断|決め|埋め)|どちらかの方式|どちらか.{0,20}(選|決め|判断)|\(a\).*\(b\)'
+internal_re='gh secret|gh variable|rc='
+req_list() { tr '\0' '\n' < "$regular" | grep -E '^docs/requests/[^/]+\.md$' | grep -vxF 'docs/requests/TEMPLATE.md' | tr '\n' '\0'; }
+while IFS= read -r -d '' f && IFS= read -r rest; do
+  n=${rest%%:*}
+  text=${rest#*:}
+  allowed choice "$f" "$text" && continue
+  report choice "$f" "$n"
+done < <(req_list | LC_ALL=C.UTF-8 xargs -0 -r grep -nIHZ -P -e "$choice_re" 2>/dev/null)
+while IFS= read -r -d '' f && IFS= read -r rest; do
+  n=${rest%%:*}
+  text=${rest#*:}
+  case "$text" in *実行しない*|*使わない*|*書かない*) continue ;; esac
+  allowed choice "$f" "$text" && continue
+  report choice "$f" "$n"
+done < <(req_list | LC_ALL=C.UTF-8 xargs -0 -r grep -nIHZ -P -e "$internal_re" 2>/dev/null)
+
+# byok: a request must not ask for AWS credentials (IAM, access keys, AWS_ names, a Bedrock API key), an inference profile or a local credential file. The model is authenticated only with the owner's BYOK in the opencode console.
+# A line that names Cloudflare or R2 is not checked (the Cloudflare Secrets request), and so is a prohibition line (実行しない・使わない・書かない). A withdrawn record (a status line in its first 5 lines, e.g. "状態: 取り下げ") is not checked.
+byok_re='\bIAM\b|アクセスキー|AWS_[A-Za-z0-9_]+|Bedrock[^。]{0,6}API キー|推論プロファイル'
+while IFS= read -r -d '' f && IFS= read -r rest; do
+  head -n 5 "$f" 2> /dev/null | LC_ALL=C.UTF-8 grep -qE '^(状態[:：][[:space:]]*)?取り下げ' && continue
+  n=${rest%%:*}
+  text=${rest#*:}
+  case "$text" in *Cloudflare*|*R2*|*実行しない*|*使わない*|*書かない*) continue ;; esac
+  allowed byok "$f" "$text" && continue
+  report byok "$f" "$n"
+done < <(req_list | LC_ALL=C.UTF-8 xargs -0 -r grep -nIHZ -P -e "$byok_re" 2>/dev/null)
+
+# trial: a live request (docs/requests/*.md, not TEMPLATE, not a withdrawn or a completed record) must have a "自分で試した記録" section that shows a help output (a line with "help")
+# or cites a document or a source (a path or a URL). An absent or empty section is a finding (the line is 0).
+while IFS= read -r -d '' f; do
+  head -n 5 "$f" 2> /dev/null | LC_ALL=C.UTF-8 grep -qE '^(状態[:：][[:space:]]*)?(取り下げ|完了)' && continue
+  allowed trial "$f" "" && continue
+  sec=$(awk '/^## 自分で試した記録/{f=1;next} /^## /{f=0} f' "$f")
+  if ! printf '%s' "$sec" | grep -q '[^[:space:]]'; then report trial "$f" 0; continue; fi
+  printf '%s\n' "$sec" | grep -qi 'help' && continue
+  printf '%s\n' "$sec" | grep -qE 'https?://|[A-Za-z0-9_.~-]+/[A-Za-z0-9_./~-]+' && continue
+  report trial "$f" 0
+done < <(req_list)
+
+# hostval: a "pattern" value that is a dotted host name (no placeholder word, no "<", no wildcard) in any tracked file, the old archives included.
+while IFS= read -r -d '' f && IFS= read -r rest; do
+  n=${rest%%:*}
+  text=${rest#*:}
+  v=$(printf '%s' "$text" | sed -nE 's/.*"pattern"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p' | head -n 1)
+  case "${v,,}" in *example*|*your-domain*|*localhost*|*'<'*) continue ;; esac
+  [[ "$v" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] || continue
+  allowed hostval "$f" "$text" && continue
+  report hostval "$f" "$n"
+done < <(xargs -0 -a "$regular" grep -nIHZ -E -e '"pattern"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null)
 
 # term: a literal match of each term; a line that only has the term inside its exception text is not a finding.
 for ((i = 0; i < ${#TM_PAT[@]}; i++)); do

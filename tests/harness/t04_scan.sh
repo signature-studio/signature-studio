@@ -110,7 +110,7 @@ out=$(scan lift evidence tools ci archive zz-new zz_root.txt)
 for f in lift/crates/fe-lift/tests/zz_new_file.rs evidence/windows-replay-new/x.tsv tools/win-replay/zz_new.tsv ci/zz_new.lock archive/other/x.txt zz-new/x.txt zz_root.txt; do
   expect_contains "shipped allowlist: a new file with 32 hex digits is found ($f)" "$out" "cfhex	$f:1"
 done
-bad_entries=$(awk -F'|' '!/^#/ && NF > 0 && !(NF == 3 && $1 ~ /^(vendor|secret|size|oldpath|cfhex|cfhost|term)$/ && $2 != "" && $2 != "/" && $2 !~ /^\// && $2 !~ /\.\./)' "$ROOT/scripts/forbidden-allowlist.txt" | wc -l)
+bad_entries=$(awk -F'|' '!/^#/ && NF > 0 && !(NF == 3 && $1 ~ /^(vendor|secret|size|oldpath|cfhex|cfhost|term|choice|hostval|byok|trial)$/ && $2 != "" && $2 != "/" && $2 !~ /^\// && $2 !~ /\.\./)' "$ROOT/scripts/forbidden-allowlist.txt" | wc -l)
 expect_eq "shipped allowlist: every entry has 3 fields, a known rule name and a relative path (no absolute path, no .., no bare /)" 0 "$bad_entries"
 
 # allowlist: a path ending in "/" is a directory prefix
@@ -240,5 +240,96 @@ for w in "$(tv 作業 木)" "$(tv 試 験)" "$(tv 依 頼 票)" "$(tv ユ ーザ
   if grep -qF -- "$w" "$ROOT/tests/harness/t04_scan.sh"; then fail "t04_scan.sh contains a term in one piece"; fi
 done
 pass "t04_scan.sh builds the terms from pieces"
+
+# request checks: choice (the owner is asked to choose, decide or fill in; internal words), byok (model credentials), hostval ("pattern" host values)
+mkdir -p "$repo/docs/requests" "$repo/docs/ops" "$repo/app/cfg"
+cw() { printf '%s\n' "$2" > "$repo/$1"; }
+has() { grep -qE "^$1$(printf '\t')$2(:|$)" <<< "$3"; }
+want() { if has "$1" "$2" "$3"; then pass "$4"; else fail "$4"; fi; }
+nowant() { if has "$1" "$2" "$3"; then fail "$4"; else pass "$4"; fi; }
+cw docs/requests/zz-choice-decide.md "依頼者が選んで実行する"
+cw docs/requests/zz-choice-fill.md "<値>は依頼者が埋める"
+cw docs/requests/zz-choice-way.md "どちらかの方式で作る"
+cw docs/requests/zz-choice-rc.md "rc=1 で止まる"
+cw docs/requests/zz-choice-cmd.md "確かめるには gh secret list を使う"
+cw docs/requests/zz-choice-cmd-ok.md "エージェントは gh secret を実行しない。"
+cw docs/requests/zz-choice-cmd-write.md "エージェントは gh secret を書かない。"
+cw docs/requests/zz-choice-ok.md "依頼者にしてほしい操作: 読み取りのみ。依頼者の権限は変えない。"
+cw docs/requests/TEMPLATE.md "依頼者が選ぶ。Bedrock の API キー。"
+cw docs/ops/zz-choice-outside.md "依頼者が選んで実行する"
+cw docs/requests/zz-byok-hit.md "Bedrock の API キーを作る"
+cw docs/requests/zz-byok-token.md "AWS_BEARER_TOKEN を登録する"
+cw docs/requests/zz-byok-profile.md "推論プロファイルの ARN を入れる"
+cw docs/requests/zz-byok-cf.md "Cloudflare の API キーを登録する"
+cw docs/requests/zz-byok-r2.md "R2 の API キーを作る"
+cw docs/requests/zz-byok-iam.md "IAM で利用者を 1 つ作る"
+cw docs/requests/zz-byok-key.md "アクセスキーを作り、登録する"
+cw docs/requests/zz-byok-aws-name.md "Secret AWS_REGION を登録する"
+cw docs/requests/zz-byok-generic.md "モデルの認証は、依頼者が console に登録した BYOK の API キーを使う。"
+cw docs/requests/zz-byok-bedrock-plain.md "Bedrock の推論を呼ぶ"
+cw docs/requests/zz-byok-cf-iam.md "Cloudflare の IAM の設定を確かめる"
+cw docs/requests/zz-byok-prohibit.md "AWS の IAM は使わない。"
+printf '%s\n' "# Issue zz: 取り下げ記録" "" "状態: 取り下げ(テスト)" "" "Bedrock の API キーを作る" > "$repo/docs/requests/zz-byok-withdrawn.md"
+printf '%s\n' "# Issue zz" "" "a" "b" "c" "状態: 取り下げ(テスト)" "Bedrock の API キーを作る" > "$repo/docs/requests/zz-byok-late.md"
+hv="chk-$(printf zone).net"
+printf '{"routes": [{"pattern": "%s"}]}\n' "$hv" > "$repo/app/cfg/zz-host.jsonc"
+printf '{"pattern": "%s"}\n' "fl.example.net" > "$repo/app/cfg/zz-example.jsonc"
+printf '{"pattern": "%s"}\n' "<team>.chk-zone.net" > "$repo/app/cfg/zz-placeholder.jsonc"
+printf '{"pattern": "%s"}\n' "your-domain.net" > "$repo/app/cfg/zz-your-domain.jsonc"
+printf '%s\n' '"pattern": "[A-Za-z0-9.-]+\.[A-Za-z]{2,}"' > "$repo/app/cfg/zz-regex.txt"
+ctout=$(scan docs/requests/zz-choice-decide.md docs/requests/zz-choice-fill.md docs/requests/zz-choice-way.md docs/requests/zz-choice-rc.md docs/requests/zz-choice-cmd.md docs/requests/zz-choice-cmd-ok.md docs/requests/zz-choice-cmd-write.md docs/requests/zz-choice-ok.md docs/requests/TEMPLATE.md docs/ops/zz-choice-outside.md)
+want choice docs/requests/zz-choice-decide.md "$ctout" "choice: 依頼者が選んで is found in a request"
+want choice docs/requests/zz-choice-fill.md "$ctout" "choice: 依頼者が埋める is found in a request"
+want choice docs/requests/zz-choice-way.md "$ctout" "choice: どちらかの方式 is found in a request"
+want choice docs/requests/zz-choice-rc.md "$ctout" "choice: the internal word rc= is found in a request"
+want choice docs/requests/zz-choice-cmd.md "$ctout" "choice: the internal word gh secret is found in a request (no prohibition on the line)"
+nowant choice docs/requests/zz-choice-cmd-ok.md "$ctout" "choice: a prohibition line with gh secret is not a finding"
+nowant choice docs/requests/zz-choice-cmd-write.md "$ctout" "choice: a line that says the agent does not write gh secret is not a finding"
+nowant choice docs/requests/zz-choice-ok.md "$ctout" "choice: an ordinary request line is not a finding"
+nowant choice docs/requests/TEMPLATE.md "$ctout" "choice: the template is not checked"
+nowant choice docs/ops/zz-choice-outside.md "$ctout" "choice: the rule covers docs/requests only"
+btout=$(scan docs/requests/zz-byok-hit.md docs/requests/zz-byok-token.md docs/requests/zz-byok-profile.md docs/requests/zz-byok-cf.md docs/requests/zz-byok-r2.md docs/requests/zz-byok-iam.md docs/requests/zz-byok-key.md docs/requests/zz-byok-aws-name.md docs/requests/zz-byok-generic.md docs/requests/zz-byok-bedrock-plain.md docs/requests/zz-byok-cf-iam.md docs/requests/zz-byok-prohibit.md docs/requests/zz-byok-withdrawn.md docs/requests/zz-byok-late.md docs/requests/TEMPLATE.md)
+want byok docs/requests/zz-byok-hit.md "$btout" "byok: a Bedrock API key in a request is found"
+want byok docs/requests/zz-byok-iam.md "$btout" "byok: IAM in a request is found"
+want byok docs/requests/zz-byok-key.md "$btout" "byok: an access key in a request is found"
+want byok docs/requests/zz-byok-aws-name.md "$btout" "byok: an AWS_ name in a request is found"
+nowant byok docs/requests/zz-byok-generic.md "$btout" "byok: a general API key or a model credential is not a finding (the console BYOK is asked for)"
+nowant byok docs/requests/zz-byok-bedrock-plain.md "$btout" "byok: Bedrock alone is not a finding"
+nowant byok docs/requests/zz-byok-cf-iam.md "$btout" "byok: a Cloudflare IAM line is not checked"
+nowant byok docs/requests/zz-byok-prohibit.md "$btout" "byok: a prohibition line (the agent does not use IAM) is not a finding"
+
+# trial: the "自分で試した記録" section of a live request shows a help output, or cites a path or a URL
+printf '%s\n' '# Issue zz' '' '## 自分で試した記録' '$ opencode --help' 'usage: opencode [options]' > "$repo/docs/requests/zz-trial-help.md"
+printf '%s\n' '# Issue zz' '' '## 自分で試した記録' "\`docs/ops/environment.md\` の確認を読んだ。" > "$repo/docs/requests/zz-trial-cite.md"
+printf '%s\n' '# Issue zz' '' '## 自分で試した記録' 'https://example.com/doc を開いた。' > "$repo/docs/requests/zz-trial-url.md"
+printf '%s\n' '# Issue zz' '' '## 自分で試した記録' '実行した。結果は良かった。' > "$repo/docs/requests/zz-trial-none.md"
+printf '%s\n' '# Issue zz' '' '## 自分で試した記録' '' '## 完了の確認コマンド' 'x' > "$repo/docs/requests/zz-trial-empty.md"
+printf '%s\n' '# Issue zz' '' '## 依頼 ID・日付' '0005 / 2026-11-16' > "$repo/docs/requests/zz-trial-missing.md"
+printf '%s\n' '# Issue zz' '状態: 取り下げ(テスト)' '' '## 依頼 ID・日付' > "$repo/docs/requests/zz-trial-withdrawn.md"
+printf '%s\n' '# Issue zz' '状態: 完了(テスト)' '' '## 依頼 ID・日付' > "$repo/docs/requests/zz-trial-done.md"
+tr_out=$(scan docs/requests/zz-trial-help.md docs/requests/zz-trial-cite.md docs/requests/zz-trial-url.md docs/requests/zz-trial-none.md docs/requests/zz-trial-empty.md docs/requests/zz-trial-missing.md docs/requests/zz-trial-withdrawn.md docs/requests/zz-trial-done.md docs/requests/TEMPLATE.md)
+want trial docs/requests/zz-trial-missing.md "$tr_out" "trial: a request without the section is a finding"
+want trial docs/requests/zz-trial-none.md "$tr_out" "trial: a section without a help output, a path or a URL is a finding"
+want trial docs/requests/zz-trial-empty.md "$tr_out" "trial: an empty section is a finding"
+nowant trial docs/requests/zz-trial-help.md "$tr_out" "trial: a help output in the section is not a finding"
+nowant trial docs/requests/zz-trial-cite.md "$tr_out" "trial: a path in the section is not a finding"
+nowant trial docs/requests/zz-trial-url.md "$tr_out" "trial: a URL in the section is not a finding"
+nowant trial docs/requests/zz-trial-withdrawn.md "$tr_out" "trial: a withdrawn record is not checked"
+nowant trial docs/requests/zz-trial-done.md "$tr_out" "trial: a completed record is not checked"
+nowant trial docs/requests/TEMPLATE.md "$tr_out" "trial: the template is not checked"
+want byok docs/requests/zz-byok-token.md "$btout" "byok: AWS_BEARER_TOKEN is found"
+want byok docs/requests/zz-byok-profile.md "$btout" "byok: an inference profile is found"
+nowant byok docs/requests/zz-byok-cf.md "$btout" "byok: a Cloudflare line is not checked"
+nowant byok docs/requests/zz-byok-r2.md "$btout" "byok: an R2 line is not checked"
+nowant byok docs/requests/zz-byok-withdrawn.md "$btout" "byok: a withdrawn record (status in the first 5 lines) is not checked"
+want byok docs/requests/zz-byok-late.md "$btout" "byok: a status line after line 5 does not exempt the file"
+nowant byok docs/requests/TEMPLATE.md "$btout" "byok: the template is not checked"
+htout=$(scan app/cfg)
+want hostval app/cfg/zz-host.jsonc "$htout" "hostval: a dotted host name in a pattern value is found"
+nowant hostval app/cfg/zz-example.jsonc "$htout" "hostval: an example host is not a finding"
+nowant hostval app/cfg/zz-placeholder.jsonc "$htout" "hostval: a placeholder host is not a finding"
+nowant hostval app/cfg/zz-your-domain.jsonc "$htout" "hostval: a your-domain host is not a finding"
+nowant hostval app/cfg/zz-regex.txt "$htout" "hostval: a regular expression in a pattern value is not a finding"
+if grep -qF "$hv" <<< "$htout$btout$ctout"; then fail "the request checks show a matched value"; else pass "the request checks show no matched value (file and line only)"; fi
 
 finish

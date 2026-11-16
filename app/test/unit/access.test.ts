@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { AccessError, checkAccess, clearJwksCache, verifyAccessJwt, type Jwks } from '../../worker/access.ts';
 import { claimsFor, makeKey, signJwt, type TestKey } from '../helpers/jwt.ts';
 
-const TEAM = 'test-team.cloudflareaccess.com';
+const TEAM = 'test-team.example.com';
 const AUD = 'aud-tag-0123456789abcdef';
 const NOW = 1_800_000_000;
 let key: TestKey, other: TestKey;
@@ -45,7 +45,7 @@ describe('verifyAccessJwt', () => {
   });
 
   it('rejects another issuer', async () => {
-    await expect(verifyAccessJwt(await signJwt(key, claimsFor('evil.cloudflareaccess.com', AUD, NOW)), cfg, deps())).rejects.toThrow('issuer');
+    await expect(verifyAccessJwt(await signJwt(key, claimsFor('other-team.example.com', AUD, NOW)), cfg, deps())).rejects.toThrow('issuer');
   });
 
   it('rejects an expired token, but allows the 60 s clock leeway', async () => {

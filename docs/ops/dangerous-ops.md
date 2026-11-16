@@ -17,11 +17,12 @@
 | 操作 | 依頼者の指示がある場合 | 指示が無い場合 |
 |---|---|---|
 | `opencode auth export` | 後任は実行しない。これらは worker の permission で拒否される。依頼者が自分で実行する(Issue で頼む)。`--help` も同じく拒否される | 実行しない |
+| 依頼者のアカウントにつながった道具(`portal_` で始まるもの・execute。GitHub・Gmail・Drive・Calendar・Cloudflare。読み取りも含む) | 後任は使わない。依頼者の名義で書く・読むことをしない。GitHub の操作は `gh`(ボットの名義)だけ | 使わない。使った場合は、道具の名前と回数を main に 1 行で報告する |
 | `gh secret`・`gh variable`(一覧・読み取りを含む) | 後任は実行しない。これらは worker の permission で拒否される。依頼者が依頼者自身で行う(Issue で頼む。`docs/ops/authority.md` §3) | 依頼者が許可していない。新しい名前の secret を提案しない・設定しない。Secrets の登録は依頼者の権限(Issue で頼む。`docs/ops/authority.md` §3) |
 | 別 identity(`GH_CONFIG_DIR`・`GIT_CONFIG_GLOBAL` の切替) | 依頼者が identity を指示した場合のみ | 使わない。404 が出たら「権限外の可能性」と書き、読める手段(ローカルのワークツリー・旧ワークツリー)で進める。シェル履歴から設定を探さない |
 | 依頼者の設定ファイル(`~/.config/`、`~/.local/share/` の他アプリ) | 編集を指示された場合のみ | 編集しない。壊れていて失敗するなら、失敗を事実として書き、別の経路で進める |
 | `rm -rf` | 対象が指示で特定されているとき: `ls -la <対象>` を先に実行し、最も狭い解釈で実行 | 自分が作った物(作業用の一時ディレクトリ)だけ。依頼者のディレクトリ・リポジトリ・旧ワークツリー内を削除しない |
-| 履歴の書き換え(force push・filter-repo・`gh api` での ref の更新) | 後任は実行しない。これらは worker の permission で拒否される(`git push --force-with-lease` を含む)。依頼者が自分で実行する(Issue で頼む) | 実行しない |
+| 履歴の書き換え(force push・filter-repo・`gh api` での ref の更新) | 後任は実行しない。これらは worker の permission で拒否される(`git push --force-with-lease` を含む)。Issue で頼まない(決定 0382)。依頼者が明示に指示したときは、その指示を決定文書に書き写して扱いを決め直す | 実行しない。Issue も出さない(決定 0382) |
 | main への直接書き込み(`gh api` の contents の PUT など) | 依頼者が「main に反映」と指示した場合のみ | 書き込まない。通常の `git push`(ブランチ)で行う |
 | 環境変数・シェル履歴の列挙 | — | しない。件数の確認は自分のシェルの `env \| grep -c` のみ |
 | Cloudflare の削除系・他の bucket・他の Worker | 指示があっても、対象が `fl-studio-web`・`fl-web-*` 以外なら実行しない | 実行しない |

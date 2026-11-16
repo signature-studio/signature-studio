@@ -1,5 +1,5 @@
 # One exception per line: <rule>|<path>|<fixed text on the line that may match>
-# <rule> is a rule name printed by scan-forbidden.sh (vendor, secret, size, oldpath, cfhex, cfhost, term). <path> is repository-relative.
+# <rule> is a rule name printed by scan-forbidden.sh (vendor, secret, size, oldpath, cfhex, cfhost, term, choice, hostval, byok, trial). <path> is repository-relative.
 # A <path> ending in "/" is a directory prefix: it covers every file below that directory (not a file or directory that merely starts with the same letters).
 # The third field is matched as a plain substring of the matching line (no regex). An empty third field allows the rule for the whole file (or the whole prefix); avoid that.
 # Lines starting with # and empty lines are ignored.

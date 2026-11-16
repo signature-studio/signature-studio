@@ -22,6 +22,9 @@
 - sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。シェルツールの `timeout` パラメータ(ミリ秒)は使ってよい。
 - 数分で終わる処理(`bash tests/harness/run.sh` など)は `background` を使わず、前面で実行する。`timeout` パラメータに 900000 を指定する。出力が戻るまでツール呼び出しを続ける。
 - `background: true` は 15 分以上かかる処理だけに使う。起動した応答で終えない。同じ応答の中で、他の作業か、状態確認(`opencode api session.active`・出力ファイルの `ls -la`)を続ける。
+- `opencode auth export` と `opencode auth import` は実行しない(前者は認証情報の中身が出力され、後者は認証情報の保存先に書き込む)。
+- コマンドの文字列に『opencode』の後に『auth』を並べると、許可設定が拒否する(ファイル名、コミットメッセージ、Issue のタイトルも)。ファイル名・メッセージは、『ログイン』『認証』の語を使う。
+- 依頼者のアカウントにつながった道具(`portal_` で始まるもの・execute。GitHub・Gmail・Drive・Calendar・Cloudflare。読み取りも含む)は使わない。GitHub の操作は gh(ボットの名義)だけ。依頼者の名義で何かを書かない。
 - 認証情報(gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。
 - Secrets・Variables を、読む(一覧も含む)・書く・消す・API で読まない(`gh secret`・`gh variable`・`gh api` の `secrets`・`variables`)。依頼者が許可していない。
@@ -40,6 +43,8 @@
 - 自分にできない物(トークンの発行・Secrets の登録・権限の付与・実機での計測)は、Issue(`docs/ops/requests.md`、雛形 `docs/requests/TEMPLATE.md`)で、合理的理由・対象・影響範囲を明示して頼む。自分でできる物を頼むのは指示違反。
 - Issue を出したら、依頼に依存しない作業を同じターンで続ける。催促しない。
 - 「作業対象がありません」と書いて止まらない。決めかねる点は、決定と根拠を 1 行書いて進める。
+- 依頼者に選択・判断を求める Issue は出さない。依頼者にしかできない 1 つの操作だけを頼む(決定 0382)。
+- モデルの認証は、依頼者が opencode の console に登録した BYOK だけを使う。AWS の認証情報(IAM・アクセスキー・Bedrock の API キー)・ローカルマシンの認証ファイル・プロファイル ID・リージョンを、スクリプトでも Actions でも要求しない。依頼者に作らせない(決定 0382)。
 
 ## 報告の形式(最終報告。日本語。結論 20 行以内 + ファイル)
 1. 実エンジン: <何を実行し、どの出力を観測したか。無ければ「実行なし」>
