@@ -1,0 +1,88 @@
+diff --git a/app/src/input/pointer.ts b/app/src/input/pointer.ts
+index c715184..38eba49 100644
+--- a/app/src/input/pointer.ts
++++ b/app/src/input/pointer.ts
+@@ -8 +8 @@
+-//  - decision 0260: the key listeners are on the desktop only, so when the browser moves the focus to another control of the page on its own (observed in headless Chrome, about once in 30 clicks: the "Monitor" button, no script call, no pointer press, no Tab) every key, an Escape that closes a menu included, is dropped until the next click: the focus goes back to the desktop (also when it fell to the page body) unless the user moved it (a pointer press on that control or outside the desktop, or a Tab, in the last second) or the control is a text field.
++//  - arm B of decision 0378 (experiment R3-6a): the focusout recovery of decision 0260 is removed here, so the browser's own focus moves to another control are not undone.
+@@ -78,13 +77,0 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions):
+-  let userMovedAt = -Infinity;
+-  let pressed: Node | null = null;
+-  const notePress = (e: Event): void => { pressed = e.target as Node | null; userMovedAt = performance.now(); };
+-  const noteTab = (e: KeyboardEvent): void => { if (e.code === 'Tab') { pressed = null; userMovedAt = performance.now(); } };
+-  const isTextEntry = (a: Element | null): boolean => { const t = (a as HTMLElement | null)?.tagName; return t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (a as HTMLElement | null)?.isContentEditable === true; };
+-  const onDesktopFocusOut = (e: FocusEvent): void => {
+-    const to = e.relatedTarget as Element | null;
+-    if (to && isTextEntry(to)) return;
+-    const recent = performance.now() - userMovedAt < 1000;
+-    const byUser = recent && (pressed === null || (to ? pressed === to || to.contains(pressed) || (pressed.contains?.(to) ?? false) : !el.contains(pressed)));
+-    if (byUser) return;
+-    setTimeout(() => { const a = document.activeElement; if (opts.enabled() && a !== el && (to ? a === to : a === null || a === document.body)) el.focus({ preventScroll: true }); }, 0);
+-  };
+@@ -111,3 +97,0 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions):
+-  el.addEventListener('focusout', onDesktopFocusOut);
+-  document.addEventListener('pointerdown', notePress, true);
+-  document.addEventListener('keydown', noteTab, true);
+@@ -120,3 +103,0 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions):
+-      el.removeEventListener('focusout', onDesktopFocusOut);
+-      document.removeEventListener('pointerdown', notePress, true);
+-      document.removeEventListener('keydown', noteTab, true);
+diff --git a/app/test/unit/pointer-dom.test.ts b/app/test/unit/pointer-dom.test.ts
+index cd369bf..3b9f2ac 100644
+--- a/app/test/unit/pointer-dom.test.ts
++++ b/app/test/unit/pointer-dom.test.ts
+@@ -43,54 +42,0 @@ describe('attachDesktopInput', () => {
+-  it('decision 0260: the browser moves the focus from the desktop to another control on its own: the desktop gets it back; not after a pointer press or a Tab, not from a text field', async () => {
+-    const { el } = make();
+-    let contains = false;
+-    const other = Object.assign(new FakeEl(), { tagName: 'BUTTON', contains: (): boolean => contains });
+-    const field = Object.assign(new FakeEl(), { tagName: 'INPUT', contains: (): boolean => false });
+-    const doc = docT as unknown as { activeElement: unknown };
+-    el.focus = (): void => { el.focused++; doc.activeElement = el; };   // as an element does: focus() makes it the active element
+-    const out = async (to: unknown, before?: () => void): Promise<void> => {
+-      doc.activeElement = el;
+-      before?.();
+-      doc.activeElement = to;
+-      const ev = new Event('focusout'); Object.assign(ev, { relatedTarget: to });
+-      el.dispatchEvent(ev);
+-      await new Promise((r) => setTimeout(r, 30));
+-    };
+-    await new Promise((r) => setTimeout(r, 1050));   // the start: no user move in the last second
+-    await out(other);
+-    expect(el.focused).toBe(1);                       // on its own: back
+-    expect(doc.activeElement).toBe(el);
+-    await out(field);
+-    expect(el.focused).toBe(1);                       // a text field keeps it
+-    await out(other, () => docT.dispatchEvent(ptr('pointerdown')));
+-    expect(el.focused).toBe(2);                       // a press on the desktop itself (the click that opened a menu) does not excuse a move to another control
+-    await new Promise((r) => setTimeout(r, 1050));
+-    contains = true;                                  // the press was on that control
+-    await out(other, () => docT.dispatchEvent(ptr('pointerdown')));
+-    expect(el.focused).toBe(2);
+-    expect(doc.activeElement).toBe(other);
+-    contains = false;
+-    await new Promise((r) => setTimeout(r, 1050));
+-    await out(other, () => docT.dispatchEvent(key('keydown', 'Tab')));
+-    expect(el.focused).toBe(2);                       // Tab
+-    await new Promise((r) => setTimeout(r, 1050));
+-    // the focus fell to the page body (no control to go to)
+-    let inside = false;
+-    (el as unknown as { contains: () => boolean }).contains = (): boolean => inside;
+-    const fall = async (before?: () => void): Promise<void> => {
+-      doc.activeElement = el;
+-      before?.();
+-      doc.activeElement = null;
+-      const gone = new Event('focusout'); Object.assign(gone, { relatedTarget: null });
+-      el.dispatchEvent(gone);
+-      await new Promise((r) => setTimeout(r, 30));
+-    };
+-    await fall();
+-    expect(el.focused).toBe(3);                       // on its own: back
+-    await new Promise((r) => setTimeout(r, 1050));
+-    await fall(() => docT.dispatchEvent(ptr('pointerdown')));
+-    expect(el.focused).toBe(3);                       // a press outside the desktop (a click on the page background): the user's
+-    await new Promise((r) => setTimeout(r, 1050));
+-    inside = true;
+-    await fall(() => docT.dispatchEvent(ptr('pointerdown')));
+-    expect(el.focused).toBe(4);                       // a press on the desktop itself does not excuse the fall
+-  });
