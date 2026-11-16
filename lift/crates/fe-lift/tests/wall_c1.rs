@@ -402,7 +402,7 @@ fn the_heap_realloc_row_is_where_it_was_and_the_header_declares_a_returning_func
 // ---- wall 8: user32!DestroyCursor of a shared cursor (the GDI part is in tests/gdi_bulk.rs) -----------------------------------------
 
 /// The shared cursors: the standard cursors (LoadCursorW, LoadImageW with a NULL hInst: base 0x7FCA0000 + 4 * (idc - 32512 + 1)) and the form of a LoadImageW cursor of a module
-/// (decisions 0061 and 0104: base 0x7FDA0000 + stride 0x1000 * k (k = 0 the lifted DLL, 1..8 a real module) + 4 * (id - 32762 + 1), id 32762..32767).
+/// (decisions 0061 and 0104: base 0x7FDA0000 + stride 0x1000 * k (k = 0 the lifted DLL, 1..16 a real module (RM_MAX of fle_realmod.c)) + 4 * (id - 32762 + 1), id 32762..32767).
 #[test]
 fn the_shared_cursor_handle_forms_are_recognised() {
     let o = run(
@@ -415,14 +415,14 @@ fn the_shared_cursor_handle_forms_are_recognised() {
     for (id = 32762; id <= 32767; id++) ok &= fle_cursor_is_shared_handle(fle_loadimage_module_handle_of(id)) == 1;
     printf("handles of the loader %d\n", ok);
     ok = 1;
-    for (k = 0; k <= 8; k++)
+    for (k = 0; k <= 16; k++)
         for (id = 32762; id <= 32767; id++) ok &= fle_cursor_is_shared_handle(b + 0x1000ull * k + 4ull * (id - 32762 + 1)) == 1;
     printf("all module forms %d\n", ok);
     printf("dll ids 32762 and 32767: %d %d\n", fle_cursor_is_shared_handle(b + 4) == 1, fle_cursor_is_shared_handle(b + 24) == 1);
     printf("ILTools 32763: %d (0x7FDA5008)\n", fle_cursor_is_shared_handle(0x7FDA5008ull));
     printf("standard: arrow %d sizeall %d (0x7FCA021C)\n", fle_cursor_is_shared_handle(0x7FCA0004ull), fle_cursor_is_shared_handle(0x7FCA021Cull));
-    printf("outside: base %d, base+2 %d, base+28 %d, k=9 %d, below %d, 0x7FCA0001 %d, 0x7FCA0018 %d, zero %d\n", fle_cursor_is_shared_handle(b), fle_cursor_is_shared_handle(b + 2),
-           fle_cursor_is_shared_handle(b + 28), fle_cursor_is_shared_handle(b + 0x9000ull + 4), fle_cursor_is_shared_handle(b - 4), fle_cursor_is_shared_handle(0x7FCA0001ull),
+    printf("outside: base %d, base+2 %d, base+28 %d, k=17 %d, below %d, 0x7FCA0001 %d, 0x7FCA0018 %d, zero %d\n", fle_cursor_is_shared_handle(b), fle_cursor_is_shared_handle(b + 2),
+           fle_cursor_is_shared_handle(b + 28), fle_cursor_is_shared_handle(b + 0x11000ull + 4), fle_cursor_is_shared_handle(b - 4), fle_cursor_is_shared_handle(0x7FCA0001ull),
            fle_cursor_is_shared_handle(0x7FCA0018ull), fle_cursor_is_shared_handle(0));
     printf("destroy cursor of ILTools 32763 %llu, DestroyIcon of it stops next\n", U(call1(fle_imp_DestroyCursor, 0x7FDA5008ull)));
     fflush(stdout);
@@ -440,7 +440,7 @@ fn the_shared_cursor_handle_forms_are_recognised() {
             "dll ids 32762 and 32767: 1 1",
             "ILTools 32763: 1 (0x7FDA5008)",
             "standard: arrow 1 sizeall 1 (0x7FCA021C)",
-            "outside: base 0, base+2 0, base+28 0, k=9 0, below 0, 0x7FCA0001 0, 0x7FCA0018 0, zero 0",
+            "outside: base 0, base+2 0, base+28 0, k=17 0, below 0, 0x7FCA0001 0, 0x7FCA0018 0, zero 0",
             "destroy cursor of ILTools 32763 1, DestroyIcon of it stops next",
         ]
     );
