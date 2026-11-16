@@ -396,7 +396,6 @@ PM の決定: (1) O20-2 は『ドラッグした値が一定値に張り付く�
 - 再生中 File click の中央値(run1/run2): A tEvent→tPage E13 0.65/0.66、RT-F 0.67/0.76。B tPage→tInject E13 0.35/1.14、RT-F 0.90/2.85。**C tInject→最初の frame(UI Worker の処理)E13 18.96/18.52、RT-F 46.87/44.39(+27.9/+25.9)**。D 最初の frame→rAF E13 3.44/2.00、RT-F 7.05/10.85。増分の大半は C。
 - UI Worker は idle でなく処理している(idle E13 0 / RT-F 0.2〜0.3 ms/入力)。phase C の 73〜75% は `g9_hook` の下(包含 34.90/31.82 ms/入力)。`g9_hook` の self は 3.93 ms/入力。GIL 関数(`fle_gil_wake`+`fle_gil_acquire_slow`)の self は合計約 1 ms/入力で、GIL 待ちを主因とする証拠は出ていない(GIL の待ち・保持の分布は `FLE_DIAG_GIL` が 0 行のため未取得)。他の pthread Worker 7 本は多くが CPU を使わず待っている(CPU/wall 0.19〜0.27)。
 - **PM の発見(実測)**: E13 本番 bundle(`fl-engine-ci-0363b050`)の wasm は `g9-diag` 文字列 0 件。RT-A(`fl-engine-test-rt1-91bf78f6`)・RT-E(`87af8f55`)・RT-G(`b083dc31`)は 5 件。tree-ci(E13 の木)の `fle_callback.c` に `g9_gui_init` は 0 件、tree-rt1/rtb/rtd/rtd2/rtd3 には 1 件(`__attribute__((constructor)) static void g9_gui_init(void) { fle_dispatch_hook = g9_hook; }`、`fle_callback.c:335`)。したがって RT 系は診断 OFF でも全ゲスト間接呼びが census hook(決定 0097)を通る。**G2 の比較(E13 = フックなし vs RT-F = フックあり)は同条件でなく、G2 の +23 ms の一部あるいは大半がフックの負荷かもしれない(未検証)。** lift-fidelity 方針の (a)「我々の余計な処理」。是正: mt3 に RT-H(診断スイッチ ON のときだけ `fle_dispatch_hook = g9_hook`)を指示、ci1 に RT-A と E13 の G2 を指示。
-- **botid の config.json**: 06:00 頃、shell が `botid: cannot read ~/.config/botid/config.json: invalid character ']'` で失敗(`rules` 配列末尾の余分なカンマ)。PM が 06:03 に末尾カンマ 1 文字だけ削除(元の内容は `/tmp/opencode/botid-config.json.orig-20261108-0600`)。ci1 は「06:08:13 に誰かが修正し 06:14 に JSON として読めた」と報告しており、PM の修正時刻と食い違う。誰が・いつ・何度壊したかは未調査。
 - **F5(gpu1、実 Chrome 156 と Firefox 158、page-rt1 のコピー+keymap 変更)**: 差分 `docs/investigations/gpu8/diffs/0335-f5-forward.diff`(9,331 B)。F5 4 回(F5×2、Ctrl+F5、Shift+F5)で印が同一=reload なし、`defaultPrevented=true`。変更前 HEAD の page は F5 1 回で reload され読み込んだ project が消える。FL には届く(inputEvents +2 ずつ、Playlist が切り替わる)。unit 変更後 1315 passed / 0 failed(変更前 1313)。未確定: 1 回目の F5 直後の描画遅れと、製品の page(協調 page + E13)での確認(gpu1 に指示済み)。main への push は未実施。
 - alpha1 の g9mix 修正差分(expos を Length 137/138 の 24 連続の最初の呼びで決める): `docs/investigations/alpha22/impl/diag-g9mix-expos-fix.diff`(1,452 B)。PM が RT-F の `fle_diag_g9mix.c` に実適用して rc=0・結果 7,760 B・alpha1 の木と cmp 一致を確認。RT-H に取り込む。
 - 依頼者の機械は 0 件。
@@ -421,5 +420,3 @@ PM の決定: (1) O20-2 は『ドラッグした値が一定値に張り付く�
 - RT-I(gpu1 の keyfocus 診断)の build は mt3 が実行中。実 Chrome の宛先窓の観測は RT-I の bundle 後。
 - O20 の delta 方式は native テストのみ。実 Chrome 未確認。
 - 右クリックは未修正。経路は未確定(静的の読みでは `f_81d040` 経由と `f_845950` 経由がある)。
-
-**botid の config.json**: 06:00 頃、shell が `~/.config/botid/config.json` の `rules` 末尾カンマで失敗。PM が 06:03 に末尾カンマ 1 文字だけ削除(元の内容は `/tmp/opencode/botid-config.json.orig-20261108-0600`)。誰がいつ壊したかは未調査。

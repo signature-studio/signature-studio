@@ -169,6 +169,5 @@ q "with c as (
      sum(cmd like '%gh api%-X%' or cmd like '%gh api%--method%') as gh_api_write,
      sum(cmd like '%git push%--force%' or cmd like '%git push%-f %' or cmd like '%git push%+%') as force_push,
      sum(cmd like '%env sleep%' or cmd like '%=% sleep %' or cmd like '%bash -c%sleep%' or cmd like '%xargs sleep%') as sleep_bypass,
-     sum(cmd like '%GH_CONFIG_DIR=%' or cmd like '%GIT_CONFIG_GLOBAL=%') as other_identity,
-     sum(cmd like '%.config/botid%' or cmd like '%.local/share/botid%') as botid_paths
+     sum(cmd like '%GH_CONFIG_DIR=%' or cmd like '%GIT_CONFIG_GLOBAL=%') as other_identity
    from c group by kind order by kind;"

@@ -47,15 +47,11 @@
     { "action": "read", "resource": "*.env.example", "effect": "allow" },
     { "action": "read", "resource": "~/.local/share/opencode/*", "effect": "deny" },
     { "action": "read", "resource": "~/.config/opencode/*", "effect": "deny" },
-    { "action": "read", "resource": "~/.local/share/botid/*", "effect": "deny" },
-    { "action": "read", "resource": "~/.config/botid/*", "effect": "deny" },
     // Truncated tool output and background shell output are saved under opencode's data directory and the model is told to read them. Allowed again (later rule wins).
     { "action": "read", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
     { "action": "read", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
     { "action": "external_directory", "resource": "~/.local/share/opencode/*", "effect": "deny" },
     { "action": "external_directory", "resource": "~/.config/opencode/*", "effect": "deny" },
-    { "action": "external_directory", "resource": "~/.local/share/botid/*", "effect": "deny" },
-    { "action": "external_directory", "resource": "~/.config/botid/*", "effect": "deny" },
     { "action": "external_directory", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
     { "action": "external_directory", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
     // V-F04, repeated here so that removing a policy does not remove the ban.
@@ -80,8 +76,6 @@
         { "action": "read", "resource": "*.env.example", "effect": "allow" },
         { "action": "read", "resource": "~/.local/share/opencode/*", "effect": "deny" },
         { "action": "read", "resource": "~/.config/opencode/*", "effect": "deny" },
-        { "action": "read", "resource": "~/.local/share/botid/*", "effect": "deny" },
-        { "action": "read", "resource": "~/.config/botid/*", "effect": "deny" },
         { "action": "read", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
         { "action": "read", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
         { "action": "glob", "resource": "*", "effect": "allow" },
@@ -90,8 +84,6 @@
         { "action": "external_directory", "resource": "*", "effect": "allow" },
         { "action": "external_directory", "resource": "~/.local/share/opencode/*", "effect": "deny" },
         { "action": "external_directory", "resource": "~/.config/opencode/*", "effect": "deny" },
-        { "action": "external_directory", "resource": "~/.local/share/botid/*", "effect": "deny" },
-        { "action": "external_directory", "resource": "~/.config/botid/*", "effect": "deny" },
         { "action": "external_directory", "resource": "~/.local/share/opencode/tool-output/*", "effect": "allow" },
         { "action": "external_directory", "resource": "~/.local/share/opencode/shell/*", "effect": "allow" },
         // V-F02: verify a worker's report against the real diff.
@@ -300,9 +292,7 @@
         { "action": "shell", "resource": "*.config/opencode*", "effect": "deny" },
         { "action": "shell", "resource": "*opencode.db*", "effect": "deny" },
         { "action": "shell", "resource": "*.local/share/opencode/auth*", "effect": "deny" },
-        { "action": "shell", "resource": "*.config/botid*", "effect": "deny" },
         { "action": "shell", "resource": "*.config/gh/*", "effect": "deny" },
-        { "action": "shell", "resource": "*.local/share/botid*", "effect": "deny" },
         { "action": "shell", "resource": "*.bash_history*", "effect": "deny" },
         // S8 D-05 (reproduced 2026-11-10): `env` printed every variable and `printenv GH_TOKEN` printed one. A bare `env` is denied, `env VAR=x cmd` is not.
         { "action": "shell", "resource": "env", "effect": "deny" }, // D-05

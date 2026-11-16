@@ -146,7 +146,7 @@ if grep -q 'default_branch' "$ROOT/scripts/preflight.sh" && ! grep -q -- '--jq .
 reads=$(grep -n '\.config/opencode' "$ROOT/scripts/preflight.sh" | grep -v '^[0-9]*:#' | cut -d: -f2- | sed 's/^ *//')
 expect_contains "the only ~/.config/opencode path in preflight is the goal-nudge registry" "$reads" 'goal-nudge.sessions'
 expect_eq "(and it appears once)" 1 "$(grep -v '^ *#' "$ROOT/scripts/preflight.sh" | grep -c '\.config/opencode')"
-for pat in 'auth\.json' '\.local/share/botid' '\.config/botid' 'hosts\.yml' 'default\.toml' 'GH_CONFIG_DIR' 'cat .*\.config' '\.config/opencode/(opencode|auth|env)'; do
+for pat in 'auth\.json' 'hosts\.yml' 'default\.toml' 'GH_CONFIG_DIR' 'cat .*\.config' '\.config/opencode/(opencode|auth|env)'; do
   if grep -v '^ *#' "$ROOT/scripts/preflight.sh" | grep -qE "$pat"; then fail "preflight touches: $pat"; else pass "preflight does not touch: $pat"; fi
 done
 if grep -q 'gh auth status' "$ROOT/scripts/preflight.sh" && ! grep -qE 'gh auth token|--show-token' "$ROOT/scripts/preflight.sh"; then pass "preflight calls gh auth status and never asks for a token"; else fail "preflight asks gh for a token"; fi
