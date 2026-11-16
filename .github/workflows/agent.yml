@@ -25,7 +25,7 @@ jobs:
       count: ${{ steps.plan.outputs.count }}
     steps:
       - name: リポジトリを取得する(差分の基準の commit が要るため全履歴)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: リポジトリを取得する
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -71,7 +71,7 @@ jobs:
         task: ${{ fromJSON(needs.plan.outputs.tasks) }}
     steps:
       - name: リポジトリを取得する
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
