@@ -15,6 +15,8 @@ reviewer の検査の報告(2026-11-16、対象 2c96b6e・e2ef762)。判定: 差
 
 §0 の「対象: HEAD の bundle」は誤り。参照した bundle(~/.cache/signature-studio/work-r53k/bundle/fl-Oz。使ったフォルダは未確認。work-r53h も wasm は同じ)の manifest の HEAD は 9610708(manifest.json の 7 行目。wasm c963715a4410dd56 と一致)。測定時の HEAD は cb81958(12:30:57 JST)。9610708..cb81958 では lift/runtime/fle_desk.c(12 行)などが変わっている。§8 は差に触れているが、§0 の文言が直っていない。
 
+注(作成者の注。報告の一部ではない): 16 行は、作成者が 458a5e7 で「使った bundle(…work-r53k)」を「参照した bundle(…使ったフォルダは未確認)」に書き換えた(2026-11-16 の再検査〔`evidence/R4-2c-review2.md`〕の差し戻し A への対応)。458a5e7 で変えたのは、この 16 行だけ(`git log -p evidence/R4-2c-review.md` で確認)。
+
 ## 差し戻し 2(出典)
 
 表 1 の S01 行の「(手入力)」「0.46 → 0 after wait-quiet」「11015 / 15417」には記録ファイルが無い。S01 の総量 15,417 MB は、他の回(25,627〜26,295 MB)と違う。
