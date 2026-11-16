@@ -1,0 +1,100 @@
+name: deploy
+on:
+  push: {branches: [main], paths: ["app/**", ".github/workflows/deploy.yml"]}
+permissions: {contents: read}
+concurrency: {group: deploy, cancel-in-progress: false}
+env: {WRANGLER_SEND_METRICS: "false"}
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+      with: {persist-credentials: false}
+    - uses: actions/setup-node@v4
+      with: {node-version: "24"}
+    - run: npm ci --prefix app --ignore-scripts --no-audit --no-fund
+    - run: npm run build --prefix app && test -s app/dist/index.html
+    - run: npm test --prefix app
+    - run: npm run test:worker --prefix app
+    - id: read
+      env: {CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"}
+      run: |
+        H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+        g() { curl -sSf -H "$H" "https://api.cloudflare.com/client/v4$1"; }
+        ID=$(g /accounts | jq -er '.result | select(length == 1) | .[0].id')
+        echo "::add-mask::$ID"
+        echo "CLOUDFLARE_ACCOUNT_ID=$ID" >> "$GITHUB_ENV"
+        S=/accounts/$ID/workers/scripts/fl-studio-web
+        OLD=$(g "$S/deployments" | jq -er '.result.deployments[0].versions
+          | select(length == 1 and .[0].percentage == 100) | .[0].version_id')
+        echo "OLD=$OLD" >> "$GITHUB_OUTPUT"
+        export VER=$(g "$S/versions/$OLD")
+        node <<'JS'
+        const fs = require('fs'), r = JSON.parse(process.env.VER).result;
+        const L = (r.resources || {}).bindings || [];
+        const plain = {}, bk = {};
+        for (const x of L) {
+          if (x.type === 'plain_text') plain[x.name] = x.text;
+          else if (x.type === 'r2_bucket') bk[x.name] = x.bucket_name;
+          else if (x.type !== 'assets') throw new Error('binding');
+        }
+        for (const v of [...Object.values(plain), ...Object.values(bk)]) {
+          if (!v) throw new Error('empty');
+          for (let n = 8; n <= v.length; n++)
+            console.log('::add-mask::' + v.slice(0, n));
+        }
+        const c = JSON.parse(fs.readFileSync('app/wrangler.jsonc', 'utf8')
+          .replace(/\/\/[^\n]*/g, ''));
+        const off = c.workers_dev === false && c.preview_urls === false;
+        if (!off || c.routes || c.r2_buckets.length !== Object.keys(bk).length)
+          throw new Error('config');
+        c.r2_buckets = c.r2_buckets.map((x) => ({
+          binding: x.binding, bucket_name: bk[x.binding] }));
+        c.vars = plain;
+        fs.writeFileSync('app/wrangler.deploy.json',
+          JSON.stringify(c, null, 2));
+        JS
+    - id: up
+      uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0
+      env: {WRANGLER_OUTPUT_FILE_PATH: "${{ runner.temp }}/upload.ndjson"}
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        workingDirectory: app
+        command: >-
+          versions upload --config wrangler.deploy.json
+          --message ci-${{ github.run_id }}
+    - id: ver
+      run: |
+        V=$(jq -Rr 'fromjson? | .version_id // empty' \
+          "$RUNNER_TEMP/upload.ndjson" | tail -n 1)
+        echo "NEW=$V" >> "$GITHUB_OUTPUT"
+    - id: sw
+      uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        workingDirectory: app
+        command: >-
+          versions deploy ${{ steps.ver.outputs.NEW }}@100%
+          --config wrangler.deploy.json --message ci-${{ github.run_id }} --yes
+    - id: check
+      if: steps.sw.outcome == 'success'
+      env: {CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}"}
+      run: |
+        H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+        S=https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID
+        V="${{ steps.ver.outputs.NEW }}"
+        curl -sSf -H "$H" "$S/workers/scripts/fl-studio-web/deployments" \
+          | jq -e --arg v "$V" '.result.deployments[0].versions
+          | length == 1 and .[0].percentage == 100 and .[0].version_id == $v'
+    - if: failure() && steps.up.outcome == 'success'
+      uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0
+      with:
+        apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        workingDirectory: app
+        command: >-
+          versions deploy ${{ steps.read.outputs.OLD }}@100%
+          --config wrangler.deploy.json --message ci-rollback --yes
