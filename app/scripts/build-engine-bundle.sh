@@ -411,6 +411,7 @@ stage_seed() {
 
 stage_bundle() {
   if [ -s "$BUNDLE/upload-commands.txt" ]; then echo "bundle: $BUNDLE has the output (restored from the stage cache or made before), skipped"; return 0; fi
+  # the manifest carries the HEAD of the build (its description); the bundle key of the workflow is the whole input hash, which is not the HEAD (decision 0395, 3 6)
   [ -s "$WEB/flengine6.wasm" ] || die "no $WEB/flengine6.wasm: run the weblink stage first"
   local ENGINE_WASM=$WEB/flengine6.opt.wasm
   [ -s "$ENGINE_WASM" ] || die "no $ENGINE_WASM: run the hybrid stage"
