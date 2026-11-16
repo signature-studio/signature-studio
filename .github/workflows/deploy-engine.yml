@@ -1,0 +1,523 @@
+# エンジンの bundle を作り(9 段。決定 0381)、R2 fl-web-assets の新しい prefix に載せる。
+# root の manifest.json は、wasm の sha256 が ci/verified-bundles.tsv に在るときだけ差し替える(退避つき)。
+# 書き込みの Secrets(R2_CACHE_ASSETS_*)は、載せる段と root の段だけに渡す。ビルドの段には渡さない。
+# 値・アカウント ID・R2 のホスト名は出さない(公開リポジトリ。ログも公開)。
+name: deploy-engine
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/deploy-engine.yml"
+      - "ci/verified-bundles.tsv"
+      - "ci/artifacts.lock"
+      - "ci/extract-dlls.tsv"
+      - "ci/versions.env"
+      - "ci/setup-toolchain.sh"
+      - "ci/lib/extract_fl.py"
+      - "app/package.json"
+      - "app/scripts/build-engine-bundle.sh"
+      - "app/scripts/pack-assets.mjs"
+      - "app/scripts/lib/wasm-exports.mjs"
+      - "app/src/bundle/pack.ts"
+      - "app/src/bundle/manifest.ts"
+      - "app/src/bundle/schema.ts"
+      - "app/src/bundle/sha256.ts"
+      - "lift/.cargo/**"
+      - "lift/Cargo.toml"
+      - "lift/Cargo.lock"
+      - "lift/crates/**"
+      - "lift/runtime/**"
+      - "lift/data/**"
+      - "lift/harness/**"
+      - "tools/extract_nsis2.py"
+      - "tools/nsis_script_dump.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-engine
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: "リポジトリを取得する"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - id: key
+        name: "prefix を入力のハッシュから決める(同じ入力なら同じ名前。末尾 8 桁)"
+        run: |
+          set -eu
+          K=$(git ls-files -s -- lift/.cargo lift/Cargo.toml lift/Cargo.lock lift/crates lift/runtime lift/data lift/harness \
+            app/package.json app/scripts/build-engine-bundle.sh app/scripts/pack-assets.mjs app/scripts/lib/wasm-exports.mjs \
+            app/src/bundle/pack.ts app/src/bundle/manifest.ts app/src/bundle/schema.ts app/src/bundle/sha256.ts \
+            ci/artifacts.lock ci/extract-dlls.tsv ci/versions.env ci/setup-toolchain.sh ci/lib/extract_fl.py \
+            tools/extract_nsis2.py tools/nsis_script_dump.py | sha256sum | cut -c1-8)
+          case "$K" in ????????) ;; *) echo "prefix の鍵が作れない"; exit 1 ;; esac
+          echo "prefix=fl-engine-ci-$K" >> "$GITHUB_OUTPUT"
+          echo "prefix: fl-engine-ci-$K"
+
+      - id: acct
+        name: "アカウント ID を実行時に 1 つ得て、すぐ伏せる(値は出さない)"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -u
+          W="$RUNNER_TEMP/deploy-engine"
+          mkdir -p "$W"
+          curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts > "$W/accounts.json"
+          python3 -c 'import json, sys; d = json.load(open(sys.argv[1])); [print(a["id"]) for a in d.get("result", [])]' \
+            "$W/accounts.json" | grep -E '^[0-9a-f]{32}$' | sort -u > "$W/cand.txt" || true
+          n=$(wc -l < "$W/cand.txt" | tr -d ' ')
+          if [ "$n" -ne 1 ]; then
+            echo "アカウント ID を 1 つに決められない(件数: $n)"
+            exit 1
+          fi
+          id=$(cat "$W/cand.txt")
+          echo "::add-mask::$id"
+          echo "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"
+          rm -f "$W/accounts.json" "$W/cand.txt"
+          echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
+
+      - id: installer
+        name: "インストーラを R2 から取り、ci/artifacts.lock と照合する"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
+          KEY=installers/flstudio_win64_26.1.7.5653.exe
+          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+          mkdir -p "$RUNNER_TEMP/in"
+          if ! aws s3 cp "s3://fl-web-artifacts/$KEY" "$INST" --only-show-errors \
+            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" > "$RUNNER_TEMP/s3.txt" 2>&1; then
+            echo "インストーラの取得: 失敗(伏せた出力)"
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' "$RUNNER_TEMP/s3.txt" | tail -n 5
+            exit 1
+          fi
+          row=$(awk -F'\t' -v k="$KEY" '$1 == k' ci/artifacts.lock)
+          want_size=$(printf '%s\n' "$row" | cut -f2)
+          want_sha=$(printf '%s\n' "$row" | cut -f3)
+          got_size=$(stat -c %s "$INST")
+          got_sha=$(sha256sum "$INST" | cut -d' ' -f1)
+          if [ -z "$want_sha" ] || [ "$got_size" != "$want_size" ] || [ "$got_sha" != "$want_sha" ]; then
+            echo "照合: 不一致(大きさ $got_size B、期待 $want_size B)"
+            rm -f "$INST"
+            exit 1
+          fi
+          echo "照合: 一致(大きさ $got_size B、SHA-256 一致)"
+
+      - id: extract
+        name: "インストーラから入力を抽出し、DLL と seed を確かめる"
+        run: |
+          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+          if python3 ci/lib/extract_fl.py "$INST" "$RUNNER_TEMP/host" \
+            --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv > "$RUNNER_TEMP/extract.txt" 2>&1; then
+            echo "抽出: 成功(rc=0)"
+          else
+            rc=$?
+            echo "抽出: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/extract.txt"
+            exit 1
+          fi
+          rm -f "$INST"
+
+      - name: "Python 3.14"
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: "Node 24"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - id: emsdk
+        name: "emscripten 6.0.12(ci/setup-toolchain.sh の固定値)"
+        run: bash ci/setup-toolchain.sh emsdk
+
+      - id: rust
+        name: "rust 1.99.0(ci/setup-toolchain.sh の固定値)"
+        run: bash ci/setup-toolchain.sh rust
+
+      - name: "cargo の依存を取る(build-engine-bundle.sh の --offline の前)"
+        run: cd lift && cargo fetch --locked
+
+      - id: b2d
+        name: "上流 Blend2D を wasm で作る(固定コミットと tarball の SHA-256 で照合)"
+        run: |
+          PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:$PATH" \
+          EMCC_CFLAGS="-matomics -mbulk-memory" \
+          OUTDIR="$RUNNER_TEMP/b2d" TARGET=wasm OPT=-O2 \
+          PATCH="$GITHUB_WORKSPACE/lift/harness/b2d1/b2d3-compop.patch" \
+          bash lift/harness/b2d1/build_upstream.sh > "$RUNNER_TEMP/b2d.txt" 2>&1 || { echo "上流 Blend2D: 失敗(末尾 40 行)"; tail -n 40 "$RUNNER_TEMP/b2d.txt"; exit 1; }
+          echo "上流 Blend2D: 成功(rc=0)"
+
+      - id: build
+        name: "9 段を既定の順で回す(prefix は上で決めた名前。書き込みの Secrets は渡さない)"
+        env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          PREFIX: ${{ steps.key.outputs.prefix }}
+          BUCKET: fl-web-assets
+        run: |
+          if bash app/scripts/build-engine-bundle.sh > "$RUNNER_TEMP/build.txt" 2>&1; then
+            echo "9 段: 成功(rc=0)"
+          else
+            rc=$?
+            echo "9 段: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build.txt"
+            exit 1
+          fi
+          cat "$WORK/logs/stages.log"
+
+      - id: check
+        name: "9 段の出力を検査する(sha256・展開・manifest の判定・載せる 5 件。値は出さない)"
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+          WORK: ${{ runner.temp }}/work
+        run: |
+          set -eu
+          W="$RUNNER_TEMP/deploy-engine"
+          mkdir -p "$W"
+          B="$WORK/bundle/$PREFIX"
+          cd "$B"
+          sha256sum -c SHA256SUMS
+          WASM=$(ls engine.*.wasm)
+          WSHA=$(sha256sum "$WASM" | cut -d' ' -f1)
+          WSIZE=$(stat -c %s "$WASM")
+          echo "wasm: 大きさ $WSIZE B、sha256 $WSHA"
+          node -e '
+            const z = require("zlib"), f = require("fs");
+            for (const p of process.argv.slice(1)) {
+              const n = p.split("/").pop();
+              const dec = z.brotliDecompressSync(f.readFileSync(p));
+              if (!dec.equals(f.readFileSync(p.slice(0, -3)))) { console.log(n + ": 展開すると元と違う"); process.exit(1); }
+              console.log(n + ": 展開すると元と同じ(展開後 " + dec.length + " B)");
+            }' "$B"/*.br
+          python3 - "$B/manifest.json" "$PREFIX" "$WASM" "$WSHA" "$WSIZE" <<'PY'
+          import json, sys
+          path, prefix, wasm, wsha, wsize = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+          m = json.load(open(path, encoding="utf-8"))
+          e = m["engine"]
+          ok = (e.get("kind") == "emscripten-fruity-v1"
+                and e["wasm"]["url"] == f"/assets/{prefix}/{wasm}"
+                and e["wasm"]["sha256"] == wsha and e["wasm"]["size"] == wsize
+                and e["options"]["glue"]["url"].startswith(f"/assets/{prefix}/")
+                and m["seedPack"]["url"].startswith(f"/assets/{prefix}/")
+                and m["dllPack"]["url"].startswith(f"/assets/{prefix}/"))
+          print(f"manifest: engine.kind {e.get('kind')}、参照先は /assets/{prefix}/ の下、判定 {ok}")
+          sys.exit(0 if ok else 1)
+          PY
+          ( cd "$GITHUB_WORKSPACE/app" && node --experimental-strip-types -e '
+            const fs = require("fs");
+            import("./shared/manifest-guard.ts").then((g) => {
+              const v = g.judgeManifestBytes(new Uint8Array(fs.readFileSync(process.argv[1])));
+              console.log("manifest の判定(app/shared/manifest-guard.ts): " + (v.ok ? "ok、engine.kind " + v.kind : "NG"));
+              process.exit(v.ok ? 0 : 1);
+            }).catch(() => { console.log("manifest の判定: 例外"); process.exit(1); });
+          ' "$B/manifest.json" )
+          python3 - "$B" "$PREFIX" "$W/upload.tsv" <<'PY'
+          import os, shlex, sys
+          bdir, prefix, out = sys.argv[1], sys.argv[2], sys.argv[3]
+          FLAGS = {"--remote": 0, "--file": 1, "--content-type": 1, "--content-encoding": 1, "--cache-control": 1}
+          rows = []
+          for line in open(os.path.join(bdir, "upload-commands.txt"), encoding="utf-8"):
+              line = line.strip()
+              if not line or line.startswith("#"):
+                  continue
+              t = shlex.split(line)
+              if t[:4] != ["wrangler", "r2", "object", "put"] or len(t) < 5:
+                  sys.exit("upload-commands: put 以外の行がある(中止)")
+              bucket, _, key = t[4].partition("/")
+              if bucket != "fl-web-assets" or not key.startswith(prefix + "/"):
+                  sys.exit("upload-commands: キーが fl-web-assets の下の prefix の外(中止)")
+              opts, i = {}, 5
+              while i < len(t):
+                  if t[i] not in FLAGS:
+                      sys.exit("upload-commands: 想定外の指定(中止)")
+                  if FLAGS[t[i]]:
+                      opts[t[i]] = t[i + 1]
+                      i += 2
+                  else:
+                      opts[t[i]] = True
+                      i += 1
+              path = os.path.abspath(opts["--file"])
+              if not path.startswith(os.path.abspath(bdir) + os.sep) or not os.path.isfile(path):
+                  sys.exit("upload-commands: ファイルが bundle の外、または無い(中止)")
+              if "--remote" not in opts:
+                  sys.exit("upload-commands: --remote が無い(中止)")
+              rows.append((key, path, opts["--content-type"], opts.get("--content-encoding", ""), opts["--cache-control"]))
+          if len(rows) != 5:
+              sys.exit(f"upload-commands: {len(rows)} 件(5 件のはず)")
+          if rows[-1][0] != f"{prefix}/manifest.json" or rows[-1][3] != "":
+              sys.exit("upload-commands: manifest.json が最後に無い、または圧縮の指定がある(中止)")
+          if any(r[3] != "br" for r in rows[:4]):
+              sys.exit("upload-commands: .br の 4 件に content-encoding br が無い(中止)")
+          with open(out, "w", encoding="utf-8") as f:
+              for r in rows:
+                  f.write("\t".join(r) + "\n")
+          print("upload-commands: 5 件。キーは fl-web-assets の prefix の下だけ。削除・同期の指定は無し")
+          PY
+          echo "wasm_sha=$WSHA" >> "$GITHUB_OUTPUT"
+          echo "wasm_size=$WSIZE" >> "$GITHUB_OUTPUT"
+
+      - id: upload
+        name: "prefix を R2 に載せ、1 件ずつ読み直して確かめる(manifest.json は最後。無いときだけ載せる)"
+        if: steps.check.outcome == 'success'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+          PREFIX: ${{ steps.key.outputs.prefix }}
+          WORK: ${{ runner.temp }}/work
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/deploy-engine"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          [ "$(wc -l < "$W/upload.tsv" 2>/dev/null | tr -d ' ')" = 5 ] || { echo "載せる一覧が 5 件でない(検査の段の出力が無い)"; exit 1; }
+          UPLOADED=yes
+          if aws s3api head-object --bucket fl-web-assets --key "$PREFIX/manifest.json" --endpoint-url "$ENDPOINT" > "$W/mh.json" 2> "$W/mh.err" < /dev/null; then
+            UPLOADED=no
+            echo "R2 の prefix に manifest.json が既に在る。載せ直さない(下で確かめる)"
+          else
+            grep -qE '404|Not Found|NoSuchKey' "$W/mh.err" || { echo "manifest.json の確認: 404 以外の失敗(伏せた末尾)"; mask < "$W/mh.err" | tail -n 3; exit 1; }
+            echo "R2 の prefix に manifest.json が無い(404)。5 件を載せる(manifest.json は最後)"
+          fi
+          echo "uploaded=$UPLOADED" >> "$GITHUB_OUTPUT"
+          verify_row() {
+            local key=$1 file=$2 cenc=$3 name=${1##*/}
+            if [ "$name" != manifest.json ]; then
+              aws s3api head-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" --output json > "$W/vh.json" 2> "$W/vh.err" < /dev/null || { echo "head: 失敗($name)"; mask < "$W/vh.err" | tail -n 3; return 1; }
+              local len enc
+              len=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentLength"))' "$W/vh.json")
+              enc=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentEncoding") or "")' "$W/vh.json")
+              if [ "$len" != "$(stat -c %s "$file")" ] || [ "$enc" != "$cenc" ]; then
+                echo "head: 大きさか ContentEncoding が違う($name)"
+                return 1
+              fi
+            fi
+            aws s3api get-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" "$W/got.bin" > "$W/vg.txt" 2>&1 < /dev/null || { echo "get: 失敗($name)"; mask < "$W/vg.txt" | tail -n 3; return 1; }
+            if [ "$name" = manifest.json ]; then
+              if [ "$UPLOADED" = yes ]; then
+                cmp -s "$W/got.bin" "$file" || { echo "manifest.json: 載せた物と違う"; return 1; }
+                echo "確かめ manifest.json: 載せた物と同じバイト"
+              else
+                python3 - "$W/got.bin" "$file" <<'PY' || { echo "manifest.json: 既に在る物と参照先が違う(中止)"; return 1; }
+          import json, sys
+          def refs(m):
+              e = m["engine"]
+              return [e["kind"], e["wasm"]["sha256"], e["wasm"]["size"], e["options"]["glue"]["sha256"], e["options"]["glue"]["size"],
+                      m["seedPack"]["sha256"], m["seedPack"]["size"], m["dllPack"]["sha256"], m["dllPack"]["size"]]
+          a = json.load(open(sys.argv[1], encoding="utf-8"))
+          b = json.load(open(sys.argv[2], encoding="utf-8"))
+          sys.exit(0 if refs(a) == refs(b) else 1)
+          PY
+                echo "確かめ manifest.json: 既に在る物と参照先(sha と大きさ)が同じ(created などは違い得る)"
+              fi
+            else
+              if [ "$(sha256sum "$W/got.bin" | cut -d' ' -f1)" != "$(sha256sum "$file" | cut -d' ' -f1)" ]; then
+                echo "sha256 が違う($name)"
+                return 1
+              fi
+              echo "確かめ $name: 大きさ $(stat -c %s "$file") B、sha256 一致"
+            fi
+            return 0
+          }
+          n=0
+          while IFS=$'\t' read -r key file ctype cenc cc; do
+            n=$((n + 1))
+            if [ "$UPLOADED" = yes ]; then
+              args=(--bucket fl-web-assets --key "$key" --body "$file" --content-type "$ctype" --cache-control "$cc" --endpoint-url "$ENDPOINT")
+              if [ -n "$cenc" ]; then args+=(--content-encoding "$cenc"); fi
+              if ! aws s3api put-object "${args[@]}" > "$W/put.out" 2>&1 < /dev/null; then
+                echo "載せる: 失敗(${key##*/})"
+                mask < "$W/put.out" | tail -n 3
+                exit 1
+              fi
+              echo "載せた: ${key##*/}"
+            fi
+            verify_row "$key" "$file" "$cenc" || exit 1
+          done < "$W/upload.tsv"
+          echo "確かめた件数: $n"
+
+      - id: root
+        name: "root の manifest.json を差し替える(wasm の sha256 が一覧に在るときだけ。退避つき)"
+        if: steps.upload.outcome == 'success'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+          PREFIX: ${{ steps.key.outputs.prefix }}
+          WASM_SHA: ${{ steps.check.outputs.wasm_sha }}
+          WORK: ${{ runner.temp }}/work
+        run: |
+          set -u
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          ENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          W="$RUNNER_TEMP/deploy-engine"
+          B="$WORK/bundle/$PREFIX"
+          mask() {
+            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'
+          }
+          if ! awk -F'\t' -v s="$WASM_SHA" 'NR > 1 && $1 == s {f = 1} END {exit f ? 0 : 1}' ci/verified-bundles.tsv; then
+            echo "wasm の sha256 は ci/verified-bundles.tsv に無い。root は変えない"
+            echo "listed=no" >> "$GITHUB_OUTPUT"
+            echo "root_changed=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "listed=yes" >> "$GITHUB_OUTPUT"
+          python3 - "$B/manifest.json" "$PREFIX" > "$W/refs.txt" <<'PY' || { echo "参照先の形が違う(中止)"; exit 1; }
+          import json, sys
+          m = json.load(open(sys.argv[1], encoding="utf-8"))
+          pre = "/assets/" + sys.argv[2] + "/"
+          urls = [m["engine"]["wasm"]["url"], m["engine"]["options"]["glue"]["url"], m["seedPack"]["url"], m["dllPack"]["url"]]
+          if not all(u.startswith(pre) for u in urls):
+              sys.exit(1)
+          for u in urls + [pre + "manifest.json"]:
+              print(u[len("/assets/"):])
+          PY
+          while read -r key; do
+            aws s3api head-object --bucket fl-web-assets --key "$key" --endpoint-url "$ENDPOINT" > /dev/null 2> "$W/rh.err" < /dev/null || { echo "参照先の head: 無い(${key##*/})"; mask < "$W/rh.err" | tail -n 3; exit 1; }
+          done < "$W/refs.txt"
+          echo "参照先: $(wc -l < "$W/refs.txt" | tr -d ' ') 件とも R2 に在る(head)"
+          aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root-before.json" > "$W/g0.txt" 2>&1 < /dev/null || { echo "root の読み: 失敗(伏せた末尾)"; mask < "$W/g0.txt" | tail -n 3; exit 1; }
+          BEFORE=$(sha256sum "$W/root-before.json" | cut -d' ' -f1)
+          NEWSHA=$(sha256sum "$B/manifest.json" | cut -d' ' -f1)
+          NEWSIZE=$(stat -c %s "$B/manifest.json")
+          echo "root の前: sha256 $BEFORE、大きさ $(stat -c %s "$W/root-before.json") B"
+          echo "root_before=$BEFORE" >> "$GITHUB_OUTPUT"
+          if [ "$BEFORE" = "$NEWSHA" ]; then
+            echo "root は既に同じバイト列。何もしない"
+            echo "root_changed=no" >> "$GITHUB_OUTPUT"
+            echo "root_after=$BEFORE" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          aws s3api head-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" --output json > "$W/root-head.json" 2> "$W/rh2.err" < /dev/null || { echo "root の head: 失敗(伏せた末尾)"; mask < "$W/rh2.err" | tail -n 3; exit 1; }
+          python3 - "$W/root-head.json" > "$W/meta.txt" <<'PY'
+          import json, sys
+          h = json.load(open(sys.argv[1], encoding="utf-8"))
+          for k, flag in (("ContentType", "--content-type"), ("ContentEncoding", "--content-encoding"), ("CacheControl", "--cache-control")):
+              if h.get(k):
+                  print(flag)
+                  print(h[k])
+          PY
+          mapfile -t META < "$W/meta.txt"
+          BK="backup/manifest-root-$(date -u +%Y%m%dT%H%M%SZ).json"
+          if aws s3api head-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" > /dev/null 2> "$W/bk0.err" < /dev/null; then
+            echo "退避先が既に在る(中止。上書きしない)"
+            exit 1
+          fi
+          grep -qE '404|Not Found|NoSuchKey' "$W/bk0.err" || { echo "退避先の確認: 404 以外の失敗(伏せた末尾)"; mask < "$W/bk0.err" | tail -n 3; exit 1; }
+          aws s3api put-object --bucket fl-web-assets --key "$BK" --body "$W/root-before.json" "${META[@]}" --endpoint-url "$ENDPOINT" > "$W/bp.txt" 2>&1 < /dev/null || { echo "退避: 書けない(伏せた末尾)"; mask < "$W/bp.txt" | tail -n 3; exit 1; }
+          aws s3api get-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" "$W/bk.json" > "$W/bg.txt" 2>&1 < /dev/null || { echo "退避の get: 失敗(伏せた末尾)"; mask < "$W/bg.txt" | tail -n 3; exit 1; }
+          if [ "$(sha256sum "$W/bk.json" | cut -d' ' -f1)" != "$BEFORE" ]; then
+            echo "退避の確認: 元の root と一致しない(中止。root は変えていない)"
+            exit 1
+          fi
+          echo "退避: $BK(sha256 $BEFORE。get で一致)"
+          echo "backup_key=$BK" >> "$GITHUB_OUTPUT"
+          restore() {
+            echo "差し替えを戻す(退避 → root)"
+            if aws s3api get-object --bucket fl-web-assets --key "$BK" --endpoint-url "$ENDPOINT" "$W/bk2.json" > /dev/null 2>&1 < /dev/null \
+              && [ "$(sha256sum "$W/bk2.json" | cut -d' ' -f1)" = "$BEFORE" ] \
+              && aws s3api put-object --bucket fl-web-assets --key manifest.json --body "$W/bk2.json" "${META[@]}" --endpoint-url "$ENDPOINT" > /dev/null 2>&1 < /dev/null \
+              && aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root-restored.json" > /dev/null 2>&1 < /dev/null \
+              && [ "$(sha256sum "$W/root-restored.json" | cut -d' ' -f1)" = "$BEFORE" ]; then
+              echo "戻し: root の sha256 が退避と一致($BEFORE)"
+              echo "root_after=$BEFORE" >> "$GITHUB_OUTPUT"
+            else
+              echo "戻しを確かめられなかった。手作業が要る(退避: $BK)"
+            fi
+          }
+          if ! aws s3api put-object --bucket fl-web-assets --key manifest.json --body "$B/manifest.json" --content-type application/json --cache-control no-cache --endpoint-url "$ENDPOINT" > "$W/pr.txt" 2>&1 < /dev/null; then
+            echo "root の書き込み: 失敗(伏せた末尾)"
+            mask < "$W/pr.txt" | tail -n 3
+            restore
+            exit 1
+          fi
+          if ! aws s3api head-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" --output json > "$W/root-new-head.json" 2> "$W/rh3.err" < /dev/null; then
+            echo "root の head: 失敗(伏せた末尾)"
+            mask < "$W/rh3.err" | tail -n 3
+            restore
+            exit 1
+          fi
+          if [ "$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])).get("ContentLength"))' "$W/root-new-head.json")" != "$NEWSIZE" ]; then
+            echo "root の head: 大きさが違う"
+            restore
+            exit 1
+          fi
+          if ! aws s3api get-object --bucket fl-web-assets --key manifest.json --endpoint-url "$ENDPOINT" "$W/root-after.json" > /dev/null 2> "$W/rg.err" < /dev/null; then
+            echo "root の get: 失敗(伏せた末尾)"
+            mask < "$W/rg.err" | tail -n 3
+            restore
+            exit 1
+          fi
+          AFTER=$(sha256sum "$W/root-after.json" | cut -d' ' -f1)
+          if [ "$AFTER" != "$NEWSHA" ]; then
+            echo "root の get: sha256 が新しい manifest と違う"
+            restore
+            exit 1
+          fi
+          echo "root の差し替え: 新しい sha256 $AFTER、大きさ $NEWSIZE B(head と get で確認)"
+          echo "root_after=$AFTER" >> "$GITHUB_OUTPUT"
+          echo "root_changed=yes" >> "$GITHUB_OUTPUT"
+
+      - name: "結果の表(失敗しても出す)"
+        if: always()
+        env:
+          R_KEY: ${{ steps.key.outcome }}
+          R_ACCT: ${{ steps.acct.outcome }}
+          R_INST: ${{ steps.installer.outcome }}
+          R_EXTRACT: ${{ steps.extract.outcome }}
+          R_EMSDK: ${{ steps.emsdk.outcome }}
+          R_RUST: ${{ steps.rust.outcome }}
+          R_B2D: ${{ steps.b2d.outcome }}
+          R_BUILD: ${{ steps.build.outcome }}
+          R_CHECK: ${{ steps.check.outcome }}
+          R_UPLOAD: ${{ steps.upload.outcome }}
+          R_ROOT: ${{ steps.root.outcome }}
+          PREFIX: ${{ steps.key.outputs.prefix }}
+          WASM_SHA: ${{ steps.check.outputs.wasm_sha }}
+          WASM_SIZE: ${{ steps.check.outputs.wasm_size }}
+          UPLOADED: ${{ steps.upload.outputs.uploaded }}
+          LISTED: ${{ steps.root.outputs.listed }}
+          ROOT_CHANGED: ${{ steps.root.outputs.root_changed }}
+          ROOT_BEFORE: ${{ steps.root.outputs.root_before }}
+          ROOT_AFTER: ${{ steps.root.outputs.root_after }}
+          BACKUP: ${{ steps.root.outputs.backup_key }}
+        run: |
+          {
+            echo "| 段 | 結果 |"
+            echo "|---|---|"
+            echo "| prefix(入力のハッシュ) | ${PREFIX:-未決定} |"
+            echo "| アカウント ID を実行時に得た | $R_ACCT |"
+            echo "| インストーラの取得と照合 | $R_INST |"
+            echo "| 抽出 | $R_EXTRACT |"
+            echo "| emsdk | $R_EMSDK |"
+            echo "| rust | $R_RUST |"
+            echo "| 上流 Blend2D | $R_B2D |"
+            echo "| 9 段 | $R_BUILD |"
+            echo "| 9 段の出力の検査 | $R_CHECK |"
+            echo "| prefix を載せ、確かめた(載せたか = $UPLOADED) | $R_UPLOAD |"
+            echo "| wasm の大きさ(B) | ${WASM_SIZE:-未取得} |"
+            echo "| wasm の sha256 | ${WASM_SHA:-未取得} |"
+            echo "| wasm の sha256 が一覧に在る | ${LISTED:-未実行} |"
+            echo "| root の差し替え | $R_ROOT(変えた = ${ROOT_CHANGED:-未実行}) |"
+            echo "| root の sha256(前) | ${ROOT_BEFORE:-未取得} |"
+            echo "| root の sha256(後。失敗して戻した場合は戻した後の値) | ${ROOT_AFTER:-未取得} |"
+            echo "| 退避のキー名 | ${BACKUP:-なし} |"
+            echo "| 時刻(UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
