@@ -3,6 +3,7 @@
 # 新しい版は versions upload で作り、versions deploy で 100% にする(トリガー = カスタムドメインには触れない: 決定 0217)。
 # 確かめで外れていれば、直前の版へ戻して失敗にする。バケット名・アクセス設定・アカウント ID はログに出さない。
 # 版の upload と 100% の切り替えは cloudflare/wrangler-action(旧 deploy.yml と同じ版・SHA)。配信の後、公開の入口が Access の背後にあることを probe で確かめる(宛先はカスタムドメインの一覧。得られなければ Secret PUBLIC_HOSTNAME。どちらも無ければ配信の前に止める)。
+# Secret PUBLIC_HOSTNAME の登録(Issue 0008)の後に、この版で配信の自動処理を動かし直して確かめる(決定 0389。動かし直しの注記。動作は変えない)。
 name: deploy-worker
 
 on:
