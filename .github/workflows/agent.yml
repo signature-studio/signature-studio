@@ -1,6 +1,6 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、opencode の認証情報(環境変数 OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。値が空のジョブは、取り込みの手順で止まる。
-# モデルは Variable OPENCODE_MODEL(依頼者が登録)の値を、設定の段で .opencode/opencode.jsonc に書く(決定 0402。決定 0399 を置き換える)。値はログに出る。
+# モデルは Variable OPENCODE_MODEL の値を、設定の段で .opencode/opencode.jsonc に書く(決定 0402。決定 0399 を置き換える)。値はログに出る。
 # R2 の鍵は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
 # 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
