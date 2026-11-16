@@ -42,3 +42,11 @@
 - `tools/verify-kit/tools/sdriveg2-export.mjs` の `exportSha`(657〜664 行の元の位置)と、この commit で追加した `openZipProject`(`sdriveg2-lat.mjs` 317〜357 行の複製)。
 - `tools/verify-kit/serve-once-r54-bundle.mjs`(`serve-once-r53-bundle.mjs` の複製。駆動するスクリプトと台本と出力の接頭辞の 3 点だけ変えた)。
 - 旧の台本 `tools/verify-kit/tools/scn-export.json` の Export の手順(`ctrlKey KeyR` → `#filedlg #fx-ok` → Export 開始の click → `exportSha`)。Export 開始の位置 `1135,832` は旧の 2260x1116 での位置で、今の画面で合うかは未確認(道具の確認の run で `export-dialog.png` を見て決める)。
+
+## 測定前の補足(2026-11-16)
+
+(a) 前の作業用サブエージェントが、E13 の 1 回目(出力フォルダ `tools/verify-kit/out/r54-r54e13-chrome-1`、更新時刻 2026-11-15 16:55〜16:56)を実行した。依頼文の記述によれば、その後レート制限のエラーで止まった。直前の記録(`free -m`・`/proc/loadavg`・`ps`)は残っていない。同じフォルダに `export.json`・`export.wav`・`report.json` があるが、直前の記録がないため、0377 の「各回の直前に `free -m` の 2 行と `/proc/loadavg` を記録する」を満たさない。
+
+(b) 決定: この 1 回は組に数えない。根拠: 各回の直前の記録は 0377 の要件であり、この 1 回はその要件を満たさない。この決定は、組の結果を見る前に行う。組の 4 回(E13 → work-r53k → E13 → work-r53k)は、新しく実行する。この 1 回の結果は、組の結果が出た後に「数えない回(直前の記録なし)」として別に書く。
+
+(c) 出力フォルダの番号は、道具が label ごとに既存の最大の番号 + 1 で付ける(`serve-once-r54-bundle.mjs` の `nextOut`)。このため、新しい回は次の名前になる見込み(道具の定義からの導出。実行の前に書いた): E13 は `r54-r54e13-chrome-2` と `r54-r54e13-chrome-3`、work-r53k は `r54-r54r53k-chrome-1` と `r54-r54r53k-chrome-2`。
