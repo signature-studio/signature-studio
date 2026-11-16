@@ -117,3 +117,9 @@ kind   shell_calls  opencode_auth  gh_secret  gh_api_write  force_push  sleep_by
 -----  -----------  -------------  ---------  ------------  ----------  ------------  --------------
 child  102234       12             6          3             0           182           0             
 main   8734         11             11         3             0           42            31            
+
+## 8. portal の道具の呼び出し(依頼者の名義の道具。portal_* と execute。状態は問わず数える。main は 0 のはず)
+kind   tool     calls
+-----  -------  -----
+main   execute  3    
+child  execute  42   

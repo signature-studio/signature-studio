@@ -3,7 +3,8 @@
 # --since (JST): count only the children created at or after that time, and only the main session's rows from that time on.
 # Read-only audit of one main session and its children, from opencode's database (opened with sqlite3 -readonly; never copied, never written).
 # What it shows: model switches, assistant rows per model (main vs children), the main session's own edit/write/shell calls,
-# gaps of 60 minutes or more without any row, rows whose model is not the pinned one, and a few risky command counts.
+# gaps of 60 minutes or more without any row, rows whose model is not the pinned one, a few risky command counts,
+# and the calls of the account-linked tools (portal_* and execute; section 8, every state counted).
 # The pins are read from opencode.jsonc (agents.build.model for the main session, agents.worker/reviewer.model for children);
 # a model set in the local override .opencode/opencode.jsonc (set-model-profile.sh bedrock writes it) wins over opencode.jsonc, entry by entry.
 # A pin has no #variant: only provider and model are compared, as the model-pin-gate plugin does.
@@ -171,3 +172,16 @@ q "with c as (
      sum(cmd like '%env sleep%' or cmd like '%=% sleep %' or cmd like '%bash -c%sleep%' or cmd like '%xargs sleep%') as sleep_bypass,
      sum(cmd like '%GH_CONFIG_DIR=%' or cmd like '%GIT_CONFIG_GLOBAL=%') as other_identity
    from c group by kind order by kind;"
+echo
+echo "## 8. portal の道具の呼び出し(依頼者の名義の道具。portal_* と execute。状態は問わず数える。main は 0 のはず)"
+q "with c as (
+     select case when s.parent_id is null then 'main' else 'child' end as kind,
+            json_extract(t.value,'\$.name') as tool
+     from session_message m join session_v2 s on s.id=m.session_id, json_each(m.data,'\$.content') t
+     where m.type='assistant' and $(scope)
+       and json_extract(t.value,'\$.type')='tool'
+       and (substr(json_extract(t.value,'\$.name'),1,7)='portal_' or json_extract(t.value,'\$.name')='execute'))
+   select kind, tool, count(*) as calls from c group by 1,2
+   union all select 'main', '(none)', 0 where not exists (select 1 from c where kind='main')
+   union all select 'child', '(none)', 0 where not exists (select 1 from c where kind='child')
+   order by 1 desc, 3 desc, 2;"

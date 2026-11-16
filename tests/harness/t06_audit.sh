@@ -97,6 +97,11 @@ asst("ses_BMAIN", T0 + 1000, BS)
 asst("ses_BMAIN", T0 + 2000, SON)                      # a gateway row in a session whose pin is the override
 asst("ses_BKID", T0 + 3000, {**BH, "variant": "low"})
 asst("ses_BKID", T0 + 4000, BH)
+db.execute("insert into session_v2 values ('ses_PTL',null,0,?)", (T0,))     # portal calls: names only, nothing is called
+db.execute("insert into session_v2 values ('ses_PTLKID','ses_PTL',0,?)", (T0,))
+asst("ses_PTL", T0, SON, [("portal_github_add_issue_comment", {"issue_number": 1, "body": "x"}), ("execute", {"code": "x"})])
+asst("ses_PTL", T0 + 1000, SON, [("portal_github_add_issue_comment", {"issue_number": 1, "body": "y"})])
+asst("ses_PTLKID", T0 + 1000, HAI, [("portal_github_search_code", {"query": "x"})])
 db.commit()
 PY
 before=$(md5sum "$db" | cut -d' ' -f1)
@@ -190,6 +195,15 @@ expect_contains "a date that does not exist is named as such" "$err" "存在し�
 err=$(HOME="$home" bash "$plain/scripts/audit-session.sh" ses_MAIN --since "2026-11-10" 2>&1 > /dev/null)
 expect_contains "a wrong format is named as such" "$err" "書式が不正"
 expect_eq "--since: the database file is still byte-identical after these runs (read-only)" "$before" "$(md5sum "$db" | cut -d' ' -f1)"
+
+# section 8: the account-linked tools (portal_* and execute), counted per main / child row
+p8() { sec_of "$1" '## 8.' | awk 'NF>=3 && $1!="kind" && $1!~/^-/ {print $1, $2, $3}'; }
+main_out=$(run ses_MAIN)
+expect_eq "portal, no calls: section 8 shows main 0 and child 0 (the section is printed)" "$(printf 'main (none) 0\nchild (none) 0')" "$(p8 "$main_out")"
+ptl_out=$(run ses_PTL); rc=$?
+expect_eq "portal: exit 0 on a session with portal calls" 0 "$rc"
+expect_eq "portal: calls are counted per tool and per row kind (main: add_issue_comment 2, execute 1; child: search 1)" "$(printf 'main portal_github_add_issue_comment 2\nmain execute 1\nchild portal_github_search_code 1')" "$(p8 "$ptl_out")"
+expect_eq "portal: the database file is still byte-identical (read-only)" "$before" "$(md5sum "$db" | cut -d' ' -f1)"
 
 # ---------------- (c) the local override .opencode/opencode.jsonc (fake Bedrock-like names, built here; no vendor word)
 BSN=console-aws-bedrock/global.fake.claude-sonnet-5-5; BHN=console-aws-bedrock/global.fake.claude-haiku-5-5
