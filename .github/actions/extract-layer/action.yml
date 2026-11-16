@@ -1,0 +1,90 @@
+# The extraction layer (decision 0386): the extracted tree of the FL Studio installer, from the R2 cache (extract-cache/<key>/ in the cache bucket) when the cache has it;
+# otherwise the installer is fetched from the artifact bucket, checked, extracted, and the tree is saved to the cache. The steps are ci/extract-cache.sh's subcommands.
+# The R2 keys are given to this action only, and each key only to the step that uses it (the env of that step). Nothing that runs after the action in the job gets them.
+name: extract-layer
+description: >-
+  The extracted tree of the installer (the engine DLLs and the seed files), restored from or saved to the R2 cache by the keys of its inputs. Same inputs, same key.
+inputs:
+  cloudflare-api-token:
+    description: API token that reads the account ID (the endpoint needs it; the value is masked)
+    required: true
+  artifact-access-key-id:
+    description: R2 S3 token, read only on the artifact bucket
+    required: true
+  artifact-secret-access-key:
+    description: the token's secret
+    required: true
+  cache-access-key-id:
+    description: R2 S3 token, read and write on the cache bucket
+    required: true
+  cache-secret-access-key:
+    description: the token's secret
+    required: true
+outputs:
+  hit:
+    description: "'true' when the tree was restored from the cache, 'false' when it was fetched and extracted"
+    value: ${{ steps.restore.outputs.hit }}
+  key:
+    description: the cache key (the SHA-256 of the inputs)
+    value: ${{ steps.key.outputs.key }}
+runs:
+  using: composite
+  steps:
+    - id: key
+      name: "抽出キャッシュの鍵(入力のハッシュ)"
+      shell: bash
+      run: bash ci/extract-cache.sh key
+
+    - id: account
+      name: "アカウント ID を実行時に 1 つ得て、すぐ伏せる(値は出さない)"
+      shell: bash
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        WORK: ${{ runner.temp }}/extract-layer
+      run: bash ci/extract-cache.sh account
+
+    - id: restore
+      name: "抽出キャッシュを復元する(鍵の入力は保存時の SHA-256 で確かめる。無ければ hit=false)"
+      shell: bash
+      env:
+        ID: ${{ steps.account.outputs.id }}
+        KEY: ${{ steps.key.outputs.key }}
+        HOST: ${{ runner.temp }}/host
+        WORK: ${{ runner.temp }}/extract-layer
+        AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cache-secret-access-key }}
+      run: bash ci/extract-cache.sh restore
+
+    - id: fetch
+      name: "インストーラを R2 から取り、ci/artifacts.lock と照合する(キャッシュが無いときだけ)"
+      if: success() && steps.restore.outputs.hit != 'true'
+      shell: bash
+      env:
+        ID: ${{ steps.account.outputs.id }}
+        HOST: ${{ runner.temp }}/host
+        WORK: ${{ runner.temp }}/extract-layer
+        AWS_ACCESS_KEY_ID: ${{ inputs.artifact-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.artifact-secret-access-key }}
+      run: bash ci/extract-cache.sh fetch
+
+    - id: extract
+      name: "インストーラから入力を抽出し、DLL と seed を確かめる(キャッシュが無いときだけ)"
+      if: success() && steps.restore.outputs.hit != 'true'
+      shell: bash
+      env:
+        HOST: ${{ runner.temp }}/host
+        WORK: ${{ runner.temp }}/extract-layer
+      run: bash ci/extract-cache.sh extract
+
+    - id: save
+      name: "抽出の結果を R2 のキャッシュに保存し、読み直して確かめる(キャッシュが無いときだけ)"
+      if: success() && steps.restore.outputs.hit != 'true'
+      shell: bash
+      env:
+        ID: ${{ steps.account.outputs.id }}
+        KEY: ${{ steps.key.outputs.key }}
+        HOST: ${{ runner.temp }}/host
+        WORK: ${{ runner.temp }}/extract-layer
+        AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cache-secret-access-key }}
+      run: bash ci/extract-cache.sh save

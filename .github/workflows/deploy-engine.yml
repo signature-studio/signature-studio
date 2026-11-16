@@ -1,6 +1,6 @@
 # エンジンの bundle を作り(9 段。決定 0381)、R2 fl-web-assets の新しい prefix に載せる。
 # root の manifest.json は、wasm の sha256 が ci/verified-bundles.tsv に在るときだけ差し替える(退避つき)。
-# 書き込みの Secrets(R2_CACHE_ASSETS_*)は、載せる段と root の段だけに渡す。ビルドの段には渡さない。
+# R2 の Secrets は、抽出の層(.github/actions/extract-layer。キャッシュの復元と保存。インストーラの取得は無いときだけ)と、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386)。
 # 値・アカウント ID・R2 のホスト名は出さない(公開リポジトリ。ログも公開)。
 name: deploy-engine
 
@@ -15,6 +15,8 @@ on:
       - "ci/versions.env"
       - "ci/setup-toolchain.sh"
       - "ci/lib/extract_fl.py"
+      - "ci/extract-cache.sh"
+      - ".github/actions/extract-layer/**"
       - "app/package.json"
       - "app/scripts/build-engine-bundle.sh"
       - "app/scripts/pack-assets.mjs"
@@ -86,49 +88,15 @@ jobs:
           rm -f "$W/accounts.json" "$W/cand.txt"
           echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
 
-      - id: installer
-        name: "インストーラを R2 から取り、ci/artifacts.lock と照合する"
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
-        run: |
-          set -u
-          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true
-          KEY=installers/flstudio_win64_26.1.7.5653.exe
-          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
-          mkdir -p "$RUNNER_TEMP/in"
-          if ! aws s3 cp "s3://fl-web-artifacts/$KEY" "$INST" --only-show-errors \
-            --endpoint-url "https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com" > "$RUNNER_TEMP/s3.txt" 2>&1; then
-            echo "インストーラの取得: 失敗(伏せた出力)"
-            sed -E -e "s/${CLOUDFLARE_ACCOUNT_ID}/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' "$RUNNER_TEMP/s3.txt" | tail -n 5
-            exit 1
-          fi
-          row=$(awk -F'\t' -v k="$KEY" '$1 == k' ci/artifacts.lock)
-          want_size=$(printf '%s\n' "$row" | cut -f2)
-          want_sha=$(printf '%s\n' "$row" | cut -f3)
-          got_size=$(stat -c %s "$INST")
-          got_sha=$(sha256sum "$INST" | cut -d' ' -f1)
-          if [ -z "$want_sha" ] || [ "$got_size" != "$want_size" ] || [ "$got_sha" != "$want_sha" ]; then
-            echo "照合: 不一致(大きさ $got_size B、期待 $want_size B)"
-            rm -f "$INST"
-            exit 1
-          fi
-          echo "照合: 一致(大きさ $got_size B、SHA-256 一致)"
-
-      - id: extract
-        name: "インストーラから入力を抽出し、DLL と seed を確かめる"
-        run: |
-          INST="$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
-          if python3 ci/lib/extract_fl.py "$INST" "$RUNNER_TEMP/host" \
-            --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv > "$RUNNER_TEMP/extract.txt" 2>&1; then
-            echo "抽出: 成功(rc=0)"
-          else
-            rc=$?
-            echo "抽出: 失敗(rc=$rc。末尾 40 行)"
-            tail -n 40 "$RUNNER_TEMP/extract.txt"
-            exit 1
-          fi
-          rm -f "$INST"
+      - id: layer
+        name: "抽出の層: R2 の抽出キャッシュを復元する。無ければ、インストーラを取り、抽出し、キャッシュに保存する(決定 0386)"
+        uses: ./.github/actions/extract-layer
+        with:
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          artifact-access-key-id: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          artifact-secret-access-key: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
 
       - name: "Python 3.14"
         uses: actions/setup-python@v5
@@ -480,8 +448,8 @@ jobs:
         env:
           R_KEY: ${{ steps.key.outcome }}
           R_ACCT: ${{ steps.acct.outcome }}
-          R_INST: ${{ steps.installer.outcome }}
-          R_EXTRACT: ${{ steps.extract.outcome }}
+          R_LAYER: ${{ steps.layer.outcome }}
+          LAYER_HIT: ${{ steps.layer.outputs.hit }}
           R_EMSDK: ${{ steps.emsdk.outcome }}
           R_RUST: ${{ steps.rust.outcome }}
           R_B2D: ${{ steps.b2d.outcome }}
@@ -504,8 +472,8 @@ jobs:
             echo "|---|---|"
             echo "| prefix(入力のハッシュ) | ${PREFIX:-未決定} |"
             echo "| アカウント ID を実行時に得た | $R_ACCT |"
-            echo "| インストーラの取得と照合 | $R_INST |"
-            echo "| 抽出 | $R_EXTRACT |"
+            echo "| 抽出の層(キャッシュの復元・取得・抽出・保存) | $R_LAYER |"
+            echo "| 抽出キャッシュから復元した(hit) | ${LAYER_HIT:-未取得} |"
             echo "| emsdk | $R_EMSDK |"
             echo "| rust | $R_RUST |"
             echo "| 上流 Blend2D | $R_B2D |"
