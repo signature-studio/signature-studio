@@ -41,6 +41,7 @@ gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusi
 
 ## 確認の記録
 (登録の後に追記: 日付・`gh run list --workflow agent.yml --limit 1` の結論の 1 行)
+- 2026-11-16: `gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusion'` の出力: `success`(run 43804191981、commit 1aff9bb。取り込みの段も success。値は出していない。詳細は evidence/R9-2.md の追記と evidence/R9-1.md)
 
 ## 起票
 - `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/5

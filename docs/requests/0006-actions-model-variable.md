@@ -42,6 +42,7 @@ gh run list --workflow agent.yml --limit 1 --json databaseId --jq '.[0].database
 
 ## 確認の記録
 (登録の後に追記: 日付・完了の確認コマンドの出力 1 行)
+- 2026-11-16: 完了の確認コマンドの出力: `success`(run 43804191981、commit 1aff9bb。「設定を確かめる」段も success。詳細は evidence/R9-1.md)。注: 同じ run のログに、Variable の値が 1 行出ている(GitHub は Variables を自動で伏せないため。evidence/R9-1.md の 4 節。修正の試行は効かず、戻した。判断は未決)
 
 ## 起票
 - `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/6
