@@ -7,7 +7,7 @@
 ## 決定
 決定: (B) 9 段を GitHub の標準ランナーで回す。根拠: (A) の手元の bundle(272,254,720 B)は git にも GitHub にも無く、Actions へ渡すには R2 への書き込みが要る。その書き込みは wrangler か S3 キーが要り、どちらも私は使わない(依頼になる)。(B) の入力は FL インストーラ 1 本(1,106,033,456 B)で、R2 の `fl-web-artifacts` から読める。
 
-手順(`.github/workflows/engine-bundle.yml`。R8-4 で書く):
+手順(.github/workflows/engine-bundle.yml(7157394 で削除済み)。R8-4 で書く):
 1. `on: push`(`branches: [main]`)のみ。`permissions: contents: read`。`workflow_dispatch`・入力・URL パラメータ・環境変数・`#ifdef`・ビルド変数は足さない。
 2. アカウント ID: Secrets `CLOUDFLARE_API_TOKEN` で `/accounts` を読み(`cloudflare-check.yml` の段 1 と同じ)、得た直後に `::add-mask::`。段 3 の R2 の endpoint に使う。Variable `CLOUDFLARE_ACCOUNT_ID` は読まない(値が公開ログに出る。0001 の注記)。
 3. 入力: Secrets `R2_ARTIFACT_ACCESS_KEY_ID` / `R2_ARTIFACT_SECRET_ACCESS_KEY` で `installers/flstudio_win64_26.1.7.5653.exe` を取り(S3 API。バケット `fl-web-artifacts`)、`ci/artifacts.lock` の大きさと SHA-256 を照合する。不一致なら止まる。
