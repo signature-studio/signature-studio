@@ -46,9 +46,10 @@ const PROG: &str = r##"
 #include "fle_class.h"
 
 /* ---- the stubs: the window table, the surfaces, the layered state ---- */
+#define STUB_N 4200                /* decision 0392: the lids and the list of a window table of up to 4096 top-level windows */
 typedef struct { uint32_t lid; int visible; int32_t x, y; uint32_t w, h; fle_rsurf s; fle_layered_info li; int layered; } win_t;
-static win_t W[80];
-static unsigned order[80];         /* lids, top first */
+static win_t W[STUB_N];
+static unsigned order[STUB_N];     /* lids, top first */
 static unsigned norder;
 
 unsigned fle_win_input_toplevels(uint64_t *h, unsigned max) { unsigned n = 0; for (; n < norder && n < max; n++) h[n] = 0x1000 + order[n]; return n; }
@@ -58,7 +59,7 @@ int fle_win_input_view(uint64_t hwnd, fle_win_iview *v) {
 }
 const fle_rsurf *fle_raster_surface_peek(uint32_t lid) { return W[lid].w ? &W[lid].s : NULL; }
 /* desk2: the class name and the title of a window, as fle_win_get and fle_class_name_of give them (the compositor prints them in fle_desk_describe) */
-static const char *CLS_OF[80], *TTL_OF[80];
+static const char *CLS_OF[STUB_N], *TTL_OF[STUB_N];
 int fle_win_get(uint64_t hwnd, fle_win_view *v) {
     win_t *w = &W[hwnd - 0x1000]; const char *s = TTL_OF[w->lid];
     memset(v, 0, sizeof *v); v->live = 1; v->atom = (uint16_t)(0x100 + w->lid);
@@ -325,19 +326,15 @@ fn compositor_draws_what_the_window_table_says_and_reports_what_changed() {
     let _ = std::fs::remove_file(&exe);
 }
 
-/// decision 0385 (R3-5): 64 top-level windows are drawn; a 65th stops the run by name (no window is cut without a sign); 65 distinct windows written before one description make the next description whole.
+/// decision 0385 (R3-5) and decision 0392: the windows drawn (visible, with a surface) are at most 64; the 65th stops the run by name, in the compositor and in the scene alike; hidden top-level windows are not drawn and do not count;
+/// a window list at its limit (4096) stops by name; 65 distinct windows written before one description make the next description whole.
 const LIMIT_MAIN: &str = r##"
-static void mkgrid(unsigned n) {
-    for (unsigned l = 1; l <= n; l++) {
-        mkwin(l, (int32_t)((l - 1) % 8) * 100, (int32_t)((l - 1) / 8) * 60, 20, 20, 0, 0, (uint8_t)l);
-        order[l - 1] = l;
-    }
-    norder = n;
-}
+static void mkvis(unsigned l) { mkwin(l, (int32_t)((l - 1) % 8) * 100, (int32_t)((l - 1) / 8) * 60, 20, 20, 0, 0, (uint8_t)l); }
+static void mkhid(unsigned l) { memset(&W[l], 0, sizeof W[l]); W[l].lid = l; W[l].visible = 0; }
 int main(int argc, char **argv) {
-    const fle_desk_state *st;
-    const fle_scene *sc;
-    unsigned n;
+    const fle_desk_state *st = NULL;
+    const fle_scene *sc = NULL;
+    unsigned vis, hid, n, l;
 
     if (argc < 2) return 2;
     if (!strcmp(argv[1], "overflow")) {
@@ -355,17 +352,26 @@ int main(int argc, char **argv) {
         printf("limit: overflow, %d checks, %d failed\n", checks, failed);
         return failed ? 1 : 0;
     }
-    n = (unsigned)atoi(argv[1]);
-    mkgrid(n);
-    st = fle_desk_compose();
-    if (n == 64) {
-        CHECK(st->n_windows == 64, "64 top-level windows: %u drawn", st->n_windows);
-        CHECK(px_is(st, 701, 421, 64, 0, 0) && px_is(st, 1, 1, 1, 0, 0), "the bottom window (lid 64) and the top one are drawn");
-        printf("limit: 64 windows drawn, %d checks, %d failed\n", checks, failed);
-        return failed ? 1 : 0;
+    if (argc < 4) return 2;
+    vis = (unsigned)atoi(argv[2]);
+    hid = (unsigned)atoi(argv[3]);
+    n = vis + hid;
+    if (!strcmp(argv[1], "scene")) fle_desk_scene_mode(1);
+    for (l = 1; l <= vis; l++) mkvis(l);
+    for (l = vis + 1; l <= n; l++) mkhid(l);
+    for (l = 0; l < n; l++) order[l] = n - l;           /* top first: the hidden windows (the higher lids) are on top; lid 1 is the bottom */
+    norder = n;
+    if (!strcmp(argv[1], "scene")) {
+        sc = fle_desk_scene();
+        CHECK(sc->n_windows == vis, "%u windows in the scene (%u visible, %u hidden)", sc->n_windows, vis, hid);
+        if (vis) CHECK(sc->win[0].lid == 1 && sc->win[vis - 1].lid == vis, "the scene lists the drawn windows bottom first (lid 1 first, lid %u last)", vis);
+    } else {
+        st = fle_desk_compose();
+        CHECK(st->n_windows == vis, "%u windows drawn (%u visible, %u hidden)", st->n_windows, vis, hid);
+        if (vis) CHECK(px_is(st, 1, 1, 1, 0, 0) && px_is(st, (int)((vis - 1) % 8) * 100 + 1, (int)((vis - 1) / 8) * 60 + 1, (int)vis, 0, 0), "lid 1 (the bottom) and lid %u (the top) are drawn", vis);
     }
-    printf("limit: %u windows: no stop\n", n);
-    return 0;
+    printf("limit: %s, %u visible, %u hidden: %u drawn, %d checks, %d failed\n", argv[1], vis, hid, sc ? sc->n_windows : st->n_windows, checks, failed);
+    return failed ? 1 : 0;
 }
 "##;
 
@@ -390,16 +396,26 @@ fn the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write(
         .output()
         .expect("clang not found");
     assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
-    let run = |arg: &str| Command::new(&exe).arg(arg).output().expect("run");
+    let run = |args: &[&str]| Command::new(&exe).args(args).output().expect("run");
+    let stdout = |r: &std::process::Output| String::from_utf8_lossy(&r.stdout).to_string();
+    let stderr = |r: &std::process::Output| String::from_utf8_lossy(&r.stderr).to_string();
 
-    let r64 = run("64");
-    let out64 = String::from_utf8_lossy(&r64.stdout).to_string();
-    assert!(r64.status.success() && out64.contains("limit: 64 windows drawn, ") && out64.contains(", 0 failed"), "64 windows:\n{out64}");
-    let r65 = run("65");
-    let err65 = String::from_utf8_lossy(&r65.stderr).to_string();
-    assert!(!r65.status.success() && err65.contains("fle: fle_desk_gather: more than 64 top-level windows"), "65 windows must stop by name: {err65}");
-    let rov = run("overflow");
-    let outov = String::from_utf8_lossy(&rov.stdout).to_string();
+    for mode in ["compose", "scene"] {
+        let r = run(&[mode, "64", "0"]);
+        assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 64 windows drawn:\n{}", stdout(&r));
+        let r = run(&[mode, "64", "10"]);
+        assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 64 drawn and 10 hidden windows on top must not stop:\n{}", stdout(&r));
+        let r = run(&[mode, "10", "70"]);
+        assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 10 drawn and 70 hidden windows must not stop:\n{}", stdout(&r));
+        let r = run(&[mode, "65", "0"]);
+        assert!(!r.status.success() && stderr(&r).contains("fle: fle_desk_gather: more than 64 windows are drawn"), "{mode}: a 65th window to be drawn must stop by name: {}", stderr(&r));
+        let r = run(&[mode, "0", "4095"]);
+        assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 4095 hidden windows (below the list limit) must not stop:\n{}", stdout(&r));
+        let r = run(&[mode, "0", "4096"]);
+        assert!(!r.status.success() && stderr(&r).contains("fle: fle_desk_gather: the top-level windows reach the limit of the window list"), "{mode}: a window list at its limit must stop by name: {}", stderr(&r));
+    }
+    let rov = run(&["overflow"]);
+    let outov = stdout(&rov);
     assert!(rov.status.success() && outov.contains(", 0 failed"), "overflow:\n{outov}");
     let _ = std::fs::remove_file(&src);
     let _ = std::fs::remove_file(&exe);

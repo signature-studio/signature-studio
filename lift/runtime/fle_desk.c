@@ -320,24 +320,26 @@ static void names_of(uint64_t hwnd, char *cls, size_t cls_cap, char *title, size
     if (fle_class_name_of(wv.atom, nm, &nl)) ascii_of(cls, cls_cap, nm, nl);
 }
 
+/* decision 0392: the window list of fle_win_input_toplevels holds at most this many top-level windows (fle_win.c SIB_MAX, 4096, its one limit); a list of this length may have been cut, so it stops by name */
+#define DESK_LIST_MAX 4096u
+
 static void gather(void)
 {
-    uint64_t hs[FLE_DESK_MAX_WINDOWS + 1];
-    unsigned n = fle_win_input_toplevels(hs, FLE_DESK_MAX_WINDOWS + 1);
+    static uint64_t hs[DESK_LIST_MAX];
+    unsigned n = fle_win_input_toplevels(hs, DESK_LIST_MAX);
 
-    /* decision 0385: fle_win_input_toplevels cuts its list at max, so a window past FLE_DESK_MAX_WINDOWS would be left out of the picture and of the scene without a sign: the run stops by name */
-    if (n > FLE_DESK_MAX_WINDOWS) fle_stop("fle_desk_gather", "more than 64 top-level windows are live (FLE_DESK_MAX_WINDOWS): the compositor and the scene hold 64 (decision 0385)");
+    /* decision 0392: every live top-level window is read, hidden ones too (they are not drawn and do not count); the 65th window to be drawn stops the run below, before it is stored */
+    if (n >= DESK_LIST_MAX) fle_stop("fle_desk_gather", "the top-level windows reach the limit of the window list (4096): a window past it would be left out (decision 0392)");
     ncur = 0;
     for (unsigned k = n; k-- > 0;) {    /* the list is top first: the picture is drawn from the bottom */
         fle_win_iview v;
         fle_layered_info li;
         const fle_rsurf *s;
-        dwin *w;
+        dwin nw, *w = &nw;              /* built here; stored in cur[] only when the window is drawn */
 
         if (!fle_win_input_view(hs[k], &v) || !v.visible) continue;
         s = fle_raster_surface_peek(v.lid);
         if (!s || !s->bits || s->bpp != 32 || s->width == 0 || s->height == 0) continue;
-        w = &cur[ncur];
         memset(w, 0, sizeof *w);
         w->lid = v.lid;
         w->hwnd = hs[k];
@@ -389,7 +391,8 @@ static void gather(void)
                 w->cb = (int32_t)imax(w->ct, imin(b, (int64_t)w->h));
             }
         }
-        ncur++;
+        if (ncur == FLE_DESK_MAX_WINDOWS) fle_stop("fle_desk_gather", "more than 64 windows are drawn (FLE_DESK_MAX_WINDOWS): the compositor and the scene hold 64 (decision 0392)");
+        cur[ncur++] = nw;
     }
 }
 
