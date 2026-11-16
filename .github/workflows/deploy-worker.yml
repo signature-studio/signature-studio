@@ -1,0 +1,363 @@
+# Worker fl-studio-web を本番に出す(決定 0379)。app/ か、このファイルが main に入ったときに動く。
+# 版の bindings と vars は、いま 100% の版から実行時に読む。書き込み(versions upload)より前に検査を全部終える。
+# 新しい版は versions upload で作り、versions deploy で 100% にする(トリガー = カスタムドメインには触れない: 決定 0217)。
+# 確かめで外れていれば、直前の版へ戻して失敗にする。バケット名・アクセス設定・アカウント ID はログに出さない。
+name: deploy-worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/deploy-worker.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+env:
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: "リポジトリを取得する"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: "Node 24 を用意する"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: "依存関係を入れる"
+        run: npm ci --prefix app --ignore-scripts --no-audit --no-fund
+
+      - id: build
+        name: "build(型検査と vite build。dist が出来たことを確かめる)"
+        run: |
+          npm run build --prefix app
+          test -s app/dist/index.html
+
+      - id: unit
+        name: "test(vitest)"
+        run: npm test --prefix app
+
+      - id: worker
+        name: "test:worker(wrangler dev --local。Cloudflare には触れない)"
+        run: npm run test:worker --prefix app
+
+      - id: read
+        name: "今 100% の版を読む(書き込まない。値は読んだ直後に伏せる)"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -eu
+          W="$RUNNER_TEMP/deploy-worker"
+          mkdir -p "$W"
+          cat > "$W/cf.py" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+
+          API = "https://api.cloudflare.com/client/v4"
+          SCRIPT = "fl-studio-web"
+          UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+          PLAIN = ("ACCESS_TEAM_DOMAIN", "ACCESS_AUD")
+          R2 = ("ASSETS_BUCKET", "PERF_BUCKET")
+          ENV_NAME = {"ACCESS_TEAM_DOMAIN": "ACCESS_TEAM_DOMAIN", "ACCESS_AUD": "ACCESS_AUD",
+                      "ASSETS_BUCKET": "ASSETS_BUCKET_NAME", "PERF_BUCKET": "PERF_BUCKET_NAME"}
+
+
+          def utc():
+              return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+          def fail(msg):
+              print("失敗: " + msg, file=sys.stderr, flush=True)
+              sys.exit(1)
+
+
+          def mask(value):
+              print("::add-mask::" + value, flush=True)
+
+
+          def out_file(var, name, value):
+              if "\n" in value:
+                  fail("値に改行がある(書かない)")
+              with open(os.environ[var], "a", encoding="utf-8") as f:
+                  f.write(f"{name}={value}\n")
+
+
+          def get(path):
+              req = urllib.request.Request(API + path, headers={
+                  "Authorization": "Bearer " + os.environ["CLOUDFLARE_API_TOKEN"],
+                  "Accept": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=60) as r:
+                      status, body = r.status, r.read()
+              except urllib.error.HTTPError as e:
+                  status, body = e.code, e.read()
+              try:
+                  d = json.loads(body)
+              except ValueError:
+                  d = {}
+              return status, (d if isinstance(d, dict) else {})
+
+
+          def result(status, d, what):
+              if status != 200 or d.get("success") is not True:
+                  codes = sorted({str(e.get("code")) for e in (d.get("errors") or []) if isinstance(e, dict)})
+                  fail(f"{what}: HTTP {status}、エラーの番号 {', '.join(codes) or '無し'}")
+              return d.get("result")
+
+
+          def base(acct):
+              return f"/accounts/{acct}/workers/scripts/{SCRIPT}"
+
+
+          def domains(acct):
+              st, d = get(f"/accounts/{acct}/workers/domains?service={SCRIPT}&per_page=100")
+              doms = result(st, d, "カスタムドメイン一覧") or []
+              if ((d.get("result_info") or {}).get("total_pages") or 1) > 1:
+                  fail("カスタムドメインが 1 ページに収まらない")
+              return len([x for x in doms if isinstance(x, dict) and x.get("service") == SCRIPT])
+
+
+          def latest(acct):
+              st, d = get(base(acct) + "/deployments")
+              deps = (result(st, d, "deployments") or {}).get("deployments") or []
+              if not deps or not isinstance(deps[0], dict):
+                  fail("deployments が空")
+              return deps[0]
+
+
+          def cmd_read():
+              st, d = get("/accounts")
+              accounts = result(st, d, "アカウント一覧") or []
+              ids = [a.get("id") for a in accounts if isinstance(a, dict)]
+              if len(ids) != 1 or not re.fullmatch(r"[0-9a-f]{32}", str(ids[0])):
+                  fail(f"アカウントが {len(ids)} 件。1 件のときだけ進める")
+              acct = ids[0]
+              mask(acct)
+              out_file("GITHUB_ENV", "CLOUDFLARE_ACCOUNT_ID", acct)
+
+              top = latest(acct)
+              vers = top.get("versions") or []
+              if len(vers) != 1 or vers[0].get("percentage") != 100 or not re.fullmatch(UUID, str(vers[0].get("version_id"))):
+                  fail(f"最新の deployment の版は {len(vers)} 件。100% の版 1 件のときだけ進める")
+              old = vers[0]["version_id"]
+              print(f"現在 100% の版: {old}(作成 UTC {top.get('created_on')})", flush=True)
+
+              st, d = get(base(acct) + f"/versions/{old}")
+              res = result(st, d, "版の詳細") or {}
+              holder = res.get("resources") if isinstance(res.get("resources"), dict) else {}
+              print("版の応答のキー名: " + ", ".join(sorted(res.keys()))
+                    + "; resources: " + ", ".join(sorted(holder.keys())), flush=True)
+              if "bindings" in holder:
+                  b = holder["bindings"]
+              elif "bindings" in res:
+                  b = res["bindings"]
+              else:
+                  fail("版の応答に bindings が無い(上にキー名を出した)")
+              if isinstance(b, dict) and "type" in b and "name" in b:
+                  b = [b]
+              if isinstance(b, list):
+                  items = [(x.get("name"), x) for x in b if isinstance(x, dict)]
+              elif isinstance(b, dict):
+                  items = [(k, v if isinstance(v, dict) else {}) for k, v in b.items()]
+              else:
+                  fail("bindings の形が配列でも辞書でもない")
+
+              found, extra = {}, []
+              for name, x in items:
+                  t = x.get("type")
+                  if name in PLAIN and t == "plain_text":
+                      found[name] = x.get("text")
+                  elif name in R2 and t == "r2_bucket":
+                      found[name] = x.get("bucket_name")
+                  elif name == "ASSETS" and t == "assets":
+                      continue
+                  else:
+                      extra.append(f"{t}:{name}")
+              if extra:
+                  fail("この workflow が作らない binding が現在の版にある(型:名前): " + ", ".join(str(e) for e in extra))
+              missing = [n for n in PLAIN + R2 if not isinstance(found.get(n), str) or not found.get(n).strip()]
+              if missing:
+                  fail("値が読めない binding: " + ", ".join(missing))
+              for name in PLAIN + R2:
+                  mask(found[name])
+                  out_file("GITHUB_ENV", ENV_NAME[name], found[name])
+              print("読んだ binding(値は伏せた): 変数 " + ", ".join(PLAIN) + "、R2 " + ", ".join(R2), flush=True)
+
+              n = domains(acct)
+              if n < 1:
+                  fail("fl-studio-web に付いたカスタムドメインが 0 件。公開の入口が無いので進めない")
+              print(f"fl-studio-web のカスタムドメイン: {n} 件(名前は出さない)", flush=True)
+              out_file("GITHUB_OUTPUT", "old_version", old)
+              out_file("GITHUB_OUTPUT", "domains_before", str(n))
+              print(f"読み取りの完了(UTC {utc()})。ここまでに Cloudflare へ書いていない", flush=True)
+
+
+          def cmd_check(expected, before):
+              acct = os.environ["CLOUDFLARE_ACCOUNT_ID"]
+              top = latest(acct)
+              vers = top.get("versions") or []
+              if len(vers) != 1 or vers[0].get("percentage") != 100 or vers[0].get("version_id") != expected:
+                  print(f"確かめ: 最新の deployment は版 {len(vers)} 件。期待の版 {expected} が 100% ではない", flush=True)
+                  return 1
+              n = domains(acct)
+              if str(n) != str(before):
+                  print(f"確かめ: カスタムドメインが {before} 件から {n} 件に変わった", flush=True)
+                  return 1
+              print(f"確かめ: 最新の deployment(UTC {top.get('created_on')})は版 {expected} が 100%、"
+                    f"カスタムドメイン {n} 件(前と同じ)", flush=True)
+              return 0
+
+
+          def main(argv):
+              if argv[1:2] == ["read"]:
+                  cmd_read()
+                  return 0
+              if argv[1:2] == ["check"] and len(argv) == 4:
+                  return cmd_check(argv[2], argv[3])
+              print("usage: cf.py read | cf.py check VERSION DOMAINS", file=sys.stderr)
+              return 64
+
+
+          if __name__ == "__main__":
+              sys.exit(main(sys.argv))
+          PY
+          python3 "$W/cf.py" read
+
+      - id: gen
+        name: "配信設定を作る(app/wrangler.deploy.json。値は出さない)"
+        run: |
+          set -eu
+          W="$RUNNER_TEMP/deploy-worker"
+          python3 ci/lib/wrangler_config.py app/wrangler.jsonc app/wrangler.deploy.json > "$W/gen.out" 2> "$W/gen.err" || { echo "配信設定を作れなかった(理由は下の行)"; cat "$W/gen.err"; exit 1; }
+          python3 - app/wrangler.deploy.json <<'PY'
+          import json
+          import sys
+
+          c = json.load(open(sys.argv[1], encoding="utf-8"))
+          buckets = c.get("r2_buckets") or []
+          bs = sorted(b.get("binding") for b in buckets)
+          vars_ = c.get("vars") or {}
+          vs = sorted(vars_.keys())
+          ok = (c.get("name") == "fl-studio-web" and c.get("workers_dev") is False
+                and c.get("preview_urls") is False and not c.get("routes") and not c.get("route")
+                and bs == ["ASSETS_BUCKET", "PERF_BUCKET"] and vs == ["ACCESS_AUD", "ACCESS_TEAM_DOMAIN"]
+                and all(isinstance(v, str) and v for v in vars_.values())
+                and all(b.get("bucket_name") for b in buckets))
+          print(f"配信設定の検査: name {c.get('name')}、workers_dev と preview_urls は false、route は無し、"
+                f"R2 {bs}、vars {vs}、判定 {ok}")
+          sys.exit(0 if ok else 1)
+          PY
+
+      - id: upload
+        name: "新しい版を作る(versions upload。まだ 100% にはしない)"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -u
+          W="$RUNNER_TEMP/deploy-worker"
+          cat > "$W/ndjson.py" <<'PY'
+          import json
+          import sys
+
+          v = ""
+          for line in open(sys.argv[1], encoding="utf-8"):
+              try:
+                  r = json.loads(line)
+              except ValueError:
+                  continue
+              if isinstance(r, dict) and r.get("type") == "version-upload":
+                  v = r.get("version_id") or ""
+          print(v)
+          PY
+          rm -f "$W/upload.ndjson"
+          rc=0
+          (cd app && WRANGLER_OUTPUT_FILE_PATH="$W/upload.ndjson" npx wrangler versions upload --config wrangler.deploy.json --message "ci ${GITHUB_SHA:0:12}") > "$W/upload.log" 2>&1 || rc=$?
+          grep -E '^(Uploaded|Total Upload|Worker Version ID|Version ID)|\[ERROR\]' "$W/upload.log" | cut -c1-200 || true
+          if [ "$rc" != 0 ]; then
+            echo "versions upload が失敗(終了 $rc)。100% の版は変わっていない"
+            exit 1
+          fi
+          VID=$(python3 "$W/ndjson.py" "$W/upload.ndjson")
+          if ! echo "$VID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
+            echo "upload の出力から版の ID を得られない(100% の版は変わっていない)"
+            exit 1
+          fi
+          echo "new_version=$VID" >> "$GITHUB_OUTPUT"
+          echo "新しい版 $VID を作った(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))。まだ 100% ではない"
+
+      - id: deploy
+        name: "新しい版を 100% にする(versions deploy)。確かめ、外れていれば直前の版へ戻す"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          NEW_VERSION: ${{ steps.upload.outputs.new_version }}
+          OLD_VERSION: ${{ steps.read.outputs.old_version }}
+          DOMAINS_BEFORE: ${{ steps.read.outputs.domains_before }}
+        run: |
+          set -u
+          W="$RUNNER_TEMP/deploy-worker"
+          echo "切り替え: 直前の版 $OLD_VERSION → 新しい版 $NEW_VERSION(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          rc=0
+          (cd app && npx wrangler versions deploy "${NEW_VERSION}@100%" --config wrangler.deploy.json --message "ci ${GITHUB_SHA:0:12}" --yes) > "$W/deploy.log" 2>&1 || rc=$?
+          grep -E '^(Deployed|Current Version ID|Version ID|Worker Version ID)|\[ERROR\]' "$W/deploy.log" | cut -c1-200 || true
+          echo "versions deploy の終了: $rc(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          if [ "$rc" = 0 ] && python3 "$W/cf.py" check "$NEW_VERSION" "$DOMAINS_BEFORE"; then
+            echo "結果: 新しい版 $NEW_VERSION が 100%。確かめた"
+            exit 0
+          fi
+          echo "新しい版が 100% になっていないので、直前の版 $OLD_VERSION へ戻す"
+          rb=0
+          (cd app && npx wrangler versions deploy "${OLD_VERSION}@100%" --config wrangler.deploy.json --message "ci rollback ${GITHUB_SHA:0:12}" --yes) > "$W/rollback.log" 2>&1 || rb=$?
+          grep -E '^(Deployed|Current Version ID|Version ID|Worker Version ID)|\[ERROR\]' "$W/rollback.log" | cut -c1-200 || true
+          if [ "$rb" = 0 ] && python3 "$W/cf.py" check "$OLD_VERSION" "$DOMAINS_BEFORE"; then
+            echo "結果: 失敗。直前の版 $OLD_VERSION に戻し、確かめた(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          else
+            echo "結果: 失敗。戻したことを確かめられなかった(戻しの終了 $rb)。手作業が要る"
+          fi
+          exit 1
+
+      - name: "結果の表(失敗しても出す)"
+        if: always()
+        env:
+          R_BUILD: ${{ steps.build.outcome }}
+          R_UNIT: ${{ steps.unit.outcome }}
+          R_WORKER: ${{ steps.worker.outcome }}
+          R_READ: ${{ steps.read.outcome }}
+          R_GEN: ${{ steps.gen.outcome }}
+          R_UPLOAD: ${{ steps.upload.outcome }}
+          R_DEPLOY: ${{ steps.deploy.outcome }}
+          OLD_VERSION: ${{ steps.read.outputs.old_version }}
+          NEW_VERSION: ${{ steps.upload.outputs.new_version }}
+        run: |
+          {
+            echo "| 段 | 結果 |"
+            echo "|---|---|"
+            echo "| build | $R_BUILD |"
+            echo "| test(vitest) | $R_UNIT |"
+            echo "| test:worker | $R_WORKER |"
+            echo "| 現在の版を読んだ(書かない) | $R_READ |"
+            echo "| 配信設定を作った | $R_GEN |"
+            echo "| versions upload | $R_UPLOAD |"
+            echo "| versions deploy と確かめ | $R_DEPLOY |"
+            echo "| 直前の版(100% だった版) | ${OLD_VERSION:-未取得} |"
+            echo "| 新しい版 | ${NEW_VERSION:-未作成} |"
+            echo "| 時刻(UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
