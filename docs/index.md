@@ -21,6 +21,7 @@
 | `ops/fidelity-and-performance.md` | lift の忠実性・性能・オプションの規則 |
 | `ops/reporting.md` | 依頼者への報告の形式 |
 | `ops/roles-and-loop.md` | 役割(main・worker・reviewer)と作業の回し方 |
+| `failures/` | 失態の記録(1 件 1 ファイル。依頼者の発言 ID・事実・原因・是正・再発防止・同じ型の探索)。一覧は `failures/README.md`、雛形は `failures/TEMPLATE.md` |
 | `requests/` | Issue(`NNNN-<slug>.md`)と雛形 `TEMPLATE.md`。依頼の一覧と状態 |
 | `core/` | 技術文書 7 ページ(各 100 行以内。旧資料の要点。区分つき) |
 | `decisions/` | 新しい決定(0346〜。1 本 1 ページ)。書き方は `decisions/README.md` |
