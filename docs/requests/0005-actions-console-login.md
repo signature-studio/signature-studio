@@ -15,8 +15,8 @@
 Actions のランナーには、依頼者の opencode のログインが無い。依頼者の console に登録した BYOK を Actions から使うには、依頼者の opencode のログイン情報を、依頼者が GitHub の Secret に登録する必要がある。エージェントは、このログイン情報を読まず、Secret を登録もできない(依頼者の権限)。登録が無いと、`ci/tasks/*.md` を push して動く作業用エージェントは 1 回も動かない。
 
 ## 影響範囲
-- 変わる物: Secret が 1 件増える(`OPENCODE_AUTH_JSON`)。ワークフローは、この Secret を、run ジョブの 1 つの手順(`opencode auth import` に標準入力で渡す)でだけ読む。
-- 変わらない物: Cloudflare の Secrets、他の Secrets・Variables、他のワークフローには渡さない。
+- 変わる物: Secret が 1 件増える(`OPENCODE_AUTH_JSON`)。自動処理は、この Secret を、実行の中の 1 つの手順(`opencode auth import` に標準入力で渡す)でだけ読む。
+- 変わらない物: Cloudflare の Secrets、他の Secrets・Variables、他の自動処理には渡さない。
 - 料金: `ci/tasks/*.md` を push するたびに、依頼者の console の BYOK の呼び出しの料金が発生する。1 push の上限は 60 件、1 件の上限は 350 分。
 - 取り消し方: GitHub の Secret `OPENCODE_AUTH_JSON` を削除する。必要なら、opencode の console で、このログイン情報を無効にする。
 
@@ -35,13 +35,13 @@ gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusi
 ```
 
 ## 依頼なしで続ける作業
-- 登録が無い間は、`ci/tasks/*.md` を置かない(run を動かさない)。
-- ワークフローの組み立ての検査(`ci/agents/check-agents.sh` など)を、登録が無くても続けて確かめる。
-- Workers の配信(`deploy-engine` のワークフロー)の作業を続ける。
+- 登録が無い間は、`ci/tasks/*.md` を置かない(実行を始めない)。
+- 自動処理の組み立ての検査(`ci/agents/check-agents.sh` など)を、登録が無くても続けて確かめる。
+- Workers の配信(`deploy-engine` の自動処理)の作業を続ける。
 
 ## 確認の記録
 (登録の後に追記: 日付・`gh run list --workflow agent.yml --limit 1` の結論の 1 行)
-- 2026-11-16: `gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusion'` の出力: `success`(run 43804191981、commit 1aff9bb。取り込みの段も success。値は出していない。詳細は evidence/R9-2.md の追記と evidence/R9-1.md)
+- 2026-11-16: `gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusion'` の出力: `success`(実行 43804191981、コミット 1aff9bb。取り込みの手順も success。値は出していない。詳細は evidence/R9-2.md の追記と evidence/R9-1.md)
 
 ## 起票
 - `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/5

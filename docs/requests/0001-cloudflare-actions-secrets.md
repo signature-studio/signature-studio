@@ -1,8 +1,8 @@
 # Issue 0001: GitHub Actions 用の Cloudflare 資格情報の登録(Worker とバケット限定)
 
-状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用ワークフロー `cloudflare-check.yml` は 2026-11-12 に存在した(7157394 で削除済み)。実行結果は `evidence/R8-2.md` に置いてある)
+状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用の自動処理 `cloudflare-check.yml` は 2026-11-12 に存在した(7157394 で削除済み)。実行結果は `evidence/R8-2.md` に置いてある)
 
-現状: 登録された Variable `CLOUDFLARE_ACCOUNT_ID` は、ワークフローが使っていない(Variable の値は公開ログに出るため。アカウント ID は実行時に API トークンから得る。`e33f3bc`)。
+現状: 登録された Variable `CLOUDFLARE_ACCOUNT_ID` は、自動処理が使っていない(Variable の値は公開ログに出るため。アカウント ID は実行時に API トークンから得る。`e33f3bc`)。
 
 依頼 ID・日付: 0001 / 2026-11-10
 
@@ -32,9 +32,9 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 ## 影響
 
 - 変わる物: GitHub の Secrets が 5 つ、Variables が 1 つ増える。Cloudflare 側に、API トークン 1 つと R2 のアクセスキー 2 組(合計 3 つ)が増える。
-- 変わらない物: 他のバケット、他の Worker、ドメインの設定などの Cloudflare の他の設定。最初に動かすワークフローは読み取りだけで、Cloudflare の中身を書き換えるのは後から作るワークフローです。その変更は、GitHub の履歴と実行ログに残ります。
+- 変わらない物: 他のバケット、他の Worker、ドメインの設定などの Cloudflare の他の設定。最初に動かす自動処理は読み取りだけで、Cloudflare の中身を書き換えるのは後から作る自動処理です。その変更は、GitHub の履歴と実行ログに残ります。
 - 取り消し方: Cloudflare の画面で、作ったトークンとアクセスキーを削除(失効)する。GitHub の画面で、Secrets 5 つと Variable 1 つを削除する。
-- GitHub Actions の実行ログで、Variable の値は伏せられず、ワークフローが使うとログに出ます。2026-11-12 の初回と 2 回目の実行で、アカウント ID が出ました(`evidence/R8-2.md`)。実行の時刻は、削除済みのため確かめられません。ワークフローのコミットは 2026-11-12 04:46〜05:00 JST(出典: `git log --format='%h %ci' -- .github/workflows/cloudflare-check.yml`)。そのため、ワークフローは Variable を使いません。Secrets の値がログでどう表示されるかは、この記録では実測していません([未確認])。ワークフローは Secrets の値を表示しません。
+- GitHub Actions の実行ログで、Variable の値は伏せられず、自動処理が使うとログに出ます。2026-11-12 の初回と 2 回目の実行で、アカウント ID が出ました(`evidence/R8-2.md`)。実行の時刻は、削除済みのため確かめられません。自動処理のコミットは 2026-11-12 04:46〜05:00 JST(出典: `git log --format='%h %ci' -- .github/workflows/cloudflare-check.yml`)。そのため、自動処理は Variable を使いません。Secrets の値がログでどう表示されるかは、この記録では実測していません([未確認])。自動処理は Secrets の値を表示しません。
 
 ## 登録しなくても進む作業
 
@@ -70,7 +70,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 確認は次の 2 つで行う。
 
 - 依頼者の連絡(Issue を閉じること)。2026-11-12 に閉じた。
-- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`。実行の結果は `evidence/R8-2.md` に置いてある(このワークフローは 7157394 で削除済み。記録は削除前の実行のもの)。
+- 確認用の自動処理の実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`。実行の結果は `evidence/R8-2.md` に置いてある(この自動処理は 7157394 で削除済み。記録は削除前の実行のもの)。
 
 エージェントは Secrets と Variables の中身も一覧も確認しない(禁止。`opencode.jsonc` の deny、`prompts/worker-rules.md`)。
 
@@ -81,6 +81,6 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 ### 確認の記録
 
 2026-11-10: Issue を作成(Issue 1)。
-2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 を閉じた(`gh issue view 1 --json state,closedAt` が `CLOSED`、closedAt 2026-11-11T19:40:43Z)。確認用ワークフローの最新実行は `success`(実行 ID 43092725843、commit `b3a70b5`)。
+2026-11-12: 依頼者が登録を終えたと連絡。Issue 1 を閉じた(`gh issue view 1 --json state,closedAt` が `CLOSED`、closedAt 2026-11-11T19:40:43Z)。確認用の自動処理の最新実行は `success`(実行 ID 43092725843、コミット `b3a70b5`)。
 
 GitHub の issue: https://github.com/signature-studio/signature-studio/issues/1(2026-11-13 確認)
