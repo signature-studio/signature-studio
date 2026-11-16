@@ -21,9 +21,14 @@
 - 時間は減らない(9 秒の復元 対 9〜12 秒の取得と抽出)。減るのは取得の通信 1.1 GB(同 76 行)。
 - runs-on/cache の README の記述: S3 の経路は RunsOn のランナー向けと書かれている。GitHub のホストランナーで使えることは、この決定の run で確かめる(未確認は下)。
 
+## 実測(run 43845385363、commit dd4d1ab、success。ログの行の時刻から)
+- 抽出物(extract ジョブ): キャッシュ未ヒット(`Cache not found`、10:03:58.9)→ 取得と抽出 → 保存の開始(`Cache Size: ~32 MB (33367052 B)`、10:04:07.3)。保存の完了(`Cache saved successfully`、10:04:10.3)。保存は約 3 秒。
+- worker ジョブ(同じ run。extract の後に起動): 復元(`Cache restored successfully`、10:04:21.4 → 10:04:23.7)。約 2.3 秒。`The cache action detected a local S3 bucket cache` が出た(R2 の経路)。
+- 同じ run の後段: `Cache hit occurred on the primary key ..., not saving cache.`(worker の保存は無し)。
+- 2 回目の run での復元(extract ジョブの hit)は、この run の worker の復元で代えた(同じ R2 のキー)。
+
 ## 未確認
-- GitHub のホストランナーで、RUNS_ON_S3_BUCKET_ENDPOINT の R2 に保存・復元できること(この決定の commit の run で確かめる)。
-- 1 回目の run の保存と、2 回目の run の復元(hit の語と秒)。
+- 2 回目の run の専用の確認(extract ジョブの hit と、その秒数)。
 - runs-on/cache@v5 の版(ブランチ v5 を使う。main の値のまま)。
 
 ## 出典
