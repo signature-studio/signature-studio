@@ -47,7 +47,7 @@
 | brotli CLI | 無い | [実測] 2026-11-12 | `command -v brotli` |
 | その他 | jq 1.8.1、shellcheck 0.11.0、sqlite3 3.46.1、7z(版は確認未)、python3 3.14.8、pnpm 12.9.1、gh 2.103.0、opencode v2.2.6、docker 29.9.2 | [実測] 2026-11-12 | `--version` |
 | sudo | `sudo -n true` が rc=0 | [実測] 2026-11-12 | `sudo -n true` |
-| `systemctl --user` | 可。`loginctl show-user` が `Linger=yes`。goal-nudge の timer は一覧に出ていない(`botid-issue.timer` ほか) | [実測] 2026-11-12 | `systemctl --user list-timers`、`loginctl show-user <user> -p Linger` |
+| `systemctl --user` | 可。`loginctl show-user` が `Linger=yes`。goal-nudge の timer は一覧に出ていない(一覧に出ているのは他の timer) | [実測] 2026-11-12 | `systemctl --user list-timers`、`loginctl show-user <user> -p Linger` |
 | ネットワーク | npm・GitHub・Rust の配布先に到達できる(HTTP 200) | [実測] 2026-11-09(R1)。2026-11-12 は [未確認]。GitHub の到達は `gh repo view` が 2026-11-12 に応答(`PUBLIC`) | `curl -sS -o /dev/null -w '%{http_code}' <URL>` |
 | OS | Ubuntu 26.04.1 LTS、Linux 7.0.0 x86_64 | [実測] | R1、2026-11-09 | `uname -r` |
 

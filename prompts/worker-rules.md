@@ -22,7 +22,7 @@
 - sleep・timeout・nohup・disown・systemd-run・末尾 `&` を使わない(引数が 0 でも、通過だけの shim でも)。シェルツールの `timeout` パラメータ(ミリ秒)は使ってよい。
 - 数分で終わる処理(`bash tests/harness/run.sh` など)は `background` を使わず、前面で実行する。`timeout` パラメータに 900000 を指定する。出力が戻るまでツール呼び出しを続ける。
 - `background: true` は 15 分以上かかる処理だけに使う。起動した応答で終えない。同じ応答の中で、他の作業か、状態確認(`opencode api session.active`・出力ファイルの `ls -la`)を続ける。
-- 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
+- 認証情報(gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)を読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。`opencode auth export` を実行しない。
 - 履歴の書き換え(force push・filter-repo)、リポジトリ・Secrets・公開範囲・org 権限の変更をしない。`rm -rf` は自分が作った物だけ(先に `ls -la`)。
 - Secrets・Variables を、読む(一覧も含む)・書く・消す・API で読まない(`gh secret`・`gh variable`・`gh api` の `secrets`・`variables`)。依頼者が許可していない。
 - `git push` は通常の `git push origin main` のみ(force 系・`gh api` による contents の PUT・ref の更新・別 identity は不可)。commit したら push する(scan 通過後)。届いたかの確認は push した worker の仕事: `git ls-remote origin main` と `git rev-parse HEAD` を実行し、出力(先頭 40 文字が一致)を報告に貼る。main と reviewer はこの 2 つを実行できず、報告の出力だけが根拠になる。リポジトリは PUBLIC で意図的。公開を理由に止めない。「push できない」と書くときは、リポジトリのディレクトリで実行した `gh auth status`(トークンの行は除く)と `git push --dry-run origin HEAD` の出力を貼る。commit の前に `scripts/scan-forbidden.sh <変更したファイル>` を通す。

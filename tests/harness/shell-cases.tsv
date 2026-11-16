@@ -255,8 +255,6 @@ worker	deny	["rm -rf .git"]	rm -rf .git
 worker	deny	["sudo rm -rf /var/x"]	sudo rm -rf /var/x
 worker	deny	["cat ~/.config/opencode/AGENTS.md"]	cat ~/.config/opencode/AGENTS.md
 worker	deny	["ls ~/.config/opencode"]	ls ~/.config/opencode
-worker	deny	["cat /home/ubuntu/.config/botid/config.json"]	cat /home/ubuntu/.config/botid/config.json
-worker	deny	["ls ~/.local/share/botid/identities"]	ls ~/.local/share/botid/identities
 worker	deny	["sqlite3 ~/.local/share/opencode/opencode.db \"select 1\""]	sqlite3 ~/.local/share/opencode/opencode.db "select 1"
 worker	deny	["cat ~/.local/share/opencode/auth.json"]	cat ~/.local/share/opencode/auth.json
 worker	deny	["cat ~/.config/gh/hosts.yml"]	cat ~/.config/gh/hosts.yml

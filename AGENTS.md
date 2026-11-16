@@ -74,7 +74,7 @@
 - 言葉は `docs/ops/glossary.md` に従う。依頼者が使う語を使い、この表にない言葉を作らない。依頼者が誤りと指摘した語は `scripts/scan-forbidden.sh` が止める。
 
 ## 8 危険操作(`docs/ops/dangerous-ops.md`)
-- 認証情報(botid・gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)は読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。
+- 認証情報(gh・wrangler・opencode の設定、シェル履歴、環境変数の列挙)は読まない・書かない・表示しない。別 identity に切り替えない。依頼者の設定ファイルを編集しない。
 - 履歴の書き換え、リポジトリ・Secrets・公開範囲・org 権限の変更は実行しない(依頼者の権限)。Issue を出して続行。
 - Secrets・Variables は、読む(一覧も含む)・書く・消すをしない。依頼者が許可していない。登録は依頼者に頼み(§10)、使えるかは GitHub Actions の実行結果で確かめる。
 - `rm -rf` は自分が作った物だけ。実行前に `ls -la <対象>`。

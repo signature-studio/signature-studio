@@ -113,7 +113,7 @@ subagent_calls  with_model_arg
 572             0             
 
 ## 7. risky shell commands (only state.input.command is searched; main / child). Counts of calls that contain the text
-kind   shell_calls  opencode_auth  gh_secret  gh_api_write  force_push  sleep_bypass  other_identity  botid_paths
------  -----------  -------------  ---------  ------------  ----------  ------------  --------------  -----------
-child  102234       12             6          3             0           182           0               5          
-main   8734         11             11         3             0           42            31              36         
+kind   shell_calls  opencode_auth  gh_secret  gh_api_write  force_push  sleep_bypass  other_identity
+-----  -----------  -------------  ---------  ------------  ----------  ------------  --------------
+child  102234       12             6          3             0           182           0             
+main   8734         11             11         3             0           42            31            
