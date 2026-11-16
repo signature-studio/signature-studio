@@ -17,4 +17,4 @@ path = "src/main.rs"
 [dependencies]
 fe-pe = { path = "../fe-pe" }
 fe-decode = { path = "../fe-decode" }
-iced-x86 = { version = "=1.21.0", default-features = false, features = ["std", "decoder", "instr_info"] }
+iced-x86 = { version = "=1.22.0", default-features = false, features = ["std", "decoder", "instr_info"] }
