@@ -42,21 +42,24 @@ jobs:
     if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 350
-    env:
-      OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+    permissions:
+      contents: read
+      actions: read
     strategy:
       fail-fast: false
       max-parallel: 60
       matrix:
         task: ${{ fromJSON(needs.plan.outputs.tasks) }}
     steps:
-      - name: モデルの指定を伏せる(GitHub は Variables を伏せないため、最初の段で伏せる)
-        run: '[ -z "$OPENCODE_MODEL" ] || echo "::add-mask::$OPENCODE_MODEL"'
-
       - name: リポジトリを取得する
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: モデルの指定を読んで伏せる(値は出さない。GitHub は Variables を伏せず、env の段に出るため)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ci/agents/mask-model.sh
 
       - name: opencode を導入する(版は固定)
         run: bash ci/agents/install-opencode.sh
