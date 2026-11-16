@@ -48,6 +48,7 @@ gh run view <id> --log | grep -ci <語>
 
 ## 確認の記録
 (登録の後に追記: 日付・完了の確認コマンドの出力 1 行)
+- 2026-11-16: 依頼者の回答: 重複として閉じた(2026-11-16 08:20:58Z)。コメントの本文: 🖕。実施しない。決定 0399 で、Variable を読まない形に替えた(依頼者の発言 msg_1e372bb3d001wZf2JpIusu3g8B「#7, #8に回答しました」)。
 
 ## 起票
 - 起票: https://github.com/signature-studio/signature-studio/issues/7

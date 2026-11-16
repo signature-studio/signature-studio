@@ -1,6 +1,6 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、依頼者の opencode の認証情報(Secret OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。Secret が無いジョブは、取り込みの手順で止まる(Issue 0005)。
-# モデルは Variable OPENCODE_PROVIDER(提供元の名前)で指定する。モデル ID は、その提供元の一覧から runner-config.sh が選ぶ(依頼者が設定。空なら runner-config が止まる。決定 0388 と Issue 0007)。
+# モデルは、取り込んだ認証の提供元(console- で始まる)の一覧から、作業用の型(末尾 haiku-5-5)の 1 件を runner-config.sh が選ぶ。Variable は読まない(決定 0399。決定 0388 を置き換える)。候補が 1 件でなければ止まる。
 # R2 の Secrets は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
 # 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
@@ -92,9 +92,7 @@ jobs:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
         run: bash ci/agents/import-login.sh
 
-      - name: 実行用のモデルの設定を書く(提供元の指定から選ぶ。背景のサービスが起動する前に書く。決定 0384 と 0388)
-        env:
-          OPENCODE_PROVIDER: ${{ vars.OPENCODE_PROVIDER }}
+      - name: 実行用のモデルの設定を書く(取り込んだ提供元の一覧から選ぶ。背景のサービスが起動する前に書く。決定 0384・0388・0399)
         run: bash ci/agents/runner-config.sh
 
       - name: 設定を確かめる(モデルと拒否の規則)
