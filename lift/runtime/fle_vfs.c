@@ -75,12 +75,12 @@ typedef struct fle_node {
 
 static fle_node root_node = { .is_dir = 1, .ct = FLE_VFS_CLOCK_START, .at = FLE_VFS_CLOCK_START, .wt = FLE_VFS_CLOCK_START };
 static fle_node *cwd_node = &root_node;
-static uint64_t clock_now = FLE_VFS_CLOCK_START;
+static uint64_t vtime_now = FLE_VFS_CLOCK_START;
 
 static uint64_t tick(void)
 {
-    clock_now += UINT64_C(10000000);
-    return clock_now;
+    vtime_now += UINT64_C(10000000);
+    return vtime_now;
 }
 
 /* ---- lazy files (decision 0314, PROVISIONAL; the format and the host side are in docs/decisions/0314-lazy-install-tree.md) ----
@@ -2757,14 +2757,14 @@ int fle_vfs_put_lazy_file(const uint16_t *wpath, unsigned stream, uint64_t off, 
     const uint16_t *leaf = NULL;
     size_t leaf_len = 0;
     int err;
-    uint64_t clock_saved = clock_now;
+    uint64_t vtime_saved = vtime_now;
     fle_node *dir, *n;
 
     if (size && (stream >= n_lazy_streams || off > lazy_logical[stream] || size > lazy_logical[stream] - off)) return 6;
     dir = put_walk(wpath, 1, &leaf, &leaf_len, &err);
-    if (dir == NULL) { clock_now = clock_saved; return err; }
+    if (dir == NULL) { vtime_now = vtime_saved; return err; }
     n = find_kid(dir, leaf, leaf_len);
-    if (n != NULL) { clock_now = clock_saved; return n->is_dir ? 2 : 7; }
+    if (n != NULL) { vtime_now = vtime_saved; return n->is_dir ? 2 : 7; }
     n = node_new(dir, leaf, leaf_len, 0, attrs & (ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE));
     n->ct = n->at = n->wt = filetime;
     n->size = size;
@@ -2772,17 +2772,17 @@ int fle_vfs_put_lazy_file(const uint16_t *wpath, unsigned stream, uint64_t off, 
         n->lazy = stream + 1u;
         n->lazy_off = off;
     }
-    clock_now = clock_saved;
+    vtime_now = vtime_saved;
     return 0;
 }
 
 int fle_vfs_put_dir(const uint16_t *wdir, uint32_t attrs, uint64_t filetime)
 {
     int err;
-    uint64_t clock_saved = clock_now;
+    uint64_t vtime_saved = vtime_now;
     fle_node *d = put_walk(wdir, 0, NULL, NULL, &err);
 
-    clock_now = clock_saved;
+    vtime_now = vtime_saved;
     if (d == NULL) return err;
     if (d != &root_node) {
         d->bits = attrs & (ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE);
