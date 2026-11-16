@@ -7,7 +7,10 @@
 #    a scripts/ file that no current document names
 # c  AGENTS.md over 140 lines; prompts/worker-rules.md over 60 lines
 # d  a decision from 0386 on that says 入れない・捨てる・書き直し・削除 cites neither an owner message (msg_…) nor an old source (archive/… or docs/archive/…)
+# e  docs/requests/NNNN-*.md (TEMPLATE.md is not one): an internal term (INTERNAL_* below) in the text the client reads: every line but the
+#    自分で試した記録 section, the code blocks and the `inline code`
 # Not checked, on purpose:
+#   the 自分で試した記録 section of a request, its code and `inline code` (commands and file names are quoted, not terms); a capitalized Worker (Cloudflare's product name)
 #   old material and outputs: docs/archive/, archive/, evidence/, patches/, tools/, lift/ (imported measurement material), artifacts/, binaries/, lift/out*
 #   a command: a backticked text with a space is checked only by its first word when that word is a path with "/" (`oc-msg.sh send …` is a command)
 #   a bare file name (no "/") that the repository lacks: it may name a file in another place (~/work/handover, ~/.agents, an old tree)
@@ -136,6 +139,44 @@ for p in sorted(files):
     word = next((w for w in DROP_WORDS if w in text), None)
     if word and not SOURCE.search(text):
         add("d", p, word, "を決定しているが依頼者の発言 ID も旧設計の出典(archive/…)も無い")
+
+# e: the internal terms of the request rule (decision 0390). Worker (capitalized) is the Cloudflare product name, so only the role name worker is counted.
+# 段 excludes 普段・段階・段落 (the step word is 手順). コミット is allowed by docs/ops/glossary.md, so only the English commit is counted; ワークフロー is not in the glossary, so it is counted.
+INTERNAL_EN = re.compile(r"(?<![A-Za-z])(?:workflow|commit|main|run|probe|binding|standalone|env)(?![A-Za-z])", re.I)
+INTERNAL_ROLE = re.compile(r"(?<![A-Za-z])worker(?![A-Za-z])")
+INTERNAL_JA = re.compile(r"ワークフロー|段")
+REQUEST = re.compile(r"docs/requests/\d{4}-[^/]+\.md")
+
+
+def client_lines(path):
+    rows, skip, fence = [], 0, False
+    for i, line in enumerate(open(path, encoding="utf-8", errors="replace").read().split("\n"), 1):
+        if line.lstrip().startswith("```"):
+            fence = not fence
+            continue
+        if fence:
+            continue
+        m = re.match(r"(#+) ", line)
+        if m and skip and len(m.group(1)) <= skip:
+            skip = 0
+        if m and not skip and "自分で試した記録" in line:
+            skip = len(m.group(1))
+            continue
+        if not skip:
+            rows.append((i, re.sub(r"`[^`\n]*`", "", line)))
+    return rows
+
+
+for p in sorted(files):
+    if not REQUEST.fullmatch(p):
+        continue
+    for i, line in client_lines(p):
+        terms = {m.group(0).lower() for m in INTERNAL_EN.finditer(line)}
+        if INTERNAL_ROLE.search(line):
+            terms.add("worker")
+        terms |= {m.group(0) for m in INTERNAL_JA.finditer(re.sub(r"普段|段階|段落", "", line))}
+        for term in sorted(terms):
+            add("e", f"{p}:{i}", term, "依頼者が読む本文に内部用語")
 
 print("KIND  WHERE                                 WHAT                                  WHY")
 for kind, where, tok, why in rows[:5]:

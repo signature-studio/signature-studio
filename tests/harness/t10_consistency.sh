@@ -3,8 +3,10 @@
 # Detects: a backticked or linked repository path that does not exist; a docs/ops or docs/core file that docs/index.md does not name;
 # a tests/harness/t*.sh that the README does not name; a scripts/ file that no document names; AGENTS.md over 140 lines;
 # a decision from 0386 that says 入れない・捨てる・書き直し・削除 with neither a msg_ ID nor an archive/ source.
+# an internal term (workflow, commit, main, worker, run, probe, binding, standalone, env, 段) in the text a client reads in docs/requests/NNNN-*.md
 # Does not detect: a path in old material (docs/archive, archive, lift); a path on a line that names another place or says it is a planned output;
-# a command's arguments; a bare file name; a todo row of docs/ROADMAP.md; text with placeholders (<…>, *).
+# a command's arguments; a bare file name; a todo row of docs/ROADMAP.md; text with placeholders (<…>, *);
+# a request's 自分で試した記録 section, its code and inline code, 普段・段階・段落, a capitalized Worker, コミット, TEMPLATE.md.
 # shellcheck source=lib.sh
 # shellcheck disable=SC2016  # the synthetic documents contain literal backticks on purpose
 . "$(dirname "$0")/lib.sh"
@@ -136,6 +138,34 @@ expect_not_contains "a decision that cites an owner message (msg_) is not a find
 expect_not_contains "a decision 0385 or older is not checked" "$out" "0385-old.md"
 expect_not_contains "a decision from 0386 without a drop word is not a finding" "$out" "0393-plain.md"
 expect_eq "and only the one decision is counted" 1 "$(count "$out")"
+
+# e: the text a client reads in a request document. An internal term is a finding, except in the 自分で試した記録 section, a code block, `inline code`,
+# 普段・段階・段落, a capitalized Worker (the product name), コミット; and TEMPLATE.md is not a request document
+rq() { # name file text(printf %b): a repository whose only request document is the given text; prints its path
+  local d="$sb/req-$1"; mk "$d"; mkdir -p "$d/docs/requests"
+  printf '%b' "$3" > "$d/docs/requests/$2"
+  printf '%s' "$d"
+}
+for w in workflow commit main worker run probe binding standalone env; do
+  d=$(rq "term-$w" 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の $w を確かめる。\n")
+  out=$(run "$d"); expect_contains "an internal term ($w) in the text the client reads is found (no 記録 heading: the whole text is read)" "$out" "0101-x.md"
+done
+d=$(rq ja-words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n自動処理の段を確かめる。ワークフローを止める。\n")
+out=$(run "$d"); expect_contains "the Japanese internal term ワークフロー is found" "$out" "ワークフロー"
+expect_contains "the Japanese internal term 段 is found" "$out" "段"
+d=$(rq code-only 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n\`main\` と \`run\` を確かめる。\n\`\`\`\nmain run workflow commit\n\`\`\`\n")
+out=$(run "$d"); expect_eq "a term only in inline code or a code block is not a finding" 0 "$(count "$out")"
+d=$(rq words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n普段の段階と、段落の話。\n")
+out=$(run "$d"); expect_eq "普段・段階・段落 are not findings" 0 "$(count "$out")"
+d=$(rq record 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の操作は 1 つだけ。\n## 自分で試した記録\nmain と run と 段 を実行した。\n")
+out=$(run "$d"); expect_eq "the 自分で試した記録 section is not read by the client" 0 "$(count "$out")"
+d=$(rq tail 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の操作は 1 つだけ。\n## 自分で試した記録\nmain を実行した。\n## 依頼なしで続ける作業\n- run を動かさない。\n")
+out=$(run "$d"); expect_contains "a section after the 自分で試した記録 section is read by the client" "$out" "0101-x.md"
+d=$(rq allowed 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n「Worker \`fl-studio-web\`」の設定。コミット \`b3a70b5\` の内容。\n")
+out=$(run "$d"); expect_eq "a capitalized Worker (the product name) and コミット are not findings" 0 "$(count "$out")"
+d="$sb/req-template"; mk "$d"; mkdir -p "$d/docs/requests"
+printf '# Issue NNNN: <件名>\n## 依頼者にお願いしたい作業\nworkflow と commit\n' > "$d/docs/requests/TEMPLATE.md"
+out=$(run "$d"); expect_eq "TEMPLATE.md is not a request document" 0 "$(count "$out")"
 
 # the real repository: the check runs and prints its count line
 real=$(cd "$ROOT" && bash scripts/check-consistency.sh 2>&1)
