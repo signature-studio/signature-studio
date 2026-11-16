@@ -72,6 +72,7 @@ jobs:
         run: bash ci/agents/check-agents.sh
 
       - name: worker を 1 回動かす
+        id: worker
         env:
           TASK: ${{ matrix.task }}
         run: bash ci/agents/run-task.sh "$TASK"
@@ -95,7 +96,7 @@ jobs:
         run: bash ci/agents/summary.sh "$TASK" >> "$GITHUB_STEP_SUMMARY"
 
       - name: worker の終了を確かめる
-        if: always()
+        if: always() && steps.worker.outcome != 'skipped'
         env:
           TASK: ${{ matrix.task }}
         run: 'grep -qx "rc: 0" "ci/agents/out/$TASK/meta.txt"'
