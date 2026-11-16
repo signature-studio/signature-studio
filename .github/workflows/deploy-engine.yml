@@ -1,8 +1,8 @@
 # エンジンの bundle を作り(9 段。決定 0381)、R2 fl-web-assets の新しい prefix に載せる。
 # root の manifest.json は、wasm の sha256 が ci/verified-bundles.tsv に在るときだけ差し替える(退避つき)。
-# R2 の Secrets は、抽出の層(.github/actions/extract-layer。キャッシュの復元と保存。インストーラの取得は無いときだけ)と、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386)。
+# R2 の Secrets は、抽出の層(.github/actions/extract-layer。キャッシュの復元と保存。インストーラの取得は無いときだけ)、段 gen のキャッシュ(.github/actions/stage-cache。復元と保存)、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386・0391)。
 # 値・アカウント ID・R2 のホスト名は出さない(公開リポジトリ。ログも公開)。
-# 抽出の層は、同じ入力の結果を R2 から復元する(決定 0386)。この注記の行は、2 回目の実行(復元)を起こすための変更(R6-8)。
+# 抽出の層は、同じ入力の結果を R2 から復元する(決定 0386)。段 gen は、同じ鍵なら出力を R2 から戻し、build-engine-bundle.sh が gen を飛ばす(決定 0391)。この注記の行は、2 回目の実行(復元)を起こすための変更(R6-8・R6-10)。
 name: deploy-engine
 
 on:
@@ -18,6 +18,10 @@ on:
       - "ci/lib/extract_fl.py"
       - "ci/extract-cache.sh"
       - ".github/actions/extract-layer/**"
+      - "ci/stage-cache.sh"
+      - "ci/stage-keys.sh"
+      - "ci/lib/common.sh"
+      - ".github/actions/stage-cache/**"
       - "app/package.json"
       - "app/scripts/build-engine-bundle.sh"
       - "app/scripts/pack-assets.mjs"
@@ -99,6 +103,24 @@ jobs:
           cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
           cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
 
+      - id: gkey
+        name: "段 gen の鍵(抽出の鍵と、gen の入力・道具・関数の文のハッシュ。同じ入力なら同じ鍵。決定 0391)"
+        env:
+          EXTRACT_KEY: ${{ steps.layer.outputs.key }}
+        run: bash ci/stage-keys.sh gen "$EXTRACT_KEY" >> "$GITHUB_OUTPUT"
+
+      - id: gen_cache
+        name: "段 gen の復元: R2 の段のキャッシュに鍵が在れば、出力を WORK に戻す(build-engine-bundle.sh が gen を飛ばす)。鍵が在るのに戻せなければ止める(決定 0391)"
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: gen
+          key: ${{ steps.gkey.outputs.key }}
+          dir: ${{ runner.temp }}/work/onat
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
       - name: "Python 3.14"
         uses: actions/setup-python@v5
         with:
@@ -149,6 +171,19 @@ jobs:
             exit 1
           fi
           cat "$WORK/logs/stages.log"
+
+      - id: gen_save
+        name: "段 gen の保存: 今回 gen を作った(復元していない)ときだけ、出力を R2 の段のキャッシュに保存し、読み直して確かめる(決定 0391)"
+        if: steps.build.outcome == 'success' && steps.gen_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: gen
+          key: ${{ steps.gkey.outputs.key }}
+          dir: ${{ runner.temp }}/work/onat
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
 
       - id: check
         name: "9 段の出力を検査する(sha256・展開・manifest の判定・載せる 5 件。値は出さない)"
@@ -458,6 +493,9 @@ jobs:
           R_CHECK: ${{ steps.check.outcome }}
           R_UPLOAD: ${{ steps.upload.outcome }}
           R_ROOT: ${{ steps.root.outcome }}
+          GKEY: ${{ steps.gkey.outputs.key }}
+          GHIT: ${{ steps.gen_cache.outputs.hit }}
+          R_GSAVE: ${{ steps.gen_save.outcome }}
           PREFIX: ${{ steps.key.outputs.prefix }}
           WASM_SHA: ${{ steps.check.outputs.wasm_sha }}
           WASM_SIZE: ${{ steps.check.outputs.wasm_size }}
@@ -478,6 +516,9 @@ jobs:
             echo "| emsdk | $R_EMSDK |"
             echo "| rust | $R_RUST |"
             echo "| 上流 Blend2D | $R_B2D |"
+            echo "| 段 gen の鍵 | ${GKEY:-未決定} |"
+            echo "| 段 gen を R2 から復元した(hit) | ${GHIT:-未取得} |"
+            echo "| 段 gen を R2 に保存した(outcome) | ${R_GSAVE:-未実行} |"
             echo "| 9 段 | $R_BUILD |"
             echo "| 9 段の出力の検査 | $R_CHECK |"
             echo "| prefix を載せ、確かめた(載せたか = $UPLOADED) | $R_UPLOAD |"

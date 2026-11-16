@@ -1,0 +1,60 @@
+# The stage cache (decision 0391): the output directory of one stage of app/scripts/build-engine-bundle.sh, restored from or saved to the R2 cache by the stage's key (ci/stage-keys.sh).
+# op restore runs before the build (hit = the output was put back, and the script skips the stage); op save runs after the build, when the stage ran (no hit).
+# The R2 keys are given to this action only, and each key only to the step that uses it (the env of that step). The build step gets none (decision 0386).
+name: stage-cache
+description: >-
+  The output directory of one build stage, restored from or saved to the R2 cache by the stage's key. Same inputs, same key.
+inputs:
+  op:
+    description: "restore (before the build; the output of the stage is put back when the cache has the key) or save (after the build)"
+    required: true
+  stage:
+    description: "the stage's name (gen)"
+    required: true
+  key:
+    description: "the stage's key (ci/stage-keys.sh)"
+    required: true
+  dir:
+    description: "the stage's output directory (under RUNNER_TEMP)"
+    required: true
+  account-id:
+    description: "the account ID of the R2 endpoint (already masked by the job; the value is not printed)"
+    required: true
+  cache-access-key-id:
+    description: "R2 S3 token, read and write on the cache bucket"
+    required: true
+  cache-secret-access-key:
+    description: "the token's secret"
+    required: true
+outputs:
+  hit:
+    description: "restore: 'true' when the output was restored from the cache, 'false' when the cache has no entry"
+    value: ${{ steps.restore.outputs.hit }}
+runs:
+  using: composite
+  steps:
+    - id: restore
+      if: inputs.op == 'restore'
+      shell: bash
+      env:
+        STAGE: ${{ inputs.stage }}
+        KEY: ${{ inputs.key }}
+        DIR: ${{ inputs.dir }}
+        ID: ${{ inputs.account-id }}
+        WORK: ${{ runner.temp }}/stage-cache
+        AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cache-secret-access-key }}
+      run: bash ci/stage-cache.sh restore
+
+    - id: save
+      if: inputs.op == 'save'
+      shell: bash
+      env:
+        STAGE: ${{ inputs.stage }}
+        KEY: ${{ inputs.key }}
+        DIR: ${{ inputs.dir }}
+        ID: ${{ inputs.account-id }}
+        WORK: ${{ runner.temp }}/stage-cache
+        AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.cache-secret-access-key }}
+      run: bash ci/stage-cache.sh save

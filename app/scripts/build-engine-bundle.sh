@@ -90,6 +90,7 @@ capped() {   # capped NAME cmd...   (stdout/stderr -> $LOGS/NAME.out/.err; the w
 
 stage_gen() {
   [ -d "$HL/out-ext" ] || die "$HL/out-ext not found (HOST_ROOT=$HOST_ROOT)"
+  if [ -s "$ONAT/gen/flengine.c" ] && [ -n "$(tag_dir)" ] && [ -s "$(tag_dir)/src/common.c" ]; then echo "gen: $ONAT has the output (restored from the stage cache or made before), skipped"; return 0; fi
   if [ ! -x "$WORK/cargo-target/release/fe-lift" ] || [ ! -x "$WORK/cargo-target/release/fe-pe" ]; then
     ( cd "$L" && CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_TARGET_DIR="$WORK/cargo-target" cargo build --release --offline -p fe-pe -p fe-lift ) > "$LOGS/cargo-build.txt" 2>&1 || die "cargo build failed (see $LOGS/cargo-build.txt)"
   fi
