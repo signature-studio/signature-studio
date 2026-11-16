@@ -29,8 +29,17 @@ NOTE
   cat "$src"
 } > "$prompt"; then echo "cannot write the prompt to $prompt" >&2; exit 2; fi
 start=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-opencode run "$(cat "$prompt")" > "$out/report.md" 2> "$out/stderr.log" < /dev/null
+err="$tmp/stderr-$task.log"
+opencode run "$(cat "$prompt")" > "$out/report.md" 2> "$err" < /dev/null
 rc=$?
+# The artifact is public: the lines that name the provider or the model are dropped here, and only their count is kept.
+# The provider word is built from parts, so that this file does not contain it (the same way as scripts/scan-forbidden.sh).
+v1=anthr v2=opic
+hide="$v1$v2|claude|haiku|bedrock|console-"
+hidden=$(grep -i -c -E "$hide" "$err" || true)
+grep -i -v -E "$hide" "$err" > "$out/stderr.log"
+echo "(提供元・モデル名を含む行 $hidden 行は伏せた)" >> "$out/stderr.log"
+rm -f "$err"
 end=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 git add -N -- . ':(exclude)ci/agents/out'
 git diff --no-color HEAD -- . ':(exclude)ci/agents/out' > "$out/changes.patch"
