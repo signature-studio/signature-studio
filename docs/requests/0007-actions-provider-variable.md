@@ -25,9 +25,10 @@ Variable は GitHub が伏せない。旧の Variable `OPENCODE_MODEL`(モデル
 エージェントは、1 の出力の形だけを確かめた。出力の中身は、この記録にもリポジトリにも書かない。Variables を一覧・読み書きするコマンドは実行していない。
 ```
 (上の 1 行のコマンド)| grep -Ec '^[^/#[:space:]]+$'   → 1(作業したマシンでの結果。出力は 1 行)
-opencode --help の抜粋: --standalone            Run with a private server instead of the background service
+opencode models --help の抜粋: List all available models
+opencode models --help の抜粋: opencode models [flags]
 ```
-上の help の抜粋は、opencode のオプションの 1 つ(非公開のサーバーで実行する)の説明。この依頼の登録では使わない。
+上の help の抜粋は、利用できるモデルの一覧を出す道具(opencode models)の説明。この依頼の登録では使わない。
 
 ## 完了の確認コマンド
 - 依頼者からの、登録が済んだ旨の連絡。
