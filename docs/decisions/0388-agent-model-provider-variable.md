@@ -28,3 +28,9 @@
 - 依頼者の発言: `msg_1e2274299001Wt4h6i62ve8mbb`(モデル指定を Variable で行う指示)。
 - 決定 0384(置き換え)、決定 0383(認証情報の取り込み)、Issue 0006(`docs/requests/0006-actions-model-variable.md`)、Issue 0007(`docs/requests/0007-actions-provider-variable.md`)。
 - run 43804191981(行 271)。evidence/R9-3.md。
+
+## 追記(2026-11-16): 提供元の名前のログへの表示を許す
+- 決定: 提供元の名前は、Variable `OPENCODE_PROVIDER` の env の表示で、その段のログに出る。許す。決定 0388 の「未決」の項はこの追記で決める(main の指示)。
+- 根拠: (a) 依頼者の指示は Variable で行う(発言 `msg_1e2274299001Wt4h6i62ve8mbb`)。この機械では未確認(`~/work/handover/setup/S16-intent/catalog.md` に 0 件。`opencode api` は policy で拒否)。Variable は GitHub が伏せない(実測: run 43804191981 の行 271。evidence/R9-3.md 3 節)。run 43807885611 では値が空で、env の行は値の無い 1 行(行 499)。(b) `scripts/forbidden-terms.tsv`(55 行)に、提供元の名前に含まれる語(aws・bedrock・console)は 0 件(`grep -ic -E 'aws|bedrock|console' scripts/forbidden-terms.tsv` → 0)。(c) 提供元の名前は認証情報ではない。モデル ID(ベンダー名を含む)は Variable に持たせず、`runner-config.sh` が一覧から選ぶ。選んだ ID はログに出さず、件数だけを出す。
+- 撤回条件: `scripts/forbidden-terms.tsv` に提供元の名前の語が加わったとき。
+- 分類: (b) 契約の実装(上の決定と同じ)。
