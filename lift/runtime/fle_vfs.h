@@ -5,6 +5,7 @@
 #ifndef FLE_VFS_H
 #define FLE_VFS_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "fle_env.h"
@@ -144,5 +145,21 @@ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *siz
 int fle_vfs_make_dirs(const uint16_t *wdir);
 int fle_vfs_put_file(const uint16_t *wpath, uint8_t *data, uint64_t size);
 int fle_vfs_file_state(const uint16_t *wpath, uint64_t *size, unsigned *opens, uint64_t *wt, const uint8_t **data);
+
+/* Decision 0314 (PROVISIONAL): lazy files of the install tree. The volume keeps the size, attributes and times of a file and asks the HOST for its bytes when the guest reads them; the runtime itself touches no host file.
+ *   fle_vfs_lazy_set_reader: the one read function (ctx is passed back). It must copy exactly `n` bytes of the logical byte string of `stream`, starting at `off`, into `dst` and return 1, or return 0 (the run stops by name).
+ *   fle_vfs_lazy_add_stream: registers a stream of `logical` bytes; returns its number (0, 1, ...) or -1 when 32 streams exist.
+ *   fle_vfs_put_lazy_file: the file "C:\dir\name" (missing directories are made) whose bytes are [off, off + size) of `stream`; attrs: ARCHIVE 0x20, READONLY 0x01, HIDDEN 0x02, SYSTEM 0x04 (others are ignored);
+ *     filetime: creation = last access = last write (FILETIME ticks). Size 0 makes an ordinary empty file. 0 done; 1 invalid path; 2 the path is a directory; 5 a directory component is a file;
+ *     6 the stream or the byte range does not exist; 7 the path already holds a file (it is NOT replaced: a file that was put with its bytes before the index was read wins).
+ *   fle_vfs_put_dir: the directory (and the ones above it) with these attributes and times; an existing directory only gets the attributes and times. 0 done, 1 invalid path, 5 a component is a file.
+ *   fle_vfs_lazy_files: the number of files that are still lazy (and their bytes in *bytes when not NULL).
+ * A write, SetEndOfFile, CreateFileMapping or a host-side peek makes the file ordinary first (the whole file is read once); CopyFileW of a lazy file makes a lazy file of the same bytes. */
+typedef int (*fle_vfs_lazy_read_fn)(void *ctx, unsigned stream, uint64_t off, void *dst, size_t n);
+void fle_vfs_lazy_set_reader(fle_vfs_lazy_read_fn fn, void *ctx);
+int fle_vfs_lazy_add_stream(uint64_t logical);
+int fle_vfs_put_lazy_file(const uint16_t *wpath, unsigned stream, uint64_t off, uint64_t size, uint32_t attrs, uint64_t filetime);
+int fle_vfs_put_dir(const uint16_t *wdir, uint32_t attrs, uint64_t filetime);
+uint64_t fle_vfs_lazy_files(uint64_t *bytes);
 
 #endif

@@ -64,6 +64,8 @@ typedef struct fle_node {
     uint32_t bits;               /* attribute bits without DIRECTORY and NORMAL */
     uint8_t *data;
     uint64_t size, cap;
+    uint32_t lazy;               /* 0: the bytes are in data. k + 1: a lazy file, the bytes are [lazy_off, lazy_off + size) of lazy stream k (decision 0314); data is NULL and cap 0 */
+    uint64_t lazy_off;
     uint64_t ct, at, wt;
     struct fle_node **kids;
     size_t nkids, kcap;
@@ -79,6 +81,21 @@ static uint64_t tick(void)
 {
     clock_now += UINT64_C(10000000);
     return clock_now;
+}
+
+/* ---- lazy files (decision 0314, PROVISIONAL; the format and the host side are in docs/decisions/0314-lazy-install-tree.md) ----
+ * A lazy file has its size, attributes and times in the node and its bytes in a stream the host owns (a stream = the concatenation of the files of one kind, as one logical byte string). The runtime never touches
+ * the host file system itself: the harness gives it ONE read function (fle_vfs_lazy_set_reader) and the lengths of the streams. A read of a lazy file asks the host for exactly the bytes of the guest's buffer
+ * (no copy in the volume); a write, SetEndOfFile, a mapping or a host-side peek first makes the file ordinary (copy-on-write of the whole file; nothing is written back to the stream). */
+#define LAZY_MAX_STREAMS 32u
+static uint64_t lazy_logical[LAZY_MAX_STREAMS];
+static unsigned n_lazy_streams;
+static fle_vfs_lazy_read_fn lazy_read_fn;
+static void *lazy_read_ctx;
+
+static void lazy_fetch(const char *api, const fle_node *n, uint64_t at, void *dst, size_t len)
+{
+    if (!lazy_read_fn || !lazy_read_fn(lazy_read_ctx, n->lazy - 1u, n->lazy_off + at, dst, len)) fle_stop(api, "the host did not give the bytes of a lazy file of the install tree (read function missing or failed)");
 }
 
 static void fail(uint32_t err, uint64_t ret)
@@ -181,6 +198,24 @@ static void node_truncate(fle_node *n)
     free(n->data);
     n->data = NULL;
     n->size = n->cap = 0;
+    n->lazy = 0;   /* a truncated file has no bytes of the stream left to read */
+    n->lazy_off = 0;
+}
+
+/* Copy-on-write: a lazy file becomes an ordinary one (all its bytes are read from the host once). The 256 MiB limit of the volume holds for it as for every file. */
+static void node_materialize(const char *api, fle_node *n)
+{
+    if (!n->lazy) return;
+    if (n->size > MAX_FILE_BYTES) fle_stop(api, "a lazy file larger than the 256 MiB virtual limit cannot be made writable");
+    if (n->size) {
+        uint8_t *d = malloc((size_t)n->size);
+        if (!d) fle_stop(api, "out of memory");
+        lazy_fetch(api, n, 0, d, (size_t)n->size);   /* a failure stops the run; the node is still lazy */
+        n->data = d;
+        n->cap = n->size;
+    }
+    n->lazy = 0;
+    n->lazy_off = 0;
 }
 
 static int is_ancestor_or_self(const fle_node *a, const fle_node *b)
@@ -654,7 +689,8 @@ void fle_imp_ReadFile(void)
     }
     avail = e->node->size - e->pos;
     k = n < avail ? n : avail;
-    memcpy((void *)fle_addr(buf, (unsigned)k, 1), e->node->data + e->pos, (size_t)k);
+    if (e->node->lazy) lazy_fetch(api, e->node, e->pos, (void *)fle_addr(buf, (unsigned)k, 1), (size_t)k);
+    else memcpy((void *)fle_addr(buf, (unsigned)k, 1), e->node->data + e->pos, (size_t)k);
     e->pos += k;
     fle_st(pr, 4, k);
     R[0] = 1;
@@ -692,6 +728,7 @@ void fle_imp_WriteFile(void)
     if (buf == 0) fle_stop(api, "lpBuffer is NULL");
     at = e->app ? e->node->size : e->pos;
     if (at + n < at) fle_stop(api, "file position overflow");
+    node_materialize(api, e->node);
     node_reserve(api, e->node, at + n);
     memcpy(e->node->data + at, (const void *)fle_addr(buf, (unsigned)n, 0), n);
     if (at + n > e->node->size) e->node->size = at + n;
@@ -720,6 +757,7 @@ int fle_vfs_file_info(const char *api, uint64_t h, const uint8_t **data, uint64_
 {
     fh_ent *e = file_arg(api, h);
     if (!e) return 0;
+    node_materialize(api, e->node);   /* the caller (a file mapping) needs the bytes in memory */
     *data = e->node->data;
     *size = e->node->size;
     *can_read = e->rd;
@@ -747,6 +785,7 @@ int fle_vfs_file_set_end(const char *api, uint64_t h)
     fh_ent *e = file_arg(api, h);
     if (!e) return 0;
     if (!e->wr && !e->app) return -1;
+    node_materialize(api, e->node);
     if (e->pos > e->node->size) {
         node_reserve(api, e->node, e->pos);   /* the new area is zero (node_reserve) */
     } else if (e->node->data != NULL && e->pos < e->node->size) {
@@ -1421,7 +1460,10 @@ void fle_imp_CopyFileW(void)
     }
     if (dst == 2) dn = node_new(dp, d.p[d.n - 1], d.l[d.n - 1], 0, sn->bits);
     node_truncate(dn);
-    if (sn->size) {
+    if (sn->lazy) {   /* the copy of a lazy file reads the same bytes of the same stream: nothing is fetched or copied now */
+        dn->lazy = sn->lazy;
+        dn->lazy_off = sn->lazy_off;
+    } else if (sn->size) {
         node_reserve(api, dn, sn->size);
         memcpy(dn->data, sn->data, (size_t)sn->size);
     }
@@ -2591,6 +2633,7 @@ int fle_vfs_peek_file(const uint16_t *wpath, const uint8_t **data, uint64_t *siz
     st = lookup(api, &v, &n, &par);
     vp_free(&v);
     if (st || n->is_dir) return 0;
+    node_materialize(api, n);
     *data = n->data;
     *size = n->size;
     return 1;
@@ -2665,6 +2708,8 @@ int fle_vfs_put_file(const uint16_t *wpath, uint8_t *data, uint64_t size)
     if (n != NULL && (n->opens || n->pending)) { free(data); return 3; }
     if (n == NULL) n = node_new(dir, leaf, leaf_len, 0, 0);
     else { free(n->data); n->wt = n->at = tick(); }
+    n->lazy = 0;   /* an eager file replaces a lazy one of the same path (the seed wins) */
+    n->lazy_off = 0;
     n->data = size ? data : NULL;
     if (!size) free(data);
     n->size = n->cap = size;
@@ -2684,9 +2729,79 @@ int fle_vfs_file_state(const uint16_t *wpath, uint64_t *size, unsigned *opens, u
     st = lookup(api, &v, &n, &par);
     vp_free(&v);
     if (st || n->is_dir) return 0;
+    node_materialize(api, n);
     *size = n->size;
     *opens = n->opens;
     *wt = n->wt;
     *data = n->data;
     return 1;
+}
+
+/* Decision 0314 (PROVISIONAL): lazy files of the install tree. Called by the harness (harness/vfs_lazy.h) before the guest runs, not by the guest. The read function and the streams are described in fle_vfs.h. A file or directory made here
+ * does not move the volume's virtual clock (the tree has 29,000 entries; the times of files the guest creates must not depend on how many there are). */
+void fle_vfs_lazy_set_reader(fle_vfs_lazy_read_fn fn, void *ctx)
+{
+    lazy_read_fn = fn;
+    lazy_read_ctx = ctx;
+}
+
+int fle_vfs_lazy_add_stream(uint64_t logical)
+{
+    if (n_lazy_streams == LAZY_MAX_STREAMS) return -1;
+    lazy_logical[n_lazy_streams] = logical;
+    return (int)n_lazy_streams++;
+}
+
+int fle_vfs_put_lazy_file(const uint16_t *wpath, unsigned stream, uint64_t off, uint64_t size, uint32_t attrs, uint64_t filetime)
+{
+    const uint16_t *leaf = NULL;
+    size_t leaf_len = 0;
+    int err;
+    uint64_t clock_saved = clock_now;
+    fle_node *dir, *n;
+
+    if (size && (stream >= n_lazy_streams || off > lazy_logical[stream] || size > lazy_logical[stream] - off)) return 6;
+    dir = put_walk(wpath, 1, &leaf, &leaf_len, &err);
+    if (dir == NULL) { clock_now = clock_saved; return err; }
+    n = find_kid(dir, leaf, leaf_len);
+    if (n != NULL) { clock_now = clock_saved; return n->is_dir ? 2 : 7; }
+    n = node_new(dir, leaf, leaf_len, 0, attrs & (ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE));
+    n->ct = n->at = n->wt = filetime;
+    n->size = size;
+    if (size) {
+        n->lazy = stream + 1u;
+        n->lazy_off = off;
+    }
+    clock_now = clock_saved;
+    return 0;
+}
+
+int fle_vfs_put_dir(const uint16_t *wdir, uint32_t attrs, uint64_t filetime)
+{
+    int err;
+    uint64_t clock_saved = clock_now;
+    fle_node *d = put_walk(wdir, 0, NULL, NULL, &err);
+
+    clock_now = clock_saved;
+    if (d == NULL) return err;
+    if (d != &root_node) {
+        d->bits = attrs & (ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM | ATTR_ARCHIVE);
+        d->ct = d->at = d->wt = filetime;
+    }
+    return 0;
+}
+
+static void lazy_count(const fle_node *n, uint64_t *files, uint64_t *bytes)
+{
+    size_t i;
+    if (n->lazy) { (*files)++; *bytes += n->size; }
+    for (i = 0; i < n->nkids; i++) lazy_count(n->kids[i], files, bytes);
+}
+
+uint64_t fle_vfs_lazy_files(uint64_t *bytes)
+{
+    uint64_t f = 0, b = 0;
+    lazy_count(&root_node, &f, &b);
+    if (bytes) *bytes = b;
+    return f;
 }

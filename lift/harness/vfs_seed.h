@@ -53,6 +53,7 @@
 #define VS_CREATE_NEW 1u
 #define VS_ATTR_NORMAL 0x80u
 #define VS_CALL_RETURN_ADDRESS UINT64_C(0xdead5eed)
+#define VS_LAZY_PREFIX "@lazy:"   /* decision 0314: the host field of a lazy-index line (harness/vfs_lazy.h) */
 
 typedef struct {
     char guest[VS_GUEST_BYTES];
@@ -62,6 +63,7 @@ typedef struct {
     uint8_t *data;
     size_t size;
     int is_dir;      /* decision 0129: a directory line (guest path ends with a backslash; host and SHA-256 are '-') */
+    int is_lazy;     /* decision 0314: a lazy-index line (guest path = the mount directory with a trailing backslash; host field "@lazy:<index file>"; SHA-256 of the index file) */
 } vs_entry;
 
 /* ---- SHA-256 (FIPS 180-4), one shot. The harness links no crypto library. ---- */
@@ -296,6 +298,17 @@ static int vs_parse(const char *list, vs_entry *ent, size_t *count)
         *t1 = 0;
         *t2 = 0;
         ent[n].is_dir = 0;
+        ent[n].is_lazy = 0;
+        if (strncmp(t1 + 1, VS_LAZY_PREFIX, sizeof VS_LAZY_PREFIX - 1) == 0) {
+            size_t gl = strlen(buf);
+            if (gl < 4 || buf[gl - 1] != '\\') {
+                fclose(f);
+                return vs_fail(list, line, "a lazy-index line needs a guest path (the mount directory) that ends with a backslash");
+            }
+            buf[gl - 1] = 0;
+            ent[n].is_lazy = 1;
+            t1 += sizeof VS_LAZY_PREFIX - 1;   /* the host field now starts at the index file name */
+        }
         if (strcmp(t1 + 1, "-") == 0 && strcmp(t2 + 1, "-") == 0) {
             size_t gl = strlen(buf);
             if (gl < 4 || buf[gl - 1] != '\\') {
@@ -411,6 +424,8 @@ static void vs_wide(uint16_t *dst, const char *s, size_t n)
     dst[k] = 0;
 }
 
+#include "vfs_lazy.h"
+
 /* Creates the directories above the file (C:\a, C:\a\b, ...) that are missing; a path component that exists as a file stops. */
 static int vs_ensure_dirs(const char *list, const vs_entry *e, size_t *ndirs)
 {
@@ -483,6 +498,7 @@ static int vs_run(const char *list)
     }
     printf("vfs seed: list %s, %zu files\n", list, n);
     for (i = 0; i < n; i++) {
+        if (ent[i].is_lazy) continue;   /* decision 0314: after the files that have bytes in the list */
         if (ent[i].is_dir) {
             if (vs_ensure_dirs(list, &ent[i], &ndirs) != 0) goto done;
             printf("vfs seed: %s\\ (directory)\n", ent[i].guest);
@@ -490,6 +506,12 @@ static int vs_run(const char *list)
         }
         if (vs_put(list, &ent[i], &ndirs) != 0) goto done;
         printf("vfs seed: %s <- %s (%zu bytes, sha256 %s)\n", ent[i].guest, ent[i].host, ent[i].size, ent[i].sha);
+    }
+    for (i = 0; i < n; i++) {
+        uint64_t lfiles = 0, ldirs = 0, lskipped = 0, lbytes = 0;
+        if (!ent[i].is_lazy) continue;
+        if (vl_load(list, ent[i].line, ent[i].host, ent[i].guest, ent[i].data, ent[i].size, &lfiles, &ldirs, &lskipped, &lbytes) != 0) goto done;
+        printf("vfs seed: %s\\ <- lazy index %s (%llu lazy files, %llu bytes, %llu directories; %llu files already had bytes from the list)\n", ent[i].guest, ent[i].host, (unsigned long long)lfiles, (unsigned long long)lbytes, (unsigned long long)ldirs, (unsigned long long)lskipped);
     }
     printf("vfs seed: done, %zu files, %zu directories created\n", n, ndirs);
     rc = 0;
