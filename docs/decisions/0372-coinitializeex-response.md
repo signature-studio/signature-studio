@@ -54,3 +54,5 @@ Learn の `CoInitializeEx` のページ(取得済み。`pilot_webfetch` で取�
 注(2026-11-15、R5-3i): 上の本文の「テストの更新」の新規ファイル(テスト用の rows の mod 1 件)は、ブランチ `r5-3h-coinitializeex` の `2f1915b` にだけあり、main には無い(`git ls-tree -r --name-only 2f1915b` を、そのテスト用の場所で引くと 1 件、`HEAD` で引くと 0 件)。0373 の観測は `2f1915b` から作った bundle で行った(`evidence/R5-3i.md`)。
 
 注(2026-11-16、R5-3m): 上の 2026-11-15 の注(R5-3i)は取り込み前の状態。`d2d90a9` の取り込みで `lift/crates/fe-lift/tests/rows_0372/mod.rs` は main に入った(`git show --stat d2d90a9` に出る)。テスト `coinitex-speed-over-memory` の値は、決定の `2|8`(= 10)に合わせて 8 から 10 に直した(commit A `123deac`)。取り込み後の HEAD での cargo test は `evidence/R5-3m-cargo.txt`(commit A の HEAD で実行。終了コード 101、既知の 1 件のみ)。
+
+注(2026-11-16、R5-3n): 本文 4 行目の「main には入れていない」は、取り込み前(ブランチ `r5-3h-coinitializeex` だけ)の状態の記述。取り込み commit `d2d90a9`(決定 0375)で、`lift/` の 12 ファイルが main に入った。
