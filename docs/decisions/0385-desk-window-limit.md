@@ -33,3 +33,12 @@
 - 0223(desk1、合成器)、0240(gpu1: S-gpu1-5「scene の上限 64 窓・64 更新は `FLE_DESK_MAX_WINDOWS` と同じ」、`docs/archive/decisions/0240-window-move-and-frame-rate.md:187`)、0244(glass・窓の領域)。
 - `docs/core/pitfalls.md` の F-7 の行、`docs/ROADMAP.md` の R3-5 の行。
 - 旧コード: `fle_desk.c` の gather(上限 64 で切る)・scene_wrote(溢れで黙って return)、`fle_win.c:7112-7122`(max で切る)。
+
+## 追記(2026-11-16。reviewer の差し戻しへの対応。本文は変えていない)
+- 置き換え: 停止の条件は、決定 0392(`docs/decisions/0392-desk-window-drawn-limit.md`)で置き換えた。上の決定 1 行目の「最上位窓が 65 以上あるとき」と、読み 4 の「非表示の窓も含めた最上位窓の数」は、0392 の「描かれる窓が 65 件目に達したとき」に替わる。上限 64 は残る。有効なのは 0392。
+- M1(分類): 先頭の「(a) 除去」は、実際の変更と合わない。上限 64 は残り、名前つき停止を足した。分類は 0392 の文言による。
+- M2(根拠の範囲): 読み 3 の「通常の利用で停止になる場面は見込まれない」の根拠は、起動直後の 1 時点の窓表(実測 3。`evidence/R5-1/engine-log-run2.txt:288`)だけで、件数の推移は未確認。基準プロジェクトのプラグインは `docs/archive/investigations/reference-project/tables/plugins.tsv` の 46 行(internal 列が Fruity Wrapper の 21 行、ほかの 25 行)。1 件で最上位窓が 1 つ増えると 9 + 46 = 55、2 つなら 9 + 2 × 46 = 101 になるが、これは件数の仮定で、実測していない。
+- M3(窓表): 実測 3 の「停止報告の窓表」は、停止の出力ではない。最初の可視の窓が現れた時点の窓表(G2 証拠。`evidence/R5-1/engine-log-run2.txt:288`)と、最初の画素の診断に続く窓表(`evidence/R1-6/e13-run-2.json` の after の欄)である。
+- M4(scene の溢れ): 決定 2 の「停止にすると、窓が多いだけで実行が終わる」の理由は、scene の溢れの条件と違う。溢れは「1 回の記述(`fle_desk_scene`)の間に 65 以上の異なる窓へ書く」(`scene_wrote` の `n_su == FLE_SCENE_MAX_WINDOWS`)で、生きている窓の数とは別。
+- M5(範囲外): 同じ打ち切りは 5 箇所ある(決定 3 の 4 箇所と、`lift/harness-docs-tools/alpha1/alpha1_rec.c:329` の 64)。どれも変えていない(依頼の範囲外)。
+- 数字: 実測 5 の 3 件は 3ded666 の時点の数字。取り直した結果は `evidence/R3-5.md` の 6・7 と `evidence/R3-5-cargo.txt`。
