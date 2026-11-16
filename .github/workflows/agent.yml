@@ -1,0 +1,103 @@
+# ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
+# モデルの認証情報は docs/requests/0004-actions-model-credentials.md の登録を待つ。登録が無いジョブは、Secrets を使う前に止まる。
+# Cloudflare の Secrets・Variables は渡さない。出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
+name: agent
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ci/tasks/*.md"
+      - ".github/workflows/agent.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: 実行するタスクを決める
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tasks: ${{ steps.plan.outputs.tasks }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - name: リポジトリを取得する(差分の基準の commit が要るため全履歴)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 追加・変更されたタスクを一覧にする
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: bash ci/agents/plan.sh "$BEFORE" "$AFTER"
+
+  run:
+    name: worker ${{ matrix.task }}
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 60
+      matrix:
+        task: ${{ fromJSON(needs.plan.outputs.tasks) }}
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: モデルの認証情報が登録されているかを確かめる(値は読まない)
+        env:
+          HAS_REGION: ${{ secrets.AWS_REGION != '' }}
+          HAS_BEARER: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK != '' }}
+          HAS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+          HAS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
+        run: bash ci/agents/check-credentials.sh
+
+      - name: opencode を導入する(版は固定)
+        run: bash ci/agents/install-opencode.sh
+
+      - name: 実行用のモデルの設定を書く
+        run: bash ci/agents/runner-config.sh
+
+      - name: 設定を確かめる(モデルと拒否の規則)
+        run: bash ci/agents/check-agents.sh
+
+      - name: worker を 1 回動かす
+        env:
+          TASK: ${{ matrix.task }}
+          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: bash ci/agents/run-task.sh "$TASK"
+
+      - name: 出力を検査する(公開ログと成果物に出せるかを確かめる)
+        env:
+          TASK: ${{ matrix.task }}
+        run: bash scripts/scan-forbidden.sh "ci/agents/out/$TASK"
+
+      - name: 成果物を保存する(7 日)
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-${{ matrix.task }}
+          path: ci/agents/out/${{ matrix.task }}/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: 要約をジョブのサマリーに書く
+        env:
+          TASK: ${{ matrix.task }}
+        run: bash ci/agents/summary.sh "$TASK" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: worker の終了を確かめる
+        if: always()
+        env:
+          TASK: ${{ matrix.task }}
+        run: 'grep -qx "rc: 0" "ci/agents/out/$TASK/meta.txt"'
