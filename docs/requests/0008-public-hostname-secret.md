@@ -26,7 +26,7 @@ GitHub の Actions の Secret `PUBLIC_HOSTNAME`(このリポジトリ)。値は�
 1. Secret の名前の出どころ(リポジトリ内。値は含まない)。`git grep -n PUBLIC_HOSTNAME -- ci archive/ci-old/deploy.yml` の出力の要点:
    - `archive/ci-old/deploy.yml` の 33 行: `PUBLIC_HOSTNAME: <CF-VALUE-REMOVED>`(旧の値は削除済み)
    - `ci/lib/wrangler_config.py`: 入力名 `PUBLIC_HOSTNAME`(Access の設定と一緒に使う)
-2. 一覧からの取得を実行(run 43807505570。`.github/workflows/deploy-worker.yml` の「今 100% の版と、この Worker のカスタムドメインの一覧を読む」の段のログ。`gh run view --job <id> --log` の該当行):
+2. 一覧からの取得を実行(run 43807505570。旧 deploy-worker の workflow(決定 0400 で deploy.yml に統合し廃止)の「今 100% の版と、この Worker のカスタムドメインの一覧を読む」の段のログ。`gh run view --job <id> --log` の該当行):
    ```
    読んだ binding(値は伏せた): 変数 ACCESS_TEAM_DOMAIN, ACCESS_AUD、R2 ASSETS_BUCKET, PERF_BUCKET
    カスタムドメインの一覧: HTTP 403、エラーの番号 10000(公開ホスト名は一覧から得られない)
