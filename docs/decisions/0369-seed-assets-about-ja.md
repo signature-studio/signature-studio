@@ -66,3 +66,5 @@
 - 未確認: work-r25 の abort の原因。`msgothic.ttc` が work-r25 で読まれるか。`BigFruit.png`・`AboutTxt.txt` の元の所在。
 
 注(2026-11-15): 14 行と 39 行の旧ツリーのパスの書き方を、`scripts/check-consistency.sh` の指摘(この clone に無いパス)に合わせて直した。意味は変えていない。元のパスは commit `90dafcf` の版にある。
+
+注(2026-11-16、R5-3 の 5 回目の検査): 上の『結果の追記』(2026-11-15)の『ロゴ・staff roll の目視は未確定』は、後の目視で置き換わる(`evidence/R5-3.md` の補い。reviewer の目視 3 枚も同じ結果)。E13(`evidence/R5-3/r53e13-chrome-2/about-28s.png`)は、ロゴ・staff roll が見えない。work-r25(`evidence/R5-3/r53wr25-chrome-1/about-28s.png`)と work-r53k(`evidence/R5-3l/r53knew-chrome-1/about-28s.png`)は、フルーツのロゴと開発者名の列が見える(各 1 枚。n=1)。撤回条件の「判定できない」は、定義 3(日本語)と work-r25 の vfs-miss が未観測のため、そのまま残る。
