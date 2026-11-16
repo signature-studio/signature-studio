@@ -50,13 +50,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: アカウント ID を得る(値は出さない)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: アカウント ID を app/wrangler.jsonc から読む
         run: |
-          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | jq -r '.result | first | .id')
-          echo "::add-mask::$ID"
-          echo "CF_ACCOUNT=$ID" >> "$GITHUB_ENV"
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
 
       - name: 抽出物のキャッシュ(R2)
         id: cache
@@ -105,13 +101,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: アカウント ID を得る(値は出さない)
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: アカウント ID を app/wrangler.jsonc から読む
         run: |
-          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | jq -r '.result | first | .id')
-          echo "::add-mask::$ID"
-          echo "CF_ACCOUNT=$ID" >> "$GITHUB_ENV"
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
 
       - name: 抽出物のキャッシュ(R2)を復元する
         uses: runs-on/cache@v5

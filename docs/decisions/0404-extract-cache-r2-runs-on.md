@@ -11,7 +11,7 @@
 ## 決定
 - 決定: 抽出物のキャッシュは R2(バケット fl-web-cache。鍵は R2_CACHE_ASSETS_*)に置き、runs-on/cache@v5 で取り出す・保存する。根拠: 依頼者の発言(上)。
 - 決定(取り消し): 0402 の「抽出のキャッシュをやめる」は取り消す。根拠: 0402 は、時間が減らないことを理由に、依頼者の発言を確かめずに機能を捨てた(誤り)。キャッシュの効果は時間ではなく通信(取得 1.1 GB を省く)。
-- 決定: endpoint のアカウント ID は、実行時に API(CLOUDFLARE_API_TOKEN)で 1 つ得て、GITHUB_ENV に入れ、伏せる。リポジトリには書かない。根拠: アカウント ID は scan-forbidden の cfhex 規則と AGENTS.md §8(コミットに Cloudflare の識別子を書かない)に当たる。依頼者の指示の「app/wrangler.jsonc の account_id を env に置く」は、この理由で採らない。
+- 決定(改): endpoint のアカウント ID は、app/wrangler.jsonc の account_id の行を、grep と cut で 1 行に読んで GITHUB_ENV に入れる。API の呼び出し・伏せる処理・CLOUDFLARE_API_TOKEN の受け渡しは agent.yml から外す。根拠: 依頼者は、配信に必要な識別子をツリーに置いてよいと明言(main の転送。deploy.yml の指摘の原文)。agent.yml に値を書かないので、scan の cfhex 規則に当たらない。注: endpoint は cache step の env として run ログに出る(runs-on/cache の env の表示)。依頼者の明言の範囲として、この表示は許される。
 - 決定: runs-on/cache の環境変数は、RUNS_ON_S3_BUCKET_CACHE=fl-web-cache、RUNS_ON_S3_BUCKET_ENDPOINT=https://<アカウント>.r2.cloudflarestorage.com、RUNS_ON_S3_FORCE_PATH_STYLE=true、AWS_REGION=auto、AWS_ACCESS_KEY_ID・AWS_SECRET_ACCESS_KEY(R2_CACHE_ASSETS_*)。根拠: 読んだ dist/restore/index.js の実装(下の実測)。
 - 決定: 抽出は、キャッシュが無いときだけ。インストーラの取得(R2_ARTIFACT_*)と抽出(ci/lib/extract_fl.py)は run の直書き。根拠: 依頼者の指示(直書き)。
 
