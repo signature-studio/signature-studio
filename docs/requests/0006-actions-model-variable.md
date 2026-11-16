@@ -44,4 +44,4 @@ gh run list --workflow agent.yml --limit 1 --json databaseId --jq '.[0].database
 (登録の後に追記: 日付・完了の確認コマンドの出力 1 行)
 
 ## 起票
-(`gh issue create` の出力を追記)
+- `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/6
