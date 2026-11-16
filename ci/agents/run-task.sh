@@ -18,7 +18,7 @@ if ! {
 ## この実行の場(GitHub Actions のワークツリー)
 - push はできない。commit もしない。変更はワークツリーに残す(後で差分を読む)。
 - `source scripts/env.sh` は使えない(emsdk が無い)。一時ファイルは `$RUNNER_TEMP` に置く。
-- Secrets・Variables・Cloudflare の資格情報は、この実行には無い。Issue は出せない。判断は「決定: X。根拠: Y」と書いて進める。
+- Secrets・Variables・Cloudflare の資格情報は、この実行には無い。判断は「決定: X。根拠: Y」と書いて進める。
 - 報告の先頭に、この実行の結論を 1 行で書く。
 
 ---

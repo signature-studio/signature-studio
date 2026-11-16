@@ -1,7 +1,7 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
-# モデルの認証は、opencode の認証情報(Secret OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。Secret が空のジョブは、取り込みの手順で止まる。
+# モデルの認証は、opencode の認証情報(環境変数 OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。値が空のジョブは、取り込みの手順で止まる。
 # モデルは、取り込んだ認証の提供元(console- で始まる)の一覧から、作業用の型(末尾 haiku-5-5)を runner-config.sh が選ぶ。Variable は読まない(決定 0399。決定 0388 を置き換える)。候補が 0 件なら止まる。2 件以上なら辞書順で先頭の 1 件(決定 0399 の追記)。
-# R2 の Secrets は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
+# R2 の鍵は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
 # 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
 
