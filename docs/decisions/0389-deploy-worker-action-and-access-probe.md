@@ -27,6 +27,7 @@
 - 決定 7: probe(配信の後)は、旧 stage-deploy.sh の probe と同じ 12 件(GET/POST/HEAD/Range。`/`・`/static/probe.js`・`/assets/manifest.json`・`/assets/probe/engine.0000000000.wasm`・`/__perf`・`/__perf/summary` など)と、同じ判定(302 で `*.cloudflareaccess.com`、401、403 は OK。他は失敗)。アセットの任意の URL は無し(bundle の manifest はこの workflow が読まない)。ログには転送先の URL を出さない(Access のログイン URL の path に公開ホストが入るため)。根拠: 旧 `archive/ci-old/ci/stage-deploy.sh:62-91`、依頼者の発言 msg_1982c56e0001L9vl9HVSX0PeIB(928 行「CF Accessによって私のみアクセス可能なWorkers…一般公開されることはありません」)。分類: 整備。
 - 決定 8: 順序は旧と同じ(配信 → 確かめ → probe)。probe が失敗しても配信は戻さない(旧と同じ。戻しは版の確かめの段だけ)。この点は未確認の論点として残す(「未確認」)。
 - 決定 9: 公開ホストは `wrangler.deploy.json` の route に入れない。gen 段の inline の検査は route を拒否する。カスタムドメインは Cloudflare 上に既にあり、versions の操作は触らない(0379 の追記)。分類: 整備。
+- 追記(0398 で置き換え): 決定 5 の (3)「どちらも無い・形が違うときは、Cloudflare に書く前(upload の前)に止める」と、deploy-worker.yml の冒頭の「どちらも無ければ配信の前に止める」は、0398 の決定 1 と 3 で置き換えた(公開ホスト名が得られないときは probe を飛ばし、配信は続ける)。この文書の決定の文は変えない。
 
 ## 実測(この機械。Cloudflare には触れていない)
 
