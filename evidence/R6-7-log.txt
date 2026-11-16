@@ -1,0 +1,92 @@
+# gh run view 43786377286 --log の抜粋(R6-7 の記録が引用した行だけ。段の名前の列と色の記号は除いた。時刻と文言はログのまま。伏せ字はこの抜粋に無い)。
+# 照合(R6-7.md の引用 ↔ この抜粋の行。不一致は 0。行番号は、この注の後の抜粋の 1 行目からの数え):
+# - §2 prefix fl-engine-ci-d5d440fa ↔ 1 行目。一致
+# - §4 インストーラの照合(大きさ 1106033456 B、SHA-256 一致) ↔ 2 行目。一致
+# - §4 抽出・上流 Blend2D ↔ 3・4 行目。成功(rc=0)
+# - §4 9 段 success ↔ 5 行目。一致
+# - §4 stage-command 32 件・rc は全て 0 ↔ 6〜37 行目(32 件。rc=0 が 32 件)。一致
+# - §4 合計 1902 s ↔ 6〜37 行目の wall の合計(この抜粋の 32 行を awk で合計した値)。一致
+# - §2 wasm 143118360 B・sha256 c963715a… ↔ 47 行目。一致
+# - §2 sha256sum -c の 9 件 OK ↔ 38〜46 行目。一致
+# - §2 .br の展開後 143118360・744946・9548386・77444112 B ↔ 48〜51 行目。一致
+# - §2 manifest の判定 ok・engine.kind emscripten-fruity-v1 ↔ 53 行目。一致
+# - §2 upload-commands 5 件・キーは fl-web-assets の prefix の下 ↔ 54 行目。一致
+# - §2 載せた 5 件の大きさ(wasm 15710596 B・glue 66919 B・seed 5230435 B・dll 15953166 B、sha256 一致) ↔ 57・59・61・63 行目。一致(4 件)
+# - §2 manifest.json の 3097 B ↔ この抜粋に大きさの行は無い(65 行目は「載せた物と同じバイト」)。3097 B は 70 行目の root の大きさ(同じ manifest のファイル)から導く(記録 §2 の注)
+# - §4 参照先 5 件 R2 に在る(head) ↔ 67 行目。一致。確かめた件数 5 ↔ 66 行目。一致
+# - §3 root の前(sha256 27b81add…・3098 B) ↔ 68 行目。一致
+# - §3 退避 backup/manifest-root-20261116T021018Z.json(get で一致) ↔ 69 行目。一致
+# - §3 root の後(sha256 1c78c19e…・3097 B) ↔ 70 行目。一致
+# - §4 結果の表 root の差し替え(変えた = yes) ↔ 71 行目。一致
+# - この抜粋に無い: run の ID・conclusion・headSha・createdAt(記録は gh run list の出力による)、HTTP 401(gh run watch の出力。ログには無い)。
+2026-11-16T01:27:36.3946408Z prefix: fl-engine-ci-d5d440fa
+2026-11-16T01:27:44.2538544Z 照合: 一致(大きさ 1106033456 B、SHA-256 一致)
+2026-11-16T01:27:45.5389355Z 抽出: 成功(rc=0)
+2026-11-16T01:29:05.9936644Z 上流 Blend2D: 成功(rc=0)
+2026-11-16T02:09:44.3860817Z 9 段: 成功(rc=0)
+2026-11-16T02:09:44.3884125Z stage-command gen rc=0 wall=37s
+2026-11-16T02:09:44.3884635Z stage-command wasm-Oz-rt rc=0 wall=23s
+2026-11-16T02:09:44.3885235Z stage-command wasm-Oz-harness rc=0 wall=3s
+2026-11-16T02:09:44.3885831Z stage-command wasm-Oz-units rc=0 wall=734s
+2026-11-16T02:09:44.3886388Z stage-command hyb-n0-fle rc=0 wall=107s
+2026-11-16T02:09:44.3886967Z stage-command hyb-n0-dsp rc=0 wall=123s
+2026-11-16T02:09:44.3887724Z stage-command hyb-n0-b2d rc=0 wall=1s
+2026-11-16T02:09:44.3888282Z stage-command hyb-n0-qfc rc=0 wall=6s
+2026-11-16T02:09:44.3888813Z stage-command hyb-n0-ft rc=0 wall=2s
+2026-11-16T02:09:44.3889702Z stage-command hyb-n0-ilt rc=0 wall=14s
+2026-11-16T02:09:44.3890350Z stage-command hyb-n0-oggio rc=0 wall=5s
+2026-11-16T02:09:44.3890996Z stage-command hyb-n0-elastique rc=0 wall=15s
+2026-11-16T02:09:44.3891605Z stage-command weblink-Oz rc=0 wall=19s
+2026-11-16T02:09:44.3892213Z stage-command wasmopt-Oz rc=0 wall=493s
+2026-11-16T02:09:44.3892687Z stage-command hyb-gen-fle rc=0 wall=107s
+2026-11-16T02:09:44.3893277Z stage-command hyb-opt-fle rc=0 wall=10s
+2026-11-16T02:09:44.3893926Z stage-command hyb-gen-dsp rc=0 wall=123s
+2026-11-16T02:09:44.3894575Z stage-command hyb-opt-dsp rc=0 wall=2s
+2026-11-16T02:09:44.3895205Z stage-command hyb-gen-b2d rc=0 wall=0s
+2026-11-16T02:09:44.3895832Z stage-command hyb-opt-b2d rc=0 wall=0s
+2026-11-16T02:09:44.3896471Z stage-command hyb-gen-qfc rc=0 wall=6s
+2026-11-16T02:09:44.3897123Z stage-command hyb-opt-qfc rc=0 wall=2s
+2026-11-16T02:09:44.3898212Z stage-command hyb-gen-ft rc=0 wall=2s
+2026-11-16T02:09:44.3898849Z stage-command hyb-opt-ft rc=0 wall=0s
+2026-11-16T02:09:44.3899589Z stage-command hyb-gen-ilt rc=0 wall=14s
+2026-11-16T02:09:44.3900229Z stage-command hyb-opt-ilt rc=0 wall=1s
+2026-11-16T02:09:44.3900855Z stage-command hyb-gen-oggio rc=0 wall=5s
+2026-11-16T02:09:44.3901482Z stage-command hyb-opt-oggio rc=0 wall=1s
+2026-11-16T02:09:44.3902175Z stage-command hyb-gen-elastique rc=0 wall=15s
+2026-11-16T02:09:44.3902892Z stage-command hyb-opt-elastique rc=0 wall=11s
+2026-11-16T02:09:44.3903547Z stage-command hyb-merge1 rc=0 wall=1s
+2026-11-16T02:09:44.3904518Z stage-command hyb-merge2 rc=0 wall=20s
+2026-11-16T02:09:44.4809744Z dll.2f494419c1ad.flpack: OK
+2026-11-16T02:09:44.4931497Z dll.2f494419c1ad.flpack.br: OK
+2026-11-16T02:09:44.4937220Z engine-glue.b063ddc0ad2f.js: OK
+2026-11-16T02:09:44.4938161Z engine-glue.b063ddc0ad2f.js.br: OK
+2026-11-16T02:09:44.6032950Z engine.c963715a4410.wasm: OK
+2026-11-16T02:09:44.6154135Z engine.c963715a4410.wasm.br: OK
+2026-11-16T02:09:44.6154780Z manifest.json: OK
+2026-11-16T02:09:44.6227603Z seed.7cd2eaecbdba.flpack: OK
+2026-11-16T02:09:44.6268175Z seed.7cd2eaecbdba.flpack.br: OK
+2026-11-16T02:09:44.7395708Z wasm: 大きさ 143118360 B、sha256 c963715a4410dd56cd77e31aac44d2fd2f3b8616098cc57b9bdfae8742e6963d
+2026-11-16T02:09:45.1728991Z dll.2f494419c1ad.flpack.br: 展開すると元と同じ(展開後 77444112 B)
+2026-11-16T02:09:45.1816122Z engine-glue.b063ddc0ad2f.js.br: 展開すると元と同じ(展開後 744946 B)
+2026-11-16T02:09:45.6740638Z engine.c963715a4410.wasm.br: 展開すると元と同じ(展開後 143118360 B)
+2026-11-16T02:09:45.7388171Z seed.7cd2eaecbdba.flpack.br: 展開すると元と同じ(展開後 9548386 B)
+2026-11-16T02:09:45.7955437Z manifest: engine.kind emscripten-fruity-v1、参照先は /assets/fl-engine-ci-d5d440fa/ の下、判定 True
+2026-11-16T02:09:45.8665796Z manifest の判定(app/shared/manifest-guard.ts): ok、engine.kind emscripten-fruity-v1
+2026-11-16T02:09:45.8893308Z upload-commands: 5 件。キーは fl-web-assets の prefix の下だけ。削除・同期の指定は無し
+2026-11-16T02:09:46.9865246Z R2 の prefix に manifest.json が無い(404)。5 件を載せる(manifest.json は最後)
+2026-11-16T02:09:51.8211042Z 載せた: engine.c963715a4410.wasm
+2026-11-16T02:09:54.3788173Z 確かめ engine.c963715a4410.wasm: 大きさ 15710596 B、sha256 一致
+2026-11-16T02:09:56.0776653Z 載せた: engine-glue.b063ddc0ad2f.js
+2026-11-16T02:09:58.3252774Z 確かめ engine-glue.b063ddc0ad2f.js: 大きさ 66919 B、sha256 一致
+2026-11-16T02:10:01.0628464Z 載せた: seed.7cd2eaecbdba.flpack
+2026-11-16T02:10:03.4647940Z 確かめ seed.7cd2eaecbdba.flpack: 大きさ 5230435 B、sha256 一致
+2026-11-16T02:10:06.5845033Z 載せた: dll.2f494419c1ad.flpack
+2026-11-16T02:10:09.2404388Z 確かめ dll.2f494419c1ad.flpack: 大きさ 15953166 B、sha256 一致
+2026-11-16T02:10:10.8016678Z 載せた: manifest.json
+2026-11-16T02:10:12.0458344Z 確かめ manifest.json: 載せた物と同じバイト
+2026-11-16T02:10:12.0459860Z 確かめた件数: 5
+2026-11-16T02:10:16.9833268Z 参照先: 5 件とも R2 に在る(head)
+2026-11-16T02:10:17.9507509Z root の前: sha256 27b81add1fd41129a1b8aa8d88c88cd55582708bfa57d416f16200ea27cb2af9、大きさ 3098 B
+2026-11-16T02:10:22.4812623Z 退避: backup/manifest-root-20261116T021018Z.json(sha256 27b81add1fd41129a1b8aa8d88c88cd55582708bfa57d416f16200ea27cb2af9。get で一致)
+2026-11-16T02:10:26.6984936Z root の差し替え: 新しい sha256 1c78c19e57f3ea727725d06595ab707e762e97b8c41c5f7943b981d9ef31e885、大きさ 3097 B(head と get で確認)
+2026-11-16T02:10:26.7191908Z | root の差し替え | success(変えた = yes) |
