@@ -13,8 +13,8 @@
 #include "fle_modules.h"
 #include "fle_realmod.h"
 
-/* The number of real modules: 8, as since decision 0106 (decision 0206 measured that a set of 11 images does not fit; the handles of fle_loadimage.h, stride 0x1000 in a 1 MiB region, allow 256). */
-#define RM_MAX 8u
+/* The number of real modules: 16 (G9-c step; 8 since decision 0106 until the plugin Fruity Balance made the eighth; decision 0206 measured that a set of 11 images did not fit in 8; the handles of fle_loadimage.h, stride 0x1000 in a 1 MiB region, allow 256). */
+#define RM_MAX 16u
 
 /* No real module unless the link brings its own fle_realmod_table and fle_realmod_count. */
 const fle_realmod_entry fle_realmod_table[] __attribute__((weak)) = { { NULL, 0 } };
@@ -41,7 +41,7 @@ static void table_check(const char *api)
     char why[200];
 
     if (table_ready) return;
-    if (n > RM_MAX) fle_stop(api, "fle_realmod_count is larger than the 8 real modules this runtime holds");
+    if (n > RM_MAX) fle_stop(api, "fle_realmod_count is larger than the 16 real modules this runtime holds");
     for (i = 0; i < n; i++) {
         const char *name = fle_realmod_table[i].name;
         uint64_t base = fle_realmod_table[i].base;

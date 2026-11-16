@@ -41,10 +41,10 @@ int main(int argc, char **argv) {
     void (*fn)(void);
     uint8_t *stk;
     /* N real modules (lift/out-three/harness-two): argv[2] is one file or several separated by ':'. One file: the output is the one of
-     * the one-module main_two.c. MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (8) of fle_realmod.c on purpose, as
+     * the one-module main_two.c. MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (16) of fle_realmod.c on purpose, as
      * in harness/two/main_two.c (decision 0106: it was 4 = RM_MAX, so a 5th real module file was refused here before the runtime saw it);
      * more files than the runtime holds are mapped and then stopped by the runtime by name. */
-    enum { MAIN_REAL_MAX = 16 };
+    enum { MAIN_REAL_MAX = 32 };
     char *rpath[MAIN_REAL_MAX], *rcopy = NULL;
     uint64_t rimg_lo[MAIN_REAL_MAX], rimg_sz[MAIN_REAL_MAX]; /* census: the images whose memory the report may read */
     int nreal = 0;

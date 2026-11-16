@@ -674,6 +674,8 @@ fn a_table_does_not_change_what_it_does_not_name() {
 #[test]
 fn a_table_that_breaks_the_rules_stops_by_name() {
     let _ = built();
+    // 17 entries (RM_MAX is 16 since the G9-c step; it was 8 with the nine-entry case): lower-case names, bases 0x2000000 + i * 0x1000000, all different
+    let seventeen_entries = format!("RM_ENTRIES={}", (0..17u64).map(|i| format!("{{ \"m{}.dll\", {:#x} }}", i, 0x2000000u64 + i * 0x1000000)).collect::<Vec<_>>().join(", "));
     let cases: [(&str, [&str; 3], &str); 7] = [
         ("virtual-name", ["RM_ENTRIES={ \"kernel32.dll\", 0x2000000 }", "RM_COUNT=1", "X=1"], "has the name of a virtual module"),
         ("exe-base", ["RM_ENTRIES={ \"mod2.dll\", 0x400000 }", "RM_COUNT=1", "X=1"], "is not usable"),
@@ -682,13 +684,13 @@ fn a_table_that_breaks_the_rules_stops_by_name() {
         ("upper-case", ["RM_ENTRIES={ \"Mod2.dll\", 0x2000000 }", "RM_COUNT=1", "X=1"], "is not lower-case"),
         ("same-base", ["RM_ENTRIES={ \"mod2.dll\", 0x2000000 }, { \"mod3.dll\", 0x2000000 }", "RM_COUNT=2", "X=1"], "repeats a name or a base"),
         (
-            "nine-modules",
+            "seventeen-modules",
             [
-                "RM_ENTRIES={ \"a.dll\", 0x2000000 }, { \"b.dll\", 0x3000000 }, { \"c.dll\", 0x4000000 }, { \"d.dll\", 0x5000000 }, { \"e.dll\", 0x6000000 }, { \"f.dll\", 0x7000000 }, { \"g.dll\", 0x8000000 }, { \"h.dll\", 0x9000000 }, { \"i.dll\", 0xa000000 }",
-                "RM_COUNT=9",
+                seventeen_entries.as_str(),
+                "RM_COUNT=17",
                 "X=1",
             ],
-            "larger than the 8 real modules",
+            "larger than the 16 real modules",
         ),
     ];
     for (label, defs, say) in cases {
@@ -700,8 +702,8 @@ fn a_table_that_breaks_the_rules_stops_by_name() {
     }
 }
 
-/// Decision 0106: RM_MAX is 8 (it was 4). A table of eight entries passes the table check, which runs at the first lookup, so a name
-/// outside the table gets the loader's usual stop and not the "larger than" stop of the check (a table of nine entries gets that one,
+/// Decision 0106: RM_MAX was 8 (it was 4); the G9-c step made it 16. A table of eight entries passes the table check, which runs at the first lookup, so a name
+/// outside the table gets the loader's usual stop and not the "larger than" stop of the check (a table of seventeen entries gets that one,
 /// in a_table_that_breaks_the_rules_stops_by_name). No image is mapped in this program, so no entry is loaded (that would read it).
 #[test]
 fn a_table_of_eight_modules_passes_the_table_check() {

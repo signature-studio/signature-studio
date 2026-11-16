@@ -38,7 +38,7 @@
 #define COUNT_VA UINT64_C(0x15EAC98)
 #define UNIT_RET UINT64_C(0x412129) /* the return address f_4120c0 pushes for `call proc` at 0x412126 */
 #define MAX_UNITS (1u << 16)
-#define MAX_IMAGES 9 /* FLEngine + RM_MAX (8, fle_realmod.c) real modules; census_add_image ignores an image beyond this (decision 0106: was 8) */
+#define MAX_IMAGES 17 /* FLEngine + RM_MAX (16, fle_realmod.c) real modules; census_add_image ignores an image beyond this (decision 0106: was 8; 9 while RM_MAX was 8) */
 #define MSG_MAX 2048
 #define ULL(x) ((unsigned long long)(x))
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # build-engine-bundle.sh: builds the engine BUNDLE (engine.kind "emscripten-fruity-v1") from the tree this script is in. ONE configuration (decision 0243: no preset, no option):
-# the lifted FLEngine and the seven modules it loads (dsp_ippv2, Blend2D, QuickFontCache, FreeType, ILTools, the sample decoder oggio and the time-stretch engine Elastique), the runtime, the hybrid (the functions of
+# the lifted FLEngine and the eight modules it loads (dsp_ippv2, Blend2D, QuickFontCache, FreeType, ILTools, the sample decoder oggio, the time-stretch engine Elastique and the plugins Fruity Balance and Fruity Filter), the runtime, the hybrid (the functions of
 # lift/harness/seeds/hyb-U-<module>.txt lowered straight to wasm by fe-wasmgen), upstream Blend2D for the lifted Blend2D context, wasm-opt -Oz, the register file in the thread-local block fle_ctx, one shared memory.
 # The procedure is that of decision 0134 with every path derived from this tree; the one thing that is added to the link line is -sEXPORT_ES6=1 (the glue is an ES module that the engine's MODULE worker can import()).
 #
@@ -15,7 +15,7 @@
 #     weblink   harness/web/fruity/link-web.sh: flengine6.{js,wasm} for the browser (ES module glue, no file system)
 #     wasmopt   wasm-opt -Oz over flengine6.wasm -> flengine6.c.opt.wasm (the C part)
 #     hybrid    fe-wasmgen over the lists with the real addresses (from the link map), wasm-opt -Oz of each direct module, wasm-merge into the C part -> flengine6.opt.wasm, and the glue without the stubs of the functions that the direct code defines
-#     seed      pack_seed.py: the seed pack (FLSEEDP1, the guest's host files + registry seeds + claims), and the DLL directory (8 files)
+#     seed      pack_seed.py: the seed pack (FLSEEDP1, the guest's host files + registry seeds + claims), and the DLL directory (6 + NEXTRA = 10 files since the Filter step)
 #     bundle    scripts/pack-assets.mjs: engine.<sha>.wasm(.br), glue, seed pack, DLL pack, manifest.json, SHA256SUMS, upload-commands.txt  -> $WORK/bundle/$PREFIX
 #   parameters (places and numbers; none of them changes what is built): WORK (default $SRCTREE/lift/out-app-engine), HOST_ROOT (the extracted inputs: binaries/win64/FLEngine_x64.dll and lift/out-*), PREFIX (bundle key prefix), BUCKET (the R2 bucket
 #             name in the printed upload commands), JOBS, MEMGUARD_MIN_MB, BROTLI_QUALITY (default 11; a lower number only makes the encoding faster), WASM_OPT_BIN, WASM_MERGE_BIN, EM_CACHE,
@@ -36,7 +36,7 @@ VARIANT=Oz
 PREFIX=${PREFIX:-fl-$VARIANT}
 die() { echo "build-engine-bundle: $*" >&2; exit 2; }
 # ---- the configuration (decision 0243): constants, not variables of the caller. Each line is what the shipped build had: the preset chain F2xH7 -> F2xH5 -> F2xH4 -> F2xH3 -> F2xH2 -> F2x (decisions 0176, 0189, 0208, 0218, 0225, 0230, 0235)
-# with the hybrid of decision 0239 (H9opt) and the two modules of decision 0230 (oggio, Elastique).
+# with the hybrid of decision 0239 (H9opt), the two modules of decision 0230 (oggio, Elastique) and the plugins of decision 0313 (Fruity Balance, G9-a) and the G9-c step (Fruity Filter).
 FRUITY_SECONDS=36000   # the engine harness stops the guest after this many wall-clock seconds (fruity.c: FLE_FRUITY_SECONDS, at most 36000 since decision 0136)
 HINT_FIRST_PIXEL_S=53; HINT_STOP_S=59          # the manifest's hints of decision 0137 (Chrome 156, shared machine)
 LOWREGS_BASE=0x1000                            # R at 0x1000, FL at +0x100, X at +0x200 (decision 0197)
@@ -45,7 +45,7 @@ EXTRA_IMPORTS=$SRCTREE/lift/harness/seeds/ship6-imports.txt   # decision 0230: t
 PRUNE_LIST=$SRCTREE/lift/data/prune-SM.tsv   # decision 0168: the S+M level, for dsp_ippv2 only (gen-direct.sh)
 AI_UNITS_FILE=$SRCTREE/lift/harness/seeds/ship-hot-units-F2.tsv      # decision 0151: the start-up-heavy units compiled with -DFLE_ALWAYS_INLINE
 AI_UNITS=$(awk -F'\t' '/^#/ {next} {print $1}' "$AI_UNITS_FILE" | tr '\n' ' ')
-EXTRA_MODULES="oggio elastique"; NEXTRA=2     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine)
+EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine); decision 0313: module 8, the plugin Fruity Balance, and the Filter step of G9-c: module 9, the plugin Fruity Filter (neither is in HYB_MODS: all of it is C part)
 HYB_MODS="fle dsp b2d qfc ft ilt oggio elastique"   # the modules of the hybrid lists lift/harness/seeds/hyb-U-<m>.txt (decision 0239)
 HYB=$WORK/hyb
 B2D_UPSTREAM_LIB=${B2D_UPSTREAM_LIB:-}
@@ -400,7 +400,7 @@ stage_seed() {
       --extra "$H/seeds/reg-seed-nsis.tsv" --extra "$H/seeds/reg-seed-app.tsv" --extra "$H/seeds/authenticode-claims.tsv" --out "$WORK/in/seedpack.bin" > "$LOGS/pack_seed.txt" || die "pack_seed.py failed"
     cat "$LOGS/pack_seed.txt" | head -12
   fi
-  # the guest's modules: the original engine DLL and the seven rebased modules the lifter made (their names carry the base: dsp_ippv2_x64.2000000.dll ...)
+  # the guest's modules: the original engine DLL and the nine rebased modules the lifter made (their names carry the base: dsp_ippv2_x64.2000000.dll ...)
   cp -n "$FLE" "$WORK/in/dll/FLEngine_x64.dll"
   local f
   for f in "$TAGDIR"/dll/*.dll; do cp -n "$f" "$WORK/in/dll/$(basename "$f")"; done
@@ -417,7 +417,7 @@ stage_bundle() {
   dsp=$(cd "$WORK/in/dll" && ls dsp_ippv2_x64.*.dll); blend=$(cd "$WORK/in/dll" && ls Blend2D.*.dll); qfc=$(cd "$WORK/in/dll" && ls quickfontcache_x64.*.dll)
   ft=$(cd "$WORK/in/dll" && ls freetype_x64.*.dll); il=$(cd "$WORK/in/dll" && ls ILTools_x64.*.dll)
   mods="/data/$dsp:/data/$blend:/data/$qfc:/data/$ft:/data/$il"
-  for x in $EXTRA_MODULES; do mods="$mods:/data/$(cd "$WORK/in/dll" && ls "${x}"_x64.*.dll)"; done   # modules 6 and 7 in the order of EXTRA_MODULES (= the order of modules.txt)
+  for x in $EXTRA_MODULES; do mods="$mods:/data/$(cd "$WORK/in/dll" && ls "${x}"_x64.*.dll)"; done   # modules 6, 7 and 8 in the order of EXTRA_MODULES (= the order of modules.txt)
   local sha; sha=$(sha256sum "$ENGINE_WASM" | cut -c1-12)
   # decision 0141: an engine with SEH (FLE_SEH_HANDLERS) does not stop at wall 16; the stop note below is for the walls known when this was written (decision 0243: the page names no window, and the manifest has no expected stop frame).
   local STOPNOTE_ARGS=(--stop-note "indirect call to 0=>The engine called address 0: a function it asked GetProcAddress for came back 0. Decision 0136 section 7 read this wall (after the welcome wizard is closed) as user32!UpdateLayeredWindow of the layered window TLightweightLayeredControl. Decision 0140 gave the engine a model of it, so a bundle built from a tree with that decision does not stop here. It stopped by design; the desktop shows the last picture of each window.")

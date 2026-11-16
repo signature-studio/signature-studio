@@ -55,9 +55,9 @@ int main(int argc, char **argv) {
     void (*fn)(void);
     uint8_t *stk;
     /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
-     * MAIN_REAL_MAX only sizes this array. It is larger than the RM_MAX (8) of fle_realmod.c on purpose: more files than the runtime
+     * MAIN_REAL_MAX only sizes this array. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
      * holds are mapped and then stopped by the runtime (fle_realmod.c table_check, by name), not by a second limit here. */
-    enum { MAIN_REAL_MAX = 16 };
+    enum { MAIN_REAL_MAX = 32 };
     char *rpath[MAIN_REAL_MAX], *rcopy = NULL;
     int nreal = 0;
     uint64_t span_lo = 0, span_hi = 0;

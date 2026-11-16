@@ -46,7 +46,7 @@
 
 /* Decision 0104 (PROVISIONAL, a token like the ones above): the cursors loaded from a real module (fle_realmod.h; hInst = its base) have
  * the handle FLE_LI_MODULE_HANDLE_BASE + FLE_LI_REALMOD_STRIDE * (index + 1) + 4 * (id - FLE_LI_MODULE_FIRST + 1), index = the position of the
- * module in fle_realmod_table (at most 8 modules, RM_MAX of fle_realmod.c: the largest handle is base + 0x8018, far below the 1 MiB region), so that two modules' cursors with the same id are two handles. Inside the region. */
+ * module in fle_realmod_table (at most 16 modules, RM_MAX of fle_realmod.c: the largest handle is base + 0x10018, far below the 1 MiB region), so that two modules' cursors with the same id are two handles. Inside the region. */
 #define FLE_LI_REALMOD_STRIDE     UINT64_C(0x00001000)
 
 /* Decision 0125 (PROVISIONAL, S-loadcursor-handle): the cursors that user32!LoadCursorW(hInstance, L"name") loads from the NAMED RT_GROUP_CURSOR entries of a module take the slots
