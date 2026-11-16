@@ -53,12 +53,6 @@ jobs:
   bundle:
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    env:
-      WORK: ${{ runner.temp }}/work
-      HOST_ROOT: ${{ runner.temp }}/host
-      B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
-      B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
-      BUCKET: fl-web-assets
     steps:
       - name: "リポジトリを取得する"
         uses: actions/checkout@v4
@@ -172,6 +166,11 @@ jobs:
         name: "段 gen と resplit を回す(毎回作る。キャッシュしない。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -188,6 +187,8 @@ jobs:
       - id: wkeys
         name: "段 wasm の 7 群の鍵(群の単位の内容のハッシュ。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          WORK: ${{ runner.temp }}/work
         run: bash ci/stage-keys.sh wasm >> "$GITHUB_OUTPUT"
 
       - id: wr_fle
@@ -292,6 +293,11 @@ jobs:
         name: "段 wasm を回す(7 群のどれかが miss のとき。object が在る群は作り直さない)"
         if: steps.bundle_cache.outputs.hit != 'true' && (steps.wr_fle.outputs.hit != 'true' || steps.wr_m1.outputs.hit != 'true' || steps.wr_m2.outputs.hit != 'true' || steps.wr_m3.outputs.hit != 'true' || steps.wr_m4.outputs.hit != 'true' || steps.wr_m5.outputs.hit != 'true' || steps.wr_rt.outputs.hit != 'true')
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -406,6 +412,8 @@ jobs:
       - id: hkey
         name: "段 hybn0 の鍵(内容のハッシュ。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          WORK: ${{ runner.temp }}/work
         run: bash ci/stage-keys.sh hybn0 >> "$GITHUB_OUTPUT"
 
       - id: hybn0_cache
@@ -426,6 +434,11 @@ jobs:
         name: "段 hybn0 を回す(復元が hit のときは飛ばす)"
         if: steps.bundle_cache.outputs.hit != 'true' && steps.hybn0_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -457,6 +470,11 @@ jobs:
         name: "段 weblink を回す(毎回作る。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -473,6 +491,8 @@ jobs:
       - id: okey
         name: "段 wasmopt の鍵(weblink の出力の内容のハッシュ。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          WORK: ${{ runner.temp }}/work
         run: bash ci/stage-keys.sh wasmopt >> "$GITHUB_OUTPUT"
 
       - id: wasmopt_cache
@@ -493,6 +513,11 @@ jobs:
         name: "段 wasmopt を回す(復元が hit のときは飛ばす)"
         if: steps.bundle_cache.outputs.hit != 'true' && steps.wasmopt_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -523,6 +548,8 @@ jobs:
       - id: hbkey
         name: "段 hybrid の鍵(C 部分・link map・glue・DLL の内容のハッシュ。決定 0395)"
         if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          WORK: ${{ runner.temp }}/work
         run: bash ci/stage-keys.sh hybrid >> "$GITHUB_OUTPUT"
 
       - id: hybrid_cache
@@ -543,6 +570,11 @@ jobs:
         name: "段 hybrid を回す(復元が hit のときは飛ばす)"
         if: steps.bundle_cache.outputs.hit != 'true' && steps.hybrid_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -574,6 +606,11 @@ jobs:
         name: "段 seed と bundle を回す(毎回作る。bundle の鍵が miss のとき)"
         if: steps.bundle_cache.outputs.hit != 'true'
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
         run: |
           set -u
@@ -590,6 +627,11 @@ jobs:
       - id: check
         name: "9 段の出力を検査する(sha256・展開・manifest の判定・載せる 5 件。値は出さない)"
         env:
+          WORK: ${{ runner.temp }}/work
+          HOST_ROOT: ${{ runner.temp }}/host
+          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
           WORK: ${{ runner.temp }}/work
         run: |
@@ -899,6 +941,7 @@ jobs:
       - name: "結果の表(失敗しても出す)"
         if: always()
         env:
+          WORK: ${{ runner.temp }}/work
           R_KEY: ${{ steps.key.outcome }}
           R_ACCT: ${{ steps.acct.outcome }}
           R_LAYER: ${{ steps.layer.outcome }}
