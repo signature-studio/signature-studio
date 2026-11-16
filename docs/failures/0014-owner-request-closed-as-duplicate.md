@@ -57,7 +57,7 @@
 ## 追記(2026-11-16): deploy-worker の 6 回の停止(依頼者の Secret への依存)
 
 - 事実(`gh run view <id> --json conclusion,headSha,createdAt,jobs`。ログ本文は確かめていない): deploy-worker の run 6 件が failure。作成時刻と commit は 43807505570(50e21bc、05:00:53Z)、43812589594(fb42bc4、05:48:12Z)、43819916606(9e2e354、06:53:43Z)、43821895100(f80f9f4、07:10:16Z)、43826158277(a566fff、07:46:26Z)、43831017455(84ebbd8、08:25:00Z)。どの run も、段「公開ホスト名を決める(一覧から得た物。無ければ Secret PUBLIC_HOSTNAME。…)」で failure。
-- 段の名前は、公開ホスト名が一覧にも Secret にも無いときに止める、と書いている。停止した版(commit f073cd0 の `.github/workflows/deploy-worker.yml`)では、その段が `secrets.PUBLIC_HOSTNAME` を参照していた(行 271)。その後、deploy-worker.yml と deploy-engine.yml は 1 本の `.github/workflows/deploy.yml` に統合された(commit aba137b。この統合は別の作業。統合後の版に Secret の参照は無い)。
+- 段の名前は、公開ホスト名が一覧にも Secret にも無いときに止める、と書いている。停止した版(commit f073cd0 の、統合の前の deploy-worker の workflow)では、その段が `secrets.PUBLIC_HOSTNAME` を参照していた(行 271)。その後、deploy-worker.yml と deploy-engine.yml は 1 本の `.github/workflows/deploy.yml` に統合された(commit aba137b。この統合は別の作業。統合後の版に Secret の参照は無い)。
 - 依頼者は Issue 8(Secret PUBLIC_HOSTNAME の登録)を 08:20:14Z に「実施しない(NOT_PLANNED)」で閉じた。依頼者は、この Secret を登録しない(deploy-worker.yml の 6 行目の注)。
 - 読み(PM の指摘。main の指示): 配信を依頼者の Secret に依存させた設計が、6 回の停止の原因。同じ型の依頼(依頼者の登録に依存する)。確かめた範囲: 依頼者の登録の依頼は、Issue 1・5・6・7・8 の 5 件(`gh issue list --state all`)。この型の依存の数は、deploy-worker の 1 件(公開ホスト名)。deploy-engine の依存は未確認。
 - 是正: この記録では、配信の版を変えていない(統合後の deploy.yml は別の作業の範囲)。6 回の停止は未是正。
