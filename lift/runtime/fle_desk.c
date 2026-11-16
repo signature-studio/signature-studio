@@ -17,6 +17,7 @@
 
 #include "fle_class.h"
 #include "fle_desk.h"
+#include "fle_env.h"
 #include "fle_input.h"
 #include "fle_layered.h"
 #include "fle_monitor.h"
@@ -321,9 +322,11 @@ static void names_of(uint64_t hwnd, char *cls, size_t cls_cap, char *title, size
 
 static void gather(void)
 {
-    uint64_t hs[FLE_DESK_MAX_WINDOWS];
-    unsigned n = fle_win_input_toplevels(hs, FLE_DESK_MAX_WINDOWS);
+    uint64_t hs[FLE_DESK_MAX_WINDOWS + 1];
+    unsigned n = fle_win_input_toplevels(hs, FLE_DESK_MAX_WINDOWS + 1);
 
+    /* decision 0385: fle_win_input_toplevels cuts its list at max, so a window past FLE_DESK_MAX_WINDOWS would be left out of the picture and of the scene without a sign: the run stops by name */
+    if (n > FLE_DESK_MAX_WINDOWS) fle_stop("fle_desk_gather", "more than 64 top-level windows are live (FLE_DESK_MAX_WINDOWS): the compositor and the scene hold 64 (decision 0385)");
     ncur = 0;
     for (unsigned k = n; k-- > 0;) {    /* the list is top first: the picture is drawn from the bottom */
         fle_win_iview v;
@@ -580,7 +583,10 @@ static void scene_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_
             if (y1 > su_r[i].y1) su_r[i].y1 = (int32_t)y1;
             return;
         }
-    if (n_su == FLE_SCENE_MAX_WINDOWS) return;      /* more windows than the compositor draws: the lid is not in the scene either */
+    if (n_su == FLE_SCENE_MAX_WINDOWS) {            /* decision 0385: more distinct windows written since the last description than the table holds: the next description sends every window whole, so no written pixel is left out */
+        need_full = 1;
+        return;
+    }
     su_lid[n_su] = lid;
     su_r[n_su].x0 = (int32_t)x0;
     su_r[n_su].y0 = (int32_t)y0;

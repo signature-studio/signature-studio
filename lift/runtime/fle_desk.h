@@ -30,7 +30,7 @@
 #define FLE_DESK_MAGIC 0x4b534544u      /* "DESK" as bytes 'D' 'E' 'S' 'K' */
 #define FLE_DESK_VERSION 1u
 #define FLE_DESK_MAX_RECTS 32u
-#define FLE_DESK_MAX_WINDOWS 64u
+#define FLE_DESK_MAX_WINDOWS 64u        /* decision 0385: also the scene's table, which app/src/engine/desk-gl.ts reads with the same 64; a run with more live top-level windows stops by name */
 #define FLE_DESK_BACKGROUND_R 5u
 #define FLE_DESK_BACKGROUND_G 7u
 #define FLE_DESK_BACKGROUND_B 10u

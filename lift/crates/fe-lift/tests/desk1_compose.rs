@@ -47,8 +47,8 @@ const PROG: &str = r##"
 
 /* ---- the stubs: the window table, the surfaces, the layered state ---- */
 typedef struct { uint32_t lid; int visible; int32_t x, y; uint32_t w, h; fle_rsurf s; fle_layered_info li; int layered; } win_t;
-static win_t W[8];
-static unsigned order[8];          /* lids, top first */
+static win_t W[80];
+static unsigned order[80];         /* lids, top first */
 static unsigned norder;
 
 unsigned fle_win_input_toplevels(uint64_t *h, unsigned max) { unsigned n = 0; for (; n < norder && n < max; n++) h[n] = 0x1000 + order[n]; return n; }
@@ -58,7 +58,7 @@ int fle_win_input_view(uint64_t hwnd, fle_win_iview *v) {
 }
 const fle_rsurf *fle_raster_surface_peek(uint32_t lid) { return W[lid].w ? &W[lid].s : NULL; }
 /* desk2: the class name and the title of a window, as fle_win_get and fle_class_name_of give them (the compositor prints them in fle_desk_describe) */
-static const char *CLS_OF[8], *TTL_OF[8];
+static const char *CLS_OF[80], *TTL_OF[80];
 int fle_win_get(uint64_t hwnd, fle_win_view *v) {
     win_t *w = &W[hwnd - 0x1000]; const char *s = TTL_OF[w->lid];
     memset(v, 0, sizeof *v); v->live = 1; v->atom = (uint16_t)(0x100 + w->lid);
@@ -73,6 +73,8 @@ int fle_class_name_of(uint16_t atom, uint16_t *out, uint16_t *len) {
     *len = n; return 1;
 }
 int fle_layered_query(uint64_t hwnd, fle_layered_info *out) { win_t *w = &W[hwnd - 0x1000]; if (!w->layered) return 0; *out = w->li; return 1; }
+/* the stop helper of fle_env.c (fle_desk.c calls it on more than 64 top-level windows, decision 0385) */
+void fle_stop(const char *api, const char *why) { fprintf(stderr, "fle: %s: %s\n", api, why); abort(); }
 
 static int checks, failed;
 #define CHECK(c, ...) do { checks++; if (!(c)) { failed++; printf("FAIL line %d: ", __LINE__); printf(__VA_ARGS__); printf("\n"); } } while (0)
@@ -319,6 +321,86 @@ fn compositor_draws_what_the_window_table_says_and_reports_what_changed() {
     let out = String::from_utf8_lossy(&run.stdout).to_string();
     assert!(run.status.success(), "the compositor test failed:\n{out}");
     assert!(out.contains(", 0 failed"), "{out}");
+    let _ = std::fs::remove_file(&src);
+    let _ = std::fs::remove_file(&exe);
+}
+
+/// decision 0385 (R3-5): 64 top-level windows are drawn; a 65th stops the run by name (no window is cut without a sign); 65 distinct windows written before one description make the next description whole.
+const LIMIT_MAIN: &str = r##"
+static void mkgrid(unsigned n) {
+    for (unsigned l = 1; l <= n; l++) {
+        mkwin(l, (int32_t)((l - 1) % 8) * 100, (int32_t)((l - 1) / 8) * 60, 20, 20, 0, 0, (uint8_t)l);
+        order[l - 1] = l;
+    }
+    norder = n;
+}
+int main(int argc, char **argv) {
+    const fle_desk_state *st;
+    const fle_scene *sc;
+    unsigned n;
+
+    if (argc < 2) return 2;
+    if (!strcmp(argv[1], "overflow")) {
+        fle_desk_scene_mode(1);
+        mkwin(1, 10, 20, 100, 50, 1, 2, 3); mkwin(2, 300, 300, 40, 30, 4, 5, 6); mkwin(3, 500, 400, 60, 40, 7, 8, 9);
+        order[0] = 1; order[1] = 2; order[2] = 3; norder = 3;
+        fle_desk_scene();
+        for (unsigned l = 4; l <= 67; l++) fle_desk_wrote(l, 0, 0, 1, 1);
+        setpx(3, 5, 5, 9, 9, 9, 0);
+        fle_desk_wrote(3, 5, 5, 6, 6);
+        sc = fle_desk_scene();
+        CHECK((sc->flags & FLE_SCENE_FLAG_WHOLE) && sc->n_windows == 3 && sc->n_updates == 3, "65 windows written before one description: the next one is whole (flags %u, %u updates)", sc->flags, sc->n_updates);
+        for (unsigned k = 0; k < sc->n_updates; k++)
+            CHECK(sc->upd[k].x0 == 0 && sc->upd[k].y0 == 0 && sc->upd[k].x1 == (int32_t)W[sc->upd[k].lid].w && sc->upd[k].y1 == (int32_t)W[sc->upd[k].lid].h, "update %u is the whole surface of lid %u", k, sc->upd[k].lid);
+        printf("limit: overflow, %d checks, %d failed\n", checks, failed);
+        return failed ? 1 : 0;
+    }
+    n = (unsigned)atoi(argv[1]);
+    mkgrid(n);
+    st = fle_desk_compose();
+    if (n == 64) {
+        CHECK(st->n_windows == 64, "64 top-level windows: %u drawn", st->n_windows);
+        CHECK(px_is(st, 701, 421, 64, 0, 0) && px_is(st, 1, 1, 1, 0, 0), "the bottom window (lid 64) and the top one are drawn");
+        printf("limit: 64 windows drawn, %d checks, %d failed\n", checks, failed);
+        return failed ? 1 : 0;
+    }
+    printf("limit: %u windows: no stop\n", n);
+    return 0;
+}
+"##;
+
+#[test]
+fn the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write() {
+    let dir = work_dir();
+    let tag = etxt_common::uniq("desk1-limit");
+    let src = dir.join(format!("{tag}.c"));
+    let exe = dir.join(format!("{tag}.out"));
+    let prefix = PROG.split("int main(void) {").next().unwrap();
+    std::fs::write(&src, format!("{prefix}{LIMIT_MAIN}")).unwrap();
+    let cc = Command::new("clang")
+        .args(["-O1", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-unused-function", "-I"])
+        .arg(src_dir())
+        .arg("-I")
+        .arg(rt_dir())
+        .arg(&src)
+        .arg(src_dir().join("fle_desk.c"))
+        .arg("-o")
+        .arg(&exe)
+        .env("TMPDIR", &dir)
+        .output()
+        .expect("clang not found");
+    assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
+    let run = |arg: &str| Command::new(&exe).arg(arg).output().expect("run");
+
+    let r64 = run("64");
+    let out64 = String::from_utf8_lossy(&r64.stdout).to_string();
+    assert!(r64.status.success() && out64.contains("limit: 64 windows drawn, ") && out64.contains(", 0 failed"), "64 windows:\n{out64}");
+    let r65 = run("65");
+    let err65 = String::from_utf8_lossy(&r65.stderr).to_string();
+    assert!(!r65.status.success() && err65.contains("fle: fle_desk_gather: more than 64 top-level windows"), "65 windows must stop by name: {err65}");
+    let rov = run("overflow");
+    let outov = String::from_utf8_lossy(&rov.stdout).to_string();
+    assert!(rov.status.success() && outov.contains(", 0 failed"), "overflow:\n{outov}");
     let _ = std::fs::remove_file(&src);
     let _ = std::fs::remove_file(&exe);
 }
