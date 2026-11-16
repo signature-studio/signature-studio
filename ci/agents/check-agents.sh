@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# usage: OPENCODE_MODEL=<提供元>/<モデル> ci/agents/check-agents.sh   (CI, after runner-config.sh. Reads the agents that opencode actually uses; prints counts and OK lines only)
-# Exits 1 when the Variable OPENCODE_MODEL is empty, is not a Haiku 5.5 model (its model id must end with claude-haiku-5-5, with no #variant: decision 0384), when an agent does not use it,
-# when the worker is not primary-capable, or when a deny rule for the worker is missing.
-# A deny rule that is missing would be a silent fail-open (see the header of opencode.jsonc). The agent list is not printed: it holds the model ids.
+# usage: ci/agents/check-agents.sh [PATH]   (CI, after runner-config.sh. PATH: the runner config, default .opencode/opencode.jsonc. Reads the agents that opencode actually uses; prints counts and OK lines only)
+# Exits 1 when the runner config has no model, has a #variant, or has a model that does not end with the worker's model type (decision 0388); when an agent does not use the config's model;
+# when the worker is not primary-capable; or when a deny rule for the worker is missing.
+# A deny rule that is missing would be a silent fail-open (see the header of opencode.jsonc). Neither the model value nor the agent list is printed: the value holds the model id.
+# This is the first call of the background service of the job (`opencode debug agents`): the config must be written before it (decision 0384).
 set -eu
-want=${OPENCODE_MODEL:-}
-if [ -z "$want" ]; then echo "::error::モデルの指定 Variable OPENCODE_MODEL が空。Issue 0006 を参照"; exit 1; fi
-case "$want" in *'#'*) echo "::error::Variable OPENCODE_MODEL に #(variant)を付けない"; exit 1 ;; esac
-case "$want" in *claude-haiku-5-5) ;; *) echo "::error::Variable OPENCODE_MODEL の末尾が claude-haiku-5-5 でない(Haiku 5.5 だけを許す)"; exit 1 ;; esac
+cfg=${1:-.opencode/opencode.jsonc}
+want=$(jq -r '.model // ""' "$cfg" 2> /dev/null || true)
+if [ -z "$want" ]; then echo "::error::実行用の設定にモデルが無い(runner-config.sh が書いていない)。Issue 0007 を参照"; exit 1; fi
+case "$want" in *'#'*) echo "::error::設定のモデルに #(variant)が付いている"; exit 1 ;; esac
+case "$want" in *claude-haiku-5-5) ;; *) echo "::error::設定のモデルの末尾が作業用の型と違う(決定 0388)"; exit 1 ;; esac
 json=$(opencode debug agents) || { echo "::error::opencode debug agents が失敗した"; exit 1; }
 bad=$(jq -r --arg want "$want" '
   .[] | select(.id == "build" or .id == "worker" or .id == "reviewer" or .id == "title" or .id == "summary")
   | select(((.model.providerID // "") + "/" + (.model.id // "")) != $want or (.model.variant // "") != "")
   | .id' <<< "$json" | paste -sd' ' -)
-if [ -n "$bad" ]; then echo "::error::モデルが Variable OPENCODE_MODEL の値になっていない: $bad"; exit 1; fi
-echo "モデル: build・worker・reviewer・title・summary の 5 件が Variable OPENCODE_MODEL の値(Haiku 5.5・variant なし)"
+if [ -n "$bad" ]; then echo "::error::モデルが実行用の設定の値になっていない: $bad"; exit 1; fi
+echo "モデル: build・worker・reviewer・title・summary の 5 件が実行用の設定の値と一致(variant なし)"
 if ! jq -e '.[] | select(.id == "worker") | select(.mode == "all" or .mode == "primary")' > /dev/null <<< "$json"; then
   echo "::error::worker が primary として動けない(mode が all でも primary でもない)"; exit 1
 fi

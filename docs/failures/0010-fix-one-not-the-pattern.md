@@ -22,7 +22,7 @@
 - 依頼者が、同じ型の指摘を複数回行った。取り込み計画の他の「捨てる」の見直しが、遅れた。
 
 ## 是正
-- AGENTS.md の先頭の節(79a6295。ローカル。push は未了)。
+- AGENTS.md の先頭の節(79a6295)。誤り(この記録の旧版): 「push は未了」。是正: 2026-11-16 に、統合の push で origin/main に入った(`git push origin main` の出力 abce180..5ed49ee。その後、別の commit が続いた。確認は 0009 の是正の行)。
 - 後任への指示: 旧設計との機能の差分表(決定 0387)、再発防止の検査(reviewer の項目、check-consistency の finding、intent.md の節)(msg_1e29419d8001vA8dWZDwt1VYA9)。結果は未確認。
 - この記録のディレクトリ(docs/failures/)を作った。
 

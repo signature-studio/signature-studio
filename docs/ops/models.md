@@ -16,8 +16,8 @@ AI の利用先は 2 つあります。請求の状況に合わせて、依頼�
 
 ## GitHub Actions(作業用エージェント)のモデル
 
-Actions の作業用エージェントのモデルは、このリポジトリの Variable `OPENCODE_MODEL` で決まります(決定 0384)。
-- 値は `<提供元>/<モデル>` の形で、モデルの末尾は `claude-haiku-5-5` です。`#` は付けません。
-- 切り替えは、GitHub のこのリポジトリの Variables で `OPENCODE_MODEL` の値を書き換えます。次の run から切り替わります。
-- 値を空にすると、run は取り込みの後で「Issue 0006 を参照」と出して止まります。既定の値はありません。
+Actions の作業用エージェントのモデルは、このリポジトリの Variable `OPENCODE_PROVIDER`(提供元の名前 1 語)で決まります(決定 0388)。モデル ID は、その提供元の一覧から `runner-config.sh` が選びます。
+- 値は提供元の名前 1 語だけです。モデル ID は書きません。選ばれるのは、その提供元の作業用の型(末尾 `claude-haiku-5-5`)の 1 件だけです。
+- 切り替えは、GitHub のこのリポジトリの Variables で `OPENCODE_PROVIDER` の値を書き換えます。次の run から切り替わります。
+- 値を空にする、または候補が 1 件でないと、run は「Issue 0007 を参照」と出して止まります。既定の値はありません。
 - `scripts/set-model-profile.sh` の切り替えは、この機械のローカルのセッションだけに効きます。Actions の値とは別に決まります。
