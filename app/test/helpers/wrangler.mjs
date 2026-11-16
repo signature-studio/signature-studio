@@ -9,8 +9,9 @@ import { freePort, run, start, wranglerEnv } from './proc.mjs';
 import { claimsFor, makeKey, signJwt } from './jwt.ts';
 
 export const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-export const BUCKET = 'fl-studio-web-assets-changeme'; // the placeholder name of wrangler.jsonc
-export const PERF_BUCKET = 'fl-studio-web-perf-changeme'; // decision 0224: the placeholder name of the beacon bucket (binding PERF_BUCKET)
+const CFG = JSON.parse(fs.readFileSync(path.join(APP, 'wrangler.jsonc'), 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/\s\/\/ .*$/gm, '').replace(/,(\s*[}\]])/g, '$1'));
+export const BUCKET = CFG.r2_buckets.find((b) => b.binding === 'ASSETS_BUCKET').bucket_name;
+export const PERF_BUCKET = CFG.r2_buckets.find((b) => b.binding === 'PERF_BUCKET').bucket_name; // decision 0224: the beacon bucket (binding PERF_BUCKET)
 const bin = (n) => path.join(APP, 'node_modules/.bin', n);
 
 export function workDirOf(name) {
@@ -107,7 +108,7 @@ export async function startWorker(workDir, vars = {}, opts = {}) {
   const port = await freePort();
   const inspector = await freePort();
   const keys = opts.unconfigured ? null : (opts.keys ?? await startAccessKeys());
-  const all = keys ? { ACCESS_TEAM_DOMAIN: keys.team, ACCESS_AUD: keys.aud, ACCESS_CERTS_URL: keys.certsUrl, ...vars } : vars;
+  const all = keys ? { ACCESS_TEAM_DOMAIN: keys.team, ACCESS_AUD: keys.aud, ACCESS_CERTS_URL: keys.certsUrl, ...vars } : { ACCESS_TEAM_DOMAIN: '', ACCESS_AUD: '', ...vars };
   const args = ['dev', '--local', ...(opts.config ? ['--config', opts.config] : []), '--ip', '127.0.0.1', '--port', String(port), '--inspector-port', String(inspector), '--persist-to', path.join(workDir, 'state')];
   for (const [k, v] of Object.entries(all)) args.push('--var', `${k}:${v}`);
   const w = start(bin('wrangler'), args, { cwd: APP, env: wranglerEnv(workDir), ready: /Ready on http/, label: 'wrangler dev' });
