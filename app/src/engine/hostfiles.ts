@@ -41,7 +41,7 @@ export class MemorySource implements ByteSource {
 export interface PackMember { offset: number; size: number; sha256: string }
 export interface HostPack { source: ByteSource; format: PackFormat; members: ReadonlyMap<string, PackMember> }
 
-const EACCES = 2, EBADF = 8, EINVAL = 28, EISDIR = 31, ENOENT = 44, EMFILE = 33, ESPIPE = 70, ENOTDIR = 54;
+const EACCES = 2, EBADF = 8, EINVAL = 28, EIO = 29, EISDIR = 31, ENOENT = 44, EMFILE = 33, ESPIPE = 70, ENOTDIR = 54;
 const O_ACCMODE = 3, O_CREAT = 0o100, O_TRUNC = 0o1000, O_DIRECTORY = 0o200000;
 const AT_FDCWD = -100;
 const S_IFDIR = 0o040000, S_IFREG = 0o100000;
@@ -68,11 +68,13 @@ export class HostFilesUnsupported extends Error {
   constructor(what: string) { super(`The engine asked its host files for something they do not do: ${what}. The host files are the read-only packs of the bundle (app/src/engine/hostfiles.ts).`); this.name = 'HostFilesUnsupported'; }
 }
 
-interface HostFile { source: ByteSource; offset: number; size: number; ino: number }
+interface HostFile { source: ByteSource; offset: number; size: number; ino: number; persistent?: boolean }
 interface OpenFile { file: HostFile; pos: number }
 
 export interface HostFileStats {
   opens: number; failedOpens: number; stats: number; reads: number; bytes: number; closes: number; seeks: number;
+  /** reads that a source could not answer (a lazy chunk that could not be fetched): the call returned EIO */
+  readErrors: number;
   /** milliseconds spent inside the replaced system calls (the copy of the bytes included) */
   callMs: number;
   /** performance.now() of the first and the last call (null: none yet) */
@@ -93,7 +95,7 @@ export class HostFiles {
   private u8: Uint8Array = new Uint8Array(0);
   private dv: DataView = new DataView(new ArrayBuffer(0));
   private nextIno = 1;
-  readonly stats: HostFileStats = { opens: 0, failedOpens: 0, stats: 0, reads: 0, bytes: 0, closes: 0, seeks: 0, callMs: 0, firstAt: null, lastAt: null, filesOpened: 0 };
+  readonly stats: HostFileStats = { opens: 0, failedOpens: 0, stats: 0, reads: 0, bytes: 0, closes: 0, seeks: 0, readErrors: 0, callMs: 0, firstAt: null, lastAt: null, filesOpened: 0 };
 
   constructor(memory: () => WebAssembly.Memory | null) { this.memory = memory; }
 
@@ -120,6 +122,18 @@ export class HostFiles {
     for (let i = p.indexOf('/', 1); i > 0; i = p.indexOf('/', i + 1)) this.dirs.add(p.slice(0, i));
   }
 
+  /**
+   * Decision 0314: a file whose bytes the engine may read at ANY time, not only at start-up (a stream of the lazy install tree, lazy-tree.ts). It survives release(): its source stays open and an open of it is not
+   * refused. `size` is the length of the whole source.
+   */
+  addPersistent(path: string, source: ByteSource): void {
+    this.add(path, source, 0, source.size);
+    (this.files.get(normalize(path)) as HostFile).persistent = true;
+  }
+
+  /** the message of the last read a source could not answer (for the page to show), or null */
+  lastReadError: string | null = null;
+
   private released = false;
   private readonly knownPaths = new Set<string>();
 
@@ -129,21 +143,29 @@ export class HostFiles {
    */
   release(): void {
     if (this.released) return;
-    for (const p of this.files.keys()) this.knownPaths.add(p);
+    for (const [p, f] of this.files) if (!f.persistent) this.knownPaths.add(p);   // decision 0314: a persistent file is not 'known to be gone'
     this.released = true;
-    this.close();
+    this.closeWhere((f) => !f.persistent);
   }
   get isReleased(): boolean { return this.released; }
 
   /** forgets every file and closes the sources (the pack bytes can be freed); later opens fail with ENOENT */
-  close(): void {
-    const sources = new Set<ByteSource>();
-    for (const f of this.files.values()) sources.add(f.source);
-    this.files.clear();
+  close(): void { this.closeWhere(() => true); }
+
+  /** forgets the files for which `drop` is true and closes their sources (a source that a kept file also uses stays open); descriptors of the dropped files are closed */
+  private closeWhere(drop: (f: HostFile) => boolean): void {
+    const sources = new Set<ByteSource>(), kept = new Set<ByteSource>();
+    for (const [p, f] of this.files) {
+      if (drop(f)) { sources.add(f.source); this.files.delete(p); } else kept.add(f.source);
+    }
     this.dirs.clear();
     this.dirs.add('/');
-    this.fds.length = 0;
-    for (const s of sources) s.close?.();
+    for (const p of this.files.keys()) for (let i = p.indexOf('/', 1); i > 0; i = p.indexOf('/', i + 1)) this.dirs.add(p.slice(0, i));
+    for (let fd = 0; fd < this.fds.length; fd++) {
+      const of = this.fds[fd];
+      if (of && drop(of.file)) this.fds[fd] = undefined;
+    }
+    for (const s of sources) if (!kept.has(s)) s.close?.();
   }
 
   private touch(): void { const t = performance.now(); if (this.stats.firstAt === null) this.stats.firstAt = t; this.stats.lastAt = t; }
@@ -229,7 +251,15 @@ export class HostFiles {
       const left = f.size - pos;
       if (left <= 0) break;
       const want = Math.min(len, left);
-      const got = f.source.readInto(u8.subarray(ptr, ptr + want), f.offset + pos);
+      let got: number;
+      try {
+        got = f.source.readInto(u8.subarray(ptr, ptr + want), f.offset + pos);
+      } catch (e) {   // decision 0314: a lazy chunk that could not be fetched. The call fails with EIO (the engine's reader answers it by name); an engine that gets the bytes it asked for never sees this
+        this.stats.readErrors++;
+        this.lastReadError = String((e as Error)?.message ?? e);
+        if (total === 0) return -EIO;
+        break;
+      }
       pos += got;
       total += got;
       if (got < len) break;
@@ -276,6 +306,7 @@ export class HostFiles {
         if (!of) return origRead ? origRead(fd, iov, iovcnt, pnum) : EBADF;
         this.touch();
         const n = this.readv(of, iov, iovcnt, null);
+        if (n < 0) { this.heap().dv.setUint32(pnum, 0, true); return -n; }
         this.heap().dv.setUint32(pnum, n, true);
         return 0;
       },
@@ -285,6 +316,7 @@ export class HostFiles {
         if (offset < 0n) return EINVAL;
         this.touch();
         const n = this.readv(of, iov, iovcnt, Number(offset));
+        if (n < 0) { this.heap().dv.setUint32(pnum, 0, true); return -n; }
         this.heap().dv.setUint32(pnum, n, true);
         return 0;
       },
