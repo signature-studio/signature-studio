@@ -405,6 +405,8 @@ fn the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write(
         assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 64 windows drawn:\n{}", stdout(&r));
         let r = run(&[mode, "64", "10"]);
         assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 64 drawn and 10 hidden windows on top must not stop:\n{}", stdout(&r));
+        let r = run(&[mode, "64", "4031"]);
+        assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 64 drawn and 4031 hidden windows (4095 in the list, below its limit) must not stop:\n{}", stdout(&r));
         let r = run(&[mode, "10", "70"]);
         assert!(r.status.success() && stdout(&r).contains(", 0 failed"), "{mode}: 10 drawn and 70 hidden windows must not stop:\n{}", stdout(&r));
         let r = run(&[mode, "65", "0"]);
