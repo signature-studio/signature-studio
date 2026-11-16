@@ -21,13 +21,11 @@ Actions のランナーには、依頼者の opencode のログインが無い�
 - 取り消し方: GitHub の Secret `OPENCODE_AUTH_JSON` を削除する。必要なら、opencode の console で、このログイン情報を無効にする。
 
 ## 自分で試した記録
-エージェントは `opencode auth export` と `opencode auth import` を実行しない(`AGENTS.md` §8)。代わりに、次を確かめた(2026-11-16)。
-- `opencode auth export --help` の表示を試したが、エージェントの実行の許可が無く、表示されなかった(取り込みの `--help` は試していない)。
-- opencode のソース(ローカルのクローン。版 ef45f1fbe0、2026-11-08 のコミット)の説明文。`commands.ts` の定義:
-  - export: 「print stored credentials, including secrets, as JSON」。対象は「Integration ID or name (exports every integration when omitted)」。
-  - import: 「import credentials exported by auth export」。ファイルは「JSON file to import (reads stdin when omitted)」。
-- `handlers/auth/export.ts`: 標準出力に JSON の配列を出す。`handlers/auth/import.ts`: 標準入力の JSON を読み、取り込みの件数を標準エラー出力に `Imported N credential(s)` と出す(値は出さない)。
-- 未確認: インストールした版(2.2.6)で、同じ仕様かどうか。対象 `opencode` が依頼者の機械の一覧に ID として有るかどうか。
+エージェントは `opencode auth export` と `opencode auth import` を実行しない(`AGENTS.md` §8)。代わりに、次を確かめた。
+- 前任のメインが、この機械(opencode 2.2.6)で、2026-11-16 に、2 つの help の表示だけを実行した(取り出しと取り込みの処理自体は実行していない)。表示の原文:
+  - 取り出しの help の説明: 「print stored credentials, including secrets, as JSON」。引数 `target` の説明: 「Integration ID or name (exports every integration when omitted)」。
+  - 取り込みの help の説明: 「import credentials exported by auth export」。引数 `file` の説明: 「JSON file to import (reads stdin when omitted)」。
+- 未確認: 対象 `opencode` が、依頼者の機械の一覧に ID として有るかどうか。
 
 ## 完了の確認
 1. 依頼者から、Secret `OPENCODE_AUTH_JSON` を登録した旨の連絡がある。

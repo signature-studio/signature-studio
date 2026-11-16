@@ -42,4 +42,4 @@
 - 公式: https://opencode.ai/docs/cli/(`opencode run`)、https://opencode.ai/docs/providers/(Bedrock)、https://opencode.ai/docs/agents/(mode・default_agent・subagent)。
 - npm: `@opencode/cli-linux-x64` と `@opencode/cli-linux-x64-baseline` の 2.2.6(`dist.integrity`)。
 - 関連: 決定 0379(Worker の配信のワークフロー。別の作業)。
-- 注(2026-11-16): 依頼 Issue 4(依頼者に別の認証情報を作らせる内容で誤りだった)は取り下げた。認証は、依頼者の opencode のログイン情報の取り込み(Secret `OPENCODE_AUTH_JSON`)に置き換えた(決定 0383)。依頼者の指示の出典: 発言 msg_1b854db83001HV82xjrIrfn2e8(2026-11-08 08:25:30。要約: ~/work/handover/setup/S16-intent/catalog.md の 3・14・15 行)。分類: (b) API 拡充(認証情報の取り込みの契約の実装)。旧方式の実測の記録は evidence/0380-agent-workflow.md に残す。
+- 注(2026-11-16): 依頼 Issue 4(依頼者に別の認証情報を作らせる内容で誤りだった)は取り下げた。GitHub の Issue 4 は、2026-11-16 の確認の時点で GitHub から消えていた(消した人は未確認)。認証は、依頼者の opencode のログイン情報の取り込み(Secret `OPENCODE_AUTH_JSON`)に置き換えた(決定 0383)。依頼者の指示の出典: 発言 msg_1b854db83001HV82xjrIrfn2e8(2026-11-08 08:25:30。要約: ~/work/handover/setup/S16-intent/catalog.md の 3・14・15 行)。分類: (b) API 拡充(認証情報の取り込みの契約の実装)。旧方式の実測の記録は evidence/0380-agent-workflow.md に残す。
