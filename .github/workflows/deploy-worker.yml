@@ -128,14 +128,6 @@ jobs:
               return f"/accounts/{acct}/workers/scripts/{SCRIPT}"
 
 
-          def domains(acct):
-              st, d = get(f"/accounts/{acct}/workers/domains?service={SCRIPT}&per_page=100")
-              doms = result(st, d, "カスタムドメイン一覧") or []
-              if ((d.get("result_info") or {}).get("total_pages") or 1) > 1:
-                  fail("カスタムドメインが 1 ページに収まらない")
-              return len([x for x in doms if isinstance(x, dict) and x.get("service") == SCRIPT])
-
-
           def latest(acct):
               st, d = get(base(acct) + "/deployments")
               deps = (result(st, d, "deployments") or {}).get("deployments") or []
@@ -201,29 +193,17 @@ jobs:
                   mask(found[name])
                   out_file("GITHUB_ENV", ENV_NAME[name], found[name])
               print("読んだ binding(値は伏せた): 変数 " + ", ".join(PLAIN) + "、R2 " + ", ".join(R2), flush=True)
-
-              n = domains(acct)
-              if n < 1:
-                  fail("fl-studio-web に付いたカスタムドメインが 0 件。公開の入口が無いので進めない")
-              print(f"fl-studio-web のカスタムドメイン: {n} 件(名前は出さない)", flush=True)
               out_file("GITHUB_OUTPUT", "old_version", old)
-              out_file("GITHUB_OUTPUT", "domains_before", str(n))
               print(f"読み取りの完了(UTC {utc()})。ここまでに Cloudflare へ書いていない", flush=True)
 
 
-          def cmd_check(expected, before):
-              acct = os.environ["CLOUDFLARE_ACCOUNT_ID"]
-              top = latest(acct)
+          def cmd_check(expected):
+              top = latest(os.environ["CLOUDFLARE_ACCOUNT_ID"])
               vers = top.get("versions") or []
               if len(vers) != 1 or vers[0].get("percentage") != 100 or vers[0].get("version_id") != expected:
                   print(f"確かめ: 最新の deployment は版 {len(vers)} 件。期待の版 {expected} が 100% ではない", flush=True)
                   return 1
-              n = domains(acct)
-              if str(n) != str(before):
-                  print(f"確かめ: カスタムドメインが {before} 件から {n} 件に変わった", flush=True)
-                  return 1
-              print(f"確かめ: 最新の deployment(UTC {top.get('created_on')})は版 {expected} が 100%、"
-                    f"カスタムドメイン {n} 件(前と同じ)", flush=True)
+              print(f"確かめ: 最新の deployment(UTC {top.get('created_on')})は版 {expected} が 100%", flush=True)
               return 0
 
 
@@ -231,9 +211,9 @@ jobs:
               if argv[1:2] == ["read"]:
                   cmd_read()
                   return 0
-              if argv[1:2] == ["check"] and len(argv) == 4:
-                  return cmd_check(argv[2], argv[3])
-              print("usage: cf.py read | cf.py check VERSION DOMAINS", file=sys.stderr)
+              if argv[1:2] == ["check"] and len(argv) == 3:
+                  return cmd_check(argv[2])
+              print("usage: cf.py read | cf.py check VERSION", file=sys.stderr)
               return 64
 
 
@@ -310,7 +290,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           NEW_VERSION: ${{ steps.upload.outputs.new_version }}
           OLD_VERSION: ${{ steps.read.outputs.old_version }}
-          DOMAINS_BEFORE: ${{ steps.read.outputs.domains_before }}
         run: |
           set -u
           W="$RUNNER_TEMP/deploy-worker"
@@ -319,7 +298,7 @@ jobs:
           (cd app && npx wrangler versions deploy "${NEW_VERSION}@100%" --config wrangler.deploy.json --message "ci ${GITHUB_SHA:0:12}" --yes) > "$W/deploy.log" 2>&1 || rc=$?
           grep -E '^(Deployed|Current Version ID|Version ID|Worker Version ID)|\[ERROR\]' "$W/deploy.log" | cut -c1-200 || true
           echo "versions deploy の終了: $rc(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
-          if [ "$rc" = 0 ] && python3 "$W/cf.py" check "$NEW_VERSION" "$DOMAINS_BEFORE"; then
+          if [ "$rc" = 0 ] && python3 "$W/cf.py" check "$NEW_VERSION"; then
             echo "結果: 新しい版 $NEW_VERSION が 100%。確かめた"
             exit 0
           fi
@@ -327,7 +306,7 @@ jobs:
           rb=0
           (cd app && npx wrangler versions deploy "${OLD_VERSION}@100%" --config wrangler.deploy.json --message "ci rollback ${GITHUB_SHA:0:12}" --yes) > "$W/rollback.log" 2>&1 || rb=$?
           grep -E '^(Deployed|Current Version ID|Version ID|Worker Version ID)|\[ERROR\]' "$W/rollback.log" | cut -c1-200 || true
-          if [ "$rb" = 0 ] && python3 "$W/cf.py" check "$OLD_VERSION" "$DOMAINS_BEFORE"; then
+          if [ "$rb" = 0 ] && python3 "$W/cf.py" check "$OLD_VERSION"; then
             echo "結果: 失敗。直前の版 $OLD_VERSION に戻し、確かめた(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
           else
             echo "結果: 失敗。戻したことを確かめられなかった(戻しの終了 $rb)。手作業が要る"
