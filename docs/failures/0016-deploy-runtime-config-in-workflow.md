@@ -28,8 +28,8 @@
 ## 同じ型の探索
 - 範囲: `git ls-files` のうち `ci/` と `.github/`(archive 系を除く)29 件。2026-11-16 時点。
 - (a) 実行時に設定を作る処理: 2 件。deploy.yml 47〜56 行(bindings を読み、`app/wrangler.deploy.json` を書く)。`ci/lib/wrangler_config.py`(97 行。設定を書き出す。呼び出し 0 件)。
-- (b) 過剰な異常系の検査(`exit`・`die`・`miss`・`中止`・`失敗`・`return 1` を含む行。`grep -c`): 計 110 行(15 ファイル)。多い順: `ci/extract-cache.sh` 27・ci/stage-cache.sh(削除済み) 24・ci/test-stage-cache.sh(削除済み) 15・ci/stage-keys.sh(削除済み) 9・ci/test-stage-keys.sh(削除済み) 8・ci/agents/check-agents.sh(削除済み) 7。deploy.yml の検査は 4 行(40・43・50・51)と、確かめの `jq -e` 1 行(90)。
-- (c) 単純なコマンドを包むシェル: 呼び出しは 15 行(`run: bash ci/…`)。内訳: `.github/actions/extract-layer/action.yml` 6・.github/actions/stage-cache/action.yml(削除済み) 2・`.github/workflows/agent.yml` 7。包まれる側: `ci/agents/summary.sh` 18 行(cat と head を包む)、`ci/setup-toolchain.sh` 27 行(rustup と emsdk の各 1 コマンドを包む)、`ci/agents/install-opencode.sh` 21 行(curl・sha512 の照合・tar・install)。
+- (b) 過剰な異常系の検査(`exit`・`die`・`miss`・`中止`・`失敗`・`return 1` を含む行。`grep -c`): 計 110 行(15 ファイル)。多い順: ci/extract-cache.sh(削除済み) 27・ci/stage-cache.sh(削除済み) 24・ci/test-stage-cache.sh(削除済み) 15・ci/stage-keys.sh(削除済み) 9・ci/test-stage-keys.sh(削除済み) 8・ci/agents/check-agents.sh(削除済み) 7。deploy.yml の検査は 4 行(40・43・50・51)と、確かめの `jq -e` 1 行(90)。
+- (c) 単純なコマンドを包むシェル: 呼び出しは 15 行(`run: bash ci/…`)。内訳: .github/actions/extract-layer/action.yml(削除済み) 6・.github/actions/stage-cache/action.yml(削除済み) 2・`.github/workflows/agent.yml` 7。包まれる側: `ci/agents/summary.sh` 18 行(cat と head を包む)、`ci/setup-toolchain.sh` 27 行(rustup と emsdk の各 1 コマンドを包む)、`ci/agents/install-opencode.sh` 21 行(curl・sha512 の照合・tar・install)。
 - (d) workflow の中のインラインの node・python: 1 件(`.github/workflows/deploy.yml` 33 行の `node <<'JS'`)。
 
 ## 未確認

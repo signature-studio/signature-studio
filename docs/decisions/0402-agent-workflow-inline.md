@@ -20,7 +20,7 @@
 
 ## 残したもの(報告。直書きで 15 行以内にならない、または時間の都合)
 - `ci/agents/plan.sh`(タスクの差分の一覧)・`ci/agents/run-task.sh`(プロンプトの組み立てと worker の実行)・`ci/agents/summary.sh`・`ci/agents/install-opencode.sh`(版の固定と sha512 の確認)。残す理由: 直書きすると 15 行を超える。異常系の分岐は、依頼者の指示(5)の対象として、次の作業で削る。
-- `ci/extract-cache.sh`・ci/stage-cache.sh(取り除く済み)・ci/stage-keys.sh(取り除く済み)・`.github/actions/extract-layer`・.github/actions/stage-cache(取り除く済み): 指示(4)。後続。
+- ci/extract-cache.sh(取り除く済み)・ci/stage-cache.sh(取り除く済み)・ci/stage-keys.sh(取り除く済み)・.github/actions/extract-layer(取り除く済み)・.github/actions/stage-cache(取り除く済み): 指示(4)。後続。
 
 ## 未確認
 - run の結果(この決定の commit の後の run。evidence/R9-1.md の 6 節に書く)。

@@ -1,7 +1,7 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、opencode の認証情報(環境変数 OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。値が空のジョブは、取り込みの手順で止まる。
 # モデルは Variable OPENCODE_MODEL の値を、設定の段で .opencode/opencode.jsonc に書く(決定 0402。決定 0399 を置き換える)。値はログに出る。
-# R2 の鍵は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
+# R2 の鍵は、抽出物を取る段(extract ジョブ)にだけ渡す。モデルが動く段には渡さない(決定 0386。抽出のキャッシュは決定 0404 でやめた)。
 # 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
 
@@ -50,14 +50,41 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 抽出の層
-        uses: ./.github/actions/extract-layer
+      - name: アカウント ID を得る(値は出さない)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | jq -r '.result | first | .id')
+          echo "::add-mask::$ID"
+          echo "CF_ACCOUNT=$ID" >> "$GITHUB_ENV"
+
+      - name: 抽出物のキャッシュ(R2)
+        id: cache
+        uses: runs-on/cache@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          artifact-access-key-id: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
-          artifact-secret-access-key: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
-          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
-          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'ci/lib/extract_fl.py', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+
+      - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/host"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          python3 ci/lib/extract_fl.py "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
   run:
     name: worker ${{ matrix.task }}
@@ -78,14 +105,28 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 抽出物を復元する
-        uses: ./.github/actions/extract-layer
+      - name: アカウント ID を得る(値は出さない)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          ID=$(curl -sS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" https://api.cloudflare.com/client/v4/accounts | jq -r '.result | first | .id')
+          echo "::add-mask::$ID"
+          echo "CF_ACCOUNT=$ID" >> "$GITHUB_ENV"
+
+      - name: 抽出物のキャッシュ(R2)を復元する
+        uses: runs-on/cache@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
-          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          artifact-access-key-id: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
-          artifact-secret-access-key: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
-          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
-          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'ci/lib/extract_fl.py', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
 
       - name: opencode を導入する(版は固定)
         run: bash ci/agents/install-opencode.sh
