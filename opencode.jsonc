@@ -33,6 +33,17 @@
     { "action": "tool.use", "resource": "shell:opencode --server*", "effect": "deny" },
     // V-A07: services and timers are enabled by the owner.
     { "action": "tool.use", "resource": "shell:opencode service *", "effect": "deny" },
+    // V-G01 (2026-11-16): `opencode auth export` prints every stored credential; `opencode auth import` writes them. Denied for every agent.
+    // Matches any spacing, arguments, an env prefix or `bash -c` (the words must appear in this order, with `opencode` spelled out).
+    { "action": "tool.use", "resource": "shell:*opencode*auth*export*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*opencode*auth*import*", "effect": "deny" },
+    // The owner's account: MCP tools of server `portal` are named `portal_<tool>` (packages/core/src/tool/mcp.ts:21-25, runtime.ts:288-293).
+    // A call is denied here for every agent (the evaluate hook, packages/core/src/config/plugin/policy.ts:105).
+    { "action": "tool.use", "resource": "portal_*", "effect": "deny" },
+    // Code Mode runs the same tools inside one `execute` call; its resource is the code.
+    { "action": "tool.use", "resource": "execute:*", "effect": "deny" },
+    // The whole server is removed from the registry (policy.ts:89), so its resources are unreachable too (opencode_read_mcp_resource).
+    { "action": "mcp.use", "resource": "portal", "effect": "deny" },
     // R3 B.4: the build agent starts only worker and reviewer.
     { "action": "tool.use", "resource": "subagent:*", "effect": "deny" },
     { "action": "tool.use", "resource": "subagent:worker", "effect": "allow" },
@@ -59,7 +70,10 @@
     { "action": "shell", "resource": "timeout *", "effect": "deny" },
     { "action": "shell", "resource": "nohup *", "effect": "deny" },
     { "action": "shell", "resource": "disown *", "effect": "deny" },
-    { "action": "shell", "resource": "systemd-run *", "effect": "deny" }
+    { "action": "shell", "resource": "systemd-run *", "effect": "deny" },
+    // The owner's account (2026-11-16): every MCP tool of server `portal`, and Code Mode. Hidden from the model (tool.ts:257, 381-384) and denied at the call (policies above).
+    { "action": "portal_*", "resource": "*", "effect": "deny" },
+    { "action": "execute", "resource": "*", "effect": "deny" }
   ],
 
   "agents": {
@@ -276,7 +290,9 @@
         { "action": "shell", "resource": "gh api * -X*", "effect": "deny" }, // D-06
         { "action": "shell", "resource": "gh api -X*", "effect": "deny" }, // D-06
         // V-G01, V-G02, V-G04: the owner's credentials and identities. `opencode auth export` (no target) wrote every provider's key to a file; `gh auth switch` is an identity change.
-        { "action": "shell", "resource": "opencode auth *", "effect": "deny" },
+        // Every `opencode auth` form (any spacing, env prefix, bash -c). The policies above deny export and import for every agent; `list --help` is the one allowed form (help text only).
+        { "action": "shell", "resource": "*opencode*auth*", "effect": "deny" },
+        { "action": "shell", "resource": "opencode auth list --help", "effect": "allow" },
         { "action": "shell", "resource": "gh auth token*", "effect": "deny" },
         { "action": "shell", "resource": "gh auth switch*", "effect": "deny" },
         { "action": "shell", "resource": "gh auth login*", "effect": "deny" },
@@ -436,7 +452,9 @@
         { "action": "shell", "resource": "stat *", "effect": "allow" },
         { "action": "shell", "resource": "*>*", "effect": "deny" },
         { "action": "shell", "resource": "*--output*", "effect": "deny" },
-        { "action": "shell", "resource": "git diff *--no-index*", "effect": "deny" }
+        { "action": "shell", "resource": "git diff *--no-index*", "effect": "deny" },
+        // The owner's credentials: every `opencode auth` form (the policies above deny export and import for every agent).
+        { "action": "shell", "resource": "*opencode*auth*", "effect": "deny" }
         // No `git -C <dir>` here on purpose: `*` spans spaces, so `git -C x commit -m status` would satisfy `git -C * status *`. To look at another work tree use `cd <dir> && git status` (the scanner drops the `cd`).
       ]
     }

@@ -8,7 +8,7 @@ bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中�
 | ファイル | 対象 | 確かめ方の段階 |
 |---|---|---|
 | `t01_config.sh` | `opencode.jsonc` が JSONC として正しい。**実物の opencode が**解決した agent 一覧とモデルが期待値と一致する。引用符 1 文字を消すと設定が黙って落ちる事実(fail-open)と、`preflight.sh` の `agents` 行がそれを FAIL にすること。`* deny` を消した場合も FAIL | **E1**(隔離した実物の opencode の `debug agents`) |
-| `t02_permissions.sh` | 377 個の shell コマンド(`shell-cases.src`)と 79 個の非 shell 呼び出しの許可/拒否。wrangler・cf の全面 deny(`wrangler …`・`cf …`・`npx`/`bunx`/`pnpm`/`yarn` 経由・`*/wrangler`・`sudo wrangler`)と、文面に語が出るだけの読み取り(`grep wrangler …`)・`npm run test:worker` の許可。許可できてはいけない物(main の書き込み、リダイレクト、`preflight.sh` に引数)と、許可されるべき物(worker の通常作業)の両方 | **E2**(opencode 自身のスキャナでコマンドを分割し、評価は `lib/rules.py` による再実装。`t01` が「`rules.py` の規則 = 実物が読んだ規則」を確かめる) |
+| `t02_permissions.sh` | 423 個の shell コマンド(`shell-cases.src`)と 73 個の非 shell 呼び出しの許可/拒否。wrangler・cf の全面 deny(`wrangler …`・`cf …`・`npx`/`bunx`/`pnpm`/`yarn` 経由・`*/wrangler`・`sudo wrangler`)と、文面に語が出るだけの読み取り(`grep wrangler …`)・`npm run test:worker` の許可。許可できてはいけない物(main の書き込み、リダイレクト、`preflight.sh` に引数)と、許可されるべき物(worker の通常作業)の両方 | **E2**(opencode 自身のスキャナでコマンドを分割し、評価は `lib/rules.py` による再実装。`t01` が「`rules.py` の規則 = 実物が読んだ規則」を確かめる) |
 | `t03_plugins.sh` | 3 本の plugin(mock の ctx)。`worker-rules.ts` の自動付与・読めないときの拒否、`model-pin-gate.ts` のピン(設定から読む。`agents.build.model` を Haiku にしても追従)、`harness-guard.ts` の `model` 引数・末尾 `&`・接頭辞つきの禁止コマンド。各 40 行以内・状態なしを静的に確認。**実物の loader が 3 本を読み込む**こと | **E3**(mock)+ E1(loader) |
 | `t04_scan.sh` | `scan-forbidden.sh`: 全規則が発火、近い形は発火しない、出力に値を出さない、許可リスト、終了コード、明示パス、未追跡ファイル | 実行 |
 | `t05_hooks.sh` | `pre-commit`(ステージされた内容を検査。ワークツリーでなく)、`pre-push`(スキャンだけ。PUBLIC のリモートでも、スキャンが通れば通す。禁止文字列があれば拒否。**環境変数での回避が無い**ことを 6 種で確認。`gh` を呼ばないことを、呼ぶと失敗する偽物で確かめる。`--no-verify` は人間の道として通る)、`setup-repo.sh` の冪等性 | 実行(ローカルの bare repo と偽の `gh`) |
@@ -29,6 +29,8 @@ bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中�
 
 規則を足して LIMIT-allow の形が止まるようになったら、`t02` が FAIL する(この表と `shell-cases.src` を更新する合図)。
 
+誤検出(2026-11-16): `*opencode*auth*` の拒否は、コマンドの文字列の中に `opencode` の後ろに `auth` が続く形があると、ファイル名・コミットメッセージ・引数も拒否する。ログインや認証の語を使う。
+
 | 防げない物 | 理由 | 代わりの手段 |
 |---|---|---|
 | `env sleep`・`FOO=1 sleep`・`command sleep`・`xargs sleep` | permission の glob は先頭語しか見ない | `harness-guard.ts` が接頭辞つきを拒否(`;` `&&` `\|\|` `\|` 改行で分けた各片の先頭)。`t03` |
@@ -40,6 +42,7 @@ bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中�
 | `gh api` の書き込み | `-X`・`--method`・`-f`・`-F`・`--field`・`--raw-field`・`--input` を拒否 | `gh api` を別のプログラム経由で呼ぶ形は防げない |
 | worker の `sh -c "wrangler …"`・`bash -c "wrangler …"`・`env wrangler …`・`python3 -c` の中の wrangler(wrangler・cf の全面 deny の限界) | 先頭語の規則は、別のプログラムに渡された文字列の中の wrangler を見ない | 監査(`audit-session.sh`)と reviewer。依頼者の決定 2026-11-10 |
 | worker の `export -p`・`declare -x`(環境変数の列挙) | opencode のスキャナが、これらの形から command part を返さない(`no command part`)ため、規則が照合されない。規則は `opencode.jsonc` に書いてあるが効かない(S10 で再現) | 監査(`audit-session.sh`)と reviewer。`env`・`printenv` は規則で止まる |
+| `opencode auth export`・`opencode auth import` を、変数や引用符で分けた綴りで書く(`X=opencode; $X auth export`、`o""pencode auth export`) | 規則は、コマンド本文に `opencode`・`auth`・`export`/`import` が字句どおりこの順で含まれることを条件にする。変数の展開後や引用符で割った語には一致しない。`LIMIT-allow` で見張る(2026-11-16) | 未対策。`audit-session.sh` は `opencode auth` の文字列で数えるので、この綴りは数えない。この綴りを検出する手段は無い |
 
 | 人間による TUI からのモデル切替 | 切替を禁じる設定が無い | `model-pin-gate.ts` が **tool 呼び出し**を止める。tool を使わない応答は止まらない。`audit-session.sh` が検知 |
 | メインが `oc-msg.sh send` の本文に `>` を含める | main の許可は `oc-msg.sh *`(許可)の後に `*>*`(拒否)を置いた。そうしないと `oc-msg.sh send … > file` で任意のファイルを上書きできる。コマンド本文の `>` は区別できないので、本文に `>` を含む送信は拒否される | 本文に `>` を書かない(`to` か文字の矢印)。ヒアドキュメントの本文も同じ |

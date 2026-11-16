@@ -90,6 +90,22 @@ cases = [
   ("reviewer", "edit", "src/a.ts", "deny"), ("reviewer", "write", "x", "deny"), ("reviewer", "patch", "x", "deny"),
   ("reviewer", "read", "src/a.ts", "allow"), ("reviewer", "read", ".env", "deny"), ("reviewer", "grep", "x", "allow"), ("reviewer", "glob", "*", "allow"),
   ("reviewer", "subagent", "worker", "deny"), ("reviewer", "execute", "*", "deny"), ("reviewer", "question", "*", "deny"),
+  # the owner's account (2026-11-16): MCP tools named portal_* and Code Mode are denied for every agent (opencode.jsonc top-level permissions and policies)
+  ("build", "portal_github_add_issue_comment", "*", "deny"), ("build", "portal_github_search_code", "*", "deny"),
+  ("build", "portal_github_get_latest_release", "*", "deny"), ("build", "portal_gmail_delete_message", "*", "deny"),
+  ("build", "portal_drive_search_files", "*", "deny"), ("build", "portal_calendar_update_event", "*", "deny"),
+  ("build", "portal_cloudflare_search", "*", "deny"), ("build", "execute", "print(1)", "deny"),
+  ("worker", "portal_github_add_issue_comment", "*", "deny"), ("worker", "portal_github_search_code", "*", "deny"),
+  ("worker", "portal_github_get_latest_release", "*", "deny"), ("worker", "portal_gmail_delete_message", "*", "deny"),
+  ("worker", "portal_drive_search_files", "*", "deny"), ("worker", "portal_calendar_update_event", "*", "deny"),
+  ("worker", "portal_cloudflare_search", "*", "deny"), ("worker", "execute", "print(1)", "deny"),
+  ("reviewer", "portal_github_add_issue_comment", "*", "deny"), ("reviewer", "portal_github_search_code", "*", "deny"),
+  ("reviewer", "portal_github_get_latest_release", "*", "deny"), ("reviewer", "portal_gmail_delete_message", "*", "deny"),
+  ("reviewer", "portal_drive_search_files", "*", "deny"), ("reviewer", "portal_calendar_update_event", "*", "deny"),
+  ("reviewer", "portal_cloudflare_search", "*", "deny"), ("reviewer", "execute", "print(1)", "deny"),
+  # the tools that stay allowed (shell, read and edit are checked above; these are the other allowed forms)
+  ("worker", "edit", "evidence/R9-1-deny-auth-export.md", "allow"), ("worker", "read", "evidence/R9-1-deny-auth-export.md", "allow"),
+  ("reviewer", "read", "AGENTS.md", "allow"), ("reviewer", "skill", "opencode", "allow"),
 ]
 for a, act, res, exp in cases:
     # `write` and `patch` are checked as `edit` by opencode (one action for the three tools)

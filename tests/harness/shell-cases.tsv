@@ -385,3 +385,40 @@ worker	deny	["git clean -fd"]	git clean -fd
 worker	allow	["git clean -n"]	git clean -n
 worker	allow	["git clean -nd"]	git clean -nd
 worker	deny	["git -C /x clean -n"]	git -C /x clean -n
+worker	deny	["opencode auth export"]	opencode auth export
+worker	deny	["opencode auth export opencode"]	opencode auth export opencode
+worker	deny	["opencode auth export  opencode"]	opencode auth export  opencode
+worker	deny	["opencode auth  export"]	opencode auth  export
+worker	deny	["opencode  auth export"]	opencode  auth export
+worker	deny	["opencode auth export"]	opencode auth export  
+worker	deny	["opencode\tauth\texport"]	opencode	auth	export
+worker	deny	["FOO=1 opencode auth export"]	FOO=1 opencode auth export
+worker	deny	["bash -c \"opencode auth export\""]	bash -c "opencode auth export"
+worker	deny	["/home/ubuntu/.opencode/bin/opencode auth export"]	/home/ubuntu/.opencode/bin/opencode auth export
+worker	deny	["opencode auth \"export\""]	opencode auth "export"
+worker	deny	["opencode auth export --help"]	opencode auth export --help
+worker	deny	["opencode auth export","echo hi"]	opencode auth export; echo hi
+worker	deny	["opencode auth import"]	opencode auth import
+worker	deny	["opencode auth import ./creds.json"]	opencode auth import ./creds.json
+worker	deny	["opencode auth import  ./creds.json"]	opencode auth import  ./creds.json
+worker	deny	["opencode  auth import"]	opencode  auth import
+worker	deny	["opencode auth  import"]	opencode auth  import
+worker	deny	["opencode auth import --help"]	opencode auth import --help
+worker	deny	["opencode auth import < creds.json"]	opencode auth import < creds.json
+worker	deny	["FOO=1 opencode auth import"]	FOO=1 opencode auth import
+worker	deny	["bash -c \"opencode auth import ./creds.json\""]	bash -c "opencode auth import ./creds.json"
+worker	deny	["opencode auth"]	opencode auth
+worker	deny	["opencode auth login"]	opencode auth login
+worker	allow	["opencode auth list --help"]	opencode auth list --help
+reviewer	deny	["opencode auth export"]	opencode auth export
+reviewer	deny	["opencode  auth export"]	opencode  auth export
+reviewer	deny	["opencode auth import ./creds.json"]	opencode auth import ./creds.json
+reviewer	deny	["opencode  auth import"]	opencode  auth import
+reviewer	deny	["opencode auth list --help"]	opencode auth list --help
+build	deny	["opencode  auth export"]	opencode  auth export
+build	deny	["opencode auth import ./creds.json"]	opencode auth import ./creds.json
+build	deny	["FOO=1 opencode auth export"]	FOO=1 opencode auth export
+build	deny	["bash -c \"opencode auth export\""]	bash -c "opencode auth export"
+build	deny	["opencode auth list --help"]	opencode auth list --help
+worker	LIMIT-allow	["$X auth export"]	X=opencode; $X auth export
+worker	LIMIT-allow	["o\"\"pencode auth export"]	o""pencode auth export

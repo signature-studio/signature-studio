@@ -404,3 +404,44 @@ worker	deny	git clean -fd
 worker	allow	git clean -n
 worker	allow	git clean -nd
 worker	deny	git -C /x clean -n
+
+# ---- auth (2026-11-16): the owner's credentials. export and import are denied for every agent (top-level policies);
+# ---- worker and reviewer deny every `opencode auth` form, whatever the spacing or arguments. worker may read `list --help`.
+worker	deny	opencode auth export
+worker	deny	opencode auth export opencode
+worker	deny	opencode auth export  opencode
+worker	deny	opencode auth  export
+worker	deny	opencode  auth export
+worker	deny	opencode auth export  
+worker	deny	opencode	auth	export
+worker	deny	FOO=1 opencode auth export
+worker	deny	bash -c "opencode auth export"
+worker	deny	/home/ubuntu/.opencode/bin/opencode auth export
+worker	deny	opencode auth "export"
+worker	deny	opencode auth export --help
+worker	deny	opencode auth export; echo hi
+worker	deny	opencode auth import
+worker	deny	opencode auth import ./creds.json
+worker	deny	opencode auth import  ./creds.json
+worker	deny	opencode  auth import
+worker	deny	opencode auth  import
+worker	deny	opencode auth import --help
+worker	deny	opencode auth import < creds.json
+worker	deny	FOO=1 opencode auth import
+worker	deny	bash -c "opencode auth import ./creds.json"
+worker	deny	opencode auth
+worker	deny	opencode auth login
+worker	allow	opencode auth list --help
+reviewer	deny	opencode auth export
+reviewer	deny	opencode  auth export
+reviewer	deny	opencode auth import ./creds.json
+reviewer	deny	opencode  auth import
+reviewer	deny	opencode auth list --help
+build	deny	opencode  auth export
+build	deny	opencode auth import ./creds.json
+build	deny	FOO=1 opencode auth export
+build	deny	bash -c "opencode auth export"
+build	deny	opencode auth list --help
+# ---- auth: forms the rules cannot stop (LIMIT-allow). The command text must spell `opencode` out; a variable or quote-split name is not matched. Not detected by audit-session.sh either (README "Limits").
+worker	LIMIT-allow	X=opencode; $X auth export
+worker	LIMIT-allow	o""pencode auth export
