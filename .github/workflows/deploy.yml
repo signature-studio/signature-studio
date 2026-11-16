@@ -17,6 +17,16 @@ jobs:
     - run: npm run build --prefix app && test -s app/dist/index.html
     - run: npm test --prefix app
     - run: npm run test:worker --prefix app
+    - run: |
+        node <<'JS'
+        const fs = require('fs');
+        const c = JSON.parse(fs.readFileSync('app/wrangler.jsonc', 'utf8')
+          .replace(/\/\/[^\n]*/g, ''));
+        const vs = Object.values(c.vars);
+        c.r2_buckets.forEach((b) => vs.push(b.bucket_name));
+        for (const v of vs) for (let n = 8; n <= v.length; n++)
+          console.log('::add-mask::' + v.slice(0, n));
+        JS
     - uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0
       with:
         apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
