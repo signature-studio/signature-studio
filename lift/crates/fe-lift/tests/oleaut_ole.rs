@@ -1254,7 +1254,7 @@ fn co_initialize_ex_inputs_the_pages_leave_open_abort() {
             ("coinitex-reserved", "CALL(fle_imp_CoInitializeEx, 1, 2);"),
             ("coinitex-multithreaded", "CALL(fle_imp_CoInitializeEx, 0, 0);"),
             ("coinitex-disable-ole1dde", "CALL(fle_imp_CoInitializeEx, 0, 6);"),
-            ("coinitex-speed-over-memory", "CALL(fle_imp_CoInitializeEx, 0, 8);"),
+            ("coinitex-speed-over-memory", "CALL(fle_imp_CoInitializeEx, 0, 10);"),
             ("coinitex-oleuninit-balance", "CALL(fle_imp_CoInitializeEx, 0, 2); CALL(fle_imp_OleUninitialize);"),
         ],
     );
