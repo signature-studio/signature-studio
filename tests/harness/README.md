@@ -17,6 +17,7 @@ bats は使わない。テストは `$TMPDIR/opencode/s2-sandbox/tests/` の中�
 | `t08_scripts.sh` | `launch.sh`(偽の opencode だけ。順序・モデルが `opencode.jsonc` と同じ、上書きの設定があればその `agents.build.model`(variant なし)・登録簿の重複なし・失敗時に何が残るか)、`env.sh` | 実行(偽の opencode、`HOME` を差し替え) |
 | `t10_consistency.sh` | `scripts/check-consistency.sh` を合成の文書(偽の木)で確かめる。**検出する**: 存在しないパス(バッククォート・リンク)、`docs/index.md` に載っていない `docs/core`・`docs/ops` の文書、README の表に載っていないテスト、どの文書にも載っていない `scripts/`、150 行の AGENTS.md。**検出しない**: 旧資料(`docs/archive`・`lift/`)のパス、他の場所を名指す行、作成予定の出力、コマンドの引数、裸の名前、ROADMAP の todo 行 | 実行 |
 | `t09_provider.sh` | `set-model-profile.sh gateway\|bedrock [セッションID]`(bedrock の上書きに model の行が 6 つで `#` が無い・gateway は上書きを消す・`session.switchModel` はセッション ID があるときだけ 1 回でモデルの JSON が合う・引数が違えば終了コード 2・スクリプトにベンダー名の語が無い。偽の opencode で呼び出しを記録)と、`preflight.sh` の agents 行(ローカルの上書きつき) | 実行 |
+| `t11_agent_model.sh` | 作業用エージェントのモデルの指定(Variable `OPENCODE_MODEL`、決定 0384)。`runner-config.sh`: 空なら何も書かず 0 で終わる(止めるのは `check-agents.sh`。取り込みの後)。値があれば 5 つの agent が同じ値になる。`check-agents.sh`: 空なら Issue 0006 を案内して 1、末尾が `claude-haiku-5-5`・`#` 無し、agent の値の一致、worker の拒否の規則 8 件(偽の `opencode debug agents`)。`agent.yml`: 設定を取り込みより前に書き、2 つの手順に Variable を渡す。3 つのファイルにベンダー名の語が無い | 実行(偽の opencode、ダミーのモデル名) |
 
 `shell-cases.tsv` は `shell-cases.src` から `lib/gen-shell-cases.ts` が作る(bun と opencode のソースの clone が要る)。テストの実行時に clone があれば、最新かどうかも確かめる。
 

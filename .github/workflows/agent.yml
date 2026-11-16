@@ -1,6 +1,7 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、依頼者の opencode の認証情報(Secret OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。Secret が無いジョブは、取り込みの手順で止まる(Issue 0005)。
-# Cloudflare の Secrets・Variables は渡さない。出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
+# モデルは Variable OPENCODE_MODEL で指定する(依頼者が設定。空なら check-agents が取り込みの後で止まる。決定 0384 と Issue 0006)。
+# Cloudflare の Secrets は渡さない。出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
 
 on:
@@ -55,15 +56,19 @@ jobs:
       - name: opencode を導入する(版は固定)
         run: bash ci/agents/install-opencode.sh
 
+      - name: 実行用のモデルの設定を書く(最初の opencode の前に書く。決定 0384)
+        env:
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+        run: bash ci/agents/runner-config.sh
+
       - name: 依頼者の opencode の認証情報を取り込む(値は表示しない)
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
         run: bash ci/agents/import-login.sh
 
-      - name: 実行用のモデルの設定を書く
-        run: bash ci/agents/runner-config.sh
-
       - name: 設定を確かめる(モデルと拒否の規則)
+        env:
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
         run: bash ci/agents/check-agents.sh
 
       - name: worker を 1 回動かす
