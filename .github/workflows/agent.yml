@@ -1,5 +1,5 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
-# モデルの認証情報は docs/requests/0004-actions-model-credentials.md の登録を待つ。登録が無いジョブは、Secrets を使う前に止まる。
+# モデルの認証は、依頼者の opencode の認証情報(Secret OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。Secret が無いジョブは、取り込みの手順で止まる(Issue 0005)。
 # Cloudflare の Secrets・Variables は渡さない。出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
 
@@ -52,16 +52,13 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: モデルの認証情報が登録されているかを確かめる(値は読まない)
-        env:
-          HAS_REGION: ${{ secrets.AWS_REGION != '' }}
-          HAS_BEARER: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK != '' }}
-          HAS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
-          HAS_SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY != '' }}
-        run: bash ci/agents/check-credentials.sh
-
       - name: opencode を導入する(版は固定)
         run: bash ci/agents/install-opencode.sh
+
+      - name: 依頼者の opencode の認証情報を取り込む(値は表示しない)
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: bash ci/agents/import-login.sh
 
       - name: 実行用のモデルの設定を書く
         run: bash ci/agents/runner-config.sh
@@ -72,10 +69,6 @@ jobs:
       - name: worker を 1 回動かす
         env:
           TASK: ${{ matrix.task }}
-          AWS_BEARER_TOKEN_BEDROCK: ${{ secrets.AWS_BEARER_TOKEN_BEDROCK }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         run: bash ci/agents/run-task.sh "$TASK"
 
       - name: 出力を検査する(公開ログと成果物に出せるかを確かめる)

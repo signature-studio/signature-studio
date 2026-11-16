@@ -8,9 +8,6 @@ case "$task" in ''|*[!A-Za-z0-9._-]*) echo "bad task name" >&2; exit 2 ;; esac
 src="ci/tasks/$task.md"
 out="ci/agents/out/$task"
 [ -f "$src" ] || { echo "no $src" >&2; exit 2; }
-for v in AWS_BEARER_TOKEN_BEDROCK AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION; do
-  [ -n "${!v:-}" ] || unset "$v"
-done
 tmp=${RUNNER_TEMP:-${TMPDIR:-/tmp}}
 prompt="$tmp/prompt-$task.md"
 mkdir -p "$tmp" "$out" || exit 2
