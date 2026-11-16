@@ -23,7 +23,7 @@
 | 0004-actions-model-credentials.md | なし(取り下げ) | 0 | — |
 | 0005-actions-console-login.md | #5(CLOSED) | 16 | workflow 6(18,19,39,40,43,44)、commit 1(44)、run 5(18,38,43,44)、段 1(44)、evidence 2(44)、ジョブ 1(18) |
 | 0006-actions-model-variable.md | #6(CLOSED) | 12 | workflow 1(20)、commit 1(46)、run 6(19,21,42,46)、段 1(46)、evidence 3(19,46) |
-| 0007-actions-provider-variable.md | #7(OPEN) | 6 | workflow 3(15,19,20)、run 1(36)、evidence 1(15)、ジョブ 1(32) |
+| 0007-actions-provider-variable.md | #7(OPEN) | 6 | workflow 3(15,19,20)、run 1(38)、evidence 1(15)、ジョブ 1(34) |
 | 0008-public-hostname-secret.md | #8(OPEN) | 2 | worker 1(16)、main 1(46)。いずれもファイル名・コマンドの引用 |
 | TEMPLATE.md | なし | 0 | — |
 
@@ -35,7 +35,7 @@
 | #3 依頼者機での計測 | OPEN | 0 | — |
 | #5 console のログイン情報の登録 | CLOSED | 13 | workflow 6(18,19,39,40,43,44)、commit 1(44)、run 5(18,38,43,44)、ジョブ 1(18) |
 | #6 作業用エージェントのモデルの Variable | CLOSED | 9 | workflow 2(18,19)、commit 1(45)、run 5(20,41,45)、evidence 1(45) |
-| #7 提供元の指定の Variable | OPEN | 6 | workflow 3(15,19,20)、run 1(36)、evidence 1(15)、ジョブ 1(32) |
+| #7 提供元の指定の Variable | OPEN | 6 | workflow 3(15,19,20)、run 1(38)、evidence 1(15)、ジョブ 1(34) |
 | #8 公開ホスト名の Secret | OPEN | 2 | worker 1(16)、main 1(46)。いずれもファイル名・コマンドの引用 |
 
 ## 4 依頼者への影響(Issue ごと)
@@ -44,5 +44,5 @@
 - #3 OPEN: 依頼者機での計測を求めている。この表の語は 0 件(「段」の 1 件は「普段」の一致で、除外済み)。
 - #5 CLOSED: 依頼者の操作は求めていない(閉じている)。内部用語が 13 件残る。未修正。
 - #6 CLOSED: 依頼者の操作は求めていない(閉じている)。内部用語が 9 件残る。未修正。
-- #7 OPEN: 依頼者の Variable 登録を求めている。内部用語が 6 件残る。別の作業者が直している最中のため、この作業では変えていない。未確認。
+- #7 OPEN: 依頼者の Variable 登録を求めている。別の作業者の commit 1e70e2a(0007 の直し)の後も、内部用語が 6 件残る。件数は直す前と同じで、行番号だけが動いた(38・34)。この作業では変えていない。
 - #8 OPEN: 依頼者の Secret 登録を求めている。直した後は 2 件(ファイル名と、コマンドの引用)。この表の語で内部用語は残っていない(引用を除く)。
