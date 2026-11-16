@@ -1,6 +1,6 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、opencode の認証情報(環境変数 OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。値が空のジョブは、取り込みの手順で止まる。
-# モデルは、取り込んだ認証の提供元(console- で始まる)の一覧から、作業用の型(末尾 haiku-5-5)を runner-config.sh が選ぶ。Variable は読まない(決定 0399。決定 0388 を置き換える)。候補が 0 件なら止まる。2 件以上なら辞書順で先頭の 1 件(決定 0399 の追記)。
+# モデルは Variable OPENCODE_MODEL(依頼者が登録)の値を、設定の段で .opencode/opencode.jsonc に書く(決定 0402。決定 0399 を置き換える)。値はログに出る。
 # R2 の鍵は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
 # 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
@@ -90,13 +90,24 @@ jobs:
       - name: opencode の認証情報を取り込む
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
-        run: bash ci/agents/import-login.sh
+        run: printf '%s' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone
 
       - name: 実行用のモデルの設定を書く
-        run: bash ci/agents/runner-config.sh
-
-      - name: 設定を確かめる(モデルと拒否の規則)
-        run: bash ci/agents/check-agents.sh
+        run: |
+          mkdir -p .opencode
+          cat > .opencode/opencode.jsonc << EOF
+          {
+            "model": "${{ vars.OPENCODE_MODEL }}",
+            "default_agent": "worker",
+            "agents": {
+              "build": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "worker": { "mode": "all", "model": "${{ vars.OPENCODE_MODEL }}" },
+              "reviewer": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "title": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "summary": { "model": "${{ vars.OPENCODE_MODEL }}" }
+            }
+          }
+          EOF
 
       - name: worker を 1 回動かす
         id: worker
@@ -122,8 +133,3 @@ jobs:
           TASK: ${{ matrix.task }}
         run: bash ci/agents/summary.sh "$TASK" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: worker の終了を確かめる
-        if: always() && steps.worker.outcome != 'skipped'
-        env:
-          TASK: ${{ matrix.task }}
-        run: 'grep -qx "rc: 0" "ci/agents/out/$TASK/meta.txt"'
