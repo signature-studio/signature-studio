@@ -110,7 +110,7 @@ jobs:
         run: bash scripts/scan-forbidden.sh "ci/agents/out/$TASK"
 
       - name: 成果物を保存する(7 日)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: agent-${{ matrix.task }}
           path: ci/agents/out/${{ matrix.task }}/
