@@ -1,7 +1,8 @@
 # ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
 # モデルの認証は、依頼者の opencode の認証情報(Secret OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。Secret が無いジョブは、取り込みの手順で止まる(Issue 0005)。
 # モデルは Variable OPENCODE_MODEL で指定する(依頼者が設定。空なら check-agents が取り込みの後で止まる。決定 0384 と Issue 0006)。
-# Cloudflare の Secrets は渡さない。出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
+# R2 の Secrets は、抽出物を用意する段(extract ジョブと、各 worker ジョブの復元の段。.github/actions/extract-layer)にだけ渡す。モデルが動く段には渡さない(決定 0386)。
+# 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
 name: agent
 
 on:
@@ -36,9 +37,30 @@ jobs:
           AFTER: ${{ github.sha }}
         run: bash ci/agents/plan.sh "$BEFORE" "$AFTER"
 
+  extract:
+    name: 抽出物を用意する(R2 の抽出キャッシュ。無ければ作る。決定 0386)
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 抽出の層(キャッシュの復元。無ければ取得・抽出・保存。鍵はこの段だけに渡す)
+        uses: ./.github/actions/extract-layer
+        with:
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          artifact-access-key-id: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          artifact-secret-access-key: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
   run:
     name: worker ${{ matrix.task }}
-    needs: plan
+    needs: [plan, extract]
     if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -52,6 +74,15 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: 抽出物を復元する(R2 の抽出キャッシュ。鍵はこの段だけに渡す。次のモデルの段には渡さない。決定 0386)
+        uses: ./.github/actions/extract-layer
+        with:
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          artifact-access-key-id: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          artifact-secret-access-key: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
 
       - name: opencode を導入する(版は固定)
         run: bash ci/agents/install-opencode.sh
