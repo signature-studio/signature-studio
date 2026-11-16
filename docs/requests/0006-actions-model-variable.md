@@ -16,7 +16,7 @@ f=.opencode/opencode.jsonc; [ -f "$f" ] || f=opencode.jsonc; grep -A4 '^ *"worke
 Actions の作業用エージェントのモデルは、依頼者が切り替えられる必要がある(依頼者の指摘。発言 `msg_1e2274299001Wt4h6i62ve8mbb`)。コミットを書き換えずに切り替えられるのは、GitHub の Variable だけ。Variable の登録は、リポジトリの管理者の操作で、エージェントは Variables を一覧・読み書きしない(依頼者の権限)。
 
 ## 影響範囲
-- 変わる物: Variable `OPENCODE_MODEL` が 1 件増える。値は、モデルの名前だけ。(この記録の時点の想定。誤り: GitHub は Variables を伏せず、値は実行のログに出た。evidence/R9-3.md。)
+- 変わる物: Variable `OPENCODE_MODEL` が 1 件増える。値は、モデルの名前だけ。(この記録の時点の想定。誤り: GitHub は Variables を伏せず、値は実行のログに出た。証跡は `evidence/R9-3.md`。)
 - 変わらない物: Secrets、Cloudflare の設定、自動処理の他の手順。
 - 取り消し方: Variable `OPENCODE_MODEL` を削除する。削除すると、次の実行は取り込みの後で「Issue 0006 を参照」と出して止まる。値を書き換えると、次の実行から切り替わる。
 
@@ -43,7 +43,7 @@ gh run list --workflow agent.yml --limit 1 --json databaseId --jq '.[0].database
 
 ## 確認の記録
 (登録の後に追記: 日付・完了の確認コマンドの出力 1 行)
-- 2026-11-16: 完了の確認コマンドの出力: `success`(実行 43804191981、コミット 1aff9bb。「設定を確かめる」手順も success。詳細は evidence/R9-1.md)。注: 同じ実行のログに、Variable の値が 1 行出ている(GitHub は Variables を自動で伏せないため。evidence/R9-1.md の 4 節。修正の試行は効かず、戻した。判断は未決 → 決定 0388 で、Variable `OPENCODE_PROVIDER`(Issue 0007)に替えた)
+- 2026-11-16: 完了の確認コマンドの出力: `success`(実行 43804191981、コミット 1aff9bb。「設定を確かめる」手順も success。詳細は証跡(`evidence/R9-1.md`)。注: 同じ実行のログに、Variable の値が 1 行出ている(GitHub は Variables を自動で伏せないため。証跡 `evidence/R9-1.md` の 4 節。修正の試行は効かず、戻した。判断は未決 → 決定 0388 で、Variable `OPENCODE_PROVIDER`(Issue 0007)に替えた)
 
 ## 起票
 - `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/6

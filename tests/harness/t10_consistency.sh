@@ -3,7 +3,7 @@
 # Detects: a backticked or linked repository path that does not exist; a docs/ops or docs/core file that docs/index.md does not name;
 # a tests/harness/t*.sh that the README does not name; a scripts/ file that no document names; AGENTS.md over 140 lines;
 # a decision from 0386 that says 入れない・捨てる・書き直し・削除 with neither a msg_ ID nor an archive/ source.
-# an internal term (workflow, commit, main, worker, run, probe, binding, standalone, env, 段) in the text a client reads in docs/requests/NNNN-*.md
+# an internal term (workflow, commit, main, worker, run, probe, binding, standalone, env, rc, dry-run, evidence, 段) in the text a client reads in docs/requests/NNNN-*.md
 # Does not detect: a path in old material (docs/archive, archive, lift); a path on a line that names another place or says it is a planned output;
 # a command's arguments; a bare file name; a todo row of docs/ROADMAP.md; text with placeholders (<…>, *);
 # a request's 自分で試した記録 section, its code and inline code, 普段・段階・段落, a capitalized Worker, コミット, TEMPLATE.md.
@@ -146,13 +146,26 @@ rq() { # name file text(printf %b): a repository whose only request document is 
   printf '%b' "$3" > "$d/docs/requests/$2"
   printf '%s' "$d"
 }
-for w in workflow commit main worker run probe binding standalone env; do
+for w in workflow commit main worker run probe binding standalone env rc dry-run evidence; do
   d=$(rq "term-$w" 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の $w を確かめる。\n")
   out=$(run "$d"); expect_contains "an internal term ($w) in the text the client reads is found (no 記録 heading: the whole text is read)" "$out" "0101-x.md"
 done
 d=$(rq ja-words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n自動処理の段を確かめる。ワークフローを止める。\n")
 out=$(run "$d"); expect_contains "the Japanese internal term ワークフロー is found" "$out" "ワークフロー"
 expect_contains "the Japanese internal term 段 is found" "$out" "段"
+d=$(rq upper-rc 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n結果の RC を確かめる。\n")
+out=$(run "$d"); expect_eq "an upper-case RC is found (the match ignores case): one finding" 1 "$(count "$out")"
+d=$(rq dry-run-words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の dry run を確かめる。\n依頼者の dry-run を確かめる。\n")
+out=$(run "$d"); expect_eq "dry run and dry-run on two lines: two findings (the run inside dry-run is not counted again)" 2 "$(count "$out")"
+expect_contains "a dry run with a space is reported as dry-run" "$out" "dry-run"
+d=$(rq evidence-path 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n結果は evidence/R8-2.md に残る。\n")
+out=$(run "$d"); expect_contains "a path evidence/… outside inline code is found" "$out" "0101-x.md"
+d=$(rq evidence-inline 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n結果は \`evidence/R9-3.md\` に残る。\n")
+out=$(run "$d"); expect_eq "evidence only in inline code is not a finding" 0 "$(count "$out")"
+d=$(rq record-terms 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n依頼者の操作は 1 つだけ。\n## 自分で試した記録\nrc と dry-run と evidence/R6-8.md を実行した。\n")
+out=$(run "$d"); expect_eq "rc, dry-run and evidence only in the 自分で試した記録 section are not findings" 0 "$(count "$out")"
+d=$(rq partial-words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n事情(circumstance)、search、evidential、dry-runner、runtime の話。\n")
+out=$(run "$d"); expect_eq "partial matches (circumstance, search, evidential, dry-runner, runtime) are not findings" 0 "$(count "$out")"
 d=$(rq code-only 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n\`main\` と \`run\` を確かめる。\n\`\`\`\nmain run workflow commit\n\`\`\`\n")
 out=$(run "$d"); expect_eq "a term only in inline code or a code block is not a finding" 0 "$(count "$out")"
 d=$(rq words 0101-x.md "# Issue 0101: x\n## 依頼者にお願いしたい作業\n普段の段階と、段落の話。\n")

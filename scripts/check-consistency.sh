@@ -142,7 +142,8 @@ for p in sorted(files):
 
 # e: the internal terms of the request rule (decision 0390). Worker (capitalized) is the Cloudflare product name, so only the role name worker is counted.
 # 段 excludes 普段・段階・段落 (the step word is 手順). コミット is allowed by docs/ops/glossary.md, so only the English commit is counted; ワークフロー is not in the glossary, so it is counted.
-INTERNAL_EN = re.compile(r"(?<![A-Za-z])(?:workflow|commit|main|run|probe|binding|standalone|env)(?![A-Za-z])", re.I)
+# dry-run and dry run are one term (one alternative, so the run inside it is not counted again). evidence is written 証跡 in the client's text; rc was called unclear by the client (decision 0390).
+INTERNAL_EN = re.compile(r"(?<![A-Za-z])(?:workflow|commit|main|run|probe|binding|standalone|env|rc|evidence|dry[- ]run)(?![A-Za-z])", re.I)
 INTERNAL_ROLE = re.compile(r"(?<![A-Za-z])worker(?![A-Za-z])")
 INTERNAL_JA = re.compile(r"ワークフロー|段")
 REQUEST = re.compile(r"docs/requests/\d{4}-[^/]+\.md")
@@ -171,7 +172,7 @@ for p in sorted(files):
     if not REQUEST.fullmatch(p):
         continue
     for i, line in client_lines(p):
-        terms = {m.group(0).lower() for m in INTERNAL_EN.finditer(line)}
+        terms = {m.group(0).lower().replace(" ", "-") for m in INTERNAL_EN.finditer(line)}
         if INTERNAL_ROLE.search(line):
             terms.add("worker")
         terms |= {m.group(0) for m in INTERNAL_JA.finditer(re.sub(r"普段|段階|段落", "", line))}
