@@ -69,3 +69,10 @@ python3 -c "p1=19/2760; p2=1/30; print((1-p1)**600, (1-p2)**600, (1-0.0069)**600
 - `docs/archive/decisions/0260-file-menu-miss.md` §0(19/2,760)。
 - ROADMAP R3-6 の行。前例: `docs/decisions/0349-remove-pixel-dedup.md`、`evidence/R3-1a.md`、`evidence/R3-1d.md`(別ブランチの腕)。
 - 決定文書の形: `docs/decisions/0377-export-sha-observation.md`。
+
+## 結果の追記(2026-11-16、`evidence/R3-6b.md`)
+
+- 取りこぼしの合計: 腕 A 0 件(600 周期)、腕 B 0 件(600 周期)。12 セッションすべて完走(停止・数えない回・撮り直しは 0 回)。
+- 判断の語: 再現せず(規則 (2) に当てはまる。この機械・headless Chrome・600 周期では再現せず)。
+- 予測との対応: 腕 B で 1 件以上は外れ、腕 A は 0 件は当たり。
+- 除去の取り込みは、この実験では決めない(規則 (2))。取り込みは reviewer の検査の後の別の依頼にする。reviewer の検査は未実施。判定の範囲と読みは `evidence/R3-6b.md` §5。
