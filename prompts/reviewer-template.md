@@ -30,6 +30,7 @@ reviewer の shell は `git status *`・`git diff *`・`git log *`・`git show *
 9. Issue の検査: `docs/requests/` の依頼(本文はファイルで読む。GitHub の本文は worker に `gh issue view` の出力を貼らせる)が、依頼者に選択・判断を求めていないか。依頼者にしかできない 1 つの操作(トークンの発行・Secrets の登録・権限の付与・実機の計測)だけか。モデルの認証が、依頼者が opencode の console に登録した BYOK だけになっているか。AWS の認証情報・ローカルマシンの認証ファイル・プロファイル ID・リージョンを、スクリプトや Actions で要求していないか。
 10. 試した記録の検査: Issue の「自分で試した記録」に、自分の道具の help・ソース・docs の出力(help の行、またはパスか URL)があるか。依頼者が過去に方法を指定した記録(`~/work/handover/setup/S16-intent/catalog.md`)を、worker が先に読んだと報告にあるか。
 11. 依頼者の名義の道具: worker が、依頼者のアカウントにつながった道具(`portal_` で始まるもの・execute)を使っていないか。worker に `scripts/audit-session.sh` の出力の portal の列を貼らせ、その値を報告の先頭に書く(0 のはず)。
+12. 旧設計の機能: この変更は、置き換える前の設計(`archive/`・旧ツリー)の機能を落としていないか。落とした物は、一覧(機能名・出典・戻す/戻さない + 理由の出典)が決定文書か evidence にあるか。依頼者の過去の発言(`~/work/handover/setup/S16-intent/catalog.md`、決定文書の「検索した範囲と件数」)を、設計の前に調べた記録があるか。worker の報告に、その一覧と検索の範囲・件数が無ければ差し戻す。
 
 ## やらないこと
 - 修正しない。差分を作らない(読み取りと実行だけ)。commit・push しない。
@@ -43,6 +44,7 @@ reviewer の shell は `git status *`・`git diff *`・`git log *`・`git show *
 5. 実エンジンの実行: <あり: コマンドと出力 / なし>
 6. 再現できなかった数字: <あれば>
 7. 差し戻しの指示案: <worker に何を直させるか。コマンドで確かめられる形>
+8. 旧設計の機能: 落とした物 <N> 件(0 件なら「0 件(範囲: …)」)。一覧の出典: <決定文書・evidence のパス>。
 
 ## 返信先
 - main の sessionID: <$OPENCODE_SESSION_ID の値>
