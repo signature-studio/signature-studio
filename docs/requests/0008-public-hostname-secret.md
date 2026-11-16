@@ -54,3 +54,4 @@ gh run view <上の databaseId> --json jobs --jq '.jobs[].steps[] | select(.name
 ## 確認の記録
 2026-11-16: Issue を作成(https://github.com/signature-studio/signature-studio/issues/8)。登録の確認は、上の確認コマンドの出力で行う。
 (登録の後に追記する。日付と、上の確認コマンドの出力 1 行)
+- 2026-11-16 08:26 UTC: 自動処理の確かめ(実行 43831017455。最新の変更 84ebbd8 に対する実行)。結果: 公開ホスト名の手順で止まった。手順の出力は「公開ホスト名が無い(一覧から得られず、Secret PUBLIC_HOSTNAME も無い)」。Secret の値は空だった。Secret の名前は、この Issue の名前(PUBLIC_HOSTNAME)と一致している。登録の有無と場所は未確認。同じ時刻帯に、この Issue にラベルが 1 件付けられ、閉じられ、ロックされた(2026-11-16 08:20 UTC。コメントは 0 件)。
