@@ -1,0 +1,13 @@
+session S10 (pre) 04:34:23 UTC
+loadavg: 1.88 2.48 2.55 1/1280 3215002
+nproc: 16; MemTotal:       26299624 kB
+               total        used        free      shared  buff/cache   available
+Mem:           25683        4512       14333         307        7577       21171
+Swap:           4095        2211        1884
+browser-main chrome count (program name contains chrom, no --type=): 1
+loose match (args contain chrom, reference only): 1
+   3439  7-06:00:46 /usr/local/share/playwright/chromium_headless_shell-1208/chrome-headle
+ 0  0 2265076 14697224 176156 7582828    0    0     0     0 2710 2919  0  0 99  0  0  0
+ 1  0 2265076 14713876 176156 7582828    0    0     0     0 2664 2930  0  0 99  0  0  0
+io pressure: some avg10=0.00 avg60=0.00 avg300=0.00 total=682312567
+quiet: load 1.59 io 0 after 12 s; mem avail 21257 MB, swap used 2212 MB, swap in/out 0/0 pages (2 s)
