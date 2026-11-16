@@ -1,10 +1,10 @@
 # 0379: Worker fl-studio-web の配信を GitHub Actions(deploy-worker)で行う。版の bindings は今 100% の版から読み、versions upload と versions deploy で出す
 分類: (b API 拡充)。新しい処理は「版の作り方」だけ(今 100% の版の bindings と vars を読み、同じ値で新しい版を作る)。除去(a)は 1 件(追記を参照)。(c) の対象外。
 撤回条件: 版の応答の bindings の形が読めず、修正を重ねても直らない(push 8 回の上限で失敗)ときは、この方式を捨てて依頼に切り替える。配信後に公開の入口(カスタムドメイン)が外れ、戻せないことが分かったときも見直す。
-日付: 2026-11-16   ROADMAP: 依頼 ID R6-5(ROADMAP に R6-5 の行は無い。ROADMAP は変えない)   一覧: なし   コミット: この文書と `.github/workflows/deploy-worker.yml` と `ci/lib/wrangler_config.py` を含む commit(push で deploy-worker が動く)
+日付: 2026-11-16   ROADMAP: 依頼 ID R6-5(ROADMAP に R6-5 の行は無い。ROADMAP は変えない)   一覧: なし   コミット: この文書と 旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合) と `ci/lib/wrangler_config.py` を含む commit(push で deploy-worker が動く)
 
 ## 決定
-- 決定 1: 配信は `.github/workflows/deploy-worker.yml` で行う(`on: push`、`main`、`app/**` と自分自身の変更で動く)。根拠: 0001 の Secrets(`CLOUDFLARE_API_TOKEN` は Workers Scripts: Edit だけ)で配信できる経路がこれだけ。
+- 決定 1: 配信は 旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合) で行う(`on: push`、`main`、`app/**` と自分自身の変更で動く)。根拠: 0001 の Secrets(`CLOUDFLARE_API_TOKEN` は Workers Scripts: Edit だけ)で配信できる経路がこれだけ。
 - 決定 2: Worker の bindings と vars は、今 100% の版から実行時に読み、同じ値で新しい版を作る。リポジトリに本番の値を置かない(公開リポジトリ。0001)。根拠: `app/wrangler.jsonc` の値は placeholder で、空の vars のまま配信すると Worker は全リクエストに 403 を返す(`app/wrangler.jsonc`、`ci/lib/wrangler_config.py`)。
 - 決定 3: 版は `wrangler versions upload` で作り、100% への切り替えは `wrangler versions deploy <版>@100%` で行う。`wrangler deploy` は使わない。根拠: 0217。`wrangler deploy` はカスタムドメインの更新で、Workers Scripts: Edit だけのトークンではゾーンを引けず失敗した。
 - 決定 4: 書き込みより前に検査を全部行う。読み取り、bindings の型と名前(この workflow が作らない binding が 1 つでもあれば止める。新しい版で失われるため)、値の有無、配信設定の検査(route は無し、workers_dev と preview_urls は false)。どれか失敗なら何も書かない。
@@ -36,3 +36,5 @@
 - `docs/requests/0001-cloudflare-actions-secrets.md`(Secrets の名前と権限。Variable を使わない理由)。
 - `archive/ci-old/ci/stage-deploy.sh` の worker 段と `archive/ci-old/ci/lib/wrangler_config.py`(後者は `ci/lib/wrangler_config.py` に同一のまま置いた)。
 - `evidence/R6-1b.md` §2(2026-11-07 作成の 100% の版。この版から更新が無い)。
+
+追記(0400 で置き換え): 配信は deploy.yml に統合した。旧 deploy-worker.yml は削除(決定 0400)。

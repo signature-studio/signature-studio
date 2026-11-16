@@ -6,7 +6,7 @@
 ## 0 検索した範囲と件数(設計の前の確認)
 - 依頼者の過去の発言: `~/work/handover/setup/S16-intent/catalog.md`(84 行)で「キャッシュ」「cache」は 0 件(grep -c)。`~/work/handover/evidence/01a-user-messages-full.md`(263 件)で同じ語を含む発言は 3 件: msg_1a2ccc2c3001RSHoExRGznB5pH(2026-11-04 04:04:51。「キャッシュは前述のステップごとに行われ、変更がなければステップをスキップします」「Dockerfile と Docker Build のように」)、msg_1a36588b5001JDXRUWPAcZ0qbI(2026-11-04 06:51:41。「wasm が毎回ダウンロードされている… なぜキャッシュされないんだ？」)、もう 1 件は R2 の鍵の名の一覧で依頼の文ではない(0391 の §0)。2026-11-16 の依頼者の発言(「なぜその重要な部分を消し、エージェントにわざわざ不便な環境を強いているのですか?」。main の依頼文に引用。発言 ID は未確認: worker は opencode api の権限が無い)。
 - 旧設計: `archive/ci-old/ci/objkeys.sh`(24 行。全行)、`plan.sh`(50 行。全行)、`needs.sh`(38 行。全行)、`archive/ci-old/deploy.yml` の 163〜200・575〜600 行(sed)。旧の 7 群は objkeys.sh の `grp` の 7 行(fle・m1〜m5・rt)。
-- 今の部品: `.github/workflows/deploy-engine.yml`(旧 533 行。全行)、`app/scripts/build-engine-bundle.sh`(453 行。全行)、`lift/harness/two/build_nmod_wasm.sh`(81 行。全行)、`lift/harness/web/fruity/link-web.sh`(全行)、`ci/stage-keys.sh`・`ci/stage-cache.sh`・`.github/actions/stage-cache/action.yml`(0391 の版)。
+- 今の部品: 旧 deploy 系の workflow(deploy-engine。決定 0400 で deploy.yml に統合)(旧 533 行。全行)、`app/scripts/build-engine-bundle.sh`(453 行。全行)、`lift/harness/two/build_nmod_wasm.sh`(81 行。全行)、`lift/harness/web/fruity/link-web.sh`(全行)、`ci/stage-keys.sh`・`ci/stage-cache.sh`・`.github/actions/stage-cache/action.yml`(0391 の版)。
 - 決定文書: `docs/decisions/` で「キャッシュ」を含むもの 0351・0386・0387・0391。
 - 実測の入力: `~/.cache/signature-studio/work-r53k`(R5-3 のワークツリーの WORK。実在する全段の出力)の `du -cb`(大きさ)と `w-Oz/obj/log/*.log.time`(群ごとの秒の和)。
 

@@ -1,7 +1,7 @@
 # 0398: 公開ホスト名が一覧にも Secret にも無いときは、配信の後の確かめ(probe)を飛ばし、配信は止めない。Secret PUBLIC_HOSTNAME は依頼者が登録しない
 分類: (a) 我々の余計な処理の除去。0389 の決定 5 の (3)(公開ホスト名が無いときは Cloudflare に書く前に止める)を外し、配信を依頼者の Secret の登録に依存させない。probe を飛ばす分岐は、この除去に伴う 1 分岐。旧設計の同じ分岐は `archive/ci-old/ci/stage-deploy.sh:63`(PUBLIC_HOSTNAME が空なら「the Worker has no route, nothing to probe」と出して exit 0)。
 撤回条件: (1) 依頼者が Secret PUBLIC_HOSTNAME を登録し、run の「公開ホスト名を決める」段がその値を使ったときは、probe が動く(本決定の分岐は残す。撤回ではない)。(2) 一覧からも Secret からも公開ホスト名が得られない配信の間に、Access の背後にない公開が外から確かめられたときは、本決定を撤回し、配信の前に公開の入口を確かめる形へ戻す。
-日付: 2026-11-16   ROADMAP: R6-19(blocked)・R6-20(doing。done にしない)   一覧: なし(整備)   コミット: この文書・`.github/workflows/deploy-worker.yml`・`docs/decisions/0389-deploy-worker-action-and-access-probe.md`(追記)を含む commit
+日付: 2026-11-16   ROADMAP: R6-19(blocked)・R6-20(doing。done にしない)   一覧: なし(整備)   コミット: この文書・旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合)・`docs/decisions/0389-deploy-worker-action-and-access-probe.md`(追記)を含む commit
 番号の理由: `docs/decisions/` の最後は 0397(2026-11-16 の ls)。0398 が最初の空き。
 
 ## 検索した範囲と件数(`docs/ops/intent.md` の「設計の前の確認」)
@@ -49,7 +49,7 @@ Issue の状態(2026-11-16 に確かめた値。コメントの本文と投稿�
 
 ## 実測(この機械。Cloudflare には触れていない)
 
-- `.github/workflows/deploy-worker.yml` を `yaml.safe_load` で読んだ: 15 段。probe 段の `if` と、結果の表の probe の式を確かめた。
+- 旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合) を `yaml.safe_load` で読んだ: 15 段。probe 段の `if` と、結果の表の probe の式を確かめた。
 - host 段の分岐(偽の環境変数。`FROM_LIST` と `FROM_SECRET` を変え、`GITHUB_OUTPUT` と `GITHUB_ENV` を一時ファイルに向けた。リポジトリの外で実行): 一覧のみ → rc 0、出力 `public_host` に 1 行。Secret のみ → rc 0、1 行。両方無し → rc 0、「得られない。probe を飛ばす」、出力 `public_host=`(空)。形が違う Secret → rc 0、「得られなかったものとして扱う」、空の出力。両方 → 一覧を使う、rc 0。
 
 ## 未確認

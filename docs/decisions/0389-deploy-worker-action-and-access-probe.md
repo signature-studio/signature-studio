@@ -1,7 +1,7 @@
 # 0389: deploy-worker の版の upload と 100% の切り替えを cloudflare/wrangler-action で行い、配信の後に公開の入口の Access の確かめ(probe)を戻す。公開ホストはカスタムドメインの一覧から得て、得られないときだけ Secret PUBLIC_HOSTNAME を使う
 分類: 整備(R6-19・R6-20。(a)(b)(c) の対象外。ROADMAP の行の分類どおり)
 撤回条件: (1) wrangler-action の versions upload・versions deploy が、この Worker の配信の資格情報で通らないと run で確かめたとき、0379 の決定 3 の方式(npx wrangler を直接)に戻す。(2) カスタムドメインの一覧の値と、公開の入口が違うと分かったとき、ホストの決め方を見直す。(3) 依頼者が公開の入口を Access の背後に置かないと言ったとき、probe を外す(0387 の撤回条件 (4) と同じ)。
-日付: 2026-11-16   ROADMAP: R6-19・R6-20(状態は doing。done にしない)   一覧: なし(整備)   コミット: この文書・`.github/workflows/deploy-worker.yml`(依頼が出た場合は docs/requests/0008-public-hostname-secret.md も)を含む commit
+日付: 2026-11-16   ROADMAP: R6-19・R6-20(状態は doing。done にしない)   一覧: なし(整備)   コミット: この文書・旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合)(依頼が出た場合は docs/requests/0008-public-hostname-secret.md も)を含む commit
 番号の理由: 0388 は別の作業(agent の provider 変数)が未 commit で先に使っている。0389 が最初の空き(2026-11-16 の ls)。
 
 ## 検索した範囲と件数(`docs/ops/intent.md` の「設計の前の確認」)
@@ -10,7 +10,7 @@
 |---|---|---|
 | 旧 `archive/ci-old/deploy.yml`(全 1,128 行) | wrangler-action の段(1050 行の SHA。`grep -c wrangler-action` = 1)、probe の段(1091〜1094 行)、`PUBLIC_HOSTNAME` の行(33 行。`grep -c` = 1) | 3 行 |
 | 旧 `archive/ci-old/ci/stage-deploy.sh`(全 93 行) | worker 段(47〜61 行)、probe 段(62〜91 行) | 12 件の要求の判定 |
-| 現在 `.github/workflows/deploy-worker.yml`(変更前 342 行)と `ci/lib/wrangler_config.py`(全行) | 段の構成、gen 段の route の検査、版の読み取り | — |
+| 現在 旧 deploy 系の workflow(deploy-worker。決定 0400 で deploy.yml に統合)(変更前 342 行)と `ci/lib/wrangler_config.py`(全行) | 段の構成、gen 段の route の検査、版の読み取り | — |
 | 依頼者の発言(前任の記録) `~/work/handover/evidence/01a-user-messages-full.md`(2,633 行、263 件) | `Access` は 1 行(928 行 = seq 29271 = msg_1982c56e0001L9vl9HVSX0PeIB)。`wrangler` は 2 行(1227 行 = seq 44954 = msg_1a2ccc2c3001RSHoExRGznB5pH の cloudflare/wrangler-action、1232 行 = 同じ発言の wrangler CLI の許可)。`probe\|公開` は 3 行(658・669 行は公開リポジトリの話で、配信の確かめとは無関係) | 263 件の seq |
 | 依頼者の発言(catalog)`~/work/handover/setup/S16-intent/catalog.md`(84 行) | Access・公開・wrangler・ホスト・probe・CI の 6 語で 2 行(31・32 行。認証と指示の判定の行。配信の確かめには関係しない) | 配信・Access に関わる行は 0 件 |
 | 依頼者の今回の発言 | この作業では再検索していない(evidence/R6-9.md §0 の 76 件の読みを引く) | — |
@@ -62,3 +62,5 @@
 - wrangler-action の SHA 953926a2e2182532811c01a25e53647d93bf07c0 のソース(action.yml、src/index.ts、src/wranglerAction.ts、src/commandOutputParsing.ts、src/packageManagers.ts。webfetch、2026-11-16)。
 - Cloudflare API: Get Worker Script Version(`/accounts/{account_id}/workers/scripts/{script_name}/versions/{version_id}`)、List Worker Domains(`/accounts/{account_id}/workers/domains`)。developers.cloudflare.com の API リファレンス(webfetch、2026-11-16)。
 - wrangler 4.156.0 のソース: `app/node_modules/wrangler/wrangler-dist/cli.js`(65168-65182、25357-25362)。
+
+追記(0400 で置き換え): 配信の段の形は deploy.yml に移した。probe は 0398 のとおり無い(決定 0400)。
