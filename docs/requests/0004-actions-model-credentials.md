@@ -77,3 +77,10 @@ opencode v2.2.6
 
 ## 確認の記録
 (登録後に追記: 日付・`gh secret list` の出力の名前の行・`gh run list` の 1 行)
+
+## 出した記録(2026-11-16)
+`gh issue create --title "[依頼] Actions でエージェントを動かすためのモデルの認証情報" --body-file docs/requests/0004-actions-model-credentials.md` の出力:
+
+```
+https://github.com/signature-studio/signature-studio/issues/4
+```
