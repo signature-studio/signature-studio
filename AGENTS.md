@@ -41,13 +41,13 @@
 | 「作業を止めます」「待ちます」「見込みが低いです」で終える | 止めない。起動済みの worker ID を書く。期限超過の見込みは 1 回だけ書き、縮める行動を実行 |
 
 ## 4 作業の場と push
-- 作業の場は、このマシンのリポジトリ(`~/work/signature-studio`)。重い実行(ビルド・測定・並列 worker)は GitHub Actions を使う想定(基盤の整備は ROADMAP の R8)。CI に自作のブラウザスクリプトを置かない。
+- 作業の場は、このマシンのリポジトリ(`~/work/signature-studio`)。GitHub Actions の役割は 2 つだけ: OpenCode のエージェントを動かすことと、Workers のデプロイ。ビルド・測定・読み取りの確認だけのワークフローは置かない(7157394 で削除済み)。CI に自作のブラウザスクリプトを置かない。
 - commit は作業ごとに行う(identity はリポジトリのローカル設定。`scripts/setup-repo.sh`)。
 - ワークツリー(worktree)が要るときは `gwq add <branch>` を使う(`~/.local/bin/gwq`。置き場は gwq の設定)。`git worktree add` を直接使わない・`~/work` 直下にワークツリーを作らない。前任の削除通知の理由の 1 つで、指示の初出は未確認(`docs/ops/launch.md` §4 G)。
 - リポジトリの PUBLIC は意図的(GitHub Actions を最大 60 並列で数時間動かすため。private ではその利用量を担えない)。公開を理由に push を止めない。公開されて困る物は git に入れない(`.gitignore` の `lift/out*/`・`artifacts/`・`binaries/`・`*.dll`・`*.exe`・`*.wasm`。インストーラ・DLL・生成物は commit しない)。調査の抜粋・考察の公開は問題ない。禁止文字列・鍵・95 MB 超は `scripts/scan-forbidden.sh`(pre-commit・pre-push)が止める。
 - commit したら通常の `git push origin main` で push する(scan 通過後)。届いたかの確認は、push した worker が `git ls-remote origin main` と `git rev-parse HEAD` を実行して出力を貼る(先頭 40 文字が一致)。main は `git ls-remote` を実行できない(許可設定が拒否。reviewer も同じ)ので、`git status -sb`(`main...origin/main` に `ahead` が付かない)と `scripts/preflight.sh` の `push-dry-run` 行を読む。「push できない」と書けるのは、リポジトリのディレクトリで実行した `gh auth status` と `git push --dry-run origin HEAD` の出力を貼ったときだけ。
 - push は通常の `git push origin main` のみ。force 系、`gh api` による contents の PUT・ref の更新、別 identity での push は使わない。
-- Cloudflare は後任が実行しない。`wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。確認・変更が要るなら Issue(§10)で依頼する。デプロイ・確認は GitHub Actions と、依頼者が Issue に応じて登録した Secrets で行う。
+- Cloudflare は後任が実行しない。`wrangler`・`cf`(`npx wrangler` を含む)は読み取りも含めて実行しない。確認・変更が要るなら Issue(§10)で依頼する。デプロイは GitHub Actions と、依頼者が Issue に応じて登録した Secrets で行う。読み取りだけの確認のワークフローは 7157394 で削除済みで、置かない。
 
 ## 5 進捗の誠実性(`docs/ops/honesty.md`)
 - 「進捗」= lift した実エンジンが実際に実行して出した結果だけ。代役・モック・スタブ、事前生成の画像・録画・固定データの再生、テストの期待値、推測は進捗ではない。

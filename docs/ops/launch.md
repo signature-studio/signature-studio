@@ -26,9 +26,9 @@
 | P1 | push: アカウントは作業ディレクトリで決まる。通常の `git push origin main` で push する(禁止語・秘密の検査を通った後。強制上書きの push・別のアカウントは使わない)。許可の設定は根拠にしない。「push 403」は前任がリポジトリ外のディレクトリで測った誤り |
 | P2 | 公開範囲: PUBLIC は意図的(GitHub Actions を最大 60 並列で数時間動かすため)。公開を理由に push を止めない。公開されて困る物は Git に入れない(`.gitignore`) |
 | P3 | 依頼者の協力: 責任範囲外の作業(トークン・Secrets・権限・実機の計測)に限り、Issue の形式で応じる(`docs/ops/requests.md`) |
-| P4 | Cloudflare: 後任者は `wrangler`・`cf` を読み取りも含め実行しない。配信と確認は GitHub Actions と、依頼者が Issue に応じて登録する Secrets で行う |
+| P4 | Cloudflare: 後任者は `wrangler`・`cf` を読み取りも含め実行しない。配信と確認は GitHub Actions と、依頼者が Issue に応じて登録する Secrets で行う(追記 2026-11-16: 読み取りだけの確認のワークフローは 7157394 で削除済み。Actions は配信と OpenCode の実行に使う) |
 | P5 | 実機の計測(依頼者機のブラウザ・実機 Windows の画面・音・120 fps)は headless で代替できない。Issue で依頼者に計測を頼む。依頼の返りを待たず headless の実測で進め、依頼者機の値は「依頼中」と書く |
-| P6 | 作業の場: このマシンのリポジトリ。重い実行(ビルド・測定・並列のサブエージェント)は GitHub Actions を使う想定 |
+| P6 | 作業の場: このマシンのリポジトリ。重い実行(ビルド・測定・並列のサブエージェント)は GitHub Actions を使う想定(追記 2026-11-16: ビルド・測定の CI は 7157394 で削除済み。ビルド・測定を Actions で行う想定は無効。Actions の役割は OpenCode の実行と Workers のデプロイの 2 つだけ) |
 | P7 | 依頼の区分と一覧の文書は廃止。依頼は Issue(`docs/requests/`)へ |
 | P8 | 起動前の自動確認(`scripts/preflight.sh`)の表の行の名前: `agents git-identity git-hooks gh-identity repo-api push-dry-run toolchain disk scan consistency goal goal-nudge` |
 

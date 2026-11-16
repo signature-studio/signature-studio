@@ -1,6 +1,6 @@
 # Issue 0001: GitHub Actions 用の Cloudflare 資格情報の登録(Worker とバケット限定)
 
-状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用ワークフロー `cloudflare-check.yml` は存在し、実行結果は `evidence/R8-2.md` に置いてある)
+状態: 完了(依頼者が登録を終え、2026-11-12 に Issue 1 を閉じた。確認用ワークフロー `cloudflare-check.yml` は 2026-11-12 に存在した(7157394 で削除済み)。実行結果は `evidence/R8-2.md` に置いてある)
 
 現状: 登録された Variable `CLOUDFLARE_ACCOUNT_ID` は、ワークフローが使っていない(Variable の値は公開ログに出るため。アカウント ID は実行時に API トークンから得る。`e33f3bc`)。
 
@@ -70,7 +70,7 @@ GitHub Actions で Cloudflare に配信する。後任者は Cloudflare の操�
 確認は次の 2 つで行う。
 
 - 依頼者の連絡(Issue を閉じること)。2026-11-12 に閉じた。
-- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`。実行の結果は `evidence/R8-2.md` に置いてある。
+- 確認用ワークフローの実行結果: `gh run list --workflow cloudflare-check.yml --limit 1` が `success`。実行の結果は `evidence/R8-2.md` に置いてある(このワークフローは 7157394 で削除済み。記録は削除前の実行のもの)。
 
 エージェントは Secrets と Variables の中身も一覧も確認しない(禁止。`opencode.jsonc` の deny、`prompts/worker-rules.md`)。
 
