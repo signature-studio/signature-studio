@@ -3,7 +3,7 @@ import { Worker } from 'node:worker_threads';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { brotliDecompressSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ChunkCache, ChunkedSource } from '../../src/engine/chunked-source.ts';
 import { ChunkIoError, SabChunkClient, ERR_LENGTH, ERR_STORE, makeChunkIoShared, type ChunkIoShared } from '../../src/engine/chunk-io.ts';
@@ -334,7 +334,7 @@ describe('HostFiles: lazy streams are persistent host files read with pread', ()
 });
 
 // opt1's generator (tools/vfs-build.py V0.1, the format of section 19): its small test tree, and a sample of the real install tree. Skipped when the files are not on this machine.
-const OPT1 = '/home/ubuntu/work/opt1-wine/vfs-out';
+const OPT1 = join(homedir(), 'work', 'opt1-wine', 'vfs-out');
 function fileBytes(p: string): Buffer { return readFileSync(p); }
 function listFiles(root: string, rel = ''): string[] {
   const out: string[] = [];
@@ -378,7 +378,7 @@ describe.skipIf(!existsSync(`${OPT1}/testtree-out/index.bin`))("opt1's small tes
 });
 
 const REAL = `${OPT1}/run-a`;
-const ORIGINAL = '/home/ubuntu/work/opt1-wine/prefix/drive_c/Program Files/Image-Line/FL Studio 2026';
+const ORIGINAL = join(homedir(), 'work', 'opt1-wine', 'prefix', 'drive_c', 'Program Files', 'Image-Line', 'FL Studio 2026');
 describe.skipIf(!existsSync(`${REAL}/index.bin`) || !existsSync(ORIGINAL))("opt1's index of the whole install tree (27,822 files): a sample of about 200 files, rebuilt from the chunks, is the original", () => {
   it('index.<sha12>.br decodes to index.bin; 27,822 files + 1,522 directories; 200 sampled files match the original bytes', () => {
     const br = readdirSync(REAL).find((n) => /^index\.[0-9a-f]{12}\.br$/.test(n)) as string;
