@@ -4,7 +4,7 @@
 //!     (imports_table.rs) or of the earlier layers (ship-imports.txt, exp1-imports.txt) or of the ACM exploration rows, and has the shape `<dll> <API> fle_imp_<API>`;
 //!  2. the three seed files: sorted, unique, one hex VA per line, every VA inside the image of its module at the base the decision used (0xc000000 / 0xd000000 / 0xe000000), the images do not overlap each
 //!     other or the 0xb000000 + 0x500000 of Elastique (the last base of decision 0190) and stay below the virtual module handles;
-//!  3. runtime/fle_realmod.c: the number of real modules is 8 (checked on the preprocessor output);
+//!  3. runtime/fle_realmod.c: the number of real modules is 16 (8 until the G9-c step of decision 0313; checked on the preprocessor output);
 //!  4. runtime/fle_vfs.c: a read at the end of a file succeeds with 0 bytes read (decision 0206; always on since decision 0243);
 //!  5. runtime/fle_vfs.c: CreateFileW accepts a SECURITY_ATTRIBUTES with a NULL descriptor and still stops on any other non-NULL value (text pins).
 
@@ -107,7 +107,7 @@ fn pp(defs: &[&str]) -> String {
 #[test]
 fn rm_max_is_8() {
     let d = pp(&[]);
-    assert!(d.contains("static rm_t mods[8u];"), "RM_MAX must stay 8 (decision 0243: the -DFLE_RM_MAX override is gone)");
+    assert!(d.contains("static rm_t mods[16u];"), "RM_MAX must stay 16 (it was 8 until the G9-c step of decision 0313; decision 0243: the -DFLE_RM_MAX override is gone)");
 }
 
 fn vfs_pp(defs: &[&str]) -> String {
