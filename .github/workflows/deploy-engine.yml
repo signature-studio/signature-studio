@@ -627,11 +627,6 @@ jobs:
       - id: check
         name: "9 段の出力を検査する(sha256・展開・manifest の判定・載せる 5 件。値は出さない)"
         env:
-          WORK: ${{ runner.temp }}/work
-          HOST_ROOT: ${{ runner.temp }}/host
-          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
-          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
-          BUCKET: fl-web-assets
           PREFIX: ${{ steps.key.outputs.prefix }}
           WORK: ${{ runner.temp }}/work
         run: |
