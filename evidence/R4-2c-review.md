@@ -5,7 +5,7 @@ reviewer の検査の報告(2026-11-16、対象 2c96b6e・e2ef762)。判定: 差
 - 差し戻し 2 件。
 - 10 回の engineHz・autoMeasuredHz・rafHz・presentsPerS・movesPerS・firstIdleMs・loadStart・ioStart・ioEnd・state・error は report.json と一致。
 - 腕 A の中央値 49.16(45.89〜52.61)、腕 B の中央値 53.03(51.25〜54.05)、走行後の rAF 57.1〜57.2 も一致。
-- T の中央値は表 2 の丸めた値と 24 個すべて整合。個々の T は lat JSON から再計算できず未確認。
+- T の中央値は表 2 の丸めた値と 24 個すべて一致。個々の T は lat JSON から再計算できず未確認。
 - §0 は e2ef762(12:41:16 JST)で、結果の commit より前。
 - 判定語の誤用なし。範囲の逸脱なし(2c96b6e は evidence のみ 83 ファイル、e2ef762 は R4-2c.md と serve-once-lat-bundle.mjs)。
 - 保存物は 83 ファイル 2,131 行、約 5.55 MB。画像・trace なし。禁止語 0 件。
@@ -13,7 +13,7 @@ reviewer の検査の報告(2026-11-16、対象 2c96b6e・e2ef762)。判定: 差
 
 ## 差し戻し 1(事実)
 
-§0 の「対象: HEAD の bundle」は誤り。使った bundle(~/.cache/signature-studio/work-r53k/bundle/fl-Oz)の manifest の HEAD は 9610708(manifest.json の 7 行目。wasm c963715a4410dd56 と一致)。測定時の HEAD は cb81958(12:30:57 JST)。9610708..cb81958 では lift/runtime/fle_desk.c(12 行)などが変わっている。§8 は差に触れているが、§0 の文言が直っていない。
+§0 の「対象: HEAD の bundle」は誤り。参照した bundle(~/.cache/signature-studio/work-r53k/bundle/fl-Oz。使ったフォルダは未確認。work-r53h も wasm は同じ)の manifest の HEAD は 9610708(manifest.json の 7 行目。wasm c963715a4410dd56 と一致)。測定時の HEAD は cb81958(12:30:57 JST)。9610708..cb81958 では lift/runtime/fle_desk.c(12 行)などが変わっている。§8 は差に触れているが、§0 の文言が直っていない。
 
 ## 差し戻し 2(出典)
 
