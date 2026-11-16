@@ -31,7 +31,8 @@
 ## 是正
 
 - 2026-11-16: 決定 0399(Variable を読まない。取り込んだ一覧から選ぶ)。Issue 7 は依頼者が閉じた。依頼者への追加の依頼は出していない。
-- 是正の検証: run 43834208450・43834458288 は、どちらも候補が 2 件で、設定の段で止まった(evidence/R9-3.md の 11 節)。Variable は読まず、値は表示されない。ただし、候補が 2 件のため、run は成功していない。どちらの提供元を使うかは PM の決定が要る。
+- 是正の検証: run 43834208450・43834458288 は、どちらも候補が 2 件で、設定の段で止まった(evidence/R9-3.md の 11 節)。その後、PM の決定(決定 0399 の追記。2 件以上は辞書順で先頭の 1 件)で、run 43835670107(commit c08104f)が success。worker が `opencode run` で rc 0 の出力を得た(evidence/R9-1.md の 5 節)。ログ検査の件数は evidence/R9-1.md の 5 節の 3。
+- 値が出た run 6 件は、成功の後に `gh run delete` で削除した(rc 0。evidence/R9-3.md の 13 節)。
 
 ## 再発防止(強制 > 検査 > 文書)
 
@@ -52,3 +53,11 @@
 - 依頼者の「重複」の意味。推定は決定 0399 の「読み」の欄(同じ目的の登録を別に頼むな、の意味と読んだ。確かめられない)。
 - Issue 7 のコメントの投稿者。依頼者として扱ったが、確認は未確認(名前は書かない)。
 - 値が出た run 6 件が公開されていた時間(evidence/R9-3.md の 6 節と同じく未確認)。
+
+## 追記(2026-11-16): deploy-worker の 6 回の停止(依頼者の Secret への依存)
+
+- 事実(`gh run view <id> --json conclusion,headSha,createdAt,jobs`。ログ本文は確かめていない): deploy-worker の run 6 件が failure。作成時刻と commit は 43807505570(50e21bc、05:00:53Z)、43812589594(fb42bc4、05:48:12Z)、43819916606(9e2e354、06:53:43Z)、43821895100(f80f9f4、07:10:16Z)、43826158277(a566fff、07:46:26Z)、43831017455(84ebbd8、08:25:00Z)。どの run も、段「公開ホスト名を決める(一覧から得た物。無ければ Secret PUBLIC_HOSTNAME。…)」で failure。
+- 段の名前は、公開ホスト名が一覧にも Secret にも無いときに止める、と書いている。停止した版(commit f073cd0 の `.github/workflows/deploy-worker.yml`)では、その段が `secrets.PUBLIC_HOSTNAME` を参照していた(行 271)。その後、deploy-worker.yml と deploy-engine.yml は 1 本の `.github/workflows/deploy.yml` に統合された(commit aba137b。この統合は別の作業。統合後の版に Secret の参照は無い)。
+- 依頼者は Issue 8(Secret PUBLIC_HOSTNAME の登録)を 08:20:14Z に「実施しない(NOT_PLANNED)」で閉じた。依頼者は、この Secret を登録しない(deploy-worker.yml の 6 行目の注)。
+- 読み(PM の指摘。main の指示): 配信を依頼者の Secret に依存させた設計が、6 回の停止の原因。同じ型の依頼(依頼者の登録に依存する)。確かめた範囲: 依頼者の登録の依頼は、Issue 1・5・6・7・8 の 5 件(`gh issue list --state all`)。この型の依存の数は、deploy-worker の 1 件(公開ホスト名)。deploy-engine の依存は未確認。
+- 是正: この記録では、配信の版を変えていない(統合後の deploy.yml は別の作業の範囲)。6 回の停止は未是正。
