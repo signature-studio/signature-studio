@@ -43,3 +43,6 @@ gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusi
 
 ## 確認の記録
 (登録の後に追記: 日付・`gh run list --workflow agent.yml --limit 1` の結論の 1 行)
+
+## 起票
+- `gh issue create` の出力: https://github.com/signature-studio/signature-studio/issues/5
