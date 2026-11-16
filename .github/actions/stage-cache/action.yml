@@ -1,21 +1,24 @@
-# The stage cache (decision 0391): the output directory of one stage of app/scripts/build-engine-bundle.sh, restored from or saved to the R2 cache by the stage's key (ci/stage-keys.sh).
-# op restore runs before the build (hit = the output was put back, and the script skips the stage); op save runs after the build, when the stage ran (no hit).
+# The stage cache (decisions 0391, 0395): the output files of one stage of app/scripts/build-engine-bundle.sh, restored from or saved to the R2 cache by the stage's key (ci/stage-keys.sh).
+# op restore runs before the stage (hit = the outputs were put back, and the stage is not run); op save runs after the stage, when the stage ran (no hit).
 # The R2 keys are given to this action only, and each key only to the step that uses it (the env of that step). The build step gets none (decision 0386).
 name: stage-cache
 description: >-
-  The output directory of one build stage, restored from or saved to the R2 cache by the stage's key. Same inputs, same key.
+  The output files of one build stage, restored from or saved to the R2 cache by the stage's key. Same inputs, same key.
 inputs:
   op:
-    description: "restore (before the build; the output of the stage is put back when the cache has the key) or save (after the build)"
+    description: "restore (before the stage; its outputs are put back when the cache has the key) or save (after the stage)"
     required: true
   stage:
-    description: "the stage's name (gen)"
+    description: "the stage's name (wasm, hybn0, wasmopt, hybrid, bundle)"
     required: true
   key:
     description: "the stage's key (ci/stage-keys.sh)"
     required: true
-  dir:
-    description: "the stage's output directory (under RUNNER_TEMP)"
+  base:
+    description: "the build's WORK directory (under RUNNER_TEMP); the paths are relative to it"
+    required: true
+  paths:
+    description: "the stage's outputs relative to base (ci/stage-keys.sh)"
     required: true
   account-id:
     description: "the account ID of the R2 endpoint (already masked by the job; the value is not printed)"
@@ -28,7 +31,7 @@ inputs:
     required: true
 outputs:
   hit:
-    description: "restore: 'true' when the output was restored from the cache, 'false' when the cache has no entry"
+    description: "restore: 'true' when the outputs were restored from the cache, 'false' when the cache has no entry"
     value: ${{ steps.restore.outputs.hit }}
 runs:
   using: composite
@@ -39,7 +42,8 @@ runs:
       env:
         STAGE: ${{ inputs.stage }}
         KEY: ${{ inputs.key }}
-        DIR: ${{ inputs.dir }}
+        BASE: ${{ inputs.base }}
+        PATHS: ${{ inputs.paths }}
         ID: ${{ inputs.account-id }}
         WORK: ${{ runner.temp }}/stage-cache
         AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}
@@ -52,7 +56,8 @@ runs:
       env:
         STAGE: ${{ inputs.stage }}
         KEY: ${{ inputs.key }}
-        DIR: ${{ inputs.dir }}
+        BASE: ${{ inputs.base }}
+        PATHS: ${{ inputs.paths }}
         ID: ${{ inputs.account-id }}
         WORK: ${{ runner.temp }}/stage-cache
         AWS_ACCESS_KEY_ID: ${{ inputs.cache-access-key-id }}

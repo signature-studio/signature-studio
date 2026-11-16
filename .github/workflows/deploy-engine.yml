@@ -1,8 +1,10 @@
 # エンジンの bundle を作り(9 段。決定 0381)、R2 fl-web-assets の新しい prefix に載せる。
 # root の manifest.json は、wasm の sha256 が ci/verified-bundles.tsv に在るときだけ差し替える(退避つき)。
-# R2 の Secrets は、抽出の層(.github/actions/extract-layer。キャッシュの復元と保存。インストーラの取得は無いときだけ)、段 gen のキャッシュ(.github/actions/stage-cache。復元と保存)、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386・0391)。
+# R2 の Secrets は、抽出の層(.github/actions/extract-layer)、段のキャッシュの復元と保存(.github/actions/stage-cache)、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386・0391・0395)。
 # 値・アカウント ID・R2 のホスト名は出さない(公開リポジトリ。ログも公開)。
-# 抽出の層は、同じ入力の結果を R2 から復元する(決定 0386)。段 gen は、同じ鍵なら出力を R2 から戻し、build-engine-bundle.sh が gen を飛ばす(決定 0391)。この注記の行は、2 回目の実行(復元)を起こすための変更(R6-8・R6-10)。R6-10 の 2 回目は、この行だけを変えて起こす(段 gen の鍵の入力に、この文書は入らない)。
+# 抽出の層は、同じ入力の結果を R2 から復元する(決定 0386)。bundle は、入力の全体のハッシュが同じなら、9 段を飛ばして R2 から戻す(決定 0395)。
+# 段の出力は、内容の鍵で R2 から戻す(決定 0395・0395): wasm は 7 群の object、hybn0・wasmopt・hybrid は出力。段 gen と weblink は毎回作る(決定 0395)。
+# 注記(決定 0395 の 2 回目の実行を起こすための変更): 鍵の入力の外の行。
 name: deploy-engine
 
 on:
@@ -51,6 +53,12 @@ jobs:
   bundle:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      WORK: ${{ runner.temp }}/work
+      HOST_ROOT: ${{ runner.temp }}/host
+      B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
+      B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
+      BUCKET: fl-web-assets
     steps:
       - name: "リポジトリを取得する"
         uses: actions/checkout@v4
@@ -58,18 +66,19 @@ jobs:
           persist-credentials: false
 
       - id: key
-        name: "prefix を入力のハッシュから決める(同じ入力なら同じ名前。末尾 8 桁)"
+        name: "prefix と入力の全体のハッシュ(同じ入力なら同じ名前。prefix は先頭 8 桁。決定 0395)"
         run: |
           set -eu
-          K=$(git ls-files -s -- lift/.cargo lift/Cargo.toml lift/Cargo.lock lift/crates lift/runtime lift/data lift/harness \
+          FULL=$(git ls-files -s -- lift/.cargo lift/Cargo.toml lift/Cargo.lock lift/crates lift/runtime lift/data lift/harness \
             app/package.json app/scripts/build-engine-bundle.sh app/scripts/pack-assets.mjs app/scripts/lib/wasm-exports.mjs \
             app/src/bundle/pack.ts app/src/bundle/manifest.ts app/src/bundle/schema.ts app/src/bundle/sha256.ts \
             ci/artifacts.lock ci/extract-dlls.tsv ci/versions.env ci/setup-toolchain.sh ci/lib/extract_fl.py \
-            tools/extract_nsis2.py tools/nsis_script_dump.py | sha256sum | cut -c1-8)
+            tools/extract_nsis2.py tools/nsis_script_dump.py | sha256sum | cut -d' ' -f1)
+          K=${FULL:0:8}
           case "$K" in ????????) ;; *) echo "prefix の鍵が作れない"; exit 1 ;; esac
           echo "prefix=fl-engine-ci-$K" >> "$GITHUB_OUTPUT"
+          echo "full=$FULL" >> "$GITHUB_OUTPUT"
           echo "prefix: fl-engine-ci-$K"
-
       - id: acct
         name: "アカウント ID を実行時に 1 つ得て、すぐ伏せる(値は出さない)"
         env:
@@ -93,6 +102,7 @@ jobs:
           rm -f "$W/accounts.json" "$W/cand.txt"
           echo "アカウント ID を実行時に 1 つ得た(値は出さない)"
 
+
       - id: layer
         name: "抽出の層: R2 の抽出キャッシュを復元する。無ければ、インストーラを取り、抽出し、キャッシュに保存する(決定 0386)"
         uses: ./.github/actions/extract-layer
@@ -103,20 +113,21 @@ jobs:
           cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
           cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
 
-      - id: gkey
-        name: "段 gen の鍵(抽出の鍵と、gen の入力・道具・関数の文のハッシュ。同じ入力なら同じ鍵。決定 0391)"
+      - id: bkey
+        name: "bundle の鍵(入力の全体のハッシュ。決定 0395)"
         env:
-          EXTRACT_KEY: ${{ steps.layer.outputs.key }}
-        run: bash ci/stage-keys.sh gen "$EXTRACT_KEY" >> "$GITHUB_OUTPUT"
+          FULL: ${{ steps.key.outputs.full }}
+        run: bash ci/stage-keys.sh bundle "$FULL" >> "$GITHUB_OUTPUT"
 
-      - id: gen_cache
-        name: "段 gen の復元: R2 の段のキャッシュに鍵が在れば、出力を WORK に戻す(build-engine-bundle.sh が gen を飛ばす)。鍵が在るのに戻せなければ止める(決定 0391)"
+      - id: bundle_cache
+        name: "bundle の復元: R2 の段のキャッシュに鍵が在れば、9 段を飛ばして bundle を戻す。無ければ 9 段を回す(決定 0395)"
         uses: ./.github/actions/stage-cache
         with:
           op: restore
-          stage: gen
-          key: ${{ steps.gkey.outputs.key }}
-          dir: ${{ runner.temp }}/work/onat
+          stage: bundle
+          key: ${{ steps.bkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.bkey.outputs.paths }}
           account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
           cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
@@ -133,17 +144,21 @@ jobs:
 
       - id: emsdk
         name: "emscripten 6.0.12(ci/setup-toolchain.sh の固定値)"
+        if: steps.bundle_cache.outputs.hit != 'true'
         run: bash ci/setup-toolchain.sh emsdk
 
       - id: rust
         name: "rust 1.99.0(ci/setup-toolchain.sh の固定値)"
+        if: steps.bundle_cache.outputs.hit != 'true'
         run: bash ci/setup-toolchain.sh rust
 
       - name: "cargo の依存を取る(build-engine-bundle.sh の --offline の前)"
+        if: steps.bundle_cache.outputs.hit != 'true'
         run: cd lift && cargo fetch --locked
 
       - id: b2d
-        name: "上流 Blend2D を wasm で作る(固定コミットと tarball の SHA-256 で照合)"
+        name: "上流 Blend2D を wasm で作る(固定コミットと tarball の SHA-256 で照合)。bundle の鍵が hit なら飛ばす"
+        if: steps.bundle_cache.outputs.hit != 'true'
         run: |
           PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:$PATH" \
           EMCC_CFLAGS="-matomics -mbulk-memory" \
@@ -152,38 +167,425 @@ jobs:
           bash lift/harness/b2d1/build_upstream.sh > "$RUNNER_TEMP/b2d.txt" 2>&1 || { echo "上流 Blend2D: 失敗(末尾 40 行)"; tail -n 40 "$RUNNER_TEMP/b2d.txt"; exit 1; }
           echo "上流 Blend2D: 成功(rc=0)"
 
-      - id: build
-        name: "9 段を既定の順で回す(prefix は上で決めた名前。書き込みの Secrets は渡さない)"
+
+      - id: gen
+        name: "段 gen と resplit を回す(毎回作る。キャッシュしない。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
         env:
-          WORK: ${{ runner.temp }}/work
-          HOST_ROOT: ${{ runner.temp }}/host
-          B2D_UPSTREAM_LIB: ${{ runner.temp }}/b2d/build-wasm/libblend2d.a
-          B2D_UPSTREAM_SRC: ${{ runner.temp }}/b2d/src/src
           PREFIX: ${{ steps.key.outputs.prefix }}
-          BUCKET: fl-web-assets
         run: |
-          if bash app/scripts/build-engine-bundle.sh > "$RUNNER_TEMP/build.txt" 2>&1; then
-            echo "9 段: 成功(rc=0)"
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh gen resplit > "$RUNNER_TEMP/build-gen.txt" 2>&1; then
+            echo "段 gen resplit: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
           else
             rc=$?
-            echo "9 段: 失敗(rc=$rc。末尾 40 行)"
-            tail -n 40 "$RUNNER_TEMP/build.txt"
+            echo "段 gen resplit: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-gen.txt"
             exit 1
           fi
-          cat "$WORK/logs/stages.log"
 
-      - id: gen_save
-        name: "段 gen の保存: 今回 gen を作った(復元していない)ときだけ、出力を R2 の段のキャッシュに保存し、読み直して確かめる(決定 0391)"
-        if: steps.build.outcome == 'success' && steps.gen_cache.outputs.hit != 'true'
+      - id: wkeys
+        name: "段 wasm の 7 群の鍵(群の単位の内容のハッシュ。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        run: bash ci/stage-keys.sh wasm >> "$GITHUB_OUTPUT"
+
+      - id: wr_fle
+        name: "段 wasm の群 fle(FLEngine の units) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
         uses: ./.github/actions/stage-cache
         with:
-          op: save
-          stage: gen
-          key: ${{ steps.gkey.outputs.key }}
-          dir: ${{ runner.temp }}/work/onat
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_fle }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_fle }}
           account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
           cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_m1
+        name: "段 wasm の群 m1(dsp) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m1 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m1 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_m2
+        name: "段 wasm の群 m2(Blend2D) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m2 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m2 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_m3
+        name: "段 wasm の群 m3(QFC) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m3 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m3 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_m4
+        name: "段 wasm の群 m4(FreeType) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m4 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m4 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_m5
+        name: "段 wasm の群 m5(モジュール 5 から 9) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m5 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m5 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wr_rt
+        name: "段 wasm の群 rt(runtime・harness・common・realmod・B2D の adapter) の復元: 鍵が R2 に在れば object を戻す。在るのに戻せなければ止める(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_rt }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_rt }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wasm
+        name: "段 wasm を回す(7 群のどれかが miss のとき。object が在る群は作り直さない)"
+        if: steps.bundle_cache.outputs.hit != 'true' && (steps.wr_fle.outputs.hit != 'true' || steps.wr_m1.outputs.hit != 'true' || steps.wr_m2.outputs.hit != 'true' || steps.wr_m3.outputs.hit != 'true' || steps.wr_m4.outputs.hit != 'true' || steps.wr_m5.outputs.hit != 'true' || steps.wr_rt.outputs.hit != 'true')
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh wasm > "$RUNNER_TEMP/build-wasm.txt" 2>&1; then
+            echo "段 wasm: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 wasm: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-wasm.txt"
+            exit 1
+          fi
+
+      - id: ws_fle
+        name: "段 wasm の群 fle(FLEngine の units) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_fle.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_fle }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_fle }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_m1
+        name: "段 wasm の群 m1(dsp) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_m1.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m1 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m1 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_m2
+        name: "段 wasm の群 m2(Blend2D) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_m2.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m2 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m2 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_m3
+        name: "段 wasm の群 m3(QFC) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_m3.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m3 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m3 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_m4
+        name: "段 wasm の群 m4(FreeType) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_m4.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m4 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m4 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_m5
+        name: "段 wasm の群 m5(モジュール 5 から 9) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_m5.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_m5 }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_m5 }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: ws_rt
+        name: "段 wasm の群 rt(runtime・harness・common・realmod・B2D の adapter) の保存: 今回 miss のときだけ、R2 に保存して読み直す(決定 0395)"
+        if: steps.wasm.outcome == 'success' && steps.wr_rt.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasm
+          key: ${{ steps.wkeys.outputs.k_rt }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.wkeys.outputs.p_rt }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: hkey
+        name: "段 hybn0 の鍵(内容のハッシュ。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        run: bash ci/stage-keys.sh hybn0 >> "$GITHUB_OUTPUT"
+
+      - id: hybn0_cache
+        name: "段 hybn0 の復元: 鍵が R2 に在れば出力を戻す(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: hybn0
+          key: ${{ steps.hkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.hkey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: hybn0
+        name: "段 hybn0 を回す(復元が hit のときは飛ばす)"
+        if: steps.bundle_cache.outputs.hit != 'true' && steps.hybn0_cache.outputs.hit != 'true'
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh hybn0 > "$RUNNER_TEMP/build-hybn0.txt" 2>&1; then
+            echo "段 hybn0: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 hybn0: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-hybn0.txt"
+            exit 1
+          fi
+
+      - id: hybn0_save
+        name: "段 hybn0 の保存: 今回作ったときだけ(決定 0395)"
+        if: steps.hybn0.outcome == 'success' && steps.hybn0_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: hybn0
+          key: ${{ steps.hkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.hkey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: weblink
+        name: "段 weblink を回す(毎回作る。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh weblink > "$RUNNER_TEMP/build-weblink.txt" 2>&1; then
+            echo "段 weblink: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 weblink: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-weblink.txt"
+            exit 1
+          fi
+
+      - id: okey
+        name: "段 wasmopt の鍵(weblink の出力の内容のハッシュ。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        run: bash ci/stage-keys.sh wasmopt >> "$GITHUB_OUTPUT"
+
+      - id: wasmopt_cache
+        name: "段 wasmopt の復元: 鍵が R2 に在れば出力を戻す(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: wasmopt
+          key: ${{ steps.okey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.okey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: wasmopt
+        name: "段 wasmopt を回す(復元が hit のときは飛ばす)"
+        if: steps.bundle_cache.outputs.hit != 'true' && steps.wasmopt_cache.outputs.hit != 'true'
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh wasmopt > "$RUNNER_TEMP/build-wasmopt.txt" 2>&1; then
+            echo "段 wasmopt: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 wasmopt: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-wasmopt.txt"
+            exit 1
+          fi
+
+      - id: wasmopt_save
+        name: "段 wasmopt の保存: 今回作ったときだけ(決定 0395)"
+        if: steps.wasmopt.outcome == 'success' && steps.wasmopt_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: wasmopt
+          key: ${{ steps.okey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.okey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: hbkey
+        name: "段 hybrid の鍵(C 部分・link map・glue・DLL の内容のハッシュ。決定 0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        run: bash ci/stage-keys.sh hybrid >> "$GITHUB_OUTPUT"
+
+      - id: hybrid_cache
+        name: "段 hybrid の復元: 鍵が R2 に在れば engine wasm と glue を戻す。weblink の後に戻す(決定 0391・0395)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: restore
+          stage: hybrid
+          key: ${{ steps.hbkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.hbkey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: hybrid
+        name: "段 hybrid を回す(復元が hit のときは飛ばす)"
+        if: steps.bundle_cache.outputs.hit != 'true' && steps.hybrid_cache.outputs.hit != 'true'
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh hybrid > "$RUNNER_TEMP/build-hybrid.txt" 2>&1; then
+            echo "段 hybrid: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 hybrid: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-hybrid.txt"
+            exit 1
+          fi
+
+      - id: hybrid_save
+        name: "段 hybrid の保存: 今回作ったときだけ(決定 0395)"
+        if: steps.hybrid.outcome == 'success' && steps.hybrid_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: hybrid
+          key: ${{ steps.hbkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.hbkey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
+      - id: seedbundle
+        name: "段 seed と bundle を回す(毎回作る。bundle の鍵が miss のとき)"
+        if: steps.bundle_cache.outputs.hit != 'true'
+        env:
+          PREFIX: ${{ steps.key.outputs.prefix }}
+        run: |
+          set -u
+          s0=$(date +%s)
+          if bash app/scripts/build-engine-bundle.sh seed bundle > "$RUNNER_TEMP/build-seedbundle.txt" 2>&1; then
+            echo "段 seed bundle: 成功(rc=0。$(( $(date +%s) - s0 )) 秒)"
+          else
+            rc=$?
+            echo "段 seed bundle: 失敗(rc=$rc。末尾 40 行)"
+            tail -n 40 "$RUNNER_TEMP/build-seedbundle.txt"
+            exit 1
+          fi
 
       - id: check
         name: "9 段の出力を検査する(sha256・展開・manifest の判定・載せる 5 件。値は出さない)"
@@ -275,6 +677,21 @@ jobs:
           PY
           echo "wasm_sha=$WSHA" >> "$GITHUB_OUTPUT"
           echo "wasm_size=$WSIZE" >> "$GITHUB_OUTPUT"
+
+      - id: bundle_save
+        name: "bundle の保存: 検査と載せの前の検査が通ったときだけ、R2 の段のキャッシュに保存して読み直す(決定 0395)"
+        if: steps.check.outcome == 'success' && steps.seedbundle.outcome == 'success' && steps.bundle_cache.outputs.hit != 'true'
+        uses: ./.github/actions/stage-cache
+        with:
+          op: save
+          stage: bundle
+          key: ${{ steps.bkey.outputs.key }}
+          base: ${{ runner.temp }}/work
+          paths: ${{ steps.bkey.outputs.paths }}
+          account-id: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          cache-access-key-id: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          cache-secret-access-key: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+
 
       - id: upload
         name: "prefix を R2 に載せ、1 件ずつ読み直して確かめる(manifest.json は最後。無いときだけ載せる)"
@@ -486,17 +903,34 @@ jobs:
           R_ACCT: ${{ steps.acct.outcome }}
           R_LAYER: ${{ steps.layer.outcome }}
           LAYER_HIT: ${{ steps.layer.outputs.hit }}
+          BUNDLE_HIT: ${{ steps.bundle_cache.outputs.hit }}
+          R_BCACHE: ${{ steps.bundle_cache.outcome }}
           R_EMSDK: ${{ steps.emsdk.outcome }}
           R_RUST: ${{ steps.rust.outcome }}
           R_B2D: ${{ steps.b2d.outcome }}
-          R_BUILD: ${{ steps.build.outcome }}
+          R_GEN: ${{ steps.gen.outcome }}
+          R_WASM: ${{ steps.wasm.outcome }}
+          HIT_FLE: ${{ steps.wr_fle.outputs.hit }}
+          HIT_M1: ${{ steps.wr_m1.outputs.hit }}
+          HIT_M2: ${{ steps.wr_m2.outputs.hit }}
+          HIT_M3: ${{ steps.wr_m3.outputs.hit }}
+          HIT_M4: ${{ steps.wr_m4.outputs.hit }}
+          HIT_M5: ${{ steps.wr_m5.outputs.hit }}
+          HIT_RT: ${{ steps.wr_rt.outputs.hit }}
+          R_HYBN0: ${{ steps.hybn0.outcome }}
+          HIT_HYBN0: ${{ steps.hybn0_cache.outputs.hit }}
+          R_WEBLINK: ${{ steps.weblink.outcome }}
+          R_WASMOPT: ${{ steps.wasmopt.outcome }}
+          HIT_WASMOPT: ${{ steps.wasmopt_cache.outputs.hit }}
+          R_HYBRID: ${{ steps.hybrid.outcome }}
+          HIT_HYBRID: ${{ steps.hybrid_cache.outputs.hit }}
+          R_SEEDBUNDLE: ${{ steps.seedbundle.outcome }}
           R_CHECK: ${{ steps.check.outcome }}
+          R_BSAVE: ${{ steps.bundle_save.outcome }}
           R_UPLOAD: ${{ steps.upload.outcome }}
           R_ROOT: ${{ steps.root.outcome }}
-          GKEY: ${{ steps.gkey.outputs.key }}
-          GHIT: ${{ steps.gen_cache.outputs.hit }}
-          R_GSAVE: ${{ steps.gen_save.outcome }}
           PREFIX: ${{ steps.key.outputs.prefix }}
+          BKEY: ${{ steps.bkey.outputs.key }}
           WASM_SHA: ${{ steps.check.outputs.wasm_sha }}
           WASM_SIZE: ${{ steps.check.outputs.wasm_size }}
           UPLOADED: ${{ steps.upload.outputs.uploaded }}
@@ -511,23 +945,32 @@ jobs:
             echo "|---|---|"
             echo "| prefix(入力のハッシュ) | ${PREFIX:-未決定} |"
             echo "| アカウント ID を実行時に得た | $R_ACCT |"
-            echo "| 抽出の層(キャッシュの復元・取得・抽出・保存) | $R_LAYER |"
-            echo "| 抽出キャッシュから復元した(hit) | ${LAYER_HIT:-未取得} |"
-            echo "| emsdk | $R_EMSDK |"
-            echo "| rust | $R_RUST |"
-            echo "| 上流 Blend2D | $R_B2D |"
-            echo "| 段 gen の鍵 | ${GKEY:-未決定} |"
-            echo "| 段 gen を R2 から復元した(hit) | ${GHIT:-未取得} |"
-            echo "| 段 gen を R2 に保存した(outcome) | ${R_GSAVE:-未実行} |"
-            echo "| 9 段 | $R_BUILD |"
-            echo "| 9 段の出力の検査 | $R_CHECK |"
-            echo "| prefix を載せ、確かめた(載せたか = $UPLOADED) | $R_UPLOAD |"
+            echo "| 抽出の層(キャッシュの復元・取得・抽出・保存) | $R_LAYER(抽出キャッシュから復元した = ${LAYER_HIT:-未取得}) |"
+            echo "| bundle の鍵 | ${BKEY:-未決定} |"
+            echo "| bundle を R2 から復元した(hit。9 段を飛ばした) | ${BUNDLE_HIT:-未取得}(復元の step: $R_BCACHE) |"
+            echo "| emsdk・rust・上流 Blend2D | ${R_EMSDK:-skipped} / ${R_RUST:-skipped} / ${R_B2D:-skipped} |"
+            echo "| 段 gen と resplit | ${R_GEN:-skipped} |"
+            echo "| 段 wasm の群の復元(hit): fle / m1 / m2 / m3 / m4 / m5 / rt | ${HIT_FLE:-skipped} / ${HIT_M1:-skipped} / ${HIT_M2:-skipped} / ${HIT_M3:-skipped} / ${HIT_M4:-skipped} / ${HIT_M5:-skipped} / ${HIT_RT:-skipped} |"
+            echo "| 段 wasm | ${R_WASM:-skipped} |"
+            echo "| 段 hybn0(復元の hit / 実行) | ${HIT_HYBN0:-skipped} / ${R_HYBN0:-skipped} |"
+            echo "| 段 weblink | ${R_WEBLINK:-skipped} |"
+            echo "| 段 wasmopt(復元の hit / 実行) | ${HIT_WASMOPT:-skipped} / ${R_WASMOPT:-skipped} |"
+            echo "| 段 hybrid(復元の hit / 実行) | ${HIT_HYBRID:-skipped} / ${R_HYBRID:-skipped} |"
+            echo "| 段 seed と bundle | ${R_SEEDBUNDLE:-skipped} |"
+            echo "| 9 段の出力の検査 | ${R_CHECK:-skipped} |"
+            echo "| bundle を R2 に保存した | ${R_BSAVE:-skipped} |"
+            echo "| prefix を載せ、確かめた(載せたか = ${UPLOADED:-未実行}) | ${R_UPLOAD:-skipped} |"
             echo "| wasm の大きさ(B) | ${WASM_SIZE:-未取得} |"
             echo "| wasm の sha256 | ${WASM_SHA:-未取得} |"
             echo "| wasm の sha256 が一覧に在る | ${LISTED:-未実行} |"
-            echo "| root の差し替え | $R_ROOT(変えた = ${ROOT_CHANGED:-未実行}) |"
+            echo "| root の差し替え | ${R_ROOT:-skipped}(変えた = ${ROOT_CHANGED:-未実行}) |"
             echo "| root の sha256(前) | ${ROOT_BEFORE:-未取得} |"
             echo "| root の sha256(後。失敗して戻した場合は戻した後の値) | ${ROOT_AFTER:-未取得} |"
             echo "| 退避のキー名 | ${BACKUP:-なし} |"
             echo "| 時刻(UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+            echo ""
+            echo "段の秒(build-engine-bundle.sh の stages.log。実行した段だけ):"
+            echo '```'
+            cat "$WORK/logs/stages.log" 2>/dev/null || echo "(stages.log が無い)"
+            echo '```'
           } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"

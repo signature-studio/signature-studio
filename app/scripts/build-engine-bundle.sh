@@ -327,6 +327,7 @@ hyb_strip() {   # takes the bodies of the listed functions out of the C units (t
 }
 
 stage_hybn0() {   # fe-wasmgen with dummy addresses (and the dummy --tls-ctx 0x0: --hybrid-r needs it, the form of the register page is the thread-local one only): the C functions that the direct code calls (module c of the imports) -> $HYB/exports.rsp; and the check that it emits exactly the listed functions
+  if [ -s "$HYB/exports.rsp" ]; then echo "hybn0: $HYB/exports.rsp exists (restored from the stage cache or made before), skipped"; return 0; fi
   hyb_lists; hyb_few; hyb_flags
   local m
   : > "$HYB/c-imports-used.txt"
@@ -409,6 +410,7 @@ stage_seed() {
 }
 
 stage_bundle() {
+  if [ -s "$BUNDLE/upload-commands.txt" ]; then echo "bundle: $BUNDLE has the output (restored from the stage cache or made before), skipped"; return 0; fi
   [ -s "$WEB/flengine6.wasm" ] || die "no $WEB/flengine6.wasm: run the weblink stage first"
   local ENGINE_WASM=$WEB/flengine6.opt.wasm
   [ -s "$ENGINE_WASM" ] || die "no $ENGINE_WASM: run the hybrid stage"
