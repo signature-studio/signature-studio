@@ -2,6 +2,7 @@
 # root の manifest.json は、wasm の sha256 が ci/verified-bundles.tsv に在るときだけ差し替える(退避つき)。
 # R2 の Secrets は、抽出の層(.github/actions/extract-layer。キャッシュの復元と保存。インストーラの取得は無いときだけ)と、載せる段・root の段だけに渡す。ビルドの段には渡さない(決定 0386)。
 # 値・アカウント ID・R2 のホスト名は出さない(公開リポジトリ。ログも公開)。
+# 抽出の層は、同じ入力の結果を R2 から復元する(決定 0386)。この注記の行は、2 回目の実行(復元)を起こすための変更(R6-8)。
 name: deploy-engine
 
 on:
