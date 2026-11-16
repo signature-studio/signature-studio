@@ -1,0 +1,13 @@
+[
+ {
+  "name": "r55-problems",
+  "what": "R5-5: the reference project opened as a zip (openZipProject). openZipProject saves missing-plugins-dialog.png when the Problems window is up and clicks its OK; then the engine must still run (expectRunning). The number N of 'N plugin(s) could not be opened' is read from the picture.",
+  "ops": [
+   {"op": "closeWizard"},
+   {"op": "wait", "ms": 2500},
+   {"op": "openZipProject"},
+   {"op": "wait", "ms": 10000},
+   {"op": "expectRunning"}
+  ]
+ }
+]

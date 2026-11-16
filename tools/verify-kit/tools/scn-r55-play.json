@@ -1,0 +1,54 @@
+[
+ {
+  "name": "r55-play",
+  "what": "R5-5: the reference project opened as a zip (openZipProject; the Problems window is closed by it), then 10 s of playback with Space (the Balance on Insert 1 and the Filter on Insert 47 are in the project). The engine log of the playback is saved (log-play.log: the lines after the mark 'play'); a shot (play-10s-playing.png) is taken while the playback runs (before the second Space); expectRunning at the end.",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "logMark",
+    "name": "play"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "play-10s-playing"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "saveLog",
+    "name": "log-play",
+    "mark": "play"
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]
