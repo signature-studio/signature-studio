@@ -36,7 +36,7 @@ gh run list --workflow agent.yml --limit 1 --json conclusion --jq '.[0].conclusi
 
 ## 依頼なしで続ける作業
 - 登録が無い間は、`ci/tasks/*.md` を置かない(実行を始めない)。
-- 自動処理の組み立ての検査(`ci/agents/check-agents.sh` など)を、登録が無くても続けて確かめる。
+- 自動処理の組み立ての検査(ci/agents/check-agents.sh(削除済み) など)を、登録が無くても続けて確かめる。
 - Workers の配信(`deploy-engine` の自動処理)の作業を続ける。
 
 ## 確認の記録

@@ -6,7 +6,7 @@
 ## 決定
 - 決定: モデルの認証は、依頼者が opencode の console に登録したログイン情報(opencode の提供元だけ)を、Secret `OPENCODE_AUTH_JSON` に 1 件登録して使う。根拠: 依頼者の指示(下の出典)。旧方式の認証情報は使わない(依頼 Issue 4 は誤りとして取り下げ、決定 0380 に注)。
 - 決定: 依頼者の操作は 2 つだけ(Issue 0005): 依頼者のマシンで `opencode auth export opencode` の出力(opencode のログイン情報だけ)を全部コピーし、Secret に貼る。根拠: 依頼者の指示。
-- 決定: run ジョブは、opencode の導入の後、Secret を環境変数に入れた手順で、値を標準入力に渡して import を実行する(`ci/agents/import-login.sh`)。Secret が空、または取り込みが 0 件なら停止する。失敗時は import の出力を表示しない(値を含みうるため)。根拠: 認証情報を、リポジトリのファイル・表示・ログに書かない。取り込み先は、ランナーの中の opencode の認証の保存先だけ。
+- 決定: run ジョブは、opencode の導入の後、Secret を環境変数に入れた手順で、値を標準入力に渡して import を実行する(ci/agents/import-login.sh(削除済み))。Secret が空、または取り込みが 0 件なら停止する。失敗時は import の出力を表示しない(値を含みうるため)。根拠: 認証情報を、リポジトリのファイル・表示・ログに書かない。取り込み先は、ランナーの中の opencode の認証の保存先だけ。
 - 決定: モデルは、取り込んだ認証情報の提供元(console が返す `console-aws-bedrock`)の Haiku 5.5 だけ。モデル ID は部品から組み立てる(禁止語を書かない)。根拠: 役割表の Haiku 5.5(AGENTS.md §1)。
 - 決定: ログに値を出さない。`set -x` を使わず、`env` を出さず、値を echo しない。GitHub の Secret は自動で伏せられるが、それには頼らない。根拠: Actions のログは公開。
 
@@ -23,7 +23,7 @@
 ## 未確認
 - インストールした版(2.2.6。`scripts/`・`ci/agents/install-opencode.sh` で固定)に、同じ import・export の仕様(標準入力・件数の出力・対象の指定)があるか。読んだのは、ローカルのクローンのソース(版 ef45f1fbe0)だけ。前の版の記載 c5e741e は、このクローンに無いため読めなかった。
 - ランナー上で、既定のサーバーの起動により import が成功するか。
-- 取り込みの後、ランナーで `console-aws-bedrock` の Haiku 5.5 が見えるか(`ci/agents/check-agents.sh` で確かめる)。
+- 取り込みの後、ランナーで `console-aws-bedrock` の Haiku 5.5 が見えるか(ci/agents/check-agents.sh(削除済み) で確かめる)。
 - 取り込みの出力に値が無いこと: ソースの読みでは、成功時は件数の 1 行だけ(`Imported N credential(s)`)。実測なし。
 
 ## 出典

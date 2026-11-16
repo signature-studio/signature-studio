@@ -12,9 +12,9 @@
 
 ## 1 決定
 - 決定 1(保存する段): この決定で保存・復元する段は gen だけ。根拠: 依存が最も少ない。gen の入力は抽出の鍵と lift の入力だけ(§2)。weblink は wasm の .o 群・hybn0 の exports.rsp・link map を読む(`build-engine-bundle.sh` の stage_weblink 156〜167 行)。bundle は 9 段の全部の出力を読む(stage_bundle 411〜419 行)。時間の大半は wasm・hybn0・wasmopt・hybrid・bundle(上の段の秒)で、この決定では保存しない(R6-11〜R6-13 の行)。gen の作り直しは 22〜25 秒なので、効果は小さい。実測は evidence/R6-10.md。
-- 決定 2(鍵): 鍵 = `fl-gen-` + SHA-256 の先頭 40 桁。SHA-256 の入力は、キャッシュの版(`stage-cache v1`)・段の名前・上流の鍵(抽出の層の鍵)・道具の版(rust 1.99.0・python 3.14)・gen が読む git の blob id の一覧(§2 の表)・段の文(`script_preamble`(40〜74 行の定数)と `script_part`(capped・stage_gen・tag_dir)のテキスト)。方法は旧 `archive/ci-old/ci/plan.sh` の k()(`fl-<段>-<hash>`)と同じ。実装は `ci/stage-keys.sh`。
+- 決定 2(鍵): 鍵 = `fl-gen-` + SHA-256 の先頭 40 桁。SHA-256 の入力は、キャッシュの版(`stage-cache v1`)・段の名前・上流の鍵(抽出の層の鍵)・道具の版(rust 1.99.0・python 3.14)・gen が読む git の blob id の一覧(§2 の表)・段の文(`script_preamble`(40〜74 行の定数)と `script_part`(capped・stage_gen・tag_dir)のテキスト)。方法は旧 `archive/ci-old/ci/plan.sh` の k()(`fl-<段>-<hash>`)と同じ。実装は ci/stage-keys.sh(削除済み)。
 - 決定 3(飛ばす分岐): `stage_gen` は、`$ONAT/gen/flengine.c` と `$ONAT/v-*/src/common.c` が在れば、cargo も gen-direct.sh も行わず「飛ばす」と表示する(`build-engine-bundle.sh` の 93 行。分類 c)。根拠: 戻した出力が在るのに fe-pe・fe-lift の cargo を走らせると、戻す利点が消える。後の段が fe-wasmgen を要るときは、`hyb_few`(194〜199 行)が従来どおり作る。gen の出力を読む後の段(resplit・wasm)は、`$ONAT` の中身だけを読む(本文の決定 4 で同じ中身を戻す)。
-- 決定 4(戻す・保存する): R2 `fl-web-cache` の `stage-cache/<鍵>/` に 3 件(out.tar・out.tar.sha256・SHA256SUMS。SHA256SUMS を最後に書く)。復元は、tar の SHA-256・tar の中身(絶対パス・`..`・リンクの無し)・件数・各ファイルの SHA-256 を、保存時の記録と照らす。404 なら作り直す(hit=false)。在るのに戻せなければ、段を止めて再実行を求める(`::error::`)。根拠: 依頼の指示(hit のはずが復元に失敗したら止めて再実行を求める)と、旧 deploy.yml 548〜550 行の扱い。抽出の層(決定 0386)は失敗時に取り直すが、この段は、在るのに戻せない原因の多くが R2 の一時的な失敗で再実行により直るものとして、止めて再実行を求める。実装は `ci/stage-cache.sh` と `.github/actions/stage-cache/action.yml`。
+- 決定 4(戻す・保存する): R2 `fl-web-cache` の `stage-cache/<鍵>/` に 3 件(out.tar・out.tar.sha256・SHA256SUMS。SHA256SUMS を最後に書く)。復元は、tar の SHA-256・tar の中身(絶対パス・`..`・リンクの無し)・件数・各ファイルの SHA-256 を、保存時の記録と照らす。404 なら作り直す(hit=false)。在るのに戻せなければ、段を止めて再実行を求める(`::error::`)。根拠: 依頼の指示(hit のはずが復元に失敗したら止めて再実行を求める)と、旧 deploy.yml 548〜550 行の扱い。抽出の層(決定 0386)は失敗時に取り直すが、この段は、在るのに戻せない原因の多くが R2 の一時的な失敗で再実行により直るものとして、止めて再実行を求める。実装は ci/stage-cache.sh(削除済み) と .github/actions/stage-cache/action.yml(削除済み)。
 - 決定 5(R2 の鍵): `R2_CACHE_ASSETS_*` は stage-cache の restore・save の step の env にだけ渡す。build の step には渡さない。根拠: 決定 0386 の決定 4 と同じ。
 - 決定 6(範囲外): R6-11(道具・Blend2D・lifter)、R6-12(resplit 以降の段の保存)、R6-13(wasm の .o)、R6-14(app)は、この決定に含めない。根拠: ROADMAP の各行。
 
@@ -29,7 +29,7 @@
 | rust 1.99.0・python 3.14 | `ci/versions.env` 6・7 行、`build-engine-bundle.sh` 95 行、`gen_two.sh` 130・135・150 行(python3) | 道具の版(鍵の文に入る) |
 | スクリプトの定数 | `build-engine-bundle.sh` 1〜74 行(preamble。例: FRUITY_SECONDS 40 行、EXTRA_IMPORTS 44 行) | `script_preamble` のテキスト |
 | stage_gen・capped・tag_dir | `build-engine-bundle.sh` 75〜104 行 | `script_part` のテキスト |
-| 外すもの: `lift/runtime` | `lift/crates/fe-lift/src/insn_int.rs` の `runtime` の読み取り(395 行)は `mod tests`(198 行〜)の中。fe-wasmgen の `flagout.rs` 287 行は hybrid の段。fe-lift の本体は読む物を引数で受ける(`main.rs`)。`lift/crates` の他の `runtime/` は C の #include の文字列(lib.rs 1236 行)か、コメント | 鍵の入力から外す。`ci/test-stage-keys.sh` が、runtime の変更で鍵が変わらないことを確かめる |
+| 外すもの: `lift/runtime` | `lift/crates/fe-lift/src/insn_int.rs` の `runtime` の読み取り(395 行)は `mod tests`(198 行〜)の中。fe-wasmgen の `flagout.rs` 287 行は hybrid の段。fe-lift の本体は読む物を引数で受ける(`main.rs`)。`lift/crates` の他の `runtime/` は C の #include の文字列(lib.rs 1236 行)か、コメント | 鍵の入力から外す。ci/test-stage-keys.sh(削除済み) が、runtime の変更で鍵が変わらないことを確かめる |
 | 外すもの: emcc・emsdk | `gen_two.sh`・`gen-direct.sh` は emcc を呼ばない(`grep -c emcc` が 0) | 外す |
 
 ## 3 実測と未確認
