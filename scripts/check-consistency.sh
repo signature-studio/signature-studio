@@ -6,6 +6,7 @@
 # g  docs/*.md, docs/core/*.md or docs/ops/*.md that docs/index.md does not name; tests/harness/t*.sh that tests/harness/README.md does not name;
 #    a scripts/ file that no current document names
 # c  AGENTS.md over 140 lines; prompts/worker-rules.md over 60 lines
+# d  a decision from 0386 on that says 入れない・捨てる・書き直し・削除 cites neither an owner message (msg_…) nor an old source (archive/… or docs/archive/…)
 # Not checked, on purpose:
 #   old material and outputs: docs/archive/, archive/, evidence/, patches/, tools/, lift/ (imported measurement material), artifacts/, binaries/, lift/out*
 #   a command: a backticked text with a space is checked only by its first word when that word is a path with "/" (`oc-msg.sh send …` is a command)
@@ -122,6 +123,19 @@ for p, limit in (("AGENTS.md", 140), ("prompts/worker-rules.md", 60)):
     n = len(open(p, encoding="utf-8").read().splitlines())
     if n > limit:
         add("c", p, f"{n} 行", f"{limit} 行を超える")
+
+# d: a decision that drops or rewrites something cites its source. 0386 is the first decision written under this rule (0385 and older are old documents, handled by another request).
+DECISION_FROM = 386
+DROP_WORDS = ("入れない", "捨てる", "書き直し", "削除")
+SOURCE = re.compile(r"msg_[0-9A-Za-z]+|(?:^|[^0-9A-Za-z_./-])(?:docs/)?archive/")
+for p in sorted(files):
+    m = re.fullmatch(r"docs/decisions/(\d{4})-[^/]+\.md", p)
+    if not m or int(m.group(1)) < DECISION_FROM:
+        continue
+    text = open(p, encoding="utf-8", errors="replace").read()
+    word = next((w for w in DROP_WORDS if w in text), None)
+    if word and not SOURCE.search(text):
+        add("d", p, word, "を決定しているが依頼者の発言 ID も旧設計の出典(archive/…)も無い")
 
 print("KIND  WHERE                                 WHAT                                  WHY")
 for kind, where, tok, why in rows[:5]:

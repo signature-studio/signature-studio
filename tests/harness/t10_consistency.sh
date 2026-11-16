@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # t10: scripts/check-consistency.sh on synthetic repositories (a copy of the script in a sandbox; no real repository is read or changed).
 # Detects: a backticked or linked repository path that does not exist; a docs/ops or docs/core file that docs/index.md does not name;
-# a tests/harness/t*.sh that the README does not name; a scripts/ file that no document names; AGENTS.md over 140 lines.
+# a tests/harness/t*.sh that the README does not name; a scripts/ file that no document names; AGENTS.md over 140 lines;
+# a decision from 0386 that says 入れない・捨てる・書き直し・削除 with neither a msg_ ID nor an archive/ source.
 # Does not detect: a path in old material (docs/archive, archive, lift); a path on a line that names another place or says it is a planned output;
 # a command's arguments; a bare file name; a todo row of docs/ROADMAP.md; text with placeholders (<…>, *).
 # shellcheck source=lib.sh
@@ -120,6 +121,21 @@ printf '| R9-1 | todo | — | 整備 | x | `evidence/R9-1.md` を作る | y | z 
 printf '| `ROADMAP.md` | r |\n' >> "$rm_/docs/index.md"
 out=$(run "$rm_")
 expect_eq "a todo row of ROADMAP is not a finding" 0 "$(count "$out")"
+
+# d: a decision from 0386 that drops something must cite an owner message or an old source; 0385 and older are not checked
+dec="$sb/decisions"; mk "$dec"; mkdir -p "$dec/docs/decisions"
+printf '# 0390: x\n決定: 旧の処理を入れない。\n' > "$dec/docs/decisions/0390-drop.md"
+printf '# 0391: x\n決定: 旧の処理を削除する。根拠: archive/ci-old/deploy.yml の 12 行。\n' > "$dec/docs/decisions/0391-cited.md"
+printf '# 0392: x\n決定: 旧の処理は書き直し。根拠: msg_1c30a3dc9001V6htDJWIQixRsO。\n' > "$dec/docs/decisions/0392-owner.md"
+printf '# 0385: x\n決定: 旧の処理を捨てる。\n' > "$dec/docs/decisions/0385-old.md"
+printf '# 0393: x\n決定: 新しい処理を足す。\n' > "$dec/docs/decisions/0393-plain.md"
+out=$(run "$dec")
+expect_contains "a decision from 0386 that drops something with no owner message or old source is found" "$out" "0390-drop.md"
+expect_not_contains "a decision that cites an old source (archive/) is not a finding" "$out" "0391-cited.md"
+expect_not_contains "a decision that cites an owner message (msg_) is not a finding" "$out" "0392-owner.md"
+expect_not_contains "a decision 0385 or older is not checked" "$out" "0385-old.md"
+expect_not_contains "a decision from 0386 without a drop word is not a finding" "$out" "0393-plain.md"
+expect_eq "and only the one decision is counted" 1 "$(count "$out")"
 
 # the real repository: the check runs and prints its count line
 real=$(cd "$ROOT" && bash scripts/check-consistency.sh 2>&1)
