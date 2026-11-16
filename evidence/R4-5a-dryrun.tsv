@@ -1,0 +1,327 @@
+diff	file	+	-	hunks	fwd_failed_hunks	fwd_rc	rev_failed_hunks	status
+rt-on-e11	app/scripts/build-engine-bundle.sh	29	7	6	0	0	-	applies
+rt-on-e11	app/src/engine/fruity.ts	9	10	2	0	0	-	applies
+rt-on-e11	app/src/main.ts	2	0	2	0	0	-	applies
+rt-on-e11	app/test/e2e/browser.mjs	22	1	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+rt-on-e11	lift/crates/fe-lift/src/imports_table.rs	3	0	1	0	0	-	applies
+rt-on-e11	lift/crates/fe-lift/tests/gil_lockfree.rs	187	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/crates/fe-lift/tests/semaphore.rs	329	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/crates/fe-lift/tests/wall_fr8.rs	43	1	2	0	0	-	applies
+rt-on-e11	lift/crates/fe-lift/tests/x87_threads.rs	105	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/crates/fe-wasmgen/src/lib.rs	15	6	6	0	0	-	applies
+rt-on-e11	lift/crates/fe-wasmgen/src/lower.rs	30	18	11	0	0	-	applies
+rt-on-e11	lift/crates/fe-wasmgen/src/main.rs	4	1	2	0	0	-	applies
+rt-on-e11	lift/crates/fe-wasmgen/src/wasm.rs	1	1	1	0	0	-	applies
+rt-on-e11	lift/crates/fe-wasmgen/tests/mx_hybrid_tls.rs	349	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/crates/fe-wasmgen/tests/typed_indirect.rs	67	11	7	0	0	-	applies
+rt-on-e11	lift/harness/fruity.c	2	0	2	0	0	-	applies
+rt-on-e11	lift/harness/fruity_g3.c	7	0	2	0	0	-	applies
+rt-on-e11	lift/harness/fruity_idle.c	33	16	3	0	0	-	applies
+rt-on-e11	lift/harness/gil/check_i1.py	94	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/harness/gil/gen_wrap.py	39	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/harness/hyb1/hybrid_glue.c	3	0	1	0	0	-	applies
+rt-on-e11	lift/harness/mt2/node-bundle-run-rt.mjs	126	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/harness/mt2/rt-worker-shim.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/harness/trace.c	6	0	1	0	0	-	applies
+rt-on-e11	lift/harness/web/filedlg/fle_filedlg_lib.js	4	2	2	0	0	-	applies
+rt-on-e11	lift/harness/web/fruity/fle_idle_lib.js	17	4	1	0	0	-	applies
+rt-on-e11	lift/harness/web/threads/fle_thread_lib.js	5	0	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_callback.c	31	0	2	1	1	2	FAILS
+rt-on-e11	lift/runtime/fle_ctx_more.h	22	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/runtime/fle_ctx_tls.c	13	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_dispatch.h	15	1	5	0	0	-	applies
+rt-on-e11	lift/runtime/fle_env.c	6	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_env.h	1	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_event.c	101	21	10	0	0	-	applies
+rt-on-e11	lift/runtime/fle_event.h	5	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_filedlg.c	3	0	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_gil.c	142	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/runtime/fle_gil.h	95	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/runtime/fle_gil_lockfree.inc	21	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/runtime/fle_holdstat.h	17	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e11	lift/runtime/fle_lowregs.h	19	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_mmx.h	6	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_mxcsr.c	2	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_mxcsr_flags.h	4	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_mxcsr.h	4	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_proc.c	4	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_realmod.c	22	1	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_seh.h	4	0	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_sys.c	226	2	10	0	0	-	applies
+rt-on-e11	lift/runtime/fle_sysinfo.c	21	12	6	0	0	-	applies
+rt-on-e11	lift/runtime/fle_sysinfo.h	5	1	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_thread.c	373	11	21	0	0	-	applies
+rt-on-e11	lift/runtime/fle_thread_wasm.c	46	1	3	0	0	-	applies
+rt-on-e11	lift/runtime/fle_thread_wasm.h	7	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_vex.h	8	0	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_win.c	11	2	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_x87.c	6	2	2	0	0	-	applies
+rt-on-e11	lift/runtime/fle_x87ctl.c	2	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_x87ctl.h	4	0	1	0	0	-	applies
+rt-on-e11	lift/runtime/fle_x87.h	6	0	1	0	0	-	applies
+rt-on-e9	app/scripts/build-engine-bundle.sh	29	7	6	1	1	0	FAILS
+rt-on-e9	app/src/engine/fruity.ts	9	10	2	0	0	-	applies
+rt-on-e9	app/src/main.ts	2	0	2	0	0	-	applies
+rt-on-e9	app/test/e2e/browser.mjs	22	1	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+rt-on-e9	lift/crates/fe-lift/src/imports_table.rs	3	0	1	0	0	-	applies
+rt-on-e9	lift/crates/fe-lift/tests/gil_lockfree.rs	187	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/crates/fe-lift/tests/semaphore.rs	329	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/crates/fe-lift/tests/wall_fr8.rs	43	1	2	0	0	-	applies
+rt-on-e9	lift/crates/fe-lift/tests/x87_threads.rs	105	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/crates/fe-wasmgen/src/lib.rs	6	3	5	3	1	0	FAILS
+rt-on-e9	lift/crates/fe-wasmgen/src/lower.rs	30	18	11	0	0	-	applies
+rt-on-e9	lift/crates/fe-wasmgen/src/main.rs	4	1	2	2	1	2	FAILS
+rt-on-e9	lift/crates/fe-wasmgen/src/wasm.rs	1	1	1	0	0	-	applies
+rt-on-e9	lift/crates/fe-wasmgen/tests/mx_hybrid_tls.rs	349	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/harness/fruity.c	2	0	2	0	0	-	applies
+rt-on-e9	lift/harness/fruity_g3.c	7	0	2	0	0	-	applies
+rt-on-e9	lift/harness/fruity_idle.c	33	16	3	0	0	-	applies
+rt-on-e9	lift/harness/gil/check_i1.py	94	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/harness/gil/gen_wrap.py	39	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/harness/hyb1/hybrid_glue.c	3	0	1	0	0	-	applies
+rt-on-e9	lift/harness/mt2/node-bundle-run-rt.mjs	126	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/harness/mt2/rt-worker-shim.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/harness/trace.c	6	0	1	0	0	-	applies
+rt-on-e9	lift/harness/web/filedlg/fle_filedlg_lib.js	4	2	2	0	0	-	applies
+rt-on-e9	lift/harness/web/fruity/fle_idle_lib.js	17	4	1	0	0	-	applies
+rt-on-e9	lift/harness/web/threads/fle_thread_lib.js	5	0	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_callback.c	31	0	2	1	1	2	FAILS
+rt-on-e9	lift/runtime/fle_ctx_more.h	22	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/runtime/fle_ctx_tls.c	13	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_dispatch.h	15	1	5	0	0	-	applies
+rt-on-e9	lift/runtime/fle_env.c	6	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_env.h	1	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_event.c	101	21	10	0	0	-	applies
+rt-on-e9	lift/runtime/fle_event.h	5	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_filedlg.c	3	0	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_gil.c	142	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/runtime/fle_gil.h	95	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/runtime/fle_gil_lockfree.inc	21	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/runtime/fle_holdstat.h	17	0	1	0	0	-	NEW(creates file, applies)
+rt-on-e9	lift/runtime/fle_lowregs.h	19	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_mmx.h	6	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_mxcsr.c	2	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_mxcsr.h	4	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_mxcsr_flags.h	4	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_proc.c	4	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_realmod.c	22	1	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_seh.h	4	0	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_sys.c	226	2	10	0	0	-	applies
+rt-on-e9	lift/runtime/fle_sysinfo.c	21	12	6	0	0	-	applies
+rt-on-e9	lift/runtime/fle_sysinfo.h	5	1	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_thread.c	373	11	21	0	0	-	applies
+rt-on-e9	lift/runtime/fle_thread_wasm.c	46	1	3	0	0	-	applies
+rt-on-e9	lift/runtime/fle_thread_wasm.h	7	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_vex.h	8	0	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_win.c	11	2	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_x87.c	6	2	2	0	0	-	applies
+rt-on-e9	lift/runtime/fle_x87.h	6	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_x87ctl.c	2	0	1	0	0	-	applies
+rt-on-e9	lift/runtime/fle_x87ctl.h	4	0	1	0	0	-	applies
+0305-d3-remove-instrumentation	lift/harness/gil/gen_wrap.py	0	15	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+0305-d3-remove-instrumentation	lift/runtime/fle_callback.c	0	13	2	2	1	2	FAILS
+0305-d3-remove-instrumentation	lift/runtime/fle_gil.c	0	32	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+0305-d3-remove-instrumentation	lift/runtime/fle_gil.h	0	9	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+0305-d3-remove-instrumentation	lift/runtime/fle_holdstat.h	0	17	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+0305-d3-remove-instrumentation	lift/runtime/fle_sys.c	0	160	4	4	1	1	FAILS
+0305-d3-remove-instrumentation	lift/runtime/fle_thread.c	0	116	5	5	1	4	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/src/imports_table.rs	3	3	2	0	1	1	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/rows_0234/mod.rs	5	0	1	0	0	-	NEW(creates file, applies)
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr13.rs	2	1	2	2	1	2	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr15.rs	4	3	3	2	1	3	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr16.rs	2	1	2	2	1	2	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr19.rs	2	1	2	2	1	2	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr20.rs	3	2	3	3	1	3	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr4.rs	2	1	2	2	1	2	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_fr5.rs	2	1	2	2	1	2	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/crates/fe-lift/tests/wall_wrp1.rs	3	0	1	0	0	-	applies
+0305-fix-the-16-failures-on-rt-on-e11	lift/runtime/fle_callback.c	0	8	1	1	1	1	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/runtime/fle_sys.c	1	9	1	1	1	1	FAILS
+0305-fix-the-16-failures-on-rt-on-e11	lift/runtime/fle_thread.c	0	2	1	1	1	1	FAILS
+0312-stack-on-main-e08b4589	app/scripts/build-engine-bundle.sh	29	7	6	0	0	-	applies
+0312-stack-on-main-e08b4589	app/src/audio/fle-out.worklet.js	1	1	1	0	0	-	applies
+0312-stack-on-main-e08b4589	app/src/audio/page-audio.ts	44	11	6	0	0	-	applies
+0312-stack-on-main-e08b4589	app/src/audio/worker-hook.ts	7	6	2	0	0	-	applies
+0312-stack-on-main-e08b4589	app/src/engine/fruity.ts	7	8	1	0	0	-	applies
+0312-stack-on-main-e08b4589	app/src/main.ts	2	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	app/test/e2e/browser.mjs	22	1	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+0312-stack-on-main-e08b4589	app/test/unit/audio-default.test.ts	14	10	9	0	0	-	applies
+0312-stack-on-main-e08b4589	app/test/unit/audio-wiring.test.ts	52	19	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/src/imports_table.rs	3	0	1	1	1	1	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/gil_lockfree.rs	187	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/rows_0234/mod.rs	5	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/semaphore.rs	329	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr13.rs	2	1	2	2	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr15.rs	4	3	3	2	1	3	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr16.rs	2	1	2	2	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr19.rs	2	1	2	2	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr20.rs	3	2	3	3	1	3	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr4.rs	2	1	2	2	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr5.rs	2	1	2	2	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_fr8.rs	43	1	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/wall_wrp1.rs	3	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-lift/tests/x87_threads.rs	105	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/src/lib.rs	15	6	6	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/src/lower.rs	30	18	11	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/src/main.rs	4	1	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/src/wasm.rs	1	1	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/tests/mx_hybrid_tls.rs	349	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/crates/fe-wasmgen/tests/typed_indirect.rs	67	11	7	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/audio/sim_transport.c	1	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/audio/tp_wasm/run.sh	14	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/audio/tp_wasm/tp_test.c	59	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/audio/tp_wasm/tp_test.mjs	86	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/audio/tp_wasm/tp_threads.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/fruity.c	2	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/fruity_g3.c	7	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/fruity_idle.c	32	15	3	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/gil/check_i1.py	94	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/gil/gen_wrap.py	24	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/hyb1/hybrid_glue.c	3	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/mt2/node-bundle-run-rt.mjs	126	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/mt2/rt-worker-shim.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/harness/trace.c	6	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/web/filedlg/fle_filedlg_lib.js	4	2	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/web/fruity/fle_idle_lib.js	17	4	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/harness/web/threads/fle_thread_lib.js	5	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_audio_transport.c	163	94	5	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_audio_transport.h	2	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_callback.c	10	0	2	1	1	2	FAILS
+0312-stack-on-main-e08b4589	lift/runtime/fle_ctx_more.h	22	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/runtime/fle_ctx_tls.c	13	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_dispatch.h	15	1	5	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_env.c	6	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_env.h	1	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_event.c	101	21	10	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_event.h	5	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_filedlg.c	3	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_gil.c	110	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/runtime/fle_gil.h	86	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/runtime/fle_gil_lockfree.inc	21	0	1	0	0	-	NEW(creates file, applies)
+0312-stack-on-main-e08b4589	lift/runtime/fle_lowregs.h	19	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_mmx.h	6	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_mxcsr.c	2	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_mxcsr.h	4	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_mxcsr_flags.h	4	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_proc.c	4	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_realmod.c	22	1	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_seh.h	4	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_sys.c	58	2	8	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_sysinfo.c	21	12	6	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_sysinfo.h	5	1	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_thread.c	258	12	22	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_thread_wasm.c	46	1	3	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_thread_wasm.h	7	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_vex.h	8	0	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_win.c	11	2	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_x87.c	6	2	2	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_x87.h	6	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_x87ctl.c	2	0	1	0	0	-	applies
+0312-stack-on-main-e08b4589	lift/runtime/fle_x87ctl.h	4	0	1	0	0	-	applies
+0312-s1-stage-c	app/src/audio/fle-out.worklet.js	1	1	1	0	0	-	applies
+0312-s1-stage-c	app/src/audio/page-audio.ts	44	11	6	0	0	-	applies
+0312-s1-stage-c	app/src/audio/worker-hook.ts	7	6	2	0	0	-	applies
+0312-s1-stage-c	app/test/unit/audio-default.test.ts	14	10	9	0	0	-	applies
+0312-s1-stage-c	app/test/unit/audio-wiring.test.ts	52	19	2	0	0	-	applies
+0312-s1-stage-c	lift/harness/audio/sim_transport.c	1	0	1	0	0	-	applies
+0312-s1-stage-c	lift/harness/audio/tp_wasm/run.sh	14	0	1	0	0	-	NEW(creates file, applies)
+0312-s1-stage-c	lift/harness/audio/tp_wasm/tp_test.c	59	0	1	0	0	-	NEW(creates file, applies)
+0312-s1-stage-c	lift/harness/audio/tp_wasm/tp_test.mjs	86	0	1	0	0	-	NEW(creates file, applies)
+0312-s1-stage-c	lift/harness/audio/tp_wasm/tp_threads.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+0312-s1-stage-c	lift/runtime/fle_audio_transport.c	163	94	5	0	0	-	applies
+0312-s1-stage-c	lift/runtime/fle_audio_transport.h	2	0	1	0	0	-	applies
+0312-s1-stage-c	lift/runtime/fle_thread.c	2	0	2	0	0	-	applies
+0312-s0-fix17-fruity-diagnostic	app/src/engine/fruity.ts	2	2	1	0	1	0	already-present(reverse applies)
+0312e-s3a-host-cpus-env-kept	lift/runtime/fle_sys.c	27	8	2	1	1	2	FAILS
+0312e-s3a-host-cpus-env-kept	lift/runtime/fle_sysinfo.c	1	1	1	1	1	1	FAILS
+0312e-s3a-host-cpus-env-kept	lift/runtime/fle_sysinfo.h	4	2	1	1	1	1	FAILS
+0312e-s3a-host-cpus-env-kept	lift/runtime/fle_thread.c	17	1	3	2	1	3	FAILS
+0312e-s3b-env-removed	lift/runtime/fle_sys.c	2	5	1	1	1	1	FAILS
+0312e-s3b-env-removed	lift/runtime/fle_thread.c	5	18	4	4	1	3	FAILS
+0319-num-cpu	lift/runtime/fle_sys.c	29	2	3	3	1	3	FAILS
+0319-num-cpu	lift/runtime/fle_sysinfo.c	27	0	1	0	0	-	applies
+0319-num-cpu	lift/runtime/fle_sysinfo.h	8	1	1	1	1	1	FAILS
+0319-num-cpu	lift/runtime/fle_cpuid.c	9	0	3	0	0	-	applies
+0319-num-cpu	lift/harness/seeds/ship6-imports.txt	6	0	1	1	1	1	FAILS
+0319-page-num-cpu	app/src/main.ts	9	1	4	1	1	0	FAILS
+0319-page-num-cpu	app/src/engine/num-cpu.ts	75	0	1	0	0	-	NEW(creates file, applies)
+0319-page-num-cpu	app/test/unit/num-cpu.test.ts	103	0	1	0	0	-	NEW(creates file, applies)
+0319-callback-stack-limit-rt1	lift/runtime/fle_callback.c	40	1	3	0	1	2	FAILS
+0319-callback-stack-limit-rt1	lift/runtime/fle_callback.h	15	4	2	0	1	0	already-present(reverse applies)
+0319-callback-stack-limit-rt1	lift/runtime/fle_thread_wasm.c	10	0	2	0	1	0	already-present(reverse applies)
+0319-callback-stack-limit-rtb	lift/runtime/fle_callback.c	43	2	3	0	1	2	FAILS
+0319-callback-stack-limit-rtb	lift/runtime/fle_callback.h	15	4	2	0	1	0	already-present(reverse applies)
+0319-callback-stack-limit-rtb	lift/runtime/fle_thread_wasm.c	10	0	2	0	1	0	already-present(reverse applies)
+mt3-stage-b-prototype-onto-4f054ecd	app/scripts/build-engine-bundle.sh	29	7	6	1	1	0	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	app/src/engine/fruity.ts	9	10	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	app/src/main.ts	2	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	app/test/e2e/browser.mjs	22	1	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-lift/src/imports_table.rs	3	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-lift/tests/gil_lockfree.rs	187	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-lift/tests/semaphore.rs	329	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-lift/tests/wall_fr8.rs	43	1	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-lift/tests/x87_threads.rs	105	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-wasmgen/src/lib.rs	6	3	5	3	1	0	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-wasmgen/src/lower.rs	30	18	11	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-wasmgen/src/main.rs	4	1	2	2	1	2	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/crates/fe-wasmgen/tests/mx_hybrid_tls.rs	349	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/fruity.c	2	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/fruity_g3.c	7	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/fruity_idle.c	20	9	3	2	1	0	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/gil/check_i1.py	94	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/gil/gen_wrap.py	39	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/hyb1/hybrid_glue.c	3	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/mt2/node-bundle-run-rt.mjs	126	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/mt2/rt-worker-shim.mjs	24	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/trace.c	6	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/web/filedlg/fle_filedlg_lib.js	4	2	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/web/fruity/fle_idle_lib.js	17	4	1	1	1	1	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/harness/web/threads/fle_thread_lib.js	5	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_callback.c	31	0	2	1	1	2	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_ctx_more.h	22	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_ctx_tls.c	13	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_dispatch.h	15	1	5	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_env.c	6	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_env.h	1	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_event.c	101	21	10	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_event.h	5	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_filedlg.c	3	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_gil.c	142	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_gil.h	95	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_gil_lockfree.inc	21	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_holdstat.h	17	0	1	0	0	-	NEW(creates file, applies)
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_lowregs.h	19	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_mmx.h	6	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_mxcsr.c	2	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_mxcsr.h	4	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_mxcsr_flags.h	4	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_proc.c	4	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_realmod.c	22	1	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_seh.h	4	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_sys.c	226	2	10	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_sysinfo.c	21	12	6	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_sysinfo.h	5	1	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_thread.c	374	11	21	1	1	0	FAILS
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_thread_wasm.c	46	1	3	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_thread_wasm.h	7	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_vex.h	8	0	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_win.c	11	2	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_x87.c	6	2	2	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_x87.h	6	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_x87ctl.c	2	0	1	0	0	-	applies
+mt3-stage-b-prototype-onto-4f054ecd	lift/runtime/fle_x87ctl.h	4	0	1	0	0	-	applies
+mt3-semaphore-onto-4f054ecd	lift/crates/fe-lift/src/imports_table.rs	3	0	1	0	0	-	applies
+mt3-semaphore-onto-4f054ecd	lift/crates/fe-lift/tests/semaphore.rs	329	0	1	0	0	-	NEW(creates file, applies)
+mt3-semaphore-onto-4f054ecd	lift/crates/fe-lift/tests/wall_fr8.rs	43	1	2	0	0	-	applies
+mt3-semaphore-onto-4f054ecd	lift/runtime/fle_env.h	1	0	1	0	0	-	applies
+mt3-semaphore-onto-4f054ecd	lift/runtime/fle_event.c	101	21	10	0	0	-	applies
+mt3-semaphore-onto-4f054ecd	lift/runtime/fle_event.h	5	0	1	0	0	-	applies
+mt3-x87-tls	lift/runtime/fle_x87.c	4	2	1	0	0	-	applies
+mt3-x87-tls	lift/crates/fe-lift/tests/x87_threads.rs	105	0	1	0	0	-	NEW(creates file, applies)
+mt3-wasmgen-small	lift/crates/fe-wasmgen/src/ir.rs	13	3	4	0	1	0	already-present(reverse applies)
+mt3-wasmgen-small	lift/crates/fe-wasmgen/src/lib.rs	8	2	3	3	1	2	FAILS
+mt3-wasmgen-small	lift/crates/fe-wasmgen/src/lower.rs	151	65	5	0	1	0	already-present(reverse applies)
+mt3-wasmgen-small	lift/crates/fe-wasmgen/tests/small_ops_hybrid.rs	399	0	1	0	0	-	applies+creates
+0279-slice-ticks-k4	lift/crates/fe-lift/tests/wall_fr20.rs	46	46	13	0	1	0	already-present(reverse applies)
+0279-slice-ticks-k4	lift/runtime/fle_thread.h	3	3	1	0	1	0	already-present(reverse applies)
+typed_indirect-test	lift/crates/fe-wasmgen/tests/typed_indirect.rs	67	11	7	0	0	-	applies

@@ -1,0 +1,52 @@
+diff	file	+	-	hunks	fwd_failed_hunks	fwd_rc	rev_failed_hunks	status
+repo-0313-g9a+filter-combined	tree-g9f/app/scripts/build-engine-bundle.sh	6	6	6	0	1	1	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/ci/extract-dlls.tsv	3	0	1	0	0	-	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/ci/objkeys.sh	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/ci/stage-bundle.sh	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/ci/stage-lift.sh	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/ci/test-hybrid.sh	16	0	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/crates/fe-lift/tests/realmod.rs	8	6	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/b2d2/gen-direct.sh	10	12	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/b2d2/realmod_tables.awk	23	0	1	0	1	0	NEW(creates file, FAILS)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/census/census.c	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/census/main_two.c	2	2	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/hooks/fruity-delphi-effect-hook-points.txt	14	0	1	0	1	0	NEW(creates file, FAILS)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/seeds/vfs-seed-idle1.tsv	2	0	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/harness/two/main_two.c	2	2	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/runtime/fle_loadimage.h	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/runtime/fle_realmod.c	3	3	2	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0313-g9a+filter-combined	tree-g9f/lift/runtime/fle_realmod.h	1	1	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0314v1-lazy-vfs-host	app/src/engine/chunk-io-worker.ts	17	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/src/engine/chunk-io.ts	144	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/src/engine/chunk-store.ts	61	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/src/engine/chunked-source.ts	86	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/src/engine/hostfiles.ts	44	12	8	0	1	0	already-present(reverse applies)
+repo-0314v1-lazy-vfs-host	app/src/engine/lazy-tree.ts	32	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/src/engine/vfs-index.ts	154	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/test/unit/helpers/chunk-io-node-worker.ts	19	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/test/unit/helpers/lazy-tree-gen.ts	97	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/test/unit/helpers/sync-dir-client.ts	23	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-host	app/test/unit/lazy-tree.test.ts	418	0	1	0	1	0	FAILS+creates
+repo-0314v1-lazy-vfs-runtime	lift/harness/seeds/lazy-conformance-prep.mjs	46	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-runtime	lift/harness/seeds/vfs_lazy_conformance.c	83	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-runtime	lift/harness/seeds/vfs_lazy_selftest.c	487	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-runtime	lift/harness/vfs_lazy.h	279	0	1	0	1	0	already-present(reverse applies)+creates
+repo-0314v1-lazy-vfs-runtime	lift/harness/vfs_seed.h	22	0	6	0	1	0	already-present(reverse applies)
+repo-0314v1-lazy-vfs-runtime	lift/runtime/fle_vfs.c	117	2	11	0	1	2	FAILS
+repo-0314v1-lazy-vfs-runtime	lift/runtime/fle_vfs.h	17	0	2	0	1	0	already-present(reverse applies)
+repo-0315-g9-hook-gate-tests	lift/crates/fe-lift/tests/g9_hook_gate.rs	205	0	1	0	0	-	NEW(creates file, applies)
+repo-0315-g9-hook-gate	lift/runtime/fle_callback.c	20	1	1	1	1	1	FAILS
+repo-0315-gdi-visrgn-subtract-weak	lift/runtime/fle_gdi.c	1	0	1	0	1	0	already-present(reverse applies)
+repo-0315-getmodulefilename-loaded-path	lift/runtime/fle_realmod.h	8	0	1	0	0	-	applies
+repo-0315-getmodulefilename-loaded-path	lift/runtime/fle_realmod.c	89	0	2	0	0	-	applies
+repo-0315-getmodulefilename-loaded-path	lift/runtime/fle_load.c	1	0	1	0	0	-	applies
+repo-0315-getmodulefilename-loaded-path	lift/runtime/fle_vfs.c	1	0	1	0	0	-	applies
+repo-0315-getmodulefilename-loaded-path	lift/crates/fe-lift/tests/wall_wrp1.rs	146	0	1	0	0	-	applies
+repo-0315-gil-diag-init-fix	lift/runtime/fle_gil.c	8	5	3	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0315-gil-diag-init-fix	lift/runtime/fle_gil.h	3	0	2	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
+repo-0315-rtb-test-expectations	lift/crates/fe-lift/tests/wall_dec1.rs	2	2	2	0	1	0	already-present(reverse applies)
+repo-0315-rtb-test-expectations	lift/crates/fe-lift/tests/dwm_timing.rs	3	2	1	0	1	0	already-present(reverse applies)
+repo-0315-rtb-test-expectations	lift/crates/fe-lift/tests/sweep1.rs	1	0	1	1	1	1	FAILS
+repo-0315-rtb-test-expectations	lift/crates/fe-lift/tests/wall_fr9t.rs	3	1	1	0	0	-	applies
+repo-0315-rtb-test-expectations	lift/harness/sweep1/sweep1_cases.c	2	0	1	1	1	1	FAILS
+repo-0315-test-hybrid-ship6-appended-rows	ci/test-hybrid.sh	4	2	1	0	1	0	TARGET-ABSENT(modifies a file not in HEAD)
