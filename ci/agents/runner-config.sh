@@ -11,7 +11,7 @@ out=${1:-.opencode/opencode.jsonc}
 list=$(opencode models --standalone 2> /dev/null) || { echo "::error::モデルの一覧を出せなかった(出力は伏せる)"; exit 1; }
 cands=$(printf '%s\n' "$list" | awk 'index($0, "console-") == 1 && $0 ~ /haiku-5-5$/')
 n=$(printf '%s\n' "$cands" | awk 'NF' | wc -l)
-echo "console- の提供元で作業用の型(末尾 haiku-5-5)の候補: $n 件"
+echo "console- の提供元で作業用の型の候補(型名の末尾が一致する行): $n 件"
 if [ "$n" -ne 1 ]; then echo "::error::候補が $n 件(1 件でない。決定 0399)"; exit 1; fi
 ref=$(printf '%s\n' "$cands" | awk 'NF')
 case "$ref" in *'#'*) echo "::error::候補に #(variant)が付いている(決定 0399)"; exit 1 ;; esac
