@@ -44,6 +44,7 @@ Issue の状態(2026-11-16 に確かめた値。コメントの本文と投稿�
 - 決定 5: 依頼者の発言 msg_1982c56e0001L9vl9HVSX0PeIB(一般公開されない)の趣旨のうち、Access の設定の検査は、`ci/lib/wrangler_config.py` と gen 段の検査(ACCESS_TEAM_DOMAIN・ACCESS_AUD の値の有無)が引き続き担う。ただし、この検査は Access が公開の入口に適用されていることを見ない。適用の確かめは、probe が動いたときだけ行う。分類: 整備。
 - 決定 6: 0389 に追記(決定の文は変えない): 0389 の決定 5 の (3)、および deploy-worker.yml の冒頭の「どちらも無ければ配信の前に止める」は、本決定の決定 1 と 3 で置き換えた。
 - 決定 7: 同じ型の探索。依頼者の登録に依存して停止する段は、3 本のワークフローで 3 段(段名と停止の分岐)。`deploy-worker.yml`: 「公開ホスト名を決める」(Secret PUBLIC_HOSTNAME。本決定で解消)。`agent.yml`: 「依頼者の opencode の認証情報を取り込む」(Secret OPENCODE_AUTH_JSON。`ci/agents/import-login.sh:7-9` で空なら停止)、「実行用のモデルの設定を書く」(Variable OPENCODE_PROVIDER。HEAD の `ci/agents/runner-config.sh:11-12` で空なら停止。Issue 7 は依頼者が DUPLICATE で閉じた)。`deploy-engine.yml`: 0 段(R2 の鍵は「在れば」で段を飛ばすため停止しない)。agent.yml の 2 段は本変更の範囲外(agent.yml と ci/agents は変えない)。未是正。
+- 決定 8: 読み取り段で、Worker の binding の値(ACCESS_TEAM_DOMAIN・ACCESS_AUD・R2 のバケット名)を、全体に加えて先頭の各長さ(8 文字以上)でも伏せる。分類: (b)(外部の出力の契約の実装)。根拠: 実行 43833129108(commit d620584)の upload の段の出力(wrangler-action が出す binding の表)に、ACCESS_AUD の値の先頭 37 文字と「…」が 1 行出た。表の値は全体を伏せる仕組み(`::add-mask::`)では、切られた値に当たらない。この workflow の冒頭の「アクセス設定はログに出さない」の契約を守るため。Access の AUD は秘密の鍵ではないが、公開リポジトリのログに Cloudflare の識別子の一部を出さない規則(AGENTS §8)に従う。
 
 ## 実測(この機械。Cloudflare には触れていない)
 

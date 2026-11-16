@@ -193,8 +193,11 @@ jobs:
               if missing:
                   fail("値が読めない binding: " + ", ".join(missing))
               for name in PLAIN + R2:
-                  mask(found[name])
-                  out_file("GITHUB_ENV", ENV_NAME[name], found[name])
+                  v = found[name]
+                  for n in range(8, len(v)):
+                      mask(v[:n])
+                  mask(v)
+                  out_file("GITHUB_ENV", ENV_NAME[name], v)
               print("読んだ binding(値は伏せた): 変数 " + ", ".join(PLAIN) + "、R2 " + ", ".join(R2), flush=True)
               st, d = get(f"/accounts/{acct}/workers/domains?service={SCRIPT}")
               hosts = [x.get("hostname") for x in (d.get("result") or []) if isinstance(x, dict) and x.get("service") == SCRIPT] if st == 200 and d.get("success") is True else None
