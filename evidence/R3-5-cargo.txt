@@ -21,7 +21,7 @@ test result: 行の数 = 219
 | 基準(123deac、R5-3m) | 219 | 2426 | 1 | 1 |
 | 今回(9e0f3a5) | 219 | 2428 | 0 | 1 |
 
-- 通過 +2 の内訳: (1) 決定 0385 の R3-5(commit 3ded666)で増えた新しいテスト 1 件 `the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write`(通過。基準には無い)。(2) 基準の既知の失敗 `getmodulehandleexw_returns_in_every_build` が、今回は通過(`wall_wrp2` を単独で追加に 2 回実行しても 2 件とも通過。下の 3 の読み)。失敗は 1 → 0。無視は 1 → 1(同じ名前 `simd_int_every_16bit_lane_pair_matches_the_host_cpu`)。
+- 通過 +2 の内訳: (1) 決定 0385 の R3-5(commit 3ded666)で増えた新しいテスト 1 件 `the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write`(通過。基準には無い)。(2) 基準の既知の失敗 `getmodulehandleexw_returns_in_every_build` が、今回は通過(`wall_wrp2` を単独で 2 回実行しても 2 件とも通過。出力は末尾の節。行 25 の読み)。失敗は 1 → 0。無視は 1 → 1(同じ名前 `simd_int_every_16bit_lane_pair_matches_the_host_cpu`)。
 - 読み((2) について): このテストの入力(`lift/runtime/fle_modules.h` と `lift/crates/fe-lift/tests/wall_wrp2.rs`)は、基準の 123deac から今の HEAD まで変わっていない(`git log --oneline 123deac..HEAD -- <2 つのファイル>` は空)。基準での失敗の原因は未確認。今回の変更(`fle_desk.c`・`fle_desk.h`・`desk1_compose.rs`)はこのテストの経路に無い。
 - 新しい失敗: 0。
 
@@ -269,5 +269,36 @@ fe-wasmgen | tests/typed_indirect.rs | 363行 | test result: ok. 4 passed; 0 fai
 fe-wasmgen | tests/x87_hybrid.rs | 372行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
 fe-wasmgen | tests/xabi_passthrough.rs | 379行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
 fe-wasmgen | doc-tests fe_wasmgen | 400行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+## 単独の実行(行 24 の `wall_wrp2`。2 回)
+
+- 実行(前景。2 回とも終了コード 0): `cd lift && FLENGINE_PE=~/work/signature-studio/binaries/win64/FLEngine_x64.dll CARGO_TARGET_DIR=~/.cache/signature-studio/cargo-r35 cargo test --offline -p fe-lift --test wall_wrp2`
+- 実行の HEAD: 9e0f3a5 から 8b5ff31 の間の main(他の作業の commit が並行して入った)。テストの入力(`lift/runtime/fle_modules.h`・`lift/crates/fe-lift/tests/wall_wrp2.rs`)は、`git diff --quiet 9e0f3a5 8b5ff31 -- <2 ファイル>` の終了コードが 0(変わっていない)。
+- 1 回目:
+```
+test no_noreturn_name_of_fle_modules_h_is_wrapped_by_a_harness_except_the_conditional_one ... ok
+test getmodulehandleexw_returns_in_every_build ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+```
+- 2 回目(`Finished` は 0.00s。テストの実行は新しく行った):
+```
+test no_noreturn_name_of_fle_modules_h_is_wrapped_by_a_harness_except_the_conditional_one ... ok
+test getmodulehandleexw_returns_in_every_build ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+```
+- 読み: 2 回とも 2 件とも通過。基準の既知の失敗が通過した原因は、この実行からは言えない(未確認)。
+
+## 任意の追加後の確認(`desk1_compose.rs` の (a) に 64 描画 + 非表示 4031 を足したワークツリー)
+
+- 実行(前景。終了コード 0): `cd lift && FLENGINE_PE=~/work/signature-studio/binaries/win64/FLEngine_x64.dll CARGO_TARGET_DIR=~/.cache/signature-studio/cargo-r35 cargo test --offline -p fe-lift --test desk1_compose --test desk_scene`
+- 結果:
+```
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s   (desk1_compose)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s   (desk_scene)
+```
+- 読み: 足した場面は (a) の `compose` と `scene` の両方で走り、通過した。上の全体の実行は 9e0f3a5 の版。この 2 本の件数は変わらない(desk1_compose 2 本・desk_scene 1 本)。
 ```
 

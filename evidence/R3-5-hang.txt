@@ -1,0 +1,14 @@
+# R3-5-hang: 背景の cargo の実行が止まった時の記録(抜粋)
+# 原本: TMPDIR の r35/hang-record.txt の 1〜9 行と、r35/cargo-full.log の 3945〜3946 行(TMPDIR = ~/.cache/signature-studio/tmp/)。/tmp/opencode/r35/ には無い。
+# 1 行目は date の出力(03:26:25 UTC = 12:26:25 JST)。State と Threads の 2 組は /proc/<pid>/status の抜粋で、原本に PID の表示は無い(原本の順)。メモリの表(原本の 10〜11 行)は省いた。
+2026年 11月 16日 月曜日 03:26:25 UTC
+    PID    PPID STAT     ELAPSED     TIME COMMAND
+2793588 2793583 Sl         10:29 00:00:00 ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --workspace --offline --no-fail-fast
+2838989 2793588 Sl         05:08 00:00:00 ~/work/signature-studio/lift/target/debug/deps/rc_helpers-37f0aa3728d95885
+2839015 2838989 Sl         05:08 00:00:00 node ~/work/signature-studio/lift/target/tmp/rc_helpers/run.js ~/work/signature-studio/lift/target/tmp/rc_helpers
+State:	S (sleeping)
+Threads:	2
+State:	S (sleeping)
+Threads:	3
+test helpers_match_the_host_cpu has been running for over 60 seconds
+exit=143
