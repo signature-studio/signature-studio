@@ -55,3 +55,5 @@
 - 実スレッド版(`patches/mt3w/0312/impl/0312-stack-on-main-e08b4589.diff`)の時計は、最初の CreateThread で Worker 1 が起動したとき(差分の 4796 行 `wk_start`。4420 行の注記)から、「その時点の仮想の経過時間＋実時間」になる(4178〜4181 行の注記。`fle_sys_clock_real_enable`)。協調版の時計は仮想時計だけ(`lift/runtime/fle_sys.h` 14〜17 行。決定 0017)。
 - Export の sha256 が協調版と違えば、原因を a(我々の処理の欠陥)か b(契約の不足)に分類してから直す。分類が書けない近道は足さない(AGENTS.md §6)。
 - 暫定(段 3 の測定の後に決める): 仮想時計そのものは a(我々の代行)に当たる疑いがある。根拠: 仮想時計は FL が読む QueryPerformanceCounter・GetTickCount・timeGetTime の値を我々の計数で決める(`lift/runtime/fle_sys.h` 14〜17 行。読み出しのたびに一定量を進める)。決定 0017 は、実時計を「実行ごとに結果が変わる」として却下した(`docs/archive/decisions/0017-sync-time-memory.md` 55 行)。Windows の時刻 API が実時間に従うという点の出典は未確認(MSDN の本文は未取得。`lift/runtime/fle_sys.c` 106〜110 行の引用のみ)。記録: `docs/archive/decisions/0147-virtual-clock-and-concurrency.md`。未確認: 実時計にしたとき Export の決定性が保てるか。
+
+追記(2026-11-16, R4-5b): 第 2 段の結果は決定 0397 と `evidence/R4-5b.md`。適用・統合・旗の除去の後も、撤回条件は変えていない。
