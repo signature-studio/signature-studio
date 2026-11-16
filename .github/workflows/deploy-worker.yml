@@ -2,6 +2,7 @@
 # 版の bindings と vars は、いま 100% の版から実行時に読む。書き込み(versions upload)より前に検査を全部終える。
 # 新しい版は versions upload で作り、versions deploy で 100% にする(トリガー = カスタムドメインには触れない: 決定 0217)。
 # 確かめで外れていれば、直前の版へ戻して失敗にする。バケット名・アクセス設定・アカウント ID はログに出さない。
+# 版の upload と 100% の切り替えは cloudflare/wrangler-action(旧 deploy.yml と同じ版・SHA)。配信の後、公開の入口が Access の背後にあることを probe で確かめる(宛先はカスタムドメインの一覧。得られなければ Secret PUBLIC_HOSTNAME。どちらも無ければ配信の前に止める)。
 name: deploy-worker
 
 on:
@@ -56,7 +57,7 @@ jobs:
         run: npm run test:worker --prefix app
 
       - id: read
-        name: "今 100% の版を読む(書き込まない。値は読んだ直後に伏せる)"
+        name: "今 100% の版と、この Worker のカスタムドメインの一覧を読む(書き込まない。値は読んだ直後に伏せる)"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
@@ -75,6 +76,7 @@ jobs:
           API = "https://api.cloudflare.com/client/v4"
           SCRIPT = "fl-studio-web"
           UUID = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+          HOST = r"([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}"
           PLAIN = ("ACCESS_TEAM_DOMAIN", "ACCESS_AUD")
           R2 = ("ASSETS_BUCKET", "PERF_BUCKET")
           ENV_NAME = {"ACCESS_TEAM_DOMAIN": "ACCESS_TEAM_DOMAIN", "ACCESS_AUD": "ACCESS_AUD",
@@ -193,6 +195,17 @@ jobs:
                   mask(found[name])
                   out_file("GITHUB_ENV", ENV_NAME[name], found[name])
               print("読んだ binding(値は伏せた): 変数 " + ", ".join(PLAIN) + "、R2 " + ", ".join(R2), flush=True)
+              st, d = get(f"/accounts/{acct}/workers/domains?service={SCRIPT}")
+              hosts = [x.get("hostname") for x in (d.get("result") or []) if isinstance(x, dict) and x.get("service") == SCRIPT] if st == 200 and d.get("success") is True else None
+              if hosts is None:
+                  codes = sorted({str(e.get("code")) for e in (d.get("errors") or []) if isinstance(e, dict)})
+                  print(f"カスタムドメインの一覧: HTTP {st}、エラーの番号 {', '.join(codes) or '無し'}(公開ホスト名は一覧から得られない)", flush=True)
+              elif len(hosts) == 1 and isinstance(hosts[0], str) and re.fullmatch(HOST, hosts[0]):
+                  mask(hosts[0])
+                  out_file("GITHUB_OUTPUT", "public_host", hosts[0])
+                  print("カスタムドメインの一覧: この Worker の件数 1(値は伏せた。公開ホスト名に使う)", flush=True)
+              else:
+                  print(f"カスタムドメインの一覧: この Worker の件数 {len(hosts)}。公開ホスト名には使わない(1 件で形が正しいときだけ使う)", flush=True)
               out_file("GITHUB_OUTPUT", "old_version", old)
               print(f"読み取りの完了(UTC {utc()})。ここまでに Cloudflare へ書いていない", flush=True)
 
@@ -247,10 +260,44 @@ jobs:
           sys.exit(0 if ok else 1)
           PY
 
-      - id: upload
-        name: "新しい版を作る(versions upload。まだ 100% にはしない)"
+      - id: host
+        name: "公開ホスト名を決める(一覧から得た物。無ければ Secret PUBLIC_HOSTNAME。どちらも無い・形が違うときは、Cloudflare に書く前に止める)"
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          FROM_LIST: ${{ steps.read.outputs.public_host }}
+          FROM_SECRET: ${{ secrets.PUBLIC_HOSTNAME }}
+        run: |
+          set -u
+          echo "CI_SHORT_SHA=${GITHUB_SHA:0:12}" >> "$GITHUB_ENV"
+          if [ -n "$FROM_LIST" ]; then
+            H="$FROM_LIST"; SRC="カスタムドメインの一覧"
+          elif [ -n "$FROM_SECRET" ]; then
+            H="$FROM_SECRET"; SRC="Secret PUBLIC_HOSTNAME"
+          else
+            echo "公開ホスト名が無い(一覧から得られず、Secret PUBLIC_HOSTNAME も無い)。配信の後の確かめ(probe)の宛先が無いので、配信の前に止めた。Cloudflare へは書いていない"
+            exit 1
+          fi
+          if ! echo "$H" | grep -Eq '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$'; then
+            echo "公開ホスト名の形が違う(値は書かない)。配信の前に止めた。Cloudflare へは書いていない"
+            exit 1
+          fi
+          echo "::add-mask::$H"
+          echo "public_host=$H" >> "$GITHUB_OUTPUT"
+          echo "公開ホスト名の出どころ: $SRC(値は伏せた)"
+
+      - id: upload
+        name: "新しい版を作る(wrangler-action の versions upload。まだ 100% にはしない)"
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/deploy-worker/upload.ndjson
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: versions upload --config wrangler.deploy.json --message "ci ${{ env.CI_SHORT_SHA }}"
+          quiet: false
+
+      - id: version
+        name: "新しい版の ID を出力から読む(100% の版は変わっていない)"
         run: |
           set -u
           W="$RUNNER_TEMP/deploy-worker"
@@ -268,14 +315,6 @@ jobs:
                   v = r.get("version_id") or ""
           print(v)
           PY
-          rm -f "$W/upload.ndjson"
-          rc=0
-          (cd app && WRANGLER_OUTPUT_FILE_PATH="$W/upload.ndjson" npx wrangler versions upload --config wrangler.deploy.json --message "ci ${GITHUB_SHA:0:12}") > "$W/upload.log" 2>&1 || rc=$?
-          grep -E '^(Uploaded|Total Upload|Worker Version ID|Version ID)|\[ERROR\]' "$W/upload.log" | cut -c1-200 || true
-          if [ "$rc" != 0 ]; then
-            echo "versions upload が失敗(終了 $rc)。100% の版は変わっていない"
-            exit 1
-          fi
           VID=$(python3 "$W/ndjson.py" "$W/upload.ndjson")
           if ! echo "$VID" | grep -Eq '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'; then
             echo "upload の出力から版の ID を得られない(100% の版は変わっていない)"
@@ -284,21 +323,29 @@ jobs:
           echo "new_version=$VID" >> "$GITHUB_OUTPUT"
           echo "新しい版 $VID を作った(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))。まだ 100% ではない"
 
-      - id: deploy
-        name: "新しい版を 100% にする(versions deploy)。確かめ、外れていれば直前の版へ戻す"
+      - id: switch
+        name: "新しい版を 100% にする(wrangler-action の versions deploy。失敗は次の段で確かめて戻す)"
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: app
+          command: versions deploy ${{ steps.version.outputs.new_version }}@100% --config wrangler.deploy.json --message "ci ${{ env.CI_SHORT_SHA }}" --yes
+          quiet: false
+
+      - id: check
+        name: "確かめ。外れていれば直前の版へ戻す(失敗にする)"
+        if: ${{ always() && steps.version.outcome == 'success' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          NEW_VERSION: ${{ steps.upload.outputs.new_version }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
           OLD_VERSION: ${{ steps.read.outputs.old_version }}
+          SWITCH: ${{ steps.switch.outcome }}
         run: |
           set -u
           W="$RUNNER_TEMP/deploy-worker"
-          echo "切り替え: 直前の版 $OLD_VERSION → 新しい版 $NEW_VERSION(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
-          rc=0
-          (cd app && npx wrangler versions deploy "${NEW_VERSION}@100%" --config wrangler.deploy.json --message "ci ${GITHUB_SHA:0:12}" --yes) > "$W/deploy.log" 2>&1 || rc=$?
-          grep -E '^(Deployed|Current Version ID|Version ID|Worker Version ID)|\[ERROR\]' "$W/deploy.log" | cut -c1-200 || true
-          echo "versions deploy の終了: $rc(UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
-          if [ "$rc" = 0 ] && python3 "$W/cf.py" check "$NEW_VERSION"; then
+          echo "切り替え: 直前の版 $OLD_VERSION → 新しい版 $NEW_VERSION(切り替えの段の結果: $SWITCH。UTC $(date -u +%Y-%m-%dT%H:%M:%SZ))"
+          if [ "$SWITCH" = success ] && python3 "$W/cf.py" check "$NEW_VERSION"; then
             echo "結果: 新しい版 $NEW_VERSION が 100%。確かめた"
             exit 0
           fi
@@ -313,6 +360,34 @@ jobs:
           fi
           exit 1
 
+      - id: probe
+        name: "配信の後、公開の入口が Access の背後にあることを確かめる(Access なしで届いたら失敗)"
+        env:
+          PUBLIC_HOSTNAME: ${{ steps.host.outputs.public_host }}
+        run: |
+          set -u
+          # METHOD|PATH|extra header. The paths need not exist: Access answers before the Worker is reached. The list and the judgment are those of archive/ci-old/ci/stage-deploy.sh (probe), without the bundle's manifest.
+          reqs=("GET|/|" "GET|/static/probe.js|" "GET|/assets/manifest.json|" "GET|/assets/probe/engine.0000000000.wasm|" "GET|/__perf|" "GET|/__perf/summary|"
+                "POST|/|" "POST|/assets/manifest.json|" "POST|/__perf|" "POST|/__perf/summary|" "HEAD|/assets/manifest.json|" "GET|/assets/manifest.json|Range: bytes=0-99")
+          bad=0
+          for r in "${reqs[@]}"; do
+            IFS='|' read -r m p h <<<"$r"
+            args=(-s -o /dev/null -w '%{http_code} %{redirect_url}' --max-time 30)
+            if [ "$m" = HEAD ]; then args+=(-I); else args+=(-X "$m"); fi
+            [ -n "$h" ] && args+=(-H "$h")
+            out=$(curl "${args[@]}" "https://$PUBLIC_HOSTNAME$p")
+            case "$out" in
+              "302 https://"*.cloudflareaccess.com/*) echo "ok   $m $p${h:+ [$h]} -> 302(Access)" ;;
+              401*|403*) echo "ok   $m $p${h:+ [$h]} -> ${out%% *}" ;;
+              *) echo "OPEN $m $p${h:+ [$h]} -> ${out%% *}"; bad=1 ;;
+            esac
+          done
+          echo "probe: ${#reqs[@]} unauthenticated requests"
+          if [ "$bad" != 0 ]; then
+            echo "匿名の要求が Access に止められなかった(上の OPEN の行)。Worker のルートと、ホスト名の Access のアプリを確かめる"
+            exit 1
+          fi
+
       - name: "結果の表(失敗しても出す)"
         if: always()
         env:
@@ -321,10 +396,14 @@ jobs:
           R_WORKER: ${{ steps.worker.outcome }}
           R_READ: ${{ steps.read.outcome }}
           R_GEN: ${{ steps.gen.outcome }}
+          R_HOST: ${{ steps.host.outcome }}
           R_UPLOAD: ${{ steps.upload.outcome }}
-          R_DEPLOY: ${{ steps.deploy.outcome }}
+          R_VERSION: ${{ steps.version.outcome }}
+          R_SWITCH: ${{ steps.switch.outcome }}
+          R_CHECK: ${{ steps.check.outcome }}
+          R_PROBE: ${{ steps.probe.outcome }}
           OLD_VERSION: ${{ steps.read.outputs.old_version }}
-          NEW_VERSION: ${{ steps.upload.outputs.new_version }}
+          NEW_VERSION: ${{ steps.version.outputs.new_version }}
         run: |
           {
             echo "| 段 | 結果 |"
@@ -334,8 +413,12 @@ jobs:
             echo "| test:worker | $R_WORKER |"
             echo "| 現在の版を読んだ(書かない) | $R_READ |"
             echo "| 配信設定を作った | $R_GEN |"
-            echo "| versions upload | $R_UPLOAD |"
-            echo "| versions deploy と確かめ | $R_DEPLOY |"
+            echo "| 公開ホスト名を決めた(一覧か Secret。無ければ書く前に止まる) | $R_HOST |"
+            echo "| versions upload(wrangler-action) | $R_UPLOAD |"
+            echo "| 新しい版の ID を読んだ | $R_VERSION |"
+            echo "| versions deploy(wrangler-action。100%) | $R_SWITCH |"
+            echo "| 確かめと、外れたときの戻し | $R_CHECK |"
+            echo "| 公開の入口が Access の背後にあるか(配信の後) | $R_PROBE |"
             echo "| 直前の版(100% だった版) | ${OLD_VERSION:-未取得} |"
             echo "| 新しい版 | ${NEW_VERSION:-未作成} |"
             echo "| 時刻(UTC) | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
