@@ -1,0 +1,56 @@
+# 0353: L01〜L04 の 4 本のパッチと sweep1 のリンク用スタブ 2 つを取り込む
+分類: L01・L02 = (b 契約の実装)。L03・L04・sweep1 スタブ = 3 分類のどれにも当たらない(テストの期待・守り・リンク用スタブ。新しい処理・分岐を足していない。製品に入らない)
+撤回条件: R1-5 の実エンジンの起動で `engine-idle` に達しないとき、または R2-7 の P1 が基準 +100 ms を超えたとき、該当パッチ(L01 または L02)を外す。sweep1 が `fle_win.c` をリンクする作りに変わったら、sweep1 のスタブ 2 つを外す。
+注(0365、2026-11-15): 上の撤回条件の『基準 +100 ms』は、`0365-r2-7-baseline-definition.md` の定義(同じ窓で交互・直列に測った work-r25 − base の `timelineIdle` の中央値の差、各 n=10)で読む。R2-7 の測定(`evidence/R2-7.md`)の差は −21.2176513671875 ms で、0365 の語は『+100 ms 以下』。範囲は重なり、有意性は測っていない。この読みで『+100 ms を超えた』事実は記録されていない。撤回条件のうち、`engine-idle` への到達・sweep1 の作りの条件は、この注の対象外。
+日付: 2026-11-14   ROADMAP: R1   一覧: -   コミット: 77dc3d8..4e719a5
+
+## 決定
+決定: 次の 4 本を `lift/` に取り込む。`patches/ci1/0323/diffs/0323-contract-fixes.diff`(L01)、`patches/ci1/0323/diffs/0323b-disabled-input.diff`(L02)、`patches/ci1/0330/0323c-test-expectations.diff`(L03)、`patches/ci1/0331/0323d-test-guards.diff`(L04)。あわせて `lift/harness/sweep1/sweep1_cases.c` と `lift/crates/fe-lift/tests/sweep1.rs` の既存のスタブの並びに、空スタブ 2 つ(`void fle_win_input_call_hooks(void) {}`・`void fle_win_input_hit_list(void) {}`)を足す。根拠: L01 は `fle_input.c` に 2 つの呼び出しを足し、定義を `fle_win.c` に置く。sweep1 は window 層をリンク用の空スタブで置き換える小さなハーネスで、`sweep1_cases.c` の 20 行に「these cases never reach」と明記している。同じ理由で同じ形のスタブが要る。`fle_win.c` を sweep1 のリンク対象に足す案は、ハーネスの前提に反し、生成物(`fle_dispatch_table` など 56 件)の供給が要るため採らない(`evidence/R1-link.md` §3)。
+
+## 分類の根拠
+- L01(0323)・L02(0323b): (b 契約の実装)。外部 API(Win32 の窓・入力の契約)の不足を埋める。`getenv`・`#ifdef FLE_` の `+` 行は 0 件(`git diff 39a1db6 HEAD -- lift | grep -c -e '^[+].*getenv[(]' -e '^[+]#ifdef FLE_'` → 0)。逆スイッチ・旗は作っていない。
+- L03(0323c)・L04(0323d): テストの期待・守りを直す。製品に入らない。
+- sweep1 のスタブ 2 つ: テストのリンク用スタブの追加。新しい処理・分岐を足していない(0352 のテスト入力パスの修正と同じ扱い)。
+
+## 途中の commit では `cargo test` が失敗する
+4 本を 1 本ずつ別の commit にしたため、各 commit は単独では緑でない。実測(`evidence/R1-1.md` の段ごとの表。通過・失敗(合計)・無視):
+- L01 だけ: 2411・6・1(新規の失敗 5 件)
+- L01〜L02: 2409・8・1(新規 7 件)
+- L01〜L03: 2411・6・1(新規 5 件)
+- L01〜L04: 2414・3・1(新規 2 件。sweep1 の `cases_equal…`・`undefined_inputs…` のリンク失敗。`fle_win_input_call_hooks`・`fle_win_input_hit_list` の未定義)
+- L01〜L04 + スタブ(この commit `4e719a5`): 2416・1・1(失敗は取り込み前と同じ `getmodulehandleexw_returns_in_every_build` の 1 件。`evidence/R1-final.md` §2)
+
+## commit の並び
+- `77dc3d8` lift: L01 契約修正(背景消去・HTTRANSPARENT・フック)を取り込む(0323)
+- `2834b02` lift: L02 無効化された窓への入力を取り込む(0323b)
+- `f2e1a35` lift: L03 古くなった native テストの期待を直す(0323c)
+- `21b978b` lift: L04 古くなった native テストの守りを直す(0323d)
+- `4e719a5` lift: sweep1 のリンク用スタブに fle_win_input_call_hooks・fle_win_input_hit_list を足す(L01 の呼び出しのため)
+- この文書と `evidence/R1-final.md`・`evidence/R1-final.log` の commit
+
+## 実測(コマンド・条件・日付・n)
+- 取り込み前: `evidence/R1-1-before.log` → 2416・1・1(SKIPPED 0)。
+- 取り込み後(スタブ込み): `cd lift && cargo test --workspace --offline --no-fail-fast`(`FLENGINE_PE` は抽出の出力 `binaries/win64/FLEngine_x64.dll`)→ rc 101、通過 2416・失敗 1・無視 1・SKIPPED 0。`grep -c 'undefined reference' evidence/R1-final.log` → 0。ログ `evidence/R1-final.log`(227 KB)。
+- 取り込み件数: L01 = 16 ファイル、L02 = 5、L03 = 2、L04 = 3(`evidence/R1-dryrun.md` の表と一致)。
+- パッチの当て方: dry-run rc 0 → 本適用 rc 0。`.rej` 0。GNU patch が `fle_input.c` の隣に作る `.orig` ファイルは作業物として削除。
+
+## 未確認
+- 実エンジン(FLEngine)は実行していない。4 本のパッチの意味上の正しさ(Wine との差、実エンジンでの挙動)は未確認。
+- HEAD での再実行は `evidence/R1-head.log`(HEAD `807222f`。期待どおり: 失敗 1 件・SKIPPED 0・test result 219 行・undefined reference 0)。
+- `getmodulehandleexw_returns_in_every_build` の失敗は取り込み前から残る 1 件。原因は未確認(本作業の対象外)。
+- R1-4 以降のパッチ(`patches/alpha22/…`)は取り込んでいない。
+
+## 出典
+- `patches/ci1/0323/diffs/0323-contract-fixes.diff`、`patches/ci1/0323/diffs/0323b-disabled-input.diff`、`patches/ci1/0330/0323c-test-expectations.diff`、`patches/ci1/0331/0323d-test-guards.diff`
+- `evidence/R1-1.md`(段ごとの結果表)、`evidence/R1-link.md`(リンク失敗の切り分け。案 A・案 B)、`evidence/R1-dryrun.md`(適用可否)、`evidence/R1-final.md`・`evidence/R1-final.log`(最終の検査)
+- `docs/core/win32-contract.md` §3(契約の不足 (b))
+- `docs/decisions/0352-write-only-vars.md`(分類の書き方の前例)
+- FLE_HTERROR の二重定義(0323b が足した重複。値は同じ `(-2)`)を 1 つにした。分類: (a)。`evidence/R1-hterror.log`
+
+## ROADMAP の完了条件「`cargo test` の失敗 0」の読み方
+
+R1-1〜R1-4 の完了条件「`cargo test` の失敗 0」は、取り込み前(HEAD。`evidence/R1-head.log`)から残る `getmodulehandleexw_returns_in_every_build` の 1 件(clang 24 で失敗する既知の件。`evidence/R0-6b.md` の 6 節)を除く「新しい失敗 0」で読む。根拠: この 1 件はパッチと無関係に取り込み前から失敗しており、R1 の範囲(R1-3 まで)で直す条件に無い。「失敗 0」の字義は未達で、1 件が残る事実を、この節と `evidence/R1-final.md` に書いた。
+
+2026-11-14 の追記: R1-1〜R1-4 に加え、R2-1・R2-2 の 1 本目・R2-3・R7-2 の 2 段目の `cargo test` の完了条件も、同じ読み(既知の 1 件を除く新しい失敗 0)で扱う。根拠: 既知の 1 件は取り込み前の HEAD から失敗している(`evidence/R1-head.log`)。R2-1 の記録(`evidence/R2-1.md`)と、R2-2 の 1 本目・R7-2 の 2 段目の記録の失敗名の集合は HEAD と一致する(`evidence/R2-2a-cargo.log`・`evidence/R7-2-cargo.log`)。R2-3 の記録(`evidence/R2-3.md` §8。通過 2419・失敗 1・無視 1、失敗名は同じ 1 件)も同じ。reviewer の判断(R2-1 の再検査 2026-11-14): 無理のない読み。『失敗 0』の字義は未達で、1 件が残る事実は変わらない。撤回条件: 既知の 1 件が直ったら、完了条件を『失敗 0』の字義に戻す。
+
+2026-11-14 の追記(R2-3c): 0363(delta-pointer の取り込み)の `cargo test` も、この読み(既知の 1 件を除く新しい失敗 0)で扱う。結果は通過 2422・失敗 1・無視 1、失敗名は同じ 1 件(`evidence/R2-3c-cargo.log`)。字義の『失敗 0』は未達で、1 件が残る事実は変わらない。

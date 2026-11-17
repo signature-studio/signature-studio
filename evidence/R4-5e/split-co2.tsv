@@ -1,0 +1,4 @@
+r45e-mixprof-p-chrome-2
+file	prog_blk_s	gil_s	notify_s	wasm_other_s	js_s	idle_s
+r45e-p3-w0.cpuprofile	17.6	0.2	0.0	250.0	6.4	47.9
+TOTAL	17.6	0.2	0.0	250.0	6.4	47.9

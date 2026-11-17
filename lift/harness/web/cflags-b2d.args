@@ -1,0 +1,7 @@
+-c -msimd128 -matomics -mbulk-memory -o lift/out-app/obj/b2d/b2d_swap.o
+-O2
+-std=c++17
+-fno-exceptions
+-fno-rtti
+-DBL_STATIC
+-Ilift/out-app/b2d-src/src

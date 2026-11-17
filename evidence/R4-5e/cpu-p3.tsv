@@ -1,0 +1,5 @@
+run	profile	wallS	worker_cpu_s	worker_sys_s	worker_user_s	workers_n	workers_cpu_s	workers_sys_s	other_s	compositor_s	main_s
+r45e-mixplain-p-chrome-1	p3-play	320.69	567.88	105.84	462.04	8	208.44,133.57,47.96,42.85,35.42,33.25,33.21,33.18	44.9,14.41,10.84,8.27,7.47,6.77,6.6,6.58	739.62	16.03	0
+r45e-mixplain-p-chrome-2	p3-play	321.88	271.47	9.94	261.53	1	271.47	9.94	509.66	12.01	0
+r45e-mixprof-p-chrome-3	r45e-p3	322.47	643.75	0	643.75	8	212.16,144.72,57.83,52.47,46.07,43.64,43.55,43.31		885.85	17.14	0
+r45e-mixprof-p-chrome-3	p3-play	325.52	650.1	0	650.10	8	213.93,146.01,58.46,53.04,46.69,44.14,44.03,43.8		715.63	17.24	0

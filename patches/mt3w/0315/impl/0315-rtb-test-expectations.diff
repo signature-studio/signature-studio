@@ -1,0 +1,69 @@
+--- a/lift/crates/fe-lift/tests/wall_dec1.rs
++++ b/lift/crates/fe-lift/tests/wall_dec1.rs
+@@ -4,7 +4,7 @@
+ //!     (imports_table.rs) or of the earlier layers (ship-imports.txt, exp1-imports.txt) or of the ACM exploration rows, and has the shape `<dll> <API> fle_imp_<API>`;
+ //!  2. the three seed files: sorted, unique, one hex VA per line, every VA inside the image of its module at the base the decision used (0xc000000 / 0xd000000 / 0xe000000), the images do not overlap each
+ //!     other or the 0xb000000 + 0x500000 of Elastique (the last base of decision 0190) and stay below the virtual module handles;
+-//!  3. runtime/fle_realmod.c: the number of real modules is 8 (checked on the preprocessor output);
++//!  3. runtime/fle_realmod.c: the number of real modules is 16 (8 until the G9-c step of decision 0313; checked on the preprocessor output);
+ //!  4. runtime/fle_vfs.c: a read at the end of a file succeeds with 0 bytes read (decision 0206; always on since decision 0243);
+ //!  5. runtime/fle_vfs.c: CreateFileW accepts a SECURITY_ATTRIBUTES with a NULL descriptor and still stops on any other non-NULL value (text pins).
+ 
+@@ -107,7 +107,7 @@
+ #[test]
+ fn rm_max_is_8() {
+     let d = pp(&[]);
+-    assert!(d.contains("static rm_t mods[8u];"), "RM_MAX must stay 8 (decision 0243: the -DFLE_RM_MAX override is gone)");
++    assert!(d.contains("static rm_t mods[16u];"), "RM_MAX must stay 16 (it was 8 until the G9-c step of decision 0313; decision 0243: the -DFLE_RM_MAX override is gone)");
+ }
+ 
+ fn vfs_pp(defs: &[&str]) -> String {
+--- a/lift/crates/fe-lift/tests/dwm_timing.rs
++++ b/lift/crates/fe-lift/tests/dwm_timing.rs
+@@ -254,9 +254,10 @@
+     let d = rows("dwmti-imports.txt");
+     assert_eq!(d, ["dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo"]);
+     let (s5, s6) = (rows("ship5-imports.txt"), rows("ship6-imports.txt"));
+-    assert_eq!(s6.len(), s5.len() + 1);
++    // the later decisions (0319: ScrollWindowEx, ScrollDC, ImageList drag, the processor count) append their rows after this one (append only, decision 0015): the dwmti row is the first row after ship5's
++    assert!(s6.len() >= s5.len() + 1);
+     assert_eq!(s6[..s5.len()], s5[..], "the rows of ship5 are first and unchanged");
+-    assert_eq!(s6[s5.len()], d[0], "the new row is the last");
++    assert_eq!(s6[s5.len()], d[0], "the new row is the first after ship5's");
+     assert!(!s5.iter().any(|r| r.contains("DwmGetCompositionTimingInfo")), "no earlier file has the row");
+     let c = std::fs::read_to_string(rt().join("fle_dwm.c")).unwrap();
+     let h = std::fs::read_to_string(rt().join("fle_dwm.h")).unwrap();
+--- a/lift/crates/fe-lift/tests/sweep1.rs
++++ b/lift/crates/fe-lift/tests/sweep1.rs
+@@ -159,6 +159,7 @@
+ void fle_win_input_activate(void) {} void fle_win_input_active(void) {} void fle_win_input_capture_any(void) {} void fle_win_input_hit(void) {} void fle_win_input_key_target(void) {}
+ void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {}
+ void fle_win_input_toplevels(void) {} void fle_win_input_remaximize(void) {} void fle_win_input_showwindow(void) {}
++void fle_win_input_call_hooks(void) {} void fle_win_input_hit_list(void) {}
+ int main(int argc, char **argv)
+ {
+     int k = atoi(argv[1]);
+--- a/lift/crates/fe-lift/tests/wall_fr9t.rs
++++ b/lift/crates/fe-lift/tests/wall_fr9t.rs
+@@ -228,7 +228,9 @@
+     assert_eq!(trace(&a), trace(&b));
+     let sw = trace(&a).iter().filter(|l| l.starts_with("switch ")).count();
+     // 2000 rounds, two transfers per round (main -> thread when main waits, thread -> main when it waits), plus the first start and the end: 4003 stderr lines = create + switches + start + exit
+-    assert_eq!(a.err.len(), 4003, "{}", a.err.len());
++    // decision 0319: the TEST-ONLY "fle-thread: wait ..." lines of diag-g9-fl (fle_thread.c begin_wait) ride on the same trace switch; they are not part of this count
++    let n_err = a.err.iter().filter(|l| !l.starts_with("fle-thread: wait ")).count();
++    assert_eq!(n_err, 4003, "{}", n_err);
+     assert!(sw >= 4000 && sw <= 4001, "{sw}");
+ }
+ 
+--- a/lift/harness/sweep1/sweep1_cases.c
++++ b/lift/harness/sweep1/sweep1_cases.c
+@@ -28,6 +28,8 @@
+ void fle_win_input_toplevels(void) {}   /* decision 0212 (screen1): fle_input.c apply_display() */
+ void fle_win_input_remaximize(void) {}
+ void fle_win_input_showwindow(void) {}
++void fle_win_input_call_hooks(void) {}   /* decision 0323 (WH_MOUSE / WH_KEYBOARD hooks, fle_input.c input_hook_swallows) */
++void fle_win_input_hit_list(void) {}     /* decision 0324 (fle_input.c hit_walk) */
+ void fle_win_pointer_get(void) {}
+ void fle_win_pointer_set(void) {}
+ typedef unsigned int UINT, DWORD, BOOL;

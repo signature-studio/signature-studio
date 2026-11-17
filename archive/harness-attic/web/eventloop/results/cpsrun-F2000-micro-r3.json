@@ -1,0 +1,99 @@
+{
+ "name": "cpsrun-F2000-micro-r3",
+ "page": "/plain/cpsrun.html?f=2000&budget=3000000&reps=9&wait=micro",
+ "started": "2026-10-28T16:27:12.039Z",
+ "loadavg_before": "1.83 1.86 2.01 6/1449 696933",
+ "url": "http://127.0.0.1:37075/plain/cpsrun.html?f=2000&budget=3000000&reps=9&wait=micro",
+ "loadavg_after": "1.99 1.91 2.02 1/1440 698586",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/cpsrun-F2000-micro-r3",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "f": "2000",
+  "budget_function_entries": 3000000,
+  "reps": 9,
+  "wait": "micro",
+  "rows": [
+   {
+    "opt": "O0",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 1780.7,
+    "ms_median": 2110.4,
+    "ns_per_function_entry_min": 593.6
+   },
+   {
+    "opt": "O0",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 1981.2,
+    "ms_median": 2469.2,
+    "ns_per_function_entry_min": 660.4
+   },
+   {
+    "opt": "O2",
+    "variant": "base",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     0
+    ],
+    "ms_min": 280.6,
+    "ms_median": 304.8,
+    "ns_per_function_entry_min": 93.5
+   },
+   {
+    "opt": "O2",
+    "variant": "cps",
+    "checksums": [
+     212669489
+    ],
+    "waits": [
+     87
+    ],
+    "suspensions": [
+     87
+    ],
+    "ms_min": 298.3,
+    "ms_median": 369.6,
+    "ns_per_function_entry_min": 99.4
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

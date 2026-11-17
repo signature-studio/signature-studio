@@ -1,0 +1,193 @@
+[
+ {
+  "name": "r45e-p3-mixmove-prof",
+  "what": "R4-5e: the P3 mix-move scenario (scn-p3-mixmove-300.json) with the V8 CPU profiler on every Worker (profStart after cpuStart, profStop before cpuStop; interval 500 us). Same ops otherwise.",
+  "rep": 1,
+  "seconds": 375,
+  "firstIdleMs": 7513.780029296875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "profs": [
+   {
+    "name": "r45e-p3",
+    "wallS": 322.47,
+    "cpuS": {
+     "worker": 643.75,
+     "main": 0,
+     "compositor": 17.14,
+     "gpu": 0,
+     "other": 885.85,
+     "workers": [
+      212.16,
+      144.72,
+      57.83,
+      52.47,
+      46.07,
+      43.64,
+      43.55,
+      43.31
+     ],
+     "top": {
+      "DedicatedWorker": 643.75,
+      "v8:ProfEvntProc": 177.08,
+      "chrome": 54.4,
+      "Thread<13>": 39.85,
+      "Thread<04>": 39.55,
+      "Thread<11>": 39.55,
+      "Thread<01>": 39.42,
+      "Thread<07>": 39.28
+     }
+    },
+    "files": [
+     {
+      "file": "r45e-p3-w0.cpuprofile",
+      "url": "http://127.0.0.1:44313/static/worker-Cvt-NCB9.js",
+      "samples": 480372,
+      "nodes": 20087,
+      "bytes": 7649167
+     },
+     {
+      "file": "r45e-p3-w1.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 493281,
+      "nodes": 3911,
+      "bytes": 3853746
+     },
+     {
+      "file": "r45e-p3-w2.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 492215,
+      "nodes": 4123,
+      "bytes": 3926267
+     },
+     {
+      "file": "r45e-p3-w3.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 493617,
+      "nodes": 4140,
+      "bytes": 3909584
+     },
+     {
+      "file": "r45e-p3-w4.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 493856,
+      "nodes": 4261,
+      "bytes": 3966183
+     },
+     {
+      "file": "r45e-p3-w5.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 491663,
+      "nodes": 12009,
+      "bytes": 5865795
+     },
+     {
+      "file": "r45e-p3-w6.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 494703,
+      "nodes": 3886,
+      "bytes": 3865910
+     },
+     {
+      "file": "r45e-p3-w7.cpuprofile",
+      "url": "blob:http://127.0.0.1:44313/1c0b9793-b47b-41d9-bd5e-da269f9ac458",
+      "samples": 495391,
+      "nodes": 4088,
+      "bytes": 3916280
+     }
+    ]
+   },
+   {
+    "name": "p3-play",
+    "wallS": 325.52,
+    "cpuS": {
+     "worker": 650.1,
+     "main": 0,
+     "compositor": 17.24,
+     "gpu": 0,
+     "other": 715.63,
+     "workers": [
+      213.93,
+      146.01,
+      58.46,
+      53.04,
+      46.69,
+      44.14,
+      44.03,
+      43.8
+     ],
+     "top": {
+      "DedicatedWorker": 650.1,
+      "chrome": 55.16,
+      "Thread<13>": 40.26,
+      "Thread<11>": 39.82,
+      "Thread<04>": 39.81,
+      "Thread<01>": 39.7,
+      "Thread<07>": 39.52,
+      "Thread<10>": 39.52
+     }
+    },
+    "files": []
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 50.32999999821186,
+   "manifest_loaded": 65.9699999988079,
+   "download_start": 95.6550000011921,
+   "download_done": 1247.3250000029802,
+   "compile_done": 1248.5600000023842,
+   "pack_source_dll": 1330.780029296875,
+   "pack_source_seed": 1330.835205078125,
+   "glue_loaded": 1343.52001953125,
+   "worker_ready": 1344.2399999946356,
+   "engine_start": 1344.280000001192,
+   "wasm_instantiated": 1372.8251953125,
+   "files_ready": 1383.865234375,
+   "main_start": 1385.31005859375,
+   "idle": 7513.780029296875,
+   "host_files_released": 7514.130126953125,
+   "first_pixel": 7541.420166015625,
+   "filedlg_request": 19220.580078125,
+   "filedlg_answer": 23047.750244140625
+  },
+  "loadStart": 2.44,
+  "loadEnd": 7.44,
+  "ioStart": 0,
+  "ioEnd": 2.15,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

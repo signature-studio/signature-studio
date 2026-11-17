@@ -1,0 +1,347 @@
+diff -ruN a/lift/harness/two/build_nmod_wasm.sh b/lift/harness/two/build_nmod_wasm.sh
+--- a/lift/harness/two/build_nmod_wasm.sh	2026-10-30 11:31:10.926427702 +0900
++++ b/lift/harness/two/build_nmod_wasm.sh	2026-10-30 11:31:10.929427636 +0900
+@@ -9,6 +9,11 @@
+ #   - DELETE_SRC=1 removes the source of a unit once it compiled and has no such function (disk quota of a tmpfs);
+ #   - VAR=nojump (the default of the tree: FLE_LANDING_NOJUMP under emscripten) or VAR=force (-DFLE_LANDING_FORCE: the guest's setjmp
+ #     landing uses the emscripten setjmp/longjmp, which emcc 6.0.12 supports by default).
++#   - SJLJ=emscripten (the default: -enable-emscripten-sjlj, the setjmp/longjmp of the guest's landing goes through JS invoke_* wrappers) or
++#     SJLJ=wasm (-sSUPPORT_LONGJMP=wasm: Wasm exception handling instructions (legacy encoding, emcc 6.0.12's default), no JS frame; added for JSPI,
++#     docs/investigations/jspi-real-wasm.md) or SJLJ=wasm-exnref (the same with the standardised exnref encoding, -sWASM_LEGACY_EXCEPTIONS=0);
++#   - JSPI=1: also compile lift/harness/wasm/jspi_hooks.c and link with -sJSPI and the --wrap options it needs. LINK_ENV overrides the
++#     environment flags of the link line (default: node + NODERAWFS).
+ # One emcc per unit under `ulimit -v $EMCC_VMEM_KB`. The units of the modules named in SERIAL_MODS are compiled one at a time (the
+ # biggest -O0 units of dsp_ippv2 peak near 9 GB), the others JOBS at a time.
+ #
+@@ -33,6 +38,9 @@
+ INITMEM=${INITMEM:-$((0x28000000))}
+ MAXMEM=${MAXMEM:-$((0x80000000))}
+ GLOBAL_BASE=${GLOBAL_BASE:-268435456}
++SJLJ=${SJLJ:-emscripten}
++JSPI=${JSPI:-0}
++LINK_ENV=${LINK_ENV:--sENVIRONMENT=node -sMODULARIZE=1 -sEXIT_RUNTIME=1 -sNODERAWFS=1}
+ V="$OUT/v-$TAG"
+ OBJ=${OBJ:-$OUT/wasm-$VAR}
+ mkdir -p "$OBJ"/{rt,h,fle,mod,log,o1/src,o1/obj,bin} "$OUT/tmp"
+@@ -43,13 +51,19 @@
+     force) LAND="-DFLE_LANDING_FORCE" ;;
+     *) echo "VAR must be nojump or force"; exit 2 ;;
+ esac
++case "$SJLJ" in
++    emscripten) SJ="" ;;
++    wasm) SJ="-sSUPPORT_LONGJMP=wasm" ;;
++    wasm-exnref) SJ="-sSUPPORT_LONGJMP=wasm -sWASM_LEGACY_EXCEPTIONS=0" ;;
++    *) echo "SJLJ must be emscripten, wasm or wasm-exnref"; exit 2 ;;
++esac
+ if grep -q '__asm__\|asm volatile' "$RT/fle_mxcsr_flags.h"; then
+     echo "build_nmod_wasm: runtime/fle_mxcsr_flags.h still has inline asm (use the overlay of harness/wasm/build.sh)"; exit 1
+ fi
+-CFLAGS_RT="-std=gnu11 -O0 -ffp-contract=off -fno-fast-math -Wall -Wextra -I$RT $LAND"
+-CFLAGS_GEN="-std=gnu11 -O0 -w -fno-builtin -ffp-contract=off -fno-fast-math -ferror-limit=0 -finstrument-functions -I$RT $LAND"
+-CFLAGS_GEN_O1="-std=gnu11 -O1 -w -fno-builtin -ffp-contract=off -fno-fast-math -ferror-limit=0 -finstrument-functions -I$RT $LAND"
+-CFLAGS_H="-std=gnu11 -O1 -Wall -Wextra -I$RT -I$LIFT/harness $LAND"
++CFLAGS_RT="-std=gnu11 -O0 -ffp-contract=off -fno-fast-math -Wall -Wextra -I$RT $LAND $SJ"
++CFLAGS_GEN="-std=gnu11 -O0 -w -fno-builtin -ffp-contract=off -fno-fast-math -ferror-limit=0 -finstrument-functions -I$RT $LAND $SJ"
++CFLAGS_GEN_O1="-std=gnu11 -O1 -w -fno-builtin -ffp-contract=off -fno-fast-math -ferror-limit=0 -finstrument-functions -I$RT $LAND $SJ"
++CFLAGS_H="-std=gnu11 -O1 -Wall -Wextra -I$RT -I$LIFT/harness $LAND $SJ"
+ LIMIT=50000
+ export OBJ TOOLS EMCC_VMEM_KB CFLAGS_GEN CFLAGS_GEN_O1 DELETE_SRC LIMIT
+ 
+@@ -87,6 +101,8 @@
+     compile_one "$LIFT/harness/image.c" "$OBJ/h/image.o" "$OBJ/log/h-image.log" "$CFLAGS_H" || return 1
+     compile_one "$LIFT/harness/a4.c" "$OBJ/h/a4.o" "$OBJ/log/h-a4.log" "$CFLAGS_H" || return 1
+     compile_one "$REALMOD_C" "$OBJ/h/realmod_table.o" "$OBJ/log/h-realmod_table.log" "$CFLAGS_H" || return 1
++    [ "$JSPI" = 1 ] && { compile_one "$LIFT/harness/wasm/jspi_hooks.c" "$OBJ/h/jspi_hooks.o" "$OBJ/log/h-jspi_hooks.log" "$CFLAGS_H" || return 1; }
++    return 0
+ }
+ stage_units() {
+     local m f serial="" par=""
+@@ -142,9 +158,11 @@
+     return 0
+ }
+ stage_link() {
++    local jf=""
+     [ -e "$OBJ/bin/flengine6.wasm" ] && { echo "link: exists"; return 0; }
++    [ "$JSPI" = 1 ] && jf="-sJSPI -Wl,--wrap=fle_imp_EnterCriticalSection -Wl,--wrap=fle_imp_WaitForSingleObject -Wl,--wrap=fle_imp_AcquireSRWLockExclusive -Wl,--wrap=fle_imp_LoadLibraryW -Wl,--wrap=fle_imp_ReadFile -Wl,--wrap=fle_imp_CreateFileW -Wl,--wrap=__cyg_profile_func_enter"
+     ( ulimit -v "$EMCC_VMEM_KB"; /usr/bin/time -f "link %e s %M KB maxrss" -o "$OBJ/log/link.time" emcc -O0 \
+-        -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$GLOBAL_BASE" -sENVIRONMENT=node -sMODULARIZE=1 -sEXIT_RUNTIME=1 -sNODERAWFS=1 \
++        -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE="$GLOBAL_BASE" $LINK_ENV $SJ $jf \
+         -Wl,--initial-memory="$INITMEM" -Wl,--max-memory="$MAXMEM" \
+         -Wl,--wrap=fprintf -Wl,--wrap=fputs -Wl,--wrap=abort \
+         "$OBJ"/h/*.o "$OBJ"/mod/*.o "$OBJ"/o1/obj/*.o "$OBJ"/fle/*.o "$OBJ"/rt/*.o -lm \
+diff -ruN a/lift/harness/two/run_node_jspi.cjs b/lift/harness/two/run_node_jspi.cjs
+--- a/lift/harness/two/run_node_jspi.cjs	1970-01-01 09:00:00.000000000 +0900
++++ b/lift/harness/two/run_node_jspi.cjs	2026-10-30 11:31:10.930539997 +0900
+@@ -0,0 +1,94 @@
++// node driver for the JSPI measurement (docs/investigations/jspi-real-wasm.md). Same arguments, environment and exit codes as
++// lift/harness/two/run_node_nmod.cjs (<FLEngine dll> <real module files joined with ':'>; FLE_WASM_DIR, FLE_WASM_BIN,
++// FLE_WASM_FAST_RETADDR=1 replaces emscripten_return_address by () => 0), and it also runs a wasm built without JSPI. Differences:
++//   - node needs --experimental-wasm-jspi (node 24, V8 13.6) for a wasm linked with -sJSPI; other V8 flags can be added on the node
++//     command line (--wasm-stack-switching-stack-size=<kB> is the size of a JSPI stack, --stack-size=<kB> that of the main stack);
++//   - the wasm is always compiled and instantiated by this file (WebAssembly.compile, then WebAssembly.instantiate) so that the two
++//     times can be taken;
++//   - FLE_JSPI_CFG='{"mode":1,"every_0":1}' becomes globalThis.JSPI_CFG (read by lift/harness/wasm/jspi_hooks.c);
++//   - FLE_JSPI_COUNT_RA=1 (with FLE_WASM_FAST_RETADDR=1) counts the calls of the emscripten_return_address stub (JSON key raCalls);
++//   - FLE_JSPI_TICK=<ms> runs a setInterval of that period during the run and reports how often it fired (key ticks): proof that other JS tasks run while the wasm is suspended;
++//   - FLE_JSPI_OUT=<file> gets a JSON summary (exit code, error, phase times, per-kind statistics of the records of jspi_hooks.c in
++//     microseconds, calls per kind); FLE_JSPI_RAW=<file> gets every record as a JSON array of rows
++//     [kind, ordinal, guest return address, guest rsp, live landings, fle_call_guest depth, dt_total_us, dt_js_us, frames, js frames, mode, seq].
++const fs = require('fs');
++const path = require('path');
++const dir = process.env.FLE_WASM_DIR || __dirname;
++const base = process.env.FLE_WASM_BIN || 'flengine6';
++if (process.env.FLE_JSPI_CFG) globalThis.JSPI_CFG = JSON.parse(process.env.FLE_JSPI_CFG);
++const create = require(path.join(dir, base + '.js'));
++const t0 = process.hrtime.bigint();
++const stamps = {};
++const ms = () => Number(process.hrtime.bigint() - t0) / 1e6;
++let error = null;
++const opts = { arguments: process.argv.slice(2), quit: (code) => { process.exitCode = code; stamps.quit = ms(); } };
++opts.instantiateWasm = (imports, done) => {
++  if (process.env.FLE_WASM_FAST_RETADDR === '1') imports.env.emscripten_return_address = process.env.FLE_JSPI_COUNT_RA === '1' ? () => { globalThis.RA_CALLS = (globalThis.RA_CALLS || 0) + 1; return 0; } : () => 0;
++  const bytes = fs.readFileSync(path.join(dir, base + '.wasm'));
++  stamps.read = ms();
++  WebAssembly.compile(bytes).then((m) => {
++    stamps.compiled = ms();
++    return WebAssembly.instantiate(m, imports).then((inst) => {
++      stamps.instantiated = ms();
++      done(inst, m);
++    });
++  }).catch((e) => { console.error('wasm compile/instantiate failed:', e && e.message ? e.message : e); process.exitCode = 99; });
++  return {};
++};
++
++let tickTimer = null;
++if (process.env.FLE_JSPI_TICK) { globalThis.TICKS = 0; tickTimer = setInterval(() => { globalThis.TICKS++; }, +process.env.FLE_JSPI_TICK); }
++const pct = (a, p) => a.length ? a[Math.min(a.length - 1, Math.floor(a.length * p))] : null;
++function stats(v) {
++  const a = Array.from(v).sort((x, y) => x - y);
++  const sum = a.reduce((s, x) => s + x, 0);
++  return { n: a.length, min: a[0], p50: pct(a, 0.5), p95: pct(a, 0.95), p99: pct(a, 0.99), max: a[a.length - 1], mean: a.length ? sum / a.length : null, sum };
++}
++function summary() {
++  const out = { exitCode: process.exitCode === undefined ? 0 : process.exitCode, error, stamps, cfg: globalThis.JSPI_CFG || null,
++    counts: globalThis.JSPI_COUNTS || null, raCalls: globalThis.RA_CALLS || null, ticks: tickTimer ? globalThis.TICKS : null, deepest: globalThis.JSPI_DEEPEST ? globalThis.JSPI_DEEPEST.split('\n') : null, rssBytes: process.memoryUsage().rss, node: process.version, v8: process.versions.v8, execArgv: process.execArgv };
++  const r = globalThis.JSPI_REC;
++  if (r) {
++    out.records = r.n;
++    out.lastRecords = [];
++    for (let i = Math.max(0, r.n - 3); i < r.n; i++) out.lastRecords.push(Array.from(r.f.subarray(i * 12, i * 12 + 12)));
++    const by = {};
++    for (let i = 0; i < r.n; i++) {
++      const o = i * 12;
++      const k = r.f[o];
++      const b = by[k] || (by[k] = { total: [], js: [], frames: [], jsFrames: [], nland: {}, cb: {}, sp: [] });
++      b.total.push(r.f[o + 6] * 1000);
++      b.js.push(r.f[o + 7] * 1000);
++      if (r.f[o + 8] >= 0) { b.frames.push(r.f[o + 8]); b.jsFrames.push(r.f[o + 9]); }
++      b.nland[r.f[o + 4]] = (b.nland[r.f[o + 4]] || 0) + 1;
++      b.cb[r.f[o + 5]] = (b.cb[r.f[o + 5]] || 0) + 1;
++      b.sp.push(r.f[o + 3]);
++    }
++    out.byKind = {};
++    for (const k of Object.keys(by)) {
++      const b = by[k];
++      out.byKind[k] = { n: b.total.length, total_us: stats(b.total), js_us: stats(b.js), frames: b.frames.length ? stats(b.frames) : null,
++        jsFrames: b.jsFrames.length ? stats(b.jsFrames) : null, nland: b.nland, cbdepth: b.cb, spMin: b.sp.reduce((x, y) => Math.min(x, y), Infinity), spMax: b.sp.reduce((x, y) => Math.max(x, y), 0) };
++    }
++    if (process.env.FLE_JSPI_RAW) {
++      const rows = [];
++      for (let i = 0; i < r.n; i++) {
++        const o = i * 12;
++        rows.push([r.f[o], r.f[o + 1], r.f[o + 2], r.f[o + 3], r.f[o + 4], r.f[o + 5], r.f[o + 6] * 1000, r.f[o + 7] * 1000, r.f[o + 8], r.f[o + 9], r.f[o + 10], r.f[o + 11]]);
++      }
++      fs.writeFileSync(process.env.FLE_JSPI_RAW, JSON.stringify(rows));
++    }
++  }
++  return out;
++}
++create(opts)
++  .catch((e) => {
++    error = { name: e && e.name, message: e && e.message ? e.message : String(e), stack: e && e.stack ? String(e.stack).split('\n').slice(0, 120) : null };
++    console.error('wasm trap/exception:', e && e.message ? e.message : e);
++    process.exitCode = 99;
++  })
++  .finally(() => {
++    stamps.end = ms();
++    if (tickTimer) clearInterval(tickTimer);
++    if (process.env.FLE_JSPI_OUT) fs.writeFileSync(process.env.FLE_JSPI_OUT, JSON.stringify(summary(), null, 1) + '\n');
++  });
+diff -ruN a/lift/harness/wasm/jspi_hooks.c b/lift/harness/wasm/jspi_hooks.c
+--- a/lift/harness/wasm/jspi_hooks.c	1970-01-01 09:00:00.000000000 +0900
++++ b/lift/harness/wasm/jspi_hooks.c	2026-10-30 11:31:10.932427569 +0900
+@@ -0,0 +1,174 @@
++/* JSPI measurement hooks (docs/investigations/jspi-real-wasm.md). A measurement aid: not part of the engine, the runtime or the lifted
++ * code. build_nmod_wasm.sh compiles and links it only with JSPI=1.
++ *
++ * It sits in front of (linker --wrap) the runtime's implementations of the Win32 calls that can block on a real Windows and are called
++ * by the InitUnits run (EnterCriticalSection, WaitForSingleObject, AcquireSRWLockExclusive), of three that do I/O (LoadLibraryW,
++ * ReadFile, CreateFileW), and of the function-entry hook of trace.c (-finstrument-functions). At a call the configuration selects it
++ * (globalThis.JSPI_CFG, set by the driver) either records the state (guest return address, guest rsp, live setjmp landings, depth of
++ * fle_call_guest) or also suspends the wasm in a JS import made by EM_ASYNC_JS (a WebAssembly.Suspending function under -sJSPI) for
++ * one microtask / one setTimeout(0) / one MessageChannel round trip, and then calls the real function. Neither the guest registers
++ * nor the guest memory nor the real function's arguments are touched; nothing is printed, so the stdout of the engine is unchanged.
++ *
++ * Configuration keys (numbers): mode (0 record only, 1 microtask, 2 setTimeout(0), 3 MessageChannel round trip, 4 a synchronous JS
++ * import call as a control), probe (1: count the stack frames the engine reports at the point), every_<k>, from_<k>, to_<k>
++ * (kind k is selected at its ordinals from..to, every `every`-th; every_<k> = 0 or absent: not selected), exit_after (exit(0) after
++ * that many completed suspensions). Kinds: 0 EnterCriticalSection, 1 WaitForSingleObject, 2 AcquireSRWLockExclusive, 3 lifted
++ * function entry, 4 LoadLibraryW, 5 ReadFile, 6 CreateFileW.
++ * Results: globalThis.JSPI_REC = {n, f: Float64Array(n * 12)}, globalThis.JSPI_COUNTS (calls per kind at exit). */
++#include <emscripten.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include "a4.h"
++#include "fle_callback.h"
++#include "fle_dispatch.h"
++#include "fle_runtime.h"
++
++enum { K_ENTERCS, K_WAITSO, K_ACQSRW, K_ENTRY, K_LOADLIB, K_READFILE, K_CREATEFILE, K_N };
++
++EM_JS(double, jspi_cfg_num, (const char *key, double dflt), {
++    const k = UTF8ToString(key);
++    const c = globalThis.JSPI_CFG;
++    return (c && Object.prototype.hasOwnProperty.call(c, k)) ? Number(c[k]) : dflt;
++});
++
++EM_JS(void, jspi_rec, (int kind, double n, double ret, double sp, int nland, int cbdepth, double dt_total, double dt_js, int mode), {
++    let r = globalThis.JSPI_REC;
++    if (!r) r = globalThis.JSPI_REC = { n: 0, f: new Float64Array(12 * 4096) };
++    if ((r.n + 1) * 12 > r.f.length) { const g = new Float64Array(r.f.length * 2); g.set(r.f); r.f = g; }
++    const p = globalThis.JSPI_PROBE; globalThis.JSPI_PROBE = null;
++    const o = r.n * 12;
++    r.f[o] = kind; r.f[o + 1] = n; r.f[o + 2] = ret; r.f[o + 3] = sp; r.f[o + 4] = nland; r.f[o + 5] = cbdepth;
++    r.f[o + 6] = dt_total; r.f[o + 7] = dt_js; r.f[o + 8] = p ? p[0] : -1; r.f[o + 9] = p ? p[1] : -1; r.f[o + 10] = mode; r.f[o + 11] = r.n;
++    r.n++;
++});
++
++EM_JS(void, jspi_counts, (int kind, double n), {
++    const c = globalThis.JSPI_COUNTS || (globalThis.JSPI_COUNTS = []);
++    c[kind] = n;
++});
++
++/* the frames of the engine's stack at this point (wasm frames and JS frames), taken without suspending */
++EM_JS(void, jspi_probe, (void), {
++    const old = Error.stackTraceLimit; Error.stackTraceLimit = 1000000;
++    const lines = new Error().stack.split('\n').slice(1);
++    Error.stackTraceLimit = old;
++    let js = 0;
++    for (const l of lines) if (l.indexOf('wasm-function') < 0) js++;
++    globalThis.JSPI_PROBE = [lines.length, js];
++    if (lines.length > (globalThis.JSPI_DEEPEST_N || 0)) { globalThis.JSPI_DEEPEST_N = lines.length; globalThis.JSPI_DEEPEST = lines.join('\n'); }
++});
++
++EM_JS(double, jspi_nop, (int mode), {
++    return 0;
++});
++
++EM_ASYNC_JS(double, jspi_suspend, (int mode), {
++    const t0 = performance.now();
++    if (mode === 1) {
++        await Promise.resolve();
++    } else if (mode === 2) {
++        await new Promise((r) => setTimeout(r, 0));
++    } else if (mode === 3) {
++        let mc = globalThis.JSPI_MC;
++        if (!mc) {
++            const ch = new MessageChannel();
++            const q = [];
++            ch.port1.onmessage = () => { if (ch.port1.unref) ch.port1.unref(); q.shift()(); };
++            mc = globalThis.JSPI_MC = { p1: ch.port1, p2: ch.port2, q };
++        }
++        await new Promise((r) => { mc.q.push(r); if (mc.p1.ref) mc.p1.ref(); mc.p2.postMessage(0); });
++    }
++    return performance.now() - t0;
++});
++
++static struct {
++    int ready;
++    int mode, probe;
++    uint32_t exit_after;
++    uint64_t every[K_N], from[K_N], to[K_N];
++    uint64_t calls[K_N];
++    uint64_t done;
++} g;
++
++static void report_counts(void) {
++    for (int k = 0; k < K_N; k++) jspi_counts(k, (double)g.calls[k]);
++}
++
++static void init_cfg(void) {
++    static const char *const ek[K_N] = {"every_0", "every_1", "every_2", "every_3", "every_4", "every_5", "every_6"};
++    static const char *const fk[K_N] = {"from_0", "from_1", "from_2", "from_3", "from_4", "from_5", "from_6"};
++    static const char *const tk[K_N] = {"to_0", "to_1", "to_2", "to_3", "to_4", "to_5", "to_6"};
++    g.ready = 1;
++    g.mode = (int)jspi_cfg_num("mode", 0);
++    g.probe = (int)jspi_cfg_num("probe", 0);
++    g.exit_after = (uint32_t)jspi_cfg_num("exit_after", 0);
++    for (int k = 0; k < K_N; k++) {
++        g.every[k] = (uint64_t)jspi_cfg_num(ek[k], 0);
++        g.from[k] = (uint64_t)jspi_cfg_num(fk[k], 1);
++        g.to[k] = (uint64_t)jspi_cfg_num(tk[k], 1e18);
++    }
++    atexit(report_counts);
++}
++
++__attribute__((no_instrument_function))
++static void point(int kind) {
++    uint64_t n;
++    int nland = 0, mode;
++    uint64_t ret, sp;
++    double t0, t1, js = 0;
++    if (!g.ready) init_cfg();
++    n = ++g.calls[kind];
++    if (!g.every[kind] || n < g.from[kind] || n > g.to[kind] || (n - g.from[kind]) % g.every[kind]) return;
++    mode = g.mode;
++    sp = R[4];
++    ret = fle_ld(sp, 8);
++    for (const fle_landing *l = fle_landing_top; l; l = l->prev) nland++;
++    if (mode == 0) {
++        if (g.probe) jspi_probe();
++        jspi_rec(kind, (double)n, (double)ret, (double)sp, nland, (int)fle_callback_depth(), 0.0, 0.0, mode);
++        return;
++    }
++    if (g.probe) jspi_probe();
++    t0 = emscripten_get_now();
++    if (mode == 4) js = jspi_nop(0);
++    else js = jspi_suspend(mode);
++    t1 = emscripten_get_now();
++    jspi_rec(kind, (double)n, (double)ret, (double)sp, nland, (int)fle_callback_depth(), t1 - t0, js, mode);
++    if (g.exit_after && ++g.done >= g.exit_after) exit(0);
++}
++
++#define WRAP(name, kind)                                                                                                            \
++    void __real_##name(void);                                                                                                       \
++    void __wrap_##name(void) {                                                                                                      \
++        point(kind);                                                                                                                \
++        __real_##name();                                                                                                            \
++    }
++
++WRAP(fle_imp_EnterCriticalSection, K_ENTERCS)
++WRAP(fle_imp_WaitForSingleObject, K_WAITSO)
++WRAP(fle_imp_AcquireSRWLockExclusive, K_ACQSRW)
++WRAP(fle_imp_LoadLibraryW, K_LOADLIB)
++WRAP(fle_imp_ReadFile, K_READFILE)
++WRAP(fle_imp_CreateFileW, K_CREATEFILE)
++
++/* The function-entry hook (-finstrument-functions) of trace.c, wrapped. A lifted function entry is the one that trace.c counted. */
++void __real___cyg_profile_func_enter(void *fn, void *call_site);
++
++__attribute__((no_instrument_function))
++void __wrap___cyg_profile_func_enter(void *fn, void *call_site) {
++    static uint64_t last;
++    uint64_t c;
++    __real___cyg_profile_func_enter(fn, call_site);
++    c = trace_call_count();
++    if (c == last) return;
++    last = c;
++    if (!g.ready) init_cfg();
++    if (!g.every[K_ENTRY]) {
++        g.calls[K_ENTRY] = c;
++        return;
++    }
++    g.calls[K_ENTRY] = c - 1;
++    point(K_ENTRY);
++}

@@ -1,0 +1,10 @@
+lift/harness/fruity.c
+lift/harness/fruity_surface.c
+lift/harness/fruity_idle.c
+lift/harness/fruity_g3.c
+lift/harness/wasm/trace_fruity.c
+lift/harness/web/jspi/tools/ra0.c
+lift/harness/image.c
+lift/harness/a4.c
+lift/harness/hyb1/hybrid_glue.c
+lift/out-app/gen/realmod.c

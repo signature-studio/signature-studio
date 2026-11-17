@@ -1,0 +1,51 @@
+# R4-5c: P3 recompute of the 10 runs after the reboot (p3-recompute-dirs.py, unchanged, run in each source worktree; inputs: <worktree>/tools/verify-kit/out/<run>/audio-p3.json and report.json, not kept in evidence)
+## tree r4-5-rt3
+# p3-recompute-dirs: 0-300 s from the play mark (audio-p3.json and report.json only; the formulas of p3-recompute.py)
+| run | label | loadStart | ioStart | 最初の書き込み(s) | 記録が全部ある窓 | underrun 0-300 s | 書き込み率 最小(窓の開始 s) | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s | wallS | cores | snaps の最後(s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-rtc2post1-chrome-1 | p3-mixmove-rtc2post1 | 1.15 | 0.00 | 96.1 | 20 | 0 | 0.985 (130) | 0 | 43.69 | 0 | 0 | 477.63 | 319.26 | 1.496 | 319.2 |
+| p3-mixmove-rtc2post2-chrome-1 | p3-mixmove-rtc2post2 | 1.96 | 0.00 | 95.2 | 20 | 0 | 0.994 (110) | 0 | 44.52 | 0 | 0 | 480.06 | 318.81 | 1.506 | 318.8 |
+| p3-mixmove-rtc2post3-chrome-1 | p3-mixmove-rtc2post3 | 5.91 | 0.00 | 95.7 | 20 | 0 | 0.985 (130) | 0 | 43.88 | 0 | 0 | 477.73 | 319.28 | 1.496 | 319.3 |
+snaps が 300 s に届かない run: なし
+BitBlt CPU: 取れない(未測定。report.json に BitBlt の項目が無い)
+
+## label ごと(median (min - max))
+| label | n | underrun 0-300 s | 書き込み率 最小 | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s |
+|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-rtc2post1 | 1 | 0 (0 - 0) | 0.985 (0.985 - 0.985) | 0 (0 - 0) | 43.69 (43.69 - 43.69) | 0 (0 - 0) | 0 (0 - 0) | 477.6 (477.6 - 477.6) |
+| p3-mixmove-rtc2post2 | 1 | 0 (0 - 0) | 0.994 (0.994 - 0.994) | 0 (0 - 0) | 44.52 (44.52 - 44.52) | 0 (0 - 0) | 0 (0 - 0) | 480.1 (480.1 - 480.1) |
+| p3-mixmove-rtc2post3 | 1 | 0 (0 - 0) | 0.985 (0.985 - 0.985) | 0 (0 - 0) | 43.88 (43.88 - 43.88) | 0 (0 - 0) | 0 (0 - 0) | 477.7 (477.7 - 477.7) |
+## tree r4-5-co
+# p3-recompute-dirs: 0-300 s from the play mark (audio-p3.json and report.json only; the formulas of p3-recompute.py)
+| run | label | loadStart | ioStart | 最初の書き込み(s) | 記録が全部ある窓 | underrun 0-300 s | 書き込み率 最小(窓の開始 s) | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s | wallS | cores | snaps の最後(s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-coc2r3-chrome-1 | p3-mixmove-coc2r3 | 2.73 | 0.00 | 96.2 | 20 | 0 | 0.920 (220) | 1 | 29.72 | 2450 | 0 | 257.84 | 320.23 | 0.805 | 320.2 |
+| p3-mixmove-coc2post1-chrome-1 | p3-mixmove-coc2post1 | 4.71 | 0.00 | 96.3 | 20 | 6 | 0.957 (220) | 0 | 29.66 | 3328 | 682 | 257.95 | 320.93 | 0.804 | 320.9 |
+| p3-mixmove-coc2post2-chrome-1 | p3-mixmove-coc2post2 | 4.41 | 0.00 | 97.4 | 20 | 6 | 0.985 (130) | 0 | 29.96 | 3088 | 510 | 258.17 | 320.65 | 0.805 | 320.6 |
+| p3-mixmove-coc2post3-chrome-1 | p3-mixmove-coc2post3 | 5.64 | 0.00 | 95.7 | 20 | 4 | 0.957 (220) | 0 | 29.35 | 3273 | 340 | 258.86 | 320.96 | 0.807 | 320.9 |
+snaps が 300 s に届かない run: なし
+BitBlt CPU: 取れない(未測定。report.json に BitBlt の項目が無い)
+
+## label ごと(median (min - max))
+| label | n | underrun 0-300 s | 書き込み率 最小 | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s |
+|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-coc2r3 | 1 | 0 (0 - 0) | 0.920 (0.920 - 0.920) | 1 (1 - 1) | 29.72 (29.72 - 29.72) | 2450 (2450 - 2450) | 0 (0 - 0) | 257.8 (257.8 - 257.8) |
+| p3-mixmove-coc2post1 | 1 | 6 (6 - 6) | 0.957 (0.957 - 0.957) | 0 (0 - 0) | 29.66 (29.66 - 29.66) | 3328 (3328 - 3328) | 682 (682 - 682) | 257.9 (257.9 - 257.9) |
+| p3-mixmove-coc2post2 | 1 | 6 (6 - 6) | 0.985 (0.985 - 0.985) | 0 (0 - 0) | 29.96 (29.96 - 29.96) | 3088 (3088 - 3088) | 510 (510 - 510) | 258.2 (258.2 - 258.2) |
+| p3-mixmove-coc2post3 | 1 | 4 (4 - 4) | 0.957 (0.957 - 0.957) | 0 (0 - 0) | 29.35 (29.35 - 29.35) | 3273 (3273 - 3273) | 340 (340 - 340) | 258.9 (258.9 - 258.9) |
+## tree r4-5-rt1
+# p3-recompute-dirs: 0-300 s from the play mark (audio-p3.json and report.json only; the formulas of p3-recompute.py)
+| run | label | loadStart | ioStart | 最初の書き込み(s) | 記録が全部ある窓 | underrun 0-300 s | 書き込み率 最小(窓の開始 s) | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s | wallS | cores | snaps の最後(s) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-rt1c2r3-chrome-1 | p3-mixmove-rt1c2r3 | 0.39 | 0.00 | 96.1 | 20 | 12 | 0.938 (220) | 2 | 27.27 | 3970 | 1192 | 264.00 | 321.27 | 0.822 | 321.3 |
+| p3-mixmove-rt1c2post1-chrome-1 | p3-mixmove-rt1c2post1 | 1.63 | 0.01 | 94.3 | 20 | 19 | 0.882 (220) | 2 | 27.01 | 4326 | 2260 | 263.72 | 320.70 | 0.822 | 320.7 |
+| p3-mixmove-rt1c2post2-chrome-1 | p3-mixmove-rt1c2post2 | 2.99 | 0.00 | 92.4 | 20 | 52 | 0.864 (180) | 4 | 27.16 | 3893 | 6226 | 263.35 | 320.85 | 0.821 | 320.8 |
+snaps が 300 s に届かない run: なし
+BitBlt CPU: 取れない(未測定。report.json に BitBlt の項目が無い)
+
+## label ごと(median (min - max))
+| label | n | underrun 0-300 s | 書き込み率 最小 | 0.95 未満の窓 | presents/s | lagCuts | engine gap frames | Worker CPU s |
+|---|---|---|---|---|---|---|---|---|
+| p3-mixmove-rt1c2r3 | 1 | 12 (12 - 12) | 0.938 (0.938 - 0.938) | 2 (2 - 2) | 27.27 (27.27 - 27.27) | 3970 (3970 - 3970) | 1192 (1192 - 1192) | 264.0 (264.0 - 264.0) |
+| p3-mixmove-rt1c2post1 | 1 | 19 (19 - 19) | 0.882 (0.882 - 0.882) | 2 (2 - 2) | 27.01 (27.01 - 27.01) | 4326 (4326 - 4326) | 2260 (2260 - 2260) | 263.7 (263.7 - 263.7) |
+| p3-mixmove-rt1c2post2 | 1 | 52 (52 - 52) | 0.864 (0.864 - 0.864) | 4 (4 - 4) | 27.16 (27.16 - 27.16) | 3893 (3893 - 3893) | 6226 (6226 - 6226) | 263.4 (263.4 - 263.4) |

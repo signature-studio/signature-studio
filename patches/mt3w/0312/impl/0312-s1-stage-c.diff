@@ -1,0 +1,909 @@
+diff -ruN -x node_modules -x 'out-*' s0/app/src/audio/fle-out.worklet.js tree/app/src/audio/fle-out.worklet.js
+--- s0/app/src/audio/fle-out.worklet.js	2026-11-05 18:13:23.000000000 +0900
++++ tree/app/src/audio/fle-out.worklet.js	2026-11-06 19:53:08.436620563 +0900
+@@ -15,7 +15,7 @@
+   constructor(options) {
+     super();
+     const o = options.processorOptions;
+-    this.h = new Int32Array(o.sab, 0, 32);
++    this.h = new Int32Array(o.sab, o.hdr || 0, 32);
+     this.d = new Float32Array(o.sab, o.dataOffset, o.cap * 2);
+     this.cap = o.cap;
+     this.mask = o.cap - 1;
+diff -ruN -x node_modules -x 'out-*' s0/app/src/audio/page-audio.ts tree/app/src/audio/page-audio.ts
+--- s0/app/src/audio/page-audio.ts	2026-11-05 18:13:23.000000000 +0900
++++ tree/app/src/audio/page-audio.ts	2026-11-06 19:53:21.745046595 +0900
+@@ -1,6 +1,7 @@
+-// The page's side of the audio output (decision 0175; always on since decision 0211 and decision 0243). It owns the AudioContext, the 'fle-out' AudioWorkletNode and the SharedArrayBuffer ring, hands the ring to the engine Worker
+-// (worker-hook.ts) and keeps the numbers the worklet and the engine report. It never changes what the engine writes into the ring: the worklet plays the frames as they are.
+-import { DATA_OFFSET, makeRingBuffer, readCounters, W, type RingCounters } from './ring-layout.ts';
++// The page's side of the audio output (decision 0175; always on since decision 0211 and decision 0243). It owns the AudioContext and the 'fle-out' AudioWorkletNode, takes the ring from the engine (stage C, decision 0312: the
++// ring is the engine's, in the shared wasm memory; the Worker's { type: 'audio-ring', sab, hdr, data, cap } message says where; until it arrives the page holds a placeholder ring of its own), tells the engine Worker that the page
++// has audio (worker-hook.ts) and keeps the numbers the worklet and the engine report. It never changes what the engine writes into the ring: the worklet plays the frames as they are.
++import { DATA_OFFSET, MAGIC_VALUE, WORDS, makeRingBuffer, readCounters, W, type RingCounters } from './ring-layout.ts';
+ import { UnderrunStats } from './underrun.ts';
+ import { SoftSink } from './soft-sink.ts';
+ 
+@@ -64,8 +65,15 @@
+ 
+ export class PageAudio {
+   readonly opts: Required<Omit<PageAudioOptions, 'workletUrl'>> & { workletUrl: string };
+-  readonly sab: SharedArrayBuffer;
+-  readonly header: Int32Array;
++  /** the ring: a placeholder until the engine's `audio-ring` message (attachRing) replaces it with the engine's memory */
++  sab: SharedArrayBuffer;
++  header: Int32Array;
++  /** byte offsets of the header and of the float data in `sab` */
++  hdrOffset = 0;
++  dataOffset: number = DATA_OFFSET;
++  /** true once the engine's ring is attached */
++  ringAttached = false;
++  private ringWaiters: (() => void)[] = [];
+   ctx: AudioContext | null = null;
+   node: AudioWorkletNode | null = null;
+   state: 'idle' | 'starting' | 'running' | 'suspended' | 'error' = 'idle';
+@@ -83,7 +91,7 @@
+   gestures = 0;
+   resumeAttempts = 0;
+   lastResume: ResumeRecord | null = null;
+-  readonly sink: SoftSink;
++  sink: SoftSink;
+   private sinkTimer: ReturnType<typeof setInterval> | null = null;
+   private readonly listeners = new Set<() => void>();
+   /** counter snapshots at named events of the session ('first-idle': the engine's first idle) */
+@@ -119,9 +127,31 @@
+     return r && r.result !== 'running' && now - r.at >= RESUME_WAIT_MS ? 'blocked' : 'resuming';
+   }
+ 
+-  /** the message that gives the ring to the engine Worker: post it before the engine's init (messages of one Worker are in order) */
+-  initMessage(): { cmd: 'audio-init'; sab: SharedArrayBuffer; cap: number; dataOffset: number; reportMs: number } {
+-    return { cmd: 'audio-init', sab: this.sab, cap: this.opts.capFrames, dataOffset: DATA_OFFSET, reportMs: this.opts.workerReportMs };
++  /** the message that tells the engine Worker that the page has audio (capacity, rate, report interval): post it before the engine's init (messages of one Worker are in order). The ring itself comes back from the engine (attachRing). */
++  initMessage(): { cmd: 'audio-init'; cap: number; rate: number; reportMs: number } {
++    return { cmd: 'audio-init', cap: this.opts.capFrames, rate: this.opts.sampleRate, reportMs: this.opts.workerReportMs };
++  }
++
++  /** the engine's ring (decision 0312): `sab` is the engine's shared memory, `hdr` and `data` the byte offsets of the 32-word header and of the float data in it. Refused (and the audio put in error) when the header is not the ring of this page: other magic, other capacity, a misaligned offset. */
++  attachRing(sab: SharedArrayBuffer, hdr: number, data: number): boolean {
++    const ok = sab instanceof SharedArrayBuffer && Number.isInteger(hdr) && Number.isInteger(data) && hdr >= 0 && data >= 0 && hdr % 4 === 0 && data % 4 === 0 && hdr + WORDS * 4 <= sab.byteLength && data + this.opts.capFrames * 8 <= sab.byteLength;
++    const h = ok ? new Int32Array(sab, hdr, WORDS) : null;
++    if (!h || Atomics.load(h, W.MAGIC) !== MAGIC_VALUE || Atomics.load(h, W.CAP) !== this.opts.capFrames) {
++      this.state = 'error';
++      this.error = `the engine's audio ring does not match this page (hdr ${hdr}, data ${data}, capacity ${h ? Atomics.load(h, W.CAP) : 'n/a'} against ${this.opts.capFrames})`;
++      this.changed();
++      return false;
++    }
++    this.sab = sab;
++    this.header = h;
++    this.hdrOffset = hdr;
++    this.dataOffset = data;
++    this.sink = new SoftSink(h, () => this.opts.sampleRate);
++    this.ringAttached = true;
++    const w = this.ringWaiters;
++    this.ringWaiters = [];
++    for (const f of w) f();
++    return true;
+   }
+ 
+   /** wires the Worker's messages (the engine's audio-pulse and the hook's aud2-worker) */
+@@ -130,7 +160,8 @@
+       const m = ev.data as { type?: string; t?: string } | null;
+       if (!m || typeof m !== 'object') return;
+       if (m.t === 'idle' && !this.marks['first-idle']) this.mark('first-idle');
+-      if (m.type === 'audio-pulse') keepLast(this.pulses, { ...(m as unknown as EnginePulse), page: performance.now() }, KEEP_PULSES);
++      if (m.type === 'audio-ring') { const r = m as unknown as { sab: SharedArrayBuffer; hdr: number; data: number }; this.attachRing(r.sab, r.hdr, r.data); }
++      else if (m.type === 'audio-pulse') keepLast(this.pulses, { ...(m as unknown as EnginePulse), page: performance.now() }, KEEP_PULSES);
+       else if (m.type === 'aud2-worker') {
+         const r = m as unknown as WorkerReport;
+         keepLast(this.reports, { ...r, page: performance.now() }, KEEP_REPORTS);
+@@ -156,7 +187,9 @@
+       this.changed();
+       void this.resume('start');
+       await ctx.audioWorklet.addModule(this.opts.workletUrl);
+-      const node = new AudioWorkletNode(ctx, 'fle-out', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: { sab: this.sab, cap: this.opts.capFrames, dataOffset: DATA_OFFSET } });
++      if (!this.ringAttached) await new Promise<void>((res) => { this.ringWaiters.push(res); });   // the node needs the engine's ring (decision 0312)
++      if ((this.state as string) === 'error') return;
++      const node = new AudioWorkletNode(ctx, 'fle-out', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2], processorOptions: { sab: this.sab, hdr: this.hdrOffset, cap: this.opts.capFrames, dataOffset: this.dataOffset } });
+       node.port.onmessage = (ev: MessageEvent<Omit<WorkletSample, 'page'> & { capture?: Float32Array; valid?: boolean; firstFrame?: number; validFrames?: number }>) => {
+         const m = ev.data;
+         if (m.capture) this.captures.push({ frames: m.capture, valid: m.valid === true, firstFrame: m.firstFrame ?? 0, validFrames: m.validFrames ?? 0, page: performance.now() });
+diff -ruN -x node_modules -x 'out-*' s0/app/src/audio/worker-hook.ts tree/app/src/audio/worker-hook.ts
+--- s0/app/src/audio/worker-hook.ts	2026-11-05 18:13:23.000000000 +0900
++++ tree/app/src/audio/worker-hook.ts	2026-11-06 19:53:08.435442138 +0900
+@@ -1,9 +1,10 @@
+-// The engine Worker's side of the audio output (decision 0175). The page sends { cmd: 'audio-init', sab, cap, dataOffset } BEFORE the engine starts; the engine's own JavaScript (EM_JS in
+-// lift/runtime/fle_audio_ring.c, decision 0139) reads it as globalThis.fleAudioSab at its first audio call. Without the message nothing changes: the engine has no external consumer and uses its virtual clock.
++// The engine Worker's side of the audio output (decision 0175; stage C, decision 0312). The page sends { cmd: 'audio-init', cap, rate, reportMs } BEFORE the engine starts; this sets globalThis.fleAudioHost, which the
++// engine's own JavaScript (EM_JS fle_js_announce in lift/runtime/fle_audio_transport.c) reads once, on this first Worker, when the thread layer starts: it answers with { type: 'audio-ring', sab, hdr, data, cap } (the ring is
++// the ENGINE's, in the shared wasm memory; the page never makes the SharedArrayBuffer of the ring). Without the message nothing changes: the engine has no external consumer and uses its virtual clock.
+ // The same listener posts, every `reportMs`, the engine's own audio counters (fleAudioWorkerState / fleAudioPace of that EM_JS) with the Unlock times since the last post. It does not touch the engine's idle
+ // protocol: it only reads, from timer turns of the Worker's event loop. Imported by worker.ts for its side effect (one line).
+ interface WorkerScope {
+-  fleAudioSab?: { sab: SharedArrayBuffer; cap: number; dataOffset: number };
++  fleAudioHost?: { cap: number; rate: number };
+   fleAudioWorkerState?: () => { unlocks: { first: number; n: number; t: number }[]; waits: number; publishes: number; skipped: number; gapFrames: number; maxWaitDrift: number };
+   fleAudioPace?: () => Record<string, number>;
+   fleAudioRewrite?: () => Record<string, number>;
+@@ -12,15 +13,15 @@
+ }
+ const scope = globalThis as unknown as WorkerScope;
+ 
+-export interface AudioInitMessage { cmd: 'audio-init'; sab: SharedArrayBuffer; cap: number; dataOffset: number; reportMs?: number }
++export interface AudioInitMessage { cmd: 'audio-init'; cap: number; rate: number; reportMs?: number }
+ 
+ let timer: ReturnType<typeof setInterval> | null = null;
+ let sentUnlocks = 0;
+ 
+ export function onAudioMessage(m: unknown, s: WorkerScope = scope): boolean {
+   const a = m as Partial<AudioInitMessage> | null;
+-  if (!a || a.cmd !== 'audio-init' || !(a.sab instanceof SharedArrayBuffer)) return false;
+-  s.fleAudioSab = { sab: a.sab, cap: a.cap as number, dataOffset: a.dataOffset as number };
++  if (!a || a.cmd !== 'audio-init' || typeof a.cap !== 'number' || typeof a.rate !== 'number') return false;
++  s.fleAudioHost = { cap: a.cap, rate: a.rate };
+   if (timer === null && (a.reportMs ?? 0) > 0) timer = setInterval(() => report(s), a.reportMs);
+   return true;
+ }
+diff -ruN -x node_modules -x 'out-*' s0/app/test/unit/audio-default.test.ts tree/app/test/unit/audio-default.test.ts
+--- s0/app/test/unit/audio-default.test.ts	2026-11-05 18:13:23.000000000 +0900
++++ tree/app/test/unit/audio-default.test.ts	2026-11-06 19:53:55.204379539 +0900
+@@ -2,6 +2,7 @@
+ import { AUDIO, audioOffReason, GESTURE_EVENTS, installAudio } from '../../src/audio/install.ts';
+ import { KEEP_PULSES, KEEP_REPORTS, KEEP_UNLOCKS, PageAudio, RESUME_WAIT_MS } from '../../src/audio/page-audio.ts';
+ import { GRACE_MS, SoftSink } from '../../src/audio/soft-sink.ts';
++import { DATA_OFFSET } from '../../src/audio/ring-layout.ts';
+ import { audioLine, bindAudioStatus } from '../../src/audio/status.ts';
+ import { W } from '../../src/audio/ring-layout.ts';
+ import { beaconProblems } from '../../shared/perf.ts';
+@@ -168,6 +169,9 @@
+ }
+ class FakeNode { port = { onmessage: null as unknown, postMessage: vi.fn() }; connect = vi.fn(); ctx: unknown; name: string; opts: unknown; constructor(ctx: unknown, name: string, opts: unknown) { this.ctx = ctx; this.name = name; this.opts = opts; } }
+ 
++// stage C (decision 0312): the ring is the engine's; the tests play the engine's { type: 'audio-ring' } message by attaching the page's placeholder ring (same magic, capacity and layout) before start()
++const attached = (a: PageAudio): PageAudio => { if (!a.attachRing(a.sab, 0, DATA_OFFSET)) throw new Error('attachRing refused the placeholder ring'); return a; };
++
+ describe('PageAudio with a context that the browser keeps suspended until a gesture', () => {
+   beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('AudioContext', FakeCtx); vi.stubGlobal('AudioWorkletNode', FakeNode); FakeCtx.last = null; FakeCtx.defaultResume = () => new Promise(() => {}); });
+   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+@@ -181,14 +185,14 @@
+   };
+ 
+   it('a page that has not started its audio (no engine Worker yet, or none at all) says idle and has no context', () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     expect(a.statusKind()).toBe('idle');
+     expect(a.detail()).toMatchObject({ status: 'idle', ctxState: null, nodeReady: false, sampleRate: null });
+     expect(FakeCtx.last).toBeNull();
+   });
+ 
+   it('before the first gesture the status is needs-gesture; the first gesture resumes the context and the status becomes running', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     const ctx = await startPending(a);
+     ctx.resumeImpl = () => new Promise(() => {});                   // the browser does not start it without a gesture
+     expect(ctx.state).toBe('suspended');
+@@ -206,7 +210,7 @@
+   });
+ 
+   it('a resume() that does not settle is recorded as pending after RESUME_WAIT_MS and the status becomes blocked (not before)', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     const ctx = await startPending(a);
+     ctx.resumeImpl = () => new Promise(() => {});
+     const p = a.resume();
+@@ -220,7 +224,7 @@
+   });
+ 
+   it('a resume() that throws is recorded as rejected with the error name; one that settles with the context still suspended is recorded as suspended', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     const ctx = await startPending(a);
+     ctx.resumeImpl = () => Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' }));
+     expect(await a.resume()).toMatchObject({ result: 'rejected', error: 'NotAllowedError' });
+@@ -230,7 +234,7 @@
+   });
+ 
+   it('a gesture while the context already runs does nothing (no resume() call, no record)', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     const ctx = await startPending(a);
+     ctx.set('running');
+     const spy = vi.spyOn(ctx, 'resume');
+@@ -241,20 +245,20 @@
+   });
+ 
+   it('start() asks the context to run once without a gesture and that call is not a gesture; a browser that allows autoplay runs it at once', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     const ctx = await startPending(a);
+     expect(a.gestures).toBe(0);
+     expect(a.resumeAttempts).toBe(1);
+     expect(ctx.audioWorklet.addModule).toHaveBeenCalledWith('/w.js');
+     FakeCtx.defaultResume = async (c) => { c.set('running'); };
+-    const b = new PageAudio({ workletUrl: '/w.js' });
++    const b = attached(new PageAudio({ workletUrl: '/w.js' }));
+     await startPending(b);
+     expect(b.statusKind()).toBe('running');
+     expect(b.gestures).toBe(0);
+   });
+ 
+   it('while the worklet does not run, the page\'s timer moves the engine\'s play cursor (the song advances), and stops doing so when the worklet processes quanta', async () => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     await startPending(a);
+     Atomics.store(a.header, W.STATE, 2);                             // the engine started its DirectSound buffer
+     await vi.advanceTimersByTimeAsync(1000);
+@@ -275,7 +279,7 @@
+ 
+   it('an error while starting is a status of its own and is announced to the listeners', async () => {
+     vi.stubGlobal('AudioContext', class { constructor() { throw new Error('no device'); } });
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     let n = 0;
+     a.onChange(() => { n++; });
+     await a.start();
+@@ -287,7 +291,7 @@
+ 
+ describe('what the page keeps for diagnosis is bounded (the audio output is on in every session)', () => {
+   const watched = (): { a: PageAudio; send: (d: unknown) => void } => {
+-    const a = new PageAudio({ workletUrl: '/w.js' });
++    const a = attached(new PageAudio({ workletUrl: '/w.js' }));
+     let h: (ev: MessageEvent) => void = () => {};
+     a.watch({ addEventListener: (_t: string, f: (ev: MessageEvent) => void) => { h = f; } } as unknown as Worker);
+     return { a, send: (d) => { h({ data: d } as MessageEvent); } };
+diff -ruN -x node_modules -x 'out-*' s0/app/test/unit/audio-wiring.test.ts tree/app/test/unit/audio-wiring.test.ts
+--- s0/app/test/unit/audio-wiring.test.ts	2026-11-05 18:13:23.000000000 +0900
++++ tree/app/test/unit/audio-wiring.test.ts	2026-11-06 19:53:55.204590215 +0900
+@@ -2,7 +2,7 @@
+ import { onAudioMessage } from '../../src/audio/worker-hook.ts';
+ import { AUDIO } from '../../src/audio/install.ts';
+ import { PageAudio } from '../../src/audio/page-audio.ts';
+-import { DATA_OFFSET, W } from '../../src/audio/ring-layout.ts';
++import { W } from '../../src/audio/ring-layout.ts';
+ 
+ // install.ts imports the worklet with ?url, which vitest's node environment resolves like vite does; the module is loaded for AUDIO only.
+ describe('audio wiring (decision 0175): the constants and the messages between the page, the Worker and the engine', () => {
+@@ -10,31 +10,64 @@
+     expect(AUDIO).toEqual({ sampleRate: 44100, capFrames: 32768 });
+   });
+ 
+-  it('the page gives the Worker the ring (the init message carries the SharedArrayBuffer, its capacity and the data offset)', () => {
++  it('the page tells the Worker that it has audio (the init message carries the capacity, the rate and the report interval; no SharedArrayBuffer: the ring is the engine\'s)', () => {
+     const a = new PageAudio({ capFrames: 8192, workletUrl: '/w.js', workerReportMs: 500 });
+     const m = a.initMessage();
+-    expect(m.cmd).toBe('audio-init');
+-    expect(m.sab).toBe(a.sab);
+-    expect(m.cap).toBe(8192);
+-    expect(m.dataOffset).toBe(DATA_OFFSET);
+-    expect(m.reportMs).toBe(500);
++    expect(m).toEqual({ cmd: 'audio-init', cap: 8192, rate: 44100, reportMs: 500 });
++    expect('sab' in m).toBe(false);
+     expect('leadMs' in m).toBe(false);   // the lead is the engine's own constant (60 ms), not a message
+   });
+ 
+-  it('the Worker hook sets globalThis.fleAudioSab for the engine\'s EM_JS and ignores every other message', () => {
+-    const scope: { fleAudioSab?: unknown; postMessage(m: unknown): void } = { postMessage() {} };
+-    const sab = new SharedArrayBuffer(DATA_OFFSET + 1024 * 8);
++  it('the Worker hook sets globalThis.fleAudioHost for the engine\'s EM_JS and ignores every other message', () => {
++    const scope: { fleAudioHost?: unknown; postMessage(m: unknown): void } = { postMessage() {} };
+     expect(onAudioMessage({ cmd: 'init' }, scope as never)).toBe(false);
+-    expect(onAudioMessage({ cmd: 'start', sab, cap: 1024, dataOffset: DATA_OFFSET }, scope as never)).toBe(false);   // a SharedArrayBuffer in another command is not the ring
+-    expect(scope.fleAudioSab).toBeUndefined();
++    expect(onAudioMessage({ cmd: 'start', cap: 1024, rate: 44100 }, scope as never)).toBe(false);   // a capacity in another command is not the audio init
++    expect(scope.fleAudioHost).toBeUndefined();
+     expect(onAudioMessage(null, scope as never)).toBe(false);
+-    expect(onAudioMessage({ cmd: 'audio-init', sab: new ArrayBuffer(8) }, scope as never)).toBe(false);   // not shared
+-    expect(scope.fleAudioSab).toBeUndefined();
+-    expect(onAudioMessage({ cmd: 'audio-init', sab, cap: 1024, dataOffset: DATA_OFFSET }, scope as never)).toBe(true);
+-    expect(scope.fleAudioSab).toEqual({ sab, cap: 1024, dataOffset: DATA_OFFSET });
+-    const noLead: { fleAudioSab?: unknown; postMessage(m: unknown): void } = { postMessage() {} };
+-    onAudioMessage({ cmd: 'audio-init', sab, cap: 1024, dataOffset: DATA_OFFSET }, noLead as never);
+-    expect(noLead.fleAudioSab).toEqual({ sab, cap: 1024, dataOffset: DATA_OFFSET });
++    expect(onAudioMessage({ cmd: 'audio-init' }, scope as never)).toBe(false);   // no capacity, no rate
++    expect(scope.fleAudioHost).toBeUndefined();
++    expect(onAudioMessage({ cmd: 'audio-init', cap: 1024, rate: 44100 }, scope as never)).toBe(true);
++    expect(scope.fleAudioHost).toEqual({ cap: 1024, rate: 44100 });
++  });
++
++  it('the engine\'s ring (decision 0312): attachRing takes the engine\'s shared memory at the offsets of its header and data, refuses a header that is not this page\'s ring, and wakes a start() that waits for it', async () => {
++    const a = new PageAudio({ capFrames: 1024, workletUrl: '/w.js' });
++    expect(a.ringAttached).toBe(false);
++    // the engine's memory: a bigger SharedArrayBuffer with the ring at odd places
++    const mem = new SharedArrayBuffer(1 << 16);
++    const hdr = 4096, data = 8192;
++    const h = new Int32Array(mem, hdr, 32);
++    expect(a.attachRing(mem, hdr, data)).toBe(false);   // the header has no magic yet: not a ring
++    expect(a.statusKind()).toBe('error');
++    const b = new PageAudio({ capFrames: 1024, workletUrl: '/w.js' });
++    h[W.MAGIC] = 0x52414c46; h[W.CAP] = 1024; h[W.RATE] = 44100;
++    let woke = false;
++    void (b as unknown as { ringWaiters: (() => void)[] }).ringWaiters.push(() => { woke = true; });
++    expect(b.attachRing(mem, 4098, data)).toBe(false);   // misaligned
++    expect(b.attachRing(new ArrayBuffer(1 << 16) as never, hdr, data)).toBe(false);   // not shared
++    const c = new PageAudio({ capFrames: 1024, workletUrl: '/w.js' });
++    (c as unknown as { ringWaiters: (() => void)[] }).ringWaiters.push(() => { woke = true; });
++    expect(c.attachRing(mem, hdr, data)).toBe(true);
++    expect(woke).toBe(true);
++    expect(c.sab).toBe(mem);
++    expect(c.hdrOffset).toBe(hdr);
++    expect(c.dataOffset).toBe(data);
++    Atomics.store(h, W.RD, 77);
++    expect(c.counters().rd).toBe(77);   // the counters are read from the engine's header
++    expect(await Promise.resolve(c.ringAttached)).toBe(true);
++  });
++
++  it('the page takes the ring from the Worker\'s audio-ring message', () => {
++    const a = new PageAudio({ capFrames: 1024, workletUrl: '/w.js' });
++    let handler: (ev: MessageEvent) => void = () => {};
++    a.watch({ addEventListener: (_t: string, f: (ev: MessageEvent) => void) => { handler = f; } } as unknown as Worker);
++    const mem = new SharedArrayBuffer(1 << 15);
++    const h = new Int32Array(mem, 256, 32);
++    h[W.MAGIC] = 0x52414c46; h[W.CAP] = 1024;
++    handler({ data: { type: 'audio-ring', sab: mem, hdr: 256, data: 1024, cap: 1024 } } as MessageEvent);
++    expect(a.ringAttached).toBe(true);
++    expect(a.sab).toBe(mem);
++    expect(a.dataOffset).toBe(1024);
+   });
+ 
+   it('the page records the engine\'s pulses and the Worker\'s reports from the Worker\'s messages and nothing else', () => {
+diff -ruN -x node_modules -x 'out-*' s0/lift/harness/audio/sim_transport.c tree/lift/harness/audio/sim_transport.c
+--- s0/lift/harness/audio/sim_transport.c	2026-11-05 18:13:23.000000000 +0900
++++ tree/lift/harness/audio/sim_transport.c	2026-11-06 19:52:13.807113597 +0900
+@@ -16,6 +16,7 @@
+ uint64_t fle_sim_offered_inside_guard(void) { return sim_offered_inside_guard; }
+ 
+ int fle_audio_external(void) { return sim_ext; }
++void fle_audio_host_init(void) {}
+ double fle_tp_consumed(void) { return (double)sim_consumed; }
+ void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { (void)lr; (void)n; (void)first; (void)rate; }
+ void fle_tp_state(uint32_t state, uint32_t rate) { (void)state; (void)rate; }
+diff -ruN -x node_modules -x 'out-*' s0/lift/harness/audio/tp_wasm/run.sh tree/lift/harness/audio/tp_wasm/run.sh
+--- s0/lift/harness/audio/tp_wasm/run.sh	1970-01-01 09:00:00.000000000 +0900
++++ tree/lift/harness/audio/tp_wasm/run.sh	2026-11-06 20:09:58.535458810 +0900
+@@ -0,0 +1,14 @@
++#!/bin/bash
++# decision 0312: builds the engine's audio transport for node and runs tp_test.mjs. usage: run.sh [OUTDIR]
++set -eu
++export PATH=$PATH:/opt/emsdk/upstream/emscripten:/opt/emsdk/node/24.19.0_64bit/bin
++H=$(cd "$(dirname "$0")" && pwd); RT=$H/../../../runtime; O=${1:-/tmp/opencode/tp_wasm}; mkdir -p "$O"
++emcc -O1 -Wall -Wextra -Wno-unused-parameter -I "$RT" "$H/tp_test.c" "$RT/fle_audio_transport.c" -o "$O/tp_test.mjs" \
++  -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=node -sASYNCIFY=1 -sALLOW_MEMORY_GROWTH=0 -sINITIAL_MEMORY=64MB -sEXPORTED_RUNTIME_METHODS=HEAPU8 \
++  -sEXPORTED_FUNCTIONS=_t_external,_t_publish,_t_rewrite,_t_consumed,_t_state,_t_unlock,_t_switch,_t_alloc,_malloc
++node "$H/tp_test.mjs" "$O/tp_test.mjs"
++# the two-pthread test: a second build with pthreads and JSPI (the product's form)
++emcc -O1 -pthread -I "$RT" "$H/tp_test.c" "$RT/fle_audio_transport.c" -o "$O/tp_threads.mjs" \
++  -sMODULARIZE=1 -sEXPORT_ES6=1 -sENVIRONMENT=node,worker -sJSPI=1 -sPTHREAD_POOL_SIZE=3 -sINITIAL_MEMORY=64MB -sMAXIMUM_MEMORY=64MB -sSHARED_MEMORY=1 -sEXPORTED_RUNTIME_METHODS=HEAPU8 \
++  -sEXPORTED_FUNCTIONS=_t_external,_t_two_threads,_malloc 2>&1 | grep -v "^$" | head -5 || true
++node --experimental-wasm-jspi "$H/tp_threads.mjs" "$O/tp_threads.mjs"
+diff -ruN -x node_modules -x 'out-*' s0/lift/harness/audio/tp_wasm/tp_test.c tree/lift/harness/audio/tp_wasm/tp_test.c
+--- s0/lift/harness/audio/tp_wasm/tp_test.c	1970-01-01 09:00:00.000000000 +0900
++++ tree/lift/harness/audio/tp_wasm/tp_test.c	2026-11-06 20:09:58.530458913 +0900
+@@ -0,0 +1,59 @@
++/* decision 0312 (stage C): the engine's own audio transport (runtime/fle_audio_transport.c, the wasm branch) built for node, with the few symbols of the rest of the runtime that it calls replaced by the stubs below.
++ * run.sh builds it and runs tp_test.mjs, which plays the page: it takes the ring from the { type: 'audio-ring' } message exactly as app/src/audio/page-audio.ts does and checks the published frames, the gap, the late
++ * skip, the rewrite, the unwrapped read position, the unlock log and the telemetry of the first Worker. */
++#include <stdint.h>
++#include <stdlib.h>
++#include <emscripten.h>
++
++#include "fle_audio_ring.h"
++#include "fle_audio_transport.h"
++#include "fle_sys.h"
++
++static fle_audio_ring_t g_ring;
++fle_audio_ring_t *fle_audio_ring_get(void) { return &g_ring; }
++uint64_t fle_audio_consumed(void) { return (uint64_t)fle_tp_consumed(); }
++uint64_t fle_sys_clock_ticks(void) { return 0; }
++
++EMSCRIPTEN_KEEPALIVE int t_external(void) { return fle_audio_external(); }
++EMSCRIPTEN_KEEPALIVE void t_publish(const float *lr, unsigned n, double first) { fle_tp_publish(lr, n, first, 44100); }
++EMSCRIPTEN_KEEPALIVE void t_rewrite(const float *lr, unsigned n, double first, unsigned guard) { fle_tp_rewrite(lr, n, first, guard); }
++EMSCRIPTEN_KEEPALIVE double t_consumed(void) { return fle_tp_consumed(); }
++EMSCRIPTEN_KEEPALIVE void t_state(unsigned st, unsigned rate) { fle_tp_state(st, rate); }
++EMSCRIPTEN_KEEPALIVE void t_unlock(double first, unsigned n) { fle_audio_unlock_note(first, n); }
++EMSCRIPTEN_KEEPALIVE void t_switch(unsigned from, unsigned to) { fle_audio_switch_note(from, to); }
++EMSCRIPTEN_KEEPALIVE float *t_alloc(unsigned frames) { return (float *)malloc((size_t)frames * 2u * sizeof(float)); }
++
++/* two real pthreads (the two Workers of the real-thread version) hand frames over in turn under a lock that stands for the giant lock: the ring must hold every block, with no silence between them (decision 0305c: with the earlier per-Worker state each Worker's hand-over filled "the gap since its own last hand-over" with zeros over the other's frames) */
++#include <pthread.h>
++static volatile int tp_lock;
++static uint64_t tp_next;
++static void tp_L(void) { while (__atomic_exchange_n(&tp_lock, 1, __ATOMIC_ACQUIRE)) { } }
++static void tp_U(void) { __atomic_store_n(&tp_lock, 0, __ATOMIC_RELEASE); }
++#define TP_BLOCKS_PER_THREAD 400
++static void *tp_thread(void *arg)
++{
++    float buf[2 * 100];
++    int i, k;
++
++    (void)arg;
++    for (i = 0; i < TP_BLOCKS_PER_THREAD; i++) {
++        tp_L();
++        for (k = 0; k < 100; k++) {
++            buf[2 * k] = (float)(tp_next + (uint64_t)k + 1u);
++            buf[2 * k + 1] = -(float)(tp_next + (uint64_t)k + 1u);
++        }
++        fle_tp_publish(buf, 100, (double)tp_next, 44100);
++        tp_next += 100;
++        tp_U();
++    }
++    return 0;
++}
++EMSCRIPTEN_KEEPALIVE int t_two_threads(void)
++{
++    pthread_t a, b;
++
++    if (pthread_create(&a, 0, tp_thread, 0) || pthread_create(&b, 0, tp_thread, 0)) return -1;
++    pthread_join(a, 0);
++    pthread_join(b, 0);
++    return (int)(tp_next / 100);
++}
+diff -ruN -x node_modules -x 'out-*' s0/lift/harness/audio/tp_wasm/tp_test.mjs tree/lift/harness/audio/tp_wasm/tp_test.mjs
+--- s0/lift/harness/audio/tp_wasm/tp_test.mjs	1970-01-01 09:00:00.000000000 +0900
++++ tree/lift/harness/audio/tp_wasm/tp_test.mjs	2026-11-06 19:56:15.903449876 +0900
+@@ -0,0 +1,86 @@
++// decision 0312: see tp_test.c. usage: node tp_test.mjs <module.mjs>   (run.sh builds it)
++import assert from 'node:assert/strict';
++const mod = process.argv[2];
++const W = { RD: 0, WR: 1, STATE: 2, RATE: 3, CAP: 4, MAGIC: 5, VERSION: 6, FILL_MIN: 12, PUBLISHES: 14, PUBLISHED: 15, SKIPPED: 16 };
++let n = 0;
++const ok = (c, m) => { n++; assert.ok(c, m); };
++const eq = (a, b, m) => { n++; assert.equal(a, b, m); };
++
++// ---- 1. a page without audio: no host object -> no external consumer, nothing is posted
++{
++  globalThis.__posted = [];
++  globalThis.self = { postMessage: (m) => globalThis.__posted.push(m) };
++  delete globalThis.fleAudioHost;
++  const M = await (await import(mod + '?noaudio')).default();
++  eq(M._t_external(), 0, 'no fleAudioHost: no external consumer');
++  eq(globalThis.__posted.length, 0, 'nothing posted');
++}
++// ---- 2. a page with audio
++globalThis.__posted = [];
++globalThis.self = { postMessage: (m) => globalThis.__posted.push(m) };
++globalThis.fleAudioHost = { cap: 32768, rate: 44100 };
++const M = await (await import(mod + '?audio')).default();
++eq(M._t_external(), 1, 'fleAudioHost: external consumer');
++eq(M._t_external(), 1, 'asked again: the same answer, announced once');
++const ring = globalThis.__posted.filter((m) => m.type === 'audio-ring');
++eq(ring.length, 1, 'one audio-ring message');
++const r = ring[0];
++eq(r.cap, 32768, 'capacity');
++ok(r.hdr % 4 === 0 && r.data % 4 === 0 && r.hdr > 0 && r.data > 0, 'offsets are 4-aligned');
++const mem = r.sab;
++const h = new Int32Array(mem, r.hdr, 32);
++const d = new Float32Array(mem, r.data, 32768 * 2);
++eq(h[W.MAGIC], 0x52414c46, 'magic'); eq(h[W.CAP], 32768, 'cap word'); eq(h[W.RATE], 44100, 'rate word'); eq(h[W.VERSION], 1, 'version'); eq(h[W.FILL_MIN], 0x7fffffff, 'fill min');
++const frames = (k, v0) => { const p = M._t_alloc(k); const f = new Float32Array(M.HEAPU8.buffer, p, k * 2); for (let i = 0; i < k; i++) { f[2 * i] = v0 + i; f[2 * i + 1] = -(v0 + i); } return p; };
++const slot = (i) => [d[(i & 32767) * 2], d[(i & 32767) * 2 + 1]];
++
++// ---- 3. contiguous hand-over: frames land at first.., WR follows, the counters count, no gap
++M._t_publish(frames(1000, 1), 1000, 0);
++eq(Atomics.load(h, W.WR), 1000, 'WR after the first publish'); eq(slot(0)[0], 1, 'frame 0'); eq(slot(999)[1], -1000, 'frame 999');
++M._t_publish(frames(1000, 2001), 1000, 1000);
++eq(Atomics.load(h, W.WR), 2000, 'WR after the second'); eq(slot(1000)[0], 2001, 'frame 1000'); eq(slot(500)[0], 501, 'the first block is intact (no zero fill over it)');
++eq(Atomics.load(h, W.PUBLISHES), 2, 'publishes'); eq(Atomics.load(h, W.PUBLISHED), 2000, 'published frames'); eq(Atomics.load(h, W.SKIPPED), 0, 'skipped');
++// ---- 4. the read position: unwrapped, monotonic, across the 32-bit wrap
++Atomics.store(h, W.RD, 600);
++eq(M._t_consumed(), 600, 'consumed 600');
++Atomics.store(h, W.RD, 0xfffffff0 | 0);
++eq(M._t_consumed(), 4294967280, 'consumed 2^32-16');
++Atomics.store(h, W.RD, 16);
++eq(M._t_consumed(), 4294967296 + 16, 'consumed past the wrap');
++Atomics.store(h, W.RD, 8);   // a stale smaller read must not move it back
++eq(M._t_consumed(), 4294967296 + 16, 'monotonic');
++// restart the position for the next checks: a new instance would be needed; use frames relative to the large base instead
++const base = 4294967296 + 16;
++// ---- 5. a late hand-over (the output has already passed part of it): the passed frames are skipped, WR moves
++const pre = Atomics.load(h, W.SKIPPED);
++M._t_publish(frames(100, 7000), 100, base - 40);   // 40 frames behind the read position, 60 ahead
++eq(Atomics.load(h, W.SKIPPED), pre + 40, '40 late frames are skipped');
++eq(slot(base)[0], 7040, 'the first frame that is still in time is written');
++// ---- 6. a gap since the last hand-over: silence for it (up to the capacity), the earlier data is untouched
++const wr = base + 60;   // the end of the last hand-over
++M._t_publish(frames(100, 9000), 100, wr + 300);   // 300 frames of gap
++eq(slot(wr + 100)[0], 0, 'gap is silence'); eq(slot(wr + 299)[1], 0, 'gap is silence (right channel)'); eq(slot(wr + 300)[0], 9000, 'frame after the gap');
++eq(slot(base + 10)[0], 7050, 'the data before the gap is intact');
++// ---- 7. rewrite: only frames at least `guard` ahead of the read position and before WR
++const rdp = M._t_consumed();
++const first = rdp + 100;
++M._t_rewrite(frames(500, 50000), 500, first, 256);
++eq(slot(rdp + 100)[0], slot(rdp + 100)[0], 'self-check');
++ok(slot(rdp + 255)[0] !== 50000 + 155 || rdp + 255 >= wr + 300 + 100, 'frames nearer than the guard are not rewritten');
++ok(slot(rdp + 256 + 5)[0] === 50000 + 161 || rdp + 261 >= wr + 300 + 100, 'a frame beyond the guard is rewritten');
++eq(Atomics.load(h, W.WR) >>> 0, (wr + 400) >>> 0, 'a rewrite does not move WR');
++// ---- 8. the state words
++M._t_state(2, 48000);
++eq(Atomics.load(h, W.STATE), 2, 'state'); eq(Atomics.load(h, W.RATE), 48000, 'rate');
++// ---- 9. the report of the first Worker: the unlock log, the counters
++M._t_unlock(123456, 4096); M._t_unlock(123456 + 4096, 4096);
++const st = globalThis.fleAudioWorkerState();
++eq(st.unlocks.length, 2, 'two unlocks logged'); eq(st.unlocks[0].first, 123456, 'first of unlock 0'); eq(st.unlocks[1].n, 4096, 'n of unlock 1'); ok(st.unlocks[0].t > 1e12, 'epoch time');
++eq(st.publishes, 4, 'publishes (stat)'); ok(st.gapFrames >= 300, 'gap frames counted'); ok(st.skipped >= 40, 'skipped counted');
++ok(typeof globalThis.fleAudioPace === 'function' && typeof globalThis.fleAudioRewrite === 'function', 'the page hook functions exist');
++// ---- 10. the 2 Hz pulse is posted by the first Worker's thread switch
++M._t_switch(0, 1); M._t_switch(1, 0);
++await new Promise((res) => setTimeout(res, 600));
++M._t_switch(0, 1); M._t_switch(1, 0);
++ok(globalThis.__posted.some((m) => m.type === 'audio-pulse'), 'a pulse reaches the page from the first Worker');
++console.log('tp_test: ' + n + ' checks ok');
+diff -ruN -x node_modules -x 'out-*' s0/lift/harness/audio/tp_wasm/tp_threads.mjs tree/lift/harness/audio/tp_wasm/tp_threads.mjs
+--- s0/lift/harness/audio/tp_wasm/tp_threads.mjs	1970-01-01 09:00:00.000000000 +0900
++++ tree/lift/harness/audio/tp_wasm/tp_threads.mjs	2026-11-06 20:09:58.533458851 +0900
+@@ -0,0 +1,24 @@
++// decision 0312: the two-pthread hand-over test (see tp_test.c). usage: node --experimental-wasm-jspi tp_threads.mjs <module.mjs>
++import assert from 'node:assert/strict';
++globalThis.__posted = [];
++globalThis.self = globalThis;
++globalThis.postMessage = (m) => globalThis.__posted.push(m);
++globalThis.fleAudioHost = { cap: 32768, rate: 44100 };
++const M = await (await import(process.argv[2])).default();
++assert.equal(M._t_external(), 1, 'external');
++const r = globalThis.__posted.find((m) => m.type === 'audio-ring');
++assert.ok(r, 'audio-ring posted');
++const h = new Int32Array(r.sab, r.hdr, 32);
++const d = new Float32Array(r.sab, r.data, 32768 * 2);
++const blocks = M._t_two_threads();
++assert.equal(blocks, 800, 'two threads hand over 800 blocks');
++// the ring holds the last 32768 frames: frames (total - 32768) .. total-1 hold their own index + 1, none is silence
++const total = blocks * 100;
++let bad = 0;
++for (let f = total - 32768; f < total; f++) { const q = (f & 32767) * 2; if (d[q] !== f + 1 || d[q + 1] !== -(f + 1)) bad++; }
++assert.equal(bad, 0, 'every frame of the ring is the frame that was handed over (' + bad + ' wrong)');
++assert.equal(Atomics.load(h, 1) >>> 0, total >>> 0, 'WR = total frames');
++assert.equal(Atomics.load(h, 14), 800, 'publishes');
++const st = globalThis.fleAudioWorkerState();
++assert.equal(st.gapFrames, 0, 'no gap was filled: the write position is shared');
++console.log('tp_threads: ok (' + total + ' frames from 2 pthreads, 0 gap frames, 0 wrong)');
+diff -ruN -x node_modules -x 'out-*' s0/lift/runtime/fle_audio_transport.c tree/lift/runtime/fle_audio_transport.c
+--- s0/lift/runtime/fle_audio_transport.c	2026-11-05 18:13:23.000000000 +0900
++++ tree/lift/runtime/fle_audio_transport.c	2026-11-06 19:52:13.806062577 +0900
+@@ -13,18 +13,42 @@
+ 
+ #ifdef __EMSCRIPTEN__
+ #include <emscripten.h>
++#include <emscripten/threading.h>
+ #endif
+ 
+ #ifdef __EMSCRIPTEN__
+-/* init: the ring of the page, from globalThis.fleAudioSab; 0 when there is none. State lives in globalThis.__fleAud. */
+-EM_JS(int, fle_js_init, (void), {
+-  if (globalThis.__fleAud !== undefined) return globalThis.__fleAud ? 1 : 0;
+-  const g = globalThis.fleAudioSab;
+-  if (!g) { globalThis.__fleAud = null; return 0; }
+-  const A = { h: new Int32Array(g.sab, 0, 32), d: new Float32Array(g.sab, g.dataOffset, g.cap * 2), cap: g.cap, mask: g.cap - 1, rdHi: 0, rdPrev: 0, wr: 0, unlocks: [], publishes: 0, skipped: 0, gapFrames: 0,
+-    resolve: null, timer: 0, waits: 0, maxWaitDrift: 0 };
+-  globalThis.__fleAud = A;
+-  globalThis.fleAudioWorkerState = () => ({ unlocks: A.unlocks, waits: A.waits, publishes: A.publishes, skipped: A.skipped, gapFrames: A.gapFrames, maxWaitDrift: A.maxWaitDrift });
++/* STAGE C (decision 0234l, 0305c): the output ring is the ENGINE's, in the shared wasm memory: a 32-word header (the layout of app/src/audio/ring-layout.ts) and the interleaved float data, both static, so that every Worker
++ * sees the same ring and the same state. There is no JavaScript state of a Worker any more (the earlier __fleAud of each Worker, with its own write position A.wr, let a second Worker's hand-over fill "the gap" since ITS last
++ * hand-over with zeros over the frames the first Worker had handed over: 212 zero runs of 2646 frames in 300 s, decision 0305c). The write position (tp_wr) and the unwrapped read position (tp_rd_abs) are shared words.
++ * JavaScript is left for the three things only JavaScript can do: telling the page where the ring is (fle_js_announce: one postMessage of the memory's SharedArrayBuffer with the two offsets, from the first Worker, whose
++ * globalThis.fleAudioHost the page's Worker hook sets), the real-time wait of the pacing, and the 2 Hz telemetry (the first Worker is the only one that can post to the page). All the runtime's entry points run under the giant
++ * lock (fle_gil.h), the words are still written with atomics where the page or the AudioWorklet reads them. */
++#define TP_CAP FLE_AUDIO_RING_FRAMES
++#define TP_MASK (TP_CAP - 1u)
++enum { H_RD = 0, H_WR = 1, H_STATE = 2, H_RATE = 3, H_CAP = 4, H_MAGIC = 5, H_VERSION = 6, H_FILL_MIN = 12, H_PUBLISHES = 14, H_PUBLISHED = 15, H_SKIPPED = 16 };
++#define TP_MAGIC 0x52414c46
++#define TP_DEFAULT_RATE 44100
++static int32_t tp_hdr[32] __attribute__((aligned(64)));
++static float tp_data[2u * TP_CAP] __attribute__((aligned(64)));
++static uint64_t tp_rd_abs;   /* RD unwrapped to 64 bits (monotonic) */
++static uint64_t tp_wr;       /* the end of the last hand-over, 64 bits: the base of "the gap" for EVERY Worker */
++enum { S_WAITS = 0, S_PUBLISHES, S_SKIPPED, S_GAP, S_MAXDRIFT, S_N = 8 };
++static double tp_stat[S_N];   /* for the page's 1 Hz report (read by fleAudioWorkerState) */
++#define TP_ULOG_MAX 4000u
++static struct { double first, n, t; } tp_ulog[TP_ULOG_MAX];
++static uint32_t tp_ulog_n;
++
++/* the page's ring: announced once, by the first Worker, as { type: 'audio-ring', sab, hdr, data, cap }; 0 when the page gave no audio (no globalThis.fleAudioHost: any other wasm build). The functions that the Worker hook
++ * of the page reads for its reports are defined here, in the first Worker, on top of the shared words. */
++EM_JS(int, fle_js_announce, (int hdr, int data, int cap, int stat, int ulog, int ulogn), {
++  const g = globalThis.fleAudioHost;
++  if (!g) return 0;
++  globalThis.fleAudioWorkerState = () => {
++    const s = new Float64Array(wasmMemory.buffer, stat, 8), n = Math.min(new Uint32Array(wasmMemory.buffer, ulogn, 1)[0], 4000), u = new Float64Array(wasmMemory.buffer, ulog, 3 * 4000);
++    const unlocks = [];
++    for (let i = 0; i < n; i++) unlocks.push({ first: u[3 * i], n: u[3 * i + 1], t: u[3 * i + 2] });
++    return { unlocks: unlocks, waits: s[0], publishes: s[1], skipped: s[2], gapFrames: s[3], maxWaitDrift: s[4] };
++  };
+   globalThis.fleAudioRewrite = () => {
+     const f = Module['_fle_audio_rewrite_stat'] || (typeof wasmExports !== 'undefined' && wasmExports['fle_audio_rewrite_stat']);
+     const names = ['events', 'applied', 'lost'];
+@@ -39,101 +63,138 @@
+     if (f) for (let i = 0; i < names.length; i++) o[names[i]] = f(i);
+     return o;
+   };
++  self.postMessage({ type: 'audio-ring', sab: wasmMemory.buffer, hdr: hdr, data: data, cap: cap });
+   return 1;
+ });
+-/* frames read by the AudioWorklet (RD, unwrapped to 64 bits) */
+-EM_JS(double, fle_js_consumed, (void), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return 0;
+-  const lo = Atomics.load(A.h, 0) >>> 0;
+-  if (lo < A.rdPrev) A.rdHi += 4294967296;
+-  A.rdPrev = lo;
+-  return A.rdHi + lo;
+-});
+-/* n stereo float frames at p (linear memory) to the ring at index `first`: silence for a gap since the last publish, nothing for frames the output has already passed; then WR */
+-EM_JS(void, fle_js_publish, (const float *p, unsigned n, double first, unsigned rate), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return;
+-  const src = new Float32Array(HEAPU8.buffer, p, n * 2);
+-  const rd = A.rdHi + (Atomics.load(A.h, 0) >>> 0);
+-  let at = first, k0 = 0;
+-  if (first + n <= rd) { A.skipped += n; Atomics.add(A.h, 16, n); return; }
+-  if (first < rd) { const late = rd - first; k0 = late; at = rd; A.skipped += late; Atomics.add(A.h, 16, late); }
+-  if (at > A.wr) {
+-    let g = at - A.wr;
+-    A.gapFrames += g;
+-    if (g > A.cap) g = A.cap;
+-    for (let i = 0; i < g; i++) { const q = ((at - g + i) & A.mask) * 2; A.d[q] = 0; A.d[q + 1] = 0; }
+-  }
+-  for (let i = k0; i < n; i++) { const q = ((first + i) & A.mask) * 2; A.d[q] = src[2 * i]; A.d[q + 1] = src[2 * i + 1]; }
+-  A.wr = first + n;
+-  Atomics.store(A.h, 1, A.wr | 0);
+-  A.publishes++;
+-  Atomics.add(A.h, 14, 1); Atomics.add(A.h, 15, n - k0);
+-});
+-/* n stereo float frames at p to the ring at index `first`, only the ones the output has not read yet and that are at least `guard` frames ahead of its read position and before the last published frame (WR): a late write of the guest
+- * reaches the output if it comes in time. It changes neither WR nor the counters of the page. */
+-EM_JS(void, fle_js_rewrite, (const float *p, unsigned n, double first, unsigned guard), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return;
+-  const rd = A.rdHi + (Atomics.load(A.h, 0) >>> 0);
+-  let from = first > rd + guard ? first : rd + guard;
+-  const end = first + n < A.wr ? first + n : A.wr;
+-  if (end <= from) return;
+-  const src = new Float32Array(HEAPU8.buffer, p, n * 2);
+-  for (let i = from; i < end; i++) { const q = (i & A.mask) * 2, k = (i - first) * 2; A.d[q] = src[k]; A.d[q + 1] = src[k + 1]; }
+-});
+-EM_JS(void, fle_js_state, (unsigned state, unsigned rate), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return;
+-  Atomics.store(A.h, 3, rate); Atomics.store(A.h, 2, state);
+-});
++static int ext_cached = -1;
++static int tp_announce(void)
++{
++    tp_hdr[H_CAP] = (int32_t)TP_CAP;
++    tp_hdr[H_RATE] = TP_DEFAULT_RATE;
++    tp_hdr[H_MAGIC] = TP_MAGIC;
++    tp_hdr[H_VERSION] = 1;
++    tp_hdr[H_FILL_MIN] = 0x7fffffff;
++    return fle_js_announce((int)(uintptr_t)tp_hdr, (int)(uintptr_t)tp_data, (int)TP_CAP, (int)(uintptr_t)tp_stat, (int)(uintptr_t)tp_ulog, (int)(uintptr_t)&tp_ulog_n);
++}
++/* 1 when the page has a consumer. Decided ONCE, on the first Worker (the only one whose globalThis the page's Worker hook touches): fle_audio_host_init() runs at the start of the thread layer (fle_thread.c ensure_init), before any
++ * other Worker exists; another Worker that asks first gets 0 and does not cache it */
++int fle_audio_external(void)
++{
++    if (ext_cached < 0) {
++        if (!emscripten_is_main_runtime_thread()) return 0;
++        ext_cached = tp_announce();
++    }
++    return ext_cached;
++}
++void fle_audio_host_init(void) { (void)fle_audio_external(); }
+ EM_JS(double, fle_js_now, (void), { return performance.now(); });
+-EM_JS(void, fle_js_unlock, (double first, unsigned n), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return;
+-  if (A.unlocks.length < 4000) A.unlocks.push({ first: first, n: n, t: performance.timeOrigin + performance.now() });
+-});
+-/* telemetry to the page, from the engine's own thread (the Worker may be inside a long compute and unable to answer a query): called from a thread switch at most every 500 ms of real time */
++EM_JS(double, fle_js_epoch_now, (void), { return performance.timeOrigin + performance.now(); });
++/* frames read by the AudioWorklet (RD, unwrapped to 64 bits, monotonic across Workers) */
++double fle_tp_consumed(void)
++{
++    uint32_t lo = (uint32_t)__atomic_load_n(&tp_hdr[H_RD], __ATOMIC_RELAXED);
++    uint64_t prev = __atomic_load_n(&tp_rd_abs, __ATOMIC_RELAXED), v;
++
++    for (;;) {
++        v = (prev & ~UINT64_C(0xffffffff)) | lo;
++        if (v < prev && prev - v > UINT64_C(0x80000000)) v += UINT64_C(1) << 32;   /* RD wrapped around 2^32 */
++        if (v <= prev) return (double)prev;
++        if (__atomic_compare_exchange_n(&tp_rd_abs, &prev, v, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) return (double)v;
++    }
++}
++/* n stereo float frames at lr to the ring at index `first`: silence for a gap since the last hand-over (the SHARED tp_wr), nothing for frames the output has already passed; then WR */
++void fle_tp_publish(const float *lr, uint32_t n, double first_d, uint32_t rate)
++{
++    uint64_t first = (uint64_t)first_d, rd = (uint64_t)fle_tp_consumed(), at = first, wr;
++    uint32_t k0 = 0, i;
++
++    (void)rate;
++    if (first + n <= rd) {
++        tp_stat[S_SKIPPED] += n;
++        __atomic_add_fetch(&tp_hdr[H_SKIPPED], (int32_t)n, __ATOMIC_RELAXED);
++        return;
++    }
++    if (first < rd) {
++        uint64_t late = rd - first;
++
++        k0 = (uint32_t)late;
++        at = rd;
++        tp_stat[S_SKIPPED] += (double)late;
++        __atomic_add_fetch(&tp_hdr[H_SKIPPED], (int32_t)late, __ATOMIC_RELAXED);
++    }
++    wr = __atomic_load_n(&tp_wr, __ATOMIC_RELAXED);
++    if (at > wr) {
++        uint64_t g = at - wr;
++
++        tp_stat[S_GAP] += (double)g;
++        if (g > TP_CAP) g = TP_CAP;
++        for (i = 0; i < g; i++) {
++            size_t q = (size_t)((at - g + i) & TP_MASK) * 2u;
++
++            tp_data[q] = 0.0f;
++            tp_data[q + 1] = 0.0f;
++        }
++    }
++    for (i = k0; i < n; i++) {
++        size_t q = (size_t)((first + i) & TP_MASK) * 2u;
++
++        tp_data[q] = lr[2u * i];
++        tp_data[q + 1] = lr[2u * i + 1u];
++    }
++    __atomic_store_n(&tp_wr, first + n, __ATOMIC_RELAXED);
++    __atomic_store_n(&tp_hdr[H_WR], (int32_t)(uint32_t)(first + n), __ATOMIC_SEQ_CST);
++    tp_stat[S_PUBLISHES] += 1.0;
++    __atomic_add_fetch(&tp_hdr[H_PUBLISHES], 1, __ATOMIC_RELAXED);
++    __atomic_add_fetch(&tp_hdr[H_PUBLISHED], (int32_t)(n - k0), __ATOMIC_RELAXED);
++}
++/* n stereo float frames to the ring at index `first`, only the ones the output has not read yet and that are at least `guard` frames ahead of its read position and before the last published frame (the SHARED tp_wr): a late
++ * write of the guest reaches the output if it comes in time. It changes neither WR nor the counters of the page. */
++void fle_tp_rewrite(const float *lr, uint32_t n, double first_d, uint32_t guard)
++{
++    uint64_t first = (uint64_t)first_d, rd = (uint64_t)fle_tp_consumed(), from = first > rd + guard ? first : rd + guard, wr = __atomic_load_n(&tp_wr, __ATOMIC_RELAXED), end = first + n < wr ? first + n : wr, i;
++
++    if (end <= from) return;
++    for (i = from; i < end; i++) {
++        size_t q = (size_t)(i & TP_MASK) * 2u, k = (size_t)(i - first) * 2u;
++
++        tp_data[q] = lr[k];
++        tp_data[q + 1] = lr[k + 1];
++    }
++}
++void fle_tp_state(uint32_t state, uint32_t rate)
++{
++    __atomic_store_n(&tp_hdr[H_RATE], (int32_t)rate, __ATOMIC_SEQ_CST);
++    __atomic_store_n(&tp_hdr[H_STATE], (int32_t)state, __ATOMIC_SEQ_CST);
++}
++/* the telemetry to the page, from the first Worker's own thread switch (the Worker may be inside a long compute and unable to answer a query): called from a thread switch at most every 500 ms of real time */
+ EM_JS(void, fle_js_pulse, (double real, double virt, double consumed, double written, unsigned nthr, const double *tot, const double *mx, const double *cnt, int mixer, double uc_n, double uc_sum, double uc_max, double uc_over78), {
+-  const A = globalThis.__fleAud;
+-  if (!A) return;
++  if (!globalThis.fleAudioWorkerState) return;
+   const n = Math.min(nthr, 32), t = [];
+   for (let i = 0; i < n; i++) t.push([HEAPF64[(tot >> 3) + i], HEAPF64[(mx >> 3) + i], HEAPF64[(cnt >> 3) + i]]);
+   self.postMessage({ type: 'audio-pulse', real: real, epoch: performance.timeOrigin + real, virt: virt, consumed: consumed, written: written, threads: t, mixer: mixer, unlockCompute: { n: uc_n, sumMs: uc_sum, maxMs: uc_max, over78: uc_over78 } });
+ });
+-#ifdef __EMSCRIPTEN__
+-/* ASYNC (JSPI): waits ms of real time (the thread's JSPI stack is suspended and the Worker's event loop runs). 2 after the time-out. It does not take part in the page's idle protocol of decision 0136 (fle_idle_wait / fleIdleDeliver:
+- * the idle host has the first say, fle_thread.c), so an input event that the page has for the engine waits for the end of this wait or for the idle. */
++/* ASYNC (JSPI): waits ms of real time (the thread's JSPI stack is suspended and the Worker's event loop runs). 2 after the time-out. It does not take part in the page's idle protocol of decision 0136 (fle_idle_wait /
++ * fleIdleDeliver: the idle host has the first say, fle_thread.c), so an input event that the page has for the engine waits for the end of this wait or for the idle. */
+ EM_ASYNC_JS(int, fle_js_wait, (double ms), {
+-  const A = globalThis.__fleAud;
+-  A.waits++;
+-  return await new Promise((resolve) => {
+-    const t0 = performance.now();
+-    setTimeout(() => { const drift = performance.now() - t0 - ms; if (drift > A.maxWaitDrift) A.maxWaitDrift = drift; resolve(2); }, ms);
+-  });
++  return await new Promise((resolve) => { setTimeout(() => { resolve(2); }, ms); });
+ });
+ int fle_tp_can_wait(void) { return 1; }
+-#else
+-static int js_wait_unavailable(double ms) { (void)ms; return 2; }
+-#define fle_js_wait js_wait_unavailable
+-int fle_tp_can_wait(void) { return 0; }
+-#endif
+-static int ext_cached = -1;
+-int fle_audio_external(void)
++double fle_tp_now(void) { return fle_js_now(); }
++int fle_tp_wait(double ms)
+ {
+-    if (ext_cached < 0) ext_cached = fle_js_init();
+-    return ext_cached;
++    double t0 = fle_js_now(), drift;
++    int r;
++
++    tp_stat[S_WAITS] += 1.0;
++    r = fle_js_wait(ms);
++    drift = fle_js_now() - t0 - ms;
++    if (drift > tp_stat[S_MAXDRIFT]) tp_stat[S_MAXDRIFT] = drift;
++    return r;
+ }
+-double fle_tp_consumed(void) { return fle_js_consumed(); }
+-void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { fle_js_publish(lr, n, first, rate); }
+-void fle_tp_state(uint32_t state, uint32_t rate) { fle_js_state(state, rate); }
+-void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard) { fle_js_rewrite(lr, n, first, guard); }
+-double fle_tp_now(void) { return fle_js_now(); }
+-int fle_tp_wait(double ms) { return fle_js_wait(ms); }
+-/* per-thread run time between switches (wall ms), the compute time of the mixer's committed blocks, and the telemetry */
++/* per-thread run time between switches (wall ms), the compute time of the mixer's committed blocks, and the telemetry. The totals are shared (every Worker adds, under the lock); the start of the slice is per Worker. */
+ #define SL_MAX 64u
+-static double sl_total[SL_MAX], sl_max[SL_MAX], sl_n[SL_MAX], sl_start = -1.0, last_pulse = -1e9, uc_n, uc_sum, uc_max, uc_over78;
++static double sl_total[SL_MAX], sl_max[SL_MAX], sl_n[SL_MAX], last_pulse = -1e9, uc_n, uc_sum, uc_max, uc_over78;
++static _Thread_local double sl_start = -1.0;
+ static int mixer_thr = -1;
+ unsigned fle_thread_current(void) __attribute__((weak));
+ void fle_audio_switch_note(unsigned from, unsigned to)
+@@ -142,7 +203,7 @@
+ 
+     (void)to;
+     if (!fle_audio_external()) return;
+-    now = fle_tp_now();
++    now = fle_js_now();
+     if (sl_start >= 0.0 && from < SL_MAX) {
+         double d = now - sl_start;
+ 
+@@ -151,18 +212,25 @@
+         if (d > sl_max[from]) sl_max[from] = d;
+     }
+     sl_start = now;
+-    if (now - last_pulse >= 500.0) {
++    if (now - last_pulse >= 500.0 && emscripten_is_main_runtime_thread()) {
+         last_pulse = now;
+         fle_js_pulse(now, (double)fle_sys_clock_ticks(), (double)fle_audio_consumed(), (double)fle_audio_ring_get()->write_frames, SL_MAX, sl_total, sl_max, sl_n, mixer_thr, uc_n, uc_sum, uc_max, uc_over78);
+     }
+ }
+ void fle_audio_unlock_note(double first_frame, uint32_t frames)
+ {
++    uint32_t i;
++
+     if (!fle_audio_external()) return;
+-    fle_js_unlock(first_frame, frames);
++    i = __atomic_fetch_add(&tp_ulog_n, 1u, __ATOMIC_RELAXED);
++    if (i < TP_ULOG_MAX) {
++        tp_ulog[i].first = first_frame;
++        tp_ulog[i].n = frames;
++        tp_ulog[i].t = fle_js_epoch_now();
++    } else __atomic_store_n(&tp_ulog_n, TP_ULOG_MAX, __ATOMIC_RELAXED);
+     if (fle_thread_current) mixer_thr = (int)fle_thread_current();
+     if (sl_start >= 0.0) {   /* the mixer ran since its slice began: this is the time it took to produce the block it just committed (and whatever else the slice did before) */
+-        double d = fle_tp_now() - sl_start;
++        double d = fle_js_now() - sl_start;
+ 
+         uc_n += 1.0;
+         uc_sum += d;
+@@ -174,6 +242,7 @@
+ /* Native: no transport. The play position is the virtual clock (fle_audio_ring.c), nothing is handed to a page. The scenarios of decision 0241 (lift/harness/audio/sim_transport.c) link their own transport instead of this file
+  * to stand for the AudioWorklet. */
+ int fle_audio_external(void) { return 0; }
++void fle_audio_host_init(void) {}
+ double fle_tp_consumed(void) { return 0.0; }
+ void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { (void)lr; (void)n; (void)first; (void)rate; }
+ void fle_tp_state(uint32_t state, uint32_t rate) { (void)state; (void)rate; }
+diff -ruN -x node_modules -x 'out-*' s0/lift/runtime/fle_audio_transport.h tree/lift/runtime/fle_audio_transport.h
+--- s0/lift/runtime/fle_audio_transport.h	2026-11-05 18:13:23.000000000 +0900
++++ tree/lift/runtime/fle_audio_transport.h	2026-11-06 19:52:13.806448321 +0900
+@@ -4,6 +4,8 @@
+ 
+ #include <stdint.h>
+ 
++/* the first Worker (or the only thread) asks once whether the page has a consumer and, if it has, tells the page where the ring is (wasm); a no-op natively. Called at the start of the thread layer. */
++void fle_audio_host_init(void);
+ /* frames the output has read (RD, unwrapped to 64 bits, as a double); 0 without an external consumer */
+ double fle_tp_consumed(void);
+ /* n stereo float frames to the ring at index `first`: silence for a gap since the last hand-over, nothing for the frames the output has already passed */
+diff -ruN -x node_modules -x 'out-*' s0/lift/runtime/fle_thread.c tree/lift/runtime/fle_thread.c
+--- s0/lift/runtime/fle_thread.c	2026-11-06 20:04:26.386281716 +0900
++++ tree/lift/runtime/fle_thread.c	2026-11-06 19:52:24.982151917 +0900
+@@ -59,6 +59,7 @@
+  * time of the next such offset is a due time like a timer's. fle_audio_poll() signals what the clock has reached (called before the waits are tested); fle_audio_next_tick() gives, in ticks of the virtual clock, the next time at which
+  * a playing buffer reaches a notification offset (0 when none: nothing is due). Weak: a link without the audio files has no device. */
+ void fle_audio_poll(void) __attribute__((weak));
++void fle_audio_host_init(void) __attribute__((weak));   /* decision 0312 (stage C): fle_audio_transport.c; absent in a build without the audio transport */
+ int fle_audio_next_tick(uint64_t *out) __attribute__((weak));
+ /* Decision 0139: real-time pacing with an external audio consumer (the browser's AudioWorklet; fle_audio_ring.h): while a buffer plays, the clock is not moved to the next deadline before that deadline has come in real time. Weak. */
+ int fle_audio_paced(void) __attribute__((weak));
+@@ -326,6 +327,7 @@
+ static void ensure_init(void)
+ {
+     if (nthr) return;
++    if (fle_audio_host_init) fle_audio_host_init();   /* decision 0312 (stage C): the first Worker asks the page for the audio consumer and announces the ring, before any other Worker exists */
+     memset(&T[0], 0, sizeof T[0]);
+     T[0].idx = 0;
+     T[0].vid = FLE_EMULATED_TID;

@@ -1,0 +1,1763 @@
+   Compiling fe-pe v0.1.0 (/home/ubuntu/work/signature-studio/lift/crates/fe-pe)
+   Compiling lazy_static v1.5.1
+   Compiling iced-x86 v1.21.0
+   Compiling fe-decode v0.1.0 (/home/ubuntu/work/signature-studio/lift/crates/fe-decode)
+   Compiling fe-lift v0.1.0 (/home/ubuntu/work/signature-studio/lift/crates/fe-lift)
+   Compiling fe-wasmgen v0.1.0 (/home/ubuntu/work/signature-studio/lift/crates/fe-wasmgen)
+warning: unnecessary parentheses around `if` condition
+    --> crates/fe-wasmgen/src/lower.rs:1564:12
+     |
+1564 | ...if (i.has_lock_prefix() || (matches!(m, M::Xadd | M::Cmpxchg | M::Xchg) && (i.op_kind(0) == OpKind::Memory || i.op_kind(1) == OpKind::Memory))) {
+     |       ^                                                                                                                                          ^
+     |
+     = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+     |
+1564 -         if (i.has_lock_prefix() || (matches!(m, M::Xadd | M::Cmpxchg | M::Xchg) && (i.op_kind(0) == OpKind::Memory || i.op_kind(1) == OpKind::Memory))) {
+1564 +         if i.has_lock_prefix() || (matches!(m, M::Xadd | M::Cmpxchg | M::Xchg) && (i.op_kind(0) == OpKind::Memory || i.op_kind(1) == OpKind::Memory)) {
+     |
+
+warning: unused doc comment
+  --> crates/fe-wasmgen/src/wasm.rs:66:1
+   |
+66 | / /// Decision 0234 (mt3, B-prime stage 1; the only form since decision 0243 layer e): the register file R/FL/X of the C path is the threa...
+67 | | /// register page (addresses TLS_RB .. TLS_RB + 0x300) is `global.get <the imported __tls_base>` + a memarg offset (address - TLS_RB + T...
+68 | | /// globals (1 with it): the globals this module defines come after them. Off (all 0): the module has no C part and no register page.
+   | |_------------------------------------------------------------------------------------------------------------------------------------^
+   |   |
+   |   rustdoc does not generate documentation for macro invocations
+   |
+   = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+   = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> crates/fe-wasmgen/src/ir.rs:237:13
+    |
+237 |         let mut target = |t: u64, tails: &mut Vec<u64>| -> Result<usize, String> {
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unreachable pattern
+    --> crates/fe-wasmgen/src/lower.rs:2006:13
+     |
+1669 | /             M::Movups | M::Movaps | M::Movdqa | M::Movdqu | M::Movapd | M::Movupd | M::Lddqu | M::Movsd | M::Movss | M::Addps | M::Subps | M::M...
+1670 | |             | M::Subpd | M::Mulpd | M::Divpd | M::Addsd | M::Subsd | M::Mulsd | M::Divsd | M::Addss | M::Subss | M::Mulss | M::Divss | M::Xorps...
+1671 | |             | M::Andps | M::Andpd | M::Pand | M::Orps | M::Orpd | M::Por | M::Sqrtsd | M::Cvtss2sd | M::Cvtsd2ss | M::Cvtsi2sd | M::Cvtsi2ss =>...
+     | |____________________________________________________________________________________________________________________________________________- matches all the relevant values
+...
+2006 |               M::Movsd if i.code() == iced_x86::Code::Movsd_m32_m32 => self.string_op(&i, va, flags_def),
+     |               ^^^^^^^^ no value can reach this
+     |
+     = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `t_addr` is never read
+    --> crates/fe-wasmgen/src/lower.rs:2366:26
+     |
+2366 |         let mut t_addr = NONE;
+     |                          ^^^^ this value is reassigned later and never used
+...
+2369 |             t_addr = self.tmp(Ty::I32);
+     |             -------------------------- `t_addr` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `fmul` is never used
+   --> crates/fe-wasmgen/src/rcgen.rs:546:8
+    |
+536 | impl Lw {
+    | ------- method in this implementation
+...
+546 |     fn fmul(&self) -> u32 { if self.w64 { 0xf2 } else { 0xe6 } }
+    |        ^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `F32_SQRT` is never used
+   --> crates/fe-wasmgen/src/rcgen.rs:992:7
+    |
+992 | const F32_SQRT: u8 = 0x91;
+    |       ^^^^^^^^
+
+warning: function `resolved_ok_or_only_the_other_rejected` is never used
+   --> crates/fe-decode/tests/msvc_switch.rs:250:4
+    |
+250 | fn resolved_ok_or_only_the_other_rejected(o: &Sw) {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `analyze_blend2d` is never used
+   --> crates/fe-decode/tests/msvc_switch.rs:580:4
+    |
+580 | fn analyze_blend2d(data: &[u8]) -> fe_decode::Analysis {
+    |    ^^^^^^^^^^^^^^^
+
+warning: constant `B2D_SCHEDULED_0109` is never used
+   --> crates/fe-decode/tests/msvc_switch.rs:589:7
+    |
+589 | const B2D_SCHEDULED_0109: [u64; 2] = [0x4756752, 0x47596c2];
+    |       ^^^^^^^^^^^^^^^^^^
+
+warning: constant `B2D_NEW_0094` is never used
+   --> crates/fe-decode/tests/msvc_switch.rs:594:7
+    |
+594 | const B2D_NEW_0094: [u64; 27] = [
+    |       ^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> crates/fe-lift/tests/sse_shuf.rs:353:9
+    |
+353 |     let mut add = |out: &mut Vec<Case>, rng: &mut Rng, imm: Option<u8>, k: usize| {
+    |         ----^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-lift` (test "sse_shuf") generated 1 warning (run `cargo fix --test "sse_shuf" -p fe-lift` to apply 1 suggestion)
+warning: `fe-decode` (test "msvc_switch") generated 4 warnings
+warning: unused variable: `ab`
+    --> crates/fe-lift/tests/locale.rs:1653:9
+     |
+1653 |     let ab = c_w(&w_nul("ab"));
+     |         ^^ help: if this is intentional, prefix it with an underscore: `_ab`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `abc`
+    --> crates/fe-lift/tests/locale.rs:1654:9
+     |
+1654 |     let abc = c_w(&w_nul("abc"));
+     |         ^^^ help: if this is intentional, prefix it with an underscore: `_abc`
+
+warning: function `vis_objs` is never used
+  --> crates/fe-lift/tests/wall_fr21.rs:74:4
+   |
+74 | fn vis_objs() -> &'static Vec<PathBuf> {
+   |    ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `dump_dir` is never used
+   --> crates/fe-lift/tests/wall_fr21.rs:352:4
+    |
+352 | fn dump_dir(tag: &str) -> PathBuf {
+    |    ^^^^^^^^
+
+warning: function `files` is never used
+   --> crates/fe-lift/tests/wall_fr21.rs:357:4
+    |
+357 | fn files(d: &Path) -> Vec<(String, Vec<u8>)> {
+    |    ^^^^^
+
+warning: constant `SRC_PROG` is never used
+   --> crates/fe-lift/tests/wall_fr21.rs:363:7
+    |
+363 | const SRC_PROG: &str = r#"
+    |       ^^^^^^^^
+
+warning: `fe-lift` (test "wall_fr21") generated 4 warnings
+warning: `fe-wasmgen` (lib) generated 7 warnings (run `cargo fix --lib -p fe-wasmgen` to apply 2 suggestions)
+warning: unused variable: `x`
+   --> crates/fe-wasmgen/tests/xabi_passthrough.rs:218:17
+    |
+218 |             let x = rng(&mut s);
+    |                 ^ help: if this is intentional, prefix it with an underscore: `_x`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variants `F32` and `F64` are never constructed
+  --> crates/fe-wasmgen/tests/sse_x2_forms.rs:74:5
+   |
+72 | enum Cmp {
+   |      --- variants in this enum
+73 |     Bits,
+74 |     F32,
+   |     ^^^
+75 |     F64,
+   |     ^^^
+   |
+   = note: `Cmp` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `lowered` is never used
+   --> crates/fe-wasmgen/tests/flags_cpu.rs:140:4
+    |
+140 | fn lowered(funcs: &[(u32, &[u8])]) -> (fe_wasmgen::Compiled, Vec<u64>) {
+    |    ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-wasmgen` (test "xabi_passthrough") generated 1 warning (run `cargo fix --test "xabi_passthrough" -p fe-wasmgen` to apply 1 suggestion)
+warning: `fe-wasmgen` (test "sse_x2_forms") generated 1 warning
+warning: unused import: `std::arch::x86_64::*`
+ --> crates/fe-wasmgen/tests/opaque_stub.rs:9:5
+  |
+9 | use std::arch::x86_64::*;
+  |     ^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-wasmgen` (test "flags_cpu") generated 1 warning
+warning: `fe-wasmgen` (test "opaque_stub") generated 1 warning (run `cargo fix --test "opaque_stub" -p fe-wasmgen` to apply 1 suggestion)
+warning: function `lines` is never used
+   --> crates/fe-lift/tests/present2_uncover.rs:296:4
+    |
+296 | fn lines(name: &str, body: &str) -> Vec<String> {
+    |    ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `lines_top` is never used
+   --> crates/fe-lift/tests/present2_uncover.rs:302:4
+    |
+302 | fn lines_top(name: &str, top: &str, body: &str) -> Vec<String> {
+    |    ^^^^^^^^^
+
+warning: function `aborts` is never used
+   --> crates/fe-lift/tests/present2_uncover.rs:309:4
+    |
+309 | fn aborts(name: &str, body: &str, api: &str, word: &str) -> Out {
+    |    ^^^^^^
+
+warning: `fe-lift` (test "locale") generated 2 warnings (run `cargo fix --test "locale" -p fe-lift` to apply 2 suggestions)
+warning: `fe-lift` (test "present2_uncover") generated 3 warnings
+warning: function `build_exe_nojump` is never used
+   --> crates/fe-lift/tests/setjmp_landing.rs:399:4
+    |
+399 | fn build_exe_nojump() -> PathBuf {
+    |    ^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-wasmgen` (lib test) generated 7 warnings (7 duplicates)
+warning: unused import: `generate_with_seh`
+  --> crates/fe-lift/tests/size1_deadflags.rs:13:30
+   |
+13 | use fe_lift::{generate_full, generate_with_seh, GenOptions, SehOptions, Stats};
+   |                              ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `shared_image` is never used
+  --> crates/fe-lift/tests/size1_deadflags.rs:76:4
+   |
+76 | fn shared_image() -> Vec<u8> {
+   |    ^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SOFT_BODY` is never used
+   --> crates/fe-lift/tests/wall_crash1.rs:553:7
+    |
+553 | const SOFT_BODY: &str = r#"
+    |       ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `soft_prog` is never used
+   --> crates/fe-lift/tests/wall_crash1.rs:563:4
+    |
+563 | fn soft_prog(body: &str) -> String {
+    |    ^^^^^^^^^
+
+warning: unused import: `generate_with_seh`
+  --> crates/fe-lift/tests/size1_outline.rs:13:30
+   |
+13 | use fe_lift::{generate_full, generate_with_seh, GenOptions, SehOptions, Stats};
+   |                              ^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `flags_image` is never used
+  --> crates/fe-lift/tests/size1_outline.rs:86:4
+   |
+86 | fn flags_image() -> Vec<u8> {
+   |    ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-lift` (test "wall_crash1") generated 2 warnings
+warning: `fe-lift` (test "size1_deadflags") generated 2 warnings (run `cargo fix --test "size1_deadflags" -p fe-lift` to apply 1 suggestion)
+warning: `fe-lift` (test "setjmp_landing") generated 1 warning
+warning: function `lines_top` is never used
+   --> crates/fe-lift/tests/wall_fr10.rs:476:4
+    |
+476 | fn lines_top(name: &str, top: &str, body: &str) -> Vec<String> {
+    |    ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-lift` (test "size1_outline") generated 2 warnings (run `cargo fix --test "size1_outline" -p fe-lift` to apply 1 suggestion)
+warning: function `lines` is never used
+   --> crates/fe-lift/tests/wall_fr16.rs:408:4
+    |
+408 | fn lines(name: &str, body: &str) -> Vec<String> {
+    |    ^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `aborts` is never used
+   --> crates/fe-lift/tests/wall_fr16.rs:421:4
+    |
+421 | fn aborts(name: &str, body: &str, api: &str, word: &str) -> Out {
+    |    ^^^^^^
+
+warning: function `strip_comments` is never used
+   --> crates/fe-lift/tests/wall_fr16.rs:430:4
+    |
+430 | fn strip_comments(s: &str) -> String {
+    |    ^^^^^^^^^^^^^^
+
+warning: constant `INIT_HEX` is never used
+   --> crates/fe-lift/tests/monitor.rs:275:7
+    |
+275 | const INIT_HEX: &str = "aaaaaaaaaaaaaaaa28000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...
+    |       ^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-lift` (test "wall_fr10") generated 1 warning
+warning: unused variable: `n`
+   --> crates/fe-lift/tests/wall_fr9.rs:249:9
+    |
+249 |     let n = rows.len();
+    |         ^ help: if this is intentional, prefix it with an underscore: `_n`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `fe-lift` (test "wall_fr16") generated 3 warnings
+warning: `fe-lift` (test "monitor") generated 1 warning
+warning: `fe-lift` (test "wall_fr9") generated 1 warning (run `cargo fix --test "wall_fr9" -p fe-lift` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 25.24s
+     Running unittests src/lib.rs (target/debug/deps/fe_decode-3336805196fee982)
+
+running 4 tests
+test indirect::tests::leader_demotes_register_resolution ... ok
+test indirect::tests::block_start_is_not_resolved_by_register ... ok
+test indirect::tests::rip_relative_and_iat_forms ... ok
+test indirect::tests::real_dll_resolution_counts ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+     Running unittests src/main.rs (target/debug/deps/fe_decode-a0f06a4f4bbc28b3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/adjustor.rs (target/debug/deps/adjustor-627b9d4f5022c891)
+
+running 6 tests
+test sub_lea_and_mov_load_forms_are_thunks ... ok
+test everything_else_is_not_a_thunk ... ok
+test add_rcx_minus_0x10_jmp_is_a_thunk ... ok
+test adjustor_seed_set_is_602_ascending_add_thunks_to_pdata_starts ... ok
+test the_three_thunks_of_the_stop_point_are_adjustor_seeds ... ok
+test closure_with_adjustors_has_no_bad_decode_and_grows_by_the_thunks_only ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.75s
+
+     Running tests/dataflow.rs (target/debug/deps/dataflow-08d8cb032d13dd82)
+
+running 4 tests
+test leaders_include_branch_targets_and_fallthrough ... ok
+test stores_to_slots_before_branch_are_not_trusted ... ok
+test synthetic_cases_have_exact_outcomes ... ok
+test real_dll_breakdown ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests/dump_tmp.rs (target/debug/deps/dump_tmp-dabbd4f1288b0423)
+
+running 1 test
+test dump ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/extra_seed.rs (target/debug/deps/extra_seed-45f12e606fd5ff96)
+
+running 5 tests
+test extra_seed_outside_text_is_not_code ... ok
+test extra_seed_41d050_enters_closure ... ok
+test default_closure_is_unchanged ... ok
+test extra_seed_41e7e0_enters_closure ... ok
+test empty_extra_equals_analyze ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.69s
+
+     Running tests/inline_run.rs (target/debug/deps/inline_run-1e38f7ea5caec7a7)
+
+running 6 tests
+test a_jump_without_the_lea_in_front_is_not_the_form ... ok
+test a_pointer_into_another_function_ends_the_run ... ok
+test an_unrelocated_first_slot_gives_no_table_and_reports_nothing ... ok
+test a_lea_that_loads_an_address_inside_the_function_without_a_relocated_run_is_not_the_table ... ok
+test a_fourth_relocated_pointer_into_the_function_extends_the_run ... ok
+test the_table_is_the_relocated_run_that_starts_at_the_lea_target_here_the_end_of_the_jump ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/inline_table.rs (target/debug/deps/inline_table-77e18687520c0ae3)
+
+running 6 tests
+test quickfontcache_has_the_idiom_at_0x40c163 ... ok
+test a_table_without_a_relocated_first_slot_or_outside_the_function_is_not_recognised_and_nothing_is_reported ... ok
+test other_shapes_are_not_recognised ... ok
+test the_table_is_the_run_of_relocated_pointers_into_the_function ... ok
+test the_run_ends_at_a_slot_that_is_not_relocated_or_points_out_of_the_function ... ok
+test flengine_has_the_idiom_once_and_it_stays_annotated ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.18s
+
+     Running tests/jt_cpu.rs (target/debug/deps/jt_cpu-d5e80454d87758e6)
+
+running 9 tests
+test dsp_ippv2_has_434_stubs ... ok
+test a_jump_with_a_displacement_is_not_a_stub ... ok
+test a_table_without_a_relocated_first_slot_is_rejected ... ok
+test a_relocated_code_pointer_in_front_of_the_table_that_is_not_the_init_path_stays_out ... ok
+test the_init_slot_is_a_case_when_every_condition_holds ... ok
+test a_branch_into_the_middle_of_the_stub_rejects_it ... ok
+test stub_tables_are_read_from_the_relocations ... ok
+test the_init_slot_is_not_a_case_when_a_condition_fails ... ok
+test flengine_has_no_stub ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.09s
+
+     Running tests/jumptab.rs (target/debug/deps/jumptab-4fe180ef16c88f1b)
+
+running 5 tests
+test a_target_outside_the_function_drops_the_table ... ok
+test a_target_in_the_middle_of_an_instruction_drops_the_table ... ok
+test table_targets_enter_the_closure_and_are_recorded ... ok
+test a_spec_whose_bytes_differ_is_rejected ... ok
+test real_dll_four_tables_pass_all_checks ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.92s
+
+     Running tests/msvc_switch.rs (target/debug/deps/msvc_switch-7c07d148279793d9)
+
+running 72 tests
+test blend2d_f_489f7d0_is_recognised_with_the_swapped_form_the_bytes_give ... ok
+test blend2d_f_489f7d0_the_seventeen_table_entries_are_instruction_starts_in_the_function ... ok
+test blend2d_f_48a2060_the_sixteen_table_entries_are_instruction_starts_in_the_function ... ok
+test blend2d_f_48a2060_the_padded_site_is_recognised_with_the_form_the_bytes_give ... ok
+test a_branch_landing_inside_the_idiom_skips_the_guard ... ok
+test a_target_in_a_chained_piece_of_the_same_function_is_inside ... ok
+test a_definition_that_does_not_come_from_a_lea_of_the_image_base_among_the_reaching_ones_rejects_it ... ok
+test caller_saved_base_in_a_function_with_a_call_is_not_proven ... ok
+test a_tail_call_by_a_direct_jmp_is_not_an_indirect_jump ... ok
+test a_second_switch_is_a_wildcard_jump_and_both_are_resolved_by_reaching_definitions ... ok
+test a_write_that_comes_back_to_the_jump_through_the_jumps_own_table_is_rejected ... ok
+test a_definition_that_is_not_lea_and_reaches_another_indirect_jump_rejects_the_proof ... ok
+test base_from_an_argument_is_not_proven ... ok
+test another_function_jumping_into_the_middle_means_the_entry_block_may_not_run ... ok
+test base_lea_of_another_address_is_not_the_image_base ... ok
+test b_that_is_undefined_on_some_path_to_the_jump_is_rejected ... ok
+test c1_one_stage_with_base_from_the_entry_block ... ok
+test c2_two_stages_entry_count_is_the_largest_index_byte_plus_one ... ok
+test dsp_ippv2_f_37cc7e0_is_resolved_by_reaching_definitions_with_the_sixteen_entries_of_the_table ... ok
+test dsp_ippv2_f_37cd2c0_is_resolved_with_seventeen_entries ... ok
+test a_padding_nop_between_the_ja_and_the_table_idiom_is_resolved ... ok
+test a_branch_into_the_padding_is_rejected ... ok
+test freetype_the_stop_point_of_the_ft_stream_readfields_switch_and_ten_more_scheduled_sites_are_resolved ... ok
+test guard_on_the_64_bit_index_and_a_cdqe_after_it ... ok
+test int3_and_ud2_in_the_padding_end_the_block_so_the_idiom_is_not_reached ... ok
+test index_bound_not_derived ... ok
+test push_pop_of_the_base_is_not_a_write_and_a_callee_saved_base_survives_a_call ... ok
+test scheduled_a_call_in_the_gap_or_between_the_cmp_and_the_branch_is_rejected ... ok
+test scheduled_a_site_that_stays_rejected_for_lack_of_n_reports_both_reasons ... ok
+test padding_nop_with_cdqe_and_the_other_forms_of_the_idiom ... ok
+test scheduled_at_most_two_guards ... ok
+test scheduled_a_write_to_the_checked_register_that_is_not_a_sign_extension_stops_the_derivation ... ok
+test scheduled_a_table_in_a_writable_section_is_rejected_because_the_gap_may_hold_stores ... ok
+test scheduled_n_is_the_largest_bound_of_the_guards ... ok
+test scheduled_landings_and_block_starts_inside_the_run_are_rejected_except_the_second_guards ... ok
+test scheduled_the_base_proof_and_the_targets_are_checked_as_before ... ok
+test scheduled_one_guard_with_nothing_but_a_sign_extension_in_the_gap ... ok
+test scheduled_the_writable_check_is_for_the_scheduled_form_only ... ok
+test scheduled_the_checked_register_may_reach_the_index_through_a_sign_extension ... ok
+test sub_before_the_compare_gives_n_from_the_compared_register ... ok
+test scheduled_stores_leas_and_nops_may_stand_in_either_gap ... ok
+test scheduled_the_guard_must_be_an_unsigned_less_or_equal_side_and_a_compare_with_an_immediate ... ok
+test swapped_f2_and_the_other_table_loads_are_not_taken ... ok
+test scheduled_the_shape_of_freetype_ft_stream_readfields_is_resolved_with_two_guards ... ok
+test swapped_an_instruction_in_a_gap_that_touches_b_x_i_or_the_flags_or_memory_or_the_control_flow_is_refused ... ok
+test scheduled_the_instructions_of_decision_0093_that_write_the_index_are_still_rejected_by_default ... ok
+test swapped_the_compare_must_be_on_the_index_with_an_immediate_and_nothing_may_write_it ... ok
+test swapped_the_landing_window_function_is_exact ... ok
+test swapped_the_gaps_before_and_after_the_add_hold_instructions_that_touch_none_of_b_x_i ... ok
+test swapped_does_not_change_what_the_standard_form_does ... ok
+test swapped_the_lea_may_sit_at_the_entry_before_the_guard ... ok
+test swapped_the_base_proof_of_decision_0094_is_not_loosened ... ok
+test swapped_n_comes_from_every_unsigned_i_le_n_side ... ok
+test swapped_the_targets_must_be_inside_the_function_and_instruction_starts ... ok
+test swapped_verify_msvc_swapped_accepts_the_run_and_rejects_a_block_start_inside_it ... ok
+test target_in_another_function_makes_the_whole_site_unresolved ... ok
+test target_not_at_an_instruction_start_is_not_resolved ... ok
+test swapped_the_table_block_needs_exactly_one_predecessor ... ok
+test swapped_the_limit_on_the_instructions_in_the_gaps_is_not_loosened ... ok
+test target_not_executable_is_outside ... ok
+test the_dispatch_form_is_unchanged_for_rejected_sites ... ok
+test swapped_the_wrong_side_of_the_guard_is_not_a_bound ... ok
+test swapped_the_shape_of_blend2d_f_489f7d0_is_resolved_with_n_from_the_jbe_taken_side ... ok
+test verify_msvc_accepts_the_padding_run_and_still_rejects_a_block_start_inside_it ... ok
+test the_landing_window_covers_two_longest_padding_nops ... ok
+test volatile_base_without_a_call_is_proven ... ok
+test which_instructions_are_padding_nops ... ok
+test which_check_rejects_a_branch_into_the_padding ... ok
+test the_padding_does_not_change_the_rejections_of_the_other_conditions ... ok
+test without_an_exception_directory_nothing_is_resolved ... ok
+test flengine_has_no_swapped_table ... ok
+test flengine_has_no_msvc_table_of_this_form ... ok
+
+test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+
+     Running tests/multisec.rs (target/debug/deps/multisec-f1d3330ba93955e6)
+
+running 7 tests
+test flags_decide_not_the_name ... ok
+test text_has_one_range_per_executable_section_in_va_order ... ok
+test closure_enters_the_second_executable_section_and_not_the_unflagged_one ... ok
+test no_relocation_directory_gives_no_reloc_seeds ... ok
+test pdata_seeds_are_the_starts_inside_executable_ranges ... ok
+test reloc_seeds_are_only_the_values_that_are_pdata_starts_in_code ... ok
+test a_section_with_only_the_execute_flag_counts_and_one_without_it_does_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pdata_seeds.rs (target/debug/deps/pdata_seeds-9f693d96cde1e8bf)
+
+running 3 tests
+test pdata_seeds_are_ascending_unique_text_starts ... ok
+test pdata_closure_has_no_decode_failures_and_contains_every_start ... ok
+test pdata_closure_contains_the_default_closure_and_the_896_seed_closure ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+     Running tests/seh.rs (target/debug/deps/seh-7f6c1d23958dbba4)
+
+running 3 tests
+test a_handler_rva_that_nothing_names_gives_nothing ... ok
+test wall_16_frames_have_the_landings_and_funclets_of_sim_scopes ... ok
+test counts_of_the_real_tables_are_the_ones_of_the_static_reading ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/vcall_setjmp.rs (target/debug/deps/vcall_setjmp-ea9809dc5febd4b6)
+
+running 9 tests
+test near_misses_of_the_setjmp_shape_are_not_setjmp ... ok
+test everything_else_is_not_a_virtual_call_thunk ... ok
+test the_setjmp_shape_is_recognised_directly_and_behind_a_trampoline ... ok
+test add_mov_jmp_through_the_loaded_register_is_a_thunk ... ok
+test the_virtual_call_thunk_set_is_82_ascending_anchored_thunks_outside_pdata ... ok
+test the_stop_point_of_unit_296_is_a_virtual_call_thunk_seed ... ok
+test a_thunk_that_is_already_an_entry_is_not_a_new_seed ... ok
+test the_guest_setjmp_and_its_one_landing ... ok
+test closure_with_the_thunk_seeds_grows_by_the_thunks_only_and_old_functions_are_unchanged ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.35s
+
+     Running unittests src/lib.rs (target/debug/deps/fe_lift-d4775e51771f5ae8)
+
+running 32 tests
+test hle::tests::file_errors_name_the_line ... ok
+test hle::tests::file_has_va_rva_comments_and_blank_lines ... ok
+test hle::tests::guard_text ... ok
+test hle::tests::rva_gets_the_image_base_and_duplicates_are_refused ... ok
+test hook::tests::file_errors_name_the_line ... ok
+test hook::tests::file_has_vas_rvas_comments_and_blank_lines ... ok
+test hook::tests::finish_sorts_dedups_and_refuses_overlap ... ok
+test hook::tests::guard_and_tail_text ... ok
+test hook::tests::point_mistakes_are_errors ... ok
+test hook::tests::point_records_the_five_bytes_little_endian ... ok
+test hook::tests::rva_gets_the_image_base ... ok
+test prune::tests::bad_hex_and_duplicates_are_errors ... ok
+test prune::tests::class_u_rows_parse_like_the_others ... ok
+test prune::tests::file_has_va_rva_class_header_and_comments ... ok
+test prune::tests::stub_text ... ok
+test site_override::tests::a_site_listed_twice_is_a_mistake ... ok
+test insn_int::tests::other_forms_are_left_to_lib ... ok
+test indirect::tests::rip_table_call_and_jmp_are_direct_and_iat_stays_unsupported ... ok
+test site_override::tests::file_errors_name_the_line ... ok
+test site_override::tests::guard_text ... ok
+test site_override::tests::file_has_va_rva_disp_comments_and_blank_lines ... ok
+test site_override::tests::registers_are_in_the_order_of_r ... ok
+test site_override::tests::rva_gets_the_image_base ... ok
+test swap::tests::file_has_va_rva_comments_and_blank_lines ... ok
+test swap::tests::rva_gets_the_image_base_and_duplicates_are_refused ... ok
+test swap::tests::stub_text ... ok
+test swap::tests::file_errors_name_the_line ... ok
+test insn_int::tests::movsxd_matches_host ... ok
+test insn_int::tests::lea32_matches_host ... ok
+test insn_int::tests::nop_matches_host ... ok
+test insn_int::tests::movzx_matches_host ... ok
+test insn_int::tests::mov_high_byte_matches_host ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/main.rs (target/debug/deps/fe_lift-fbf73af049284632)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/a2a_remaining.rs (target/debug/deps/a2a_remaining-016ed0d53d7834b0)
+
+running 13 tests
+test bswap_16bit_and_other_forms_stay_unsupported ... ok
+test rcp_table_header_matches_host_dump ... ok
+test runtime_cpuid_never_reports_osxsave_and_avx ... ok
+test xgetbv_is_a_named_stop ... ok
+test bswap_matches_host ... ok
+test andnpd_matches_host ... ok
+test psubw_matches_host ... ok
+test rcpps_matches_host ... ok
+test pcmpgtd_matches_host ... ok
+test high_byte_test_and_match_host ... ok
+test high_byte_audit_of_all_8bit_forms_matches_host ... ok
+test misaligned_memory_operand_aborts ... ok
+test rcpps_all_2e32_inputs_match_host ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.54s
+
+     Running tests/a4_report.rs (target/debug/deps/a4_report-8993e10eae48b188)
+
+running 16 tests
+test an_earlier_unit_on_the_stack_is_not_in_progress_for_the_last_one ... ok
+test a_unit_outside_the_image_is_counted_and_not_read ... ok
+test a_started_unit_that_is_not_a_lifted_function_counts_as_not_entered ... ok
+test init_count_on_a_noproc_unit_counts_the_previous_runnable_unit_as_last ... ok
+test entry_check_counts_started_units_that_were_never_entered ... ok
+test init_count_on_an_empty_unit ... ok
+test no_image_means_a_note_and_no_read ... ok
+test nothing_started ... ok
+test in_progress_unit ... ok
+test init_count_above_the_unit_count_is_not_a_crash ... ok
+test context_not_yet_written ... ok
+test entry_check_counts_units_entered_beyond_init_count ... ok
+test all_units_done_needs_the_full_count_and_no_unit_in_progress ... ok
+test bad_context_is_reported_not_followed ... ok
+test a_header_zeroed_by_the_exit_path_is_replaced_by_the_sampled_one ... ok
+test the_edges_of_the_image ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/a9_a10.rs (target/debug/deps/a9_a10-55802e121e6dc50c)
+
+running 28 tests
+test every_thunk_of_the_two_groups_calls_its_runtime_function ... ok
+test every_function_of_the_table_is_declared_and_defined_in_the_runtime ... ok
+test midi_dev_caps_report_a_bad_device_id_for_every_identifier_and_do_not_touch_the_buffer ... ok
+test midi_error_text_with_zero_length_copies_nothing ... ok
+test char_case_string_is_converted_in_place_and_ascii_only ... ok
+test midi_has_no_devices ... ok
+test midi_out_mapper_is_nodriver_and_the_structure_is_not_written ... ok
+test intersect_rect_known_cases ... ok
+test clipboard_format_name_returns_the_registered_name_and_its_length ... ok
+test midi_out_open_fails_without_a_device_and_leaves_the_handle_alone ... ok
+test char_case_single_character_is_returned_in_the_low_word ... ok
+test char_buff_converts_exactly_the_count_including_nul_and_returns_it ... ok
+test char_next_steps_one_unit_over_plain_ascii_and_stays_on_nul ... ok
+test char_next_stops_where_the_page_does_not_decide ... ok
+test char_case_stops_on_non_ascii_and_null ... ok
+test midi_dev_caps_and_error_text_stop_where_the_pages_are_silent ... ok
+test set_rect_and_offset_rect ... ok
+test registered_values_start_at_0xc000_and_the_same_name_gives_the_same_value ... ok
+test time_period_calls_count_matched_pairs_and_range_check ... ok
+test timer_resolution_calls_do_not_move_the_virtual_clock_that_time_get_time_reads ... ok
+test union_rect_known_cases ... ok
+test time_period_end_without_begin_and_too_many_periods_stop ... ok
+test midi_out_open_and_short_msg_stop_or_fail_as_the_pages_say ... ok
+test time_get_dev_caps_fills_timecaps_and_fails_for_null ... ok
+test rect_functions_stop_on_null_and_on_undefined_cases ... ok
+test register_functions_stop_where_the_pages_are_silent ... ok
+test rect_functions_match_the_model_on_a_grid_of_small_values ... ok
+test registered_values_stay_inside_0xc000_0xffff_and_the_range_ends_with_a_stop ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running tests/act1_net.rs (target/debug/deps/act1_net-2415d9d3eea33703)
+
+running 8 tests
+test last_response_info_with_nothing_stored_is_true_with_error_zero_and_an_empty_text ... ok
+test without_the_act1_file_closing_an_unknown_handle_stops_as_before ... ok
+test the_record_on_stderr_holds_names_and_lengths_but_no_query_value_header_value_or_body_byte ... ok
+test a_null_verb_is_get_and_the_header_length_may_be_explicit ... ok
+test the_guests_request_sequence_fails_at_the_send_with_cannot_connect_and_never_succeeds_at_a_transfer ... ok
+test the_open_url_record_hides_every_query_value_including_the_ampersand_form_of_the_news_url ... ok
+test a_polling_loop_does_not_run_out_of_handles ... ok
+test the_forms_the_guest_has_not_been_seen_to_use_still_stop_by_name ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+     Running tests/adjustor.rs (target/debug/deps/adjustor-9a5e4ecca75e4a73)
+
+running 2 tests
+test dispatch_table_has_the_thunks_with_the_roots ... ok
+test adjustor_roots_add_602_functions_and_no_bad_nodes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.03s
+
+     Running tests/alpha10_syscmd.rs (target/debug/deps/alpha10_syscmd-b2367b5e15a5c284)
+
+running 1 test
+test system_commands_minimize_maximize_restore_and_the_task_bar_follow_the_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.95s
+
+     Running tests/alpha10b_setplace.rs (target/debug/deps/alpha10b_setplace-73841cb465bccebf)
+
+running 1 test
+test set_window_placement_moves_the_window_then_shows_it_and_get_window_placement_takes_44 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+     Running tests/alpha1_glass.rs (target/debug/deps/alpha1_glass-c91834b29211c616)
+
+running 1 test
+test extended_frame_alpha_region_and_hit_test ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.90s
+
+     Running tests/alpha2_changed.rs (target/debug/deps/alpha2_changed-17ec3c134d0fb045)
+
+running 1 test
+test an_identical_copy_is_not_told_to_the_compositor_and_any_difference_is ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/alpha3_updregion.rs (target/debug/deps/alpha3_updregion-5282e287e4ccb6c4)
+
+running 1 test
+test the_update_region_is_a_set_of_rectangles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/alpha5_erase_dc.rs (target/debug/deps/alpha5_erase_dc-e84919f69e4384cd)
+
+running 1 test
+test redraw_window_erase_message_has_a_dc ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/alpha7_showwin.rs (target/debug/deps/alpha7_showwin-df0cbdc43d023a8d)
+
+running 1 test
+test show_window_states_send_the_messages_of_the_contract ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+     Running tests/alpha8_hidden_move.rs (target/debug/deps/alpha8_hidden_move-c35024a14af25e93)
+
+running 1 test
+test a_hidden_window_does_not_stop_the_copy_of_a_moved_child_and_rdw_nochildren_is_0x40 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/api2.rs (target/debug/deps/api2-057d139f9e85b9ef)
+
+running 4 tests
+test rows_are_new_declared_and_defined ... ok
+test undefined_inputs_stop_by_name ... ok
+test cases_equal_the_wine_output_except_the_listed_divergences ... ok
+test window_update_region_cases_vs_wine_with_the_known_gaps ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s
+
+     Running tests/authenticode_check.rs (target/debug/deps/authenticode_check-c35b2caddb95f084)
+
+running 14 tests
+test the_real_fl64_exe_passes_both_checks_and_has_the_same_signer_as_the_engine ... ok
+test the_real_flengine_passes_both_checks_with_the_values_of_the_independent_run ... ok
+test the_committed_claims_table_is_what_the_tool_writes_for_the_real_files ... ok
+test an_unsigned_file_is_a_row_that_does_not_hold_and_says_why ... ok
+test one_changed_byte_of_the_code_fails_the_digest_check_and_not_the_signature_check ... ok
+test one_changed_byte_of_the_signature_value_fails_the_signature_check_and_not_the_digest_check ... ok
+test a_sha1_signature_with_a_counter_signature_is_ok_and_the_timestamp_is_reported_but_not_judged ... ok
+test a_correctly_signed_file_passes_both_checks_and_the_digest_is_the_independent_one ... ok
+test the_tool_does_not_modify_its_input_and_writes_only_the_two_named_files ... ok
+test the_command_line_errors_exit_2_and_write_nothing ... ok
+test the_tool_names_what_it_does_not_check_in_every_row_and_in_the_file_header ... ok
+test a_real_flengine_with_one_byte_of_code_changed_fails_the_digest_and_one_byte_of_the_signature_fails_the_signature ... ok
+test the_limits_are_real_a_changed_certificate_or_timestamp_byte_still_gives_ok_ok_because_neither_chain_nor_time_is_checked ... ok
+test a_wrong_message_digest_attribute_a_wrong_content_type_a_missing_signer_and_a_mismatched_algorithm_fail_the_signature_check_each_for_its_own_reason ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/call_iat.rs (target/debug/deps/call_iat-8858a15d1183697e)
+
+running 3 tests
+test indirect_calls_outside_the_iat_are_unchanged ... ok
+test call_through_iat_slot_uses_the_response_row_and_keeps_the_call_shape ... ok
+test call_through_iat_slot_without_a_row_stays_unsupported_and_stops_the_run ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.99s
+
+     Running tests/call_iat_dll.rs (target/debug/deps/call_iat_dll-f38ac91ead3c7af9)
+
+running 1 test
+test dsp_ippv2_iat_calls_by_api_name ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/callback.rs (target/debug/deps/callback-f52cd8d1968afa93)
+
+running 18 tests
+test source_is_plain_c_with_no_host_access_and_no_unwinding ... ok
+test the_constants_are_the_decided_ones ... ok
+test four_arguments_reach_rcx_rdx_r8_r9_and_the_result_is_rax ... ok
+test a_callee_that_saves_and_restores_the_callee_saved_registers_leaves_them_as_they_were ... ok
+test a_callback_may_make_the_runtime_call_another_callback ... ok
+test a_stop_inside_a_callback_stops_the_whole_run ... ok
+test a_changed_return_address_slot_stops_the_run_by_name ... ok
+test a_callee_that_changes_a_callee_saved_register_stops_the_run_by_name ... ok
+test the_usual_entry_16n_plus_8_gives_the_same_distance_as_a_generated_call ... ok
+test the_callee_may_write_its_shadow_space_and_use_a_kilobyte_of_stack_without_touching_the_callers_frame ... ok
+test nesting_of_exactly_the_limit_is_allowed_and_one_more_stops ... ok
+test an_unbalanced_stack_stops_the_run_by_name ... ok
+test all_64_bits_of_every_argument_and_of_the_result_are_kept ... ok
+test rsp_is_restored_exactly_for_every_residue ... ok
+test address_zero_and_a_non_entry_stop_by_name ... ok
+test the_callee_starts_at_16n_plus_8_with_a_shadow_space_below_the_apis_frame ... ok
+test each_callee_saved_register_is_checked_and_each_volatile_one_is_free ... ok
+test a_generated_call_and_fle_call_guest_give_the_callee_the_same_stack ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.70s
+
+     Running tests/census.rs (target/debug/deps/census-ac6901dac4b80cac)
+
+running 9 tests
+test an_existing_output_file_is_never_overwritten ... ok
+test without_the_variable_nothing_changes ... ok
+test an_abandoned_unit_gets_rax_0_and_its_registers_and_the_fpu_state_back ... ok
+test faults_hangs_and_the_stack_overflow_are_told_apart ... ok
+test every_way_a_unit_can_end_is_recorded_and_the_guest_loop_goes_on ... ok
+test a_stop_outside_every_unit_is_written_down_and_then_ends_the_run_as_before ... ok
+test the_file_ends_with_the_counts_and_says_it_is_not_a4_progress ... ok
+test the_record_of_a_stop_has_the_message_the_top_function_and_the_import ... ok
+test a_nested_dispatch_inside_a_unit_is_not_a_unit ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/class.rs (target/debug/deps/class-dced059c8b694dfe)
+
+running 24 tests
+test source_uses_no_host_window_class_module_clock_thread_process_or_file_and_never_calls_the_window_procedure ... ok
+test the_decided_constants ... ok
+test f_52a7f0_asks_for_its_class_then_registers_it_and_then_creates_the_window ... ok
+test the_guest_has_11_get_class_info_sites_and_8_register_class_sites ... ok
+test get_class_info_of_the_guests_own_names_before_they_are_registered_returns_zero_and_writes_nothing ... ok
+test the_extra_bytes_0_and_40_are_accepted_in_both_fields ... ok
+test a_name_that_is_not_registered_and_not_a_system_class_is_not_found_whatever_its_spelling ... ok
+test the_two_rows_are_in_the_table_and_declared_and_the_neighbours_are_not_answered ... ok
+test register_returns_the_next_atom_counts_the_class_and_leaves_everything_else_alone ... ok
+test get_class_info_copies_the_registered_72_bytes_and_returns_nonzero ... ok
+test the_static_classes_have_the_names_the_runtime_knows_and_a_window_procedure_and_no_class_style ... ok
+test the_smallest_value_above_16_bits_is_a_string_pointer_and_0xffff_is_an_atom ... ok
+test the_window_procedure_is_kept_as_an_address_and_never_called ... ok
+test an_all_upper_spelling_that_is_t_and_an_upper_case_letter_is_answered_not_found_by_the_delphi_name_rule_since_decision_0123 ... ok
+test a_second_thread_stops_the_run_in_both_apis ... ok
+test nothing_is_stored_before_a_stop ... ok
+test get_class_info_matches_names_unit_for_unit_and_stops_on_a_case_difference ... ok
+test a_name_of_256_units_is_registered_and_one_of_257_stops ... ok
+test a_second_registration_of_a_name_stops_and_a_name_that_differs_only_in_case_stops_too ... ok
+test the_two_thunks_jump_to_the_user32_slots_and_nothing_else_points_at_them ... ok
+test get_class_info_stops_on_the_module_the_buffer_and_the_name ... ok
+test register_stops_on_every_form_the_pages_leave_open ... ok
+test get_class_info_of_a_system_class_stops_the_run_and_any_other_unregistered_name_is_not_found ... ok
+test the_atoms_end_at_0xffff_and_the_next_registration_stops ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.57s
+
+     Running tests/cpuid.rs (target/debug/deps/cpuid-9c53406a3e3d3c64)
+
+running 4 tests
+test leaf1_edx_is_exactly_the_x86_64_baseline_bits ... ok
+test cpuid_body_calls_runtime ... ok
+test cpuid_response_matches_table ... ok
+test only_edx_changed_and_ecx_ebx_eax_stay_zero ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-d6805a0e5da18c2b)
+
+running 25 tests
+test header_is_plain_c ... ok
+test idc_arrow_is_the_learn_number ... ok
+test source_uses_no_host_cursor_theme_mouse_display_resource_clock_thread_process_or_file ... ok
+test the_handle_region_is_decided_below_2_gib_and_apart_from_the_other_two_tables ... ok
+test the_learn_tables_in_this_file_have_no_repeated_number_and_no_repeated_name ... ok
+test the_dll_name_and_the_api_name_are_part_of_the_match ... ok
+test the_row_is_in_the_table_and_declared_in_the_header ... ok
+test four_sites_pass_null_and_idc_arrow_and_three_pass_the_module_and_a_name ... ok
+test the_result_is_stored_compared_and_passed_on_the_way_the_investigation_reads_it ... ok
+test the_thunk_calls_the_runtime ... ok
+test the_guest_has_exactly_seven_call_sites_and_no_jump_to_the_thunk ... ok
+test the_thunk_jumps_to_the_slot_which_is_user32_loadcursorw ... ok
+test the_next_stop_is_loadimagew_with_shared_standard_cursors_and_the_guests_resources ... ok
+test nothing_else_in_the_file_points_at_the_thunk_or_the_slot ... ok
+test the_inspection_functions_agree_with_the_call ... ok
+test it_is_stateless_leaves_the_last_error_alone_and_keeps_the_return_address ... ok
+test the_handle_is_the_same_on_every_call_and_does_not_depend_on_other_calls ... ok
+test idc_arrow_returns_the_decided_handle ... ok
+test the_answer_does_not_depend_on_the_other_argument_registers ... ok
+test the_three_dynamic_names_are_the_vt_cursors_of_the_guests_own_resources ... ok
+test a_non_null_hinstance_stops_with_a_named_reason ... ok
+test a_name_pointer_stops_with_a_named_reason ... ok
+test every_other_standard_cursor_stops_by_number ... ok
+test the_additional_cursors_and_other_numbers_stop_by_number ... ok
+test a_cursor_handle_is_not_a_gdi_object_or_a_dc ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/deferred.rs (target/debug/deps/deferred-74ed1708026356df)
+
+running 15 tests
+test the_rows_are_the_export_directories_of_the_real_dlls ... ok
+test the_response_table_has_one_row_per_export_after_the_rows_that_existed ... ok
+test the_table_has_the_two_deferred_modules_n33_and_n34_and_shcore_after_them ... ok
+test load_library_succeeds_with_the_handle_of_the_rule_and_runs_no_dllmain ... ok
+test get_module_handle_answers_like_for_any_virtual_module ... ok
+test get_proc_address_gives_a_pseudo_va_for_each_export_name_of_blend2d ... ok
+test get_proc_address_gives_a_pseudo_va_for_each_of_the_ten_exports_of_qfc ... ok
+test the_driver_without_a_real_module_is_the_deferred_build ... ok
+test the_reference_count_is_the_one_of_a_virtual_module ... ok
+test with_a_real_blend2d_get_proc_address_reads_its_export_directory_not_the_deferred_rows ... ok
+test a_real_module_named_blend2d_wins_over_the_deferred_one ... ok
+test a_real_blend2d_follows_the_real_module_rules_of_free_library ... ok
+test a_real_blend2d_next_to_a_deferred_qfc_loads_each_its_own_way ... ok
+test what_decision_0096_does_not_change_still_stops_or_fails_as_before ... ok
+test calling_any_export_stops_by_name_with_the_register_arguments ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/desk1_compose.rs (target/debug/deps/desk1_compose-bd1f2a29d6e1b055)
+
+running 1 test
+test compositor_draws_what_the_window_table_says_and_reports_what_changed ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/desk_scene.rs (target/debug/deps/desk_scene-3b8fdf555681954f)
+
+running 1 test
+test the_scene_description_loses_nothing_and_a_move_or_restack_sends_no_pixel ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running tests/dispatch.rs (target/debug/deps/dispatch-fa1dc26b64e5b7d1)
+
+running 3 tests
+test unresolved_indirect_call_uses_dispatch_and_table_has_entries ... ok
+test dispatch_calls_table_entry_and_aborts_on_miss ... ok
+test generated_unit_compiles_with_clang_o0 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/dump_string_tmp.rs (target/debug/deps/dump_string_tmp-c3683af4a2d70582)
+
+running 1 test
+test dump ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/dwm_timing.rs (target/debug/deps/dwm_timing-766cdca4d4a02510)
+
+running 6 tests
+test the_structure_is_292_bytes_with_1_byte_packing_which_is_the_cbsize_the_real_caller_passes ... ok
+test the_import_row_is_one_appended_row_after_the_rows_of_the_earlier_decisions_and_the_runtime_defines_it ... ok
+test the_counters_that_the_page_says_are_valid_after_a_second_call_are_the_change_since_the_previous_call ... ok
+test hwnd_not_null_is_e_invalidarg_a_wrong_cbsize_is_e_invalidarg_and_touches_nothing_and_a_null_pointer_stops_by_name ... ok
+test every_member_has_the_value_the_contract_and_the_virtual_clock_give_at_60_75_and_120_hz ... ok
+test the_vblank_is_the_one_dwmflush_waits_for_so_the_two_agree_at_every_boundary ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/entry_label.rs (target/debug/deps/entry_label-79f344fa54eb0f72)
+
+running 2 tests
+test entry_label_starts_function_body ... ok
+test entry_block_runs_first_and_compiles ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/env.rs (target/debug/deps/env-071dc31c53154a80)
+
+running 8 tests
+test sizeof_startupinfow_from_member_types ... ok
+test startup_info_does_not_read_the_incoming_cb ... ok
+test set_get_replace_delete ... ok
+test command_line_and_startup_info ... ok
+test expand_environment_strings ... ok
+test environment_starts_empty_and_hides_the_host ... ok
+test many_variables_and_a_long_value ... ok
+test undefined_input_stops_the_run ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+
+     Running tests/event.rs (target/debug/deps/event-70f1413613ebe460)
+
+running 16 tests
+test header_is_plain_c ... ok
+test source_uses_no_host_clock_thread_process_or_file ... ok
+test the_event_region_is_the_one_decided_and_overlaps_nothing ... ok
+test rows_are_in_the_table_and_declared_in_the_header ... ok
+test the_runtime_sources_use_at_most_four_close_hooks ... ok
+test close_handle_closes_events_and_reuse_after_close_fails ... ok
+test wait_results ... ok
+test the_close_hook_leaves_other_handles_and_the_other_hooks_alone ... ok
+test the_four_kinds_follow_the_pages ... ok
+test invalid_handles_fail_with_error_invalid_handle ... ok
+test handles_are_in_the_region_distinct_never_reused_and_leave_the_last_error_alone ... ok
+test a_bool_is_a_32_bit_value ... ok
+test create_with_attributes_or_a_name_stops_the_run ... ok
+test a_second_thread_stops_the_run ... ok
+test wait_that_would_block_stops_the_run ... ok
+test handles_that_are_not_events_stop_the_run ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.75s
+
+     Running tests/flags.rs (target/debug/deps/flags-b48a375b6f5209c7)
+
+running 5 tests
+test lift_body_rejects_control_transfer ... ok
+test lift_body_add_emits_flag_helper ... ok
+test lifted_setcc_cmov_match_sdm_formula ... ok
+test lifted_code_matches_host_flags ... ok
+test flag_helpers_match_host_and_table ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/gdc.rs (target/debug/deps/gdc-4d85a602828f69e9)
+
+running 17 tests
+test header_is_plain_c ... ok
+test the_handle_region_overlaps_nothing_and_survives_32_bit_truncation ... ok
+test source_uses_no_host_display_window_clock_thread_process_or_file ... ok
+test the_decided_values_and_index_numbers ... ok
+test rows_are_in_the_table_and_declared_in_the_header ... ok
+test the_dll_name_is_part_of_the_match ... ok
+test the_three_thunks_call_the_runtime ... ok
+test release_results_follow_the_page ... ok
+test the_values_are_the_decided_ones_for_the_seven_indexes ... ok
+test handles_are_in_the_region_distinct_never_reused_and_leave_the_last_error_alone ... ok
+test only_the_low_dword_of_the_index_counts ... ok
+test a_second_thread_stops_the_run ... ok
+test get_dc_with_a_window_stops_the_run ... ok
+test horzsize_and_vertsize_are_derived_from_the_virtual_display_at_96_dpi ... ok
+test caps_on_a_dc_that_is_not_live_stops_the_run ... ok
+test release_dc_with_a_window_or_a_foreign_handle_stops_the_run ... ok
+test indexes_the_guest_does_not_use_stop_by_number ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s
+
+     Running tests/gdi.rs (target/debug/deps/gdi-a853108fbcbc8ece)
+
+running 102 tests
+test a_font_gets_a_handle_in_the_gdi_region_and_the_table_keeps_a_copy_of_the_92_bytes ... ok
+test a_gdi_handle_is_not_a_dc_for_release_dc ... ok
+test a_bitmap_gets_a_handle_in_the_gdi_region_and_the_table_keeps_its_size_and_format ... ok
+test a_dib_section_gets_its_bits_a_handle_and_the_stride_of_the_page ... ok
+test a_fill_with_a_pattern_brush_stops_by_name_for_want_of_the_pixels_of_a_pattern_fill ... ok
+test a_font_never_reuses_a_slot_and_shares_the_sequence_with_palettes_and_leaves_the_last_error ... ok
+test a_bitmap_into_a_screen_dc_is_refused_with_null_and_changes_nothing ... ok
+test a_dib_section_of_8_bits_or_less_keeps_the_colour_table_of_its_bitmapinfo ... ok
+test a_compatible_bitmap_follows_the_format_of_the_dc_it_is_made_for ... ok
+test a_font_handle_is_not_a_palette_a_dc_or_a_cursor_and_the_other_tables_stop_on_it ... ok
+test a_second_thread_stops_mainicon_too ... ok
+test a_palette_of_the_guests_table_gets_a_handle_and_keeps_its_entries ... ok
+test a_memory_dc_starts_with_the_placeholder_the_default_objects_and_the_initial_colours ... ok
+test a_solid_or_hollow_brush_gets_a_handle_and_keeps_its_style_and_colour ... ok
+test an_icon_or_cursor_is_made_from_a_mask_and_a_colour_bitmap_and_the_bitmaps_stay_the_guests ... ok
+test a_zero_width_or_height_gives_the_one_by_one_monochrome_bitmap_of_the_page ... ok
+test a_null_logfont_pointer_stops_the_run_and_creates_nothing ... ok
+test a_stock_font_is_not_a_created_font_and_still_stops_on_delete ... ok
+test createbitmap_with_initial_bits_keeps_the_word_aligned_rows_of_the_page ... ok
+test a_memory_dc_is_not_a_screen_dc_for_release_dc_and_get_device_caps ... ok
+test a_halftone_palette_is_an_opaque_palette_that_can_be_selected_and_deleted ... ok
+test delete_dc_unselects_what_was_selected_and_does_not_delete_it ... ok
+test delete_object_of_a_bitmap_follows_the_page ... ok
+test a_bitmap_form_the_guest_does_not_use_stops_by_name_and_creates_nothing ... ok
+test delete_object_of_a_dib_section_follows_the_page_and_releases_its_bits ... ok
+test delete_object_of_a_font_follows_the_page ... ok
+test delete_object_of_a_selected_object_returns_zero_until_it_is_selected_out ... ok
+test bitblt_patblt_fillrect_getdibits_and_realizepalette_stop_by_name_with_their_arguments ... ok
+test a_compatible_bitmap_of_what_the_page_leaves_open_stops_by_name ... ok
+test delete_object_on_a_memory_dc_deletes_it_like_delete_dc ... ok
+test delete_object_results_follow_the_page ... ok
+test f_5c0bc0_asks_for_0x5c_bytes_and_reads_only_these_fields_of_the_logfont ... ok
+test delete_dc_of_what_the_page_leaves_open_stops_by_name ... ok
+test a_second_thread_stops_the_run ... ok
+test each_font_gives_its_own_copy_and_the_table_is_not_changed_by_asking ... ok
+test every_palette_is_new_never_reused_and_the_last_error_is_left_alone ... ok
+test createpatternbrush_makes_a_brush_of_the_8x8_monochrome_bitmap_and_the_bitmap_stays_the_guests ... ok
+test a_memory_dc_can_be_made_from_null_or_a_screen_dc_and_from_nothing_else ... ok
+test gdi_handles_and_screen_dc_handles_are_different_kinds ... ok
+test a_brush_style_the_guest_does_not_use_or_a_palette_colour_stops_by_name ... ok
+test get_sys_color_answers_the_table_of_indices_0_to_30_and_zero_for_any_other_index_since_decision_0123 ... ok
+test header_is_plain_c ... ok
+test getobjectw_of_a_bitmap_stops_with_a_reason_of_its_own ... ok
+test get_object_of_a_24_bit_dib_section_asks_for_a_dibsection_stops ... ok
+test delete_object_of_the_placeholder_the_default_objects_and_an_icon_stops ... ok
+test getobjectw_adds_no_new_state_and_leaves_the_other_apis_alone ... ok
+test get_object_of_a_dib_section_gives_a_dibsection ... ok
+test a_colour_with_a_high_byte_or_a_dc_that_is_not_modelled_stops_by_name ... ok
+test mainicon_from_no_module_returns_null_and_changes_nothing ... ok
+test get_object_of_a_dc_a_brush_or_a_default_object_stops_as_a_kind_the_page_does_not_describe ... ok
+test only_the_92_bytes_of_the_logfontw_are_read ... ok
+test rows_are_in_the_table_and_declared_in_the_header ... ok
+test only_the_low_dword_of_each_argument_counts_and_the_largest_size_below_two_gib_is_accepted ... ok
+test only_the_low_dword_of_rdx_is_c_and_only_92_bytes_are_written ... ok
+test get_object_of_a_device_dependent_bitmap_gives_the_bitmap_structure ... ok
+test only_the_low_dword_of_the_stock_index_counts ... ok
+test select_object_returns_the_previous_bitmap_and_a_bitmap_is_in_one_dc_at_a_time ... ok
+test select_object_selects_brushes_pens_and_fonts_and_returns_the_previous_one_of_the_type ... ok
+test source_uses_no_host_display_resource_clock_thread_process_or_file ... ok
+test mainicon_with_a_module_handle_still_stops_on_the_module ... ok
+test a_logpalette_other_than_the_guests_form_stops_the_run ... ok
+test select_palette_null_is_the_failure_value_and_changes_nothing ... ok
+test the_26_call_sites_are_exactly_these_and_only_one_passes_c_0x5c ... ok
+test the_constants_of_decision_0108 ... ok
+test select_palette_returns_the_previous_palette_and_ignores_bforcebkgd_for_a_memory_dc ... ok
+test the_application_icon_has_one_handle_for_every_call ... ok
+test the_createfontindirectw_thunk_calls_the_runtime_and_the_names_are_part_of_the_match ... ok
+test the_decided_constants ... ok
+test the_dll_name_is_part_of_the_match ... ok
+test the_colour_table_of_the_dib_section_selected_into_a_dc_is_read_and_written_with_a_clamp ... ok
+test the_copy_is_taken_at_the_call_and_two_fonts_keep_their_own ... ok
+test the_created_font_is_answered_with_its_92_byte_copy_and_92 ... ok
+test the_four_thunks_call_the_runtime ... ok
+test the_getobjectw_thunk_calls_the_runtime_and_the_names_are_part_of_the_match ... ok
+test the_handle_region_overlaps_nothing_and_survives_32_bit_truncation ... ok
+test create_icon_indirect_of_what_the_page_leaves_open_stops_by_name ... ok
+test the_face_name_is_kept_as_it_is_without_a_terminator_check_or_a_font_mapper ... ok
+test the_name_length_limit_is_the_decided_one ... ok
+test the_neighbours_that_decision_0108_does_not_answer_stay_unsupported_thunks ... ok
+test the_nineteen_rows_are_appended_in_order_after_the_older_rows_and_declared ... ok
+test the_flags_byte_and_the_entries_are_copied_not_referenced ... ok
+test the_source_of_decision_0108_pins_the_rules_that_the_c_tests_cannot_see ... ok
+test the_font_and_the_other_tables_use_regions_that_do_not_overlap ... ok
+test get_object_of_a_dib_section_gives_the_bitmap_structure_for_32_bytes_and_stops_for_a_dibsection ... ok
+test nothing_is_stored_before_a_stop ... ok
+test the_thunks_of_the_nineteen_apis_call_the_runtime_and_the_dll_name_is_part_of_the_match ... ok
+test the_text_and_background_colours_return_the_previous_colour_and_start_at_the_choices ... ok
+test the_three_stock_objects_have_fixed_distinct_handles ... ok
+test select_palette_of_what_the_page_leaves_open_stops_by_name ... ok
+test delete_object_of_what_the_pages_do_not_define_stops_the_run ... ok
+test the_smallest_pointer_value_above_16_bits_is_a_string_and_0xffff_is_an_identifier ... ok
+test the_handles_of_deleted_dcs_bitmaps_sections_and_brushes_are_never_reused ... ok
+test the_thunk_jumps_to_the_slot_which_is_gdi32_getobjectw_and_nothing_else_points_at_either ... ok
+test load_icon_of_anything_but_idi_application_from_no_module_stops_the_run ... ok
+test the_name_is_read_in_at_most_16_units_and_never_past_the_nul ... ok
+test only_the_exact_utf16_mainicon_is_answered ... ok
+test select_object_of_what_the_page_leaves_open_stops_by_name ... ok
+test without_a_dib_section_of_8_bits_or_less_the_colour_table_calls_fail_with_zero ... ok
+test a_second_thread_stops_the_new_calls_too_and_get_sys_color_has_no_thread_rule ... ok
+test stock_indexes_the_guest_does_not_use_stop_by_number ... ok
+test create_dib_section_forms_the_pages_leave_open_stop_by_name ... ok
+test getobjectw_of_every_other_form_stops_with_a_reason_of_its_own ... ok
+
+test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.92s
+
+     Running tests/gdi_bulk.rs (target/debug/deps/gdi_bulk-a6e4e334b4878f9c)
+
+running 39 tests
+test bit_blt_copies_the_pixel_bytes_between_dib_sections_of_the_same_format ... ok
+test fill_rect_paints_the_half_open_rectangle_with_a_solid_brush_into_a_32_bit_dib ... ok
+test a_new_memory_dc_starts_with_the_defaults_of_the_display_device_context_page ... ok
+test a_rectangle_is_clipped_to_the_bitmap_and_an_empty_one_paints_nothing ... ok
+test get_icon_info_makes_two_new_bitmaps_for_a_cursor_and_destroy_cursor_deletes_it ... ok
+test bit_blt_copies_device_rows_between_a_top_down_and_a_bottom_up_dib_and_8_bit_dibs ... ok
+test bit_blt_inside_one_bitmap_moves_like_memmove_in_both_directions ... ok
+test fill_rect_with_the_window_text_system_colour_plus_one_and_a_bitfields_dib ... ok
+test a_bottom_up_dib_has_its_first_memory_row_at_the_bottom_of_the_image ... ok
+test a_solid_brush_gets_a_gdi_handle_and_is_selected_and_deleted_like_the_one_of_create_brush_indirect ... ok
+test pat_blt_paints_with_the_brush_or_black_or_white ... ok
+test destroy_cursor_of_a_shared_standard_cursor_returns_1_and_keeps_it ... ok
+test get_clip_box_gives_the_bitmap_of_the_memory_dc_in_logical_units ... ok
+test move_to_and_the_current_position_follow_the_pages ... ok
+test the_constants_of_decision_0111 ... ok
+test save_dc_pushes_a_state_and_restore_dc_pops_it_with_the_ones_above ... ok
+test stretch_dibits_copies_a_same_format_one_to_one_rectangle_into_a_dib_section ... ok
+test the_ninety_six_rows_are_appended_in_order_after_the_older_rows_and_declared ... ok
+test a_second_thread_stops_each_of_the_answering_calls ... ok
+test a_pen_gets_a_gdi_handle_and_is_selected_and_deleted ... ok
+test palette_entries_are_copied_from_a_created_palette_with_the_clamp_of_the_page ... ok
+test the_source_of_decision_0111_pins_where_the_pixel_bytes_are_written ... ok
+test the_thunks_of_the_new_rows_call_the_runtime_and_the_names_are_part_of_the_match ... ok
+test the_graphic_modes_return_the_previous_mode_and_start_at_the_defaults ... ok
+test restore_dc_stops_where_the_pages_leave_the_state_open ... ok
+test stretch_blt_of_equal_sizes_copies_like_bit_blt_and_other_sizes_stop ... ok
+test the_origins_of_the_dc_move_the_rectangle ... ok
+test the_sixty_one_calls_that_need_the_rasterizer_the_fonts_or_the_system_still_stop_by_name_and_eight_region_calls_answer_since_decision_0123 ... ok
+test the_window_and_viewport_origins_and_lptodp_follow_the_page_formula ... ok
+test fills_and_blits_stop_where_the_pages_leave_the_bytes_open ... ok
+test the_cursor_state_follows_set_cursor_get_cursor_and_show_cursor ... ok
+test stretch_dibits_forms_the_pages_do_not_fix_stop_by_name ... ok
+test the_memory_dc_answer_of_get_device_caps_reports_the_bits_and_planes_of_the_selected_bitmap ... ok
+test icon_and_cursor_calls_stop_where_the_pages_give_no_result ... ok
+test stretch_dibits_reads_a_bottom_up_source_from_its_top_row_and_honours_the_viewport_origin ... ok
+test the_brush_origin_is_kept_for_values_zero_to_seven ... ok
+test a_mode_the_pages_do_not_list_or_a_dc_that_is_not_modelled_stops_by_name ... ok
+test unrealize_object_does_nothing_for_a_brush_and_a_palette_and_stops_for_the_rest ... ok
+test lptodp_and_the_origin_calls_stop_where_the_pages_leave_the_result_open ... ok
+
+test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/glob.rs (target/debug/deps/glob-81048b638c0e59e8)
+
+running 25 tests
+test mul_div_model_matches_the_page_examples ... ok
+test movable_handle_region_does_not_overlap_the_other_regions ... ok
+test a_hash_sign_without_digits_is_a_string_atom_name ... ok
+test allocation_failure_returns_null_with_not_enough_memory ... ok
+test global_add_atom_counts_references_but_delete_is_not_in_the_closure ... ok
+test a_second_thread_stops_the_run ... ok
+test movable_memory_has_a_distinct_handle_and_a_lock_count ... ok
+test source_uses_no_host_process_time_environment_or_file_state ... ok
+test mul_div_uses_only_the_low_32_bits_of_each_argument ... ok
+test rows_are_in_the_table_and_declared_in_the_header ... ok
+test integer_atoms_and_hash_strings ... ok
+test integer_atom_delete_has_no_effect_and_returns_zero ... ok
+test local_and_global_tables_are_independent ... ok
+test lstrlen_counts_utf16_units_and_null_gives_zero ... ok
+test fixed_memory_handle_is_the_pointer_and_the_lock_count_is_zero ... ok
+test mul_div_follows_the_rounding_and_overflow_rules ... ok
+test name_length_limits_and_many_atoms ... ok
+test zero_byte_objects_and_blocks ... ok
+test zero_init_flags_give_zeroed_memory ... ok
+test obsolete_flag_0x2000_is_ignored_and_free_null_succeeds ... ok
+test string_atoms_are_in_range_ignore_case_and_count_references ... ok
+test only_the_low_16_bits_of_an_atom_argument_count ... ok
+test atom_names_outside_the_pages_stop_the_run ... ok
+test global_memory_cases_outside_the_pages_stop_the_run ... ok
+test a_full_atom_table_and_a_deleted_atom_s_slot ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s
+
+     Running tests/gpu7_ring_poll.rs (target/debug/deps/gpu7_ring_poll-98d902abedfd9cf1)
+
+running 6 tests
+test the_hook_exists_only_in_the_wasm_build_or_with_the_test_define ... ok
+test the_hook_is_called_at_scheduler_points_only_and_at_every_switch_after_the_second_thread_exists ... ok
+test an_input_queued_by_the_hook_reaches_the_thread_in_getmessage_at_the_next_switch ... ok
+test an_injected_input_is_settled_only_when_the_thread_that_handled_it_waits_in_its_message_loop_again ... ok
+test a_hook_with_nothing_queued_changes_neither_the_virtual_clock_nor_the_thread_order ... ok
+test the_records_of_fruity_idle_give_the_same_state_as_the_same_events_applied_directly ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+     Running tests/gs_stacklimit.rs (target/debug/deps/gs_stacklimit-23146df50965f0e1)
+
+running 6 tests
+test the_dll_bytes_are_the_constant ... ok
+test stacklimit_read_is_lifted_and_other_gs_forms_stay_unsupported ... ok
+test generated_chkstk_has_the_gs_read_and_nothing_unsupported ... ok
+test chkstk_matches_the_host_cpu_with_the_real_stack_bottom_as_stacklimit ... ok
+test runtime_stop_paths_and_callback_keep_the_stack_limit ... ok
+test wasm_gives_the_same_results_as_native_for_the_generated_chkstk ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.68s
+
+     Running tests/hle_entries.rs (target/debug/deps/hle_entries-3a2bc0a72a774708)
+
+running 10 tests
+test without_an_entry_the_output_is_the_old_output ... ok
+test the_guard_is_the_only_change ... ok
+test an_entry_that_is_not_a_function_entry_is_an_error ... ok
+test two_entries_in_two_functions_each_get_one_guard ... ok
+test the_command_line_reads_rva_and_va_lines_with_comments ... ok
+test the_command_line_stops_on_a_bad_file_and_on_an_address_that_is_not_a_function_entry ... ok
+test a_host_that_declines_leaves_the_lifted_body_to_run ... ok
+test a_host_that_takes_the_call_makes_the_function_return_at_once ... ok
+test the_guard_is_in_the_annotated_function_only_and_asks_at_every_call ... ok
+test the_runtime_guard_of_the_dsp_function_is_silent_when_nothing_calls_it ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/hook_points.rs (target/debug/deps/hook_points-551b0f52eac71462)
+
+running 17 tests
+test the_iltools_hook_file_matches_the_real_dll ... ok
+test a_hook_point_listed_twice_is_one_point ... ok
+test without_hook_points_the_output_is_the_old_output ... ok
+test the_guards_the_include_and_the_table_are_the_only_changes ... ok
+test a_mistake_in_the_annotation_stops_the_generator ... ok
+test the_command_line_reads_va_and_rva_lines_with_comments ... ok
+test the_command_line_stops_on_a_bad_file_and_on_a_point_that_is_not_an_entry ... ok
+test a_jmp_to_an_address_that_is_not_a_function_entry_stops_in_dispatch ... ok
+test the_displacement_is_signed_and_counted_from_the_end_of_the_jmp ... ok
+test before_the_hook_the_body_runs ... ok
+test writing_the_original_bytes_back_returns_to_the_body_and_the_hook_can_be_set_again ... ok
+test a_jmp_rel32_in_the_image_is_a_tail_dispatch_that_keeps_the_stack_and_the_registers ... ok
+test a_function_that_is_not_annotated_has_no_guard_and_virtualprotect_is_what_stops_it ... ok
+test bytes_that_are_neither_the_original_nor_jmp_rel32_stop_by_name ... ok
+test virtualprotect_outside_the_image_is_as_before ... ok
+test virtualprotect_of_a_hook_point_returns_the_protection_of_the_page_and_records_the_new_one ... ok
+test virtualprotect_in_a_registered_image_outside_the_hook_points_stops_by_name ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/imports_table.rs (target/debug/deps/imports_table-540cc9a2b44615f7)
+
+running 1 test
+test table_thunk_calls_runtime_and_others_stay_unsupported ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/int_ext.rs (target/debug/deps/int_ext-00e7cadeb6173719)
+
+running 4 tests
+test sign_extension_matches_host ... ok
+test movsx_matches_host ... ok
+test idiv_imul_matches_host ... ok
+test divide_error_aborts ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/int_more.rs (target/debug/deps/int_more-93622d77e626b25a)
+
+running 5 tests
+test cmpxchg_matches_host ... ok
+test div_matches_host ... ok
+test bt_matches_host ... ok
+test xadd_matches_host ... ok
+test divide_error_aborts ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests/int_more2.rs (target/debug/deps/int_more2-1ed90ad3c03d122d)
+
+running 10 tests
+test unsupported_stay_unsupported ... ok
+test cmpxchg16b_misaligned_aborts ... ok
+test pause_and_fences_match_host ... ok
+test cmpxchg16b_matches_host ... ok
+test jecxz_jrcxz_match_host ... ok
+test jcxz_to_function_entry_is_a_tail_call ... ok
+test xchg_matches_host ... ok
+test bsf_bsr_match_host ... ok
+test rol_ror_match_host ... ok
+test bts_btr_btc_match_host ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/jt_cpu.rs (target/debug/deps/jt_cpu-54edc378b9d15874)
+
+running 5 tests
+test real_stub_selector_k_reaches_table_k_natively_and_lifted ... ok
+test real_stub_selector_outside_the_table_stops_by_name ... ok
+test synthetic_generator_output ... ok
+test synthetic_every_selector_matches_native_and_the_table ... ok
+test synthetic_selector_outside_the_table_stops_by_name ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/jumptab.rs (target/debug/deps/jumptab-d6662ad60d0de041)
+
+running 5 tests
+test synthetic_generator_output ... ok
+test synthetic_every_index_matches_native_and_the_table ... ok
+test synthetic_index_outside_the_table_aborts ... ok
+test real_dll_f_40d210_is_a_memset_native_and_lifted ... ok
+test real_dll_every_index_reaches_the_table_target_natively_and_lifted ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.87s
+
+     Running tests/k32_dsp.rs (target/debug/deps/k32_dsp-8e0ef28488229347)
+
+running 14 tests
+test real_dll_leaves_only_the_two_unrowed_names ... ok
+test the_new_code_reads_nothing_from_the_host ... ok
+test every_answered_and_stopped_name_has_one_row_and_a_declaration ... ok
+test get_command_line_a_is_the_ascii_text_of_the_wide_one ... ok
+test fls_follows_the_learn_pages ... ok
+test initialize_critical_section_and_spin_count_succeeds_and_the_section_works ... ok
+test call_through_the_iat_reaches_the_new_runtime_functions_and_the_stop_aborts ... ok
+test environment_strings_block_has_the_page_format ... ok
+test slist_head_is_kept_outside_the_object_and_flushes_empty ... ok
+test initialize_critical_section_and_spin_count_on_a_live_section_stops ... ok
+test oem_code_page_and_valid_code_pages_follow_the_emulated_locale ... ok
+test fls_cases_the_pages_leave_open_stop ... ok
+test the_names_that_stop_say_their_name_and_never_return ... ok
+test is_processor_feature_present_agrees_with_the_cpuid_answer ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.62s
+
+     Running tests/kbd.rs (target/debug/deps/kbd-2d3952aa3d652bfc)
+
+running 18 tests
+test header_is_plain_c ... ok
+test source_uses_no_host_keyboard_layout_input_method_registry_clock_thread_process_or_file ... ok
+test the_constants_are_the_decided_ones ... ok
+test the_row_is_in_the_table_and_declared_in_the_header ... ok
+test the_thunk_calls_the_runtime ... ok
+test the_dll_name_and_the_api_name_are_part_of_the_match ... ok
+test the_guest_uses_the_whole_hkl_the_low_word_and_nothing_inside_the_high_word ... ok
+test the_thunk_jumps_to_the_slot_which_is_user32_getkeyboardlayout ... ok
+test the_guest_passes_thread_id_zero_at_all_three_call_sites ... ok
+test it_is_stateless_leaves_the_last_error_alone_and_keeps_the_return_address ... ok
+test the_low_word_is_the_emulated_langid_and_follows_the_locale_object ... ok
+test the_other_registers_do_not_matter_and_the_callee_saved_ones_are_kept ... ok
+test the_current_thread_gets_the_virtual_hkl ... ok
+test the_virtual_get_current_thread_id_value_stops_with_its_own_reason ... ok
+test only_the_low_dword_of_rcx_is_the_argument ... ok
+test another_thread_id_stops_with_a_named_reason ... ok
+test the_low_word_is_the_lcid_and_the_high_word_is_not_derived_from_it ... ok
+test nothing_else_in_the_file_calls_or_points_at_the_thunk ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests/ldst_switch.rs (target/debug/deps/ldst_switch-b2ab15c51c7b8042)
+
+running 4 tests
+test a_rejected_address_stops_with_the_same_size_and_kind_and_touches_nothing ... ok
+test native_access_is_exactly_n_bytes_wide_at_the_end_of_a_mapping ... ok
+test native_fle_ld_and_fle_st_equal_the_byte_wise_reference_for_every_n ... ok
+test wasm_fle_ld_and_fle_st_equal_the_byte_wise_reference_for_every_n ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.62s
+
+     Running tests/load.rs (target/debug/deps/load-c00e08ed4e73fa3d)
+
+running 38 tests
+test external_and_unnamed_modules_fail_with_null_and_126 ... ok
+test load2_a_contract_name_gives_the_handle_of_its_host_and_one_more_reference_on_it ... ok
+test avrt_and_powrprof_load_by_name_and_get_module_handle_gives_the_same_handle ... ok
+test avrt_and_powrprof_have_nothing_to_find_and_dwmapi_and_uxtheme_stay_absent ... ok
+test load2_get_proc_address_on_a_host_handle_asks_the_response_table_under_the_host_name ... ok
+test load2_the_minor_version_is_part_of_the_lookup_and_the_virtual_contract_modules_of_the_table_keep_their_handles ... ok
+test load2_the_schema_is_sorted_unique_lower_case_and_has_the_hosts_of_the_contracts_the_crt_asks_for ... ok
+test load2_get_module_handle_of_a_contract_gives_the_host_when_the_host_is_a_loaded_module ... ok
+test image_nt_header_on_the_real_dll ... ok
+test load1_a_path_that_the_volume_lacks_fails_with_null_and_126 ... ok
+test load1_the_environment_variables_of_the_exploration_are_gone_from_the_loader ... ok
+test load_library_a_uses_the_same_names ... ok
+test load2_the_resolver_answers_the_four_cases_by_the_lookup_key ... ok
+test image_nt_header_on_synthetic_images ... ok
+test get_proc_address_then_dispatch_reaches_the_loader_answers ... ok
+test response_table_has_rows_for_the_six_apis ... ok
+test load_library_of_an_empty_name_fails_with_null_and_126 ... ok
+test the_loader_thunks_and_image_nt_header_call_the_runtime ... ok
+test load_library_ex_w_flags ... ok
+test the_roster_is_sorted_unique_lower_case_ascii_and_has_no_name_of_the_product ... ok
+test the_same_name_in_another_dll_is_not_the_same_api ... ok
+test load_library_w_returns_the_virtual_handle_by_name ... ok
+test load_library_w_of_a_delay_only_dll_fails_with_126 ... ok
+test load2_a_contract_that_the_schema_lacks_is_searched_as_a_file_like_any_other_bare_name ... ok
+test set_dll_directory_stores_replaces_and_restores ... ok
+test set_dll_directory_too_long_stops ... ok
+test set_dll_directory_does_not_change_what_a_load_finds ... ok
+test reference_counts_follow_load_and_free ... ok
+test avrt_and_powrprof_follow_the_free_library_rule_of_the_other_virtual_modules ... ok
+test load1_get_proc_address_of_a_null_module_is_a_lookup_in_the_process_image ... ok
+test load2_a_contract_without_a_host_fails_and_a_contract_whose_host_is_not_a_virtual_module_stops_by_name ... ok
+test free_library_below_one_stops_and_other_handles_stop ... ok
+test image_nt_header_stops_on_bad_headers_and_other_bases ... ok
+test load1_a_path_whose_name_is_a_virtual_module_and_forms_the_volume_does_not_model_stop_by_name ... ok
+test the_other_ten_windows_dlls_still_stop_by_name_after_decision_0088 ... ok
+test load1_a_file_of_the_volume_that_is_not_a_module_of_the_build_stops_by_name ... ok
+test windows_dlls_that_are_not_virtual_modules_and_api_set_names_stop_by_name ... ok
+test undefined_load_library_inputs_stop ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+
+     Running tests/load2_files.rs (target/debug/deps/load2_files-423be608c6748d0c)
+
+running 4 tests
+test load2_get_file_type_is_disk_for_an_open_file_and_unknown_with_an_error_for_a_handle_that_is_not ... ok
+test load2_flush_file_buffers_needs_a_handle_with_write_access ... ok
+test load2_set_file_pointer_ex_moves_the_pointer_of_an_open_file_like_set_file_pointer ... ok
+test load2_find_first_file_ex_is_find_first_file_for_the_plain_cases_and_stops_for_the_rest ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/loadimage.rs (target/debug/deps/loadimage-81728635ef553674)
+
+running 33 tests
+test header_is_plain_c ... ok
+test learn_values_in_the_header ... ok
+test source_uses_no_host_cursor_theme_mouse_display_clock_thread_process_or_file ... ok
+test synthetic_group_with_two_components_needs_both ... ok
+test synthetic_group_whose_component_is_missing_stops_as_no_cursor ... ok
+test synthetic_group_with_its_component_is_answered ... ok
+test a_dll_that_does_have_a_32649_group_does_not_get_the_null_answer ... ok
+test synthetic_image_without_a_resource_type_12_has_no_cursor ... ok
+test the_dll_name_and_the_api_name_are_part_of_the_match ... ok
+test synthetic_malformed_groups_stop_by_name ... ok
+test the_handle_regions_are_decided_below_2_gib_and_apart_from_the_other_tables ... ok
+test idc_arrow_has_the_same_handle_in_loadimagew_and_loadcursorw ... ok
+test the_dll_has_the_rt_group_cursors_32761_to_32767_and_not_32649 ... ok
+test the_resource_check_reads_only_the_dlls_own_directory_and_leaves_the_last_error ... ok
+test the_row_is_in_the_table_and_declared_in_the_header ... ok
+test only_the_low_32_bits_of_type_cx_cy_and_fuload_count ... ok
+test the_dll_has_no_cursor_32649_and_loadimagew_returns_null_without_touching_the_last_error ... ok
+test the_thunk_calls_the_runtime ... ok
+test the_inspection_functions_agree_with_the_formulas ... ok
+test the_same_arguments_give_the_same_handle_on_every_call_and_nothing_else_matters ... ok
+test the_order_of_the_checks_is_type_fuload_size_name_hinst ... ok
+test the_dll_cursors_32762_to_32767_are_answered_with_the_formula_handles ... ok
+test a_dll_cursor_the_guest_does_not_load_or_the_dll_does_not_have_stops ... ok
+test another_type_stops ... ok
+test a_string_name_stops ... ok
+test a_loadimagew_handle_is_not_a_gdi_object_or_a_dc ... ok
+test a_hinst_that_is_neither_null_nor_the_dll_stops ... ok
+test only_the_32649_form_of_the_guest_returns_null_every_other_shape_with_it_still_stops ... ok
+test the_thirteen_standard_cursors_are_answered_with_the_formula_handles ... ok
+test another_size_stops ... ok
+test another_fuload_stops ... ok
+test the_guests_21_calls_are_all_answered_and_the_module_idc_hand_is_null ... ok
+test a_null_hinst_with_an_identifier_the_guest_does_not_load_stops ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+
+     Running tests/locale.rs (target/debug/deps/locale-0a0c988de1e0f96d)
+
+running 36 tests
+test all_thirteen_locale_imports_are_in_the_table ... ok
+test compare_string_nonascii_units_by_the_sorting_weight_table ... ok
+test get_cp_info ... ok
+test get_locale_info_enus_0048 ... ok
+test compare_string_symbol_at_any_position_two_symbols_and_the_space ... ok
+test compare_string_one_a_prefix_of_the_other_is_the_shorter_first ... ok
+test get_locale_info ... ok
+test gstw_c1_all_at_once_the_attach_input_and_the_page_rules ... ok
+test compare_string ... ok
+test compare_string_hyphen_and_apostrophe_follow_the_word_sort ... ok
+test lc_map_string ... ok
+test range_d_data_files_agree_with_each_other_and_with_the_attach_input ... ok
+test compare_string_symbol_before_alnum ... ok
+test gstw_c1_every_unit_of_d_one_by_one ... ok
+test thunks_call_runtime ... ok
+test lcmap_u00b5_is_unchanged_and_the_ascii_rows_still_work_with_locale_zero ... ok
+test get_locale_info_enus_0042 ... ok
+test thread_locale_and_validity ... ok
+test mbtwc_cp1252_all_256_bytes_at_once_and_the_size_query ... ok
+test mbtwc_cp_acp_and_thread_acp_are_1252 ... ok
+test multi_byte_to_wide_char ... ok
+test wctmb_1252_size_buffer_nul_and_error_rules ... ok
+test wctmb_1252_the_attach_chain_gstw_lcmap_lower_wctmb_lcmap_upper_wctmb ... ok
+test gstw_stops_by_name_outside_the_decision_and_writes_nothing ... ok
+test wide_char_to_multi_byte ... ok
+test compare_string_symbol_outside_rule_aborts ... ok
+test mbtwc_cp1252_every_byte_one_by_one ... ok
+test thread_locale_is_per_thread_value ... ok
+test lcmap_range_d_every_unit_for_locale_zero_and_the_defaults ... ok
+test decision_0087_stops_are_real_aborts ... ok
+test wctmb_1252_every_unit_of_d_flags_0_and_no_best_fit_default_and_used_chars ... ok
+test lcmap_stops_locale_zero_for_other_flags_and_everything_else_stops_as_before ... ok
+test mbtwc_cp437_high_byte_still_stops ... ok
+test wctmb_stops_outside_d_other_flags_and_other_code_pages ... ok
+test mbtwc_cp1252_composite_and_glyph_flags_still_stop_on_a_high_byte ... ok
+test undefined_cases_abort ... ok
+
+test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+
+     Running tests/lock_rmw.rs (target/debug/deps/lock_rmw-e796f88faa8fc8ae)
+
+running 1 test
+test lock_forms_match_host ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+     Running tests/lock_rmw_threads.rs (target/debug/deps/lock_rmw_threads-342f63bf51142cf7)
+
+running 1 test
+test rmw_helpers_are_atomic_across_threads ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+     Running tests/mmx.rs (target/debug/deps/mmx-754061942d662212)
+
+running 14 tests
+test case_sets_cover_the_edges ... ok
+test other_mmx_forms_stay_unsupported ... ok
+test emms_matches_host ... ok
+test psllw_matches_host ... ok
+test pshufw_matches_host ... ok
+test movd_matches_host ... ok
+test punpcklbw_matches_host ... ok
+test paddw_matches_host ... ok
+test packuswb_matches_host ... ok
+test pmulhuw_matches_host ... ok
+test pmulhw_matches_host ... ok
+test psubsw_matches_host ... ok
+test pxor_matches_host ... ok
+test movq_matches_host ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/modules.rs (target/debug/deps/modules-dd818c4262c785b0)
+
+running 17 tests
+test tables_absent_without_get_proc_address ... ok
+test thunks_call_runtime_and_tables_are_emitted ... ok
+test dispatch_table_stays_sorted_and_pseudo_vas_are_unique ... ok
+test get_module_handle_a_name_rules ... ok
+test get_proc_address_found_and_not_found ... ok
+test every_pe_import_dll_is_a_module ... ok
+test get_proc_address_result_is_called_through_dispatch ... ok
+test get_proc_address_without_a_table_finds_nothing ... ok
+test module_handles_follow_the_formula_and_are_distinct ... ok
+test get_module_handle_name_rules ... ok
+test get_module_handle_a_answers_like_w_on_every_ascii_row ... ok
+test a_name_the_process_image_does_not_export_is_not_found ... ok
+test get_module_handle_a_has_a_response_row_after_the_existing_ones_and_is_found_by_get_proc_address ... ok
+test generated_unit_with_tables_compiles_and_links_with_runtime ... ok
+test get_module_handle_a_stops_where_the_page_is_silent_and_w_does_not_stop_on_a_high_unit ... ok
+test undefined_cases_abort ... ok
+test real_dll_emits_response_table ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.44s
+
+     Running tests/monitor.rs (target/debug/deps/monitor-7f274c90426ae5ec)
+
+running 25 tests
+test header_is_plain_c ... ok
+test source_uses_no_host_display_monitor_clock_thread_process_or_file ... ok
+test the_constants_are_the_decided_ones ... ok
+test the_handle_region_is_below_2_gib_and_apart_from_every_other_table ... ok
+test the_rows_are_in_the_table_and_declared_in_the_header ... ok
+test the_thunks_call_the_runtime ... ok
+test the_dll_name_and_the_api_name_are_part_of_the_match ... ok
+test the_thunks_jump_to_the_slots_which_are_user32_enumdisplaymonitors_and_getmonitorinfow ... ok
+test the_two_enumeration_sites_pass_null_null_the_callback_and_the_list_in_the_registers_the_page_names ... ok
+test the_callback_reads_only_rcx_and_r9_and_returns_true_in_al ... ok
+test the_six_getmonitorinfow_sites_pass_cbsize_0x28_and_none_passes_a_monitorinfoex ... ok
+test a_null_lpmi_stops_with_a_named_reason ... ok
+test a_callback_that_overwrites_its_rectangle_does_not_damage_the_callers_stack ... ok
+test the_virtual_monitor_with_cbsize_0x28_gets_the_rectangles_and_the_primary_flag ... ok
+test the_rectangle_has_a_positive_size_and_the_work_area_is_inside_the_monitor ... ok
+test a_callback_address_that_is_not_a_function_entry_stops_inside_the_runtime ... ok
+test only_the_dword_cbsize_counts_and_the_upper_half_of_the_eight_bytes_is_not_read ... ok
+test the_callback_is_called_once_with_the_monitor_a_null_dc_the_rectangle_and_the_data ... ok
+test two_enumerations_give_the_same_answers_and_the_rectangle_is_written_again_for_each ... ok
+test it_works_for_every_residue_of_the_apis_stack_pointer_and_restores_it ... ok
+test a_non_null_dc_a_clip_rectangle_or_a_null_callback_stops_with_a_named_reason ... ok
+test the_data_pointer_and_every_bit_of_dwdata_reach_the_callback ... ok
+test a_false_from_the_callback_stops_the_enumeration_and_the_result_is_the_callbacks_bool ... ok
+test another_monitor_handle_stops_with_a_named_reason_and_writes_nothing ... ok
+test a_cbsize_other_than_0x28_stops_with_a_named_reason_and_writes_nothing ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/msctf.rs (target/debug/deps/msctf-de360fef575baa96)
+
+running 12 tests
+test the_response_table_has_the_msctf_row_under_msctf_dll_only ... ok
+test the_guest_asks_for_msctf_dll_and_set_input_scope_in_the_forms_the_decision_describes ... ok
+test the_four_lacking_names_still_fail_with_126 ... ok
+test the_other_handles_are_unchanged_by_the_new_module ... ok
+test msctf_is_the_26th_virtual_module ... ok
+test calling_set_input_scope_stops_by_name_through_fle_dispatch ... ok
+test load_library_w_gives_the_msctf_handle_and_leaves_the_last_error_alone ... ok
+test get_proc_address_finds_set_input_scope_in_msctf_only ... ok
+test avrt_and_powrprof_are_modules_with_no_row_in_the_real_response_table ... ok
+test free_library_follows_the_reference_count_of_the_new_module ... ok
+test a_handle_past_the_table_or_misaligned_is_not_a_module ... ok
+test names_near_msctf_are_not_answered ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+     Running tests/msvc_switch.rs (target/debug/deps/msvc_switch-12017ce39cd4efa2)
+
+running 25 tests
+test real_blend2d_f_48a2060_every_size_reaches_the_table_target_natively_and_lifted ... ok
+test real_blend2d_f_489f7d0_every_size_reaches_the_table_target_natively_and_lifted ... ok
+test real_blend2d_f_4709ea0_every_index_reaches_the_table_target_by_default ... ok
+test real_blend2d_f_48a2060_native_every_size_reaches_the_table_target ... ok
+test real_blend2d_site_is_resolved_by_default ... ok
+test real_dsp_ippv2_f_37cc7e0_every_size_reaches_the_table_target_natively_and_lifted ... ok
+test real_dsp_ippv2_f_37cd2c0_every_size_reaches_the_table_target_natively_and_lifted ... ok
+test real_freetype_the_stop_point_0x4b1674d_is_a_switch_in_the_generated_c ... ok
+test a_padded_site_is_a_switch_in_the_generated_c ... ok
+test padded_sites_that_decision_0093_rejected_are_resolved_by_the_scheduled_form_by_default ... ok
+test scheduled_sites_that_are_not_resolved_stay_a_tail_dispatch ... ok
+test synthetic_generator_output ... ok
+test swapped_sites_that_are_not_resolved_stay_a_tail_dispatch ... ok
+test unresolved_sites_stay_a_tail_dispatch ... ok
+test c1_every_index_matches_native_and_the_table ... ok
+test scheduled_an_index_above_n_past_the_guard_stops_in_fle_jumptab_miss ... ok
+test c2_every_index_matches_native_and_the_table ... ok
+test swapped_an_index_above_n_past_the_guard_stops_in_fle_jumptab_miss ... ok
+test sub_k_before_the_guard_every_index_matches_native_and_the_table ... ok
+test c1_with_cdqe_and_a_64_bit_guard_and_a_call ... ok
+test a_register_value_that_is_not_a_table_target_stops_by_name ... ok
+test a_lea_outside_the_entry_block_on_every_path_every_index_matches_native_and_the_table ... ok
+test swapped_every_index_matches_native_and_the_table ... ok
+test scheduled_every_index_matches_native_and_the_table ... ok
+test a_padding_nop_between_the_ja_and_the_idiom_every_index_matches_native_and_the_table ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
+     Running tests/mxcsr.rs (target/debug/deps/mxcsr-b80bed5dfee50322)
+
+running 4 tests
+test stmxcsr_rsp_body_text ... ok
+test ldmxcsr_reserved_bit_31_aborts ... ok
+test ldmxcsr_reserved_bit_16_aborts ... ok
+test stmxcsr_ldmxcsr_match_host_and_sdm ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/mxcsr_flags.rs (target/debug/deps/mxcsr_flags-ed1dfb8b9adcd68f)
+
+running 12 tests
+test prefetch_never_faults_and_changes_nothing ... ok
+test flags_match_sdm_expectations ... ok
+test comi_matches_host ... ok
+test haddpd_matches_host ... ok
+test convert_int_matches_host ... ok
+test convert_fp_matches_host ... ok
+test cmp_matches_host ... ok
+test round_matches_host ... ok
+test unmasked_raised_flag_is_a_named_abort ... ok
+test arith_matches_host ... ok
+test random_pure_matches_host_ref ... ok
+test sse3_ia2_matches_host ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.47s
+
+     Running tests/noreturn_audit.rs (target/debug/deps/noreturn_audit-a681920ffe4bbf99)
+
+running 6 tests
+test mutation_a_declaring_header_entering_the_generated_include_closure_invalidates_the_not_gen_visible_rows ... FAILED
+test mutation_a_new_returning_wrapper_of_a_noreturn_name_is_caught ... FAILED
+test mutation_declaring_a_function_that_a_harness_answers_noreturn_in_a_generated_header_is_caught ... FAILED
+test a_lifted_style_call_block_loses_the_code_after_the_call_exactly_for_the_names_the_tool_calls_gen_visible ... ok
+test the_detector_finds_each_kind_of_return_path_and_not_a_forwarder ... ok
+test the_real_tree_has_no_returning_implementation_of_a_noreturn_name_outside_the_allow_list ... ok
+
+failures:
+
+---- mutation_a_declaring_header_entering_the_generated_include_closure_invalidates_the_not_gen_visible_rows stdout ----
+
+thread 'mutation_a_declaring_header_entering_the_generated_include_closure_invalidates_the_not_gen_visible_rows' (2120498) panicked at crates/fe-lift/tests/noreturn_audit.rs:42:38:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- mutation_a_new_returning_wrapper_of_a_noreturn_name_is_caught stdout ----
+
+thread 'mutation_a_new_returning_wrapper_of_a_noreturn_name_is_caught' (2120499) panicked at crates/fe-lift/tests/noreturn_audit.rs:42:38:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+---- mutation_declaring_a_function_that_a_harness_answers_noreturn_in_a_generated_header_is_caught stdout ----
+
+thread 'mutation_declaring_a_function_that_a_harness_answers_noreturn_in_a_generated_header_is_caught' (2120500) panicked at crates/fe-lift/tests/noreturn_audit.rs:42:38:
+called `Result::unwrap()` on an `Err` value: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    mutation_a_declaring_header_entering_the_generated_include_closure_invalidates_the_not_gen_visible_rows
+    mutation_a_new_returning_wrapper_of_a_noreturn_name_is_caught
+    mutation_declaring_a_function_that_a_harness_answers_noreturn_in_a_generated_header_is_caught
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.16s
+
+error: test failed, to rerun pass `-p fe-lift --test noreturn_audit`

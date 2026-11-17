@@ -1,0 +1,3 @@
+[{"name":"alpha7-look","what":"decision 0258 (alpha7): the main window geometry and what it looks like at a 1920x1080 guest; the windows of the table","ops":[
+ {"op":"closeWizard"},{"op":"wait","ms":3000},{"op":"winlog","name":"main"},{"op":"shot","name":"main-1920x1080"},{"op":"listWindows"},
+ {"op":"expectRunning"}]}]

@@ -1,0 +1,83 @@
+[
+ {
+  "name": "r635-probe-f9",
+  "what": "R6-35 probe (not measured): the reference project opened as a zip (the same start as scn-s3a-song.json), the desktop picture before F9, after one F9, and after a second F9 (decision 0247 says F9 hides the Mixer; the pictures show the Mixer behind the Playlist before F9, in front after one F9, hidden after two). Then two audio snapshots and an audio dump without playback, to read the fields of an audio snapshot. No mouse move.",
+  "rep": 1,
+  "seconds": 54,
+  "firstIdleMs": 5338.169921875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 54.850000001490116,
+   "manifest_loaded": 70.4100000038743,
+   "download_start": 104.95499999821186,
+   "download_done": 1415.969999998808,
+   "compile_done": 1417.320000000298,
+   "pack_source_dll": 1494.25,
+   "pack_source_seed": 1494.33984375,
+   "glue_loaded": 1506.0400390625,
+   "worker_ready": 1506.929999999702,
+   "engine_start": 1506.984999999404,
+   "wasm_instantiated": 1539.119873046875,
+   "files_ready": 1553.64501953125,
+   "main_start": 1555.18994140625,
+   "idle": 5338.169921875,
+   "host_files_released": 5338.550048828125,
+   "first_pixel": 5366.050048828125,
+   "filedlg_request": 18390.159912109375,
+   "filedlg_answer": 22582.47998046875
+  },
+  "loadStart": 0.55,
+  "loadEnd": 1.35,
+  "ioStart": 1.74,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

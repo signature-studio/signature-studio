@@ -1,0 +1,117 @@
+[
+ {
+  "name": "p3-hidden-move-300",
+  "what": "R4-5c condition 3 (made from scn-p3-mixmove-300.json by inserting F9 after the first audioSnap w0, then a 2 s wait and a shot): the Mixer window is hidden (F9, as scn-o19.json hidden) and the mouse is moved as in condition 2; the rest is the same.",
+  "rep": 1,
+  "seconds": 373,
+  "firstIdleMs": 7552.170166015625,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "profs": [
+   {
+    "name": "p3-play",
+    "wallS": 321.27,
+    "cpuS": {
+     "worker": 571.61,
+     "main": 0,
+     "compositor": 16.48,
+     "gpu": 0,
+     "other": 734.66,
+     "workers": [
+      210.56,
+      132.96,
+      48.3,
+      43.32,
+      35.42,
+      33.91,
+      33.65,
+      33.49
+     ],
+     "top": {
+      "DedicatedWorker": 571.61,
+      "chrome": 54.84,
+      "Thread<06>": 41.65,
+      "Thread<11>": 41.38,
+      "Thread<03>": 40.95,
+      "Thread<14>": 40.95,
+      "Thread<00>": 40.91,
+      "Thread<15>": 40.8
+     }
+    },
+    "files": []
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 53.200000047683716,
+   "manifest_loaded": 72.51499998569489,
+   "download_start": 100.18499994277954,
+   "download_done": 1332.7000000476837,
+   "compile_done": 1334.3099999427795,
+   "pack_source_dll": 1411.16015625,
+   "pack_source_seed": 1411.219970703125,
+   "glue_loaded": 1423.235107421875,
+   "worker_ready": 1424.1749999523163,
+   "engine_start": 1424.2350000143051,
+   "wasm_instantiated": 1455.650146484375,
+   "files_ready": 1468.324951171875,
+   "main_start": 1469.610107421875,
+   "idle": 7552.170166015625,
+   "host_files_released": 7552.545166015625,
+   "first_pixel": 7579.64501953125,
+   "filedlg_request": 19288.840087890625,
+   "filedlg_answer": 23154.91015625
+  },
+  "loadStart": 2.94,
+  "loadEnd": 4.61,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

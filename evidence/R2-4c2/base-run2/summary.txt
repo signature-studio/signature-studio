@@ -1,0 +1,6 @@
+o20-start.png 229419 B sha256 57c6b729e0b739fc
+o20-3px.png 229832 B sha256 2af3f7825826e582
+o20-80px.png 229838 B sha256 eee46dbc98f2d661
+o20-20pxup.png 229838 B sha256 eee46dbc98f2d661
+state engine-idle stopped False opErrors [] error None expects [] seconds 18 firstIdleMs 4205.5
+describe o20-end: lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class "TFruityLoopsMainForm" title "FL Studio 2026"

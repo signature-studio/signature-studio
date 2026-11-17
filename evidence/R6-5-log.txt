@@ -1,0 +1,26 @@
+# gh run view 43784820980 --log の抜粋(R6-5 の記録が引用した行だけ。段の名前の列と色の記号は除いた。時刻と文言はログのまま)。
+# 照合(R6-5.md の引用 ↔ この抜粋の行。不一致は 0。行番号は、この注の後の抜粋の 1 行目からの数え):
+# - §2 「現在 100% の版: 2cb938be-…(作成 UTC 2026-11-07T21:40:44.504223Z)」 ↔ 1 行目。一致
+# - §3 「読んだ binding … 変数 2、R2 2」(4 項目。値は伏せた) ↔ 2 行目。一致
+# - §3 「配信設定を作る … 判定 True」 ↔ 3 行目。一致
+# - §3 「Uploaded 2 of 2 assets」 ↔ 5 行目。一致
+# - §3 「Uploaded fl-studio-web (2.96 sec)」 ↔ 7 行目。一致
+# - §2 「新しい版 dcb18ff6-… を作った(UTC 2026-11-16T01:13:02Z)。まだ 100% ではない」 ↔ 9 行目。一致
+# - §2 「切り替え: 直前の版 2cb938be-… → 新しい版 dcb18ff6-…(UTC 2026-11-16T01:13:02Z)」 ↔ 10 行目。一致
+# - §2 「versions deploy の終了: 0(UTC 2026-11-16T01:13:06Z)」 ↔ 11 行目。一致
+# - §2 「確かめ: 最新の deployment(UTC 2026-11-16T01:13:05.046265Z)は版 dcb18ff6-… が 100%」 ↔ 12 行目。一致
+# - §2 「結果: 新しい版 dcb18ff6-… が 100%。確かめた」 ↔ 13 行目。一致
+# - この抜粋に無い: run の ID・headSha・createdAt(記録は gh run list・gh run view の出力による)。
+2026-11-16T01:12:57.7251191Z 現在 100% の版: 2cb938be-e32d-44e4-8268-1824660956fe(作成 UTC 2026-11-07T21:40:44.504223Z)
+2026-11-16T01:12:57.9245156Z 読んだ binding(値は伏せた): 変数 ACCESS_TEAM_DOMAIN, ACCESS_AUD、R2 ASSETS_BUCKET, PERF_BUCKET
+2026-11-16T01:12:57.9760094Z 配信設定の検査: name fl-studio-web、workers_dev と preview_urls は false、route は無し、R2 ['ASSETS_BUCKET', 'PERF_BUCKET']、vars ['ACCESS_AUD', 'ACCESS_TEAM_DOMAIN']、判定 True
+2026-11-16T01:13:02.8100202Z Uploaded 1 of 2 assets
+2026-11-16T01:13:02.8100815Z Uploaded 2 of 2 assets
+2026-11-16T01:13:02.8101254Z Total Upload: 58.26 KiB / gzip: 17.82 KiB
+2026-11-16T01:13:02.8101689Z Uploaded fl-studio-web (2.96 sec)
+2026-11-16T01:13:02.8102164Z Worker Version ID: dcb18ff6-77fc-4cf5-8270-fce1b5187fa2
+2026-11-16T01:13:02.8295980Z 新しい版 dcb18ff6-77fc-4cf5-8270-fce1b5187fa2 を作った(UTC 2026-11-16T01:13:02Z)。まだ 100% ではない
+2026-11-16T01:13:02.8416028Z 切り替え: 直前の版 2cb938be-e32d-44e4-8268-1824660956fe → 新しい版 dcb18ff6-77fc-4cf5-8270-fce1b5187fa2(UTC 2026-11-16T01:13:02Z)
+2026-11-16T01:13:06.6518887Z versions deploy の終了: 0(UTC 2026-11-16T01:13:06Z)
+2026-11-16T01:13:06.8942937Z 確かめ: 最新の deployment(UTC 2026-11-16T01:13:05.046265Z)は版 dcb18ff6-77fc-4cf5-8270-fce1b5187fa2 が 100%
+2026-11-16T01:13:06.9025608Z 結果: 新しい版 dcb18ff6-77fc-4cf5-8270-fce1b5187fa2 が 100%。確かめた

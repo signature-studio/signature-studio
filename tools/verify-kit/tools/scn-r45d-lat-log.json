@@ -1,0 +1,378 @@
+[
+ {
+  "name": "lat-log",
+  "what": "R4-5d: the P2 input-latency scenario (scn-lat-ff.json) with the engine log saved after the playback menu clicks (saveLog all). Used with the R4-5d diagnostic bundle (branch r4-5d-rt) and with the product bundles, the same ops otherwise.",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "menuCycles",
+    "n": 35
+   },
+   {
+    "op": "latDump",
+    "name": "a-idle-menu"
+   },
+   {
+    "op": "drag",
+    "x": 715,
+    "y": 564,
+    "x2": 1015,
+    "y2": 564,
+    "steps": 40,
+    "stepMs": 60
+   },
+   {
+    "op": "wait",
+    "ms": 800
+   },
+   {
+    "op": "drag",
+    "x": 1015,
+    "y": 564,
+    "x2": 715,
+    "y2": 564,
+    "steps": 40,
+    "stepMs": 60
+   },
+   {
+    "op": "wait",
+    "ms": 800
+   },
+   {
+    "op": "latDump",
+    "name": "c-mixer-drag"
+   },
+   {
+    "op": "dragMeasure",
+    "name": "c-mixer-fps",
+    "x": 715,
+    "y": 564,
+    "x2": 1015,
+    "y2": 564,
+    "n": 40,
+    "secs": 6
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "describe",
+    "name": "before-play"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "latDump",
+    "name": "d-space"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioMark",
+    "name": "bp"
+   },
+   {
+    "op": "menuCycles",
+    "n": 35
+   },
+   {
+    "op": "latDump",
+    "name": "b-play-menu"
+   },
+   {
+    "op": "saveLog",
+    "name": "engine-all",
+    "all": true
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-bp"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

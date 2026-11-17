@@ -1,0 +1,39 @@
+tree	run	state	bundle	cond	set	ok	state_json	loadStart	firstWrite_s	windows	underrun_0_300	wr_min	win_below_095	presents_per_s	lagCuts	engineGap	workerCpu_s	workerCpu_each_s
+r4-5-rt3	p3-rtc1r1-chrome-2	pre	rt	1	A	True	engine-idle	4.22	75.9	22	0	0.947 (150)	2	30.37	0	0	523.13	182.9 127.6 45.2 39.9 33.4 31.6 31.4 31.1
+r4-5-rt3	p3-rtc1r2-chrome-1	pre	rt	1	A	True	engine-idle	3.19	73.8	22	0	0.920 (140)	2	31.00	0	0	531.74	185.6 129.4 45.8 41.0 33.7 32.2 32.1 32.0
+r4-5-rt3	p3-rtc1r3-chrome-1	pre	rt	1	A	True	engine-idle	3.22	75.8	22	0	0.882 (290)	1	32.40	0	0	528.25	188.0 125.1 45.3 40.3 33.7 32.4 31.8 31.6
+r4-5-rt3	p3-rtc2r1-chrome-1	pre	rt	2	A	True	engine-idle	1.99	96.7	20	0	0.966 (270)	0	32.59	0	0	576.59	210.4 133.9 49.1 44.1 36.2 34.4 34.3 34.2
+r4-5-rt3	p3-rtc2r2-chrome-1	pre	rt	2	A	True	engine-idle	2.7	98.0	20	0	0.985 (140)	0	33.25	0	0	572.87	210.7 132.5 48.2 43.3 36.2 34.3 34.1 33.6
+r4-5-rt3	p3-rtc2r3-chrome-1	pre	rt	2	A	True	engine-idle	2.66	97.0	20	0	0.966 (260)	0	33.23	0	0	574.45	210.7 132.7 48.4 43.9 36.3 34.6 34.1 33.9
+r4-5-rt3	p3-rtc3r1-chrome-1	pre	rt	3	A	True	engine-idle	0.82	76.9	22	0	0.966 (140)	0	32.92	0	0	516.35	187.5 119.6 44.2 39.9 32.9 30.9 30.7 30.6
+r4-5-rt3	p3-rtc3r2-chrome-1	pre	rt	3	A	True	engine-idle	1.63	77.5	22	0	0.975 (130)	0	32.68	0	0	519.41	186.1 121.3 45.0 39.7 33.4 31.6 31.6 30.8
+r4-5-rt3	p3-rtc3r3-chrome-1	pre	rt	3	A	True	engine-idle	1.54	36.8	26	0	0.446 (140)	15	25.53	0	0	566.49	194.5 137.9 50.9 43.9 36.9 34.4 34.1 34.0
+r4-5-rt3	p3-rtc4r1-chrome-1	pre	rt	4	A	True	engine-idle	1.73	98.3	20	0	0.985 (140)	0	33.20	0	0	570.69	210.5 132.1 48 43.1 35.6 34.1 33.9 33.3
+r4-5-rt3	p3-rtc4r2-chrome-1	pre	rt	4	A	True	engine-idle	2.28	97.8	20	0	0.994 (100)	0	33.18	0	0	574.82	209.7 132.9 48.8 43.5 36.4 34.7 34.6 34.1
+r4-5-rt3	p3-rtc4r3-chrome-1	pre	rt	4	A	True	engine-idle	2.94	97.1	20	0	0.957 (160)	0	33.19	0	0	571.61	210.6 133.0 48.3 43.3 35.4 33.9 33.6 33.5
+r4-5-rt3	p3-mixmove-rtc2post1-chrome-1	post	rt	2	B	True	engine-idle	1.15	96.1	20	0	0.985 (130)	0	43.69	0	0	477.63	197.5 103.7 37.9 33.2 27.4 26.1 26.0 25.8
+r4-5-rt3	p3-mixmove-rtc2post2-chrome-1	post	rt	2	B	True	engine-idle	1.96	95.2	20	0	0.994 (110)	0	44.52	0	0	480.06	200.8 102.9 37.5 33.4 27.5 26.1 26.1 25.6
+r4-5-rt3	p3-mixmove-rtc2post3-chrome-1	post	rt	2	B	True	engine-idle	5.91	95.7	20	0	0.985 (130)	0	43.88	0	0	477.73	198.0 103.1 37.5 34.0 27.6 26.0 26.0 25.5
+r4-5-co	p3-coc1r1-chrome-2	pre	co	1	A	True	engine-idle	3.69	67.4	23	2	0.762 (190)	8	15.80	4254	170	252.99	253.0
+r4-5-co	p3-coc1r2-chrome-1	pre	co	1	A	True	engine-idle	5.82	60.9	23	119	0.697 (100)	8	14.62	4176	13598	252.53	252.5
+r4-5-co	p3-coc1r3-chrome-1	pre	co	1	A	True	engine-idle	3.12	67.7	23	0	0.771 (230)	6	15.95	4342	0	253.66	253.7
+r4-5-co	p3-coc2r1-chrome-1	pre	co	2	A	True	engine-idle	4.7	73.0	22	1837	0.743 (250)	15	21.93	2339	219312	272.4	272.4
+r4-5-co	p3-coc2r2-chrome-1	pre	co	2	A	True	engine-idle	4.52	80.5	21	1745	0.678 (240)	12	22.24	2478	210546	273.86	273.9
+r4-5-co	p3-coc2r3-chrome-1	pre	co	2	A	True	engine-idle	3.82	77.1	22	1832	0.789 (240)	15	22.33	2452	220220	271.48	271.5
+r4-5-co	p3-coc2r1-chrome-2	pre	co	2	A-extra	True	engine-idle	2.28	83.2	21	1113	0.743 (100)	12	22.54	3214	132832	272.39	272.4
+r4-5-co	p3-coc2r2-chrome-2	pre	co	2	A-extra	True	engine-idle	1.64	87.7	21	862	0.734 (230)	7	23.50	2728	102596	269.55	269.6
+r4-5-co	p3-coc3r1-chrome-1	pre	co	3	A	True	engine-idle	3.79	69.8	23	2	0.845 (90)	6	16.18	4241	170	252.87	252.9
+r4-5-co	p3-coc3r2-chrome-1	pre	co	3	A	True	engine-idle	3.75	63.2	23	2	0.780 (190)	11	15.39	4136	170	253.79	253.8
+r4-5-co	p3-coc3r3-chrome-1	pre	co	3	A	True	engine-idle	3.84	-50.8	30	262	0.399 (180)	29	9.71	4290	28462	263.59	263.6
+r4-5-co	p3-coc4r1-chrome-1	pre	co	4	A	True	engine-idle	3.63	78.8	22	1497	0.697 (190)	14	22.20	2497	178372	272.39	272.4
+r4-5-co	p3-coc4r2-chrome-1	pre	co	4	A	True	engine-idle	3.12	81.2	21	1643	0.762 (90)	11	22.14	2597	196028	275	275
+r4-5-co	p3-coc4r3-chrome-1	pre	co	4	A	True	engine-idle	4.24	75.5	22	1501	0.743 (90)	16	22.27	2333	177250	272.39	272.4
+r4-5-co	p3-mixmove-coc2r3-chrome-1	post	co	2	B-completion	True	engine-idle	2.73	96.2	20	0	0.920 (220)	1	29.72	2450	0	257.84	257.8
+r4-5-co	p3-mixmove-coc2post1-chrome-1	post	co	2	B	True	engine-idle	4.71	96.3	20	6	0.957 (220)	0	29.66	3328	682	257.95	257.9
+r4-5-co	p3-mixmove-coc2post2-chrome-1	post	co	2	B	True	engine-idle	4.41	97.4	20	6	0.985 (130)	0	29.96	3088	510	258.17	258.2
+r4-5-co	p3-mixmove-coc2post3-chrome-1	post	co	2	B	True	engine-idle	5.64	95.7	20	4	0.957 (220)	0	29.35	3273	340	258.86	258.9
+r4-5-rt1	p3-rt1c2r1-chrome-1	pre	rt1	2	A	True	engine-idle	1.34	68.8	23	1458	0.659 (250)	16	22.13	2387	173810	276.3	276.3
+r4-5-rt1	p3-rt1c2r2-chrome-1	pre	rt1	2	A	True	engine-idle	2.6	75.9	22	1266	0.780 (90)	14	22.76	2803	150266	272.96	273.0
+r4-5-rt1	p3-mixmove-rt1c2r3-chrome-1	post	rt1	2	B-completion	True	engine-idle	0.39	96.1	20	12	0.938 (220)	2	27.27	3970	1192	264	264
+r4-5-rt1	p3-mixmove-rt1c2post1-chrome-1	post	rt1	2	B	True	engine-idle	1.63	94.3	20	19	0.882 (220)	2	27.01	4326	2260	263.72	263.7
+r4-5-rt1	p3-mixmove-rt1c2post2-chrome-1	post	rt1	2	B	True	engine-idle	2.99	92.4	20	52	0.864 (180)	4	27.16	3893	6226	263.35	263.4

@@ -1,0 +1,425 @@
+closure_instructions   303167
+functions              4580
+emitted_instructions   303167
+bad_nodes              0
+tail_calls             2470
+gotos                  32839
+c_lines                332478
+c_bytes                28462934
+handled
+  adc          7
+  add          14319
+  addps        310
+  addsd        68
+  addss        515
+  and          4279
+  andnpd       7
+  andnps       7
+  andpd        17
+  andps        14
+  bsr          13
+  bswap        14
+  bt           18
+  btr          1
+  bts          1
+  call         11004
+  call_imp:AdjustWindowRectEx 7
+  call_imp:BeginPaint 1
+  call_imp:BitBlt 1
+  call_imp:CallWindowProcW 4
+  call_imp:ClientToScreen 3
+  call_imp:CloseHandle 14
+  call_imp:CoCreateInstance 9
+  call_imp:CoInitialize 1
+  call_imp:CoInitializeEx 1
+  call_imp:CoTaskMemAlloc 7
+  call_imp:CoTaskMemFree 5
+  call_imp:CoUninitialize 1
+  call_imp:CombineRgn 2
+  call_imp:CreateBitmap 2
+  call_imp:CreateCompatibleBitmap 2
+  call_imp:CreateCompatibleDC 4
+  call_imp:CreateDIBSection 5
+  call_imp:CreateEventW 2
+  call_imp:CreateFileW 2
+  call_imp:CreateFontIndirectW 1
+  call_imp:CreateIconIndirect 1
+  call_imp:CreatePen 1
+  call_imp:CreateRectRgn 1
+  call_imp:CreateThread 1
+  call_imp:CreateWindowExW 5
+  call_imp:DeleteCriticalSection 3
+  call_imp:DeleteDC 14
+  call_imp:DeleteObject 10
+  call_imp:DestroyCursor 1
+  call_imp:DestroyIcon 6
+  call_imp:DestroyWindow 14
+  call_imp:DispatchMessageW 1
+  call_imp:DrawIcon 1
+  call_imp:DrawTextW 1
+  call_imp:DuplicateHandle 1
+  call_imp:EndPaint 1
+  call_imp:EnterCriticalSection 4
+  call_imp:EnumDisplayMonitors 2
+  call_imp:EnumDisplaySettingsW 2
+  call_imp:ExitProcess 1
+  call_imp:ExtTextOutW 1
+  call_imp:FormatMessageW 17
+  call_imp:FreeLibrary 128
+  call_imp:GetAsyncKeyState 4
+  call_imp:GetClientRect 6
+  call_imp:GetClipCursor 2
+  call_imp:GetCurrentProcess 2
+  call_imp:GetCurrentThread 2
+  call_imp:GetCurrentThreadId 6
+  call_imp:GetCursorInfo 1
+  call_imp:GetCursorPos 4
+  call_imp:GetDC 9
+  call_imp:GetDIBColorTable 1
+  call_imp:GetDesktopWindow 1
+  call_imp:GetDeviceCaps 5
+  call_imp:GetDoubleClickTime 1
+  call_imp:GetFocus 1
+  call_imp:GetForegroundWindow 2
+  call_imp:GetIconInfo 1
+  call_imp:GetKeyState 4
+  call_imp:GetKeyboardLayout 3
+  call_imp:GetKeyboardState 2
+  call_imp:GetLastError 39
+  call_imp:GetMenu 5
+  call_imp:GetMessageW 2
+  call_imp:GetModuleFileNameW 1
+  call_imp:GetModuleHandleExW 1
+  call_imp:GetModuleHandleW 13
+  call_imp:GetMonitorInfoW 3
+  call_imp:GetParent 1
+  call_imp:GetProcAddress 132
+  call_imp:GetPropW 1
+  call_imp:GetSystemInfo 1
+  call_imp:GetSystemMetrics 7
+  call_imp:GetTextMetricsW 1
+  call_imp:GetTickCount 3
+  call_imp:GetWindowLongPtrW 2
+  call_imp:GetWindowRect 3
+  call_imp:GetWindowTextW 2
+  call_imp:GetWindowThreadProcessId 1
+  call_imp:GlobalAlloc 1
+  call_imp:GlobalLock 3
+  call_imp:GlobalUnlock 3
+  call_imp:InitializeCriticalSection 2
+  call_imp:InitializeCriticalSectionAndSpinCount 1
+  call_imp:IntersectRect 1
+  call_imp:IsDBCSLeadByteEx 1
+  call_imp:IsDebuggerPresent 1
+  call_imp:IsIconic 1
+  call_imp:KillTimer 2
+  call_imp:LeaveCriticalSection 8
+  call_imp:LoadCursorW 2
+  call_imp:LoadLibraryA 116
+  call_imp:LoadLibraryExW 3
+  call_imp:LoadLibraryW 6
+  call_imp:LocalFree 13
+  call_imp:MapVirtualKeyW 1
+  call_imp:MultiByteToWideChar 2
+  call_imp:OutputDebugStringW 2
+  call_imp:PeekMessageW 1
+  call_imp:PostMessageW 1
+  call_imp:PostThreadMessageW 1
+  call_imp:PtInRect 1
+  call_imp:QueryPerformanceCounter 2
+  call_imp:QueryPerformanceFrequency 4
+  call_imp:RaiseException 1
+  call_imp:ReadFile 4
+  call_imp:RegCloseKey 2
+  call_imp:RegOpenKeyExW 1
+  call_imp:RegQueryValueExW 1
+  call_imp:RegisterClassW 1
+  call_imp:ReleaseCapture 1
+  call_imp:ReleaseDC 15
+  call_imp:RemovePropW 2
+  call_imp:ResetEvent 4
+  call_imp:SHGetFolderPathW 1
+  call_imp:ScreenToClient 3
+  call_imp:SelectObject 3
+  call_imp:SendMessageW 1
+  call_imp:SetCapture 1
+  call_imp:SetCursor 1
+  call_imp:SetCursorPos 2
+  call_imp:SetErrorMode 2
+  call_imp:SetEvent 2
+  call_imp:SetFilePointer 2
+  call_imp:SetFilePointerEx 1
+  call_imp:SetFocus 2
+  call_imp:SetForegroundWindow 1
+  call_imp:SetLayeredWindowAttributes 1
+  call_imp:SetPropW 1
+  call_imp:SetThreadPriority 1
+  call_imp:SetTimer 2
+  call_imp:SetWindowLongPtrW 4
+  call_imp:SetWindowPos 8
+  call_imp:SetWindowTextW 1
+  call_imp:SetWindowsHookExW 1
+  call_imp:ShowWindow 5
+  call_imp:SysFreeString 3
+  call_imp:SystemParametersInfoW 1
+  call_imp:TerminateProcess 1
+  call_imp:TlsAlloc 1
+  call_imp:TlsSetValue 1
+  call_imp:TranslateMessage 1
+  call_imp:UnhookWindowsHookEx 4
+  call_imp:UnregisterClassW 6
+  call_imp:VerSetConditionMask 2
+  call_imp:VerifyVersionInfoW 2
+  call_imp:VirtualProtect 1
+  call_imp:VirtualQuery 1
+  call_imp:WaitForMultipleObjects 1
+  call_imp:WaitForSingleObject 7
+  call_imp:WideCharToMultiByte 7
+  call_imp:WriteFile 2
+  call_imp:timeEndPeriod 2
+  call_ind:dispatch 2128
+  call_ind:reg_table 10
+  call_ind:rip_table 51
+  cdq          222
+  cdqe         589
+  cmov         2083
+  cmp          12156
+  cmpsd        6
+  cmpss        6
+  cmpxchg      7
+  comisd       51
+  comiss       197
+  cpuid        77
+  cqo          36
+  cvtdq2pd     4
+  cvtdq2ps     242
+  cvtpd2ps     6
+  cvtps2dq     13
+  cvtps2pd     4
+  cvtsd2ss     47
+  cvtsi2sd     113
+  cvtsi2ss     498
+  cvtss2sd     118
+  cvttps2dq    90
+  cvttsd2si    101
+  cvttss2si    232
+  cwde         16
+  dec          2
+  div          33
+  divpd        8
+  divps        8
+  divsd        59
+  divss        182
+  f2xm1        2
+  fabs         2
+  fadd         6
+  fcom         2
+  fild         2
+  fld          57
+  fld1         5
+  fldcw        6
+  fldl2e       1
+  fldln2       1
+  fldpi        2
+  fldz         2
+  fmul         8
+  fninit       1
+  fnstcw       3
+  fnstsw       10
+  frndint      4
+  fscale       5
+  fsqrt        5
+  fstp         60
+  fsub         4
+  fsubr        3
+  fwait        3
+  fxam         2
+  fxch         7
+  haddps       2
+  idiv         256
+  imul         7003
+  imul1        7
+  inc          9
+  jcc          24509
+  jmp          8641
+  jmp_imp:CloseHandle 2
+  jmp_imp:CoUninitialize 1
+  jmp_imp:DefWindowProcW 1
+  jmp_imp:DeleteObject 1
+  jmp_imp:EnterCriticalSection 2
+  jmp_imp:FreeLibrary 1
+  jmp_imp:GetCurrentThreadId 1
+  jmp_imp:GetProcAddress 2
+  jmp_imp:LeaveCriticalSection 3
+  jmp_imp:PostMessageW 1
+  jmp_imp:QueryPerformanceCounter 1
+  jmp_imp:SetActiveWindow 1
+  jmp_imp:SetForegroundWindow 1
+  jmp_imp:ShowWindow 3
+  jmp_imp:Sleep 2
+  jmp_imp:TlsGetValue 1
+  jmp_imp:WaitForSingleObject 1
+  jmp_imp:timeBeginPeriod 1
+  jmp_ind:mem_dispatch 36
+  jmp_ind:reg_dispatch 261
+  jmp_ind:rip_table 1606
+  lea          15579
+  maxps        13
+  maxsd        6
+  maxss        17
+  minps        13
+  minsd        7
+  minss        20
+  mmx_emms     6
+  mov          78063
+  mov_gs       1
+  movapd       200
+  movaps       4048
+  movd         977
+  movddup      9
+  movdqa       3516
+  movdqu       679
+  movhlps      1
+  movhpd       2
+  movhps       34
+  movlhps      53
+  movlps       74
+  movntdq      6
+  movntps      16
+  movq         1692
+  movs         10
+  movsd        328
+  movshdup     11
+  movsldup     8
+  movss        2084
+  movsx        732
+  movsxd       3038
+  movupd       4
+  movups       969
+  movzx        10888
+  mul          10
+  mulps        365
+  mulsd        114
+  mulss        752
+  neg          153
+  nop          3434
+  not          70
+  or           3595
+  orpd         7
+  orps         7
+  packssdw     40
+  packsswb     1
+  packuswb     498
+  paddb        24
+  paddd        381
+  paddq        2
+  paddw        688
+  pand         1153
+  pandn        56
+  pause        1
+  pcmpeqd      18
+  pcmpgtb      3
+  pcmpgtd      77
+  pcmpgtw      10
+  pinsrw       10
+  pmaddwd      10
+  pmaxsw       2
+  pminsw       2
+  pmulhw       9
+  pmullw       494
+  pmuludq      656
+  pop          12121
+  por          380
+  prefetchnta  1
+  prefetcht0   8
+  pshufd       851
+  pshufhw      8
+  pshuflw      12
+  pslld        250
+  psllq        2
+  psllw        131
+  psrad        24
+  psraw        410
+  psrld        638
+  psrldq       36
+  psrlq        302
+  psrlw        409
+  psubd        86
+  psubw        141
+  punpckhbw    367
+  punpckhdq    168
+  punpckhwd    366
+  punpcklbw    434
+  punpckldq    560
+  punpcklqdq   651
+  punpcklwd    601
+  push         8956
+  pxor         939
+  ret          2935
+  rol          112
+  ror          1
+  sar          1710
+  sbb          209
+  setcc        1053
+  shl          3981
+  shr          7076
+  shufps       353
+  sqrtsd       1
+  sqrtss       1
+  stos         9
+  sub          7125
+  subps        5
+  subsd        72
+  subss        154
+  test         12754
+  ucomisd      37
+  ucomiss      95
+  unpckhps     27
+  unpcklpd     4
+  unpcklps     121
+  vmovaps      4
+  vmovups      10
+  vzeroupper   1
+  xadd         11
+  xchg         8
+  xgetbv_stop  1
+  xor          6389
+  xorpd        11
+  xorps        28
+outlined_heads         20 (shared instructions before 232 after 0; 0 heads not promoted: on a tail-call cycle)
+dead_flags             writers 75071 fully_dead 43814 partly_dead 24191 substituted 43668 rounds 3
+register_jmp_sites     261
+jumptabs               0
+msvc_tables            0
+setjmp_landings        0
+msvc_rejected          0
+register_jmps
+  jmp_ind:reg_dispatch   261
+unsupported_total      857
+unsupported            26
+       532  Call: indirect through IAT slot (not lifted)
+       200  Jmp: indirect through IAT slot (not lifted)
+        16  Vaddss: mnemonic outside minimal set
+        12  Pavgb: mnemonic outside minimal set
+        12  Ud2: mnemonic outside minimal set
+        12  Vmulss: mnemonic outside minimal set
+        10  Vmovss: mnemonic outside minimal set
+         8  Vaddps: mnemonic outside minimal set
+         8  Vmulps: mnemonic outside minimal set
+         7  Vshufps: mnemonic outside minimal set
+         6  Tzcnt: mnemonic outside minimal set
+         5  Fpatan: mnemonic outside minimal set
+         5  Vmovq: mnemonic outside minimal set
+         3  Sahf: mnemonic outside minimal set
+         3  Vblendps: mnemonic outside minimal set
+         2  Fcos: mnemonic outside minimal set
+         2  Fprem1: mnemonic outside minimal set
+         2  Fprem: mnemonic outside minimal set
+         2  Fsin: mnemonic outside minimal set
+         2  Fyl2x: mnemonic outside minimal set
+         2  Fyl2xp1: mnemonic outside minimal set
+         2  Pushfq: mnemonic outside minimal set
+         1  Popfq: mnemonic outside minimal set
+         1  Vmovlps: mnemonic outside minimal set
+         1  Vmovsldup: mnemonic outside minimal set
+         1  Vperm2f128: mnemonic outside minimal set

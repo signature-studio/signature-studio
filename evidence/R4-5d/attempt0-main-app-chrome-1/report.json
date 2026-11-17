@@ -1,0 +1,98 @@
+[
+ {
+  "name": "lat-log",
+  "what": "R4-5d: the P2 input-latency scenario (scn-lat-ff.json) with the engine log saved after the playback menu clicks (saveLog all). Used with the R4-5d diagnostic bundle (branch r4-5d-rt) and with the product bundles, the same ops otherwise.",
+  "rep": 1,
+  "seconds": 3,
+  "firstIdleMs": null,
+  "stopped": true,
+  "state": "error",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "exitText": "The engine crashed: TypeError: Invalid URL (other)\nTypeError: Invalid URL\n    at Object.allocateUnusedWorker (blob:http://127.0.0.1:40345/ac7309c8-dde8-436c-a7ee-c818bebdda55:1151:25)\n    at Object.getNewWorker (blob:http://127.0.0.1:40345/ac7309c8-dde8-436c-a7ee-c818bebdda55:1167:31)\n    at spawnThread (blob:http://127.0.0.1:40345/ac7309c8-dde8-436c-a7ee-c818bebdda55:874:24)\n    at ___pthread_cre",
+  "beaconExit": {
+   "reason": "trap",
+   "code": -1,
+   "presents": 1,
+   "message": "(none)"
+  },
+  "tail": [
+   "functions executed (distinct): 0",
+   "function entries (calls): 0",
+   "call depth at stop: 0",
+   "a4: init_count=0 of ?, InitContext+0 is 0 (InitUnits not reached)",
+   "entry log (first 0 of 0 entries):",
+   "rax=0x1",
+   "fruity: DllMain returned (the report above is its report). Stage 1: calling CreateFruityInstance as FL64.exe does (docs/investigations/host-engine-boundary.md 5.1 #10)",
+   "fruity: CreateFruityInstance: export ordinal 3, va 0x1375990 (PE export table of the image at 0x400000)",
+   "fruity: host object at 0x13972e20 (0x38 bytes): vtable=0x13972e60 [slot0=0x7ffb00000010 slot1=0x7ffb00000020 slot2=0x7ffb00000030] version=1 flags=0 +0x10=0",
+   "fruity:   +0x18 name=0x13972e80 \"FL Studio\"  +0x20=0x13972e90 \"\"  +0x28=0x13972e90 \"\"  +0x30 base directory=0x13972ea0 \"C:\\Program Files\\Image-Line\\FL Studio 21\\\" (buffer 0x8000 bytes)",
+   "fruity: before the call: functions executed (distinct) 0, entries 0, shadow depth 0 (frames left over from DllMain's longjmps)",
+   "fruity: limits: 4000000000 lifted entries, 36000 s wall",
+   "fruity: calling CreateFruityInstance(rcx=0xc0, rdx=0xede95a, r8=host 0x13972e20, r9=&instance 0x103828e0) with rsp=0x12787fc0",
+   "[err] Tried to spawn a new thread, but the thread pool is exhausted.\nThis might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.\nIf you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.\nIf you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`."
+  ],
+  "inputs": [
+   "{\"op\":\"waitIdle\",\"ms\":600000,\"minIdles\":20}"
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "total",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 58.36499999463558,
+   "manifest_loaded": 73.875,
+   "download_start": 98.60499999672174,
+   "compile_done": 1066.4899999946356,
+   "download_done": 1239.3399999961257,
+   "pack_source_dll": 1316.8349609375,
+   "pack_source_seed": 1316.869873046875,
+   "glue_loaded": 1325.85986328125,
+   "worker_ready": 1326.7999999970198,
+   "engine_start": 1326.875,
+   "wasm_instantiated": 1353.52490234375,
+   "files_ready": 1364.074951171875,
+   "main_start": 1365.33984375,
+   "first_pixel": 1916.10986328125,
+   "worker_done": 1916.554931640625,
+   "exit": 1917.5999999940395,
+   "error": 1918.9099999964237
+  },
+  "loadStart": 0.74,
+  "loadEnd": 1.08,
+  "ioStart": 0,
+  "ioEnd": 0.14,
+  "windowsEnd": [],
+  "intendedExit": false,
+  "ok": false
+ }
+]

@@ -1,0 +1,30 @@
+--- a/lift/runtime/fle_layered.c
++++ b/lift/runtime/fle_layered.c
+@@ -30,6 +30,7 @@
+ #include "fle_runtime.h"
+ #include "fle_win.h"
+ #include "fle_thread.h"
++#include "fle_test_env.h"
+ 
+ /* weak, like the hooks of fle_win.c: a unit-test link without fle_gdi.c still links (a call then stops by name) */
+ int fle_gdi_memdc_surface(uint64_t hdc, fle_rsurf *out) __attribute__((weak));
+@@ -114,6 +115,19 @@
+     unsigned nk;
+     int per_pixel_src = 0;
+ 
++    {   /* decision 0319 TEST-ONLY diagnostic (FLE_DIAG_WIN=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there; O3 'the logo is 4x3', O1): every call, before it is checked, on stderr as "fl-diag: ULW ..." */
++        static int on = -1;
++        static unsigned n;
++
++        if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++        if (on && n < 4000u) {
++            n++;
++            fprintf(stderr, "fl-diag: ULW %s hwnd %#llx dst (%d,%d)%s size (%d,%d)%s hdcSrc %#llx src (%d,%d) flags %#x blend %#x dirty %s caller %#llx\n", indirect ? "Indirect" : "plain", (unsigned long long)hwnd,
++                    ppt_dst ? (int)(int32_t)fle_ld(ppt_dst, 4) : 0, ppt_dst ? (int)(int32_t)fle_ld(ppt_dst + 4, 4) : 0, ppt_dst ? "" : " (NULL)",
++                    psize ? (int)(int32_t)fle_ld(psize, 4) : 0, psize ? (int)(int32_t)fle_ld(psize + 4, 4) : 0, psize ? "" : " (NULL)", (unsigned long long)hdc_src,
++                    ppt_src ? (int)(int32_t)fle_ld(ppt_src, 4) : 0, ppt_src ? (int)(int32_t)fle_ld(ppt_src + 4, 4) : 0, (unsigned)flags, pblend ? (unsigned)fle_ld(pblend, 4) : 0u, prc_dirty ? "yes" : "no", (unsigned long long)fle_ld(R[4], 8));
++        }
++    }
+     if (!layered_window(api, hwnd, &v)) return;
+     if (flags & ~(FLE_ULW_COLORKEY | FLE_ULW_ALPHA | FLE_ULW_OPAQUE | FLE_ULW_EX_NORESIZE)) stopf(api, "dwFlags has a bit that the page does not list", flags);
+     if ((flags & FLE_ULW_EX_NORESIZE) && !indirect) stopf(api, "ULW_EX_NORESIZE for UpdateLayeredWindow: the page ties it to UpdateLayeredWindowIndirect", flags);

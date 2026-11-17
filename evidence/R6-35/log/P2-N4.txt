@@ -1,0 +1,36 @@
+## before P2-N4 (2026-11-17T05:26:53Z)
+3.28 2.86 2.15 1/1253 1442209
+               total        used        free      shared  buff/cache   available
+Mem:           25215        4638        3076        1013       18955       20577
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1358372 3150728 528592 18881796   29   45  3698  1008 6055    3  5  1 93  0  0  0
+ 2  0 1358372 3156496 528592 18881812    0    0     0     4 3149 3321  1  0 99  0  0  0
+ 0  0 1358372 3159776 528604 18881848    0    0     0  1292 5410 4779  1  1 97  0  0  0
+some avg10=0.00 avg60=0.07 avg300=0.82 total=156576004
+browser pid=7131 age=13:03:30 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 3.01 io 0 after 2 s; mem avail 20575 MB, swap used 1327 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-lat-n-chrome-4
+--- stdout (tail)
+05:26:59 backend chrome 
+05:26:59 scenario lat 
+05:31:24   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P2-N4 (2026-11-17T05:31:25Z)
+3.14 3.41 2.63 1/1270 1451340
+               total        used        free      shared  buff/cache   available
+Mem:           25539        4941        2921        1138       19256       20598
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1358360 2991208 541388 19177120   29   45  3685  1007 6091    3  5  1 93  0  0  0
+ 1  0 1358360 3003136 541388 19177192    0    0     0     0 9467 11745  1  2 97  0  0  0
+ 1  0 1358360 2993360 541388 19177232    0    0     0     0 4982 3976  9  1 90  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.29 total=156623305
+browser pid=7131 age=13:08:03 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-lat-n-chrome-4

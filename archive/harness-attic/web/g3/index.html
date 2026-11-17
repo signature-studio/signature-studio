@@ -1,0 +1,12 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>FL Studio engine (wasm): the G3 round trip - input to the engine and back to canvases (decision 0136, PROVISIONAL)</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #202020; overflow: hidden; }
+  #desktop { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; background: #101820; }
+  #desktop canvas { position: absolute; image-rendering: pixelated; }
+  #log { position: fixed; right: 0; bottom: 0; width: 520px; height: 120px; overflow: hidden; font: 10px monospace; color: #8c8; background: rgba(0,0,0,.6); white-space: pre; z-index: 100000; pointer-events: none; }
+</style>
+<div id="desktop"></div>
+<div id="log"></div>
+<script src="main.js"></script>

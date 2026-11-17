@@ -1,0 +1,47 @@
+diff -ru a/app/src/main.ts b/app/src/main.ts
+--- a/app/src/main.ts	2026-11-07 07:21:07.000000000 +0900
++++ b/app/src/main.ts	2026-11-07 07:22:19.341925740 +0900
+@@ -319,8 +319,8 @@
+   if (g.width !== app.screen.guest.width || g.height !== app.screen.guest.height) { app.screen.guest = { width: g.width, height: g.height }; applyDisplay(); }
+ }
+ 
+-/** decision 0212: the room settled at a size for which the guest's screen would be another: the engine is told (a display change: WM_DISPLAYCHANGE and WM_SETTINGCHANGE to the guest's windows; FLE_SCREEN_REMAXIMIZE=1 in the
+- *  environment makes the runtime resize the maximized windows by the change). */
++/** decision 0212: the room settled at a size for which the guest's screen would be another: the engine is told (a display change: WM_DISPLAYCHANGE and WM_SETTINGCHANGE to the guest's windows; the runtime then resizes the maximized windows
++ *  by the change: fle_win_input_remaximize, S-remaximize, an inference that decision 0322 lists as unverified). */
+ function followRoom(room: Room): void {
+   const g = chooseGuestScreen(room);
+   if (!app.screen.asked) return;
+@@ -340,7 +340,7 @@
+ function applyScreenParam(manifest: Manifest): void {
+   const room = measureRoom();
+   const g = chooseGuestScreen(room);
+-  const env = { ...screenEnv(g.width, g.height), FLE_SCREEN_REMAXIMIZE: '1' };
++  const env = screenEnv(g.width, g.height);
+   Object.assign(manifest.engine.env, env);
+   app.screen.asked = { width: g.width, height: g.height, env };
+   app.screen.guest = { width: g.width, height: g.height };
+diff -ru a/app/src/ui/screen-fit.ts b/app/src/ui/screen-fit.ts
+--- a/app/src/ui/screen-fit.ts	2026-11-07 07:21:07.000000000 +0900
++++ b/app/src/ui/screen-fit.ts	2026-11-07 07:22:19.341997014 +0900
+@@ -1,7 +1,7 @@
+ // The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1).
+ // The page measures the room it has for the screen (everything below the header and left of the monitor panel), tells the engine that size through the engine's environment (FLE_MONITOR_W / FLE_MONITOR_H:
+ // lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room in CSS pixels (1 guest pixel = 1 CSS pixel; the browser scales the canvas by the device pixel ratio).
+-// When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE, FLE_SCREEN_REMAXIMIZE=1). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
++// When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE and WM_SETTINGCHANGE; the runtime resizes the maximized windows: S-remaximize). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
+ 
+ export const SCREEN_DEFAULT = { width: 1920, height: 1080 } as const;
+ /** the limits of lift/runtime/fle_screen.h (FLE_SCREEN_MIN_* .. FLE_SCREEN_MAX_*): outside them the engine ignores the value */
+diff -ru a/lift/runtime/fle_win.c b/lift/runtime/fle_win.c
+--- a/lift/runtime/fle_win.c	2026-11-07 07:21:07.000000000 +0900
++++ b/lift/runtime/fle_win.c	2026-11-07 07:22:37.554230513 +0900
+@@ -6745,7 +6745,7 @@
+     return c;
+ }
+ 
+-/* Decision 0212 (PROVISIONAL, opt-in FLE_SCREEN_REMAXIMIZE=1; S-remaximize, an inference without a page: a window that was maximized is resized by Windows when the display changes, and this model does not do it by itself).
++/* Decision 0212 (PROVISIONAL; S-remaximize; decision 0243 removed the environment switch FLE_SCREEN_REMAXIMIZE, so this always runs; an inference without a page: a window that was maximized is resized by Windows when the display changes, and this model does not do it by itself).
+  * Every live top-level window in the zoomed state (ShowWindow SW_SHOWMAXIMIZED) keeps its position and is given the size it had PLUS the change of the screen (dw, dh): a window that covered the screen with an outset (the guest sets
+  * (-5, -6, W + 10, H + 12) on its main form) keeps the outset. Done as the guest's own SetWindowPos would do it (WM_WINDOWPOSCHANGING, the position change, WM_SIZE with SIZE_MAXIMIZED). Returns the number of windows moved. */
+ unsigned fle_win_input_remaximize(int32_t dw, int32_t dh)

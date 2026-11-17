@@ -1,0 +1,127 @@
+diff --git a/lift/runtime/fle_gil.c b/lift/runtime/fle_gil.c
+index 841e0b37..728d3076 100644
+--- a/lift/runtime/fle_gil.c
++++ b/lift/runtime/fle_gil.c
+@@ -20,6 +20,42 @@ static volatile uint64_t gil_key[32];   /* the queue key of each waiting Worker
+ int32_t fle_thread_gil_prio(void) __attribute__((weak));
+ _Thread_local uint32_t fle_worker_id;
+ void fle_worker_id_set(uint32_t id) { fle_worker_id = id; }
++
++/* R4-5d DIAGNOSTIC (experimental branch r4-5d-rt only; not for the product). Each entry is written by the Worker it names only. Times: emscripten_get_now (ms since the Worker's start) for durations, emscripten_date_now (epoch ms) for instants. */
++volatile uint64_t fle_dg_acq[32];
++static volatile uint64_t dg_slow[32], dg_spins[32], dg_sleeps[32], dg_slices[32];
++static volatile double dg_slow_ms[32], dg_sleep_ms[32], dg_slice_ms[32];
++static double dg_last_print;
++double fle_dg_now(void) { return emscripten_get_now(); }
++static double dg_abs_now(void) { return EM_ASM_DOUBLE({ return performance.timeOrigin + performance.now(); }); }
++static void dg_wait_record(uint32_t me, double t0, double sleep, uint64_t nsleep, uint64_t spins, uint32_t holder)
++{
++    double dur = emscripten_get_now() - t0;
++
++    dg_slow[me]++;
++    dg_slow_ms[me] += dur;
++    dg_sleep_ms[me] += sleep;
++    dg_sleeps[me] += nsleep;
++    dg_spins[me] += spins;
++    if ((me == 0 && dur >= 0.5) || dur >= 5.0)
++        fprintf(stderr, "R4-5d gilwait w=%u start=%.1f dur=%.3f sleep=%.3f sleeps=%u spins=%u holder=%u\n", (unsigned)me, dg_abs_now() - dur, dur, sleep, (unsigned)nsleep, (unsigned)spins, (unsigned)holder);
++}
++void fle_dg_slice(double t0)
++{
++    unsigned me = fle_worker_id & 31u;
++    double now = emscripten_get_now(), dur = now - t0;
++
++    dg_slices[me]++;
++    dg_slice_ms[me] += dur;
++    if (dur >= 5.0) fprintf(stderr, "R4-5d slice w=%u start=%.1f dur=%.3f\n", me, dg_abs_now() - dur, dur);
++    if (me == 0 && now - dg_last_print >= 5000.0) {
++        unsigned w;
++
++        dg_last_print = now;
++        for (w = 0; w < 8u; w++)
++            fprintf(stderr, "R4-5d stat t=%.1f w=%u acq=%llu slow=%llu slow_ms=%.2f spins=%llu sleeps=%llu sleep_ms=%.2f slices=%llu slice_ms=%.2f\n", dg_abs_now(), w, (unsigned long long)fle_dg_acq[w], (unsigned long long)dg_slow[w], dg_slow_ms[w], (unsigned long long)dg_spins[w], (unsigned long long)dg_sleeps[w], dg_sleep_ms[w], (unsigned long long)dg_slices[w], dg_slice_ms[w]);
++    }
++}
+ void fle_gil_assert_fail(const char *where)
+ {
+     char why[200];
+@@ -40,6 +76,9 @@ void fle_gil_acquire_slow(void)
+     uint32_t spin, me = fle_worker_id & 31u, ticket;
+     uint64_t key;
+     int32_t prio = fle_thread_gil_prio ? fle_thread_gil_prio() : 0;
++    double dg_t0 = emscripten_get_now(), dg_sleep = 0.0;
++    uint64_t dg_nsleep = 0, dg_spin_total = 0;
++    uint32_t dg_holder = fle_gil_owner;
+ 
+     if (fle_gil_owner == fle_worker_id + 1u) fle_stop("fle_gil", "this Worker takes the lock while it holds it: a point where the runtime hands over to the guest or parks is missing its release (decision 0234 mt3)");
+     if (prio < -31) prio = -31;
+@@ -66,16 +105,19 @@ void fle_gil_acquire_slow(void)
+                     if (w != me && __atomic_load_n(&gil_key[w], __ATOMIC_SEQ_CST) > key) { best = 0; break; }
+             }
+         }
++        dg_spin_total += spin;
+         __atomic_store_n(&gil_key[me], 0u, __ATOMIC_SEQ_CST);   /* asleep: holds nobody back */
+         __atomic_add_fetch(&fle_gil_nsleep, 1u, __ATOMIC_SEQ_CST);
+         if (__atomic_load_n(&fle_gil_word, __ATOMIC_SEQ_CST) == 0u) {   /* let go between the last look and the registration: nobody would wake us */
+             __atomic_sub_fetch(&fle_gil_nsleep, 1u, __ATOMIC_SEQ_CST);
+             continue;
+         }
+-        __builtin_wasm_memory_atomic_wait32((int32_t *)&gil_gen, (int32_t)g, 3000000000LL);   /* every Worker waits synchronously: a Worker that holds the lock never waits for another Worker's event loop (I1, harness/gil/check_i1.py), so the holder lets go in microseconds. The first Worker used to suspend its JSPI stack here (Atomics.waitAsync): it was resumed by its event loop, which a task of the page (a present of the desktop) could keep busy for 10-100 ms: the Worker waited for the lock 190 times in 10 s for that long (measured, docs 0234q) */
++        { double dg_s = emscripten_get_now(); __builtin_wasm_memory_atomic_wait32((int32_t *)&gil_gen, (int32_t)g, 3000000000LL); dg_sleep += emscripten_get_now() - dg_s; dg_nsleep++; }   /* every Worker waits synchronously: a Worker that holds the lock never waits for another Worker's event loop (I1, harness/gil/check_i1.py), so the holder lets go in microseconds. The first Worker used to suspend its JSPI stack here (Atomics.waitAsync): it was resumed by its event loop, which a task of the page (a present of the desktop) could keep busy for 10-100 ms: the Worker waited for the lock 190 times in 10 s for that long (measured, docs 0234q) */
+         __atomic_sub_fetch(&fle_gil_nsleep, 1u, __ATOMIC_SEQ_CST);
+     }
+ got:
++    dg_spin_total += spin;
++    dg_wait_record(me, dg_t0, dg_sleep, dg_nsleep, dg_spin_total, dg_holder);
+     fle_gil_owner = fle_worker_id + 1u;
+     __atomic_store_n(&gil_key[me], 0u, __ATOMIC_SEQ_CST);
+     __atomic_sub_fetch(&fle_gil_nwait, 1u, __ATOMIC_SEQ_CST);
+diff --git a/lift/runtime/fle_gil.h b/lift/runtime/fle_gil.h
+index da329927..20ece643 100644
+--- a/lift/runtime/fle_gil.h
++++ b/lift/runtime/fle_gil.h
+@@ -35,12 +35,17 @@ void fle_gil_release_slow(void);
+ extern volatile uint32_t fle_gil_nwait;   /* Workers in the slow path of fle_gil_acquire */
+ extern volatile uint32_t fle_gil_nsleep;   /* ... of which are asleep (waiting on the futex) */
+ void fle_gil_wake(void);
++/* R4-5d DIAGNOSTIC (experimental branch r4-5d-rt only; not for the product). Counts written by the Worker that owns the entry only. */
++extern volatile uint64_t fle_dg_acq[32];
++double fle_dg_now(void);
++void fle_dg_slice(double t0);
+ static inline void fle_gil_acquire(void)
+ {
+     uint32_t z = 0;
+ 
+     if (__builtin_expect(__atomic_compare_exchange_n(&fle_gil_word, &z, 1u, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED), 1)) {
+         fle_gil_owner = fle_worker_id + 1u;
++        fle_dg_acq[fle_worker_id & 31u]++;
+         FLE_STAT_ACQ();
+         return;
+     }
+@@ -69,6 +74,8 @@ static inline void fle_gil_leave(int took)
+     fle_export_depth--;
+ }
+ #else
++static inline double fle_dg_now(void) { return 0.0; }
++static inline void fle_dg_slice(double t0) { (void)t0; }
+ static inline void fle_gil_acquire(void) {}
+ static inline void fle_gil_release(void) {}
+ static inline int fle_gil_enter(void) { return 0; }
+diff --git a/lift/runtime/fle_thread.c b/lift/runtime/fle_thread.c
+index 32ffc18c..72f7842c 100644
+--- a/lift/runtime/fle_thread.c
++++ b/lift/runtime/fle_thread.c
+@@ -898,7 +898,12 @@ void fle_progress_slice(void)
+     pst.ticks += slice_ticks;
+     fle_sys_clock_advance_to(now_ticks() + slice_ticks);
+     t->state = T_READY;
+-    if (schedule_ex(1)) pst.switches++;
++    {
++        double dg_t = fle_dg_now();   /* R4-5d DIAGNOSTIC */
++
++        if (schedule_ex(1)) pst.switches++;
++        fle_dg_slice(dg_t);
++    }
+     fle_gil_release();
+ }
+ 

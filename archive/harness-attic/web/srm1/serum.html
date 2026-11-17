@@ -1,0 +1,57 @@
+<!doctype html><meta charset=utf-8><title>srm1 serum</title>
+<script type="module">
+// srm1 (decision 0177): N Workers on ONE compiled Serum 2 harness module; each runs the harness once (a state of the reference project, one held note, B blocks of 4096 frames).
+// ?n=1&mod=O2&state=3&blocks=40&notes=&seed=small|full&procOnly=0
+window.__log = [];
+const log = (s) => window.__log.push(s);
+const q = new URLSearchParams(location.search);
+const MOD = q.get('mod') || 'O2', BLOCKS = +(q.get('blocks') || 40), NOTES = q.get('notes') || '', SEED0 = q.get('seed') || 'small';
+// states=0,1,3,4,5,3 : one Worker per entry (a different state of the reference project in each; state 5 runs --state-proc-only); else n Workers with state= . A state 2 (piano) needs the full seed.
+const STATES = q.get('states') ? q.get('states').split(',') : Array(+(q.get('n') ?? 1)).fill(q.get('state') ?? '3');
+const N = STATES.length, STATE = STATES.join(','), SEED = STATES.includes('2') ? 'full' : SEED0;
+const PROCONLY = q.get('procOnly') === '1';
+(async () => {
+  try {
+    // the files are SharedArrayBuffer-backed so that N Workers read ONE copy (mt1's shared VFS, decision 0173); the wasm file itself is compiled once and the Module is shared
+    const fetchU8 = async (u) => { const b = new Uint8Array(await (await fetch(u)).arrayBuffer()); const sab = new Uint8Array(new SharedArrayBuffer(b.length)); sab.set(b); return sab; };
+    const t0 = performance.now();
+    const [wbytes, plugin, seedTxt] = await Promise.all([fetch(`/coi/data/${MOD}.wasm`).then(async (r) => new Uint8Array(await r.arrayBuffer())), fetchU8('/coi/data/serum.vst3'), fetch(`/coi/data/seed-${SEED}.tsv`).then((r) => r.text())]);
+    const files = { '/serum.vst3': plugin, '/seed.tsv': new TextEncoder().encode(seedTxt) };
+    const hostFiles = seedTxt.split('\n').filter((l) => l && l[0] !== '#').map((l) => l.split('\t')[1]).filter((p) => p && p !== '-');
+    let contentBytes = 0;
+    await Promise.all(hostFiles.map(async (p) => { files[p] = await fetchU8('/coi/data' + p); contentBytes += files[p].length; }));
+    for (const st of new Set(STATES)) for (const k of [2, 3]) files[`/state/s${st}_c${k}.bin`] = await fetchU8(`/coi/data/state/s${st}_c${k}.bin`);
+    const tFetch = performance.now() - t0;
+    const t1 = performance.now();
+    const module = await WebAssembly.compile(wbytes);
+    const tCompile = performance.now() - t1;
+    log(`fetched wasm ${wbytes.length} B + plugin ${plugin.length} B + ${hostFiles.length} content files ${contentBytes} B in ${tFetch.toFixed(0)} ms; compile ${tCompile.toFixed(0)} ms`);
+    const flag = new SharedArrayBuffer(4);
+    const argsFor = (st) => {
+      const a = ['/serum.vst3', '--blocks', String(BLOCKS), '--note', '--state', st, '--state-dir', '/state', '--presets-dir', 'C:\\SerumData\\Presets'];
+      if (PROCONLY || st === '5') a.push('--state-proc-only');
+      if (NOTES) a.push('--notes', NOTES);
+      return a;
+    };
+    const workers = [], ready = [];
+    for (let i = 0; i < N; i++) {
+      const w = new Worker('serum-worker.js', { type: 'module' });
+      workers.push(w);
+      ready.push(new Promise((res, rej) => { w.onmessage = (e) => (e.data.type === 'ready' ? res(e.data) : e.data.type === 'error' ? rej(new Error(e.data.error)) : null); w.onerror = (e) => rej(new Error('worker error ' + e.message)); }));
+      w.postMessage({ type: 'prep', id: i, module, files, flag, args: argsFor(STATES[i]), env: ['FLE_VFS_SEED=/seed.tsv', 'VST_BLOCKS=1'] });
+    }
+    const rd = await Promise.all(ready);
+    const done = workers.map((w) => new Promise((res, rej) => { w.onmessage = (e) => (e.data.type === 'done' ? res(e.data) : null); w.onerror = (e) => rej(new Error('worker error ' + e.message)); w.postMessage({ type: 'go' }); }));
+    window.__ready = true;
+    while (!window.__go) await new Promise((r) => setTimeout(r, 5));
+    const tg = performance.now();
+    Atomics.store(new Int32Array(flag), 0, 1); Atomics.notify(new Int32Array(flag), 0);
+    const results = await Promise.all(done);
+    const tEnd = performance.now();
+    window.__result = { N, MOD, STATE, BLOCKS, hardwareConcurrency: navigator.hardwareConcurrency, wasmBytes: wbytes.length, contentBytes, tFetch, tCompile, instMs: rd.map((r) => r.instMs), memBytesAtInstantiate: rd.map((r) => r.memBytes), wallMs: tEnd - tg, results };
+    window.__done = true;
+    while (!window.__terminate) await new Promise((r) => setTimeout(r, 20));
+    for (const w of workers) w.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); window.__done = true; }
+})();
+</script>

@@ -1,0 +1,15 @@
+# draw1: Space playback for 60 virtual seconds (after the wizard is closed), for the HLE check run.
+snap wiz0
+advance 4000
+tap 13
+advance 3000
+snap e3000
+tap 0x20
+advance 3000
+snap play3
+advance 57000
+snap play60
+tap 0x20
+advance 1000
+snap stop
+end

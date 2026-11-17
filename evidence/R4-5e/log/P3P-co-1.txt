@@ -1,0 +1,36 @@
+## before P3P-co-1 (2026-11-17T11:45:59Z)
+4.50 3.88 2.65 3/1254 4868
+               total        used        free      shared  buff/cache   available
+Mem:           24967        3272       13710         106        8529       21695
+Swap:           4095        2156        1939
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 2  1 2207992 14038588 441440 8293240   45   93  3952  1143 7032    4  7  2 91  0  0  0
+ 1  0 2207980 13873652 441440 8437552    8    0 143772   160 9545 9925  5  3 90  2  0  0
+ 1  0 2207980 13879744 441440 8437548    0    0     0     0 4645 3972  7  1 93  0  0  0
+some avg10=0.90 avg60=0.16 avg300=0.03 total=205546556
+browser pid=7131 age=19:22:36 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 0.99 io 0 after 212 s; mem avail 10863 MB, swap used 2157 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/.worktrees/github.com/signature-studio/signature-studio/r4-5e-doc/tools/verify-kit/out/r45e-mixprof-p-chrome-2
+--- stdout (tail)
+11:49:35 backend chrome 
+11:49:35 scenario r45e-p3-mixmove-prof 
+11:55:45   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P3P-co-1 (2026-11-17T11:55:46Z)
+3.29 3.01 2.59 1/1243 82764
+               total        used        free      shared  buff/cache   available
+Mem:           25015        3534       12250         359       10027       21481
+Swap:           4095        2155        1940
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 2207336 12544892 372212 9896408   45   92  5249  1137 7094    4  7  2 91  0  0  0
+ 0  0 2207336 12558084 372212 9896324    0    0     0   228 2385 2389  0  0 99  0  0  0
+ 0  0 2207336 12572332 372220 9896324    0    0     0   248 4711 4292  2  1 97  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.80 total=219805529
+browser pid=7131 age=19:32:23 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R4-5e/r45e-mixprof-p-chrome-2 (3 files)

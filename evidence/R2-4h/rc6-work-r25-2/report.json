@@ -1,0 +1,96 @@
+[
+ {
+  "name": "o20-rc6",
+  "what": "R2-4c-4 one element per run, no Escape: close wizard, wait 800, shot pre, describe pre; right click Mixer insert name (505,676), wait 1000, shot post, describe post; control left click File (18,20), wait 1000, shot ctl, describe ctl. Centres from evidence/R2-4c3.md section 1.",
+  "rep": 1,
+  "seconds": 17,
+  "firstIdleMs": 4649.830078125,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "describes": [
+   {
+    "name": "pre",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\""
+    ]
+   },
+   {
+    "name": "post",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 136 at (537, 337) 251x727 glass(0,0,0,0) alpha 0 key 000000 class \"TQuickPopupMenuWindow\" title \"\""
+    ]
+   },
+   {
+    "name": "ctl",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 137 at (4, 36) 208x298 glass(0,0,0,0) alpha 0 key 000000 class \"TQuickPopupMenuWindow\" title \"\""
+    ]
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 59.99700014999249,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 46.9099999666214,
+   "manifest_loaded": 61.969999969005585,
+   "download_start": 90.78999996185303,
+   "compile_done": 982.4049999713898,
+   "download_done": 1144.0099999904633,
+   "pack_source_dll": 1206.300048828125,
+   "pack_source_seed": 1206.35009765625,
+   "glue_loaded": 1215.335205078125,
+   "worker_ready": 1216.2099999785423,
+   "engine_start": 1216.2450000047684,
+   "wasm_instantiated": 1242.0751953125,
+   "files_ready": 1257.7451171875,
+   "main_start": 1258.93505859375,
+   "idle": 4649.830078125,
+   "host_files_released": 4650.239990234375,
+   "first_pixel": 4675.460205078125
+  },
+  "loadStart": 1.89,
+  "loadEnd": 2.34,
+  "ioStart": 10.79,
+  "ioEnd": 8.45,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080",
+   "TQuickPopupMenuWindow@4,36 208x298"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

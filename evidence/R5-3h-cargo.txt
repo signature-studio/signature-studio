@@ -1,0 +1,6 @@
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test getmodulehandleexw_returns_in_every_build ... FAILED
+test co_initialize_ex_row_is_in_the_table_and_declared_in_the_header ... ok
+test co_initialize_ex_apartment_threaded_s_ok_then_s_false_and_balance ... ok
+test co_initialize_ex_reads_only_the_low_32_bits_of_dword_argument ... ok
+test co_initialize_ex_inputs_the_pages_leave_open_abort ... ok

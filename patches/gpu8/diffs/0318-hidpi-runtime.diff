@@ -1,0 +1,264 @@
+--- a/lift/runtime/fle_appfile.c
++++ b/lift/runtime/fle_appfile.c
+@@ -223,10 +223,11 @@
+ }
+ 
+ /* shcore!GetDpiForMonitor (Learn, shellscalingapi.h): HRESULT f(HMONITOR hmonitor rcx, MONITOR_DPI_TYPE dpiType edx, UINT *dpiX r8, UINT *dpiY r9). S_OK with the DPI of the monitor; E_INVALIDARG "The handle, DPI type, or pointers
+- * passed in are not valid". The page gives the value by the awareness of the calling process: "PROCESS_DPI_UNAWARE: 96 because the app is unaware of any other scale factors"; the process of this environment is DPI
+- * unaware (fle_proc.c GetProcessDpiAwareness) and its one virtual monitor is 96 DPI (decision 0053), so 96 for dpiX and dpiY ("The values of *dpiX and *dpiY are identical"). The three MONITOR_DPI_TYPE values
+- * (MDT_EFFECTIVE_DPI 0, MDT_ANGULAR_DPI 1, MDT_RAW_DPI 2: shellscalingapi.h) all answer 96: the page says only that ANGULAR and RAW ignore the desktop scaling slider (S-g8a-dpi, a choice without a source for the
+- * unaware case). The engine delay-loads this function and, when GetProcAddress gave NULL, the delay-load helper raised 0xC06D007F (wall 3 of decision 0144). */
++ * passed in are not valid". The page gives the value by the awareness of the calling process: "PROCESS_DPI_UNAWARE: 96 because the app is unaware of any other scale factors"; "PROCESS_PER_MONITOR_DPI_AWARE: the DPI of the monitor"
++ * (MDT_EFFECTIVE_DPI "the effective DPI ... takes the scale factor into account", the other two types the physical or angular DPI). Decision 0318: the process of this environment is per-monitor aware (fle_proc.c
++ * GetProcessDpiAwareness, from the manifest of FL64.exe) and its one virtual monitor has the DPI of the display, FLE_SCREEN_DPI (fle_screen.h; 96 unless the page passes the device pixel ratio of its screen), for dpiX and dpiY ("The values of
++ * *dpiX and *dpiY are identical"). The three MONITOR_DPI_TYPE values (MDT_EFFECTIVE_DPI 0, MDT_ANGULAR_DPI 1, MDT_RAW_DPI 2: shellscalingapi.h) answer the same number: the virtual monitor has no scale factor of its own, its pixels per logical inch
++ * are its physical DPI (S-g8a-dpi, a choice without a source for the three types being equal; the physical size in millimetres follows the DPI: fle_screen.h). The engine delay-loads this function and, when GetProcAddress gave NULL, the delay-load helper raised 0xC06D007F (wall 3 of decision 0144). */
+ void fle_imp_GetDpiForMonitor(void)
+ {
+     uint64_t h = R[1], px = R[8], py = R[9];
+--- a/lift/runtime/fle_proc.c
++++ b/lift/runtime/fle_proc.c
+@@ -392,10 +392,10 @@
+ /* shcore!GetProcessDpiAwareness (decision 0099, provisional): HRESULT GetProcessDpiAwareness(HANDLE hprocess, PROCESS_DPI_AWARENESS *value).
+  * Learn (shellscalingapi.h, Windows 8.1 and later, Shcore.dll): hprocess "NULL: the current process is queried"; S_OK, E_INVALIDARG ("the
+  * handle or pointer passed in is not valid"), E_ACCESSDENIED. This environment has one process and cannot create another handle (no
+- * OpenProcess), so NULL and the GetCurrentProcess pseudo handle are the current process and any other handle is not valid. The awareness of
+- * the current process is a setting of this environment, not a rule of the page: PROCESS_DPI_UNAWARE (0), because nothing says that the host
+- * process declares DPI awareness and the virtual screen is 96 DPI on one monitor (decision 0053). The delay-loaded guest asks only for
+- * "is it per-monitor aware" (== 2), so 0 sends it down the non-per-monitor path. rcx, rdx. */
++ * OpenProcess), so NULL and the GetCurrentProcess pseudo handle are the current process and any other handle is not valid. Decision 0318: the awareness
++ * of the current process is PROCESS_PER_MONITOR_DPI_AWARE (2), because the process this environment stands for, FL64.exe, declares it in its manifest
++ * (<dpiAware>True/PM</dpiAware>, read from the installed file; the decision 0099 answer, UNAWARE, was made for want of that declaration and was the reason
++ * the guest took the non-per-monitor path). The DPI itself is FLE_SCREEN_DPI (fle_screen.h): at 96 a per-monitor aware process sees the same numbers an unaware one does. rcx, rdx. */
+ void fle_imp_GetProcessDpiAwareness(void)
+ {
+     uint64_t h = R[1], pv = R[2];
+@@ -405,10 +405,67 @@
+         R[0] = FLE_HR_E_INVALIDARG;
+         return;
+     }
+-    fle_st(pv, 4, fle_screen_dpi() > FLE_SCREEN_DPI_DEFAULT ? FLE_PROCESS_PER_MONITOR_DPI_AWARE : FLE_PROCESS_DPI_UNAWARE);   /* decision 0212 (opt-in FLE_SCREEN_DPI) */
++    fle_st(pv, 4, FLE_PROCESS_PER_MONITOR_DPI_AWARE);
+     R[0] = FLE_HR_S_OK;
+ }
+ 
++/* user32!IsProcessDPIAware (decision 0318): BOOL f(void). Learn (IsProcessDPIAware): "Returns TRUE if the process is dots per inch (dpi) aware; otherwise FALSE"; the process is per-monitor aware
++ * (GetProcessDpiAwareness above), which is DPI aware. */
++void fle_imp_IsProcessDPIAware(void)
++{
++    R[0] = 1;
++}
++
++/* The two per-thread DPI states (decision 0318). A thread starts with the awareness of the process (the manifest: per-monitor aware, FLE_DPI_CTX_PER_MONITOR) and the default hosting behavior (0). The state is
++ * kept per guest thread (fle_thread_current); a thread index outside the table stops by name. S-gpu8-thread-dpi (a choice without a source): the context a thread sets is stored and returned, but the numbers
++ * the other functions give (GetDeviceCaps, GetSystemMetrics, GetDpiForMonitor) do not depend on it: they are the DPI of the display for every context; with FLE_SCREEN_DPI = 96 the contexts do not differ. */
++static uint64_t thread_dpi_ctx[FLE_THREAD_MAX];   /* 0 = never set: the process default */
++static int32_t thread_dpi_host[FLE_THREAD_MAX];
++
++static unsigned dpi_thread(const char *api)
++{
++    unsigned t = fle_thread_current ? fle_thread_current() : 0u;   /* weak: a test that links no thread file has the one thread */
++
++    if (t >= FLE_THREAD_MAX) fle_stop(api, "the thread index is outside the table of per-thread DPI state");
++    return t;
++}
++
++/* user32!SetThreadDpiAwarenessContext (decision 0318): DPI_AWARENESS_CONTEXT f(DPI_AWARENESS_CONTEXT dpiContext rcx). Learn (SetThreadDpiAwarenessContext): "Set the DPI awareness for the current thread to
++ * the provided value"; the return value is "The old DPI_AWARENESS_CONTEXT for the thread. If the dpiContext is invalid, the thread will not be updated and the return value will be NULL"; the valid values are the five
++ * predefined contexts DPI_AWARENESS_CONTEXT_UNAWARE (-1), SYSTEM_AWARE (-2), PER_MONITOR_AWARE (-3), PER_MONITOR_AWARE_V2 (-4), UNAWARE_GDISCALED (-5) (windef.h). */
++void fle_imp_SetThreadDpiAwarenessContext(void)
++{
++    static const char api[] = "SetThreadDpiAwarenessContext";
++    uint64_t ctx = R[1], old;
++    unsigned t = dpi_thread(api);
++
++    old = thread_dpi_ctx[t] != 0 ? thread_dpi_ctx[t] : FLE_DPI_CTX_PER_MONITOR;
++    if (ctx != FLE_DPI_CTX_UNAWARE && ctx != FLE_DPI_CTX_SYSTEM_AWARE && ctx != FLE_DPI_CTX_PER_MONITOR && ctx != FLE_DPI_CTX_PER_MONITOR_V2 && ctx != FLE_DPI_CTX_UNAWARE_GDI) {
++        R[0] = 0;
++        return;
++    }
++    thread_dpi_ctx[t] = ctx;
++    R[0] = old;
++}
++
++/* user32!SetThreadDpiHostingBehavior (decision 0318): DPI_HOSTING_BEHAVIOR f(DPI_HOSTING_BEHAVIOR value ecx). Learn (SetThreadDpiHostingBehavior): "Sets the thread's DPI_HOSTING_BEHAVIOR"; the return value is "The
++ * previous DPI_HOSTING_BEHAVIOR for the thread. If the hosting behavior passed in is invalid, the thread will not be updated and the return value will be DPI_HOSTING_BEHAVIOR_INVALID"; the values are
++ * DPI_HOSTING_BEHAVIOR_INVALID -1, DEFAULT 0, MIXED 1 (windef.h). */
++void fle_imp_SetThreadDpiHostingBehavior(void)
++{
++    static const char api[] = "SetThreadDpiHostingBehavior";
++    int32_t v = (int32_t)R[1], old;
++    unsigned t = dpi_thread(api);
++
++    old = thread_dpi_host[t];
++    if (v != 0 && v != 1) {
++        R[0] = (uint64_t)(uint32_t)-1;
++        return;
++    }
++    thread_dpi_host[t] = v;
++    R[0] = (uint64_t)(uint32_t)old;
++}
++
+ /* rpcrt4!UuidCreate (decision 0118 wall 7, provisional): RPC_STATUS UuidCreate(UUID *Uuid). Learn (UuidCreate): "The UuidCreate function creates a new UUID";
+  * Uuid "Returns a pointer to the created UUID"; the return values are RPC_S_OK (the call succeeded), RPC_S_UUID_LOCAL_ONLY and RPC_S_UUID_NO_ADDRESS. The page
+  * says that the UUID "cannot be traced to the ethernet address of the computer" and gives no algorithm and no version. A new UUID per call is the page's;
+--- a/lift/runtime/fle_proc.h
++++ b/lift/runtime/fle_proc.h
+@@ -92,11 +92,25 @@
+ void fle_imp_DecodePointer(void);
+ 
+ /* shcore!GetProcessDpiAwareness: HRESULT f(HANDLE hprocess, PROCESS_DPI_AWARENESS *value). rcx, rdx. Decision 0099 (provisional): the current process
+- * (NULL or the GetCurrentProcess pseudo handle) is PROCESS_DPI_UNAWARE (0); a NULL pointer or any other handle is E_INVALIDARG. */
++ * (NULL or the GetCurrentProcess pseudo handle) is the answer below; a NULL pointer or any other handle is E_INVALIDARG. Decision 0318: the answer is PROCESS_PER_MONITOR_DPI_AWARE (2) whatever the DPI,
++ * because the manifest of FL64.exe says <dpiAware>True/PM</dpiAware> (per-monitor aware): the process this environment stands for declares it (decision 0099 answered UNAWARE for want of that declaration). */
+ #define FLE_PROCESS_DPI_UNAWARE 0u
+-#define FLE_PROCESS_PER_MONITOR_DPI_AWARE 2u   /* shellscalingapi.h PROCESS_PER_MONITOR_DPI_AWARE; decision 0212: reported instead when FLE_SCREEN_DPI (fle_screen.h) is above 96 */
++#define FLE_PROCESS_PER_MONITOR_DPI_AWARE 2u   /* shellscalingapi.h PROCESS_PER_MONITOR_DPI_AWARE */
+ void fle_imp_GetProcessDpiAwareness(void);
+ 
++/* Decision 0318: the DPI functions the guest delay-loads next to GetProcessDpiAwareness. user32!IsProcessDPIAware: BOOL f(void): TRUE ("Returns TRUE if the process is dots per inch (dpi) aware"; per-monitor aware is aware).
++ * user32!SetThreadDpiAwarenessContext: DPI_AWARENESS_CONTEXT f(DPI_AWARENESS_CONTEXT rcx): sets the awareness of the calling thread and returns the old one; an invalid context changes nothing and returns NULL
++ * (Learn). user32!SetThreadDpiHostingBehavior: DPI_HOSTING_BEHAVIOR f(DPI_HOSTING_BEHAVIOR ecx): sets the hosting behavior of the calling thread (DEFAULT 0, MIXED 1) and returns the old one; an invalid value changes
++ * nothing and returns DPI_HOSTING_BEHAVIOR_INVALID (-1) (Learn). The state is per guest thread (fle_thread_current). */
++#define FLE_DPI_CTX_UNAWARE          ((uint64_t)-1)   /* DPI_AWARENESS_CONTEXT_UNAWARE */
++#define FLE_DPI_CTX_SYSTEM_AWARE     ((uint64_t)-2)
++#define FLE_DPI_CTX_PER_MONITOR      ((uint64_t)-3)   /* PER_MONITOR_AWARE: the process default (the manifest) */
++#define FLE_DPI_CTX_PER_MONITOR_V2   ((uint64_t)-4)
++#define FLE_DPI_CTX_UNAWARE_GDI      ((uint64_t)-5)   /* UNAWARE_GDISCALED */
++void fle_imp_IsProcessDPIAware(void);
++void fle_imp_SetThreadDpiAwarenessContext(void);
++void fle_imp_SetThreadDpiHostingBehavior(void);
++
+ /* rpcrt4!UuidCreate: RPC_STATUS f(UUID *Uuid rcx). Decision 0118 wall 7 (provisional): writes a version 4 (RFC 4122 section 4.4) UUID made from a fixed-seed
+  * pseudo-random sequence (SplitMix64, seed FLE_UUID_SEED) and returns RPC_S_OK (0). The sequence is the same in every run; the n-th call gets the n-th value. */
+ #define FLE_UUID_SEED UINT64_C(0x5555555555555555)
+--- a/lift/runtime/fle_screen.h
++++ b/lift/runtime/fle_screen.h
+@@ -54,9 +54,18 @@
+     return fle_screen_px[1];
+ }
+ 
+-/* The DPI of the virtual display: 96 (100%), what GetDeviceCaps(LOGPIXELSX / LOGPIXELSY) and shcore!GetDpiForMonitor answer, and the physical size in millimetres follows it (decision 0243: the page has no DPI choice any more; the process is DPI-unaware, fle_proc.c). */
++/* The DPI of the virtual display (decision 0318): the pixels per logical inch of the screen the page has, what GetDeviceCaps(LOGPIXELSX / LOGPIXELSY), shcore!GetDpiForMonitor and the icon and
++ * cursor sizes of GetSystemMetrics answer, and the physical size in millimetres follows it. Like the pixel size above it is a value of the RUN, not an option: the page passes the device pixel ratio of
++ * its screen as FLE_SCREEN_DPI = round(96 x devicePixelRatio) (a whole number of decimal digits in 96..384; unset, or anything else, is 96 = 100%, the answer of every bundle and test before this change).
++ * The process is per-monitor DPI aware whatever the value (the manifest of FL64.exe says <dpiAware>True/PM</dpiAware>: fle_proc.c). Read once at the first use, in every translation unit through one weak variable. */
+ #define FLE_SCREEN_DPI_DEFAULT 96u
+-static inline uint32_t fle_screen_dpi(void) { return FLE_SCREEN_DPI_DEFAULT; }
++#define FLE_SCREEN_DPI_MAX 384u   /* S-gpu8-dpi-max (a choice without a source): 400% of 96, the largest row of the cursor size table of Learn "About Cursors" */
++__attribute__((weak)) uint32_t fle_screen_dpi_v;
++static inline uint32_t fle_screen_dpi(void)
++{
++    if (fle_screen_dpi_v == 0) fle_screen_dpi_v = fle_screen_dim("FLE_SCREEN_DPI", FLE_SCREEN_DPI_DEFAULT, FLE_SCREEN_DPI_DEFAULT, FLE_SCREEN_DPI_MAX);
++    return fle_screen_dpi_v;
++}
+ 
+ /* Sets the size of the run (a display change while the engine runs, decision 0212 section 3); returns 0 and changes nothing when a dimension is outside the limits. The caller (fle_input.c, apply_display)
+  * tells the guest; this function only changes the numbers every answer is made from. */
+--- a/lift/runtime/fle_sysmetrics.c
++++ b/lift/runtime/fle_sysmetrics.c
+@@ -51,12 +51,12 @@
+     switch (idx) {
+     case FLE_SM_IDX_CXSCREEN: R[0] = (uint32_t)FLE_GDC_HORZRES; return;
+     case FLE_SM_IDX_CYSCREEN: R[0] = (uint32_t)FLE_GDC_VERTRES; return;
+-    case FLE_SM_IDX_CXICON: R[0] = FLE_SM_CXICON; return;
+-    case FLE_SM_IDX_CYICON: R[0] = FLE_SM_CYICON; return;
+-    case FLE_SM_IDX_CXCURSOR: R[0] = FLE_SM_CXCURSOR; return;
+-    case FLE_SM_IDX_CYCURSOR: R[0] = FLE_SM_CYCURSOR; return;
+-    case FLE_SM_IDX_CXSMICON: R[0] = FLE_SM_CXSMICON; return;
+-    case FLE_SM_IDX_CYSMICON: R[0] = FLE_SM_CYSMICON; return;
++    case FLE_SM_IDX_CXICON: R[0] = (uint32_t)fle_sm_icon_px(FLE_SM_CXICON, fle_screen_dpi()); return;
++    case FLE_SM_IDX_CYICON: R[0] = (uint32_t)fle_sm_icon_px(FLE_SM_CYICON, fle_screen_dpi()); return;
++    case FLE_SM_IDX_CXCURSOR: R[0] = (uint32_t)fle_sm_cursor_px(fle_screen_dpi()); return;
++    case FLE_SM_IDX_CYCURSOR: R[0] = (uint32_t)fle_sm_cursor_px(fle_screen_dpi()); return;
++    case FLE_SM_IDX_CXSMICON: R[0] = (uint32_t)fle_sm_icon_px(FLE_SM_CXSMICON, fle_screen_dpi()); return;
++    case FLE_SM_IDX_CYSMICON: R[0] = (uint32_t)fle_sm_icon_px(FLE_SM_CYSMICON, fle_screen_dpi()); return;
+     case FLE_SM_IDX_MOUSEPRESENT: R[0] = FLE_SM_MOUSEPRESENT; return;
+     case FLE_SM_IDX_MOUSEWHEELPRESENT: R[0] = FLE_SM_MOUSEWHEELPRESENT; return;
+     case FLE_SM_IDX_XVIRTUALSCREEN: R[0] = FLE_SM_VIRTUALSCREEN_ORIGIN; return;
+--- a/lift/runtime/fle_sysmetrics.h
++++ b/lift/runtime/fle_sysmetrics.h
+@@ -52,6 +52,12 @@
+  * a Windows 10 22H2 follows the same table (it names no OS), nor what the "default cursor size setting" of this environment is. */
+ #define FLE_SM_CXCURSOR             32
+ #define FLE_SM_CYCURSOR             32
++/* Decision 0318: the icon and cursor sizes follow the DPI of the virtual display (fle_screen.h, FLE_SCREEN_DPI; 96 unless the page says another, so every value above is unchanged at 96).
++ * Icons: Learn "About Icons" (System icon sizes) says the system icon sizes "are reported by GetSystemMetrics and scale with the display DPI" and lists SM_CXSMICON / SM_CXICON 16 / 32 at 96 DPI,
++ * 24 / 48 at 150% (144 DPI) and 32 / 64 at 200% (192 DPI): base * dpi / 96, rounded to the nearest (S-gpu8-icon-scale, a choice without a source for the DPIs between the listed rows).
++ * Cursors: the table of "About Cursors" (Cursor Sizes), "at default cursor size setting": below 144 DPI 32, 144-191 48, 192-287 64, 288-383 96, 384 and above 128 (OFFICIAL, steps, not a ratio). */
++static inline int32_t fle_sm_icon_px(int32_t base_at_96, uint32_t dpi) { return (int32_t)(((uint32_t)base_at_96 * dpi + 48u) / 96u); }
++static inline int32_t fle_sm_cursor_px(uint32_t dpi) { return dpi < 144u ? 32 : dpi < 192u ? 48 : dpi < 288u ? 64 : dpi < 384u ? 96 : 128; }
+ #define FLE_SM_MOUSEPRESENT         1   /* provisional choice: the page says only "rarely zero" */
+ #define FLE_SM_MOUSEWHEELPRESENT    1   /* provisional choice: the page gives no default */
+ #define FLE_SM_VIRTUALSCREEN_ORIGIN 0   /* one monitor, which holds the origin (0,0) (Learn: The Virtual Screen) */
+--- a/lift/harness/hyb/c-imports-engine.txt
++++ b/lift/harness/hyb/c-imports-engine.txt
+@@ -352,6 +352,7 @@
+ IsDebuggerPresent
+ IsEqualGUID
+ IsIconic
++IsProcessDPIAware
+ IsProcessorFeaturePresent
+ IsValidCodePage
+ IsValidLocale
+@@ -525,6 +526,8 @@
+ SetStdHandle
+ SetStretchBltMode
+ SetTextColor
++SetThreadDpiAwarenessContext
++SetThreadDpiHostingBehavior
+ SetThreadErrorMode
+ SetThreadLocale
+ SetThreadPriority
+--- a/lift/harness/parity-paint/parity_traceall.c
++++ b/lift/harness/parity-paint/parity_traceall.c
+@@ -473,6 +473,7 @@
+ TRACEALL(IShellItem_GetDisplayName)
+ TRACEALL(IShellItem_GetParent)
+ TRACEALL(IsIconic)
++TRACEALL(IsProcessDPIAware)
+ TRACEALL(IsProcessorFeaturePresent)
+ TRACEALL(IsValidCodePage)
+ TRACEALL(IsValidLocale)
+@@ -657,6 +658,8 @@
+ TRACEALL(SetStdHandle)
+ TRACEALL(SetStretchBltMode)
+ TRACEALL(SetTextColor)
++TRACEALL(SetThreadDpiAwarenessContext)
++TRACEALL(SetThreadDpiHostingBehavior)
+ TRACEALL(SetThreadErrorMode)
+ TRACEALL(SetThreadExecutionState)
+ TRACEALL(SetThreadLocale)
+--- a/lift/harness/vis1/vis1_apis.inc
++++ b/lift/harness/vis1/vis1_apis.inc
+@@ -338,6 +338,7 @@
+ V1API(IsDebuggerPresent)
+ V1API(IsEqualGUID)
+ V1API(IsIconic)
++V1API(IsProcessDPIAware)
+ V1API(IsProcessorFeaturePresent)
+ V1API(IsValidCodePage)
+ V1API(IsValidLocale)
+@@ -507,6 +508,8 @@
+ V1API(SetStdHandle)
+ V1API(SetStretchBltMode)
+ V1API(SetTextColor)
++V1API(SetThreadDpiAwarenessContext)
++V1API(SetThreadDpiHostingBehavior)
+ V1API(SetThreadErrorMode)
+ V1API(SetThreadLocale)
+ V1API(SetThreadPriority)
+--- a/lift/crates/fe-lift/src/imports_table.rs
++++ b/lift/crates/fe-lift/src/imports_table.rs
+@@ -769,6 +769,11 @@
+     ("shell32.dll", "SHAddToRecentDocs", "fle_imp_SHAddToRecentDocs", "jmp_imp:SHAddToRecentDocs"),
+     // Wall 3 (Sampler.flp): shcore!GetDpiForMonitor, delay-loaded by the engine after MonitorFromWindow (f_85dfcd); without the row the delay-load helper raised 0xC06D007F (S-g8a-dpi).
+     ("shcore.dll", "GetDpiForMonitor", "fle_imp_GetDpiForMonitor", "jmp_imp:GetDpiForMonitor"),
++    // Decision 0318 (HiDPI): the per-monitor DPI functions the engine delay-loads next to shcore!GetProcessDpiAwareness (runtime/fle_proc.c). The manifest of FL64.exe declares per-monitor awareness
++    // (<dpiAware>True/PM</dpiAware>), so the guest takes the per-monitor path and calls them; without the rows the delay-load helper would raise 0xC06D007F.
++    ("user32.dll", "IsProcessDPIAware", "fle_imp_IsProcessDPIAware", "jmp_imp:IsProcessDPIAware"),
++    ("user32.dll", "SetThreadDpiAwarenessContext", "fle_imp_SetThreadDpiAwarenessContext", "jmp_imp:SetThreadDpiAwarenessContext"),
++    ("user32.dll", "SetThreadDpiHostingBehavior", "fle_imp_SetThreadDpiHostingBehavior", "jmp_imp:SetThreadDpiHostingBehavior"),
+     // Decision 0147 (provisional): user32!PostThreadMessageW (runtime/fle_win.c): the queue of the guest thread with that id; WM_QUIT is the kept WM_QUIT of PostQuitMessage. Appended after the rows of decision 0144.
+     ("user32.dll", "PostThreadMessageW", "fle_imp_PostThreadMessageW", "jmp_imp:PostThreadMessageW"),
+     // Decision 0267 (alpha10b; appended: decision 0015, append only): user32!SetWindowPlacement, the show state and the restored rectangle set (runtime/fle_win.c); FL calls it for its main form and one more window when they are created (SW_HIDE and the rectangle) once GetWindowPlacement answers.

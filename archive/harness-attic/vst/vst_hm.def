@@ -1,0 +1,22 @@
+/* The methods of the host objects that the harness hands to a VST3 plugin (decision 0156). One line per method; the order fixes the pseudo-VA
+ * VST_HM_VA(k) = 0x7FFC00000000 + 0x10 * (k + 1), which mkrows.sh writes into the rows file for fe-lift's merged dispatch table (mk_common.py --extra-rows).
+ * The C function of entry NAME is vst_hm_NAME (vst_host.c). Append only. */
+HM(qi)
+HM(addref)
+HM(release)
+HM(ha_getName)
+HM(ha_createInstance)
+HM(ch_beginEdit)
+HM(ch_performEdit)
+HM(ch_endEdit)
+HM(ch_restart)
+HM(pc_count)
+HM(pc_data)
+HM(pc_add)
+HM(vq_id)
+HM(vq_npoints)
+HM(vq_getPoint)
+HM(vq_addPoint)
+HM(el_count)
+HM(el_get)
+HM(el_add)

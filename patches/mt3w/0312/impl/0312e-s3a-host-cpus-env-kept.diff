@@ -1,0 +1,129 @@
+diff -ruN base/lift/runtime/fle_sys.c a/lift/runtime/fle_sys.c
+--- base/lift/runtime/fle_sys.c	2026-11-06 19:49:26.167309784 +0900
++++ a/lift/runtime/fle_sys.c	2026-11-06 22:20:08.272879114 +0900
+@@ -595,20 +595,14 @@
+          s->shared == 0 ? "exclusively" : "in shared mode", why);
+ }
+ 
+-/* Decision 0234 (mt3, experiment): see fle_sysinfo.h */
+-uint32_t fle_sys_processors(void)
+-{
+-    return 1u;
+-}
+-
+ /* ---- GetSystemInfo ----
+  * SYSTEM_INFO (MSDN: SYSTEM_INFO) on x64 is 48 bytes: wProcessorArchitecture at 0, wReserved 2,
+  * dwPageSize 4, lpMinimumApplicationAddress 8, lpMaximumApplicationAddress 16, dwActiveProcessorMask
+  * 24, dwNumberOfProcessors 32, dwProcessorType 36, dwAllocationGranularity 40, wProcessorLevel 44,
+  * wProcessorRevision 46 (the offsets follow from the member types and natural alignment).
+  * Values: architecture AMD64 (9, MSDN table); page size FLE_PAGE_SIZE, the page VirtualAlloc uses
+- * (MSDN: dwPageSize); one processor with mask 1, because the run is a single guest thread (a choice;
+- * a host core count would make the output differ between machines); processor type 8664
++ * (MSDN: dwPageSize); the processors: fle_sys_processors (fle_sysinfo.h; the host's logical processors with real
++ * threads, 1 where one guest thread runs at a time), the mask with one bit each; processor type 8664
+  * (PROCESSOR_AMD_X8664, listed in MSDN, obsolete member); level and revision 0 as the CPUID answer
+  * claims no model (decision 0009; MSDN: level is for display only). The MSDN pages read do not
+  * give numbers for the allocation granularity or the application address range. Granularity
+@@ -642,6 +636,31 @@
+     memcpy((void *)fle_addr(out, (unsigned)sizeof si, 1), si, sizeof si);
+ }
+ 
++#ifdef FLE_GIL
++/* Decision 0312 (mt3, S3a): the number of processors is the host's (D2). hardwareConcurrency exists in the browser's Workers and in node. FLE_PROCESSORS (fle_thread.c fle_cfg_processors, S3a only: the
++ * measurement of the Worker count before the variable is removed) takes precedence when it is set. Decided once; the value is the same for every Worker. */
++EM_JS(int, fle_js_hardware_concurrency, (void), { const n = (typeof navigator !== 'undefined' && navigator.hardwareConcurrency) | 0; return n > 0 ? n : 1; });
++uint32_t fle_cfg_processors(void) __attribute__((weak));
++uint32_t fle_sys_processors(void)
++{
++    static uint32_t n;
++    uint32_t v = __atomic_load_n(&n, __ATOMIC_RELAXED);
++
++    if (v == 0) {
++        v = fle_cfg_processors ? fle_cfg_processors() : 0u;
++        if (v == 0) v = (uint32_t)fle_js_hardware_concurrency();
++        v = v < 1u ? 1u : v > FLE_SYS_MAX_PROCESSORS ? FLE_SYS_MAX_PROCESSORS : v;
++        __atomic_store_n(&n, v, __ATOMIC_RELAXED);
++    }
++    return v;
++}
++#else
++uint32_t fle_sys_processors(void)
++{
++    return 1u;
++}
++#endif
++
+ /* ---- VirtualAlloc, VirtualFree ----
+  * (With FLE_VMEM_ARENA, wasm, a reservation is a range of the arena and the host protection calls are not made; see
+  * "Arena" above and decision 0045. What follows describes the native build.)
+diff -ruN base/lift/runtime/fle_sysinfo.c a/lift/runtime/fle_sysinfo.c
+--- base/lift/runtime/fle_sysinfo.c	2026-11-06 19:49:26.126097730 +0900
++++ a/lift/runtime/fle_sysinfo.c	2026-11-06 22:19:02.730939835 +0900
+@@ -151,7 +151,7 @@
+ {
+     uint64_t buf = R[1], plen = R[2];
+     uint32_t np = fle_sys_processors(), count = FLE_GLPI_RECORD_COUNT - 1u + np, k;   /* one RelationProcessorCore record per processor (Learn: a record per logical-processor group of a core), then the node, the caches and the package */
+-    uint8_t rec[(FLE_GLPI_RECORD_COUNT + 15u) * FLE_GLPI_RECORD_SIZE];
++    uint8_t rec[(FLE_GLPI_RECORD_COUNT - 1u + FLE_SYS_MAX_PROCESSORS) * FLE_GLPI_RECORD_SIZE];
+     uint32_t total = count * FLE_GLPI_RECORD_SIZE, have;
+     uint32_t node = 0;
+ 
+diff -ruN base/lift/runtime/fle_sysinfo.h a/lift/runtime/fle_sysinfo.h
+--- base/lift/runtime/fle_sysinfo.h	2026-11-06 19:49:26.126207216 +0900
++++ a/lift/runtime/fle_sysinfo.h	2026-11-06 22:19:02.730771709 +0900
+@@ -17,8 +17,10 @@
+  * affinity mask here, the initial process affinity mask, and the processor mask of every record that
+  * GetLogicalProcessorInformation returns; fle_sys.c reports the same bit as dwActiveProcessorMask. */
+ #define FLE_SYSINFO_PROC_MASK fle_sys_proc_mask()
+-/* Decision 0234 (mt3, stage B, experiment): the number of processors of the virtual system. 1 unless the host says otherwise: the environment variable FLE_PROCESSORS (set by the page from navigator.hardwareConcurrency, a fact of the machine, not an option) up to 16.
+- * The mask has one bit per processor. */
++/* The number of logical processors of the virtual system (what GetSystemInfo, GetLogicalProcessorInformation and the affinity masks report). A fact of the host, as on Windows, where it is the machine's: with real threads
++ * (-DFLE_GIL, the build that runs guest threads on more than one Worker) it is navigator.hardwareConcurrency of the browser, at least 1 and at most FLE_SYS_MAX_PROCESSORS (one mask bit each, and the Workers
++ * of the scheduler, fle_thread.c); in every other build, where one guest thread runs at a time, it is 1. The mask has one bit per processor. */
++#define FLE_SYS_MAX_PROCESSORS 32u
+ uint32_t fle_sys_processors(void);
+ static inline uint64_t fle_sys_proc_mask(void) { return (UINT64_C(1) << fle_sys_processors()) - 1u; }
+ 
+diff -ruN base/lift/runtime/fle_thread.c a/lift/runtime/fle_thread.c
+--- base/lift/runtime/fle_thread.c	2026-11-06 19:52:24.982151917 +0900
++++ a/lift/runtime/fle_thread.c	2026-11-06 22:40:14.011621514 +0900
+@@ -38,6 +38,7 @@
+ #include <pthread.h>
+ #include <emscripten/proxying.h>
+ #include <emscripten/threading.h>
++#include "fle_sysinfo.h"   /* decision 0312 (S3): fle_sys_processors */
+ #endif
+ #include "fle_thread.h"
+ #include "fle_input.h"
+@@ -324,6 +325,18 @@
+     R[0] = ret;
+ }
+ 
++#ifdef FLE_GIL
++/* decision 0312 (S3a only, removed with FLE_WORKERS in S3b): FLE_PROCESSORS=n sets the number of processors the guest sees (fle_sys.c fle_sys_processors); 0: the host's */
++uint32_t fle_cfg_processors(void);
++uint32_t fle_cfg_processors(void)
++{
++    const char *e = getenv("FLE_PROCESSORS");
++    long v = e ? strtol(e, NULL, 10) : 0;
++
++    return v < 1 ? 0u : v > (long)FLE_SYS_MAX_PROCESSORS ? FLE_SYS_MAX_PROCESSORS : (uint32_t)v;
++}
++#endif
++
+ static void ensure_init(void)
+ {
+     if (nthr) return;
+@@ -338,8 +351,11 @@
+ #ifdef FLE_GIL
+     {
+         const char *e = getenv("FLE_WORKERS");
++        unsigned n = fle_sys_processors();   /* the host's logical processors, 1..FLE_SYS_MAX_PROCESSORS: the same answer GetSystemInfo gives the guest */
+ 
+-        nworkers_cfg = e ? (unsigned)strtoul(e, NULL, 10) : 0u;   /* FLE_WORKERS=2: every thread but the first on Worker 1; FLE_WORKERS=N: one Worker per thread, the threads beyond N-1 share them */
++        /* decision 0312 (S3a): the number of Workers (the first one included) follows from n: n - 1, at least 2 (the UI Worker and one more) and at most 8 (a choice, not a fact of the machine: the Workers beyond 8 are
++         * not measured). FLE_WORKERS=N (S3a only) takes precedence: every thread but the first on Worker 1 for 2; one Worker per thread for N, the threads beyond N-1 share them; 0 or 1: the cooperative scheduler. */
++        nworkers_cfg = e ? (unsigned)strtoul(e, NULL, 10) : n < 3u ? 2u : n > 9u ? 8u : n - 1u;
+         if (nworkers_cfg > FLE_MAXW) nworkers_cfg = FLE_MAXW;
+         rt_mode = nworkers_cfg >= 2u;
+     }

@@ -1,0 +1,52 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -6026,9 +5998,9 @@
+  * Decision 0319 (O20): Windows's "cursor state" is a virtual cursor. SetCursorPos moves it, and the host
+  * (browser) pointer's absolute motion is relative to that new place: the guest position is the host's latest
+  * absolute position plus an offset, clamped to the screen. SetCursorPos/SetPhysicalCursorPos stores the
+- * requested point and sets offset = requested - host_latest. The host move records its absolute browser
+- * point and derives the guest point as host + offset clamped to the screen. With no offset this is the
+- * same behaviour as before. */
++ * requested point and re-anchors the host latest to that point (offset = 0); the next host absolute move is
++ * then measured from the new position. The host move records its absolute browser point and derives the
++ * guest point as host + offset clamped to the screen. With no offset this is the same behaviour as before. */
+ static int32_t ptr_x, ptr_y;
+ static int32_t host_ptr_x, host_ptr_y;
+ static int32_t virt_off_x, virt_off_y;
+@@ -6065,8 +6037,10 @@
+     fle_win_check_thread(api);
+     ptr_x = clamp_x(x);
+     ptr_y = clamp_y(y);
+-    virt_off_x = ptr_x - host_ptr_x;
+-    virt_off_y = ptr_y - host_ptr_y;
++    host_ptr_x = ptr_x;
++    host_ptr_y = ptr_y;
++    virt_off_x = 0;
++    virt_off_y = 0;
+     R[0] = 1;
+ }
+--- a/lift/runtime/fle_input.c
++++ b/lift/runtime/fle_input.c
+@@ -979,7 +979,7 @@ case FLE_WM_RBUTTONUP:
+     case FLE_WM_NCRBUTTONUP: {
+         /* Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
+          * WM_RBUTTONUP or WM_NCRBUTTONUP message". wParam is the handle of the window in which the button was
+-         * released (a child forwards to the parent), lParam the cursor position in screen coordinates. For
++         * released; when that window is a child, the message is forwarded to the parent, but wParam keeps
++         * the child handle ("This can be a child window of the window receiving the message"). lParam is the
+          * cursor position in screen coordinates. For WM_RBUTTONUP lParam is client-relative; for
+          * WM_NCRBUTTONUP it is already screen-relative. Return value "If an application processes this
+-         * message, it should return zero". */
++         * message, it should return zero". */
+         int32_t sx, sy;
+         uint64_t target = v.parent ? v.parent : hwnd;
+ 
+@@ -992,7 +992,7 @@ case FLE_WM_RBUTTONUP:
+             sx = sx16(lp);
+             sy = sx16(lp >> 16);
+         }
+-        (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, target, lparam_xy(sx, sy));
++        (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, hwnd, lparam_xy(sx, sy));
+         *result = 0;
+         return 1;
+     }

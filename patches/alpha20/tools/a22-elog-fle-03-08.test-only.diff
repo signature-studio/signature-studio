@@ -1,0 +1,101 @@
+--- a/onat/src/fle-03.c
++++ b/onat/src/fle-03.c
+@@ -10,6 +10,22 @@
+ extern fle_eflags FL;
+ extern fle_xmm X[16];
+ 
++/* ---- alpha1 0308b elog (throwaway test tree only) ---- */
++static uint64_t el_h(uint64_t a, uint64_t n) {
++    uint64_t h = UINT64_C(0xcbf29ce484222325), i;
++    if (a == 0 || n == 0) return h;
++    if (n > (UINT64_C(1) << 20)) n = UINT64_C(1) << 20;
++    for (i = 0; i < n; i++) { h ^= fle_ld(a + i, 1) & 0xff; h *= UINT64_C(0x100000001b3); }
++    return h;
++}
++static unsigned long el_total;
++static unsigned el_n_677f60;
++static unsigned el_n_677fb0;
++static unsigned el_n_678010;
++#define EL_OK() (el_total < 100000u)
++#define EL_LINE(...) do { el_total++; fprintf(stderr, __VA_ARGS__); } while (0)
++/* ---- end elog ---- */
++
+ void f_403579(void);
+ void f_403582(void);
+ void f_40358b(void);
+@@ -120568,6 +120584,7 @@
+ 
+ void f_677f60(void)
+ {
++    if (EL_OK()) EL_LINE("ELOG 677f60 %x ecx=%x edx=%x f2=%x r8=%llx r9=%x\n", (unsigned)el_n_677f60++, (unsigned)R[1], (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned long long)(R[8]), (unsigned)R[9]);
+ L_677f60: { /* 0x677f60 Push */ { uint64_t t = R[13]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_677f62: { /* 0x677f62 Push */ { uint64_t t = R[7]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_677f63: { /* 0x677f63 Push */ { uint64_t t = R[6]; R[4] -= 8; fle_st(R[4], 8, t); }}
+@@ -120600,6 +120617,7 @@
+ 
+ void f_677fb0(void)
+ {
++    if (EL_OK()) EL_LINE("ELOG 677fb0 %x ecx=%x edx=%x f2=%x r8=%llx r9=%x f5=%x\n", (unsigned)el_n_677fb0++, (unsigned)R[1], (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned long long)(R[8]), (unsigned)R[9], (unsigned)fle_ld(R[4] + 0x28, 4));
+ L_677fb0: { /* 0x677fb0 Push */ { uint64_t t = R[13]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_677fb2: { /* 0x677fb2 Push */ { uint64_t t = R[7]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_677fb3: { /* 0x677fb3 Push */ { uint64_t t = R[6]; R[4] -= 8; fle_st(R[4], 8, t); }}
+@@ -120634,6 +120652,7 @@
+ 
+ void f_678010(void)
+ {
++    if (EL_OK()) EL_LINE("ELOG 678010 %x ecx=%x edx=%x f2=%x r8=%llx r9=%x\n", (unsigned)el_n_678010++, (unsigned)R[1], (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned long long)(R[8]), (unsigned)R[9]);
+ L_678010: { /* 0x678010 Push */ { uint64_t t = R[7]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_678011: { /* 0x678011 Push */ { uint64_t t = R[6]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_678012: { /* 0x678012 Push */ { uint64_t t = R[3]; R[4] -= 8; fle_st(R[4], 8, t); }}
+--- a/onat/src/fle-08.c
++++ b/onat/src/fle-08.c
+@@ -10,6 +10,22 @@
+ extern fle_eflags FL;
+ extern fle_xmm X[16];
+ 
++/* ---- alpha1 0308b elog (throwaway test tree only) ---- */
++static uint64_t el_h(uint64_t a, uint64_t n) {
++    uint64_t h = UINT64_C(0xcbf29ce484222325), i;
++    if (a == 0 || n == 0) return h;
++    if (n > (UINT64_C(1) << 20)) n = UINT64_C(1) << 20;
++    for (i = 0; i < n; i++) { h ^= fle_ld(a + i, 1) & 0xff; h *= UINT64_C(0x100000001b3); }
++    return h;
++}
++static unsigned long el_total;
++static unsigned el_n_a97780;
++static unsigned el_n_a981f0;
++static unsigned el_n_a97930;
++#define EL_OK() (el_total < 100000u)
++#define EL_LINE(...) do { el_total++; fprintf(stderr, __VA_ARGS__); } while (0)
++/* ---- end elog ---- */
++
+ void f_403579(void);
+ void f_403582(void);
+ void f_40358b(void);
+@@ -91659,6 +91675,7 @@
+ 
+ void f_a97780(void)
+ {
++    if (EL_OK()) EL_LINE("ELOG a97780 %x p=%llx edx=%x r8=%x d3=%llx mode=%x\n", (unsigned)el_n_a97780++, (unsigned long long)(R[1]), (unsigned)R[2], (unsigned)R[8], (unsigned long long)(X[3].u64[0]), (unsigned)fle_ld(R[4] + 0x28, 4));
+ L_a97780: { /* 0xa97780 Push */ { uint64_t t = R[6]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_a97781: { /* 0xa97781 Push */ { uint64_t t = R[3]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_a97782: { /* 0xa97782 Sub */ { uint64_t t = fle_nf_sub(64, R[4], (UINT64_C(0x28)), 0); R[4] = t; }}
+@@ -91794,7 +91811,10 @@
+ {
+     fle_seh_reg sr;
+     fle_seh_enter(&sr, UINT64_C(0xa97930));
++    uint64_t el_b1 = R[2], el_b2 = R[8], el_ch = fle_ld(R[4] + 0x38, 4), el_n1 = R[9], el_n2 = fle_ld(R[4] + 0x28, 8); unsigned el_s = el_n_a97930++;
++    if (EL_OK()) EL_LINE("ELOG a97930 %x p=%llx n1=%llx n2=%llx ratio=%llx ch=%x flag=%x h1=%llx h2=%llx\n", el_s, (unsigned long long)(R[1]), (unsigned long long)(el_n1), (unsigned long long)(el_n2), (unsigned long long)(fle_ld(R[4] + 0x30, 8)), (unsigned)el_ch, (unsigned)(fle_ld(R[4] + 0x40, 1) & 0xff), (unsigned long long)(el_h(el_b1, el_n1 * el_ch * 4)), (unsigned long long)(el_h(el_b2, el_n2 * el_ch * 4)));
+     if (FLE_SEH_SETJMP(&sr) == 0) { fb_a97930(); } else { fle_seh_land(&sr); }
++    if (EL_OK()) EL_LINE("ELOG a97930x %x h1=%llx h2=%llx\n", el_s, (unsigned long long)(el_h(el_b1, el_n1 * el_ch * 4)), (unsigned long long)(el_h(el_b2, el_n2 * el_ch * 4)));
+     fle_seh_leave(&sr);
+ }
+ 
+@@ -92266,6 +92286,7 @@
+ 
+ void f_a981f0(void)
+ {
++    if (EL_OK()) EL_LINE("ELOG a981f0 %x p=%llx len=%llx ratio=%llx mode=%x ch=%x sr=%llx n=%llx\n", (unsigned)el_n_a981f0++, (unsigned long long)(R[1]), (unsigned long long)(R[2]), (unsigned long long)(X[2].u64[0]), (unsigned)R[9], (unsigned)(fle_ld(R[1] + 0x74, 1) & 0xff), (unsigned long long)(fle_ld(R[1] + 0x7c, 8)), (unsigned long long)(fle_ld(R[1] + 0x94, 8)));
+ L_a981f0: { /* 0xa981f0 Push */ { uint64_t t = R[5]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_a981f1: { /* 0xa981f1 Push */ { uint64_t t = R[13]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_a981f3: { /* 0xa981f3 Push */ { uint64_t t = R[7]; R[4] -= 8; fle_st(R[4], 8, t); }}

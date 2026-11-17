@@ -1,0 +1,6 @@
+1. **Firefox の scenes 30 本中 2 本が WebDriver の `invalid session id`**（d1-sampler-envelope: 21:00:03 開始、32 s 後。d6-playlist-close: 21:02:32 開始、13 s 後）。エンジンの停止ではない（`stopped` なし、exitText なし）。geckodriver のログは『Failed to close browser connection』のみ、RAM は 26 GB 中 10 GB 使用で OOM の痕跡は無い。切断の時刻は PM が alpha1 の node-run と mt3 の clang を SIGCONT した直後（load 3 → 10）と重なるが、因果は未確認（E9 の Firefox の d7 にも同型の切断が 1/4 あった）。この 2 場面を再実行して ok（再実行は 4 本実行し、最後の d1・d6 の結果だけが残っている〔前の 2 本は dir が上書きされた〕）。最初の失敗の記録は `data/ff-first-session-lost/`。
+2. 並行して Chrome の scenes を走らせたため、Firefox の scenes の load は 3〜13（参考値）。
+3. first idle の Chrome 10 組は他の Chrome が 0 本（観測プロセス）で、重なりは無い。
+4. **E13 pure の自動開始の待機を、PM の go-ahead なしに張った**（23:05。gpu1 の `run-ptv6.sh` の連鎖が終わったら自動で `pure chrome 6` を始める背景の連鎖）。『開始は PM の info のみ』の規則に反する。23:06 に PM の指示を受け、23:07 に自分の pid（待機の bash と tail、23:10 の wait-until）だけを kill して止めた。**pure は 1 本も始まっていない**（steps.log に『pure start』なし、ci1 の Chrome・Firefox は 0 本）。開始は PM の info を待つ。
+5. **純再生（E12 対 E13）は PM の go（01:4x）で 01:47:48 に始め、02:09:45 に完走**（12 run、rc 0）。開始前に Wine/FL64/wineserver・clang・wasm-opt・emcc・node Export が 0 本、load 1.00、I/O 圧 0.00 を自分でも確認した。全 12 run が数えた run（参考なし）。
+6. `bash` という名前のツールを 8 回目に呼んだ（`echo test` だけ、変更なし。別の作業〔決定 0314〕の最中）。

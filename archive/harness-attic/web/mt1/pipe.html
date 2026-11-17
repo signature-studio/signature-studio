@@ -1,0 +1,41 @@
+<!doctype html><meta charset=utf-8><title>mt1 pipe</title>
+<script type="module">
+window.__log = [];
+const q = new URLSearchParams(location.search);
+const K = +(q.get('k') || 1), BLOCKS = +(q.get('blocks') || 100), TOPO = q.get('topo') || 'par', PACED = q.get('paced') === '1', MOD = q.get('mod') || 'mx9';
+const SLOT = 64 + 2 * 4096 * 2 * 4, PERIOD = 4096 / 44100 * 1000;
+function pct(a, qs = [50, 90, 99]) { const s = Float64Array.from(a).sort(); const o = { n: s.length, min: s[0], max: s[s.length - 1], mean: s.reduce((x, y) => x + y, 0) / s.length }; for (const p of qs) o['p' + p] = s[Math.min(s.length - 1, Math.floor(p / 100 * s.length))]; return o; }
+(async () => {
+  try {
+    const [wbytes, plugin, seed] = await Promise.all([`/coi/data/${MOD}.wasm`, '/coi/data/ott.vst3', '/coi/data/seed.tsv'].map(async (u) => new Uint8Array(await (await fetch(u)).arrayBuffer())));
+    const module = await WebAssembly.compile(wbytes);
+    const files = { '/ott.vst3': plugin, '/seed.tsv': seed };
+    const sabs = [], workers = [], loopReady = [], done = [];
+    for (let k = 0; k < K; k++) {
+      const sab = new SharedArrayBuffer(SLOT); sabs.push(sab);
+      const w = new Worker('pipe-plugin.js', { type: 'module' }); workers.push(w);
+      let resolveReady, resolveLoop, resolveDone;
+      const pReady = new Promise((r) => (resolveReady = r)); loopReady.push(new Promise((r) => (resolveLoop = r))); done.push(new Promise((r) => (resolveDone = r)));
+      w.onmessage = (e) => { const t = e.data.type; if (t === 'ready') resolveReady(); else if (t === 'loop-ready') resolveLoop(); else if (t === 'done') resolveDone(e.data); else if (t === 'error') { window.__error = e.data.error; window.__done = true; } };
+      w.postMessage({ type: 'prep', id: k, module, files, sab, blocks: BLOCKS, args: ['/ott.vst3', '--blocks', String(BLOCKS)], env: ['FLE_VFS_SEED=/seed.tsv'] });
+      await pReady;
+    }
+    for (const w of workers) w.postMessage({ type: 'go' });      // each plugin runs init, then blocks at the first process() until a block arrives
+    await Promise.all(loopReady);
+    window.__ready = true;
+    while (!window.__go) await new Promise((r) => setTimeout(r, 5));
+    const prod = new Worker('pipe-producer.js', { type: 'module' });
+    const t0 = performance.now();
+    const res = await new Promise((r) => { prod.onmessage = (e) => r(e.data); prod.postMessage({ sabs, blocks: BLOCKS, topo: TOPO, paced: PACED, periodMs: PERIOD }); });
+    const wall = performance.now() - t0;
+    const dres = await Promise.all(done);
+    const lat = Array.from(res.lat), skip = Math.min(5, Math.floor(BLOCKS / 4));
+    const steady = lat.slice(skip);
+    window.__result = { K, BLOCKS, TOPO, PACED, MOD, period: PERIOD, wall, hardwareConcurrency: navigator.hardwareConcurrency, lat: pct(steady), latFirst: lat.slice(0, skip), late: pct(Array.from(res.late).slice(skip)),
+      missesSteady: steady.filter((x) => x > PERIOD).length, missesAll: lat.filter((x) => x > PERIOD).length, over50pct: steady.filter((x) => x > PERIOD / 2).length, plugins: dres.map((d) => ({ rc: d.rc, err: d.err, done: d.done, lines: d.lines })) };
+    window.__done = true;
+    while (!window.__terminate) await new Promise((r) => setTimeout(r, 20));
+    for (const w of workers) w.terminate(); prod.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); window.__done = true; }
+})();
+</script>

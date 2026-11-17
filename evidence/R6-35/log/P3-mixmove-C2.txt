@@ -1,0 +1,36 @@
+## before P3-mixmove-C2 (2026-11-17T06:46:29Z)
+2.51 2.69 2.33 3/1237 1804339
+               total        used        free      shared  buff/cache   available
+Mem:           25499        5809       12778        1804        9156       19690
+Swap:           4095        1367        2728
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 1  0 1400164 13085324 245228 9131336   26   42  3469   945 6451    4  6  2 93  0  0  0
+ 1  0 1400164 13222820 245236 8812492    0    0     0   148 3337 2347  5  2 93  0  0  0
+ 1  0 1400164 13271320 245236 8812492    0    0     0    64 3474 2590  4  2 93  0  0  0
+some avg10=9.90 avg60=5.06 avg300=1.26 total=161993475
+browser pid=7131 age=14:23:07 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 1.04 io 0 after 67 s; mem avail 20362 MB, swap used 1367 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-mixmove-c-chrome-2
+--- stdout (tail)
+06:47:40 backend chrome 
+06:47:40 scenario p3-mixmove-300 
+06:53:50   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P3-mixmove-C2 (2026-11-17T06:53:51Z)
+3.53 2.78 2.42 1/1243 1847405
+               total        used        free      shared  buff/cache   available
+Mem:           25499        5242       13647        1612        8662       20256
+Swap:           4095        1367        2728
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1400144 13974764 247440 8622672   26   42  3440   938 6484    4  6  2 92  0  0  0
+ 0  0 1400144 13997472 247440 8622588    0    0     0     0 5769 6098  1  1 98  0  0  0
+ 0  0 1400144 14020804 247440 8622588    0    0     0     8 2153 2354  0  0 100  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.25 total=162039482
+browser pid=7131 age=14:30:29 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-mixmove-c-chrome-2 (3 files)

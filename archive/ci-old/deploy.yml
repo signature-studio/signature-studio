@@ -1,0 +1,1128 @@
+# Deploy: installer extraction -> lift (decompile) -> wasm build -> Workers build -> Cloudflare Workers + R2 deploy.
+#
+# Every stage is a layer whose cache key is made from the stage's INPUTS (file hashes, tool versions, the installers' SHA-256 in ci/artifacts.lock, the build configuration): same inputs, same key, the stage is
+# skipped and its output comes from the CACHE R2 bucket (not GitHub's Actions cache). See ci/README.md, ci/plan.sh (keys), ci/needs.sh (what to restore/run), ci/objkeys.sh (per-module object keys).
+# The installers are in the ARTIFACT R2 bucket and nothing derived from them is. The delivery bucket (what the Worker serves) only receives the finished bundle, and only from main.
+# GitHub Variables: none (the names and the build configuration are in the env below). Secrets: five, listed in ci/README.md. Runner: the standard GitHub-hosted ubuntu-24.04 for every job.
+#
+# A push to main (except one that changes only docs/** or *.md) builds and DEPLOYS. A push to any other branch does not run it. A dispatch (it has no inputs) on main deploys too; a dispatch on another branch builds, tests and
+# plans everything and uploads and deploys nothing (wrangler deploy --dry-run): the ref decides, nothing else. The condition of the deploy steps is tested by ci/test-real-deploy.py.
+# This file was generated once (the cache steps repeat) and is maintained as text.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  WRANGLER_SEND_METRICS: "false"
+  # The build configuration (one, in app/scripts/build-engine-bundle.sh) and the names are code, not GitHub Variables: there are no Variables to set. Only the five secrets below are the owner's.
+  CLOUDFLARE_ACCOUNT_ID: <CF-VALUE-REMOVED>
+  R2_ENDPOINT: <CF-VALUE-REMOVED>
+  R2_ARTIFACT_BUCKET: fl-web-artifacts
+  R2_CACHE_BUCKET: fl-web-cache
+  R2_ASSETS_BUCKET: fl-web-assets
+  ACCESS_TEAM_DOMAIN: <CF-VALUE-REMOVED>
+  ACCESS_AUD: <CF-VALUE-REMOVED>
+  PUBLIC_HOSTNAME: <CF-VALUE-REMOVED>
+  CI_RUNNER_OS: ubuntu24-x64
+  # what each cache entry holds (the list is part of the cache version, so restore and save must use the same text)
+  P_EXTRACT: |
+    ci-work/host
+    ci-work/extract-fl.sha256
+  P_VST3: |
+    ci-work/vst3
+  P_FELIFT: |
+    ci-work/engine/cargo-target/release/fe-pe
+    ci-work/engine/cargo-target/release/fe-lift
+    ci-work/engine/cargo-target/release/fe-wasmgen
+  P_B2D: |
+    ci-work/b2d/build-wasm/libblend2d.a
+    ci-work/b2d/src/src
+  P_LIFT: |
+    ci-work/engine/wsrc
+    ci-work/engine/onat/v-*/dll
+    ci-work/engine/onat/v-*/native
+    ci-work/engine/onat/v-*/modules.txt
+    ci-work/engine/logs/generated-c-sha256.txt
+  P_SEED: |
+    ci-work/engine/in
+  P_OBJ_FLE: |
+    ci-work/engine/w-Oz/obj/fle/*.o
+  P_OBJ_M1: |
+    ci-work/engine/w-Oz/obj/mod/m1-*.o
+  P_OBJ_M2: |
+    ci-work/engine/w-Oz/obj/mod/m2-*.o
+  P_OBJ_M3: |
+    ci-work/engine/w-Oz/obj/mod/m3-*.o
+  P_OBJ_M4: |
+    ci-work/engine/w-Oz/obj/mod/m4-*.o
+  P_OBJ_M5: |
+    ci-work/engine/w-Oz/obj/mod/m[5-9]-*.o
+  P_OBJ_RT: |
+    ci-work/engine/w-Oz/obj/rt/*.o
+    ci-work/engine/w-Oz/obj/h-fruity/*.o
+    ci-work/engine/w-Oz/obj/mod/common.o
+    ci-work/engine/w-Oz/obj/b2d/*.o
+  P_LINK: |
+    ci-work/engine/w-Oz/web/flengine6.js
+    ci-work/engine/w-Oz/web/flengine6.opt.wasm
+    ci-work/engine/w-Oz/web/flengine6.wasm
+  P_APP: |
+    app/dist
+  P_EMSDK: |
+    /opt/emsdk
+
+jobs:
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # plan: static checks, the cache keys, which stages are cached (lookup only: nothing is downloaded) and what the build job must do.
+  # It needs no big runner: with every stage cached, only this job, the app job and the deploy job do any work.
+  plan:
+    name: plan (keys and cache lookups)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      r2_ready: ${{ steps.cfg.outputs.r2_ready }}
+      deploy_ready: ${{ steps.cfg.outputs.deploy_ready }}
+      prefix: ${{ steps.keys.outputs.prefix }}
+      k_extract: ${{ steps.keys.outputs.k_extract }}
+      k_vst3: ${{ steps.keys.outputs.k_vst3 }}
+      k_felift: ${{ steps.keys.outputs.k_felift }}
+      k_lift: ${{ steps.keys.outputs.k_lift }}
+      k_b2d: ${{ steps.keys.outputs.k_b2d }}
+      k_seed: ${{ steps.keys.outputs.k_seed }}
+      k_link: ${{ steps.keys.outputs.k_link }}
+      k_bundle: ${{ steps.keys.outputs.k_bundle }}
+      k_app: ${{ steps.keys.outputs.k_app }}
+      k_emsdk: ${{ steps.keys.outputs.k_emsdk }}
+      h_wasm: ${{ steps.keys.outputs.h_wasm }}
+      sp_wasm: ${{ steps.keys.outputs.sp_wasm }}
+      h_bundle: ${{ steps.lk_bundle.outputs.cache-hit }}
+      h_link: ${{ steps.lk_link.outputs.cache-hit }}
+      h_seed: ${{ steps.lk_seed.outputs.cache-hit }}
+      h_app: ${{ steps.lk_app.outputs.cache-hit }}
+      h_vst3: ${{ steps.lk_vst3.outputs.cache-hit }}
+      h_emsdk: ${{ steps.lk_emsdk.outputs.cache-hit }}
+      need_build: ${{ steps.needs.outputs.need_build }}
+      need_link: ${{ steps.needs.outputs.need_link }}
+      need_seed: ${{ steps.needs.outputs.need_seed }}
+      need_lift_out: ${{ steps.needs.outputs.need_lift_out }}
+      run_lift: ${{ steps.needs.outputs.run_lift }}
+      restore_lift: ${{ steps.needs.outputs.restore_lift }}
+      need_extract: ${{ steps.needs.outputs.need_extract }}
+      restore_extract: ${{ steps.needs.outputs.restore_extract }}
+      run_extract: ${{ steps.needs.outputs.run_extract }}
+      run_felift: ${{ steps.needs.outputs.run_felift }}
+      restore_felift: ${{ steps.needs.outputs.restore_felift }}
+      need_b2d: ${{ steps.needs.outputs.need_b2d }}
+      restore_b2d: ${{ steps.needs.outputs.restore_b2d }}
+      run_b2d: ${{ steps.needs.outputs.run_b2d }}
+      need_emsdk: ${{ steps.needs.outputs.need_emsdk }}
+      restore_link: ${{ steps.needs.outputs.restore_link }}
+      restore_seed: ${{ steps.needs.outputs.restore_seed }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: static checks of the CI scripts
+        run: |
+          set -eu
+          for f in ci/*.sh ci/lib/*.sh app/scripts/build-engine-bundle.sh; do bash -n "$f"; done
+          shellcheck -x -S warning ci/*.sh ci/lib/*.sh
+          python3 -m py_compile ci/lib/*.py
+          bash ci/test-needs.sh
+          bash ci/test-hybrid.sh
+          bash ci/test-lifecycle.sh
+          bash ci/test-b2d-key.sh
+          python3 ci/test-real-deploy.py > /dev/null
+          # artifacts.lock: four installers, numeric size, 64-hex SHA-256
+          awk -F'\t' '!/^#/ && NF {n++; if ($2 !~ /^[0-9]+$/ || $3 !~ /^[0-9a-f]{64}$/ || $1 !~ /^installers\//) bad=1} END {if (n != 4 || bad) {print "ci/artifacts.lock is malformed"; exit 1}}' ci/artifacts.lock
+      - name: configuration (are the variables and secrets there?)
+        id: cfg
+        env:
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> != '' }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> != '' }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> != '' }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> != '' }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> != '' }}
+        run: bash ci/check-config.sh
+      - name: cache keys of every stage (ci/plan.sh)
+        id: keys
+        run: |
+          bash ci/plan.sh "$GITHUB_OUTPUT" 2> "$RUNNER_TEMP/plan.err"
+          { echo '### Stage keys'; echo; echo '```'; grep -E '^(k_|prefix)' "$GITHUB_OUTPUT"; echo '```'; echo '<details><summary>tool versions</summary>'; echo; echo '```'; cat "$RUNNER_TEMP/plan.err"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
+      # ---- lookup only (nothing is downloaded): which stages are cached
+
+      - name: "lookup bundle"
+        id: lk_bundle
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: bundle
+          key: ${{ steps.keys.outputs.k_bundle }}
+          path: |
+            ci-work/engine/bundle/${{ steps.keys.outputs.prefix }}/*.br
+            ci-work/engine/bundle/${{ steps.keys.outputs.prefix }}/manifest.json
+            ci-work/engine/bundle/${{ steps.keys.outputs.prefix }}/SHA256SUMS
+            ci-work/engine/bundle/${{ steps.keys.outputs.prefix }}/upload-commands.txt
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup link"
+        id: lk_link
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: link
+          key: ${{ steps.keys.outputs.k_link }}
+          path: ${{ env.P_LINK }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup seed"
+        id: lk_seed
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: seed
+          key: ${{ steps.keys.outputs.k_seed }}
+          path: ${{ env.P_SEED }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup lift"
+        id: lk_lift
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: lift
+          key: ${{ steps.keys.outputs.k_lift }}
+          path: ${{ env.P_LIFT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup extract"
+        id: lk_extract
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: extract
+          key: ${{ steps.keys.outputs.k_extract }}
+          path: ${{ env.P_EXTRACT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup felift"
+        id: lk_felift
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: felift
+          key: ${{ steps.keys.outputs.k_felift }}
+          path: ${{ env.P_FELIFT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup b2d"
+        id: lk_b2d
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: b2d
+          key: ${{ steps.keys.outputs.k_b2d }}
+          path: ${{ env.P_B2D }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup toolchain-emsdk"
+        id: lk_emsdk
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: toolchain-emsdk
+          key: ${{ steps.keys.outputs.k_emsdk }}
+          path: ${{ env.P_EMSDK }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup app"
+        id: lk_app
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: app
+          key: ${{ steps.keys.outputs.k_app }}
+          path: ${{ env.P_APP }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lookup vst3"
+        id: lk_vst3
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: lookup
+          stage: vst3
+          key: ${{ steps.keys.outputs.k_vst3 }}
+          path: ${{ env.P_VST3 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: what the build job has to restore and to run (ci/needs.sh)
+        id: needs
+        if: steps.cfg.outputs.r2_ready == 'true' && steps.keys.outcome == 'success'
+        env:
+          H_BUNDLE: ${{ steps.lk_bundle.outputs.cache-hit }}
+          H_LINK: ${{ steps.lk_link.outputs.cache-hit }}
+          H_SEED: ${{ steps.lk_seed.outputs.cache-hit }}
+          H_LIFT: ${{ steps.lk_lift.outputs.cache-hit }}
+          H_EXTRACT: ${{ steps.lk_extract.outputs.cache-hit }}
+          H_FELIFT: ${{ steps.lk_felift.outputs.cache-hit }}
+          H_B2D: ${{ steps.lk_b2d.outputs.cache-hit }}
+        run: |
+          bash ci/needs.sh "$GITHUB_OUTPUT"
+          { echo '### What runs'; echo; echo '```'; bash ci/needs.sh /dev/stdout | grep true || echo '(nothing to build: the bundle is cached)'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: cache table
+        if: always()
+        run: bash ci/summary.sh "$RUNNER_TEMP/r2cache-rows.tsv" >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # vst3: the VST3 plug-ins from the Serum 2 / OTT / Vital installers (nothing in the engine bundle reads them yet; they are kept in the cache for the stage that will).
+  vst3:
+    name: extract VST3
+    needs: plan
+    if: needs.plan.outputs.r2_ready == 'true' && needs.plan.outputs.h_vst3 != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 7-Zip (only when the image has none)
+        run: |
+          command -v 7z >/dev/null || command -v 7zz >/dev/null || command -v 7za >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq 7zip; }
+      - name: fetch the three installers from the artifact bucket, verify them, extract the VST3
+        env:
+          ARTIFACT_S3_ENDPOINT: ${{ env.R2_ENDPOINT }}
+          ARTIFACT_BUCKET: ${{ env.R2_ARTIFACT_BUCKET }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+        run: bash ci/stage-extract.sh vst3
+
+      - name: "save vst3"
+        id: save_vst3
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: vst3
+          key: ${{ needs.plan.outputs.k_vst3 }}
+          path: ${{ env.P_VST3 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: cache table
+        if: always()
+        run: bash ci/summary.sh "$RUNNER_TEMP/r2cache-rows.tsv" >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # build: extraction, lift, wasm, packing - only the stages that are not cached (ci/needs.sh decides), each one: restore | run, then save. A stage is saved the moment it has succeeded,
+  # so a later failure keeps the layers below it. Runs on the standard GitHub-hosted ubuntu-24.04 (private repository: 2 vCPU, 8 GB RAM, 14 GB SSD, 6 hours a job);
+  # ci/preflight.sh prints what the runner has, adds a swap file and, if needed, makes room, and stops with the reason when it is not enough.
+  build:
+    name: build (extract, lift, wasm, bundle)
+    needs: plan
+    if: needs.plan.outputs.r2_ready == 'true' && needs.plan.outputs.need_build == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: "the runner's resources (nproc, memory, disk), swap file, room"
+        run: |
+          bash ci/preflight.sh
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      # ---------------- tools (the FROM of the Dockerfile): emscripten from the toolchain cache, rust from rustup
+
+      - name: "restore emsdk (try the cache; a miss installs it)"
+        id: emsdk_restore
+        if: needs.plan.outputs.need_emsdk == 'true' && needs.plan.outputs.h_emsdk == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: toolchain-emsdk
+          key: ${{ needs.plan.outputs.k_emsdk }}
+          path: ${{ env.P_EMSDK }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "emsdk (install when the cache had none)"
+        id: emsdk
+        if: needs.plan.outputs.need_emsdk == 'true'
+        run: |
+          if [ -x /opt/emsdk/upstream/emscripten/emcc ]; then echo "installed=no" >> "$GITHUB_OUTPUT"; else echo "installed=yes" >> "$GITHUB_OUTPUT"; fi
+          bash ci/setup-toolchain.sh emsdk
+      - name: "save toolchain-emsdk"
+        id: emsdk_save
+        if: steps.emsdk.outputs.installed == 'yes'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: toolchain-emsdk
+          key: ${{ needs.plan.outputs.k_emsdk }}
+          path: ${{ env.P_EMSDK }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "rust toolchain"
+        if: needs.plan.outputs.run_felift == 'true'
+        run: |
+          bash ci/setup-toolchain.sh rust
+      # ---------------- stage: fetch + extract (the installer is downloaded only when this stage has to run)
+      - name: "restore extract"
+        id: r_extract
+        if: needs.plan.outputs.restore_extract == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: extract
+          key: ${{ needs.plan.outputs.k_extract }}
+          path: ${{ env.P_EXTRACT }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "run extract"
+        id: x_extract
+        if: needs.plan.outputs.run_extract == 'true' || steps.r_extract.outputs.restore-failed == 'true'
+        env:
+          ARTIFACT_S3_ENDPOINT: ${{ env.R2_ENDPOINT }}
+          ARTIFACT_BUCKET: ${{ env.R2_ARTIFACT_BUCKET }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+        run: |
+          bash ci/stage-extract.sh fl
+      - name: "save extract"
+        id: s_extract
+        if: steps.x_extract.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: extract
+          key: ${{ needs.plan.outputs.k_extract }}
+          path: ${{ env.P_EXTRACT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      # ---------------- stage: lift (the lifter, then the generated C)
+      - name: "restore felift"
+        id: r_felift
+        if: needs.plan.outputs.restore_felift == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: felift
+          key: ${{ needs.plan.outputs.k_felift }}
+          path: ${{ env.P_FELIFT }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "run felift"
+        id: x_felift
+        if: needs.plan.outputs.run_felift == 'true' || steps.r_felift.outputs.restore-failed == 'true'
+        run: |
+          bash ci/stage-lift.sh felift
+      - name: "save felift"
+        id: s_felift
+        if: steps.x_felift.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: felift
+          key: ${{ needs.plan.outputs.k_felift }}
+          path: ${{ env.P_FELIFT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      # upstream Blend2D for wasm (only when the configuration swaps Blend2D); the gen stage checks that it exists
+      - name: "restore b2d"
+        id: r_b2d
+        if: needs.plan.outputs.restore_b2d == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: b2d
+          key: ${{ needs.plan.outputs.k_b2d }}
+          path: ${{ env.P_B2D }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "run b2d"
+        id: x_b2d
+        if: needs.plan.outputs.run_b2d == 'true' || steps.r_b2d.outputs.restore-failed == 'true'
+        run: |
+          bash ci/stage-wasm.sh b2d
+      - name: "save b2d"
+        id: s_b2d
+        if: steps.x_b2d.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: b2d
+          key: ${{ needs.plan.outputs.k_b2d }}
+          path: ${{ env.P_B2D }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore lift"
+        id: r_lift
+        if: needs.plan.outputs.restore_lift == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: lift
+          key: ${{ needs.plan.outputs.k_lift }}
+          path: ${{ env.P_LIFT }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "lift: restore failed although the lookup found the entry"
+        if: steps.r_lift.outputs.restore-failed == 'true'
+        run: |
+          echo "::error::the restore of lift failed (transient R2 or network error?): re-run the job"; exit 1
+      - name: "run lift"
+        id: x_lift
+        if: needs.plan.outputs.run_lift == 'true'
+        run: |
+          bash ci/stage-lift.sh lift
+      - name: "save lift"
+        id: s_lift
+        if: steps.x_lift.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: lift
+          key: ${{ needs.plan.outputs.k_lift }}
+          path: ${{ env.P_LIFT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "the generated C (SHA-256 of each file)"
+        if: needs.plan.outputs.need_lift_out == 'true'
+        run: |
+          cat ci-work/engine/logs/generated-c-sha256.txt | sed 's|  .*/|  |' | tee -a "$GITHUB_STEP_SUMMARY"
+      # ---------------- stage: wasm build. The objects are cached per module, by the CONTENT of the C they were compiled from (ci/objkeys.sh)
+      - name: "keys of the object groups"
+        id: ok
+        if: needs.plan.outputs.need_link == 'true'
+        env:
+          PLAN_H_WASM: ${{ needs.plan.outputs.h_wasm }}
+          PLAN_TOOLS: ${{ needs.plan.outputs.k_emsdk }}
+          PLAN_SP_WASM: ${{ needs.plan.outputs.sp_wasm }}
+          PLAN_K_B2D: ${{ needs.plan.outputs.k_b2d }}
+        run: |
+          bash ci/objkeys.sh "$GITHUB_OUTPUT"
+      - name: "restore objects: fle (a miss is compiled below)"
+        id: ro_fle
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-fle
+          key: ${{ steps.ok.outputs.ko_fle }}
+          path: ${{ env.P_OBJ_FLE }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: dsp (a miss is compiled below)"
+        id: ro_dsp
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-dsp
+          key: ${{ steps.ok.outputs.ko_m1 }}
+          path: ${{ env.P_OBJ_M1 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: blend2d (a miss is compiled below)"
+        id: ro_blend2d
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-blend2d
+          key: ${{ steps.ok.outputs.ko_m2 }}
+          path: ${{ env.P_OBJ_M2 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: freetype (a miss is compiled below)"
+        id: ro_freetype
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-freetype
+          key: ${{ steps.ok.outputs.ko_m4 }}
+          path: ${{ env.P_OBJ_M4 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: qfc (a miss is compiled below)"
+        id: ro_qfc
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-qfc
+          key: ${{ steps.ok.outputs.ko_m3 }}
+          path: ${{ env.P_OBJ_M3 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: iltools (a miss is compiled below)"
+        id: ro_iltools
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-iltools
+          key: ${{ steps.ok.outputs.ko_m5 }}
+          path: ${{ env.P_OBJ_M5 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "restore objects: runtime (a miss is compiled below)"
+        id: ro_runtime
+        if: needs.plan.outputs.need_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: objects-runtime
+          key: ${{ steps.ok.outputs.ko_rt }}
+          path: ${{ env.P_OBJ_RT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "wasm objects (units whose object was restored are skipped)"
+        id: x_objects
+        if: needs.plan.outputs.need_link == 'true'
+        run: |
+          bash ci/stage-wasm.sh objects
+      - name: "save objects: fle"
+        id: so_fle
+        if: steps.x_objects.outcome == 'success' && steps.ro_fle.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-fle
+          key: ${{ steps.ok.outputs.ko_fle }}
+          path: ${{ env.P_OBJ_FLE }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: dsp"
+        id: so_dsp
+        if: steps.x_objects.outcome == 'success' && steps.ro_dsp.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-dsp
+          key: ${{ steps.ok.outputs.ko_m1 }}
+          path: ${{ env.P_OBJ_M1 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: blend2d"
+        id: so_blend2d
+        if: steps.x_objects.outcome == 'success' && steps.ro_blend2d.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-blend2d
+          key: ${{ steps.ok.outputs.ko_m2 }}
+          path: ${{ env.P_OBJ_M2 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: freetype"
+        id: so_freetype
+        if: steps.x_objects.outcome == 'success' && steps.ro_freetype.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-freetype
+          key: ${{ steps.ok.outputs.ko_m4 }}
+          path: ${{ env.P_OBJ_M4 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: qfc"
+        id: so_qfc
+        if: steps.x_objects.outcome == 'success' && steps.ro_qfc.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-qfc
+          key: ${{ steps.ok.outputs.ko_m3 }}
+          path: ${{ env.P_OBJ_M3 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: iltools"
+        id: so_iltools
+        if: steps.x_objects.outcome == 'success' && steps.ro_iltools.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-iltools
+          key: ${{ steps.ok.outputs.ko_m5 }}
+          path: ${{ env.P_OBJ_M5 }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "save objects: runtime"
+        id: so_runtime
+        if: steps.x_objects.outcome == 'success' && steps.ro_runtime.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: objects-runtime
+          key: ${{ steps.ok.outputs.ko_rt }}
+          path: ${{ env.P_OBJ_RT }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "resources after the wasm objects (peak memory since the job began, swap, disk)"
+        if: always()
+        run: |
+          bash ci/preflight.sh end
+      - name: "restore link"
+        id: r_link
+        if: needs.plan.outputs.restore_link == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: link
+          key: ${{ needs.plan.outputs.k_link }}
+          path: ${{ env.P_LINK }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "link: restore failed although the lookup found the entry"
+        if: steps.r_link.outputs.restore-failed == 'true'
+        run: |
+          echo "::error::the restore of link failed (transient R2 or network error?): re-run the job"; exit 1
+      - name: "run link (emcc link, wasm-opt)"
+        id: x_link
+        if: needs.plan.outputs.need_link == 'true'
+        run: |
+          bash ci/stage-wasm.sh link
+      - name: "save link"
+        id: s_link
+        if: steps.x_link.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: link
+          key: ${{ needs.plan.outputs.k_link }}
+          path: ${{ env.P_LINK }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "resources after the link (peak memory since the job began, swap, disk)"
+        if: always()
+        run: |
+          bash ci/preflight.sh end
+      # ---------------- stage: packing (the guest's files and the DLL directory; then brotli, manifest, SHA256SUMS)
+      - name: "restore seed"
+        id: r_seed
+        if: needs.plan.outputs.restore_seed == 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: seed
+          key: ${{ needs.plan.outputs.k_seed }}
+          path: ${{ env.P_SEED }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "seed: restore failed although the lookup found the entry"
+        if: steps.r_seed.outputs.restore-failed == 'true'
+        run: |
+          echo "::error::the restore of seed failed (transient R2 or network error?): re-run the job"; exit 1
+      - name: "run seed"
+        id: x_seed
+        if: needs.plan.outputs.need_seed == 'true'
+        run: |
+          bash ci/stage-bundle.sh seed
+      - name: "save seed"
+        id: s_seed
+        if: steps.x_seed.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: seed
+          key: ${{ needs.plan.outputs.k_seed }}
+          path: ${{ env.P_SEED }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "bundle (brotli, manifest, SHA256SUMS)"
+        id: x_bundle
+        env:
+          R2_ASSETS_BUCKET: ${{ env.R2_ASSETS_BUCKET }}
+        run: |
+          bash ci/stage-bundle.sh bundle
+      - name: "save bundle"
+        id: s_bundle
+        if: steps.x_bundle.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: bundle
+          key: ${{ needs.plan.outputs.k_bundle }}
+          path: |
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/*.br
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/manifest.json
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/SHA256SUMS
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/upload-commands.txt
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "wasm size"
+        if: always()
+        run: |
+          { echo '### Engine wasm'; echo; echo '```'; ls -l ci-work/engine/w-Oz/web/ "ci-work/engine/bundle/${PREFIX}/" 2>/dev/null || true; sha256sum ci-work/engine/w-Oz/web/flengine6.opt.wasm 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: "runner resources at the end (peak memory, swap, disk, OOM kills)"
+        if: always()
+        run: |
+          bash ci/preflight.sh end
+      - name: "cache table"
+        if: always()
+        run: |
+          bash ci/summary.sh "$RUNNER_TEMP/r2cache-rows.tsv" >> "$GITHUB_STEP_SUMMARY"
+      - name: "logs of the build on failure"
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-logs
+          path: |
+            ci-work/engine/logs/
+            ci-work/engine/w-Oz/obj/log/
+            !ci-work/engine/**/*.o
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # app: the front end and the Cloudflare Worker (type check, vite build, unit tests, Worker tests); the output app/dist is cached by the hash of app/.
+  app:
+    name: app (Workers build and tests)
+    needs: plan
+    if: needs.plan.outputs.r2_ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: "restore the npm download cache (a miss is fine)"
+        id: npm_restore
+        if: needs.plan.outputs.h_app != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: npm
+          key: fl-npm-${{ hashFiles('app/package-lock.json') }}
+          path: |
+            ~/.npm
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "npm ci"
+        id: npm
+        if: needs.plan.outputs.h_app != 'true'
+        run: |
+          bash ci/stage-app.sh install
+      - name: "save the npm download cache"
+        id: npm_save
+        if: steps.npm.outcome == 'success' && steps.npm_restore.outputs.cache-hit != 'true'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: npm
+          key: fl-npm-${{ hashFiles('app/package-lock.json') }}
+          path: |
+            ~/.npm
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "type check, vite build, unit tests, Worker tests"
+        id: check
+        if: needs.plan.outputs.h_app != 'true'
+        run: |
+          bash ci/stage-app.sh check
+      - name: "save app/dist"
+        id: s_app
+        if: steps.check.outcome == 'success'
+        uses: ./ci/actions/r2-cache
+        with:
+          op: save
+          stage: app
+          key: ${{ needs.plan.outputs.k_app }}
+          path: ${{ env.P_APP }}
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "note"
+        if: needs.plan.outputs.h_app == 'true'
+        run: |
+          echo 'app/ is unchanged since the last green run (the cache entry of the same inputs exists): its build and tests are not repeated.' >> "$GITHUB_STEP_SUMMARY"
+      - name: "cache table"
+        if: always()
+        run: |
+          bash ci/summary.sh "$RUNNER_TEMP/r2cache-rows.tsv" >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # deploy: off main it prints the upload plan and runs `wrangler deploy --dry-run`. On main (a push, or a dispatch): upload the bundle to the DELIVERY bucket with an S3 token that is limited to that bucket
+  # (the files first), then the Worker as a new version (`wrangler versions upload` + `versions deploy`), then the default manifest (last), then check that nothing answers a request without Cloudflare Access.
+  deploy:
+    name: deploy (a real deploy only from main)
+    needs: [plan, build, app]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.r2_ready == 'true' && (needs.build.result == 'success' || needs.build.result == 'skipped') && needs.app.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      PREFIX: ${{ needs.plan.outputs.prefix }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+
+      - name: "restore the bundle (output of the build stages)"
+        id: r_bundle
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: bundle
+          key: ${{ needs.plan.outputs.k_bundle }}
+          path: |
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/*.br
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/manifest.json
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/SHA256SUMS
+            ci-work/engine/bundle/${{ needs.plan.outputs.prefix }}/upload-commands.txt
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "the bundle must be there"
+        if: steps.r_bundle.outputs.cache-hit != 'true'
+        run: |
+          echo "::error::no bundle for key ${{ needs.plan.outputs.k_bundle }}: the build job did not produce it or the restore failed"; exit 1
+      - name: "restore app/dist"
+        id: r_app
+        uses: ./ci/actions/r2-cache
+        with:
+          op: restore
+          stage: app
+          key: ${{ needs.plan.outputs.k_app }}
+          path: ${{ env.P_APP }}
+          expect-hit: "true"
+          bucket: ${{ env.R2_CACHE_BUCKET }}
+          endpoint: ${{ env.R2_ENDPOINT }}
+          access-key-id: ${{ secrets.<CREDENTIAL-NAME> }}
+          secret-access-key: ${{ secrets.<CREDENTIAL-NAME> }}
+      - name: "npm ci (wrangler comes from app/package-lock.json)"
+        run: |
+          bash ci/stage-app.sh install
+      - name: "app/dist was not restored: build it"
+        if: steps.r_app.outputs.cache-hit != 'true'
+        run: |
+          cd app && npm run build
+      - name: "Worker configuration (refuses a route without Access settings)"
+        run: |
+          bash ci/stage-deploy.sh config
+      - name: "upload plan (checks SHA256SUMS, sizes, the manifest)"
+        run: |
+          bash ci/stage-deploy.sh plan "ci-work/engine/bundle/${PREFIX}" | tee "$RUNNER_TEMP/plan.txt"
+          { echo '### Delivery bucket upload plan'; echo; cat ci-work/r2-upload-plan.md; echo; echo "real deploy: ${{ github.ref == 'refs/heads/main' }} (a run on main deploys; a run on another branch is a dry run)"; } >> "$GITHUB_STEP_SUMMARY"
+      - name: "wrangler deploy --dry-run (no credential)"
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        with:
+          workingDirectory: app
+          command: deploy --config wrangler.deploy.json --dry-run --outdir ../ci-work/worker-dry-run
+          quiet: false
+      - name: "upload the bundle's files to the delivery bucket (the default manifest is NOT among them)"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          R2_ENDPOINT: ${{ env.R2_ENDPOINT }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+        run: |
+          bash ci/stage-deploy.sh upload "ci-work/engine/bundle/${PREFIX}" objects
+      # The beacon prefix perf/ of the cache bucket expires after 180 days (idempotent: a rule that is there is left alone). With the cache credentials, the S3 API; the rule is set on every push to main, so that nobody has to do it by hand.
+      - name: "R2: the beacons (perf/) expire after 180 days"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          R2_ENDPOINT: ${{ env.R2_ENDPOINT }}
+          R2_CACHE_BUCKET: ${{ env.R2_CACHE_BUCKET }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+        run: |
+          bash ci/stage-deploy.sh lifecycle
+      # The Worker only: a new VERSION at 100% (wrangler versions upload + versions deploy). `wrangler deploy` also updates the triggers (the custom domain), which a Workers Scripts: Edit token cannot
+      # (the first push to main failed there after the Worker had been uploaded); the domain is already attached and is not touched.
+      - name: "Worker: new version at 100% (the triggers are not touched)"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          bash ci/stage-deploy.sh worker
+      # Last: the default manifest points the site to the new bundle (the files it names are in the bucket, the new page is live).
+      - name: "switch the default manifest to the new bundle (last)"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          R2_ENDPOINT: ${{ env.R2_ENDPOINT }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+          <CREDENTIAL-NAME>: ${{ secrets.<CREDENTIAL-NAME> }}
+        run: |
+          bash ci/stage-deploy.sh upload "ci-work/engine/bundle/${PREFIX}" switch
+      - name: "nothing may answer without Cloudflare Access"
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          bash ci/stage-deploy.sh probe "ci-work/engine/bundle/${PREFIX}/manifest.json" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: "cache table"
+        if: always()
+        run: |
+          bash ci/summary.sh "$RUNNER_TEMP/r2cache-rows.tsv" >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------------------------------------------------------------------
+  # report: one table in the run summary (which job ended how, and whether production was changed), so that a failed run says what happened without opening the logs. GitHub also mails a failed run to the person who pushed.
+  report:
+    name: result of the run
+    needs: [plan, vst3, build, app, deploy]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      NEEDS: ${{ toJSON(needs) }}
+      REAL: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - name: summary
+        run: |
+          deploy=$(echo "$NEEDS" | jq -r '.deploy.result')
+          {
+            echo '### Result of the run'; echo
+            echo '| job | result |'; echo '|---|---|'
+            echo "$NEEDS" | jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"'
+            echo
+            if [ "$REAL" != true ]; then echo 'This run was a dry run: nothing was uploaded to the delivery bucket and nothing was deployed.'
+            elif [ "$deploy" = success ]; then echo '**This run deployed to production.**'
+            elif [ "$deploy" = skipped ]; then echo '**Production was not changed:** the deploy job did not run (an earlier job failed).'
+            else echo '**The deploy job did not succeed:** the delivery bucket or the Worker may be partly updated; the steps of the deploy job show how far it went.'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          failed=$(echo "$NEEDS" | jq -r 'to_entries[] | select(.value.result == "failure" or .value.result == "cancelled") | .key' | tr '\n' ' ')
+          if [ -n "$failed" ]; then echo "::error::job(s) failed or cancelled: $failed"; fi
+

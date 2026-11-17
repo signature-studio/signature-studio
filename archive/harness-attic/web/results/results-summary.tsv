@@ -1,0 +1,37 @@
+name	fast	mode	enc	rate_MBps	jsflags	completed	exit	stdout_lines	lines_differing_from_node	fetch_data_ms	wasm_ready_ms	run_ms	worker_total_ms	renderer_peak_rss_MB	renderer_peak_pss_MB	renderer_cpu_s	tree_peak_rss_MB	wasm_server_ms	memory_bytes_end
+G-default-1	1	instantiate	identity			true	0	297	1	188	1275	3037	4523	1398		5.4	2592	1116.7	838402048
+G-default-2	1	instantiate	identity			true	0	297	1	181	1211	2797	4208	1338		5.1	2516	1070.4	838402048
+G-default-3	1	instantiate	identity			true	0	297	1	202	1264	2831	4317	1384		5.2	2566	1105.2	838402048
+H-br-buffer	1	buffer	br			true	0	297	1	182	1211	2744	4161	1577		4.7	2904	766.4	838402048
+H-br-instantiate-1	1	instantiate	br			true	0	297	1	211	987	2888	4109	1312		5	2490	787.1	838402048
+H-br-instantiate-2	1	instantiate	br			true	0	297	1	203	957	2712	3893	1402		4.8	2579	784.2	838402048
+H-br-instantiate-3	1	instantiate	br			true	0	297	1	208	933	2806	3968	1411		4.9	2589	750.3	838402048
+H-gzip-buffer	1	buffer	gzip			true	0	297	1	205	1043	2687	3953	1558		4.9	2821	627.6	838402048
+H-gzip-instantiate-1	1	instantiate	gzip			true	0	297	1	196	809	2758	3783	1307		5	2482	653.2	838402048
+H-gzip-instantiate-2	1	instantiate	gzip			true	0	297	1	218	838	2861	3934	1389		5	2562	674.4	838402048
+H-gzip-instantiate-3	1	instantiate	gzip			true	0	297	1	199	809	2850	3883	1303		5.1	2486	655.6	838402048
+H-identity-buffer	1	buffer	identity			true	0	297	1	185	1492	2870	4570	1625		5.3	3035	1067.2	838402048
+H-identity-compile	1	compile	identity			true	0	297	1	195	1267	2973	4454	1394		5.3	2567	1118.1	838402048
+H-zstd-instantiate-1	1	instantiate	zstd			true	0	297	1	196	715	2857	3792	1283		4.9	2463	557.3	838402048
+H-zstd-instantiate-2	1	instantiate	zstd			true	0	297	1	215	757	2907	3900	1338		5.1	2514	586	838402048
+H-zstd-instantiate-3	1	instantiate	zstd			true	0	297	1	214	836	2888	3959	1370		5.1	2547	653.8	838402048
+I-eager-br	1	instantiate	br		--no-wasm-lazy-compilation	true	0	297	1	198	12779	2305	15311	4010		57.6	5353	1195.8	838402048
+I-eager	1	instantiate	identity		--no-wasm-lazy-compilation	true	0	297	1	198	12742	2150	15119	3722		58.4	4952	1209.5	838402048
+I-liftoff-only-1	1	instantiate	identity		--liftoff-only	true	0	297	1	200	1316	3900	5438	1302		5.9	2611	1125.2	838402048
+I-liftoff-only-2	1	instantiate	identity		--liftoff-only	true	0	297	1	188	1247	3889	5349	1273		5.8	2631	1090.4	838402048
+I-no-liftoff	1	instantiate	identity		--no-liftoff	true	0	297	1	206	1244	9070	10547	1422		11	2603	1095.7	838402048
+M-pss-default	1	instantiate	identity			true	0	297	1	215	1415	2888	4537	1382	1312	5.2	2584	1268.5	838402048
+R-br-rate12.5-b	1	instantiate	br	12.5		true	0	297	1	205	3525	2751	6502	1263		4.8	2666	3378.2	838402048
+R-br-rate12.5	1	instantiate	br	12.5		true	0	297	1	318	3625	4364	8331	1342		7.4	2751	3378.5	838402048
+R-br-rate125	1	instantiate	br	125		true	0	297	1	197	920	2768	3913	1272		4.8	2449	739.6	838402048
+R-gzip-rate12.5	1	instantiate	gzip	12.5		true	0	297	1	203	8704	2800	11725	1332		5.2	2733	8560.7	838402048
+R-identity-rate12.5	1	instantiate	identity	12.5		true	0	297	1	185	29882	2905	32999	1391		5.9	2488	29711.8	838402048
+R-zstd-rate12.5	1	instantiate	zstd	12.5		true	0	297	1	198	4289	2797	7307	1347		5.1	2755	4142.7	838402048
+W-cache-br-1	1	instantiate	br			true	0	297	1	199	1050	2752	4021	1420		5	2600	870	838402048
+W-cache-br-2	1	instantiate	br			true	0	297	1	206	1032	2734	3990	1421		4.8	2693	182	838402048
+W-cache-br-3	1	instantiate	br			true	0	297	1	198	997	2744	3957	1353		4.9	2331	727.3	838402048
+Z-final-default-1	1	instantiate	identity			true	0	297	1	186	1255	2926	4388	1365		5.2	2541	1110.3	838402048
+Z-final-default-2	1	instantiate	identity			true	0	297	1	184	1280	2872	4359	1396		5.3	2579	1130.7	838402048
+Z-final-default-3	1	instantiate	identity			true	0	297	1	184	1264	2890	4362	1419		5.2	2594	1118.7	838402048
+Z-final-default-4	1	instantiate	identity			true	0	297	1	209	1276	2831	4338	1303		5.2	2665	1132	838402048
+Z-final-default-5	1	instantiate	identity			true	0	297	1	198	1288	2817	4326	1340		5.2	2516	1138	838402048

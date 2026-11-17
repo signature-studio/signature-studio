@@ -1,0 +1,13 @@
+# Inline hook points of FLEngine_x64.dll (decision 0105; fe-lift lift --hook-points). One address per line: a VA of the image as lifted, or
+# "rva:" and a hex RVA (the ImageBase is added; FLEngine is always at 0x400000). "#" starts a comment.
+#
+# Unit 314 (the static initialisation f_8e48a0) constructs three hook objects with f_8e0c60(the class reference at [0x8d9ba8], 1, target, replacement, 0)
+# (calls at 0x8e4a17, 0x8e4a3f, 0x8e4a67; the only three callers of f_8e0c60 in the image: byte scan of the call sites). The constructor
+# calls f_8e0de0, which saves the first 5 bytes of the target, builds "e9 rel32" and calls VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE,
+# &old) through the thunk 0x423d00. f_8e0ef0 (called at 0x8e4af1 unless ParamStr(0) in lower case is "delphi32.exe", "kylix" or
+# "bds.exe") prepares the three objects again and f_8e0db0 writes the "e9 rel32" into the target; f_8e0d80 writes the original bytes back.
+# The targets and the replacements (the operands of the "lea r8" / "lea r9" before each call; all six are .pdata function starts):
+#   0x41c820 -> 0x8dad80    0x43b130 -> 0x8dac70    0x43b150 -> 0x8dace0
+rva:0x1c820   # 0x41c820, first 5 bytes 55 56 53 c6 44 (push rbp; push rsi; push rbx; the start of mov byte [rsp-0x20],0)
+rva:0x3b130   # 0x43b130, first 5 bytes 53 48 83 ec 20 (push rbx; sub rsp,0x20)
+rva:0x3b150   # 0x43b150, first 5 bytes 55 48 83 ec 50 (push rbp; sub rsp,0x50)

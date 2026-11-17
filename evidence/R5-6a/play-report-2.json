@@ -1,0 +1,76 @@
+[
+ {
+  "name": "r55-play",
+  "what": "R5-5: the reference project opened as a zip (openZipProject; the Problems window is closed by it), then 10 s of playback with Space (the Balance on Insert 1 and the Filter on Insert 47 are in the project). The engine log of the playback is saved (log-play.log: the lines after the mark 'play'); a shot (play-10s-playing.png) is taken while the playback runs (before the second Space); expectRunning at the end.",
+  "rep": 1,
+  "seconds": 55,
+  "firstIdleMs": 4114.530029296875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "logs": [
+   {
+    "name": "log-play",
+    "lines": 0
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 40.08999999985099,
+   "manifest_loaded": 51.92999999970198,
+   "download_start": 76.0949999988079,
+   "compile_done": 1028.769999999553,
+   "download_done": 1119.570000000298,
+   "pack_source_dll": 1173.580078125,
+   "pack_source_seed": 1173.619873046875,
+   "glue_loaded": 1182.080078125,
+   "worker_ready": 1182.679999999702,
+   "engine_start": 1182.719999998808,
+   "wasm_instantiated": 1206.574951171875,
+   "files_ready": 1216.93505859375,
+   "main_start": 1217.969970703125,
+   "idle": 4114.530029296875,
+   "host_files_released": 4114.89501953125,
+   "first_pixel": 4135.784912109375,
+   "filedlg_request": 16388.215087890625,
+   "filedlg_answer": 19746.35009765625
+  },
+  "loadStart": 0.61,
+  "loadEnd": 1.26,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

@@ -1,0 +1,15 @@
+d2d90a9 R5-3k: ole32!CoInitializeEx の応答を足す(決定 0372・0375。分類 b。ブランチ r5-3h-coinitializeex の 2f1915b を取り込み。cargo test は既知の 1 件を除く新しい失敗 0。台本 A で 0372 を含む bundle だけが止まらなかった(各 n=3))
+
+ lift/crates/fe-lift/src/imports_table.rs   |  2 +
+ lift/crates/fe-lift/tests/oleaut_ole.rs    | 71 ++++++++++++++++++++++++++++++
+ lift/crates/fe-lift/tests/rows_0372/mod.rs |  7 +++
+ lift/crates/fe-lift/tests/wall_fr13.rs     |  3 +-
+ lift/crates/fe-lift/tests/wall_fr15.rs     |  3 +-
+ lift/crates/fe-lift/tests/wall_fr16.rs     |  3 +-
+ lift/crates/fe-lift/tests/wall_fr19.rs     |  3 +-
+ lift/crates/fe-lift/tests/wall_fr20.rs     |  5 ++-
+ lift/crates/fe-lift/tests/wall_fr4.rs      |  3 +-
+ lift/crates/fe-lift/tests/wall_fr5.rs      |  3 +-
+ lift/runtime/fle_ole.c                     | 13 ++++++
+ lift/runtime/fle_ole.h                     |  2 +
+ 12 files changed, 110 insertions(+), 8 deletions(-)

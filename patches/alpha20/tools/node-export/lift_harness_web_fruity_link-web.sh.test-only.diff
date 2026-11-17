@@ -1,0 +1,17 @@
+--- /tmp/base-lift_harness_web_fruity_link-web.sh	2026-11-06 21:18:16.690385100 +0900
++++ tt-split/lift/harness/web/fruity/link-web.sh	2026-11-06 21:06:21.165619336 +0900
+@@ -16,11 +16,11 @@
+ mkdir -p "$OUTD"
+ ( shopt -s nullglob; ulimit -v 12582912; /usr/bin/time -f "link %e s %M KB maxrss" -o "$OUTD/link.time" emcc -O0 \
+     -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8MB -sGLOBAL_BASE=268435456 \
+-    -sENVIRONMENT=web,worker -sMODULARIZE=1 -sEXIT_RUNTIME=1 -sEXPORT_ES6=1 -sFILESYSTEM=0 \
++    -sENVIRONMENT=web,worker -sMODULARIZE=1 -sEXIT_RUNTIME=1 -sEXPORT_ES6=1 -sFORCE_FILESYSTEM=1 \
+     -sSUPPORT_LONGJMP=wasm -sJSPI \
+-    --js-library "$LIFT/harness/web/threads/fle_thread_lib.js" -sEXPORTED_FUNCTIONS=_main,_fle_wasm_thread_entry,_fle_host_post_input --js-library "$LIFT/harness/web/fruity/fle_idle_lib.js" -sEXPORTED_RUNTIME_METHODS=ENV,wasmExports,stackRestore \
++    --js-library "$LIFT/harness/web/threads/fle_thread_lib.js" -sEXPORTED_FUNCTIONS=_main,_fle_wasm_thread_entry,_fle_host_post_input --js-library "$LIFT/harness/web/fruity/fle_idle_lib.js" -sEXPORTED_RUNTIME_METHODS=FS,ENV,wasmExports,stackRestore \
+     --js-library "$LIFT/harness/web/filedlg/fle_filedlg_lib.js" \
+-    -pthread -sPTHREAD_POOL_SIZE=0 -sINITIAL_MEMORY=671088640 -sMAXIMUM_MEMORY=2147483648 -Wl,--export-memory -Wl,--export=__tls_base \
++    -pthread -sPTHREAD_POOL_SIZE=0 -sINITIAL_MEMORY=671088640 -sMAXIMUM_MEMORY=4294967296 -Wl,--export-memory -Wl,--export=__tls_base \
+     -Wl,--allow-undefined -sERROR_ON_UNDEFINED_SYMBOLS=0 -sWARN_ON_UNDEFINED_SYMBOLS=0 \
+     -Wl,--wrap=__cyg_profile_func_enter -Wl,--wrap=fle_raster_wrote \
+     -Wl,--wrap=fprintf -Wl,--wrap=fputs -Wl,--wrap=abort \

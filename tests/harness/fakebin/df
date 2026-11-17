@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Test double for df: prints a fixed free size so that preflight's disk row can be tested on both sides.
+# FAKE_DF_REPO_GIB (default 600) is what the repository's file system has free; /tmp is reported as a tmpfs with FAKE_DF_TMP_GIB (default 3).
+args="$*"
+last="${*: -1}"
+case "$args" in
+  *"--output=avail"*) if [ "$last" = /tmp ]; then echo "Avail"; echo "${FAKE_DF_TMP_GIB:-3}G"; else echo "Avail"; echo "${FAKE_DF_REPO_GIB:-600}G"; fi ;;
+  *"--output=fstype"*) echo "Type"; echo tmpfs ;;
+  *) exec "$(PATH=${PATH#*fakebin:} command -v df)" "$@" ;;
+esac

@@ -1,0 +1,8 @@
+# Extra rows of the MERGED dispatch table for the fake host object of CreateFruityInstance (lift/harness/fruity_host.h).
+# Read by lift/harness/two/merge_tables_n.py --extra-rows (gen_two.sh passes it when FRUITY_ROWS is set; a4-multi.sh sets it for FLE_CALL_FRUITY=1).
+# One row per line: <VA, 0x-prefixed hex> <C function name>. '#' starts a comment. The VAs are in a region that no other table uses and
+# must equal FRUITY_STUB_VA(0..2) of fruity_host.h (lift/harness/seeds/fruity_selftest.c checks that when it is given this file).
+# The functions are defined in lift/harness/fruity.c (void f(void), the convention of the runtime answers).
+0x7ffb00000010 fruity_host_slot0
+0x7ffb00000020 fruity_host_slot1
+0x7ffb00000030 fruity_host_slot2

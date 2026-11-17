@@ -1,0 +1,17 @@
+# VFS seed list (decision 0110, PROVISIONAL): product files of the FL Studio installer that the harness writes to the virtual volume before
+# the guest runs. Used only when the harness gets FLE_VFS_SEED=<this file> (a4-multi.sh: VFS_SEED=<abs path of this file>); otherwise the
+# volume is empty (decision 0018). Format and rules: lift/harness/vfs_seed.h. Three TAB-separated fields per line:
+#   guest path  <TAB>  host file (relative to $FLE_VFS_SEED_ROOT = the repository root for a4-multi.sh)  <TAB>  SHA-256 of the host file
+# The host files are NOT in git (lift/out*/ is ignored). Make them once, from the installer, with
+#   INSTALLER = flstudio_win64_26.1.7.5653.exe (SHA-256 04393e7946c7369aaa5cd9ce1c755803e922146289e1ae3263629a44f4e5fc02):
+#   mkdir -p lift/out-inventory/extracted/fonts
+#   python3 tools/extract_nsis2.py INSTALLER --write ILCursors.ilfont  lift/out-inventory/extracted/fonts/ILCursors.ilfont
+#   python3 tools/extract_nsis2.py INSTALLER --write ILGlyphsEx.ilfont lift/out-inventory/extracted/fonts/ILGlyphsEx.ilfont
+# Guest directory: FLE_VIRTUAL_SHARED_DIR of lift/runtime/fle_vfs.c (decision 0104) + "Artwork\Fonts\". ILTools looks for it as the directory of
+# its own GetModuleFileNameW path + "Artwork\Fonts\ILGlyphsEx.ilfont" (the marker); if the marker is there, the same directory is searched for
+# "ILCursors.ilfont". If FLE_VIRTUAL_SHARED_DIR changes, change both paths here.
+# Not listed on purpose (candidates, see decision 0110): OpenSans-Regular.ttf (217,360 B, SHA-256 e64e508b2aa2880f907e470c4550980ec4c0694d103a43f36150ac3f93189bee),
+# the rest of the 36 files of Shared\Artwork\Fonts. Windows system fonts (Segoe UI, ...) are not in the installer and are never listed.
+C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILCursors.ilfont	lift/out-inventory/extracted/fonts/ILCursors.ilfont	588c4bf43070ebe92e97ef7a317677575ae344f71ef75020f0b13a308adb880b
+C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILGlyphsEx.ilfont	lift/out-inventory/extracted/fonts/ILGlyphsEx.ilfont	578b46df16da9e98e9fe837b5786ec037b84a91478a46990b0d251d86f58aeb1
+C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Generators\MIDI Out\Data\GM CCs.txt	lift/out-fruity11/inputs/GM_CCs.txt	af33bd90f8bc734332e6ed7349c2decd43979b0c9275fa55eda90cde87eaee5e

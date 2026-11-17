@@ -1,0 +1,49 @@
+--- a/wsrc/src/fle-08.c
++++ b/wsrc/src/fle-08.c
+@@ -5,6 +5,8 @@
+ #include "fle_vmap.h"
+ #include "fle_seh.h"
+ #include "fle_flags_nf.h"
++#include "fle_x87ctl.h"
++extern uint32_t fle_mxcsr;
+ /* ---- alpha1 0308b elog (throwaway test tree only) ---- */
+ static uint64_t el_h(uint64_t a, uint64_t n) {
+     uint64_t h = UINT64_C(0xcbf29ce484222325), i;
+@@ -188636,7 +188638,7 @@
+     fle_seh_enter(&sr, UINT64_C(0xa97930));
+     uint64_t el_b1 = R[2], el_b2 = R[8], el_ch = fle_ld(R[4] + 0x38, 4), el_n1 = R[9], el_n2 = fle_ld(R[4] + 0x28, 8); unsigned el_s = el_n_a97930++;
+     if (el_s == 0) el_dump("/dump/a97930-in.f32", el_b1, el_n1 * el_ch * 4);
+-    if (EL_OK()) EL_LINE("ELOG a97930 %x p=%llx n1=%llx n2=%llx ratio=%llx ch=%x flag=%x h1=%llx h2=%llx\n", el_s, (unsigned long long)(R[1]), (unsigned long long)(el_n1), (unsigned long long)(el_n2), (unsigned long long)(fle_ld(R[4] + 0x30, 8)), (unsigned)el_ch, (unsigned)(fle_ld(R[4] + 0x40, 1) & 0xff), (unsigned long long)(el_h(el_b1, el_n1 * el_ch * 4)), (unsigned long long)(el_h(el_b2, el_n2 * el_ch * 4)));
++    if (EL_OK()) EL_LINE("ELOG a97930 %x p=%llx n1=%llx n2=%llx ratio=%llx ch=%x flag=%x h1=%llx h2=%llx cw=%04x mx=%08x\n", el_s, (unsigned long long)(R[1]), (unsigned long long)(el_n1), (unsigned long long)(el_n2), (unsigned long long)(fle_ld(R[4] + 0x30, 8)), (unsigned)el_ch, (unsigned)(fle_ld(R[4] + 0x40, 1) & 0xff), (unsigned long long)(el_h(el_b1, el_n1 * el_ch * 4)), (unsigned long long)(el_h(el_b2, el_n2 * el_ch * 4)), (unsigned)fle_x87.cw, (unsigned)fle_mxcsr);
+     if (FLE_SEH_SETJMP(&sr) == 0) { fb_a97930(); } else { fle_seh_land(&sr); }
+     if (el_s == 0) el_dump("/dump/a97930-out.f32", el_b2, el_n2 * el_ch * 4);
+     if (EL_OK()) EL_LINE("ELOG a97930x %x h1=%llx h2=%llx\n", el_s, (unsigned long long)(el_h(el_b1, el_n1 * el_ch * 4)), (unsigned long long)(el_h(el_b2, el_n2 * el_ch * 4)));
+--- a/wsrc/v-tb2d2/src/m7-03.c
++++ b/wsrc/v-tb2d2/src/m7-03.c
+@@ -3,6 +3,8 @@
+ #include "fle_sse.h"
+ #include "fle_dispatch.h"
+ #include "fle_flags_nf.h"
++#include "fle_x87ctl.h"
++extern uint32_t fle_mxcsr;
+ 
+ /* ---- alpha1 0308b elog2 helper (throwaway test tree only) ---- */
+ static uint64_t el_h(uint64_t a, uint64_t n) {
+@@ -102560,7 +102562,7 @@
+ {
+     uint64_t el_p = R[1], el_a = R[2]; unsigned el_n = (uint32_t)R[8]; int el_i = el_inst(el_p); unsigned el_ic = 0, el_lg = 0, el_s6 = el_n_b284e60++;
+     if (el_i >= 0) el_ic = el_icnt[el_i]++;
+-    if (el_total < 100000u && el_c_b284e60 < 10000u) { el_lg = 1; el_c_b284e60++; EL_LINE("ELOG b284e60 %x inst=%x ic=%x n=%x\n", el_s6, (unsigned)el_i, el_ic, el_n); }
++    if (el_total < 100000u && el_c_b284e60 < 10000u) { el_lg = 1; el_c_b284e60++; EL_LINE("ELOG b284e60 %x inst=%x ic=%x n=%x cw=%04x mx=%08x\n", el_s6, (unsigned)el_i, el_ic, el_n, (unsigned)fle_x87.cw, (unsigned)fle_mxcsr); }
+ L_b284e60: { /* 0xb284e60 Mov */ R[1] = fle_ld((R[1] + UINT64_C(0x8)), 8);}
+ L_b284e64: { /* 0xb284e64 Mov */ R[0] = fle_ld((R[1]), 8);}
+ L_b284e67: { /* 0xb284e67 Jmp */ { fle_dispatch(fle_ld((R[0] + UINT64_C(0x28)), 8)); if (el_lg) { unsigned el_ch = (el_i >= 0) ? el_chn[el_i] : 0, el_c; uint64_t el_h2 = UINT64_C(0xcbf29ce484222325); for (el_c = 0; el_c < el_ch && el_c < 8u; el_c++) el_h2 = el_hu(el_h2, fle_ld(el_a + 8 * (uint64_t)el_c, 8), (uint64_t)el_n * 4); EL_LINE("ELOG b284e60x %x inst=%x ic=%x n=%x ch=%x h=%016llx\n", el_s6, (unsigned)el_i, el_ic, el_n, el_ch, (unsigned long long)el_h2); if (el_i >= 0 && el_i < 8 && el_ic < 20u) { char el_nm[64]; FILE *el_f; snprintf(el_nm, sizeof el_nm, "/dump/rs-%d-%u.f32", el_i, el_ic); el_f = fopen(el_nm, "wb"); if (el_f) { for (el_c = 0; el_c < el_ch && el_c < 8u; el_c++) el_dump_ch(el_f, fle_ld(el_a + 8 * (uint64_t)el_c, 8), (uint64_t)el_n * 4); fclose(el_f); } } } return; }}
+@@ -102967,7 +102969,7 @@
+ {
+     unsigned el_s = el_n_b285320++;
+     el_lastch = (unsigned)R[2];
+-    if (EL_OK(el_c_b285320)) { el_c_b285320++; EL_LINE("ELOG b285320 %x rcx=%llx rdx=%x x2=%x x3=%x s5=%x s6=%x s7=%x s8=%x\n", el_s, (unsigned long long)(R[1]), (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned)X[3].u32[0], (unsigned)fle_ld(R[4] + 0x28, 4), (unsigned)fle_ld(R[4] + 0x30, 4), (unsigned)fle_ld(R[4] + 0x38, 4), (unsigned)fle_ld(R[4] + 0x40, 4)); }
++    if (EL_OK(el_c_b285320)) { el_c_b285320++; EL_LINE("ELOG b285320 %x rcx=%llx rdx=%x x2=%x x3=%x s5=%x s6=%x s7=%x s8=%x cw=%04x mx=%08x\n", el_s, (unsigned long long)(R[1]), (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned)X[3].u32[0], (unsigned)fle_ld(R[4] + 0x28, 4), (unsigned)fle_ld(R[4] + 0x30, 4), (unsigned)fle_ld(R[4] + 0x38, 4), (unsigned)fle_ld(R[4] + 0x40, 4), (unsigned)fle_x87.cw, (unsigned)fle_mxcsr); }
+ L_b285320: { /* 0xb285320 Sub */ { uint64_t t = fle_nf_sub(64, R[4], (UINT64_C(0x68)), 0); R[4] = t; }}
+ L_b285324: { /* 0xb285324 Mov */ R[8] = (uint32_t)(fle_ld((R[4] + UINT64_C(0x90)), 4));}
+ L_b28532c: { /* 0xb28532c Xor */ { uint64_t t = fle_op_logic(32, (((uint32_t)R[9])) ^ (((uint32_t)R[9]))); R[9] = (uint32_t)(t); }}

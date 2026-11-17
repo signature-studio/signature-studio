@@ -1,0 +1,36 @@
+## before P3-song-C1 (2026-11-17T05:55:21Z)
+1.75 2.21 2.16 2/1263 1675252
+               total        used        free      shared  buff/cache   available
+Mem:           25539        5206        3345        1515       18943       20332
+Swap:           4095        1311        2784
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 1  0 1342560 3425620 558708 18838956   28   44  3613   984 6262    4  5  1 93  0  0  0
+ 2  0 1342560 3432608 558708 18838956    0    0     0     0 11732 7291  2  6 92  0  0  0
+ 1  0 1342560 3441580 558708 18838960    0    0     0     8 11528 6948  2  6 92  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.03 total=157393943
+browser pid=7131 age=13:31:58 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 1.69 io 0 after 2 s; mem avail 15034 MB, swap used 1311 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-song-c-chrome-1
+--- stdout (tail)
+05:55:27 backend chrome 
+05:55:27 scenario s3a-song 
+06:01:20   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P3-song-C1 (2026-11-17T06:01:22Z)
+2.86 2.23 2.14 1/1259 1700963
+               total        used        free      shared  buff/cache   available
+Mem:           25687        5218       16900        1611        5621       20468
+Swap:           4095        1368        2727
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1400888 17305976 211088 5545068   28   45  3601   987 6294    4  6  1 93  0  0  0
+ 0  0 1400884 17293256 211092 5545892   48    0   516  1168 4380 3808  2  1 97  0  0  0
+ 0  0 1400884 17306764 211092 5545640    0    0     0     0 2086 2345  0  0 99  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=157558432
+browser pid=7131 age=13:37:59 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-song-c-chrome-1 (3 files)

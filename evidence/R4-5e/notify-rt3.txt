@@ -1,0 +1,8 @@
+r45e-mixprof-p-chrome-3 notify functions: 7 self s (top 8):
+ 122519 instr 9 calls 0          30.94
+ 122945 instr 491 calls 1        25.81
+ 123409 instr 74 calls 1         0.00
+   7357 instr 50 calls 0         0.00
+ 122961 instr 1043 calls 1       0.00
+ 122969 instr 80 calls 2         0.00
+ 123467 instr 274 calls 1        0.00

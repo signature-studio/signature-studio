@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# pre-commit: scan the STAGED content (not the working tree) with scripts/scan-forbidden.sh. A finding rejects the commit.
+# The staged files are exported from the index to a directory inside .git, so a file that is only partly staged is judged by what would be committed.
+# Findings print rule, file and line only; values are never printed. There is no switch to skip it (docs/policies: no options).
+set -o pipefail
+
+root=$(git rev-parse --show-toplevel) || { echo "pre-commit: not inside a git work tree" >&2; exit 1; }
+cd "$root" || { echo "pre-commit: cannot enter $root" >&2; exit 1; }
+[ -x scripts/scan-forbidden.sh ] || { echo "pre-commit: scripts/scan-forbidden.sh is missing or not executable; refusing to commit without the scan" >&2; exit 1; }
+
+gitdir=$(git rev-parse --absolute-git-dir) || { echo "pre-commit: cannot find the git directory" >&2; exit 1; }
+tmp=$(mktemp -d "$gitdir/scan-staged.XXXXXX") || { echo "pre-commit: cannot create a directory in $gitdir" >&2; exit 1; }
+trap 'rm -rf "$tmp"' EXIT
+
+git diff --cached --name-only -z --diff-filter=ACMR > "$tmp.list" || { echo "pre-commit: cannot list staged files" >&2; exit 1; }
+trap 'rm -rf "$tmp" "$tmp.list"' EXIT
+if [ ! -s "$tmp.list" ]; then
+  exit 0
+fi
+git checkout-index --prefix="$tmp/" -z --stdin < "$tmp.list" || { echo "pre-commit: cannot export the staged files" >&2; exit 1; }
+
+# The allowlist is read from the repository's scripts/ directory (the script's own location), the paths are the repository paths.
+(cd "$tmp" && "$root/scripts/scan-forbidden.sh" .) || {
+  echo "pre-commit: the commit is rejected. Fix the staged files (see rule, file and line above)." >&2
+  exit 1
+}

@@ -1,0 +1,458 @@
+#define _GNU_SOURCE
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "fle_runtime.h"
+#include "fle_host.h"
+#include "fle_imports.h"
+#include "fle_thread.h"
+#include "fle_env.h"
+
+/* MSDN GetCurrentThreadId: DWORD, "the thread identifier of the calling thread", unique in the system until the
+ * thread ends. The run has one guest thread, so the answer is the fixed FLE_EMULATED_TID on native and wasm alike
+ * (decision 0056); the host tid is not returned. A second guest thread would need its own value (decision 0056,
+ * extension point). Arguments are not read. */
+void fle_imp_GetCurrentThreadId(void)
+{
+    /* Decision 0122: the first thread is FLE_EMULATED_TID, a thread that CreateThread made has the next numbers (fle_thread.c). */
+    R[0] = fle_thread_current ? FLE_EMULATED_TID + fle_thread_current() : FLE_EMULATED_TID;
+}
+
+/* The index is opaque (MSDN: TlsAlloc Remarks). The harness hands out a fresh
+ * index per call, up to the per-process maximum of 1,088 (MSDN: Thread Local
+ * Storage). 0xFFFFFFFF on exhaustion is an assumption, not checked against the
+ * spec. Arguments are not read (the function takes none). */
+#define FLE_TLS_MAX_INDEXES 1088u
+#define FLE_TLS_OUT_OF_INDEXES 0xFFFFFFFFu
+
+static uint32_t fle_tls_next_index;
+
+void fle_imp_TlsAlloc(void)
+{
+    uint32_t idx = __atomic_fetch_add(&fle_tls_next_index, 1, __ATOMIC_SEQ_CST);
+    if (idx >= FLE_TLS_MAX_INDEXES) {
+        __atomic_fetch_sub(&fle_tls_next_index, 1, __ATOMIC_SEQ_CST);
+        R[0] = FLE_TLS_OUT_OF_INDEXES;
+        return;
+    }
+    R[0] = idx;
+}
+
+/* kernel32!LocalAlloc: HLOCAL LocalAlloc(UINT uFlags, SIZE_T uBytes). uFlags is
+ * in rcx (R[1]), uBytes in rdx (R[2]). Without LMEM_MOVEABLE the default
+ * LMEM_FIXED applies and the return value is a pointer to the block (MSDN:
+ * LocalAlloc, uFlags and Return value). LMEM_ZEROINIT (0x40) zeroes the block.
+ * uBytes == 0 is allocated as 1 byte (not specified for LMEM_FIXED; assumption).
+ * Failure returns NULL. GetLastError is not set (not implemented in this
+ * runtime). LMEM_MOVEABLE handles are not implemented and stop the run. */
+#define FLE_LMEM_MOVEABLE 0x0002u
+#define FLE_LMEM_ZEROINIT 0x0040u
+
+void fle_imp_LocalAlloc(void)
+{
+    uint32_t flags = (uint32_t)R[1];
+    uint64_t bytes = R[2];
+    void *p;
+
+    if (flags & FLE_LMEM_MOVEABLE) {
+        fprintf(stderr, "fle: LocalAlloc flags %#x (LMEM_MOVEABLE) not supported\n", flags);
+        abort();
+    }
+    if (bytes == 0) bytes = 1;
+    p = !fle_host_size_fits(bytes) ? NULL : (flags & FLE_LMEM_ZEROINIT) ? calloc(1, (size_t)bytes) : malloc((size_t)bytes);
+    R[0] = (uint64_t)(uintptr_t)p;
+}
+
+/* kernel32!FormatMessageW: DWORD f(DWORD dwFlags rcx, LPCVOID lpSource rdx, DWORD dwMessageId r8d, DWORD dwLanguageId r9d, LPWSTR lpBuffer [5], DWORD nSize [6], va_list *Arguments [7]) (decision 0126, PROVISIONAL,
+ * wall 75). Learn (FormatMessageW): "Formats a message string ... The function copies the formatted message text to an output buffer"; FORMAT_MESSAGE_ALLOCATE_BUFFER 0x100: "The function allocates a buffer large enough to
+ * hold the formatted message, and places a pointer to the allocated buffer at the address specified by lpBuffer ... The nSize parameter specifies the minimum number of TCHARs to allocate ... The caller should use the
+ * LocalFree function to free the buffer"; FORMAT_MESSAGE_FROM_SYSTEM 0x1000: "The function should search the system message-table resource(s) for the requested message ... an application can pass the result of the
+ * GetLastError function to retrieve the message text for a system-defined error"; FORMAT_MESSAGE_IGNORE_INSERTS 0x200: "Insert sequences in the message definition such as %1 are to be ignored and passed through to the output
+ * buffer unchanged ... the Arguments parameter is ignored"; FORMAT_MESSAGE_ARGUMENT_ARRAY 0x2000; the low-order byte of dwFlags is the line-width option (0: "There are no output line width restrictions"); "If you
+ * pass in zero [for dwLanguageId], FormatMessage looks for a message for LANGIDs in the following order: Language neutral, Thread LANGID ..., User default ..., System default ..., US English"; "If the function succeeds, the
+ * return value is the number of TCHARs stored in the output buffer, excluding the terminating null character. If the function fails, the return value is zero. To get extended error information, call GetLastError"
+ * (ERROR_RESOURCE_LANG_NOT_FOUND for a message that is not found in a language). Answered: dwFlags exactly FORMAT_MESSAGE_FROM_SYSTEM | IGNORE_INSERTS, optionally with ALLOCATE_BUFFER and ARGUMENT_ARRAY (ignored with
+ * IGNORE_INSERTS) and a zero line-width byte; lpSource ignored ("If neither of these flags [FROM_HMODULE, FROM_STRING] is set ... lpSource is ignored"); dwLanguageId 0 (the neutral/user language: the one English text);
+ * dwMessageId one of the 241 numbers of the page System Error Codes (0-499) (fle_errmsg_table.h, generated by tools/gen_errmsg.py): the text of the page followed by a space-less CR LF as the real function appends
+ * ("Windows system messages end with CR LF" is NOT on the page: S-errmsg-crlf, a CHOICE: the text is stored WITHOUT the line break, so that the result is the page's text exactly); a message number that the page does not
+ * list: 0 and ERROR_MR_MID_NOT_FOUND (317, System Error Codes: "The system cannot find message text for message number 0x%1 in the message file for %2.": the code the page names for a message that is not found).
+ * With ALLOCATE_BUFFER the block is allocated like LocalAlloc (a fixed block, malloc) with room for the text, the terminating NUL and at least nSize characters, and its address is stored at lpBuffer. Without it the buffer
+ * is nSize TCHARs: a text that does not fit fails with 0 and ERROR_INSUFFICIENT_BUFFER (122, System Error Codes: "The data area passed to a system call is too small."). Every other flag combination (FROM_STRING,
+ * FROM_HMODULE, inserts processed, a line width, a language id other than 0) stops. */
+#include "fle_errmsg_table.h"
+#include "fle_errmsg_hresult.h"   /* decision 0129: HRESULT texts from Learn's COM Error Codes (S-errmsg-hresult-learn-text) */
+#include "fle_errmsg_module.h"    /* decision 0132: texts of the message tables of virtual modules (S-errmsg-wininet-learn-text) */
+
+/* Decision 0132: the name of the virtual module whose handle is `h` (fle_modules.c: FLE_MODULE_HANDLE_BASE + STEP * (index + 1)), or NULL. Weak references: a unit that links fle_imports.c without fle_modules.c has no module. */
+uint64_t fle_module_count(void) __attribute__((weak));
+const char *fle_module_name(uint64_t index) __attribute__((weak));
+static const char *fle_fmt_module_of(uint64_t h)
+{
+    const uint64_t base = UINT64_C(0x7FF800000000), step = UINT64_C(0x10000);   /* fle_modules.h */
+    uint64_t k;
+
+    if (!fle_module_count || !fle_module_name || h <= base || (h - base) % step) return NULL;
+    k = (h - base) / step - 1u;
+    return k < fle_module_count() ? fle_module_name(k) : NULL;
+}
+
+#define FLE_FMT_ALLOCATE_BUFFER 0x00000100u
+#define FLE_FMT_IGNORE_INSERTS  0x00000200u
+#define FLE_FMT_FROM_STRING     0x00000400u
+#define FLE_FMT_FROM_HMODULE    0x00000800u
+#define FLE_FMT_FROM_SYSTEM     0x00001000u
+#define FLE_FMT_ARGUMENT_ARRAY  0x00002000u
+#define FLE_FMT_MAX_WIDTH_MASK  0x000000FFu
+
+/* Decision 0126: the stops of FormatMessageW use this local function and not fle_stop (fle_env.c): fle_imports.c is linked without fle_env.c by the unit tests of the locale, the system and the version
+ * answers, and the message and the abort are the same ("fle: <api>: <why>", SIGABRT). */
+static void fle_fmt_stop(const char *api, const char *why) __attribute__((noreturn));
+static void fle_fmt_stop(const char *api, const char *why)
+{
+    fprintf(stderr, "fle: %s: %s\n", api, why);
+    abort();
+}
+
+void fle_imp_FormatMessageW(void)
+{
+    static const char api[] = "FormatMessageW";
+    uint32_t flags = (uint32_t)R[1], id = (uint32_t)R[8], lang = (uint32_t)R[9], nsize = (uint32_t)fle_arg(6);
+    uint64_t buf = fle_arg(5);
+    const char *text = NULL, *modname = NULL;
+    size_t i, n, cap;
+    char why[160];
+
+    if (flags & FLE_FMT_FROM_STRING) fle_fmt_stop(api, "FORMAT_MESSAGE_FROM_STRING: a message definition with inserts is not formatted here");
+    /* Decision 0132 (PROVISIONAL, wall 24): FORMAT_MESSAGE_FROM_HMODULE with the handle of a virtual module whose message table this runtime holds (fle_errmsg_module.h). Learn: "The lpSource parameter is a module handle
+     * containing the message-table resource(s) to search"; with FORMAT_MESSAGE_FROM_SYSTEM too, "the function searches the system message table if the message is not found in the module specified by lpSource". A module
+     * with no entry in the table stops (its message table is not read here); a NULL lpSource ("the current process's application image file will be searched") stops. */
+    if (flags & FLE_FMT_FROM_HMODULE) {
+        size_t k;
+        int has = 0;
+
+        modname = fle_fmt_module_of(R[2]);
+        if (!modname) fle_fmt_stop(api, "FORMAT_MESSAGE_FROM_HMODULE: lpSource is not the handle of a virtual module of this runtime (NULL asks for the application image file): message tables of modules are not read here");
+        for (k = 0; k < sizeof fle_errmsg_module / sizeof fle_errmsg_module[0]; k++)
+            if (!strcmp(fle_errmsg_module[k].module, modname)) has = 1;
+        if (!has) fle_fmt_stop(api, "FORMAT_MESSAGE_FROM_HMODULE: the message table of this module is not read here");
+    }
+    if (!(flags & (FLE_FMT_FROM_SYSTEM | FLE_FMT_FROM_HMODULE))) fle_fmt_stop(api, "neither FORMAT_MESSAGE_FROM_SYSTEM nor FORMAT_MESSAGE_FROM_HMODULE is set: without a source flag the page gives no message to format");
+    if (!(flags & FLE_FMT_IGNORE_INSERTS)) fle_fmt_stop(api, "FORMAT_MESSAGE_IGNORE_INSERTS is not set: the insert sequences of the system messages are not formatted here");
+    if (flags & ~(FLE_FMT_ALLOCATE_BUFFER | FLE_FMT_IGNORE_INSERTS | FLE_FMT_FROM_SYSTEM | FLE_FMT_FROM_HMODULE | FLE_FMT_ARGUMENT_ARRAY)) {
+        snprintf(why, sizeof why, "dwFlags %#x holds a bit this runtime does not model (a line width in the low byte, or an unknown bit)", flags);
+        fle_fmt_stop(api, why);
+    }
+    if (lang != 0) {
+        snprintf(why, sizeof why, "dwLanguageId %#x is not 0: the texts of other languages are not on the pages", lang);
+        fle_fmt_stop(api, why);
+    }
+    if (buf == 0) fle_fmt_stop(api, "lpBuffer is NULL: the page gives no behaviour");
+    if (modname) {
+        for (i = 0; i < sizeof fle_errmsg_module / sizeof fle_errmsg_module[0]; i++)
+            if (fle_errmsg_module[i].code == id && !strcmp(fle_errmsg_module[i].module, modname)) text = fle_errmsg_module[i].text;
+        if (!text && !(flags & FLE_FMT_FROM_SYSTEM)) {
+            fle_set_last_error(317u);   /* ERROR_MR_MID_NOT_FOUND, as for the system table (System Error Codes) */
+            R[0] = 0;
+            return;
+        }
+    }
+    for (i = 0; !text && (flags & FLE_FMT_FROM_SYSTEM) && i < sizeof fle_errmsg / sizeof fle_errmsg[0]; i++)
+        if (fle_errmsg[i].code == id) text = fle_errmsg[i].text;
+    /* Decision 0129 (PROVISIONAL, S-errmsg-hresult-learn-text, PM's decision): an HRESULT that Learn's COM Error Codes page holds with a text (only the ones the guest has asked about: fle_errmsg_hresult.h) is answered
+     * with the page's text as the Win32 ones are. A message number that neither table holds is still 0 and ERROR_MR_MID_NOT_FOUND (317), lpBuffer untouched (the page says nothing of lpBuffer on failure); a guest that
+     * then frees an uninitialised lpBuffer is the guest's own matter (the guest of decision 0129 wall 15 did, for 0x80040154, before this table). */
+    for (i = 0; !text && (flags & FLE_FMT_FROM_SYSTEM) && i < sizeof fle_errmsg_hresult / sizeof fle_errmsg_hresult[0]; i++)
+        if (fle_errmsg_hresult[i].code == id) text = fle_errmsg_hresult[i].text;
+    if (!text) {
+        fle_set_last_error(317u);
+        R[0] = 0;
+        return;
+    }
+    n = strlen(text);
+    if (flags & FLE_FMT_ALLOCATE_BUFFER) {
+        uint64_t units = n + 1u > nsize ? n + 1u : nsize;
+        uint16_t *p = (uint16_t *)calloc((size_t)units, sizeof(uint16_t));
+
+        if (!p) {
+            fle_set_last_error(8u);          /* ERROR_NOT_ENOUGH_MEMORY (System Error Codes: "Not enough memory resources are available to process this command.") */
+            R[0] = 0;
+            return;
+        }
+        for (i = 0; i < n; i++) p[i] = (uint8_t)text[i];
+        fle_st(buf, 8, (uint64_t)(uintptr_t)p);
+        R[0] = n;
+        return;
+    }
+    cap = nsize;
+    if (cap < n + 1u) {
+        fle_set_last_error(122u);
+        R[0] = 0;
+        return;
+    }
+    for (i = 0; i < n; i++) fle_st(buf + 2u * i, 2, (uint8_t)text[i]);
+    fle_st(buf + 2u * n, 2, 0);
+    R[0] = n;
+}
+
+/* TLS slots and last error for a single-thread run. One value per TlsAlloc index,
+ * held for the owner thread: the first call from these stubs records its gettid,
+ * and a call from another thread stops the run (fail-closed). Other threads'
+ * slots are not implemented. Slots start at NULL (MSDN: TlsAlloc, Remarks). */
+#define FLE_ERROR_INVALID_PARAMETER 87u
+
+uint64_t fle_tls_values[FLE_TLS_MAX_INDEXES]; /* not static: GS:[0x58] (fle_vex.h) points here */
+static uint32_t fle_last_error;
+static long fle_tls_owner_tid;
+
+static void fle_tls_check_thread(void)
+{
+    long tid = fle_host_tid();
+    if (fle_tls_owner_tid == 0) fle_tls_owner_tid = tid;
+    if (tid != fle_tls_owner_tid) {
+        fprintf(stderr, "fle: TLS or last-error call from tid %ld (owner %ld) not supported\n",
+                tid, fle_tls_owner_tid);
+        abort();
+    }
+}
+
+/* Decision 0122: the slots of the running guest thread. The first thread keeps fle_tls_values (GS:[0x58] answers it); a thread that CreateThread made has its own table, which starts
+ * at zero (Learn TlsAlloc: "The slots for the index are initialized to zero"), and a last error of its own (Learn GetLastError: "maintained on a per-thread basis"). */
+static uint64_t *tls_table(void)
+{
+    uint64_t *t = fle_thread_tls_values ? fle_thread_tls_values() : NULL;
+
+    return t ? t : fle_tls_values;
+}
+
+static uint32_t *last_error_slot(void)
+{
+    uint32_t *e = fle_thread_slot_last_error ? fle_thread_slot_last_error() : NULL;
+
+    return e ? e : &fle_last_error;
+}
+
+static uint8_t fle_tls_freed[FLE_TLS_MAX_INDEXES]; /* TlsFree (decision 0078) */
+
+static int fle_tls_allocated(uint32_t idx)
+{
+    return idx < __atomic_load_n(&fle_tls_next_index, __ATOMIC_SEQ_CST) && !fle_tls_freed[idx];
+}
+
+/* kernel32!TlsSetValue: BOOL TlsSetValue(DWORD dwTlsIndex, LPVOID lpTlsValue).
+ * dwTlsIndex in rcx (R[1]), lpTlsValue in rdx (R[2]). Nonzero on success, zero
+ * on failure (MSDN: TlsSetValue, Return value). Remarks say the function succeeds
+ * for indexes 0 through TLS_MINIMUM_AVAILABLE - 1 without checking them. The
+ * harness does check: an index that TlsAlloc has not handed out fails. The spec
+ * does not name the error code; ERROR_INVALID_PARAMETER (87) is a harness choice. */
+void fle_imp_TlsSetValue(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (!fle_tls_allocated(idx)) {
+        *last_error_slot() = FLE_ERROR_INVALID_PARAMETER;
+        R[0] = 0;
+        return;
+    }
+    tls_table()[idx] = R[2];
+    R[0] = 1;
+}
+
+/* kernel32!TlsGetValue: LPVOID TlsGetValue(DWORD dwTlsIndex). Index in rcx (R[1]).
+ * On success it sets the last error to 0 (MSDN: TlsGetValue, Remarks). On an
+ * invalid index it returns NULL and sets the last error (same code choice as
+ * TlsSetValue). */
+void fle_imp_TlsGetValue(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (!fle_tls_allocated(idx)) {
+        *last_error_slot() = FLE_ERROR_INVALID_PARAMETER;
+        R[0] = 0;
+        return;
+    }
+    *last_error_slot() = 0;
+    R[0] = tls_table()[idx];
+}
+
+/* kernel32!TlsFree: BOOL TlsFree(DWORD dwTlsIndex ecx) (decision 0078). MSDN (TlsFree): the index is one "allocated by the TlsAlloc
+ * function"; nonzero on success, zero on failure ("call GetLastError"). The page names no failing case and no code: an index that
+ * TlsAlloc did not hand out, and one that was already freed, fail with ERROR_INVALID_PARAMETER (87), the same harness choice as
+ * TlsSetValue and TlsGetValue above (which now also reject a freed index). TlsAlloc here never reuses an index (the page does not say
+ * a freed index is handed out again). The slot value is dropped; the page: "The TlsFree function does not free memory blocks whose
+ * addresses have been stored in the TLS slots". */
+void fle_imp_TlsFree(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (!fle_tls_allocated(idx)) {
+        *last_error_slot() = FLE_ERROR_INVALID_PARAMETER;
+        R[0] = 0;
+        return;
+    }
+    fle_tls_freed[idx] = 1;
+    fle_tls_values[idx] = 0;
+    if (fle_thread_tls_clear) fle_thread_tls_clear(idx); /* decision 0122: the slot is gone for every thread */
+    R[0] = 1;
+}
+
+/* ---- Fiber local storage (decision 0078) ----
+ * MSDN FlsAlloc, FlsFree, FlsGetValue, FlsSetValue (fibersapi.h). The run has one thread and no fiber is created, so there is one
+ * set of slots (the thread's implicit fiber). FlsAlloc returns "an FLS index initialized to zero"; the callback is kept (the page:
+ * "optional"). The index is opaque; indexes are handed out in increasing order and are not reused (the pages are silent about reuse).
+ * The pages name no maximum number of indexes, so a request past this runtime's own limit stops the run instead of returning
+ * FLS_OUT_OF_INDEXES for a limit that Windows is not documented to have.
+ * FlsSetValue names ERROR_INVALID_PARAMETER "The index is not in range" (87); FlsFree and FlsGetValue say only "the function fails",
+ * so an index that FlsAlloc did not hand out, and any use of a freed index, stop the run (no code is made up). FlsFree "causes the
+ * associated callback routine to be called for each fiber, if the corresponding FLS slot contains a non-NULL value": calling a guest
+ * function is not done here (fle_callback.c would be needed), so that case stops by name; a slot that holds NULL, or a slot with no
+ * callback, is freed. The last error is not touched on success (the pages do not say it is). */
+#define FLE_FLS_MAX_INDEXES 4096u
+#define FLE_FLS_OUT_OF_INDEXES 0xFFFFFFFFu
+#define FLE_FLS_NEVER 0u
+#define FLE_FLS_LIVE 1u
+#define FLE_FLS_FREED 2u
+
+static uint64_t fle_fls_values[FLE_FLS_MAX_INDEXES];
+/* Decision 0122: the values of FLS slots are per thread (Learn FlsAlloc: "an FLS index initialized to zero"): the first thread keeps fle_fls_values, another thread has its own table. */
+static uint64_t *fls_table(void)
+{
+    uint64_t *t = fle_thread_slot_fls ? fle_thread_slot_fls() : NULL;
+
+    return t ? t : fle_fls_values;
+}
+static uint64_t fle_fls_callbacks[FLE_FLS_MAX_INDEXES];
+static uint8_t fle_fls_state[FLE_FLS_MAX_INDEXES];
+static uint32_t fle_fls_next;
+
+static void fle_fls_stop(const char *api, const char *why)
+{
+    fprintf(stderr, "fle: %s: %s\n", api, why);
+    abort();
+}
+
+/* kernel32!FlsAlloc: DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback rcx). */
+void fle_imp_FlsAlloc(void)
+{
+    uint32_t idx;
+
+    fle_tls_check_thread();
+    if (fle_fls_next >= FLE_FLS_MAX_INDEXES)
+        fle_fls_stop("FlsAlloc", "more than 4096 FLS indexes (a limit of this runtime; the page names no maximum)");
+    idx = fle_fls_next++;
+    fle_fls_state[idx] = FLE_FLS_LIVE;
+    fls_table()[idx] = 0;
+    fle_fls_callbacks[idx] = R[1];
+    R[0] = idx;
+}
+
+/* kernel32!FlsFree: BOOL FlsFree(DWORD dwFlsIndex ecx). */
+void fle_imp_FlsFree(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (idx >= FLE_FLS_MAX_INDEXES || fle_fls_state[idx] != FLE_FLS_LIVE)
+        fle_fls_stop("FlsFree", "an index that FlsAlloc did not hand out or that was already freed (the page names no error code)");
+    if (fls_table()[idx] != 0 && fle_fls_callbacks[idx] != 0)
+        fle_fls_stop("FlsFree", "the slot holds a value and the index has a callback; the page says the callback is called, "
+                                "and calling a guest function from here is not modelled");
+    fle_fls_state[idx] = FLE_FLS_FREED;
+    fls_table()[idx] = 0;
+    fle_fls_callbacks[idx] = 0;
+    R[0] = 1;
+}
+
+/* kernel32!FlsGetValue: PVOID FlsGetValue(DWORD dwFlsIndex ecx). */
+void fle_imp_FlsGetValue(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (idx >= FLE_FLS_MAX_INDEXES || fle_fls_state[idx] != FLE_FLS_LIVE)
+        fle_fls_stop("FlsGetValue", "an index that FlsAlloc did not hand out or that was freed (the page names no error code)");
+    R[0] = fls_table()[idx];
+}
+
+/* kernel32!FlsSetValue: BOOL FlsSetValue(DWORD dwFlsIndex ecx, PVOID lpFlsData rdx). */
+void fle_imp_FlsSetValue(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_tls_check_thread();
+    if (idx >= fle_fls_next) {
+        *last_error_slot() = FLE_ERROR_INVALID_PARAMETER;
+        R[0] = 0;
+        return;
+    }
+    if (fle_fls_state[idx] != FLE_FLS_LIVE)
+        fle_fls_stop("FlsSetValue", "a freed index (the page's \"not in range\" does not say whether a freed index is in range)");
+    fls_table()[idx] = R[2];
+    R[0] = 1;
+}
+
+/* kernel32!GetLastError: DWORD GetLastError(void). Returns the value last set by
+ * the TLS stubs above. Initial value 0 is an assumption. TlsAlloc and LocalAlloc
+ * do not set it (existing code, not changed here). */
+void fle_imp_GetLastError(void)
+{
+    fle_tls_check_thread();
+    R[0] = *last_error_slot();
+}
+
+/* kernel32!VerSetConditionMask: ULONGLONG VerSetConditionMask(ULONGLONG ConditionMask,
+ * DWORD TypeMask, BYTE Condition). ConditionMask in rcx (R[1]), TypeMask in rdx
+ * (R[2]), Condition in r8 (R[8], low byte). The new mask is returned in R[0].
+ *
+ * The MSDN page (VerSetConditionMask, Return value and Parameters) gives the
+ * return value as the condition mask but not the bit layout. The layout used here:
+ * each condition takes 3 bits at shift 3 * k, where k is the bit index of the
+ * TypeMask flag (VER_MINORVERSION 0x1 -> k=0 ... VER_PRODUCT_TYPE 0x80 -> k=7).
+ * The 3-bit width is VER_NUM_BITS_PER_CONDITION_MASK and the value mask is
+ * VER_CONDITION_MASK (7) in winnt.h. The layout is from Wine dlls/ntdll/version.c
+ * (unverified against Windows). Condition is masked to 3 bits. Bits are OR-ed into
+ * the given mask (Wine's code does the same). A TypeMask with no flag in 0x01..0x80
+ * returns the mask unchanged. For a TypeMask with several flags the spec is silent
+ * (MSDN: "call once for each bit"); the highest flag is used, as in Wine. */
+#define FLE_VER_CONDITION_MASK 7u
+
+void fle_imp_VerSetConditionMask(void)
+{
+    uint64_t mask = R[1];
+    uint32_t type = (uint32_t)R[2];
+    uint32_t cond = (uint32_t)(uint8_t)R[8] & FLE_VER_CONDITION_MASK;
+    int k;
+
+    for (k = 7; k >= 0; k--) {
+        if (type & (1u << k)) {
+            R[0] = mask | ((uint64_t)cond << (3 * k));
+            return;
+        }
+    }
+    R[0] = mask;
+}
+
+/* kernel32!LocalFree: HLOCAL LocalFree(HLOCAL hMem). hMem in rcx (R[1]). Success returns
+ * NULL (MSDN: LocalFree, Return value). A NULL hMem is ignored and returns NULL (MSDN:
+ * LocalFree, Remarks). The handles here come only from fle_imp_LocalAlloc, which returns
+ * malloc/calloc pointers (LMEM_MOVEABLE stops the run there), so free() applies. A pointer
+ * not from LocalAlloc is not checked (assumption). Locking is not implemented, so no
+ * handle is locked. */
+void fle_imp_LocalFree(void)
+{
+    free((void *)fle_addr_opt(R[1], 1, 1));
+    R[0] = 0;
+}
+
+/* Setter for the last error above, for runtime files outside this one (fle_osver.c). Same
+ * thread rule as the other last-error users: a call from another thread stops the run. */
+void fle_set_last_error(uint32_t code)
+{
+    fle_tls_check_thread();
+    *last_error_slot() = code;
+}

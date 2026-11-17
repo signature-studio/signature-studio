@@ -1,0 +1,227 @@
+closure_instructions   143750
+functions              2033
+emitted_instructions   143817
+bad_nodes              0
+tail_calls             585
+gotos                  13668
+c_lines                157862
+c_bytes                13951911
+handled
+  adc          13
+  add          8246
+  addsd        1205
+  addss        1148
+  and          1862
+  andnpd       2
+  andpd        12
+  bsr          64
+  bswap        176
+  bt           10
+  bts          1
+  call         5255
+  call_imp:CloseHandle 25
+  call_imp:DeleteCriticalSection 2
+  call_imp:DuplicateHandle 1
+  call_imp:EnterCriticalSection 8
+  call_imp:FileTimeToSystemTime 1
+  call_imp:FindClose 1
+  call_imp:FindFirstFileW 1
+  call_imp:FindNextFileW 1
+  call_imp:FreeLibrary 20
+  call_imp:GetConsoleMode 1
+  call_imp:GetCurrentProcess 4
+  call_imp:GetCurrentProcessId 2
+  call_imp:GetCurrentThread 1
+  call_imp:GetCurrentThreadId 16
+  call_imp:GetDesktopWindow 2
+  call_imp:GetFileAttributesW 1
+  call_imp:GetLastError 10
+  call_imp:GetModuleFileNameW 7
+  call_imp:GetModuleHandleA 2
+  call_imp:GetModuleHandleExW 2
+  call_imp:GetModuleHandleW 7
+  call_imp:GetProcAddress 13
+  call_imp:GetProcessAffinityMask 3
+  call_imp:GetStdHandle 1
+  call_imp:GetSystemDirectoryW 4
+  call_imp:GetSystemTimeAsFileTime 4
+  call_imp:GetThreadPriority 1
+  call_imp:GetTickCount64 2
+  call_imp:GetTimeZoneInformation 1
+  call_imp:GetTokenInformation 1
+  call_imp:InitializeCriticalSection 3
+  call_imp:IsDBCSLeadByteEx 1
+  call_imp:IsDebuggerPresent 1
+  call_imp:LeaveCriticalSection 23
+  call_imp:LoadLibraryA 2
+  call_imp:LoadLibraryExW 4
+  call_imp:MapViewOfFile 1
+  call_imp:MultiByteToWideChar 9
+  call_imp:OpenProcessToken 1
+  call_imp:QueryPerformanceFrequency 1
+  call_imp:RaiseException 4
+  call_imp:RegCloseKey 7
+  call_imp:RegEnumKeyExW 1
+  call_imp:RegEnumValueW 1
+  call_imp:RegOpenKeyExA 1
+  call_imp:RegOpenKeyExW 2
+  call_imp:RegQueryInfoKeyW 1
+  call_imp:RegQueryValueExW 3
+  call_imp:ResetEvent 3
+  call_imp:ResumeThread 3
+  call_imp:RtlCaptureContext 2
+  call_imp:RtlLookupFunctionEntry 1
+  call_imp:RtlUnwindEx 3
+  call_imp:SetEvent 4
+  call_imp:SetLastError 2
+  call_imp:SetProcessAffinityMask 1
+  call_imp:SetThreadErrorMode 3
+  call_imp:SetThreadPriority 2
+  call_imp:Sleep 6
+  call_imp:SuspendThread 1
+  call_imp:TlsAlloc 2
+  call_imp:TlsGetValue 3
+  call_imp:TlsSetValue 5
+  call_imp:VirtualProtect 1
+  call_imp:VirtualQuery 1
+  call_imp:WaitForSingleObject 8
+  call_imp:WideCharToMultiByte 1
+  call_ind:dispatch 631
+  call_ind:reg_const 2
+  call_ind:reg_table 57
+  call_ind:rip_table 19
+  cdq          61
+  cdqe         166
+  cmov         558
+  cmp          4378
+  cmpsd        2
+  cmpxchg      10
+  comisd       83
+  comiss       2
+  cpuid        1
+  cqo          16
+  cvtsd2si     8
+  cvtsd2ss     50
+  cvtsi2sd     125
+  cvtss2sd     14
+  cvtss2si     21
+  cvttsd2si    26
+  dec          3
+  div          10
+  divsd        45
+  f2xm1        3
+  fabs         2
+  fadd         10
+  fcom         2
+  fld          52
+  fld1         3
+  fldcw        8
+  fldl2e       1
+  fldln2       1
+  fldpi        5
+  fldz         3
+  fmul         6
+  fninit       1
+  fnstcw       4
+  fnstsw       16
+  frndint      5
+  fscale       4
+  fsincos      6
+  fsqrt        1
+  fstp         64
+  fsub         5
+  fsubr        1
+  fwait        4
+  fxam         3
+  fxch         12
+  idiv         72
+  imul         1248
+  imul1        3
+  inc          49
+  jcc          10639
+  jmp          3291
+  jmp_imp:EnterCriticalSection 2
+  jmp_imp:FreeLibrary 1
+  jmp_imp:GetProcAddress 2
+  jmp_imp:LeaveCriticalSection 3
+  jmp_imp:UnmapViewOfFile 1
+  jmp_imp:WaitForMultipleObjects 1
+  jmp_imp:WaitForSingleObject 1
+  jmp_ind:mem_dispatch 333
+  jmp_ind:reg_dispatch 262
+  lea          7490
+  lfence       3
+  mov          41543
+  mov_gs       1
+  movapd       1198
+  movaps       2064
+  movd         2
+  movdqa       93
+  movdqu       127
+  movq         124
+  movs         28
+  movsd        2272
+  movss        1962
+  movsx        118
+  movsxd       2071
+  movups       126
+  movzx        1695
+  mul          28
+  mulsd        1000
+  mulss        778
+  neg          296
+  nop          1730
+  not          230
+  or           1066
+  orpd         2
+  pause        1
+  pop          5649
+  push         4404
+  pxor         145
+  ret          2070
+  rol          1755
+  ror          858
+  sar          901
+  sbb          49
+  setcc        262
+  shl          871
+  shr          1376
+  sqrtsd       7
+  stos         71
+  sub          4094
+  subsd        891
+  subss        855
+  test         5968
+  ucomisd      44
+  xadd         4
+  xchg         16
+  xgetbv_stop  1
+  xor          6491
+  xorpd        40
+  xorps        20
+outlined_heads         4 (shared instructions before 248 after 67; 6 heads not promoted: on a tail-call cycle)
+dead_flags             writers 37321 fully_dead 23827 partly_dead 9946 substituted 21122 rounds 5
+register_jmp_sites     262
+jumptabs               0
+msvc_tables            0
+setjmp_landings        0
+msvc_rejected          0
+register_jmps
+  jmp_ind:reg_dispatch   262
+unsupported_total      252
+unsupported            15
+       116  Call: indirect through IAT slot (not lifted)
+        89  Jmp: indirect through IAT slot (not lifted)
+        14  Tzcnt: mnemonic outside minimal set
+         8  Ud2: mnemonic outside minimal set
+         5  Fprem1: mnemonic outside minimal set
+         4  Movntdqa: mnemonic outside minimal set
+         3  Rdtsc: mnemonic outside minimal set
+         2  Fcos: mnemonic outside minimal set
+         2  Fsin: mnemonic outside minimal set
+         2  Fyl2x: mnemonic outside minimal set
+         2  Fyl2xp1: mnemonic outside minimal set
+         2  Sahf: mnemonic outside minimal set
+         1  Fnstenv: mnemonic outside minimal set
+         1  Fpatan: mnemonic outside minimal set
+         1  Fprem: mnemonic outside minimal set

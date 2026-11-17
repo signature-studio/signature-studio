@@ -1,0 +1,65 @@
+{
+  "startedAt": "2026-11-13T21:49:39.614Z",
+  "chromeVersion": "Chrome/156.0.8078.47",
+  "engineKind": "emscripten-fruity-v1",
+  "timelineIdle": 4553.46484375,
+  "viewport": {
+    "beforeShrink": {
+      "w": 2260,
+      "h": 1116
+    },
+    "afterShrink": {
+      "w": 1500,
+      "h": 900
+    },
+    "afterRestore": {
+      "w": 780,
+      "h": 493
+    }
+  },
+  "state": {
+    "beforeShrink": "engine-idle",
+    "afterShrink": "engine-idle",
+    "afterRestore": "engine-idle"
+  },
+  "engineStatus": {
+    "beforeShrink": "Engine: computing (0.0 s) - input waits for its next idle",
+    "afterShrink": "Engine: computing (0.0 s) - input waits for its next idle",
+    "afterRestore": "Engine: computing (0.0 s) - input waits for its next idle"
+  },
+  "logLengthAtShrink": 313,
+  "logLengthAfterShrink": 315,
+  "restored": "done",
+  "callbackNestingLines": {
+    "count": 0,
+    "lines": []
+  },
+  "logAroundShrink": {
+    "before": [
+      "[err]     handle 0x7f990024 lid 9 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 1 thread 0",
+      "[err]     handle 0x7f99001c lid 7 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 2 thread 0",
+      "[err]     handle 0x7f990014 lid 5 class \"TApplication\" title \"\" rect (960, 540, 0 x 0) style 0x84ca0000 exstyle 0x80 owner 0 visible 0 enabled 1 z 3 thread 0",
+      "[err]     handle 0x7f990010 lid 4 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 4 thread 0",
+      "[err]     handle 0x7f99000c lid 3 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 5 thread 0",
+      "[err]     handle 0x7f990008 lid 2 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 6 thread 0",
+      "[err]     handle 0x7f990004 lid 1 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 7 thread 0",
+      "[err] first drawing call discarded because its window is not visible (decision 0126, S-draw-hidden): BitBlt into the surface of top-level window lid 14; function entries since the program began: 0",
+      "[err] fle: act1-net\t#1\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadnewsrss?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)",
+      "[err] fle: act1-net\t#2\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadversionsxml?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)"
+    ],
+    "after": [
+      "[err] fle: act1-net\t#3\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadnewsrss?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)",
+      "[err] fle: act1-net\t#4\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadversionsxml?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)",
+      "[err] fle: act1-net\t#5\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadnewsrss?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)",
+      "[err] fle: act1-net\t#6\tInternetOpenUrlW\tscheme=https\thost=support.image-line.com\tobject=/redirect/downloadversionsxml?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>\theaders=NULL\tflags=0x80000000\t-> NULL, last error 12007 (decision 0132)"
+    ]
+  },
+  "loadavg": [
+    1.42,
+    0.7,
+    0.72
+  ],
+  "elapsedMs": 23079,
+  "error": null,
+  "engineLogLines": 317
+}

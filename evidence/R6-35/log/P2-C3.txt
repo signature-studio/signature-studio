@@ -1,0 +1,36 @@
+## before P2-C3 (2026-11-17T05:22:05Z)
+3.34 2.63 1.87 3/1262 1409685
+               total        used        free      shared  buff/cache   available
+Mem:           25215        4597        2615         908       19352       20618
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 3  0 1358404 2678436 230452 19586708   29   45  3668   999 6012    3  5  1 93  0  0  0
+ 1  0 1358404 2617120 230452 19652276    0    0 65536  1408 6499 5363  7  1 91  0  0  0
+ 2  0 1358404 2655884 230360 19610800    0    0 98304     0 6409 5592  7  1 92  0  0  0
+some avg10=0.00 avg60=1.65 avg300=1.85 total=155628238
+browser pid=7131 age=12:58:42 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 3.15 io 0 after 7 s; mem avail 20640 MB, swap used 1327 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-lat-c-chrome-3
+--- stdout (tail)
+05:22:15 backend chrome 
+05:22:15 scenario lat 
+05:26:39   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P2-C3 (2026-11-17T05:26:41Z)
+3.87 2.96 2.17 2/1263 1440179
+               total        used        free      shared  buff/cache   available
+Mem:           25215        4901        2823        1013       18945       20313
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 1  0 1358372 2891680 528528 18871312   29   45  3698  1008 6055    3  5  1 93  0  0  0
+ 1  0 1358372 2926048 528528 18871304    0    0     0     0 11155 7207  2  6 93  0  0  0
+ 1  0 1358372 2966716 528528 18871308    0    0     0     0 5903 3466  5  3 92  0  0  0
+some avg10=0.00 avg60=0.09 avg300=0.85 total=156575016
+browser pid=7131 age=13:03:18 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-lat-c-chrome-3

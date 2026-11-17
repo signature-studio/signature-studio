@@ -1,0 +1,101 @@
+[
+ {
+  "name": "o19-keys",
+  "what": "O19 allhidden / hidden check (untimed, no playback): the project opened, then F9, F5, F6, F8 one by one with the compositor window list (describe) and a picture after each; the keys reach the engine as WM_KEYDOWN, what disappears is FL's own doing",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "describe",
+    "name": "open"
+   },
+   {
+    "op": "shot",
+    "name": "open"
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "describe",
+    "name": "after-F9-mixer"
+   },
+   {
+    "op": "shot",
+    "name": "after-F9-mixer"
+   },
+   {
+    "op": "key",
+    "code": "F5"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "describe",
+    "name": "after-F5-playlist"
+   },
+   {
+    "op": "shot",
+    "name": "after-F5-playlist"
+   },
+   {
+    "op": "key",
+    "code": "F6"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "describe",
+    "name": "after-F6-channelrack"
+   },
+   {
+    "op": "shot",
+    "name": "after-F6-channelrack"
+   },
+   {
+    "op": "key",
+    "code": "F8"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "describe",
+    "name": "after-F8-browser"
+   },
+   {
+    "op": "shot",
+    "name": "after-F8-browser"
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

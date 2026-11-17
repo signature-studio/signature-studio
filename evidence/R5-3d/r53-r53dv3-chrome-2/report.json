@@ -1,0 +1,114 @@
+[
+ {
+  "name": "r53-about-ja",
+  "what": "R5-3 (decision 0369): About (F10, then the About tab at 1221,137 on the Settings window, the position found in the first run; scn-g6-d3's 1222,95 hit the title bar) with shots 3 s, 8 s and 28 s after the click; Escape; the reference project (the zip, openZipProject as in scn-p3-mixmove-300) with shots 10 s and 20 s after it opened; the whole engine log. No playback.",
+  "rep": 1,
+  "seconds": 89,
+  "firstIdleMs": 3981.525146484375,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "listed": [
+   "14 TFruityLoopsMainForm 'FL Studio 2026' @0,0 1920x1080"
+  ],
+  "describes": [
+   {
+    "name": "about-windows",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 22 at (626, 90) 668x900 alpha 0 key 000000 class \"TMIDIForm\" title \"Settings - About FL Studio\"",
+     "lid 141 at (755, 306) 3x3 layered premultiplied alpha alpha 255 key 000000 class \"TLightweightLayeredControl\" title \"\""
+    ]
+   },
+   {
+    "name": "about-windows-28s",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"",
+     "lid 22 at (626, 90) 668x900 alpha 0 key 000000 class \"TMIDIForm\" title \"Settings - About FL Studio\"",
+     "lid 141 at (759, 309) 3x3 layered premultiplied alpha alpha 255 key 000000 class \"TLightweightLayeredControl\" title \"\""
+    ]
+   }
+  ],
+  "logs": [
+   {
+    "name": "log-about",
+    "lines": 0
+   },
+   {
+    "name": "log-all",
+    "lines": 311
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 59.99700014999238,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 43.080000042915344,
+   "manifest_loaded": 56.2700001001358,
+   "download_start": 91.22500002384186,
+   "compile_done": 735.6150000095367,
+   "download_done": 898.545000076294,
+   "pack_source_dll": 986.775146484375,
+   "pack_source_seed": 986.80517578125,
+   "glue_loaded": 996.170166015625,
+   "worker_ready": 996.7750000953674,
+   "engine_start": 996.8050000667572,
+   "wasm_instantiated": 1018.460205078125,
+   "files_ready": 1028.690185546875,
+   "main_start": 1029.89501953125,
+   "idle": 3981.525146484375,
+   "host_files_released": 3981.75,
+   "first_pixel": 4004.78515625,
+   "filedlg_request": 51532.60009765625,
+   "filedlg_answer": 54991.195068359375
+  },
+  "loadStart": 1.31,
+  "loadEnd": 2.3,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

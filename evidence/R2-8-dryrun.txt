@@ -1,0 +1,8 @@
+checking file app/src/engine/client.ts
+checking file app/src/engine/desk-gl.ts
+checking file app/src/engine/protocol.ts
+checking file app/src/engine/worker.ts
+checking file app/src/main.ts
+checking file app/test/unit/worker-diag.test.ts
+checking file app/tsconfig.json
+checking file app/tsconfig.webworker.json

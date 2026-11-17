@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "bundle": {
+    "name": "fl-engine-Oz",
+    "version": "58ad4a6aa720",
+    "created": "2026-11-06T11:48:06.046Z",
+    "description": "lifted FL Studio engine (decision 0129 final configuration; variant Oz; HEAD d0447902; one configuration (decision 0243); always-inline-units=15 prune-list=prune-SM.tsv modules=8 hybrid=U)"
+  },
+  "engine": {
+    "kind": "emscripten-fruity-v1",
+    "wasm": {
+      "url": "/assets/fl-engine-ci-0363b050/engine.58ad4a6aa720.wasm",
+      "size": 143087706,
+      "sha256": "58ad4a6aa720375aa412e6d87d58852688ddfa08ea27571953592d14ee74ccbf",
+      "compression": "br",
+      "encodedSize": 15697877
+    },
+    "args": [
+      "/data/FLEngine_x64.dll",
+      "/data/dsp_ippv2_x64.2000000.dll:/data/Blend2D.4700000.dll:/data/quickfontcache_x64.1d00000.dll:/data/freetype_x64.4b00000.dll:/data/ILTools_x64.6000000.dll:/data/oggio_x64.c000000.dll:/data/elastique_x64.b000000.dll"
+    ],
+    "env": {
+      "FLE_VFS_SEED": "/data/seed/vfs-seed-idle1.tsv",
+      "FLE_VFS_SEED_ROOT": "/data/seed",
+      "FLE_REG_SEED": "/data/seed/reg-seed-nsis.tsv:/data/seed/reg-seed-app.tsv",
+      "FLE_AUTH_CLAIMS": "/data/seed/authenticode-claims.tsv",
+      "FLE_FRUITY_MAX_CALLS": "4000000000",
+      "FLE_FRUITY_SECONDS": "36000"
+    },
+    "options": {
+      "glue": {
+        "url": "/assets/fl-engine-ci-0363b050/engine-glue.07e7646f280b.js",
+        "size": 744946,
+        "sha256": "07e7646f280b1b7963c74457eacc7ef050c47682cc0911b373c5ae5575cfd074",
+        "compression": "br",
+        "encodedSize": 67170
+      },
+      "root": "/data",
+      "hostFilesAbi": "emscripten-6.0.12",
+      "hints": {
+        "firstPixelSeconds": 53,
+        "stopSeconds": 59,
+        "variant": "Oz"
+      },
+      "stopNotes": [
+        {
+          "contains": "indirect call to 0",
+          "note": "The engine called address 0: a function it asked GetProcAddress for came back 0. Decision 0136 section 7 read this wall (after the welcome wizard is closed) as user32!UpdateLayeredWindow of the layered window TLightweightLayeredControl. Decision 0140 gave the engine a model of it, so a bundle built from a tree with that decision does not stop here. It stopped by design; the desktop shows the last picture of each window."
+        },
+        {
+          "contains": "pruned function",
+          "note": "This build leaves out the IPP CPU variants that the fixed CPUID answer should never reach (prune list prune-SM.tsv). The engine reached one of them, so that leave-out is wrong for this run."
+        }
+      ]
+    }
+  },
+  "seedPack": {
+    "url": "/assets/fl-engine-ci-0363b050/seed.f7726113ae34.flpack",
+    "size": 7248243,
+    "sha256": "f7726113ae34d52e0712fff5e893ae6a61f1eaecc72545e82eb27b4ebd6d8984",
+    "compression": "br",
+    "encodedSize": 4446700,
+    "format": "flseedp1"
+  },
+  "dllPack": {
+    "url": "/assets/fl-engine-ci-0363b050/dll.2f494419c1ad.flpack",
+    "size": 77444112,
+    "sha256": "2f494419c1adec95aad70e0beed730a6ed5e9cba695a7b72efca3cdb18fa7d39",
+    "compression": "br",
+    "encodedSize": 15953166,
+    "format": "flpack1"
+  }
+}

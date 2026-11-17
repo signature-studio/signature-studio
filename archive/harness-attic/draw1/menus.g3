@@ -1,0 +1,36 @@
+# draw1: FILE menu, its Escape, a context menu of the channel button, F7 (mixer) and F8 once, for the HLE check run.
+snap wiz0
+advance 4000
+tap 13
+advance 3000
+snap e3000
+move 18 19
+advance 100
+down L
+advance 200
+up L
+advance 1500
+snap file-menu
+tap 27
+advance 1000
+move 522 144
+advance 100
+down R
+advance 200
+up R
+advance 1500
+snap ctx-menu
+tap 27
+advance 1000
+tap 0x76
+advance 3000
+snap mixer
+tap 0x76
+advance 1000
+tap 0x77
+advance 3000
+snap f8
+tap 27
+advance 2000
+snap end-menus
+end

@@ -1,0 +1,149 @@
+--- a/lift/runtime/fle_sys.c
++++ b/lift/runtime/fle_sys.c
+@@ -636,6 +636,24 @@
+     memcpy((void *)fle_addr(out, (unsigned)sizeof si, 1), si, sizeof si);
+ }
+ 
++/* Decision 0319 section 10 (alpha1, PROVISIONAL; PM 08:3x): the number of logical processors is a VALUE OF THE RUN, FLE_NUM_CPU=<n> in the engine's environment (the page passes the number of Workers that can really run in
++ * parallel, like FLE_MONITOR_W and FLE_WALL_FILETIME). Learn GetSystemInfo / SYSTEM_INFO: dwNumberOfProcessors is "the number of logical processors in the current group" and dwActiveProcessorMask "a mask representing the
++ * set of processors configured into the system" - a guest that can run on n Workers must be told n. 0 = unset or not a whole number of decimal digits in 1..FLE_SYS_MAX_PROCESSORS (then the former rule applies: the host's
++ * processors with real threads, 1 otherwise). An Export harness leaves it unset (1: every answer is the former one). */
++#include <stdlib.h>
++static uint32_t fle_num_cpu_env(void)
++{
++    const char *e = getenv("FLE_NUM_CPU");
++    uint32_t v = 0;
++
++    if (e == NULL || *e == '\0') return 0u;
++    for (; *e != '\0'; e++) {
++        if (*e < '0' || *e > '9' || v > 1000u) return 0u;
++        v = v * 10u + (uint32_t)(*e - '0');
++    }
++    return v >= 1u && v <= FLE_SYS_MAX_PROCESSORS ? v : 0u;
++}
++
+ #ifdef FLE_GIL
+ /* Decision 0312 (mt3, S3a): the number of processors is the host's (D2). hardwareConcurrency exists in the browser's Workers and in node. FLE_PROCESSORS (fle_thread.c fle_cfg_processors, S3a only: the
+  * measurement of the Worker count before the variable is removed) takes precedence when it is set. Decided once; the value is the same for every Worker. */
+@@ -647,7 +665,8 @@
+     uint32_t v = __atomic_load_n(&n, __ATOMIC_RELAXED);
+ 
+     if (v == 0) {
+-        v = fle_cfg_processors ? fle_cfg_processors() : 0u;
++        v = fle_num_cpu_env();                                  /* decision 0319 section 10: the run's value wins over the host's */
++        if (v == 0) v = fle_cfg_processors ? fle_cfg_processors() : 0u;
+         if (v == 0) v = (uint32_t)fle_js_hardware_concurrency();
+         v = v < 1u ? 1u : v > FLE_SYS_MAX_PROCESSORS ? FLE_SYS_MAX_PROCESSORS : v;
+         __atomic_store_n(&n, v, __ATOMIC_RELAXED);
+@@ -657,7 +676,15 @@
+ #else
+ uint32_t fle_sys_processors(void)
+ {
+-    return 1u;
++    static uint32_t n;
++    uint32_t v = n;
++
++    if (v == 0) {
++        v = fle_num_cpu_env();                                  /* decision 0319 section 10: unset = 1, the former constant */
++        n = v ? v : 1u;
++        v = n;
++    }
++    return v;
+ }
+ #endif
+ 
+--- a/lift/runtime/fle_sysinfo.c
++++ b/lift/runtime/fle_sysinfo.c
+@@ -251,3 +251,30 @@
+     fle_proc_affinity = mask;
+     R[0] = 1;
+ }
++
++/* ---- Processor counts and groups (decision 0319 section 10: all from fle_sys_processors, so that no answer contradicts GetSystemInfo / GetLogicalProcessorInformation / the affinity masks) ----
++ * Learn GetActiveProcessorCount: DWORD f(WORD GroupNumber): "the number of active processors in the specified group"; ALL_PROCESSOR_GROUPS (0xFFFF) "to retrieve the total number of active processors in all groups";
++ * zero on failure. GetMaximumProcessorCount: the same for "the maximum number of logical processors". GetActiveProcessorGroupCount / GetMaximumProcessorGroupCount: WORD, "the number of active /
++ * maximum processor groups". The run has ONE group of n processors (n <= FLE_SYS_MAX_PROCESSORS). A group number other than 0 and 0xFFFF: the page names no error code for it: the run stops by name.
++ * GetCurrentProcessorNumber: DWORD f(void): "the number of the processor on which the calling thread is currently running"; the guest thread index modulo n (a choice: the threads are spread over the
++ * processors in order; with one processor it is 0 as before). */
++static uint32_t fle_group_count(const char *api)
++{
++    uint32_t g = (uint32_t)(R[1] & 0xFFFFu);
++
++    fle_sysinfo_check_thread(api);
++    if (g != 0u && g != 0xFFFFu) fle_stop(api, "a processor group other than 0: this machine has one group and the page names no error for another");
++    return fle_sys_processors();
++}
++
++void fle_imp_GetActiveProcessorCount(void) { R[0] = fle_group_count("GetActiveProcessorCount"); }
++void fle_imp_GetMaximumProcessorCount(void) { R[0] = fle_group_count("GetMaximumProcessorCount"); }
++void fle_imp_GetActiveProcessorGroupCount(void) { fle_sysinfo_check_thread("GetActiveProcessorGroupCount"); R[0] = 1; }
++void fle_imp_GetMaximumProcessorGroupCount(void) { fle_sysinfo_check_thread("GetMaximumProcessorGroupCount"); R[0] = 1; }
++
++uint32_t fle_thread_current(void) __attribute__((weak));
++void fle_imp_GetCurrentProcessorNumber(void)
++{
++    fle_sysinfo_check_thread("GetCurrentProcessorNumber");
++    R[0] = fle_thread_current ? fle_thread_current() % fle_sys_processors() : 0u;
++}
+--- a/lift/runtime/fle_sysinfo.h
++++ b/lift/runtime/fle_sysinfo.h
+@@ -21,7 +21,14 @@
+  * (-DFLE_GIL, the build that runs guest threads on more than one Worker) it is navigator.hardwareConcurrency of the browser, at least 1 and at most FLE_SYS_MAX_PROCESSORS (one mask bit each, and the Workers
+  * of the scheduler, fle_thread.c); in every other build, where one guest thread runs at a time, it is 1. The mask has one bit per processor. */
+ #define FLE_SYS_MAX_PROCESSORS 32u
+-uint32_t fle_sys_processors(void);
++uint32_t fle_sys_processors(void);   /* decision 0319 section 10: FLE_NUM_CPU (the run's value) first, then the rule above */
++/* decision 0319 section 10 (all from fle_sys_processors): kernel32!GetActiveProcessorCount / GetMaximumProcessorCount: DWORD f(WORD group) rcx; GetActiveProcessorGroupCount / GetMaximumProcessorGroupCount: WORD f(void) = 1;
++ * GetCurrentProcessorNumber: DWORD f(void). */
++void fle_imp_GetActiveProcessorCount(void);
++void fle_imp_GetMaximumProcessorCount(void);
++void fle_imp_GetActiveProcessorGroupCount(void);
++void fle_imp_GetMaximumProcessorGroupCount(void);
++void fle_imp_GetCurrentProcessorNumber(void);
+ static inline uint64_t fle_sys_proc_mask(void) { return (UINT64_C(1) << fle_sys_processors()) - 1u; }
+ 
+ /* MEMORYSTATUS on x64 (MSDN: MEMORYSTATUS): DWORD dwLength, DWORD dwMemoryLoad and six SIZE_T members, 56 bytes.
+--- a/lift/runtime/fle_cpuid.c
++++ b/lift/runtime/fle_cpuid.c
+@@ -19,6 +19,7 @@
+  *   maximum extended leaf for this processor, so this is a decision, not confirmed. */
+ #include "fle_runtime.h"
+ #include "fle_cpuid.h"
++#include "fle_sysinfo.h"
+ 
+ #define FLE_CPUID_EDX_FPU   (UINT64_C(1) << 0)
+ #define FLE_CPUID_EDX_CX8   (UINT64_C(1) << 8)
+@@ -30,6 +31,7 @@
+ #define FLE_CPUID_LEAF1_EDX (FLE_CPUID_EDX_FPU | FLE_CPUID_EDX_CX8 | FLE_CPUID_EDX_CMOV | FLE_CPUID_EDX_MMX | FLE_CPUID_EDX_FXSR | \
+                              FLE_CPUID_EDX_SSE | FLE_CPUID_EDX_SSE2)
+ 
++uint32_t fle_sys_processors(void) __attribute__((weak));
+ void fle_cpuid(void) {
+     uint32_t leaf = (uint32_t)R[0];
+     uint64_t a = 0, b = 0, c = 0, d = 0;
+@@ -40,6 +42,13 @@
+         a = b = c = d = 0;
+     } else {
+         d = FLE_CPUID_LEAF1_EDX;
++        if (fle_sys_processors && fle_sys_processors() > 1u) {   /* decision 0319 section 10: more than one logical processor (one: the answer above, unchanged). SDM Vol. 2 CPUID leaf 1: EDX bit 28 = HTT "the physical package can hold more than one logical processor"; EBX[23:16] = "maximum number of addressable IDs for logical processors in this physical package" (a power of two); EBX[31:24] = the initial APIC ID (0). */
++            uint32_t ids = 1u;
++
++            while (ids < fle_sys_processors()) ids <<= 1;
++            d |= UINT64_C(1) << 28;
++            b = (uint64_t)ids << 16;
++        }
+     }
+     R[0] = a;
+     R[3] = b;
+--- a/lift/harness/seeds/ship6-imports.txt
++++ b/lift/harness/seeds/ship6-imports.txt
+@@ -306,3 +306,9 @@
+ user32.dll ScrollWindow fle_imp_ScrollWindow
+ # Decision 0319 (alpha1, PROVISIONAL): user32!ScrollDC (runtime/fle_gdi.c: the bits of a DC move inside its clip, the uncovered area is returned, nothing is invalidated). The engine imports it. Appended LAST (decision 0015: append only).
+ user32.dll ScrollDC fle_imp_ScrollDC
++# Decision 0319 (alpha1, PROVISIONAL; PM 08:3x): the processor counts of the run (runtime/fle_sysinfo.c; the number = FLE_NUM_CPU or the rule of fle_sys_processors). Rows for the questions that go with GetSystemInfo / GetLogicalProcessorInformation / Get/SetProcessAffinityMask so that no answer contradicts another. Appended LAST (decision 0015: append only).
++kernel32.dll GetActiveProcessorCount fle_imp_GetActiveProcessorCount
++kernel32.dll GetMaximumProcessorCount fle_imp_GetMaximumProcessorCount
++kernel32.dll GetActiveProcessorGroupCount fle_imp_GetActiveProcessorGroupCount
++kernel32.dll GetMaximumProcessorGroupCount fle_imp_GetMaximumProcessorGroupCount
++kernel32.dll GetCurrentProcessorNumber fle_imp_GetCurrentProcessorNumber

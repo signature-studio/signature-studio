@@ -1,0 +1,316 @@
+check	Set up job	﻿2026-11-11T20:02:23.9396219Z Current runner version: '2.338.2'
+check	Set up job	2026-11-11T20:02:23.9413127Z ##[group]Runner Image Provisioner
+check	Set up job	2026-11-11T20:02:23.9413777Z Hosted Compute Agent
+check	Set up job	2026-11-11T20:02:23.9414131Z Version: 20261028.624
+check	Set up job	2026-11-11T20:02:23.9414528Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+check	Set up job	2026-11-11T20:02:23.9414998Z Build Date: 2026-10-28T21:51:42Z
+check	Set up job	2026-11-11T20:02:23.9415408Z Worker ID: {db1b1e75-bbe4-46ad-aac5-4223897897f7}
+check	Set up job	2026-11-11T20:02:23.9415928Z Region: centralus
+check	Set up job	2026-11-11T20:02:23.9416269Z Cloud: Azure
+check	Set up job	2026-11-11T20:02:23.9416661Z ##[endgroup]
+check	Set up job	2026-11-11T20:02:23.9417690Z ##[group]Operating System
+check	Set up job	2026-11-11T20:02:23.9418134Z Ubuntu
+check	Set up job	2026-11-11T20:02:23.9418495Z 26.04.1
+check	Set up job	2026-11-11T20:02:23.9418850Z LTS
+check	Set up job	2026-11-11T20:02:23.9419234Z ##[endgroup]
+check	Set up job	2026-11-11T20:02:23.9419586Z ##[group]Runner Image
+check	Set up job	2026-11-11T20:02:23.9420003Z Image: ubuntu-26.04
+check	Set up job	2026-11-11T20:02:23.9420376Z Version: 20261101.186.1
+check	Set up job	2026-11-11T20:02:23.9421008Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261101.186/images/ubuntu/Ubuntu2604-Readme.md
+check	Set up job	2026-11-11T20:02:23.9422019Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261101.186
+check	Set up job	2026-11-11T20:02:23.9422629Z ##[endgroup]
+check	Set up job	2026-11-11T20:02:23.9423303Z ##[group]GITHUB_TOKEN Permissions
+check	Set up job	2026-11-11T20:02:23.9424462Z Contents: read
+check	Set up job	2026-11-11T20:02:23.9424820Z Metadata: read
+check	Set up job	2026-11-11T20:02:23.9425207Z ##[endgroup]
+check	Set up job	2026-11-11T20:02:23.9426458Z Secret source: Actions
+check	Set up job	2026-11-11T20:02:23.9427257Z Cache mode: write
+check	Set up job	2026-11-11T20:02:23.9427714Z Prepare workflow directory
+check	Set up job	2026-11-11T20:02:23.9632659Z Prepare all required actions
+check	Set up job	2026-11-11T20:02:23.9664491Z Getting action download info
+check	Set up job	2026-11-11T20:02:24.1867688Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+check	Set up job	2026-11-11T20:02:24.3852918Z Complete job name: check
+check	リポジトリを取得する	﻿2026-11-11T20:02:24.4438661Z ##[group]Run actions/checkout@v4
+check	リポジトリを取得する	2026-11-11T20:02:24.4439123Z with:
+check	リポジトリを取得する	2026-11-11T20:02:24.4439393Z   persist-credentials: false
+check	リポジトリを取得する	2026-11-11T20:02:24.4439717Z   repository: signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:24.4441865Z   token: ***
+check	リポジトリを取得する	2026-11-11T20:02:24.4442111Z   ssh-strict: true
+check	リポジトリを取得する	2026-11-11T20:02:24.4442374Z   ssh-user: git
+check	リポジトリを取得する	2026-11-11T20:02:24.4442621Z   clean: true
+check	リポジトリを取得する	2026-11-11T20:02:24.4442887Z   sparse-checkout-cone-mode: true
+check	リポジトリを取得する	2026-11-11T20:02:24.4443186Z   fetch-depth: 1
+check	リポジトリを取得する	2026-11-11T20:02:24.4443436Z   fetch-tags: false
+check	リポジトリを取得する	2026-11-11T20:02:24.4443700Z   show-progress: true
+check	リポジトリを取得する	2026-11-11T20:02:24.4443964Z   lfs: false
+check	リポジトリを取得する	2026-11-11T20:02:24.4444225Z   submodules: false
+check	リポジトリを取得する	2026-11-11T20:02:24.4444484Z   set-safe-directory: true
+check	リポジトリを取得する	2026-11-11T20:02:24.4444772Z   allow-unsafe-pr-checkout: false
+check	リポジトリを取得する	2026-11-11T20:02:24.4445142Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:24.6719543Z Syncing repository: signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:24.6721050Z ##[group]Getting Git version info
+check	リポジトリを取得する	2026-11-11T20:02:24.6721640Z Working directory is '/home/runner/work/signature-studio/signature-studio'
+check	リポジトリを取得する	2026-11-11T20:02:24.6722281Z [command]/usr/bin/git version
+check	リポジトリを取得する	2026-11-11T20:02:24.6725598Z git version 2.56.0
+check	リポジトリを取得する	2026-11-11T20:02:24.6736102Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:24.6744459Z Temporarily overriding HOME='/home/runner/work/_temp/664716b3-e7b4-4072-887c-8b9409ff156d' before making global git config changes
+check	リポジトリを取得する	2026-11-11T20:02:24.6745638Z Adding repository directory to the temporary git global config as a safe directory
+check	リポジトリを取得する	2026-11-11T20:02:24.6747719Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:24.6802663Z Deleting the contents of '/home/runner/work/signature-studio/signature-studio'
+check	リポジトリを取得する	2026-11-11T20:02:24.6804258Z ##[group]Initializing the repository
+check	リポジトリを取得する	2026-11-11T20:02:24.6807270Z [command]/usr/bin/git init /home/runner/work/signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:24.6922127Z hint: Using 'master' as the name for the initial branch. This default branch name
+check	リポジトリを取得する	2026-11-11T20:02:24.6923251Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+check	リポジトリを取得する	2026-11-11T20:02:24.6924206Z hint: to use in all of your new repositories, which will suppress this warning,
+check	リポジトリを取得する	2026-11-11T20:02:24.6925205Z hint: call:
+check	リポジトリを取得する	2026-11-11T20:02:24.6925693Z hint:
+check	リポジトリを取得する	2026-11-11T20:02:24.6926277Z hint: 	git config --global init.defaultBranch <name>
+check	リポジトリを取得する	2026-11-11T20:02:24.6926945Z hint:
+check	リポジトリを取得する	2026-11-11T20:02:24.6927679Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+check	リポジトリを取得する	2026-11-11T20:02:24.6928628Z hint: 'development'. The just-created branch can be renamed via this command:
+check	リポジトリを取得する	2026-11-11T20:02:24.6929410Z hint:
+check	リポジトリを取得する	2026-11-11T20:02:24.6929891Z hint: 	git branch -m <name>
+check	リポジトリを取得する	2026-11-11T20:02:24.6930431Z hint:
+check	リポジトリを取得する	2026-11-11T20:02:24.6931186Z hint: Disable this message with "git config set advice.defaultBranchName false"
+check	リポジトリを取得する	2026-11-11T20:02:24.6935767Z Initialized empty Git repository in /home/runner/work/signature-studio/signature-studio/.git/
+check	リポジトリを取得する	2026-11-11T20:02:24.6944546Z [command]/usr/bin/git remote add origin https://github.com/signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:24.6993836Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:24.6994554Z ##[group]Disabling automatic garbage collection
+check	リポジトリを取得する	2026-11-11T20:02:24.6996863Z [command]/usr/bin/git config --local gc.auto 0
+check	リポジトリを取得する	2026-11-11T20:02:24.7022291Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:24.7022931Z ##[group]Setting up auth
+check	リポジトリを取得する	2026-11-11T20:02:24.7027099Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+check	リポジトリを取得する	2026-11-11T20:02:24.7051561Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+check	リポジトリを取得する	2026-11-11T20:02:24.7422406Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+check	リポジトリを取得する	2026-11-11T20:02:24.7447965Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+check	リポジトリを取得する	2026-11-11T20:02:24.7653261Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+check	リポジトリを取得する	2026-11-11T20:02:24.7679324Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+check	リポジトリを取得する	2026-11-11T20:02:24.7876865Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+check	リポジトリを取得する	2026-11-11T20:02:24.7907616Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:24.7908154Z ##[group]Fetching the repository
+check	リポジトリを取得する	2026-11-11T20:02:24.7913116Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +b3a70b5405940a00d2a24f2bb2c06c675d0bd100:refs/remotes/origin/main
+check	リポジトリを取得する	2026-11-11T20:02:26.6848120Z From https://github.com/signature-studio/signature-studio
+check	リポジトリを取得する	2026-11-11T20:02:26.6849645Z  * [new ref]         b3a70b5405940a00d2a24f2bb2c06c675d0bd100 -> origin/main
+check	リポジトリを取得する	2026-11-11T20:02:26.6852480Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:26.6853576Z ##[group]Determining the checkout info
+check	リポジトリを取得する	2026-11-11T20:02:26.6854845Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:26.6856532Z [command]/usr/bin/git sparse-checkout disable
+check	リポジトリを取得する	2026-11-11T20:02:26.6899764Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+check	リポジトリを取得する	2026-11-11T20:02:26.6923822Z ##[group]Checking out the ref
+check	リポジトリを取得する	2026-11-11T20:02:26.6932085Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+check	リポジトリを取得する	2026-11-11T20:02:26.9365574Z Switched to a new branch 'main'
+check	リポジトリを取得する	2026-11-11T20:02:26.9369660Z branch 'main' set up to track 'origin/main'.
+check	リポジトリを取得する	2026-11-11T20:02:26.9379460Z ##[endgroup]
+check	リポジトリを取得する	2026-11-11T20:02:26.9419914Z [command]/usr/bin/git log -1 --format=%H
+check	リポジトリを取得する	2026-11-11T20:02:26.9439927Z b3a70b5405940a00d2a24f2bb2c06c675d0bd100
+check	リポジトリを取得する	2026-11-11T20:02:26.9448039Z ##[group]Removing auth
+check	リポジトリを取得する	2026-11-11T20:02:26.9450615Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+check	リポジトリを取得する	2026-11-11T20:02:26.9473707Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+check	リポジトリを取得する	2026-11-11T20:02:26.9685222Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+check	リポジトリを取得する	2026-11-11T20:02:26.9703494Z http.https://github.com/.extraheader
+check	リポジトリを取得する	2026-11-11T20:02:26.9708407Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+check	リポジトリを取得する	2026-11-11T20:02:26.9732944Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+check	リポジトリを取得する	2026-11-11T20:02:26.9930434Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+check	リポジトリを取得する	2026-11-11T20:02:26.9953463Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+check	リポジトリを取得する	2026-11-11T20:02:27.0155870Z ##[endgroup]
+check	1 アカウント ID を実行時に得て、すぐ伏せる	﻿2026-11-11T20:02:27.0324420Z ##[group]Run WR=app/node_modules/.bin/wrangler
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0324769Z ^[[36;1mWR=app/node_modules/.bin/wrangler^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0325093Z ^[[36;1mif ! npm ci --prefix app --ignore-scripts --no-audit --no-fund > npm-ci.log 2>&1; then^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0325404Z ^[[36;1m  echo "依存関係の準備: 失敗"^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0325575Z ^[[36;1mfi^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0326031Z ^[[36;1mcurl -sS -H "Authorization: ***" \^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0326348Z ^[[36;1m  https://api.cloudflare.com/client/v4/accounts > accounts.json 2>/dev/null || true^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0326782Z ^[[36;1mpython3 -c 'import json; d=json.load(open("accounts.json")); [print(a["id"]) for a in d.get("result", [])]' > ids.txt 2>/dev/null || true^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0327395Z ^[[36;1mgrep -E '^[0-9a-f]{32}$' ids.txt 2>/dev/null | sort -u > cand.txt || true^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0327672Z ^[[36;1mif [ "$(wc -l < cand.txt | tr -d ' ')" -ne 1 ]; then^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0327896Z ^[[36;1m  "$WR" whoami > who.txt 2>&1 || true^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0328259Z ^[[36;1m  grep -oE '(^|[^0-9a-f])[0-9a-f]{32}([^0-9a-f]|$)' who.txt 2>/dev/null | grep -oE '[0-9a-f]{32}' | sort -u > cand.txt || true^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0328573Z ^[[36;1mfi^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0328731Z ^[[36;1mn=$(wc -l < cand.txt | tr -d ' ')^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0328928Z ^[[36;1mif [ "$n" -ne 1 ]; then^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329123Z ^[[36;1m  echo "アカウント ID を 1 つに決められない(件数: $n)"^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329313Z ^[[36;1m  exit 1^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329464Z ^[[36;1mfi^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329612Z ^[[36;1mid=$(cat cand.txt)^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329789Z ^[[36;1mecho "::add-mask::$id"^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0329994Z ^[[36;1mecho "CLOUDFLARE_ACCOUNT_ID=$id" >> "$GITHUB_ENV"^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0330209Z ^[[36;1mecho "アカウント ID を実行時に 1 つ得た(値は出さない)"^[[0m
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0373555Z shell: /usr/bin/bash -e {0}
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0373751Z env:
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0374038Z   CLOUDFLARE_API_TOKEN: ***
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:27.0374209Z ##[endgroup]
+check	1 アカウント ID を実行時に得て、すぐ伏せる	2026-11-11T20:02:29.6455674Z アカウント ID を実行時に 1 つ得た(値は出さない)
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	﻿2026-11-11T20:02:29.6493420Z ##[group]Run if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6551845Z ^[[36;1mif [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6552223Z ^[[36;1m  echo "アカウント ID が未設定のため、この確認は行わない"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6552480Z ^[[36;1m  exit 1^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6552666Z ^[[36;1mfi^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6552884Z ^[[36;1mWR=app/node_modules/.bin/wrangler^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6553182Z ^[[36;1mif [ ! -x "$WR" ]; then^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6553467Z ^[[36;1m  echo "wrangler が無い(依存関係の準備が失敗)"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6553748Z ^[[36;1m  exit 1^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6553992Z ^[[36;1mfi^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6554189Z ^[[36;1mmask() {^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6554403Z ^[[36;1m  sed -E \^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6554663Z ^[[36;1m    -e "s/$CLOUDFLARE_ACCOUNT_ID/[アカウント ID 伏せ]/g" \^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6554988Z ^[[36;1m    -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/[メール伏せ]/g' \^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6555341Z ^[[36;1m    -e 's/[A-Za-z0-9.-]+\.workers\.dev/[ホスト伏せ]/g'^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6555613Z ^[[36;1m}^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6556016Z ^[[36;1mecho "wrangler の版: $(node -p "require('./app/node_modules/wrangler/package.json').version")"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6556728Z ^[[36;1mif "$WR" whoami > /dev/null 2>&1; then^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6557156Z ^[[36;1m  echo "wrangler whoami(参考): 成功"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6557398Z ^[[36;1melse^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6557609Z ^[[36;1m  echo "wrangler whoami(参考): 失敗"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6557847Z ^[[36;1mfi^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6558177Z ^[[36;1mif "$WR" deployments list --name fl-studio-web > deploy.txt 2>&1; then^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6558576Z ^[[36;1m  mask < deploy.txt > deploy-masked.txt^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6558874Z ^[[36;1m  echo "deployments list: 成功"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6559344Z ^[[36;1m  grep -E 'Version|Created|Deployment|[0-9]{4}-[0-9]{2}-[0-9]{2}' deploy-masked.txt | grep -v -i 'author' || true^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6559804Z ^[[36;1melse^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6560017Z ^[[36;1m  echo "deployments list: 失敗"^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6560311Z ^[[36;1m  mask < deploy.txt | tail -n 20^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6560660Z ^[[36;1m  exit 1^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6560868Z ^[[36;1mfi^[[0m
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6605231Z shell: /usr/bin/bash -e {0}
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6605408Z env:
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6605702Z   CLOUDFLARE_ACCOUNT_ID: ***
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6605944Z   CLOUDFLARE_API_TOKEN: ***
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6606089Z ##[endgroup]
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:29.6881833Z wrangler の版: 4.156.0
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:31.7926849Z wrangler whoami(参考): 成功
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0400430Z deployments list: 成功
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0411745Z Created:     2026-11-05T15:29:27.596Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0412133Z Version(s):  (100%) a3fc8c43-a3a9-48a2-b9cf-86b1dbf5cfca
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0414861Z                  Created:  2026-11-05T15:29:24.427Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0415137Z Created:     2026-11-06T01:10:44.539Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0415395Z Version(s):  (100%) 51f102d8-a15e-4972-b2fc-0288705a224f
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0415687Z                  Created:  2026-11-06T01:10:41.741Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0415937Z Created:     2026-11-06T02:36:07.510Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0416227Z Version(s):  (100%) 4a03e043-212d-4392-b35a-a1cbb60fa726
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0416527Z                  Created:  2026-11-06T02:36:04.082Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0416765Z Created:     2026-11-06T04:25:32.893Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0417241Z Version(s):  (100%) 2f390ad3-5853-423e-89a3-fb6610a15263
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0417498Z                  Created:  2026-11-06T04:25:30.095Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0417725Z Created:     2026-11-06T05:27:38.771Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0417960Z Version(s):  (100%) 3e82eb40-5415-4d92-8873-f94628ad6eef
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0418219Z                  Created:  2026-11-06T05:27:35.940Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0418479Z Created:     2026-11-06T06:31:59.124Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0418729Z Version(s):  (100%) 00769751-6314-4262-8464-151fcd043354
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0418993Z                  Created:  2026-11-06T06:31:56.907Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0419238Z Created:     2026-11-06T08:39:58.155Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0419495Z Version(s):  (100%) e9565033-8c44-4395-a6a4-53abee97001d
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0420012Z                  Created:  2026-11-06T08:39:55.525Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0420252Z Created:     2026-11-06T11:49:06.106Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0420506Z Version(s):  (100%) 0f8ed7c4-f576-4b40-a3b9-7fca05115164
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0420776Z                  Created:  2026-11-06T11:49:03.288Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0421051Z Created:     2026-11-07T03:37:53.141Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0427625Z Version(s):  (100%) 7c2b233f-9f71-4006-8acc-e3bfc5daaa93
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0427894Z                  Created:  2026-11-07T03:37:50.385Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0428070Z Created:     2026-11-07T21:40:44.504Z
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0428249Z Version(s):  (100%) 2cb938be-e32d-44e4-8268-1824660956fe
+check	2 API トークンで Worker の一覧を読む(wrangler の版は package-lock で固定)	2026-11-11T20:02:33.0428470Z                  Created:  2026-11-07T21:40:42.102Z
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	﻿2026-11-11T20:02:33.0453085Z ##[group]Run if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0453341Z ^[[36;1mif [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0453523Z ^[[36;1m  echo "アカウント ID が未設定のため、この確認は行わない"^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0453682Z ^[[36;1m  exit 1^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0453799Z ^[[36;1mfi^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0454105Z ^[[36;1mexport AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0454384Z ^[[36;1mENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0454601Z ^[[36;1mstatus=0^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0454742Z ^[[36;1mfor bucket in fl-web-artifacts; do^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0454979Z ^[[36;1m  if aws s3 ls "s3://${bucket}/" --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0455204Z ^[[36;1m    echo "バケット ${bucket} の一覧: 成功"^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0455508Z ^[[36;1m    head -n 3 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0455823Z ^[[36;1m  else^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0455951Z ^[[36;1m    echo "バケット ${bucket} の一覧: 失敗"^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0456233Z ^[[36;1m    sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' ls.txt | tail -n 5^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0456510Z ^[[36;1m    status=1^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0456643Z ^[[36;1m  fi^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0456755Z ^[[36;1mdone^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0456872Z ^[[36;1mexit $status^[[0m
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0496408Z shell: /usr/bin/bash -e {0}
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0496557Z env:
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0496819Z   CLOUDFLARE_ACCOUNT_ID: ***
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0497050Z   AWS_ACCESS_KEY_ID: ***
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0497283Z   AWS_SECRET_ACCESS_KEY: ***
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:33.0497419Z ##[endgroup]
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:37.1677915Z バケット fl-web-artifacts の一覧: 成功
+check	3a R2 のアクセスキー 1 組目を確かめる(fl-web-artifacts・読み取り)	2026-11-11T20:02:37.1703192Z                            PRE installers/
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	﻿2026-11-11T20:02:37.1732514Z ##[group]Run if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1732765Z ^[[36;1mif [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1732950Z ^[[36;1m  echo "アカウント ID が未設定のため、この確認は行わない"^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1733106Z ^[[36;1m  exit 1^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1733224Z ^[[36;1mfi^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1733398Z ^[[36;1mexport AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1733693Z ^[[36;1mENDPOINT="https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1733910Z ^[[36;1mstatus=0^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1734056Z ^[[36;1mfor bucket in fl-web-cache fl-web-assets; do^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1734302Z ^[[36;1m  if aws s3 ls "s3://${bucket}/" --endpoint-url "$ENDPOINT" > ls.txt 2>&1; then^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1734528Z ^[[36;1m    echo "バケット ${bucket} の一覧: 成功"^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1734834Z ^[[36;1m    head -n 3 ls.txt | sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g'^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1735130Z ^[[36;1m  else^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1735265Z ^[[36;1m    echo "バケット ${bucket} の一覧: 失敗"^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1735544Z ^[[36;1m    sed -E -e "s/$CLOUDFLARE_ACCOUNT_ID/[伏せ]/g" -e 's/[A-Za-z0-9.-]+\.r2\.cloudflarestorage\.com/[ホスト伏せ]/g' ls.txt | tail -n 5^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1735821Z ^[[36;1m    status=1^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1735949Z ^[[36;1m  fi^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1736064Z ^[[36;1mdone^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1736196Z ^[[36;1mexit $status^[[0m
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1775339Z shell: /usr/bin/bash -e {0}
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1775485Z env:
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1775737Z   CLOUDFLARE_ACCOUNT_ID: ***
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1775912Z   AWS_ACCESS_KEY_ID: ***
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1776143Z   AWS_SECRET_ACCESS_KEY: ***
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:37.1776285Z ##[endgroup]
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:38.0045133Z バケット fl-web-cache の一覧: 成功
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:38.0072090Z                            PRE cache/
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:38.0073561Z                            PRE perf/
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:39.0377740Z バケット fl-web-assets の一覧: 成功
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:39.0399739Z                            PRE fl-engine-ci-0363b050/
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:39.0400130Z                            PRE fl-engine-ci-251dfabc/
+check	3b R2 のアクセスキー 2 組目を確かめる(fl-web-cache・fl-web-assets)	2026-11-11T20:02:39.0400419Z                            PRE fl-engine-ci-432c65ec/
+check	4 結果の表	﻿2026-11-11T20:02:39.1066563Z ##[group]Run fail=0
+check	4 結果の表	2026-11-11T20:02:39.1066740Z ^[[36;1mfail=0^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1066863Z ^[[36;1mline() {^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067170Z ^[[36;1m  if [ "$2" = "success" ]; then^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067501Z ^[[36;1m    r="成功"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067625Z ^[[36;1m  else^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067750Z ^[[36;1m    r="失敗"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067873Z ^[[36;1m    fail=1^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1067999Z ^[[36;1m  fi^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068125Z ^[[36;1m  echo "| $1 | $r |"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068269Z ^[[36;1m}^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068388Z ^[[36;1mecho "| 確認 | 結果 |"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068532Z ^[[36;1mecho "|---|---|"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068684Z ^[[36;1mline "1 アカウント ID を実行時に得た" "$R_ACCT"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1068905Z ^[[36;1mline "2 API トークン(Worker fl-studio-web の一覧)" "$R_TOKEN"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1069146Z ^[[36;1mline "3a R2 のキー 1 組目(fl-web-artifacts の読み取り)" "$R_ART"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1069408Z ^[[36;1mline "3b R2 のキー 2 組目(fl-web-cache・fl-web-assets の読み取り)" "$R_CACHE"^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1069661Z ^[[36;1mexit $fail^[[0m
+check	4 結果の表	2026-11-11T20:02:39.1108963Z shell: /usr/bin/bash -e {0}
+check	4 結果の表	2026-11-11T20:02:39.1109111Z env:
+check	4 結果の表	2026-11-11T20:02:39.1109393Z   CLOUDFLARE_ACCOUNT_ID: ***
+check	4 結果の表	2026-11-11T20:02:39.1109536Z   R_ACCT: success
+check	4 結果の表	2026-11-11T20:02:39.1109663Z   R_TOKEN: success
+check	4 結果の表	2026-11-11T20:02:39.1109783Z   R_ART: success
+check	4 結果の表	2026-11-11T20:02:39.1109908Z   R_CACHE: success
+check	4 結果の表	2026-11-11T20:02:39.1110032Z ##[endgroup]
+check	4 結果の表	2026-11-11T20:02:39.1278293Z | 確認 | 結果 |
+check	4 結果の表	2026-11-11T20:02:39.1278503Z |---|---|
+check	4 結果の表	2026-11-11T20:02:39.1278765Z | 1 アカウント ID を実行時に得た | 成功 |
+check	4 結果の表	2026-11-11T20:02:39.1279056Z | 2 API トークン(Worker fl-studio-web の一覧) | 成功 |
+check	4 結果の表	2026-11-11T20:02:39.1279398Z | 3a R2 のキー 1 組目(fl-web-artifacts の読み取り) | 成功 |
+check	4 結果の表	2026-11-11T20:02:39.1279712Z | 3b R2 のキー 2 組目(fl-web-cache・fl-web-assets の読み取り) | 成功 |
+check	Post リポジトリを取得する	﻿2026-11-11T20:02:39.1372681Z Post job cleanup.
+check	Post リポジトリを取得する	2026-11-11T20:02:39.1958538Z [command]/usr/bin/git version
+check	Post リポジトリを取得する	2026-11-11T20:02:39.1993519Z git version 2.56.0
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2017986Z Temporarily overriding HOME='/home/runner/work/_temp/3f223489-2a27-40ce-890f-59e5fdabe98f' before making global git config changes
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2018663Z Adding repository directory to the temporary git global config as a safe directory
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2021338Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/signature-studio/signature-studio
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2088165Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2118769Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2376798Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2406848Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2635838Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+check	Post リポジトリを取得する	2026-11-11T20:02:39.2665018Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+check	Complete job	﻿2026-11-11T20:02:39.2985178Z Cleaning up orphan processes
+check	Complete job	2026-11-11T20:02:39.3246782Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

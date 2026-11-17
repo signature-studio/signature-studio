@@ -1,0 +1,1 @@
+-Wl,--wrap=fle_imp_CreateFileW -Wl,--wrap=fle_imp_ReadFile -Wl,--wrap=fle_imp_CreateFileMappingW -Wl,--wrap=fle_imp_MapViewOfFile -Wl,--wrap=fle_audio_ring_append -Wl,--wrap=fle_imp_GetProcAddress

@@ -1,0 +1,7 @@
+#### scenario N (runtime only): pixels of a window after the erase of the update rectangle (10,10,50,40)
+N1 default WM_PAINT, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+N2 RDW_ERASENOW, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+N3 own BeginPaint, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+N4 default WM_PAINT, class without a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+N5 bErase FALSE, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+N6 default WM_PAINT, COLOR_WINDOW + 1: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040

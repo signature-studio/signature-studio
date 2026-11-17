@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>flengine6.wasm in the browser</title>
+<style>body{font:13px monospace;margin:1em}#log{white-space:pre;max-height:70vh;overflow:auto;border:1px solid #888;padding:.5em}</style>
+<h3>flengine6.wasm (FLEngine + 5 modules, a4) in a Web Worker</h3>
+<p>Parameters: <code>?auto=1&amp;fast=1&amp;mode=instantiate|compile|buffer&amp;enc=identity|gzip|br|zstd&amp;rate=&lt;MB/s&gt;&amp;root=/data</code>
+(fast=1 replaces emscripten_return_address by a function that returns 0, as FLE_WASM_FAST_RETADDR=1 of run_node_nmod.cjs; fast=0 takes about 30 minutes under node).</p>
+<button id="go">run</button> <span id="state">idle</span>
+<div id="log"></div>
+<script>
+'use strict';
+const q = new URLSearchParams(location.search);
+const cfg = {
+  cmd: 'run',
+  glue: new URL('dist/flengine6.web.js', location.href).href,
+  wasm: new URL('dist/flengine6.wasm', location.href).href,
+  dataBase: new URL('dist/data/', location.href).href,
+  root: q.get('root') || '/data',
+  fast: q.get('fast') !== '0',
+  mode: q.get('mode') || 'instantiate',
+  enc: q.get('enc') || 'identity',
+  cache: q.get('cache') === '1',
+  rate: +(q.get('rate') || 0),
+};
+const logEl = document.getElementById('log');
+const stateEl = document.getElementById('state');
+const events = [];
+window.__done = false;
+window.__events = events;
+function start() {
+  document.getElementById('go').disabled = true;
+  const t0 = performance.now();
+  const w = new Worker('fle-worker.js');
+  stateEl.textContent = 'running';
+  w.onmessage = (ev) => {
+    const m = ev.data;
+    if (m.type === 'stdout' || m.type === 'stderr') {
+      const st = window.__stdoutTimes = window.__stdoutTimes || { n: 0, first_ms: null, last_ms: null, a4: [] };
+      const now = +(performance.now() - t0).toFixed(1);
+      st.n++; st.last_ms = now; if (st.first_ms === null) st.first_ms = now;
+      if (m.line.startsWith('a4: ')) st.a4.push({ ms: now, line: m.line.slice(0, 60) });
+      logEl.textContent += (m.type === 'stderr' ? '[err] ' : '') + m.line + '\n';
+      return;
+    }
+    events.push(Object.assign({ page_t: +(performance.now() - t0).toFixed(1) }, m.type === 'done' ? { type: 'done' } : m));
+    if (m.type === 'mark') logEl.textContent += '-- ' + m.name + ' ' + m.t + ' ms\n';
+    if (m.type === 'done' || m.type === 'error') {
+      stateEl.textContent = m.type === 'done' ? 'done, exit code ' + m.exitCode : 'error: ' + m.message;
+      window.__result = m;
+      window.__result.cfg = cfg;
+      window.__result.stdoutTimes = window.__stdoutTimes;
+      window.__result.page_ms = +(performance.now() - t0).toFixed(1);
+      window.__done = true;
+      if (q.get('keep') !== '1') w.terminate();
+    }
+  };
+  w.onerror = (ev) => {
+    window.__result = { type: 'error', phase: 'worker.onerror', message: String(ev.message), cfg };
+    window.__done = true;
+  };
+  w.postMessage(cfg);
+}
+document.getElementById('go').onclick = start;
+if (q.get('auto') === '1') start();
+</script>

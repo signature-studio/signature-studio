@@ -1,0 +1,16 @@
+--- a/app/test/e2e/engine-desk.mjs	2026-11-07 08:58:15.000000000 +0900
++++ b/app/test/e2e/engine-desk.mjs	2026-11-07 09:13:50.950152194 +0900
+@@ -138,9 +138,10 @@
+     record('record: the page state when the engine\'s main() had started (the starting-stage checks need "running")', String(await page.ev('window.__app.state')));
+     if (startingStage) check('the engine is running while it starts (state "running"), not yet idle', (await page.ev('window.__app.state')) === 'running');
+     {
+-      // the PM's rule: only the stand-in engine's page carries the STAND-IN banner; the real engine's page has none
+-      const ban = JSON.parse(await page.ev(`JSON.stringify((() => { const e = document.getElementById('standin-banner'); return { text: e.textContent, hidden: e.hidden, display: getComputedStyle(e).display, kind: window.__app.engineKind, inPageText: document.body.innerText.includes('STAND-IN') }; })())`));
+-      check('the real engine\'s page has no STAND-IN banner (the banner is hidden and empty, engineKind is emscripten-fruity-v1)', ban.hidden && ban.text === '' && ban.display === 'none' && ban.kind === 'emscripten-fruity-v1' && !ban.inPageText, JSON.stringify(ban));
++      // the PM's rule: only the stand-in engine's page carried the STAND-IN banner; the real engine's page has none. Decision 0243 deleted the stand-in engine and its banner element (`#standin-banner`) from the page, so
++      // the check is now that the element is absent, the page text has no STAND-IN, and the engine is the real one (this read the element's text before and threw on null: the scenario stopped here and no later check ran)
++      const ban = JSON.parse(await page.ev(`JSON.stringify({ element: document.getElementById('standin-banner') !== null, kind: window.__app.engineKind, inPageText: document.body.innerText.includes('STAND-IN') })`));
++      check('the real engine\'s page has no STAND-IN banner (decision 0243: the banner element is gone, the page text has no STAND-IN, engineKind is emscripten-fruity-v1)', !ban.element && ban.kind === 'emscripten-fruity-v1' && !ban.inPageText, JSON.stringify(ban));
+     }
+     if (startingStage) {
+       const early = await page.ev("JSON.stringify({ st: window.__app.engineStatus(), input: document.getElementById('desktop').dataset.input })");

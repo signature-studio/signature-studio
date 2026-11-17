@@ -1,0 +1,7 @@
+ImageBase 0x400000
+slot RVA 0x3503a0 section .data file offset 0x34efa0
+raw 8 bytes 20f2750000000000
+raw value 0x75f220 = ImageBase + RVA 0x35f220
+base relocation for the slot: DIR64 at 0x3503a0
+rebased to base 0x9000000: 0x935f220
+0x35f220 is in section .bss (0x351000..0x361688)

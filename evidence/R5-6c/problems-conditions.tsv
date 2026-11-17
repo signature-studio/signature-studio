@@ -1,0 +1,11 @@
+arm	label	start_utc	loadavg1	vmstat_sample2_si_so	vmstat_sample3_si_so	io_avg10	other_chrome_procs	avail_mb	load_start_report	first_idle_ms	run_dir	out
+new	e6new1	2026-11-16T23:26:13Z	0.67	0/0	0/0	0.00	3	9804	0.67	4232	r55-e6new1-problems-chrome-1	rc=0
+ctl	e6ctl1	2026-11-16T23:27:03Z	0.96	0/0	0/0	0.00	3	19799	0.96	4159	r55-e6ctl1-problems-chrome-1	rc=0
+new	e6new2	2026-11-16T23:27:50Z	1.07	0/0	0/0	0.00	3	19754	0.98	4257	r55-e6new2-problems-chrome-1	rc=0
+ctl	e6ctl2	2026-11-16T23:28:40Z	0.90	0/0	0/0	0.00	3	19811	0.83	4190	r55-e6ctl2-problems-chrome-1	rc=0
+new	e6new3	2026-11-16T23:29:28Z	1.21	0/0	0/0	0.00	3	19835	1.21	4249	r55-e6new3-problems-chrome-1	rc=0
+ctl	e6ctl3	2026-11-16T23:30:18Z	1.97	12/0	0/0	16.16	3	19813	1.97	4230	r55-e6ctl3-problems-chrome-1	rc=0
+new	expi1	2026-11-16T23:41:19Z	0.88	52/0	0/0	0.00	3	9887	0.88	0	r55-expi1-problems-chrome-1	rc=0
+new	expi2	2026-11-16T23:41:26Z	1.13	0/0	0/0	0.00	3	16771	1.04	0	r55-expi2-problems-chrome-1	rc=0
+new	expi3	2026-11-16T23:47:49Z	1.13	0/0	0/0	0.00	3	10340	1.13	4291	r55-expi3-problems-chrome-1	rc=0
+new	expi4	2026-11-16T23:48:39Z	0.81	0/0	0/0	0.00	3	22860	0.81	4299	r55-expi4-problems-chrome-1	rc=0

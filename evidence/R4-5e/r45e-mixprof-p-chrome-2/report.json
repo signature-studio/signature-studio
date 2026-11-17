@@ -1,0 +1,130 @@
+[
+ {
+  "name": "r45e-p3-mixmove-prof",
+  "what": "R4-5e: the P3 mix-move scenario (scn-p3-mixmove-300.json) with the V8 CPU profiler on every Worker (profStart after cpuStart, profStop before cpuStop; interval 500 us). Same ops otherwise.",
+  "rep": 1,
+  "seconds": 370,
+  "firstIdleMs": 4867.6650390625,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "profs": [
+   {
+    "name": "r45e-p3",
+    "wallS": 321.99,
+    "cpuS": {
+     "worker": 276.51,
+     "main": 0,
+     "compositor": 11.86,
+     "gpu": 0,
+     "other": 530,
+     "workers": [
+      276.51
+     ],
+     "top": {
+      "DedicatedWorker": 276.51,
+      "chrome": 47.42,
+      "Thread<11>": 27.64,
+      "Thread<10>": 27.61,
+      "Thread<09>": 27.57,
+      "Thread<04>": 27.54,
+      "Thread<02>": 27.46,
+      "Thread<07>": 27.36
+     }
+    },
+    "files": [
+     {
+      "file": "r45e-p3-w0.cpuprofile",
+      "url": "http://127.0.0.1:46437/static/worker-a5brPI4p.js",
+      "samples": 523939,
+      "nodes": 25280,
+      "bytes": 9610090
+     }
+    ]
+   },
+   {
+    "name": "p3-play",
+    "wallS": 322.63,
+    "cpuS": {
+     "worker": 277.08,
+     "main": 0,
+     "compositor": 11.88,
+     "gpu": 0,
+     "other": 511.58,
+     "workers": [
+      277.08
+     ],
+     "top": {
+      "DedicatedWorker": 277.08,
+      "chrome": 47.59,
+      "Thread<11>": 27.68,
+      "Thread<10>": 27.66,
+      "Thread<09>": 27.6,
+      "Thread<04>": 27.57,
+      "Thread<02>": 27.49,
+      "Thread<07>": 27.41
+     }
+    },
+    "files": []
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 49.64000000059605,
+   "manifest_loaded": 65.5300000011921,
+   "download_start": 94.80000001192093,
+   "compile_done": 1180.030000001192,
+   "download_done": 1258.5450000017881,
+   "pack_source_dll": 1341.1650390625,
+   "pack_source_seed": 1341.235107421875,
+   "glue_loaded": 1349.4599609375,
+   "worker_ready": 1350.25,
+   "engine_start": 1350.2900000065565,
+   "wasm_instantiated": 1375.050048828125,
+   "files_ready": 1385.22509765625,
+   "main_start": 1386.534912109375,
+   "idle": 4867.6650390625,
+   "host_files_released": 4871.534912109375,
+   "first_pixel": 4895.880126953125,
+   "filedlg_request": 17367.27490234375,
+   "filedlg_answer": 21009.425048828125
+  },
+  "loadStart": 0.91,
+  "loadEnd": 3.29,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

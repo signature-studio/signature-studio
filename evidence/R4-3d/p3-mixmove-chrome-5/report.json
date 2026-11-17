@@ -1,0 +1,110 @@
+[
+ {
+  "name": "p3-mixmove-300",
+  "what": "P3 (the same song as s3a-song: 5 minutes of playback from the start, counters every 2 s, the measured window cpuStart to cpuStop) with the Mixer shown and the mouse moved at 10 per second during the measured playback: 20 moves of 100 ms in each 2 s block (the move list of scn-o19.json o19-song-mixmove, cycled). Condition 2 of R4-3.",
+  "rep": 1,
+  "seconds": 367,
+  "firstIdleMs": 3994.685302734375,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "profs": [
+   {
+    "name": "p3-play",
+    "wallS": 321.8,
+    "cpuS": {
+     "worker": 261.23,
+     "main": 0,
+     "compositor": 11.12,
+     "gpu": 0,
+     "other": 556.01,
+     "workers": [
+      261.23
+     ],
+     "top": {
+      "DedicatedWorker": 261.23,
+      "chrome": 45.27,
+      "Thread<14>": 31.43,
+      "Thread<08>": 30.92,
+      "Thread<15>": 30.63,
+      "Thread<05>": 30.62,
+      "Thread<01>": 30.61,
+      "Thread<07>": 30.39
+     }
+    },
+    "files": []
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 59.98800239952019,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 41.31999999284744,
+   "manifest_loaded": 54.07499998807907,
+   "download_start": 76.47999995946884,
+   "compile_done": 777.6049999594688,
+   "download_done": 929.8100000023842,
+   "pack_source_dll": 1002.89013671875,
+   "pack_source_seed": 1002.935302734375,
+   "glue_loaded": 1010.085205078125,
+   "worker_ready": 1010.6899999976158,
+   "engine_start": 1010.7299999594688,
+   "wasm_instantiated": 1033.01513671875,
+   "files_ready": 1042.76025390625,
+   "main_start": 1043.840087890625,
+   "idle": 3994.685302734375,
+   "host_files_released": 3994.915283203125,
+   "first_pixel": 4018.315185546875,
+   "filedlg_request": 16466.4052734375,
+   "filedlg_answer": 19955.455322265625
+  },
+  "loadStart": 1.93,
+  "loadEnd": 1.83,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

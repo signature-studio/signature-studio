@@ -1,0 +1,872 @@
+image: base=0x400000 size=0x18c0000 entry=0x1376820 imports=738 exports=3
+real module image: base=0x2000000 size=0x261f000 entry=0x37caca8 imports(cumulative)=810 exports(cumulative)=449
+real module table: name=dsp_ippv2_x64.dll base=0x2000000
+real module image: base=0x4700000 size=0x300000 entry=0x489e584 imports(cumulative)=904 exports(cumulative)=450
+real module table: name=blend2d.dll base=0x4700000
+real module image: base=0x1d00000 size=0x20e000 entry=0x1e9c1f0 imports(cumulative)=1121 exports(cumulative)=460
+real module table: name=quickfontcache_x64.dll base=0x1d00000
+real module image: base=0x4b00000 size=0x9a000 entry=0x4b580f0 imports(cumulative)=1195 exports(cumulative)=731
+real module table: name=freetype_x64.dll base=0x4b00000
+real module image: base=0x6000000 size=0x394000 entry=0x62b35f0 imports(cumulative)=1715 exports(cumulative)=738
+real module table: name=iltools_x64.dll base=0x6000000
+real module image: base=0xc000000 size=0x1cf000 entry=0xc056580 imports(cumulative)=1810 exports(cumulative)=747
+real module table: name=oggio_x64.dll base=0xc000000
+real module image: base=0xb000000 size=0x4cc000 entry=0xb2c7fb8 imports(cumulative)=1889 exports(cumulative)=762
+real module table: name=elastique_x64.dll base=0xb000000
+real module image: base=0x6800000 size=0x3a1000 entry=0x6ac13a0 imports(cumulative)=2394 exports(cumulative)=765
+real module table: name=fruity_balance_x64.dll base=0x6800000
+real module image: base=0x7000000 size=0x3b2000 entry=0x72cdf20 imports(cumulative)=2899 exports(cumulative)=768
+real module table: name=fruity_filter_x64.dll base=0x7000000
+vfs seed: list /data/seed/vfs-seed-idle1.tsv, 245 files
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILCursors.ilfont <- /data/seed/lift/out-inventory/extracted/fonts/ILCursors.ilfont (7892 bytes, sha256 588c4bf43070ebe92e97ef7a317677575ae344f71ef75020f0b13a308adb880b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILGlyphsEx.ilfont <- /data/seed/lift/out-inventory/extracted/fonts/ILGlyphsEx.ilfont (102712 bytes, sha256 578b46df16da9e98e9fe837b5786ec037b84a91478a46990b0d251d86f58aeb1)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Generators\MIDI Out\Data\GM CCs.txt <- /data/seed/lift/out-fruity11/inputs/GM_CCs.txt (1434 bytes, sha256 af33bd90f8bc734332e6ed7349c2decd43979b0c9275fa55eda90cde87eaee5e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Channel presets\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Envelopes\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Misc\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin presets\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Soundfonts\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\System\Articulator\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Templates\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Hardware specific\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\ (directory)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\BigFruit.png <- /data/seed/lift/out-idle1/inputs/install/Artwork/Skins/Default/BigFruit.png (166508 bytes, sha256 0a8dab6829bde22c64bbea6d5c467d8f89bc14a4b8c3bee93bc6b257f2e6e108)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\ScopeGradient.bmp <- /data/seed/lift/out-idle1/inputs/install/Artwork/Skins/Default/ScopeGradient.bmp (1592 bytes, sha256 7d94276e95bb2e8ea793e78e5352929a95f7a0cf2ff06f8b50758cc73c10217e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\Title.png <- /data/seed/lift/out-idle1/inputs/install/Artwork/Skins/Default/Title.png (175455 bytes, sha256 ab01534e8878379c118ff4d65fa09818e898d1f4aa90b750798ef3597a0d40c6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Default.txt <- /data/seed/lift/out-idle1/inputs/install/Artwork/Wallpapers/Default.txt (97 bytes, sha256 31c97b422aaccb84ab17bf388a90d3f6f0f51fe3d1400448b5cabdd79db60de8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL STUDIO dark.png <- /data/seed/lift/out-idle1/inputs/install/Artwork/Wallpapers/FL STUDIO dark.png (14548 bytes, sha256 72851aeb919ca6c566a66dc88ebb16b0ac762d9a990c5cc8b8ab7d4288af4f7c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Demo projects.nfo (22 bytes, sha256 a362c7539de8a60a33413e344c409ff9fb3be8bcebbfdb4cf367e87d4c7fc311)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\NewStuff.flp <- /data/seed/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp (313356 bytes, sha256 9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Channel presets.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Channel presets.nfo (108 bytes, sha256 cd2d0ffc59697cb63259e142fc92bd7af223a6cead7e0bd995556ea800659ab0)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Envelopes.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Envelopes.nfo (73 bytes, sha256 c8eff7e1d04ef334dc1ec67de955a3e94c209f35f16645cc59bc6236b4122729)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses.nfo (45 bytes, sha256 d0c14c441b1ffed85f8be7d803a9975d6b3aa14ffbfb5a070039ac7ed2d1688c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Chambers.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Chambers.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Corridors.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Corridors.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Default.wav <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Default.wav (604220 bytes, sha256 b1075082540fc5dd2c2e4ad51cf3e80f0f7d5dda32c6da914c4a49cecc632573)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Exteriors.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Exteriors.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\FX.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/FX.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Halls.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Halls.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Small Rooms.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Small Rooms.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses\Underground.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Impulses/Underground.nfo (29 bytes, sha256 c5705dd82713be76cc5e4c1930589106d67cab8b6e905768a21233c77387db31)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Misc.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Misc.nfo (25 bytes, sha256 c642fab1a1daac5ce811b1e01b6b9a281f943989b7a34bca234e8bc77d67ebc4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets.nfo (109 bytes, sha256 f6f46ef81a7beea69e5df6b2d29748b630b8f245458a3d410a1581f0ab054074)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\1-bar overdub recording.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/1-bar overdub recording.fst (1171 bytes, sha256 e81f4aa9462ddd68c29665e1cd100045a83486675d122a75f15d07f37230354a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Big meter.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Big meter.fst (1213 bytes, sha256 dfdbea12635d54ee8deb7e9294b27feafc78001358b2b439afee2aee05942115)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Chorus send.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Chorus send.fst (503 bytes, sha256 20352433b5d83cb0add6496cfac628200830d59f834da3fb00ad68affa1335ce)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Default.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Default.fst (478 bytes, sha256 05ba0b3cbba7b425b6d77f5027afbad76ba5b7b97ab7f87f7f5f1a429bf477d2)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Dual joypad control.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Dual joypad control.fst (779 bytes, sha256 db0575941077df743d4bf51c01e70b016b3f99e5eab80eeceef35ecdfa8486fd)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Flanger send.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Flanger send.fst (505 bytes, sha256 8120ed2b418aca2ddabbd34b500d45e2403705725c9cd967887b24b8a27d8d1f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\General purpose air mastering.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/General purpose air mastering.fst (887 bytes, sha256 209330cf3e1e07296e2cc141edd990247d02155568a277b91c574a901b7247f8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\General purpose mastering 2.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/General purpose mastering 2.fst (887 bytes, sha256 6d8ad04af23f9cdd8c0598f86a1ef90e5784e807fc5c38b7defde12ffba2c8b9)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\General purpose mastering 3.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/General purpose mastering 3.fst (1082 bytes, sha256 2023f7fb7b942e64feb494af9e0fa985466e03b0d2e8fc004492d15122ab3342)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\General purpose mastering 4.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/General purpose mastering 4.fst (887 bytes, sha256 5d734b9d664b07b6fabdf5ef4c6460f730def4991cf0cae8225a1f04f3f94c80)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\General purpose mastering.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/General purpose mastering.fst (887 bytes, sha256 8f2f86dc041fd41a834fb820e06e7c64fda31309404417efcee7d5d709048be6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Guitar stuff.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Guitar stuff.fst (9054 bytes, sha256 3b0bf4886a7939d46762fe2d22df6aeef9d0bd8bc7f26bb3a4e571221c339dec)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Mastering for strings.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Mastering for strings.fst (1015 bytes, sha256 c2cd8a003ff294492ad7562d3b85323aacda0e7dd816c1f84e897904d190560a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Mono tape simulation.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Mono tape simulation.fst (3192 bytes, sha256 33dddc641d755d9bdf79e7d4fb9476507616a895f1c88c4fccc9dbfdc0c5384d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Outside the club.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Outside the club.fst (895 bytes, sha256 faf7a2233c75dff56b692f42ac3ee788d625db56ccc7d2eae7585e53bf77c4df)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Reverb send.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Reverb send.fst (496 bytes, sha256 5024f448585d54bf24c01c91b713adc67fd56f4716696e531a0a7df3c97d8de8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Stereo tape simulation.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Stereo tape simulation.fst (3192 bytes, sha256 de8007aba6d27533fce483ee22fbe6741756aa0c8ac4f4e9717553b0dda65dca)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Mixer presets\Techno pounder.fst <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Mixer presets/Techno pounder.fst (887 bytes, sha256 8a77c4a3cc94c7585937a3a65bc86853965a3fb944618dc5983ba1a38368ff4a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs.nfo (90 bytes, sha256 59e798173bc0e401010c388aa8ddfe66082780d47a41b5ce5c6e1f0c58d81ef5)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Drums (ModeAudio).nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Drums (ModeAudio).nfo (46 bytes, sha256 e6c9c86df60e85acf9065c0d9502489c4552ac3e0cbe435620483dbc14f83d35)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Drums.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Drums.nfo (43 bytes, sha256 f14c22a731c8fbdbcce8e2e5d95b73955298a26c9907755f433b061e3cc0bba2)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Instruments.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Instruments.nfo (38 bytes, sha256 e0eacc3fe5b8b4fe4bac3ba013600fc152da54870614aea95ca030e1e0f721ac)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Legacy.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Legacy.nfo (34 bytes, sha256 4f3ce1f7245962c762b44f21d168baa7bd2d60c2196db003c23d548094350962)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Loops.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Loops.nfo (33 bytes, sha256 18709c55af72eb2809fd4066c01c7a28e9567de048abd8caa6052a331e0f0443)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\SFX.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/SFX.nfo (32 bytes, sha256 7d51ea262102f28c05ef384bc86f89302418226eecdca0c911a1667854edb99e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Packs\Vocals.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Packs/Vocals.nfo (33 bytes, sha256 3ae98ea6c0df2cfa9f1ae5726b0617f94ab3c5094c029f9ba913870812ecb7c9)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin database.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Plugin database.nfo (168 bytes, sha256 7059f4bd1291f9a121aafde6fde1781f64ff4afcf10ffdf805deecf0e4be936d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin presets.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Plugin presets.nfo (130 bytes, sha256 7b828d3c5e2cba1802f63cc22d1797ce45b23cb735930677b422ecda6e6731d8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin presets\Effects.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Plugin presets/Effects.nfo (53 bytes, sha256 85c1113825cd5bbde8f7ea0eff960301dfd448d13407becb4845109f2387f30c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin presets\Generators.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Plugin presets/Generators.nfo (43 bytes, sha256 724ab9a7b43e16bdd6f477b135edc8d075299d8829fefbd8cd2636466d15a421)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Plugin presets\VST.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Plugin presets/VST.nfo (39 bytes, sha256 c6a0fd69f7fe2f1324059be9d7b228035d010135809e6022de03e3b4d9f9e023)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores.nfo (102 bytes, sha256 c2a0f4d933a05cbe630c15dd6ab90359953f4f7121abfa56d5dde18a0f801a9e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\4 steps.fsc <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/4 steps.fsc (115 bytes, sha256 cb1ae3de7b0b17e84dc9e1b37967feaa38ebafbb1cdb7617ce297085c4a21af0)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Arpeggiator.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Arpeggiator.nfo (32 bytes, sha256 93c0d4603dd565141b4e5bd399fbe41737e98591066eca84b138586abd8bd88b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Automation.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Automation.nfo (36 bytes, sha256 40d670ff0913978d0099b6a74db29ec8499ca506b995f23a7b1cee3a4804691f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Chopping.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Chopping.nfo (29 bytes, sha256 d5ab7f4fd3b160f1ede71810d353f3d8555b454f9afe8893b9ca03a30eb49a6e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\DrumRoll 1.fsc <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/DrumRoll 1.fsc (516 bytes, sha256 6414b7f0e424131e1705afc1fda8779b84e0e576e0b73e32c46ea9b9cb2606e8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\DrumRoll 2.fsc <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/DrumRoll 2.fsc (516 bytes, sha256 28f5b0f6edd45d1c3aacbb3bb80ff47c26c1033ed9a9c06c0aca84a0ae5ae78c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\DrumRoll 3.fsc <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/DrumRoll 3.fsc (1636 bytes, sha256 99532b02d438d1245055125736c6532b8fe9f2245e713f5461faa0a8455e26bf)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Humanizing presets.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Humanizing presets.nfo (39 bytes, sha256 ef5450dd3722c72a378aaed8309b07e7e35f21234781b65568fb89ca044e5386)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Quantization.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Quantization.nfo (33 bytes, sha256 5c8e745a56ceb7f4e762d47647ea0a729cd934db1a0286591b6e7acb5dc302be)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Randomness.fsc <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Randomness.fsc (356 bytes, sha256 44c9d50d9bf9cbb1aca91f07225b775b3ea89666163faf8d7872a6297eb665d9)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Scores\Reference scales.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Scores/Reference scales.nfo (19 bytes, sha256 39666d175896d1b60bf700ade591de836578fb87d918b6f5db25deefdfd73c27)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Soundfonts.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Soundfonts.nfo (32 bytes, sha256 86d9e8f4770e0ac858784784dd8dadc34937d99f030f52d0a710e5b5ef64180c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Soundfonts\STR_Ensemble.sf2 <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Soundfonts/STR_Ensemble.sf2 (2293286 bytes, sha256 6800b140ed0718f73fdf2f5a32309473372e9598758122522cdb3910fc4fc782)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech.nfo <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech.nfo (18 bytes, sha256 3fd4e5848e9124d1372c2d179892af5139190934cfa0fd500e7ecc855dc0c363)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\1st_listen.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/1st_listen.speech (132 bytes, sha256 9adcc67a76539da65f8cea944fe429a91e0ff88652d67a88fe95a7732722aa67)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Activate.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Activate.speech (96 bytes, sha256 e520eadf02b3a523ec3a5b4b368e36fc00d90b70a5b5fcd80139d07da4262781)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\AllYourBase.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/AllYourBase.speech (117 bytes, sha256 dcb58c89e5cb5a0f5b734fd3bfaec7c6f29def043a2b3ab60e8e39ea59df31eb)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\alphabet_soup.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/alphabet_soup.speech (142 bytes, sha256 f5ae5b14510b62d20d9ff954939eafbe7d2c30b79441352a3d274df0e84689c6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\AreYouReady.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/AreYouReady.speech (101 bytes, sha256 719c46b46ce076101f058f45b84bf22f9d796e9228b04f32661f5df4b99e16df)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Arpegiator.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Arpegiator.speech (101 bytes, sha256 b86f462bf5fd537c0d2c98692795de602f7666811d72a1db8dd913820499ec8b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Barty1.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Barty1.speech (101 bytes, sha256 6e26019e1ac12270c3ab746578303f8ef314e2f78741b5aa1351fdae9b5014aa)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Barty2.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Barty2.speech (103 bytes, sha256 8c49cef49832eae7400872bbc30777bd93f7ceca69d66d2dd170085b59353232)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Bicycle.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Bicycle.speech (130 bytes, sha256 7db489fc6b6eb6f4289cdf3e8ae042e47680f8fd31dc5c73a29b2bda3dc5bf8f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\bump.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/bump.speech (124 bytes, sha256 2fee4b8a4a357220a191464cab80ce0fd00275bcb2393a942e155935879ce1e8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Burning_ears.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Burning_ears.speech (104 bytes, sha256 c2457940535a8a487e2b18b157d25b3cc4d8bd110c18edcf83815b241e23ad83)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\CantHoldMeBack.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/CantHoldMeBack.speech (105 bytes, sha256 05061a5afea6c7257f3acb69637090fb4f37328b8a9ea1884e45938ba0ecb1ae)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\CheckYourReality.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/CheckYourReality.speech (105 bytes, sha256 e0c43dd31e8207e13a0c6fe8061c919e2aacbe0da3bf8fa5ba16067ae53016b5)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\chopper.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/chopper.speech (107 bytes, sha256 0732dfd489c908eb22d76ea5708695853fdd0c1b06f5de3053fd1ddb6e6b2ae4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\clouds.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/clouds.speech (119 bytes, sha256 3387f4669d4b85232aec05833b2d52ffb8ee7cf19dc72e2b4104a93078af8ea6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\ComeOnDJ.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/ComeOnDJ.speech (97 bytes, sha256 cd1c5dd08bfa9e6ae72faaa8334af07354f5f33afc0e5fcf610bf4c8cffe8417)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\countdown.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/countdown.speech (131 bytes, sha256 971b0f77ae0d2675a267aed9caed9695e681617f99c425e411477c38448b88d6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Cyber_me.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Cyber_me.speech (100 bytes, sha256 16b4f09c09933fc114fb2f3c54701922c54908eb1874bf9a05f7fe137059e06b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Cyber_me_Large male.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Cyber_me_Large male.speech (99 bytes, sha256 ba9d82485ace8997837eb814a0f366c55f1d8293e782250edd6f8f398bc514bc)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Default.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Default.speech (105 bytes, sha256 104562dc4aabc96fe21bb52e19adac2833daea2a7fcaa8a4c659f40511308f65)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Devistating.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Devistating.speech (104 bytes, sha256 139d0d10a8d0e38f10b4947fb1f532c430b7b513a2470b2c620c2fa6d05f49ca)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\EastCoast.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/EastCoast.speech (97 bytes, sha256 ad027192b3ba7fc22f05ed3cfd3fc330962e5a2bcf78c011ecab7bb4fabb9eb3)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\EasyOnTheCut.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/EasyOnTheCut.speech (104 bytes, sha256 e9e6d868d17f20a70c162ebb5553a3f04d328b8338764f96904d689dc601bb53)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\electrogroove.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/electrogroove.speech (113 bytes, sha256 ef38b832c245f0198b84b9dc6474965f95bd98e8b245f0d1fbcfe60369c86121)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\FeelTheRythym.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/FeelTheRythym.speech (103 bytes, sha256 0595a7c8ff6f73dbd94d9146a2adae2daf52abf8386210e910aa2cbdfe999c14)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\FlowWiththeMusic.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/FlowWiththeMusic.speech (106 bytes, sha256 505dc004e851f06c052d18d1a2d828fd28a6a27b90bdd7f75a6a743e58fb6cb2)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\FreakMeBaby.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/FreakMeBaby.speech (101 bytes, sha256 cbd1af472cf21b223b8e1441b55965be5bb054194f609c309f59494b8a8c68f1)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\fruity feeling.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/fruity feeling.speech (112 bytes, sha256 8186c6a7f62373036d2aee2c255e6fac592d1473b289dfb0bd5cd6eedf1b2849)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\FruityFun.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/FruityFun.speech (105 bytes, sha256 14eaee8e97a99e06eafe44cf0839dbb46259f35961dfd5a8bcd4658ba649d4d6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\FunkyMusic.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/FunkyMusic.speech (98 bytes, sha256 8ffb7b8e1900e41a2a059b852b8876bc3bd5e737788a9e5c4e4efc09d83c44a8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\GoodbyeSoberDay.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/GoodbyeSoberDay.speech (104 bytes, sha256 956af6c92453783606840e9fbe1861d00d12f50d9c007e34f8ec906c14a4afc4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Hardman.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Hardman.speech (128 bytes, sha256 0ef1d1ee2b6d3b9113edea01299da52f059680ad52905cb6b094ce8bf7629406)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\higherstate.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/higherstate.speech (115 bytes, sha256 cc238f536d7c128b2800185237520d4b84d9ac7b198a561a419f7aa7797707e4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\human beatbox.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/human beatbox.speech (106 bytes, sha256 863aca5969fdc61d9c8b258018f6cfb51ffc97dc805ea5580b7b996ad7599132)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\IHaveFreedom_long.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/IHaveFreedom_long.speech (144 bytes, sha256 799fd5032dd11e7f953a80446533d633387e367636f2e8454d8691c9759ac3cc)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\ItSeemsWeHaveAProblem.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/ItSeemsWeHaveAProblem.speech (114 bytes, sha256 aa1d806ad5bd21c64da14d1237ee8e7255b40008b595d58c49984f27e7383f05)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\IwouldLikeToIntro.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/IwouldLikeToIntro.speech (113 bytes, sha256 ed5bd8a459f8a3fbb93dbb9eb634d614bb36326db8bb20d5719ecff647a50acf)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\LadiesAndGentlemen.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/LadiesAndGentlemen.speech (107 bytes, sha256 6e0060d14853930b6db602d7cbacb5c5da47335072f962df76a32643c20bba82)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\LetMySoulFlyFree.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/LetMySoulFlyFree.speech (109 bytes, sha256 3bfcbbcde3ec6098fbc933f3a73444eab13afd1ae75a1a745d1d919eecc38bc0)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\LiquidAdrenalin.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/LiquidAdrenalin.speech (103 bytes, sha256 16be0b1a7d627ca65335d646b2100226bcffb9d4308009be80190d97dac6392d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\LockItDown.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/LockItDown.speech (99 bytes, sha256 8954e17c088ec8b8a4a75f7fca0ba948abf2d79183cc91b7807ea97b9e253171)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\London.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/London.speech (105 bytes, sha256 b819ad39f1aa2420ffb15846ce70e0a3d037b1bc68c19ed58a88bc3e345dd740)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\m0000nit.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/m0000nit.speech (89 bytes, sha256 3f24aac8326f45533a3ce5d3d54e91baac7bd39390ddd02ebdc630003d92f541)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\NoneOfThemKnew.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/NoneOfThemKnew.speech (123 bytes, sha256 1d4c027d2282d4e7e5c24db9a5c98f3ab599d937dcf6ad4cacf5ee8c9e3ce8b6)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\OK.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/OK.speech (89 bytes, sha256 7cc47e40f8f16f3887903585c71ea02498f2498bcc90b1297b45fc3743179496)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\OneMansDream.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/OneMansDream.speech (103 bytes, sha256 5e8df7f3ca94fbb1fa671485ae5772c16b14a49a679381f78f329cd2e0c59135)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Ooooooooooooo_Giant male.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Ooooooooooooo_Giant male.speech (99 bytes, sha256 6edc82f705ce8a8648343aac58748e154eaeea53da1964af7c8e37ccb8c2ef5d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Oxygene_Robotoid.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Oxygene_Robotoid.speech (93 bytes, sha256 4831a130d4ca7ea63c51009a6f65d22a2206021635bc1c40d502a28752a93aec)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Pilchards on toast.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Pilchards on toast.speech (106 bytes, sha256 bd34ee79284195ed6df676b3aa43884a42355e1109179a28c1285f7557e85de5)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\PoundTheBeat.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/PoundTheBeat.speech (101 bytes, sha256 9a5500fbf2d22fb237a15cd168cd7c24a2dae84b46f36b660ce0e50fdfdc39a2)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\ReeKuf_Large male.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/ReeKuf_Large male.speech (93 bytes, sha256 bd835813759b312926f94b43dfea35fc2239571dc4536300c48a1c3df4798196)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Retrovertigo.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Retrovertigo.speech (100 bytes, sha256 193ee3c611d8fb6e0abeb3fae49de8a863c91f81ed50ae7d0faaf9c8e5d02dc8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\RippedIt.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/RippedIt.speech (95 bytes, sha256 d6ab12bc918662c97b21b789da1348b0c687304c9bbaeed68698dbe266831c10)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\rock me.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/rock me.speech (105 bytes, sha256 4b118630f4d2224a01972438d685b31052e4a64d127e9a74f28c91e8db925e64)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\RockMeBaby.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/RockMeBaby.speech (99 bytes, sha256 6edb72c2e9cc7003a6283a45ec35c8c85d285007465015a021daf899e228c087)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\ShutYoMouth.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/ShutYoMouth.speech (108 bytes, sha256 aa4b22a95785a9e2cb7ef403b3ee8de83fd67eee12741aa6f899cc04b132e432)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\SingItWithMe.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/SingItWithMe.speech (102 bytes, sha256 21f1db6d3f93609930c3129c59d2b8f5fff322a2e1becb17c35fa72aeb045331)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Smoking.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Smoking.speech (109 bytes, sha256 6cfa004f833fac61e57a2422712df832ac440f780ddaa0d4e07d913a103f00c7)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\StealMyBodyHome.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/StealMyBodyHome.speech (105 bytes, sha256 bfaaf3e2488c056008c2c115e956719042ea8cebc229dd89cf34bc8ae8d547c3)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Superstar.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Superstar.speech (96 bytes, sha256 ed1d0661c7e1bb707efb97e37ed5bc5c2cc878e9df698893c0c07a9066bf8477)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Targetlocked_Colossus.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Targetlocked_Colossus.speech (100 bytes, sha256 41da2b5292ab06bd0536d42fd4612d0dcafc813303aba414dc34a0a1a221a9ad)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\TestLow_hi.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/TestLow_hi.speech (95 bytes, sha256 9924f2bdddac045bf5517bdadf056849bb583bd5128f2478c1c1b89515d1f907)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\TestLow_Tipsy.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/TestLow_Tipsy.speech (96 bytes, sha256 b0de5dfd9f410b7895320ec016a7faf36b098fbf5c35df0e2d77e08f24ee9e99)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\TheFutureIsNow.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/TheFutureIsNow.speech (104 bytes, sha256 bef236df38c5e60216bc07be6f0e462ef27580c257c74017d2125ef0430a6356)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\TimeToGroove.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/TimeToGroove.speech (101 bytes, sha256 011da00ac0dc4ba178daf79562ad36cba598f176d4ca99876d1081953648585d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\Transmission.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/Transmission.speech (99 bytes, sha256 d98ad1bf46db294890b873d5431f30ae109b09356578eee5dee39ea3ddffde3b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\UKbeat.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/UKbeat.speech (93 bytes, sha256 08c244f57599cb09c846092466e3f26b597e063874ca0e5f1814de5651f61206)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\WestCoast.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/WestCoast.speech (97 bytes, sha256 7d151ef3a963b076366eeca942fc9c4758d9b427fa854dfd444466f4fdae63fd)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\WhatsNewPussyCat.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/WhatsNewPussyCat.speech (106 bytes, sha256 a197076c3d2c63790cdd566cb1c9282f0fa7f180895973e95535c744d9195fce)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\WhoNeedsMonoRendering.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/WhoNeedsMonoRendering.speech (113 bytes, sha256 ea50fcceea0ffec3361f1716851acda3b4ceedf9a107776a123c041f3ab1b401)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\YouNeedAHaircut.speech <- /data/seed/lift/out-idle1/inputs/install/Data/Patches/Speech/YouNeedAHaircut.speech (105 bytes, sha256 fe8640f915c5e6c5a20812a17de3e4603b983b82c00ae98091d8520d66a542fe)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\System\Empty.flp <- /data/seed/lift/out-idle1/inputs/install/Data/System/Empty.flp (46361 bytes, sha256 ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\System\Metronome2.wav <- /data/seed/lift/out-idle1/inputs/install/Data/System/Metronome2.wav (2672 bytes, sha256 0dd31ecb6d206820d8f68b3ec961dd4714e30bd1c8bbaef9d92cc993f5adec56)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\System\PreviewTrack.fst <- /data/seed/lift/out-idle1/inputs/install/Data/System/PreviewTrack.fst (704 bytes, sha256 430f27411636cf386d399eed9cc3c73b81c8359dd9646bd09f503890e5e06723)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Data\System\waveform colors.bmp <- /data/seed/lift/out-idle1/inputs/install/Data/System/waveform colors.bmp (2090 bytes, sha256 9767d941bc44ebd3e0c46bc379ece4e50c703326f8871c3f66e933b55a045423)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Help\HelpAliases.scr <- /data/seed/lift/out-idle1/inputs/install/Help/HelpAliases.scr (8682 bytes, sha256 c69f82c57ee8aba99c0b7ba13850eca5c6f2a013df6973968f059a0243fc47ae)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Help\HelpPlugins.scr <- /data/seed/lift/out-idle1/inputs/install/Help/HelpPlugins.scr (2267 bytes, sha256 654e8d7e06308a80b0d17b898944bbbf83979d336eccb1a3f22bac182d72d51b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\Barlow-Medium.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/Barlow-Medium.ttf (89352 bytes, sha256 c57cd2a156368c32c34ad254283f6eb0033b82574fec41bffd92a84f1083b131)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILLogos.ilfont <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/ILLogos.ilfont (43452 bytes, sha256 08fa238c51df228ba68e7865eed17cdd41d476c0f5c5df4ad45dd5971d2c719e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\JosefinSans-SemiBold.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/JosefinSans-SemiBold.ttf (33004 bytes, sha256 bce2ed51da316e20fc108befa1ba152850eca29cfc2b26f278a8d74957a677fb)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\OpenSans-CondLight.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/OpenSans-CondLight.ttf (221108 bytes, sha256 d406b798f7c073d64e0b143accc363f5dbc9f5c735b3c8c1dd7d00500b81906a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\OpenSans-Regular.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/OpenSans-Regular.ttf (217360 bytes, sha256 e64e508b2aa2880f907e470c4550980ec4c0694d103a43f36150ac3f93189bee)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\PT_Sans-Narrow-Web-Regular.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/PT_Sans-Narrow-Web-Regular.ttf (396212 bytes, sha256 4102edda03059163771869d258df54ac8563c408fa6e9ef75b2ddc85eabea6f4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\PT_Sans-Web-Regular.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/PT_Sans-Web-Regular.ttf (442960 bytes, sha256 9cc831490532009bae2b3ce0d39c62adfc889060beb421593bfd9d2396d0f10a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\Share-Regular.ttf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/Share-Regular.ttf (91940 bytes, sha256 406d79e7b0c514ecf2819a08a465e89597890f8c73ff564f1160d599d80a3c27)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\WebSymbols-Regular.otf <- /data/seed/lift/out-idle1/inputs/install/Shared/Artwork/Fonts/WebSymbols-Regular.otf (28824 bytes, sha256 c5ad03293f28af304b8ce9c50a4288809b14e1b989e8f24b12ec210a5523cc7a)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Backup.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Backup.nfo (74 bytes, sha256 e6ef2b213c61df501b7d98c894f77211798af2fc4a473f45a1e5bfdf7ff42817)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Clipboard files.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Clipboard files.nfo (49 bytes, sha256 8ddc9d054dc46c11d9db856ccbec26617021d4e92f220c14aaff603ebe61c9b0)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Project bones.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Project bones.nfo (88 bytes, sha256 9627663c33ad503403b7b196ec4973c9436b5fe0e171c8c6c0690cdf33b6965b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Projects.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Projects.nfo (16 bytes, sha256 8313ef7f7c686f4d55d65fda9b0ad24eaee0c81349984d40ce63ee466b9208c1)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Recorded.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Recorded.nfo (53 bytes, sha256 a645ee3632a79dd8d5bf96d8830e6b4027526db42dfe542ca5761f53924c84bc)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Rendered.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Rendered.nfo (56 bytes, sha256 4a72a58a53b329d9bb4101abce3cf215806c3f2e4d4006b8c88e0a0822b80395)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Infos\Sliced audio.nfo <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Infos/Sliced audio.nfo (65 bytes, sha256 dc20cfdcaf43db6006017d93bbf1c45b6eec390f1c5dcafdb4fa23f995c6406b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Snap1.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Snap1.scr (157 bytes, sha256 fba5397e813ab08fadfc2a1ba7238f6244492b6a82b862fa1a7cb7feacee7463)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Snap2.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Snap2.scr (123 bytes, sha256 cad3bb02e1a95f3093256725d9c513925d97453861606a4f1fb9af42eda13e0c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\Snap3.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Browser/Snap3.scr (68 bytes, sha256 533358055fa4a87047032ab1e96afbfb8a53ef0fa64655abf3d000151a8cb452)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Chords.map <- /data/seed/lift/out-idle1/inputs/install/System/Config/Chords.map (2716 bytes, sha256 66c443d9d23baf8f8a6c68ae953595335ed4758d9751c489ddbdaa2588e790cf)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Mapping\Vel curve 0.env <- /data/seed/lift/out-idle1/inputs/install/System/Config/Mapping/Vel curve 0.env (80 bytes, sha256 11855f8fa84c30b8267d516392629c63de4be8b25bac251ae2a43bebd1341aa3)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Mapping\Vel curve 1.env <- /data/seed/lift/out-idle1/inputs/install/System/Config/Mapping/Vel curve 1.env (80 bytes, sha256 11855f8fa84c30b8267d516392629c63de4be8b25bac251ae2a43bebd1341aa3)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\MP3Genres.txt <- /data/seed/lift/out-idle1/inputs/install/System/Config/MP3Genres.txt (558 bytes, sha256 76d8c281a7a0bc5c539d2aac22bb9d3534ebf6284678e6746867ec68864f09df)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Compact.tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Compact.tpr (371 bytes, sha256 d1d7a6bb5a4a42c324c0919957cb8c359ad4cd58e42bb0e8c1d74a442f01fddd)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Default (hint above menu).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Default (hint above menu).tpr (991 bytes, sha256 87d9f140c681d69b5fbceba655517abdac20d54867d132cae74e8013eac99bce)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Default (macOS).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Default (macOS).tpr (661 bytes, sha256 ac78b0c4aad60ae45883260ba0c42128c1e127174b8188f5a370fc81c5a330bf)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Default.tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Default.tpr (659 bytes, sha256 dd67461d87f9f610b5153923074da650e38c55520d3e45a21ffc677a0a860282)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\FL Studio 12.tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/FL Studio 12.tpr (957 bytes, sha256 ea5234d440092aea1f72700f0e831fe54ce0a3ea1b092820a0e34a0651ddf660)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\FL Studio 24 (macOS).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/FL Studio 24 (macOS).tpr (935 bytes, sha256 69c53af8777f902438eb74a5838edeeb4a57fdd6c4b6b85cfb29a6fc4bfe38e4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\FL Studio 24 (Windows).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/FL Studio 24 (Windows).tpr (973 bytes, sha256 3d53a535861683ff103b3f4b617f531265ce1bceb496c29228c80bf0c0ba3139)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\FL Studio 25 (macOS).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/FL Studio 25 (macOS).tpr (608 bytes, sha256 2dca229bd48eb03155103dd9c5b53542cb073ff03023937a163132e03809b948)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\FL Studio 25 (Windows).tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/FL Studio 25 (Windows).tpr (605 bytes, sha256 b2b6dc3c0215f7658cad61f156dbb4f6bd74003a6bb411b75a840cba42b8ee73)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Single line centered.tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Single line centered.tpr (455 bytes, sha256 608450792b795219e1f1bfcfe5ca31aae6ac891f0a9b33647842b36b62b3c0d4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\Single line.tpr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Toolbar presets/Single line.tpr (486 bytes, sha256 63e72414a94b6fd2ccebdeaf9245ca1e068b3de919457f9e9c225160cd2b235d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\01 Typing Keyboard Layouts Explained.txt <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/01 Typing Keyboard Layouts Explained.txt (986 bytes, sha256 b135ab6b5cf29cfff4e41d1f220cb4ba99fbb0691b65783ce4192916d461d05b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Layout FPC (C4).scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Layout FPC (C4).scr (259 bytes, sha256 b258d0f6e983563cb2b1fa15882e53a865efc0a51ffa32d4eb5e6944dd9aba51)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Layout Janko.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Layout Janko.scr (220 bytes, sha256 7868a6a901841c0954896eadc7ed9232a8cc261d5a03e1ed3772f8bdb1047d40)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Layout Performance mode.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Layout Performance mode.scr (225 bytes, sha256 8226e48802d1aed0ab7a65cbfd1dc7d8e43ef4e2e71c8a38395b5a78b4360cf4)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Layout Piano.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Layout Piano.scr (236 bytes, sha256 e4ac91ab38b9009e639fc5673daf34edc0234e56888e4c57ce82c84766514bf7)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Layout Slicex (C4).scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Layout Slicex (C4).scr (259 bytes, sha256 1e56cc450fd57791a7878b346b9570b0d2e7f83e11df02064ddaed1197e4c75f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Major + Chords.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Major + Chords.scr (292 bytes, sha256 8aa711b4c8f6db342bd928a3f8471a7ace3855b4a6aac9d72a4606be4e82e306)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Major Bebop.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Major Bebop.scr (224 bytes, sha256 0d401425a41065c508bf83a59d38a40dc15a73ffc7611cf3534e8befb423b3e0)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Major Chordmap.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Major Chordmap.scr (430 bytes, sha256 b2a7725c217165c0fac0bd5908a7094666f35d9197a1d95c1678128f77824979)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Major Pentatonic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Major Pentatonic.scr (220 bytes, sha256 231225ddfdb6659f4b3bfcec11ce50e91532437a0504c18607536f6ec802dfca)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Major.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Major.scr (220 bytes, sha256 d11c888fbc0bb45e106829e9b9afac1e06cffd13733302fcf6a583c49600b87d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Harmonic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Harmonic.scr (232 bytes, sha256 133e8cfb8481fb1ab1691996d2377c24811d097d5740a319f927da759664f2dd)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Hungarian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Hungarian.scr (239 bytes, sha256 4bf2659c70b56b07be98776868a6a4ae6f3d1dff8c2b7fc998ac4233063f2327)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Melodic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Melodic.scr (228 bytes, sha256 852fa652f046e22c2568d5ba8f71f8a07ab30d06621fc9a7d294be306843598b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Natural (Aeolian).scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Natural (Aeolian).scr (236 bytes, sha256 63b424ad21062b310fe561ce79d31207d3db32d563312f3679986189efe8474c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Natural + Chords.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Natural + Chords.scr (319 bytes, sha256 d1e2a98bfa73dcd639ba7728f09a4aeed339c6aa86e1d218abf6e88eb0975d56)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Natural Chordmap.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Natural Chordmap.scr (478 bytes, sha256 8b53374f7868f73de1162eda198eab2136d9d0bf7d3b1e66767913bbec30a674)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Neopolitan.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Neopolitan.scr (240 bytes, sha256 0117999c62ac5ea486384bd1d8ade0b5a53cf93ff856439b0052134cc153fb22)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Minor Pentatonic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Minor Pentatonic.scr (238 bytes, sha256 7328d9a88dcab8b6d7997f483fc0b5b988fd12238658174f72ccfa20ff39c99c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Arabic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Arabic.scr (232 bytes, sha256 d48295fdc32b41e9a6fdc9ced517ad2dd99cd06e4c17ada2917cf4c643530a6e)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Blues.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Blues.scr (242 bytes, sha256 8166ed4ffee9f9056ac1896387f611265254fa3802d53019f9fb591bca040046)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Diminished.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Diminished.scr (235 bytes, sha256 91988ca68619fe134ca39ba4b63ff08266b59d5023ab20959404a179d0c55903)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Dominant Bebop.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Dominant Bebop.scr (224 bytes, sha256 d4c9831229abeacf2248f96cb6b8a7079c43512baf0a0535f0e55a92710fdca1)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Dorian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Dorian.scr (232 bytes, sha256 4f4508b66597592ad5a9292fec28f3196fff7b1c46d97afcb41a318b7878d8e8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Enigmatic.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Enigmatic.scr (240 bytes, sha256 c2c718abe2962f8af0ae32787d8dcaed138db323e14bde20e29a1f66d682d15b)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Japanese Insen.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Japanese Insen.scr (238 bytes, sha256 b3e0ee45c8285e9527eabe7c3b905f72cd93eb3adbc3373c6bf85a1fb6c58f71)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Locrian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Locrian.scr (250 bytes, sha256 d3b44622bd33baef83120d1b2036c712eed801e9d47c3440f8b677a2ec4ff97d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Lydian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Lydian.scr (227 bytes, sha256 ec30f7a1a79d71db4a2648e22a20d8fe068f6883850f90386f7ca7873e9168ad)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Mixolydian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Mixolydian.scr (224 bytes, sha256 e838874df081022e715671b3644f73774c38e64206ccf7c821e3dd522c14e41d)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Neopolitan.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Neopolitan.scr (236 bytes, sha256 c3934e92efcd6e59a96e70ef7fff2450ff357bc20f9d5f70334f39c7c2f26682)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Phrygian.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Phrygian.scr (244 bytes, sha256 1fad0c52dc19fa50f5687b26a3c8bf4e1c09469d196b798b3beb4c93f2520b8f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\Other Whole Tone.scr <- /data/seed/lift/out-idle1/inputs/install/System/Config/Typing to piano/Other Whole Tone.scr (241 bytes, sha256 102bf3f9488162f695cdf325054b26340011a2f28ad66ea855a67730384bf2cf)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\FL Studio homepage.url <- /data/seed/lift/out-idle1/inputs/install/System/Internet/About/FL Studio homepage.url (103 bytes, sha256 b4e5a8117bd7e7b196ed176eb86f2f6bda54a75a5f433378f8b05733e3468b9c)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\FL Studio Mobile.url <- /data/seed/lift/out-idle1/inputs/install/System/Internet/About/FL Studio Mobile.url (101 bytes, sha256 966be374b887d09a40e2e0042affc653e97d890bf93715584731b38ea0a784a8)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\FL Studio tutorials.url <- /data/seed/lift/out-idle1/inputs/install/System/Internet/About/FL Studio tutorials.url (104 bytes, sha256 f3746dd557ed796a2a5e9fa7fb3118893c824b87f58298ce5831df0d02140ca9)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\Support - Forum.url <- /data/seed/lift/out-idle1/inputs/install/System/Internet/About/Support - Forum.url (100 bytes, sha256 e7c9c18d944b5c8619a45643c579e77ba72bbd40b7be1c5118bb3cde3608821f)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\Support - Knowledgebase.url <- /data/seed/lift/out-idle1/inputs/install/System/Internet/About/Support - Knowledgebase.url (97 bytes, sha256 148284827bfba36adc2dacf60fbcee204a26c4f25f2ff1e316d7d6318bf03a44)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Internet\Default news.rss <- /data/seed/lift/out-idle1/inputs/install/System/Internet/Default news.rss (434047 bytes, sha256 d4bc1d95850aa828b7d694a2f7ec94d99a6869461b8e3c521fedbe7a93cb9c34)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Languages\en.svg <- /data/seed/lift/out-idle1/inputs/install/System/Languages/en.svg (899 bytes, sha256 ede8af9e729b81ffc599e71abf89a7e85414b16fa79afe3aea958debd3ee7712)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\System\Texts\About\AboutTxt.txt <- /data/seed/lift/out-idle1/inputs/install/System/Texts/About/AboutTxt.txt (9228 bytes, sha256 2e59358cbd85ac611a8fd2296f12adb6ad6ad98f8a5689818d0c0fa5a8c8813c)
+vfs seed: C:\Windows\Fonts\msgothic.ttc <- /data/seed/lift/harness/seeds/os-fonts/NotoSansCJKjp-subset-msgothic.ttc (2123288 bytes, sha256 1ab00fd8ffe15553c16ef441b6a63e539159d560491c70fbc598d26f470eea69)
+vfs seed: C:\Windows\Fonts\arial.ttf <- /data/seed/lift/harness/seeds/os-fonts/LiberationSans-Regular.ttf (410820 bytes, sha256 075e71be4c58beda172ecb574a799308f04c3d054c6a5b7434954d3b0f1b28d8)
+vfs seed: C:\Windows\Fonts\tahoma.ttf <- /data/seed/lift/harness/seeds/os-fonts/DejaVuSans.ttf (759720 bytes, sha256 b4c632e3cdf9acc7f28758fb5a323c8524d7fc6660d46904d9b6cbe2809c419c)
+vfs seed: C:\Windows\Fonts\lucon.ttf <- /data/seed/lift/harness/seeds/os-fonts/DejaVuSansMono.ttf (343140 bytes, sha256 a54dca07c76d6289e717e75e0a58c0128f6d7269ef3faf76417c9d7d3bba37ab)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll <- /data/seed/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll (3718656 bytes, sha256 a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064)
+vfs seed: C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll <- /data/seed/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll (3780608 bytes, sha256 f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c)
+vfs seed: done, 245 files, 50 directories created
+reg seed: 2 list file(s), 6 values
+reg seed: HKLM\Software\Image-Line\Shared\Paths [FL Studio] REG_SZ "C:\Program Files\Image-Line\FL Studio 21\FL64.exe"
+reg seed: HKLM\Software\Image-Line\Shared\Paths [FL Studio engine] REG_SZ "C:\Program Files\Image-Line\FL Studio 21\FLEngine_x64.dll"
+reg seed: HKCU\Software\Image-Line\Shared\Paths [FL Studio] REG_SZ "C:\Program Files\Image-Line\FL Studio 21\FL64.exe"
+reg seed: HKCU\Software\Image-Line\Shared\Paths [FL Studio engine] REG_SZ "C:\Program Files\Image-Line\FL Studio 21\FLEngine_x64.dll"
+reg seed: HKCU\Software\Image-Line\Shared\Paths [Install path] REG_SZ "C:\Program Files\Image-Line\FL Studio 21"
+reg seed: HKCU\Software\Image-Line\Shared\Paths [Shared data] REG_SZ "C:\Users\user\Documents\Image-Line\"
+reg seed: done, 6 values
+authenticode claims: list /data/seed/authenticode-claims.tsv, 2 row(s)
+authenticode claims: C:\Program Files\Image-Line\FL Studio 21\FLEngine_x64.dll <- row 'FLEngine_x64.dll' established=yes signer CN 'Image Line NV' issuer CN 'DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1' valid 2026-07-28T00:00:00Z .. 2027-10-21T23:59:59Z timestamp rfc3161@2026-09-29T14:31:53Z file sha256 b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d digest sha256:16a77cf976070f9d356a3f575451239a1452a839e45cafc95a9c2217f9ddd5d0; attested: the SHA-256 equals that of the DLL the harness loaded
+authenticode claims: C:\Program Files\Image-Line\FL Studio 21\FL64.exe <- row 'FL64.exe' established=yes signer CN 'Image Line NV' issuer CN 'DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1' valid 2026-07-28T00:00:00Z .. 2027-10-21T23:59:59Z timestamp rfc3161@2026-09-29T14:31:48Z file sha256 4c839f24da13885fef7190d81c792fe2a2e0248dcfce9cb5f400a48ae0520c65 digest sha256:2853174a524a4a9dadc8205b64ee02726a610673e50681913d2a744e0948070c; NOT attested: the harness holds no copy of this file
+authenticode claims: not verified (by the tool or here): chain,revocation,time. done, 2 claim(s) registered
+calling entry (no export name) rcx=0x400000 rdx=1 r8=0 rsp=0x12787fc0
+== stop: returned from entry
+runtime message: (none)
+abort kind: (not a runtime message)
+functions executed (distinct): 0
+function entries (calls): 0
+call depth at stop: 0
+a4: init_count=0 of ?, InitContext+0 is 0 (InitUnits not reached)
+entry log (first 0 of 0 entries):
+rax=0x1
+fruity: DllMain returned (the report above is its report). Stage 1: calling CreateFruityInstance as FL64.exe does (docs/investigations/host-engine-boundary.md 5.1 #10)
+fruity: CreateFruityInstance: export ordinal 3, va 0x1375990 (PE export table of the image at 0x400000)
+fruity: host object at 0x13972e20 (0x38 bytes): vtable=0x13972e60 [slot0=0x7ffb00000010 slot1=0x7ffb00000020 slot2=0x7ffb00000030] version=1 flags=0 +0x10=0
+fruity:   +0x18 name=0x13972e80 "FL Studio"  +0x20=0x13972e90 ""  +0x28=0x13972e90 ""  +0x30 base directory=0x13972ea0 "C:\Program Files\Image-Line\FL Studio 21\" (buffer 0x8000 bytes)
+fruity: before the call: functions executed (distinct) 0, entries 0, shadow depth 0 (frames left over from DllMain's longjmps)
+fruity: limits: 4000000000 lifted entries, 36000 s wall
+fruity: calling CreateFruityInstance(rcx=0xc0, rdx=0xede95a, r8=host 0x13972e20, r9=&instance 0x103828e0) with rsp=0x12787fc0
+wf1-surface: event=first-non-background-pixel lid=13 size=1920x1080 stride=7680 pixels=0x47480600 nonzero=165424 rgba_sha256=b7d4133fe7bb5b77f94e6e26770a3196436248a8a8aaa076d92ffb39e2c6fa8f entries_since_program_start=0
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] Tried to spawn a new thread, but the thread pool is exhausted.
+This might result in a deadlock unless some threads eventually exit or the code explicitly breaks out to the event loop.
+If you want to increase the pool size, use setting `-sPTHREAD_POOL_SIZE=...`.
+If you want to throw an explicit error instead of the risk of deadlocking in those cases, use setting `-sPTHREAD_POOL_SIZE_STRICT=2`.
+[err] R4-5d stat t=1794914112247.2 w=0 acq=16454 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=1 slice_ms=0.25
+[err] R4-5d stat t=1794914112247.4 w=1 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.4 w=2 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.4 w=3 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.4 w=4 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.5 w=5 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.5 w=6 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914112247.5 w=7 acq=0 slow=0 slow_ms=0.00 spins=0 sleeps=0 sleep_ms=0.00 slices=0 slice_ms=0.00
+[err] G2 evidence (decision 0123): the window table when the first visible top-level window appeared (function entries since the program began: 0)
+[err]   window table: 17 entries, 15 live; top-level windows in z-order, top first, each followed by its children (z = position in its group, top first):
+[err]     handle 0x7f990034 lid 13 class "TFruityLoopsMainForm" title "FL Studio" rect (-5, -6, 1930 x 1092) style 0x84030000 exstyle 0x50000 owner 0 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f99003c lid 15 class "TWPControl" title "" rect (38, 462, 1854 x 591) style 0x44000000 exstyle 0x10000 parent 0x7f990034 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990040 lid 16 class "TStepSeqForm" title "Channel rack" rect (247, 410, 574 x 313) style 0x44000000 exstyle 0x10000 parent 0x7f99003c visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990044 lid 17 class "TVectorPanel" title "" rect (5, 30, 563 x 253) style 0x46000000 exstyle 0x10000 parent 0x7f990040 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f99002c lid 11 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 1 thread 0
+[err]     handle 0x7f990028 lid 10 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 2 thread 0
+[err]     handle 0x7f990024 lid 9 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 3 thread 0
+[err]     handle 0x7f990020 lid 8 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 4 thread 0
+[err]     handle 0x7f99001c lid 7 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 5 thread 0
+[err]     handle 0x7f990014 lid 5 class "TApplication" title "" rect (960, 540, 0 x 0) style 0x94ca0000 exstyle 0x8000080 owner 0 visible 1 enabled 1 z 6 thread 0
+[err]     handle 0x7f990010 lid 4 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 7 thread 0
+[err]     handle 0x7f99000c lid 3 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 8 thread 0
+[err]     handle 0x7f990008 lid 2 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 9 thread 0
+[err]     handle 0x7f990004 lid 1 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 10 thread 0
+[err] first drawing call discarded because its window is not visible (decision 0126, S-draw-hidden): BitBlt into the surface of top-level window lid 13; function entries since the program began: 0
+[err] first non-background pixel on a drawing surface (decision 0126): written by BitBlt into the surface of top-level window lid 13; function entries since the program began: 0
+[err]   surface of top-level window lid 13: 1920 x 1080 (BGRX 32-bit top-down), calls that wrote 1, non-zero pixels 165424 of 2073600, distinct colours 2255; top colours (COLORREF 0xBBGGRR: count): 00000000:1908176 0x676259:82076 0x4b463e:15651 0x666553:7997 0x74735f:6798 0x514c43:6649 0x504b42:6206 0x3d3830:4063
+[err]   window table: 109 entries, 101 live; top-level windows in z-order, top first, each followed by its children (z = position in its group, top first):
+[err]     handle 0x7f9900bc lid 47 class "TWelcomeWizard" title "Welcome to FL Studio" rect (460, 68, 894 x 664) style 0x84000000 exstyle 0x10008 owner 0x7f990034 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900b8 lid 46 class "TTestForm" title "Tests" rect (170, 112, 562 x 282) style 0x84000000 exstyle 0x10008 owner 0x7f990034 visible 0 enabled 1 z 1 thread 0
+[err]     handle 0x7f9900a4 lid 41 class "TGraphEditorForm" title "GraphEditorForm" rect (0, 0, 651 x 240) style 0x84010000 exstyle 0x10008 owner 0x7f990034 visible 0 enabled 1 z 2 thread 0
+[err]     handle 0x7f9900a8 lid 42 class "TWPControl" title "" rect (0, 216, 651 x 24) style 0x46000000 exstyle 0x10000 parent 0x7f9900a4 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900ac lid 43 class "TQuickTabSelector" title "" rect (0, 0, 196 x 24) style 0x46000000 exstyle 0 parent 0x7f9900a8 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900a0 lid 40 class "TFLHintBarForm" title "FLHintBarForm" rect (-4, 996, 32 x 32) style 0x86000000 exstyle 0x90088 owner 0x7f990034 visible 0 enabled 1 z 3 thread 0
+[err]     handle 0x7f990054 lid 21 class "TMIDIForm" title "Settings - System / miscellaneous" rect (-6, -4, 668 x 1080) style 0x84000000 exstyle 0x10000 owner 0x7f990034 visible 0 enabled 1 z 4 thread 0
+[err]     handle 0x7f990058 lid 22 class "TQuickSheetSelector" title "" rect (5, 33, 658 x 32) style 0x46000000 exstyle 0 parent 0x7f990054 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f99005c lid 23 class "TVectorSheet" title "MIDI" rect (6, 65, 656 x 1009) style 0x46000000 exstyle 0x10000 parent 0x7f990054 visible 0 enabled 1 z 1 thread 0
+[err]     handle 0x7f990060 lid 24 class "TVectorPanel" title "Output" rect (24, 16, 608 x 149) style 0x46000000 exstyle 0x10000 parent 0x7f99005c visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990068 lid 26 class "TQuickStringGrid" title "" rect (7, 27, 594 x 44) style 0x46010000 exstyle 0x10000 parent 0x7f990060 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990064 lid 25 class "TVectorPanel" title "Input" rect (24, 173, 608 x 255) style 0x46000000 exstyle 0x10000 parent 0x7f99005c visible 0 enabled 1 z 1 thread 0
+[err]     handle 0x7f99006c lid 27 class "TQuickStringGrid" title "" rect (7, 27, 594 x 45) style 0x46010000 exstyle 0x10000 parent 0x7f990064 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990070 lid 28 class "TVectorSheet" title "File" rect (6, 65, 656 x 1009) style 0x46000000 exstyle 0x10000 parent 0x7f990054 visible 0 enabled 1 z 2 thread 0
+[err]     handle 0x7f990074 lid 29 class "TVectorPanel" title "Browser extra search folders" rect (24, 187, 608 x 598) style 0x46000000 exstyle 0x10000 parent 0x7f990070 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990078 lid 30 class "TQuickStringGrid" title "" rect (7, 27, 594 x 564) style 0x46010000 exstyle 0x10000 parent 0x7f990074 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f99007c lid 31 class "TVectorPanel" title "External tools" rect (24, 794, 608 x 171) style 0x46000000 exstyle 0x10000 parent 0x7f990070 visible 0 enabled 1 z 1 thread 0
+[err]     handle 0x7f990080 lid 32 class "TQuickStringGrid" title "" rect (7, 27, 477 x 97) style 0x46010000 exstyle 0x10000 parent 0x7f99007c visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900b0 lid 44 class "TPythonForm" title "Script output" rect (194, 196, 630 x 680) style 0x84000000 exstyle 0x10000 owner 0x7f990034 visible 0 enabled 1 z 5 thread 0
+[err]     handle 0x7f9900b4 lid 45 class "TQuickSheetSelector" title "" rect (6, 33, 618 x 32) style 0x46000000 exstyle 0 parent 0x7f9900b0 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900d4 lid 53 class "TPluginForm" title "" rect (34, 118, 568 x 466) style 0x84010000 exstyle 0x10000 owner 0x7f990034 visible 0 enabled 1 z 6 thread 0
+[err]     handle 0x7f9900e8 lid 58 class "TVectorPanel" title "" rect (5, 26, 558 x 45) style 0x46000000 exstyle 0x10000 parent 0x7f9900d4 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900ec lid 59 class "TQuickSheetSelector" title "" rect (0, 0, 264 x 45) style 0x46000000 exstyle 0 parent 0x7f9900e8 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900f0 lid 60 class "TVectorSheet" title "?" rect (5, 72, 558 x 389) style 0x4e000000 exstyle 0x10000 parent 0x7f9900d4 visible 0 enabled 0 z 1 thread 0
+[err]     handle 0x7f9900f4 lid 61 class "TVectorPanel" title "Root note" rect (7, 245, 544 x 137) style 0x46000000 exstyle 0x10000 parent 0x7f9900f0 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900f8 lid 62 class "TVectorPanel" title "" rect (0, 48, 544 x 89) style 0x46000000 exstyle 0x10000 parent 0x7f9900f4 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900d8 lid 54 class "TVectorSheet" title "?" rect (5, 72, 558 x 389) style 0x4e000000 exstyle 0x10000 parent 0x7f9900d4 visible 0 enabled 0 z 2 thread 0
+[err]     handle 0x7f9900dc lid 55 class "TQuickTabSelector" title "" rect (6, 6, 215 x 29) style 0x46000000 exstyle 0 parent 0x7f9900d8 visible 0 enabled 1 z 0 thread 0
+[err]     handle 0x7f990034 lid 13 class "TFruityLoopsMainForm" title "FL Studio" rect (0, 0, 1920 x 1080) style 0x94030000 exstyle 0x50000 owner 0 visible 1 enabled 1 z 7 thread 0
+[err]     handle 0x7f9901b4 lid 109 class "TWinControlProxy" title "" rect (0, 0, 0 x 0) style 0x54000000 exstyle 0x20 parent 0x7f990034 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9901b0 lid 108 class "TWPControl" title "" rect (1920, 82, 0 x 998) style 0x56000000 exstyle 0x10000 parent 0x7f990034 visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f9900c0 lid 48 class "TWPControl" title "" rect (0, 82, 364 x 998) style 0x56000000 exstyle 0x10000 parent 0x7f990034 visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f99010c lid 67 class "TSampleListForm" title "Browser" rect (0, 0, 364 x 998) style 0x55000000 exstyle 0x10000 parent 0x7f9900c0 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9901a8 lid 106 class "TVectorPanel" title "" rect (0, 63, 364 x 929) style 0x56000000 exstyle 0x10000 parent 0x7f99010c visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9901ac lid 107 class "TEdgeBrowser" title "" rect (0, 0, 364 x 929) style 0x54000000 exstyle 0 parent 0x7f9901a8 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9901a0 lid 104 class "TVectorPanel" title "" rect (6, 27, 352 x 36) style 0x56000000 exstyle 0x10000 parent 0x7f99010c visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f9901a4 lid 105 class "TVectorPanel" title "" rect (0, 0, 352 x 33) style 0x56000000 exstyle 0x10000 parent 0x7f9901a0 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f99019c lid 103 class "TQuickScroller" title "" rect (6, 63, 13 x 929) style 0x5e000000 exstyle 0 parent 0x7f99010c visible 1 enabled 0 z 2 thread 0
+[err]     handle 0x7f990198 lid 102 class "TWinControlProxy" title "" rect (6, 4, 0 x 0) style 0x54000000 exstyle 0x20 parent 0x7f99010c visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f990194 lid 101 class "TNewCaption" title "Browser" rect (4, 4, 356 x 23) style 0x56000000 exstyle 0x10000 parent 0x7f99010c visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f990190 lid 100 class "TQuickControlBar" title "" rect (0, 1080, 1920 x 0) style 0x56000000 exstyle 0x10000 parent 0x7f990034 visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f99003c lid 15 class "TWPControl" title "" rect (372, 82, 1548 x 998) style 0x54000000 exstyle 0x10000 parent 0x7f990034 visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f990040 lid 16 class "TStepSeqForm" title "Channel rack" rect (0, 0, 499 x 126) style 0x54000000 exstyle 0x10000 parent 0x7f99003c visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f99018c lid 99 class "TWinControlProxy" title "" rect (0, 0, 0 x 0) style 0x54000000 exstyle 0x20 parent 0x7f990040 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990188 lid 98 class "TVectorPanel" title "" rect (494, 30, 0 x 66) style 0x56000000 exstyle 0x10000 parent 0x7f990040 visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f990044 lid 17 class "TVectorPanel" title "" rect (5, 30, 488 x 66) style 0x56000000 exstyle 0x10000 parent 0x7f990040 visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f990184 lid 97 class "TNewCaption" title "Channel rack" rect (4, 4, 491 x 26) style 0x56000000 exstyle 0x10000 parent 0x7f990040 visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f99017c lid 95 class "TVectorPanel" title "" rect (4, 96, 491 x 26) style 0x56000000 exstyle 0x10000 parent 0x7f990040 visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f990180 lid 96 class "TNumBar" title "" rect (198, 13, 283 x 15) style 0x56000000 exstyle 0 parent 0x7f99017c visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900d0 lid 52 class "TEventEditForm" title "Playlist -" rect (499, 0, 1049 x 998) style 0x54000000 exstyle 0x10000 parent 0x7f99003c visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f990178 lid 94 class "TWinControlProxy" title "" rect (0, 0, 0 x 0) style 0x54000000 exstyle 0x20 parent 0x7f9900d0 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990174 lid 93 class "TNumBar" title "" rect (146, 83, 16 x 889) style 0x5e000000 exstyle 0 parent 0x7f9900d0 visible 1 enabled 0 z 1 thread 0
+[err]     handle 0x7f990170 lid 92 class "TNumBar" title "" rect (1022, 48, 21 x 944) style 0x56000000 exstyle 0 parent 0x7f9900d0 visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f99016c lid 91 class "TQuickScroller" title "" rect (278, 28, 745 x 21) style 0x56000000 exstyle 0 parent 0x7f9900d0 visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f990168 lid 90 class "TNewCaption" title "Playlist -" rect (4, 4, 1041 x 23) style 0x56000000 exstyle 0x10000 parent 0x7f9900d0 visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f990164 lid 89 class "TWPControl" title "" rect (167, 28, 112 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900d0 visible 1 enabled 1 z 5 thread 0
+[err]     handle 0x7f9900fc lid 63 class "TFXForm" title "Mixer - Master" rect (16, 466, 1516 x 500) style 0x54000000 exstyle 0x10000 parent 0x7f99003c visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f990160 lid 88 class "TWinControlProxy" title "" rect (0, 0, 0 x 0) style 0x54000000 exstyle 0x20 parent 0x7f9900fc visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f99015c lid 87 class "TVectorPanel" title "" rect (7, 28, 44 x 465) style 0x56000000 exstyle 0x10000 parent 0x7f9900fc visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f990154 lid 85 class "TVectorPanel" title "" rect (61, 28, 1213 x 465) style 0x56000000 exstyle 0x10000 parent 0x7f9900fc visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f990158 lid 86 class "TQuickScrollBoxScroller" title "" rect (0, 446, 1213 x 19) style 0x56000000 exstyle 0 parent 0x7f990154 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990150 lid 84 class "TNewCaption" title "Mixer - Master" rect (4, 4, 1508 x 23) style 0x56000000 exstyle 0x10000 parent 0x7f9900fc visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f990148 lid 82 class "TVectorPanel" title "" rect (1289, 28, 220 x 465) style 0x56000000 exstyle 0x10000 parent 0x7f9900fc visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f99014c lid 83 class "TVectorPanel" title "" rect (0, 32, 220 x 191) style 0x56000000 exstyle 0x10000 parent 0x7f990148 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f9900c4 lid 49 class "TQuickControlBar" title "" rect (0, 0, 1920 x 82) style 0x56000000 exstyle 0x10000 parent 0x7f990034 visible 1 enabled 1 z 5 thread 0
+[err]     handle 0x7f9900c8 lid 50 class "TQuickEditToolBar" title "" rect (0, 0, 1919 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c4 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990144 lid 81 class "TQuickEditToolbarPanel" title "Splitter_1" rect (1191, 0, 660 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990140 lid 80 class "TQuickEditToolbarPanel" title "" rect (765, 0, 96 x 40) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f99013c lid 79 class "TQuickEditToolbarPanel" title "" rect (1851, 0, 68 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f990134 lid 77 class "TQuickEditToolbarPanel" title "" rect (1, 0, 300 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f990138 lid 78 class "TNewMenu" title "" rect (3, 4, 293 x 33) style 0x56000000 exstyle 0 parent 0x7f990134 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990130 lid 76 class "TQuickEditToolbarPanel" title "" rect (497, 0, 136 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f99012c lid 75 class "TQuickEditToolbarPanel" title "" rect (301, 0, 196 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 5 thread 0
+[err]     handle 0x7f990128 lid 74 class "TQuickEditToolbarPanel" title "" rect (1033, 0, 156 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 6 thread 0
+[err]     handle 0x7f9900cc lid 51 class "TQuickEditToolbarPanel" title "" rect (861, 0, 172 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c8 visible 1 enabled 1 z 7 thread 0
+[err]     handle 0x7f990110 lid 68 class "TQuickEditToolBar" title "" rect (0, 41, 1919 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f9900c4 visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f990124 lid 73 class "TQuickEditToolbarPanel" title "" rect (624, 0, 144 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f990110 visible 1 enabled 1 z 0 thread 0
+[err]     handle 0x7f990120 lid 72 class "TQuickEditToolbarPanel" title "" rect (1, 0, 300 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f990110 visible 1 enabled 1 z 1 thread 0
+[err]     handle 0x7f99011c lid 71 class "TQuickEditToolbarPanel" title "" rect (900, 0, 35 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f990110 visible 1 enabled 1 z 2 thread 0
+[err]     handle 0x7f990118 lid 70 class "TQuickEditToolbarPanel" title "" rect (532, 0, 92 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f990110 visible 1 enabled 1 z 3 thread 0
+[err]     handle 0x7f990114 lid 69 class "TQuickEditToolbarPanel" title "" rect (935, 0, 172 x 41) style 0x56000000 exstyle 0x10000 parent 0x7f990110 visible 1 enabled 1 z 4 thread 0
+[err]     handle 0x7f990108 lid 66 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 8 thread 0
+[err]     handle 0x7f990104 lid 65 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 9 thread 0
+[err]     handle 0x7f9900e4 lid 57 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 10 thread 0
+[err]     handle 0x7f9900e0 lid 56 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 11 thread 0
+[err]     handle 0x7f990098 lid 38 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 12 thread 0
+[err]     handle 0x7f990094 lid 37 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 13 thread 0
+[err]     handle 0x7f990090 lid 36 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 14 thread 0
+[err]     handle 0x7f990088 lid 34 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 15 thread 0
+[err]     handle 0x7f990084 lid 33 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 16 thread 0
+[err]     handle 0x7f99002c lid 11 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 17 thread 0
+[err]     handle 0x7f990028 lid 10 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 18 thread 0
+[err]     handle 0x7f990024 lid 9 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 19 thread 0
+[err]     handle 0x7f990020 lid 8 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 20 thread 0
+[err]     handle 0x7f99001c lid 7 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 21 thread 0
+[err]     handle 0x7f990014 lid 5 class "TApplication" title "" rect (960, 540, 0 x 0) style 0x94ca0000 exstyle 0x8000080 owner 0 visible 1 enabled 1 z 22 thread 0
+[err]     handle 0x7f990010 lid 4 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 23 thread 0
+[err]     handle 0x7f99000c lid 3 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 24 thread 0
+[err]     handle 0x7f990008 lid 2 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 25 thread 0
+[err]     handle 0x7f990004 lid 1 class "TPUtilWindow" title "" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 26 thread 0
+[err] R4-5d gilwait w=0 start=1794914118014.7 dur=1.280 sleep=1.280 sleeps=2 spins=4000 holder=6
+[err] R4-5d gilwait w=0 start=1794914118020.2 dur=1.060 sleep=1.050 sleeps=4 spins=8000 holder=6
+[err] R4-5d gilwait w=0 start=1794914118098.0 dur=0.840 sleep=0.840 sleeps=1 spins=2000 holder=4
+[err] fle: act1-net	#1	InternetOpenUrlW	scheme=https	host=support.image-line.com	object=/redirect/downloadnewsrss?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>	headers=NULL	flags=0x80000000	-> NULL, last error 12007 (decision 0132)
+[err] fle: act1-net	#2	InternetOpenUrlW	scheme=https	host=support.image-line.com	object=/redirect/downloadversionsxml?user=<0>&v=<11>&flags=<3>&flsdata=<0>&id=<74>	headers=NULL	flags=0x80000000	-> NULL, last error 12007 (decision 0132)
+[err] R4-5d gilwait w=0 start=1794914119277.5 dur=0.590 sleep=0.585 sleeps=2 spins=4000 holder=2
+[err] R4-5d stat t=1794914121777.8 w=0 acq=12175491 slow=589 slow_ms=19.58 spins=1070415 sleeps=477 sleep_ms=18.65 slices=1779 slice_ms=4.69
+[err] R4-5d stat t=1794914121777.9 w=1 acq=29572 slow=305 slow_ms=13.01 spins=399529 sleeps=170 sleep_ms=12.51 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914121777.9 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914121777.9 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914121777.9 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914121777.9 w=5 acq=2669 slow=123 slow_ms=6.09 spins=167158 sleeps=72 sleep_ms=5.84 slices=2 slice_ms=0.56
+[err] R4-5d stat t=1794914121777.9 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914121777.9 w=7 acq=1369 slow=88 slow_ms=6.40 spins=158520 sleeps=64 sleep_ms=6.14 slices=0 slice_ms=0.00
+[err] R4-5d gilwait w=0 start=1794914122977.9 dur=0.600 sleep=0.600 sleeps=1 spins=2000 holder=6
+[err] R4-5d stat t=1794914128013.3 w=0 acq=12232570 slow=1026 slow_ms=27.28 spins=1851559 sleeps=809 sleep_ms=25.64 slices=1804 slice_ms=4.98
+[err] R4-5d stat t=1794914128013.3 w=1 acq=29663 slow=306 slow_ms=13.01 spins=400950 sleeps=170 sleep_ms=12.51 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914128013.4 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914128013.4 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914128013.4 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914128013.4 w=5 acq=56742 slow=433 slow_ms=11.82 spins=501208 sleeps=219 sleep_ms=11.04 slices=30 slice_ms=0.67
+[err] R4-5d stat t=1794914128013.4 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914128013.4 w=7 acq=2818 slow=129 slow_ms=6.86 spins=187164 sleeps=76 sleep_ms=6.47 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914133646.3 w=0 acq=12266027 slow=1324 slow_ms=31.96 spins=2415687 sleeps=1042 sleep_ms=29.86 slices=1807 slice_ms=4.99
+[err] R4-5d stat t=1794914133646.4 w=1 acq=29925 slow=320 slow_ms=13.33 spins=427369 sleeps=181 sleep_ms=12.81 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914133646.4 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914133646.4 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914133646.4 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914133646.4 w=5 acq=103344 slow=641 slow_ms=15.88 spins=740980 sleeps=323 sleep_ms=14.88 slices=49 slice_ms=0.74
+[err] R4-5d stat t=1794914133646.4 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914133646.4 w=7 acq=4134 slow=159 slow_ms=7.44 spins=240038 sleeps=98 sleep_ms=6.90 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914143130.3 w=0 acq=12324138 slow=1781 slow_ms=40.87 spins=3293716 sleeps=1410 sleep_ms=38.11 slices=1818 slice_ms=5.03
+[err] R4-5d stat t=1794914143130.3 w=1 acq=30369 slow=336 slow_ms=13.73 spins=446196 sleeps=189 sleep_ms=13.18 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914143130.4 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914143130.4 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914143130.4 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914143130.4 w=5 acq=182223 slow=927 slow_ms=22.79 spins=1073544 sleeps=474 sleep_ms=21.41 slices=93 slice_ms=0.82
+[err] R4-5d stat t=1794914143130.4 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914143130.4 w=7 acq=6373 slow=190 slow_ms=7.92 spins=287040 sleeps=118 sleep_ms=7.31 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914148230.0 w=0 acq=12352845 slow=2034 slow_ms=45.32 spins=3764407 sleeps=1605 sleep_ms=42.21 slices=1821 slice_ms=5.08
+[err] R4-5d stat t=1794914148230.0 w=1 acq=30636 slow=345 slow_ms=13.80 spins=456196 sleeps=194 sleep_ms=13.23 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914148230.0 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914148230.0 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914148230.0 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914148230.0 w=5 acq=224612 slow=1132 slow_ms=27.98 spins=1355493 sleeps=598 sleep_ms=26.24 slices=119 slice_ms=0.88
+[err] R4-5d stat t=1794914148230.0 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914148230.0 w=7 acq=7573 slow=210 slow_ms=8.28 spins=317418 sleeps=132 sleep_ms=7.66 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914153830.2 w=0 acq=12386529 slow=2323 slow_ms=50.22 spins=4296495 sleeps=1828 sleep_ms=46.69 slices=1828 slice_ms=5.12
+[err] R4-5d stat t=1794914153830.2 w=1 acq=30900 slow=357 slow_ms=14.07 spins=477871 sleeps=203 sleep_ms=13.48 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914153830.3 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914153830.3 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914153830.3 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914153830.3 w=5 acq=271383 slow=1346 slow_ms=32.86 spins=1606738 sleeps=711 sleep_ms=30.83 slices=143 slice_ms=0.93
+[err] R4-5d stat t=1794914153830.3 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914153830.3 w=7 acq=8880 slow=242 slow_ms=8.79 spins=372556 sleeps=155 sleep_ms=8.13 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914159253.7 w=0 acq=12418873 slow=2602 slow_ms=55.05 spins=4795480 sleeps=2039 sleep_ms=51.05 slices=1840 slice_ms=5.21
+[err] R4-5d stat t=1794914159253.7 w=1 acq=31165 slow=368 slow_ms=14.14 spins=492408 sleeps=206 sleep_ms=13.55 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914159253.7 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914159253.8 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914159253.8 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914159253.8 w=5 acq=316321 slow=1541 slow_ms=36.95 spins=1833445 sleeps=810 sleep_ms=34.64 slices=170 slice_ms=0.98
+[err] R4-5d stat t=1794914159253.8 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914159253.8 w=7 acq=10153 slow=267 slow_ms=9.24 spins=418770 sleeps=176 sleep_ms=8.52 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914164631.7 w=0 acq=12452081 slow=2852 slow_ms=60.68 spins=5292117 sleeps=2262 sleep_ms=56.31 slices=1847 slice_ms=5.25
+[err] R4-5d stat t=1794914164631.8 w=1 acq=31423 slow=386 slow_ms=14.27 spins=505250 sleeps=212 sleep_ms=13.66 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914164631.8 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914164631.8 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914164631.8 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914164631.8 w=5 acq=360981 slow=1722 slow_ms=42.86 spins=2065683 sleeps=914 sleep_ms=40.26 slices=194 slice_ms=1.02
+[err] R4-5d stat t=1794914164631.8 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914164631.8 w=7 acq=11418 slow=290 slow_ms=9.62 spins=451630 sleeps=192 sleep_ms=8.87 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914170446.4 w=0 acq=12488883 slow=3111 slow_ms=65.34 spins=5759816 sleeps=2456 sleep_ms=60.59 slices=1853 slice_ms=5.31
+[err] R4-5d stat t=1794914170446.5 w=1 acq=31681 slow=404 slow_ms=14.45 spins=533573 sleeps=221 sleep_ms=13.81 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914170446.6 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914170446.6 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914170446.6 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914170446.6 w=5 acq=409109 slow=1939 slow_ms=48.03 spins=2342624 sleeps=1039 sleep_ms=45.21 slices=217 slice_ms=1.09
+[err] R4-5d stat t=1794914170446.6 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914170446.6 w=7 acq=12786 slow=314 slow_ms=10.12 spins=501850 sleeps=214 sleep_ms=9.34 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914175563.9 w=0 acq=12518876 slow=3355 slow_ms=68.92 spins=6199352 sleeps=2649 sleep_ms=63.80 slices=1860 slice_ms=5.35
+[err] R4-5d stat t=1794914175564.0 w=1 acq=31944 slow=417 slow_ms=14.56 spins=545712 sleeps=226 sleep_ms=13.92 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914175564.0 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914175564.0 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914175564.0 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914175564.0 w=5 acq=451937 slow=2114 slow_ms=52.53 spins=2580601 sleeps=1148 sleep_ms=49.48 slices=238 slice_ms=1.13
+[err] R4-5d stat t=1794914175564.0 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914175564.0 w=7 acq=13990 slow=336 slow_ms=10.29 spins=524527 sleeps=224 sleep_ms=9.49 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914181279.7 w=0 acq=12552960 slow=3621 slow_ms=73.62 spins=6680903 sleeps=2859 sleep_ms=68.12 slices=1867 slice_ms=5.39
+[err] R4-5d stat t=1794914181279.7 w=1 acq=32209 slow=428 slow_ms=14.62 spins=551909 sleeps=228 sleep_ms=13.96 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914181279.7 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914181279.7 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914181279.7 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914181279.7 w=5 acq=499121 slow=2319 slow_ms=58.20 spins=2842857 sleeps=1268 sleep_ms=54.79 slices=266 slice_ms=1.21
+[err] R4-5d stat t=1794914181279.7 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914181279.7 w=7 acq=15327 slow=365 slow_ms=10.83 spins=568486 sleeps=244 sleep_ms=9.99 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914186829.8 w=0 acq=12586128 slow=3861 slow_ms=79.37 spins=7171127 sleeps=3078 sleep_ms=73.43 slices=1876 slice_ms=5.47
+[err] R4-5d stat t=1794914186829.8 w=1 acq=32472 slow=441 slow_ms=14.87 spins=567262 sleeps=235 sleep_ms=14.20 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914186829.8 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914186829.8 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914186829.8 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914186829.8 w=5 acq=545286 slow=2492 slow_ms=62.93 spins=3072387 sleeps=1373 sleep_ms=59.24 slices=295 slice_ms=1.27
+[err] R4-5d stat t=1794914186829.8 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914186829.8 w=7 acq=16634 slow=384 slow_ms=11.17 spins=598486 sleeps=259 sleep_ms=10.28 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914191831.5 w=0 acq=12655937 slow=4254 slow_ms=88.49 spins=7983310 sleeps=3436 sleep_ms=81.88 slices=1890 slice_ms=5.61
+[err] R4-5d stat t=1794914191831.6 w=1 acq=32648 slow=449 slow_ms=15.00 spins=571262 sleeps=237 sleep_ms=14.31 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914191831.6 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914191831.6 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914191831.6 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914191831.6 w=5 acq=586739 slow=2728 slow_ms=71.19 spins=3367729 sleeps=1501 sleep_ms=67.22 slices=318 slice_ms=1.33
+[err] R4-5d stat t=1794914191831.6 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914191831.6 w=7 acq=17805 slow=412 slow_ms=11.75 spins=635770 sleeps=274 sleep_ms=10.81 slices=1 slice_ms=0.00
+[err] R4-5d stat t=1794914196930.1 w=0 acq=12724732 slow=4691 slow_ms=99.40 spins=8918983 sleeps=3852 sleep_ms=92.05 slices=1908 slice_ms=5.75
+[err] R4-5d stat t=1794914196930.2 w=1 acq=32648 slow=449 slow_ms=15.00 spins=571262 sleeps=237 sleep_ms=14.31 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914196930.2 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914196930.2 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914196930.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914196930.2 w=5 acq=628907 slow=2953 slow_ms=83.08 spins=3602013 sleeps=1605 sleep_ms=78.85 slices=342 slice_ms=1.41
+[err] R4-5d stat t=1794914196930.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914196930.2 w=7 acq=19010 slow=428 slow_ms=12.13 spins=670315 sleeps=290 sleep_ms=11.17 slices=1 slice_ms=0.00
+[err] R4-5d stat t=1794914202043.6 w=0 acq=12801398 slow=5201 slow_ms=109.54 spins=10029392 sleeps=4330 sleep_ms=101.41 slices=1922 slice_ms=5.92
+[err] R4-5d stat t=1794914202043.7 w=1 acq=32648 slow=449 slow_ms=15.00 spins=571262 sleeps=237 sleep_ms=14.31 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914202043.7 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914202043.7 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914202043.7 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914202043.7 w=5 acq=671024 slow=3289 slow_ms=102.88 spins=3955842 sleeps=1761 sleep_ms=98.21 slices=365 slice_ms=1.50
+[err] R4-5d stat t=1794914202043.7 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914202043.7 w=7 acq=20207 slow=452 slow_ms=12.53 spins=698785 sleeps=300 sleep_ms=11.50 slices=1 slice_ms=0.00
+[err] R4-5d stat t=1794914207913.2 w=0 acq=12906265 slow=5945 slow_ms=123.92 spins=11588730 sleeps=5004 sleep_ms=114.52 slices=1933 slice_ms=6.08
+[err] R4-5d stat t=1794914207913.2 w=1 acq=32648 slow=449 slow_ms=15.00 spins=571262 sleeps=237 sleep_ms=14.31 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914207913.2 w=2 acq=568 slow=56 slow_ms=3.20 spins=108737 sleeps=50 sleep_ms=3.05 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914207913.2 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914207913.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914207913.3 w=5 acq=718869 slow=3785 slow_ms=137.59 spins=4503026 sleeps=1996 sleep_ms=132.13 slices=390 slice_ms=1.56
+[err] R4-5d stat t=1794914207913.3 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914207913.3 w=7 acq=21569 slow=490 slow_ms=15.28 spins=771830 sleeps=333 sleep_ms=14.21 slices=1 slice_ms=0.00
+[err] filedlg: THE SELECTION WAS MADE BY THE PERSON AT THE PAGE (1 item); the file stays in this tab's memory, it is not uploaded
+[err] R4-5d gilwait w=7 start=1794914213679.5 dur=13.280 sleep=13.270 sleeps=2 spins=4000 holder=1
+[err] R4-5d stat t=1794914219527.1 w=0 acq=13512782 slow=6294 slow_ms=132.63 spins=12259857 sleeps=5318 sleep_ms=122.74 slices=1935 slice_ms=6.10
+[err] R4-5d stat t=1794914219527.1 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914219527.1 w=2 acq=782 slow=59 slow_ms=3.21 spins=110737 sleeps=51 sleep_ms=3.06 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914219527.1 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914219527.1 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914219527.2 w=5 acq=763735 slow=3879 slow_ms=139.55 spins=4623292 sleeps=2050 sleep_ms=133.98 slices=414 slice_ms=1.64
+[err] R4-5d stat t=1794914219527.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914219527.2 w=7 acq=23728 slow=579 slow_ms=71.62 spins=942512 sleeps=410 sleep_ms=70.41 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914224547.8 w=0 acq=13574651 slow=7358 slow_ms=146.81 spins=14168940 sleeps=6095 sleep_ms=135.33 slices=2131 slice_ms=7.42
+[err] R4-5d stat t=1794914224547.8 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914224547.8 w=2 acq=782 slow=59 slow_ms=3.21 spins=110737 sleeps=51 sleep_ms=3.06 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914224547.8 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914224547.8 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914224547.8 w=5 acq=850630 slow=4635 slow_ms=148.54 spins=5339287 sleeps=2327 sleep_ms=142.29 slices=623 slice_ms=2.28
+[err] R4-5d stat t=1794914224547.9 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914224547.9 w=7 acq=24910 slow=605 slow_ms=71.97 spins=975908 sleeps=421 sleep_ms=70.73 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914229562.8 w=0 acq=13633543 slow=8075 slow_ms=157.77 spins=15382022 sleeps=6610 sleep_ms=145.37 slices=2331 slice_ms=8.84
+[err] R4-5d stat t=1794914229562.8 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914229562.8 w=2 acq=782 slow=59 slow_ms=3.21 spins=110737 sleeps=51 sleep_ms=3.06 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914229562.8 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914229562.8 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914229562.8 w=5 acq=925563 slow=5038 slow_ms=156.37 spins=5748109 sleeps=2510 sleep_ms=149.70 slices=808 slice_ms=2.70
+[err] R4-5d stat t=1794914229562.9 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914229562.9 w=7 acq=26090 slow=629 slow_ms=72.32 spins=1006498 sleeps=434 sleep_ms=71.06 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914234565.1 w=0 acq=13692483 slow=8796 slow_ms=170.97 spins=16625450 sleeps=7137 sleep_ms=157.44 slices=2532 slice_ms=10.52
+[err] R4-5d stat t=1794914234565.2 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914234565.2 w=2 acq=782 slow=59 slow_ms=3.21 spins=110737 sleeps=51 sleep_ms=3.06 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914234565.2 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914234565.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914234565.2 w=5 acq=1000386 slow=5439 slow_ms=163.35 spins=6139653 sleeps=2683 sleep_ms=156.21 slices=1005 slice_ms=3.28
+[err] R4-5d stat t=1794914234565.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914234565.2 w=7 acq=27266 slow=653 slow_ms=72.58 spins=1045518 sleeps=452 sleep_ms=71.29 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914239598.1 w=0 acq=13770151 slow=9631 slow_ms=187.91 spins=18041864 sleeps=7746 sleep_ms=173.24 slices=2736 slice_ms=12.26
+[err] R4-5d stat t=1794914239598.1 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914239598.1 w=2 acq=2696 slow=142 slow_ms=4.35 spins=201812 sleeps=92 sleep_ms=4.03 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914239598.1 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914239598.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914239598.2 w=5 acq=1075774 slow=5946 slow_ms=174.49 spins=6674116 sleeps=2924 sleep_ms=166.79 slices=1197 slice_ms=3.78
+[err] R4-5d stat t=1794914239598.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914239598.2 w=7 acq=28443 slow=683 slow_ms=73.27 spins=1083429 sleeps=469 sleep_ms=71.92 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914244614.1 w=0 acq=13860183 slow=10823 slow_ms=215.27 spins=20171562 sleeps=8677 sleep_ms=198.90 slices=2938 slice_ms=14.05
+[err] R4-5d stat t=1794914244614.1 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914244614.1 w=2 acq=11318 slow=546 slow_ms=12.81 spins=838702 sleeps=375 sleep_ms=11.85 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914244614.1 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914244614.1 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914244614.1 w=5 acq=1153104 slow=6822 slow_ms=193.70 spins=7842521 sleeps=3460 sleep_ms=184.88 slices=1390 slice_ms=4.48
+[err] R4-5d stat t=1794914244614.1 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914244614.1 w=7 acq=29612 slow=718 slow_ms=73.89 spins=1125656 sleeps=486 sleep_ms=72.50 slices=2 slice_ms=0.01
+[err] R4-5d stat t=1794914249614.9 w=0 acq=13957595 slow=12013 slow_ms=241.44 spins=22347864 sleeps=9644 sleep_ms=223.46 slices=3142 slice_ms=15.79
+[err] R4-5d stat t=1794914249615.0 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914249615.0 w=2 acq=21003 slow=972 slow_ms=26.30 spins=1458461 sleeps=647 sleep_ms=24.77 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914249615.0 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914249615.0 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914249615.0 w=5 acq=1230923 slow=7658 slow_ms=215.20 spins=9007996 sleeps=3983 sleep_ms=205.41 slices=1583 slice_ms=5.08
+[err] R4-5d stat t=1794914249615.0 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914249615.0 w=7 acq=30769 slow=759 slow_ms=76.51 spins=1185133 sleeps=512 sleep_ms=75.07 slices=3 slice_ms=0.02
+[err] R4-5d stat t=1794914254648.1 w=0 acq=14054155 slow=13126 slow_ms=265.91 spins=24361528 sleeps=10518 sleep_ms=246.30 slices=3337 slice_ms=17.48
+[err] R4-5d stat t=1794914254648.2 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914254648.2 w=2 acq=27553 slow=1304 slow_ms=33.68 spins=2002272 sleeps=884 sleep_ms=31.64 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914254648.2 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914254648.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914254648.2 w=5 acq=1307628 slow=8446 slow_ms=234.81 spins=10100593 sleeps=4466 sleep_ms=224.03 slices=1777 slice_ms=5.63
+[err] R4-5d stat t=1794914254648.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914254648.2 w=7 acq=31933 slow=801 slow_ms=77.12 spins=1246554 sleeps=541 sleep_ms=75.61 slices=3 slice_ms=0.02
+[err] R4-5d stat t=1794914259680.9 w=0 acq=14145695 slow=14425 slow_ms=295.12 spins=26699234 sleeps=11554 sleep_ms=273.64 slices=3547 slice_ms=19.29
+[err] R4-5d stat t=1794914259680.9 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914259680.9 w=2 acq=37606 slow=1757 slow_ms=41.71 spins=2622725 sleeps=1159 sleep_ms=38.99 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914259681.0 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914259681.0 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914259681.0 w=5 acq=1386648 slow=9402 slow_ms=256.67 spins=11384114 sleeps=5048 sleep_ms=244.85 slices=1977 slice_ms=6.18
+[err] R4-5d stat t=1794914259681.0 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914259681.0 w=7 acq=33095 slow=845 slow_ms=77.88 spins=1318084 sleeps=571 sleep_ms=76.29 slices=3 slice_ms=0.02
+[err] R4-5d stat t=1794914264710.1 w=0 acq=14241040 slow=15731 slow_ms=325.29 spins=29092862 sleeps=12612 sleep_ms=301.79 slices=3739 slice_ms=20.92
+[err] R4-5d stat t=1794914264710.2 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914264710.2 w=2 acq=46012 slow=2154 slow_ms=54.74 spins=3264938 sleeps=1446 sleep_ms=51.46 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914264710.2 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914264710.2 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914264710.2 w=5 acq=1463913 slow=10341 slow_ms=281.55 spins=12691035 sleeps=5640 sleep_ms=268.57 slices=2164 slice_ms=6.81
+[err] R4-5d stat t=1794914264710.2 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914264710.2 w=7 acq=34254 slow=890 slow_ms=78.70 spins=1396394 sleeps=605 sleep_ms=77.04 slices=4 slice_ms=0.03
+[err] R4-5d stat t=1794914269714.4 w=0 acq=14328838 slow=16846 slow_ms=350.30 spins=31135647 sleeps=13527 sleep_ms=325.20 slices=3940 slice_ms=22.58
+[err] R4-5d stat t=1794914269714.4 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914269714.5 w=2 acq=53331 slow=2485 slow_ms=62.52 spins=3771358 sleeps=1663 sleep_ms=58.76 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914269714.5 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914269714.5 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914269714.5 w=5 acq=1540839 slow=11138 slow_ms=299.20 spins=13756309 sleeps=6119 sleep_ms=285.21 slices=2356 slice_ms=7.31
+[err] R4-5d stat t=1794914269714.5 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914269714.5 w=7 acq=35411 slow=935 slow_ms=79.16 spins=1451433 sleeps=627 sleep_ms=77.47 slices=4 slice_ms=0.03
+[err] R4-5d stat t=1794914274714.6 w=0 acq=14431737 slow=18160 slow_ms=380.16 spins=33644993 sleeps=14639 sleep_ms=353.29 slices=4142 slice_ms=24.24
+[err] R4-5d stat t=1794914274714.7 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914274714.7 w=2 acq=63978 slow=2924 slow_ms=73.26 spins=4481402 sleeps=1982 sleep_ms=68.86 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914274714.7 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914274714.7 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914274714.7 w=5 acq=1618648 slow=12107 slow_ms=325.53 spins=15166200 sleeps=6771 sleep_ms=310.34 slices=2553 slice_ms=7.94
+[err] R4-5d stat t=1794914274714.7 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914274714.7 w=7 acq=36571 slow=973 slow_ms=80.31 spins=1504257 sleeps=651 sleep_ms=78.56 slices=4 slice_ms=0.03
+[err] R4-5d stat t=1794914279796.5 w=0 acq=14526110 slow=19244 slow_ms=402.92 spins=35646055 sleeps=15517 sleep_ms=374.60 slices=4345 slice_ms=25.73
+[err] R4-5d stat t=1794914279796.5 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914279796.5 w=2 acq=71208 slow=3237 slow_ms=80.32 spins=4914908 sleeps=2167 sleep_ms=75.50 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914279796.5 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914279796.6 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914279796.6 w=5 acq=1696073 slow=12817 slow_ms=340.69 spins=16047718 sleeps=7172 sleep_ms=324.67 slices=2733 slice_ms=8.46
+[err] R4-5d stat t=1794914279796.6 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914279796.6 w=7 acq=37767 slow=995 slow_ms=80.57 spins=1539416 sleeps=668 sleep_ms=78.80 slices=4 slice_ms=0.03
+[err] R4-5d stat t=1794914284829.6 w=0 acq=14616087 slow=20385 slow_ms=428.11 spins=37742807 sleeps=16444 sleep_ms=398.15 slices=4542 slice_ms=27.56
+[err] R4-5d stat t=1794914284829.6 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914284829.6 w=2 acq=79958 slow=3553 slow_ms=85.61 spins=5337361 sleeps=2352 sleep_ms=80.24 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914284829.6 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914284829.6 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914284829.6 w=5 acq=1773605 slow=13656 slow_ms=362.01 spins=17266422 sleeps=7731 sleep_ms=344.95 slices=2921 slice_ms=9.14
+[err] R4-5d stat t=1794914284829.6 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914284829.6 w=7 acq=38928 slow=1040 slow_ms=81.41 spins=1610039 sleeps=701 sleep_ms=79.58 slices=4 slice_ms=0.03
+[err] R4-5d stat t=1794914289829.9 w=0 acq=14713932 slow=21683 slow_ms=455.84 spins=40067797 sleeps=17474 sleep_ms=424.08 slices=4735 slice_ms=29.16
+[err] R4-5d stat t=1794914289830.0 w=1 acq=33686 slow=524 slow_ms=49.92 spins=738600 sleeps=312 sleep_ms=49.06 slices=12 slice_ms=0.04
+[err] R4-5d stat t=1794914289830.0 w=2 acq=89631 slow=4035 slow_ms=97.43 spins=6111932 sleeps=2697 sleep_ms=91.30 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914289830.0 w=3 acq=626 slow=36 slow_ms=1.94 spins=58930 sleeps=27 sleep_ms=1.82 slices=4 slice_ms=3.24
+[err] R4-5d stat t=1794914289830.0 w=4 acq=447 slow=25 slow_ms=2.22 spins=48791 sleeps=24 sleep_ms=2.16 slices=0 slice_ms=0.00
+[err] R4-5d stat t=1794914289830.0 w=5 acq=1851100 slow=14610 slow_ms=386.12 spins=18624222 sleeps=8344 sleep_ms=367.72 slices=3118 slice_ms=9.65
+[err] R4-5d stat t=1794914289830.0 w=6 acq=10037 slow=112 slow_ms=7.82 spins=183730 sleeps=83 sleep_ms=7.63 slices=3 slice_ms=0.20
+[err] R4-5d stat t=1794914289830.0 w=7 acq=40081 slow=1084 slow_ms=82.68 spins=1708508 sleeps=747 sleep_ms=80.78 slices=4 slice_ms=0.03
+[err] R4-5d gilwait w=0 start=1794914293553.3 dur=0.500 sleep=0.500 sleeps=1 spins=2000 holder=7
+[err] R4-5d gilwait w=0 start=1794914294391.2 dur=0.540 sleep=0.525 sleeps=6 spins=12000 holder=6
+[err] R4-5d stat t=1794914294832.9 w=0 acq=14817925 slow=24990 slow_ms=568.88 spins=46493595 sleeps=20394 sleep_ms=532.10 slices=4898 slice_ms=30.60
+[err] R4-5d stat t=1794914294832.9 w=1 acq=38216 slow=1575 slow_ms=93.78 spins=2786050 sleeps=1226 sleep_ms=91.07 slices=375 slice_ms=2.30
+[err] R4-5d stat t=1794914294832.9 w=2 acq=110892 slow=6095 slow_ms=171.64 spins=9886545 sleeps=4358 sleep_ms=162.11 slices=330 slice_ms=3.72
+[err] R4-5d stat t=1794914294832.9 w=3 acq=4988 slow=1082 slow_ms=50.81 spins=2234227 sleeps=1005 sleep_ms=48.76 slices=256 slice_ms=5.36
+[err] R4-5d stat t=1794914294832.9 w=4 acq=6080 slow=1347 slow_ms=66.70 spins=2783807 sleeps=1255 sleep_ms=64.22 slices=314 slice_ms=5.56
+[err] R4-5d stat t=1794914294832.9 w=5 acq=1947318 slow=17958 slow_ms=488.33 spins=24505072 sleeps=10936 sleep_ms=465.14 slices=3771 slice_ms=19.57
+[err] R4-5d stat t=1794914294832.9 w=6 acq=14488 slow=1175 slow_ms=53.19 spins=2234762 sleeps=1009 sleep_ms=51.16 slices=289 slice_ms=2.72
+[err] R4-5d stat t=1794914294832.9 w=7 acq=45556 slow=2262 slow_ms=132.01 spins=4009073 sleeps=1789 sleep_ms=128.23 slices=311 slice_ms=4.72
+[err] R4-5d gilwait w=0 start=1794914294964.7 dur=1.045 sleep=1.040 sleeps=6 spins=12000 holder=5
+[err] R4-5d gilwait w=0 start=1794914295670.1 dur=0.640 sleep=0.640 sleeps=1 spins=2000 holder=6
+[err] R4-5d gilwait w=0 start=1794914295739.5 dur=0.690 sleep=0.690 sleeps=1 spins=2000 holder=0
+[err] R4-5d gilwait w=0 start=1794914296050.4 dur=0.880 sleep=0.875 sleeps=1 spins=2000 holder=2
+[err] R4-5d gilwait w=0 start=1794914296580.0 dur=0.510 sleep=0.510 sleeps=7 spins=14000 holder=6
+[err] R4-5d gilwait w=0 start=1794914296679.0 dur=0.745 sleep=0.745 sleeps=4 spins=8000 holder=3
+[err] R4-5d gilwait w=0 start=1794914296687.1 dur=0.540 sleep=0.540 sleeps=1 spins=2000 holder=6
+[err] R4-5d gilwait w=0 start=1794914297414.1 dur=0.745 sleep=0.735 sleeps=4 spins=8000 holder=3
+[err] R4-5d gilwait w=0 start=1794914298567.5 dur=0.615 sleep=0.615 sleeps=1 spins=2000 holder=2
+[err] R4-5d gilwait w=0 start=1794914298824.3 dur=0.500 sleep=0.490 sleeps=3 spins=6000 holder=6
+[err] R4-5d gilwait w=0 start=1794914299556.1 dur=0.550 sleep=0.550 sleeps=5 spins=10607 holder=6
+[err] R4-5d gilwait w=0 start=1794914299624.2 dur=0.725 sleep=0.720 sleeps=2 spins=4000 holder=3
+[err] R4-5d gilwait w=0 start=1794914299789.1 dur=0.920 sleep=0.920 sleeps=1 spins=2000 holder=5
+[err] R4-5d stat t=1794914300536.1 w=0 acq=14968146 slow=34806 slow_ms=982.49 spins=65711823 sleeps=29011 sleep_ms=930.45 slices=4988 slice_ms=31.48
+[err] R4-5d stat t=1794914300536.1 w=1 acq=58261 slow=6250 slow_ms=302.90 spins=12663191 sleeps=5510 sleep_ms=291.36 slices=1531 slice_ms=11.81
+[err] R4-5d stat t=1794914300536.1 w=2 acq=149268 slow=12638 slow_ms=467.21 spins=23211627 sleeps=10162 sleep_ms=445.69 slices=1605 slice_ms=28.44
+[err] R4-5d stat t=1794914300536.1 w=3 acq=25424 slow=5753 slow_ms=267.58 spins=11919206 sleeps=5229 sleep_ms=256.29 slices=1657 slice_ms=17.84
+[err] R4-5d stat t=1794914300536.1 w=4 acq=33320 slow=7530 slow_ms=343.17 spins=15561027 sleeps=6817 sleep_ms=329.33 slices=1862 slice_ms=23.58
+[err] R4-5d stat t=1794914300536.1 w=5 acq=2099060 slow=28752 slow_ms=898.57 spins=45912349 sleeps=20156 sleep_ms=857.42 slices=5636 slice_ms=51.40
+[err] R4-5d stat t=1794914300536.1 w=6 acq=34177 slow=5715 slow_ms=262.41 spins=11481922 sleeps=5156 sleep_ms=251.82 slices=1439 slice_ms=16.91
+[err] R4-5d stat t=1794914300536.1 w=7 acq=67015 slow=7134 slow_ms=350.44 spins=13721828 sleeps=6135 sleep_ms=336.81 slices=1709 slice_ms=15.55
+[err] R4-5d gilwait w=0 start=1794914303176.9 dur=0.790 sleep=0.790 sleeps=1 spins=2000 holder=6
+[err] R4-5d gilwait w=0 start=1794914303178.2 dur=0.630 sleep=0.630 sleeps=2 spins=4000 holder=6
+[err] R4-5d gilwait w=0 start=1794914304255.2 dur=0.640 sleep=0.635 sleeps=2 spins=4000 holder=2
+[err] R4-5d gilwait w=0 start=1794914304553.9 dur=0.755 sleep=0.755 sleeps=2 spins=4000 holder=6
+[err] R4-5d gilwait w=0 start=1794914305773.2 dur=0.940 sleep=0.940 sleeps=2 spins=4323 holder=5
+[err] R4-5d gilwait w=0 start=1794914306217.1 dur=0.965 sleep=0.965 sleeps=2 spins=4000 holder=3
+[err] R4-5d stat t=1794914306325.0 w=0 acq=15094365 slow=42424 slow_ms=1284.19 spins=80112747 sleeps=35550 sleep_ms=1220.41 slices=4991 slice_ms=31.54
+[err] R4-5d stat t=1794914306325.1 w=1 acq=79453 slow=11091 slow_ms=532.67 spins=22712869 sleeps=10027 sleep_ms=511.65 slices=3195 slice_ms=45.68
+[err] R4-5d stat t=1794914306325.1 w=2 acq=188843 slow=19597 slow_ms=785.58 spins=36940546 sleeps=16299 sleep_ms=751.40 slices=3065 slice_ms=57.14
+[err] R4-5d stat t=1794914306325.1 w=3 acq=46588 slow=10720 slow_ms=507.79 spins=22309674 sleeps=9874 sleep_ms=486.65 slices=3118 slice_ms=44.59
+[err] R4-5d stat t=1794914306325.1 w=4 acq=61440 slow=13855 slow_ms=637.14 spins=28582193 sleeps=12657 sleep_ms=610.97 slices=3811 slice_ms=58.69
+[err] R4-5d stat t=1794914306325.1 w=5 acq=2273050 slow=40094 slow_ms=1432.66 spins=68941782 sleeps=30445 sleep_ms=1372.58 slices=9425 slice_ms=193.66
+[err] R4-5d stat t=1794914306325.1 w=6 acq=54255 slow=10554 slow_ms=499.02 spins=21578867 sleeps=9686 sleep_ms=479.45 slices=2771 slice_ms=34.80
+[err] R4-5d stat t=1794914306325.1 w=7 acq=88859 slow=12331 slow_ms=603.72 spins=24503504 sleeps=10979 sleep_ms=580.03 slices=3260 slice_ms=40.50
+[err] R4-5d gilwait w=0 start=1794914307158.2 dur=0.755 sleep=0.750 sleeps=5 spins=10000 holder=6
+[err] R4-5d gilwait w=0 start=1794914307433.4 dur=0.810 sleep=0.805 sleeps=1 spins=2000 holder=3
+[err] R4-5d gilwait w=0 start=1794914308941.6 dur=0.830 sleep=0.830 sleeps=1 spins=2000 holder=0
+[err] R4-5d gilwait w=0 start=1794914311150.1 dur=0.675 sleep=0.675 sleeps=1 spins=2000 holder=4
+[err] R4-5d gilwait w=0 start=1794914312062.8 dur=0.800 sleep=0.800 sleeps=2 spins=4000 holder=6
+[err] R4-5d stat t=1794914312636.6 w=0 acq=15224933 slow=49413 slow_ms=1570.82 spins=93865455 sleeps=41879 sleep_ms=1496.06 slices=5000 slice_ms=31.67
+[err] R4-5d stat t=1794914312636.7 w=1 acq=102464 slow=17285 slow_ms=841.54 spins=36328723 sleeps=16110 sleep_ms=808.75 slices=5040 slice_ms=68.77
+[err] R4-5d stat t=1794914312636.7 w=2 acq=231423 slow=27760 slow_ms=1183.91 spins=53604528 sleeps=23779 sleep_ms=1134.17 slices=4779 slice_ms=89.69
+[err] R4-5d stat t=1794914312636.7 w=3 acq=70066 slow=16854 slow_ms=805.59 spins=35413722 sleeps=15726 sleep_ms=773.02 slices=5030 slice_ms=70.05
+[err] R4-5d stat t=1794914312636.7 w=4 acq=92512 slow=21420 slow_ms=1033.28 spins=44909390 sleeps=20006 sleep_ms=991.60 slices=5954 slice_ms=89.15
+[err] R4-5d stat t=1794914312636.7 w=5 acq=2491321 slow=53269 slow_ms=2117.71 spins=96908917 sleeps=43032 sleep_ms=2031.87 slices=14597 slice_ms=393.07
+[err] R4-5d stat t=1794914312636.7 w=6 acq=77809 slow=16506 slow_ms=815.14 spins=34235246 sleeps=15403 sleep_ms=783.90 slices=4667 slice_ms=60.41
+[err] R4-5d stat t=1794914312636.7 w=7 acq=113586 slow=18905 slow_ms=939.68 spins=38515587 sleeps=17264 sleep_ms=903.68 slices=5032 slice_ms=72.13
+[err] R4-5d gilwait w=0 start=1794914313224.7 dur=0.635 sleep=0.630 sleeps=3 spins=6000 holder=8
+[err] R4-5d gilwait w=0 start=1794914314329.8 dur=0.575 sleep=0.570 sleeps=1 spins=3452 holder=8
+[err] R4-5d gilwait w=0 start=1794914314472.3 dur=0.560 sleep=0.545 sleeps=6 spins=12000 holder=8
+[err] R4-5d gilwait w=0 start=1794914316848.9 dur=0.645 sleep=0.640 sleeps=2 spins=4000 holder=3
+[err] R4-5d gilwait w=0 start=1794914318513.7 dur=0.745 sleep=0.745 sleeps=3 spins=6000 holder=8
+[err] R4-5d stat t=1794914319587.0 w=0 acq=15420928 slow=57227 slow_ms=1857.81 spins=108230358 sleeps=48444 sleep_ms=1771.56 slices=5010 slice_ms=31.75
+[err] R4-5d stat t=1794914319587.0 w=1 acq=121529 slow=21647 slow_ms=1043.36 spins=45159386 sleeps=20098 sleep_ms=1002.93 slices=6324 slice_ms=81.08
+[err] R4-5d stat t=1794914319587.0 w=2 acq=271430 slow=34309 slow_ms=1470.91 spins=66259775 sleeps=29474 sleep_ms=1410.17 slices=5928 slice_ms=103.06
+[err] R4-5d stat t=1794914319587.0 w=3 acq=88342 slow=21104 slow_ms=1005.36 spins=44162901 sleeps=19691 sleep_ms=964.70 slices=6574 slice_ms=107.09
+[err] R4-5d stat t=1794914319587.1 w=4 acq=119042 slow=27108 slow_ms=1293.73 spins=56443498 sleeps=25232 sleep_ms=1241.33 slices=7841 slice_ms=106.81
+[err] R4-5d stat t=1794914319587.1 w=5 acq=2790394 slow=65786 slow_ms=2682.07 spins=122747550 sleeps=54568 sleep_ms=2574.58 slices=20074 slice_ms=505.74
+[err] R4-5d stat t=1794914319587.1 w=6 acq=96297 slow=20937 slow_ms=1028.65 spins=43515315 sleeps=19592 sleep_ms=988.42 slices=6107 slice_ms=71.84
+[err] R4-5d stat t=1794914319587.1 w=7 acq=133559 slow=23412 slow_ms=1161.59 spins=48026658 sleeps=21573 sleep_ms=1117.36 slices=6131 slice_ms=80.42
+[err] R4-5d stat t=1794914325262.4 w=0 acq=15580884 slow=64041 slow_ms=2096.76 spins=120446454 sleeps=53956 sleep_ms=2000.79 slices=5016 slice_ms=31.80
+[err] R4-5d stat t=1794914325262.5 w=1 acq=138428 slow=25690 slow_ms=1227.76 spins=53651792 sleeps=23855 sleep_ms=1179.80 slices=7469 slice_ms=89.54
+[err] R4-5d stat t=1794914325262.6 w=2 acq=305799 slow=40167 slow_ms=1753.42 spins=78005867 sleeps=34711 sleep_ms=1681.72 slices=6945 slice_ms=115.58
+[err] R4-5d stat t=1794914325262.6 w=3 acq=105085 slow=25237 slow_ms=1193.36 spins=52778763 sleeps=23510 sleep_ms=1144.73 slices=7638 slice_ms=116.56
+[err] R4-5d stat t=1794914325262.6 w=4 acq=141711 slow=32398 slow_ms=1546.96 spins=67603086 sleeps=30289 sleep_ms=1484.67 slices=9312 slice_ms=121.21
+[err] R4-5d stat t=1794914325262.6 w=5 acq=3040182 slow=76971 slow_ms=3207.93 spins=146229856 sleeps=65106 sleep_ms=3078.87 slices=24853 slice_ms=629.18
+[err] R4-5d stat t=1794914325262.6 w=6 acq=112788 slow=25120 slow_ms=1224.07 spins=52580713 sleeps=23596 sleep_ms=1175.36 slices=7340 slice_ms=81.67
+[err] R4-5d stat t=1794914325262.6 w=7 acq=151244 slow=27706 slow_ms=1366.39 spins=57065964 sleeps=25629 sleep_ms=1314.00 slices=7032 slice_ms=88.77
+[err] R4-5d gilwait w=0 start=1794914327501.6 dur=0.565 sleep=0.555 sleeps=3 spins=6000 holder=3
+[err] R4-5d gilwait w=0 start=1794914327989.8 dur=0.695 sleep=0.690 sleeps=1 spins=2000 holder=2
+[err] R4-5d gilwait w=0 start=1794914329322.2 dur=0.900 sleep=0.900 sleeps=1 spins=2000 holder=8
+[err] R4-5d stat t=1794914331601.7 w=0 acq=15757547 slow=72399 slow_ms=2409.34 spins=135976798 sleeps=60844 sleep_ms=2300.92 slices=5023 slice_ms=31.94
+[err] R4-5d stat t=1794914331601.7 w=1 acq=158324 slow=30569 slow_ms=1466.31 spins=64069851 sleeps=28529 sleep_ms=1409.02 slices=8562 slice_ms=97.34
+[err] R4-5d stat t=1794914331601.7 w=2 acq=345393 slow=47241 slow_ms=2084.37 spins=92119263 sleeps=41045 sleep_ms=2000.06 slices=8151 slice_ms=130.69
+[err] R4-5d stat t=1794914331601.7 w=3 acq=125041 slow=30240 slow_ms=1431.58 spins=63347232 sleeps=28218 sleep_ms=1373.58 slices=9080 slice_ms=128.22
+[err] R4-5d stat t=1794914331601.7 w=4 acq=168374 slow=38660 slow_ms=1858.08 spins=81027764 sleeps=36337 sleep_ms=1782.80 slices=10873 slice_ms=135.96
+[err] R4-5d stat t=1794914331601.7 w=5 acq=3322878 slow=90417 slow_ms=3851.56 spins=174113295 sleeps=77496 sleep_ms=3697.58 slices=30436 slice_ms=746.61
+[err] R4-5d stat t=1794914331602.1 w=6 acq=132498 slow=30291 slow_ms=1474.44 spins=63602247 sleeps=28586 sleep_ms=1415.40 slices=8386 slice_ms=90.19
+[err] R4-5d stat t=1794914331602.1 w=7 acq=171904 slow=32873 slow_ms=1615.60 spins=68017646 sleeps=30557 sleep_ms=1553.09 slices=8233 slice_ms=101.10
+[err] R4-5d gilwait w=0 start=1794914332209.4 dur=0.500 sleep=0.490 sleeps=7 spins=14000 holder=8
+[err] R4-5d gilwait w=0 start=1794914332327.4 dur=0.520 sleep=0.515 sleeps=6 spins=12000 holder=6
+[err] R4-5d gilwait w=0 start=1794914335195.1 dur=0.505 sleep=0.495 sleeps=5 spins=10000 holder=0
+[err] R4-5d stat t=1794914337854.5 w=0 acq=15899971 slow=78690 slow_ms=2630.38 spins=147579813 sleeps=66112 sleep_ms=2513.03 slices=5033 slice_ms=32.06
+[err] R4-5d stat t=1794914337854.5 w=1 acq=175034 slow=34202 slow_ms=1619.66 spins=71484436 sleeps=31865 sleep_ms=1556.10 slices=9972 slice_ms=107.02
+[err] R4-5d stat t=1794914337854.5 w=2 acq=382690 slow=52877 slow_ms=2314.60 spins=102627222 sleeps=45776 sleep_ms=2220.20 slices=9793 slice_ms=148.90
+[err] R4-5d stat t=1794914337854.5 w=3 acq=141093 slow=33800 slow_ms=1595.55 spins=70415551 sleeps=31417 sleep_ms=1529.64 slices=10559 slice_ms=137.19
+[err] R4-5d stat t=1794914337854.5 w=4 acq=191675 slow=43686 slow_ms=2088.09 spins=91391605 sleeps=41035 sleep_ms=2003.71 slices=12646 slice_ms=152.48
+[err] R4-5d stat t=1794914337854.6 w=5 acq=3562017 slow=101385 slow_ms=4364.74 spins=196735260 sleeps=87746 sleep_ms=4191.94 slices=38201 slice_ms=852.90
+[err] R4-5d stat t=1794914337854.6 w=6 acq=148088 slow=33849 slow_ms=1640.48 spins=70921473 sleeps=31930 sleep_ms=1574.91 slices=9619 slice_ms=101.74
+[err] R4-5d stat t=1794914337854.6 w=7 acq=188951 slow=36610 slow_ms=1790.99 spins=75687717 sleeps=34030 sleep_ms=1722.20 slices=9562 slice_ms=110.62
+[err] R4-5d gilwait w=0 start=1794914340247.4 dur=0.685 sleep=0.675 sleeps=1 spins=3819 holder=5
+[err] R4-5d gilwait w=0 start=1794914340573.5 dur=0.525 sleep=0.515 sleeps=7 spins=14000 holder=6
+[err] R4-5d gilwait w=0 start=1794914341223.6 dur=0.515 sleep=0.490 sleeps=9 spins=18000 holder=6
+[err] R4-5d gilwait w=0 start=1794914341966.4 dur=0.655 sleep=0.655 sleeps=2 spins=4000 holder=3
+[err] R4-5d gilwait w=0 start=1794914342133.3 dur=0.670 sleep=0.670 sleeps=1 spins=2000 holder=8
+[err] R4-5d gilwait w=0 start=1794914342620.1 dur=0.500 sleep=0.500 sleeps=1 spins=2000 holder=5
+[err] R4-5d gilwait w=0 start=1794914342794.9 dur=0.865 sleep=0.865 sleeps=1 spins=2000 holder=0
+[err] R4-5d gilwait w=0 start=1794914344581.4 dur=0.545 sleep=0.525 sleeps=5 spins=10000 holder=6
+[err] R4-5d stat t=1794914344633.0 w=0 acq=16049580 slow=85957 slow_ms=2905.82 spins=161287734 sleeps=72390 sleep_ms=2777.68 slices=5042 slice_ms=32.17
+[err] R4-5d stat t=1794914344633.1 w=1 acq=196083 slow=38946 slow_ms=1838.97 spins=81658113 sleeps=36275 sleep_ms=1766.60 slices=12014 slice_ms=126.56
+[err] R4-5d stat t=1794914344633.1 w=2 acq=425421 slow=60071 slow_ms=2649.92 spins=116507830 sleeps=52050 sleep_ms=2543.55 slices=11926 slice_ms=174.96
+[err] R4-5d stat t=1794914344633.1 w=3 acq=161618 slow=38475 slow_ms=1817.87 spins=79994607 sleeps=35779 sleep_ms=1743.46 slices=12908 slice_ms=154.72
+[err] R4-5d stat t=1794914344633.1 w=4 acq=219330 slow=49577 slow_ms=2360.65 spins=103686091 sleeps=46640 sleep_ms=2265.42 slices=15255 slice_ms=204.42
+[err] R4-5d stat t=1794914344633.1 w=5 acq=3816371 slow=113551 slow_ms=4970.96 spins=222570192 sleeps=99291 sleep_ms=4775.29 slices=44197 slice_ms=968.62
+[err] R4-5d stat t=1794914344633.1 w=6 acq=168218 slow=38473 slow_ms=1854.95 spins=80831323 sleeps=36278 sleep_ms=1780.59 slices=11656 slice_ms=116.06
+[err] R4-5d stat t=1794914344633.1 w=7 acq=210684 slow=41351 slow_ms=2023.32 spins=85615776 sleeps=38550 sleep_ms=1945.66 slices=11577 slice_ms=136.55
+[err] R4-5d gilwait w=0 start=1794914349164.3 dur=0.575 sleep=0.570 sleeps=1 spins=2000 holder=3
+[err] R4-5d stat t=1794914350361.2 w=0 acq=16169035 slow=92458 slow_ms=3161.69 spins=173937601 sleeps=78166 sleep_ms=3023.59 slices=5049 slice_ms=32.23
+[err] R4-5d stat t=1794914350361.3 w=1 acq=216658 slow=43774 slow_ms=2082.12 spins=92069207 sleeps=40993 sleep_ms=1999.71 slices=13783 slice_ms=142.74
+[err] R4-5d stat t=1794914350361.3 w=2 acq=464035 slow=67032 slow_ms=2999.30 spins=130929811 sleeps=58597 sleep_ms=2880.00 slices=13507 slice_ms=196.61
+[err] R4-5d stat t=1794914350361.3 w=3 acq=181718 slow=43446 slow_ms=2065.72 spins=90596616 sleeps=40563 sleep_ms=1982.02 slices=14491 slice_ms=177.55
+[err] R4-5d stat t=1794914350361.3 w=4 acq=248117 slow=55900 slow_ms=2673.56 spins=117024914 sleeps=52686 sleep_ms=2566.54 slices=17845 slice_ms=234.81
+[err] R4-5d stat t=1794914350361.3 w=5 acq=4049843 slow=125097 slow_ms=5575.34 spins=247611919 sleeps=110380 sleep_ms=5357.04 slices=49323 slice_ms=1094.22
+[err] R4-5d stat t=1794914350361.3 w=6 acq=188627 slow=43357 slow_ms=2093.95 spins=91258026 sleeps=41019 sleep_ms=2010.63 slices=13679 slice_ms=139.33
+[err] R4-5d stat t=1794914350361.3 w=7 acq=233308 slow=46586 slow_ms=2288.31 spins=96736291 sleeps=43625 sleep_ms=2199.83 slices=13389 slice_ms=160.68
+[err] R4-5d gilwait w=0 start=1794914350825.2 dur=0.625 sleep=0.625 sleeps=1 spins=2000 holder=3
+[err] R4-5d gilwait w=4 start=1794914351339.6 dur=5.115 sleep=5.110 sleeps=3 spins=6000 holder=8
+[err] R4-5d gilwait w=0 start=1794914353115.5 dur=1.025 sleep=1.020 sleeps=2 spins=4000 holder=6
+[err] R4-5d gilwait w=0 start=1794914353548.7 dur=0.845 sleep=0.845 sleeps=4 spins=8000 holder=4
+[err] R4-5d stat t=1794914356696.6 w=0 acq=16344132 slow=98716 slow_ms=3373.88 spins=185132120 sleeps=83292 sleep_ms=3226.80 slices=5055 slice_ms=32.33
+[err] R4-5d stat t=1794914356696.7 w=1 acq=231304 slow=46730 slow_ms=2212.96 spins=97931789 sleeps=43632 sleep_ms=2125.53 slices=15204 slice_ms=153.11
+[err] R4-5d stat t=1794914356696.7 w=2 acq=499236 slow=71806 slow_ms=3189.10 spins=139926865 sleeps=62545 sleep_ms=3062.03 slices=14916 slice_ms=212.60
+[err] R4-5d stat t=1794914356696.7 w=3 acq=196216 slow=46344 slow_ms=2187.42 spins=96430132 sleeps=43212 sleep_ms=2098.70 slices=15955 slice_ms=187.12
+[err] R4-5d stat t=1794914356696.7 w=4 acq=269526 slow=59824 slow_ms=2840.73 spins=124730421 sleeps=56192 sleep_ms=2726.83 slices=19645 slice_ms=250.38
+[err] R4-5d stat t=1794914356696.7 w=5 acq=4298778 slow=135180 slow_ms=6021.74 spins=268397992 sleeps=119741 sleep_ms=5785.91 slices=53352 slice_ms=1148.38
+[err] R4-5d stat t=1794914356696.7 w=6 acq=202419 slow=46366 slow_ms=2234.75 spins=97418349 sleeps=43823 sleep_ms=2145.38 slices=14923 slice_ms=147.49
+[err] R4-5d stat t=1794914356696.7 w=7 acq=249489 slow=49713 slow_ms=2422.49 spins=102965444 sleeps=46472 sleep_ms=2328.37 slices=14880 slice_ms=175.03
+[err] R4-5d gilwait w=0 start=1794914356825.1 dur=0.855 sleep=0.855 sleeps=1 spins=2000 holder=6
+[err] R4-5d gilwait w=0 start=1794914359928.5 dur=0.715 sleep=0.700 sleeps=3 spins=6000 holder=3
+[err] R4-5d gilwait w=0 start=1794914364742.3 dur=0.675 sleep=0.675 sleeps=2 spins=4000 holder=5
+[err] R4-5d stat t=1794914364940.5 w=0 acq=16570108 slow=108810 slow_ms=3741.51 spins=203917469 sleeps=91857 sleep_ms=3578.62 slices=5061 slice_ms=32.39
+[err] R4-5d stat t=1794914364940.6 w=1 acq=254556 slow=52056 slow_ms=2445.53 spins=108471453 sleeps=48404 sleep_ms=2349.33 slices=16765 slice_ms=169.55
+[err] R4-5d stat t=1794914364940.6 w=2 acq=549264 slow=79601 slow_ms=3544.58 spins=155125129 sleeps=69442 sleep_ms=3402.72 slices=16920 slice_ms=239.21
+[err] R4-5d stat t=1794914364940.6 w=3 acq=219029 slow=51338 slow_ms=2429.48 spins=106666919 sleeps=47838 sleep_ms=2331.89 slices=18049 slice_ms=207.68
+[err] R4-5d stat t=1794914364940.6 w=4 acq=301086 slow=66359 slow_ms=3148.68 spins=138404198 sleeps=62413 sleep_ms=3022.03 slices=22054 slice_ms=285.39
+[err] R4-5d stat t=1794914364940.6 w=5 acq=4648089 slow=150529 slow_ms=6705.84 spins=299826677 sleeps=133846 sleep_ms=6443.37 slices=60517 slice_ms=1258.03
+[err] R4-5d stat t=1794914364940.6 w=6 acq=224940 slow=51489 slow_ms=2472.40 spins=107959017 sleeps=48599 sleep_ms=2373.71 slices=16878 slice_ms=164.19
+[err] R4-5d stat t=1794914364940.6 w=7 acq=273976 slow=55133 slow_ms=2670.21 spins=114158371 sleeps=51557 sleep_ms=2566.35 slices=16854 slice_ms=196.30
+[err] R4-5d gilwait w=0 start=1794914365201.6 dur=0.595 sleep=0.575 sleeps=7 spins=14000 holder=3
+[err] R4-5d gilwait w=0 start=1794914369569.6 dur=0.660 sleep=0.660 sleeps=2 spins=4000 holder=6
+[err] R4-5d gilwait w=0 start=1794914369977.2 dur=0.570 sleep=0.555 sleeps=10 spins=20000 holder=3
+[err] R4-5d gilwait w=0 start=1794914370217.4 dur=0.510 sleep=0.500 sleeps=7 spins=14000 holder=3
+[err] R4-5d gilwait w=0 start=1794914370618.3 dur=0.545 sleep=0.545 sleeps=3 spins=6000 holder=6
+[err] R4-5d gilwait w=0 start=1794914370716.5 dur=0.640 sleep=0.630 sleeps=6 spins=12000 holder=5
+[err] R4-5d stat t=1794914371340.4 w=0 acq=16743080 slow=117792 slow_ms=4094.75 spins=221450138 sleeps=99871 sleep_ms=3917.70 slices=5070 slice_ms=32.47
+[err] R4-5d stat t=1794914371340.4 w=1 acq=277396 slow=57528 slow_ms=2707.59 spins=119958444 sleeps=53554 sleep_ms=2601.17 slices=18349 slice_ms=185.57
+[err] R4-5d stat t=1794914371340.4 w=2 acq=592714 slow=87223 slow_ms=3907.53 spins=170425815 sleeps=76376 sleep_ms=3750.88 slices=18803 slice_ms=269.40
+[err] R4-5d stat t=1794914371340.4 w=3 acq=241332 slow=56748 slow_ms=2706.88 spins=118298942 sleeps=53095 sleep_ms=2599.12 slices=19732 slice_ms=226.82
+[err] R4-5d stat t=1794914371340.4 w=4 acq=331914 slow=73308 slow_ms=3495.46 spins=153323180 sleeps=69143 sleep_ms=3354.65 slices=24234 slice_ms=335.45
+[err] R4-5d stat t=1794914371340.4 w=5 acq=4920974 slow=163738 slow_ms=7311.79 spins=327341806 sleeps=146189 sleep_ms=7025.53 slices=64855 slice_ms=1351.58
+[err] R4-5d stat t=1794914371340.4 w=6 acq=247030 slow=56856 slow_ms=2731.24 spins=119515201 sleeps=53802 sleep_ms=2622.06 slices=18497 slice_ms=180.21
+[err] R4-5d stat t=1794914371340.4 w=7 acq=298002 slow=60954 slow_ms=2950.05 spins=126420031 sleeps=57106 sleep_ms=2835.00 slices=18611 slice_ms=216.65

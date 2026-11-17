@@ -1,0 +1,172 @@
+diff -ruN app/test/unit/desk-gl-link.test.ts app/test/unit/desk-gl-link.test.ts
+--- app/test/unit/desk-gl-link.test.ts	1970-01-01 09:00:00.000000000 +0900
++++ app/test/unit/desk-gl-link.test.ts	2026-11-06 20:01:08.415830142 +0900
+@@ -0,0 +1,76 @@
++// Decision 0311: the presenter in the present Worker. The description is read from the link's slot (a SharedArrayBuffer of its own) and the pixels from the engine's memory (another buffer); a resync is only a request there
++// ('deferred'), so a present that found the screen size changed must not look again at once.
++import { describe, expect, it } from 'vitest';
++import { GlDeskPresenter, SCENE_FLAG_CHANGED, SCENE_FLAG_WHOLE, SCENE_HEADER_BYTES, SCENE_MAGIC, SCENE_MAX_UPDATES, SCENE_MAX_WINDOWS, SCENE_UPD_BYTES, SCENE_VERSION, SCENE_WIN_BYTES } from '../../src/engine/desk-gl.ts';
++import { HEADER_BYTES, newDeskLink } from '../../src/engine/desk-link.ts';
++
++type Call = [string, ...unknown[]];
++function fakeGl(): { gl: unknown; calls: Call[] } {
++  const calls: Call[] = [];
++  let tex = 0;
++  const consts: Record<string, number> = { VERTEX_SHADER: 1, FRAGMENT_SHADER: 2, COMPILE_STATUS: 3, LINK_STATUS: 4, TEXTURE_2D: 10, RGBA: 11, RGBA8: 12, UNSIGNED_BYTE: 13, TEXTURE_MIN_FILTER: 14, TEXTURE_MAG_FILTER: 15, TEXTURE_WRAP_S: 16, TEXTURE_WRAP_T: 17, NEAREST: 18, CLAMP_TO_EDGE: 19, UNPACK_ROW_LENGTH: 20, DEPTH_TEST: 21, DITHER: 22, BLEND: 23, ONE: 24, ONE_MINUS_SRC_ALPHA: 25, TRIANGLE_STRIP: 26, COLOR_BUFFER_BIT: 27 };
++  const gl = new Proxy({}, {
++    get(_t, name: string) {
++      if (name in consts) return consts[name];
++      return (...a: unknown[]) => {
++        calls.push([name, ...a]);
++        if (name === 'getShaderParameter' || name === 'getProgramParameter') return true;
++        if (name === 'createTexture') return { id: ++tex };
++        if (name === 'createShader' || name === 'createProgram') return {};
++        if (name === 'getUniformLocation') return { name: a[1] };
++        return undefined;
++      };
++    },
++  });
++  return { gl, calls };
++}
++
++function writeScene(buf: ArrayBufferLike, ptr: number, o: { w: number; h: number; flags: number; wins: { lid: number; x: number; y: number; w: number; h: number; bits: number; stride: number; fresh?: boolean }[]; upds: { lid: number; x0: number; y0: number; x1: number; y1: number }[] }): void {
++  const dv = new DataView(buf, ptr);
++  dv.setUint32(0, SCENE_MAGIC, true); dv.setUint32(4, SCENE_VERSION, true); dv.setUint32(8, o.w, true); dv.setUint32(12, o.h, true); dv.setUint32(16, 1, true);
++  dv.setUint32(20, o.wins.length, true); dv.setUint32(24, o.upds.length, true); dv.setUint32(28, o.flags, true); dv.setUint32(32, 0, true);
++  o.wins.forEach((w, i) => {
++    const b = SCENE_HEADER_BYTES + i * SCENE_WIN_BYTES;
++    [w.lid, w.x, w.y, w.w, w.h, w.bits, w.stride, 0, 255, 0, w.fresh ? 1 : 0, 0, 0, 0, 0, 0, 0, 0, w.w, w.h].forEach((v, k) => dv.setInt32(b + k * 4, v, true));
++  });
++  const ub = SCENE_HEADER_BYTES + SCENE_MAX_WINDOWS * SCENE_WIN_BYTES;
++  o.upds.forEach((u, i) => [u.lid, u.x0, u.y0, u.x1, u.y1].forEach((v, k) => dv.setInt32(ub + i * SCENE_UPD_BYTES + k * 4, v, true)));
++  expect(ub + SCENE_MAX_UPDATES * SCENE_UPD_BYTES).toBe(6464);
++}
++
++function setup(): { p: GlDeskPresenter; link: SharedArrayBuffer; engineMem: SharedArrayBuffer; calls: Call[]; surface: { width: number; height: number }; api: { modes: number[]; resyncs: number } } {
++  const link = newDeskLink(), engineMem = new SharedArrayBuffer(1 << 20);
++  const { gl, calls } = fakeGl();
++  const surface = { width: 1920, height: 1080, getContext: () => gl as never };
++  const api = { modes: [] as number[], resyncs: 0, deferred: true, scene: () => HEADER_BYTES, sceneMode(on: number) { this.modes.push(on); }, resync() { this.resyncs++; }, describe: () => '' };
++  const p = new GlDeskPresenter(surface as never, api, () => engineMem, () => 0, () => link);
++  return { p, link, engineMem, calls, surface, api };
++}
++
++describe('GlDeskPresenter with the description in the link', () => {
++  it('reads the description from the link and uploads the pixels from the engine memory', () => {
++    const t = setup();
++    writeScene(t.link, HEADER_BYTES, { w: 1920, h: 1080, flags: SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE, wins: [{ lid: 3, x: 10, y: 20, w: 100, h: 50, bits: 0x8000, stride: 448, fresh: true }], upds: [{ lid: 3, x0: 0, y0: 0, x1: 100, y1: 50 }] });
++    expect(t.p.present()).toBe(1);
++    const up = t.calls.find((c) => c[0] === 'texSubImage2D') as Call;
++    expect(up).toBeDefined();
++    expect(up[5]).toBe(100);                    // width of the rectangle
++    expect(up[6]).toBe(50);                     // height
++  });
++  it('the pixel source is the engine memory (not the link) at the surface address', () => {
++    const t = setup();
++    writeScene(t.link, HEADER_BYTES, { w: 1920, h: 1080, flags: SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE, wins: [{ lid: 3, x: 0, y: 0, w: 64, h: 32, bits: 0x4000, stride: 256, fresh: true }], upds: [{ lid: 3, x0: 0, y0: 0, x1: 64, y1: 32 }] });
++    t.p.present();
++    const up = t.calls.find((c) => c[0] === 'texSubImage2D') as Call;
++    const src = up.find((x) => x instanceof Uint8Array) as Uint8Array;
++    expect(src.buffer).toBe(t.engineMem);
++    expect(up[up.length - 1]).toBe(0x4000);     // the offset into the engine memory
++  });
++  it('a screen size that changed asks for a resync and does not look again at once (the new picture comes with a later description)', () => {
++    const t = setup();
++    writeScene(t.link, HEADER_BYTES, { w: 800, h: 600, flags: SCENE_FLAG_CHANGED, wins: [], upds: [] });
++    expect(t.p.present()).toBe(0);
++    expect(t.api.resyncs).toBe(1);
++    expect(t.surface.width).toBe(800);
++  });
++});
+diff -ruN app/test/unit/desk-link.test.ts app/test/unit/desk-link.test.ts
+--- app/test/unit/desk-link.test.ts	1970-01-01 09:00:00.000000000 +0900
++++ app/test/unit/desk-link.test.ts	2026-11-06 19:47:48.081930816 +0900
+@@ -0,0 +1,76 @@
++// Decision 0311: the link between the engine Worker and the present Worker: one scene in flight, the description is copied (not shared), the present Worker is woken by the publish, and what it finished comes back as a number.
++import { describe, expect, it } from 'vitest';
++import { DeskLinkEngine, DeskLinkP, HEADER_BYTES, LINK_BYTES, SCENE_BYTES, newDeskLink } from '../../src/engine/desk-link.ts';
++
++function engineMemory(fill: number, at: number): { mem: SharedArrayBuffer; ptr: number } {
++  const mem = new SharedArrayBuffer(1 << 16);
++  new Uint8Array(mem, at, SCENE_BYTES).fill(fill);
++  return { mem, ptr: at };
++}
++
++describe('desk link', () => {
++  it('has a header and room for exactly one description', () => {
++    expect(SCENE_BYTES).toBe(64 + 64 * 80 + 64 * 20);
++    expect(LINK_BYTES).toBe(HEADER_BYTES + SCENE_BYTES);
++    expect(newDeskLink().byteLength).toBe(LINK_BYTES);
++  });
++
++  it('publishes one scene at a time: the next waits until P has finished the one in flight', () => {
++    const sab = newDeskLink(), e = new DeskLinkEngine(sab), p = new DeskLinkP(sab);
++    expect(e.canPublish()).toBe(true);
++    const { mem, ptr } = engineMemory(7, 4096);
++    const seq = e.publish(mem, ptr);
++    expect(seq).toBe(1);
++    expect(e.canPublish()).toBe(false);
++    p.markDone(seq, 3, 1234.5);
++    expect(e.canPublish()).toBe(true);
++    expect(e.done).toBe(1);
++    expect(e.result).toBe(3);
++    expect(e.presentAt).toBe(1234.5);
++    expect(e.presents).toBe(1);
++  });
++
++  it('copies the description into the slot at the time of the publish', () => {
++    const sab = newDeskLink(), e = new DeskLinkEngine(sab), p = new DeskLinkP(sab);
++    const { mem, ptr } = engineMemory(9, 8192);
++    e.publish(mem, ptr);
++    new Uint8Array(mem, ptr, SCENE_BYTES).fill(1);   // the runtime writes the next description; the slot keeps the published one
++    const slot = new Uint8Array(sab, p.slotOffset, SCENE_BYTES);
++    expect(slot[0]).toBe(9);
++    expect(slot[SCENE_BYTES - 1]).toBe(9);
++  });
++
++  it('wakes P: waitPublished resolves when PUB changes and at once when it already differs', async () => {
++    const sab = newDeskLink(), e = new DeskLinkEngine(sab), p = new DeskLinkP(sab);
++    const waiting = p.waitPublished(0);
++    const { mem, ptr } = engineMemory(5, 0);
++    e.publish(mem, ptr);
++    await expect(waiting).resolves.toBe(1);
++    await expect(p.waitPublished(0)).resolves.toBe(1);
++  });
++
++  it('carries the requests: a frame asks, the engine clears it when it publishes; the mode and the resync are asked by P and done by the engine', () => {
++    const sab = newDeskLink(), e = new DeskLinkEngine(sab), p = new DeskLinkP(sab);
++    expect(e.wantSet).toBe(false);
++    p.requestScene();
++    expect(e.wantSet).toBe(true);
++    e.clearWant();
++    expect(e.wantSet).toBe(false);
++    expect(e.modeRequested()).toBe(false);
++    p.requestMode(1);
++    expect(e.modeRequested()).toBe(true);
++    e.setModeOn();
++    expect(e.modeRequested()).toBe(false);
++    expect(e.modeOn).toBe(true);
++    expect(e.takeResync()).toBe(false);
++    p.requestResync();
++    expect(e.takeResync()).toBe(true);
++    expect(e.takeResync()).toBe(false);
++    p.setAsleep(true);
++    expect(e.asleep).toBe(true);
++    p.setReady(1);
++    expect(e.ready).toBe(1);
++    e.setCounters(4, 5, 6);
++    expect([p.counter(10), p.counter(11), p.counter(12)]).toEqual([4, 5, 6]);
++  });
++});
+diff -ruN app/test/unit/worker-diag.test.ts app/test/unit/worker-diag.test.ts
+--- app/test/unit/worker-diag.test.ts	2026-11-06 19:42:58.610555151 +0900
++++ app/test/unit/worker-diag.test.ts	2026-11-06 19:54:35.164818792 +0900
+@@ -57,7 +57,7 @@
+   const assets = { module: {} as WebAssembly.Module, seed: new Uint8Array(0), glue: new Uint8Array(0), dll: new Uint8Array(0) };
+   const run = async (ev: { message: string; filename: string; lineno: number }) => {
+     let w: { onerror: ((e: unknown) => void) | null } | null = null;
+-    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor() { w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
++    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor() { if (!w) w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
+     g.Worker = FakeWorker; g.fetch = async () => ({ status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) });
+     const errors: string[] = [], logs: string[] = [];
+     const events = { deskCanvas: () => ({ transferControlToOffscreen: () => ({}) }) as unknown as HTMLCanvasElement, log: (_l: string, t: string) => { logs.push(t); }, exit: () => undefined, error: (p: string, m: string) => { errors.push(`${p}: ${m}`); } };

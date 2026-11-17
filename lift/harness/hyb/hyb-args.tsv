@@ -1,0 +1,8 @@
+fle	FLEngine_x64.dll	--pdata --seeds lift/harness/seeds/flengine-seeds-thunks.txt
+dsp	dsp_ippv2_x64.2000000.dll	--seeds lift/harness/seeds/dsp-ippv2-2000000-seeds-idle1.txt
+b2d	Blend2D.4700000.dll	--seeds lift/harness/b2d1/blend2d-4700000-seeds-wrapper.txt
+qfc	quickfontcache_x64.1d00000.dll	--pdata
+ft	freetype_x64.4b00000.dll	--pdata --seeds lift/harness/seeds/ft-seeds-4b00000-c2.txt
+ilt	ILTools_x64.6000000.dll	--pdata --seeds lift/harness/seeds/iltools-6000000-seeds400.txt
+oggio	oggio_x64.c000000.dll	--pdata --seeds lift/harness/seeds/dec1-seeds-oggio-c000000.txt
+elastique	elastique_x64.b000000.dll	--pdata --seeds lift/harness/seeds/elastique-seeds-all3.txt

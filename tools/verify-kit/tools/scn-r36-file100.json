@@ -1,0 +1,12 @@
+[
+ {
+  "name": "r36-file100",
+  "what": "R3-6a (decision 0378): the File menu opened and closed with Escape 100 times (menuCycles, the same ops as d8 in scn-client.json); the popup's window and surface are checked every cycle; no reference project is opened",
+  "ops": [
+   {"op": "closeWizard"},
+   {"op": "wait", "ms": 2500},
+   {"op": "menuCycles", "n": 100},
+   {"op": "expectRunning"}
+  ]
+ }
+]

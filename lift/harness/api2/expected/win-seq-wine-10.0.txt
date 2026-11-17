@@ -1,0 +1,57 @@
+create top-level popup (no WS_VISIBLE) 100,100 300x200:
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=300 cy=200
+  ? WM_MOVE x=100 y=100
+create child 10,10 100x50 (not visible):
+  ? WM_NCCREATE
+  ? WM_NCCALCSIZE wp=0
+  ? WM_CREATE
+  ? WM_SIZE wp=0 cx=100 cy=50
+  ? WM_MOVE x=10 y=10
+ShowWindow(top, SW_SHOWNOACTIVATE):
+  top WM_SHOWWINDOW wp=1 lp=0
+  top WM_WINDOWPOSCHANGING x=0 y=0 cx=0 cy=0 flags=0x57
+  top WM_NCPAINT
+  top WM_ERASEBKGND
+  top WM_WINDOWPOSCHANGED x=100 y=100 cx=300 cy=200 flags=0x1857
+  top WM_PAINT
+SetWindowPos(top, move to 150,130, NOSIZE|NOZORDER|NOACTIVATE):
+  top WM_WINDOWPOSCHANGING x=150 y=130 cx=0 cy=0 flags=0x15
+  top WM_WINDOWPOSCHANGED x=150 y=130 cx=300 cy=200 flags=0x815
+  top WM_MOVE x=150 y=130
+SetWindowPos(top, size to 320x210, NOMOVE|NOZORDER|NOACTIVATE):
+  top WM_WINDOWPOSCHANGING x=0 y=0 cx=320 cy=210 flags=0x16
+  top WM_NCCALCSIZE wp=1
+  top WM_NCPAINT
+  top WM_ERASEBKGND
+  top WM_WINDOWPOSCHANGED x=150 y=130 cx=320 cy=210 flags=0x1016
+  top WM_SIZE wp=0 cx=320 cy=210
+  top WM_PAINT
+SetWindowPos(top, same position and size):
+  top WM_WINDOWPOSCHANGING x=150 y=130 cx=320 cy=210 flags=0x14
+MoveWindow(child, 20,20, 110x60, repaint):
+  child WM_WINDOWPOSCHANGING x=20 y=20 cx=110 cy=60 flags=0x14
+  child WM_NCCALCSIZE wp=1
+  child WM_WINDOWPOSCHANGED x=20 y=20 cx=110 cy=60 flags=0x1c
+  child WM_MOVE x=20 y=20
+  child WM_SIZE wp=0 cx=110 cy=60
+ShowWindow(child, SW_SHOW):
+  child WM_SHOWWINDOW wp=1 lp=0
+  child WM_WINDOWPOSCHANGING x=0 y=0 cx=0 cy=0 flags=0x57
+  child WM_WINDOWPOSCHANGED x=20 y=20 cx=110 cy=60 flags=0x1857
+  top WM_PAINT
+  top WM_ERASEBKGND
+  child WM_PAINT
+  child WM_NCPAINT
+  child WM_ERASEBKGND
+ShowWindow(top, SW_HIDE):
+  top WM_SHOWWINDOW wp=0 lp=0
+  top WM_WINDOWPOSCHANGING x=0 y=0 cx=0 cy=0 flags=0x83
+  top WM_WINDOWPOSCHANGED x=150 y=130 cx=320 cy=210 flags=0x1887
+DestroyWindow(top):
+  top WM_DESTROY
+  child WM_DESTROY
+  child WM_NCDESTROY
+  top WM_NCDESTROY

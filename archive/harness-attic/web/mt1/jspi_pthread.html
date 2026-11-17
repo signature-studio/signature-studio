@@ -1,0 +1,7 @@
+<!doctype html><meta charset=utf-8><title>mt1 jspi+pthread</title>
+<script>
+window.__log = []; window.__lines = [];
+window.Module = { print: (s) => { window.__lines.push(s); if (s === 'DONE') { window.__result = window.__lines; window.__done = true; } }, printErr: (s) => window.__log.push('err: ' + s), onAbort: (w) => { window.__error = 'abort ' + w + ' ' + window.__log.slice(-5).join(' | '); window.__done = true; } };
+setTimeout(() => { if (!window.__done) { window.__error = 'timeout; lines=' + JSON.stringify(window.__lines) + ' log=' + JSON.stringify(window.__log.slice(-5)); window.__done = true; } }, 25000);
+</script>
+<script src="/coi/data/smem/jspi_pthread.js"></script>

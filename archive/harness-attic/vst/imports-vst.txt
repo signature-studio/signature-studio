@@ -1,0 +1,23 @@
+# Extra import rows for fe-lift --extra-imports (decision 0156): <dll> <API> <runtime function>. Only APIs that a third-party VST3 plugin reached.
+kernel32.dll InitializeCriticalSectionEx fle_imp_InitializeCriticalSectionEx
+ole32.dll CoCreateGuid fle_imp_CoCreateGuid
+user32.dll RegisterClassExW fle_imp_RegisterClassExW
+shell32.dll SHGetSpecialFolderPathW fle_imp_SHGetSpecialFolderPathW
+kernel32.dll FindResourceA fle_imp_FindResourceA
+kernel32.dll InitializeSRWLock fle_imp_InitializeSRWLock
+kernel32.dll InitializeConditionVariable fle_imp_InitializeConditionVariable
+kernel32.dll TryEnterCriticalSection fle_imp_TryEnterCriticalSection
+kernel32.dll IsProcessorFeaturePresent fle_imp_IsProcessorFeaturePresent
+kernel32.dll TlsFree fle_imp_TlsFree
+gdiplus.dll GdiplusStartup fle_imp_GdiplusStartup
+gdiplus.dll GdiplusShutdown fle_imp_GdiplusShutdown
+gdiplus.dll GdipAlloc fle_imp_GdipAlloc
+gdiplus.dll GdipFree fle_imp_GdipFree
+gdiplus.dll GdipCreateBitmapFromScan0 fle_imp_GdipCreateBitmapFromScan0
+gdiplus.dll GdipGetImageWidth fle_imp_GdipGetImageWidth
+gdiplus.dll GdipGetImageHeight fle_imp_GdipGetImageHeight
+gdiplus.dll GdipDisposeImage fle_imp_GdipDisposeImage
+gdiplus.dll GdipBitmapLockBits fle_imp_GdipBitmapLockBits
+gdiplus.dll GdipBitmapUnlockBits fle_imp_GdipBitmapUnlockBits
+gdi32.dll AddFontResourceExW fle_imp_AddFontResourceExW
+gdi32.dll RemoveFontResourceExW fle_imp_RemoveFontResourceExW

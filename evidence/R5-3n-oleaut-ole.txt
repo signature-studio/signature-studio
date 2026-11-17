@@ -1,0 +1,16 @@
+R5-3n: 0372 の 4 テスト(oleaut_ole)の ok 行の記録
+実行コマンド: cd lift && CARGO_TARGET_DIR=~/.cache/signature-studio/target-r5-3h cargo test -p fe-lift --test oleaut_ole (foreground。全出力は作業用の一時ファイルに保存し、ここには grep -n の抜粋を書く)
+日付: 2026-11-16 (UTC、00:44 頃に実行)
+実行時の HEAD: 20224a624e0ef21b9d1f61e8df45d939a267ca7d
+git status --short -- lift: 空
+git diff --stat 123deac HEAD -- lift: 空 (123deac から実行時の HEAD まで lift/ に差分なし)
+終了コード: 0
+
+grep -n の抜粋:
+50:test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+5:test co_initialize_ex_row_is_in_the_table_and_declared_in_the_header ... ok
+8:test co_initialize_ex_reads_only_the_low_32_bits_of_dword_argument ... ok
+12:test co_initialize_ex_apartment_threaded_s_ok_then_s_false_and_balance ... ok
+39:test co_initialize_ex_inputs_the_pages_leave_open_abort ... ok
+
+FAILED の行: 0 件 (grep -c ' \.\.\. FAILED' の結果 0)。4 テストは全部 ok。ほかのテストの失敗はない (44 passed, 0 failed)。

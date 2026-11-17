@@ -1,0 +1,6 @@
+/* Resources of the synthetic second module (tests/realmod.rs, decision 0102 W2): one RT_STRING block, IDs 1 and 2 (block 1, language neutral). */
+STRINGTABLE
+BEGIN
+    1, "mod2 one"
+    2, "mod2 two"
+END

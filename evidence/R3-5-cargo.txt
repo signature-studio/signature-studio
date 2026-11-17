@@ -1,0 +1,304 @@
+# R3-5-cargo: 決定 0392 の直しの後の cargo test(全 4 パッケージ)の結果の行の保存
+
+- 実行: `cd lift && FLENGINE_PE=<リポジトリの binaries/win64/FLEngine_x64.dll> cargo test -p <パッケージ> --offline --no-fail-fast` を 3 回に分けて前景で実行(`-p fe-lift`、`-p fe-pe -p fe-decode`、`-p fe-wasmgen`。doc-test は各パッケージの実行に含まれる)。全部で workspace の 4 パッケージ。
+- 実行した HEAD: `9e0f3a5`(決定 0392 の対象のコードとテスト。この文書と決定文書は後続の commit)。実行の前に、追跡されているファイルに未 commit の変更は無い(未追跡の `evidence/R0-6-failfast.txt` は別の作業の物で、この commit に含めていない)。
+- 終了コード: fe-lift 0、fe-pe・fe-decode 0、fe-wasmgen 0。
+- 生ログ(全行): `/tmp/opencode/r35/cargo-fe-lift.log`(3289 行)、`cargo-pe-decode.log`、`cargo-wasmgen.log`。行数が多いので、この文書には `test result:` の行だけを保存した(R5-3m-cargo.txt と同じ形)。
+
+## 合計
+
+```
+test result: 行の数 = 219
+通過 passed の合計 = 2428
+失敗 failed の合計 = 0
+無視 ignored の合計 = 1
+```
+
+## 基準との並び(基準: `evidence/R5-3m-cargo.txt`、HEAD 123deac)
+
+| 版 | test result の行 | 通過 | 失敗 | 無視 |
+|---|---|---|---|---|
+| 基準(123deac、R5-3m) | 219 | 2426 | 1 | 1 |
+| 今回(9e0f3a5) | 219 | 2428 | 0 | 1 |
+
+- 通過 +2 の内訳: (1) 決定 0385 の R3-5(commit 3ded666)で増えた新しいテスト 1 件 `the_window_limit_stops_by_name_at_65_and_an_overflowing_scene_loses_no_write`(通過。基準には無い)。(2) 基準の既知の失敗 `getmodulehandleexw_returns_in_every_build` が、今回は通過(`wall_wrp2` を単独で 2 回実行しても 2 件とも通過。出力は末尾の節。行 25 の読み)。失敗は 1 → 0。無視は 1 → 1(同じ名前 `simd_int_every_16bit_lane_pair_matches_the_host_cpu`)。
+- 読み((2) について): このテストの入力(`lift/runtime/fle_modules.h` と `lift/crates/fe-lift/tests/wall_wrp2.rs`)は、基準の 123deac から今の HEAD まで変わっていない(`git log --oneline 123deac..HEAD -- <2 つのファイル>` は空)。基準での失敗の原因は未確認。今回の変更(`fle_desk.c`・`fle_desk.h`・`desk1_compose.rs`)はこのテストの経路に無い。
+- 新しい失敗: 0。
+
+## 新しいテストと fle_desk を連結するテストの行(抜粋。全行は下の表)
+
+- fe-lift | tests/alpha10_syscmd.rs | ログの 336 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.98s`
+- fe-lift | tests/alpha10b_setplace.rs | ログの 343 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s`
+- fe-lift | tests/alpha1_glass.rs | ログの 350 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.04s`
+- fe-lift | tests/alpha2_changed.rs | ログの 357 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s`
+- fe-lift | tests/alpha3_updregion.rs | ログの 364 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s`
+- fe-lift | tests/alpha5_erase_dc.rs | ログの 371 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s`
+- fe-lift | tests/alpha7_showwin.rs | ログの 378 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s`
+- fe-lift | tests/alpha8_hidden_move.rs | ログの 385 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s`
+- fe-lift | tests/desk1_compose.rs | ログの 571 行 | `test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s`
+- fe-lift | tests/desk_scene.rs | ログの 578 行 | `test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s`
+- fe-lift | tests/wall_wrp2.rs | ログの 3163 行 | `test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s`
+
+## 失敗の行(FAILED)
+
+- 0 行。`grep -c FAILED` の出力は 3 ログとも 0。
+
+## 無視の行
+
+- cargo-wasmgen.log:298:test simd_int_every_16bit_lane_pair_matches_the_host_cpu ... ignored
+
+## 全部の `test result:` の行(219 行。パッケージ・対象・ログの行番号つき)
+
+```
+fe-lift | unittests src/lib.rs | 226行 | test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+fe-lift | unittests src/main.rs | 232行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-lift | tests/a2a_remaining.rs | 251行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.40s
+fe-lift | tests/a4_report.rs | 273行 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+fe-lift | tests/a9_a10.rs | 307行 | test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.27s
+fe-lift | tests/act1_net.rs | 321行 | test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+fe-lift | tests/adjustor.rs | 329行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.65s
+fe-lift | tests/alpha10_syscmd.rs | 336行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.98s
+fe-lift | tests/alpha10b_setplace.rs | 343行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+fe-lift | tests/alpha1_glass.rs | 350行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.04s
+fe-lift | tests/alpha2_changed.rs | 357行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+fe-lift | tests/alpha3_updregion.rs | 364行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+fe-lift | tests/alpha5_erase_dc.rs | 371行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+fe-lift | tests/alpha7_showwin.rs | 378行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+fe-lift | tests/alpha8_hidden_move.rs | 385行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+fe-lift | tests/api2.rs | 395行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.72s
+fe-lift | tests/authenticode_check.rs | 415行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+fe-lift | tests/call_iat.rs | 424行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s
+fe-lift | tests/call_iat_dll.rs | 431行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-lift | tests/callback.rs | 456行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.96s
+fe-lift | tests/census.rs | 471行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s
+fe-lift | tests/class.rs | 501行 | test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
+fe-lift | tests/cpuid.rs | 511行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+fe-lift | tests/cursor.rs | 542行 | test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+fe-lift | tests/deferred.rs | 563行 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+fe-lift | tests/desk1_compose.rs | 571行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+fe-lift | tests/desk_scene.rs | 578行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+fe-lift | tests/dispatch.rs | 587行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+fe-lift | tests/dump_string_tmp.rs | 594行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-lift | tests/dwm_timing.rs | 606行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+fe-lift | tests/entry_label.rs | 614行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+fe-lift | tests/env.rs | 628行 | test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.01s
+fe-lift | tests/event.rs | 650行 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
+fe-lift | tests/flags.rs | 661行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+fe-lift | tests/gdc.rs | 684行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+fe-lift | tests/gdi.rs | 792行 | test result: ok. 102 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.92s
+fe-lift | tests/gdi_bulk.rs | 837行 | test result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+fe-lift | tests/glob.rs | 868行 | test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.24s
+fe-lift | tests/gpu7_ring_poll.rs | 880行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+fe-lift | tests/gs_stacklimit.rs | 892行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+fe-lift | tests/hle_entries.rs | 908行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+fe-lift | tests/hook_points.rs | 931行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+fe-lift | tests/imports_table.rs | 938行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-lift | tests/int_ext.rs | 948行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+fe-lift | tests/int_more.rs | 959行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+fe-lift | tests/int_more2.rs | 975行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.88s
+fe-lift | tests/jt_cpu.rs | 986行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+fe-lift | tests/jumptab.rs | 997行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.84s
+fe-lift | tests/k32_dsp.rs | 1017行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.17s
+fe-lift | tests/kbd.rs | 1041行 | test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+fe-lift | tests/ldst_switch.rs | 1051行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s
+fe-lift | tests/load.rs | 1095行 | test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+fe-lift | tests/load2_files.rs | 1105行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+fe-lift | tests/loadimage.rs | 1144行 | test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+fe-lift | tests/locale.rs | 1186行 | test result: ok. 36 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.49s
+fe-lift | tests/lock_rmw.rs | 1193行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+fe-lift | tests/lock_rmw_threads.rs | 1200行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+fe-lift | tests/mmx.rs | 1220行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+fe-lift | tests/modules.rs | 1243行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s
+fe-lift | tests/monitor.rs | 1274行 | test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+fe-lift | tests/msctf.rs | 1292行 | test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+fe-lift | tests/msvc_switch.rs | 1323行 | test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.77s
+fe-lift | tests/mxcsr.rs | 1333行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+fe-lift | tests/mxcsr_flags.rs | 1351行 | test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.83s
+fe-lift | tests/noreturn_audit.rs | 1363行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.69s
+fe-lift | tests/null0.rs | 1375行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+fe-lift | tests/oleaut_ole.rs | 1425行 | test result: ok. 44 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s
+fe-lift | tests/osver.rs | 1438行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+fe-lift | tests/present2_uncover.rs | 1460行 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.20s
+fe-lift | tests/proc.rs | 1484行 | test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+fe-lift | tests/prune_list.rs | 1496行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+fe-lift | tests/raster.rs | 1512行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+fe-lift | tests/realmod.rs | 1534行 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.79s
+fe-lift | tests/reg.rs | 1555行 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.24s
+fe-lift | tests/res.rs | 1580行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s
+fe-lift | tests/screen1.rs | 1592行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+fe-lift | tests/seh.rs | 1602行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.81s
+fe-lift | tests/seh_rt.rs | 1621行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+fe-lift | tests/setjmp_landing.rs | 1634行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+fe-lift | tests/site_override.rs | 1651行 | test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+fe-lift | tests/size1_deadflags.rs | 1659行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+fe-lift | tests/size1_lowregs.rs | 1666行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+fe-lift | tests/size1_outline.rs | 1674行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+fe-lift | tests/spi.rs | 1715行 | test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+fe-lift | tests/srw.rs | 1738行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+fe-lift | tests/sse_int2.rs | 1772行 | test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.91s
+fe-lift | tests/sse_legacy.rs | 1815行 | test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.78s
+fe-lift | tests/sse_more.rs | 1828行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+fe-lift | tests/sse_pack.rs | 1844行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+fe-lift | tests/sse_scalar.rs | 1859行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.42s
+fe-lift | tests/sse_shuf.rs | 1882行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.04s
+fe-lift | tests/sse_ssse3.rs | 1894行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.76s
+fe-lift | tests/string.rs | 1906行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+fe-lift | tests/swap_entries.rs | 1918行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+fe-lift | tests/sweep1.rs | 1928行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+fe-lift | tests/sys.rs | 1953行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+fe-lift | tests/sysinfo.rs | 1975行 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.75s
+fe-lift | tests/sysmetrics.rs | 1998行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+fe-lift | tests/tailjmp.rs | 2009行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+fe-lift | tests/tid.rs | 2022行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.89s
+fe-lift | tests/time.rs | 2052行 | test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.87s
+fe-lift | tests/txt1_createsize.rs | 2059行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+fe-lift | tests/uilang.rs | 2069行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+fe-lift | tests/vcall_thunk_dll.rs | 2077行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.97s
+fe-lift | tests/ver.rs | 2085行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+fe-lift | tests/verify.rs | 2094行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+fe-lift | tests/versioninfo.rs | 2103行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-lift | tests/vex.rs | 2122行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.29s
+fe-lift | tests/vfs.rs | 2151行 | test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.81s
+fe-lift | tests/vmap.rs | 2180行 | test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.02s
+fe-lift | tests/vol.rs | 2208行 | test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+fe-lift | tests/wall_b.rs | 2227行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.75s
+fe-lift | tests/wall_c1.rs | 2245行 | test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.66s
+fe-lift | tests/wall_crash1.rs | 2265行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.75s
+fe-lift | tests/wall_dec1.rs | 2278行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-lift | tests/wall_dlg1.rs | 2313行 | test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+fe-lift | tests/wall_e1.rs | 2342行 | test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+fe-lift | tests/wall_exp1.rs | 2363行 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+fe-lift | tests/wall_fpick1.rs | 2375行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.79s
+fe-lift | tests/wall_fr10.rs | 2401行 | test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s
+fe-lift | tests/wall_fr11.rs | 2459行 | test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.79s
+fe-lift | tests/wall_fr12.rs | 2497行 | test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+fe-lift | tests/wall_fr13.rs | 2508行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+fe-lift | tests/wall_fr14.rs | 2540行 | test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+fe-lift | tests/wall_fr15.rs | 2570行 | test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+fe-lift | tests/wall_fr16.rs | 2593行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+fe-lift | tests/wall_fr17.rs | 2619行 | test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+fe-lift | tests/wall_fr18.rs | 2631行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.50s
+fe-lift | tests/wall_fr19.rs | 2650行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+fe-lift | tests/wall_fr20.rs | 2669行 | test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+fe-lift | tests/wall_fr21.rs | 2682行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+fe-lift | tests/wall_fr3.rs | 2707行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+fe-lift | tests/wall_fr4.rs | 2737行 | test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+fe-lift | tests/wall_fr5.rs | 2757行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s
+fe-lift | tests/wall_fr6.rs | 2796行 | test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s
+fe-lift | tests/wall_fr7.rs | 2820行 | test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+fe-lift | tests/wall_fr8.rs | 2871行 | test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+fe-lift | tests/wall_fr9.rs | 2907行 | test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.78s
+fe-lift | tests/wall_fr9t.rs | 2931行 | test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+fe-lift | tests/wall_ia1.rs | 2956行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.57s
+fe-lift | tests/wall_ia1w.rs | 2969行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.13s
+fe-lift | tests/wall_ia2.rs | 2996行 | test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+fe-lift | tests/wall_opfs1.rs | 3005行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+fe-lift | tests/wall_opfs1_map.rs | 3012行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+fe-lift | tests/wall_q.rs | 3023行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.02s
+fe-lift | tests/wall_q_lift.rs | 3032行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-lift | tests/wall_r.rs | 3069行 | test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.43s
+fe-lift | tests/wall_r2.rs | 3092行 | test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+fe-lift | tests/wall_ref1.rs | 3104行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+fe-lift | tests/wall_s.rs | 3125行 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+fe-lift | tests/wall_tbl1.rs | 3139行 | test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+fe-lift | tests/wall_wrp1.rs | 3155行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+fe-lift | tests/wall_wrp2.rs | 3163行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+fe-lift | tests/wall_wrp3.rs | 3171行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+fe-lift | tests/wasm_port.rs | 3183行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+fe-lift | tests/win2_act.rs | 3191行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+fe-lift | tests/window.rs | 3234行 | test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.63s
+fe-lift | tests/x87.rs | 3254行 | test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.48s
+fe-lift | tests/x87_trans.rs | 3269行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.26s
+fe-lift | tests/x87ctl.rs | 3282行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+fe-lift | doc-tests fe_lift | 3288行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | unittests src/lib.rs | 37行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+fe-pe, fe-decode | unittests src/main.rs | 43行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | tests/adjustor.rs | 55行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.29s
+fe-pe, fe-decode | tests/dataflow.rs | 65行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+fe-pe, fe-decode | tests/dump_tmp.rs | 72行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+fe-pe, fe-decode | tests/extra_seed.rs | 83行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s
+fe-pe, fe-decode | tests/inline_run.rs | 95行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | tests/inline_table.rs | 107行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.19s
+fe-pe, fe-decode | tests/jt_cpu.rs | 122行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.13s
+fe-pe, fe-decode | tests/jumptab.rs | 133行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.07s
+fe-pe, fe-decode | tests/msvc_switch.rs | 211行 | test result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s
+fe-pe, fe-decode | tests/multisec.rs | 224行 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | tests/pdata_seeds.rs | 233行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.37s
+fe-pe, fe-decode | tests/seh.rs | 242行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+fe-pe, fe-decode | tests/vcall_setjmp.rs | 257行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s
+fe-pe, fe-decode | unittests src/lib.rs | 263行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | unittests src/main.rs | 269行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | tests/inittable.rs | 285行 | test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+fe-pe, fe-decode | tests/pdata.rs | 309行 | test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-pe, fe-decode | tests/real_dll.rs | 324行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+fe-pe, fe-decode | tests/rebase.rs | 345行 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+fe-pe, fe-decode | tests/reloc.rs | 354行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+fe-pe, fe-decode | tests/resources.rs | 369行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-pe, fe-decode | tests/synthetic.rs | 394行 | test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | doc-tests fe_decode | 400行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-pe, fe-decode | doc-tests fe_pe | 406行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | unittests src/lib.rs | 128行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | unittests src/main.rs | 134行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | tests/boundary_regs.rs | 142行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+fe-wasmgen | tests/c_only_forms.rs | 149行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+fe-wasmgen | tests/encode.rs | 158行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | tests/flagout.rs | 169行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-wasmgen | tests/flagread.rs | 180行 | test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | tests/flags_cpu.rs | 189行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s
+fe-wasmgen | tests/hybrid_progress.rs | 196行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+fe-wasmgen | tests/jmp_resolved.rs | 204行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-wasmgen | tests/locshare.rs | 213行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+fe-wasmgen | tests/mx_hybrid.rs | 220行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+fe-wasmgen | tests/mx_rc_wire.rs | 227行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.01s
+fe-wasmgen | tests/opaque_stub.rs | 234行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+fe-wasmgen | tests/rc_cvt.rs | 241行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+fe-wasmgen | tests/rc_divsqrt.rs | 248行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
+fe-wasmgen | tests/rc_helpers.rs | 256行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.52s
+fe-wasmgen | tests/rc_packed.rs | 263行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s
+fe-wasmgen | tests/rmw_forms.rs | 271行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+fe-wasmgen | tests/rsp_boundary.rs | 281行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-wasmgen | tests/rsp_delta.rs | 293行 | test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-wasmgen | tests/simd_int_forms.rs | 302行 | test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.67s
+fe-wasmgen | tests/size_limit.rs | 309行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+fe-wasmgen | tests/small_ops_hybrid.rs | 324行 | test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+fe-wasmgen | tests/sse_forms.rs | 331行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.48s
+fe-wasmgen | tests/sse_x2_forms.rs | 338行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s
+fe-wasmgen | tests/synthetic.rs | 345行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+fe-wasmgen | tests/tls_ctx.rs | 353行 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+fe-wasmgen | tests/typed_indirect.rs | 363行 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+fe-wasmgen | tests/x87_hybrid.rs | 372行 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+fe-wasmgen | tests/xabi_passthrough.rs | 379行 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+fe-wasmgen | doc-tests fe_wasmgen | 400行 | test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
+
+## 単独の実行(行 24 の `wall_wrp2`。2 回)
+
+- 実行(前景。2 回とも終了コード 0): `cd lift && FLENGINE_PE=~/work/signature-studio/binaries/win64/FLEngine_x64.dll CARGO_TARGET_DIR=~/.cache/signature-studio/cargo-r35 cargo test --offline -p fe-lift --test wall_wrp2`
+- 実行の HEAD: 9e0f3a5 から 8b5ff31 の間の main(他の作業の commit が並行して入った)。テストの入力(`lift/runtime/fle_modules.h`・`lift/crates/fe-lift/tests/wall_wrp2.rs`)は、`git diff --quiet 9e0f3a5 8b5ff31 -- <2 ファイル>` の終了コードが 0(変わっていない)。
+- 1 回目:
+```
+test no_noreturn_name_of_fle_modules_h_is_wrapped_by_a_harness_except_the_conditional_one ... ok
+test getmodulehandleexw_returns_in_every_build ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+```
+- 2 回目(`Finished` は 0.00s。テストの実行は新しく行った):
+```
+test no_noreturn_name_of_fle_modules_h_is_wrapped_by_a_harness_except_the_conditional_one ... ok
+test getmodulehandleexw_returns_in_every_build ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+```
+- 読み: 2 回とも 2 件とも通過。基準の既知の失敗が通過した原因は、この実行からは言えない(未確認)。
+
+## 任意の追加後の確認(`desk1_compose.rs` の (a) に 64 描画 + 非表示 4031 を足したワークツリー)
+
+- 実行(前景。終了コード 0): `cd lift && FLENGINE_PE=~/work/signature-studio/binaries/win64/FLEngine_x64.dll CARGO_TARGET_DIR=~/.cache/signature-studio/cargo-r35 cargo test --offline -p fe-lift --test desk1_compose --test desk_scene`
+- 結果:
+```
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s   (desk1_compose)
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s   (desk_scene)
+```
+- 読み: 足した場面は (a) の `compose` と `scene` の両方で走り、通過した。上の全体の実行は 9e0f3a5 の版。この 2 本の件数は変わらない(desk1_compose 2 本・desk_scene 1 本)。
+```
+

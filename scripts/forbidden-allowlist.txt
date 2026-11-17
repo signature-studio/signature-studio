@@ -1,0 +1,169 @@
+# One exception per line: <rule>|<path>|<fixed text on the line that may match>
+# <rule> is a rule name printed by scan-forbidden.sh (vendor, secret, size, oldpath, cfhex, cfhost, python, term, choice, hostval, byok, trial). <path> is repository-relative.
+# A <path> ending in "/" is a directory prefix: it covers every file below that directory (not a file or directory that merely starts with the same letters).
+# The third field is matched as a plain substring of the matching line (no regex). An empty third field allows the rule for the whole file (or the whole prefix); avoid that.
+# Lines starting with # and empty lines are ignored.
+# Keep this list short. Every entry is a place where a value that looks forbidden is allowed to stay. A new file is scanned in full until it gets its own entry.
+#
+# cfhex: confirmed on 2026-11-10 that these are not Cloudflare identifiers. R2-verify.sh check 2a (exact match of the values of the old deploy workflow, the tailnet host
+#   and the owner handle against the imported tree) was ok with 0 files. The matches are md5/ETag columns, Windows API replay values, certificate columns, test expectations and session ids.
+# oldpath: the imported tree names the old working tree in its records, archive and old tools. Records and archive are kept verbatim (they are evidence). The live tools
+#   marked R7-5 read the old working tree by absolute path; docs/ROADMAP.md row R7-5 removes those entries.
+
+# --- term: one line of a code file (a string the tool shows; not changed, see the report of the term replacement)
+term|tools/verify-kit/tools/mkdoc0277.py|は CI に入れない
+
+# --- cfhex: measurement records and locked inputs
+cfhex|evidence/windows-replay/|
+cfhex|tools/win-replay/cases.tsv|
+cfhex|ci/artifacts.lock|
+# --- cfhex: test expectations and fixtures (file by file)
+cfhex|lift/crates/fe-lift/tests/gdi.rs|
+cfhex|lift/crates/fe-lift/tests/gdi_bulk.rs|
+cfhex|lift/crates/fe-lift/tests/wall_wrp1.rs|
+cfhex|lift/crates/fe-lift/tests/wall_fr5.rs|
+cfhex|lift/crates/fe-lift/tests/authenticode_check.rs|
+cfhex|lift/harness/seeds/authenticode-claims.tsv|
+cfhex|lift/harness/seeds/authenticode_claims_selftest.c|
+cfhex|archive/harness-attic/web/results/features-plain.json|
+cfhex|archive/harness-attic/web/results/features-coi.json|
+
+# --- oldpath: documentation that names the old working tree once, on purpose
+oldpath|docs/ops/lessons.md|
+# --- oldpath: records (verbatim captures)
+oldpath|evidence/windows-replay/|
+oldpath|evidence/real-engine-runs/e13/RESULTS-E13.md|
+# --- oldpath: archive (not run; kept as it was)
+oldpath|archive/e2e-old/e2e/|
+oldpath|archive/harness-attic/web/|
+oldpath|archive/harness-attic/draw1/|
+oldpath|archive/harness-attic/mt2/|
+oldpath|archive/harness-attic/pick1/|
+oldpath|archive/harness-attic/parity-paint/|
+oldpath|archive/legacy-tools/wasm-final0129/|
+oldpath|archive/legacy-tools/a4-six-module-wasm/|
+oldpath|archive/legacy-tools/ship1/|
+# --- oldpath: R7-5 live code (0 件。R7-5 で解消)
+# --- docs/archive: the original text of the old documents (published as it was; the visibility decision is 2026-11-10, see .gitignore history)
+# cfhex: md5/ETag columns, certificate serial numbers, gist ids and session ids in the text (checked by R2-verify.sh 2a: ok)
+cfhex|docs/archive/decisions/|
+cfhex|docs/archive/investigations/|
+cfhex|docs/archive/milestones/|
+# oldpath: the old documents name the old working tree in their text
+oldpath|docs/archive/decisions/|
+oldpath|docs/archive/decisions-unmerged/|
+oldpath|docs/archive/investigations/|
+oldpath|docs/archive/windows-delegation/|
+oldpath|docs/archive/progress.md|
+oldpath|docs/archive/OLD-ROOT-README.md|
+cfhex|app/wrangler.jsonc|"account_id": "
+# --- python (AGENTS §6, 2026-11-17; decision 0415 §7). The rule (scripts/scan-forbidden.sh) finds, in the production scope, a line that runs python or python3, a path that names a .py file, and a .py file itself.
+#   Each entry is a verification tool (an oracle, a measurement, a harness build, a test runner, the generator of a test's expectation or of a provenance record), or a file or a line of a directory that holds no deploy input.
+#   deploy.yml runs npm, cargo, fe-build (endpoint, extract, engine, bundle, upload), runs-on/cache, emcc (through setup-emsdk) and wrangler-action; agent.yml runs node (app/scripts/extract-fl.mjs), bash scripts/scan-forbidden.sh and opencode.
+#   fe-build runs git, patch, em++, emcc, emar, emranlib, wasm-opt, node (app/scripts/pack-seed.mjs and pack-assets.mjs), aws, sha256sum, and the Rust programs fe-lift and fe-wasmgen (lift/crates/fe-build/src/main.rs).
+#   None of the entries below is one of those programs or scripts (the check: evidence/R6-37.md §6).
+#   tests/harness/t12_python.sh checks the python lines of the two workflows and of the production scope; it does not follow a script that a workflow calls, so §6 is the check of those.
+#   A directory entry covers its whole directory, so only a directory without a deploy input is listed as a directory (the check: evidence/R6-37.md §8).
+#   A directory that holds a deploy input (lift/harness/b2d2, hyb, seeds, two, web, and the file lift/harness/wasm/trace_fruity.c) is listed file by file, and a script is listed line by line.
+# dir: the cargo tests (lift/crates/fe-lift/tests): the test code (.rs) that runs python3 for its oracles, and the oracles and generators of the test inputs
+python|lift/crates/fe-lift/tests/|
+# dir: cargo test flags_cpu (lift/crates/fe-wasmgen/tests): the generator of its test code
+python|lift/crates/fe-wasmgen/tests/|
+# dir: the runtime tests (lift/runtime/test): the generators of the expected-output tables that the runtime tests read (fe-build reads only the fle_*.c of lift/runtime itself)
+python|lift/runtime/test/|
+# dir: the tools that wrote the tables of the measurement records (lift/harness-docs-tools); no build or test runs them
+python|lift/harness-docs-tools/|
+# dir: alpha1 (lift/harness/alpha1): the measurements and the pixel comparisons (harness)
+python|lift/harness/alpha1/|
+# dir: api2 (lift/harness/api2): the comparisons with Wine (harness)
+python|lift/harness/api2/|
+# dir: census (lift/harness/census): the census measurements and the merge of their tables (harness)
+python|lift/harness/census/|
+# dir: fp1 (lift/harness/fp1): the mutation test that cargo test wall_fr18 runs
+python|lift/harness/fp1/|
+# dir: idle (lift/harness/idle): the idle wrappers generator that cargo test wall_fr12 runs
+python|lift/harness/idle/|
+# dir: noreturn-audit (lift/harness/noreturn-audit): the audit that cargo test noreturn_audit runs
+python|lift/harness/noreturn-audit/|
+# dir: parity (lift/harness/parity): the parity measurements (native against wasm) and their checks (harness)
+python|lift/harness/parity/|
+# dir: testfast (lift/harness/testfast): the runner of the lift tests (test.sh and testfast call fletest.py); no file of it is a deploy input
+python|lift/harness/testfast/|
+# dir: vst3a (lift/harness/vst3a): the VST3 harness builds and measurements
+python|lift/harness/vst3a/|
+# file: lift/harness/wasm (it holds the deploy input trace_fruity.c, which fe-build reads through two/harness-inputs.txt; these are not): the split of the generated C (the harness build)
+python|lift/harness/wasm/split_c.py|
+# line: the harness wasm build runs split_c.py
+python|lift/harness/wasm/build.sh|python3 "$HERE/split_c.py"
+# file: lift/harness/b2d2 (it holds the deploy input gen.args; these two tools are not deploy inputs): the Blend2D G3 comparison (harness)
+python|lift/harness/b2d2/g3cmp.py|
+# file: the Blend2D scan comparison (harness)
+python|lift/harness/b2d2/scan-compare.py|
+# file: lift/harness/hyb (it holds the deploy inputs n0.cmd, hybrid.cmd, n0.args, h.args and hyb-args.tsv; these two tools are not): the filter that removes from the hybrid lists seeds/hyb-U-*.txt the functions with a locked instruction (decision 0246). The VA sets of hyb/lists/lowered-*.txt, which deploy reads, equal them (decision 0415 §10)
+python|lift/harness/hyb/filter-hybrid-list.py|
+# file: the list of the atomic functions (writes seeds/mt4-atomic-functions.tsv, the removal list of the filter above)
+python|lift/harness/hyb/list-atomic-functions.py|
+# file: the strip of the units (cargo test split_units runs it)
+python|lift/harness/hyb/strip_units.py|
+# file: lift/harness/seeds (the deploy inputs in it are committed tables; the Python tools below are the provenance of some of them, decision 0415 §10; no deploy step runs a tool)
+# file: the walk of the installer's NSIS script that lists the installed tree (imported by gen_vfs_seed_installed.py; the installer is not in git; decision 0415 §10)
+python|lift/harness/seeds/gen_install_tree.py|
+# file: the installed-tree seed list with the host files (the tool of the installed part of vfs-seed-idle1.tsv; its header names it)
+python|lift/harness/seeds/gen_vfs_seed_installed.py|
+# file: the candidates of the lea leaves (a measurement; tools/gen_wasm.sh and tools/repro.sh of vst3a call it; not the provenance of a deploy table)
+python|lift/harness/seeds/lea_leaf_candidates.py|
+# file: the refinement of the candidate seeds (a measurement; decision 0104 in docs/archive: its output is the 400 rows of iltools-6000000-seeds400.txt, a deploy input)
+python|lift/harness/seeds/refine_seeds.py|
+# file: lift/harness/test.sh (the runner of the lift tests; its four lines call fletest.py)
+python|lift/harness/test.sh|python3 "$here/testfast/fletest.py"
+# file: lift/harness/two (it holds the deploy inputs main_two.c and the *-inputs and *-units lists; these tools and scripts are not): the harness build of the two-module native build (line 124 runs the idle wrappers generator)
+python|lift/harness/two/build_two_native.sh|python3 "$LIFT/harness/idle/gen_idle_wraps.py"
+# file: the two-module native chain (harness; the two lines name the probe and the gdb helper, both python files)
+python|lift/harness/two/chain.sh|"$HERE/patches_chain.py"
+python|lift/harness/two/chain.sh|"$HERE/${GDBI_SCRIPT:-gdb_imports.py}"
+# file: the two-module build (harness; it runs split_mod.py and merge_tables_n.py)
+python|lift/harness/two/gen_two.sh|python3 "$TOOLS/split_mod.py"
+python|lift/harness/two/gen_two.sh|python3 "$HERE/merge_tables_n.py"
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_dllmain_ret.py|
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_hits.py|
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_imports.py|
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_mem.py|
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_probe_call.py|
+# file: gdb observer (harness)
+python|lift/harness/two/gdb_watch.py|
+# file: the lowering of the registers (cargo tests size1_lowregs and split_units run it)
+python|lift/harness/two/lowregs.py|
+# file: the merge of the dispatch tables (harness; the Rust gen-all is compared with it)
+python|lift/harness/two/merge_tables_n.py|
+# file: the seed lists (harness)
+python|lift/harness/two/mkseeds.py|
+# file: the probes of the chain (harness)
+python|lift/harness/two/patches_chain.py|
+# file: the probes (harness)
+python|lift/harness/two/patches_probe_lcmap.py|
+# file: the probes (harness)
+python|lift/harness/two/patches_stage1.py|
+# file: the users of the selectors (measurement)
+python|lift/harness/two/selector_users.py|
+# file: the split of the generated C (cargo test split_units runs it)
+python|lift/harness/two/split_bytes.py|
+# file: the stub functions (harness)
+python|lift/harness/two/stub_funcs.py|
+# file: the summary of the imports (measurement)
+python|lift/harness/two/summ_imports.py|
+# file: lift/harness/web (it holds the deploy inputs *.args, link.rsp, the sed and cmd files; these two are not): the round trip check of a seed pack (the producer is app/scripts/pack-seed.mjs)
+python|lift/harness/web/final0129/unpack_seed.py|
+# file: the comparison of the threads scenarios (harness; one python3 line reads the stats of a run)
+python|lift/harness/web/threads/compare_scen.sh|python3 -c "import json,sys;d=json.load(open('$OUT/$s.wasm.stats'))
+# --- python: scripts/ holds no python (AGENTS §6): audit-session.sh, check-consistency.sh and preflight.sh were ported to node (heredocs, decision 0415 §11)
+# scan-forbidden.sh: the rule's own text (the regular expressions of the rule and its names; the scan runs no python)
+python|scripts/scan-forbidden.sh|py_rule=python
+python|scripts/scan-forbidden.sh|py_word='(^
+python|scripts/scan-forbidden.sh|[[:alnum:]_./-]+\.py(
+# --- python: the list itself (a whole-file entry: its entries name the rule and the python words, and this file is data that no step runs)
+python|scripts/forbidden-allowlist.txt|

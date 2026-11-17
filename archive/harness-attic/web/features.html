@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>feature tests</title>
+<pre id="out">running</pre>
+<script src="features.js"></script>
+<script>
+window.__done = false;
+features('window').then((r) => { window.__result = r; document.getElementById('out').textContent = JSON.stringify(r, null, 1); window.__done = true; },
+  (e) => { window.__result = { error: String(e && e.stack || e) }; window.__done = true; });
+</script>

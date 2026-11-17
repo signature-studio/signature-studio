@@ -1,0 +1,70 @@
+[
+ {
+  "name": "r55-problems",
+  "what": "R5-5: the reference project opened as a zip (openZipProject). openZipProject saves missing-plugins-dialog.png when the Problems window is up and clicks its OK; then the engine must still run (expectRunning). The number N of 'N plugin(s) could not be opened' is read from the picture.",
+  "rep": 1,
+  "seconds": 47,
+  "firstIdleMs": 5588.4599609375,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 62.28999999910593,
+   "manifest_loaded": 80.21000000089407,
+   "download_start": 109.96500000357628,
+   "compile_done": 1289.1349999979138,
+   "download_done": 1534.515000000596,
+   "pack_source_dll": 1606.97509765625,
+   "pack_source_seed": 1607.074951171875,
+   "glue_loaded": 1616.6201171875,
+   "worker_ready": 1618.3950000032783,
+   "engine_start": 1618.4500000029802,
+   "wasm_instantiated": 1650.110107421875,
+   "files_ready": 1661.525146484375,
+   "main_start": 1662.794921875,
+   "idle": 5588.4599609375,
+   "host_files_released": 5589.175048828125,
+   "first_pixel": 5618.074951171875,
+   "filedlg_request": 18386.14501953125,
+   "filedlg_answer": 22472.4150390625
+  },
+  "loadStart": 1.23,
+  "loadEnd": 0.9,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

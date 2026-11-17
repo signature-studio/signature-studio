@@ -1,0 +1,13 @@
+quickfontcache_x64.dll             base 0x1d00000 SizeOfImage 0x20e000 end 0x1f0e000
+dsp_ippv2_x64.dll                  base 0x2000000 SizeOfImage 0x261f000 end 0x461f000
+blend2d.dll                        base 0x4700000 SizeOfImage 0x300000 end 0x4a00000
+freetype_x64.dll                   base 0x4b00000 SizeOfImage 0x9a000 end 0x4b9a000
+iltools_x64.dll                    base 0x6000000 SizeOfImage 0x394000 end 0x6394000
+fruity_balance_x64.dll             base 0x6800000 SizeOfImage 0x3a1000 end 0x6ba1000
+fruity_filter_x64.dll              base 0x7000000 SizeOfImage 0x3b2000 end 0x73b2000
+fruity_delay2_x64.dll              base 0x7800000 SizeOfImage 0x3a5000 end 0x7ba5000
+fruity_parametric_eq2_x64.dll      base 0x9000000 SizeOfImage 0x3f0000 end 0x93f0000
+elastique_x64.dll                  base 0xb000000 SizeOfImage 0x4cc000 end 0xb4cc000
+oggio_x64.dll                      base 0xc000000 SizeOfImage 0x1cf000 end 0xc1cf000
+modules: 11  overlapping pairs: 0
+largest end: 0xc1cf000 (oggio_x64.dll)

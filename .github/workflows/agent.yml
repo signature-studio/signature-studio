@@ -1,0 +1,202 @@
+# ci/tasks/<名前>.md を push すると、ファイルごとに 1 ジョブ(最大 60 並列)で worker を 1 回動かす(決定 0380)。
+# モデルの認証は、opencode の認証情報(環境変数 OPENCODE_AUTH_JSON)を取り込んで使う(決定 0383)。値が空のジョブは、取り込みの手順で止まる。
+# モデルは Variable OPENCODE_MODEL の値を、設定の段で .opencode/opencode.jsonc に書く(決定 0402。決定 0399 を置き換える)。値はログに出る。
+# R2 の鍵は、抽出物を取る段(extract ジョブ)にだけ渡す。モデルが動く段には渡さない(決定 0386。抽出のキャッシュは決定 0404 でやめた)。
+# 出力は scripts/scan-forbidden.sh を通してから、成果物とサマリーに出す。
+name: agent
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "ci/tasks/*.md"
+      - ".github/workflows/agent.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: 実行するタスクを決める
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tasks: ${{ steps.plan.outputs.tasks }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - name: リポジトリを取得する(差分の基準の commit が要るため全履歴)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 追加・変更されたタスクを一覧にする
+        id: plan
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          names=$(git diff --name-only --diff-filter=AM "$BEFORE" "$AFTER" -- ci/tasks | sed -n 's#^ci/tasks/\(.*\)\.md$#\1#p')
+          echo "tasks=$(printf '%s\n' "$names" | jq -R -s -c 'split("\n") | map(select(length > 0))')" >> "$GITHUB_OUTPUT"
+          echo "count=$(printf '%s\n' "$names" | grep -c .)" >> "$GITHUB_OUTPUT"
+
+  extract:
+    name: 抽出物を用意する
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: アカウント ID を app/wrangler.jsonc から読む
+        run: |
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+
+      - name: 抽出物のキャッシュ(R2)
+        id: cache
+        uses: runs-on/cache@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+
+      - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/host"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node app/scripts/extract-fl.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+  run:
+    name: worker ${{ matrix.task }}
+    needs:
+      - plan
+      - extract
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 60
+      matrix:
+        task: ${{ fromJSON(needs.plan.outputs.tasks) }}
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: アカウント ID を app/wrangler.jsonc から読む
+        run: |
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+
+      - name: 抽出物のキャッシュ(R2)を復元する
+        uses: runs-on/cache@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+
+      - name: opencode を導入する(版は固定)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/cli.tgz" https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.3.0.tgz
+          test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/cli.tgz" | base64 -w0)" = 'sha512-8T3K8L6Nd4fSG5BSgofqhmIDQ1ZvzDZZ2J7bFVB9RK1d5Hjqh24IcxgbcwpgGKkdvItrayi4Rl+wrSmhl17FFg=='
+          tar -xzf "$RUNNER_TEMP/cli.tgz" -C "$RUNNER_TEMP"
+          install -D -m 755 "$RUNNER_TEMP/package/bin/opencode" "$HOME/.opencode/bin/opencode"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: opencode の認証情報を取り込む
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+        run: printf '%s' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone
+
+      - name: 実行用のモデルの設定を書く
+        run: |
+          mkdir -p .opencode
+          cat > .opencode/opencode.jsonc << EOF
+          {
+            "model": "${{ vars.OPENCODE_MODEL }}",
+            "default_agent": "worker",
+            "agents": {
+              "build": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "worker": { "mode": "all", "model": "${{ vars.OPENCODE_MODEL }}" },
+              "reviewer": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "title": { "model": "${{ vars.OPENCODE_MODEL }}" },
+              "summary": { "model": "${{ vars.OPENCODE_MODEL }}" }
+            }
+          }
+          EOF
+
+      - name: worker を 1 回動かす
+        env:
+          TASK: ${{ matrix.task }}
+        run: |
+          out=ci/agents/out/$TASK
+          mkdir -p "$out"
+          {
+            cat prompts/worker-rules.md
+            cat << 'NOTE'
+
+          ## この実行の場(GitHub Actions のワークツリー)
+          - push はできない。commit もしない。変更はワークツリーに残す(後で差分を読む)。
+          - `source scripts/env.sh` は使えない(emsdk が無い)。一時ファイルは `$RUNNER_TEMP` に置く。
+          - Secrets・Variables・Cloudflare の資格情報は、この実行には無い。判断は「決定: X。根拠: Y」と書いて進める。
+          - 報告の先頭に、この実行の結論を 1 行で書く。
+
+          ---
+
+          NOTE
+            cat AGENTS.md
+            printf '\n\n---\n\n## タスク(ci/tasks/%s.md)\n\n' "$TASK"
+            cat "ci/tasks/$TASK.md"
+          } > "$RUNNER_TEMP/prompt.md"
+          opencode run "$(cat "$RUNNER_TEMP/prompt.md")" > "$out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null
+          git status --short > "$out/changes.txt"
+          echo "task: $TASK" > "$out/meta.txt"
+          echo "commit: $(git rev-parse --short HEAD)" >> "$out/meta.txt"
+
+      - name: 出力を検査する(公開ログと成果物に出せるかを確かめる)
+        env:
+          TASK: ${{ matrix.task }}
+        run: bash scripts/scan-forbidden.sh "ci/agents/out/$TASK"
+
+      - name: 成果物を保存する(7 日)
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-${{ matrix.task }}
+          path: ci/agents/out/${{ matrix.task }}/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: 要約をジョブのサマリーに書く
+        env:
+          TASK: ${{ matrix.task }}
+        run: |
+          { echo "### $TASK"; echo '```'; cat "ci/agents/out/$TASK/meta.txt"; echo '```'; head -n 80 "ci/agents/out/$TASK/report.md"; } >> "$GITHUB_STEP_SUMMARY"
+

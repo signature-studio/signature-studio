@@ -1,0 +1,113 @@
+<!doctype html><meta charset=utf-8><title>pw1 decoupled / staggered rings: Serum 2 Workers</title>
+<script type="module">
+// pw1 (decision 0186): K Serum 2 instances (+ M OTT instances), one Worker each, on ONE compiled WebAssembly.Module per plug-in, driven block by block in real time (4096 frames = 92.879 ms) by an engine Worker.
+// ?serum=0,1,3,4,5,3 (entries <state>[c|s]: c = 4-note chord, s = silent / no note)&ott=0&ottmod=c|mx9&blocks=650&warm=1&warmblocks=60&mod=h123
+// warm=1: before the schedule starts, throw-away instances (one per distinct Serum entry, one OTT) run warmblocks free-running blocks on the same Module (V8 compiles lazily and tiers up: the compiled
+// code belongs to the Module, so the production instances start warm); warm=0: the production instances start cold.
+window.__log = [];
+const log = (s) => window.__log.push(s);
+const q = new URLSearchParams(location.search);
+const MOD = q.get('mod') || 'h123', BLOCKS = +(q.get('blocks') || 650), WARM = q.get('warm') !== '0', WARMB = +(q.get('warmblocks') || 60), WARMMS = +(q.get('warmms') || 0), SETTLE = +(q.get('settle') || 0);
+const SER = (q.get('serum') || '').split(',').filter(Boolean), NOTT = +(q.get('ott') || 0), OTTMOD = q.get('ottmod') || 'c';
+const PERIOD = 4096 / 44100 * 1000, SLOT = 128 + 5 * 4096 * 2 * 4;
+const STAGGER = q.get('stagger') !== '0', LEAD = +(q.get('lead') || 1), AHEAD = +(q.get('ahead') || 0);
+const abs = () => performance.timeOrigin + performance.now();
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+(async () => {
+  try {
+    const fetchU8 = async (u) => { const b = new Uint8Array(await (await fetch(u)).arrayBuffer()); const sab = new Uint8Array(new SharedArrayBuffer(b.length)); sab.set(b); return sab; };
+    const states = [...new Set(SER.map((s) => s[0]))];
+    const t0 = performance.now();
+    const files = {}, sfiles = {};
+    let module = null, ottModule = null, contentBytes = 0;
+    if (SER.length) {
+      const [wbytes, plugin, seedTxt] = await Promise.all([fetch(`/coi/data/${MOD}.wasm`).then(async (r) => new Uint8Array(await r.arrayBuffer())), fetchU8('/coi/data/serum.vst3'), fetch('/coi/data/seed-small.tsv').then((r) => r.text())]);
+      Object.assign(sfiles, { '/serum.vst3': plugin, '/seed.tsv': new TextEncoder().encode(seedTxt) });
+      const hostFiles = seedTxt.split('\n').filter((l) => l && l[0] !== '#').map((l) => l.split('\t')[1]).filter((p) => p && p !== '-');
+      await Promise.all(hostFiles.map(async (p) => { sfiles[p] = await fetchU8('/coi/data' + p); contentBytes += sfiles[p].length; }));
+      for (const st of states) for (const k of [2, 3]) sfiles[`/state/s${st}_c${k}.bin`] = await fetchU8(`/coi/data/state/s${st}_c${k}.bin`);
+      const t1 = performance.now();
+      module = await WebAssembly.compile(wbytes);
+      log(`serum: wasm ${wbytes.length} B, content ${contentBytes} B; fetch ${(t1 - t0).toFixed(0)} ms, compile ${(performance.now() - t1).toFixed(0)} ms`);
+    }
+    if (NOTT) {
+      const [wbytes, plugin, seed] = await Promise.all([`/coi/data/ott-${OTTMOD}.wasm`, '/coi/data/ott.vst3', '/coi/data/ott-seed.tsv'].map(async (u) => new Uint8Array(await (await fetch(u)).arrayBuffer())));
+      Object.assign(files, { '/ott.vst3': plugin, '/seed.tsv': seed });
+      ottModule = await WebAssembly.compile(wbytes);
+      log(`ott: wasm ${wbytes.length} B (${OTTMOD})`);
+    }
+    const serumArgs = (e, blocks) => {
+      const st = e[0], flag = e[1] || '';
+      const a = ['/serum.vst3', '--blocks', String(blocks), '--state', st, '--state-dir', '/state', '--presets-dir', 'C:\\SerumData\\Presets'];
+      if (flag !== 's') a.push('--note');
+      if (flag === 'c') a.push('--notes', '60,64,67,72');
+      if (st === '5') a.push('--state-proc-only');
+      return a;
+    };
+    const inst = SER.map((e, i) => ({ kind: 'serum', label: `serum#${i}:${e}`, module, files: sfiles, args: serumArgs(e, BLOCKS), env: ['FLE_VFS_SEED=/seed.tsv', 'VST_BLOCKS=1'] }));
+    for (let i = 0; i < NOTT; i++) inst.push({ kind: 'ott', label: `ott#${i}`, module: ottModule, files, args: ['/ott.vst3', '--blocks', String(BLOCKS)], env: ['FLE_VFS_SEED=/seed.tsv'] });
+    const mk = (x, id, blocks, sab, warmMs = 0) => {
+      const w = new Worker('ring-plugin-worker.js', { type: 'module' });
+      const o = { w, x, id, ready: null, loop: null, done: null };
+      o.ready = new Promise((res, rej) => (o.rres = [res, rej])); o.loop = new Promise((r) => (o.lres = r)); o.done = new Promise((r) => (o.dres = r));
+      w.onmessage = (e) => { const t = e.data.type; if (t === 'ready') o.rres[0](e.data); else if (t === 'loop-ready') o.lres(); else if (t === 'done') o.dres(e.data); else if (t === 'error') o.rres[1](new Error(`${x.label}: ${e.data.error}`)); };
+      w.onerror = (e) => o.rres[1](new Error(`${x.label} worker error ${e.message}`));
+      w.postMessage({ type: 'prep', id, kind: x.kind, module: x.module, files: x.files, sab, blocks, args: x.args, env: x.env, warmMs });
+      return o;
+    };
+    // warm-up: one free-running throw-away instance per distinct Serum entry and one OTT
+    const warmRes = [];
+    let tWarm = 0;
+    if (WARM) {
+      const tw = performance.now();
+      const seen = new Set(), ws = [];
+      inst.forEach((x, i) => {
+        const key = x.kind === 'ott' ? 'ott' : x.args.join(' ').replace(/--blocks \d+/, '');
+        if (seen.has(key)) return; seen.add(key);
+        const wx = { ...x, args: x.args.map((a, j) => (x.args[j - 1] === '--blocks' ? String(WARMMS ? 20000 : WARMB) : a)) };
+        const o = mk(wx, 1000 + i, WARMB, null, WARMMS); o.src = x.label; ws.push(o);
+      });
+      await Promise.all(ws.map((o) => o.ready));
+      for (const o of ws) o.w.postMessage({ type: 'go' });
+      const dn = await Promise.all(ws.map((o) => o.done));
+      dn.forEach((d, i) => {
+        const wt = Array.from(d.warmT || []);
+        const wall = wt.length > 1 ? wt.slice(1).map((v, j) => v - wt[j]) : d.lines.filter((l) => /^vst: block/.test(l)).map((l) => +/wall ([\d.]+) ms/.exec(l)?.[1]);
+        warmRes.push({ src: ws[i].src, rc: d.rc, err: d.err, runMs: d.runMs, blockWallMs: wall, lines: d.lines.filter((l) => /^RESULT/.test(l)) });
+      });
+      for (const o of ws) o.w.terminate();
+      if (SETTLE) await wait(SETTLE);
+      tWarm = performance.now() - tw;
+      log(`warm-up: ${ws.length} throw-away instances x ${WARMB} blocks in ${tWarm.toFixed(0)} ms`);
+    }
+    // production instances
+    const tp = performance.now();
+    const sabs = inst.map(() => new SharedArrayBuffer(SLOT));
+    const prods = [];
+    for (let i = 0; i < inst.length; i++) { const o = mk(inst[i], i, BLOCKS, sabs[i]); prods.push(o); await o.ready; }
+    for (const o of prods) o.w.postMessage({ type: 'go' });
+    await Promise.all(prods.map((o) => o.loop));
+    const tInit = performance.now() - tp;
+    log(`production: ${inst.length} instances ready in ${tInit.toFixed(0)} ms`);
+    window.__ready = true;
+    while (!window.__go) await wait(5);
+    const T0 = abs() + 300, K = inst.length;
+    const phis = inst.map((_, k) => (STAGGER ? ((k * 0.6180339887498949) % 1) * PERIOD : 0));   // golden-ratio phases: the heavy instances (listed first) land far apart
+    sabs.forEach((s, k) => { const par = new Float64Array(s, 64, 8); par[0] = T0; par[1] = PERIOD; par[2] = phis[k]; par[3] = AHEAD; const c = new Int32Array(s, 0, 16); Atomics.store(c, 2, 1); Atomics.notify(c, 2); });
+    const eng = new Worker('ring-engine-worker.js', { type: 'module' });
+    const er = await new Promise((r) => { eng.onmessage = (e) => r(e.data); eng.postMessage({ sabs, blocks: BLOCKS, periodMs: PERIOD, t0: T0, lead: LEAD }); });
+    window.__engineDone = true;
+    const dres = await Promise.race([Promise.all(prods.map((o) => o.done)), wait(60000).then(() => null)]);
+    const rel = (a) => Array.from(a, (v) => (v ? +(v - T0).toFixed(3) : null));
+    window.__result = {
+      cfg: { MOD, BLOCKS, WARM, WARMB, WARMMS, SER, NOTT, OTTMOD, PERIOD, STAGGER, LEAD, AHEAD }, hardwareConcurrency: navigator.hardwareConcurrency, T0abs: T0, tWarm, tInit, contentBytes, phis,
+      ring: { readAt: rel(er.readAt), miss: Array.from(er.miss), prod: Array.from(er.prod), K, lead: er.lead },
+      plugins: inst.map((x, k) => { const d = dres && dres[k]; return { label: x.label, kind: x.kind, phi: phis[k], rc: d?.rc, err: d?.err, done: d?.done, runMs: d?.runMs, memBytes: d?.memBytes, missing: d?.missing, lines: d?.lines.filter((l) => !/^vst: block/.test(l)), T: d ? rel(d.T).reduce((acc, v, i) => { (acc[i % 4] = acc[i % 4] || []).push(v); return acc; }, []) : null }; }),
+      warm: warmRes,
+    };
+    window.__done = true;
+    while (!window.__terminate) await wait(20);
+    for (const o of prods) o.w.terminate(); eng.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); window.__done = true; }
+})();
+</script>

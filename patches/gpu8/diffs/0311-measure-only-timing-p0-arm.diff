@@ -1,0 +1,27 @@
+diff -ruN a/app/src/engine/desk-gl.ts b/app/src/engine/desk-gl.ts
+--- a/app/src/engine/desk-gl.ts	2026-11-06 19:45:50.000000000 +0900
++++ b/app/src/engine/desk-gl.ts	2026-11-06 20:59:42.552559836 +0900
+@@ -131,7 +131,7 @@
+ interface Tex { tex: WebGLTexture; w: number; h: number }
+ 
+ export class GlDeskPresenter implements DeskShow {
+-  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0 };
++  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number; slow8: number; slow16: number; slowMs: number; maxMs: number; totalMs: number; slowLog: number[] } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0, slow8: 0, slow16: 0, slowMs: 0, maxMs: 0, totalMs: 0, slowLog: [] };
+   lastState: DeskState | null = null;
+   private gl: Gl;
+   private loc: Record<string, WebGLUniformLocation | null> = {};
+@@ -197,7 +197,14 @@
+     return this.heap.u8;
+   }
+ 
++  /** MEASUREMENT ONLY (decision 0311): how long one present() takes, as the caller sees it (JS and the waits inside the GL calls) */
+   present(): number {
++    const t0 = this.now();
++    const r = this.presentInner();
++    if (r > 0) { const d = this.now() - t0, s = this.stats; s.totalMs += d; if (d > 8) { s.slow8++; s.slowMs += d; s.slowLog.push(performance.timeOrigin + t0, +d.toFixed(2)); if (s.slowLog.length > 1024) s.slowLog.splice(0, 2); } if (d > 16) s.slow16++; if (d > s.maxMs) s.maxMs = d; }
++    return r;
++  }
++  private presentInner(): number {
+     if (!this.memory() || this.lost) return 0;
+     const t0 = this.now();
+     const ptr = this.api.scene();

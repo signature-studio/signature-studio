@@ -1,0 +1,5 @@
+# ci/extract-vst3.tsv - the VST3 plug-ins taken from the third-party installers. Fields (TAB): installer file name <TAB> member inside the installer <TAB> destination under $CI_WORK/vst3 <TAB> SHA-256 the bytes must have
+# Same bytes as lift/out-vst1/bin/ of docs/investigations/vst3-hosting.md (checked 2026-11-04). Nothing of this is read by the engine bundle build yet: the plug-ins are cached for the stage that will use them.
+Install_Xfer_Serum2_2.1.5.exe	$COMMONFILES64/VST3/Serum2.vst3/Contents/x86_64-win/Serum2.vst3	Serum2.vst3	501e7bb3dd9cafe416b3412df3d4e084c01b7468201e5690b9009d7ecd4e5283
+Install_Xfer_OTT_137.exe	C:/Program Files/Common Files/VST3/OTT.vst3	OTT.vst3	8965c7114506d7a74361233c418b0988ebbd0f7a59d602b9a469c83e31f6fd5a
+VitalInstaller.exe	carved_1.bin	Vital.vst3	a622a2c99b4066cd7945a4ab9bbdd698e7632a30702f6f0a7ccbf26a56b576e1

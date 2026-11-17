@@ -1,0 +1,76 @@
+[
+ {
+  "name": "r55-play",
+  "what": "R5-5: the reference project opened as a zip (openZipProject; the Problems window is closed by it), then 10 s of playback with Space (the Balance on Insert 1 and the Filter on Insert 47 are in the project). The engine log of the playback is saved (log-play.log: the lines after the mark 'play'); a shot (play-10s-playing.png) is taken while the playback runs (before the second Space); expectRunning at the end.",
+  "rep": 1,
+  "seconds": 55,
+  "firstIdleMs": 4114.429931640625,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "logs": [
+   {
+    "name": "log-play",
+    "lines": 0
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 42.644999999552965,
+   "manifest_loaded": 53.08999999985099,
+   "download_start": 79,
+   "compile_done": 946.2900000009686,
+   "download_done": 1123.3650000002235,
+   "pack_source_dll": 1177.594970703125,
+   "pack_source_seed": 1177.639892578125,
+   "glue_loaded": 1185.974853515625,
+   "worker_ready": 1186.535000000149,
+   "engine_start": 1186.565000001341,
+   "wasm_instantiated": 1210.9599609375,
+   "files_ready": 1220.659912109375,
+   "main_start": 1221.794921875,
+   "idle": 4114.429931640625,
+   "host_files_released": 4114.77001953125,
+   "first_pixel": 4135.594970703125,
+   "filedlg_request": 16454.010009765625,
+   "filedlg_answer": 19809.4599609375
+  },
+  "loadStart": 0.8,
+  "loadEnd": 1.1,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

@@ -1,0 +1,58 @@
+--- a/lift/crates/fe-lift/tests/wall_fr11.rs
++++ b/lift/crates/fe-lift/tests/wall_fr11.rs
+@@ -1544,6 +1544,13 @@
+     K(fle_imp_GetCursorPos, A(pt)); printf("host 20 20 -> %d %d\n", pt[0], pt[1]);
+     memset(ci, 0, sizeof ci); ci[0] = 24;
+     K(fle_imp_GetCursorInfo, A(ci)); printf("info pos %d %d\n", ci[4], ci[5]);
++    fle_win_host_pointer_set(450, 1079);
++    K(fle_imp_SetPhysicalCursorPos, 450, 17);
++    K(fle_imp_GetCursorPos, A(pt)); printf("wrap set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 21);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 21 -> %d %d\n", pt[0], pt[1]);
+     K(fle_imp_SetCursorPos, 1920, 1080);
+     K(fle_imp_GetCursorPos, A(pt)); printf("clamped -> %d %d\n", pt[0], pt[1]);
+     fle_win_host_pointer_set(21, 20);
+@@ -1559,14 +1566,17 @@
+     );
+     assert_eq!(l[0], "host 10 10 -> 10 10");
+     assert_eq!(l[1], "set -> 100 200");
+-    assert_eq!(l[2], "host 20 10 -> 110 200");
+-    assert_eq!(l[3], "host 20 20 -> 110 210");
+-    assert_eq!(l[4], "info pos 110 210");
+-    assert_eq!(l[5], "clamped -> 1919 1079");
+-    assert_eq!(l[6], "host 21 20 -> 1919 1079");
+-    assert_eq!(l[7], "host 22 20 -> 1919 1079");
+-    assert_eq!(l[5], "shrunk -> 1023 767");
+-    assert_eq!(l[6], "host 23 21 -> 1023 767");
++    assert_eq!(l[2], "host 20 10 -> 20 10");
++    assert_eq!(l[3], "host 20 20 -> 20 20");
++    assert_eq!(l[4], "info pos 20 20");
++    assert_eq!(l[5], "wrap set -> 450 17");
++    assert_eq!(l[6], "host 450 20 -> 450 20");
++    assert_eq!(l[7], "host 450 21 -> 450 21");
++    assert_eq!(l[8], "clamped -> 1919 1079");
++    assert_eq!(l[9], "host 21 20 -> 21 20");
++    assert_eq!(l[10], "host 22 20 -> 22 20");
++    assert_eq!(l[11], "shrunk -> 22 20");
++    assert_eq!(l[12], "host 23 21 -> 23 21");
+ }
+ 
+ #[test]
+@@ -1582,13 +1592,13 @@
+     uint64_t r;
+     wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
+     r = K(fle_imp_DefWindowProcW, kid, 0x0205, 2, ((uint64_t)2 << 16) | 1);
+-    printf("child rbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == top ? "top" : "other", U(last_ctx_lp));
++    printf("child rbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == kid ? "kid" : "other", U(last_ctx_lp));
+     wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
+     r = K(fle_imp_DefWindowProcW, top, 0x00A5, 1, ((uint64_t)40 << 16) | 30);
+     printf("top ncrbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == top ? "top" : "other", U(last_ctx_lp));
+ "#,
+     );
+-    assert_eq!(l[0], "child rbuttonup r 0 ctx 1 target top wparam top lparam 1c0010");
++    assert_eq!(l[0], "child rbuttonup r 0 ctx 1 target top wparam kid lparam 1c0010");
+     assert_eq!(l[1], "top ncrbuttonup r 0 ctx 1 target top wparam top lparam 28001e");
+ }
+ 

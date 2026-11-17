@@ -1,0 +1,2 @@
+zstd v1.5.7: zstd -19 --zstd=wlog=23 -T1 -q -c flengine6.wasm -> 54,290,375 B, 2:42.67 wall, max RSS 224,992 KB (window 8 MiB, the largest window a browser accepts for Content-Encoding: zstd)
+gzip -9 (the gzip binary), brotli quality 11 lgwin 24 (node zlib): see compression.json

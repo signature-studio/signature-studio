@@ -1,0 +1,145 @@
+[
+ {
+  "name": "lat",
+  "what": "gpu7 (0269): input latency (the page's own LatencyTracker records) in four situations: (a) idle File-menu clicks x35, (c) a drag of the Mixer header (2 x 40 moves), then 6 s of the same drag for frame/s (dragMeasure c-mixer-fps; added by R4-2), (d) Space x32 with the reference project, (b) File-menu clicks x35 during playback [0271: Firefox; the project is opened as a zip through the Files window (openZipProject) because the 49-file upload aborts in Firefox]",
+  "rep": 1,
+  "seconds": 264,
+  "firstIdleMs": 5021.39501953125,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "menuCycles": {
+   "n": 35,
+   "popupSeen": 35,
+   "popupMissingSurface": [],
+   "notVisible": [],
+   "completed": 35
+  },
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "describes": [
+   {
+    "name": "before-play",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"serina1-serum2.flp - FL Studio 2026\""
+    ]
+   }
+  ],
+  "measures": [
+   {
+    "name": "c-mixer-fps",
+    "wallS": 6,
+    "moves": 360,
+    "movesPerS": 60,
+    "presents": 326,
+    "presentsPerS": 54.33,
+    "rectsPerS": 54.33,
+    "mpxPerS": 37.268,
+    "composeMsPerPresent": 0.277,
+    "putMsPerPresent": 0.192,
+    "wholeFrames": 0,
+    "cpuS": {
+     "worker": 3.25,
+     "main": 0,
+     "compositor": 0.38,
+     "gpu": 0,
+     "other": 22.32,
+     "workers": [
+      3.25
+     ],
+     "top": {
+      "DedicatedWorker": 3.25,
+      "chrome": 1.53,
+      "Thread<02>": 1.41,
+      "Thread<05>": 1.4,
+      "Thread<04>": 1.36,
+      "Thread<08>": 1.35,
+      "Thread<01>": 1.32,
+      "Thread<03>": 1.29
+     }
+    },
+    "workerMsPerPresent": 9.97,
+    "workerMsPerMove": 9.03,
+    "workerBusyFrac": 0.542,
+    "gl": {
+     "drawMsPerPresent": 0.054,
+     "uploadsPerPresent": 1,
+     "drawsPerPresent": 1,
+     "uploadMBPerS": 149.07,
+     "texAllocs": 0
+    },
+    "load0": 1.34,
+    "load1": 2.39
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 49.84500000625849,
+   "manifest_loaded": 66.67000000178814,
+   "download_start": 98.12000000476837,
+   "download_done": 1440.9000000059605,
+   "compile_done": 1442.289999999106,
+   "pack_source_dll": 1505.85009765625,
+   "pack_source_seed": 1505.905029296875,
+   "glue_loaded": 1514.77001953125,
+   "worker_ready": 1517.0050000026822,
+   "engine_start": 1517.039999999106,
+   "wasm_instantiated": 1543.570068359375,
+   "files_ready": 1554.9951171875,
+   "main_start": 1556.43017578125,
+   "idle": 5021.39501953125,
+   "host_files_released": 5021.81005859375,
+   "first_pixel": 5049.880126953125,
+   "filedlg_request": 97335.36499023438,
+   "filedlg_answer": 101164.8251953125
+  },
+  "loadStart": 2.62,
+  "loadEnd": 1.83,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

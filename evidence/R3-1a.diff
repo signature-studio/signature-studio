@@ -1,0 +1,155 @@
+diff --git a/lift/crates/fe-lift/tests/desk_scene.rs b/lift/crates/fe-lift/tests/desk_scene.rs
+index 41720eb..6ee06d6 100644
+--- a/lift/crates/fe-lift/tests/desk_scene.rs
++++ b/lift/crates/fe-lift/tests/desk_scene.rs
+@@ -90,14 +90,14 @@ int main(void) {
+     /* 3. nothing changed: nothing to do */
+     sc = fle_desk_scene();
+     CHECK(sc->n_updates == 0 && !(sc->flags & (FLE_SCENE_FLAG_CHANGED | FLE_SCENE_FLAG_WHOLE)) && !sc->win[0].fresh, "unchanged: no update, not changed");
+-    /* 4. the same pixels written again are not reported; one changed pixel inside a big written rectangle is reported alone */
++    /* 4. without the window's shadow (R3-1a) a written rectangle is reported as written, even where its pixels are the same as before */
+     fle_desk_wrote(1, 0, 0, 100, 50);
+     sc = fle_desk_scene();
+-    CHECK(sc->n_updates == 0, "the same pixels again: %u updates", sc->n_updates);
++    CHECK(sc->n_updates == 1 && sc->upd[0].x0 == 0 && sc->upd[0].y0 == 0 && sc->upd[0].x1 == 100 && sc->upd[0].y1 == 50, "the same pixels again: %u updates", sc->n_updates);
+     setpx(1, 20, 10, 1, 2, 3, 0);
+     fle_desk_wrote(1, 0, 0, 100, 50);
+     sc = fle_desk_scene();
+-    CHECK(sc->n_updates == 1 && sc->upd[0].x0 == 20 && sc->upd[0].y0 == 10 && sc->upd[0].x1 == 21 && sc->upd[0].y1 == 11, "one pixel: %u updates", sc->n_updates);
++    CHECK(sc->n_updates == 1 && sc->upd[0].x0 == 0 && sc->upd[0].y0 == 0 && sc->upd[0].x1 == 100 && sc->upd[0].y1 == 50, "one pixel: %u updates", sc->n_updates);
+     CHECK(apply(sc, &nu) == 0, "mirror equals surface after the pixel");
+     /* 5. a window moves: the description changes, no pixel is sent */
+     W[1].x = 300; W[1].y = 200;
+diff --git a/lift/runtime/fle_desk.c b/lift/runtime/fle_desk.c
+index 9a6ebe8..18fd715 100644
+--- a/lift/runtime/fle_desk.c
++++ b/lift/runtime/fle_desk.c
+@@ -238,7 +238,7 @@ static void draw_rect(uint32_t *base, int32_t stride, int32_t ox, int32_t oy, co
+ }
+ 
+ /* The one rule of 'report only what differs' (the trim of decision 0223, which the scene of decision 0240 shares): in one row, the span [*a, *b) narrowed to its first and its last pixel where `old` and `neu` differ; `old` takes the new
+- * pixels there. 0: the row is the same (nothing changes, nothing is reported). Used by paint() on the compositor's picture and by sh_trim() on the scene's copy of a window's surface. */
++ * pixels there. 0: the row is the same (nothing changes, nothing is reported). Used by paint() on the compositor's picture. */
+ static int trim_row(uint32_t *old, const uint32_t *neu, int32_t *a, int32_t *b)
+ {
+     int32_t x0 = *a, x1 = *b;
+@@ -492,75 +492,6 @@ static uint32_t su_lid[FLE_SCENE_MAX_WINDOWS];      /* the rectangles collected
+ static fle_desk_rect su_r[FLE_SCENE_MAX_WINDOWS];
+ static unsigned n_su;
+ static int scene_whole = 1;
+-/* What the browser holds of each window's surface, byte for byte (B, G, R, X as the surface has them): a written rectangle whose pixels are the ones the browser already has is not reported (the idle redraw of the main form writes
+- * the same pixels again once per frame; the CPU compositor drops those the same way, by comparing with its picture). One copy per window of the scene, made when the window is new or has another size. */
+-static uint32_t sh_lid[FLE_SCENE_MAX_WINDOWS];
+-static uint32_t *sh_px[FLE_SCENE_MAX_WINDOWS];
+-static uint32_t sh_w[FLE_SCENE_MAX_WINDOWS], sh_h[FLE_SCENE_MAX_WINDOWS];
+-static unsigned n_sh;
+-
+-static unsigned sh_find(uint32_t lid)
+-{
+-    unsigned i;
+-
+-    for (i = 0; i < n_sh; i++)
+-        if (sh_lid[i] == lid) return i;
+-    return n_sh;
+-}
+-static void sh_drop(unsigned i)
+-{
+-    free(sh_px[i]);
+-    n_sh--;
+-    sh_lid[i] = sh_lid[n_sh];
+-    sh_px[i] = sh_px[n_sh];
+-    sh_w[i] = sh_w[n_sh];
+-    sh_h[i] = sh_h[n_sh];
+-}
+-/* the shadow of a window: made (and filled from the surface) when it does not exist or has another size; 1 when it was made now (the whole surface is to be sent), 0 when it was there, -1 when there is no memory */
+-static int sh_get(const dwin *c, uint32_t **out)
+-{
+-    unsigned i = sh_find(c->lid);
+-    uint32_t y;
+-
+-    if (i < n_sh && sh_w[i] == c->w && sh_h[i] == c->h) {
+-        *out = sh_px[i];
+-        return 0;
+-    }
+-    if (i < n_sh) sh_drop(i);
+-    if (n_sh == FLE_SCENE_MAX_WINDOWS) return -1;
+-    sh_px[n_sh] = (uint32_t *)malloc((size_t)c->w * c->h * 4u);
+-    if (!sh_px[n_sh]) return -1;
+-    sh_lid[n_sh] = c->lid;
+-    sh_w[n_sh] = c->w;
+-    sh_h[n_sh] = c->h;
+-    for (y = 0; y < c->h; y++) memcpy(sh_px[n_sh] + (size_t)y * c->w, c->surf->bits + (size_t)y * c->surf->stride, (size_t)c->w * 4u);
+-    *out = sh_px[n_sh];
+-    n_sh++;
+-    return 1;
+-}
+-/* compares a written rectangle of the surface with the shadow, brings the shadow up to date and returns the bounding rectangle of the pixels that differ (empty: none) */
+-static int sh_trim(const dwin *c, uint32_t *sh, fle_desk_rect *r)
+-{
+-    int32_t cx0 = r->x1, cy0 = r->y1, cx1 = r->x0, cy1 = r->y0;
+-
+-    for (int32_t y = r->y0; y < r->y1; y++) {
+-        const uint32_t *s = (const uint32_t *)(const void *)(c->surf->bits + (size_t)y * c->surf->stride);
+-        uint32_t *d = sh + (size_t)y * c->w;
+-        int32_t a = r->x0, b = r->x1;
+-
+-        if (!trim_row(d, s, &a, &b)) continue;
+-        if (a < cx0) cx0 = a;
+-        if (b > cx1) cx1 = b;
+-        if (y < cy0) cy0 = y;
+-        cy1 = y + 1;
+-    }
+-    if (cx0 >= cx1) return 0;
+-    r->x0 = cx0;
+-    r->x1 = cx1;
+-    r->y0 = cy0;
+-    r->y1 = cy1;
+-    return 1;
+-}
+ 
+ static void scene_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_t y1)
+ {
+@@ -617,16 +548,8 @@ EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
+         scene_whole = 0;
+         nprev = 0;
+         n_su = 0;
+-        while (n_sh) sh_drop(n_sh - 1);     /* the browser starts again: every window is sent whole */
+     }
+     gather();
+-    for (i = 0; i < n_sh;) {
+-        unsigned q;
+-
+-        for (q = 0; q < ncur && cur[q].lid != sh_lid[i]; q++) {}
+-        if (q == ncur) sh_drop(i);
+-        else i++;
+-    }
+     if (ncur != nprev) changed = 1;
+     sc.magic = FLE_SCENE_MAGIC;
+     sc.version = FLE_SCENE_VERSION;
+@@ -638,17 +561,6 @@ EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
+         const dwin *p = find_in(prev, nprev, c->lid);
+         fle_scene_win *o = &sc.win[i];
+         int fresh = !p || p->w != c->w || p->h != c->h || p->surf != c->surf;
+-        uint32_t *sh = NULL;
+-        int made;
+-
+-        if (!p || p->surf != c->surf) {         /* another surface: what the browser holds is not what this one has */
+-            unsigned k = sh_find(c->lid);
+-
+-            if (k < n_sh) sh_drop(k);
+-        }
+-        made = sh_get(c, &sh);
+-
+-        if (made != 0) fresh = 1;       /* the shadow was just made from the surface (or could not be made): the whole surface is sent */
+ 
+         if (!p || !same_win(p, c) || (i < nprev && prev[i].lid != c->lid)) changed = 1;
+         o->lid = c->lid;
+@@ -686,7 +598,7 @@ EMSCRIPTEN_KEEPALIVE const fle_scene *fle_desk_scene(void)
+ 
+                     if (r.x1 > (int32_t)c->w) r.x1 = (int32_t)c->w;
+                     if (r.y1 > (int32_t)c->h) r.y1 = (int32_t)c->h;
+-                    if (r.x0 < r.x1 && r.y0 < r.y1 && sh_trim(c, sh, &r)) {
++                    if (r.x0 < r.x1 && r.y0 < r.y1) {
+                         sc.upd[nu].lid = c->lid;
+                         sc.upd[nu].x0 = r.x0;
+                         sc.upd[nu].y0 = r.y0;

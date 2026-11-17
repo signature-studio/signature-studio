@@ -1,0 +1,110 @@
+[
+ {
+  "name": "s3a-song",
+  "what": "S3a (0312c 5c): 5 minute playback of the reference project (zip) from the start, counters every 2 s; the project is in Song Mode (to be checked in the first run: the screenshot s3a-mode, op shot)",
+  "rep": 1,
+  "seconds": 349,
+  "firstIdleMs": 4920.070068359375,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "profs": [
+   {
+    "name": "p3-play",
+    "wallS": 300.78,
+    "cpuS": {
+     "worker": 256.83,
+     "main": 0,
+     "compositor": 7.48,
+     "gpu": 0,
+     "other": 318.28,
+     "workers": [
+      256.83
+     ],
+     "top": {
+      "DedicatedWorker": 256.83,
+      "chrome": 22.04,
+      "Thread<08>": 17.71,
+      "Thread<01>": 17.67,
+      "Thread<15>": 17.54,
+      "Thread<06>": 17.53,
+      "Thread<02>": 17.48,
+      "Thread<09>": 17.42
+     }
+    },
+    "files": []
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 51.025000005960464,
+   "manifest_loaded": 64.80000000447035,
+   "download_start": 91.2850000038743,
+   "compile_done": 1134.2850000038743,
+   "download_done": 1346.554999999702,
+   "pack_source_dll": 1411.89501953125,
+   "pack_source_seed": 1411.955078125,
+   "glue_loaded": 1423.2451171875,
+   "worker_ready": 1424.2900000065565,
+   "engine_start": 1424.3700000047684,
+   "wasm_instantiated": 1462.80517578125,
+   "files_ready": 1479.0751953125,
+   "main_start": 1480.864990234375,
+   "idle": 4920.070068359375,
+   "host_files_released": 4920.445068359375,
+   "first_pixel": 4946.27001953125,
+   "filedlg_request": 17711.9150390625,
+   "filedlg_answer": 21551.68017578125
+  },
+  "loadStart": 1.6,
+  "loadEnd": 1.33,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

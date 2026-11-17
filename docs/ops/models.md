@@ -1,0 +1,22 @@
+# AI の利用先を切り替える
+
+AI の利用先は 2 つあります。請求の状況に合わせて、依頼者がどちらかを選びます。
+- **Cloudflare の AI ゲートウェイ経由**(初期の設定。`opencode.jsonc` にその値が入っている)
+- **Amazon Bedrock**
+
+リポジトリのフォルダで、次のように実行します。
+- Cloudflare に戻す: `scripts/set-model-profile.sh gateway [セッションID]`
+- Bedrock に切り替える: `scripts/set-model-profile.sh bedrock [セッションID]`
+
+- `gateway` は、この機械だけの上書きの設定(Git に入らないファイル)を消します。`bedrock` は、決まった値をその上書きの設定に書きます。どちらも、続けて `opencode reload` を実行して、動いているサーバーに設定を読ませます。
+- Bedrock の設定は、variant(`#high` など)を付けない固定値です(付けると HTTP 400 で作業用のサブエージェントが起動しません)。メインと build は Sonnet 5.5、作業用・検証用・表題・要約は Haiku 5.5 です。全 Haiku の構成は、もうありません。
+- Bedrock のモデル名には、依頼者が禁止した語が含まれるため、リポジトリのファイルには書きません。切り替えるときにスクリプトが組み立てて、Git に入らない上書きの設定に書きます。
+- `scripts/launch.sh`(メインセッションの作成)と `scripts/audit-session.sh`(固定外の検査)は、その上書きの設定があれば、そのモデルを読みます。
+- 動いているセッションのモデルは、第 2 引数のセッション ID を付けたときだけ切り替わります(`opencode api session.switchModel`)。付けないと、そのセッションは次の操作で止まります(安全のための動きです)。モデルを選び直すか、ID を付けて実行し直してください。
+
+## GitHub Actions(作業用エージェント)のモデル
+
+Actions の作業用エージェントのモデルは、このリポジトリの Variable `OPENCODE_MODEL` の値です(決定 0402)。設定の工程が、実行時にその値を含む `.opencode/opencode.jsonc` を作成します。
+- 値を変えると、次の run から切り替わります。
+- Variable の値は GitHub が伏せず、その工程のログに出ます(依頼者の指示。決定 0402)。
+- `scripts/set-model-profile.sh` の切り替えは、この機械のローカルのセッションだけに効きます。Actions の値とは別に決まります。

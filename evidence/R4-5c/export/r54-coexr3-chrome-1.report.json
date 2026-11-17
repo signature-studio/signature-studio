@@ -1,0 +1,88 @@
+[
+ {
+  "name": "r54-export",
+  "what": "R5-4a (decision 0377): the reference project as a zip (openZipProject: Files window upload, File > Open), describe, Ctrl+R (the Save box), its OK, the Export start click at 1135,832 (provisional: the position of scn-export.json at 2260x1116; the export-dialog shot decides it), exportSha (size and sha256 of the WAV; the WAV is saved), expectRunning",
+  "rep": 1,
+  "seconds": 145,
+  "firstIdleMs": 5339.510009765625,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "evals": [
+   {
+    "expr": "(() => { const n = document.querySelector('#filedlg #fx-filename'); return n ? n",
+    "v": "serina1-serum2.wav"
+   },
+   {
+    "expr": "(() => { document.querySelector('#filedlg #fx-ok').click(); return true; })()",
+    "v": true
+   }
+  ],
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "describes": [
+   {
+    "name": "before-export",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"serina1-serum2.flp - FL Studio 2026\""
+    ]
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 59.985000014305115,
+   "manifest_loaded": 77.3400000333786,
+   "download_start": 109.86500000953674,
+   "download_done": 1530.25,
+   "compile_done": 1531.7650001049042,
+   "pack_source_dll": 1603.945068359375,
+   "pack_source_seed": 1604,
+   "glue_loaded": 1614.945068359375,
+   "worker_ready": 1615.820000052452,
+   "engine_start": 1615.8600000143051,
+   "wasm_instantiated": 1643.3701171875,
+   "files_ready": 1656.89013671875,
+   "main_start": 1658.239990234375,
+   "idle": 5339.510009765625,
+   "host_files_released": 5340.18505859375,
+   "first_pixel": 5367.699951171875,
+   "filedlg_request": 18268.43505859375,
+   "filedlg_answer": 22401.6201171875
+  },
+  "loadStart": 5.95,
+  "loadEnd": 3.34,
+  "ioStart": 0,
+  "ioEnd": 0.52,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

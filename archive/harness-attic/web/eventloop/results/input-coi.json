@@ -1,0 +1,413 @@
+{
+ "name": "input-coi",
+ "page": "/coi/input.html",
+ "started": "2026-10-28T16:06:32.086Z",
+ "loadavg_before": "2.36 1.77 1.72 16/1451 648904",
+ "url": "http://127.0.0.1:44299/coi/input.html",
+ "loadavg_after": "3.13 2.07 1.82 3/1414 649653",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/input-coi",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "grant": "ok",
+  "bringToFront": "ok",
+  "probe": {
+   "apis": {
+    "PointerEvent": "function",
+    "pointerrawupdate": true,
+    "getCoalescedEvents": "function",
+    "getPredictedEvents": "function",
+    "EditContext": "function",
+    "clipboard": true,
+    "keyboardLock": true,
+    "requestPointerLock": "function",
+    "requestFullscreen": "function",
+    "showOpenFilePicker": "function",
+    "showDirectoryPicker": "function",
+    "getGamepads": "function",
+    "requestMIDIAccess": "function",
+    "webkitGetAsEntry": "function",
+    "getAsFileSystemHandle": "function",
+    "setPointerCapture": "function",
+    "visualViewport": true,
+    "ResizeObserver": "function",
+    "matchMediaHover": false,
+    "devicePixelRatio": 1,
+    "screen": [
+     800,
+     600
+    ],
+    "isSecureContext": true,
+    "focus": true
+   },
+   "cursor": {
+    "crosshair": "crosshair",
+    "ew-resize": "ew-resize",
+    "not-allowed": "not-allowed",
+    "none": "none",
+    "url(\"data:image/svg+": "url(\"data:image/svg+xml;utf8,<svg xmlns="
+   }
+  },
+  "focusPad": true,
+  "seenAfterMoves": "{\"pointermove\":2000,\"pointerdown\":0,\"pointerup\":0,\"mousemove\":2000,\"wheel\":0,\"keydown\":0,\"keyup\":0,\"contextmenu\":0,\"dropFiles\":0}",
+  "cdp_move_roundtrip_ms": 16.666,
+  "dragDrop": "dispatched",
+  "focusIme": true,
+  "ime": [
+   {
+    "type": "compositionstart",
+    "data": ""
+   },
+   {
+    "type": "compositionupdate",
+    "data": "に"
+   },
+   {
+    "type": "beforeinput",
+    "data": "に",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "input",
+    "data": "に",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "compositionupdate",
+    "data": "にほ"
+   },
+   {
+    "type": "beforeinput",
+    "data": "にほ",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "input",
+    "data": "にほ",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "compositionupdate",
+    "data": "日本"
+   },
+   {
+    "type": "beforeinput",
+    "data": "日本",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "input",
+    "data": "日本",
+    "inputType": "insertCompositionText",
+    "composing": true
+   },
+   {
+    "type": "compositionend",
+    "data": "日本"
+   }
+  ],
+  "gesture": {
+   "pointerLock": {
+    "event": "change",
+    "locked": true
+   },
+   "pointerLockUnadjusted": {
+    "promiseError": "NotSupportedError: The options asked for in this request are not supported on this platform.",
+    "event": "error",
+    "locked": false
+   },
+   "fullscreen": {
+    "ok": true,
+    "el": true,
+    "size": [
+     780,
+     493
+    ]
+   },
+   "clipboardKeyboard": {
+    "clipboardWrite": true,
+    "clipboardRead": "FLclip",
+    "keyboardLock": "ok (outside fullscreen)"
+   }
+  },
+  "summary": {
+   "seen": {
+    "pointermove": 2000,
+    "pointerdown": 107,
+    "pointerup": 107,
+    "mousemove": 2000,
+    "wheel": 50,
+    "keydown": 10,
+    "keyup": 10,
+    "contextmenu": 3,
+    "dropFiles": 1
+   },
+   "queueDelay_ms": {
+    "n": 2284,
+    "min": 0.10500001907348633,
+    "max": 32.395000010728836,
+    "mean": 14.157421191002776,
+    "p50": 15.395000010728836,
+    "p95": 15.699999988079071,
+    "p99": 32.15500000119209
+   },
+   "handlerCost_us": {
+    "n": 2284,
+    "min": 4.999995231628418,
+    "max": 284.9999964237213,
+    "mean": 40.68082346598864,
+    "p50": 35.0000262260437,
+    "p95": 64.99999761581421,
+    "p99": 94.9999988079071
+   },
+   "coalescedPerMove": {
+    "n": 2000,
+    "min": 1,
+    "max": 1,
+    "mean": 1,
+    "p50": 1,
+    "p95": 1,
+    "p99": 1
+   },
+   "worker": {
+    "unit": "ms",
+    "latency": {
+     "n": 2284,
+     "min": 0.014892578125,
+     "max": 1.699951171875,
+     "mean": 0.079486907050405,
+     "p50": 0.07470703125,
+     "p95": 0.124755859375,
+     "p99": 0.184814453125
+    },
+    "consumed": 2284,
+    "moves": 2000,
+    "dropped": 0,
+    "maxDepth": 0,
+    "work": 0
+   },
+   "posted": 2284,
+   "wheels": [
+    {
+     "dy": 100,
+     "dx": 0,
+     "mode": 0,
+     "ctrl": false
+    },
+    {
+     "dy": 100,
+     "dx": 0,
+     "mode": 0,
+     "ctrl": false
+    },
+    {
+     "dy": 100,
+     "dx": 0,
+     "mode": 0,
+     "ctrl": false
+    }
+   ],
+   "keys": [
+    {
+     "t": "d",
+     "key": "a",
+     "code": "KeyA",
+     "keyCode": 65,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "a",
+     "code": "KeyA",
+     "keyCode": 65,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "1",
+     "code": "Digit1",
+     "keyCode": 49,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "1",
+     "code": "Digit1",
+     "keyCode": 49,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "Enter",
+     "code": "Enter",
+     "keyCode": 13,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "Enter",
+     "code": "Enter",
+     "keyCode": 13,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": " ",
+     "code": "Space",
+     "keyCode": 32,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": " ",
+     "code": "Space",
+     "keyCode": 32,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "ArrowLeft",
+     "code": "ArrowLeft",
+     "keyCode": 37,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "ArrowLeft",
+     "code": "ArrowLeft",
+     "keyCode": 37,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "F9",
+     "code": "F9",
+     "keyCode": 120,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "F9",
+     "code": "F9",
+     "keyCode": 120,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "Shift",
+     "code": "ShiftLeft",
+     "keyCode": 16,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "Shift",
+     "code": "ShiftLeft",
+     "keyCode": 16,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "Control",
+     "code": "ControlLeft",
+     "keyCode": 17,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "Control",
+     "code": "ControlLeft",
+     "keyCode": 17,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "5",
+     "code": "Numpad5",
+     "keyCode": 101,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "5",
+     "code": "Numpad5",
+     "keyCode": 101,
+     "loc": 0
+    },
+    {
+     "t": "d",
+     "key": "Backspace",
+     "code": "Backspace",
+     "keyCode": 8,
+     "loc": 0,
+     "rep": false
+    },
+    {
+     "t": "u",
+     "key": "Backspace",
+     "code": "Backspace",
+     "keyCode": 8,
+     "loc": 0
+    }
+   ],
+   "lastPointer": {
+    "type": "mouse",
+    "button": 0,
+    "buttons": 1,
+    "pressure": 0,
+    "pointerId": 1,
+    "isPrimary": true
+   },
+   "drop": {
+    "types": [
+     "Files"
+    ],
+    "files": [
+     {
+      "name": "dropme.bin",
+      "size": 12,
+      "type": "application/octet-stream",
+      "readBytes": 12,
+      "read_ms": 1.22,
+      "first": [
+       82,
+       73,
+       70,
+       70
+      ]
+     }
+    ]
+   }
+  }
+ },
+ "chrome_pids_left": 0
+}

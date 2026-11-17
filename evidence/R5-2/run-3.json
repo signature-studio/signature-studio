@@ -1,0 +1,217 @@
+{
+  "startedAt": "2026-11-13T16:29:43.377Z",
+  "run": 3,
+  "state": "engine-idle",
+  "engineKind": "emscripten-fruity-v1",
+  "timelineIdle": 5730.880126953125,
+  "timeline": {
+    "page_script": 65.02499997615814,
+    "manifest_loaded": 79.04000002145767,
+    "download_start": 122.10500001907349,
+    "compile_done": 970.7900000214577,
+    "download_done": 1215.0149999856949,
+    "pack_source_dll": 1364.60498046875,
+    "pack_source_seed": 1364.659912109375,
+    "glue_loaded": 1373.830078125,
+    "worker_ready": 1374.8600000143051,
+    "engine_start": 1374.925000011921,
+    "wasm_instantiated": 1406.080078125,
+    "files_ready": 1420.465087890625,
+    "main_start": 1422.030029296875,
+    "idle": 5730.880126953125,
+    "host_files_released": 5731.125,
+    "first_pixel": 5755.14013671875
+  },
+  "engineLogLines": 310,
+  "windowTable": [
+    {
+      "handle": "0x7f990020",
+      "lid": 8,
+      "className": "TLightweightLayeredControl",
+      "title": "",
+      "x": 224,
+      "y": 3,
+      "width": 334,
+      "height": 476,
+      "relation": "owner 0x7f990014",
+      "visible": true,
+      "enabled": true,
+      "z": 0
+    },
+    {
+      "handle": "0x7f990024",
+      "lid": 9,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 1
+    },
+    {
+      "handle": "0x7f99001c",
+      "lid": 7,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 2
+    },
+    {
+      "handle": "0x7f990014",
+      "lid": 5,
+      "className": "TApplication",
+      "title": "",
+      "x": 390,
+      "y": 240,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 3
+    },
+    {
+      "handle": "0x7f990010",
+      "lid": 4,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 4
+    },
+    {
+      "handle": "0x7f99000c",
+      "lid": 3,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 5
+    },
+    {
+      "handle": "0x7f990008",
+      "lid": 2,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 6
+    },
+    {
+      "handle": "0x7f990004",
+      "lid": 1,
+      "className": "TPUtilWindow",
+      "title": "",
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "relation": "owner 0",
+      "visible": false,
+      "enabled": true,
+      "z": 7
+    }
+  ],
+  "idles": {
+    "count": 2,
+    "first": {
+      "at": 1794587389605.435,
+      "busyMs": null,
+      "n": 1,
+      "now": 36004989390,
+      "next": 36004993210
+    },
+    "last": {
+      "at": 1794587389812.145,
+      "busyMs": 202.764892578125,
+      "n": 3,
+      "now": 36005006390,
+      "next": 36005013800
+    }
+  },
+  "pageTitle": {
+    "title": "Welcome to FL Studio - in ?trial mode?",
+    "source": "engine",
+    "why": "the title of the foreground window",
+    "lid": null
+  },
+  "documentTitle": "Welcome to FL Studio - in ?trial mode?",
+  "standIn": false,
+  "canvas": {
+    "count": 1,
+    "width": 780,
+    "height": 480,
+    "rect": {
+      "x": 0,
+      "y": 36,
+      "width": 502,
+      "height": 309
+    }
+  },
+  "pageMs": 6077.620000004768,
+  "page": {
+    "file": "evidence/R5-2/page-run3.png",
+    "bytes": 41318,
+    "width": 780,
+    "height": 493
+  },
+  "readback": {
+    "width": 780,
+    "height": 480,
+    "sha256": "639f953f3d2b1aaf5148fc045f1d70f53e70fd240d8c8d9edd2c97c317c58e4b"
+  },
+  "desk": {
+    "width": 780,
+    "height": 480,
+    "pixels": 374400,
+    "backgroundRgba": [
+      60,
+      69,
+      75,
+      255
+    ],
+    "backgroundPixels": 250295,
+    "nonBackgroundPixels": 124105,
+    "distinctColours": 1063,
+    "windows": "lid 14 at (0, 0) 780x480 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\"\nlid 48 at (0, 0) 874x573 alpha 0 key 000000 class \"TWelcomeWizard\" title \"Welcome to FL Studio - in ?trial mode?\"\n"
+  },
+  "compositor": {
+    "file": "evidence/R5-2/compositor-run3.png",
+    "bytes": 29745,
+    "width": 780,
+    "height": 480
+  },
+  "chromeVersion": "Chrome/156.0.8078.47",
+  "elapsedMs": 6528,
+  "loadavg": [
+    2.78,
+    3.08,
+    2.44
+  ],
+  "error": null
+}

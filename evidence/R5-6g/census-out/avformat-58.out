@@ -1,0 +1,431 @@
+closure_instructions   1885973
+functions              23923
+emitted_instructions   1888402
+bad_nodes              4
+tail_calls             9884
+gotos                  238114
+c_lines                2033694
+c_bytes                170279897
+handled
+  adc          1741
+  add          72771
+  addpd        13
+  addps        60
+  addsd        416
+  addss        518
+  and          16001
+  andnpd       31
+  andnps       18
+  andpd        136
+  andps        73
+  bsf          25
+  bsr          154
+  bswap        1673
+  bt           687
+  btc          9
+  btr          11
+  bts          23
+  call         116316
+  call_imp:CertCloseStore 3
+  call_imp:CertFindCertificateInStore 1
+  call_imp:CertFreeCertificateContext 7
+  call_imp:CloseHandle 27
+  call_imp:CreateDirectoryW 1
+  call_imp:DeleteCriticalSection 8
+  call_imp:DuplicateHandle 2
+  call_imp:EnterCriticalSection 11
+  call_imp:EnumFontFamiliesExW 1
+  call_imp:FileTimeToSystemTime 1
+  call_imp:FindClose 1
+  call_imp:FindFirstFileW 1
+  call_imp:FindNextFileW 1
+  call_imp:FormatMessageW 3
+  call_imp:FreeLibrary 14
+  call_imp:GetACP 1
+  call_imp:GetConsoleMode 1
+  call_imp:GetCurrentProcess 2
+  call_imp:GetCurrentProcessId 3
+  call_imp:GetCurrentThread 5
+  call_imp:GetCurrentThreadId 20
+  call_imp:GetDC 1
+  call_imp:GetEnvironmentVariableW 2
+  call_imp:GetFileAttributesW 1
+  call_imp:GetFileType 1
+  call_imp:GetLastError 39
+  call_imp:GetModuleFileNameW 1
+  call_imp:GetModuleHandleA 4
+  call_imp:GetModuleHandleExW 2
+  call_imp:GetModuleHandleW 6
+  call_imp:GetProcAddress 14
+  call_imp:GetProcessAffinityMask 2
+  call_imp:GetProcessHeap 1
+  call_imp:GetStdHandle 7
+  call_imp:GetSystemTimeAsFileTime 5
+  call_imp:GetThreadPriority 1
+  call_imp:GetTickCount64 2
+  call_imp:GetTimeZoneInformation 1
+  call_imp:GetVersion 1
+  call_imp:GetWindowsDirectoryW 1
+  call_imp:HeapAlloc 2
+  call_imp:HeapFree 2
+  call_imp:InitializeCriticalSection 7
+  call_imp:InitializeCriticalSectionAndSpinCount 1
+  call_imp:IsDBCSLeadByteEx 1
+  call_imp:IsDebuggerPresent 1
+  call_imp:IsValidCodePage 14
+  call_imp:LeaveCriticalSection 25
+  call_imp:LoadLibraryA 1
+  call_imp:LoadLibraryExW 2
+  call_imp:LoadLibraryW 4
+  call_imp:LocalFree 1
+  call_imp:MapViewOfFile 1
+  call_imp:MultiByteToWideChar 34
+  call_imp:QueryPerformanceCounter 4
+  call_imp:QueryPerformanceFrequency 3
+  call_imp:RaiseException 4
+  call_imp:ReadFile 1
+  call_imp:RegCloseKey 2
+  call_imp:RegEnumValueW 1
+  call_imp:RegOpenKeyExW 1
+  call_imp:RegQueryValueExW 1
+  call_imp:ReleaseDC 1
+  call_imp:ResetEvent 3
+  call_imp:ResumeThread 3
+  call_imp:RtlCaptureContext 2
+  call_imp:RtlLookupFunctionEntry 1
+  call_imp:RtlUnwindEx 3
+  call_imp:SHGetFolderPathW 3
+  call_imp:SetDllDirectoryW 1
+  call_imp:SetEvent 4
+  call_imp:SetLastError 6
+  call_imp:SetProcessAffinityMask 1
+  call_imp:SetThreadPriority 3
+  call_imp:Sleep 8
+  call_imp:SuspendThread 1
+  call_imp:TlsAlloc 4
+  call_imp:TlsGetValue 5
+  call_imp:TlsSetValue 7
+  call_imp:UnmapViewOfFile 1
+  call_imp:VirtualProtect 1
+  call_imp:VirtualQuery 1
+  call_imp:WaitForMultipleObjects 1
+  call_imp:WaitForSingleObject 9
+  call_imp:WideCharToMultiByte 22
+  call_imp:WriteFile 1
+  call_ind:dispatch 9686
+  call_ind:reg_const 6
+  call_ind:reg_table 1048
+  call_ind:rip_table 229
+  cbw          3
+  cdq          486
+  cdqe         1550
+  cld          3
+  cmov         9914
+  cmp          92686
+  cmppd        24
+  cmpsd        32
+  cmpss        19
+  cmpxchg      26
+  comisd       435
+  comiss       323
+  cpuid        16
+  cqo          277
+  cvtdq2pd     21
+  cvtpd2ps     2
+  cvtps2dq     2
+  cvtps2pd     2
+  cvtsd2si     12
+  cvtsd2ss     74
+  cvtsi2sd     981
+  cvtsi2ss     226
+  cvtss2sd     139
+  cvtss2si     3
+  cvttpd2dq    20
+  cvttsd2si    337
+  cvttss2si    139
+  cwde         59
+  dec          174
+  div          443
+  divpd        22
+  divsd        498
+  divss        123
+  f2xm1        2
+  fabs         4
+  fadd         9
+  fcom         3
+  fcomi        8
+  fld          156
+  fld1         2
+  fldcw        7
+  fldl2e       1
+  fldln2       1
+  fldpi        5
+  fldz         11
+  fmul         6
+  fnclex       1
+  fninit       1
+  fnstcw       5
+  fnstsw       19
+  frndint      4
+  fscale       3
+  fsincos      6
+  fsqrt        3
+  fstp         208
+  fsub         5
+  fsubr        1
+  fwait        2
+  fxam         5
+  fxch         16
+  idiv         692
+  imul         6670
+  imul1        225
+  inc          92
+  jcc          178138
+  jmp          65463
+  jmp_imp:EnterCriticalSection 5
+  jmp_imp:GetCurrentThreadId 2
+  jmp_imp:HeapAlloc 1
+  jmp_imp:HeapFree 1
+  jmp_imp:HeapReAlloc 1
+  jmp_imp:LeaveCriticalSection 6
+  jmp_imp:WaitForMultipleObjects 1
+  jmp_imp:WaitForSingleObject 1
+  jmp_ind:mem_dispatch 73
+  jmp_ind:reg_dispatch 1094
+  jmp_ind:reg_table 30
+  jmp_ind:rip_table 6
+  jrcxz        5
+  ldmxcsr      2
+  lea          104458
+  maxps        2
+  maxsd        10
+  maxss        19
+  minps        2
+  minsd        10
+  minss        24
+  mov          663333
+  mov_gs       1
+  movapd       881
+  movaps       6078
+  movd         1286
+  movdqa       3715
+  movdqu       2785
+  movhlps      39
+  movhpd       1
+  movhps       61
+  movlps       9
+  movmskpd     2
+  movq         1677
+  movs         186
+  movsd        1519
+  movss        2273
+  movsx        4050
+  movsxd       12321
+  movupd       7
+  movups       3317
+  movzx        27829
+  mul          982
+  mulpd        14
+  mulps        72
+  mulsd        779
+  mulss        932
+  neg          1599
+  nop          26325
+  not          955
+  or           8557
+  orpd         35
+  orps         18
+  packssdw     1
+  packuswb     45
+  paddd        1267
+  paddq        31
+  paddw        2
+  palignr      67
+  pand         508
+  pandn        108
+  pause        3
+  pcmpeqb      3
+  pcmpeqd      97
+  pcmpgtd      14
+  pcmpgtw      3
+  pextrw       24
+  pinsrw       73
+  pmuludq      276
+  pop          78327
+  por          535
+  prefetcht0   85
+  pshufb       205
+  pshufd       693
+  pshuflw      1
+  pslld        521
+  pslldq       76
+  psllq        40
+  psrad        30
+  psrld        614
+  psrldq       53
+  psrlq        248
+  psubd        16
+  punpckhbw    3
+  punpckhdq    28
+  punpckhqdq   13
+  punpckhwd    19
+  punpcklbw    3
+  punpckldq    701
+  punpcklqdq   632
+  punpcklwd    25
+  push         62052
+  pxor         3847
+  ret          25352
+  rol          3590
+  ror          2373
+  sar          6086
+  sbb          1300
+  setcc        5228
+  shl          10008
+  shr          10825
+  shufps       65
+  sqrtsd       13
+  sqrtss       10
+  stmxcsr      2
+  stos         532
+  sub          45601
+  subpd        20
+  subps        33
+  subsd        243
+  subss        412
+  test         84039
+  ucomisd      184
+  ucomiss      154
+  unpcklpd     19
+  unpcklps     2
+  vmovaps      62
+  vmovups      165
+  vzeroupper   52
+  xadd         210
+  xchg         300
+  xgetbv_stop  1
+  xor          59052
+  xorpd        41
+  xorps        237
+outlined_heads         101 (shared instructions before 30591 after 2429; 25 heads not promoted: on a tail-call cycle)
+dead_flags             writers 383417 fully_dead 159229 partly_dead 178520 substituted 150704 rounds 5
+register_jmp_sites     1119
+jumptabs               0
+msvc_tables            0
+setjmp_landings        0
+msvc_rejected          0
+register_jmps
+  jmp_ind:reg_dispatch   1094
+  jmp_ind:reg_table      26
+unsupported_total      20614
+unsupported            110
+      2840  Vpxor: mnemonic outside minimal set
+      1859  Vpaddd: mnemonic outside minimal set
+      1200  Vpsrld: mnemonic outside minimal set
+      1118  Vmovdqu: mnemonic outside minimal set
+      1088  Rorx: mnemonic outside minimal set
+       936  Vpslld: mnemonic outside minimal set
+       899  Call: indirect through IAT slot (not lifted)
+       820  Shrd: mnemonic outside minimal set
+       752  Vmovdqa: mnemonic outside minimal set
+       644  Vpaddq: mnemonic outside minimal set
+       571  Aesenc: mnemonic outside minimal set
+       554  Vpor: mnemonic outside minimal set
+       469  Jmp: indirect through IAT slot (not lifted)
+       430  Vpand: mnemonic outside minimal set
+       384  Vpmuludq: mnemonic outside minimal set
+       368  Adcx: mnemonic outside minimal set
+       346  Aesdec: mnemonic outside minimal set
+       344  Vaesenc: mnemonic outside minimal set
+       340  Mulx: mnemonic outside minimal set
+       319  Vpsrlq: mnemonic outside minimal set
+       316  Adox: mnemonic outside minimal set
+       249  Vmovd: mnemonic outside minimal set
+       225  Vpshufb: mnemonic outside minimal set
+       192  Vpinsrd: mnemonic outside minimal set
+       191  Shld: mnemonic outside minimal set
+       172  Andn: mnemonic outside minimal set
+       164  Vpshufd: mnemonic outside minimal set
+       152  Vpalignr: mnemonic outside minimal set
+       142  Vpclmulqdq: mnemonic outside minimal set
+       128  Sha256rnds2: mnemonic outside minimal set
+       128  Vpunpckldq: mnemonic outside minimal set
+       104  Vaesdec: mnemonic outside minimal set
+       104  Vpandn: mnemonic outside minimal set
+        98  Aesenclast: mnemonic outside minimal set
+        80  Sha1nexte: mnemonic outside minimal set
+        80  Sha1rnds4: mnemonic outside minimal set
+        80  Vprold: mnemonic outside minimal set
+        80  Vpsllq: mnemonic outside minimal set
+        78  Vpunpckhqdq: mnemonic outside minimal set
+        75  Vpxord: mnemonic outside minimal set
+        70  Vmovdqa64: mnemonic outside minimal set
+        66  Vpsrldq: mnemonic outside minimal set
+        64  Sha1msg1: mnemonic outside minimal set
+        64  Sha1msg2: mnemonic outside minimal set
+        62  Vinserti128: mnemonic outside minimal set
+        59  Aesdeclast: mnemonic outside minimal set
+        57  Aeskeygenassist: mnemonic outside minimal set
+        56  Vprotd: mnemonic outside minimal set
+        55  Pclmulqdq: mnemonic outside minimal set
+        54  Vpermq: mnemonic outside minimal set
+        48  Sha256msg1: mnemonic outside minimal set
+        48  Sha256msg2: mnemonic outside minimal set
+        48  Vpunpcklqdq: mnemonic outside minimal set
+        46  Vaesenclast: mnemonic outside minimal set
+        45  Vpblendd: mnemonic outside minimal set
+        40  Vshufi32x4: mnemonic outside minimal set
+        38  Vpslldq: mnemonic outside minimal set
+        37  Vmovdqa32: mnemonic outside minimal set
+        37  Vmovdqu32: mnemonic outside minimal set
+        34  Ud2: mnemonic outside minimal set
+        32  Vpermd: mnemonic outside minimal set
+        32  Vprotq: mnemonic outside minimal set
+        32  Vpunpckhdq: mnemonic outside minimal set
+        30  Rcr: mnemonic outside minimal set
+        28  Vpbroadcastq: mnemonic outside minimal set
+        24  Vperm2i128: mnemonic outside minimal set
+        22  Vpandq: mnemonic outside minimal set
+        22  Vpcmpeqd: mnemonic outside minimal set
+        21  Vbroadcasti128: mnemonic outside minimal set
+        18  Movbe: mnemonic outside minimal set
+        17  Vpaddb: mnemonic outside minimal set
+        16  Vzeroall: mnemonic outside minimal set
+        12  Vextracti32x4: mnemonic outside minimal set
+        11  Tzcnt: mnemonic outside minimal set
+        11  Vmovq: mnemonic outside minimal set
+        10  Vxorps: mnemonic outside minimal set
+         9  Vpbroadcastd: mnemonic outside minimal set
+         9  Vpcmpgtd: mnemonic outside minimal set
+         8  Shlx: mnemonic outside minimal set
+         8  Shrx: mnemonic outside minimal set
+         8  Vaesdeclast: mnemonic outside minimal set
+         8  Vbroadcasti32x4: mnemonic outside minimal set
+         8  Vmovdqu64: mnemonic outside minimal set
+         5  Fprem1: mnemonic outside minimal set
+         5  Vextracti128: mnemonic outside minimal set
+         5  Vextracti64x4: mnemonic outside minimal set
+         4  <undecodable or outside .text>
+         4  Aesimc: mnemonic outside minimal set
+         4  Rdseed: mnemonic outside minimal set
+         4  Vpinsrq: mnemonic outside minimal set
+         4  Vporq: mnemonic outside minimal set
+         3  Fyl2x: mnemonic outside minimal set
+         3  Fyl2xp1: mnemonic outside minimal set
+         3  Kmovw: mnemonic outside minimal set
+         3  Pinsrd: mnemonic outside minimal set
+         3  Sahf: mnemonic outside minimal set
+         3  Vpextrq: mnemonic outside minimal set
+         2  Fcos: mnemonic outside minimal set
+         2  Fsin: mnemonic outside minimal set
+         2  Popfq: mnemonic outside minimal set
+         2  Pushfq: mnemonic outside minimal set
+         2  Rdrand: mnemonic outside minimal set
+         1  Fldenv: mnemonic outside minimal set
+         1  Fnstenv: mnemonic outside minimal set
+         1  Fprem: mnemonic outside minimal set
+         1  In: mnemonic outside minimal set
+         1  Loop: no condition code (loop or jrcxz)
+         1  Mov: gs offset is not modeled (only 0x30, 0x58 and 0x10)
+         1  Psadbw: mnemonic outside minimal set
+         1  Vpsubq: mnemonic outside minimal set

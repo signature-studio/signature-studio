@@ -1,0 +1,169 @@
+--- a/wsrc/src/fle-03.c
++++ b/wsrc/src/fle-03.c
+@@ -14,12 +14,13 @@
+     return h;
+ }
+ static unsigned long el_total;
++static unsigned el_n_67dd90, el_n_67ddf0;
+ static unsigned el_n_677f60;
+ static unsigned el_n_677fb0;
+ static unsigned el_n_678010;
+ #define EL_OK() (el_total < 100000u)
+ #define EL_LINE(...) do { el_total++; fprintf(stderr, __VA_ARGS__); } while (0)
+-/* ---- end elog ---- */
++/* ---- end elog ---- (elog2 sites below) */
+ 
+ #ifndef FLE_LOWREGS
+ extern uint64_t R[16];
+@@ -90053,7 +90054,7 @@
+ 
+ void f_678010(void)
+ {
+-    if (EL_OK()) EL_LINE("ELOG 678010 %x ecx=%x edx=%x f2=%x r8=%llx r9=%x\n", (unsigned)el_n_678010++, (unsigned)R[1], (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned long long)(R[8]), (unsigned)R[9]);
++    if (EL_OK()) EL_LINE("ELOG 678010 %x ecx=%x edx=%x f2=%x r8=%llx r9=%x f3=%x s5=%x s6=%x s7=%x s8=%x\n", (unsigned)el_n_678010++, (unsigned)R[1], (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned long long)(R[8]), (unsigned)R[9], (unsigned)X[3].u32[0], (unsigned)fle_ld(R[4] + 0x28, 4), (unsigned)fle_ld(R[4] + 0x30, 4), (unsigned)fle_ld(R[4] + 0x38, 4), (unsigned)fle_ld(R[4] + 0x40, 4));
+ L_678010: { /* 0x678010 Push */ { uint64_t t = R[7]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_678011: { /* 0x678011 Push */ { uint64_t t = R[6]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_678012: { /* 0x678012 Push */ { uint64_t t = R[3]; R[4] -= 8; fle_st(R[4], 8, t); }}
+@@ -94412,6 +94413,7 @@
+ 
+ void f_67dd90(void)
+ {
++    if (el_total < 100000u && el_n_67dd90 < 20000u) { el_total++; fprintf(stderr, "ELOG 67dd90 %x p=%llx d1=%llx\n", el_n_67dd90++, (unsigned long long)(R[1]), (unsigned long long)(X[1].u64[0])); }
+ L_67dd90: { /* 0x67dd90 Push */ { uint64_t t = R[3]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_67dd91: { /* 0x67dd91 Sub */ { uint64_t t = fle_op_sub(64, R[4], (UINT64_C(0x30)), 0); R[4] = t; }}
+ L_67dd95: { /* 0x67dd95 Movdqa */ fle_stxa((R[4] + UINT64_C(0x20)), X[6]);}
+@@ -94438,6 +94440,7 @@
+ 
+ void f_67ddf0(void)
+ {
++    if (el_total < 100000u && el_n_67ddf0 < 20000u) { el_total++; fprintf(stderr, "ELOG 67ddf0 %x p=%llx d1=%llx\n", el_n_67ddf0++, (unsigned long long)(R[1]), (unsigned long long)(X[1].u64[0])); }
+ L_67ddf0: { /* 0x67ddf0 Push */ { uint64_t t = R[3]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_67ddf1: { /* 0x67ddf1 Sub */ { uint64_t t = fle_op_sub(64, R[4], (UINT64_C(0x30)), 0); R[4] = t; }}
+ L_67ddf5: { /* 0x67ddf5 Movdqa */ fle_stxa((R[4] + UINT64_C(0x20)), X[6]);}
+--- a/wsrc/v-tb2d2/src/m7-03.c
++++ b/wsrc/v-tb2d2/src/m7-03.c
+@@ -4,6 +4,28 @@
+ #include "fle_dispatch.h"
+ #include "fle_flags_nf.h"
+ 
++/* ---- alpha1 0308b elog2 helper (throwaway test tree only) ---- */
++static uint64_t el_h(uint64_t a, uint64_t n) {
++    uint64_t h = UINT64_C(0xcbf29ce484222325), i = 0, v;
++    int k;
++    if (a == 0 || n == 0) return h;
++    if (n > (UINT64_C(1) << 20)) n = UINT64_C(1) << 20;
++    for (; i + 8 <= n; i += 8) { v = fle_ld(a + i, 8); for (k = 0; k < 8; k++) { h ^= (v >> (8 * k)) & 0xff; h *= UINT64_C(0x100000001b3); } }
++    for (; i < n; i++) { h ^= fle_ld(a + i, 1) & 0xff; h *= UINT64_C(0x100000001b3); }
++    return h;
++}
++static unsigned long el_total;
++#define EL_OK(c) (el_total < 100000u && (c) < 20000u)
++#define EL_LINE(...) do { el_total++; fprintf(stderr, __VA_ARGS__); } while (0)
++static uint64_t el_obj[8192];
++static unsigned el_icnt[8192];
++static unsigned el_nobj;
++static int el_inst(uint64_t o) { unsigned i; for (i = 0; i < el_nobj; i++) if (el_obj[i] == o) return (int)i; return -1; }
++static void el_reg(uint64_t o) { if (el_nobj < 8192u) el_obj[el_nobj++] = o; }
++/* ---- end elog2 helper ---- */
++static unsigned el_n_b285320, el_n_b284700, el_n_b285460, el_c_b285320, el_c_b284700, el_c_b285460;
++static unsigned el_n_b285040, el_c_b285040, el_n_b285020, el_c_b285020, el_n_b284c60, el_c_b284c60, el_n_b284fe0, el_c_b284fe0;
++
+ #ifndef FLE_LOWREGS
+ extern uint64_t R[16];
+ #endif
+@@ -101880,6 +101902,7 @@
+ 
+ void f_b284700(void)
+ {
++    if (EL_OK(el_c_b284700)) { el_c_b284700++; EL_LINE("ELOG b284700 %x inst=%x d1=%llx d2=%llx d3=%llx\n", el_n_b284700++, el_inst(R[1]), (unsigned long long)(X[1].u64[0]), (unsigned long long)(X[2].u64[0]), (unsigned long long)(X[3].u64[0])); }
+ L_b284700: { /* 0xb284700 Mov */ R[1] = fle_ld((R[1] + UINT64_C(0x8)), 8);}
+ L_b284704: { /* 0xb284704 Mov */ R[0] = fle_ld((R[1]), 8);}
+ L_b284707: { /* 0xb284707 Jmp */ { fle_dispatch(fle_ld((R[0] + UINT64_C(0x8)), 8)); return; }}
+@@ -102363,6 +102386,7 @@
+ 
+ void f_b284c60(void)
+ {
++    if (EL_OK(el_c_b284c60)) { el_c_b284c60++; EL_LINE("ELOG b284c60 %x inst=%d rdx=%llx r8=%llx r9=%llx s5=%llx s6=%llx\n", el_n_b284c60++, el_inst(R[1]), (unsigned long long)(R[2]), (unsigned long long)(R[8]), (unsigned long long)(R[9]), (unsigned long long)(fle_ld(R[4] + 0x28, 8)), (unsigned long long)(fle_ld(R[4] + 0x30, 8))); }
+ L_b284c60: { /* 0xb284c60 Mov */ R[1] = fle_ld((R[1] + UINT64_C(0x8)), 8);}
+ L_b284c64: { /* 0xb284c64 Test */ { (void)(fle_op_logic(32, (((uint32_t)R[9])) & (((uint32_t)R[9])))); }}
+ L_b284c67: { /* 0xb284c67 Setne */ R[9] = (R[9] & ~UINT64_C(0xff)) | (uint8_t)((uint64_t)(fle_cc(5) != 0));}
+@@ -102659,6 +102683,7 @@
+ 
+ void f_b284fe0(void)
+ {
++    if (EL_OK(el_c_b284fe0)) { el_c_b284fe0++; EL_LINE("ELOG b284fe0 %x inst=%d rdx=%llx r8=%llx r9=%llx s5=%llx s6=%llx\n", el_n_b284fe0++, el_inst(R[1]), (unsigned long long)(R[2]), (unsigned long long)(R[8]), (unsigned long long)(R[9]), (unsigned long long)(fle_ld(R[4] + 0x28, 8)), (unsigned long long)(fle_ld(R[4] + 0x30, 8))); }
+ L_b284fe0: { /* 0xb284fe0 Mov */ R[1] = fle_ld((R[1] + UINT64_C(0x8)), 8);}
+ L_b284fe4: { /* 0xb284fe4 Test */ { (void)(fle_op_logic(32, (((uint32_t)R[8])) & (((uint32_t)R[8])))); }}
+ L_b284fe7: { /* 0xb284fe7 Setne */ R[8] = (R[8] & ~UINT64_C(0xff)) | (uint8_t)((uint64_t)(fle_cc(5) != 0));}
+@@ -102684,6 +102709,7 @@
+ 
+ void f_b285020(void)
+ {
++    if (EL_OK(el_c_b285020)) { el_c_b285020++; EL_LINE("ELOG b285020 %x inst=%d rdx=%llx r8=%llx r9=%llx s5=%llx s6=%llx\n", el_n_b285020++, el_inst(R[1]), (unsigned long long)(R[2]), (unsigned long long)(R[8]), (unsigned long long)(R[9]), (unsigned long long)(fle_ld(R[4] + 0x28, 8)), (unsigned long long)(fle_ld(R[4] + 0x30, 8))); }
+ L_b285020: { /* 0xb285020 Mov */ R[1] = fle_ld((R[1] + UINT64_C(0x8)), 8);}
+ L_b285024: { /* 0xb285024 Test */ { (void)(fle_op_logic(32, (((uint32_t)R[9])) & (((uint32_t)R[9])))); }}
+ L_b285027: { /* 0xb285027 Setne */ R[9] = (R[9] & ~UINT64_C(0xff)) | (uint8_t)((uint64_t)(fle_cc(5) != 0));}
+@@ -102693,6 +102719,8 @@
+ 
+ void f_b285040(void)
+ {
++    unsigned el_s5 = el_n_b285040++;
++    if (EL_OK(el_c_b285040)) { el_c_b285040++; EL_LINE("ELOG b285040 %x p=%llx ch=%x f2=%x f3=%x f4=%x\n", el_s5, (unsigned long long)(R[1]), (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned)X[3].u32[0], (unsigned)fle_ld(R[4] + 0x28, 4)); }
+ L_b285040: { /* 0xb285040 Mov */ fle_st((R[4] + UINT64_C(0x8)), 8, R[3]);}
+ L_b285045: { /* 0xb285045 Mov */ fle_st((R[4] + UINT64_C(0x10)), 8, R[5]);}
+ L_b28504a: { /* 0xb28504a Mov */ fle_st((R[4] + UINT64_C(0x18)), 8, R[6]);}
+@@ -102753,7 +102781,7 @@
+ L_b285109: { /* 0xb285109 Movaps */ X[6] = fle_ldxa((R[4] + UINT64_C(0x30)));}
+ L_b28510e: { /* 0xb28510e Add */ { uint64_t t = fle_op_add(64, R[4], (UINT64_C(0x40)), 0); R[4] = t; }}
+ L_b285112: { /* 0xb285112 Pop */ { uint64_t t = fle_ld(R[4], 8); R[4] += 8; R[7] = t; }}
+-L_b285113: { /* 0xb285113 Ret */ return;}
++L_b285113: { /* 0xb285113 Ret */ if (R[0] != 0) el_reg(R[0]); if (el_total < 100000u) EL_LINE("ELOG b285040x %x obj=%llx\n", el_s5, (unsigned long long)(R[0])); return;}
+ }
+ 
+ void f_b285120(void)
+@@ -102919,6 +102947,8 @@
+ 
+ void f_b285320(void)
+ {
++    unsigned el_s = el_n_b285320++;
++    if (EL_OK(el_c_b285320)) { el_c_b285320++; EL_LINE("ELOG b285320 %x rcx=%llx rdx=%x x2=%x x3=%x s5=%x s6=%x s7=%x s8=%x\n", el_s, (unsigned long long)(R[1]), (unsigned)R[2], (unsigned)X[2].u32[0], (unsigned)X[3].u32[0], (unsigned)fle_ld(R[4] + 0x28, 4), (unsigned)fle_ld(R[4] + 0x30, 4), (unsigned)fle_ld(R[4] + 0x38, 4), (unsigned)fle_ld(R[4] + 0x40, 4)); }
+ L_b285320: { /* 0xb285320 Sub */ { uint64_t t = fle_nf_sub(64, R[4], (UINT64_C(0x68)), 0); R[4] = t; }}
+ L_b285324: { /* 0xb285324 Mov */ R[8] = (uint32_t)(fle_ld((R[4] + UINT64_C(0x90)), 4));}
+ L_b28532c: { /* 0xb28532c Xor */ { uint64_t t = fle_op_logic(32, (((uint32_t)R[9])) ^ (((uint32_t)R[9]))); R[9] = (uint32_t)(t); }}
+@@ -102953,14 +102983,14 @@
+ L_b2853a4: { /* 0xb2853a4 Mov */ R[0] = R[1];}
+ L_b2853a7: { /* 0xb2853a7 Mov */ fle_st((R[1]), 8, R[2]);}
+ L_b2853aa: { /* 0xb2853aa Add */ { uint64_t t = fle_op_add(64, R[4], (UINT64_C(0x68)), 0); R[4] = t; }}
+-L_b2853ae: { /* 0xb2853ae Ret */ return;}
++L_b2853ae: { /* 0xb2853ae Ret */ { int el_k = -1; if (R[0] != 0) { el_reg(R[0]); el_k = (int)el_nobj - 1; } if (el_total < 100000u) EL_LINE("ELOG b285320x %x obj=%llx inst=%x\n", el_s, (unsigned long long)(R[0]), (unsigned)el_k); } return;}
+ L_b2853af: { /* 0xb2853af Xor */ { uint64_t t = fle_op_logic(32, (((uint32_t)R[1])) ^ (((uint32_t)R[1]))); R[1] = (uint32_t)(t); }}
+ L_b2853b1: { /* 0xb2853b1 Mov */ R[0] = (uint32_t)(((uint32_t)R[1]));}
+ L_b2853b3: { /* 0xb2853b3 Add */ { uint64_t t = fle_op_add(64, R[4], (UINT64_C(0x68)), 0); R[4] = t; }}
+-L_b2853b7: { /* 0xb2853b7 Ret */ return;}
++L_b2853b7: { /* 0xb2853b7 Ret */ { int el_k = -1; if (R[0] != 0) { el_reg(R[0]); el_k = (int)el_nobj - 1; } if (el_total < 100000u) EL_LINE("ELOG b285320x %x obj=%llx inst=%x\n", el_s, (unsigned long long)(R[0]), (unsigned)el_k); } return;}
+ L_b2853b8: { /* 0xb2853b8 Xor */ { uint64_t t = fle_op_logic(32, (((uint32_t)R[0])) ^ (((uint32_t)R[0]))); R[0] = (uint32_t)(t); }}
+ L_b2853ba: { /* 0xb2853ba Add */ { uint64_t t = fle_op_add(64, R[4], (UINT64_C(0x68)), 0); R[4] = t; }}
+-L_b2853be: { /* 0xb2853be Ret */ return;}
++L_b2853be: { /* 0xb2853be Ret */ { int el_k = -1; if (R[0] != 0) { el_reg(R[0]); el_k = (int)el_nobj - 1; } if (el_total < 100000u) EL_LINE("ELOG b285320x %x obj=%llx inst=%x\n", el_s, (unsigned long long)(R[0]), (unsigned)el_k); } return;}
+ }
+ 
+ void f_b2853c0(void)
+@@ -103029,6 +103059,9 @@
+ 
+ void f_b285460(void)
+ {
++    unsigned el_s = el_n_b285460++; uint64_t el_a = R[2], el_b = R[8]; unsigned el_n = (uint32_t)R[9]; int el_i = el_inst(R[1]); unsigned el_ic = 0, el_lg = 0;
++    if (el_i >= 0) el_ic = el_icnt[el_i]++;
++    if (el_total < 100000u && el_c_b285460 < 10000u) { el_lg = 1; el_c_b285460++; EL_LINE("ELOG b285460 %x inst=%x ic=%x n=%x h1=%016llx h2=%016llx\n", el_s, (unsigned)el_i, el_ic, el_n, (unsigned long long)(el_h(el_a, (uint64_t)el_n * 4)), (unsigned long long)(el_h(el_b, (uint64_t)el_n * 4))); }
+ L_b285460: { /* 0xb285460 Mov */ fle_st((R[4] + UINT64_C(0x18)), 8, R[3]);}
+ L_b285465: { /* 0xb285465 Push */ { uint64_t t = R[5]; R[4] -= 8; fle_st(R[4], 8, t); }}
+ L_b285466: { /* 0xb285466 Push */ { uint64_t t = R[12]; R[4] -= 8; fle_st(R[4], 8, t); }}
+@@ -103083,7 +103116,7 @@
+ L_b285505: { /* 0xb285505 Pop */ { uint64_t t = fle_ld(R[4], 8); R[4] += 8; R[13] = t; }}
+ L_b285507: { /* 0xb285507 Pop */ { uint64_t t = fle_ld(R[4], 8); R[4] += 8; R[12] = t; }}
+ L_b285509: { /* 0xb285509 Pop */ { uint64_t t = fle_ld(R[4], 8); R[4] += 8; R[5] = t; }}
+-L_b28550a: { /* 0xb28550a Ret */ return;}
++L_b28550a: { /* 0xb28550a Ret */ if (el_lg) EL_LINE("ELOG b285460x %x inst=%x h1=%016llx h2=%016llx\n", el_s, (unsigned)el_i, (unsigned long long)(el_h(el_a, (uint64_t)el_n * 4)), (unsigned long long)(el_h(el_b, (uint64_t)el_n * 4))); return;}
+ }
+ 
+ void f_b285510(void)

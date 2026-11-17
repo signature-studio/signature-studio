@@ -1,0 +1,8 @@
+# ci/artifacts.lock - the installers kept in the ARTIFACT R2 bucket (fl-web-artifacts). Only the installers are there: no extracted file, no build output.
+# The installers themselves are never in git. The workflow verifies every object it uses against this file (size, then SHA-256 of what it downloaded; the ETag is checked from the bucket's listing).
+# Uploaded 2026-11-03 from the owner's ~/ダウンロード (multipart through a local `wrangler dev` with a remote R2 binding: wrangler's own `r2 object put` stops at 300 MiB).
+# Fields (TAB separated): key <TAB> size in bytes <TAB> SHA-256 <TAB> ETag (R2: md5, or md5-of-part-md5s-N for a multipart object; 64 MiB parts) <TAB> used for
+installers/flstudio_win64_26.1.7.5653.exe	1106033456	04393e7946c7369aaa5cd9ce1c755803e922146289e1ae3263629a44f4e5fc02	7f1e3b7989c03a673d3a7a053b4fde68-17	FL Studio 26.1.7.5653 (NSIS): the engine, the bundled DLLs, the guest file tree
+installers/Install_Xfer_Serum2_2.1.5.exe	1313084056	507b726d97bf78920157f3817aff003b9ee38ee961f4efd318cf43216370f695	84140bcc501d789c170a1faa0a550615-20	Serum 2 2.1.5 (VST3)
+installers/Install_Xfer_OTT_137.exe	8397928	d4e1d3f62a1db904d3ab5c776ddcbb39ac74469e5ca3ed723e3dcef89ebcefeb	d37e8c8e92d55af5d4eb031d07544238	OTT 1.37 (VST3)
+installers/VitalInstaller.exe	41808960	5bf1b8c7b08ca55d9b023b9bdbb7bd112606015d8c6f31dddda3b11dd70c6ed7	bc802d46888002c281698bd56b2a70b8	Vital (VST3)

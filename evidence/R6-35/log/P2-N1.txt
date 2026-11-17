@@ -1,0 +1,36 @@
+## before P2-N1 (2026-11-17T04:57:41Z)
+0.32 0.59 0.43 2/1255 1353484
+               total        used        free      shared  buff/cache   available
+Mem:           14773        4658        4283         904        7139       10114
+Swap:           4095        1328        2767
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1359904 4385600 199408 7111252   29   47  2844  1014 5840    3  5  1 93  0  0  0
+ 3  0 1359904 4384692 199408 7111396    0    0     0     0 3675 4339  0  1 99  0  0  0
+ 0  0 1359904 4383712 199408 7111400    0    0     0    12 4823 4338  1  1 98  0  0  0
+some avg10=0.00 avg60=0.03 avg300=0.71 total=145984171
+browser pid=7131 age=12:34:18 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 0.38 io 0 after 2 s; mem avail 10077 MB, swap used 1328 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-lat-n-chrome-1
+--- stdout (tail)
+04:57:47 backend chrome 
+04:57:47 scenario lat 
+05:02:24   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P2-N1 (2026-11-17T05:02:25Z)
+2.44 1.58 0.90 1/1244 1369224
+               total        used        free      shared  buff/cache   available
+Mem:           25031        4722       14273         905        7385       20308
+Swap:           4095        1327        2768
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1359860 14616112 201916 7360516   29   47  2831  1009 5878    3  5  1 93  0  0  0
+ 0  0 1359856 14644852 201916 7360440    4    0     4     0 2095 2124  0  0 100  0  0  0
+ 0  0 1359856 14688808 201916 7360440    0    0     0     0 1978 2056  0  0 100  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.25 total=146050755
+browser pid=7131 age=12:39:02 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-lat-n-chrome-1

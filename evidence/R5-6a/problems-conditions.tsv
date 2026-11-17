@@ -1,0 +1,7 @@
+arm	label	start_utc	loadavg1	vmstat_sample2_si_so	vmstat_sample3_si_so	io_avg10	other_chrome_procs	avail_mb	load_start_report	first_idle_ms	run_dir	out
+ctl	r56ctl1	2026-11-16T20:03:19Z	0.48	0/0	0/0	0.00	3	26928	0.44	4075	r55-r56ctl1-problems-chrome-1	rc=0
+new	r56new2	2026-11-16T20:04:06Z	0.94	0/0	0/0	0.00	3	26785	0.94	4147	r55-r56new2-problems-chrome-1	rc=0
+new	r56new3	2026-11-16T20:05:00Z	0.67	0/0	0/0	0.00	3	20686	0.67	4169	r55-r56new3-problems-chrome-1	rc=0
+ctl	r56ctl2	2026-11-16T20:05:46Z	1.65	0/0	0/0	0.00	3	20628	1.65	4116	r55-r56ctl2-problems-chrome-1	rc=0
+new	r56new4	2026-11-16T20:06:33Z	1.13	0/0	0/0	0.00	3	20598	1.12	4181	r55-r56new4-problems-chrome-1	rc=0
+ctl	r56ctl3	2026-11-16T20:07:21Z	1.48	0/0	0/0	0.00	3	20621	1.48	4126	r55-r56ctl3-problems-chrome-1	rc=0

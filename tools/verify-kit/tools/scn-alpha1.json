@@ -1,0 +1,307 @@
+[
+ {
+  "name": "add-menu-simple-fade",
+  "what": "alpha1: close the wizard, open the Add menu, choose the row 'Simple' (a pull-down choice), and read the colour of the chosen row and of the row below the menu in the browser's own screenshots, as fast as they come",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "click",
+    "x": 73,
+    "y": 20
+   },
+   {
+    "op": "waitWindow",
+    "cls": "TQuickPopupMenuWindow",
+    "visible": true,
+    "ms": 10000
+   },
+   {
+    "op": "wait",
+    "ms": 1200
+   },
+   {
+    "op": "series",
+    "name": "before",
+    "points": [
+     [
+      99,
+      133
+     ],
+     [
+      200,
+      200
+     ]
+    ],
+    "n": 1
+   },
+   {
+    "op": "shot",
+    "name": "menu-open"
+   },
+   {
+    "op": "click",
+    "x": 99,
+    "y": 133
+   },
+   {
+    "op": "series",
+    "name": "fade",
+    "points": [
+     [
+      99,
+      133
+     ],
+     [
+      200,
+      200
+     ]
+    ],
+    "n": 40,
+    "gapMs": 0
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "series",
+    "name": "after",
+    "points": [
+     [
+      99,
+      133
+     ],
+     [
+      200,
+      200
+     ]
+    ],
+    "n": 1
+   },
+   {
+    "op": "shot",
+    "name": "after"
+   }
+  ]
+ },
+ {
+  "name": "picker-f8-fade",
+  "what": "alpha1: F8 opens the plug-in picker (a translucent full-screen window that fades in); colours of points over the project while it fades in and after it is closed with Escape",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "series",
+    "name": "before",
+    "points": [
+     [
+      500,
+      300
+     ],
+     [
+      960,
+      540
+     ],
+     [
+      1500,
+      900
+     ],
+     [
+      300,
+      60
+     ]
+    ],
+    "n": 1
+   },
+   {
+    "op": "key",
+    "code": "F8"
+   },
+   {
+    "op": "series",
+    "name": "fadein",
+    "points": [
+     [
+      500,
+      300
+     ],
+     [
+      960,
+      540
+     ],
+     [
+      1500,
+      900
+     ],
+     [
+      300,
+      60
+     ]
+    ],
+    "n": 25,
+    "gapMs": 0
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "series",
+    "name": "open",
+    "points": [
+     [
+      500,
+      300
+     ],
+     [
+      960,
+      540
+     ],
+     [
+      1500,
+      900
+     ],
+     [
+      300,
+      60
+     ]
+    ],
+    "n": 1
+   },
+   {
+    "op": "shot",
+    "name": "picker-open"
+   },
+   {
+    "op": "key",
+    "code": "Escape"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "series",
+    "name": "after",
+    "points": [
+     [
+      500,
+      300
+     ],
+     [
+      960,
+      540
+     ],
+     [
+      1500,
+      900
+     ],
+     [
+      300,
+      60
+     ]
+    ],
+    "n": 1
+   },
+   {
+    "op": "shot",
+    "name": "picker-closed"
+   }
+  ]
+ },
+ {
+  "name": "picker-cost",
+  "what": "alpha1: the cost of composing the full-screen plug-in picker in the browser's Worker: during the fade-in (F8) and in the steady state (the guest redraws the whole window 62.5 times a second), per second",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 3000
+   },
+   {
+    "op": "seqMeasure",
+    "name": "idle-main",
+    "units": 2,
+    "ops": [
+     {
+      "op": "wait",
+      "ms": 2000
+     }
+    ]
+   },
+   {
+    "op": "seqMeasure",
+    "name": "fadein-0.8s",
+    "units": 1,
+    "ops": [
+     {
+      "op": "key",
+      "code": "F8"
+     },
+     {
+      "op": "wait",
+      "ms": 800
+     }
+    ]
+   },
+   {
+    "op": "wait",
+    "ms": 1500
+   },
+   {
+    "op": "seqMeasure",
+    "name": "steady-3s",
+    "units": 3,
+    "ops": [
+     {
+      "op": "wait",
+      "ms": 3000
+     }
+    ]
+   },
+   {
+    "op": "seqMeasure",
+    "name": "fadeout-1.2s",
+    "units": 1,
+    "ops": [
+     {
+      "op": "key",
+      "code": "Escape"
+     },
+     {
+      "op": "wait",
+      "ms": 1200
+     }
+    ]
+   },
+   {
+    "op": "wait",
+    "ms": 1000
+   },
+   {
+    "op": "seqMeasure",
+    "name": "idle-after",
+    "units": 2,
+    "ops": [
+     {
+      "op": "wait",
+      "ms": 2000
+     }
+    ]
+   }
+  ]
+ }
+]

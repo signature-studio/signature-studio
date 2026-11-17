@@ -1,0 +1,36 @@
+## before P2-C5 (2026-11-17T05:41:10Z)
+2.85 2.39 2.40 3/1261 1512869
+               total        used        free      shared  buff/cache   available
+Mem:           25539        4766        3376        1140       18993       20772
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 2  0 1358216 3457600 546068 18903008   28   44  3644   998 6163    3  5  1 93  0  0  0
+ 1  0 1358216 3466212 546076 18903024    0    0     0   164 11395 7086  2  6 93  0  0  0
+ 1  0 1358216 3467876 546076 18903040    0    0     0   176 12579 9171  2  6 92  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.01 total=156752753
+browser pid=7131 age=13:17:48 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 2.85 io 0 after 2 s; mem avail 20763 MB, swap used 1326 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-lat-c-chrome-5
+--- stdout (tail)
+05:41:16 backend chrome 
+05:41:16 scenario lat 
+05:45:40   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P2-C5 (2026-11-17T05:45:42Z)
+1.83 1.97 2.21 1/1255 1519857
+               total        used        free      shared  buff/cache   available
+Mem:           25539        4975        3160        1140       19000       20564
+Swap:           4095        1326        2769
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1358208 3236656 547832 18908428   28   44  3623   994 6191    3  5  1 93  0  0  0
+ 0  0 1358208 3274256 547832 18908352    0    0     0     0 2111 2240  0  0 100  0  0  0
+ 0  0 1358208 3311732 547832 18908352    0    0     0   568 2015 2193  0  0 99  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=156789951
+browser pid=7131 age=13:22:19 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-lat-c-chrome-5

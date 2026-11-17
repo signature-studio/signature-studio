@@ -1,0 +1,36 @@
+## before P2-D1 (2026-11-17T11:05:34Z)
+1.07 1.81 2.20 3/1257 4052599
+               total        used        free      shared  buff/cache   available
+Mem:           33065        3304       23816         112        6526       29760
+Swap:           4095        2141        1954
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 1  0 2193236 24388080 229736 6453556   47   96  3565  1139 6796    4  7  2 91  0  0  0
+ 0  0 2193236 24403024 229736 6453552    0    0     0     0 4187 4428  0  1 99  0  0  0
+ 0  0 2193236 24488548 229736 6453552    0    0     0     0 3319 3316  4  0 96  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=195896070
+browser pid=7131 age=18:42:12 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 0.98 io 0 after 7 s; mem avail 29781 MB, swap used 2142 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r45d-latlog-d-chrome-1
+--- stdout (tail)
+11:05:45 backend chrome 
+11:05:45 scenario lat-log 
+11:10:12   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P2-D1 (2026-11-17T11:10:13Z)
+4.78 2.75 2.44 1/1255 4058178
+               total        used        free      shared  buff/cache   available
+Mem:           24577        3573       14708         112        6845       21004
+Swap:           4095        2141        1954
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 2192612 15061300 238736 6771332   46   96  3551  1138 6836    4  7  2 91  0  0  0
+ 0  0 2192608 15140204 238736 6771332    4    0     4  1016 4973 4061  2  1 97  0  0  0
+ 0  0 2192608 15178292 238736 6771412    0    0     0   256 2558 2836  0  0 99  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=195945209
+browser pid=7131 age=18:46:51 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R4-5d/r45d-latlog-d-chrome-1 (7 files)

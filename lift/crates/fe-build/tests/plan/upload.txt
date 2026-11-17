@@ -1,0 +1,4 @@
+stage upload: 3 step(s)
+  aws s3 sync lift/out-app/bundle/br s3://fl-web-assets/ --content-encoding br --cache-control max-age=31536000, immutable
+  aws s3 sync lift/out-app/bundle/raw s3://fl-web-assets/ --cache-control no-cache
+  aws s3 cp lift/out-app/bundle/raw/fl-Oz/manifest.json s3://fl-web-assets/manifest.json --cache-control no-cache --content-type application/json

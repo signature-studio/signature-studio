@@ -1,0 +1,3 @@
+# Decision 0302 (mt3, PROVISIONAL): the one import row of dwmapi!DwmGetCompositionTimingInfo (runtime/fle_dwm.c). The engine's QuickFontCache looks the function up with GetProcAddress and, when it is there, takes the DWM branch
+# of its frame-time function (f_1e857b0) instead of the EnumDisplaySettingsW branch (decision 0299). Format of decision 0156: <dll> <API> <runtime function>. Appended LAST (decision 0015: append only; ship6-imports.txt = ship5 + this file).
+dwmapi.dll DwmGetCompositionTimingInfo fle_imp_DwmGetCompositionTimingInfo

@@ -1,0 +1,20 @@
+# 実行: 2026-11-14T15:30:35Z UTC (2026-11-15T00:30:35 JST) / HEAD 0d778aeffcd0441067d0262181172eaef5cd6ec8
+# コマンド: cd lift && FLENGINE_PE=<リポジトリ>/binaries/win64/FLEngine_x64.dll cargo test -p fe-lift --test wall_s get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware -- --exact ; 同じ形で --test screen1 the_dpi_is_96_whatever_the_environment_says_and_the_physical_size_follows_it -- --exact
+    Finished `test` profile [unoptimized] target(s) in 0.02s
+     Running tests/wall_s.rs (target/debug/deps/wall_s-79b99a506c727ec1)
+
+running 1 test
+test get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.19s
+
+rc=0
+    Finished `test` profile [unoptimized] target(s) in 0.00s
+     Running tests/screen1.rs (target/debug/deps/screen1-fb5bc78dc4283577)
+
+running 1 test
+test the_dpi_is_96_whatever_the_environment_says_and_the_physical_size_follows_it ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.09s
+
+rc=0

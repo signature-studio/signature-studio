@@ -1,0 +1,12286 @@
+[
+ {
+  "name": "o19b-song-shown",
+  "what": "O19 (PM 13:47): song (all tracks); condition shown; the picture and the window list before the play prove the condition; 60 s window after the mark play. shown = as opened; hidden = F9 x2 (Mixer off); allhidden = F9 x2, F6, the Playlist close box (1905,97); mixmove / plmove = hover only",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "o19b-song-hidden",
+  "what": "O19 (PM 13:47): song (all tracks); condition hidden; the picture and the window list before the play prove the condition; 60 s window after the mark play. shown = as opened; hidden = F9 x2 (Mixer off); allhidden = F9 x2, F6, the Playlist close box (1905,97); mixmove / plmove = hover only",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "o19b-song-allhidden",
+  "what": "O19 (PM 13:47): song (all tracks); condition allhidden; the picture and the window list before the play prove the condition; 60 s window after the mark play. shown = as opened; hidden = F9 x2 (Mixer off); allhidden = F9 x2, F6, the Playlist close box (1905,97); mixmove / plmove = hover only",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "F9"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "key",
+    "code": "F6"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "click",
+    "x": 1905,
+    "y": 97
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "o19b-song-mixmove",
+  "what": "O19 (PM 13:47): song (all tracks); condition mixmove; the picture and the window list before the play prove the condition; 60 s window after the mark play. shown = as opened; hidden = F9 x2 (Mixer off); allhidden = F9 x2, F6, the Playlist close box (1905,97); mixmove / plmove = hover only",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 850,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "move",
+    "x": 828,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 807,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 786,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 764,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 742,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 721,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 700,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 678,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 656,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 635,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 614,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 592,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 570,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 549,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 528,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 506,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 484,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 463,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 442,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 420,
+    "y": 800
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ },
+ {
+  "name": "o19b-song-plmove",
+  "what": "O19 (PM 13:47): song (all tracks); condition plmove; the picture and the window list before the play prove the condition; 60 s window after the mark play. shown = as opened; hidden = F9 x2 (Mixer off); allhidden = F9 x2, F6, the Playlist close box (1905,97); mixmove / plmove = hover only",
+  "ops": [
+   {
+    "op": "closeWizard"
+   },
+   {
+    "op": "wait",
+    "ms": 2500
+   },
+   {
+    "op": "openZipProject"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "shot",
+    "name": "s3a-mode"
+   },
+   {
+    "op": "audioSnap",
+    "name": "w0"
+   },
+   {
+    "op": "shot",
+    "name": "a-opened"
+   },
+   {
+    "op": "describe",
+    "name": "a-opened"
+   },
+   {
+    "op": "shot",
+    "name": "b-before-play"
+   },
+   {
+    "op": "describe",
+    "name": "b-before-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "start"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 10000
+   },
+   {
+    "op": "audioSnap",
+    "name": "s10"
+   },
+   {
+    "op": "cpuStart",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioMark",
+    "name": "play"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w1"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w2"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w3"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w4"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w5"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w6"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w7"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w8"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w9"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w10"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w11"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w12"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w13"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w14"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w15"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w16"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w17"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w18"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w19"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w20"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w21"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w22"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w23"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w24"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w25"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w26"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w27"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w28"
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1880,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w29"
+   },
+   {
+    "op": "move",
+    "x": 1844,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1807,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1770,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1734,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1698,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1661,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1624,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1588,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1552,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1515,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1478,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1442,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1406,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1369,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1332,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1296,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1260,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1223,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1186,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "move",
+    "x": 1150,
+    "y": 500
+   },
+   {
+    "op": "wait",
+    "ms": 100
+   },
+   {
+    "op": "audioSnap",
+    "name": "w30"
+   },
+   {
+    "op": "shot",
+    "name": "c-end"
+   },
+   {
+    "op": "describe",
+    "name": "c-end"
+   },
+   {
+    "op": "cpuStop",
+    "name": "p3-play"
+   },
+   {
+    "op": "audioDump",
+    "name": "audio-p3"
+   },
+   {
+    "op": "key",
+    "code": "Space"
+   },
+   {
+    "op": "wait",
+    "ms": 2000
+   },
+   {
+    "op": "expectRunning"
+   }
+  ]
+ }
+]

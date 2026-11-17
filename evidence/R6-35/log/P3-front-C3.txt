@@ -1,0 +1,36 @@
+## before P3-front-C3 (2026-11-17T07:38:26Z)
+1.06 1.59 1.77 1/1251 1887276
+               total        used        free      shared  buff/cache   available
+Mem:           25499        5095       13682        1612        8773       20403
+Swap:           4095        1367        2728
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1400076 14010880 261540 8722900   25   40  3273   898 6590    4  6  2 92  0  0  0
+ 0  0 1400076 14017516 261540 8722908    0    0     0     0 2301 2423  0  0 99  0  0  0
+ 0  0 1400076 14026808 261540 8722908    0    0     0   640 3227 3686  0  0 99  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=162307922
+browser pid=7131 age=15:15:03 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 1.06 io 0 after 2 s; mem avail 20402 MB, swap used 1367 MB, swap in/out 0/0 pages (2 s)
+rc=0 out=~/work/signature-studio/tools/verify-kit/out/r635-front-c-chrome-3
+--- stdout (tail)
+07:38:32 backend chrome 
+07:38:32 scenario r635-front-song 
+07:44:22   -> ok (no stop)
+
+--- stderr (tail)
+
+## after P3-front-C3 (2026-11-17T07:44:23Z)
+1.65 1.74 1.77 1/1248 1891764
+               total        used        free      shared  buff/cache   available
+Mem:           25499        5201       13569        1612        8781       20297
+Swap:           4095        1367        2728
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 0  0 1400056 13894916 263436 8728964   25   40  3251   893 6602    4  6  2 92  0  0  0
+ 0  0 1400056 13899740 263436 8728812    0    0     0     0 3360 3787  0  0 99  0  0  0
+ 0  0 1400056 13915768 263436 8728816    0    0     0     0 1613 1744  0  0 100  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.00 total=162345092
+browser pid=7131 age=15:21:01 comm=chrome-headless
+browser processes (not --type=): 1
+saved: evidence/R6-35/r635-front-c-chrome-3 (3 files)

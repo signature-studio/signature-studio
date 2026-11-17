@@ -1,0 +1,55 @@
+# Forbidden terms (checked by scripts/scan-forbidden.sh, rule "term"). One term per line, TAB-separated:
+#   ID <TAB> fragments <TAB> replacement <TAB> exception
+# fragments: the pieces of the term joined with "|". The pieces are joined with nothing when the check runs, so the term itself is never written in this file.
+# replacement: the word to use instead (shown when the check fails).
+# exception: fragments of a longer text that contains the term but is not the term (a line containing it is not reported). Empty: none.
+# Lines starting with # are ignored, and so is the header line whose first column is ID.
+ID	fragments	replacement	exception
+T01	作|業|木	ワークツリー	
+T09	作|業|ツリー	ワークツリー	
+T02	試|験	テスト	試|験|的
+T02a	試|験|的	実験的	
+T03	依|頼|票	Issue	
+T06	作|業|担|当	作業用サブエージェント	
+T07	検|証|担|当	検証用サブエージェント	
+T08	複|写	コピー	
+T05a	ユ|ーザー|の|判|断	自分で決めた内容(決定: X。根拠: Y)	
+T05b	ユ|ーザー|判|断	決定	
+T05c	ユ|ーザー|の|返|答	依頼者の発言	
+T05d	ユ|ーザー|の|指|示	依頼者の指示	
+T05e	ユ|ーザー|に|確|認	自分で確かめる	
+T05f	ユ|ーザー|が|明|示	依頼者が明示	
+T05g	ユ|ーザー|の|承|認	自分の判断で実行	
+T05h	ユ|ーザー|の|許|可	自分の判断で実行	
+T05i	ユ|ーザー|の|資|格|情|報	依頼者の資格情報	
+T03b	こ|の|票	Issue	
+T03c	票|の|末|尾	Issue	
+T10a	依頼者の判|断が必要	決定: X。根拠: Y と書いて実行	
+T10b	判断を|仰	決定: X。根拠: Y と書いて実行	
+T10c	判断待|ち	決定: X。根拠: Y と書いて実行	
+T10d	確認さ|せて	自分で確かめる	
+T10e	許可を|ください	実行して事実を書く	
+T10f	ご|判断	決定: X。根拠: Y と書いて実行	
+T10g	どちら|にしますか	決定: X。根拠: Y と書いて実行	
+T10h	依頼者に|確認	自分で確かめる	
+T10i	依頼者の|確|認|待ち	実行して事実を書く	
+T10j	依頼者の判|断	依頼者が決定済み	
+T10k	決|め|る|ま|で	決まる前に、自分で決めて実行	
+T10l	判断が|要る	決定: X。根拠: Y と書いて実行	
+T10m	判断が|必要	決定: X。根拠: Y と書いて実行	
+T10n	判断を委|ね	決定: X。根拠: Y と書いて実行	
+T10o	判断に|任せ	決定: X。根拠: Y と書いて実行	
+T10p	PM の|判断	PM が決めた内容(決定: X。根拠: Y)	
+T10q	依頼者|が|決|め|る|ま|で	決まる前に、自分で決めて実行	
+T10r	依頼者に|質問	自分で決めて実行	
+T10s	許可を|求	実行して事実を書く	
+T10t	許可が|必要	実行して事実を書く	
+T10u	承認が|必要	実行して事実を書く	
+T10v	ご|確認	自分で確かめる	
+T10w	依頼者の|許可	自分で決めて実行	
+T10x	依頼者の|承認	自分で決めて実行	
+T10y	依頼者に|判断	自分で決めて実行	
+T10z	依頼者|が判断	自分で決めて実行	
+T10za	依頼者の|確|認	自分で確かめる	
+T10zb	依頼者に|確認	自分で確かめる	
+T10zc	質問で|きない	自分で決めて実行	

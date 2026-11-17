@@ -1,0 +1,18 @@
+compile base O0 4.36 s 1222728 KB
+link base O0 0.47 s 91180 KB
+cps_base_2000-O0.wasm	7477033
+compile cps O0 5.40 s 1464400 KB
+link cps O0 0.48 s 95612 KB
+cps_cps_2000-O0.wasm	8977886
+compile base O2 28.03 s 976716 KB
+link base O2 1.07 s 176340 KB
+cps_base_2000-O2.wasm	3756577
+compile cps O2 29.54 s 1185852 KB
+link cps O2 1.21 s 215980 KB
+cps_cps_2000-O2.wasm	4798354
+compile base O0 17.86 s 4683804 KB
+link base O0 0.75 s 227720 KB
+cps_base_8000-O0.wasm	29902971
+compile cps O0 22.37 s 5683716 KB
+link cps O0 0.77 s 244356 KB
+cps_cps_8000-O0.wasm	35984802

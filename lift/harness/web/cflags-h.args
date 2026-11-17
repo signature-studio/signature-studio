@@ -1,0 +1,1 @@
+-std=gnu11 -O1 -Ilift/runtime -Ilift/harness -sSUPPORT_LONGJMP=wasm -msimd128 -matomics -mbulk-memory

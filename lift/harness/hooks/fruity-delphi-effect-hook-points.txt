@@ -1,0 +1,14 @@
+# Inline hook points of the Delphi plugins Fruity Balance and Fruity Filter (decisions 0313 G9-a and the Filter step of G9-c; the mechanism of decisions 0105/0106/0183: fe-lift lift --hook-points).
+#   Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll   3,718,656 bytes, SHA-256 a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064   (hook constructor 0x5c2d70; calls at 0x5c6b97, 0x5c6bbf, 0x5c6be7)
+#   Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll       3,780,608 bytes, SHA-256 f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c   (hook constructor 0x5c2c90; calls at 0x5c6ab7, 0x5c6adf, 0x5c6b07)
+# Both DLLs give the SAME three RVAs (checked with find-hook-points.py on each; Fruity Delay 2 gives them too). Other Delphi plugins do NOT (Frequency Shifter 0x17e90/0x320b0/0x320d0, Parametric EQ 2
+# 0x17ee0/0x32100/0x32120, Soundgoodizer 0x1b7b0/0x389e0/0x38a00): they need their own file. One address per line: "rva:" and a hex RVA (relative to the ImageBase 0x400000, so this file is the same at every
+# base the module is lifted at: 0x6800000 for Balance, 0x7000000 for Filter in the shipped configuration). "#" starts a comment.
+#
+# Like every Delphi module (FLEngine, QFC, ILTools, Fruity Wrapper), the static initialisation of the Delphi runtime of each DLL constructs three hook objects that patch three of its OWN runtime functions
+# with "e9 rel32" after VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE, &old). Found by find-hook-points.py (decision 0310; byte scan of the call sites of the kernel32!VirtualProtect thunk, then the hook
+# constructor and its three calls). First bytes of the three targets in both DLLs: 55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50, the same Delphi runtime functions as in FLEngine, QFC, ILTools and the
+# Wrapper. Nothing else was checked: whether a plugin patches other functions is not known (the runtime stops by name on a VirtualProtect at an address that is not listed here).
+rva:0x17bc0   # 0x417bc0, first bytes 55 56 53 c6 44
+rva:0x31d70   # 0x431d70, first bytes 53 48 83 ec 20
+rva:0x31d90   # 0x431d90, first bytes 55 48 83 ec 50

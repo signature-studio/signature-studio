@@ -1,0 +1,49 @@
+--- a/app/src/engine/worker.ts	2026-11-07 00:19:03.060406214 +0900
++++ b/app/src/engine/worker.ts	2026-11-07 00:19:03.068676319 +0900
+@@ -50,7 +50,10 @@
+ let deskApiP: import('./desk.ts').DeskApi | null = null;
+ // decision 0311: the inputs the IdleDriver processed at an idle (not taken inline at a scheduler point) are answered by the first scene published after they were processed, when it shows something (as before: the present right after processing)
+ let idleAnswerSeqs: number[] = [];
+-let pendingScene: { answers: number[]; seq: number; gate: boolean } | null = null;
++// V4 (decision 0311): the last scene that showed something (when it was published, when it was drawn) and when the guest last settled: an input the IdleDriver processed is answered at once by a scene published after the injection and the settle that showed something, when there is one
++let lastShown: { tPubAbs: number; at: number } | null = null;
++let tSettledAt = 0;
++let pendingScene: { answers: number[]; seq: number; gate: boolean; tPub: number } | null = null;
+ 
+ const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
+ 
+@@ -125,7 +128,7 @@
+       flushLogs();
+       post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle })) });
+       // decision 0223: what the engine drew in answer to the input is shown now, not at the next animation frame (S-desk-input-present); the compositor holds the frame until the display's next refresh either way
+-      if (deskPresenter || deskHanded) { try { if (deskHanded) { idleAnswerSeqs.push(...list.map((x) => x.seq)); deskTick(false); } else { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
++      if (deskPresenter || deskHanded) { try { if (deskHanded) { const t0 = Math.max(Math.min(...list.map((x) => x.tInject)), performance.timeOrigin + tSettledAt); if (lastShown && lastShown.tPubAbs >= t0) post({ t: 'desk-answers', answers: list.map((x) => x.seq), at: lastShown.at }); else idleAnswerSeqs.push(...list.map((x) => x.seq)); deskTick(false); } else { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+     },
+     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
+     resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
+@@ -167,7 +170,7 @@
+ function inputPoll(ptr: number, max: number): number {
+   const d = driver, mem = fruity?.memory;
+   if (!ring || !d || !d.ready || !mem) { servicePresent(false); return 0; }
+-  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
++  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) { inlineSettled = true; tSettledAt = performance.now(); }
+   servicePresent(false);   // decision 0311: after the settled word was read, so that a scene published here is the one that may answer the inputs
+   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
+   let i32: Int32Array | null = null;
+@@ -422,6 +425,7 @@
+   if (!L || !pendingScene || L.done !== pendingScene.seq) return;
+   const p = pendingScene;
+   pendingScene = null;
++  if (L.result > 0) lastShown = { tPubAbs: performance.timeOrigin + p.tPub, at: L.presentAt };
+   if (L.result > 0 && p.answers.length > 0) post({ t: 'desk-answers', answers: p.answers, at: L.presentAt });
+   if (L.result > 0) {
+     if (p.gate) completeInline(true);   // decision 0280: the first present that shows something after the guest settled answers the inputs taken inline
+@@ -454,7 +458,7 @@
+   const ptr = api.scene();   // the call can grow the memory: the buffer is read after it
+   const seq = L.publish(mem.buffer, ptr);
+   L.clearWant();
+-  pendingScene = { answers: idleAnswerSeqs.splice(0), seq, gate };
++  pendingScene = { answers: idleAnswerSeqs.splice(0), seq, gate, tPub: performance.now() };
+ }
+ /** one present; true when it changed a pixel. `flush`: tell the page about it now unless it was told less than 100 ms ago. With the present Worker the scene is only published here (the answer comes back through pService) and the result is false */
+ function deskTick(flush = true): boolean {

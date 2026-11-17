@@ -1,0 +1,6 @@
+NATIVE GetLargePageMinimum = 0
+NATIVE CreateSymbolicLinkW = 0 err=1314
+NATIVE CreateSymbolicLinkW dir = 0 err=1314
+NATIVE OutputDebugStringA done
+NATIVE ShellExecuteA = 31
+NATIVE ShellExecuteExW = 0 err=1155 hInstApp=31

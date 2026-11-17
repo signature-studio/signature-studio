@@ -1,0 +1,201 @@
+api	trace_calls	audit_class	tool_class	cases	cases_with_runtime_answer	note
+@box	0		helper	2	0	
+@bstr	0		helper	4	0	
+@bstrp	0		helper	1	0	
+@eq	0		helper	5	0	
+@peek	0		helper	5	0	
+@peekp	0		helper	5	0	
+@poke	0		helper	2	0	
+@selfcode	0		helper	1	0	
+AcquireSRWLockExclusive	1	D	M	1	1	
+CharLowerBuffW	48	S	M	10	6	
+CharLowerW	2	S	M	3	1	
+CharNextW	2	S	M	4	1	
+CharUpperBuffW	6	S	M	8	2	
+CloseHandle	3	S	K	0	0	S in the audit; only valid on handles of the skipped file/event APIs
+CompareStringW	27	P	M	67	7	
+CreateBitmap	34	D	M	3	1	
+CreateBrushIndirect	34	D	M	2	1	
+CreateCompatibleDC	102	P	M	5	4	
+CreateDIBSection	34	P	M	2	1	
+CreateDirectoryW	6	N	K	0	0	writes the file system
+CreateEventW	36	D	K	0	0	kernel object; S/D in the audit, nothing to measure
+CreateFileW	3	P	K	0	0	file API; the traced paths are FL Studio files that do not exist here
+CreateFontIndirectW	11	D	M	2	1	
+CreateIconIndirect	34	D	M	1	1	
+CreatePalette	3	D	M	3	1	
+CreatePenIndirect	1	D	M	1	1	
+CreateWindowExW	3	P	K	0	0	creates a window
+DecodePointer	16	D	M	3	1	
+DefWindowProcW	9	P	K	0	0	needs a window
+DeleteCriticalSection	34	S	M	2	1	
+DeleteDC	102	S	M	5	4	
+DeleteObject	102	S	M	11	3	
+DestroyCursor	30	P	M	13	13	
+DestroyIcon	0		helper	1	0	
+EncodePointer	17	D	M	2	2	
+EnterCriticalSection	681	S	M	2	1	
+EnumDisplayMonitors	4	P	R	1	1	
+EnumDisplaySettingsW	2	P	R	1	1	
+EnumFontFamiliesExW	2	P	R	8	1	
+FindFirstFileW	12	P	M	14	12	
+FlsAlloc	2	D	M	1	1	
+FlsFree	0		helper	1	0	
+FlsGetValue	140	D	M	3	1	
+FlsSetValue	3	S	M	1	0	
+FreeEnvironmentStringsW	3	S	M	1	1	
+FreeLibrary	2	S	M	3	0	
+GdiFlush	34	N	M	1	1	
+GetACP	9	P	L	1	1	
+GetBkColor	0		helper	1	0	
+GetBkMode	0		helper	1	0	
+GetCPInfo	12	X	M	20	2	
+GetClassInfoW	3	D	M	2	1	
+GetClipCursor	2	P	R	1	1	
+GetClipboardFormatNameW	2	D	M	2	1	
+GetCommandLineA	3	P	R	1	1	
+GetCommandLineW	5	P	R	1	1	
+GetComputerNameExW	2	P	R	12	1	
+GetCurrentObject	0		helper	5	0	
+GetCurrentPositionEx	34	D	M	1	1	
+GetCurrentProcess	2	S	M	1	1	
+GetCurrentProcessId	5	D	R	1	1	
+GetCurrentThread	2	D	M	1	1	
+GetCurrentThreadId	1684	D	R	1	1	
+GetDC	78	D	R	2	2	
+GetDIBColorTable	34	D	M	1	1	
+GetDeviceCaps	76	P	R	242	4	
+GetEnvironmentStringsW	3	P	R	1	1	
+GetEnvironmentVariableW	3	P	R	11	2	
+GetErrorMode	0		helper	1	0	
+GetFileAttributesExW	1	P	M	2	1	
+GetFileAttributesW	136	P	M	73	52	
+GetFileVersionInfoSizeW	1	P	R	2	1	
+GetKeyboardLayout	2	P	R	1	1	
+GetLastError	270	D	M	1	1	
+GetLocalTime	1	D	R	1	1	
+GetLocaleInfoW	245	X	M	520	60	
+GetLogicalProcessorInformation	12	P	R	2	2	
+GetMapMode	0		helper	1	0	
+GetModuleFileNameA	1	P	R	2	1	
+GetModuleFileNameW	41	P	R	16	6	
+GetModuleHandleA	21	P	R	5	3	
+GetModuleHandleW	53	P	R	23	12	
+GetMonitorInfoW	2	P	R	1	1	
+GetNativeSystemInfo	3	P	M	1	1	
+GetOEMCP	0		helper	1	0	
+GetObjectType	0		helper	4	0	
+GetObjectW	44	P	M	6	2	
+GetPolyFillMode	0		helper	1	0	
+GetProcAddress	1612	P	M	114	114	
+GetProcessDpiAwareness	2	P	R	2	1	
+GetProcessHeap	10	D	R	1	1	
+GetROP2	0		helper	1	0	
+GetStartupInfoA	1	P	R	1	1	
+GetStartupInfoW	5	P	R	1	1	
+GetStdHandle	9	D	R	4	3	
+GetStockObject	9	D	M	22	3	
+GetStretchBltMode	0		helper	1	0	
+GetStringTypeW	4	X	M	8	2	
+GetSysColor	68	P	R	32	2	
+GetSystemDefaultLCID	0		helper	1	0	
+GetSystemDefaultLocaleName	2	P	R	2	1	
+GetSystemInfo	14	P	M	1	1	
+GetSystemMetrics	18	P	R	148	10	
+GetSystemTimeAsFileTime	3	D	R	1	1	
+GetTempPathW	1	P	R	2	1	
+GetTextColor	0		helper	1	0	
+GetThreadLocale	4	P	R	4	1	
+GetThreadPreferredUILanguages	6	P	L	2	2	
+GetThreadUILanguage	3	P	R	1	1	
+GetTickCount	104	D	R	1	1	
+GetTimeZoneInformation	1	P	R	1	1	
+GetUserDefaultLCID	0		helper	1	0	
+GetUserDefaultLocaleName	0		helper	1	0	
+GetUserDefaultUILanguage	6	P	R	1	1	
+GetVersion	8	P;X	M	1	1	
+GetVersionExA	1	P	M	1	1	
+GetVersionExW	10	P	M	2	1	
+GlobalAddAtomW	6	D	K	0	0	adds to the global atom table (side effect)
+HeapAlloc	101	D	M	12	8	
+HeapCreate	1	D	M	1	1	
+HeapFree	8	S	M	3	0	
+HeapReAlloc	9	D	M	4	0	
+HeapSetInformation	1	N;S	M	1	0	
+HeapSize	1	S	M	12	0	
+InitializeCriticalSection	121	S	M	1	1	
+InitializeCriticalSectionAndSpinCount	179	S	M	1	1	
+InitializeSListHead	2	S	M	1	1	
+IntersectRect	34	S	M	7	1	
+IsValidCodePage	3	P	M	20	1	
+IsValidLocale	7	P	M	50	2	
+LCMapStringW	21	P	M	25	7	
+LeaveCriticalSection	681	S	M	2	1	
+LoadCursorW	2	D	M	1	1	
+LoadIconW	5	P	M	2	2	
+LoadImageW	42	P	M	13	13	
+LoadLibraryA	8	P	M	2	2	
+LoadLibraryExW	11	P	M	4	4	
+LoadLibraryW	34	P	M	24	10	
+LoadStringW	162	S	M	2	0	
+LocalAlloc	11	D	M	4	0	
+LocalFree	0		helper	1	0	
+MonitorFromPoint	0		helper	1	0	
+MoveToEx	34	D	M	1	1	
+MulDiv	3	S	M	13	1	
+MultiByteToWideChar	578	P	M	46	14	
+OleInitialize	2	S	M	2	2	
+OleUninitialize	0		helper	2	0	
+PatBlt	34	P	M	3	1	
+QueryPerformanceCounter	19	D	R	1	1	
+QueryPerformanceFrequency	6	D	R	1	1	
+ReadFile	3	S	K	0	0	file API, not called
+RegCloseKey	10	S	M	19	0	
+RegCreateKeyExW	5	P	K	0	0	writes the registry (RegOpenKeyExW on the same key is measured instead)
+RegOpenKeyExA	2	P	M	1	1	
+RegOpenKeyExW	186	P	M	18	17	
+RegQueryInfoKeyW	2	P	R	1	0	
+RegQueryValueExW	12	P	R	18	5	
+RegSetValueExW	1	D	K	0	0	writes the registry
+RegisterClassW	2	D	K	0	0	window class registration
+RegisterClipboardFormatW	8	D	K	0	0	adds to the session-wide atom table (side effect)
+RegisterWindowMessageW	16	D	K	0	0	adds to the session-wide atom table (side effect)
+ReleaseDC	78	S	M	2	2	
+ReleaseSRWLockExclusive	1	S	M	1	1	
+RtlGetVersion	0		helper	1	0	
+SHGetFolderPathW	5	X	R	24	2	
+SHGetMalloc	2	D	M	1	1	
+SelectObject	408	D	M	10	6	
+SelectPalette	34	P	M	3	1	
+SetBkColor	68	P	M	3	1	
+SetBkMode	34	D	M	3	1	
+SetDllDirectoryW	9	N;S	M	2	1	
+SetErrorMode	30	D	M	3	2	
+SetEvent	8	S	K	0	0	S in the audit
+SetFilePointer	6	S	K	0	0	needs a file handle; file APIs are not called
+SetHandleCount	1	N;P	M	1	1	
+SetLastError	125	S	M	3	2	
+SetROP2	34	D	M	3	1	
+SetStretchBltMode	68	D	M	2	2	
+SetTextColor	68	P	M	3	1	
+SetThreadErrorMode	126	D	M	2	2	
+SetThreadLocale	3	X;P	M	2	1	
+SetWindowLongPtrW	3	D	K	0	0	needs a window
+StretchDIBits	34	P	M	1	1	
+SysAllocStringLen	40	D	M	4	2	
+SysFreeString	43	S	M	3	1	
+SysReAllocStringLen	3	D	M	1	1	
+SystemParametersInfoW	45	P	R	21	8	
+TlsAlloc	6	D	M	1	1	
+TlsFree	0		helper	1	0	
+TlsGetValue	513	S	M	3	1	
+TlsSetValue	7	S	M	2	0	
+UnrealizeObject	34	S	M	1	1	
+VerSetConditionMask	12	X	M	77	4	
+VerifyVersionInfoW	6	P	M	14	2	
+VirtualAlloc	26	D	M	4	4	
+VirtualProtect	18	P	M	1	0	
+WaitForSingleObject	8	S	K	0	0	could block forever; S in the audit
+WideCharToMultiByte	3011	P	M	77	20	
+WriteFile	2	S	K	0	0	writes the file system
+acmMetrics	2	P	M	1	1	

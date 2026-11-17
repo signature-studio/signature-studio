@@ -1,0 +1,16 @@
+--- a/ci/test-hybrid.sh
++++ b/ci/test-hybrid.sh
+@@ -21,9 +21,11 @@
+ d=$(rows "$s/ship5-imports.txt" | awk '{print tolower($1) " " tolower($2)}' | LC_ALL=C sort | uniq -d | wc -l)
+ [ "$d" = 0 ] && ok "no (dll, API) pair twice" || bad "$d (dll, API) pair(s) twice"
+ n6=$(rows "$s/ship6-imports.txt" | wc -l); nd=$(rows "$s/dwmti-imports.txt" | wc -l)
+-[ "$n6" = $((n5 + nd)) ] && ok "ship6-imports.txt has $n6 rows = $n5 (ship5) + $nd (dwmti)" || bad "ship6-imports.txt has $n6 rows, ship5 $n5 + dwmti $nd"
++# decision 0315 (mt3): ship6-imports.txt is append-only (a row's position is its pseudo-VA, decision 0015) and the decisions after 0302 append their rows to it (0319: ScrollWindow, ScrollDC, ...), so the file is ship5 (unchanged, first),
++# dwmti (next) and then LATER rows: the count must be at least n5 + nd, the first n5 rows are ship5, the next nd rows are dwmti, and no pair repeats
++[ "$n6" -ge $((n5 + nd)) ] && ok "ship6-imports.txt has $n6 rows = $n5 (ship5) + $nd (dwmti) + $((n6 - n5 - nd)) later row(s)" || bad "ship6-imports.txt has $n6 rows, ship5 $n5 + dwmti $nd"
+ [ "$(rows "$s/ship6-imports.txt" | head -n "$n5")" = "$(rows "$s/ship5-imports.txt")" ] && ok "the first $n5 rows are the rows of ship5-imports.txt, in order" || bad "the first rows of ship6-imports.txt are not the rows of ship5-imports.txt"
+-[ "$(rows "$s/ship6-imports.txt" | tail -n "$nd")" = "$(rows "$s/dwmti-imports.txt")" ] && ok "the last $nd row(s) are the rows of dwmti-imports.txt" || bad "the last rows of ship6-imports.txt are not the rows of dwmti-imports.txt"
++[ "$(rows "$s/ship6-imports.txt" | sed -n "$((n5 + 1)),$((n5 + nd))p")" = "$(rows "$s/dwmti-imports.txt")" ] && ok "the $nd row(s) after those of ship5 are the rows of dwmti-imports.txt" || bad "the rows after those of ship5 in ship6-imports.txt are not the rows of dwmti-imports.txt"
+ d=$(rows "$s/ship6-imports.txt" | awk '{print tolower($1) " " tolower($2)}' | LC_ALL=C sort | uniq -d | wc -l)
+ [ "$d" = 0 ] && ok "ship6: no (dll, API) pair twice" || bad "ship6: $d (dll, API) pair(s) twice"
+ 

@@ -1,0 +1,17 @@
+# mt1: the ui1 play script, shortened: wizard, Enter, 3 s, Space (play), 4 virtual seconds, snapshot every second
+snap wiz0
+advance 3000
+tap 13
+advance 3000
+snap e03
+advance 500
+snap before-play
+tap 32
+advance 1000
+snap p01
+advance 1000
+snap p02
+advance 1000
+snap p03
+advance 1000
+snap p04

@@ -1,0 +1,483 @@
+{
+ "name": "features-final-coi0",
+ "args": {
+  "name": "features-final-coi0",
+  "coi": "0",
+  "timeout": "120"
+ },
+ "started": "2026-10-28T11:48:38.452Z",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "protocol": "1.3",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--disable-gpu",
+   "--user-data-dir=/tmp/opencode/web/profiles/features-final-coi0",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "url": "http://127.0.0.1:35731/features.html",
+ "navigate_at_ms": 48,
+ "finished_at_ms": 310,
+ "completed": true,
+ "crashed": [],
+ "timed_out": false,
+ "events": [],
+ "result": {
+  "scope": "window",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "crossOriginIsolated": false,
+  "secureContext": true,
+  "hardwareConcurrency": 16,
+  "deviceMemory": 32,
+  "SharedArrayBuffer": {
+   "typeof": "undefined",
+   "construct": "ERROR ReferenceError: SharedArrayBuffer is not defined"
+  },
+  "Atomics": {
+   "typeof": "object",
+   "wait_exists": "function",
+   "waitAsync": "function"
+  },
+  "sharedWasmMemory": "ERROR ReferenceError: SharedArrayBuffer is not defined",
+  "wasm": {
+   "validate": {
+    "simd": true,
+    "threads": true,
+    "bulk": true,
+    "exc_legacy": true,
+    "memory64": true,
+    "tailcall": true,
+    "multivalue": true,
+    "reftypes": true,
+    "extconst": true,
+    "multimem": true,
+    "relaxed": true
+   },
+   "compileStreaming": "function",
+   "instantiateStreaming": "function",
+   "memory": {
+    "initial 1024 MiB, max 4096 MiB": 1073741824,
+    "initial 2048 MiB, max 4096 MiB": 2147483648,
+    "initial 4096 MiB, max 4096 MiB": 4294967296,
+    "maximum 65537 pages": "ERROR RangeError: WebAssembly.Memory(): Property 'maximum': value 65537 is above the upper bound 65536"
+   },
+   "maxLocals": {
+    "50000 locals validates": true,
+    "50001 locals validates": false
+   },
+   "memory64": "ERROR TypeError: Cannot convert 1 to a BigInt",
+   "jspi": {
+    "Suspending": "function",
+    "promising": "function"
+   }
+  },
+  "OffscreenCanvas": {
+   "typeof": "function",
+   "ctx2d": "255,0,0,255",
+   "webgl2": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+   },
+   "webgl1": true,
+   "convertToBlob": true,
+   "transferControlToOffscreen": "function"
+  },
+  "webgpu": {
+   "navigator_gpu": "object",
+   "adapter": null
+  },
+  "OPFS": {
+   "getDirectory": "function",
+   "roundtrip": {
+    "createWritable": "function",
+    "createSyncAccessHandle": "undefined",
+    "writable_read": 5
+   }
+  },
+  "storage": {
+   "quotaMB": 4096,
+   "usageMB": 0
+  },
+  "persist": false,
+  "IndexedDB": {
+   "typeof": "object",
+   "cacheStorage": "object",
+   "roundtrip": "1 MiB stored",
+   "storeWasmModule": "ERROR DataCloneError"
+  },
+  "streams": {
+   "CompressionStream": "function",
+   "DecompressionStream": "function",
+   "Decompression gzip": "constructible",
+   "Decompression deflate": "constructible",
+   "Decompression brotli": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'brotli'",
+   "Decompression zstd": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'zstd'"
+  },
+  "audio": {
+   "AudioContext": "function",
+   "OfflineAudioContext": "function",
+   "AudioWorkletNode": "function",
+   "audioContext": {
+    "state": "suspended",
+    "sampleRate": 48000,
+    "baseLatency": 0.010666666666666666,
+    "hasAudioWorklet": true
+   },
+   "offlineWorklet": {
+    "rendered_first_samples": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "length": 512
+   },
+   "sharedMemoryToWorklet": "ERROR ReferenceError: SharedArrayBuffer is not defined"
+  },
+  "worker": {
+   "scope": "worker",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "crossOriginIsolated": false,
+   "secureContext": true,
+   "hardwareConcurrency": 16,
+   "deviceMemory": 32,
+   "SharedArrayBuffer": {
+    "typeof": "undefined",
+    "construct": "ERROR ReferenceError: SharedArrayBuffer is not defined"
+   },
+   "Atomics": {
+    "typeof": "object",
+    "wait_exists": "function",
+    "waitAsync": "function"
+   },
+   "sharedWasmMemory": "ERROR ReferenceError: SharedArrayBuffer is not defined",
+   "wasm": {
+    "validate": {
+     "simd": true,
+     "threads": true,
+     "bulk": true,
+     "exc_legacy": true,
+     "memory64": true,
+     "tailcall": true,
+     "multivalue": true,
+     "reftypes": true,
+     "extconst": true,
+     "multimem": true,
+     "relaxed": true
+    },
+    "compileStreaming": "function",
+    "instantiateStreaming": "function",
+    "memory": {
+     "initial 1024 MiB, max 4096 MiB": 1073741824,
+     "initial 2048 MiB, max 4096 MiB": 2147483648,
+     "initial 4096 MiB, max 4096 MiB": 4294967296,
+     "maximum 65537 pages": "ERROR RangeError: WebAssembly.Memory(): Property 'maximum': value 65537 is above the upper bound 65536"
+    },
+    "maxLocals": {
+     "50000 locals validates": true,
+     "50001 locals validates": false
+    },
+    "memory64": "ERROR TypeError: Cannot convert 1 to a BigInt",
+    "jspi": {
+     "Suspending": "function",
+     "promising": "function"
+    }
+   },
+   "OffscreenCanvas": {
+    "typeof": "function",
+    "ctx2d": "255,0,0,255",
+    "webgl2": {
+     "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+     "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "webgl1": true,
+    "convertToBlob": true
+   },
+   "webgpu": {
+    "navigator_gpu": "object",
+    "adapter": null
+   },
+   "OPFS": {
+    "getDirectory": "function",
+    "roundtrip": {
+     "createWritable": "function",
+     "createSyncAccessHandle": "function",
+     "writable_read": 5,
+     "sync_write_bytes": 1048576,
+     "sync_size": 1048576
+    }
+   },
+   "storage": {
+    "quotaMB": 4096,
+    "usageMB": 0
+   },
+   "persist": false,
+   "IndexedDB": {
+    "typeof": "object",
+    "cacheStorage": "object",
+    "roundtrip": "1 MiB stored",
+    "storeWasmModule": "ERROR DataCloneError"
+   },
+   "streams": {
+    "CompressionStream": "function",
+    "DecompressionStream": "function",
+    "Decompression gzip": "constructible",
+    "Decompression deflate": "constructible",
+    "Decompression brotli": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'brotli'",
+    "Decompression zstd": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'zstd'"
+   },
+   "audio": {
+    "AudioContext": "undefined",
+    "OfflineAudioContext": "undefined",
+    "AudioWorkletNode": "undefined"
+   },
+   "returnAddressCost": {
+    "calls": 20000,
+    "microseconds_per_call": 2.8,
+    "frames_parsed": "depth 12 + 3",
+    "note": "micro-benchmark in JS, not the wasm"
+   }
+  }
+ },
+ "worker_heap_error": "Error: Session with given id not found. (\"\")",
+ "page_heap_usage": {
+  "usedSize": 1447380,
+  "totalSize": 3407872,
+  "embedderHeapUsedSize": 1613680,
+  "backingStorageSize": 1064163
+ },
+ "performance_metrics": [],
+ "rss": {
+  "samples": 5,
+  "everyMs": 100,
+  "busiestRenderer": {
+   "pid": 366409,
+   "type": "renderer",
+   "peakRssKB": 165220,
+   "peakPssKB": 0,
+   "hwmKB": 165220,
+   "peakAtMs": 332,
+   "cpuMs": 210,
+   "threadsMax": 25
+  },
+  "otherRenderersPeakRssKB": [
+   152756,
+   106060,
+   104476,
+   100564,
+   79168
+  ],
+  "peakTreeRssKB": 1469832,
+  "peakTreePssKB": 0,
+  "processes": [
+   {
+    "pid": 366279,
+    "type": "browser",
+    "peakRssKB": 236692,
+    "peakPssKB": 0,
+    "hwmKB": 236692,
+    "peakAtMs": 306,
+    "cpuMs": 580,
+    "threadsMax": 31
+   },
+   {
+    "pid": 366283,
+    "type": "browser",
+    "peakRssKB": 7716,
+    "peakPssKB": 0,
+    "hwmKB": 7716,
+    "peakAtMs": 12,
+    "cpuMs": 0,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366284,
+    "type": "browser",
+    "peakRssKB": 7592,
+    "peakPssKB": 0,
+    "hwmKB": 7592,
+    "peakAtMs": 12,
+    "cpuMs": 0,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366293,
+    "type": "zygote",
+    "peakRssKB": 75452,
+    "peakPssKB": 0,
+    "hwmKB": 75452,
+    "peakAtMs": 12,
+    "cpuMs": 10,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366294,
+    "type": "zygote",
+    "peakRssKB": 75984,
+    "peakPssKB": 0,
+    "hwmKB": 75984,
+    "peakAtMs": 12,
+    "cpuMs": 20,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366318,
+    "type": "network",
+    "peakRssKB": 118220,
+    "peakPssKB": 0,
+    "hwmKB": 118220,
+    "peakAtMs": 306,
+    "cpuMs": 70,
+    "threadsMax": 15
+   },
+   {
+    "pid": 366315,
+    "type": "gpu-process",
+    "peakRssKB": 97340,
+    "peakPssKB": 0,
+    "hwmKB": 97340,
+    "peakAtMs": 332,
+    "cpuMs": 70,
+    "threadsMax": 29
+   },
+   {
+    "pid": 366338,
+    "type": "utility",
+    "peakRssKB": 50432,
+    "peakPssKB": 0,
+    "hwmKB": 50432,
+    "peakAtMs": 108,
+    "cpuMs": 10,
+    "threadsMax": 10
+   },
+   {
+    "pid": 366374,
+    "type": "renderer",
+    "peakRssKB": 152756,
+    "peakPssKB": 0,
+    "hwmKB": 152756,
+    "peakAtMs": 306,
+    "cpuMs": 250,
+    "threadsMax": 18
+   },
+   {
+    "pid": 366385,
+    "type": "browser",
+    "peakRssKB": 0,
+    "peakPssKB": 0,
+    "hwmKB": 0,
+    "peakAtMs": 0,
+    "cpuMs": 10,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366387,
+    "type": "renderer",
+    "peakRssKB": 104476,
+    "peakPssKB": 0,
+    "hwmKB": 104476,
+    "peakAtMs": 108,
+    "cpuMs": 30,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366409,
+    "type": "renderer",
+    "peakRssKB": 165220,
+    "peakPssKB": 0,
+    "hwmKB": 165220,
+    "peakAtMs": 332,
+    "cpuMs": 210,
+    "threadsMax": 25
+   },
+   {
+    "pid": 366411,
+    "type": "renderer",
+    "peakRssKB": 106060,
+    "peakPssKB": 0,
+    "hwmKB": 106060,
+    "peakAtMs": 306,
+    "cpuMs": 20,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366445,
+    "type": "renderer",
+    "peakRssKB": 79168,
+    "peakPssKB": 0,
+    "hwmKB": 79168,
+    "peakAtMs": 108,
+    "cpuMs": 10,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366464,
+    "type": "renderer",
+    "peakRssKB": 100564,
+    "peakPssKB": 0,
+    "hwmKB": 100564,
+    "peakAtMs": 108,
+    "cpuMs": 30,
+    "threadsMax": 13
+   },
+   {
+    "pid": 366489,
+    "type": "utility",
+    "peakRssKB": 92260,
+    "peakPssKB": 0,
+    "hwmKB": 92260,
+    "peakAtMs": 206,
+    "cpuMs": 30,
+    "threadsMax": 10
+   }
+  ],
+  "busiestRendererSeries": [
+   {
+    "t": 12,
+    "rssMB": 77,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 108,
+    "rssMB": 135,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 206,
+    "rssMB": 149,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 306,
+    "rssMB": 161,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 332,
+    "rssMB": 161,
+    "pssMB": null,
+    "anonMB": null
+   }
+  ]
+ },
+ "server_log": [],
+ "console": [],
+ "workers": [
+  {
+   "sessionId": "40412815D6DB36871EE23A88599F846F",
+   "url": "http://127.0.0.1:35731/features.js"
+  }
+ ],
+ "profile_MB": 3
+}

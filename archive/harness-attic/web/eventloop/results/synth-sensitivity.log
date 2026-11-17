@@ -1,0 +1,12 @@
+== real-shape params F=4000 O0
+{"out":"/home/ubuntu/work/signature-studio-develop/lift/out-web2/synth-sens/s_sync_4000.c","functions":4000,"ops":170951,"calls":17987,"dispatchCalls":2750,"bytes":11890244}
+base	8289797	0.53	95492
+jspi	8289888	0.51	95784
+asyncify	15376489	1.67	489192
+asyncify_ignore_indirect	15052219	1.80	484212
+== real-shape params F=4000 O2
+{"out":"/home/ubuntu/work/signature-studio-develop/lift/out-web2/synth-sens/s_sync_4000.c","functions":4000,"ops":170951,"calls":17987,"dispatchCalls":2750,"bytes":11890244}
+base	4336325	1.27	176988
+jspi	4336336	1.23	176604
+asyncify	5512298	2.30	348544
+asyncify_ignore_indirect	5339607	2.27	337028

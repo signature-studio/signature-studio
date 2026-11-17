@@ -1,0 +1,502 @@
+closure_instructions   1526821
+functions              17301
+emitted_instructions   1528298
+bad_nodes              0
+tail_calls             6875
+gotos                  173966
+c_lines                1633923
+c_bytes                138531569
+handled
+  adc          70
+  add          75379
+  addps        745
+  addsd        3963
+  addss        4857
+  and          15563
+  andnpd       71
+  andnps       153
+  andpd        380
+  andps        499
+  bsr          90
+  bswap        158
+  bt           682
+  btc          12
+  bts          11
+  call         57085
+  call_imp:CloseHandle 28
+  call_imp:CreateCompatibleDC 1
+  call_imp:CreateFileW 1
+  call_imp:CreateFontIndirectW 1
+  call_imp:DeleteCriticalSection 10
+  call_imp:DeleteDC 2
+  call_imp:DeleteObject 1
+  call_imp:DuplicateHandle 2
+  call_imp:EnterCriticalSection 10
+  call_imp:FindClose 5
+  call_imp:FindFirstFileExW 2
+  call_imp:FindFirstFileW 1
+  call_imp:FindNextFileW 1
+  call_imp:FreeLibrary 21
+  call_imp:GetACP 1
+  call_imp:GetCurrentProcess 3
+  call_imp:GetCurrentProcessId 2
+  call_imp:GetCurrentThread 2
+  call_imp:GetCurrentThreadId 18
+  call_imp:GetDC 1
+  call_imp:GetFileAttributesW 1
+  call_imp:GetFileSize 1
+  call_imp:GetLastError 11
+  call_imp:GetModuleFileNameA 4
+  call_imp:GetModuleFileNameW 3
+  call_imp:GetModuleHandleA 2
+  call_imp:GetModuleHandleExW 3
+  call_imp:GetModuleHandleW 6
+  call_imp:GetProcAddress 14
+  call_imp:GetProcessAffinityMask 2
+  call_imp:GetProcessHeap 1
+  call_imp:GetSystemTimeAsFileTime 2
+  call_imp:GetThreadPriority 1
+  call_imp:GetTickCount64 2
+  call_imp:GetTokenInformation 1
+  call_imp:HeapAlloc 2
+  call_imp:HeapFree 2
+  call_imp:InitializeCriticalSection 8
+  call_imp:IsDBCSLeadByteEx 1
+  call_imp:IsDebuggerPresent 1
+  call_imp:LeaveCriticalSection 32
+  call_imp:LoadLibraryA 4
+  call_imp:LoadLibraryExW 2
+  call_imp:LoadLibraryW 2
+  call_imp:MapViewOfFile 3
+  call_imp:MultiByteToWideChar 7
+  call_imp:OpenProcessToken 1
+  call_imp:RaiseException 4
+  call_imp:RegCloseKey 7
+  call_imp:RegEnumKeyExW 1
+  call_imp:RegEnumValueW 1
+  call_imp:RegOpenKeyExA 1
+  call_imp:RegOpenKeyExW 2
+  call_imp:RegQueryInfoKeyW 1
+  call_imp:RegQueryValueExW 3
+  call_imp:ReleaseDC 1
+  call_imp:ResetEvent 3
+  call_imp:ResumeThread 3
+  call_imp:RtlCaptureContext 2
+  call_imp:RtlLookupFunctionEntry 1
+  call_imp:RtlUnwindEx 3
+  call_imp:SelectObject 1
+  call_imp:SetEvent 4
+  call_imp:SetLastError 2
+  call_imp:SetProcessAffinityMask 1
+  call_imp:SetThreadErrorMode 3
+  call_imp:SetThreadPriority 2
+  call_imp:Sleep 6
+  call_imp:SuspendThread 1
+  call_imp:TlsAlloc 3
+  call_imp:TlsGetValue 4
+  call_imp:TlsSetValue 6
+  call_imp:UnmapViewOfFile 5
+  call_imp:VirtualProtect 1
+  call_imp:VirtualQuery 1
+  call_imp:WaitForSingleObject 9
+  call_imp:WideCharToMultiByte 4
+  call_ind:dispatch 6235
+  call_ind:reg_const 2
+  call_ind:reg_table 1093
+  call_ind:rip_table 148
+  cbw          1
+  cdq          1764
+  cdqe         2957
+  cmov         11550
+  cmp          74549
+  cmpsd        84
+  cmpss        152
+  cmpxchg      343
+  comisd       1877
+  comiss       973
+  cpuid        23
+  cqo          140
+  cvtdq2ps     100
+  cvtpd2ps     1
+  cvtps2dq     85
+  cvtps2pd     1
+  cvtsd2si     135
+  cvtsd2ss     1150
+  cvtsi2sd     2979
+  cvtsi2ss     4011
+  cvtss2sd     1700
+  cvtss2si     351
+  cvttsd2si    1034
+  cvttss2si    1792
+  cwde         135
+  dec          193
+  div          243
+  divsd        1869
+  divss        1296
+  f2xm1        5
+  fabs         5
+  fadd         15
+  fcom         5
+  fcomi        25
+  fdiv         1
+  fdivr        2
+  fild         2
+  fistp        2
+  fld          204
+  fld1         7
+  fldcw        12
+  fldl2e       1
+  fldln2       9
+  fldpi        5
+  fldz         21
+  fmul         10
+  fnclex       1
+  fninit       1
+  fnstcw       6
+  fnstsw       25
+  frndint      7
+  fscale       5
+  fsincos      6
+  fsqrt        7
+  fstp         254
+  fsub         8
+  fsubr        4
+  fwait        5
+  fxam         7
+  fxch         32
+  idiv         1838
+  imul         11910
+  imul1        15
+  inc          539
+  jcc          134771
+  jmp          42931
+  jmp_imp:EnterCriticalSection 7
+  jmp_imp:FreeLibrary 1
+  jmp_imp:GetCurrentThreadId 1
+  jmp_imp:GetProcAddress 2
+  jmp_imp:HeapAlloc 1
+  jmp_imp:HeapFree 1
+  jmp_imp:HeapReAlloc 1
+  jmp_imp:LeaveCriticalSection 7
+  jmp_imp:SelectObject 1
+  jmp_imp:WaitForMultipleObjects 1
+  jmp_imp:WaitForSingleObject 1
+  jmp_ind:mem_dispatch 386
+  jmp_ind:reg_dispatch 1018
+  jmp_ind:reg_table 28
+  jmp_ind:rip_table 3
+  ldmxcsr      1
+  lea          75969
+  maxps        24
+  maxsd        215
+  maxss        591
+  minps        24
+  minsd        181
+  minss        606
+  mmx_emms     19
+  mmx_movd     7
+  mmx_movq     13
+  mmx_packuswb 3
+  mmx_paddw    8
+  mmx_pmulhuw  2
+  mmx_pmulhw   4
+  mmx_pshufw   1
+  mmx_psllw    6
+  mmx_punpcklbw 4
+  mmx_pxor     7
+  mov          463412
+  mov_gs       1
+  movapd       4740
+  movaps       17881
+  movd         349
+  movdqa       2839
+  movdqu       1646
+  movhlps      56
+  movlhps      54
+  movq         1059
+  movs         77
+  movsd        12733
+  movss        11378
+  movsx        3018
+  movsxd       17500
+  movups       1518
+  movzx        30978
+  mul          81
+  mulps        653
+  mulsd        5579
+  mulss        8465
+  neg          3872
+  nop          23787
+  not          1559
+  or           5341
+  orpd         71
+  orps         159
+  pabsw        1
+  packssdw     165
+  packuswb     29
+  paddd        1006
+  paddq        8
+  paddsw       3
+  paddw        973
+  pand         80
+  pandn        55
+  pause        3
+  pcmpeqd      12
+  pcmpgtd      6
+  pextrw       128
+  pmaddwd      808
+  pminsw       118
+  pminub       9
+  pmulhuw      2
+  pmulhw       1
+  pmullw       3
+  pop          61188
+  por          63
+  pshufd       437
+  pshuflw      2
+  pslld        6
+  psllq        3
+  psllw        23
+  psrad        208
+  psraw        1
+  psrld        12
+  psrlw        4
+  psubusb      4
+  psubusw      8
+  psubw        4
+  punpckhbw    15
+  punpckhdq    36
+  punpckhqdq   36
+  punpckhwd    472
+  punpcklbw    27
+  punpckldq    36
+  punpcklqdq   41
+  punpcklwd    631
+  push         49416
+  pxor         9468
+  ret          18290
+  rol          380
+  ror          39
+  sar          8335
+  sbb          410
+  setcc        5141
+  shl          12596
+  shr          7250
+  shufps       561
+  sqrtsd       158
+  sqrtss       87
+  stmxcsr      2
+  stos         402
+  sub          35289
+  subps        34
+  subsd        1822
+  subss        3415
+  test         60928
+  ucomisd      459
+  ucomiss      302
+  unpckhps     72
+  unpcklpd     1
+  unpcklps     55
+  vmovaps      3122
+  vmovups      297
+  vzeroupper   719
+  xadd         182
+  xchg         52
+  xgetbv_stop  3
+  xor          30975
+  xorpd        214
+  xorps        171
+outlined_heads         32 (shared instructions before 1813 after 1477; 18 heads not promoted: on a tail-call cycle)
+dead_flags             writers 318615 fully_dead 146919 partly_dead 138000 substituted 146334 rounds 5
+register_jmp_sites     1042
+jumptabs               0
+msvc_tables            0
+setjmp_landings        0
+msvc_rejected          0
+register_jmps
+  jmp_ind:reg_dispatch   1018
+  jmp_ind:reg_table      25
+unsupported_total      41329
+unsupported            182
+      2822  Vshufps: mnemonic outside minimal set
+      2094  Vfmadd132ps: mnemonic outside minimal set
+      1826  Vpextrw: mnemonic outside minimal set
+      1807  Vaddps: mnemonic outside minimal set
+      1700  Vmovss: mnemonic outside minimal set
+      1573  Vmulps: mnemonic outside minimal set
+      1336  Vcvtph2ps: mnemonic outside minimal set
+      1304  Vpaddw: mnemonic outside minimal set
+      1173  Call: indirect through IAT slot (not lifted)
+      1168  Vshufi32x4: mnemonic outside minimal set
+      1142  Vpaddd: mnemonic outside minimal set
+      1055  Vpunpcklwd: mnemonic outside minimal set
+       971  Vpunpckhwd: mnemonic outside minimal set
+       888  Vmovdqa32: mnemonic outside minimal set
+       872  Vmovdqa: mnemonic outside minimal set
+       867  Vpmaddwd: mnemonic outside minimal set
+       821  Vmovaps: EVEX encoding
+       762  Vmovdqa64: mnemonic outside minimal set
+       741  Vfmadd231ps: mnemonic outside minimal set
+       736  Vshuff32x4: mnemonic outside minimal set
+       735  Vbroadcastss: mnemonic outside minimal set
+       696  Vextractps: mnemonic outside minimal set
+       604  Vmovdqu: mnemonic outside minimal set
+       570  Vbroadcastf128: mnemonic outside minimal set
+       524  Vxorps: mnemonic outside minimal set
+       485  Vpbroadcastw: mnemonic outside minimal set
+       474  Vcvtps2ph: mnemonic outside minimal set
+       449  Vpermps: mnemonic outside minimal set
+       406  Jmp: indirect through IAT slot (not lifted)
+       400  Vunpckhps: mnemonic outside minimal set
+       400  Vunpcklps: mnemonic outside minimal set
+       398  Vpunpckhdq: mnemonic outside minimal set
+       398  Vpunpckldq: mnemonic outside minimal set
+       376  Vpunpcklqdq: mnemonic outside minimal set
+       375  Vpdpwssd: mnemonic outside minimal set
+       372  Vpunpckhqdq: mnemonic outside minimal set
+       337  Vinsertps: mnemonic outside minimal set
+       330  Vpsrad: mnemonic outside minimal set
+       309  Vpalignr: mnemonic outside minimal set
+       300  Vpshufd: mnemonic outside minimal set
+       229  Vfmadd132ss: mnemonic outside minimal set
+       216  Vinsertf128: mnemonic outside minimal set
+       216  Vperm2f128: mnemonic outside minimal set
+       205  Vpaddq: mnemonic outside minimal set
+       204  Vmovdqu64: mnemonic outside minimal set
+       186  Vpackssdw: mnemonic outside minimal set
+       186  Vpminsw: mnemonic outside minimal set
+       173  Vmulss: mnemonic outside minimal set
+       173  Vpbroadcastd: mnemonic outside minimal set
+       166  Vmovdqu32: mnemonic outside minimal set
+       160  Vaddss: mnemonic outside minimal set
+       156  Vcvtdq2ps: mnemonic outside minimal set
+       137  Vcvtps2dq: mnemonic outside minimal set
+       137  Vpxor: mnemonic outside minimal set
+       133  Vcvtsi2ss: mnemonic outside minimal set
+       132  Kmovw: mnemonic outside minimal set
+       120  Vpermq: mnemonic outside minimal set
+       115  Vmovq: mnemonic outside minimal set
+       108  Vmovd: mnemonic outside minimal set
+       108  Vpmuludq: mnemonic outside minimal set
+       104  Vmovups: EVEX encoding
+       102  Vbroadcastf32x4: mnemonic outside minimal set
+        96  Vextracti32x4: mnemonic outside minimal set
+        94  Vperm2i128: mnemonic outside minimal set
+        90  Vpermw: mnemonic outside minimal set
+        88  Vmovdqu16: mnemonic outside minimal set
+        87  Vsubss: mnemonic outside minimal set
+        80  Vpbroadcastq: mnemonic outside minimal set
+        76  Vmaskmovps: mnemonic outside minimal set
+        76  Vmaxps: mnemonic outside minimal set
+        73  Vcvtss2si: mnemonic outside minimal set
+        73  Vmaxss: mnemonic outside minimal set
+        72  Vextractf128: mnemonic outside minimal set
+        72  Vinserti128: mnemonic outside minimal set
+        71  Vminss: mnemonic outside minimal set
+        70  Vfmadd213ps: mnemonic outside minimal set
+        70  Vpackusdw: mnemonic outside minimal set
+        67  Vminps: mnemonic outside minimal set
+        66  Vbroadcasti32x4: mnemonic outside minimal set
+        66  Vextractf32x4: mnemonic outside minimal set
+        64  Kmovd: mnemonic outside minimal set
+        64  Vblendps: mnemonic outside minimal set
+        64  Vpextrq: mnemonic outside minimal set
+        64  Vsubps: mnemonic outside minimal set
+        60  Vpsrlq: mnemonic outside minimal set
+        55  Vpsrld: mnemonic outside minimal set
+        54  Vextracti64x2: mnemonic outside minimal set
+        52  Vpmullw: mnemonic outside minimal set
+        50  Vpackuswb: mnemonic outside minimal set
+        50  Vpand: mnemonic outside minimal set
+        50  Vpandn: mnemonic outside minimal set
+        50  Vpor: mnemonic outside minimal set
+        47  Vpmovzxwd: mnemonic outside minimal set
+        46  Vpmovzxbd: mnemonic outside minimal set
+        44  Vpmovzxdq: mnemonic outside minimal set
+        43  Vpmulhuw: mnemonic outside minimal set
+        40  Vpandq: mnemonic outside minimal set
+        40  Vpmovzxbw: mnemonic outside minimal set
+        40  Vpmullq: mnemonic outside minimal set
+        38  Vpmaxsd: mnemonic outside minimal set
+        36  Vpinsrd: mnemonic outside minimal set
+        33  Vbroadcasti128: mnemonic outside minimal set
+        32  Vbroadcastsd: mnemonic outside minimal set
+        32  Vpmovsdw: mnemonic outside minimal set
+        32  Vpsubw: mnemonic outside minimal set
+        31  Vpermd: mnemonic outside minimal set
+        30  Vpblendd: mnemonic outside minimal set
+        30  Vpslldq: mnemonic outside minimal set
+        28  Vpblendvb: mnemonic outside minimal set
+        28  Vpminsd: mnemonic outside minimal set
+        28  Vpminsq: mnemonic outside minimal set
+        26  Vcvtsi2sd: mnemonic outside minimal set
+        24  Vpermt2ps: mnemonic outside minimal set
+        24  Vpminuw: mnemonic outside minimal set
+        24  Vpmulld: mnemonic outside minimal set
+        24  Vpsllw: mnemonic outside minimal set
+        22  Vextracti128: mnemonic outside minimal set
+        22  Vmovapd: mnemonic outside minimal set
+        20  Ud2: mnemonic outside minimal set
+        16  Vextracti64x4: mnemonic outside minimal set
+        13  Vmulsd: mnemonic outside minimal set
+        12  Tzcnt: mnemonic outside minimal set
+        12  Vandps: mnemonic outside minimal set
+        12  Vgetmantps: mnemonic outside minimal set
+        12  Vpmovusdb: mnemonic outside minimal set
+        12  Vpmovusdw: mnemonic outside minimal set
+        12  Vpsubd: mnemonic outside minimal set
+        12  Vpternlogd: mnemonic outside minimal set
+        12  Vrangeps: mnemonic outside minimal set
+        11  Vmovsd: mnemonic outside minimal set
+         9  Fyl2x: mnemonic outside minimal set
+         9  Vpermi2ps: mnemonic outside minimal set
+         8  Vcmpps: mnemonic outside minimal set
+         8  Vcomiss: mnemonic outside minimal set
+         8  Vpmovzxwq: mnemonic outside minimal set
+         8  Vpxord: mnemonic outside minimal set
+         7  Fyl2xp1: mnemonic outside minimal set
+         7  Sahf: mnemonic outside minimal set
+         7  Vaddsd: mnemonic outside minimal set
+         7  Vxorpd: mnemonic outside minimal set
+         6  Kmovq: mnemonic outside minimal set
+         6  Psubw: mnemonic outside minimal set
+         6  Vcvtsd2ss: mnemonic outside minimal set
+         6  Vdivsd: mnemonic outside minimal set
+         6  Vpblendw: mnemonic outside minimal set
+         6  Vpmovwb: mnemonic outside minimal set
+         6  Vpsrldq: mnemonic outside minimal set
+         5  Fpatan: mnemonic outside minimal set
+         5  Fprem1: mnemonic outside minimal set
+         5  Vucomiss: mnemonic outside minimal set
+         4  Rdseed: mnemonic outside minimal set
+         4  Vcvttsd2si: mnemonic outside minimal set
+         4  Vorps: mnemonic outside minimal set
+         4  Vsubsd: mnemonic outside minimal set
+         3  Pmovzxbw: mnemonic outside minimal set
+         3  Psadbw: mnemonic outside minimal set
+         3  Rcpss: mnemonic outside minimal set
+         3  Vcvttps2dq: mnemonic outside minimal set
+         2  Fcos: mnemonic outside minimal set
+         2  Fprem: mnemonic outside minimal set
+         2  Fsin: mnemonic outside minimal set
+         2  Packsswb: mnemonic outside minimal set
+         2  Paddb: mnemonic outside minimal set
+         2  Paddsb: mnemonic outside minimal set
+         2  Pcmpeqb: mnemonic outside minimal set
+         2  Pmaxsw: mnemonic outside minimal set
+         2  Pminsw: mnemonic outside minimal set
+         2  Pmullw: mnemonic outside minimal set
+         2  Psraw: mnemonic outside minimal set
+         2  Psrlw: mnemonic outside minimal set
+         2  Punpckhbw: mnemonic outside minimal set
+         2  Punpcklwd: mnemonic outside minimal set
+         2  Vgatherdps: mnemonic outside minimal set
+         2  Vminsd: mnemonic outside minimal set
+         1  Fldenv: mnemonic outside minimal set
+         1  Fnstenv: mnemonic outside minimal set
+         1  Movntq: mnemonic outside minimal set
+         1  Rdrand: mnemonic outside minimal set
+         1  Vcvttss2si: mnemonic outside minimal set
+         1  Vfmadd231ss: mnemonic outside minimal set
+         1  Vpcmpeqd: mnemonic outside minimal set
+         1  Vpsadbw: mnemonic outside minimal set

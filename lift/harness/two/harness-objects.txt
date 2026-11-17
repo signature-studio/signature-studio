@@ -1,0 +1,10 @@
+main_two.o	lift/harness/two/main_two.c
+fruity.o	lift/harness/fruity.c
+fruity_surface.o	lift/harness/fruity_surface.c
+fruity_idle.o	lift/harness/fruity_idle.c
+fruity_g3.o	lift/harness/fruity_g3.c
+trace.o	lift/harness/wasm/trace_fruity.c
+ra0.o	lift/harness/web/jspi/tools/ra0.c
+image.o	lift/harness/image.c
+a4.o	lift/harness/a4.c
+hybrid_glue.o	lift/harness/hyb1/hybrid_glue.c

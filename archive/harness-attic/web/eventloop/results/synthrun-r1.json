@@ -1,0 +1,106 @@
+{
+ "name": "synthrun",
+ "page": "/plain/synthrun.html?budget=3000000&reps=7",
+ "started": "2026-10-28T15:59:55.643Z",
+ "loadavg_before": "1.57 1.67 1.73 7/1401 639479",
+ "url": "http://127.0.0.1:32777/plain/synthrun.html?budget=3000000&reps=7",
+ "loadavg_after": "1.51 1.60 1.70 1/1403 641531",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/synthrun",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "budget_function_entries": 3000000,
+  "reps": 7,
+  "functions": "2000",
+  "rows": [
+   {
+    "opt": "O0",
+    "variant": "base",
+    "ret": 1,
+    "ms_min": 1849.4,
+    "ms_median": 2174.4,
+    "ns_per_function_entry_min": 616.5,
+    "first_ms": 3293.3
+   },
+   {
+    "opt": "O0",
+    "variant": "jspi",
+    "ret": 1,
+    "ms_min": 1658.4,
+    "ms_median": 1979.6,
+    "ns_per_function_entry_min": 552.8,
+    "first_ms": 2682.8
+   },
+   {
+    "opt": "O0",
+    "variant": "asyncify",
+    "ret": 1,
+    "ms_min": 2196.2,
+    "ms_median": 2550.7,
+    "ns_per_function_entry_min": 732.1,
+    "first_ms": 6486.2
+   },
+   {
+    "opt": "O0",
+    "variant": "asyncify_ignore_indirect",
+    "ret": 1,
+    "ms_min": 2209.7,
+    "ms_median": 2445.4,
+    "ns_per_function_entry_min": 736.6,
+    "first_ms": 6231.7
+   },
+   {
+    "opt": "O2",
+    "variant": "base",
+    "ret": 1,
+    "ms_min": 265.2,
+    "ms_median": 295,
+    "ns_per_function_entry_min": 88.4,
+    "first_ms": 409.2
+   },
+   {
+    "opt": "O2",
+    "variant": "jspi",
+    "ret": 1,
+    "ms_min": 251.5,
+    "ms_median": 324.2,
+    "ns_per_function_entry_min": 83.8,
+    "first_ms": 436.6
+   },
+   {
+    "opt": "O2",
+    "variant": "asyncify",
+    "ret": 1,
+    "ms_min": 530.3,
+    "ms_median": 712.5,
+    "ns_per_function_entry_min": 176.8,
+    "first_ms": 1119.3
+   },
+   {
+    "opt": "O2",
+    "variant": "asyncify_ignore_indirect",
+    "ret": 1,
+    "ms_min": 608.3,
+    "ms_median": 700.5,
+    "ns_per_function_entry_min": 202.8,
+    "first_ms": 892.6
+   }
+  ]
+ },
+ "chrome_pids_left": 0
+}

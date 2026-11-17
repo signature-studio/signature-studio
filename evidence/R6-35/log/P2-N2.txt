@@ -1,0 +1,15 @@
+## before P2-N2 (2026-11-17T05:07:55Z)
+2.31 1.96 1.25 1/1242 1386781
+               total        used        free      shared  buff/cache   available
+Mem:           25031        4322       14621         908        7440       20708
+Swap:           4095        1327        2768
+procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu-------
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu
+ 1  0 1358912 14972292 204020 7414552   29   46  2812  1003 5907    3  5  1 93  0  0  0
+ 0  0 1358912 14976256 204020 7414556    0    0     0     0 1921 1776  0  0 100  0  0  0
+ 0  0 1358912 14983772 204020 7414556    0    0     0     0 4666 5312  1  1 99  0  0  0
+some avg10=0.00 avg60=0.00 avg300=0.06 total=146099439
+browser pid=7131 age=12:44:32 comm=chrome-headless
+browser processes (not --type=): 1
+quiet: load 2.31 io 0 after 2 s; mem avail 20716 MB, swap used 1327 MB, swap in/out 0/0 pages (2 s)
+note (2026-11-17 14:47 JST, added by hand): this log kept only its first 14 lines (the before block). The run output, the after block and the saved line are not in the file, and the cause is not identified (the leftover tools/log/P2-N2.txt.run was 0 bytes at 14:12:40). The run itself is complete in tools/verify-kit/out/r635-lat-n-chrome-2 (report.json and lat-*.json, written 14:12). The copy into evidence/R6-35/r635-lat-n-chrome-2 was done by hand from that folder (6 files). The after state of this run was not measured.

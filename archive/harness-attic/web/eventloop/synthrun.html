@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Run-time cost of Asyncify / JSPI on synthetic lifted-shaped code</title>
+<script>
+'use strict';
+const Q = new URLSearchParams(location.search);
+const BUDGET = +(Q.get('budget') || 3000000);
+const REPS = +(Q.get('reps') || 7);
+const F = Q.get('f') || '2000';
+const run = (variant) => new Promise((res, rej) => {
+  const w = new Worker('synthrun-worker.js');
+  w.onmessage = (e) => { w.terminate(); res(e.data); };
+  w.onerror = (e) => rej(new Error('worker: ' + e.message));
+  w.postMessage({ variant, budget: BUDGET, reps: REPS });
+});
+(async () => {
+  const R = { budget_function_entries: BUDGET, reps: REPS, functions: F, rows: [] };
+  for (const o of ['O0', 'O2']) {
+    for (const v of ['base', 'jspi', 'asyncify', 'asyncify_ignore_indirect']) {
+      const r = await run(`sy_${v}_${F}-${o}`);
+      if (r.error) { R.rows.push({ opt: o, variant: v, error: r.error }); continue; }
+      const s = r.ms.slice(1).sort((a, b) => a - b);   // the first repetition is the warm-up
+      R.rows.push({ opt: o, variant: v, ret: r.ret, ms_min: +s[0].toFixed(1), ms_median: +s[s.length >> 1].toFixed(1), ns_per_function_entry_min: +(s[0] * 1e6 / BUDGET).toFixed(1), first_ms: +r.ms[0].toFixed(1) });
+      (window.__log = window.__log || []).push(`${o} ${v} done`);
+    }
+  }
+  window.__result = R; window.__done = true;
+})().catch((e) => { window.__error = String(e && e.stack || e); });
+</script>

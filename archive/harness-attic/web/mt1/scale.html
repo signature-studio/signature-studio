@@ -1,0 +1,39 @@
+<!doctype html><meta charset=utf-8><title>mt1 scale</title>
+<script type="module">
+window.__log = [];
+const log = (s) => window.__log.push(s);
+const q = new URLSearchParams(location.search);
+const N = +(q.get('n') || 1), MOD = q.get('mod') || 'mx9', BLOCKS = +(q.get('blocks') || 200), WAIT = +(q.get('wait') || 0);
+(async () => {
+  try {
+    const t0 = performance.now();
+    const [wbytes, plugin, seed] = await Promise.all([`/coi/data/${MOD}.wasm`, '/coi/data/ott.vst3', '/coi/data/seed.tsv'].map(async (u) => new Uint8Array(await (await fetch(u)).arrayBuffer())));
+    const tFetch = performance.now() - t0;
+    const t1 = performance.now();
+    const module = await WebAssembly.compile(wbytes);
+    const tCompile = performance.now() - t1;
+    log(`fetched ${wbytes.length} B in ${tFetch.toFixed(0)} ms; compile ${tCompile.toFixed(0)} ms`);
+    const flag = new SharedArrayBuffer(4);
+    const files = { '/ott.vst3': plugin, '/seed.tsv': seed };
+    const workers = [], ready = [];
+    for (let i = 0; i < N; i++) {
+      const w = new Worker('vst-worker.js', { type: 'module' });
+      workers.push(w);
+      ready.push(new Promise((res, rej) => { w.onmessage = (e) => (e.data.type === 'ready' ? res(e.data) : e.data.type === 'error' ? rej(new Error(e.data.error)) : null); w.onerror = (e) => rej(new Error('worker error ' + e.message)); }));
+      w.postMessage({ type: 'prep', id: i, module, files, flag, args: ['/ott.vst3', '--blocks', String(BLOCKS)], env: ['FLE_VFS_SEED=/seed.tsv', 'VST_BLOCKS=1'] });
+    }
+    const rd = await Promise.all(ready);
+    const done = workers.map((w, i) => new Promise((res, rej) => { w.onmessage = (e) => (e.data.type === 'done' ? res(e.data) : null); w.onerror = (e) => rej(new Error('worker error ' + e.message)); w.postMessage({ type: 'go' }); }));
+    window.__ready = true;                        // the runner reads /proc CPU now, then sets __go
+    while (!window.__go) await new Promise((r) => setTimeout(r, 5));
+    const tg = performance.now();
+    Atomics.store(new Int32Array(flag), 0, 1); Atomics.notify(new Int32Array(flag), 0);
+    const results = await Promise.all(done);
+    const tEnd = performance.now();
+    window.__result = { N, MOD, BLOCKS, hardwareConcurrency: navigator.hardwareConcurrency, tFetch, tCompile, instMs: rd.map((r) => r.instMs), memBytes: rd.map((r) => r.memBytes), wallMs: tEnd - tg, results };
+    window.__done = true;
+    while (!window.__terminate) await new Promise((r) => setTimeout(r, 20));
+    for (const w of workers) w.terminate();
+  } catch (e) { window.__error = String(e && e.stack || e); window.__done = true; }
+})();
+</script>

@@ -1,0 +1,14 @@
+#!/bin/bash
+# wasm6 measurement wrapper (disk quota): after a successful split_mod.py run removes its input (the whole generated C of a module).
+/home/ubuntu/.local/bin/python3 "$@"
+rc=$?
+if [ $rc -eq 0 ]; then
+    case "${1:-}" in
+        */split_mod.py)
+            case "${2:-}" in
+                /tmp/opencode/wasm6/o*/gen/*.c|/tmp/opencode/wasm6/o*/v-*/gen/*.c|gen/*.c)
+                    case "$PWD" in /tmp/opencode/wasm6/o*) rm -f -- "$2" ;; esac ;;
+            esac ;;
+    esac
+fi
+exit $rc

@@ -1,0 +1,76 @@
+[
+ {
+  "name": "r55-play",
+  "what": "R5-5: the reference project opened as a zip (openZipProject; the Problems window is closed by it), then 10 s of playback with Space (the Balance on Insert 1 and the Filter on Insert 47 are in the project). The engine log of the playback is saved (log-play.log: the lines after the mark 'play'); a shot (play-10s-playing.png) is taken while the playback runs (before the second Space); expectRunning at the end.",
+  "rep": 1,
+  "seconds": 59,
+  "firstIdleMs": 5355.294921875,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [
+   {
+    "cls": "engine still running",
+    "visible": true,
+    "ok": true,
+    "detail": "engine-idle"
+   }
+  ],
+  "openedTitle": "serina1-serum2.flp - FL Studio 2026",
+  "logs": [
+   {
+    "name": "log-play",
+    "lines": 0
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "timeline": {
+   "page_script": 54.67999999970198,
+   "manifest_loaded": 71.99000000208616,
+   "download_start": 102.97500000149012,
+   "download_done": 1419.6850000023842,
+   "compile_done": 1420.914999999106,
+   "pack_source_dll": 1488.08984375,
+   "pack_source_seed": 1488.14501953125,
+   "glue_loaded": 1498.27490234375,
+   "worker_ready": 1499.5050000026822,
+   "engine_start": 1499.5450000017881,
+   "wasm_instantiated": 1531.530029296875,
+   "files_ready": 1544.02490234375,
+   "main_start": 1545.544921875,
+   "idle": 5355.294921875,
+   "host_files_released": 5355.974853515625,
+   "first_pixel": 5383.425048828125,
+   "filedlg_request": 18330.58984375,
+   "filedlg_answer": 22361.324951171875
+  },
+  "loadStart": 1.86,
+  "loadEnd": 3.05,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

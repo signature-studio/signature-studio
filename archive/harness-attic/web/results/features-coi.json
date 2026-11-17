@@ -1,0 +1,490 @@
+{
+ "name": "features-final-coi1",
+ "args": {
+  "name": "features-final-coi1",
+  "coi": "1",
+  "timeout": "120"
+ },
+ "started": "2026-10-28T11:48:47.028Z",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "protocol": "1.3",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--disable-gpu",
+   "--user-data-dir=/tmp/opencode/web/profiles/features-final-coi1",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "url": "http://127.0.0.1:36125/coi/features.html",
+ "navigate_at_ms": 56,
+ "finished_at_ms": 323,
+ "completed": true,
+ "crashed": [],
+ "timed_out": false,
+ "events": [],
+ "result": {
+  "scope": "window",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "crossOriginIsolated": true,
+  "secureContext": true,
+  "hardwareConcurrency": 16,
+  "deviceMemory": 32,
+  "SharedArrayBuffer": {
+   "typeof": "function",
+   "construct": 16
+  },
+  "Atomics": {
+   "typeof": "object",
+   "wait_exists": "function",
+   "waitAsync": "function"
+  },
+  "sharedWasmMemory": true,
+  "wasm": {
+   "validate": {
+    "simd": true,
+    "threads": true,
+    "bulk": true,
+    "exc_legacy": true,
+    "memory64": true,
+    "tailcall": true,
+    "multivalue": true,
+    "reftypes": true,
+    "extconst": true,
+    "multimem": true,
+    "relaxed": true
+   },
+   "compileStreaming": "function",
+   "instantiateStreaming": "function",
+   "memory": {
+    "initial 1024 MiB, max 4096 MiB": 1073741824,
+    "initial 2048 MiB, max 4096 MiB": 2147483648,
+    "initial 4096 MiB, max 4096 MiB": 4294967296,
+    "maximum 65537 pages": "ERROR RangeError: WebAssembly.Memory(): Property 'maximum': value 65537 is above the upper bound 65536"
+   },
+   "maxLocals": {
+    "50000 locals validates": true,
+    "50001 locals validates": false
+   },
+   "memory64": "ERROR TypeError: Cannot convert 1 to a BigInt",
+   "jspi": {
+    "Suspending": "function",
+    "promising": "function"
+   }
+  },
+  "OffscreenCanvas": {
+   "typeof": "function",
+   "ctx2d": "255,0,0,255",
+   "webgl2": {
+    "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+    "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+   },
+   "webgl1": true,
+   "convertToBlob": true,
+   "transferControlToOffscreen": "function"
+  },
+  "webgpu": {
+   "navigator_gpu": "object",
+   "adapter": null
+  },
+  "OPFS": {
+   "getDirectory": "function",
+   "roundtrip": {
+    "createWritable": "function",
+    "createSyncAccessHandle": "undefined",
+    "writable_read": 5
+   }
+  },
+  "storage": {
+   "quotaMB": 4096,
+   "usageMB": 0
+  },
+  "persist": false,
+  "IndexedDB": {
+   "typeof": "object",
+   "cacheStorage": "object",
+   "roundtrip": "1 MiB stored",
+   "storeWasmModule": "ERROR DataCloneError"
+  },
+  "streams": {
+   "CompressionStream": "function",
+   "DecompressionStream": "function",
+   "Decompression gzip": "constructible",
+   "Decompression deflate": "constructible",
+   "Decompression brotli": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'brotli'",
+   "Decompression zstd": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'zstd'"
+  },
+  "audio": {
+   "AudioContext": "function",
+   "OfflineAudioContext": "function",
+   "AudioWorkletNode": "function",
+   "audioContext": {
+    "state": "suspended",
+    "sampleRate": 48000,
+    "baseLatency": 0.010666666666666666,
+    "hasAudioWorklet": true
+   },
+   "offlineWorklet": {
+    "rendered_first_samples": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "length": 512
+   },
+   "sharedMemoryToWorklet": {
+    "process_calls_seen_through_SAB": 1
+   }
+  },
+  "worker": {
+   "scope": "worker",
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "crossOriginIsolated": true,
+   "secureContext": true,
+   "hardwareConcurrency": 16,
+   "deviceMemory": 32,
+   "SharedArrayBuffer": {
+    "typeof": "function",
+    "construct": 16
+   },
+   "Atomics": {
+    "typeof": "object",
+    "wait_exists": "function",
+    "waitAsync": "function"
+   },
+   "sharedWasmMemory": true,
+   "wasm": {
+    "validate": {
+     "simd": true,
+     "threads": true,
+     "bulk": true,
+     "exc_legacy": true,
+     "memory64": true,
+     "tailcall": true,
+     "multivalue": true,
+     "reftypes": true,
+     "extconst": true,
+     "multimem": true,
+     "relaxed": true
+    },
+    "compileStreaming": "function",
+    "instantiateStreaming": "function",
+    "memory": {
+     "initial 1024 MiB, max 4096 MiB": 1073741824,
+     "initial 2048 MiB, max 4096 MiB": 2147483648,
+     "initial 4096 MiB, max 4096 MiB": 4294967296,
+     "maximum 65537 pages": "ERROR RangeError: WebAssembly.Memory(): Property 'maximum': value 65537 is above the upper bound 65536"
+    },
+    "maxLocals": {
+     "50000 locals validates": true,
+     "50001 locals validates": false
+    },
+    "memory64": "ERROR TypeError: Cannot convert 1 to a BigInt",
+    "jspi": {
+     "Suspending": "function",
+     "promising": "function"
+    }
+   },
+   "OffscreenCanvas": {
+    "typeof": "function",
+    "ctx2d": "255,0,0,255",
+    "webgl2": {
+     "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+     "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)"
+    },
+    "webgl1": true,
+    "convertToBlob": true
+   },
+   "webgpu": {
+    "navigator_gpu": "object",
+    "adapter": null
+   },
+   "OPFS": {
+    "getDirectory": "function",
+    "roundtrip": {
+     "createWritable": "function",
+     "createSyncAccessHandle": "function",
+     "writable_read": 5,
+     "sync_write_bytes": 1048576,
+     "sync_size": 1048576
+    }
+   },
+   "storage": {
+    "quotaMB": 4096,
+    "usageMB": 0
+   },
+   "persist": false,
+   "IndexedDB": {
+    "typeof": "object",
+    "cacheStorage": "object",
+    "roundtrip": "1 MiB stored",
+    "storeWasmModule": "ERROR DataCloneError"
+   },
+   "streams": {
+    "CompressionStream": "function",
+    "DecompressionStream": "function",
+    "Decompression gzip": "constructible",
+    "Decompression deflate": "constructible",
+    "Decompression brotli": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'brotli'",
+    "Decompression zstd": "ERROR TypeError: Failed to construct 'DecompressionStream': Unsupported compression format: 'zstd'"
+   },
+   "audio": {
+    "AudioContext": "undefined",
+    "OfflineAudioContext": "undefined",
+    "AudioWorkletNode": "undefined"
+   },
+   "returnAddressCost": {
+    "calls": 20000,
+    "microseconds_per_call": 2.69,
+    "frames_parsed": "depth 12 + 3",
+    "note": "micro-benchmark in JS, not the wasm"
+   }
+  }
+ },
+ "worker_heap_error": "Error: Session with given id not found. (\"\")",
+ "page_heap_usage": {
+  "usedSize": 1444084,
+  "totalSize": 2883584,
+  "embedderHeapUsedSize": 1778320,
+  "backingStorageSize": 1064174
+ },
+ "performance_metrics": [],
+ "rss": {
+  "samples": 5,
+  "everyMs": 100,
+  "busiestRenderer": {
+   "pid": 366780,
+   "type": "renderer",
+   "peakRssKB": 166732,
+   "peakPssKB": 0,
+   "hwmKB": 166732,
+   "peakAtMs": 341,
+   "cpuMs": 190,
+   "threadsMax": 27
+  },
+  "otherRenderersPeakRssKB": [
+   152320,
+   106120,
+   104940,
+   100708,
+   79696,
+   78776
+  ],
+  "peakTreeRssKB": 1474876,
+  "peakTreePssKB": 0,
+  "processes": [
+   {
+    "pid": 366617,
+    "type": "browser",
+    "peakRssKB": 237700,
+    "peakPssKB": 0,
+    "hwmKB": 237700,
+    "peakAtMs": 341,
+    "cpuMs": 600,
+    "threadsMax": 30
+   },
+   {
+    "pid": 366622,
+    "type": "browser",
+    "peakRssKB": 7668,
+    "peakPssKB": 0,
+    "hwmKB": 7668,
+    "peakAtMs": 9,
+    "cpuMs": 0,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366623,
+    "type": "browser",
+    "peakRssKB": 7636,
+    "peakPssKB": 0,
+    "hwmKB": 7636,
+    "peakAtMs": 9,
+    "cpuMs": 0,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366632,
+    "type": "zygote",
+    "peakRssKB": 77052,
+    "peakPssKB": 0,
+    "hwmKB": 77052,
+    "peakAtMs": 9,
+    "cpuMs": 10,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366633,
+    "type": "zygote",
+    "peakRssKB": 77864,
+    "peakPssKB": 0,
+    "hwmKB": 77864,
+    "peakAtMs": 9,
+    "cpuMs": 20,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366658,
+    "type": "network",
+    "peakRssKB": 117396,
+    "peakPssKB": 0,
+    "hwmKB": 117396,
+    "peakAtMs": 308,
+    "cpuMs": 60,
+    "threadsMax": 14
+   },
+   {
+    "pid": 366655,
+    "type": "gpu-process",
+    "peakRssKB": 96848,
+    "peakPssKB": 0,
+    "hwmKB": 96848,
+    "peakAtMs": 308,
+    "cpuMs": 70,
+    "threadsMax": 29
+   },
+   {
+    "pid": 366683,
+    "type": "utility",
+    "peakRssKB": 50788,
+    "peakPssKB": 0,
+    "hwmKB": 50788,
+    "peakAtMs": 108,
+    "cpuMs": 0,
+    "threadsMax": 10
+   },
+   {
+    "pid": 366712,
+    "type": "renderer",
+    "peakRssKB": 152320,
+    "peakPssKB": 0,
+    "hwmKB": 152320,
+    "peakAtMs": 308,
+    "cpuMs": 260,
+    "threadsMax": 17
+   },
+   {
+    "pid": 366723,
+    "type": "browser",
+    "peakRssKB": 0,
+    "peakPssKB": 0,
+    "hwmKB": 0,
+    "peakAtMs": 0,
+    "cpuMs": 10,
+    "threadsMax": 1
+   },
+   {
+    "pid": 366725,
+    "type": "renderer",
+    "peakRssKB": 104940,
+    "peakPssKB": 0,
+    "hwmKB": 104940,
+    "peakAtMs": 108,
+    "cpuMs": 30,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366744,
+    "type": "renderer",
+    "peakRssKB": 78776,
+    "peakPssKB": 0,
+    "hwmKB": 78776,
+    "peakAtMs": 9,
+    "cpuMs": 40,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366750,
+    "type": "renderer",
+    "peakRssKB": 106120,
+    "peakPssKB": 0,
+    "hwmKB": 106120,
+    "peakAtMs": 108,
+    "cpuMs": 30,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366780,
+    "type": "renderer",
+    "peakRssKB": 166732,
+    "peakPssKB": 0,
+    "hwmKB": 166732,
+    "peakAtMs": 341,
+    "cpuMs": 190,
+    "threadsMax": 27
+   },
+   {
+    "pid": 366797,
+    "type": "renderer",
+    "peakRssKB": 100708,
+    "peakPssKB": 0,
+    "hwmKB": 100708,
+    "peakAtMs": 207,
+    "cpuMs": 30,
+    "threadsMax": 13
+   },
+   {
+    "pid": 366810,
+    "type": "renderer",
+    "peakRssKB": 79696,
+    "peakPssKB": 0,
+    "hwmKB": 79696,
+    "peakAtMs": 108,
+    "cpuMs": 10,
+    "threadsMax": 11
+   },
+   {
+    "pid": 366834,
+    "type": "utility",
+    "peakRssKB": 91408,
+    "peakPssKB": 0,
+    "hwmKB": 91408,
+    "peakAtMs": 207,
+    "cpuMs": 30,
+    "threadsMax": 10
+   }
+  ],
+  "busiestRendererSeries": [
+   {
+    "t": 108,
+    "rssMB": 127,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 207,
+    "rssMB": 149,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 308,
+    "rssMB": 163,
+    "pssMB": null,
+    "anonMB": null
+   },
+   {
+    "t": 341,
+    "rssMB": 163,
+    "pssMB": null,
+    "anonMB": null
+   }
+  ]
+ },
+ "server_log": [],
+ "console": [],
+ "workers": [
+  {
+   "sessionId": "F3D70404F7B851C6823B990EF34AA8B1",
+   "url": "http://127.0.0.1:36125/coi/features.js"
+  }
+ ],
+ "profile_MB": 3
+}

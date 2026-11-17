@@ -1,0 +1,128 @@
+insert_record	role(read)	name	flags_u32	plugin_slots_used	plugins	routes_to_inserts	channels_routed_here(ev104-1)	volume_param_msg(id192)	slots_disabled(MixerParams id0 msg0)
+0	master		0xc	6	kHs Filter[VST3];Spectral Gate[VST3];kHs Gain[VST3];Ozone Imager 2[VST3];Frequency Shifter[native];GClip[VST2]		0	12800	
+1		[fadr.com] Vocals - Still_in_my_heart_feat_ぷにぷに電機 - 172bpm - Cmin	0xc	1	Fruity Balance[native]	0	7	12800	
+2		car crash and siren	0x4c	4	Soundgoodizer[native];Fruity Parametric EQ 2[native];Fruity Parametric EQ 2[native];Fruity Delay 2[native]	0	12;13	12800	
+3		Serum	0x4c	0		0	1	12800	
+4		Other - Dot To Dot Feat. Shully - 174bpm - C#maj	0x4c	0		0	35	12800	
+5		Serum #2	0x4c	1	Fruity Parametric EQ 2[native]	1	2	12800	
+6		schnozz atmos pad - accidental wii music remake (Gmaj)	0x4c	2	Soundgoodizer[native];kHs Haas[VST3]	1	45	12800	
+7		Serum 2	0x4c	0		1	3	12800	
+8		JC_Clap_04	0x4c	1	Soundgoodizer[native]	1	30	12800	
+9		amen-break-skull-break_165bpm_2	0x4c	0		0	67	12800	
+10		Dot To Dot Feat. Shully	0x4c	1	kHs Haas[VST3]	0		12800	
+11		celtix_Albiorix_Snare_05	0x4c	2	kHs Pitch Shifter[VST3];Fruity Parametric EQ 2[native]	0	16	12800	
+12		guitarhero	0x4c	1	Fruity Parametric EQ 2[native]	0	26	12800	
+13		Bubble Down	0x4c	0		0	11	12800	
+14		zap14	0x4c	0		0	68	12800	
+15		Serum #3	0x4c	0		1	28	12800	
+16		Serum #4	0x4c	3	Soundgoodizer[native];Fruity Parametric EQ 2[native];Soundgoodizer[native]	1		12800	
+17		Serum #4	0x4c	3	Fruity Parametric EQ 2[native];Soundgoodizer[native];OTT[VST3]	1	33	12800	
+18		celtix_Albiorix_Kick_06	0x4c	3	Fruity Parametric EQ 2[native];OTT[VST3];Soundgoodizer[native]	1	14;15	12800	
+19		dariacore snare 2	0x4c	0		0	22	12800	
+20		snareroll3	0x4c	0		0	49	12800	
+21		Project_4 - 	0x4c	0		0	41	12800	
+22		Phase Plant	0x4c	0		1		12800	
+23		Agogo	0x4c	3	Soundgoodizer[native];kHs Filter[VST3];kHs Tape Stop[VST3]	47	36	12800	
+24		Serum #5	0x4c	2	Soundgoodizer[native];Disperser[VST3]	1	37	12800	
+25		rec_20240918_233440	0x4c	1	Soundgoodizer[native]	1	44	12800	
+26		classic_schnozz_riser	0x4c	0		0	21	12800	
+27		this_the_kinda_beat_that_go_180bpm	0x4c	0		0	60	12800	
+28		bring it back	0x4c	0		0	10	12800	
+29		JC_KICKS_05	0x4c	0		0	31	12800	
+30		bodies scream	0x4c	0		0		12800	
+31		WhipCrack_(_Mike_Gip_)	0x4c	0		1	65	12800	
+32		schnozz lazers 9	0x4c	0		0	46	12800	
+33		JC_SNAP_04	0x4c	0		0	32	12800	
+34		RIMSHOT	0x4c	0		0		12800	
+35		celtix_Albiorix_Sweep_Up_02	0x4c	0		1	18	12800	
+36		galil-1	0x4c	0		0	25	12800	
+37		Kick - Classic Knocker	0x4c	0		0		12800	
+38		anvil_land	0x4c	0		0	9	12800	
+39		hardstyle kick 1	0x4c	0		0	29	12800	
+40		SIREN_4	0x4c	0		0	47	12800	
+41		Magical 8bit Plug 2	0x4c	0		0	55	12800	
+42		snare1	0x4c	1	Soundgoodizer[native]	1		12800	
+43		[fadr.com] Vocals - クリスマスセリナ　メモリアルロビー　高画質 - ぶるぶるあーかいぶ - 115bpm - Cmin	0x4c	0		0		12800	
+44		elwood_fill	0x4c	0		0	24	12800	
+45		Phase Plant #2	0x4c	1	Ozone Imager 2[VST3]	0		12800	
+46			0x4c	1	Soundgoodizer[native]	47		12800	
+47		Pattern 7 (consolidated)	0x4c	1	Fruity Filter[native]	1		12800	
+48			0x4c	0		1		12800	
+49			0x4c	0		0		12800	
+50			0x4c	0		0		12800	
+51			0x4c	0		0		12800	
+52			0x4c	0		0		12800	
+53			0x4c	0		0		12800	
+54			0x4c	0		0		12800	
+55			0x4c	0		0		12800	
+56			0x4c	0		0		12800	
+57			0x4c	0		0		12800	
+58			0x4c	0		0		12800	
+59			0x4c	0		0		12800	
+60			0x4c	0		0		12800	
+61			0x4c	0		0		12800	
+62			0x4c	0		0			
+63			0x4c	0		0			
+64			0x4c	0		0		12800	
+65			0x4c	0		0		12800	
+66			0x4c	0		0		13652	
+67			0x4c	0		0		11035	
+68			0x4c	0		0		14050	
+69			0x4c	0		0		11267	0
+70			0x4c	0		0		14455	
+71			0x4c	0		0		13462	
+72			0x4c	0		0		16000	
+73			0x4c	0		0		12800	
+74			0x4c	0		0		13241	
+75			0x4c	0		0		12800	1
+76			0x4c	0		0		14550	
+77			0x4c	0		0		12800	
+78			0x4c	0		0		12800	
+79			0x4c	0		0		12800	
+80			0x4c	0		0		16000	
+81			0x4c	0		0		14124	
+82			0x4c	0		0		15603	
+83			0x4c	0		0		12800	
+84			0x4c	0		0		12800	
+85			0x4c	0		0		16000	
+86			0x4c	0		0		15007	
+87			0x4c	0		0		16000	
+88			0x4c	0		0		16000	
+89			0x4c	0		0		14124	
+90			0x4c	0		0		12800	
+91			0x4c	0		0		12800	
+92			0x4c	0		0		12800	
+93			0x4c	0		0		12800	
+94			0x4c	0		0		16000	
+95			0x4c	0		0		12800	
+96			0x4c	0		0		12800	
+97			0x4c	0		0		14191	
+98			0x4c	0		0		12800	
+99			0x4c	0		0		12800	
+100			0x4c	0		0		12800	
+101			0x4c	0		0		14049	
+102			0x4c	0		0		12800	
+103			0x4c	0		0		12800	
+104			0x4c	0		0		14418	
+105			0x4c	0		0		12800	
+106			0x4c	0		0		11215	
+107			0x4c	0		0		14025	
+108			0x4c	0		0		13664	
+109			0x4c	0		0		14503	
+110			0x4c	0		0		12800	
+111			0x4c	0		0		12800	
+112			0x4c	0		0		12800	
+113			0x4c	0		0		12800	
+114			0x4c	0		0		12800	
+115			0x4c	0		0		12800	
+116			0x4c	0		0		12800	
+117			0x4c	0		0		12800	
+118			0x4c	0		0		12800	
+119			0x4c	0		0		12800	
+120			0x4c	0		0		12800	
+121			0x4c	0		0		12800	
+122			0x4c	0		0		12800	
+123			0x4c	0		0		12800	
+124			0x4c	0		0		12800	
+125			0x4c	0		0		12800	
+126	current?		0xc	0				12800	

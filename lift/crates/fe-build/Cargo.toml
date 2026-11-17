@@ -1,0 +1,11 @@
+[package]
+name = "fe-build"
+description = "The engine steps of deploy.yml (decision 0412): blend2d, gen-all, emcc compile and link, hybrid, wasm-opt and the glue, as one program with no shell"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "fe-build"
+path = "src/main.rs"

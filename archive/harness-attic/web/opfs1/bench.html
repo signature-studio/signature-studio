@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>opfs1 stage 3 bench</title>
+<script>
+// the page side of the stage 3 measurement (decision 0216): window.call(cmd, args) runs a command in a dedicated Worker (bench-worker.js); window.bridge(n) runs the SAB bridge between two Workers; window.kill() terminates the Worker without closing its handles
+let worker = new Worker('bench-worker.js'), n = 0; const pend = new Map();
+const wire = (w) => { w.onmessage = (e) => { const p = pend.get(e.data.id); pend.delete(e.data.id); if (p) e.data.ok ? p.res(e.data.result) : p.rej(new Error(e.data.error)); }; };
+wire(worker);
+window.call = (cmd, args = {}) => new Promise((res, rej) => { const id = ++n; pend.set(id, { res, rej }); worker.postMessage({ id, cmd, ...args }); });
+window.kill = () => { worker.terminate(); worker = new Worker('bench-worker.js'); wire(worker); return true; };
+window.bridge = async (count) => {
+  const sab = new SharedArrayBuffer(1 << 20);
+  const srv = new Worker('bench-worker.js'), cli = new Worker('bench-worker.js');
+  wire(srv); wire(cli);
+  const id1 = ++n, id2 = ++n;
+  const sp = new Promise((res, rej) => pend.set(id1, { res, rej })), cp = new Promise((res, rej) => pend.set(id2, { res, rej }));
+  srv.postMessage({ id: id1, cmd: 'bridge-server', sab });
+  cli.postMessage({ id: id2, cmd: 'bridge-client', sab, n: count });
+  const r = await cp; await sp; srv.terminate(); cli.terminate(); return r;
+};
+/* jspi.wat assembled (160 bytes), inline so that the diff carries no binary */
+window.jspi = async () => { const wasm = Uint8Array.from(atob('AGFzbQEAAAABCgJgAAF/YAF/AX8CGwIDZW52CHJlc29sdmVkAAADZW52BG9wZW4AAQMDAgEBBxsCDHJ1bl9yZXNvbHZlZAACCHJ1bl9vcGVuAAMKSwIjAQJ/AkADQCABIABPDQEgAhAAaiECIAFBAWohAQwACwsgAgslAQJ/AkADQCABIABPDQEgAiABEAFqIQIgAUEBaiEBDAALCyACCw=='), (c) => c.charCodeAt(0)).buffer; return window.call('jspi', { wasm }); };
+</script>

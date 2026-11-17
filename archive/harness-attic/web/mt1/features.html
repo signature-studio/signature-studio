@@ -1,0 +1,81 @@
+<!doctype html><meta charset=utf-8><title>mt1 features</title>
+<script>
+window.__log = [];
+const log = (s) => window.__log.push(s);
+(async () => {
+  try {
+    // wasm binaries (hand-assembled, validated only)
+    const v = (bytes) => { try { return WebAssembly.validate(new Uint8Array(bytes)); } catch (e) { return 'ERR ' + e.message; } };
+    const hdr = [0, 0x61, 0x73, 0x6d, 1, 0, 0, 0];
+    const feat = {};
+    // shared memory + atomic.rmw add i32: (memory 1 1 shared)(func (param i32) (result i32) local.get 0 i32.const 1 i32.atomic.rmw.add align=2)
+    feat.threads_atomics = v([0x00,0x61,0x73,0x6d,0x01,0x00,0x00,0x00,0x01,0x06,0x01,0x60,0x01,0x7f,0x01,0x7f,0x03,0x02,0x01,0x00,0x05,0x04,0x01,0x03,0x01,0x01,0x07,0x05,0x01,0x01,0x66,0x00,0x00,0x0a,0x0c,0x01,0x0a,0x00,0x20,0x00,0x41,0x01,0xfe,0x1e,0x02,0x00,0x0b]);
+    // simd: v128.const + drop in a func ()
+    feat.simd128 = v([0x00,0x61,0x73,0x6d,0x01,0x00,0x00,0x00,0x01,0x05,0x01,0x60,0x00,0x01,0x7b,0x03,0x02,0x01,0x00,0x07,0x05,0x01,0x01,0x66,0x00,0x00,0x0a,0x16,0x01,0x14,0x00,0xfd,0x0c,0x01,0x00,0x00,0x00,0x02,0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x04,0x00,0x00,0x00,0x0b]);
+    // memory64: (memory i64 1)
+    feat.memory64 = v([...hdr, 5, 3, 1, 4, 1]);
+    // multi-memory: two memories
+    feat.multi_memory = v([...hdr, 5, 5, 2, 0, 1, 0, 1]);
+    // tail call: return_call 0 in func 0
+    feat.tail_call = v([...hdr, 1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 10, 6, 1, 4, 0, 0x12, 0, 0x0b]);
+    // exception handling (legacy) : try ... catch_all end
+    feat.exceptions_legacy = v([0x00,0x61,0x73,0x6d,0x01,0x00,0x00,0x00,0x01,0x04,0x01,0x60,0x00,0x00,0x03,0x02,0x01,0x00,0x07,0x05,0x01,0x01,0x66,0x00,0x00,0x0a,0x08,0x01,0x06,0x00,0x06,0x40,0x19,0x0b,0x0b]);
+    // relaxed simd: i32x4.relaxed_trunc_f32x4_s (0xfd 0x101 -> leb 0x81 0x02)
+    feat.relaxed_simd = v([0x00,0x61,0x73,0x6d,0x01,0x00,0x00,0x00,0x01,0x06,0x01,0x60,0x01,0x7b,0x01,0x7b,0x03,0x02,0x01,0x00,0x07,0x05,0x01,0x01,0x66,0x00,0x00,0x0a,0x09,0x01,0x07,0x00,0x20,0x00,0xfd,0x81,0x02,0x0b]);
+    const f = {
+      userAgent: navigator.userAgent, hardwareConcurrency: navigator.hardwareConcurrency, deviceMemory: navigator.deviceMemory ?? null,
+      crossOriginIsolated: self.crossOriginIsolated, SharedArrayBuffer: typeof SharedArrayBuffer, Atomics_waitAsync: typeof Atomics.waitAsync, Atomics_wait: typeof Atomics.wait,
+      JSPI_Suspending: typeof WebAssembly.Suspending, JSPI_promising: typeof WebAssembly.promising, AudioWorklet: typeof AudioWorklet, AudioContext: typeof AudioContext,
+      Worker: typeof Worker, WebAssembly_Module_postMessage: 'see worker test', OffscreenCanvas: typeof OffscreenCanvas, wasm: feat,
+    };
+    try { new WebAssembly.Memory({ initial: 1, maximum: 65536, shared: true }); f.shared_memory_max_65536 = 'ok'; } catch (e) { f.shared_memory_max_65536 = 'ERR ' + e.message; }
+    try { const m = new WebAssembly.Memory({ initial: 1, maximum: 32768, shared: true }); f.shared_memory_max_2GiB = m.buffer instanceof SharedArrayBuffer ? 'ok(SAB)' : 'ok(not SAB)'; } catch (e) { f.shared_memory_max_2GiB = 'ERR ' + e.message; }
+    f.sab_sizes = {};
+    for (const [label, bytes] of [['256MiB', 2 ** 28], ['1GiB', 2 ** 30], ['2GiB', 2 ** 31], ['4GiB-64KiB', 2 ** 32 - 65536], ['4GiB', 2 ** 32], ['8GiB', 2 ** 33]]) {
+      try { const b = new SharedArrayBuffer(bytes); f.sab_sizes[label] = 'ok byteLength=' + b.byteLength; } catch (e) { f.sab_sizes[label] = 'ERR ' + e.message; }
+    }
+    f.shared_memory_sizes = {};
+    for (const [label, pages, max] of [['1GiB initial', 16384, 32768], ['2GiB initial', 32768, 32768], ['4GiB initial', 65536, 65536]]) {
+      try { const m = new WebAssembly.Memory({ initial: pages, maximum: max, shared: true }); f.shared_memory_sizes[label] = 'ok ' + m.buffer.byteLength; } catch (e) { f.shared_memory_sizes[label] = 'ERR ' + e.message; }
+    }
+    try { Atomics.wait(new Int32Array(new SharedArrayBuffer(8)), 0, 0, 1); f.main_Atomics_wait = 'allowed'; } catch (e) { f.main_Atomics_wait = 'throws: ' + e.message; }
+    try { const r = Atomics.waitAsync(new Int32Array(new SharedArrayBuffer(8)), 0, 0, 1); f.main_Atomics_waitAsync = 'ok async=' + r.async; } catch (e) { f.main_Atomics_waitAsync = 'ERR ' + e.message; }
+    // worker side
+    const wsrc = `
+      (async () => {
+        const r = {};
+        r.crossOriginIsolated = self.crossOriginIsolated; r.SharedArrayBuffer = typeof SharedArrayBuffer; r.waitAsync = typeof Atomics.waitAsync;
+        r.JSPI = typeof WebAssembly.Suspending + '/' + typeof WebAssembly.promising; r.hardwareConcurrency = navigator.hardwareConcurrency;
+        try { const ia = new Int32Array(new SharedArrayBuffer(8)); const t = performance.now(); const x = Atomics.wait(ia, 0, 0, 20); r.worker_Atomics_wait = x + ' after ' + (performance.now() - t).toFixed(1) + ' ms'; } catch (e) { r.worker_Atomics_wait = 'ERR ' + e.message; }
+        try { const w2 = new Worker(URL.createObjectURL(new Blob(['postMessage(1)'], {type: 'text/javascript'}))); r.nested_worker = await new Promise((res) => { w2.onmessage = () => res('ok'); w2.onerror = (e) => res('ERR ' + e.message); setTimeout(() => res('timeout'), 3000); }); w2.terminate(); } catch (e) { r.nested_worker = 'ERR ' + e.message; }
+        r.timerRes = typeof setTimeout;
+        postMessage(r);
+      })();`;
+    f.worker = await new Promise((res) => { const w = new Worker(URL.createObjectURL(new Blob([wsrc], { type: 'text/javascript' }))); w.onmessage = (e) => res(e.data); w.onerror = (e) => res('ERR ' + e.message); });
+    // Module sharing: compile once, send to a worker
+    {
+      const bytes = new Uint8Array([...hdr, 1, 4, 1, 0x60, 0, 0, 3, 2, 1, 0, 7, 5, 1, 1, 0x66, 0, 0, 10, 4, 1, 2, 0, 0x0b]);
+      const mod = await WebAssembly.compile(bytes);
+      const w = new Worker(URL.createObjectURL(new Blob(['onmessage=(e)=>{const i=new WebAssembly.Instance(e.data,{});postMessage(typeof i.exports.f)}'], { type: 'text/javascript' })));
+      f.module_postMessage = await new Promise((res) => { w.onmessage = (e) => res(e.data); w.onerror = (e) => res('ERR ' + e.message); w.postMessage(mod); });
+    }
+    // AudioWorklet
+    try {
+      const ac = new AudioContext({ sampleRate: 48000, latencyHint: 'interactive' });
+      f.audio = { state_initial: ac.state, sampleRate: ac.sampleRate, baseLatency: ac.baseLatency, outputLatency: ac.outputLatency };
+      await ac.audioWorklet.addModule('worklet-probe.js');
+      const node = new AudioWorkletNode(ac, 'p');
+      const msgs = [];
+      node.port.onmessage = (e) => msgs.push(e.data);
+      node.connect(ac.destination);
+      await ac.resume().catch(() => {});
+      for (let i = 0; i < 40 && msgs.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
+      f.audio.state = ac.state; f.audio.worklet = msgs;
+      await ac.close();
+      try { const a2 = new AudioContext({ sampleRate: 44100 }); f.audio.rate44100 = { sampleRate: a2.sampleRate, baseLatency: a2.baseLatency, state: a2.state }; await a2.close(); } catch (e) { f.audio.rate44100 = 'ERR ' + e.message; }
+    } catch (e) { f.audio = 'ERR ' + e.message; }
+    window.__result = f;
+  } catch (e) { window.__error = String(e && e.stack || e); }
+  window.__done = true;
+})();
+</script>

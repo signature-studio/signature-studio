@@ -1,0 +1,32 @@
+ILVideo_x64.dll
+  bytes 1329152  sha256 82ab852157998e8809633c8f8997c398a34acf6dfdacc4c483852acbee719c55
+  ImageBase 0x400000  SizeOfImage 1404928
+  import DLLs (10): avutil-56.dll, kernel32.dll, user32.dll, avdevice-58.dll, oleaut32.dll, advapi32.dll, swresample-3.dll, swscale-5.dll, avformat-58.dll, avcodec-58.dll
+avcodec-58.dll
+  bytes 47050240  sha256 c38a6078dd21fa1de837d98150388b86b3b39f0edf2a0a5489dee1526de61b14
+  ImageBase 0x180000000  SizeOfImage 57798656
+  import DLLs (10): ADVAPI32.dll, bcrypt.dll, KERNEL32.dll, MFPlat.DLL, msvcrt.dll, ole32.dll, USERENV.dll, WS2_32.dll, avutil-56.dll, swresample-3.dll
+avdevice-58.dll
+  bytes 1879552  sha256 c6cef5f3a00011a989778efc4d6e95bcb507d1dbd8c67e1c3c40a24aa4b51ac5
+  ImageBase 0x180000000  SizeOfImage 1916928
+  import DLLs (18): ADVAPI32.dll, GDI32.dll, IMM32.dll, KERNEL32.dll, msvcrt.dll, ole32.dll, OLEAUT32.dll, SETUPAPI.dll, SHELL32.dll, SHLWAPI.dll, USER32.dll, VERSION.dll, AVICAP32.dll, WINMM.dll, avcodec-58.dll, avfilter-7.dll, avformat-58.dll, avutil-56.dll
+avfilter-7.dll
+  bytes 11524608  sha256 64be4e5a0f078a739c2a8e1622fc5547a2bda89b6ce272ab1cb347ebb225a03b
+  ImageBase 0x180000000  SizeOfImage 11841536
+  import DLLs (13): ADVAPI32.dll, CFGMGR32.dll, GDI32.dll, KERNEL32.dll, msvcrt.dll, ole32.dll, USER32.dll, WS2_32.dll, avcodec-58.dll, avformat-58.dll, avutil-56.dll, swresample-3.dll, swscale-5.dll
+avformat-58.dll
+  bytes 12441600  sha256 0ce8459a45bc31593168f0e5da56a3c3f438e078f385d102183be5cae3766c1b
+  ImageBase 0x180000000  SizeOfImage 13295616
+  import DLLs (11): ADVAPI32.dll, CRYPT32.dll, GDI32.dll, KERNEL32.dll, msvcrt.dll, Secur32.dll, SHELL32.dll, USER32.dll, WS2_32.dll, avcodec-58.dll, avutil-56.dll
+avutil-56.dll
+  bytes 862208  sha256 242e395783096ce5b4fa3dc7fa68fce914218bd7ffa56910d2f438259b7d2b00
+  ImageBase 0x180000000  SizeOfImage 3047424
+  import DLLs (7): ADVAPI32.dll, bcrypt.dll, CFGMGR32.dll, KERNEL32.dll, msvcrt.dll, ole32.dll, USER32.dll
+swresample-3.dll
+  bytes 602112  sha256 ece14061769c711096ff0389e94c5aa23900f8e1f0b228d0c27355652589bded
+  ImageBase 0x180000000  SizeOfImage 851968
+  import DLLs (4): ADVAPI32.dll, KERNEL32.dll, msvcrt.dll, avutil-56.dll
+swscale-5.dll
+  bytes 566784  sha256 4b8d18ed10641b96108c4f83e63f15ad3dca5d057f450ba2bb7c6885deee29d8
+  ImageBase 0x180000000  SizeOfImage 634880
+  import DLLs (4): ADVAPI32.dll, KERNEL32.dll, msvcrt.dll, avutil-56.dll

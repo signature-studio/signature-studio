@@ -1,0 +1,420 @@
+--- a/lift/crates/fe-lift/tests/screen1.rs
++++ b/lift/crates/fe-lift/tests/screen1.rs
+@@ -136,12 +136,43 @@
+ }
+ 
+ #[test]
+-fn the_dpi_is_96_whatever_the_environment_says_and_the_physical_size_follows_it() {
+-    // decision 0243: the page has no DPI choice and the runtime reads no FLE_SCREEN_DPI: 96 (100%), and the millimetres follow the size
++fn the_dpi_follows_the_environment_and_the_physical_size_follows_it() {
++    // decision 0318 (HiDPI): FLE_SCREEN_DPI is the DPI of the virtual display, a value of the run like the pixel size; unset it is 96 and every answer of the default is unchanged
+     let want = format!("3240 1923 3240 1923 | 3240 1923 {} {} 96 96", mm(3240, 96), mm(1923, 96));
+     assert_eq!(run("screen1-3240", &[("FLE_MONITOR_W", "3240"), ("FLE_MONITOR_H", "1923")], "    report();"), [want]);
+-    assert_eq!(run("screen1-dpi-ignored", &[("FLE_SCREEN_DPI", "192")], "    report();"), [format!("1920 1080 1920 1080 | 1920 1080 {} {} 96 96", mm(1920, 96), mm(1080, 96))]);
+     assert_eq!((mm(1920, 96), mm(1080, 96)), (508, 286));
++    // 200%: the pixels are device pixels, the millimetres are the same physical size per pixel at twice the density
++    assert_eq!(run("screen1-dpi192", &[("FLE_SCREEN_DPI", "192")], "    report();"), [format!("1920 1080 1920 1080 | 1920 1080 {} {} 192 192", mm(1920, 192), mm(1080, 192))]);
++    assert_eq!((mm(1920, 192), mm(1080, 192)), (254, 143));
++    // a device pixel ratio of 1.75 (round(96 x 1.75) = 168) with a 3840 x 2160 guest
++    assert_eq!(run("screen1-dpi168", &[("FLE_MONITOR_W", "3840"), ("FLE_MONITOR_H", "2160"), ("FLE_SCREEN_DPI", "168")], "    report();"), [format!("3840 2160 3840 2160 | 3840 2160 {} {} 168 168", mm(3840, 168), mm(2160, 168))]);
++    // the limits themselves are accepted
++    assert_eq!(run("screen1-dpi-min", &[("FLE_SCREEN_DPI", "96")], "    report();"), ["1920 1080 1920 1080 | 1920 1080 508 286 96 96"]);
++    assert_eq!(run("screen1-dpi-max", &[("FLE_SCREEN_DPI", "384")], "    report();"), [format!("1920 1080 1920 1080 | 1920 1080 {} {} 384 384", mm(1920, 384), mm(1080, 384))]);
++}
++
++#[test]
++fn a_dpi_that_is_not_a_whole_number_of_decimal_digits_or_is_out_of_range_is_96() {
++    let d = "1920 1080 1920 1080 | 1920 1080 508 286 96 96";
++    for v in ["abc", "", "192 ", " 192", "-192", "192.5", "0xC0", "95", "385", "0", "99999999999"] {
++        assert_eq!(run("screen1-dpi-bad", &[("FLE_SCREEN_DPI", v)], "    report();"), [d], "FLE_SCREEN_DPI={v:?}");
++    }
++    // the DPI and the size are judged alone: a bad DPI keeps a good size
++    assert_eq!(run("screen1-dpi-bad-size-good", &[("FLE_MONITOR_W", "2400"), ("FLE_MONITOR_H", "1300"), ("FLE_SCREEN_DPI", "abc")], "    report();"), [format!("2400 1300 2400 1300 | 2400 1300 {} {} 96 96", mm(2400, 96), mm(1300, 96))]);
++}
++
++#[test]
++fn the_icon_and_cursor_sizes_follow_the_dpi() {
++    // GetSystemMetrics: SM_CXICON 11, SM_CYICON 12, SM_CXCURSOR 13, SM_CYCURSOR 14, SM_CXSMICON 49, SM_CYSMICON 50. At 96: 32, 32, 32, 32, 16, 16 (the constants of decision 0057).
++    // Icons: base x dpi / 96 rounded to the nearest. Cursors: the table of Learn "About Cursors" (below 144 DPI 32, 144..191 48, 192..287 64, 288..383 96, 384 128).
++    let body = "    printf(\"%d %d %d %d %d %d\\n\", SM(11), SM(12), SM(13), SM(14), SM(49), SM(50));";
++    assert_eq!(run("screen1-sm96", &[], body), ["32 32 32 32 16 16"]);
++    assert_eq!(run("screen1-sm120", &[("FLE_SCREEN_DPI", "120")], body), ["40 40 32 32 20 20"]);
++    assert_eq!(run("screen1-sm144", &[("FLE_SCREEN_DPI", "144")], body), ["48 48 48 48 24 24"]);
++    assert_eq!(run("screen1-sm168", &[("FLE_SCREEN_DPI", "168")], body), ["56 56 48 48 28 28"]);
++    assert_eq!(run("screen1-sm192", &[("FLE_SCREEN_DPI", "192")], body), ["64 64 64 64 32 32"]);
++    assert_eq!(run("screen1-sm288", &[("FLE_SCREEN_DPI", "288")], body), ["96 96 96 96 48 48"]);
++    assert_eq!(run("screen1-sm384", &[("FLE_SCREEN_DPI", "384")], body), ["128 128 128 128 64 64"]);
+ }
+ 
+ #[test]
+@@ -215,9 +246,9 @@
+         code.push('\n');
+     }
+     let names: Vec<&str> = code.match_indices("getenv(").map(|(i, _)| &code[i..i + 40]).collect();
+-    // getenv is called with a parameter in fle_screen_dim only (decision 0243: the DPI and the flag readers are gone); the names are the literal arguments
++    // getenv is called with a parameter in fle_screen_dim only (decision 0243: the flag readers are gone; decision 0318: the DPI is read again, as a value of the run); the names are the literal arguments
+     assert_eq!(names.len(), 1, "{names:?}");
+-    for lit in ["\"FLE_MONITOR_W\"", "\"FLE_MONITOR_H\""] {
++    for lit in ["\"FLE_MONITOR_W\"", "\"FLE_MONITOR_H\"", "\"FLE_SCREEN_DPI\""] {
+         assert!(code.contains(lit), "{lit}");
+     }
+     for bad in ["X11", "DISPLAY", "xrandr", "wayland", "/dev", "/sys", "/proc", "ioctl", "fb0", "devicePixelRatio", "screen.width", "emscripten", "getpid", "clock_gettime", "fopen", "pthread"] {
+--- a/lift/crates/fe-lift/tests/wall_s.rs
++++ b/lift/crates/fe-lift/tests/wall_s.rs
+@@ -475,17 +475,18 @@
+ }
+ 
+ #[test]
+-fn get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware() {
++fn get_process_dpi_awareness_answers_the_current_process_as_per_monitor_dpi_aware() {
+     // Learn (GetProcessDpiAwareness): hprocess NULL = the current process; S_OK (0) and E_INVALIDARG (0x80070057) for a handle or pointer that is
+-    // not valid. Decision 0099: the current process (NULL or the GetCurrentProcess pseudo handle -1) is PROCESS_DPI_UNAWARE (0); another handle
+-    // (this environment cannot make one) and a NULL pointer are E_INVALIDARG. Only 4 bytes are written (the enum is an int); the last error is not touched.
++    // not valid. Decision 0318 (decision 0099 answered PROCESS_DPI_UNAWARE for want of a declaration): the current process (NULL or the GetCurrentProcess
++    // pseudo handle -1) is PROCESS_PER_MONITOR_DPI_AWARE (2), the declaration of the manifest of FL64.exe (<dpiAware>True/PM</dpiAware>), whatever FLE_SCREEN_DPI is;
++    // another handle (this environment cannot make one) and a NULL pointer are E_INVALIDARG. Only 4 bytes are written (the enum is an int); the last error is not touched.
+     let got = lines("dpi");
+     assert_eq!(
+         got,
+         [
+             "found 5",
+-            "cur 0 v=aaaaaaaa00000000 le=5",
+-            "null 0 v=aaaaaaaa00000000",
++            "cur 0 v=aaaaaaaa00000002 le=5",
++            "null 0 v=aaaaaaaa00000002",
+             "other 80070057 v=aaaaaaaaaaaaaaaa",
+             "thread-pseudo 80070057 v=aaaaaaaaaaaaaaaa",
+             "null-ptr 80070057",
+--- /dev/null
++++ b/lift/crates/fe-lift/tests/dpi1.rs
+@@ -0,0 +1,179 @@
++//! Tests for the DPI answers of runtime/fle_proc.c (decision 0318): shcore!GetProcessDpiAwareness, user32!IsProcessDPIAware, user32!SetThreadDpiAwarenessContext, user32!SetThreadDpiHostingBehavior.
++//!
++//! Expected values are written here from the rules on the Microsoft pages (GetProcessDpiAwareness, IsProcessDPIAware, SetThreadDpiAwarenessContext, SetThreadDpiHostingBehavior, windef.h /
++//! shellscalingapi.h values), not read back from the C code. The process is per-monitor aware because the manifest of FL64.exe says <dpiAware>True/PM</dpiAware>. The thread state is a choice
++//! without a source (S-gpu8-thread-dpi): stored and returned, no other answer depends on it. The host is Linux: nothing is compared with a real Windows. These tests link no thread file, so
++//! the one thread is thread 0.
++
++mod etxt_common;
++
++use std::os::unix::process::ExitStatusExt;
++use std::path::{Path, PathBuf};
++use std::process::Command;
++use std::sync::OnceLock;
++
++fn manifest() -> PathBuf {
++    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
++}
++fn runtime_dir() -> PathBuf {
++    manifest().join("../../runtime")
++}
++fn work_dir() -> PathBuf {
++    let d = manifest().join("../../out-dpi1-test");
++    std::fs::create_dir_all(d.join("tmp")).unwrap();
++    d
++}
++
++fn clang_c(src: &Path, obj: &Path, strict: bool) {
++    let mut cmd = Command::new("clang");
++    cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
++    if strict {
++        cmd.arg("-Werror");
++    }
++    let cc = cmd.arg("-I").arg(runtime_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
++    assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
++}
++
++fn objs() -> &'static Vec<PathBuf> {
++    static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
++    O.get_or_init(|| {
++        let dir = work_dir().join(etxt_common::per_process("obj-dpi1"));
++        std::fs::create_dir_all(&dir).unwrap();
++        let mut v = Vec::new();
++        for (name, ours) in [("fle_proc.c", true), ("fle_time.c", true), ("fle_sys.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
++            let o = dir.join(name.replace(".c", ".o"));
++            clang_c(&runtime_dir().join(name), &o, ours);
++            v.push(o);
++        }
++        v
++    })
++}
++
++const PRELUDE: &str = r#"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdint.h>
++#include <pthread.h>
++#include "fle_runtime.h"
++#include "fle_imports.h"
++#include "fle_env.h"
++#include "fle_sys.h"
++#include "fle_proc.h"
++
++uint64_t R[16];
++static uint64_t stk[32];
++
++static uint64_t callv(void (*f)(void), const uint64_t *a)
++{
++    memset(stk, 0, sizeof stk);
++    stk[0] = 0xdead0000u;
++    R[1] = a[0]; R[2] = a[1]; R[8] = a[2]; R[9] = a[3];
++    R[4] = (uint64_t)(uintptr_t)stk;
++    R[0] = 0xBADBADBADull;
++    f();
++    return R[0];
++}
++#define CALL(f, ...) callv((void (*)(void))(f), (uint64_t[12]){ __VA_ARGS__ })
++#define A(x) ((uint64_t)(uintptr_t)(x))
++#define U(x) ((unsigned long long)(x))
++"#;
++
++fn run(name: &str, env: &[(&str, &str)], body: &str) -> Vec<String> {
++    let dir = work_dir();
++    let uname = etxt_common::uniq(name);
++    let c = dir.join(format!("{uname}.c"));
++    let exe = dir.join(&uname);
++    std::fs::write(&c, format!("{PRELUDE}\nint main(void)\n{{\n{body}\n    return 0;\n}}\n")).unwrap();
++    let mut cmd = Command::new("clang");
++    cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(runtime_dir());
++    for o in objs() {
++        cmd.arg(o);
++    }
++    let cc = cmd.arg("-o").arg(&exe).arg(&c).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
++    assert!(cc.status.success(), "clang failed for {name}: {}", String::from_utf8_lossy(&cc.stderr));
++    let mut r = Command::new(&exe);
++    r.env_remove("FLE_SCREEN_DPI").env("TMPDIR", dir.join("tmp"));
++    for (k, v) in env {
++        r.env(k, v);
++    }
++    let o = r.output().expect("run failed");
++    assert!(o.status.success(), "{name} did not exit normally (signal {:?}): {}", o.status.signal(), String::from_utf8_lossy(&o.stderr));
++    String::from_utf8_lossy(&o.stdout).lines().map(|s| s.to_string()).collect()
++}
++
++const E_INVALIDARG: &str = "80070057";
++
++#[test]
++fn the_rows_are_in_the_table_and_declared_in_the_header() {
++    let table = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
++    let h = std::fs::read_to_string(runtime_dir().join("fle_proc.h")).unwrap();
++    for n in ["IsProcessDPIAware", "SetThreadDpiAwarenessContext", "SetThreadDpiHostingBehavior"] {
++        let row = format!("(\"user32.dll\", \"{n}\", \"fle_imp_{n}\", \"jmp_imp:{n}\")");
++        assert_eq!(table.matches(&row).count(), 1, "{n}: exactly one row in imports_table.rs");
++        assert!(h.contains(&format!("void fle_imp_{n}(void)")), "{n} is declared in fle_proc.h");
++    }
++}
++
++#[test]
++fn the_process_is_per_monitor_dpi_aware_whatever_the_dpi() {
++    // Learn GetProcessDpiAwareness: hprocess NULL = the current process; S_OK; PROCESS_PER_MONITOR_DPI_AWARE = 2 (shellscalingapi.h); the manifest of FL64.exe: <dpiAware>True/PM</dpiAware>
++    let body = r#"
++    uint32_t v = 0xFFu;
++    uint64_t hr = CALL(fle_imp_GetProcessDpiAwareness, 0, A(&v));
++    printf("%llx %u\n", U(hr), v);
++    v = 0xFFu;
++    hr = CALL(fle_imp_GetProcessDpiAwareness, (uint64_t)-1, A(&v));
++    printf("%llx %u\n", U(hr), v);
++    v = 0xFFu;
++    hr = CALL(fle_imp_GetProcessDpiAwareness, 0x1234, A(&v));
++    printf("%llx %u\n", U(hr), v);
++    hr = CALL(fle_imp_GetProcessDpiAwareness, 0, 0);
++    printf("%llx\n", U(hr));
++    printf("%llu\n", U(CALL(fle_imp_IsProcessDPIAware, 0)));
++"#;
++    let want = ["0 2".to_string(), "0 2".to_string(), format!("{E_INVALIDARG} 255"), E_INVALIDARG.to_string(), "1".to_string()];
++    assert_eq!(run("dpi1-aware-96", &[], body), want);
++    assert_eq!(run("dpi1-aware-192", &[("FLE_SCREEN_DPI", "192")], body), want);
++}
++
++#[test]
++fn the_thread_dpi_awareness_context_is_stored_and_the_old_one_returned() {
++    // Learn SetThreadDpiAwarenessContext: the return value is the old context; an invalid context leaves the thread as it was and returns NULL. Contexts (windef.h): UNAWARE -1, SYSTEM_AWARE -2,
++    // PER_MONITOR_AWARE -3, PER_MONITOR_AWARE_V2 -4, UNAWARE_GDISCALED -5. A thread starts with the awareness of the process: -3 (per-monitor, the manifest).
++    let body = r#"
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-4)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-2)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, 0)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, 5)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-6)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, 0x1234567890ull)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-1)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-5)));
++    printf("%llx\n", U(CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-3)));
++"#;
++    let want = ["fffffffffffffffd", "fffffffffffffffc", "0", "0", "0", "0", "fffffffffffffffe", "ffffffffffffffff", "fffffffffffffffb"];
++    assert_eq!(run("dpi1-ctx", &[], body), want);
++    // the answers of the screen do not depend on the context (S-gpu8-thread-dpi): GetProcessDpiAwareness is the process's
++    let body2 = r#"
++    uint32_t v = 0xFFu;
++    CALL(fle_imp_SetThreadDpiAwarenessContext, (uint64_t)-1);
++    CALL(fle_imp_GetProcessDpiAwareness, 0, A(&v));
++    printf("%u\n", v);
++"#;
++    assert_eq!(run("dpi1-ctx-process", &[], body2), ["2"]);
++}
++
++#[test]
++fn the_thread_dpi_hosting_behavior_is_stored_and_the_old_one_returned() {
++    // Learn SetThreadDpiHostingBehavior: the return value is the previous DPI_HOSTING_BEHAVIOR; an invalid value leaves the thread as it was and returns DPI_HOSTING_BEHAVIOR_INVALID (-1).
++    // Values (windef.h): INVALID -1, DEFAULT 0, MIXED 1. A thread starts with DEFAULT.
++    let body = r#"
++    printf("%x\n", (uint32_t)CALL(fle_imp_SetThreadDpiHostingBehavior, 1));
++    printf("%x\n", (uint32_t)CALL(fle_imp_SetThreadDpiHostingBehavior, 2));
++    printf("%x\n", (uint32_t)CALL(fle_imp_SetThreadDpiHostingBehavior, (uint32_t)-1));
++    printf("%x\n", (uint32_t)CALL(fle_imp_SetThreadDpiHostingBehavior, 0));
++    printf("%x\n", (uint32_t)CALL(fle_imp_SetThreadDpiHostingBehavior, 0));
++"#;
++    assert_eq!(run("dpi1-host", &[], body), ["0", "ffffffff", "ffffffff", "1", "0"]);
++}
+--- /dev/null
++++ b/lift/crates/fe-lift/tests/rows_0318/mod.rs
+@@ -0,0 +1,6 @@
++//! The response rows that decision 0318 (HiDPI: the process is per-monitor DPI aware, the guest calls the per-monitor functions it delay-loads) appends after the last row of HEAD d71efab5, user32!SetWindowPlacement of decision 0267 (tests/rows_0267)
++//! (decision 0015: append only, no pseudo-VA moves). Shared by the tests that pin the rows before them (wall_fr4, wall_fr5, wall_fr13, wall_fr15, wall_fr16, wall_fr19, wall_fr20, wall_fr21, vcall_thunk_dll);
++//! a new row of decision 0318 is added here and at the end of src/imports_table.rs.
++#![allow(dead_code)]
++
++pub const ROWS_0318: [(&str, &str); 3] = [("user32.dll", "IsProcessDPIAware"), ("user32.dll", "SetThreadDpiAwarenessContext"), ("user32.dll", "SetThreadDpiHostingBehavior")];
+--- a/lift/crates/fe-lift/tests/wall_fr4.rs
++++ b/lift/crates/fe-lift/tests/wall_fr4.rs
+@@ -21,6 +21,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use fe_lift::generate;
+ use std::os::unix::process::ExitStatusExt;
+@@ -194,7 +195,7 @@
+     // (tests/wall_fr5.rs) were appended after those: LATER_ROWS is how many there are now (1 until decision 0119, which appended 8 more: tests/wall_fr6.rs; decision 0122 appended 15 more:
+     // tests/wall_fr8.rs; decision 0123 appended 73 more: tests/wall_fr9.rs; decision 0125 appended 2 more: tests/wall_fr10.rs; old value 9 + 15 + 73).
+     // decision 0126 appended 33 more (tests/wall_fr11.rs; old value 9 + 15 + 73 + 2: it ended at decision 0125's rows).
+-    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
++    const LATER_ROWS: usize = 9 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0318::ROWS_0318.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
+     // decision 0129 (old: ... + 33): + 4 rows (tests/wall_fr12.rs); decision 0132: + tests/rows_0132/mod.rs
+     assert_eq!((rows[n - LATER_ROWS - 10].0.as_str(), rows[n - LATER_ROWS - 10].1.as_str()), ("shell32.dll", "SHGetPathFromIDListW"));
+     for (k, (dll, name)) in NEW_ROWS.iter().enumerate() {
+--- a/lift/crates/fe-lift/tests/wall_fr5.rs
++++ b/lift/crates/fe-lift/tests/wall_fr5.rs
+@@ -20,6 +20,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use fe_lift::generate;
+ use std::os::unix::process::ExitStatusExt;
+@@ -173,7 +174,7 @@
+     // decision 0015: append only. The last row of decision 0117 is GetUserPreferredUILanguages; the one row of decision 0118 follows it. Decision 0119 appended 8 rows
+     // after it (tests/wall_fr6.rs; old: the UuidCreate row was the last one, `rows[n - 1]`), decision 0122 another 15 (tests/wall_fr8.rs), decision 0123 another 73 (tests/wall_fr9.rs), decision 0125 another 2 (tests/wall_fr10.rs): LATER_ROWS = 98 (decision 0123: 96; decision 0122: 23; decision 0119 only: 8).
+     // decision 0126 appended 33 more (tests/wall_fr11.rs; old value 8 + 15 + 73 + 2).
+-    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
++    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0318::ROWS_0318.len(); // decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
+     // decision 0129 (old: ... + 33): + 4 rows (tests/wall_fr12.rs); decision 0132: + tests/rows_0132/mod.rs
+     assert_eq!((rows[n - LATER_ROWS - 2].0.as_str(), rows[n - LATER_ROWS - 2].1.as_str()), ("kernel32.dll", "GetUserPreferredUILanguages"));
+     assert_eq!((rows[n - LATER_ROWS - 1].0.as_str(), rows[n - LATER_ROWS - 1].1.as_str()), ("rpcrt4.dll", "UuidCreate"));
+--- a/lift/crates/fe-lift/tests/wall_fr13.rs
++++ b/lift/crates/fe-lift/tests/wall_fr13.rs
+@@ -14,6 +14,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use fe_lift::generate;
+ use std::path::PathBuf;
+@@ -145,7 +146,7 @@
+     assert_eq!(rows.len(), st.resp_entries);
+     let k = rows_0132::ROWS_0132.len();
+     // decision 0136 appends 10 rows after these (tests/wall_fr14.rs) and decision 0139 appends 3 more (tests/rows_0139/mod.rs): the table of this test ends where decision 0132's rows end
+-    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
++    let n = rows.len() - 10 - rows_0139::ROWS_0139.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len(); // decision 0267 appends 1 more after those of decision 0147; decision 0147 appends 1 more after those of decision 0144; decision 0140 appends 4 more after those of decision 0139, decision 0144 2 more after them
+     // HEAD 3ce8e7f has 581 rows (544 of decision 0125, 33 of 0126, 4 of 0129); decision 0132 appends k (decision 0015: append only)
+     assert_eq!(n, 581 + k, "the 581 rows of HEAD 3ce8e7f and the {k} of decision 0132");
+     assert_eq!((rows[n - k - 1].0.as_str(), rows[n - k - 1].1.as_str()), ("ole32.dll", "CoCreateInstance"), "the row before the new ones is the last row of decision 0129");
+--- a/lift/crates/fe-lift/tests/wall_fr15.rs
++++ b/lift/crates/fe-lift/tests/wall_fr15.rs
+@@ -18,6 +18,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use std::os::unix::process::ExitStatusExt;
+ use std::path::{Path, PathBuf};
+@@ -144,7 +145,7 @@
+     // src/imports_table.rs: the rows are appended after decision 0132's 7 and decision 0136's 10 (decision 0015: append only). The pseudo-VA of row k (0-based) is 0x7FF900000000 + 0x10 * (k + 1) (tests/wall_fr13.rs checks the rule).
+     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+     let tail: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
+-    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
++    let n = tail.len() - rows_0140::ROWS_0140.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len(); // decision 0267 appends 1 row (tests/rows_0267) after those of decision 0147; decision 0147 appends 1 row (tests/wall_fr20.rs) after those of decision 0144; decision 0140 appends 4 rows (tests/wall_fr16.rs) after these, decision 0144 2 rows (tests/wall_fr19.rs) after those
+     for (i, (dll, name)) in rows_0139::ROWS_0139.iter().enumerate() {
+         let want = format!("(\"{dll}\", \"{name}\", \"fle_imp_{name}\", \"jmp_imp:{name}\"),");
+         assert_eq!(tail[n - 3 + i].trim(), want, "row {i} of decision 0139");
+--- a/lift/crates/fe-lift/tests/wall_fr16.rs
++++ b/lift/crates/fe-lift/tests/wall_fr16.rs
+@@ -19,6 +19,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use fe_lift::generate;
+ use std::os::unix::process::ExitStatusExt;
+@@ -460,7 +461,7 @@
+     let rows = resp_rows(&c);
+     assert_eq!(rows.len(), st.resp_entries);
+     let k = rows_0140::ROWS_0140.len();
+-    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
++    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len(); // decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
+     // the rows before are the 3 of decision 0139 (tests/wall_fr15.rs), whose last row is dsound!DirectSoundEnumerateW; HEAD 93881c0 has 601 rows (598 of decision 0136 + 3), decision 0140 appends 4 (decision 0015: append only)
+     assert_eq!(n, 601 + k, "the 601 rows of HEAD 93881c0 and the {k} of decision 0140");
+     assert_eq!((rows[n - k - 1].0.as_str(), rows[n - k - 1].1.as_str()), ("dsound.dll", "DirectSoundEnumerateW"), "the row before the new ones is the last row of decision 0139");
+--- a/lift/crates/fe-lift/tests/wall_fr19.rs
++++ b/lift/crates/fe-lift/tests/wall_fr19.rs
+@@ -9,6 +9,7 @@
+ mod rows_0144;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use std::path::{Path, PathBuf};
+ use std::process::Command;
+@@ -249,7 +250,7 @@
+     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+     let rows: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
+     let k = rows_0144::ROWS_0144.len();
+-    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len(); // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that
++    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len(); // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that
+     for (i, (dll, name)) in rows_0144::ROWS_0144.iter().enumerate() {
+         let want = format!("(\"{dll}\", \"{name}\", \"fle_imp_{name}\", \"jmp_imp:{name}\"),");
+         assert_eq!(rows[n - k + i].trim(), want, "row {i} of decision 0144");
+--- a/lift/crates/fe-lift/tests/wall_fr20.rs
++++ b/lift/crates/fe-lift/tests/wall_fr20.rs
+@@ -15,6 +15,7 @@
+ mod etxt_common;
+ mod rows_0147;
+ mod rows_0267;
++mod rows_0318;
+ 
+ use fe_lift::generate;
+ use std::os::unix::process::ExitStatusExt;
+@@ -170,7 +171,7 @@
+     let rows = resp_rows(&c);
+     assert_eq!(rows.len(), st.resp_entries);
+     let k = rows_0147::ROWS_0147.len();
+-    let n = rows.len() - rows_0267::ROWS_0267.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one
++    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one
+     // decision 0015: append only. HEAD 7b82424 ends with user32!GetLayeredWindowAttributes (decision 0140); once decision 0144's rows are in the tree they come between (the check is "last row", not "after row 605")
+     for (i, (dll, name)) in rows_0147::ROWS_0147.iter().enumerate() {
+         assert_eq!((rows[n - k + i].0.as_str(), rows[n - k + i].1.as_str()), (*dll, *name), "row {i} of decision 0147");
+@@ -184,7 +185,7 @@
+     // and in the source table, right before the row of decision 0267
+     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+     let table: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
+-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len()].trim().to_string();
++    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0318::ROWS_0318.len()].trim().to_string();
+     assert_eq!(last, "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
+ }
+ 

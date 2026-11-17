@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pre-push: scans every tracked file with scripts/scan-forbidden.sh and refuses the push when it finds a forbidden string. It does nothing else.
+# Arguments from git (remote name, URL) are not read. No environment variable or option skips the scan. `git push --no-verify` skips it: that is the human's way.
+# Limit: only the files of the current tree are scanned, not the history of earlier commits.
+set -o pipefail
+
+root=$(git rev-parse --show-toplevel) || { echo "pre-push: not inside a git work tree" >&2; exit 1; }
+cd "$root" || { echo "pre-push: cannot enter $root" >&2; exit 1; }
+
+[ -x scripts/scan-forbidden.sh ] || { echo "pre-push: scripts/scan-forbidden.sh is missing or not executable; refusing to push without the scan" >&2; exit 1; }
+git ls-files -z | xargs -0 scripts/scan-forbidden.sh > /dev/null || {
+  echo "pre-push: the push is rejected: tracked files contain forbidden strings. Run scripts/scan-forbidden.sh for rule, file and line." >&2
+  exit 1
+}
+exit 0

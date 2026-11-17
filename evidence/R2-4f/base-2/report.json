@@ -1,0 +1,81 @@
+[
+ {
+  "name": "o20-tempo",
+  "what": "R2-4c-2: close the welcome wizard, wait 800 ms, shot o20-start; then drag on the Tempo box from (450,20): 3 px down (o20-3px), 80 px down (o20-80px), 20 px up (o20-20pxup), each followed by wait 800 and shot; describe the compositor's window table o20-end. Every drag starts at (450,20). No right click.",
+  "rep": 1,
+  "seconds": 18,
+  "firstIdleMs": 4565.43505859375,
+  "stopped": false,
+  "state": "engine-idle",
+  "opErrors": [],
+  "error": null,
+  "expects": [],
+  "describes": [
+   {
+    "name": "o20-end",
+    "lines": [
+     "lid 14 at (0, 0) 1920x1080 alpha 0 key 000000 class \"TFruityLoopsMainForm\" title \"FL Studio 2026\""
+    ]
+   }
+  ],
+  "prunedLines": 0,
+  "screen": {
+   "guest": {
+    "width": 1920,
+    "height": 1080
+   },
+   "reported": {
+    "width": 1920,
+    "height": 1080
+   },
+   "desktop": [
+    1920,
+    1080
+   ],
+   "viewport": [
+    2260,
+    1116
+   ]
+  },
+  "hz": {
+   "param": null,
+   "request": "auto",
+   "engineEnvHz": 60,
+   "engineHz": 60,
+   "autoMeasuredHz": 60.006000600059934,
+   "rafHz": 60,
+   "peakHz": 60,
+   "basis": "since-idle",
+   "ratio": 1,
+   "fit": "match",
+   "note": "エンジン 60 Hz と画面の rAF 60 Hz は合っています"
+  },
+  "timeline": {
+   "page_script": 48.3400000333786,
+   "manifest_loaded": 62.19499999284744,
+   "download_start": 93.93999999761581,
+   "download_done": 1126.5699999928474,
+   "compile_done": 1127.1499999761581,
+   "pack_source_dll": 1188.1650390625,
+   "pack_source_seed": 1188.219970703125,
+   "glue_loaded": 1197.215087890625,
+   "worker_ready": 1197.9700000286102,
+   "engine_start": 1198.0049999952316,
+   "wasm_instantiated": 1221.045166015625,
+   "files_ready": 1231.614990234375,
+   "main_start": 1232.880126953125,
+   "idle": 4565.43505859375,
+   "host_files_released": 4565.655029296875,
+   "first_pixel": 4589.85009765625
+  },
+  "loadStart": 0.83,
+  "loadEnd": 1.04,
+  "ioStart": 0,
+  "ioEnd": 0,
+  "windowsEnd": [
+   "TFruityLoopsMainForm@0,0 1920x1080"
+  ],
+  "intendedExit": false,
+  "ok": true
+ }
+]

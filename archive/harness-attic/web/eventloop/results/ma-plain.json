@@ -1,0 +1,50 @@
+{
+ "name": "ma-plain",
+ "page": "/plain/ma.html?tests=env%2Crtt",
+ "started": "2026-10-28T16:08:35.249Z",
+ "loadavg_before": "1.53 1.81 1.75 5/1419 652520",
+ "url": "http://127.0.0.1:34837/plain/ma.html?tests=env%2Crtt",
+ "loadavg_after": "1.53 1.81 1.75 2/1426 652567",
+ "chrome": {
+  "product": "Chrome/156.0.8078.47",
+  "v8": "15.6.75.19",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+  "args": [
+   "--headless=new",
+   "--no-sandbox",
+   "--user-data-dir=/home/ubuntu/work/signature-studio-develop/lift/out-web2/chrome-profile/ma-plain",
+   "--no-first-run",
+   "--no-default-browser-check",
+   "--disable-dev-shm-usage",
+   "--disable-gpu",
+   "--mute-audio",
+   "about:blank"
+  ]
+ },
+ "console": [],
+ "error": null,
+ "result": {
+  "env": {
+   "crossOriginIsolated": false,
+   "SharedArrayBuffer": "undefined",
+   "waitAsync": "function",
+   "hardwareConcurrency": 16,
+   "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36",
+   "timeResolution_us": 100
+  },
+  "rtt_nonblocking_pm": {
+   "unit": "us",
+   "n": 10000,
+   "rtt": {
+    "n": 10000,
+    "min": 0,
+    "max": 3900.0000059604645,
+    "mean": 94.25999999344349,
+    "p50": 99.99999403953552,
+    "p95": 200.00001788139343,
+    "p99": 200.00001788139343
+   }
+  }
+ },
+ "chrome_pids_left": 0
+}

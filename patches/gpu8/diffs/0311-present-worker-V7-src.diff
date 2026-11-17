@@ -1,0 +1,21 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -27,6 +27,9 @@
+ let frameTicks = 0;
+ const presentedAt: number[] = [];
+ let lastReport = 0;
++// the scene request of an animation frame is raised by a task after the frame step, so that the engine Worker's publish does not arrive while this Worker is in the frame step (measured: such a publish waits up to the next frame)
++const requestAfterFrame = new MessageChannel();
++requestAfterFrame.port1.onmessage = () => { link?.requestScene(); };
+ 
+ self.onmessage = (ev: MessageEvent<{ cmd: 'init'; link: SharedArrayBuffer; port: MessagePort }>) => {
+   const m = ev.data;
+@@ -80,7 +83,7 @@
+   const tick = (): void => {
+     frameTicks++;
+     const now = performance.now();
+-    L.requestScene();
++    requestAfterFrame.port2.postMessage(0);
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+     next();
+   };

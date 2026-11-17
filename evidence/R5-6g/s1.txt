@@ -1,0 +1,18 @@
+8 DLLs: file bytes, c_bytes (census), SizeOfImage, unsupported_total
+  ILVideo_x64.dll 1329152 11221233 1404928 85
+  avutil-56.dll 862208 13951911 3047424 252
+  avcodec-58.dll 47050240 555348358 57798656 172523
+  avformat-58.dll 12441600 170279897 13295616 20614
+  swresample-3.dll 602112 9225459 851968 3943
+  swscale-5.dll 566784 11635712 634880 3669
+  avdevice-58.dll 1879552 28462934 1916928 857
+  avfilter-7.dll 11524608 138531569 11841536 41329
+sum native 76256256  sum c_bytes 938657073  sum SizeOfImage 90791936  sum unsupported 243272
+current 10 real modules: sum SizeOfImage 68083712
+after adding the 8: 158875648 (151.5 MiB); current 64.9 MiB
+k_C 0.209407  k_N 2.0503  base ratio 1.8695  denominator with the 8: 164930432
+A  C-type   increment 196561735 wasm 362338514 ratio 2.1969
+A' native-type increment 156347999 wasm 322124778 ratio 1.9531
+C  break-even C-type: C <= 783563937 (cut 16.52%)
+B  dsp prune retention 0.431222 (230146596/533708102); C-type increment 84761715 wasm 250538494 ratio 1.5191
+D  without avfilter-7: C 800125504 C-type increment 167552200 wasm 333328979 ratio 2.1729

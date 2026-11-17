@@ -1,0 +1,3 @@
+# 実行: 2026-11-14T15:30:35Z UTC (2026-11-15T00:30:35 JST) / HEAD 0d778aeffcd0441067d0262181172eaef5cd6ec8
+# コマンド: source scripts/env.sh && grep -rn FLE_PROCESS_PER_MONITOR_DPI_AWARE lift/runtime; echo rc=$?
+rc=1
