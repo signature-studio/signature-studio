@@ -156,7 +156,6 @@ jobs:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
           OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
         run: |
-          case "$OPENCODE_MODEL" in *haiku*) ;; *) echo "OPENCODE_MODEL が Haiku ではない"; exit 1 ;; esac
           printf '%s' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone
           mkdir -p .opencode
           printf '{"model":"%s","agents":{"worker":{"model":"%s"},"title":{"model":"%s"},"summary":{"model":"%s"}}}\n' "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" > .opencode/opencode.jsonc
