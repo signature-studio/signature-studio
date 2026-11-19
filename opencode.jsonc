@@ -1,0 +1,64 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // 作業者(worker)は Haiku 5.5 だけ。Sonnet 5.5 は監査・受付(audit)だけ。Opus は使わない(ledger L-018)。
+  "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5",
+  "default_agent": "worker",
+
+  // ここに置く deny は、台帳(ledger/instructions.tsv)にある依頼者の指示に対応する物だけ。
+  "policies": [
+    // ---- commit の名義を変えない(ledger L-023)
+    { "action": "tool.use", "resource": "shell:git config*user.*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:git -C * config*user.*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:git*--author*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*GIT_AUTHOR*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*GIT_COMMITTER*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*GIT_CONFIG*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:git -c *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:git -C * -c *", "effect": "deny" },
+    // ---- Cloudflare の CLI を使わない(ledger L-010)。依頼者の資格と portal の道具に触れない(ledger L-011)
+    { "action": "tool.use", "resource": "shell:wrangler*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:npx wrangler*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:bunx wrangler*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:cf *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*opencode*auth*export*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*opencode*auth*import*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:gh secret*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:gh auth *", "effect": "deny" },
+    { "action": "tool.use", "resource": "portal_*", "effect": "deny" },
+    { "action": "mcp.use", "resource": "portal", "effect": "deny" },
+    // ---- 他のセッションとサーバーの API に触れない(ledger L-014)
+    { "action": "tool.use", "resource": "shell:opencode api *", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*localhost:4096*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:*127.0.0.1:4096*", "effect": "deny" }
+  ],
+
+  "permissions": [],
+
+  "agents": {
+    // 監査・受付。固定のセッション 1 つ(ledger L-015)。製品の作業は Actions で行うので、このマシンでは製品のファイルを変えない(ledger L-009)。
+    "audit": {
+      "description": "Receives the owner's instructions, watches the whole system and repairs what is not running. Never edits the product.",
+      "mode": "primary",
+      "model": "console-cloudflare-ai-gateway-custom/claude-sonnet-5-5#high",
+      "permissions": [
+        { "action": "edit", "resource": "app/*", "effect": "deny" },
+        { "action": "edit", "resource": "lift/*", "effect": "deny" },
+        { "action": "edit", "resource": "tools/*", "effect": "deny" },
+        { "action": "edit", "resource": "patches/*", "effect": "deny" },
+        { "action": "edit", "resource": "ci/*", "effect": "deny" }
+      ]
+    },
+    // 作業者。Actions の runner で動く(ledger L-009)。依頼者の返答を待って止まらない(ledger L-001)。
+    "worker": {
+      "description": "Does one assigned task and reports facts.",
+      "mode": "all",
+      "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#high",
+      "permissions": [
+        { "action": "question", "resource": "*", "effect": "deny" }
+      ]
+    },
+    "title": { "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#low" },
+    "summary": { "model": "console-cloudflare-ai-gateway-custom/claude-haiku-5-5#low" }
+  }
+}
