@@ -27,6 +27,11 @@
     { "action": "tool.use", "resource": "shell:gh auth *", "effect": "deny" },
     { "action": "tool.use", "resource": "portal_*", "effect": "deny" },
     { "action": "mcp.use", "resource": "portal", "effect": "deny" },
+    // ---- GitHub Actions は、依頼者が確認して承認するまで実行しない(ledger L-021)
+    { "action": "tool.use", "resource": "shell:gh workflow run*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:gh workflow enable*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:gh run rerun*", "effect": "deny" },
+    { "action": "tool.use", "resource": "shell:gh api *dispatches*", "effect": "deny" },
     // ---- 他のセッションとサーバーの API に触れない(ledger L-014)
     { "action": "tool.use", "resource": "shell:opencode api *", "effect": "deny" },
     { "action": "tool.use", "resource": "shell:*localhost:4096*", "effect": "deny" },
