@@ -1,0 +1,3 @@
+# 並列で足される関数の一覧は、両方の行を残して取り込む(作業者のジョブが同じ一覧に行を足すため)
+lift/harness/hyb/lowered-all.txt merge=union
+lift/harness/hyb/lists/*.txt merge=union

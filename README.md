@@ -6,9 +6,11 @@ FL Studio(Windows 版)のエンジンを x86-64 から C / wasm へ変換し、�
 |---|---|
 | `app/` `lift/` `tools/` `patches/` `ci/` | 製品(前の世代の main から、そのまま運んだ物) |
 | `guard/` | 判定の道具。作業ジョブの最後の段で `guard/judge.sh` を呼びます |
-| `spec/` | テスト(`bash spec/guard.test.sh`) |
+| `spec/` | テスト(`bash spec/guard.test.sh`、`bash spec/driver.test.sh`) |
 | `ci/tasks/` | タスク(前の世代の 6 件がある) |
+| `driver/` | 駆動(閾値補充・生成器・タスクの本文・待ち行列の状態) |
+| `queue/` | 閾値、生成器の入力と型、手で書いたタスク |
 | `ledger/` | 依頼者の指示の台帳 |
 | `opencode.jsonc` | エージェントの設定(作業者は Haiku 5.5、監査・受付は Sonnet 5.5) |
 
-駆動とワークフローは、まだありません。
+駆動は `.github/workflows/agent.yml` の fill です(`driver/fill.sh`)。待ち行列は Issues です。

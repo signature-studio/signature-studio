@@ -6,19 +6,17 @@
 - P1: 10 秒以内に起動する。
 - P2: UI が 120 fps で動く。
 - P3: Song Mode で音が途切れない。
-
-目標どうしがぶつかるときは、P3、P2、P1、サイズの順に優先します。
+- 目標どうしがぶつかるときは、P3、P2、P1、サイズの順に優先します。
 
 ## 役割
 - 作業者(Haiku 5.5): GitHub Actions の runner で動きます。1 つのタスクを 1 つのジョブで、新しいセッションで行います。
 - 監査・受付(Sonnet 5.5): 1 つの固定のセッションです。依頼者の指示を受け、全体を見て、止まっているところを調べて直します。タスクの分解や計画の見直しも、ここで行います。
-- 駆動: 足りない分のジョブを起動し、変更を main に入れる仕組みです。まだありません。
+- 駆動: `.github/workflows/agent.yml` の fill(`driver/fill.sh`)です。待ち行列から、閾値(`queue/threshold`)まで作業ジョブを起動します。待ちが 100 件を下回ると、生成器(`driver/generate.sh`)がタスクを足します。
 
 ワークフローとハーネス(駆動、判定の道具、テスト、設定)は、エージェントが自分で改善します。改善はテストを通してから入れます。
 
 ## 作業者の手順
-タスクは `ci/tasks/<名前>.md` に置きます。受け入れコマンドは、タスクの中の `accept: ` で始まる行に書きます。
-
+待ち行列は Issues です。題名がタスクの名前、ラベル(ready・running・failed)が状態です。タスクの本文は `bash driver/task.sh <名前>` が出します(`queue/tasks/<名前>.md`、`ci/tasks/<名前>.md`、または `queue/kinds/` の型)。受け入れコマンドは、本文の中の `accept: ` で始まる行に書きます。この行が無いタスクは、待ち行列に入りません。タスクを足すときは、`queue/tasks/<名前>.md` を main に入れ、同じ題名の Issue をラベル ready で作ります。
 1. タスクを読みます。目的と受け入れコマンドが書いてあります。
 2. 受け入れコマンドを実行し、その出力をそのまま報告に貼ります。
 3. 変更を commit します。push はしません。ジョブの最後の段が `guard/judge.sh` で判定し、通ったときだけ push します。
@@ -33,7 +31,7 @@
 - 他のプロジェクトのセッション、portal の道具、依頼者の設定と資格情報に触れない。
 - リポジトリの外に、ファイル・ユニット・設定を作らない。一時ファイルはリポジトリの中の `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。このマシンでは行わない。
-- GitHub Actions は、依頼者が確認して承認するまで実行しない。ワークフローの起動条件は、承認までは `workflow_dispatch` だけにする(push・schedule・pull_request で動く条件を入れない)。
+- GitHub Actions は、依頼者が確認して承認した範囲でだけ動かす。承認の前は、`gh workflow run` を使わず、`schedule` を足さず、`app/`・`lift/`・`ci/` に触れる push をしない(main の `deploy.yml` が動く)。
 
 ## 監査・受付の決まり
 - 依頼者の発言のうち、「質問:」で始まる物だけが質問です。質問には、道具を使わずに文章で答えます。
@@ -43,10 +41,9 @@
 ## GitHub に登録済みの値
 - Secrets: `OPENCODE_AUTH_JSON`(opencode の認証)、`R2_CACHE_ASSETS_ACCESS_KEY_ID`・`R2_CACHE_ASSETS_SECRET_ACCESS_KEY`(ビルドのキャッシュ用の R2)、`R2_ARTIFACT_ACCESS_KEY_ID`・`R2_ARTIFACT_SECRET_ACCESS_KEY`(インストーラなどを置く R2)、`CLOUDFLARE_API_TOKEN`(デプロイ用)
 - Variables: `OPENCODE_MODEL`(作業者のモデル)、`CLOUDFLARE_ACCOUNT_ID`
-- 前の世代のワークフローは `git show archive/gen4-2026-11-18:.github/workflows/agent.yml` で読める。
 
 ## 置き場所
 - `app/` `lift/` `tools/` `patches/` `ci/`: 製品
+- `driver/` `queue/`: 駆動(補充・生成器・タスクの本文・待ち行列の状態)と、閾値・生成器の入力と型・手で書いたタスク
 - `guard/`: 判定の道具(`judge.sh` が全体の判定。`scan.sh`・`flags.sh`・`deploy-lint.sh` を使う)
-- `spec/`: テスト
-- `ledger/`: 依頼者の指示の台帳
+- `spec/`: テスト(`spec/guard.test.sh`・`spec/driver.test.sh`)。`ledger/`: 依頼者の指示の台帳

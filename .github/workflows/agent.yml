@@ -1,18 +1,32 @@
 # 作業者(Haiku 5.5)を、タスク 1 件につき 1 ジョブで動かす。前の世代の agent.yml(実際に動いた物)を土台にした。
-# 起動は workflow_dispatch だけ(依頼者が Actions を承認するまで、push・schedule では動かさない。台帳 L-021)。
+# 起動は workflow_dispatch だけ。schedule は、依頼者が Actions を承認してから足す(台帳 L-021)。
+# 駆動: ジョブの最後の fill が、待ち行列(Issues)から閾値(queue/threshold)まで次のジョブを起動する(driver/fill.sh)。
+# task を空にして起動すると、fill だけが動く。fill を false にすると、次のジョブを起動しない。
 # 判定は、取り直した main の guard/judge.sh で行い、通った変更だけを main に push する。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # GitHub の名義: Secrets の鍵から、この実行のための token を発行する。
 # 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
 name: agent
+run-name: ${{ inputs.task && format('worker {0}', inputs.task) || 'fill' }}
 
 on:
   workflow_dispatch:
     inputs:
       task:
-        description: "ci/tasks の中のタスクの名前(拡張子 .md を除く)"
-        required: true
+        description: "タスクの名前(本文は driver/task.sh が出す)。空なら fill だけ"
+        required: false
+        default: ""
         type: string
+      issue:
+        description: "待ち行列の Issue の番号(fill が渡す)"
+        required: false
+        default: ""
+        type: string
+      fill:
+        description: "終わった後に、次のジョブを起動するか"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -20,6 +34,7 @@ permissions:
 jobs:
   extract:
     name: 抽出物を用意する
+    if: inputs.task != ''
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -63,6 +78,7 @@ jobs:
   run:
     name: worker ${{ inputs.task }}
     needs: extract
+    if: inputs.task != ''
     runs-on: ubuntu-latest
     timeout-minutes: 350
     env:
@@ -163,7 +179,7 @@ jobs:
       - name: 作業者を 1 回動かす
         run: |
           mkdir -p "$RUNNER_TEMP/out"
-          { cat AGENTS.md; printf '\n\n---\n\n## タスク(ci/tasks/%s.md)\n\n' "$TASK"; cat "ci/tasks/$TASK.md"; } > "$RUNNER_TEMP/prompt.md"
+          { cat AGENTS.md; printf '\n\n---\n\n## タスク(%s)\n\n' "$TASK"; bash driver/task.sh "$TASK"; } > "$RUNNER_TEMP/prompt.md"
           opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")" > "$RUNNER_TEMP/out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null || true
           rm -rf .opencode
 
@@ -174,7 +190,8 @@ jobs:
           git fetch --no-tags "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" +refs/heads/main:refs/judge/main
           mkdir -p "$RUNNER_TEMP/guard"
           for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done
-          git show "refs/judge/main:ci/tasks/$TASK.md" > "$RUNNER_TEMP/task.md"
+          git show "refs/judge/main:driver/task.sh" > "$RUNNER_TEMP/task.sh"
+          TASK_REF=refs/judge/main bash "$RUNNER_TEMP/task.sh" "$TASK" > "$RUNNER_TEMP/task.md"
           bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task.md"
 
       - name: 通った変更を main に push する(token はこの段で発行する)
@@ -208,3 +225,54 @@ jobs:
           path: ${{ runner.temp }}/out/report.md
           retention-days: 7
           if-no-files-found: ignore
+
+  close:
+    name: 待ち行列の状態を変える
+    needs: run
+    if: always() && inputs.issue != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: リポジトリ(最新の main)を取得する
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: 結果で Issue を閉じるか、待ちに戻す
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE: ${{ inputs.issue }}
+          RESULT: ${{ needs.run.result }}
+          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash driver/close.sh "$ISSUE" "$RESULT" "$URL"
+
+  fill:
+    name: 次のジョブを起動する(閾値補充)
+    needs: [run, close]
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.fill)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: fill
+      cancel-in-progress: false
+    permissions:
+      actions: write
+      contents: read
+      issues: write
+    steps:
+      - name: リポジトリ(最新の main)を取得する
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: 不足分を起動する
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: bash driver/fill.sh
