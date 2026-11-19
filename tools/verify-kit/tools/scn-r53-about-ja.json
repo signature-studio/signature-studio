@@ -1,0 +1,34 @@
+[
+ {
+  "name": "r53-about-ja",
+  "what": "R5-3 (decision 0369): About (F10, then the About tab at 1221,137 on the Settings window, the position found in the first run; scn-g6-d3's 1222,95 hit the title bar) with shots 3 s, 8 s and 28 s after the click; Escape; the reference project (the zip, openZipProject as in scn-p3-mixmove-300) with shots 10 s and 20 s after it opened; the whole engine log. No playback.",
+  "ops": [
+   {"op": "closeWizard"},
+   {"op": "wait", "ms": 2500},
+   {"op": "key", "code": "F10"},
+   {"op": "wait", "ms": 3500},
+   {"op": "logMark", "name": "m1"},
+   {"op": "click", "x": 1221, "y": 137, "hover": 60, "hold": 50},
+   {"op": "wait", "ms": 3000},
+   {"op": "shot", "name": "about-3s"},
+   {"op": "describe", "name": "about-windows"},
+   {"op": "wait", "ms": 5000},
+   {"op": "shot", "name": "about-8s"},
+   {"op": "wait", "ms": 20000},
+   {"op": "shot", "name": "about-28s"},
+   {"op": "describe", "name": "about-windows-28s"},
+   {"op": "listWindows"},
+   {"op": "saveLog", "name": "log-about", "mark": "m1"},
+   {"op": "key", "code": "Escape"},
+   {"op": "wait", "ms": 1500},
+   {"op": "listWindows"},
+   {"op": "openZipProject"},
+   {"op": "wait", "ms": 10000},
+   {"op": "shot", "name": "ja-main-10s"},
+   {"op": "wait", "ms": 10000},
+   {"op": "shot", "name": "ja-main-20s"},
+   {"op": "saveLog", "name": "log-all", "all": true},
+   {"op": "expectRunning"}
+  ]
+ }
+]

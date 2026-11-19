@@ -1,0 +1,92 @@
+diff
+--- a/lift/harness/web/fruity/link-web.sh
++++ b/lift/harness/web/fruity/link-web.sh
+@@ -24,6 +24,7 @@
+     -Wl,--allow-undefined -sERROR_ON_UNDEFINED_SYMBOLS=0 -sWARN_ON_UNDEFINED_SYMBOLS=0 \
+     -Wl,--wrap=__cyg_profile_func_enter -Wl,--wrap=fle_raster_wrote \
+     -Wl,--wrap=fprintf -Wl,--wrap=fputs -Wl,--wrap=abort \
++    -Wl,--wrap=fle_imp_CreateWindowExW -Wl,--wrap=fle_imp_DestroyWindow -Wl,--wrap=fle_imp_SetParent -Wl,--wrap=fle_imp_ShowWindow -Wl,--wrap=fle_imp_SetWindowPos -Wl,--wrap=fle_imp_MoveWindow -Wl,--wrap=fle_imp_RegisterClassW -Wl,--wrap=fle_imp_SetWindowLongPtrW -Wl,--wrap=fle_imp_InvalidateRect -Wl,--wrap=fle_imp_UpdateWindow -Wl,--wrap=fle_imp_BeginPaint -Wl,--wrap=fle_imp_EndPaint -Wl,--wrap=fle_imp_BitBlt -Wl,--wrap=fle_imp_StretchBlt -Wl,--wrap=fle_imp_RaiseException -Wl,--wrap=fle_imp_FindResourceW -Wl,--wrap=fle_imp_LoadResource \
+     "$@" \
+     "$OBJ"/h-fruity/*.o "$OBJ"/mod/*.o "$OBJ"/fle/*.o "$OBJ"/rt/*.o -lm \
+     -o "$OUTD/flengine6.js" > "$OUTD/link.log" 2>&1 )
+diff
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -74,3 +74,77 @@
+     result = R[0];
+     return result;
+ }
++
++/* 0313 TEST-ONLY diagnostic (diag-g9-gui.diff; never pushed; supersedes diag-g9-count.diff). Observation only: it changes nothing the guest sees (no register, no memory, no return value is written; the real function runs
++ * as before). Everything is printed to stderr as "g9-diag: ..." lines.
++ *  (1) fle_dispatch_hook (the census hook of decision 0097, it only observes and calls fn itself): the indirect calls that the guest makes INTO the image slot of the real modules Fruity Balance / Fruity Filter
++ *      (0x6800000..0x7400000): the first 64 calls with the target and rcx/rdx/r8/r9 (for the plug-in's Dispatcher(Self, ID, Index, Value) that is the ID in rdx and the parent window in r9: ID 0 = FPD_ShowEditor), the first 16
++ *      distinct targets, and the count at every power of two.
++ *  (2) the Win32 calls of the GUI that the guest code of those images makes (the return address on the guest stack is inside the image slot): name, arguments, result, and the number of drawing calls the raster layer
++ *      discarded so far (S-draw-hidden, fle_raster_discarded_count). The wrappers are installed by the linker (--wrap=fle_imp_NAME in lift/harness/web/fruity/link-web.sh): the other callers are not seen at all.
++ * At most G9_API_MAX lines of (2). */
++#include "fle_raster.h"
++#define G9_LO UINT64_C(0x6800000)
++#define G9_HI UINT64_C(0x7400000)
++#define G9_API_MAX 600u
++static uint64_t g9_n, g9_seen[16], g9_api_lines;
++static unsigned g9_nd;
++static int g9_from_image(void) { uint64_t ra = fle_ld(R[4], 8); return ra >= G9_LO && ra < G9_HI; }
++static void g9_hook(uint64_t va, void (*fn)(void))
++{
++    if (va >= G9_LO && va < G9_HI) {
++        uint64_t n = __atomic_add_fetch(&g9_n, 1, __ATOMIC_RELAXED);
++        unsigned i;
++        for (i = 0; i < g9_nd && i < 16 && g9_seen[i] != va; i++) {}
++        if (i == g9_nd && g9_nd < 16) {
++            g9_seen[g9_nd++] = va;
++            fprintf(stderr, "g9-diag: first call into the plug-in image at %#llx (call #%llu)\n", (unsigned long long)va, (unsigned long long)n);
++        }
++        if (n <= 64) fprintf(stderr, "g9-diag: call #%llu into the image: target %#llx rcx %#llx rdx %#llx r8 %#llx r9 %#llx\n", (unsigned long long)n, (unsigned long long)va,
++                             (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[8], (unsigned long long)R[9]);
++        if ((n & (n - 1)) == 0) fprintf(stderr, "g9-diag: %llu indirect calls into the plug-in image so far (distinct targets seen, up to 16: %u)\n", (unsigned long long)n, g9_nd);
++    }
++    fn();
++}
++__attribute__((constructor)) static void g9_gui_init(void) { fle_dispatch_hook = g9_hook; }
++
++#define G9_API(NAME, EXTRA) \
++    void __real_fle_imp_##NAME(void); \
++    void __wrap_fle_imp_##NAME(void) \
++    { \
++        int on = g9_from_image() && g9_api_lines < G9_API_MAX; \
++        if (on) { \
++            g9_api_lines++; \
++            fprintf(stderr, "g9-diag: API " #NAME " rcx %#llx rdx %#llx r8 %#llx r9 %#llx" EXTRA "\n", (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[8], (unsigned long long)R[9]); \
++        } \
++        __real_fle_imp_##NAME(); \
++        if (on) fprintf(stderr, "g9-diag: API " #NAME " -> %#llx (discarded drawing calls so far %llu)\n", (unsigned long long)R[0], (unsigned long long)fle_raster_discarded_count()); \
++    }
++void __real_fle_imp_CreateWindowExW(void);
++void __wrap_fle_imp_CreateWindowExW(void)
++{
++    int on = g9_from_image() && g9_api_lines < G9_API_MAX;
++    if (on) {
++        g9_api_lines++;
++        fprintf(stderr, "g9-diag: API CreateWindowExW exstyle %#llx class %#llx name %#llx style %#llx x %d y %d w %d h %d parent %#llx\n", (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[8],
++                (unsigned long long)R[9], (int)(uint32_t)fle_arg(5), (int)(uint32_t)fle_arg(6), (int)(uint32_t)fle_arg(7), (int)(uint32_t)fle_arg(8), (unsigned long long)fle_arg(9));
++    }
++    __real_fle_imp_CreateWindowExW();
++    if (on) fprintf(stderr, "g9-diag: API CreateWindowExW -> %#llx\n", (unsigned long long)R[0]);
++}
++G9_API(DestroyWindow, "")
++G9_API(SetParent, "")
++G9_API(ShowWindow, "")
++G9_API(SetWindowPos, "")
++G9_API(MoveWindow, "")
++G9_API(RegisterClassW, "")
++G9_API(SetWindowLongPtrW, "")
++G9_API(InvalidateRect, "")
++G9_API(UpdateWindow, "")
++G9_API(BeginPaint, "")
++G9_API(EndPaint, "")
++G9_API(BitBlt, "")
++G9_API(StretchBlt, "")
++G9_API(RaiseException, "")
++G9_API(FindResourceW, "")
++G9_API(LoadResource, "")

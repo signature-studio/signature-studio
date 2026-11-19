@@ -1,0 +1,18 @@
+--- a/lift/runtime/fle_env.c
++++ b/lift/runtime/fle_env.c
+@@ -9,7 +9,15 @@
+ 
+ void fle_stop(const char *api, const char *why)
+ {
++    uint64_t sp = R[4], ra = 0;
++
+     fprintf(stderr, "fle: %s: %s\n", api, why);
++    /* Decision 0319 (PM 07:5x; diagnostic only: a stop is fatal either way): the reason text names no value, so the second line gives the guest's view at the stop. For a stop made inside an API call these are the
++     * arguments (rcx, rdx, r8, r9) and the return address of the call (the guest word at rsp: which module's image the caller is in tells the family: FLEngine 0x400000.., a real module at its base, e.g. Fruity Balance
++     * 0x6800000, Fruity Filter 0x7000000). A stop made after the runtime changed the registers shows the values at that time, not the call's. The stack word is read only when rsp looks like a guest address. */
++    if (sp >= 0x1000u && (sp >> 32) == 0 && (sp & 7u) == 0) ra = fle_ld(sp, 8);
++    fprintf(stderr, "fle: stop context: guest return %#llx rsp %#llx rcx %#llx rdx %#llx r8 %#llx r9 %#llx\n", (unsigned long long)ra, (unsigned long long)sp, (unsigned long long)R[1], (unsigned long long)R[2],
++            (unsigned long long)R[8], (unsigned long long)R[9]);
+     abort();
+ }
+ 

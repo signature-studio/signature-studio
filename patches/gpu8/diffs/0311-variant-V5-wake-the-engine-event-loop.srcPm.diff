@@ -1,0 +1,30 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -83,6 +83,7 @@
+     frameTicks++;
+     const now = performance.now();
+     L.requestScene();
++    port?.postMessage(0);   // VARIANT V5 (decision 0311): wake the engine Worker's event loop (it sleeps between idles in the real-thread build) so that the request is served now, not at its next idle
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+     next();
+   };
+@@ -107,6 +108,7 @@
+       if (quiet.changed(performance.now())) { L.setAsleep(false); nextFrame?.(); }
+     }
+     L.markDone(seq, shown, at);
++    port?.postMessage(1);   // V5: the engine Worker reaps this scene and may publish the next one now
+     report(false);
+   }
+ }
+--- a/app/src/engine/worker.ts
++++ b/app/src/engine/worker.ts
+@@ -78,7 +78,8 @@
+ 
+ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
+   deskCanvas = m.desk.canvas;
+-  if (m.desk.link && m.desk.port) { deskLink = new DeskLinkEngine(m.desk.link); deskPort = m.desk.port; }
++  if (m.desk.link && m.desk.port) { deskLink = new DeskLinkEngine(m.desk.link); deskPort = m.desk.port; deskPort.onmessage = () => { if (deskHanded) servicePresent(false); }; }   // VARIANT V5 (decision 0311): the present Worker wakes this Worker's event loop at a frame request and when a scene is drawn
++
+   ring = new RingReader(m.desk.ring);
+   watchContextLoss(deskCanvas as unknown as ContextLossTarget, { lost: () => { deskPresenter?.resync(); wakeDesk(); }, restored: () => { deskPresenter?.resync(); wakeDesk(); } });   // a sleeping frame loop (desk2) is woken: the whole picture is sent again
+   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');

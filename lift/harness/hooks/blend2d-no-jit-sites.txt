@@ -1,0 +1,10 @@
+# Call-site memory overrides of Blend2D.dll (SHA-256 66634d24...66066c7), decision 0120 (provisional); format: lift/crates/fe-lift/src/site_override.rs.
+# fe-lift lift ... --site-overrides this-file. Addresses are RVAs, so the file does not depend on the base the module is measured at.
+#
+# RVA 0x56ce9 is the one call of blContextInitAs (RVA 0x146ff0) in the whole module: Agg2D::attach (vtable slot 1, RVA 0x56c90). The instruction
+# before it, `lea r8,[rsp+0x60]` (RVA 0x56cdb), makes r8 the address of a BLContextCreateInfo that attach zeroed with two 16-byte stores (RVA 0x56cc7,
+# 0x56ccc). The word at r8+0 is `flags`; its bit 0 is BL_CONTEXT_CREATE_FLAG_DISABLE_JIT: blContextInitAs' inner function (RVA 0x146040) tests
+# `test al,1` on it (RVA 0x146267) and takes the fixed (non-JIT) pipeline provider when it is set (X1, docs/investigations/blend2d-jit-and-drawing-path.md).
+# The guest wrote 0; the override makes it 1 just before the call. This environment has no executable memory (a wasm cannot run machine code
+# that a program generates), so Blend2D is told to use the pipelines that are compiled into it.
+rva:0x56ce9 store32 r8 0x0 0x1   # Agg2D::attach: BLContextCreateInfo.flags 0 -> BL_CONTEXT_CREATE_FLAG_DISABLE_JIT

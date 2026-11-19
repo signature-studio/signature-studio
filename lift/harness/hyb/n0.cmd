@@ -1,0 +1,12 @@
+--modules
+lift/harness/hyb/hyb-args.tsv
+--lists
+lift/harness/hyb/lists
+--dll-dir
+lift/out-app/dll
+--args
+lift/harness/hyb/n0.args
+--work
+lift/out-app/hyb
+--out-rsp
+lift/out-app/exports.rsp

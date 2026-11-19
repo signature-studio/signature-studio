@@ -1,0 +1,206 @@
+--- a/src/blend2d/pipeline/reference/compopgeneric_p.h
++++ b/src/blend2d/pipeline/reference/compopgeneric_p.h
+@@ -82,6 +82,123 @@
+   }
+ };
+ 
++// Decision 0195 (b2d3): OVERLAY for a PRGB32 pixel, a scalar form of the arithmetic of the JIT pipeline (pipeline/jit/compoppart.cpp, "VMaskProc - RGBA32 - Overlay", the `useSa` branch):
++// the channel values are 8-bit, the products are kept in 16 bits (as the JIT's packed 16-bit lanes do) and divided by 255 with the same rounding (div255_), the result is clamped to [0, 255].
++//   if (2.Dca < Da)  Dca' = Dca + Sca - (Dca.Sa + Sca.Da - 2.Sca.Dca)
++//   else             Dca' = Dca + Sca + (Dca.Sa + Sca.Da - 2.Sca.Dca) - Sa.Da
++//   Da' = Da + Sa - Sa.Da
++// In the differential tests of decision 0195 (lift/harness/b2d1/b2d3_diff.cpp, b3_wine.c) it agreed bit for bit with the JIT pipeline; it is registered for a PRGB32/XRGB32 target and a solid or gradient source only.
++template<typename PixelT>
++struct CompOp_Overlay_Op {
++  typedef PixelT PixelType;
++
++  enum : uint32_t {
++    kCompOp = BL_COMP_OP_OVERLAY,
++    kOptimizeOpaque = 0
++  };
++
++  static BL_INLINE uint32_t div255_(uint32_t x) noexcept {
++    uint32_t u = x + 0x80u;
++    return ((u + ((u >> 8) & 0xFFu)) >> 8) & 0xFFu;
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s) noexcept {
++    uint32_t dc[3] = { d.r(), d.g(), d.b() };
++    uint32_t sc[3] = { s.r(), s.g(), s.b() };
++    uint32_t da = d.a(), sa = s.a();
++    uint32_t sada = div255_(sa * da);
++    int32_t out[3];
++    for (int i = 0; i < 3; i++) {
++      uint32_t xx = (da * sc[i] - dc[i] * sc[i] + sa * dc[i] - dc[i] * sc[i]) & 0xFFFFu;
++      int32_t x = int32_t(div255_(xx));
++      bool lt = int32_t(da) > int32_t((dc[i] << 1) & 0xFFFFu);   // 2.Dca < Da
++      int32_t r = int32_t(sc[i] + dc[i]) + (lt ? -x : x) - (lt ? 0 : int32_t(sada));
++      out[i] = r < 0 ? 0 : (r > 255 ? 255 : r);
++    }
++    int32_t aa = int32_t(sa + da) - int32_t(sada);
++    aa = aa < 0 ? 0 : (aa > 255 ? 255 : aa);
++    return PixelType { (uint32_t(aa) << PixelType::Format::kAShift) | (uint32_t(out[0]) << PixelType::Format::kRShift) | (uint32_t(out[1]) << PixelType::Format::kGShift) | (uint32_t(out[2]) << PixelType::Format::kBShift) };
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s, uint32_t m) noexcept {
++    uint32_t sa = div255_(s.a() * m), sr = div255_(s.r() * m), sg = div255_(s.g() * m), sb = div255_(s.b() * m);
++    PixelType s2 { (sa << PixelType::Format::kAShift) | (sr << PixelType::Format::kRShift) | (sg << PixelType::Format::kGShift) | (sb << PixelType::Format::kBShift) };
++    return op_prgb32_prgb32(d, s2);
++  }
++};
++
++// Decision 0195 (b2d3): HARD_LIGHT is OVERLAY with the roles of source and destination swapped in the condition (pipeline/jit/compoppart.cpp, "VMaskProc - RGBA32 - HardLight"): the same 16-bit arithmetic, the test is 2.Sca < Sa.
++template<typename PixelT>
++struct CompOp_HardLight_Op {
++  typedef PixelT PixelType;
++
++  enum : uint32_t {
++    kCompOp = BL_COMP_OP_HARD_LIGHT,
++    kOptimizeOpaque = 0
++  };
++
++  static BL_INLINE uint32_t div255_(uint32_t x) noexcept {
++    uint32_t u = x + 0x80u;
++    return ((u + ((u >> 8) & 0xFFu)) >> 8) & 0xFFu;
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s) noexcept {
++    uint32_t dc[3] = { d.r(), d.g(), d.b() };
++    uint32_t sc[3] = { s.r(), s.g(), s.b() };
++    uint32_t da = d.a(), sa = s.a();
++    uint32_t sada = div255_(sa * da);
++    int32_t out[3];
++    for (int i = 0; i < 3; i++) {
++      uint32_t xx = (da * sc[i] - dc[i] * sc[i] + sa * dc[i] - dc[i] * sc[i]) & 0xFFFFu;
++      int32_t x = int32_t(div255_(xx));
++      bool lt = int32_t(sa) > int32_t((sc[i] << 1) & 0xFFFFu);   // 2.Sca < Sa
++      int32_t r = int32_t(sc[i] + dc[i]) + (lt ? -x : x) - (lt ? 0 : int32_t(sada));
++      out[i] = r < 0 ? 0 : (r > 255 ? 255 : r);
++    }
++    int32_t aa = int32_t(sa + da) - int32_t(sada);
++    aa = aa < 0 ? 0 : (aa > 255 ? 255 : aa);
++    return PixelType { (uint32_t(aa) << PixelType::Format::kAShift) | (uint32_t(out[0]) << PixelType::Format::kRShift) | (uint32_t(out[1]) << PixelType::Format::kGShift) | (uint32_t(out[2]) << PixelType::Format::kBShift) };
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s, uint32_t m) noexcept {
++    uint32_t sa = div255_(s.a() * m), sr = div255_(s.r() * m), sg = div255_(s.g() * m), sb = div255_(s.b() * m);
++    PixelType s2 { (sa << PixelType::Format::kAShift) | (sr << PixelType::Format::kRShift) | (sg << PixelType::Format::kGShift) | (sb << PixelType::Format::kBShift) };
++    return op_prgb32_prgb32(d, s2);
++  }
++};
++
++// Decision 0195 (b2d3): SCREEN, Dca' = Sca + Dca.(1 - Sca) and Da' = Sa + Da.(1 - Sa) in every lane (the x86 branch of "VMaskProc - RGBA32 - Screen"): the destination times the inverted source, divided by 255 with the JIT's rounding, plus the source.
++template<typename PixelT>
++struct CompOp_Screen_Op {
++  typedef PixelT PixelType;
++
++  enum : uint32_t {
++    kCompOp = BL_COMP_OP_SCREEN,
++    kOptimizeOpaque = 0
++  };
++
++  static BL_INLINE uint32_t div255_(uint32_t x) noexcept {
++    uint32_t u = x + 0x80u;
++    return ((u + ((u >> 8) & 0xFFu)) >> 8) & 0xFFu;
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s) noexcept {
++    uint32_t sa = s.a(), sr = s.r(), sg = s.g(), sb = s.b();
++    uint32_t aa = sa + div255_(d.a() * (255u - sa));
++    uint32_t rr = sr + div255_(d.r() * (255u - sr));
++    uint32_t gg = sg + div255_(d.g() * (255u - sg));
++    uint32_t bb = sb + div255_(d.b() * (255u - sb));
++    aa = aa > 255u ? 255u : aa; rr = rr > 255u ? 255u : rr; gg = gg > 255u ? 255u : gg; bb = bb > 255u ? 255u : bb;
++    return PixelType { (aa << PixelType::Format::kAShift) | (rr << PixelType::Format::kRShift) | (gg << PixelType::Format::kGShift) | (bb << PixelType::Format::kBShift) };
++  }
++
++  static BL_INLINE PixelType op_prgb32_prgb32(PixelType d, PixelType s, uint32_t m) noexcept {
++    uint32_t sa = div255_(s.a() * m), sr = div255_(s.r() * m), sg = div255_(s.g() * m), sb = div255_(s.b() * m);
++    PixelType s2 { (sa << PixelType::Format::kAShift) | (sr << PixelType::Format::kRShift) | (sg << PixelType::Format::kGShift) | (sb << PixelType::Format::kBShift) };
++    return op_prgb32_prgb32(d, s2);
++  }
++};
++
+ template<typename OpT, typename PixelT, typename FetchOp, uint32_t kDstBPP_>
+ struct CompOp_Base {
+   typedef OpT Op;
+--- a/src/blend2d/pipeline/reference/fixedpiperuntime.cpp
++++ b/src/blend2d/pipeline/reference/fixedpiperuntime.cpp
+@@ -196,9 +196,14 @@
+   }};
+ }
+ 
+-static const constexpr FillSolidFuncTable prgb32_fill_solid_funcs[2] = {
++// Decision 0195 (b2d3): indexes 2 (PLUS), 3 (OVERLAY), 4 (SCREEN) and 5 (HARD_LIGHT) exist for a solid or gradient source and a PRGB32/XRGB32 target only; patterns and the A8 target keep the 2 entries of upstream.
++static const constexpr FillSolidFuncTable prgb32_fill_solid_funcs[6] = {
+   get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcOver_Op<Reference::Pixel::P32_A8R8G8B8>>(),
+-  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcCopy_Op<Reference::Pixel::P32_A8R8G8B8>>()
++  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcCopy_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Plus_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Overlay_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Screen_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_solid_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_HardLight_Op<Reference::Pixel::P32_A8R8G8B8>>()
+ };
+ 
+ static const constexpr FillPatternFuncTable prgb32_fill_pattern_prgb32_funcs[2] = {
+@@ -216,9 +221,13 @@
+   get_fill_pattern_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcCopy_Op<Reference::Pixel::P32_A8R8G8B8>, FormatExt::kA8>()
+ };
+ 
+-static const constexpr FillGradientFuncTable prgb32_fill_gradient_funcs[2] = {
++static const constexpr FillGradientFuncTable prgb32_fill_gradient_funcs[6] = {
+   get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcOver_Op<Reference::Pixel::P32_A8R8G8B8>>(),
+-  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcCopy_Op<Reference::Pixel::P32_A8R8G8B8>>()
++  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_SrcCopy_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Plus_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Overlay_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_Screen_Op<Reference::Pixel::P32_A8R8G8B8>>(),
++  get_fill_gradient_func_table<FormatExt::kPRGB32, 4, Reference::CompOp_HardLight_Op<Reference::Pixel::P32_A8R8G8B8>>()
+ };
+ 
+ static const constexpr FillSolidFuncTable a8_fill_solid_funcs[2] = {
+@@ -252,15 +261,17 @@
+   FillFunc fillFunc = nullptr;
+   FetchFunc fetchFunc = nullptr;
+ 
+-  if (compOp == CompOpExt::kSrcCopy || compOp == CompOpExt::kSrcOver) {
+-    uint32_t compOpIndex = uint32_t(compOp);
++  if (compOp == CompOpExt::kSrcCopy || compOp == CompOpExt::kSrcOver || compOp == CompOpExt::kPlus || compOp == CompOpExt::kOverlay || compOp == CompOpExt::kScreen || compOp == CompOpExt::kHardLight) {
++    // Decision 0195: PLUS, OVERLAY, SCREEN and HARD_LIGHT take index 2..5 of the PRGB32 solid/gradient tables; patterns and the A8 target only have SRC_COPY (1) and SRC_OVER (0).
++    bool basicOp = compOp == CompOpExt::kSrcCopy || compOp == CompOpExt::kSrcOver;
++    uint32_t compOpIndex = compOp == CompOpExt::kPlus ? 2u : compOp == CompOpExt::kOverlay ? 3u : compOp == CompOpExt::kScreen ? 4u : compOp == CompOpExt::kHardLight ? 5u : uint32_t(compOp);
+     switch (s.dstFormat()) {
+       case FormatExt::kPRGB32:
+       case FormatExt::kXRGB32: {
+         if (fetchType == FetchType::kSolid) {
+           fillFunc = prgb32_fill_solid_funcs[compOpIndex].funcs[fillTypeIdx];
+         }
+-        else if (fetchType >= FetchType::kPatternAnyFirst && fetchType <= FetchType::kPatternAnyLast) {
++        else if (basicOp && fetchType >= FetchType::kPatternAnyFirst && fetchType <= FetchType::kPatternAnyLast) {
+           uint32_t patternIndex = uint32_t(fetchType) - uint32_t(FetchType::kPatternAnyFirst);
+           switch (s.srcFormat()) {
+             case FormatExt::kPRGB32:
+@@ -277,14 +288,20 @@
+           }
+         }
+         else if (fetchType >= FetchType::kGradientAnyFirst && fetchType <= FetchType::kGradientAnyLast) {
+-          uint32_t gradientIndex = uint32_t(fetchType) - uint32_t(FetchType::kGradientAnyFirst);
+-          fillFunc = prgb32_fill_gradient_funcs[compOpIndex].funcs[fillTypeIdx * FillGradientFuncTable::kGradientTypeCount + gradientIndex];
++          // OVERLAY with a gradient onto an XRGB32 target differs from the JIT pipeline by 1 in some channels (decision 0195, measured): not registered, so it stays BL_ERROR_NOT_IMPLEMENTED.
++          if (!(compOp == CompOpExt::kOverlay && s.dstFormat() == FormatExt::kXRGB32)) {
++            uint32_t gradientIndex = uint32_t(fetchType) - uint32_t(FetchType::kGradientAnyFirst);
++            fillFunc = prgb32_fill_gradient_funcs[compOpIndex].funcs[fillTypeIdx * FillGradientFuncTable::kGradientTypeCount + gradientIndex];
++          }
+         }
+         break;
+       }
+ 
+       case FormatExt::kA8: {
+-        if (fetchType == FetchType::kSolid) {
++        if (!basicOp) {
++          // no PLUS/OVERLAY template for an A8 target: fillFunc stays null (BL_ERROR_NOT_IMPLEMENTED)
++        }
++        else if (fetchType == FetchType::kSolid) {
+           fillFunc = a8_fill_solid_funcs[compOpIndex].funcs[fillTypeIdx];
+         }
+         else if (fetchType >= FetchType::kPatternAnyFirst && fetchType <= FetchType::kPatternAnyLast) {

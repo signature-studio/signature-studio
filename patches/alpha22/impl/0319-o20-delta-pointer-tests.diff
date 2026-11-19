@@ -1,0 +1,198 @@
+--- a/lift/crates/fe-lift/tests/wall_fr11.rs
++++ b/lift/crates/fe-lift/tests/wall_fr11.rs
+@@ -1522,61 +1522,163 @@
+ }
+ 
+ #[test]
+-fn the_virtual_pointer_keeps_set_cursor_pos_as_a_relative_offset() {
+-    // Decision 0319 O20: Windows's pointer is a virtual cursor. SetCursorPos moves it, and the host
+-    // (browser) pointer's absolute motion is relative to that new place: the guest position is the
+-    // host's latest absolute position plus an offset, clamped to the screen. With no offset this is
+-    // the same behaviour as before.
++fn the_virtual_pointer_moves_by_the_host_delta_while_the_cursor_is_hidden() {
++    // Decision 0319 O20 (delta form): while the cursor is shown the guest pointer is the host's point; while it is hidden (ShowCursor display count < 0, as FL's drag does) a host move is applied as the motion
++    // since the host's previous point, and SetCursorPos/SetPhysicalCursorPos change the guest point only. With no SetCursorPos the guest point equals the host's point, so the old absolute behaviour is kept.
+     let l = lines(
+-        "fr11-virtual-pointer",
++        "fr11-virtual-pointer-delta",
+         r#"
+     int32_t pt[2], ci[6];
+     void fle_win_host_pointer_set(int32_t, int32_t);
+-    void fle_win_pointer_reclamp(void);
+     K(fle_imp_SetCursorPos, 0, 0);
+     fle_win_host_pointer_set(10, 10);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 10 10 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_GetCursorPos, A(pt)); printf("shown host 10 10 -> %d %d\n", pt[0], pt[1]);
+     K(fle_imp_SetCursorPos, 100, 200);
+     K(fle_imp_GetCursorPos, A(pt)); printf("set -> %d %d\n", pt[0], pt[1]);
+     fle_win_host_pointer_set(20, 10);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 10 -> %d %d\n", pt[0], pt[1]);
+-    fle_win_host_pointer_set(20, 20);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 20 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_GetCursorPos, A(pt)); printf("shown host 20 10 -> %d %d\n", pt[0], pt[1]);
+     memset(ci, 0, sizeof ci); ci[0] = 24;
+-    K(fle_imp_GetCursorInfo, A(ci)); printf("info pos %d %d\n", ci[4], ci[5]);
++    K(fle_imp_GetCursorInfo, A(ci)); printf("info flags %d pos %d %d\n", ci[1], ci[4], ci[5]);
++    K(fle_imp_ShowCursor, 0);
++    fle_win_host_pointer_set(20, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("hidden host 20 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(21, 19);
++    K(fle_imp_GetCursorPos, A(pt)); printf("hidden host 21 19 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 40);
++    K(fle_imp_GetCursorPos, A(pt)); printf("hidden host 450 40 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 32);
++    fle_win_host_pointer_set(450, 31);
++    K(fle_imp_SetPhysicalCursorPos, 450, 1036);
++    K(fle_imp_GetCursorPos, A(pt)); printf("wrap set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 30);
++    K(fle_imp_GetCursorPos, A(pt)); printf("after wrap host 450 30 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 29);
++    K(fle_imp_GetCursorPos, A(pt)); printf("after wrap host 450 29 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 28);
++    K(fle_imp_GetCursorPos, A(pt)); printf("after wrap host 450 28 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 0);
++    K(fle_imp_ShowCursor, 1);
++    fle_win_host_pointer_set(450, 27);
++    K(fle_imp_GetCursorPos, A(pt)); printf("count -1 still hidden host 450 27 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 1);
++    fle_win_host_pointer_set(450, 26);
++    K(fle_imp_GetCursorPos, A(pt)); printf("count 0 shown host 450 26 -> %d %d\n", pt[0], pt[1]);
++"#,
++    );
++    assert_eq!(l[0], "shown host 10 10 -> 10 10");
++    assert_eq!(l[1], "set -> 100 200");
++    assert_eq!(l[2], "shown host 20 10 -> 20 10");
++    assert_eq!(l[3], "info flags 1 pos 20 10");
++    assert_eq!(l[4], "hidden host 20 20 -> 20 20");
++    assert_eq!(l[5], "hidden host 21 19 -> 21 19");
++    assert_eq!(l[6], "hidden host 450 40 -> 450 40");
++    assert_eq!(l[7], "wrap set -> 450 1036");
++    assert_eq!(l[8], "after wrap host 450 30 -> 450 1035");
++    assert_eq!(l[9], "after wrap host 450 29 -> 450 1034");
++    assert_eq!(l[10], "after wrap host 450 28 -> 450 1033");
++    assert_eq!(l[11], "count -1 still hidden host 450 27 -> 450 1032");
++    assert_eq!(l[12], "count 0 shown host 450 26 -> 450 26");
++}
++
++#[test]
++fn the_virtual_pointer_is_the_host_point_again_when_the_cursor_is_shown_after_a_set_cursor_pos() {
++    // Decision 0319 O20: FL's drag ends with SetPhysicalCursorPos(start) and ShowCursor(TRUE) while the browser pointer is elsewhere; the next host move must give the host's point (not the host's point plus
++    // an offset: the offset form gave 0 here and a third and fourth drag did not work), and a following drag moves by the delta again.
++    let l = lines(
++        "fr11-virtual-pointer-reshown",
++        r#"
++    int32_t pt[2];
++    void fle_win_host_pointer_set(int32_t, int32_t);
+     fle_win_host_pointer_set(450, 1079);
++    K(fle_imp_ShowCursor, 0);
+     K(fle_imp_SetPhysicalCursorPos, 450, 17);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("wrap set -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_GetCursorPos, A(pt)); printf("end set -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 1);
++    K(fle_imp_GetCursorPos, A(pt)); printf("shown before a host move -> %d %d\n", pt[0], pt[1]);
+     fle_win_host_pointer_set(450, 20);
+     K(fle_imp_GetCursorPos, A(pt)); printf("host 450 20 -> %d %d\n", pt[0], pt[1]);
+     fle_win_host_pointer_set(450, 21);
+     K(fle_imp_GetCursorPos, A(pt)); printf("host 450 21 -> %d %d\n", pt[0], pt[1]);
+-    K(fle_imp_SetCursorPos, 1920, 1080);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("clamped -> %d %d\n", pt[0], pt[1]);
+-    fle_win_host_pointer_set(21, 20);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 21 20 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 0);
++    fle_win_host_pointer_set(450, 22);
++    K(fle_imp_GetCursorPos, A(pt)); printf("drag 4 host 450 22 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 23);
++    K(fle_imp_GetCursorPos, A(pt)); printf("drag 4 host 450 23 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetPhysicalCursorPos, 450, 1036);
++    fle_win_host_pointer_set(450, 24);
++    K(fle_imp_GetCursorPos, A(pt)); printf("drag 4 wrap then host 450 24 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetPhysicalCursorPos, 450, 23);
++    K(fle_imp_ShowCursor, 1);
++    fle_win_host_pointer_set(450, 25);
++    K(fle_imp_GetCursorPos, A(pt)); printf("drag 4 end host 450 25 -> %d %d\n", pt[0], pt[1]);
++"#,
++    );
++    assert_eq!(l[0], "end set -> 450 17");
++    assert_eq!(l[1], "shown before a host move -> 450 17");
++    assert_eq!(l[2], "host 450 20 -> 450 20");
++    assert_eq!(l[3], "host 450 21 -> 450 21");
++    assert_eq!(l[4], "drag 4 host 450 22 -> 450 22");
++    assert_eq!(l[5], "drag 4 host 450 23 -> 450 23");
++    assert_eq!(l[6], "drag 4 wrap then host 450 24 -> 450 1037");
++    assert_eq!(l[7], "drag 4 end host 450 25 -> 450 25");
++}
++
++#[test]
++fn the_virtual_pointer_is_brought_inside_a_smaller_screen_and_keeps_moving_by_the_delta() {
++    // Decision 0319 O20: a display change brings the guest point and the host's previous point inside the new screen; the delta of the next host move is measured from the clamped host point.
++    let l = lines(
++        "fr11-virtual-pointer-reclamp",
++        r#"
++    int32_t pt[2];
++    void fle_win_host_pointer_set(int32_t, int32_t);
++    void fle_win_pointer_reclamp(void);
+     fle_win_host_pointer_set(22, 20);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 22 20 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 0);
++    K(fle_imp_SetCursorPos, 1500, 900);
++    K(fle_imp_GetCursorPos, A(pt)); printf("set -> %d %d\n", pt[0], pt[1]);
+     fle_screen_set(1024, 768);
+     fle_win_pointer_reclamp();
+     K(fle_imp_GetCursorPos, A(pt)); printf("shrunk -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(21, 19);
++    K(fle_imp_GetCursorPos, A(pt)); printf("hidden host 21 19 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_ShowCursor, 1);
+     fle_win_host_pointer_set(23, 21);
+-    K(fle_imp_GetCursorPos, A(pt)); printf("host 23 21 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_GetCursorPos, A(pt)); printf("shown host 23 21 -> %d %d\n", pt[0], pt[1]);
+ "#,
+     );
+-    assert_eq!(l[0], "host 10 10 -> 10 10");
+-    assert_eq!(l[1], "set -> 100 200");
+-    assert_eq!(l[2], "host 20 10 -> 20 10");
+-    assert_eq!(l[3], "host 20 20 -> 20 20");
+-    assert_eq!(l[4], "info pos 20 20");
+-    assert_eq!(l[5], "wrap set -> 450 17");
+-    assert_eq!(l[6], "host 450 20 -> 450 20");
+-    assert_eq!(l[7], "host 450 21 -> 450 21");
+-    assert_eq!(l[8], "clamped -> 1919 1079");
+-    assert_eq!(l[9], "host 21 20 -> 21 20");
+-    assert_eq!(l[10], "host 22 20 -> 22 20");
+-    assert_eq!(l[11], "shrunk -> 22 20");
+-    assert_eq!(l[12], "host 23 21 -> 23 21");
++    assert_eq!(l[0], "set -> 1500 900");
++    assert_eq!(l[1], "shrunk -> 1023 767");
++    assert_eq!(l[2], "hidden host 21 19 -> 1022 766");
++    assert_eq!(l[3], "shown host 23 21 -> 23 21");
++}
++
++#[test]
++fn the_virtual_pointer_equals_the_clamped_host_point_when_the_guest_never_sets_the_cursor() {
++    // Decision 0319 O20: with no SetCursorPos/SetPhysicalCursorPos the guest point is the host's point clamped to the screen, shown or hidden (the old, absolute behaviour). The series includes points outside
++    // the screen, so the clamp of the delta form is compared with the clamp of the absolute form.
++    let l = lines(
++        "fr11-virtual-pointer-same-as-absolute",
++        r#"
++    static const int32_t xs[] = { 0, 5, 1919, 2500, -30, 700, 700, 1, 1919, 0, 1000, -1, 1920 };
++    static const int32_t ys[] = { 0, 5, 1079, -9, 1500, 0, 1079, 1, 1, 1079, 540, -1, 1080 };
++    int32_t pt[2];
++    unsigned i, n = sizeof xs / sizeof xs[0], bad, pass;
++    void fle_win_host_pointer_set(int32_t, int32_t);
++    for (pass = 0; pass < 2; pass++) {
++        if (pass == 1) K(fle_imp_ShowCursor, 0);
++        bad = 0;
++        for (i = 0; i < n; i++) {
++            int32_t ex = xs[i] < 0 ? 0 : xs[i] > 1919 ? 1919 : xs[i], ey = ys[i] < 0 ? 0 : ys[i] > 1079 ? 1079 : ys[i];
++            fle_win_host_pointer_set(xs[i], ys[i]);
++            K(fle_imp_GetCursorPos, A(pt));
++            if (pt[0] != ex || pt[1] != ey) bad++;
++        }
++        printf("%s n %u bad %u\n", pass ? "hidden" : "shown", n, bad);
++    }
++"#,
++    );
++    assert_eq!(l[0], "shown n 13 bad 0");
++    assert_eq!(l[1], "hidden n 13 bad 0");
+ }
+ 
+ #[test]

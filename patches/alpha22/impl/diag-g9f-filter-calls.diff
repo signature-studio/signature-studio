@@ -1,0 +1,161 @@
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -168,6 +168,83 @@
+ #define G9_HI UINT64_C(0x7400000)
+ static uint64_t g9_n, g9_seen[16];
+ static unsigned g9_nd;
++
++/* Decision 0319 TEST-ONLY diagnostic (alpha1, the Fruity Filter ins1-lp difference; FLE_DIAG_G9F=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there; docs/0319 sections 20 and 25): the indirect
++ * calls INTO the Filter image (0x7000000..0x73B2000). A call that comes from OUTSIDE the image (its return address is not in it: the FLEngine mixer calling the plug-in) and has the shape Eff_Render(Self, Source, Dest, Length)
++ * is counted: per Self object (the project has two Filter instances: Insert 1 slot 1 and the project's own at Insert 47, each called once per tick, so the position in the Export of one instance is the sum of ITS Lengths: "scum"),
++ * and over all instances ("cum"). Only such calls add to the counts; the plug-in's own internal calls never do (the first version counted them too and ran out of its cap at 1.1 s of audio). Printed: every such call
++ * while scum <= 1500 or 205000 <= scum <= 215000 (the window of the Export's exact-zero frames 210723..211680 and its surroundings) and one in 16 elsewhere, with the Length, the peak of the source before and of the
++ * destination after the call; in the same windows every internal call of the plug-in during such a call (its arguments, no peaks); the first 3000 other calls from outside; a table by target of the calls the plug-in makes OUT of
++ * its image (marks at scum 205000, 210700, 211700, 213000); and a dump of each Self object and of the first guest pointers inside it at the first call and at the first one with scum >= 205000. At most 20000 lines. The state is shared by
++ * the Workers of a real-thread build (a spin lock guards the counters; the plug-in is called outside it; the "active call" flags are per thread). Observation only: no register, memory or return value the guest sees changes. */
++#define G9F_LO UINT64_C(0x7000000)
++#define G9F_HI UINT64_C(0x73B2000)
++#define G9F_SELFS 8u
++static uint64_t g9f_n, g9f_hostcum, g9f_other, g9f_innerline, g9f_lines, g9f_back_n, g9f_posmax;
++static uint64_t g9f_selfid[G9F_SELFS], g9f_scum[G9F_SELFS];
++static unsigned g9f_nself;
++static unsigned char g9f_dumped_first[G9F_SELFS], g9f_dumped_late[G9F_SELFS];
++static int g9f_lock_word;
++static _Thread_local int g9f_active, g9f_active_win;
++static _Thread_local unsigned g9f_cur_self;
++static _Thread_local uint64_t g9f_cur_scum;
++typedef struct { uint64_t va, n, first_cum, last_cum; } g9f_bt_t;
++static g9f_bt_t g9f_bt[64];
++static unsigned g9f_nbt;
++static int g9f_on(void)
++{
++    static int on = -1;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_G9F"); on = e != NULL && e[0] == '1'; }
++    return on;
++}
++static int g9f_in_window(uint64_t sc) { return sc <= 1500u || (sc >= 205000u && sc <= 215000u); }
++static void g9f_lock(void) { while (__atomic_exchange_n(&g9f_lock_word, 1, __ATOMIC_ACQUIRE)) {} }
++static void g9f_unlock(void) { __atomic_store_n(&g9f_lock_word, 0, __ATOMIC_RELEASE); }
++static float g9f_peak(uint64_t p, uint64_t len)
++{
++    float m = 0.0f;
++    uint64_t i;
++
++    for (i = 0; i < len * 2u; i++) {
++        uint32_t b = (uint32_t)fle_ld(p + 4u * i, 4);
++        float x;
++
++        memcpy(&x, &b, 4);
++        if (x < 0.0f) x = -x;
++        if (x > m || x != x) m = x;
++    }
++    return m;
++}
++static void g9f_bt_print(const char *why)   /* the caller holds the lock */
++{
++    unsigned i;
++
++    fprintf(stderr, "g9f: back-calls (Filter image -> elsewhere) %s: %" PRIu64 " calls, %u distinct targets, scum_max %" PRIu64 " cum_frames %" PRIu64 "\n", why, g9f_back_n, g9f_nbt, g9f_posmax, g9f_hostcum);
++    for (i = 0; i < g9f_nbt; i++)
++        fprintf(stderr, "g9f:   target %#" PRIx64 " x%" PRIu64 " first_cum %" PRIu64 " last_cum %" PRIu64 "\n", g9f_bt[i].va, g9f_bt[i].n, g9f_bt[i].first_cum, g9f_bt[i].last_cum);
++}
++static void g9f_dump(unsigned self, const char *why, uint64_t obj)
++{
++    unsigned i, k, shown = 0;
++
++    fprintf(stderr, "g9f: object dump self %u %s at %#" PRIx64 "\n", self, why, obj);
++    for (i = 0; i < 192u; i += 16u) {
++        fprintf(stderr, "g9f:   +%03x", i);
++        for (k = 0; k < 16u; k += 4u) fprintf(stderr, " %08x", (unsigned)fle_ld(obj + i + k, 4));
++        fprintf(stderr, "\n");
++    }
++    for (i = 0; i < 192u && shown < 3u; i += 8u) {
++        uint64_t q = fle_ld(obj + i, 8);
++
++        if (q >= 0x1000000u && q < 0x30000000u && (q & 3u) == 0 && !(q >= G9F_LO && q < G9F_HI)) {
++            shown++;
++            fprintf(stderr, "g9f: pointer at +%03x -> %#" PRIx64 ":", i, q);
++            for (k = 0; k < 256u; k += 4u) fprintf(stderr, "%s%08x", (k & 31u) == 0 ? "\ng9f:   " : " ", (unsigned)fle_ld(q + k, 4));
++            fprintf(stderr, "\n");
++        }
++    }
++}
+ static void g9_hook(uint64_t va, void (*fn)(void))
+ {
+     if (va >= G9_LO && va < G9_HI) {
+@@ -182,6 +259,74 @@
+                              (uint64_t)R[1], (uint64_t)R[2], (uint64_t)R[8], (uint64_t)R[9]);
+         if ((n & (n - 1)) == 0) fprintf(stderr, "g9-diag: %" PRIu64 " indirect calls into the plug-in image so far (distinct targets seen, up to 16: %u)\n", (uint64_t)n, g9_nd);
+     }
++    if (g9f_on() && !(va >= G9F_LO && va < G9F_HI)) {   /* the plug-in calling out: the return address pushed by the lifted call is in the Filter image */
++        uint64_t ra = fle_ld(R[4], 8);
++
++        if (ra >= G9F_LO && ra < G9F_HI) {
++            static const uint64_t marks[] = { 1, 205000, 210700, 211700, 213000 };
++            static unsigned nextmark;
++            unsigned i;
++
++            g9f_lock();
++            g9f_back_n++;
++            for (i = 0; i < g9f_nbt && g9f_bt[i].va != va; i++) {}
++            if (i == g9f_nbt && g9f_nbt < 64u) { g9f_bt[g9f_nbt].va = va; g9f_bt[g9f_nbt].n = 0; g9f_bt[g9f_nbt].first_cum = g9f_posmax; g9f_nbt++; }
++            if (i < g9f_nbt) { g9f_bt[i].n++; g9f_bt[i].last_cum = g9f_posmax; }
++            if (nextmark < sizeof marks / sizeof marks[0] && g9f_posmax >= marks[nextmark]) { nextmark++; g9f_bt_print("at a mark"); }
++            g9f_unlock();
++        }
++    }
++    if (va >= G9F_LO && va < G9F_HI && g9f_on()) {   /* into the Filter image */
++        uint64_t a1 = R[1], a2 = R[2], a8 = R[8], a9 = R[9], ra = fle_ld(R[4], 8);
++        int host = !(ra >= G9F_LO && ra < G9F_HI);   /* from outside the image: the structural condition; the plug-in's own internal calls are not host calls */
++        int blk = a9 > 0 && a9 <= 16384 && a2 >= 0x1000000 && a2 < 0x30000000 && a8 >= 0x1000000 && a8 < 0x30000000 && (a2 & 3u) == 0 && (a8 & 3u) == 0;
++
++        if (host && blk) {   /* Eff_Render(Self, Source, Dest, Length) from the mixer */
++            unsigned k;
++            uint64_t n, cum, scf;
++            int win, print, dump_first = 0, dump_late = 0;
++            float sp, dp;
++
++            g9f_lock();
++            for (k = 0; k < g9f_nself && g9f_selfid[k] != a1; k++) {}
++            if (k == g9f_nself) { if (k < G9F_SELFS) { g9f_selfid[k] = a1; g9f_nself++; } else k = G9F_SELFS - 1u; }
++            n = ++g9f_n;
++            cum = g9f_hostcum;
++            scf = g9f_scum[k];
++            g9f_scum[k] += a9;
++            g9f_hostcum += a9;
++            if (g9f_scum[k] > g9f_posmax) g9f_posmax = g9f_scum[k];
++            win = g9f_in_window(scf);
++            print = (win || (n & 15u) == 0) && g9f_lines < 20000u;
++            if (print) g9f_lines++;
++            if (!g9f_dumped_first[k]) { g9f_dumped_first[k] = 1; dump_first = 1; }
++            if (scf >= 205000u && !g9f_dumped_late[k]) { g9f_dumped_late[k] = 1; dump_late = 1; }
++            g9f_unlock();
++            if (dump_first) g9f_dump(k, "at the first Eff_Render", a1);
++            if (dump_late) g9f_dump(k, "at the first Eff_Render with scum >= 205000", a1);
++            sp = g9f_peak(a2, a9);
++            g9f_cur_self = k; g9f_cur_scum = scf; g9f_active = 1; g9f_active_win = win;
++            fn();
++            g9f_active = 0; g9f_active_win = 0;
++            dp = g9f_peak(a8, a9);
++            if (print) fprintf(stderr, "g9f: #%" PRIu64 " va %#" PRIx64 " caller %#" PRIx64 " a1 %#" PRIx64 " a2 %#" PRIx64 " a8 %#" PRIx64 " a9 %#" PRIx64 " blk 1 src_peak %g dst_peak %g cum_before %" PRIu64 " self %u scum %" PRIu64 "\n",
++                               n, va, ra, a1, a2, a8, a9, (double)sp, (double)dp, cum, k, scf);
++            return;
++        }
++        {   /* every other call into the image: from outside (the first 3000), or the plug-in's own internal call (inside the windows of an active Eff_Render, and the first 300 elsewhere) */
++            int print = 0;
++            uint64_t n;
++
++            g9f_lock();
++            n = ++g9f_n;
++            if (host) { if (g9f_other < 3000u && g9f_lines < 20000u) { g9f_other++; g9f_lines++; print = 1; } }
++            else if (g9f_active && g9f_active_win) { if (g9f_lines < 20000u) { g9f_lines++; print = 1; } }
++            else if (g9f_innerline < 300u && g9f_lines < 20000u) { g9f_innerline++; g9f_lines++; print = 1; }
++            g9f_unlock();
++            if (print) fprintf(stderr, "g9f: #%" PRIu64 " va %#" PRIx64 " caller %#" PRIx64 " a1 %#" PRIx64 " a2 %#" PRIx64 " a8 %#" PRIx64 " a9 %#" PRIx64 " blk 0 src_peak -1 dst_peak -1 cum_before 0 self %u scum %" PRIu64 "\n",
++                               n, va, ra, a1, a2, a8, a9, g9f_active ? g9f_cur_self : 99u, g9f_active ? g9f_cur_scum : 0u);
++        }
++    }
+     fn();
+ }
+ __attribute__((constructor)) static void g9_gui_init(void) { fle_dispatch_hook = g9_hook; }

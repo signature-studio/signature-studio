@@ -1,0 +1,12 @@
+--tsv
+lift/harness/seeds/vfs-seed-idle1.tsv
+--extra
+lift/harness/seeds/reg-seed-nsis.tsv
+--extra
+lift/harness/seeds/reg-seed-app.tsv
+--extra
+lift/harness/seeds/authenticode-claims.tsv
+--root
+lift/out-app/host
+--out
+lift/out-app/seed/seed.bin

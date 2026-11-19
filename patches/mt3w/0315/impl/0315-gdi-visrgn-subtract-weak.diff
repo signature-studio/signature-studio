@@ -1,0 +1,10 @@
+--- a/lift/runtime/fle_gdi.c	2026-11-07 09:50:13.453733840 +0900
++++ b/lift/runtime/fle_gdi.c	2026-11-07 09:50:13.452706531 +0900
+@@ -1590,6 +1590,7 @@
+ int fle_visrgn_intersect(fle_visrgn *a, const fle_visrgn *b) __attribute__((weak));   /* decision 0247 */
+ fle_rrect fle_visrgn_bounds(const fle_visrgn *v) __attribute__((weak));
+ int fle_visrgn_equal_rect(const fle_visrgn *v, fle_rrect r) __attribute__((weak));
++int fle_visrgn_subtract(fle_visrgn *v, fle_rrect s) __attribute__((weak));   /* the scroll of a DC (0319-scrolldc-model) takes the uncovered area with it */
+ 
+ typedef struct {
+     fle_rsurf s;                            /* the pixels */

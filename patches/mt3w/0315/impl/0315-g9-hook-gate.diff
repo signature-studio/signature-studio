@@ -1,0 +1,28 @@
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -332,5 +332,24 @@
+     }
+     fn();
+ }
+-__attribute__((constructor)) static void g9_gui_init(void) { fle_dispatch_hook = g9_hook; }
++/* Decision 0320 (mt3, RT-H; TEST-ONLY): the census hook is installed only while a diagnostic switch of this build is on (FLE_DIAG_G9F, FLE_DIAG_ATOM, FLE_DIAG_GIL or FLE_DIAG_CENSUS = "1"). Without one,
++ * fle_dispatch_hook stays NULL and the `if (fle_dispatch_hook)` of fle_dispatch.h does not run: no indirect call of the guest goes through g9_hook (the RT builds installed it always, which E13's build never did).
++ * One read per line (the sed that makes the diagnostic build tree's reads changes the first one of a line). In the product FLE_TEST_GETENV is a null constant, so the hook is never installed there. */
++static int g9_diag_on(void)
++{
++    const char *e;
++
++    e = FLE_TEST_GETENV("FLE_DIAG_G9F");
++    if (e != NULL && e[0] == '1') return 1;
++    e = FLE_TEST_GETENV("FLE_DIAG_ATOM");
++    if (e != NULL && e[0] == '1') return 1;
++    e = FLE_TEST_GETENV("FLE_DIAG_GIL");
++    if (e != NULL && e[0] == '1') return 1;
++    e = FLE_TEST_GETENV("FLE_DIAG_CENSUS");
++    return e != NULL && e[0] == '1';
++}
++__attribute__((constructor)) static void g9_gui_init(void)
++{
++    if (g9_diag_on()) fle_dispatch_hook = g9_hook;
++}
+ 

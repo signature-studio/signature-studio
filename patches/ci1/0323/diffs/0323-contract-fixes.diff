@@ -1,0 +1,1852 @@
+diff -ruN orig/lift/harness/c0323/build.sh new/lift/harness/c0323/build.sh
+--- orig/lift/harness/c0323/build.sh	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/build.sh	2026-11-07 07:46:11.990514887 +0900
+@@ -0,0 +1,29 @@
++#!/bin/bash
++# Decision 0323 (ci1, test tool). usage: build.sh native|wine|both TREE WORKDIR [SCENARIO]
++#   native: contract_0323.c with the runtime of TREE (clang -O0, nice 19, one at a time): WORKDIR/native.out
++#   wine:   the same file with mingw, run under Wine 10.0 headless in a prefix of its own: WORKDIR/wine.out
++set -eu -o pipefail
++MODE=$1; T=$(readlink -f "$2"); mkdir -p "$3"; W=$(readlink -f "$3"); SC=${4:-}
++RT=$T/lift/runtime; HERE=$T/lift/harness/c0323
++WL="fle_api2_call fle_appview fle_callback fle_class fle_comctl fle_cursor fle_env fle_event fle_gdc fle_gdi fle_host fle_imports fle_input fle_layered fle_locale fle_mxcsr fle_proc fle_raster fle_sys fle_thread fle_time fle_token fle_vfs fle_visrgn fle_vmap fle_vol fle_wall_ia2 fle_wall_ia2w fle_win fle_x87 fle_x87ctl"
++native() {
++  O=""
++  for f in $WL; do
++    if [ ! -f "$W/$f.o" ] || [ "$RT/$f.c" -nt "$W/$f.o" ] || [ "$RT/fle_win.h" -nt "$W/$f.o" ] || [ "$RT/fle_input.h" -nt "$W/$f.o" ] || [ "$RT/fle_class.h" -nt "$W/$f.o" ] || [ "$RT/fle_gdc.h" -nt "$W/$f.o" ]; then
++      nice -n 19 clang -O0 -std=gnu11 -w -fPIE -c -I"$RT" "$RT/$f.c" -o "$W/$f.o"
++    fi
++    O="$O $W/$f.o"
++  done
++  nice -n 19 clang -O0 -std=gnu11 -w -fPIE -pthread -I"$RT" "$HERE/contract_0323.c" $O -o "$W/contract_native" -lm
++  "$W/contract_native" $SC > "$W/native.out" 2> "$W/native.err" || echo "native rc=$?"
++}
++wine_run() {
++  x86_64-w64-mingw32-gcc -O1 -mwindows -DC0323_WINE -static-libgcc -o "$W/contract_wine.exe" "$HERE/contract_0323.c" -lgdi32 -luser32
++  env -u DISPLAY WINEPREFIX=${WINEPREFIX:-$W/wineprefix} WINEDEBUG=-all LC_ALL=en_US.UTF-8 wine "$W/contract_wine.exe" $SC 2> "$W/wine.err" | tr -d '\r' > "$W/wine.out" || echo "wine rc=$?"
++}
++case "$MODE" in
++  native) native ;;
++  wine) wine_run ;;
++  both) native; wine_run; diff "$W/wine.out" "$W/native.out" > "$W/wine-vs-native.diff" || true; wc -l "$W/wine-vs-native.diff" ;;
++  *) echo "usage: build.sh native|wine|both TREE WORKDIR [E|P|T|H]"; exit 2 ;;
++esac
+diff -ruN orig/lift/harness/c0323/contract_0323.c new/lift/harness/c0323/contract_0323.c
+--- orig/lift/harness/c0323/contract_0323.c	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/contract_0323.c	2026-11-07 07:53:46.282047553 +0900
+@@ -0,0 +1,598 @@
++/* Decision 0323 (ci1, test tool; the scaffold of harness/api2/win_act.c): three Win32 contracts of the window layer, run (a) against Wine 10.0's user32 (C0323_WINE: mingw build, headless Wine, the null display
++ * driver) and (b) against the REAL runtime (fle_win.c, fle_input.c, fle_gdi.c ... with a harness window procedure that calls DefWindowProcW). Same lines out of both; the lines on which the runtime differs are listed in
++ * expected/known-divergence.txt. Wine is the reference, not the truth (UNOFFICIAL): a difference is judged against the Learn page.
++ *   E  DefWindowProc(WM_ERASEBKGND): the class background brush fills the clip box of the DC, the answer is 1 with a brush and 0 without (memory DCs; no window surface is read)
++ *   P  the erase of a window DC: BeginPaint / RedrawWindow(RDW_ERASENOW) / the default WM_PAINT send WM_ERASEBKGND with a DC clipped to the update region; fErase; the erase flag after RDW_ERASENOW
++ *   T  WM_NCHITTEST answered HTTRANSPARENT: the message goes on to the windows beneath in the same thread
++ *   H  the WH_MOUSE and WH_KEYBOARD hooks: called when GetMessage / PeekMessage is about to return a mouse or key message; HC_ACTION / HC_NOREMOVE; a nonzero answer discards the message; CallNextHookEx
++ * Coordinates are inside 0..700 x 0..500 (the smallest screen of the two sides). usage: contract_0323 [E|P|T|H] */
++#include <stdio.h>
++#include <string.h>
++#include <stdint.h>
++
++#ifdef C0323_WINE
++#include <windows.h>
++typedef LRESULT LR;
++static void pump(void) { MSG msg; while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) DispatchMessageW(&msg); }
++static LRESULT CALLBACK wp(HWND h, UINT m, WPARAM w, LPARAM l);
++static LRESULT CALLBACK hk_mouse(int n, WPARAM w, LPARAM l);
++static LRESULT CALLBACK hk_key(int n, WPARAM w, LPARAM l);
++static void regclass(const char *name, uint32_t style, uint64_t bg)
++{
++    WNDCLASSW wc;
++    wchar_t nm[32];
++    int i;
++    for (i = 0; name[i]; i++) nm[i] = (wchar_t)name[i];
++    nm[i] = 0;
++    memset(&wc, 0, sizeof wc);
++    wc.style = style;
++    wc.lpfnWndProc = wp;
++    wc.hInstance = GetModuleHandleW(NULL);
++    wc.lpszClassName = nm;
++    wc.hbrBackground = (HBRUSH)(uintptr_t)bg;
++    RegisterClassW(&wc);
++}
++static HBRUSH mkbrush(uint32_t colorref) { return CreateSolidBrush(colorref); }
++static HWND mkwin(const char *cls, DWORD style, int x, int y, int cx, int cy, HWND parent)
++{
++    wchar_t nm[32];
++    int i;
++    for (i = 0; cls[i]; i++) nm[i] = (wchar_t)cls[i];
++    nm[i] = 0;
++    return CreateWindowExW(0, nm, L"", style, x, y, cx, cy, parent, NULL, GetModuleHandleW(NULL), NULL);
++}
++static void mouse(int kind, int x, int y)
++{
++    INPUT in;
++    memset(&in, 0, sizeof in);
++    in.type = INPUT_MOUSE;
++    in.mi.dx = (LONG)((x * 65535L) / (GetSystemMetrics(SM_CXSCREEN) - 1));
++    in.mi.dy = (LONG)((y * 65535L) / (GetSystemMetrics(SM_CYSCREEN) - 1));
++    in.mi.dwFlags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE | (kind == 2 ? MOUSEEVENTF_LEFTDOWN : kind == 3 ? MOUSEEVENTF_LEFTUP : 0);
++    SendInput(1, &in, sizeof in);
++}
++static void key(int down, unsigned vk, unsigned scan)
++{
++    INPUT in;
++    memset(&in, 0, sizeof in);
++    in.type = INPUT_KEYBOARD;
++    in.ki.wVk = (WORD)vk;
++    in.ki.wScan = (WORD)scan;
++    in.ki.dwFlags = down ? 0 : KEYEVENTF_KEYUP;
++    SendInput(1, &in, sizeof in);
++}
++static LR defproc(HWND h, UINT m, WPARAM w, LPARAM l) { return DefWindowProcW(h, m, w, l); }
++static LR sendmsg(HWND h, UINT m, WPARAM w, LPARAM l) { return SendMessageW(h, m, w, l); }
++static HDC memdc(int w, int h) { HDC dc = CreateCompatibleDC(NULL), scr = GetDC(NULL); HBITMAP b = CreateCompatibleBitmap(scr, w, h); ReleaseDC(NULL, scr); SelectObject(dc, b); return dc; }
++static void fillrect(HDC dc, int l, int t, int r, int b, uint32_t colorref) { RECT rc = { l, t, r, b }; HBRUSH br = CreateSolidBrush(colorref); FillRect(dc, &rc, br); DeleteObject(br); }
++static uint32_t getpixel(HDC dc, int x, int y) { return (uint32_t)GetPixel(dc, x, y) & 0xFFFFFFu; }
++static void clip(HDC dc, int l, int t, int r, int b) { IntersectClipRect(dc, l, t, r, b); }
++static void unclip(HDC dc) { SelectClipRgn(dc, NULL); }
++static int rectvisible(HDC dc, int l, int t, int r, int b) { RECT rc = { l, t, r, b }; return RectVisible(dc, &rc) ? 1 : 0; }
++static void invalidate(HWND h, int l, int t, int r, int b, int erase) { RECT rc = { l, t, r, b }; InvalidateRect(h, &rc, erase); }
++static void update(HWND h) { UpdateWindow(h); }
++static void redraw(HWND h, int l, int t, int r, int b, unsigned fl) { RECT rc = { l, t, r, b }; RedrawWindow(h, &rc, NULL, fl); }
++static void paint_probe(HWND h, int *ferase, int rc[4]) { PAINTSTRUCT ps; BeginPaint(h, &ps); *ferase = ps.fErase; rc[0] = ps.rcPaint.left; rc[1] = ps.rcPaint.top; rc[2] = ps.rcPaint.right; rc[3] = ps.rcPaint.bottom; EndPaint(h, &ps); }
++static int getupdate(HWND h, int rc[4]) { RECT r = { 0, 0, 0, 0 }; BOOL b = GetUpdateRect(h, &r, FALSE); rc[0] = r.left; rc[1] = r.top; rc[2] = r.right; rc[3] = r.bottom; return b ? 1 : 0; }
++static void showwin(HWND h, int c) { ShowWindow(h, c); }
++static void enablewin(HWND h, int e) { EnableWindow(h, e); }
++static void destroywin(HWND h) { DestroyWindow(h); }
++static HWND setfocus(HWND h) { SetActiveWindow(h); return SetFocus(h); }
++static void *hook_install(int id, int which) { return (void *)SetWindowsHookExW(id, which ? (HOOKPROC)hk_key : (HOOKPROC)hk_mouse, NULL, GetCurrentThreadId()); }
++static void hook_remove(void *hh) { UnhookWindowsHookEx((HHOOK)hh); }
++static LR hook_next(void *hh, int n, WPARAM w, LPARAM l) { return CallNextHookEx((HHOOK)hh, n, w, l); }
++static int peek(int remove) { MSG msg; BOOL b = PeekMessageW(&msg, NULL, 0, 0, remove ? PM_REMOVE : PM_NOREMOVE); if (b && remove) DispatchMessageW(&msg); return b ? (int)msg.message : 0; }
++static uint64_t mhs_u64(uint64_t l, int off) { return *(const uint64_t *)(uintptr_t)(l + off); }
++static int32_t mhs_i32(uint64_t l, int off) { return *(const int32_t *)(uintptr_t)(l + off); }
++#define W_(x) x
++typedef HWND H_;
++typedef WPARAM WP_;
++typedef LPARAM LP_;
++typedef HDC DC_;
++#else
++#define _GNU_SOURCE
++#include "fle_runtime.h"
++#include "fle_sse.h"
++#include "fle_dispatch.h"
++#include "fle_imports.h"
++#include "fle_env.h"
++#include "fle_callback.h"
++#include "fle_class.h"
++#include "fle_win.h"
++#include "fle_thread.h"
++#include "fle_cursor.h"
++#include "fle_input.h"
++#include "fle_gdc.h"
++#include "fle_gdi.h"
++#include "fle_wall_ia2.h"
++#include "fle_api2.h"
++uint64_t R[16];
++fle_eflags FL;
++fle_xmm X[16];
++void fle_imp_PeekMessageW(void);
++void fle_imp_DispatchMessageW(void);
++void fle_imp_CreateSolidBrush(void);
++void fle_imp_CreateCompatibleDC(void);
++void fle_imp_CreateCompatibleBitmap(void);
++void fle_imp_GetDC(void);
++void fle_imp_ReleaseDC(void);
++void fle_imp_SelectObject(void);
++void fle_imp_DeleteObject(void);
++void fle_imp_IntersectClipRect(void);
++void fle_imp_SelectClipRgn(void);
++void fle_imp_GetPixel(void);
++void fle_imp_FillRect(void);
++void fle_imp_RectVisible(void);
++void fle_imp_InvalidateRect(void);
++void fle_imp_UpdateWindow(void);
++void fle_imp_RedrawWindow(void);
++void fle_imp_BeginPaint(void);
++void fle_imp_EndPaint(void);
++void fle_imp_GetUpdateRect(void);
++void fle_imp_SetWindowsHookExW(void);
++void fle_imp_UnhookWindowsHookEx(void);
++void fle_imp_CallNextHookEx(void);
++void fle_imp_SetFocus(void);
++void fle_imp_SetActiveWindow(void);
++void fle_imp_ShowWindow(void);
++void fle_imp_DestroyWindow(void);
++void fle_imp_EnableWindow(void);
++void fle_imp_DefWindowProcW(void);
++void fle_imp_SendMessageW(void);
++void fle_imp_GetCurrentThreadId(void);
++typedef uint64_t HWND;
++typedef uint64_t WPARAM;
++typedef uint64_t LPARAM;
++typedef uint64_t LR;
++typedef uint64_t DC_;
++typedef unsigned int DWORD, UINT;
++typedef int BOOL;
++#define A(x) ((uint64_t)(uintptr_t)(x))
++#define VA_WP 0x2000
++#define VA_HK_MOUSE 0x2010
++#define VA_HK_KEY 0x2020
++#define WS_POPUP 0x80000000u
++#define WS_CHILD 0x40000000u
++#define WS_VISIBLE 0x10000000u
++#define SW_SHOWNOACTIVATE 4
++#define RDW_INVALIDATE 1u
++#define RDW_ERASE 4u
++#define RDW_UPDATENOW 0x100u
++#define RDW_ERASENOW 0x200u
++#define CS_PARENTDC 0x80u
++#define WH_KEYBOARD 2
++#define WH_MOUSE 7
++static void wndproc(void);
++static void hkproc_mouse(void);
++static void hkproc_key(void);
++const fle_fn_entry fle_dispatch_table[] = { { VA_WP, wndproc }, { VA_HK_MOUSE, hkproc_mouse }, { VA_HK_KEY, hkproc_key } };
++const uint64_t fle_dispatch_count = 3;
++static uint64_t stk[0x4000] __attribute__((aligned(4096)));
++#define API(name, ...) fle_api2_call(fle_imp_##name, __VA_ARGS__)
++static uint16_t *w16(const char *s)
++{
++    static uint16_t pool[16][32];
++    static int n;
++    uint16_t *p = pool[n++ & 15];
++    int i;
++    for (i = 0; s[i]; i++) p[i] = (uint16_t)(uint8_t)s[i];
++    p[i] = 0;
++    return p;
++}
++static void regclass(const char *name, uint32_t style, uint64_t bg)
++{
++    static uint8_t wc[72];
++    uint64_t proc = VA_WP, inst = 0x400000, nmp = A(w16(name)), cur = FLE_CURSOR_HANDLE_BASE + 4u, bgv = bg;
++    memset(wc, 0, sizeof wc);
++    memcpy(wc, &style, 4); memcpy(wc + 8, &proc, 8); memcpy(wc + 24, &inst, 8); memcpy(wc + 40, &cur, 8); memcpy(wc + 48, &bgv, 8); memcpy(wc + 64, &nmp, 8);
++    (void)fle_api2_call(fle_imp_RegisterClassW, A(wc), 0, 0, 0, 0, 0, 0, 0);
++}
++static void rt_init(void)
++{
++    R[4] = (uint64_t)(uintptr_t)stk + 0x10000 + 8;
++    fle_st(R[4], 8, 0xdead0000);
++    fle_teb_set_stack(A(stk), A(stk) + sizeof stk);
++}
++static uint64_t mkbrush(uint32_t colorref) { return API(CreateSolidBrush, colorref, 0, 0, 0, 0, 0, 0, 0); }
++static HWND mkwin(const char *cls, DWORD style, int x, int y, int cx, int cy, HWND parent)
++{
++    uint64_t h, sp0 = R[4];
++    uint16_t empty[1] = { 0 };
++    R[4] = (R[4] - 0x80) & ~UINT64_C(15);
++    R[4] -= 8;
++    fle_st(R[4], 8, 0xAAAA0000);
++    fle_st(R[4] + 0x28, 8, (uint32_t)x); fle_st(R[4] + 0x30, 8, (uint32_t)y); fle_st(R[4] + 0x38, 8, (uint32_t)cx); fle_st(R[4] + 0x40, 8, (uint32_t)cy);
++    fle_st(R[4] + 0x48, 8, parent); fle_st(R[4] + 0x50, 8, 0); fle_st(R[4] + 0x58, 8, 0x400000); fle_st(R[4] + 0x60, 8, 0);
++    R[1] = 0; R[2] = A(w16(cls)); R[8] = A(empty); R[9] = style;
++    fle_imp_CreateWindowExW();
++    h = R[0];
++    R[4] = sp0;
++    return h;
++}
++static void pump(void)
++{
++    uint8_t msg[FLE_MSG_SIZE];
++    while (fle_api2_call(fle_imp_PeekMessageW, A(msg), 0, 0, 0, 1, 0, 0, 0) & 1) (void)fle_api2_call(fle_imp_DispatchMessageW, A(msg), 0, 0, 0, 0, 0, 0, 0);
++}
++static void mouse(int kind, int x, int y) { (void)fle_input_host_mouse(kind == 2 ? FLE_IN_BDOWN : kind == 3 ? FLE_IN_BUP : FLE_IN_MOVE, x, y, FLE_IN_BTN_L); }
++static void key(int down, unsigned vk, unsigned scan) { (void)fle_input_host_key(down ? FLE_IN_KDOWN : FLE_IN_KUP, vk, scan, 0); }
++static LR defproc(HWND h, UINT m, WPARAM w, LPARAM l) { return fle_api2_call(fle_imp_DefWindowProcW, h, m, w, l, 0, 0, 0, 0); }
++static LR sendmsg(HWND h, UINT m, WPARAM w, LPARAM l) { return API(SendMessageW, h, m, w, l, 0, 0, 0, 0); }
++static DC_ memdc(int w, int h)
++{
++    uint64_t dc = API(CreateCompatibleDC, 0, 0, 0, 0, 0, 0, 0, 0), scr = API(GetDC, 0, 0, 0, 0, 0, 0, 0, 0), b = API(CreateCompatibleBitmap, scr, (uint32_t)w, (uint32_t)h, 0, 0, 0, 0, 0);
++    (void)API(ReleaseDC, 0, scr, 0, 0, 0, 0, 0, 0);
++    (void)API(SelectObject, dc, b, 0, 0, 0, 0, 0, 0);
++    return dc;
++}
++static void fillrect(DC_ dc, int l, int t, int r, int b, uint32_t colorref)
++{
++    int32_t rc[4] = { l, t, r, b };
++    uint64_t br = mkbrush(colorref);
++    (void)API(FillRect, dc, A(rc), br, 0, 0, 0, 0, 0);
++    (void)API(DeleteObject, br, 0, 0, 0, 0, 0, 0, 0);
++}
++static uint32_t getpixel(DC_ dc, int x, int y) { return (uint32_t)API(GetPixel, dc, (uint32_t)x, (uint32_t)y, 0, 0, 0, 0, 0) & 0xFFFFFFu; }
++static void clip(DC_ dc, int l, int t, int r, int b) { (void)API(IntersectClipRect, dc, (uint32_t)l, (uint32_t)t, (uint32_t)r, (uint32_t)b, 0, 0, 0); }
++static void unclip(DC_ dc) { (void)API(SelectClipRgn, dc, 0, 0, 0, 0, 0, 0, 0); }
++static int rectvisible(DC_ dc, int l, int t, int r, int b) { int32_t rc[4] = { l, t, r, b }; return (int)(API(RectVisible, dc, A(rc), 0, 0, 0, 0, 0, 0) & 0xFFFFFFFFu) ? 1 : 0; }
++static void invalidate(HWND h, int l, int t, int r, int b, int erase) { int32_t rc[4] = { l, t, r, b }; (void)API(InvalidateRect, h, A(rc), (uint32_t)erase, 0, 0, 0, 0, 0); }
++static void update(HWND h) { (void)API(UpdateWindow, h, 0, 0, 0, 0, 0, 0, 0); }
++static void redraw(HWND h, int l, int t, int r, int b, unsigned fl) { int32_t rc[4] = { l, t, r, b }; (void)API(RedrawWindow, h, A(rc), 0, fl, 0, 0, 0, 0); }
++static void paint_probe(HWND h, int *ferase, int rc[4])
++{
++    uint8_t ps[72];
++    memset(ps, 0, sizeof ps);
++    (void)API(BeginPaint, h, A(ps), 0, 0, 0, 0, 0, 0);
++    *ferase = (int)*(uint32_t *)(ps + 8);
++    memcpy(rc, ps + 12, 16);
++    (void)API(EndPaint, h, A(ps), 0, 0, 0, 0, 0, 0);
++}
++static int getupdate(HWND h, int rc[4]) { int32_t r[4] = { 0, 0, 0, 0 }; uint64_t b = API(GetUpdateRect, h, A(r), 0, 0, 0, 0, 0, 0); memcpy(rc, r, 16); return (b & 0xFFFFFFFFu) ? 1 : 0; }
++static void showwin(HWND h, int c) { (void)API(ShowWindow, h, (uint32_t)c, 0, 0, 0, 0, 0, 0); }
++static void enablewin(HWND h, int e) { (void)API(EnableWindow, h, (uint32_t)e, 0, 0, 0, 0, 0, 0); }
++static void destroywin(HWND h) { (void)API(DestroyWindow, h, 0, 0, 0, 0, 0, 0, 0); }
++static HWND setfocus(HWND h) { (void)API(SetActiveWindow, h, 0, 0, 0, 0, 0, 0, 0); return API(SetFocus, h, 0, 0, 0, 0, 0, 0, 0); }
++static void *hook_install(int id, int which) { return (void *)(uintptr_t)API(SetWindowsHookExW, (uint32_t)id, which ? VA_HK_KEY : VA_HK_MOUSE, 0, API(GetCurrentThreadId, 0, 0, 0, 0, 0, 0, 0, 0) & 0xFFFFFFFFu, 0, 0, 0, 0); }
++static void hook_remove(void *hh) { (void)API(UnhookWindowsHookEx, (uint64_t)(uintptr_t)hh, 0, 0, 0, 0, 0, 0, 0); }
++static LR hook_next(void *hh, int n, WPARAM w, LPARAM l) { return API(CallNextHookEx, (uint64_t)(uintptr_t)hh, (uint32_t)n, w, l, 0, 0, 0, 0); }
++static int peek(int remove)
++{
++    uint8_t msg[FLE_MSG_SIZE];
++    uint64_t r = fle_api2_call(fle_imp_PeekMessageW, A(msg), 0, 0, 0, remove ? 1 : 0, 0, 0, 0);
++    int m = (int)*(uint32_t *)(msg + 8);
++    if ((r & 1) && remove) (void)fle_api2_call(fle_imp_DispatchMessageW, A(msg), 0, 0, 0, 0, 0, 0, 0);
++    return (r & 1) ? m : 0;
++}
++static uint64_t mhs_u64(uint64_t l, int off) { return *(const uint64_t *)(uintptr_t)(l + off); }
++static int32_t mhs_i32(uint64_t l, int off) { return *(const int32_t *)(uintptr_t)(l + off); }
++#define W_(x) x
++typedef uint64_t H_;
++typedef uint64_t WP_;
++typedef uint64_t LP_;
++#endif
++
++#define NW 12
++static HWND g_h[NW];
++static const char *g_n[NW];
++static int g_mute;
++static const char *nm_(HWND h)
++{
++    int k;
++    for (k = 0; k < NW; k++) if (g_h[k] && g_h[k] == h) return g_n[k];
++    return h ? "?" : "none";
++}
++#define P(...) do { if (!g_mute) printf(__VA_ARGS__); } while (0)
++static int slot_of(HWND h) { int k; for (k = 0; k < NW; k++) if (g_h[k] && g_h[k] == h) return k; return -1; }
++/* behaviours of the harness window procedure, by the first letter of the window's name: 'T' answers WM_NCHITTEST with HTTRANSPARENT; 'C' handles WM_PAINT with BeginPaint / EndPaint and prints PAINTSTRUCT;
++ * 'Q' probes the DC of WM_ERASEBKGND with RectVisible (g_probe_in must be visible, g_probe_out must not). */
++static int g_probe_in[4] = { 12, 12, 14, 14 }, g_probe_out[4] = { 80, 60, 82, 62 };
++static LR wproc_common(HWND h, UINT m, WPARAM w, LPARAM l)
++{
++    const char *n = nm_(h);
++    LR r;
++    switch (m) {
++    case 0x0084:
++        P("  %s WM_NCHITTEST\n", n);
++        if (n[0] == 'T') return (LR)-1;
++        break;
++    case 0x0014:
++        r = defproc(h, m, w, l);
++        P("  %s WM_ERASEBKGND dc=%d", n, w ? 1 : 0);
++        if (n[0] == 'Q' && w) P(" probe(inside the update rect)=%d probe(outside)=%d", rectvisible((DC_)w, g_probe_in[0], g_probe_in[1], g_probe_in[2], g_probe_in[3]), rectvisible((DC_)w, g_probe_out[0], g_probe_out[1], g_probe_out[2], g_probe_out[3]));
++        P(" -> %d\n", (int)(r & 0xFFFFFFFFu));
++        return r;
++    case 0x000F:
++        if (n[0] == 'C' || n[0] == 'Q') {
++            int fe, rc[4];
++            paint_probe(h, &fe, rc);
++            P("  %s WM_PAINT BeginPaint fErase=%d rcPaint=(%d,%d,%d,%d)\n", n, fe, rc[0], rc[1], rc[2], rc[3]);
++            return 0;
++        }
++        P("  %s WM_PAINT (default)\n", n);
++        break;
++    case 0x0201: P("  %s WM_LBUTTONDOWN x=%d y=%d\n", n, (int)(int16_t)(l & 0xFFFF), (int)(int16_t)((l >> 16) & 0xFFFF)); break;
++    case 0x0202: P("  %s WM_LBUTTONUP x=%d y=%d\n", n, (int)(int16_t)(l & 0xFFFF), (int)(int16_t)((l >> 16) & 0xFFFF)); break;
++    case 0x0200: P("  %s WM_MOUSEMOVE x=%d y=%d\n", n, (int)(int16_t)(l & 0xFFFF), (int)(int16_t)((l >> 16) & 0xFFFF)); break;
++    case 0x0100: P("  %s WM_KEYDOWN vk=%#x lp=%#x\n", n, (unsigned)w, (unsigned)(l & 0xFFFFFFFFu)); break;
++    case 0x0101: P("  %s WM_KEYUP vk=%#x lp=%#x\n", n, (unsigned)w, (unsigned)(l & 0xFFFFFFFFu)); break;
++    case 0x0020: P("  %s WM_SETCURSOR hit=%d msg=%#x\n", n, (int)(int16_t)(l & 0xFFFF), (unsigned)((l >> 16) & 0xFFFF)); break;
++    case 0x0021: P("  %s WM_MOUSEACTIVATE hit=%d msg=%#x\n", n, (int)(int16_t)(l & 0xFFFF), (unsigned)((l >> 16) & 0xFFFF)); break;
++    case 0x00A0: P("  %s WM_NCMOUSEMOVE ht=%d\n", n, (int)w); break;
++    case 0x00A1: P("  %s WM_NCLBUTTONDOWN ht=%d\n", n, (int)w); break;
++    case 0x00A2: P("  %s WM_NCLBUTTONUP ht=%d\n", n, (int)w); break;
++    default: break;
++    }
++    return defproc(h, m, w, l);
++}
++
++/* the hooks: each call prints one line; g_hook_swallow is the message number the hook answers 1 for (0 = none); g_hook_next: call CallNextHookEx; the handle of the hook is in g_hh[] */
++static void *g_hh[4];
++static unsigned g_hook_swallow_mouse, g_hook_swallow_key;
++static int g_hook_next = 1;
++static LR hook_body(int which, int slot, int n, WPARAM w, LPARAM l)
++{
++    LR r = 0;
++    if (n < 0) return hook_next(g_hh[slot], n, w, l);
++    if (which == 0) {
++        P("  HOOK%d mouse nCode=%d msg=%#x pt=(%d,%d) hwnd=%s ht=%d\n", slot, n, (unsigned)w, (int)mhs_i32(l, 0), (int)mhs_i32(l, 4), nm_((HWND)mhs_u64(l, 8)), (int)mhs_i32(l, 16));
++        if (g_hook_swallow_mouse && (unsigned)w == g_hook_swallow_mouse && slot == 0) return 1;
++    } else {
++        P("  HOOK%d key nCode=%d vk=%#x lp=%#x\n", slot, n, (unsigned)w, (unsigned)(l & 0xFFFFFFFFu));
++        if (g_hook_swallow_key && (unsigned)w == g_hook_swallow_key && slot == 2) return 1;
++    }
++    if (g_hook_next) r = hook_next(g_hh[slot], n, w, l);
++    P("  HOOK%d -> %d\n", slot, (int)(r & 0xFFFFFFFFu));
++    return r;
++}
++#ifdef C0323_WINE
++static LRESULT CALLBACK wp(HWND h, UINT m, WPARAM w, LPARAM l) { return wproc_common(h, m, w, l); }
++static LRESULT CALLBACK hk_mouse(int n, WPARAM w, LPARAM l) { return hook_body(0, 0, n, w, l); }
++static LRESULT CALLBACK hk_key(int n, WPARAM w, LPARAM l) { return hook_body(1, 2, n, w, l); }
++#else
++static void wndproc(void) { uint64_t hw = R[1], msg = R[2], wp_ = R[8], lp = R[9]; R[0] = wproc_common(hw, (unsigned)msg, wp_, lp); }
++static void hkproc_mouse(void) { int n = (int)(int32_t)R[1]; uint64_t w = R[2], l = R[8]; R[0] = hook_body(0, 0, n, w, l); }
++static void hkproc_key(void) { int n = (int)(int32_t)R[1]; uint64_t w = R[2], l = R[8]; R[0] = hook_body(1, 2, n, w, l); }
++#endif
++
++static void step(const char *s) { printf("%s:\n", s); }
++static HWND add(int slot, const char *nm, const char *cls, DWORD style, int x, int y, int cx, int cy, HWND parent)
++{
++    int mu = g_mute;
++    g_n[slot] = nm;
++    g_mute = 1;                    /* the messages of the creation (WM_ERASEBKGND of a visible window ...) are not what the scenarios are about */
++    g_h[slot] = mkwin(cls, style, x, y, cx, cy, parent);
++    g_mute = mu;
++    return g_h[slot];
++}
++static void clearall(void)
++{
++    int k;
++    for (k = NW - 1; k >= 0; k--) if (g_h[k]) destroywin(g_h[k]);
++    pump();
++    memset(g_h, 0, sizeof g_h);
++}
++static void click(int x, int y)
++{
++    mouse(1, x, y); pump();
++    mouse(2, x, y); pump();
++    mouse(3, x, y); pump();
++}
++
++static uint64_t g_solid;
++static void classes(void)
++{
++    g_solid = (uint64_t)(uintptr_t)mkbrush(0x00563412u);
++    regclass("cnone", 0, 0);
++    regclass("csolid", 0, g_solid);
++    regclass("cwin", 0, 5 + 1);                /* COLOR_WINDOW + 1 */
++    regclass("cpar", CS_PARENTDC, g_solid);
++}
++
++static void erase_mem(const char *label, const char *cls)
++{
++    HWND w = add(0, "E", cls, WS_POPUP, 300, 300, 100, 80, 0);
++    DC_ dc;
++    LR r;
++    unsigned c0, c1, c2;
++    printf("%s (class %s)\n", label, cls);
++    dc = memdc(16, 16);
++    fillrect(dc, 0, 0, 16, 16, 0x00404040u);
++    r = sendmsg(w, 0x0014, (WPARAM)dc, 0);
++    c0 = getpixel(dc, 0, 0); c1 = getpixel(dc, 8, 8); c2 = getpixel(dc, 15, 15);
++    printf("  whole DC: result=%d pixels (0,0)=%06x (8,8)=%06x (15,15)=%06x\n", (int)(r & 0xFFFFFFFFu), c0, c1, c2);
++    fillrect(dc, 0, 0, 16, 16, 0x00404040u);
++    clip(dc, 4, 4, 10, 8);
++    r = sendmsg(w, 0x0014, (WPARAM)dc, 0);
++    unclip(dc);   /* GetPixel outside the clip: CLR_INVALID in the Learn page, the pixel itself in Wine 10.0 */
++    printf("  clip (4,4,10,8): result=%d pixels (5,5)=%06x (4,4)=%06x (9,7)=%06x (10,7)=%06x (3,5)=%06x (12,6)=%06x (5,8)=%06x\n", (int)(r & 0xFFFFFFFFu), getpixel(dc, 5, 5), getpixel(dc, 4, 4), getpixel(dc, 9, 7), getpixel(dc, 10, 7), getpixel(dc, 3, 5), getpixel(dc, 12, 6), getpixel(dc, 5, 8));
++    clearall();
++}
++
++static void sc_E(void)
++{
++    printf("#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC\n");
++    erase_mem("E1 solid brush", "csolid");
++    erase_mem("E2 no brush", "cnone");
++    erase_mem("E3 COLOR_WINDOW + 1", "cwin");
++    erase_mem("E4 CS_PARENTDC with a brush", "cpar");
++}
++
++static void paint_case(const char *label, const char *cls, const char *name, int how)
++{
++    HWND w;
++    int rc[4], gu;
++    w = add(0, name, cls, WS_POPUP | WS_VISIBLE, 30, 30, 120, 90, 0);
++    g_mute = 1; pump(); update(w); pump(); g_mute = 0;
++    printf("%s (window %s, class %s)\n", label, name, cls);
++    if (how == 0) {            /* InvalidateRect(rect, TRUE) + UpdateWindow */
++        invalidate(w, 10, 10, 50, 40, 1);
++        update(w); pump();
++    } else if (how == 1) {     /* RedrawWindow(RDW_INVALIDATE | RDW_ERASE | RDW_ERASENOW), then UpdateWindow */
++        redraw(w, 10, 10, 50, 40, RDW_INVALIDATE | RDW_ERASE | RDW_ERASENOW);
++        gu = getupdate(w, rc);
++        printf("  after RDW_ERASENOW: update rect %d (%d,%d,%d,%d)\n", gu, rc[0], rc[1], rc[2], rc[3]);
++        update(w); pump();
++    } else {                   /* InvalidateRect(rect, FALSE): no erase */
++        invalidate(w, 10, 10, 50, 40, 0);
++        update(w); pump();
++    }
++    gu = getupdate(w, rc);
++    printf("  after: update rect %d (%d,%d,%d,%d)\n", gu, rc[0], rc[1], rc[2], rc[3]);
++    clearall();
++}
++
++static void sc_P(void)
++{
++    printf("#### scenario P: the erase of a window DC\n");
++    paint_case("P1 default WM_PAINT, class with a brush", "csolid", "WS", 0);
++    paint_case("P2 default WM_PAINT, class without a brush", "cnone", "WN", 0);
++    paint_case("P3 own BeginPaint, class with a brush", "csolid", "C1", 0);
++    paint_case("P4 own BeginPaint, class without a brush", "cnone", "C2", 0);
++    paint_case("P5 own BeginPaint, bErase FALSE", "csolid", "C3", 2);
++    paint_case("P6 RDW_ERASENOW then BeginPaint, class with a brush", "csolid", "C4", 1);
++    paint_case("P7 RDW_ERASENOW then BeginPaint, class without a brush", "cnone", "C5", 1);
++    paint_case("P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint)", "csolid", "Q1", 0);
++    paint_case("P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW)", "csolid", "Q2", 1);
++    paint_case("P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT)", "csolid", "Q3", 0);
++}
++
++static void sc_T(void)
++{
++    HWND a, b, p, c1;
++    printf("#### scenario T: WM_NCHITTEST answered HTTRANSPARENT\n");
++    step("T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A)");
++    a = add(0, "A", "csolid", WS_POPUP | WS_VISIBLE, 20, 20, 200, 150, 0);
++    b = add(1, "TB", "csolid", WS_POPUP | WS_VISIBLE, 120, 80, 200, 150, 0);
++    (void)a; (void)b;
++    g_mute = 1; pump(); g_mute = 0;
++    step(" click (160,120): in both");
++    click(160, 120);
++    step(" click (280,200): only in TB: nothing beneath");
++    click(280, 200);
++    step(" click (60,50): only in A");
++    click(60, 50);
++    clearall();
++    step("T2 a transparent child (TC) of a pop-up (P): the click goes to P");
++    p = add(0, "P", "csolid", WS_POPUP | WS_VISIBLE, 40, 40, 300, 200, 0);
++    c1 = add(1, "TC", "csolid", WS_CHILD | WS_VISIBLE, 20, 20, 100, 80, p);
++    (void)c1;
++    g_mute = 1; pump(); g_mute = 0;
++    step(" click (80,80): in TC");
++    click(80, 80);
++    clearall();
++    step("T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P");
++    p = add(0, "P", "csolid", WS_POPUP | WS_VISIBLE, 40, 40, 300, 200, 0);
++    add(1, "TC", "csolid", WS_CHILD | WS_VISIBLE, 20, 20, 150, 100, p);
++    add(2, "C", "csolid", WS_CHILD | WS_VISIBLE, 100, 60, 100, 80, p);
++    g_mute = 1; pump(); g_mute = 0;
++    step(" click (160,120): in C (and in TC)");
++    click(160, 120);
++    step(" click (80,80): in TC only");
++    click(80, 80);
++    clearall();
++    step("T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it");
++    p = add(0, "P", "csolid", WS_POPUP | WS_VISIBLE, 40, 40, 300, 200, 0);
++    c1 = add(1, "D", "csolid", WS_CHILD | WS_VISIBLE, 20, 20, 100, 80, p);
++    enablewin(c1, 0);
++    g_mute = 1; pump(); g_mute = 0;
++    step(" click (80,80): in D");
++    click(80, 80);
++    clearall();
++    step("T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event");
++    a = add(0, "DP", "csolid", WS_POPUP | WS_VISIBLE, 20, 20, 200, 150, 0);
++    enablewin(a, 0);
++    g_mute = 1; pump(); g_mute = 0;
++    step(" click (100,80): in DP");
++    click(100, 80);
++    clearall();
++}
++
++static void sc_H(void)
++{
++    HWND w, v;
++    int k;
++    printf("#### scenario H: WH_MOUSE and WH_KEYBOARD\n");
++    w = add(0, "W", "csolid", WS_POPUP | WS_VISIBLE, 30, 30, 200, 150, 0);
++    v = add(1, "V", "csolid", WS_POPUP | WS_VISIBLE, 300, 30, 100, 100, 0);
++    (void)v;
++    g_mute = 1; pump(); (void)setfocus(w); pump(); g_mute = 0;
++    g_hh[0] = hook_install(WH_MOUSE, 0);
++    g_hh[2] = hook_install(WH_KEYBOARD, 1);
++    step("H1 click on W with a mouse hook that lets everything pass");
++    click(100, 80);
++    step("H2 the key A down and up with a keyboard hook that lets everything pass");
++    key(1, 0x41, 0x1e); pump();
++    key(0, 0x41, 0x1e); pump();
++    step("H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it");
++    g_hook_swallow_mouse = 0x0201;
++    click(100, 80);
++    g_hook_swallow_mouse = 0;
++    step("H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up");
++    g_hook_swallow_key = 0x41;
++    key(1, 0x41, 0x1e); pump();
++    key(0, 0x41, 0x1e); pump();
++    g_hook_swallow_key = 0;
++    step("H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION)");
++    mouse(1, 120, 90);
++    k = peek(0); printf("  peek(noremove) -> %#x\n", k);
++    k = peek(1); printf("  peek(remove) -> %#x\n", k);
++    step("H6 the mouse hook is removed: no hook line");
++    hook_remove(g_hh[0]); g_hh[0] = 0;
++    click(100, 80);
++    hook_remove(g_hh[2]); g_hh[2] = 0;
++    clearall();
++}
++
++#ifndef C0323_WINE
++/* scenario N (the runtime only: Wine's null driver has no window surface to read): the pixels of a window DC after the erase. The class brush colour is 0x563412; the window is first filled with 0x404040. */
++static void pixels_case(const char *label, const char *cls, const char *name, int how)
++{
++    HWND w;
++    DC_ dc;
++    w = add(0, name, cls, WS_POPUP | WS_VISIBLE, 30, 30, 120, 90, 0);
++    g_mute = 1; pump(); update(w); pump(); g_mute = 0;
++    dc = API(GetDC, w, 0, 0, 0, 0, 0, 0, 0);
++    fillrect(dc, 0, 0, 120, 90, 0x00404040u);
++    (void)API(ReleaseDC, w, dc, 0, 0, 0, 0, 0, 0);
++    g_mute = 1;
++    if (how == 0) { invalidate(w, 10, 10, 50, 40, 1); update(w); }
++    else if (how == 1) { redraw(w, 10, 10, 50, 40, RDW_INVALIDATE | RDW_ERASE | RDW_ERASENOW); }
++    else { invalidate(w, 10, 10, 50, 40, 0); update(w); }
++    pump(); g_mute = 0;
++    dc = API(GetDC, w, 0, 0, 0, 0, 0, 0, 0);
++    printf("%s: inside (10,10)=%06x (20,20)=%06x (49,39)=%06x; outside (9,10)=%06x (50,39)=%06x (10,40)=%06x (60,60)=%06x\n", label, getpixel(dc, 10, 10), getpixel(dc, 20, 20), getpixel(dc, 49, 39), getpixel(dc, 9, 10), getpixel(dc, 50, 39), getpixel(dc, 10, 40), getpixel(dc, 60, 60));
++    (void)API(ReleaseDC, w, dc, 0, 0, 0, 0, 0, 0);
++    clearall();
++}
++
++static void sc_N(void)
++{
++    printf("#### scenario N (runtime only): pixels of a window after the erase of the update rectangle (10,10,50,40)\n");
++    pixels_case("N1 default WM_PAINT, class with a brush", "csolid", "WS", 0);
++    pixels_case("N2 RDW_ERASENOW, class with a brush", "csolid", "C4", 1);
++    pixels_case("N3 own BeginPaint, class with a brush", "csolid", "C1", 0);
++    pixels_case("N4 default WM_PAINT, class without a brush", "cnone", "WN", 0);
++    pixels_case("N5 bErase FALSE, class with a brush", "csolid", "C3", 2);
++    pixels_case("N6 default WM_PAINT, COLOR_WINDOW + 1", "cwin", "WW", 0);
++}
++#endif
++
++int main(int argc, char **argv)
++{
++    char only = argc > 1 ? argv[1][0] : 0;
++    setvbuf(stdout, NULL, _IONBF, 0);
++#ifndef C0323_WINE
++    rt_init();
++#endif
++    classes();
++    if (!only || only == 'E') sc_E();
++    if (!only || only == 'P') sc_P();
++    if (!only || only == 'T') sc_T();
++    if (!only || only == 'H') sc_H();
++#ifndef C0323_WINE
++    if (only == 'N') sc_N();
++#endif
++    (void)slot_of;
++    return 0;
++}
+diff -ruN orig/lift/harness/c0323/expected/README.md new/lift/harness/c0323/expected/README.md
+--- orig/lift/harness/c0323/expected/README.md	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/README.md	2026-11-07 07:54:22.922192936 +0900
+@@ -0,0 +1,15 @@
++# harness/c0323/expected (decision 0323, ci1)
++
++- `wine-10.0.out`: contract_0323.c (scenarios E P T H) built with mingw and run under Wine 10.0 (headless, a prefix of its own). UNOFFICIAL reference: Wine is not Windows.
++- `runtime-HEAD-3969ad31.out`: the same file against the runtime of HEAD 3969ad31 (before decision 0323): 130 differing lines against Wine (E 20, P 16, T 51, H 31).
++- `runtime-0323.out`: against the runtime with the 0323 diff: 48 differing lines against Wine (E 0, P 0, T 35, H 13). Scenarios E and P are identical to Wine.
++- `runtime-0323-scenario-N.out`, `runtime-HEAD-3969ad31-scenario-N.out`: scenario N (runtime only: `contract_0323 N`; Wine's null driver has no window surface to read): the pixels of a window after the erase of the update rectangle.
++- `regress.sh TREE WORKDIR` (after `build.sh native TREE WORKDIR`): the native outputs of api2/win_upd.c, win_seq.c and win_act.c, to be compared between two trees. HEAD and 0323 differ only by 2 WM_ERASEBKGND lines in win_seq (Wine has them too) and 0 lines in win_upd and win_act.
++
++The 48 lines that remain in T and H (known divergences, each judged against the Learn page):
++- T1: Wine 10.0 does not walk from a transparent top-level window to a sibling top-level window (its window_from_point looks only below the top-level window the server chose); Learn WM_NCHITTEST says "underlying windows in the same thread". The runtime follows Learn.
++- T4, T5: S-disabled-drops of decision 0136 (not part of 0323): Wine skips a disabled child (the parent gets the click) and answers a disabled top-level window with HTERROR (WM_SETCURSOR hit=-2); the runtime drops the event.
++- the trailing WM_NCHITTEST that Wine sends after a click (a refresh of the hit test), and the WM_SETCURSOR of a button-up, which the runtime does not send (decision 0136).
++- H: the runtime sends WM_SETCURSOR / WM_MOUSEACTIVATE / WM_PARENTNOTIFY when it translates the event, i.e. before the hook is called; Wine sends them after the hook, and not at all for a message the hook discards. PM_NOREMOVE: Wine hit-tests at the peek.
++
++Build: `bash build.sh native|wine|both TREE WORKDIR [E|P|T|H|N]` (clang -O0 at nice 19; Wine in a prefix of its own under WORKDIR; about 18 s for the first run because of wineboot, about 2 s after).
+diff -ruN orig/lift/harness/c0323/expected/runtime-0323-scenario-N.out new/lift/harness/c0323/expected/runtime-0323-scenario-N.out
+--- orig/lift/harness/c0323/expected/runtime-0323-scenario-N.out	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/runtime-0323-scenario-N.out	2026-11-07 07:53:19.100102827 +0900
+@@ -0,0 +1,7 @@
++#### scenario N (runtime only): pixels of a window after the erase of the update rectangle (10,10,50,40)
++N1 default WM_PAINT, class with a brush: inside (10,10)=563412 (20,20)=563412 (49,39)=563412; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N2 RDW_ERASENOW, class with a brush: inside (10,10)=563412 (20,20)=563412 (49,39)=563412; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N3 own BeginPaint, class with a brush: inside (10,10)=563412 (20,20)=563412 (49,39)=563412; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N4 default WM_PAINT, class without a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N5 bErase FALSE, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N6 default WM_PAINT, COLOR_WINDOW + 1: inside (10,10)=ffffff (20,20)=ffffff (49,39)=ffffff; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+diff -ruN orig/lift/harness/c0323/expected/runtime-0323.out new/lift/harness/c0323/expected/runtime-0323.out
+--- orig/lift/harness/c0323/expected/runtime-0323.out	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/runtime-0323.out	2026-11-07 07:54:03.219607188 +0900
+@@ -0,0 +1,196 @@
++#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC
++E1 solid brush (class csolid)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E2 no brush (class cnone)
++  E WM_ERASEBKGND dc=1 -> 0
++  whole DC: result=0 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 0
++  clip (4,4,10,8): result=0 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E3 COLOR_WINDOW + 1 (class cwin)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=ffffff (8,8)=ffffff (15,15)=ffffff
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=ffffff (4,4)=ffffff (9,7)=ffffff (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E4 CS_PARENTDC with a brush (class cpar)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++#### scenario P: the erase of a window DC
++P1 default WM_PAINT, class with a brush (window WS, class csolid)
++  WS WM_PAINT (default)
++  WS WM_ERASEBKGND dc=1 -> 1
++  after: update rect 0 (0,0,0,0)
++P2 default WM_PAINT, class without a brush (window WN, class cnone)
++  WN WM_PAINT (default)
++  WN WM_ERASEBKGND dc=1 -> 0
++  after: update rect 0 (0,0,0,0)
++P3 own BeginPaint, class with a brush (window C1, class csolid)
++  C1 WM_ERASEBKGND dc=1 -> 1
++  C1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P4 own BeginPaint, class without a brush (window C2, class cnone)
++  C2 WM_ERASEBKGND dc=1 -> 0
++  C2 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P5 own BeginPaint, bErase FALSE (window C3, class csolid)
++  C3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P6 RDW_ERASENOW then BeginPaint, class with a brush (window C4, class csolid)
++  C4 WM_ERASEBKGND dc=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C4 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P7 RDW_ERASENOW then BeginPaint, class without a brush (window C5, class cnone)
++  C5 WM_ERASEBKGND dc=1 -> 0
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C5 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint) (window Q1, class csolid)
++  Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW) (window Q2, class csolid)
++  Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  Q2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT) (window Q3, class csolid)
++  Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++#### scenario T: WM_NCHITTEST answered HTTRANSPARENT
++T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A):
++ click (160,120): in both:
++  TB WM_NCHITTEST
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=140 y=100
++  TB WM_NCHITTEST
++  A WM_NCHITTEST
++  A WM_MOUSEACTIVATE hit=1 msg=0x201
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=140 y=100
++  A WM_NCHITTEST
++  A WM_LBUTTONUP x=140 y=100
++ click (280,200): only in TB: nothing beneath:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (60,50): only in A:
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=40 y=30
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=40 y=30
++  A WM_NCHITTEST
++  A WM_LBUTTONUP x=40 y=30
++T2 a transparent child (TC) of a pop-up (P): the click goes to P:
++ click (80,80): in TC:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_LBUTTONUP x=40 y=40
++T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P:
++ click (160,120): in C (and in TC):
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_SETCURSOR hit=1 msg=0x200
++  P WM_SETCURSOR hit=1 msg=0x200
++  C WM_MOUSEMOVE x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  C WM_SETCURSOR hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  C WM_LBUTTONDOWN x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_LBUTTONUP x=20 y=20
++ click (80,80): in TC only:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_LBUTTONUP x=40 y=40
++T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it:
++ click (80,80): in D:
++T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event:
++ click (100,80): in DP:
++#### scenario H: WH_MOUSE and WH_KEYBOARD
++H1 click on W with a mouse hook that lets everything pass:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONUP x=70 y=50
++H2 the key A down and up with a keyboard hook that lets everything pass:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 -> 0
++  W WM_KEYDOWN vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++  HOOK2 -> 0
++  W WM_KEYUP vk=0x41 lp=0xc01e0001
++H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_LBUTTONUP x=70 y=50
++H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION):
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  HOOK0 mouse nCode=3 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  peek(noremove) -> 0x200
++  HOOK0 mouse nCode=0 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_MOUSEMOVE x=90 y=60
++  peek(remove) -> 0x200
++H6 the mouse hook is removed: no hook line:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_LBUTTONUP x=70 y=50
+diff -ruN orig/lift/harness/c0323/expected/runtime-HEAD-3969ad31-scenario-N.out new/lift/harness/c0323/expected/runtime-HEAD-3969ad31-scenario-N.out
+--- orig/lift/harness/c0323/expected/runtime-HEAD-3969ad31-scenario-N.out	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/runtime-HEAD-3969ad31-scenario-N.out	2026-11-07 07:53:28.797752650 +0900
+@@ -0,0 +1,7 @@
++#### scenario N (runtime only): pixels of a window after the erase of the update rectangle (10,10,50,40)
++N1 default WM_PAINT, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N2 RDW_ERASENOW, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N3 own BeginPaint, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N4 default WM_PAINT, class without a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N5 bErase FALSE, class with a brush: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
++N6 default WM_PAINT, COLOR_WINDOW + 1: inside (10,10)=404040 (20,20)=404040 (49,39)=404040; outside (9,10)=404040 (50,39)=404040 (10,40)=404040 (60,60)=404040
+diff -ruN orig/lift/harness/c0323/expected/runtime-HEAD-3969ad31.out new/lift/harness/c0323/expected/runtime-HEAD-3969ad31.out
+--- orig/lift/harness/c0323/expected/runtime-HEAD-3969ad31.out	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/runtime-HEAD-3969ad31.out	2026-11-07 07:54:03.221802391 +0900
+@@ -0,0 +1,140 @@
++#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC
++E1 solid brush (class csolid)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E2 no brush (class cnone)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E3 COLOR_WINDOW + 1 (class cwin)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E4 CS_PARENTDC with a brush (class cpar)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++#### scenario P: the erase of a window DC
++P1 default WM_PAINT, class with a brush (window WS, class csolid)
++  WS WM_PAINT (default)
++  after: update rect 0 (0,0,0,0)
++P2 default WM_PAINT, class without a brush (window WN, class cnone)
++  WN WM_PAINT (default)
++  after: update rect 0 (0,0,0,0)
++P3 own BeginPaint, class with a brush (window C1, class csolid)
++  C1 WM_ERASEBKGND dc=1 -> 1
++  C1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P4 own BeginPaint, class without a brush (window C2, class cnone)
++  C2 WM_ERASEBKGND dc=1 -> 1
++  C2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P5 own BeginPaint, bErase FALSE (window C3, class csolid)
++  C3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P6 RDW_ERASENOW then BeginPaint, class with a brush (window C4, class csolid)
++  C4 WM_ERASEBKGND dc=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C4 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P7 RDW_ERASENOW then BeginPaint, class without a brush (window C5, class cnone)
++  C5 WM_ERASEBKGND dc=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C5 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint) (window Q1, class csolid)
++  Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
++  Q1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW) (window Q2, class csolid)
++  Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  Q2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT) (window Q3, class csolid)
++  Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
++  Q3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++#### scenario T: WM_NCHITTEST answered HTTRANSPARENT
++T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A):
++ click (160,120): in both:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (280,200): only in TB: nothing beneath:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (60,50): only in A:
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=40 y=30
++  A WM_NCHITTEST
++  A WM_MOUSEACTIVATE hit=1 msg=0x201
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=40 y=30
++  A WM_NCHITTEST
++  A WM_LBUTTONUP x=40 y=30
++T2 a transparent child (TC) of a pop-up (P): the click goes to P:
++ click (80,80): in TC:
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P:
++ click (160,120): in C (and in TC):
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++ click (80,80): in TC only:
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++  TC WM_NCHITTEST
++T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it:
++ click (80,80): in D:
++T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event:
++ click (100,80): in DP:
++#### scenario H: WH_MOUSE and WH_KEYBOARD
++H1 click on W with a mouse hook that lets everything pass:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_LBUTTONUP x=70 y=50
++H2 the key A down and up with a keyboard hook that lets everything pass:
++  W WM_KEYDOWN vk=0x41 lp=0x1e0001
++  W WM_KEYUP vk=0x41 lp=0xc01e0001
++H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_LBUTTONUP x=70 y=50
++H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up:
++  W WM_KEYDOWN vk=0x41 lp=0x1e0001
++  W WM_KEYUP vk=0x41 lp=0xc01e0001
++H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION):
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  peek(noremove) -> 0x200
++  W WM_MOUSEMOVE x=90 y=60
++  peek(remove) -> 0x200
++H6 the mouse hook is removed: no hook line:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_LBUTTONUP x=70 y=50
+diff -ruN orig/lift/harness/c0323/expected/wine-10.0.out new/lift/harness/c0323/expected/wine-10.0.out
+--- orig/lift/harness/c0323/expected/wine-10.0.out	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/expected/wine-10.0.out	2026-11-07 07:54:03.219082074 +0900
+@@ -0,0 +1,214 @@
++#### scenario E: DefWindowProc(WM_ERASEBKGND) with a memory DC
++E1 solid brush (class csolid)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E2 no brush (class cnone)
++  E WM_ERASEBKGND dc=1 -> 0
++  whole DC: result=0 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
++  E WM_ERASEBKGND dc=1 -> 0
++  clip (4,4,10,8): result=0 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E3 COLOR_WINDOW + 1 (class cwin)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=ffffff (8,8)=ffffff (15,15)=ffffff
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=ffffff (4,4)=ffffff (9,7)=ffffff (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++E4 CS_PARENTDC with a brush (class cpar)
++  E WM_ERASEBKGND dc=1 -> 1
++  whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
++  E WM_ERASEBKGND dc=1 -> 1
++  clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
++#### scenario P: the erase of a window DC
++P1 default WM_PAINT, class with a brush (window WS, class csolid)
++  WS WM_PAINT (default)
++  WS WM_ERASEBKGND dc=1 -> 1
++  after: update rect 0 (0,0,0,0)
++P2 default WM_PAINT, class without a brush (window WN, class cnone)
++  WN WM_PAINT (default)
++  WN WM_ERASEBKGND dc=1 -> 0
++  after: update rect 0 (0,0,0,0)
++P3 own BeginPaint, class with a brush (window C1, class csolid)
++  C1 WM_ERASEBKGND dc=1 -> 1
++  C1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P4 own BeginPaint, class without a brush (window C2, class cnone)
++  C2 WM_ERASEBKGND dc=1 -> 0
++  C2 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P5 own BeginPaint, bErase FALSE (window C3, class csolid)
++  C3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P6 RDW_ERASENOW then BeginPaint, class with a brush (window C4, class csolid)
++  C4 WM_ERASEBKGND dc=1 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C4 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P7 RDW_ERASENOW then BeginPaint, class without a brush (window C5, class cnone)
++  C5 WM_ERASEBKGND dc=1 -> 0
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  C5 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P8 the DC of WM_ERASEBKGND is clipped to the update region (BeginPaint) (window Q1, class csolid)
++  Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q1 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P9 the DC of WM_ERASEBKGND is clipped to the update region (RDW_ERASENOW) (window Q2, class csolid)
++  Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  after RDW_ERASENOW: update rect 1 (10,10,50,40)
++  Q2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++P10 the DC of WM_ERASEBKGND is clipped to the update region (default WM_PAINT) (window Q3, class csolid)
++  Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
++  Q3 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
++  after: update rect 0 (0,0,0,0)
++#### scenario T: WM_NCHITTEST answered HTTRANSPARENT
++T1 two top-level pop-ups of one thread, the upper one (TB) transparent: a click where they overlap goes to the one beneath (A):
++ click (160,120): in both:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (280,200): only in TB: nothing beneath:
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++  TB WM_NCHITTEST
++ click (60,50): only in A:
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x200
++  A WM_MOUSEMOVE x=40 y=30
++  A WM_NCHITTEST
++  A WM_MOUSEACTIVATE hit=1 msg=0x201
++  A WM_SETCURSOR hit=1 msg=0x201
++  A WM_LBUTTONDOWN x=40 y=30
++  A WM_NCHITTEST
++  A WM_SETCURSOR hit=1 msg=0x202
++  A WM_LBUTTONUP x=40 y=30
++  A WM_NCHITTEST
++T2 a transparent child (TC) of a pop-up (P): the click goes to P:
++ click (80,80): in TC:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x202
++  P WM_LBUTTONUP x=40 y=40
++  P WM_ERASEBKGND dc=1 -> 1
++T3 an opaque child (C) of a pop-up (P) over a transparent child (TC): C is above TC and takes the click; a click on TC alone goes to P:
++ click (160,120): in C (and in TC):
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_SETCURSOR hit=1 msg=0x200
++  P WM_SETCURSOR hit=1 msg=0x200
++  C WM_MOUSEMOVE x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_MOUSEACTIVATE hit=1 msg=0x201
++  P WM_MOUSEACTIVATE hit=1 msg=0x201
++  C WM_SETCURSOR hit=1 msg=0x201
++  P WM_SETCURSOR hit=1 msg=0x201
++  C WM_LBUTTONDOWN x=20 y=20
++  TC WM_NCHITTEST
++  C WM_NCHITTEST
++  C WM_SETCURSOR hit=1 msg=0x202
++  P WM_SETCURSOR hit=1 msg=0x202
++  C WM_LBUTTONUP x=20 y=20
++ click (80,80): in TC only:
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  TC WM_NCHITTEST
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x202
++  P WM_LBUTTONUP x=40 y=40
++  P WM_NCHITTEST
++  P WM_ERASEBKGND dc=1 -> 1
++  P WM_ERASEBKGND dc=1 -> 1
++T4 (not part of the HTTRANSPARENT change; S-disabled-drops of decision 0136) a disabled child (D) of a pop-up (P): Wine 10.0 skips a disabled child, so P gets the click; the runtime drops it:
++ click (80,80): in D:
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x200
++  P WM_MOUSEMOVE x=40 y=40
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x201
++  P WM_LBUTTONDOWN x=40 y=40
++  P WM_NCHITTEST
++  P WM_SETCURSOR hit=1 msg=0x202
++  P WM_LBUTTONUP x=40 y=40
++  P WM_ERASEBKGND dc=1 -> 1
++T5 (same) a disabled top-level pop-up (DP): Wine 10.0 answers the hit with HTERROR and sends WM_SETCURSOR to it; the runtime drops the event:
++ click (100,80): in DP:
++  DP WM_SETCURSOR hit=-2 msg=0x200
++  DP WM_SETCURSOR hit=-2 msg=0x201
++  DP WM_SETCURSOR hit=-2 msg=0x202
++#### scenario H: WH_MOUSE and WH_KEYBOARD
++H1 click on W with a mouse hook that lets everything pass:
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x202
++  W WM_LBUTTONUP x=70 y=50
++H2 the key A down and up with a keyboard hook that lets everything pass:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 -> 0
++  W WM_KEYDOWN vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++  HOOK2 -> 0
++  W WM_KEYUP vk=0x41 lp=0xc01e0001
++H3 the mouse hook answers 1 for WM_LBUTTONDOWN: W does not get it:
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x202
++  W WM_LBUTTONUP x=70 y=50
++H4 the keyboard hook answers 1 for VK_A: W does not get the key down or up:
++  HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
++  HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
++H5 PeekMessage with PM_NOREMOVE (HC_NOREMOVE), then with PM_REMOVE (HC_ACTION):
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=3 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  peek(noremove) -> 0x200
++  W WM_NCHITTEST
++  HOOK0 mouse nCode=0 msg=0x200 pt=(120,90) hwnd=W ht=1
++  HOOK0 -> 0
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=90 y=60
++  peek(remove) -> 0x200
++H6 the mouse hook is removed: no hook line:
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x200
++  W WM_MOUSEMOVE x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x201
++  W WM_LBUTTONDOWN x=70 y=50
++  W WM_NCHITTEST
++  W WM_SETCURSOR hit=1 msg=0x202
++  W WM_LBUTTONUP x=70 y=50
+diff -ruN orig/lift/harness/c0323/regress.sh new/lift/harness/c0323/regress.sh
+--- orig/lift/harness/c0323/regress.sh	1970-01-01 09:00:00.000000000 +0900
++++ new/lift/harness/c0323/regress.sh	2026-11-07 07:54:12.881387846 +0900
+@@ -0,0 +1,10 @@
++#!/bin/bash
++# regression: the native outputs of the api2 window cases (win_upd, win_seq, win_act) with the runtime of TREE, using the objects of WORKDIR (built by c0323/build.sh)
++set -eu -o pipefail
++T=$(readlink -f "$1"); W=$(readlink -f "$2"); RT=$T/lift/runtime; H=$T/lift/harness/api2
++O=""; for f in fle_api2_call fle_appview fle_callback fle_class fle_comctl fle_cursor fle_env fle_event fle_gdc fle_gdi fle_host fle_imports fle_input fle_layered fle_locale fle_mxcsr fle_proc fle_raster fle_sys fle_thread fle_time fle_token fle_vfs fle_visrgn fle_vmap fle_vol fle_wall_ia2 fle_wall_ia2w fle_win fle_x87 fle_x87ctl; do O="$O $W/$f.o"; done
++for c in win_upd win_seq win_act; do
++  nice -n 19 clang -O0 -std=gnu11 -w -fPIE -pthread -I"$RT" "$H/$c.c" $O -o "$W/${c}_native" -lm
++  "$W/${c}_native" > "$W/${c}.out" 2> "$W/${c}.err" || echo "$c rc=$?"
++done
++wc -l "$W"/win_upd.out "$W"/win_seq.out "$W"/win_act.out | tail -4
+diff -ruN orig/lift/runtime/fle_class.c new/lift/runtime/fle_class.c
+--- orig/lift/runtime/fle_class.c	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_class.c	2026-11-07 07:39:43.896398501 +0900
+@@ -291,6 +291,18 @@
+     return 0;
+ }
+ 
++int fle_class_hbrbackground_of(uint16_t atom, uint64_t *hbr)
++{
++    uint64_t i;
++
++    for (i = 0; i < tab_n; i++) {
++        if (tab[i].atom != atom) continue;
++        memcpy(hbr, tab[i].wc + FLE_CLASS_WC_OFF_HBRBACKGROUND, 8);
++        return 1;
++    }
++    return 0;
++}
++
+ /* Decision 0136: the hCursor of the WNDCLASSW that registered `atom` (offset 40 of the layout above), 0 when the atom is not in the table or the class has none. No state moves. */
+ uint64_t fle_class_hcursor_of(uint16_t atom)
+ {
+diff -ruN orig/lift/runtime/fle_class.h new/lift/runtime/fle_class.h
+--- orig/lift/runtime/fle_class.h	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_class.h	2026-11-07 07:39:43.896170372 +0900
+@@ -67,6 +67,10 @@
+ /* Decision 0125 (PROVISIONAL): the `style` member of the WNDCLASSW that registered `atom` (fle_win.c: GetDC and the other DC calls read CS_OWNDC, CS_CLASSDC and CS_PARENTDC from it): 1 and the style when the atom is in the
+  * table, 0 otherwise. No state moves. */
+ int fle_class_style_of(uint16_t atom, uint32_t *style);
++/* Decision 0323: the `hbrBackground` member of the WNDCLASSW that registered `atom` (offset 48): 1 and the value (a brush handle, a system colour index plus 1, or 0 = none) when the atom is in the table, 0 otherwise.
++ * fle_win.c: DefWindowProc(WM_ERASEBKGND) erases with it. No state moves. */
++#define FLE_CLASS_WC_OFF_HBRBACKGROUND 48
++int fle_class_hbrbackground_of(uint16_t atom, uint64_t *hbr);
+ void fle_imp_UnregisterClassW(void);
+ /* fle_win.c: the number of live windows that have the class `atom`. A weak reference in fle_class.c: a link without fle_win.c (the unit tests of the class table) has no windows, so the count is 0. */
+ uint32_t fle_win_count_of_atom(uint16_t atom) __attribute__((weak));
+diff -ruN orig/lift/runtime/fle_gdc.c new/lift/runtime/fle_gdc.c
+--- orig/lift/runtime/fle_gdc.c	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_gdc.c	2026-11-07 07:40:08.284233277 +0900
+@@ -178,6 +178,13 @@
+     return FLE_GDC_HANDLE_BASE + 4u * (idx + 1u);
+ }
+ 
++int fle_gdc_is_window_dc(uint64_t h)
++{
++    int64_t i = dc_index(h);
++
++    return i >= 0 && dcs[i].live && dcs[i].kind != FLE_GDC_K_SCREEN;
++}
++
+ int fle_gdc_dc_info(uint64_t h, fle_gdc_info *out)
+ {
+     int64_t i = dc_index(h);
+diff -ruN orig/lift/runtime/fle_gdc.h new/lift/runtime/fle_gdc.h
+--- orig/lift/runtime/fle_gdc.h	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_gdc.h	2026-11-07 07:40:08.284051676 +0900
+@@ -113,6 +113,9 @@
+     int32_t pp[FLE_GDC_PAINT_PIECES][4];
+ } fle_gdc_info;
+ int fle_gdc_dc_info(uint64_t h, fle_gdc_info *out);
++/* Decision 0323: 1 when `h` is a live DC of a WINDOW of this table (client area or whole window: any kind but FLE_GDC_K_SCREEN), 0 for the DC of the entire screen, a memory DC and every other handle. fle_win.c: DefWindowProc(WM_ERASEBKGND)
++ * asks it, because GetClipBox answers memory DCs only. */
++int fle_gdc_is_window_dc(uint64_t h);
+ /* Decision 0142: BeginPaint / EndPaint set and lift the paint rectangle of the DC (the clipping to the update region). */
+ void fle_gdc_set_paint_rect(uint64_t h, int valid, int32_t l, int32_t t, int32_t r, int32_t b);
+ /* Decision 0247 (alpha3): after fle_gdc_set_paint_rect(h, 1, ...), the update region of the PAINTSTRUCT when it is not one rectangle: n (2..FLE_GDC_PAINT_PIECES) disjoint rectangles (l, t, r, b). EndPaint's fle_gdc_set_paint_rect(h, 0, ...) clears them. */
+diff -ruN orig/lift/runtime/fle_input.c new/lift/runtime/fle_input.c
+--- orig/lift/runtime/fle_input.c	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_input.c	2026-11-07 07:52:27.823470986 +0900
+@@ -481,6 +481,57 @@
+     }
+ }
+ 
++/* the pointer left every window: the leave notification of the window it was in */
++static void pointer_over_nothing(const hwev *e)
++{
++    if (e->kind == FLE_IN_MOVE && cursor_win) {
++        trk *tr = trk_find(cursor_win);
++        fle_win_iview ov;
++
++        if (tr && (tr->flags & FLE_TME_LEAVE) && fle_win_input_view(cursor_win, &ov)) {
++            out_push(ov.owner, cursor_win, (tr->flags & FLE_TME_NONCLIENT) ? FLE_WM_NCMOUSELEAVE : FLE_WM_MOUSELEAVE, 0, 0, e->ticks, e->x, e->y);
++            trk_drop(tr);
++        }
++        cursor_win = 0;
++    }
++}
++
++/* Decision 0323 (replaces S-httransparent of decision 0136, which dropped the event). Learn WM_NCHITTEST, HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to
++ * underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)". The windows that contain the point are walked in the order of Wine 10.0's window_from_point (win32u/window.c,
++ * UNOFFICIAL: the list of fle_win_input_hit_list, a child before its parent, a sibling below after the whole of the one above): each one that belongs to the thread of the first one is sent WM_NCHITTEST; the first
++ * answer that is not HTTRANSPARENT decides the window and the hit-test code; a window of another thread is not asked (Wine: HTCLIENT, "the hit test is only sent to windows of the current thread"). A disabled
++ * window ends the walk with the event dropped, as it does for the first one (S-disabled-drops). When every window answers HTTRANSPARENT there is no window (Wine: the result is NULL). `first` is the window
++ * mouse_target found, `thread` its thread. Returns the window (0 = none) and its hit-test code in *ht. */
++#define HIT_LIST_MAX 64u
++static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, int *ht)
++{
++    uint64_t list[HIT_LIST_MAX];
++    unsigned n, k;
++    int r = send_hittest("input", first, x, y);
++
++    *ht = r;
++    if (r != FLE_HTTRANSPARENT) return first;      /* the common case: the first window decides (no list is made) */
++    *ht = FLE_HTNOWHERE;
++    n = fle_win_input_hit_list(x, y, list, HIT_LIST_MAX);
++    for (k = 0; k < n && list[k] != first; k++) {}
++    for (k++; k < n; k++) {                         /* the windows after `first` in the list */
++        fle_win_iview cv;
++
++        if (!fle_win_input_view(list[k], &cv)) continue;          /* a window that went away while an earlier one handled WM_NCHITTEST */
++        if (!cv.enabled) return 0;
++        if (cv.owner != thread) {
++            *ht = FLE_HTCLIENT;
++            return list[k];
++        }
++        r = send_hittest("input", list[k], x, y);
++        if (r != FLE_HTTRANSPARENT) {
++            *ht = r;
++            return list[k];
++        }
++    }
++    return 0;
++}
++
+ static void translate_mouse(const hwev *e)
+ {
+     unsigned tt = 0;
+@@ -492,21 +543,18 @@
+     uint32_t mk = e->mk;
+ 
+     if (!w || !fle_win_input_view(w, &v)) {
+-        if (e->kind == FLE_IN_MOVE && cursor_win) {
+-            /* the pointer left every window: the leave notification of the window it was in */
+-            trk *tr = trk_find(cursor_win);
+-            fle_win_iview ov;
+-
+-            if (tr && (tr->flags & FLE_TME_LEAVE) && fle_win_input_view(cursor_win, &ov)) {
+-                out_push(ov.owner, cursor_win, (tr->flags & FLE_TME_NONCLIENT) ? FLE_WM_NCMOUSELEAVE : FLE_WM_MOUSELEAVE, 0, 0, e->ticks, e->x, e->y);
+-                trk_drop(tr);
+-            }
+-            cursor_win = 0;
+-        }
++        pointer_over_nothing(e);
+         return;
+     }
+-    ht = send_hittest("input", w, e->x, e->y);
+-    if (ht == FLE_HTTRANSPARENT) return;       /* S-httransparent: the window beneath is not tried; the event is dropped */
++    if (cap) {
++        ht = send_hittest("input", w, e->x, e->y);      /* S-capture-client: the answer decides nothing while a window has the capture (below) */
++    } else {
++        w = hit_walk(e->x, e->y, w, tt, &ht);
++        if (!w || !fle_win_input_view(w, &v)) {
++            pointer_over_nothing(e);
++            return;
++        }
++    }
+     /* S-capture-client: while a window has the capture it gets the client messages (WM_MOUSEMOVE, WM_LBUTTONDOWN ... with coordinates relative to its client area, negative or beyond its size when the pointer is outside)
+      * whatever WM_NCHITTEST answered (Learn WM_MOUSEMOVE: "the message is posted to the window that has captured the mouse"; the page says nothing of a non-client message to it). */
+     if (cap) ht = FLE_HTCLIENT;
+@@ -715,6 +763,48 @@
+     return 0;
+ }
+ 
++/* Decision 0323: the WH_MOUSE and WH_KEYBOARD hooks (fle_win.c fle_win_input_call_hooks has the pages). Called where GetMessage / PeekMessage of thread t is about to return the hardware message *m: a mouse message
++ * (WM_MOUSEMOVE .. WM_MOUSEHWHEEL, and the non-client WM_NCMOUSEMOVE .. WM_NCXBUTTONDBLCLK) calls the WH_MOUSE chain with wParam = the message, lParam = a MOUSEHOOKSTRUCT(Ex) (pt = the screen position, hwnd, wHitTestCode =
++ * the hit-test code [HTCLIENT for a client message, wParam for a non-client one], dwExtraInfo = 0, mouseData = the message's wParam: Wine 10.0 gives the Ex form to every hook, UNOFFICIAL); a key message (WM_KEYDOWN, WM_KEYUP,
++ * WM_SYSKEYDOWN, WM_SYSKEYUP) calls the WH_KEYBOARD chain with wParam = the virtual-key code and lParam = the message's lParam. nCode is HC_ACTION (0) when the message is being removed and HC_NOREMOVE (3) for a peek.
++ * A nonzero answer discards the message (Learn: "to prevent the system from passing the message to the target window procedure"). Returns 1 then. WM_CHAR and the like are made by TranslateMessage from a posted
++ * message and do not pass through a hook (Learn KeyboardProc: WM_KEYUP / WM_KEYDOWN). A hook procedure that retrieves messages itself does not run the hooks again (the guard). */
++#define FLE_WH_KEYBOARD_ 2
++#define FLE_WH_MOUSE_ 7
++#define FLE_HC_ACTION_ 0
++#define FLE_HC_NOREMOVE_ 3
++static int in_input_hook;
++static int input_hook_swallows(unsigned t, const fle_tmsg *m, int remove)
++{
++    uint64_t res = 0;
++    int ncode = remove ? FLE_HC_ACTION_ : FLE_HC_NOREMOVE_, called;
++
++    if (in_input_hook) return 0;
++    if ((m->msg >= 0x0200u && m->msg <= 0x020Eu) || (m->msg >= 0x00A0u && m->msg <= 0x00ADu)) {
++        uint8_t hs[40];
++        uint32_t ht = m->msg >= 0x00A0u && m->msg <= 0x00ADu ? (uint32_t)m->wp : (uint32_t)FLE_HTCLIENT;
++        uint32_t md = (uint32_t)m->wp;
++
++        memset(hs, 0, sizeof hs);
++        memcpy(hs + 0, &m->ptx, 4);
++        memcpy(hs + 4, &m->pty, 4);
++        memcpy(hs + 8, &m->hwnd, 8);
++        memcpy(hs + 16, &ht, 4);
++        memcpy(hs + 32, &md, 4);
++        in_input_hook = 1;
++        called = fle_win_input_call_hooks(FLE_WH_MOUSE_, t, ncode, m->msg, 0, hs, sizeof hs, &res);
++        in_input_hook = 0;
++        return called && res != 0;
++    }
++    if (m->msg >= 0x0100u && m->msg <= 0x0105u && m->msg != 0x0102u && m->msg != 0x0103u) {   /* WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP (not WM_CHAR, WM_DEADCHAR) */
++        in_input_hook = 1;
++        called = fle_win_input_call_hooks(FLE_WH_KEYBOARD_, t, ncode, m->wp & 0xFFFFu, m->lp, NULL, 0, &res);
++        in_input_hook = 0;
++        return called && res != 0;
++    }
++    return 0;
++}
++
+ /* Called by GetMessageW and PeekMessageW of thread t after the posted queue found nothing. */
+ int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int remove, uint32_t qs, fle_tmsg *out)
+ {
+@@ -770,6 +860,17 @@
+                 for (j = k; j + 1 < outq.n; j++) outq.m[(outq.head + j) % OUT_MAX] = outq.m[(outq.head + j + 1) % OUT_MAX];
+                 outq.n--;
+             }
++            /* decision 0323: the hook runs after the message has left the queue when it is removed (Wine: "if remove is TRUE, remove message first before calling hooks to avoid recursive hook calls") */
++            if (input_hook_swallows(t, out, remove)) {
++                if (!remove) {
++                    unsigned j;
++
++                    for (j = k; j + 1 < outq.n; j++) outq.m[(outq.head + j) % OUT_MAX] = outq.m[(outq.head + j + 1) % OUT_MAX];
++                    outq.n--;
++                }
++                k--;
++                continue;
++            }
+             return 1;
+         }
+         return 0;
+diff -ruN orig/lift/runtime/fle_input.h new/lift/runtime/fle_input.h
+--- orig/lift/runtime/fle_input.h	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_input.h	2026-11-07 07:42:58.126764838 +0900
+@@ -74,6 +74,8 @@
+     char cls[40];                    /* the class name, ASCII (the trace) */
+ } fle_win_iview;
+ int fle_win_input_view(uint64_t hwnd, fle_win_iview *v);
++int fle_win_input_call_hooks(int id, unsigned thread, int ncode, uint64_t wp, uint64_t lp, const void *blob, unsigned len, uint64_t *result);   /* decision 0323: the WH_MOUSE / WH_KEYBOARD chain of the thread; 1 = a hook was called */
++unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned max);   /* decision 0323: the visible windows that contain the point, children before their parent, top sibling first (the first one is what fle_win_input_hit gives); the count */
+ uint64_t fle_win_input_hit(int32_t x, int32_t y);                 /* the deepest visible window that contains the point (disabled windows are found), 0 = none */
+ uint64_t fle_win_input_send(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp, uint64_t lp);
+ void fle_win_input_showwindow(const char *api, uint64_t hwnd, int cmd);   /* decision 0267: the ShowWindow that DefWindowProcW makes of WM_SYSCOMMAND SC_MINIMIZE / SC_MAXIMIZE / SC_RESTORE */
+diff -ruN orig/lift/runtime/fle_win.c new/lift/runtime/fle_win.c
+--- orig/lift/runtime/fle_win.c	2026-11-07 07:36:22.000000000 +0900
++++ new/lift/runtime/fle_win.c	2026-11-07 07:48:38.858426955 +0900
+@@ -115,6 +115,7 @@
+     int min_set;                                /* decision 0267: the window was minimized once (GetWindowPlacement then reports ptMinPosition (-32000, -32000), not (-1, -1)) */
+     int32_t upd_l, upd_t, upd_r, upd_b;         /* the update region as one bounding rectangle in client coordinates (empty = none) */
+     int upd_erase;                              /* bErase of some InvalidateRect */
++    int upd_delayed;                            /* decision 0323: WM_ERASEBKGND was sent for this update region and answered 0: it stays marked for erasing, without a second message (Wine 10.0: UPDATE_DELAYED_ERASE): BeginPaint then reports fErase = TRUE */
+     fle_visrgn *updr;                           /* decision 0247 (alpha3): the update region when it is more than one rectangle (disjoint pieces, client coordinates; upd_l..upd_b is their bounding box); NULL = the region is the rectangle upd_l..upd_b */
+     int paint_internal;                         /* RedrawWindow RDW_INTERNALPAINT (not used) */
+     int in_paint;                               /* between BeginPaint and EndPaint */
+@@ -401,6 +402,9 @@
+ int fle_r_direct(const fle_rsurf *s) __attribute__((weak));
+ void fle_gdc_set_paint_rect(uint64_t h, int valid, int32_t l, int32_t t, int32_t r, int32_t b) __attribute__((weak));
+ void fle_gdc_set_paint_pieces(uint64_t h, const int32_t (*p)[4], uint32_t n) __attribute__((weak));   /* decision 0247 */
++int fle_gdc_is_window_dc(uint64_t h) __attribute__((weak));   /* decision 0323 */
++void fle_imp_FillRect(void) __attribute__((weak));   /* decision 0323: DefWindowProc(WM_ERASEBKGND) fills with the class background brush */
++void fle_imp_GetClipBox(void) __attribute__((weak));
+ static void upd_clear_rect(int64_t i);   /* decision 0247 (alpha3): the update region as a set of rectangles; see upd_add */
+ static void upd_set_full(int64_t i);
+ 
+@@ -1325,6 +1329,9 @@
+  * Any other message, WM_NCCALCSIZE with wParam TRUE (NCCALCSIZE_PARAMS), a NULL lParam, or a window that is not of this table stops
+  * by name. wParam of WM_NCCREATE and WM_CREATE is not used (Learn) and is not looked at. The last error is not touched. */
+ static void get_min_max_info(const char *api, int64_t i, int32_t out[8]);
++static uint64_t def_erase_background(const char *api, int64_t wi, uint64_t dc);
++static void erase_now_one(const char *api, int64_t i);
++
+ void fle_imp_DefWindowProcW(void)
+ {
+     static const char api[] = "DefWindowProcW";
+@@ -1481,16 +1488,19 @@
+         R[0] = 0;
+         return;
+     case FLE_WM_ERASEBKGND:
+-        /* Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If hbrBackground is NULL, the
+-         * application should process the WM_ERASEBKGND message and erase the background." and "An application should return nonzero ... if it erases the background". Nothing is drawn here: the answer is 1 (erased: a choice
+-         * without a source; with hbrBackground NULL the page says nonzero is the application's answer, not the default's). */
+-        R[0] = 1;
++        /* Decision 0323. Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If hbrBackground is NULL,
++         * the application should process the WM_ERASEBKGND message and erase the background." and "An application should return nonzero ... if it erases the background; otherwise, it should return zero". It filled nothing
++         * and answered 1 before (decision 0123, a choice without a source). Now: the class brush fills the clip box of the DC (wParam) and the answer is 1; a class without a brush answers 0 (Wine 10.0, win32u/defwnd.c
++         * default_window_proc, UNOFFICIAL: the same two answers), so BeginPaint reports fErase = TRUE for it. */
++        R[0] = def_erase_background(api, wi, wp);
+         return;
+     case FLE_WM_NCPAINT:
+     case FLE_WM_PAINT:
+         /* Learn WM_PAINT: "The DefWindowProc function validates the update region. The function may also send the WM_NCPAINT message to the window procedure if the window frame must be painted and send the
+-         * WM_ERASEBKGND message if the window background must be erased." Nothing is drawn: the update region is validated. */
++         * WM_ERASEBKGND message if the window background must be erased." Decision 0323: the background is erased first when the update region is marked for it (BeginPaint's WM_ERASEBKGND, as Wine 10.0's
++         * default_window_proc does with BeginPaint / EndPaint: UNOFFICIAL); then the update region is validated. Nothing else is drawn. */
+         if (msg == FLE_WM_PAINT) {
++            if (tab[wi].upd_erase && tab[wi].upd_r > tab[wi].upd_l && tab[wi].upd_b > tab[wi].upd_t) erase_now_one(api, wi);
+             upd_clear_rect(wi);
+             tab[wi].upd_erase = 0;
+         }
+@@ -2324,8 +2334,8 @@
+  * and the dwThreadId parameter is zero or specifies the identifier of a thread created by another process". Learn UnhookWindowsHookEx: "Removes a hook procedure installed in a hook chain"; nonzero on success, zero on failure
+  * (GetLastError).
+  * Answered: WH_MOUSE (7) and WH_KEYBOARD (2) (the numbers are on the page) installed for a thread of this process (dwThreadId = the id of a live guest thread: fle_thread_index_of_vid, or the first thread's id 0x1001) with hmod NULL and a
+- * non-NULL lpfn. S-hook-no-events: the hook is recorded and NEVER CALLED: no mouse or keyboard message exists in this environment (nothing posts one; GetKeyState / the cursor are stateless inputs), so the events that these two hooks
+- * monitor do not occur. Every other hook type stops (WH_CALLWNDPROC, WH_GETMESSAGE, WH_CBT, WH_MSGFILTER, ... would be called by the window messages that do occur: not modelled), as do dwThreadId 0 (a global hook needs a DLL
++ * non-NULL lpfn. (S-hook-no-events of this decision, "recorded and NEVER CALLED: no mouse or keyboard message exists", ended with decision 0323: fle_win_input_call_hooks calls them when GetMessage / PeekMessage is about to return a
++ * mouse or key message.) Every other hook type stops (WH_CALLWNDPROC, WH_GETMESSAGE, WH_CBT, WH_MSGFILTER, ... would be called by the window messages that do occur: not modelled), as do dwThreadId 0 (a global hook needs a DLL
+  * and every thread of the desktop), a thread id that is not a thread of this process (no failure code is on the page), hmod not NULL and lpfn NULL. The handle is FLE_HOOK_HANDLE_BASE + 4 * (k + 1), never reused (a choice: the page
+  * gives no value); at most 64 live hooks (a limit of the virtual machine: the 65th stops). UnhookWindowsHookEx of a handle that is not a live hook of this table returns 0, the last error left alone (the page names no code). */
+ #define FLE_HOOK_HANDLE_BASE UINT64_C(0x7FFA0000)
+@@ -2432,7 +2442,7 @@
+  * shown to the hook (S-ia1-hook-1: the page lists them as 'sent by the system' only in the CBT hook's text).
+  * user32!CallNextHookEx: LRESULT f(HHOOK hhk rcx, int nCode edx, WPARAM wParam r8, LPARAM lParam r9). Learn: "Passes the hook information to the next hook procedure in the current hook chain"; hhk "This parameter is ignored" (Windows
+  * 10 era page text); the result is the value of the next procedure, or 0 when the chain ends (S-ia1-hook-2: the page says "The return value is the value returned by the next hook procedure in the chain"; 0 at the end of the chain is a
+- * choice). Called outside a hook procedure it stops (the current hook is unknown). A WH_MOUSE / WH_KEYBOARD hook is still never called (S-hook-no-events of decision 0126), so only the WH_CALLWNDPROC chain can be the current one. */
++ * choice). Called outside a hook procedure it stops (the current hook is unknown). A WH_MOUSE / WH_KEYBOARD hook is called since decision 0323 (fle_win_input_call_hooks below), and its procedure walks its chain with this function the same way. */
+ #define FLE_HC_ACTION 0
+ static int cur_hook[8];
+ static unsigned cur_hook_n;
+@@ -2504,6 +2514,46 @@
+     }
+ }
+ 
++/* Decision 0323 (replaces S-hook-no-events of decision 0126: "the hook is recorded and NEVER CALLED: no mouse or keyboard message exists in this environment"; the input round trip of decision 0136 made them exist, and the
++ * decision's own condition for a second look, "when the input model is built", was met). Learn SetWindowsHookEx: a thread-specific hook procedure is called for the thread it was installed for. Learn MouseProc: "The system
++ * calls this function whenever an application calls the GetMessage or PeekMessage function and there is a mouse message to be processed"; nCode HC_ACTION (0) "The wParam and lParam parameters contain information about
++ * a mouse message", HC_NOREMOVE (3) "...contain information about a mouse message, and the mouse message has not been removed from the message queue (An application called the PeekMessage function, specifying the
++ * PM_NOREMOVE flag.)"; wParam "The identifier of the mouse message"; lParam "A pointer to a MOUSEHOOKSTRUCT structure"; the return value is "If nCode is less than zero, the hook procedure must return the value returned
++ * by CallNextHookEx. If nCode is greater than or equal to zero, and the hook procedure did not process the message, it is highly recommended that you call CallNextHookEx and return the value it returns ... If the hook
++ * procedure processed the message, it may return a nonzero value to prevent the system from passing the message to the target window procedure." Learn KeyboardProc is the same with wParam "the virtual-key code" and
++ * lParam "the repeat count, scan code, extended-key flag, context code, previous key-state flag, and transition-state flag" (the lParam of the key message). The hooks of a thread form a chain, the most recently installed
++ * first (the chain of WH_CALLWNDPROC, above); CallNextHookEx walks it. Called by fle_input.c at the point where GetMessage / PeekMessage is about to return a mouse or key message of `thread` (Wine 10.0, win32u/message.c
++ * process_mouse_message and process_keyboard_message: the same two calls, nCode HC_ACTION for a removal and HC_NOREMOVE for PM_NOREMOVE, the message dropped when the answer is nonzero: UNOFFICIAL).
++ * `blob` (len bytes, NULL = none) is copied onto the guest stack and its address is lParam (the MOUSEHOOKSTRUCT). Returns 1 when the chain of hook `id` for the thread has a hook (the answer of the newest hook is then in
++ * *result), 0 when it has none. */
++int fle_win_input_call_hooks(int id, unsigned thread, int ncode, uint64_t wp, uint64_t lp, const void *blob, unsigned len, uint64_t *result)
++{
++    uint32_t vid;
++    int k, j;
++    uint64_t sp0, res;
++
++    if (hook_count == 0) return 0;
++    vid = fle_thread_vid ? fle_thread_vid(thread) : FLE_EMULATED_TID;
++    for (k = -1, j = 0; j < (int)FLE_HOOK_MAX; j++)
++        if (hooks[j].live && hooks[j].id == id && hooks[j].thread == vid && (k < 0 || hooks[j].order > hooks[k].order)) k = j;
++    if (k < 0) return 0;
++    if (cur_hook_n >= sizeof cur_hook / sizeof cur_hook[0]) fle_stop("WH_MOUSE / WH_KEYBOARD", "hook procedures are nested more than 8 deep (a limit of the virtual machine)");
++    sp0 = R[4];
++    R[4] = (R[4] - ((uint64_t)len + 64u)) & ~UINT64_C(15);
++    if (blob != NULL && len != 0) {
++        unsigned q;
++
++        for (q = 0; q < len; q++) fle_st(R[4] + q, 1, ((const uint8_t *)blob)[q]);
++        lp = R[4];
++    }
++    cur_hook[cur_hook_n++] = k;
++    res = fle_call_guest(hooks[k].proc, (uint64_t)(int64_t)ncode, wp, lp, 0);
++    cur_hook_n--;
++    R[4] = sp0;
++    *result = res;
++    return 1;
++}
++
+ /* user32!GetClientRect: BOOL f(HWND rcx, LPRECT rdx). Learn: "The left and top members are zero. The right and bottom members contain the width and height of the window." The non-client area is 0 here (nc_zero). */
+ void fle_imp_GetClientRect(void)
+ {
+@@ -2634,6 +2684,7 @@
+ 
+ static void upd_clear_rect(int64_t i)
+ {
++    tab[i].upd_delayed = 0;
+     tab[i].upd_l = tab[i].upd_t = tab[i].upd_r = tab[i].upd_b = 0;
+     free(tab[i].updr);
+     tab[i].updr = NULL;
+@@ -2731,7 +2782,7 @@
+         return;
+     }
+     upd_put(i, &v);
+-    if (v.n == 0) tab[i].upd_erase = 0;
++    if (v.n == 0) { tab[i].upd_erase = 0; tab[i].upd_delayed = 0; }
+ }
+ 
+ static void upd_add(int64_t i, int32_t l, int32_t t, int32_t r, int32_t b, int erase)
+@@ -5317,7 +5368,7 @@
+     int64_t i;
+     uint64_t dc, sp = R[4];
+     int32_t l, t2, r, b;
+-    int erase;
++    int erase, delayed;
+     uint64_t er = 1;
+     uint32_t bp_np = 0;
+     int32_t bp_pc[FLE_GDC_PAINT_PIECES][4];
+@@ -5351,6 +5402,7 @@
+     r = tab[i].upd_r;
+     b = tab[i].upd_b;
+     erase = tab[i].upd_erase;
++    delayed = tab[i].upd_delayed;
+     if (!(r > l && b > t2)) {
+         l = t2 = r = b = 0;
+     }
+@@ -5370,16 +5422,18 @@
+     tab[i].in_paint = 1;
+     upd_clear_rect(i);
+     tab[i].upd_erase = 0;
++    /* decision 0142: the DC is clipped to the update region until EndPaint (Learn BeginPaint: "automatically sets the clipping region of the device context to exclude any area outside the update region").
++     * Decision 0323: this comes BEFORE the WM_ERASEBKGND below, as in Wine 10.0 (win32u/dce.c send_erase: the DC is made with the update region as its clip, then the message is sent): the erase of the guest's own
++     * procedure, and DefWindowProc's fill, reach the update region only. It was after the message, so an erase that fills "the client area" overpainted pixels that were valid. */
++    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, l, t2, r, b);
++    if (bp_np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])bp_pc, bp_np);
+     if (erase && r > l) {
+         R[4] = sp;
+         er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
+         R[4] = sp;
+     }
+-    /* decision 0142: the DC is clipped to the update region until EndPaint (Learn BeginPaint: "automatically sets the clipping region of the device context to exclude any area outside the update region") */
+-    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, l, t2, r, b);
+-    if (bp_np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])bp_pc, bp_np);
+     fle_st(ps, 8, dc);
+-    fle_st(ps + 8, 4, (erase && r > l && er == 0) ? 1u : 0u);
++    fle_st(ps + 8, 4, ((erase && r > l && er == 0) || (delayed && r > l)) ? 1u : 0u);
+     put_i32(ps + 12, l);
+     put_i32(ps + 16, t2);
+     put_i32(ps + 20, r);
+@@ -6456,49 +6510,106 @@
+     }
+ }
+ 
+-static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)
+-{
+-    uint64_t sp = R[4];
+-
+-    if (tab[i].live && is_visible(i) && tab[i].upd_r > tab[i].upd_l && tab[i].upd_b > tab[i].upd_t) {
+-        if ((fl & RDW_ERASENOW_ || fl & RDW_UPDATENOW_) && tab[i].upd_erase) {
+-            /* decision 0253 (alpha5): Learn WM_ERASEBKGND: wParam "A handle to the device context." (the same DC as the one BeginPaint gives it: GetDC(hWnd), released when the message has been answered). It was 0 here, so a window
+-             * procedure that fills with Message.DC (TEdgeBrowser of FL: FillRect(0, ...)) stopped the run with "hDC is not a DC of this runtime" at RedrawWindow(RDW_ERASE | RDW_UPDATENOW). */
+-            uint64_t dc = 0, h = handle_of(i);
++/* Decision 0323: DefWindowProc(WM_ERASEBKGND). Learn WM_ERASEBKGND: "The DefWindowProc function erases the background by using the class background brush specified by the hbrBackground member of the WNDCLASS structure. If
++ * hbrBackground is NULL, the application should process the WM_ERASEBKGND message and erase the background." Learn WNDCLASSW hbrBackground: a handle to the class background brush, or a system colour index plus 1 (the
++ * values FillRect takes). Wine 10.0 (win32u/defwnd.c default_window_proc, UNOFFICIAL): no brush: the answer is 0 and nothing is drawn; else the clip box of the DC (a CS_PARENTDC class: the client rectangle, "can't use
++ * GetClipBox with a parent DC or we fill the whole parent") is filled with the brush and the answer is 1. The DC given by BeginPaint / RedrawWindow is clipped to the update region (this file), so filling a
++ * rectangle that covers it paints the update region and nothing else; a DC of a window therefore gets the client rectangle (fle_gdi.c's GetClipBox answers memory DCs only and stops for a window DC). A memory DC
++ * (a test that sends the message with its own DC) gets its clip box. The DC of the entire screen stops by name (its clip box is not modelled). A brush that FillRect cannot take (a pattern brush) stops there. */
++static uint64_t def_erase_background(const char *api, int64_t wi, uint64_t dc)
++{
++    uint64_t hbr = 0, sv[5];
++    uint8_t rc[16];
++    uint64_t prc = (uint64_t)(uintptr_t)rc;
++
++    if (!fle_class_hbrbackground_of(tab[wi].atom, &hbr) || hbr == 0) return 0;
++    if (!fle_imp_FillRect || !fle_imp_GetClipBox || !fle_gdc_is_window_dc) fle_stop(api, "no GDI is linked (fle_gdi.c, fle_gdc.c): the class background brush of the window cannot be filled (decision 0323)");
++    memset(rc, 0, sizeof rc);
++    if (fle_gdc_is_window_dc(dc)) {
++        put_i32(prc + 8, tab[wi].pcx);
++        put_i32(prc + 12, tab[wi].pcy);
++    } else {
++        uint64_t type;
+ 
+-            if (!fle_imp_GetDC || !fle_imp_ReleaseDC) fle_stop(api, "no virtual screen DC is linked (fle_gdc.c): the DC of WM_ERASEBKGND is not available");
+-            {
+-                uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
++        sv[0] = R[0]; sv[1] = R[1]; sv[2] = R[2]; sv[3] = R[8]; sv[4] = R[9];
++        R[1] = dc;
++        R[2] = prc;
++        fle_imp_GetClipBox();
++        type = R[0];
++        R[0] = sv[0]; R[1] = sv[1]; R[2] = sv[2]; R[8] = sv[3]; R[9] = sv[4];
++        if (type == 0) return 0;      /* ERROR: nothing to fill */
++    }
++    sv[0] = R[0]; sv[1] = R[1]; sv[2] = R[2]; sv[3] = R[8]; sv[4] = R[9];
++    R[1] = dc;
++    R[2] = prc;
++    R[8] = hbr;
++    fle_imp_FillRect();
++    R[0] = sv[0]; R[1] = sv[1]; R[2] = sv[2]; R[8] = sv[3]; R[9] = sv[4];
++    return 1;
++}
+ 
+-                R[1] = h;
+-                fle_imp_GetDC();
+-                dc = R[0];
+-                R[0] = sv[0];
+-                R[1] = sv[1];
+-                R[2] = sv[2];
+-                R[8] = sv[3];
+-                R[9] = sv[4];
+-            }
+-            uint64_t er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
++/* Decision 0323: the WM_ERASEBKGND of a window whose update region is marked for erasing, as RDW_ERASENOW / RDW_UPDATENOW and the default WM_PAINT send it. wParam is the DC of the window (GetDC(hWnd), released when
++ * the message has been answered), clipped to the update region while the message is handled (Wine 10.0 win32u/dce.c send_erase: GetDCEx with the update region, DCX_INTERSECTRGN | DCX_USESTYLE). The erase request
++ * is cleared when the message was answered with nonzero (Learn WM_ERASEBKGND: "If the application returns zero, the window will remain marked for erasing"). decision 0253 (alpha5) made the DC a real one: a window
++ * procedure that fills with Message.DC (TEdgeBrowser of FL: FillRect(0, ...)) stopped the run at RedrawWindow(RDW_ERASE | RDW_UPDATENOW) when it was 0. */
++static void erase_now_one(const char *api, int64_t i)
++{
++    uint64_t sp = R[4], dc = 0, h = handle_of(i), er;
++    int32_t pc[FLE_GDC_PAINT_PIECES][4];
++    uint32_t np = 0, k;
++    fle_visrgn uv;
+ 
+-            R[4] = sp;
+-            {
+-                uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
++    if (!fle_imp_GetDC || !fle_imp_ReleaseDC) fle_stop(api, "no virtual screen DC is linked (fle_gdc.c): the DC of WM_ERASEBKGND is not available");
++    {
++        uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
+ 
+-                R[1] = h;
+-                R[2] = dc;
+-                fle_imp_ReleaseDC();
+-                R[0] = sv[0];
+-                R[1] = sv[1];
+-                R[2] = sv[2];
+-                R[8] = sv[3];
+-                R[9] = sv[4];
+-            }
+-            /* Learn WM_ERASEBKGND: "An application should return nonzero ... if it processes the message and erases the background; this indicates that no further erasing is required. If the application returns zero, the window
+-             * will remain marked for erasing." (BeginPaint does the same: fErase is TRUE only when the message returned 0.) So the erase request is cleared here when the message was answered with nonzero, and the WM_PAINT
+-             * that follows does not erase a second time. */
+-            if (er != 0) tab[i].upd_erase = 0;
++        R[1] = h;
++        fle_imp_GetDC();
++        dc = R[0];
++        R[0] = sv[0];
++        R[1] = sv[1];
++        R[2] = sv[2];
++        R[8] = sv[3];
++        R[9] = sv[4];
++    }
++    upd_get(i, &uv);
++    if (uv.n > 1 && uv.n <= FLE_GDC_PAINT_PIECES) {
++        np = uv.n;
++        for (k = 0; k < np; k++) {
++            pc[k][0] = (int32_t)uv.r[k].x0;
++            pc[k][1] = (int32_t)uv.r[k].y0;
++            pc[k][2] = (int32_t)uv.r[k].x1;
++            pc[k][3] = (int32_t)uv.r[k].y1;
+         }
++    }
++    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 1, tab[i].upd_l, tab[i].upd_t, tab[i].upd_r, tab[i].upd_b);
++    if (np > 1 && fle_gdc_set_paint_pieces) fle_gdc_set_paint_pieces(dc, (const int32_t (*)[4])pc, np);
++    er = send_to(api, i, FLE_WM_ERASEBKGND, dc, 0);
++    R[4] = sp;
++    if (fle_gdc_set_paint_rect) fle_gdc_set_paint_rect(dc, 0, 0, 0, 0, 0);
++    {
++        uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
++
++        R[1] = h;
++        R[2] = dc;
++        fle_imp_ReleaseDC();
++        R[0] = sv[0];
++        R[1] = sv[1];
++        R[2] = sv[2];
++        R[8] = sv[3];
++        R[9] = sv[4];
++    }
++    /* Learn WM_ERASEBKGND: nonzero = "no further erasing is required"; zero = "the window will remain marked for erasing" (BeginPaint does the same: fErase is TRUE only when the message returned 0) */
++    tab[i].upd_erase = 0;
++    if (er == 0) tab[i].upd_delayed = 1;
++}
++
++static void paint_now_tree(const char *api, int64_t i, uint32_t fl, int children)
++{
++    uint64_t sp = R[4];
++
++    if (tab[i].live && is_visible(i) && tab[i].upd_r > tab[i].upd_l && tab[i].upd_b > tab[i].upd_t) {
++        if ((fl & RDW_ERASENOW_ || fl & RDW_UPDATENOW_) && tab[i].upd_erase) erase_now_one(api, i);
+         if (fl & RDW_UPDATENOW_) {
+             (void)send_to(api, i, FLE_WM_PAINT, 0, 0);
+             R[4] = sp;
+@@ -6597,6 +6708,36 @@
+     return -1;
+ }
+ 
++/* Decision 0323: every visible window that contains the screen point, in the order of Wine 10.0's list for window_from_point (server/window.c get_window_children_from_point and all_windows_from_point, UNOFFICIAL): the
++ * siblings from the top of the z-order, and for each the windows below it that contain the point (recursively, the same rule) BEFORE the window itself. The first entry is what fle_win_input_hit gives. Learn WM_NCHITTEST,
++ * HTTRANSPARENT: "In a window currently covered by another window in the same thread (the message will be sent to underlying windows in the same thread until one of them returns a code that is not HTTRANSPARENT)":
++ * fle_input.c walks this list. Disabled windows are in it (as in fle_win_input_hit); the same tests as hit_visible. */
++static unsigned hit_list_rec(int64_t parent, int32_t px, int32_t py, uint64_t *out, unsigned max, unsigned n)
++{
++    int64_t idx[SIB_MAX];
++    uint32_t cnt = siblings(parent, idx, SIB_MAX), k;
++
++    for (k = 0; k < cnt && n < max; k++) {
++        int64_t i = idx[k];
++        int32_t ox, oy;
++
++        if (!tab[i].live || !(tab[i].style & FLE_WS_VISIBLE) || tab[i].iconic) continue;
++        if (tab[i].parent >= 0) client_origin(tab[i].parent, &ox, &oy);
++        else ox = oy = 0;
++        if (px < ox + tab[i].px || py < oy + tab[i].py || px >= ox + tab[i].px + tab[i].pcx || py >= oy + tab[i].py + tab[i].pcy) continue;
++        if (!in_window_region(i, px - ox - tab[i].px, py - oy - tab[i].py)) continue;
++        n = hit_list_rec(i, px, py, out, max, n);
++        if (n < max) out[n++] = handle_of(i);
++    }
++    return n;
++}
++
++unsigned fle_win_input_hit_list(int32_t x, int32_t y, uint64_t *out, unsigned max)
++{
++    if (!tab_n || max == 0) return 0;
++    return hit_list_rec(-1, x, y, out, max, 0);
++}
++
+ uint64_t fle_win_input_hit(int32_t x, int32_t y)
+ {
+     int64_t i;

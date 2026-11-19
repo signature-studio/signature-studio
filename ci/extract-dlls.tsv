@@ -1,0 +1,18 @@
+# ci/extract-dlls.tsv - the files of the FL Studio installer (flstudio_win64_26.1.7.5653.exe) that the engine bundle build reads, besides the seed files of lift/harness/seeds/vfs-seed-idle1.tsv.
+# Fields (TAB): name in the installer's NSIS file list (matched as a case-insensitive suffix, like tools/extract_nsis2.py) <TAB> destination under HOST_ROOT <TAB> SHA-256 the extracted bytes must have
+# The SHA-256 values are the ones of docs/investigations/win64-extraction.md (FLEngine) and docs/investigations/bundled-dll-inventory.md (the others).
+# Note (2026-11-17, decision 0415): ci/lib/extract_fl.py, named in the comments below, was deleted in 9590e599. app/scripts/extract-fl.mjs reads this table now. Those names are records, not calls.
+FLEngine_x64.dll	binaries/win64/FLEngine_x64.dll	b2c64da40921cf262c15c5b25c2b0422e4d1851e953c87e0bc38ed2c19f9496d
+dsp_ippv2_x64.dll	lift/out-ext/dsp_ippv2_x64.dll	497dd4f77e859df9e86d999b3811be3c72526b41f86c38b0c3c6e395f691c352
+Blend2D.dll	lift/out-blend2d/Blend2D.dll	66634d24412084b7541b4b27a11be8b0f4cb90d844c87e1ee5e5c3ecd66066c7
+QuickFontCache_x64.dll	lift/out-qfc/quickfontcache_x64.dll	afc5a0ed70eb7e4af3d0f4baf771bd6f53eb014e237f857f23023471047736d2
+freetype_x64.dll	lift/out-wallQ/freetype/freetype_x64.dll	6ea6c106ad2695b5ec75738a0c790bba81dca7866d63254c2c69602973837cb8
+ILTools_x64.dll	lift/out-inventory/extracted/ILTools_x64.dll	20409dcbc5eb5055c476ed663d6e944984281155f15c6b3a5a2961ba061a0f95
+oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084004a5fff5739cafb9f602c66e6466f9
+elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3
+# 2026-11-16 (R6-12): the two Fruity plugin DLLs of gen-direct.sh (decision 0313 G9-c) were not extracted by this table, so the gen stage failed in the workflow.
+# Their SHA-256 are those the extractor verified from the installer 26.1.7.5653 (evidence/R6-12.md section 5: extract_fl.py exit 0, "all SHA-256 verified").
+fruity balance_x64.dll	lift/out-plugins/fruity_balance_x64.dll	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064
+fruity filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
+# 2026-11-17 (R5-6a, decision 0408): Fruity Delay 2, the tenth module. The SHA-256 is the one extract_fl.py verifies from the installer 26.1.7.5653 (evidence/R5-6a.md section 2).
+fruity delay 2_x64.dll	lift/out-plugins/fruity_delay2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc

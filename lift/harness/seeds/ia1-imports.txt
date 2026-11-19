@@ -1,0 +1,40 @@
+# Decision 0171 (PROVISIONAL), LAYER 1 + LAYER 2 (layer 1 alone: ia1-imports-l1.txt): the import rows that the user operations of the main window reached (fe-lift lift ... --extra-imports THIS FILE; lift/harness/two/gen_two.sh: FLE_EXTRA_IMPORTS=THIS FILE).
+# Format of decision 0156: <dll> <API> <runtime function>, '#' starts a comment. Without the option the generated C is the one of the earlier decisions (the rows are not in TABLE).
+# The rows of delay-loaded imports (LogicalToPhysicalPoint ...) matter through the response table (GetProcAddress, fle_resp_table), which is built from the same rows.
+# wall ia1-W1: the clipboard (runtime/fle_clip.c)
+user32.dll OpenClipboard fle_imp_OpenClipboard
+user32.dll CloseClipboard fle_imp_CloseClipboard
+user32.dll EmptyClipboard fle_imp_EmptyClipboard
+user32.dll IsClipboardFormatAvailable fle_imp_IsClipboardFormatAvailable
+user32.dll CountClipboardFormats fle_imp_CountClipboardFormats
+user32.dll EnumClipboardFormats fle_imp_EnumClipboardFormats
+user32.dll GetClipboardData fle_imp_GetClipboardData
+user32.dll SetClipboardData fle_imp_SetClipboardData
+ole32.dll OleSetClipboard fle_imp_OleSetClipboard
+ole32.dll OleIsCurrentClipboard fle_imp_OleIsCurrentClipboard
+ole32.dll OleFlushClipboard fle_imp_OleFlushClipboard
+# wall ia1-W2: the toolbar's Shift/Ctrl/Alt buttons (runtime/fle_input.c)
+user32.dll SetKeyboardState fle_imp_SetKeyboardState
+# wall ia1-W3: timer-queue timers (runtime/fle_timerq.c)
+kernel32.dll CreateTimerQueueTimer fle_imp_CreateTimerQueueTimer
+kernel32.dll ChangeTimerQueueTimer fle_imp_ChangeTimerQueueTimer
+kernel32.dll DeleteTimerQueueTimer fle_imp_DeleteTimerQueueTimer
+# walls ia1-W4, W5: the system caret, ShowOwnedPopups (runtime/fle_win.c)
+user32.dll CreateCaret fle_imp_CreateCaret
+user32.dll DestroyCaret fle_imp_DestroyCaret
+user32.dll HideCaret fle_imp_HideCaret
+user32.dll ShowCaret fle_imp_ShowCaret
+user32.dll SetCaretPos fle_imp_SetCaretPos
+user32.dll ShowOwnedPopups fle_imp_ShowOwnedPopups
+# wall ia1-W6: shell32 (runtime/fle_shell.c)
+shell32.dll PathCleanupSpec fle_imp_PathCleanupSpec
+# walls ia1-W8, W9: delay-loaded user32 exports (runtime/fle_win.c)
+user32.dll LogicalToPhysicalPoint fle_imp_LogicalToPhysicalPoint
+user32.dll PhysicalToLogicalPoint fle_imp_PhysicalToLogicalPoint
+# LAYER 2 (wall ia1-W13): dwmapi exports that the menu bar and the pop-up menus delay-load (runtime/fle_dwm.c). DwmIsCompositionEnabled is also asked at START-UP: with the row it answers TRUE (FL64.exe's manifest declares Windows 8 / 8.1) and the engine takes the composition path, so the start-up (entries, wizard surface) differs from the recorded baseline
+dwmapi.dll DwmIsCompositionEnabled fle_imp_DwmIsCompositionEnabled
+dwmapi.dll DwmExtendFrameIntoClientArea fle_imp_DwmExtendFrameIntoClientArea
+# wall ia1-W14: WH_CALLWNDPROC (runtime/fle_win.c; SetWindowsHookExW is an old row)
+user32.dll CallNextHookEx fle_imp_CallNextHookEx
+# wall ia1-W15: SetWindowRgn (runtime/fle_win.c, state only)
+user32.dll SetWindowRgn fle_imp_SetWindowRgn

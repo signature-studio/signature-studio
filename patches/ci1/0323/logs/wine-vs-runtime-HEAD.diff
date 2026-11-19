@@ -1,0 +1,182 @@
+4c4
+<   whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
+---
+>   whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+6c6
+<   clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+---
+>   clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+8,11c8,11
+<   E WM_ERASEBKGND dc=1 -> 0
+<   whole DC: result=0 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+<   E WM_ERASEBKGND dc=1 -> 0
+<   clip (4,4,10,8): result=0 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+---
+>   E WM_ERASEBKGND dc=1 -> 1
+>   whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+>   E WM_ERASEBKGND dc=1 -> 1
+>   clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+14c14
+<   whole DC: result=1 pixels (0,0)=ffffff (8,8)=ffffff (15,15)=ffffff
+---
+>   whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+16c16
+<   clip (4,4,10,8): result=1 pixels (5,5)=ffffff (4,4)=ffffff (9,7)=ffffff (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+---
+>   clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+19c19
+<   whole DC: result=1 pixels (0,0)=563412 (8,8)=563412 (15,15)=563412
+---
+>   whole DC: result=1 pixels (0,0)=404040 (8,8)=404040 (15,15)=404040
+21c21
+<   clip (4,4,10,8): result=1 pixels (5,5)=563412 (4,4)=563412 (9,7)=563412 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+---
+>   clip (4,4,10,8): result=1 pixels (5,5)=404040 (4,4)=404040 (9,7)=404040 (10,7)=404040 (3,5)=404040 (12,6)=404040 (5,8)=404040
+25d24
+<   WS WM_ERASEBKGND dc=1 -> 1
+29d27
+<   WN WM_ERASEBKGND dc=1 -> 0
+36,37c34,35
+<   C2 WM_ERASEBKGND dc=1 -> 0
+<   C2 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
+---
+>   C2 WM_ERASEBKGND dc=1 -> 1
+>   C2 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+48c46
+<   C5 WM_ERASEBKGND dc=1 -> 0
+---
+>   C5 WM_ERASEBKGND dc=1 -> 1
+50c48
+<   C5 WM_PAINT BeginPaint fErase=1 rcPaint=(10,10,50,40)
+---
+>   C5 WM_PAINT BeginPaint fErase=0 rcPaint=(10,10,50,40)
+53c51
+<   Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
+---
+>   Q1 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+57c55
+<   Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
+---
+>   Q2 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+62c60
+<   Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=0 -> 1
+---
+>   Q3 WM_ERASEBKGND dc=1 probe(inside the update rect)=1 probe(outside)=1 -> 1
+84d81
+<   A WM_SETCURSOR hit=1 msg=0x202
+86d82
+<   A WM_NCHITTEST
+90,101c86,87
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x200
+<   P WM_MOUSEMOVE x=40 y=40
+<   TC WM_NCHITTEST
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x201
+<   P WM_LBUTTONDOWN x=40 y=40
+<   TC WM_NCHITTEST
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x202
+<   P WM_LBUTTONUP x=40 y=40
+<   P WM_ERASEBKGND dc=1 -> 1
+---
+>   TC WM_NCHITTEST
+>   TC WM_NCHITTEST
+105,120c91,92
+<   C WM_NCHITTEST
+<   C WM_SETCURSOR hit=1 msg=0x200
+<   P WM_SETCURSOR hit=1 msg=0x200
+<   C WM_MOUSEMOVE x=20 y=20
+<   TC WM_NCHITTEST
+<   C WM_NCHITTEST
+<   C WM_MOUSEACTIVATE hit=1 msg=0x201
+<   P WM_MOUSEACTIVATE hit=1 msg=0x201
+<   C WM_SETCURSOR hit=1 msg=0x201
+<   P WM_SETCURSOR hit=1 msg=0x201
+<   C WM_LBUTTONDOWN x=20 y=20
+<   TC WM_NCHITTEST
+<   C WM_NCHITTEST
+<   C WM_SETCURSOR hit=1 msg=0x202
+<   P WM_SETCURSOR hit=1 msg=0x202
+<   C WM_LBUTTONUP x=20 y=20
+---
+>   TC WM_NCHITTEST
+>   TC WM_NCHITTEST
+123,136c95,96
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x200
+<   P WM_MOUSEMOVE x=40 y=40
+<   TC WM_NCHITTEST
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x201
+<   P WM_LBUTTONDOWN x=40 y=40
+<   TC WM_NCHITTEST
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x202
+<   P WM_LBUTTONUP x=40 y=40
+<   P WM_NCHITTEST
+<   P WM_ERASEBKGND dc=1 -> 1
+<   P WM_ERASEBKGND dc=1 -> 1
+---
+>   TC WM_NCHITTEST
+>   TC WM_NCHITTEST
+139,148d98
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x200
+<   P WM_MOUSEMOVE x=40 y=40
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x201
+<   P WM_LBUTTONDOWN x=40 y=40
+<   P WM_NCHITTEST
+<   P WM_SETCURSOR hit=1 msg=0x202
+<   P WM_LBUTTONUP x=40 y=40
+<   P WM_ERASEBKGND dc=1 -> 1
+151,153d100
+<   DP WM_SETCURSOR hit=-2 msg=0x200
+<   DP WM_SETCURSOR hit=-2 msg=0x201
+<   DP WM_SETCURSOR hit=-2 msg=0x202
+157,158d103
+<   HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
+<   HOOK0 -> 0
+162,163d106
+<   HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
+<   HOOK0 -> 0
+167,169d109
+<   HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
+<   HOOK0 -> 0
+<   W WM_SETCURSOR hit=1 msg=0x202
+172,173d111
+<   HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
+<   HOOK2 -> 0
+175,176d112
+<   HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
+<   HOOK2 -> 0
+180,181d115
+<   HOOK0 mouse nCode=0 msg=0x200 pt=(100,80) hwnd=W ht=1
+<   HOOK0 -> 0
+185c119,120
+<   HOOK0 mouse nCode=0 msg=0x201 pt=(100,80) hwnd=W ht=1
+---
+>   W WM_SETCURSOR hit=1 msg=0x201
+>   W WM_LBUTTONDOWN x=70 y=50
+187,189d121
+<   HOOK0 mouse nCode=0 msg=0x202 pt=(100,80) hwnd=W ht=1
+<   HOOK0 -> 0
+<   W WM_SETCURSOR hit=1 msg=0x202
+192,193c124,125
+<   HOOK2 key nCode=0 vk=0x41 lp=0x1e0001
+<   HOOK2 key nCode=0 vk=0x41 lp=0xc01e0001
+---
+>   W WM_KEYDOWN vk=0x41 lp=0x1e0001
+>   W WM_KEYUP vk=0x41 lp=0xc01e0001
+196,201d127
+<   HOOK0 mouse nCode=3 msg=0x200 pt=(120,90) hwnd=W ht=1
+<   HOOK0 -> 0
+<   peek(noremove) -> 0x200
+<   W WM_NCHITTEST
+<   HOOK0 mouse nCode=0 msg=0x200 pt=(120,90) hwnd=W ht=1
+<   HOOK0 -> 0
+202a129
+>   peek(noremove) -> 0x200
+213d139
+<   W WM_SETCURSOR hit=1 msg=0x202

@@ -1,0 +1,50 @@
+/* decision 0216 (opfs1): the browser-files window. A dialog above the engine's windows (they get z-index 1001 and up) and below the engine's file box (src/ui/filedlg.ts, z-index 2147483000). */
+#files-btn { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 12px; padding: 2px 10px; cursor: pointer; }
+#files-btn:disabled { color: #6b7380; cursor: not-allowed; }
+#files-overlay { position: fixed; inset: 0; z-index: 2147482000; background: rgba(5, 7, 10, 0.72); display: flex; align-items: center; justify-content: center; }
+#files-overlay[hidden] { display: none; }
+.fx-window { position: relative; display: flex; flex-direction: column; width: min(1100px, 96vw); height: min(720px, 92vh); background: #171a20; border: 2px solid #5a8ad8; color: #e1e5eb; font-size: 13px; }
+.fx-window button { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 12px; padding: 3px 9px; cursor: pointer; }
+.fx-window button:hover:not(:disabled) { background: #272d38; }
+.fx-window button:disabled { color: #5d6572; cursor: default; }
+.fx-window button.danger { border-color: #8b3a3a; color: #ffb4b4; }
+.fx-window input[type="text"] { background: #0e1013; color: #e8ecf2; border: 1px solid #3a4150; font-size: 13px; padding: 3px 6px; }
+.fx-title { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #2a2e36; background: #1b2230; }
+.fx-title .fx-sub { color: #9db3d6; font-size: 11px; flex: 1; }
+.fx-toolbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 10px; border-bottom: 1px solid #2a2e36; }
+.fx-crumbs { padding: 4px 10px; border-bottom: 1px solid #2a2e36; font-size: 12px; color: #8a93a2; }
+.fx-crumbs .fx-crumb { background: none; border: none; color: #9ec1ff; padding: 1px 3px; }
+.fx-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); flex: 1; min-height: 0; }
+.fx-tree { overflow: auto; border-right: 1px solid #2a2e36; padding: 4px 0; background: #14161a; }
+.fx-node { display: flex; align-items: center; gap: 2px; padding: 1px 6px; cursor: pointer; white-space: nowrap; }
+.fx-node:hover { background: #20252e; } .fx-node.cur { background: #26354d; }
+.fx-node.d1 { padding-left: 20px; } .fx-node.d2 { padding-left: 34px; } .fx-node.d3 { padding-left: 48px; } .fx-node.d4 { padding-left: 62px; } .fx-node.d5 { padding-left: 76px; } .fx-node.d6 { padding-left: 90px; } .fx-node.d7 { padding-left: 104px; } .fx-node.d8 { padding-left: 118px; }
+.fx-window .fx-toggle { background: none; border: none; color: #8a93a2; padding: 0 3px; width: 18px; }
+.fx-list { overflow: auto; outline: none; background: #14161a; }
+.fx-list:focus-visible { box-shadow: inset 0 0 0 2px #5a8ad8; }
+.fx-row:not(.fx-head) { content-visibility: auto; contain-intrinsic-size: auto 22px; }
+.fx-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 170px; gap: 8px; padding: 2px 10px; cursor: default; user-select: none; -webkit-user-select: none; }
+.fx-row .fx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-row .fx-size { text-align: right; color: #aab2c0; } .fx-row .fx-mod { color: #8a93a2; font-size: 12px; }
+.fx-row.fx-head { position: sticky; top: 0; background: #1d2128; color: #8a93a2; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #2a2e36; }
+.fx-row:not(.fx-head):hover { background: #1c2129; } .fx-row.sel { background: #26354d; }
+.fx-empty { padding: 24px 12px; color: #8a93a2; }
+.fx-progress { display: flex; gap: 8px; align-items: center; padding: 4px 10px; border-top: 1px solid #2a2e36; } .fx-progress progress { flex: 0 0 240px; } .fx-prog-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #aab2c0; }
+.fx-status { padding: 4px 10px; border-top: 1px solid #2a2e36; min-height: 1.5em; color: #cfe0f8; } .fx-status[data-error="1"] { color: #ff8b8b; }
+.fx-storage { padding: 4px 10px; border-top: 1px solid #2a2e36; font-size: 12px; color: #8a93a2; } .fx-storage .ok { color: #8be28b; } .fx-storage .warn { color: #e2d08b; }
+.fx-footer:empty { display: none; } .fx-footer { border-top: 1px solid #2a2e36; padding: 6px 10px; }
+.fx-modal { position: absolute; inset: 0; background: rgba(5, 7, 10, 0.6); display: flex; align-items: center; justify-content: center; } .fx-modal[hidden] { display: none; }
+.fx-modal-box { background: #1b2230; border: 1px solid #5a8ad8; padding: 14px 18px; max-width: 560px; width: 90%; } .fx-modal-box h3 { margin: 0 0 8px; font-size: 14px; }
+.fx-buttons { display: flex; gap: 8px; margin-top: 12px; } .fx-err { color: #ff8b8b; min-height: 1.3em; font-size: 12px; margin-top: 4px; }
+.fx-drop { position: absolute; inset: 0; background: rgba(38, 53, 77, 0.88); border: 3px dashed #9ec1ff; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #e8f0ff; pointer-events: none; } .fx-drop[hidden] { display: none; }
+
+/* stage 2: the window as the engine's file dialog (src/ui/filedlg.ts keeps its box element but shows only the window) */
+#filedlg[data-select="1"] .filedlg-box { max-width: none; width: min(1100px, 96vw); padding: 0; border: none; background: transparent; }
+#filedlg[data-select="1"] .filedlg-tag, #filedlg[data-select="1"] #filedlg-title { display: none; }
+#filedlg[data-select="1"] #filedlg-status { background: #171a20; margin: 0; padding: 4px 10px; border: 2px solid #5a8ad8; border-top: none; }
+#filedlg[data-select="1"] #filedlg-status:empty { display: none; }
+.fx-window.fx-select { height: min(720px, 86vh); }
+.fx-selrow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .fx-selrow label { flex: 1 1 320px; } .fx-selrow input[type="text"] { width: 60%; min-width: 180px; }
+.fx-selrow select { background: #0e1013; color: #e8ecf2; border: 1px solid #3a4150; font-size: 12px; padding: 3px 6px; max-width: 360px; }
+.fx-window button.primary { border-color: #5a8ad8; background: #26354d; }
+.fx-note { color: #9db3d6; font-size: 12px; margin-bottom: 4px; }

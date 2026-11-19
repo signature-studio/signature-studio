@@ -1,0 +1,156 @@
+handles: h1 h2 h3
+count(m): ret=0 le=-
+count(bogus): ret=-1 le=-
+insert File: ret=1 le=-
+insert &Edit popup(p): ret=1 le=-
+insert Cut into p: ret=1 le=-
+insert Copy checked: ret=1 le=-
+insert separator: ret=1 le=-
+insert Paste grayed: ret=1 le=-
+insert ownerdraw: ret=1 le=-
+insert bitmap item: ret=1 le=-
+insert NULL string (separator): ret=1 le=-
+insert before id 202 by command: ret=1 le=-
+insert BYPOSITION 99 (append): ret=1 le=-
+insert into bogus: ret=0 le=-
+insert popup with bad handle: ret=1 le=1401
+insert help item \b: ret=1 le=-
+count(m): ret=2 le=-
+count(p): ret=8 le=-
+count(q): ret=3 le=-
+id(p,0): ret=201 le=-
+id(p,1): ret=207 le=-
+id(p,2): ret=202 le=-
+id(p,3): ret=0 le=-
+id(p,4): ret=203 le=-
+id(p,5): ret=204 le=-
+id(p,6): ret=205 le=-
+id(p,7): ret=206 le=-
+id(p,8): ret=-1 le=-
+id(p,9): ret=-1 le=-
+id(p,10): ret=-1 le=-
+id(p,11): ret=-1 le=-
+id(m,1) popup: ret=-1 le=-
+id(bogus,0): ret=-1 le=-
+sub(m,0): h0 le=-
+sub(m,1): h2 le=-
+sub(m,2): h0 le=-
+sub(m,3): h0 le=-
+sub(p,0) not popup: h0 le=-
+sub(bogus,0): h0 le=-
+state(p,pos 0): ret=0 le=-
+state(p,pos 1): ret=0 le=-
+state(p,pos 2): ret=8 le=-
+state(p,pos 3): ret=2051 le=-
+state(p,pos 4): ret=1 le=-
+state(p,pos 5): ret=256 le=-
+state(p,pos 6): ret=4 le=-
+state(p,pos 7): ret=2051 le=-
+state(p,pos 8): ret=-1 le=-
+state(p,pos 9): ret=-1 le=-
+state(p,pos 10): ret=-1 le=-
+state(m,pos 1) popup: ret=2064 le=-
+state(m, cmd 202) found in submenu: ret=8 le=-
+state(m, cmd 999): ret=-1 le=-
+state(bogus): ret=-1 le=-
+state(m, cmd 0 = the popup's id): ret=2064 le=-
+string(p,0,max 0): ret=3 le=-
+  buf: 5555 5555 5555 5555
+string(p,0,max 1): ret=0 le=-
+  buf: 0 5555 5555 5555
+string(p,0,max 2): ret=1 le=-
+  buf: 43 0 5555 5555
+string(p,0,max 4): ret=3 le=-
+  buf: 43 75 74 0
+string(p,0,max 100): ret=3 le=-
+  buf: 43 75 74 0
+string(p,pos 2 separator): ret=0 le=-
+string(p,pos 6 ownerdraw): ret=0 le=-
+string(p, cmd 203): ret=5 le=-
+  text='Paste'
+string(p, cmd 999): ret=0 le=1456
+string(NULL buf, cmd 202): ret=4 le=-
+string(bogus): ret=0 le=1456
+string(m, cmd 201) found in submenu: ret=3 le=-
+info(p,0) all: ok=1 le=- type=0 state=0 id=c9 sub=h0 chk=0 unchk=0 data=0 cch=3 bmp=0 text='Cut'
+info(m,1) popup: ok=1 le=- type=0 state=0 id=h2 sub=h2 chk=0 unchk=0 data=99 cch=5 bmp=88 text='&Edit'
+info(p,1) checked: ok=1 le=- type=0 state=0 id=cf sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88
+info(p,2) separator TYPE: ok=1 le=- type=800 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=0 text='UEdit'
+info(p,4) ownerdraw TYPE: ok=1 le=- type=100 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=0 text='UEdit'
+info(p,5) bitmap TYPE: ok=1 le=- type=4 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=55 text='UEdit'
+info(p,0) STRING length query: ok=1 le=- type=55 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=3 bmp=88
+info(p,0) STRING small buf 2: ok=1 le=- type=55 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=1 bmp=88 text='C'
+info(p,0) STRING buf 4: ok=1 le=- type=55 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=3 bmp=88 text='Cut'
+info(p,0) STRING buf 1: ok=1 le=- type=55 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+info(p,0) TYPE|STRING invalid: ok=0 le=87
+info(p,0) TYPE|FTYPE invalid: ok=0 le=87
+info(p,99) not found: ok=0 le=1456
+info(bogus): ok=0 le=1456
+info(m,cmd 203 in submenu): ok=1 le=- type=55 state=1 id=cb sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88
+info cbSize 48: ok=0 le=87
+info cbSize 72: ok=1 le=43690
+insertitem by pos 0: ret=1 le=-
+insertitem MIIM_TYPE string: ret=1 le=-
+insertitem TYPE|STRING invalid: ret=0 le=87
+insertitem FTYPE bitmap invalid: ret=0 le=87
+insertitem cbSize 72: ret=1 le=-
+insertitem cbSize 40: ret=0 le=87
+insertitem popup p into q: ret=1 le=-
+insertitem bad submenu: ret=0 le=87
+count(q): ret=8 le=-
+insertitem by command 401 (before it): ret=1 le=-
+insertitem by command 999 (append): ret=1 le=-
+q pos 0: ok=1 le=- type=800 state=0 id=195 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+q pos 1: ok=1 le=- type=0 state=8 id=191 sub=h0 chk=0 unchk=0 data=99 cch=7 bmp=88 text='Via MII'
+q pos 2: ok=1 le=- type=0 state=0 id=12d sub=h0 chk=0 unchk=0 data=99 cch=2 bmp=88 text='Q1'
+q pos 3: ok=1 le=- type=0 state=0 id=999999 sub=h0 chk=0 unchk=0 data=99 cch=6 bmp=88 text='BadSub'
+q pos 4: ok=1 le=- type=4000 state=0 id=12e sub=h0 chk=0 unchk=0 data=99 cch=4 bmp=88 text='Help'
+q pos 5: ok=1 le=- type=0 state=0 id=0 sub=h0 chk=0 unchk=0 data=99 cch=14 bmp=88 text='Old style TYPE'
+q pos 6: ok=1 le=- type=800 state=0 id=192 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+q pos 7: ok=1 le=- type=0 state=0 id=193 sub=h2 chk=0 unchk=0 data=99 cch=11 bmp=88 text='Sub p again'
+q pos 8: ok=1 le=- type=0 state=0 id=194 sub=h4 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+q pos 9: ok=1 le=- type=800 state=0 id=196 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+q pos 10: ok=0 le=1456
+q pos 11: ok=0 le=1456
+setinfo p,0: ret=1 le=-
+after set p,0: ok=1 le=- type=0 state=3 id=1f5 sub=h0 chk=0 unchk=0 data=1234 cch=11 bmp=88 text='Renamed Cut'
+setinfo p,0 text NULL: ret=1 le=-
+after text NULL (becomes a separator): ok=1 le=- type=800 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88 text=''
+setinfo p,1 submenu q: ret=0 le=-
+after submenu: ok=1 le=- type=0 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88
+setinfo p,1 submenu NULL: ret=1 le=-
+after submenu NULL: ok=1 le=- type=0 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=0 bmp=88
+setinfo bad submenu: ret=0 le=87
+setinfo not found: ret=0 le=-
+setinfo bogus menu: ret=0 le=-
+setinfo checkmarks: ret=1 le=-
+after checkmarks: ok=1 le=- type=55 state=66 id=77 sub=h0 chk=1 unchk=1 data=99 cch=0 bmp=88
+setinfo bitmap: ret=1 le=-
+after bitmap TYPE: ok=1 le=- type=4 state=66 id=77 sub=h0 chk=0 unchk=0 data=99 cch=4 bmp=41 text='Uenamed Cut'
+check 202 uncheck: ret=8 le=-
+state 202: ret=0 le=-
+check 202 check: ret=0 le=-
+state 202: ret=8 le=-
+enable 203 enable: ret=1 le=-
+state 203: ret=0 le=-
+enable 203 disabled: ret=0 le=-
+state 203: ret=2 le=-
+check 999: ret=-1 le=-
+enable bogus: ret=-1 le=-
+remove cmd 207 found in submenu: ret=1 le=-
+count(p): ret=7 le=-
+remove pos 99: ret=0 le=-
+remove cmd 999: ret=0 le=-
+remove bogus: ret=0 le=-
+remove popup item pos 1 of m (submenu stays alive): ret=1 le=-
+count(m): ret=1 le=-
+count(p) still: ret=7 le=-
+insert p back as popup: ret=1 le=-
+delete popup item pos 1 of m (destroys p): ret=1 le=-
+count(p) after delete: ret=-1 le=-
+count(m): ret=1 le=-
+destroy q: ret=1 le=-
+destroy q again: ret=0 le=-
+count(q): ret=-1 le=-
+destroy bogus: ret=0 le=-
+destroy m: ret=1 le=-

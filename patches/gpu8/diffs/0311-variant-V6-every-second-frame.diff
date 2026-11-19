@@ -1,0 +1,11 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -82,7 +82,7 @@
+   const tick = (): void => {
+     frameTicks++;
+     const now = performance.now();
+-    L.requestScene();
++    if ((frameTicks & 1) === 0) L.requestScene();   // VARIANT V6 (decision 0311, a test of the rate): a scene is asked for at every second animation frame only
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+     next();
+   };

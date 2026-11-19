@@ -1,0 +1,62 @@
+# opt1 (decision 0243) follow-up of decision 0246: the 60 functions of the two modules that ship6 adds to the lift (oggio 0xc000000: 42, Elastique 0xb000000: 18) that contain a LOCK-prefixed or implicitly locked instruction. mt4-atomic-functions.tsv was made from the lift of the six modules of HEAD; the lift of the eight modules (the generated C of m6 and m7) needs these too. Made by lift/harness/hyb/list-atomic-functions.py over the wsrc of the eight-module lift; only the rows that mt4-atomic-functions.tsv does not have. Apply: filter-hybrid-list.py mt4-atomic-functions-m67.tsv hyb-U-oggio.txt hyb-U-elastique.txt
+va	sites	mnemonics
+0xb2c8538	1	Cmpxchg:1
+0xb2c8814	1	Xchg:1
+0xb2ce4c8	4	Xchg:4
+0xb2d6490	1	Xchg:1
+0xb2d7214	1	Xadd:1
+0xb2d99e4	1	Inc:1
+0xb2d9aac	1	Xadd:1
+0xb2db2d8	2	Inc:1 Xadd:1
+0xb2db7a8	1	Xadd:1
+0xb2dba18	2	Inc:1 Xadd:1
+0xb2dc170	4	Xchg:4
+0xb2dceec	2	And:1 Or:1
+0xb2dd4d0	1	Xchg:1
+0xb2dd58c	8	Inc:7 Xadd:1
+0xb2dd7f0	1	Xadd:1
+0xb2dd818	7	Add:7
+0xb2dfaa4	1	And:1
+0xb2e0e00	1	Xchg:1
+0xc006460	1	Inc:1
+0xc006470	1	Add:1
+0xc02d7b8	1	Inc:1
+0xc02d838	1	Xadd:1
+0xc0566b0	1	Cmpxchg:1
+0xc05698c	1	Xchg:1
+0xc05c1b8	4	Xchg:4
+0xc05d56c	2	And:2
+0xc05d8d4	1	Or:1
+0xc05ddd4	2	Or:2
+0xc061ed0	4	And:1 Or:3
+0xc065098	1	Xchg:1
+0xc065a70	2	Xadd:2
+0xc0683bc	2	Dec:1 Xadd:1
+0xc06c808	1	Xadd:1
+0xc06d288	1	Xchg:1
+0xc06d2a4	2	Cmpxchg:1 Or:1
+0xc06d694	1	Or:1
+0xc06d76c	1	Inc:1
+0xc06d834	1	Xadd:1
+0xc06de88	1	Xchg:1
+0xc06e1ec	1	Xchg:1
+0xc06ea80	4	Xadd:4
+0xc06eefc	1	Xadd:1
+0xc06fa1c	1	And:1
+0xc06fc38	2	And:1 Or:1
+0xc071aac	1	Or:1
+0xc071c20	4	And:2 Or:2
+0xc071d2c	1	Or:1
+0xc071df4	1	And:1
+0xc071ee0	4	Xchg:4
+0xc072ad8	4	Or:4
+0xc077d3c	1	Inc:1
+0xc078aac	2	Inc:1 Xadd:1
+0xc078f7c	1	Xadd:1
+0xc0791ec	2	Inc:1 Xadd:1
+0xc07aaa8	8	Inc:7 Xadd:1
+0xc07ad0c	1	Xadd:1
+0xc07ad34	7	Add:7
+0xc07afc0	2	Dec:1 Xadd:1
+0xc07b560	2	Dec:1 Xadd:1
+0xc07d834	2	Or:2

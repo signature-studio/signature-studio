@@ -1,0 +1,62 @@
+--- a/lift/runtime/fle_wall_ia2w.c
++++ b/lift/runtime/fle_wall_ia2w.c
+@@ -200,6 +200,24 @@
+     return fle_win_scroll(api, hwnd, dx, dy, prc_scroll != 0 ? rs : NULL, prc_clip != 0 ? rc : NULL, flags, res);
+ }
+ 
++/* Decision 0319 TEST-ONLY diagnostic (FLE_DIAG_SCROLL=1; dead code in the product): the arguments and the answer of ScrollWindowEx / ScrollWindow on the window model (fle_win_scroll), on stderr as
++ * "fl-diag: <api> ..."; the simple path above has its own line. */
++static void scroll_diag(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, uint64_t prc_scroll, uint64_t prc_clip, uint64_t hrgn, uint64_t prc_update, uint32_t flags, int type, const fle_win_scroll_result *sr, uint64_t ra)
++{
++    static int on = -1;
++    static unsigned n;
++    char ss[64] = "NULL", cc[64] = "NULL";
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_SCROLL"); on = e != NULL && e[0] == '1'; }
++    if (!on || n >= 4000u) return;
++    n++;
++    if (prc_scroll != 0) { irect r = rect_ld(prc_scroll); snprintf(ss, sizeof ss, "(%d,%d,%d,%d)", (int)r.l, (int)r.t, (int)r.r, (int)r.b); }
++    if (prc_clip != 0) { irect r = rect_ld(prc_clip); snprintf(cc, sizeof cc, "(%d,%d,%d,%d)", (int)r.l, (int)r.t, (int)r.r, (int)r.b); }
++    fprintf(stderr, "fl-diag: %s hwnd %#llx dx %d dy %d prcScroll %s prcClip %s hrgnUpdate %#llx prcUpdate %#llx flags %#x -> %d invalid_handle %d parts %d uncovered (%d,%d,%d,%d) update (%d,%d,%d,%d) caller %#llx\n",
++            api, (unsigned long long)hwnd, (int)dx, (int)dy, ss, cc, (unsigned long long)hrgn, (unsigned long long)prc_update, (unsigned)flags, type, sr->invalid, sr->parts,
++            (int)sr->unc[0], (int)sr->unc[1], (int)sr->unc[2], (int)sr->unc[3], (int)sr->upd[0], (int)sr->upd[1], (int)sr->upd[2], (int)sr->upd[3], (unsigned long long)ra);
++}
++
+ void fle_imp_ScrollWindowEx(void)
+ {
+     static const char api[] = "ScrollWindowEx";
+@@ -208,9 +226,11 @@
+     uint32_t flags = (uint32_t)stack_arg(8);
+     fle_win_scroll_result sr;
+     int type;
++    uint64_t diag_ra = fle_ld(R[4], 8);   /* decision 0319 TEST-ONLY diagnostic: the guest return address */
+ 
+     if (!scroll_run(api, hwnd, dx, dy, prc_scroll, prc_clip, flags, &sr)) { scroll_window_ex_simple(); return; }
+     if (sr.invalid) {
++        scroll_diag(api, hwnd, dx, dy, prc_scroll, prc_clip, hrgn, prc_update, flags, 0, &sr, diag_ra);
+         fle_set_last_error(1400);       /* ERROR_INVALID_WINDOW_HANDLE */
+         R[0] = 0;
+         return;
+@@ -232,6 +252,7 @@
+ 
+         fle_st(prc_update, 4, (uint32_t)u[0]); fle_st(prc_update + 4, 4, (uint32_t)u[1]); fle_st(prc_update + 8, 4, (uint32_t)u[2]); fle_st(prc_update + 12, 4, (uint32_t)u[3]);
+     }
++    scroll_diag(api, hwnd, dx, dy, prc_scroll, prc_clip, hrgn, prc_update, flags, type, &sr, diag_ra);
+     R[0] = (uint64_t)type;
+ }
+ 
+@@ -242,12 +263,14 @@
+     uint64_t hwnd = R[1], prc_scroll = R[9], prc_clip = stack_arg(5);
+     int32_t dx = (int32_t)R[2], dy = (int32_t)R[8];
+     fle_win_scroll_result sr;
++    uint64_t diag_ra = fle_ld(R[4], 8);   /* decision 0319 TEST-ONLY diagnostic: the guest return address */
+     uint32_t flags = 0x2u | 0x4u | (prc_scroll == 0 ? 0x1u : 0x80000000u);   /* SW_INVALIDATE | SW_ERASE | SW_SCROLLCHILDREN when the whole client area is scrolled; with an lpRect the invalid areas are not offset (internal bit) */
+ 
+     if (!scroll_run(api, hwnd, dx, dy, prc_scroll, prc_clip, flags, &sr)) {
+         /* no model: the same as ScrollWindowEx with a NULL hrgnUpdate and prcUpdate, through the former simple path (its arguments are on the stack: build the call) */
+         fle_stop(api, "the window model for scrolling is not available in this build (fle_win_scroll answered 0)");
+     }
++    scroll_diag(api, hwnd, dx, dy, prc_scroll, prc_clip, 0, 0, flags, sr.invalid ? 0 : 1, &sr, diag_ra);
+     if (sr.invalid) {
+         fle_set_last_error(1400);       /* ERROR_INVALID_WINDOW_HANDLE */
+         R[0] = 0;

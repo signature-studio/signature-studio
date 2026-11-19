@@ -1,0 +1,19 @@
+# Decision 0160: swapped entries of Blend2D.dll (RVA, name of lift/harness/b2d1/b2d_swap.cpp fle_swap_<name>). blContextInitAs (0x146ff0) and 17 functions of the BLContextVirt table at RVA 0x1d6380 (slots 0,3,19,25,32,33,34,35,38,39,45,46,51,53,54,71,72 = destroy, applyTransformOp, setHint, setStyle, setGlobalAlpha, setCompOp, setFillRule, setStrokeWidth, setStrokeCaps, setStrokeJoin, clipToRectD, restoreClipping, fillAllRgba32, fillGeometry, fillGeometryRgba32, strokeGeometry, strokeGeometryRgba32).
+rva:0x146ff0 ctx_init_as
+rva:0x12f170 ctx_destroy
+rva:0x12e8a0 ctx_apply_transform_op
+rva:0xf7c80 ctx_set_hint
+rva:0xf4b10 ctx_set_style
+rva:0xf15b0 ctx_set_global_alpha
+rva:0xf0ba0 ctx_set_comp_op
+rva:0xf0360 ctx_set_fill_rule
+rva:0xef980 ctx_set_stroke_width
+rva:0xef220 ctx_set_stroke_caps
+rva:0xeeec0 ctx_set_stroke_join
+rva:0xeca70 ctx_clip_to_rect_d
+rva:0xec670 ctx_restore_clipping
+rva:0xea670 ctx_fill_all_rgba32
+rva:0xe9340 ctx_fill_geometry
+rva:0xe8ae0 ctx_fill_geometry_rgba32
+rva:0x12cf40 ctx_stroke_geometry
+rva:0x12d3a0 ctx_stroke_geometry_rgba32

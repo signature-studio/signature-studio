@@ -1,0 +1,11 @@
+--- a/app/src/engine/worker.ts
++++ b/app/src/engine/worker.ts
+@@ -457,6 +457,8 @@
+   reapPresented();
+   L.setCounters(deskCounters.ringReads, deskCounters.wakes, deskCounters.idleTicks);
+   if (pendingScene) return;
++  // VARIANT V1 (decision 0311): while an input waits for its answer and the guest has not settled, no scene is published for a frame request: the written rectangles a scene hands out are consumed by it, and a scene published before the guest settled would take the guest's last drawing and leave nothing for the scene that may answer
++  if (driver && driver.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled) return;
+   if (L.wantSet) deskTick(false);
+   else if (atIdle && L.asleep && performance.now() - lastTickAt > DESK_FALLBACK_MS) { lastTickAt = performance.now(); deskCounters.idleTicks++; deskTick(false); }
+ }

@@ -1,0 +1,31 @@
+diff -u -r -N a/lift/runtime/fle_callback.c b/lift/runtime/fle_callback.c
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -74,3 +74,27 @@
+     result = R[0];
+     return result;
+ }
++
++/* 0313 TEST-ONLY diagnostic (diag-g9-count.diff; not part of the product, never pushed): counts the indirect calls that the guest makes INTO the image slot of the
++ * real module Fruity Balance (base 0x6800000, SizeOfImage 0x3a1000; the slot up to the next module is taken as 0x6800000..0x6c00000) through fle_dispatch_hook (the
++ * hook of the census harness, decision 0097: it only observes and calls fn itself). It prints the first 16 distinct targets and the count at every power of two.
++ * It does not change what runs; it makes every indirect call take the hook path (slower). Used to tell "FL never calls Balance" from "Balance has no effect". */
++#define G9_LO UINT64_C(0x6800000)
++#define G9_HI UINT64_C(0x6c00000)
++static uint64_t g9_n, g9_seen[16];
++static unsigned g9_nd;
++static void g9_hook(uint64_t va, void (*fn)(void))
++{
++    if (va >= G9_LO && va < G9_HI) {
++        uint64_t n = __atomic_add_fetch(&g9_n, 1, __ATOMIC_RELAXED);
++        unsigned i;
++        for (i = 0; i < g9_nd && i < 16 && g9_seen[i] != va; i++) {}
++        if (i == g9_nd && g9_nd < 16) {
++            g9_seen[g9_nd++] = va;
++            fprintf(stderr, "g9-diag: first call into Balance at %#llx (call #%llu)\n", (unsigned long long)va, (unsigned long long)n);
++        }
++        if ((n & (n - 1)) == 0) fprintf(stderr, "g9-diag: %llu indirect calls into Balance so far (distinct targets seen, up to 16: %u)\n", (unsigned long long)n, g9_nd);
++    }
++    fn();
++}
++__attribute__((constructor)) static void g9_count_init(void) { fle_dispatch_hook = g9_hook; }

@@ -1,0 +1,18 @@
+[
+ {
+  "name": "r53c-settings-close",
+  "what": "R5-3c (decision 0370): the same start as scn-r53-about-ja.json (close the welcome wizard; F10 opens Settings on its default tab). The About tab is not clicked and the reference project is not opened. Shot, Escape (closes Settings), wait, listWindows, shot. No playback.",
+  "ops": [
+   {"op": "closeWizard"},
+   {"op": "wait", "ms": 2500},
+   {"op": "key", "code": "F10"},
+   {"op": "wait", "ms": 3500},
+   {"op": "logMark", "name": "m1"},
+   {"op": "shot", "name": "settings-3s"},
+   {"op": "key", "code": "Escape"},
+   {"op": "wait", "ms": 1500},
+   {"op": "listWindows"},
+   {"op": "shot", "name": "settings-closed"}
+  ]
+ }
+]

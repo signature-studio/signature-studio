@@ -1,0 +1,1238 @@
+diff --git a/app/src/engine/chunk-io-worker.ts b/app/src/engine/chunk-io-worker.ts
+new file mode 100644
+index 0000000..bc3b646
+--- /dev/null
++++ b/app/src/engine/chunk-io-worker.ts
+@@ -0,0 +1,17 @@
++// Decision 0314 (PROVISIONAL): the I/O Worker of the lazy install tree. The engine Worker starts it (`new Worker(new URL('./chunk-io-worker.ts', import.meta.url), { type: 'module' })` as ONE expression, decision 0189) and
++// posts one message: the shared buffers of chunk-io.ts, the streams of the index and where the chunks are. The loop then serves the engine thread's requests until the engine closes the channel.
++
++import { FetchChunkStore } from './chunk-store.ts';
++import { serveChunkIo, type ChunkIoShared } from './chunk-io.ts';
++import type { VfsStream } from './vfs-index.ts';
++
++export interface ChunkIoStart { type: 'start'; shared: ChunkIoShared; streams: VfsStream[]; base: string }
++export type ChunkIoReply = { type: 'ready' } | { type: 'done'; served: number } | { type: 'error'; message: string };
++
++const scope = self as unknown as { onmessage: ((e: MessageEvent<ChunkIoStart>) => void) | null; postMessage(m: ChunkIoReply): void };
++scope.onmessage = (e) => {
++  const m = e.data;
++  if (m.type !== 'start') return;
++  scope.postMessage({ type: 'ready' });
++  serveChunkIo(m.shared, m.streams, new FetchChunkStore(m.base)).then((served) => scope.postMessage({ type: 'done', served }), (err: unknown) => scope.postMessage({ type: 'error', message: String((err as Error)?.stack ?? err) }));
++};
+diff --git a/app/src/engine/chunk-io.ts b/app/src/engine/chunk-io.ts
+new file mode 100644
+index 0000000..24d1f2e
+--- /dev/null
++++ b/app/src/engine/chunk-io.ts
+@@ -0,0 +1,144 @@
++// Decision 0314 (PROVISIONAL): how the engine thread gets a chunk of the lazy install tree while a guest ReadFile is waiting for it.
++//
++// The engine is one Worker that answers libc calls SYNCHRONOUSLY (hostfiles.ts: ByteSource.readInto), and a fetch is asynchronous. So the fetch is done by a second Worker (the I/O Worker) and the engine thread
++// waits for it with Atomics.wait: no JSPI, no change of the engine wasm. The two threads share one small control block and one data buffer (SharedArrayBuffers); there is ONE request in flight at a time
++// (the engine thread is blocked while it waits, and it is the only one that asks), so a single slot is the whole protocol:
++//
++//   ctrl[STATE]  IDLE -> REQUEST (engine writes stream and chunk, notifies) -> REPLY or ERROR (I/O Worker writes length or code, notifies) -> IDLE (engine has copied the bytes out)
++//   ctrl[STREAM] ctrl[CHUNK]  the request            ctrl[LENGTH]  bytes in `data` (REPLY)            ctrl[CODE]  an error number (ERROR)
++//   CLOSE        the engine side sets it when the engine goes away; the I/O Worker's loop returns.
++//
++// The I/O Worker's loop blocks in Atomics.wait while it is idle (nothing else runs in that Worker) and is free for the promises of the fetch while it works. Atomics.waitAsync is not used: Firefox did not have it.
++
++import type { ChunkStore } from './chunk-store.ts';
++import type { VfsStream } from './vfs-index.ts';
++
++export const STATE = 0, STREAM = 1, CHUNK = 2, LENGTH = 3, CODE = 4;
++export const IDLE = 0, REQUEST = 1, REPLY = 2, ERROR = 3, CLOSE = 4;
++export const CTRL_WORDS = 8;
++
++export const ERR_STORE = 1, ERR_LENGTH = 2, ERR_REQUEST = 3;
++
++export class ChunkIoError extends Error {
++  readonly code: number;
++  constructor(code: number, what: string) { super(`The lazy install tree could not fetch a chunk: ${what}.`); this.name = 'ChunkIoError'; this.code = code; }
++}
++
++export interface ChunkIoShared { ctrl: SharedArrayBuffer; data: SharedArrayBuffer }
++
++export function makeChunkIoShared(maxChunk: number): ChunkIoShared {
++  return { ctrl: new SharedArrayBuffer(CTRL_WORDS * 4), data: new SharedArrayBuffer(maxChunk) };
++}
++
++/** what the engine thread holds: ask for a chunk and get its decoded bytes (a copy: the caller may keep it) */
++export interface ChunkClient {
++  fetchChunk(stream: number, chunk: number): Uint8Array;
++}
++
++export interface ChunkClientOptions {
++  /** how long one chunk may take before the engine gives up (the I/O Worker is gone or the network is) */
++  timeoutMs?: number;
++  /** counts, for the performance panel */
++  onFetch?: (stream: number, chunk: number, bytes: number, ms: number) => void;
++}
++
++export class SabChunkClient implements ChunkClient {
++  private readonly ctrl: Int32Array;
++  private readonly data: Uint8Array;
++  private readonly timeoutMs: number;
++  private readonly onFetch: ChunkClientOptions['onFetch'];
++  fetches = 0;
++  waitedMs = 0;
++
++  constructor(shared: ChunkIoShared, opts: ChunkClientOptions = {}) {
++    this.ctrl = new Int32Array(shared.ctrl);
++    this.data = new Uint8Array(shared.data);
++    this.timeoutMs = opts.timeoutMs ?? 60000;
++    this.onFetch = opts.onFetch;
++  }
++
++  fetchChunk(stream: number, chunk: number): Uint8Array {
++    const c = this.ctrl;
++    const t0 = performance.now();
++    if (Atomics.load(c, STATE) !== IDLE) throw new ChunkIoError(ERR_REQUEST, 'the I/O channel is not idle (a request is already in flight or the channel is closed)');
++    Atomics.store(c, STREAM, stream);
++    Atomics.store(c, CHUNK, chunk);
++    Atomics.store(c, STATE, REQUEST);
++    Atomics.notify(c, STATE);
++    const deadline = t0 + this.timeoutMs;
++    for (;;) {
++      const s = Atomics.load(c, STATE);
++      if (s !== REQUEST) break;
++      const left = deadline - performance.now();
++      if (left <= 0) {
++        Atomics.compareExchange(c, STATE, REQUEST, CLOSE);   // the channel is dead from now on: a late reply of the I/O Worker is not taken for the next request's
++        throw new ChunkIoError(ERR_STORE, `no reply for stream ${stream} chunk ${chunk} in ${this.timeoutMs} ms`);
++      }
++      Atomics.wait(c, STATE, REQUEST, Math.min(left, 1000));
++    }
++    const state = Atomics.load(c, STATE);
++    if (state === ERROR) {
++      const code = Atomics.load(c, CODE);
++      Atomics.store(c, STATE, IDLE);
++      throw new ChunkIoError(code, `the store answered an error (code ${code}) for stream ${stream} chunk ${chunk}`);
++    }
++    if (state !== REPLY) throw new ChunkIoError(ERR_REQUEST, `the I/O channel was closed (state ${state})`);
++    const n = Atomics.load(c, LENGTH);
++    const out = new Uint8Array(n);
++    out.set(this.data.subarray(0, n));
++    Atomics.store(c, STATE, IDLE);
++    const ms = performance.now() - t0;
++    this.fetches++;
++    this.waitedMs += ms;
++    this.onFetch?.(stream, chunk, n, ms);
++    return out;
++  }
++
++  /** the engine goes away: the I/O Worker's loop returns */
++  close(): void {
++    Atomics.store(this.ctrl, STATE, CLOSE);
++    Atomics.notify(this.ctrl, STATE);
++  }
++}
++
++/** the length the chunk `chunk` of the stream must have */
++export function chunkLength(s: VfsStream, chunk: number): number {
++  return Math.min(s.chunkSize, s.logical - chunk * s.chunkSize);
++}
++
++/**
++ * The I/O Worker's loop. Serves requests until the engine side closes the channel. `store` gives the decoded bytes of a chunk; their length is checked here against the index (a chunk of the wrong size is an error, not a short read).
++ * Returns the number of requests it served.
++ */
++export async function serveChunkIo(shared: ChunkIoShared, streams: readonly VfsStream[], store: ChunkStore): Promise<number> {
++  const c = new Int32Array(shared.ctrl);
++  const data = new Uint8Array(shared.data);
++  let served = 0;
++  for (;;) {
++    let s = Atomics.load(c, STATE);
++    while (s !== REQUEST) {
++      if (s === CLOSE) return served;
++      Atomics.wait(c, STATE, s);
++      s = Atomics.load(c, STATE);
++    }
++    const si = Atomics.load(c, STREAM), ci = Atomics.load(c, CHUNK);
++    let code = 0, len = 0;
++    const st = streams[si];
++    if (!st || ci < 0 || ci >= st.chunks.length) code = ERR_REQUEST;
++    else {
++      try {
++        const want = chunkLength(st, ci);
++        const bytes = await store.get(st.chunks[ci] as string, st.coding, want);
++        if (bytes.length !== want || bytes.length > data.length) code = ERR_LENGTH;
++        else { data.set(bytes); len = bytes.length; }
++      } catch {
++        code = ERR_STORE;
++      }
++    }
++    if (Atomics.load(c, STATE) !== REQUEST) continue;   // the engine gave up (timeout) or closed while the fetch ran: nobody waits for this reply
++    if (code) { Atomics.store(c, CODE, code); Atomics.store(c, STATE, ERROR); }
++    else { Atomics.store(c, LENGTH, len); Atomics.store(c, STATE, REPLY); }
++    Atomics.notify(c, STATE);
++    served++;
++  }
++}
+diff --git a/app/src/engine/chunk-store.ts b/app/src/engine/chunk-store.ts
+new file mode 100644
+index 0000000..f54e8ac
+--- /dev/null
++++ b/app/src/engine/chunk-store.ts
+@@ -0,0 +1,61 @@
++// Decision 0314 (PROVISIONAL): where the chunks of the lazy install tree come from. A chunk is an immutable object `vfs/<SHA-256 of its decoded bytes>.chk`; a brotli stream's objects are stored encoded and served with
++// Content-Encoding: br, so fetch() hands the page the DECODED bytes, whose SHA-256 is the name (docs/decisions/0314-lazy-install-tree.md 'Format'). Every chunk is checked against its name before anyone sees it.
++
++export interface ChunkStore {
++  /** the decoded bytes of the chunk named `sha` (lower-case hex of the SHA-256 of those bytes); `coding` 0 identity, 1 brotli; `length` is what the index says they must be */
++  get(sha: string, coding: 0 | 1, length: number): Promise<Uint8Array>;
++}
++
++export class ChunkStoreError extends Error {
++  constructor(what: string) { super(what); this.name = 'ChunkStoreError'; }
++}
++
++export async function sha256Hex(bytes: Uint8Array): Promise<string> {
++  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>));
++  let s = '';
++  for (const x of d) s += x.toString(16).padStart(2, '0');
++  return s;
++}
++
++export interface FetchChunkStoreOptions {
++  /** how many times a chunk is asked for when the network fails or the bytes do not hash to their name (the later tries bypass the HTTP cache) */
++  attempts?: number;
++  fetchFn?: typeof fetch;
++}
++
++/** the chunks as objects of a URL prefix: `${base}vfs/${sha}.chk` (the base ends with a slash) */
++export class FetchChunkStore implements ChunkStore {
++  private readonly base: string;
++  private readonly attempts: number;
++  private readonly fetchFn: typeof fetch;
++  fetched = 0;
++  bytes = 0;
++  retries = 0;
++
++  constructor(base: string, opts: FetchChunkStoreOptions = {}) {
++    this.base = base.endsWith('/') ? base : `${base}/`;
++    this.attempts = opts.attempts ?? 3;
++    this.fetchFn = opts.fetchFn ?? ((...a) => fetch(...a));
++  }
++
++  async get(sha: string, _coding: 0 | 1, length: number): Promise<Uint8Array> {
++    if (!/^[0-9a-f]{64}$/.test(sha)) throw new ChunkStoreError(`${sha} is not a SHA-256`);
++    let last = 'no try';
++    for (let k = 0; k < this.attempts; k++) {
++      if (k > 0) this.retries++;
++      try {
++        const r = await this.fetchFn(`${this.base}vfs/${sha}.chk`, k === 0 ? {} : { cache: 'reload' });
++        if (!r.ok) { last = `HTTP ${r.status}`; continue; }
++        const b = new Uint8Array(await r.arrayBuffer());
++        if (b.length !== length) { last = `${b.length} bytes, the index says ${length}`; continue; }
++        if ((await sha256Hex(b)) !== sha) { last = 'the bytes do not hash to the name of the object'; continue; }
++        this.fetched++;
++        this.bytes += b.length;
++        return b;
++      } catch (e) {
++        last = String((e as Error)?.message ?? e);
++      }
++    }
++    throw new ChunkStoreError(`chunk ${sha}: ${last} (after ${this.attempts} tries)`);
++  }
++}
+diff --git a/app/src/engine/chunked-source.ts b/app/src/engine/chunked-source.ts
+new file mode 100644
+index 0000000..2caea8a
+--- /dev/null
++++ b/app/src/engine/chunked-source.ts
+@@ -0,0 +1,86 @@
++// Decision 0314 (PROVISIONAL): a stream of the lazy install tree as a ByteSource (hostfiles.ts): the logical bytes of the stream, read synchronously. A read that needs a chunk the page does not hold asks the ChunkClient
++// (chunk-io.ts: the engine thread waits for the I/O Worker); the decoded chunks are kept in a small LRU shared by all the streams, so a file read in pieces is one fetch.
++
++import type { ByteSource } from './hostfiles.ts';
++import type { ChunkClient } from './chunk-io.ts';
++import type { VfsStream } from './vfs-index.ts';
++
++export interface ChunkCacheStats { hits: number; misses: number; evictions: number; heldBytes: number; fetchedBytes: number }
++
++/** decoded chunks by (stream, chunk), least recently used out first when the held bytes pass the budget */
++export class ChunkCache {
++  private readonly map = new Map<number, Uint8Array>();   // insertion order = recency
++  readonly stats: ChunkCacheStats = { hits: 0, misses: 0, evictions: 0, heldBytes: 0, fetchedBytes: 0 };
++  readonly budget: number;
++
++  constructor(budgetBytes: number) { this.budget = budgetBytes; }
++
++  static key(stream: number, chunk: number): number { return stream * 0x1000000 + chunk; }   // 16 streams x 16 M chunks (a stream is at most 16 M x 8 MiB)
++
++  get(key: number): Uint8Array | undefined {
++    const v = this.map.get(key);
++    if (v === undefined) return undefined;
++    this.map.delete(key);
++    this.map.set(key, v);
++    this.stats.hits++;
++    return v;
++  }
++
++  put(key: number, bytes: Uint8Array): void {
++    this.stats.misses++;
++    this.stats.fetchedBytes += bytes.length;
++    const old = this.map.get(key);
++    if (old) { this.stats.heldBytes -= old.length; this.map.delete(key); }
++    this.map.set(key, bytes);
++    this.stats.heldBytes += bytes.length;
++    while (this.stats.heldBytes > this.budget && this.map.size > 1) {   // the chunk just put always stays
++      const first = this.map.keys().next().value as number;
++      const v = this.map.get(first) as Uint8Array;
++      this.map.delete(first);
++      this.stats.heldBytes -= v.length;
++      this.stats.evictions++;
++    }
++  }
++}
++
++export class ChunkedSource implements ByteSource {
++  private readonly stream: VfsStream;
++  private readonly index: number;
++  private readonly client: ChunkClient;
++  private readonly cache: ChunkCache;
++
++  constructor(stream: VfsStream, index: number, client: ChunkClient, cache: ChunkCache) {
++    this.stream = stream;
++    this.index = index;
++    this.client = client;
++    this.cache = cache;
++  }
++
++  get size(): number { return this.stream.logical; }
++
++  private chunk(c: number): Uint8Array {
++    const key = ChunkCache.key(this.index, c);
++    const hit = this.cache.get(key);
++    if (hit) return hit;
++    const b = this.client.fetchChunk(this.index, c);
++    this.cache.put(key, b);
++    return b;
++  }
++
++  readInto(dst: Uint8Array, at: number): number {
++    const s = this.stream;
++    if (at >= s.logical || dst.length === 0) return 0;
++    const n = Math.min(dst.length, s.logical - at);
++    let done = 0;
++    while (done < n) {
++      const pos = at + done;
++      const c = Math.floor(pos / s.chunkSize), inChunk = pos - c * s.chunkSize;
++      const b = this.chunk(c);
++      const take = Math.min(n - done, b.length - inChunk);
++      if (take <= 0) throw new Error(`stream ${s.name} chunk ${c} is ${b.length} bytes, the read needs byte ${inChunk}`);
++      dst.set(b.subarray(inChunk, inChunk + take), done);
++      done += take;
++    }
++    return n;
++  }
++}
+diff --git a/app/src/engine/hostfiles.ts b/app/src/engine/hostfiles.ts
+index 51fbbee..4e20c9a 100644
+--- a/app/src/engine/hostfiles.ts
++++ b/app/src/engine/hostfiles.ts
+@@ -41,7 +41,7 @@ export class MemorySource implements ByteSource {
+ export interface PackMember { offset: number; size: number; sha256: string }
+ export interface HostPack { source: ByteSource; format: PackFormat; members: ReadonlyMap<string, PackMember> }
+ 
+-const EACCES = 2, EBADF = 8, EINVAL = 28, EISDIR = 31, ENOENT = 44, EMFILE = 33, ESPIPE = 70, ENOTDIR = 54;
++const EACCES = 2, EBADF = 8, EINVAL = 28, EIO = 29, EISDIR = 31, ENOENT = 44, EMFILE = 33, ESPIPE = 70, ENOTDIR = 54;
+ const O_ACCMODE = 3, O_CREAT = 0o100, O_TRUNC = 0o1000, O_DIRECTORY = 0o200000;
+ const AT_FDCWD = -100;
+ const S_IFDIR = 0o040000, S_IFREG = 0o100000;
+@@ -68,11 +68,13 @@ export class HostFilesUnsupported extends Error {
+   constructor(what: string) { super(`The engine asked its host files for something they do not do: ${what}. The host files are the read-only packs of the bundle (app/src/engine/hostfiles.ts).`); this.name = 'HostFilesUnsupported'; }
+ }
+ 
+-interface HostFile { source: ByteSource; offset: number; size: number; ino: number }
++interface HostFile { source: ByteSource; offset: number; size: number; ino: number; persistent?: boolean }
+ interface OpenFile { file: HostFile; pos: number }
+ 
+ export interface HostFileStats {
+   opens: number; failedOpens: number; stats: number; reads: number; bytes: number; closes: number; seeks: number;
++  /** reads that a source could not answer (a lazy chunk that could not be fetched): the call returned EIO */
++  readErrors: number;
+   /** milliseconds spent inside the replaced system calls (the copy of the bytes included) */
+   callMs: number;
+   /** performance.now() of the first and the last call (null: none yet) */
+@@ -93,7 +95,7 @@ export class HostFiles {
+   private u8: Uint8Array = new Uint8Array(0);
+   private dv: DataView = new DataView(new ArrayBuffer(0));
+   private nextIno = 1;
+-  readonly stats: HostFileStats = { opens: 0, failedOpens: 0, stats: 0, reads: 0, bytes: 0, closes: 0, seeks: 0, callMs: 0, firstAt: null, lastAt: null, filesOpened: 0 };
++  readonly stats: HostFileStats = { opens: 0, failedOpens: 0, stats: 0, reads: 0, bytes: 0, closes: 0, seeks: 0, readErrors: 0, callMs: 0, firstAt: null, lastAt: null, filesOpened: 0 };
+ 
+   constructor(memory: () => WebAssembly.Memory | null) { this.memory = memory; }
+ 
+@@ -120,6 +122,18 @@ export class HostFiles {
+     for (let i = p.indexOf('/', 1); i > 0; i = p.indexOf('/', i + 1)) this.dirs.add(p.slice(0, i));
+   }
+ 
++  /**
++   * Decision 0314: a file whose bytes the engine may read at ANY time, not only at start-up (a stream of the lazy install tree, lazy-tree.ts). It survives release(): its source stays open and an open of it is not
++   * refused. `size` is the length of the whole source.
++   */
++  addPersistent(path: string, source: ByteSource): void {
++    this.add(path, source, 0, source.size);
++    (this.files.get(normalize(path)) as HostFile).persistent = true;
++  }
++
++  /** the message of the last read a source could not answer (for the page to show), or null */
++  lastReadError: string | null = null;
++
+   private released = false;
+   private readonly knownPaths = new Set<string>();
+ 
+@@ -129,21 +143,29 @@ export class HostFiles {
+    */
+   release(): void {
+     if (this.released) return;
+-    for (const p of this.files.keys()) this.knownPaths.add(p);
++    for (const [p, f] of this.files) if (!f.persistent) this.knownPaths.add(p);   // decision 0314: a persistent file is not 'known to be gone'
+     this.released = true;
+-    this.close();
++    this.closeWhere((f) => !f.persistent);
+   }
+   get isReleased(): boolean { return this.released; }
+ 
+   /** forgets every file and closes the sources (the pack bytes can be freed); later opens fail with ENOENT */
+-  close(): void {
+-    const sources = new Set<ByteSource>();
+-    for (const f of this.files.values()) sources.add(f.source);
+-    this.files.clear();
++  close(): void { this.closeWhere(() => true); }
++
++  /** forgets the files for which `drop` is true and closes their sources (a source that a kept file also uses stays open); descriptors of the dropped files are closed */
++  private closeWhere(drop: (f: HostFile) => boolean): void {
++    const sources = new Set<ByteSource>(), kept = new Set<ByteSource>();
++    for (const [p, f] of this.files) {
++      if (drop(f)) { sources.add(f.source); this.files.delete(p); } else kept.add(f.source);
++    }
+     this.dirs.clear();
+     this.dirs.add('/');
+-    this.fds.length = 0;
+-    for (const s of sources) s.close?.();
++    for (const p of this.files.keys()) for (let i = p.indexOf('/', 1); i > 0; i = p.indexOf('/', i + 1)) this.dirs.add(p.slice(0, i));
++    for (let fd = 0; fd < this.fds.length; fd++) {
++      const of = this.fds[fd];
++      if (of && drop(of.file)) this.fds[fd] = undefined;
++    }
++    for (const s of sources) if (!kept.has(s)) s.close?.();
+   }
+ 
+   private touch(): void { const t = performance.now(); if (this.stats.firstAt === null) this.stats.firstAt = t; this.stats.lastAt = t; }
+@@ -229,7 +251,15 @@ export class HostFiles {
+       const left = f.size - pos;
+       if (left <= 0) break;
+       const want = Math.min(len, left);
+-      const got = f.source.readInto(u8.subarray(ptr, ptr + want), f.offset + pos);
++      let got: number;
++      try {
++        got = f.source.readInto(u8.subarray(ptr, ptr + want), f.offset + pos);
++      } catch (e) {   // decision 0314: a lazy chunk that could not be fetched. The call fails with EIO (the engine's reader answers it by name); an engine that gets the bytes it asked for never sees this
++        this.stats.readErrors++;
++        this.lastReadError = String((e as Error)?.message ?? e);
++        if (total === 0) return -EIO;
++        break;
++      }
+       pos += got;
+       total += got;
+       if (got < len) break;
+@@ -276,6 +306,7 @@ export class HostFiles {
+         if (!of) return origRead ? origRead(fd, iov, iovcnt, pnum) : EBADF;
+         this.touch();
+         const n = this.readv(of, iov, iovcnt, null);
++        if (n < 0) { this.heap().dv.setUint32(pnum, 0, true); return -n; }
+         this.heap().dv.setUint32(pnum, n, true);
+         return 0;
+       },
+@@ -285,6 +316,7 @@ export class HostFiles {
+         if (offset < 0n) return EINVAL;
+         this.touch();
+         const n = this.readv(of, iov, iovcnt, Number(offset));
++        if (n < 0) { this.heap().dv.setUint32(pnum, 0, true); return -n; }
+         this.heap().dv.setUint32(pnum, n, true);
+         return 0;
+       },
+diff --git a/app/src/engine/lazy-tree.ts b/app/src/engine/lazy-tree.ts
+new file mode 100644
+index 0000000..65694cc
+--- /dev/null
++++ b/app/src/engine/lazy-tree.ts
+@@ -0,0 +1,32 @@
++// Decision 0314 (PROVISIONAL): puts the streams of a lazy install tree among the host files of the engine. The engine's seed list has a row `<mount>\<TAB>@lazy:vfs/index.bin<TAB><SHA-256 of the index>` (lift/harness/vfs_lazy.h): at
++// start-up the C side reads `<root>/vfs/index.bin` (an ordinary, released-at-first-idle host file here) and registers the streams `<root>/vfs/<stream name>` as the files it reads the lazy bytes from, with pread, at any time.
++
++import { MemorySource, type HostFiles } from './hostfiles.ts';
++import { ChunkCache, ChunkedSource } from './chunked-source.ts';
++import type { ChunkClient } from './chunk-io.ts';
++import { parseIndex, type VfsIndex } from './vfs-index.ts';
++
++export interface MountedLazyTree {
++  index: VfsIndex;
++  cache: ChunkCache;
++  /** the host file names that were added: the index and one per stream */
++  paths: string[];
++}
++
++/**
++ * `root` is the directory the seed list's host names are relative to (the engine's FLE_VFS_SEED_ROOT); the index goes to `<root>/vfs/index.bin` and the streams to `<root>/vfs/<name>`.
++ * `cacheBytes` is the budget of decoded chunks the page holds (the chunks of a file being read, and what was read lately).
++ */
++export function mountLazyTree(files: HostFiles, root: string, indexBytes: Uint8Array, client: ChunkClient, cacheBytes = 64 * 1024 * 1024): MountedLazyTree {
++  const index = parseIndex(indexBytes);
++  const cache = new ChunkCache(cacheBytes);
++  const dir = `${root.replace(/\/+$/, '')}/vfs`;
++  const paths: string[] = [`${dir}/index.bin`];
++  files.add(paths[0] as string, new MemorySource(indexBytes), 0, indexBytes.length);
++  index.streams.forEach((s, i) => {
++    const p = `${dir}/${s.name}`;
++    files.addPersistent(p, new ChunkedSource(s, i, client, cache));
++    paths.push(p);
++  });
++  return { index, cache, paths };
++}
+diff --git a/app/src/engine/vfs-index.ts b/app/src/engine/vfs-index.ts
+new file mode 100644
+index 0000000..4f332e6
+--- /dev/null
++++ b/app/src/engine/vfs-index.ts
+@@ -0,0 +1,154 @@
++// Decision 0314 (PROVISIONAL): the reader of the lazy install tree's index (FLVFSIX1 v1; the grammar is docs/decisions/0314-lazy-install-tree.md 'Format'). The C side (lift/harness/vfs_lazy.h) reads the same bytes
++// for the files and directories; the page needs the STREAMS only (names, coding, chunk size, the SHA-256 of every chunk), so `entries: false` (the default) stops after the stream table. A full parse (`entries: true`) is
++// for tests and tools.
++//
++// Limits (the same as the C reader): 16 streams, 65,536 entries, a chunk of 1 B .. 8 MiB, a stream name of [A-Za-z0-9._-], at most 64 characters. Every read is bounded: a malformed index throws VfsIndexError by name.
++
++export const VFS_MAX_STREAMS = 16;
++export const VFS_MAX_ENTRIES = 65536;
++export const VFS_MAX_CHUNK = 8 * 1024 * 1024;
++export const VFS_MAX_INDEX_BYTES = 16 * 1024 * 1024;
++const MAGIC = [0x46, 0x4c, 0x56, 0x46, 0x53, 0x49, 0x58, 0x31];   // 'FLVFSIX1'
++const VFS_NAME_RE = /^[A-Za-z0-9._-]{1,64}$/;
++
++export class VfsIndexError extends Error {
++  constructor(what: string) { super(`The lazy install tree's index is not usable: ${what}.`); this.name = 'VfsIndexError'; }
++}
++
++export interface VfsStream {
++  name: string;
++  /** 0 = identity, 1 = brotli (the object is stored encoded and served with Content-Encoding: br; the fetch API hands the page the decoded bytes) */
++  coding: 0 | 1;
++  chunkSize: number;
++  /** logical bytes of the stream = the sum of the sizes of its files */
++  logical: number;
++  /** SHA-256 (lower-case hex) of the LOGICAL bytes of every chunk; the object is `vfs/<hex>.chk` */
++  chunks: string[];
++}
++
++export interface VfsEntry {
++  kind: 'file' | 'dir';
++  /** UTF-8 decoded, '/' separated, relative to the mount */
++  path: string;
++  /** FILETIME ticks (100 ns since 1601) */
++  mtimeFt: bigint;
++  attrs: number;
++  /** files only */
++  stream?: number;
++  size?: number;
++  /** files only: where the file starts in its stream's logical bytes (the running sum of the earlier files of that stream) */
++  offset?: number;
++}
++
++export interface VfsIndex {
++  version: number;
++  flags: number;
++  smallMax: number;
++  baseFt: bigint;
++  /** the guest directory the entries are relative to, backslashes, e.g. C:\Program Files\Image-Line\FL Studio 21 */
++  mount: string;
++  streams: VfsStream[];
++  nDirs: number;
++  nFiles: number;
++  entries: VfsEntry[];
++}
++
++class Cursor {
++  i = 0;
++  readonly b: Uint8Array;
++  readonly dv: DataView;
++  constructor(b: Uint8Array) { this.b = b; this.dv = new DataView(b.buffer, b.byteOffset, b.byteLength); }
++  need(n: number, what: string): void { if (n > this.b.length - this.i) throw new VfsIndexError(`cut short in ${what}`); }
++  u8(what: string): number { this.need(1, what); return this.b[this.i++] as number; }
++  u32(what: string): number { this.need(4, what); const v = this.dv.getUint32(this.i, true); this.i += 4; return v; }
++  u64(what: string): bigint { this.need(8, what); const v = this.dv.getBigUint64(this.i, true); this.i += 8; return v; }
++  varint(what: string): number {
++    let v = 0, mul = 1;
++    for (let k = 0; k < 8; k++) {
++      const c = this.u8(what);
++      v += (c & 0x7f) * mul;
++      if (!(c & 0x80)) return v;
++      mul *= 128;
++    }
++    throw new VfsIndexError(`a number in ${what} is longer than 8 bytes of 7 bits`);
++  }
++  take(n: number, what: string): Uint8Array { this.need(n, what); const r = this.b.subarray(this.i, this.i + n); this.i += n; return r; }
++}
++
++const hex = (b: Uint8Array): string => { let s = ''; for (const x of b) s += x.toString(16).padStart(2, '0'); return s; };
++
++export function parseIndex(bytes: Uint8Array, opts: { entries?: boolean } = {}): VfsIndex {
++  if (bytes.length > VFS_MAX_INDEX_BYTES) throw new VfsIndexError(`${bytes.length} bytes is over the ${VFS_MAX_INDEX_BYTES} limit`);
++  const c = new Cursor(bytes);
++  const td = new TextDecoder('utf-8', { fatal: true });
++  if (bytes.length < 8 || !MAGIC.every((c, i) => bytes[i] === c)) throw new VfsIndexError('it does not start with FLVFSIX1');
++  c.i = 8;
++  const version = c.u32('the header'), flags = c.u32('the header'), smallMax = c.u32('the header'), baseFt = c.u64('the header');
++  const ns = c.varint('the header'), nd = c.varint('the header'), nf = c.varint('the header');
++  const mountLen = c.varint('the header');
++  let mount: string;
++  try { mount = td.decode(c.take(mountLen, 'the mount')); } catch (e) { if (e instanceof VfsIndexError) throw e; throw new VfsIndexError('the mount is not valid UTF-8'); }
++  if (version !== 1) throw new VfsIndexError(`version ${version} (this reader knows 1)`);
++  if ((flags & ~1) !== 0) throw new VfsIndexError(`unknown flags 0x${flags.toString(16)}`);
++  if (ns < 1 || ns > VFS_MAX_STREAMS) throw new VfsIndexError(`${ns} streams (1..${VFS_MAX_STREAMS} are supported)`);
++  if (nd > VFS_MAX_ENTRIES || nf > VFS_MAX_ENTRIES || nd + nf > VFS_MAX_ENTRIES) throw new VfsIndexError(`${nd} directories and ${nf} files (at most ${VFS_MAX_ENTRIES} entries)`);
++  const streams: VfsStream[] = [];
++  const seen = new Set<string>();
++  for (let s = 0; s < ns; s++) {
++    const nameLen = c.varint(`stream ${s}`);
++    const name = nameLen > 64 ? '' : new TextDecoder().decode(c.take(nameLen, `stream ${s}`));
++    const coding = c.u8(`stream ${s}`);
++    const chunkSize = c.varint(`stream ${s}`), nChunks = c.varint(`stream ${s}`), logical = c.varint(`stream ${s}`);
++    if (!VFS_NAME_RE.test(name) || name === '.' || name === '..') throw new VfsIndexError(`stream ${s} has a name outside [A-Za-z0-9._-]{1,64}`);
++    if (seen.has(name)) throw new VfsIndexError(`stream name ${name} is used twice`);
++    seen.add(name);
++    if (coding > 1) throw new VfsIndexError(`stream ${name} has coding ${coding} (0 identity, 1 brotli)`);
++    if (chunkSize < 1 || chunkSize > VFS_MAX_CHUNK) throw new VfsIndexError(`stream ${name} has chunk size ${chunkSize} (1..${VFS_MAX_CHUNK})`);
++    if (nChunks !== Math.ceil(logical / chunkSize)) throw new VfsIndexError(`stream ${name} has ${nChunks} chunks for ${logical} bytes of ${chunkSize} per chunk`);
++    if (nChunks > (c.b.length - c.i) / 32) throw new VfsIndexError(`cut short in the chunk hashes of stream ${name}`);
++    const chunks: string[] = [];
++    for (let k = 0; k < nChunks; k++) chunks.push(hex(c.take(32, `the chunk hashes of ${name}`)));
++    streams.push({ name, coding: coding as 0 | 1, chunkSize, logical, chunks });
++  }
++  const index: VfsIndex = { version, flags, smallMax, baseFt, mount, streams, nDirs: nd, nFiles: nf, entries: [] };
++  if (!opts.entries) return index;
++
++  const cursor = new Array<number>(ns).fill(0);
++  let prev = new Uint8Array(0);
++  let seenDirs = 0, seenFiles = 0;
++  for (let e = 0; e < nd + nf; e++) {
++    const kind = c.u8(`entry ${e}`);
++    const common = c.varint(`entry ${e}`), sufLen = c.varint(`entry ${e}`);
++    if (common > prev.length) throw new VfsIndexError(`entry ${e} shares ${common} bytes with a path of ${prev.length}`);
++    if (kind > 1) throw new VfsIndexError(`entry ${e} has kind ${kind}`);
++    const suffix = c.take(sufLen, `entry ${e}`);
++    const zz = c.varint(`entry ${e}`);
++    const attrs = c.u8(`entry ${e}`);
++    const pb = new Uint8Array(common + sufLen);
++    pb.set(prev.subarray(0, common));
++    pb.set(suffix, common);
++    prev = pb;
++    let path: string;
++    try { path = td.decode(pb); } catch { throw new VfsIndexError(`entry ${e} is not valid UTF-8`); }
++    const delta = zz % 2 === 0 ? zz / 2 : -(zz + 1) / 2;
++    const mtimeFt = baseFt + BigInt(delta) * 10000000n;
++    if (kind === 1) {
++      index.entries.push({ kind: 'dir', path, mtimeFt, attrs });
++      seenDirs++;
++      continue;
++    }
++    const stream = c.u8(`entry ${e}`), size = c.varint(`entry ${e}`);
++    if (flags & 1) c.take(32, `entry ${e}`);
++    const st = streams[stream];
++    if (!st) throw new VfsIndexError(`file ${path} names stream ${stream} of ${ns}`);
++    const offset = cursor[stream] as number;
++    if (size > st.logical - offset) throw new VfsIndexError(`file ${path} runs past the end of stream ${st.name}`);
++    cursor[stream] = offset + size;
++    index.entries.push({ kind: 'file', path, mtimeFt, attrs, stream, size, offset });
++    seenFiles++;
++  }
++  if (seenDirs !== nd || seenFiles !== nf) throw new VfsIndexError(`the header says ${nd} directories and ${nf} files, the entries are ${seenDirs} and ${seenFiles}`);
++  if (c.i !== c.b.length) throw new VfsIndexError(`${c.b.length - c.i} bytes after the last entry`);
++  for (let s = 0; s < ns; s++) if (cursor[s] !== (streams[s] as VfsStream).logical) throw new VfsIndexError(`the files of stream ${(streams[s] as VfsStream).name} add up to ${cursor[s]} bytes, the stream has ${(streams[s] as VfsStream).logical}`);
++  return index;
++}
+diff --git a/app/test/unit/helpers/chunk-io-node-worker.ts b/app/test/unit/helpers/chunk-io-node-worker.ts
+new file mode 100644
+index 0000000..cde5f0d
+--- /dev/null
++++ b/app/test/unit/helpers/chunk-io-node-worker.ts
+@@ -0,0 +1,19 @@
++// Test helper for decision 0314: the I/O Worker of the tests, a node worker_thread over a directory of chunk objects. `failSha`: the hex names whose chunk is refused (the store throws).
++import { parentPort, workerData } from 'node:worker_threads';
++import { serveChunkIo, type ChunkIoShared } from '../../../src/engine/chunk-io.ts';
++import { DirChunkStore } from './lazy-tree-gen.ts';
++import type { VfsStream } from '../../../src/engine/vfs-index.ts';
++import type { ChunkStore } from '../../../src/engine/chunk-store.ts';
++
++const d = workerData as { shared: ChunkIoShared; streams: VfsStream[]; dir: string; failSha?: string[]; delayMs?: number; wrongLength?: boolean };
++const inner = new DirChunkStore(d.dir);
++const store: ChunkStore = {
++  async get(sha, coding, length) {
++    if (d.delayMs) await new Promise((r) => setTimeout(r, d.delayMs));
++    if (d.failSha?.includes(sha)) throw new Error('refused by the test');
++    if (d.wrongLength) return new Uint8Array(10);
++    return inner.get(sha, coding, length);
++  },
++};
++parentPort?.postMessage({ type: 'ready' });
++serveChunkIo(d.shared, d.streams, store).then((served) => parentPort?.postMessage({ type: 'done', served }), (e: unknown) => parentPort?.postMessage({ type: 'error', message: String(e) }));
+diff --git a/app/test/unit/helpers/lazy-tree-gen.ts b/app/test/unit/helpers/lazy-tree-gen.ts
+new file mode 100644
+index 0000000..8c12ca5
+--- /dev/null
++++ b/app/test/unit/helpers/lazy-tree-gen.ts
+@@ -0,0 +1,97 @@
++// Test helper for decision 0314: makes a small lazy install tree (the FLVFSIX1 index, the chunk objects `vfs/<sha256>.chk`) from a list of files, with the grammar written independently of src/engine/vfs-index.ts.
++import { brotliCompressSync, brotliDecompressSync } from 'node:zlib';
++import { createHash } from 'node:crypto';
++import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
++import { join } from 'node:path';
++import type { ChunkStore } from '../../../src/engine/chunk-store.ts';
++
++export const BASE_FT = 134344736000000000n;
++export const MOUNT = 'C:\\Program Files\\Image-Line\\FL Studio 21';
++
++export interface GenFile { kind: 'file'; path: string; data: Uint8Array; dsec: number; attrs: number; stream: number }
++export interface GenDir { kind: 'dir'; path: string; dsec: number; attrs: number }
++export type GenEntry = GenFile | GenDir;
++export interface GenStream { name: string; coding: 0 | 1; chunkSize: number }
++
++export const pattern = (n: number, seed: number): Uint8Array => Uint8Array.from({ length: n }, (_, i) => (i * 13 + seed * 31 + 7) & 0xff);
++
++const varint = (v: number): number[] => { const o: number[] = []; while (v >= 0x80) { o.push((v % 128) | 0x80); v = Math.floor(v / 128); } o.push(v); return o; };
++const le = (v: bigint | number, n: number): number[] => { let x = BigInt(v); const o: number[] = []; for (let i = 0; i < n; i++) { o.push(Number(x & 0xffn)); x >>= 8n; } return o; };
++const sha = (b: Uint8Array): Buffer => createHash('sha256').update(b).digest();
++
++export interface GenResult { index: Uint8Array; streams: Uint8Array[]; chunks: Map<string, Uint8Array> }
++
++/** the index bytes, the logical bytes of each stream, and the chunk objects as stored (hex name -> stored bytes) */
++export function generate(entries: GenEntry[], streams: GenStream[], mount = MOUNT, flags = 0): GenResult {
++  const logical = streams.map(() => [] as Uint8Array[]);
++  for (const e of entries) if (e.kind === 'file') logical[e.stream]!.push(e.data);
++  const joined = logical.map((parts) => { const n = parts.reduce((a, p) => a + p.length, 0); const o = new Uint8Array(n); let at = 0; for (const p of parts) { o.set(p, at); at += p.length; } return o; });
++  const chunks = new Map<string, Uint8Array>();
++  const out: number[] = [...Buffer.from('FLVFSIX1'), ...le(1, 4), ...le(flags, 4), ...le(262144, 4), ...le(BASE_FT, 8)];
++  const nd = entries.filter((e) => e.kind === 'dir').length, nf = entries.length - nd;
++  const mountB = Buffer.from(mount, 'utf8');
++  out.push(...varint(streams.length), ...varint(nd), ...varint(nf), ...varint(mountB.length), ...mountB);
++  streams.forEach((s, si) => {
++    const data = joined[si]!;
++    const nameB = Buffer.from(s.name);
++    const n = Math.ceil(data.length / s.chunkSize);
++    out.push(...varint(nameB.length), ...nameB, s.coding, ...varint(s.chunkSize), ...varint(n), ...varint(data.length));
++    for (let c = 0; c < n; c++) {
++      const piece = data.subarray(c * s.chunkSize, Math.min(data.length, (c + 1) * s.chunkSize));
++      const h = sha(piece);
++      out.push(...h);
++      chunks.set(h.toString('hex'), s.coding === 1 ? new Uint8Array(brotliCompressSync(piece)) : piece);
++    }
++  });
++  let prev = Buffer.alloc(0);
++  for (const e of entries) {
++    const p = Buffer.from(e.path, 'utf8');
++    let common = 0;
++    while (common < prev.length && common < p.length && prev[common] === p[common]) common++;
++    out.push(e.kind === 'file' ? 0 : 1, ...varint(common), ...varint(p.length - common), ...p.subarray(common), ...varint(e.dsec >= 0 ? e.dsec * 2 : -e.dsec * 2 - 1), e.attrs);
++    if (e.kind === 'file') {
++      out.push(e.stream, ...varint(e.data.length));
++      if (flags & 1) out.push(...sha(e.data));
++    }
++    prev = p;
++  }
++  return { index: Uint8Array.from(out), streams: joined, chunks };
++}
++
++export function writeTree(dir: string, g: GenResult): void {
++  mkdirSync(join(dir, 'vfs'), { recursive: true });
++  for (const [h, b] of g.chunks) writeFileSync(join(dir, 'vfs', `${h}.chk`), b);
++}
++
++/** a ChunkStore over a directory of stored objects (brotli ones are decoded here, as the browser's fetch does) */
++export class DirChunkStore implements ChunkStore {
++  gets = 0;
++  readonly dir: string;
++  constructor(dir: string) { this.dir = dir; }
++  async get(shaHex: string, coding: 0 | 1, length: number): Promise<Uint8Array> {
++    this.gets++;
++    const stored = readFileSync(join(this.dir, 'vfs', `${shaHex}.chk`));
++    const b = coding === 1 ? new Uint8Array(brotliDecompressSync(stored)) : new Uint8Array(stored);
++    if (b.length !== length) throw new Error(`chunk ${shaHex}: ${b.length} bytes, expected ${length}`);
++    if (sha(b).toString('hex') !== shaHex) throw new Error(`chunk ${shaHex}: hash mismatch`);
++    return b;
++  }
++}
++
++/** the files of the standard test tree: streams small-bin (identity, 1 KiB chunks) and large-pcm (brotli, 4 KiB chunks) */
++export function standardTree(): { entries: GenEntry[]; streams: GenStream[] } {
++  return {
++    streams: [{ name: 'small-bin', coding: 0, chunkSize: 1024 }, { name: 'large-pcm', coding: 1, chunkSize: 4096 }],
++    entries: [
++      { kind: 'dir', path: 'Data', dsec: 5, attrs: 0 },
++      { kind: 'dir', path: 'Data/Empty folder', dsec: 6, attrs: 0 },
++      { kind: 'dir', path: 'Data/Patches', dsec: 7, attrs: 0 },
++      { kind: 'file', path: 'Data/Patches/a.txt', data: pattern(10, 1), dsec: 100, attrs: 0x20, stream: 0 },
++      { kind: 'file', path: 'Data/Patches/zero.bin', data: new Uint8Array(0), dsec: 101, attrs: 0x20, stream: 0 },
++      { kind: 'file', path: 'Data/Patches/日本語.txt', data: pattern(5, 2), dsec: -50, attrs: 0x21, stream: 0 },
++      { kind: 'file', path: 'Data/b.bin', data: pattern(3000, 3), dsec: 3, attrs: 0x20, stream: 0 },
++      { kind: 'file', path: 'Data/big.dat', data: pattern(10000, 4), dsec: 4000, attrs: 0x20, stream: 1 },
++      { kind: 'file', path: 'Data/exact.dat', data: pattern(8192, 5), dsec: 4001, attrs: 0x20, stream: 1 },
++    ],
++  };
++}
+diff --git a/app/test/unit/helpers/sync-dir-client.ts b/app/test/unit/helpers/sync-dir-client.ts
+new file mode 100644
+index 0000000..bdb79f3
+--- /dev/null
++++ b/app/test/unit/helpers/sync-dir-client.ts
+@@ -0,0 +1,23 @@
++// Test helper for decision 0314: a synchronous ChunkClient over a directory of chunk objects (node fs + zlib), the same bytes the I/O Worker would give.
++import { brotliDecompressSync } from 'node:zlib';
++import { createHash } from 'node:crypto';
++import { readFileSync } from 'node:fs';
++import { join } from 'node:path';
++import type { ChunkClient } from '../../../src/engine/chunk-io.ts';
++import type { VfsStream } from '../../../src/engine/vfs-index.ts';
++
++export class SyncDirClient implements ChunkClient {
++  fetches = 0;
++  private readonly dir: string;
++  private readonly streams: readonly VfsStream[];
++  constructor(dir: string, streams: readonly VfsStream[]) { this.dir = dir; this.streams = streams; }
++  fetchChunk(stream: number, chunk: number): Uint8Array {
++    this.fetches++;
++    const s = this.streams[stream] as VfsStream;
++    const sha = s.chunks[chunk] as string;
++    const stored = readFileSync(join(this.dir, 'vfs', `${sha}.chk`));
++    const b = new Uint8Array(s.coding === 1 ? brotliDecompressSync(stored) : stored);
++    if (createHash('sha256').update(b).digest('hex') !== sha) throw new Error(`chunk ${sha}: the decoded bytes do not hash to the name`);
++    return b;
++  }
++}
+diff --git a/app/test/unit/lazy-tree.test.ts b/app/test/unit/lazy-tree.test.ts
+new file mode 100644
+index 0000000..f031d07
+--- /dev/null
++++ b/app/test/unit/lazy-tree.test.ts
+@@ -0,0 +1,418 @@
++import { describe, expect, it } from 'vitest';
++import { Worker } from 'node:worker_threads';
++import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs';
++import { brotliDecompressSync } from 'node:zlib';
++import { createHash } from 'node:crypto';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++import { ChunkCache, ChunkedSource } from '../../src/engine/chunked-source.ts';
++import { ChunkIoError, SabChunkClient, ERR_LENGTH, ERR_STORE, makeChunkIoShared, type ChunkIoShared } from '../../src/engine/chunk-io.ts';
++import { ChunkStoreError, FetchChunkStore, sha256Hex } from '../../src/engine/chunk-store.ts';
++import { HostFiles, HostFilesUnsupported, installHostFiles } from '../../src/engine/hostfiles.ts';
++import { mountLazyTree } from '../../src/engine/lazy-tree.ts';
++import { parseIndex, VfsIndexError, type VfsIndex } from '../../src/engine/vfs-index.ts';
++import { BASE_FT, DirChunkStore, MOUNT, generate, pattern, standardTree, writeTree, type GenEntry } from './helpers/lazy-tree-gen.ts';
++import { SyncDirClient } from './helpers/sync-dir-client.ts';
++
++// The expected bytes are the original files of the generator (pattern(n, seed)), not anything the code under test produced.
++
++function expectedFiles(entries: GenEntry[]): Map<string, Uint8Array> {
++  const m = new Map<string, Uint8Array>();
++  for (const e of entries) if (e.kind === 'file') m.set(e.path, e.data);
++  return m;
++}
++
++function readAll(src: ChunkedSource, off: number, size: number, piece = 777): Uint8Array {
++  const out = new Uint8Array(size);
++  let at = 0;
++  while (at < size) {
++    const n = src.readInto(out.subarray(at, Math.min(size, at + piece)), off + at);
++    if (n === 0) throw new Error(`short read at ${off + at}`);
++    at += n;
++  }
++  return out;
++}
++
++describe('FLVFSIX1: the index reader', () => {
++  const t = standardTree();
++  const g = generate(t.entries, t.streams);
++
++  it('stream table only, by default; full entries on request (names, times, attributes, offsets)', () => {
++    const lite = parseIndex(g.index);
++    expect(lite.entries).toEqual([]);
++    expect(lite.mount).toBe(MOUNT);
++    expect(lite.baseFt).toBe(BASE_FT);
++    expect(lite.streams.map((s) => [s.name, s.coding, s.chunkSize, s.logical])).toEqual([['small-bin', 0, 1024, 3015], ['large-pcm', 1, 4096, 18192]]);
++    expect(lite.streams[0]?.chunks.length).toBe(3);
++    expect(lite.streams[1]?.chunks.length).toBe(5);
++    const full = parseIndex(g.index, { entries: true });
++    expect(full.nDirs).toBe(3);
++    expect(full.nFiles).toBe(6);
++    expect(full.entries.map((e) => e.path)).toEqual(t.entries.map((e) => e.path));
++    const jp = full.entries.find((e) => e.path.endsWith('日本語.txt'));
++    expect(jp).toMatchObject({ kind: 'file', stream: 0, size: 5, offset: 10, attrs: 0x21 });
++    expect(jp?.mtimeFt).toBe(BASE_FT - 50n * 10000000n);
++    const big = full.entries.find((e) => e.path === 'Data/big.dat');
++    expect(big).toMatchObject({ stream: 1, size: 10000, offset: 0 });
++    expect(full.entries.find((e) => e.path === 'Data/exact.dat')).toMatchObject({ offset: 10000, size: 8192 });
++    expect(full.entries.find((e) => e.path === 'Data/Patches/zero.bin')).toMatchObject({ size: 0, offset: 10 });
++  });
++
++  it('a per-file SHA-256 (flags bit 0) is skipped over', () => {
++    const f = generate(t.entries, t.streams, MOUNT, 1);
++    expect(parseIndex(f.index, { entries: true }).entries.length).toBe(9);
++  });
++
++  it('every proper prefix is refused by name, and no single-byte change throws anything but VfsIndexError', () => {
++    for (let k = 0; k < g.index.length; k++) expect(() => parseIndex(g.index.subarray(0, k), { entries: true })).toThrow(VfsIndexError);
++    for (let k = 0; k < g.index.length; k++) {
++      for (const x of [0xff, 0x80]) {
++        const c = Uint8Array.from(g.index);
++        c[k] = (c[k] as number) ^ x;
++        try { parseIndex(c, { entries: true }); } catch (e) { expect(e).toBeInstanceOf(VfsIndexError); }
++      }
++    }
++  });
++
++  it('limits: 17 streams, a chunk over 8 MiB, a name outside [A-Za-z0-9._-], a wrong chunk count, files that do not add up', () => {
++    const many = generate(t.entries, [...t.streams, ...Array.from({ length: 15 }, (_, i) => ({ name: `x${i}`, coding: 0 as const, chunkSize: 1024 }))]);
++    expect(() => parseIndex(many.index)).toThrow(/17 streams/);
++    const huge = generate(t.entries, [{ ...t.streams[0]!, chunkSize: 9 * 1024 * 1024 }, t.streams[1]!]);
++    expect(() => parseIndex(huge.index)).toThrow(/chunk size/);
++    const slash = generate(t.entries, [{ ...t.streams[0]!, name: 'a/b' }, t.streams[1]!]);
++    expect(() => parseIndex(slash.index)).toThrow(/name/);
++    const dots = generate(t.entries, [{ ...t.streams[0]!, name: '..' }, t.streams[1]!]);
++    expect(() => parseIndex(dots.index)).toThrow(/name/);
++    const bad = Uint8Array.from(g.index);
++    bad.set([9], 8);   // version 9
++    expect(() => parseIndex(bad)).toThrow(/version 9/);
++  });
++});
++
++describe('ChunkedSource and the chunk cache', () => {
++  const t = standardTree();
++  const g = generate(t.entries, t.streams);
++  const dir = mkdtempSync(join(tmpdir(), 'lazy-tree-'));
++  writeTree(dir, g);
++  const idx = parseIndex(g.index, { entries: true });
++  const files = expectedFiles(t.entries);
++
++  it('reads every file back, in odd pieces, across chunk boundaries (identity and brotli streams)', () => {
++    const client = new SyncDirClient(dir, idx.streams);
++    const cache = new ChunkCache(1 << 20);
++    const srcs = idx.streams.map((s, i) => new ChunkedSource(s, i, client, cache));
++    for (const e of idx.entries) {
++      if (e.kind !== 'file') continue;
++      const got = readAll(srcs[e.stream as number] as ChunkedSource, e.offset as number, e.size as number, 333);
++      expect(Buffer.compare(Buffer.from(got), Buffer.from(files.get(e.path) as Uint8Array)), e.path).toBe(0);
++    }
++  });
++
++  it('reads at the end and past it answer 0; a read that ends in the next chunk is one piece of two chunks', () => {
++    const client = new SyncDirClient(dir, idx.streams);
++    const src = new ChunkedSource(idx.streams[1] as typeof idx.streams[number], 1, client, new ChunkCache(1 << 20));
++    expect(src.size).toBe(18192);
++    expect(src.readInto(new Uint8Array(10), 18192)).toBe(0);
++    expect(src.readInto(new Uint8Array(10), 99999)).toBe(0);
++    const buf = new Uint8Array(100);
++    expect(src.readInto(buf, 4090)).toBe(100);   // 6 bytes of chunk 0, 94 of chunk 1
++    const all = generate(t.entries, t.streams).streams[1] as Uint8Array;
++    expect(Buffer.compare(Buffer.from(buf), Buffer.from(all.subarray(4090, 4190)))).toBe(0);
++    expect(client.fetches).toBe(2);
++    expect(src.readInto(buf, 4100)).toBe(100);   // chunk 1 again: from the cache
++    expect(client.fetches).toBe(2);
++    expect(src.readInto(new Uint8Array(5000), 18000)).toBe(192);   // the short last chunk
++  });
++
++  it('the cache keeps within its budget (the chunk just read always stays) and counts hits, misses, evictions', () => {
++    const client = new SyncDirClient(dir, idx.streams);
++    const cache = new ChunkCache(5000);   // room for one 4096-byte chunk of the brotli stream
++    const src = new ChunkedSource(idx.streams[1] as typeof idx.streams[number], 1, client, cache);
++    for (const at of [0, 4096, 8192, 0]) src.readInto(new Uint8Array(1), at);
++    expect(cache.stats.misses).toBe(4);
++    expect(cache.stats.hits).toBe(0);
++    expect(cache.stats.evictions).toBe(3);
++    expect(cache.stats.heldBytes).toBeLessThanOrEqual(5000);
++    src.readInto(new Uint8Array(1), 5);
++    expect(cache.stats.hits).toBe(1);
++  });
++
++});
++
++describe('FetchChunkStore', () => {
++  const body = pattern(2048, 9);
++  const sha = createHash('sha256').update(body).digest('hex');
++  const resp = (b: Uint8Array, status = 200): Response => new Response(status === 200 ? (b as Uint8Array<ArrayBuffer>) : null, { status });
++
++  it('gets vfs/<sha>.chk, checks length and hash, retries after a failure with the HTTP cache bypassed', async () => {
++    const seen: Array<[string, RequestInit | undefined]> = [];
++    let n = 0;
++    const store = new FetchChunkStore('https://example.test/assets/x', {
++      fetchFn: (async (u: string | URL | Request, init?: RequestInit) => { seen.push([String(u), init]); n++; return n === 1 ? resp(body, 500) : resp(body); }) as typeof fetch,
++    });
++    const got = await store.get(sha, 0, 2048);
++    expect(Buffer.compare(Buffer.from(got), Buffer.from(body))).toBe(0);
++    expect(seen[0]?.[0]).toBe(`https://example.test/assets/x/vfs/${sha}.chk`);
++    expect(seen[1]?.[1]).toEqual({ cache: 'reload' });
++    expect(store.retries).toBe(1);
++    expect(store.fetched).toBe(1);
++  });
++
++  it('refuses bytes that do not hash to their name, a wrong length, and a name that is not a SHA-256', async () => {
++    const wrong = pattern(2048, 10);
++    const s1 = new FetchChunkStore('https://e.test/', { attempts: 2, fetchFn: (async () => resp(wrong)) as typeof fetch });
++    await expect(s1.get(sha, 0, 2048)).rejects.toThrow(ChunkStoreError);
++    const s2 = new FetchChunkStore('https://e.test/', { attempts: 1, fetchFn: (async () => resp(body)) as typeof fetch });
++    await expect(s2.get(sha, 0, 2047)).rejects.toThrow(/the index says 2047/);
++    await expect(s2.get('../etc/passwd', 0, 1)).rejects.toThrow(/not a SHA-256/);
++    expect(await sha256Hex(body)).toBe(sha);
++  });
++
++  it('a network error is retried and then reported with the count of tries', async () => {
++    const s = new FetchChunkStore('https://e.test/', { attempts: 3, fetchFn: (async () => { throw new Error('offline'); }) as typeof fetch });
++    await expect(s.get(sha, 0, 2048)).rejects.toThrow(/offline.*after 3 tries/);
++    expect(s.retries).toBe(2);
++  });
++});
++
++function spawnIoWorker(shared: ChunkIoShared, streams: VfsIndex['streams'], dir: string, opts: { failSha?: string[]; delayMs?: number } = {}): Promise<{ w: Worker; done: Promise<number> }> {
++  return new Promise((resolve, reject) => {
++    const w = new Worker(new URL('./helpers/chunk-io-node-worker.ts', import.meta.url), { workerData: { shared, streams, dir, ...opts } });
++    let done!: (n: number) => void;
++    const donep = new Promise<number>((r) => { done = r; });
++    w.on('message', (m: { type: string; served?: number; message?: string }) => {
++      if (m.type === 'ready') resolve({ w, done: donep });
++      else if (m.type === 'done') done(m.served as number);
++      else if (m.type === 'error') reject(new Error(m.message));
++    });
++    w.on('error', reject);
++  });
++}
++
++describe('SabChunkClient + serveChunkIo in a real worker thread (Atomics.wait on both sides)', () => {
++  const t = standardTree();
++  const g = generate(t.entries, t.streams);
++  const dir = mkdtempSync(join(tmpdir(), 'lazy-tree-io-'));
++  writeTree(dir, g);
++  const idx = parseIndex(g.index, { entries: true });
++  const files = expectedFiles(t.entries);
++
++  it('serves every chunk of both streams, in an order that revisits chunks, and the client copy is the decoded bytes', async () => {
++    const shared = makeChunkIoShared(4096);
++    const { w, done } = await spawnIoWorker(shared, idx.streams, dir);
++    const client = new SabChunkClient(shared);
++    for (const [si, s] of idx.streams.entries()) {
++      const order = [...s.chunks.keys()];
++      for (const c of [...order, ...order.slice().reverse()]) {
++        const b = client.fetchChunk(si, c);
++        const want = (g.streams[si] as Uint8Array).subarray(c * s.chunkSize, Math.min(s.logical, (c + 1) * s.chunkSize));
++        expect(Buffer.compare(Buffer.from(b), Buffer.from(want)), `stream ${si} chunk ${c}`).toBe(0);
++      }
++    }
++    expect(client.fetches).toBe(2 * (3 + 5));
++    client.close();
++    expect(await done).toBe(2 * (3 + 5));
++    await w.terminate();
++  });
++
++  it('a ChunkedSource over the SAB client reads files whole and in pieces (the engine thread blocks while the other thread fetches)', async () => {
++    const shared = makeChunkIoShared(4096);
++    const { w, done } = await spawnIoWorker(shared, idx.streams, dir, { delayMs: 2 });
++    const client = new SabChunkClient(shared);
++    const cache = new ChunkCache(8192);
++    const srcs = idx.streams.map((s, i) => new ChunkedSource(s, i, client, cache));
++    for (const e of idx.entries) {
++      if (e.kind !== 'file') continue;
++      const got = readAll(srcs[e.stream as number] as ChunkedSource, e.offset as number, e.size as number, 1500);
++      expect(Buffer.compare(Buffer.from(got), Buffer.from(files.get(e.path) as Uint8Array)), e.path).toBe(0);
++    }
++    client.close();
++    await done;
++    await w.terminate();
++  });
++
++  it('a chunk the store refuses is an ERR_STORE error, the channel is usable afterwards, and an unknown chunk number is refused', async () => {
++    const shared = makeChunkIoShared(4096);
++    const refused = (idx.streams[0] as typeof idx.streams[number]).chunks[1] as string;
++    const { w, done } = await spawnIoWorker(shared, idx.streams, dir, { failSha: [refused] });
++    const client = new SabChunkClient(shared);
++    expect(() => client.fetchChunk(0, 1)).toThrow(ChunkIoError);
++    try { client.fetchChunk(0, 1); } catch (e) { expect((e as ChunkIoError).code).toBe(ERR_STORE); }
++    expect(client.fetchChunk(0, 0).length).toBe(1024);
++    expect(() => client.fetchChunk(0, 99)).toThrow(ChunkIoError);
++    expect(() => client.fetchChunk(7, 0)).toThrow(ChunkIoError);
++    client.close();
++    await done;
++    await w.terminate();
++  });
++
++  it('no I/O Worker: the engine thread gives up after the timeout instead of waiting for ever, and the channel stays closed', () => {
++    const shared = makeChunkIoShared(4096);
++    const client = new SabChunkClient(shared, { timeoutMs: 150 });
++    const t0 = performance.now();
++    expect(() => client.fetchChunk(0, 0)).toThrow(/no reply/);
++    expect(performance.now() - t0).toBeGreaterThanOrEqual(140);
++    expect(() => client.fetchChunk(0, 0)).toThrow(/not idle/);
++  });
++
++  it('a store that gives a chunk of the wrong length is an ERR_LENGTH error (not a short read)', async () => {
++    const shared = makeChunkIoShared(4096);
++    const { w, done } = await spawnIoWorker(shared, idx.streams, dir, { wrongLength: true });
++    const client = new SabChunkClient(shared);
++    try { client.fetchChunk(0, 0); expect.unreachable(); } catch (e) { expect(e).toBeInstanceOf(ChunkIoError); expect((e as ChunkIoError).code).toBe(ERR_LENGTH); }
++    client.close();
++    await done;
++    await w.terminate();
++  });
++});
++
++describe('HostFiles: lazy streams are persistent host files read with pread', () => {
++  const ENOENT = 44, EIO = 29;
++  const t = standardTree();
++  const g = generate(t.entries, t.streams);
++  const dir = mkdtempSync(join(tmpdir(), 'lazy-tree-hf-'));
++  writeTree(dir, g);
++  const idx = parseIndex(g.index, { entries: true });
++
++  function rig() {
++    const mem = new WebAssembly.Memory({ initial: 4 });
++    const files = new HostFiles(() => mem);
++    const orig: Record<string, unknown> = { fd_write: () => 0, fd_read: () => 52, fd_pread: () => 52, fd_seek: () => 70, fd_close: () => 52, __syscall_fstat64: () => 0 };
++    const imports = { env: orig, wasi_snapshot_preview1: orig } as unknown as WebAssembly.Imports;
++    installHostFiles(imports, files);
++    const sc = orig as Record<string, (...a: unknown[]) => number>;
++    const u8 = new Uint8Array(mem.buffer), dv = new DataView(mem.buffer);
++    const str = (at: number, s: string) => { u8.set(new TextEncoder().encode(`${s}\0`), at); return at; };
++    const iov = (at: number, list: Array<[number, number]>) => { list.forEach(([p, l], i) => { dv.setUint32(at + 8 * i, p, true); dv.setUint32(at + 8 * i + 4, l, true); }); return at; };
++    return { mem, files, sc, u8, dv, str, iov };
++  }
++
++  it('openat + fd_pread across a chunk boundary; the index is an ordinary file that release() takes away, the streams stay', () => {
++    const r = rig();
++    const client = new SyncDirClient(dir, idx.streams);
++    const m = mountLazyTree(r.files, '/data/seed', g.index, client);
++    expect(m.paths).toEqual(['/data/seed/vfs/index.bin', '/data/seed/vfs/small-bin', '/data/seed/vfs/large-pcm']);
++    const fd = r.sc.__syscall_openat!(-100, r.str(100, '/data/seed/vfs/large-pcm'), 0, 0) as number;
++    expect(fd).toBeGreaterThanOrEqual(3);
++    expect(r.sc.fd_pread!(fd, r.iov(200, [[1000, 100]]), 1, 4090n, 600)).toBe(0);
++    expect(r.dv.getUint32(600, true)).toBe(100);
++    expect(Buffer.compare(Buffer.from(r.u8.subarray(1000, 1100)), Buffer.from((g.streams[1] as Uint8Array).subarray(4090, 4190)))).toBe(0);
++    expect(r.sc.__syscall_stat64!(r.str(100, '/data/seed/vfs/large-pcm'), 800)).toBe(0);
++    expect(r.dv.getBigInt64(824, true)).toBe(18192n);
++    r.files.release();
++    // after the first idle: the stream is still there and readable from a descriptor opened before and by a new open; the index is not
++    expect(r.sc.fd_pread!(fd, r.iov(200, [[1200, 8]]), 1, 0n, 600)).toBe(0);
++    expect(Buffer.compare(Buffer.from(r.u8.subarray(1200, 1208)), Buffer.from((g.streams[1] as Uint8Array).subarray(0, 8)))).toBe(0);
++    const fd2 = r.sc.__syscall_openat!(-100, r.str(100, '/data/seed/vfs/small-bin'), 0, 0) as number;
++    expect(fd2).toBeGreaterThanOrEqual(3);
++    expect(() => r.sc.__syscall_openat!(-100, r.str(100, '/data/seed/vfs/index.bin'), 0, 0)).toThrow(HostFilesUnsupported);
++    expect(r.files.has('/data/seed/vfs/index.bin')).toBe(false);
++    expect(r.sc.__syscall_stat64!(r.str(100, '/data/seed/vfs'), 800)).toBe(0);   // the directory is still there
++    expect(r.sc.__syscall_stat64!(r.str(100, '/data/seed/nothing'), 800)).toBe(-ENOENT);
++  });
++
++  it('a chunk that cannot be fetched is EIO for the call (nothing is read), counted, and the message is kept', () => {
++    const r = rig();
++    const failing = { fetchChunk: (): Uint8Array => { throw new ChunkIoError(ERR_STORE, 'refused for the test'); } };
++    mountLazyTree(r.files, '/data/seed', g.index, failing);
++    const fd = r.sc.__syscall_openat!(-100, r.str(100, '/data/seed/vfs/small-bin'), 0, 0) as number;
++    expect(r.sc.fd_pread!(fd, r.iov(200, [[1000, 16]]), 1, 0n, 600)).toBe(EIO);
++    expect(r.dv.getUint32(600, true)).toBe(0);
++    expect(r.files.stats.readErrors).toBe(1);
++    expect(r.files.lastReadError).toMatch(/refused for the test/);
++    expect(r.sc.fd_read!(fd, r.iov(200, [[1000, 16]]), 1, 600)).toBe(EIO);
++    expect(r.files.stats.readErrors).toBe(2);
++  });
++
++  it('close() (the end of the session) forgets the persistent streams too', () => {
++    const r = rig();
++    mountLazyTree(r.files, '/data/seed', g.index, new SyncDirClient(dir, idx.streams));
++    r.files.close();
++    expect(r.files.has('/data/seed/vfs/small-bin')).toBe(false);
++    expect(r.sc.__syscall_stat64!(r.str(100, '/data/seed/vfs/small-bin'), 800)).toBe(-ENOENT);
++  });
++});
++
++// opt1's generator (tools/vfs-build.py V0.1, the format of section 19): its small test tree, and a sample of the real install tree. Skipped when the files are not on this machine.
++const OPT1 = '/home/ubuntu/work/opt1-wine/vfs-out';
++function fileBytes(p: string): Buffer { return readFileSync(p); }
++function listFiles(root: string, rel = ''): string[] {
++  const out: string[] = [];
++  for (const d of readdirSync(join(root, rel), { withFileTypes: true })) {
++    const r = rel ? `${rel}/${d.name}` : d.name;
++    if (d.isDirectory()) out.push(...listFiles(root, r)); else out.push(r);
++  }
++  return out;
++}
++
++describe.skipIf(!existsSync(`${OPT1}/testtree-out/index.bin`))("opt1's small test tree (vfs-make-testtree.py): every file reads back byte for byte", () => {
++  it('21 files, 21 directories, the mount, the 6 MiB wav across two 4 MiB chunks, Japanese and accented names, a zero-byte file', () => {
++    const out = `${OPT1}/testtree-out`, src = `${OPT1}/testtree-src`;
++    const bytes = new Uint8Array(readFileSync(`${out}/index.bin`));
++    const idx = parseIndex(bytes, { entries: true });
++    expect(idx.mount).toBe(MOUNT);
++    expect(idx.nFiles).toBe(21);
++    expect(idx.nDirs).toBe(21);
++    expect(createHash('sha256').update(bytes).digest('hex').slice(0, 12)).toBe(readdirSync(out).find((n) => /^index\..*\.br$/.test(n))?.split('.')[1]);
++    expect(Buffer.compare(Buffer.from(brotliDecompressSync(readFileSync(`${out}/${readdirSync(out).find((n) => /^index\..*\.br$/.test(n))}`))), Buffer.from(bytes))).toBe(0);
++    const client = new SyncDirClient(out, idx.streams);
++    const cache = new ChunkCache(16 << 20);
++    const srcs = idx.streams.map((s, i) => new ChunkedSource(s, i, client, cache));
++    let compared = 0;
++    for (const e of idx.entries) {
++      if (e.kind !== 'file') continue;
++      const want = fileBytes(`${src}/${e.path}`);
++      expect(e.size, e.path).toBe(want.length);
++      const got = readAll(srcs[e.stream as number] as ChunkedSource, e.offset as number, e.size as number, 65536);
++      expect(Buffer.compare(Buffer.from(got), want), e.path).toBe(0);
++      compared++;
++    }
++    expect(compared).toBe(21);
++    const dirs = idx.entries.filter((e) => e.kind === 'dir').map((e) => e.path);
++    expect(dirs).toContain('Data/Empty folder');
++    expect(idx.entries.some((e) => e.path.includes('日本語'))).toBe(true);
++    expect(idx.entries.some((e) => e.path.includes('Noël'))).toBe(true);
++    const names = listFiles(src);
++    expect(names.length).toBe(21);
++  });
++});
++
++const REAL = `${OPT1}/run-a`;
++const ORIGINAL = '/home/ubuntu/work/opt1-wine/prefix/drive_c/Program Files/Image-Line/FL Studio 2026';
++describe.skipIf(!existsSync(`${REAL}/index.bin`) || !existsSync(ORIGINAL))("opt1's index of the whole install tree (27,822 files): a sample of about 200 files, rebuilt from the chunks, is the original", () => {
++  it('index.<sha12>.br decodes to index.bin; 27,822 files + 1,522 directories; 200 sampled files match the original bytes', () => {
++    const br = readdirSync(REAL).find((n) => /^index\.[0-9a-f]{12}\.br$/.test(n)) as string;
++    const bin = new Uint8Array(brotliDecompressSync(readFileSync(`${REAL}/${br}`)));
++    expect(Buffer.compare(Buffer.from(bin), readFileSync(`${REAL}/index.bin`))).toBe(0);
++    expect(createHash('sha256').update(bin).digest('hex').slice(0, 12)).toBe(br.split('.')[1]);
++    const idx = parseIndex(bin, { entries: true });
++    expect(idx.nFiles).toBe(27822);
++    expect(idx.nDirs).toBe(1522);
++    expect(idx.mount).toBe(MOUNT);
++    expect(idx.streams.length).toBeLessThanOrEqual(16);
++    const files = idx.entries.filter((e) => e.kind === 'file');
++    const sample = new Set<number>();
++    for (let k = 0; k < files.length; k += Math.floor(files.length / 181)) sample.add(k);   // about 180 evenly spread
++    files.map((f, i) => [f.size as number, i] as const).sort((a, b) => b[0] - a[0]).slice(0, 20).forEach(([, i]) => sample.add(i));   // and the 20 largest
++    files.forEach((f, i) => { if (f.size === 0 && sample.size < 215) sample.add(i); });
++    const client = new SyncDirClient(REAL, idx.streams);
++    const cache = new ChunkCache(256 << 20);
++    const srcs = idx.streams.map((s, i) => new ChunkedSource(s, i, client, cache));
++    let compared = 0, changed = 0, missing = 0, bytes = 0;
++    for (const i of sample) {
++      const e = files[i]!;
++      const p = `${ORIGINAL}/${e.path}`;
++      if (!existsSync(p)) { missing++; continue; }
++      const want = readFileSync(p);
++      if (want.length !== e.size) { changed++; continue; }   // the prefix was used by Wine after the index was made
++      const got = readAll(srcs[e.stream as number] as ChunkedSource, e.offset as number, e.size as number, 1 << 20);
++      expect(Buffer.compare(Buffer.from(got), want), e.path).toBe(0);
++      compared++;
++      bytes += want.length;
++    }
++    // the evidence goes into the test output
++    console.log(`lazy-tree real sample: ${sample.size} chosen, ${compared} compared byte for byte (${bytes} bytes), ${changed} with a different size now, ${missing} not at the original path; chunk fetches ${client.fetches}`);
++    expect(compared).toBeGreaterThanOrEqual(190);
++    expect(statSync(`${REAL}/vfs`).isDirectory()).toBe(true);
++  }, 300000);
++});

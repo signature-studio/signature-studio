@@ -1,0 +1,10 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -106,6 +106,7 @@
+       presentedAt.push(at);
+       if (quiet.changed(performance.now())) { L.setAsleep(false); nextFrame?.(); }
+     }
++    (canvas as unknown as { commit?: () => void } | null)?.commit?.();   // VARIANT V3 (decision 0311): the frame is committed here when this platform has commit(); else nothing changes
+     L.markDone(seq, shown, at);
+     report(false);
+   }

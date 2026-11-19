@@ -1,0 +1,365 @@
+diff -ruN tree-g9-base/app/scripts/build-engine-bundle.sh tree-g9f/app/scripts/build-engine-bundle.sh
+--- tree-g9-base/app/scripts/build-engine-bundle.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/app/scripts/build-engine-bundle.sh	2026-11-07 05:25:17.438674382 +0900
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ # build-engine-bundle.sh: builds the engine BUNDLE (engine.kind "emscripten-fruity-v1") from the tree this script is in. ONE configuration (decision 0243: no preset, no option):
+-# the lifted FLEngine and the seven modules it loads (dsp_ippv2, Blend2D, QuickFontCache, FreeType, ILTools, the sample decoder oggio and the time-stretch engine Elastique), the runtime, the hybrid (the functions of
++# the lifted FLEngine and the eight modules it loads (dsp_ippv2, Blend2D, QuickFontCache, FreeType, ILTools, the sample decoder oggio, the time-stretch engine Elastique and the plugins Fruity Balance and Fruity Filter), the runtime, the hybrid (the functions of
+ # lift/harness/seeds/hyb-U-<module>.txt lowered straight to wasm by fe-wasmgen), upstream Blend2D for the lifted Blend2D context, wasm-opt -Oz, the register file in the thread-local block fle_ctx, one shared memory.
+ # The procedure is that of decision 0134 with every path derived from this tree; the one thing that is added to the link line is -sEXPORT_ES6=1 (the glue is an ES module that the engine's MODULE worker can import()).
+ #
+@@ -15,7 +15,7 @@
+ #     weblink   harness/web/fruity/link-web.sh: flengine6.{js,wasm} for the browser (ES module glue, no file system)
+ #     wasmopt   wasm-opt -Oz over flengine6.wasm -> flengine6.c.opt.wasm (the C part)
+ #     hybrid    fe-wasmgen over the lists with the real addresses (from the link map), wasm-opt -Oz of each direct module, wasm-merge into the C part -> flengine6.opt.wasm, and the glue without the stubs of the functions that the direct code defines
+-#     seed      pack_seed.py: the seed pack (FLSEEDP1, the guest's host files + registry seeds + claims), and the DLL directory (8 files)
++#     seed      pack_seed.py: the seed pack (FLSEEDP1, the guest's host files + registry seeds + claims), and the DLL directory (6 + NEXTRA = 10 files since the Filter step)
+ #     bundle    scripts/pack-assets.mjs: engine.<sha>.wasm(.br), glue, seed pack, DLL pack, manifest.json, SHA256SUMS, upload-commands.txt  -> $WORK/bundle/$PREFIX
+ #   parameters (places and numbers; none of them changes what is built): WORK (default $SRCTREE/lift/out-app-engine), HOST_ROOT (the extracted inputs: binaries/win64/FLEngine_x64.dll and lift/out-*), PREFIX (bundle key prefix), BUCKET (the R2 bucket
+ #             name in the printed upload commands), JOBS, MEMGUARD_MIN_MB, BROTLI_QUALITY (default 11; a lower number only makes the encoding faster), WASM_OPT_BIN, WASM_MERGE_BIN, EM_CACHE,
+@@ -36,7 +36,7 @@
+ PREFIX=${PREFIX:-fl-$VARIANT}
+ die() { echo "build-engine-bundle: $*" >&2; exit 2; }
+ # ---- the configuration (decision 0243): constants, not variables of the caller. Each line is what the shipped build had: the preset chain F2xH7 -> F2xH5 -> F2xH4 -> F2xH3 -> F2xH2 -> F2x (decisions 0176, 0189, 0208, 0218, 0225, 0230, 0235)
+-# with the hybrid of decision 0239 (H9opt) and the two modules of decision 0230 (oggio, Elastique).
++# with the hybrid of decision 0239 (H9opt), the two modules of decision 0230 (oggio, Elastique) and the plugins of decision 0313 (Fruity Balance, G9-a) and the G9-c step (Fruity Filter).
+ FRUITY_SECONDS=36000   # the engine harness stops the guest after this many wall-clock seconds (fruity.c: FLE_FRUITY_SECONDS, at most 36000 since decision 0136)
+ HINT_FIRST_PIXEL_S=53; HINT_STOP_S=59          # the manifest's hints of decision 0137 (Chrome 156, shared machine)
+ LOWREGS_BASE=0x1000                            # R at 0x1000, FL at +0x100, X at +0x200 (decision 0197)
+@@ -45,7 +45,7 @@
+ PRUNE_LIST=$SRCTREE/docs/investigations/prune1/tables/prune-SM.tsv   # decision 0168: the S+M level, for dsp_ippv2 only (gen-direct.sh)
+ AI_UNITS_FILE=$SRCTREE/lift/harness/seeds/ship-hot-units-F2.tsv      # decision 0151: the start-up-heavy units compiled with -DFLE_ALWAYS_INLINE
+ AI_UNITS=$(awk -F'\t' '/^#/ {next} {print $1}' "$AI_UNITS_FILE" | tr '\n' ' ')
+-EXTRA_MODULES="oggio elastique"; NEXTRA=2     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine)
++EXTRA_MODULES="oggio elastique fruity_balance fruity_filter"; NEXTRA=4     # decision 0230: modules 6 and 7 of the lift (the sample decoder and the time-stretch engine); decision 0313: module 8, the plugin Fruity Balance, and the Filter step of G9-c: module 9, the plugin Fruity Filter (neither is in HYB_MODS: all of it is C part)
+ HYB_MODS="fle dsp b2d qfc ft ilt oggio elastique"   # the modules of the hybrid lists lift/harness/seeds/hyb-U-<m>.txt (decision 0239)
+ HYB=$WORK/hyb
+ B2D_UPSTREAM_LIB=${B2D_UPSTREAM_LIB:-}
+@@ -400,7 +400,7 @@
+       --extra "$H/seeds/reg-seed-nsis.tsv" --extra "$H/seeds/reg-seed-app.tsv" --extra "$H/seeds/authenticode-claims.tsv" --out "$WORK/in/seedpack.bin" > "$LOGS/pack_seed.txt" || die "pack_seed.py failed"
+     cat "$LOGS/pack_seed.txt" | head -12
+   fi
+-  # the guest's modules: the original engine DLL and the seven rebased modules the lifter made (their names carry the base: dsp_ippv2_x64.2000000.dll ...)
++  # the guest's modules: the original engine DLL and the nine rebased modules the lifter made (their names carry the base: dsp_ippv2_x64.2000000.dll ...)
+   cp -n "$FLE" "$WORK/in/dll/FLEngine_x64.dll"
+   local f
+   for f in "$TAGDIR"/dll/*.dll; do cp -n "$f" "$WORK/in/dll/$(basename "$f")"; done
+@@ -417,7 +417,7 @@
+   dsp=$(cd "$WORK/in/dll" && ls dsp_ippv2_x64.*.dll); blend=$(cd "$WORK/in/dll" && ls Blend2D.*.dll); qfc=$(cd "$WORK/in/dll" && ls quickfontcache_x64.*.dll)
+   ft=$(cd "$WORK/in/dll" && ls freetype_x64.*.dll); il=$(cd "$WORK/in/dll" && ls ILTools_x64.*.dll)
+   mods="/data/$dsp:/data/$blend:/data/$qfc:/data/$ft:/data/$il"
+-  for x in $EXTRA_MODULES; do mods="$mods:/data/$(cd "$WORK/in/dll" && ls "${x}"_x64.*.dll)"; done   # modules 6 and 7 in the order of EXTRA_MODULES (= the order of modules.txt)
++  for x in $EXTRA_MODULES; do mods="$mods:/data/$(cd "$WORK/in/dll" && ls "${x}"_x64.*.dll)"; done   # modules 6, 7 and 8 in the order of EXTRA_MODULES (= the order of modules.txt)
+   local sha; sha=$(sha256sum "$ENGINE_WASM" | cut -c1-12)
+   # decision 0141: an engine with SEH (FLE_SEH_HANDLERS) does not stop at wall 16; the stop note below is for the walls known when this was written (decision 0243: the page names no window, and the manifest has no expected stop frame).
+   local STOPNOTE_ARGS=(--stop-note "indirect call to 0=>The engine called address 0: a function it asked GetProcAddress for came back 0. Decision 0136 section 7 read this wall (after the welcome wizard is closed) as user32!UpdateLayeredWindow of the layered window TLightweightLayeredControl. Decision 0140 gave the engine a model of it, so a bundle built from a tree with that decision does not stop here. It stopped by design; the desktop shows the last picture of each window.")
+diff -ruN tree-g9-base/ci/extract-dlls.tsv tree-g9f/ci/extract-dlls.tsv
+--- tree-g9-base/ci/extract-dlls.tsv	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/ci/extract-dlls.tsv	2026-11-07 05:24:01.051063355 +0900
+@@ -9,3 +9,6 @@
+ ILTools_x64.dll	lift/out-inventory/extracted/ILTools_x64.dll	20409dcbc5eb5055c476ed663d6e944984281155f15c6b3a5a2961ba061a0f95
+ oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084004a5fff5739cafb9f602c66e6466f9
+ elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3
++# decision 0313 (G9-a): the plugin Fruity Balance (3,718,656 bytes; the SHA-256 is the one of the installer, checked against flstudio_win64_26.1.7.5653.exe); the name has no space in its destination so that the lift scripts need no quoting
++Fruity Balance_x64.dll	lift/out-plugins/fruity_balance_x64.dll	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064
++Fruity Filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
+diff -ruN tree-g9-base/ci/objkeys.sh tree-g9f/ci/objkeys.sh
+--- tree-g9-base/ci/objkeys.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/ci/objkeys.sh	2026-11-07 05:25:17.438899575 +0900
+@@ -1,7 +1,7 @@
+ #!/bin/bash
+ # ci/objkeys.sh [OUTFILE] - the cache keys of the wasm OBJECT groups, from the CONTENT of the generated C they are compiled from (so they need the lift output: the workflow runs this after the lift output
+ # is in place). A group's key = hash(its translation units' bytes, the build inputs of the wasm stage). When only the dsp module's C changes, the other groups keep their keys and their objects.
+-#   groups: fle (FLEngine: wsrc/src/fle-NN.c), m1 dsp_ippv2, m2 Blend2D, m3 QuickFontCache, m4 FreeType, m5 ILTools, oggio and Elastique (m5 holds m5-m7: wsrc/v-<tag>/src/mK-NN.c), rt (runtime fle_*.c, the harness objects, common.c, realmod table)
++#   groups: fle (FLEngine: wsrc/src/fle-NN.c), m1 dsp_ippv2, m2 Blend2D, m3 QuickFontCache, m4 FreeType, m5 ILTools, oggio, Elastique and the plugins Fruity Balance and Fruity Filter (m5 holds m5-m9: wsrc/v-<tag>/src/mK-NN.c; the loop below takes m[6-9], decision 0313), rt (runtime fle_*.c, the harness objects, common.c, realmod table)
+ # env: the values of ci/plan.sh: PLAN_H_WASM, PLAN_TOOLS, PLAN_SP_WASM, PLAN_K_B2D (the workflow passes plan.sh's outputs). The rt group holds the Blend2D adapter object, which is compiled against the upstream headers: it carries PLAN_K_B2D.
+ set -u -o pipefail
+ . "$(dirname "$0")/lib/common.sh"
+diff -ruN tree-g9-base/ci/stage-bundle.sh tree-g9f/ci/stage-bundle.sh
+--- tree-g9-base/ci/stage-bundle.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/ci/stage-bundle.sh	2026-11-07 05:25:17.439013689 +0900
+@@ -1,6 +1,6 @@
+ #!/bin/bash
+ # ci/stage-bundle.sh seed|bundle - the packing stages.
+-#   seed:   the guest's file pack (FLSEEDP1) and the eight-file DLL directory ($ENGINE_WORK/in): from the extracted inputs and the lift output.
++#   seed:   the guest's file pack (FLSEEDP1) and the ten-file DLL directory (FLEngine and the nine rebased modules) ($ENGINE_WORK/in): from the extracted inputs and the lift output.
+ #   bundle: app/scripts/pack-assets.mjs: brotli, engine.<sha>.wasm(.br), glue, packs, manifest.json, SHA256SUMS, upload-commands.txt -> $ENGINE_WORK/bundle/$PREFIX
+ #           (BUCKET names the delivery bucket in the printed upload commands; ci/lib/upload_plan.py rewrites it anyway).
+ set -u -o pipefail
+diff -ruN tree-g9-base/ci/stage-lift.sh tree-g9f/ci/stage-lift.sh
+--- tree-g9-base/ci/stage-lift.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/ci/stage-lift.sh	2026-11-07 05:25:17.438965899 +0900
+@@ -1,7 +1,7 @@
+ #!/bin/bash
+ # ci/stage-lift.sh felift|lift - the stage "lift" (decompile).
+ #   felift: builds the lifter (fe-pe, fe-lift) and the direct wasm generator of the hybrid (fe-wasmgen, decision 0230) from lift/crates with the locked dependencies. Output: $ENGINE_WORK/cargo-target/release/{fe-pe,fe-lift,fe-wasmgen}
+-#   lift:   app/scripts/build-engine-bundle.sh `gen resplit` on the extracted inputs ($HOST_ROOT): the generated C of FLEngine and of the seven bundled modules, cut into 10 MB translation units.
++#   lift:   app/scripts/build-engine-bundle.sh `gen resplit` on the extracted inputs ($HOST_ROOT): the generated C of FLEngine and of the nine bundled modules (the seven DLLs of the engine and the plugins Fruity Balance and Fruity Filter, decisions 0313 and G9-c), cut into 10 MB translation units.
+ #           Output (what the later stages read, and what the lift cache holds): $ENGINE_WORK/wsrc, $ENGINE_WORK/onat/v-*/{dll,modules.txt,native/realmod_table_gen.c}, $ENGINE_WORK/onat/log, $ENGINE_WORK/logs/generated-c-sha256.txt
+ #           The generated C itself (onat/gen, onat/v-*/gen: the same text as wsrc, before the cut) is not kept: the SHA-256 list of it is (logs/generated-c-sha256.txt).
+ set -u -o pipefail
+diff -ruN tree-g9-base/ci/test-hybrid.sh tree-g9f/ci/test-hybrid.sh
+--- tree-g9-base/ci/test-hybrid.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/ci/test-hybrid.sh	2026-11-07 05:25:53.826294356 +0900
+@@ -45,6 +45,22 @@
+ awk -F'\t' '$2 ~ /out-sampledec/ {n++} END {exit n == 2 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the rows of oggio_x64.dll and elastique_x64.dll" || bad "ci/extract-dlls.tsv: the oggio/elastique rows are missing"
+ [ -s "$s/elastique-seeds-all3.txt" ] && ok "the seeds of elastique_x64.dll are in lift/harness/seeds" || bad "elastique-seeds-all3.txt is missing"
+ 
++# ---- 2b. decision 0313 (G9-a) and the G9-c step: the plugins Fruity Balance (the eighth module) and Fruity Filter (the ninth); not in the hybrid: all of it is C part
++awk -F'\t' '$1 == "Fruity Balance_x64.dll" && $2 == "lift/out-plugins/fruity_balance_x64.dll" && $3 == "a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064" {n++} END {exit n == 1 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the row of Fruity Balance_x64.dll (the installer's SHA-256)" || bad "ci/extract-dlls.tsv: the Fruity Balance row is missing or wrong"
++awk -F'\t' '$3 == "a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "the seed list puts Fruity Balance_x64.dll on the volume (LoadLibraryW of its path needs the file, fle_load.c volume_file)" || bad "vfs-seed-idle1.tsv: the Fruity Balance row is missing or wrong"
++[ "$(grep -c '^rva:' "$repo/lift/harness/hooks/fruity-delphi-effect-hook-points.txt")" = 3 ] && ok "fruity-delphi-effect-hook-points.txt: the three inline-hook points of the Delphi runtime of the plugins" || bad "fruity-delphi-effect-hook-points.txt: not three rva lines"
++printf 'm1|/x/a.dll|0x2000000|--pdata||800\nm2|/x/b.dll|0x6800000|--pdata||800\n' > "$t/mods.txt"
++awk -F'|' -v rm='m1=dsp_ippv2_x64.dll;m2=fruity_balance_x64.dll' -v pm='m2=plugins/fruity/effects/fruity balance/fruity balance_x64.dll' -f "$repo/lift/harness/b2d2/realmod_tables.awk" "$t/mods.txt" > "$t/rm1.c"
++awk -F'|' -v rm='m1=dsp_ippv2_x64.dll;m2=fruity_balance_x64.dll' -v pm='' -f "$repo/lift/harness/b2d2/realmod_tables.awk" "$t/mods.txt" > "$t/rm0.c"
++{ grep -qF '{ "fruity_balance_x64.dll", UINT64_C(0x6800000) },' "$t/rm1.c" && grep -qF 'fle_realmod_count = 2;' "$t/rm1.c" && grep -qF '{ "plugins\\fruity\\effects\\fruity balance\\fruity balance_x64.dll", "fruity_balance_x64.dll" },' "$t/rm1.c" && grep -qF 'fle_realmod_path_count = 1;' "$t/rm1.c"; } && ok "realmod_tables.awk: the module table and the path table (the suffix has two backslash characters per separator in the C string)" || bad "realmod_tables.awk: wrong output with a path row"
++{ grep -qF 'fle_realmod_count = 2;' "$t/rm0.c" && ! grep -q 'fle_realmod_path' "$t/rm0.c"; } && ok "realmod_tables.awk: without path rows no path table is written (the weak one of fle_realmod.c stays)" || bad "realmod_tables.awk: a path table without rows"
++awk -F'\t' '$1 == "Fruity Filter_x64.dll" && $2 == "lift/out-plugins/fruity_filter_x64.dll" && $3 == "f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c" {n++} END {exit n == 1 ? 0 : 1}' "$repo/ci/extract-dlls.tsv" && ok "ci/extract-dlls.tsv has the row of Fruity Filter_x64.dll (the installer's SHA-256)" || bad "ci/extract-dlls.tsv: the Fruity Filter row is missing or wrong"
++awk -F'\t' '$3 == "f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c" && $1 == "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Filter\\Fruity Filter_x64.dll" {n++} END {exit n == 1 ? 0 : 1}' "$s/vfs-seed-idle1.tsv" && ok "the seed list puts Fruity Filter_x64.dll on the volume" || bad "vfs-seed-idle1.tsv: the Fruity Filter file row is missing or wrong"
++# the number of modules of the table: the five of the engine + NEXTRA extra ones; NEXTRA = the names in EXTRA_MODULES; the specs of gen-direct.sh = 5 + NEXTRA; RM_MAX of the runtime holds them all
++nx=$(sed -n 's/^EXTRA_MODULES="\([^"]*\)"; NEXTRA=\([0-9]*\) .*/\1 \2/p' "$repo/app/scripts/build-engine-bundle.sh"); nn=${nx##* }; nl=$(echo "${nx% *}" | wc -w)
++ns=$(grep -c '^  "[a-z0-9_]*\.dll|' "$repo/lift/harness/b2d2/gen-direct.sh"); rmx=$(sed -n 's/^#define RM_MAX \([0-9]*\)u$/\1/p' "$repo/lift/runtime/fle_realmod.c")
++{ [ "$nn" = "$nl" ] && [ "$ns" = $((5 + nn)) ] && [ -n "$rmx" ] && [ "$rmx" -ge "$ns" ]; } && ok "NEXTRA ($nn) = the names in EXTRA_MODULES ($nl); gen-direct.sh has $ns specs = 5 + NEXTRA; RM_MAX ($rmx) holds them" || bad "NEXTRA ($nn), EXTRA_MODULES names ($nl), specs ($ns), RM_MAX ($rmx) do not agree"
++
+ 
+ # ---- 3. the keys of ci/plan.sh, in a copy of the files it reads (so that a list can be changed); a tree without .git is hashed by content
+ w3=$t/tree; mkdir -p "$w3"
+diff -ruN tree-g9-base/lift/crates/fe-lift/tests/realmod.rs tree-g9f/lift/crates/fe-lift/tests/realmod.rs
+--- tree-g9-base/lift/crates/fe-lift/tests/realmod.rs	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/crates/fe-lift/tests/realmod.rs	2026-11-07 05:25:34.587776402 +0900
+@@ -674,6 +674,8 @@
+ #[test]
+ fn a_table_that_breaks_the_rules_stops_by_name() {
+     let _ = built();
++    // 17 entries (RM_MAX is 16 since the G9-c step; it was 8 with the nine-entry case): lower-case names, bases 0x2000000 + i * 0x1000000, all different
++    let seventeen_entries = format!("RM_ENTRIES={}", (0..17u64).map(|i| format!("{{ \"m{}.dll\", {:#x} }}", i, 0x2000000u64 + i * 0x1000000)).collect::<Vec<_>>().join(", "));
+     let cases: [(&str, [&str; 3], &str); 7] = [
+         ("virtual-name", ["RM_ENTRIES={ \"kernel32.dll\", 0x2000000 }", "RM_COUNT=1", "X=1"], "has the name of a virtual module"),
+         ("exe-base", ["RM_ENTRIES={ \"mod2.dll\", 0x400000 }", "RM_COUNT=1", "X=1"], "is not usable"),
+@@ -682,13 +684,13 @@
+         ("upper-case", ["RM_ENTRIES={ \"Mod2.dll\", 0x2000000 }", "RM_COUNT=1", "X=1"], "is not lower-case"),
+         ("same-base", ["RM_ENTRIES={ \"mod2.dll\", 0x2000000 }, { \"mod3.dll\", 0x2000000 }", "RM_COUNT=2", "X=1"], "repeats a name or a base"),
+         (
+-            "nine-modules",
++            "seventeen-modules",
+             [
+-                "RM_ENTRIES={ \"a.dll\", 0x2000000 }, { \"b.dll\", 0x3000000 }, { \"c.dll\", 0x4000000 }, { \"d.dll\", 0x5000000 }, { \"e.dll\", 0x6000000 }, { \"f.dll\", 0x7000000 }, { \"g.dll\", 0x8000000 }, { \"h.dll\", 0x9000000 }, { \"i.dll\", 0xa000000 }",
+-                "RM_COUNT=9",
++                seventeen_entries.as_str(),
++                "RM_COUNT=17",
+                 "X=1",
+             ],
+-            "larger than the 8 real modules",
++            "larger than the 16 real modules",
+         ),
+     ];
+     for (label, defs, say) in cases {
+@@ -700,8 +702,8 @@
+     }
+ }
+ 
+-/// Decision 0106: RM_MAX is 8 (it was 4). A table of eight entries passes the table check, which runs at the first lookup, so a name
+-/// outside the table gets the loader's usual stop and not the "larger than" stop of the check (a table of nine entries gets that one,
++/// Decision 0106: RM_MAX was 8 (it was 4); the G9-c step made it 16. A table of eight entries passes the table check, which runs at the first lookup, so a name
++/// outside the table gets the loader's usual stop and not the "larger than" stop of the check (a table of seventeen entries gets that one,
+ /// in a_table_that_breaks_the_rules_stops_by_name). No image is mapped in this program, so no entry is loaded (that would read it).
+ #[test]
+ fn a_table_of_eight_modules_passes_the_table_check() {
+diff -ruN tree-g9-base/lift/harness/b2d2/gen-direct.sh tree-g9f/lift/harness/b2d2/gen-direct.sh
+--- tree-g9-base/lift/harness/b2d2/gen-direct.sh	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/harness/b2d2/gen-direct.sh	2026-11-07 05:25:17.434151929 +0900
+@@ -1,9 +1,11 @@
+ #!/bin/bash
+-# Decision 0167, 0230, 0243: the generation stage of the shipped configuration without a native build and run: gen_two.sh rebase gen split merge over FLEngine and the seven modules, the realmod table (what b2d1's gen-final.sh did after it).
++# Decision 0167, 0230, 0243: the generation stage of the shipped configuration without a native build and run: gen_two.sh rebase gen split merge over FLEngine and the eight modules, the realmod table (what b2d1's gen-final.sh did after it).
++# Decision 0313 (G9-a, PROVISIONAL): the eighth module is the plugin fruity_balance_x64.dll, which FL opens with LoadLibraryW of its FULL path (decision 0183, wrp1): a spec may carry a fifth field, the lower-case path suffix with '/' for the separator, and the realmod path table (fle_realmod_path_table) is emitted for those.
+ # usage (called by app/scripts/build-engine-bundle.sh stage_gen; every variable below is exported by it):
+ #   OUT=<ONAT> TAG=<tag> FEBIN LIFT FLE FLE_HOOKS FLE_SEEDS FLE_SEH_HANDLERS FLE_EXTRA_IMPORTS PRUNE_LIST H HL  bash gen-direct.sh
+ # The Blend2D module is lifted as decision 0160 (--seeds blend2d-4700000-seeds-wrapper.txt, no --pdata, --swap-entries blend2d-context-swap.txt), dsp_ippv2 with --hle-entries (decision 0162) and --prune-list (decision 0168),
+-# the sample decoder and the time-stretch engine as decision 0230 (--pdata and their seeds, the DLLs that ci/extract-dlls.tsv takes out of the installer: lift/out-sampledec/).
++# the sample decoder and the time-stretch engine as decision 0230 (--pdata and their seeds, the DLLs that ci/extract-dlls.tsv takes out of the installer: lift/out-sampledec/),
++# the plugins Fruity Balance (decision 0313, G9-a) and Fruity Filter (G9-c) (--pdata and the three inline-hook points of their Delphi runtime, lift/harness/hooks/fruity-delphi-effect-hook-points.txt; no seeds: the ~11,700 .pdata functions are the roots).
+ set -u -o pipefail
+ export PYTHONDONTWRITEBYTECODE=1
+ : "${OUT:?}" "${TAG:?}" "${FEBIN:?}" "${LIFT:?}" "${FLE:?}" "${H:?}" "${HL:?}"
+@@ -19,16 +21,19 @@
+   "iltools_x64.dll|$HL/out-inventory/extracted/ILTools_x64.dll|0x6000000|--pdata --seeds $H/seeds/iltools-6000000-seeds400.txt --hook-points $H/hooks/iltools-hook-points.txt"
+   "oggio_x64.dll|$HL/out-sampledec/oggio_x64.dll|0xc000000|--pdata --seeds $H/seeds/dec1-seeds-oggio-c000000.txt"
+   "elastique_x64.dll|$HL/out-sampledec/elastique_x64.dll|0xb000000|--pdata --seeds $H/seeds/elastique-seeds-all3.txt"
++  "fruity_balance_x64.dll|$HL/out-plugins/fruity_balance_x64.dll|0x6800000|--pdata --hook-points $H/hooks/fruity-delphi-effect-hook-points.txt|plugins/fruity/effects/fruity balance/fruity balance_x64.dll"
++  "fruity_filter_x64.dll|$HL/out-plugins/fruity_filter_x64.dll|0x7000000|--pdata --hook-points $H/hooks/fruity-delphi-effect-hook-points.txt|plugins/fruity/effects/fruity filter/fruity filter_x64.dll"
+ )
+ # FLE_EXTRA_IMPORTS (decision 0171) goes to every real module (the response table must be the same in all of them); FLEngine gets it from gen_two.sh itself
+ XARGS=" --extra-imports $FLE_EXTRA_IMPORTS"
+-MODULES=""; RMNAMES=""; k=0
++MODULES=""; RMNAMES=""; RMPATHS=""; k=0
+ for s in "${specs[@]}"; do
+-  IFS='|' read -r nm f b la <<< "$s"
++  IFS='|' read -r nm f b la ps <<< "$s"
+   [ -r "$f" ] || { echo "gen-direct: cannot read $f" >&2; exit 2; }
+   k=$((k + 1))
+   MODULES="${MODULES:+$MODULES;}m$k|$f|$b|$la$XARGS||800"
+   RMNAMES="${RMNAMES:+$RMNAMES;}m$k=$nm"
++  [ -z "$ps" ] || RMPATHS="${RMPATHS:+$RMPATHS;}m$k=$ps"   # decision 0313: a module that the guest opens by its full path (a plugin): the suffix for fle_realmod_find_path
+ done
+ mkdir -p "$OUT/log"
+ export OUT TAG FEBIN LIFT FLE MODULES DLLDIR="v-$TAG/dll" FLE_PER_PART=3700 REAL_PER_PART=800 EXPECT_FLE_SHA=skip FRUITY_ROWS="$H/fruity-rows.txt"
+@@ -38,12 +43,5 @@
+ tail -5 "$OUT/log/gen.out"
+ [ $rc -eq 0 ] || { echo "gen-direct: gen_two.sh failed (exit $rc), see $OUT/log/gen.err" >&2; exit $rc; }
+ V=$OUT/v-$TAG; mkdir -p "$V/native"
+-awk -F'|' -v rm="$RMNAMES" 'BEGIN {
+-  print "/* generated by lift/harness/b2d2/gen-direct.sh from modules.txt as lift/harness/two/build_two_native.sh does */";
+-  print "#include \"fle_realmod.h\"";
+-  print "const fle_realmod_entry fle_realmod_table[] = {";
+-  np = split(rm, pairs, ";"); for (i = 1; i <= np; i++) { split(pairs[i], kv, "="); nm[kv[1]] = kv[2] }
+-}
+-$1 != "" { printf "    { \"%s\", UINT64_C(%s) },\n", nm[$1], $3; n++ }
+-END { print "};"; print "const uint64_t fle_realmod_count = " n ";" }' "$V/modules.txt" > "$V/native/realmod_table_gen.c"
++awk -F'|' -v rm="$RMNAMES" -v pm="$RMPATHS" -f "$(dirname "${BASH_SOURCE[0]}")/realmod_tables.awk" "$V/modules.txt" > "$V/native/realmod_table_gen.c"
+ sha256sum "$OUT/gen/flengine.c" "$V"/gen/m*.c "$V/src/common.c" | tee "$OUT/log/generated-c-sha256.txt"
+diff -ruN tree-g9-base/lift/harness/b2d2/realmod_tables.awk tree-g9f/lift/harness/b2d2/realmod_tables.awk
+--- tree-g9-base/lift/harness/b2d2/realmod_tables.awk	1970-01-01 09:00:00.000000000 +0900
++++ tree-g9f/lift/harness/b2d2/realmod_tables.awk	2026-11-07 01:11:19.323540121 +0900
+@@ -0,0 +1,23 @@
++# Decision 0313 (G9-a): the realmod tables of lift/harness/b2d2/gen-direct.sh (it was an inline awk program; a file so that ci/test-hybrid.sh can run it on a synthetic modules.txt).
++# usage: awk -F'|' -v rm="m1=<name>;m2=<name>..." -v pm="m8=<path suffix with / for the separator>;..." -f realmod_tables.awk modules.txt
++#   modules.txt: lines "mK|<file>|<base>|<arguments>||<per part>" (gen_two.sh). Output: C for the runtime: fle_realmod_table / fle_realmod_count (name, base), and when pm has rows, fle_realmod_path_table / fle_realmod_path_count
++#   (decision 0183: a plugin is opened by LoadLibraryW of its full path; fle_realmod_find_path matches the lower-case suffix). Without rows no path table is written: the weak (empty) one of fle_realmod.c stays.
++#   The suffix has "/" in pm and a backslash in the C string (two characters "\\"); no gsub: the awks (mawk, gawk) differ on the escapes of its replacement.
++BEGIN {
++  print "/* generated by lift/harness/b2d2/gen-direct.sh from modules.txt as lift/harness/two/build_two_native.sh does */";
++  print "#include \"fle_realmod.h\"";
++  print "const fle_realmod_entry fle_realmod_table[] = {";
++  np = split(rm, pairs, ";"); for (i = 1; i <= np; i++) { split(pairs[i], kv, "="); nm[kv[1]] = kv[2] }
++  bs = sprintf("%c", 92)
++}
++$1 != "" { printf "    { \"%s\", UINT64_C(%s) },\n", nm[$1], $3; n++ }
++END {
++  print "};"; print "const uint64_t fle_realmod_count = " n ";";
++  np2 = split(pm, pp, ";"); m = 0; rows = "";
++  for (i = 1; i <= np2; i++) {
++    if (pp[i] == "") continue;
++    split(pp[i], kv, "="); ns = split(kv[2], parts, "/"); s = parts[1]; for (j = 2; j <= ns; j++) s = s bs bs parts[j];
++    rows = rows sprintf("    { \"%s\", \"%s\" },\n", s, nm[kv[1]]); m++
++  }
++  if (m > 0) { print "const fle_realmod_path_entry fle_realmod_path_table[] = {"; printf "%s", rows; print "};"; print "const uint64_t fle_realmod_path_count = " m ";" }
++}
+diff -ruN tree-g9-base/lift/harness/census/census.c tree-g9f/lift/harness/census/census.c
+--- tree-g9-base/lift/harness/census/census.c	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/harness/census/census.c	2026-11-07 05:25:17.439825393 +0900
+@@ -38,7 +38,7 @@
+ #define COUNT_VA UINT64_C(0x15EAC98)
+ #define UNIT_RET UINT64_C(0x412129) /* the return address f_4120c0 pushes for `call proc` at 0x412126 */
+ #define MAX_UNITS (1u << 16)
+-#define MAX_IMAGES 9 /* FLEngine + RM_MAX (8, fle_realmod.c) real modules; census_add_image ignores an image beyond this (decision 0106: was 8) */
++#define MAX_IMAGES 17 /* FLEngine + RM_MAX (16, fle_realmod.c) real modules; census_add_image ignores an image beyond this (decision 0106: was 8; 9 while RM_MAX was 8) */
+ #define MSG_MAX 2048
+ #define ULL(x) ((unsigned long long)(x))
+ 
+diff -ruN tree-g9-base/lift/harness/census/main_two.c tree-g9f/lift/harness/census/main_two.c
+--- tree-g9-base/lift/harness/census/main_two.c	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/harness/census/main_two.c	2026-11-07 05:25:17.439982629 +0900
+@@ -41,10 +41,10 @@
+     void (*fn)(void);
+     uint8_t *stk;
+     /* N real modules (lift/out-three/harness-two): argv[2] is one file or several separated by ':'. One file: the output is the one of
+-     * the one-module main_two.c. MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (8) of fle_realmod.c on purpose, as
++     * the one-module main_two.c. MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (16) of fle_realmod.c on purpose, as
+      * in harness/two/main_two.c (decision 0106: it was 4 = RM_MAX, so a 5th real module file was refused here before the runtime saw it);
+      * more files than the runtime holds are mapped and then stopped by the runtime by name. */
+-    enum { MAIN_REAL_MAX = 16 };
++    enum { MAIN_REAL_MAX = 32 };
+     char *rpath[MAIN_REAL_MAX], *rcopy = NULL;
+     uint64_t rimg_lo[MAIN_REAL_MAX], rimg_sz[MAIN_REAL_MAX]; /* census: the images whose memory the report may read */
+     int nreal = 0;
+diff -ruN tree-g9-base/lift/harness/hooks/fruity-delphi-effect-hook-points.txt tree-g9f/lift/harness/hooks/fruity-delphi-effect-hook-points.txt
+--- tree-g9-base/lift/harness/hooks/fruity-delphi-effect-hook-points.txt	1970-01-01 09:00:00.000000000 +0900
++++ tree-g9f/lift/harness/hooks/fruity-delphi-effect-hook-points.txt	2026-11-07 05:24:21.873139140 +0900
+@@ -0,0 +1,14 @@
++# Inline hook points of the Delphi plugins Fruity Balance and Fruity Filter (decisions 0313 G9-a and the Filter step of G9-c; the mechanism of decisions 0105/0106/0183: fe-lift lift --hook-points).
++#   Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll   3,718,656 bytes, SHA-256 a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064   (hook constructor 0x5c2d70; calls at 0x5c6b97, 0x5c6bbf, 0x5c6be7)
++#   Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll       3,780,608 bytes, SHA-256 f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c   (hook constructor 0x5c2c90; calls at 0x5c6ab7, 0x5c6adf, 0x5c6b07)
++# Both DLLs give the SAME three RVAs (checked with find-hook-points.py on each; Fruity Delay 2 gives them too). Other Delphi plugins do NOT (Frequency Shifter 0x17e90/0x320b0/0x320d0, Parametric EQ 2
++# 0x17ee0/0x32100/0x32120, Soundgoodizer 0x1b7b0/0x389e0/0x38a00): they need their own file. One address per line: "rva:" and a hex RVA (relative to the ImageBase 0x400000, so this file is the same at every
++# base the module is lifted at: 0x6800000 for Balance, 0x7000000 for Filter in the shipped configuration). "#" starts a comment.
++#
++# Like every Delphi module (FLEngine, QFC, ILTools, Fruity Wrapper), the static initialisation of the Delphi runtime of each DLL constructs three hook objects that patch three of its OWN runtime functions
++# with "e9 rel32" after VirtualProtect(target, 5, PAGE_EXECUTE_READWRITE, &old). Found by find-hook-points.py (decision 0310; byte scan of the call sites of the kernel32!VirtualProtect thunk, then the hook
++# constructor and its three calls). First bytes of the three targets in both DLLs: 55 56 53 c6 44 / 53 48 83 ec 20 / 55 48 83 ec 50, the same Delphi runtime functions as in FLEngine, QFC, ILTools and the
++# Wrapper. Nothing else was checked: whether a plugin patches other functions is not known (the runtime stops by name on a VirtualProtect at an address that is not listed here).
++rva:0x17bc0   # 0x417bc0, first bytes 55 56 53 c6 44
++rva:0x31d70   # 0x431d70, first bytes 53 48 83 ec 20
++rva:0x31d90   # 0x431d90, first bytes 55 48 83 ec 50
+diff -ruN tree-g9-base/lift/harness/seeds/vfs-seed-idle1.tsv tree-g9f/lift/harness/seeds/vfs-seed-idle1.tsv
+--- tree-g9-base/lift/harness/seeds/vfs-seed-idle1.tsv	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/harness/seeds/vfs-seed-idle1.tsv	2026-11-07 05:24:01.051281395 +0900
+@@ -239,3 +239,5 @@
+ C:\Windows\Fonts\arial.ttf	lift/harness/seeds/os-fonts/LiberationSans-Regular.ttf	075e71be4c58beda172ecb574a799308f04c3d054c6a5b7434954d3b0f1b28d8
+ C:\Windows\Fonts\tahoma.ttf	lift/harness/seeds/os-fonts/DejaVuSans.ttf	b4c632e3cdf9acc7f28758fb5a323c8524d7fc6660d46904d9b6cbe2809c419c
+ C:\Windows\Fonts\lucon.ttf	lift/harness/seeds/os-fonts/DejaVuSansMono.ttf	a54dca07c76d6289e717e75e0a58c0128f6d7269ef3faf76417c9d7d3bba37ab
++C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064
++C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll	lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
+diff -ruN tree-g9-base/lift/harness/two/main_two.c tree-g9f/lift/harness/two/main_two.c
+--- tree-g9-base/lift/harness/two/main_two.c	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/harness/two/main_two.c	2026-11-07 05:25:17.440111771 +0900
+@@ -55,9 +55,9 @@
+     void (*fn)(void);
+     uint8_t *stk;
+     /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
+-     * MAIN_REAL_MAX only sizes this array. It is larger than the RM_MAX (8) of fle_realmod.c on purpose: more files than the runtime
++     * MAIN_REAL_MAX only sizes this array. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
+      * holds are mapped and then stopped by the runtime (fle_realmod.c table_check, by name), not by a second limit here. */
+-    enum { MAIN_REAL_MAX = 16 };
++    enum { MAIN_REAL_MAX = 32 };
+     char *rpath[MAIN_REAL_MAX], *rcopy = NULL;
+     int nreal = 0;
+     uint64_t span_lo = 0, span_hi = 0;
+diff -ruN tree-g9-base/lift/runtime/fle_loadimage.h tree-g9f/lift/runtime/fle_loadimage.h
+--- tree-g9-base/lift/runtime/fle_loadimage.h	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/runtime/fle_loadimage.h	2026-11-07 05:25:17.439734933 +0900
+@@ -46,7 +46,7 @@
+ 
+ /* Decision 0104 (PROVISIONAL, a token like the ones above): the cursors loaded from a real module (fle_realmod.h; hInst = its base) have
+  * the handle FLE_LI_MODULE_HANDLE_BASE + FLE_LI_REALMOD_STRIDE * (index + 1) + 4 * (id - FLE_LI_MODULE_FIRST + 1), index = the position of the
+- * module in fle_realmod_table (at most 8 modules, RM_MAX of fle_realmod.c: the largest handle is base + 0x8018, far below the 1 MiB region), so that two modules' cursors with the same id are two handles. Inside the region. */
++ * module in fle_realmod_table (at most 16 modules, RM_MAX of fle_realmod.c: the largest handle is base + 0x10018, far below the 1 MiB region), so that two modules' cursors with the same id are two handles. Inside the region. */
+ #define FLE_LI_REALMOD_STRIDE     UINT64_C(0x00001000)
+ 
+ /* Decision 0125 (PROVISIONAL, S-loadcursor-handle): the cursors that user32!LoadCursorW(hInstance, L"name") loads from the NAMED RT_GROUP_CURSOR entries of a module take the slots
+diff -ruN tree-g9-base/lift/runtime/fle_realmod.c tree-g9f/lift/runtime/fle_realmod.c
+--- tree-g9-base/lift/runtime/fle_realmod.c	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/runtime/fle_realmod.c	2026-11-07 05:25:17.439385357 +0900
+@@ -13,8 +13,8 @@
+ #include "fle_modules.h"
+ #include "fle_realmod.h"
+ 
+-/* The number of real modules: 8, as since decision 0106 (decision 0206 measured that a set of 11 images does not fit; the handles of fle_loadimage.h, stride 0x1000 in a 1 MiB region, allow 256). */
+-#define RM_MAX 8u
++/* The number of real modules: 16 (G9-c step; 8 since decision 0106 until the plugin Fruity Balance made the eighth; decision 0206 measured that a set of 11 images did not fit in 8; the handles of fle_loadimage.h, stride 0x1000 in a 1 MiB region, allow 256). */
++#define RM_MAX 16u
+ 
+ /* No real module unless the link brings its own fle_realmod_table and fle_realmod_count. */
+ const fle_realmod_entry fle_realmod_table[] __attribute__((weak)) = { { NULL, 0 } };
+@@ -41,7 +41,7 @@
+     char why[200];
+ 
+     if (table_ready) return;
+-    if (n > RM_MAX) fle_stop(api, "fle_realmod_count is larger than the 8 real modules this runtime holds");
++    if (n > RM_MAX) fle_stop(api, "fle_realmod_count is larger than the 16 real modules this runtime holds");
+     for (i = 0; i < n; i++) {
+         const char *name = fle_realmod_table[i].name;
+         uint64_t base = fle_realmod_table[i].base;
+diff -ruN tree-g9-base/lift/runtime/fle_realmod.h tree-g9f/lift/runtime/fle_realmod.h
+--- tree-g9-base/lift/runtime/fle_realmod.h	2026-11-07 00:54:49.000000000 +0900
++++ tree-g9f/lift/runtime/fle_realmod.h	2026-11-07 05:25:17.439642239 +0900
+@@ -21,7 +21,7 @@
+  * ("dsp_ippv2_x64.dll"). `base` is the ImageBase of the mapped image (a multiple of 64 K, not FLE_EXE_HANDLE, not a virtual module
+  * handle). The name must not be a virtual module name (except a deferred module's, decision 0096: blend2d.dll and
+  * quickfontcache_x64.dll are in fle_modules[] until they are lifted, and a real module of the same name wins over them everywhere);
+- * at most 8 modules (RM_MAX of fle_realmod.c), names and bases pairwise different. A table that breaks this stops the run on first use. */
++ * at most 16 modules (RM_MAX of fle_realmod.c), names and bases pairwise different. A table that breaks this stops the run on first use. */
+ typedef struct {
+     const char *name;
+     uint64_t base;

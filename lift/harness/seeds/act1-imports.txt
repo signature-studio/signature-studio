@@ -1,0 +1,14 @@
+# Decision 0213 (act1, PROVISIONAL), LAYER 5: THIS FILE HOLDS ONLY THE NEW ROWS (the style of harness/seeds/exp1-imports.txt). Append it AFTER the rows of the build it is added to, so that the pseudo-VAs of the earlier rows do not move:
+#   cat harness/seeds/ship2-imports.txt harness/seeds/act1-imports.txt > <combined rows file>     (the rows of the shipping bundle SHIP2 + these; NOT generated or tested by act1)
+# act1's own builds (docs/0213-activation.md section 3): A1 = ia2-imports.txt + these rows (logs/rows-A1-combined.txt); A2 = ia2-imports.txt + exp1-imports.txt + these rows (logs/rows-A2-combined.txt).
+# Format of decision 0156: <dll> <API> <runtime function>. Each runtime function is in runtime/fle_act1_net.c. Without these rows the calls stop at the import thunk as before.
+wininet.dll InternetConnectW fle_imp_InternetConnectW
+wininet.dll HttpOpenRequestW fle_imp_HttpOpenRequestW
+wininet.dll HttpAddRequestHeadersW fle_imp_HttpAddRequestHeadersW
+wininet.dll HttpSendRequestExW fle_imp_HttpSendRequestExW
+wininet.dll InternetWriteFile fle_imp_InternetWriteFile
+wininet.dll HttpEndRequestW fle_imp_HttpEndRequestW
+wininet.dll HttpQueryInfoW fle_imp_HttpQueryInfoW
+wininet.dll HttpQueryInfoA fle_imp_HttpQueryInfoA
+wininet.dll InternetReadFile fle_imp_InternetReadFile
+wininet.dll InternetGetLastResponseInfoW fle_imp_InternetGetLastResponseInfoW

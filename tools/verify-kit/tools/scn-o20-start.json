@@ -1,0 +1,1 @@
+[{"name":"o20-start","what":"R2-4c-1: close the welcome wizard (the usage-data box first if present), wait 800 ms, shot the start picture o20-start (the window geometry crop), describe the compositor's window table. No Tempo drag, no right click.","ops":[{"op":"closeWizard"},{"op":"wait","ms":800},{"op":"shot","name":"o20-start"},{"op":"describe","name":"o20-start"}]}]

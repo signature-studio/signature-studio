@@ -1,0 +1,7 @@
+--- a/lift/harness/seeds/vfs-seed-idle1.tsv
++++ b/lift/harness/seeds/vfs-seed-idle1.tsv
+@@ -239,3 +239,4 @@
+ C:\Windows\Fonts\arial.ttf	lift/harness/seeds/os-fonts/LiberationSans-Regular.ttf	075e71be4c58beda172ecb574a799308f04c3d054c6a5b7434954d3b0f1b28d8
+ C:\Windows\Fonts\tahoma.ttf	lift/harness/seeds/os-fonts/DejaVuSans.ttf	b4c632e3cdf9acc7f28758fb5a323c8524d7fc6660d46904d9b6cbe2809c419c
+ C:\Windows\Fonts\lucon.ttf	lift/harness/seeds/os-fonts/DejaVuSansMono.ttf	a54dca07c76d6289e717e75e0a58c0128f6d7269ef3faf76417c9d7d3bba37ab
++C:\Windows\Fonts\msgothic.ttc	lift/harness/seeds/os-fonts/NotoSansCJKjp-subset-msgothic.ttc	1ab00fd8ffe15553c16ef441b6a63e539159d560491c70fbc598d26f470eea69

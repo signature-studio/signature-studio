@@ -1,0 +1,210 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -641,6 +641,117 @@
+             (int)tab[wi].pcx, (int)tab[wi].pcy, is_visible(wi) ? 1 : 0, chain);
+ }
+ 
++/* Decision 0319 TEST-ONLY diagnostic (FLE_DIAG_WIN=1; FLE_TEST_GETENV is a null constant in the product, so this is dead code there): O9 'the picture breaks / a window that never appears'. Per window (lid), on stderr as
++ * "fl-diag: vis|show|paint-msg|BeginPaint|EndPaint|draw-discard lid ...": every change of is_visible() (found by a scan after CreateWindowExW, ShowWindow, SetWindowPos, SetWindowLongPtr(GWL_STYLE), ShowOwnedPopups: the
++ * route that caused it is named), every ShowWindow call, every WM_PAINT the retrieval calls make, every BeginPaint / EndPaint, and every drawing call that was discarded because the window is not visible (S-draw-hidden;
++ * the first window of the chain that lacks WS_VISIBLE is named). Each kind prints the first 3 events of a window and then every power of two (the counters are exact); 8000 lines at most. Observation only. */
++enum { DPT_SHOW, DPT_PAINT, DPT_BEGIN, DPT_END, DPT_DISCARD, DPT_KINDS };
++static int diag_pt_on(void)
++{
++    static int on = -1;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_WIN"); on = e != NULL && e[0] == '1'; }
++    return on;
++}
++
++static uint32_t diag_pt_count(int kind, int64_t i, int *print)
++{
++    static uint32_t *cnt[DPT_KINDS];
++    static uint64_t cap;
++    static unsigned lines;
++
++    if (cap <= (uint64_t)i) {
++        uint64_t nc = (uint64_t)i + 256u;
++        int k;
++
++        for (k = 0; k < DPT_KINDS; k++) {
++            uint32_t *g = (uint32_t *)calloc((size_t)nc, sizeof *g);
++
++            if (!g) { *print = 0; return 0; }
++            if (cnt[k]) { memcpy(g, cnt[k], (size_t)cap * sizeof *g); free(cnt[k]); }
++            cnt[k] = g;
++        }
++        cap = nc;
++    }
++    {
++        uint32_t n = ++cnt[kind][i];
++
++        *print = (n <= 3u || (n & (n - 1u)) == 0) && lines < 8000u;
++        if (*print) lines++;
++        return n;
++    }
++}
++
++static int64_t diag_first_hidden(int64_t i)
++{
++    int64_t a = i;
++    int d = 0;
++
++    for (; a >= 0 && d < 64; d++) {
++        if (!(tab[a].style & FLE_WS_VISIBLE)) return (int64_t)tab[a].lid;
++        a = tab[a].parent >= 0 ? tab[a].parent : -1;
++    }
++    return -1;
++}
++
++static void diag_pt_class(int64_t i, char *cls, size_t n)
++{
++    uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
++
++    cls[0] = 0;
++    if (fle_class_name_of(tab[i].atom, nm, &nl)) u16_ascii(cls, n, nm, nl < n - 1 ? nl : (uint16_t)(n - 1));
++}
++
++static void diag_vis_scan(const char *what)
++{
++    static uint8_t *seen;
++    static uint64_t cap;
++    uint64_t k;
++
++    if (!diag_pt_on()) return;
++    if (cap < tab_n) {
++        uint8_t *g = (uint8_t *)calloc((size_t)tab_n + 256u, 1);
++
++        if (!g) return;
++        if (seen) { memcpy(g, seen, (size_t)cap); free(seen); }
++        seen = g;
++        cap = tab_n + 256u;
++    }
++    for (k = 0; k < tab_n; k++) {
++        int v = tab[k].live && is_visible((int64_t)k) ? 1 : 0;
++        char cls[60];
++
++        if (v == seen[k]) continue;
++        seen[k] = (uint8_t)v;
++        diag_pt_class((int64_t)k, cls, sizeof cls);
++        fprintf(stderr, "fl-diag: vis lid %u class \"%s\" %d->%d by %s own-bit %d first-hidden-lid %d rect (%d,%d,%dx%d) style %#x parent_lid %d\n", (unsigned)tab[k].lid, cls, !v, v, what,
++                (tab[k].style & FLE_WS_VISIBLE) != 0, (int)diag_first_hidden((int64_t)k), (int)tab[k].px, (int)tab[k].py, (int)tab[k].pcx, (int)tab[k].pcy, (unsigned)tab[k].style,
++                tab[k].parent >= 0 ? (int)tab[tab[k].parent].lid : -1);
++    }
++}
++
++static void diag_pt_event(int kind, int64_t i, const char *what, const char *extra)
++{
++    static const char *const nm[DPT_KINDS] = { "show", "paint-msg", "BeginPaint", "EndPaint", "draw-discard" };
++    int print;
++    uint32_t n;
++    char cls[60];
++
++    if (!diag_pt_on() || i < 0) return;
++    n = diag_pt_count(kind, i, &print);
++    if (!print) return;
++    diag_pt_class(i, cls, sizeof cls);
++    fprintf(stderr, "fl-diag: %s lid %u class \"%s\" n %u visible %d own-bit %d first-hidden-lid %d %s%s%s\n", nm[kind], (unsigned)tab[i].lid, cls, (unsigned)n, is_visible(i) ? 1 : 0,
++            (tab[i].style & FLE_WS_VISIBLE) != 0, (int)diag_first_hidden(i), what ? what : "", what && extra ? " " : "", extra ? extra : "");
++}
++
++void fle_win_diag_discard(uint64_t hwnd, const char *api);
++void fle_win_diag_discard(uint64_t hwnd, const char *api)
++{
++    if (!diag_pt_on()) return;
++    diag_pt_event(DPT_DISCARD, live_index(hwnd), api, NULL);
++}
++
+ void fle_win_timer_report(FILE *f);
+ 
+ void fle_win_table_report(FILE *f)
+@@ -1204,6 +1315,7 @@
+         (void)call_wndproc(api, tab[idx].wndproc, h, FLE_WM_SHOWWINDOW, 1, 0);
+         note_visibility_changed();
+     }
++    diag_vis_scan(api);
+     R[0] = h;
+ }
+ 
+@@ -1253,6 +1365,7 @@
+         tab[i].visible = (ns & FLE_WS_VISIBLE) != 0;
+         tab[i].enabled = !(ns & FLE_WS_DISABLED);
+         if (tab[i].visible) note_visibility_changed();
++        diag_vis_scan("SetWindowLongPtrW(GWL_STYLE)");
+         return;
+     }
+     if (index == FLE_GWLP_ID) {
+@@ -3544,6 +3657,7 @@
+         }
+     }
+     if (nflags & FLE_SWP_SHOWWINDOW) note_visibility_changed();
++    diag_vis_scan(api);
+     unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS), !(nflags & FLE_SWP_NOREDRAW));
+ }
+ 
+@@ -3869,6 +3983,7 @@
+     }
+     was = (tab[i].style & FLE_WS_VISIBLE) != 0;
+     now = cmd != FLE_SW_HIDE;
++    if (diag_pt_on()) { char ex[40]; snprintf(ex, sizeof ex, "cmd %d was %d", (int)cmd, was); diag_pt_event(DPT_SHOW, i, "ShowWindow", ex); }
+     was_iconic = tab[i].iconic != 0;
+     was_zoomed = tab[i].zoomed != 0;
+     tab[i].ever_shown = 1;
+@@ -3962,6 +4077,7 @@
+     if (tab[i].parent < 0 && (cmd == FLE_SW_SHOWNORMAL || cmd == FLE_SW_SHOWMINIMIZED || cmd == FLE_SW_SHOWMAXIMIZED || cmd == 5 /* SW_SHOW */ || cmd == FLE_SW_RESTORE)
+         && !(was && (cmd == 5 || ((cmd == FLE_SW_SHOWNORMAL || cmd == FLE_SW_RESTORE) && !was_iconic && !was_zoomed) || (cmd == FLE_SW_SHOWMINIMIZED && was_iconic) || (cmd == FLE_SW_SHOWMAXIMIZED && was_zoomed))))
+         activate_for_swp(api, i);
++    diag_vis_scan(api);
+     R[0] = was ? 1u : 0u;
+ }
+ 
+@@ -5373,6 +5489,7 @@
+             out->msg = FLE_WM_PAINT;
+             out->time = (uint32_t)(now / FLE_TICKS_PER_MS);
+             synth_paints++;
++            diag_pt_event(DPT_PAINT, w, "WM_PAINT retrieved", remove ? "(remove)" : "(peek)");
+             return 1;
+         }
+     }
+@@ -5674,6 +5791,7 @@
+         }
+     }
+     tab[i].in_paint = 1;
++    if (diag_pt_on()) { char ex[80]; snprintf(ex, sizeof ex, "rcPaint (%d,%d,%d,%d) erase %d", (int)l, (int)t2, (int)r, (int)b, erase); diag_pt_event(DPT_BEGIN, i, NULL, ex); }
+     upd_clear_rect(i);
+     tab[i].upd_erase = 0;
+     /* decision 0142: the DC is clipped to the update region until EndPaint (Learn BeginPaint: "automatically sets the clipping region of the device context to exclude any area outside the update region").
+@@ -5720,6 +5838,7 @@
+         return;
+     }
+     if (!tab[i].in_paint) fle_stop(api, "EndPaint for a window that is not between BeginPaint and EndPaint: the page says each BeginPaint has one EndPaint");
++    diag_pt_event(DPT_END, i, NULL, NULL);
+     {
+         uint64_t sv[5] = { R[0], R[1], R[2], R[8], R[9] };
+ 
+@@ -7335,6 +7454,7 @@
+             note_visibility_changed();
+         }
+     }
++    diag_vis_scan("ShowOwnedPopups");
+     R[0] = 1;
+ }
+ 
+--- a/lift/runtime/fle_gdi.c
++++ b/lift/runtime/fle_gdi.c
+@@ -1565,6 +1565,7 @@
+ 
+ /* weak: a link without fle_win.c (the unit tests of this file) has no window table */
+ void fle_win_lock_attempted(uint64_t hwnd) __attribute__((weak));
++void fle_win_diag_discard(uint64_t hwnd, const char *api) __attribute__((weak));   /* decision 0319 TEST-ONLY diagnostic (FLE_DIAG_WIN=1) */
+ /* weak too (decision 0126): a unit-test link of this file without fle_win.c has no window table, so a window / screen DC stops by name */
+ int fle_win_dc_query(uint64_t hwnd, fle_win_dcq *out) __attribute__((weak));
+ int fle_win_dc_query_ex(uint64_t hwnd, uint32_t dcx, fle_win_dcq *out) __attribute__((weak));   /* decision 0319 section 13 */
+@@ -1910,6 +1911,7 @@
+ {
+     if (t->is_window && t->hidden) {
+         fle_raster_discarded(api, t->lid);
++        if (t->hwnd && fle_win_diag_discard) fle_win_diag_discard(t->hwnd, api);
+         if (t->hwnd && fle_win_lock_attempted) fle_win_lock_attempted(t->hwnd);       /* LockWindowUpdate: the extent of the attempt is recorded, the unlock invalidates it */
+         return 0;
+     }

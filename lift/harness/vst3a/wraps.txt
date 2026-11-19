@@ -1,0 +1,6 @@
+-Wl,--wrap=fle_imp_VirtualProtect
+-Wl,--wrap=fle_imp_RtlPcToFileHeader
+-Wl,--wrap=fle_imp_AcquireSRWLockExclusive -Wl,--wrap=fle_imp_ReleaseSRWLockExclusive -Wl,--wrap=fle_imp_AcquireSRWLockShared -Wl,--wrap=fle_imp_ReleaseSRWLockShared
+-Wl,--wrap=fle_mxcsr_load
+-Wl,--wrap=fle_imp_WakeConditionVariable -Wl,--wrap=fle_imp_WakeAllConditionVariable -Wl,--wrap=fle_imp_SleepConditionVariableSRW
+-Wl,--wrap=fle_seh_raise

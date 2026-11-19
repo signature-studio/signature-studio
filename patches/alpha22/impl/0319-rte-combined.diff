@@ -1,0 +1,540 @@
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -2651,6 +2651,26 @@
+ 
+ static void upd_set_full(int64_t i) { upd_set_rect(i, 0, 0, tab[i].pcx, tab[i].pcy); }
+ 
++/* Decision 0319 section 23 (alpha1, PROVISIONAL; O9 / the Balance form: the child windows of a form that was shown never got a WM_PAINT): showing a window gives its whole client area to paint AND the whole client
++ * area of every visible descendant, whatever their clip styles. Wine 10.0 (UNOFFICIAL; server/window.c set_window_pos: the exposed region of a window that becomes visible goes to redraw_window(win, ..., RDW_INVALIDATE |
++ * RDW_ERASE | RDW_FRAME | RDW_ALLCHILDREN), which recurses into every child that has WS_VISIBLE, WS_CLIPCHILDREN or not: "if ((win->style & WS_CLIPCHILDREN) && !(flags & RDW_ALLCHILDREN)) return" is the only stop and
++ * ALLCHILDREN is set). A descendant that had WS_VISIBLE while an ancestor was hidden had no update region (S-0247-hidden: a window that is not visible has none), so when the ancestor is shown it is now visible and must paint.
++ * Learn BeginPaint: the update region is set "by the system after sizing, moving, creating, scrolling, or any other operation that affects the client area". No class or window-kind test. */
++static void upd_show_descendants(int64_t i)
++{
++    int64_t idx[SIB_MAX];
++    uint32_t n = siblings(i, idx, SIB_MAX), k;
++
++    for (k = 0; k < n; k++) {
++        int64_t c = idx[k];
++
++        if (!tab[c].live || !(tab[c].style & FLE_WS_VISIBLE) || tab[c].iconic || tab[c].pcx <= 0 || tab[c].pcy <= 0) continue;
++        upd_set_full(c);
++        tab[c].upd_erase = 1;
++        upd_show_descendants(c);
++    }
++}
++
+ static void upd_get(int64_t i, fle_visrgn *v)
+ {
+     if (!(tab[i].upd_r > tab[i].upd_l && tab[i].upd_b > tab[i].upd_t)) v->n = 0;
+@@ -3438,6 +3458,13 @@
+             upd_set_full(i);
+         }
+     }
++    if ((nflags & FLE_SWP_SHOWWINDOW) && vis0 == 0 && !(nflags & FLE_SWP_NOREDRAW) && is_visible(i) && tab[i].pcx > 0 && tab[i].pcy > 0) {
++        /* decision 0319 section 23: SetWindowPos(SWP_SHOWWINDOW) on a window that was not visible exposes the whole window and all its visible descendants (Wine 10.0 server/window.c set_window_pos: the old visible
++         * region was empty, so everything is exposed: redraw_window(..., RDW_ALLCHILDREN)). ShowWindow does the same for itself in fle_imp_ShowWindow. */
++        upd_set_full(i);
++        tab[i].upd_erase = 1;
++        upd_show_descendants(i);
++    }
+     if (nflags & FLE_SWP_SHOWWINDOW) note_visibility_changed();
+     unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS), !(nflags & FLE_SWP_NOREDRAW));
+ }
+@@ -3660,6 +3687,7 @@
+         /* a window that becomes visible has its whole client area to paint (Learn BeginPaint: the update region is set "by the system after ... creating"): a choice for the show */
+         upd_set_full(i);
+         tab[i].upd_erase = 1;
++        upd_show_descendants(i);   /* decision 0319 section 23 */
+     }
+     if (cmd == FLE_SW_HIDE) input_window_hidden(api, i);
+     /* Learn ShowWindow: SW_SHOWNORMAL, SW_SHOWMINIMIZED, SW_SHOWMAXIMIZED, SW_SHOW and SW_RESTORE "Activate" the window; SW_SHOWNOACTIVATE, SW_SHOWMINNOACTIVE and SW_SHOWNA do not (activate_for_swp: a visible, enabled
+--- a/lift/harness/alpha3/upd_region.c
++++ b/lift/harness/alpha3/upd_region.c
+@@ -377,6 +377,44 @@
+     (void)fle_api2_call(fle_imp_ShowWindow, win, 8 /* SW_SHOWNA */, 0, 0, 0, 0, 0, 0);
+     yes("a window shown again has its whole client area to repaint even when a part was invalid while hidden", gur(win, rc) == 1 && same_rect(rc, 0, 0, 200, 100));
+ 
++    /* ---- decision 0319 section 23 (alpha1): showing a window gives the whole client area to every visible descendant too (Wine 10.0 server/window.c set_window_pos: redraw_window(..., RDW_ALLCHILDREN)).
++     * h is a hidden child of the visible popup t; g (child of h) gets WS_VISIBLE while h is hidden (VCL: Visible := True before the parent is shown): it has no update region (a window that is not visible
++     * has none). ShowWindow(h) makes both visible: both have the whole client area to paint, whether or not the parent clips its children (t, h with and without WS_CLIPCHILDREN). ---- */
++    {
++        int clip;
++
++        for (clip = 0; clip < 2; clip++) {
++            HWND t = mk(0x10000, WS_POPUP | WS_VISIBLE | (clip ? 0x02000000u : 0u), 700, 700, 300, 300);
++            HWND h = mkp(t, 0, 0x44000000u | (clip ? 0x02000000u : 0u), 20, 20, 200, 200);        /* WS_CHILD | WS_CLIPSIBLINGS, not visible */
++            HWND g = mkp(h, 0, 0x54000000u, 10, 10, 100, 100);                                     /* WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS under the hidden h */
++            HWND gg = mkp(g, 0, 0x54000000u, 5, 5, 40, 40);                                        /* and one more level */
++            char buf[200];
++
++            pump();
++            (void)fle_desk_compose();
++            snprintf(buf, sizeof buf, "show-descendants (%s): g and gg have WS_VISIBLE but their ancestor h is hidden: no update region", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(g, rc) == 0 && gur(gg, rc) == 0);
++            (void)fle_api2_call(fle_imp_ValidateRect, t, 0, 0, 0, 0, 0, 0, 0);
++            (void)fle_api2_call(fle_imp_ShowWindow, h, 5 /* SW_SHOW */, 0, 0, 0, 0, 0, 0);
++            snprintf(buf, sizeof buf, "show-descendants (%s): ShowWindow(h): h has its whole client area (0,0,200,200)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 1 && same_rect(rc, 0, 0, 200, 200));
++            snprintf(buf, sizeof buf, "show-descendants (%s): ... and so has the visible child g (0,0,100,100)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(g, rc) == 1 && same_rect(rc, 0, 0, 100, 100));
++            snprintf(buf, sizeof buf, "show-descendants (%s): ... and the grandchild gg (0,0,40,40)", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(gg, rc) == 1 && same_rect(rc, 0, 0, 40, 40));
++            pump();
++            snprintf(buf, sizeof buf, "show-descendants (%s): after the messages are dispatched nothing is left to paint in h, g, gg", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 0 && gur(g, rc) == 0 && gur(gg, rc) == 0);
++            /* the same when the parent is shown by SetWindowPos(SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE) instead of ShowWindow */
++            (void)fle_api2_call(fle_imp_ShowWindow, h, 0, 0, 0, 0, 0, 0, 0);
++            pump();
++            (void)fle_api2_call(fle_imp_ValidateRect, t, 0, 0, 0, 0, 0, 0, 0);
++            (void)fle_api2_call(fle_imp_SetWindowPos, h, 0, 0, 0, 0, 0, 0x40u | 0x1u | 0x2u | 0x4u | 0x10u, 0);
++            snprintf(buf, sizeof buf, "show-descendants (%s): SetWindowPos(SWP_SHOWWINDOW) of the hidden h: h, g and gg all have their whole client area", clip ? "WS_CLIPCHILDREN" : "plain");
++            yes(buf, gur(h, rc) == 1 && same_rect(rc, 0, 0, 200, 200) && gur(g, rc) == 1 && same_rect(rc, 0, 0, 100, 100) && gur(gg, rc) == 1 && same_rect(rc, 0, 0, 40, 40));
++        }
++    }
++
+     printf("checks %d failed %d\n", checks, fails);
+     return fails ? 1 : 0;
+ }
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -5994,8 +5994,16 @@
+  * the coordinates so that the cursor stays within the rectangle"; "Returns nonzero if successful or zero otherwise"; (GetPhysicalCursorPos) "Retrieves the position of the cursor in physical coordinates",
+  * (SetPhysicalCursorPos) its counterpart. There is no input device here and no ClipCursor (no row): the position is a state of the runtime, starting at (0, 0) (S-cursor-start: decision 0123's value), set by the setters
+  * to the given point clamped to the virtual screen [0, 1920) x [0, 1080) (S-cursor-screen: the page's "adjusts the coordinates so that the cursor stays within the rectangle" is applied with the screen as the rectangle),
+- * and read back by the getters. The physical and the logical position are the same (no DPI virtualisation: fle_gdc.h 96 DPI, S-physical-cursor). */
++ * and read back by the getters. The physical and the logical position are the same (no DPI virtualisation: fle_gdc.h 96 DPI, S-physical-cursor).
++ * Decision 0319 (O20): Windows's "cursor state" is a virtual cursor. SetCursorPos moves it, and the host
++ * (browser) pointer's absolute motion is relative to that new place: the guest position is the host's latest
++ * absolute position plus an offset, clamped to the screen. SetCursorPos/SetPhysicalCursorPos stores the
++ * requested point and re-anchors the host latest to that point (offset = 0); the next host absolute move is
++ * then measured from the new position. The host move records its absolute browser point and derives the
++ * guest point as host + offset clamped to the screen. With no offset this is the same behaviour as before. */
+ static int32_t ptr_x, ptr_y;
++static int32_t host_ptr_x, host_ptr_y;
++static int32_t virt_off_x, virt_off_y;
+ 
+ void fle_imp_GetCursorPos(void)
+ {
+@@ -6019,13 +6027,20 @@
+     R[0] = 1;
+ }
+ 
++static int32_t clamp_x(int32_t x) { return x < 0 ? 0 : x > FLE_GDC_HORZRES - 1 ? FLE_GDC_HORZRES - 1 : x; }
++static int32_t clamp_y(int32_t y) { return y < 0 ? 0 : y > FLE_GDC_VERTRES - 1 ? FLE_GDC_VERTRES - 1 : y; }
++
+ static void set_pointer(const char *api)
+ {
+     int32_t x = (int32_t)(uint32_t)R[1], y = (int32_t)(uint32_t)R[2];
+ 
+     fle_win_check_thread(api);
+-    ptr_x = x < 0 ? 0 : x > FLE_GDC_HORZRES - 1 ? FLE_GDC_HORZRES - 1 : x;
+-    ptr_y = y < 0 ? 0 : y > FLE_GDC_VERTRES - 1 ? FLE_GDC_VERTRES - 1 : y;
++    ptr_x = clamp_x(x);
++    ptr_y = clamp_y(y);
++    host_ptr_x = ptr_x;
++    host_ptr_y = ptr_y;
++    virt_off_x = 0;
++    virt_off_y = 0;
+     R[0] = 1;
+ }
+ 
+@@ -6059,6 +6074,22 @@
+     ptr_x = x;
+     ptr_y = y;
+ }
++void fle_win_host_pointer_set(int32_t x, int32_t y)
++{
++    host_ptr_x = clamp_x(x);
++    host_ptr_y = clamp_y(y);
++    ptr_x = clamp_x(host_ptr_x + virt_off_x);
++    ptr_y = clamp_y(host_ptr_y + virt_off_y);
++}
++void fle_win_pointer_reclamp(void)
++{
++    host_ptr_x = clamp_x(host_ptr_x);
++    host_ptr_y = clamp_y(host_ptr_y);
++    ptr_x = clamp_x(ptr_x);
++    ptr_y = clamp_y(ptr_y);
++    virt_off_x = ptr_x - host_ptr_x;
++    virt_off_y = ptr_y - host_ptr_y;
++}
+ 
+ void fle_win_pointer_get(int32_t *x, int32_t *y)
+ {
+--- a/lift/runtime/fle_input.c
++++ b/lift/runtime/fle_input.c
+@@ -143,7 +143,8 @@
+     if (y < 0) y = 0;
+     if (x > FLE_GDC_HORZRES - 1) x = FLE_GDC_HORZRES - 1;
+     if (y > FLE_GDC_VERTRES - 1) y = FLE_GDC_VERTRES - 1;
+-    fle_win_pointer_set(x, y);
++    fle_win_host_pointer_set(x, y);
++    fle_win_pointer_get(&x, &y);
+     if (kind == FLE_IN_BDOWN || kind == FLE_IN_BUP) {
+         b = data == (int32_t)FLE_IN_BTN_R ? VK_RBUTTON_ : data == (int32_t)FLE_IN_BTN_M ? VK_MBUTTON_ : VK_LBUTTON_;
+         set_key(key_async, b, kind == FLE_IN_BDOWN);
+@@ -742,13 +743,11 @@
+ {
+     uint64_t hs[64];
+     unsigned n, k;
+-    int32_t px, py;
+     uint32_t w = (uint32_t)e->x, h = (uint32_t)e->y, ow = fle_screen_w(), oh = fle_screen_h();
+ 
+     if (w == ow && h == oh) return;
+     if (!fle_screen_set(w, h)) return;
+-    fle_win_pointer_get(&px, &py);
+-    fle_win_pointer_set(px, py);
++    fle_win_pointer_reclamp();
+     n = fle_win_input_toplevels(hs, 64);
+     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_DISPLAYCHANGE, FLE_GDC_BITSPIXEL, ((uint64_t)h << 16) | w);
+     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_SETTINGCHANGE, FLE_SPI_SETWORKAREA, 0);
+@@ -976,6 +975,29 @@
+         if (wp == VK_F4_ && (lp & (1u << 29))) (void)fle_win_input_send(api, hwnd, FLE_WM_SYSCOMMAND, 0xF060u, 0);
+         *result = 0;
+         return 1;
++    case FLE_WM_RBUTTONUP:
++    case FLE_WM_NCRBUTTONUP: {
++        /* Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
++         * WM_RBUTTONUP or WM_NCRBUTTONUP message". wParam is the handle of the window in which the button was
++         * released; when that window is a child, the message is forwarded to the parent, but wParam keeps
++         * the child handle ("This can be a child window of the window receiving the message"). lParam is the
++         * cursor position in screen coordinates. For WM_RBUTTONUP lParam is client-relative; for
++         * WM_NCRBUTTONUP it is already screen-relative. Return value "If an application processes this
++         * message, it should return zero". */
++        int32_t sx, sy;
++        uint64_t target = v.parent ? v.parent : hwnd;
++
++        if (msg == FLE_WM_RBUTTONUP) {
++            sx = sx16(lp) + v.ox;
++            sy = sx16(lp >> 16) + v.oy;
++        } else {
++            sx = sx16(lp);
++            sy = sx16(lp >> 16);
++        }
++        (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, hwnd, lparam_xy(sx, sy));
++        *result = 0;
++        return 1;
++    }
+     default:
+         break;
+     }
+--- a/lift/runtime/fle_input.h
++++ b/lift/runtime/fle_input.h
+@@ -89,8 +89,13 @@
+ int fle_win_host_timer(uint64_t hwnd, uint64_t id, uint32_t ms);   /* a timer for a window of the table made by the host (a probe, not a guest call) */
+ void fle_win_pointer_set(int32_t x, int32_t y);
+ void fle_win_pointer_get(int32_t *x, int32_t *y);
++void fle_win_host_pointer_set(int32_t x, int32_t y);
++void fle_win_pointer_reclamp(void);
+ uint64_t fle_class_hcursor_of(uint16_t atom);                     /* fle_class.c */
+ 
++#define FLE_WM_CONTEXTMENU    0x007Bu
++#define FLE_WM_RBUTTONUP      0x0205u
++#define FLE_WM_NCRBUTTONUP    0x00A5u
+ #define FLE_WM_NCHITTEST      0x0084u
+ #define FLE_WM_SETCURSOR      0x0020u
+ #define FLE_WM_MOUSEACTIVATE  0x0021u
+--- a/lift/crates/fe-lift/tests/wall_fr11.rs
++++ b/lift/crates/fe-lift/tests/wall_fr11.rs
+@@ -423,10 +423,12 @@
+ /* the window procedure stub: every message gets the creation answers (WM_NCCREATE 1, WM_NCCALCSIZE 0, WM_CREATE 0) and otherwise the default processing, as the guest's own handler would call DefWindowProcW */
+ #define VA_WP 0x2000
+ static uint32_t wp_count[0x400];
++static uint64_t last_ctx_target, last_ctx_wp, last_ctx_lp;
+ static void wndproc(void)
+ {
+     uint64_t h = R[1], msg = R[2], wp = R[8], lp = R[9], sp = R[4];
+     if (msg < 0x400) wp_count[msg]++;
++    if (msg == 0x007B) { last_ctx_target = h; last_ctx_wp = wp; last_ctx_lp = lp; }
+     if (msg == 0x81) { R[0] = 1; return; }
+     if (msg == 0x83) { R[0] = 0; return; }
+     if (msg == 0x01) { R[0] = 0; return; }
+@@ -1520,6 +1522,87 @@
+ }
+ 
+ #[test]
++fn the_virtual_pointer_keeps_set_cursor_pos_as_a_relative_offset() {
++    // Decision 0319 O20: Windows's pointer is a virtual cursor. SetCursorPos moves it, and the host
++    // (browser) pointer's absolute motion is relative to that new place: the guest position is the
++    // host's latest absolute position plus an offset, clamped to the screen. With no offset this is
++    // the same behaviour as before.
++    let l = lines(
++        "fr11-virtual-pointer",
++        r#"
++    int32_t pt[2], ci[6];
++    void fle_win_host_pointer_set(int32_t, int32_t);
++    void fle_win_pointer_reclamp(void);
++    K(fle_imp_SetCursorPos, 0, 0);
++    fle_win_host_pointer_set(10, 10);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 10 10 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetCursorPos, 100, 200);
++    K(fle_imp_GetCursorPos, A(pt)); printf("set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(20, 10);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 10 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(20, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 20 20 -> %d %d\n", pt[0], pt[1]);
++    memset(ci, 0, sizeof ci); ci[0] = 24;
++    K(fle_imp_GetCursorInfo, A(ci)); printf("info pos %d %d\n", ci[4], ci[5]);
++    fle_win_host_pointer_set(450, 1079);
++    K(fle_imp_SetPhysicalCursorPos, 450, 17);
++    K(fle_imp_GetCursorPos, A(pt)); printf("wrap set -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(450, 21);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 450 21 -> %d %d\n", pt[0], pt[1]);
++    K(fle_imp_SetCursorPos, 1920, 1080);
++    K(fle_imp_GetCursorPos, A(pt)); printf("clamped -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(21, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 21 20 -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(22, 20);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 22 20 -> %d %d\n", pt[0], pt[1]);
++    fle_screen_set(1024, 768);
++    fle_win_pointer_reclamp();
++    K(fle_imp_GetCursorPos, A(pt)); printf("shrunk -> %d %d\n", pt[0], pt[1]);
++    fle_win_host_pointer_set(23, 21);
++    K(fle_imp_GetCursorPos, A(pt)); printf("host 23 21 -> %d %d\n", pt[0], pt[1]);
++"#,
++    );
++    assert_eq!(l[0], "host 10 10 -> 10 10");
++    assert_eq!(l[1], "set -> 100 200");
++    assert_eq!(l[2], "host 20 10 -> 20 10");
++    assert_eq!(l[3], "host 20 20 -> 20 20");
++    assert_eq!(l[4], "info pos 20 20");
++    assert_eq!(l[5], "wrap set -> 450 17");
++    assert_eq!(l[6], "host 450 20 -> 450 20");
++    assert_eq!(l[7], "host 450 21 -> 450 21");
++    assert_eq!(l[8], "clamped -> 1919 1079");
++    assert_eq!(l[9], "host 21 20 -> 21 20");
++    assert_eq!(l[10], "host 22 20 -> 22 20");
++    assert_eq!(l[11], "shrunk -> 22 20");
++    assert_eq!(l[12], "host 23 21 -> 23 21");
++}
++
++#[test]
++fn def_window_proc_generates_wm_context_menu_from_right_button_up() {
++    // Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
++    // WM_RBUTTONUP or WM_NCRBUTTONUP message"; wParam is the handle of the window in which the button was
++    // released (a child forwards to the parent), lParam the cursor position in screen coordinates.
++    let l = lines(
++        "fr11-contextmenu",
++        r#"
++    uint64_t top = cw(0x80, "t", POPUP | VIS, 10, 20, 40, 30, 0);
++    uint64_t kid = cw(0, "k", CHILD | VIS, 5, 6, 10, 10, top);
++    uint64_t r;
++    wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
++    r = K(fle_imp_DefWindowProcW, kid, 0x0205, 2, ((uint64_t)2 << 16) | 1);
++    printf("child rbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == kid ? "kid" : "other", U(last_ctx_lp));
++    wp_count[0x007B] = 0; last_ctx_target = 0; last_ctx_wp = 0; last_ctx_lp = 0;
++    r = K(fle_imp_DefWindowProcW, top, 0x00A5, 1, ((uint64_t)40 << 16) | 30);
++    printf("top ncrbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == top ? "top" : "other", U(last_ctx_lp));
++"#,
++    );
++    assert_eq!(l[0], "child rbuttonup r 0 ctx 1 target top wparam kid lparam 1c0010");
++    assert_eq!(l[1], "top ncrbuttonup r 0 ctx 1 target top wparam top lparam 28001e");
++}
++
++#[test]
+ fn set_thread_error_mode_returns_the_previous_mode_and_accepts_the_alignment_fault_bit() {
+     // Learn SetThreadErrorMode: dwNewMode "can be one or more of the following values": 0 "Use the system default", SEM_FAILCRITICALERRORS 0x0001, SEM_NOGPFAULTERRORBOX 0x0002, SEM_NOOPENFILEERRORBOX 0x8000;
+     // lpOldMode "If the function succeeds, this parameter is set to the thread's previous error mode. This parameter can be NULL"; "If the function succeeds, the return value is nonzero". SEM_NOALIGNMENTFAULTEXCEPT 0x0004
+--- a/lift/crates/fe-lift/tests/sweep1.rs
++++ b/lift/crates/fe-lift/tests/sweep1.rs
+@@ -157,7 +157,7 @@
+ #include "fle_sweep1.h"
+ uint64_t R[16];
+ void fle_win_input_activate(void) {} void fle_win_input_active(void) {} void fle_win_input_capture_any(void) {} void fle_win_input_hit(void) {} void fle_win_input_key_target(void) {}
+-void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {}
++void fle_win_input_send(void) {} void fle_win_input_view(void) {} void fle_win_pointer_get(void) {} void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
+ void fle_win_input_toplevels(void) {} void fle_win_input_remaximize(void) {} void fle_win_input_showwindow(void) {}
+ void fle_win_input_call_hooks(void) {} void fle_win_input_hit_list(void) {}
+ int main(int argc, char **argv)
+--- a/lift/harness/sweep1/sweep1_cases.c
++++ b/lift/harness/sweep1/sweep1_cases.c
+@@ -31,7 +31,7 @@
+ void fle_win_input_call_hooks(void) {}   /* decision 0323 (WH_MOUSE / WH_KEYBOARD hooks, fle_input.c input_hook_swallows) */
+ void fle_win_input_hit_list(void) {}     /* decision 0324 (fle_input.c hit_walk) */
+ void fle_win_pointer_get(void) {}
+-void fle_win_pointer_set(void) {}
++void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
+ typedef unsigned int UINT, DWORD, BOOL;
+ typedef int INT;
+ typedef uint16_t WCHAR, WORD;
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -191,6 +191,8 @@
+ typedef struct { uint64_t va, n, first_cum, last_cum; } g9f_bt_t;
+ static g9f_bt_t g9f_bt[64];
+ static unsigned g9f_nbt;
++/* Decision 0319: hook of fle_diag_g9mix.c (weak, so a link without that file still links). */
++void fle_diag_g9mix_hook(uint64_t va, void (*fn)(void)) __attribute__((weak));
+ static int g9f_on(void)
+ {
+     static int on = -1;
+@@ -247,6 +249,7 @@
+ }
+ static void g9_hook(uint64_t va, void (*fn)(void))
+ {
++    if (va == UINT64_C(0xcf2a90) && fle_diag_g9mix_hook) { fle_diag_g9mix_hook(va, fn); return; }
+     if (va >= G9_LO && va < G9_HI) {
+         uint64_t n = __atomic_add_fetch(&g9_n, 1, __ATOMIC_RELAXED);
+         unsigned i;
+--- /dev/null
++++ b/lift/runtime/fle_diag_g9mix.c
+@@ -0,0 +1,156 @@
++/* Decision 0319 TEST-ONLY slot/mix diagnostic (alpha1; RT-D4 increment, FLE_DIAG_G9F=1).
++ * Observation only: reads guest fields and float buffers, calls fn itself, and writes nothing the guest
++ * sees. FLE_TEST_GETENV is a null constant outside the native tests and in the product, so the on-path
++ * is dead there; the diagnostic build tree turns the read into getenv like the other FLE_DIAG_* reads.
++ *
++ * The hook point is FLEngine f_cf2a90(task rcx, Length edx). It is reached from a vtable slot of the
++ * mixer task object, so the indirect call of the guest goes through fle_dispatch and can be seen here.
++ * The three direct subcalls inside it (f_cf2f90, f_cf2d00, f_cf3020) are NOT reached this way, so
++ * this file calls them out only from the final task state: smartSkip sees task+0x28, the silence counter
++ * sees task+0x38/slot+0xa0 before and after.
++ *
++ * Each line prints, per slot pointer: the cumulative frames of that slot (scum), the Export position
++ * (expos; -1 until the export start), the task block pointers, the slot state (si, silence, smart flag,
++ * insert), the pre/post peak and sum and first 8 floats of in/dry/out. The export start follows the
++ * source-popinter change of this slot (task+0x18 changed from the first call of the slot to the current
++ * call). This rule is based on two observed runs only; the reader prefers an expos field in the log
++ * when the format provides one. Lines in expos 210000..212499 are all printed; outside, every 16th call
++ * of a slot is printed; a line budget keeps the total bounded.
++ */
++#include <inttypes.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "fle_runtime.h"
++#include "fle_test_env.h"
++
++#define G9M_SLOTS 128u
++#define G9M_WIN_LO 210000u
++#define G9M_WIN_HI 212500u
++
++typedef struct { uint32_t peak; double sum; float first[8]; } g9m_stat;
++static float g9m_peakf(g9m_stat s) { float x; memcpy(&x, &s.peak, 4); return x; }
++static g9m_stat g9m_peak(uint64_t p, uint64_t len)
++{
++    g9m_stat s;
++    uint64_t i;
++
++    { float z = 0.0f; memcpy(&s.peak, &z, 4); }
++    s.sum = 0;
++    for (i = 0; i < 8; i++) s.first[i] = 0.0f;
++    if (p == 0 || len == 0) return s;
++    for (i = 0; i < len * 2u; i++) {
++        uint32_t b = (uint32_t)fle_ld(p + 4u * i, 4);
++        float x;
++
++        memcpy(&x, &b, 4);
++        if (x < 0.0f) x = -x;
++        if (x > g9m_peakf(s) || x != x) memcpy(&s.peak, &x, 4);
++        s.sum += (double)x;
++        if (i < 8) s.first[i] = x;
++    }
++    return s;
++}
++
++static uint64_t g9m_slotid[G9M_SLOTS], g9m_scum[G9M_SLOTS], g9m_first_src[G9M_SLOTS], g9m_expos0[G9M_SLOTS], g9m_calln[G9M_SLOTS];
++static unsigned char g9m_have_first[G9M_SLOTS], g9m_have_e0[G9M_SLOTS];
++static unsigned g9m_nslots;
++static uint64_t g9m_lines;
++static int g9m_lockword;
++
++static int g9m_on(void)
++{
++    static int on = -1;
++
++    if (on < 0) { const char *e = FLE_TEST_GETENV("FLE_DIAG_G9F"); on = e != NULL && e[0] == '1'; }
++    return on;
++}
++static void g9m_lock(void) { while (__atomic_exchange_n(&g9m_lockword, 1, __ATOMIC_ACQUIRE)) {} }
++static void g9m_unlock(void) { __atomic_store_n(&g9m_lockword, 0, __ATOMIC_RELEASE); }
++
++static void g9m_print(uint64_t task, uint64_t slot, uint64_t len, uint64_t scum, int64_t expos,
++                      unsigned k, uint64_t in_ptr, uint64_t dry_ptr, uint64_t dst_ptr,
++                      g9m_stat is, g9m_stat ds, g9m_stat os, g9m_stat ip, g9m_stat dp,
++                      unsigned si, uint64_t sil0, uint64_t sil1, unsigned smart, unsigned insert,
++                      int smartskip)
++{
++    unsigned i;
++
++    fprintf(stderr, "g9m: slot %#" PRIx64 " task %#" PRIx64 " k %u len %" PRIu64 " scum %" PRIu64 " expos %" PRId64 "\n",
++            slot, task, k, len, scum, expos);
++    fprintf(stderr, "g9m:   si %u insert %u silence %" PRIu64 "->%" PRIu64 " smart %u skip %d in %#" PRIx64 " dry %#" PRIx64 " out %#" PRIx64 "\n",
++            si, insert, sil0, sil1, smart, smartskip, in_ptr, dry_ptr, dst_ptr);
++    fprintf(stderr, "g9m:   in pre peak %g sum %g | dry pre peak %g sum %g | out pre peak %g sum %g | out post peak %g sum %g\n",
++            (double)g9m_peakf(is), is.sum, (double)g9m_peakf(ds), ds.sum, (double)g9m_peakf(os), os.sum, (double)g9m_peakf(ip), ip.sum);
++    fprintf(stderr, "g9m:   src_first8");
++    for (i = 0; i < 8; i++) fprintf(stderr, " %g", (double)is.first[i]);
++    fprintf(stderr, " dry_first8");
++    for (i = 0; i < 8; i++) fprintf(stderr, " %g", (double)ds.first[i]);
++    fprintf(stderr, " out_before_first8");
++    for (i = 0; i < 8; i++) fprintf(stderr, " %g", (double)os.first[i]);
++    fprintf(stderr, " out_after_first8");
++    for (i = 0; i < 8; i++) fprintf(stderr, " %g", (double)ip.first[i]);
++    fprintf(stderr, " dst_pre_first8");
++    for (i = 0; i < 8; i++) fprintf(stderr, " %g", (double)dp.first[i]);
++    fprintf(stderr, "\n");
++}
++
++void fle_diag_g9mix_hook(uint64_t va, void (*fn)(void))
++{
++    uint64_t task, slot, len;
++    uint64_t in_ptr, dry_ptr, dst_ptr, src_change;
++    g9m_stat is, ds, os, ip, dp;
++    unsigned si, insert, smart;
++    uint64_t sil0, sil1, scum_before;
++    int smartskip;
++    unsigned k;
++
++    if (va != UINT64_C(0xcf2a90) || !g9m_on()) { fn(); return; }
++    task = R[1];
++    if (task == 0) { fn(); return; }
++    len = (uint32_t)R[2];
++    slot = fle_ld(task + UINT64_C(0x38), 8);
++    if (slot == 0) { fn(); return; }
++    si = (unsigned)(uint32_t)fle_ld(slot + UINT64_C(0x64), 4);
++    insert = (unsigned)(uint32_t)fle_ld(slot + UINT64_C(0x130), 4);
++    smart = (unsigned)fle_ld(slot + UINT64_C(0xf7), 1);
++    sil0 = (uint32_t)fle_ld(slot + UINT64_C(0xa0), 4);
++    in_ptr = fle_ld(task + UINT64_C(0x18), 8);
++    if (((uint32_t)fle_ld(slot + UINT64_C(0x13c), 4) | (uint32_t)fle_ld(slot + UINT64_C(0x140), 4)) != 0)
++        dst_ptr = fle_ld(fle_ld(task + UINT64_C(0x2c), 8) + UINT64_C(0x68), 8);
++    else
++        dst_ptr = in_ptr;
++    if ((uint32_t)fle_ld(slot + UINT64_C(0x154), 4) != 0)
++        dry_ptr = fle_ld(fle_ld(task + UINT64_C(0x2c), 8) + UINT64_C(0x60), 8);
++    else
++        dry_ptr = in_ptr;
++    is = g9m_peak(in_ptr, len);
++    ds = g9m_peak(dry_ptr, len);
++    os = g9m_peak(dst_ptr, len);
++    dp = os;
++    g9m_lock();
++    for (k = 0; k < g9m_nslots && g9m_slotid[k] != slot; k++) {}
++    if (k == g9m_nslots) { if (g9m_nslots < G9M_SLOTS) { g9m_slotid[g9m_nslots] = slot; g9m_nslots++; } else k = G9M_SLOTS - 1u; }
++    scum_before = g9m_scum[k];
++    src_change = 0;
++    if (!g9m_have_first[k]) { g9m_have_first[k] = 1; g9m_first_src[k] = in_ptr; }
++    else if (in_ptr != g9m_first_src[k] && !g9m_have_e0[k]) { g9m_have_e0[k] = 1; g9m_expos0[k] = scum_before; src_change = 1; }
++    g9m_calln[k]++;
++    g9m_scum[k] += len;
++    g9m_unlock();
++    (void)src_change;
++    fn();
++    sil1 = (uint32_t)fle_ld(slot + UINT64_C(0xa0), 4);
++    smartskip = (uint32_t)fle_ld(task + UINT64_C(0x28), 4) == 0 && len != 0;
++    ip = g9m_peak(fle_ld(task + UINT64_C(0x54), 8), len);
++    dp = os;
++    if ((g9m_have_e0[k] && scum_before >= g9m_expos0[k] + G9M_WIN_LO && scum_before < g9m_expos0[k] + G9M_WIN_HI) ||
++        (g9m_calln[k] % 16u) == 0) {
++        if (g9m_lines < 19000u) {
++            g9m_lines++;
++            g9m_print(task, slot, len, scum_before, g9m_have_e0[k] ? (int64_t)(scum_before - g9m_expos0[k]) : (int64_t)-1,
++                      k, in_ptr, dry_ptr, dst_ptr, is, ds, os, ip, dp, si, sil0, sil1, smart, insert, smartskip);
++        }
++    }
++}

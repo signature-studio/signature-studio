@@ -1,0 +1,207 @@
+--- a/app/src/main.ts
++++ b/app/src/main.ts
+@@ -21,7 +21,7 @@
+ import { EngineLogView, renderThreads, renderWindows } from './ui/panels.ts';
+ import { stageRows, Timeline, type StageId } from './ui/phases.ts';
+ import { ProgressView } from './ui/progress.ts';
+-import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
++import { chooseGuestScreen, dpiOfRatio, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
+ import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
+ import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
+ import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+@@ -95,7 +95,7 @@
+   hz: { hz: number | null; measurement: HzMeasurement | null; warning: string | null };
+   /** decision 0212: the guest's screen. `asked` is what the page put into the engine's environment (null: nothing, the engine's own 1920x1080); `reported` is what the engine says it uses (fle_av_poll: screen_w, screen_h; null until the first
+    *  report, {0,0} from a build that does not report it); `guest` is what the desktop is drawn for now; `room` the room measured at the last layout */
+-  screen: { panelOpen: boolean; engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; room: Room | null; notes: string[] };
++  screen: { panelOpen: boolean; engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; dpi: number; room: Room | null; notes: string[] };
+   /** decision 0193: the page's answers to the engine's file dialogs (no file names) and the files the engine wrote (Save dialog targets) */
+   fileDlg: { readonly open: boolean; readonly history: FileDialogView['history']; /** for the record of decision 0193: whether the page had a transient user activation (navigator.userActivation.isActive) and how long ago the page's last trusted pointer or key event was, when each engine request arrived */ readonly requests: { id: number; save: boolean; at: number; activationActive: boolean | null; msSinceInput: number | null; /** what the engine asked (its own strings: types, title, folder, suggested name) */ request: FileDlgRequest }[] };
+   saved: SavedFilesView['files'];
+@@ -161,7 +161,7 @@
+ const app: AppApi = {
+   assetsReport: () => assetsNow(),
+   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+-  screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
++  screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, dpi: 96, room: null, notes: [] },
+   engineLog: () => engineLog.lines,
+   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
+   audio,
+@@ -256,10 +256,13 @@
+ }
+ 
+ // ---- display: CSS size of the desktop (the room); the engine's clock state; the input ----
++let stageDevice: { w: number; h: number } | null = null;
+ /** decision 0212: the room for the screen, in CSS pixels: the stage (everything below the header and left of the monitor panel) */
+ function measureRoom(): Room {
+-  const r = $('stage').getBoundingClientRect();
+-  return { width: r.width, height: r.height, dpr: window.devicePixelRatio || 1 };
++  const r = $('stage').getBoundingClientRect(), dpr = window.devicePixelRatio || 1, d = stageDevice;
++  // decision 0318: the whole device pixels of the stage as the browser last observed them (device-pixel-content-box), kept only while they are this size
++  const same = d !== null && Math.abs(d.w - r.width * dpr) <= 1.5 && Math.abs(d.h - r.height * dpr) <= 1.5;
++  return same ? { width: r.width, height: r.height, dpr, deviceWidth: d.w, deviceHeight: d.h } : { width: r.width, height: r.height, dpr };
+ }
+ function applyDisplay(): void {
+   const dpr = window.devicePixelRatio || 1;
+@@ -272,7 +275,7 @@
+   const scale = Math.max(0.05, d.scale);
+   view.setScreen(g.width, g.height);
+   view.setScale(scale, d.snap);
+-  $('canvas-info').textContent = `guest screen ${g.width}x${g.height} in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)}, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
++  $('canvas-info').textContent = `guest screen ${g.width}x${g.height} in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${app.screen.dpi} DPI, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
+ }
+ // decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
+ const panelBtn = $<HTMLButtonElement>('panel-toggle');
+@@ -300,7 +303,14 @@
+ // decision 0212: the room changes with the browser window and with the panel; the picture is rescaled at once, and what the engine is told waits until the room has been still for a moment (RoomDebouncer)
+ const roomTimers = { set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms), clear: (h: unknown): void => clearTimeout(h as ReturnType<typeof setTimeout>) };
+ const roomFollower = new RoomDebouncer((room) => followRoom(room), roomTimers);
+-if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { applyDisplay(); roomFollower.push(measureRoom()); }).observe($('stage'));
++if (typeof ResizeObserver !== 'undefined') {
++  const ro = new ResizeObserver((entries) => {
++    const b = entries[entries.length - 1]?.devicePixelContentBoxSize?.[0];
++    if (b) stageDevice = { w: b.inlineSize, h: b.blockSize };
++    applyDisplay(); roomFollower.push(measureRoom());
++  });
++  try { ro.observe($('stage'), { box: 'device-pixel-content-box' }); } catch { ro.observe($('stage')); }   // a browser without the box (Safari) measures CSS pixels x the ratio
++}
+ window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', applyDisplay);
+ 
+ $('stop-btn').addEventListener('click', () => { endRequested = true; client.stop(); });
+@@ -332,7 +342,7 @@
+   if (!inputEnabled()) return;   // before the first idle: followRoom runs again at the first idle
+   sendRaw({ k: 'display', kind: IN.DISPLAY, width: g.width, height: g.height }, 'room', undefined, false);
+   rec.sent = true;
+-  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height) };
++  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height, app.screen.dpi) };
+   addLog('info', `the room is now ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px: the engine is told its display is now ${g.width}x${g.height}`);
+ }
+ 
+@@ -340,13 +350,15 @@
+ function applyScreenParam(manifest: Manifest): void {
+   const room = measureRoom();
+   const g = chooseGuestScreen(room);
+-  const env = { ...screenEnv(g.width, g.height), FLE_SCREEN_REMAXIMIZE: '1' };
++  const dpi = dpiOfRatio(room.dpr);   // decision 0318: the DPI of the screen the page has, told once at the start (a later change of the ratio needs a reload)
++  const env = { ...screenEnv(g.width, g.height, dpi), FLE_SCREEN_REMAXIMIZE: '1' };
++  app.screen.dpi = dpi;
+   Object.assign(manifest.engine.env, env);
+   app.screen.asked = { width: g.width, height: g.height, env };
+   app.screen.guest = { width: g.width, height: g.height };
+   app.screen.room = room;
+   applyDisplay();
+-  addLog('info', `guest screen ${g.width}x${g.height} for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr} (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
++  addLog('info', `guest screen ${g.width}x${g.height} device px for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr}, ${dpi} DPI (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
+   if (g.clamped) addLog('warn', `the room is outside what the engine accepts (${640}x${480}..${7680}x${4320}): the size was pulled inside it`);
+ }
+ 
+@@ -447,7 +459,7 @@
+ function guestScreenInfo(): GuestScreenInfo {
+   const sc = app.screen;
+   const r1 = (v: number): number => Math.round(v * 10) / 10;
+-  return { mode: 'fit', source: 'default', width: sc.guest.width, height: sc.guest.height, reported: sc.reported !== null && sc.reported.width > 0, dpi: null, roomWidth: sc.room ? r1(sc.room.width) : null, roomHeight: sc.room ? r1(sc.room.height) : null, dpr: Math.round((window.devicePixelRatio || 1) * 10000) / 10000, follow: 'live' };
++  return { mode: 'fit', source: 'default', width: sc.guest.width, height: sc.guest.height, reported: sc.reported !== null && sc.reported.width > 0, dpi: sc.dpi, roomWidth: sc.room ? r1(sc.room.width) : null, roomHeight: sc.room ? r1(sc.room.height) : null, dpr: Math.round((window.devicePixelRatio || 1) * 10000) / 10000, follow: 'live' };
+ }
+ function hzInfo(): HzInfo {
+   const env = app.hz.hz;
+--- a/app/src/ui/screen-fit.ts
++++ b/app/src/ui/screen-fit.ts
+@@ -1,6 +1,7 @@
+ // The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1).
+ // The page measures the room it has for the screen (everything below the header and left of the monitor panel), tells the engine that size through the engine's environment (FLE_MONITOR_W / FLE_MONITOR_H:
+-// lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room in CSS pixels (1 guest pixel = 1 CSS pixel; the browser scales the canvas by the device pixel ratio).
++// lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room in DEVICE pixels (decision 0318: CSS pixels x the device pixel ratio, 1 guest pixel = 1 device pixel; the canvas is shown at
++// guest / dpr CSS pixels, so the browser does not resample it), and the engine is told the DPI of that screen (FLE_SCREEN_DPI = round(96 x device pixel ratio)): FL64.exe is per-monitor DPI aware and scales its own UI.
+ // When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE, FLE_SCREEN_REMAXIMIZE=1). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
+ 
+ export const SCREEN_DEFAULT = { width: 1920, height: 1080 } as const;
+@@ -16,21 +17,21 @@
+   width: number;
+   height: number;
+   reported: boolean;
+-  dpi: null;
++  dpi: number | null;
+   roomWidth: number | null;
+   roomHeight: number | null;
+   dpr: number;
+   follow: 'live';
+ }
+ 
+-/** the room for the screen, in CSS pixels, and the device pixel ratio */
+-export interface Room { width: number; height: number; dpr: number }
++/** the room for the screen, in CSS pixels, and the device pixel ratio; `deviceWidth` / `deviceHeight` are the same room in whole device pixels when the browser said so (ResizeObserver device-pixel-content-box, decision 0318) */
++export interface Room { width: number; height: number; dpr: number; deviceWidth?: number; deviceHeight?: number }
+ export interface GuestScreen {
+   width: number;
+   height: number;
+-  /** CSS pixels per guest pixel: the desktop is drawn at this scale */
++  /** CSS pixels per guest pixel: the desktop is drawn at this scale (1 / the device pixel ratio when the guest has the pixels of the room) */
+   scale: number;
+-  /** the CSS length that edges are rounded to: 1 (whole CSS pixels) */
++  /** the CSS length that edges are rounded to: one device pixel (1 / the device pixel ratio) */
+   snap: number;
+   /** true when the room asked for a size outside the engine's limits and the size was pulled inside them */
+   clamped: boolean;
+@@ -38,11 +39,26 @@
+ 
+ const clampDim = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, Math.floor(v)));
+ 
++/** the device pixel ratio of a room: at least 1 (a screen below 100% is drawn at 1) */
++export function deviceRatio(room: Room): number { return Number.isFinite(room.dpr) && room.dpr > 1 ? room.dpr : 1; }
++
++/** the room in device pixels: the whole device pixels the browser gave for this room when it did (a ratio above 1), else the CSS size times the ratio */
++export function roomDevicePx(room: Room): { width: number; height: number } {
++  const dpr = deviceRatio(room);
++  const exact = room.dpr > 1 && room.deviceWidth !== undefined && room.deviceHeight !== undefined;
++  return { width: exact ? room.deviceWidth as number : room.width * dpr, height: exact ? room.deviceHeight as number : room.height * dpr };
++}
++
++/** the DPI of the guest's screen for a device pixel ratio: 96 x ratio rounded, inside the runtime's range 96..384 (lift/runtime/fle_screen.h FLE_SCREEN_DPI) */
++export function dpiOfRatio(ratio: number): number { return Math.max(96, Math.min(384, Math.round(96 * (Number.isFinite(ratio) && ratio > 1 ? ratio : 1)))); }
++
+ /**
+- * The guest screen for a room: the room in CSS pixels, pulled inside the engine's limits. The scale is then whatever makes the screen fill the room exactly (1 when the room is inside the limits).
++ * The guest screen for a room: the room in DEVICE pixels (CSS pixels x the device pixel ratio, rounded down), pulled inside the engine's limits. The scale is then whatever makes the screen fill the room exactly (1 / the
++ * device pixel ratio when the room is inside the limits).
+  */
+ export function chooseGuestScreen(room: Room): GuestScreen {
+-  const rw = Math.max(1, room.width), rh = Math.max(1, room.height);
++  const dev = roomDevicePx(room);
++  const rw = Math.max(1, dev.width), rh = Math.max(1, dev.height);
+   const w = clampDim(rw, SCREEN_MIN.width, SCREEN_MAX.width), h = clampDim(rh, SCREEN_MIN.height, SCREEN_MAX.height);
+   const clamped = w !== Math.floor(rw) || h !== Math.floor(rh);
+   const d = drawScale({ width: w, height: h }, room);
+@@ -50,18 +66,19 @@
+ }
+ 
+ /**
+- * How the desktop of a guest screen is drawn in a room. The guest has exactly the pixels the room holds, so a guest pixel is exactly one CSS pixel: not stretched by the fraction that fitting to the room would
++ * How the desktop of a guest screen is drawn in a room. The guest has exactly the device pixels the room holds, so a guest pixel is exactly one device pixel (scale 1 / dpr CSS pixels): not stretched by the fraction that fitting to the room would
+  * give (1836.4 / 1836), which would resample every window. When the guest's screen is not that (the room is outside the engine's limits, or the engine did not take the size the page asked for) the screen is
+  * fitted into the room in both directions and edges are rounded to whole CSS pixels.
+  */
+ export function drawScale(guest: { width: number; height: number }, room: Room, honoured = true): { scale: number; snap: number } {
+-  const fit = Math.min(Math.max(1, room.width) / guest.width, Math.max(1, room.height) / guest.height);
+-  return { scale: honoured && 1 <= fit + 1e-9 ? 1 : fit, snap: 1 };
++  const dpr = deviceRatio(room), dev = roomDevicePx(room);
++  const fit = Math.min(Math.max(1, dev.width) / guest.width, Math.max(1, dev.height) / guest.height);   // device pixels of the room over guest pixels
++  return { scale: (honoured && 1 <= fit + 1e-9 ? 1 : fit) / dpr, snap: 1 / dpr };
+ }
+ 
+ /** the engine's environment for a guest screen: both variables */
+-export function screenEnv(width: number, height: number): Record<string, string> {
+-  return { FLE_MONITOR_W: String(width), FLE_MONITOR_H: String(height) };
++export function screenEnv(width: number, height: number, dpi: number = 96): Record<string, string> {
++  return { FLE_MONITOR_W: String(width), FLE_MONITOR_H: String(height), FLE_SCREEN_DPI: String(dpi) };
+ }
+ 
+ export function screenDiffers(a: { width: number; height: number }, b: { width: number; height: number }): boolean {
+@@ -84,7 +101,7 @@
+     this.quietMs = quietMs;
+   }
+   push(room: Room): void {
+-    if (this.last && this.last.width === room.width && this.last.height === room.height && this.last.dpr === room.dpr && this.timer === null) return;
++    if (this.last && this.last.width === room.width && this.last.height === room.height && this.last.dpr === room.dpr && this.last.deviceWidth === room.deviceWidth && this.last.deviceHeight === room.deviceHeight && this.timer === null) return;
+     this.last = room;
+     if (this.timer !== null) this.timers.clear(this.timer);
+     this.timer = this.timers.set(() => { this.timer = null; if (this.last) this.onSettled(this.last); }, this.quietMs);

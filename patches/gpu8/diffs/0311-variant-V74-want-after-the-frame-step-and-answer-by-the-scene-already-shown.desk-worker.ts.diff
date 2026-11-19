@@ -1,0 +1,22 @@
+--- a/app/src/engine/desk-worker.ts
++++ b/app/src/engine/desk-worker.ts
+@@ -27,6 +27,10 @@
+ let frameTicks = 0;
+ const presentedAt: number[] = [];
+ let lastReport = 0;
++// VARIANT V7 (decision 0311): the scene request of an animation frame is raised by a task after the frame step, so a publish does not land in the frame step (the stretch of the frame's commit)
++const wantCh = new MessageChannel();
++const wantAfterFrame = wantCh.port2;
++wantCh.port1.onmessage = () => { link?.requestScene(); };
+ // MEASUREMENT ONLY (decision 0311): how long after the engine Worker stored PUB this Worker's loop got to run (the event-loop latency of Atomics.waitAsync's resolution)
+ // MEASUREMENT ONLY (decision 0311): the spacing of this Worker's animation frames (ms): <= 14, <= 19, <= 25, <= 40, > 40 (a frame loop blocked by the frame commit shows long spacings)
+ const rafDt = [0, 0, 0, 0, 0];
+@@ -89,7 +93,7 @@
+     frameTicks++;
+     { const t = performance.now(); if (lastRaf) { const dt = t - lastRaf; const k = dt <= 14 ? 0 : dt <= 19 ? 1 : dt <= 25 ? 2 : dt <= 40 ? 3 : 4; rafDt[k] = (rafDt[k] ?? 0) + 1; } lastRaf = t; lastRafAbs = nowAbs(); }
+     const now = performance.now();
+-    L.requestScene();
++    wantAfterFrame.postMessage(0);
+     if (quiet.sleepAfterFrame(now)) { L.setAsleep(true); return; }
+     next();
+   };

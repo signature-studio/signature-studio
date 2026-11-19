@@ -1,0 +1,4 @@
+17a18
+>   top WM_ERASEBKGND
+40a42
+>   child WM_ERASEBKGND
