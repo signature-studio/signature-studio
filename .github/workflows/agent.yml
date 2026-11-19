@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - name: リポジトリを取得する
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
@@ -69,7 +69,7 @@ jobs:
       TASK: ${{ inputs.task }}
     steps:
       - name: リポジトリを取得する(資格は残さない)
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -203,7 +203,7 @@ jobs:
 
       - name: 報告を成果物に保存する(7 日)
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: agent-${{ inputs.task }}
           path: ${{ runner.temp }}/out/report.md
