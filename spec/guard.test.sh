@@ -23,7 +23,7 @@ printf 'ok text\n' > "$T/app/d.txt"; ( cd "$T" && ok "scan: 問題の無いフ�
 printf 'x.%s.dev\npython3 x.py\n' workers > "$T/app/e.txt"; ( cd "$T" && ok "scan: 2 件の違反を 2 件と数える" "$(bash "$g/scan.sh" app/e.txt 2>/dev/null | wc -l)" 2 )
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
-# 旗(git の差分を使う)
+# 旗と判定(git の差分を使う)
 if git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then
   R=$T/repo; mkdir -p "$R"; git -C "$R" init -q .
   cm() { git -C "$R" add -A && git -C "$R" commit -q --allow-empty -m "$1"; }
@@ -31,7 +31,16 @@ if git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then
   mkdir -p "$R/lift/runtime"; printf 'int x;\n' > "$R/lift/runtime/a.c"; cm c1
   printf 'int x;\nchar *p = getenv("FOO");\n' > "$R/lift/runtime/a.c"; cm c2
   ( cd "$R" && ok "flags: 新しい getenv は見つかる" "$(rc bash "$g/flags.sh" HEAD~1 HEAD)" 1 )
+  # 判定(judge.sh)
+  printf 'accept: true\n' > "$T/task-ok.md"; printf 'accept: false\n' > "$T/task-ng.md"; printf '指示だけ\n' > "$T/task-none.md"
+  printf 'int y;\n' > "$R/lift/runtime/b.c"; cm c3; base=$(git -C "$R" rev-parse HEAD~1)
+  ( cd "$R" && ok "judge: きれいな作業ツリーで、受け入れコマンドが通れば通る" "$(rc bash "$g/judge.sh" "$base" "$T/task-ok.md")" 0 )
+  ( cd "$R" && ok "judge: 受け入れコマンドの行が無いタスクも、ほかが通れば通る" "$(rc bash "$g/judge.sh" "$base" "$T/task-none.md")" 0 )
+  ( cd "$R" && ok "judge: 受け入れコマンドが失敗すれば落ちる" "$(rc bash "$g/judge.sh" "$base" "$T/task-ng.md")" 1 )
+  printf 'x\n' > "$R/untracked.txt"; ( cd "$R" && ok "judge: commit していない変更があれば落ちる" "$(rc bash "$g/judge.sh" "$base" "$T/task-ok.md")" 1 ); rm -f "$R/untracked.txt"
+  mkdir -p "$R/app"; printf 'run: python3 x.py\n' > "$R/app/b.txt"; cm c4; base=$(git -C "$R" rev-parse HEAD~1)
+  ( cd "$R" && ok "judge: 変更に違反があれば落ちる" "$(rc bash "$g/judge.sh" "$base" "$T/task-ok.md")" 1 )
 else
-  echo "skip flags: 環境に git の名義が無い"
+  echo "skip flags・judge: 環境に git の名義が無い"
 fi
 rm -rf "$T"; exit $fail
