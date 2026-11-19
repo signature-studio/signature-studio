@@ -38,6 +38,11 @@
 - それ以外の発言は、指示か是正の要求です。台帳(`ledger/instructions.tsv`)に書き足し、指された動作を行います。理由や経緯は書きません。
 - 状態は、起きるたびに添付されます。状態を確かめるだけのコマンドは打ちません。添付が欠けているときと、異常があるときだけ、道具で調べます。
 
+## GitHub に登録済みの値
+- Secrets: `OPENCODE_AUTH_JSON`(opencode の認証)、`R2_CACHE_ASSETS_ACCESS_KEY_ID`・`R2_CACHE_ASSETS_SECRET_ACCESS_KEY`(ビルドのキャッシュ用の R2)、`R2_ARTIFACT_ACCESS_KEY_ID`・`R2_ARTIFACT_SECRET_ACCESS_KEY`(インストーラなどを置く R2)、`CLOUDFLARE_API_TOKEN`(デプロイ用)
+- Variables: `OPENCODE_MODEL`(作業者のモデル)、`CLOUDFLARE_ACCOUNT_ID`
+- 前の世代のワークフローは `git show archive/gen4-2026-11-18:.github/workflows/agent.yml` で読める。
+
 ## 置き場所
 - `app/` `lift/` `tools/` `patches/` `ci/`: 製品
 - `guard/`: 判定の道具
