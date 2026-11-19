@@ -1,0 +1,211 @@
+# 作業者(Haiku 5.5)を、タスク 1 件につき 1 ジョブで動かす。前の世代の agent.yml(実際に動いた物)を土台にした。
+# 起動は workflow_dispatch だけ(依頼者が Actions を承認するまで、push・schedule では動かさない。台帳 L-021)。
+# 判定は、取り直した main の guard/judge.sh で行い、通った変更だけを main に push する。
+# 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
+# GitHub の名義: Secrets の鍵から、この実行のための token を発行する。
+# 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
+name: agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "ci/tasks の中のタスクの名前(拡張子 .md を除く)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    name: 抽出物を用意する
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: リポジトリを取得する
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: アカウント ID を app/wrangler.jsonc から読む
+        run: |
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+
+      - name: 抽出物のキャッシュ(R2)
+        id: cache
+        uses: runs-on/cache@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+
+      - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
+        if: steps.cache.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/host"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node app/scripts/extract-fl.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+  run:
+    name: worker ${{ inputs.task }}
+    needs: extract
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      TASK: ${{ inputs.task }}
+    steps:
+      - name: リポジトリを取得する(資格は残さない)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 名義を設定する(token は消す)
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
+          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
+          umask 077
+          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+            > "$RUNNER_TEMP/botid-config.json"
+          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$b/botid" issue 2>/dev/null
+          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
+          echo "GIT_CONFIG_GLOBAL=$(printf '%s' "$e" | jq -r .GIT_CONFIG_GLOBAL)" >> "$GITHUB_ENV"
+          echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
+          rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
+
+      - name: 版の値を ci/versions.env から読む
+        run: |
+          echo "NODE_VERSION=$(grep '^NODE_VERSION=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
+          echo "EMSDK_VERSION=$(grep '^EMSDK_VERSION=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
+          echo "RUST_TOOLCHAIN=$(grep '^RUST_TOOLCHAIN=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
+
+      - name: Node を入れる
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: rust をそろえ、app の依存と fe-build を用意する
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
+          rustup default "$RUST_TOOLCHAIN"
+          npm ci --prefix app
+          cargo build --release --locked --manifest-path lift/Cargo.toml
+
+      - name: emsdk を入れる
+        uses: emscripten-core/setup-emsdk@v16
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+
+      - name: アカウント ID を app/wrangler.jsonc から読む
+        run: echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+
+      - name: 抽出物を R2 のキャッシュから取る(公開の artifact は使わない)
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/host
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          fail-on-cache-miss: true
+
+      - name: 抽出物を lift/out-app/host に置く
+        run: |
+          mkdir -p lift/out-app
+          mv "$RUNNER_TEMP/host" lift/out-app/host
+          test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
+
+      - name: opencode を導入する(版は固定)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/cli.tgz" https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.3.0.tgz
+          test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/cli.tgz" | base64 -w0)" = 'sha512-8T3K8L6Nd4fSG5BSgofqhmIDQ1ZvzDZZ2J7bFVB9RK1d5Hjqh24IcxgbcwpgGKkdvItrayi4Rl+wrSmhl17FFg=='
+          tar -xzf "$RUNNER_TEMP/cli.tgz" -C "$RUNNER_TEMP"
+          install -D -m 755 "$RUNNER_TEMP/package/bin/opencode" "$HOME/.opencode/bin/opencode"
+          echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
+
+      - name: opencode の認証情報を取り込み、作業者のモデルを Haiku に固定する
+        env:
+          OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
+          OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
+        run: |
+          case "$OPENCODE_MODEL" in *haiku*) ;; *) echo "OPENCODE_MODEL が Haiku ではない"; exit 1 ;; esac
+          printf '%s' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone
+          mkdir -p .opencode
+          printf '{"model":"%s","agents":{"worker":{"model":"%s"},"title":{"model":"%s"},"summary":{"model":"%s"}}}\n' "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" > .opencode/opencode.jsonc
+
+      - name: 作業者を 1 回動かす
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          { cat AGENTS.md; printf '\n\n---\n\n## タスク(ci/tasks/%s.md)\n\n' "$TASK"; cat "ci/tasks/$TASK.md"; } > "$RUNNER_TEMP/prompt.md"
+          opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")" > "$RUNNER_TEMP/out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null || true
+          rm -rf .opencode
+
+      - name: 判定(取り直した main の guard/judge.sh と、main のタスクで)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --no-tags "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" +refs/heads/main:refs/judge/main
+          mkdir -p "$RUNNER_TEMP/guard"
+          for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done
+          git show "refs/judge/main:ci/tasks/$TASK.md" > "$RUNNER_TEMP/task.md"
+          bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task.md"
+
+      - name: 通った変更を main に push する(token はこの段で発行する)
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          if [ -z "$(git log refs/judge/main..HEAD --oneline)" ]; then echo "変更なし"; exit 0; fi
+          mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
+          export GH_CONFIG_DIR=$BOTID_GH
+          for i in 1 2 3; do
+            git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main && git push origin HEAD:main && exit 0
+          done
+          exit 1
+
+      - name: 報告を検査して、成果物とサマリーに出す
+        if: always()
+        run: |
+          touch "$RUNNER_TEMP/out/report.md"
+          git show "refs/judge/main:guard/scan.sh" > "$RUNNER_TEMP/scan.sh" 2>/dev/null || cp guard/scan.sh "$RUNNER_TEMP/scan.sh"
+          bash "$RUNNER_TEMP/scan.sh" "$RUNNER_TEMP/out/report.md"
+          { echo "### $TASK"; head -n 80 "$RUNNER_TEMP/out/report.md"; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 報告を成果物に保存する(7 日)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: agent-${{ inputs.task }}
+          path: ${{ runner.temp }}/out/report.md
+          retention-days: 7
+          if-no-files-found: ignore
