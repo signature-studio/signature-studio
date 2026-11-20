@@ -188,6 +188,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -o pipefail
           git fetch --no-tags "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" +refs/heads/main:refs/judge/main
           mkdir -p "$RUNNER_TEMP/guard"
           for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done

@@ -93,6 +93,19 @@ ok "state: 製品(app/)の変更では変わる" "$([ "$s2" != "$s3" ] && echo c
 A=$top/.github/workflows/agent.yml
 ok "agent.yml: 判定の出力を out/judge.txt に残し、成果物(out)に入れる" "$(grep -c 'tee "$RUNNER_TEMP/out/judge.txt"' "$A")/$(grep -c '^ *path: [$]{{ runner.temp }}/out$' "$A")" 1/1
 ok "agent.yml: 待ち行列の段(close)は actions を読める" "$(awk '/^  close:/{f=1} /^  fill:/{f=0} f && /actions: read/{print "yes"}' "$A")" yes
+# agent.yml の判定の段: 判定(judge.sh)の失敗が、パイプ(| tee)で隠れないこと。shell 未指定の run は bash -e で動き、pipefail は無い
+J=$(awk '/^      - name: 判定/{f=1} /^      - name: 通った変更/{f=0} f' "$A")
+jl=$(grep -n 'judge.sh" refs/judge/main' <<<"$J" | cut -d: -f1); pl=$(grep -n '^ *set -o pipefail$' <<<"$J" | head -1 | cut -d: -f1)
+ok "agent.yml: 判定の段は judge.sh の行より前に set -o pipefail を置く" "$([ -n "$pl" ] && [ -n "$jl" ] && [ "$pl" -lt "$jl" ] && echo yes)" yes
+# 同じ形で動かす: 判定の段の judge の行(と pipefail の行)をそのまま使い、judge.sh は落ちる偽物にする
+jr=$T/judge-rt; mkdir -p "$jr/guard" "$jr/out"; printf 'echo "judge: 違反がある"\nexit 1\n' > "$jr/guard/judge.sh"
+jline=$(sed -n "${jl}p" <<<"$J" | sed 's/^ *//'); pline=""; [ -n "$pl" ] && pline=$(sed -n "${pl}p" <<<"$J" | sed 's/^ *//')
+ok "判定の段の形で、judge.sh が落ちれば段も落ちる(パイプで隠れない)" "$(RUNNER_TEMP=$jr bash -e -c "$pline"$'\n'"$jline" >/dev/null 2>&1 && echo passes || echo fails)" fails
+ok "対照: pipefail が無い bash -e では、同じ判定の行の失敗は 0 になる(偽物が本物の形を再現すること)" "$(RUNNER_TEMP=$jr bash -e -c "$jline" >/dev/null 2>&1; echo $?)" 0
+# push の段は判定の段が成功したときだけ走る: if を持たず、どの段にも continue-on-error が無い
+P=$(awk '/^      - name: 通った変更を main に push/{f=1} /^      - name: 報告を検査/{f=0} f' "$A")
+ok "agent.yml: push の段は if を持たない(判定が成功したときだけ走る)" "$(grep -c '^ *if:' <<<"$P")" 0
+ok "agent.yml: どの段にも continue-on-error が無い(判定の失敗を飛ばさない)" "$(grep -c 'continue-on-error' "$A")" 0
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
