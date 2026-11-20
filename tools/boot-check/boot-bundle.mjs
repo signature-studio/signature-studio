@@ -36,7 +36,8 @@ const ISOLATION = [
   '--force-color-profile=srgb', '--disable-lcd-text',
 ];
 
-const POLL = `(() => { const a = window.__app; if (!a) return null; return { state: a.state, idle: typeof a.timeline.idle === 'number' ? a.timeline.idle : null }; })()`;
+// the state, not timeline.idle: the Worker sends the 'idle' mark before the 'idle' message that sets engine-idle, so timeline.idle is set for a moment while the state is still 'running'
+const POLL = `(() => { const a = window.__app; if (!a) return null; return { state: a.state }; })()`;
 const FINAL = `(() => { const a = window.__app ?? null; return {
   state: a ? a.state : null,
   engineKind: a ? a.engineKind : null,
@@ -87,7 +88,7 @@ async function main() {
     let stopped = false;
     for (;;) {
       const p = await ev(POLL).catch(() => null);
-      if (p && (p.idle !== null || p.state === 'error' || p.state === 'exited')) { stopped = true; break; }
+      if (p && (p.state === 'engine-idle' || p.state === 'error' || p.state === 'exited')) { stopped = true; break; }
       if (Date.now() - navAt >= WAIT_LIMIT_MS) break;
       await sleep(POLL_MS);
     }
