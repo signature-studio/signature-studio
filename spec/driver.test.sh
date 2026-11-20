@@ -5,7 +5,7 @@
 here=$(cd "$(dirname "$0")" && pwd); top=$here/..; fail=0; T=$(mktemp -d "$top/.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
-if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "skip driver: 環境に git の名義が無い"; rm -rf "$T"; exit 0; fi
+if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "FAIL driver: 環境に git の名義が無い(判定の spec は、名義が無いと検査を行わない。skip して通さない)"; rm -rf "$T"; exit 1; fi
 # 小さなリポジトリ: 関数の表 4 行(0xa1 は直接 wasm 済み)、型、閾値 3、ci のタスク 1 件
 R=$T/repo; mkdir -p "$R/queue/inputs" "$R/queue/kinds" "$R/ci/tasks" "$R/lift/harness/hyb/lists"
 cp -r "$top/driver" "$R/"; cp "$top/queue/kinds/lower.md" "$R/queue/kinds/"; printf '3\n' > "$R/queue/threshold"
@@ -81,6 +81,17 @@ reset "" ""; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure ht
 ok "close: 落ちた時は、落ちた回数と原因の行(判定の出力)をコメントに残す" "$(grep -c '^落ちた: https://x/actions/runs/77(1 回目' "$Q/comment-5.txt")/$(grep -c 'judge: 受け入れコマンドが失敗した' "$Q/comment-5.txt")" 1/1
 ok "close: 落ちた時の main の SHA と状態を、コメントに 1 行ずつ残す" "$(grep -c '^main-sha: [0-9a-f]\{40\}$' "$Q/comment-5.txt")/$(grep -c '^state: [0-9a-f]\{40\}$' "$Q/comment-5.txt")" 1/1
 ok "close: 判定の出力を使い終えたら、一時のディレクトリは消す" "$([ -e "$R/.tmp-close-77" ] && echo kept || echo gone)" gone
+# 失敗の数え方: 「落ちた:」で始まり、state: の行がある(今の形の)コメントだけを数える。古い形のコメントは数えない
+st=0000000000000000000000000000000000000000
+reset "" ""; jq -n '{comments: [{body: "落ちた: https://x/old1(1 回目。待ちに戻した)"}, {body: "落ちた: https://x/old2(2 回目。待ちに戻した)"}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/88 >/dev/null 2>&1 )
+ok "close: 古い形の落ちたが 2 つ有っても、今の形の 1 回目は 1 回目で待ちに戻る" "$(grep -c '^落ちた: https://x/actions/runs/88(1 回目。待ちに戻した)' "$Q/comment-5.txt" 2>/dev/null)/$(grep -c -- '--add-label failed' "$Q/log")" 1/0
+reset "" ""; jq -n --arg s "$st" '{comments: [{body: ("落ちた: https://x/n1(1 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}, {body: ("落ちた: https://x/n2(2 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/89 >/dev/null 2>&1 )
+ok "close: 今の形の落ちたが 2 つ有れば、3 回目で failed にして閉じる" "$(grep -c -- '--add-label failed' "$Q/log")/$(grep -c '^issue close 5' "$Q/log")" 1/1
+reset "" ""; jq -n --arg s "$st" '{comments: [{body: "落ちた: https://x/old1(1 回目。待ちに戻した)"}, {body: "落ちた: https://x/old2(2 回目。待ちに戻した)"}, {body: ("落ちた: https://x/n1(1 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/90 >/dev/null 2>&1 )
+ok "close: 古い形の 2 つと今の形の 1 つが有れば、今回は 2 回目で待ちに戻る(failed にしない)" "$(grep -c '^落ちた: https://x/actions/runs/90(2 回目。待ちに戻した)' "$Q/comment-5.txt" 2>/dev/null)/$(grep -c -- '--add-label failed' "$Q/log")" 1/0
 # state: 作業が読む木(製品・判定・駆動・型)が変わったときだけ変わる(台帳の変更では変わらない)
 s1=$(cd "$R" && source driver/state.sh && state)
 mkdir -p "$R/ledger"; echo x > "$R/ledger/x.tsv"; git -C "$R" add -A && git -C "$R" commit -q -m ledger
@@ -106,14 +117,29 @@ ok "対照: pipefail が無い bash -e では、同じ判定の行の失敗は 0
 P=$(awk '/^      - name: 通った変更を main に push/{f=1} /^      - name: 報告を検査/{f=0} f' "$A")
 ok "agent.yml: push の段は if を持たない(判定が成功したときだけ走る)" "$(grep -c '^ *if:' <<<"$P")" 0
 ok "agent.yml: どの段にも continue-on-error が無い(判定の失敗を飛ばさない)" "$(grep -c 'continue-on-error' "$A")" 0
-# アカウント ID(公開リポジトリのログに出さない。L-006)。値は表示しない: 書く段の数と、マスク無しの段の数だけを比べる
-mk=$(awk '/^      - name:/{m=0} /::add-mask::/{m=1} /GITHUB_ENV/ && /CF_ACCOUNT=/{n++; if(!m) b++} END{print n+0":"b+0}' "$A")
-ok "agent.yml: CF_ACCOUNT を GITHUB_ENV に書く段がある(検査が空振りしない)" "$([ "${mk%%:*}" -gt 0 ] && echo yes)" yes
-ok "agent.yml: CF_ACCOUNT を書く前に ::add-mask:: でマスクする(マスク無しの段の数)" "${mk##*:}" 0
+# アカウント ID の値を、ファイルに直書きしていない(一致の件数だけを見る。値は表示しない。L-006)
 acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" | cut -d'"' -f4)
 ok "agent.yml・deploy.yml・driver/・spec/ に、アカウント ID の値を直書きしていない(一致の数)" "$(if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/driver/*.sh "$top"/spec/*.sh | grep -cF -- "$acct"; else echo none; fi)" 0
+# push の段の再試行(agent.yml の for 〜 done を、実際の URL の代わりに手元の bare リポジトリで動かす)。衝突は中断して、衝突したファイル名だけを出す。拒否されたら次の試行へ
+PB=$(awk '/for i in 1 2 3; do/{f=1} f{print} f && /^ *exit 1$/{exit}' "$A" | sed 's#"https://github.com/$GITHUB_REPOSITORY.git"#"$BARE"#')
+pr=$T/push; mkdir -p "$pr"; printf '%s\n' "$PB" > "$pr/loop.sh"
+mkbase() { git init -q --bare "$pr/$1.git" && git -C "$pr/$1.git" symbolic-ref HEAD refs/heads/main && git init -q "$pr/$1.seed" && git -C "$pr/$1.seed" symbolic-ref HEAD refs/heads/main && printf 'x\n' > "$pr/$1.seed/f" && git -C "$pr/$1.seed" add f && git -C "$pr/$1.seed" commit -q -m base && git -C "$pr/$1.seed" push -q "$pr/$1.git" main && git clone -q "$pr/$1.git" "$pr/$1.work"; }
+mkbase c1; git clone -q "$pr/c1.git" "$pr/c1.other"
+( cd "$pr/c1.work" && printf 'mine\n' > f && git commit -q -am mine )
+( cd "$pr/c1.other" && printf 'theirs\n' > f && git commit -q -am theirs && git push -q origin HEAD:main )
+out=$(cd "$pr/c1.work" && BARE="$pr/c1.git" bash -e "$pr/loop.sh" 2>&1); rc=$?
+ok "push の段: 衝突したら、試行ごとに衝突したファイル名だけを出し、マージを中断する(未解決の印を残さない)" "$(grep -c '^衝突: f$' <<<"$out")/$(git -C "$pr/c1.work" status --porcelain | grep -c '^UU')" 3/0
+ok "push の段: 衝突で 3 回とも失敗したら、非 0 で終わる" "$([ "$rc" -ne 0 ] && echo nonzero)" nonzero
+ok "push の段: 2 回目の試行は、未解決の印のせいで落ちない(Pulling is not possible が出ない)" "$(grep -c 'Pulling is not possible' <<<"$out")" 0
+mkbase c2
+( cd "$pr/c2.work" && printf 'g\n' > g.txt && git add g.txt && git commit -q -m mine2 )
+printf '#!/bin/sh\nif [ ! -e "%s" ]; then : > "%s"; echo "reject once" >&2; exit 1; fi\nexit 0\n' "$pr/rejected-once" "$pr/rejected-once" > "$pr/c2.git/hooks/pre-receive"; chmod +x "$pr/c2.git/hooks/pre-receive"
+out2=$(cd "$pr/c2.work" && BARE="$pr/c2.git" bash -e "$pr/loop.sh" 2>&1); rc2=$?
+ok "push の段: push が拒否されたら、次の試行で成功する(終了コード 0、リモートに手元の commit が入る)" "$rc2/$(git -C "$pr/c2.git" log -1 --format=%s main)" "0/mine2"
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
+ok "名義の無い環境では、driver の spec は skip して通らず、落ちる" "$(env -i HOME="$T/nohome" PATH="$PATH" bash "$here/driver.test.sh" >/dev/null 2>&1; echo $?)" 1
+ok "判定の spec の中(JUDGE_IN_SPEC が有る)でも、guard の spec は判定の検査を省かずに通る" "$(JUDGE_IN_SPEC=1 bash "$here/guard.test.sh" >/dev/null 2>&1; echo $?)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
 A=$top/.github/workflows/agent.yml; ci_line=$(grep -n '^ *npm ci --prefix app$' "$A" | cut -d: -f1)
 ok "agent.yml: 作業段は npm ci の直後に npm run build --prefix app を実行する" "$(awk -v c="$ci_line" 'NR==c+1' "$A" | sed 's/^ *//')" "npm run build --prefix app"

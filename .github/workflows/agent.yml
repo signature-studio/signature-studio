@@ -45,9 +45,7 @@ jobs:
 
       - name: アカウント ID を app/wrangler.jsonc から読む
         run: |
-          a=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)
-          echo "::add-mask::$a"
-          echo "CF_ACCOUNT=$a" >> "$GITHUB_ENV"
+          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
 
       - name: 抽出物のキャッシュ(R2)
         id: cache
@@ -138,10 +136,7 @@ jobs:
           version: ${{ env.EMSDK_VERSION }}
 
       - name: アカウント ID を app/wrangler.jsonc から読む
-        run: |
-          a=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)
-          echo "::add-mask::$a"
-          echo "CF_ACCOUNT=$a" >> "$GITHUB_ENV"
+        run: echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
 
       - name: 抽出物を R2 のキャッシュから取る(公開の artifact は使わない)
         uses: runs-on/cache/restore@v5
@@ -212,7 +207,13 @@ jobs:
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH
           for i in 1 2 3; do
-            git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main && git push origin HEAD:main && exit 0
+            if git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main; then
+              if git push origin HEAD:main; then exit 0; fi
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then echo "衝突: $c"; else echo "pull が失敗した($i 回目)"; fi
+              git merge --abort 2>/dev/null || true
+            fi
           done
           exit 1
 
