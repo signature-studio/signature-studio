@@ -60,7 +60,7 @@
 - 現状(コードから):
   - lift の対象は 10 DLL(lift/harness/b2d2/modules.tsv)。FL の内蔵は、そのうち Fruity Balance・Fruity Filter・Fruity Delay 2 の 3 つ(同 8〜10 行)。残りはエンジンのライブラリ(dsp・Blend2D・QuickFontCache・FreeType・ILTools・oggio・elastique)。
   - インストゥルメントの DLL は 0 件(ci/extract-dlls.tsv に無い。seed の Plugins\Fruity\Generators は GM CCs.txt の 1 件だけ。seed の 4 行)。
-  - 直接 wasm にした関数は 4316 件(lift/harness/hyb/lowered-all.txt)。
+  - 直接 wasm にした関数は 4327 件(lift/harness/hyb/lowered-all.txt。2026-11-21 の push の時点)。
 - 未確認: 内蔵の全件の数(インストーラの一覧が runner に無い。C-3 と同じ)。
 - 実測が要ること: 表の行数と、抽出の木にある DLL の数(survey-c4-builtin-plugins)。
 - 前提: C-3 の全件の一覧。UI から選べるかは、C-6 のメニューが出るようになるまで確かめられない。内蔵を増やすと、lift と lower の段の時間が増える(推定)。
@@ -96,7 +96,7 @@
   4. C-4(内蔵の数)。C-3 の一覧と、C-6 の後(UI から選ぶ確認)に行う。lower の進みを見ながら進める。
   5. C-5(外部プラグイン)。C-2 の音声の経路が決まり、入力の取得経路が決まってから行う。
 - 時期の目安: 数字の目安は置かない。survey の受理の後、監査・受付が実装のタスクに分けて、順に足す。
-- 待ち行列の前提: 待ちは番号の昇順で処理する。ready は約 100 件に保つ(生成器)。2026-11-21 時点では ready 98 件(番号 559〜656)、running 58 件。survey 6 件は、この後ろに並ぶ。作業ジョブは 60 並列、1 件あたり約 1 時間(推定)。ready の 98 件が起動し終えるまで約 2 時間(推定)なので、新しいタスクは数時間以内に起動する(推定。実際の起動は Actions の実行で確かめる)。
+- 待ち行列の前提: 待ちは番号の昇順で処理する。ready は約 100 件に保つ(生成器)。2026-11-21 の push の時点では ready 98 件(番号 563〜660)、running 56 件。survey 6 件は、この後ろに並ぶ。作業ジョブは 60 並列、1 件あたり約 1 時間(推定)。ready の 98 件が起動し終えるまで約 2 時間(推定)なので、新しいタスクは数時間以内に起動する(推定。実際の起動は Actions の実行で確かめる)。
 - 実装タスクの大きさ: 1 件が約 1 時間で終わる大きさにする。受け入れコマンドを本文の accept: の 1 行に書き、実測の出力を報告に残す。
 
 ## ④ 更新の記録
