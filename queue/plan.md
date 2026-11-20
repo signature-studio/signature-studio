@@ -20,7 +20,7 @@
 | C-1 | HiDPI に対応しておらず、画面がぼやける | P2 | survey-c1-hidpi |
 | C-2 | 画面の描画が音声処理を圧迫する。Worker 分離は完了していないのか | P3(最優先)、P2 | survey-c2-worker-split |
 | C-3 | 言語パック・テーマ・プロジェクトテンプレートなど、FL Studio 自体が必要とする物が揃っていない | P1、機能 | survey-c3-fl-resources |
-| C-4 | 100 以上の内蔵エフェクトとインストゥルメントが 1 つも無い | P1、P3 | survey-c4-builtin-plugins |
+| C-4 | 内蔵のエフェクトとインストゥルメントが 1 つも無い(目標は約 141。L-034) | P1、P3 | survey-c4-builtin-plugins |
 | C-5 | Serum 2・OTT など、多数の外部プラグインが無い | P3 | survey-c5-external-plugins |
 | C-6 | Tempo・Song Position・Pattern Selector などトップバーのコンテキストメニューが機能しない | P2 | survey-c6-topbar-menus |
 
@@ -52,19 +52,25 @@
   - 抽出は app/scripts/extract-fl.mjs。作業ジョブが持つ抽出の木は、DLL の表と seed の行の物だけ(.github/workflows/agent.yml の extract ジョブ)。
 - 未確認: インストーラの全件の一覧。runner に無い(R2 の鍵は extract ジョブにだけある)。必要な全件の数。
 - 実測が要ること: seed の行と抽出の木の突き合わせ、起動時に見つからないパスの記録(survey-c3-fl-resources)。
-- 前提: 全件の一覧を作る道具を extract ジョブに足す。ci/ の変更は main の deploy.yml を動かすので、報告に書く。
+- 前提: 共通の前提の inventory(インストーラの一覧)。作る経路と実現可能性は、下の「共通の前提」の節。
 - 受け入れの条件(案): 全件の一覧と抽出の木の差が 0。起動時の「見つからない」が 0。言語・テーマ・テンプレートの件数が一覧と一致する。
 
-### C-4 内蔵のエフェクトとインストゥルメント 100 以上
+### C-4 内蔵のエフェクトとインストゥルメント(目標 約 141)
 
+- 依頼者の言葉: 「100 以上の内蔵エフェクトやインストゥルメントは 1 つも存在しない」(L-033)。是正(L-034): 内蔵のエフェクトは `Plugins\Fruity\Effects` に約 90 件、インストゥルメントは `Plugins\Fruity\Generators` に約 51 件ある。依頼者の手元の版の数で、lift 対象の版とは ±2 ほど違いうる。
+- 目標: 約 141(効果 約 90 + インストゥルメント 約 51)。OpenGL を使う VFX 系は後回しにしてよい。それ以外の内蔵プラグインは、全て lift の対象。
+- 進み具合(目標ではない): lift の対象になっている内蔵は 3 件(Fruity Balance・Fruity Filter・Fruity Delay 2。lift/harness/b2d2/modules.tsv の 8〜10 行)。進み具合は「3 / 約 141」。分母は inventory で確かめる(下の共通の前提)。
 - 現状(コードから):
-  - lift の対象は 10 DLL(lift/harness/b2d2/modules.tsv)。FL の内蔵は、そのうち Fruity Balance・Fruity Filter・Fruity Delay 2 の 3 つ(同 8〜10 行)。残りはエンジンのライブラリ(dsp・Blend2D・QuickFontCache・FreeType・ILTools・oggio・elastique)。
+  - lift の対象の表は 10 行(lift/harness/b2d2/modules.tsv)。残りはエンジンのライブラリ(dsp・Blend2D・QuickFontCache・FreeType・ILTools・oggio・elastique)。hyb の対象は 8 行(lift/harness/hyb/hyb-args.tsv)で、Fruity を含まない。
   - インストゥルメントの DLL は 0 件(ci/extract-dlls.tsv に無い。seed の Plugins\Fruity\Generators は GM CCs.txt の 1 件だけ。seed の 4 行)。
   - 直接 wasm にした関数は 4327 件(lift/harness/hyb/lowered-all.txt。2026-11-21 の push の時点)。
-- 未確認: 内蔵の全件の数(インストーラの一覧が runner に無い。C-3 と同じ)。
-- 実測が要ること: 表の行数と、抽出の木にある DLL の数(survey-c4-builtin-plugins)。
-- 前提: C-3 の全件の一覧。UI から選べるかは、C-6 のメニューが出るようになるまで確かめられない。内蔵を増やすと、lift と lower の段の時間が増える(推定)。
-- 受け入れの条件(案): 内蔵のエフェクトとインストゥルメントが 100 以上。全件が lift 済み(表の行数が一致)。全件が起動確認で通る。各 1 件以上が UI から選べる(C-6 の後)。
+- 未確認: 約 141 は依頼者の申告で、実測ではない。インストーラの一覧(inventory)で確かめるまで、全件の数は未確認。
+- 実測が要ること: 表の行数と、抽出の木にある DLL の数(survey-c4-builtin-plugins)。1 件を足す手数の履歴(同 task の手順 7)。全件数は inventory が要る。
+- 前提: 共通の前提の inventory(約 141 の一覧はそこから作る)。UI から選べるかは、C-6 のメニューが出るまで確かめられない。内蔵を増やすと、lift と lower の段の時間が増える(推定)。
+- 方式の案(survey の結果で決める): inventory から、1 DLL につき 1 タスクを作る。lower と同じく、型を queue/kinds/ に足し、生成器の入力に一覧を置く。Fruity の効果は共通の hook 点(lift/harness/hooks/fruity-delphi-effect-hook-points.txt)を使うので、共通の部分を直すと他にも効く可能性がある(推定。survey で確かめる)。
+- 論点(解決は survey と inventory の後): 約 141 件を 1 つのエンジンの wasm に入れると、大きさと起動(P1 の 10 秒)に効く。リポジトリの .gitignore(4 行と 30 行)は、エンジン本体の wasm を 143 MB と書いている。依頼者の指示にあった「約 165 MB」は、リポジトリに出典が無いので、この版では使わない。全件を 1 つに入れるか、必要になった時に読み込むかは survey の結果で決める。優先は P3、P2、P1、サイズの順。
+- 後回しの VFX 系(案): DLL の PE の import に OpenGL の DLL(opengl32 など)を含む物。一覧と理由を計画に書き、着手の条件は survey の結果で決める。
+- 受け入れの条件(案): (a) 目標の全件(後回しの VFX 系を除く)について、inventory の各 DLL に、ci/extract-dlls.tsv の行(SHA-256 つき)と、lift 対象の表の行と、hook 点が在る。(b) 全件が lift・compile・link を通る。(c) 全件が起動確認で通る(state が engine-idle、standIn が false、error が null)。(d) 各種類で 1 件以上が UI から選べる(C-6 の後)。(e) 後回しの VFX 系は、名前の一覧と理由(OpenGL)が計画に在る。
 
 ### C-5 外部プラグイン(Serum 2・OTT など)
 
@@ -86,6 +92,22 @@
 - 前提: メニューの描画は、画面の合成(C-2 の分離)の上に載る。C-4 の UI からの選択が、このメニューに依る。
 - 受け入れの条件(案): Tempo・Song Position・Pattern Selector の右クリックで、メニューが画面に出る(前後の画面の差が 0 でない)。項目を選ぶと、値が変わる(Tempo の値など)。
 
+## 共通の前提: インストーラの一覧(inventory)
+
+- 定義: インストーラ(FL Studio の exe)の中の、インストール先の全ファイルの表。列は、guest のパス、抽出先(lift/out-app/host の中の相対パス)、大きさ(バイト)、SHA-256、(DLL などの実行形式なら)import した DLL の名前。C-3 と C-4 が使う。C-5 の外部プラグインのインストーラにも使えるかは未確認(形式を確かめていない)。
+- 経路(案): extract ジョブ(R2 の鍵を持つ)で一覧を作り、キャッシュの木(lift/out-app/host)の中に置く。作業ジョブは、復元された木から読む。commit が要るなら、作業ジョブが queue/inputs/ にコピーして commit する(案。判定の段で scan される)。
+- 実現可能性(読みのみ。2026-11-21。この機械では製品を build・実行していない):
+  1. 件数と guest パスは、既に作られている。app/scripts/lib/nsis-script.mjs の installTree(102〜124 行)は、section 0 の EXTRACTFILE のうち、インストール先の下の物を [番号, guest パス, ストリームの位置] で返す($PLUGINSDIR と $TEMP は 118 行で除く)。app/scripts/extract-fl.mjs は 69〜70 行でこの表を Map にしているが、出力はしていない。section 0 の外の EXTRACTFILE は、この表に入らない(差の件数は未確認)。
+  2. 大きさと SHA-256 は、復号しないと分からない。各ファイルのストリームは独立で(app/scripts/lib/nsis.mjs の streamFile、116〜121 行: 4 バイトの長さ語、LZMA1 の 5 バイトの props、データ)、展開後の長さはストリームに無い。圧縮されていない物(長さ語の最上位ビットが 0)だけは、長さ = clen。復号の所要は、pure JS の app/scripts/lib/lzma1.mjs の速さに依るので、全件の所要は未確認(推定の材料が無い)。
+  3. DLL の import は、読める道具が既にある。Rust の fe-pe(lift/crates/fe-pe)の CLI `pe-info FILE` は、import した DLL の名前を出す(lift/crates/fe-pe/src/main.rs の 67〜105 行)。ただし extract ジョブは lift を build しない(agent.yml の extract ジョブは aws と node の段だけで、cargo は動かさない)。extract ジョブで fe-pe だけを cargo build すれば、lift/ を変えずに済む(ビルドの所要は未確認)。
+  4. 作る場所: driver/ に新規の 1 ファイル(案: driver/inventory.mjs)。app/scripts/lib/nsis.mjs と nsis-script.mjs を、読むだけで import する。agent.yml の extract ジョブの「インストーラを取り、抽出する」の段で、rm -f の前に呼ぶ。出力は $RUNNER_TEMP/host/inventory.tsv(木の中なので、キャッシュに入り、lift/out-app/host に移る)。
+  5. キャッシュの鍵: 既存の木には一覧が無いので、一覧を入れるには鍵を変えて抽出し直すしかない。鍵は agent.yml の 2 か所(64 行: extract ジョブの cache、154 行: run ジョブの restore。どちらも extract-tree-<hashFiles(...)>)にあり、両方に driver/inventory.mjs を足す。run ジョブの restore は fail-on-cache-miss なので、2 か所の鍵がずれると、作業ジョブは全件落ちる。鍵を変えた直後は、同時に並ぶ作業ジョブが全部 cache miss で抽出し直す(重複。推定)。
+  6. 失敗時: 一覧の段が落ちると、extract ジョブが失敗する。キャッシュが保存されるのが成功した時だけかは未確認(runs-on/cache の仕様)。保存されなければ、全件が毎回 miss になる。
+  7. 触れないもの: app/・lift/・ci/・deploy.yml は変えない。deploy.yml の抽出は、lift/target/release/fe-build extract(deploy.yml の 37 行)で、別の鍵(host-...。32 行)を使う別経路なので、影響しない。ただし、agent.yml の抽出の段は lift/crates/fe-build/src/main.rs の extract_steps(531〜548 行)と同じ手順になるので、2 か所の手順がずれないように注意する。
+  8. 結論: agent.yml と driver/ の新規 1 ファイルで、app/・lift/・ci/・deploy.yml に触れずに、一覧は作れる。queue/ の中だけでは置けない(queue/ は待ち行列の状態と入力の置き場所で、道具は置かない)。deploy.yml の paths は app/**・lift/**・ci/**・deploy.yml の 4 つだけ(deploy.yml の 4〜8 行)。
+  9. 代案(app/ を変える): app/scripts/extract-fl.mjs に一覧の出力を足すのが一番小さいが、app/** が deploy.yml を動かすので、報告が要る。監査・受付が決める。
+- 未確認: 全件の展開の所要と大きさ、section 0 の外の EXTRACTFILE の件数、キャッシュの保存の条件、installTree の件数と extractFiles の件数の差。これらは、一覧の段を入れた後の extract ジョブの計測で測る。
+
 ## ③ 着手の順と時期
 
 - 優先: P3、P2、P1、サイズ(AGENTS.md の目標の順)。
@@ -102,3 +124,4 @@
 ## ④ 更新の記録
 
 - 2026-11-21: 初版。台帳 L-033 を足した。survey 6 件(survey-c1-hidpi、survey-c2-worker-split、survey-c3-fl-resources、survey-c4-builtin-plugins、survey-c5-external-plugins、survey-c6-topbar-menus)を、待ち行列に入れた(Issue は ready)。survey は測定と読みだけで、製品は変えない。出力は queue/findings/<名前>.md。
+- 2026-11-21(L-034): 依頼者の是正で、C-4 の目標を約 141(効果 約 90 + インストゥルメント 約 51。OpenGL を使う VFX 系は後回し可)に直した。lift 対象の 3 件は、目標ではなく進み具合。共通の前提(inventory)の節を足し、一覧の実現可能性を読みで調べた(agent.yml と driver/ の新規 1 ファイルで可能。app/・lift/・ci/ は変えない)。survey-c4 の本文を直した。C-3 の前提の 1 行を、inventory の節への参照に変えた。

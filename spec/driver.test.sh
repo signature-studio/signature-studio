@@ -209,4 +209,16 @@ ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5
 ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
 ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
 ok "台帳: L-033 が在り、5 列" "$(awk -F'\t' '$1 == "L-033" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
+# 内蔵の目標(台帳 L-034): 約 141(効果 約 90 + インストゥルメント 約 51)。共通の前提に inventory。survey-c4 の本文の整え
+ok "台帳: L-034 が在り、5 列" "$(awk -F'\t' '$1 == "L-034" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
+C4SEC=$(awk '/^### C-4 /{f=1; next} /^### |^## /{f=0} f' "$top/queue/plan.md")
+ok "plan: C-4 の節に、目標の約 141 が在る" "$(grep -q '約 141' <<<"$C4SEC" && echo yes || echo no)" yes
+ok "plan: C-4 の節に、後回しの VFX 系と OpenGL が在る" "$(grep -q 'VFX' <<<"$C4SEC" && grep -q 'OpenGL' <<<"$C4SEC" && echo yes || echo no)" yes
+ok "plan: 共通の前提の節に、インストーラの一覧(inventory)が在る" "$(grep -c '^## 共通の前提.*inventory' "$top/queue/plan.md")" 1
+ok "plan: 更新の記録(④)に L-034 の行が在る" "$(awk '/^## ④ 更新の記録/{f=1} f' "$top/queue/plan.md" | grep -c 'L-034')" 1
+S4=$top/queue/tasks/survey-c4-builtin-plugins.md
+ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
+ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
+ok "survey-c4: 手順の行は、句点か閉じ括弧で終わる(途中で切れていない)" "$(grep -E '^[0-9]+\. ' "$S4" | grep -vcE '(。|）|\))$')" 0
+ok "survey-c4: インストゥルメントの件数が 0 件だと、手順 2 に書く" "$(grep -E '^2\. ' "$S4" | grep -c '0 件')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
