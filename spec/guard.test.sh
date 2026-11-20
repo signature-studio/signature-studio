@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # spec/guard.test.sh : 判定の道具(guard/)が、依頼者の決まりへの違反を見つけられることを確かめるテスト。
 # 一時ディレクトリはリポジトリの中の .tmp-spec.*(git の無視の対象)に作り、終わったら消す。
-# git の commit を使うテストは、環境の名義で commit する(名義を上書きしない)。環境に名義が無ければ skip と出す。
+# git の commit を使うテストは、環境の名義で commit する(名義を上書きしない)。環境に名義が無ければ落ちる(skip して通さない)。
+# JUDGE_IN_SPEC は、判定が spec を呼ぶときだけ立つ印。この spec の中の判定の検査は、印が無い通常の判定として行う。
+unset JUDGE_IN_SPEC
+unset RUNNER_TEMP   # 判定の受け入れは RUNNER_TEMP の boot.json を使う。この spec の判定の検査は、作業者のジョブの一時ディレクトリに触れない
 here=$(cd "$(dirname "$0")" && pwd); g=$here/../guard; fail=0; T=$(mktemp -d "$here/../.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
@@ -96,7 +99,78 @@ if git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then
   ( cd "$R" && ok "judge: base の ref が読めなければ「通った」を出さない" "$(bash "$g/judge.sh" no-such-ref "$T/task-ok.md" 2>&1 | grep -c '通った')" 0 )
   ( cd "$R" && ok "flags: base の ref が読めなければ落ちる" "$(rc bash "$g/flags.sh" no-such-ref HEAD)" 1 )
   ( cd "$R" && ok "judge: 変更が無い base(HEAD)なら、通った旨を出して通る" "$(bash "$g/judge.sh" HEAD "$T/task-ok.md" 2>&1 | tail -1)" "judge: 通った" )
+  # 受け入れが boot.json(起動確認)を使うとき: 判定の再実行の前に boot.json を消し、失敗したら、その結果か「無い」を 1 行で出す(受け入れの再試行は足さない)
+  rt=$T/rt; mkdir -p "$rt"
+  bj() { ( cd "$R" && RUNNER_TEMP="$rt" bash "$g/judge.sh" HEAD "$1" > "$T/bj.out" 2>&1; echo "$?" > "$T/bj.rc" ); }
+  cat > "$T/task-b1.md" <<'EOF'
+accept: echo '{"state":"running","error":null,"standIn":false,"elapsedMs":1234}' > "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b1.md"
+  ok "判定: 受け入れが boot.json を使って失敗したら、起動確認の結果を 1 行で、失敗の直前に出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果: {"state":"running","error":null,"standIn":false,"elapsedMs":1234}'
+  ok "判定: 起動確認の結果を出しても、受け入れの失敗は従来どおり最後の行で、終了コードは 1" "$(tail -n 1 "$T/bj.out")/$(cat "$T/bj.rc")" 'judge: 受け入れコマンドが失敗した/1'
+  cat > "$T/task-b2.md" <<'EOF'
+accept: test -s "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b2.md"
+  ok "判定: boot.json が無いまま受け入れが失敗したら、その旨を 1 行で出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果が無い(boot-bundle の前の段で落ちたか、boot-bundle が何も出さなかった)'
+  printf '%s\n' '{"state":"engine-idle","error":null,"standIn":false,"elapsedMs":999}' > "$rt/boot.json"
+  bj "$T/task-b2.md"
+  ok "判定: 前の段の boot.json が残っていても、判定が消してから受け入れを走らせ、前の結果を出さない" "$(tail -n 2 "$T/bj.out" | head -n 1)/$(grep -c 'elapsedMs":999' "$T/bj.out")" 'judge: 起動確認の結果が無い(boot-bundle の前の段で落ちたか、boot-bundle が何も出さなかった)/0'
+  cat > "$T/task-b4.md" <<'EOF'
+accept: echo '{broken' > "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b4.md"
+  ok "判定: boot.json が JSON として読めないときは、先頭だけを 1 行で出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果が読めない: {broken'
+  cat > "$T/task-b5.md" <<'EOF'
+accept: false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b5.md"
+  ok "判定: boot.json を使わない受け入れの失敗には、起動確認の行を足さない" "$(grep -c '起動確認' "$T/bj.out")" 0
+  cat > "$T/task-b7.md" <<'EOF'
+accept: node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/boot.json", JSON.stringify({state: "error", error: "x".repeat(400), standIn: false, elapsedMs: 5}))'; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b7.md"
+  ok "判定: 起動確認の error は 300 文字で切って出す" "$(tail -n 2 "$T/bj.out" | head -n 1 | grep -o 'x*' | awk '{print length}' | sort -n | tail -n 1)" 300
+  cat > "$T/task-b6.md" <<'EOF'
+accept: echo '{}' > "$RUNNER_TEMP/boot.json"; true
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b6.md"
+  ok "判定: 受け入れが通るときは、起動確認の行を足さず、通った旨を出す" "$(tail -n 1 "$T/bj.out")/$(grep -c '起動確認' "$T/bj.out")/$(cat "$T/bj.rc")" 'judge: 通った/0/0'
+  # ハーネス(tools/・guard/・driver/・spec/・.github/・queue/kinds/・opencode.jsonc)を変えたら、BASE に在る spec を判定の中で実行する。偽の spec で確かめる
+  fp=$T/fake; mkdir -p "$fp"
+  cat > "$fp/fake-spec.sh" <<'FAKE'
+#!/usr/bin/env bash
+n=$(basename "$0")
+echo "$n" >> "$FAKE_T/spec-runs.log"
+if [ -n "${FAKE_NEST:-}" ] && [ -z "${FAKE_DONE:-}" ] && [ "$n" = guard.test.sh ]; then FAKE_DONE=1 bash "$FAKE_G/judge.sh" "$FAKE_BASE" "$FAKE_T/task-ok.md" >/dev/null 2>&1; fi
+exit "$(cat "$FAKE_T/rc-$n")"
+FAKE
+  mkh() { rm -rf "$1"; mkdir -p "$1/spec" "$1/tools" "$1/guard" "$1/lift/harness/hyb"; cp "$fp/fake-spec.sh" "$1/spec/guard.test.sh"; cp "$fp/fake-spec.sh" "$1/spec/driver.test.sh"; printf '1\n' > "$1/tools/x.mjs"; printf 'echo\n' > "$1/guard/x.sh"; printf '0xa1\n' > "$1/lift/harness/hyb/lowered-all.txt"; git -C "$1" init -q && git -C "$1" add -A && git -C "$1" commit -q -m base; }
+  H=$T/harness; mkh "$H"; HB=$(git -C "$H" rev-parse HEAD)
+  rcset() { printf '%s\n' "$1" > "$T/rc-guard.test.sh"; printf '%s\n' "$2" > "$T/rc-driver.test.sh"; }
+  jrun() { rm -f "$T/spec-runs.log"; ( cd "$H" && out=$(FAKE_T="$T" FAKE_G="$g" FAKE_BASE="$HB" bash "$g/judge.sh" "$HB" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" ); }
+  git -C "$H" checkout -q -B s1 "$HB"; printf '2\n' > "$H/tools/x.mjs"; git -C "$H" commit -qam s1
+  rcset 0 0; jrun
+  ok "判定: ハーネス(tools/)の変更で、BASE の spec 2 本が走り、通れば通る" "$(cat "$T/jrc")/$(grep -c '^judge: 通った' "$T/jout")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/1/2
+  rcset 1 0; jrun
+  ok "判定: spec が 0 以外なら落ちて、その spec を名指しする" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/guard.test.sh)' "$T/jout")" 1/1
+  git -C "$H" checkout -q -B s3 "$HB"; printf '0xa1\n0xb2\n' > "$H/lift/harness/hyb/lowered-all.txt"; git -C "$H" commit -qam s3
+  rcset 1 1; jrun
+  ok "判定: 製品のデータ(lift/harness/hyb)だけの変更では、spec を走らせず通る" "$(cat "$T/jrc")/$(grep -c '^judge: 通った' "$T/jout")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/1/0
+  git -C "$H" checkout -q -B s4 "$HB"; git -C "$H" rm -q guard/x.sh; git -C "$H" commit -qm s4
+  rcset 0 1; jrun
+  ok "判定: ファイルの削除だけ(guard/x.sh)の変更でも、ハーネスとして spec を走らせる" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/driver.test.sh)' "$T/jout")/$(grep -c 'driver.test.sh' "$T/spec-runs.log" 2>/dev/null)" 1/1/1
+  H2=$T/harness2; rm -rf "$H2"; mkdir -p "$H2/tools"; printf '1\n' > "$H2/tools/x.mjs"; git -C "$H2" init -q && git -C "$H2" add -A && git -C "$H2" commit -q -m base2; H2B=$(git -C "$H2" rev-parse HEAD)
+  printf '2\n' > "$H2/tools/x.mjs"; git -C "$H2" commit -qam s5; rcset 1 1; rm -f "$T/spec-runs.log"
+  ( cd "$H2" && out=$(FAKE_T="$T" FAKE_G="$g" bash "$g/judge.sh" "$H2B" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
+  ok "判定: BASE に spec が無いリポジトリでは、ハーネスの変更でも spec を走らせず通る" "$(cat "$T/jrc")/$(grep -c '^judge: 通った' "$T/jout")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/1/0
+  git -C "$H" checkout -q -B s6 "$HB"; git -C "$H" rm -q spec/guard.test.sh; git -C "$H" commit -qm s6
+  rcset 0 0; jrun
+  ok "判定: BASE に在る spec を消す変更は、実行に失敗して落ちる" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/guard.test.sh)' "$T/jout")" 1/1
+  git -C "$H" checkout -q -B s7 "$HB"; printf '3\n' > "$H/tools/x.mjs"; git -C "$H" commit -qam s7
+  rcset 0 0; rm -f "$T/spec-runs.log"; ( cd "$H" && out=$(FAKE_NEST=1 FAKE_T="$T" FAKE_G="$g" FAKE_BASE="$HB" bash "$g/judge.sh" "$HB" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
+  ok "判定: spec の中で判定を呼び直しても、ハーネスの spec は再び走らない(再帰しない。走るのは 2 本だけ)" "$(cat "$T/jrc")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/2
 else
-  echo "skip flags・judge: 環境に git の名義が無い"
+  echo "FAIL flags・judge: 環境に git の名義が無い(判定の検査は名義が要る。skip して通さない)"; fail=1
 fi
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
