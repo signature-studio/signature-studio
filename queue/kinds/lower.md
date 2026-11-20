@@ -8,4 +8,4 @@
 3. 通らなければ、原因を直して、もう一度実行する。直せなければ、足した 2 行を戻し、原因を報告に書く。
 4. 変更を commit する。
 
-accept: grep -qx '{{va}}' lift/harness/hyb/lists/lowered-{{module}}.txt && grep -qx '{{va}}' lift/harness/hyb/lowered-all.txt && cargo build --release --locked --manifest-path lift/Cargo.toml && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.standIn==null?0:1)' "$RUNNER_TEMP/boot.json"
+accept: grep -qx '{{va}}' lift/harness/hyb/lists/lowered-{{module}}.txt && grep -qx '{{va}}' lift/harness/hyb/lowered-all.txt && cargo build --release --locked --manifest-path lift/Cargo.toml && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json"
