@@ -48,10 +48,12 @@ export async function launchChrome({ profile, extraArgs = [], url = 'about:blank
   const proc = spawn(CHROME, args, { stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
   proc.stderr.on('data', (d) => { if (stderr.length < 200000) stderr += d; });
+  // a cold start (a new profile, a loaded machine) can take more than 10 s to open the DevTools port: the wait is by time, and ends early when Chrome has exited
+  const deadline = Date.now() + 60000;
   let ws = null;
-  for (let i = 0; i < 100 && !ws; i++) {
+  while (!ws && proc.exitCode === null && Date.now() < deadline) {
     try {
-      const r = await fetch(`http://127.0.0.1:${port}/json/version`);
+      const r = await fetch(`http://127.0.0.1:${port}/json/version`, { signal: AbortSignal.timeout(2000) });
       ws = (await r.json());
     } catch { await sleep(100); }
   }

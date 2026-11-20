@@ -1,5 +1,6 @@
 // Boot check for an arbitrary bundle directory (copy of boot.mjs with the bundle named by argv[2]). Runs it once in headless Chrome (a new profile) and prints one JSON object on stdout. Exit 1 when the run failed ("error" set), 2 when no bundle directory is given.
-// Usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory> > boot.json   (needs app/node_modules and app/dist). The page is opened at "/" with no parameters.
+// Usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory raw/<name>> > boot.json   (needs app/node_modules and app/dist). The page is opened at "/" with no parameters.
+// The brotli files of the bundle are in br/<name>/ next to raw/ (stage-assets.mjs links them for the app's /assets/ route). The temporary directory is inside the repository (.tmp-boot-*) and is removed.
 // standIn is only whether the text "STAND-IN" is in the page body; it is a reading, not a proof either way.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -7,6 +8,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from './cdp.mjs';
+import { stageAssets } from './stage-assets.mjs';
 
 if (!process.argv[2]) {
   process.stderr.write('usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory>\n');
@@ -14,6 +16,7 @@ if (!process.argv[2]) {
 }
 const bundleDir = path.resolve(process.argv[2]);
 const BUNDLE = path.basename(bundleDir);
+const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const appDir = path.join(repo, 'app');
@@ -51,14 +54,12 @@ const timed = (p, ms, what) => {
 async function main() {
   const t0 = Date.now();
   const out = { startedAt: new Date(t0).toISOString(), state: null, engineKind: null, timelineIdle: null, engineLog30: null, standIn: null, documentTitle: null, elapsedMs: null, loadavg: null, chromeVersion: null, error: null };
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'boot-check-'));
+  const root = fs.mkdtempSync(path.join(repo, '.tmp-boot-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
   let server = null, chrome = null, cdp = null, navAt = null;
   try {
-    fs.mkdirSync(assets);
-    fs.symlinkSync(bundleDir, path.join(assets, BUNDLE));
-    fs.copyFileSync(path.join(bundleDir, 'manifest.json'), path.join(assets, 'manifest.json'));
+    stageAssets({ rawDir: bundleDir, brDir, assets, bundle: BUNDLE });
     process.env.FL_ASSETS_DIR = assets;
 
     const vite = await import(pathToFileURL(createRequire(path.join(appDir, 'package.json')).resolve('vite')).href);
@@ -101,7 +102,6 @@ async function main() {
     if (cdp) await shutdown(chrome, cdp).catch(() => {});
     else if (chrome) chrome.proc.kill('SIGKILL');
     if (server) await server.close().catch(() => {});
-    try { fs.unlinkSync(path.join(assets, BUNDLE)); } catch { /* not made */ }
     fs.rmSync(root, { recursive: true, force: true });
   }
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
