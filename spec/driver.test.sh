@@ -200,4 +200,13 @@ const { launchChrome } = await import(pathToFileURL(path.join(top, "tools/boot-c
 try { const c = await launchChrome({ profile: path.join(T, "fake/profile") }); console.log(c.version.Browser); c.proc.kill("SIGKILL"); } catch (e) { console.log("threw"); }
 ' "$T" "$top" 2>/dev/null)
 ok "cdp: DevTools が 12 秒後に答える Chrome でも起動できる" "$slow" "fake/1"
+# 完成までの計画(台帳 L-033): 待ち行列の survey 6 件、計画の見出し、受け入れの行、台帳の行
+Q_TASKS=$top/queue/tasks
+ok "queue: survey の本文が 6 件ある" "$(ls "$Q_TASKS"/survey-c*.md 2>/dev/null | wc -l)" 6
+ok "queue: 本文のすべてが、accept: の行をちょうど 1 つ持つ" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; [ "$(grep -c '^accept: ' "$f")" = 1 ] || n=$((n+1)); done; echo "$n")" 0
+ok "plan: C-1 から C-6 の見出しが在る" "$(for n in 1 2 3 4 5 6; do grep -q "^### C-$n " "$top/queue/plan.md" 2>/dev/null && echo x; done | wc -l)" 6
+ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_TASKS"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
+ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
+ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
+ok "台帳: L-033 が在り、5 列" "$(awk -F'\t' '$1 == "L-033" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
