@@ -43,7 +43,8 @@
    - `git ls-files lift/harness/vst lift/harness/web/mt1 2>/dev/null | head`、`test -f lift/harness/vst/main_vst.c && echo yes || echo no`、`test -f lift/harness/web/mt1/plugin-worker/build.sh && echo yes || echo no` の結果。OTT の harness の source と build がリポジトリに在るか。
    - `grep -rn -i "opt-in\|OPT-IN\|opt in" lift/runtime lift/harness/two lift/crates --include=*.c --include=*.h --include=*.rs | cut -c1-200 | head -20` の結果。既定で無効のものが、いくつ在るか。
 5. Serum 2 の経路を読む(実行しない): lift/harness/vst3a/main_vst3a.c の注釈と、lift/harness/two/wrp1_vst3.c の注釈(何を link するか、既定で有効か)。
-6. 後始末: 一時ファイルを消す。`git status --short` で残りが無いことを確かめる。
+6. 同じ方針(配信の方針 L-035: 1 プラグイン 1 wasm、起動後のバックグラウンド取得)に従う時の差を、読みで書く(読みのみ)。(a) 入力と配る物: ci/artifacts.lock の 3 件(R2 の artifact)は、作業ジョブに鍵が無いので取れない(手順 1 の結果)。配るのが、入力のインストーラか、ビルドの出力(プラグインを lift した wasm と data)かを、区別して書く。(b) ビルドの出力の経路: lift/harness/two/wrp1_vst3.c と lift/runtime/fle_realmod.h(real module の表は、ビルドが与える)を読み、1 プラグイン 1 wasm の形にできるかを、読みで書く(推定)。(c) app/src/plugins/plugin-client.ts と app/src/plugins/ott-host.ts(1 インスタンス 1 Worker)が、起動後の取得とインスタンス化に使えるかを、読みで書く。
+7. 後始末: 一時ファイルを消す。`git status --short` で残りが無いことを確かめる。
 
 ## 出力
 - queue/findings/survey-c5-external-plugins.md に、次の見出しで日本語で書く。
