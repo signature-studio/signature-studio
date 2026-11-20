@@ -68,6 +68,24 @@ ok "fill: 落ちた時と状態が同じ Issue は起動しない(飛ばした�
 reset "$(printf '1\tlower-0xb2\n')" ""; jq -n '{comments: [{body: "落ちた: x\nstate: 0000"}]}' > "$Q/comments-1.json"
 ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: 落ちた時と状態が違えば、同じ Issue を起動する" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")" 1
+# 非 lower(survey・計画の課題など)を、lower より先に起動する(台帳 L-036)。どちらも番号の昇順
+mkdir -p "$R/queue/tasks"; printf '# survey-x\n\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\naccept: true\n' > "$R/queue/tasks/other-y.md"
+git -C "$R" add -A && git -C "$R" commit -q -m tasks
+started() { grep '^workflow run agent.yml' "$Q/log" | sed 's/.*-f task=\([^ ]*\).*/\1/' | tr '\n' ' '; }
+printf '2\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 閾値 2 なら、lower が番号の先でも、非 lower の survey-x と other-y を起動する" "$(started)" "survey-x other-y "
+printf '3\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 閾値 3 なら、非 lower の 2 件の後に、lower の番号の一番小さい物" "$(started)" "survey-x other-y lower-0xb2 "
+printf '2\n' > "$R/queue/threshold"; reset "$(printf '5\tlower-0xd4\n2\tlower-0xb2\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 非 lower が無ければ、番号の昇順(従来どおり)" "$(started)" "lower-0xb2 lower-0xd4 "
+cur=$(cd "$R" && source driver/state.sh && state)
+reset "$(printf '3\tsurvey-x\n4\tother-y\n1\tlower-0xb2\n')" ""; jq -n --arg b "$(printf 'state: %s' "$cur")" '{comments: [{body: $b}]}' > "$Q/comments-3.json"
+( cd "$R" && bash driver/fill.sh > "$T/fill-order.out" 2>&1 )
+ok "fill: 非 lower で状態が同じ物は飛ばし、その枠は次の候補(other-y、lower-0xb2)に回る" "$(started)" "other-y lower-0xb2 "
+ok "fill: 飛ばした件数はログに出る(非 lower の 1 件)" "$(grep -c '状態が同じ.*1 件' "$T/fill-order.out")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -216,6 +234,11 @@ ok "plan: C-4 の節に、目標の約 141 が在る" "$(grep -q '約 141' <<<"$
 ok "plan: C-4 の節に、後回しの VFX 系と OpenGL が在る" "$(grep -q 'VFX' <<<"$C4SEC" && grep -q 'OpenGL' <<<"$C4SEC" && echo yes || echo no)" yes
 ok "plan: 共通の前提の節に、インストーラの一覧(inventory)が在る" "$(grep -c '^## 共通の前提.*inventory' "$top/queue/plan.md")" 1
 ok "plan: 更新の記録(④)に L-034 の行が在る" "$(awk '/^## ④ 更新の記録/{f=1} f' "$top/queue/plan.md" | grep -c 'L-034')" 1
+ok "plan: エンジン本体の wasm の実測(165848536)と出典が、同じ行に在る" "$(grep -q '165848536.*出典' "$top/queue/plan.md" && echo yes || echo no)" yes
+# 配信の方針(台帳 L-035・依頼者の提案): 起動前と起動後の区分、1 プラグイン 1 wasm。古い方式の文(survey で決める)は残さない
+ok "台帳: L-035 が在り、5 列" "$(awk -F'\t' '$1 == "L-035" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 配信の方針の節が在り、1 プラグイン 1 wasm・起動前・バックグラウンドの語が在る" "$(P=$top/queue/plan.md; if [ "$(grep -c '^## 配信の方針' "$P")" = 1 ] && grep -q '1 プラグイン 1 wasm' "$P" && grep -q '起動前' "$P" && grep -q 'バックグラウンド' "$P"; then echo yes; else echo no; fi)" yes
+ok "plan: 「必要になった時に読み込むか」の方式の文が残っていない" "$(grep -c '必要になった時に読み込むかは survey の結果で決める' "$top/queue/plan.md")" 0
 S4=$top/queue/tasks/survey-c4-builtin-plugins.md
 ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes

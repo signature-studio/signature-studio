@@ -53,7 +53,8 @@
 - 未確認: インストーラの全件の一覧。runner に無い(R2 の鍵は extract ジョブにだけある)。必要な全件の数。
 - 実測が要ること: seed の行と抽出の木の突き合わせ、起動時に見つからないパスの記録(survey-c3-fl-resources)。
 - 前提: 共通の前提の inventory(インストーラの一覧)。作る経路と実現可能性は、下の「共通の前提」の節。
-- 受け入れの条件(案): 全件の一覧と抽出の木の差が 0。起動時の「見つからない」が 0。言語・テーマ・テンプレートの件数が一覧と一致する。
+- 配信の方針の分類: 起動前に取る物(配信の方針 L-035)。今の bundle では seed pack に入る(app/scripts/pack-seed.mjs の 1〜7 行: 「the guest runs の前にハーネスが読むホストファイル」を 1 つにまとめる。seed pack は 20780949 B。run 44673024703 の判定の出力)。言語・テーマ・テンプレートが、そのうち何バイトかは、survey-c3 で測る(推定: seed の行の中に在る)。
+- 受け入れの条件(案): 全件の一覧と抽出の木の差が 0。起動時の「見つからない」が 0。言語・テーマ・テンプレートの件数が一覧と一致する。起動前の取得に含まれ、P1 の 10 秒を超えない。
 
 ### C-4 内蔵のエフェクトとインストゥルメント(目標 約 141)
 
@@ -67,10 +68,11 @@
 - 未確認: 約 141 は依頼者の申告で、実測ではない。インストーラの一覧(inventory)で確かめるまで、全件の数は未確認。
 - 実測が要ること: 表の行数と、抽出の木にある DLL の数(survey-c4-builtin-plugins)。1 件を足す手数の履歴(同 task の手順 7)。全件数は inventory が要る。
 - 前提: 共通の前提の inventory(約 141 の一覧はそこから作る)。UI から選べるかは、C-6 のメニューが出るまで確かめられない。内蔵を増やすと、lift と lower の段の時間が増える(推定)。
-- 方式の案(survey の結果で決める): inventory から、1 DLL につき 1 タスクを作る。lower と同じく、型を queue/kinds/ に足し、生成器の入力に一覧を置く。Fruity の効果は共通の hook 点(lift/harness/hooks/fruity-delphi-effect-hook-points.txt)を使うので、共通の部分を直すと他にも効く可能性がある(推定。survey で確かめる)。
-- 論点(解決は survey と inventory の後): 約 141 件を 1 つのエンジンの wasm に入れると、大きさと起動(P1 の 10 秒)に効く。リポジトリの .gitignore(4 行と 30 行)は、エンジン本体の wasm を 143 MB と書いている。依頼者の指示にあった「約 165 MB」は、リポジトリに出典が無いので、この版では使わない。全件を 1 つに入れるか、必要になった時に読み込むかは survey の結果で決める。優先は P3、P2、P1、サイズの順。
+- 方式(配信の方針 L-035 に従う): 1 プラグイン 1 wasm で試行し、起動後にバックグラウンドで取る。inventory から、1 DLL につき 1 タスクを作る。lower と同じく、型を queue/kinds/ に足し、生成器の入力に一覧を置く。Fruity の効果は共通の hook 点(lift/harness/hooks/fruity-delphi-effect-hook-points.txt)を使うので、共通の部分を直すと他にも効く可能性がある(推定。survey で確かめる)。
+- 論点(解決は survey と inventory の後): 約 141 件を 1 つのエンジンの wasm に入れると、大きさと起動(P1 の 10 秒)に効く。エンジン本体の wasm の大きさは、runner の実測で 165848536 バイト(`engine wasm  165848536 B`。165,848,536 バイト、圧縮 br で 17,510,392 バイト)。出典: run 44673024703(worker lower-0xe40550)の判定の出力(成果物 judge.txt)の `engine wasm` の行。同じ行は Issue #81 のコメントにも在る。同じ行は、run 44672756722(lower-0x6f0530。Issue #45)、44672998002(lower-0x7205c0。Issue #74)、44672617908(lower-0xddf630。Issue #24)でも得られ、範囲は 165,820,907〜165,848,536 バイト。依頼者の見立てでは、lower で直接 wasm にする関数が増えるたびに数十 KB 変わる。この見立ては、関数の数と照合していない(推定)。.gitignore(4 行と 30 行)の 143 MB は、それより前の版の数字とみられる(推定)。配信の方針(L-035)では、プラグインは起動後に取るので、起動前の wasm には入れない。1 プラグイン 1 wasm の分け方(今の engine wasm に、どのモジュールの lift 済みの関数が何件入っているか)は、survey-c4 の読みで決める。優先は P3、P2、P1、サイズの順。
 - 後回しの VFX 系(案): DLL の PE の import に OpenGL の DLL(opengl32 など)を含む物。一覧と理由を計画に書き、着手の条件は survey の結果で決める。
-- 受け入れの条件(案): (a) 目標の全件(後回しの VFX 系を除く)について、inventory の各 DLL に、ci/extract-dlls.tsv の行(SHA-256 つき)と、lift 対象の表の行と、hook 点が在る。(b) 全件が lift・compile・link を通る。(c) 全件が起動確認で通る(state が engine-idle、standIn が false、error が null)。(d) 各種類で 1 件以上が UI から選べる(C-6 の後)。(e) 後回しの VFX 系は、名前の一覧と理由(OpenGL)が計画に在る。
+- 受け入れの条件(案): (a) 目標の全件(後回しの VFX 系を除く)について、inventory の各 DLL に、ci/extract-dlls.tsv の行(SHA-256 つき)と、lift 対象の表の行と、hook 点が在る。(b) 全件が lift・compile・link を通る。(c) 全件が起動確認で通る(state が engine-idle、standIn が false、error が null)。(d) 各種類で 1 件以上が UI から選べる(C-6 の後)。(e) 後回しの VFX 系は、名前の一覧と理由(OpenGL)が計画に在る。(f) 各プラグインの wasm が、起動後のバックグラウンド取得で届き、起動(P1)を遅らせない。
+- 最初の 1 件(配信の方針の試行): 3 件の Fruity(Balance・Filter・Delay 2)のうち、Fruity Balance を案として始める。大きさは未確認。survey-c4 が測って、3 件のうち最も小さい物に替えてよい。lift/harness/hyb/lists/ には Fruity の lowered の一覧が無いので、最初の 1 件は、直接 wasm 化の一覧を作るところから始まる(推定)。
 
 ### C-5 外部プラグイン(Serum 2・OTT など)
 
@@ -78,6 +80,7 @@
   - 入力は ci/artifacts.lock の 3 件(Serum 2・OTT・Vital。R2 の artifact バケット。6〜8 行)。作業ジョブに、このバケットの鍵は無い(.github/workflows/agent.yml の R2_ARTIFACT_* は extract ジョブにだけある。取るのは FL のインストーラだけ)。
   - 製品の画面からは、プラグインの仕組みを呼んでいない(app/src/plugins は、テストからだけ使われる)。OTT の harness の source と build は、リポジトリに無い(app/src/plugins/ott-host.ts:1〜3 と app/test/unit/plugins-ott.test.ts:2 が指す lift/harness/vst と lift/harness/web/mt1/plugin-worker/build.sh)。
   - VST3 の link(lift/harness/two/wrp1_vst3.c)は、リンクされたときだけ働く。注釈には「opt-in」とある(lift/runtime/fle_modules.h:82、lift/runtime/fle_ole.c:171)。台帳 L-002 により、既定で有効にする。Serum 2 の native の harness は lift/harness/vst3a/main_vst3a.c にある。
+- 配信の方針(L-035): 外部プラグインも、1 プラグイン 1 wasm で、起動後にバックグラウンドで取る。配るのは、ビルドで lift した wasm と必要な data であり、インストーラ(R2 の artifact)は配らない(推定。survey-c5 で確かめる)。OTT の先例は app/src/plugins/ott-host.ts(1 インスタンス 1 Worker)。
 - 実測が要ること: 入力が無いことの確認と、読み(survey-c5-external-plugins)。入力が無いので、実測は行わない。
 - 前提: 作業ジョブが入力を取る経路を、監査・受付が決める。C-2 の音声の経路が決まってから、プラグインの処理を入れる。
 - 受け入れの条件(案): Serum 2 と OTT が、既定で(オプトイン無しで)読み込まれ、1 ブロックの音声を処理する(実測)。P3 の実測で underrun が 0(n=3)。
@@ -91,6 +94,29 @@
 - 実測が要ること: headless Chrome で、右クリック後の画面の差と、ログ(survey-c6-topbar-menus)。
 - 前提: メニューの描画は、画面の合成(C-2 の分離)の上に載る。C-4 の UI からの選択が、このメニューに依る。
 - 受け入れの条件(案): Tempo・Song Position・Pattern Selector の右クリックで、メニューが画面に出る(前後の画面の差が 0 でない)。項目を選ぶと、値が変わる(Tempo の値など)。
+
+## 配信の方針(L-035)
+
+依頼者の提案(台帳 L-035)。実現が難しいと判断した時は、方針を変えてよい(依頼者)。変えたときは、この節と「④ 更新の記録」に書く。
+
+- 起動前に取る物(P1 の 10 秒に入る): FLEngine、言語パック、テーマ、プロジェクトテンプレートなど。FL Studio の起動に必要な wasm が揃った段階で、FL Studio は起動する。
+- 起動後にバックグラウンドで取る物: プラグインとアセット。FL の起動処理が始まった時点から、順次取る。プラグインやアセットへのアクセスを起点にしない。
+- 1 プラグイン 1 wasm で試行する。1 ページの Worker 数の上限に当たる可能性がある場合も、この限りではない。上限に当たるかを、この計画の中で事前に考えない。
+- 現状(コードから。この方針と比べる):
+  - 起動時の取得は 4 つで、すべて起動の前にまとめて取る: エンジン wasm・seed pack・DLL pack・glue(app/src/main.ts:714〜717 行)。起動前と起動後の区分は、今は無い。
+  - DLL pack は 11 ファイル(FLEngine と 10 モジュール。88675800 B。run 44673024703 の判定の出力の `dll pack` の行)。エンジンへは起動引数(lift/harness/web/pack.args の --args 行)で並べて渡され、Fruity の 3 つを含む。
+  - モジュールの PE の扱い: lift/runtime/fle_realmod.h の冒頭は、「ビルドが同じプログラムにリンクし、リベース・lift した第 2 の PE」を real module と呼ぶ。10 モジュールがどちらの扱いか、読みでは分からない(未確認)。
+  - lowered の一覧は、モジュール別に lift/harness/hyb/lists/ の 8 件(b2d・dsp・elastique・fle・ft・ilt・oggio・qfc)。Fruity の一覧は無い。
+  - 取得の先例: app/src/engine/chunk-io.ts(1〜10 行。decision 0314: 遅延の install tree の chunk を、別の I/O Worker が取り、エンジンは Atomics.wait で待つ)。プラグインごとに Worker を持つ先例: app/src/plugins/plugin-client.ts と app/src/plugins/ott-host.ts(OTT の 1 インスタンス 1 Worker)。
+  - 配信: app/worker/index.ts の 2 行目(/assets/* は R2 から、単一の Range・ETag・保存された Content-Encoding で返す)。ページは app/src/bundle/loader.ts の fetchAsset(185 行)と loadPack(219 行)で、manifest の SHA-256 と大きさを検査する(verifyingStream 138 行)。
+- 論点(案。依頼者の指示ではない。survey と実装で決める):
+  1. 起動後の取得の順序: 何を先に取るか(内蔵の一覧の順、使われやすい物の順など)。
+  2. 取得が終わる前にプラグインが使われた時の振る舞い: 待つ、その 1 つを先に取る、など。
+  3. 検証と版: 各 wasm の SHA-256 と大きさを、manifest で検査する(今の loader と同じ作り)。ブラウザのキャッシュの扱い。
+  4. 起動前の予算: 起動前に取る物の大きさ。今の bundle は、engine wasm 165848536 B(br 17510392 B)、seed pack 20780949 B、DLL pack 88675800 B(同じ判定の出力)。起動前に残す物と、P1 の 10 秒に入るかは、起動の実測(P1)で決める。
+  5. 音声への負荷: 取得と wasm のコンパイル・インスタンス化を、音声を作る Worker の外で行う(C-2 の分離と同じ考え)。今は、取得もコンパイルも、ページのメインスレッドで行われている(app/src/main.ts:714〜717 行が loadWasm と loadPack を呼ぶ)。
+  6. 1 プラグイン 1 wasm の作り方: fe-build の bundle(lift/crates/fe-build/src/main.rs の pack_step_for)と、wasm の出し方(lift/crates/fe-wasmgen)。survey-c4 で読む。
+  7. Worker 数の上限: 1 プラグイン 1 wasm が上限に当たるかは、事前に考えない(依頼者の指示)。試行で当たったら、その時点で方針を見直す。
 
 ## 共通の前提: インストーラの一覧(inventory)
 
@@ -115,13 +141,15 @@
   1. C-2(P3)。描画と音声の分離を最初に終える。
   2. C-1(P2)と C-6(P2)。C-1 は C-2 の受理の後に行う(画素数を増やすと、分離の無い engine の Worker の負荷が増えるため。推定)。
   3. C-3(FL の必要物)。
-  4. C-4(内蔵の数)。C-3 の一覧と、C-6 の後(UI から選ぶ確認)に行う。lower の進みを見ながら進める。
+  4. C-4(内蔵の数)。C-3 の一覧と、C-6 の後(UI から選ぶ確認)に行う。lower の進みを見ながら進める。配信の方針(L-035)の試行の最初の 1 件は Fruity Balance(案。大きさは survey-c4 で測り、3 件のうち最も小さい物に替えてよい)。
   5. C-5(外部プラグイン)。C-2 の音声の経路が決まり、入力の取得経路が決まってから行う。
 - 時期の目安: 数字の目安は置かない。survey の受理の後、監査・受付が実装のタスクに分けて、順に足す。
-- 待ち行列の前提: 待ちは番号の昇順で処理する。ready は約 100 件に保つ(生成器)。2026-11-21 の push の時点では ready 98 件(番号 563〜660)、running 56 件。survey 6 件は、この後ろに並ぶ。作業ジョブは 60 並列、1 件あたり約 1 時間(推定)。ready の 98 件が起動し終えるまで約 2 時間(推定)なので、新しいタスクは数時間以内に起動する(推定。実際の起動は Actions の実行で確かめる)。
+- 待ち行列の前提: 非 lower のタスク(survey・計画の課題など)は、lower より先に起動する(driver/fill.sh。台帳 L-036)。どちらも番号の昇順。ready は約 100 件に保つ(生成器)。新しいタスクは、実行中のジョブが 1 件終わった時の fill で起動する(推定。最大で約 1 時間。作業ジョブは 60 並列、1 件あたり約 1 時間(推定))。2026-11-21 の時点では、survey 6 件は ready の lower の後ろに並び、1 件も起動していなかった(起動の確認は、push の後の run と Issue の状態で行う)。
 - 実装タスクの大きさ: 1 件が約 1 時間で終わる大きさにする。受け入れコマンドを本文の accept: の 1 行に書き、実測の出力を報告に残す。
 
 ## ④ 更新の記録
 
 - 2026-11-21: 初版。台帳 L-033 を足した。survey 6 件(survey-c1-hidpi、survey-c2-worker-split、survey-c3-fl-resources、survey-c4-builtin-plugins、survey-c5-external-plugins、survey-c6-topbar-menus)を、待ち行列に入れた(Issue は ready)。survey は測定と読みだけで、製品は変えない。出力は queue/findings/<名前>.md。
 - 2026-11-21(L-034): 依頼者の是正で、C-4 の目標を約 141(効果 約 90 + インストゥルメント 約 51。OpenGL を使う VFX 系は後回し可)に直した。lift 対象の 3 件は、目標ではなく進み具合。共通の前提(inventory)の節を足し、一覧の実現可能性を読みで調べた(agent.yml と driver/ の新規 1 ファイルで可能。app/・lift/・ci/ は変えない)。survey-c4 の本文を直した。C-3 の前提の 1 行を、inventory の節への参照に変えた。
+- 2026-11-21(L-035): 依頼者の提案で、配信の方針を入れた(起動前に取る物と、起動後にバックグラウンドで取る物の区分。1 プラグイン 1 wasm の試行。lazy-load)。C-3・C-4・C-5 を、この方針に直した。方針は、実現が難しいと判断した時に変えてよい(依頼者)。
+- 2026-11-21(L-036): survey 6 件は、作成から 1 時間以上たっても 1 件も起動しなかった。原因は、driver/fill.sh が ready を番号の昇順で起動し、番号の小さい lower(約 100 件)の後ろに並んでいたこと。fill を直し、非 lower のタスクを先に、lower を後に、それぞれ番号の昇順で起動するようにした(台帳 L-036)。spec/driver.test.sh に、起動の順の検査を 4 件足した。
