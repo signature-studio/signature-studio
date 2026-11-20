@@ -122,11 +122,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: rust をそろえ、app の依存と fe-build を用意する
+      - name: rust をそろえ、app の依存を入れてビルドし、fe-build を用意する
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
           rustup default "$RUST_TOOLCHAIN"
           npm ci --prefix app
+          npm run build --prefix app
           cargo build --release --locked --manifest-path lift/Cargo.toml
 
       - name: emsdk を入れる
