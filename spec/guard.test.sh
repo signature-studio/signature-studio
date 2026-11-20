@@ -22,6 +22,7 @@ printf 'x\n' > "$T/app/c.py"; ( cd "$T" && ok "scan: 製品の .py は見つか�
 printf 'ok text\n' > "$T/app/d.txt"; ( cd "$T" && ok "scan: 問題の無いファイルは通る" "$(rc bash "$g/scan.sh" app/d.txt)" 0 )
 printf 'x.%s.dev\npython3 x.py\n' workers > "$T/app/e.txt"; ( cd "$T" && ok "scan: 2 件の違反を 2 件と数える" "$(bash "$g/scan.sh" app/e.txt 2>/dev/null | wc -l)" 2 )
 # 値を隠す命令(マスク)は、ワークフローに置かない(依頼者の指示 2026-11-20・L-031)。scan.sh の mask 規則は .github/workflows/ の下だけを見る
+ok "ワークフローに、値を隠す命令が無い(件数)" "$(cat "$here"/../.github/workflows/*.yml | grep -cF -- 'add-mask')" 0
 mkdir -p "$T/.github/workflows" "$T/x/.github/workflows" "$T/app"
 printf 'run: echo "::add-mask::a"\nrun: echo "::add-mask::b"\n' > "$T/.github/workflows/mk.yml"
 printf 'run: echo "::add-mask::a"\n' > "$T/app/mk.yml"; printf 'run: echo "::add-mask::a"\n' > "$T/x/.github/workflows/mk.yml"

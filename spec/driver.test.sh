@@ -117,10 +117,7 @@ ok "対照: pipefail が無い bash -e では、同じ判定の行の失敗は 0
 P=$(awk '/^      - name: 通った変更を main に push/{f=1} /^      - name: 報告を検査/{f=0} f' "$A")
 ok "agent.yml: push の段は if を持たない(判定が成功したときだけ走る)" "$(grep -c '^ *if:' <<<"$P")" 0
 ok "agent.yml: どの段にも continue-on-error が無い(判定の失敗を飛ばさない)" "$(grep -c 'continue-on-error' "$A")" 0
-# アカウント ID(公開リポジトリのログに出さない。L-006)。値は表示しない: 書く段の数と、マスク無しの段の数だけを比べる
-mk=$(awk '/^      - name:/{m=0} /::add-mask::/{m=1} /GITHUB_ENV/ && /CF_ACCOUNT=/{n++; if(!m) b++} END{print n+0":"b+0}' "$A")
-ok "agent.yml: CF_ACCOUNT を GITHUB_ENV に書く段がある(検査が空振りしない)" "$([ "${mk%%:*}" -gt 0 ] && echo yes)" yes
-ok "agent.yml: CF_ACCOUNT を書く前に ::add-mask:: でマスクする(マスク無しの段の数)" "${mk##*:}" 0
+# アカウント ID の値を、ファイルに直書きしていない(一致の件数だけを見る。値は表示しない。L-006)
 acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" | cut -d'"' -f4)
 ok "agent.yml・deploy.yml・driver/・spec/ に、アカウント ID の値を直書きしていない(一致の数)" "$(if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/driver/*.sh "$top"/spec/*.sh | grep -cF -- "$acct"; else echo none; fi)" 0
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
