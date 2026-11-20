@@ -5,7 +5,7 @@
 here=$(cd "$(dirname "$0")" && pwd); top=$here/..; fail=0; T=$(mktemp -d "$top/.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
-if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "skip driver: 環境に git の名義が無い"; rm -rf "$T"; exit 0; fi
+if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "FAIL driver: 環境に git の名義が無い(判定の spec は、名義が無いと検査を行わない。skip して通さない)"; rm -rf "$T"; exit 1; fi
 # 小さなリポジトリ: 関数の表 4 行(0xa1 は直接 wasm 済み)、型、閾値 3、ci のタスク 1 件
 R=$T/repo; mkdir -p "$R/queue/inputs" "$R/queue/kinds" "$R/ci/tasks" "$R/lift/harness/hyb/lists"
 cp -r "$top/driver" "$R/"; cp "$top/queue/kinds/lower.md" "$R/queue/kinds/"; printf '3\n' > "$R/queue/threshold"
@@ -138,6 +138,8 @@ out2=$(cd "$pr/c2.work" && BARE="$pr/c2.git" bash -e "$pr/loop.sh" 2>&1); rc2=$?
 ok "push の段: push が拒否されたら、次の試行で成功する(終了コード 0、リモートに手元の commit が入る)" "$rc2/$(git -C "$pr/c2.git" log -1 --format=%s main)" "0/mine2"
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
+ok "名義の無い環境では、driver の spec は skip して通らず、落ちる" "$(env -i HOME="$T/nohome" PATH="$PATH" bash "$here/driver.test.sh" >/dev/null 2>&1; echo $?)" 1
+ok "判定の spec の中(JUDGE_IN_SPEC が有る)でも、guard の spec は判定の検査を省かずに通る" "$(JUDGE_IN_SPEC=1 bash "$here/guard.test.sh" >/dev/null 2>&1; echo $?)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
 A=$top/.github/workflows/agent.yml; ci_line=$(grep -n '^ *npm ci --prefix app$' "$A" | cut -d: -f1)
 ok "agent.yml: 作業段は npm ci の直後に npm run build --prefix app を実行する" "$(awk -v c="$ci_line" 'NR==c+1' "$A" | sed 's/^ *//')" "npm run build --prefix app"
