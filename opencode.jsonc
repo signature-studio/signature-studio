@@ -27,7 +27,7 @@
     { "action": "tool.use", "resource": "shell:gh auth *", "effect": "deny" },
     { "action": "tool.use", "resource": "portal_*", "effect": "deny" },
     { "action": "mcp.use", "resource": "portal", "effect": "deny" },
-    // ---- GitHub Actions は、依頼者が確認して承認するまで実行しない(ledger L-021)
+    // ---- GitHub Actions は依頼者が承認済み(ledger L-027)。起動は駆動(driver/fill.sh)だけが行い、作業者は起動しない(ledger L-021)
     { "action": "tool.use", "resource": "shell:gh workflow run*", "effect": "deny" },
     { "action": "tool.use", "resource": "shell:gh workflow enable*", "effect": "deny" },
     { "action": "tool.use", "resource": "shell:gh run rerun*", "effect": "deny" },

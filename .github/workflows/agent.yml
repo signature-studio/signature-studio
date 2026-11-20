@@ -1,5 +1,5 @@
 # 作業者(Haiku 5.5)を、タスク 1 件につき 1 ジョブで動かす。前の世代の agent.yml(実際に動いた物)を土台にした。
-# 起動は workflow_dispatch だけ。schedule は、依頼者が Actions を承認してから足す(台帳 L-021)。
+# 起動は workflow_dispatch だけ。依頼者が Actions の実行を承認した(台帳 L-021・L-027)。schedule は足していない。
 # 駆動: ジョブの最後の fill が、待ち行列(Issues)から閾値(queue/threshold)まで次のジョブを起動する(driver/fill.sh)。
 # task を空にして起動すると、fill だけが動く。fill を false にすると、次のジョブを起動しない。
 # 判定は、取り直した main の guard/judge.sh で行い、通った変更だけを main に push する。
