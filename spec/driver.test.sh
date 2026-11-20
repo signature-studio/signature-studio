@@ -120,6 +120,22 @@ ok "agent.yml: どの段にも continue-on-error が無い(判定の失敗を飛
 # アカウント ID の値を、ファイルに直書きしていない(一致の件数だけを見る。値は表示しない。L-006)
 acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" | cut -d'"' -f4)
 ok "agent.yml・deploy.yml・driver/・spec/ に、アカウント ID の値を直書きしていない(一致の数)" "$(if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/driver/*.sh "$top"/spec/*.sh | grep -cF -- "$acct"; else echo none; fi)" 0
+# push の段の再試行(agent.yml の for 〜 done を、実際の URL の代わりに手元の bare リポジトリで動かす)。衝突は中断して、衝突したファイル名だけを出す。拒否されたら次の試行へ
+PB=$(awk '/for i in 1 2 3; do/{f=1} f{print} f && /^ *exit 1$/{exit}' "$A" | sed 's#"https://github.com/$GITHUB_REPOSITORY.git"#"$BARE"#')
+pr=$T/push; mkdir -p "$pr"; printf '%s\n' "$PB" > "$pr/loop.sh"
+mkbase() { git init -q --bare "$pr/$1.git" && git -C "$pr/$1.git" symbolic-ref HEAD refs/heads/main && git init -q "$pr/$1.seed" && git -C "$pr/$1.seed" symbolic-ref HEAD refs/heads/main && printf 'x\n' > "$pr/$1.seed/f" && git -C "$pr/$1.seed" add f && git -C "$pr/$1.seed" commit -q -m base && git -C "$pr/$1.seed" push -q "$pr/$1.git" main && git clone -q "$pr/$1.git" "$pr/$1.work"; }
+mkbase c1; git clone -q "$pr/c1.git" "$pr/c1.other"
+( cd "$pr/c1.work" && printf 'mine\n' > f && git commit -q -am mine )
+( cd "$pr/c1.other" && printf 'theirs\n' > f && git commit -q -am theirs && git push -q origin HEAD:main )
+out=$(cd "$pr/c1.work" && BARE="$pr/c1.git" bash -e "$pr/loop.sh" 2>&1); rc=$?
+ok "push の段: 衝突したら、試行ごとに衝突したファイル名だけを出し、マージを中断する(未解決の印を残さない)" "$(grep -c '^衝突: f$' <<<"$out")/$(git -C "$pr/c1.work" status --porcelain | grep -c '^UU')" 3/0
+ok "push の段: 衝突で 3 回とも失敗したら、非 0 で終わる" "$([ "$rc" -ne 0 ] && echo nonzero)" nonzero
+ok "push の段: 2 回目の試行は、未解決の印のせいで落ちない(Pulling is not possible が出ない)" "$(grep -c 'Pulling is not possible' <<<"$out")" 0
+mkbase c2
+( cd "$pr/c2.work" && printf 'g\n' > g.txt && git add g.txt && git commit -q -m mine2 )
+printf '#!/bin/sh\nif [ ! -e "%s" ]; then : > "%s"; echo "reject once" >&2; exit 1; fi\nexit 0\n' "$pr/rejected-once" "$pr/rejected-once" > "$pr/c2.git/hooks/pre-receive"; chmod +x "$pr/c2.git/hooks/pre-receive"
+out2=$(cd "$pr/c2.work" && BARE="$pr/c2.git" bash -e "$pr/loop.sh" 2>&1); rc2=$?
+ok "push の段: push が拒否されたら、次の試行で成功する(終了コード 0、リモートに手元の commit が入る)" "$rc2/$(git -C "$pr/c2.git" log -1 --format=%s main)" "0/mine2"
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
