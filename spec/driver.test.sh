@@ -68,6 +68,24 @@ ok "fill: 落ちた時と状態が同じ Issue は起動しない(飛ばした�
 reset "$(printf '1\tlower-0xb2\n')" ""; jq -n '{comments: [{body: "落ちた: x\nstate: 0000"}]}' > "$Q/comments-1.json"
 ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: 落ちた時と状態が違えば、同じ Issue を起動する" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")" 1
+# 非 lower(survey・計画の課題など)を、lower より先に起動する(台帳 L-036)。どちらも番号の昇順
+mkdir -p "$R/queue/tasks"; printf '# survey-x\n\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\naccept: true\n' > "$R/queue/tasks/other-y.md"
+git -C "$R" add -A && git -C "$R" commit -q -m tasks
+started() { grep '^workflow run agent.yml' "$Q/log" | sed 's/.*-f task=\([^ ]*\).*/\1/' | tr '\n' ' '; }
+printf '2\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 閾値 2 なら、lower が番号の先でも、非 lower の survey-x と other-y を起動する" "$(started)" "survey-x other-y "
+printf '3\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 閾値 3 なら、非 lower の 2 件の後に、lower の番号の一番小さい物" "$(started)" "survey-x other-y lower-0xb2 "
+printf '2\n' > "$R/queue/threshold"; reset "$(printf '5\tlower-0xd4\n2\tlower-0xb2\n')" ""
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 非 lower が無ければ、番号の昇順(従来どおり)" "$(started)" "lower-0xb2 lower-0xd4 "
+cur=$(cd "$R" && source driver/state.sh && state)
+reset "$(printf '3\tsurvey-x\n4\tother-y\n1\tlower-0xb2\n')" ""; jq -n --arg b "$(printf 'state: %s' "$cur")" '{comments: [{body: $b}]}' > "$Q/comments-3.json"
+( cd "$R" && bash driver/fill.sh > "$T/fill-order.out" 2>&1 )
+ok "fill: 非 lower で状態が同じ物は飛ばし、その枠は次の候補(other-y、lower-0xb2)に回る" "$(started)" "other-y lower-0xb2 "
+ok "fill: 飛ばした件数はログに出る(非 lower の 1 件)" "$(grep -c '状態が同じ.*1 件' "$T/fill-order.out")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
