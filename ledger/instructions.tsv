@@ -27,3 +27,4 @@ L-025	2026-11-20	依頼者(本調査への回答)	依頼者はこのリポジト
 L-026	2026-11-20	依頼者(本調査への回答)	依頼者が言っていない制限を、エージェントが作らない	制限(deny、判定の規則、決まり)は、台帳の依頼者の指示に対応する物だけを置く
 L-027	2026-11-20	依頼者	GitHub Actions の実行を承認した。最初の作業ジョブ 0001-read-only-check は起動済み	L-021 の承認待ちが解けた。駆動(driver/fill.sh)は閾値(queue/threshold)まで作業ジョブを起動してよい
 L-028	2026-11-20	依頼者(監視セッション経由)	lower の連鎖が全件落ちている。1〜6(連鎖停止、atomic 除外、判定修正、起動確認修正、失敗の扱い、1件確認後に閾値復帰)の全件を承認した	閾値 0 で止め、直してから 60 に戻す。復帰は 1 件の成功を確かめてから
+L-029	2026-11-20	依頼者(監視セッション経由)	lower の作業を再開する前の修正: 作業段で app をビルドする。生成器は atomic の関数を出さない。判定は standIn の true/false と engine-idle を見る。起動確認は br の配信を再現し、Chrome の起動待ちを時間で切る。落ちた原因と状態を Issue に残し、同じ状態では起動しない	.github/workflows/agent.yml(作業段の npm run build、判定の出力を成果物に、close の actions: read)・driver/generate.sh・queue/kinds/lower.md・tools/boot-check/stage-assets.mjs と cdp.mjs・driver/close.sh と fill.sh と state.sh(比べるのは作業が読む木の hash。台帳の変更では変わらない)。spec/driver.test.sh
