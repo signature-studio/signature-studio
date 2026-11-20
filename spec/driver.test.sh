@@ -217,6 +217,10 @@ ok "plan: C-4 の節に、後回しの VFX 系と OpenGL が在る" "$(grep -q '
 ok "plan: 共通の前提の節に、インストーラの一覧(inventory)が在る" "$(grep -c '^## 共通の前提.*inventory' "$top/queue/plan.md")" 1
 ok "plan: 更新の記録(④)に L-034 の行が在る" "$(awk '/^## ④ 更新の記録/{f=1} f' "$top/queue/plan.md" | grep -c 'L-034')" 1
 ok "plan: エンジン本体の wasm の実測(165848536)と出典が、同じ行に在る" "$(grep -q '165848536.*出典' "$top/queue/plan.md" && echo yes || echo no)" yes
+# 配信の方針(台帳 L-035・依頼者の提案): 起動前と起動後の区分、1 プラグイン 1 wasm。古い方式の文(survey で決める)は残さない
+ok "台帳: L-035 が在り、5 列" "$(awk -F'\t' '$1 == "L-035" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 配信の方針の節が在り、1 プラグイン 1 wasm・起動前・バックグラウンドの語が在る" "$(P=$top/queue/plan.md; if [ "$(grep -c '^## 配信の方針' "$P")" = 1 ] && grep -q '1 プラグイン 1 wasm' "$P" && grep -q '起動前' "$P" && grep -q 'バックグラウンド' "$P"; then echo yes; else echo no; fi)" yes
+ok "plan: 「必要になった時に読み込むか」の方式の文が残っていない" "$(grep -c '必要になった時に読み込むかは survey の結果で決める' "$top/queue/plan.md")" 0
 S4=$top/queue/tasks/survey-c4-builtin-plugins.md
 ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
