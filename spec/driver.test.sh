@@ -120,6 +120,15 @@ ok "判定(lower): standIn が無い(読めなかった)のは落ちる" "$(boot
 ok "判定(lower): error が有れば落ちる" "$(boot '{"error":"x","state":"engine-idle","standIn":false}')" 1
 ok "判定(lower): engine-idle で止まっていなければ落ちる" "$(boot '{"error":null,"state":"exited","standIn":false}')" 1
 ok "判定(lower): 型の受け入れ行は standIn===false を見て、standIn==null を持たない" "$(grep -c 'r.standIn===false' <<<"$acc")/$(grep -c 'standIn==null' <<<"$acc")" 1/0
+# 判定(lower)は同じ作業ツリーで 2 回走る(作業者の受け入れ、次に判定)。fe-build engine の clone 先と gen の出力先を、走る前に消す(2 回目も通すため)
+rmcmd=$(grep -o 'rm -rf [^&]*' <<<"$acc" | sed 's/ *$//')
+ok "判定(lower): fe-build engine の前に、clone 先と gen の出力先を消す" "$([ -n "$rmcmd" ] && case $acc in *"$rmcmd"*"lift/target/release/fe-build engine"*) echo yes;; esac)" yes
+ib=$T/idem; mkdir -p "$ib/origin.git"; git init -q --bare "$ib/origin.git"
+mkfix() { rm -rf "$ib/work"; mkdir -p "$ib/work/lift/out-app/b2d-src" "$ib/work/lift/out-app/gen/src" "$ib/work/lift/out-app/host"; echo stale > "$ib/work/lift/out-app/b2d-src/old.txt"; echo stale > "$ib/work/lift/out-app/gen/src/fle-tables.txt"; echo keep > "$ib/work/lift/out-app/host/keep.txt"; }
+mkfix; ok "判定(lower): 対照: 消さないと、2 回目の git clone は失敗する(この検査が 2 回目の失敗を再現すること)" "$(cd "$ib/work" && git clone -q "$ib/origin.git" lift/out-app/b2d-src >/dev/null 2>&1; echo $?)" 128
+mkfix; ok "判定(lower): accept の rm の後は、既に在る clone 先でも git clone できる" "$(cd "$ib/work" && eval "$rmcmd" && git clone -q "$ib/origin.git" lift/out-app/b2d-src >/dev/null 2>&1; echo $?)" 0
+mkfix; ok "判定(lower): accept の rm の後は、既に在る gen の出力(排他で作る)を作り直せる" "$(cd "$ib/work" && eval "$rmcmd"; mkdir -p lift/out-app/gen/src && (set -C; : > lift/out-app/gen/src/fle-tables.txt) 2>/dev/null; echo $?)" 0
+mkfix; ok "判定(lower): 前の段の入力(lift/out-app/host)は、rm で消えない" "$(cd "$ib/work" && eval "$rmcmd"; test -f lift/out-app/host/keep.txt; echo $?)" 0
 # 起動確認の道具(tools/boot-check): raw/<名前> の隣の br/<名前>/ を <ファイル>.br として assets に置くと、app の配信(assets-middleware.ts)が Content-Encoding br で返す
 mv=$(node --input-type=module -e '
 import fs from "node:fs"; import http from "node:http"; import zlib from "node:zlib"; import path from "node:path"; import { pathToFileURL } from "node:url";
