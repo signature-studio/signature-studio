@@ -31,6 +31,47 @@ printf 'run: echo hi\n' > "$T/.github/workflows/ok.yml"
 ( cd "$T" && ok "scan: 同じ命令でも、.github/workflows/ の外(app/)は見つけない" "$(rc bash "$g/scan.sh" app/mk.yml)" 0 )
 ( cd "$T" && ok "scan: 名前が .github/workflows/ で始まらない場所は見つけない" "$(rc bash "$g/scan.sh" x/.github/workflows/mk.yml)" 0 )
 ( cd "$T" && ok "scan: 命令の無いワークフローは通る" "$(rc bash "$g/scan.sh" .github/workflows/ok.yml)" 0 )
+# wrangler.jsonc は、その場で作り直さず、デプロイに使える形でコミットする(依頼者の指示 2026-11-20・L-032)
+ok "app/wrangler.jsonc は追跡されている(ls-files)" "$(git -C "$here/.." ls-files --error-unmatch app/wrangler.jsonc >/dev/null 2>&1 && echo yes)" yes
+ok "app/wrangler.jsonc は無視されていない(check-ignore)" "$(git -C "$here/.." check-ignore -q app/wrangler.jsonc && echo ignored || echo kept)" kept
+mkdir -p "$T/tools" "$T/spec" "$T/ledger"
+cat > "$T/tools/write.txt" <<'EOF'
+cat <<EOT > app/wrangler.jsonc
+echo x >> app/wrangler.jsonc
+jq '.a' in.json | tee app/wrangler.jsonc
+sed -i 's/a/b/' app/wrangler.jsonc
+cp new.jsonc app/wrangler.jsonc
+mv new.jsonc app/wrangler.jsonc
+envsubst < t.jsonc > app/wrangler.jsonc
+jq '.x' a.json >| app/wrangler.jsonc
+ln -sf other.jsonc app/wrangler.jsonc
+dd if=x of=app/wrangler.jsonc
+perl -pi -e 's/a/b/' app/wrangler.jsonc
+touch app/wrangler.jsonc
+fs.writeFileSync('app/wrangler.jsonc', text);
+fs::write("app/wrangler.jsonc", s)?;
+fs.copyFileSync(src, 'app/wrangler.jsonc');
+EOF
+cat > "$T/tools/read.txt" <<'EOF'
+grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4
+cat app/wrangler.jsonc
+jq '.x' app/wrangler.jsonc > out.json
+diff app/wrangler.jsonc new.json > log.txt
+cp app/wrangler.jsonc backup/out.json
+let t = fs::read_to_string("app/wrangler.jsonc")?;
+const t = fs.readFileSync(path.join(APP, 'wrangler.jsonc'), 'utf8');
+fs.writeFileSync(noperf, readFileSync('app/wrangler.jsonc'));
+EOF
+cat > "$T/tools/other.txt" <<'EOF'
+cat > wrangler.deploy.json <<EOT
+cp x app/wrangler.noperf.jsonc
+fs.writeFileSync(path.join(work, 'wrangler.noperf.jsonc'), text);
+EOF
+cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/ledger/write.tsv"; cp "$T/tools/write.txt" "$T/notes.md"
+( cd "$T" && ok "scan: wrangler.jsonc を作る・書く行は、行ごとに見つかる(15 行)" "$(bash "$g/scan.sh" tools/write.txt 2>/dev/null | grep -c '^wranglergen')" 15 )
+( cd "$T" && ok "scan: wrangler.jsonc を読むだけの行(書きの関数と同じ行でも)は見つけない" "$(bash "$g/scan.sh" tools/read.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
+( cd "$T" && ok "scan: wrangler.noperf.jsonc・wrangler.deploy.json は見つけない" "$(bash "$g/scan.sh" tools/other.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
+( cd "$T" && ok "scan: spec/・ledger/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt ledger/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
 # 旗と判定(git の差分を使う)
