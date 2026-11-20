@@ -68,7 +68,7 @@
 - 実測が要ること: 表の行数と、抽出の木にある DLL の数(survey-c4-builtin-plugins)。1 件を足す手数の履歴(同 task の手順 7)。全件数は inventory が要る。
 - 前提: 共通の前提の inventory(約 141 の一覧はそこから作る)。UI から選べるかは、C-6 のメニューが出るまで確かめられない。内蔵を増やすと、lift と lower の段の時間が増える(推定)。
 - 方式の案(survey の結果で決める): inventory から、1 DLL につき 1 タスクを作る。lower と同じく、型を queue/kinds/ に足し、生成器の入力に一覧を置く。Fruity の効果は共通の hook 点(lift/harness/hooks/fruity-delphi-effect-hook-points.txt)を使うので、共通の部分を直すと他にも効く可能性がある(推定。survey で確かめる)。
-- 論点(解決は survey と inventory の後): 約 141 件を 1 つのエンジンの wasm に入れると、大きさと起動(P1 の 10 秒)に効く。リポジトリの .gitignore(4 行と 30 行)は、エンジン本体の wasm を 143 MB と書いている。依頼者の指示にあった「約 165 MB」は、リポジトリに出典が無いので、この版では使わない。全件を 1 つに入れるか、必要になった時に読み込むかは survey の結果で決める。優先は P3、P2、P1、サイズの順。
+- 論点(解決は survey と inventory の後): 約 141 件を 1 つのエンジンの wasm に入れると、大きさと起動(P1 の 10 秒)に効く。エンジン本体の wasm の大きさは、runner の実測で 165848536 バイト(`engine wasm  165848536 B`。165,848,536 バイト、圧縮 br で 17,510,392 バイト)。出典: run 44673024703(worker lower-0xe40550)の判定の出力(成果物 judge.txt)の `engine wasm` の行。同じ行は Issue #81 のコメントにも在る。同じ行は、run 44672756722(lower-0x6f0530。Issue #45)、44672998002(lower-0x7205c0。Issue #74)、44672617908(lower-0xddf630。Issue #24)でも得られ、範囲は 165,820,907〜165,848,536 バイト。依頼者の見立てでは、lower で直接 wasm にする関数が増えるたびに数十 KB 変わる。この見立ては、関数の数と照合していない(推定)。.gitignore(4 行と 30 行)の 143 MB は、それより前の版の数字とみられる(推定)。全件を 1 つに入れるか、必要になった時に読み込むかは survey の結果で決める。優先は P3、P2、P1、サイズの順。
 - 後回しの VFX 系(案): DLL の PE の import に OpenGL の DLL(opengl32 など)を含む物。一覧と理由を計画に書き、着手の条件は survey の結果で決める。
 - 受け入れの条件(案): (a) 目標の全件(後回しの VFX 系を除く)について、inventory の各 DLL に、ci/extract-dlls.tsv の行(SHA-256 つき)と、lift 対象の表の行と、hook 点が在る。(b) 全件が lift・compile・link を通る。(c) 全件が起動確認で通る(state が engine-idle、standIn が false、error が null)。(d) 各種類で 1 件以上が UI から選べる(C-6 の後)。(e) 後回しの VFX 系は、名前の一覧と理由(OpenGL)が計画に在る。
 

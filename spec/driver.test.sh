@@ -216,6 +216,7 @@ ok "plan: C-4 の節に、目標の約 141 が在る" "$(grep -q '約 141' <<<"$
 ok "plan: C-4 の節に、後回しの VFX 系と OpenGL が在る" "$(grep -q 'VFX' <<<"$C4SEC" && grep -q 'OpenGL' <<<"$C4SEC" && echo yes || echo no)" yes
 ok "plan: 共通の前提の節に、インストーラの一覧(inventory)が在る" "$(grep -c '^## 共通の前提.*inventory' "$top/queue/plan.md")" 1
 ok "plan: 更新の記録(④)に L-034 の行が在る" "$(awk '/^## ④ 更新の記録/{f=1} f' "$top/queue/plan.md" | grep -c 'L-034')" 1
+ok "plan: エンジン本体の wasm の実測(165848536)と出典が、同じ行に在る" "$(grep -q '165848536.*出典' "$top/queue/plan.md" && echo yes || echo no)" yes
 S4=$top/queue/tasks/survey-c4-builtin-plugins.md
 ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
