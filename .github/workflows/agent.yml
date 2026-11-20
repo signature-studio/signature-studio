@@ -45,7 +45,9 @@ jobs:
 
       - name: アカウント ID を app/wrangler.jsonc から読む
         run: |
-          echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+          a=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)
+          echo "::add-mask::$a"
+          echo "CF_ACCOUNT=$a" >> "$GITHUB_ENV"
 
       - name: 抽出物のキャッシュ(R2)
         id: cache
@@ -136,7 +138,10 @@ jobs:
           version: ${{ env.EMSDK_VERSION }}
 
       - name: アカウント ID を app/wrangler.jsonc から読む
-        run: echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
+        run: |
+          a=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)
+          echo "::add-mask::$a"
+          echo "CF_ACCOUNT=$a" >> "$GITHUB_ENV"
 
       - name: 抽出物を R2 のキャッシュから取る(公開の artifact は使わない)
         uses: runs-on/cache/restore@v5
