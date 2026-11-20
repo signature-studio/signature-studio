@@ -39,7 +39,8 @@
    - 既定のプロジェクト: `Data\System\` の下の .flp
    - 補足の表: `Data\Patches\`、`System\Config\`、`Shared\Artwork\Fonts\` の件数
 5. エンジンの起動時に、見つからないファイルの記録を読む。queue/kinds/lower.md の accept と同じ段で engine と bundle を作り(npm ci --prefix app、npm run build --prefix app、cargo build --release --locked --manifest-path lift/Cargo.toml、lift/target/release/fe-build engine、lift/target/release/fe-build bundle)、tools/boot-check/boot-bundle.mjs の main を一時ファイル tools/boot-check/.tmp-survey-c3.mjs に写して起動し、engine-idle になった後に `window.__app.engineLog()` を取り、その中で「見つからない」「not found」「ENOENT」などの行を grep で数える。行の形は実際の出力で確かめ、使った語を書く。ビルドの段が失敗したら、その段の名前と終了コードを書き、この手順は「未確認」とする。
-6. 後始末: `rm -f tools/boot-check/.tmp-survey-c3.mjs` を行い、残った一時ファイルが無いことを `git status --short` で確かめる。
+6. 起動前に取る物の大きさ(配信の方針 L-035)。手順 5 で作った seed pack(lift/out-app/seed/seed.bin。pack-seed.mjs の作りは app/scripts/pack-seed.mjs の 1〜7 行)を読む。ヘッダは JSON なので、そのエントリ(パスと大きさ)を読み、言語(System\Languages\)・テーマ(Artwork\Skins\)・テンプレート(Data\Templates\)・プロジェクト(Data\System\、Data\Demo projects\)ごとに、大きさ(バイト)を足す。seed pack の全体の大きさと並べて書く。判定の出力の seed pack は 20780949 B(run 44673024703)なので、この実行の値も書く。ヘッダの読み方が分からなければ、「未確認(ヘッダの作りが読めない)」と書く。seed pack が作られていなければ、手順 5 の build の結果を書く。
+7. 後始末: `rm -f tools/boot-check/.tmp-survey-c3.mjs` を行い、残った一時ファイルが無いことを `git status --short` で確かめる。
 
 ## 出力
 - queue/findings/survey-c3-fl-resources.md に、次の見出しで日本語で書く。
