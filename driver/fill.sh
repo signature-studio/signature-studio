@@ -22,6 +22,8 @@ k=$((threshold - $(count "$running")))
 echo "fill: 閾値 $threshold、実行中 $(count "$running")、待ち $(count "$ready")、起動 $((k > 0 ? k : 0))"
 [ "$k" -gt 0 ] || exit 0
 # 落ちた時の state(Issue の state: 行)と今の state が同じ Issue は、同じ結果になるので起動しない(driver/state.sh)。飛ばした件数はログに出す
+# 起動の順: 題名が lower- で始まらない物を先に、lower を後に。どちらも番号の昇順(台帳 L-036。lower は件数が多く、先に並ぶと他の物が待つ)
+order=$(sort -n <<<"$ready" | awk -F'\t' '$2 !~ /^lower-/'; sort -n <<<"$ready" | awk -F'\t' '$2 ~ /^lower-/')
 cur=$(state); launched=0; skipped=0
 while IFS=$'\t' read -r num id && [ "$launched" -lt "$k" ]; do
   [ -n "$num" ] || continue
@@ -36,5 +38,5 @@ while IFS=$'\t' read -r num id && [ "$launched" -lt "$k" ]; do
   gh issue edit "$num" --remove-label ready --add-label running >/dev/null
   gh workflow run agent.yml -f task="$id" -f issue="$num"
   launched=$((launched + 1))
-done < <(sort -n <<<"$ready")
+done < <(printf '%s\n' "$order")
 echo "fill: 状態が同じで起動を飛ばした $skipped 件、起動 $launched 件"
