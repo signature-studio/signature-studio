@@ -40,7 +40,7 @@ case "$1 $2" in
     elif [ -f "$Q/fails" ]; then cat "$Q/fails"
     else echo '{"comments":[]}' | jq -r "$(arg --jq "$@")"; fi ;;
   "issue comment") printf '%s\n' "$(arg --body "$@")" > "$Q/comment-$3.txt" ;;
-  "run download") d=$(arg -D "$@"); printf 'ok\njudge: 受け入れコマンドが失敗した\n' > "$d/judge.txt" ;;
+  "run download") d=$(arg -D "$@"); if [ -f "$Q/judge.txt" ]; then cp "$Q/judge.txt" "$d/judge.txt"; else printf 'ok\njudge: 受け入れコマンドが失敗した\n' > "$d/judge.txt"; fi ;;
   "run view") echo "判定(テスト)" ;;
 esac
 EOF
@@ -81,6 +81,9 @@ reset "" ""; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure ht
 ok "close: 落ちた時は、落ちた回数と原因の行(判定の出力)をコメントに残す" "$(grep -c '^落ちた: https://x/actions/runs/77(1 回目' "$Q/comment-5.txt")/$(grep -c 'judge: 受け入れコマンドが失敗した' "$Q/comment-5.txt")" 1/1
 ok "close: 落ちた時の main の SHA と状態を、コメントに 1 行ずつ残す" "$(grep -c '^main-sha: [0-9a-f]\{40\}$' "$Q/comment-5.txt")/$(grep -c '^state: [0-9a-f]\{40\}$' "$Q/comment-5.txt")" 1/1
 ok "close: 判定の出力を使い終えたら、一時のディレクトリは消す" "$([ -e "$R/.tmp-close-77" ] && echo kept || echo gone)" gone
+reset "" ""; echo 0 > "$Q/fails"; printf 'ok\njudge: 起動確認の結果: {"state":"running","error":null,"standIn":false,"elapsedMs":1234}\njudge: 受け入れコマンドが失敗した\n' > "$Q/judge.txt"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/91 >/dev/null 2>&1 )
+ok "close: 判定の末尾の起動確認の行と、失敗の行が、落ちたコメントに残る" "$(grep -c '^judge: 起動確認の結果: {"state":"running"' "$Q/comment-5.txt" 2>/dev/null)/$(grep -c '^judge: 受け入れコマンドが失敗した$' "$Q/comment-5.txt" 2>/dev/null)" 1/1
 # 失敗の数え方: 「落ちた:」で始まり、state: の行がある(今の形の)コメントだけを数える。古い形のコメントは数えない
 st=0000000000000000000000000000000000000000
 reset "" ""; jq -n '{comments: [{body: "落ちた: https://x/old1(1 回目。待ちに戻した)"}, {body: "落ちた: https://x/old2(2 回目。待ちに戻した)"}]}' > "$Q/comments-5.json"
