@@ -4,6 +4,8 @@
 # 1) 作業ツリーに、commit していない変更が無い(判定するのは push される物)
 # 2) タスクの受け入れコマンド(タスクのファイルの「accept: 」の行)が 0 で終わる。行が無いタスクは、この段を飛ばす
 # 3) BASE からの変更ファイルに、依頼者の決まりへの違反が無い(scan.sh、flags.sh)
+# 4) ハーネス(tools/・guard/・driver/・spec/・.github/・queue/kinds/・opencode.jsonc)を変えたなら、BASE に在る spec/guard.test.sh と spec/driver.test.sh を実行する。判定の中の spec は、判定を呼び直さない
+# 既知の限界: 4) の spec は作業者の作業ツリーの版で走る。作業者が spec を弱めれば、それを通す。
 base=${1:?usage: guard/judge.sh BASE TASKFILE}; task=${2:?usage: guard/judge.sh BASE TASKFILE}
 here=$(cd "$(dirname "$0")" && pwd)
 changed=$(git diff --name-only --diff-filter=AM "$base"...HEAD) || { echo "judge: base の ref を読めない: $base"; exit 1; }
@@ -14,4 +16,11 @@ files=()
 if [ -n "$changed" ]; then mapfile -t files <<<"$changed"; fi
 if [ "${#files[@]}" -gt 0 ]; then bash "$here/scan.sh" "${files[@]}" || { echo "judge: 違反がある"; exit 1; }; fi
 bash "$here/flags.sh" "$base" HEAD || { echo "judge: 製品に新しい旗がある"; exit 1; }
+harness=$(git diff --name-only --no-renames "$base"...HEAD | grep -E '^(tools|guard|driver|spec|[.]github|queue/kinds)/|^opencode[.]jsonc$' || true)
+if [ -n "$harness" ] && [ -z "${JUDGE_IN_SPEC:-}" ]; then
+  for s in spec/guard.test.sh spec/driver.test.sh; do
+    git cat-file -e "$base:$s" 2>/dev/null || continue
+    out=$(JUDGE_IN_SPEC=1 bash "$s" 2>&1) || { grep -v '^ok' <<<"$out" | tail -n 20; echo "judge: ハーネスの変更がテストに通らない($s)"; exit 1; }
+  done
+fi
 echo "judge: 通った"
