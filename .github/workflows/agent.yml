@@ -193,7 +193,7 @@ jobs:
           for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done
           git show "refs/judge/main:driver/task.sh" > "$RUNNER_TEMP/task.sh"
           TASK_REF=refs/judge/main bash "$RUNNER_TEMP/task.sh" "$TASK" > "$RUNNER_TEMP/task.md"
-          bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task.md"
+          bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task.md" 2>&1 | tee "$RUNNER_TEMP/out/judge.txt"
 
       - name: 通った変更を main に push する(token はこの段で発行する)
         env:
@@ -218,12 +218,12 @@ jobs:
           bash "$RUNNER_TEMP/scan.sh" "$RUNNER_TEMP/out/report.md"
           { echo "### $TASK"; head -n 80 "$RUNNER_TEMP/out/report.md"; } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: 報告を成果物に保存する(7 日)
+      - name: 報告と判定の出力を成果物に保存する(7 日)
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
           name: agent-${{ inputs.task }}
-          path: ${{ runner.temp }}/out/report.md
+          path: ${{ runner.temp }}/out
           retention-days: 7
           if-no-files-found: ignore
 
@@ -236,6 +236,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: read
     steps:
       - name: リポジトリ(最新の main)を取得する
         uses: actions/checkout@v7.0.1

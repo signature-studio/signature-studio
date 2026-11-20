@@ -3,6 +3,7 @@
 # 待ちが 100 件を下回れば、先に生成器で足す。待ち行列は Issues(題名がタスクの名前、ラベルが状態)。
 # 要る環境: GH_TOKEN(actions と issues の書き込み)、GH_REPO。main の作業ツリーで実行する。
 set -euo pipefail
+source "$(dirname "$0")/state.sh"
 threshold=$(cat queue/threshold)
 list() { gh issue list --state open --label "$1" --limit 1000 --json number,title --jq '.[] | "\(.number)\t\(.title)"'; }
 count() { grep -c . <<<"$1" || true; }
@@ -20,13 +21,20 @@ fi
 k=$((threshold - $(count "$running")))
 echo "fill: 閾値 $threshold、実行中 $(count "$running")、待ち $(count "$ready")、起動 $((k > 0 ? k : 0))"
 [ "$k" -gt 0 ] || exit 0
-sort -n <<<"$ready" | awk -v k="$k" 'NF && c++ < k' | while IFS=$'\t' read -r num id; do
+# 落ちた時の state(Issue の state: 行)と今の state が同じ Issue は、同じ結果になるので起動しない(driver/state.sh)。飛ばした件数はログに出す
+cur=$(state); launched=0; skipped=0
+while IFS=$'\t' read -r num id && [ "$launched" -lt "$k" ]; do
+  [ -n "$num" ] || continue
   text=$(bash driver/task.sh "$id" 2>/dev/null || true)
   if ! grep -q '^accept: ' <<<"$text"; then
     gh issue edit "$num" --remove-label ready --add-label failed >/dev/null
     gh issue close "$num" --reason "not planned" --comment "受け入れコマンド(accept: の行)が無いので、待ち行列に入れない。" >/dev/null
     continue
   fi
+  last=$(gh issue view "$num" --json comments --jq '[.comments[].body | split("\n")[] | select(startswith("state: ")) | ltrimstr("state: ")] | last // ""')
+  if [ "$last" = "$cur" ]; then skipped=$((skipped + 1)); continue; fi
   gh issue edit "$num" --remove-label ready --add-label running >/dev/null
   gh workflow run agent.yml -f task="$id" -f issue="$num"
-done
+  launched=$((launched + 1))
+done < <(sort -n <<<"$ready")
+echo "fill: 状態が同じで起動を飛ばした $skipped 件、起動 $launched 件"

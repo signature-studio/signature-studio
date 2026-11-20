@@ -24,19 +24,28 @@ git -C "$R" init -q . && git -C "$R" add -A && git -C "$R" commit -q -m base
 ( cd "$R" && ok "generate: 直接 wasm 済み・除く名前・atomic を飛ばし、表の順に出す" "$(printf 'lower-0xb2\n' | bash driver/generate.sh 5 | tr '\n' ' ')" "lower-0xd4 lower-0xe5 " )
 ( cd "$R" && ok "generate: atomic の関数(表の書式が違っても)は生成されない" "$(bash driver/generate.sh 5 < /dev/null | grep -c 'lower-0xc3')" 0 )
 ( cd "$R" && ok "generate: 件数で止まる" "$(bash driver/generate.sh 1 < /dev/null)" "lower-0xb2" )
-# 偽の gh: 待ち行列は $Q/ready・$Q/running(番号<TAB>題名)、落ちた回数は $Q/fails
+# 偽の gh: 待ち行列は $Q/ready・$Q/running(番号<TAB>題名)、落ちた回数は $Q/fails、Issue ごとのコメントは $Q/comments-<番号>.json(--jq は実際の jq で通す)
+# 報告の成果物は、run download が(落ちた判定の出力として)judge.txt を作る。コメントは $Q/comment-<番号>.txt に残す
 Q=$T/q; mkdir -p "$Q" "$T/bin"
 cat > "$T/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >> "$Q/log"
+arg() { local w=$1; shift; while [ $# -gt 0 ]; do if [ "$1" = "$w" ]; then echo "$2"; return; fi; shift; done; }
 case "$1 $2" in
   "issue list") for a in "$@"; do case $a in ready|running) cat "$Q/$a" 2>/dev/null;; failed) ;; esac; done ;;
   "issue create") n=$(( $(cat "$Q/n" 2>/dev/null || echo 100) + 1 )); echo "$n" > "$Q/n"; printf '%s\t%s\n' "$n" "$4" >> "$Q/ready" ;;
-  "issue view") cat "$Q/fails" ;;
+  "issue view") n=$3
+    if [ "$(arg --json "$@")" = title ]; then awk -F'\t' -v n="$n" '$1 == n { print $2 }' "$Q/ready" "$Q/running" 2>/dev/null | head -1
+    elif [ -f "$Q/comments-$n.json" ]; then jq -r "$(arg --jq "$@")" "$Q/comments-$n.json"
+    elif [ -f "$Q/fails" ]; then cat "$Q/fails"
+    else echo '{"comments":[]}' | jq -r "$(arg --jq "$@")"; fi ;;
+  "issue comment") printf '%s\n' "$(arg --body "$@")" > "$Q/comment-$3.txt" ;;
+  "run download") d=$(arg -D "$@"); printf 'ok\njudge: 受け入れコマンドが失敗した\n' > "$d/judge.txt" ;;
+  "run view") echo "判定(テスト)" ;;
 esac
 EOF
 chmod +x "$T/bin/gh"; export Q PATH="$T/bin:$PATH"
-reset() { rm -f "$Q"/*; printf '%s' "$1" > "$Q/ready"; printf '%s' "$2" > "$Q/running"; }
+reset() { rm -f "$Q"/*; { [ -n "$1" ] && printf '%s\n' "$1"; } > "$Q/ready"; { [ -n "$2" ] && printf '%s\n' "$2"; } > "$Q/running"; }
 # fill.sh
 reset "" ""
 ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
@@ -51,6 +60,14 @@ ok "fill: 受け入れコマンドの無いタスクは起動せず、閉じる"
 printf '0\n' > "$R/queue/threshold"; reset "$(printf '8\tlower-0xb2\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: 閾値が 0 なら、待ちが有っても何も起動しない" "$(grep -c '^workflow run agent.yml' "$Q/log")" 0
 printf '3\n' > "$R/queue/threshold"
+# 落ちた時の状態(state:)と今の状態が同じ Issue は起動しない。違えば起動する(driver/state.sh)
+cur=$(cd "$R" && source driver/state.sh && state)
+reset "$(printf '1\tlower-0xb2\n')" ""; jq -n --arg b "$(printf '落ちた: x\nstate: %s' "$cur")" '{comments: [{body: $b}]}' > "$Q/comments-1.json"
+( cd "$R" && bash driver/fill.sh > "$T/fill-same.out" 2>&1 )
+ok "fill: 落ちた時と状態が同じ Issue は起動しない(飛ばした件数をログに出す)" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")/$(grep -c '状態が同じ.*1 件' "$T/fill-same.out")" 0/1
+reset "$(printf '1\tlower-0xb2\n')" ""; jq -n '{comments: [{body: "落ちた: x\nstate: 0000"}]}' > "$Q/comments-1.json"
+( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: 落ちた時と状態が違えば、同じ Issue を起動する" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -60,6 +77,22 @@ reset "" ""; echo 2 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure ht
 ok "close: 3 回落ちたら failed にして閉じる" "$(grep -c -- '--add-label failed' "$Q/log")/$(grep -c '^issue close 5' "$Q/log")" 1/1
 reset "" ""; echo 2 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 cancelled https://x >/dev/null 2>&1 )
 ok "close: 取り消された run は落ちた数に入れず、コメントせず待ちに戻す(2 回の後でも failed にしない)" "$(grep -c -- '--add-label failed' "$Q/log")/$(grep -c -- '--add-label ready' "$Q/log")/$(grep -c '^issue comment' "$Q/log")" 0/1/0
+reset "" ""; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/77 >/dev/null 2>&1 )
+ok "close: 落ちた時は、落ちた回数と原因の行(判定の出力)をコメントに残す" "$(grep -c '^落ちた: https://x/actions/runs/77(1 回目' "$Q/comment-5.txt")/$(grep -c 'judge: 受け入れコマンドが失敗した' "$Q/comment-5.txt")" 1/1
+ok "close: 落ちた時の main の SHA と状態を、コメントに 1 行ずつ残す" "$(grep -c '^main-sha: [0-9a-f]\{40\}$' "$Q/comment-5.txt")/$(grep -c '^state: [0-9a-f]\{40\}$' "$Q/comment-5.txt")" 1/1
+ok "close: 判定の出力を使い終えたら、一時のディレクトリは消す" "$([ -e "$R/.tmp-close-77" ] && echo kept || echo gone)" gone
+# state: 作業が読む木(製品・判定・駆動・型)が変わったときだけ変わる(台帳の変更では変わらない)
+s1=$(cd "$R" && source driver/state.sh && state)
+mkdir -p "$R/ledger"; echo x > "$R/ledger/x.tsv"; git -C "$R" add -A && git -C "$R" commit -q -m ledger
+s2=$(cd "$R" && source driver/state.sh && state)
+mkdir -p "$R/app"; echo x > "$R/app/a.txt"; git -C "$R" add -A && git -C "$R" commit -q -m app
+s3=$(cd "$R" && source driver/state.sh && state)
+ok "state: 台帳だけの変更では変わらない" "$([ "$s1" = "$s2" ] && echo same)" same
+ok "state: 製品(app/)の変更では変わる" "$([ "$s2" != "$s3" ] && echo changed)" changed
+# agent.yml: 判定の出力は報告と同じ成果物に入る。待ち行列の段は、落ちた run の成果物とジョブを読める
+A=$top/.github/workflows/agent.yml
+ok "agent.yml: 判定の出力を out/judge.txt に残し、成果物(out)に入れる" "$(grep -c 'tee "$RUNNER_TEMP/out/judge.txt"' "$A")/$(grep -c '^ *path: [$]{{ runner.temp }}/out$' "$A")" 1/1
+ok "agent.yml: 待ち行列の段(close)は actions を読める" "$(awk '/^  close:/{f=1} /^  fill:/{f=0} f && /actions: read/{print "yes"}' "$A")" yes
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
