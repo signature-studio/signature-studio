@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # driver/close.sh Issue番号 結果 runのURL : 作業ジョブの結果で、待ち行列の Issue の状態を変える。
 # 通った: 閉じる。落ちた: 待ちに戻す。原因(失敗した段と、判定の出力の末尾)と、落ちた時の main の SHA と state をコメントに残す。3 回落ちたら failed にして閉じる。取り消された: 落ちた数に入れず、待ちに戻す。
+# 落ちた数に数えるのは、「落ちた:」で始まり、state: の行がある(今の形の)コメントだけ。state: の無い古い形のコメントは数えない。
 # 要る環境: GH_TOKEN(issues の書き込み、actions の読み取り)、GH_REPO。
 set -euo pipefail
 source "$(dirname "$0")/state.sh"
@@ -25,7 +26,7 @@ note() {
   rm -rf "$d"
   printf 'main-sha: %s\nstate: %s\n失敗した段: %s\n判定の出力(末尾):\n%s\n' "$(git rev-parse HEAD)" "$(state)" "${steps:-(取れなかった)}" "${tail_:-(判定の出力が無い。ジョブのログを見る)}"
 }
-fails=$(gh issue view "$num" --json comments --jq '[.comments[].body | select(startswith("落ちた:"))] | length')
+fails=$(gh issue view "$num" --json comments --jq '[.comments[].body | select(startswith("落ちた:") and (split("\n") | any(startswith("state: "))))] | length')
 fails=$((fails + 1))
 if [ "$fails" -ge 3 ]; then
   gh issue edit "$num" --remove-label running --add-label failed >/dev/null
