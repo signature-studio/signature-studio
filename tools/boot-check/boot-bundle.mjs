@@ -85,15 +85,17 @@ async function main() {
     const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
     if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
     let stopped = false;
+    // the Worker's 'idle' mark sets timeline.idle, but the state becomes 'engine-idle' only with its 'idle' message, which comes after hostFiles.release(): wait for the state
     for (;;) {
       const p = await ev(POLL).catch(() => null);
-      if (p && (p.idle !== null || p.state === 'error' || p.state === 'exited')) { stopped = true; break; }
+      if (p && (p.state === 'engine-idle' || p.state === 'error' || p.state === 'exited')) { stopped = true; break; }
       if (Date.now() - navAt >= WAIT_LIMIT_MS) break;
       await sleep(POLL_MS);
     }
     Object.assign(out, await ev(FINAL));
     if (out.timelineIdle === null && !stopped) out.error = `no first idle, error or exit within ${WAIT_LIMIT_MS} ms (state ${out.state ?? 'window.__app not set'})`;
     else if (out.timelineIdle === null) out.error = `state ${out.state} before the first idle`;
+    else if (!stopped) out.error = `state ${out.state} after the first idle, no engine-idle within ${WAIT_LIMIT_MS} ms`;
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
   } finally {
