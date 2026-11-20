@@ -3,7 +3,7 @@
 # 一時ディレクトリはリポジトリの中の .tmp-spec.*(git の無視の対象)に作り、終わったら消す。
 # git の commit を使うので、環境の名義で commit する(名義を上書きしない)。環境に名義が無ければ skip と出す。
 here=$(cd "$(dirname "$0")" && pwd); top=$here/..; fail=0; T=$(mktemp -d "$top/.tmp-spec.XXXXXX")
-ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; fi; }
+ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
 if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "skip driver: 環境に git の名義が無い"; rm -rf "$T"; exit 0; fi
 # 小さなリポジトリ: 関数の表 4 行(0xa1 は直接 wasm 済み)、型、閾値 3、ci のタスク 1 件
@@ -165,4 +165,4 @@ const { launchChrome } = await import(pathToFileURL(path.join(top, "tools/boot-c
 try { const c = await launchChrome({ profile: path.join(T, "fake/profile") }); console.log(c.version.Browser); c.proc.kill("SIGKILL"); } catch (e) { console.log("threw"); }
 ' "$T" "$top" 2>/dev/null)
 ok "cdp: DevTools が 12 秒後に答える Chrome でも起動できる" "$slow" "fake/1"
-rm -rf "$T"; exit $fail
+[ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
