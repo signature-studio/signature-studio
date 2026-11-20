@@ -3,7 +3,7 @@
 # 一時ディレクトリはリポジトリの中の .tmp-spec.*(git の無視の対象)に作り、終わったら消す。
 # git の commit を使うので、環境の名義で commit する(名義を上書きしない)。環境に名義が無ければ skip と出す。
 here=$(cd "$(dirname "$0")" && pwd); top=$here/..; fail=0; T=$(mktemp -d "$top/.tmp-spec.XXXXXX")
-ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; fi; }
+ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
 if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "skip driver: 環境に git の名義が無い"; rm -rf "$T"; exit 0; fi
 # 小さなリポジトリ: 関数の表 4 行(0xa1 は直接 wasm 済み)、型、閾値 3、ci のタスク 1 件
@@ -81,6 +81,17 @@ reset "" ""; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure ht
 ok "close: 落ちた時は、落ちた回数と原因の行(判定の出力)をコメントに残す" "$(grep -c '^落ちた: https://x/actions/runs/77(1 回目' "$Q/comment-5.txt")/$(grep -c 'judge: 受け入れコマンドが失敗した' "$Q/comment-5.txt")" 1/1
 ok "close: 落ちた時の main の SHA と状態を、コメントに 1 行ずつ残す" "$(grep -c '^main-sha: [0-9a-f]\{40\}$' "$Q/comment-5.txt")/$(grep -c '^state: [0-9a-f]\{40\}$' "$Q/comment-5.txt")" 1/1
 ok "close: 判定の出力を使い終えたら、一時のディレクトリは消す" "$([ -e "$R/.tmp-close-77" ] && echo kept || echo gone)" gone
+# 失敗の数え方: 「落ちた:」で始まり、state: の行がある(今の形の)コメントだけを数える。古い形のコメントは数えない
+st=0000000000000000000000000000000000000000
+reset "" ""; jq -n '{comments: [{body: "落ちた: https://x/old1(1 回目。待ちに戻した)"}, {body: "落ちた: https://x/old2(2 回目。待ちに戻した)"}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/88 >/dev/null 2>&1 )
+ok "close: 古い形の落ちたが 2 つ有っても、今の形の 1 回目は 1 回目で待ちに戻る" "$(grep -c '^落ちた: https://x/actions/runs/88(1 回目。待ちに戻した)' "$Q/comment-5.txt" 2>/dev/null)/$(grep -c -- '--add-label failed' "$Q/log")" 1/0
+reset "" ""; jq -n --arg s "$st" '{comments: [{body: ("落ちた: https://x/n1(1 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}, {body: ("落ちた: https://x/n2(2 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/89 >/dev/null 2>&1 )
+ok "close: 今の形の落ちたが 2 つ有れば、3 回目で failed にして閉じる" "$(grep -c -- '--add-label failed' "$Q/log")/$(grep -c '^issue close 5' "$Q/log")" 1/1
+reset "" ""; jq -n --arg s "$st" '{comments: [{body: "落ちた: https://x/old1(1 回目。待ちに戻した)"}, {body: "落ちた: https://x/old2(2 回目。待ちに戻した)"}, {body: ("落ちた: https://x/n1(1 回目。待ちに戻した)\nmain-sha: a\nstate: " + $s)}]}' > "$Q/comments-5.json"
+( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/90 >/dev/null 2>&1 )
+ok "close: 古い形の 2 つと今の形の 1 つが有れば、今回は 2 回目で待ちに戻る(failed にしない)" "$(grep -c '^落ちた: https://x/actions/runs/90(2 回目。待ちに戻した)' "$Q/comment-5.txt" 2>/dev/null)/$(grep -c -- '--add-label failed' "$Q/log")" 1/0
 # state: 作業が読む木(製品・判定・駆動・型)が変わったときだけ変わる(台帳の変更では変わらない)
 s1=$(cd "$R" && source driver/state.sh && state)
 mkdir -p "$R/ledger"; echo x > "$R/ledger/x.tsv"; git -C "$R" add -A && git -C "$R" commit -q -m ledger
@@ -106,6 +117,9 @@ ok "対照: pipefail が無い bash -e では、同じ判定の行の失敗は 0
 P=$(awk '/^      - name: 通った変更を main に push/{f=1} /^      - name: 報告を検査/{f=0} f' "$A")
 ok "agent.yml: push の段は if を持たない(判定が成功したときだけ走る)" "$(grep -c '^ *if:' <<<"$P")" 0
 ok "agent.yml: どの段にも continue-on-error が無い(判定の失敗を飛ばさない)" "$(grep -c 'continue-on-error' "$A")" 0
+# アカウント ID の値を、ファイルに直書きしていない(一致の件数だけを見る。値は表示しない。L-006)
+acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" | cut -d'"' -f4)
+ok "agent.yml・deploy.yml・driver/・spec/ に、アカウント ID の値を直書きしていない(一致の数)" "$(if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/driver/*.sh "$top"/spec/*.sh | grep -cF -- "$acct"; else echo none; fi)" 0
 # driver/ はリポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "driver/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$top"/driver/*.sh | wc -l)" 0
 # agent.yml の作業段: npm ci の直後に app のビルドを実行する(tools/boot-check が app/dist を前提にする)
@@ -165,4 +179,4 @@ const { launchChrome } = await import(pathToFileURL(path.join(top, "tools/boot-c
 try { const c = await launchChrome({ profile: path.join(T, "fake/profile") }); console.log(c.version.Browser); c.proc.kill("SIGKILL"); } catch (e) { console.log("threw"); }
 ' "$T" "$top" 2>/dev/null)
 ok "cdp: DevTools が 12 秒後に答える Chrome でも起動できる" "$slow" "fake/1"
-rm -rf "$T"; exit $fail
+[ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
