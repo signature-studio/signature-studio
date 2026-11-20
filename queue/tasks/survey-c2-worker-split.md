@@ -48,7 +48,8 @@
 5. 実測(スレッドの一覧)。手順 4 と同じ実行で、CDP の Target.getTargets の結果を type ごとに数え、JSON の 1 行で出す。worker は URL の末尾(fl-engine や chunk-io-worker など、repo の中の名前だけ)を添える。
 6. 実測(音声の数字)。window.__app の音声の項目(app/src/main.ts の audio や underrun の項目。名前を読んで使う)が取れれば、underrun の数を書く。取れなければ「未確認(取れない理由)」と書く。
 7. 手順 4〜6 を 3 回走らせる。各回の JSON の行を findings に貼る。
-8. 後始末: `rm -f tools/boot-check/.tmp-survey-c2.mjs` を行い、残った一時ファイルが無いことを `git status --short` で確かめる。
+8. 配信の方針(L-035)の読み(読みのみ)。起動後のバックグラウンドの取得と、wasm のコンパイル・インスタンス化が、音声を作る Worker(fl-engine)の外で行えるかを、次の順に読み、行番号つきで書く。(a) 起動時の取得を、どのスレッドが行うか: app/src/main.ts の 714〜717 行(loadWasm・loadPack・fetchAsset をページから呼ぶ)と、app/src/bundle/loader.ts の fetchAsset(185 行)・loadWasm(189 行)・loadPack(219 行)。(b) 遅延の install tree の先例: app/src/engine/chunk-io.ts(1〜10 行)と app/src/engine/chunk-io-worker.ts(1 行。I/O の Worker が取り、エンジンは Atomics.wait で待つ)。(c) 音声の書き込み(lift/runtime/fle_audio_transport.c の 54 行: fle_js_publish)が、どのスレッドで走るか。(a) と (b) の取得とコンパイルが、そのスレッドと同じかどうかを、表で書く(スレッド・何を行うか・音声と同じか)。(d) 結論: 取得・コンパイル・インスタンス化を、音声のスレッドの外に置けるか(推定と明記。実測は、手順 4〜7 の結果と合わせて書く)。
+9. 後始末: `rm -f tools/boot-check/.tmp-survey-c2.mjs` を行い、残った一時ファイルが無いことを `git status --short` で確かめる。
 
 ## 出力
 - queue/findings/survey-c2-worker-split.md に、次の見出しで日本語で書く。
