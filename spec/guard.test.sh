@@ -4,6 +4,7 @@
 # git の commit を使うテストは、環境の名義で commit する(名義を上書きしない)。環境に名義が無ければ落ちる(skip して通さない)。
 # JUDGE_IN_SPEC は、判定が spec を呼ぶときだけ立つ印。この spec の中の判定の検査は、印が無い通常の判定として行う。
 unset JUDGE_IN_SPEC
+unset RUNNER_TEMP   # 判定の受け入れは RUNNER_TEMP の boot.json を使う。この spec の判定の検査は、作業者のジョブの一時ディレクトリに触れない
 here=$(cd "$(dirname "$0")" && pwd); g=$here/../guard; fail=0; T=$(mktemp -d "$here/../.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
@@ -98,6 +99,43 @@ if git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then
   ( cd "$R" && ok "judge: base の ref が読めなければ「通った」を出さない" "$(bash "$g/judge.sh" no-such-ref "$T/task-ok.md" 2>&1 | grep -c '通った')" 0 )
   ( cd "$R" && ok "flags: base の ref が読めなければ落ちる" "$(rc bash "$g/flags.sh" no-such-ref HEAD)" 1 )
   ( cd "$R" && ok "judge: 変更が無い base(HEAD)なら、通った旨を出して通る" "$(bash "$g/judge.sh" HEAD "$T/task-ok.md" 2>&1 | tail -1)" "judge: 通った" )
+  # 受け入れが boot.json(起動確認)を使うとき: 判定の再実行の前に boot.json を消し、失敗したら、その結果か「無い」を 1 行で出す(受け入れの再試行は足さない)
+  rt=$T/rt; mkdir -p "$rt"
+  bj() { ( cd "$R" && RUNNER_TEMP="$rt" bash "$g/judge.sh" HEAD "$1" > "$T/bj.out" 2>&1; echo "$?" > "$T/bj.rc" ); }
+  cat > "$T/task-b1.md" <<'EOF'
+accept: echo '{"state":"running","error":null,"standIn":false,"elapsedMs":1234}' > "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b1.md"
+  ok "判定: 受け入れが boot.json を使って失敗したら、起動確認の結果を 1 行で、失敗の直前に出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果: {"state":"running","error":null,"standIn":false,"elapsedMs":1234}'
+  ok "判定: 起動確認の結果を出しても、受け入れの失敗は従来どおり最後の行で、終了コードは 1" "$(tail -n 1 "$T/bj.out")/$(cat "$T/bj.rc")" 'judge: 受け入れコマンドが失敗した/1'
+  cat > "$T/task-b2.md" <<'EOF'
+accept: test -s "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b2.md"
+  ok "判定: boot.json が無いまま受け入れが失敗したら、その旨を 1 行で出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果が無い(boot-bundle の前の段で落ちたか、boot-bundle が何も出さなかった)'
+  printf '%s\n' '{"state":"engine-idle","error":null,"standIn":false,"elapsedMs":999}' > "$rt/boot.json"
+  bj "$T/task-b2.md"
+  ok "判定: 前の段の boot.json が残っていても、判定が消してから受け入れを走らせ、前の結果を出さない" "$(tail -n 2 "$T/bj.out" | head -n 1)/$(grep -c 'elapsedMs":999' "$T/bj.out")" 'judge: 起動確認の結果が無い(boot-bundle の前の段で落ちたか、boot-bundle が何も出さなかった)/0'
+  cat > "$T/task-b4.md" <<'EOF'
+accept: echo '{broken' > "$RUNNER_TEMP/boot.json"; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b4.md"
+  ok "判定: boot.json が JSON として読めないときは、先頭だけを 1 行で出す" "$(tail -n 2 "$T/bj.out" | head -n 1)" 'judge: 起動確認の結果が読めない: {broken'
+  cat > "$T/task-b5.md" <<'EOF'
+accept: false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b5.md"
+  ok "判定: boot.json を使わない受け入れの失敗には、起動確認の行を足さない" "$(grep -c '起動確認' "$T/bj.out")" 0
+  cat > "$T/task-b7.md" <<'EOF'
+accept: node -e 'require("fs").writeFileSync(process.env.RUNNER_TEMP + "/boot.json", JSON.stringify({state: "error", error: "x".repeat(400), standIn: false, elapsedMs: 5}))'; false
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b7.md"
+  ok "判定: 起動確認の error は 300 文字で切って出す" "$(tail -n 2 "$T/bj.out" | head -n 1 | grep -o 'x*' | awk '{print length}' | sort -n | tail -n 1)" 300
+  cat > "$T/task-b6.md" <<'EOF'
+accept: echo '{}' > "$RUNNER_TEMP/boot.json"; true
+EOF
+  rm -f "$rt/boot.json"; bj "$T/task-b6.md"
+  ok "判定: 受け入れが通るときは、起動確認の行を足さず、通った旨を出す" "$(tail -n 1 "$T/bj.out")/$(grep -c '起動確認' "$T/bj.out")/$(cat "$T/bj.rc")" 'judge: 通った/0/0'
   # ハーネス(tools/・guard/・driver/・spec/・.github/・queue/kinds/・opencode.jsonc)を変えたら、BASE に在る spec を判定の中で実行する。偽の spec で確かめる
   fp=$T/fake; mkdir -p "$fp"
   cat > "$fp/fake-spec.sh" <<'FAKE'
