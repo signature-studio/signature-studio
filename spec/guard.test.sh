@@ -37,7 +37,7 @@ printf 'run: echo hi\n' > "$T/.github/workflows/ok.yml"
 # wrangler.jsonc は、その場で作り直さず、デプロイに使える形でコミットする(依頼者の指示 2026-11-20・L-032)
 ok "app/wrangler.jsonc は追跡されている(ls-files)" "$(git -C "$here/.." ls-files --error-unmatch app/wrangler.jsonc >/dev/null 2>&1 && echo yes)" yes
 ok "app/wrangler.jsonc は無視されていない(check-ignore)" "$(git -C "$here/.." check-ignore -q app/wrangler.jsonc && echo ignored || echo kept)" kept
-mkdir -p "$T/tools" "$T/spec" "$T/ledger"
+mkdir -p "$T/tools" "$T/spec" "$T/pm-work"
 cat > "$T/tools/write.txt" <<'EOF'
 cat <<EOT > app/wrangler.jsonc
 echo x >> app/wrangler.jsonc
@@ -70,11 +70,11 @@ cat > wrangler.deploy.json <<EOT
 cp x app/wrangler.noperf.jsonc
 fs.writeFileSync(path.join(work, 'wrangler.noperf.jsonc'), text);
 EOF
-cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/ledger/write.tsv"; cp "$T/tools/write.txt" "$T/notes.md"
+cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/pm-work/write.tsv"; cp "$T/tools/write.txt" "$T/notes.md"
 ( cd "$T" && ok "scan: wrangler.jsonc を作る・書く行は、行ごとに見つかる(15 行)" "$(bash "$g/scan.sh" tools/write.txt 2>/dev/null | grep -c '^wranglergen')" 15 )
 ( cd "$T" && ok "scan: wrangler.jsonc を読むだけの行(書きの関数と同じ行でも)は見つけない" "$(bash "$g/scan.sh" tools/read.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: wrangler.noperf.jsonc・wrangler.deploy.json は見つけない" "$(bash "$g/scan.sh" tools/other.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
-( cd "$T" && ok "scan: spec/・ledger/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt ledger/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
+( cd "$T" && ok "scan: spec/・pm-work/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt pm-work/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
 # 旗と判定(git の差分を使う)
@@ -136,7 +136,7 @@ accept: echo '{}' > "$RUNNER_TEMP/boot.json"; true
 EOF
   rm -f "$rt/boot.json"; bj "$T/task-b6.md"
   ok "判定: 受け入れが通るときは、起動確認の行を足さず、通った旨を出す" "$(tail -n 1 "$T/bj.out")/$(grep -c '起動確認' "$T/bj.out")/$(cat "$T/bj.rc")" 'judge: 通った/0/0'
-  # ハーネス(tools/・guard/・driver/・spec/・.github/・queue/kinds/・opencode.jsonc)を変えたら、BASE に在る spec を判定の中で実行する。偽の spec で確かめる
+  # ハーネス(tools/・guard/・spec/・.github/・opencode.jsonc)を変えたら、BASE に在る spec を判定の中で実行する。偽の spec で確かめる
   fp=$T/fake; mkdir -p "$fp"
   cat > "$fp/fake-spec.sh" <<'FAKE'
 #!/usr/bin/env bash
@@ -170,6 +170,14 @@ FAKE
   git -C "$H" checkout -q -B s7 "$HB"; printf '3\n' > "$H/tools/x.mjs"; git -C "$H" commit -qam s7
   rcset 0 0; rm -f "$T/spec-runs.log"; ( cd "$H" && out=$(FAKE_NEST=1 FAKE_T="$T" FAKE_G="$g" FAKE_BASE="$HB" bash "$g/judge.sh" "$HB" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
   ok "判定: spec の中で判定を呼び直しても、ハーネスの spec は再び走らない(再帰しない。走るのは 2 本だけ)" "$(cat "$T/jrc")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/2
+  # driver/ と queue/kinds/ は削除された物なので、ハーネスではない。pm-work/(PM 資料)もハーネスではない。spec/workflow.test.sh は、BASE に在れば判定の中で走る
+  git -C "$H" checkout -q -B s8 "$HB"; mkdir -p "$H/driver" "$H/queue/kinds" "$H/pm-work"; printf 'echo\n' > "$H/driver/y.sh"; printf 'x\n' > "$H/queue/kinds/z.md"; printf 'x\n' > "$H/pm-work/w.md"; git -C "$H" add -A; git -C "$H" commit -qm s8
+  rcset 1 1; jrun
+  ok "判定: driver/・queue/kinds/・pm-work/ の変更は、ハーネスとして spec を走らせず、通る" "$(cat "$T/jrc")/$(grep -c '^judge: 通った' "$T/jout")/$(cat "$T/spec-runs.log" 2>/dev/null | wc -l)" 0/1/0
+  H3=$T/harness3; rm -rf "$H3"; mkdir -p "$H3/spec" "$H3/tools"; cp "$fp/fake-spec.sh" "$H3/spec/workflow.test.sh"; printf '1\n' > "$H3/tools/x.mjs"; git -C "$H3" init -q && git -C "$H3" add -A && git -C "$H3" commit -q -m base3; H3B=$(git -C "$H3" rev-parse HEAD)
+  printf '2\n' > "$H3/tools/x.mjs"; git -C "$H3" commit -qam s9; printf '1\n' > "$T/rc-workflow.test.sh"; rm -f "$T/spec-runs.log"
+  ( cd "$H3" && out=$(FAKE_T="$T" FAKE_G="$g" bash "$g/judge.sh" "$H3B" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
+  ok "判定: spec/workflow.test.sh が BASE に在るとき、ハーネスの変更で走り、失敗すれば落ちて名指しする" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/workflow.test.sh)' "$T/jout")/$(grep -c 'workflow.test.sh' "$T/spec-runs.log" 2>/dev/null)" 1/1/1
 else
   echo "FAIL flags・judge: 環境に git の名義が無い(判定の検査は名義が要る。skip して通さない)"; fail=1
 fi

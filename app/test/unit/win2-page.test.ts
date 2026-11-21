@@ -14,9 +14,9 @@ describe('decision 0222 with the desktop compositor (decision 0223): the desktop
     const i = w.indexOf('const result = await f.run();');
     expect(i).toBeGreaterThan(0);
     const after = w.slice(i, i + 600);
-    expect(after).toContain('deskTick()');
-    expect(after.indexOf('deskTick()')).toBeLessThan(after.indexOf("post({ t: 'exit'"));
-    expect(after).toMatch(/\n  try \{ deskTick\(\); \}/); // at the level of the function: not inside a condition on how the engine ended
+    expect(after).toContain('deskTick(false)');
+    expect(after.indexOf('deskTick(false)')).toBeLessThan(after.indexOf("post({ t: 'exit'"));
+    expect(after).toMatch(/\n  try \{ deskTick\(false\); \}/); // at the level of the function: not inside a condition on how the engine ended
     expect(w).not.toContain('pollAppView');
   });
 });
