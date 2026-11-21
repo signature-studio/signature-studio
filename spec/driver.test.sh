@@ -270,4 +270,19 @@ ok "survey-c4: インストゥルメントの件数が 0 件だと、手順 2 �
 ok "台帳: L-037 が在り、5 列で、日付 2026-11-21 と出所(依頼者)が在る" "$(awk -F'\t' '$1 == "L-037" && NF == 5 && $2 == "2026-11-21" && $3 == "依頼者" { print "yes" }' "$top/ledger/instructions.tsv")" yes
 ok "plan: 「タスクの粒度」の節が在り、3 時間と 30 件を書く" "$(P=$top/queue/plan.md; S=$(awk '/^## タスクの粒度/{f=1; next} /^## /{f=0} f' "$P"); if [ "$(grep -c '^## タスクの粒度' "$P")" = 1 ] && grep -q '3 時間' <<<"$S" && grep -q '30 件' <<<"$S"; then echo yes; else echo no; fi)" yes
 ok "AGENTS.md: 作業者の手順に、mode: script の行が在る" "$(grep -c '^- タスク本文の `mode: script` は、スクリプトが作業を行う' "$top/AGENTS.md")" 1
+# agent.yml(台帳 L-037): 作業の型(MODE)を読み、opencode に関わる段は agent のときだけ動く。script の段は、タスクの run: をスクリプトとして実行する
+RUNJ=$(awk '/^  run:$/{f=1} /^  close:$/{f=0} f' "$A")
+EXPECT_NAMES='リポジトリを取得する(資格は残さない)|作業の型を読む(script はスクリプト、agent は作業者)|名義を設定する(token は消す)|版の値を ci/versions.env から読む|Node を入れる|rust をそろえ、app の依存を入れてビルドし、fe-build を用意する|emsdk を入れる|アカウント ID を app/wrangler.jsonc から読む|抽出物を R2 のキャッシュから取る(公開の artifact は使わない)|抽出物を lift/out-app/host に置く|opencode を導入する(版は固定)|opencode の認証情報を取り込み、作業者のモデルを設定する|作業者を 1 回動かす|スクリプトで作業する(script。エージェントは動かさない)|判定(取り直した main の guard/judge.sh と、main のタスクで)|通った変更を main に push する(token はこの段で発行する)|報告を検査して、成果物とサマリーに出す|報告と判定の出力を成果物に保存する(7 日)'
+ok "agent.yml: run ジョブの段の名前と順が、型の 2 段を足した物と一致する" "$(awk '/^      - name: /{ sub(/^      - name: /, ""); print }' <<<"$RUNJ" | paste -sd'|')" "$EXPECT_NAMES"
+ok "agent.yml: opencode の 3 段は、if: env.MODE == 'agent' を名前の次の行に持つ" "$(awk '/^      - name: /{ name = $0; if ((getline nxt) > 0 && nxt == "        if: env.MODE == '\''agent'\''") print name }' <<<"$RUNJ" | grep -c 'opencode を導入する\|opencode の認証情報\|作業者を 1 回動かす')" 3
+ok "agent.yml: if: env.MODE == 'agent' は、ちょうど 3 つ(opencode の段だけ)" "$(grep -cF -- "        if: env.MODE == 'agent'" <<<"$RUNJ")" 3
+ok "agent.yml: opencode の段の主要な行が、変更前のまま在る(認証・導入・実行)" "$(for l in 'install -D -m 755 "$RUNNER_TEMP/package/bin/opencode" "$HOME/.opencode/bin/opencode"' 'printf '\''%s'\'' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone' 'opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")"'; do grep -cF -- "$l" <<<"$RUNJ"; done | paste -sd' ')" "1 1 1"
+MODESTEP=$(awk '/^      - name: 作業の型を読む/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: 型の段は mode.sh で TASK の型を読み、値は script か agent の 2 つだけを GITHUB_ENV に書く" "$(grep -cF -- 'm=$(bash driver/mode.sh "$TASK" || true)' <<<"$MODESTEP")/$(grep -cF -- 'case "$m" in script|agent) echo "MODE=$m" >> "$GITHUB_ENV" ;;' <<<"$MODESTEP")" 1/1
+ok "agent.yml: 型の段は、GITHUB_ENV への書き込みと、失敗時の >&2 以外に echo しない" "$(grep 'echo' <<<"$MODESTEP" | grep -v 'GITHUB_ENV' | grep -vc '>&2')" 0
+SCRIPTSTEP=$(awk '/^      - name: スクリプトで作業する/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: スクリプトの段は if: env.MODE == 'script' を持つ" "$(head -n 1 <<<"$SCRIPTSTEP" | sed 's/^ *//')" "if: env.MODE == 'script'"
+ok "agent.yml: スクリプトの段は pipefail を置き、task.sh の run: 行を bash -c で実行し、出力を script.txt に残す" "$(grep -cF -- '          set -o pipefail' <<<"$SCRIPTSTEP")/$(grep -cF -- 'cmd=$(awk' <<<"$SCRIPTSTEP")/$(grep -cF -- 'bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt"' <<<"$SCRIPTSTEP")" 1/1/1
+ok "agent.yml: スクリプトの段は opencode を動かさない" "$(grep -c 'opencode' <<<"$SCRIPTSTEP")" 0
+ok "agent.yml: スクリプトの段の失敗は止めず、判定(judge)が決める(agent の段と同じ)" "$(grep -cF -- 'script.txt" || true' <<<"$SCRIPTSTEP")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
