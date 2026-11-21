@@ -158,4 +158,150 @@ ok "task-accept: accept ブロックが 2 つなら 1 で終わる" "$(acc '```a
 ok "task-accept: 中身が 2 行なら 1 で終わる" "$(acc '```accept\nfalse\ntrue\n```\n' | tail -n 1)" "rc=1"
 ok "task-accept: 閉じていない accept ブロックは 1 で終わる" "$(acc '```accept\nfalse\n' | tail -n 1)" "rc=1"
 ok "task-accept: 中身が空なら 1 で終わる" "$(acc '```accept\n\n```\n' | tail -n 1)" "rc=1"
+# (i) pm-work/tools/create-issues.mjs: 下書きから Issue を作る道具。偽の gh(node。呼び出しを CG に残し、番号は飛び飛びに返す)で試す。実際の GitHub には書かない
+CI=$top/pm-work/tools/create-issues.mjs; CD=$T/cdrafts; CM=$T/milestones.md; CS=$T/cstate.json; CG=$T/cgh.log; CFX=$T/cfx; CFN=$T/cfx-none
+mkdir -p "$CD" "$CFX" "$CFN" "$T/cbin"; : > "$CG"
+cat > "$T/cbin/gh" <<'FAKEGH'
+#!/usr/bin/env node
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+const { FX, GHLOG, FAIL_ON = '', FAIL_NTH = '0' } = process.env;
+const argv = process.argv.slice(2);
+const fail = (msg) => { process.stderr.write(`fake gh: ${msg}\n`); process.exit(1); };
+if (argv[0] !== 'api') fail(`未対応: ${argv.join(' ')}`);
+let method = null; let path = null; let input = false;
+for (let i = 1; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === '-X') method = argv[++i];
+  else if (a === '--input') { input = true; i++; }
+  else if (!a.startsWith('-') && path === null) path = a;
+}
+const p = path.split('?')[0];
+const m = method ?? (input ? 'POST' : 'GET');
+const body = input ? JSON.parse(readFileSync(0, 'utf8')) : null;
+appendFileSync(GHLOG, `${JSON.stringify({ m, p, body })}\n`);
+const lines = readFileSync(GHLOG, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));
+if (FAIL_ON && lines.filter((x) => `${x.m} ${x.p}` === FAIL_ON).length === Number(FAIL_NTH)) fail('失敗させた');
+const out = (v) => process.stdout.write(`${JSON.stringify(v)}\n`);
+const R = 'repos/o/r';
+function route() {
+  if (p === 'graphql') {
+    const q = body.query;
+    if (q.includes('addProjectV2ItemById')) return out({ data: { addProjectV2ItemById: { item: { id: `PVTI_${body.variables.content}` } } } });
+    if (q.includes('updateProjectV2ItemFieldValue')) return out({ data: { updateProjectV2ItemFieldValue: { projectV2Item: { id: body.variables.item } } } });
+    if (q.includes('projectV2(')) return out(existsSync(`${FX}/project.json`) ? JSON.parse(readFileSync(`${FX}/project.json`, 'utf8')) : { data: { organization: { projectV2: null } } });
+    return fail('未対応の GraphQL');
+  }
+  if (p.startsWith('orgs/') && p.endsWith('/issue-types')) return out([{ id: 1, name: 'Task' }, { id: 2, name: 'Feature' }, { id: 3, name: 'Bug' }]);
+  if (p === `${R}/labels` && m === 'GET') return out([]);
+  if (p === `${R}/labels` && m === 'POST') return out({ name: body.name });
+  if (p === `${R}/milestones` && m === 'GET') return out([]);
+  if (p === `${R}/milestones` && m === 'POST') return out({ number: 99 + lines.filter((x) => x.p === `${R}/milestones` && x.m === 'POST').length, title: body.title });
+  if (/^repos\/o\/r\/milestones\/\d+$/.test(p) && m === 'PATCH') return out({});
+  if (p === `${R}/issues` && m === 'POST') {
+    const seq = Number(existsSync(`${FX}/seq`) ? readFileSync(`${FX}/seq`, 'utf8') : 4021);
+    writeFileSync(`${FX}/seq`, String(seq + 3));
+    return out({ number: seq, id: seq * 10, node_id: `I_${seq}`, title: body.title, type: body.type ? { name: body.type } : null });
+  }
+  if (/^repos\/o\/r\/issues\/\d+\/sub_issues$/.test(p) && m === 'POST') return out({});
+  if (/^repos\/o\/r\/issues\/\d+\/dependencies\/blocked_by$/.test(p) && m === 'POST') return out({});
+  if (/^repos\/o\/r\/issues\/\d+$/.test(p) && m === 'PATCH') return out({});
+  if (/^repos\/o\/r\/issues\/\d+\/labels\/pm-hold$/.test(p) && m === 'DELETE') return out([]);
+  return fail(`未対応: ${m} ${p}`);
+}
+route();
+FAKEGH
+chmod +x "$T/cbin/gh"
+cat > "$CFX/project.json" <<'PJ'
+{"data":{"organization":{"projectV2":{"id":"PVT_1","fields":{"nodes":[{"id":"F_size","name":"Size","options":[{"id":"O_XS","name":"XS"},{"id":"O_S","name":"S"},{"id":"O_M","name":"M"},{"id":"O_L","name":"L"},{"id":"O_XL","name":"XL"}]},{"id":"F_prio","name":"Priority","options":[{"id":"P_U","name":"Urgent"},{"id":"P_H","name":"High"},{"id":"P_M","name":"Medium"},{"id":"P_L","name":"Low"}]}]}}}}}
+PJ
+cdraft() { printf -- '---\n%s\n---\n\n%s\n' "$2" "$3" > "$CD/$1"; }
+cdraft 001-parent.md 'draft: "001"
+title: "T001 親課題"
+type: "Feature"
+milestone: "M1 テスト(P3)"
+parent: null
+blocked_by: []
+labels: ["render"]
+size: "L"
+priority: "Urgent"
+project: "signature-studio/3"' '子課題をまとめる親の課題。'
+cdraft 002-after.md 'draft: "002"
+title: "T002 後続課題"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "001"
+blocked_by: ["003"]
+labels: []
+size: "S"
+priority: "High"
+project: "signature-studio/3"' '先行課題 #{{003}} が閉じたら始める。親は #{{001}}。'
+cdraft 003-before.md 'draft: "003"
+title: "T003 先行課題"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "001"
+blocked_by: []
+labels: []
+size: "M"
+priority: "Medium"
+project: "signature-studio/3"' '先に終える課題。'
+cdraft 004-child.md 'draft: "004"
+title: "T004 子課題"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "001"
+blocked_by: []
+labels: ["render"]
+size: "XS"
+priority: "Low"
+project: "signature-studio/3"' '通常の子課題。'
+cat > "$CM" <<'MS'
+# マイルストーン(テスト)
+
+| 番号 | タイトル | 対応 |
+| --- | --- | --- |
+| M1 | M1 テスト(P3) | - |
+
+### M1 テスト(P3)
+
+- 説明: テスト用。下位は #{{004}}。
+- 完了の条件: 無し
+MS
+cr() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=${FXD:-$CFX} FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${DR:-$CD}" --milestones "$CM" --state "$CS" 2>"$T/cr.err" ); }
+writes() { jq -c 'select(.m != "GET" and (.p != "graphql" or ((.body.query // "") | contains("mutation"))))' "$CG" | wc -l | tr -d ' '; }
+: > "$CG"; rm -f "$CS"; out=$(cr); rc=$?
+ok "create: dry-run は 0 で終わり、gh を 1 回も呼ばず、状態ファイルも作らない" "$rc/$(wc -l < "$CG" | tr -d ' ')/$([ -e "$CS" ] && echo made || echo none)" "0/0/none"
+ok "create: dry-run は、実行しない旨と、作る Issue の行(4 件)を出す" "$(head -n 1 <<<"$out" | cut -c1-7)/$(grep -c '^   作る ' <<<"$out")" "dry-run/4"
+: > "$CG"; FXD=$CFN cr --apply >/dev/null; rc=$?
+ok "create: 事前の検査(プロジェクトが読めない)で、書き込みを 1 件も行わず 1 で終わる" "$rc/$(writes)/$([ -e "$CS" ] && echo made || echo none)" "1/0/none"
+ok "create: 事前の検査の失敗は、プロジェクト名を含む理由を標準エラーに出す" "$(grep -c 'signature-studio/3' "$T/cr.err")" 1
+ok "create: --resume だけ(--apply 無し)は使い方の誤りで 2" "$(cr --resume >/dev/null 2>&1; echo $?)" 2
+rm -f "$CS" "$CFX/seq"; : > "$CG"; cr --apply > "$T/capply.out"; rc=$?
+ok "create: --apply は 0 で終わる" "$rc" 0
+ok "create: 作成の順は親 → 子、blocked by の先 → 後(下書きの番号の順ではない)" "$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | paste -sd, -)" "T001 親課題,T003 先行課題,T002 後続課題,T004 子課題"
+ok "create: 番号は API の応答から取り(4021 から飛び飛び)、対応表を標準出力に出す" "$(grep -c '^001 -> #4021 Feature' "$T/capply.out")/$(grep -c '^[0-9][0-9][0-9] -> #' "$T/capply.out")" "1/4"
+ok "create: Issue Type は下書きの type で作る" "$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.type' "$CG" | paste -sd, -)" "Feature,Task,Task,Task"
+ok "create: ラベルは pm-hold と領域のラベルだけ(Type・Size・Priority を入れない)" "$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | (.body.labels | join("+"))' "$CG" | paste -sd, -)" "pm-hold+render,pm-hold,pm-hold,pm-hold+render"
+ok "create: タイトルと本文に Type・Size・Priority の語が無い" "$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | [.body.title, .body.body] | join("\n")' "$CG" | grep -ciE 'task|epic|feature|bug|size|priority|urgent|high|medium|low')" 0
+ok "create: 作成の時の本文は #{{NNN}} のまま(置換は後の PATCH)" "$(jq -r 'select(.m=="POST" and .body.title=="T002 後続課題") | .body.body' "$CG")" "先行課題 #{{003}} が閉じたら始める。親は #{{001}}。"
+ok "create: 本文の PATCH は 1 件(#{{NNN}} が残らず、実番号に直る)" "$(jq -r 'select(.m=="PATCH" and (.p|startswith("repos/o/r/issues/"))) | .body.body' "$CG")/$(jq -c 'select(.m=="PATCH" and (.p|startswith("repos/o/r/issues/")))' "$CG" | wc -l | tr -d ' ')" "先行課題 #4024 が閉じたら始める。親は #4021。/1"
+ok "create: マイルストーンの説明の #{{NNN}} も実番号に直す" "$(jq -r 'select(.m=="PATCH" and (.p|startswith("repos/o/r/milestones/"))) | .body.description' "$CG")" "テスト用。下位は #4030。"
+ok "create: 親子は、親の番号に、子の id(番号ではない)を付ける(子 3 件)" "$(jq -r 'select(.p|endswith("/sub_issues")) | "\(.p) \(.body.sub_issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/sub_issues 40240,repos/o/r/issues/4021/sub_issues 40270,repos/o/r/issues/4021/sub_issues 40300"
+ok "create: blocked by は、後続(002)の番号に、先行(003)の id を付ける" "$(jq -r 'select(.p|endswith("/dependencies/blocked_by")) | "\(.p) \(.body.issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4027/dependencies/blocked_by 40240"
+ok "create: 全ての Issue をプロジェクトに追加する(4 件)" "$(grep -c 'addProjectV2ItemById' "$CG")" 4
+ok "create: Size と Priority を全ての Issue に設定する(4 件 × 2)" "$(jq -r 'select(.body.variables.option != null) | .body.variables.option' "$CG" | sort | paste -sd, -)" "O_L,O_M,O_S,O_XS,P_H,P_L,P_M,P_U"
+ok "create: pm-hold を、全ての関係とプロジェクトの設定の後に、4 件から外す" "$(jq -s -r '[to_entries[] | select(.value.m=="DELETE") | .key] as $d | [to_entries[] | select(.value.m!="DELETE" and .value.m!="GET") | .key] as $o | "\($d | length)/\(($d | min) > ($o | max))"' "$CG")/$(jq -r 'select(.m=="DELETE") | .p' "$CG" | grep -c 'labels/pm-hold$')" "4/true/4"
+ok "create: 状態ファイルに 4 件を、別々の番号で残す" "$(jq '.drafts | length' "$CS")/$(jq -r '[.drafts[].number] | unique | length' "$CS")/$(jq -r '.drafts["002"].number' "$CS")" "4/4/4027"
+: > "$CG"; cr --apply >/dev/null 2>&1; rc=$?
+ok "create: 状態ファイルが在るのに --resume が無ければ、gh を呼ばずに 1 で終わる" "$rc/$(wc -l < "$CG" | tr -d ' ')" "1/0"
+rm -f "$CS" "$CFX/seq"; : > "$CG"; FAIL_ON='POST repos/o/r/issues' FAIL_NTH=3 cr --apply >/dev/null 2>&1; rc=$?
+ok "create: 途中で落ちると 1 で終わり、作れた分(001・003)だけを状態ファイルに残す" "$rc/$(jq '.drafts | length' "$CS")/$(jq -r '.drafts | keys | join(",")' "$CS")" "1/2/001,003"
+: > "$CG"; cr --apply --resume > "$T/cres.out"; rc=$?
+ok "create: --resume は作った分を作り直さず、残り(002・004)だけを作る" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | paste -sd, -)" "0/T002 後続課題,T004 子課題"
+ok "create: --resume の後、4 件とも別の番号で、重複が無い" "$(jq '.drafts | length' "$CS")/$(jq -r '[.drafts[].number] | unique | length' "$CS")/$(jq -r '.drafts["004"].number' "$CS")" "4/4/4030"
+vz() { local dir=$T/cv-$1; rm -rf "$dir"; cp -r "$CD" "$dir"; sed -i "s/$2/$3/" "$dir/$4"; : > "$CG"; DR=$dir cr >/dev/null 2>&1; a=$?; DR=$dir cr --apply >/dev/null 2>&1; b=$?; ok "create: $5" "$a/$b/$(wc -l < "$CG" | tr -d ' ')" "1/1/0"; }
+vz ref '#{{003}}' '#{{999}}' 002-after.md "下書きの無い #{{999}} があると、dry-run と --apply の両方が、書く前に 1 で止まる"
+vz kisoku '先に終える課題。' '規模: 大。先に終える課題。' 003-before.md "本文に 規模 を書くと、dry-run と --apply の両方が、書く前に 1 で止まる"
+vz type 'type: "Task"' 'type: "epic"' 004-child.md "Type が Task・Feature・Bug 以外なら、dry-run と --apply の両方が、書く前に 1 で止まる"
+vz label 'labels: \["render"\]' 'labels: ["task"]' 004-child.md "ラベルに task を書くと、dry-run と --apply の両方が、書く前に 1 で止まる"
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
