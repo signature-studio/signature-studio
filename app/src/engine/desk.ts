@@ -27,6 +27,11 @@ export function readDeskState(buffer: ArrayBufferLike, ptr: number): DeskState |
   };
 }
 
+/** the generation of the picture at `ptr` (the header's gen word): the engine reads it to know whether a compose changed the picture (C-2) */
+export function deskGen(buffer: ArrayBufferLike, ptr: number): number {
+  return new DataView(buffer, ptr, DESK_HEADER_BYTES).getUint32(24, true);
+}
+
 /** the part of the engine's exports the presenter uses */
 export interface DeskApi {
   /** fle_desk_compose(): the address of the state */
