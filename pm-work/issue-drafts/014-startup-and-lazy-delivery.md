@@ -45,7 +45,7 @@ needs_owner: false
 - `lift/crates/fe-build/src/main.rs`(bundle の段。`pack_step_for`)
 - `lift/harness/web/pack.args`(13〜14 行: `--args` の行)、`lift/harness/b2d2/modules.tsv`(10 行)
 - `lift/runtime/fle_realmod.h`(1〜3 行の注釈: real module)、`lift/runtime/fle_load.c`(LoadLibrary の解決)
-- `app/worker/index.ts`(2 行目: `/assets/*` の配信)、`app/tools/assets-middleware.ts`(ローカルの配信)
+- `app/worker/index.ts`(2 行目: /assets/ の配信)、`app/tools/assets-middleware.ts`(ローカルの配信)
 - `tools/boot-check/boot-bundle.mjs`、`tools/boot-check/cdp.mjs`
 - `pm-work/plan.md`(「配信の方針(L-035)」の節。論点の出典)
 
