@@ -30,9 +30,13 @@ while IFS=$'\t' read -r num id && [ "$launched" -lt "$k" ]; do
   text=$(bash driver/task.sh "$id" 2>/dev/null || true)
   # 型(mode: script か agent)の無いタスクも、受け入れと同じく起動しない。lower- は古い型の在庫なので免除する(台帳 L-037。A6 で閉じる)
   mode_ok=1; [[ $id == lower-* ]] || bash driver/mode.sh "$id" >/dev/null 2>&1 || mode_ok=0
-  if ! grep -q '^accept: ' <<<"$text" || [ "$mode_ok" -eq 0 ]; then
+  # mode: agent は本文を queue/tasks/<名前>.md に持つ物だけ起動する。型から出した本文は、機械的な作業なので起動しない(台帳 L-038)
+  agent_ok=1; if [ "$(bash driver/mode.sh "$id" 2>/dev/null)" = agent ] && ! git cat-file -e "HEAD:queue/tasks/$id.md" 2>/dev/null; then agent_ok=0; fi
+  if ! grep -q '^accept: ' <<<"$text" || [ "$mode_ok" -eq 0 ] || [ "$agent_ok" -eq 0 ]; then
+    why="受け入れコマンド(accept: の行)が無いので、待ち行列に入れない。"
+    [ "$agent_ok" -eq 1 ] || why="mode: agent のタスクは queue/tasks/$id.md を持つ(台帳 L-038)"
     gh issue edit "$num" --remove-label ready --add-label failed >/dev/null
-    gh issue close "$num" --reason "not planned" --comment "受け入れコマンド(accept: の行)が無いので、待ち行列に入れない。" >/dev/null
+    gh issue close "$num" --reason "not planned" --comment "$why" >/dev/null
     continue
   fi
   last=$(gh issue view "$num" --json comments --jq '[.comments[].body | split("\n")[] | select(startswith("state: ")) | ltrimstr("state: ")] | last // ""')
