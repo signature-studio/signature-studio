@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // tools/select-targets.mjs select | claim TARGETS RETRY : 作業フロー(.github/workflows/agent.yml)が、起動する Issue を決める。設計は pm-work/workflow-design.md の「5」。
-// select: GITHUB_EVENT_NAME と GITHUB_EVENT_PATH のイベントから候補を集め、起動してよい物だけを選ぶ。出力: {"targets":[番号],"retry":真偽}
+// select: GITHUB_EVENT_NAME と GITHUB_EVENT_PATH のイベントから候補を集め、起動してよい物だけを選ぶ。イベントを起こした人(sender)に書き込み権限が無ければ候補を集めない。出力: {"targets":[番号],"retry":真偽}
 // claim TARGETS RETRY: 候補(JSON の配列)を、もう一度確かめ、起動してよい物に running を付ける。RETRY が true なら failed を外す。出力: {"claimed":[番号]}
 // 読みは gh api、書きは gh issue edit だけ。リポジトリは GH_REPO(無ければ GITHUB_REPOSITORY)。認証は gh の既定に従う。
 // 起動しない理由は標準エラーに 1 件ずつ出す。標準出力は JSON の 1 行だけ。
@@ -33,7 +33,24 @@ function state(n) {
   return { issue, openBlockers: blocked.filter((b) => b.state === 'open').length, subIssues: subs.length };
 }
 
+const writers = new Set(['admin', 'write']);
+
+function canWrite(actor) {
+  if (actor?.type === 'Bot') return true;
+  if (!actor?.login) return false;
+  try {
+    return writers.has(api(`repos/${repo}/collaborators/${actor.login}/permission`).permission);
+  } catch {
+    log(`${actor.login} の権限を読めない(書き込み無しとして扱う)`);
+    return false;
+  }
+}
+
 function candidates(eventName, event) {
+  if (!canWrite(event.sender)) {
+    log(`イベントを起こした ${event.sender?.login ?? '(不明)'} に書き込み権限が無い`);
+    return { numbers: [], retry: false };
+  }
   if (eventName === 'issue_comment') {
     if (event.issue.pull_request || event.comment.user?.type === 'Bot') return { numbers: [], retry: false };
     return { numbers: [event.issue.number], retry: /^\/retry(\s|$)/.test(event.comment.body.trimStart()) };

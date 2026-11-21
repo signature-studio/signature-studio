@@ -101,24 +101,38 @@ fx $R/issues/24 "$(iss 24 open)"; fx $R/issues/24/dependencies/blocked_by '[]'; 
 fx $R/issues/25 "$(iss 25 open task,running)"; fx $R/issues/25/dependencies/blocked_by '[]'; fx $R/issues/25/sub_issues '[]'
 fx $R/issues/28 "$(iss 28 open task)"; fx $R/issues/28/dependencies/blocked_by '[{"number":29,"state":"open"}]'; fx $R/issues/28/sub_issues '[]'
 fx $R/issues/26 "$(iss 26 open task,needs-owner)"; fx $R/issues/26/dependencies/blocked_by '[]'; fx $R/issues/26/sub_issues '[]'
+fx $R/issues/31 "$(iss 31 open task)"; fx $R/issues/31/dependencies/blocked_by '[]'; fx $R/issues/31/sub_issues '[]'
+fx $R/collaborators/w/permission '{"permission":"write","role_name":"write"}'
+fx $R/collaborators/r/permission '{"permission":"read","role_name":"read"}'
+# x の権限は fixture を置かない(gh api が失敗する = 権限の無い人。実際の API でも非コラボレーターは 404)
 sel() { # 引数: イベント名、イベントの JSON、(任意)gh の追加の準備。標準出力に select の出力
   printf '%s' "$2" > "$T/ev.json"
   ( GITHUB_EVENT_NAME=$1 GITHUB_EVENT_PATH=$T/ev.json GH_REPO=o/r FX=$FX GHLOG=$GHLOG PATH=$T/bin:$PATH node "$top/tools/select-targets.mjs" select 2>"$T/sel.err" )
 }
-ok "select: closed(5)の解除で、ブロッカーが残る 11 を外し、解除された 10 だけを選ぶ" "$(sel issues '{"action":"closed","issue":{"number":5}}' | jq -c .targets 2>/dev/null)" "[10]"
-ok "select: opened で pm-hold が付いた 20 は選ばない" "$(sel issues '{"action":"opened","issue":{"number":20}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: labeled で epic の 21 は選ばない" "$(sel issues '{"action":"labeled","issue":{"number":21}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: sub-issue を持つ 22 は選ばない(親)" "$(sel issues '{"action":"edited","issue":{"number":22}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: 開いたブロッカー 29 を持つ 28 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":28}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: running の付いた 25 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":25}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: needs-owner の 26 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":26}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: task ラベルの無い 24 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":24}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: 条件を満たす 10 を、edited で選ぶ" "$(sel issues '{"action":"edited","issue":{"number":10}}' | jq -c .targets 2>/dev/null)" "[10]"
-ok "select: failed の 23 は、普通のコメントでは選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"了解","user":{"type":"User"}}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: /retry のコメントなら failed の 23 を選び、retry を true にする" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry\n","user":{"type":"User"}}}' | jq -c '[.targets, .retry]' 2>/dev/null)" "[[23],true]"
-ok "select: Bot のコメントは対象にしない(/retry でも)" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"Bot"}}}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: PR のコメントは対象にしない" "$(sel issue_comment '{"action":"created","issue":{"number":23,"pull_request":{"url":"x"}},"comment":{"body":"/retry","user":{"type":"User"}}}' | jq -c .targets 2>/dev/null)" "[]"
-: > "$GHLOG"; out=$(sel issues '{"action":"closed","issue":{"number":5}}' >/dev/null; cat "$GHLOG")
+W='{"login":"w","type":"User"}'; RD='{"login":"r","type":"User"}'; X='{"login":"x","type":"User"}'; BOT='{"login":"agent-app[bot]","type":"Bot"}'
+ok "select: closed(5)の解除で、ブロッカーが残る 11 を外し、解除された 10 だけを選ぶ" "$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[10]"
+ok "select: opened で pm-hold が付いた 20 は選ばない" "$(sel issues '{"action":"opened","issue":{"number":20},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: labeled で epic の 21 は選ばない" "$(sel issues '{"action":"labeled","issue":{"number":21},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: sub-issue を持つ 22 は選ばない(親)" "$(sel issues '{"action":"edited","issue":{"number":22},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 開いたブロッカー 29 を持つ 28 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":28},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: running の付いた 25 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":25},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: needs-owner の 26 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":26},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: task ラベルの無い 24 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":24},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 条件を満たす 10 を、書き込み権限のある人の edited で選ぶ" "$(sel issues '{"action":"edited","issue":{"number":10},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[10]"
+ok "select: failed の 23 は、普通のコメントでは選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"了解","user":{"type":"User"}},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: /retry のコメントなら failed の 23 を選び、retry を true にする" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry\n","user":{"type":"User"}},"sender":'"$W"'}' | jq -c '[.targets, .retry]' 2>/dev/null)" "[[23],true]"
+ok "select: Bot のコメントは対象にしない(/retry でも)" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"Bot"}},"sender":'"$BOT"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: PR のコメントは対象にしない" "$(sel issue_comment '{"action":"created","issue":{"number":23,"pull_request":{"url":"x"}},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 権限の無い人(x)の /retry では、failed の 23 を選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 読むだけの人(r)の /retry では、failed の 23 を選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$RD"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 権限の無い人(x)が開いた Issue(task ラベル無し)は選ばない" "$(sel issues '{"action":"opened","issue":{"number":24},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 権限の無い人(x)による edited では、条件を満たす 10 でも選ばない(作者による本文の書き換え)" "$(sel issues '{"action":"edited","issue":{"number":10},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 権限の無い人(x)が閉じたブロッカー 5 では、後続の 10 を選ばない" "$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: sender の無いイベントは選ばない(権限を確かめられない)" "$(sel issues '{"action":"edited","issue":{"number":10}}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: App(Bot)が閉じた 5 は、解除された 10 を選ぶ(報告の close の経路)" "$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$BOT"'}' | jq -c .targets 2>/dev/null)" "[10]"
+ok "select: App(Bot)が外した pm-hold の 31 は選ぶ" "$(sel issues '{"action":"unlabeled","issue":{"number":31},"label":{"name":"pm-hold"},"sender":'"$BOT"'}' | jq -c .targets 2>/dev/null)" "[31]"
+ok "select: 権限の無い人(x)が外した pm-hold の 31 は選ばない" "$(sel issues '{"action":"unlabeled","issue":{"number":31},"label":{"name":"pm-hold"},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+: > "$GHLOG"; out=$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$W"'}' >/dev/null; cat "$GHLOG")
 ok "select: 読みだけ行う(gh の書き込みが無い)" "$(grep -c 'issue \(edit\|close\|comment\)' <<<"$out")" 0
 cl() { ( GH_REPO=o/r FX=$FX GHLOG=$GHLOG PATH=$T/bin:$PATH node "$top/tools/select-targets.mjs" claim "$1" "$2" 2>"$T/cl.err" ); }
 : > "$GHLOG"; ok "claim: 条件を満たす 10 に running を付け、claimed に入れる" "$(cl '[10]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit 10 .*--add-label running' "$GHLOG")" "[10]/1"
