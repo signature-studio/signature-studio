@@ -5,8 +5,10 @@ import type { DriverStats } from './idle-driver.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import type { HostFileStats } from './hostfiles.ts';
 
-/** decision 0223: what the page hands the Worker for the desktop: the ONE canvas (transferred) and the input ring (shared). The Worker presents the compositor's picture on the canvas itself and reads the input from the ring. */
-export interface DeskHandover { canvas: OffscreenCanvas; ring: SharedArrayBuffer }
+/** decision 0223: what the page hands the engine Worker for the desktop: the input ring (shared), the handshake block with the render Worker (desk-link.ts) and the port to the render Worker. The engine composes; it does not draw. */
+export interface DeskHandover { ring: SharedArrayBuffer; ctl: SharedArrayBuffer; port: MessagePort }
+/** C-2: what the page hands the render Worker: the ONE canvas of the desktop (transferred), the port to the engine Worker and the handshake block (desk-link.ts). It draws the picture the engine composed. */
+export interface RenderHandover { canvas: OffscreenCanvas; port: MessagePort; ctl: SharedArrayBuffer }
 
 /** What the page loaded and verified for the engine (transferred to the Worker). */
 export interface BundleAssets {
@@ -14,9 +16,8 @@ export interface BundleAssets {
 }
 
 export type ToWorker =
-  | { cmd: 'init'; manifest: Manifest; assets: BundleAssets; /** the desktop canvas and the input ring */ desk: DeskHandover }
+  | { cmd: 'init'; manifest: Manifest; assets: BundleAssets; /** the input ring and the link to the render Worker */ desk: DeskHandover }
   | { cmd: 'start' }
-  | { cmd: 'readback'; key: string }
   | { cmd: 'end-idle' }
   /** a raw input event (decision 0141). `seq` numbers the page's events; `tPage` is performance.timeOrigin + performance.now() of the page when the DOM event was handled */
   | { cmd: 'input'; seq: number; tPage: number; ev: RawInput }
@@ -28,9 +29,29 @@ export type ToWorker =
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
   | { cmd: 'desk-peek' }
-  /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the GL canvas (R, G, B, A bytes) */
-  | { cmd: 'desk-gl-read' }
   | { cmd: 'ping'; id: number };
+
+/** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
+export type ToRender =
+  | { cmd: 'init'; desk: RenderHandover }
+  | { cmd: 'readback'; key: string }
+  /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the GL canvas (R, G, B, A bytes) */
+  | { cmd: 'desk-gl-read' };
+
+/** C-2: on the MessagePort, the engine Worker to the render Worker. `desk-ready`: the engine has the compositor (scene: the description is drawn with WebGL when the canvas can). `frame`: the picture was composed (changed) or the render Worker asked and nothing changed;
+ *  `buffer` is the engine's shared memory (the picture and the window surfaces are read from it), `ptr` the address of the compositor's state (or of the scene); `answers`: the inputs this change answers; `read-pixels`: a test aid asks for the picture drawn again (WebGL) */
+export type EngineToRender =
+  | { t: 'desk-ready'; scene: boolean }
+  | { t: 'frame'; changed: boolean; gen: number; ptr: number; buffer?: SharedArrayBuffer; composeMs: number; ringReads: number; wakes: number; answers?: number[] }
+  | { t: 'read-pixels' };
+
+/** C-2: on the same port, the render Worker to the engine Worker. `want`: compose now (the render Worker asks at its frame loop, or once in a while while the picture does not move); `resync`: the next compose reports the whole picture; `scene-mode`: the description is drawn with WebGL from now on; `pixels` / `pixels-error`: the answer to read-pixels */
+export type RenderToEngine =
+  | { cmd: 'want' }
+  | { cmd: 'resync' }
+  | { cmd: 'scene-mode' }
+  | { cmd: 'pixels'; width: number; height: number; data: ArrayBuffer }
+  | { cmd: 'pixels-error'; message: string };
 
 export type FromWorker =
   | { t: 'ready'; kind: string }
@@ -63,4 +84,4 @@ export type FromWorker =
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }
-  | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** animation frames delivered to the Worker / presents made from the engine's idle because none was */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
+  | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
