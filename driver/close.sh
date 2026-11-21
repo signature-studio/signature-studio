@@ -14,6 +14,12 @@ if [ "$result" = cancelled ]; then
   gh issue edit "$num" --remove-label running --add-label ready >/dev/null
   exit 0
 fi
+# 古い型 lower-0x は、バッチ(lowerb)に置き換えた。落ちても待ちに戻さず閉じる(台帳 L-037)
+if [[ $(gh issue view "$num" --json title --jq .title) == lower-0x* ]]; then
+  gh issue edit "$num" --remove-label running >/dev/null
+  gh issue close "$num" --reason "not planned" --comment "$(printf '落ちた: %s\nバッチ(lowerb)に置き換えた。待ちには戻さない(台帳 L-037)' "$url")" >/dev/null
+  exit 0
+fi
 # 原因: 報告の成果物(agent-<名前>)の judge.txt の末尾。成果物が無ければ、失敗した段の名前だけ
 note() {
   local run=${url##*/} title steps tail_=""
