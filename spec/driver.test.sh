@@ -69,7 +69,10 @@ reset "$(printf '1\tlower-0xb2\n')" ""; jq -n '{comments: [{body: "落ちた: x\
 ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: 落ちた時と状態が違えば、同じ Issue を起動する" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")" 1
 # 非 lower(survey・計画の課題など)を、lower より先に起動する(台帳 L-036)。どちらも番号の昇順
-mkdir -p "$R/queue/tasks"; printf '# survey-x\n\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\naccept: true\n' > "$R/queue/tasks/other-y.md"
+mkdir -p "$R/queue/tasks"; printf '# survey-x\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/other-y.md"
+# 型(mode)の行: script と agent は読める。行の無い物・値が不正な物・本文の無い名前は、起動の検査で落ちる(台帳 L-037)
+printf '# m-script\n\nmode: script\naccept: true\n' > "$R/queue/tasks/m-script.md"; printf '# m-agent\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/m-agent.md"
+printf '# m-none\n\naccept: true\n' > "$R/queue/tasks/m-none.md"; printf '# m-bad\n\nmode: other\naccept: true\n' > "$R/queue/tasks/m-bad.md"
 git -C "$R" add -A && git -C "$R" commit -q -m tasks
 started() { grep '^workflow run agent.yml' "$Q/log" | sed 's/.*-f task=\([^ ]*\).*/\1/' | tr '\n' ' '; }
 printf '2\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
@@ -86,6 +89,25 @@ reset "$(printf '3\tsurvey-x\n4\tother-y\n1\tlower-0xb2\n')" ""; jq -n --arg b "
 ( cd "$R" && bash driver/fill.sh > "$T/fill-order.out" 2>&1 )
 ok "fill: 非 lower で状態が同じ物は飛ばし、その枠は次の候補(other-y、lower-0xb2)に回る" "$(started)" "other-y lower-0xb2 "
 ok "fill: 飛ばした件数はログに出る(非 lower の 1 件)" "$(grep -c '状態が同じ.*1 件' "$T/fill-order.out")" 1
+# mode.sh: 本文の mode: の値(script・agent)を出す。無い・不正・本文の無い名前は、何も出さずに非 0 で終わる
+ok "mode: script のタスクは script を出す" "$(cd "$R" && bash driver/mode.sh m-script)" script
+ok "mode: agent のタスクは agent を出す" "$(cd "$R" && bash driver/mode.sh m-agent)" agent
+ok "mode: 行の無いタスクは非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh m-none)" 1
+ok "mode: 行の無いタスクは何も出さない" "$(cd "$R" && bash driver/mode.sh m-none 2>/dev/null)" ""
+ok "mode: 値が script・agent 以外なら非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh m-bad)" 1
+ok "mode: 本文の無い名前は非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh no-such-task)" 1
+# fill: mode の無いタスクは起動せず閉じる。mode: script と agent は起動する。lower- は古い型の在庫なので、mode の検査を免除する
+reset "$(printf '7\tm-none\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode の無いタスクは起動せず、閉じる" "$(grep -c -- '-f task=m-none' "$Q/log")/$(grep -c '^issue close 7' "$Q/log")" 0/1
+reset "$(printf '9\tm-script\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: script のタスクは起動する" "$(grep -c -- '-f task=m-script' "$Q/log")" 1
+reset "$(printf '9\tm-agent\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: agent のタスクは起動する" "$(grep -c -- '-f task=m-agent' "$Q/log")" 1
+reset "$(printf '9\tm-bad\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode の値が不正なタスクは起動しない" "$(grep -c -- '-f task=m-bad' "$Q/log")" 0
+reset "$(printf '9\tlower-0xd4\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: lower- の古い型は mode が無くても起動する(A6 で閉じるまでの在庫)" "$(grep -c -- '-f task=lower-0xd4' "$Q/log")" 1
+ok "fill: 起動の順は、題名が ^lower で始まる物(lowerb- を含む)を後に並べる" "$(grep -c "\$2 ~ /^lower/" "$R/driver/fill.sh")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -244,4 +266,23 @@ ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4"
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
 ok "survey-c4: 手順の行は、句点か閉じ括弧で終わる(途中で切れていない)" "$(grep -E '^[0-9]+\. ' "$S4" | grep -vcE '(。|）|\))$')" 0
 ok "survey-c4: インストゥルメントの件数が 0 件だと、手順 2 に書く" "$(grep -E '^2\. ' "$S4" | grep -c '0 件')" 1
+# タスクの粒度(台帳 L-037): 機械的な作業は mode: script(スクリプト)で行い、エージェントは規模が大のタスクだけ
+ok "台帳: L-037 が在り、5 列で、日付 2026-11-21 と出所(依頼者)が在る" "$(awk -F'\t' '$1 == "L-037" && NF == 5 && $2 == "2026-11-21" && $3 == "依頼者" { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 「タスクの粒度」の節が在り、3 時間と 30 件を書く" "$(P=$top/queue/plan.md; S=$(awk '/^## タスクの粒度/{f=1; next} /^## /{f=0} f' "$P"); if [ "$(grep -c '^## タスクの粒度' "$P")" = 1 ] && grep -q '3 時間' <<<"$S" && grep -q '30 件' <<<"$S"; then echo yes; else echo no; fi)" yes
+ok "AGENTS.md: 作業者の手順に、mode: script の行が在る" "$(grep -c '^- タスク本文の `mode: script` は、スクリプトが作業を行う' "$top/AGENTS.md")" 1
+# agent.yml(台帳 L-037): 作業の型(MODE)を読み、opencode に関わる段は agent のときだけ動く。script の段は、タスクの run: をスクリプトとして実行する
+RUNJ=$(awk '/^  run:$/{f=1} /^  close:$/{f=0} f' "$A")
+EXPECT_NAMES='リポジトリを取得する(資格は残さない)|作業の型を読む(script はスクリプト、agent は作業者)|名義を設定する(token は消す)|版の値を ci/versions.env から読む|Node を入れる|rust をそろえ、app の依存を入れてビルドし、fe-build を用意する|emsdk を入れる|アカウント ID を app/wrangler.jsonc から読む|抽出物を R2 のキャッシュから取る(公開の artifact は使わない)|抽出物を lift/out-app/host に置く|opencode を導入する(版は固定)|opencode の認証情報を取り込み、作業者のモデルを設定する|作業者を 1 回動かす|スクリプトで作業する(script。エージェントは動かさない)|判定(取り直した main の guard/judge.sh と、main のタスクで)|通った変更を main に push する(token はこの段で発行する)|報告を検査して、成果物とサマリーに出す|報告と判定の出力を成果物に保存する(7 日)'
+ok "agent.yml: run ジョブの段の名前と順が、型の 2 段を足した物と一致する" "$(awk '/^      - name: /{ sub(/^      - name: /, ""); print }' <<<"$RUNJ" | paste -sd'|')" "$EXPECT_NAMES"
+ok "agent.yml: opencode の 3 段は、if: env.MODE == 'agent' を名前の次の行に持つ" "$(awk '/^      - name: /{ name = $0; if ((getline nxt) > 0 && nxt == "        if: env.MODE == '\''agent'\''") print name }' <<<"$RUNJ" | grep -c 'opencode を導入する\|opencode の認証情報\|作業者を 1 回動かす')" 3
+ok "agent.yml: if: env.MODE == 'agent' は、ちょうど 3 つ(opencode の段だけ)" "$(grep -cF -- "        if: env.MODE == 'agent'" <<<"$RUNJ")" 3
+ok "agent.yml: opencode の段の主要な行が、変更前のまま在る(認証・導入・実行)" "$(for l in 'install -D -m 755 "$RUNNER_TEMP/package/bin/opencode" "$HOME/.opencode/bin/opencode"' 'printf '\''%s'\'' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone' 'opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")"'; do grep -cF -- "$l" <<<"$RUNJ"; done | paste -sd' ')" "1 1 1"
+MODESTEP=$(awk '/^      - name: 作業の型を読む/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: 型の段は mode.sh で TASK の型を読み、値は script か agent の 2 つだけを GITHUB_ENV に書く" "$(grep -cF -- 'm=$(bash driver/mode.sh "$TASK" || true)' <<<"$MODESTEP")/$(grep -cF -- 'case "$m" in script|agent) echo "MODE=$m" >> "$GITHUB_ENV" ;;' <<<"$MODESTEP")" 1/1
+ok "agent.yml: 型の段は、GITHUB_ENV への書き込みと、失敗時の >&2 以外に echo しない" "$(grep 'echo' <<<"$MODESTEP" | grep -v 'GITHUB_ENV' | grep -vc '>&2')" 0
+SCRIPTSTEP=$(awk '/^      - name: スクリプトで作業する/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: スクリプトの段は if: env.MODE == 'script' を持つ" "$(head -n 1 <<<"$SCRIPTSTEP" | sed 's/^ *//')" "if: env.MODE == 'script'"
+ok "agent.yml: スクリプトの段は pipefail を置き、task.sh の run: 行を bash -c で実行し、出力を script.txt に残す" "$(grep -cF -- '          set -o pipefail' <<<"$SCRIPTSTEP")/$(grep -cF -- 'cmd=$(awk' <<<"$SCRIPTSTEP")/$(grep -cF -- 'bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt"' <<<"$SCRIPTSTEP")" 1/1/1
+ok "agent.yml: スクリプトの段は opencode を動かさない" "$(grep -c 'opencode' <<<"$SCRIPTSTEP")" 0
+ok "agent.yml: スクリプトの段の失敗は止めず、判定(judge)が決める(agent の段と同じ)" "$(grep -cF -- 'script.txt" || true' <<<"$SCRIPTSTEP")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
