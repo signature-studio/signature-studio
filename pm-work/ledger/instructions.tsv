@@ -39,3 +39,7 @@ L-037	2026-11-21	依頼者	2 行足すだけのような機械的な作業に、
 L-038	2026-11-21	依頼者	エージェントに行わせるタスクは、1 件ごとに、内容を記述したファイルを持ち、内容が互いに異なる。同じ型から機械的に作った同一内容のタスクを、エージェントに行わせない	fill: mode: agent のタスクは queue/tasks/<名前>.md が無ければ起動しない。spec: queue/tasks の accept の行が互いに異なる。型(queue/kinds)は mode: script だけ(L-037)
 L-039	2026-11-21	依頼者	設計を改める。(1) queue/kinds/lower.md を削除する(2) .github/workflows/agent.yml の on は、Issues の作成・更新、PR の作成・更新、Issues・PR のコメント作成だけを認める。workflow_dispatch は Issue 番号の入力だけを許す。ブロッカー解除を検知する event があれば、workflow_dispatch は許さない(3) Issue の中に、タスクに関する全ての情報を含める(4) queue/・ci/tasks/・driver/ を全て削除する(5) マイルストーンは GitHub Milestones に、タスクは Issues とその Sub-Issues に格納する(6) タスクの依存関係を blocking/blocked-by で示し、ブロッカーのないタスクは即座に起動する。Issue の作成で起動してブロッカーがある場合、run は即座に終了する(7) PM 資料は全て pm-work/ に格納する	判定の段・テスト: spec/workflow.test.sh(on の検査)。pm-work/
 L-040	2026-11-21	依頼者	Milestones・Issues・ラベル・PR は、下書きを依頼者に見せて承認を得てから作る。承認までは、Milestones も書き込まない	承認まで、Issues・Milestones・ラベル・PR への書き込みをしない(gh の書き込みの呼び出しをしない)。下書き: pm-work/issue-drafts/・pm-work/milestones.md
+L-041	2026-11-21	依頼者	新設計でも、ブロッカーの無いタスクを常に 60 件以上保ち、60 の runner を動かし続ける。Issue の起票は、初期投入で終わらせず、持続的に回す	起票は PM が行う(pm-work/issue-drafts/WAVES.md)
+L-042	2026-11-21	依頼者	engine wasm の大きさの目標は無い。単一の wasm の上限は、ブラウザが読み込める約 1GB で、超える場合は分割する	pm-work/milestones.md の M8
+L-043	2026-11-21	依頼者	OTT・Serum 2・Vital のインストーラは、前任者の頃から R2 に在る。取得経路を依頼者に問わない	pm-work/issue-drafts/025
+L-044	2026-11-21	依頼者	依頼者に判断を求めるのは、依頼者だけが決められる事項だけにする。それ以外は PM が決める。依頼者に見せる文章は、依頼者が認識する必要のある事項だけにし、長い質問の一覧や内部の ID を書かない	依頼者への文章は短くする。質問の一覧のファイルを作らない
