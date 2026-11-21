@@ -1,0 +1,41 @@
+id	date_jst	source	text	enforcement
+L-001	2026-10-19	gen2 msg_1502eb3cd001LU4sxYbGsre74H	作業はすべて subagent で行う。依頼者の返答をゲートにしない	作業者は Actions のジョブ。判断は監査・受付。依頼者の返答を待って止まる段を作らない
+L-002	2026-11-05	gen2 msg_1a89d578c001Y9aoxVvaAiZYi1	オプトイン・オプトアウトの処理を禁止する。既定で全部有効	判定の段: guard/flags.sh(製品の新しい環境変数・ifdef・URL パラメータ・ビルド変数)
+L-003	2026-11-08	gen2 msg_1b7b15f58001NenKr0f1iII6u0	明示的な停止の指示があっても、常に動き続ける	駆動(補充)。止める操作は 1 つだけにする
+L-004	2026-11-08	gen2 msg_1b85eab66001eRrcUcythg6xrd	ワークツリーは gwq で管理する	作業のブランチは gwq で作った worktree で扱う
+L-005	2026-11-08	gen2(2 代目の削除)	ベンダー名の文字列を成果物に含めない	判定の段: guard/scan.sh の vendor 規則
+L-006	2026-11-12	gen3(11-12・11-16 の run の削除)	Cloudflare の識別子(アカウント ID・ホスト名)を公開ログとファイルに出さない	判定の段: guard/scan.sh の cfhex・cfhost 規則。ワークフローで値を echo しない
+L-007	2026-11-16	gen3 msg_1e3906868001R9PZIMtXtF5cfB	deploy.yml は 100 行以内・1 行 80 字以内。シェルスクリプトを実行しない。再利用ワークフロー・composite action・Makefile を作らない	判定の段: guard/deploy-lint.sh
+L-008	2026-10-11	gen1 msg_12ab668710014S8R9wQAssjbqi	Python は調査・検証だけ。本番の経路と製品に使わない	判定の段: guard/scan.sh の python 規則
+L-009	2026-11-17	gen3 msg_1e9ff0e38001SAKPje2dgbdGWn	作業は全て Actions で行う。このマシンの subagent で実プロダクトの作業をしない	構成の前提。製品の作業は Actions のジョブだけ
+L-010	2026-10-18	gen1 msg_14e6d77e9001qw2ML4TRw84HYD	wrangler deploy を実行しない。cf・wrangler の CLI を使わない	デプロイは deploy.yml だけ。作業者に Cloudflare の資格を渡さない。opencode.jsonc の policies
+L-011	2026-11-16	gen3	依頼者の資格情報・アカウント・設定に触れない	opencode.jsonc の policies。作業者に依頼者の個人の資格を置かない
+L-012	2026-11-16	gen3 msg_1e201a378001yhm9TI032OOtew	依頼者の名義で GitHub に書き込まない	GitHub の操作は、環境が与える名義で行う。名義を選んだり変えたりしない。portal の道具を出さない
+L-013	2026-11-16	gen3	判定だけ・確認だけのワークフローを作らない(OpenCode も動かさず、デプロイもしない CI は不要)	判定と計測は、作業ジョブの段か deploy の段に置く
+L-014	2026-11-18	gen3	プロジェクトに無関係な話を持ち出さない	添付する状態を、このプロジェクトに限る。他のセッションへの API を拒否する
+L-015	2026-11-18	gen3	同じ sessionID を使う	監査・受付は固定のセッション 1 つ
+L-016	2026-10-18	gen1 msg_14dc43ea7001m8jvtTlWomY1hR	閾値補充: 同時実行が閾値を下回れば、不足分を起動する。Actions の 60 並列以外に上限を置かない	駆動 driver/fill.sh。テストは spec/driver.test.sh
+L-017	2026-11-19	依頼者(本調査への回答)	上限を置かない。日額の上限も置かない。常に 60 以上(余裕を持つなら 100 程度)のタスクを作り、60 の runner を動かし続ける	生成器 driver/generate.sh が待ちを 100 件に保つ。閾値は queue/threshold(60)。費用は上限ではなく、測る対象
+L-018	2026-11-19	依頼者(本調査への回答)	作業者は Haiku 5.5 だけ。Opus は使わない。Sonnet 5.5 は監査・受付だけ	作業ジョブの最初の段で、モデルが Haiku でなければ落とす。opencode.jsonc の agents
+L-019	2026-11-19	依頼者(本調査への回答)	質問は「質問: 〇〇は〇〇ですか?」の形だけ。それ以外の発言は指示・是正の要求	監査・受付: 先頭が「質問:」かどうかで種別を決める。質問には道具を使わず文章で答える
+L-020	2026-11-19	依頼者(本調査への回答)	プロンプトによる是正は信頼しない。是正は仕組み(コード・設定・判定)で行う	guard/・spec/・opencode.jsonc の policies
+L-021	2026-11-19	依頼者(本調査への回答)	GitHub Actions は、依頼者が確認して承認するまで実行しない	承認の範囲を超えて起動しない。承認の前は gh workflow run・schedule・app/・lift/・ci/ に触れる push をしない(deploy.yml が動く)
+L-022	2026-11-19	依頼者(本調査への回答)	リポジトリの外に成果物を設けない	一時ファイルはリポジトリの中の .tmp-* に置き、終わったら消す。spec/guard.test.sh(guard/ がリポジトリの外を参照しない)
+L-023	2026-11-20	依頼者(本調査への回答)	commit・タグ・PR に Claude の行を付けない。commit の名義を上書きしない	名義は環境の git 設定のまま。git config user.*・git -c・GIT_AUTHOR_*・--author を使わない(opencode.jsonc の policies)
+L-024	2026-11-20	依頼者(本調査への回答)	不要なブランチを作らない	作業は main に積む
+L-025	2026-11-20	依頼者(本調査への回答)	依頼者はこのリポジトリの承認に関わらない。エージェントは、ワークフローとハーネスを自分で改善する。意味の無い制限をかけない	依頼者の承認やレビューを前提にした仕組み(CODEOWNERS など)を置かない。ハーネスの変更は、テストと判定の段を通して入れる
+L-026	2026-11-20	依頼者(本調査への回答)	依頼者が言っていない制限を、エージェントが作らない	制限(deny、判定の規則、決まり)は、台帳の依頼者の指示に対応する物だけを置く
+L-027	2026-11-20	依頼者	GitHub Actions の実行を承認した。最初の作業ジョブ 0001-read-only-check は起動済み	L-021 の承認待ちが解けた。駆動(driver/fill.sh)は閾値(queue/threshold)まで作業ジョブを起動してよい
+L-028	2026-11-20	依頼者(監視セッション経由)	lower の連鎖が全件落ちている。1〜6(連鎖停止、atomic 除外、判定修正、起動確認修正、失敗の扱い、1件確認後に閾値復帰)の全件を承認した	閾値 0 で止め、直してから 60 に戻す。復帰は 1 件の成功を確かめてから
+L-029	2026-11-20	依頼者(監視セッション経由)	lower の作業を再開する前の修正: 作業段で app をビルドする。生成器は atomic の関数を出さない。判定は standIn の true/false と engine-idle を見る。起動確認は br の配信を再現し、Chrome の起動待ちを時間で切る。落ちた原因と状態を Issue に残し、同じ状態では起動しない	.github/workflows/agent.yml(作業段の npm run build、判定の出力を成果物に、close の actions: read)・driver/generate.sh・queue/kinds/lower.md・tools/boot-check/stage-assets.mjs と cdp.mjs・driver/close.sh と fill.sh と state.sh(比べるのは作業が読む木の hash。台帳の変更では変わらない)。spec/driver.test.sh
+L-030	2026-11-20	依頼者(監視セッション経由)	判定の段は、judge の失敗をパイプで隠さない。受け入れコマンドは、作業者が一度実行した後の作業ツリーでも、作り直して起動を確かめられる	判定の段(.github/workflows/agent.yml)の set -o pipefail。queue/kinds/lower.md の accept の rm -rf(b2d-src と gen)。どちらも spec/driver.test.sh で確かめる。閾値は queue/threshold(60)
+L-031	2026-11-20	依頼者	マスクは必要ない。アカウント ID などを、すべてマスクしない	ワークフローに、値を隠す命令を置かない。判定の段: guard/scan.sh の mask 規則(.github/workflows/ の変更ファイル)。spec/guard.test.sh で確かめる
+L-032	2026-11-20	依頼者	wrangler.jsonc をその場で作り直す CI を置かない(見つかれば全て削除する)。wrangler.jsonc は、そのままデプロイに使える状態でコミットする	判定の段: guard/scan.sh の wranglergen 規則。spec: app/wrangler.jsonc が追跡され、無視されていない
+L-033	2026-11-21	依頼者(不定期フィードバック)	次の 6 つを、プロダクト完成までに必ず達成する課題として計画に含め、適切なタイミングで着手する。今すぐでなくてよい。(1) HiDPI に対応する(画面がぼやけている) (2) 画面の描画処理が音声処理を圧迫しないようにする(Worker 分離を完了する) (3) 言語パック・テーマ・プロジェクトテンプレートなど、FL Studio 自体が必要とする物を揃える (4) 100 以上の内蔵エフェクトとインストゥルメントを存在させる (5) Serum 2・OTT など多数の外部プラグインを存在させる (6) トップバー(Tempo・Song Position・Pattern Selector など)のコンテキストメニューを機能させる	計画: queue/plan.md。着手の判断は監査・受付。完成の条件は、この 6 つが全て受理されること
+L-034	2026-11-21	依頼者	内蔵のエフェクトは Plugins\Fruity\Effects に約 90 件、インストゥルメントは Plugins\Fruity\Generators に約 51 件ある(依頼者の手元の版の数。lift 対象の版とは ±2 ほど違いうる)。OpenGL を使う VFX 系は後回しにしてよい。それ以外の内蔵プラグインは、全て lift の対象	計画: queue/plan.md の C-4。件数は、インストーラの実際の一覧で確かめる
+L-035	2026-11-21	依頼者(提案)	内蔵プラグインは、1 プラグイン 1 wasm で試行する(1 ページの Worker 数の上限に当たる可能性がある場合は、この限りではない。上限に当たるかを事前に考える必要は無い)。lazy-load を採用する。FL Studio の起動に必要な wasm が揃った段階で FL Studio は起動し、プラグインが使用されていなくても、バックグラウンドでプラグインやアセットをダウンロードする。FL 起動前にダウンロードする物: FLEngine・言語パック・テーマ・プロジェクトテンプレートなど。FL 起動後にバックグラウンドでダウンロードする物: プラグインやアセットなど。バックグラウンドダウンロードは、プラグインやアセットへのアクセスを起点に始めず、FL の起動処理が始まった時点から順次行う。実現が難しいと判断した場合は、方針を変更してよい	計画: queue/plan.md の配信の方針の節。変更するときは、計画の更新の記録に書く
+L-036	2026-11-21	依頼者	動いていない物を、動いていると報告しない。稼働中の subagent・背景の処理・待ち行列の状態は、その場で実行した出力だけを根拠に報告する。出力が取れない物は『確認できない』と書く	報告の前に ps・gh の出力を取る。session.active が使えない間は、subagent の稼働数を報告しない。待ち時間そのものを減らすため、fill は非 lower のタスクを先に起動する
+L-037	2026-11-21	依頼者	2 行足すだけのような機械的な作業に、エージェントを使わない。タスクの最低粒度を、厳し目に設定する	mode: script のタスクはスクリプトが行う(driver/mode.sh・agent.yml)。queue/kinds の型は mode: script だけで、1 タスク 30 件以上(spec)。エージェントのタスクは queue/tasks の手書きで、規模: 大(spec)
+L-038	2026-11-21	依頼者	エージェントに行わせるタスクは、1 件ごとに、内容を記述したファイルを持ち、内容が互いに異なる。同じ型から機械的に作った同一内容のタスクを、エージェントに行わせない	fill: mode: agent のタスクは queue/tasks/<名前>.md が無ければ起動しない。spec: queue/tasks の accept の行が互いに異なる。型(queue/kinds)は mode: script だけ(L-037)
+L-039	2026-11-21	依頼者	設計を改める。(1) queue/kinds/lower.md を削除する(2) .github/workflows/agent.yml の on は、Issues の作成・更新、PR の作成・更新、Issues・PR のコメント作成だけを認める。workflow_dispatch は Issue 番号の入力だけを許す。ブロッカー解除を検知する event があれば、workflow_dispatch は許さない(3) Issue の中に、タスクに関する全ての情報を含める(4) queue/・ci/tasks/・driver/ を全て削除する(5) マイルストーンは GitHub Milestones に、タスクは Issues とその Sub-Issues に格納する(6) タスクの依存関係を blocking/blocked-by で示し、ブロッカーのないタスクは即座に起動する。Issue の作成で起動してブロッカーがある場合、run は即座に終了する(7) PM 資料は全て pm-work/ に格納する	判定の段・テスト: spec/workflow.test.sh(on の検査)。pm-work/
+L-040	2026-11-21	依頼者	Milestones・Issues・ラベル・PR は、下書きを依頼者に見せて承認を得てから作る。承認までは、Milestones も書き込まない	承認まで、Issues・Milestones・ラベル・PR への書き込みをしない(gh の書き込みの呼び出しをしない)。下書き: pm-work/issue-drafts/・pm-work/milestones.md

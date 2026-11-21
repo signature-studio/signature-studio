@@ -1,20 +1,19 @@
-// The engine Worker (module worker). Owns the engine instance. The lifted FL engine runs in Module(). The runtime composes the windows into one picture of the screen (decision 0223) and this Worker shows it on the one
-// canvas the page transferred (desk.ts); the page gets no pixel and knows no window. Input arrives through a SharedArrayBuffer ring (input/ring.ts), the cursor and the title as small messages.
-import { sha256Hex } from '../bundle/sha256.ts';
+// The engine Worker (module worker). Owns the engine instance. The lifted FL engine runs in Module(). The runtime composes the windows into one picture of the screen (decision 0223). Since C-2 this Worker only
+// composes: it says to the render Worker (render-worker.ts, over a MessagePort) that the picture changed, and that Worker draws it from the engine's shared memory (desk-link.ts is the handshake). The page gets no pixel and knows no window.
+// Input arrives through a SharedArrayBuffer ring (input/ring.ts), the cursor and the title as small messages.
 import { classifyEngineError, FruityEngine, type FruityHost } from './fruity.ts';
 import { hostPackFromBytes } from './hostfiles.ts';
 import { IdleDriver, newDriverStats } from './idle-driver.ts';
 import { IdleTrace } from './idle-trace.ts';
 import { ReportThrottle } from './report-throttle.ts';
 import { TaskbarReport } from './taskbar-report.ts';
-import { watchContextLoss, type ContextLossTarget } from './ctx-resync.ts';
-import type { FromWorker, ToWorker } from './protocol.ts';
+import type { EngineToRender, FromWorker, RenderToEngine, ToWorker } from './protocol.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
-import { DeskPresenter, readDeskState, type DeskApi, type DeskSurface } from './desk.ts';
-import { GlDeskPresenter, webgl2Usable, type DeskShow, type GlSurface, type SceneApi } from './desk-gl.ts';
+import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
+import { sceneGen } from './desk-gl.ts';
+import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
-import { QuietClock } from './desk-sleep.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -32,14 +31,23 @@ const reports = new ReportThrottle();
 const trace = new IdleTrace();
 const checkpoints: { n: number; hash: number }[] = [];
 let lastAppSeq = -1;
-// decision 0223: the one canvas of the desktop (the runtime composes the windows into one picture; this Worker shows it) and the input ring. Nothing below knows about windows.
-let deskCanvas: OffscreenCanvas | null = null;
-let deskPresenter: DeskShow | null = null;
+// decision 0223: the input ring. The desktop: the picture is composed here and drawn by the render Worker (C-2): `port` carries the messages, `gate` the handshake. Nothing below knows about windows.
 let ring: RingReader | null = null;
-const DESK_FALLBACK_MS = 20;
-/** desk2: when no present changed a pixel for this long, the Worker stops asking for animation frames and looks for a change from the engine's idle (at most every DESK_FALLBACK_MS); the first change wakes the frame loop */
-const DESK_SLEEP_AFTER_MS = 100;
-const deskCounters = { ringReads: 0, wakes: 0, ticks: 0, idleTicks: 0 };
+let port: MessagePort | null = null;
+let gate: DeskGate | null = null;
+const deskCounters = { ringReads: 0, wakes: 0 };
+/** C-2: the compositor's API, once the wasm is instantiated; `deskReady`: the render Worker has been told that there is one */
+let deskApi: DeskApi | null = null;
+let deskReady = false;
+let deskMissingLogged = false;
+/** the scene mode (decision 0240) is on: the description is composed with scene() and drawn by the render Worker with WebGL2 */
+let deskScene = false;
+/** the address of the compositor's state (or of the scene) at the last compose, and the composes' time not yet told to the render Worker */
+let deskPtr = 0;
+let pendingComposeMs = 0;
+let framesSent = 0;
+let pendingDump: string | null = null;
+let sharedWarned = false;
 
 const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
 
@@ -55,19 +63,18 @@ async function handle(m: ToWorker): Promise<void> {
     case 'end-idle': if (fruity && !(driver ? driver.end() : fruity.endIdle())) log('warn', 'the engine is not idle: nothing to end'); break;
     case 'input': onInput(m.seq, m.tPage, m.ev); break;
     case 'filedlg-answer': onFileDlgAnswer(m.id, m.answer); break;
-    case 'readback': await readback(m.key); break;
     case 'wake': deskCounters.wakes++; drainRing(); break;
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
-    case 'desk-gl-read': deskGlRead(); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
 
 async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
-  deskCanvas = m.desk.canvas;
   ring = new RingReader(m.desk.ring);
-  watchContextLoss(deskCanvas as unknown as ContextLossTarget, { lost: () => { deskPresenter?.resync(); wakeDesk(); }, restored: () => { deskPresenter?.resync(); wakeDesk(); } });   // a sleeping frame loop (desk2) is woken: the whole picture is sent again
+  port = m.desk.port;
+  port.onmessage = (ev: MessageEvent<RenderToEngine>) => onRender(ev.data);
+  gate = new DeskGate(m.desk.ctl);
   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');
   const host: FruityHost = {
     mark,
@@ -113,7 +120,7 @@ function ensureDriver(): IdleDriver | null {
       flushLogs();
       post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle })) });
       // decision 0223: what the engine drew in answer to the input is shown now, not at the next animation frame (S-desk-input-present); the compositor holds the frame until the display's next refresh either way
-      if (deskPresenter) { try { const shown = deskTick(false); flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+      if (deskReady) { try { deskTick(false, list.map((x) => x.seq)); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
     },
     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
     resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
@@ -187,20 +194,21 @@ function inputDone(ptr: number, n: number): void {
   inlineStaged = [];
   if (done.length > 0) { if (d.awaitingCount === 0) inlineSince = performance.now(); inlineSettled = false; d.injectedInline(done); }
 }
-// the answer to the inputs the runtime took inline: the first present that changed a pixel after the injection, by whichever path made it (this function, the rAF tick, the idle's fallback present: deskTick calls completeInline when it shows
-// something and inputs await); this function tries a present every INLINE_TRY_MS, and after INLINE_GIVEUP_MS without a change the inputs are finished without an answer (an input that changes no pixel)
-function completeInline(shown: boolean): void {
+// the answer to the inputs the runtime took inline: the first compose that changed a pixel after the injection, by whichever path made it (this function, the render Worker's question: deskTick calls completeInline when it changes
+// something and inputs await); this function tries a compose every INLINE_TRY_MS, and after INLINE_GIVEUP_MS without a change the inputs are finished without an answer (an input that changes no pixel)
+/** the inputs the runtime took inline are done; `shown`: the present that answers them showed a change (their sequence numbers are returned, for the render Worker's latency report) */
+function completeInline(shown: boolean): number[] | undefined {
   const d = driver;
-  if (!d || d.awaitingCount === 0 || inlineSince === 0) return;
+  if (!d || d.awaitingCount === 0 || inlineSince === 0) return undefined;
   const list = d.takeAwaiting(), at = nowAbs();
   inlineSince = 0;
   inlineSettled = false;
   post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle: at })) });
-  flushDeskStats(true, shown ? list.map((x) => x.seq) : undefined);
+  return shown ? list.map((x) => x.seq) : undefined;
 }
 function answerInline(): void {
   const d = driver;
-  if (!d || d.awaitingCount === 0 || !deskPresenter || inlineSince === 0) return;
+  if (!d || d.awaitingCount === 0 || !deskReady || inlineSince === 0) return;
   const t = performance.now();
   if (!inlineSettled) { if (t - inlineSince >= INLINE_GIVEUP_MS) completeInline(false); return; }
   if (t - inlineTryAt < INLINE_TRY_MS) return;
@@ -216,14 +224,13 @@ function reportIdle(n: number, nowTicks: number, nextTicks: number, busyMs: numb
   post({ t: 'idle', n, now: nowTicks, next: nextTicks, busyMs, abs, caps, stats: driver?.stats ?? { ...newDriverStats(), idleCount: n }, queued: driver?.queued ?? 0, ...(checkpoints.length ? { trace: checkpoints.splice(0) } : {}), memBytes: curMemory()?.buffer.byteLength, ...(fruity?.hostFileStats ? { hostFiles: fruity.hostFileStats } : {}) });
 }
 
-// the engine is waiting: show what it drew (the desktop picture), then let the driver decide (give queued input, or wait for the engine's next deadline)
+// the engine is waiting: then let the driver decide (give queued input, or wait for the engine's next deadline). The picture is not composed here (C-2): the render Worker asks for it (onRender 'want'), and its own frame loop
+// is not held back by the engine's business, which is what the idle used to do with a compose every 20 ms while nothing moved
 function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
   const ck = trace.push(n, nowTicks, nextTicks);
   if (ck) checkpoints.push(ck);
   flushLogs();
-  startDeskLoop();
-  // the Worker's requestAnimationFrame is not delivered while the engine keeps the Worker busy (measured, when the engine runs behind the wall clock): the picture is then shown from here, at most every DESK_FALLBACK_MS
-  if (performance.now() - lastTickAt > DESK_FALLBACK_MS) { lastTickAt = performance.now(); deskCounters.idleTicks++; try { deskTick(); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+  sendDeskReady();
   if (saveArmed) pollSavedFiles();
   ensureDriver();
   drainRing(); // the page's input waits in the ring: it is queued now and given to the engine by onIdle below
@@ -277,9 +284,8 @@ async function startFruity(f: FruityEngine): Promise<void> {
   const result = await f.run();
   stopAudioReport();
   flushLogs();
-  try { deskTick(); } catch (e) { log('error', `final desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
-  flushDeskStats(true);
-  const drawn = deskPresenter?.stats.presents ?? 0;
+  try { deskTick(false); } catch (e) { log('error', `final desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+  const drawn = framesSent;
   mark('worker_done', { memoryBytes: curMemory()?.buffer.byteLength ?? null, drawn, hostFiles: f.hostFileStats });
   if (result.kind === 'trap') {
     const c = classifyEngineError(result.message);
@@ -291,29 +297,7 @@ async function startFruity(f: FruityEngine): Promise<void> {
   }
 }
 
-function deskGlRead(): void {
-  const p = deskPresenter;
-  if (!(p instanceof GlDeskPresenter)) { post({ t: 'desk-dump-error', message: 'the desktop is not shown with WebGL (the canvas gave no WebGL2 context)' }); return; }
-  const r = p.readPixels();
-  if (!r) { post({ t: 'desk-dump-error', message: 'no scene has been drawn yet' }); return; }
-  const data = r.data.buffer as ArrayBuffer;
-  post({ t: 'desk-gl-pixels', width: r.width, height: r.height, data }, [data]);
-}
-
-async function readback(key: string): Promise<void> {
-  if (key !== 'desk' || !deskCanvas) { post({ t: 'readback-error', key, message: `no OffscreenCanvas bound to ${key}` }); return; }
-  if (deskPresenter instanceof GlDeskPresenter) {
-    const r = deskPresenter.readPixels();
-    if (!r) { post({ t: 'readback-error', key, message: 'no scene has been drawn yet' }); return; }
-    post({ t: 'readback', key, width: r.width, height: r.height, sha256: await sha256Hex(r.data) });
-    return;
-  }
-  const ctx = deskCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
-  const d = ctx.getImageData(0, 0, deskCanvas.width, deskCanvas.height);
-  post({ t: 'readback', key, width: deskCanvas.width, height: deskCanvas.height, sha256: await sha256Hex(new Uint8Array(d.data.buffer)) });
-}
-
-// ---- decision 0223: the desktop ----
+// ---- decision 0223: the desktop (the picture is drawn by the render Worker, render-worker.ts; C-2) ----
 // The input: the page writes raw events into the ring (input/ring.ts); they are read here at every idle of the engine and when the page wakes the Worker. Nothing else changed in how the engine is given input.
 function drainRing(): void {
   if (!ring) return;
@@ -323,112 +307,104 @@ function drainRing(): void {
   if (n) deskCounters.ringReads++;
 }
 
-// The picture: once per animation frame of the Worker (requestAnimationFrame of a dedicated Worker; setTimeout where it is missing), the compositor of the runtime is asked to bring the picture up to date and the
-// changed rectangles are put on the canvas (desk.ts). The same tick reads the operating system's state that is not a picture (the cursor, the title of the foreground window) and reports it when it changed.
-let deskLoopOn = false;
-let firstDeskPixel = false;
-const presentedAt: number[] = [];
-let lastDeskReport = 0;
-let lastTickAt = 0;
+// The picture (C-2): the compositor of the runtime is asked to bring the picture up to date when the render Worker asks (onRender 'want'), and when an input is answered (answerInline, the processed inputs).
+// A compose changes the picture in the engine's memory and the render Worker reads what changed from there (render-worker.ts). Nothing is composed while the render Worker has not read the last picture (gate.busy).
+// The operating system's state that is not a picture (the cursor, the title of the foreground window, the taskbar) is read at each compose, as before.
 let lastOs = '';
 let lastTitle = '';
 const taskbarReport = new TaskbarReport();
-const deskQuiet = new QuietClock(DESK_SLEEP_AFTER_MS, performance.now());
-let deskNextFrame: (() => void) | null = null;
-function startDeskLoop(): void {
-  if (deskLoopOn) return;
-  deskLoopOn = true;
-  const g = self as unknown as { requestAnimationFrame?: (cb: (t: number) => void) => number };
-  const next = (): void => { if (g.requestAnimationFrame) g.requestAnimationFrame(tick); else setTimeout(tick, 16); };
-  const tick = (): void => {
-    deskCounters.ticks++;
-    const now = performance.now();
-    lastTickAt = now;
-    try { deskTick(); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
-    // nothing changed for DESK_SLEEP_AFTER_MS: no more animation frames until the picture changes (the engine's idle looks for a change at most every DESK_FALLBACK_MS and wakes the loop; a Worker that asks for a frame every
-    // refresh of the display keeps the compositor and the GPU process working for a picture that does not move: measured with the refresh rate unlimited, and at 240 Hz)
-    if (deskQuiet.sleepAfterFrame(now)) return;
-    next();
-  };
-  deskNextFrame = next;
-  deskQuiet.wake(performance.now());
-  next();
+
+function renderPost(m: EngineToRender, transfer: Transferable[] = []): void { port?.postMessage(m, transfer); }
+
+/** the compositor's API (decision 0223; scene: decision 0240), once the wasm is instantiated */
+function compositor(): DeskApi | null {
+  if (deskApi) return deskApi;
+  deskApi = fruity?.deskApi ?? null;
+  if (!deskApi && fruity?.instance && !deskMissingLogged) { deskMissingLogged = true; log('error', 'display method D: this engine build has no desktop compositor'); }
+  return deskApi;
 }
-function wakeDesk(): void {
-  if (deskQuiet.wake(performance.now())) deskNextFrame?.();
+
+/** tells the render Worker once that there is a compositor, and whether its description is to be drawn with WebGL (the scene exports exist) */
+function sendDeskReady(): void {
+  if (deskReady || !port) return;
+  const api = compositor();
+  if (!api) return;
+  deskReady = true;
+  renderPost({ t: 'desk-ready', scene: !!(api.scene && api.sceneMode) });
 }
-/**
- * Decision 0240: how the desktop is shown is decided here, once, by what the browser can do - not by a URL parameter or a setting. When the engine describes its scene (fle_desk_scene) and the canvas gives a WebGL2 context, the
- * description is drawn with WebGL2 (desk-gl.ts); otherwise the runtime composes one picture and putImageData shows it (desk.ts). The two never run together: the runtime is switched to the scene only after the GL context exists.
- */
-function makeDeskPresenter(api: DeskApi): DeskShow {
-  const memory = (): ArrayBufferLike | null => fruity?.memory?.buffer ?? null;
-  if (api.scene && api.sceneMode && webgl2Usable(() => new OffscreenCanvas(1, 1) as unknown as GlSurface)) {
-    try {
-      const gl = new GlDeskPresenter(deskCanvas as unknown as GlSurface, api as SceneApi, memory);
-      const target = deskCanvas as unknown as { addEventListener(type: string, listener: (ev: Event) => void): void };
-      target.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); gl.setLost(true); });
-      target.addEventListener('webglcontextrestored', () => { gl.setLost(false); wakeDesk(); });
-      log('info', 'display method D: the runtime describes the desktop (windows, positions, written rectangles) and this Worker draws it with WebGL2, one texture per window');
-      return gl;
-    } catch (e) {
-      log('info', `display method D: no WebGL2 for the desktop canvas (${String((e as Error)?.message ?? e)}); the runtime composes one picture and this Worker shows it with putImageData`);
+
+/** the render Worker's messages: its question (compose now), the resync, the scene mode, and the answer to a test aid's read-pixels */
+function onRender(m: RenderToEngine): void {
+  switch (m.cmd) {
+    case 'want': sendDeskReady(); deskTick(true); break;
+    case 'resync': compositor()?.resync(); break;
+    case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
+    case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
+    case 'pixels-error': pendingDump = null; post({ t: 'desk-dump-error', message: m.message }); break;
+  }
+}
+
+/** one compose (the picture brought up to date) and the hand-over to the render Worker: when the picture changed, it is told, with the inputs this change answers (`seqs`, and the inline ones); `reply`: the render Worker asked, so it is answered even when nothing changed. True when the picture changed */
+function deskTick(reply: boolean, seqs?: number[]): boolean {
+  const api = compositor(), mem = fruity?.memory;
+  if (!api || !mem || !gate) { if (reply) renderNoChange(); return false; }
+  if (gate.busy) { if (reply) renderNoChange(); return false; }
+  const gate0 = inlineSettled;   // decision 0280, L1c: read before the compose: the picture of this compose is composed after it
+  const t0 = performance.now();
+  const ptr = deskScene && api.scene ? api.scene() : api.compose();
+  pendingComposeMs += performance.now() - t0;
+  deskPtr = ptr;
+  const buf = mem.buffer;   // after the compose: it can grow the memory
+  const gen = ptr === 0 ? gate.published : deskScene ? sceneGen(buf, ptr) : deskGen(buf, ptr);
+  const changed = ptr !== 0 && gen !== gate.published;
+  let answers: number[] | undefined;
+  if (changed) {
+    gate.publish(gen);
+    framesSent++;
+    if (gate0) answers = completeInline(true);   // decision 0280: the inputs the runtime took inline are answered by the first change that shows something
+    if (seqs) answers = [...(answers ?? []), ...seqs];
+  }
+  if (changed || reply) {
+    const shared = buf instanceof SharedArrayBuffer ? buf : null;
+    if (!shared && !sharedWarned) { sharedWarned = true; log('error', 'the engine memory is not shared: the render Worker cannot read the picture from it'); }
+    renderPost({ t: 'frame', changed, gen: gate.published, ptr, ...(shared ? { buffer: shared } : {}), composeMs: pendingComposeMs, ringReads: deskCounters.ringReads, wakes: deskCounters.wakes, ...(answers && answers.length > 0 ? { answers } : {}) });
+    pendingComposeMs = 0;
+  }
+  if (fruity) {
+    const v = fruity.readAppView(lastAppSeq);
+    if (v) {
+      lastAppSeq = v.seq;
+      const os = osStateOf(v, lastTitle);
+      lastTitle = os.title;
+      const key = osStateKey(os);
+      if (key !== lastOs) { lastOs = key; post({ t: 'osstate', ...os, abs: nowAbs() }); }
     }
-  } else log('info', 'display method D: no scene description in this engine build (fle_desk_scene) or no usable WebGL2 (a context with a largest texture of at least 8192); the runtime composes one picture and this Worker shows it with putImageData');
-  return new DeskPresenter(deskCanvas as unknown as DeskSurface, api, memory);
+    // decision 0272: a minimized window with a taskbar button, as the engine says it (null: this build has no such export; nothing is posted)
+    const tb = taskbarReport.next(fruity.taskbarIconic());
+    if (tb !== null) post({ t: 'taskbar', lid: tb });
+  }
+  return changed;
 }
-/** one present; true when it changed a pixel. `flush`: tell the page about it now unless it was told less than 100 ms ago */
-function deskTick(flush = true): boolean {
-  if (!fruity || !deskCanvas) return false;
-  if (!deskPresenter) {
-    const api = fruity.deskApi;
-    if (!api) { log('error', 'display method D: this engine build has no desktop compositor'); deskLoopOn = false; return false; }
-    deskPresenter = makeDeskPresenter(api);
-  }
-  const gate = inlineSettled;   // decision 0280, L1c: read before the present: the picture of this present is composed after it
-  const shown = deskPresenter.present();
-  if (shown > 0) {
-    presentedAt.push(nowAbs());
-    if (deskQuiet.changed(performance.now())) deskNextFrame?.();
-    if (gate) completeInline(true);   // decision 0280: inputs the runtime took inline are answered by the first present that shows something
-    if (!firstDeskPixel) { firstDeskPixel = true; mark('first_pixel', { source: 'desktop', width: deskCanvas.width, height: deskCanvas.height }); }
-  }
-  const v = fruity.readAppView(lastAppSeq);
-  if (v) {
-    lastAppSeq = v.seq;
-    const os = osStateOf(v, lastTitle);
-    lastTitle = os.title;
-    const key = osStateKey(os);
-    if (key !== lastOs) { lastOs = key; post({ t: 'osstate', ...os, abs: nowAbs() }); }
-  }
-  // decision 0272: a minimized window with a taskbar button, as the engine says it (null: this build has no such export; nothing is posted)
-  const tb = taskbarReport.next(fruity.taskbarIconic());
-  if (tb !== null) post({ t: 'taskbar', lid: tb });
-  if (flush) flushDeskStats(false);
-  return shown > 0;
-}
-function flushDeskStats(force: boolean, answers?: number[]): void {
-  const now = performance.now();
-  if (!force && now - lastDeskReport < 100) return;
-  if (!deskPresenter || (presentedAt.length === 0 && !force && now - lastDeskReport < 1000)) return;
-  lastDeskReport = now;
-  post({ t: 'desk', stats: { ...deskPresenter.stats, ringReads: deskCounters.ringReads, ringFull: 0, wakes: deskCounters.wakes, ticks: deskCounters.ticks, idleTicks: deskCounters.idleTicks, sleeps: deskQuiet.sleeps }, at: presentedAt.splice(0, 64), ...(answers && answers.length > 0 ? { answers } : {}), nWindows: 0 });
+
+/** the answer to a question that found the picture busy: nothing changed (the render Worker's last picture is the one it has) */
+function renderNoChange(): void {
+  if (port && gate) renderPost({ t: 'frame', changed: false, gen: gate.published, ptr: deskPtr, composeMs: 0, ringReads: deskCounters.ringReads, wakes: deskCounters.wakes });
 }
 
 // A test aid (any display method): the compositor is asked for the whole desktop as the window table is now, and the picture is copied out. With display method D the next present shows everything again as well.
 function deskDump(peek: boolean): void {
-  const api = fruity?.deskApi, mem = fruity?.memory;
+  const api = compositor(), mem = fruity?.memory;
   if (!api || !mem) { post({ t: 'desk-dump-error', message: 'this engine build has no desktop compositor' }); return; }
-  // peek: the picture as it is (what the presenter last read), no compose; dump: the whole picture drawn again from the window table (the next present then shows everything)
-  if (peek && deskPresenter instanceof GlDeskPresenter) {   // decision 0240: with WebGL the picture 'as it is' is the scene drawn again from the textures the browser holds, read back
-    const r = deskPresenter.readPixels();
-    if (!r) { post({ t: 'desk-dump-error', message: 'the compositor has no picture yet' }); return; }
-    const copy = r.data.buffer as ArrayBuffer;
-    post({ t: 'desk-dump', width: r.width, height: r.height, data: copy, windows: api.describe() }, [copy]);
+  // peek: the picture as it is (what the render Worker last read), no compose; dump: the whole picture drawn again from the window table (the next present then shows everything)
+  if (peek && deskScene) {   // decision 0240: with WebGL the picture 'as it is' is the scene drawn again from the textures the browser holds: the render Worker reads it back, the answer comes as 'pixels'
+    pendingDump = api.describe();
+    renderPost({ t: 'read-pixels' });
     return;
   }
-  let st = peek ? deskPresenter?.lastState ?? null : null;
-  if (!peek) { api.resync(); const ptr = api.compose(); st = readDeskState(mem.buffer, ptr); }   // the buffer after compose: it can grow the memory (see DeskPresenter.present)
+  if (!peek && gate?.busy) { post({ t: 'desk-dump-error', message: 'the picture is being shown: ask again' }); return; }
+  let st: DeskState | null = null;
+  if (peek) st = deskPtr ? readDeskState(mem.buffer, deskPtr) : null;
+  else { api.resync(); deskPtr = api.compose(); st = readDeskState(mem.buffer, deskPtr); }   // the buffer after compose: it can grow the memory (see DeskPresenter.present)
   if (!st) { post({ t: 'desk-dump-error', message: 'the compositor has no picture yet' }); return; }
   const data = new Uint8Array(mem.buffer, st.pixels, st.height * st.stride).slice().buffer as ArrayBuffer;   // decision 0271: a SharedArrayBuffer's slice() is a SharedArrayBuffer, which cannot be in the transfer list (DataCloneError in Firefox without WebGL); a Uint8Array's slice() copies into a plain ArrayBuffer
   if (!peek) api.resync();
