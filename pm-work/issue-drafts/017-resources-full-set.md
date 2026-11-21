@@ -7,12 +7,11 @@ parent: "012"
 blocked_by: ["013", "016"]
 labels: ["task", "resources", "priority-p1"]
 size: 5
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (3): 言語パック・テーマ・プロジェクトテンプレートなど、FL Studio 自体が必要とする物を揃える。今の抽出の木は、seed の表と同じ範囲(238 件)しか持たない。インストーラの全件の一覧(013)と、見つからなかったファイルの記録(016)を使って、足りない物を入れる。
+課題 C-3: 言語パック・テーマ・プロジェクトテンプレートなど、FL Studio 自体が必要とする物を揃える。今の抽出の木は、seed の表と同じ範囲(238 件)しか持たない。インストーラの全件の一覧(013)と、見つからなかったファイルの記録(016)を使って、足りない物を入れる。
 
 ## 規模
 
@@ -23,7 +22,7 @@ needs_owner: false
 - 旧の測定(pm-work/findings/survey-c3-fl-resources.md。runner の値): 抽出の木(238 件)と seed の表(ファイル 227 件)は、件数も名前も一致した(missing 0)。分類: 言語 `System\Languages\` は 1 件(`en.svg`、899 B)。テーマ `Artwork\Skins\` は 3 件(343,555 B)。テンプレート `Data\Templates\` はディレクトリの行だけでファイルは 0 件。デモ `Data\Demo projects\` は 1 件(313,356 B)。既定のプロジェクト `Data\System\Empty.flp` は 1 件(46,361 B)。
 - 「全件」は、インストーラの一覧(013)が出るまで分からない。インストーラの言語とテーマの全件の数は、未確認。
 - seed の表: `lift/harness/seeds/vfs-seed-idle1.tsv`(247 行。guest のパス、抽出先、SHA-256)。seed の pack の作り: `app/scripts/pack-seed.mjs`。抽出: `app/scripts/extract-fl.mjs`(seed の行を抽出先で引き、無ければ終了コード 2 で止まる)。
-- 起動前の取得に入る: seed pack は、起動前の取得(`app/src/main.ts` 714〜717 行)の中。言語・テーマ・テンプレートは、起動前に取る物の区分に入る(L-035)。
+- 起動前の取得に入る: seed pack は、起動前の取得(`app/src/main.ts` 714〜717 行)の中。言語・テーマ・テンプレートは、起動前に取る物の区分に入る。
 
 ## 読む物
 
@@ -59,9 +58,9 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- 作業者に依頼者の個人の資格を置かない(L-011)。インストーラの取得は、R2 の鍵を持つ段だけ。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。インストール先の既定の値を、表にも報告にも書かない。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- 作業者に依頼者の個人の資格を置かない。インストーラの取得は、R2 の鍵を持つ段だけ。
+- ベンダー名と Cloudflare の識別子を書かない。インストール先の既定の値を、表にも報告にも書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係

@@ -7,12 +7,11 @@ parent: "012"
 blocked_by: ["014"]
 labels: ["task", "delivery", "plugin-builtin"]
 size: 4
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-035 の試行: 内蔵のプラグイン 1 件(Fruity Balance)を、起動後にバックグラウンドで届け、1 プラグイン 1 wasm の形を、最初の 1 件で確かめる。内蔵の 141 件(台帳 L-034)の全件を入れる前の、型の確認。
+試行: 内蔵のプラグイン 1 件(Fruity Balance)を、起動後にバックグラウンドで届け、1 プラグイン 1 wasm の形を、最初の 1 件で確かめる。内蔵の 141 件の全件を入れる前の、型の確認。
 
 ## 規模
 
@@ -59,9 +58,9 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
 - 製品の既定の動作を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 依頼者が言っていない制限(例: 他のプラグインの扱い)を、この作業の判断で増やさない。
 

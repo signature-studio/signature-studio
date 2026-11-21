@@ -7,12 +7,11 @@ parent: "018"
 blocked_by: ["015"]
 labels: ["task", "plugin-builtin", "delivery", "priority-p1"]
 size: 4
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-035 と L-034: 内蔵のエフェクトを、起動後にバックグラウンドで届ける(1 プラグイン 1 wasm)。Fruity Filter と Fruity Delay 2 を、015 で作った型に乗せる。
+依頼者の指示: 内蔵のエフェクトを、起動後にバックグラウンドで届ける(1 プラグイン 1 wasm)。Fruity Filter と Fruity Delay 2 を、015 で作った型に乗せる。
 
 ## 規模
 
@@ -59,8 +58,8 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係

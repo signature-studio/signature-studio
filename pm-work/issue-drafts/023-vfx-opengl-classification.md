@@ -7,12 +7,11 @@ parent: "018"
 blocked_by: ["013"]
 labels: ["task", "plugin-builtin", "inventory", "priority-p1"]
 size: 3
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-034: OpenGL を使う VFX 系は後回しにしてよい。後回しにする物の一覧を、インストーラの import の情報で作り、理由(OpenGL の DLL を import する)を書く。後回しの物は、020 の表から外す。
+依頼者の指示: OpenGL を使う VFX 系は後回しにしてよい。後回しにする物の一覧を、インストーラの import の情報で作り、理由(OpenGL の DLL を import する)を書く。後回しの物は、020 の表から外す。
 
 ## 規模
 
@@ -53,13 +52,13 @@ node -e 'const fs=require("fs");const inv=fs.readFileSync("inputs/fl-installer-f
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
-- Python を製品に使わない(L-008)。判定は既存の道具か JavaScript で行う。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- ベンダー名と Cloudflare の識別子を書かない。
+- Python を製品に使わない。判定は既存の道具か JavaScript で行う。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係
 
 - blocked_by: 013。
 - 020 が、この Issue の一覧を使う。
-- 後回しの VFX 系の着手は、この Issue の後に、依頼者の判断で決める(QUESTIONS 4)。
+- 後回しの範囲は、この Issue の判定で決まる。判定の結果(件数と名前)は、この Issue の報告に出す。後回しの物の実装は 039 で、全群の後に行う。

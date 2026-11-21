@@ -1,18 +1,17 @@
 ---
 draft: "026"
-title: "VST3 の link を既定で有効にする(オプトインを外す。台帳 L-002)"
+title: "VST3 の link を既定で有効にする(オプトインを外す)"
 type: task
 milestone: "M6 外部プラグイン"
 parent: "024"
 blocked_by: []
 labels: ["task", "plugin-external", "priority-p1"]
 size: 6
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-002: オプトイン・オプトアウトの処理を作らない。既定で全部有効。VST3 の link が、今は「opt-in」の注釈つきで、製品の build に入っていない。この Issue は、VST3 の経路を既定で有効にし、外部プラグインが読み込める状態を作る。
+オプトイン・オプトアウトの処理を作らない。既定で全部有効。VST3 の link が、今は「opt-in」の注釈つきで、製品の build に入っていない。この Issue は、VST3 の経路を既定で有効にし、外部プラグインが読み込める状態を作る。
 
 ## 規模
 
@@ -63,8 +62,8 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。オプトインを作らない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない。
+- ベンダー名と Cloudflare の識別子を書かない。
 - 製品の build を変えるので、main の deploy の仕組みが動く。報告に書く(AGENTS.md の運用)。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 

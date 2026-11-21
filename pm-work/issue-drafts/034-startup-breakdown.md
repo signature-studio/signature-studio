@@ -7,7 +7,6 @@ parent: "033"
 blocked_by: []
 labels: ["task", "startup", "verify", "priority-p1"]
 size: 3
-needs_owner: false
 ---
 
 ## 目的
@@ -56,9 +55,9 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。計測のための切り替えを、製品に作らない。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。計測のための切り替えを、製品に作らない。
 - 製品の既定の起動の動作を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。待ちは JS のタイマーで行う。
 
 ## 他のタスクとの関係

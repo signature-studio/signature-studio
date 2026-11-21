@@ -7,12 +7,11 @@ parent: "009"
 blocked_by: ["010"]
 labels: ["task", "topbar-menu", "priority-p2"]
 size: 5
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (6): Tempo・Song Position・Pattern Selector などのトップバーのコンテキストメニューが機能すること。3 つの部品それぞれで、メニューの項目を選ぶと、部品の表示する値が変わる。
+課題 C-6: Tempo・Song Position・Pattern Selector などのトップバーのコンテキストメニューが機能すること。3 つの部品それぞれで、メニューの項目を選ぶと、部品の表示する値が変わる。
 
 ## 規模
 
@@ -57,9 +56,9 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
 - 製品の既定の動作を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係

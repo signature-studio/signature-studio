@@ -7,12 +7,11 @@ parent: null
 blocked_by: []
 labels: ["epic", "verify"]
 size: "子の合計"
-needs_owner: false
 ---
 
 ## 目的
 
-完成の条件(台帳 L-033): 6 つの課題(C-1〜C-6)が、全て「受理」されること。P1・P2・P3 の最終の実測を、同じ道具で行い、報告する。
+完成の条件: 6 つの課題(C-1〜C-6)が、全て「受理」されること。P1・P2・P3 の最終の実測を、同じ道具で行い、報告する。
 
 ## 背景
 
@@ -25,9 +24,9 @@ needs_owner: false
 
 ## Sub-Issue の一覧
 
-- 038 完成の検証(blocked_by: 全ての Epic。needs_owner。needs-owner)
+- 038 完成の検証(blocked_by: 全ての Epic と 039)
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- ベンダー名と Cloudflare の識別子を書かない。

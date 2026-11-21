@@ -7,12 +7,11 @@ parent: "005"
 blocked_by: []
 labels: ["task", "hidpi", "priority-p2"]
 size: 6
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (1): HiDPI に対応する(画面がぼやけている)。拡大率 1・1.5・2 で、描画の画素と CSS の大きさが一致し、窓の文字や部品が、拡大率 1 の時と同じ CSS の大きさに見えること。
+課題 C-1: HiDPI に対応する(画面がぼやけている)。拡大率 1・1.5・2 で、描画の画素と CSS の大きさが一致し、窓の文字や部品が、拡大率 1 の時と同じ CSS の大きさに見えること。
 
 ## 規模
 
@@ -69,11 +68,11 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。既存の `FLE_MONITOR_W`・`FLE_MONITOR_H` は値を変えて使ってよいが、名前を増やさない。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。既存の `FLE_MONITOR_W`・`FLE_MONITOR_H` は値を変えて使ってよいが、名前を増やさない。
 - 製品の既定の動作を、測定のためだけに変えない。窓の大きさと拡大率は、測定の道具の中だけで決める。
-- ベンダー名・Cloudflare の識別子・絶対パスを書かない(L-005・L-006)。
+- ベンダー名・Cloudflare の識別子・絶対パスを書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
-- commit の名義は環境の git の設定のまま。Claude の行を付けない(L-023)。
+- commit の名義は環境の git の設定のまま。Claude の行を付けない。
 
 ## 他のタスクとの関係
 

@@ -7,33 +7,36 @@ parent: null
 blocked_by: []
 labels: ["epic", "render", "priority-p3"]
 size: "子の合計"
-needs_owner: false
 ---
 
 ## 目的
 
-依頼者の言葉: 「画面の描画処理が音声処理を圧迫している。Worker 分離は完了していないのか」(台帳 L-033 の (2)。優先は P3: Song Mode で音が途切れない)。描画の合成と提示を、engine と音声の書き込みを行う Worker から分け、所定のプロジェクトで P3 を実測する。
+依頼者の課題 C-2: 「画面の描画処理が音声処理を圧迫している。Worker 分離は完了していないのか」。優先は P3(Song Mode で音が途切れない)。描画の合成と提示を、engine と音声の書き込みを行う Worker から分けた効果を実測し、残る圧迫を取り除き、所定のプロジェクトで P3 を実測する。
 
 ## 背景
 
-- 旧の測定(pm-work/findings/survey-c2-worker-split.md。Worker 分離の前の版で測った。runner の値)では、描画の合成と提示が engine と同じ Worker で動いていた。画面が動かない間も、compose が 36〜48 回/秒走っていた。
-- その後、commit 43a6eb88 で描画の Worker(render-worker.ts)を分けた。受理の記録は main に無い。子 002 で受理を判定する。
-- P3 の underrun は、所定のプロジェクト(依頼者の個人のファイル)が runner に無いので、まだ測っていない。
+- 旧の測定(pm-work/findings/survey-c2-worker-split.md。分離の前の版。runner の値)では、描画の合成と提示が engine と同じ Worker で動いていた。画面が動かない間も、compose が 36〜48 回/秒走っていた。
+- 分離の commit 43a6eb88 は main に在る。しかし本番には出ていない。最後に成功した deploy(run 44869716216。head 7a0c75ef)は、この commit を含まない。その後の deploy は、1 件が `Set up job` で失敗し、他は取り消された。依頼者が本番で見た圧迫は、分離の前の版のものである。
+- 分離の後の版で圧迫が消えたかは、まだ測っていない。このため、子 002 で前後を同じ道具で測り、子 040 で残る経路を取り除く。
+- P3 の入力は、インストーラに含まれる demo・テンプレートのプロジェクトのうち、Song Mode の playlist を持つ物を、作業者が一覧(子 013 の成果物)から選ぶ(子 004)。
+- 定義(旧 ci タスク 0005 の記述による。出典の文書 docs/ops/fidelity-and-performance.md は、リポジトリに無い): Song Mode の再生で、AudioWorklet のリングの枯渇(underrun)が 0。
 
 ## 完了の条件
 
-- 子 002: 描画の Worker の分離が、実測で確かめられ、受理または差し戻しの判定がついている。差し戻しなら、直して受理にする。
+- 子 002: 分離の前後の版を、同じ道具と同じ負荷で測り、音声の余裕の差を数字で報告する。
 - 子 003: P3 の音声の実測の道具があり、AudioContext を開始して underrun と再生の quantum を数えられる。
-- 子 004: 所定のプロジェクトを Song Mode で再生し、underrun が 0(n=3)。入力は依頼者が用意する(QUESTIONS 1)。
+- 子 040: UI の負荷をかけても、underrun が 0(n=3)。起動・engine-idle・standIn が false・error が null。
+- 子 004: 所定のプロジェクト(子 004 で選ぶ demo・テンプレート)を Song Mode で再生し、underrun が 0(n=3)。
 
 ## Sub-Issue の一覧
 
-- 002 C-2 の受理を確かめ、残りを直す(blocked_by なし)
 - 003 P3 の音声の実測の道具(blocked_by なし)
-- 004 所定のプロジェクトで P3 の underrun を測る(blocked_by 002, 003。needs-owner)
+- 002 分離の前後の音声の余裕を、同じ道具で測る(blocked_by 003)
+- 040 描画が音声を圧迫する経路を取り除く(blocked_by 002)
+- 004 所定のプロジェクトで P3 の underrun を測る(blocked_by 003, 040)
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない(台帳 L-002)。
-- ベンダー名と Cloudflare の識別子をファイルに書かない(L-005・L-006)。
-- 作業者に依頼者の個人の資格を置かない(L-011)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない。
+- ベンダー名と Cloudflare の識別子をファイルに書かない。
+- 作業者に依頼者の個人の資格を置かない。

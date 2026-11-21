@@ -7,12 +7,11 @@ parent: "005"
 blocked_by: []
 labels: ["task", "perf", "verify", "priority-p2"]
 size: 4
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の完成の条件の 1 つ P2(UI が 120 fps で動く)を、runner で測る道具を作る。この Issue は道具を作って、道具が使えることを確かめる。120 fps の判定は子 008 で行う。
+完成の条件の 1 つ P2(UI が 120 fps で動く)を、runner で測る道具を作る。この Issue は道具を作って、道具が使えることを確かめる。120 fps の判定は子 008 で行う。
 
 ## 規模
 
@@ -20,8 +19,8 @@ needs_owner: false
 
 ## 背景
 
-- P2 の定義(旧 ci タスク 0004 の記述による。定義元の `docs/ops/fidelity-and-performance.md` は、リポジトリに無い。QUESTIONS 6): 所定のプロジェクトを開き、UI を 120 fps で動かし、入力から画面の p95 が 17 ms 以下。
-- 旧の記録(旧 ci タスク 0004 の先頭の注意による): この機械の rAF は 60 Hz だった。120 fps は、headless の表示の上限で確かめられないことがある(QUESTIONS 7)。
+- P2 の定義(旧 ci タスク 0004 の記述による。出典の文書 docs/ops/fidelity-and-performance.md は、リポジトリに無い): 所定のプロジェクトを開き、UI を 120 fps で動かし、入力から画面の p95 が 17 ms 以下。
+- 旧の記録: この機械の表示は 60 Hz だった。120 fps を、表示の上限に縛られずに測るため、headless Chrome のフレーム数の上限を外す起動の引数を使う。引数は作業者が選び、報告に書く。
 - 既存の道具: `tools/verify-kit/tools/sdriveg2-lat.mjs`(入力の遅延 T と、`presentsPerS` を出す駆動。先頭のコメントに使い方)、`tools/verify-kit/tools/scn-lat-ff.json`(P2 の台本の候補)、`tools/verify-kit/serve-once-lat-bundle.mjs`(bundle を 1 回配信する道具)。
 - 製品の画面のフレーム統計: `window.__app.deskStats`(`presents`・`ticks`・`idleTicks` など。main の描画分離後も同じ名前で出る。`app/src/engine/protocol.ts` の 87 行付近)。
 
@@ -57,10 +56,10 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
 - 製品の既定の動作を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
-- Python を製品に使わない(L-008)。道具は JavaScript で書く。
+- ベンダー名と Cloudflare の識別子を書かない。
+- Python を製品に使わない。道具は JavaScript で書く。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係

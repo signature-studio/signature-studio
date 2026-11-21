@@ -7,12 +7,11 @@ parent: "009"
 blocked_by: []
 labels: ["task", "topbar-menu", "priority-p2"]
 size: 6
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (6): トップバーのコンテキストメニューを機能させる。右クリックの後に、メニューが画面に出て、項目を選ぶと engine に届くこと。
+課題 C-6: トップバーのコンテキストメニューを機能させる。右クリックの後に、メニューが画面に出て、項目を選ぶと engine に届くこと。
 
 ## 規模
 
@@ -23,7 +22,7 @@ needs_owner: false
 - 旧の測定(pm-work/findings/survey-c6-topbar-menus.md。runner の値。変更の前の版): 右クリックは、ページの `contextmenu` を止めた上で engine に届いた(入力欄に `button R up` が出て、`defaultPrevented` が true)。engine のログは増えなかった(322 → 322 行)。メニューらしい物は見えなかった。
 - 原因(読みによる推定。実測で確かめる): `lift/runtime/fle_crash1_menu.c` の `fle_imp_TrackPopupMenu`(600〜618 行)は、「何も表示せず、選ばれず、窓へ何も送らない」(注釈 600〜601 行、`fle_crash1_menu.h` 5 行)。戻り値は、`TPM_RETURNCMD`(0x100)なら 0、それ以外なら 1(617 行)。
 - 関係する経路: `app/src/input/pointer.ts` 68 行(`onContext` が既定の動作を止める)と 104 行(`contextmenu` の登録)。`lift/runtime/fle_input.c` 975〜992 行(右ボタンを離した時の `WM_CONTEXTMENU` の送信)。
-- 起動直後の画面には、「使用状況の送信への同意」の確認ダイアログが出る(旧の測定。「No thanks」で閉じられる。製品の既定の扱いは QUESTIONS 5)。
+- 起動直後の画面には、「使用状況の送信への同意」の確認ダイアログが出る(旧の測定。「No thanks」で閉じられる。測定の道具の中だけで「No thanks」で閉じる。製品の既定の動作は変えない)。
 
 ## 読む物
 
@@ -65,11 +64,11 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
 - 製品の既定の動作を、測定のためだけに変えない(起動時の確認ダイアログを含む)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
-- 依頼者の資格情報・設定に触れない(L-011)。
+- 依頼者の資格情報・設定に触れない。
 
 ## 他のタスクとの関係
 

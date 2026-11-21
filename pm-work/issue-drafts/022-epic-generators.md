@@ -1,18 +1,17 @@
 ---
 draft: "022"
-title: "E 内蔵インストゥルメント(Generators。約 51 件。群の Sub-Issue は 020 の後に起票)"
+title: "E 内蔵インストゥルメント(Generators。約 51 件。束ねた Sub-Issue は WAVES.md の第 2 波で起票)"
 type: epic
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["020"]
 labels: ["epic", "plugin-builtin", "priority-p1"]
 size: "子の合計"
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-034: `Plugins\Fruity\Generators` の内蔵のインストゥルメント(約 51 件)を、1 プラグイン 1 wasm で起動後に届ける。OpenGL を使う VFX 系(023 の一覧)は除く。
+依頼者の指示: `Plugins\Fruity\Generators` の内蔵のインストゥルメント(約 51 件)を、1 プラグイン 1 wasm で起動後に届ける。OpenGL を使う VFX 系(023 の一覧)は除く。
 
 ## 背景
 
@@ -28,10 +27,10 @@ needs_owner: false
 
 ## Sub-Issue の一覧
 
-- (起票待ち。020 の完了後に、監査・受付が、群ごとに Sub-Issue を起票する)
+- (起票待ち。WAVES.md の第 2 波で PM が 3 件ずつ束ねて起票する)
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- 1 タスク 1 関数に戻さない(L-037)。同じ内容のタスクを機械的に量産しない(L-038)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- 1 タスク 1 関数に戻さない。同じ内容のタスクを機械的に量産しない。
+- ベンダー名と Cloudflare の識別子を書かない。

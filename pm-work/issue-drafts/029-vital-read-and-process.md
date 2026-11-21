@@ -4,15 +4,14 @@ title: "Vital を既定の経路で読み込み、1 ブロックの音声を処�
 type: task
 milestone: "M6 外部プラグイン"
 parent: "024"
-blocked_by: ["002", "025", "026", "015"]
+blocked_by: ["040", "025", "026", "015"]
 labels: ["task", "plugin-external", "priority-p1"]
 size: 6
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (5): Vital を存在させる(台帳 L-033 の「Serum 2・OTT など多数の外部プラグイン」の 1 件として)。既定の経路で読み込み、1 ブロックの音声を処理する。1 プラグイン 1 wasm で、起動後に届ける(台帳 L-035)。
+課題 C-5: Vital を存在させる(Serum 2・OTT と合わせた 3 件のうちの 1 件として)。既定の経路で読み込み、1 ブロックの音声を処理する。1 プラグイン 1 wasm で、起動後に届ける。
 
 ## 規模
 
@@ -22,7 +21,7 @@ needs_owner: false
 
 - 入力: 外部の 3 件のうちの Vital のインストーラ(子 025 が取る。大きさ 41,808,960 B。`ci/artifacts.lock` の 4 行目)。
 - 未確認: Vital の harness の有無、Vital のインストーラの中身(VST3 のバンドルの場所)。リポジトリにも、この機械にも、Vital の harness は無い(pm-work/findings/survey-c5-external-plugins.md は Vital を入力の一覧に挙げるのみ)。
-- 対象に含めるかは依頼者の判断(QUESTIONS 15)。含めない場合は、この Issue を閉じる。
+- 対象に含める(依頼者の指示で、外部プラグインは Serum 2・OTT・Vital の 3 件を全て対象にする)。
 
 ## 読む物
 
@@ -34,7 +33,7 @@ needs_owner: false
 
 ## やること
 
-1. 依頼者の判断(QUESTIONS 15)が出ているかを、報告の先頭に書く。出ていない場合は止まる。
+1. 入力(子 025)から、Vital のインストーラの中身を確かめる。
 2. 入力(子 025)から、Vital の VST3 の本体を取り出す経路を確かめ、報告に書く。
 3. harness の作り方を決める(027 の Serum 2 と同じ形を使えるかを確かめる)。
 4. 1 プラグイン 1 wasm で既定の build に入れ、起動後の取得で届ける。
@@ -57,12 +56,12 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。オプトインを作らない。
-- 作業者に依頼者の個人の資格を置かない(L-011)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない。
+- 作業者に依頼者の個人の資格を置かない。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係
 
-- blocked_by: 002(描画の分離。プラグインの処理は、音声の経路の分離の後に入れる)、025、026、015。
+- blocked_by: 040(音声への圧迫の解消)、025、026、015。
 - 027・028 と同じ仕組みを使う。

@@ -7,7 +7,6 @@ parent: "030"
 blocked_by: ["031"]
 labels: ["task", "perf", "priority-p3"]
 size: 8
-needs_owner: false
 ---
 
 ## 目的
@@ -21,7 +20,7 @@ needs_owner: false
 ## 背景
 
 - 031 の成果物: `inputs/p3-profile.tsv`(P3 の再生中の関数ごとの命令数)と、基準の割合 `baselinePct`。
-- 直接 wasm にする手順の先例: 過去のバッチ(lowerb-0105・0107・0118・0126。main の履歴に在る。1 バッチ 40 関数。`lift/harness/hyb/lists/lowered-<module>.txt` と `lift/harness/hyb/lowered-all.txt` の末尾に足す)。その後、関数の塊を一括で足す方式を、この Issue で使う。1 関数 1 タスクには戻さない(台帳 L-037)。
+- 直接 wasm にする手順の先例: 過去のバッチ(lowerb-0105・0107・0118・0126。main の履歴に在る。1 バッチ 40 関数。`lift/harness/hyb/lists/lowered-<module>.txt` と `lift/harness/hyb/lowered-all.txt` の末尾に足す)。その後、関数の塊を一括で足す方式を、この Issue で使う。1 関数 1 タスクには戻さない。
 - 除外: atomic の関数(`lift/harness/seeds/mt4-atomic-functions.tsv`)。直接 wasm にして起動が通らなかった関数(`pm-work/inputs/lower-rejected.tsv`。理由は `listed but not emitted` など)。
 - 判定: 起動が通ること(engine-idle・standIn が false・error が null)。
 
@@ -38,15 +37,15 @@ needs_owner: false
 1. 031 の内訳から、直接 wasm でない関数のうち、命令数の多い順に、除外を外した塊を選ぶ(塊の大きさは作業者が決め、理由を書く)。
 2. 塊を、モジュール別の一覧と `lowered-all.txt` の末尾に足す。
 3. ビルドと起動確認を行う。通らない場合は、落ちた関数を外し、`lower-rejected.tsv` に理由を書く。
-4. 通った物を、1 つの commit にする。割合(`coveragePct`)が基準(`baselinePct`)より 1 以上上がったことを、道具の出力で確かめる。
+4. 通った物を、1 つの commit にする。割合(`coveragePct`)が 99 以上で、かつ基準(`baselinePct`)以上であることを、道具の出力で確かめる。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/instr-coverage/measure.mjs inputs/p3-profile.tsv > "$RUNNER_TEMP/cov.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").trim());process.exit(r.coveragePct>=r.baselinePct+1?0:1)' "$RUNNER_TEMP/cov.json"
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/instr-coverage/measure.mjs inputs/p3-profile.tsv > "$RUNNER_TEMP/cov.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").trim());process.exit(r.coveragePct>=99&&r.coveragePct>=r.baselinePct?0:1)' "$RUNNER_TEMP/cov.json"
 ```
 
-判定の基準: 起動が通り、割合が基準より 1 ポイント以上上がっていること。上がらない場合は「差し戻し」と書く。
+判定の基準: 起動が通り、割合が 99% 以上で、基準以上であること。満たさない場合は「差し戻し」と書く。
 
 ## 報告の規則
 
@@ -57,10 +56,10 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- 1 タスク 1 関数に戻さない(L-037)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- 1 タスク 1 関数に戻さない。
 - atomic の関数を直接 wasm にしない(除外の一覧に従う)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の build を変えるので、main の deploy の仕組みが動く。報告に書く。
 

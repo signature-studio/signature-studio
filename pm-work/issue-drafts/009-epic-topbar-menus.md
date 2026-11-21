@@ -7,12 +7,11 @@ parent: null
 blocked_by: []
 labels: ["epic", "topbar-menu", "priority-p2"]
 size: "子の合計"
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (6): トップバー(Tempo・Song Position・Pattern Selector など)のコンテキストメニューを機能させる。
+課題 C-6: トップバー(Tempo・Song Position・Pattern Selector など)のコンテキストメニューを機能させる。
 
 ## 背景
 
@@ -31,6 +30,6 @@ needs_owner: false
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
 - 製品の既定の起動の動作(起動時の確認ダイアログ)を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子をファイルに書かない(L-005・L-006)。
+- ベンダー名と Cloudflare の識別子をファイルに書かない。

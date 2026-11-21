@@ -7,12 +7,11 @@ parent: "012"
 blocked_by: []
 labels: ["task", "delivery", "priority-p1"]
 size: 8
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-035(依頼者の提案): FL Studio の起動に必要な wasm が揃った段階で FL は起動し、プラグインやアセットは、使われていなくても、起動後にバックグラウンドで取る。FL の起動処理が始まった時点から順次取り、プラグインやアセットへのアクセスを起点にしない。1 プラグイン 1 wasm で試行する。実現が難しいと判断した場合は、方針を変えてよい(理由を報告に書く)。
+依頼者の提案: FL Studio の起動に必要な wasm が揃った段階で FL は起動し、プラグインやアセットは、使われていなくても、起動後にバックグラウンドで取る。FL の起動処理が始まった時点から順次取り、プラグインやアセットへのアクセスを起点にしない。1 プラグイン 1 wasm で試行する。実現が難しいと判断した場合は、方針を変えてよい(理由を報告に書く)。
 
 ## 規模
 
@@ -47,7 +46,7 @@ needs_owner: false
 - `lift/runtime/fle_realmod.h`(1〜3 行の注釈: real module)、`lift/runtime/fle_load.c`(LoadLibrary の解決)
 - `app/worker/index.ts`(2 行目: /assets/ の配信)、`app/tools/assets-middleware.ts`(ローカルの配信)
 - `tools/boot-check/boot-bundle.mjs`、`tools/boot-check/cdp.mjs`
-- `pm-work/plan.md`(「配信の方針(L-035)」の節。論点の出典)
+- `pm-work/plan.md`(「配信の方針」の節。論点の出典)
 
 ## やること
 
@@ -75,11 +74,11 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。オプトインを作らない。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない。
 - 製品の既定の起動の動作(起動前に取る物の一覧)を、測定のためだけに変えない。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
-- 作業者に依頼者の個人の資格を置かない(L-011)。
-- Worker 数の上限は、事前に考えない。当たったら報告に書き、方針を変える(L-035)。
+- ベンダー名と Cloudflare の識別子を書かない。
+- 作業者に依頼者の個人の資格を置かない。
+- Worker 数の上限は、事前に考えない。当たったら報告に書き、方針を変える。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係

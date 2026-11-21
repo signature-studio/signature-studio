@@ -7,12 +7,11 @@ parent: "012"
 blocked_by: []
 labels: ["task", "inventory", "delivery", "priority-p1"]
 size: 4
-needs_owner: false
 ---
 
 ## 目的
 
-台帳 L-033 の (3) と (4) の前提: FL Studio のインストーラの全ファイルの一覧を作る。言語・テーマ・テンプレート(C-3)と、内蔵のエフェクト・インストゥルメントの件数(C-4。約 141 は依頼者の申告)を、実物で確かめるための入力になる。
+課題 C-3 と (4) の前提: FL Studio のインストーラの全ファイルの一覧を作る。言語・テーマ・テンプレート(C-3)と、内蔵のエフェクト・インストゥルメントの件数(C-4。約 141 は依頼者の申告)を、実物で確かめるための入力になる。
 
 ## 規模
 
@@ -21,7 +20,7 @@ needs_owner: false
 ## 背景
 
 - 作業ジョブは R2 の鍵を持たない。インストーラを取れるのは、R2 の鍵を持つ extract の段だけ(鍵は既存の仕組みで extract の段にだけある)。このため、一覧は extract の段で作り、作業ジョブがコミットする。
-- 依頼者の要件(L-039 の (3)・(7) と、この Issue の目的): 一覧は、インストール先の全ファイル。作業者は、その一覧を読める。
+- 依頼者の要件(この Issue の目的): 一覧は、インストール先の全ファイル。作業者は、その一覧を読める。
 - 以前の試み(main の履歴の commit `c6418a78` が、インストーラを読む道具と extract の段の追加を入れた。その道具は、旧の仕組みの削除で消えた)。しかし、その一覧は main に無い(`inputs/` も無い)。この Issue は、一覧が実際に出ることを確かめる。
 - インストーラの入力: `ci/artifacts.lock` の 1 行目(FL Studio の exe。大きさ 1,106,033,456 B。SHA-256 は同ファイル)。
 - 読みの道具: `app/scripts/lib/nsis.mjs`(`Installer`・`streamFile`)、`app/scripts/lib/nsis-script.mjs`(`Script`・`installTree`。インストール先の下の EXTRACTFILE の一覧)。`app/scripts/extract-fl.mjs` が、同じ読みで抽出している。
@@ -58,7 +57,7 @@ needs_owner: false
 f=inputs/fl-installer-files.tsv; test -f "$f" && test "$(wc -l < "$f")" -ge 101 && test "$(awk -F'\t' 'index($1, "Plugins\\Fruity\\Effects\\") == 1 && $4 == "dll"' "$f" | wc -l)" -ge 85 && test "$(awk -F'\t' 'index($1, "Plugins\\Fruity\\Generators\\") == 1 && $4 == "dll"' "$f" | wc -l)" -ge 45 && test "$(awk -F'\t' '$4 == "dll" && (length($3) != 64 || $3 !~ /^[0-9a-f]+$/)' "$f" | wc -l)" -eq 0 && git log -1 --format=%s -- "$f" | grep -q .
 ```
 
-判定の基準: 閾値(Effects の DLL 85 以上、Generators の DLL 45 以上)は、台帳 L-034 の申告(約 90・約 51)から余裕を取った案。実際の件数が違う場合は、報告に実数を書く。閾値を直すのは PM の判断(QUESTIONS 3)。
+判定の基準: 閾値(Effects の DLL 85 以上、Generators の DLL 45 以上)は、依頼者の申告(約 90・約 51)から余裕を取った案。実際の件数が違う場合は、報告に実数を書く。実数が閾値を下回る場合は、閾値を実数に合わせて直してよい(理由と実数を報告に書く)。
 
 ## 報告の規則
 
@@ -70,11 +69,11 @@ f=inputs/fl-installer-files.tsv; test -f "$f" && test "$(wc -l < "$f")" -ge 101 
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない(L-002)。
-- 作業者に R2 の鍵を渡さない。鍵は、既存の extract の段でだけ使う(L-011)。
-- ベンダー名と Cloudflare の識別子を書かない(L-005・L-006)。
+- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- 作業者に R2 の鍵を渡さない。鍵は、既存の extract の段でだけ使う。
+- ベンダー名と Cloudflare の識別子を書かない。
 - 製品のビルドの入力(`app/`・`lift/`)を変える場合は、main の deploy の仕組みが動くので、報告に書く。
-- commit の名義は環境の git の設定のまま。Claude の行を付けない(L-023)。
+- commit の名義は環境の git の設定のまま。Claude の行を付けない。
 - sleep・timeout・nohup・末尾の `&` は使わない。
 
 ## 他のタスクとの関係
