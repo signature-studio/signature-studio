@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// pm-work/tools/create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE] : 下書き(pm-work/issue-drafts/[0-9]*.md)と pm-work/milestones.md から、GitHub に Issue・マイルストーン・ラベル・プロジェクトの設定を作る。PM が依頼者の承認の後に実行する道具。
+// pm-work/tools/create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE] : 下書き(pm-work/issue-drafts/[0-9]*.md)と pm-work/milestones.md から、GitHub に Issue・マイルストーン・ラベル・プロジェクトの設定・Issue field の値を作る。PM が依頼者の承認の後に実行する道具。
 // 既定は dry-run: 検査だけをして、実行する呼び出しの一覧を出す(gh を呼ばない)。--apply で実行する。
-// 順序: 検査(ローカル) → 事前の検査(--apply のみ。gh の読みだけ: プロジェクトの Size・Priority、Issue Type) → ラベル → マイルストーン → Issue を依存の順に作る(本文の #{{NNN}} はそのまま) → 本文とマイルストーンの説明の #{{NNN}} を実番号に直す → 親子・blocked by → プロジェクトに追加して Size・Priority → 全ての Issue から pm-hold を外す(最後)。
+// 順序: 検査(ローカル) → 事前の検査(--apply のみ。gh の読みだけ: プロジェクトの Size、組織の Issue field の Priority、Issue Type) → ラベル → マイルストーン → Issue を依存の順に作る(本文の #{{NNN}} はそのまま) → 本文とマイルストーンの説明の #{{NNN}} を実番号に直す → 親子・blocked by → プロジェクトに追加して Size → Issue field の Priority を Issue ごとに設定 → 全ての Issue から pm-hold を外す(最後)。
 // 状態は --state(既定: リポジトリ直下の .tmp-create-state.json)に 1 手ごとに書く。途中で止まったら --apply --resume で続ける。作った Issue は作り直さない。
 // 読みと書きは gh api だけを使う(gh issue create は使わない。Issue Type と関係の API を使うため)。リポジトリは GH_REPO(無ければ GITHUB_REPOSITORY)。
 // 終了コード: 0 = 完了、1 = 検査か実行が失敗(理由を標準エラーに出す)、2 = 使い方の誤り。
@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url';
 const TYPES = ['Task', 'Feature', 'Bug'];
 const SIZES = ['XS', 'S', 'M', 'L', 'XL'];
 const PRIORITIES = ['Urgent', 'High', 'Medium', 'Low'];
-const FIELDS = { Size: SIZES, Priority: PRIORITIES };
+// Priority は組織の Issue field で、プロジェクトの単一選択ではない(プロジェクトの同名のフィールドは選択肢が空)
+const FIELDS = { Size: SIZES };
 const KEYS = ['draft', 'title', 'type', 'milestone', 'parent', 'blocked_by', 'labels', 'size', 'priority', 'project'];
 const RESERVED = ['pm-hold', 'running', 'failed', 'needs-owner', 'task', 'epic', ...TYPES, ...SIZES, ...PRIORITIES].map((s) => s.toLowerCase());
 const REF = /#\{\{(\d{3})\}\}/g;
@@ -174,7 +175,7 @@ function plan({ drafts, sorted, byN, milestones, labels, project }) {
   const say = (s) => L.push(s);
   say('dry-run: 何も書かない(gh を呼ばない)。実行するには --apply(途中から続けるには --apply --resume)。');
   say(`検査: 下書き ${drafts.length} 件、マイルストーン ${milestones.size} 件。エラーは無い。`);
-  say(`1. 事前の検査(読みだけ): プロジェクト ${project} の Size・Priority の選択肢、Issue Type(${[...new Set(drafts.map((d) => d.type))].join(', ')})`);
+  say(`1. 事前の検査(読みだけ): プロジェクト ${project} の Size の選択肢、組織の Issue field の Priority(${PRIORITIES.join('・')})、Issue Type(${[...new Set(drafts.map((d) => d.type))].join(', ')})`);
   say(`2. ラベルを作る(無い物だけ): ${labels.join(', ')}`);
   say(`3. マイルストーンを作る(無い物だけ): ${[...milestones.keys()].join(' | ')}`);
   say('4. Issue を作る(依存の順。本文の #{{NNN}} はそのまま。labels に pm-hold を付ける):');
@@ -191,9 +192,11 @@ function plan({ drafts, sorted, byN, milestones, labels, project }) {
     if (d.parent !== null) say(`   親子 ${d.parent} -> ${n}`);
     for (const b of d.blocked_by) say(`   blocked by ${n} <- ${b}`);
   }
-  say(`7. プロジェクトに追加し、Size・Priority を設定: ${sorted.length} 件`);
-  for (const n of sorted) say(`   追加 ${n} Size=${byN.get(n).size} Priority=${byN.get(n).priority}`);
-  say(`8. 全ての Issue から pm-hold を外す(最後): ${sorted.length} 件`);
+  say(`7. プロジェクトに追加し、Size を設定: ${sorted.length} 件`);
+  for (const n of sorted) say(`   追加 ${n} Size=${byN.get(n).size}`);
+  say(`8. Priority を組織の Issue field に設定(Issue ごと): ${sorted.length} 件`);
+  for (const n of sorted) say(`   設定 ${n} Priority=${byN.get(n).priority}`);
+  say(`9. 全ての Issue から pm-hold を外す(最後): ${sorted.length} 件`);
   return L.join('\n');
 }
 
@@ -241,10 +244,31 @@ function precheck(project, drafts) {
     if (missing.length) problems.push(`${name} の選択肢が無い: ${missing.join(', ')}`);
     fields[name] = { id: f.id, options };
   }
+  const org = repo.split('/')[0];
+  let issueFields = null;
+  try {
+    issueFields = api('GET', `orgs/${org}/issue-fields`) ?? [];
+  } catch (e) {
+    problems.push(/\b403\b/.test(e.message)
+      ? `組織 ${org} の Issue Fields が読めない(403)。App に、組織の Issue Fields の読み取りの権限が要る`
+      : `組織 ${org} の Issue Fields が読めない: ${e.message}`);
+  }
+  let priorityFieldId = null;
+  if (issueFields) {
+    const f = issueFields.find((x) => x?.name === 'Priority');
+    if (!f) problems.push(`組織 ${org} に Issue field の Priority が無い`);
+    else {
+      if (f.data_type !== 'single_select') problems.push(`Issue field の Priority は単一選択でない(実際: ${f.data_type})`);
+      const have = new Set((f.options ?? []).map((o) => o.name));
+      const missing = PRIORITIES.filter((w) => !have.has(w));
+      if (missing.length) problems.push(`Priority の選択肢が無い: ${missing.join(', ')}`);
+      priorityFieldId = f.id;
+    }
+  }
   if (problems.length) die(problems);
   let types = null;
   try {
-    types = (api('GET', `orgs/${repo.split('/')[0]}/issue-types`) ?? []).map((t) => t.name);
+    types = (api('GET', `orgs/${org}/issue-types`) ?? []).map((t) => t.name);
   } catch (e) {
     warn(`Issue Type の一覧を読めない(作成時の応答で確かめる): ${e.message}`);
   }
@@ -252,7 +276,7 @@ function precheck(project, drafts) {
     const missing = [...new Set(drafts.map((d) => d.type))].filter((t) => !types.includes(t));
     if (missing.length) die([`Issue Type が無い: ${missing.join(', ')}`]);
   }
-  return { projectId: p.id, fields };
+  return { projectId: p.id, fields, priorityFieldId };
 }
 
 function run({ drafts, byN, sorted, milestones, colors, project }) {
@@ -341,6 +365,13 @@ function run({ drafts, byN, sorted, milestones, colors, project }) {
       gql(M_SET, { project: pre.projectId, item: rec.item, field: pre.fields[field].id, option: pre.fields[field].options.get(d[field.toLowerCase()]) });
       mark(k);
     }
+  }
+
+  for (const n of sorted) {
+    const k = `issue-priority:${n}`;
+    if (done(k)) continue;
+    api('POST', `repos/${repo}/issues/${st.drafts[n].number}/issue-field-values`, { issue_field_values: [{ field_id: pre.priorityFieldId, value: byN.get(n).priority }] });
+    mark(k);
   }
 
   for (const n of sorted) {

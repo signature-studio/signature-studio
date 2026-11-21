@@ -164,7 +164,7 @@ mkdir -p "$CD" "$CFX" "$CFN" "$T/cbin"; : > "$CG"
 cat > "$T/cbin/gh" <<'FAKEGH'
 #!/usr/bin/env node
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
-const { FX, GHLOG, FAIL_ON = '', FAIL_NTH = '0' } = process.env;
+const { FX, GHLOG, FAIL_ON = '', FAIL_NTH = '0', DROP_TYPE = '' } = process.env;
 const argv = process.argv.slice(2);
 const fail = (msg) => { process.stderr.write(`fake gh: ${msg}\n`); process.exit(1); };
 if (argv[0] !== 'api') fail(`未対応: ${argv.join(' ')}`);
@@ -192,6 +192,11 @@ function route() {
     return fail('未対応の GraphQL');
   }
   if (p.startsWith('orgs/') && p.endsWith('/issue-types')) return out([{ id: 1, name: 'Task' }, { id: 2, name: 'Feature' }, { id: 3, name: 'Bug' }]);
+  if (p.startsWith('orgs/') && p.endsWith('/issue-fields') && m === 'GET') {
+    if (existsSync(`${FX}/issue-fields.err`)) return fail(readFileSync(`${FX}/issue-fields.err`, 'utf8'));
+    if (!existsSync(`${FX}/issue-fields.json`)) return fail(`無い: ${p}`);
+    return out(JSON.parse(readFileSync(`${FX}/issue-fields.json`, 'utf8')));
+  }
   if (p === `${R}/labels` && m === 'GET') return out([]);
   if (p === `${R}/labels` && m === 'POST') return out({ name: body.name });
   if (p === `${R}/milestones` && m === 'GET') return out([]);
@@ -200,9 +205,10 @@ function route() {
   if (p === `${R}/issues` && m === 'POST') {
     const seq = Number(existsSync(`${FX}/seq`) ? readFileSync(`${FX}/seq`, 'utf8') : 4021);
     writeFileSync(`${FX}/seq`, String(seq + 3));
-    return out({ number: seq, id: seq * 10, node_id: `I_${seq}`, title: body.title, type: body.type ? { name: body.type } : null });
+    return out({ number: seq, id: seq * 10, node_id: `I_${seq}`, title: body.title, type: body.type && !DROP_TYPE ? { name: body.type } : null });
   }
   if (/^repos\/o\/r\/issues\/\d+\/sub_issues$/.test(p) && m === 'POST') return out({});
+  if (/^repos\/o\/r\/issues\/\d+\/issue-field-values$/.test(p) && m === 'POST') return out(body.issue_field_values);
   if (/^repos\/o\/r\/issues\/\d+\/dependencies\/blocked_by$/.test(p) && m === 'POST') return out({});
   if (/^repos\/o\/r\/issues\/\d+$/.test(p) && m === 'PATCH') return out({});
   if (/^repos\/o\/r\/issues\/\d+\/labels\/pm-hold$/.test(p) && m === 'DELETE') return out([]);
@@ -212,8 +218,9 @@ route();
 FAKEGH
 chmod +x "$T/cbin/gh"
 cat > "$CFX/project.json" <<'PJ'
-{"data":{"organization":{"projectV2":{"id":"PVT_1","fields":{"nodes":[{"id":"F_size","name":"Size","options":[{"id":"O_XS","name":"XS"},{"id":"O_S","name":"S"},{"id":"O_M","name":"M"},{"id":"O_L","name":"L"},{"id":"O_XL","name":"XL"}]},{"id":"F_prio","name":"Priority","options":[{"id":"P_U","name":"Urgent"},{"id":"P_H","name":"High"},{"id":"P_M","name":"Medium"},{"id":"P_L","name":"Low"}]}]}}}}}
+{"data":{"organization":{"projectV2":{"id":"PVT_1","fields":{"nodes":[{"id":"F_size","name":"Size","options":[{"id":"O_XS","name":"XS"},{"id":"O_S","name":"S"},{"id":"O_M","name":"M"},{"id":"O_L","name":"L"},{"id":"O_XL","name":"XL"}]},{"id":"F_prio","name":"Priority","options":[]}]}}}}}
 PJ
+printf '%s' '[{"id":777,"name":"Priority","data_type":"single_select","options":[{"id":1,"name":"Urgent"},{"id":2,"name":"High"},{"id":3,"name":"Medium"},{"id":4,"name":"Low"}]}]' > "$CFX/issue-fields.json"
 cdraft() { printf -- '---\n%s\n---\n\n%s\n' "$2" "$3" > "$CD/$1"; }
 cdraft 001-parent.md 'draft: "001"
 title: "T001 親課題"
@@ -267,11 +274,12 @@ cat > "$CM" <<'MS'
 - 説明: テスト用。下位は #{{004}}。
 - 完了の条件: 無し
 MS
-cr() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=${FXD:-$CFX} FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${DR:-$CD}" --milestones "$CM" --state "$CS" 2>"$T/cr.err" ); }
+cr() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=${FXD:-$CFX} FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" DROP_TYPE="${DROP_TYPE:-}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${DR:-$CD}" --milestones "$CM" --state "$CS" 2>"$T/cr.err" ); }
 writes() { jq -c 'select(.m != "GET" and (.p != "graphql" or ((.body.query // "") | contains("mutation"))))' "$CG" | wc -l | tr -d ' '; }
 : > "$CG"; rm -f "$CS"; out=$(cr); rc=$?
 ok "create: dry-run は 0 で終わり、gh を 1 回も呼ばず、状態ファイルも作らない" "$rc/$(wc -l < "$CG" | tr -d ' ')/$([ -e "$CS" ] && echo made || echo none)" "0/0/none"
 ok "create: dry-run は、実行しない旨と、作る Issue の行(4 件)を出す" "$(head -n 1 <<<"$out" | cut -c1-7)/$(grep -c '^   作る ' <<<"$out")" "dry-run/4"
+ok "create: dry-run の事前の検査は、プロジェクトの Size と、組織の Issue field の Priority を挙げる" "$(grep -c 'プロジェクト signature-studio/3 の Size の選択肢、組織の Issue field の Priority' <<<"$out")" 1
 : > "$CG"; FXD=$CFN cr --apply >/dev/null; rc=$?
 ok "create: 事前の検査(プロジェクトが読めない)で、書き込みを 1 件も行わず 1 で終わる" "$rc/$(writes)/$([ -e "$CS" ] && echo made || echo none)" "1/0/none"
 ok "create: 事前の検査の失敗は、プロジェクト名を含む理由を標準エラーに出す" "$(grep -c 'signature-studio/3' "$T/cr.err")" 1
@@ -289,8 +297,9 @@ ok "create: マイルストーンの説明の #{{NNN}} も実番号に直す" "$
 ok "create: 親子は、親の番号に、子の id(番号ではない)を付ける(子 3 件)" "$(jq -r 'select(.p|endswith("/sub_issues")) | "\(.p) \(.body.sub_issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/sub_issues 40240,repos/o/r/issues/4021/sub_issues 40270,repos/o/r/issues/4021/sub_issues 40300"
 ok "create: blocked by は、後続(002)の番号に、先行(003)の id を付ける" "$(jq -r 'select(.p|endswith("/dependencies/blocked_by")) | "\(.p) \(.body.issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4027/dependencies/blocked_by 40240"
 ok "create: 全ての Issue をプロジェクトに追加する(4 件)" "$(grep -c 'addProjectV2ItemById' "$CG")" 4
-ok "create: Size と Priority を全ての Issue に設定する(4 件 × 2)" "$(jq -r 'select(.body.variables.option != null) | .body.variables.option' "$CG" | sort | paste -sd, -)" "O_L,O_M,O_S,O_XS,P_H,P_L,P_M,P_U"
-ok "create: pm-hold を、全ての関係とプロジェクトの設定の後に、4 件から外す" "$(jq -s -r '[to_entries[] | select(.value.m=="DELETE") | .key] as $d | [to_entries[] | select(.value.m!="DELETE" and .value.m!="GET") | .key] as $o | "\($d | length)/\(($d | min) > ($o | max))"' "$CG")/$(jq -r 'select(.m=="DELETE") | .p' "$CG" | grep -c 'labels/pm-hold$')" "4/true/4"
+ok "create: Size はプロジェクトの単一選択で、全ての Issue に設定する(4 件。Priority の選択肢は使わない)" "$(jq -r 'select(.body.variables.option != null) | "\(.body.variables.field) \(.body.variables.option)"' "$CG" | sort | paste -sd, -)" "F_size O_L,F_size O_M,F_size O_S,F_size O_XS"
+ok "create: Priority は組織の Issue field の値として、Issue ごとに 1 回ずつ設定する(4 件)" "$(jq -r 'select(.m=="POST" and (.p|endswith("/issue-field-values"))) | "\(.p) \(.body.issue_field_values[0].field_id) \(.body.issue_field_values[0].value)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/issue-field-values 777 Urgent,repos/o/r/issues/4024/issue-field-values 777 Medium,repos/o/r/issues/4027/issue-field-values 777 High,repos/o/r/issues/4030/issue-field-values 777 Low"
+ok "create: pm-hold を、Priority・Size・関係の設定の後に、4 件から外す" "$(jq -s -r '[to_entries[] | select(.value.m=="DELETE") | .key] as $d | [to_entries[] | select(.value.m!="DELETE" and .value.m!="GET") | .key] as $o | "\($d | length)/\(($d | min) > ($o | max))"' "$CG")/$(jq -r 'select(.m=="DELETE") | .p' "$CG" | grep -c 'labels/pm-hold$')" "4/true/4"
 ok "create: 状態ファイルに 4 件を、別々の番号で残す" "$(jq '.drafts | length' "$CS")/$(jq -r '[.drafts[].number] | unique | length' "$CS")/$(jq -r '.drafts["002"].number' "$CS")" "4/4/4027"
 : > "$CG"; cr --apply >/dev/null 2>&1; rc=$?
 ok "create: 状態ファイルが在るのに --resume が無ければ、gh を呼ばずに 1 で終わる" "$rc/$(wc -l < "$CG" | tr -d ' ')" "1/0"
@@ -304,4 +313,18 @@ vz ref '#{{003}}' '#{{999}}' 002-after.md "下書きの無い #{{999}} がある
 vz kisoku '先に終える課題。' '規模: 大。先に終える課題。' 003-before.md "本文に 規模 を書くと、dry-run と --apply の両方が、書く前に 1 で止まる"
 vz type 'type: "Task"' 'type: "epic"' 004-child.md "Type が Task・Feature・Bug 以外なら、dry-run と --apply の両方が、書く前に 1 で止まる"
 vz label 'labels: \["render"\]' 'labels: ["task"]' 004-child.md "ラベルに task を書くと、dry-run と --apply の両方が、書く前に 1 で止まる"
+for c in 403 three nopriority text; do mkdir -p "$T/cfx-$c"; cp "$CFX/project.json" "$T/cfx-$c/project.json"; done
+printf 'Resource not accessible by integration (HTTP 403)' > "$T/cfx-403/issue-fields.err"
+printf '%s' '[{"id":777,"name":"Priority","data_type":"single_select","options":[{"id":1,"name":"Urgent"},{"id":2,"name":"High"},{"id":3,"name":"Medium"}]}]' > "$T/cfx-three/issue-fields.json"
+printf '%s' '[]' > "$T/cfx-nopriority/issue-fields.json"
+printf '%s' '[{"id":777,"name":"Priority","data_type":"text","options":[]}]' > "$T/cfx-text/issue-fields.json"
+pn() { rm -f "$CS" "$CFX/seq"; : > "$CG"; FXD=$1 cr --apply >/dev/null 2>&1; rc=$?; echo "$rc/$(writes)/$([ -e "$CS" ] && echo made || echo none)"; }
+ok "create: Issue fields が 403 なら、書き込みを 1 件も行わず 1 で終わる" "$(pn "$T/cfx-403")" "1/0/none"
+ok "create: 403 の理由は、組織の Issue Fields の読み取りの権限が要る、と言う" "$(grep -c 'App に、組織の Issue Fields の読み取りの権限が要る' "$T/cr.err")" 1
+ok "create: Priority の選択肢が 3 つ(Low が無い)なら、書き込みを 1 件も行わず 1 で終わり、Low が無いと言う" "$(pn "$T/cfx-three")/$(grep -c 'Priority の選択肢が無い: Low' "$T/cr.err")" "1/0/none/1"
+ok "create: 組織に Issue field の Priority が無ければ、書き込みを 1 件も行わず 1 で終わる" "$(pn "$T/cfx-nopriority")" "1/0/none"
+ok "create: Priority が単一選択でなければ、書き込みを 1 件も行わず 1 で終わる" "$(pn "$T/cfx-text")/$(grep -c '単一選択' "$T/cr.err")" "1/0/none/1"
+rm -f "$CS" "$CFX/seq"; : > "$CG"; DROP_TYPE=1 cr --apply >/dev/null 2>&1; rc=$?
+ok "create: 作成の応答に Issue Type が無い(捨てられた)なら、その場で 1 で止まり、次の Issue を作らない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(jq '.drafts | length' "$CS")" "1/1/1"
+ok "create: Type が違うと、標準エラーに Issue Type が Feature でない、と出す" "$(grep -c 'Issue Type が Feature でない' "$T/cr.err")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
