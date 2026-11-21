@@ -17,3 +17,9 @@ PM(計画・監査・受付)の資料を置く場所です。依頼者の指示�
 - マイルストーンは GitHub Milestones に、タスクは Issues とその Sub-Issues に格納する。
 - Issue の中に、タスクに関する全ての情報を含める。
 - 旧 `queue/`・`driver/`・`ci/tasks/` は削除した(下の「削除した物」を参照)。
+
+## 削除した物
+
+- 削除した driver/ の最後の版は commit c6f70096(`git show c6f70096:driver/<ファイル>` で読める)。
+- driver/inventory.mjs の最後の変更は commit c6418a78(`git show c6418a78:driver/inventory.mjs` で読める)。
+- 削除したファイル: `queue/kinds/lower.md`、`queue/kinds/lowerb.md`、`queue/threshold`、`driver/` の全ファイル、`ci/tasks/`(`pm-work/old-tasks/ci-tasks/` へ移動済み)。
