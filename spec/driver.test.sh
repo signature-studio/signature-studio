@@ -195,6 +195,10 @@ reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
 reset "" ""; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure https://x >/dev/null 2>&1 )
 ok "close: 落ちたら待ちに戻す" "$(grep -c -- '--add-label ready' "$Q/log")" 1
+reset "" "$(printf '5\tlower-0xb2\n')"; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/92 >/dev/null 2>&1 )
+ok "close: 古い型 lower-0x が落ちたら、待ちに戻さず閉じる(バッチ(lowerb)に置き換え済み。台帳 L-037)" "$(grep -c -- '--add-label ready' "$Q/log")/$(grep -c '^issue close 5 --reason not planned' "$Q/log")" 0/1
+reset "" "$(printf '5\tlowerb-0000\n')"; echo 0 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure https://x/actions/runs/93 >/dev/null 2>&1 )
+ok "close: lowerb は落ちたら待ちに戻す(従来どおり)" "$(grep -c -- '--add-label ready' "$Q/log")" 1
 reset "" ""; echo 2 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 failure https://x >/dev/null 2>&1 )
 ok "close: 3 回落ちたら failed にして閉じる" "$(grep -c -- '--add-label failed' "$Q/log")/$(grep -c '^issue close 5' "$Q/log")" 1/1
 reset "" ""; echo 2 > "$Q/fails"; ( cd "$R" && bash driver/close.sh 5 cancelled https://x >/dev/null 2>&1 )
