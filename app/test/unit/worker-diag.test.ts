@@ -57,7 +57,7 @@ describe('EngineClient: a plain Worker event is reported as before and then diag
   const assets = { module: {} as WebAssembly.Module, seed: new Uint8Array(0), glue: new Uint8Array(0), dll: new Uint8Array(0) };
   const run = async (ev: { message: string; filename: string; lineno: number }) => {
     let w: { onerror: ((e: unknown) => void) | null } | null = null;
-    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor() { w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
+    class FakeWorker { onmessage: unknown = null; onerror: ((e: unknown) => void) | null = null; onmessageerror: unknown = null; constructor(_url: unknown, opts: unknown) { if ((opts as { name?: string }).name === 'fl-engine') w = this; } postMessage(): void { /* nothing */ } terminate(): void { /* nothing */ } }
     g.Worker = FakeWorker; g.fetch = async () => ({ status: 404, headers: { get: () => null }, arrayBuffer: async () => new ArrayBuffer(0) });
     const errors: string[] = [], logs: string[] = [];
     const events = { deskCanvas: () => ({ transferControlToOffscreen: () => ({}) }) as unknown as HTMLCanvasElement, log: (_l: string, t: string) => { logs.push(t); }, exit: () => undefined, error: (p: string, m: string) => { errors.push(`${p}: ${m}`); } };
