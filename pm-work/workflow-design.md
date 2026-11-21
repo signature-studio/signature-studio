@@ -59,9 +59,9 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 Issue N が対象になるのは、次をすべて満たすとき(select の判定。start は同じ判定をもう一度行う):
 
 - 状態が `open`。PR ではない。
-- ラベル `task` がある。
+- Issue の Type が Task。
 - ラベル `pm-hold`・`running`・`needs-owner` が無い。
-- ラベル `epic` が無く、sub-issue を持たない(親は起動しない)。
+- sub-issue を持たない(Type が Feature の親は起動しない)。
 - `blocked by` の Issue のうち、`open` のものが 0 件。
 - ラベル `failed` が無い。ただし、本文が `/retry` で始まる `issue_comment` のときだけ、`failed` は無視される(start が `failed` を外す)。
 
@@ -71,8 +71,6 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 | ラベル | 意味 | 付ける人・物 |
 | --- | --- | --- |
-| `task` | 作業の対象 | PM |
-| `epic` | 子(sub-issue)を持つ親。起動しない | PM |
 | `pm-hold` | 依存関係を付けている途中。起動しない | PM |
 | `running` | 作業中 | start が付け、report が外す |
 | `failed` | 落ちた。再試行は `/retry` か、このラベルを外す | report が付ける |
@@ -108,7 +106,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 1. **起動する数**: ブロッカーの無い task を常に 60 件以上起票して、60 の作業を動かし続ける。起票は PM が `issue-drafts/WAVES.md` の波で行う。閾値(`queue/threshold`)と生成器は作らない。60 の同時実行は GitHub の上限に任せる。
 2. **`pull_request`**: 置かない。PR を使う処理が無いため。
-3. **ラベル**: 運用は `task`・`epic`・`pm-hold`・`running`・`failed` の 5 種。PM は `needs-owner` を使わない(依頼者の判断待ちで起動を止める Issue は作らない)。表示用のラベルは PM が作る(`issue-drafts/LABELS.md`)。
+3. **ラベル**: 運用は `pm-hold`・`running`・`failed` の 3 種。種別は Issue の Type(Task・Feature)、規模と優先度はプロジェクトの Size と Priority で指定する。PM は `needs-owner` を使わない(依頼者の判断待ちで起動を止める Issue は作らない)。表示用のラベルは PM が作る(`issue-drafts/LABELS.md`)。
 4. **App の権限**: start・report・push は、既存の App の token を使う。Issues への書き込みの権限は、初回の起動の結果で確かめる。
 5. **受け入れコマンドの出所**: 本文の `accept` から取る(今の設計のまま)。本文を編集できるのは PM と依頼者だけにする。
 6. **依存の手動の変更**: 「9」の既知の限界として扱う。
