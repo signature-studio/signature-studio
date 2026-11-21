@@ -190,6 +190,16 @@ ok "fill: mode の値が不正なタスクは起動しない" "$(grep -c -- '-f 
 reset "$(printf '9\tlower-0xd4\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: lower- の古い型は mode が無くても起動する(A6 で閉じるまでの在庫)" "$(grep -c -- '-f task=lower-0xd4' "$Q/log")" 1
 ok "fill: 起動の順は、題名が ^lower で始まる物(lowerb- を含む)を後に並べる" "$(grep -c "\$2 ~ /^lower/" "$R/driver/fill.sh")" 1
+# mode: agent は、本文を queue/tasks/<名前>.md に持つ物だけ起動する。型(queue/kinds)から出した本文は起動せず、閉じる(台帳 L-038)
+# K は $R の複製で、型 lowerb を mode: agent に替えたもの(型だけで本文が出る mode: agent の例)
+K=$T/kagent; rm -rf "$K"; cp -r "$R" "$K"; sed -i 's/^mode: script$/mode: agent/' "$K/queue/kinds/lowerb.md"; git -C "$K" commit -q -am "lowerb を mode: agent に(検査の確かめ用)"
+reset "$(printf '9\tlowerb-0000\n')" ""; ( cd "$K" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: agent の型だけで本文が出るタスク(queue/tasks に無い)は起動されず、閉じて failed になる(台帳 L-038)" "$(grep -c -- '-f task=lowerb-0000' "$Q/log")/$(grep -c '^issue close 9 ' "$Q/log")/$(grep -c '^issue edit 9 .*--add-label failed' "$Q/log")" "0/1/1"
+ok "fill: その閉じる時のコメントは、queue/tasks/<名前>.md を持つ決まりを言う" "$(grep -c 'mode: agent のタスクは queue/tasks/lowerb-0000.md を持つ(台帳 L-038)' "$Q/log")" 1
+reset "$(printf '9\tm-agent\n')" ""; ( cd "$K" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: queue/tasks に在る mode: agent は、起動される(K でも)" "$(grep -c -- '-f task=m-agent' "$Q/log")" 1
+reset "$(printf '9\tlowerb-0000\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: script の型だけで本文が出るタスクは、queue/tasks に無くても起動される(回帰)" "$(grep -c -- '-f task=lowerb-0000' "$Q/log")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -489,4 +499,12 @@ ok "inventory-0 の受け入れ: Effects が 19 件なら落ちる" "$(cd "$T/ac
 ok "inventory-0 の受け入れ: Generators が 9 件なら落ちる" "$(cd "$T/acc-few-gen" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
 ok "inventory-0 の受け入れ: 見出しを除いて 99 行なら落ちる" "$(cd "$T/acc-short" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
 ok "inventory-0 の受け入れ: dll に 64 桁でない SHA-256 があれば落ちる" "$(cd "$T/acc-badsha" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
+# 同じ内容のエージェントのタスクを、待ち行列に入れない(台帳 L-038)。queue/tasks の accept: の行と、先頭の見出しの行は、互いに異なる
+ok "queue/tasks: 本文が 1 件以上ある" "$(ls "$Q_TASKS"/*.md 2>/dev/null | wc -l | tr -d ' ' | awk '$1 > 0 { print "yes" }')" yes
+ok "queue/tasks: accept: の行が互いに異なる(重複 0)" "$(for f in "$Q_TASKS"/*.md; do grep '^accept: ' "$f"; done | sort | uniq -d | wc -l | tr -d ' ')" 0
+ok "queue/tasks: 先頭の見出しの行(# )が互いに異なる(重複 0)" "$(for f in "$Q_TASKS"/*.md; do head -n 1 "$f"; done | sort | uniq -d | wc -l | tr -d ' ')" 0
+ok "kinds: 型に mode: agent は無い(lower.md は、型の行が無い古い型。台帳 L-037・L-038)" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; grep -qx 'mode: agent' "$f" && n=$((n+1)); done; echo "$n")" 0
+ok "台帳: L-038 が在り、5 列で、日付 2026-11-21 と出所(依頼者)が在る" "$(awk -F'\t' '$1 == "L-038" && NF == 5 && $2 == "2026-11-21" && $3 == "依頼者" { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 「タスクの粒度」の節に、1 件ごとの queue/tasks/<名前>.md と、内容が互いに異なる決まり(L-038)が在る" "$(P=$top/queue/plan.md; S=$(awk '/^## タスクの粒度/{f=1; next} /^## /{f=0} f' "$P"); if grep -qF 'queue/tasks/<名前>.md' <<<"$S" && grep -q '内容が互いに異なる' <<<"$S"; then echo yes; else echo no; fi)" yes
+ok "AGENTS.md: 作業者の手順の mode: agent の行に、queue/tasks/<名前>.md の決まり(L-038)が在る" "$(grep -cF '`mode: agent` は `queue/tasks/<名前>.md` を持つ(L-038)。' "$top/AGENTS.md")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
