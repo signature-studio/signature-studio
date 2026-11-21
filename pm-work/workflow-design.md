@@ -15,6 +15,7 @@ PM が決めた事項は「10」にまとめた。
 | on | types | 対象にする Issue |
 | --- | --- | --- |
 | `issues` | `opened`・`edited`・`reopened`・`labeled`・`unlabeled` | そのイベントの Issue 1 件 |
+| `issues` | `typed`・`untyped` | そのイベントの Issue 1 件。Type が付いた・外れたときに、起動の可否を「5」で再評価する |
 | `issues` | `closed` | 閉じた Issue が `blocking` している Issue の全て(ブロッカーの解除を、ブロックされる側の起動に変える) |
 | `issue_comment` | `created` | そのイベントの Issue 1 件。作者が Bot のもの、PR のコメントは対象外。本文が `/retry` で始まるなら再試行 |
 
