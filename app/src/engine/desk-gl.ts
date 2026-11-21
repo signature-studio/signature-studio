@@ -44,6 +44,11 @@ export function readScene(buffer: ArrayBufferLike, ptr: number): SceneState | nu
   return { width: dv.getUint32(8, true), height: dv.getUint32(12, true), gen: dv.getUint32(16, true), flags: dv.getUint32(28, true), background: dv.getUint32(32, true), windows, updates };
 }
 
+/** the generation of the scene at `ptr` (the header's gen word); see deskGen (desk.ts) */
+export function sceneGen(buffer: ArrayBufferLike, ptr: number): number {
+  return new DataView(buffer, ptr, SCENE_HEADER_BYTES).getUint32(16, true);
+}
+
 /** the part of the engine's exports the GL presenter uses (on top of the compositor's resync / describe) */
 export interface SceneApi {
   /** fle_desk_scene(): the address of the description */
