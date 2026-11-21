@@ -35,6 +35,7 @@
   ],
   "exclude": [
     "src/engine/worker.ts",
-    "src/engine/worker-*.ts"
+    "src/engine/worker-*.ts",
+    "src/engine/render-worker.ts"
   ]
 }

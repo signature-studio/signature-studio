@@ -37,7 +37,7 @@ printf 'run: echo hi\n' > "$T/.github/workflows/ok.yml"
 # wrangler.jsonc は、その場で作り直さず、デプロイに使える形でコミットする(依頼者の指示 2026-11-20・L-032)
 ok "app/wrangler.jsonc は追跡されている(ls-files)" "$(git -C "$here/.." ls-files --error-unmatch app/wrangler.jsonc >/dev/null 2>&1 && echo yes)" yes
 ok "app/wrangler.jsonc は無視されていない(check-ignore)" "$(git -C "$here/.." check-ignore -q app/wrangler.jsonc && echo ignored || echo kept)" kept
-mkdir -p "$T/tools" "$T/spec" "$T/ledger"
+mkdir -p "$T/tools" "$T/spec" "$T/pm-work"
 cat > "$T/tools/write.txt" <<'EOF'
 cat <<EOT > app/wrangler.jsonc
 echo x >> app/wrangler.jsonc
@@ -70,11 +70,11 @@ cat > wrangler.deploy.json <<EOT
 cp x app/wrangler.noperf.jsonc
 fs.writeFileSync(path.join(work, 'wrangler.noperf.jsonc'), text);
 EOF
-cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/ledger/write.tsv"; cp "$T/tools/write.txt" "$T/notes.md"
+cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/pm-work/write.tsv"; cp "$T/tools/write.txt" "$T/notes.md"
 ( cd "$T" && ok "scan: wrangler.jsonc を作る・書く行は、行ごとに見つかる(15 行)" "$(bash "$g/scan.sh" tools/write.txt 2>/dev/null | grep -c '^wranglergen')" 15 )
 ( cd "$T" && ok "scan: wrangler.jsonc を読むだけの行(書きの関数と同じ行でも)は見つけない" "$(bash "$g/scan.sh" tools/read.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: wrangler.noperf.jsonc・wrangler.deploy.json は見つけない" "$(bash "$g/scan.sh" tools/other.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
-( cd "$T" && ok "scan: spec/・ledger/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt ledger/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
+( cd "$T" && ok "scan: spec/・pm-work/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt pm-work/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
 # 旗と判定(git の差分を使う)
