@@ -11,7 +11,7 @@ run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
 on:
   issues:
-    types: [opened, edited, reopened, closed, labeled, unlabeled]
+    types: [opened, edited, reopened, closed, labeled, unlabeled, typed, untyped]
   issue_comment:
     types: [created]
 

@@ -18,7 +18,8 @@ ok "agent.yml: YAML として読める(旧版も読める)" "$(test -s "$T/new.j
 J=$T/new.json; O=$T/old.json
 # (b) on: issues と issue_comment だけ。workflow_dispatch・schedule・push・pull_request は置かない
 ok "agent.yml: on のキーは issues と issue_comment だけ" "$(jq -c '.on | keys' "$J")" '["issue_comment","issues"]'
-ok "agent.yml: issues の types は、許可の一覧(opened・edited・reopened・closed・labeled・unlabeled)の部分集合" "$(jq -r '(.on.issues.types - ["opened","edited","reopened","closed","labeled","unlabeled"]) | length' "$J")" 0
+ok "agent.yml: issues の types は、許可の一覧(opened・edited・reopened・closed・labeled・unlabeled・typed・untyped)の部分集合" "$(jq -r '(.on.issues.types - ["opened","edited","reopened","closed","labeled","unlabeled","typed","untyped"]) | length' "$J")" 0
+ok "agent.yml: issues の types は typed と untyped を含む(Issue の Type の変更で再評価する)" "$(jq -r '[.on.issues.types | index("typed") != null, index("untyped") != null] | map(tostring) | join("/")' "$J")" "true/true"
 ok "agent.yml: issues の types は closed を含む(ブロッカーの解除を検知する)" "$(jq -r '.on.issues.types | index("closed") != null' "$J")" true
 ok "agent.yml: issue_comment の types は created だけ" "$(jq -c '.on.issue_comment.types' "$J")" '["created"]'
 # (d) 旧い駆動の参照が残らない(driver・queue・MODE・inputs・ledger・inventory)
@@ -87,21 +88,24 @@ esac
 GH
 chmod +x "$T/bin/gh"
 fx() { printf '%s' "$2" > "$FX/$(printf '%s' "$1" | sed 's#/#__#g').json"; }
-iss() { local l=""; for x in ${3//,/ }; do l="$l{\"name\":\"$x\"},"; done; printf '{"number":%s,"state":"%s","labels":[%s]}' "$1" "$2" "${l%,}"; }
+iss() { local l=""; for x in ${3//,/ }; do l="$l{\"name\":\"$x\"},"; done; local t=null; [ -n "${4:-}" ] && t="{\"name\":\"$4\"}"; printf '{"number":%s,"state":"%s","labels":[%s],"type":%s}' "$1" "$2" "${l%,}" "$t"; }
 R=repos/o/r
-fx $R/issues/5 "$(iss 5 closed task)"
+fx $R/issues/5 "$(iss 5 closed "" Task)"
 fx $R/issues/5/dependencies/blocking '[{"number":10,"state":"open"},{"number":11,"state":"open"}]'
-fx $R/issues/10 "$(iss 10 open task)"; fx $R/issues/10/dependencies/blocked_by '[{"number":5,"state":"closed"}]'; fx $R/issues/10/sub_issues '[]'
-fx $R/issues/11 "$(iss 11 open task)"; fx $R/issues/11/dependencies/blocked_by '[{"number":5,"state":"closed"},{"number":12,"state":"open"}]'; fx $R/issues/11/sub_issues '[]'
-fx $R/issues/20 "$(iss 20 open task,pm-hold)"; fx $R/issues/20/dependencies/blocked_by '[]'; fx $R/issues/20/sub_issues '[]'
-fx $R/issues/21 "$(iss 21 open task,epic)"; fx $R/issues/21/dependencies/blocked_by '[]'; fx $R/issues/21/sub_issues '[]'
-fx $R/issues/22 "$(iss 22 open task)"; fx $R/issues/22/dependencies/blocked_by '[]'; fx $R/issues/22/sub_issues '[{"number":30,"state":"open"}]'
-fx $R/issues/23 "$(iss 23 open task,failed)"; fx $R/issues/23/dependencies/blocked_by '[]'; fx $R/issues/23/sub_issues '[]'
+fx $R/issues/10 "$(iss 10 open "" Task)"; fx $R/issues/10/dependencies/blocked_by '[{"number":5,"state":"closed"}]'; fx $R/issues/10/sub_issues '[]'
+fx $R/issues/11 "$(iss 11 open "" Task)"; fx $R/issues/11/dependencies/blocked_by '[{"number":5,"state":"closed"},{"number":12,"state":"open"}]'; fx $R/issues/11/sub_issues '[]'
+fx $R/issues/20 "$(iss 20 open pm-hold Task)"; fx $R/issues/20/dependencies/blocked_by '[]'; fx $R/issues/20/sub_issues '[]'
+fx $R/issues/21 "$(iss 21 open "" Feature)"; fx $R/issues/21/dependencies/blocked_by '[]'; fx $R/issues/21/sub_issues '[]'
+fx $R/issues/22 "$(iss 22 open "" Task)"; fx $R/issues/22/dependencies/blocked_by '[]'; fx $R/issues/22/sub_issues '[{"number":30,"state":"open"}]'
+fx $R/issues/23 "$(iss 23 open failed Task)"; fx $R/issues/23/dependencies/blocked_by '[]'; fx $R/issues/23/sub_issues '[]'
 fx $R/issues/24 "$(iss 24 open)"; fx $R/issues/24/dependencies/blocked_by '[]'; fx $R/issues/24/sub_issues '[]'
-fx $R/issues/25 "$(iss 25 open task,running)"; fx $R/issues/25/dependencies/blocked_by '[]'; fx $R/issues/25/sub_issues '[]'
-fx $R/issues/28 "$(iss 28 open task)"; fx $R/issues/28/dependencies/blocked_by '[{"number":29,"state":"open"}]'; fx $R/issues/28/sub_issues '[]'
-fx $R/issues/26 "$(iss 26 open task,needs-owner)"; fx $R/issues/26/dependencies/blocked_by '[]'; fx $R/issues/26/sub_issues '[]'
-fx $R/issues/31 "$(iss 31 open task)"; fx $R/issues/31/dependencies/blocked_by '[]'; fx $R/issues/31/sub_issues '[]'
+fx $R/issues/25 "$(iss 25 open running Task)"; fx $R/issues/25/dependencies/blocked_by '[]'; fx $R/issues/25/sub_issues '[]'
+fx $R/issues/27 "$(iss 27 open task)"; fx $R/issues/27/dependencies/blocked_by '[]'; fx $R/issues/27/sub_issues '[]'
+fx $R/issues/28 "$(iss 28 open "" Task)"; fx $R/issues/28/dependencies/blocked_by '[{"number":29,"state":"open"}]'; fx $R/issues/28/sub_issues '[]'
+fx $R/issues/26 "$(iss 26 open needs-owner Task)"; fx $R/issues/26/dependencies/blocked_by '[]'; fx $R/issues/26/sub_issues '[]'
+fx $R/issues/31 "$(iss 31 open "" Task)"; fx $R/issues/31/dependencies/blocked_by '[]'; fx $R/issues/31/sub_issues '[]'
+fx $R/issues/32 "$(iss 32 open "" Bug)"; fx $R/issues/32/dependencies/blocked_by '[]'; fx $R/issues/32/sub_issues '[]'
+fx $R/issues/33 "$(iss 33 open "" Task)"; fx $R/issues/33/dependencies/blocked_by '[]'; fx $R/issues/33/sub_issues '[]'
 fx $R/collaborators/w/permission '{"permission":"write","role_name":"write"}'
 fx $R/collaborators/r/permission '{"permission":"read","role_name":"read"}'
 # x の権限は fixture を置かない(gh api が失敗する = 権限の無い人。実際の API でも非コラボレーターは 404)
@@ -112,12 +116,16 @@ sel() { # 引数: イベント名、イベントの JSON、(任意)gh の追加�
 W='{"login":"w","type":"User"}'; RD='{"login":"r","type":"User"}'; X='{"login":"x","type":"User"}'; BOT='{"login":"agent-app[bot]","type":"Bot"}'
 ok "select: closed(5)の解除で、ブロッカーが残る 11 を外し、解除された 10 だけを選ぶ" "$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[10]"
 ok "select: opened で pm-hold が付いた 20 は選ばない" "$(sel issues '{"action":"opened","issue":{"number":20},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: labeled で epic の 21 は選ばない" "$(sel issues '{"action":"labeled","issue":{"number":21},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: Type が Feature の 21(親)は、labeled でも選ばない" "$(sel issues '{"action":"labeled","issue":{"number":21},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: Type が Bug の 32 は選ばない" "$(sel issues '{"action":"opened","issue":{"number":32},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: Type が Task なら、ラベル無しの 33 を選ぶ(ラベルは要らない)" "$(sel issues '{"action":"opened","issue":{"number":33},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[33]"
 ok "select: sub-issue を持つ 22 は選ばない(親)" "$(sel issues '{"action":"edited","issue":{"number":22},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: 開いたブロッカー 29 を持つ 28 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":28},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: running の付いた 25 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":25},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: needs-owner の 26 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":26},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: task ラベルの無い 24 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":24},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: Type の無い 24 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":24},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: ラベル task があっても、Type の無い 27 は選ばない" "$(sel issues '{"action":"edited","issue":{"number":27},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: task・epic のラベルを判定に使わない(ソースに 'task'・'epic' の文字列が無い)" "$(grep -cE "'(task|epic)'" "$top/tools/select-targets.mjs")" 0
 ok "select: 条件を満たす 10 を、書き込み権限のある人の edited で選ぶ" "$(sel issues '{"action":"edited","issue":{"number":10},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[10]"
 ok "select: failed の 23 は、普通のコメントでは選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"了解","user":{"type":"User"}},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: /retry のコメントなら failed の 23 を選び、retry を true にする" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry\n","user":{"type":"User"}},"sender":'"$W"'}' | jq -c '[.targets, .retry]' 2>/dev/null)" "[[23],true]"
@@ -125,7 +133,7 @@ ok "select: Bot のコメントは対象にしない(/retry でも)" "$(sel issu
 ok "select: PR のコメントは対象にしない" "$(sel issue_comment '{"action":"created","issue":{"number":23,"pull_request":{"url":"x"}},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$W"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: 権限の無い人(x)の /retry では、failed の 23 を選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: 読むだけの人(r)の /retry では、failed の 23 を選ばない" "$(sel issue_comment '{"action":"created","issue":{"number":23},"comment":{"body":"/retry","user":{"type":"User"}},"sender":'"$RD"'}' | jq -c .targets 2>/dev/null)" "[]"
-ok "select: 権限の無い人(x)が開いた Issue(task ラベル無し)は選ばない" "$(sel issues '{"action":"opened","issue":{"number":24},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
+ok "select: 権限の無い人(x)が開いた Issue(Type 無し)は選ばない" "$(sel issues '{"action":"opened","issue":{"number":24},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: 権限の無い人(x)による edited では、条件を満たす 10 でも選ばない(作者による本文の書き換え)" "$(sel issues '{"action":"edited","issue":{"number":10},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: 権限の無い人(x)が閉じたブロッカー 5 では、後続の 10 を選ばない" "$(sel issues '{"action":"closed","issue":{"number":5},"sender":'"$X"'}' | jq -c .targets 2>/dev/null)" "[]"
 ok "select: sender の無いイベントは選ばない(権限を確かめられない)" "$(sel issues '{"action":"edited","issue":{"number":10}}' | jq -c .targets 2>/dev/null)" "[]"
@@ -136,7 +144,7 @@ ok "select: 権限の無い人(x)が外した pm-hold の 31 は選ばない" "$
 ok "select: 読みだけ行う(gh の書き込みが無い)" "$(grep -c 'issue \(edit\|close\|comment\)' <<<"$out")" 0
 cl() { ( GH_REPO=o/r FX=$FX GHLOG=$GHLOG PATH=$T/bin:$PATH node "$top/tools/select-targets.mjs" claim "$1" "$2" 2>"$T/cl.err" ); }
 : > "$GHLOG"; ok "claim: 条件を満たす 10 に running を付け、claimed に入れる" "$(cl '[10]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit 10 .*--add-label running' "$GHLOG")" "[10]/1"
-fx $R/issues/23 "$(iss 23 open task,failed)"
+fx $R/issues/23 "$(iss 23 open failed Task)"
 : > "$GHLOG"; ok "claim: /retry の 23 は running を付けてから failed を外す(外す → 付けの順だと二重に起動する)" "$(cl '[23]' true | jq -c .claimed 2>/dev/null)/$(a=$(grep -n 'issue edit 23 .*--add-label running' "$GHLOG" | cut -d: -f1); r=$(grep -n 'issue edit 23 .*--remove-label failed' "$GHLOG" | cut -d: -f1); [ -n "$a" ] && [ -n "$r" ] && [ "$a" -lt "$r" ] && echo add-first)" "[23]/add-first"
 : > "$GHLOG"; ok "claim: 普通の再起動(retry でない)は failed の 23 を選ばない" "$(cl '[23]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit' "$GHLOG")" "[]/0"
 : > "$GHLOG"; ok "claim: pm-hold の 20 は付けない" "$(cl '[20]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit' "$GHLOG")" "[]/0"

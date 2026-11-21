@@ -12,7 +12,7 @@
 ## 役割
 - 作業者(Haiku 5.5): GitHub Actions の runner で動きます。Issue 1 件を、1 つのジョブで、新しいセッションで行います。
 - 監査・受付(Sonnet 5.5): 1 つの固定のセッションです。依頼者の指示を受け、全体を見て、止まっているところを調べて直します。Issue の分解や計画の見直しも、ここで行います。
-- 駆動: `.github/workflows/agent.yml` です。Issues とコメントのイベントで起動し、ブロッカーの無い `task` の Issue を、即座に起動します。ブロッカーが閉じたときは、そのブロッカーが塞いでいた Issue を起動します。`workflow_dispatch` と `schedule` は置きません。設計は `pm-work/workflow-design.md` です。
+- 駆動: `.github/workflows/agent.yml` です。Issues とコメントのイベントで起動し、ブロッカーの無い Issue Type が Task の Issue を、即座に起動します。ブロッカーが閉じたときは、そのブロッカーが塞いでいた Issue を起動します。`workflow_dispatch` と `schedule` は置きません。設計は `pm-work/workflow-design.md` です。
 
 ワークフローとハーネス(駆動、判定の道具、テスト、設定)は、エージェントが自分で改善します。改善はテストを通してから入れます。
 
@@ -27,7 +27,7 @@
 起動と再試行:
 - Issue に `blocked by` の依存が無ければ、作成や更新の時点で起動します。依存の Issue が閉じたときに、塞がれていた Issue が起動します。
 - 落ちた Issue には `failed` が付きます。再試行は、Issue に `/retry` とコメントするか、`failed` のラベルを外します。
-- 起動しない条件(`pm-hold`・`running`・`needs-owner`・`epic`・sub-issue を持つ・open の依存がある)は、`pm-work/workflow-design.md` の「5」にあります。
+- 起動しない条件(Issue Type が Task でない・`pm-hold`・`running`・`needs-owner`・sub-issue を持つ・open の依存がある)は、`pm-work/workflow-design.md` の「5」にあります。
 
 ## 守ること(依頼者の指示。台帳 `pm-work/ledger/instructions.tsv` にある)
 - 製品に、新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない(オプションは作らず、既定で全部有効にする)。

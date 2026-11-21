@@ -17,10 +17,10 @@ function reason(issue, { openBlockers, subIssues }, retry) {
   const labels = names(issue);
   if (issue.pull_request) return 'PR である';
   if (issue.state !== 'open') return '閉じている';
-  if (!labels.has('task')) return 'task のラベルが無い';
+  if (issue.type?.name !== 'Task') return `Issue の Type が Task でない(${issue.type?.name ?? '無し'})`;
   for (const l of ['pm-hold', 'running', 'needs-owner']) if (labels.has(l)) return `${l} が付いている`;
   if (labels.has('failed') && !retry) return 'failed が付いている(/retry か、ラベルを外すと再試行する)';
-  if (labels.has('epic') || subIssues > 0) return 'epic である(子を持つ)';
+  if (subIssues > 0) return 'sub-issue を持つ(親)';
   if (openBlockers > 0) return `blocked by の open が ${openBlockers} 件ある`;
   return '';
 }
