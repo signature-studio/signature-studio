@@ -2,7 +2,7 @@
 
 運用に使うラベルは 3 種。設計は `pm-work/workflow-design.md` の「6」に従う。既存の旧ラベル `ready` は使わない(設計の「6」)。
 
-種別は Issue の Type(Task・Feature)、規模と優先度はプロジェクトの Size と Priority で指定するため、`task`・`epic`・`priority-*` のラベルは作らない。
+種別は Issue の Type(Task・Feature)、規模はプロジェクトの Size、優先度は組織の Issue field の Priority で指定するため、`task`・`epic`・`priority-*` のラベルは作らない。
 
 ## 運用に使う 3 種(起動の判定に使う)
 

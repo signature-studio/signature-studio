@@ -5,7 +5,7 @@
 依頼者の承認まで、GitHub に書き込まない。この下書きは、承認の後に、Milestones・Issues・Sub-Issues・ラベルとして作る。
 
 - 1 ファイル = 1 つの Issue。ファイルの先頭の front matter は、起票の属性(`draft`・`title`・`type`・`milestone`・`parent`・`blocked_by`・`labels`・`size`・`priority`・`project`)。`---` より後が、Issue の本文。
-- `type` は Issue の Type(Task・Feature)。`size` と `priority` は、プロジェクト(`project`: signature-studio/3)の Size(XS・S・M・L・XL)と Priority(Urgent・High・Medium・Low)で指定する。本文とラベルには入れない。
+- `type` は Issue の Type(Task・Feature)。`size` は、プロジェクト(`project`: signature-studio/3)の Size(XS・S・M・L・XL)で指定する。`priority` は、組織の Issue field の Priority(Urgent・High・Medium・Low)で指定する。本文とラベルには入れない。
 - Size の決め方: 想定の所要が 1 時間以下なら XS、3 時間以下なら S、6 時間以下なら M、10 時間以下なら L、10 時間を超えるなら XL。Epic は、子の最大の Size。
 - Priority の決め方: P3 に直結するものは Urgent。P2 のものと、多くの task を塞ぐものは High。P1・プラグイン・性能は Medium。後回しと最終の検証は Low。Epic は、子の最も高い Priority。
 - Milestones の一覧と説明: `pm-work/milestones.md`。ラベルの案: `pm-work/issue-drafts/LABELS.md`。依存図: `pm-work/issue-drafts/GRAPH.md`。持続的な起票の計画(第 2 波以降): `pm-work/issue-drafts/WAVES.md`。
