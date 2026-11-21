@@ -8,8 +8,11 @@ rc() { "$@" >/dev/null 2>&1; echo $?; }
 if ! git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then echo "FAIL driver: 環境に git の名義が無い(判定の spec は、名義が無いと検査を行わない。skip して通さない)"; rm -rf "$T"; exit 1; fi
 # 小さなリポジトリ: 関数の表 4 行(0xa1 は直接 wasm 済み)、型、閾値 3、ci のタスク 1 件
 R=$T/repo; mkdir -p "$R/queue/inputs" "$R/queue/kinds" "$R/ci/tasks" "$R/lift/harness/hyb/lists"
-cp -r "$top/driver" "$R/"; cp "$top/queue/kinds/lower.md" "$R/queue/kinds/"; printf '3\n' > "$R/queue/threshold"
+cp -r "$top/driver" "$R/"; cp "$top/queue/kinds/lower.md" "$top/queue/kinds/lowerb.md" "$R/queue/kinds/"; printf '3\n' > "$R/queue/threshold"
 printf 'va\tmodule\tinstructions\n0xa1\tfle\t40\n0xb2\tfle\t30\n0xc3\tdsp\t20\n0xd4\tfle\t10\n0xe5\tfle\t5\n' > "$R/queue/inputs/lift-function-classes.tsv"
+# 表の 100 行を足す(バッチは 3 つになる。0x1001〜0x1064。台帳 L-037)
+for i in $(seq 1 100); do printf '0x%x\tfle\t%d\n' $((0x1000 + i)) $((900 - i)); done >> "$R/queue/inputs/lift-function-classes.tsv"
+printf 'va\tmodule\t理由\t日付\n' > "$R/queue/inputs/lower-rejected.tsv"
 printf '0xa1\n' > "$R/lift/harness/hyb/lowered-all.txt"; printf '手で書いたタスク\n' > "$R/ci/tasks/hand.md"
 # atomic の表(本物と同じ形: 注釈の行、見出しの行)。0X00C3 は表の書式が違っても飛ばすことを確かめるための行
 mkdir -p "$R/lift/harness/seeds"; printf '# 注釈\nva\tsites\tmnemonics\n0X00C3\t2\tCmpxchg:2\n' > "$R/lift/harness/seeds/mt4-atomic-functions.tsv"
@@ -20,10 +23,89 @@ git -C "$R" init -q . && git -C "$R" add -A && git -C "$R" commit -q -m base
 ( cd "$R" && ok "task: 型 lower には受け入れコマンドがある" "$(bash driver/task.sh lower-0xc3 | grep -c '^accept: ')" 1 )
 ( cd "$R" && ok "task: 表に無い VA は落ちる" "$(rc bash driver/task.sh lower-0xff)" 1 )
 ( cd "$R" && ok "task: 不正な名前は落ちる" "$(rc bash driver/task.sh ../x)" 1 )
-# generate.sh
-( cd "$R" && ok "generate: 直接 wasm 済み・除く名前・atomic を飛ばし、表の順に出す" "$(printf 'lower-0xb2\n' | bash driver/generate.sh 5 | tr '\n' ' ')" "lower-0xd4 lower-0xe5 " )
-( cd "$R" && ok "generate: atomic の関数(表の書式が違っても)は生成されない" "$(bash driver/generate.sh 5 < /dev/null | grep -c 'lower-0xc3')" 0 )
-( cd "$R" && ok "generate: 件数で止まる" "$(bash driver/generate.sh 1 < /dev/null)" "lower-0xb2" )
+# generate.sh(台帳 L-037): 型 lowerb だけを出す。関数が残るバッチを番号の昇順に、除く名前は飛ばす。古い型 lower-0x は出さない
+( cd "$R" && ok "generate: 関数が残るバッチを番号の昇順に出し、除く名前(lowerb-0000)は飛ばす" "$(printf 'lowerb-0000\n' | bash driver/generate.sh 5 | tr '\n' ' ')" "lowerb-0001 lowerb-0002 " )
+( cd "$R" && ok "generate: 古い型 lower-0x は出さない" "$(bash driver/generate.sh 5 < /dev/null | grep -c '^lower-0x')" 0 )
+( cd "$R" && ok "generate: 件数で止まる" "$(bash driver/generate.sh 1 < /dev/null)" "lowerb-0000" )
+( cd "$R" && ok "rows: atomic の 0x00C3(表の書式が違う)は、バッチに入らない" "$(bash driver/lowerb.sh rows | awk -F'\t' '$2 == "0xc3"' | wc -l)" 0 )
+( cd "$R" && ok "rows: 残りは 40 件ずつ(0 から)。104 件は 40・40・24" "$(bash driver/lowerb.sh rows | cut -f1 | uniq -c | awk '{ print $1 }' | paste -sd' ')" "40 40 24" )
+( cd "$R" && ok "task: 型 lowerb は番号を埋め、mode: script・バッチ・run:・accept の行を持つ" "$(bash driver/task.sh lowerb-0002 | grep -c -e '^mode: script$' -e '^バッチ: 40$' -e '^run: bash driver/lowerb.sh 0002$' -e '^accept: bash driver/lowerb.sh 0002 check && bash driver/lower-check.sh$' | paste -sd' ')/$(bash driver/task.sh lowerb-0002 | grep -c '{{')" "4/0" )
+( cd "$R" && ok "task: 4 桁でない番号(lowerb-12)は本文が無い" "$(bash driver/task.sh lowerb-12 >/dev/null 2>&1; echo $?)" 1 )
+( cd "$R" && ok "mode: 型 lowerb は script" "$(bash driver/mode.sh lowerb-0000)" script )
+# lower-check.sh(台帳 L-037): 型 lowerb の受け入れの後半。queue/kinds/lower.md の判定と同じ条件を持つ(弱めない)
+LC=$top/driver/lower-check.sh
+ok "lower-check: 起動確認の判定の条件(error が null・engine-idle・standIn が false)を、lower と同じに持つ" "$(grep -cF 'r.error==null&&r.state==="engine-idle"&&r.standIn===false' "$LC")/$(grep -cF 'r.error==null&&r.state==="engine-idle"&&r.standIn===false' "$top/queue/kinds/lower.md")" 1/1
+ok "lower-check: lower と同じビルドの段(cargo・rm・fe-build の engine と bundle・boot-bundle)を持つ" "$(for w in 'cargo build --release --locked --manifest-path lift/Cargo.toml' 'rm -rf lift/out-app/b2d-src lift/out-app/gen' 'lift/target/release/fe-build engine' 'lift/target/release/fe-build bundle' 'node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz"'; do grep -cF -- "$w" "$LC"; done | paste -sd' ')" "1 1 1 1 1"
+ok "lower-check: 段の印(lower-check: 段: …)と、通った印を出す" "$(grep -c 'echo "lower-check: 通った"' "$LC")/$(grep -c 'step engine' "$LC")" 1/1
+# lowerb.sh(台帳 L-037)の振る舞い: 偽のビルド(cargo・fe-build・boot-bundle)で、通る・listed but not emitted で外す・起動確認の二分探索・戻す・記録済みを足さない・足す物が無い
+LBB=$T/lb; mkdir -p "$LBB/bin" "$LBB/rt"
+printf '#!/usr/bin/env bash\necho cargo >> "$FAKE_LOG"\n' > "$LBB/bin/cargo"
+cat > "$LBB/bin/fe-build" <<'EOF'
+#!/usr/bin/env bash
+echo "$1" >> "$FAKE_LOG"
+[ "$1" = engine ] || exit 0
+n=0
+while read -r v; do
+  [ -n "$v" ] || continue
+  if grep -qxF "$v" lift/harness/hyb/lowered-all.txt; then echo "  not emitted: $v: not in the report of fe-wasmgen"; n=$((n + 1)); fi
+done < "$FAKE_MISS"
+[ "$n" -eq 0 ] || { echo "fe-wasmgen did not emit the listed functions of fle ($n of them)" >&2; exit 1; }
+EOF
+cat > "$LBB/bin/boot-bundle.mjs" <<'EOF'
+import fs from 'node:fs';
+const lines = (p) => (fs.existsSync(p) ? fs.readFileSync(p, 'utf8').split('\n').filter(Boolean) : []);
+const all = new Set(lines('lift/harness/hyb/lowered-all.txt'));
+const bad = lines(process.env.FAKE_BAD).filter((v) => all.has(v));
+fs.appendFileSync(process.env.FAKE_LOG, 'boot\n');
+console.log(JSON.stringify({ error: null, state: bad.length ? 'exited' : 'engine-idle', standIn: false, elapsedMs: 1 }));
+EOF
+chmod +x "$LBB/bin/cargo" "$LBB/bin/fe-build"
+# 偽のリポジトリ: 表 45 行(0x2001〜0x202d。5 の倍数は dsp)、atomic は 0X2003(表の書式が違う)。バッチ 0 は 40 件、バッチ 1 は 4 件
+mklb() {
+  local d=$1 i m
+  rm -rf "$d"; mkdir -p "$d/queue/inputs" "$d/queue/kinds" "$d/lift/harness/seeds" "$d/lift/harness/hyb/lists" "$d/lift/target/release" "$d/tools/boot-check"
+  cp -r "$top/driver" "$d/"; cp "$top/queue/kinds/lowerb.md" "$top/queue/kinds/lower.md" "$d/queue/kinds/"
+  { printf 'va\tmodule\tinstructions\n'; for i in $(seq 1 45); do m=fle; [ $((i % 5)) -eq 0 ] && m=dsp; printf '0x%x\t%s\t%d\n' $((0x2000 + i)) "$m" $((1000 - i)); done; } > "$d/queue/inputs/lift-function-classes.tsv"
+  printf 'va\tmodule\t理由\t日付\n' > "$d/queue/inputs/lower-rejected.tsv"
+  printf '# 注釈\nva\tsites\tmnemonics\n0X2003\t2\tCmpxchg:2\n' > "$d/lift/harness/seeds/mt4-atomic-functions.tsv"
+  : > "$d/lift/harness/hyb/lowered-all.txt"; : > "$d/lift/harness/hyb/lists/lowered-fle.txt"; : > "$d/lift/harness/hyb/lists/lowered-dsp.txt"
+  cp "$LBB/bin/fe-build" "$d/lift/target/release/fe-build"; cp "$LBB/bin/boot-bundle.mjs" "$d/tools/boot-check/boot-bundle.mjs"
+  git -C "$d" init -q . && git -C "$d" add -A && git -C "$d" commit -q -m base
+}
+lbrun() { ( cd "$1" && RUNNER_TEMP="$LBB/rt" FAKE_LOG="$LBB/log" FAKE_MISS="$LBB/miss" FAKE_BAD="$LBB/bad" PATH="$LBB/bin:$PATH" bash driver/lowerb.sh "${@:2}" ); }
+D=$LBB/r1; mklb "$D"; : > "$LBB/miss"; : > "$LBB/bad"; : > "$LBB/log"
+o=$(lbrun "$D" 0000 2>&1); r=$?
+ok "lowerb: 偽のビルドが通ると、バッチ 0 の 40 件が一覧に足され、commit が 1 つできる(内訳つき)" "$r/$(git -C "$D" log --format=%s -1)/$(wc -l < "$D/lift/harness/hyb/lowered-all.txt")/$(wc -l < "$D/lift/harness/hyb/lists/lowered-fle.txt")/$(wc -l < "$D/lift/harness/hyb/lists/lowered-dsp.txt")" "0/lowerb-0000: 40 関数を直接 wasm にする(dsp: 8, fle: 32)/40/32/8"
+ok "lowerb: 通ったバッチは check で全て処理済みになる(0)" "$(lbrun "$D" 0000 check >/dev/null 2>&1; echo $?)" 0
+ok "lowerb: 通った後の作業ツリーは clean(一覧と記録の範囲)" "$(git -C "$D" status --porcelain -- lift/harness queue/inputs | wc -l)" 0
+ok "lowerb: 通るまでのビルドは 1 回" "$(grep -c '^engine$' "$LBB/log")" 1
+D=$LBB/r2; mklb "$D"; printf '0x2001\n0x2002\n' > "$LBB/miss"; : > "$LBB/bad"; : > "$LBB/log"
+o=$(lbrun "$D" 0000 2>&1); r=$?
+ok "lowerb: listed but not emitted の 2 件は外して記録し、残りの 38 件を足す(ビルドは 2 回)" "$r/$(wc -l < "$D/lift/harness/hyb/lowered-all.txt")/$(grep -cxF 0x2001 "$D/lift/harness/hyb/lowered-all.txt")/$(awk -F'\t' '$3 == "listed but not emitted"' "$D/queue/inputs/lower-rejected.tsv" | wc -l)/$(grep -c '^engine$' "$LBB/log")" "0/38/0/2/2"
+ok "lowerb: 外したバッチの commit の subject は、残りの内訳(dsp: 8, fle: 30)" "$(git -C "$D" log --format=%s -1)" "lowerb-0000: 38 関数を直接 wasm にする(dsp: 8, fle: 30)"
+D=$LBB/r3; mklb "$D"; : > "$LBB/miss"; printf '0x2024\n' > "$LBB/bad"; : > "$LBB/log"
+o=$(lbrun "$D" 0000 2>&1); r=$?
+ok "lowerb: 起動確認が通らないとき、二分探索で通る前半(33 件)を残し、後半(7 件)を boot で記録する(ビルドは 6 回まで)" "$r/$(wc -l < "$D/lift/harness/hyb/lowered-all.txt")/$(grep -cxF 0x2024 "$D/lift/harness/hyb/lowered-all.txt")/$(awk -F'\t' '$3 == "boot"' "$D/queue/inputs/lower-rejected.tsv" | wc -l)/$(grep -c '^engine$' "$LBB/log")" "0/33/0/7/6"
+ok "lowerb: 残した前半の commit の subject" "$(git -C "$D" log --format=%s -1)" "lowerb-0000: 33 関数を直接 wasm にする(dsp: 6, fle: 27)"
+D=$LBB/r4; mklb "$D"; : > "$LBB/miss"; printf '0x2001\n' > "$LBB/bad"; : > "$LBB/log"
+o=$(lbrun "$D" 0000 2>&1); r=$?
+ok "lowerb: 通る物が無いときは変更を全部戻し、非 0 で終わる(ビルドは 6 回まで)" "$([ "$r" -ne 0 ] && echo nonzero)/$(wc -l < "$D/lift/harness/hyb/lowered-all.txt")/$(wc -l < "$D/queue/inputs/lower-rejected.tsv")/$(git -C "$D" status --porcelain -- lift/harness queue/inputs | wc -l)/$(grep -c '^engine$' "$LBB/log")" "nonzero/0/1/0/6"
+D=$LBB/r5; mklb "$D"; printf '0x2001\n' > "$D/lift/harness/hyb/lowered-all.txt"; printf '0x2002\tfle\tlisted but not emitted\t2026-11-21\n' >> "$D/queue/inputs/lower-rejected.tsv"; git -C "$D" commit -q -am pre
+: > "$LBB/miss"; : > "$LBB/bad"; : > "$LBB/log"
+o=$(lbrun "$D" 0000 2>&1); r=$?
+ok "lowerb: 既に在る物(lowered-all)と記録済み(rejected)は足さない(残り 38 件が 1 つの commit)" "$r/$(wc -l < "$D/lift/harness/hyb/lowered-all.txt")/$(sort "$D/lift/harness/hyb/lowered-all.txt" | uniq -d | wc -l)/$(grep -cxF 0x2002 "$D/lift/harness/hyb/lowered-all.txt")/$(git -C "$D" log --format=%s -1)" "0/39/0/0/lowerb-0000: 38 関数を直接 wasm にする(dsp: 8, fle: 30)"
+D=$LBB/r6; mklb "$D"; printf '0x202a\n0x202b\n0x202c\n0x202d\n' > "$D/lift/harness/hyb/lowered-all.txt"; git -C "$D" commit -q -am pre
+: > "$LBB/miss"; : > "$LBB/bad"; : > "$LBB/log"; h=$(git -C "$D" rev-parse HEAD)
+o=$(lbrun "$D" 0001 2>&1); r=$?
+ok "lowerb: 足す関数が無いバッチは、何も変えずに 0 で終わる(ビルドしない)" "$r/$([ "$(git -C "$D" rev-parse HEAD)" = "$h" ] && echo same)/$(grep -c . "$LBB/log")" "0/same/0"
+ok "lowerb: check は、未処理が残るバッチで非 0、全て処理済みなら 0" "$(lbrun "$D" 0000 check >/dev/null 2>&1; echo $?)/$(lbrun "$D" 0001 check >/dev/null 2>&1; echo $?)" "1/0"
+ok "lowerb: rows の塊は表の順に 40・4 件(atomic の 0x2003 を除く)" "$(lbrun "$D" rows | cut -f1 | uniq -c | awk '{ print $1 }' | paste -sd' ')/$(lbrun "$D" rows | grep -c '0x2003')" "40 4/0"
+# 生成器(lowerb): 残りの有るバッチを番号順に、記録済みだけのバッチは出さない
+D=$LBB/g; mklb "$D"
+ok "generate(lowerb): 残りの有る 2 バッチを番号順に出す(lower-0x は無い)" "$( (cd "$D" && bash driver/generate.sh 5 < /dev/null) | tr '\n' ' ')" "lowerb-0000 lowerb-0001 "
+( cd "$D" && bash driver/lowerb.sh rows | awk -F'\t' '$1 == "0000" { print $2 }' > lift/harness/hyb/lowered-all.txt && git commit -q -am pre )
+ok "generate(lowerb): 全て処理済みのバッチは出さない" "$( (cd "$D" && bash driver/generate.sh 5 < /dev/null) | tr '\n' ' ')" "lowerb-0001 "
+ok "generate(lowerb): 除く名前(lowerb-0001)は飛ばす" "$(printf 'lowerb-0001\n' | (cd "$D" && bash driver/generate.sh 5) | wc -l)" 0
 # 偽の gh: 待ち行列は $Q/ready・$Q/running(番号<TAB>題名)、落ちた回数は $Q/fails、Issue ごとのコメントは $Q/comments-<番号>.json(--jq は実際の jq で通す)
 # 報告の成果物は、run download が(落ちた判定の出力として)judge.txt を作る。コメントは $Q/comment-<番号>.txt に残す
 Q=$T/q; mkdir -p "$Q" "$T/bin"
@@ -69,7 +151,10 @@ reset "$(printf '1\tlower-0xb2\n')" ""; jq -n '{comments: [{body: "落ちた: x\
 ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: 落ちた時と状態が違えば、同じ Issue を起動する" "$(grep -c -- '-f task=lower-0xb2' "$Q/log")" 1
 # 非 lower(survey・計画の課題など)を、lower より先に起動する(台帳 L-036)。どちらも番号の昇順
-mkdir -p "$R/queue/tasks"; printf '# survey-x\n\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\naccept: true\n' > "$R/queue/tasks/other-y.md"
+mkdir -p "$R/queue/tasks"; printf '# survey-x\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/survey-x.md"; printf '# other-y\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/other-y.md"
+# 型(mode)の行: script と agent は読める。行の無い物・値が不正な物・本文の無い名前は、起動の検査で落ちる(台帳 L-037)
+printf '# m-script\n\nmode: script\naccept: true\n' > "$R/queue/tasks/m-script.md"; printf '# m-agent\n\nmode: agent\naccept: true\n' > "$R/queue/tasks/m-agent.md"
+printf '# m-none\n\naccept: true\n' > "$R/queue/tasks/m-none.md"; printf '# m-bad\n\nmode: other\naccept: true\n' > "$R/queue/tasks/m-bad.md"
 git -C "$R" add -A && git -C "$R" commit -q -m tasks
 started() { grep '^workflow run agent.yml' "$Q/log" | sed 's/.*-f task=\([^ ]*\).*/\1/' | tr '\n' ' '; }
 printf '2\n' > "$R/queue/threshold"; reset "$(printf '1\tlower-0xb2\n2\tlower-0xd4\n3\tsurvey-x\n4\tother-y\n')" ""
@@ -86,6 +171,25 @@ reset "$(printf '3\tsurvey-x\n4\tother-y\n1\tlower-0xb2\n')" ""; jq -n --arg b "
 ( cd "$R" && bash driver/fill.sh > "$T/fill-order.out" 2>&1 )
 ok "fill: 非 lower で状態が同じ物は飛ばし、その枠は次の候補(other-y、lower-0xb2)に回る" "$(started)" "other-y lower-0xb2 "
 ok "fill: 飛ばした件数はログに出る(非 lower の 1 件)" "$(grep -c '状態が同じ.*1 件' "$T/fill-order.out")" 1
+# mode.sh: 本文の mode: の値(script・agent)を出す。無い・不正・本文の無い名前は、何も出さずに非 0 で終わる
+ok "mode: script のタスクは script を出す" "$(cd "$R" && bash driver/mode.sh m-script)" script
+ok "mode: agent のタスクは agent を出す" "$(cd "$R" && bash driver/mode.sh m-agent)" agent
+ok "mode: 行の無いタスクは非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh m-none)" 1
+ok "mode: 行の無いタスクは何も出さない" "$(cd "$R" && bash driver/mode.sh m-none 2>/dev/null)" ""
+ok "mode: 値が script・agent 以外なら非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh m-bad)" 1
+ok "mode: 本文の無い名前は非 0 で終わる" "$(cd "$R" && rc bash driver/mode.sh no-such-task)" 1
+# fill: mode の無いタスクは起動せず閉じる。mode: script と agent は起動する。lower- は古い型の在庫なので、mode の検査を免除する
+reset "$(printf '7\tm-none\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode の無いタスクは起動せず、閉じる" "$(grep -c -- '-f task=m-none' "$Q/log")/$(grep -c '^issue close 7' "$Q/log")" 0/1
+reset "$(printf '9\tm-script\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: script のタスクは起動する" "$(grep -c -- '-f task=m-script' "$Q/log")" 1
+reset "$(printf '9\tm-agent\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: agent のタスクは起動する" "$(grep -c -- '-f task=m-agent' "$Q/log")" 1
+reset "$(printf '9\tm-bad\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode の値が不正なタスクは起動しない" "$(grep -c -- '-f task=m-bad' "$Q/log")" 0
+reset "$(printf '9\tlower-0xd4\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: lower- の古い型は mode が無くても起動する(A6 で閉じるまでの在庫)" "$(grep -c -- '-f task=lower-0xd4' "$Q/log")" 1
+ok "fill: 起動の順は、題名が ^lower で始まる物(lowerb- を含む)を後に並べる" "$(grep -c "\$2 ~ /^lower/" "$R/driver/fill.sh")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -219,13 +323,18 @@ try { const c = await launchChrome({ profile: path.join(T, "fake/profile") }); c
 ' "$T" "$top" 2>/dev/null)
 ok "cdp: DevTools が 12 秒後に答える Chrome でも起動できる" "$slow" "fake/1"
 # 完成までの計画(台帳 L-033): 待ち行列の survey 6 件、計画の見出し、受け入れの行、台帳の行
-Q_TASKS=$top/queue/tasks
-ok "queue: survey の本文が 6 件ある" "$(ls "$Q_TASKS"/survey-c*.md 2>/dev/null | wc -l)" 6
-ok "queue: 本文のすべてが、accept: の行をちょうど 1 つ持つ" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; [ "$(grep -c '^accept: ' "$f")" = 1 ] || n=$((n+1)); done; echo "$n")" 0
+Q_TASKS=$top/queue/tasks; Q_DONE=$top/queue/done
+ok "queue: survey の本文が 6 件ある" "$(ls "$Q_DONE"/survey-c*.md 2>/dev/null | wc -l)" 6
+ok "queue: 本文のすべてが、accept: の行をちょうど 1 つ持つ" "$(n=0; for f in "$Q_TASKS"/*.md "$Q_DONE"/*.md; do [ -e "$f" ] || continue; [ "$(grep -c '^accept: ' "$f")" = 1 ] || n=$((n+1)); done; echo "$n")" 0
 ok "plan: C-1 から C-6 の見出しが在る" "$(for n in 1 2 3 4 5 6; do grep -q "^### C-$n " "$top/queue/plan.md" 2>/dev/null && echo x; done | wc -l)" 6
-ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_TASKS"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
-ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
-ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
+ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_DONE"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
+ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
+ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
+# 型と待ち行列の本文の決まり(台帳 L-037): 型(queue/kinds)は mode: script とバッチの件数(30 以上)。queue/tasks の手書きは mode: agent と 規模: 大。
+# 型の例外は lower.md だけ(古い型。実行中の lower-0x の判定が main から読むので残す。A6 で待ちの lower-0x を閉じた後も、この型は読まれる)
+ok "kinds: lower.md を除き、すべての型が mode: script を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; grep -qx 'mode: script' "$f" || n=$((n+1)); done; echo "$n")" 0
+ok "kinds: lower.md を除き、すべての型がバッチの件数(30 以上)を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; b=$(sed -n 's/^バッチ: \([0-9]*\)$/\1/p' "$f" | head -n 1); [ -n "$b" ] && [ "$b" -ge 30 ] || n=$((n+1)); done; echo "$n")" 0
+ok "queue/tasks の本文は、すべて mode: agent と 規模: 大を持つ(件数の不一致は 0)" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; { grep -qx 'mode: agent' "$f" && grep -qx '規模: 大' "$f"; } || n=$((n+1)); done; echo "$n")" 0
 ok "台帳: L-033 が在り、5 列" "$(awk -F'\t' '$1 == "L-033" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 # 内蔵の目標(台帳 L-034): 約 141(効果 約 90 + インストゥルメント 約 51)。共通の前提に inventory。survey-c4 の本文の整え
 ok "台帳: L-034 が在り、5 列" "$(awk -F'\t' '$1 == "L-034" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
@@ -239,9 +348,28 @@ ok "plan: エンジン本体の wasm の実測(165848536)と出典が、同じ�
 ok "台帳: L-035 が在り、5 列" "$(awk -F'\t' '$1 == "L-035" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 ok "plan: 配信の方針の節が在り、1 プラグイン 1 wasm・起動前・バックグラウンドの語が在る" "$(P=$top/queue/plan.md; if [ "$(grep -c '^## 配信の方針' "$P")" = 1 ] && grep -q '1 プラグイン 1 wasm' "$P" && grep -q '起動前' "$P" && grep -q 'バックグラウンド' "$P"; then echo yes; else echo no; fi)" yes
 ok "plan: 「必要になった時に読み込むか」の方式の文が残っていない" "$(grep -c '必要になった時に読み込むかは survey の結果で決める' "$top/queue/plan.md")" 0
-S4=$top/queue/tasks/survey-c4-builtin-plugins.md
+S4=$top/queue/done/survey-c4-builtin-plugins.md
 ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
 ok "survey-c4: 手順の行は、句点か閉じ括弧で終わる(途中で切れていない)" "$(grep -E '^[0-9]+\. ' "$S4" | grep -vcE '(。|）|\))$')" 0
 ok "survey-c4: インストゥルメントの件数が 0 件だと、手順 2 に書く" "$(grep -E '^2\. ' "$S4" | grep -c '0 件')" 1
+# タスクの粒度(台帳 L-037): 機械的な作業は mode: script(スクリプト)で行い、エージェントは規模が大のタスクだけ
+ok "台帳: L-037 が在り、5 列で、日付 2026-11-21 と出所(依頼者)が在る" "$(awk -F'\t' '$1 == "L-037" && NF == 5 && $2 == "2026-11-21" && $3 == "依頼者" { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 「タスクの粒度」の節が在り、3 時間と 30 件を書く" "$(P=$top/queue/plan.md; S=$(awk '/^## タスクの粒度/{f=1; next} /^## /{f=0} f' "$P"); if [ "$(grep -c '^## タスクの粒度' "$P")" = 1 ] && grep -q '3 時間' <<<"$S" && grep -q '30 件' <<<"$S"; then echo yes; else echo no; fi)" yes
+ok "AGENTS.md: 作業者の手順に、mode: script の行が在る" "$(grep -c '^- タスク本文の `mode: script` は、スクリプトが作業を行う' "$top/AGENTS.md")" 1
+# agent.yml(台帳 L-037): 作業の型(MODE)を読み、opencode に関わる段は agent のときだけ動く。script の段は、タスクの run: をスクリプトとして実行する
+RUNJ=$(awk '/^  run:$/{f=1} /^  close:$/{f=0} f' "$A")
+EXPECT_NAMES='リポジトリを取得する(資格は残さない)|作業の型を読む(script はスクリプト、agent は作業者)|名義を設定する(token は消す)|版の値を ci/versions.env から読む|Node を入れる|rust をそろえ、app の依存を入れてビルドし、fe-build を用意する|emsdk を入れる|アカウント ID を app/wrangler.jsonc から読む|抽出物を R2 のキャッシュから取る(公開の artifact は使わない)|抽出物を lift/out-app/host に置く|opencode を導入する(版は固定)|opencode の認証情報を取り込み、作業者のモデルを設定する|作業者を 1 回動かす|スクリプトで作業する(script。エージェントは動かさない)|判定(取り直した main の guard/judge.sh と、main のタスクで)|通った変更を main に push する(token はこの段で発行する)|報告を検査して、成果物とサマリーに出す|報告と判定の出力を成果物に保存する(7 日)'
+ok "agent.yml: run ジョブの段の名前と順が、型の 2 段を足した物と一致する" "$(awk '/^      - name: /{ sub(/^      - name: /, ""); print }' <<<"$RUNJ" | paste -sd'|')" "$EXPECT_NAMES"
+ok "agent.yml: opencode の 3 段は、if: env.MODE == 'agent' を名前の次の行に持つ" "$(awk '/^      - name: /{ name = $0; if ((getline nxt) > 0 && nxt == "        if: env.MODE == '\''agent'\''") print name }' <<<"$RUNJ" | grep -c 'opencode を導入する\|opencode の認証情報\|作業者を 1 回動かす')" 3
+ok "agent.yml: if: env.MODE == 'agent' は、ちょうど 3 つ(opencode の段だけ)" "$(grep -cF -- "        if: env.MODE == 'agent'" <<<"$RUNJ")" 3
+ok "agent.yml: opencode の段の主要な行が、変更前のまま在る(認証・導入・実行)" "$(for l in 'install -D -m 755 "$RUNNER_TEMP/package/bin/opencode" "$HOME/.opencode/bin/opencode"' 'printf '\''%s'\'' "$OPENCODE_AUTH_JSON" | opencode auth import --standalone' 'opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")"'; do grep -cF -- "$l" <<<"$RUNJ"; done | paste -sd' ')" "1 1 1"
+MODESTEP=$(awk '/^      - name: 作業の型を読む/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: 型の段は mode.sh で TASK の型を読み、値は script か agent の 2 つだけを GITHUB_ENV に書く" "$(grep -cF -- 'm=$(bash driver/mode.sh "$TASK" || true)' <<<"$MODESTEP")/$(grep -cF -- 'case "$m" in script|agent) echo "MODE=$m" >> "$GITHUB_ENV" ;;' <<<"$MODESTEP")" 1/1
+ok "agent.yml: 型の段は、GITHUB_ENV への書き込みと、失敗時の >&2 以外に echo しない" "$(grep 'echo' <<<"$MODESTEP" | grep -v 'GITHUB_ENV' | grep -vc '>&2')" 0
+SCRIPTSTEP=$(awk '/^      - name: スクリプトで作業する/{f=1; next} /^      - name: /{f=0} f' <<<"$RUNJ")
+ok "agent.yml: スクリプトの段は if: env.MODE == 'script' を持つ" "$(head -n 1 <<<"$SCRIPTSTEP" | sed 's/^ *//')" "if: env.MODE == 'script'"
+ok "agent.yml: スクリプトの段は pipefail を置き、task.sh の run: 行を bash -c で実行し、出力を script.txt に残す" "$(grep -cF -- '          set -o pipefail' <<<"$SCRIPTSTEP")/$(grep -cF -- 'cmd=$(awk' <<<"$SCRIPTSTEP")/$(grep -cF -- 'bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt"' <<<"$SCRIPTSTEP")" 1/1/1
+ok "agent.yml: スクリプトの段は opencode を動かさない" "$(grep -c 'opencode' <<<"$SCRIPTSTEP")" 0
+ok "agent.yml: スクリプトの段の失敗は止めず、判定(judge)が決める(agent の段と同じ)" "$(grep -cF -- 'script.txt" || true' <<<"$SCRIPTSTEP")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
