@@ -1,10 +1,11 @@
-// Page side of the engine Worker: spawns it, sends the loaded bundle and hands it the one desktop canvas and the input ring (decision 0223).
+// Page side of the engine Worker: spawns it and the render Worker (C-2), sends the loaded bundle, hands the engine the input ring and the link to the render Worker, and hands the render Worker the one desktop canvas (decision 0223).
 import type { Manifest } from '../bundle/manifest.ts';
 import type { RawInput } from '../input/events.ts';
 import { browserWorkerDiagHost, diagnoseWorkerStart, isPlainWorkerStartEvent } from './worker-diag.ts';
 import { parseRequest, type FileDlgAnswer, type FileDlgRequest } from './filedlg.ts';
-import type { BundleAssets, DeskHandover, FromWorker, ToWorker } from './protocol.ts';
+import type { BundleAssets, DeskHandover, FromWorker, RenderHandover, ToRender, ToWorker } from './protocol.ts';
 import { newRingBuffer, RingWriter } from '../input/ring.ts';
+import { newDeskControl } from './desk-link.ts';
 
 export interface ExitInfo { reason: 'finished' | 'stopped' | 'trap'; code: number; message: string; presents: number }
 
@@ -38,6 +39,8 @@ export interface ClientEvents {
 
 export class EngineClient {
   private worker: Worker | null = null;
+  /** C-2: the render Worker (draws the desktop canvas) */
+  private render: Worker | null = null;
   private readonly readbacks = new Map<string, (m: FromWorker) => void>();
   private readyResolve: (() => void) | null = null;
   private exitInfo: ExitInfo | null = null;
@@ -56,7 +59,7 @@ export class EngineClient {
   deskGlPixels(): Promise<{ width: number; height: number; data: ArrayBuffer }> {
     return new Promise((res, rej) => {
       this.dumpWaiter = (m) => { if (m.t === 'desk-gl-pixels') res({ width: m.width, height: m.height, data: m.data }); else if (m.t === 'desk-dump-error') rej(new Error(m.message)); };
-      this.send({ cmd: 'desk-gl-read' });
+      this.renderSend({ cmd: 'desk-gl-read' });
     });
   }
   /** decision 0223: the page's end of the input ring */
@@ -67,8 +70,9 @@ export class EngineClient {
   constructor(events: ClientEvents) { this.events = events; }
 
   private send(m: ToWorker, transfer: Transferable[] = []): void { (this.worker as Worker).postMessage(m, transfer); }
+  private renderSend(m: ToRender): void { this.render?.postMessage(m); }
 
-  /** spawns the Worker, sends the bundle and resolves when the engine is loaded */
+  /** spawns the Workers, sends the bundle and resolves when the engine is loaded */
   async init(manifest: Manifest, assets: BundleAssets): Promise<void> {
     const workerCreatedAt = performance.now();
     // NOTE (decision 0189): keep `new Worker(new URL('./worker.ts', import.meta.url), …)` as ONE expression: Vite recognises the Worker only in this form (a `new URL(…)` kept in a variable is emitted as a plain asset `worker-*.ts`, which the server sends with the wrong MIME type and the Worker does not start)
@@ -81,13 +85,24 @@ export class EngineClient {
       if (isPlainWorkerStartEvent(ev)) void diagnoseWorkerStart(ev, browserWorkerDiagHost(), workerCreatedAt).then((d) => { (globalThis as { __flWorkerStartFailure?: unknown }).__flWorkerStartFailure = d; this.events.log('warn', `worker start failure diagnostics: ${JSON.stringify(d)}`); });
     };
     w.onmessageerror = () => this.events.error('worker', 'a message from the engine Worker could not be deserialised');
+    // C-2: the desktop is drawn by a second Worker (render-worker.ts); the one canvas goes to it, and the engine composes and says when the picture changed (the link is a MessageChannel between the two)
+    // NOTE: as for the engine Worker, the constructor is one expression (decision 0189)
+    const r = new Worker(new URL('./render-worker.ts', import.meta.url), { type: 'module', name: 'fl-render' });
+    this.render = r;
+    r.onmessage = (ev: MessageEvent<FromWorker>) => this.onMessage(ev.data);
+    r.onerror = (ev) => this.events.error('render', `${ev.message || 'the render Worker raised an error'} (${ev.filename}:${ev.lineno})`);
+    r.onmessageerror = () => this.events.error('render', 'a message from the render Worker could not be deserialised');
     const ready = new Promise<void>((res) => { this.readyResolve = res; });
     const transfer: Transferable[] = [assets.seed, assets.glue, assets.dll].filter((b): b is Uint8Array => b !== null).map((b) => b.buffer as ArrayBuffer);
     const off = this.events.deskCanvas().transferControlToOffscreen();
     const sab = newRingBuffer();
     this.ring = new RingWriter(sab);
-    const desk: DeskHandover = { canvas: off, ring: sab };
-    transfer.push(off);
+    const ctl = newDeskControl();
+    const link = new MessageChannel();
+    const renderDesk: RenderHandover = { canvas: off, port: link.port1, ctl };
+    r.postMessage({ cmd: 'init', desk: renderDesk } satisfies ToRender, [off, link.port1]);
+    const desk: DeskHandover = { ring: sab, ctl, port: link.port2 };
+    transfer.push(link.port2);
     const msg: ToWorker = { cmd: 'init', manifest, assets, desk };
     // the packs are handed over, not copied (the DLL pack alone is about 70 MB)
     this.send(msg, transfer);
@@ -118,21 +133,21 @@ export class EngineClient {
     this.terminate();
     this.finishExit({ reason: 'stopped', code: -1, message: 'the engine Worker was terminated by the page while the engine was running', presents: 0 });
   }
-  terminate(): void { this.worker?.terminate(); this.worker = null; }
+  terminate(): void { this.worker?.terminate(); this.worker = null; this.render?.terminate(); this.render = null; }
 
   whenExited(): Promise<ExitInfo> {
     if (this.exitInfo) return Promise.resolve(this.exitInfo);
     return new Promise((res) => this.exitWaiters.push(res));
   }
 
-  /** SHA-256 of the RGBA bytes the canvas of `key` holds (getImageData). The Worker owns the OffscreenCanvas ('desk' for the desktop canvas of display method D) and answers. */
+  /** SHA-256 of the RGBA bytes the canvas of `key` holds (getImageData). The render Worker owns the OffscreenCanvas ('desk' for the desktop canvas of display method D) and answers. */
   async readback(key: string): Promise<{ width: number; height: number; sha256: string }> {
     return new Promise((res, rej) => {
       this.readbacks.set(key, (m) => {
         if (m.t === 'readback') res({ width: m.width, height: m.height, sha256: m.sha256 });
         else if (m.t === 'readback-error') rej(new Error(m.message));
       });
-      this.send({ cmd: 'readback', key });
+      this.renderSend({ cmd: 'readback', key });
     });
   }
 
