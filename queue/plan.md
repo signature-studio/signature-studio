@@ -149,6 +149,7 @@
 - 2 行・1 ファイル・1 つの関数・1 つの DLL・1 つの表の行を足すような作業は、エージェントに任せない。
 - 同じ型の作業を機械的に増やすときは、型(queue/kinds/。`mode: script`)にし、1 タスクで 30 件以上を扱う(バッチ)。lower は、1 タスク 40 関数のバッチ `lowerb-<k>`(`mode: script`)にする。
 - 型は `mode: script` だけ。`mode: script` のタスクは、本文の `run: ` の行のコマンドを、作業ジョブがスクリプトとして実行する(エージェントは動かさない)。
+- エージェントのタスクは、1 件ごとに `queue/tasks/<名前>.md` を持ち、内容が互いに異なる(台帳 L-038。fill が検査する)。
 
 ## ③ 着手の順と時期
 
@@ -173,3 +174,4 @@
 - 2026-11-21(L-036): survey 6 件は、作成から 1 時間以上たっても 1 件も起動しなかった。原因は、driver/fill.sh が ready を番号の昇順で起動し、番号の小さい lower(約 100 件)の後ろに並んでいたこと。fill を直し、非 lower のタスクを先に、lower を後に、それぞれ番号の昇順で起動するようにした(台帳 L-036)。spec/driver.test.sh に、起動の順の検査を 4 件足した。
 - 2026-11-21(機能タスク 5 件): survey の 6 件は完了し、実測が入った。依頼者の是正(1800 件のコミットで、HiDPI・右クリック・テンプレートが 1 つも解決していない。タスクの粒度を大きくして開発を加速する)を受けて、機能の課題を大きなタスク 5 件にした: feat-c2-render-worker・feat-c1-hidpi・feat-c6-popup-menus・feat-delivery-lazy-load・feat-c3-resources-seed(queue/tasks/feat-*.md)。Issue は ready で作った(題名は同じ名前)。C-4・C-5 は、inventory と lazy-load の後にバッチにする。feat-c3-resources-seed は、抽出の木が seed 表と同じ範囲(238 件 = 227 + 11)なので、件数の増加は受け入れに入れていない(survey-c3 の実測による)。
 - 2026-11-21(inventory): インストーラの全ファイルの一覧の経路を入れた(タスク inventory-0。extract ジョブの 2 段と run ジョブの 1 段が inventory の作業だけで動く。driver/inventory.mjs・driver/inventory-commit.sh・queue/tasks/inventory-0.md)。spec/driver.test.sh は 182 件が通る。queue/tasks の検査は、mode: script なら run: の行、mode: agent なら 規模: 大を要求する形に直した。実インストーラでの動作は未確認。
+- 2026-11-21(L-038): 依頼者の是正で、エージェントのタスクは 1 件ごとに queue/tasks/<名前>.md を持ち、内容が互いに異なる決まりにした。型(queue/kinds)から機械的に出した本文は、mode: agent でも起動しない(fill が検査し、閉じる)。spec/driver.test.sh は、accept の行と見出しの重複が 0 であることと、型に mode: agent が無いことを検査する。lower-0x の古い型は、型の行が無いので、この検査の対象外(台帳 L-037)。
