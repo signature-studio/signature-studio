@@ -90,6 +90,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: 作業の型を読む(script はスクリプト、agent は作業者)
+        run: |
+          m=$(bash driver/mode.sh "$TASK" || true)
+          # lower- の古い型(queue/kinds/lower.md)は mode の行が無いので、agent のまま動かす(台帳 L-037)
+          case "$TASK" in lower-*) m=${m:-agent} ;; esac
+          case "$m" in script|agent) echo "MODE=$m" >> "$GITHUB_ENV" ;; *) echo "mode が無い: $TASK" >&2; exit 1 ;; esac
+
       - name: 名義を設定する(token は消す)
         env:
           APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
@@ -161,6 +168,7 @@ jobs:
           test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
 
       - name: opencode を導入する(版は固定)
+        if: env.MODE == 'agent'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/cli.tgz" https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.3.0.tgz
           test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/cli.tgz" | base64 -w0)" = 'sha512-8T3K8L6Nd4fSG5BSgofqhmIDQ1ZvzDZZ2J7bFVB9RK1d5Hjqh24IcxgbcwpgGKkdvItrayi4Rl+wrSmhl17FFg=='
@@ -169,6 +177,7 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
       - name: opencode の認証情報を取り込み、作業者のモデルを設定する
+        if: env.MODE == 'agent'
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
           OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
@@ -178,11 +187,22 @@ jobs:
           printf '{"model":"%s","agents":{"worker":{"model":"%s"},"title":{"model":"%s"},"summary":{"model":"%s"}}}\n' "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" > .opencode/opencode.jsonc
 
       - name: 作業者を 1 回動かす
+        if: env.MODE == 'agent'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           { cat AGENTS.md; printf '\n\n---\n\n## タスク(%s)\n\n' "$TASK"; bash driver/task.sh "$TASK"; } > "$RUNNER_TEMP/prompt.md"
           opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")" > "$RUNNER_TEMP/out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null || true
           rm -rf .opencode
+
+      - name: スクリプトで作業する(script。エージェントは動かさない)
+        if: env.MODE == 'script'
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/out"
+          bash driver/task.sh "$TASK" > "$RUNNER_TEMP/task.md"
+          cmd=$(awk '/^run: / { sub(/^run: /, ""); print; exit }' "$RUNNER_TEMP/task.md")
+          test -n "$cmd"
+          bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt" || true
 
       - name: 判定(取り直した main の guard/judge.sh と、main のタスクで)
         env:

@@ -22,13 +22,15 @@ k=$((threshold - $(count "$running")))
 echo "fill: 閾値 $threshold、実行中 $(count "$running")、待ち $(count "$ready")、起動 $((k > 0 ? k : 0))"
 [ "$k" -gt 0 ] || exit 0
 # 落ちた時の state(Issue の state: 行)と今の state が同じ Issue は、同じ結果になるので起動しない(driver/state.sh)。飛ばした件数はログに出す
-# 起動の順: 題名が lower- で始まらない物を先に、lower を後に。どちらも番号の昇順(台帳 L-036。lower は件数が多く、先に並ぶと他の物が待つ)
-order=$(sort -n <<<"$ready" | awk -F'\t' '$2 !~ /^lower-/'; sort -n <<<"$ready" | awk -F'\t' '$2 ~ /^lower-/')
+# 起動の順: 題名が lower で始まらない物を先に、lower(lowerb- を含む)を後に。どちらも番号の昇順(台帳 L-036。lower は件数が多く、先に並ぶと他の物が待つ)
+order=$(sort -n <<<"$ready" | awk -F'\t' '$2 !~ /^lower/'; sort -n <<<"$ready" | awk -F'\t' '$2 ~ /^lower/')
 cur=$(state); launched=0; skipped=0
 while IFS=$'\t' read -r num id && [ "$launched" -lt "$k" ]; do
   [ -n "$num" ] || continue
   text=$(bash driver/task.sh "$id" 2>/dev/null || true)
-  if ! grep -q '^accept: ' <<<"$text"; then
+  # 型(mode: script か agent)の無いタスクも、受け入れと同じく起動しない。lower- は古い型の在庫なので免除する(台帳 L-037。A6 で閉じる)
+  mode_ok=1; [[ $id == lower-* ]] || bash driver/mode.sh "$id" >/dev/null 2>&1 || mode_ok=0
+  if ! grep -q '^accept: ' <<<"$text" || [ "$mode_ok" -eq 0 ]; then
     gh issue edit "$num" --remove-label ready --add-label failed >/dev/null
     gh issue close "$num" --reason "not planned" --comment "受け入れコマンド(accept: の行)が無いので、待ち行列に入れない。" >/dev/null
     continue
