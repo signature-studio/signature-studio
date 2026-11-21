@@ -190,6 +190,16 @@ ok "fill: mode の値が不正なタスクは起動しない" "$(grep -c -- '-f 
 reset "$(printf '9\tlower-0xd4\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
 ok "fill: lower- の古い型は mode が無くても起動する(A6 で閉じるまでの在庫)" "$(grep -c -- '-f task=lower-0xd4' "$Q/log")" 1
 ok "fill: 起動の順は、題名が ^lower で始まる物(lowerb- を含む)を後に並べる" "$(grep -c "\$2 ~ /^lower/" "$R/driver/fill.sh")" 1
+# mode: agent は、本文を queue/tasks/<名前>.md に持つ物だけ起動する。型(queue/kinds)から出した本文は起動せず、閉じる(台帳 L-038)
+# K は $R の複製で、型 lowerb を mode: agent に替えたもの(型だけで本文が出る mode: agent の例)
+K=$T/kagent; rm -rf "$K"; cp -r "$R" "$K"; sed -i 's/^mode: script$/mode: agent/' "$K/queue/kinds/lowerb.md"; git -C "$K" commit -q -am "lowerb を mode: agent に(検査の確かめ用)"
+reset "$(printf '9\tlowerb-0000\n')" ""; ( cd "$K" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: agent の型だけで本文が出るタスク(queue/tasks に無い)は起動されず、閉じて failed になる(台帳 L-038)" "$(grep -c -- '-f task=lowerb-0000' "$Q/log")/$(grep -c '^issue close 9 ' "$Q/log")/$(grep -c '^issue edit 9 .*--add-label failed' "$Q/log")" "0/1/1"
+ok "fill: その閉じる時のコメントは、queue/tasks/<名前>.md を持つ決まりを言う" "$(grep -c 'mode: agent のタスクは queue/tasks/lowerb-0000.md を持つ(台帳 L-038)' "$Q/log")" 1
+reset "$(printf '9\tm-agent\n')" ""; ( cd "$K" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: queue/tasks に在る mode: agent は、起動される(K でも)" "$(grep -c -- '-f task=m-agent' "$Q/log")" 1
+reset "$(printf '9\tlowerb-0000\n')" ""; ( cd "$R" && bash driver/fill.sh >/dev/null 2>&1 )
+ok "fill: mode: script の型だけで本文が出るタスクは、queue/tasks に無くても起動される(回帰)" "$(grep -c -- '-f task=lowerb-0000' "$Q/log")" 1
 # close.sh
 reset "" ""; ( cd "$R" && bash driver/close.sh 5 success https://x >/dev/null 2>&1 )
 ok "close: 通ったら閉じる" "$(grep -c '^issue close 5 --reason completed' "$Q/log")" 1
@@ -334,11 +344,11 @@ ok "plan: C-1 から C-6 の見出しが在る" "$(for n in 1 2 3 4 5 6; do grep
 ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_DONE"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
 ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
 ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
-# 型と待ち行列の本文の決まり(台帳 L-037): 型(queue/kinds)は mode: script とバッチの件数(30 以上)。queue/tasks の手書きは mode: agent と 規模: 大。
+# 型と待ち行列の本文の決まり(台帳 L-037): 型(queue/kinds)は mode: script とバッチの件数(30 以上)。queue/tasks の手書きは、mode: agent なら 規模: 大、mode: script なら run: の行。
 # 型の例外は lower.md だけ(古い型。実行中の lower-0x の判定が main から読むので残す。A6 で待ちの lower-0x を閉じた後も、この型は読まれる)
 ok "kinds: lower.md を除き、すべての型が mode: script を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; grep -qx 'mode: script' "$f" || n=$((n+1)); done; echo "$n")" 0
 ok "kinds: lower.md を除き、すべての型がバッチの件数(30 以上)を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; b=$(sed -n 's/^バッチ: \([0-9]*\)$/\1/p' "$f" | head -n 1); [ -n "$b" ] && [ "$b" -ge 30 ] || n=$((n+1)); done; echo "$n")" 0
-ok "queue/tasks の本文は、すべて mode: agent と 規模: 大を持つ(件数の不一致は 0)" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; { grep -qx 'mode: agent' "$f" && grep -qx '規模: 大' "$f"; } || n=$((n+1)); done; echo "$n")" 0
+ok "queue/tasks の本文は、mode: agent なら 規模: 大を、mode: script なら run: の行を持つ(件数の不一致は 0)" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; if grep -qx 'mode: script' "$f"; then grep -q '^run: ' "$f" || n=$((n+1)); else { grep -qx 'mode: agent' "$f" && grep -qx '規模: 大' "$f"; } || n=$((n+1)); fi; done; echo "$n")" 0
 ok "台帳: L-033 が在り、5 列" "$(awk -F'\t' '$1 == "L-033" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 # 内蔵の目標(台帳 L-034): 約 141(効果 約 90 + インストゥルメント 約 51)。共通の前提に inventory。survey-c4 の本文の整え
 ok "台帳: L-034 が在り、5 列" "$(awk -F'\t' '$1 == "L-034" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
@@ -363,7 +373,7 @@ ok "plan: 「タスクの粒度」の節が在り、3 時間と 30 件を書く"
 ok "AGENTS.md: 作業者の手順に、mode: script の行が在る" "$(grep -c '^- タスク本文の `mode: script` は、スクリプトが作業を行う' "$top/AGENTS.md")" 1
 # agent.yml(台帳 L-037): 作業の型(MODE)を読み、opencode に関わる段は agent のときだけ動く。script の段は、タスクの run: をスクリプトとして実行する
 RUNJ=$(awk '/^  run:$/{f=1} /^  close:$/{f=0} f' "$A")
-EXPECT_NAMES='リポジトリを取得する(資格は残さない)|作業の型を読む(script はスクリプト、agent は作業者)|名義を設定する(token は消す)|版の値を ci/versions.env から読む|Node を入れる|rust をそろえ、app の依存を入れてビルドし、fe-build を用意する|emsdk を入れる|アカウント ID を app/wrangler.jsonc から読む|抽出物を R2 のキャッシュから取る(公開の artifact は使わない)|抽出物を lift/out-app/host に置く|opencode を導入する(版は固定)|opencode の認証情報を取り込み、作業者のモデルを設定する|作業者を 1 回動かす|スクリプトで作業する(script。エージェントは動かさない)|判定(取り直した main の guard/judge.sh と、main のタスクで)|通った変更を main に push する(token はこの段で発行する)|報告を検査して、成果物とサマリーに出す|報告と判定の出力を成果物に保存する(7 日)'
+EXPECT_NAMES='リポジトリを取得する(資格は残さない)|作業の型を読む(script はスクリプト、agent は作業者)|名義を設定する(token は消す)|版の値を ci/versions.env から読む|Node を入れる|rust をそろえ、app の依存を入れてビルドし、fe-build を用意する|emsdk を入れる|アカウント ID を app/wrangler.jsonc から読む|抽出物を R2 のキャッシュから取る(公開の artifact は使わない)|一覧(inventory)を R2 のキャッシュから取る(inventory の作業だけ)|抽出物を lift/out-app/host に置く|opencode を導入する(版は固定)|opencode の認証情報を取り込み、作業者のモデルを設定する|作業者を 1 回動かす|スクリプトで作業する(script。エージェントは動かさない)|判定(取り直した main の guard/judge.sh と、main のタスクで)|通った変更を main に push する(token はこの段で発行する)|報告を検査して、成果物とサマリーに出す|報告と判定の出力を成果物に保存する(7 日)'
 ok "agent.yml: run ジョブの段の名前と順が、型の 2 段を足した物と一致する" "$(awk '/^      - name: /{ sub(/^      - name: /, ""); print }' <<<"$RUNJ" | paste -sd'|')" "$EXPECT_NAMES"
 ok "agent.yml: opencode の 3 段は、if: env.MODE == 'agent' を名前の次の行に持つ" "$(awk '/^      - name: /{ name = $0; if ((getline nxt) > 0 && nxt == "        if: env.MODE == '\''agent'\''") print name }' <<<"$RUNJ" | grep -c 'opencode を導入する\|opencode の認証情報\|作業者を 1 回動かす')" 3
 ok "agent.yml: if: env.MODE == 'agent' は、ちょうど 3 つ(opencode の段だけ)" "$(grep -cF -- "        if: env.MODE == 'agent'" <<<"$RUNJ")" 3
@@ -376,4 +386,125 @@ ok "agent.yml: スクリプトの段は if: env.MODE == 'script' を持つ" "$(h
 ok "agent.yml: スクリプトの段は pipefail を置き、task.sh の run: 行を bash -c で実行し、出力を script.txt に残す" "$(grep -cF -- '          set -o pipefail' <<<"$SCRIPTSTEP")/$(grep -cF -- 'cmd=$(awk' <<<"$SCRIPTSTEP")/$(grep -cF -- 'bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt"' <<<"$SCRIPTSTEP")" 1/1/1
 ok "agent.yml: スクリプトの段は opencode を動かさない" "$(grep -c 'opencode' <<<"$SCRIPTSTEP")" 0
 ok "agent.yml: スクリプトの段の失敗は止めず、判定(judge)が決める(agent の段と同じ)" "$(grep -cF -- 'script.txt" || true' <<<"$SCRIPTSTEP")" 1
+# inventory(台帳 L-033。queue/plan.md の「共通の前提: インストーラの一覧」): 表の作り方(driver/inventory.mjs)、置き方(driver/inventory-commit.sh)、タスク(inventory-0)、agent.yml の段
+# (a) inventory.mjs: 偽の PE と偽の読み(依存の注入)で確かめる。インストーラの実物は無いので、NSIS の読みは確かめていない(未確認)
+cat > "$T/inv.mjs" <<'EOF'
+import crypto from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+const top = process.argv[2];
+const m = await import(pathToFileURL(`${top}/driver/inventory.mjs`).href);
+const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+const out = (name, got, exp) => console.log([name, got, exp].join('\t'));
+// 偽の PE(64 ビット): import ディレクトリは RVA 0x1000、.idata の 1 節(raw 0x200 = RVA 0x1000)、名前は RVA 0x1100 から
+function fakePe(dlls) {
+  const b = Buffer.alloc(0x600);
+  b.write('MZ', 0, 'latin1');
+  b.writeUInt32LE(0x40, 0x3c);
+  b.writeUInt32LE(0x4550, 0x40);
+  b.writeUInt16LE(0x8664, 0x44);
+  b.writeUInt16LE(1, 0x46);
+  b.writeUInt16LE(240, 0x54);
+  const opt = 0x58;
+  b.writeUInt16LE(0x20b, opt);
+  b.writeUInt32LE(0x200, opt + 60);
+  b.writeUInt32LE(16, opt + 108);
+  b.writeUInt32LE(0x1000, opt + 120);
+  b.writeUInt32LE(0x100, opt + 124);
+  const s = opt + 240;
+  b.write('.idata', s, 'latin1');
+  b.writeUInt32LE(0x100, s + 8);
+  b.writeUInt32LE(0x1000, s + 12);
+  b.writeUInt32LE(0x200, s + 16);
+  b.writeUInt32LE(0x200, s + 20);
+  dlls.forEach((name, i) => {
+    b.writeUInt32LE(0x1100 + 0x40 * i, 0x200 + 20 * i + 12);
+    b.writeUInt32LE(0x1200, 0x200 + 20 * i + 16);
+    b.write(`${name}\0`, 0x300 + 0x40 * i, 'latin1');
+  });
+  return b;
+}
+out('peImports: 64 ビットの PE の import の DLL 名を、小文字で、取れる', m.peImports(fakePe(['KERNEL32.dll', 'OpenGL32.dll'])).join(';'), 'kernel32.dll;opengl32.dll');
+out('peImports: PE でない物は空', String(m.peImports(Buffer.from('plain text, not a PE image, long enough to pass the length check')).length), '0');
+out('kindOf: 拡張子で dll・exe・other(大文字の拡張子も dll)', [m.kindOf('X.DLL'), m.kindOf('a.exe'), m.kindOf('b.flp')].join(','), 'dll,exe,other');
+out('hashed: Shared の other は計算しない。Data と Plugins の下は計算する', [m.hashed('Shared\\x.ilfont', 'other'), m.hashed('Data\\t.flp', 'other'), m.hashed('Plugins\\x.txt', 'other'), m.hashed('Shared\\y.dll', 'dll')].join(','), 'false,true,true,true');
+const bufs = new Map([[1, fakePe(['KERNEL32.dll', 'OpenGL32.dll'])], [2, fakePe(['kernel32.dll'])], [3, Buffer.from('dup-old')], [4, Buffer.from('dup-new')], [5, Buffer.from('font')], [6, Buffer.from('template')]]);
+const calls = [];
+const read = (off) => { calls.push(off); return bufs.get(off); };
+const entries = [['Plugins\\Fruity\\Effects\\Fruity Balance_x64.dll', 1], ['Plugins\\Fruity\\Generators\\Foo.dll', 2], ['Plugins\\Fruity\\Effects\\dup.dll', 3], ['Plugins\\Fruity\\Effects\\DUP.dll', 4], ['Shared\\Artwork\\Fonts\\a.ilfont', 5], ['Data\\Templates\\t.flp', 6]];
+const rows = m.inventoryRows(entries, read);
+const [data, dup, bal, foo, shared] = rows;
+out('inventoryRows: 行は guest の小文字の順', rows.map((r) => r.guest).join('|'), 'Data\\Templates\\t.flp|Plugins\\Fruity\\Effects\\DUP.dll|Plugins\\Fruity\\Effects\\Fruity Balance_x64.dll|Plugins\\Fruity\\Generators\\Foo.dll|Shared\\Artwork\\Fonts\\a.ilfont');
+out('inventoryRows: 読むのは計算する行だけ(Shared の other は読まない)', calls.join(','), '6,4,1,2');
+out('inventoryRows: 同じ guest は後の物を使う(大きさと SHA-256 も)', [dup.guest, dup.bytes, String(dup.sha256 === sha(bufs.get(4)))].join(','), 'Plugins\\Fruity\\Effects\\DUP.dll,7,true');
+out('inventoryRows: dll の行は kind・大きさ・SHA-256・import を持つ', [bal.kind, String(bal.bytes === String(bufs.get(1).length)), String(bal.sha256 === sha(bufs.get(1))), bal.imports].join(','), 'dll,true,true,kernel32.dll;opengl32.dll');
+out('inventoryRows: dll の import は小文字で、; 区切り(Foo の行)', [foo.kind, foo.imports].join(','), 'dll,kernel32.dll');
+out('inventoryRows: 展開しない行は、大きさ・SHA-256・import が空', [shared.kind, shared.bytes, shared.sha256, shared.imports].join(','), 'other,,,');
+out('inventoryRows: Data の other は大きさと SHA-256 を持ち、import は空', [data.kind, data.bytes, data.sha256 === sha(bufs.get(6)), data.imports].join(','), 'other,8,true,');
+const text = m.tsv(rows);
+out('tsv: 1 行目は見出し、行数は見出しを足した数', [String(text.split('\n')[0] === 'guest\tbytes\tsha256\tkind\timports'), String(text.trimEnd().split('\n').length)].join(','), 'true,6');
+out('tsv: ドライブ名の絶対パスも、インストール先の接頭辞も出さない', [String(/[A-Za-z]:\\/.test(text)), String(/^install\\/m.test(text))].join(','), 'false,false');
+out('inventoryRows: タブを含むパスは受け付けない', (() => { try { m.inventoryRows([['a\tb', 1]], read); return 'accepted'; } catch { return 'threw'; } })(), 'threw');
+const uniq = entries.filter(([, off]) => off !== 3);
+out('inventoryRows: 入力の順に依らず、同じ表になる', String(m.tsv(m.inventoryRows(uniq, read)) === m.tsv(m.inventoryRows([...uniq].reverse(), read))), 'true');
+EOF
+node "$T/inv.mjs" "$top" > "$T/inv.out" 2> "$T/inv.err"; ok "inventory.mjs: 検査が例外なく終わる" "$?" 0
+ok "inventory.mjs: 検査の行数" "$(wc -l < "$T/inv.out" | tr -d ' ')" 15
+while IFS=$'\t' read -r n g e; do ok "inventory.mjs: $n" "$g" "$e"; done < "$T/inv.out"
+# (b) agent.yml: inventory の段は 3 つ(extract の 2 つと run の 1 つ)。通常のタスクの段は、if が増えていない(変更前の 11 件のまま)
+A=$top/.github/workflows/agent.yml
+ok "agent.yml: inventory の段は if: startsWith(inputs.task, 'inventory') を持つ(3 つ)" "$(grep -cF "if: startsWith(inputs.task, 'inventory')" "$A")" 3
+ok "agent.yml: その if は、直前の - name: が inventory の段に付いている(3 つ)" "$(awk '/^ *- name: /{n=$0} /^ *if: startsWith\(inputs.task, .inventory.\)$/{ if (index(n, "inventory")) c++ } END{print c+0}' "$A")" 3
+ok "agent.yml: inventory 以外の if: は、変更前の 11 件のまま(通常のタスクの段は増えていない)" "$(grep -E '^ *if:' "$A" | grep -vc 'inventory')" 11
+ok "agent.yml: 作業ジョブ(run)に R2_ARTIFACT の鍵が無い" "$(awk '/^  run:$/{f=1} /^  close:$/{f=0} f' "$A" | grep -c 'R2_ARTIFACT')" 0
+ok "agent.yml: extract の段の R2_ARTIFACT は 4 行(既存の 2 行と、一覧の作成の 2 行)" "$(awk '/^  extract:$/{f=1} /^  run:$/{f=0} f' "$A" | grep -c 'R2_ARTIFACT')" 4
+ok "agent.yml: 一覧の作成は、node driver/inventory.mjs の出力を \$RUNNER_TEMP/inventory に書く" "$(grep -cF 'node driver/inventory.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/inventory/fl-installer-files.tsv"' "$A")" 1
+ok "agent.yml: キャッシュの鍵は inventory-<run_id>-<run_attempt>(保存と復元の 2 か所)" "$(grep -cF 'key: inventory-${{ github.run_id }}-${{ github.run_attempt }}' "$A")" 2
+ok "agent.yml: 保存は runs-on/cache/save で、一覧の path は \$RUNNER_TEMP/inventory" "$(grep -cF 'uses: runs-on/cache/save@v5' "$A")/$(grep -cF 'path: ${{ runner.temp }}/inventory' "$A")" 1/2
+ok "agent.yml: 復元の段は fail-on-cache-miss: true を持つ" "$(awk '/一覧\(inventory\)を R2 のキャッシュから取る/{f=1} f && /fail-on-cache-miss: true/{print "yes"; exit}' "$A")" yes
+ok "agent.yml: タブ文字が無い(YAML の字下げの規則)" "$(grep -c "$(printf '\t')" "$A")" 0
+ok "agent.yml: 段の - name: は、すべて 6 字下げ(字下げの違いが無い)" "$(grep -c '^ *- name: ' "$A")" "$(grep -c '^      - name: ' "$A")"
+# (c) inventory-commit.sh: 偽のリポジトリと偽の $RUNNER_TEMP で。並べ替え・見出し・1 つの commit・同じ一覧の再実行・一覧の無い時・未 commit の変更
+ic=$T/ic; icrt=$T/icrt; rm -rf "$ic" "$icrt"; mkdir -p "$ic/queue/inputs" "$icrt/inventory"
+printf 'va\tmodule\n' > "$ic/queue/inputs/lower-rejected.tsv"; git -C "$ic" init -q . && git -C "$ic" add -A && git -C "$ic" commit -q -m base
+printf 'guest\tbytes\tsha256\tkind\timports\nPlugins\\Fruity\\Generators\\b.dll\t2\tab\tdll\t\nPlugins\\Fruity\\Effects\\a.dll\t1\tcd\tdll\tkernel32.dll\nShared\\c.txt\t\t\tother\t\n' > "$icrt/inventory/fl-installer-files.tsv"
+icr=$(cd "$ic" && RUNNER_TEMP="$icrt" bash "$top/driver/inventory-commit.sh" 2>&1); ok "inventory-commit: 一覧を置いて commit し、終了コード 0" "$?" 0
+ok "inventory-commit: 見出しを先頭に残し、残りを並べる(C ロケール)" "$(cut -f1 "$ic/queue/inputs/fl-installer-files.tsv" | paste -sd'|' -)" 'guest|Plugins\Fruity\Effects\a.dll|Plugins\Fruity\Generators\b.dll|Shared\c.txt'
+ok "inventory-commit: 件名(件数つき)" "$(git -C "$ic" log -1 --format=%s)" 'inventory-0: インストーラの全ファイルの一覧を queue/inputs に置く(3 件)'
+ok "inventory-commit: commit は 1 つ増える(base と合わせて 2)" "$(git -C "$ic" rev-list --count HEAD)" 2
+ok "inventory-commit: 作業ツリーは clean" "$(git -C "$ic" status --porcelain | wc -l | tr -d ' ')" 0
+icr2=$(cd "$ic" && RUNNER_TEMP="$icrt" bash "$top/driver/inventory-commit.sh" 2>&1); rc2=$?
+ok "inventory-commit: 同じ一覧の 2 回目は変更が無く 0 で終わり、commit を増やさない" "$(echo "$icr2" | grep -c '変更が無い')/$rc2/$(git -C "$ic" rev-list --count HEAD)" 1/0/2
+ok "inventory-commit: 一覧が無ければ 1 で終わる" "$(cd "$ic" && RUNNER_TEMP="$T/nowhere" bash "$top/driver/inventory-commit.sh" >/dev/null 2>&1; echo $?)" 1
+echo x >> "$ic/queue/inputs/lower-rejected.tsv"
+ok "inventory-commit: queue/inputs に commit していない変更があれば 1 で終わる" "$(cd "$ic" && RUNNER_TEMP="$icrt" bash "$top/driver/inventory-commit.sh" >/dev/null 2>&1; echo $?)" 1
+git -C "$ic" checkout -q -- queue/inputs/lower-rejected.tsv
+ok "inventory-commit: 名義を変える指定(-c・--author・GIT_*)を使わない" "$(grep -cE -- '--author|git -c |GIT_' "$top/driver/inventory-commit.sh")" 0
+# (d) タスク inventory-0: 本文は mode: script と run: の行(ちょうど 1 つ)と accept: の行(ちょうど 1 つ)を持つ。task.sh は HEAD から読む
+I0=$(cd "$top" && bash driver/task.sh inventory-0 2>/dev/null); ok "task: inventory-0 は終了コード 0 で本文を出す" "$(cd "$top" && bash driver/task.sh inventory-0 >/dev/null 2>&1; echo $?)" 0
+ok "task: inventory-0 は mode: script・run:(1 つ)・accept:(1 つ)を持つ" "$(grep -cx 'mode: script' <<<"$I0")/$(grep -c '^run: ' <<<"$I0")/$(grep -c '^accept: ' <<<"$I0")" 1/1/1
+ok "task: inventory-0 の run: は一覧の置き方の段(inventory-commit.sh)" "$(grep '^run: ' <<<"$I0")" 'run: bash driver/inventory-commit.sh'
+ok "task: inventory-0 の型は script(driver/mode.sh)" "$(cd "$top" && bash driver/mode.sh inventory-0)" script
+# inventory-0 の受け入れ: 偽の表で、通る・落ちる(件数・SHA-256 の形)
+acc=$(grep -m1 '^accept: ' "$top/queue/tasks/inventory-0.md" | cut -c9-)
+mkacc() {
+  local d=$T/acc-$1; rm -rf "$d"; mkdir -p "$d/queue/inputs"
+  { printf 'guest\tbytes\tsha256\tkind\timports\n'
+    for i in $(seq 1 "$2"); do s=$(printf '%064x' "$i"); [ "$5" = 1 ] && [ "$i" = 1 ] && s=abc; printf 'Plugins\\Fruity\\Effects\\e%d.dll\t1\t%s\tdll\tkernel32.dll\n' "$i" "$s"; done
+    for i in $(seq 1 "$3"); do printf 'Plugins\\Fruity\\Generators\\g%d.dll\t1\t%s\tdll\t\n' "$i" "$(printf '%064x' "$i")"; done
+    for i in $(seq 1 "$4"); do printf 'Shared\\s%d.txt\t\t\tother\t\n' "$i"; done; } > "$d/queue/inputs/fl-installer-files.tsv"
+}
+mkacc ok 20 10 70 0; mkacc few-fx 19 10 71 0; mkacc few-gen 20 9 71 0; mkacc short 20 10 69 0; mkacc badsha 20 10 70 1
+ok "inventory-0 の受け入れ: Effects 20・Generators 10・見出しを除く 100 行・SHA-256 の形が正しい表は通る" "$(cd "$T/acc-ok" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 0
+ok "inventory-0 の受け入れ: Effects が 19 件なら落ちる" "$(cd "$T/acc-few-fx" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
+ok "inventory-0 の受け入れ: Generators が 9 件なら落ちる" "$(cd "$T/acc-few-gen" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
+ok "inventory-0 の受け入れ: 見出しを除いて 99 行なら落ちる" "$(cd "$T/acc-short" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
+ok "inventory-0 の受け入れ: dll に 64 桁でない SHA-256 があれば落ちる" "$(cd "$T/acc-badsha" && bash -c "$acc" >/dev/null 2>&1; echo $?)" 1
+# 同じ内容のエージェントのタスクを、待ち行列に入れない(台帳 L-038)。queue/tasks の accept: の行と、先頭の見出しの行は、互いに異なる
+ok "queue/tasks: 本文が 1 件以上ある" "$(ls "$Q_TASKS"/*.md 2>/dev/null | wc -l | tr -d ' ' | awk '$1 > 0 { print "yes" }')" yes
+ok "queue/tasks: accept: の行が互いに異なる(重複 0)" "$(for f in "$Q_TASKS"/*.md; do grep '^accept: ' "$f"; done | sort | uniq -d | wc -l | tr -d ' ')" 0
+ok "queue/tasks: 先頭の見出しの行(# )が互いに異なる(重複 0)" "$(for f in "$Q_TASKS"/*.md; do head -n 1 "$f"; done | sort | uniq -d | wc -l | tr -d ' ')" 0
+ok "kinds: 型に mode: agent は無い(lower.md は、型の行が無い古い型。台帳 L-037・L-038)" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; grep -qx 'mode: agent' "$f" && n=$((n+1)); done; echo "$n")" 0
+ok "台帳: L-038 が在り、5 列で、日付 2026-11-21 と出所(依頼者)が在る" "$(awk -F'\t' '$1 == "L-038" && NF == 5 && $2 == "2026-11-21" && $3 == "依頼者" { print "yes" }' "$top/ledger/instructions.tsv")" yes
+ok "plan: 「タスクの粒度」の節に、1 件ごとの queue/tasks/<名前>.md と、内容が互いに異なる決まり(L-038)が在る" "$(P=$top/queue/plan.md; S=$(awk '/^## タスクの粒度/{f=1; next} /^## /{f=0} f' "$P"); if grep -qF 'queue/tasks/<名前>.md' <<<"$S" && grep -q '内容が互いに異なる' <<<"$S"; then echo yes; else echo no; fi)" yes
+ok "AGENTS.md: 作業者の手順の mode: agent の行に、queue/tasks/<名前>.md の決まり(L-038)が在る" "$(grep -cF '`mode: agent` は `queue/tasks/<名前>.md` を持つ(L-038)。' "$top/AGENTS.md")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
