@@ -75,6 +75,34 @@ jobs:
           node app/scripts/extract-fl.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
+      - name: 一覧(inventory)を作る(inventory の作業だけ。インストーラを取り直す)
+        if: startsWith(inputs.task, 'inventory')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/inventory"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node driver/inventory.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/inventory/fl-installer-files.tsv"
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+      - name: 一覧(inventory)を R2 のキャッシュに保存する(inventory の作業だけ)
+        if: startsWith(inputs.task, 'inventory')
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/inventory
+          key: inventory-${{ github.run_id }}-${{ github.run_attempt }}
+
   run:
     name: worker ${{ inputs.task }}
     needs: extract
@@ -159,6 +187,23 @@ jobs:
         with:
           path: ${{ runner.temp }}/host
           key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          fail-on-cache-miss: true
+
+      - name: 一覧(inventory)を R2 のキャッシュから取る(inventory の作業だけ)
+        if: startsWith(inputs.task, 'inventory')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/inventory
+          key: inventory-${{ github.run_id }}-${{ github.run_attempt }}
           fail-on-cache-miss: true
 
       - name: 抽出物を lift/out-app/host に置く
