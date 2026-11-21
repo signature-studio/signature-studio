@@ -13,35 +13,31 @@ project: signature-studio/3
 
 ## 目的
 
-依頼者の指示: 内蔵のエフェクト(Effects 約 90 件)とインストゥルメント(Generators 約 51 件)を存在させる。その前段として、抽出の表(DLL の一覧と SHA-256)に、インストーラの一覧(013)の内蔵の DLL を、SHA-256 つきで揃える。OpenGL の VFX 系(023)は除く。実際の lift は、群ごとの Sub-Issue(021・022)が行う。
-
-## 規模
-
-規模: 大(想定 6 時間。ビルドを約 5 回回す規模)
+依頼者の指示: 内蔵のエフェクト(Effects 約 90 件)とインストゥルメント(Generators 約 51 件)を存在させる。その前段として、抽出の表(DLL の一覧と SHA-256)に、インストーラの一覧(#{{013}})の内蔵の DLL を、SHA-256 つきで揃える。OpenGL の VFX 系(#{{023}})は除く。実際の lift は、群ごとの Sub-Issue(#{{021}}・#{{022}})が行う。
 
 ## 背景
 
 - 現在の抽出の表: `ci/extract-dlls.tsv` の有効な行は 11 件(FLEngine 1 件とエンジンのライブラリ 7 件と Fruity 3 件。pm-work/findings/survey-c4-builtin-plugins.md の手順 1・4)。インストーラの内蔵の DLL は、ここには無い。
-- Generators の DLL は、今の抽出の表に 0 件。Effects の DLL の追加(Fruity Filter・Delay 2)は、子 019 で扱う。
+- Generators の DLL は、今の抽出の表に 0 件。Effects の DLL の追加(Fruity Filter・Delay 2)は、#{{019}} で扱う。
 - 表の 1 行の形: `ci/extract-dlls.tsv` の各行は、インストーラ内の DLL のパス、抽出先、SHA-256 などを持つ(現在の表の形に従う。形は作業者が読んで確かめる)。
 - 1 DLL を足す手数(推定。survey-c4 の手順 8): 表の行、`lift/harness/b2d2/modules.tsv` の行、seed の行、`lift/harness/web/pack.args` の `--args`。hook 点のファイルが必要な Delphi の DLL もある。
-- 一覧の入力: `inputs/fl-installer-files.tsv`(013 の成果物。列: guest・bytes・sha256・kind・imports)。
-- 後回しの VFX 系の一覧: `inputs/vfx-deferred.tsv`(023 の成果物)。
+- 一覧の入力: `inputs/fl-installer-files.tsv`(#{{013}} の成果物。列: guest・bytes・sha256・kind・imports)。
+- 後回しの VFX 系の一覧: `inputs/vfx-deferred.tsv`(#{{023}} の成果物)。
 
 ## 読む物
 
 - `ci/extract-dlls.tsv`(全行。17・18 行の注釈)
-- `inputs/fl-installer-files.tsv`(013 の成果物)
-- `inputs/vfx-deferred.tsv`(023 の成果物)
+- `inputs/fl-installer-files.tsv`(#{{013}} の成果物)
+- `inputs/vfx-deferred.tsv`(#{{023}} の成果物)
 - `app/scripts/extract-fl.mjs`(52〜68 行: DLL の表。SHA-256 が一致した物を抽出先に置く)
 - `lift/harness/b2d2/modules.tsv`、`lift/harness/web/pack.args`、`lift/harness/seeds/vfs-seed-idle1.tsv`(表の 4 つの箇所)
 - `lift/harness/hooks/fruity-delphi-effect-hook-points.txt`(Delphi の DLL の hook 点の形)
 
 ## やること
 
-1. 一覧(013)から、`Plugins\Fruity\Effects\`・`Plugins\Fruity\Generators\` の DLL のうち、後回し(023)を除いた物を取り出す。件数を報告に書く。
+1. 一覧(#{{013}})から、`Plugins\Fruity\Effects\`・`Plugins\Fruity\Generators\` の DLL のうち、後回し(#{{023}})を除いた物を取り出す。件数を報告に書く。
 2. 取り出した各 DLL について、`ci/extract-dlls.tsv` の行を、一覧の SHA-256 と一致させて加える。各行は、抽出の仕組み(extract-fl.mjs の DLL 表)で検査できる形にする。
-3. Generators の DLL は、seed の表に無いので、そのままでは起動の経路に入らない。この Issue では表だけを揃え、lift と起動の経路は群の Sub-Issue(022)に任せる。報告に、どの表が未完かを書く。
+3. Generators の DLL は、seed の表に無いので、そのままでは起動の経路に入らない。この Issue では表だけを揃え、lift と起動の経路は群の Sub-Issue(#{{022}})に任せる。報告に、どの表が未完かを書く。
 4. 追加の手数(表の行数・触った箇所の数)を、報告に書く。
 
 ## 受け入れ
@@ -68,6 +64,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 013(一覧)、023(後回しの一覧)。
-- 019(Fruity Filter と Delay 2)と同じ表を変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
-- 021・022 の群の Sub-Issue は、この Issue の表を前提にする。
+- blocked_by: #{{013}}(一覧)、#{{023}}(後回しの一覧)。
+- #{{019}}(Fruity Filter と Delay 2)と同じ表を変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- #{{021}}・#{{022}} の群の Sub-Issue は、この Issue の表を前提にする。

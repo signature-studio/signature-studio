@@ -15,13 +15,9 @@ project: signature-studio/3
 
 課題 C-5: OTT を存在させる。既定の経路で読み込み、1 ブロックの音声を処理する。1 プラグイン 1 wasm で、起動後に届ける。
 
-## 規模
-
-規模: 大(想定 8 時間。harness の source を作る分を含む。ビルドを約 5 回回す規模)
-
 ## 背景
 
-- 入力: 外部の 3 件のうちの OTT のインストーラ(子 025 が取る。大きさ 8,397,928 B。`ci/artifacts.lock` の 3 行目)。
+- 入力: 外部の 3 件のうちの OTT のインストーラ(#{{025}} が取る。大きさ 8,397,928 B。`ci/artifacts.lock` の 3 行目)。
 - 欠けている物: OTT の harness の source と build は、リポジトリに無い。`app/src/plugins/ott-host.ts` の 1〜3 行が指す `lift/harness/vst`(decision 0156・0164)と、`lift/harness/web/mt1/plugin-worker/main_vst_ext.c`(decision 0173)は、どちらも無い。`app/test/unit/plugins-ott.test.ts` の 2 行が指す `lift/harness/vst/vfs-seed-vst.tsv` も無い(pm-work/findings/survey-c5-external-plugins.md の 2 節)。
 - したがって、この Issue は、harness の source の作り直しから始める。作り直しの元は、この機械に無い。作業者は、OTT の入力を読んで、harness の形を新しく決める。
 - 既存の先例: `app/src/plugins/ott-host.ts`(1 インスタンス 1 Worker。テストからだけ使われる)、`app/src/plugins/plugin-client.ts`。
@@ -32,13 +28,13 @@ project: signature-studio/3
 - `app/test/unit/plugins-ott.test.ts`(2 行と、15 行の `have` の判定)
 - `lift/harness/vst3a/main_vst3a.c`(Serum 2 の native harness。OTT の harness の形の参考)
 - `lift/harness/two/wrp1_vst3.c`(VST3 の読みの経路)
-- 子 014 の成果物(起動後の取得)、子 026 の成果物(既定の link)
+- #{{014}} の成果物(起動後の取得)、#{{026}} の成果物(既定の link)
 
 ## やること
 
-1. 入力(子 025)が取れていることを確かめる。取れていなければ、報告に書いて止まる。
+1. 入力(#{{025}})が取れていることを確かめる。取れていなければ、報告に書いて止まる。
 2. OTT の harness の source を作る(`lift/harness/` の下に新しく置く)。作った場所と形を、報告に書く。
-3. 1 プラグイン 1 wasm の build を、既定の build の一部として作る。起動後の取得で届ける(子 014)。
+3. 1 プラグイン 1 wasm の build を、既定の build の一部として作る。起動後の取得で届ける(#{{014}})。
 4. 道具 `tools/plugin-run/measure.mjs` で、OTT を読み込み、1 ブロックの音声を処理する。JSON の 1 行を出す: `{"plugin","instantiated","blockFrames","nonSilent","error"}`。
 5. 結果を報告に書く。耳の確認はしない。
 
@@ -67,5 +63,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 040(音声への圧迫の解消。プラグインの処理は、音声の経路が決まった後に入れる)、025(入力)、026(既定の link)、015(1 プラグイン 1 wasm の型)。
-- 027・029 と同じ仕組みを使う。
+- blocked_by: #{{040}}(音声への圧迫の解消。プラグインの処理は、音声の経路が決まった後に入れる)、#{{025}}(入力)、#{{026}}(既定の link)、#{{015}}(1 プラグイン 1 wasm の型)。
+- #{{027}}・#{{029}} と同じ仕組みを使う。

@@ -13,30 +13,26 @@ project: signature-studio/3
 
 ## 目的
 
-依頼者の指示: OpenGL を使う VFX 系は後回しにしてよい。後回しにする物の一覧を、インストーラの import の情報で作り、理由(OpenGL の DLL を import する)を書く。後回しの物は、020 の表から外す。
-
-## 規模
-
-規模: 大(想定 3 時間。一覧の判定と、確かめのビルドを含む)
+依頼者の指示: OpenGL を使う VFX 系は後回しにしてよい。後回しにする物の一覧を、インストーラの import の情報で作り、理由(OpenGL の DLL を import する)を書く。後回しの物は、#{{020}} の表から外す。
 
 ## 背景
 
-- 判定の材料: インストーラの一覧(013)の `imports` 列(dll と exe の PE が import する DLL の名前。小文字、`;` 区切り)。判定の規則: import に `opengl32.dll` を含む DLL を、VFX 系(後回し)とする。
+- 判定の材料: インストーラの一覧(#{{013}})の `imports` 列(dll と exe の PE が import する DLL の名前。小文字、`;` 区切り)。判定の規則: import に `opengl32.dll` を含む DLL を、VFX 系(後回し)とする。
 - 旧の文字列の判定(pm-work/findings/survey-c4-builtin-plugins.md の手順 4。目安にすぎない): `grep -a -c -i opengl32` で、FLEngine に 1 行、Fruity の 3 件に 0 行。PE の import 表の解析ではない。
 - 動的に読む DLL は、import 表に出ない(推定)。判定の限界は報告に書く。
 
 ## 読む物
 
-- `inputs/fl-installer-files.tsv`(013 の成果物。列: guest・bytes・sha256・kind・imports)
+- `inputs/fl-installer-files.tsv`(#{{013}} の成果物。列: guest・bytes・sha256・kind・imports)
 - `pm-work/findings/survey-c4-builtin-plugins.md`(手順 4 の旧の判定)
 - `lift/crates/fe-pe/src/main.rs`(`pe-info` の import の読み。67〜105 行)
 
 ## やること
 
-1. 013 の一覧から、`Plugins\Fruity\Effects\`・`Plugins\Fruity\Generators\` の DLL のうち、`opengl32.dll` を import する物を取り出す。取り出した件数と名前を報告に書く。
+1. #{{013}} の一覧から、`Plugins\Fruity\Effects\`・`Plugins\Fruity\Generators\` の DLL のうち、`opengl32.dll` を import する物を取り出す。取り出した件数と名前を報告に書く。
 2. `inputs/vfx-deferred.tsv` を作る。列: `guest`(タブ)`reason`(タブ)`imports`。見出し行を 1 行残す。`reason` は `opengl32.dll を import`。
 3. 判定の限界(動的に読む DLL、import 表の無い DLL)を、報告に書く。
-4. 後回しの物が、020 の表から外れていることを確かめ、結果を報告に書く。
+4. 後回しの物が、#{{020}} の表から外れていることを確かめ、結果を報告に書く。
 
 ## 受け入れ
 
@@ -61,6 +57,6 @@ node -e 'const fs=require("fs");const inv=fs.readFileSync("inputs/fl-installer-f
 
 ## 他のタスクとの関係
 
-- blocked_by: 013。
-- 020 が、この Issue の一覧を使う。
-- 後回しの範囲は、この Issue の判定で決まる。判定の結果(件数と名前)は、この Issue の報告に出す。後回しの物の実装は 039 で、全群の後に行う。
+- blocked_by: #{{013}}。
+- #{{020}} が、この Issue の一覧を使う。
+- 後回しの範囲は、この Issue の判定で決まる。判定の結果(件数と名前)は、この Issue の報告に出す。後回しの物の実装は #{{039}} で、全群の後に行う。

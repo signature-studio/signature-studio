@@ -15,16 +15,12 @@ project: signature-studio/3
 
 試行: 内蔵のプラグイン 1 件(Fruity Balance)を、起動後にバックグラウンドで届け、1 プラグイン 1 wasm の形を、最初の 1 件で確かめる。内蔵の 141 件の全件を入れる前の、型の確認。
 
-## 規模
-
-規模: 大(想定 4 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - Fruity Balance は、内蔵のエフェクトの 1 件。DLL の大きさは 3,718,656 B(`lift/out-plugins/fruity_balance_x64.dll` の実測。pm-work/findings/survey-c4-builtin-plugins.md)。Fruity Filter(3,780,608 B)と Delay 2(3,731,968 B)より小さく、最初の 1 件に選んだ。
 - 登録の場所: `lift/harness/b2d2/modules.tsv` の 8 行(`fruity_balance_x64.dll`・base `0x6800000`・`--hook-points lift/harness/hooks/fruity-delphi-effect-hook-points.txt`)。`lift/harness/web/pack.args` の `--args` の行(13〜14 行)。seed 表の 245 行(`Plugins\Fruity\Effects\Fruity Balance\...`)。`ci/extract-dlls.tsv` の 15 行(SHA-256 つき)。
 - hook 点: `lift/harness/hooks/fruity-delphi-effect-hook-points.txt` の 12〜14 行(RVA 3 つ。Balance と Filter で同じ値)。
-- 起動時の取得: 今は DLL pack(11 ファイル)に入り、起動の前に取られる(子 014 の結果による)。この Issue では、Fruity Balance を起動前の取得から外し、起動後の取得で届ける。
+- 起動時の取得: 今は DLL pack(11 ファイル)に入り、起動の前に取られる(#{{014}} の結果による)。この Issue では、Fruity Balance を起動前の取得から外し、起動後の取得で届ける。
 - 未確認: engine が起動時に Fruity Balance を読むかどうか(起動引数に名前がある)。この Issue で、`lift/runtime` の読みで確かめる。読み込まれないなら、起動の引数から外して、起動の記録で確かめる。
 
 ## 読む物
@@ -33,8 +29,8 @@ project: signature-studio/3
 - `lift/harness/seeds/vfs-seed-idle1.tsv`(245 行)
 - `lift/runtime/fle_modules.c`(仮想モジュールの表)、`lift/runtime/fle_load.c`(LoadLibrary の解決)、`lift/runtime/fle_realmod.h`(1〜3 行)
 - `app/src/bundle/loader.ts`、`app/src/engine/fruity.ts`(120〜140 行)
-- 子 014 の出力(区分の作り)
-- `tools/delivery-split/measure.mjs`(子 014 が作る道具)
+- #{{014}} の出力(区分の作り)
+- `tools/delivery-split/measure.mjs`(#{{014}} が作る道具)
 
 ## やること
 
@@ -68,6 +64,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 014(区分の仕組み)。
-- 019(Fruity Filter と Delay 2)、027〜029 が、この Issue の型を使う。
-- 017(言語・テーマ・テンプレート)と同じ manifest を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- blocked_by: #{{014}}(区分の仕組み)。
+- #{{019}}(Fruity Filter と Delay 2)、#{{027}}〜#{{029}} が、この Issue の型を使う。
+- #{{017}}(言語・テーマ・テンプレート)と同じ manifest を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。

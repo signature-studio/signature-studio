@@ -15,13 +15,9 @@ project: signature-studio/3
 
 課題 C-5: Vital を存在させる(Serum 2・OTT と合わせた 3 件のうちの 1 件として)。既定の経路で読み込み、1 ブロックの音声を処理する。1 プラグイン 1 wasm で、起動後に届ける。
 
-## 規模
-
-規模: 大(想定 6 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
-- 入力: 外部の 3 件のうちの Vital のインストーラ(子 025 が取る。大きさ 41,808,960 B。`ci/artifacts.lock` の 4 行目)。
+- 入力: 外部の 3 件のうちの Vital のインストーラ(#{{025}} が取る。大きさ 41,808,960 B。`ci/artifacts.lock` の 4 行目)。
 - 未確認: Vital の harness の有無、Vital のインストーラの中身(VST3 のバンドルの場所)。リポジトリにも、この機械にも、Vital の harness は無い(pm-work/findings/survey-c5-external-plugins.md は Vital を入力の一覧に挙げるのみ)。
 - 対象に含める(依頼者の指示で、外部プラグインは Serum 2・OTT・Vital の 3 件を全て対象にする)。
 
@@ -31,13 +27,13 @@ project: signature-studio/3
 - `lift/harness/vst3a/main_vst3a.c`(1〜6 行: Serum 2 の native harness。VST3 の読みの参考)
 - `lift/harness/two/wrp1_vst3.c`(1〜4 行)
 - `app/src/plugins/plugin-client.ts`、`app/src/plugins/plugin-worker.ts`
-- 子 014 の成果物、子 026 の成果物
+- #{{014}} の成果物、#{{026}} の成果物
 
 ## やること
 
-1. 入力(子 025)から、Vital のインストーラの中身を確かめる。
-2. 入力(子 025)から、Vital の VST3 の本体を取り出す経路を確かめ、報告に書く。
-3. harness の作り方を決める(027 の Serum 2 と同じ形を使えるかを確かめる)。
+1. 入力(#{{025}})から、Vital のインストーラの中身を確かめる。
+2. 入力(#{{025}})から、Vital の VST3 の本体を取り出す経路を確かめ、報告に書く。
+3. harness の作り方を決める(#{{027}} の Serum 2 と同じ形を使えるかを確かめる)。
 4. 1 プラグイン 1 wasm で既定の build に入れ、起動後の取得で届ける。
 5. 道具 `tools/plugin-run/measure.mjs` で、Vital を読み込み、1 ブロックの音声を処理する。結果を報告に書く。
 
@@ -65,5 +61,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 040(音声への圧迫の解消)、025、026、015。
-- 027・028 と同じ仕組みを使う。
+- blocked_by: #{{040}}(音声への圧迫の解消)、#{{025}}、#{{026}}、#{{015}}。
+- #{{027}}・#{{028}} と同じ仕組みを使う。

@@ -15,10 +15,6 @@ project: signature-studio/3
 
 依頼者の提案: FL Studio の起動に必要な wasm が揃った段階で FL は起動し、プラグインやアセットは、使われていなくても、起動後にバックグラウンドで取る。FL の起動処理が始まった時点から順次取り、プラグインやアセットへのアクセスを起点にしない。1 プラグイン 1 wasm で試行する。実現が難しいと判断した場合は、方針を変えてよい(理由を報告に書く)。
 
-## 規模
-
-規模: 大(想定 8 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - 今の起動前の取得は 4 つで、すべて起動の前にまとめて取る(`app/src/main.ts` 714〜717 行): `loadWasm`(engine wasm)、`loadPack`(seed pack)、`loadPack`(DLL pack)、`fetchAsset`(engine glue)。起動後の区分は無い。`client.init` は 724 行。
@@ -64,7 +60,7 @@ project: signature-studio/3
 npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/delivery-split/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/delivery.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const sum=(a)=>a.reduce((s,f)=>s+f.bytes,0);const ok=L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&Array.isArray(r.preStart)&&sum(r.preStart)>0&&Array.isArray(r.lazy)&&typeof r.preStartDoneMs==="number");process.exit(ok?0:1)' "$RUNNER_TEMP/delivery.jsonl"
 ```
 
-判定の基準: 道具の 3 行の生の値を、上の node -e が読む。起動前の取得の合計が 0 より大きいこと、3 回とも engine-idle に達したこと。`elapsedMs` の 3 回の値(最小・中央値)は報告に書く。P1 の 10 秒との比較は、判定に入れず、報告に書く(子 035)。
+判定の基準: 道具の 3 行の生の値を、上の node -e が読む。起動前の取得の合計が 0 より大きいこと、3 回とも engine-idle に達したこと。`elapsedMs` の 3 回の値(最小・中央値)は報告に書く。P1 の 10 秒との比較は、判定に入れず、報告に書く(#{{035}})。
 
 ## 報告の規則
 
@@ -85,5 +81,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 015(Fruity Balance を起動後の取得に移す)、035(起動を 10 秒以内にする)、027〜029(外部プラグイン)が、この仕組みを使う。
-- 002(描画の分離)と同じ起動の経路(`app/src/engine/client.ts`)を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- #{{015}}(Fruity Balance を起動後の取得に移す)、#{{035}}(起動を 10 秒以内にする)、#{{027}}〜#{{029}}(外部プラグイン)が、この仕組みを使う。
+- #{{002}}(描画の分離)と同じ起動の経路(`app/src/engine/client.ts`)を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。

@@ -13,34 +13,30 @@ project: signature-studio/3
 
 ## 目的
 
-課題 C-2(画面の描画処理が音声処理を圧迫する)に対して、描画の分離(commit 43a6eb88)が効いたかを、数字で示す。分離の前の版(親の commit)と後の版(main)を、同じ道具で、同じ負荷(画面の更新を続ける操作)をかけて測り、音声の余裕の差を報告する。この Issue は直さない。残る圧迫は子 040 で直す。
-
-## 規模
-
-規模: 大(想定 6 時間。ビルドを 2 回回す規模: 分離の後の版と前の版)
+課題 C-2(画面の描画処理が音声処理を圧迫する)に対して、描画の分離(commit 43a6eb88)が効いたかを、数字で示す。分離の前の版(親の commit)と後の版(main)を、同じ道具で、同じ負荷(画面の更新を続ける操作)をかけて測り、音声の余裕の差を報告する。この Issue は直さない。残る圧迫は#{{040}} で直す。
 
 ## 背景
 
 - 分離の commit 43a6eb88(「C-2: 描画の合成と提示を engine の Worker から描画の Worker へ分ける」)は main に在る。描画の Worker(`app/src/engine/render-worker.ts`)を新設し、engine は合成と変化の通知だけを行う。
 - しかし本番に出ていない。最後に成功した deploy は run 44869716216(head 7a0c75ef。2026-11-21 05:50Z に完了)で、43a6eb88 を含まない。その後の deploy run 44872421132 は `Set up job` で失敗し、他は取り消された。依頼者が本番で見た圧迫は、分離の前の版のものである。
 - 分離の後の版で圧迫が消えたかは、誰も測っていない。過去の確認は、Worker の数と合成の回数を見ただけで、音声への影響は測っていない。
-- 分離の前の版の値(runner の値。pm-work/findings/survey-c2-worker-split.md): 提示が止まった後も compose が 36〜48 回/秒走る。音声の underrun は、AudioContext が suspended のため測れていなかった(子 003 で測れるようにする)。
+- 分離の前の版の値(runner の値。pm-work/findings/survey-c2-worker-split.md): 提示が止まった後も compose が 36〜48 回/秒走る。音声の underrun は、AudioContext が suspended のため測れていなかった(#{{003}} で測れるようにする)。
 - 音声の余裕は、`window.__app.audio.detail()` の既存の項目で読む(`app/src/audio/page-audio.ts` の 42〜43 行: `quantaWhilePlaying`・`underrunQuanta`・`engineGapFrames`)。書き込みの遅延の分布は、既存の項目で取れる物だけを報告する。取れない物は「確認できない」と書く。
 
 ## 読む物
 
-- `tools/p3-audio-probe/measure.mjs`(子 003 が作る道具。`--load` の引数)
+- `tools/p3-audio-probe/measure.mjs`(#{{003}} が作る道具。`--load` の引数)
 - `app/src/audio/page-audio.ts`(42〜43 行: 音声の項目。249 行: 取得)
 - `app/src/engine/render-worker.ts`、`app/src/engine/worker.ts`(deskTick の呼び出し元)、`app/src/engine/client.ts`(75・90・97 行)
 - `pm-work/findings/survey-c2-worker-split.md`(分離の前の版の値と手順)
 
 ## やること
 
-1. 負荷の定義: 測定の間、UI の更新を続ける操作を行う。子 003 の道具の `--load ui` を使う(窓の中の点へのマウス移動を、一定間隔で送り続ける)。作業者は、測定の間に `presentsDelta`(提示の回数の増分)が 0 より大きいことを確かめ、この操作を報告に書く。0 のときは、更新を起こす別の操作を選び、理由を書く。
+1. 負荷の定義: 測定の間、UI の更新を続ける操作を行う。#{{003}} の道具の `--load ui` を使う(窓の中の点へのマウス移動を、一定間隔で送り続ける)。作業者は、測定の間に `presentsDelta`(提示の回数の増分)が 0 より大きいことを確かめ、この操作を報告に書く。0 のときは、更新を起こす別の操作を選び、理由を書く。
 2. 分離の後の版(main)で、boot-bundle で起動した後、道具を `--load ui` で 3 回実行する。
 3. 分離の前の版を `.tmp-c2-before` に detached の worktree として取る(`git worktree add --detach .tmp-c2-before 43a6eb88~1`。ブランチは作らない)。そこで同じ手順で build し、同じ道具で 3 回測る。測り終えたら `git worktree remove --force .tmp-c2-before` で消す。
 4. 結果を `pm-work/findings/c2-split-measure.md` に書く。前後それぞれの 3 回について、JSON の 1 行、`underrunQuanta`、`engineGapFrames` の増分、`presentsDelta`、`quantaWhilePlaying` の表にする。
-5. 判定は「改善が見えた」「改善が見えない」「未確認」のいずれかで書く。圧迫が残っていれば、残る要因の候補を、実測で絞って報告する(子 040 へ渡す)。
+5. 判定は「改善が見えた」「改善が見えない」「未確認」のいずれかで書く。圧迫が残っていれば、残る要因の候補を、実測で絞って報告する(#{{040}} へ渡す)。
 
 ## 受け入れ
 
@@ -61,13 +57,13 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 制約
 
 - 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
-- 製品の既定の動作を、測定のためだけに変えない。この Issue は製品のコードを変えない(変えるのは `pm-work/findings/` と、子 003 の道具の引数だけ)。
+- 製品の既定の動作を、測定のためだけに変えない。この Issue は製品のコードを変えない(変えるのは `pm-work/findings/` と、#{{003}} の道具の引数だけ)。
 - ベンダー名と Cloudflare の識別子を、ファイルにも報告にも書かない。
 - ブランチを作らない。commit の名義は環境の git の設定のまま。Claude の行を付けない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 他のタスクとの関係
 
-- blocked_by: 003(測定の道具)。
-- 040(圧迫を取り除く)は、この Issue の結果を使う。
-- 008(HiDPI と描画の分離の後の実測)は、この Issue の結果を待つ。
+- blocked_by: #{{003}}(測定の道具)。
+- #{{040}}(圧迫を取り除く)は、この Issue の結果を使う。
+- #{{008}}(HiDPI と描画の分離の後の実測)は、この Issue の結果を待つ。

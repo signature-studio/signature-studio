@@ -15,10 +15,6 @@ project: signature-studio/3
 
 課題 C-3: FL Studio が必要とする物を揃える。今の記録の仕組みでは、engine がファイルを要求して無かった場合が見えない。このため、無かったパスを記録する仕組みを足し、どのファイルが足りないかを実測で確かめられるようにする。
 
-## 規模
-
-規模: 大(想定 4 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - 旧の測定(pm-work/findings/survey-c3-fl-resources.md の 5 節。runner の値): 起動の engine ログは 322 行。「見つから」「not found」「ENOENT」「no such」「not exist」「CreateFile」「FindFirst」「GetFileAttributes」は 0 件。ただし、欠落の証明にはならない(記録の仕組みが無いので、ファイルを開いた記録も出ない)。
@@ -66,5 +62,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 017(言語・テーマ・テンプレートの全件)が、この Issue の記録を使う。
+- #{{017}}(言語・テーマ・テンプレートの全件)が、この Issue の記録を使う。
 - `lift/runtime/` を変える。`lift/` の変更は main の deploy の仕組みを動かすので、報告に書く。

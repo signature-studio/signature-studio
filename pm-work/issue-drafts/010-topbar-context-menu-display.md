@@ -15,10 +15,6 @@ project: signature-studio/3
 
 課題 C-6: トップバーのコンテキストメニューを機能させる。右クリックの後に、メニューが画面に出て、項目を選ぶと engine に届くこと。
 
-## 規模
-
-規模: 大(想定 6 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - 旧の測定(pm-work/findings/survey-c6-topbar-menus.md。runner の値。変更の前の版): 右クリックは、ページの `contextmenu` を止めた上で engine に届いた(入力欄に `button R up` が出て、`defaultPrevented` が true)。engine のログは増えなかった(322 → 322 行)。メニューらしい物は見えなかった。
@@ -46,7 +42,7 @@ project: signature-studio/3
 2. 実装: `TrackPopupMenu` で、メニューの項目(メニューの表)を、既存の窓の描き方で画面に描く。項目を選んだら WM_COMMAND(0x0111。wParam の下位 16 ビットが項目の ID。hwnd へ送る)を送る。`TPM_RETURNCMD`(0x100)のときは WM_COMMAND を送らず、選んだ ID を戻り値にする(選ばなければ 0)。
 3. 表示した時と項目を選んだ時に、engine のログに、WM_COMMAND か TrackPopupMenu の語を含む行を出す(既存の pushLog の経路)。
 4. 測定の道具 `tools/feat-c6-popup-menus/measure.mjs` を作る。boot-bundle と同じ起動で、engine-idle の後、(a) 測定の道具の中だけで確認ダイアログを「No thanks」で閉じる、(b) 右クリックの前の画面を保存、(c) 窓の内側の 1 点に右ボタンの press と release を送る、(d) 1 秒待って画面を保存、(e) クリック位置の近く(半径 200 px の正方形)で、前後の差のある画素数を数える、(f) 出たメニューの項目を 1 つクリックする、(g) engine のログの増分を取る。JSON の 1 行だけを stdout に出す: `{"state","standIn","error","changedNearClick","changedTotal","logAdded":[...]}`。
-5. 3 つの部品(Tempo・Song Position・Pattern Selector)の位置を、起動後の画面から読む。読めた物は右クリックで試す。読めない物は「未確認」と書く(受け入れには入れない。子 011 で扱う)。
+5. 3 つの部品(Tempo・Song Position・Pattern Selector)の位置を、起動後の画面から読む。読めた物は右クリックで試す。読めない物は「未確認」と書く(受け入れには入れない。#{{011}} で扱う)。
 
 ## 受け入れ
 
@@ -74,6 +70,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 011(3 部品の値の変化)が、この Issue を待つ(blocked_by)。
-- 006(HiDPI)が描画の座標を変える場合、この Issue の測定の座標を、006 の結果に合わせる。両方を変えるときは、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、受け入れをもう一度通す。
-- 002(描画の分離)の Worker を通る経路を、描画の Worker が変える場合がある。その場合も、同じ受け入れで確かめる。
+- #{{011}}(3 部品の値の変化)が、この Issue を待つ(blocked_by)。
+- #{{006}}(HiDPI)が描画の座標を変える場合、この Issue の測定の座標を、#{{006}} の結果に合わせる。両方を変えるときは、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、受け入れをもう一度通す。
+- #{{002}}(描画の分離)の Worker を通る経路を、描画の Worker が変える場合がある。その場合も、同じ受け入れで確かめる。

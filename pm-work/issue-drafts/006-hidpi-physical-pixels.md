@@ -15,10 +15,6 @@ project: signature-studio/3
 
 課題 C-1: HiDPI に対応する(画面がぼやけている)。拡大率 1・1.5・2 で、描画の画素と CSS の大きさが一致し、窓の文字や部品が、拡大率 1 の時と同じ CSS の大きさに見えること。
 
-## 規模
-
-規模: 大(想定 6 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - 旧の測定(pm-work/findings/survey-c1-hidpi.md。runner の値。変更の前の版)。窓を 1580×957 にした時、拡大率 2 で canvas は 1580×957、CSS は 1580×957。式 `canvas 幅 ÷ (CSS 幅 × dpr)` は 0.5 だった(CSS 1px に描画バッファの 1 画素)。ブラウザが 2 倍に引き伸ばすので、ぼやける。
@@ -31,7 +27,7 @@ project: signature-studio/3
   - `app/src/engine/render-worker.ts`(描画の Worker。canvas の大きさを読む側。commit 43a6eb88 で分離済み)。
 - 案 A(推定。旧計画の案): guest 画面の大きさを room × dpr(物理画素)にし、canvas の大きさも同じにする。engine へは既存の `FLE_MONITOR_W`・`FLE_MONITOR_H` に物理画素を渡す。canvas の CSS の大きさは room のまま。guest には 96 × dpr の DPI を伝える。
 - 案 B(旧計画で退けた案): guest の大きさは据え置き、canvas だけ CSS × dpr にする。描画の元の画素が増えないので、ぼやけは直らない(推定)。
-- 画素数は拡大率の 2 乗で増える(1580×957 → 3160×1914 は 4 倍。推定)。描画の所要が増える。影響は子 008 で測る。
+- 画素数は拡大率の 2 乗で増える(1580×957 → 3160×1914 は 4 倍。推定)。描画の所要が増える。影響は#{{008}} で測る。
 
 ## 読む物
 
@@ -78,6 +74,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 002(描画の分離)の後に 008 で、画素数の増加の影響を測る。この Issue 自体は 002 を待たない。
-- 同じ canvas の経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を、002 が変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
-- 010(トップバーのメニュー)は、描画の座標に依る。HiDPI の後で座標が変わる場合は、010 の報告に書く。
+- #{{002}}(描画の分離)の後に #{{008}} で、画素数の増加の影響を測る。この Issue 自体は #{{002}} を待たない。
+- 同じ canvas の経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を、#{{002}} が変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- #{{010}}(トップバーのメニュー)は、描画の座標に依る。HiDPI の後で座標が変わる場合は、#{{010}} の報告に書く。

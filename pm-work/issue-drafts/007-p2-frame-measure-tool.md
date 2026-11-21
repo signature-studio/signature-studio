@@ -13,11 +13,7 @@ project: signature-studio/3
 
 ## 目的
 
-完成の条件の 1 つ P2(UI が 120 fps で動く)を、runner で測る道具を作る。この Issue は道具を作って、道具が使えることを確かめる。120 fps の判定は子 008 で行う。
-
-## 規模
-
-規模: 大(想定 4 時間。ビルドを約 5 回回す規模)
+完成の条件の 1 つ P2(UI が 120 fps で動く)を、runner で測る道具を作る。この Issue は道具を作って、道具が使えることを確かめる。120 fps の判定は#{{008}} で行う。
 
 ## 背景
 
@@ -47,7 +43,7 @@ project: signature-studio/3
 npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/p2-frames/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/p2.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").trim());process.exit(r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.frames>=60&&typeof r.rafFps==="number"&&typeof r.rafIntervalP95Ms==="number"?0:1)' "$RUNNER_TEMP/p2.json"
 ```
 
-判定の基準: 道具の出力の生の値を、上の node -e が読む。120 fps を満たすかは判定に入れない(子 008 で判定する)。
+判定の基準: 道具の出力の生の値を、上の node -e が読む。120 fps を満たすかは判定に入れない(#{{008}} で判定する)。
 
 ## 報告の規則
 
@@ -66,5 +62,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 008(HiDPI と描画の分離の後の実測)が、この道具を使う。
-- 003(P3 の音声の道具)と、起動の手順(`tools/boot-check/`)を共有する。道具を変えるときは、両方の受け入れを通す。
+- #{{008}}(HiDPI と描画の分離の後の実測)が、この道具を使う。
+- #{{003}}(P3 の音声の道具)と、起動の手順(`tools/boot-check/`)を共有する。道具を変えるときは、両方の受け入れを通す。

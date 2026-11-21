@@ -13,30 +13,26 @@ project: signature-studio/3
 
 ## 目的
 
-OpenGL を使う VFX 系は、後回しにした。それ以外の内蔵プラグインは、全て lift の対象で、既に群の作業(021・022)で入る。この Issue は、後回しにした VFX 系(023 の一覧)を、全群の後に 1 プラグイン 1 wasm で入れる。
-
-## 規模
-
-規模: 大(想定 8 時間。OpenGL の描画の経路を含むため、ビルドを約 5 回回す規模)
+OpenGL を使う VFX 系は、後回しにした。それ以外の内蔵プラグインは、全て lift の対象で、既に群の作業(#{{021}}・#{{022}})で入る。この Issue は、後回しにした VFX 系(#{{023}} の一覧)を、全群の後に 1 プラグイン 1 wasm で入れる。
 
 ## 背景
 
-- 対象: `inputs/vfx-deferred.tsv`(023 の成果物)の全件。判定の規則は、import に `opengl32.dll` を含む DLL。
+- 対象: `inputs/vfx-deferred.tsv`(#{{023}} の成果物)の全件。判定の規則は、import に `opengl32.dll` を含む DLL。
 - 後回しの理由: OpenGL を使う描画の経路が、ブラウザでの WebGL の描画と合っているかを、この Issue で確かめる必要がある(推定)。
-- 型: 015・019(1 プラグイン 1 wasm の起動後の届け方)と、群(021・022)の作り方を使う。
-- 着手: 023 の判定で後回しの範囲が決まり、021・022 が閉じた後に、自動で起動する。依頼者の判断は要らない。
+- 型: #{{015}}・#{{019}}(1 プラグイン 1 wasm の起動後の届け方)と、群(#{{021}}・#{{022}})の作り方を使う。
+- 着手: #{{023}} の判定で後回しの範囲が決まり、#{{021}}・#{{022}} が閉じた後に、自動で起動する。依頼者の判断は要らない。
 
 ## 読む物
 
-- `inputs/vfx-deferred.tsv`(023 の成果物)
-- `inputs/fl-installer-files.tsv`(013 の成果物)
+- `inputs/vfx-deferred.tsv`(#{{023}} の成果物)
+- `inputs/fl-installer-files.tsv`(#{{013}} の成果物)
 - `lift/harness/b2d2/modules.tsv`、`lift/harness/web/pack.args`(表の形)
-- `tools/delivery-split/measure.mjs`(014 が作る道具)
+- `tools/delivery-split/measure.mjs`(#{{014}} が作る道具)
 - `app/src/engine/desk-gl.ts`(WebGL の描画の経路。既存)
 
 ## やること
 
-1. 対象の DLL を、020 と同じ表の形で揃える。OpenGL の描画の経路が、ブラウザで動くかを、最初の 1 件で確かめる。動かないなら、理由を報告に書いて止まる。
+1. 対象の DLL を、#{{020}} と同じ表の形で揃える。OpenGL の描画の経路が、ブラウザで動くかを、最初の 1 件で確かめる。動かないなら、理由を報告に書いて止まる。
 2. 全件を、起動後の取得で届ける。
 3. 起動確認と、取得の確認を行う。
 
@@ -64,5 +60,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 021・022(内蔵の残りの全群)、023(後回しの一覧)。
-- 020 の表の形を使う。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- blocked_by: #{{021}}・#{{022}}(内蔵の残りの全群)、#{{023}}(後回しの一覧)。
+- #{{020}} の表の形を使う。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。

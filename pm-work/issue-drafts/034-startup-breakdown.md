@@ -15,10 +15,6 @@ project: signature-studio/3
 
 起動(ページを開いてから engine-idle まで)の内訳を、段ごとに実測する。併せて、P1 の測り方(何を始まりと終わりにするか)を確定する。測り方が違うと、旧の値(9.2〜12.8 秒)が比べられない。
 
-## 規模
-
-規模: 大(想定 3 時間。ビルドを約 5 回回す規模の前段)
-
 ## 背景
 
 - 測り方の違い(旧の測定): boot-bundle の `timelineIdle`(9.2〜9.4 秒。survey-c2)、navigate から engine-idle の確認まで(10.2〜10.6 秒。survey-c1。poll を含む)、probe を含む(12.3〜12.8 秒。survey-c6)。
@@ -46,7 +42,7 @@ project: signature-studio/3
 npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/startup-breakdown/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/startup.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));process.exit(L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&typeof r.navToIdleMs==="number"&&typeof r.phases==="object")?0:1)' "$RUNNER_TEMP/startup.jsonl"
 ```
 
-判定の基準: 3 回とも engine-idle に達し、段の時刻の項目が出ていること。値の目標(10 秒)は判定に入れない(子 035)。
+判定の基準: 3 回とも engine-idle に達し、段の時刻の項目が出ていること。値の目標(10 秒)は判定に入れない(#{{035}})。
 
 ## 報告の規則
 
@@ -64,5 +60,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 035(10 秒以内にする)が、この Issue の測り方を使う。
-- 014(起動後の取得の仕組み)と、同じ起動の経路を測る。
+- #{{035}}(10 秒以内にする)が、この Issue の測り方を使う。
+- #{{014}}(起動後の取得の仕組み)と、同じ起動の経路を測る。

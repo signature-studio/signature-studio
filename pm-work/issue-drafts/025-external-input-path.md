@@ -15,16 +15,12 @@ project: signature-studio/3
 
 Serum 2・OTT・Vital のインストーラを、作業の段が使えるようにする。3 件は R2 の artifact に既に在る。取得は FL Studio のインストーラと同じ経路で行う。作業の段は R2 の鍵を持たず、抽出の木から読む。
 
-## 規模
-
-規模: 中(想定 4 時間。extract の段の変更と、取得の確かめ)
-
 ## 背景
 
 - 入力: `ci/artifacts.lock` の 2〜4 行(外部プラグインの 3 件。大きさ・SHA-256・ETag が書いてある)。FL Studio のインストーラは 1 行目で、別の物。
 - 現状: 作業の段には、この artifact の鍵が無い。R2 の鍵は、FL Studio のインストーラを取る extract の段だけが持つ。extract の段の取得は `app/scripts/extract-fl.mjs` と `.github/workflows/agent.yml` の extract の段の仕組みに従う。
 - 方針(PM の決定): 3 件を、extract の段が R2 から取り、FL のインストーラと同じ仕組みで抽出の木に置く。作業の段は、復元された抽出の木から読む。作業の段に鍵は渡さない。
-- 取り出したインストーラから、VST3 のバンドル(プラグインの本体)を得る経路は、子 027〜029 で確かめる。
+- 取り出したインストーラから、VST3 のバンドル(プラグインの本体)を得る経路は、#{{027}}〜#{{029}} で確かめる。
 
 ## 読む物
 
@@ -64,5 +60,5 @@ node tools/external-inputs/check.mjs "$PWD/lift/out-app/external"
 
 ## 他のタスクとの関係
 
-- 027・028・029 が、この Issue の入力を使う。
-- 020(内蔵の DLL の表)と、同じ extract の段を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- #{{027}}・#{{028}}・#{{029}} が、この Issue の入力を使う。
+- #{{020}}(内蔵の DLL の表)と、同じ extract の段を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。

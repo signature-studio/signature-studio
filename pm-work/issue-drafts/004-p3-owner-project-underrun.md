@@ -13,26 +13,22 @@ project: signature-studio/3
 
 ## 目的
 
-P3 の完成の条件: プロジェクトを Song Mode で再生して、音が途切れない。underrun が 0 であることを、runner で n=3 で実測する。この実測は、子 040(音声への圧迫の解消)の後に行う。
-
-## 規模
-
-規模: 大(想定 3 時間。実測の 3 回が、それぞれ数分の再生を含む)
+P3 の完成の条件: プロジェクトを Song Mode で再生して、音が途切れない。underrun が 0 であることを、runner で n=3 で実測する。この実測は、#{{040}}(音声への圧迫の解消)の後に行う。
 
 ## 背景
 
 - 入力のプロジェクト: インストーラに含まれる demo・テンプレートのプロジェクト(`.flp`)のうち、Song Mode の playlist を持つ物を、作業者が選ぶ。依頼者の個人のファイルは使わない。
-- 選ぶ元は、子 013 の成果物 `inputs/fl-installer-files.tsv`(インストーラ全件の一覧)。`Data\` の下の `.flp` を候補にする。playlist の件数で、Song Mode の再生があるかを確かめる。
+- 選ぶ元は、#{{013}} の成果物 `inputs/fl-installer-files.tsv`(インストーラ全件の一覧)。`Data\` の下の `.flp` を候補にする。playlist の件数で、Song Mode の再生があるかを確かめる。
 - 選んだ 1 件を `inputs/p3-project.tsv` に書いて commit する(列: `guest`・`bytes`・`sha256`・`playlist`。見出し行を 1 行残す)。インストール先の既定の値は書かない。
 - 実行に使うファイルは、インストーラの展開の木から取り、`.tmp-p3-project.flp` に置く。受け入れの後に消す。リポジトリには入れない。展開の木に無い場合は、ここで止めて報告する。
 - 定義(旧 ci タスク 0005 の記述による。出典の文書 docs/ops/fidelity-and-performance.md は、リポジトリに無い): 所定のプロジェクトを Song Mode で再生し、AudioWorklet のリングの枯渇(underrun)が 0。
-- 台本: `tools/verify-kit/tools/scn-p3-mixmove-300.json` を参考にしてよい。ただし、Song Mode の再生は子 003 の道具の中の手順で行う。
-- 前提: 子 003(音声の道具)と子 040(音声への圧迫の解消)が終わっている。
+- 台本: `tools/verify-kit/tools/scn-p3-mixmove-300.json` を参考にしてよい。ただし、Song Mode の再生は#{{003}} の道具の中の手順で行う。
+- 前提: #{{003}}(音声の道具)と#{{040}}(音声への圧迫の解消)が終わっている。
 
 ## 読む物
 
-- `tools/p3-audio-probe/measure.mjs`(子 003 が作る道具。プロジェクトを開いて Song Mode で再生する手順)
-- `inputs/fl-installer-files.tsv`(子 013 の成果物)
+- `tools/p3-audio-probe/measure.mjs`(#{{003}} が作る道具。プロジェクトを開いて Song Mode で再生する手順)
+- `inputs/fl-installer-files.tsv`(#{{013}} の成果物)
 - `app/src/audio/page-audio.ts`(42〜43 行: 音声の状態の項目)
 
 ## やること
@@ -66,6 +62,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 003(道具)と 040(圧迫の解消)。
-- 031(P3 の再生中の命令の内訳)は、この Issue が commit する `inputs/p3-project.tsv` を使う。
-- 008(HiDPI の後の実測)と 038(完成の検証)が、この Issue の結果を使う。
+- blocked_by: #{{003}}(道具)と #{{040}}(圧迫の解消)。
+- #{{031}}(P3 の再生中の命令の内訳)は、この Issue が commit する `inputs/p3-project.tsv` を使う。
+- #{{008}}(HiDPI の後の実測)と #{{038}}(完成の検証)が、この Issue の結果を使う。

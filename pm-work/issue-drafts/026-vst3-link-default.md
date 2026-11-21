@@ -15,10 +15,6 @@ project: signature-studio/3
 
 オプトイン・オプトアウトの処理を作らない。既定で全部有効。VST3 の link が、今は「opt-in」の注釈つきで、製品の build に入っていない。この Issue は、VST3 の経路を既定で有効にし、外部プラグインが読み込める状態を作る。
 
-## 規模
-
-規模: 大(想定 6 時間。ビルドを約 5 回回す規模)
-
 ## 背景
 
 - 現状(旧の読み。pm-work/findings/survey-c5-external-plugins.md の 3・4 節。読みによる):
@@ -71,5 +67,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- 027・028・029 の前提。
-- `lift/` の real module の表を変えるので、015(Fruity Balance)と 020(抽出の表)と同じ build の段を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- #{{027}}・#{{028}}・#{{029}} の前提。
+- `lift/` の real module の表を変えるので、#{{015}}(Fruity Balance)と #{{020}}(抽出の表)と同じ build の段を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。

@@ -13,18 +13,14 @@ project: signature-studio/3
 
 ## 目的
 
-依頼者の指示: 内蔵のエフェクトを、起動後にバックグラウンドで届ける(1 プラグイン 1 wasm)。Fruity Filter と Fruity Delay 2 を、015 で作った型に乗せる。
-
-## 規模
-
-規模: 大(想定 4 時間。ビルドを約 5 回回す規模)
+依頼者の指示: 内蔵のエフェクトを、起動後にバックグラウンドで届ける(1 プラグイン 1 wasm)。Fruity Filter と Fruity Delay 2 を、#{{015}} で作った型に乗せる。
 
 ## 背景
 
 - Fruity Filter: `lift/harness/b2d2/modules.tsv` の 9 行(`fruity_filter_x64.dll`・base `0x7000000`・hook 点のファイルを使う)。DLL の大きさは 3,780,608 B(survey-c4 の実測)。seed の表は 246 行。
 - Fruity Delay 2: `lift/harness/b2d2/modules.tsv` の 10 行(base `0x7800000`。hook 点のファイルを使う)。DLL の大きさは 3,731,968 B。seed の表は 247 行。`ci/extract-dlls.tsv` の 18 行(追加の記録は 17 行の注釈)。
 - hook 点: `lift/harness/hooks/fruity-delphi-effect-hook-points.txt` の 4 行は、Fruity Delay 2 も同じ 3 つの RVA だと書く。この記述は、旧の作業では未検証(pm-work/findings/survey-c4-builtin-plugins.md の手順 2)。この Issue で確かめる。
-- 015(Fruity Balance の型)の後に行う。
+- #{{015}}(Fruity Balance の型)の後に行う。
 
 ## 読む物
 
@@ -33,13 +29,13 @@ project: signature-studio/3
 - `lift/harness/web/pack.args`(13〜14 行の `--args`)
 - `lift/harness/seeds/vfs-seed-idle1.tsv`(246・247 行)
 - `ci/extract-dlls.tsv`(17・18 行)
-- `tools/delivery-split/measure.mjs`(014 が作る道具)
-- 015 の成果物(Fruity Balance の型)
+- `tools/delivery-split/measure.mjs`(#{{014}} が作る道具)
+- #{{015}} の成果物(Fruity Balance の型)
 
 ## やること
 
 1. Fruity Filter と Fruity Delay 2 の hook 点の RVA を、DLL の実物で確かめる(報告に書く。確かめられなければ「未確認」)。
-2. 015 の型で、2 件を起動後の取得に移す。
+2. #{{015}} の型で、2 件を起動後の取得に移す。
 3. 2 件それぞれが、起動後に届き、engine が読み込むことを、道具の出力で確かめる。
 4. 大きさ(起動前の取得の合計)の変化を、報告に書く。
 
@@ -66,5 +62,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: 015(型)。
-- 020(抽出の表の拡張)と同じ表(`ci/extract-dlls.tsv`、`lift/harness/b2d2/modules.tsv`)を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- blocked_by: #{{015}}(型)。
+- #{{020}}(抽出の表の拡張)と同じ表(`ci/extract-dlls.tsv`、`lift/harness/b2d2/modules.tsv`)を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
