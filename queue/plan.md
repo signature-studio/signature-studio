@@ -133,6 +133,13 @@
   8. 結論: agent.yml と driver/ の新規 1 ファイルで、app/・lift/・ci/・deploy.yml に触れずに、一覧は作れる。queue/ の中だけでは置けない(queue/ は待ち行列の状態と入力の置き場所で、道具は置かない)。deploy.yml の paths は app/**・lift/**・ci/**・deploy.yml の 4 つだけ(deploy.yml の 4〜8 行)。
   9. 代案(app/ を変える): app/scripts/extract-fl.mjs に一覧の出力を足すのが一番小さいが、app/** が deploy.yml を動かすので、報告が要る。監査・受付が決める。
 - 未確認: 全件の展開の所要と大きさ、section 0 の外の EXTRACTFILE の件数、キャッシュの保存の条件、installTree の件数と extractFiles の件数の差。これらは、一覧の段を入れた後の extract ジョブの計測で測る。
+- 実装(2026-11-21。タスク inventory-0。上の 4〜5 の案は、次の形に変えた: extract-tree の鍵と木は変えず、一覧を別のキャッシュに入れる):
+  - .github/workflows/agent.yml の extract ジョブに、`if: startsWith(inputs.task, 'inventory')` の 2 段を足した。「一覧(inventory)を作る」は、インストーラを取り直し(既存の抽出と同じ s3 cp)、driver/inventory.mjs で表を作る。「一覧(inventory)を R2 のキャッシュに保存する」は runs-on/cache/save で、キーは inventory-<run_id>-<run_attempt>、path は $RUNNER_TEMP/inventory。run ジョブに同じ if の段を 1 つ足した(runs-on/cache/restore。fail-on-cache-miss: true。同じ path と鍵)。R2_ARTIFACT の鍵は extract の段にだけ渡し、run の段には無い。
+  - driver/inventory.mjs(新規): app/scripts/lib/nsis.mjs と nsis-script.mjs を読むだけで使う(app/ は変えない)。installTree の結果から、接頭辞を外した guest パスを作る。表の列は guest・bytes・sha256・kind(dll・exe・other)・imports(dll と exe の PE の import した DLL の名前。小文字、; 区切り)。展開するのは dll・exe と Plugins\・Data\ の下の物だけ(全件の展開の所要は未計測のため)。インストール先の既定値は会社名を含むので、表にもファイルにも書かない。
+  - driver/inventory-commit.sh(新規): $RUNNER_TEMP/inventory/fl-installer-files.tsv を、見出しを残して C ロケールで並べ、queue/inputs/fl-installer-files.tsv に置き、1 つの commit にする。
+  - queue/tasks/inventory-0.md: mode: script・run: bash driver/inventory-commit.sh・accept: の行(表の行数 100 以上、Effects の dll 20 以上、Generators の dll 10 以上、dll の全行に 64 桁の SHA-256)。
+  - 通常のタスク(inventory で始まらない)は、新しい段が全て skip される。spec/driver.test.sh で、inventory の if が 3 つで、他の if: は変更前の 11 件のままであることを検査する。app/・lift/・ci/・deploy.yml は変えない。
+  - 未確認: 実インストーラでの動作(NSIS の読み、表の行数と Effects・Generators の dll の件数、展開の所要)。偽の PE と偽の読みで確かめただけ。inventory-0 の run の結果(表の件数)は、その run の後に確かめる。
 
 ## タスクの粒度(台帳 L-037)
 
@@ -165,3 +172,4 @@
 - 2026-11-21(L-035): 依頼者の提案で、配信の方針を入れた(起動前に取る物と、起動後にバックグラウンドで取る物の区分。1 プラグイン 1 wasm の試行。lazy-load)。C-3・C-4・C-5 を、この方針に直した。方針は、実現が難しいと判断した時に変えてよい(依頼者)。
 - 2026-11-21(L-036): survey 6 件は、作成から 1 時間以上たっても 1 件も起動しなかった。原因は、driver/fill.sh が ready を番号の昇順で起動し、番号の小さい lower(約 100 件)の後ろに並んでいたこと。fill を直し、非 lower のタスクを先に、lower を後に、それぞれ番号の昇順で起動するようにした(台帳 L-036)。spec/driver.test.sh に、起動の順の検査を 4 件足した。
 - 2026-11-21(機能タスク 5 件): survey の 6 件は完了し、実測が入った。依頼者の是正(1800 件のコミットで、HiDPI・右クリック・テンプレートが 1 つも解決していない。タスクの粒度を大きくして開発を加速する)を受けて、機能の課題を大きなタスク 5 件にした: feat-c2-render-worker・feat-c1-hidpi・feat-c6-popup-menus・feat-delivery-lazy-load・feat-c3-resources-seed(queue/tasks/feat-*.md)。Issue は ready で作った(題名は同じ名前)。C-4・C-5 は、inventory と lazy-load の後にバッチにする。feat-c3-resources-seed は、抽出の木が seed 表と同じ範囲(238 件 = 227 + 11)なので、件数の増加は受け入れに入れていない(survey-c3 の実測による)。
+- 2026-11-21(inventory): インストーラの全ファイルの一覧の経路を入れた(タスク inventory-0。extract ジョブの 2 段と run ジョブの 1 段が inventory の作業だけで動く。driver/inventory.mjs・driver/inventory-commit.sh・queue/tasks/inventory-0.md)。spec/driver.test.sh は 182 件が通る。queue/tasks の検査は、mode: script なら run: の行、mode: agent なら 規模: 大を要求する形に直した。実インストーラでの動作は未確認。
