@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # driver/task.sh 名前 : タスクの本文を出す。TASK_REF(既定 HEAD)の木から読む。
-# 探す順: queue/tasks/<名前>.md、ci/tasks/<名前>.md、queue/kinds の型(lower-<VA>)。
+# 探す順: queue/tasks/<名前>.md、ci/tasks/<名前>.md、queue/done/<名前>.md(終わったタスクの本文)、または型(lower-<VA>、lowerb-<k>)。
 set -euo pipefail
 id=${1:?usage: driver/task.sh 名前}
 ref=${TASK_REF:-HEAD}
@@ -8,6 +8,7 @@ ref=${TASK_REF:-HEAD}
 show() { git show "$ref:$1" 2>/dev/null; }
 show "queue/tasks/$id.md" && exit 0
 show "ci/tasks/$id.md" && exit 0
+show "queue/done/$id.md" && exit 0
 case $id in
   lower-0x*)
     va=${id#lower-}
@@ -16,6 +17,9 @@ case $id in
     [ -n "$row" ] || { echo "task: 関数の表に $va が無い" >&2; exit 1; }
     IFS=$'\t' read -r _ module ins <<<"$row"
     show queue/kinds/lower.md | sed -e "s/{{va}}/$va/g" -e "s/{{module}}/$module/g" -e "s/{{instructions}}/$ins/g"
+    ;;
+  lowerb-[0-9][0-9][0-9][0-9])
+    show queue/kinds/lowerb.md | sed -e "s/{{k}}/${id#lowerb-}/g"
     ;;
   *) echo "task: $id の本文が無い" >&2; exit 1 ;;
 esac
