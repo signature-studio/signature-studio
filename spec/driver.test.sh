@@ -323,13 +323,18 @@ try { const c = await launchChrome({ profile: path.join(T, "fake/profile") }); c
 ' "$T" "$top" 2>/dev/null)
 ok "cdp: DevTools が 12 秒後に答える Chrome でも起動できる" "$slow" "fake/1"
 # 完成までの計画(台帳 L-033): 待ち行列の survey 6 件、計画の見出し、受け入れの行、台帳の行
-Q_TASKS=$top/queue/tasks
-ok "queue: survey の本文が 6 件ある" "$(ls "$Q_TASKS"/survey-c*.md 2>/dev/null | wc -l)" 6
-ok "queue: 本文のすべてが、accept: の行をちょうど 1 つ持つ" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; [ "$(grep -c '^accept: ' "$f")" = 1 ] || n=$((n+1)); done; echo "$n")" 0
+Q_TASKS=$top/queue/tasks; Q_DONE=$top/queue/done
+ok "queue: survey の本文が 6 件ある" "$(ls "$Q_DONE"/survey-c*.md 2>/dev/null | wc -l)" 6
+ok "queue: 本文のすべてが、accept: の行をちょうど 1 つ持つ" "$(n=0; for f in "$Q_TASKS"/*.md "$Q_DONE"/*.md; do [ -e "$f" ] || continue; [ "$(grep -c '^accept: ' "$f")" = 1 ] || n=$((n+1)); done; echo "$n")" 0
 ok "plan: C-1 から C-6 の見出しが在る" "$(for n in 1 2 3 4 5 6; do grep -q "^### C-$n " "$top/queue/plan.md" 2>/dev/null && echo x; done | wc -l)" 6
-ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_TASKS"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
-ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
-ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_TASKS"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
+ok "plan: 各 C に対応する survey の本文が在る" "$(for n in 1 2 3 4 5 6; do ls "$Q_DONE"/survey-c$n-*.md >/dev/null 2>&1 && echo x; done | wc -l)" 6
+ok "task.sh: survey の 6 件は終了コード 0 で、accept: の行を含む本文を出す" "$(cd "$top" && for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); out=$(bash driver/task.sh "$n" 2>/dev/null) && grep -q '^accept: ' <<<"$out" && echo x; done | wc -l)" 6
+ok "survey: 受け入れの行は、出力の先と findings の 3 つの見出しを検査する(6 件とも)" "$(for f in "$Q_DONE"/survey-c*.md; do n=$(basename "$f" .md); a=$(grep '^accept: ' "$f"); grep -q "queue/findings/$n.md" <<<"$a" && grep -q '## 実測' <<<"$a" && grep -q '## 未確認' <<<"$a" && grep -q '## 次の手順の案' <<<"$a" && echo x; done | wc -l)" 6
+# 型と待ち行列の本文の決まり(台帳 L-037): 型(queue/kinds)は mode: script とバッチの件数(30 以上)。queue/tasks の手書きは mode: agent と 規模: 大。
+# 型の例外は lower.md だけ(古い型。実行中の lower-0x の判定が main から読むので残す。A6 で待ちの lower-0x を閉じた後も、この型は読まれる)
+ok "kinds: lower.md を除き、すべての型が mode: script を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; grep -qx 'mode: script' "$f" || n=$((n+1)); done; echo "$n")" 0
+ok "kinds: lower.md を除き、すべての型がバッチの件数(30 以上)を持つ" "$(n=0; for f in "$top"/queue/kinds/*.md; do [ "$(basename "$f")" = lower.md ] && continue; b=$(sed -n 's/^バッチ: \([0-9]*\)$/\1/p' "$f" | head -n 1); [ -n "$b" ] && [ "$b" -ge 30 ] || n=$((n+1)); done; echo "$n")" 0
+ok "queue/tasks の本文は、すべて mode: agent と 規模: 大を持つ(件数の不一致は 0)" "$(n=0; for f in "$Q_TASKS"/*.md; do [ -e "$f" ] || continue; { grep -qx 'mode: agent' "$f" && grep -qx '規模: 大' "$f"; } || n=$((n+1)); done; echo "$n")" 0
 ok "台帳: L-033 が在り、5 列" "$(awk -F'\t' '$1 == "L-033" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 # 内蔵の目標(台帳 L-034): 約 141(効果 約 90 + インストゥルメント 約 51)。共通の前提に inventory。survey-c4 の本文の整え
 ok "台帳: L-034 が在り、5 列" "$(awk -F'\t' '$1 == "L-034" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
@@ -343,7 +348,7 @@ ok "plan: エンジン本体の wasm の実測(165848536)と出典が、同じ�
 ok "台帳: L-035 が在り、5 列" "$(awk -F'\t' '$1 == "L-035" && NF == 5 { print "yes" }' "$top/ledger/instructions.tsv")" yes
 ok "plan: 配信の方針の節が在り、1 プラグイン 1 wasm・起動前・バックグラウンドの語が在る" "$(P=$top/queue/plan.md; if [ "$(grep -c '^## 配信の方針' "$P")" = 1 ] && grep -q '1 プラグイン 1 wasm' "$P" && grep -q '起動前' "$P" && grep -q 'バックグラウンド' "$P"; then echo yes; else echo no; fi)" yes
 ok "plan: 「必要になった時に読み込むか」の方式の文が残っていない" "$(grep -c '必要になった時に読み込むかは survey の結果で決める' "$top/queue/plan.md")" 0
-S4=$top/queue/tasks/survey-c4-builtin-plugins.md
+S4=$top/queue/done/survey-c4-builtin-plugins.md
 ok "survey-c4: accept: の行はちょうど 1 つ" "$(grep -c '^accept: ' "$S4")" 1
 ok "survey-c4: 目的に依頼者の申告(約 90・約 51・±2・VFX 後回し)が在る" "$(for w in '約 90' '約 51' '±2' 'VFX'; do grep -q -- "$w" "$S4" || { echo no; exit 0; }; done; echo yes)" yes
 ok "survey-c4: 手順の行は、句点か閉じ括弧で終わる(途中で切れていない)" "$(grep -E '^[0-9]+\. ' "$S4" | grep -vcE '(。|）|\))$')" 0
