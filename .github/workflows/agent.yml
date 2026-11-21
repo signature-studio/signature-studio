@@ -1,40 +1,107 @@
-# 作業者(Haiku 5.5)を、タスク 1 件につき 1 ジョブで動かす。前の世代の agent.yml(実際に動いた物)を土台にした。
-# 起動は workflow_dispatch だけ。依頼者が Actions の実行を承認した(台帳 L-021・L-027)。schedule は足していない。
-# 駆動: ジョブの最後の fill が、待ち行列(Issues)から閾値(queue/threshold)まで次のジョブを起動する(driver/fill.sh)。
-# task を空にして起動すると、fill だけが動く。fill を false にすると、次のジョブを起動しない。
-# 判定は、取り直した main の guard/judge.sh で行い、通った変更だけを main に push する。
+# 作業者(Haiku 5.5)を、Issue 1 件につき 1 ジョブで動かす。前の世代の agent.yml(実際に動いた物)の段を、そのまま移した。
+# 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
+#   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
+#   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
+#   report: 結果を Issue に書き、状態を変える(通った: close。落ちた: failed)。
+# ラベル・コメント・close は App の token で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
+# 鍵は、名義の設定の段と、書き込みの段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
-# GitHub の名義: Secrets の鍵から、この実行のための token を発行する。
-# 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
 name: agent
-run-name: ${{ inputs.task && format('worker {0}', inputs.task) || 'fill' }}
+run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
 on:
-  workflow_dispatch:
-    inputs:
-      task:
-        description: "タスクの名前(本文は driver/task.sh が出す)。空なら fill だけ"
-        required: false
-        default: ""
-        type: string
-      issue:
-        description: "待ち行列の Issue の番号(fill が渡す)"
-        required: false
-        default: ""
-        type: string
-      fill:
-        description: "終わった後に、次のジョブを起動するか"
-        required: false
-        default: true
-        type: boolean
+  issues:
+    types: [opened, edited, reopened, closed, labeled, unlabeled]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
 
 jobs:
+  select:
+    name: 起動する Issue を決める
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      targets: ${{ steps.pick.outputs.targets }}
+      retry: ${{ steps.pick.outputs.retry }}
+    steps:
+      - name: リポジトリを取得する(資格は残さない)
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 条件を満たす Issue を選ぶ(起動しない理由は、ログに 1 件ずつ出す)
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          out=$(node tools/select-targets.mjs select)
+          echo "$out"
+          echo "targets=$(jq -c .targets <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "retry=$(jq -r .retry <<<"$out")" >> "$GITHUB_OUTPUT"
+
+  start:
+    name: 起動する Issue に running を付ける
+    needs: select
+    if: success() && needs.select.outputs.targets != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      claimed: ${{ steps.claim.outputs.claimed }}
+    steps:
+      - name: リポジトリを取得する(資格は残さない)
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: 名義を設定する(token は消す)
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
+          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
+          umask 077
+          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+            > "$RUNNER_TEMP/botid-config.json"
+          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$b/botid" issue 2>/dev/null
+          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
+          echo "GIT_CONFIG_GLOBAL=$(printf '%s' "$e" | jq -r .GIT_CONFIG_GLOBAL)" >> "$GITHUB_ENV"
+          echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
+          rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
+
+      - name: 起動してよい物に running を付ける(App の token で。失敗・再試行の判定は、もう一度行う)
+        id: claim
+        env:
+          GH_REPO: ${{ github.repository }}
+          TARGETS: ${{ needs.select.outputs.targets }}
+          RETRY: ${{ needs.select.outputs.retry }}
+        run: |
+          mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
+          export GH_CONFIG_DIR=$BOTID_GH
+          out=$(node tools/select-targets.mjs claim "$TARGETS" "$RETRY")
+          echo "$out"
+          echo "claimed=$(jq -c .claimed <<<"$out")" >> "$GITHUB_OUTPUT"
+
   extract:
     name: 抽出物を用意する
-    if: inputs.task != ''
+    needs: start
+    if: success() && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -75,55 +142,30 @@ jobs:
           node app/scripts/extract-fl.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
-      - name: 一覧(inventory)を作る(inventory の作業だけ。インストーラを取り直す)
-        if: startsWith(inputs.task, 'inventory')
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
-        run: |
-          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
-          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/inventory"
-          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
-          node driver/inventory.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/inventory/fl-installer-files.tsv"
-          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
-
-      - name: 一覧(inventory)を R2 のキャッシュに保存する(inventory の作業だけ)
-        if: startsWith(inputs.task, 'inventory')
-        uses: runs-on/cache/save@v5
-        env:
-          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
-          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
-          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
-          AWS_REGION: auto
-          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
-        with:
-          path: ${{ runner.temp }}/inventory
-          key: inventory-${{ github.run_id }}-${{ github.run_attempt }}
-
-  run:
-    name: worker ${{ inputs.task }}
-    needs: extract
-    if: inputs.task != ''
+  work:
+    name: 作業 #${{ matrix.issue }}
+    needs: [start, extract]
+    if: success() && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 350
+    permissions:
+      contents: read
+      issues: read
+    strategy:
+      fail-fast: false
+      matrix:
+        issue: ${{ fromJSON(needs.start.outputs.claimed || '[]') }}
+    concurrency:
+      group: task-${{ matrix.issue }}
+      cancel-in-progress: false
     env:
-      TASK: ${{ inputs.task }}
+      ISSUE: ${{ matrix.issue }}
     steps:
       - name: リポジトリを取得する(資格は残さない)
         uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
-
-      - name: 作業の型を読む(script はスクリプト、agent は作業者)
-        run: |
-          m=$(bash driver/mode.sh "$TASK" || true)
-          # lower- の古い型(queue/kinds/lower.md)は mode の行が無いので、agent のまま動かす(台帳 L-037)
-          case "$TASK" in lower-*) m=${m:-agent} ;; esac
-          case "$m" in script|agent) echo "MODE=$m" >> "$GITHUB_ENV" ;; *) echo "mode が無い: $TASK" >&2; exit 1 ;; esac
 
       - name: 名義を設定する(token は消す)
         env:
@@ -189,31 +231,22 @@ jobs:
           key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
           fail-on-cache-miss: true
 
-      - name: 一覧(inventory)を R2 のキャッシュから取る(inventory の作業だけ)
-        if: startsWith(inputs.task, 'inventory')
-        uses: runs-on/cache/restore@v5
-        env:
-          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
-          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
-          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
-          AWS_REGION: auto
-          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
-          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
-        with:
-          path: ${{ runner.temp }}/inventory
-          key: inventory-${{ github.run_id }}-${{ github.run_attempt }}
-          fail-on-cache-miss: true
-
       - name: 抽出物を lift/out-app/host に置く
         run: |
           mkdir -p lift/out-app
           mv "$RUNNER_TEMP/host" lift/out-app/host
           test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
 
+      - name: タスク(Issue の本文)を取り、受け入れコマンドを取り出す
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          gh api "repos/$GH_REPO/issues/$ISSUE" --jq '.body // ""' > "$RUNNER_TEMP/task.md"
+          node tools/task-accept.mjs < "$RUNNER_TEMP/task.md" > "$RUNNER_TEMP/task-accept.md" 2> "$RUNNER_TEMP/out/judge.txt"
+
       - name: opencode を導入する(版は固定)
-        if: env.MODE == 'agent'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/cli.tgz" https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.3.0.tgz
           test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/cli.tgz" | base64 -w0)" = 'sha512-8T3K8L6Nd4fSG5BSgofqhmIDQ1ZvzDZZ2J7bFVB9RK1d5Hjqh24IcxgbcwpgGKkdvItrayi4Rl+wrSmhl17FFg=='
@@ -222,7 +255,6 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
       - name: opencode の認証情報を取り込み、作業者のモデルを設定する
-        if: env.MODE == 'agent'
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
           OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
@@ -231,25 +263,18 @@ jobs:
           mkdir -p .opencode
           printf '{"model":"%s","agents":{"worker":{"model":"%s"},"title":{"model":"%s"},"summary":{"model":"%s"}}}\n' "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" > .opencode/opencode.jsonc
 
-      - name: 作業者を 1 回動かす
-        if: env.MODE == 'agent'
+      - name: 作業者のプロンプトを作る(AGENTS.md と、Issue の本文)
         run: |
           mkdir -p "$RUNNER_TEMP/out"
-          { cat AGENTS.md; printf '\n\n---\n\n## タスク(%s)\n\n' "$TASK"; bash driver/task.sh "$TASK"; } > "$RUNNER_TEMP/prompt.md"
+          { cat AGENTS.md; printf '\n\n---\n\n## タスク(Issue #%s)\n\n' "$ISSUE"; cat "$RUNNER_TEMP/task.md"; } > "$RUNNER_TEMP/prompt.md"
+
+      - name: 作業者を 1 回動かす
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
           opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")" > "$RUNNER_TEMP/out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null || true
           rm -rf .opencode
 
-      - name: スクリプトで作業する(script。エージェントは動かさない)
-        if: env.MODE == 'script'
-        run: |
-          set -o pipefail
-          mkdir -p "$RUNNER_TEMP/out"
-          bash driver/task.sh "$TASK" > "$RUNNER_TEMP/task.md"
-          cmd=$(awk '/^run: / { sub(/^run: /, ""); print; exit }' "$RUNNER_TEMP/task.md")
-          test -n "$cmd"
-          bash -c "$cmd" 2>&1 | tee "$RUNNER_TEMP/out/script.txt" || true
-
-      - name: 判定(取り直した main の guard/judge.sh と、main のタスクで)
+      - name: 判定の道具を、取り直した main から取る
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -257,9 +282,11 @@ jobs:
           git fetch --no-tags "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" +refs/heads/main:refs/judge/main
           mkdir -p "$RUNNER_TEMP/guard"
           for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done
-          git show "refs/judge/main:driver/task.sh" > "$RUNNER_TEMP/task.sh"
-          TASK_REF=refs/judge/main bash "$RUNNER_TEMP/task.sh" "$TASK" > "$RUNNER_TEMP/task.md"
-          bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task.md" 2>&1 | tee "$RUNNER_TEMP/out/judge.txt"
+
+      - name: 判定(取り直した main の guard/judge.sh と、Issue の受け入れコマンドで)
+        run: |
+          set -o pipefail
+          bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task-accept.md" 2>&1 | tee "$RUNNER_TEMP/out/judge.txt"
 
       - name: 通った変更を main に push する(token はこの段で発行する)
         env:
@@ -273,7 +300,7 @@ jobs:
           export GH_CONFIG_DIR=$BOTID_GH
           for i in 1 2 3; do
             if git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main; then
-              if git push origin HEAD:main; then exit 0; fi
+              if git push origin HEAD:main; then git rev-parse HEAD > "$RUNNER_TEMP/out/commit.txt"; exit 0; fi
             else
               c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
               if [ -n "$c" ]; then echo "衝突: $c"; else echo "pull が失敗した($i 回目)"; fi
@@ -288,65 +315,95 @@ jobs:
           touch "$RUNNER_TEMP/out/report.md"
           git show "refs/judge/main:guard/scan.sh" > "$RUNNER_TEMP/scan.sh" 2>/dev/null || cp guard/scan.sh "$RUNNER_TEMP/scan.sh"
           bash "$RUNNER_TEMP/scan.sh" "$RUNNER_TEMP/out/report.md"
-          { echo "### $TASK"; head -n 80 "$RUNNER_TEMP/out/report.md"; } >> "$GITHUB_STEP_SUMMARY"
+          { echo "### 作業 #$ISSUE"; head -n 80 "$RUNNER_TEMP/out/report.md"; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 報告と判定の出力を成果物に保存する(7 日)
         if: always()
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: agent-${{ inputs.task }}
+          name: agent-${{ matrix.issue }}
           path: ${{ runner.temp }}/out
           retention-days: 7
           if-no-files-found: ignore
 
-  close:
-    name: 待ち行列の状態を変える
-    needs: run
-    if: always() && inputs.issue != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write
-      actions: read
-    steps:
-      - name: リポジトリ(最新の main)を取得する
-        uses: actions/checkout@v7.0.1
-        with:
-          ref: main
-          persist-credentials: false
-
-      - name: 結果で Issue を閉じるか、待ちに戻す
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          ISSUE: ${{ inputs.issue }}
-          RESULT: ${{ needs.run.result }}
-          URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: bash driver/close.sh "$ISSUE" "$RESULT" "$URL"
-
-  fill:
-    name: 次のジョブを起動する(閾値補充)
-    needs: [run, close]
-    if: always() && (github.event_name != 'workflow_dispatch' || inputs.fill)
+  report:
+    name: 結果を Issue に書き、状態を変える
+    needs: [start, work]
+    if: always() && needs.start.result == 'success' && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    concurrency:
-      group: fill
-      cancel-in-progress: false
     permissions:
-      actions: write
       contents: read
+      actions: read
       issues: write
+    env:
+      CLAIMED: ${{ needs.start.outputs.claimed }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      SERVER: ${{ github.server_url }}
     steps:
-      - name: リポジトリ(最新の main)を取得する
+      - name: リポジトリを取得する(資格は残さない)
         uses: actions/checkout@v7.0.1
         with:
-          ref: main
           persist-credentials: false
 
-      - name: 不足分を起動する
+      - name: 結果を集める(GITHUB_TOKEN。読むだけ)
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: bash driver/fill.sh
+        run: |
+          mkdir -p "$RUNNER_TEMP/report"
+          gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | {name, conclusion, failed: [.steps[]? | select(.conclusion == "failure") | .name]}' | jq -s . > "$RUNNER_TEMP/report/jobs.json"
+          for n in $(jq -r '.[]' <<<"$CLAIMED"); do
+            d="$RUNNER_TEMP/report/$n"; mkdir -p "$d"
+            gh run download "$RUN_ID" -n "agent-$n" -D "$d" >/dev/null 2>&1 || true
+            conc=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me)][0].conclusion // "なし"' "$RUNNER_TEMP/report/jobs.json")
+            failed=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me or (.name | startswith("作業 #") | not)) | select(.conclusion == "failure") | .failed[]] | join(", ")' "$RUNNER_TEMP/report/jobs.json")
+            tail_=""; if [ -s "$d/judge.txt" ]; then tail_=$(tail -n 8 "$d/judge.txt"); fi
+            sha=""; if [ -s "$d/commit.txt" ]; then sha=$(cat "$d/commit.txt"); fi
+            if [ "$conc" = success ]; then
+              echo success > "$d/status"
+              { echo "通った: $RUN_URL"; if [ -n "$sha" ]; then echo "commit: $SERVER/$GH_REPO/commit/$sha"; else echo "commit: 変更なし"; fi; echo "受け入れの出力(末尾 8 行):"; echo "${tail_:-(出力が無い)}"; } > "$d/comment.md"
+            else
+              echo failure > "$d/status"
+              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; } > "$d/comment.md"
+            fi
+          done
+
+      - name: 名義を設定する(token は消す)
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
+          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
+          umask 077
+          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+            > "$RUNNER_TEMP/botid-config.json"
+          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$b/botid" issue 2>/dev/null
+          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
+          echo "GIT_CONFIG_GLOBAL=$(printf '%s' "$e" | jq -r .GIT_CONFIG_GLOBAL)" >> "$GITHUB_ENV"
+          echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
+          rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
+
+      - name: 結果を Issue に書き、状態を変える(App の token で。書き込みは GITHUB_TOKEN ではしない)
+        run: |
+          mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
+          export GH_CONFIG_DIR=$BOTID_GH
+          for n in $(jq -r '.[]' <<<"$CLAIMED"); do
+            d="$RUNNER_TEMP/report/$n"
+            gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
+            if [ "$(cat "$d/status")" = success ]; then
+              gh issue close "$n" --repo "$GH_REPO" --reason completed
+              gh issue edit "$n" --repo "$GH_REPO" --remove-label running
+            else
+              gh issue edit "$n" --repo "$GH_REPO" --add-label failed
+              gh issue edit "$n" --repo "$GH_REPO" --remove-label running
+            fi
+          done
