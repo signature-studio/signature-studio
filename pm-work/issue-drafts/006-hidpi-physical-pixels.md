@@ -1,12 +1,14 @@
 ---
 draft: "006"
 title: "HiDPI guest の画面を物理画素にし、DPI を guest に伝える(画面をぼやけさせない)"
-type: task
+type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
 blocked_by: []
-labels: ["task", "hidpi", "priority-p2"]
-size: 6
+labels: ["hidpi"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

@@ -1,12 +1,14 @@
 ---
 draft: "012"
 title: "E FL Studio に必要な物の配布(一覧、起動前と起動後の区分、言語・テーマ・テンプレート)"
-type: epic
+type: Feature
 milestone: "M4 FL に必要な物の配布"
 parent: null
 blocked_by: []
-labels: ["epic", "delivery", "resources", "priority-p1"]
-size: "子の合計"
+labels: ["delivery", "resources"]
+size: L
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

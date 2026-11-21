@@ -1,12 +1,14 @@
 ---
 draft: "014"
 title: "起動前に取る物と、起動後にバックグラウンドで取る物を分ける(lazy-load の仕組み)"
-type: task
+type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: []
-labels: ["task", "delivery", "priority-p1"]
-size: 8
+labels: ["delivery"]
+size: L
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

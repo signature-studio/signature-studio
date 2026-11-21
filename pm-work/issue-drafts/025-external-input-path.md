@@ -1,12 +1,14 @@
 ---
 draft: "025"
 title: "外部プラグインのインストーラ(3 件)を、FL のインストーラと同じ経路で作業の段から読めるようにする"
-type: task
+type: Task
 milestone: "M6 外部プラグイン"
 parent: "024"
 blocked_by: []
-labels: ["task", "plugin-external", "priority-p1"]
-size: 4
+labels: ["plugin-external"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

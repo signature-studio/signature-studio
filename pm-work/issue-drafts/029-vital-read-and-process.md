@@ -1,12 +1,14 @@
 ---
 draft: "029"
 title: "Vital を既定の経路で読み込み、1 ブロックの音声を処理する"
-type: task
+type: Task
 milestone: "M6 外部プラグイン"
 parent: "024"
 blocked_by: ["040", "025", "026", "015"]
-labels: ["task", "plugin-external", "priority-p1"]
-size: 6
+labels: ["plugin-external"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

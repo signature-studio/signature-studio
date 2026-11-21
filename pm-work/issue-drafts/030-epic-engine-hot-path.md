@@ -1,12 +1,14 @@
 ---
 draft: "030"
 title: "E エンジンの性能(P3 の再生中に実行される関数を、直接 wasm にする)"
-type: epic
+type: Feature
 milestone: "M7 エンジンの性能(P3 のホットパス)"
 parent: null
 blocked_by: []
-labels: ["epic", "perf", "priority-p3"]
-size: "子の合計"
+labels: ["perf"]
+size: L
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

@@ -1,12 +1,14 @@
 ---
 draft: "024"
 title: "E 外部プラグイン(Serum 2・OTT・Vital を、既定の経路で読み込み、音声を処理する)"
-type: epic
+type: Feature
 milestone: "M6 外部プラグイン"
 parent: null
 blocked_by: []
-labels: ["epic", "plugin-external", "priority-p1"]
-size: "子の合計"
+labels: ["plugin-external"]
+size: L
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

@@ -1,12 +1,14 @@
 ---
 draft: "002"
 title: "C-2 の描画の分離が、音声への圧迫を減らしたかを、本番相当の版で実測する"
-type: task
+type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
 blocked_by: ["003"]
-labels: ["task", "render", "audio", "verify", "priority-p3"]
-size: 6
+labels: ["render", "audio", "verify"]
+size: M
+priority: Urgent
+project: signature-studio/3
 ---
 
 ## 目的

@@ -1,12 +1,14 @@
 ---
 draft: "032"
 title: "P3 の再生中に命令数の多い未直接の関数を、一括で直接 wasm にする"
-type: task
+type: Task
 milestone: "M7 エンジンの性能(P3 のホットパス)"
 parent: "030"
 blocked_by: ["031"]
-labels: ["task", "perf", "priority-p3"]
-size: 8
+labels: ["perf"]
+size: L
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

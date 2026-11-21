@@ -1,12 +1,14 @@
 ---
 draft: "010"
 title: "右クリックでメニューを画面に出し、項目の選択を engine に返す"
-type: task
+type: Task
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: "009"
 blocked_by: []
-labels: ["task", "topbar-menu", "priority-p2"]
-size: 6
+labels: ["topbar-menu"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

@@ -1,12 +1,14 @@
 ---
 draft: "005"
 title: "E HiDPI と P2 の測り方(画面がぼやけない。UI の 120 fps)"
-type: epic
+type: Feature
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: null
 blocked_by: []
-labels: ["epic", "hidpi", "perf", "priority-p2"]
-size: "子の合計"
+labels: ["hidpi", "perf"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

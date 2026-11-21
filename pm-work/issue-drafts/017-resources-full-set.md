@@ -1,12 +1,14 @@
 ---
 draft: "017"
 title: "言語・テーマ・プロジェクトテンプレートを、インストーラの全件と揃える"
-type: task
+type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: ["013", "016"]
-labels: ["task", "resources", "priority-p1"]
-size: 5
+labels: ["resources"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

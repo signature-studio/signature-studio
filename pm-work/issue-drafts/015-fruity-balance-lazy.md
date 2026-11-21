@@ -1,12 +1,14 @@
 ---
 draft: "015"
 title: "Fruity Balance を起動後の取得に移し、1 プラグイン 1 wasm で届ける(最初の 1 件)"
-type: task
+type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: ["014"]
-labels: ["task", "delivery", "plugin-builtin"]
-size: 4
+labels: ["delivery", "plugin-builtin"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

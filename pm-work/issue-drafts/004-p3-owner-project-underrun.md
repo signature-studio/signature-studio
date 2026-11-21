@@ -1,12 +1,14 @@
 ---
 draft: "004"
 title: "インストーラの demo プロジェクトで P3(Song Mode の underrun)を測る"
-type: task
+type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
 blocked_by: ["003", "040"]
-labels: ["task", "audio", "verify", "priority-p3"]
-size: 3
+labels: ["audio", "verify"]
+size: S
+priority: Urgent
+project: signature-studio/3
 ---
 
 ## 目的

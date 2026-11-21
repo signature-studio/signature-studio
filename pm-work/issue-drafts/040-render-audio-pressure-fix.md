@@ -1,12 +1,14 @@
 ---
 draft: "040"
 title: "描画(guest の UI 描画を含む)が音声を圧迫する経路を取り除く"
-type: task
+type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
 blocked_by: ["002"]
-labels: ["task", "render", "audio", "priority-p3"]
-size: 8
+labels: ["render", "audio"]
+size: L
+priority: Urgent
+project: signature-studio/3
 ---
 
 ## 目的

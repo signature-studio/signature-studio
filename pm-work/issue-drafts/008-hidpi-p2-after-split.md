@@ -1,12 +1,14 @@
 ---
 draft: "008"
 title: "HiDPI と描画の分離の後で、描画の所要と P2 を実測する"
-type: task
+type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
 blocked_by: ["006", "002", "007"]
-labels: ["task", "hidpi", "perf", "verify", "priority-p2"]
-size: 3
+labels: ["hidpi", "perf", "verify"]
+size: S
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

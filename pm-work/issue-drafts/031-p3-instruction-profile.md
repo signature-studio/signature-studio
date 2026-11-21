@@ -1,12 +1,14 @@
 ---
 draft: "031"
 title: "P3 の再生中の命令の内訳を採り、直接 wasm でない関数の割合を測る"
-type: task
+type: Task
 milestone: "M7 エンジンの性能(P3 のホットパス)"
 parent: "030"
 blocked_by: ["003", "004"]
-labels: ["task", "perf", "verify", "priority-p3"]
-size: 5
+labels: ["perf", "verify"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

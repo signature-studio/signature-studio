@@ -1,12 +1,14 @@
 ---
 draft: "009"
 title: "E トップバーのコンテキストメニュー(Tempo・Song Position・Pattern Selector)"
-type: epic
+type: Feature
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: null
 blocked_by: []
-labels: ["epic", "topbar-menu", "priority-p2"]
-size: "子の合計"
+labels: ["topbar-menu"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

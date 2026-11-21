@@ -1,12 +1,14 @@
 ---
 draft: "035"
 title: "起動の中央値を 10 秒以内にする(起動前に取る量と、wasm のコンパイルを見直す)"
-type: task
+type: Task
 milestone: "M8 起動 10 秒以内とサイズ(P1)"
 parent: "033"
 blocked_by: ["034", "014"]
-labels: ["task", "startup", "priority-p1"]
-size: 8
+labels: ["startup"]
+size: L
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

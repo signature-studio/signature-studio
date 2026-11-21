@@ -1,12 +1,14 @@
 ---
 draft: "007"
 title: "P2 の測定の道具を作る(フレーム間隔と入力の遅延を JSON で出す)"
-type: task
+type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
 blocked_by: []
-labels: ["task", "perf", "verify", "priority-p2"]
-size: 4
+labels: ["perf", "verify"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

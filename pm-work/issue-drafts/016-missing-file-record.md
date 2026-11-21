@@ -1,12 +1,14 @@
 ---
 draft: "016"
 title: "起動時にホストに無かったファイルを、engine のログに記録する"
-type: task
+type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: []
-labels: ["task", "resources", "priority-p1"]
-size: 4
+labels: ["resources"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

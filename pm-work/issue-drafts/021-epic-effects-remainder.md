@@ -1,12 +1,14 @@
 ---
 draft: "021"
 title: "E 内蔵 Effects の残り(約 87 件。束ねた Sub-Issue は WAVES.md の第 2 波で起票)"
-type: epic
+type: Feature
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["020"]
-labels: ["epic", "plugin-builtin", "priority-p1"]
-size: "子の合計"
+labels: ["plugin-builtin"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

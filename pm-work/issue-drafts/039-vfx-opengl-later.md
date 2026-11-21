@@ -1,12 +1,14 @@
 ---
 draft: "039"
 title: "OpenGL を使う VFX 系の内蔵プラグインを、全群の後に 1 プラグイン 1 wasm で入れる"
-type: task
+type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["021", "022", "023"]
-labels: ["task", "plugin-builtin"]
-size: 8
+labels: ["plugin-builtin"]
+size: L
+priority: Low
+project: signature-studio/3
 ---
 
 ## 目的

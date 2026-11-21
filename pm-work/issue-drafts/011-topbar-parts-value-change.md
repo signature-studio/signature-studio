@@ -1,12 +1,14 @@
 ---
 draft: "011"
 title: "Tempo・Song Position・Pattern Selector のメニューで項目を選ぶと、部品の値が変わる"
-type: task
+type: Task
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: "009"
 blocked_by: ["010"]
-labels: ["task", "topbar-menu", "priority-p2"]
-size: 5
+labels: ["topbar-menu"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

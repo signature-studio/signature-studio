@@ -1,12 +1,14 @@
 ---
 draft: "001"
 title: "E 描画と音声の分離(P3)"
-type: epic
+type: Feature
 milestone: "M1 描画と音声の分離(P3)"
 parent: null
 blocked_by: []
-labels: ["epic", "render", "priority-p3"]
-size: "子の合計"
+labels: ["render"]
+size: L
+priority: Urgent
+project: signature-studio/3
 ---
 
 ## 目的

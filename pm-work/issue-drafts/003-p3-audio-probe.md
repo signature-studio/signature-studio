@@ -1,12 +1,14 @@
 ---
 draft: "003"
 title: "P3 の音声の実測の道具を作る(AudioContext を開始し、underrun を数える)"
-type: task
+type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
 blocked_by: []
-labels: ["task", "audio", "verify", "priority-p3"]
-size: 4
+labels: ["audio", "verify"]
+size: M
+priority: Urgent
+project: signature-studio/3
 ---
 
 ## 目的

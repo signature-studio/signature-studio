@@ -1,12 +1,14 @@
 ---
 draft: "037"
 title: "E 完成の検証(6 課題と P1・P2・P3 の最終の実測)"
-type: epic
+type: Feature
 milestone: "M9 完成の検証"
 parent: null
 blocked_by: []
-labels: ["epic", "verify"]
-size: "子の合計"
+labels: ["verify"]
+size: M
+priority: Low
+project: signature-studio/3
 ---
 
 ## 目的

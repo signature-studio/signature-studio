@@ -1,12 +1,14 @@
 ---
 draft: "038"
 title: "完成の検証: 6 課題と P1・P2・P3 の最終の実測を、同じ道具で行う"
-type: task
+type: Task
 milestone: "M9 完成の検証"
 parent: "037"
 blocked_by: ["001", "005", "009", "012", "018", "021", "022", "024", "030", "033", "039"]
-labels: ["task", "verify", "priority-p1"]
-size: 6
+labels: ["verify"]
+size: M
+priority: Low
+project: signature-studio/3
 ---
 
 ## 目的

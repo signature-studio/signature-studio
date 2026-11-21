@@ -1,12 +1,14 @@
 ---
 draft: "023"
 title: "OpenGL を使う VFX 系の DLL を一覧から判定し、後回しの一覧を作る"
-type: task
+type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["013"]
-labels: ["task", "plugin-builtin", "inventory", "priority-p1"]
-size: 3
+labels: ["plugin-builtin", "inventory"]
+size: S
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

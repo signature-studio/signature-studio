@@ -1,12 +1,14 @@
 ---
 draft: "018"
 title: "E 内蔵のエフェクトとインストゥルメント(DLL で 100 以上。OpenGL の VFX 系は後で入れる)"
-type: epic
+type: Feature
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: null
 blocked_by: []
-labels: ["epic", "plugin-builtin", "priority-p1"]
-size: "子の合計"
+labels: ["plugin-builtin"]
+size: L
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的

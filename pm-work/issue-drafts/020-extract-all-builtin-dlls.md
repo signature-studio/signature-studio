@@ -1,12 +1,14 @@
 ---
 draft: "020"
 title: "内蔵のエフェクトとインストゥルメントの DLL を、抽出の表に揃える(一覧と SHA-256 が一致)"
-type: task
+type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["013", "023"]
-labels: ["task", "plugin-builtin", "inventory", "priority-p1"]
-size: 6
+labels: ["plugin-builtin", "inventory"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

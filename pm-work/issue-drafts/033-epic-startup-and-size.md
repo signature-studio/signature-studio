@@ -1,12 +1,14 @@
 ---
 draft: "033"
 title: "E 起動を 10 秒以内にする(P1)。単一の wasm は 1GB 以下にする(サイズ)"
-type: epic
+type: Feature
 milestone: "M8 起動 10 秒以内とサイズ(P1)"
 parent: null
 blocked_by: []
-labels: ["epic", "startup", "priority-p1"]
-size: "子の合計"
+labels: ["startup"]
+size: L
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

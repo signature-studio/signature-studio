@@ -1,12 +1,14 @@
 ---
 draft: "034"
 title: "起動の内訳を実測し、P1 の測り方を確定する(取得・コンパイル・インスタンス化・起動)"
-type: task
+type: Task
 milestone: "M8 起動 10 秒以内とサイズ(P1)"
 parent: "033"
 blocked_by: []
-labels: ["task", "startup", "verify", "priority-p1"]
-size: 3
+labels: ["startup", "verify"]
+size: S
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

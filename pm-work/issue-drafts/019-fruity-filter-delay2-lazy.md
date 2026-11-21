@@ -1,12 +1,14 @@
 ---
 draft: "019"
 title: "Fruity Filter と Fruity Delay 2 を、起動後の取得で届ける(1 プラグイン 1 wasm)"
-type: task
+type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
 blocked_by: ["015"]
-labels: ["task", "plugin-builtin", "delivery", "priority-p1"]
-size: 4
+labels: ["plugin-builtin", "delivery"]
+size: M
+priority: Medium
+project: signature-studio/3
 ---
 
 ## 目的

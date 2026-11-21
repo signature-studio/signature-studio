@@ -1,12 +1,14 @@
 ---
 draft: "013"
 title: "インストーラ全件の一覧を作り、作業者が読めるように commit する"
-type: task
+type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: []
-labels: ["task", "inventory", "delivery", "priority-p1"]
-size: 4
+labels: ["inventory", "delivery"]
+size: M
+priority: High
+project: signature-studio/3
 ---
 
 ## 目的
