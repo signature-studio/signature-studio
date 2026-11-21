@@ -39,6 +39,7 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 | work | start・extract | 起動された対象が空でない | `contents: read`・`issues: read` | 本文の取得だけ GITHUB_TOKEN。作業者の段には無い | Issue ごとに: 本文を取る → 受け入れコマンドを取り出す → 作業者を動かす → 判定 → 通れば push |
 | report | start・work | 常に(`always()`)。起動された対象が空でない | `contents: read`・`actions: read`・`issues: write` | 読みは GITHUB_TOKEN、書きは App の token | Issue ごとに結果をコメントし、状態を変える |
 
+- `if:` を書いたジョブは、既定の `success()` の判定が外れるので、`start`・`extract`・`work` の `if` には `success() &&` を付ける(上流が落ちたときに、空の対象で後続が走らないため)。
 - work は `strategy.matrix.issue` で Issue の番号ごとに 1 ジョブ。`fail-fast: false` で、1 件の失敗が他を止めない。
 - work の `concurrency` は `group: task-<番号>`、`cancel-in-progress: false`。同じ Issue の作業は直列になる。
 - 対象が空なら start 以降は skip される。runner を使うのは select(数十秒)だけ。
@@ -109,6 +110,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 4. **App の権限**: start・report が使う App に、`issues` の書き込み権限が要る。確認できない(依頼者の設定)。
 5. **受け入れコマンドは Issue の本文から来る**: 判定の段で、本文の `accept` を実行する。Issue を編集できる人は、作業ジョブで任意のコマンドを動かせる。旧設計は main の `queue/tasks` から取っていた。案: 受け入れを main 由来に戻す、または本文の編集を依頼者だけに限る(GitHub の設定)。
 6. **依存の手動の変更は検知しない**: 「9」の 2 のとおり。
+7. **作業モードは無くした**: 依頼者の指示 L-037(機械的な作業にエージェントを使わない。`mode: script` でスクリプトが行う)は、この設計では強制されない。旧い agent.yml の `mode` の分岐を、指示どおり取り除いたため。機械的な作業を Issue として起こすなら、今は作業者が動く。依頼者の判断: スクリプトだけの作業の経路を、Issue に付けるラベルか本文の書き方で残すか。
 
 ## 11. 依頼者の指示との対応
 
