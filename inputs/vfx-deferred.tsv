@@ -1,0 +1,12 @@
+guest	reason	imports
+Plugins\Fruity\Effects\Fruity Delay 3\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;shell32.dll;ole32.dll;winmm.dll;dwmapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;shlwapi.dll;windowscodecs.dll
+Plugins\Fruity\Effects\ZGameEditor Visualizer\SpoutLibrary.dll	opengl32.dll を import	opengl32.dll;kernel32.dll;user32.dll;gdi32.dll;comctl32.dll;advapi32.dll;shell32.dll;d3d11.dll;dxgi.dll;version.dll;winmm.dll
+Plugins\Fruity\Effects\ZGameEditor Visualizer\ZGameEditor Visualizer_x64.dll	opengl32.dll を import	mpr.dll;winmm.dll;winspool.drv;comdlg32.dll;opengl32.dll;comctl32.dll;shell32.dll;user32.dll;version.dll;oleaut32.dll;advapi32.dll;kernel32.dll;wsock32.dll;ole32.dll;msacm32.dll;api-ms-win-crt-string-l1-1-0.dll;gdi32.dll
+Plugins\Fruity\Effects\ZGameEditor Visualizer\ZgeNano_x64.dll	opengl32.dll を import	opengl32.dll;kernel32.dll
+Plugins\Fruity\Effects\ZGameEditor Visualizer\ZgeSkelet_x64.dll	opengl32.dll を import	opengl32.dll;kernel32.dll
+Plugins\Fruity\Generators\FLEX\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;comdlg32.dll;advapi32.dll;shell32.dll;ole32.dll;dbghelp.dll;shlwapi.dll;version.dll;winmm.dll;dwmapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;windowscodecs.dll
+Plugins\Fruity\Generators\FLEX\engineV2_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;comdlg32.dll;advapi32.dll;shell32.dll;ole32.dll;version.dll;dbghelp.dll;shlwapi.dll;winmm.dll;dwmapi.dll;rpcrt4.dll;d3d9.dll;opengl32.dll;windowscodecs.dll
+Plugins\Fruity\Generators\Fruity Slicer 2\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;shell32.dll;ole32.dll;winmm.dll;dwmapi.dll;shlwapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;windowscodecs.dll
+Plugins\Fruity\Generators\Kepler Exo\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;shell32.dll;ole32.dll;winmm.dll;dwmapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;shlwapi.dll;windowscodecs.dll
+Plugins\Fruity\Generators\Kepler\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;shell32.dll;ole32.dll;winmm.dll;dwmapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;shlwapi.dll;windowscodecs.dll
+Plugins\Fruity\Generators\Transistor Bass\engine_x64.dll	opengl32.dll を import	kernel32.dll;user32.dll;gdi32.dll;shell32.dll;ole32.dll;winmm.dll;dwmapi.dll;d3d9.dll;opengl32.dll;rpcrt4.dll;windowscodecs.dll;shlwapi.dll

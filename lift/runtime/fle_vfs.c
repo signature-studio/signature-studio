@@ -104,6 +104,23 @@ static void fail(uint32_t err, uint64_t ret)
     R[0] = ret;
 }
 
+/* C-3 (#1316): the line for a request that failed because the file, the directory or the module is not there. A unit
+ * that is not printable ASCII, and the quote, is written as \uXXXX, so the path stays between the quotes on one line. Every
+ * failure writes its own line: the count of a path is the count of its lines in the engine's log. */
+void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n)
+{
+    char out[6 * MAX_PATH_UNITS + 1];
+    size_t k, o = 0;
+    if (n > MAX_PATH_UNITS) n = MAX_PATH_UNITS;
+    for (k = 0; k < n; k++) {
+        uint16_t c = w[k];
+        if (c >= 0x20 && c < 0x7f && c != '"') out[o++] = (char)c;
+        else o += (size_t)snprintf(out + o, sizeof out - o, "\\u%04X", (unsigned)c);
+    }
+    out[o] = 0;
+    fprintf(stderr, "missing-path: %s %u \"%s\"\n", api, (unsigned)err, out);
+}
+
 static uint32_t node_attrs(const fle_node *n)
 {
     uint32_t a = n->bits | (n->is_dir ? ATTR_DIRECTORY : 0u);
@@ -270,6 +287,7 @@ typedef struct {
     int trail;       /* the text ends with a separator */
     int wild;        /* the last component has * or ? */
     uint16_t *own;
+    size_t olen;     /* units of own: the path as the guest passed it (the log line of a missing path) */
 } vpath;
 
 static int is_sep(uint16_t c) { return c == '\\' || c == '/'; }
@@ -286,6 +304,11 @@ static void vp_free(vpath *v)
 {
     free(v->own);
     v->own = NULL;
+}
+
+static void note_missing(const char *api, uint32_t err, const vpath *v)
+{
+    fle_vfs_note_missing(api, err, v->own, v->olen);
 }
 
 static int is_device(const uint16_t *c, size_t cl)
@@ -340,6 +363,7 @@ static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath 
     v->own = NULL;
     s = fle_w_read_alloc(api, guest, MAX_PATH_UNITS, &len);
     v->own = s;
+    v->olen = len;
     if (len == 0) fle_stop(api, "empty path is not defined");
     if (len >= 4 && is_sep(s[0]) && is_sep(s[1]) && (s[2] == '?' || s[2] == '.') && is_sep(s[3]))
         fle_stop(api, "the \\\\?\\ and \\\\.\\ prefixes are not implemented");
@@ -576,12 +600,14 @@ void fle_imp_CreateFileW(void)
     if (v.trail) fle_stop(api, "a trailing separator in a CreateFile name is not defined");
     st = lookup(api, &v, &n, &par);
     if (st == 3) {
+        note_missing(api, 3, &v);
         vp_free(&v);
         fail(3, FLE_INVALID_HANDLE_VALUE);
         return;
     }
     if (st == 2) {
         if (disp == 3 || disp == 5) {
+            note_missing(api, 2, &v);
             vp_free(&v);
             fail(2, FLE_INVALID_HANDLE_VALUE);
             return;
@@ -1069,6 +1095,7 @@ void fle_imp_FindFirstFileW(void)
         d.trail = 0;
         st = lookup(api, &d, &n, &par);
         if (st != 0 || !n->is_dir) {
+            note_missing(api, 3, &v);
             vp_free(&v);
             fail(3, FLE_INVALID_HANDLE_VALUE);
             return;
@@ -1089,12 +1116,14 @@ void fle_imp_FindFirstFileW(void)
         st = lookup(api, &v, &n, &par);
         if (st == 0) item_push(&items, &cnt, &cap, n, n->name, n->nlen);
     }
-    vp_free(&v);
     if (cnt == 0) {
         free(items);
+        note_missing(api, st == 3 ? 3u : 2u, &v);
+        vp_free(&v);
         fail(st == 3 ? 3u : 2u, FLE_INVALID_HANDLE_VALUE);
         return;
     }
+    vp_free(&v);
     if (fd_n == fd_cap) {
         size_t nc = fd_cap ? fd_cap * 2 : 16;
         find_ent *nf = realloc(fd, nc * sizeof *nf);
@@ -1197,6 +1226,7 @@ int fle_vfs_path_exists(const char *api, uint64_t guest_path)
 
     parse_path(api, guest_path, 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     return st == 0;
 }
@@ -1214,11 +1244,13 @@ void fle_imp_GetFileAttributesW(void)
     fle_node *n, *par;
     uint32_t st;
     if (R[1] != 0 && fle_ld(R[1], 2) == 0) {
+        fle_vfs_note_missing(api, 3, NULL, 0);
         fail(3, FLE_INVALID_FILE_ATTRIBUTES);
         return;
     }
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, FLE_INVALID_FILE_ATTRIBUTES);
@@ -1253,11 +1285,13 @@ void fle_imp_GetFileAttributesExW(void)
     /* Decision 0126 (PROVISIONAL), wall 70 (S-empty-attrs-ex, the choice of GetFileAttributesW of decision 0123 item 1 applied to the Ex form): the empty name "" fails with 0 and last error 3 (ERROR_PATH_NOT_FOUND); the
      * page of GetFileAttributesExW does not say what an empty name gives. The structure is left as it is. */
     if (R[1] != 0 && fle_ld(R[1], 2) == 0) {
+        fle_vfs_note_missing(api, 3, NULL, 0);
         fail(3, 0);
         return;
     }
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1286,6 +1320,7 @@ void fle_imp_SetFileAttributesW(void)
     if (a & ~(ATTR_SETTABLE | ATTR_NORMAL)) fle_stop(api, "dwFileAttributes has values the page does not list as supported");
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1317,6 +1352,7 @@ void fle_imp_CreateDirectoryW(void)
         return;
     }
     if (st == 3) {
+        note_missing(api, 3, &v);
         vp_free(&v);
         fail(3, 0);
         return;
@@ -1338,6 +1374,7 @@ void fle_imp_RemoveDirectoryW(void)
     uint32_t st;
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1375,6 +1412,7 @@ void fle_imp_DeleteFileW(void)
     uint32_t st;
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1411,6 +1449,7 @@ void fle_imp_CopyFileW(void)
     parse_path(api, R[2], 0, &d);
     sst = lookup(api, &s, &sn, &sp);
     if (sst) {
+        note_missing(api, sst, &s);
         vp_free(&s);
         vp_free(&d);
         fail(sst, 0);
@@ -1420,6 +1459,7 @@ void fle_imp_CopyFileW(void)
     if (d.trail || d.n == 0) fle_stop(api, "destination names no file");
     dst = lookup(api, &d, &dn, &dp);
     if (dst == 3) {
+        note_missing(api, 3, &d);
         vp_free(&s);
         vp_free(&d);
         fail(3, 0);
@@ -1492,6 +1532,7 @@ void fle_imp_MoveFileW(void)
     parse_path(api, R[2], 0, &d);
     sst = lookup(api, &s, &sn, &sp);
     if (sst) {
+        note_missing(api, sst, &s);
         vp_free(&s);
         vp_free(&d);
         fail(sst, 0);
@@ -1507,6 +1548,7 @@ void fle_imp_MoveFileW(void)
     if (d.trail && !sn->is_dir) fle_stop(api, "a trailing separator on a file's new name is not defined");
     dst = lookup(api, &d, &dn, &dp);
     if (dst == 3) {
+        note_missing(api, 3, &d);
         vp_free(&s);
         vp_free(&d);
         fail(3, 0);
@@ -1627,6 +1669,7 @@ void fle_imp_SetCurrentDirectoryW(void)
     uint32_t st;
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1892,6 +1935,7 @@ void fle_imp_GetFileVersionInfoSizeW(void)
     }
     parse_path(api, name, 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
@@ -1947,6 +1991,7 @@ void fle_imp_GetFileVersionInfoW(void)
     }
     parse_path(api, name, 0, &v);
     st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
     vp_free(&v);
     if (st) {
         fail(st, 0);
