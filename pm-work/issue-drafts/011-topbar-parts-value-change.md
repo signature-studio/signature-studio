@@ -4,7 +4,7 @@ title: "Tempo・Song Position・Pattern Selector のメニューで項目を選�
 type: Task
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: "009"
-blocked_by: ["010"]
+blocked_by: ["106"]
 labels: ["topbar-menu"]
 size: M
 priority: High

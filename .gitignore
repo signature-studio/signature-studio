@@ -40,6 +40,9 @@ tmp/
 .tmp-*
 *.new
 
+# the note for a retried worker (agent.yml の「前回の作業を取り込む」が作業ツリーのルートに書く。commit しない)
+.prior-work.md
+
 # product data and archives that must never be committed (the old tree's publish audit)
 *.ilfont
 *.ttf

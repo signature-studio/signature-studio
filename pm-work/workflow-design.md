@@ -54,6 +54,9 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 5. 判定: `guard/judge.sh`(取り直した main の物)に `task-accept.md` を渡す。
 6. 判定に通ったときだけ push する。push の段は、題名と `(Closes #番号)` を付けた空の commit(`git commit --allow-empty`)を作ってから、pull → push する(衝突時は中断して再試行)。push の token は App のもの(「8」)。push できた SHA を `out/commit.txt` に残す。
 7. 成果物 `agent-<番号>`(`out/`: 報告・判定の出力・SHA)を 7 日保存する。
+8. 押せなかった作業を保存する(push の段が 3 回とも落ちたときだけ。判定が落ちたときは動かさない): 基点は、push の前に残した HEAD(`RUNNER_TEMP/work-tip.txt`)と `refs/judge/main` の merge-base。`git diff --binary <基点> <push 前の HEAD>` を `out/work.diff` にし、7 の artifact に入れる。pull で取り込んだ main の変更は含めない(含めると、再試行で他人の変更を再適用し、後から戻された変更を巻き戻す)。差分が空なら作らず、50 MB を超えるなら作らない(警告)。
+- 再試行の作業の前に「前回の作業を取り込む」段がある: 同じ番号の artifact のうち、期限内で `work.diff` を持つ最新を取り、`git apply --3way --index` で載せる。きれいに載れば commit し、作業ツリーのルートに `.prior-work.md` を書く(「衝突なく」)。衝突すれば、衝突の印を残し、`.prior-work.md` に衝突したファイルを書く(commit はしない。作業者が解消して commit する)。`.prior-work.md` は `.gitignore` の対象で、commit しない。作業者は `AGENTS.md` の指示で、これを最初に読む。
+- 保存の基点を「push の前の HEAD」にするのは、push の段の pull が、成功すると HEAD に main の merge を足すため。merge の後の HEAD を基点にすると、差分に main の変更が混ざる。
 
 ## 5. 起動してよい条件
 
@@ -84,6 +87,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - 通った: push の段が作った `Closes #N` の空の commit で、GitHub が Issue を閉じる(未確認。「9」)。report は「通った: <run の URL>」「commit: <SHA の URL>」「受け入れの出力(末尾 8 行)」をコメントする。Issue がまだ open のときは、「close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する」を追記し、GITHUB_TOKEN で閉じる。そのあと `running` を外す(開いたまま外すと、同じ Issue への別の run が、`running` の無い状態を見て再起動し得るため)。
 - 落ちた: 「落ちた: <run の URL>」「作業の状態」「失敗した段」「判定の出力(末尾 8 行)」をコメントし、`failed` を付けてから `running` を外す(逆順だと、外した直後の別の run が、`failed` の無い状態を見て再起動する)。
 - 取り消された(cancelled)・ジョブが動かなかった: 落ちたのと同じく `failed` を付ける。
+- push の段で落ちた(判定は通った): 作業は「4」の 8 の `work.diff` として artifact に残る。落ちた旨のコメントに「押せなかった作業を保存した」を書く。次の再試行は、その差分を作業の前に取り込んでから始める。
 - 再試行: Issue に `/retry` と書く、または `failed` ラベルを外す。`/retry` のときは start が `running` を付けてから `failed` を外す(逆順だと、外した直後の別の run が、`running` の無い状態を見て二重に起動し得る)。
 
 ## 8. トークン
@@ -98,6 +102,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 - `blocked_by_added` は Actions の event に無い。依存を後から付けた Issue は、付ける前に起動していれば止まらない。PM は `pm-hold` を付けて作り、依存を付けてから外す(`unlabeled` で検知する)。
 - `blocked_by_removed` も無い。依存を手で外しただけでは起動しない。Issue にコメントするか、本文を `edited` にすると、再評価される。
+- 保存と取り込みは、衝突の損失を減らすだけで、衝突を無くさない。衝突は作業者が解消する(自動では解消しない)。ジョブが取り消された(cancel)ときは、`failure()` が動かないので保存しない。
 - 同じ Issue への run が 2 つほぼ同時に来ると、start の再確認の間に両方が通ることがある。残りの窓は数秒。work の `concurrency` で作業は直列になるが、0 にはならない。
 - start が途中で落ちると、それまでに付いた `running` が残る。PM が外す。report は動かない(start が成功していないため)。
 - 作業ジョブの鍵の一時ファイル(`$RUNNER_TEMP/botid-config.json`)は、作業の段から読める(旧設計から同じ)。
@@ -127,6 +132,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 17. **エンジンの大きさ**: engine wasm の大きさの目標は無い。単一の wasm ファイルの上限は、ブラウザが読み込める約 1GB。超える場合は分割する。起動前に取る量は、P1 の実測で決める。
 18. **M7 の目標**: P3 の再生中の命令数のうち、直接 wasm の割合が 99% 以上。
 19. **依存の変更**: 外部プラグインの 3 件(027・028・029)は、音声の経路の修正(040)の後に入れる。
+20. **同じファイルを変える Issue は `blocked by` でつなぐ**(PM の起票の規則)。同じ生成物の入力(`lift/harness/web/pack.args`・`lift/harness/web/seed.args`・`lift/crates/fe-build/tests/plan/*.txt` など)を変える Issue が並行すると、push の段の pull で衝突し、作業が失われる(#1341 は #1319 と衝突して 3 回失敗した)。後から起票する側を、先に入る側の `blocked by` にする。
 
 ## 11. 依頼者の指示との対応
 

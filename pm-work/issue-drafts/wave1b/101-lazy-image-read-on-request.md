@@ -4,7 +4,7 @@ title: "起動時に全 DLL を写す設計を、guest の LoadLibrary の時ま
 type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
-blocked_by: []
+blocked_by: ["105"]
 labels: ["delivery", "startup"]
 size: L
 priority: High
