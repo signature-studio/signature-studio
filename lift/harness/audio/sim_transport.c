@@ -3,6 +3,7 @@
  * device appends is what the output reads), so a rewrite is a write into that ring of the frames that JavaScript's fle_js_rewrite would write: only the ones at least `guard` frames ahead of the read position and before the last handed-over frame. */
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "fle_audio_ring.h"
 #include "fle_audio_transport.h"
@@ -18,7 +19,13 @@ uint64_t fle_sim_offered_inside_guard(void) { return sim_offered_inside_guard; }
 int fle_audio_external(void) { return sim_ext; }
 double fle_tp_consumed(void) { return (double)sim_consumed; }
 void fle_tp_publish(const float *lr, uint32_t n, double first, uint32_t rate) { (void)lr; (void)n; (void)first; (void)rate; }
-void fle_tp_state(uint32_t state, uint32_t rate) { (void)state; (void)rate; }
+void fle_tp_state(uint32_t state, uint32_t rate)
+{
+    fle_audio_ring_t *r = fle_audio_ring_get();
+
+    if (state == FLE_AUDIO_PLAYING && r->write_frames < sim_consumed + r->lead_frames) abort();
+    (void)rate;
+}
 void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard)
 {
     fle_audio_ring_t *r = fle_audio_ring_get();

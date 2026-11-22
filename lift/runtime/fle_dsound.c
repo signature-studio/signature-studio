@@ -1196,9 +1196,9 @@ static void m_b_play(void)
     b->silent_until_coop = b->dev->coop == 0;
     b->playing = 1;
     restart_geometry(b, b->cursor);
-    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
     stats.plays++;
     audio_sync();
+    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
     ret(HR_OK);
 }
 
