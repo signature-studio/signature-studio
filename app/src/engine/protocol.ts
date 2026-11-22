@@ -4,15 +4,17 @@ import type { RawInput } from '../input/events.ts';
 import type { DriverStats } from './idle-driver.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import type { HostFileStats } from './hostfiles.ts';
+import type { LazyFileShared } from './lazy-file.ts';
 
 /** decision 0223: what the page hands the engine Worker for the desktop: the input ring (shared), the handshake block with the render Worker (desk-link.ts) and the port to the render Worker. The engine composes; it does not draw. */
 export interface DeskHandover { ring: SharedArrayBuffer; ctl: SharedArrayBuffer; port: MessagePort }
 /** C-2: what the page hands the render Worker: the ONE canvas of the desktop (transferred), the port to the engine Worker and the handshake block (desk-link.ts). It draws the picture the engine composed. */
 export interface RenderHandover { canvas: OffscreenCanvas; port: MessagePort; ctl: SharedArrayBuffer }
 
-/** What the page loaded and verified for the engine (transferred to the Worker). */
+/** What the page loaded and verified for the engine (transferred to the Worker). `lazy`: the manifest's lazy files, in its order (none when absent); their bytes come later, through shared memory (lazy-file.ts), so they are not transferred. */
 export interface BundleAssets {
   module: WebAssembly.Module; seed: Uint8Array; glue: Uint8Array; dll: Uint8Array;
+  lazy?: LazyFileShared[];
 }
 
 export type ToWorker =

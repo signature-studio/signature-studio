@@ -121,4 +121,34 @@ describe('pack-assets.mjs', () => {
     expect(bad.status).not.toBe(0);
     expect(bad.stderr).toContain('--glue is required');
   });
+
+  it('writes the lazy list (Issue #1314): empty by default', () => {
+    expect(manifest().lazy).toEqual([]);
+  });
+});
+
+describe('pack-assets.mjs: a lazy DLL (Issue #1314)', () => {
+  const dll2 = path.join(tmp, 'dll-lazy');
+  fs.mkdirSync(dll2);
+  fs.writeFileSync(path.join(dll2, 'FLEngine_x64.dll'), Buffer.from('MZ-engine'));
+  fs.writeFileSync(path.join(dll2, 'fruity_balance_x64.dll'), Buffer.from('MZ-balance'));
+  const lr = run(['--dll-dir', dll2, '--lazy-dll', 'fruity_balance_x64.dll', '--glue', path.join(tmp, 'glue.js'), '--args', '/data/FLEngine_x64.dll /data/fruity_balance_x64.dll'], 'out-lazy');
+  const lm = JSON.parse(fs.readFileSync(path.join(tmp, 'out-lazy', 'raw', 'fl-x', 'manifest.json'), 'utf8'));
+
+  it('names it as a lazy entry of its own (its name, its path under the root, its SHA-256) and leaves it out of the DLL pack', () => {
+    expect(lr.status, lr.stderr).toBe(0);
+    expect(validateManifest(lm).ok).toBe(true);
+    expect(lm.lazy).toHaveLength(1);
+    expect(lm.lazy[0]).toMatchObject({ name: 'fruity_balance_x64.dll', path: 'fruity_balance_x64.dll', size: 10, sha256: sha(Buffer.from('MZ-balance')), compression: 'br' });
+    expect(lm.lazy[0].url).toMatch(/^\/assets\/fl-x\/fruity_balance_x64\.[0-9a-f]{12}\.dll$/);
+    const file = fs.readdirSync(path.join(tmp, 'out-lazy', 'br', 'fl-x')).find((f) => /^dll\.[0-9a-f]{12}\.flpack$/.test(f))!;
+    const files = parsePack(new Uint8Array(zlib.brotliDecompressSync(fs.readFileSync(path.join(tmp, 'out-lazy', 'br', 'fl-x', file)))), { verifyFiles: true });
+    expect([...files.keys()]).toEqual(['FLEngine_x64.dll']);
+  });
+
+  it('refuses a lazy name that is not a file of the DLL directory', () => {
+    const bad = run(['--dll-dir', dll2, '--lazy-dll', 'missing.dll', '--glue', path.join(tmp, 'glue.js'), '--args', '/data/FLEngine_x64.dll'], 'out-lazy-missing');
+    expect(bad.status).not.toBe(0);
+    expect(bad.stderr).toContain('missing.dll');
+  });
 });
