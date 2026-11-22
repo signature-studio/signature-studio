@@ -272,6 +272,16 @@ static void stop_file_not_a_module(const char *api, const char *shown)
     fle_stop(api, why);
 }
 
+extern void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n) __attribute__((weak));   /* C-3 (#1316): a link without fle_vfs.c writes no line */
+
+/* C-3 (#1316): a module that is not found gives NULL and ERROR_MOD_NOT_FOUND (as before), and its name is written to the engine's log (fle_vfs_note_missing). */
+static void not_found(const char *api, const uint16_t *u, size_t n)
+{
+    if (fle_vfs_note_missing) fle_vfs_note_missing(api, FLE_ERROR_MOD_NOT_FOUND, u, n);
+    fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
+    R[0] = 0;
+}
+
 /* 1 when the folder part of u (the units before `base`, the position after the last separator) is C:\Windows, C:\Windows\System32 or C:\Windows\SysWOW64 (the folders where a Windows installation keeps its DLLs; without case, '/' as '\') */
 static int in_windows_dir(const uint16_t *u, size_t base)
 {
@@ -324,8 +334,7 @@ static void load_with_path(const char *api, const uint16_t *u, size_t n)
         if (rm >= 0) {
             if (!fle_vfs_peek_file) fle_stop(api, "a path names a real module but fle_vfs.c is not linked (no virtual volume to check the file in)");
             if (!volume_file(api, u)) {
-                fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-                R[0] = 0;
+                not_found(api, u, n);
                 return;
             }
             R[0] = fle_realmod_load(api, rm);
@@ -348,8 +357,7 @@ static void load_with_path(const char *api, const uint16_t *u, size_t n)
                 }
         }
     }
-    fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);   /* 4. */
-    R[0] = 0;
+    not_found(api, u, n);   /* 4. */
 }
 
 /* Decision 0238 (load2, PROVISIONAL): an API set contract name that is not itself a module of the table. Learn "Windows API sets" / "API set loader operation": "The loader recognizes a name that begins with api- or ext- and routes it to the API set
@@ -360,7 +368,7 @@ static void load_with_path(const char *api, const uint16_t *u, size_t n)
  * gives STATUS_APISET_NOT_PRESENT and the file search goes on). A contract that is in the schema and maps to no host fails like an unmapped one: NULL and ERROR_MOD_NOT_FOUND (126 is this file's code for a module that is not there, decision 0015; the pages name
  * none; Wine 10.0 get_apiset_target gives STATUS_DLL_NOT_FOUND, which ntdll/error.h maps to 126). A host that is not a virtual module of this environment stops by name: nobody has said whether that DLL is loaded or what it exports, so neither a handle
  * nor a failure is true. The host's exports are those of the response table under the host's name (GetProcAddress, fle_modules.c). */
-static int api_set_load(const char *api, const char *name)
+static int api_set_load(const char *api, const char *name, const uint16_t *u, size_t n)
 {
     const char *host;
     uint64_t i;
@@ -382,8 +390,7 @@ static int api_set_load(const char *api, const char *name)
         }
         return 1;
     case FLE_APISET_NO_HOST:
-        fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-        R[0] = 0;
+        not_found(api, u, n);
         return 1;
     default:
         return 0;
@@ -402,13 +409,11 @@ static void load_by_name(const char *api, const uint16_t *u, size_t n)
          * pages of LoadLibraryW / LoadLibraryExW say what happens then: "If the function cannot find the module, the function fails" and "If the function fails, the return value is NULL". The pages name no error
          * code; ERROR_MOD_NOT_FOUND (126, "The specified module could not be found") is the code this file gives for every module that is not there (S-ref1-loadlib-empty-code: ERROR_INVALID_PARAMETER (87) is the other
          * candidate; a real machine's code for an empty name was not read). The engine asks for an empty name after the file of a plugin DLL was not found on the volume (46 times while the reference project loads). */
-        fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-        R[0] = 0;
+        not_found(api, u, n);
         return;
     }
     if (fle_ia2_path_absent != NULL && fle_ia2_path_absent(u, n)) {   /* decision 0191 (opt-in: the layer-4 marker row), wall ia2-W21: see fle_wall_ia2.c */
-        fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-        R[0] = 0;
+        not_found(api, u, n);
         return;
     }
     if (name_has_path(u, n)) {   /* decision 0233 */
@@ -433,12 +438,11 @@ static void load_by_name(const char *api, const uint16_t *u, size_t n)
     }
     for (i = 0; i < LOAD_ABSENT_N; i++) {
         if (strcmp(name, fle_load_absent[i]) == 0) {
-            fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-            R[0] = 0;
+            not_found(api, u, n);
             return;
         }
     }
-    if (api_set_load(api, name)) return;   /* decision 0238 */
+    if (api_set_load(api, name, u, n)) return;   /* decision 0238 */
     if (on_roster(name)) {   /* decision 0233: a DLL that Windows ships (roster), that this environment does not model */
         char why[LOAD_NAME_MAX + 260];
         snprintf(why, sizeof why,
@@ -466,8 +470,7 @@ static void load_by_name(const char *api, const uint16_t *u, size_t n)
         }
         rel[rn] = 0;
         if (search_volume(api, rel, rn, 0, shown, sizeof shown)) stop_file_not_a_module(api, shown);
-        fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
-        R[0] = 0;
+        not_found(api, u, n);
     }
 }
 

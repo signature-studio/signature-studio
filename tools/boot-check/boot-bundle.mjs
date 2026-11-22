@@ -2,6 +2,7 @@
 // Usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory raw/<name>> > boot.json   (needs app/node_modules and app/dist). The page is opened at "/" with no parameters.
 // The brotli files of the bundle are in br/<name>/ next to raw/ (stage-assets.mjs links them for the app's /assets/ route). The temporary directory is inside the repository (.tmp-boot-*) and is removed.
 // standIn is only whether the text "STAND-IN" is in the page body; it is a reading, not a proof either way.
+// bootBundle() is the same start-up for the other tools (tools/missing-paths/measure.mjs); it also returns the whole engine log, not only its first 30 lines.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,13 +11,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from './cdp.mjs';
 import { stageAssets } from './stage-assets.mjs';
 
-if (!process.argv[2]) {
-  process.stderr.write('usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory>\n');
-  process.exit(2);
-}
-const bundleDir = path.resolve(process.argv[2]);
-const BUNDLE = path.basename(bundleDir);
-const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const appDir = path.join(repo, 'app');
@@ -42,7 +36,7 @@ const FINAL = `(() => { const a = window.__app ?? null; return {
   state: a ? a.state : null,
   engineKind: a ? a.engineKind : null,
   timelineIdle: a && typeof a.timeline.idle === 'number' ? a.timeline.idle : null,
-  engineLog30: a ? a.engineLog().slice(0, 30) : null,
+  engineLog: a ? a.engineLog() : null,
   documentTitle: document.title,
   standIn: document.body.innerText.includes('STAND-IN'),
 }; })()`;
@@ -52,9 +46,13 @@ const timed = (p, ms, what) => {
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`timeout ${ms} ms: ${what}`)), ms); })]).finally(() => clearTimeout(t));
 };
 
-async function main() {
+/** One start-up of the bundle in its own Chrome: `out` is the check's JSON object (engineLog30: the first 30 lines of the engine's log); `engineLog` is the whole log (null when the page has no app) */
+export async function bootBundle(bundleDir) {
   const t0 = Date.now();
+  const BUNDLE = path.basename(bundleDir);
+  const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
   const out = { startedAt: new Date(t0).toISOString(), state: null, engineKind: null, timelineIdle: null, engineLog30: null, standIn: null, documentTitle: null, elapsedMs: null, loadavg: null, chromeVersion: null, error: null };
+  let engineLog = null;
   const root = fs.mkdtempSync(path.join(repo, '.tmp-boot-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
@@ -93,7 +91,9 @@ async function main() {
       if (Date.now() - navAt >= WAIT_LIMIT_MS) break;
       await sleep(POLL_MS);
     }
-    Object.assign(out, await ev(FINAL));
+    const { engineLog: all, ...fin } = await ev(FINAL);
+    engineLog = all;
+    Object.assign(out, fin, { engineLog30: all ? all.slice(0, 30) : null });
     if (out.timelineIdle === null && !stopped) out.error = `no first idle, error or exit within ${WAIT_LIMIT_MS} ms (state ${out.state ?? 'window.__app not set'})`;
     else if (out.timelineIdle === null) out.error = `state ${out.state} before the first idle`;
     else if (!stopped) out.error = `state ${out.state} after the first idle, no engine-idle within ${WAIT_LIMIT_MS} ms`;
@@ -107,8 +107,19 @@ async function main() {
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
   }
+  return { out, engineLog };
+}
+
+async function main() {
+  if (!process.argv[2]) {
+    process.stderr.write('usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory>\n');
+    process.exit(2);
+  }
+  const { out } = await bootBundle(path.resolve(process.argv[2]));
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
   process.exitCode = out.error ? 1 : 0;
 }
 
-await main();
+// the check runs when this file is the program; a tool that imports it gets bootBundle only
+const self = process.argv[1] ? fs.realpathSync(process.argv[1]) : null;
+if (self === fs.realpathSync(fileURLToPath(import.meta.url))) await main();
