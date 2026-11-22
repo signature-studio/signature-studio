@@ -29,6 +29,13 @@ export interface AssetRef {
 /** A pack of files: the guest's virtual files (seed pack) or DLL data (DLL pack). Formats: see pack.ts (flpack1; flseedp1 = the seed pack of decision 0134, app/scripts/pack-seed.mjs). */
 export interface PackRef extends AssetRef { format: 'flpack1' | 'flseedp1' }
 
+/**
+ * Issue #1314: a file that the page downloads AFTER the engine has started (a plugin's data, an asset that the start-up does not need), in the manifest's order (the page downloads one after another).
+ * `name` is what the page calls it (the progress and the log); `path` is where the engine finds the file under its root (`fruity_balance_x64.dll` = <root>/fruity_balance_x64.dll). The engine knows its size from the start;
+ * a read of it that comes before the bytes arrive waits for them (src/engine/lazy-file.ts). Everything else in the manifest is fetched before the engine starts.
+ */
+export interface LazyRef extends AssetRef { name: string; path: string }
+
 /** One note for a known way the engine stops: when the engine's stop message contains `contains`, the UI adds `note` to what it says. */
 export interface StopNote { contains: string; note: string }
 
@@ -73,6 +80,8 @@ export interface Manifest {
   seedPack: PackRef;
   /** the engine and module DLLs, and their data */
   dllPack: PackRef;
+  /** Issue #1314: the files that are downloaded after the engine has started (everything above is downloaded before it). Absent in a bundle of an older build: none. */
+  lazy?: LazyRef[];
 }
 
 const sha256Schema: Schema = { type: 'string', pattern: '^[0-9a-f]{64}$' };
@@ -90,6 +99,11 @@ const assetSchema: Schema = { type: 'object', required: ['url', 'size', 'sha256'
 const packSchema: Schema = {
   type: 'object', required: ['url', 'size', 'sha256', 'compression', 'format'], additionalProperties: false,
   properties: { ...assetProps, format: { type: 'string', enum: ['flpack1', 'flseedp1'] } },
+};
+
+const lazySchema: Schema = {
+  type: 'object', required: ['name', 'path', 'url', 'size', 'sha256', 'compression'], additionalProperties: false,
+  properties: { ...assetProps, name: { type: 'string', minLength: 1, maxLength: 100 }, path: { type: 'string', format: 'relative-path', maxLength: 256 } },
 };
 
 export const MANIFEST_SCHEMA: Schema = {
@@ -119,6 +133,7 @@ export const MANIFEST_SCHEMA: Schema = {
     },
     seedPack: packSchema,
     dllPack: packSchema,
+    lazy: { type: 'array', maxItems: 64, items: lazySchema },
   },
 };
 
@@ -153,6 +168,14 @@ export function validateManifest(input: unknown): ManifestResult {
       const root = m.engine.options.root;
       if (!(m.engine.args[0] as string).startsWith(`${root}/`)) errors.push({ path: '/engine/args/0', message: `must be a path under the file root ${root}/ (the engine DLL)` });
     }
+    // a lazy file is named once, and its path under the root is one file of the engine
+    const names = new Set<string>(), paths = new Set<string>();
+    (m.lazy ?? []).forEach((l, i) => {
+      if (names.has(l.name)) errors.push({ path: `/lazy/${i}/name`, message: 'is listed twice' });
+      if (paths.has(l.path)) errors.push({ path: `/lazy/${i}/path`, message: 'is listed twice' });
+      names.add(l.name);
+      paths.add(l.path);
+    });
   }
   return errors.length === 0 ? { ok: true, manifest: input as Manifest } : { ok: false, errors };
 }

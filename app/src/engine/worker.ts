@@ -3,6 +3,7 @@
 // Input arrives through a SharedArrayBuffer ring (input/ring.ts), the cursor and the title as small messages.
 import { classifyEngineError, FruityEngine, type FruityHost } from './fruity.ts';
 import { hostPackFromBytes } from './hostfiles.ts';
+import { LazyFileSource } from './lazy-file.ts';
 import { IdleDriver, newDriverStats } from './idle-driver.ts';
 import { IdleTrace } from './idle-trace.ts';
 import { ReportThrottle } from './report-throttle.ts';
@@ -25,6 +26,8 @@ const post = (m: FromWorker, transfer: Transferable[] = []): void => self.postMe
 const log = (level: 'info' | 'warn' | 'error', text: string): void => post({ t: 'log', level, text });
 const mark = (name: string, detail?: Record<string, unknown>): void => post({ t: 'mark', name, abs: nowAbs(), ...(detail ? { detail } : {}) });
 
+/** Issue #1314: how long a read of a lazy file waits for its bytes before it fails (lazy-file.ts) */
+const LAZY_TIMEOUT_MS = 120000;
 let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
 const reports = new ReportThrottle();
@@ -92,7 +95,9 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   const seedPack = hostPackFromBytes(m.assets.seed);
   mark('pack_source_dll', { how: 'memory' });
   mark('pack_source_seed', { how: 'memory' });
-  fruity = await FruityEngine.create(m.manifest, { module: m.assets.module, glue: m.assets.glue, seed: seedPack, dll: dllPack }, host);
+  // Issue #1314: the lazy files are in the host files from the start; a read that comes before their bytes waits for them (lazy-file.ts)
+  const lazy = (m.assets.lazy ?? []).map((l) => new LazyFileSource(l, { timeoutMs: LAZY_TIMEOUT_MS, onWait: (path, ms) => mark('lazy_wait', { path, ms: Math.round(ms) }) }));
+  fruity = await FruityEngine.create(m.manifest, { module: m.assets.module, glue: m.assets.glue, seed: seedPack, dll: dllPack, lazy }, host);
   log('info', `engine ${m.manifest.bundle.name} ${m.manifest.bundle.version} ready; stack switching ${fruity.canSuspend ? 'JSPI' : 'unavailable'}`);
   post({ t: 'ready', kind: m.manifest.engine.kind });
 }
