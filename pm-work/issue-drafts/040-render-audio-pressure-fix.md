@@ -1,6 +1,6 @@
 ---
 draft: "040"
-title: "描画(guest の UI 描画を含む)が音声を圧迫する経路を取り除く"
+title: "起動の直後の、guest の長い計算が音声の補充を止める問題を取り除く(切り替え点の挿入。起動して 10 秒後・無操作の途切れ 0)"
 type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
@@ -13,89 +13,105 @@ project: signature-studio/3
 
 ## 目的
 
-課題 C-2 の残り: 画面の描画が音声の処理を圧迫しない状態にする。#{{002}} の実測で、描画の分離の後も圧迫が残ると分かった(下の「前回の測定で分かったこと」)。この Issue は、残る圧迫の主因を計測で特定し、取り除く。完了の目安は、画面の更新を続ける負荷(`--load ui`)をかけても、10 秒あたりの underrun が 20 以下であること。P3 の目標は 0 だが、実環境(runner は 4 vCPU の共有)で届く範囲は、報告で見積もる。
+P3 の目標は、Song Mode で音が途切れないこと。目標どうしがぶつかるときは P3、P2、P1、サイズの順に優先する(`AGENTS.md`)。
 
-## 背景
+依頼者の指摘(2026-11-23): **起動して約 10 秒後、再生もマウス操作も無い状態で、ヘッダーの `直近 60 秒の途切れ` が 343**(実機)。使い物にならないレベルで、パフォーマンスが最悪である。
 
-- #{{002}} の成果物: `pm-work/findings/c2-split-measure.md`。この Issue の本文は、その要点と数字を「前回の測定で分かったこと」に写してある。
-- 分離(commit 43a6eb88)は、描画の合成と提示を engine の Worker から描画の Worker へ移した。#{{002}} で分離の前後の版を比べると、underrun に差は見えなかった。
-- survey の読み(pm-work/findings/survey-c2-worker-split.md。推定を含む): ゲストの複数のスレッドは、1 つのホストのスレッドで協調して動く(`lift/runtime/fle_thread.h` の 1〜6 行)。音声の書き込み(`lift/runtime/fle_audio_transport.c` の 54 行 `fle_js_publish`)と音声の実時間の待ち(同 108 行付近 `fle_js_wait`)は、engine と同じ fl-engine の Worker で動く。
-- 旧の仮説(描画が音声を圧迫する)は、#{{002}} の測定では支持されなかった。UI 負荷を外しても underrun は同じ程度に出た。
-- 主因の見立て(推定。未確認): 圧迫は描画そのものより、engine の Worker の中で音声を作る側の時間の不足(guest のミキサとスケジューラ、音声の書き込みと実時間の待ち)とみられる。この見立てを、最初の計測で確かめる。
-- 方針の案(設計は作業者が決める): 計測で支配的な要因が分かってから決める。候補は、協調スケジューラの切り替えの頻度、待ちの粒度、音声を作る guest のスレッドを描画とは別の Worker に分ける仕組み(共有メモリと、wasm のスレッドの仕組み)、busy loop の抑制。
-- 製品の既定の動作は変えない。オプトインは作らない。
+この Issue の目標: **起動の直後の途切れを 0 にする**。具体的には、engine の idle の +10 秒と +70 秒に読んだ `直近 60 秒の途切れ` が、n=3 の全てで 0。併せて、音声の補充の停止の最大を 60 ms 以下にする(音声の先読みは 60 ms。この Issue では変えない)。
 
-## 前回の測定で分かったこと(#{{002}})
+原因の見立て(前回の試行の実測。下の「前回の試行で分かったこと」): 起動の直後、guest の重い計算が、協調スケジューラの切り替えを通らずに続く。コールバックの中では切り替えが飛ばされ、その間は音声の補充も止まる。前回は、コールバックの中でも補充するようにして途切れを半分にしたが、0 にはならなかった。残りは、切り替え点も音声の呼び出しも無い長い計算(推定。関数は未特定)。
 
-測定: `tools/p3-audio-probe/measure.mjs`、bundle fl-Oz、headless Chrome、窓 10 秒、各 n=3。値は runner の値で、この機械とは別枠(nproc 4、loadavg 0.96〜2.12)。UI 負荷は、デスクトップ中央で半径 30 px の円を 50 ms ごとにマウス移動する。
+## 依頼者の指摘(2026-11-23)
 
-| 負荷 | 版 | underrunDelta(10 秒あたり。平均(範囲)) | engineGapFrames 増分(平均(範囲)) | presentsDelta(平均) |
-|---|---|---|---|---|
-| UI | 分離の前 | 257(199〜301) | 39,298(33,268〜46,580) | 30 |
-| UI | 分離の後 | 267(238〜289) | 51,955(45,170〜55,710) | 27 |
-| なし | 分離の前 | 268(247〜292) | 39,541(36,344〜44,062) | 27 |
-| なし | 分離の後 | 262(239〜281) | 41,547(32,758〜58,140) | 21 |
+- 起動して約 10 秒後、再生もマウス操作も無い状態で、ヘッダー `音: 動作中 44.1 kHz · 出力遅延 32 ms · 直近 60 秒の途切れ 343`(実機。画面 2 回。343 は、約 175 ms に 1 回の割合)。
+- 同じ画面のログ: `[warn] the virtual clock fell 84 ms further behind the wall clock than the cap allows (S-clk-maxlag); it stays behind (no virtual time is skipped)`(別の画面では 94 ms)。
+- 起動の時刻(実機): `Download … at 2.0 s`、`Compile … at 2.0 s`、`Engine running … ran 2.5 s (main() began at 4.0 s)`、`First pixel at 6.9 s`、`Idle at 6.4 s`(2 回目。保存した複製からの起動)。
+- マウスを動かした後の値(別の貼り付け): `直近 60 秒の途切れ 420`、`input: 228 sent, 225 processed, 0 pending, 3 dropped/merged · engine cycle 0.00 s (1115.6/s)`、`last input: move at screen (3238,143) (pointermove)`。マウスの 1 イベントごとに engine が 1 周している。
+- 画面: `guest screen 3240x1863 device px in a room of 1836x1056 CSS px (device pixel ratio 1.7647, 6.04 Mpx)`。依頼者のマウスは 8000 Hz で、互換性のため 1000 Hz に落として使っている。
+- ヘッダーの値の数え方(`app/src` の読み): `underrunQuantaLast60s`(`app/src/audio/page-audio.ts` の `detail()`)。出力が PLAYING の間に、engine が次の 128 フレームを書き終えていなかった quantum を数える(`app/src/audio/fle-out.worklet.js` の冒頭)。PLAYING は、再生ボタンとは別に、engine が起動時に開始する状態。値は「60 秒前の標本からの差」なので、起動から 60 秒以内は、起動からの累計になる。ワークレットは AudioContext が running のときだけ処理するので、その間の途切れは数えられない(推定。段 0 の測定で確かめる)。
 
-- 圧迫は分離の後も残る。underrun は、再生の quantum(10 秒で約 3,460)の約 6〜9%。
-- 前後の差は見えない。UI 負荷の有無でも差は見えない。マウスによる UI の処理は主因ではない。
-- 負荷なしでも、提示は 10 秒あたり 20〜28 回起きる。
-- engineGapFrames は、エンジンが無音で埋めた量(エンジン側の書き込みの遅れ)。
-- 12 回すべてで nonSilentQuanta が 0。所定のプロジェクトを再生していない。P3(Song Mode)は判定していない。
-- 取れていない項目(この Issue で取る): compose の回数と時間、書き込みの遅延の分布、quantum ごとのジッタ、AudioWorklet の CPU 時間。
+## 前回の試行で分かったこと
 
-## 読む物
+前回の作業者の試行(run 45045850171)は、判定が落ちて push されず、作業は失われた。以下は、その報告の数字と結論。変更前の版で測った値(窓 10 秒。窓の開始は `tools/p3-audio-probe/measure.mjs` と同じ、Space の直後。runner の値。nproc 4、loadavg 1 分値 1.6〜2.2。この機械とは別枠)。
 
-- `pm-work/findings/c2-split-measure.md`(#{{002}} の成果物)、`pm-work/findings/survey-c2-worker-split.md`(手順 4〜8 の読み)
-- `lift/runtime/fle_thread.h`(1〜6 行: 協調のスレッド)、`lift/runtime/fle_audio_transport.c`(54 行・108 行付近)、`lift/runtime/fle_dsound.c`(416〜471 行付近: 音声の混合と書き込み)、`lift/runtime/fle_audio_ring.c`(148〜176 行)
-- `app/src/engine/client.ts`(75・90・97 行)、`app/src/engine/worker.ts`、`app/src/engine/render-worker.ts`、`app/src/engine/desk.ts`
-- `app/src/audio/page-audio.ts`、`app/src/audio/soft-sink.ts`
-- `tools/p3-audio-probe/measure.mjs`(#{{003}} が作った道具)
+1. **音声の補充の停止の主因は、描画ではない**。窓の 10 秒の内訳: 音声の計算 `audio_sync` 27.5 ms(窓の 0.3%)、混合 2.6 ms、書き込み 3.3 ms(892 回、1 回約 3.7 µs)。描画(compose)は約 40 回、合計約 5 ms(1 回約 0.13 ms)。
+2. **否定された候補**: 描画(compose)。音声の計算と書き込み。アイドルの待ちが補充より長い(計画された待ちは 60 ms 以下、実際の最大は 12.7 ms。窓の 79% がアイドル)。協調の実時間待ち `fle_js_wait` は 0 回。
+3. **時間の偏り**(1 秒ごとの値。窓の開始からの時刻):
+   - 前半(−3 s 〜 +1.2 s。起動の直後で、Space の直後): スレッド 2 が約 93% を実行(区間の最大 209 ms の連続)。アイドル 0〜3%。`audio_sync` の呼び出し 430〜1,070/s。スライス終了の約 9 割がコールバックの中で飛ばされる(47〜103/s)。書き込みの間隔が 60 ms を超える事象は 3〜9/s。underrun の連続は 50〜830 ms。
+   - 後半(+1.5 s 以降): スレッド 7 の `Sleep(1)` の繰り返し。アイドル約 94%。`audio_sync` 約 5,200〜5,500/s。遅れと間隔 > 60 ms は 0。underrun は +1.7 s より後は 0。
+   - 注: 窓全体の集計で「スレッド 7 が約 93%」と書かれた箇所もあった。前半と後半を分けた集計を正とする。
+4. **支持された原因**: コールバックの中での切り替えの飛ばし。`lift/runtime/fle_thread.c` の `fle_progress_slice`(792 行付近: `fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH` の分岐で、切り替えを飛ばして戻る)。この間、音声の補充も止まる。
+5. **前回の修正と結果**(失われた。作り直してよい): 上の分岐で、切り替えと仮想時計は従来どおりにし、**音声の補充だけを行う**。`lift/runtime/fle_dsound.c` に `fle_audio_poll_in_callback` を足し、外部の音声消費者(AudioWorklet)があるときだけ `audio_sync` を呼ぶ(ネイティブの仮想時計の動作は変えない)。
+   - underrunDelta(10 秒): 変更前 185・192(各 n=1)。補充を無条件に行った版 135・120・95(n=3)。外部の消費者があるときだけ行った版 108・150・98(n=3、平均 119)。
+   - 補充の停止の最大: 修正前 317 ms → 修正後 185 ms(累積の最大)。
+   - 窓の中の最長の連続 underrun: 修正前 約 250 ms(85 quanta) → 修正後 38〜42 quanta(約 110〜120 ms)。
+   - 評価: 約半分に減ったが、0 にはならない。修正後も前半に、切り替え点も `audio_sync` の呼び出しも無い長い計算が残る(書き込みの間隔が 60 ms を超える事象が 1 秒に 3〜9 回)。**関数は未特定**。関数別の計測はしていない。
+6. **先読み**: `FLE_AUDIO_LEAD_MS` は 60 ms(`lift/runtime/fle_audio_ring.h` の 23 行)。60 ms より増やせば、185 ms までの停止は吸収できるが、入力から音までの遅れが増える(`S-audio-lead`。依頼者の決定の対象)。**この Issue では先読みを変えない**。
+7. **受け入れの窓の位置**: 前回の受け入れ(UI の負荷あり、窓 10 秒、10 秒あたり 20 以下)は、Space の直後の起動の山の後半に当たっていた。定常(+1.7 s より後)の途切れは 0 だった(推定)。この 10 秒窓の基準は、この Issue では使わない。
+8. **取れていないもの**: 関数別の所要(`fle_*` の内訳)、AudioWorklet の CPU 時間、quantum ごとのジッタ、Song Mode の判定、耳の確認。
 
-## やること
+## 作業の順序
 
-1. 最初に計測する(変更の前)。engine の Worker の中で、音声 1 quantum 分の 1 周の時間の内訳を取る。どの guest のスレッドの、どの `fle_*` の関数(`lift/runtime/fle_audio_transport.c` の書き込みと待ち、`lift/runtime/fle_thread.h` の協調スケジューラ、ミキサ)に時間がかかっているかを表にする。合わせて、書き込み 1 回の所要、書き込みの間隔の分布、描画(compose)の時間を取る。計測は一時的な変更として入れ、受け入れの前に取り除く(製品に残さない。切り替えも作らない)。結果は報告に表で出す(pm-work には書かない)。
-2. 1 の結果で、支配的な要因を 1 つ決め、それを取り除く。設計の理由を報告に書く。製品の既定の動作は変えない。
-3. 同じ道具(`--load ui`)で、取り除いた後の underrunDelta・engineGapFrames 増分・quantaDelta を n=3 で測る。上の表の「分離の後・UI」と並べて、報告に表で書く。
-4. 起動が通ることを確かめる(engine-idle・standIn が false・error が null)。
+1. **修正を入れ直す**: 前節 5 の修正(`lift/runtime/fle_thread.c` と `lift/runtime/fle_dsound.c`)。単独では 0 にならないことは実測済み。以降の作業の土台にする。
+2. **長く走る関数を特定する**(計測。一時的な変更として入れ、受け入れの前に取り除く)。
+   - 前提(コードの読みで確かめた。計測ではない): 切り替えの計数は、guest の間接呼び出しでしか進まない(`lift/runtime/fle_dispatch.h` の 177 行の `++fle_progress_count`)。直接の呼び出しと、ループの後方辺では進まない。スライスは 4096 回の間接呼び出しごと(`lift/runtime/fle_thread.h` の `FLE_PREEMPT_SLICE_DISPATCHES`)。だから、間接呼び出しの無い長いループは、切り替えを通らずに走りうる。
+   - 方法: CDP の `Profiler` で、engine の Worker に接続し(`Target.setAutoAttach` で Worker の対象へ。`Profiler.start` と `Profiler.stop`)、wasm の関数の自己時間を取る。関数名が取れない場合は、`lift/` の生成物の関数の名前(`lower 0x…` など)から、guest の RVA に対応づける。取り方は作業者が決め、報告に書く。
+   - 対象: 起動の直後(engine の idle の前後 0〜30 秒)。出すもの: (a) 自己時間の上位 20 関数(割合と ms)。(b) 各関数について、切り替え点を通らずに続いた最長の時間(ms)。
+   - 計測の切り替えは、既存の仕組み(既存の記録の経路や、既存の引数)だけで行う。新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数は作らない。既定では無効にする。
+3. **切り替え点を入れる**(特定した長い計算に)。方式は作業者が選び、実測で比べ、理由を報告に書く。
+   - (a) 生成器(`lift/crates/fe-lift`・`fe-wasmgen`・`fe-build`)で、ループの後方辺と関数の入口に、カウンタの減算と、0 以下で協調スケジューラへ戻る呼び出しを入れる。全関数ではなく、特定した上位の関数と、そこから呼ばれるループの多い関数に限ってよい。全関数に入れる場合は、P3 の再生中の性能への影響を実測し、許容範囲に収める。
+   - (b) 該当の guest の処理が、特定の API(`WaitForSingleObject`・`Sleep`・`SwitchToThread` など)を呼ぶ所で、切り替えを増やす。
+   - どちらの方式でも、音声を作る guest のスレッドが、締め切り(先読み 60 ms)の前に必ず走ることを保つ。
+   - 製品に新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。既定の動作として直す。
+4. **測定の道具に起動段の測定を足す**: `tools/p3-audio-probe/measure.mjs` に `--boot` を足す。既存の窓・`--load ui`・既存の出力の項目は変えない。
+   - 画面: CSS 1836×1056・DPR 1.7647(依頼者の実機と同じ。guest の画面は 3240×1863 の物理画素。`Emulation.setDeviceMetricsOverride` などで作る)。
+   - 0 とする時刻: `window.__app.state` が `engine-idle` を最初に観測した時刻(ポーリングは 50 ms 以下)。
+   - 窓: idle の +10 秒から +70 秒。
+   - 押下: AudioContext を running にするための、状態の行への押下を 1 回だけ、窓の前に行ってよい(`startAudio` と同じ。ゲストには届かない)。窓の中では、何も操作しない。Space を押さない。ゲストの同意の箱(No thanks)を押さない。マウスを動かさない。
+   - JSON(stdout に 1 行): `error`・`state`・`standIn`・`screenDevicePx`(`window.__app.screen.guest` の幅×高さ。例 `3240x1863`)・`dpr`・`ctxState`(窓の終わりの AudioContext の状態)・`quantaDelta`(idle+10 から +70 の `quantaWhilePlaying` の増分。期待値は約 20,600)・`bootLast60sAt10s`(idle+10 秒に読んだ `underrunQuantaLast60s`)・`bootLast60sAt70s`(idle+70 秒に読んだ値)・`maxRefillStallMs`・`nproc`・`loadavg`。
+   - `maxRefillStallMs`: 音声の補充の停止の最大(ms)。音声の出力が PLAYING になった時刻から、idle の +70 秒まで、engine が出力のリングへ補充した時刻の、連続する 2 回の差の最大。取り方(engine 側の一時的な計数か、ページ側の標本か)は作業者が決め、報告に書く。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --load ui > ".tmp-1334/ui-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/ui-"+i+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.load==="ui"&&r.state==="engine-idle"&&r.standIn===false&&r.presentsDelta>0&&r.quantaDelta>0&&r.underrunDelta<=20)?0:1)' && rm -rf .tmp-1334
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.screenDevicePx==="3240x1863"&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt10s===0&&r.bootLast60sAt70s===0&&r.maxRefillStallMs!==null&&r.maxRefillStallMs<=60)?0:1)' && rm -rf .tmp-1334
 ```
 
-判定の基準: 道具の 3 回すべてで、`error` が null、`load` が ui、`state` が engine-idle、`standIn` が false、`presentsDelta` が 0 より大きい(負荷が効いている)、`quantaDelta` が 0 より大きい(再生している)、`underrunDelta` が 20 以下。
-受け入れが通らないときは、到達した 3 回の `underrunDelta` と残る要因を報告に書き、PM が目標と実環境の限界を見直せるようにする(この場合は「差し戻し」と書かない)。
+判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`screenDevicePx` が 3240x1863、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt10s` と `bootLast60sAt70s` が 0、`maxRefillStallMs` が 60 以下。
+
+0 にできないときは、到達した値(3 回の `bootLast60sAt10s`・`bootLast60sAt70s`・`maxRefillStallMs`)と、残る関数(上位 5 件)を報告に書く。その場合、受け入れは通らないので、PM が判定を見直す(「差し戻し」とは書かない)。
 
 ## 報告の規則
 
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 残る要因の候補と、絞り込みの計測の結果、取り除いた経路、変えたパス(app/・lift/ を含む。`app/` と `lift/` を変えると main の deploy の仕組みが動く)、変更の前後の underrun と余裕の値。
-- 耳の確認は行わない。「音が途切れない」とは書かない。
+- 報告に書く: 変更の前後の表(`bootLast60sAt10s`・`bootLast60sAt70s`・`maxRefillStallMs`・連続 underrun の最長)、特定した関数の表(上位 20 関数と、切り替え点を通らずに続いた最長の時間)、切り替え点の方式と理由、P3 の再生中の性能(再生中の engine の周あたりの時間が変わったか)、変えたパス(`app/`・`lift/`・`tools/` を含む。`app/` と `lift/` を変えると main の deploy が動く)。
+- 耳の確認は行わない。「音が途切れない」とは書かず、途切れ(underrun)の数で書く。
 
 ## 制約
 
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。オプトインを作らない(計測の切り替えも含む)。
+- 製品に新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。オプトインを作らない(計測の切り替えも含む)。
 - 製品の既定の動作を、測定のためだけに変えない。
+- 音声の先読み(`FLE_AUDIO_LEAD_MS`)は変えない(依頼者の決定の対象)。
 - ベンダー名と Cloudflare の識別子を書かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。この機械で製品のビルドや計測をしない。
 
+## 読む物
+
+- `lift/runtime/fle_thread.c`(780〜800 行: `fle_progress_slice` と、792 行のコールバックの分岐)、`lift/runtime/fle_thread.h`(80〜92 行: 切り替えの決まりと `FLE_PREEMPT_MAX_DEPTH`)、`lift/runtime/fle_dispatch.h`(35 行と 177 行: 計数)
+- `lift/runtime/fle_dsound.c`(416 行 `audio_sync`、471 行 `fle_audio_poll`)、`lift/runtime/fle_audio_transport.c`(54 行 `fle_js_publish`、108 行付近 `fle_js_wait`)、`lift/runtime/fle_audio_ring.h`(23 行 `FLE_AUDIO_LEAD_MS`)、`lift/runtime/fle_audio_ring.c`(148〜176 行)
+- `lift/harness/fruity_idle.c`(65 行 `fle_thread_idle_hook`: アイドルの待ち。JSPI で止まり、ページが次の締切まで 1 本のタイマーで待つ)
+- `lift/crates/fe-lift`・`lift/crates/fe-wasmgen`・`lift/crates/fe-build`(生成器)
+- `app/src/audio/page-audio.ts`(`detail()`・`underrunQuantaLast60s`)、`app/src/audio/fle-out.worklet.js`(途切れの数え方)、`app/src/audio/status.ts`(ヘッダーの文言)
+- `app/src/engine/idle-driver.ts`(`S-clk-maxlag`)、`app/src/engine/worker.ts`(138 行付近: 仮想の時計の警告)
+- `tools/p3-audio-probe/measure.mjs`(#{{003}} の道具。`--boot` を足す)、`tools/boot-check/boot-bundle.mjs`・`cdp.mjs`・`stage-assets.mjs`
+- `pm-work/findings/c2-split-measure.md`(#{{002}} の測定)、`pm-work/findings/survey-c2-worker-split.md`
+
 ## 他のタスクとの関係
 
 - blocked_by: #{{002}}(分離の前後の測定と、残る要因の候補)。
+- #{{109}}(実機の条件の段階的な測定)は、この Issue の後に、段 1〜3(マウス 1000 Hz・再生)を直す。段 0(無音・無操作)は、この Issue で直す。
 - #{{004}}(所定のプロジェクトの実測)と #{{027}}〜#{{029}}(外部プラグインの処理)は、この Issue の完了を待つ。音声の経路が決まってから、プラグインの処理を入れるため。
 - 描画の Worker を変えるので、同じ経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を変える #{{006}}(HiDPI)と #{{010}}(メニュー)と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
-
-## 依頼者の実機の観察(2026-11-23)
-
-- 依頼者の実機で、マウスを動かすだけで音が途切れる。ヘッダー: `動作中 44.1 kHz · 出力遅延 32 ms · 直近 60 秒の途切れ 420`。
-- 画面: `guest screen 3240x1863 device px in a room of 1836x1056 CSS px (device pixel ratio 1.7647, 6.04 Mpx)`(物理画素の画面)。
-- engine: `input: 228 sent, 225 processed, 0 pending, 3 dropped/merged · engine cycle 0.00 s (1115.6/s)`、`last input: move at screen (3238,143) (pointermove)`。マウスの 1 イベントごとに engine が 1 周している(1115.6 周/s)。
-- ポインタの測定は、最低 1000 Hz で行う(依頼者の実機は 8000 Hz のマウスを、互換性のため 1000 Hz に落として使っている)。以前の測定の頻度(50 ms の間隔)では、この現象が出なかったと推定する(推定)。
-- #{{109}} が、この条件(物理画素の画面・再生中・1000 Hz 以上のポインタ)の測定と修正を行う。
-- **起動して約 10 秒後、再生もマウス操作も無い状態で、直近 60 秒の途切れが 343**(依頼者の実機。2026-11-23)。目標は、無音・無操作の途切れ 0。仮想の時計が壁の時計より 80〜90 ms 遅れる警告(`S-clk-maxlag`)が出ている。
-- この Issue の受け入れ(UI の負荷ありで 10 秒あたり 20 以下)は、**緩すぎる**。#{{002}} の測定で、再生していない(無音の)状態でも 10 秒あたり 200〜300 の途切れが出ていたのに、それを圧迫の基準として扱ったのは PM の誤り。
-- #{{109}} が、段階的な測定(段 0 は無音・無操作)と修正を行う。この Issue で、無音・無操作の途切れの原因が分かったら、報告に書く。

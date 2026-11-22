@@ -21,6 +21,7 @@ P3 の目標は、Song Mode で音が途切れないこと。依頼者の是正(
 
 ## 背景
 
+- 段 0 の定義(PM の直し。2026-11-23): 段 0 は「起動して 10 秒後から 60 秒」ではなく、ヘッダーの `直近 60 秒の途切れ` を、engine の idle の +10 秒と +70 秒に読む(起動の最中の途切れを含む)。#{{040}} が、起動の直後の guest の長い計算に切り替え点を入れて、段 0 を直す。この Issue は、#{{040}} の後に、段 0 が 0 になっていることを確かめ、残りの段 1〜3(マウス 1000 Hz・再生)を直す。
 - 依頼者の実機の観察(2026-11-23。画面は物理画素 3240×1863、DPR 1.7647、部屋は 1836×1056 CSS px)。
   - ヘッダー: `音: 動作中 44.1 kHz · 出力遅延 32 ms · 直近 60 秒の途切れ 343`。**起動して約 10 秒後の値。再生もマウス操作も無い**(前回の貼り付けでは 420)。
   - 343 回/60 秒 ≈ 5.7 回/秒(約 175 ms に 1 回)。周期性は未確認。
@@ -52,7 +53,7 @@ P3 の目標は、Song Mode で音が途切れないこと。依頼者の是正(
 
 ## やること
 
-0. 段階的な測定(この Issue の最初の作業)。全て、画面 CSS 1836×1056・DPR 1.7647、n=3、各 60 秒。ページの読み込みの後 10 秒待ってから窓を始める。測る値は、ヘッダーの `直近 60 秒の途切れ` と同じ定義の値。窓の終わりに `window.__app.audio.detail().underrunQuantaLast60s` を読み、そのまま出す(`app/src` の定義は変えない)。
+0. 段階的な測定(この Issue の最初の作業)。全て、画面 CSS 1836×1056・DPR 1.7647、n=3。窓は engine の idle の +10 秒から +70 秒(idle は、`window.__app.state` が `engine-idle` を最初に観測した時刻)。測る値は、ヘッダーの `直近 60 秒の途切れ` と同じ定義の値(`window.__app.audio.detail().underrunQuantaLast60s`)。段 0 は、idle の +10 秒と +70 秒の両方に読む(起動の最中の途切れを含む)。段 1〜3 は、窓の終わり(+70 秒)に読む。読んだ値は、そのまま出す(`app/src` の定義は変えない)。
    - 段 0: 無音・無操作(`--play 0 --hz 0 --mouse 0`)。再生も、マウスの動きも無い。AudioContext を開くための、測定の道具の起動の手順(ブラウザの中で 1 回、押して離す)は、窓の前に行ってよい。それ以外の入力は無い。
    - 段 1: 無音・マウス 1000 Hz(`--play 0 --hz 1000 --mouse 60`)。
    - 段 2: 再生しながら・マウス無し(`--play 1 --hz 0 --mouse 0`)。再生は窓の始まりに押す。
@@ -80,8 +81,8 @@ P3 の目標は、Song Mode で音が途切れないこと。依頼者の是正(
    - 経路: 画面の広い範囲を通る円(半径 400 CSS px。部屋の中央)を、1 秒に 1〜2 周する。1 イベントあたり約 1〜5 物理画素になる速さ。ボタンは押さない(mouseMoved だけ)。
    - 頻度: `--hz` の間隔で、`--mouse` の秒数の間、連続して送る。CDP の `Input.dispatchMouseEvent` を、応答を待たずに連続して(パイプラインで)送る、またはバッチにする。送り方の選択と理由は報告に書く。`setTimeout` の間隔に頼らない(タイマーの解像度で頻度が落ちる)。
    - 届いたかの確認: ページ側で、`pointermove` の件数を 1 秒ごとに数える(`getCoalescedEvents()` の件数も記録する)。60 秒の窓の全ての 1 秒で、件数が `--hz` 以上でなければ、`inputRateOk` を false にする。届かない時は、送り方を直す(複数の接続、`Input.dispatchMouseEvent` の `timestamp`、ページ内で `PointerEvent` を合成する方法など。合成する時は、アプリの入力の処理が `isTrusted` を見ていないかを確かめる)。
-3. 出力: stdout に 1 行の JSON: `{"error","state","standIn","dpr","play","hz","mouseSec","screenDevicePx","playing","nonSilentQuanta","last60sUnderruns","underrunDelta","inputRateOk","pointerEventsPerSecMin","inputSentPerSec","inputProcessedPerSec","engineCyclePerSec","guestMouseMovePerSec","quantaDelta","engineGapFrames","engineGapFramesDelta","presentsDelta"}`。
-   - `last60sUnderruns`: 窓の終わりの `underrunQuantaLast60s`(ヘッダーの値と同じ)。
+3. 出力: stdout に 1 行の JSON: `{"error","state","standIn","dpr","play","hz","mouseSec","screenDevicePx","playing","nonSilentQuanta","last60sUnderruns","last60sUnderrunsAtIdle10s","underrunDelta","inputRateOk","pointerEventsPerSecMin","inputSentPerSec","inputProcessedPerSec","engineCyclePerSec","guestMouseMovePerSec","quantaDelta","engineGapFrames","engineGapFramesDelta","presentsDelta"}`。
+   - `last60sUnderruns`: 窓の終わり(idle の +70 秒)の `underrunQuantaLast60s`(ヘッダーの値と同じ)。`last60sUnderrunsAtIdle10s`: idle の +10 秒の同じ値(段 0 の判定に使う)。
    - `underrunDelta`: 窓の中の `underrunQuanta` の増分。
    - `play`・`hz`・`mouseSec`: 引数の値。`inputRateOk`: `--hz` が 0 なら null。
    - `screenDevicePx`: guest の画面の物理画素(例 "3240x1863")。
@@ -100,11 +101,11 @@ P3 の目標は、Song Mode で音が途切れないこと。依頼者の是正(
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-109 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 0 --mouse 0 > ".tmp-109/s0-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 1000 --mouse 60 > ".tmp-109/s1-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 0 --mouse 0 > ".tmp-109/s2-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 1000 --mouse 60 > ".tmp-109/s3-$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=(s,i)=>JSON.parse(fs.readFileSync(".tmp-109/s"+s+"-"+i+".json","utf8").trim());const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&Math.abs(r.dpr-1.7647)<0.0001;const all=(s,f)=>[1,2,3].every((i)=>f(R(s,i)));process.exit(all(0,(r)=>ok(r)&&r.play===0&&r.hz===0&&r.last60sUnderruns===0)&&all(1,(r)=>ok(r)&&r.play===0&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.last60sUnderruns===0)&&all(2,(r)=>ok(r)&&r.play===1&&r.hz===0&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)&&all(3,(r)=>ok(r)&&r.play===1&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)?0:1)' && rm -rf .tmp-109
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-109 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 0 --mouse 0 > ".tmp-109/s0-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 1000 --mouse 60 > ".tmp-109/s1-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 0 --mouse 0 > ".tmp-109/s2-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 1000 --mouse 60 > ".tmp-109/s3-$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=(s,i)=>JSON.parse(fs.readFileSync(".tmp-109/s"+s+"-"+i+".json","utf8").trim());const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&Math.abs(r.dpr-1.7647)<0.0001;const all=(s,f)=>[1,2,3].every((i)=>f(R(s,i)));process.exit(all(0,(r)=>ok(r)&&r.play===0&&r.hz===0&&r.last60sUnderrunsAtIdle10s===0&&r.last60sUnderruns===0&&r.quantaDelta>0)&&all(1,(r)=>ok(r)&&r.play===0&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.last60sUnderruns===0)&&all(2,(r)=>ok(r)&&r.play===1&&r.hz===0&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)&&all(3,(r)=>ok(r)&&r.play===1&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)?0:1)' && rm -rf .tmp-109
 ```
 
 判定の基準(DPR 1.7647、画面は物理画素の 1836×1056 CSS px の部屋。各段 n=3 の全て):
-- 段 0(無音・無操作): `last60sUnderruns` が 0。
+- 段 0(無音・無操作): `last60sUnderrunsAtIdle10s`(idle の +10 秒)と `last60sUnderruns`(+70 秒)が、どちらも 0。`quantaDelta` が 0 より大きい(音声の出力が動いていたことの確認)。
 - 段 1(無音・マウス 1000 Hz): `last60sUnderruns` が 0 で、`inputRateOk` が true。
 - 段 2(再生・マウス無し): `nonSilentQuanta` が 0 より大きく、`last60sUnderruns` が 1 以下。
 - 段 3(再生・マウス 1000 Hz): `nonSilentQuanta` が 0 より大きく、`last60sUnderruns` が 1 以下で、`inputRateOk` が true。
