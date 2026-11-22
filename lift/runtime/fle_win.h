@@ -417,6 +417,8 @@ void fle_imp_EndDeferWindowPos(void);
  * is visible and top-level is in the table. fle_win_visible_toplevel_count: how many such windows exist now. fle_win_g2_seen: 1 once one has appeared. */
 /* Decision 0126: the window table as the stop reports and the evidence blocks print it: one line per live window (handle, logical id, class, title, rectangle, styles, parent, owner, visible, z position in its group). */
 void fle_win_table_report(FILE *f);
+/* C-6 (#1310): the window-API trace. Off until the page turns it on (fle_g3_window_api_trace, harness/fruity_idle.c); then CreateWindowExW (once the window is made), ShowWindow, SetWindowPos and MoveWindow write one line each to stderr. */
+void fle_win_api_trace_set(int on);
 uint32_t fle_win_visible_toplevel_count(void);
 int fle_win_g2_seen(void);
 void fle_win_g2_report(FILE *f);
