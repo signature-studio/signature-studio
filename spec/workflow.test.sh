@@ -226,6 +226,7 @@ function route() {
   if (/^repos\/o\/r\/issues\/\d+\/sub_issues$/.test(p) && m === 'POST') return out({});
   if (/^repos\/o\/r\/issues\/\d+\/issue-field-values$/.test(p) && m === 'POST') return out(body.issue_field_values);
   if (/^repos\/o\/r\/issues\/\d+\/dependencies\/blocked_by$/.test(p) && m === 'POST') return out({});
+  if (/^repos\/o\/r\/issues\/\d+$/.test(p) && m === 'GET') { const n = Number(p.split('/').pop()); return out({ number: n, id: n * 10, node_id: `I_${n}` }); }
   if (/^repos\/o\/r\/issues\/\d+$/.test(p) && m === 'PATCH') return out({});
   if (/^repos\/o\/r\/issues\/\d+\/labels\/pm-hold$/.test(p) && m === 'DELETE') return out([]);
   return fail(`未対応: ${m} ${p}`);
@@ -343,6 +344,89 @@ ok "create: Priority が単一選択でなければ、書き込みを 1 件も�
 rm -f "$CS" "$CFX/seq"; : > "$CG"; DROP_TYPE=1 cr --apply >/dev/null 2>&1; rc=$?
 ok "create: 作成の応答に Issue Type が無い(捨てられた)なら、その場で 1 で止まり、次の Issue を作らない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(jq '.drafts | length' "$CS")" "1/1/1"
 ok "create: Type が違うと、標準エラーに Issue Type が Feature でない、と出す" "$(grep -c 'Issue Type が Feature でない' "$T/cr.err")" 1
+# (i2) 増分の起票(--existing): 既に作った下書き番号 → Issue 番号の表(pm-work/created-issues.tsv の形)で、第 2 波の参照(parent・blocked_by・#{{NNN}})を既存の Issue に解決する
+EX=$top/pm-work/created-issues.tsv; EXT=$T/w2-existing.tsv; WD=$T/w2d; WS=$T/w2state.json; EXF=$EXT
+cp "$EX" "$EXT"; mkdir -p "$WD"
+w2() { printf -- '---\n%s\n---\n\n%s\n' "$2" "$3" > "$WD/$1"; }
+w2 041-ext.md 'draft: "041"
+title: "W2 1: 既存の親と既存の blocked_by"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "018"
+blocked_by: ["015"]
+labels: []
+size: "S"
+priority: "Medium"
+project: "signature-studio/3"' '既存の 015 の型(#{{015}})を使う。親は #{{018}}。'
+w2 042-batch.md 'draft: "042"
+title: "W2 2: 同じ束の 041 の後"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "018"
+blocked_by: ["041"]
+labels: []
+size: "S"
+priority: "Medium"
+project: "signature-studio/3"' '先行は #{{041}}。'
+cr2() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=$CFX FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${WDIR:-$WD}" --milestones "$CM" --existing "$EXF" --state "$WS" 2>"$T/cr.err" ); }
+: > "$CG"; EXF=$EX cr2 > "$T/w2dry.out"; rc=$?
+ok "増分: dry-run は既存の表(実物)を読んで 0 で終わり、gh を呼ばず、状態ファイルも作らない" "$rc/$(wc -l < "$CG" | tr -d ' ')/$([ -e "$WS" ] && echo made || echo none)" "0/0/none"
+ok "増分: dry-run の計画に、既存への参照の対応(018 -> #1318・015 -> #1315)を出す" "$(grep -c '018 -> #1318' "$T/w2dry.out")/$(grep -c '015 -> #1315' "$T/w2dry.out")" "1/1"
+rm -f "$WS" "$CFX/seq"; : > "$CG"; cr2 --apply > "$T/w2apply.out"; rc=$?
+ok "増分: --apply は 0 で終わり、第 2 波の 2 件を作る" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')" "0/2"
+ok "増分: parent 018 は既存の #1318 に付く(子の id を付ける)" "$(jq -r 'select(.p|endswith("/sub_issues")) | "\(.p) \(.body.sub_issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/1318/sub_issues 40210,repos/o/r/issues/1318/sub_issues 40240"
+ok "増分: blocked_by 015 は既存の #1315 の id(13150)を、同じ束の 041 は新しい id(40210)を付ける" "$(jq -r 'select(.p|endswith("/dependencies/blocked_by")) | "\(.p) \(.body.issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/dependencies/blocked_by 13150,repos/o/r/issues/4024/dependencies/blocked_by 40210"
+ok "増分: 本文の #{{015}}・#{{018}} は既存の番号に直り、#{{041}} は新しい番号に直る" "$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4021") | .body.body' "$CG")/$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4024") | .body.body' "$CG")" "既存の 015 の型(#1315)を使う。親は #1318。/先行は #4021。"
+ok "増分: 作った 2 件を、既存の表に追記する(下書き番号・Issue 番号・Type)" "$(awk -F'\t' '$1=="041"||$1=="042"{print $1" "$2" "$4}' "$EXT" | paste -sd, -)" "041 #4021 Task,042 #4024 Task"
+ok "増分: 既存の表の行数は、元の行数に 2 を足した数" "$(( $(wc -l < "$EXT") - $(wc -l < "$EX") ))" 2
+: > "$CG"; cr2 --apply --resume >/dev/null 2>&1; rc=$?
+ok "増分: 完了の後の --resume は、作り直さず、表も増やさずに 1 で止まる(表に在る番号は重複)" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(( $(wc -l < "$EXT") - $(wc -l < "$EX") ))/$(grep -c '作成済み。重複' "$T/cr.err")" "1/0/2/2"
+EXF=$T/w2-existing2.tsv; cp "$EX" "$EXF"; rm -f "$WS" "$CFX/seq"; : > "$CG"; FAIL_ON='POST repos/o/r/issues' FAIL_NTH=2 cr2 --apply >/dev/null 2>&1; rc=$?
+ok "増分: 途中で落ちた(2 件目の作成)ときは 1 で止まり、表には 1 行も追記しない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))/$(jq '.drafts | keys | join(",")' "$WS")" '1/2/0/"041"'
+: > "$CG"; cr2 --apply --resume > /dev/null 2>&1; rc=$?
+ok "増分: --resume は作った 041 を作り直さず、残りの 042 だけを作り、表に 2 行追記する" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | paste -sd, -)/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))" "0/W2 2: 同じ束の 041 の後/2"
+UD=$T/w2u; rm -rf "$UD"; cp -r "$WD" "$UD"
+printf -- '---\n%s\n---\n\n%s\n' 'draft: "043"
+title: "W2 3: 未解決の blocked_by"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "018"
+blocked_by: ["099"]
+labels: []
+size: "S"
+priority: "Medium"
+project: "signature-studio/3"' '未解決の先行。' > "$UD/043-bad.md"
+rm -f "$WS"; : > "$CG"; WDIR=$UD cr2 --apply >/dev/null 2>&1; rc=$?
+ok "増分: 未解決の blocked_by(099)は、書く前に 1 で止まり、状態ファイルも作らない" "$rc/$(writes)/$([ -e "$WS" ] && echo made || echo none)" "1/0/none"
+ok "増分: 未解決の理由は、下書き番号 099 を挙げる" "$(grep -c '099' "$T/cr.err")" 1
+UB=$T/w2b; rm -rf "$UB"; cp -r "$WD" "$UB"
+printf -- '---\n%s\n---\n\n%s\n' 'draft: "043"
+title: "W2 3: 未解決の本文の参照"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: "018"
+blocked_by: []
+labels: []
+size: "S"
+priority: "Medium"
+project: "signature-studio/3"' '未解決の参照 #{{998}}。' > "$UB/043-bad.md"
+rm -f "$WS"; : > "$CG"; WDIR=$UB cr2 --apply >/dev/null 2>&1; rc=$?
+ok "増分: 未解決の本文の #{{998}} は、書く前に 1 で止まる" "$rc/$(writes)/$([ -e "$WS" ] && echo made || echo none)" "1/0/none"
+UP=$T/w2dup; rm -rf "$UP"; cp -r "$WD" "$UP"
+printf -- '---\n%s\n---\n\n%s\n' 'draft: "018"
+title: "W2 重複"
+type: "Task"
+milestone: "M1 テスト(P3)"
+parent: null
+blocked_by: []
+labels: []
+size: "S"
+priority: "Medium"
+project: "signature-studio/3"' '既存の 018 と重複。' > "$UP/018-dup.md"
+rm -f "$WS"; : > "$CG"; EXF=$EX WDIR=$UP cr2 --apply >/dev/null 2>&1; rc=$?
+ok "増分: 既存の表に在る下書き番号(018)と重複すると、書く前に 1 で止まる" "$rc/$(writes)/$(grep -c '重複' "$T/cr.err")" "1/0/1"
+rm -f "$WS"; : > "$CG"; EXF=$T/none.tsv cr2 --apply >/dev/null 2>&1; rc=$?
+ok "増分: --existing の表が無ければ、書く前に 1 で止まる" "$rc/$(writes)" "1/0"
 # (k) インストーラの一覧(inventory)と外部プラグイン(plugin-external)の段(pm-work/workflow-design.md の「3」「10」)。変更前の agent.yml(BASE)と比べる。
 # 新しい段は、対象の Issue のラベルで条件を付けた段だけ。既存の段とジョブの設定は、変更前と一致する
 BASE=551a4e59
@@ -384,5 +468,5 @@ fx $R/issues/50 "$(iss 50 closed "" Task)"; fx $R/issues/50/dependencies/blockin
 ok "select: 2 件の対象の labels は、重複なしのカンマ区切り。issue_labels は番号ごと(偽のイベントで)" "$(sel issues '{"action":"closed","issue":{"number":50},"sender":'"$W"'}' | jq -c '[.targets, .labels, .issue_labels]' 2>/dev/null)" '[[40,41],"inventory,plugin-external",{"40":"inventory","41":"inventory,plugin-external"}]'
 ok "select: ラベルの無い対象は、labels が空の文字列、issue_labels は空の値" "$(sel issues '{"action":"opened","issue":{"number":33},"sender":'"$W"'}' | jq -c '[.labels, .issue_labels]' 2>/dev/null)" '["",{"33":""}]'
 ok "select: 起動しない対象だけなら、labels は空(対象が空)" "$(sel issues '{"action":"opened","issue":{"number":20},"sender":'"$W"'}' | jq -c '[.targets, .labels]' 2>/dev/null)" '[[],""]'
-for n in fl-installer-files external-inputs; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
+for n in fl-installer-files external-inputs gen-wave-plugins; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

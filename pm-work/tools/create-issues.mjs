@@ -1,13 +1,14 @@
 #!/usr/bin/env node
-// pm-work/tools/create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE] : 下書き(pm-work/issue-drafts/[0-9]*.md)と pm-work/milestones.md から、GitHub に Issue・マイルストーン・ラベル・プロジェクトの設定・Issue field の値を作る。PM が依頼者の承認の後に実行する道具。
+// pm-work/tools/create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE] [--existing FILE] : 下書き(pm-work/issue-drafts/[0-9]*.md)と pm-work/milestones.md から、GitHub に Issue・マイルストーン・ラベル・プロジェクトの設定・Issue field の値を作る。PM が依頼者の承認の後に実行する道具。
+// --existing FILE: 既に作った下書きの表(pm-work/created-issues.tsv の形。下書き番号・#Issue 番号・題名・Type)。増分の起票(第 2 波)で、今回の下書きの parent・blocked_by・本文の #{{NNN}} が、この表の番号に解決される。全部作り終えたら、この表に追記する(途中で止まったときは追記しない)。表に在る下書き番号と重複すると止まる。
 // 既定は dry-run: 検査だけをして、実行する呼び出しの一覧を出す(gh を呼ばない)。--apply で実行する。
 // 順序: 検査(ローカル) → 事前の検査(--apply のみ。gh の読みだけ: プロジェクトの Size、組織の Issue field の Priority、Issue Type) → ラベル → マイルストーン → Issue を依存の順に作る(本文の #{{NNN}} はそのまま) → 本文とマイルストーンの説明の #{{NNN}} を実番号に直す → 親子・blocked by → プロジェクトに追加して Size → Issue field の Priority を Issue ごとに設定 → 全ての Issue から pm-hold を外す(最後)。
-// 状態は --state(既定: リポジトリ直下の .tmp-create-state.json)に 1 手ごとに書く。途中で止まったら --apply --resume で続ける。作った Issue は作り直さない。
+// 状態は --state に 1 手ごとに書く。既定は .tmp-create-state.json(--drafts を変えたときは .tmp-create-state-<下書きの場所の名前>.json)。途中で止まったら --apply --resume で続ける。作った Issue は作り直さない。
 // 読みと書きは gh api だけを使う(gh issue create は使わない。Issue Type と関係の API を使うため)。リポジトリは GH_REPO(無ければ GITHUB_REPOSITORY)。
 // 終了コード: 0 = 完了、1 = 検査か実行が失敗(理由を標準エラーに出す)、2 = 使い方の誤り。
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const TYPES = ['Task', 'Feature', 'Bug'];
@@ -26,12 +27,12 @@ const M_SET = 'mutation($project: ID!, $item: ID!, $field: ID!, $option: String!
 
 const argv = process.argv.slice(2);
 const usage = (msg) => {
-  process.stderr.write(`create-issues: ${msg}\nusage: create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE]\n`);
+  process.stderr.write(`create-issues: ${msg}\nusage: create-issues.mjs [--apply [--resume]] [--drafts DIR] [--milestones FILE] [--state FILE] [--existing FILE]\n`);
   process.exit(2);
 };
 for (let i = 0; i < argv.length; i++) {
   if (['--apply', '--resume'].includes(argv[i])) continue;
-  if (['--drafts', '--milestones', '--state'].includes(argv[i]) && argv[i + 1] !== undefined) { i++; continue; }
+  if (['--drafts', '--milestones', '--state', '--existing'].includes(argv[i]) && argv[i + 1] !== undefined) { i++; continue; }
   usage(`不明な引数: ${argv[i]}`);
 }
 const apply = argv.includes('--apply');
@@ -39,9 +40,13 @@ const resume = argv.includes('--resume');
 if (resume && !apply) usage('--resume は --apply と一緒に使う');
 const arg = (name) => { const i = argv.indexOf(name); return i < 0 ? null : argv[i + 1]; };
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const draftsDir = resolve(arg('--drafts') ?? join(root, 'pm-work', 'issue-drafts'));
+const defaultDrafts = resolve(root, 'pm-work', 'issue-drafts');
+const draftsDir = resolve(arg('--drafts') ?? defaultDrafts);
 const milestonesFile = resolve(arg('--milestones') ?? join(root, 'pm-work', 'milestones.md'));
-const stateFile = resolve(arg('--state') ?? join(root, '.tmp-create-state.json'));
+// 既定の状態ファイルは、第 1 波(既定の下書き)と増分の起票で別々にする。第 1 波の状態が残っていても、増分は止まらない
+const stateName = draftsDir === defaultDrafts ? '.tmp-create-state.json' : `.tmp-create-state-${basename(draftsDir)}.json`;
+const stateFile = resolve(arg('--state') ?? join(root, stateName));
+const existingFile = arg('--existing') === null ? null : resolve(arg('--existing'));
 const repo = process.env.GH_REPO || process.env.GITHUB_REPOSITORY || '';
 
 const die = (lines) => {
@@ -102,7 +107,48 @@ function readColors(dir) {
   return out;
 }
 
-function check(raw, milestones) {
+function readExisting(file) {
+  if (!existsSync(file)) die([`--existing の表が無い: ${file}`]);
+  const out = new Map();
+  for (const line of readFileSync(file, 'utf8').replace(/\r\n/g, '\n').split('\n')) {
+    if (!line.trim() || line.startsWith('下書き番号\t')) continue;
+    const [n, ref] = line.split('\t');
+    if (!/^\d{3}$/.test(n ?? '') || !/^#\d+$/.test(ref ?? '')) die([`--existing の行を読めない: ${line}`]);
+    if (out.has(n)) die([`--existing の下書き番号 ${n} が重複している`]);
+    out.set(n, { number: Number(ref.slice(1)) });
+  }
+  return out;
+}
+
+function appendExisting(file, rows) {
+  const have = readExisting(file);
+  const add = [];
+  for (const r of rows) {
+    const old = have.get(r.n);
+    if (old === undefined) add.push(r);
+    else if (old.number !== r.number) die([`--existing の下書き ${r.n} は #${old.number} だが、作った番号は #${r.number}`]);
+  }
+  if (add.length === 0) return;
+  const text = readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
+  const sep = text === '' || text.endsWith('\n') ? '' : '\n';
+  writeFileSync(file, `${text}${sep}${add.map((r) => `${r.n}\t#${r.number}\t${r.title}\t${r.type}`).join('\n')}\n`);
+}
+
+// 今回の下書きが、--existing の表の下書きを指す参照(parent・blocked_by・本文と説明の #{{NNN}})
+function externalRefs(drafts, milestones, existing) {
+  const own = new Set(drafts.map((d) => d.n));
+  const out = new Map();
+  const add = (n) => { if (!own.has(n) && existing.has(n)) out.set(n, existing.get(n).number); };
+  for (const d of drafts) {
+    if (d.parent !== null) add(d.parent);
+    for (const b of d.blocked_by) add(b);
+    for (const [, ref] of d.body.matchAll(REF)) add(ref);
+  }
+  for (const description of milestones.values()) for (const [, ref] of description.matchAll(REF)) add(ref);
+  return [...out].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+function check(raw, milestones, existing) {
   const errors = [];
   const drafts = [];
   const num = (x) => (x === null || x === undefined || x === '' ? null : String(x).trim().padStart(3, '0'));
@@ -136,17 +182,19 @@ function check(raw, milestones) {
   const seen = new Set();
   for (const d of drafts) {
     if (seen.has(d.n)) errors.push(`${d.file}: draft の番号 ${d.n} が重複`);
+    if (existing.has(d.n)) errors.push(`${d.file}: draft の番号 ${d.n} は --existing の表に在る(作成済み。重複)`);
     seen.add(d.n);
   }
+  const known = (n) => seen.has(n) || existing.has(n);
   for (const d of drafts) {
     const err = (s) => errors.push(`${d.file}: ${s}`);
-    if (d.parent !== null && (!seen.has(d.parent) || d.parent === d.n)) err(`parent ${d.parent} の下書きが無い`);
-    for (const b of d.blocked_by) if (!seen.has(b) || b === d.n) err(`blocked_by ${b} の下書きが無い(自分自身は不可)`);
+    if (d.parent !== null && (!known(d.parent) || d.parent === d.n)) err(`parent ${d.parent} の下書きが無い(今回の下書きにも --existing の表にも無い)`);
+    for (const b of d.blocked_by) if (!known(b) || b === d.n) err(`blocked_by ${b} の下書きが無い(自分自身は不可。今回の下書きにも --existing の表にも無い)`);
     if (new Set(d.blocked_by).size !== d.blocked_by.length) err('blocked_by に重複がある');
-    for (const [, ref] of d.body.matchAll(REF)) if (!seen.has(ref)) err(`本文の #{{${ref}}} に当たる下書きが無い`);
+    for (const [, ref] of d.body.matchAll(REF)) if (!known(ref)) err(`本文の #{{${ref}}} に当たる下書きが無い(今回の下書きにも --existing の表にも無い)`);
   }
   for (const [title, description] of milestones) {
-    for (const [, ref] of description.matchAll(REF)) if (!seen.has(ref)) errors.push(`マイルストーン ${title}: 説明の #{{${ref}}} に当たる下書きが無い`);
+    for (const [, ref] of description.matchAll(REF)) if (!known(ref)) errors.push(`マイルストーン ${title}: 説明の #{{${ref}}} に当たる下書きが無い(今回の下書きにも --existing の表にも無い)`);
     if (description.replace(/#\{\{\d{3}\}\}/g, '').includes('{{')) errors.push(`マイルストーン ${title}: 説明の #{{NNN}} の形以外の {{ がある`);
   }
   const projects = new Set(drafts.map((d) => d.project));
@@ -156,7 +204,7 @@ function check(raw, milestones) {
 
 function order(drafts) {
   const byN = new Map(drafts.map((d) => [d.n, d]));
-  const deps = (d) => [d.parent, ...d.blocked_by].filter((x) => x !== null);
+  const deps = (d) => [d.parent, ...d.blocked_by].filter((x) => x !== null && byN.has(x));
   const placed = new Set();
   const out = [];
   let left = [...byN.keys()].sort();
@@ -170,11 +218,12 @@ function order(drafts) {
   return { out };
 }
 
-function plan({ drafts, sorted, byN, milestones, labels, project }) {
+function plan({ drafts, sorted, byN, milestones, labels, project, ext }) {
   const L = [];
   const say = (s) => L.push(s);
   say('dry-run: 何も書かない(gh を呼ばない)。実行するには --apply(途中から続けるには --apply --resume)。');
   say(`検査: 下書き ${drafts.length} 件、マイルストーン ${milestones.size} 件。エラーは無い。`);
+  if (ext.length) say(`既存の表への参照(--existing): ${ext.map(([n, number]) => `${n} -> #${number}`).join(', ')}`);
   say(`1. 事前の検査(読みだけ): プロジェクト ${project} の Size の選択肢、組織の Issue field の Priority(${PRIORITIES.join('・')})、Issue Type(${[...new Set(drafts.map((d) => d.type))].join(', ')})`);
   say(`2. ラベルを作る(無い物だけ): ${labels.join(', ')}`);
   say(`3. マイルストーンを作る(無い物だけ): ${[...milestones.keys()].join(' | ')}`);
@@ -279,7 +328,7 @@ function precheck(project, drafts) {
   return { projectId: p.id, fields, priorityFieldId };
 }
 
-function run({ drafts, byN, sorted, milestones, colors, project }) {
+function run({ drafts, byN, sorted, milestones, colors, project, existing, existingFile }) {
   if (!repo) die(['GH_REPO が無い(例: GH_REPO=<owner>/<repo>)']);
   let st;
   if (existsSync(stateFile)) {
@@ -297,7 +346,17 @@ function run({ drafts, byN, sorted, milestones, colors, project }) {
   };
   const done = (k) => st.steps[k] === true;
   const mark = (k) => { st.steps[k] = true; save(); };
-  const fill = (text) => text.replace(REF, (_, k) => `#${st.drafts[k].number}`);
+  // 既存の表の下書きは、GET で id と node_id を取る(作る前に読まない。dry-run は gh を呼ばない)
+  const extCache = new Map();
+  const ext = (n) => {
+    if (!extCache.has(n)) {
+      const r = api('GET', `repos/${repo}/issues/${existing.get(n).number}`);
+      extCache.set(n, { number: r.number, id: r.id, node: r.node_id });
+    }
+    return extCache.get(n);
+  };
+  const rec = (n) => st.drafts[n] ?? ext(n);
+  const fill = (text) => text.replace(REF, (_, k) => `#${rec(k).number}`);
   const pre = precheck(project, drafts);
   save();
 
@@ -340,14 +399,14 @@ function run({ drafts, byN, sorted, milestones, colors, project }) {
   for (const n of sorted) {
     const d = byN.get(n);
     if (d.parent === null || done(`sub:${n}`)) continue;
-    api('POST', `repos/${repo}/issues/${st.drafts[d.parent].number}/sub_issues`, { sub_issue_id: st.drafts[n].id });
+    api('POST', `repos/${repo}/issues/${rec(d.parent).number}/sub_issues`, { sub_issue_id: rec(n).id });
     mark(`sub:${n}`);
   }
   for (const n of sorted) {
     for (const b of byN.get(n).blocked_by) {
       const k = `blk:${n}:${b}`;
       if (done(k)) continue;
-      api('POST', `repos/${repo}/issues/${st.drafts[n].number}/dependencies/blocked_by`, { issue_id: st.drafts[b].id });
+      api('POST', `repos/${repo}/issues/${rec(n).number}/dependencies/blocked_by`, { issue_id: rec(b).id });
       mark(k);
     }
   }
@@ -380,14 +439,16 @@ function run({ drafts, byN, sorted, milestones, colors, project }) {
     mark(`hold:${n}`);
   }
 
+  if (existingFile) appendExisting(existingFile, sorted.map((n) => ({ n, number: st.drafts[n].number, title: byN.get(n).title, type: byN.get(n).type })));
   for (const n of sorted) console.log(`${n} -> #${st.drafts[n].number} ${st.drafts[n].type} ${byN.get(n).title}`);
   console.log(`完了。状態ファイル: ${stateFile}`);
 }
 
 const raw = readDrafts(draftsDir);
 const milestones = readMilestones(milestonesFile);
-const colors = readColors(draftsDir);
-const { errors, drafts } = check(raw, milestones);
+const colors = readColors(existsSync(join(draftsDir, 'LABELS.md')) ? draftsDir : defaultDrafts);
+const existing = existingFile ? readExisting(existingFile) : new Map();
+const { errors, drafts } = check(raw, milestones, existing);
 if (drafts.length === 0 && errors.length === 0) errors.push(`下書きが 1 件も無い: ${draftsDir}`);
 if (errors.length) die(errors);
 const byN = new Map(drafts.map((d) => [d.n, d]));
@@ -398,10 +459,10 @@ const project = drafts[0].project;
 const labels = [...new Set(['pm-hold', 'running', 'failed', ...drafts.flatMap((d) => d.labels)])];
 
 if (!apply) {
-  console.log(plan({ drafts, sorted, byN, milestones, labels, project }));
+  console.log(plan({ drafts, sorted, byN, milestones, labels, project, ext: externalRefs(drafts, milestones, existing) }));
 } else {
   try {
-    run({ drafts, byN, sorted, milestones, colors, project });
+    run({ drafts, byN, sorted, milestones, colors, project, existing, existingFile });
   } catch (e) {
     die([e.message, ...(existsSync(stateFile) ? [`途中で止まった。続けるには --apply --resume(状態: ${stateFile})`] : [])]);
   }

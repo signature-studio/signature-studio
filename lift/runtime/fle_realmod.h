@@ -82,7 +82,7 @@ uint64_t fle_realmod_base_of(int idx) FLE_REALMOD_REF;
  * A module that is not loaded stops. Decision 0104 (provisional): used for GetModuleFileNameW of a real module (fle_vfs.c). */
 int fle_realmod_file_name(const char *api, int idx, char *out, unsigned n) FLE_REALMOD_REF;
 
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: a link that supplies no path table behaves as before): a module requested by a PATH
+/* Decision 0183 (wrp1, PROVISIONAL): a module requested by a PATH
  * ("C:\...\Plugins\Fruity\Generators\Fruity Wrapper\Fruity Wrapper_x64.dll") is the real module `name` when the link's path table has an entry whose `suffix`
  * (lower-case, backslashes, no drive) is the tail of the requested path (ASCII case and '/' folded to '\'; the character before the tail is a separator or there is none).
  * Learn (LoadLibraryW): "If the string specifies a full path, the function searches only that path for the module"; the caller (fle_load.c) therefore also requires that the
