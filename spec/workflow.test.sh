@@ -441,11 +441,11 @@ NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not))')
-ok "新しい段: extract に 6 件、work に 4 件" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=6 work=4"
+ok "新しい段: 551a4e59 より後の段は、extract に 12 件、work に 8 件(抽出物の追加の段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=12 work=8"
 ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
 ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
-ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 10
-ok "新しい段: R2 の鍵を使うのは、extract の 2 つ(一覧の作成と、外部の取得)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract"
+ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 20
+ok "新しい段: R2 の鍵を使うのは、extract の 4 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: .["if"], id: .id, uses: .uses, with: .with, env: .env, run: .run}];
@@ -454,8 +454,8 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
 ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.start == $n[0].jobs.start, $b[0].jobs.report == $n[0].jobs.report] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
-ok "保存の段: runs-on/cache/save が 2 つ(一覧と外部)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "2 true"
-ok "復元の段: work の R2 の復元は、既存の 1 つと新しい 2 つの、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true"
+ok "保存の段: runs-on/cache/save が 4 つ(一覧・外部・言語等・内蔵のプラグイン)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "4 true"
+ok "復元の段: work の R2 の復元は 5 つ(既存の 1、一覧・外部・言語等・内蔵のプラグイン)、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true,true,true"
 ok "作業ツリーへの配置は commit しない(inputs/ に置く段に git が無い)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("inputs/ に置く")) | .run] | .[0] // "" | contains("git ")' "$J")" false
 ok "node の道具は、一覧と外部の検査で呼ぶ(fl-installer-files と external-inputs/check)" "$(grep -cF 'node tools/fl-installer-files.mjs' "$A")/$(grep -cF 'node tools/external-inputs/check.mjs' "$A")" "1/2"
 ok "agent.yml: python を使わない(製品の検査の規則)" "$(grep -ciE 'python' "$A")" 0
@@ -468,5 +468,50 @@ fx $R/issues/50 "$(iss 50 closed "" Task)"; fx $R/issues/50/dependencies/blockin
 ok "select: 2 件の対象の labels は、重複なしのカンマ区切り。issue_labels は番号ごと(偽のイベントで)" "$(sel issues '{"action":"closed","issue":{"number":50},"sender":'"$W"'}' | jq -c '[.targets, .labels, .issue_labels]' 2>/dev/null)" '[[40,41],"inventory,plugin-external",{"40":"inventory","41":"inventory,plugin-external"}]'
 ok "select: ラベルの無い対象は、labels が空の文字列、issue_labels は空の値" "$(sel issues '{"action":"opened","issue":{"number":33},"sender":'"$W"'}' | jq -c '[.labels, .issue_labels]' 2>/dev/null)" '["",{"33":""}]'
 ok "select: 起動しない対象だけなら、labels は空(対象が空)" "$(sel issues '{"action":"opened","issue":{"number":20},"sender":'"$W"'}' | jq -c '[.targets, .labels]' 2>/dev/null)" '[[],""]'
-for n in fl-installer-files external-inputs gen-wave-plugins; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
+# (l) 抽出物の追加(インストーラの言語・テーマ・テンプレート・プロジェクト(resources)と、内蔵のプラグインの DLL(plugin-builtin))。変更前の agent.yml(B3)と比べる。
+# 新しい段は、対象の Issue のラベルで条件を付けた段だけ。既存の段とジョブの設定は変更前と一致する。ラベルの無い run では、判定の文字列は ',,' で、どのラベルも含まない(新しい段は skip される)
+B3=a7f153b4
+git -C "$top" show "$B3:.github/workflows/agent.yml" > "$T/base3.yml" 2>/dev/null || echo "FAIL 変更前の agent.yml を読めない($B3)"
+pj "$T/base3.yml" > "$T/base3.json" 2>>"$T/pj.err"; B3J=$T/base3.json
+NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
+  | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
+  | map(select((.name) as $x | ($old | any(. == $x)) | not))')
+ok "抽出物の追加: 新しい段は extract に 6 件、work に 4 件" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=6 work=4"
+ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
+ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
+ok "抽出物の追加: resources の段は 5 件、plugin-builtin の段は 5 件(判定に、そのラベルを含む)" "$(jq -r '[(map(.["if"] // "" | select(test(",resources,"))) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "5/5"
+ok "抽出物の追加: 新しい段に App の鍵・token を使う段が無い" "$(jq -r 'map(tostring | test("GH_APP_|GITHUB_TOKEN|github[.]token|GH_TOKEN")) | any' <<<"$NEWS3")" false
+cat > "$T/want-res.txt" <<'WANT'
+node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" 'System\Languages\' 'Artwork\' 'Data\Templates\' 'Data\Demo projects\' 'Data\System\' 'Data\Projects\'
+WANT
+cat > "$T/want-plg.txt" <<'WANT'
+node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" 'Plugins\Fruity\Effects\' 'Plugins\Fruity\Generators\'
+WANT
+cat > "$T/want-key-res.txt" <<'WANT'
+extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+WANT
+cat > "$T/want-key-plg.txt" <<'WANT'
+extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+WANT
+ok "抽出物の追加: 言語等の取り出しは、接頭辞の 6 件を、取り出しの道具で extra-resources に書く(行の完全一致)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-res.txt")" 1
+ok "抽出物の追加: 内蔵のプラグインの取り出しは、接頭辞の 2 件を、取り出しの道具で extra-plugins に書く(行の完全一致)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-plg.txt")" 1
+ok "抽出物の追加: 言語等の鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-resources-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-res.txt")"
+ok "抽出物の追加: 内蔵のプラグインの鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-plugins-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-plg.txt")"
+ok "抽出物の追加: 作業の場所は、RUNNER_TEMP の extra-resources と extra-plugins(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-plugins ${{ runner.temp }}/extra-resources'
+ok "抽出物の追加: 言語等の復元の段の id は resources、内蔵のプラグインの復元の段の id は plugins" "$(jq -r '[(.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)") | .id), (.jobs.extract.steps[] | select(.name == "内蔵のプラグインのキャッシュ(R2)") | .id)] | join(" ")' "$J")" "resources plugins"
+ok "抽出物の追加: 取り出しと保存の 4 つの段は、cache-hit が偽のときだけ動く(言語等は resources、プラグインは plugins の復元を見る)" "$(jq -r '[.jobs.extract.steps[] | select(.name | test("^インストーラの言語・テーマ・テンプレート・プロジェクト(を取り出す|をキャッシュに保存)|^内蔵のプラグインの DLL を取り出す|^内蔵のプラグインをキャッシュに保存")) | .["if"] | (contains("cache-hit != ") and contains(",resources,") or contains("cache-hit != ") and contains(",plugin-builtin,"))] | "\(length) \(all)"' "$J")" "4 true"
+ok "抽出物の追加: 作業の段は、取った物を lift/out-app/host-extra/resources と lift/out-app/host-extra/plugins に置く(mv 2 件)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(test("mv .*lift/out-app/host-extra/(resources|plugins)"))) | length' "$J")" 2
+ok "抽出物の追加: 作業の段の配置は、git を呼ばない(commit は作業者が行う。ここでは置くだけ)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(contains("git "))) | length' "$J")" 0
+ok "抽出物の追加: 作業ツリーの lift/out-app/host-extra は git の対象外(判定の git status を汚さない)" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/resources/x && git -C "$top" check-ignore -q lift/out-app/host-extra/plugins/x && echo yes)" yes
+EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
+WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
+ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
+ok "抽出物の追加: work の段の順は、lift/out-app/host の後に、言語等と内蔵のプラグインを置き、タスクの前" "$(jq -r --argjson o "$WORD" '[.jobs.work.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
+ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
+  def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: .["if"], id: .id, uses: .uses, with: .with, env: .env, run: .run}];
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $names
+  | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
+ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, $b[0].jobs.report == $n[0].jobs.report] | all')" true
+for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
