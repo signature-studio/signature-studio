@@ -43,3 +43,4 @@
 103	#1343	内蔵のプラグインの DLL を分類し、第 2 波の入力(inputs/plugin-classes.tsv)を commit する	Task
 104	#1344	Delphi 系の内蔵プラグインの hook 点を、全プラグイン分、検出する道具を作り、`inputs/plugin-hooks.tsv` を commit する	Task
 105	#1345	言語パック・テーマ・プロジェクトテンプレート・デモを、インストーラの全件、配信に入れる(言語・テーマ・テンプレートは起動前、デモは起動後)	Task
+106	#1346	トップバー(Tempo・Song Position・Pattern Selector)の右クリックに FL が反応しない原因を特定し、メニューを出す	Task
