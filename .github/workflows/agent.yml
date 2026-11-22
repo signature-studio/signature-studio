@@ -379,49 +379,6 @@ jobs:
           echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
           rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
 
-      - name: 前回の作業を取り込む
-        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
-        if: success() && steps.check.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          d="$RUNNER_TEMP/prior"; rm -rf "$d"; mkdir -p "$d"
-          gh api "repos/$GH_REPO/actions/artifacts?name=agent-$ISSUE&per_page=100" --jq '.artifacts | sort_by(.created_at) | reverse | .[] | select(.expired == false) | .workflow_run.id' > "$d/runs.txt"
-          run=""
-          for r in $(cat "$d/runs.txt"); do
-            mkdir -p "$d/$r"
-            if gh run download "$r" -n "agent-$ISSUE" -D "$d/$r" > /dev/null 2>&1 && [ -s "$d/$r/work.diff" ]; then run=$r; break; fi
-          done
-          if [ -z "$run" ]; then echo "前回の保存された作業は無い"; exit 0; fi
-          jt="$d/$run/judge.txt"
-          if [ -s "$jt" ] && grep -qx 'judge: 通った' "$jt"; then
-            rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
-            if [ "$rc" -eq 0 ]; then
-              if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
-              echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
-            else
-              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
-              if [ -n "$c" ]; then
-                echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
-              else
-                echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
-              fi
-            fi
-          else
-            # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
-            rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
-            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。判定の出力が無い)"; fi
-            if [ "$rc" -eq 0 ]; then
-              st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
-            else
-              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
-              if [ -n "$c" ]; then st="その作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消する。"; else st="その作業は取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。"; fi
-            fi
-            { echo "前回の run $run の作業は、途中で終わり、判定を通らなかった。理由(判定の出力の末尾 10 行。長い行は 200 字で切る):"; echo "$why"; echo "$st 最初からやり直さず、続きから行う。作業ツリーの状態(git status・git diff HEAD)と、Issue の本文の受け入れを照らし、残りを行い、受け入れを通して commit する。"; } > .prior-work.md
-          fi
-          echo "前回の作業の取り込み: run $run(終了コード $rc)"
-
       - name: 版の値を ci/versions.env から読む
         if: success() && steps.check.outputs.skip != 'true'
         run: |
@@ -573,6 +530,49 @@ jobs:
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-plugins" lift/out-app/host-extra/plugins
           test -f lift/out-app/host-extra/plugins/MANIFEST.tsv
+
+      - name: 前回の作業を取り込む
+        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
+        if: success() && steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          d="$RUNNER_TEMP/prior"; rm -rf "$d"; mkdir -p "$d"
+          gh api "repos/$GH_REPO/actions/artifacts?name=agent-$ISSUE&per_page=100" --jq '.artifacts | sort_by(.created_at) | reverse | .[] | select(.expired == false) | .workflow_run.id' > "$d/runs.txt"
+          run=""
+          for r in $(cat "$d/runs.txt"); do
+            mkdir -p "$d/$r"
+            if gh run download "$r" -n "agent-$ISSUE" -D "$d/$r" > /dev/null 2>&1 && [ -s "$d/$r/work.diff" ]; then run=$r; break; fi
+          done
+          if [ -z "$run" ]; then echo "前回の保存された作業は無い"; exit 0; fi
+          jt="$d/$run/judge.txt"
+          if [ -s "$jt" ] && grep -qx 'judge: 通った' "$jt"; then
+            rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
+              echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then
+                echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
+              else
+                echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
+              fi
+            fi
+          else
+            # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
+            rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
+            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。判定の出力が無い)"; fi
+            if [ "$rc" -eq 0 ]; then
+              st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then st="その作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消する。"; else st="その作業は取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。"; fi
+            fi
+            { echo "前回の run $run の作業は、途中で終わり、判定を通らなかった。理由(判定の出力の末尾 10 行。長い行は 200 字で切る):"; echo "$why"; echo "$st 最初からやり直さず、続きから行う。作業ツリーの状態(git status・git diff HEAD)と、Issue の本文の受け入れを照らし、残りを行い、受け入れを通して commit する。"; } > .prior-work.md
+          fi
+          echo "前回の作業の取り込み: run $run(終了コード $rc)"
 
       - name: タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す
         if: success() && steps.check.outputs.skip != 'true'

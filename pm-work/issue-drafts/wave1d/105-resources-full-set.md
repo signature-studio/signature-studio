@@ -37,6 +37,26 @@ project: signature-studio/3
 - 起動: P1(起動 10 秒以内)。今は約 6.4 秒(runner の値。この機械とは別枠)。起動前の取得の合計は 272,181,853 B(復号後。#{{015}} の判定の値)。
 - 起動の記録の限界: `tools/missing-paths/measure.mjs` は、guest が要求して無かったものだけを出す。列挙(`FindFirstFile`)で見えないものは出ない。列挙の件数を出す仕組みが要る(やること 5)。
 
+## 前回の試行で分かったこと
+
+前回の作業者の試行(run 45059606254)は、判定の (2) で落ちた。作業は push されず、差分(`work.diff`)として保存された。次の作業は、その差分を作業ツリーに載せ、`.prior-work.md` を付けた状態から始まる(判定を通らなかった作業を、続きから行う)。以下は、その報告の数字と結論(runner の値。この機械とは別枠。nproc 4、loadavg 0.2〜2.6)。
+
+- 判定の結果: (1)(3) は受理。(2) は差し戻し(missing が 0 件でなく、elapsedMs が 10,000 を超えた)。
+- 変えた物: `lift/harness/seeds/vfs-seed-idle1.tsv`(新規 251 行。ファイル 158・ディレクトリ 42・demo 45・ディレクトリ 6)、`lift/harness/vfs_seed.h`(`@lazy-file:` の行は、起動時に読まず、大きさだけを VFS に置く)、`lift/harness/vfs_lazy.h`(遅延の上限 32 → 128)、`lift/runtime/fle_vfs.c`・`fle_vfs.h`(列挙の `enum-dir:` 行。投入中の調べは `missing-path` に数えない)、`lift/harness/web/pack.args`(demo 46 件の `--lazy-file`)、`app/scripts/pack-seed.mjs`・`extract-fl.mjs`(印を読む)、`tools/delivery-split/measure.mjs`(待ちの時刻を出す)。`seed.args` と `fe-build` は元のまま。
+- 足した物(MANIFEST の値。接頭辞は本文と同じ物):
+  - 起動の前: `System\Languages\` 14 件 6,285,250 B(既存の 1 件を除く)、`Artwork\` 75 件 20,261,618 B(既存の 5 件を除く)、`Data\Templates\` 69 件 30,844,125 B(既存の 1 件を除く)、ディレクトリの行 42 件。
+  - 起動の後: `Data\Demo projects\` 45 件 48,766,556 B(既存の NewStuff を含めて 46 件 49,079,912 B)。
+- 起動前の合計(復号後): 257,164,662 → 314,318,672 B(+57,154,010)。br: 39,387,195 → 64,307,246 B。seed パック: 9,549,689 → 66,701,852 B。
+- 起動の待ち: 起動時に読む版(`--lazy`)で 165 件を入れた計測では、起動が 12,016〜12,274 ms で、初回の待ちが 2.9〜3.9 s。起動を待たせた。表の印 `@lazy-file:` の版では、demo の待ちは 0。残る待ちは Fruity Delay 2 の DLL の要求(3 回中 2 回、50・72 ms)。
+- elapsedMs: **変更の前から 10 秒を超えていた**。変更前(delivery-split・3 回): 11,208.8・11,216.8・10,232.7 ms。変更後: 11,585.2・11,564.6・11,471.1 ms(delivery-split)、12,308・12,261・12,275 ms(missing-paths)。
+- missing: 変更後 1,563 件(3 回とも同じ件数)。内訳: インストール先の下 1,015 件(うち 321 件は、新しく見えるようになったフォルダに対する `<フォルダ名>.nfo` の要求で、一覧に無い)、ユーザーのフォルダ 211 件、Windows のフォント 127 件、名前だけの要求 145 件など。**一覧に在る物は 0 件**(判定 (2) の式で 0)。missing を 0 件にできないのは、要求の大半がインストーラに無い物(実行時に作られる物・無い設定のファイル)だから。前回の判定の式(missing が 0 件)は、この点で誤っていた。
+- 列挙: `Data\Templates\*` 7 件、`Data\Demo projects\*` 5 件で、一覧の直下の件数と一致。`System\Languages\*` と `Artwork\Themes\*` は、この起動では列挙されなかった(未確認)。
+- 足さなかった: `Data\System\`(1,952 件・77.8 MiB)は、起動の記録で要求が 1 件(一覧に無い)。`System\`(Languages を除く 849 件)は、要求が 15 件。うち 4 件は `System\Config\Thumbnails\edition-*.png`(一覧に大きさが無く、SHA-256 を取れない)、残りは一覧に無い。3 回の記録だけで判断した(UI の操作での要求は未確認)。
+- 残りの課題:
+  - P1(10 秒以内)が未達。下の 7 と 8 を行う。
+  - PM の判断: 起動前に取る物(言語・テーマ・テンプレート)は、方針どおり起動前に入れる。10 秒に収めるのは、取り込みの費用を下げることで行う。
+  - 未確認: UI の操作で demo が要求されるか。`System\Languages\`・`Artwork\Themes\` の列挙。
+
 ## 読む物
 
 - `inputs/fl-installer-files.tsv`(一覧)、`lift/harness/seeds/vfs-seed-idle1.tsv`(seed 表)
@@ -55,19 +75,26 @@ project: signature-studio/3
    - 1 行ごとに、guest(表の既存の行と同じ接頭辞を使い、その接頭辞を本文と報告に書かない)、host(`resources/<相対パス>`)、SHA-256(MANIFEST の値)。
    - 同じ guest(大文字・小文字を区別しない)の行が既に在るものは足さない。既存の行は消さない・変えない。
    - 対象の全てのディレクトリの行も足す(`<guest>\` と `-` と `-`。例: `Artwork\Themes\DEDZII\`)。
-3. 起動の後に取る物: `Data\Demo projects\*`(46 件。既存の 1 件を含む)を、#{{015}} の `--lazy` の仕組みで、起動の後に取る。`seed.args` の `--lazy` と、`pack.args` の `--lazy-file`(1 件 1 行。件数が多ければ 1 つの pack にまとめてよい)。
+3. 起動の後に取る物: `Data\Demo projects\*`(46 件。既存の 1 件を含む)を、#{{015}} の `--lazy` の仕組みで、起動の後に取る。`seed.args` の `--lazy` と、`pack.args` の `--lazy-file`(1 件 1 行。件数が多ければ 1 つの pack にまとめてよい)。前回の試行は、`--lazy` の行が起動を待たせたため、表の印 `@lazy-file:` で入れた(前節を見る)。
    - 起動の時の読み(`vs_run`)が、この行で起動を待たせないことを、`tools/delivery-split/measure.mjs` の `fetches`(`startMs`・`endMs`)と `elapsedMs` で確かめる。待たせるなら、起動時の読みを遅らせるか、0314 の `@lazy:` の索引にするかを選び、理由を報告に書く。#{{101}} と同じ読みの経路を使うので、衝突したら pull して直す。
 4. `Data\System\`(1952 件。77.8 MiB)と `System\`(Languages を除く 849 件)は、範囲を作業者が決める。決め方: 起動の記録(列挙の件数のログと missing)と、FL の起動・UI に要る物の実測で判断する。起動に要るものは seed 表に足す(`System\` の残りは抽出の接頭辞の外なので、やること 1 の注意の通り、接頭辞とキャッシュの鍵を直す)。要らないものは足さない。どちらにしたかを、件数と大きさで報告に書く。
 5. 列挙の確認: 起動後に guest が `System\Languages\` と `Artwork\Themes\` を列挙したとき、直下の全件が見えること。engine のログに、列挙したディレクトリと件数を 1 行で常に出す(環境変数・`#ifdef` は作らない。`missing-path:` の行とは別の行の形にする)。報告に、列挙の件数と、一覧から数えた直下の件数を並べる。
-6. 変更の後の起動前の合計(復号後と br)と、elapsedMs の 3 回の値を報告に書く。elapsedMs が 10000 を超えたら、どれを起動後に回せるかを報告し、回す。
+6. 変更の後の起動前の合計(復号後と br)と、elapsedMs の 3 回の値を報告に書く。elapsedMs が 10000 を超えたら、7 を行い、それでも超えるなら 8 を行う。
+7. 起動時の取り込みの費用を下げる(デモ以外を起動後に回す前に行う)。起動時に、seed の表の全行を読んで、各ファイルの SHA-256 を検査し、VFS にコピーする所(`lift/harness/vfs_seed.h` の `vs_run`・`vs_read_host`)を、次のように変える。
+   - (1) ファイルの本体は、初回の読みまで遅らせる。起動の時には、ディレクトリ・ファイルの名前と大きさだけを作る。本体は、seed パックの領域を参照して、guest が読んだ時に写す。
+   - (2) SHA-256 の検査は、パックの作成時(ビルド)と、初回の読みの時に行う。起動の時に全件を検査しない。
+   - (3) 列挙(`FindFirstFile`)は、名前の表だけで答える。
+   - 検査を弱めない。読んだ物は、必ず検査する。製品に新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。
+   - 変えた後で、起動前の合計と elapsedMs の 3 回の値を、報告に書く。
+8. それでも 10000 を超えるときだけ、起動後に回す。優先順位(P3 > P2 > P1 > サイズ)に従い、次の順に回す: デモ(既に起動後)、`Artwork\Wallpapers\`、`Artwork\Fonts\`・`Artwork\Skins\`(#{{016}} の `missing-paths` で、起動の最中に要求されない物だけ)。テーマ・言語・テンプレートは、起動前のまま。回した物と、回した理由を報告に書く。
 
 ## 受け入れ
 
 ```accept
-mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/missing-paths/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/missing.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));process.exit(L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&r.missing.length===0&&r.elapsedMs<=10000)?0:1)' "$RUNNER_TEMP/missing.jsonl" && node -e 'const fs=require("fs");const rows=(f)=>fs.readFileSync(f,"utf8").replace(/\r/g,"").split("\n").filter((l)=>l&&!l.startsWith("#")).map((l)=>l.split("\t"));const inv=rows("inputs/fl-installer-files.tsv").slice(1).filter((r)=>/^(System\\Languages\\|Artwork\\|Data\\Templates\\)/i.test(r[0]));const seed=rows("lift/harness/seeds/vfs-seed-idle1.tsv");const man=new Map(rows("lift/out-app/host-extra/resources/MANIFEST.tsv").slice(1).map((r)=>[r[0].toLowerCase(),r[2].toLowerCase()]));const root=seed.find((r)=>r[0].endsWith("\\Data\\Templates\\")&&r[1]==="-")[0].slice(0,-"\\Data\\Templates\\".length).toLowerCase();const byGuest=new Map(seed.filter((r)=>r[1]!=="-").map((r)=>[r[0].toLowerCase(),r]));let miss=0,bad=0;for(const r of inv){const k=r[0].toLowerCase();const s=byGuest.get(root+"\\"+k);const sha=man.get(k);if(!s||!sha)miss++;else if(s[2].toLowerCase()!==sha)bad++;}process.exit(inv.length===165&&miss===0&&bad===0?0:1)'
+mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/missing-paths/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/missing.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const inv=new Set(fs.readFileSync("inputs/fl-installer-files.tsv","utf8").replace(/\r/g,"").split("\n").filter((l)=>l&&!l.startsWith("#")).slice(1).map((l)=>l.split("\t")[0].toLowerCase()));const dec=(p)=>p.replace(/\\u([0-9A-F]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16)));const left=L.flatMap((r)=>r.missing).map(dec).filter((p)=>{const m=/^[^\\]+\\[^\\]+\\[^\\]+\\FL Studio [0-9]+\\/i.exec(p);if(!m)return false;const rel=p.slice(m[0].length);return /^(System\\Languages\\|Artwork\\|Data\\Templates\\|Data\\Demo projects\\)/i.test(rel)&&inv.has(rel.toLowerCase())});process.exit(L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&r.elapsedMs<=10000)&&left.length===0?0:1)' "$RUNNER_TEMP/missing.jsonl" && node -e 'const fs=require("fs");const rows=(f)=>fs.readFileSync(f,"utf8").replace(/\r/g,"").split("\n").filter((l)=>l&&!l.startsWith("#")).map((l)=>l.split("\t"));const inv=rows("inputs/fl-installer-files.tsv").slice(1).filter((r)=>/^(System\\Languages\\|Artwork\\|Data\\Templates\\)/i.test(r[0]));const seed=rows("lift/harness/seeds/vfs-seed-idle1.tsv");const man=new Map(rows("lift/out-app/host-extra/resources/MANIFEST.tsv").slice(1).map((r)=>[r[0].toLowerCase(),r[2].toLowerCase()]));const root=seed.find((r)=>r[0].endsWith("\\Data\\Templates\\")&&r[1]==="-")[0].slice(0,-"\\Data\\Templates\\".length).toLowerCase();const byGuest=new Map(seed.filter((r)=>r[1]!=="-").map((r)=>[r[0].toLowerCase(),r]));let miss=0,bad=0;for(const r of inv){const k=r[0].toLowerCase();const s=byGuest.get(root+"\\"+k);const sha=man.get(k);if(!s||!sha)miss++;else if(s[2].toLowerCase()!==sha)bad++;}process.exit(inv.length===165&&miss===0&&bad===0?0:1)'
 ```
 
-判定の基準: (1) 起動 1 回(boot-bundle)で、engine-idle・standIn が false・error が null。(2) 3 回の起動(missing-paths)で、engine-idle・standIn が false・error が null・missing が 0 件・elapsedMs が 10000 以下。(3) 一覧の `System\Languages\`・`Artwork\`・`Data\Templates\` の 165 件(15 + 80 + 70)の全てが、seed 表に同じ guest パスで在り、SHA-256 が MANIFEST と一致する(欠け 0・不一致 0)。
+判定の基準: (1) 起動 1 回(boot-bundle)で、engine-idle・standIn が false・error が null。(2) 3 回の起動(missing-paths)で、engine-idle・standIn が false・error が null・elapsedMs が 10000 以下(3 回の全て)。そのうえで、3 回の `missing` の各行(パス)を次の式で数え、0 件であること。(i) 行は絶対パスで、非 ASCII は `\uXXXX` と書かれているので、戻してから比べる。インストール先のフォルダより下の物だけを取り、相対パスにする。(ii) その相対パスが、接頭辞 `System\Languages\`・`Artwork\`・`Data\Templates\`・`Data\Demo projects\` のどれかで始まる(大文字小文字を区別しない)。(iii) `inputs/fl-installer-files.tsv` に、同じパス(大文字小文字を区別しない)の行が在る。範囲の外・一覧に無い物(実行時に作られる物・無い設定のファイル・既定のフォルダ)は数えない。(3) 一覧の `System\Languages\`・`Artwork\`・`Data\Templates\` の 165 件(15 + 80 + 70)の全てが、seed 表に同じ guest パスで在り、SHA-256 が MANIFEST と一致する(欠け 0・不一致 0)。
 
 ## 報告の規則
 
