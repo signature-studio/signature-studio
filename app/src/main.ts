@@ -39,7 +39,9 @@ import { EngineFiles } from './files/engine-dialog.ts';
 import { filesUsage } from './files/usage.ts';
 import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
-import type { AssetRef } from './bundle/manifest.ts';
+import type { AssetRef, LazyRef } from './bundle/manifest.ts';
+import { downloadLazy, type LazyResult } from './bundle/lazy.ts';
+import { LazyFileFeed, makeLazyFileShared, type LazyFileShared } from './engine/lazy-file.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const manifestUrl = '/assets/manifest.json';
@@ -63,6 +65,8 @@ interface AppApi {
   features: FeatureReport | null;
   /** decision 0220: where the start-up assets came from and where the time went, as the beacon carries it; null before the downloads began */
   assetsReport(): AssetsReport | null;
+  /** Issue #1314: the lazy files (manifest.lazy) as their downloads ended, in the order they ended: verified or failed (empty until the first one ends) */
+  lazy: LazyResult[];
   /** what the engine's printed lines say (stop message, windows, threads, surface reports); filled when the engine has exited */
   summary: EngineLogSummary | null;
   engineLog(): string[];
@@ -160,7 +164,7 @@ let endRequested = false;
 
 const app: AppApi = {
   assetsReport: () => assetsNow(),
-  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
@@ -654,7 +658,8 @@ function applyHzParam(manifest: Manifest, measured: HzMeasurement | null): void 
 
 
 // decision 0220: after the downloads: the browser's storage state, and the removal of the stored copies of older versions (the ones the manifest no longer names and no other page holds)
-async function finishAssets(store: AssetStore | null, recorder: AssetsRecorder, keep: AssetRef[]): Promise<void> {
+// `keep` names every asset of the bundle that is still wanted: the clean-up runs only when all of them are stored (so the lazy files, which come later, are not removed by the start-up's clean-up)
+async function finishAssets(store: AssetStore | null, recorder: AssetsRecorder, keep: AssetRef[], lines = true): Promise<void> {
   if (!store) return;
   try {
     recorder.setStorage(await store.estimate());
@@ -662,8 +667,24 @@ async function finishAssets(store: AssetStore | null, recorder: AssetsRecorder, 
     if (keep.every((r) => recorder.stored(r))) recorder.setClean(await store.clean(keep));
     recorder.setStorage(await store.estimate());
   } catch (e) { addLog('warn', `stored copies: ${String((e as Error)?.message ?? e).slice(0, 200)}`); }
+  if (!lines) return;
   const r = recorder.report(resourceLookup);
   for (const line of assetLines(r)) addLog('info', `asset: ${line}`);
+}
+
+// Issue #1314 (PROVISIONAL): the lazy files (manifest.lazy) are downloaded from the start of the engine on, in the manifest's order; the engine reads them through its host files (engine/lazy-file.ts).
+// They are not needed for the start-up, so nothing waits for them: the engine's idle does not wait, and a read that comes before its bytes waits in the engine's own thread.
+function startLazy(refs: readonly LazyRef[], shared: readonly LazyFileShared[], store: AssetStore | null, recorder: AssetsRecorder, keep: AssetRef[]): void {
+  if (refs.length === 0) return;
+  stamp('lazy_start');
+  const items = refs.map((ref, i) => ({ ref, feed: new LazyFileFeed(shared[i] as LazyFileShared) }));
+  void downloadLazy(items, { store, onTrace: recorder.trace }, (r) => {
+    app.lazy.push(r);
+    addLog(r.ok ? 'info' : 'error', r.ok ? `lazy file ${r.name} is here (after the engine started)` : `lazy file ${r.name} failed: ${r.message}`);
+  }).then(async () => {
+    stamp('lazy_done');
+    await finishAssets(store, recorder, keep, false);
+  });
 }
 
 async function boot(): Promise<void> {
@@ -708,7 +729,12 @@ async function boot(): Promise<void> {
     const base = location.href;
     assetsRecorder = recorder;
     const refs: [string, AssetRef][] = [['engine wasm', manifest.engine.wasm], ['seed pack', manifest.seedPack], ['DLL pack', manifest.dllPack], ['engine glue', fopts.glue]];
+    // Issue #1314: the lazy files are not part of the start-up downloads above; their shared buffers exist before the Worker does (the engine reads them through its host files)
+    const lazyRefs = manifest.lazy ?? [];
+    const lazyShared = lazyRefs.map((r) => makeLazyFileShared(r.name, r.path, r.size));
     for (const [label, r] of refs) recorder.expect(label, r, base);
+    for (const r of lazyRefs) recorder.expect(r.name, r, base);
+    const keep: AssetRef[] = [...refs.map(([, r]) => r), ...lazyRefs];
     const opts = { onProgress, store, onTrace: recorder.trace };
     const [module, seed, dll, glue]: [WebAssembly.Module, LoadedPack, LoadedPack, Uint8Array] = await Promise.all([
       loadWasm(manifest.engine.wasm, 'engine wasm', opts).then((m) => { stamp('compile_done'); return m; }),
@@ -717,11 +743,11 @@ async function boot(): Promise<void> {
       fetchAsset(fopts.glue, 'engine glue', opts),
     ]);
     stamp('download_done');
-    void finishAssets(store, recorder, refs.map(([, r]) => r));
+    void finishAssets(store, recorder, keep);
     applyHzParam(manifest, await hzMeasuring);
     applyScreenParam(manifest);
     setState('loaded', 'starting engine');
-    await client.init(manifest, { module, seed: seed.bytes, glue, dll: dll.bytes });
+    await client.init(manifest, { module, seed: seed.bytes, glue, dll: dll.bytes, lazy: lazyShared });
     stamp('worker_ready');
     setState('running', 'engine starting');
     stamp('engine_start');
@@ -730,6 +756,7 @@ async function boot(): Promise<void> {
     $('stop-btn').hidden = false;
     $('stop-btn').textContent = 'Stop engine';
     client.start();
+    startLazy(lazyRefs, lazyShared, store, recorder, keep);
   } catch (e) {
     if (e instanceof LoadError) {
       const d = e.describe();
