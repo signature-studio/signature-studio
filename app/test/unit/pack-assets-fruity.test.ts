@@ -152,3 +152,38 @@ describe('pack-assets.mjs: a lazy DLL (Issue #1314)', () => {
     expect(bad.stderr).toContain('missing.dll');
   });
 });
+
+describe('pack-assets.mjs: a lazy file that is in no pack (Issue #1315)', () => {
+  const host = path.join(tmp, 'host-lazy');
+  fs.mkdirSync(path.join(host, 'lift', 'idle'), { recursive: true });
+  const seedCopy = Buffer.from('MZ-seed-copy');
+  fs.writeFileSync(path.join(host, 'lift', 'idle', 'Fruity_Balance_x64.dll'), seedCopy);
+  const src = path.join(host, 'lift', 'idle', 'Fruity_Balance_x64.dll');
+  const dll2 = path.join(tmp, 'dll-lazy-file');
+  fs.mkdirSync(dll2);
+  fs.writeFileSync(path.join(dll2, 'FLEngine_x64.dll'), Buffer.from('MZ-engine'));
+  fs.writeFileSync(path.join(dll2, 'fruity_balance_x64.dll'), Buffer.from('MZ-balance'));
+  const lr = run(['--dll-dir', dll2, '--lazy-dll', 'fruity_balance_x64.dll', '--lazy-file', `${src}=seed/lift/idle/Fruity_Balance_x64.dll`, '--glue', path.join(tmp, 'glue.js'),
+    '--args', '/data/FLEngine_x64.dll /data/fruity_balance_x64.dll'], 'out-lazy-file');
+  const lm = JSON.parse(fs.readFileSync(path.join(tmp, 'out-lazy-file', 'raw', 'fl-x', 'manifest.json'), 'utf8'));
+
+  it('names it after the DLL lazy files, by the file name of its path under the root, with its SHA-256 and size', () => {
+    expect(lr.status, lr.stderr).toBe(0);
+    expect(validateManifest(lm).ok).toBe(true);
+    expect(lm.lazy.map((l: { name: string; path: string }) => [l.name, l.path])).toEqual([
+      ['fruity_balance_x64.dll', 'fruity_balance_x64.dll'],
+      ['Fruity_Balance_x64.dll', 'seed/lift/idle/Fruity_Balance_x64.dll'],
+    ]);
+    expect(lm.lazy[1]).toMatchObject({ size: seedCopy.length, sha256: sha(seedCopy), compression: 'br' });
+    expect(lm.lazy[1].url).toMatch(/^\/assets\/fl-x\/Fruity_Balance_x64\.[0-9a-f]{12}\.dll$/);
+  });
+
+  it('refuses a --lazy-file without SRC=PATH, and one whose source is missing', () => {
+    const noEq = run(['--dll-dir', dll2, '--lazy-file', src, '--glue', path.join(tmp, 'glue.js'), '--args', '/data/FLEngine_x64.dll'], 'out-lazy-file-noeq');
+    expect(noEq.status).not.toBe(0);
+    expect(noEq.stderr).toContain('--lazy-file SRC=PATH');
+    const gone = run(['--dll-dir', dll2, '--lazy-file', `${src}.gone=seed/x.dll`, '--glue', path.join(tmp, 'glue.js'), '--args', '/data/FLEngine_x64.dll'], 'out-lazy-file-gone');
+    expect(gone.status).not.toBe(0);
+    expect(gone.stderr).toContain('no such file');
+  });
+});
