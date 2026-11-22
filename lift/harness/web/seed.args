@@ -12,3 +12,7 @@ lift/out-app/host
 lift/out-app/seed/seed.bin
 --lazy
 lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll
+--lazy
+lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll
+--lazy
+lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Delay_2_x64.dll
