@@ -7,7 +7,7 @@ export class DesktopView {
   readonly root: HTMLElement;
   private scale = 1;
   private snap = 1;
-  /** decision 0212: the size of the guest's screen (1920 x 1080 until the page or the engine says another) */
+  /** decision 0212: the size of the guest's screen in device pixels (1920 x 1080 until the page or the engine says another); the canvas has these pixels and is shown at `scale` CSS px per pixel (C-1) */
   private screen: { width: number; height: number } = { width: SCREEN.width, height: SCREEN.height };
   private desk: HTMLCanvasElement | null = null;
   private onLayout: (() => void) | null = null;

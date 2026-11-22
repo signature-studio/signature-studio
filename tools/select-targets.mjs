@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // tools/select-targets.mjs select | claim TARGETS RETRY : 作業フロー(.github/workflows/agent.yml)が、起動する Issue を決める。設計は pm-work/workflow-design.md の「5」。
-// select: GITHUB_EVENT_NAME と GITHUB_EVENT_PATH のイベントから候補を集め、起動してよい物だけを選ぶ。イベントを起こした人(sender)に書き込み権限が無ければ候補を集めない。出力: {"targets":[番号],"retry":真偽}
+// select: GITHUB_EVENT_NAME と GITHUB_EVENT_PATH のイベントから候補を集め、起動してよい物だけを選ぶ。イベントを起こした人(sender)に書き込み権限が無ければ候補を集めない。出力: {"targets":[番号],"retry":真偽,"labels":"対象のラベルの重複なしのカンマ区切り","issue_labels":{"番号":"その Issue のラベルのカンマ区切り"}}
 // claim TARGETS RETRY: 候補(JSON の配列)を、もう一度確かめ、起動してよい物に running を付ける。RETRY が true なら failed を外す。出力: {"claimed":[番号]}
 // 読みは gh api、書きは gh issue edit だけ。リポジトリは GH_REPO(無ければ GITHUB_REPOSITORY)。認証は gh の既定に従う。
 // 起動しない理由は標準エラーに 1 件ずつ出す。標準出力は JSON の 1 行だけ。
@@ -66,13 +66,20 @@ function select() {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
   const { numbers, retry } = candidates(process.env.GITHUB_EVENT_NAME, event);
   const targets = [];
+  const labels = new Set();
+  const issueLabels = {};
   for (const n of [...new Set(numbers)].sort((a, b) => a - b)) {
     const s = state(n);
     const why = reason(s.issue, s, retry);
     if (why) log(`#${n} は起動しない: ${why}`);
-    else targets.push(n);
+    else {
+      targets.push(n);
+      const mine = [...names(s.issue)].sort();
+      mine.forEach((l) => labels.add(l));
+      issueLabels[n] = mine.join(',');
+    }
   }
-  return { targets, retry };
+  return { targets, retry, labels: [...labels].sort().join(','), issue_labels: issueLabels };
 }
 
 function claim(targets, retry) {

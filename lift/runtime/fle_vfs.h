@@ -96,6 +96,10 @@ int fle_vfs_file_set_end(const char *api, uint64_t h);
 /* Decision 0183 (wrp1, PROVISIONAL), for fle_load.c: 1 when the UTF-16 path at the guest address names a FILE of the virtual volume (a directory, a missing file or a missing directory: 0). The same path rules as GetFileAttributesW. */
 int fle_vfs_guest_is_file(const char *api, uint64_t guest);
 
+/* C-3 (#1316): a guest file request (or a module load) that failed because the file, the directory or the module is not there (2, 3, 126) writes one line to the engine's stderr: missing-path: <api> <code> "<path>".
+ * w is the path as the guest passed it (n UTF-16 units; n = 0 for the empty name). fle_vfs.c and fle_load.c call it; fle_load.c calls it through a weak reference (a link without the volume writes nothing). */
+void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n);
+
 /* wintrust!WinVerifyTrust and the crypt32 calls behind the engine's signer-name check (decision 0117, PROVISIONAL; the notes are in fle_vfs.c).
  * The runtime vouches for a file only through a table of CLAIMS that the harness fills before the guest runs (harness/authenticode_claims.h, from
  * harness/seeds/authenticode-claims.tsv, written by tools/authenticode_check.py); a build whose harness registers nothing has an empty table and every

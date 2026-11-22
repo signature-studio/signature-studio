@@ -14,6 +14,7 @@ import { type AppView, readAppView } from './appview.ts';
 import type { DeskApi } from './desk.ts';
 import { HostFiles, type HostFileStats, type HostPack, installHostFiles, SUPPORTED_EMSCRIPTEN, unsupportedImports } from './hostfiles.ts';
 import type { EngineInput } from './idle-driver.ts';
+import type { LazyFileSource } from './lazy-file.ts';
 
 /** the engine-side Module object (what the glue is given); the glue adds FS, ENV and the idle functions to it */
 /** decision 0234: TextDecoder, ImageData and Blob refuse a view of a SharedArrayBuffer (Chrome 156, Firefox 158); a view of a shared memory is copied first (nothing happens for an ordinary memory) */
@@ -73,6 +74,8 @@ export interface FruityAssets {
   glue: Uint8Array;
   seed: HostPack;
   dll: HostPack;
+  /** Issue #1314: the lazy files of the manifest (their bytes may still be on their way; lazy-file.ts). Each is a host file under the root for the whole run. */
+  lazy?: LazyFileSource[];
 }
 
 /** Imports the glue from a Blob URL made of exactly the bytes whose SHA-256 the manifest named (the CSP allows blob: for scripts for this). */
@@ -124,8 +127,10 @@ export class FruityEngine {
         const t0 = performance.now();
         const dll = hostFiles.mountPack(root, assets.dll);
         const seed = hostFiles.mountPack(root, assets.seed);
+        // Issue #1314: a lazy file is persistent (hostfiles.ts addPersistent), so the release at the first idle does not take it away
+        for (const f of assets.lazy ?? []) hostFiles.addPersistent(`${root}/${f.path}`, f);
         for (const [k, v] of Object.entries(manifest.engine.env)) opts.ENV[k] = v;
-        host.mark('files_ready', { how: 'packs-v1', dllFiles: dll.files, dllBytes: dll.bytes, seedFiles: seed.files, seedBytes: seed.bytes, ms: +(performance.now() - t0).toFixed(1) });
+        host.mark('files_ready', { how: 'packs-v1', dllFiles: dll.files, dllBytes: dll.bytes, seedFiles: seed.files, seedBytes: seed.bytes, lazyFiles: assets.lazy?.length ?? 0, ms: +(performance.now() - t0).toFixed(1) });
       }],
       instantiateWasm: (imports, done) => {
         void (async () => {
