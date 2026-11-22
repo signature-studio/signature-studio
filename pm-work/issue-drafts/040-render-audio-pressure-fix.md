@@ -88,3 +88,11 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - blocked_by: #{{002}}(分離の前後の測定と、残る要因の候補)。
 - #{{004}}(所定のプロジェクトの実測)と #{{027}}〜#{{029}}(外部プラグインの処理)は、この Issue の完了を待つ。音声の経路が決まってから、プラグインの処理を入れるため。
 - 描画の Worker を変えるので、同じ経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を変える #{{006}}(HiDPI)と #{{010}}(メニュー)と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+
+## 依頼者の実機の観察(2026-11-23)
+
+- 依頼者の実機で、マウスを動かすだけで音が途切れる。ヘッダー: `動作中 44.1 kHz · 出力遅延 32 ms · 直近 60 秒の途切れ 420`。
+- 画面: `guest screen 3240x1863 device px in a room of 1836x1056 CSS px (device pixel ratio 1.7647, 6.04 Mpx)`(物理画素の画面)。
+- engine: `input: 228 sent, 225 processed, 0 pending, 3 dropped/merged · engine cycle 0.00 s (1115.6/s)`、`last input: move at screen (3238,143) (pointermove)`。マウスの 1 イベントごとに engine が 1 周している(1115.6 周/s)。
+- ポインタの測定は、最低 1000 Hz で行う(依頼者の実機は 8000 Hz のマウスを、互換性のため 1000 Hz に落として使っている)。以前の測定の頻度(50 ms の間隔)では、この現象が出なかったと推定する(推定)。
+- #{{109}} が、この条件(物理画素の画面・再生中・1000 Hz 以上のポインタ)の測定と修正を行う。

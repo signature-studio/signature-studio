@@ -440,7 +440,7 @@ ok "work: needs は select・start・extract(issue_labels を読む)" "$(jq -c '
 NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
-  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨") | not))')
+  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
 ok "新しい段: 551a4e59 より後の段は、extract に 12 件、work に 8 件(抽出物の追加の段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=12 work=8"
 ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
 ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
@@ -450,9 +450,9 @@ ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たな�
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
-  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す"]) as $names
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
+ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
 ok "保存の段: runs-on/cache/save が 4 つ(一覧・外部・言語等・内蔵のプラグイン)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "4 true"
@@ -477,7 +477,7 @@ pj "$T/base3.yml" > "$T/base3.json" 2>>"$T/pj.err"; B3J=$T/base3.json
 NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
-  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨") | not))')
+  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
 ok "抽出物の追加: 新しい段は extract に 6 件、work に 4 件" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=6 work=4"
 ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
 ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
@@ -512,9 +512,9 @@ ok "抽出物の追加: work の段の順は、lift/out-app/host の後に、言
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
-  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す"]) as $names
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
+ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 # (n) 同じ Issue の直列化、作業の前の Issue の状態の確認、報告の伏せ字、報告の判定(閉じて main に入った作業は、失敗の印を付けない)。偽の gh と fixture で、段の実際の動きを確かめる
 v1=anthr; v2=opic
@@ -523,7 +523,7 @@ ok "作業の前の確認: work の 2 番目の段(リポジトリ取得の次)�
 ok "作業の前の確認: token は github.token だけ(secrets を使わない)" "$(jq -r '.jobs.work.steps[1].env | tostring | ((test("secrets") | not) and test("github[.]token"))' "$J")" true
 ok "作業の前の確認: skip は GITHUB_OUTPUT に書く(GITHUB_ENV は使わない)" "$(jq -r '.jobs.work.steps[1].run' "$J" | grep -cF 'GITHUB_OUTPUT')/$(jq -r '.jobs.work.steps[1].run' "$J" | grep -c 'GITHUB_ENV')" "1/0"
 NGT="steps.check.outputs.skip != 'true'"
-ok "作業の段: 確認より後の段(飛ばした旨を除く)は、全て success() か always() で、skip でないときの条件を持つ(例外 0)" "$(jq -r --arg g "$NGT" '[.jobs.work.steps[2:][] | select(.name | test("飛ばした旨") | not) | (.["if"] // "") | select((contains($g) and (startswith("success() && ") or startswith("always() && "))) | not)] | length' "$J")" 0
+ok "作業の段: 確認より後の段(飛ばした旨を除く)は、全て success() か always() で、skip でないときの条件を持つ(例外 0)" "$(jq -r --arg g "$NGT" '[.jobs.work.steps[2:][] | select(.name | test("飛ばした旨|押せなかった作業を保存する|判定が落ちた作業を保存する") | not) | (.["if"] // "") | select((contains($g) and (startswith("success() && ") or startswith("always() && "))) | not)] | length' "$J")" 0
 ok "作業の段: 確認より後の段は 20 以上ある(空振りでない)" "$(jq -r '[.jobs.work.steps[2:][] | select(.name | test("飛ばした旨") | not)] | length > 20' "$J")" true
 ok "作業の段: always() の段は 2 つ(報告の検査・成果物の保存)で、どちらも skip でないときの条件を持つ" "$(jq -r --arg g "$NGT" '[.jobs.work.steps[] | select((.["if"] // "") | startswith("always()")) | (.["if"] | contains($g))] | "\(length)/\(all)"' "$J")" "2/true"
 ok "作業の段: 飛ばした旨の段は、成功の後で、確認の skip が真のときだけ動く" "$(jq -r '[.jobs.work.steps[] | select(.name | test("飛ばした旨")) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip == 'true'"
@@ -593,7 +593,7 @@ jq -n --arg sk "$SKN" --arg ck "$CKN" --arg sc "$SCN" '{jobs: [
   {name: "作業 #14", conclusion: "success", steps: [{name: $ck, conclusion: "success"}, {name: $sk, conclusion: "success"}]},
   {name: "作業 #15", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $sc, conclusion: "failure"}]}
 ]}' > "$NFX/repos__o__r__actions__runs__77__jobs.json"
-mkdir -p "$NFX/art-11" "$NFX/art-13" "$NFX/art-15"; printf '0123abc\n' > "$NFX/art-11/commit.txt"; printf '4567def\n' > "$NFX/art-13/commit.txt"
+mkdir -p "$NFX/art-11" "$NFX/art-13" "$NFX/art-15"; printf '0123abc\n' > "$NFX/art-11/commit.txt"; printf '4567def\n' > "$NFX/art-13/commit.txt"; printf 'diff\n' > "$NFX/art-15/work.diff"
 printf '%s\n' "$R1" > "$T/nrep1.sh"; printf '%s\n' "$R2" > "$T/nrep2.sh"
 nrun() { ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NFX" NGL="$NGL" NGB="$NGB" GH_TOKEN=x GH_REPO=o/r RUN_ID=77 RUN_URL=https://example.test/run/77 SERVER=https://example.test CLAIMED='[11,12,13,14,15]' RUNNER_TEMP="$T/nrt" bash -e "$T/$1" > "$T/$1.log" 2>&1; echo $? ); }
 mkdir -p "$T/nrt"
@@ -608,6 +608,8 @@ ok "報告(open のまま失敗): 作業が main に入ったとは書かない"
 ok "報告(成功): 通った旨を書き、開いていれば close し、running を外す" "$(grep -c '^issue close 13' "$NGL")/$(nb 13 | grep -cF '通った')/$(grep -c '^issue edit 13 .*remove-label running' "$NGL")" "1/1/1"
 ok "報告(飛ばした): 何も書かず、failed も付けず、running だけ外す" "$(grep -c '^BODY 14 ' "$NGB")/$(grep -c '^issue edit 14 .*add-label failed' "$NGL")/$(grep -c '^issue edit 14 .*remove-label running' "$NGL")" "0/0/1"
 ok "報告(閉じていて、main に入った記録が無い失敗): failed を付け、作業が入ったとは書かない" "$(grep -c '^issue edit 15 .*add-label failed' "$NGL")/$(nb 15 | grep -cF '作業は完了し')" "1/0"
+ok "報告(落ちた・保存した作業あり): 作業を保存したと書く" "$(nb 15 | grep -cF '作業を保存した')" 1
+ok "報告(落ちた・保存した作業なし): 保存したとは書かない" "$(nb 12 | grep -cF '作業を保存した')" 0
 SCD=$T/nscan; SRT=$T/nscan-rt; mkdir -p "$SCD/guard" "$SRT/out"; cp "$top/guard/scan.sh" "$SCD/guard/scan.sh"; printf '%s\n' "$RP" > "$T/nscan.sh"
 printf 'by %s%s\n' "$v1" "$v2" > "$SRT/out/report.md"
 ( cd "$SCD" && env RUNNER_TEMP="$SRT" ISSUE=5 GITHUB_STEP_SUMMARY="$SRT/summary.md" bash -e "$T/nscan.sh" > "$T/nscan.log" 2>&1; echo $? > "$T/nscan.rc" )
@@ -615,4 +617,113 @@ ok "報告の検査(実行): ベンダー名の文字列だけなら通り、報
 hx=0123456789abcdef; hx="$hx$hx"; printf 'id %s\nby %s%s\n' "$hx" "$v1" "$v2" > "$SRT/out/report.md"; rm -f "$SRT/summary.md"
 ( cd "$SCD" && env RUNNER_TEMP="$SRT" ISSUE=5 GITHUB_STEP_SUMMARY="$SRT/summary.md" bash -e "$T/nscan.sh" > "$T/nscan.log" 2>&1; echo $? > "$T/nscan.rc" )
 ok "報告の検査(実行): ベンダー名以外(cfhex)が残れば失敗し、サマリーには出さない" "$(cat "$T/nscan.rc")/$(grep -c "$v1$v2" "$SRT/out/report.md")/$(test -e "$SRT/summary.md" && echo made || echo none)" "1/0/none"
+# (o) 押せなかった作業の保存(push の段が落ちたとき)と、再試行での前回の作業の取り込み。段の順・条件・権限は JSON で、動きは偽の gh とローカルの git で確かめる
+SVN="押せなかった作業を保存する"; PRN="前回の作業を取り込む"
+ok "保存の段: 名前が 1 つ。push の段(id push)の後で、報告の検査の前に在る" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | .id // ""] as $ids | [.jobs.work.steps[] | .name] as $n | ($n | index($s)) as $s0 | ($ids | index("push")) as $p | ($n | index("報告を検査して、成果物とサマリーに出す")) as $r | "\($n | map(select(. == $s)) | length) \($p != null and $s0 != null and $r != null and $p < $s0 and $s0 < $r)"' "$J")" "1 true"
+ok "保存の段の if: 判定が通り push が落ちたときだけ(判定の失敗では保存しない。確認の skip も偽)" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "failure() && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'"
+ok "push の段: id は push" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .id] | .[0]' "$J")" push
+PSH=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
+ok "push の段: 変更前の run と比べ、保存の基点の 1 行(work-tip)の追加だけ" "$(a=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B" | grep -v 'work-tip[.]txt'); b=$(grep -v 'work-tip[.]txt' <<<"$PSH"); [ "$a" = "$b" ] && echo same)" same
+ok "push の段: env は変更前と一致する(App の鍵は、この段と名義の段だけ)" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[$b[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env] == [$n[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env]')" true
+ok "push の段: push 前の HEAD を RUNNER_TEMP/work-tip.txt に、空の commit を作る前に残す(pull の後の HEAD は保存の基点にしない)" "$(t=$(grep -n 'git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"' <<<"$PSH" | cut -d: -f1); c=$(grep -n 'git commit --allow-empty' <<<"$PSH" | cut -d: -f1); [ -n "$t" ] && [ -n "$c" ] && [ "$t" -lt "$c" ] && echo yes)" yes
+ok "取り込みの段: 名前が 1 つ。名義の段の後で、作業者の段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | .name] as $n | ($n | index($p)) as $i | ($n | index("名義を設定する(token は消す)")) as $g | ($n | index("作業者を 1 回動かす")) as $w | "\($n | map(select(. == $p)) | length) \($g != null and $i != null and $w != null and $g < $i and $i < $w)"' "$J")" "1 true"
+ok "取り込みの段の if: 作業の前の確認が通った(skip が偽)ときだけ" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
+ok "取り込みの段の env: GH_TOKEN は github.token で、secrets を使わない" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .env] | .[0] | "\(.GH_TOKEN)/\(tostring | test("secrets"))"' "$J")" '${{ github.token }}/false'
+ok "作業者の段に env が無い(取り込みの token を渡さない)" "$(jq -r --arg n "作業者を 1 回動かす" '[.jobs.work.steps[] | select(.name == $n) | has("env")] | .[0] | tostring' "$J")" false
+ok "work の権限: actions が read(取り込みの段が、保存された artifact を読む)。contents と issues は read のまま" "$(jq -r '.jobs.work.permissions | "\(.actions)/\(.contents)/\(.issues)"' "$J")" "read/read/read"
+ok ".gitignore に .prior-work.md が在る(取り込みの記述は commit しない)" "$(grep -cxF '.prior-work.md' "$top/.gitignore")" 1
+ok "AGENTS.md: 作業者の手順に、.prior-work.md を最初に読む旨が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c '[.]prior-work[.]md')" 1
+ok "AGENTS.md: 作業者の手順に、ターンを終えない規則が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c 'ターンを終えるのは、受け入れが通って commit した時か、続けられない理由を報告に書く時だけ')" 1
+ok "AGENTS.md: 作業者の手順に、長いコマンドを前景で行い timeout 引数を渡す旨が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c 'フォアグラウンドで実行し、シェルツールの')" 1
+SVS=$T/save.sh; printf '%s\n' "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0] // ""' "$J")" > "$SVS"
+SVD=$T/save; mkdir -p "$SVD"
+mkrepo() { rm -rf "$1"; git init -q -b main "$1"; printf '[user]\n\tname = spec\n\temail = spec@example.invalid\n' >> "$1/.git/config"; printf 'l1\nl2\nl3\nl4\nl5\n' > "$1/a.txt"; git -C "$1" add a.txt; git -C "$1" commit -qm base; git -C "$1" update-ref refs/judge/main main; }
+sv() { # 引数: リポジトリ、RUNNER_TEMP。標準出力に終了コード
+  mkdir -p "$2"; ( cd "$1" && env RUNNER_TEMP="$2" bash -eo pipefail "$SVS" > "$2.log" 2>&1; echo $? )
+}
+S1=$SVD/s1; mkrepo "$S1"; git -C "$S1" checkout -q -b agent; sed -i '1s/.*/T1/' "$S1/a.txt"; printf 'new\n' > "$S1/b.txt"; git -C "$S1" add -A; git -C "$S1" commit -qm agent-work; A1=$(git -C "$S1" rev-parse HEAD)
+git -C "$S1" checkout -q -b m main; sed -i '3s/.*/M3/' "$S1/a.txt"; git -C "$S1" commit -qam main-moved; git -C "$S1" checkout -q agent; git -C "$S1" merge -q --no-edit m >/dev/null
+R1=$SVD/rt1; mkdir -p "$R1"; printf '%s\n' "$A1" > "$R1/work-tip.txt"
+ok "保存: push 前の HEAD から、pull で取り込んだ main の変更(3 行目の M3)を除いた差分を work.diff に残す" "$(rc=$(sv "$S1" "$R1"); echo "$rc/$(cat "$R1/out/work.diff" 2>/dev/null | grep -c '^+M3')/$(cat "$R1/out/work.diff" 2>/dev/null | grep -c '^+T1')/$(cat "$R1/out/work.diff" 2>/dev/null | grep -c '^+new')")" "0/0/1/1"
+S2=$SVD/s2; mkrepo "$S2"; R2=$SVD/rt2; mkdir -p "$R2"; git -C "$S2" rev-parse main > "$R2/work-tip.txt"
+ok "保存: 差分が空(作業が無い)なら work.diff を作らず、その旨を出す" "$(rc=$(sv "$S2" "$R2"); echo "$rc/$(test -e "$R2/out/work.diff" && echo made || echo none)/$(grep -c '空' "$R2.log")")" "0/none/1"
+R3=$SVD/rt3; S3=$SVD/s3; mkrepo "$S3"; mkdir -p "$R3"
+ok "保存: push の段が始まる前に落ちた(work-tip.txt が無い)なら、何もせずに 0 で終わる" "$(rc=$(sv "$S3" "$R3"); echo "$rc/$(test -e "$R3/out/work.diff" && echo made || echo none)")" "0/none"
+S4=$SVD/s4; mkrepo "$S4"; git -C "$S4" checkout -q -b agent; head -c 44000000 /dev/urandom > "$S4/big.bin"; git -C "$S4" add -A; git -C "$S4" commit -qm big; R4=$SVD/rt4; mkdir -p "$R4"; git -C "$S4" rev-parse HEAD > "$R4/work-tip.txt"
+ok "保存: 差分が 50 MB を超えるなら作らず、警告を出す" "$(rc=$(sv "$S4" "$R4"); echo "$rc/$(test -e "$R4/out/work.diff" && echo made || echo none)/$(grep -c '::warning::' "$R4.log")")" "0/none/1"
+PRS=$T/prior.sh; printf '%s\n' "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .run] | .[0] // ""' "$J")" > "$PRS"
+PBIN=$T/pbin; PLOG=$T/pgh.log; mkdir -p "$PBIN"
+cat > "$PBIN/gh" <<'PGH'
+#!/usr/bin/env bash
+echo "$*" >> "$PLOG"
+case "$1" in
+  api) shift; jqf=""; while [ $# -gt 0 ]; do case "$1" in --jq) jqf=$2; shift ;; esac; shift; done
+       if [ -n "$jqf" ]; then jq -r "$jqf" "$FIX/list.json"; else cat "$FIX/list.json"; fi ;;
+  run) rid=$3; d=""; shift 3; while [ $# -gt 0 ]; do case "$1" in -D) d=$2; shift ;; esac; shift; done
+       [ -d "$FIX/dl-$rid" ] || exit 1; cp -r "$FIX/dl-$rid"/. "$d"/ ;;
+  *) echo "fake gh: 未対応: $*" >&2; exit 1 ;;
+esac
+PGH
+chmod +x "$PBIN/gh"
+PV=$T/pv; mkrepo "$PV"; git -C "$PV" checkout -q -b agent; sed -i '1s/.*/T1/' "$PV/a.txt"; printf 'new\n' > "$PV/b.txt"; git -C "$PV" add -A; git -C "$PV" commit -qm prior-work; git -C "$PV" diff --binary main agent > "$T/diff901"
+pf() { mkdir -p "$1"; printf '%s' "$2" > "$1/list.json"; }
+prun() { # 引数: リポジトリ、fixture の dir、RUNNER_TEMP。標準出力に終了コード
+  mkdir -p "$3"; : > "$PLOG"; ( cd "$1" && env PATH="$PBIN:$PATH" FIX="$2" PLOG="$PLOG" GH_TOKEN=x GH_REPO=o/r ISSUE=5 RUNNER_TEMP="$3" bash -eo pipefail "$PRS" > "$3.log" 2>&1; echo $? )
+}
+LIST901='{"artifacts":[{"id":1,"expired":false,"created_at":"2026-11-20T00:00:00Z","workflow_run":{"id":901}}]}'
+FC=$T/fc; pf "$FC" "$LIST901"; mkdir -p "$FC/dl-901"; cp "$T/diff901" "$FC/dl-901/work.diff"; printf 'judge: 通った\n' > "$FC/dl-901/judge.txt"
+CR=$T/pc; mkrepo "$CR"; sed -i '5s/.*/R5/' "$CR/a.txt"; git -C "$CR" commit -qam main-moved; n0=$(git -C "$CR" rev-list --count HEAD)
+rc=$(prun "$CR" "$FC" "$T/rc1")
+ok "取り込み(衝突なし): 段は 0 で終わり、前回の作業を commit 1 つで載せ、.prior-work.md に「衝突なく」と書く" "$rc/$(( $(git -C "$CR" rev-list --count HEAD) - n0 ))/$(grep -c '衝突なく' "$CR/.prior-work.md" 2>/dev/null)" "0/1/1"
+ok "取り込み(衝突なし): 前回の変更(1 行目 T1・b.txt)と、main の変更(5 行目 R5)が両方在る" "$(sed -n 1p "$CR/a.txt")/$(sed -n 5p "$CR/a.txt")/$(test -f "$CR/b.txt" && echo yes)" "T1/R5/yes"
+ok "取り込み(衝突なし): commit の題名は「前回の作業を取り込む(run 901)」で、期限内の artifact(run 901)を取る" "$(git -C "$CR" log -1 --format=%s)/$(grep -c 'run download 901' "$PLOG")" "前回の作業を取り込む(run 901)/1"
+CX=$T/px; mkrepo "$CX"; sed -i '1s/.*/X1/' "$CX/a.txt"; git -C "$CX" commit -qam main-moved; n0=$(git -C "$CX" rev-list --count HEAD)
+rc=$(prun "$CX" "$FC" "$T/rx1")
+ok "取り込み(衝突): 段は 0 で終わり、commit は増えず、衝突の印が a.txt に残る" "$rc/$(( $(git -C "$CX" rev-list --count HEAD) - n0 ))/$(grep -c '^<<<<<<<' "$CX/a.txt")" "0/0/1"
+ok "取り込み(衝突): .prior-work.md に衝突したファイル(a.txt)と、解消して commit する旨を書く" "$(grep -c 'a[.]txt' "$CX/.prior-work.md")/$(grep -c '衝突' "$CX/.prior-work.md")/$(grep -c '解消' "$CX/.prior-work.md")" "1/1/1"
+ok "取り込み(衝突): 未解決のファイルは a.txt だけ(git の unmerged)" "$(git -C "$CX" diff --name-only --diff-filter=U | paste -sd, -)" "a.txt"
+CN=$T/pn; mkrepo "$CN"; FN=$T/fn; pf "$FN" '{"artifacts":[]}'
+rc=$(prun "$CN" "$FN" "$T/rn1")
+ok "取り込み(保存なし): artifact が無ければ、何もせずに 0 で終わる(.prior-work.md も作らず、download もしない)" "$rc/$(test -e "$CN/.prior-work.md" && echo made || echo none)/$(grep -c 'run download' "$PLOG")" "0/none/0"
+CE=$T/pe; mkrepo "$CE"; sed -i '5s/.*/R5/' "$CE/a.txt"; git -C "$CE" commit -qam main-moved; FE=$T/fe; pf "$FE" '{"artifacts":[{"id":2,"expired":true,"created_at":"2026-11-21T00:00:00Z","workflow_run":{"id":902}}]}'; mkdir -p "$FE/dl-902"; cp "$T/diff901" "$FE/dl-902/work.diff"
+rc=$(prun "$CE" "$FE" "$T/re1")
+ok "取り込み(期限切れ): 期限切れの artifact しか無ければ、取らずに 0 で終わる" "$rc/$(test -e "$CE/.prior-work.md" && echo made || echo none)/$(grep -c 'run download' "$PLOG")" "0/none/0"
+CF=$T/pf; mkrepo "$CF"; sed -i '5s/.*/R5/' "$CF/a.txt"; git -C "$CF" commit -qam main-moved; FF=$T/ff; pf "$FF" '{"artifacts":[{"id":1,"expired":false,"created_at":"2026-11-20T00:00:00Z","workflow_run":{"id":901}},{"id":3,"expired":false,"created_at":"2026-11-22T00:00:00Z","workflow_run":{"id":903}}]}'; mkdir -p "$FF/dl-901" "$FF/dl-903"; cp "$T/diff901" "$FF/dl-901/work.diff"; printf 'judge: 通った\n' > "$FF/dl-901/judge.txt"; printf 'x\n' > "$FF/dl-903/judge.txt"
+rc=$(prun "$CF" "$FF" "$T/rf1")
+ok "取り込み(新しい方に差分が無い): 新しい順に見て、差分が在る 901 を取る(903 を先に試す)" "$rc/$(grep -c 'run 901' "$CF/.prior-work.md" 2>/dev/null)/$(awk '/^run download/{print $3}' "$PLOG" | paste -sd, -)" "0/1/903,901"
+# (p) 判定が落ちた作業の保存(判定の段が落ちて push が飛んだとき)と、判定を通らなかった作業の続きからの取り込み(commit せず作業ツリーに載せる)
+JSN="判定が落ちた作業を保存する"; JS=$T/jsave.sh; printf '%s\n' "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0] // ""' "$J")" > "$JS"
+ok "判定が落ちた作業の保存: 名前が 1 つ。押せなかった作業の保存の後で、報告の検査の前に在る" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | .name] as $n | ($n | index("押せなかった作業を保存する")) as $a | ($n | index($s)) as $b | ($n | index("報告を検査して、成果物とサマリーに出す")) as $c | "\($n | map(select(. == $s)) | length) \($a != null and $b != null and $c != null and $a < $b and $b < $c)"' "$J")" "1 true"
+ok "判定が落ちた作業の保存の if: 判定の段で落ちて push が飛んだときだけ(確認の skip も偽)" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "failure() && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'"
+ok "判定が落ちた作業の保存: env を持たない(token を渡さない)" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | has("env")] | .[0] | tostring' "$J")" false
+JR=$SVD/jr; jrepo() { rm -rf "$1"; git init -q -b main "$1"; printf '[user]\n\tname = spec\n\temail = spec@example.invalid\n' >> "$1/.git/config"; cp "$top/.gitignore" "$1/.gitignore"; printf 'l1\nl2\nl3\nl4\nl5\n' > "$1/a.txt"; git -C "$1" add -A; git -C "$1" commit -qm base; git -C "$1" update-ref refs/judge/main main; }
+J1=$JR/a; jrepo "$J1"; git -C "$J1" checkout -q -b agent; sed -i '1s/.*/T1/' "$J1/a.txt"; git -C "$J1" commit -qam committed-work
+git -C "$J1" checkout -q main; sed -i '5s/.*/R5/' "$J1/a.txt"; git -C "$J1" commit -qam main-moved; git -C "$J1" update-ref refs/judge/main main; git -C "$J1" checkout -q agent
+sed -i '2s/.*/U2/' "$J1/a.txt"; printf 'new\n' > "$J1/b.txt"; mkdir -p "$J1/lift/out-app" "$J1/target"; printf 'x\n' > "$J1/lift/out-app/big.bin"; printf 'x\n' > "$J1/target/t.o"; printf 'p\n' > "$J1/.prior-work.md"; printf 'x\n' > "$J1/.tmp-x.txt"
+JA=$JR/rt-a; mkdir -p "$JA/out"; : > "$JA/out/report.md"
+jsv() { ( cd "$1" && env RUNNER_TEMP="$2" bash -eo pipefail "$JS" > "$2.log" 2>&1; echo $? ); }
+rc=$(jsv "$J1" "$JA"); D=$JA/out/work.diff
+ok "判定が落ちた作業の保存: 終了コード 0 で、work.diff を残す" "$rc/$(test -s "$D" && echo made)" "0/made"
+ok "判定が落ちた作業の保存: commit 済みの変更(T1)・未 commit の変更(U2)・未追跡(b.txt)を含む" "$(grep -c '^+T1$' "$D")/$(grep -c '^+U2$' "$D")/$(grep -c '^+new$' "$D")" "1/1/1"
+ok "判定が落ちた作業の保存: .gitignore の物(lift/out-app・target・.prior-work.md・.tmp-*)と .gitignore 自体を含まない(差分の見出しは 2 件)" "$(grep -c '^diff --git' "$D")/$(grep -cE 'big[.]bin|t[.]o|prior-work|tmp-x|a/[.]gitignore' "$D")" "2/0"
+ok "判定が落ちた作業の保存: 基点は refs/judge/main との merge-base(main が進んだ後の R5 を含まない)" "$(grep -c 'R5' "$D")" 0
+JE=$JR/e; jrepo "$JE"; JEA=$JR/rt-e; mkdir -p "$JEA/out"; : > "$JEA/out/report.md"
+rc=$(jsv "$JE" "$JEA"); ok "判定が落ちた作業の保存: 差分が空なら作らず、その旨を出す" "$rc/$(test -e "$JEA/out/work.diff" && echo made || echo none)/$(grep -c '空' "$JEA.log")" "0/none/1"
+JN=$JR/rt-n; mkdir -p "$JN/out"; rc=$(jsv "$J1" "$JN"); ok "判定が落ちた作業の保存: 作業者が動いていなければ(report.md が無ければ)作らない" "$rc/$(test -e "$JN/out/work.diff" && echo made || echo none)" "0/none"
+FJ=$JR/fj; pf "$FJ" '{"artifacts":[{"id":950,"expired":false,"created_at":"2026-11-23T00:00:00Z","workflow_run":{"id":950}}]}'; mkdir -p "$FJ/dl-950"; cp "$D" "$FJ/dl-950/work.diff"; { printf 'judge: 受け入れコマンドが失敗した\n'; printf '%300s\n' '' | tr ' ' x; } > "$FJ/dl-950/judge.txt"
+CJ=$JR/cj; mkrepo "$CJ"; sed -i '5s/.*/R5/' "$CJ/a.txt"; git -C "$CJ" commit -qam main-moved; n0=$(git -C "$CJ" rev-list --count HEAD); h0=$(git -C "$CJ" rev-parse HEAD)
+rc=$(prun "$CJ" "$FJ" "$JR/rj1")
+ok "取り込み(判定が落ちた): 段は 0 で終わり、commit は増えず、HEAD も変わらない" "$rc/$(( $(git -C "$CJ" rev-list --count HEAD) - n0 ))/$(test "$(git -C "$CJ" rev-parse HEAD)" = "$h0" && echo same)" "0/0/same"
+ok "取り込み(判定が落ちた): 前回の変更(1 行目 T1・2 行目 U2・b.txt)と、main の変更(5 行目 R5)が作業ツリーに在る" "$(sed -n 1p "$CJ/a.txt")/$(sed -n 2p "$CJ/a.txt")/$(sed -n 5p "$CJ/a.txt")/$(test -f "$CJ/b.txt" && echo yes)" "T1/U2/R5/yes"
+ok "取り込み(判定が落ちた): 取り込んだ変更は未 commit で、作業ツリーに載っている(git status に在る)" "$(test -n "$(git -C "$CJ" status --porcelain)" && echo yes)" yes
+ok "取り込み(判定が落ちた): .prior-work.md に、判定を通らなかった旨・理由・続きから行う旨を書き、「衝突なく」は書かない" "$(grep -c '判定を通らなかった' "$CJ/.prior-work.md")/$(grep -c '受け入れコマンドが失敗した' "$CJ/.prior-work.md")/$(grep -c '続きから' "$CJ/.prior-work.md")/$(grep -c '衝突なく' "$CJ/.prior-work.md")" "1/1/1/0"
+ok "取り込み(判定が落ちた): 理由の行は 200 字で切る(300 字の行が 200 字になる)" "$(grep -c '^x\{200\}$' "$CJ/.prior-work.md")/$(grep -c 'x\{201\}' "$CJ/.prior-work.md")" "1/0"
+CX=$JR/cx; mkrepo "$CX"; sed -i '1s/.*/X1/' "$CX/a.txt"; git -C "$CX" commit -qam main-moved; n0=$(git -C "$CX" rev-list --count HEAD)
+rc=$(prun "$CX" "$FJ" "$JR/rj2")
+ok "取り込み(判定が落ちた・衝突): 段は 0 で終わり、commit は増えず、衝突の印が a.txt に残る" "$rc/$(( $(git -C "$CX" rev-list --count HEAD) - n0 ))/$(grep -c '^<<<<<<<' "$CX/a.txt")" "0/0/1"
+ok "取り込み(判定が落ちた・衝突): .prior-work.md に衝突したファイル(a.txt)と、解消する旨を書く" "$(grep -c 'a[.]txt' "$CX/.prior-work.md")/$(grep -c '解消' "$CX/.prior-work.md")" "1/1"
+FJ2=$JR/fj2; pf "$FJ2" "$(cat "$FJ/list.json")"; mkdir -p "$FJ2/dl-950"; cp "$D" "$FJ2/dl-950/work.diff"
+CN=$JR/cn; mkrepo "$CN"; sed -i '5s/.*/R5/' "$CN/a.txt"; git -C "$CN" commit -qam main-moved; n0=$(git -C "$CN" rev-list --count HEAD)
+rc=$(prun "$CN" "$FJ2" "$JR/rj3")
+ok "取り込み(判定の出力が無い): 判定に至らなかった作業として、commit せずに取り込み、その旨を書く" "$rc/$(( $(git -C "$CN" rev-list --count HEAD) - n0 ))/$(grep -c '判定に至らなかった' "$CN/.prior-work.md")" "0/0/1"
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
