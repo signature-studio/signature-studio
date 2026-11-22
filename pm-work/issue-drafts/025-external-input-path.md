@@ -13,52 +13,49 @@ project: signature-studio/3
 
 ## 目的
 
-Serum 2・OTT・Vital のインストーラを、作業の段が使えるようにする。3 件は R2 の artifact に既に在る。取得は FL Studio のインストーラと同じ経路で行う。作業の段は R2 の鍵を持たず、抽出の木から読む。
+外部プラグイン 3 件(Serum 2・OTT・Vital)のインストーラから、VST3 の本体(`.vst3` の中の DLL)を取り出す方法を確かめ、取り出した物の一覧を commit する。
 
 ## 背景
 
-- 入力: `ci/artifacts.lock` の 2〜4 行(外部プラグインの 3 件。大きさ・SHA-256・ETag が書いてある)。FL Studio のインストーラは 1 行目で、別の物。
-- 現状: 作業の段には、この artifact の鍵が無い。R2 の鍵は、FL Studio のインストーラを取る extract の段だけが持つ。extract の段の取得は `app/scripts/extract-fl.mjs` と `.github/workflows/agent.yml` の extract の段の仕組みに従う。
-- 方針(PM の決定): 3 件を、extract の段が R2 から取り、FL のインストーラと同じ仕組みで抽出の木に置く。作業の段は、復元された抽出の木から読む。作業の段に鍵は渡さない。
-- 取り出したインストーラから、VST3 のバンドル(プラグインの本体)を得る経路は、#{{027}}〜#{{029}} で確かめる。
-
-## 読む物
-
-- `ci/artifacts.lock`(外部の 3 件の行。大きさ・SHA-256・ETag)
-- `.github/workflows/agent.yml`(extract の段の取得と鍵。作り直し中の版。段の名前は作業者が確かめる)
-- `app/scripts/extract-fl.mjs`(抽出の仕組み)
+- 3 件のインストーラは、ワークフローの extract の段が R2 から取り、`tools/external-inputs/check.mjs` で大きさと SHA-256 を照合して、R2 のキャッシュに置いた。この作業の段が、それを `lift/out-app/external/` に置き、照合し直している(照合が通らなければ、この作業は始まらない)。ファイル名は `ci/artifacts.lock` の `installers/` の下の名前のまま。
+- ワークフローの extract の段は、PM が作った。ワークフロー(`.github/`)は、変えない(ワーカー用 App が push できない)。
+- 作業者には R2 の鍵が無い。インストーラを取り直さない。
+- インストーラの形式は未確認。NSIS・Inno Setup・その他のどれかを、まず調べる。
+- 取り出した本体は、リポジトリに commit しない(大きさと著作物のため。commit するのは一覧だけ)。取り出し先は `lift/out-app/` の下(git の無視の対象)か、`.tmp-*`。
+- 実行環境は Linux。`7z`(p7zip)などが在るかを、確かめて使う。インストーラは実行しない(読むだけ)。
+- 既存の道具: `app/scripts/lib/nsis.mjs`・`app/scripts/lib/nsis-script.mjs`(NSIS の読み。読むだけで、`app/` は変えない)。
 
 ## やること
 
-1. extract の段で、外部の 3 件を、FL のインストーラと同じ取得の仕組み(R2 の鍵を使う段)で取り、`lift/out-app/external/` に置く。抽出の木のキャッシュに入るので、作業の段から読める。キャッシュの鍵は、この変更を含むように変える(extract の段と作業の段の両方の鍵を揃える)。
-2. 道具 `tools/external-inputs/check.mjs` を作る。引数は置き場所。3 件の大きさと SHA-256 を `ci/artifacts.lock` と照合し、結果を JSON の 1 行で出す。
-3. 結果を報告に書く: 3 件の大きさと SHA-256 の検査の結果、extract の段の所要の増分、鍵を使った段の名前(鍵の値は書かない)。
+1. 3 件それぞれの形式を調べ、VST3 の本体をどの方法で取り出せるかを、実際の出力で確かめる。
+2. 取り出しの道具を `tools/external-inputs/` の下に作る(node。インストーラを実行しない)。既存の NSIS の読みを使えるなら使う。
+3. 3 件から、`.vst3` の中の DLL を取り出し、`lift/out-app/` の下の作業の場所(git の無視の対象)に置く。
+4. `inputs/external-plugins.tsv` を作って commit する。TAB 区切り。1 行目は見出し `plugin`・`path`・`bytes`・`sha256`・`imports`。2 行目以降は、取り出した DLL ごとに 1 行。`plugin` は `Serum 2`・`OTT`・`Vital` のどれか(この名前のまま)。`path` は、取り出した DLL のインストーラの中での相対パス(インストール先の接頭辞は書かない)。`bytes` と `sha256` は、取り出した DLL の大きさと SHA-256。`imports` は、PE が import する DLL の名前(小文字、`;` 区切り)。
+5. 受け入れコマンドを実行し、その出力を報告に貼る。
 
 ## 受け入れ
 
 ```accept
-node tools/external-inputs/check.mjs "$PWD/lift/out-app/external"
+f=inputs/external-plugins.tsv; test -f "$f" && test "$(awk -F'\t' '$1 == "Serum 2"' "$f" | wc -l)" -ge 1 && test "$(awk -F'\t' '$1 == "OTT"' "$f" | wc -l)" -ge 1 && test "$(awk -F'\t' '$1 == "Vital"' "$f" | wc -l)" -ge 1 && test "$(awk -F'\t' 'NR > 1 && (length($4) != 64 || $4 !~ /^[0-9a-f]+$/)' "$f" | wc -l)" -eq 0 && node tools/external-inputs/check.mjs lift/out-app/external > /dev/null
 ```
 
-判定の基準: 道具が、3 件の大きさと SHA-256 を `ci/artifacts.lock` と照合して、終了コード 0 で終わること。道具の出力の JSON の 1 行を報告に貼る。
+判定の基準: `inputs/external-plugins.tsv` があり、`Serum 2`・`OTT`・`Vital` の行がそれぞれ 1 つ以上、見出しを除く全ての行の `sha256` が 64 桁の 16 進、`node tools/external-inputs/check.mjs lift/out-app/external` が終了コード 0 で終わる。
 
 ## 報告の規則
 
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。
+- 報告に書く: 3 件のインストーラの形式、取り出しの方法、取り出した件数、照合の結果(`check.mjs` の出力の JSON の 1 行)。
 - 鍵の値、ホストの名前、アカウント ID は書かない。
-- 変えたパス(`.github/` と `tools/` を含む)を報告に書く。
+- 変えたパス(commit したファイルだけ)を書く。
 
 ## 制約
 
-- 作業の段に、依頼者の個人の資格を置かない。鍵を使うのは extract の段だけ。
-- 製品に新しい環境変数・#ifdef・URL パラメータ・ビルド変数を足さない。
+- R2 の鍵・アカウント ID・ホストの名前を、探さず、書かない。
+- インストーラを実行しない。`lift/out-app/external/` の 3 件を変えたり消したりしない。
+- 取り出した本体を commit しない(`.dll`・`.vst3` は git の無視の対象に置く。`inputs/` には一覧だけ)。
+- 製品(`app/`・`lift/` の製品の部分)・`ci/`・ワークフロー(`.github/`)を変えない。
 - ベンダー名と Cloudflare の識別子を書かない。インストーラの名前に含まれる会社名を、そのまま書かない。
 - 値を隠す命令(マスク)を置かない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
-- 抽出の段の鍵を変える場合は、変えたことを報告に書く(全件の抽出し直しになる)。
-
-## 他のタスクとの関係
-
-- #{{027}}・#{{028}}・#{{029}} が、この Issue の入力を使う。
-- #{{020}}(内蔵の DLL の表)と、同じ extract の段を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直す。
+- commit の名義は環境の git の設定のまま。Claude の行を付けない。ブランチを作らない。

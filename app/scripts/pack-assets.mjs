@@ -3,11 +3,13 @@
 // with SHA-256s, and the brotli-compressed form of each of the four files. It never uploads anything and never needs credentials.
 //
 //   node scripts/pack-assets.mjs --out DIR --name NAME --version VER --engine-wasm FILE --glue FILE --seed-pack FILE --dll-dir DIR --host-files emscripten-X.Y.Z --args "/data/FLEngine_x64.dll /data/mod1.dll:/data/mod2.dll"
-//        [--env K=V]... [--root /data] [--fruity-hints first=49,stop=55,variant=Oz] [--stop-note "TEXT CONTAINED IN THE ENGINE'S STOP MESSAGE=>NOTE"]... [--brotli-quality 11] [--prefix KEY_PREFIX] [--description TEXT]
+//        [--env K=V]... [--root /data] [--fruity-hints first=49,stop=55,variant=Oz] [--stop-note "TEXT CONTAINED IN THE ENGINE'S STOP MESSAGE=>NOTE"]... [--lazy-dll FILE]... [--brotli-quality 11] [--prefix KEY_PREFIX] [--description TEXT]
 //   scripts/build-engine-bundle.sh calls it (decision 0137). --glue is the emscripten ES module flengine6.js (-sMODULARIZE=1 -sEXPORT_ES6=1) linked with -sFILESYSTEM=0 by the Emscripten named in --host-files (decision 0221: the page
 //   answers the engine's file reads from the pack bytes). --seed-pack is an FLSEEDP1 pack (app/scripts/pack-seed.mjs), --dll-dir the engine and module DLLs (packed as flpack1: pack path = file name).
 //   --stop-note texts are shown by the UI when the engine's stop message contains the text before `=>` (repeatable). The engine wasm must export the desktop compositor (fle_desk_compose, fle_desk_resync): the page shows
 //   the engine through it and has no other way (decision 0223).
+//   --lazy-dll FILE (repeatable, Issue #1314): a file of --dll-dir that the page downloads AFTER the engine has started. It is not in the DLL pack; the manifest names it under `lazy` with its path under the
+//   engine's root (the file name). Nothing names a lazy file by default: the start-up downloads are the same as before.
 //
 // The layout is the bucket's: br/<KEY_PREFIX>/<file> is each of the four files brotli-compressed, to be uploaded under the key <KEY_PREFIX>/<file> with Content-Encoding br;
 // raw/<KEY_PREFIX>/manifest.json is the manifest (no encoding). SHA256SUMS lists every file of the directory. Nothing else is written.
@@ -32,7 +34,7 @@ function parseArgs(argv) {
     const v = argv[++i];
     if (v === undefined) throw new Error(`--${k} needs a value`);
     if (k === 'env') { const j = v.indexOf('='); if (j < 1) throw new Error('--env K=V'); a.env[v.slice(0, j)] = v.slice(j + 1); }
-    else if (k === 'stop-note') (a[k] ??= []).push(v);
+    else if (k === 'stop-note' || k === 'lazy-dll') (a[k] ??= []).push(v);
     else a[k] = v;
   }
   return a;
@@ -70,7 +72,12 @@ async function main() {
   for (const k of ['name', 'version', 'engine-wasm', 'glue', 'seed-pack', 'dll-dir', 'host-files', 'args']) if (!args[k]) throw new Error(`--${k} is required`);
   const { name, version, description } = args;
   const wasmSrc = path.resolve(args['engine-wasm']);
-  const dllFiles = walk(path.resolve(args['dll-dir']));
+  const dllDir = path.resolve(args['dll-dir']);
+  const dllAll = walk(dllDir);
+  // Issue #1314: the --lazy-dll files are not in the DLL pack (they are downloaded after the engine has started)
+  const lazyNames = args['lazy-dll'] ?? [];
+  for (const n of lazyNames) if (!dllAll.some((f) => f.path === n)) throw new Error(`--lazy-dll ${n}: no such file in --dll-dir ${dllDir}`);
+  const dllFiles = dllAll.filter((f) => !lazyNames.includes(f.path));
 
   // br/<prefix>/<base>.<12 hex>.<ext>: the brotli form under the key (the key has no .br: the object carries Content-Encoding br)
   async function emit(srcFile, base, ext) {
@@ -109,12 +116,18 @@ async function main() {
   const seedPack = { ...(await emit(seedFile, 'seed', 'flpack')), format: 'flseedp1' };
   const dllPack = await packRef(dllFiles, 'dll');
   fs.rmSync(tmp, { recursive: true, force: true });
+  // Issue #1314: each lazy file is an object of its own (named by its file name; the engine finds it at <root>/<name>)
+  const lazy = [];
+  for (const n of lazyNames) {
+    const ext = path.extname(n);
+    lazy.push({ name: n, path: n, ...(await emit(path.join(dllDir, n), path.basename(n, ext), ext.slice(1) || 'bin')) });
+  }
 
   const manifest = {
     schema: 1,
     bundle: { name, version, created: new Date().toISOString(), ...(description ? { description } : {}) },
     engine: { kind: 'emscripten-fruity-v1', wasm, args: args.args.split(/\s+/).filter(Boolean), env: args.env, options },
-    seedPack, dllPack,
+    seedPack, dllPack, lazy,
   };
   const v = validateManifest(manifest);
   if (!v.ok) throw new Error('the manifest this script built is invalid:\n' + formatErrors(v.errors));
@@ -135,6 +148,7 @@ async function main() {
   console.log(`  engine wasm  ${wasm.size} B  sha256 ${wasm.sha256}  stored as ${wasm.compression}${wasm.encodedSize ? ` (${wasm.encodedSize} B)` : ''}`);
   console.log(`  seed pack    ${seedPack.size} B  sha256 ${seedPack.sha256}  ${seedPack.format}`);
   console.log(`  dll pack     ${dllPack.size} B  sha256 ${dllPack.sha256}  ${dllFiles.length} files`);
+  for (const l of lazy) console.log(`  lazy         ${l.size} B  sha256 ${l.sha256}  ${l.name} (after the engine starts)`);
   console.log(`  upload       ${path.join(out, 'br')} (Content-Encoding br) and ${path.join(out, 'raw')} (manifest.json); nothing was uploaded`);
 }
 

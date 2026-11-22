@@ -91,6 +91,40 @@ describe('manifest schema 1', () => {
   });
 });
 
+describe('manifest schema 1: the lazy files (Issue #1314: downloaded after the engine started)', () => {
+  const lazy = (name: string, path: string) => ({ ...asset(`/assets/fl/${name}.${'b'.repeat(12)}.dll`), name, path });
+  const withLazy = (list: unknown) => { const m = good() as any; m.lazy = list; return m; };
+
+  it('accepts a list of lazy files, an empty list, and a manifest without the list', () => {
+    expect(validateManifest(withLazy([lazy('fruity balance', 'fruity_balance_x64.dll')])).ok).toBe(true);
+    expect(validateManifest(withLazy([])).ok).toBe(true);
+    expect(validateManifest(good()).ok).toBe(true);
+  });
+
+  it('rejects a lazy file with no name, or with a path that is absolute or has ..', () => {
+    const noName = lazy('a', 'a.dll') as any; delete noName.name;
+    expect(validateManifest(withLazy([noName])).ok).toBe(false);
+    for (const p of ['/data/a.dll', '../a.dll', 'x/../a.dll']) {
+      const r = validateManifest(withLazy([lazy('a', p)]));
+      expect(r.ok, p).toBe(false);
+      if (!r.ok) expect(r.errors.map((e) => e.path)).toContain('/lazy/0/path');
+    }
+  });
+
+  it('rejects two lazy files with the same path (the engine has one file per path)', () => {
+    const r = validateManifest(withLazy([lazy('a', 'x.dll'), lazy('b', 'x.dll')]));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.map((e) => e.message).join('\n')).toContain('listed twice');
+  });
+
+  it('rejects a lazy file whose URL is on another origin', () => {
+    const l = lazy('a', 'a.dll') as any; l.url = 'https://cdn.example.com/a.dll';
+    const r = validateManifest(withLazy([l]));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errors.map((e) => e.path)).toContain('/lazy/0/url');
+  });
+});
+
 describe('manifest schema 1: the options of the engine', () => {
   const badOpt = (label: string, mutate: (m: any) => void, path: string, text?: string) =>
     it(`rejects: ${label}`, () => {
