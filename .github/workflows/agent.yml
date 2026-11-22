@@ -217,7 +217,7 @@ jobs:
           key: external-${{ hashFiles('ci/artifacts.lock', 'tools/external-inputs/check.mjs') }}
 
   work:
-    name: 作業 #${{ matrix.issue }}
+    name: '作業 #${{ matrix.issue }}'
     needs: [select, start, extract]
     if: success() && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
