@@ -2,9 +2,10 @@
 # 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
 #   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
 #   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
-#   report: 結果を Issue に書き、状態を変える(通った: close。落ちた: failed)。
-# ラベル・コメント・close は App の token で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
-# 鍵は、名義の設定の段と、書き込みの段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
+#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed)。
+# ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
+# 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
+# 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
@@ -63,37 +64,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 名義を設定する(token は消す)
-        env:
-          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
-          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
-        run: |
-          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
-          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
-          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
-          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
-          umask 077
-          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
-            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
-            > "$RUNNER_TEMP/botid-config.json"
-          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
-          "$b/botid" issue 2>/dev/null
-          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
-          echo "GIT_CONFIG_GLOBAL=$(printf '%s' "$e" | jq -r .GIT_CONFIG_GLOBAL)" >> "$GITHUB_ENV"
-          echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
-          rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
-
-      - name: 起動してよい物に running を付ける(App の token で。失敗・再試行の判定は、もう一度行う)
+      - name: 起動してよい物に running を付ける(GITHUB_TOKEN で。失敗・再試行の判定は、もう一度行う)
         id: claim
         env:
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TARGETS: ${{ needs.select.outputs.targets }}
           RETRY: ${{ needs.select.outputs.retry }}
         run: |
-          mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
-          "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
-          export GH_CONFIG_DIR=$BOTID_GH
           out=$(node tools/select-targets.mjs claim "$TARGETS" "$RETRY")
           echo "$out"
           echo "claimed=$(jq -c .claimed <<<"$out")" >> "$GITHUB_OUTPUT"
@@ -237,13 +215,15 @@ jobs:
           mv "$RUNNER_TEMP/host" lift/out-app/host
           test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
 
-      - name: タスク(Issue の本文)を取り、受け入れコマンドを取り出す
+      - name: タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           mkdir -p "$RUNNER_TEMP/out"
-          gh api "repos/$GH_REPO/issues/$ISSUE" --jq '.body // ""' > "$RUNNER_TEMP/task.md"
+          gh api "repos/$GH_REPO/issues/$ISSUE" > "$RUNNER_TEMP/issue.json"
+          jq -r '.body // ""' "$RUNNER_TEMP/issue.json" > "$RUNNER_TEMP/task.md"
+          jq -r .title "$RUNNER_TEMP/issue.json" > "$RUNNER_TEMP/title.txt"
           node tools/task-accept.mjs < "$RUNNER_TEMP/task.md" > "$RUNNER_TEMP/task-accept.md" 2> "$RUNNER_TEMP/out/judge.txt"
 
       - name: opencode を導入する(版は固定)
@@ -294,7 +274,7 @@ jobs:
           APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
           APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
         run: |
-          if [ -z "$(git log refs/judge/main..HEAD --oneline)" ]; then echo "変更なし"; exit 0; fi
+          git commit --allow-empty -m "$(cat "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
           mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH
@@ -370,39 +350,23 @@ jobs:
             fi
           done
 
-      - name: 名義を設定する(token は消す)
+      - name: 結果を Issue に書き、状態を変える(GITHUB_TOKEN で。通った Issue が開いたままなら、ここで閉じる)
         env:
-          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
-          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
-          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
-          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
-          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
-          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
-          umask 077
-          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
-            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
-            > "$RUNNER_TEMP/botid-config.json"
-          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
-          "$b/botid" issue 2>/dev/null
-          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
-          echo "GIT_CONFIG_GLOBAL=$(printf '%s' "$e" | jq -r .GIT_CONFIG_GLOBAL)" >> "$GITHUB_ENV"
-          echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
-          rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
-
-      - name: 結果を Issue に書き、状態を変える(App の token で。書き込みは GITHUB_TOKEN ではしない)
-        run: |
-          mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
-          "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
-          export GH_CONFIG_DIR=$BOTID_GH
           for n in $(jq -r '.[]' <<<"$CLAIMED"); do
             d="$RUNNER_TEMP/report/$n"
-            gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
             if [ "$(cat "$d/status")" = success ]; then
-              gh issue close "$n" --repo "$GH_REPO" --reason completed
+              if [ "$(gh api "repos/$GH_REPO/issues/$n" --jq .state)" = open ]; then
+                echo "close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する" >> "$d/comment.md"
+                gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
+                gh issue close "$n" --repo "$GH_REPO" --reason completed
+              else
+                gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
+              fi
               gh issue edit "$n" --repo "$GH_REPO" --remove-label running
             else
+              gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
               gh issue edit "$n" --repo "$GH_REPO" --add-label failed
               gh issue edit "$n" --repo "$GH_REPO" --remove-label running
             fi

@@ -33,7 +33,7 @@ ok "agent.yml: work の concurrency は task-<番号>、cancel-in-progress: fals
 ok "agent.yml: report は always() で動き、start が起動した対象がある時だけ(if に両方)" "$(jq -r '.jobs.report.if' "$J" | grep -cF "always() && needs.start.result == 'success' && needs.start.outputs.claimed != '[]'")" 1
 ok "agent.yml: select の権限は issues: read(書き込みなし)" "$(jq -r '.jobs.select.permissions.issues' "$J")" read
 ok "agent.yml: work の権限に issues: write が無い(書き込みは start と report だけ)" "$(jq -r '.jobs.work.permissions.issues' "$J")" read
-ok "agent.yml: start と report は issues: write(App の token で書く)" "$(jq -r '[.jobs.start.permissions.issues, .jobs.report.permissions.issues] | join("/")' "$J")" 'write/write'
+ok "agent.yml: start と report は issues: write(GITHUB_TOKEN で書く)" "$(jq -r '[.jobs.start.permissions.issues, .jobs.report.permissions.issues] | join("/")' "$J")" 'write/write'
 ok "agent.yml: report は成果物の名前 agent-<番号> を取る(work の保存と同じ名前)" "$(grep -cF 'name: agent-${{ matrix.issue }}' "$A")/$(grep -cF 'gh run download "$RUN_ID" -n "agent-$n"' "$A")" 1/1
 # (c) opencode の導入・認証は、旧版と中身が一致(if を除く)。起動の段は、旧版の 1 行(driver/task.sh を呼ぶ行)だけを除く
 for n in "opencode を導入する(版は固定)" "opencode の認証情報を取り込み、作業者のモデルを設定する"; do
@@ -71,6 +71,21 @@ ok "push の段: if を持たない(判定が通ったときだけ走る)" "$(jq
 ok "push の段: push できた SHA を out/commit.txt に残す" "$(grep -cF 'git rev-parse HEAD > "$RUNNER_TEMP/out/commit.txt"' "$A")" 1
 ok "どの段にも continue-on-error が無い" "$(grep -c 'continue-on-error' "$A")" 0
 ok "agent.yml: タブ文字が無い" "$(grep -c "$(printf '\t')" "$A")" 0
+# (j) start と report の書き込みは GITHUB_TOKEN で行う(App の token は使わない)。App の鍵は、名義の段と push の段だけ。Issue の close は、push する commit の Closes #N で行う
+ok "start・report: botid・GH_APP_ の secrets・GH_CONFIG_DIR を使わない" "$(jq -r '[.jobs.start, .jobs.report] | map(tostring | test("botid|GH_APP_|GH_CONFIG_DIR")) | join("/")' "$J")" "false/false"
+ok "work: GH_APP_ の secrets を持つ段は、名義の段と push の段だけ" "$(jq -r '[.jobs.work.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "名義を設定する(token は消す)|通った変更を main に push する(token はこの段で発行する)"
+ok "start: running を付ける段の GH_TOKEN は github.token" "$(jq -r '[.jobs.start.steps[] | select(.name | test("running を付ける")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
+ok "report: 結果を Issue に書く段の GH_TOKEN は github.token" "$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
+ok "work: タスクの段が、題名を RUNNER_TEMP/title.txt に残す(push の段の commit に使う)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("タスク")) | .run] | .[0]' "$J" | grep -q 'title[.]txt' && echo yes)" yes
+P=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
+ok "push: 判定の後に、題名と Closes #\$ISSUE の空の commit を作り、その後に push する" "$(c=$(grep -n 'git commit --allow-empty' <<<"$P" | cut -d: -f1); p=$(grep -n 'git push origin HEAD:main' <<<"$P" | cut -d: -f1); [ -n "$c" ] && [ -n "$p" ] && [ "$c" -lt "$p" ] && grep -qF 'Closes #$ISSUE' <<<"$P" && grep -qF 'title.txt' <<<"$P" && echo yes)" yes
+ok "push: 変更が無くても止めない(「変更なし」で終わる経路が無い)" "$(grep -c '変更なし' <<<"$P")" 0
+ok "push: commit の名義を書かない(git -c・--author・GIT_AUTHOR・GIT_COMMITTER・git config user を使わない)" "$(grep -cE 'git -c |--author|GIT_AUTHOR|GIT_COMMITTER|git config user' "$A")" 0
+ok "push の段は、判定の段より後にあり、if を持たない" "$(jq -r '[.jobs.work.steps | to_entries[] | select(.value.name | test("^判定[(]")) | .key] as $j | [.jobs.work.steps | to_entries[] | select(.value.name | test("通った変更を main に push")) | .key] as $p | "\($j[0] < $p[0])/\(.jobs.work.steps[$p[0]] | has("if") | not)"' "$J")" "true/true"
+R=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .run] | .[0]' "$J")
+ok "report: gh issue close は 1 回だけ、Issue が open のときの if の中にある" "$(grep -c 'gh issue close' <<<"$R")/$(awk '/= open \]; then/{f=1} /else/{f=0} /gh issue close/{print f}' <<<"$R")" "1/1"
+ok "report: 閉じられなかったときの注記を、コメントに書く" "$(grep -cF 'close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する' <<<"$R")" 1
+ok "report: 成功の段は、running を close の後に外す" "$(awk '/gh issue close/{c=NR} /--remove-label running/{if (!r) r=NR} END{print (c && r && c < r) ? "yes" : "no"}' <<<"$R")" yes
 ok "agent.yml・deploy.yml・tools/ に、アカウント ID の値を直書きしていない" "$(acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" 2>/dev/null | cut -d'"' -f4); if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/tools/*.mjs | grep -cF -- "$acct"; else echo none; fi)" 0
 # (g) tools/select-targets.mjs を、偽の gh と偽のイベントで試す
 FX=$T/fx; GHLOG=$T/gh.log; mkdir -p "$FX" "$T/bin"; : > "$GHLOG"
