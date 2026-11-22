@@ -24,6 +24,23 @@ printf 'run: python3 x.py\n' > "$T/app/b.txt"; ( cd "$T" && ok "scan: 製品の�
 printf 'x\n' > "$T/app/c.py"; ( cd "$T" && ok "scan: 製品の .py は見つかる" "$(rc bash "$g/scan.sh" app/c.py)" 1 )
 printf 'ok text\n' > "$T/app/d.txt"; ( cd "$T" && ok "scan: 問題の無いファイルは通る" "$(rc bash "$g/scan.sh" app/d.txt)" 0 )
 printf 'x.%s.dev\npython3 x.py\n' workers > "$T/app/e.txt"; ( cd "$T" && ok "scan: 2 件の違反を 2 件と数える" "$(bash "$g/scan.sh" app/e.txt 2>/dev/null | wc -l)" 2 )
+# 報告の伏せ字(--redact)。ベンダー名の一致だけを行ごとに伏せ字にし、伏せた後にもう一度検査する。ほかの規則の指摘は従来どおり失敗にする(報告の検査の段)
+hx=0123456789abcdef; hx="$hx$hx"; hs="x.r2.cloudflare"; hs="${hs}storage.com"   # 検査の規則に当たる文字列は、組み立てて作る
+printf 'by %s%s\nby %s%s\nok\n' "$v1" "$v2" "$v1" "$v2" > "$T/app/r1.txt"
+printf 'by %s%s\n' "$v1" "$v2" > "$T/app/r5.txt"
+printf 'by %s%s and %s%s\n' "$v1" "$v2" "$v1" "$v2" > "$T/app/r6.txt"
+( cd "$T" && ok "redact: ベンダー名の行を、行ごとに出す(2 行)" "$(bash "$g/scan.sh" --redact app/r1.txt 2>/dev/null | grep -c '^redact')" 2 )
+( cd "$T" && ok "redact: 伏せた後の内容に、ベンダー名が残らない(件数)" "$(grep -c "$v1$v2" app/r1.txt)" 0 )
+( cd "$T" && ok "redact: 伏せ字の数は、一致の数と同じ(2 件)" "$(grep -o '\[伏せ字\]' app/r1.txt | wc -l | tr -d ' ')" 2 )
+( cd "$T" && ok "redact: 伏せた後の再検査が通れば 0 で終わる" "$(rc bash "$g/scan.sh" --redact app/r5.txt)" 0 )
+( cd "$T" && ok "redact: 1 行に 2 件あっても、その行は 1 行として出す" "$(bash "$g/scan.sh" --redact app/r6.txt 2>/dev/null | grep -c '^redact')/$(grep -o '\[伏せ字\]' app/r6.txt | wc -l | tr -d ' ')" "1/2" )
+( cd "$T" && printf 'by %s%s\n' "$v1" "$v2" > app/r7.txt && ok "redact: 出力に、ベンダー名の文字列を含めない" "$(bash "$g/scan.sh" --redact app/r7.txt 2>&1 | grep -c "$v1$v2")" 0 )
+( cd "$T" && printf 'id %s\nby %s%s\n' "$hx" "$v1" "$v2" > app/r2.txt && ok "redact: 伏せ字の後も cfhex が残れば失敗する(1)。ベンダー名は伏せる" "$(rc bash "$g/scan.sh" --redact app/r2.txt)/$(grep -c "$v1$v2" app/r2.txt)" "1/0" )
+( cd "$T" && printf 'id %s\n' "$hx" > app/r2.txt && ok "redact: cfhex の指摘は伏せ字にしない(出力に cfhex、ファイルに伏せ字無し)" "$(bash "$g/scan.sh" --redact app/r2.txt 2>/dev/null | grep -c '^cfhex')/$(grep -c '伏せ字' app/r2.txt)" "1/0" )
+( cd "$T" && printf 'host %s by %s%s\n' "$hs" "$v1" "$v2" > app/r3.txt && ok "redact: cfhost の指摘は伏せ字にしない(終了コード 1、ホスト名は残る)" "$(rc bash "$g/scan.sh" --redact app/r3.txt)/$(grep -cF -- "$hs" app/r3.txt)/$(grep -c '伏せ字' app/r3.txt)" "1/1/1" )
+( cd "$T" && printf 'ok text\n' > app/r4.txt && ok "redact: 違反の無いファイルは 0 で終わり、redact の行を出さない" "$(rc bash "$g/scan.sh" --redact app/r4.txt)/$(bash "$g/scan.sh" --redact app/r4.txt 2>/dev/null | grep -c '^redact')" "0/0" )
+( cd "$T" && ok "redact: PATH が無ければ使い方の誤り(2)" "$(rc bash "$g/scan.sh" --redact)" 2 )
+( cd "$T" && printf 'by %s%s\n' "$v1" "$v2" > app/r9.txt && ok "redact: --redact 無しの検査は、従来どおり vendor で失敗し、伏せ字にしない" "$(rc bash "$g/scan.sh" app/r9.txt)/$(grep -c "$v1$v2" app/r9.txt)" "1/1" )
 # 値を隠す命令(マスク)は、ワークフローに置かない(依頼者の指示 2026-11-20・L-031)。scan.sh の mask 規則は .github/workflows/ の下だけを見る
 ok "ワークフローに、値を隠す命令が無い(件数)" "$(cat "$here"/../.github/workflows/*.yml | grep -cF -- 'add-mask')" 0
 mkdir -p "$T/.github/workflows" "$T/x/.github/workflows" "$T/app"

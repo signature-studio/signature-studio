@@ -2,7 +2,8 @@
 # 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
 #   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
 #   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
-#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed)。
+#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。
+# 同じ Issue のイベントの run は、concurrency で 1 本ずつ動く。work は最初に Issue の状態を確かめ、閉じた・failed・pm-hold の Issue の作業は飛ばす。報告の検査は、ベンダー名の文字列を伏せ字にして通す(ほかの指摘は失敗)。
 # ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
 # 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
@@ -20,6 +21,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: agent-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   select:
@@ -332,7 +337,26 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: 作業の前に Issue の状態を確かめる(開いていて、failed・pm-hold が無いときだけ作業する)
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh api "repos/$GH_REPO/issues/$ISSUE" > "$RUNNER_TEMP/now.json"
+          why=""
+          if [ "$(jq -r .state "$RUNNER_TEMP/now.json")" != open ]; then why="開いていない"; fi
+          for l in failed pm-hold; do
+            if jq -e --arg l "$l" '[.labels[].name] | index($l) != null' "$RUNNER_TEMP/now.json" > /dev/null; then why="${why:+$why、}ラベル $l が付いている"; fi
+          done
+          if [ -n "$why" ]; then echo "作業を飛ばす(Issue の状態): $why"; echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 作業を飛ばした旨を残す
+        if: success() && steps.check.outputs.skip == 'true'
+        run: echo "Issue の状態により、この Issue の作業は飛ばした"
+
       - name: 名義を設定する(token は消す)
+        if: success() && steps.check.outputs.skip != 'true'
         env:
           APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
           APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
@@ -354,17 +378,20 @@ jobs:
           rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
 
       - name: 版の値を ci/versions.env から読む
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           echo "NODE_VERSION=$(grep '^NODE_VERSION=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
           echo "EMSDK_VERSION=$(grep '^EMSDK_VERSION=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
           echo "RUST_TOOLCHAIN=$(grep '^RUST_TOOLCHAIN=' ci/versions.env | cut -d= -f2)" >> "$GITHUB_ENV"
 
       - name: Node を入れる
+        if: success() && steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: rust をそろえ、app の依存を入れてビルドし、fe-build を用意する
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --no-self-update
           rustup default "$RUST_TOOLCHAIN"
@@ -373,14 +400,17 @@ jobs:
           cargo build --release --locked --manifest-path lift/Cargo.toml
 
       - name: emsdk を入れる
+        if: success() && steps.check.outputs.skip != 'true'
         uses: emscripten-core/setup-emsdk@v16
         with:
           version: ${{ env.EMSDK_VERSION }}
 
       - name: アカウント ID を app/wrangler.jsonc から読む
+        if: success() && steps.check.outputs.skip != 'true'
         run: echo "CF_ACCOUNT=$(grep '"account_id"' app/wrangler.jsonc | cut -d'"' -f4)" >> "$GITHUB_ENV"
 
       - name: 抽出物を R2 のキャッシュから取る(公開の artifact は使わない)
+        if: success() && steps.check.outputs.skip != 'true'
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -397,13 +427,14 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 抽出物を lift/out-app/host に置く
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p lift/out-app
           mv "$RUNNER_TEMP/host" lift/out-app/host
           test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
 
       - name: インストーラの一覧(inventory)を R2 のキャッシュから取る(inventory の作業だけ)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -420,13 +451,13 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 一覧を作業ツリーの inputs/ に置く(inventory の作業だけ。commit は作業者が行う)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
         run: |
           mkdir -p inputs
           cp "$RUNNER_TEMP/inventory/fl-installer-files.tsv" inputs/fl-installer-files.tsv
 
       - name: 外部プラグインのインストーラを R2 のキャッシュから取る(plugin-external の作業だけ)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -443,7 +474,7 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 外部プラグインを lift/out-app/external に置き、照合する(plugin-external の作業だけ)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
         run: |
           set -o pipefail
           mkdir -p lift/out-app/external "$RUNNER_TEMP/out"
@@ -451,7 +482,7 @@ jobs:
           node tools/external-inputs/check.mjs lift/out-app/external | tee "$RUNNER_TEMP/out/external-check.txt"
 
       - name: 言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -468,14 +499,14 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
         run: |
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-resources" lift/out-app/host-extra/resources
           test -f lift/out-app/host-extra/resources/MANIFEST.tsv
 
       - name: 内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-builtin,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-builtin,')
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -492,13 +523,14 @@ jobs:
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)
-        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-builtin,')
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-builtin,')
         run: |
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-plugins" lift/out-app/host-extra/plugins
           test -f lift/out-app/host-extra/plugins/MANIFEST.tsv
 
       - name: タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す
+        if: success() && steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -510,6 +542,7 @@ jobs:
           node tools/task-accept.mjs < "$RUNNER_TEMP/task.md" > "$RUNNER_TEMP/task-accept.md" 2> "$RUNNER_TEMP/out/judge.txt"
 
       - name: opencode を導入する(版は固定)
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           curl -fsSL -o "$RUNNER_TEMP/cli.tgz" https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-2.3.0.tgz
           test "sha512-$(openssl dgst -sha512 -binary "$RUNNER_TEMP/cli.tgz" | base64 -w0)" = 'sha512-8T3K8L6Nd4fSG5BSgofqhmIDQ1ZvzDZZ2J7bFVB9RK1d5Hjqh24IcxgbcwpgGKkdvItrayi4Rl+wrSmhl17FFg=='
@@ -518,6 +551,7 @@ jobs:
           echo "$HOME/.opencode/bin" >> "$GITHUB_PATH"
 
       - name: opencode の認証情報を取り込み、作業者のモデルを設定する
+        if: success() && steps.check.outputs.skip != 'true'
         env:
           OPENCODE_AUTH_JSON: ${{ secrets.OPENCODE_AUTH_JSON }}
           OPENCODE_MODEL: ${{ vars.OPENCODE_MODEL }}
@@ -527,17 +561,20 @@ jobs:
           printf '{"model":"%s","agents":{"worker":{"model":"%s"},"title":{"model":"%s"},"summary":{"model":"%s"}}}\n' "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" "$OPENCODE_MODEL" > .opencode/opencode.jsonc
 
       - name: 作業者のプロンプトを作る(AGENTS.md と、Issue の本文)
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           { cat AGENTS.md; printf '\n\n---\n\n## タスク(Issue #%s)\n\n' "$ISSUE"; cat "$RUNNER_TEMP/task.md"; } > "$RUNNER_TEMP/prompt.md"
 
       - name: 作業者を 1 回動かす
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           opencode run --agent worker "$(cat "$RUNNER_TEMP/prompt.md")" > "$RUNNER_TEMP/out/report.md" 2> "$RUNNER_TEMP/stderr.log" < /dev/null || true
           rm -rf .opencode
 
       - name: 判定の道具を、取り直した main から取る
+        if: success() && steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -547,11 +584,13 @@ jobs:
           for f in judge.sh scan.sh flags.sh; do git show "refs/judge/main:guard/$f" > "$RUNNER_TEMP/guard/$f"; done
 
       - name: 判定(取り直した main の guard/judge.sh と、Issue の受け入れコマンドで)
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           set -o pipefail
           bash "$RUNNER_TEMP/guard/judge.sh" refs/judge/main "$RUNNER_TEMP/task-accept.md" 2>&1 | tee "$RUNNER_TEMP/out/judge.txt"
 
       - name: 通った変更を main に push する(token はこの段で発行する)
+        if: success() && steps.check.outputs.skip != 'true'
         env:
           APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
           APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
@@ -573,15 +612,18 @@ jobs:
           exit 1
 
       - name: 報告を検査して、成果物とサマリーに出す
-        if: always()
+        if: always() && steps.check.outputs.skip != 'true'
         run: |
+          set -o pipefail
           touch "$RUNNER_TEMP/out/report.md"
           git show "refs/judge/main:guard/scan.sh" > "$RUNNER_TEMP/scan.sh" 2>/dev/null || cp guard/scan.sh "$RUNNER_TEMP/scan.sh"
-          bash "$RUNNER_TEMP/scan.sh" "$RUNNER_TEMP/out/report.md"
+          bash "$RUNNER_TEMP/scan.sh" --redact "$RUNNER_TEMP/out/report.md" | tee "$RUNNER_TEMP/redact.txt"
+          red=$(grep -c '^redact' "$RUNNER_TEMP/redact.txt" || true)
+          if [ "$red" -gt 0 ]; then echo "::warning::報告のベンダー名の文字列を伏せ字にした($red 行。値は出さない)"; fi
           { echo "### 作業 #$ISSUE"; head -n 80 "$RUNNER_TEMP/out/report.md"; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: 報告と判定の出力を成果物に保存する(7 日)
-        if: always()
+        if: always() && steps.check.outputs.skip != 'true'
         uses: actions/upload-artifact@v7.0.2
         with:
           name: agent-${{ matrix.issue }}
@@ -616,7 +658,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/report"
-          gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | {name, conclusion, failed: [.steps[]? | select(.conclusion == "failure") | .name]}' | jq -s . > "$RUNNER_TEMP/report/jobs.json"
+          gh api --paginate "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | {name, conclusion, failed: [.steps[]? | select(.conclusion == "failure") | .name], skipped: any(.steps[]?; .name == "作業を飛ばした旨を残す" and .conclusion == "success")}' | jq -s . > "$RUNNER_TEMP/report/jobs.json"
           for n in $(jq -r '.[]' <<<"$CLAIMED"); do
             d="$RUNNER_TEMP/report/$n"; mkdir -p "$d"
             gh run download "$RUN_ID" -n "agent-$n" -D "$d" >/dev/null 2>&1 || true
@@ -624,9 +666,16 @@ jobs:
             failed=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me or (.name | startswith("作業 #") | not)) | select(.conclusion == "failure") | .failed[]] | join(", ")' "$RUNNER_TEMP/report/jobs.json")
             tail_=""; if [ -s "$d/judge.txt" ]; then tail_=$(tail -n 8 "$d/judge.txt"); fi
             sha=""; if [ -s "$d/commit.txt" ]; then sha=$(cat "$d/commit.txt"); fi
-            if [ "$conc" = success ]; then
+            state=$(gh api "repos/$GH_REPO/issues/$n" --jq .state 2>/dev/null || echo unknown)
+            skipped=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me)][0].skipped // false' "$RUNNER_TEMP/report/jobs.json")
+            if [ "$skipped" = true ]; then
+              echo skipped > "$d/status"; : > "$d/comment.md"
+            elif [ "$conc" = success ]; then
               echo success > "$d/status"
               { echo "通った: $RUN_URL"; if [ -n "$sha" ]; then echo "commit: $SERVER/$GH_REPO/commit/$sha"; else echo "commit: 変更なし"; fi; echo "受け入れの出力(末尾 8 行):"; echo "${tail_:-(出力が無い)}"; } > "$d/comment.md"
+            elif [ "$state" = closed ] && [ -n "$sha" ]; then
+              echo pushed-failed > "$d/status"
+              { echo "作業は完了し main に入った。後続の段(${failed:-(取れなかった。ジョブのログを見る)})が失敗した。"; echo "run: $RUN_URL"; } > "$d/comment.md"
             else
               echo failure > "$d/status"
               { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; } > "$d/comment.md"
@@ -639,7 +688,8 @@ jobs:
         run: |
           for n in $(jq -r '.[]' <<<"$CLAIMED"); do
             d="$RUNNER_TEMP/report/$n"
-            if [ "$(cat "$d/status")" = success ]; then
+            s=$(cat "$d/status")
+            if [ "$s" = success ]; then
               if [ "$(gh api "repos/$GH_REPO/issues/$n" --jq .state)" = open ]; then
                 echo "close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する" >> "$d/comment.md"
                 gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
@@ -647,10 +697,13 @@ jobs:
               else
                 gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
               fi
-              gh issue edit "$n" --repo "$GH_REPO" --remove-label running
+            elif [ "$s" = skipped ]; then
+              :
+            elif [ "$s" = pushed-failed ]; then
+              gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
             else
               gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
               gh issue edit "$n" --repo "$GH_REPO" --add-label failed
-              gh issue edit "$n" --repo "$GH_REPO" --remove-label running
             fi
+            gh issue edit "$n" --repo "$GH_REPO" --remove-label running
           done

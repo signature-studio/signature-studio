@@ -41,18 +41,18 @@ for n in "opencode を導入する(版は固定)" "opencode の認証情報を�
   o=$(jq -S --arg n "$n" '[.jobs.run.steps[] | select(.name == $n) | del(.if)] | .[0]' "$O")
   w=$(jq -S --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | del(.if)] | .[0]' "$J")
   ok "opencode: 「$n」の run・uses・env・with は旧版と一致" "$([ "$o" = "$w" ] && [ "$o" != null ] && echo same)" same
-  ok "opencode: 「$n」は if を持たない(モードの分岐を除く)" "$(jq -r --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | has("if")] | .[0]' "$J")" false
+  ok "opencode: 「$n」の if は、成功の後で、確認の skip が偽のときだけ" "$(jq -r --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
 done
 n="作業者を 1 回動かす"
 o=$(jq -r --arg n "$n" '[.jobs.run.steps[] | select(.name == $n) | .run] | .[0]' "$O" | grep -v 'driver/task.sh')
 w=$(jq -r --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | .run] | .[0]' "$J")
 ok "opencode: 「作業者を 1 回動かす」は、旧版から driver/task.sh の行だけを除いた物と一致" "$([ "$o" = "$w" ] && [ -n "$w" ] && echo same)" same
-ok "opencode: 「作業者を 1 回動かす」に if が無い" "$(jq -r --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | has("if")] | .[0]' "$J")" false
+ok "opencode: 「作業者を 1 回動かす」の if は、成功の後で、確認の skip が偽のときだけ" "$(jq -r --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
 ok "opencode: プロンプトは、AGENTS.md と Issue の本文から作る(別の段)" "$(jq -r '[.jobs.work.steps[] | select(.name | startswith("作業者のプロンプトを作る")) | .run] | .[0]' "$J" | grep -cE 'cat AGENTS[.]md.*task[.]md')" 1
 # 変えない段は、旧版と中身が一致する(run・uses・env・with・if)
 KEEP=("リポジトリを取得する(資格は残さない)" "名義を設定する(token は消す)" "版の値を ci/versions.env から読む" "Node を入れる" "rust をそろえ、app の依存を入れてビルドし、fe-build を用意する" "emsdk を入れる" "アカウント ID を app/wrangler.jsonc から読む" "抽出物を R2 のキャッシュから取る(公開の artifact は使わない)" "抽出物を lift/out-app/host に置く")
 diffs=""; for n in "${KEEP[@]}"; do
-  o=$(jq -S --arg n "$n" '[.jobs.run.steps[] | select(.name == $n)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.work.steps[] | select(.name == $n)] | .[0]' "$J")
+  o=$(jq -S --arg n "$n" '[.jobs.run.steps[] | select(.name == $n) | del(.if)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | del(.if)] | .[0]' "$J")
   [ "$o" != null ] && [ "$o" = "$w" ] || diffs="$diffs|$n"
 done
 ok "作業の段: 変えない段は旧版と中身が一致する(差の一覧)" "$diffs" ""
@@ -68,7 +68,7 @@ ok "作業ジョブ: job の env に secrets・github.token が無い" "$(jq -r 
 # (f) 判定の段は pipefail を持つ。push の段は if を持たない。判定の出力は成果物に残す
 ok "判定の段: 最初の行が set -o pipefail(パイプで失敗を隠さない)" "$(jq -r '.jobs.work.steps[] | select((.run // "") | test("judge[.]sh\" refs/judge/main")) | .run' "$J" | grep -m1 . )" "set -o pipefail"
 ok "判定の段: judge の出力を out/judge.txt に tee で残す" "$(grep -cF 'tee "$RUNNER_TEMP/out/judge.txt"' "$A")" 1
-ok "push の段: if を持たない(判定が通ったときだけ走る)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | has("if")] | .[0]' "$J")" false
+ok "push の段: if は成功の後で、確認の skip が偽のときだけ(判定が通ったときだけ走る)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
 ok "push の段: push できた SHA を out/commit.txt に残す" "$(grep -cF 'git rev-parse HEAD > "$RUNNER_TEMP/out/commit.txt"' "$A")" 1
 ok "どの段にも continue-on-error が無い" "$(grep -c 'continue-on-error' "$A")" 0
 ok "agent.yml: タブ文字が無い" "$(grep -c "$(printf '\t')" "$A")" 0
@@ -82,7 +82,7 @@ P=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main �
 ok "push: 判定の後に、題名と Closes #\$ISSUE の空の commit を作り、その後に push する" "$(c=$(grep -n 'git commit --allow-empty' <<<"$P" | cut -d: -f1); p=$(grep -n 'git push origin HEAD:main' <<<"$P" | cut -d: -f1); [ -n "$c" ] && [ -n "$p" ] && [ "$c" -lt "$p" ] && grep -qF 'Closes #$ISSUE' <<<"$P" && grep -qF 'title.txt' <<<"$P" && echo yes)" yes
 ok "push: 変更が無くても止めない(「変更なし」で終わる経路が無い)" "$(grep -c '変更なし' <<<"$P")" 0
 ok "push: commit の名義を書かない(git -c・--author・GIT_AUTHOR・GIT_COMMITTER・git config user を使わない)" "$(grep -cE 'git -c |--author|GIT_AUTHOR|GIT_COMMITTER|git config user' "$A")" 0
-ok "push の段は、判定の段より後にあり、if を持たない" "$(jq -r '[.jobs.work.steps | to_entries[] | select(.value.name | test("^判定[(]")) | .key] as $j | [.jobs.work.steps | to_entries[] | select(.value.name | test("通った変更を main に push")) | .key] as $p | "\($j[0] < $p[0])/\(.jobs.work.steps[$p[0]] | has("if") | not)"' "$J")" "true/true"
+ok "push の段は、判定の段より後にあり、if は成功の後で、確認の skip が偽のとき" "$(jq -r '[.jobs.work.steps | to_entries[] | select(.value.name | test("^判定[(]")) | .key] as $j | [.jobs.work.steps | to_entries[] | select(.value.name | test("通った変更を main に push")) | .key] as $p | "\($j[0] < $p[0])/\(.jobs.work.steps[$p[0]].if == "success() && steps.check.outputs.skip != '"'"'true'"'"'")"' "$J")" "true/true"
 R=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .run] | .[0]' "$J")
 ok "report: gh issue close は 1 回だけ、Issue が open のときの if の中にある" "$(grep -c 'gh issue close' <<<"$R")/$(awk '/= open \]; then/{f=1} /else/{f=0} /gh issue close/{print f}' <<<"$R")" "1/1"
 ok "report: 閉じられなかったときの注記を、コメントに書く" "$(grep -cF 'close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する' <<<"$R")" 1
@@ -440,7 +440,7 @@ ok "work: needs は select・start・extract(issue_labels を読む)" "$(jq -c '
 NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
-  | map(select((.name) as $x | ($old | any(. == $x)) | not))')
+  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨") | not))')
 ok "新しい段: 551a4e59 より後の段は、extract に 12 件、work に 8 件(抽出物の追加の段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=12 work=8"
 ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
 ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
@@ -448,10 +448,11 @@ ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一�
 ok "新しい段: R2 の鍵を使うのは、extract の 4 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
-  def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: .["if"], id: .id, uses: .uses, with: .with, env: .env, run: .run}];
-  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $names
+  def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
+  def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.start == $n[0].jobs.start, $b[0].jobs.report == $n[0].jobs.report] | all')" true
+ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
 ok "保存の段: runs-on/cache/save が 4 つ(一覧・外部・言語等・内蔵のプラグイン)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "4 true"
@@ -476,7 +477,7 @@ pj "$T/base3.yml" > "$T/base3.json" 2>>"$T/pj.err"; B3J=$T/base3.json
 NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
-  | map(select((.name) as $x | ($old | any(. == $x)) | not))')
+  | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨") | not))')
 ok "抽出物の追加: 新しい段は extract に 6 件、work に 4 件" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=6 work=4"
 ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
 ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
@@ -509,9 +510,109 @@ WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テン�
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
 ok "抽出物の追加: work の段の順は、lift/out-app/host の後に、言語等と内蔵のプラグインを置き、タスクの前" "$(jq -r --argjson o "$WORD" '[.jobs.work.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
-  def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: .["if"], id: .id, uses: .uses, with: .with, env: .env, run: .run}];
-  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $names
+  def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
+  def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
+  ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, $b[0].jobs.report == $n[0].jobs.report] | all')" true
+ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name)) == ($n[0].jobs.work | del(.steps, .needs, .name)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
+# (n) 同じ Issue の直列化、作業の前の Issue の状態の確認、報告の伏せ字、報告の判定(閉じて main に入った作業は、失敗の印を付けない)。偽の gh と fixture で、段の実際の動きを確かめる
+v1=anthr; v2=opic
+ok "concurrency: workflow の最上位が、Issue の番号ごとの group で、cancel-in-progress は false" "$(jq -r '.concurrency | "\(.group)/\(.["cancel-in-progress"] | tostring)"' "$J")" 'agent-${{ github.event.issue.number }}/false'
+ok "作業の前の確認: work の 2 番目の段(リポジトリ取得の次)が id check" "$(jq -r '.jobs.work.steps[1].id' "$J")" check
+ok "作業の前の確認: token は github.token だけ(secrets を使わない)" "$(jq -r '.jobs.work.steps[1].env | tostring | ((test("secrets") | not) and test("github[.]token"))' "$J")" true
+ok "作業の前の確認: skip は GITHUB_OUTPUT に書く(GITHUB_ENV は使わない)" "$(jq -r '.jobs.work.steps[1].run' "$J" | grep -cF 'GITHUB_OUTPUT')/$(jq -r '.jobs.work.steps[1].run' "$J" | grep -c 'GITHUB_ENV')" "1/0"
+NGT="steps.check.outputs.skip != 'true'"
+ok "作業の段: 確認より後の段(飛ばした旨を除く)は、全て success() か always() で、skip でないときの条件を持つ(例外 0)" "$(jq -r --arg g "$NGT" '[.jobs.work.steps[2:][] | select(.name | test("飛ばした旨") | not) | (.["if"] // "") | select((contains($g) and (startswith("success() && ") or startswith("always() && "))) | not)] | length' "$J")" 0
+ok "作業の段: 確認より後の段は 20 以上ある(空振りでない)" "$(jq -r '[.jobs.work.steps[2:][] | select(.name | test("飛ばした旨") | not)] | length > 20' "$J")" true
+ok "作業の段: always() の段は 2 つ(報告の検査・成果物の保存)で、どちらも skip でないときの条件を持つ" "$(jq -r --arg g "$NGT" '[.jobs.work.steps[] | select((.["if"] // "") | startswith("always()")) | (.["if"] | contains($g))] | "\(length)/\(all)"' "$J")" "2/true"
+ok "作業の段: 飛ばした旨の段は、成功の後で、確認の skip が真のときだけ動く" "$(jq -r '[.jobs.work.steps[] | select(.name | test("飛ばした旨")) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip == 'true'"
+RP=$(jq -r '[.jobs.work.steps[] | select(.name == "報告を検査して、成果物とサマリーに出す") | .run][0] // ""' "$J")
+ok "報告の検査: --redact で伏せ字にし、伏せ字の件数を ::warning:: で出す(値は出さない)" "$(grep -cF -- '--redact "$RUNNER_TEMP/out/report.md"' <<<"$RP")/$(grep -c '::warning::' <<<"$RP")" "1/1"
+ok "報告の検査: pipefail を持つ(伏せ字の後の失敗を隠さない)" "$(grep -c 'set -o pipefail' <<<"$RP")" 1
+NFX=$T/nfx; NFB=$T/nfbin; NGL=$T/ngh.log; NGB=$T/ngh-bodies.txt; mkdir -p "$NFX" "$NFB"; : > "$NGL"; : > "$NGB"
+cat > "$NFB/gh" <<'NGH'
+#!/usr/bin/env bash
+echo "$*" >> "$NGL"
+case "$1" in
+  api)
+    shift; p=""; jqf=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --jq) jqf=$2; shift ;;
+        -*) ;;
+        *) [ -z "$p" ] && p=$1 ;;
+      esac
+      shift
+    done
+    f="$NFX/$(printf '%s' "${p%%\?*}" | sed 's#/#__#g').json"
+    [ -f "$f" ] || { echo "fake gh: 無い: $p" >&2; exit 1; }
+    if [ -n "$jqf" ]; then jq -r "$jqf" "$f"; else cat "$f"; fi
+    exit $? ;;
+  run)
+    n=""; d=""; shift 2
+    while [ $# -gt 0 ]; do case "$1" in -n) n=$2; shift ;; -D) d=$2; shift ;; esac; shift; done
+    src="$NFX/art-${n#agent-}"; [ -d "$src" ] || exit 1
+    cp -r "$src"/. "$d"/; exit $? ;;
+  issue)
+    sub=$2; num=$3; shift 3; bf=""
+    while [ $# -gt 0 ]; do case "$1" in --body-file) bf=$2; shift ;; esac; shift; done
+    if [ -n "$bf" ]; then echo "BODY $num $sub" >> "$NGB"; cat "$bf" >> "$NGB"; fi
+    exit 0 ;;
+  *) echo "fake gh: 未対応: $*" >&2; exit 1 ;;
+esac
+NGH
+chmod +x "$NFB/gh"
+nfx() { printf '%s' "$2" > "$NFX/repos__o__r__issues__$1.json"; }
+nfx 11 '{"number":11,"state":"closed","labels":[]}'
+nfx 12 '{"number":12,"state":"open","labels":[]}'
+nfx 13 '{"number":13,"state":"open","labels":[]}'
+nfx 14 '{"number":14,"state":"open","labels":[]}'
+nfx 15 '{"number":15,"state":"closed","labels":[]}'
+nfx 21 '{"number":21,"state":"open","labels":[]}'
+nfx 22 '{"number":22,"state":"closed","labels":[]}'
+nfx 23 '{"number":23,"state":"open","labels":[{"name":"failed"}]}'
+nfx 24 '{"number":24,"state":"open","labels":[{"name":"render"},{"name":"pm-hold"}]}'
+CHK=$(jq -r '[.jobs.work.steps[] | select(.id == "check") | .run][0] // ""' "$J"); printf '%s\n' "$CHK" > "$T/nchk.sh"
+nchk() { rm -f "$T/nchk-out"; ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NFX" NGL="$NGL" NGB="$NGB" GH_TOKEN=x GH_REPO=o/r ISSUE=$1 RUNNER_TEMP="$T" GITHUB_OUTPUT="$T/nchk-out" bash -e "$T/nchk.sh" > "$T/nchk.log" 2>&1; echo "$? $(grep '^skip=' "$T/nchk-out" 2>/dev/null)" ); }
+ok "作業の前の確認: 開いていて、failed・pm-hold が無ければ、作業する(skip=false)" "$(nchk 21)" "0 skip=false"
+ok "作業の前の確認: 閉じていれば、作業を飛ばす(skip=true)" "$(nchk 22)" "0 skip=true"
+ok "作業の前の確認: failed が付いていれば、作業を飛ばす(skip=true)" "$(nchk 23)" "0 skip=true"
+ok "作業の前の確認: pm-hold が付いていれば、作業を飛ばす(skip=true)" "$(nchk 24)" "0 skip=true"
+ok "作業の前の確認: Issue を読めなければ失敗する(作業の判定を出さない)" "$(nchk 25)" "1 "
+R1=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を集める")) | .run][0] // ""' "$J")
+R2=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .run][0] // ""' "$J")
+SKN=$(jq -r '[.jobs.work.steps[] | select(.name | test("飛ばした旨")) | .name][0] // "無し"' "$J")
+CKN=$(jq -r '[.jobs.work.steps[] | select(.id == "check") | .name][0] // "無し"' "$J")
+SCN="報告を検査して、成果物とサマリーに出す"
+jq -n --arg sk "$SKN" --arg ck "$CKN" --arg sc "$SCN" '{jobs: [
+  {name: "起動する Issue を決める", conclusion: "success", steps: []},
+  {name: "作業 #11", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $sc, conclusion: "failure"}]},
+  {name: "作業 #12", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: "作業者を 1 回動かす", conclusion: "failure"}]},
+  {name: "作業 #13", conclusion: "success", steps: [{name: $ck, conclusion: "success"}, {name: $sc, conclusion: "success"}]},
+  {name: "作業 #14", conclusion: "success", steps: [{name: $ck, conclusion: "success"}, {name: $sk, conclusion: "success"}]},
+  {name: "作業 #15", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $sc, conclusion: "failure"}]}
+]}' > "$NFX/repos__o__r__actions__runs__77__jobs.json"
+mkdir -p "$NFX/art-11" "$NFX/art-13" "$NFX/art-15"; printf '0123abc\n' > "$NFX/art-11/commit.txt"; printf '4567def\n' > "$NFX/art-13/commit.txt"
+printf '%s\n' "$R1" > "$T/nrep1.sh"; printf '%s\n' "$R2" > "$T/nrep2.sh"
+nrun() { ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NFX" NGL="$NGL" NGB="$NGB" GH_TOKEN=x GH_REPO=o/r RUN_ID=77 RUN_URL=https://example.test/run/77 SERVER=https://example.test CLAIMED='[11,12,13,14,15]' RUNNER_TEMP="$T/nrt" bash -e "$T/$1" > "$T/$1.log" 2>&1; echo $? ); }
+mkdir -p "$T/nrt"
+ok "報告の 1 段目(結果を集める)が、0 で終わる" "$(nrun nrep1.sh)" 0
+ok "報告の 2 段目(結果を書き、状態を変える)が、0 で終わる" "$(nrun nrep2.sh)" 0
+nb() { awk -v n="$1" '$0 ~ ("^BODY " n " ") {f=1; next} /^BODY /{f=0} f' "$NGB"; }
+ok "報告(閉じて main に入った失敗): 失敗の印 failed を付けない" "$(grep -c '^issue edit 11 .*add-label failed' "$NGL")" 0
+ok "報告(閉じて main に入った失敗): 作業が main に入ったと書き、失敗した段の名前を出す" "$(nb 11 | grep -cF "作業は完了し main に入った。後続の段($SCN)が失敗した")" 1
+ok "報告(閉じて main に入った失敗): 閉じているので close はせず、running は外す" "$(grep -c '^issue close 11' "$NGL")/$(grep -c '^issue edit 11 .*remove-label running' "$NGL")" "0/1"
+ok "報告(open のまま失敗): failed を付け、running を外す" "$(grep -c '^issue edit 12 .*add-label failed' "$NGL")/$(grep -c '^issue edit 12 .*remove-label running' "$NGL")" "1/1"
+ok "報告(open のまま失敗): 作業が main に入ったとは書かない" "$(nb 12 | grep -cF '作業は完了し')" 0
+ok "報告(成功): 通った旨を書き、開いていれば close し、running を外す" "$(grep -c '^issue close 13' "$NGL")/$(nb 13 | grep -cF '通った')/$(grep -c '^issue edit 13 .*remove-label running' "$NGL")" "1/1/1"
+ok "報告(飛ばした): 何も書かず、failed も付けず、running だけ外す" "$(grep -c '^BODY 14 ' "$NGB")/$(grep -c '^issue edit 14 .*add-label failed' "$NGL")/$(grep -c '^issue edit 14 .*remove-label running' "$NGL")" "0/0/1"
+ok "報告(閉じていて、main に入った記録が無い失敗): failed を付け、作業が入ったとは書かない" "$(grep -c '^issue edit 15 .*add-label failed' "$NGL")/$(nb 15 | grep -cF '作業は完了し')" "1/0"
+SCD=$T/nscan; SRT=$T/nscan-rt; mkdir -p "$SCD/guard" "$SRT/out"; cp "$top/guard/scan.sh" "$SCD/guard/scan.sh"; printf '%s\n' "$RP" > "$T/nscan.sh"
+printf 'by %s%s\n' "$v1" "$v2" > "$SRT/out/report.md"
+( cd "$SCD" && env RUNNER_TEMP="$SRT" ISSUE=5 GITHUB_STEP_SUMMARY="$SRT/summary.md" bash -e "$T/nscan.sh" > "$T/nscan.log" 2>&1; echo $? > "$T/nscan.rc" )
+ok "報告の検査(実行): ベンダー名の文字列だけなら通り、報告を伏せ字にし、サマリーに出す" "$(cat "$T/nscan.rc")/$(grep -c "$v1$v2" "$SRT/out/report.md")/$(grep -c '^### 作業 #5$' "$SRT/summary.md")/$(grep -c '::warning::' "$T/nscan.log")" "0/0/1/1"
+hx=0123456789abcdef; hx="$hx$hx"; printf 'id %s\nby %s%s\n' "$hx" "$v1" "$v2" > "$SRT/out/report.md"; rm -f "$SRT/summary.md"
+( cd "$SCD" && env RUNNER_TEMP="$SRT" ISSUE=5 GITHUB_STEP_SUMMARY="$SRT/summary.md" bash -e "$T/nscan.sh" > "$T/nscan.log" 2>&1; echo $? > "$T/nscan.rc" )
+ok "報告の検査(実行): ベンダー名以外(cfhex)が残れば失敗し、サマリーには出さない" "$(cat "$T/nscan.rc")/$(grep -c "$v1$v2" "$SRT/out/report.md")/$(test -e "$SRT/summary.md" && echo made || echo none)" "1/0/none"
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
