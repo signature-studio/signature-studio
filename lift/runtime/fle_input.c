@@ -4,6 +4,7 @@
  *   WM_NCHITTEST (inputdev/wm-nchittest), WM_SETCURSOR (menurc/wm-setcursor), WM_MOUSEACTIVATE, WM_MOUSEMOVE, WM_LBUTTONDOWN, WM_MOUSELEAVE, WM_MOUSEHOVER, TrackMouseEvent, TRACKMOUSEEVENT, _TrackMouseEvent,
  *   WM_KEYDOWN, WM_CHAR, GetDoubleClickTime, GetMessageTime, GetMessagePos, MessageBeep (quoted below where they decide a value). */
 #define FLE_INPUT_IMPL 1
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -815,6 +816,13 @@ static int input_hook_swallows(unsigned t, const fle_tmsg *m, int remove)
     return 0;
 }
 
+/* C-6 (#1310): one line on stderr for a right button message that a thread takes out of its queue: input: WM_RBUTTONDOWN|WM_RBUTTONUP <window> <screen x>,<screen y> client=<x>,<y> (the client point is lParam). */
+static void note_rbutton(const fle_tmsg *m)
+{
+    fprintf(stderr, "input: %s %#" PRIx64 " %d,%d client=%d,%d\n", m->msg == FLE_WM_RBUTTONUP ? "WM_RBUTTONUP" : "WM_RBUTTONDOWN", m->hwnd, m->ptx, m->pty,
+            (int)(int16_t)(uint16_t)m->lp, (int)(int16_t)(uint16_t)(m->lp >> 16));
+}
+
 /* Called by GetMessageW and PeekMessageW of thread t after the posted queue found nothing. */
 int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int remove, uint32_t qs, fle_tmsg *out)
 {
@@ -881,6 +889,7 @@ int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int r
                 k--;
                 continue;
             }
+            if (remove && (out->msg == FLE_WM_RBUTTONDOWN || out->msg == FLE_WM_RBUTTONUP)) note_rbutton(out);
             return 1;
         }
         return 0;
@@ -989,6 +998,7 @@ int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp,
             sx = sx16(lp);
             sy = sx16(lp >> 16);
         }
+        fprintf(stderr, "input: WM_CONTEXTMENU %#" PRIx64 " %d,%d child=%#" PRIx64 "\n", target, sx, sy, hwnd);
         (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, hwnd, lparam_xy(sx, sy));
         *result = 0;
         return 1;

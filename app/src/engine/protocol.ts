@@ -31,6 +31,8 @@ export type ToWorker =
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
   | { cmd: 'desk-peek' }
+  /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
+  | { cmd: 'window-api-trace'; on: boolean }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */

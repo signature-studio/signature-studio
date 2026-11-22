@@ -7,7 +7,7 @@
  *     the browser (G3). The answer is a double: < 0 the page ended the session; 0 input events were queued by the exports below (and/or the clock was moved by fle_g3_clock_to); > 0 the virtual clock is to be moved to
  *     that many ticks (the scheduler never skips a deadline: fle_thread.c clamps it to `next`).
  * The exports (called by the Worker while the engine is suspended; the engine and the exports run one at a time on the one wasm thread): fle_g3_mouse, fle_g3_key, fle_g3_clock_to, fle_g3_snapshot, fle_g3_timers,
- * fle_g3_ticks, fle_g3_pending. The runtime turns the queued raw events into messages when the owning thread retrieves them (runtime/fle_input.c): the page makes no message. */
+ * fle_g3_ticks, fle_g3_pending, fle_g3_window_api_trace (C-6). The runtime turns the queued raw events into messages when the owning thread retrieves them (runtime/fle_input.c): the page makes no message. */
 #ifndef __EMSCRIPTEN__
 #error "fruity_idle.c is the wasm build of the FRUITY-on harness (build_nmod_wasm.sh FRUITY=1)"
 #endif
@@ -105,6 +105,8 @@ EMSCRIPTEN_KEEPALIVE void fle_g3_snapshot(void) {
 /* a timer made by the host for the window with logical id `lid` (a probe of the G3 record, not a call of the guest: runtime fle_win_host_timer) */
 EMSCRIPTEN_KEEPALIVE int fle_g3_probe_timer(unsigned lid, unsigned id, unsigned ms) { return fle_win_host_timer(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid, id, ms); }
 EMSCRIPTEN_KEEPALIVE void fle_g3_timers(void) { g3_timer_log(stdout); fflush(stdout); }
+/* C-6 (#1310, a test aid): the window-API trace (window-api: lines on stderr, fle_win.c) on (1) or off (0). Off until the page turns it on, so a start-up writes none of them */
+EMSCRIPTEN_KEEPALIVE void fle_g3_window_api_trace(int on) { fle_win_api_trace_set(on); }
 
 /* the export of decision 0128 (a message by window id), kept because the link line names it: the allow-list is the one of decision 0128 */
 EMSCRIPTEN_KEEPALIVE int fle_host_post_input(unsigned lid, unsigned msg, unsigned wparam, unsigned lparam) {

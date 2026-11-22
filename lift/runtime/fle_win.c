@@ -353,6 +353,9 @@ static int is_no_redraw_chain(int64_t i);
 static uint32_t next_lid = 1;
 static int g2_seen;                            /* the first visible top-level window has appeared (G2) */
 static char g2_text[12000];
+/* C-6 (#1310): the window-API trace (fle_win_api_trace_set). Off by default, so a start-up writes none of its lines. */
+static int api_trace;
+void fle_win_api_trace_set(int on) { api_trace = on != 0; }
 
 static uint64_t handle_of(int64_t i) { return FLE_WIN_HANDLE_BASE + (uint64_t)FLE_WIN_HANDLE_STEP * ((uint64_t)i + 1u); }
 
@@ -1151,6 +1154,7 @@ void fle_imp_CreateWindowExW(void)
         (void)call_wndproc(api, tab[idx].wndproc, h, FLE_WM_SHOWWINDOW, 1, 0);
         note_visibility_changed();
     }
+    if (api_trace) fprintf(stderr, "window-api: CreateWindowExW %#" PRIx64 " ex=%#x style=%#x parent=%#" PRIx64 " x=%d y=%d cx=%d cy=%d\n", h, ex, style, parent, (int32_t)x, (int32_t)y, (int32_t)cx, (int32_t)cy);
     R[0] = h;
 }
 
@@ -3747,6 +3751,7 @@ void fle_imp_SetWindowPos(void)
     uint32_t flags = (uint32_t)fle_arg(7);
     int64_t i;
 
+    if (api_trace) fprintf(stderr, "window-api: SetWindowPos %#" PRIx64 " after=%#" PRIx64 " x=%d y=%d cx=%d cy=%d flags=%#x\n", h, after, x, y, cx, cy, flags);
     fle_win_check_thread(api);
     if (h == FLE_DESKTOP_HANDLE) fle_stop(api, "hWnd is the desktop window: the page does not say what moving it does");
     i = win_arg(h);
@@ -3772,6 +3777,7 @@ void fle_imp_MoveWindow(void)
     uint32_t repaint = (uint32_t)fle_arg(6);
     int64_t i;
 
+    if (api_trace) fprintf(stderr, "window-api: MoveWindow %#" PRIx64 " x=%d y=%d cx=%d cy=%d repaint=%u\n", R[1], x, y, w, hgt, repaint);
     fle_win_check_thread(api);
     i = win_arg(R[1]);
     if (i < 0) return;
@@ -3832,6 +3838,7 @@ void fle_imp_ShowWindow(void)
     int was, now, was_iconic, was_zoomed;
     uint32_t swp;
 
+    if (api_trace) fprintf(stderr, "window-api: ShowWindow %#" PRIx64 " cmd=%d\n", R[1], cmd);
     fle_win_check_thread(api);
     if (i < 0) return;
     if (cmd < 0 || cmd > 9) {
