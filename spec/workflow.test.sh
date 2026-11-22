@@ -629,6 +629,14 @@ ok "push の段: push 前の HEAD を RUNNER_TEMP/work-tip.txt に、空の comm
 ok "取り込みの段: 名前が 1 つ。名義の段の後で、作業者の段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | .name] as $n | ($n | index($p)) as $i | ($n | index("名義を設定する(token は消す)")) as $g | ($n | index("作業者を 1 回動かす")) as $w | "\($n | map(select(. == $p)) | length) \($g != null and $i != null and $w != null and $g < $i and $i < $w)"' "$J")" "1 true"
 ok "取り込みの段の if: 作業の前の確認が通った(skip が偽)ときだけ" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
 ok "取り込みの段の env: GH_TOKEN は github.token で、secrets を使わない" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .env] | .[0] | "\(.GH_TOKEN)/\(tostring | test("secrets"))"' "$J")" '${{ github.token }}/false'
+ok "取り込みの段の位置: キャッシュの復元(runs-on/cache/restore の 5 つ)と、取った物の置く段の全てより後で、作業者の段の前に在る(鍵は取り込み前の main のファイルで計算される)" "$(jq -r --arg p "$PRN" '
+  [.jobs.work.steps[].name] as $n
+  | ($n | index($p)) as $i
+  | ($n | index("作業者を 1 回動かす")) as $w
+  | [.jobs.work.steps | to_entries[] | select((.value.uses // "") | startswith("runs-on/cache/restore")) | .key] as $r
+  | [.jobs.work.steps | to_entries[] | select((.value.name // "") | test("^(抽出物を lift/out-app/host に置く|一覧を作業ツリーの inputs/ に置く|外部プラグインを lift/out-app/external に置き|取った物を lift/out-app/host-extra/)")) | .key] as $p
+  | "\($r | length)/\($p | length)/\(($i != null) and ($w != null) and (((($r + $p) | max) < $i)) and ($i < $w))"' "$J")" "5/5/true"
+ok "取り込みの段の位置: 取った物の置く段(plugin-builtin)の後で、タスクの段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[].name] as $n | ($n | index($p)) as $i | ($n | index("取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)")) as $q | ($n | index("タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す")) as $t | ($i != null and $q != null and $t != null and $q < $i and $i < $t)' "$J")" true
 ok "作業者の段に env が無い(取り込みの token を渡さない)" "$(jq -r --arg n "作業者を 1 回動かす" '[.jobs.work.steps[] | select(.name == $n) | has("env")] | .[0] | tostring' "$J")" false
 ok "work の権限: actions が read(取り込みの段が、保存された artifact を読む)。contents と issues は read のまま" "$(jq -r '.jobs.work.permissions | "\(.actions)/\(.contents)/\(.issues)"' "$J")" "read/read/read"
 ok ".gitignore に .prior-work.md が在る(取り込みの記述は commit しない)" "$(grep -cxF '.prior-work.md' "$top/.gitignore")" 1
