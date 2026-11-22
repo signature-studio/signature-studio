@@ -197,6 +197,14 @@ export class FruityEngine {
     return (ex.fle_g3_taskbar_iconic as () => number)() >>> 0;
   }
 
+  /** C-6 (#1310, a test aid): the engine's window-API trace on or off (fle_g3_window_api_trace, lift/harness/fruity_idle.c); false when the wasm has no such export */
+  windowApiTrace(on: boolean): boolean {
+    const ex = this.instance?.exports as Record<string, unknown> | undefined;
+    if (!ex || typeof ex.fle_g3_window_api_trace !== 'function') return false;
+    (ex.fle_g3_window_api_trace as (on: number) => void)(on ? 1 : 0);
+    return true;
+  }
+
   /** decision 0212: the wasm has the export that tells the guest the display changed (a bundle built before screen1 has none) */
   get hasDisplay(): boolean { return typeof (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_display === 'function'; }
 

@@ -69,6 +69,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'wake': deskCounters.wakes++; drainRing(); break;
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
+    case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }

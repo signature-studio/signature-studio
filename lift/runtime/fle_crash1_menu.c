@@ -1,4 +1,5 @@
 /* Decision 0209 (crash1): user32's menu family. See fle_crash1_menu.h for the pages and for what is Wine's reading. */
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -331,13 +332,15 @@ static int insert_with(const char *api, uint64_t h, uint32_t id, uint32_t flags,
     return ok;
 }
 
-void fle_imp_CreateMenu(void) { R[0] = new_menu(0); }
-void fle_imp_CreatePopupMenu(void) { R[0] = new_menu(MF_POPUP); }
+/* C-6 (#1310): every call of the menu family writes one line on stderr, menu-api: <API> <the arguments that matter> (a start-up makes few of them). */
+void fle_imp_CreateMenu(void) { fprintf(stderr, "menu-api: CreateMenu\n"); R[0] = new_menu(0); }
+void fle_imp_CreatePopupMenu(void) { fprintf(stderr, "menu-api: CreatePopupMenu\n"); R[0] = new_menu(MF_POPUP); }
 
 void fle_imp_DestroyMenu(void)
 {
     fle_menu *m = get_menu(R[1], 0);
 
+    fprintf(stderr, "menu-api: DestroyMenu %#" PRIx64 "\n", R[1]);
     if (!m) {
         R[0] = 0;
         return;
@@ -351,6 +354,7 @@ void fle_imp_InsertMenuW(void)
     fle_mii mii;
     uint32_t flags = (uint32_t)R[8];
 
+    fprintf(stderr, "menu-api: InsertMenuW %#" PRIx64 " pos=%u flags=%#x id=%#" PRIx64 "\n", R[1], (uint32_t)R[2], flags, R[9]);
     mnu2mii(flags, R[9], fle_arg(5), &mii);
     R[0] = insert_with("InsertMenuW", R[1], (uint32_t)R[2], flags, &mii) ? 1u : 0u;
 }
@@ -361,6 +365,7 @@ void fle_imp_InsertMenuItemW(void)
     uint64_t h = R[1], p = R[9];
     uint32_t item = (uint32_t)R[2], bypos = (uint32_t)R[8] != 0;
 
+    fprintf(stderr, "menu-api: InsertMenuItemW %#" PRIx64 " item=%u bypos=%u\n", h, item, bypos);
     if (!normalize_mii(p, &mii)) {
         R[0] = 0;
         return;
@@ -376,6 +381,7 @@ void fle_imp_SetMenuItemInfoW(void)
     uint64_t h = R[1], p = R[9];
     uint32_t item = (uint32_t)R[2], bypos = (uint32_t)R[8] != 0;
 
+    fprintf(stderr, "menu-api: SetMenuItemInfoW %#" PRIx64 " item=%u bypos=%u\n", h, item, bypos);
     if (!normalize_mii(p, &mii)) {
         R[0] = 0;
         return;
@@ -456,6 +462,7 @@ void fle_imp_GetMenuItemInfoW(void)
 
     uint32_t cb = p ? (uint32_t)fle_ld(p, 4) : 0;
 
+    fprintf(stderr, "menu-api: GetMenuItemInfoW %#" PRIx64 " item=%u bypos=%u\n", h, item, bypos);
     if (cb != MII_SIZE && cb != MII_SIZE_OLD) {   /* the size without hbmpItem is accepted, too (user32 normalizes it, as for the insertion) */
         fle_set_last_error(87u);
         R[0] = 0;
@@ -487,6 +494,7 @@ void fle_imp_GetMenuStringW(void)
 {
     fle_mii io;
 
+    fprintf(stderr, "menu-api: GetMenuStringW %#" PRIx64 " id=%u flags=%#x\n", R[1], (uint32_t)R[2], (uint32_t)fle_arg(5));
     memset(&io, 0, sizeof io);
     io.cbSize = MII_SIZE;
     io.mask = MIIM_STRING;
@@ -500,6 +508,7 @@ void fle_imp_GetMenuItemCount(void)
 {
     fle_menu *m = get_menu(R[1], 0);
 
+    fprintf(stderr, "menu-api: GetMenuItemCount %#" PRIx64 "\n", R[1]);
     R[0] = m ? (uint64_t)m->n : 0xFFFFFFFFull;
 }
 
@@ -508,6 +517,7 @@ void fle_imp_GetMenuItemID(void)
     fle_menu *m;
     uint32_t pos;
 
+    fprintf(stderr, "menu-api: GetMenuItemID %#" PRIx64 " pos=%u\n", R[1], (uint32_t)R[2]);
     if (!find_item(R[1], (uint32_t)R[2], MF_BYPOSITION, &m, &pos)) {
         R[0] = 0xFFFFFFFFull;
         return;
@@ -520,6 +530,7 @@ void fle_imp_GetSubMenu(void)
     fle_menu *m;
     uint32_t pos;
 
+    fprintf(stderr, "menu-api: GetSubMenu %#" PRIx64 " pos=%u\n", R[1], (uint32_t)R[2]);
     if (!find_item(R[1], (uint32_t)R[2], MF_BYPOSITION, &m, &pos)) {
         R[0] = 0;
         return;
@@ -533,6 +544,7 @@ void fle_imp_GetMenuState(void)
     uint32_t pos;
     fle_mitem *it;
 
+    fprintf(stderr, "menu-api: GetMenuState %#" PRIx64 " pos=%u flags=%#x\n", R[1], (uint32_t)R[2], (uint32_t)R[8]);
     if (!find_item(R[1], (uint32_t)R[2], (uint32_t)R[8], &m, &pos)) {
         R[0] = 0xFFFFFFFFull;
         return;
@@ -552,6 +564,7 @@ void fle_imp_RemoveMenu(void)
     fle_menu *m;
     uint32_t pos;
 
+    fprintf(stderr, "menu-api: RemoveMenu %#" PRIx64 " pos=%u flags=%#x\n", R[1], (uint32_t)R[2], (uint32_t)R[8]);
     if (!find_item(R[1], (uint32_t)R[2], (uint32_t)R[8], &m, &pos)) {
         R[0] = 0;
         return;
@@ -604,7 +617,11 @@ void fle_imp_TrackPopupMenu(void)
     uint64_t h = R[1], hwnd = fle_arg(6);
     uint32_t flags = (uint32_t)R[2];
     fle_win_view v;
+    int mok = get_menu(h, 0) != NULL, wok = fle_win_get(hwnd, &v) && v.live;
 
+    /* written before any return below, so that the early returns have their line too (menu= and window= say which branch is taken) */
+    fprintf(stderr, "menu-api: TrackPopupMenu %#" PRIx64 " flags=%#x x=%d y=%d hwnd=%#" PRIx64 " menu=%s window=%s\n", h, flags, (int32_t)(uint32_t)R[8], (int32_t)(uint32_t)R[9], hwnd,
+            mok ? "yes" : "no", wok ? "yes" : "no");
     if (!get_menu(h, 1)) {
         R[0] = 0;
         return;

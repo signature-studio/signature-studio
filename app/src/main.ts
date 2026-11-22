@@ -111,6 +111,8 @@ interface AppApi {
   deskDumpBase64(peek?: boolean): Promise<{ windows: string; width: number; height: number; base64: string }>;
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the WebGL canvas, base64 of R, G, B, A bytes */
   deskGlPixelsBase64(): Promise<{ width: number; height: number; base64: string }>;
+  /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines in engineLog()) on or off; off at the start */
+  windowApiTrace(on: boolean): void;
   /** sends a raw event as the desktop would (for the tests that cannot use a pointer) */
   sendRaw(ev: RawInput): void;
   /** decision 0272: the restore button of a minimized window (the Worker reports the window; a build without the engine's taskbar entry never does) */
@@ -177,6 +179,7 @@ const app: AppApi = {
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
   deskDumpBase64: async (peek = false) => { const d = await client.deskDump(peek); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { windows: d.windows, width: d.width, height: d.height, base64: btoa(s) }; },
+  windowApiTrace: (on) => client.windowApiTrace(on),
   deskGlPixelsBase64: async () => { const d = await client.deskGlPixels(); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { width: d.width, height: d.height, base64: btoa(s) }; },
   perf: null as unknown as AppApi['perf'],
   pageTitle: () => deskTitle(baseTitle),

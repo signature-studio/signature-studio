@@ -94,6 +94,7 @@ void fle_win_pointer_reclamp(void);
 uint64_t fle_class_hcursor_of(uint16_t atom);                     /* fle_class.c */
 
 #define FLE_WM_CONTEXTMENU    0x007Bu
+#define FLE_WM_RBUTTONDOWN    0x0204u
 #define FLE_WM_RBUTTONUP      0x0205u
 #define FLE_WM_NCRBUTTONUP    0x00A5u
 #define FLE_WM_NCHITTEST      0x0084u

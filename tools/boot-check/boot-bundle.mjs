@@ -3,6 +3,8 @@
 // The brotli files of the bundle are in br/<name>/ next to raw/ (stage-assets.mjs links them for the app's /assets/ route). The temporary directory is inside the repository (.tmp-boot-*) and is removed.
 // standIn is only whether the text "STAND-IN" is in the page body; it is a reading, not a proof either way.
 // bootBundle() is the same start-up for the other tools (tools/missing-paths/measure.mjs); it also returns the whole engine log, not only its first 30 lines.
+// bootBundle(dir, { afterIdle }): when the engine is idle (the state engine-idle, no error), afterIdle({ send, evaluate }) runs once on the same page (send(method, params) is a CDP call, evaluate(expression) a Runtime.evaluate by value);
+// then the state and the log are read again. A failure in afterIdle is the start-up's error. Without afterIdle nothing changes.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -46,8 +48,8 @@ const timed = (p, ms, what) => {
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`timeout ${ms} ms: ${what}`)), ms); })]).finally(() => clearTimeout(t));
 };
 
-/** One start-up of the bundle in its own Chrome: `out` is the check's JSON object (engineLog30: the first 30 lines of the engine's log); `engineLog` is the whole log (null when the page has no app) */
-export async function bootBundle(bundleDir) {
+/** One start-up of the bundle in its own Chrome: `out` is the check's JSON object (engineLog30: the first 30 lines of the engine's log); `engineLog` is the whole log (null when the page has no app). `afterIdle` see the header. */
+export async function bootBundle(bundleDir, { afterIdle } = {}) {
   const t0 = Date.now();
   const BUNDLE = path.basename(bundleDir);
   const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
@@ -97,6 +99,12 @@ export async function bootBundle(bundleDir) {
     if (out.timelineIdle === null && !stopped) out.error = `no first idle, error or exit within ${WAIT_LIMIT_MS} ms (state ${out.state ?? 'window.__app not set'})`;
     else if (out.timelineIdle === null) out.error = `state ${out.state} before the first idle`;
     else if (!stopped) out.error = `state ${out.state} after the first idle, no engine-idle within ${WAIT_LIMIT_MS} ms`;
+    if (afterIdle && out.error === null && out.state === 'engine-idle') {
+      await afterIdle({ send: S, evaluate: ev });
+      const { engineLog: after, ...fin2 } = await ev(FINAL);
+      engineLog = after;
+      Object.assign(out, fin2, { engineLog30: after ? after.slice(0, 30) : null });
+    }
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
   } finally {
