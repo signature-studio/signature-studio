@@ -1,4 +1,4 @@
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: linked only into the wrp1 native build; nothing else defines the two hooks): the loader's work for a third-party VST3 (Serum2.vst3, ImageBase 0x8000000) as a real module of the engine.
+/* Decision 0183 (wrp1, PROVISIONAL; linked into every engine build by Issue #1326, which defines the two hooks): the loader's work for a third-party VST3 (Serum2.vst3, ImageBase 0x8000000) as a real module of the engine.
  * Ported from harness/vst3a/main_vst3a.c (decision 0165): (1) the IMPLICIT TLS of the module (S-vst-tls), (2) the IAT slots of the imports that have a row are set to the row's pseudo-VA, because Serum 2's code loads an
  * IAT slot into a register and calls it later (S-vst3a-iatptr; harness/image.c leaves each slot at its own VA), (3) the module's TLS callbacks run before the first DllMain (fle_realmod_pre_attach).
  * Only the module at WRP1_VST3_BASE is touched. The ordinal imports are not given pseudo-VAs (the 17 ordinal imports of Serum2.vst3 stay `fle_unsupported`: a named stop if reached). */
@@ -141,7 +141,7 @@ void fle_realmod_pre_attach(uint64_t base, int idx)
     vst_loaded = 1;
 }
 
-/* Decision 0200 (wrp3, OPT-IN; S-wrp3-tls-per-thread): the loader's per-thread TLS work for the VST3 module, called by fle_realmod_thread_notify (runtime/fle_realmod.c) in the context of the thread that starts (reason 2) or ends (3).
+/* Decision 0200 (wrp3; S-wrp3-tls-per-thread): the loader's per-thread TLS work for the VST3 module, called by fle_realmod_thread_notify (runtime/fle_realmod.c) in the context of the thread that starts (reason 2) or ends (3).
  * Learn (PE format, the .tls section): "The system copies all of this data each time a thread is created"; the TLS array is per thread and the module's slot holds its block; since Windows Vista the loader also allocates the
  * slot for a DLL that is loaded dynamically ("allocating TLS slots for such DLLs at load time"). So a thread has the block whether it started before or after the module was loaded: here the block is made when the thread starts,
  * whatever the load state. The TLS callbacks run with DLL_THREAD_ATTACH / DLL_THREAD_DETACH ("sent for all but the first thread") only while the module is loaded. The first thread keeps the block of tls_setup (fle_tls_values). */

@@ -169,13 +169,13 @@ static void read_headers(const char *api, int idx)
 
 /* DllMain(hinstDLL = base, reason, lpvReserved = NULL): lpvReserved is NULL for a dynamic load and for the call that follows a failed
  * load (Learn, DllMain). fle_call_guest needs R[4] to be the stack pointer of the running API, which it is inside LoadLibrary*. */
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN): the loader's work that precedes the first DllMain(DLL_PROCESS_ATTACH) of a module with a TLS directory (the TLS callbacks run first, Learn: PE format, "TLS Callback Functions").
- * A link that defines fle_realmod_pre_attach (harness/two/wrp1_vst3.c) gets it called with the module's base and table index; without it nothing happens. */
+/* Decision 0183 (wrp1, PROVISIONAL): the loader's work that precedes the first DllMain(DLL_PROCESS_ATTACH) of a module with a TLS directory (the TLS callbacks run first, Learn: PE format, "TLS Callback Functions").
+ * The link defines fle_realmod_pre_attach (harness/two/wrp1_vst3.c, Issue #1326), which gets it called with the module's base and table index; the weak reference only keeps a link without that file building. */
 void fle_realmod_pre_attach(uint64_t base, int idx) __attribute__((weak));
 
-/* Decision 0200 (wrp3, OPT-IN): the loader's per-thread work for a module with implicit TLS (the TLS block of the starting thread; the TLS callbacks with DLL_THREAD_ATTACH / DLL_THREAD_DETACH) is done by a link that
- * defines fle_realmod_pre_thread (harness/two/wrp1_vst3.c), called in the context of the thread that starts (reason 2) or ends (reason 3), before the DllMain notifications and whatever the load state of the modules is
- * (a thread that started before the module was loaded also has a block: Learn, PE format, the .tls section, Windows Vista and later). Without it nothing happens. */
+/* Decision 0200 (wrp3): the loader's per-thread work for a module with implicit TLS (the TLS block of the starting thread; the TLS callbacks with DLL_THREAD_ATTACH / DLL_THREAD_DETACH) is done by the link's
+ * fle_realmod_pre_thread (harness/two/wrp1_vst3.c, Issue #1326), called in the context of the thread that starts (reason 2) or ends (reason 3), before the DllMain notifications and whatever the load state of the modules is
+ * (a thread that started before the module was loaded also has a block: Learn, PE format, the .tls section, Windows Vista and later). */
 void fle_realmod_pre_thread(uint32_t reason) __attribute__((weak));
 
 static uint32_t call_dllmain(int idx, uint32_t reason)

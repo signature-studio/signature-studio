@@ -168,7 +168,7 @@ void fle_imp_CoTaskMemFree(void)
  * (called from the window code of CreateFruityInstance, return 0x63abb7 in the stop of the run). SHGetFolderPathW (fle_env.c) does NOT answer it yet (the tests of decision 0126 pin that). */
 #define FLE_SPECIAL_CSIDL_SYSTEM  0x0025u
 
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN): a link may supply more CSIDLs (harness/two/wrp1_vst3_imp.c: CSIDL_PERSONAL 0x05, which Serum 2 asks for); the default (no definition) stops as before, with the same message. */
+/* Decision 0183 (wrp1, PROVISIONAL): the link supplies more CSIDLs (harness/two/wrp1_vst3_imp.c, Issue #1326: CSIDL_PERSONAL 0x05, which Serum 2 asks for); a CSIDL that it does not give stops as before, with the same message. */
 const char *fle_special_folder_extra(uint32_t csidl) __attribute__((weak));
 
 static const char *special_folder_text(const char *api, uint32_t csidl)

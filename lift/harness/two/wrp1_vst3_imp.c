@@ -1,4 +1,4 @@
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN: linked only into the VST3 build, rows in seeds/wrp1-vst3-imports.txt): the answers that Serum2.vst3 needed from the runtime, PORTED from harness/vst3a/vst3a_imp.c (decision 0165;
+/* Decision 0183 (wrp1, PROVISIONAL; linked into every engine build by Issue #1326, rows in seeds/wrp1-vst3-imports.txt): the answers that Serum2.vst3 needed from the runtime, PORTED from harness/vst3a/vst3a_imp.c (decision 0165;
  * the S-vst3a-* names and their reasons are there) with three changes: vst3a_note is a no-op, vst3a_stop is fle_stop, and SHGetKnownFolderPath is NOT redefined (the engine's model in fle_filedlg.c answers the same GUIDs,
  * plus ProgramData added by this decision). Convention of fle_imports.h: arguments in R[1], R[2], R[8], R[9] and the stack, the result in R[0], the guest return address stays on the stack. */
 #include <stdint.h>
@@ -12,64 +12,10 @@
 
 #define vst3a_note(x) ((void)(x))
 #define vst3a_stop(what, why) fle_stop((what), (why))
-#define vst3a_arg(n) fle_arg(n)
-
-/* ---- kernel32 locale: the Ex forms (name instead of LCID) ---- */
-static uint32_t lcid_of_name(const char *api, uint64_t pname)
-{
-    char nm[32];
-    size_t i;
-    if (pname == 0) return 0; /* LOCALE_NAME_USER_DEFAULT: fle_imp_LCMapStringW takes LCID 0 as the user default for the two case flags (decision 0087) */
-    for (i = 0; i + 1 < sizeof nm; i++) {
-        uint16_t c = (uint16_t)fle_ld(pname + 2 * i, 2);
-        if (!c) break;
-        nm[i] = c < 0x80 ? (char)c : '?';
-    }
-    nm[i] = 0;
-    if (!strcmp(nm, "en-US")) return 0x0409u;
-    fprintf(stderr, "vst3a: %s: locale name \"%s\" is not modelled\n", api, nm);
-    vst3a_stop(api, "locale name other than NULL / en-US");
-}
-
-void fle_imp_LCMapStringW(void);
-/* kernel32!LCMapStringEx(LPCWSTR name rcx, DWORD flags edx, LPCWSTR src r8, int cchSrc r9d, LPWSTR dst [+0x28], int cchDst [+0x30], LPNLSVERSIONINFO, LPVOID, LPARAM): int.
- * Learn: same as LCMapStringW but the locale is a name. The last three parameters are ignored when NULL/0 (the CRT passes NULL, NULL, 0); a non-NULL one stops. The call is
- * LCMapStringW with the LCID of the name (S-vst3a-locale-ex: NULL = user default = the emulated en-US, "en-US" = 0x0409, any other name stops). */
-void fle_imp_LCMapStringEx(void)
-{
-    uint64_t name = R[1];
-    if (vst3a_arg(7) || vst3a_arg(8) || vst3a_arg(9)) vst3a_stop("LCMapStringEx", "lpVersionInformation / lpReserved / sortHandle is not NULL/0");
-    R[1] = lcid_of_name("LCMapStringEx", name);
-    fle_imp_LCMapStringW();
-}
-
-#include "fle_locale.h"
 
 /* kernel32!AreFileApisANSI(): BOOL. Learn: TRUE if the file I/O functions use the ANSI character set, FALSE for OEM. A process starts with ANSI (SetFileApisToOEM is the only way
  * to change it and nothing here calls it): TRUE. (S-vst3a-fileapis-ansi: the runtime has no SetFileApisToOEM row, so the state cannot change.) */
 void fle_imp_AreFileApisANSI(void) { vst3a_note("AreFileApisANSI"); R[0] = 1; }
-
-/* kernel32!GetUserDefaultLCID(): LCID. Learn: the user's default locale identifier; here the emulated locale of the runtime (fle_emulated_locale, en-US 0x0409). */
-void fle_imp_GetUserDefaultLCID(void) { vst3a_note("GetUserDefaultLCID"); R[0] = fle_emulated_locale.lcid; }
-
-void fle_imp_CompareStringW(void);
-/* kernel32!CompareStringEx(name rcx, flags edx, s1 r8, c1 r9d, s2 [+0x28], c2 [+0x30], version [+0x38], reserved [+0x40], lParam [+0x48]): CompareStringW with the LCID of the name (S-vst3a-locale-ex). */
-void fle_imp_CompareStringEx(void)
-{
-    if (vst3a_arg(7) || vst3a_arg(8) || vst3a_arg(9)) vst3a_stop("CompareStringEx", "lpVersionInformation / lpReserved / lParam is not NULL/0");
-    R[1] = lcid_of_name("CompareStringEx", R[1]);
-    if (R[1] == 0) R[1] = fle_emulated_locale.lcid;
-    fle_imp_CompareStringW();
-}
-
-void fle_imp_GetLocaleInfoW(void);
-/* kernel32!GetLocaleInfoEx(name rcx, LCType edx, buf r8, cch r9d): GetLocaleInfoW with the LCID of the name (S-vst3a-locale-ex). */
-void fle_imp_GetLocaleInfoEx(void)
-{
-    R[1] = lcid_of_name("GetLocaleInfoEx", R[1]);
-    if (R[1] == 0) R[1] = fle_emulated_locale.lcid;
-    fle_imp_GetLocaleInfoW();
-}
 
 /* kernel32!InitOnceBeginInitialize(INIT_ONCE *rcx, DWORD flags edx, BOOL *fPending r8, LPVOID *ctx r9) and InitOnceComplete(INIT_ONCE *rcx, DWORD flags edx, LPVOID ctx r8): BOOL.
  * Learn: a one-time initialisation object (a pointer-sized word, 0 at start). Synchronous use, one thread: state 0 -> Begin sets "pending" (1) and reports fPending TRUE; Complete stores
@@ -292,7 +238,6 @@ int wrp1_vst3_loadlib(int kind)
 }
 
 /* ---- more environment answers ported from harness/vst3a/vst_env3a.c (decisions 0156, 0165) ---- */
-#include "fle_class.h"
 #include "fle_vfs.h"
 
 /* S-vst-getmodulehandleex: GetModuleHandleExW(dwFlags ecx, lpModuleName rdx, phModule r8). FROM_ADDRESS (4) with an address inside the plug-in's image -> its base; a name -> what GetModuleHandleW answers; any other address fails with 126. */
@@ -314,20 +259,6 @@ void __wrap_fle_imp_GetModuleHandleExW(void)
     fle_imp_GetModuleHandleW();
     fle_st(ph, 8, R[0]);
     R[0] = R[0] ? 1 : 0;
-}
-
-/* S-vst-classatom: CreateWindowExW with the class given as an ATOM (MAKEINTATOM) that RegisterClassW/ExW handed out becomes the class's registered name; an unknown atom goes to the runtime unchanged. */
-void __real_fle_imp_CreateWindowExW(void);
-void __wrap_fle_imp_CreateWindowExW(void)
-{
-    static uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 2];
-    uint64_t c = R[2];
-    uint16_t len = 0;
-    if (c != 0 && c < 0x10000u && fle_class_name_of((uint16_t)c, nm, &len)) {
-        nm[len] = 0;
-        R[2] = (uint64_t)(uintptr_t)nm;
-    }
-    __real_fle_imp_CreateWindowExW();
 }
 
 /* S-vst3a-createfile-empty and S-vst3a-dirwatch-fail (called from the CreateFileW wrap of tools/wrp1_wraps.c; 1 = answered): an empty name (Serum 2 opens "" with BACKUP_SEMANTICS|OVERLAPPED: a directory watcher of
@@ -355,39 +286,6 @@ int wrp1_vst3_createfile(void)
         return 1;
     }
     return 0;
-}
-
-/* S-vst-filetype: GetFileType(h): a handle that fle_vfs.c issued for an open virtual file is a disk file (FILE_TYPE_DISK 1; Learn); any other value goes to the runtime. */
-void __real_fle_imp_GetFileType(void);
-void __wrap_fle_imp_GetFileType(void)
-{
-    const uint8_t *d;
-    uint64_t sz;
-    unsigned r, w;
-    uint64_t h = R[1];
-    if (h != 0 && h != UINT64_MAX && fle_vfs_file_info("GetFileType", h, &d, &sz, &r, &w)) { R[0] = 1; return; }
-    __real_fle_imp_GetFileType();
-}
-
-/* S-vst-setfilepointerex: SetFilePointerEx(h, liDistanceToMove, lpNewFilePointer, dwMoveMethod) = SetFilePointer with the distance split in two (Learn: nonzero on success). */
-void fle_imp_SetFilePointer(void);
-void fle_imp_GetLastError(void);
-void __wrap_fle_imp_SetFilePointerEx(void)
-{
-    uint64_t h = R[1], newp = R[8];
-    int64_t dist = (int64_t)R[2];
-    uint32_t method = (uint32_t)R[9], hi = (uint32_t)((uint64_t)dist >> 32), lo, err;
-    R[1] = h;
-    R[2] = (uint32_t)dist;
-    R[8] = (uint64_t)(uintptr_t)&hi;
-    R[9] = method;
-    fle_imp_SetFilePointer();
-    lo = (uint32_t)R[0];
-    fle_imp_GetLastError();
-    err = (uint32_t)R[0];
-    if (lo == 0xFFFFFFFFu && err != 0) { R[0] = 0; return; }
-    if (newp) fle_st(newp, 8, ((uint64_t)hi << 32) | lo);
-    R[0] = 1;
 }
 
 /* S-wrp1-csidl-personal: SHGetSpecialFolderLocation / SHGetPathFromIDListW for the CSIDLs that SHGetFolderPathW (fle_env.c) already answers (0x05 PERSONAL asked for by the wrapper after Serum 2 hashed the embedded data of the state in r13; 0x23 COMMON_APPDATA right after in r14; the others added together). Learn (CSIDL): "CSIDL_PERSONAL: The virtual folder that represents
