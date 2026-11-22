@@ -13,16 +13,35 @@ project: signature-studio/3
 
 ## 目的
 
-課題 C-2 の残り: 画面の描画が音声の処理を圧迫しない状態にする。#{{002}} の実測で圧迫が残ると分かった経路を、取り除く。完了は、画面の更新を続ける負荷をかけても、音声の underrun が 0 であること。
+課題 C-2 の残り: 画面の描画が音声の処理を圧迫しない状態にする。#{{002}} の実測で、描画の分離の後も圧迫が残ると分かった(下の「前回の測定で分かったこと」)。この Issue は、残る圧迫の主因を計測で特定し、取り除く。完了の目安は、画面の更新を続ける負荷(`--load ui`)をかけても、10 秒あたりの underrun が 20 以下であること。P3 の目標は 0 だが、実環境(runner は 4 vCPU の共有)で届く範囲は、報告で見積もる。
 
 ## 背景
 
-- #{{002}} の成果物: `pm-work/findings/c2-split-measure.md`(分離の前後の音声の余裕。残る要因の候補)。この Issue は、その候補を実測で確かめてから直す。
-- 分離(commit 43a6eb88)は、描画の合成と提示を別の Worker に移した。しかし本番に出ていないため、分離の後の版で圧迫が消えたかは、#{{002}} まで不明である。
+- #{{002}} の成果物: `pm-work/findings/c2-split-measure.md`。この Issue の本文は、その要点と数字を「前回の測定で分かったこと」に写してある。
+- 分離(commit 43a6eb88)は、描画の合成と提示を engine の Worker から描画の Worker へ移した。#{{002}} で分離の前後の版を比べると、underrun に差は見えなかった。
 - survey の読み(pm-work/findings/survey-c2-worker-split.md。推定を含む): ゲストの複数のスレッドは、1 つのホストのスレッドで協調して動く(`lift/runtime/fle_thread.h` の 1〜6 行)。音声の書き込み(`lift/runtime/fle_audio_transport.c` の 54 行 `fle_js_publish`)と音声の実時間の待ち(同 108 行付近 `fle_js_wait`)は、engine と同じ fl-engine の Worker で動く。
-- 仮説(推定。未確認): FL 本体の UI 描画(guest の GDI・Blend2D による描画)が、音声を作る guest のスレッドと同じホストのスレッドで動くため、描画の合成を別の Worker に移しても、guest の描画そのものが音声を圧迫する。この仮説を、#{{002}} の測定と、この Issue の最初の計測で確かめる。
-- 方針の案(設計は作業者が決める): 音声を作る側を、描画とは別の Worker に分ける(共有メモリと、wasm のスレッドの仕組みを使う)。ただし、どの経路を分けるかは、計測の結果で決める。
+- 旧の仮説(描画が音声を圧迫する)は、#{{002}} の測定では支持されなかった。UI 負荷を外しても underrun は同じ程度に出た。
+- 主因の見立て(推定。未確認): 圧迫は描画そのものより、engine の Worker の中で音声を作る側の時間の不足(guest のミキサとスケジューラ、音声の書き込みと実時間の待ち)とみられる。この見立てを、最初の計測で確かめる。
+- 方針の案(設計は作業者が決める): 計測で支配的な要因が分かってから決める。候補は、協調スケジューラの切り替えの頻度、待ちの粒度、音声を作る guest のスレッドを描画とは別の Worker に分ける仕組み(共有メモリと、wasm のスレッドの仕組み)、busy loop の抑制。
 - 製品の既定の動作は変えない。オプトインは作らない。
+
+## 前回の測定で分かったこと(#{{002}})
+
+測定: `tools/p3-audio-probe/measure.mjs`、bundle fl-Oz、headless Chrome、窓 10 秒、各 n=3。値は runner の値で、この機械とは別枠(nproc 4、loadavg 0.96〜2.12)。UI 負荷は、デスクトップ中央で半径 30 px の円を 50 ms ごとにマウス移動する。
+
+| 負荷 | 版 | underrunDelta(10 秒あたり。平均(範囲)) | engineGapFrames 増分(平均(範囲)) | presentsDelta(平均) |
+|---|---|---|---|---|
+| UI | 分離の前 | 257(199〜301) | 39,298(33,268〜46,580) | 30 |
+| UI | 分離の後 | 267(238〜289) | 51,955(45,170〜55,710) | 27 |
+| なし | 分離の前 | 268(247〜292) | 39,541(36,344〜44,062) | 27 |
+| なし | 分離の後 | 262(239〜281) | 41,547(32,758〜58,140) | 21 |
+
+- 圧迫は分離の後も残る。underrun は、再生の quantum(10 秒で約 3,460)の約 6〜9%。
+- 前後の差は見えない。UI 負荷の有無でも差は見えない。マウスによる UI の処理は主因ではない。
+- 負荷なしでも、提示は 10 秒あたり 20〜28 回起きる。
+- engineGapFrames は、エンジンが無音で埋めた量(エンジン側の書き込みの遅れ)。
+- 12 回すべてで nonSilentQuanta が 0。所定のプロジェクトを再生していない。P3(Song Mode)は判定していない。
+- 取れていない項目(この Issue で取る): compose の回数と時間、書き込みの遅延の分布、quantum ごとのジッタ、AudioWorklet の CPU 時間。
 
 ## 読む物
 
@@ -30,22 +49,23 @@ project: signature-studio/3
 - `lift/runtime/fle_thread.h`(1〜6 行: 協調のスレッド)、`lift/runtime/fle_audio_transport.c`(54 行・108 行付近)、`lift/runtime/fle_dsound.c`(416〜471 行付近: 音声の混合と書き込み)、`lift/runtime/fle_audio_ring.c`(148〜176 行)
 - `app/src/engine/client.ts`(75・90・97 行)、`app/src/engine/worker.ts`、`app/src/engine/render-worker.ts`、`app/src/engine/desk.ts`
 - `app/src/audio/page-audio.ts`、`app/src/audio/soft-sink.ts`
-- `tools/p3-audio-probe/measure.mjs`(#{{003}} が作る道具)
+- `tools/p3-audio-probe/measure.mjs`(#{{003}} が作った道具)
 
 ## やること
 
-1. 変更の前に、#{{002}} の結果を読み、残る要因の候補を 1 つに絞る。絞るための計測を、道具の中で行う(例: 描画の合成を止めた時と動かした時の underrun の差。計測の切り替えは、道具の中だけで行い、製品に入れない)。結果を報告に書く。
-2. 候補を取り除く設計と実装。設計の理由を報告に書く。製品の既定の動作は変えない。
-3. 同じ道具(`--load ui`)で、取り除いた後の underrun を n=3 で測る。
-4. 起動が通ること(engine-idle・standIn が false・error が null)を確かめる。
+1. 最初に計測する(変更の前)。engine の Worker の中で、音声 1 quantum 分の 1 周の時間の内訳を取る。どの guest のスレッドの、どの `fle_*` の関数(`lift/runtime/fle_audio_transport.c` の書き込みと待ち、`lift/runtime/fle_thread.h` の協調スケジューラ、ミキサ)に時間がかかっているかを表にする。合わせて、書き込み 1 回の所要、書き込みの間隔の分布、描画(compose)の時間を取る。計測は一時的な変更として入れ、受け入れの前に取り除く(製品に残さない。切り替えも作らない)。結果は報告に表で出す(pm-work には書かない)。
+2. 1 の結果で、支配的な要因を 1 つ決め、それを取り除く。設計の理由を報告に書く。製品の既定の動作は変えない。
+3. 同じ道具(`--load ui`)で、取り除いた後の underrunDelta・engineGapFrames 増分・quantaDelta を n=3 で測る。上の表の「分離の後・UI」と並べて、報告に表で書く。
+4. 起動が通ることを確かめる(engine-idle・standIn が false・error が null)。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --load ui > "$RUNNER_TEMP/c2-fix-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/c2-fix-"+i+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.presentsDelta>0&&r.quantaWhilePlaying>0&&r.underrunQuanta===0)?0:1)'
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --load ui > ".tmp-1334/ui-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/ui-"+i+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.load==="ui"&&r.state==="engine-idle"&&r.standIn===false&&r.presentsDelta>0&&r.quantaDelta>0&&r.underrunDelta<=20)?0:1)' && rm -rf .tmp-1334
 ```
 
-判定の基準: 道具の 3 回すべてで、`error` が null、`state` が engine-idle、`standIn` が false、`presentsDelta` が 0 より大きい(負荷が効いている)、再生の quantum が 1 以上、`underrunQuanta` が 0。
+判定の基準: 道具の 3 回すべてで、`error` が null、`load` が ui、`state` が engine-idle、`standIn` が false、`presentsDelta` が 0 より大きい(負荷が効いている)、`quantaDelta` が 0 より大きい(再生している)、`underrunDelta` が 20 以下。
+受け入れが通らないときは、到達した 3 回の `underrunDelta` と残る要因を報告に書き、PM が目標と実環境の限界を見直せるようにする(この場合は「差し戻し」と書かない)。
 
 ## 報告の規則
 
