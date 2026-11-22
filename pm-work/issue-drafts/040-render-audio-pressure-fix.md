@@ -50,6 +50,24 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
 7. **受け入れの窓の位置**: 前回の受け入れ(UI の負荷あり、窓 10 秒、10 秒あたり 20 以下)は、Space の直後の起動の山の後半に当たっていた。定常(+1.7 s より後)の途切れは 0 だった(推定)。この 10 秒窓の基準は、この Issue では使わない。
 8. **取れていないもの**: 関数別の所要(`fle_*` の内訳)、AudioWorklet の CPU 時間、quantum ごとのジッタ、Song Mode の判定、耳の確認。
 
+### 2 回目の試行(判定が落ちた。作業は `.prior-work.md` で続きから載る)
+
+2 回目の試行(run 45072464291)は、判定が `commit していない変更がある` で落ちた。作業者が commit せずにターンを終えたため。作業ツリーの 4 ファイル(`lift/runtime/fle_audio_transport.c`・`fle_dsound.c`・`fle_thread.c`、`tools/p3-audio-probe/measure.mjs`)は、次の作業に載る。以下は、その報告の数字(runner の値。この機械とは別枠。nproc 4、loadavg 0.36〜0.57)。
+
+- 入れた物: 前節 5 の修正の入れ直し(`fle_audio_poll_in_callback`)。補充の計数(Worker 側。`fleAudioWorkerState` に 1 項目。動作は変えない)。`tools/p3-audio-probe/measure.mjs` の `--boot`。既存の不具合を直した: `return` で終わると JSON が出なかったので、JSON の出力を `finally` に移した。
+- 部屋の寸法: `--boot` の部屋は `#stage` の寸法(ビューポートから、モニターの 340 px とヘッダーの 36 px を除いたもの)。CSS 1836×1056 の部屋には、ビューポート 2176×1092 を使い、DPR は 30/17 にする(1.7647 のままでは画面が 3239×1863 になり、受け入れの `3240x1863` にならない)。
+- 測定(最終の設定。窓は idle の +10 秒〜+70 秒。押下は idle を見た直後に 1 回):
+
+| 回 | screenDevicePx | ctxState | quantaDelta | bootLast60sAt10s | bootLast60sAt70s | maxRefillStallMs | 連続 underrun の最長(quanta) |
+|---|---|---|---|---|---|---|---|
+| 1 | 3240x1863 | running | 20676 | 447 | 0 | 554.6 | 35 |
+| 2 | 3240x1863 | running | 20675 | 516 | 0 | 566.7 | 36 |
+| 3 | 3240x1863 | running | 20675 | 556 | 0 | 571.5 | 39 |
+
+- 結果: 目標に届かない。`bootLast60sAt70s` は 3 回とも 0。`bootLast60sAt10s` は 447〜556、`maxRefillStallMs` は 555〜572 ms(目標は 0 と 60 以下)。変更の前後の表は、この試行では作っていない(修正を入れない版の bundle を作り直していない)。
+- 関数の特定(未完): CDP の `Profiler` を Worker に付けた(navigation から idle の +30 秒まで。サンプリング 250 µs)。関数名は `wasm-function[N]` だけで、guest の RVA に戻せなかった。自己時間の上位は `wasm-function[19053]`(1,337 ms、3.7%)など。上位 20 件は、どれも単独では 120 ms 程度。idle は 69.2%。「切り替え点を通らずに続いた最長」は未確認(枠の名前が無く、`(root)` が 6,138 ms と出た)。`link.map` と最適化後の `engine.wasm` の番号が一致する保証は無い。
+- 作業者の見立て(PM へ): (1) 関数の番号を名前に戻す手段が要る。(2) `maxRefillStallMs`(555〜572 ms)と、連続 underrun の最長(35〜39 quanta、約 100〜115 ms)が合わない。計数の定義を検証する。(3) 押下より前の停止は数えていない。依頼者の実機の 343 は押下の後の数字で、この定義で合うかは未確認。(4) 前景の待ちに約 1 時間使った(下の設計の (iv))。
+
 ## 作業の順序
 
 1. **修正を入れ直す**: 前節 5 の修正(`lift/runtime/fle_thread.c` と `lift/runtime/fle_dsound.c`)。単独では 0 にならないことは実測済み。以降の作業の土台にする。
@@ -70,6 +88,13 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
    - 押下: AudioContext を running にするための、状態の行への押下を 1 回だけ、窓の前に行ってよい(`startAudio` と同じ。ゲストには届かない)。窓の中では、何も操作しない。Space を押さない。ゲストの同意の箱(No thanks)を押さない。マウスを動かさない。
    - JSON(stdout に 1 行): `error`・`state`・`standIn`・`screenDevicePx`(`window.__app.screen.guest` の幅×高さ。例 `3240x1863`)・`dpr`・`ctxState`(窓の終わりの AudioContext の状態)・`quantaDelta`(idle+10 から +70 の `quantaWhilePlaying` の増分。期待値は約 20,600)・`bootLast60sAt10s`(idle+10 秒に読んだ `underrunQuantaLast60s`)・`bootLast60sAt70s`(idle+70 秒に読んだ値)・`maxRefillStallMs`・`nproc`・`loadavg`。
    - `maxRefillStallMs`: 音声の補充の停止の最大(ms)。音声の出力が PLAYING になった時刻から、idle の +70 秒まで、engine が出力のリングへ補充した時刻の、連続する 2 回の差の最大。取り方(engine 側の一時的な計数か、ページ側の標本か)は作業者が決め、報告に書く。
+
+## 設計の追加(2 回目の試行の結果から)
+
+- (i) **関数の名前の表**: 生成器(`lift/crates/fe-wasmgen`・`fe-build`)は、ビルドのたびに、wasm の関数の番号 → guest の RVA と関数名の対応を、`lift/out-app/gen/` の下の別のファイルに書く。配信の対象に入れない(engine.wasm の大きさを増やさない)。新しい旗・環境変数は足さない。測定の道具は、CDP の `Profiler` の結果を、この表で関数の名前に戻す。
+- (ii) **計数の定義の検証**: `maxRefillStallMs` と連続 underrun の最長が合わない理由(単位・起点・quantum の長さ・先読みの扱い)を、コードを読んで特定し、直す。受け入れが読む `bootLast60sAt10s`・`bootLast60sAt70s` が、アプリのヘッダーの `直近 60 秒の途切れ` と同じ定義であることを、該当の行(ファイル・行番号)を引いて報告に書く(`app/src/audio/page-audio.ts` の `detail()`、`app/src/audio/status.ts`)。
+- (iii) **押下より前**: AudioContext を始める利用者の操作(押下)より前は、消費者が無いので途切れとして数えない(アプリの定義どおり)。押下の直後の数秒には、起動の直後の山が残ることがある。測定の道具は、押下を idle の直後(+1 秒)に行う条件(既定。受け入れが読む。起動の山を含むため、厳しい方)と、idle の +30 秒に行う条件の両方を測り、報告に表で出す。
+- (iv) **作業の進め方**: ビルドの完了は、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000)を渡して待つ。バックグラウンドで起動して、完了の通知を待つ形にしない(ターンを終えると作業が止まる)。受け入れが通らなくても、作業の最後に作業ツリーを commit する(判定は commit 済みを要求する。通らなければ push されず、差分が保存される)。
 
 ## 受け入れ
 
