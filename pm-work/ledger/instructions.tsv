@@ -50,3 +50,5 @@ L-048	2026-11-23	依頼者	伴って、描画の崩壊も発生している	pm-w
 L-049	2026-11-23	依頼者	描画処理はまだ音声処理をブロックしている。特に、マウスを動かすだけで音が途切れる	pm-work/issue-drafts/wave1f/109-audio-under-physical-screen-mouse.md
 L-050	2026-11-23	依頼者	拡大されてぼやけた画面を出したら、即座に棄却する。Windows と同じ Fractional Scaling を、正確に再現すること	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md・pm-work/issue-drafts/wave1f/108-hidpi-dynamic-and-all-scales.md
 L-051	2026-11-23	依頼者	マウスの動きは最低 1000 Hz で測る(依頼者の実機は 8000 Hz のマウスを、互換性のため 1000 Hz に落としている)	pm-work/issue-drafts/wave1f/109-audio-under-physical-screen-mouse.md
+L-052	2026-11-23	依頼者	FL のネイティブでは、Main GUI Scaling の System が OS の拡大率(175%)に自動で従う。今の版では従っていない。DPI・拡大率に関するメトリクスを、きちんと取ること。メトリクスには、Settings → Debug のログも含める	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
+L-053	2026-11-23	依頼者	175% などの数字を、予め用意しない。拡大率は、環境(DPR)から、Windows と同じ計算で導く	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
