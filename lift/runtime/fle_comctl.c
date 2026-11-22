@@ -27,6 +27,7 @@ void fle_imp__TrackMouseEvent(void)
     flags = (uint32_t)fle_ld(p + 4, 4);
     h = fle_ld(p + 8, 8);
     hover = (uint32_t)fle_ld(p + 16, 4);
+    if (fle_win_api_trace_on()) fprintf(stderr, "window-api: _TrackMouseEvent flags=%#x hwnd=%#llx hover=%u\n", flags, (unsigned long long)h, hover);
     /* S-tme-invalid: the pages name no failure value beyond "zero"; a cbSize that is not the structure size and a flag that is not one of the five documented fail with ERROR_INVALID_PARAMETER (87), an
      * hwndTrack that is not a live window with ERROR_INVALID_WINDOW_HANDLE (1400) (the codes are choices). */
     if (cb != TME_SIZE || (flags & ~TME_VALID) != 0) {

@@ -316,7 +316,83 @@ static uint64_t call_wndproc_untraced(const char *api, uint64_t proc, uint64_t h
     return fle_call_guest(jump, h, msg, wp, lp);
 }
 
-static uint64_t call_wndproc(const char *api, uint64_t proc, uint64_t h, uint32_t msg, uint64_t wp, uint64_t lp)
+/* C-6 (#1310): the window-API trace (fle_win_api_trace_set). Off by default, so a start-up writes none of its lines. */
+static int api_trace;
+static int ptr_depth;   /* C-6 (#1346): > 0 while a pointer message's window procedure runs: the messages and the window calls inside it are traced too */
+void fle_win_api_trace_set(int on) { api_trace = on != 0; }
+int fle_win_api_trace_on(void) { return api_trace; }
+
+/* C-6 (#1346): the pointer path in the same trace. The messages named here (the mouse, the cursor, the capture, the focus and the hit test) are written by call_wndproc before and after the
+ * window procedure runs, and by fle_input_defproc when DefWindowProc answers them. A message that is not named here is not written. */
+static const char *trace_msg_name(uint32_t msg)
+{
+    switch (msg) {
+    case 0x0006u: return "WM_ACTIVATE";
+    case 0x0007u: return "WM_SETFOCUS";
+    case 0x0008u: return "WM_KILLFOCUS";
+    case 0x0020u: return "WM_SETCURSOR";
+    case 0x0021u: return "WM_MOUSEACTIVATE";
+    case 0x0084u: return "WM_NCHITTEST";
+    case 0x0086u: return "WM_NCACTIVATE";
+    case 0x007Bu: return "WM_CONTEXTMENU";
+    case 0x00A0u: return "WM_NCMOUSEMOVE";
+    case 0x00A1u: return "WM_NCLBUTTONDOWN";
+    case 0x00A2u: return "WM_NCLBUTTONUP";
+    case 0x00A4u: return "WM_NCRBUTTONDOWN";
+    case 0x00A5u: return "WM_NCRBUTTONUP";
+    case 0x0200u: return "WM_MOUSEMOVE";
+    case 0x0201u: return "WM_LBUTTONDOWN";
+    case 0x0202u: return "WM_LBUTTONUP";
+    case 0x0203u: return "WM_LBUTTONDBLCLK";
+    case 0x0204u: return "WM_RBUTTONDOWN";
+    case 0x0205u: return "WM_RBUTTONUP";
+    case 0x0206u: return "WM_RBUTTONDBLCLK";
+    case 0x0207u: return "WM_MBUTTONDOWN";
+    case 0x0208u: return "WM_MBUTTONUP";
+    case 0x0211u: return "WM_ENTERMENULOOP";
+    case 0x0212u: return "WM_EXITMENULOOP";
+    case 0x0215u: return "WM_CAPTURECHANGED";
+    case 0x02A1u: return "WM_MOUSEHOVER";
+    case 0x02A3u: return "WM_MOUSELEAVE";
+    default: return NULL;
+    }
+}
+
+/* One line: wndproc: <phase in|out|def> <api> <window> lid= cls= style= ex= parent= <message> wp= lp= (ret= for out). */
+void fle_win_trace_wndproc(const char *phase, const char *api, uint64_t h, uint32_t msg, uint64_t wp, uint64_t lp, uint64_t result, int has_result)
+{
+    const char *nm = trace_msg_name(msg);
+    uint32_t lid = 0;
+    char cls[64];
+    int64_t i;
+    uint64_t ph = 0;
+    unsigned style = 0, ex = 0;
+    char nb[24];
+
+    if (!api_trace || (!nm && ptr_depth <= 0)) return;
+    if (!nm) {
+        snprintf(nb, sizeof nb, "msg=%#x", msg);
+        nm = nb;
+    }
+    w2_desc(h, &lid, cls, sizeof cls);
+    i = index_of_fwd(h);
+    if (i >= 0) {
+        style = (unsigned)tab[i].style;
+        ex = (unsigned)tab[i].exstyle;
+        if (tab[i].parent >= 0) ph = FLE_WIN_HANDLE_BASE + (uint64_t)FLE_WIN_HANDLE_STEP * ((uint64_t)tab[i].parent + 1u);
+    }
+    fprintf(stderr, "wndproc: %s %s %#" PRIx64 " lid=%u cls=\"%s\" style=%#x ex=%#x parent=%#" PRIx64 " %s wp=%#" PRIx64 " lp=%#" PRIx64, phase, api, h, lid, cls, style, ex, ph, nm, wp, lp);
+    if (has_result) fprintf(stderr, " ret=%#" PRIx64, result);
+    fputc('\n', stderr);
+}
+
+/* One line: window-api: <name> <argument> -> <result>, for the window queries that the pointer path reads. */
+void fle_win_trace_query(const char *name, uint64_t arg, uint64_t result)
+{
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: %s %#" PRIx64 " -> %#" PRIx64 "\n", name, arg, result);
+}
+
+static uint64_t call_wndproc_fwd(const char *api, uint64_t proc, uint64_t h, uint32_t msg, uint64_t wp, uint64_t lp)
 {
     uint64_t r;
     uint32_t lid;
@@ -327,6 +403,20 @@ static uint64_t call_wndproc(const char *api, uint64_t proc, uint64_t h, uint32_
     fle_win_trace_msg(0, api, lid, cls, msg, wp, lp, 0);
     r = call_wndproc_untraced(api, proc, h, msg, wp, lp);
     fle_win_trace_msg(1, api, lid, cls, msg, wp, lp, r);
+    return r;
+}
+
+static uint64_t call_wndproc(const char *api, uint64_t proc, uint64_t h, uint32_t msg, uint64_t wp, uint64_t lp)
+{
+    uint64_t r;
+    int named = api_trace && trace_msg_name(msg) != NULL;
+
+    if (!named && !(api_trace && ptr_depth > 0)) return call_wndproc_fwd(api, proc, h, msg, wp, lp);
+    fle_win_trace_wndproc("in", api, h, msg, wp, lp, 0, 0);
+    if (named) ptr_depth++;
+    r = call_wndproc_fwd(api, proc, h, msg, wp, lp);
+    if (named) ptr_depth--;
+    fle_win_trace_wndproc("out", api, h, msg, wp, lp, r, 1);
     return r;
 }
 
@@ -353,10 +443,6 @@ static int is_no_redraw_chain(int64_t i);
 static uint32_t next_lid = 1;
 static int g2_seen;                            /* the first visible top-level window has appeared (G2) */
 static char g2_text[12000];
-/* C-6 (#1310): the window-API trace (fle_win_api_trace_set). Off by default, so a start-up writes none of its lines. */
-static int api_trace;
-void fle_win_api_trace_set(int on) { api_trace = on != 0; }
-
 static uint64_t handle_of(int64_t i) { return FLE_WIN_HANDLE_BASE + (uint64_t)FLE_WIN_HANDLE_STEP * ((uint64_t)i + 1u); }
 
 /* The window `i` is a top-level window of the desktop (no parent window; owned or not). A message-only window is not part of the z-order and is not enumerated (Learn Window Features). */
@@ -1273,6 +1359,7 @@ void fle_imp_GetWindowLongPtrW(void)
     char why[200];
 
     fle_win_check_thread(api);
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: GetWindowLongPtrW %#" PRIx64 " index=%d\n", h, (int)index);
     i = live_index(h);
     if (i < 0) {
         invalid_window();
@@ -2043,6 +2130,7 @@ void fle_imp_IsWindowVisible(void)
     }
     i = live_index(h);
     R[0] = (i >= 0 && is_visible(i)) ? 1u : 0u;
+    fle_win_trace_query("IsWindowVisible", R[1], R[0]);
 }
 
 /* user32!IsWindowEnabled: BOOL f(HWND rcx). Learn: nonzero if the window is enabled. An invalid handle: 0 (a choice: no page text; no last error). */
@@ -2053,6 +2141,7 @@ void fle_imp_IsWindowEnabled(void)
     fle_win_check_thread("IsWindowEnabled");
     i = live_index(R[1]);
     R[0] = (i >= 0 && tab[i].enabled) ? 1u : 0u;
+    fle_win_trace_query("IsWindowEnabled", R[1], R[0]);
 }
 
 void fle_imp_IsIconic(void)
@@ -4371,6 +4460,7 @@ void fle_imp_GetFocus(void)
     fle_win_check_thread("GetFocus");
     inp_ensure();
     R[0] = (inp[t].focus >= 0 && tab[inp[t].focus].live) ? handle_of(inp[t].focus) : 0;
+    fle_win_trace_query("GetFocus", 0, R[0]);
 }
 
 /* user32!SetActiveWindow: HWND f(HWND rcx). Learn: "The SetActiveWindow function activates a window, but not if the application is in the background. ... If the window identified by the hWnd parameter was created by the
@@ -4411,6 +4501,7 @@ void fle_imp_GetActiveWindow(void)
     fle_win_check_thread("GetActiveWindow");
     inp_ensure();
     R[0] = (inp[t].active >= 0 && tab[inp[t].active].live) ? handle_of(inp[t].active) : 0;
+    fle_win_trace_query("GetActiveWindow", 0, R[0]);
 }
 
 /* user32!GetGuiResources: DWORD f(HANDLE hProcess rcx, DWORD uiFlags edx) (decision 0129, wall 12). Learn: "Retrieves the count of handles to graphical user interface (GUI) objects in use by the specified process";
@@ -4493,6 +4584,7 @@ void fle_imp_GetForegroundWindow(void)
 {
     fle_win_check_thread("GetForegroundWindow");
     R[0] = (fg_window >= 0 && tab[fg_window].live) ? handle_of(fg_window) : 0;
+    fle_win_trace_query("GetForegroundWindow", 0, R[0]);
 }
 
 /* user32!SetForegroundWindow: BOOL f(HWND rcx). Learn: nonzero if the window was brought to the foreground, zero if not; the process may set the foreground window only under the listed conditions, among them "The calling
@@ -4544,6 +4636,7 @@ void fle_imp_SetCapture(void)
     }
     prev = inp[t].capture;
     inp[t].capture = i;
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: SetCapture %#" PRIx64 " prev=%#" PRIx64 "\n", handle_of(i), prev >= 0 ? handle_of(prev) : 0);
     if (prev >= 0 && prev != i && tab[prev].live) (void)send_to(api, prev, FLE_WM_CAPTURECHANGED, 0, handle_of(i));
     R[0] = (prev >= 0 && tab[prev].live) ? handle_of(prev) : 0;
 }
@@ -4570,6 +4663,7 @@ void fle_imp_ReleaseCapture(void)
     inp_ensure();
     prev = inp[t].capture;
     inp[t].capture = -1;
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: ReleaseCapture prev=%#" PRIx64 "\n", prev >= 0 ? handle_of(prev) : 0);
     if (prev >= 0 && tab[prev].live) (void)send_to(api, prev, FLE_WM_CAPTURECHANGED, 0, 0);
     R[0] = 1;
 }
@@ -5838,8 +5932,16 @@ void fle_imp_EnableMenuItem(void)
  * accepted (the page lists no failing value). Stateless: no thread rule. */
 /* Decision 0136 (PROVISIONAL): with fle_input.c linked the key and button state is the one the host fed in (GetKeyState: as of the key messages the thread read; GetAsyncKeyState: the hardware state); without it, or before
  * any event, every key is up (S-no-keys, above). */
-void fle_imp_GetKeyState(void) { R[0] = fle_input_key_state ? fle_input_key_state((uint32_t)R[1], 0) : 0; }
-void fle_imp_GetAsyncKeyState(void) { R[0] = fle_input_key_state ? fle_input_key_state((uint32_t)R[1], 1) : 0; }
+void fle_imp_GetKeyState(void)
+{
+    R[0] = fle_input_key_state ? fle_input_key_state((uint32_t)R[1], 0) : 0;
+    if (R[1] == 1 || R[1] == 2 || R[1] == 4) fle_win_trace_query("GetKeyState", R[1], R[0]);
+}
+void fle_imp_GetAsyncKeyState(void)
+{
+    R[0] = fle_input_key_state ? fle_input_key_state((uint32_t)R[1], 1) : 0;
+    if (R[1] == 1 || R[1] == 2 || R[1] == 4) fle_win_trace_query("GetAsyncKeyState", R[1], R[0]);
+}
 
 /* The pointer position (decision 0126, PROVISIONAL, wall 74; decision 0123 answered (0, 0) for GetCursorPos and had no setter). Learn (GetCursorPos): "retrieves the position of the mouse cursor, in screen coordinates";
  * (SetCursorPos): "Moves the cursor to the specified screen coordinates. If the new coordinates are not within the screen rectangle set by the most recent ClipCursor function call, the system automatically adjusts
@@ -5863,6 +5965,7 @@ void fle_imp_GetCursorPos(void)
     if (p == 0) fle_stop("GetCursorPos", "lpPoint is NULL: the page gives no behaviour");
     put_i32(p, ptr_x);
     put_i32(p + 4, ptr_y);
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: GetCursorPos %d,%d\n", ptr_x, ptr_y);
     R[0] = 1;
 }
 
@@ -5995,6 +6098,7 @@ void fle_imp_WindowFromPoint(void)
     fle_win_check_thread("WindowFromPoint");
     i = hit_test(-1, x, y);
     R[0] = i >= 0 ? handle_of(i) : 0;
+    if (api_trace && ptr_depth > 0) fprintf(stderr, "window-api: WindowFromPoint %d,%d -> %#" PRIx64 "\n", x, y, R[0]);
 }
 
 /* user32!IsWindowUnicode: BOOL f(HWND rcx). Learn: nonzero when the window is a native Unicode window; "The character set of the window is determined by the use of the RegisterClass function": a class registered with RegisterClassW (the only
@@ -6038,6 +6142,23 @@ void fle_imp_GetClassNameW(void)
  * high-order word must be zero." (SetPropW). A string key is compared without case folding? The page does not say: compared exactly (a choice without a source, S-prop: Windows converts a string to an atom, and atom names are
  * not case-sensitive in the global atom table: the model compares ASCII-case-insensitively as the atom table does: choice). An atom key and a string key never match each other here (the global atom table is not modelled:
  * GlobalAddAtom is not answered). */
+/* C-6 (#1346): a property call made while a pointer message is processed: window-api: <name> <window> "<property>" -> <result> (an atom is written as atom=). */
+static void trace_prop(const char *api, uint64_t h, const struct wprop *k, uint64_t result)
+{
+    char tx[96];
+    size_t n = 0;
+    uint16_t i;
+
+    if (!api_trace || ptr_depth <= 0) return;
+    if (k->is_atom) {
+        snprintf(tx, sizeof tx, "atom=%#x", (unsigned)k->atom);
+    } else {
+        for (i = 0; i < k->nlen && n + 1 < sizeof tx; i++) tx[n++] = k->name[i] < 128 ? (char)k->name[i] : '?';
+        tx[n] = 0;
+    }
+    fprintf(stderr, "window-api: %s %#" PRIx64 " \"%s\" -> %#" PRIx64 "\n", api, h, tx, result);
+}
+
 static int prop_key(const char *api, uint64_t p, struct wprop *k)
 {
     uint16_t i;
@@ -6086,6 +6207,7 @@ void fle_imp_SetPropW(void)
     w = win_arg(R[1]);
     if (w < 0) return;
     prop_key(api, R[2], &k);
+    trace_prop(api, R[1], &k, R[8]);
     k.data = R[8];
     at = prop_find(w, &k);
     if (at >= 0) {
@@ -6120,6 +6242,7 @@ void fle_imp_GetPropW(void)
     prop_key(api, R[2], &k);
     at = prop_find(w, &k);
     R[0] = at >= 0 ? tab[w].props[at].data : 0;
+    trace_prop(api, R[1], &k, R[0]);
 }
 
 /* user32!RemovePropW: HANDLE f(HWND rcx, LPCWSTR rdx). Learn: "The return value identifies the specified data. If the data cannot be found in the specified property list, the return value is NULL"; "The return value is the hData
