@@ -162,6 +162,26 @@ fn run(name: &str, globals: &str, main: &str) -> (i32, Vec<String>) {
     run_env(name, globals, main, &[])
 }
 
+#[test]
+fn a_pending_picker_yields_the_guest_thread_until_the_answer_is_ready() {
+    let globals = r#"
+static unsigned yields, polls;
+const char *fle_filedlg_host_pick(const char *req) { (void)req; return NULL; }
+const char *fle_filedlg_host_poll(void) { polls++; return yields >= 3 ? strdup("CANCEL") : NULL; }
+void fle_thread_sleep(const char *api, uint32_t ms) {
+    if (strcmp(api, "filedlg") || ms != 1) abort();
+    yields++;
+}
+"#;
+    let main = format!(r#"{OPEN}
+    uint64_t result = vcall(d, 3, 0, 0, 0);
+    printf("show %#llx yields %u polls %u\n", U(result), yields, polls);
+"#);
+    let (rc, lines) = run("fpick-cooperative", globals, &main);
+    assert_eq!(rc, 0, "{lines:?}");
+    assert_eq!(lines, ["show 0x800704c7 yields 3 polls 3"]);
+}
+
 const OPEN: &str = r#"
     uint64_t d = 0;
     uint64_t hr = cocreate(CLSID_FOD, 0, IID_FOD, &d);
