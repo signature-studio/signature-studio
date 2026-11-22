@@ -7,6 +7,7 @@
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
 # 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
+# インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
@@ -30,6 +31,8 @@ jobs:
     outputs:
       targets: ${{ steps.pick.outputs.targets }}
       retry: ${{ steps.pick.outputs.retry }}
+      labels: ${{ steps.pick.outputs.labels }}
+      issue_labels: ${{ steps.pick.outputs.issue_labels }}
     steps:
       - name: リポジトリを取得する(資格は残さない)
         uses: actions/checkout@v7.0.1
@@ -46,6 +49,8 @@ jobs:
           echo "$out"
           echo "targets=$(jq -c .targets <<<"$out")" >> "$GITHUB_OUTPUT"
           echo "retry=$(jq -r .retry <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "labels=$(jq -r .labels <<<"$out")" >> "$GITHUB_OUTPUT"
+          echo "issue_labels=$(jq -c .issue_labels <<<"$out")" >> "$GITHUB_OUTPUT"
 
   start:
     name: 起動する Issue に running を付ける
@@ -78,7 +83,7 @@ jobs:
 
   extract:
     name: 抽出物を用意する
-    needs: start
+    needs: [select, start]
     if: success() && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -120,9 +125,100 @@ jobs:
           node app/scripts/extract-fl.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/host" --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
+      - name: インストーラの一覧(inventory)のキャッシュ(R2)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',inventory,')
+        id: inventory
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/inventory
+          key: inventory-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
+      - name: インストーラの一覧(inventory)を作る(キャッシュが無いときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',inventory,') && steps.inventory.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/inventory"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node tools/fl-installer-files.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/inventory/fl-installer-files.tsv"
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+      - name: インストーラの一覧(inventory)をキャッシュに保存する(作ったときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',inventory,') && steps.inventory.outputs.cache-hit != 'true'
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/inventory
+          key: inventory-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
+      - name: 外部プラグインのキャッシュ(R2)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-external,')
+        id: external
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/external
+          key: external-${{ hashFiles('ci/artifacts.lock', 'tools/external-inputs/check.mjs') }}
+
+      - name: 外部プラグインのインストーラを取り、照合する(キャッシュが無いときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-external,') && steps.external.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/external"
+          awk -F'\t' '$1 ~ /^installers\// && $1 !~ /^installers\/flstudio_/ {print $1}' ci/artifacts.lock | while read -r key; do
+            aws s3 cp "s3://fl-web-artifacts/$key" "$RUNNER_TEMP/external/$(basename "$key")" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          done
+          node tools/external-inputs/check.mjs "$RUNNER_TEMP/external"
+
+      - name: 外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-external,') && steps.external.outputs.cache-hit != 'true'
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/external
+          key: external-${{ hashFiles('ci/artifacts.lock', 'tools/external-inputs/check.mjs') }}
+
   work:
     name: 作業 #${{ matrix.issue }}
-    needs: [start, extract]
+    needs: [select, start, extract]
     if: success() && needs.start.outputs.claimed != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -214,6 +310,54 @@ jobs:
           mkdir -p lift/out-app
           mv "$RUNNER_TEMP/host" lift/out-app/host
           test -f lift/out-app/host/binaries/win64/FLEngine_x64.dll
+
+      - name: インストーラの一覧(inventory)を R2 のキャッシュから取る(inventory の作業だけ)
+        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/inventory
+          key: inventory-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          fail-on-cache-miss: true
+
+      - name: 一覧を作業ツリーの inputs/ に置く(inventory の作業だけ。commit は作業者が行う)
+        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',inventory,')
+        run: |
+          mkdir -p inputs
+          cp "$RUNNER_TEMP/inventory/fl-installer-files.tsv" inputs/fl-installer-files.tsv
+
+      - name: 外部プラグインのインストーラを R2 のキャッシュから取る(plugin-external の作業だけ)
+        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/external
+          key: external-${{ hashFiles('ci/artifacts.lock', 'tools/external-inputs/check.mjs') }}
+          fail-on-cache-miss: true
+
+      - name: 外部プラグインを lift/out-app/external に置き、照合する(plugin-external の作業だけ)
+        if: contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-external,')
+        run: |
+          set -o pipefail
+          mkdir -p lift/out-app/external "$RUNNER_TEMP/out"
+          mv "$RUNNER_TEMP/external"/* lift/out-app/external/
+          node tools/external-inputs/check.mjs lift/out-app/external | tee "$RUNNER_TEMP/out/external-check.txt"
 
       - name: タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す
         env:
