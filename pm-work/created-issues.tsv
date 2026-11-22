@@ -41,3 +41,4 @@
 101	#1341	起動時に全 DLL を写す設計を、guest の LoadLibrary の時まで遅らせる(遅延の読み込みの完成)	Task
 102	#1342	プラグインのコードを engine.wasm から分け、Fruity Balance を 1 プラグイン 1 wasm で起動後に取得する(最初の分割)	Task
 103	#1343	内蔵のプラグインの DLL を分類し、第 2 波の入力(inputs/plugin-classes.tsv)を commit する	Task
+104	#1344	Delphi 系の内蔵プラグインの hook 点を、全プラグイン分、検出する道具を作り、`inputs/plugin-hooks.tsv` を commit する	Task
