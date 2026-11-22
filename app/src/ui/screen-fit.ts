@@ -1,6 +1,7 @@
 // The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1).
 // The page measures the room it has for the screen (everything below the header and left of the monitor panel), tells the engine that size through the engine's environment (FLE_MONITOR_W / FLE_MONITOR_H:
-// lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room in CSS pixels (1 guest pixel = 1 CSS pixel; the browser scales the canvas by the device pixel ratio).
+// lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room's device pixels (the room in CSS pixels times the device pixel ratio, C-1), so 1 guest pixel = 1 device pixel
+// and the canvas is shown at 1 / devicePixelRatio CSS pixels per guest pixel (the browser does not stretch it).
 // When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE and WM_SETTINGCHANGE; the runtime resizes the maximized windows: S-remaximize). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
 
 export const SCREEN_DEFAULT = { width: 1920, height: 1080 } as const;
@@ -26,9 +27,10 @@ export interface GuestScreenInfo {
 /** the room for the screen, in CSS pixels, and the device pixel ratio */
 export interface Room { width: number; height: number; dpr: number }
 export interface GuestScreen {
+  /** the guest's screen in device pixels */
   width: number;
   height: number;
-  /** CSS pixels per guest pixel: the desktop is drawn at this scale */
+  /** CSS pixels per guest pixel: the desktop is drawn at this scale (1 / devicePixelRatio when the screen is the room's device pixels) */
   scale: number;
   /** the CSS length that edges are rounded to: 1 (whole CSS pixels) */
   snap: number;
@@ -37,12 +39,15 @@ export interface GuestScreen {
 }
 
 const clampDim = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, Math.floor(v)));
+const ratioOf = (room: Room): number => (room.dpr > 0 ? room.dpr : 1);
 
 /**
- * The guest screen for a room: the room in CSS pixels, pulled inside the engine's limits. The scale is then whatever makes the screen fill the room exactly (1 when the room is inside the limits).
+ * The guest screen for a room: the room's device pixels (the room in CSS pixels times the device pixel ratio, rounded down), pulled inside the engine's limits. The scale is then whatever makes the screen
+ * fill the room: 1 / devicePixelRatio when the room is inside the limits.
  */
 export function chooseGuestScreen(room: Room): GuestScreen {
-  const rw = Math.max(1, room.width), rh = Math.max(1, room.height);
+  const dpr = ratioOf(room);
+  const rw = Math.max(1, room.width * dpr), rh = Math.max(1, room.height * dpr);
   const w = clampDim(rw, SCREEN_MIN.width, SCREEN_MAX.width), h = clampDim(rh, SCREEN_MIN.height, SCREEN_MAX.height);
   const clamped = w !== Math.floor(rw) || h !== Math.floor(rh);
   const d = drawScale({ width: w, height: h }, room);
@@ -50,13 +55,14 @@ export function chooseGuestScreen(room: Room): GuestScreen {
 }
 
 /**
- * How the desktop of a guest screen is drawn in a room. The guest has exactly the pixels the room holds, so a guest pixel is exactly one CSS pixel: not stretched by the fraction that fitting to the room would
- * give (1836.4 / 1836), which would resample every window. When the guest's screen is not that (the room is outside the engine's limits, or the engine did not take the size the page asked for) the screen is
- * fitted into the room in both directions and edges are rounded to whole CSS pixels.
+ * How the desktop of a guest screen is drawn in a room. The guest has the device pixels the room holds, so a guest pixel is one device pixel: 1 / devicePixelRatio CSS pixels, which the browser shows
+ * without stretching the canvas (C-1). When the guest's screen is not that (the room is outside the engine's limits, or the engine did not take the size the page asked for) the screen is fitted into
+ * the room in both directions and edges are rounded to whole CSS pixels.
  */
 export function drawScale(guest: { width: number; height: number }, room: Room, honoured = true): { scale: number; snap: number } {
   const fit = Math.min(Math.max(1, room.width) / guest.width, Math.max(1, room.height) / guest.height);
-  return { scale: honoured && 1 <= fit + 1e-9 ? 1 : fit, snap: 1 };
+  const natural = 1 / ratioOf(room);
+  return { scale: honoured && natural <= fit + 1e-9 ? natural : fit, snap: 1 };
 }
 
 /** the engine's environment for a guest screen: both variables */
