@@ -267,16 +267,16 @@ function measureRoom(): Room {
 }
 function applyDisplay(): void {
   const dpr = window.devicePixelRatio || 1;
-  // the desktop fills the stage: the scale is the room over the guest's screen (1 when the guest has exactly the pixels of the room)
+  // the desktop fills the stage: the scale is the room over the guest's screen (1 / device pixel ratio when the guest has exactly the device pixels of the room, C-1)
   const room = measureRoom(), g = app.screen.guest;
   app.screen.room = room;
-  // when the engine uses the size the page asked for, a guest pixel is exactly one CSS pixel; else the screen is fitted into the room
+  // when the engine uses the size the page asked for, a guest pixel is exactly one device pixel; else the screen is fitted into the room
   const asked = app.screen.asked, honoured = asked !== null && asked.width === g.width && asked.height === g.height;
   const d = drawScale(g, room, honoured);
   const scale = Math.max(0.05, d.scale);
   view.setScreen(g.width, g.height);
   view.setScale(scale, d.snap);
-  $('canvas-info').textContent = `guest screen ${g.width}x${g.height} in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)}, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
+  $('canvas-info').textContent = `guest screen ${g.width}x${g.height} device px in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
 }
 // decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
 const panelBtn = $<HTMLButtonElement>('panel-toggle');
@@ -350,7 +350,7 @@ function applyScreenParam(manifest: Manifest): void {
   app.screen.guest = { width: g.width, height: g.height };
   app.screen.room = room;
   applyDisplay();
-  addLog('info', `guest screen ${g.width}x${g.height} for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr} (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
+  addLog('info', `guest screen ${g.width}x${g.height} device px for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr} (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
   if (g.clamped) addLog('warn', `the room is outside what the engine accepts (${640}x${480}..${7680}x${4320}): the size was pulled inside it`);
 }
 

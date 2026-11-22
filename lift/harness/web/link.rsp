@@ -31,6 +31,14 @@ lift/harness/web/filedlg/fle_filedlg_lib.js
 -Wl,--wrap=fprintf
 -Wl,--wrap=fputs
 -Wl,--wrap=abort
+-Wl,--wrap=fle_imp_LockResource
+-Wl,--wrap=fle_imp_FormatMessageW
+-Wl,--wrap=fle_imp_RtlPcToFileHeader
+-Wl,--wrap=fle_imp_AcquireSRWLockExclusive
+-Wl,--wrap=fle_imp_ReleaseSRWLockExclusive
+-Wl,--wrap=fle_imp_AcquireSRWLockShared
+-Wl,--wrap=fle_imp_ReleaseSRWLockShared
+-Wl,--wrap=fle_imp_GetModuleHandleExW
 -Wl,-Map,lift/out-app/web/link.map
 lift/out-app/obj/b2d/b2d_swap.o
 lift/out-app/b2d/build/libblend2d.a

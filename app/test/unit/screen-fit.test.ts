@@ -24,24 +24,28 @@ describe('the guest screen (decision 0212; one mode since decision 0243)', () =>
 
 describe('the guest screen for a room', () => {
   const room = (width: number, height: number, dpr: number): Room => ({ width, height, dpr });
-  it('the guest screen is the room in CSS pixels, drawn at scale 1', () => {
-    const g = chooseGuestScreen(room(1836, 1048, 1.7647));
-    expect(g).toEqual({ width: 1836, height: 1048, scale: 1, snap: 1, clamped: false });
-    // a room of 1836.4 CSS pixels still gives a scale of exactly 1: a guest pixel is a CSS pixel, not 1.0002 of one
+  it('the guest screen is the room in device pixels (CSS x device pixel ratio), drawn at 1 / devicePixelRatio CSS pixels per pixel (C-1)', () => {
+    expect(chooseGuestScreen(room(1240, 921, 2))).toEqual({ width: 2480, height: 1842, scale: 0.5, snap: 1, clamped: false });
+    expect(chooseGuestScreen(room(1580, 957, 1.5))).toEqual({ width: 2370, height: 1435, scale: 1 / 1.5, snap: 1, clamped: false });
+    // a room at a ratio of 1 is the room itself: a guest pixel is a CSS pixel, not 1.0002 of one
     expect(chooseGuestScreen(room(1836.4, 1048.7, 1))).toMatchObject({ width: 1836, height: 1048, scale: 1 });
   });
-  it('drawScale: natural scale when the guest has the pixels the room holds, a fit when it does not (a bundle that did not take the size)', () => {
-    expect(drawScale({ width: 1836, height: 1056 }, room(1836.4, 1056.9, 1.7647))).toEqual({ scale: 1, snap: 1 });
-    // a guest that is bigger than the room (the engine kept 1920x1080 in a 1836 room): fitted, not cut
-    expect(drawScale({ width: 1920, height: 1080 }, room(1836, 1056, 1)).scale).toBeCloseTo(1836 / 1920, 9);
+  it('drawScale: natural scale when the guest has the device pixels the room holds, a fit when it does not (a bundle that did not take the size)', () => {
+    expect(drawScale({ width: 2480, height: 1842 }, room(1240.4, 921.9, 2))).toEqual({ scale: 0.5, snap: 1 });
+    // a guest that is bigger than the room (the engine kept 1920x1080 in a 1240 room): fitted, not cut
+    expect(drawScale({ width: 1920, height: 1080 }, room(1240, 921, 1)).scale).toBeCloseTo(1240 / 1920, 9);
     // a guest that the engine did not size to the room (not honoured) is fitted in both directions
     expect(drawScale({ width: 1920, height: 1080 }, room(960, 540, 1), false)).toEqual({ scale: 0.5, snap: 1 });
     expect(drawScale({ width: 1920, height: 1080 }, room(3840, 2160, 1), false)).toEqual({ scale: 2, snap: 1 });
+    // a room too small for the natural scale: the screen is fitted into it
+    expect(drawScale({ width: 640, height: 480 }, room(200, 100, 2)).scale).toBeCloseTo(100 / 480, 9);
   });
   it('a room outside the engine limits is pulled inside them: below the minimum the screen is fitted into the room, above the maximum it stays at its natural scale', () => {
     const small = chooseGuestScreen(room(500, 300, 1));
     expect(small).toMatchObject({ width: 640, height: 480, clamped: true });
     expect(small.scale).toBeCloseTo(Math.min(500 / 640, 300 / 480), 9);
+    // the limits are in device pixels: a room of 300 x 200 CSS px at ratio 2 is 600 x 400 device px, below the minimum
+    expect(chooseGuestScreen(room(300, 200, 2))).toMatchObject({ width: 640, height: 480, clamped: true });
     const big = chooseGuestScreen(room(9000, 5000, 1));
     expect(big).toMatchObject({ width: 7680, height: 4320, clamped: true });
     expect(big.scale).toBe(1);

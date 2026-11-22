@@ -43,7 +43,7 @@ static void (*find_fn(uint64_t va))(void) {
     return NULL;
 }
 
-/* Decision 0183 (wrp1, PROVISIONAL, OPT-IN): a hook that the link may supply (harness/two/wrp1_vst3.c): called after a real module is mapped, with its base and size. */
+/* Decision 0183 (wrp1, PROVISIONAL): a hook that the link supplies (harness/two/wrp1_vst3.c, linked into every engine build by Issue #1326): called after a real module is mapped, with its base and size. */
 void wrp1_after_image_load(uint64_t base, uint64_t size) __attribute__((weak));
 
 int main(int argc, char **argv) {
@@ -128,7 +128,7 @@ int main(int argc, char **argv) {
         fruity_add_image(rimg.base, rimg.size);
 #endif
         fle_vmap_register_image(rimg.base); /* decision 0123 */
-        if (wrp1_after_image_load) wrp1_after_image_load(rimg.base, rimg.size); /* decision 0183 (OPT-IN: the link's harness/two/wrp1_vst3.c; absent = nothing) */
+        if (wrp1_after_image_load) wrp1_after_image_load(rimg.base, rimg.size); /* decision 0183 (harness/two/wrp1_vst3.c; for a module that is not at WRP1_VST3_BASE it does nothing) */
         if (rimg.base < span_lo) span_lo = rimg.base;
         if (rimg.base + rimg.size > span_hi) span_hi = rimg.base + rimg.size;
         {
