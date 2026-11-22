@@ -53,8 +53,9 @@ function toEngine(m: RenderToEngine, transfer: Transferable[] = []): void { port
 
 /** asks the engine to compose; false when a question is still open */
 function ask(): boolean {
-  if (waiting || !port) return false;
+  if (waiting || !port || !gate) return false;
   waiting = true;
+  gate.request();
   toEngine({ cmd: 'want' });
   return true;
 }

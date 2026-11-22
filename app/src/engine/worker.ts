@@ -168,6 +168,7 @@ function readSettled(ptr: number, max: number): number {
 function inputPoll(ptr: number, max: number): number {
   const d = driver, mem = fruity?.memory;
   if (!ring || !d || !d.ready || !mem) return 0;
+  serviceDeskRequest();
   if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
   let i32: Int32Array | null = null;
@@ -342,11 +343,23 @@ function sendDeskReady(): void {
 /** the render Worker's messages: its question (compose now), the resync, the scene mode, and the answer to a test aid's read-pixels */
 function onRender(m: RenderToEngine): void {
   switch (m.cmd) {
-    case 'want': sendDeskReady(); deskTick(true); break;
+    case 'want': serviceDeskRequest(); break;
     case 'resync': compositor()?.resync(); break;
     case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
     case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
     case 'pixels-error': pendingDump = null; post({ t: 'desk-dump-error', message: m.message }); break;
+  }
+}
+
+// The shared request is consumed once, either here in the event loop or at a
+// guest scheduler point. A wake message arriving afterwards does no extra work.
+function serviceDeskRequest(): void {
+  if (!gate?.takeRequest()) return;
+  sendDeskReady();
+  try { deskTick(true); }
+  catch (e) {
+    log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`);
+    renderNoChange();
   }
 }
 

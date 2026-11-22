@@ -2,7 +2,9 @@
 // GEN is the generation of the picture the engine published last; ACK is the generation the render Worker has finished reading. The engine composes only while ACK = GEN, so the picture (which only
 // fle_desk_compose writes) does not change while the render Worker reads it. Only the engine writes GEN and only the render Worker writes ACK.
 
-const GEN = 0, ACK = 1;
+// REQUEST lets the engine see a frame request at a guest scheduler point even
+// while its JavaScript event loop cannot receive the accompanying wake message.
+const GEN = 0, ACK = 1, REQUEST = 2;
 export const DESK_CTL_BYTES = 64;
 
 export const newDeskControl = (): SharedArrayBuffer => new SharedArrayBuffer(DESK_CTL_BYTES);
@@ -16,4 +18,6 @@ export class DeskGate {
   get published(): number { return Atomics.load(this.ctl, GEN); }
   publish(gen: number): void { Atomics.store(this.ctl, GEN, gen); }
   ack(gen: number): void { Atomics.store(this.ctl, ACK, gen); }
+  request(): void { Atomics.store(this.ctl, REQUEST, 1); }
+  takeRequest(): boolean { return Atomics.exchange(this.ctl, REQUEST, 0) !== 0; }
 }
