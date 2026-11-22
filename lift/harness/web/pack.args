@@ -40,3 +40,15 @@ lift/out-app/web/engine-glue.js
 lift/out-app/seed/seed.bin
 --dll-dir
 lift/out-app/dll
+--lazy-dll
+fruity_balance_x64.6800000.dll
+--lazy-dll
+fruity_filter_x64.7000000.dll
+--lazy-dll
+fruity_delay2_x64.7800000.dll
+--lazy-file
+lift/out-app/host/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll=seed/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll
+--lazy-file
+lift/out-app/host/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll=seed/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll
+--lazy-file
+lift/out-app/host/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Delay_2_x64.dll=seed/lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Delay_2_x64.dll

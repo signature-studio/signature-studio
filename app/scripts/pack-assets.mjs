@@ -3,13 +3,15 @@
 // with SHA-256s, and the brotli-compressed form of each of the four files. It never uploads anything and never needs credentials.
 //
 //   node scripts/pack-assets.mjs --out DIR --name NAME --version VER --engine-wasm FILE --glue FILE --seed-pack FILE --dll-dir DIR --host-files emscripten-X.Y.Z --args "/data/FLEngine_x64.dll /data/mod1.dll:/data/mod2.dll"
-//        [--env K=V]... [--root /data] [--fruity-hints first=49,stop=55,variant=Oz] [--stop-note "TEXT CONTAINED IN THE ENGINE'S STOP MESSAGE=>NOTE"]... [--lazy-dll FILE]... [--brotli-quality 11] [--prefix KEY_PREFIX] [--description TEXT]
+//        [--env K=V]... [--root /data] [--fruity-hints first=49,stop=55,variant=Oz] [--stop-note "TEXT CONTAINED IN THE ENGINE'S STOP MESSAGE=>NOTE"]... [--lazy-dll FILE]... [--lazy-file SRC=PATH]... [--brotli-quality 11] [--prefix KEY_PREFIX] [--description TEXT]
 //   scripts/build-engine-bundle.sh calls it (decision 0137). --glue is the emscripten ES module flengine6.js (-sMODULARIZE=1 -sEXPORT_ES6=1) linked with -sFILESYSTEM=0 by the Emscripten named in --host-files (decision 0221: the page
 //   answers the engine's file reads from the pack bytes). --seed-pack is an FLSEEDP1 pack (app/scripts/pack-seed.mjs), --dll-dir the engine and module DLLs (packed as flpack1: pack path = file name).
 //   --stop-note texts are shown by the UI when the engine's stop message contains the text before `=>` (repeatable). The engine wasm must export the desktop compositor (fle_desk_compose, fle_desk_resync): the page shows
 //   the engine through it and has no other way (decision 0223).
 //   --lazy-dll FILE (repeatable, Issue #1314): a file of --dll-dir that the page downloads AFTER the engine has started. It is not in the DLL pack; the manifest names it under `lazy` with its path under the
 //   engine's root (the file name). Nothing names a lazy file by default: the start-up downloads are the same as before.
+//   --lazy-file SRC=PATH (repeatable, Issue #1315): any other file that the page downloads after the engine has started, SRC on the disk and PATH under the engine's root (for example
+//   seed/<host path> for a file that pack-seed.mjs --lazy leaves out of the seed pack). Named as --lazy-dll is; `name` is the file name of PATH. The DLL lazy files come first in the manifest's order.
 //
 // The layout is the bucket's: br/<KEY_PREFIX>/<file> is each of the four files brotli-compressed, to be uploaded under the key <KEY_PREFIX>/<file> with Content-Encoding br;
 // raw/<KEY_PREFIX>/manifest.json is the manifest (no encoding). SHA256SUMS lists every file of the directory. Nothing else is written.
@@ -34,7 +36,7 @@ function parseArgs(argv) {
     const v = argv[++i];
     if (v === undefined) throw new Error(`--${k} needs a value`);
     if (k === 'env') { const j = v.indexOf('='); if (j < 1) throw new Error('--env K=V'); a.env[v.slice(0, j)] = v.slice(j + 1); }
-    else if (k === 'stop-note' || k === 'lazy-dll') (a[k] ??= []).push(v);
+    else if (k === 'stop-note' || k === 'lazy-dll' || k === 'lazy-file') (a[k] ??= []).push(v);
     else a[k] = v;
   }
   return a;
@@ -121,6 +123,15 @@ async function main() {
   for (const n of lazyNames) {
     const ext = path.extname(n);
     lazy.push({ name: n, path: n, ...(await emit(path.join(dllDir, n), path.basename(n, ext), ext.slice(1) || 'bin')) });
+  }
+  // Issue #1315: --lazy-file SRC=PATH: a file of no pack (the engine finds it at <root>/PATH; the name is the file name of PATH)
+  for (const t of args['lazy-file'] ?? []) {
+    const j = t.indexOf('=');
+    if (j < 1 || j === t.length - 1) throw new Error('--lazy-file SRC=PATH');
+    const src = path.resolve(t.slice(0, j)), p = t.slice(j + 1);
+    if (!fs.existsSync(src)) throw new Error(`--lazy-file ${t.slice(0, j)}: no such file`);
+    const ext = path.extname(p);
+    lazy.push({ name: path.basename(p), path: p, ...(await emit(src, path.basename(p, ext), ext.slice(1) || 'bin')) });
   }
 
   const manifest = {
