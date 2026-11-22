@@ -10,7 +10,7 @@
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
 # 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。
-# push が 3 回とも落ちたときは、押せなかった作業を差分(work.diff)で artifact に残す。同じ Issue の次の run は、それを作業の前に取り込む(設計は pm-work/workflow-design.md の「4」「7」)。
+# push が 3 回とも落ちたとき、および判定が落ちたときは、作業を差分(work.diff)で artifact に残す。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
@@ -380,7 +380,7 @@ jobs:
           rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
 
       - name: 前回の作業を取り込む
-        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く(commit しない)
+        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
         if: success() && steps.check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -394,17 +394,31 @@ jobs:
             if gh run download "$r" -n "agent-$ISSUE" -D "$d/$r" > /dev/null 2>&1 && [ -s "$d/$r/work.diff" ]; then run=$r; break; fi
           done
           if [ -z "$run" ]; then echo "前回の保存された作業は無い"; exit 0; fi
-          rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
-          if [ "$rc" -eq 0 ]; then
-            if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
-            echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
-          else
-            c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
-            if [ -n "$c" ]; then
-              echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
+          jt="$d/$run/judge.txt"
+          if [ -s "$jt" ] && grep -qx 'judge: 通った' "$jt"; then
+            rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
+              echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
             else
-              echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then
+                echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
+              else
+                echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
+              fi
             fi
+          else
+            # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
+            rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
+            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。判定の出力が無い)"; fi
+            if [ "$rc" -eq 0 ]; then
+              st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then st="その作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消する。"; else st="その作業は取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。"; fi
+            fi
+            { echo "前回の run $run の作業は、途中で終わり、判定を通らなかった。理由(判定の出力の末尾 10 行。長い行は 200 字で切る):"; echo "$why"; echo "$st 最初からやり直さず、続きから行う。作業ツリーの状態(git status・git diff HEAD)と、Issue の本文の受け入れを照らし、残りを行い、受け入れを通して commit する。"; } > .prior-work.md
           fi
           echo "前回の作業の取り込み: run $run(終了コード $rc)"
 
@@ -656,6 +670,19 @@ jobs:
           if [ "$(wc -c < "$RUNNER_TEMP/out/work.diff")" -gt 52428800 ]; then rm -f "$RUNNER_TEMP/out/work.diff"; echo "::warning::差分が 50 MB を超えるので保存しない"; exit 0; fi
           echo "押せなかった作業を保存した($(wc -c < "$RUNNER_TEMP/out/work.diff") バイト)"
 
+      - name: 判定が落ちた作業を保存する
+        # 判定の段が落ちて push が飛んだとき(作業者が動いた後)だけ。作業ツリーの全差分(commit 済み・未 commit・未追跡。.gitignore の物を除く)を、基点(refs/judge/main との merge-base)からの差分にする。次の再試行は、判定を通らなかった作業として続きから取り込む
+        if: failure() && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          if [ ! -e "$RUNNER_TEMP/out/report.md" ]; then echo "作業者が動いていない。保存する作業が無い"; exit 0; fi
+          base=$(git merge-base HEAD refs/judge/main 2>/dev/null || git merge-base HEAD origin/main)
+          git add -A
+          git diff --cached --binary "$base" > "$RUNNER_TEMP/out/work.diff"
+          if [ ! -s "$RUNNER_TEMP/out/work.diff" ]; then rm -f "$RUNNER_TEMP/out/work.diff"; echo "保存する差分が空"; exit 0; fi
+          if [ "$(wc -c < "$RUNNER_TEMP/out/work.diff")" -gt 52428800 ]; then rm -f "$RUNNER_TEMP/out/work.diff"; echo "::warning::差分が 50 MB を超えるので保存しない"; exit 0; fi
+          echo "判定が落ちた作業を保存した($(wc -c < "$RUNNER_TEMP/out/work.diff") バイト)"
+
       - name: 報告を検査して、成果物とサマリーに出す
         if: always() && steps.check.outputs.skip != 'true'
         run: |
@@ -723,7 +750,7 @@ jobs:
               { echo "作業は完了し main に入った。後続の段(${failed:-(取れなかった。ジョブのログを見る)})が失敗した。"; echo "run: $RUN_URL"; } > "$d/comment.md"
             else
               echo failure > "$d/status"
-              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "押せなかった作業を保存した(次の再試行で、前回の作業を取り込んでから始める)"; fi; } > "$d/comment.md"
+              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; } > "$d/comment.md"
             fi
           done
 
