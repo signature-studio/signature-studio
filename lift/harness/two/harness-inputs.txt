@@ -8,3 +8,5 @@ lift/harness/image.c
 lift/harness/a4.c
 lift/harness/hyb1/hybrid_glue.c
 lift/out-app/gen/realmod.c
+lift/harness/two/wrp1_vst3.c
+lift/harness/two/wrp1_vst3_imp.c

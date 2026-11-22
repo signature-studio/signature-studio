@@ -79,9 +79,9 @@ void fle_imp_GetModuleHandleA(void);
  * rcx = module (R[1]), rdx = name (R[2]). */
 void fle_imp_GetProcAddress(void);
 
-/* kernel32!GetModuleHandleExW: stops by name (decision 0078). Decision 0190 (opt-in): a link that answers this API (harness/two/wrp1_vst3_imp.c wraps it for Serum2.vst3's UCRT thread start-up) compiles
- * the lifted units that call it with -DFLE_GMHEX_RETURNS: with the noreturn attribute below, clang drops the code that follows the call (the caller's `R[4] += 8` and the next instructions of
- * the lifted block), so the guest stack lost 8 bytes in _beginthreadex and the CreateThread that followed read a wrong dwCreationFlags (wall W12 of decision 0183). Without the macro nothing changes. */
+/* kernel32!GetModuleHandleExW: stops by name (decision 0078), and the link answers it (harness/two/wrp1_vst3_imp.c wraps it for Serum2.vst3's UCRT thread start-up). The declaration is plain in every build
+ * (decision 0243): a noreturn attribute here would make clang drop the code that follows the call (the caller's `R[4] += 8` and the next instructions of the lifted block), which lost 8 bytes of guest stack in
+ * _beginthreadex and gave the CreateThread that followed a wrong dwCreationFlags (wall W12 of decision 0183; decision 0190). */
 void fle_imp_GetModuleHandleExW(void);
 
 /* shell32 PIDL functions that the guest fetches by ordinal (decision 0099): rows of the response table, and each stops by name when called. */
