@@ -2,10 +2,12 @@
 // Seed pack of the browser build (decision 0134): ONE file that holds every host file the harness reads before the guest runs, so that a Worker can fetch it once.
 // The port of lift/harness/web/final0129/pack_seed.py (the same layout and the same bytes; the header is the JSON that Python writes, with non-ASCII escaped).
 //
-//   node app/scripts/pack-seed.mjs --root <repository root> --tsv <vfs seed list> --extra <file> [--extra <file> ...] --out <pack file>
+//   node app/scripts/pack-seed.mjs --root <repository root> --tsv <vfs seed list> --extra <file> [--extra <file> ...] [--lazy <host file> ...] --out <pack file>
 //
 // What goes in: the VFS seed list and, for every line of it that names a host file, that host file (path relative to --root). The SHA-256 of every host file is checked
 // against the list's third column before it is packed; the registry seeds and the Authenticode claims come in as --extra.
+// --lazy HOST (repeatable, Issue #1315): a host file of the list that is NOT packed. It is checked against the list the same way and written to the side manifest under `left_out`;
+// pack-assets.mjs --lazy-file names it, and the page downloads it after the engine has started (the engine reads it from <root>/seed/<HOST> as it reads the packed files).
 // Layout (little endian): 'FLSEEDP1' (8 bytes) | u32 header_length | header (UTF-8 JSON) | the data region.
 // A JSON manifest is written next to the pack (<pack file>.manifest.json).
 import crypto from 'node:crypto';
@@ -18,10 +20,11 @@ const pyJson = (v, indent) => (indent === undefined ? JSON.stringify(v) : JSON.s
   .replace(/[^\x20-\x7e\n]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 
 function parseArgs(argv) {
-  const a = { extra: [] };
+  const a = { extra: [], lazy: [] };
   for (let i = 0; i < argv.length; i += 2) {
     const k = argv[i].replace(/^--/, '');
     if (k === 'extra') a.extra.push(argv[i + 1]);
+    else if (k === 'lazy') a.lazy.push(argv[i + 1]);
     else a[k] = argv[i + 1];
   }
   return a;
@@ -32,7 +35,7 @@ class PackError extends Error {}
 function main(argv) {
   const a = parseArgs(argv);
   if (!a.root || !a.tsv || !a.out) {
-    console.log('usage: pack-seed.mjs --root ROOT --tsv TSV [--extra FILE]... --out PACK');
+    console.log('usage: pack-seed.mjs --root ROOT --tsv TSV [--extra FILE]... [--lazy HOST]... --out PACK');
     return 2;
   }
   const root = path.resolve(a.root);
@@ -50,6 +53,7 @@ function main(argv) {
   add(`seed/${path.basename(tsv)}`, tsv);
   const want = new Map();
   const guestSeen = new Map();
+  const listed = new Set();
   const lines = fs.readFileSync(tsv, 'utf8').split(/\r\n|\r|\n/);
   for (let ln = 1; ln <= lines.length; ln++) {
     const line = lines[ln - 1];
@@ -63,8 +67,18 @@ function main(argv) {
     guestSeen.set(gk, ln);
     if (h === '-' && s === '-') continue;
     if (h.startsWith('/') || h.split('/').includes('..')) throw new PackError(`${tsv}:${ln}: host path must be relative without '..': ${h}`);
-    add(`seed/${h}`, path.join(root, h));
+    listed.add(h);
+    if (!a.lazy.includes(h)) add(`seed/${h}`, path.join(root, h));
     want.set(`seed/${h}`, s.toLowerCase());
+  }
+  // Issue #1315: a --lazy host file is not packed; its bytes are checked against the list here (the packed ones are checked below)
+  const leftOut = [];
+  for (const h of a.lazy) {
+    if (!listed.has(h)) throw new PackError(`--lazy ${h}: not a host file of ${tsv}`);
+    const data = fs.readFileSync(path.join(root, h));
+    const sha = sha256(data);
+    if (want.get(`seed/${h}`) !== sha) throw new PackError(`SHA-256 mismatch for ${path.join(root, h)}: list ${want.get(`seed/${h}`)}, file ${sha}`);
+    leftOut.push({ path: `seed/${h}`, host: h, size: data.length, sha256: sha });
   }
   for (const x of a.extra) {
     add(`seed/${path.basename(path.resolve(x))}`, path.resolve(x));
@@ -87,7 +101,7 @@ function main(argv) {
   const largest = files.map((f) => [f.size, f.path]).sort((x, y) => (x[0] !== y[0] ? y[0] - x[0] : x[1] < y[1] ? 1 : x[1] > y[1] ? -1 : 0)).slice(0, 5);
   const man = {
     pack: path.basename(a.out), bytes: pack.length, sha256: sha256(pack), header_bytes: header.length, data_bytes: off, files: files.length,
-    files_checked_against_list_sha256: want.size, largest,
+    files_checked_against_list_sha256: want.size, largest, left_out: leftOut,
   };
   fs.writeFileSync(`${a.out}.manifest.json`, pyJson(man, 1));
   console.log(pyJson(man, 1));

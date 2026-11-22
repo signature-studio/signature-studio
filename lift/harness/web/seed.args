@@ -10,3 +10,5 @@ lift/harness/seeds/authenticode-claims.tsv
 lift/out-app/host
 --out
 lift/out-app/seed/seed.bin
+--lazy
+lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll
