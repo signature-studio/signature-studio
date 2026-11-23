@@ -780,4 +780,38 @@ PY
 ok "deploy.yml: 抽出の木の鍵(id: cache)は host- で、seed 表(lift/harness/seeds/vfs-seed-idle1.tsv)を入力に含む" "$(case "$DK" in host-*"'lift/harness/seeds/vfs-seed-idle1.tsv'"*) echo yes;; *) echo no;; esac)" yes
 ok "deploy.yml: 抽出の木の鍵は、agent.yml の extract-tree- の鍵が読む入力(ファイルの集合)を全て覆う(覆われていない物の一覧)" "$(cover "$AK" "$DK")" covered
 ok "deploy.yml: 抽出の木の鍵は、fe-build extract が読む表(ci/extract-dlls.tsv・seed 表)と extract-fl.mjs を全て覆う" "$(cover "hashFiles('ci/extract-dlls.tsv', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'app/scripts/extract-fl.mjs')" "$DK")" covered
+# (m) 本番へ上げる前のスモーク(deploy.yml): 起動の確認と、Welcome 窓の 4 つの流れ。上げる段(upload・wrangler)より前に在り、既定の success() で、落ちれば後を飛ばす
+D=$top/.github/workflows/deploy.yml; DOLD=cf3e7dc9
+git -C "$top" show "$DOLD:.github/workflows/deploy.yml" > "$T/deploy-old.yml" 2>/dev/null || echo "FAIL 変更前の deploy.yml を読めない($DOLD)"
+pj "$T/deploy-old.yml" > "$T/deploy-old.json" 2>>"$T/pj.err"; DO=$T/deploy-old.json
+SMOKE='boot-bundle|welcome-flow|jq -e'
+KINDS='[.jobs.deploy.steps[] | (.run // "") as $r | if .uses then (if (.uses | test("wrangler")) then "wrangler" else "uses" end) elif ($r | test("fe-build bundle$")) then "bundle" elif ($r | test("boot-bundle[.]mjs")) then "boot" elif ($r | test("jq -e") and test("boot[.]json")) then "bootgate" elif ($r | test("welcome-flow[.]mjs")) then "flow" elif ($r | test("jq -e") and test("flow[.]jsonl")) then "flowgate" elif ($r | test("fe-build upload$")) then "upload" else "other" end] | map(select(. != "other" and . != "uses")) | join(" ")'
+ok "deploy.yml(m): 順は fe-build bundle → 起動の確認 → 起動の判定 → Welcome 窓の流れ → 流れの判定 → fe-build upload → wrangler" "$(jq -r "$KINDS" "$DJ")" "bundle boot bootgate flow flowgate upload wrangler"
+ok "deploy.yml(m): 起動の確認と Welcome 窓の流れの段は、それぞれ 1 つ" "$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("boot-bundle[.]mjs"))] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("welcome-flow[.]mjs"))] | length' "$DJ")" "1/1"
+ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落ちれば後の段を飛ばす)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"if\")] | any" "$DJ")" false
+ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
+ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
+ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
+ok "deploy.yml(m): スモーク以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する" "$(jq -n -S --slurpfile n "$DJ" --slurpfile o "$DO" "([\$n[0].jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\")) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
+ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
+ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
+BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
+bg() { mkdir -p "$T/rt"; printf '%s\n' "$1" > "$T/rt/boot.json"; ( cd "$T" && RUNNER_TEMP="$T/rt" bash -c "$BG" > /dev/null 2>&1 ); echo $?; }
+ok "deploy.yml(m): 起動の判定: idle・standIn 偽・error 無しで通る" "$(bg '{"error":null,"state":"engine-idle","standIn":false}')" 0
+ok "deploy.yml(m): 起動の判定: error が有れば落ちる" "$(bg '{"error":"x","state":"engine-idle","standIn":false}')" 1
+ok "deploy.yml(m): 起動の判定: error が null でも idle でなければ落ちる(boot-bundle の error は idle の証拠ではない)" "$(bg '{"error":null,"state":"error","standIn":false}')" 1
+ok "deploy.yml(m): 起動の判定: standIn が真なら落ちる" "$(bg '{"error":null,"state":"engine-idle","standIn":true}')" 1
+FG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("flow[.]jsonl"))) | .run] | .[0] // ""' "$DJ")
+fg() { mkdir -p "$T/rt"; printf '%s\n' "$1" > "$T/rt/flow.jsonl"; ( cd "$T" && RUNNER_TEMP="$T/rt" bash -c "$FG" > /dev/null 2>&1 ); echo $?; }
+FL=$(for f in A B C D; do jq -c -n --arg f $f '{flow:$f,error:null,state:"engine-idle",standIn:false,trapped:false,hostErrors:0,welcomeClosed:true,opened:true}'; done)
+ok "deploy.yml(m): 流れの判定: 4 つ(A B C D)が全て正常なら通る" "$(fg "$FL")" 0
+ok "deploy.yml(m): 流れの判定: 1 つでも trap していれば落ちる" "$(fg "$(jq -c 'if .flow == "B" then .trapped = true else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 1 つに error が有れば落ちる" "$(fg "$(jq -c 'if .flow == "C" then .error = "x" else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 1 つで開かなければ落ちる(開いたか)" "$(fg "$(jq -c 'if .flow == "D" then .opened = false else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 1 つで窓が閉じなければ落ちる" "$(fg "$(jq -c 'if .flow == "A" then .welcomeClosed = false else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 1 つで idle でなければ落ちる" "$(fg "$(jq -c 'if .flow == "A" then .state = "error" else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 流れが 3 つだけなら落ちる" "$(fg "$(head -n 3 <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 流れの名前が重複すれば落ちる(D が無い)" "$(fg "$(jq -c 'if .flow == "D" then .flow = "A" else . end' <<<"$FL")")" 1
+ok "deploy.yml(m): 流れの判定: 出力が空なら落ちる" "$(fg "")" 1
+ok "deploy.yml(m): 流れの判定: HostFilesUnsupported の件数は判定に入れない(documented: 正常時の件数は未確認)" "$(fg "$(jq -c 'if .flow == "A" then .hostErrors = 3 else . end' <<<"$FL")")" 0
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

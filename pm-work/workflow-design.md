@@ -147,3 +147,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 | 依存は blocking/blocked-by で示し、ブロッカーの無いタスクは即座に起動 | `blocked by` の open が 0 の Issue を、起動の条件にする。ブロッカーが閉じた `closed` で後続を起動する(未確認。「9」) |
 | PM 資料は `pm-work/` | この文書を含め、PM 資料は `pm-work/` に置く |
 | Issues・Milestones・ラベル・PR への書き込みは承認まで禁止 | この文書は書き込みを行わない。ラベル・Issue は承認後に PM が作る |
+
+## 12. 本番のデプロイ前のスモーク(deploy.yml)
+
+`fe-build bundle` の後、`fe-build upload`・wrangler の前に、2 つの検査の段を置く。(1) `tools/boot-check/boot-bundle.mjs` で起動を確かめ、状態が `engine-idle`・`standIn` が偽・`error` が null のときだけ通す(boot-bundle の `error` が null でも、状態が idle とは限らないので、状態を別に見る)。(2) `tools/smoke/welcome-flow.mjs` で Welcome 窓の 4 つの閉じ方(「No thanks」→ Default、Escape、「No thanks」→ Default の 1 回クリック、「I'm in」→ Default)を、流れごとに別の起動で走らせ、4 件とも `error` が無く、trap せず、idle に戻り、プロジェクトが開き、窓が閉じたときだけ通す。判定は、deploy.yml の中の `jq -e` の段が行う(道具の終了コードは流れの成否を表さないため)。どちらかが落ちれば、後の upload・wrangler は飛び、本番は更新されない(既定の `success()`)。判定の式は `spec/workflow.test.sh` の (m) が、fixture で実際に動かして確かめる。`HostFilesUnsupported` の件数は、正常時の値が未確認のため判定に入れない。時間の上限は、起動の段 15 分、流れの段 30 分。Chrome は runner の画像の `google-chrome` を使う(作業ジョブの boot-check と同じ)。作業ジョブの判定(judge)には、まだ入れていない。判定には取り直した main の engine と bundle を作り直す段が要り、作業ジョブの時間が大きく増えるため、deploy のログで `fe-build engine` の所要時間を見てから決める。
