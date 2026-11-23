@@ -16,8 +16,8 @@ export interface PageAudioOptions {
 
 export interface WorkletSample { frame: number; time: number; rd: number; wr: number; state: number; peak: number; sumSq: number; n: number; nonSilent: number; fmin: number | null; page: number }
 export interface Capture { frames: Float32Array; valid: boolean; firstFrame: number; validFrames: number; page: number }
-export interface EnginePulse { real: number; epoch: number; virt: number; consumed: number; written: number; threads: number[][]; mixer: number; unlockCompute: { n: number; sumMs: number; maxMs: number; over78: number }; page: number }
-export interface WorkerReport { at: number; unlocks: { first: number; n: number; t: number }[]; waits: number; publishes: number; skipped: number; gapFrames: number; maxWaitDrift: number; pace: Record<string, number> | null; rewrite?: { events: number; applied: number; lost: number } | null; page: number }
+export interface EnginePulse { real: number; epoch: number; virt: number; consumed: number; written: number; threads: number[][]; mixer: number; unlockCompute: { n: number; frames?: number; sumMs: number; maxMs: number; over78: number }; page: number }
+export interface WorkerReport { at: number; unlocks: { first: number; n: number; t: number; bufferFrames?: number; offsetFrames?: number }[]; waits: number; publishes: number; skipped: number; gapFrames: number; maxWaitDrift: number; pace: Record<string, number> | null; rewrite?: { events: number; applied: number; lost: number } | null; page: number }
 
 /** decision 0211: what the page can say about the state of the audio output (the status line and the beacon carry it); 'idle' = no AudioContext yet (no engine Worker yet) */
 export type AudioStatusKind = 'idle' | 'starting' | 'needs-gesture' | 'resuming' | 'running' | 'blocked' | 'error' | 'closed';

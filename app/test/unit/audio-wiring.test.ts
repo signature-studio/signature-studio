@@ -71,11 +71,12 @@ describe('audio wiring (decision 0175): the constants and the messages between t
     a.watch(worker);
     handler({ data: { t: 'idle', n: 1 } } as MessageEvent);
     handler({ data: 'text' } as MessageEvent);
-    handler({ data: { type: 'audio-pulse', real: 1, epoch: 2, virt: 3, consumed: 4, written: 5, threads: [], mixer: -1, unlockCompute: { n: 0, sumMs: 0, maxMs: 0, over78: 0 } } } as MessageEvent);
-    handler({ data: { type: 'aud2-worker', at: 1, unlocks: [{ first: 0, n: 4096, t: 7 }], waits: 0, publishes: 1, skipped: 0, gapFrames: 0, maxWaitDrift: 0, pace: null } } as MessageEvent);
+    handler({ data: { type: 'audio-pulse', real: 1, epoch: 2, virt: 3, consumed: 4, written: 5, threads: [], mixer: -1, unlockCompute: { n: 1, frames: 4096, sumMs: 0, maxMs: 0, over78: 0 } } } as MessageEvent);
+    handler({ data: { type: 'aud2-worker', at: 1, unlocks: [{ first: 0, n: 4096, t: 7, bufferFrames: 8192, offsetFrames: 4096 }], waits: 0, publishes: 1, skipped: 0, gapFrames: 0, maxWaitDrift: 0, pace: null } } as MessageEvent);
     expect(a.pulses.length).toBe(1);
     expect(a.reports.length).toBe(1);
-    expect(a.workerUnlocks).toEqual([{ first: 0, n: 4096, t: 7 }]);
+    expect(a.pulses[0]?.unlockCompute.frames).toBe(4096);
+    expect(a.workerUnlocks).toEqual([{ first: 0, n: 4096, t: 7, bufferFrames: 8192, offsetFrames: 4096 }]);
   });
 
   it('the counters read from the ring are the worklet\'s: a fresh ring has no underruns and 0 playing quanta, P3 is 0 and the share is 0', () => {

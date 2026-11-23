@@ -89,18 +89,18 @@ EM_JS(void, fle_js_state, (unsigned state, unsigned rate), {
   Atomics.store(A.h, 3, rate); Atomics.store(A.h, 2, state);
 });
 EM_JS(double, fle_js_now, (void), { return performance.now(); });
-EM_JS(void, fle_js_unlock, (double first, unsigned n), {
+EM_JS(void, fle_js_unlock, (double first, unsigned n, unsigned buffer_frames, unsigned offset_frames), {
   const A = globalThis.__fleAud;
   if (!A) return;
-  if (A.unlocks.length < 4000) A.unlocks.push({ first: first, n: n, t: performance.timeOrigin + performance.now() });
+  if (A.unlocks.length < 4000) A.unlocks.push({ first: first, n: n, bufferFrames: buffer_frames, offsetFrames: offset_frames, t: performance.timeOrigin + performance.now() });
 });
 /* telemetry to the page, from the engine's own thread (the Worker may be inside a long compute and unable to answer a query): called from a thread switch at most every 500 ms of real time */
-EM_JS(void, fle_js_pulse, (double real, double virt, double consumed, double written, unsigned nthr, const double *tot, const double *mx, const double *cnt, int mixer, double uc_n, double uc_sum, double uc_max, double uc_over78), {
+EM_JS(void, fle_js_pulse, (double real, double virt, double consumed, double written, unsigned nthr, const double *tot, const double *mx, const double *cnt, int mixer, double uc_n, double uc_frames, double uc_sum, double uc_max, double uc_over78), {
   const A = globalThis.__fleAud;
   if (!A) return;
   const n = Math.min(nthr, 32), t = [];
   for (let i = 0; i < n; i++) t.push([HEAPF64[(tot >> 3) + i], HEAPF64[(mx >> 3) + i], HEAPF64[(cnt >> 3) + i]]);
-  self.postMessage({ type: 'audio-pulse', real: real, epoch: performance.timeOrigin + real, virt: virt, consumed: consumed, written: written, threads: t, mixer: mixer, unlockCompute: { n: uc_n, sumMs: uc_sum, maxMs: uc_max, over78: uc_over78 } });
+  self.postMessage({ type: 'audio-pulse', real: real, epoch: performance.timeOrigin + real, virt: virt, consumed: consumed, written: written, threads: t, mixer: mixer, unlockCompute: { n: uc_n, frames: uc_frames, sumMs: uc_sum, maxMs: uc_max, over78: uc_over78 } });
 });
 #ifdef __EMSCRIPTEN__
 /* ASYNC (JSPI): waits ms of real time (the thread's JSPI stack is suspended and the Worker's event loop runs). 2 after the time-out. It does not take part in the page's idle protocol of decision 0136 (fle_idle_wait / fleIdleDeliver:
@@ -133,7 +133,7 @@ double fle_tp_now(void) { return fle_js_now(); }
 int fle_tp_wait(double ms) { return fle_js_wait(ms); }
 /* per-thread run time between switches (wall ms), the compute time of the mixer's committed blocks, and the telemetry */
 #define SL_MAX 64u
-static double sl_total[SL_MAX], sl_max[SL_MAX], sl_n[SL_MAX], sl_start = -1.0, last_pulse = -1e9, uc_n, uc_sum, uc_max, uc_over78;
+static double sl_total[SL_MAX], sl_max[SL_MAX], sl_n[SL_MAX], sl_start = -1.0, last_pulse = -1e9, uc_n, uc_frames, uc_sum, uc_max, uc_over78;
 static int mixer_thr = -1;
 unsigned fle_thread_current(void) __attribute__((weak));
 void fle_audio_switch_note(unsigned from, unsigned to)
@@ -153,18 +153,19 @@ void fle_audio_switch_note(unsigned from, unsigned to)
     sl_start = now;
     if (now - last_pulse >= 500.0) {
         last_pulse = now;
-        fle_js_pulse(now, (double)fle_sys_clock_ticks(), (double)fle_audio_consumed(), (double)fle_audio_ring_get()->write_frames, SL_MAX, sl_total, sl_max, sl_n, mixer_thr, uc_n, uc_sum, uc_max, uc_over78);
+        fle_js_pulse(now, (double)fle_sys_clock_ticks(), (double)fle_audio_consumed(), (double)fle_audio_ring_get()->write_frames, SL_MAX, sl_total, sl_max, sl_n, mixer_thr, uc_n, uc_frames, uc_sum, uc_max, uc_over78);
     }
 }
-void fle_audio_unlock_note(double first_frame, uint32_t frames)
+void fle_audio_unlock_note(double first_frame, uint32_t frames, uint32_t buffer_frames, uint32_t offset_frames)
 {
     if (!fle_audio_external()) return;
-    fle_js_unlock(first_frame, frames);
+    fle_js_unlock(first_frame, frames, buffer_frames, offset_frames);
     if (fle_thread_current) mixer_thr = (int)fle_thread_current();
     if (sl_start >= 0.0) {   /* the mixer ran since its slice began: this is the time it took to produce the block it just committed (and whatever else the slice did before) */
         double d = fle_tp_now() - sl_start;
 
         uc_n += 1.0;
+        uc_frames += frames;
         uc_sum += d;
         if (d > uc_max) uc_max = d;
         if (d > 78.0) uc_over78 += 1.0;
@@ -181,7 +182,7 @@ void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard) {
 double fle_tp_now(void) { return 0.0; }
 int fle_tp_wait(double ms) { (void)ms; return 2; }
 int fle_tp_can_wait(void) { return 0; }
-void fle_audio_unlock_note(double first_frame, uint32_t frames) { (void)first_frame; (void)frames; }
+void fle_audio_unlock_note(double first_frame, uint32_t frames, uint32_t buffer_frames, uint32_t offset_frames) { (void)first_frame; (void)frames; (void)buffer_frames; (void)offset_frames; }
 void fle_audio_switch_note(unsigned from, unsigned to) { (void)from; (void)to; }
 #endif
 

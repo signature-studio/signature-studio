@@ -1141,7 +1141,7 @@ static void m_b_unlock(void)
 
         cursors(b, &pl, &wr);
         d = (off_f + sf - (pl / b->fmt.align) % sf) % sf;
-        fle_audio_unlock_note((double)(c + d), (n1 + n2) / b->fmt.align);
+        fle_audio_unlock_note((double)(c + d), (n1 + n2) / b->fmt.align, (uint32_t)sf, (uint32_t)off_f);
         rewrite_unread(b, (uint32_t)off_f, n1 / b->fmt.align, n2 / b->fmt.align, wf0);
     }
     ret(HR_OK);

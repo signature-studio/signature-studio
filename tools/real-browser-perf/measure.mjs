@@ -79,8 +79,28 @@ async function browserMeasure(c) {
       const driver = Object.fromEntries([...new Set([...Object.keys(before.driver ?? {}), ...Object.keys(after.driver ?? {})])].map((k) => [k, delta(before.driver?.[k], after.driver?.[k])]));
       const recentPulses = after.pulses.filter((p) => p.page >= before.at && p.page <= after.at);
       const firstPulse = before.pulses.at(-1), lastPulse = after.pulses.at(-1);
-      const unlockCompute = Object.fromEntries(['n', 'sumMs', 'over78'].map(k => [k, delta(firstPulse?.unlockCompute?.[k], lastPulse?.unlockCompute?.[k])]));
+      const pulseWallMs = delta(firstPulse?.real, lastPulse?.real);
+      const pulseVirtualTicks = delta(firstPulse?.virt, lastPulse?.virt);
+      const clock = {
+        pulseWallMs,
+        virtualMs: pulseVirtualTicks === null ? null : pulseVirtualTicks / 10000,
+        virtualPerWall: pulseWallMs > 0 && pulseVirtualTicks !== null ? pulseVirtualTicks / 10000 / pulseWallMs : null,
+      };
+      const unlockCompute = Object.fromEntries(['n', 'frames', 'sumMs', 'over78'].map(k => [k, delta(firstPulse?.unlockCompute?.[k], lastPulse?.unlockCompute?.[k])]));
       unlockCompute.lifetimeMaxMs = lastPulse?.unlockCompute?.maxMs ?? null;
+      const unlocks = (a.audio?.reports ?? []).flatMap(r => r.unlocks ?? []).filter(u => u.t > firstPulse?.epoch && u.t <= lastPulse?.epoch);
+      const outputConsumedFrames = delta(firstPulse?.consumed, lastPulse?.consumed);
+      const recordedWriteFrames = unlocks.reduce((sum, u) => sum + u.n, 0);
+      const fullyLogged = unlockCompute.n !== null && unlocks.length === unlockCompute.n;
+      const audioProducer = {
+        registeredUnlocks: unlockCompute.n, recordedUnlocks: unlocks.length,
+        registeredWriteFrames: unlockCompute.frames,
+        recordedWriteFrames, outputConsumedFrames, fullyLogged,
+        writeToReadFrameRatio: outputConsumedFrames > 0 ? unlockCompute.frames !== null ? unlockCompute.frames / outputConsumedFrames : fullyLogged ? recordedWriteFrames / outputConsumedFrames : null : null,
+        bufferFrames: [...new Set(unlocks.map(u => u.bufferFrames).filter(Number.isFinite))],
+        offsetFrames: [...new Set(unlocks.map(u => u.offsetFrames).filter(Number.isFinite))],
+        note: '書き込み量と消費量の比。同一サンプルレートで比較する。ループ音源は再利用できるため、単独で音声の正しさ・欠落を判定しない。累積フレーム数がない旧ビルドではログ欠落時の比率は未測定。',
+      };
       // These counters attribute wall time between guest switches, including
       // waits; they are not a CPU sample profile. Keep output bounded even for
       // a long soak rather than returning every cumulative telemetry sample.
@@ -91,7 +111,7 @@ async function browserMeasure(c) {
         lifetimeMaxMs: lastPulse.threads[thread][1],
       }));
       const elapsedMs = after.at - before.at;
-      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
     } finally {
       if (timer !== null) clearTimeout(timer);
       if (worker && listener) worker.removeEventListener('message', listener);

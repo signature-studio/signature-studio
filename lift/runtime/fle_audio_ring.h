@@ -94,7 +94,7 @@ uint32_t fle_audio_ring_fill(void);
 int fle_audio_external(void);
 /* A region of a secondary buffer was committed by Unlock: `first_frame` is the output frame at which the device will read its first frame (the consumed count plus the region's distance ahead of the play cursor), `frames` its
  * length. Lets the page measure the delay from the engine's write to the AudioWorklet's read. A no-op without an external consumer. */
-void fle_audio_unlock_note(double first_frame, uint32_t frames);
+void fle_audio_unlock_note(double first_frame, uint32_t frames, uint32_t buffer_frames, uint32_t offset_frames);
 /* S-ds-late-write (decision 0241, PROVISIONAL): a region of a playing buffer was written (Unlock) after the device had already handed the frames of that region to the output ring. Hands the frames [first, first + frames) that
  * the output has NOT read yet to the output again, over the ones handed before, without moving the write position of the ring; the frames within fle_audio_rewrite_guard_frames() of the read position (and the ones already read) are
  * left alone. External consumer only: a no-op without one (the virtual clock never moves while guest code runs, so nothing is ever published stale there). */
