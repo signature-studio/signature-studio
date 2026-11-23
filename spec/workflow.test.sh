@@ -643,7 +643,7 @@ ok "報告の検査(実行): ベンダー名以外(cfhex)が残れば失敗し�
 # (o) 押せなかった作業の保存(push の段が落ちたとき)と、再試行での前回の作業の取り込み。段の順・条件・権限は JSON で、動きは偽の gh とローカルの git で確かめる
 SVN="押せなかった作業を保存する"; PRN="前回の作業を取り込む"
 ok "保存の段: 名前が 1 つ。push の段(id push)の後で、報告の検査の前に在る" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | .id // ""] as $ids | [.jobs.work.steps[] | .name] as $n | ($n | index($s)) as $s0 | ($ids | index("push")) as $p | ($n | index("報告を検査して、成果物とサマリーに出す")) as $r | "\($n | map(select(. == $s)) | length) \($p != null and $s0 != null and $r != null and $p < $s0 and $s0 < $r)"' "$J")" "1 true"
-ok "保存の段の if: 判定が通り push が落ちたときだけ(判定の失敗では保存しない。確認の skip も偽)" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "failure() && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'"
+ok "保存の段の if: 判定が通り push が落ちたとき、または時間切れで取り消されたときだけ(判定の失敗では保存しない。確認の skip も偽)" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "(failure() || cancelled()) && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'"
 ok "push の段: id は push" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .id] | .[0]' "$J")" push
 PSH=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
 ok "push の段: 変更前の run と比べ、保存の基点の 1 行(work-tip)の追加だけ" "$(a=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B" | grep -v 'work-tip[.]txt'); b=$(grep -v 'work-tip[.]txt' <<<"$PSH"); [ "$a" = "$b" ] && echo same)" same
@@ -726,7 +726,7 @@ ok "取り込み(新しい方に差分が無い): 新しい順に見て、差分
 # (p) 判定が落ちた作業の保存(判定の段が落ちて push が飛んだとき)と、判定を通らなかった作業の続きからの取り込み(commit せず作業ツリーに載せる)
 JSN="判定が落ちた作業を保存する"; JS=$T/jsave.sh; printf '%s\n' "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0] // ""' "$J")" > "$JS"
 ok "判定が落ちた作業の保存: 名前が 1 つ。押せなかった作業の保存の後で、報告の検査の前に在る" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | .name] as $n | ($n | index("押せなかった作業を保存する")) as $a | ($n | index($s)) as $b | ($n | index("報告を検査して、成果物とサマリーに出す")) as $c | "\($n | map(select(. == $s)) | length) \($a != null and $b != null and $c != null and $a < $b and $b < $c)"' "$J")" "1 true"
-ok "判定が落ちた作業の保存の if: 判定の段で落ちて push が飛んだときだけ(確認の skip も偽)" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "failure() && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'"
+ok "判定が落ちた作業の保存の if: 判定の段で落ちた、または時間切れで取り消されて push が飛んだときだけ(確認の skip も偽)" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "(failure() || cancelled()) && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'"
 ok "判定が落ちた作業の保存: env を持たない(token を渡さない)" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | has("env")] | .[0] | tostring' "$J")" false
 JR=$SVD/jr; jrepo() { rm -rf "$1"; git init -q -b main "$1"; printf '[user]\n\tname = spec\n\temail = spec@example.invalid\n' >> "$1/.git/config"; cp "$top/.gitignore" "$1/.gitignore"; printf 'l1\nl2\nl3\nl4\nl5\n' > "$1/a.txt"; git -C "$1" add -A; git -C "$1" commit -qm base; git -C "$1" update-ref refs/judge/main main; }
 J1=$JR/a; jrepo "$J1"; git -C "$J1" checkout -q -b agent; sed -i '1s/.*/T1/' "$J1/a.txt"; git -C "$J1" commit -qam committed-work
@@ -814,4 +814,33 @@ ok "deploy.yml(m): 流れの判定: 流れが 3 つだけなら落ちる" "$(fg 
 ok "deploy.yml(m): 流れの判定: 流れの名前が重複すれば落ちる(D が無い)" "$(fg "$(jq -c 'if .flow == "D" then .flow = "A" else . end' <<<"$FL")")" 1
 ok "deploy.yml(m): 流れの判定: 出力が空なら落ちる" "$(fg "")" 1
 ok "deploy.yml(m): 流れの判定: HostFilesUnsupported の件数は判定に入れない(documented: 正常時の件数は未確認)" "$(fg "$(jq -c 'if .flow == "A" then .hostErrors = 3 else . end' <<<"$FL")")" 0
+# (q) 時間切れ(取り消し)でも作業を保存する。保存の段は、通信をせず、取り消しで残った index.lock を外してから差分を作る。報告は、取り消された作業を failed にし、保存の有無を書く。取り込みは、判定の出力が無い作業を、判定の前の取り消しとして続きから扱う。AGENTS.md に、長いコマンドと 5 時間の規則が在る
+ok "取り消し: 保存の 2 段は、通信をしない(git fetch・gh を呼ばない。猶予の約 5 分で終わる)" "$(for s in "$SVN" "$JSN"; do jq -r --arg s "$s" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0]' "$J" | grep -cE 'git fetch|gh '; done | paste -sd/)" "0/0"
+ok "取り消し: 判定が落ちた作業の保存は、取り消しで残った index.lock を外してから git add -A する" "$(jq -r --arg s "$JSN" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0]' "$J" | grep -n 'rm -f .git/index.lock\|git add -A' | cut -d: -f2 | paste -sd' ' -)" "rm -f .git/index.lock git add -A"
+RPT=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を集める")) | .run][0] // ""' "$J")
+ok "取り消し: 報告の結果を集める段は、取り消された作業を、時間切れで取り消された旨として書く" "$(grep -c '時間切れで取り消された' <<<"$RPT")" 1
+NCF=$T/ncfx; NCL=$T/ncgh.log; NCB=$T/ncgh-bodies.txt; NCRT=$T/ncrt; mkdir -p "$NCF" "$NCRT"; : > "$NCL"; : > "$NCB"
+printf '%s' '{"number":16,"state":"open","labels":[]}' > "$NCF/repos__o__r__issues__16.json"
+printf '%s' '{"number":17,"state":"open","labels":[]}' > "$NCF/repos__o__r__issues__17.json"
+jq -n --arg ck "$CKN" '{jobs: [
+  {name: "起動する Issue を決める", conclusion: "success", steps: []},
+  {name: "作業 #16", conclusion: "cancelled", steps: [{name: $ck, conclusion: "success"}, {name: "作業者を 1 回動かす", conclusion: "cancelled"}]},
+  {name: "作業 #17", conclusion: "cancelled", steps: [{name: $ck, conclusion: "success"}, {name: "作業者を 1 回動かす", conclusion: "cancelled"}]}
+]}' > "$NCF/repos__o__r__actions__runs__78__jobs.json"
+mkdir -p "$NCF/art-16"; printf 'diff\n' > "$NCF/art-16/work.diff"
+ncrun() { ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NCF" NGL="$NCL" NGB="$NCB" GH_TOKEN=x GH_REPO=o/r RUN_ID=78 RUN_URL=https://example.test/run/78 SERVER=https://example.test CLAIMED='[16,17]' RUNNER_TEMP="$NCRT" bash -e "$T/$1" > "$T/$1.nc.log" 2>&1; echo $? ); }
+ncr=$(ncrun nrep1.sh)/$(ncrun nrep2.sh)
+ncb() { awk -v n="$1" '$0 ~ ("^BODY " n " ") {f=1; next} /^BODY /{f=0} f' "$NCB"; }
+ok "取り消し(報告): 2 段とも 0 で終わる" "$ncr" "0/0"
+ok "取り消し(報告・保存あり): 失敗の印 failed を付け、running を外し、close はしない" "$(grep -c '^issue edit 16 .*add-label failed' "$NCL")/$(grep -c '^issue edit 16 .*remove-label running' "$NCL")/$(grep -c '^issue close 16' "$NCL")" "1/1/0"
+ok "取り消し(報告・保存あり): 時間切れで取り消された旨と、作業を保存した旨を書く(保存できなかった旨は書かない)" "$(ncb 16 | grep -cF '時間切れで取り消された')/$(ncb 16 | grep -cF '作業を保存した')/$(ncb 16 | grep -cF '作業を保存できなかった')" "1/1/0"
+ok "取り消し(報告・保存なし): 失敗の印 failed を付け、running を外す" "$(grep -c '^issue edit 17 .*add-label failed' "$NCL")/$(grep -c '^issue edit 17 .*remove-label running' "$NCL")" "1/1"
+ok "取り消し(報告・保存なし): 時間切れで取り消された旨と、作業を保存できなかった旨を書く(保存した旨は書かない)" "$(ncb 17 | grep -cF '時間切れで取り消された')/$(ncb 17 | grep -cF '作業を保存できなかった')/$(ncb 17 | grep -cF '作業を保存した')" "1/1/0"
+ok "取り消し(取り込み): 判定の出力が無い作業は、判定の前に取り消された(時間切れ)旨を、続きから行う理由に書く" "$(grep -c '判定の前に取り消された(時間切れ)' "$CN/.prior-work.md")" 1
+A2=$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md")
+ok "取り消し(AGENTS): 作業者の手順に、長いコマンドを背景で起動して終了を待たない旨が 1 行在る" "$(grep -c 'プロセスの終了を待つ' <<<"$A2")/$(grep -c 'フォアグラウンドで、直接実行する' <<<"$A2")" "1/1"
+ok "取り消し(AGENTS): timeout 引数の上限は 最大 5400000(90 分)で、0 や、それ以上にしない" "$(grep -c '最大 5400000(90 分)' <<<"$A2")" 1
+ok "取り消し(AGENTS): 作業は開始から 5 時間以内に終え、4 時間 30 分を過ぎたら commit して終える" "$(grep -c '5 時間以内に終える' <<<"$A2")/$(grep -c '4 時間 30 分を過ぎたら' <<<"$A2")/$(grep -c 'date -u' <<<"$A2")" "1/1/1"
+ok "取り消し(AGENTS): 旧い規則(timeout の 0 で無効・背景の完了を同じターンで待つ)を残さない" "$(grep -c '0 で無効\|同じターンの中で、出力のファイルを読んで確かめる' <<<"$A2")" 0
+ok "取り消し(設計): 時間切れの保存と、待ちの固まりの規則を、設計の文書に書いた" "$(grep -cE '時間切れ.*保存|待ちの固まり' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 2) ? "yes" : "no"}')" yes
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
