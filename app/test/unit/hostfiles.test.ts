@@ -301,8 +301,8 @@ describe('the system-call layer of the engine wasm', () => {
   });
 });
 
-describe('FruityEngine: the packs are let go at the first idle', () => {
-  it('released at the first idle, and a later open stops by name', async () => {
+describe('FruityEngine: the packs stay after the first idle (Issue #1357)', () => {
+  it('a pack member survives the first idle: an open after it works (the guest reads its seed files later)', async () => {
     const dll = hostPackFromBytes(buildPack([{ path: 'FLEngine_x64.dll', data: new Uint8Array([9, 8, 7, 6]) }]));
     const seed = hostPackFromBytes(buildPack([{ path: 'seed/l.tsv', data: new Uint8Array([1, 2]) }]));
     const marks: string[] = [];
@@ -322,7 +322,28 @@ describe('FruityEngine: the packs are let go at the first idle', () => {
     const eng = await FruityEngine.create(newFormat(), { module: await WebAssembly.compile(MIN_ENGINE), glue: new Uint8Array([1]), seed, dll }, h, async () => create);
     await eng.run();
     expect(marks).toContain('host_files_released');
-    expect(after).toBe('HostFilesUnsupported');
+    expect(after).toBe('3');   // the first descriptor: the DLL pack's file is still there after the release
+  });
+
+  it('a file that is not persistent is let go at the first idle: an open after it stops by name, a persistent one stays', () => {
+    const mem = new WebAssembly.Memory({ initial: 1 });
+    const files = new HostFiles(() => mem);
+    files.add('/data/idx.bin', new MemorySource(new Uint8Array([1, 2, 3])), 0, 3);
+    files.addPersistent('/data/late.bin', new MemorySource(new Uint8Array([4])));
+    files.release();
+    const sc = files.overrides({}) as Record<string, (...a: unknown[]) => number>;
+    const u8 = new Uint8Array(mem.buffer);
+    u8.set(new TextEncoder().encode('/data/idx.bin\0'), 100);
+    u8.set(new TextEncoder().encode('/data/late.bin\0'), 200);
+    expect(() => sc.__syscall_openat!(-100, 100, 0, 0)).toThrow(/after the host files were released/);
+    expect(sc.__syscall_openat!(-100, 200, 0, 0)).toBe(3);
+  });
+
+  it('a call on a closed descriptor names the file the descriptor was opened for', () => {
+    const r = rig();
+    const fd = r.sc.__syscall_openat!(-100, r.str(100, '/data/m1.dll'), 0, 0)!;
+    r.sc.fd_close!(fd);
+    expect(() => r.sc.fd_pread!(fd, r.iov(200, [[1000, 1]]), 1, 0n, 600)).toThrow(`pread on descriptor ${fd}, which was never opened or has been closed (it was opened for /data/m1.dll)`);
   });
 });
 

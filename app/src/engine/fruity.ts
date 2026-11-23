@@ -125,8 +125,9 @@ export class FruityEngine {
       preRun: [() => {
         if (!opts.ENV) throw new Error('the emscripten glue exposes no ENV (link with -sEXPORTED_RUNTIME_METHODS=ENV,...)');
         const t0 = performance.now();
-        const dll = hostFiles.mountPack(root, assets.dll);
-        const seed = hostFiles.mountPack(root, assets.seed);
+        // Issue #1357: the packs are persistent (hostfiles.ts release): the guest reads them after the first idle too (a seed file at its first read, a real module at its LoadLibrary)
+        const dll = hostFiles.mountPack(root, assets.dll, true);
+        const seed = hostFiles.mountPack(root, assets.seed, true);
         // Issue #1314: a lazy file is persistent (hostfiles.ts addPersistent), so the release at the first idle does not take it away
         for (const f of assets.lazy ?? []) hostFiles.addPersistent(`${root}/${f.path}`, f);
         for (const [k, v] of Object.entries(manifest.engine.env)) opts.ENV[k] = v;

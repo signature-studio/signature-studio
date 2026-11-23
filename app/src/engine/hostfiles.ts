@@ -89,6 +89,7 @@ export class HostFiles {
   private readonly files = new Map<string, HostFile>();
   private readonly dirs = new Set<string>(['/']);
   private readonly fds: (OpenFile | undefined)[] = [];
+  private readonly fdNames: (string | undefined)[] = [];
   private readonly opened = new Set<string>();
   private readonly memory: () => WebAssembly.Memory | null;
   private buf: ArrayBufferLike | null = null;
@@ -102,23 +103,23 @@ export class HostFiles {
   get fileCount(): number { return this.files.size; }
   has(path: string): boolean { return this.files.has(normalize(path)); }
 
-  /** makes every member of the pack visible as `root/<member path>` */
-  mountPack(root: string, pack: HostPack): { files: number; bytes: number } {
+  /** makes every member of the pack visible as `root/<member path>`; `persistent`: the members survive release() (see addPersistent) */
+  mountPack(root: string, pack: HostPack, persistent = false): { files: number; bytes: number } {
     let n = 0, bytes = 0;
     for (const [p, m] of pack.members) {
-      this.add(`${root}/${p}`, pack.source, m.offset, m.size);
+      this.add(`${root}/${p}`, pack.source, m.offset, m.size, persistent);
       n++;
       bytes += m.size;
     }
     return { files: n, bytes };
   }
 
-  add(path: string, source: ByteSource, offset: number, size: number): void {
+  add(path: string, source: ByteSource, offset: number, size: number, persistent = false): void {
     const p = normalize(path);
     if (!p.startsWith('/') || p === '/') throw new Error(`host file path ${JSON.stringify(path)} must be absolute`);
     if (this.files.has(p)) throw new Error(`host file ${p} is added twice`);
     if (offset < 0 || size < 0 || offset + size > source.size) throw new Error(`host file ${p}: ${size} bytes at ${offset} run past the end of the source (${source.size} bytes)`);
-    this.files.set(p, { source, offset, size, ino: this.nextIno++ });
+    this.files.set(p, { source, offset, size, ino: this.nextIno++, ...(persistent ? { persistent: true } : {}) });
     for (let i = p.indexOf('/', 1); i > 0; i = p.indexOf('/', i + 1)) this.dirs.add(p.slice(0, i));
   }
 
@@ -127,8 +128,7 @@ export class HostFiles {
    * refused. `size` is the length of the whole source.
    */
   addPersistent(path: string, source: ByteSource): void {
-    this.add(path, source, 0, source.size);
-    (this.files.get(normalize(path)) as HostFile).persistent = true;
+    this.add(path, source, 0, source.size, true);
   }
 
   /** the message of the last read a source could not answer (for the page to show), or null */
@@ -138,8 +138,10 @@ export class HostFiles {
   private readonly knownPaths = new Set<string>();
 
   /**
-   * The engine has read what it reads at start-up (decision 0221: all of it happens before the first idle; nothing after): closes the sources, so that the bytes of the packs are freed in the Worker
+   * The engine has read what it reads at start-up: closes the sources of the files that are not persistent, so that their bytes are freed in the Worker
    * (a stored copy is closed, which also gives its access handle back to other tabs). The names stay: an open of one of them from now on stops the engine by name instead of finding nothing.
+   * Issue #1357: the packs are persistent (fruity.ts). The guest reads a seed file at its first read (vfs_seed.h) and maps a real module at its LoadLibrary (fle_realmod_map_image), and both happen after the
+   * first idle too: a pack released here made the Welcome window's "No thanks" and the Default project stop the engine. So only what is read at start-up is released (the index of the lazy install tree).
    */
   release(): void {
     if (this.released) return;
@@ -224,7 +226,7 @@ export class HostFiles {
     this.touch();
     const path = this.cstr(pathPtr);
     if (!path.startsWith('/') && dirfd !== AT_FDCWD) { this.stats.failedOpens++; throw new HostFilesUnsupported(`opening ${path} relative to the directory descriptor ${dirfd}`); }
-    if (this.released && this.knownPaths.has(normalize(path))) { this.stats.failedOpens++; throw new HostFilesUnsupported(`opening ${path} after the host files were released (at the engine's first idle the packs are let go)`); }
+    if (this.released && this.knownPaths.has(normalize(path))) { this.stats.failedOpens++; throw new HostFilesUnsupported(`opening ${path} after the host files were released (at the engine's first idle the files that are not persistent are let go)`); }
     const r = this.lookup(path);
     if ((flags & O_ACCMODE) !== 0 || (flags & (O_CREAT | O_TRUNC)) !== 0) { this.stats.failedOpens++; throw new HostFilesUnsupported(`opening ${path} for writing, creating or truncating (open flags 0x${flags.toString(16)})`); }
     if (!r) { this.stats.failedOpens++; return -ENOENT; }
@@ -234,6 +236,7 @@ export class HostFiles {
     while (this.fds[fd] !== undefined) fd++;
     if (fd >= MAX_FDS) { this.stats.failedOpens++; return -EMFILE; }
     this.fds[fd] = { file: r.file, pos: 0 };
+    this.fdNames[fd] = normalize(path);   // the name stays after the descriptor is closed: a later call on it says what the descriptor was
     this.stats.opens++;
     this.opened.add(normalize(path));
     this.stats.filesOpened = this.opened.size;
@@ -277,7 +280,7 @@ export class HostFiles {
     const owned = (fd: number, what: string): OpenFile | undefined => {
       if (fd < FIRST_FD) return undefined;
       const of = this.fds[fd];
-      if (!of) throw new HostFilesUnsupported(`${what} on descriptor ${fd}, which was never opened or has been closed`);
+      if (!of) throw new HostFilesUnsupported(`${what} on descriptor ${fd}, which was never opened or has been closed${this.fdNames[fd] ? ` (it was opened for ${this.fdNames[fd]})` : ''}`);
       return of;
     };
     const origRead = o('fd_read'), origPread = o('fd_pread'), origSeek = o('fd_seek'), origClose = o('fd_close'), origFstat = o('__syscall_fstat64');
