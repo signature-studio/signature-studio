@@ -10,7 +10,7 @@
 # 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
-# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。
+# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。接頭辞の一覧は ci/resources-prefixes.txt・ci/plugin-builtin-prefixes.txt(1 行 1 接頭辞。鍵の入力に入る)。
 # push が 3 回とも落ちたとき、判定が落ちたとき、および時間切れで取り消されたときは、作業を差分(work.diff)で artifact に残す(取り消しの猶予の約 5 分で終わるよう、保存の段は通信をしない)。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」「13」)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
@@ -239,7 +239,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)
         if: contains(format(',{0},', needs.select.outputs.labels), ',resources,') && steps.resources.outputs.cache-hit != 'true'
@@ -250,7 +250,8 @@ jobs:
           export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
           mkdir -p "$RUNNER_TEMP/in"
           aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
-          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" 'System\Languages\' 'Artwork\' 'Data\Templates\' 'Data\Demo projects\' 'Data\System\' 'Data\Projects\'
+          mapfile -t prefixes < ci/resources-prefixes.txt
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" "${prefixes[@]}"
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)
@@ -267,7 +268,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 
       - name: 内蔵のプラグインのキャッシュ(R2)
         if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-builtin,')
@@ -284,7 +285,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
 
       - name: 内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)
         if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-builtin,') && steps.plugins.outputs.cache-hit != 'true'
@@ -295,7 +296,8 @@ jobs:
           export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
           mkdir -p "$RUNNER_TEMP/in"
           aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
-          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" 'Plugins\Fruity\Effects\' 'Plugins\Fruity\Generators\'
+          mapfile -t prefixes < ci/plugin-builtin-prefixes.txt
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" "${prefixes[@]}"
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
       - name: 内蔵のプラグインをキャッシュに保存する(取ったときだけ)
@@ -312,7 +314,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
 
       - name: 起動用の実行ファイルのキャッシュ(R2)
         if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,')
@@ -329,7 +331,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-exe
-          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
 
       - name: 起動用の実行ファイルを取り出す(キャッシュが無いときだけ)
         if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,') && steps.exe.outputs.cache-hit != 'true'
@@ -357,7 +359,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-exe
-          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
 
   work:
     name: '作業 #${{ matrix.issue }}'
@@ -543,7 +545,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)
@@ -567,7 +569,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)
@@ -591,7 +593,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-exe
-          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/exe に置く(fl-exe の作業だけ。commit はしない)

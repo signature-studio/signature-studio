@@ -484,19 +484,21 @@ ok "抽出物の追加: extract の新しい段は labels、work の新しい段
 ok "抽出物の追加: resources の段は 5 件、plugin-builtin の段は 5 件(判定に、そのラベルを含む)" "$(jq -r '[(map(.["if"] // "" | select(test(",resources,"))) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "5/5"
 ok "抽出物の追加: 新しい段に App の鍵・token を使う段が無い" "$(jq -r 'map(tostring | test("GH_APP_|GITHUB_TOKEN|github[.]token|GH_TOKEN")) | any' <<<"$NEWS3")" false
 cat > "$T/want-res.txt" <<'WANT'
-node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" 'System\Languages\' 'Artwork\' 'Data\Templates\' 'Data\Demo projects\' 'Data\System\' 'Data\Projects\'
+mapfile -t prefixes < ci/resources-prefixes.txt
+node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" "${prefixes[@]}"
 WANT
 cat > "$T/want-plg.txt" <<'WANT'
-node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" 'Plugins\Fruity\Effects\' 'Plugins\Fruity\Generators\'
+mapfile -t prefixes < ci/plugin-builtin-prefixes.txt
+node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" "${prefixes[@]}"
 WANT
 cat > "$T/want-key-res.txt" <<'WANT'
-extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 WANT
 cat > "$T/want-key-plg.txt" <<'WANT'
-extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
 WANT
-ok "抽出物の追加: 言語等の取り出しは、接頭辞の 6 件を、取り出しの道具で extra-resources に書く(行の完全一致)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-res.txt")" 1
-ok "抽出物の追加: 内蔵のプラグインの取り出しは、接頭辞の 2 件を、取り出しの道具で extra-plugins に書く(行の完全一致)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-plg.txt")" 1
+ok "抽出物の追加: 言語等の取り出しは、接頭辞の一覧(ci/resources-prefixes.txt)を配列で読み、取り出しの道具に渡す(run の行の完全一致 2 行)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-res.txt")" 2
+ok "抽出物の追加: 内蔵のプラグインの取り出しは、接頭辞の一覧(ci/plugin-builtin-prefixes.txt)を配列で読み、取り出しの道具に渡す(run の行の完全一致 2 行)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-plg.txt")" 2
 ok "抽出物の追加: 言語等の鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-resources-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-res.txt")"
 ok "抽出物の追加: 内蔵のプラグインの鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-plugins-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-plg.txt")"
 ok "抽出物の追加: 作業の場所は、RUNNER_TEMP の extra-exe・extra-plugins・extra-resources(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-exe ${{ runner.temp }}/extra-plugins ${{ runner.temp }}/extra-resources'
@@ -510,7 +512,7 @@ cat > "$T/want-exe-run.txt" <<'WANT'
 node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-exe" --file 'FL64.exe' --file 'FL64 (scaled).exe'
 WANT
 cat > "$T/want-key-exe.txt" <<'WANT'
-extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
 WANT
 EXR='起動用の実行ファイルを取り出す(キャッシュが無いときだけ)'; EXRE='起動用の実行ファイルのキャッシュ(R2)'; EXS='起動用の実行ファイルをキャッシュに保存する(取ったときだけ)'
 WKR='起動用の実行ファイルを R2 のキャッシュから取る(fl-exe の作業だけ)'; WKP='取った物を lift/out-app/host-extra/exe に置く(fl-exe の作業だけ。commit はしない)'
@@ -528,6 +530,24 @@ ok "fl-exe: 作業の段の順は、plugins の置く段の後、fl-exe の復�
 ok "fl-exe: extract の段の順は、内蔵のプラグインの保存の後で、fl-exe の 3 段(復元・取り出し・保存)" "$(jq -r --arg e "$EXRE" --arg x "$EXR" --arg s "$EXS" '[.jobs.extract.steps[].name] as $n | ($n | index("内蔵のプラグインをキャッシュに保存する(取ったときだけ)")) as $p | ($n | index($e)) as $a | ($n | index($x)) as $b | ($n | index($s)) as $c | ($p != null and $a != null and $b != null and $c != null and $p < $a and $a < $b and $b < $c)' "$J")" true
 ok "fl-exe: 作業ジョブに R2_ARTIFACT の鍵を使う段が無い(取り出しは extract だけ)" "$(jq -r '[.jobs.work.steps[] | tostring | test("R2_ARTIFACT")] | any' "$J")" false
 ok "fl-exe: 作業ツリーの lift/out-app/host-extra/exe は git の対象外" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/exe/FL64.exe && echo yes)" yes
+# (r) 接頭辞の一覧は、ci/ の 1 行 1 接頭辞のファイル(resources・plugin-builtin)。extract の取り出しは一覧を読み、鍵の hashFiles に一覧のファイルを入れる(一覧を変えると鍵が変わり、古いキャッシュは使われない)。fl-exe の完全なパスは鍵の文字列に入れる
+RPF=$top/ci/resources-prefixes.txt; PPF=$top/ci/plugin-builtin-prefixes.txt
+ok "接頭辞(r): ci/resources-prefixes.txt は、この 7 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞を含む)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\'
+ok "接頭辞(r): ci/plugin-builtin-prefixes.txt は、この 2 件を、この順で、1 行 1 接頭辞で持つ" "$(paste -sd'|' "$PPF" 2>/dev/null)" 'Plugins\Fruity\Effects\|Plugins\Fruity\Generators\'
+ok "接頭辞(r): 2 つのファイルは、合わせて 9 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "9/0/0"
+RRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
+PRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
+ok "接頭辞(r): 言語等の取り出しは、一覧のファイルを読む 1 行と、配列を渡す 1 行で、接頭辞の直書きが無い" "$(grep -cxF 'mapfile -t prefixes < ci/resources-prefixes.txt' <<<"$RRUN")/$(grep -cF '"${prefixes[@]}"' <<<"$RRUN")/$(grep -cE "'[A-Za-z]+[\\]" <<<"$RRUN")" "1/1/0"
+ok "接頭辞(r): 内蔵のプラグインの取り出しは、一覧のファイルを読む 1 行と、配列を渡す 1 行で、接頭辞の直書きが無い" "$(grep -cxF 'mapfile -t prefixes < ci/plugin-builtin-prefixes.txt' <<<"$PRUN")/$(grep -cF '"${prefixes[@]}"' <<<"$PRUN")/$(grep -cE "'[A-Za-z]+[\\]" <<<"$PRUN")" "1/1/0"
+KR=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-resources-"))) | .[]' "$J")
+KP=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-plugins-"))) | .[]' "$J")
+KE=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-fl-exe-"))) | .[]' "$J")
+ok "接頭辞(r): 言語等の鍵(保存・復元の 3 つ)の hashFiles に、一覧のファイル ci/resources-prefixes.txt が入る" "$(grep -cE "hashFiles[(].*'ci/resources-prefixes[.]txt'[)]" <<<"$KR")/$(wc -l <<<"$KR" | tr -d ' ')" "3/3"
+ok "接頭辞(r): 内蔵のプラグインの鍵(保存・復元の 3 つ)の hashFiles に、一覧のファイル ci/plugin-builtin-prefixes.txt が入る" "$(grep -cE "hashFiles[(].*'ci/plugin-builtin-prefixes[.]txt'[)]" <<<"$KP")/$(wc -l <<<"$KP" | tr -d ' ')" "3/3"
+EXRUN=$(jq -r --arg n "$EXR" '[.jobs.extract.steps[] | select(.name == $n) | .run][0]' "$J")
+EXNAMES=$(grep -oE "[-]-file '[^']*'" <<<"$EXRUN" | sed -E "s/^[-]-file '//; s/'\$//" | tr -d '()' | tr ' ' '-' | paste -sd- -)
+ok "接頭辞(r): fl-exe の鍵(保存・復元の 3 つ)の文字列は、--file の 2 つの完全なパスを空白と括弧を除いて - でつないだ物を含む($EXNAMES)" "$(grep -cF "extra-fl-exe-$EXNAMES-" <<<"$KE")/$(wc -l <<<"$KE" | tr -d ' ')" "3/3"
+ok "接頭辞(r): 設計の文書に、一覧のファイルと鍵の関係を書いた" "$(grep -c 'ci/resources-prefixes[.]txt' "$top/pm-work/workflow-design.md")/$(grep -c 'ci/plugin-builtin-prefixes[.]txt' "$top/pm-work/workflow-design.md")" "1/1"
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
