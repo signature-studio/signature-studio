@@ -666,6 +666,7 @@ ok ".gitignore に .prior-work.md が在る(取り込みの記述は commit し�
 ok "AGENTS.md: 作業者の手順に、.prior-work.md を最初に読む旨が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c '[.]prior-work[.]md')" 1
 ok "AGENTS.md: 作業者の手順に、ターンを終えない規則が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c 'ターンを終えるのは、受け入れが通って commit した時か、続けられない理由を報告に書く時だけ')" 1
 ok "AGENTS.md: 作業者の手順に、長いコマンドを前景で行い timeout 引数を渡す旨が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c 'フォアグラウンドで実行し、シェルツールの')" 1
+ok "AGENTS.md: 作業者の手順に、受け入れが通らなくても作業の最後に作業ツリーを commit する旨が 1 行在る" "$(awk '/^## 作業者の手順/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md" | grep -c '受け入れが通らなくても、作業の最後に、作業ツリーを commit する')" 1
 SVS=$T/save.sh; printf '%s\n' "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .run] | .[0] // ""' "$J")" > "$SVS"
 SVD=$T/save; mkdir -p "$SVD"
 mkrepo() { rm -rf "$1"; git init -q -b main "$1"; printf '[user]\n\tname = spec\n\temail = spec@example.invalid\n' >> "$1/.git/config"; printf 'l1\nl2\nl3\nl4\nl5\n' > "$1/a.txt"; git -C "$1" add a.txt; git -C "$1" commit -qm base; git -C "$1" update-ref refs/judge/main main; }
