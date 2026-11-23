@@ -262,10 +262,23 @@ static void window(void)
     fle_raster_describe(stdout, 7);
 }
 
+static void evidence(void)
+{
+    fle_rsurf *w = fle_raster_window_surface(9, 5700, 1000);
+    CHECK(w != NULL && !fle_raster_evidence_seen());
+    fle_r_rop_rect(w, NULL, (fle_rrect){ 0, 0, 1, 1 }, 0xF0, 0);
+    fle_raster_wrote(w, (fle_rrect){ 0, 0, 1, 1 }, "black-write");
+    CHECK(!fle_raster_evidence_seen());
+    fle_r_rop_rect(w, NULL, (fle_rrect){ 0, 0, 1, 1 }, 0xF0, 0x0000FF);
+    fle_raster_wrote(w, (fle_rrect){ 0, 0, 1, 1 }, "test-write");
+    CHECK(fle_raster_evidence_seen());
+    fle_raster_report(stdout);
+}
+
 int main(int argc, char **argv)
 {
     static const struct { const char *name; void (*f)(void); } sec[] = {
-        { "named", named }, { "binary", binary }, { "surface", surface }, { "blit", blit }, { "stretch", stretch }, { "line", line }, { "window", window },
+        { "named", named }, { "binary", binary }, { "surface", surface }, { "blit", blit }, { "stretch", stretch }, { "line", line }, { "window", window }, { "evidence", evidence },
     };
 
     if (argc < 2) return 2;
@@ -446,6 +459,17 @@ fn lines_include_the_start_and_exclude_the_end() {
 fn window_surfaces_keep_their_overlap_on_resize_and_have_limits() {
     let out = run("window");
     assert!(out.contains("surface of top-level window lid 7: 20 x 10"), "{out}");
+}
+
+#[test]
+fn first_pixel_evidence_is_light_and_full_statistics_remain_in_explicit_report() {
+    let o = Command::new(driver()).arg("evidence").output().unwrap();
+    let stdout = String::from_utf8_lossy(&o.stdout);
+    let stderr = String::from_utf8_lossy(&o.stderr);
+    assert!(o.status.success() && stdout.contains("ok evidence"), "{stdout}\n{stderr}");
+    assert!(stderr.contains("first non-background pixel") && stderr.contains("surface 5700 x 1000") && stderr.contains("calls that wrote 2"), "{stderr}");
+    assert!(!stderr.contains("non-zero pixels") && !stderr.contains("distinct colours"), "heavy stats leaked into first-pixel evidence: {stderr}");
+    assert!(stdout.contains("non-zero pixels 1 of 5700000") && stdout.contains("distinct colours"), "explicit report lost pixel statistics: {stdout}");
 }
 
 #[test]

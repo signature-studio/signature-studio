@@ -259,6 +259,7 @@ uint64_t fle_r_rop_rect(const fle_rsurf *d, const fle_rrect *clip, fle_rrect r, 
 {
     fle_rrect c = eff_clip(d, clip);
     int ud = fle_r_idx_uses_dest(idx);
+    uint32_t color = ud ? 0u : fle_r_rop3(idx, pat, 0u, 0u);
     uint64_t n = 0;
 
     fle_r_clip(&r, &c);
@@ -267,7 +268,7 @@ uint64_t fle_r_rop_rect(const fle_rsurf *d, const fle_rrect *clip, fle_rrect r, 
         for (int64_t x = r.x0; x < r.x1; x++) {
             uint32_t dc = ud ? fle_r_get(d, (uint32_t)x, (uint32_t)y) : 0u;
 
-            fle_r_put(d, (uint32_t)x, (uint32_t)y, fle_r_rop3(idx, pat, 0u, dc));
+            fle_r_put(d, (uint32_t)x, (uint32_t)y, ud ? fle_r_rop3(idx, pat, 0u, dc) : color);
             n++;
         }
     return n;
@@ -803,8 +804,8 @@ void fle_raster_report(FILE *f)
     if (evidence_text) fputs(evidence_text, f);
 }
 
-/* The first non-background pixel: when a window surface holds, for the first time, a pixel whose three colour bytes are not all 0 after a write, the window table and the summary of the surface are written (once
- * per run; the first surface only: a later surface's first pixel is not "the first"). */
+/* The first non-background pixel: when a window surface holds, for the first time, a pixel whose three colour bytes are not all 0 after a write, the window table and light surface facts are written (once
+ * per run; the first surface only: a later surface's first pixel is not "the first"). Full pixel statistics stay in fle_raster_describe/report. */
 void fle_raster_discarded(const char *api, uint32_t lid)
 {
     discarded_total++;
@@ -840,16 +841,15 @@ void fle_raster_wrote(const fle_rsurf *surf, fle_rrect r, const char *api)
             }
     }
     if (!any) return;
-    s->first_done = 1;
-    evidence_seen = 1;
     m = open_memstream(&buf, &len);
     if (!m) return;
-    fprintf(m, "first non-background pixel on a drawing surface (decision 0126): written by %s into the surface of top-level window lid %u; function entries since the program began: %" PRIu64 "\n",
-            api ? api : "?", (unsigned)s->lid, trace_call_count ? trace_call_count() : (uint64_t)0);
-    describe_view(m, s->lid, &s->view, s->writes);
+    fprintf(m, "first non-background pixel on a drawing surface (decision 0126): written by %s into the surface of top-level window lid %u; surface %u x %u, calls that wrote %" PRIu64 "; function entries since the program began: %" PRIu64 "\n",
+            api ? api : "?", (unsigned)s->lid, (unsigned)s->w, (unsigned)s->h, s->writes, trace_call_count ? trace_call_count() : (uint64_t)0);
     if (fle_win_table_report) fle_win_table_report(m);
     fclose(m);
     evidence_text = buf;
+    s->first_done = 1;
+    evidence_seen = 1;
     fputs(buf, stderr);
 }
 
