@@ -4,7 +4,7 @@ import { IdleDriver, TICKS_PER_MS, type Injected } from '../../src/engine/idle-d
 
 
 // a fake engine (records the calls), a fake host (a clock the test moves, timers it fires by hand)
-function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number } = {}) {
+function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number; readClock?: () => number } = {}) {
   const calls: string[] = [];
   const delivered: number[] = [];
   const timers: { fn: () => void; ms: number; id: number; live: boolean }[] = [];
@@ -20,6 +20,7 @@ function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number } = 
       mouse: (k, x, y, data) => { calls.push(`mouse ${k} ${x} ${y} ${data}`); return opts.mouseResult ?? 1; },
       key: (k, vk, sc, e) => { calls.push(`key ${k} ${vk.toString(16)} ${sc.toString(16)} ${e}`); return 1; },
       clockTo: (ticks) => { calls.push(`clock ${ticks}`); },
+      ...(opts.readClock ? { clockTicks: opts.readClock } : {}),
     },
     {
       deliver: (code) => { delivered.push(code); const w = waiting; waiting = false; return w; },
@@ -39,6 +40,26 @@ const down = (x: number, y: number): RawInput => ({ k: 'mouse', kind: IN.BDOWN, 
 const kd: RawInput = { k: 'key', kind: IN.KDOWN, vk: 0xd, scan: 0x1c, ext: 0 };
 
 describe('IdleDriver: the engine\'s idle in wall-clock mode', () => {
+
+  it('keeps time moving while continuous input prevents the guest from idling', () => {
+    let ticks = 1_000_000;
+    const r = rig({ readClock: () => ticks });
+    r.d.syncRunningClock();
+    expect(r.calls).toEqual([]);
+    r.idle(1, ticks, ticks + 30 * TICKS_PER_MS);
+    r.advance(5);
+    r.d.syncRunningClock(); // the pending idle timer retains control while idle
+    expect(r.calls).toEqual([]);
+    r.d.submit(move(1, 1), 1, 0);
+    ticks += 5 * TICKS_PER_MS;
+    r.calls.length = 0;
+    r.advance(8);
+    r.d.syncRunningClock();
+    expect(r.calls).toEqual([`clock ${1_000_000 + 13 * TICKS_PER_MS}`]);
+    ticks = 1_000_000 + 20 * TICKS_PER_MS;
+    r.d.syncRunningClock(); // guest execution ahead of wall time never goes back
+    expect(r.calls).toHaveLength(1);
+  });
 
   it('drops input that arrives before the first idle (S-input-before-idle) and says so', () => {
     const r = rig();

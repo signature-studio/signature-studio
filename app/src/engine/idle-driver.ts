@@ -25,6 +25,8 @@ export interface EngineInput {
   /** decision 0272: the taskbar button of window `lid` was pressed (fle_g3_taskbar_syscommand); absent in a build that has no such export */
   syscommand?(lid: number, cmd: number): number;
   clockTo(ticks: number): void;
+  /** current guest time, read at a scheduler point while guest code is running */
+  clockTicks?(): number;
 }
 export interface DriverHost {
   /** resumes the engine; false when it was not waiting */
@@ -107,6 +109,19 @@ export class IdleDriver {
   get queued(): number { return this.queue.length; }
   /** input events the engine has been given and has not yet finished with (decision 0182: the idle that ends them is the one at which the window list must be read) */
   get awaitingCount(): number { return this.awaiting.length; }
+
+  /** A stream of input can keep the guest runnable indefinitely. Its clock
+   * must still follow real time, so expired timers and sleeping threads become
+   * runnable even when the guest has not returned to the host's idle wait. */
+  syncRunningClock(): void {
+    if (!this.started || this.idle || !this.anchor || !this.engine.clockTicks) return;
+    const now = this.engine.clockTicks();
+    const t = this.target(this.host.now(), now);
+    if (t > now) {
+      this.engine.clockTo(t);
+      this.stats.clockMovedTicks += t - now;
+    }
+  }
 
   /** a raw event from the page */
   submit(ev: RawInput, seq: number, tPage: number): 'dropped' | 'applied' | 'queued' {

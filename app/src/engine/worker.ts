@@ -168,6 +168,7 @@ function readSettled(ptr: number, max: number): number {
 function inputPoll(ptr: number, max: number): number {
   const d = driver, mem = fruity?.memory;
   if (!ring || !d || !d.ready || !mem) return 0;
+  d.syncRunningClock();
   serviceDeskRequest();
   if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }

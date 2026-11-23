@@ -182,9 +182,10 @@ export class FruityEngine {
     const mouse = ex.fle_g3_mouse as (a: number, b: number, c: number, d: number) => number;
     const key = ex.fle_g3_key as (a: number, b: number, c: number, d: number) => number;
     const clk = ex.fle_g3_clock_to as (t: number) => void;
+    const ticks = typeof ex.fle_g3_ticks === 'function' ? ex.fle_g3_ticks as () => number : null;
     const display = typeof ex.fle_g3_display === 'function' ? (ex.fle_g3_display as (w: number, h: number) => number) : null;
     const syscmd = typeof ex.fle_g3_taskbar_iconic === 'function' && typeof ex.fle_g3_taskbar_syscommand === 'function' ? (ex.fle_g3_taskbar_syscommand as (lid: number, cmd: number) => number) : null;
-    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
+    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(ticks ? { clockTicks: () => ticks() } : {}), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
   }
 
   /**
