@@ -53,6 +53,7 @@ int fle_win_has_paint(unsigned idx) __attribute__((weak));
  * time of the next such offset is a due time like a timer's. fle_audio_poll() signals what the clock has reached (called before the waits are tested); fle_audio_next_tick() gives, in ticks of the virtual clock, the next time at which
  * a playing buffer reaches a notification offset (0 when none: nothing is due). Weak: a link without the audio files has no device. */
 void fle_audio_poll(void) __attribute__((weak));
+void fle_audio_poll_in_callback(void) __attribute__((weak));
 int fle_audio_next_tick(uint64_t *out) __attribute__((weak));
 /* Decision 0139: real-time pacing with an external audio consumer (the browser's AudioWorklet; fle_audio_ring.h): while a buffer plays, the clock is not moved to the next deadline before that deadline has come in real time. Weak. */
 int fle_audio_paced(void) __attribute__((weak));
@@ -791,6 +792,7 @@ void fle_progress_slice(void)
     if (t->state != T_RUNNING) return;
     if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
         pst.deferred++;
+        if (fle_audio_poll_in_callback) fle_audio_poll_in_callback();
         return;
     }
     pst.slices++;

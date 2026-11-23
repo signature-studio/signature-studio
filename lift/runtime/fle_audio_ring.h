@@ -75,7 +75,7 @@ void fle_audio_ring_set_state(uint32_t state);
 uint64_t fle_audio_consumed(void);
 /* Starts the device clock at the current virtual time (the first Play after the device opened); a second call does nothing. */
 void fle_audio_clock_start(void);
-/* The virtual tick (100 ns) at which fle_audio_consumed() reaches `frames` (native source only; 0 when the clock is not started or the source is external). */
+/* The tick (100 ns) at which fle_audio_consumed() reaches `frames`: the virtual clock natively (0 when the clock is not started); with an external consumer, the frames after the consumed count at the device's rate from now (#1334). */
 uint64_t fle_audio_tick_of_frame(uint64_t frames);
 /* The lead in frames for the current rate (FLE_AUDIO_LEAD_MS). */
 uint32_t fle_audio_lead_frames(void);

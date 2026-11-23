@@ -38,6 +38,7 @@ enum Step {
     RemoveFile(String),
     CheckSources(String),
     CopyDlls,
+    Copy(String, String),
     Glue,
 }
 
@@ -57,6 +58,7 @@ impl Step {
             Step::RemoveFile(path) => format!("rm -f {path}"),
             Step::CheckSources(list_file) => format!("check {list_file} against the .cpp files under {BLEND2D_SRC}"),
             Step::CopyDlls => format!("copy {OUT_APP_DIR}/gen/dll/*.dll and {OUT_APP_DIR}/host/binaries/win64/FLEngine_x64.dll to {OUT_APP_DIR}/dll/"),
+            Step::Copy(from, to) => format!("copy {from} to {to}"),
             Step::Glue => format!("glue {OUT_APP_DIR}/web/flengine6.js -> {OUT_APP_DIR}/web/engine-glue.js (the two rules of {HARNESS_DIR}/web/glue.sed)"),
         }
     }
@@ -311,7 +313,8 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
 
     let mut hybrid_argv = vec![fe_wasmgen];
     hybrid_argv.extend(lines(&format!("{HARNESS_DIR}/hyb/hybrid.cmd"))?);
-    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::Run(hybrid_argv), Step::Glue], parallel: false });
+    let func_names = format!("{OUT_APP_DIR}/hyb/wasm-func-names.tsv");
+    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::Run(hybrid_argv), Step::Copy(func_names, format!("{OUT_APP_DIR}/gen/wasm-func-names.tsv")), Step::Glue], parallel: false });
     Ok(stages)
 }
 
@@ -361,6 +364,12 @@ fn run(step: &Step) -> Result<(), String> {
         },
         Step::CheckSources(list_file) => check_blend2d_sources(list_file),
         Step::CopyDlls => copy_dlls(),
+        Step::Copy(from, to) => {
+            if let Some(dir) = Path::new(to).parent() {
+                fs::create_dir_all(dir).map_err(|e| format!("mkdir {}: {e}", dir.display()))?;
+            }
+            fs::copy(from, to).map(|_| ()).map_err(|e| format!("copy {from} to {to}: {e}"))
+        }
         Step::Glue => {
             let from = format!("{OUT_APP_DIR}/web/flengine6.js");
             let text = fs::read_to_string(&from).map_err(|e| format!("{from}: {e}"))?;

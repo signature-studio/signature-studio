@@ -48,6 +48,19 @@ project: signature-studio/3
 - **実装の要点**(作業ツリーに在る): 分けた module は merge せず別のファイルに書く(`--separate`・`--separate-dir`)。n0 の exports に `__wrap_<名前>` も出す(`--wrap` の対象 `fle_imp_FormatMessageW`・`fle_imp_LockResource` が素の名前で export されず、hybrid の検査で落ちたため)。JS 側は素の名前が無いとき `__wrap_` 版を使う。`tests/plan/engine.txt`・`bundle.txt` を現在の入力に合わせた(`bundle.txt` は #{{019}} 以来古かった)。`fe-build engine` は hybrid 段で 1 回落ちた。直した後は、残りの段を `tests/plan/engine.txt` の同じコマンドで手で走らせた。
 - **未確認・リスク**: Worker の数と、各 Worker が持つ物(未測定)。MXCSR・x87 の状態は direct モジュールごとに持つので、Balance 側の写しが一つ増える。Balance のフックポイント(`fruity-delphi-effect-hook-points.txt` の 3 つ)は direct の経路に無いので適用していない。ゲストのスレッド(別の pthread Worker)から Balance を呼ぶと、その Worker に供給が無く、glue の欠落 import で止まる(fail-closed。未確認)。Balance 越しの longjmp は JS の stub を通るため通らない(未確認)。
 
+### 2 回目の試行(時間切れ。作業は失われた)
+
+run 45197326869。5 時間 50 分(上限 350 分)で時間切れ(`cancelled`)になり、作業は保存されず、`work.diff` は無い。報告(artifact `agent-1342`)では、作業者が 14:54 に engine のビルドを背景で起動し、`tail --pid` で待った。その待ちは 20:34 まで戻らず、ジョブが取り消された。ビルドが固まったのか、待ちが戻らなかったのかは、ログが無いため確認できない。
+
+作業は残っている。1 回目の作業ツリーの差分は `.prior-work.md` で載るので、次の作業者は「残りのやること」に従う。2 回目の試行で決めた場面と進め方は次のとおり(作業者の読み。未検証)。
+
+- (4) の場面は `tools/delivery-split/measure.mjs` に scene を足す: 「No thanks」(513, 308)→ Default の行(124, 81)をダブルクリック → Ctrl+O → ページの `#filedlg-input`(type=file)に、CDP の `DOM.setFileInputFiles` で `Fruity Balance.flp`(`Data/System/Render tests/Fruity Balance.flp`。ASCII で Balance を含む)を渡す。`reads`・`fetches`・最終の state は scene の後の snapshot で取る。
+- Worker の数は、Target の一覧と JS ヒープで数える(`fl-engine`・`fl-render`・`chunk-io`・pthread)。scene が失敗したときは、画面の写しを `.tmp-delivery-scene-fail.png` に残す。
+- 分けた module の import は `c` だけで、`c.memory` は engine の `--export-memory`。
+- この scene は作業ツリーの `measure.mjs` に書かれたが、ビルドの完了前に失われた。
+- Welcome を閉じる trap は #{{116}} で直った(`tools/smoke/welcome-flow.mjs` が在る)。受け入れの (4) の場面にある「別の Issue で直す予定」の文は、この修正で古くなった。場面で Welcome を閉じてよい。
+- ビルドの進め方: engine のビルドは約 35〜60 分。**フォアグラウンドで直接実行し、`timeout` 引数に 5400000 を渡す**。背景で起動して待たない(`tail --pid` が戻らず、時間切れになった)。**開始から 4 時間 30 分で commit して終える**。
+
 ### 残りのやること
 
 (a) 作業ツリーを確かめる。`git status`・`git diff HEAD` で、次のパスの変更が載っていること: `lift/crates/fe-wasmgen/src/hybrid.rs`・`main.rs`、`lift/harness/hyb/`、`lift/harness/two/main_two.c`、`lift/harness/web/pack.args`、`app/src/engine/xmod.ts`(新規)・`fruity.ts`、`lift/crates/fe-build/tests/plan/*.txt`、`tools/delivery-split/measure.mjs`。載っていなければ、`work.diff` の内容から作り直す(違いは報告に書く)。

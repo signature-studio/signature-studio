@@ -4,10 +4,14 @@
 //! hybrid: fe-wasmgen with the addresses of the link map of the C part; wasm-opt -Oz of each direct module; wasm-merge of the direct modules,
 //! then into the C part; the output has no import of module c and no import of a lifted function (f_<va>) from env.
 //! A module whose list is missing or empty is skipped (as the shell did). The lists are lowered-<module>.txt in --lists, one VA per line.
+//! The merges keep the names (-g): the table of the function names (names_table) is written to the work directory, and the output has no names section.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+
+/// The table of the functions of the engine (names_table), written to the work directory; fe-build copies it to lift/out-app/gen.
+const FUNC_NAMES: &str = "wasm-func-names.tsv";
 
 struct Module {
     name: String,
@@ -186,6 +190,123 @@ fn function_imports(b: &[u8]) -> Result<Vec<(String, String)>, String> {
     Ok(out)
 }
 
+/// A section of a wasm module: its id, the offsets of its first byte and of its end, and its payload.
+struct Section<'a> {
+    id: u8,
+    start: usize,
+    end: usize,
+    body: &'a [u8],
+}
+
+fn sections(b: &[u8]) -> Result<Vec<Section<'_>>, String> {
+    if b.len() < 8 || &b[..4] != b"\0asm" {
+        return Err("not a wasm module".into());
+    }
+    let mut out = Vec::new();
+    let mut i = 8;
+    while i < b.len() {
+        let start = i;
+        let id = b[i];
+        i += 1;
+        let size = leb(b, &mut i)? as usize;
+        let end = i.checked_add(size).filter(|&e| e <= b.len()).ok_or("truncated section")?;
+        out.push(Section { id, start, end, body: &b[i..end] });
+        i = end;
+    }
+    Ok(out)
+}
+
+/// The rest of a custom section after its name, when the name is `name` (the names section); None for any other custom section.
+fn name_section(body: &[u8]) -> Result<Option<&[u8]>, String> {
+    let mut i = 0;
+    let n = leb(body, &mut i)? as usize;
+    Ok(if body.get(i..i + n) == Some(&b"name"[..]) { Some(&body[i + n..]) } else { None })
+}
+
+/// The names of the functions (the subsection 1 of the names section), by function index.
+fn function_names(b: &[u8]) -> Result<BTreeMap<u32, String>, String> {
+    let mut out = BTreeMap::new();
+    for s in sections(b)? {
+        let Some(mut rest) = (if s.id == 0 { name_section(s.body)? } else { None }) else { continue };
+        while !rest.is_empty() {
+            let id = rest[0];
+            let mut i = 1;
+            let size = leb(rest, &mut i)? as usize;
+            let sub = rest.get(i..i + size).ok_or("truncated name subsection")?;
+            rest = &rest[i + size..];
+            if id != 1 {
+                continue;
+            }
+            let mut j = 0;
+            for _ in 0..leb(sub, &mut j)? {
+                let idx = leb(sub, &mut j)? as u32;
+                let l = leb(sub, &mut j)? as usize;
+                let name = std::str::from_utf8(sub.get(j..j + l).ok_or("truncated function name")?).map_err(|e| e.to_string())?;
+                j += l;
+                out.insert(idx, name.to_string());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The kind and the guest VA of a function name of the generator: `f_<va>` (a lifted function), `ia_<va>` (its adapter for an indirect call) and `t_<va>` (its test adapter). Any other name is a C function.
+fn classify(name: &str) -> (&'static str, String) {
+    for (prefix, kind) in [("f_", "f"), ("ia_", "ia"), ("t_", "t")] {
+        if let Some(hex) = name.strip_prefix(prefix) {
+            if !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return (kind, format!("0x{hex}"));
+            }
+        }
+    }
+    ("c", String::new())
+}
+
+/// The table of the functions of a module (lift/out-app/gen/wasm-func-names.tsv): one line per function index, from the imports and then the defined functions,
+/// with the kind (import, f, ia, t, c, or - for a function without a name), the guest VA and the name.
+fn names_table(b: &[u8]) -> Result<String, String> {
+    let names = function_names(b)?;
+    if names.is_empty() {
+        return Err("the module has no function names (the names section is missing)".into());
+    }
+    let imports = function_imports(b)?;
+    let mut defined = 0u64;
+    for s in sections(b)? {
+        if s.id == 3 {
+            let mut i = 0;
+            defined = leb(s.body, &mut i)?;
+        }
+    }
+    let mut out = String::from("index\tkind\tva\tname\n");
+    for idx in 0..imports.len() as u64 + defined {
+        let (kind, va, name) = match imports.get(idx as usize) {
+            Some((module, name)) => ("import", String::new(), format!("{module}.{name}")),
+            None => match names.get(&(idx as u32)) {
+                Some(name) => {
+                    let (kind, va) = classify(name);
+                    (kind, va, name.clone())
+                }
+                None => ("-", String::new(), String::new()),
+            },
+        };
+        out.push_str(&format!("{idx}\t{kind}\t{va}\t{name}\n"));
+    }
+    Ok(out)
+}
+
+/// The module without its names section: the shipped engine has none (the table of names_table has them).
+fn without_names(b: &[u8]) -> Result<Vec<u8>, String> {
+    let secs = sections(b)?;
+    let mut out = b[..8].to_vec();
+    for s in secs {
+        if s.id == 0 && name_section(s.body)?.is_some() {
+            continue;
+        }
+        out.extend_from_slice(&b[s.start..s.end]);
+    }
+    Ok(out)
+}
+
 /// The addresses of the C part from its link map: the first line whose fields are the given shape and whose last field is the name.
 /// The shapes are the regular expressions of build-engine-bundle.sh: "hex", "dig" (decimal digits) or a literal in the field.
 struct Addrs {
@@ -269,6 +390,21 @@ mod tests {
         .concat();
         assert_eq!(function_imports(&b).unwrap(), vec![("c".to_string(), "f1".to_string())]);
     }
+
+    fn sec(id: u8, body: &[u8]) -> Vec<u8> {
+        [&[id, body.len() as u8][..], body].concat()
+    }
+
+    #[test]
+    fn names_table_lists_every_function_and_the_names_section_is_dropped() {
+        let sub: Vec<u8> = [&[2u8, 1, 4][..], b"f_40", &[2, 18][..], b"fle_progress_slice"].concat();
+        let names = sec(0, &[&[4u8][..], b"name", &[1, sub.len() as u8][..], &sub].concat());
+        let imp = sec(2, &[&[1u8, 1][..], b"c", &[2], b"f1", &[0, 0]].concat());
+        let module = [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &imp, &sec(3, &[2, 0, 0]), &names].concat();
+        let table = names_table(&module).unwrap();
+        assert_eq!(table, "index\tkind\tva\tname\n0\timport\t\tc.f1\n1\tf\t0x40\tf_40\n2\tc\t\tfle_progress_slice\n");
+        assert_eq!(without_names(&module).unwrap(), [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &imp, &sec(3, &[2, 0, 0])].concat());
+    }
 }
 
 pub fn run_n0(args: &[String]) -> ExitCode {
@@ -333,7 +469,8 @@ fn hybrid(args: &[String]) -> Result<(), String> {
     let opt_bin = req(&o, "wasm-opt")?;
     let opt_args = words(req(&o, "wasm-opt-args")?)?;
     let merge_bin = req(&o, "wasm-merge")?;
-    let features = words(req(&o, "features")?)?;
+    let mut features = words(req(&o, "features")?)?;
+    features.push("-g".into());
     let dir = work.join("dir");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let mut extra: Vec<String> = vec![
@@ -387,7 +524,9 @@ fn hybrid(args: &[String]) -> Result<(), String> {
     if imps.iter().any(|(m, n)| m == "env" && n.starts_with("f_")) {
         return Err("the merged module still imports a lifted function (f_<va>) from env: a listed function is not defined by the direct code".into());
     }
-    std::fs::copy(&merged, &out).map_err(|e| format!("{}: {e}", out.display()))?;
-    println!("hybrid: {} bytes, {} direct modules", bytes.len(), ins.len());
+    std::fs::write(work.join(FUNC_NAMES), names_table(&bytes)?).map_err(|e| format!("{FUNC_NAMES}: {e}"))?;
+    let shipped = without_names(&bytes)?;
+    std::fs::write(&out, &shipped).map_err(|e| format!("{}: {e}", out.display()))?;
+    println!("hybrid: {} bytes, {} direct modules, the function names in {}", shipped.len(), ins.len(), work.join(FUNC_NAMES).display());
     Ok(())
 }

@@ -2,7 +2,7 @@
 # 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
 #   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
 #   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
-#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。
+#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。時間切れで取り消された: failed と、作業の保存の有無。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。
 # 同じ Issue のイベントの run は、concurrency で 1 本ずつ動く。work は最初に Issue の状態を確かめ、閉じた・failed・pm-hold の Issue の作業は飛ばす。報告の検査は、ベンダー名の文字列を伏せ字にして通す(ほかの指摘は失敗)。
 # ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
@@ -11,7 +11,7 @@
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
 # 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。
-# push が 3 回とも落ちたとき、および判定が落ちたときは、作業を差分(work.diff)で artifact に残す。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」)。
+# push が 3 回とも落ちたとき、判定が落ちたとき、および時間切れで取り消されたときは、作業を差分(work.diff)で artifact に残す(取り消しの猶予の約 5 分で終わるよう、保存の段は通信をしない)。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」「13」)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
@@ -634,7 +634,7 @@ jobs:
           else
             # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
             rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
-            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。判定の出力が無い)"; fi
+            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。前回の run が、判定の前に取り消された(時間切れ)ため、判定の出力が無い)"; fi
             if [ "$rc" -eq 0 ]; then
               st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
             else
@@ -730,8 +730,8 @@ jobs:
           exit 1
 
       - name: 押せなかった作業を保存する
-        # push の段が落ちたときだけ。基点は push の前に残した HEAD(work-tip.txt)と refs/judge/main の merge-base。pull で取り込んだ main の変更は含めない
-        if: failure() && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'
+        # push の段が落ちたとき、または時間切れで取り消されたときだけ。基点は push の前に残した HEAD(work-tip.txt)と refs/judge/main の merge-base。pull で取り込んだ main の変更は含めない
+        if: (failure() || cancelled()) && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           if [ ! -s "$RUNNER_TEMP/work-tip.txt" ]; then echo "保存する作業が無い(push の段が始まる前に落ちた)"; exit 0; fi
@@ -742,12 +742,13 @@ jobs:
           echo "押せなかった作業を保存した($(wc -c < "$RUNNER_TEMP/out/work.diff") バイト)"
 
       - name: 判定が落ちた作業を保存する
-        # 判定の段が落ちて push が飛んだとき(作業者が動いた後)だけ。作業ツリーの全差分(commit 済み・未 commit・未追跡。.gitignore の物を除く)を、基点(refs/judge/main との merge-base)からの差分にする。次の再試行は、判定を通らなかった作業として続きから取り込む
-        if: failure() && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'
+        # 判定の段が落ちて push が飛んだとき、または時間切れで取り消されて push が飛んだとき(作業者が動いた後)だけ。作業ツリーの全差分(commit 済み・未 commit・未追跡。.gitignore の物を除く)を、基点(refs/judge/main との merge-base)からの差分にする。次の再試行は、判定を通らなかった作業として続きから取り込む。取り消しの猶予(約 5 分)で終わるよう、通信はせず、取り消しで残った index.lock だけを外す
+        if: (failure() || cancelled()) && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           if [ ! -e "$RUNNER_TEMP/out/report.md" ]; then echo "作業者が動いていない。保存する作業が無い"; exit 0; fi
           base=$(git merge-base HEAD refs/judge/main 2>/dev/null || git merge-base HEAD origin/main)
+          rm -f .git/index.lock
           git add -A
           git diff --cached --binary "$base" > "$RUNNER_TEMP/out/work.diff"
           if [ ! -s "$RUNNER_TEMP/out/work.diff" ]; then rm -f "$RUNNER_TEMP/out/work.diff"; echo "保存する差分が空"; exit 0; fi
@@ -819,6 +820,9 @@ jobs:
             elif [ "$state" = closed ] && [ -n "$sha" ]; then
               echo pushed-failed > "$d/status"
               { echo "作業は完了し main に入った。後続の段(${failed:-(取れなかった。ジョブのログを見る)})が失敗した。"; echo "run: $RUN_URL"; } > "$d/comment.md"
+            elif [ "$conc" = cancelled ]; then
+              echo failure > "$d/status"
+              { echo "時間切れで取り消された: $RUN_URL"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。判定の前に取り消された)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; else echo "作業を保存できなかった(差分が無い・空・50 MB を超えた、または保存の段が動かなかった)"; fi; } > "$d/comment.md"
             else
               echo failure > "$d/status"
               { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; } > "$d/comment.md"

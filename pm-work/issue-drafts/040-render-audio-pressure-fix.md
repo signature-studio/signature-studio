@@ -25,7 +25,7 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
 2. 計数の定義の食い違い(`maxRefillStallMs` と連続 underrun の最長)を確かめた結果。
 3. コールバック内の切り替えの飛ばしで、外部の音声の消費者があるときだけ音声の補充を行う修正(作業ツリーに在る。`fle_audio_poll_in_callback`)。
 
-途切れを 0 にする切り替え点の実装は、`#{{112}}` に分けた。この Issue の受け入れは、途切れの目標値(0 と 60 ms 以下)を含まない。
+途切れを 0 にする切り替え点の実装は、`#{{112}}` に分けた。この Issue の受け入れは、起動直後の山を含む途切れの目標(`bootLast60sAt10s`・`bootLast60sAt70s` の 0。音声の補充の停止の 60 ms 以下)を含まない。定常(idle の +90 秒の窓)の途切れが 0 であることは含む(`bootLast60sAt90s`。6 回目の試行の PM の決定)。
 
 原因の見立て(3 回の試行の実測。下の「前回の試行で分かったこと」): 起動の直後、guest の重い計算が、協調スケジューラの切り替えを通らずに続く。コールバックの中では切り替えが飛ばされ、その間は音声の補充も止まる。コールバックの中でも補充すると途切れは減るが、0 にはならない。3 回目の試行で、長い計算の上位の関数を特定した(`f_344fcf0` など。下の表)。どのスレッドの、どの連続の計算が締め切りを超えるかは、`#{{112}}` で確定する。
 
@@ -155,6 +155,26 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
 (c) 作業ツリーを commit する(受け入れが通らなくても。未 commit の変更を残さない)。
 (d) 余裕があれば、`maxRefillStallMs` を、窓の中の公開の間隔(閉じていない停止を含む)に直す(`#{{112}}` の目標の測定に要る。この Issue の受け入れには入れない)。
 
+### 6 回目の試行(run 45197329578。約 3 時間。受け入れに届かず `failed`。作業は `work.diff` として artifact `agent-1334` に残った)
+
+次の run は、この `work.diff` を作業ツリーに取り込んでから始める(取り込みの結果は `.prior-work.md`)。artifact は次の作業者が読めないので、要点を本文に書く。
+
+- **修正前**(この main の版。6 回目の変更は入れていない): 最初のアイドルの後、公開(`publishes`)が増えないまま窓の終わりまで止まった。`bootLast60sAt10s` 3381・3350・3353、`bootLast60sAt70s` 20662・20671・20658、`maxRefillStallMs` 659・672・701。連続 underrun の最長は窓の全体(24,018 quanta、69.7 秒)。5 回目の試行の修正の効果は、この版では再現しなかった(違いの原因は未確認。この main には、その後に `#{{101}}`・`#{{107}}`・`#{{116}}` が入った)。
+- **修正**(`lift/runtime/fle_dsound.c`): `audio_sync` は、外部の消費者があるとき、再生中のバッファが無くても補充する(`mix_chunk` は 0 から始まるので無音になる)。`fle_audio_next_tick` は、外部の消費者があるとき、補充の締切を返す。ネイティブと消費者が無いときの動作と、先読み(`FLE_AUDIO_LEAD_MS`)は変えていない。
+- **推定(一部未確認)**: `fle_audio_next_tick` と `audio_sync` が、`play_count() == 0` で外部の締切より先に戻る。再生中のバッファが無い間は、外部の消費者があっても補充も締切も無くなり、engine は入力まで眠る。`play_count()` の値は直接見ていない。
+- **結果**(修正後。n=3。runner の値): `bootLast60sAt10s` 2311・2312・2303(修正前 3381・3350・3353)。`bootLast60sAt70s` 1054・1032・1039(判定の出力では 967・953 も出た)。公開の増加(窓): 0 → 6,003(約 10 ms の周期で続く)。連続 underrun の最長(トレース): 24,018 quanta(窓の全体)→ 2,167 quanta(0.6〜9.3 秒)。`maxRefillStallMs` 757・740・752 ms(起動からの最大の間隔。窓の値ではない)。
+- **途切れの位置**(トレース): 修正後の途切れは、起動直後の約 13.8 秒までに集中し、それ以降は増えない。
+- **落ちた理由**: 受け入れの `bootLast60sAt70s`(idle の +70 秒の直近 60 秒。窓は +10〜+70 秒)が 0 にならなかった。窓の中に、起動直後の山の終わり(約 10〜13.8 秒)の約 1,000 件が入る。5 回目の試行では、山は約 9 秒で終わっていた。この版では約 13.8 秒まで続く。推定: `#{{107}}` で guest の画面が物理画素(6 Mpx)になり、起動の最初の計算が長くなった。
+- **PM の解釈と決定**: 山の中身(guest の長い計算)は `#{{112}}`(切り替え点)の対象。この Issue の目的(公開が止まらないこと・測る道具・関数名の表)は達した。受け入れの `bootLast60sAt70s` の 0 を、`bootLast60sAt90s` の 0(idle の +90 秒の直近 60 秒。窓は +30〜+90 秒。山を含まない定常)に変える。道具に +90 秒の読みを足す。`bootLast60sAt10s`・`bootLast60sAt70s` は JSON と報告に出すが、判定に入れない(`#{{112}}` の目標)。
+- **未確認**: `play_count()` の直接の値。5 回目の 0 と今回の差の原因(山が延びたこと以外)。押下の時刻ごとの再測定。切り替え点の効果。耳の確認。
+
+### 残りのやること(6 回目の試行の後)
+
+(a) 作業ツリーを確かめる。`git status`・`git diff HEAD` で、`lift/runtime/fle_dsound.c`(6 回目の修正)と、前回までの変更(`fle_audio_ring.c`・`.h`・`fle_audio_transport.c`・`fle_thread.c`、`lift/crates/fe-wasmgen`・`fe-build`、`lift/harness/web`、`tools/p3-audio-probe/`、`pm-work/findings/boot-stall-1334.md`)が載っていること。載っていなければ、`work.diff` の内容から作り直す(違いは報告に書く)。
+(b) `tools/p3-audio-probe/measure.mjs` の `--boot` に +90 秒の読みを足す。既存の +10 秒と +70 秒の読みは残し、+70 秒の読みを取った後で +90 秒を読む(`BOOT_READ_MS` に 90 秒を足す)。JSON に `bootLast60sAt90s`(idle の +90 秒の直近 60 秒の途切れ。`app/src/audio/page-audio.ts` の `detail()` の `underrunQuantaLast60s`)と、読んだ時刻(`at90`)を出す。この読みが無いと、下の受け入れの式は落ちる。
+(c) 受け入れを 1 回通す(再ビルドは約 35〜50 分)。判定は上の「受け入れ」の式(`bootLast60sAt90s` が 0)で行う。
+(d) 作業ツリーを commit する(受け入れが通らなくても。未 commit の変更を残さない)。
+
 ## 最優先: 公開が止まる欠陥(4 回目の試行の結果)
 
 5 回目の試行で、この欠陥の原因を確定し、直した(上の「5 回目の試行」)。下の実験は、その試行で行った。
@@ -188,7 +208,7 @@ PM の見立て(実測で確かめる。作業の最初にやる):
 ## 設計の追加(2〜4 回目の試行の結果から)
 
 - (i) 関数名の表: 上の「作業の順序」2 と 3。生成器が、wasm の関数の番号 → guest の RVA・関数名を、`lift/out-app/gen/` の下の別のファイルに書く。配信の対象に入れない。
-- (ii) 計数の定義: 上の「作業の順序」4。受け入れが読む `bootLast60sAt10s`・`bootLast60sAt70s` は、アプリのヘッダーの `直近 60 秒の途切れ` と同じ定義(`app/src/audio/page-audio.ts` の `detail()`)。この Issue はその定義を変えない。
+- (ii) 計数の定義: 上の「作業の順序」4。受け入れが読む `bootLast60sAt90s`(以前は `bootLast60sAt70s`)と、JSON に出す `bootLast60sAt10s`・`bootLast60sAt70s` は、アプリのヘッダーの `直近 60 秒の途切れ` と同じ定義(`app/src/audio/page-audio.ts` の `detail()`)。この Issue はその定義を変えない。
 - (iii) 押下より前: 上の「作業の順序」5。AudioContext を始める押下より前は、消費者が無いので途切れとして数えない(アプリの定義どおり)。ただし、4 回目の試行で、押下より前に公開が止まる欠陥が見つかった(上の「最優先」の節)。途切れの数え方は変えず、公開が止まる欠陥を直す。
 - (iv) 作業の進め方: ビルドの完了は、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000)を渡して待つ。バックグラウンドで起動して、完了の通知を待つ形にしない(ターンを終えると作業が止まる)。受け入れが通らなくても、作業の最後に作業ツリーを commit する。
 - (v) 作業の進め方(4 回目の試行から): 1 回の試行で、ビルドは数回まで(engine の再ビルドは約 35 分)。実験は、押下の時刻を変える測定を、1 回のビルドで全てまとめて行う。作業の最後に、受け入れが通らなくても、作業ツリーを commit する。
@@ -196,10 +216,10 @@ PM の見立て(実測で確かめる。作業の最初にやる):
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));const near=(a,b)=>Math.abs(a-b)<=1;const px=(r)=>{const [w,h]=r.screenDevicePx.split("x").map(Number);return near(w,Math.round(1836*r.dpr))&&near(h,Math.round(1056*r.dpr));};process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt70s===0&&px(r))?0:1)' && test "$(wc -l < lift/out-app/gen/wasm-func-names.tsv)" -ge 100000 && grep -q fle_progress_slice lift/out-app/gen/wasm-func-names.tsv && test -f pm-work/findings/boot-stall-1334.md && rm -rf .tmp-1334
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));const near=(a,b)=>Math.abs(a-b)<=1;const px=(r)=>{const [w,h]=r.screenDevicePx.split("x").map(Number);return near(w,Math.round(1836*r.dpr))&&near(h,Math.round(1056*r.dpr));};process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt90s===0&&px(r))?0:1)' && test "$(wc -l < lift/out-app/gen/wasm-func-names.tsv)" -ge 100000 && grep -q fle_progress_slice lift/out-app/gen/wasm-func-names.tsv && test -f pm-work/findings/boot-stall-1334.md && rm -rf .tmp-1334
 ```
 
-判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt70s` が 0、`screenDevicePx` の幅と高さが、道具の `dpr`(既定 30/17 ≈ 1.7647)から求めた `Math.round(1836 × dpr)` と `Math.round(1056 × dpr)` の ±1 以内になる。丸めは、アプリの `chooseGuestScreen`(`app/src/ui/screen-fit.ts`。#{{107}} で `Math.round` になった)と同じ。既定の DPR では 3240x1864 になる。±1 は、端数の見込み(PM の決定)。
+判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt90s` が 0(idle の +90 秒の直近 60 秒。山を含まない定常)、`screenDevicePx` の幅と高さが、道具の `dpr`(既定 30/17 ≈ 1.7647)から求めた `Math.round(1836 × dpr)` と `Math.round(1056 × dpr)` の ±1 以内になる。丸めは、アプリの `chooseGuestScreen`(`app/src/ui/screen-fit.ts`。#{{107}} で `Math.round` になった)と同じ。既定の DPR では 3240x1864 になる。±1 は、端数の見込み(PM の決定)。`bootLast60sAt10s`・`bootLast60sAt70s` は、JSON と報告に出すが、判定に入れない(`#{{112}}` の目標)。`bootLast60sAt90s` は、道具に +90 秒の読みが実装されてから読める(「残りのやること」の (b))。
 
 関数名の表 `lift/out-app/gen/wasm-func-names.tsv` が在り、行数が 100,000 以上で、`fle_progress_slice` の行を含む。`pm-work/findings/boot-stall-1334.md` が在る。
 
