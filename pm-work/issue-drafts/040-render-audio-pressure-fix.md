@@ -118,7 +118,46 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
 - **変えた物**(`work.diff`。次の run が取り込む): `lift/crates/fe-wasmgen`(名前の出力・hybrid の表)、`lift/crates/fe-build`(表の `copy` 段・計画の記録)、`lift/harness/web`(`link.rsp`・`wasm-opt-c.cmd`・`wasm-opt.args`)、`lift/runtime`(前回の 3 ファイル。動作は変えず、計数と外部の消費者の補充だけ)、`tools/p3-audio-probe`(`measure.mjs` に `--press-at`・`--trace`・`--profile`。新規 `profile-names.mjs`・`trace-stats.mjs`)、`pm-work/findings/boot-stall-1334.md`。
 - **未実施**: `maxRefillStallMs` の定義の修正(窓の中の間隔。閉じていない停止を数える)、再生中の性能、耳の確認。
 
+### 5 回目の試行(run 45149438071。約 1 時間 30 分。受け入れの画面の式だけで落ちた。作業は `work.diff` として artifact `agent-1334` に残った。ローカルの commit `7d41579f` は push されていない)
+
+次の run は、この `work.diff` を作業ツリーに取り込んでから始める(取り込みの結果は `.prior-work.md`)。artifact は次の作業者が読めないので、要点を本文に書く。
+
+- **止まっていた原因(確定。コードと実測)**: 外部の音声の消費者(AudioWorklet)があるとき、`fle_audio_tick_of_frame` が 0 を返し、`fle_audio_next_tick` も音声の締切を 1 つも返さなかった。ゲストのタイマーが無いと、アイドルの engine は入力が来るまで眠り、音声の補充が止まった。4 回目の「公開が止まる」欠陥は、この締切の欠落。
+- **修正**(`lift/runtime/fle_audio_ring.c`・`fle_dsound.c`): 外部の消費者があるときだけ、(a) 読み取り位置までの時刻を今からの実時間で求める、(b) 補充の締切(先読みの半分を読み終える時刻)を締切の集合に入れる。ネイティブと消費者が無いときの動作は変えない。切り替え点は足していない(計算の途中の切り替えは `#{{112}}`)。
+- **変更の前後**(runner の値。nproc 4、loadavg 0.1〜1.8。n=3):
+
+| 版 | 押下(idle の後) | bootLast60sAt10s | bootLast60sAt70s | maxRefillStallMs (ms) |
+|---|---|---|---|---|
+| 修正前(4 回目) | +0.5〜0.8 s | 3398・3343・3395 | 20661 ×3 | 733〜766 |
+| 修正後(5 回目) | +0.9 s | 1827・1822・1903 | 0 ×3 | 428〜439 |
+
+- **押下の時刻ごと**(修正後。1 ビルド。`bootLast60sAt70s` は全部 0):
+
+| 押下 (s) | bootLast60sAt10s | 途切れの最後 (ms) | +10 s 以降の公開の最長間隔 (ms) |
+|---|---|---|---|
+| 0 | 2022 | 9528 | 52 |
+| 0.5 | 1926 | 9266 | 51 |
+| 1 | 1809 | 9165 | 52 |
+| 5 | 927 | 9141 | 52 |
+| 30 | (押下より前) | なし | 52 |
+
+  途切れは、最初のアイドルの約 9.1〜9.5 秒後に終わる。押下の時刻には依らない。押下 30 秒の run に途切れが無いのは、その時点で計算が終わっていたため。
+- **押下の後の約 9 秒の計算(`#{{112}}` の対象)**: busy は、アイドルの 0〜8 秒が約 100%、10 秒以降は約 2%。切り替え点(`fle_progress_slice`)を通らずに続いた最長は **1,310 ms**(`f_344fcf0` 467 ms、`fle_mx_addsd` 181 ms、`f_27ad5f8` 160 ms)。自己時間の上位(busy 10.6 s / 69.6 s): `f_344fcf0` 2,925 ms(guest VA 0x344fcf0)、`f_27ad5f8` 1,164 ms(0x27ad5f8)、`fle_mx_addsd` 1,046 ms、`fle_mx_subsd` 537 ms、`fle_mx_addss` 453 ms、`fle_mx_mulsd` 344 ms、`f_33d6e70` 259 ms、`fle_lg_psrldq` 208 ms。`fle_mx_*` は SSE 命令のランタイム。
+- **計数の定義(確認済み)**: `maxRefillStallMs` は起動からの最大の公開の間隔で、窓の値ではない(トレースの最初の 395 ms で既に 430.8 ms)。この定義では目標(60 ms 以下)は測れない。途切れの数え方は `fle-out.worklet.js` の `WR − RD < 128` のとおり。
+- **関数名の表(できた)**: `lift/out-app/gen/wasm-func-names.tsv`(142,050 行。`fle_progress_slice` を含む)。
+- **受け入れの落ちた理由**: 画面の式だけ。`boot-N.json` の `screenDevicePx` は `3240x1864`。式は `3240x1863`(`Math.floor`)を要求した。#{{107}} で `chooseGuestScreen` が `Math.round` になったため(幅と高さの両方で、切り捨てと丸めが一致する DPR は無い)。他の判定の項目は 3 回とも通った。→ 式を `Math.round` の ±1 に直した(下の「受け入れ」)。
+- **未確認**: 押下の後の約 9 秒の計算が、修正で現れたのか以前からあったのか(外部の通知の締切を外した版で、プロファイルを 1 回取れば分かる。約 50 分)。再生中の性能(周あたりの時間は未測定)。耳の確認は行わない。
+
+### 残りのやること(5 回目の試行の後)
+
+(a) 作業ツリーを確かめる。`git status`・`git diff HEAD` で、次のパスの変更が載っていること: `lift/runtime/fle_audio_ring.c`・`fle_audio_ring.h`・`fle_dsound.c`・`fle_audio_transport.c`・`fle_thread.c`、`lift/crates/fe-wasmgen`・`fe-build`、`lift/harness/web/link.rsp`・`wasm-opt-c.cmd`・`wasm-opt.args`、`tools/p3-audio-probe/`(3 ファイル)、`pm-work/findings/boot-stall-1334.md`。載っていなければ、`work.diff` の内容から作り直す(違いは報告に書く)。
+(b) 直した受け入れを、1 回通す(再ビルドは約 35〜50 分)。
+(c) 作業ツリーを commit する(受け入れが通らなくても。未 commit の変更を残さない)。
+(d) 余裕があれば、`maxRefillStallMs` を、窓の中の公開の間隔(閉じていない停止を含む)に直す(`#{{112}}` の目標の測定に要る。この Issue の受け入れには入れない)。
+
 ## 最優先: 公開が止まる欠陥(4 回目の試行の結果)
+
+5 回目の試行で、この欠陥の原因を確定し、直した(上の「5 回目の試行」)。下の実験は、その試行で行った。
 
 PM の見立て(実測で確かめる。作業の最初にやる):
 
@@ -134,6 +173,8 @@ PM の見立て(実測で確かめる。作業の最初にやる):
 - **(b) 止まる時刻が押下の時刻に依らない**(全ての run で、idle の約 0.28 秒後に止まる): 製品の欠陥は別にある。二分探索で、どの変更から起きたかを確かめる。候補は、上の 4 回目の試行の「候補(作業者の推定)」の commit(`6698a7bd`・`dc21310c`・`96cecd97`・`0bb44070`・`2b528414`・`ecb300bb`・`32a318c2`)。1 回のビルドは約 35 分なので、候補を先に絞る。各 commit の `lift/`・`app/` は、`git worktree add .tmp-<名前> <commit>` で、リポジトリの中の `.tmp-*` に取り出して使い、終わったら `git worktree remove` で消す(リポジトリの外に作らない)。
 
 ## 作業の順序
+
+5 回目の試行の後は、この節の 1 と 5 は済んでいる(手順は「5 回目の試行」の「残りのやること」に従う)。
 
 作業の始めに、前回の作業が作業ツリーに載っている(`.prior-work.md` が指示する。衝突が在れば、その解消から始める)。前回の変更は取り除かず、残りを行う。
 
@@ -155,10 +196,10 @@ PM の見立て(実測で確かめる。作業の最初にやる):
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));const px=(r)=>Math.floor(1836*r.dpr)+"x"+Math.floor(1056*r.dpr);process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt70s===0&&r.screenDevicePx===px(r))?0:1)' && test "$(wc -l < lift/out-app/gen/wasm-func-names.tsv)" -ge 100000 && grep -q fle_progress_slice lift/out-app/gen/wasm-func-names.tsv && test -f pm-work/findings/boot-stall-1334.md && rm -rf .tmp-1334
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));const near=(a,b)=>Math.abs(a-b)<=1;const px=(r)=>{const [w,h]=r.screenDevicePx.split("x").map(Number);return near(w,Math.round(1836*r.dpr))&&near(h,Math.round(1056*r.dpr));};process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt70s===0&&px(r))?0:1)' && test "$(wc -l < lift/out-app/gen/wasm-func-names.tsv)" -ge 100000 && grep -q fle_progress_slice lift/out-app/gen/wasm-func-names.tsv && test -f pm-work/findings/boot-stall-1334.md && rm -rf .tmp-1334
 ```
 
-判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt70s` が 0、`screenDevicePx` が、道具の `dpr`(既定 30/17 ≈ 1.7647)から `Math.floor(1836 × dpr)` × `Math.floor(1056 × dpr)` になる。切り捨ては、アプリの `chooseGuestScreen`(`app/src/ui/screen-fit.ts`)と同じ。丸めると高さが 1864 になり、実測の 1863 と合わない。
+判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt70s` が 0、`screenDevicePx` の幅と高さが、道具の `dpr`(既定 30/17 ≈ 1.7647)から求めた `Math.round(1836 × dpr)` と `Math.round(1056 × dpr)` の ±1 以内になる。丸めは、アプリの `chooseGuestScreen`(`app/src/ui/screen-fit.ts`。#{{107}} で `Math.round` になった)と同じ。既定の DPR では 3240x1864 になる。±1 は、端数の見込み(PM の決定)。
 
 関数名の表 `lift/out-app/gen/wasm-func-names.tsv` が在り、行数が 100,000 以上で、`fle_progress_slice` の行を含む。`pm-work/findings/boot-stall-1334.md` が在る。
 
