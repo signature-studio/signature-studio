@@ -16,9 +16,23 @@
 //  - canvas: canvas[data-desk="1"] width and height (the drawing buffer = the guest's screen in device pixels).
 //  - display: the canvas's getBoundingClientRect x dpr, rounded (the device pixels the canvas covers). The acceptance wants it to match canvas within 1 pixel.
 //  - asked: the size and the environment the page passed to the engine (window.__app.screen.asked).
-//  - NOT MEASURED here (null): flScalingPercent (FL's scale of its UI), mainGuiScaling, parts (the positions of the UI's parts), edgeWidth, blackShare (the Browser's rectangle is
-//    #1355's), debugLog. #1353 gives the first four and the Debug log: the window table (fle_desk_describe) has only the top-level windows, the Main GUI Scaling setting is read by no
-//    traced call, and the Debug log's text is not read from the guest (pm-work/findings/hidpi-fl-scaling.md).
+//  - scale (#1353): the picture (window.__app.deskDumpBase64) and the window table. flScalingPercent = round(100 x the Welcome window's width / its width at the DPR 1 reference of the
+//    calibration boot): FL's own window, the only one of its size in the table that does not move. scale.tempoLen: the Tempo box's bright interior in guest pixels (DPR 1: 54), a cross-check.
+//    The Tempo box is the longest run of bright interior pixels in the top band (x within 0.2 W .. 0.3 W); the scale of the other parts is its ratio to the DPR 1 reference.
+//  - edgeWidth: the 10 % to 90 % width of the transitions at the four edges of the Tempo box (the median of the four; pixels).
+//  - parts: the Tempo box's frame is measured; "song-position" and "pattern-selector" are NOT measured (measured: false): their DPR 1 offsets from the Tempo frame, scaled by the Tempo ratio.
+//  - pointerErrPx: presses (move, press, release) at three points of the Welcome window's title bar, and the guest pixel the engine received ("hit: down ... ptr=x,y", the trace).
+//    The presses are on the Welcome window's title bar (it is open at the start; the main form is not pressed).
+//    The error is max |received - floor((clientX - canvas left) x dpr)| over the three points and both axes.
+//    pointerSentErrPx: the same error from the page's own record of the presses it sent (app.latency.records: "button L down at screen (x, y)"), which needs no answer from the engine.
+//    It is a supplement: pointerErrPx (the engine's answer) is the acceptance's value.
+//    pointerDiag: the page's input count (__app.inputEvents) and the log's line count before and after the presses, the element under each press, the log's last lines.
+//  - engineFaults: the guest thread failures ("fle thread N failed") in the engine's log before the pointer test. A failed guest thread stops the engine's thread switch (fle_thread_lib.js fail:
+//    nothing is handed over), so the engine answers no press while the page still shows "engine-idle": such a row has no "hit" line (pointerErrPx null). Not retried: one boot per row.
+//  - mainGuiScaling: FL's last registry read of a value whose name has "scaling", "GUI" or "uiscale" (window-api: RegQueryValueExW, from the trace), { found, value, line }; null when FL read none.
+//    The trace of the start-up has no such read (the General settings are read when the settings window opens; #1353).
+//  - debugLog: { captured: false } here. The Debug tab is not reached: the Welcome window closes only by No thanks or Escape, and both trap the engine (HostFilesUnsupported).
+//  - NOT MEASURED here (null): blackShare (the Browser's rectangle is #1355's).
 //  - the room: the calibration. The viewport is set (Emulation.setDeviceMetricsOverride) so that the room is ROOM_CSS (1836 x 1056). The first boot (DPR 1) reads the room the page
 //    used; the viewport is corrected by the difference and booted again (at most three boots; the layout outside the stage is assumed to be a fixed offset, and the boots check it).
 //
@@ -83,8 +97,9 @@ export function parseArgs(argv) {
   return opts;
 }
 
-// the random ratios: a seed (from the system's random bytes on each start unless given), then mulberry32; each value is a multiple of 0.01 in the range
-export function randomDprs(count, [min, max], seedIn = crypto.randomBytes(4).readUInt32BE(0)) {
+// the random ratios: a seed (from the system's random bytes on each start unless given), then mulberry32; each value is a multiple of 0.01 in the range,
+// and is drawn without repeat: not one of the fixed ratios (a repeat would make two rows of one ratio, and the acceptance counts the distinct ratios)
+export function randomDprs(count, [min, max], seedIn = crypto.randomBytes(4).readUInt32BE(0), fixed = []) {
   let s = seedIn >>> 0;
   const next = () => {
     s = (s + 0x6d2b79f5) >>> 0;
@@ -94,8 +109,119 @@ export function randomDprs(count, [min, max], seedIn = crypto.randomBytes(4).rea
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
   const lo = Math.round(min * 100), hi = Math.round(max * 100);
-  const values = Array.from({ length: count }, () => (lo + Math.floor(next() * (hi - lo + 1))) / 100);
+  const pool = [];
+  for (let k = lo; k <= hi; k++) if (!fixed.some((f) => Math.abs(f - k / 100) < 1e-9)) pool.push(k / 100);
+  if (count > pool.length) throw new Error(`--random: ${count} values do not fit in the range ${min}..${max} without the fixed ratios`);
+  const values = Array.from({ length: count }, () => pool.splice(Math.floor(next() * pool.length), 1)[0]);
   return { seed: seedIn >>> 0, values };
+}
+
+// The picture of the guest (deskDumpBase64: RGBA, rows of `stride` bytes) and the analyses of it. Only the picture and the window list are read; nothing is drawn or compared with an expected picture.
+const lumAt = (b, stride, x, y) => { const i = y * stride + 4 * x; return 0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2]; };
+const BRIGHT_LO = 175, BRIGHT_HI = 215;
+
+/** the Tempo box: the longest run of bright interior pixels (the LCD's background) in the top band of the picture, x within [0.2 W, 0.3 W] (at DPR 1 it is guest x 437..490, y 13) */
+export function tempoBox(b, stride, w, h) {
+  const xa = Math.floor(0.2 * w), xb = Math.floor(0.3 * w), yb = Math.floor(0.04 * h);
+  let best = null;
+  for (let y = 0; y < yb; y++) {
+    let run = 0, start = -1;
+    for (let x = xa; x <= xb; x++) {
+      const l = lumAt(b, stride, x, y);
+      if (l >= BRIGHT_LO && l <= BRIGHT_HI) {
+        if (run === 0) start = x;
+        run++;
+        if (best === null || run > best.len) best = { len: run, x0: start, x1: x, y };
+      } else run = 0;
+    }
+  }
+  return best;
+}
+
+/** the 10 % to 90 % width (pixels) of a transition in a profile that runs from the outside (first samples) to the inside (last samples); null when there is no transition */
+export function transitionWidth(prof) {
+  const lo = (prof[0] + prof[1]) / 2, hi = (prof[prof.length - 2] + prof[prof.length - 1]) / 2;
+  if (!(hi - lo >= 40)) return null;
+  const at = (t) => {
+    const v = lo + t * (hi - lo);
+    for (let i = 1; i < prof.length; i++) {
+      const a = prof[i - 1], c = prof[i];
+      if ((a - v) * (c - v) <= 0 && a !== c) return i - 1 + (v - a) / (c - a);
+    }
+    return null;
+  };
+  const p10 = at(0.1), p90 = at(0.9);
+  return p10 === null || p90 === null ? null : Math.abs(p90 - p10);
+}
+
+/** the frame edges of the Tempo box: the widths (median of the horizontal and the vertical ones) of the transitions at its four edges, and the outer box (the frame's top-left) */
+export function tempoEdges(b, stride, box) {
+  const L = (x, y) => lumAt(b, stride, x, y);
+  const row = box.y, xc = box.x0 + 1;
+  let top = row;
+  while (top > 0 && L(xc, top) >= BRIGHT_LO) top--;
+  let bot = row;
+  while (L(xc, bot) >= BRIGHT_LO && bot < box.y + 200) bot++;
+  const yTop = top + 1, yBot = bot - 1;
+  const run = (a, c) => Array.from({ length: Math.abs(c - a) + 1 }, (_, i) => (c >= a ? a + i : a - i));
+  const widths = [
+    transitionWidth(run(box.x0 - 4, box.x0 + 3).map((x) => L(x, row))),
+    transitionWidth(run(box.x1 + 4, box.x1 - 3).map((x) => L(x, row))),
+    transitionWidth(run(yTop - 4, yTop + 3).map((y) => L(xc, y))),
+    transitionWidth(run(yBot + 4, yBot - 3).map((y) => L(xc, y))),
+  ].filter((v) => v !== null);
+  const sorted = widths.slice().sort((p, q) => p - q);
+  const mid = sorted.length === 0 ? null : sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+  return { edgeWidth: mid, frame: { x: box.x0 - 1, y: yTop - 1, x1: box.x1 + 1, y1: yBot + 1 } };
+}
+
+// the DPR 1 boxes of the top bar's other parts (tools/topbar-parts/measure.mjs: box x0, y0, x1, y1 at DPR 1); their places are read from the Tempo box's frame, scaled by the Tempo's width
+const DPR1_TEMPO = { x: 436, y: 8, w: 56, h: 25 };
+const DPR1_PARTS = {
+  'song-position': { x: 500, y: 4, w: 129, h: 33 },
+  'pattern-selector': { x: 592, y: 48, w: 47, h: 28 },
+};
+
+/** the parts' places and centres in guest pixels: the Tempo box is measured in the picture; the others are its DPR 1 offsets scaled by the Tempo's scale */
+export function partPlaces(frame, s) {
+  const place = (p) => {
+    const x = frame.x + (p.x - DPR1_TEMPO.x) * s, y = frame.y + (p.y - DPR1_TEMPO.y) * s, w = p.w * s, h = p.h * s;
+    return { x: Math.round(x), y: Math.round(y), cx: Math.round(x + w / 2), cy: Math.round(y + h / 2), measured: false };
+  };
+  const tw = (frame.x1 - frame.x) * 1, th = (frame.y1 - frame.y);
+  return {
+    tempo: { x: frame.x, y: frame.y, cx: Math.round(frame.x + tw / 2), cy: Math.round(frame.y + th / 2), measured: true },
+    'song-position': place(DPR1_PARTS['song-position']),
+    'pattern-selector': place(DPR1_PARTS['pattern-selector']),
+  };
+}
+
+/** a window of the window table (window table: "lid N at (x, y) WxH ... class \"...\""): { x, y, w, h }, or null when it is not in the list */
+export function windowRect(windows, cls) {
+  for (const l of windows.split('\n')) {
+    const m = /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l);
+    if (m && m[6].includes(`class "${cls}"`)) return { x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]) };
+  }
+  return null;
+}
+
+/** FL's reading of the Main GUI Scaling setting: the last registry read (window-api: RegQueryValueExW) of a value whose name has "scaling", "GUI" or "uiscale" in it: { found, value, line }; null when FL read no such value */
+export function mainGuiScalingRead(lines) {
+  const hits = lines.map(String).filter((l) => /RegQueryValueExW "[^"]*" "[^"]*(scaling|gui|uiscale)[^"]*" -> /i.test(l));
+  if (hits.length === 0) return null;
+  const last = hits[hits.length - 1];
+  const m = /value="([^"]*)"|value=(-?\d+)/.exec(last);
+  return { found: /-> found/.test(last), value: m ? (m[1] ?? m[2]) : null, line: last.replace(/^\[err\] /, '').slice(0, 300) };
+}
+
+/** the pointer's answers of the engine's trace: the guest pixel the engine received (ptr=x,y) for each button-down line, in order (the last ones are the presses of this run: the engine log is a ring) */
+export function pointerDowns(lines) {
+  const out = [];
+  for (const l of lines.map(String)) {
+    const m = /hit: down .* ptr=(-?\d+),(-?\d+)/.exec(l);
+    if (m) out.push({ x: Number(m[1]), y: Number(m[2]) });
+  }
+  return out;
 }
 
 const timed = (p, ms, what) => {
@@ -164,11 +290,47 @@ async function openPage(chrome, dpr, viewport) {
 }
 
 let runNo = 0;
+// the DPR 1 reference of the scale (the calibration boot): the Welcome window's width and the Tempo box's interior width at 96 DPI
+let REF = null;
+
+// one press (move, press, release) at a CSS point; the engine gets the pointer as the page's events say (the pointer path of the page, not the engine's)
+async function cdpPress(S, x, y) {
+  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0, pointerType: 'mouse' });
+  await sleep(60);
+  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+  await sleep(50);
+  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+  await sleep(300);
+}
+
+// the picture measures of one boot: the scale (the Welcome window and the Tempo box against the DPR 1 reference), the frame's edge width, the parts' places
+async function pictureMeasures(ev) {
+  const d = await ev(`window.__app.deskDumpBase64(true)`);
+  const b = Buffer.from(d.base64, 'base64');
+  const stride = b.length / d.height;
+  const box = tempoBox(b, stride, d.width, d.height);
+  const welcome = windowRect(d.windows, 'TWelcomeWizard');
+  const welcomeW = welcome ? welcome.w : null;
+  if (!box) return { welcomeW, welcome, tempo: null, edgeWidth: null, parts: null, scale: null };
+  const edges = tempoEdges(b, stride, box);
+  const tempoLen = box.len;
+  const s = REF && REF.tempoLen ? tempoLen / REF.tempoLen : null;
+  return {
+    welcomeW,
+    welcome,
+    tempo: { len: tempoLen, x0: box.x0, x1: box.x1, y: box.y, frame: edges.frame },
+    edgeWidth: edges.edgeWidth,
+    parts: s === null ? null : partPlaces(edges.frame, s),
+    scale: s,
+  };
+}
 
 // one boot at one ratio. The row's state is the last state the page showed ("engine-idle" when the engine reached its first idle); a stop shows as another state or as no idle within the limit
 async function runOnce(dpr, viewport, port, root, rnd) {
   const out = { dpr, randomDprs: rnd, room: null, state: null, standIn: null, error: null, guest: null, dpi: null, api: null, asked: null,
-    flScalingPercent: null, mainGuiScaling: null, parts: null, canvas: null, display: null, edgeWidth: null, blackShare: null, debugLog: null };
+    flScalingPercent: null, mainGuiScaling: null, parts: null, canvas: null, display: null, edgeWidth: null, blackShare: null,
+    debugLog: { captured: false, lines: 0, method: null, scalingLines: null, why: 'not reached: the Welcome window closes only by No thanks or Escape, and both trap the engine (HostFilesUnsupported) in this build; F10 opens nothing while it is open' },
+    pointerErrPx: null, pointerSentErrPx: null, pointerPoints: null, pointerDiag: null, engineFaults: null, scale: null };
   const profile = path.join(root, `profile-${++runNo}`);
   let chrome = null, cdp = null;
   try {
@@ -195,6 +357,10 @@ async function runOnce(dpr, viewport, port, root, rnd) {
     for (let i = 0; i < SETTLE_S; i++) await sleep(1000);
     const lines = await ev(`(() => { const a = window.__app; return a ? a.engineLog().map((l) => String(l)) : []; })()`);
     out.api = dpiAnswers(lines);
+    out.mainGuiScaling = mainGuiScalingRead(lines);
+    // the engine's faults in its log before the pointer test: a guest thread that fails halts the engine's thread switch (fle_thread_lib.js fail: nothing is handed over), and the page stays "engine-idle"
+    const faults = lines.filter((l) => /fle thread \d+ failed/.test(String(l)));
+    out.engineFaults = { threadFailed: faults.length, first: faults.length ? faults[0].slice(0, 200) : null };
     // the guest reads LOGPIXELSY (90) and not LOGPIXELSX (88) in this build: the X value is taken only when the Y call is absent
     out.dpi = out.api.logpixelsY ?? out.api.logpixelsX;
     const v = await ev(PAGE);
@@ -208,6 +374,46 @@ async function runOnce(dpr, viewport, port, root, rnd) {
     if (!v.canvas || !v.canvasRect) throw new Error('no canvas[data-desk="1"] in the page');
     out.canvas = { w: v.canvas.w, h: v.canvas.h };
     out.display = { w: Math.round(v.canvasRect.w * v.dpr), h: Math.round(v.canvasRect.h * v.dpr) };
+    const pm = await pictureMeasures(ev);
+    out.scale = { welcomeW: pm.welcomeW, tempoLen: pm.tempo ? pm.tempo.len : null, ratio: pm.scale };
+    if (REF && REF.welcomeW && pm.welcomeW) out.flScalingPercent = Math.round((100 * pm.welcomeW) / REF.welcomeW);
+    out.edgeWidth = pm.edgeWidth;
+    out.parts = pm.parts;
+    if (!REF) out.reference = { welcomeW: pm.welcomeW, tempoLen: pm.tempo ? pm.tempo.len : null };
+    if (pm.welcome && REF && REF.welcomeW) {
+      // the pointer: presses on the Welcome window's title bar (three points, guest pixels), then the guest pixel the engine received ("hit: down ... ptr=x,y").
+      // The main form gets no pointer input while this modal window is open (a press on the top bar reaches no engine line), so the presses are inside it.
+      const rect = v.canvasRect;
+      const w = pm.welcome;
+      const ty = w.y + Math.round(15 * (w.w / REF.welcomeW));
+      const points = [0.3, 0.5, 0.7].map((k) => ({ gx: w.x + Math.round(k * w.w), gy: ty }));
+      const expect = [];
+      const at = [];
+      const inputState = `({ inputEvents: window.__app.inputEvents, input: document.getElementById('desktop')?.dataset.input ?? null, state: window.__app.state, lines: window.__app.engineLog().length })`;
+      const before = await ev(inputState);
+      const downsBefore = pointerDowns(await ev(`window.__app.engineLog().map((l) => String(l))`)).length;
+      for (const p of points) {
+        const cx = rect.x + (p.gx + 0.5) / v.dpr, cy = rect.y + (p.gy + 0.5) / v.dpr;
+        expect.push({ client: { x: cx, y: cy }, want: { x: Math.floor((cx - rect.x) * v.dpr), y: Math.floor((cy - rect.y) * v.dpr) } });
+        at.push(await ev(`(() => { const e = document.elementFromPoint(${cx}, ${cy}); return e ? e.tagName + (e.id ? '#' + e.id : '') : null; })()`));
+        await cdpPress(S, cx, cy);
+      }
+      // the engine's log reaches the page through the worker's flush (every 100 ms): the lines of the three presses are waited for, 5 s at most
+      let lines = [];
+      for (let i = 0; i < 10; i++) {
+        lines = await ev(`window.__app.engineLog().map((l) => String(l))`);
+        if (pointerDowns(lines).length >= downsBefore + expect.length) break;
+        await sleep(500);
+      }
+      const got = pointerDowns(lines).slice(downsBefore, downsBefore + expect.length);
+      out.pointerPoints = expect.map((e, i) => ({ want: e.want, got: got[i] ?? null }));
+      out.pointerErrPx = got.length === expect.length ? Math.max(...expect.map((e, i) => Math.max(Math.abs(got[i].x - e.want.x), Math.abs(got[i].y - e.want.y)))) : null;
+      // the page's own record of the presses it sent to the engine (describeRaw: "button L down at screen (x, y)"): the same coordinates, read without the engine's answer
+      const sentDesc = await ev(`window.__app.latency.records.map((r) => r.desc)`);
+      const sent = sentDesc.map((d) => /^button \w+ down at screen \((-?\d+), (-?\d+)\)$/.exec(d)).filter((m) => m !== null).map((m) => ({ x: Number(m[1]), y: Number(m[2]) })).slice(-expect.length);
+      out.pointerSentErrPx = sent.length === expect.length ? Math.max(...expect.map((e, i) => Math.max(Math.abs(sent[i].x - e.want.x), Math.abs(sent[i].y - e.want.y)))) : null;
+      out.pointerDiag = { before, after: await ev(inputState), at, downsBefore, downs: pointerDowns(lines).length, tail: lines.slice(-4).map((l) => String(l).slice(0, 160)) };
+    }
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
   } finally {
@@ -224,7 +430,11 @@ async function calibrate(port, root) {
     const r = await runOnce(1, vp, port, root, null);
     process.stderr.write(`calibrate ${i}: viewport ${vp.w}x${vp.h} gives room ${JSON.stringify(r.room)}${r.error ? ` error ${r.error.slice(0, 300)}` : ''}\n`);
     if (r.error || !r.room) throw new Error(`calibration: ${r.error ?? 'no room'}`);
-    if (Math.abs(r.room.w - ROOM_CSS.w) <= 2 && Math.abs(r.room.h - ROOM_CSS.h) <= 2) return vp;
+    if (Math.abs(r.room.w - ROOM_CSS.w) <= 2 && Math.abs(r.room.h - ROOM_CSS.h) <= 2) {
+      REF = r.reference && r.reference.tempoLen ? r.reference : null;
+      if (!REF) process.stderr.write('calibrate: no Tempo box or Welcome window in the picture: the scale and the parts are null\n');
+      return vp;
+    }
     vp = { w: vp.w + ROOM_CSS.w - r.room.w, h: vp.h + ROOM_CSS.h - r.room.h };
   }
   throw new Error('calibration: the room is not the size asked after three boots');
@@ -257,7 +467,7 @@ async function main() {
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
     const vp = await calibrate(port, root);
-    const rnd = randomDprs(opts.random, opts.range);
+    const rnd = randomDprs(opts.random, opts.range, undefined, opts.dprs);
     for (const dpr of [...opts.dprs, ...rnd.values]) {
       const r = await runOnce(dpr, vp, port, root, rnd);
       if (r.error) failed = true;
