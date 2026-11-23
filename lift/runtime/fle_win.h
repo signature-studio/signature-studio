@@ -419,6 +419,11 @@ void fle_imp_EndDeferWindowPos(void);
 void fle_win_table_report(FILE *f);
 /* C-6 (#1310): the window-API trace. Off until the page turns it on (fle_g3_window_api_trace, harness/fruity_idle.c); then CreateWindowExW (once the window is made), ShowWindow, SetWindowPos and MoveWindow write one line each to stderr. */
 void fle_win_api_trace_set(int on);
+/* C-6 (#1346): the pointer path in the same trace. fle_win_api_trace_on: nonzero while the trace is on. fle_win_trace_wndproc: one wndproc: line for a pointer message (phase "in", "out" with ret, or "def"; nothing for another message).
+ * fle_win_trace_query: one window-api: <name> <argument> -> <result> line. */
+int fle_win_api_trace_on(void);
+void fle_win_trace_wndproc(const char *phase, const char *api, uint64_t h, uint32_t msg, uint64_t wp, uint64_t lp, uint64_t result, int has_result);
+void fle_win_trace_query(const char *name, uint64_t arg, uint64_t result);
 uint32_t fle_win_visible_toplevel_count(void);
 int fle_win_g2_seen(void);
 void fle_win_g2_report(FILE *f);

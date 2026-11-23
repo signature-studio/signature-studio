@@ -160,6 +160,11 @@ const FILES = [
   ok('selectFiles: 選んだ物に .. の段があれば落ちる', verdict([['Artwork\\..\\x', 1]], ['Artwork\\']), 'threw');
   ok('selectFiles: コロンを含む段(絶対パス)は落ちる', verdict([['Artwork\\C:x', 1]], ['Artwork\\']), 'threw');
   ok('selectFiles: 選んでいない物の安全でないパスでは落ちない', verdict([['..\\y', 1], ['Artwork\\a', 2]], ['Artwork\\']), 'accepted');
+  const exactList = [['FL64.exe', 1], ['FL64 (scaled).exe', 2], ['FL64.exe.bak', 3], ['Artwork\\a', 4]];
+  ok('selectExact: 完全なパスだけを、大文字・小文字を区別せず、guest の小文字の順に選ぶ', m.selectExact(exactList, ['fl64.EXE', 'FL64 (scaled).exe']), [{ guest: 'FL64 (scaled).exe', off: 2 }, { guest: 'FL64.exe', off: 1 }]);
+  ok('selectExact: 接頭辞の一致では選ばない(FL64 では何も選ばない)', m.selectExact(exactList, ['FL64']), []);
+  ok('selectExact: 同じ guest は後の物', m.selectExact([['FL64.exe', 1], ['fl64.exe', 2]], ['FL64.exe']), [{ guest: 'fl64.exe', off: 2 }]);
+  ok('selectExact: 指定の無い物は選ばない', m.selectExact(exactList, []), []);
 }
 
 // 2. 合成のインストーラを、道具で読む(CLI)
@@ -203,6 +208,19 @@ try {
   ok('CLI: 一致が無い接頭辞は、接頭辞ごとに警告を出す(2 件)', none.stderr.split('\n').filter((l) => l.includes('警告')).length, 2);
   const bad = spawnSync(process.execPath, [TOOL, path.join(T, 'missing.exe'), path.join(T, 'o4'), 'Artwork\\'], { encoding: 'utf8' });
   ok('CLI: インストーラが無ければ 0 以外で終わる', bad.status !== 0, true);
+  // --file GUEST: インストール先の相対の完全なパス(根の直下の物を選ぶ)。接頭辞の規則(\ で終わる)は変えない
+  const exactOut = path.join(T, 'o5');
+  const exact = spawnSync(process.execPath, [TOOL, inst, exactOut, '--file', 'Program.exe', '--file', 'artwork\\THEMES\\ash.flstheme'], { encoding: 'utf8' });
+  ok('CLI --file: 完全なパス(大文字・小文字を区別しない)を指定すれば終了コード 0', exact.status, 0);
+  const exactListed = fs.readdirSync(exactOut, { recursive: true }).filter((f) => fs.statSync(path.join(exactOut, f)).isFile()).sort();
+  ok('CLI --file: 書かれた物は、指定の完全なパスの物と MANIFEST だけ', exactListed, ['Artwork/Themes/Ash.flstheme', 'MANIFEST.tsv', 'Program.exe']);
+  ok('CLI --file: 中身はインストーラの物と同じ', [fs.readFileSync(path.join(exactOut, 'Program.exe'), 'utf8'), fs.readFileSync(path.join(exactOut, 'Artwork/Themes/Ash.flstheme'), 'utf8')], ['MZ outside', 'theme']);
+  const exactNone = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o6'), '--file', 'Nope.exe'], { encoding: 'utf8' });
+  ok('CLI --file: 一致が無ければ 1 で終わり、何も書かず、警告を 1 件出す', [exactNone.status, fs.existsSync(path.join(T, 'o6')), exactNone.stderr.split('\n').filter((l) => l.includes('警告') && l.includes('Nope.exe')).length], [1, false, 1]);
+  const exactSlash = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o7'), '--file', 'Artwork\\'], { encoding: 'utf8' });
+  ok('CLI --file: 末尾が \\ の物は完全なパスではないので、終了コード 64 で、何も書かない', [exactSlash.status, fs.existsSync(path.join(T, 'o7'))], [64, false]);
+  const exactNoValue = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o8'), '--file'], { encoding: 'utf8' });
+  ok('CLI --file: 値が無ければ、終了コード 64 で、何も書かない', [exactNoValue.status, fs.existsSync(path.join(T, 'o8'))], [64, false]);
 } finally {
   fs.rmSync(T, { recursive: true, force: true });
 }

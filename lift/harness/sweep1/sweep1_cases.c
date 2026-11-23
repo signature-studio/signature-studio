@@ -32,6 +32,7 @@ void fle_win_input_call_hooks(void) {}
 void fle_win_input_hit_list(void) {}
 void fle_win_pointer_get(void) {}
 void fle_win_pointer_set(void) {} void fle_win_host_pointer_set(void) {} void fle_win_pointer_reclamp(void) {}
+int fle_win_api_trace_on(void) { return 0; } void fle_win_trace_wndproc(void) {}   /* C-6 (#1346): the pointer trace of fle_win.c */
 typedef unsigned int UINT, DWORD, BOOL;
 typedef int INT;
 typedef uint16_t WCHAR, WORD;

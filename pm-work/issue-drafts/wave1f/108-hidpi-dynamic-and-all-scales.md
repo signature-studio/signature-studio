@@ -27,6 +27,8 @@ project: signature-studio/3
 - Windows の動的な変化: 拡大率の変更や、別のモニターへの移動で DPI が変わると、DPI 対応のアプリは `WM_DPICHANGED`(提案の矩形つき)を受け取り、窓を提案の大きさに変える。画面の大きさが変わると `WM_DISPLAYCHANGE` が届く。Windows の公式の仕様(DPI の文書)で、この形を確かめる。ただし FL は上の仕様のとおり、拡大率を再起動で適用する。Windows の振る舞いは、FL の仕様より優先しない。
 - Windows の FL の実際の挙動は、この機械では確かめられない。FL の実行ファイルと runtime の実測で分かる範囲を報告し、確認できない部分は「確認できない」と書く。
 - 既存の経路: 画面の大きさの更新は `app/src/main.ts`(`applyScreenParam`・`applyDisplay`・DPR の監視)と `lift/runtime` の `WM_DISPLAYCHANGE` の送り方(`grep -rn WM_DISPLAYCHANGE lift/runtime` で探す)にある。
+- DPI が 240 以上(DPR 2.5 以上)で、FL が起動しない障害(`[js] fle thread 2 failed: RangeError: Maximum call stack size exceeded`)が #{{107}} の試行で見つかった。#{{107}} が直す。この Issue では、DPR 2.5〜3.0 の検証を含む。
+- 起動用の実行ファイルには、通常の起動用(`FL64.exe`)と、Windows が拡大する形の起動用(`FL64 (scaled).exe`)の 2 つがある(推定。マニフェストの違いで確かめる。#{{107}} の「起動用の実行ファイル」の節を参照)。この製品は、通常の起動用(`FL64.exe`)の振る舞いに合わせる。`(scaled)` の方式は、この Issue の範囲外。
 
 ## 読む物
 
@@ -97,5 +99,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 他のタスクとの関係
 
 - blocked_by: #{{107}}(起動時の DPR に対する Windows と同じ Fractional Scaling)。
-- #{{109}}(音が途切れる現象)は、この Issue と並行して進めてよい。ただし、物理画素の画面で測る。
-- 同じ描画の経路を変える #{{040}} と #{{106}} と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- #1349(音が途切れる現象)は、この Issue と並行して進めてよい。ただし、物理画素の画面で測る。
+- 同じ描画の経路を変える #1334 と #1346 と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+

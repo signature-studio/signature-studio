@@ -1685,7 +1685,9 @@ fn the_virtual_pointer_equals_the_clamped_host_point_when_the_guest_never_sets_t
 fn def_window_proc_generates_wm_context_menu_from_right_button_up() {
     // Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
     // WM_RBUTTONUP or WM_NCRBUTTONUP message"; wParam is the handle of the window in which the button was
-    // released (a child forwards to the parent), lParam the cursor position in screen coordinates.
+    // released, lParam the cursor position in screen coordinates. The message goes to that window first (its
+    // own procedure sees it, C-6 #1346); DefWindowProc passes it on: "If a window is a child window,
+    // DefWindowProc sends the message to the parent" (wParam kept). A top-level window passes nothing on.
     let l = lines(
         "fr11-contextmenu",
         r#"
@@ -1700,7 +1702,7 @@ fn def_window_proc_generates_wm_context_menu_from_right_button_up() {
     printf("top ncrbuttonup r %llu ctx %u target %s wparam %s lparam %llx\n", U(r), wp_count[0x007B], last_ctx_target == top ? "top" : "other", last_ctx_wp == top ? "top" : "other", U(last_ctx_lp));
 "#,
     );
-    assert_eq!(l[0], "child rbuttonup r 0 ctx 1 target top wparam kid lparam 1c0010");
+    assert_eq!(l[0], "child rbuttonup r 0 ctx 2 target top wparam kid lparam 1c0010");
     assert_eq!(l[1], "top ncrbuttonup r 0 ctx 1 target top wparam top lparam 28001e");
 }
 
