@@ -88,11 +88,11 @@ fn msgs(name: &str, keep_setcursor: bool) -> Vec<String> {
 }
 
 #[test]
-fn the_scenario_list_has_24_scenarios() {
+fn the_scenario_list_has_26_scenarios() {
     let r = Command::new(scen_exe()).arg("list").output().unwrap();
     let l: Vec<String> = String::from_utf8_lossy(&r.stdout).lines().map(|s| s.to_string()).collect();
-    assert_eq!(l.len(), 24, "{l:?}");
-    for must in ["move", "click", "capture", "track_leave", "track_hover", "track_hover_edge", "key_target", "key_dead_window", "post_dead_window", "token", "cmp_control", "keys", "syskeys", "timer_periodic", "idle_hook"] {
+    assert_eq!(l.len(), 26, "{l:?}");
+    for must in ["move", "coalesce_boundaries", "coalesce_full", "click", "capture", "track_leave", "track_hover", "track_hover_edge", "key_target", "key_dead_window", "post_dead_window", "token", "cmp_control", "keys", "syskeys", "timer_periodic", "idle_hook"] {
         assert!(l.iter().any(|x| x == must), "{must}");
     }
 }
@@ -124,7 +124,20 @@ fn a_move_is_a_hit_test_then_wm_setcursor_then_wm_mousemove_in_client_coordinate
 fn consecutive_moves_are_one_wm_mousemove_at_the_last_point_and_getcursorpos_has_it() {
     // S-mousemove-coalesce (a choice: Windows combines consecutive moves; the pages read do not say how)
     let o = msgs("coalesce", false);
-    assert_eq!(o, ["  A msg 84 NCHITTEST x 320 y 270", "  A msg 200 wp 0 x 220 y 170", "pump 1", "cursor 320 270"]);
+    assert_eq!(o, ["move injections accepted 1 1 1", "pending before pump 1", "  A msg 84 NCHITTEST x 320 y 270", "  A msg 200 wp 0 x 220 y 170", "pump 1", "cursor 320 270"]);
+}
+
+#[test]
+fn a_move_replaces_only_a_pending_tail_move_and_never_crosses_button_wheel_or_key_events() {
+    let o = run("coalesce_boundaries");
+    assert!(o.iter().any(|l| l == "pending across button/wheel/key boundaries 7"), "{o:?}");
+}
+
+#[test]
+fn a_pending_move_can_be_replaced_when_the_event_queue_is_full_without_losing_the_new_input() {
+    let o = run("coalesce_full");
+    assert!(o.iter().any(|l| l == "full queue: wheels 511 initial move 1 replacement 1 button 0 pending 512"), "{o:?}");
+    assert!(o.iter().any(|l| l == "cursor after full-queue replacement 320 270"), "{o:?}");
 }
 
 #[test]

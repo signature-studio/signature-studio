@@ -221,14 +221,48 @@ static void sc_move(void)
 }
 static void sc_coalesce(void)
 {
+    int a, b, c;
+
     world();
-    fle_input_host_mouse(FLE_IN_MOVE, 300, 250, 0);
-    fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
-    fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
+    a = fle_input_host_mouse(FLE_IN_MOVE, 300, 250, 0);
+    b = fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
+    c = fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
+    printf("move injections accepted %d %d %d\n", a, b, c);
+    printf("pending before pump %u\n", fle_input_host_pending());
     printf("pump %d\n", pump());
     uint64_t p = A(&stk[0x100]);
     CALL4(fle_imp_GetCursorPos, p, 0, 0, 0);
     printf("cursor %u %u\n", (unsigned)fle_ld(p, 4), (unsigned)fle_ld(p + 4, 4));
+}
+static void sc_coalesce_boundaries(void)
+{
+    world();
+    fle_input_host_mouse(FLE_IN_MOVE, 300, 250, 0);
+    fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
+    fle_input_host_mouse(FLE_IN_BDOWN, 310, 260, FLE_IN_BTN_L);
+    fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
+    fle_input_host_mouse(FLE_IN_WHEEL, 320, 270, 120);
+    fle_input_host_mouse(FLE_IN_MOVE, 330, 280, 0);
+    fle_input_host_key(FLE_IN_KDOWN, 0x41, 0, 0);
+    fle_input_host_mouse(FLE_IN_MOVE, 340, 290, 0);
+    printf("pending across button/wheel/key boundaries %u\n", fle_input_host_pending());
+}
+static void sc_coalesce_full(void)
+{
+    unsigned i, wheels = 0;
+    uint64_t p = A(&stk[0x100]);
+
+    world();
+    for (i = 0; i < 511; i++) wheels += (unsigned)fle_input_host_mouse(FLE_IN_WHEEL, 300, 250, 120);
+    i = (unsigned)fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
+    {
+        unsigned replaced = (unsigned)fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
+        unsigned button = (unsigned)fle_input_host_mouse(FLE_IN_BDOWN, 320, 270, FLE_IN_BTN_L);
+
+        printf("full queue: wheels %u initial move %u replacement %u button %u pending %u\n", wheels, i, replaced, button, fle_input_host_pending());
+    }
+    CALL4(fle_imp_GetCursorPos, p, 0, 0, 0);
+    printf("cursor after full-queue replacement %u %u\n", (unsigned)fle_ld(p, 4), (unsigned)fle_ld(p + 4, 4));
 }
 static void sc_click(void)
 {
@@ -665,7 +699,7 @@ static void sc_idle_hook(void)
 
 typedef struct { const char *name; void (*fn)(void); int idle; } scenario;
 static const scenario S[] = {
-    { "move", sc_move, 0 }, { "coalesce", sc_coalesce, 0 }, { "click", sc_click, 0 }, { "capture", sc_capture, 0 }, { "disabled", sc_disabled, 0 }, { "dblclk", sc_dblclk, 0 },
+    { "move", sc_move, 0 }, { "coalesce", sc_coalesce, 0 }, { "coalesce_boundaries", sc_coalesce_boundaries, 0 }, { "coalesce_full", sc_coalesce_full, 0 }, { "click", sc_click, 0 }, { "capture", sc_capture, 0 }, { "disabled", sc_disabled, 0 }, { "dblclk", sc_dblclk, 0 },
     { "hit_transparent", sc_hit_transparent, 0 }, { "mouseactivate", sc_mouseactivate, 0 }, { "mouseactivate_no", sc_mouseactivate_no, 0 },
     { "track_leave", sc_track_leave, 0 }, { "track_hover", sc_track_hover, 0 }, { "track_hover_edge", sc_track_hover_edge, 0 }, { "key_target", sc_key_target, 0 }, { "key_dead_window", sc_key_dead_window, 0 }, { "post_dead_window", sc_post_dead_window, 0 }, { "token", sc_token, 0 }, { "cmp_control", sc_cmp_control, 0 }, { "track_cancel", sc_track_cancel, 0 },
     { "keys", sc_keys, 0 }, { "syskeys", sc_syskeys, 0 }, { "keystate", sc_keystate, 0 }, { "msgpos", sc_msgpos, 0 },
