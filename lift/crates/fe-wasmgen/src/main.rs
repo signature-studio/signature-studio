@@ -27,7 +27,7 @@ fn compile_cli(args: &[String]) -> ExitCode {
     if args.len() < 3 {
         return usage();
     }
-    let mut conf = fe_wasmgen::Config::default();
+    let mut conf = fe_wasmgen::Config { names: true, ..fe_wasmgen::Config::default() };
     let mut pdata = false;
     let mut seeds_file: Option<String> = None;
     let mut rel_sites: Option<String> = None;

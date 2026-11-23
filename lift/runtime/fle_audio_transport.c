@@ -22,9 +22,9 @@ EM_JS(int, fle_js_init, (void), {
   const g = globalThis.fleAudioSab;
   if (!g) { globalThis.__fleAud = null; return 0; }
   const A = { h: new Int32Array(g.sab, 0, 32), d: new Float32Array(g.sab, g.dataOffset, g.cap * 2), cap: g.cap, mask: g.cap - 1, rdHi: 0, rdPrev: 0, wr: 0, unlocks: [], publishes: 0, skipped: 0, gapFrames: 0,
-    resolve: null, timer: 0, waits: 0, maxWaitDrift: 0 };
+    resolve: null, timer: 0, waits: 0, maxWaitDrift: 0, lastPub: 0, maxPubGap: 0, rdPub: 0, runPub: false };
   globalThis.__fleAud = A;
-  globalThis.fleAudioWorkerState = () => ({ unlocks: A.unlocks, waits: A.waits, publishes: A.publishes, skipped: A.skipped, gapFrames: A.gapFrames, maxWaitDrift: A.maxWaitDrift });
+  globalThis.fleAudioWorkerState = () => ({ unlocks: A.unlocks, waits: A.waits, publishes: A.publishes, skipped: A.skipped, gapFrames: A.gapFrames, maxWaitDrift: A.maxWaitDrift, maxPubGapMs: A.maxPubGap });
   globalThis.fleAudioRewrite = () => {
     const f = Module['_fle_audio_rewrite_stat'] || (typeof wasmExports !== 'undefined' && wasmExports['fle_audio_rewrite_stat']);
     const names = ['events', 'applied', 'lost'];
@@ -50,7 +50,8 @@ EM_JS(double, fle_js_consumed, (void), {
   A.rdPrev = lo;
   return A.rdHi + lo;
 });
-/* n stereo float frames at p (linear memory) to the ring at index `first`: silence for a gap since the last publish, nothing for frames the output has already passed; then WR */
+/* n stereo float frames at p (linear memory) to the ring at index `first`: silence for a gap since the last publish, nothing for frames the output has already passed; then WR.
+ * maxPubGap (fleAudioWorkerState): the longest interval between two publishes, counted only when the output read frames in both intervals (RD moved since the publish before each): a publish that the output did not need (no consumer yet) is not a stall. */
 EM_JS(void, fle_js_publish, (const float *p, unsigned n, double first, unsigned rate), {
   const A = globalThis.__fleAud;
   if (!A) return;
@@ -70,6 +71,9 @@ EM_JS(void, fle_js_publish, (const float *p, unsigned n, double first, unsigned 
   Atomics.store(A.h, 1, A.wr | 0);
   A.publishes++;
   Atomics.add(A.h, 14, 1); Atomics.add(A.h, 15, n - k0);
+  const now = performance.now(), rdNow = A.rdHi + (Atomics.load(A.h, 0) >>> 0), running = rdNow > A.rdPub;
+  if (A.lastPub > 0 && running && A.runPub && now - A.lastPub > A.maxPubGap) A.maxPubGap = now - A.lastPub;
+  A.runPub = running; A.rdPub = rdNow; A.lastPub = now;
 });
 /* n stereo float frames at p to the ring at index `first`, only the ones the output has not read yet and that are at least `guard` frames ahead of its read position and before the last published frame (WR): a late write of the guest
  * reaches the output if it comes in time. It changes neither WR nor the counters of the page. */

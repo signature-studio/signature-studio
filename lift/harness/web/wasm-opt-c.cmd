@@ -1,4 +1,5 @@
 -Oz
+-g
 --enable-bulk-memory
 --enable-exception-handling
 --enable-sign-ext
