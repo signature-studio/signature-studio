@@ -1,6 +1,6 @@
 # #1355 WebView2 の呼び出しの記録(FL が WebView2 に渡す内容)
 
-実エンジン: この runner で `fe-build engine`・`fe-build bundle` を作り、`tools/boot-check/boot-bundle.mjs`・`tools/browser-panel/measure.mjs`・`tools/smoke/welcome-flow.mjs`・`tools/browser-panel/probe-navigate.mjs` を走らせ、エンジンのログ(`window.__app.engineLog()`)の `webview2:` 行と、窓の操作の結果を観測した。ビルドは 5 回(履歴は「8」)。
+実エンジン: この runner で `fe-build engine`・`fe-build bundle` を作り、`tools/boot-check/boot-bundle.mjs`・`tools/browser-panel/measure.mjs`・`tools/smoke/welcome-flow.mjs`・`tools/browser-panel/probe-navigate.mjs` を走らせ、エンジンのログ(`window.__app.engineLog()`)の `webview2:` 行と、窓の操作の結果を観測した。ビルドは 6 回(最後の 1 回は、受け入れのコマンドを commit した版でそのまま通したもの。履歴は「8」)。受け入れのコマンドは `ACCEPT_RC=0` で通った。
 
 runner の値(この機械とは別枠。nproc 4。loadavg は測定の終わりに出た値)。
 
@@ -8,11 +8,11 @@ runner の値(この機械とは別枠。nproc 4。loadavg は測定の終わり
 
 | 項目 | 結果 | 出力 |
 | --- | --- | --- |
-| 起動(boot-bundle) | 受理 | `state` engine-idle・`error` null・`standIn` false・`elapsedMs` 9143 |
+| 起動(boot-bundle) | 受理 | `state` engine-idle・`error` null・`standIn` false・`elapsedMs` 9203 |
 | `webview2Lines` ≥ 10 | 受理 | 3 回とも 63 |
 | `webview2Methods` に `CreateCoreWebView2EnvironmentWithOptions` | 受理 | 3 回とも在る |
 | `webview2Fired` に `NavigationCompleted` | 受理 | `["NavigationStarting","SourceChanged","ContentLoading","NavigationCompleted"]` |
-| `elapsedMs` の最大 ≤ 12500 | 受理 | 8678・8691・8759 |
+| `elapsedMs` の最大 ≤ 12500 | 受理 | 9064・9034・9034(最終の版。同じ内容の前の版では 8678〜8759) |
 | 本ファイルが在る | 受理 | (このファイル) |
 | 流れ A(welcome-flow) | 受理 | A・B・C・D の全て `error` null・`engine-idle`・`trapped` false・`hostErrors` 0・`opened` true |
 | `npm test --prefix app` | 受理 | Test Files 68 passed・1 skipped。Tests 1335 passed・10 skipped |
@@ -23,11 +23,11 @@ runner の値(この機械とは別枠。nproc 4。loadavg は測定の終わり
 
 | 回 | state | error | standIn | blackShare | browserComponents | elapsedMs | webview2Lines | navigateCalls |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | engine-idle | null | false | 0.9291581108829569 | 1 | 8678 | 63 | 0 |
-| 2 | engine-idle | null | false | 0.9291581108829569 | 1 | 8691 | 63 | 0 |
-| 3 | engine-idle | null | false | 0.9291581108829569 | 1 | 8759 | 63 | 0 |
+| 1 | engine-idle | null | false | 0.9291581108829569 | 1 | 9064 | 63 | 0 |
+| 2 | engine-idle | null | false | 0.9291581108829569 | 1 | 9034 | 63 | 0 |
+| 3 | engine-idle | null | false | 0.9291581108829569 | 1 | 9034 | 63 | 0 |
 
-基準(変更の前): elapsedMs 7751。今回は絶対値で判定する(基準の相対値は使わない)。
+基準(変更の前): elapsedMs 7751。今回は絶対値で判定する(基準の相対値は使わない)。同じ内容の前の版の 3 回は 8678・8691・8759 ms。nproc 4、loadavg は 2.26 1.76 1.98 など(測定の標準エラーの値)。
 
 ## 2. 呼び出しの順序(起動。先頭 50 行。全 63 行のうち)
 
@@ -168,7 +168,8 @@ fle: indirect call: the window procedure 0x15979340 lies in a page of a VirtualA
 2. ヘッダーの `get_RequestHeaders` を `S_OK` にした版: `GetIterator` が `E_NOTIMPL` → 止まる。
 3. 反復子(空)を足した版: `get_Source` の文字列を `malloc` で作っていた → FL の `CoTaskMemFree` が「ランタイムの割り当てではない」と止める(`exited`)。
 4. 文字列を `CoTaskMemAlloc`(`fle_ole.c` の stub)で作る版: 起動は `engine-idle`。
-5. 最終版(`Navigate`・`NavigateToString` の後はイベントを返さない): 起動は `engine-idle`。測定 3 回と流れ A〜D は、この版で採った。
+5. `Navigate`・`NavigateToString` の後はイベントを返さない版: 起動は `engine-idle`。測定 3 回と流れ A〜D は、この版で採った。
+6. 同じ版を、受け入れのコマンドそのもので作り直して通した(コメントだけの変更の後。`ACCEPT_RC=0`)。この最後の実行の測定が上の 1 の 9064・9034・9034 ms。
 
 (途中で `fe-build engine` が、既存の `lift/out-app/b2d-src` で失敗した回が 1 回ある。その時は古いエンジンで bundle を作ったので、その回の起動の結果は採らない。)
 
