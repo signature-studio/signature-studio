@@ -65,10 +65,11 @@
  * Decision 0126 wall 86 (PROVISIONAL, S-webview2-absent, a CHOICE WITHOUT A SOURCE): "webview2loader.dll" is added. FLEngine's f_be3520 calls LoadLibraryW(L"WebView2Loader.dll") and returns 0 when it gets NULL
  * (docs/investigations/loadlibrary-names-classification.md #22: "NULL を許容"); the installer ships the DLL (bundled-dll-inventory.md) but the virtual file system holds no module file for it, so "the search ends without a
  * module" (case 2): the alternative is to load it and answer CreateCoreWebView2Environment and the WebView2 COM interfaces, a COM / network model ((d') of decision 0126). The claim "this machine does not find
- * WebView2Loader.dll" differs from a real installation (where the loader is in the application directory). Withdrawn when a module lane (M2) loads the product's DLLs or a WebView2 model exists.) */
+ * WebView2Loader.dll" differs from a real installation (where the loader is in the application directory). Withdrawn when a module lane (M2) loads the product's DLLs or a WebView2 model exists.
+ * Issue #1355 withdrew it: webview2loader.dll is a virtual module now (fle_modules.c, N = 42), and its exports are modelled by fle_webview2.c (the record of what FLEngine hands to WebView2).) */
 static const char *const fle_load_absent[] = {
     "imm32.dll", "msimg32.dll", "propsys.dll",
-    "windowscodecs.dll", "webview2loader.dll",
+    "windowscodecs.dll",
 };
 #define LOAD_ABSENT_N (sizeof fle_load_absent / sizeof fle_load_absent[0])
 
