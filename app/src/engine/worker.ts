@@ -28,6 +28,8 @@ const mark = (name: string, detail?: Record<string, unknown>): void => post({ t:
 
 /** Issue #1314: how long a read of a lazy file waits for its bytes before it fails (lazy-file.ts) */
 const LAZY_TIMEOUT_MS = 120000;
+/** Issue #1341: the engine's line for the read of a real module's image (harness/two/main_two.c): the file name and whether the guest asked for it */
+const IMAGE_READ = /^image-read: (.+) requested=([01]) /;
 let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
 const reports = new ReportThrottle();
@@ -83,7 +85,11 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   const host: FruityHost = {
     mark,
     stdout: (line) => pushLog('out', line),
-    stderr: (line) => pushLog('err', line),
+    stderr: (line) => {
+      pushLog('err', line);
+      const r = IMAGE_READ.exec(line);   // Issue #1341: the read of a real module's image, with the page's time (the line's own clock is the engine's)
+      if (r) mark('image_read', { name: r[1], requested: r[2] === '1' });
+    },
     log,
     idle: onEngineIdle,
     fileDlg: (id, request) => { mark('filedlg_request', { id }); post({ t: 'filedlg-request', id, request: request as FileDlgRequest }); },

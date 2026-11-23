@@ -1,7 +1,8 @@
 // Delivery split of the start-up (Issue #1314): what the page downloads before the engine starts (the manifest's pre-start assets) and what it downloads after it has started (manifest.lazy),
 // and when the engine is idle. One run = one headless Chrome with a new profile, the same launch as tools/boot-check/boot-bundle.mjs, until the engine is idle (or an error / exit).
 // Usage: node tools/delivery-split/measure.mjs <absolute path to the bundle directory raw/<name>> [runs, 1..5, default 3] > delivery.jsonl
-// stdout: one JSON object per run, on its own line: {"state","standIn","error","elapsedMs","preStart":[{"name","bytes"}],"lazy":[{"name","bytes"}],"preStartDoneMs","lazyStartMs","lazyDoneMs","lazyWaitFirstMs","lazyWaitLast","fetches":[{"name","startMs","endMs"}]}
+// stdout: one JSON object per run, on its own line: {"state","standIn","error","elapsedMs","preStart":[{"name","bytes"}],"lazy":[{"name","bytes"}],"preStartDoneMs","lazyStartMs","lazyDoneMs","lazyWaitFirstMs","lazyWaitLast","fetches":[{"name","startMs","endMs"}],"reads":[{"name","atMs","requested"}]}
+//   reads (Issue #1341): the engine's reads of a real module's image, from its line `image-read: <file name> requested=<0|1> <ms>` (the page takes the time of the line: atMs, ms since the navigation, the clock of elapsedMs; requested true when the guest asked for the module). Always an array; [] when the engine read none.
 //   lazyWaitFirstMs: the time of the first read of a lazy file that had to wait for its bytes (the page mark lazy_wait, ms since the navigation); lazyWaitLast: the last such read (its path and ms). null: no read waited.
 //   state: the page's state at the end ('engine-idle' is the good one); standIn: whether the text "STAND-IN" is in the page body (a reading, as in boot-bundle.mjs); error: null, or what failed.
 //   preStart / lazy: the manifest's assets, `bytes` = the decoded size (what the page counts). preStartDoneMs: the page's timeline mark download_done (ms since the navigation started).
@@ -57,6 +58,7 @@ const SNAPSHOT = `(() => { const a = window.__app ?? null; return {
   error: a && a.error ? a.error : null,
   standIn: document.body.innerText.includes('STAND-IN'),
   resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name, startTime: e.startTime, responseEnd: e.responseEnd })),
+  imageReads: a ? a.imageReads : [],
 }; })()`;
 
 const timed = (p, ms, what) => {
@@ -100,7 +102,7 @@ function fetchesOf(resources, byUrl) {
 
 async function measureOnce(port) {
   const t0 = Date.now();
-  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [] };
+  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [] };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-delivery-run-'));
   let chrome = null, cdp = null;
   try {
@@ -140,6 +142,7 @@ async function measureOnce(port) {
     out.lazyWaitLast = snap?.details?.lazy_wait ?? null;
     out.elapsedMs = num(tl.idle);
     out.fetches = fetchesOf(snap?.resources ?? [], a.byUrl);
+    out.reads = (snap?.imageReads ?? []).map((r) => ({ name: r.name, atMs: num(r.atMs), requested: r.requested === true }));
     if (!snap) out.error = `window.__app not readable within ${WAIT_LIMIT_MS} ms`;
     else if (snap.error) out.error = `${snap.error.what} [${snap.error.where}]`;
     else if (snap.state !== 'engine-idle') out.error = `state ${snap.state} at the end (no engine-idle within ${WAIT_LIMIT_MS} ms)`;

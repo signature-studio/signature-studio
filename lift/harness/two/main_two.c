@@ -3,11 +3,14 @@
  * are not changed). It maps FLEngine_x64.dll at its ImageBase and the rebased real module (a file made by `fe-pe rebase`, at the
  * base that the link names in fle_realmod_table) at that base, then calls the DllMain-equivalent entry of FLEngine as the
  * single-module harness does. Loading the real module is done by the guest's own LoadLibraryW (fle_realmod.c).
+ * Issue #1341: a real module's file is not read at start. It is matched to its table entry by name here, and its image is read and mapped when the guest first asks for the module (fle_realmod_map_image).
  * Usage: main_two <FLEngine dll> <real module file>[:<real module file>...] [entry_va_hex] */
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifndef __EMSCRIPTEN__
 #include <sys/mman.h>
 #include <sys/resource.h>
@@ -45,22 +48,82 @@ static void (*find_fn(uint64_t va))(void) {
 
 /* Decision 0183 (wrp1, PROVISIONAL): a hook that the link supplies (harness/two/wrp1_vst3.c, linked into every engine build by Issue #1326): called after a real module is mapped, with its base and size. */
 void wrp1_after_image_load(uint64_t base, uint64_t size) __attribute__((weak));
+/* fruity.c (FLE_FRUITY builds, fruity.h) registers an image for the FRUITY harness; a weak reference keeps the other builds linking */
+void fruity_add_image(uint64_t base, uint64_t size) __attribute__((weak));
+
+/* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
+ * MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
+ * holds are stopped by the runtime (fle_realmod.c table_check, by name), not by a second limit here. */
+enum { MAIN_REAL_MAX = 32 };
+static char *rpath[MAIN_REAL_MAX];
+static int rm_file_of[MAIN_REAL_MAX];   /* #1341: the file (index into rpath) of each table entry, -1 when none */
+static struct timespec t_start;
+
+static double ms_since_start(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (double)(t.tv_sec - t_start.tv_sec) * 1000.0 + (double)(t.tv_nsec - t_start.tv_nsec) / 1e6;
+}
+
+/* #1341: the name fle_realmod_table gives a real module, from its file name "<stem>.<base hex>.dll" (fe-lift writes a rebased file so, decision 0080 D1): the stem in lower case and ".dll",
+ * so "fruity_balance_x64.6800000.dll" is "fruity_balance_x64.dll". Returns 0, or -1 when the file name has no base suffix. */
+static int rm_table_name(const char *path, char *out, size_t n) {
+    const char *base = strrchr(path, '/'), *ext, *p;
+    size_t len, i, stem;
+    base = base ? base + 1 : path;
+    len = strlen(base);
+    if (len < 5 || strcmp(base + len - 4, ".dll") != 0) return -1;
+    ext = base + len - 4;
+    for (p = ext; p > base && p[-1] != '.'; p--) {}
+    if (p == base || p - 1 == base) return -1;
+    for (i = 0; p + i < ext; i++)
+        if (!isxdigit((unsigned char)p[i])) return -1;
+    if (i == 0) return -1;
+    stem = (size_t)(p - 1 - base);
+    if (stem + 5 > n) return -1;
+    for (i = 0; i < stem; i++) out[i] = (char)tolower((unsigned char)base[i]);
+    memcpy(out + stem, ".dll", 5);
+    return 0;
+}
+
+/* #1341: fle_realmod.c calls this when the guest first asks for real module idx (LoadLibrary*), before the module's headers are read. The file is read now: the whole PE image is mapped
+ * at its base, and the read is logged on stderr (image-read: <file name> requested=1 <ms since the start of main>). A file that cannot be mapped, or whose ImageBase is not the table's base,
+ * stops the run by name; no empty image is made. requested is 1 because the only caller is the guest's request. */
+void fle_realmod_map_image(const char *api, int idx) {
+    const char *path = rpath[rm_file_of[idx]];
+    const char *name = strrchr(path, '/');
+    harness_image rimg;
+    char err[256], why[384];
+    name = name ? name + 1 : path;
+    fprintf(stderr, "image-read: %s requested=1 %.1f\n", name, ms_since_start());
+    if (image_load(path, &rimg, err, sizeof err) != 0) {
+        snprintf(why, sizeof why, "real module \"%s\": the file %s could not be mapped: %s", fle_realmod_table[idx].name, path, err);
+        fle_stop(api, why);
+    }
+    if (rimg.base != fle_realmod_table[idx].base) {
+        snprintf(why, sizeof why, "real module \"%s\": the file %s is mapped at %#llx, the table gives %#llx", fle_realmod_table[idx].name, path,
+                 (unsigned long long)rimg.base, (unsigned long long)fle_realmod_table[idx].base);
+        fle_stop(api, why);
+    }
+    printf("real module image: base=%#llx size=%#llx entry=%#llx imports(cumulative)=%zu exports(cumulative)=%zu\n",
+           (unsigned long long)rimg.base, (unsigned long long)rimg.size,
+           (unsigned long long)rimg.entry, rimg.nimports, rimg.nexports);
+    printf("real module table: name=%s base=%#llx\n", fle_realmod_table[idx].name, (unsigned long long)fle_realmod_table[idx].base);
+    if (fruity_add_image) fruity_add_image(rimg.base, rimg.size);
+    fle_vmap_register_image(rimg.base); /* decision 0123 */
+    if (wrp1_after_image_load) wrp1_after_image_load(rimg.base, rimg.size); /* decision 0183 (harness/two/wrp1_vst3.c; for a module that is not at WRP1_VST3_BASE it does nothing) */
+}
 
 int main(int argc, char **argv) {
     const char *path = argc > 1 ? argv[1] : "FLEngine_x64.dll";
     const char *real = argc > 2 ? argv[2] : NULL;
-    harness_image img, rimg;
+    harness_image img;
     char err[256];
     uint64_t entry;
     void (*fn)(void);
     uint8_t *stk;
-    /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
-     * MAIN_REAL_MAX only sizes this array. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
-     * holds are mapped and then stopped by the runtime (fle_realmod.c table_check, by name), not by a second limit here. */
-    enum { MAIN_REAL_MAX = 32 };
-    char *rpath[MAIN_REAL_MAX], *rcopy = NULL;
+    char *rcopy = NULL;
     int nreal = 0;
-    uint64_t span_lo = 0, span_hi = 0;
 #ifdef FLE_FRUITY
     uint64_t fruity_sp = 0;
 #endif
@@ -100,6 +163,7 @@ int main(int argc, char **argv) {
         }
     }
 #endif
+    clock_gettime(CLOCK_MONOTONIC, &t_start);
     trace_init();
     if (image_load(path, &img, err, sizeof err) != 0) {
         fprintf(stderr, "image: %s\n", err);
@@ -110,53 +174,41 @@ int main(int argc, char **argv) {
 #ifdef FLE_FRUITY
     fruity_add_image(img.base, img.size);
 #endif
-    span_lo = img.base;
-    span_hi = img.base + img.size;
     printf("image: base=%#llx size=%#llx entry=%#llx imports=%zu exports=%zu\n",
            (unsigned long long)img.base, (unsigned long long)img.size,
            (unsigned long long)img.entry, img.nimports, img.nexports);
 
+    /* #1341: no real module file is read here. Each file is matched to its table entry by name (rm_table_name); the image is mapped when the guest asks for it (fle_realmod_map_image). */
+    if (fle_realmod_count > MAIN_REAL_MAX) {
+        fprintf(stderr, "fle_realmod_table has %llu entries (at most %d are matched)\n", (unsigned long long)fle_realmod_count, MAIN_REAL_MAX);
+        return 2;
+    }
+    for (uint64_t i = 0; i < fle_realmod_count; i++) rm_file_of[i] = -1;
     for (int k = 0; k < nreal; k++) {
-        if (image_load(rpath[k], &rimg, err, sizeof err) != 0) {
-            fprintf(stderr, "real module image: %s (%s)\n", err, rpath[k]);
+        char want[64];
+        int idx = -1;
+        if (rm_table_name(rpath[k], want, sizeof want) != 0) {
+            fprintf(stderr, "the real module file %s has no base suffix (<name>.<base hex>.dll)\n", rpath[k]);
             return 2;
         }
-        printf("real module image: base=%#llx size=%#llx entry=%#llx imports(cumulative)=%zu exports(cumulative)=%zu\n",
-               (unsigned long long)rimg.base, (unsigned long long)rimg.size,
-               (unsigned long long)rimg.entry, rimg.nimports, rimg.nexports);
-#ifdef FLE_FRUITY
-        fruity_add_image(rimg.base, rimg.size);
-#endif
-        fle_vmap_register_image(rimg.base); /* decision 0123 */
-        if (wrp1_after_image_load) wrp1_after_image_load(rimg.base, rimg.size); /* decision 0183 (harness/two/wrp1_vst3.c; for a module that is not at WRP1_VST3_BASE it does nothing) */
-        if (rimg.base < span_lo) span_lo = rimg.base;
-        if (rimg.base + rimg.size > span_hi) span_hi = rimg.base + rimg.size;
-        {
-            int ok = 0;
-            for (uint64_t i = 0; i < fle_realmod_count; i++) {
-                if (fle_realmod_table[i].base == rimg.base) {
-                    ok = 1;
-                    printf("real module table: name=%s base=%#llx\n", fle_realmod_table[i].name,
-                           (unsigned long long)fle_realmod_table[i].base);
-                }
-            }
-            if (!ok) {
-                fprintf(stderr, "the file %s is mapped at %#llx, which no entry of fle_realmod_table names\n", rpath[k],
-                        (unsigned long long)rimg.base);
-                return 2;
-            }
-        }
-    }
-    {
-        /* every table entry must have been mapped (fle_realmod.c would otherwise stop at the first LoadLibrary of it) */
-        if (fle_realmod_count != (uint64_t)nreal) {
-            fprintf(stderr, "fle_realmod_table has %llu entries and %d real module files were mapped\n",
-                    (unsigned long long)fle_realmod_count, nreal);
+        for (uint64_t i = 0; i < fle_realmod_count; i++)
+            if (strcmp(fle_realmod_table[i].name, want) == 0) idx = (int)i;
+        if (idx < 0) {
+            fprintf(stderr, "the file %s (name %s) names no entry of fle_realmod_table\n", rpath[k], want);
             return 2;
         }
+        if (rm_file_of[idx] >= 0) {
+            fprintf(stderr, "the files %s and %s name the same real module %s\n", rpath[rm_file_of[idx]], rpath[k], want);
+            return 2;
+        }
+        rm_file_of[idx] = k;
     }
-    (void)span_lo;
-    (void)span_hi;
+    /* every table entry must have a file (fle_realmod.c would otherwise stop at the first LoadLibrary of it) */
+    if (fle_realmod_count != (uint64_t)nreal) {
+        fprintf(stderr, "fle_realmod_table has %llu entries and %d real module files were given\n",
+                (unsigned long long)fle_realmod_count, nreal);
+        return 2;
+    }
 
     entry = argc > 3 ? strtoull(argv[3], NULL, 0) : img.entry;
     fn = find_fn(entry);

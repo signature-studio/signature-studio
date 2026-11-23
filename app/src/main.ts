@@ -67,6 +67,8 @@ interface AppApi {
   assetsReport(): AssetsReport | null;
   /** Issue #1314: the lazy files (manifest.lazy) as their downloads ended, in the order they ended: verified or failed (empty until the first one ends) */
   lazy: LazyResult[];
+  /** Issue #1341: the engine's reads of a real module's image (its line image-read: on the engine's stderr), in the order they happened: the file name, whether the guest asked for it, and the time (ms since the navigation) */
+  imageReads: { name: string; requested: boolean; atMs: number }[];
   /** what the engine's printed lines say (stop message, windows, threads, surface reports); filled when the engine has exited */
   summary: EngineLogSummary | null;
   engineLog(): string[];
@@ -166,7 +168,7 @@ let endRequested = false;
 
 const app: AppApi = {
   assetsReport: () => assetsNow(),
-  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
@@ -569,6 +571,7 @@ const client = new EngineClient({
   },
   log: addLog,
   mark(name, at, detail) {
+    if (name === 'image_read') { app.imageReads.push({ name: String(detail?.name), requested: detail?.requested === true, atMs: at }); return; }   // Issue #1341
     stamp(name, at);
     if (detail) app.details[name] = detail;
     if (name === 'first_pixel') { if (stateAfterFirstPixel(app.state) === 'running') setState('running', 'running · first pixel'); addLog('info', `first pixel at ${(at / 1000).toFixed(1)} s`); }
