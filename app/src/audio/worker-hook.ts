@@ -15,8 +15,6 @@ const scope = globalThis as unknown as WorkerScope;
 export interface AudioInitMessage { cmd: 'audio-init'; sab: SharedArrayBuffer; cap: number; dataOffset: number; reportMs?: number }
 
 let timer: ReturnType<typeof setInterval> | null = null;
-let sentUnlocks = 0;
-
 export function onAudioMessage(m: unknown, s: WorkerScope = scope): boolean {
   const a = m as Partial<AudioInitMessage> | null;
   if (!a || a.cmd !== 'audio-init' || !(a.sab instanceof SharedArrayBuffer)) return false;
@@ -33,8 +31,7 @@ export function stopAudioReport(): void {
 function report(s: WorkerScope): void {
   const st = s.fleAudioWorkerState?.();
   if (!st) return;
-  const fresh = st.unlocks.slice(sentUnlocks);
-  sentUnlocks = st.unlocks.length;
+  const fresh = st.unlocks.splice(0);
   s.postMessage({ type: 'aud2-worker', at: performance.timeOrigin + performance.now(), unlocks: fresh, waits: st.waits, publishes: st.publishes, skipped: st.skipped, gapFrames: st.gapFrames, maxWaitDrift: st.maxWaitDrift, rewrite: s.fleAudioRewrite?.() ?? null, pace: s.fleAudioPace?.() ?? null });
 }
 

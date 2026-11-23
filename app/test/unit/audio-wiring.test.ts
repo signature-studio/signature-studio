@@ -1,8 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { onAudioMessage } from '../../src/audio/worker-hook.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { onAudioMessage, stopAudioReport } from '../../src/audio/worker-hook.ts';
 import { AUDIO } from '../../src/audio/install.ts';
 import { PageAudio } from '../../src/audio/page-audio.ts';
 import { DATA_OFFSET, W } from '../../src/audio/ring-layout.ts';
+
+afterEach(() => { stopAudioReport(); vi.useRealTimers(); });
 
 // install.ts imports the worklet with ?url, which vitest's node environment resolves like vite does; the module is loaded for AUDIO only.
 describe('audio wiring (decision 0175): the constants and the messages between the page, the Worker and the engine', () => {
@@ -35,6 +37,31 @@ describe('audio wiring (decision 0175): the constants and the messages between t
     const noLead: { fleAudioSab?: unknown; postMessage(m: unknown): void } = { postMessage() {} };
     onAudioMessage({ cmd: 'audio-init', sab, cap: 1024, dataOffset: DATA_OFFSET }, noLead as never);
     expect(noLead.fleAudioSab).toEqual({ sab, cap: 1024, dataOffset: DATA_OFFSET });
+  });
+
+  it('reports and releases each batch from the producer-owned unlock array', () => {
+    vi.useFakeTimers();
+    const unlocks: { first: number; n: number; t: number }[] = [];
+    const reports: { unlocks: typeof unlocks }[] = [];
+    const state = { unlocks, waits: 0, publishes: 0, skipped: 0, gapFrames: 0, maxWaitDrift: 0 };
+    const scope = {
+      postMessage(m: unknown) { reports.push(m as { unlocks: typeof unlocks }); },
+      fleAudioWorkerState: () => state,
+    };
+    const sab = new SharedArrayBuffer(8);
+    onAudioMessage({ cmd: 'audio-init', sab, cap: 1024, dataOffset: DATA_OFFSET, reportMs: 10 }, scope);
+
+    unlocks.push({ first: 1, n: 128, t: 1 });
+    vi.advanceTimersByTime(10);
+    expect(reports[0]?.unlocks).toEqual([{ first: 1, n: 128, t: 1 }]);
+    expect(unlocks).toEqual([]);
+    expect(reports[0]?.unlocks).not.toBe(unlocks);
+
+    unlocks.push({ first: 2, n: 128, t: 2 });
+    vi.advanceTimersByTime(10);
+    expect(reports[1]?.unlocks).toEqual([{ first: 2, n: 128, t: 2 }]);
+    expect(reports[1]?.unlocks).not.toBe(reports[0]?.unlocks);
+    expect(unlocks).toEqual([]);
   });
 
   it('the page records the engine\'s pulses and the Worker\'s reports from the Worker\'s messages and nothing else', () => {
