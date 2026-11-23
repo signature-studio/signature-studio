@@ -5,6 +5,7 @@
 ```sh
 node tools/real-browser-perf/measure.mjs signature-perf none 30000 1
 node tools/real-browser-perf/measure.mjs signature-perf center 30000 1250
+node tools/real-browser-perf/interaction.mjs signature-perf 700 560 1000 560 20 40
 ```
 
 第1引数は browse の自分のタブID、第2引数は `none`・`center`・`toolbar`、第3引数は計測時間(ms)、第4引数は入力頻度(Hz)。結果は標準出力のJSON。接続されたブラウザに対して実行するため、同じタブの他の操作は計測完了まで待つ。
@@ -18,5 +19,9 @@ node tools/real-browser-perf/measure.mjs signature-perf center 30000 1250
 - スレッド別の時間は切替間の経過時間で、ホスト側での待機を含む。CPU時間やCPUプロファイルではない。
 - 不足プラグイン・不足サンプルがある場合は、完全なプロジェクトの合格判定に使わない。
 - 同じビルド・解像度・再生区間で複数回比較し、起動直後の測定と定常再生を分ける。結果にはビルド識別子・画面サイズ・計測条件を含む。
+
+`interaction.mjs` は `tab fromX fromY toX toY reps steps` を取り、measure と同じ precondition で通常の browse drag を交互方向に反復する。各 pointerdown/up 区間の `__app.deskStats.displayFrames` 差分、経過時間、その区間あたりの canvas 更新率を drag ごとに報告し、CLI call 間の待ち時間を平均へ混ぜない。counter が未対応または不正な場合は `null` と警告を返す。開始後の `__app.latency.records` だけを集計する。records は最大400件のため、入力数との差があれば警告する。
+
+browse drag は CDP 経由の DOM pointer 入力であり、物理 mouse 入力ではない。canvas 更新率は物理表示 FPS を示さない。UI 要素が実際に動いたかは画面で別途確認する。
 
 個人のプロジェクト、音声、ブラウザの保存データはリポジトリに保存しない。
