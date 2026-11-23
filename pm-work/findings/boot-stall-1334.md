@@ -167,3 +167,81 @@ idle から押下までの時刻。途切れの最後の時刻は、トレース
 - 5 回目の 0 と、この版の差の原因。
 - 押下の時刻ごと(0.5〜30 秒)の再測定は、この試行では行っていない。
 - 計算の切り替え点(#1352)と、再生中の周あたりの時間(P3)は測っていない。
+
+## 12. 7 回目の試行(受け入れ 1 回目の通過。runner の値。nproc 4、loadavg 0.5〜1.3)
+
+### 12.1 受け入れ(`measure.mjs --boot`。n=3。押下は idle を見た直後。判定は `bootLast60sAt90s`)
+
+| 回 | screenDevicePx | ctxState | quantaDelta | bootLast60sAt10s | bootLast60sAt70s | bootLast60sAt90s | maxRefillStallMs (ms) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 3240x1864 | running | 20676 | 2118 | 32 | 0 | 614.3 |
+| 2 | 3240x1864 | running | 20675 | 2057 | 0 | 0 | 605.7 |
+| 3 | 3240x1864 | running | 20675 | 2126 | 0 | 0 | 593.1 |
+
+- 判定: 受け入れのコマンド全体が通った(`ACCEPT_EXIT=0`)。3 回とも `error` null、`engine-idle`、`standIn` false、`ctxState` running、`bootLast60sAt90s` 0、画面は `Math.round` の ±1 以内。関数名の表は 142,050 行で `fle_progress_slice` を含む。
+- 窓(+10〜+70 s)の 1 回目の `bootLast60sAt70s` が 32 で、残りは 0。山(起動直後の計算)は約 10 秒で終わる。`bootLast60sAt10s` は 2,057〜2,126 で、6 回目の修正後の 2,303〜2,312 より少ない(runner の差。推定)。
+- `maxRefillStallMs` は起動からの最大の公開間隔で、窓の値ではない(§6)。
+
+### 12.2 変更の前後(6 回目の記録と、今回の run。計測の条件は同じではない)
+
+| 版 | bootLast60sAt10s | bootLast60sAt70s | maxRefillStallMs (ms) | 連続 underrun の最長 |
+| --- | --- | --- | --- | --- |
+| 修正前(6 回目の記録。この main の版) | 3,381・3,350・3,353 | 20,662・20,671・20,658 | 659・672・701 | 窓の全体(24,018 quanta) |
+| 修正後(6 回目の記録) | 2,311・2,312・2,303 | 1,054・1,032・1,039 | 740〜757 | 2,167 quanta(トレース) |
+| 修正後(今回。受け入れの 3 回) | 2,057〜2,126 | 0〜32 | 593〜614 | 1,354 quanta(トレース 1 回。§12.5) |
+
+- 今回の版は、6 回目の修正(`fle_dsound.c` の再生中のバッファが無いときの補充と締切)を含む。`bootLast60sAt70s` が 0 になったのは、山が 10 秒前後で終わったため(6 回目の記録では約 13.8 秒まで続いた。違いの原因は未確認)。
+- 修正前のトレース(同じ版の修正前)は、この試行では取っていない。
+
+### 12.3 関数の表(上位 20。CDP `Profiler`、engine の Worker、engine-idle から +90 s。サンプリング 250 µs、実効 316.7 µs。`profile-names.mjs`)
+
+プロファイラを付けた run。自己時間の合計は busy 11,793 ms(span 89,586 ms のうち)。
+
+| 順位 | 名前 | guest VA | 自己時間 (ms) | busy 比 |
+| --- | --- | --- | --- | --- |
+| 1 | f_344fcf0 | 0x344fcf0 | 3,007.7 | 25.5% |
+| 2 | f_27ad5f8 | 0x27ad5f8 | 1,351.3 | 11.5% |
+| 3 | fle_mx_addsd_13134 | (C runtime) | 840.4 | 7.1% |
+| 4 | fle_mx_addss_10157 | (C runtime) | 448.7 | 3.8% |
+| 5 | fle_mx_subsd_13133 | (C runtime) | 404.4 | 3.4% |
+| 6 | fle_mx_mulsd_13130 | (C runtime) | 318.1 | 2.7% |
+| 7 | f_33d6e70 | 0x33d6e70 | 299.8 | 2.5% |
+| 8 | fle_mx_subss_10151 | (C runtime) | 282.8 | 2.4% |
+| 9 | fle_lg_psrldq_9749 | (C runtime) | 256.3 | 2.2% |
+| 10 | fle_mx_mulss_10156 | (C runtime) | 215.6 | 1.8% |
+| 11 | (program) | | 187.4 | 1.6% |
+| 12 | f_27acd60 | 0x27acd60 | 162.3 | 1.4% |
+| 13 | fle_r_blit | (C runtime) | 161.7 | 1.4% |
+| 14 | fle_hyb_dispatch | (C runtime) | 148.9 | 1.3% |
+| 15 | fle_mx_cvttss2si32_10205 | (C runtime) | 143.9 | 1.2% |
+| 16 | f_863b50 | 0x863b50 | 143.3 | 1.2% |
+| 17 | poll_waiters | (C runtime) | 133.4 | 1.1% |
+| 18 | f_27ad5d6 | 0x27ad5d6 | 124.8 | 1.1% |
+| 19 | fle_mx_addps_10154 | (C runtime) | 116.9 | 1.0% |
+| 20 | fle_desk_scene | (C runtime) | 106.0 | 0.9% |
+
+- `fle_mx_*`・`fle_lg_*` は SSE 命令のランタイム(演算ごとの呼び出し)。`f_<16 進>` は guest の関数(VA)。上位 2 つ(`f_344fcf0`・`f_27ad5f8`)で busy の 37%。
+
+### 12.4 切り替え点を通らずに続いた最長
+
+- 2,128 ms(プロファイルの 1,447 ms から。`fle_progress_slice` を含まない連続の busy)。内訳: `f_344fcf0` 598、`f_27ad5f8` 308、`fle_mx_addsd` 175、`fle_mx_addss` 89、`fle_mx_subsd` 82(ms)。
+- 5 回目の試行の記録は 1,310 ms。違いは、プロファイラの付加と版の違いのどちらかで、未確認。
+- 区間ごとの busy(プロファイラ付き): 0〜10 s が 97%(9,639 ms)、10〜90 s が 2.4〜3.1%(区間の合計 2,154 ms)。10〜90 s の再生は 27,494 quanta なので、約 78 µs/quantum(プロファイラの負荷を含む)。プロファイラ無しの周あたりは未測定。
+
+### 12.5 計数の検証(作業の順序 4。トレース 1 回。`measure.mjs --boot --trace`・`trace-stats.mjs`)
+
+- `maxRefillStallMs`(engine の maxPubGapMs): 597.24 ms は、トレースの最初の標本(窓の 420 ms)で既に出ている。起動からの最大で、窓の値ではない。
+- 連続 underrun の最長(`trace-stats.mjs`): 1,354 quanta(6.2 s。標本の 420 ms〜6,653 ms の区間)。窓の underrun 2,103 quanta は、再生開始(0.4 s 頃)から 10.1 s の間に増え、その後は増えない(10.1〜89.9 s で 0)。
+- 標本の `fill`(WR−RD)は、標本の時刻で 1,750〜2,646 frames(128 より大きい)。underrun の 63%(再生開始〜10 s)と一致しない。推定: 標本は engine の Worker が CDP の評価を受け付けた時刻(publish の直後の待ちの時刻)に偏り、また 0.4〜6.6 s は標本が約 450 ms 間隔に延びた。取りこぼした欠落は標本では見えない。
+- **未確認**: 0.4〜10 s の underrun の、quantum ごとの原因(worklet の quantum 開始時の fill と、publish の間隔を、同じ時刻で記録する必要がある。worklet は 50 ms ごとに `fmin`(最小の fill)を post する。これを取る道具が未実施)。
+
+### 12.6 この試行の変更
+
+- `tools/p3-audio-probe/measure.mjs`: `--boot` に +90 秒の読み(`bootLast60sAt90s`、`readAtMs` の 3 つ目)を足した。既存の +10・+70 秒の読みは残した。
+- 前回までの作業ツリーの変更(6 回目の `fle_dsound.c` を含む)は、commit `84067368` にまとめた(`lift/runtime`・`lift/crates`・`lift/harness/web`・`tools/p3-audio-probe`・`pm-work/findings`)。`app/` は変えていない。`lift/` を変えたので、main の push で deploy が動く(報告に書く)。
+
+### 12.7 未実施・次にやること
+
+- `maxRefillStallMs` の定義の修正(窓の中の公開の間隔。閉じていない停止を含む)は未実施(この Issue の受け入れには入らない。#1352 の目標の測定に要る)。
+- quantum ごとの fill と publish の間隔の同時記録(§12.5)。
+- 押下の時刻の再測定(0・1・30 秒)、耳の確認は行わない。
