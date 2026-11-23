@@ -757,4 +757,26 @@ FJ2=$JR/fj2; pf "$FJ2" "$(cat "$FJ/list.json")"; mkdir -p "$FJ2/dl-950"; cp "$D"
 CN=$JR/cn; mkrepo "$CN"; sed -i '5s/.*/R5/' "$CN/a.txt"; git -C "$CN" commit -qam main-moved; n0=$(git -C "$CN" rev-list --count HEAD)
 rc=$(prun "$CN" "$FJ2" "$JR/rj3")
 ok "取り込み(判定の出力が無い): 判定に至らなかった作業として、commit せずに取り込み、その旨を書く" "$rc/$(( $(git -C "$CN" rev-list --count HEAD) - n0 ))/$(grep -c '判定に至らなかった' "$CN/.prior-work.md")" "0/0/1"
+# (k) 本番のデプロイ(deploy.yml)の抽出の木の鍵は、作業ジョブの抽出の木の鍵(agent.yml の extract-tree-)が読む入力を全て覆う。覆わないと、表を変えても古い木が使われる
+pj "$top/.github/workflows/deploy.yml" > "$T/deploy.json" 2>>"$T/pj.err"; DJ=$T/deploy.json
+DK=$(jq -r '[.jobs.deploy.steps[] | select(.id == "cache") | .with.key][0]' "$DJ")
+AK=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("extract-tree-"))) | unique[0]' "$J")
+cover() { python3 - "$top" "$1" "$2" <<'PY'
+import glob, os, re, sys
+os.chdir(sys.argv[1])
+def files(key):
+    s = set()
+    for args in re.findall(r"hashFiles\(([^)]*)\)", key):
+        for pat in re.findall(r"'([^']*)'", args):
+            s |= {os.path.normpath(f) for f in glob.glob(pat, recursive=True) if os.path.isfile(f)}
+    return s
+a = files(sys.argv[2]); d = files(sys.argv[3])
+miss = sorted(a - d)
+print(" ".join(miss) if miss else ("covered" if a else "empty"))
+sys.exit(0 if a and not miss else 1)
+PY
+}
+ok "deploy.yml: 抽出の木の鍵(id: cache)は host- で、seed 表(lift/harness/seeds/vfs-seed-idle1.tsv)を入力に含む" "$(case "$DK" in host-*"'lift/harness/seeds/vfs-seed-idle1.tsv'"*) echo yes;; *) echo no;; esac)" yes
+ok "deploy.yml: 抽出の木の鍵は、agent.yml の extract-tree- の鍵が読む入力(ファイルの集合)を全て覆う(覆われていない物の一覧)" "$(cover "$AK" "$DK")" covered
+ok "deploy.yml: 抽出の木の鍵は、fe-build extract が読む表(ci/extract-dlls.tsv・seed 表)と extract-fl.mjs を全て覆う" "$(cover "hashFiles('ci/extract-dlls.tsv', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'app/scripts/extract-fl.mjs')" "$DK")" covered
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

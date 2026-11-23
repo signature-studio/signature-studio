@@ -29,7 +29,9 @@ jobs:
         uses: runs-on/cache@v5.0.7
         with:
           path: lift/out-app/host
-          key: host-${{ hashFiles('ci/**', 'app/scripts/**/*.mjs') }}
+          key: >-
+            host-${{ hashFiles('ci/**', 'app/scripts/**/*.mjs',
+            'lift/harness/seeds/vfs-seed-idle1.tsv') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
