@@ -1942,8 +1942,12 @@ static void dispatch_message(const char *api, int ansi)
     if (msg == FLE_WM_TIMER && lp != 0) {
         /* Learn WM_TIMER / SetTimer: "DispatchMessage will call the TimerProc callback function specified in the call to the SetTimer" and "the DispatchMessage calls the callback function instead of calling the window
          * procedure when it processes WM_TIMER with a non-NULL lParam"; TIMERPROC(HWND, UINT, UINT_PTR, DWORD): the window, WM_TIMER, the timer id, the milliseconds since the system started (the virtual clock). */
+        unsigned allow_depth2 = fle_callback_depth() == 1;
+        int old_allow = fle_callback_depth2_allowed();
+        if (allow_depth2) fle_callback_depth2_allow(1);
         R[0] = 0;
         (void)fle_call_guest(lp, h, FLE_WM_TIMER, wp, (uint32_t)(clk_now() / FLE_TICKS_PER_MS));
+        if (allow_depth2) fle_callback_depth2_allow(old_allow);
         R[0] = 0;
         return;
     }
@@ -1953,7 +1957,13 @@ static void dispatch_message(const char *api, int ansi)
         return;
     }
     if (tab[i].owner != fle_thread_current()) fle_stop(api, "the message is for a window that another thread owns: the page gives no behaviour");
-    R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
+    {
+        unsigned allow_depth2 = fle_callback_depth() == 1;
+        int old_allow = fle_callback_depth2_allowed();
+        if (allow_depth2) fle_callback_depth2_allow(1);
+        R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
+        if (allow_depth2) fle_callback_depth2_allow(old_allow);
+    }
 }
 
 void fle_imp_DispatchMessageW(void) { dispatch_message("DispatchMessageW", 0); }

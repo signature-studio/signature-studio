@@ -433,9 +433,9 @@ fn a_slice_inside_a_callback_of_the_runtime_is_skipped_and_the_clock_does_not_mo
     // (Decision 0279: a slice moves the clock 2,500 ticks; the clock is printed in ticks.) OUTER: work(8192) = calls 3..8194: slice 1 at 4096 (clock 2500), slice 2 at 8192 (clock 5000). fle_call_guest(INNER) is call 8195 (depth 2); INNER work(12288) = 8196..20483: the limit passes
     // 12288, 16384, 20480 inside the callback: 3 skipped, no clock. Back in OUTER (depth 1), work(8192) = 20484..28675: slice 3 at 24576 (clock 7500), slice 4 at 28672 (clock 10000).
     let top = format!(
-        "{VA}\nstatic uint64_t ev;\nstatic void th_b(void) {{ W1(ev, INF); R[0] = 0; }}\nstatic void outer(void) {{ work(8192); fle_call_guest(VA_INNER, 0, 0, 0, 0); work(8192); R[0] = 0; }}\n\
-         static void inner(void) {{ printf(\"inner depth %u clock %llu\\n\", fle_callback_depth(), U(REL())); work(12288); printf(\"inner end clock %llu\\n\", U(REL())); R[0] = 0; }}\n{}",
-        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
+        "{VA}\n#define VA_DEEPEST 0x1060\nstatic uint64_t ev;\nstatic void th_b(void) {{ W1(ev, INF); R[0] = 0; }}\nstatic void outer(void) {{ work(8192); fle_call_guest(VA_INNER, 0, 0, 0, 0); work(8192); R[0] = 0; }}\n\
+         static void deepest(void) {{ printf(\"inner depth %u clock %llu\\n\", fle_callback_depth(), U(REL())); work(12288); printf(\"inner end clock %llu\\n\", U(REL())); R[0] = 0; }}\nstatic void inner(void) {{ fle_call_guest(VA_DEEPEST, 0, 0, 0, 0); R[0] = 0; }}\n{}",
+        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner"), ("VA_DEEPEST", "deepest")])
     );
     let l = lines(
         "p-callback",
@@ -454,18 +454,84 @@ fn a_slice_inside_a_callback_of_the_runtime_is_skipped_and_the_clock_does_not_mo
         l,
         [
             "count after start 1",
-            "inner depth 2 clock 5000",
+            "inner depth 3 clock 5000",
             "inner end clock 5000",
-            "end count 28675 clock 10000",
+            "end count 28676 clock 10000",
             "stats: armed 1 slices 4 deferred 3 switches 0 ticks 10000",
         ]
     );
 }
 
 #[test]
+fn a_depth_two_callback_can_switch_threads_and_restores_guest_state_and_callback_depth() {
+    // After Sleep(0), B's work reaches slice 1 and returns to main. The callback's work reaches slice 2;
+    // B resumes, yields with Sleep(0), then main resumes the callback. Both slice ends switch threads.
+    let top = format!(
+        r#"{VA}
+static void th_b(void) {{
+    uint64_t entry_r3 = R[3]; fle_xmm entry_x[16]; fle_eflags entry_fl = FL;
+    memcpy(entry_x, X, sizeof X);
+    work(4096);
+    R[3] = UINT64_C(0x55555555); memset(X, 0x5a, sizeof X); memset(&FL, 0, sizeof FL); FL.cf = 1;
+    SLEEP(0);
+    R[3] = entry_r3; memcpy(X, entry_x, sizeof X); FL = entry_fl; R[0] = 0;
+}}
+static void inner(void) {{
+    uint64_t entry_r3 = R[3]; fle_xmm entry_x[16]; fle_eflags entry_fl = FL;
+    memcpy(entry_x, X, sizeof X);
+    R[3] = UINT64_C(0x33333333); memset(X, 0x11, sizeof X); memset(&FL, 0, sizeof FL); FL.zf = 1;
+    uint64_t saved_r[16]; fle_xmm saved_x[16]; fle_eflags saved_fl = FL;
+    memcpy(saved_r, R, sizeof R); memcpy(saved_x, X, sizeof X);
+    work(4096);
+    printf("depth %u restored %d\n", fle_callback_depth(),
+        memcmp(saved_r, R, sizeof R) == 0 && memcmp(saved_x, X, sizeof X) == 0 && memcmp(&saved_fl, &FL, sizeof FL) == 0);
+    R[3] = entry_r3; memcpy(X, entry_x, sizeof X); FL = entry_fl;
+    R[0] = 0;
+}}
+static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
+{}"#,
+        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
+    );
+    let l = lines(
+        "p-depth-two-switch",
+        &top,
+        r#"
+    H_CREATE(VA_B, 0, 0, 0);
+    SLEEP(0);
+    fle_callback_depth2_allow(1);
+    fle_call_guest(VA_OUTER, 0, 0, 0, 0);
+    fle_callback_depth2_allow(0);
+    stats("stats");
+"#,
+    );
+    assert_eq!(l, ["depth 2 restored 1", "stats: armed 1 slices 2 deferred 0 switches 2 ticks 5000"]);
+}
+
+#[test]
+fn depth_two_permission_is_not_inherited_by_a_new_thread() {
+    let top = format!(
+        "{VA}\nstatic unsigned child_allowed;\nstatic void th_b(void) {{ child_allowed = (unsigned)fle_callback_depth2_allowed(); R[0] = 0; }}\n{}",
+        table(&[("VA_B", "th_b")])
+    );
+    let l = lines(
+        "p-depth-two-thread-state",
+        &top,
+        r#"
+    fle_callback_depth2_allow(1);
+    H_CREATE(VA_B, 0, 0, 0);
+    SLEEP(0);
+    printf("child %u parent %d\n", child_allowed, fle_callback_depth2_allowed());
+    fle_callback_depth2_allow(0);
+"#,
+    );
+    assert_eq!(l, ["child 0 parent 1"]);
+}
+
+#[test]
 fn deferred_callback_slices_poll_audio_without_advancing_time_or_switching_even_when_audio_signals_a_waiter() {
     let top = format!(
         r#"{VA}
+#define VA_DEEPEST 0x1060
 static uint64_t ev;
 static unsigned polls, resumed;
 void fle_audio_poll(void) {{
@@ -475,7 +541,7 @@ void fle_audio_poll(void) {{
     }}
 }}
 static void th_b(void) {{ W1(ev, INF); resumed++; R[0] = 0; }}
-static void inner(void) {{
+static void deepest(void) {{
     uint64_t saved_r[16];
     fle_xmm saved_x[16];
     fle_eflags saved_fl = FL;
@@ -487,9 +553,10 @@ static void inner(void) {{
         memcmp(saved_r, R, sizeof R) == 0 && memcmp(saved_x, X, sizeof X) == 0 && memcmp(&saved_fl, &FL, sizeof FL) == 0);
     R[0] = 0;
 }}
+static void inner(void) {{ fle_call_guest(VA_DEEPEST, 0, 0, 0, 0); R[0] = 0; }}
 static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
 {}"#,
-        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
+        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner"), ("VA_DEEPEST", "deepest")])
     );
     for opt in ["-O0", "-O2"] {
         let l = lines_with(
@@ -508,7 +575,7 @@ static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
             &[],
         );
         assert_eq!(l, [
-            "inner: depth 2 polls 3 resumed 0 clock 0 registers 1",
+            "inner: depth 3 polls 3 resumed 0 clock 0 registers 1",
             "after callback: armed 1 slices 0 deferred 3 switches 0 ticks 0",
             "after yield: resumed 1",
         ], "{opt}");

@@ -3,7 +3,7 @@
  * The guest's threads run the guest's own instructions, one at a time, all on the one host thread (so fle_host_tid() and the 14 single-thread checks
  * of decision 0054 are unchanged). A thread is given up only inside one of the waiting or yielding APIs below; between two of them a thread runs
  * without interruption -- EXCEPT for the deterministic pseudo-preemption of decision 0147 (the block "decision 0147" below): after the first CreateThread, a slice ends
- * every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest and may give the processor to another ready thread. Which thread runs next is a CHOICE WITHOUT A SOURCE (decision 0122): round robin by creation order, priorities ignored; with fle_thread_set_priorities(1) (decision 0234 (mt3), Learn "Scheduling Priorities") the ready thread of the highest priority, the same priority in rotation. When
+ * every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest and may give the processor to another ready thread. Which thread runs next is a CHOICE WITHOUT A SOURCE (decision 0122): by default the ready thread of highest scheduling priority, same priority in creation-order rotation; fle_thread_set_priorities(0) restores round robin with priorities ignored. When
  * every thread waits, the virtual clock (fle_sys.h) is moved to the smallest deadline; when no thread can ever run again, the run stops by name.
  *
  * The FIRST thread (the one that called into the guest: the harness's) keeps the legacy single-thread storage (fle_tls_values, the last error of
@@ -82,8 +82,7 @@ uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
 /* ---- decision 0147 (PROVISIONAL): deterministic pseudo-preemption (an exception to decision 0122's "a thread is given up only inside one of the waiting or yielding APIs") ----
  * From the first CreateThread on, every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest (fle_progress_count of fle_dispatch.h; the count is the same for native, wasm, -O0 and -O2) end one slice: the virtual
  * clock is moved by FLE_PREEMPT_SLICE_TICKS, the waits whose time has come are tested and the next ready thread (creation order; with fle_thread_set_priorities(1) one of the same or a higher priority than the running one) runs; the preempted thread stays ready. A slice ends a thread's turn only while the
- * thread is not inside a callback of the runtime (fle_callback_depth() <= FLE_PREEMPT_MAX_DEPTH: the thread's own outermost guest call is depth 1, a window procedure called by DispatchMessageW is depth 2); inside a
- * callback the slice is skipped (the clock is not moved either), so a window procedure, EnumWindows callback or timer procedure still runs without interruption, as under decision 0122. Every value is a CHOICE
+ * thread is not inside a callback of the runtime beyond depth 1, except for the scoped depth-2 WndProc/TIMERPROC calls made by DispatchMessageW. A slice in every other depth-2 callback, and every callback at depth 3 or more, is deferred without moving the clock. Every value is a CHOICE
  * WITHOUT A SOURCE (S-vclock-*, decision 0147; FLE_PREEMPT_SLICE_TICKS was corrected by decision 0279). There is NO environment variable for them: FLE_PREEMPT, FLE_PREEMPT_DISPATCHES and FLE_PREEMPT_TICKS,
  * which decision 0147 named, do not exist in this runtime (nothing reads them; decision 0243 folded them into these constants). */
 #define FLE_PREEMPT_SLICE_DISPATCHES 4096u   /* S-vclock-slice-progress */
@@ -216,9 +215,10 @@ void fle_thread_set_idle_stop(int on) FLE_THREAD_REF;
 void fle_thread_preempt_stats(fle_preempt_stats *out) FLE_THREAD_REF;
 /* Prints the thread table, the queues and the virtual clock (the harness report). */
 void fle_thread_report(FILE *f) FLE_THREAD_REF;
+void fle_thread_report_state(FILE *f) FLE_THREAD_REF;
 /* A trace of every switch on stderr (write(2)), for diagnosis. */
 void fle_thread_set_trace(int on) FLE_THREAD_REF;
-/* Decision 0234 (mt3, PROVISIONAL): 1 = the scheduler orders the ready threads by their scheduling priority (Learn "Scheduling Priorities": the levels SetThreadPriority kept), 0 (the default) = the rotation in creation order of decision 0122, the priorities are only kept. */
+/* Decision 0234 (mt3, PROVISIONAL): 1 (the default) = order ready threads by their scheduling priority (the levels SetThreadPriority kept); 0 = ignore priorities and use the rotation in creation order of decision 0122. */
 void fle_thread_set_priorities(int on) FLE_THREAD_REF;
 
 #endif

@@ -98,6 +98,7 @@ typedef struct {
     struct fle_seh_reg *seh;       /* decision 0132: the registrations of functions with an except landing, and the exception being dispatched */
     struct fle_seh_disp *sehd;
     unsigned cbdepth;
+    unsigned cbdepth2_allowed;
     size_t tdepth;
 } gctx;
 
@@ -212,6 +213,7 @@ static void save_ctx(gctx *c)
     c->seh = fle_seh_top;
     c->sehd = fle_seh_cur;
     c->cbdepth = fle_callback_depth();
+    c->cbdepth2_allowed = (unsigned)fle_callback_depth2_allowed();
     c->tdepth = trace_depth ? trace_depth() : 0;
 }
 
@@ -230,6 +232,7 @@ static void load_ctx(const gctx *c)
     fle_seh_top = c->seh;
     fle_seh_cur = c->sehd;
     fle_callback_depth_set(c->cbdepth);
+    fle_callback_depth2_allow((int)c->cbdepth2_allowed);
     if (trace_set_depth) trace_set_depth(c->tdepth);
 }
 
@@ -499,15 +502,15 @@ static void switch_to(unsigned to)
  * the highest priority. If none of these threads are ready to run, the system assigns time slices in a round-robin fashion to all threads with the next highest priority. If a higher-priority thread becomes available to run, the system
  * ceases to execute the lower-priority thread (without allowing it to finish using its time slice) and assigns a full time slice to the higher-priority thread." The base priority is made of the priority class of the process and the
  * priority level of the thread (the same page); all threads of this environment are in ONE process, so only the level orders them: for every class the table of the page is non-decreasing in the level (IDLE -15, LOWEST -2, BELOW_NORMAL -1, NORMAL 0,
- * ABOVE_NORMAL 1, HIGHEST 2, TIME_CRITICAL 15; the REALTIME levels -7..6 between them), so the level stands for the base priority. Off by default (fle_thread_set_priorities): every thread then counts as priority 0 and the rotation of decision 0122 is unchanged. Not modelled: the dynamic boosts (Learn "Priority Boosts"), THREAD_MODE_BACKGROUND_BEGIN's effect on the CPU priority (the pages say nothing about its value). */
-static int prio_on;
+ * ABOVE_NORMAL 1, HIGHEST 2, TIME_CRITICAL 15; the REALTIME levels -7..6 between them), so the level stands for the base priority. Enabled by default; fle_thread_set_priorities can disable priority ordering, in which case every thread counts as priority 0 and the rotation of decision 0122 is unchanged. Not modelled: the dynamic boosts (Learn "Priority Boosts"), THREAD_MODE_BACKGROUND_BEGIN's effect on the CPU priority (the pages say nothing about its value). */
+static int prio_on = 1;
 void fle_thread_set_priorities(int on) { prio_on = on; }
-static int32_t prio_of(unsigned i)
+static int32_t base_prio_of(unsigned i)
 {
-    if (!prio_on) return 0;
     if (i == 0) return fle_proc_first_thread_priority ? fle_proc_first_thread_priority() : 0;
     return T[i].ps.prio;
 }
+static int32_t prio_of(unsigned i) { return prio_on ? base_prio_of(i) : 0; }
 
 /* The runnable thread (never `cur` itself) that the scheduler takes next, or -1: the one with the highest priority, and among those with the same priority the first after `cur` in creation order (the round-robin). When all runnable
  * threads have the same priority this is the rotation of decision 0122. */
@@ -582,9 +585,9 @@ static void report_threads(FILE *f)
         for (s = q->sent_head; s; s = s->next) nsent++;
         wd[0] = 0;
         if (t->state == T_WAITING) describe_wait(t, wd, sizeof wd);
-        fprintf(f, "  thread %u: id %#x handle %#" PRIx64 " %s%s start %#" PRIx64 " param %#" PRIx64 " exit %u suspend %u rsp %#" PRIx64 "; queue %s%u posted %u sent%s\n", i, (unsigned)t->vid,
+        fprintf(f, "  thread %u: id %#x handle %#" PRIx64 " %s%s start %#" PRIx64 " param %#" PRIx64 " exit %u suspend %u rsp %#" PRIx64 "; prio %d/%d; queue %s%u posted %u sent%s\n", i, (unsigned)t->vid,
                 i ? handle_of(i) : (uint64_t)0, state_name(t), t->closed ? " (handle closed)" : "", t->start, t->param, (unsigned)t->exit_code, (unsigned)t->suspend,
-                i == cur ? R[4] : t->g.r[4], q->exists ? "" : "none ", q->exists ? (unsigned)q->count : 0u, nsent, q->quit ? " QUIT pending" : "");
+                i == cur ? R[4] : t->g.r[4], (int)prio_of(i), (int)base_prio_of(i), q->exists ? "" : "none ", q->exists ? (unsigned)q->count : 0u, nsent, q->quit ? " QUIT pending" : "");
         if (wd[0]) fprintf(f, "      waiting: %s\n", wd);
         if (q->exists) {
             uint32_t k;
@@ -606,10 +609,15 @@ static void report_preempt(FILE *f)
                 slice_dispatches, slice_ticks, pst.slices, pst.deferred, pst.switches, fle_progress_count);
 }
 
-void fle_thread_report(FILE *f)
+void fle_thread_report_state(FILE *f)
 {
     report_threads(f);
     report_preempt(f);
+}
+
+void fle_thread_report(FILE *f)
+{
+    fle_thread_report_state(f);
     if (fle_win_report) fle_win_report(f);
 }
 
@@ -789,7 +797,8 @@ void fle_progress_slice(void)
     if (!preempt_armed || nthr < 2) return;
     t = &T[cur];
     if (t->state != T_RUNNING) return;
-    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
+    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH &&
+        !(fle_callback_depth() == 2 && fle_callback_depth2_allowed())) {
         pst.deferred++;
         if (fle_audio_poll) fle_audio_poll();
         return;

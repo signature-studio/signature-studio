@@ -60,4 +60,8 @@ unsigned fle_callback_depth(void);
 /* Decision 0122: sets the nesting. Only fle_thread.c calls it (the depth belongs to the running guest thread and is switched with it). */
 void fle_callback_depth_set(unsigned d);
 
+/* Scoped exception for DispatchMessage's depth-2 callback; saved with the running thread context. */
+int fle_callback_depth2_allowed(void);
+void fle_callback_depth2_allow(int allow);
+
 #endif

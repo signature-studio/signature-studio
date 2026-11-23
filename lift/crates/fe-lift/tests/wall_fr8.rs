@@ -820,11 +820,12 @@ fn a_thread_start_address_that_is_not_a_function_entry_stops_by_name_when_the_th
 /// CreateWindowExW (WS_EX_TOOLWINDOW, WS_POPUP, size 0, hInstance the guest's 0x400000), as decision 0071 answers it.
 const WM_STUB: &str = r#"
 #define VA_WP 0x2000
-static int wp_calls; static uint64_t wp_log[64][5]; static unsigned wp_thread[64];
+static int wp_calls; static uint64_t wp_log[64][5]; static unsigned wp_thread[64]; static void (*wp_probe)(void);
 static void wndproc(void)
 {
     if (wp_calls < 64) { wp_log[wp_calls][0] = R[1]; wp_log[wp_calls][1] = R[2]; wp_log[wp_calls][2] = R[8]; wp_log[wp_calls][3] = R[9]; wp_thread[wp_calls] = fle_thread_current(); }
     wp_calls++;
+    if (R[2] == 0x8023 && wp_probe) wp_probe();
     if (R[2] == 0x81) { R[0] = 1; return; }
     if (R[2] == 0x83) { R[0] = 0; return; }
     if (R[2] == 0x01) { R[0] = 0; return; }
@@ -1152,6 +1153,82 @@ fn dispatch_message_calls_the_window_procedure_in_the_receivers_context_and_a_th
 "#,
     );
     assert_eq!(l, ["translate 0", "dispatch 9021 calls 1", "log hwnd 7f990004 msg 8021 wp 5 lp 6", "thread-msg 0 calls 1"]);
+}
+
+#[test]
+fn dispatch_w_and_a_allow_scoped_depth_two_but_send_message_and_depth_three_do_not() {
+    let extra = r#"
+#define VA_DRIVER 0x1060
+#define VA_TIMER 0x1070
+#define VA_NESTED 0x1080
+#define VA_NOP 0x1090
+static void nop(void) { }
+static void work(unsigned n) { unsigned i; for (i = 0; i < n; i++) fle_dispatch(VA_NOP); }
+static uint64_t probe_event;
+static MSGX probe_msg;
+static unsigned mode, worker_runs, stop_worker, nested_depth, nested_allowed, nested_worker_runs;
+static int callback_depth, callback_allowed;
+static void nested_cb(void) {
+    nested_depth = fle_callback_depth(); nested_allowed = fle_callback_depth2_allowed();
+    work(4096); nested_worker_runs = worker_runs; R[0] = 0;
+}
+static void wnd_probe(void) {
+    callback_depth = (int)fle_callback_depth(); callback_allowed = fle_callback_depth2_allowed();
+    SETEV(probe_event);
+    if (mode == 0) fle_call_guest(VA_NESTED, 0, 0, 0, 0);
+    work(4096);
+}
+static void timer_proc(void) {
+    callback_depth = (int)fle_callback_depth(); callback_allowed = fle_callback_depth2_allowed();
+    SETEV(probe_event); work(4096); R[0] = 0;
+}
+static void worker(void) {
+    for (;;) { W1(probe_event, INF); if (stop_worker) break; worker_runs++; }
+    R[0] = 0;
+}
+static void driver(void) {
+    if (mode == 0) CALL4(fle_imp_DispatchMessageW, A(&probe_msg), 0, 0, 0);
+    else if (mode == 1) CALL4(fle_imp_DispatchMessageA, A(&probe_msg), 0, 0, 0);
+    else if (mode == 2) CALL4(fle_imp_DispatchMessageW, A(&probe_msg), 0, 0, 0);
+    else if (mode == 3) CALL4(fle_imp_DispatchMessageA, A(&probe_msg), 0, 0, 0);
+    else CALL4(fle_imp_SendMessageW, probe_msg.hwnd, probe_msg.msg, probe_msg.wp, probe_msg.lp);
+    R[0] = 0;
+}
+"#;
+    let top = msg_top(extra, &[("VA_A", "worker"), ("VA_DRIVER", "driver"), ("VA_TIMER", "timer_proc"), ("VA_NESTED", "nested_cb"), ("VA_NOP", "nop")]);
+    let l = lines(
+        "m-dispatch-depth2-scope",
+        &top,
+        r#"
+    uint64_t w = mkwnd(), h;
+    probe_event = H_EVENT(0, 0);
+    wp_probe = wnd_probe;
+    h = H_CREATE(VA_A, 0, 0, 0);
+    SLEEP(0);
+    for (mode = 0; mode < 5; mode++) {
+        probe_msg.hwnd = w;
+        probe_msg.msg = mode < 2 || mode == 4 ? 0x8023 : 0x0113;
+        probe_msg.wp = mode;
+        probe_msg.lp = mode >= 2 && mode <= 3 ? VA_TIMER : 0;
+        fle_call_guest(VA_DRIVER, 0, 0, 0, 0);
+        printf("mode %u callback %d/%d nested %u/%u/%u worker %u scope %d\n", mode,
+            callback_depth, callback_allowed, nested_depth, nested_allowed, nested_worker_runs,
+            worker_runs, fle_callback_depth2_allowed());
+        if (mode == 1 || mode == 3 || mode == 4) { SLEEP(0); printf("yield %u worker %u\n", mode, worker_runs); }
+    }
+    stop_worker = 1; SETEV(probe_event); W1(h, INF);
+"#,
+    );
+    assert_eq!(l, [
+        "mode 0 callback 2/1 nested 3/1/0 worker 1 scope 0",
+        "mode 1 callback 2/1 nested 3/1/0 worker 2 scope 0",
+        "yield 1 worker 2",
+        "mode 2 callback 2/1 nested 3/1/0 worker 3 scope 0",
+        "mode 3 callback 2/1 nested 3/1/0 worker 4 scope 0",
+        "yield 3 worker 4",
+        "mode 4 callback 2/0 nested 3/1/0 worker 4 scope 0",
+        "yield 4 worker 5",
+    ]);
 }
 
 #[test]

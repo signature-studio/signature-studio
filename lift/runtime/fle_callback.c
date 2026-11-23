@@ -15,6 +15,7 @@ extern uint8_t fle_teb[] __attribute__((weak));
 extern uint8_t *fle_teb_cur __attribute__((weak));
 
 static unsigned depth;
+static int depth2_allowed;
 
 unsigned fle_callback_depth(void)
 {
@@ -25,6 +26,16 @@ unsigned fle_callback_depth(void)
 void fle_callback_depth_set(unsigned d)
 {
     depth = d;
+}
+
+int fle_callback_depth2_allowed(void)
+{
+    return depth2_allowed;
+}
+
+void fle_callback_depth2_allow(int allow)
+{
+    depth2_allowed = allow != 0;
 }
 
 /* The guest registers that a Win64 callee must preserve and that live in R[]: rbx 3, rbp 5, rsi 6, rdi 7, r12-r15 12..15 (rsp is

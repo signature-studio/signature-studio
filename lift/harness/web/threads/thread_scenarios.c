@@ -552,7 +552,6 @@ static uint64_t H_CREATE_PRIO(uint64_t start, uint64_t param, int32_t level)
 static void sc_priority_yield(void)
 {
     uint64_t h[3]; int i;
-    fle_thread_set_priorities(1);
     h[0] = H_CREATE_PRIO(VA(5), 0, 0); h[1] = H_CREATE_PRIO(VA(6), 0, 2); h[2] = H_CREATE_PRIO(VA(7), 0, -1);
     for (i = 0; i < 3; i++) W1(h[i], INF);
     print_order();
