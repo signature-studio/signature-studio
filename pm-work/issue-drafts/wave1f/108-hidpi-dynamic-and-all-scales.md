@@ -4,7 +4,7 @@ title: "Fractional Scaling の動的な変化と、全ての拡大率(100%〜300
 type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
-blocked_by: ["107"]
+blocked_by: ["107", "113", "114"]
 labels: ["hidpi", "verify"]
 size: L
 priority: High
@@ -27,7 +27,8 @@ project: signature-studio/3
 - Windows の動的な変化: 拡大率の変更や、別のモニターへの移動で DPI が変わると、DPI 対応のアプリは `WM_DPICHANGED`(提案の矩形つき)を受け取り、窓を提案の大きさに変える。画面の大きさが変わると `WM_DISPLAYCHANGE` が届く。Windows の公式の仕様(DPI の文書)で、この形を確かめる。ただし FL は上の仕様のとおり、拡大率を再起動で適用する。Windows の振る舞いは、FL の仕様より優先しない。
 - Windows の FL の実際の挙動は、この機械では確かめられない。FL の実行ファイルと runtime の実測で分かる範囲を報告し、確認できない部分は「確認できない」と書く。
 - 既存の経路: 画面の大きさの更新は `app/src/main.ts`(`applyScreenParam`・`applyDisplay`・DPR の監視)と `lift/runtime` の `WM_DISPLAYCHANGE` の送り方(`grep -rn WM_DISPLAYCHANGE lift/runtime` で探す)にある。
-- DPI が 240 以上(DPR 2.5 以上)で、FL が起動しない障害(`[js] fle thread 2 failed: RangeError: Maximum call stack size exceeded`)が #{{107}} の試行で見つかった。#{{107}} が直す。この Issue では、DPR 2.5〜3.0 の検証を含む。
+- 本文の背景に、`#{{113}}`(測定と FL の拡大率)・`#{{114}}`(DPI 240 以上)の後に行う、と書く。この Issue は、その 2 つが直した後の値で、全ての拡大率と窓の種類を確かめる。
+- DPI が 240 以上(DPR 2.5 以上)で、FL が起動しない障害(`[js] fle thread 2 failed: RangeError: Maximum call stack size exceeded`)が #{{107}} の試行で見つかった。#{{114}} が直す。この Issue では、DPR 2.5〜3.0 の検証を含む。
 - 起動用の実行ファイルには、通常の起動用(`FL64.exe`)と、Windows が拡大する形の起動用(`FL64 (scaled).exe`)の 2 つがある(推定。マニフェストの違いで確かめる。#{{107}} の「起動用の実行ファイル」の節を参照)。この製品は、通常の起動用(`FL64.exe`)の振る舞いに合わせる。`(scaled)` の方式は、この Issue の範囲外。
 
 ## 読む物
@@ -41,7 +42,7 @@ project: signature-studio/3
 ## やること
 
 1. #{{107}} の道具を拡張する。引数は次のとおり。
-   - `--dprs 1,1.25,1.5,1.75,2,2.5,3`(固定の一覧。DPR の入力としてだけ使い、期待値には使わない)に加えて、`--random 3` で乱数の DPR を 3 つ選ぶ(範囲 1.00〜3.00・0.01 刻み。起動のたびに crypto の乱数で種を選び、その種から 3 つを決める。種と値は `randomDprs` に出す)。静的な行は、固定と乱数を合わせて 10 段 × 窓の種類 8 種 = 80 行。
+   - `--dprs 1,1.25,1.5,1.75,2,2.5,3`(固定の一覧。DPR の入力としてだけ使い、期待値には使わない)に加えて、`--random 3 --random-range 1,3` で乱数の DPR を 3 つ選ぶ(#{{107}} の道具の既定の範囲は 1.00〜2.25 なので、この Issue では 1.00〜3.00 を明示する。0.01 刻み。起動のたびに crypto の乱数で種を選び、その種から 3 つを決める。種と値は `randomDprs` に出す)。静的な行は、固定と乱数を合わせて 10 段 × 窓の種類 8 種 = 80 行。
    - `--windows main,welcome,mixer,playlist,piano-roll,plugin,tooltip,menu`(窓の種類ごと。開けない窓は、その行の `error` に理由を書く)
    - `--dynamic 1,1.7647,2,1`(1 回の実行の中で DPR をこの順に変える。`Emulation.setDeviceMetricsOverride` の deviceScaleFactor を使う)。動的の行は段ごとに 1 行を出し、`dpr` はその段の DPR、`step` は段の番号(1〜4)にする。
    - 各行に `"window"`(窓の名前)と `"mode"`(`"static"` か `"dynamic"`)と `"randomDprs"` を足す。
@@ -67,7 +68,7 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1,1.25,1.5,1.75,2,2.5,3 --windows main,welcome,mixer,playlist,piano-roll,plugin,tooltip,menu --random 3 --dynamic 1,1.7647,2,1 > "$RUNNER_TEMP/fs.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const P=["tempo","song-position","pattern-selector"];const W=["main","welcome","mixer","playlist","piano-roll","plugin","tooltip","menu"];const eq=(x,y)=>Math.abs(x-y)<0.0001;const near=(x,y,t)=>Math.abs(x-y)<=Math.max(2,t*Math.abs(y));const S=L.filter((x)=>x.mode==="static");const Dy=L.filter((x)=>x.mode==="dynamic");const R=S[0].randomDprs.values;const F=[1,1.25,1.5,1.75,2,2.5,3].concat(R);const a=S.find((x)=>eq(x.dpr,1)&&x.window==="main");const dbg=(x)=>x.debugLog.captured===true&&x.debugLog.lines>=1&&!x.debugLog.scalingLines.some((l)=>/error|warn/i.test(l));const base=(x)=>x.error===null&&x.state==="engine-idle"&&x.standIn===false&&Math.abs(x.guest.w-Math.round(x.room.w*x.dpr))<=1&&Math.abs(x.guest.h-Math.round(x.room.h*x.dpr))<=1&&Math.abs(x.canvas.w-x.display.w)<=1&&Math.abs(x.canvas.h-x.display.h)<=1&&x.edgeWidth<=2&&x.mainGuiScaling==="System"&&dbg(x);const sRow=(x)=>base(x)&&Math.abs(x.dpi-Math.round(96*x.dpr))<=1&&(x.window!=="plugin"||[100,200,300,400].includes(x.pluginScalePercent))&&(x.window!=="main"||Math.abs(x.flScalingPercent-Math.round(100*x.dpr))<=3);const dRow=(x)=>base(x)&&x.dpi===a.dpi&&Math.abs(x.flScalingPercent-a.flScalingPercent)<=1&&(eq(x.dpr,1)||x.restartNotice===true);const mainOk=(x)=>P.every((p)=>near(x.parts[p].x,a.parts[p].x,0.05)&&near(x.parts[p].y,a.parts[p].y,0.05))&&Math.abs(x.blackShare-a.blackShare)<=0.02;const last=Dy[Dy.length-1];const ok=a!==undefined&&R.length===3&&R.every((d)=>d>=1&&d<=3)&&S.length===80&&F.every((d)=>W.every((w)=>S.some((x)=>eq(x.dpr,d)&&x.window===w)))&&S.every(sRow)&&S.filter((x)=>x.window==="main").every(mainOk)&&a.blackShare<0.5&&Math.abs(a.room.w-1836)<=2&&Math.abs(a.room.h-1056)<=2&&Dy.length===4&&Dy.every(dRow)&&eq(last.dpr,1)&&P.every((p)=>near(last.parts[p].x,a.parts[p].x,0.02)&&near(last.parts[p].y,a.parts[p].y,0.02))&&Math.abs(last.edgeWidth-a.edgeWidth)<=0.5;process.exit(ok?0:1)' "$RUNNER_TEMP/fs.jsonl" && ! git diff -U0 refs/judge/main -- lift/runtime lift/harness app/src | grep -E '^\+[^+]' | grep -qE '\b(125|150|168|169|175|176)\b|1\.75\b|1\.7647|0\.5667' && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1,1.25,1.5,1.75,2,2.5,3 --windows main,welcome,mixer,playlist,piano-roll,plugin,tooltip,menu --random 3 --random-range 1,3 --dynamic 1,1.7647,2,1 > "$RUNNER_TEMP/fs.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const P=["tempo","song-position","pattern-selector"];const W=["main","welcome","mixer","playlist","piano-roll","plugin","tooltip","menu"];const eq=(x,y)=>Math.abs(x-y)<0.0001;const near=(x,y,t)=>Math.abs(x-y)<=Math.max(2,t*Math.abs(y));const S=L.filter((x)=>x.mode==="static");const Dy=L.filter((x)=>x.mode==="dynamic");const R=S[0].randomDprs.values;const F=[1,1.25,1.5,1.75,2,2.5,3].concat(R);const a=S.find((x)=>eq(x.dpr,1)&&x.window==="main");const dbg=(x)=>x.debugLog.captured===true&&x.debugLog.lines>=1&&!x.debugLog.scalingLines.some((l)=>/error|warn/i.test(l));const base=(x)=>x.error===null&&x.state==="engine-idle"&&x.standIn===false&&Math.abs(x.guest.w-Math.round(x.room.w*x.dpr))<=1&&Math.abs(x.guest.h-Math.round(x.room.h*x.dpr))<=1&&Math.abs(x.canvas.w-x.display.w)<=1&&Math.abs(x.canvas.h-x.display.h)<=1&&x.edgeWidth<=2&&x.mainGuiScaling==="System"&&dbg(x);const sRow=(x)=>base(x)&&Math.abs(x.dpi-Math.round(96*x.dpr))<=1&&(x.window!=="plugin"||[100,200,300,400].includes(x.pluginScalePercent))&&(x.window!=="main"||Math.abs(x.flScalingPercent-Math.round(100*x.dpr))<=3);const dRow=(x)=>base(x)&&x.dpi===a.dpi&&Math.abs(x.flScalingPercent-a.flScalingPercent)<=1&&(eq(x.dpr,1)||x.restartNotice===true);const mainOk=(x)=>P.every((p)=>near(x.parts[p].x,a.parts[p].x,0.05)&&near(x.parts[p].y,a.parts[p].y,0.05))&&Math.abs(x.blackShare-a.blackShare)<=0.02;const last=Dy[Dy.length-1];const ok=a!==undefined&&R.length===3&&R.every((d)=>d>=1&&d<=3)&&S.length===80&&F.every((d)=>W.every((w)=>S.some((x)=>eq(x.dpr,d)&&x.window===w)))&&S.every(sRow)&&S.filter((x)=>x.window==="main").every(mainOk)&&a.blackShare<0.5&&Math.abs(a.room.w-1836)<=2&&Math.abs(a.room.h-1056)<=2&&Dy.length===4&&Dy.every(dRow)&&eq(last.dpr,1)&&P.every((p)=>near(last.parts[p].x,a.parts[p].x,0.02)&&near(last.parts[p].y,a.parts[p].y,0.02))&&Math.abs(last.edgeWidth-a.edgeWidth)<=0.5;process.exit(ok?0:1)' "$RUNNER_TEMP/fs.jsonl" && ! git diff -U0 refs/judge/main -- lift/runtime lift/harness app/src | grep -E '^\+[^+]' | grep -qE '\b(125|150|168|169|175|176)\b|1\.75\b|1\.7647|0\.5667' && npm test --prefix app
 ```
 
 判定の基準: 道具の出力の生の値を、上の node -e が読む。
@@ -98,7 +99,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: #{{107}}(起動時の DPR に対する Windows と同じ Fractional Scaling)。
+- blocked_by: #{{107}}(起動時の DPR に対する Windows と同じ Fractional Scaling)、`#{{113}}`(FL の UI の拡大の実測)、`#{{114}}`(DPI 240 以上の停止)。
 - #1349(音が途切れる現象)は、この Issue と並行して進めてよい。ただし、物理画素の画面で測る。
 - 同じ描画の経路を変える #1334 と #1346 と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 
