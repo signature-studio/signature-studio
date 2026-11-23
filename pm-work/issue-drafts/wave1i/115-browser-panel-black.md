@@ -1,6 +1,6 @@
 ---
 draft: "115"
-title: "Browser のパネル(左の黒い領域)を FL と同じにする: 黒いのが描かれていないのか空の一覧なのかを切り分け、一覧に要るフォルダの階層を seed に入れ、中身は起動後に取る"
+title: "Browser のパネル(左の黒い領域)を FL と同じにする: 一覧の窓の WM_PAINT が描画に至らない原因を直す"
 type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
@@ -57,7 +57,7 @@ probe-beginpaint: 0x7f990110 vis 1 upd 0,0,364,974 pc 364,974 in_paint 0
 
 - 未確認: 一覧の窓の class と、`WM_PAINT` の配送先。`lift/runtime/fle_win.c` の既定の処理の `WM_PAINT`(`case FLE_WM_PAINT`)は、`BeginPaint` を呼ばず、更新領域を消すだけ("Nothing else is drawn")。配送の経路は trace の対象外で、前回の probe では確定できなかった。
 - 候補(未確認。コードの読み): `fle_win.c` の `no_redraw`(`WM_SETREDRAW` の状態)。FALSE の窓と子は、空の可視領域で描かれて捨てられる。一覧の窓が `WM_SETREDRAW`(0)を受けて、再開(1)を受けていないかを確かめる。
-- 除外: 表示の欠落は無い。列挙の欠落も無い(件数が返る)ので、階層を seed に足す根拠は、この切り分けからは出ていない。
+- 除外: 表示の欠落は無い。列挙の欠落も無い(件数が返る)。seed への階層の追加は、描画が直った後、一覧の件数が FL と違う場合だけ行う(この切り分けからは、足す根拠は出ていない)。
 - 前回の probe の変更は、製品に残していない(戻した。wasm に probe の文字列が無いことを確認した)。
 
 **前回の作業で使った trace の経緯**
