@@ -166,6 +166,8 @@ let cycleLast: number | null = null;
 let cycleLastN = 0;
 let endRequested = false;
 
+/** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
+let apiTraceWanted = false;
 const app: AppApi = {
   assetsReport: () => assetsNow(),
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
@@ -181,7 +183,7 @@ const app: AppApi = {
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
   deskDumpBase64: async (peek = false) => { const d = await client.deskDump(peek); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { windows: d.windows, width: d.width, height: d.height, base64: btoa(s) }; },
-  windowApiTrace: (on) => client.windowApiTrace(on),
+  windowApiTrace: (on) => { apiTraceWanted = on; client.windowApiTrace(on); },
   deskGlPixelsBase64: async () => { const d = await client.deskGlPixels(); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { width: d.width, height: d.height, base64: btoa(s) }; },
   perf: null as unknown as AppApi['perf'],
   pageTitle: () => deskTitle(baseTitle),
@@ -280,7 +282,7 @@ function applyDisplay(): void {
   const d = drawScale(g, room, honoured);
   const scale = Math.max(0.05, d.scale);
   view.setScreen(g.width, g.height);
-  view.setScale(scale, d.snap);
+  view.setScale(scale);
   $('canvas-info').textContent = `guest screen ${g.width}x${g.height} device px in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
 }
 // decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
@@ -341,7 +343,7 @@ function followRoom(room: Room): void {
   if (!inputEnabled()) return;   // before the first idle: followRoom runs again at the first idle
   sendRaw({ k: 'display', kind: IN.DISPLAY, width: g.width, height: g.height }, 'room', undefined, false);
   rec.sent = true;
-  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height) };
+  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height, room.dpr) };
   addLog('info', `the room is now ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px: the engine is told its display is now ${g.width}x${g.height}`);
 }
 
@@ -349,7 +351,7 @@ function followRoom(room: Room): void {
 function applyScreenParam(manifest: Manifest): void {
   const room = measureRoom();
   const g = chooseGuestScreen(room);
-  const env = screenEnv(g.width, g.height);
+  const env = screenEnv(g.width, g.height, room.dpr);
   Object.assign(manifest.engine.env, env);
   app.screen.asked = { width: g.width, height: g.height, env };
   app.screen.guest = { width: g.width, height: g.height };
@@ -761,6 +763,7 @@ async function boot(): Promise<void> {
     perfRecorder.start(clock.startedAt);
     $('stop-btn').hidden = false;
     $('stop-btn').textContent = 'Stop engine';
+    if (apiTraceWanted) client.windowApiTrace(true);   // #1347: on before the engine's first instruction, so the start-up's DPI answers are traced
     client.start();
     startLazy(lazyRefs, lazyShared, store, recorder, keep);
   } catch (e) {

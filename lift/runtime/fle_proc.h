@@ -92,8 +92,11 @@ void fle_imp_EncodePointer(void);
 void fle_imp_DecodePointer(void);
 
 /* shcore!GetProcessDpiAwareness: HRESULT f(HANDLE hprocess, PROCESS_DPI_AWARENESS *value). rcx, rdx. Decision 0099 (provisional): the current process
- * (NULL or the GetCurrentProcess pseudo handle) is PROCESS_DPI_UNAWARE (0); a NULL pointer or any other handle is E_INVALIDARG. */
+ * (NULL or the GetCurrentProcess pseudo handle) is answered as PROCESS_DPI_PER_MONITOR_AWARE (2); a NULL pointer or any other handle is E_INVALIDARG.
+ * Issue #1347: the process is DPI-aware, so the DPI it is told is the DPI of the display (fle_screen.h) and it draws at the physical pixels. This is an inference from the
+ * guest's own branch (it asks for "== 2"); the awareness that FL.exe declares in its manifest is not read here (pm-work/findings/hidpi-fl-scaling.md). */
 #define FLE_PROCESS_DPI_UNAWARE 0u
+#define FLE_PROCESS_DPI_PER_MONITOR_AWARE 2u
 void fle_imp_GetProcessDpiAwareness(void);
 
 /* rpcrt4!UuidCreate: RPC_STATUS f(UUID *Uuid rcx). Decision 0118 wall 7 (provisional): writes a version 4 (RFC 4122 section 4.4) UUID made from a fixed-seed

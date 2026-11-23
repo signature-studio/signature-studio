@@ -130,6 +130,7 @@ export class FruityEngine {
         // Issue #1314: a lazy file is persistent (hostfiles.ts addPersistent), so the release at the first idle does not take it away
         for (const f of assets.lazy ?? []) hostFiles.addPersistent(`${root}/${f.path}`, f);
         for (const [k, v] of Object.entries(manifest.engine.env)) opts.ENV[k] = v;
+        if (this.traceOn) this.windowApiTrace(true);   // #1347: the trace asked before the start is on from the first instruction
         host.mark('files_ready', { how: 'packs-v1', dllFiles: dll.files, dllBytes: dll.bytes, seedFiles: seed.files, seedBytes: seed.bytes, lazyFiles: assets.lazy?.length ?? 0, ms: +(performance.now() - t0).toFixed(1) });
       }],
       instantiateWasm: (imports, done) => {
@@ -151,6 +152,8 @@ export class FruityEngine {
   }
 
   private failure: ((e: unknown) => void) | null = null;
+  /** #1347: the window-API trace as last asked (windowApiTrace); the start applies it */
+  private traceOn = false;
   private fail(e: unknown): void { if (this.failure) this.failure(e); else this.host.log('error', String((e as Error)?.stack ?? e)); }
 
   /** imports the glue and builds the Module object; nothing of the engine runs yet */
@@ -199,6 +202,7 @@ export class FruityEngine {
 
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (fle_g3_window_api_trace, lift/harness/fruity_idle.c); false when the wasm has no such export */
   windowApiTrace(on: boolean): boolean {
+    this.traceOn = on;   // kept for the start (preRun): a trace asked before the engine runs is on from its first instruction
     const ex = this.instance?.exports as Record<string, unknown> | undefined;
     if (!ex || typeof ex.fle_g3_window_api_trace !== 'function') return false;
     (ex.fle_g3_window_api_trace as (on: number) => void)(on ? 1 : 0);

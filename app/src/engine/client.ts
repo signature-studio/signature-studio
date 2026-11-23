@@ -56,7 +56,7 @@ export class EngineClient {
     });
   }
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (the answer is the engine's stderr, not a message) */
-  windowApiTrace(on: boolean): void { this.send({ cmd: 'window-api-trace', on }); }
+  windowApiTrace(on: boolean): void { this.worker?.postMessage({ cmd: 'window-api-trace', on } satisfies ToWorker); }
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the GL canvas */
   deskGlPixels(): Promise<{ width: number; height: number; data: ArrayBuffer }> {
     return new Promise((res, rej) => {

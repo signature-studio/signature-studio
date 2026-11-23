@@ -106,7 +106,7 @@ fn run(name: &str, env: &[(&str, &str)], body: &str) -> Vec<String> {
     let cc = cmd.arg("-o").arg(&exe).arg(&c).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {name}: {}", String::from_utf8_lossy(&cc.stderr));
     let mut r = Command::new(&exe);
-    r.env_remove("FLE_MONITOR_W").env_remove("FLE_MONITOR_H").env_remove("FLE_SCREEN_DPI").env("TMPDIR", dir.join("tmp"));
+    r.env_remove("FLE_MONITOR_W").env_remove("FLE_MONITOR_H").env_remove("FLE_MONITOR_DPR").env_remove("FLE_SCREEN_DPI").env("TMPDIR", dir.join("tmp"));
     for (k, v) in env {
         r.env(k, v);
     }
@@ -133,6 +133,25 @@ fn the_variables_set_the_screen_everywhere_the_two_files_answer_it() {
     let want = format!("{w} {h} {w} {h} | {w} {h} {} {} 96 96", mm(w, 96), mm(h, 96));
     assert_eq!(want, "2400 1300 2400 1300 | 2400 1300 635 344 96 96");
     assert_eq!(run("screen1-2400", &[("FLE_MONITOR_W", "2400"), ("FLE_MONITOR_H", "1300")], "    report();"), [want]);
+}
+
+/// the DPI of the rule (Issue #1347) for the page's ratio x 10000: the scale is round(ratio x 100) percent, the DPI is MulDiv(96, percent, 100)
+fn dpi_of(e4: u32) -> u32 {
+    let pct = (e4 + 50) / 100;
+    (96 * pct + 50) / 100
+}
+
+#[test]
+fn the_page_ratio_gives_the_dpi_by_the_rule_and_a_value_outside_the_limits_or_not_digits_is_ignored() {
+    // the sizes do not change with the ratio: the guest's screen is FLE_MONITOR_W x H; only the DPI follows
+    for e4 in [10000u32, 12500, 15000, 17647, 22500] {
+        let s = e4.to_string();
+        let want = format!("1920 1080 1920 1080 | 1920 1080 {} {} {} {}", mm(1920, 96), mm(1080, 96), dpi_of(e4), dpi_of(e4));
+        assert_eq!(run("screen1-dpr", &[("FLE_MONITOR_DPR", s.as_str())], "    report();"), [want], "FLE_MONITOR_DPR={e4}");
+    }
+    for bad in ["2499", "50001", "1.5", "abc", "99999999999"] {
+        assert_eq!(run("screen1-dpr-bad", &[("FLE_MONITOR_DPR", bad)], "    report();"), ["1920 1080 1920 1080 | 1920 1080 508 286 96 96"], "FLE_MONITOR_DPR={bad}");
+    }
 }
 
 #[test]
@@ -215,9 +234,9 @@ fn the_header_reads_only_the_engines_own_variables_and_nothing_of_the_host_displ
         code.push('\n');
     }
     let names: Vec<&str> = code.match_indices("getenv(").map(|(i, _)| &code[i..i + 40]).collect();
-    // getenv is called with a parameter in fle_screen_dim only (decision 0243: the DPI and the flag readers are gone); the names are the literal arguments
+    // getenv is called in fle_screen_dim only (decision 0243: the DPI and the flag readers are gone; Issue #1347: the ratio is read by fle_screen_dim too); the names are the literal arguments
     assert_eq!(names.len(), 1, "{names:?}");
-    for lit in ["\"FLE_MONITOR_W\"", "\"FLE_MONITOR_H\""] {
+    for lit in ["\"FLE_MONITOR_W\"", "\"FLE_MONITOR_H\"", "\"FLE_MONITOR_DPR\""] {
         assert!(code.contains(lit), "{lit}");
     }
     for bad in ["X11", "DISPLAY", "xrandr", "wayland", "/dev", "/sys", "/proc", "ioctl", "fb0", "devicePixelRatio", "screen.width", "emscripten", "getpid", "clock_gettime", "fopen", "pthread"] {

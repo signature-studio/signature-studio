@@ -66,6 +66,7 @@ _Static_assert(FLE_GDC_HORZSIZE == (FLE_GDC_HORZRES * 254 + 480) / 960 && FLE_GD
 _Static_assert(FLE_GDC_LOGPIXELSX == FLE_SCREEN_DPI_DEFAULT && FLE_GDC_LOGPIXELSY == FLE_SCREEN_DPI_DEFAULT, "the default DPI of fle_screen.h is the constant above");
 #undef FLE_GDC_LOGPIXELSX
 #undef FLE_GDC_LOGPIXELSY
+/* Issue #1347: the DPI follows the page's device pixel ratio (fle_screen.h); it is read at each call, not fixed here. */
 #define FLE_GDC_LOGPIXELSX FLE_SCREEN_PX_DPI
 #define FLE_GDC_LOGPIXELSY FLE_SCREEN_PX_DPI
 

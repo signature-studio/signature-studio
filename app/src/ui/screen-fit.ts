@@ -1,7 +1,8 @@
-// The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1).
-// The page measures the room it has for the screen (everything below the header and left of the monitor panel), tells the engine that size through the engine's environment (FLE_MONITOR_W / FLE_MONITOR_H:
-// lift/runtime/fle_screen.h) and draws the desktop to fill the room: the guest's screen is the room's device pixels (the room in CSS pixels times the device pixel ratio, C-1), so 1 guest pixel = 1 device pixel
-// and the canvas is shown at 1 / devicePixelRatio CSS pixels per guest pixel (the browser does not stretch it).
+// The size of the guest's screen as the page's room for it (decision 0212, screen1; one mode since decision 0243 / opt1; the physical pixels of #1347).
+// The page measures the room it has for the screen (everything below the header and left of the monitor panel), and tells the engine that size and the device pixel ratio through the engine's
+// environment (FLE_MONITOR_W / FLE_MONITOR_H / FLE_MONITOR_DPR: lift/runtime/fle_screen.h). The guest's screen is the room's DEVICE pixels (the room in CSS pixels times the device pixel ratio,
+// rounded to whole pixels): one guest pixel is one device pixel, and the canvas is shown at 1 / devicePixelRatio CSS pixels per guest pixel, so the browser neither stretches nor shrinks it.
+// The engine computes the scale of the UI from the ratio itself (Windows' rule: round(ratio x 100) percent, DPI = MulDiv(96, percent, 100)); nothing here chooses a scale for the UI.
 // When the room changes while the engine runs, the engine is told (WM_DISPLAYCHANGE and WM_SETTINGCHANGE; the runtime resizes the maximized windows: S-remaximize). Everything here is pure: the numbers come in, the numbers go out (test/unit/screen-fit.test.ts).
 
 export const SCREEN_DEFAULT = { width: 1920, height: 1080 } as const;
@@ -32,42 +33,41 @@ export interface GuestScreen {
   height: number;
   /** CSS pixels per guest pixel: the desktop is drawn at this scale (1 / devicePixelRatio when the screen is the room's device pixels) */
   scale: number;
-  /** the CSS length that edges are rounded to: 1 (whole CSS pixels) */
-  snap: number;
   /** true when the room asked for a size outside the engine's limits and the size was pulled inside them */
   clamped: boolean;
 }
 
-const clampDim = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, Math.floor(v)));
+const clampDim = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, Math.round(v)));
 const ratioOf = (room: Room): number => (room.dpr > 0 ? room.dpr : 1);
 
 /**
- * The guest screen for a room: the room's device pixels (the room in CSS pixels times the device pixel ratio, rounded down), pulled inside the engine's limits. The scale is then whatever makes the screen
- * fill the room: 1 / devicePixelRatio when the room is inside the limits.
+ * The guest screen for a room: the room's device pixels (the room in CSS pixels times the device pixel ratio, rounded to whole pixels), pulled inside the engine's limits. The scale is then
+ * 1 / devicePixelRatio (the room is drawn at its own device pixels).
  */
 export function chooseGuestScreen(room: Room): GuestScreen {
   const dpr = ratioOf(room);
   const rw = Math.max(1, room.width * dpr), rh = Math.max(1, room.height * dpr);
   const w = clampDim(rw, SCREEN_MIN.width, SCREEN_MAX.width), h = clampDim(rh, SCREEN_MIN.height, SCREEN_MAX.height);
-  const clamped = w !== Math.floor(rw) || h !== Math.floor(rh);
+  const clamped = w !== Math.round(rw) || h !== Math.round(rh);
   const d = drawScale({ width: w, height: h }, room);
-  return { width: w, height: h, scale: d.scale, snap: d.snap, clamped };
+  return { width: w, height: h, scale: d.scale, clamped };
 }
 
 /**
- * How the desktop of a guest screen is drawn in a room. The guest has the device pixels the room holds, so a guest pixel is one device pixel: 1 / devicePixelRatio CSS pixels, which the browser shows
- * without stretching the canvas (C-1). When the guest's screen is not that (the room is outside the engine's limits, or the engine did not take the size the page asked for) the screen is fitted into
- * the room in both directions and edges are rounded to whole CSS pixels.
+ * How the desktop of a guest screen is drawn in a room. When the engine took the size the page asked for, the guest has the device pixels the room holds, so a guest pixel is one device
+ * pixel: 1 / devicePixelRatio CSS pixels (the rounding of the room to whole device pixels may overhang the room by less than one CSS pixel; that is allowed). Otherwise (the room is outside
+ * the engine's limits, or the engine did not take the size the page asked for) the screen is fitted into the room in both directions.
  */
-export function drawScale(guest: { width: number; height: number }, room: Room, honoured = true): { scale: number; snap: number } {
+export function drawScale(guest: { width: number; height: number }, room: Room, honoured = true): { scale: number } {
   const fit = Math.min(Math.max(1, room.width) / guest.width, Math.max(1, room.height) / guest.height);
   const natural = 1 / ratioOf(room);
-  return { scale: honoured && natural <= fit + 1e-9 ? natural : fit, snap: 1 };
+  const fits = natural * guest.width <= room.width + 1 && natural * guest.height <= room.height + 1;
+  return { scale: honoured && fits ? natural : fit };
 }
 
-/** the engine's environment for a guest screen: both variables */
-export function screenEnv(width: number, height: number): Record<string, string> {
-  return { FLE_MONITOR_W: String(width), FLE_MONITOR_H: String(height) };
+/** the engine's environment for a guest screen: its size and the device pixel ratio of the room (FLE_MONITOR_DPR: the ratio x 10000, a whole number; 1.5 is 15000) */
+export function screenEnv(width: number, height: number, dpr: number): Record<string, string> {
+  return { FLE_MONITOR_W: String(width), FLE_MONITOR_H: String(height), FLE_MONITOR_DPR: String(Math.round((dpr > 0 ? dpr : 1) * 10000)) };
 }
 
 export function screenDiffers(a: { width: number; height: number }, b: { width: number; height: number }): boolean {

@@ -6,8 +6,7 @@ import type { ViewRect } from '../input/tracker.ts';
 export class DesktopView {
   readonly root: HTMLElement;
   private scale = 1;
-  private snap = 1;
-  /** decision 0212: the size of the guest's screen in device pixels (1920 x 1080 until the page or the engine says another); the canvas has these pixels and is shown at `scale` CSS px per pixel (C-1) */
+  /** decision 0212: the size of the guest's screen in device pixels (1920 x 1080 until the page or the engine says another); the canvas has these pixels and is shown at `scale` CSS px per pixel (C-1, #1347: 1 / devicePixelRatio, the CSS size is fractional so that it is whole device pixels) */
   private screen: { width: number; height: number } = { width: SCREEN.width, height: SCREEN.height };
   private desk: HTMLCanvasElement | null = null;
   private onLayout: (() => void) | null = null;
@@ -33,13 +32,14 @@ export class DesktopView {
     return canvas;
   }
 
-  setScale(scale: number, snap = 1): void { if (scale === this.scale && snap === this.snap) return; this.scale = scale; this.snap = snap; this.apply(); }
+  setScale(scale: number): void { if (scale === this.scale) return; this.scale = scale; this.apply(); }
   get currentScale(): number { return this.scale; }
   setCursor(css: string): void { this.root.style.cursor = css; }
 
   setScreen(width: number, height: number): void { if (width === this.screen.width && height === this.screen.height) return; this.screen = { width, height }; this.apply(); }
   get screenSize(): { width: number; height: number } { return this.screen; }
-  get screenCssSize(): { width: number; height: number } { const r = (v: number): number => Math.round((v * this.scale) / this.snap) * this.snap; return { width: r(this.screen.width), height: r(this.screen.height) }; }
+  /** the CSS size of the screen: not rounded (#1347). At 1 / devicePixelRatio it is whole device pixels; rounding it to whole CSS pixels would make the canvas differ from the device pixels. */
+  get screenCssSize(): { width: number; height: number } { return { width: this.screen.width * this.scale, height: this.screen.height * this.scale }; }
   rect(): ViewRect { const r = this.root.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; }
 
   private apply(): void {

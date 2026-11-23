@@ -1,4 +1,5 @@
 /* Decision 0144 (PROVISIONAL): see fle_appfile.h. */
+#include <stdio.h>
 #include <stdlib.h>
 #include "fle_test_env.h"
 #include <string.h>
@@ -14,6 +15,9 @@
 #include "fle_input.h"
 #include "fle_monitor.h"
 #include "fle_screen.h"
+#include "fle_win.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
 #include "fle_runtime.h"
 #include "fle_thread.h"
 
@@ -223,10 +227,10 @@ void fle_imp_SHAddToRecentDocs(void)
 }
 
 /* shcore!GetDpiForMonitor (Learn, shellscalingapi.h): HRESULT f(HMONITOR hmonitor rcx, MONITOR_DPI_TYPE dpiType edx, UINT *dpiX r8, UINT *dpiY r9). S_OK with the DPI of the monitor; E_INVALIDARG "The handle, DPI type, or pointers
- * passed in are not valid". The page gives the value by the awareness of the calling process: "PROCESS_DPI_UNAWARE: 96 because the app is unaware of any other scale factors"; the process of this environment is DPI
- * unaware (fle_proc.c GetProcessDpiAwareness) and its one virtual monitor is 96 DPI (decision 0053), so 96 for dpiX and dpiY ("The values of *dpiX and *dpiY are identical"). The three MONITOR_DPI_TYPE values
- * (MDT_EFFECTIVE_DPI 0, MDT_ANGULAR_DPI 1, MDT_RAW_DPI 2: shellscalingapi.h) all answer 96: the page says only that ANGULAR and RAW ignore the desktop scaling slider (S-g8a-dpi, a choice without a source for the
- * unaware case). The engine delay-loads this function and, when GetProcAddress gave NULL, the delay-load helper raised 0xC06D007F (wall 3 of decision 0144). */
+ * passed in are not valid". The process of this environment is per-monitor aware (fle_proc.c GetProcessDpiAwareness, Issue #1347), and its one virtual monitor has the DPI of the page's
+ * device pixel ratio (fle_screen.h: MulDiv(96, round(DPR x 100), 100)), so that DPI for dpiX and dpiY ("The values of *dpiX and *dpiY are identical"). The three MONITOR_DPI_TYPE values
+ * (MDT_EFFECTIVE_DPI 0, MDT_ANGULAR_DPI 1, MDT_RAW_DPI 2: shellscalingapi.h) all answer that DPI (the page says only that ANGULAR and RAW ignore the desktop scaling slider; no separate value is modelled).
+ * The engine delay-loads this function and, when GetProcAddress gave NULL, the delay-load helper raised 0xC06D007F (wall 3 of decision 0144). */
 void fle_imp_GetDpiForMonitor(void)
 {
     uint64_t h = R[1], px = R[8], py = R[9];
@@ -236,7 +240,8 @@ void fle_imp_GetDpiForMonitor(void)
         R[0] = 0x80070057u;   /* E_INVALIDARG */
         return;
     }
-    fle_st(px, 4, (uint32_t)FLE_SCREEN_PX_DPI);   /* fle_screen.h: FLE_SCREEN_DPI_DEFAULT (96); no environment variable sets it */
+    fle_st(px, 4, (uint32_t)FLE_SCREEN_PX_DPI);   /* fle_screen.h: the DPI of the display (fle_screen_dpi) */
     fle_st(py, 4, (uint32_t)FLE_SCREEN_PX_DPI);
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "window-api: GetDpiForMonitor type=%u -> %u\n", type, (unsigned)FLE_SCREEN_PX_DPI);
     R[0] = 0;
 }

@@ -475,17 +475,17 @@ fn shcore_has_only_the_two_dpi_rows() {
 }
 
 #[test]
-fn get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware() {
+fn get_process_dpi_awareness_answers_the_current_process_as_per_monitor_aware() {
     // Learn (GetProcessDpiAwareness): hprocess NULL = the current process; S_OK (0) and E_INVALIDARG (0x80070057) for a handle or pointer that is
-    // not valid. Decision 0099: the current process (NULL or the GetCurrentProcess pseudo handle -1) is PROCESS_DPI_UNAWARE (0); another handle
+    // not valid. Decision 0099: the current process (NULL or the GetCurrentProcess pseudo handle -1) is PROCESS_DPI_PER_MONITOR_AWARE (2) (Issue #1347: the DPI of the display; was 0 before); another handle
     // (this environment cannot make one) and a NULL pointer are E_INVALIDARG. Only 4 bytes are written (the enum is an int); the last error is not touched.
     let got = lines("dpi");
     assert_eq!(
         got,
         [
             "found 5",
-            "cur 0 v=aaaaaaaa00000000 le=5",
-            "null 0 v=aaaaaaaa00000000",
+            "cur 0 v=aaaaaaaa00000002 le=5",
+            "null 0 v=aaaaaaaa00000002",
             "other 80070057 v=aaaaaaaaaaaaaaaa",
             "thread-pseudo 80070057 v=aaaaaaaaaaaaaaaa",
             "null-ptr 80070057",
