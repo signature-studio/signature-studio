@@ -99,6 +99,8 @@ int fle_vfs_guest_is_file(const char *api, uint64_t guest);
 /* C-3 (#1316): a guest file request (or a module load) that failed because the file, the directory or the module is not there (2, 3, 126) writes one line to the engine's stderr: missing-path: <api> <code> "<path>".
  * w is the path as the guest passed it (n UTF-16 units; n = 0 for the empty name). fle_vfs.c and fle_load.c call it; fle_load.c calls it through a weak reference (a link without the volume writes nothing). */
 void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n);
+/* #1345: while on, fle_vfs_note_missing writes nothing. The harness turns it on while it puts the seed list: the directories it makes are looked up first (a miss is the reason to make one), and those are not requests of the guest. */
+void fle_vfs_note_quiet(int on);
 
 /* wintrust!WinVerifyTrust and the crypt32 calls behind the engine's signer-name check (decision 0117, PROVISIONAL; the notes are in fle_vfs.c).
  * The runtime vouches for a file only through a table of CLAIMS that the harness fills before the guest runs (harness/authenticode_claims.h, from
@@ -152,7 +154,7 @@ int fle_vfs_file_state(const uint16_t *wpath, uint64_t *size, unsigned *opens, u
 
 /* Decision 0314 (PROVISIONAL): lazy files of the install tree. The volume keeps the size, attributes and times of a file and asks the HOST for its bytes when the guest reads them; the runtime itself touches no host file.
  *   fle_vfs_lazy_set_reader: the one read function (ctx is passed back). It must copy exactly `n` bytes of the logical byte string of `stream`, starting at `off`, into `dst` and return 1, or return 0 (the run stops by name).
- *   fle_vfs_lazy_add_stream: registers a stream of `logical` bytes; returns its number (0, 1, ...) or -1 when 32 streams exist.
+ *   fle_vfs_lazy_add_stream: registers a stream of `logical` bytes; returns its number (0, 1, ...) or -1 when 512 streams exist (#1345).
  *   fle_vfs_put_lazy_file: the file "C:\dir\name" (missing directories are made) whose bytes are [off, off + size) of `stream`; attrs: ARCHIVE 0x20, READONLY 0x01, HIDDEN 0x02, SYSTEM 0x04 (others are ignored);
  *     filetime: creation = last access = last write (FILETIME ticks). Size 0 makes an ordinary empty file. 0 done; 1 invalid path; 2 the path is a directory; 5 a directory component is a file;
  *     6 the stream or the byte range does not exist; 7 the path already holds a file (it is NOT replaced: a file that was put with its bytes before the index was read wins).

@@ -1,4 +1,5 @@
 # decision 0129: vfs-seed-fonts.tsv (decisions 0110, 0126) + the installed product's files that the guest asked for (vfs-seed-installed.tsv; harness/seeds/gen_vfs_seed_installed.py). Host files under lift/out-idle1/inputs/ (not in git).
+# #1345: a host field that starts with @lazy-file: names a file the page serves after the engine has started: pack-seed.mjs leaves it out of the pack, the engine puts it on the volume by its size and reads it when the guest asks (the rest of the host field is the path as usual).
 C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILCursors.ilfont	lift/out-inventory/extracted/fonts/ILCursors.ilfont	588c4bf43070ebe92e97ef7a317677575ae344f71ef75020f0b13a308adb880b
 C:\Program Files\Image-Line\FL Studio 21\Shared\Artwork\Fonts\ILGlyphsEx.ilfont	lift/out-inventory/extracted/fonts/ILGlyphsEx.ilfont	578b46df16da9e98e9fe837b5786ec037b84a91478a46990b0d251d86f58aeb1
 C:\Program Files\Image-Line\FL Studio 21\Plugins\Fruity\Generators\MIDI Out\Data\GM CCs.txt	lift/out-fruity11/inputs/GM_CCs.txt	af33bd90f8bc734332e6ed7349c2decd43979b0c9275fa55eda90cde87eaee5e
@@ -17,6 +18,105 @@ C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Speech\	-	-
 C:\Program Files\Image-Line\FL Studio 21\Data\System\Articulator\	-	-
 C:\Program Files\Image-Line\FL Studio 21\Data\Templates\	-	-
 C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic with limiter\Basic with limiter.nfo	resources/Data/Templates/Minimal/Basic with limiter/Basic with limiter.nfo	c649b7543e66a004f128511bed3f9f826c98e80efb1838bac95429f27cb0ebc1
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Empty\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic with limiter\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Delay and reverb\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty with 4 sends\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\All MIDI CC\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Blocks\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Patch bank\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Video chopping\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\4x4\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\8x8\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\Touchscreen\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Power User\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Power User\Cheese's recording setup\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Create a chord progression\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Drum mix\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Launch loop starter\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Record Audio\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Remix a song\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\SFX transitions\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Surround mix\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Vocoder\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Breakbeat.flp	resources/Data/Templates/Advanced/Electronic/Breakbeat.flp	cd2973b2e1fe5f769498234eaa14eb47d921059e6d4e5024cad256a3d4b426e0
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Breakbeat.nfo	resources/Data/Templates/Advanced/Electronic/Breakbeat.nfo	53665bad233941816ab528be11ca2c569ef568c1c7548d174a25b0c250df39b1
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Chillout-Ambient.flp	resources/Data/Templates/Advanced/Electronic/Chillout-Ambient.flp	d7776998893a0990e762bf51cc3f36e8d176efb40c5bc876d32efbed7cfc47b1
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Chillout-Ambient.nfo	resources/Data/Templates/Advanced/Electronic/Chillout-Ambient.nfo	7af437e69a430acb20bd3bda157b989faf1392dff944cbff6d812fbb716ccc46
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Chillout.flp	resources/Data/Templates/Advanced/Electronic/Chillout.flp	cec889facaee67326a032217e9442808d2c8ff7f9921a4f99aaa5abfde462dbf
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Chillout.nfo	resources/Data/Templates/Advanced/Electronic/Chillout.nfo	69a0277128094451fbbd636185529620309d127341e601ef6c73ee39bcc4a61b
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Drum & Bass.flp	resources/Data/Templates/Advanced/Electronic/Drum & Bass.flp	74b4b3fbab62a7e332c5087217ff7ea73a84b680424e015baa76e623216fde37
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Drum & Bass.nfo	resources/Data/Templates/Advanced/Electronic/Drum & Bass.nfo	681cdbb51c43fa6e3adb09924911d5c16a19463b65423d287d2cc81cceb87512
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Dubstep.flp	resources/Data/Templates/Advanced/Electronic/Dubstep.flp	be0799c914e3b64221b199b6989c29004cdfdc9631695265adb8b4d7fabf160d
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Dubstep.nfo	resources/Data/Templates/Advanced/Electronic/Dubstep.nfo	3888c4f121593447c0bde2b2ca33bd708e7a49c2817fe3b5d381e23e2cf61f8b
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\EDM-House.flp	resources/Data/Templates/Advanced/Electronic/EDM-House.flp	b35a34be520c236dc18e4e588e5e49e4b538bf4adc1200dde7dccdcad80cca42
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\EDM-House.nfo	resources/Data/Templates/Advanced/Electronic/EDM-House.nfo	56ae7d00692797d0f01538d26b6d030afc4439019a1fc50112fc1ac860b806d4
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Electro.flp	resources/Data/Templates/Advanced/Electronic/Electro.flp	9963b9f4db7672f6a4fbd68b4add69807dd4caca9ec20bab58973ad194c4ea3c
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Electro.nfo	resources/Data/Templates/Advanced/Electronic/Electro.nfo	2acb1784fc8d4551ae2d9eb8c4fc0a32e2fd557a69dcd7405cd137be878302b5
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\HipHop-Trap.flp	resources/Data/Templates/Advanced/Electronic/HipHop-Trap.flp	d4329d79adfe0a3e5d03258ecf3a266f1641fdc5132d116b65e0b286764f28f6
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\HipHop-Trap.nfo	resources/Data/Templates/Advanced/Electronic/HipHop-Trap.nfo	d5c0bd84921975f36fe96950885b9391d3f43c4b9a058e76d95ce149a08719aa
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Trap.flp	resources/Data/Templates/Advanced/Electronic/Trap.flp	ddfe53b524e9ed75f0b42212c817f25d8584f02c5c57f76b2da372ba3ef636ff
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Electronic\Trap.nfo	resources/Data/Templates/Advanced/Electronic/Trap.nfo	6a0b3611b2fddfec174437b79ce3384de20c6652932f81a331bd745744c4a255
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Funk.flp	resources/Data/Templates/Advanced/Instrumental/Funk.flp	f359fffc559ef7ec8149d3f9decb23e2056dc19643ace013b620c42f20bf9b4a
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Funk.nfo	resources/Data/Templates/Advanced/Instrumental/Funk.nfo	76fdc445bfca4a58b2765db6f65bc9c326c3580b4fcd3db3d19bbaacf62445e0
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Jazz.flp	resources/Data/Templates/Advanced/Instrumental/Jazz.flp	7ff804ff82f0091ba3bed963f10a263121f26e4494060509d065219fb4a120f0
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Jazz.nfo	resources/Data/Templates/Advanced/Instrumental/Jazz.nfo	5e923de8771c61ef3108586870698bbffd89b210580b058f897973fff51df866
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Metal.flp	resources/Data/Templates/Advanced/Instrumental/Metal.flp	10a552f8952a3d8eed087f3c28f22a15af46a65d94aae92382949102096faf98
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Metal.nfo	resources/Data/Templates/Advanced/Instrumental/Metal.nfo	3baa2991fb7b860b561e3d13e94453464cd55d0cc5cba9c386ec813fbcfa4023
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Rock.flp	resources/Data/Templates/Advanced/Instrumental/Rock.flp	e07e673bf6d12f0527ae459ff09d87a5496be95f9d5b6627a968f914fd3b7b60
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Advanced\Instrumental\Rock.nfo	resources/Data/Templates/Advanced/Instrumental/Rock.nfo	5c1ddc8f557a478c350f01efba5dd73eb3a55c7e2d826003086023c297041159
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Empty\Empty.flp	resources/Data/Templates/Empty/Empty.flp	ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Empty\Empty.nfo	resources/Data/Templates/Empty/Empty.nfo	e77333922b6eb4154fdba3672606bccb8c2814f92d9db64b97c850e6263bbc7c
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic with limiter\Basic with limiter.flp	resources/Data/Templates/Minimal/Basic with limiter/Basic with limiter.flp	7547bba3fcf960481a4a8dd6990e7844c54e50cba4d3196aa213259802fa297d
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic\Basic.flp	resources/Data/Templates/Minimal/Basic/Basic.flp	c8a7a05cf39dcf8489a9cd67e31024602fe0dd910fcb941d52ca27ddb35c907f
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Basic\Basic.nfo	resources/Data/Templates/Minimal/Basic/Basic.nfo	6a36b13f9b14099cb1a95eb87278bd99e6080d6cd7ad30321810296e2e64d4f2
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Delay and reverb\Delay and reverb.flp	resources/Data/Templates/Minimal/Delay and reverb/Delay and reverb.flp	fc28b645c582784b617a108f2c5412a33127268ddaee8761a5368abecb42d8a5
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Delay and reverb\Delay and reverb.nfo	resources/Data/Templates/Minimal/Delay and reverb/Delay and reverb.nfo	0137713ca6d64abd25d6e05f6e31f80685d866450de209e447d7d2c9c7ff6e15
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty with 4 sends\Empty with 4 sends.flp	resources/Data/Templates/Minimal/Empty with 4 sends/Empty with 4 sends.flp	172c74da874e967501cc219c5dab718b5624f2e83f336d1043b152080a210644
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty with 4 sends\Empty with 4 sends.nfo	resources/Data/Templates/Minimal/Empty with 4 sends/Empty with 4 sends.nfo	0921cee96a2b7400c592b39efda318f7e8ff41064700e64ecdea01df3fbebe08
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty\Empty.flp	resources/Data/Templates/Minimal/Empty/Empty.flp	ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Minimal\Empty\Empty.nfo	resources/Data/Templates/Minimal/Empty/Empty.nfo	e77333922b6eb4154fdba3672606bccb8c2814f92d9db64b97c850e6263bbc7c
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\All MIDI CC\All MIDI CC.flp	resources/Data/Templates/Other/All MIDI CC/All MIDI CC.flp	408feaa964279bd76599cb1a241698a75f15527f11a2ef0d1d2560e28e010a87
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\All MIDI CC\All MIDI CC.nfo	resources/Data/Templates/Other/All MIDI CC/All MIDI CC.nfo	f5cabd87baf6577c0445fa94e302c657e4a774d48342fc86c99cfd9503569570
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Blocks\Blocks.flp	resources/Data/Templates/Other/Blocks/Blocks.flp	3d3eee6d459e2af964fd8dc5e60bb076bb12f10c97a4ab299cf9c4bcf6252d57
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Blocks\Blocks.nfo	resources/Data/Templates/Other/Blocks/Blocks.nfo	30d1738a37003c428ae4ad5585514c5f47fac7aba462f335d1b1b26cc572e37c
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Patch bank\Patch bank.flp	resources/Data/Templates/Other/Patch bank/Patch bank.flp	c95305b1e67dfaf0ba159d022de64fb92978fb005e39ae2b8fa4114d602ee330
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Patch bank\Patch bank.nfo	resources/Data/Templates/Other/Patch bank/Patch bank.nfo	66f085f3815302d1cadad7d6eba9103a86f33f1914776ae5e8c9fddcf1dc9e34
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Video chopping\Video chopping.flp	resources/Data/Templates/Other/Video chopping/Video chopping.flp	958a0fb34b9d0dce23c7663605d360128661f56c6441f64f02e08541a8cfac99
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Other\Video chopping\Video chopping.nfo	resources/Data/Templates/Other/Video chopping/Video chopping.nfo	4155b4c8765c876333088c5dffbd76059f92dffaac8384ba43f7d410ee85c2cb
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\4x4\4x4.flp	resources/Data/Templates/Performance/4x4/4x4.flp	b35b29570e90bcd0cb60b88227f0857a59d615c84a2fd39b5591311356a6c589
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\4x4\4x4.nfo	resources/Data/Templates/Performance/4x4/4x4.nfo	1db9bd881a74e1d369fcd4a34f233133f3b08ba14344c64d243d1cd1bce49078
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\8x8\8x8.flp	resources/Data/Templates/Performance/8x8/8x8.flp	f41e63b9f97b7a0b45b0d29881b4a1e4de20933609024f0f9ce3e4c0145d1031
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\8x8\8x8.nfo	resources/Data/Templates/Performance/8x8/8x8.nfo	345fa1909ca984409d21089f8754d3b2b32b29b5efe90434afeed03183448ef7
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\Touchscreen\Touchscreen.flp	resources/Data/Templates/Performance/Touchscreen/Touchscreen.flp	f1e2a0df8b6b110ce36e9094dc3769f25c142f97091f2519a99e178f4261d2d2
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Performance\Touchscreen\Touchscreen.nfo	resources/Data/Templates/Performance/Touchscreen/Touchscreen.nfo	6531ca490f71c79baa4b54dd585d3f7f6c88bc04e75df444703597834e407012
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Power User\Cheese's recording setup\Cheese's recording setup.flp	resources/Data/Templates/Power User/Cheese's recording setup/Cheese's recording setup.flp	dd838eb513bfab7294e84ed520b07b2a0de44daccc7a7f3520fca1a8d94a8030
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Power User\Cheese's recording setup\Cheese's recording setup.nfo	resources/Data/Templates/Power User/Cheese's recording setup/Cheese's recording setup.nfo	97489e588501ec75945a9e741247ab11efbaf8aef92f11ee167adb18d3798402
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Create a chord progression\Create a chord progression.flp	resources/Data/Templates/Utility/Create a chord progression/Create a chord progression.flp	f3afb1e9802c24ade65ed9dd776fe8f809053ebb3778927fe5c2c7e7ab118a4d
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Create a chord progression\Create a chord progression.nfo	resources/Data/Templates/Utility/Create a chord progression/Create a chord progression.nfo	c44e9dc7575ea5d74be85509e936f9b965443350c5d6b6a2b2586d15131e72c7
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Drum mix\Drum mix.flp	resources/Data/Templates/Utility/Drum mix/Drum mix.flp	bfb0fc1d544c29269d5df52f7568077aa994a3a5de52761507869fd227fd35b2
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Drum mix\Drum mix.nfo	resources/Data/Templates/Utility/Drum mix/Drum mix.nfo	ce54045ca12013da1bde49808561550a3ab72881cdf090d7715ece2235fa8879
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Launch loop starter\Launch Loop Starter.flp	resources/Data/Templates/Utility/Launch loop starter/Launch Loop Starter.flp	ae67bc831525c0650de212b1e614d9dc541ead54af72a6eb413482d9413685d4
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Launch loop starter\Launch Loop Starter.nfo	resources/Data/Templates/Utility/Launch loop starter/Launch Loop Starter.nfo	9227aaae7706e6b6697e4df95b91631b8a4cc7d52691951acbe67fb5904588eb
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Record Audio\Record Audio.flp	resources/Data/Templates/Utility/Record Audio/Record Audio.flp	4213c6dac8435de8ba083be28cdb1995ef27ff2bec9135221c4840b72f96f001
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Record Audio\Record Audio.nfo	resources/Data/Templates/Utility/Record Audio/Record Audio.nfo	43631f305790f3c0d645bd4a2b9be8c81754be39c95684879ab5cde6808b6f11
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Remix a song\Remix a song.flp	resources/Data/Templates/Utility/Remix a song/Remix a song.flp	98af5a354eb476372ddbd4a2db82e8d41bad520fada93c184b653901a3165a05
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Remix a song\Remix a song.nfo	resources/Data/Templates/Utility/Remix a song/Remix a song.nfo	bc8f86b1b9f19921528c314ce0c80b17779273e5ed300f3b6d9a771b295c9dba
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\SFX transitions\SFX transitions.flp	resources/Data/Templates/Utility/SFX transitions/SFX transitions.flp	78b9033e8db9156c09c9f715c0b3cfda395b954b2663f52ba3987fa4f03113c8
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\SFX transitions\SFX transitions.nfo	resources/Data/Templates/Utility/SFX transitions/SFX transitions.nfo	6e3bb51926dff6b0d54ea19615aecd00c49218dd60c2e1efecccb93be1a5fd64
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Surround mix\Surround mix.flp	resources/Data/Templates/Utility/Surround mix/Surround mix.flp	e3327b0024a1ccfadb9433d6fa6127c5692d7a52a9a05c47b886be2c3be5c109
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Surround mix\Surround mix.nfo	resources/Data/Templates/Utility/Surround mix/Surround mix.nfo	ce866522ca8a561ea359f7a075d2810384e4200e367f1e933bdfdd6a170b4714
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Vocoder\Vocoder.flp	resources/Data/Templates/Utility/Vocoder/Vocoder.flp	6ceccf82f9340ef5f052d4a554138b128563fc8f8420b5471ac99493013d2acf
+C:\Program Files\Image-Line\FL Studio 21\Data\Templates\Utility\Vocoder\Vocoder.nfo	resources/Data/Templates/Utility/Vocoder/Vocoder.nfo	026306a23261543cb3a242d2db45a3cc90f73a7be965bdb4f8f69d4f65fd5ada
 C:\Program Files\Image-Line\FL Studio 21\System\Config\Browser\	-	-
 C:\Program Files\Image-Line\FL Studio 21\System\Config\Toolbar presets\	-	-
 C:\Program Files\Image-Line\FL Studio 21\System\Config\Typing to piano\	-	-
@@ -27,8 +127,145 @@ C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\ScopeGradient.bmp
 C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\Title.png	lift/out-idle1/inputs/install/Artwork/Skins/Default/Title.png	ab01534e8878379c118ff4d65fa09818e898d1f4aa90b750798ef3597a0d40c6
 C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Default.txt	lift/out-idle1/inputs/install/Artwork/Wallpapers/Default.txt	31c97b422aaccb84ab17bf388a90d3f6f0f51fe3d1400448b5cabdd79db60de8
 C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL STUDIO dark.png	lift/out-idle1/inputs/install/Artwork/Wallpapers/FL STUDIO dark.png	72851aeb919ca6c566a66dc88ebb16b0ac762d9a990c5cc8b8ab7d4288af4f7c
+C:\Program Files\Image-Line\FL Studio 21\Artwork\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Cuprum\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Francois One\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Veela\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Cuprum\Cuprum.ttf	resources/Artwork/Fonts/Cuprum/Cuprum.ttf	75227c6375af8cc620a03d57f099642b928c24b9c9a7af5e5fe3ae3af7dade29
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Cuprum\OFL.txt	resources/Artwork/Fonts/Cuprum/OFL.txt	d173514a2b2977597045c3abf68d7f8c0107a6fcde3ca035ba926c686085c016
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Francois One\FrancoisOne.ttf	resources/Artwork/Fonts/Francois One/FrancoisOne.ttf	8032be46b1ef4234ff9fd02fa6455a2ab07cf4d01e1271af8fa650daaaafe78c
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Francois One\OFL.txt	resources/Artwork/Fonts/Francois One/OFL.txt	cdcd022ff38936694dfdb7d8d3fb4d21e64a73b258c13e2537be100bff1b9c0d
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Fonts\Fruity microfont.ttf	resources/Artwork/Fonts/Fruity microfont.ttf	7ecd6ce6c72a505e21d5d7ba60b30e97661e1f563042a0271e5e054fc542e791
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\ClipHanger.png	resources/Artwork/Skins/Default/ClipHanger.png	d38ab2936c2e51273f3517053074339fc4e8331ce1d8a6cd7ab745f1c43c4a2e
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\PickerChan.png	resources/Artwork/Skins/Default/PickerChan.png	2834c2aa760bf27794909ef9b99cdfa1d503f4efe1e65dd7ea119f0245867cb0
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\RenderSnd.wv	resources/Artwork/Skins/Default/RenderSnd.wv	1ebe0d613b19416b307c4d7131ff76269e1f4c2e0e15c505339eb757a9793448
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Skins\Default\StartSnd.wv	resources/Artwork/Skins/Default/StartSnd.wv	3596776f7cc779e84705db6ced3abc4d47e4af0957d573c652048e6e5f703eab
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Ash.flstheme	resources/Artwork/Themes/Ash.flstheme	7082f11a047e2547288faa0734df27d329b4da8154c857feef54b424e858e90b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\ash.txt	resources/Artwork/Themes/ash.txt	80195cb3f80a65f1179f06fe63bdf390e688bf70a9ff64c5aa04edb5681c7296
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Dark orange.flstheme	resources/Artwork/Themes/Dark orange.flstheme	61b90c806b2a204b593a2fa669394056b4890800d706dfb0be221c45ab1ab560
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Dark.flstheme	resources/Artwork/Themes/Dark.flstheme	911f7db38121dc40e076acd9d184f3393db795fdd2cdf62a5f8437b39e6719a1
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\DEDZII Light.flstheme	resources/Artwork/Themes/DEDZII/DEDZII Light.flstheme	32c5a15a27fa88b105b5305c177bd3c95dbd81d89cf2ec5be8129f0fa1604630
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\dedzii_splash.png	resources/Artwork/Themes/DEDZII/dedzii_splash.png	41f0b0f0a80c6e09ee35597b4b80055d8036d4044bc47493a37d0e706510d933
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\dedzii-light-landscape.jpg	resources/Artwork/Themes/DEDZII/dedzii-light-landscape.jpg	4e1dc74009e4e95ed422ea245f99485a6da6504d99453baa52883e517dc4e593
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\DEDZII.flstheme	resources/Artwork/Themes/DEDZII/DEDZII.flstheme	f99feca2f3c284f8ac61114e4096a9f5ef17baba6001bafc3b7aa5c789488999
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\dedzii.jpg	resources/Artwork/Themes/DEDZII/dedzii.jpg	a952f1dc477cc79d6b233415e29b562bae63c9aa278325ec38364a4295cc8411
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\thmDEDZII Light.png	resources/Artwork/Themes/DEDZII/thmDEDZII Light.png	bf3045e2650347e4a3ab25ca2884526997c33d305bd4dee9630359ec47388ea9
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\DEDZII\thmDEDZII.jpg	resources/Artwork/Themes/DEDZII/thmDEDZII.jpg	4b5953342c6fe8a41ffaf8419b2fc3b196ec1f403d3cc57d94b7fd0b28158d45
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Light cherry.flstheme	resources/Artwork/Themes/Light cherry.flstheme	726563b8716d30fd0a11c64b2394054ccd93a51515efb85c19368123fe9e7008
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Light pear.flstheme	resources/Artwork/Themes/Light pear.flstheme	51e5857e94c0fc347ad6df1bc24fc36afa1291b14e6cb8edf99127499f35afeb
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Light tangerine.flstheme	resources/Artwork/Themes/Light tangerine.flstheme	18ddd2a52481963efca004212e19eedbfb67b3308087ce552e05f1283d56f25e
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\PPRIIME Dark.flstheme	resources/Artwork/Themes/P.Priime/PPRIIME Dark.flstheme	f59faba3760ddf71a92e6bd9b13ef68ecc203f321111efe5c164e4aa71f0e8a1
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\PPRIIME Light.flstheme	resources/Artwork/Themes/P.Priime/PPRIIME Light.flstheme	63bf71bb060a89b4f07ff3cf7d4e4376f8c189da1b9f915832a70c50c7f6ce8b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\ppriime_dark_1080p.png	resources/Artwork/Themes/P.Priime/ppriime_dark_1080p.png	cb33d312ac7e38993d33ddfc34c08a82282d9dbed6d57d1a8988342e26527c15
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\ppriime_dark.png	resources/Artwork/Themes/P.Priime/ppriime_dark.png	9772031e9c7894c679810dd386bb708ab4f33c314ee39d7707dae9aa88a12c8d
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\ppriime_light_1080p.png	resources/Artwork/Themes/P.Priime/ppriime_light_1080p.png	a3b06cacd682e28d58a9d2a566d3f41113a6afcb2a5723e1d8c03dc0391edcce
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\ppriime_light.png	resources/Artwork/Themes/P.Priime/ppriime_light.png	b79b402a3167ce8357147fe8f658b34e7aee3279f783fbc4f6955970c463fd7e
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\thmPPRIIME Dark.jpg	resources/Artwork/Themes/P.Priime/thmPPRIIME Dark.jpg	ba1b70522177c036666c3adaca764f39bcd506ba811e71ed15a73357a16c1c2c
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\P.Priime\thmPPRIIME Light.jpg	resources/Artwork/Themes/P.Priime/thmPPRIIME Light.jpg	435ce87c46f6df4cb68433280c4a1ba23b108edd751273ea20e03270bed87284
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Sytrus.flstheme	resources/Artwork/Themes/Sytrus.flstheme	66c5ec9f516b0a872db6b8ebab2d98ef6d65ede17dd6564711371fd74e4623ef
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Sytrus.jpg	resources/Artwork/Themes/Sytrus.jpg	2d53fa4a9e8fc38ddb8e7c045120240e5922587fa3c6adaf863553ca1a6202f9
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmAsh.jpg	resources/Artwork/Themes/thmAsh.jpg	fa20a281a3c5153c9e5f280a34287e075568a0f1237eb62cb37d43abcc773b09
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmDark orange.jpg	resources/Artwork/Themes/thmDark orange.jpg	54a738dbe2633f11919429cb25752a01f1f8c03c7fafc8311bcedda71cc3d7b3
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmDark.jpg	resources/Artwork/Themes/thmDark.jpg	604004083d2811d0da316ac793121768574de08cb0d9680ec29c4cffaf97b1f4
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmDefault.png	resources/Artwork/Themes/thmDefault.png	ae857eb6712c97d17a741d485e759cfe85493d0cd8790cda5e103794c4ba2b2a
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmLight cherry.jpg	resources/Artwork/Themes/thmLight cherry.jpg	a9e712ae81c8654522706a35452769b14dc9b7b25c0ad042f2d2e8de53d8032b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmLight pear.jpg	resources/Artwork/Themes/thmLight pear.jpg	2e5f4c7b9fecece7d69e44194425c746e7590d07264416983f24bb60595a0a72
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmLight tangerine.jpg	resources/Artwork/Themes/thmLight tangerine.jpg	e47fe028d27e1c1262f126d47db1eb835f20e5c694125c8dde299a6495773b22
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmSytrus.jpg	resources/Artwork/Themes/thmSytrus.jpg	4ea4ba206a4646451b123848e8221a122690427f0122caf32c5f5289bf7dbad4
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\thmUltra green.jpg	resources/Artwork/Themes/thmUltra green.jpg	199b1298ac105112ab2b12fe1c0564f8e461c9a3025d633e5f38af726fe082a6
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\tweak_default.png	resources/Artwork/Themes/tweak_default.png	0671f8637705575fce5ba2b369b930b0ffcd1b05f1143adbb5c915245f886008
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Ultra green.flstheme	resources/Artwork/Themes/Ultra green.flstheme	ccd159dd0f84d90649739c3d1c2c41e6e94618401e81f112927bfd11c7f9a697
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Ultra green.txt	resources/Artwork/Themes/Ultra green.txt	24cf53e3a426a2c6fc3cd73ec4fb8cdaed20f16becdf6da230fef27e8a481ec8
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Veela\thmVeela.png	resources/Artwork/Themes/Veela/thmVeela.png	a0f77d5203fee2fcceda41c56e77bb879a587e101be8e724ed16e8d525e1ef40
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Veela\veela-background-plain.png	resources/Artwork/Themes/Veela/veela-background-plain.png	6550f64a58ccab256567946dc837097c84a782ae00101a90d4786265007944fc
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Themes\Veela\Veela.flstheme	resources/Artwork/Themes/Veela/Veela.flstheme	ddedec567c87b5b0b30ec73ba9ac81637b5ee0a962b831a943402669c5e25f39
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\ASCII.png	resources/Artwork/Wallpapers/ASCII.png	f477a8b8243f8f7c7b0826ba67fe007137d20d86ebc452d7af1ab5062c933114
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Bot.jpg	resources/Artwork/Wallpapers/Bot.jpg	fd8e3995630c01d9107ac2cc06a33ed2a07adb12718e77c1cc86a1bea59ab363
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Browser.html	resources/Artwork/Wallpapers/Browser.html	d13f3850c512e0b85c4f77349c6d7288a0ef09b5b135d242aa6b3c057d130edb
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Default (ultra violet).txt	resources/Artwork/Wallpapers/Default (ultra violet).txt	f9f7905baf52fe2b5981d79098a11f4880c257d58c89283d9fe64a30750b40aa
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Fence.png	resources/Artwork/Wallpapers/Fence.png	e75d52ae40fba61aa902af2a64bffb5c83e2158c0eaba93578608d1c66ab0c6f
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL STUDIO dark smaller.png	resources/Artwork/Wallpapers/FL STUDIO dark smaller.png	a3519056598f7aac838c47bf9b96344a5045a602a3cac6f23e800bfae67374cc
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL STUDIO nixie bot.png	resources/Artwork/Wallpapers/FL STUDIO nixie bot.png	0fe33c5afb261de286cb8824b4be529b543bcb88de5cc315cf7325861bc80b25
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL STUDIO.png	resources/Artwork/Wallpapers/FL STUDIO.png	a2044f0600ec8c36914c1e83e6652be3ebcba634a9de8a1c8057d787b1ce3243
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (bust).png	resources/Artwork/Wallpapers/FL-chan (bust).png	e0ff3548e0bc26b812bca4c9a73482462d696167c4c4e1ab7ab93cafd14d8e22
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (chibi blurred).png	resources/Artwork/Wallpapers/FL-chan (chibi blurred).png	b5ed286f10c66474e8aa305cee41c82548cff1f2346bd26ce21300eaa10fd63d
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (chibi).png	resources/Artwork/Wallpapers/FL-chan (chibi).png	e4011d8434cfd6218b59b46050c67d7d097c0b22d1dd959fc9272f7ebf7a3540
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (SD).png	resources/Artwork/Wallpapers/FL-chan (SD).png	ec208a2cf0d539073faa11d16cfcbe73576d816b655c73304565a65ef02dae80
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (sketch).png	resources/Artwork/Wallpapers/FL-chan (sketch).png	823a49df0dbadfd3852f94fe2100dd4ed9ba20e9d46ffeb339930c75376c7083
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan (soft).png	resources/Artwork/Wallpapers/FL-chan (soft).png	37aec1d4c52f4552145928ce9e881ec01467500ed965def40b2bd101a85a49c5
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-chan.png	resources/Artwork/Wallpapers/FL-chan.png	9743837fb069e455fa04404e857eccf2658a1a7b0d9ee776c933e8b5adca7cdd
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\FL-Chan.txt	resources/Artwork/Wallpapers/FL-Chan.txt	9640fdfe7287a629c482d162ed8656383ab58bb9409aea1df6e81e3b6255aefa
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Fresh fruits.jpg	resources/Artwork/Wallpapers/Fresh fruits.jpg	23e3f6e9ead8b16427888537e7047e5b521f08ed2f31c4b363b78c62bd1c09c7
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Fruit plate.txt	resources/Artwork/Wallpapers/Fruit plate.txt	9705c0cf30481adca2923ceda2ba811ef5a9ede5806e829248fbc50c61b1ed8e
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Fruits.png	resources/Artwork/Wallpapers/Fruits.png	0217c04286245f3c583d9e9a0c4f8150011c55fa709be7c46efb361d2b7fd935
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Grid.png	resources/Artwork/Wallpapers/Grid.png	214e79f3c8d680e302983cab8c162e387a5812f697e860ef99a3218a2d07f2dd
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Knob.txt	resources/Artwork/Wallpapers/Knob.txt	3f58f5ab15830901e12181eaf6aef9ed1a29ce5fde0a4e7b92570de192faad58
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\LMHY.png	resources/Artwork/Wallpapers/LMHY.png	fad77b13573a9a7aef347fc0b655c7fc638356d240e775362dffffc0afbf781b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Metal plate.txt	resources/Artwork/Wallpapers/Metal plate.txt	80ecbf7e0660e4d9864d81993ef3daa580b524d9bb0bbd3e3412affa41d1e226
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Mosaic.png	resources/Artwork/Wallpapers/Mosaic.png	527fb9e1c72b857f446298ec06d3e35cf3838819d902f1e26404af81fe53ae7b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\New fruits.png	resources/Artwork/Wallpapers/New fruits.png	7b35b7d3cf599f1092a7a15386450a448cb32e63175c4a92f943934a7f8d31ac
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Splash.png	resources/Artwork/Wallpapers/Splash.png	a79c760d0b55bb74301c0886929fa3dc7327d9a533060f32702a0a97d462368b
+C:\Program Files\Image-Line\FL Studio 21\Artwork\Wallpapers\Texture.png	resources/Artwork/Wallpapers/Texture.png	db0c9b130c94935853c8996ac8f68187a5c745ea33cf5fb13d104a76f1e3149b
 C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects.nfo	lift/out-idle1/inputs/install/Data/Demo projects.nfo	a362c7539de8a60a33413e344c409ff9fb3be8bcebbfdb4cf367e87d4c7fc311
-C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\NewStuff.flp	lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp	9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\NewStuff.flp	@lazy-file:lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp	9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\Razer Chroma\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\	-	-
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Asher Postman - Future House.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Asher Postman - Future House.flp	5dc2baba7088c761b2fc76b4e9ad2d68c06d28962feeea2b8960f65ad3feb146
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Astes - Bien Duro.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Astes - Bien Duro.flp	394af32e1daf734dba2d97df89f8e41c73068ffa3dcd2f7508bca4d64d763b26
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Atthar Feat Mehran Abbasi & Elise Chantelle - Right Night feeling.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Atthar Feat Mehran Abbasi & Elise Chantelle - Right Night feeling.flp	3e165c21288f86ab90c6e491540b740f8e1180693d051491f78b3474278a08e6
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Bombs Away ft KARRA - I'm Awake.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Bombs Away ft KARRA - I'm Awake.flp	0c4b22170ef7400db9b0f9943ad3c5258fcc78d24f61639f8edd741ad81b1912
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Chan Gibbons x Ceebeaats - Time.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Chan Gibbons x Ceebeaats - Time.flp	9180bbb64a9ce2546bf90b29f255b93bf4ff6568589867ea912acced6a8006e9
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Cuebur & Thandi Draai - Africa's Calling.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Cuebur & Thandi Draai - Africa's Calling.flp	37d3e05a808bc56975fa4751d65813c45429dec5b7998f21928ff0953066b183
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\DEDZII - NIGHT TERROR.flp	@lazy-file:resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp	a53124d19adab2cbbaf52f86bc380557f938ec7064f727e01d170c1aeab2c95a
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Edlan & Ella Noël - Song For You.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Edlan & Ella Noël - Song For You.flp	b37243d9e512e9978df12a18efabe0b5114d53478291f5e739505e469277a119
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Electroconductor - Inner Days - Original.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Electroconductor - Inner Days - Original.flp	6793bfec2d1127cf78e9c218f4ff3615c9bbf1abd7c8b380e90f04eef47f1f40
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Electroconductor - Inner Days - SH-1 Rework (feat. Maja Mannila).flp	@lazy-file:resources/Data/Demo projects/Demo songs/Electroconductor - Inner Days - SH-1 Rework (feat. Maja Mannila).flp	938e91088abf9eede9493e3b26df54e2f74bbd00ca97bfa3f9811de68c29d475
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Eric Kauffmann & NrgMind - Exoplanet.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Eric Kauffmann & NrgMind - Exoplanet.flp	76a5cd7a0fff653072d96d256b1a371d228c55d80734741539e7adc61e0b63ea
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Jay Cactus x Confz - Mic Check Ready.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Jay Cactus x Confz - Mic Check Ready.flp	6a33661b704150f1c8edef2f664d9462df07611db9559ad46ef1ed7fadb17495
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\LeriQ - SHINE.flp	@lazy-file:resources/Data/Demo projects/Demo songs/LeriQ - SHINE.flp	4d7272968aecca97b07f6e9a7c219d70edf0f13fd5e6d40ae29f8765ba227a63
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\LollieVox & Lezina J - I'll Be Your Madonna.flp	@lazy-file:resources/Data/Demo projects/Demo songs/LollieVox & Lezina J - I'll Be Your Madonna.flp	10163fc586b307b3fa98788afeb0b7ddc0fdfd676720a5994a679999d404bcd8
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Mehdi Ebrahiminejad - Never Out.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Mehdi Ebrahiminejad - Never Out.flp	631dd2e941a7f3a24d69e57b287639ae877e1fde364e60ba97498699c4bfcbf9
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Mehran Abbasi - With You.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp	569f8e9a3dfbd118662326c15f158b3d49cff247ecdaa9235f97dbe4dc09f794
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Ookay - Thief.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Ookay - Thief.flp	9bd28ac62041297f973c1570df77e9b97fe9ca0b71ab458ef4d24b0ec6354a45
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\P.Priime - Use Me.flp	@lazy-file:resources/Data/Demo projects/Demo songs/P.Priime - Use Me.flp	4f7d8d5d81272ec7d48870fb8c1304f84c1c9cdfea2b9ae6c892636865d50318
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Purps On The Beat Feat Luclover - Stroll Up.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Purps On The Beat Feat Luclover - Stroll Up.flp	ae5b613e8b6b26e6b9ae9c5313e9fb13e91f127fc462bf61e1132ac3a8452d45
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Demo songs\Sid De La Cruz - Secret Agent Rendezvous.flp	@lazy-file:resources/Data/Demo projects/Demo songs/Sid De La Cruz - Secret Agent Rendezvous.flp	68f7ba2ca47cf52030aa17fbc62ee526ace561fe3b2f9877d59510abe5d4a988
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\Charles Deluxe - Performance Demo.flp	@lazy-file:resources/Data/Demo projects/Performance mode/Charles Deluxe - Performance Demo.flp	6a75c90cfb7b15fb6ea4a8605837fb3f3201170874b976b7b1bc1aba7c4045f2
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\Drumloop Masher.flp	@lazy-file:resources/Data/Demo projects/Performance mode/Drumloop Masher.flp	ace7ed0a7c0a2e3810dc0aa0a5b48dbf16263eec45425f7e68864e937c9a5e1f
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\nucleon - Complextreon.flp	@lazy-file:resources/Data/Demo projects/Performance mode/nucleon - Complextreon.flp	15f8ab9afacb67a55d946347d61734db34a078d225f8804c5f436034d7879167
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\nucleon - Housework.flp	@lazy-file:resources/Data/Demo projects/Performance mode/nucleon - Housework.flp	205c38b613a793020c5ecb10fc2af066fa330b5f581c76e9414df67d868fa18d
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\nucleon - Steptime.flp	@lazy-file:resources/Data/Demo projects/Performance mode/nucleon - Steptime.flp	5a538397e5755339dd3475f925a60dde7f6accf8607ad0808ab1bf195164c26f
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Performance mode\SeamlessR - Bass Antics Performance.flp	@lazy-file:resources/Data/Demo projects/Performance mode/SeamlessR - Bass Antics Performance.flp	7e0793bbd96b54ad5817526dfd05a5932b218dba6c35aede3f28401fb76af472
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Electric Loop - The Ogun Dream.flp	@lazy-file:resources/Data/Demo projects/Product demos/Electric Loop - The Ogun Dream.flp	1c1ac0caf8a0c0a806bc5927caaac6e14ad22270fc8b8816c65d5e3b806da0ea
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\nucleon - Fruity Delay 3.flp	@lazy-file:resources/Data/Demo projects/Product demos/nucleon - Fruity Delay 3.flp	e2b62b7936ce08ea67fa5ed226a3afa55de772b3130387808e14238465b343ab
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\nucleon - Harmless Galactic.flp	@lazy-file:resources/Data/Demo projects/Product demos/nucleon - Harmless Galactic.flp	a599f1a5662a0d17d516241690d8342a189c137c78e15010580269eed28e287a
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\nucleon - Transient Processor.flp	@lazy-file:resources/Data/Demo projects/Product demos/nucleon - Transient Processor.flp	5265874fd8a971770f9d9fedc88a54941a2b20624f7c8839e5eff75a4c0459b5
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Olbaid - Harmless Essentials.flp	@lazy-file:resources/Data/Demo projects/Product demos/Olbaid - Harmless Essentials.flp	1891a0549624a940f9bcdd17da42255a77a65d0467082d4d36f0c180d4f7f8cf
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Olbaid - Sytrus Essentials.flp	@lazy-file:resources/Data/Demo projects/Product demos/Olbaid - Sytrus Essentials.flp	5b6723e8540365aec265ce950c37853c8de2eee5d28ad25f00b1400ff8ab5ac5
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Square a Saw - Lightning (VEELA Vocals Resynthesized).flp	@lazy-file:resources/Data/Demo projects/Product demos/Square a Saw - Lightning (VEELA Vocals Resynthesized).flp	fa04c42e1c148ff24f4b5aa96a29a3e20f9f947c8a17f238b21146568f964a81
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Square a Saw - Oxygen (Tevlo Vocals Resynthesized).flp	@lazy-file:resources/Data/Demo projects/Product demos/Square a Saw - Oxygen (Tevlo Vocals Resynthesized).flp	c18ec13ec570703e026be7591e744635817566bde679cad6fff9bc6a87f498f5
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Synth_dfr - Overcome - Sytrus.flp	@lazy-file:resources/Data/Demo projects/Product demos/Synth_dfr - Overcome - Sytrus.flp	cc02ff43574a124e5f064dd2334b361e48a497144c9e1f13460953eefc443ae1
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Product demos\Vocodex demo.flp	@lazy-file:resources/Data/Demo projects/Product demos/Vocodex demo.flp	d718405a6595e12e4e303920364a3510146863d71a18cb8fe3cf5718d40f36f2
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\Razer Chroma\nucleon - Razer Chroma.flp	@lazy-file:resources/Data/Demo projects/Visual/Razer Chroma/nucleon - Razer Chroma.flp	ed9cbb79475bef0872f9278a19042b9fdc98d94a3f5dee2be6836de987f16ebf
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Astes - Raubana - LIFE.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Astes - Raubana - LIFE.flp	1d00eb82432c5b7cf3e47c04252dba720a2f44f230175cc7a39d1fbfdbbf7b1c
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\JuiceBass - SeamlessR - Menagerie.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/JuiceBass - SeamlessR - Menagerie.flp	8296880e285267b898fe6db18ede5a3fb80097f90ece97e211891ac50fc7087c
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Sacco - Expanding universe.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Expanding universe.flp	b1b79709ca93fd4bf88bef68daa9e4687e1186a04d06d6a7eb27650a794d0a69
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Sacco - Exploding Chips.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Exploding Chips.flp	20220838a348c3e986acb5f382cd0cbfa13707aa11c12cb2114a163fa34b9c49
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Sacco - FlashyWaves.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - FlashyWaves.flp	6d6964795dfb4b3e647c6b43bfaf7ecbb1c86c66f2a56de9df9599b2379afa3e
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Sacco - Pumping objects.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Sacco - Pumping objects.flp	c73ca89f802d0a1a60cc0f0beff7294f10fa3d0072309eda0af6a336ebbe4e12
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Treben - Gimbal and Sinan - RawFL.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Gimbal and Sinan - RawFL.flp	7bcacd9b07222c51f3f50746dab6ac7565860bb6be7463355cc78bfdd2266108
+C:\Program Files\Image-Line\FL Studio 21\Data\Demo projects\Visual\ZGameEditor Visualizer\Treben - Umziky - All the same.flp	@lazy-file:resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Umziky - All the same.flp	562c1044fcbf4ba4d0139a5ff89cf4e1cfe7324e39d9fccd9c4f01da974e4df2
 C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Channel presets.nfo	lift/out-idle1/inputs/install/Data/Patches/Channel presets.nfo	cd2d0ffc59697cb63259e142fc92bd7af223a6cead7e0bd995556ea800659ab0
 C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Envelopes.nfo	lift/out-idle1/inputs/install/Data/Patches/Envelopes.nfo	c8eff7e1d04ef334dc1ec67de955a3e94c209f35f16645cc59bc6236b4122729
 C:\Program Files\Image-Line\FL Studio 21\Data\Patches\Impulses.nfo	lift/out-idle1/inputs/install/Data/Patches/Impulses.nfo	d0c14c441b1ffed85f8be7d803a9975d6b3aa14ffbfb5a070039ac7ed2d1688c
@@ -238,6 +475,21 @@ C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\Support - Forum.u
 C:\Program Files\Image-Line\FL Studio 21\System\Internet\About\Support - Knowledgebase.url	lift/out-idle1/inputs/install/System/Internet/About/Support - Knowledgebase.url	148284827bfba36adc2dacf60fbcee204a26c4f25f2ff1e316d7d6318bf03a44
 C:\Program Files\Image-Line\FL Studio 21\System\Internet\Default news.rss	lift/out-idle1/inputs/install/System/Internet/Default news.rss	d4bc1d95850aa828b7d694a2f7ec94d99a6869461b8e3c521fedbe7a93cb9c34
 C:\Program Files\Image-Line\FL Studio 21\System\Languages\en.svg	lift/out-idle1/inputs/install/System/Languages/en.svg	ede8af9e729b81ffc599e71abf89a7e85414b16fa79afe3aea958debd3ee7712
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\	-	-
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\de.moe	resources/System/Languages/de.moe	fdd29ebca1be8b4e66aa8cb54aca1e7fb68de2c90cf62ee1cfe2560c1b4e40f0
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\de.svg	resources/System/Languages/de.svg	44a4580e94ae11037b8983e43e37a220e72f884217dba5b33a94309db2dcd88b
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\es.moe	resources/System/Languages/es.moe	25418b7c2c88001047696247fdccbd9546acd6f9a6b9d9af122a899617ca0390
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\es.svg	resources/System/Languages/es.svg	e35c6f4b7665e832dfba34f447b8f1320274986f496e8fbfad1acdd7ee8c994b
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\fr.moe	resources/System/Languages/fr.moe	04b92c8a5413da0eceb00e8b7ab6e0c29e4f759a856ff90732247b0e4d00de92
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\fr.svg	resources/System/Languages/fr.svg	efbc92e9e937af3b3f44e16793c817e05c1681b171fe9efc88b2df753e7de247
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\ja.moe	resources/System/Languages/ja.moe	b641212716588a8b8f85ec3a447c3ceb74189f3d533871564718083dcb82a46b
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\ja.svg	resources/System/Languages/ja.svg	35e785339e19d1ec1987cb9c3d8e66fc97f29a287db0b0b590b8dfdd96d4766b
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\ko.moe	resources/System/Languages/ko.moe	0455ca5de00092ff47b757d0714c4d462c95b92172180ff3f865479b6de75823
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\ko.svg	resources/System/Languages/ko.svg	7819689a31bc0a7e942e33139314e020242d13e5e877bfbc3308360ebd45ec3b
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\vi.moe	resources/System/Languages/vi.moe	d31c9950046b34d8ac4bd8718eb1b5d90d8054d52c8498937522b1ed63c7d5bc
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\vi.svg	resources/System/Languages/vi.svg	175120e06bb95dda22133758395f352acb46433ff81eee449326db54e78af2c4
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\zh.moe	resources/System/Languages/zh.moe	04b5bcf2dd3fcce3991e988e22d691669f28cac68a0e8d574ba86225a1521bc6
+C:\Program Files\Image-Line\FL Studio 21\System\Languages\zh.svg	resources/System/Languages/zh.svg	18ca2ce0b32339bc93775a3d55d835f3c0a3daad8025e86203694e33057d385d
 C:\Program Files\Image-Line\FL Studio 21\System\Texts\About\AboutTxt.txt	lift/out-idle1/inputs/install/System/Texts/About/AboutTxt.txt	2e59358cbd85ac611a8fd2296f12adb6ad6ad98f8a5689818d0c0fa5a8c8813c
 C:\Windows\Fonts\msgothic.ttc	lift/harness/seeds/os-fonts/NotoSansCJKjp-subset-msgothic.ttc	1ab00fd8ffe15553c16ef441b6a63e539159d560491c70fbc598d26f470eea69
 C:\Windows\Fonts\arial.ttf	lift/harness/seeds/os-fonts/LiberationSans-Regular.ttf	075e71be4c58beda172ecb574a799308f04c3d054c6a5b7434954d3b0f1b28d8

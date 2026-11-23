@@ -87,7 +87,7 @@ static uint64_t tick(void)
  * A lazy file has its size, attributes and times in the node and its bytes in a stream the host owns (a stream = the concatenation of the files of one kind, as one logical byte string). The runtime never touches
  * the host file system itself: the harness gives it ONE read function (fle_vfs_lazy_set_reader) and the lengths of the streams. A read of a lazy file asks the host for exactly the bytes of the guest's buffer
  * (no copy in the volume); a write, SetEndOfFile, a mapping or a host-side peek first makes the file ordinary (copy-on-write of the whole file; nothing is written back to the stream). */
-#define LAZY_MAX_STREAMS 32u
+#define LAZY_MAX_STREAMS 512u   /* #1345: one stream per file of the seed list (its bytes are read when the guest reads them), and the index streams (harness/vfs_lazy.h VL_REG_MAX) */
 static uint64_t lazy_logical[LAZY_MAX_STREAMS];
 static unsigned n_lazy_streams;
 static fle_vfs_lazy_read_fn lazy_read_fn;
@@ -107,17 +107,30 @@ static void fail(uint32_t err, uint64_t ret)
 /* C-3 (#1316): the line for a request that failed because the file, the directory or the module is not there. A unit
  * that is not printable ASCII, and the quote, is written as \uXXXX, so the path stays between the quotes on one line. Every
  * failure writes its own line: the count of a path is the count of its lines in the engine's log. */
-void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n)
+static void quoted_units(char *out, size_t cap, const uint16_t *w, size_t n)
 {
-    char out[6 * MAX_PATH_UNITS + 1];
     size_t k, o = 0;
     if (n > MAX_PATH_UNITS) n = MAX_PATH_UNITS;
     for (k = 0; k < n; k++) {
         uint16_t c = w[k];
         if (c >= 0x20 && c < 0x7f && c != '"') out[o++] = (char)c;
-        else o += (size_t)snprintf(out + o, sizeof out - o, "\\u%04X", (unsigned)c);
+        else o += (size_t)snprintf(out + o, cap - o, "\\u%04X", (unsigned)c);
     }
     out[o] = 0;
+}
+
+static int note_quiet;
+
+void fle_vfs_note_quiet(int on)
+{
+    note_quiet = on != 0;
+}
+
+void fle_vfs_note_missing(const char *api, uint32_t err, const uint16_t *w, size_t n)
+{
+    char out[6 * MAX_PATH_UNITS + 1];
+    if (note_quiet) return;
+    quoted_units(out, sizeof out, w, n);
     fprintf(stderr, "missing-path: %s %u \"%s\"\n", api, (unsigned)err, out);
 }
 
@@ -309,6 +322,14 @@ static void vp_free(vpath *v)
 static void note_missing(const char *api, uint32_t err, const vpath *v)
 {
     fle_vfs_note_missing(api, err, v->own, v->olen);
+}
+
+/* #1345: the line for a listing (FindFirstFileW with a wildcard): the number of names it returns (. and .. not counted) and the request as the guest wrote it. One line for every listing. */
+static void note_listing(const vpath *v, size_t count)
+{
+    char out[6 * MAX_PATH_UNITS + 1];
+    quoted_units(out, sizeof out, v->own, v->olen);
+    fprintf(stderr, "enum-dir: %zu \"%s\"\n", count, out);
 }
 
 static int is_device(const uint16_t *c, size_t cl)
@@ -1074,7 +1095,7 @@ void fle_imp_FindFirstFileW(void)
     fle_node *n, *par;
     uint32_t st;
     find_item *items = NULL;
-    size_t cnt = 0, cap = 0, i;
+    size_t cnt = 0, cap = 0, i, nk = 0;
     find_ent *fe;
 
     if (pdata == 0) fle_stop(api, "lpFindFileData is NULL");
@@ -1110,12 +1131,15 @@ void fle_imp_FindFirstFileW(void)
             if (glob(pat, pl, dotdot, 2)) item_push(&items, &cnt, &cap, n->parent, dotdot, 2);
         }
         for (i = 0; i < n->nkids; i++)
-            if (glob(pat, pl, n->kids[i]->name, n->kids[i]->nlen))
+            if (glob(pat, pl, n->kids[i]->name, n->kids[i]->nlen)) {
                 item_push(&items, &cnt, &cap, n->kids[i], n->kids[i]->name, n->kids[i]->nlen);
+                nk++;
+            }
     } else {
         st = lookup(api, &v, &n, &par);
         if (st == 0) item_push(&items, &cnt, &cap, n, n->name, n->nlen);
     }
+    if (v.wild) note_listing(&v, nk);
     if (cnt == 0) {
         free(items);
         note_missing(api, st == 3 ? 3u : 2u, &v);

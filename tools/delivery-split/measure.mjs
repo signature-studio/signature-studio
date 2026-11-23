@@ -1,7 +1,8 @@
 // Delivery split of the start-up (Issue #1314): what the page downloads before the engine starts (the manifest's pre-start assets) and what it downloads after it has started (manifest.lazy),
 // and when the engine is idle. One run = one headless Chrome with a new profile, the same launch as tools/boot-check/boot-bundle.mjs, until the engine is idle (or an error / exit).
 // Usage: node tools/delivery-split/measure.mjs <absolute path to the bundle directory raw/<name>> [runs, 1..5, default 3] > delivery.jsonl
-// stdout: one JSON object per run, on its own line: {"state","standIn","error","elapsedMs","preStart":[{"name","bytes"}],"lazy":[{"name","bytes"}],"preStartDoneMs","fetches":[{"name","startMs","endMs"}]}
+// stdout: one JSON object per run, on its own line: {"state","standIn","error","elapsedMs","preStart":[{"name","bytes"}],"lazy":[{"name","bytes"}],"preStartDoneMs","lazyStartMs","lazyDoneMs","lazyWaitFirstMs","lazyWaitLast","fetches":[{"name","startMs","endMs"}]}
+//   lazyWaitFirstMs: the time of the first read of a lazy file that had to wait for its bytes (the page mark lazy_wait, ms since the navigation); lazyWaitLast: the last such read (its path and ms). null: no read waited.
 //   state: the page's state at the end ('engine-idle' is the good one); standIn: whether the text "STAND-IN" is in the page body (a reading, as in boot-bundle.mjs); error: null, or what failed.
 //   preStart / lazy: the manifest's assets, `bytes` = the decoded size (what the page counts). preStartDoneMs: the page's timeline mark download_done (ms since the navigation started).
 //   elapsedMs: the page's timeline mark idle (ms since the navigation started: the engine is idle). fetches: the browser's resource timing of the bundle's assets (startTime and responseEnd, ms since the navigation started).
@@ -50,6 +51,7 @@ const ISOLATION = [
 // read in the page: the state, the manifest, the marks of the timeline, and the resource timing of every request made so far
 const SNAPSHOT = `(() => { const a = window.__app ?? null; return {
   state: a ? a.state : null,
+  details: a ? a.details : {},
   manifest: a ? a.manifest : null,
   timeline: a ? a.timeline : {},
   error: a && a.error ? a.error : null,
@@ -98,7 +100,7 @@ function fetchesOf(resources, byUrl) {
 
 async function measureOnce(port) {
   const t0 = Date.now();
-  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, fetches: [] };
+  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [] };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-delivery-run-'));
   let chrome = null, cdp = null;
   try {
@@ -132,6 +134,10 @@ async function measureOnce(port) {
     out.preStart = a.preStart;
     out.lazy = a.lazy;
     out.preStartDoneMs = num(tl.download_done);
+    out.lazyStartMs = num(tl.lazy_start);
+    out.lazyDoneMs = num(tl.lazy_done);
+    out.lazyWaitFirstMs = num(tl.lazy_wait);
+    out.lazyWaitLast = snap?.details?.lazy_wait ?? null;
     out.elapsedMs = num(tl.idle);
     out.fetches = fetchesOf(snap?.resources ?? [], a.byUrl);
     if (!snap) out.error = `window.__app not readable within ${WAIT_LIMIT_MS} ms`;

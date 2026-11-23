@@ -132,9 +132,9 @@ int main(int argc, char **argv)
     set_pattern();
     check(vfs_seed_from_env() == 0, "good list: returns 0");
     check(pattern_intact(), "good list: R[] put back");
-    /* the 3 seeded files used the file handle numbers 1..3 (never reused), so the first handle the guest gets is the 4th */
+    /* #1345: the seeded files are lazy (no handle is made while seeding), so the first handle the guest gets is the 1st */
     h = VS_CALL(fle_imp_CreateFileW, VS_A(u"C:\\Program Files\\Image-Line\\X\\a\\abc.bin"), 0x80000000u, 1, 0, 3, 0x80, 0);
-    check(h == FLE_VFS_FILE_BASE + 4u * 4u, "good list: the first guest handle is the 4th (the seeding used 3 handle numbers)");
+    check(h == FLE_VFS_FILE_BASE + 1u * 4u, "good list: the first guest handle is the 1st (the seeding made no handle)");
     VS_CALL(fle_imp_CloseHandle, h);
     check((attrs_of(u"C:\\Program Files\\Image-Line\\X\\a\\b") & 0x10u) != 0, "good list: a directory made on the way exists");
     a = attrs_of(u"C:\\Program Files\\Image-Line\\X\\a\\abc.bin");
@@ -157,7 +157,6 @@ int main(int argc, char **argv)
     write_file(dir, "one.bin", (const uint8_t *)"abc", 3);
     {
         static const struct { const char *name, *second; } bad[] = {
-            { "sha mismatch", "C:\\neg\\two.bin\tabc.bin\t0000000000000000000000000000000000000000000000000000000000000000\n" },
             { "sha not hex", "C:\\neg\\two.bin\tabc.bin\tzzzz\n" },
             { "missing host file", "C:\\neg\\two.bin\tno-such-file.bin\tba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\n" },
             { "relative host with ..", "C:\\neg\\two.bin\t../abc.bin\tba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\n" },
@@ -179,6 +178,16 @@ int main(int argc, char **argv)
             check(attrs_of(u"C:\\neg") == FLE_INVALID_FILE_ATTRIBUTES, nm);
         }
     }
+    /* #1345: a wrong SHA-256 is not found by the seeding (the list is accepted; the file is put by its size), but at the first read of the file, which is refused */
+    write_list(dir, "sha.tsv", "C:\\neg-sha\\two.bin\tabc.bin\t0000000000000000000000000000000000000000000000000000000000000000\n");
+    snprintf(list, sizeof list, "%s/sha.tsv", dir);
+    setenv(VFS_SEED_ENV, list, 1);
+    set_pattern();
+    check(vfs_seed_from_env() == 0, "sha mismatch: the list is accepted (the seeding does not read the file)");
+    check(pattern_intact(), "sha mismatch: R[] put back");
+    check(vl_read(NULL, vl_n_streams - 1, 0, back, 3) == 0, "sha mismatch: the first read is refused");
+    check(vl_read(NULL, vl_n_streams - 1, 0, back, 3) == 0, "sha mismatch: a later read is refused too");
+    check(vl_read(NULL, 0, 0, back, 3) == 1 && memcmp(back, "abc", 3) == 0, "a file with the right SHA-256 is read at its first read");
     /* a relative host name without FLE_VFS_SEED_ROOT, and a missing list */
     unsetenv(VFS_SEED_ROOT_ENV);
     snprintf(list, sizeof list, "%s/bad.tsv", dir);

@@ -20,6 +20,7 @@ import { Script, installTree } from './lib/nsis-script.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REPO_ROWS = 'lift/harness/seeds/os-fonts/';
+const LAZY_FILE = '@lazy-file:';   // Issue #1345: the host field of a row the page serves after the start (the file is still extracted)
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
 
 function rows(file) {
@@ -71,7 +72,8 @@ function main(argv) {
     let n = 0;
     for (const r of rows(seed)) {
       if (r.length < 3 || r[1] === '-') continue;
-      const [guest, rel, want] = r;
+      const [guest, host, want] = r;
+      const rel = host.startsWith(LAZY_FILE) ? host.slice(LAZY_FILE.length) : host;
       let data;
       if (rel.startsWith(REPO_ROWS)) {
         data = fs.readFileSync(path.join(ROOT, rel));

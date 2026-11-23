@@ -6,6 +6,7 @@
 //
 // What goes in: the VFS seed list and, for every line of it that names a host file, that host file (path relative to --root). The SHA-256 of every host file is checked
 // against the list's third column before it is packed; the registry seeds and the Authenticode claims come in as --extra.
+// A host field that starts with '@lazy-file:' (Issue #1345) is a --lazy HOST of the list itself: the list says the file is served after the start, and the same SHA-256 check applies.
 // --lazy HOST (repeatable, Issue #1315): a host file of the list that is NOT packed. It is checked against the list the same way and written to the side manifest under `left_out`;
 // pack-assets.mjs --lazy-file names it, and the page downloads it after the engine has started (the engine reads it from <root>/seed/<HOST> as it reads the packed files).
 // Layout (little endian): 'FLSEEDP1' (8 bytes) | u32 header_length | header (UTF-8 JSON) | the data region.
@@ -15,6 +16,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
+// Issue #1345: the host field of a row that the page serves after the engine has started (the engine puts it on the volume by its size and reads it when the guest asks)
+const LAZY_FILE = '@lazy-file:';
 // Python's json.dumps (ensure_ascii): every character outside printable ASCII is written as \uXXXX (the line breaks of an indented form stay)
 const pyJson = (v, indent) => (indent === undefined ? JSON.stringify(v) : JSON.stringify(v, null, indent))
   .replace(/[^\x20-\x7e\n]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
@@ -54,6 +57,7 @@ function main(argv) {
   const want = new Map();
   const guestSeen = new Map();
   const listed = new Set();
+  const lazyRows = [];
   const lines = fs.readFileSync(tsv, 'utf8').split(/\r\n|\r|\n/);
   for (let ln = 1; ln <= lines.length; ln++) {
     const line = lines[ln - 1];
@@ -66,14 +70,17 @@ function main(argv) {
     if (guestSeen.has(gk)) throw new PackError(`vfs-seed: ${tsv}:${ln}: the guest path ${g} is listed twice (line ${guestSeen.get(gk)})`);
     guestSeen.set(gk, ln);
     if (h === '-' && s === '-') continue;
-    if (h.startsWith('/') || h.split('/').includes('..')) throw new PackError(`${tsv}:${ln}: host path must be relative without '..': ${h}`);
-    listed.add(h);
-    if (!a.lazy.includes(h)) add(`seed/${h}`, path.join(root, h));
-    want.set(`seed/${h}`, s.toLowerCase());
+    const lazyRow = h.startsWith(LAZY_FILE);
+    const hp = lazyRow ? h.slice(LAZY_FILE.length) : h;
+    if (hp.startsWith('/') || hp.split('/').includes('..')) throw new PackError(`${tsv}:${ln}: host path must be relative without '..': ${hp}`);
+    listed.add(hp);
+    if (lazyRow) lazyRows.push(hp);
+    else if (!a.lazy.includes(hp)) add(`seed/${hp}`, path.join(root, hp));
+    want.set(`seed/${hp}`, s.toLowerCase());
   }
   // Issue #1315: a --lazy host file is not packed; its bytes are checked against the list here (the packed ones are checked below)
   const leftOut = [];
-  for (const h of a.lazy) {
+  for (const h of [...a.lazy, ...lazyRows]) {
     if (!listed.has(h)) throw new PackError(`--lazy ${h}: not a host file of ${tsv}`);
     const data = fs.readFileSync(path.join(root, h));
     const sha = sha256(data);
