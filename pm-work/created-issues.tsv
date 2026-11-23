@@ -55,3 +55,4 @@
 115	#1355	Browser のパネル(左の黒い領域)を FL と同じにする: 黒いのが描かれていないのか空の一覧なのかを切り分け、一覧に要るフォルダの階層を seed に入れ、中身は起動後に取る	Task
 116	#1357	回帰: Welcome 窓を閉じる(No thanks・Escape・Default の選択)と engine が trap する。ホストのファイルの解放の後の読みを直す	Task
 117	#1358	F10 の General settings(Display の節・Debug タブ・Info タブ)を開き、FL 自身のログと設定を取る	Task
+118	#1362	Browser のパネル: WebView2 の窓の面を、ページ側の iframe に写し、オフラインのページ(error-offline.html)を出す	Task
