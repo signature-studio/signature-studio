@@ -1,6 +1,6 @@
 ---
 draft: "040"
-title: "起動の直後の、guest の長い計算が音声の補充を止める問題を取り除く(切り替え点の挿入。起動して 10 秒後・無操作の途切れ 0)"
+title: "起動直後の音声の補充の停止を測る道具と、関数名の表を入れ、コールバック内の補充の修正を入れる(切り替え点の実装は次の Issue)"
 type: Task
 milestone: "M1 描画と音声の分離(P3)"
 parent: "001"
@@ -11,15 +11,23 @@ priority: Urgent
 project: signature-studio/3
 ---
 
+
+
 ## 目的
 
 P3 の目標は、Song Mode で音が途切れないこと。目標どうしがぶつかるときは P3、P2、P1、サイズの順に優先する(`AGENTS.md`)。
 
 依頼者の指摘(2026-11-23): **起動して約 10 秒後、再生もマウス操作も無い状態で、ヘッダーの `直近 60 秒の途切れ` が 343**(実機)。使い物にならないレベルで、パフォーマンスが最悪である。
 
-この Issue の目標: **起動の直後の途切れを 0 にする**。具体的には、engine の idle の +10 秒と +70 秒に読んだ `直近 60 秒の途切れ` が、n=3 の全てで 0。併せて、音声の補充の停止の最大を 60 ms 以下にする(音声の先読みは 60 ms。この Issue では変えない)。
+この Issue は、1 回の試行で終わる大きさに分けた(PM の決定。3 回の試行で、受け入れの全てには届かなかった)。この Issue で入れるもの:
 
-原因の見立て(前回の試行の実測。下の「前回の試行で分かったこと」): 起動の直後、guest の重い計算が、協調スケジューラの切り替えを通らずに続く。コールバックの中では切り替えが飛ばされ、その間は音声の補充も止まる。前回は、コールバックの中でも補充するようにして途切れを半分にしたが、0 にはならなかった。残りは、切り替え点も音声の呼び出しも無い長い計算(推定。関数は未特定)。
+1. 起動直後の音声の補充の停止を測る道具(`tools/p3-audio-probe/measure.mjs --boot`)と、wasm の関数の番号から guest の関数名に戻す表(製品のビルドで書き出す)。
+2. 計数の定義の食い違い(`maxRefillStallMs` と連続 underrun の最長)を確かめた結果。
+3. コールバック内の切り替えの飛ばしで、外部の音声の消費者があるときだけ音声の補充を行う修正(作業ツリーに在る。`fle_audio_poll_in_callback`)。
+
+途切れを 0 にする切り替え点の実装は、`#{{112}}` に分けた。この Issue の受け入れは、途切れの目標値(0 と 60 ms 以下)を含まない。
+
+原因の見立て(3 回の試行の実測。下の「前回の試行で分かったこと」): 起動の直後、guest の重い計算が、協調スケジューラの切り替えを通らずに続く。コールバックの中では切り替えが飛ばされ、その間は音声の補充も止まる。コールバックの中でも補充すると途切れは減るが、0 にはならない。3 回目の試行で、長い計算の上位の関数を特定した(`f_344fcf0` など。下の表)。どのスレッドの、どの連続の計算が締め切りを超えるかは、`#{{112}}` で確定する。
 
 ## 依頼者の指摘(2026-11-23)
 
@@ -68,43 +76,62 @@ P3 の目標は、Song Mode で音が途切れないこと。目標どうしが�
 - 関数の特定(未完): CDP の `Profiler` を Worker に付けた(navigation から idle の +30 秒まで。サンプリング 250 µs)。関数名は `wasm-function[N]` だけで、guest の RVA に戻せなかった。自己時間の上位は `wasm-function[19053]`(1,337 ms、3.7%)など。上位 20 件は、どれも単独では 120 ms 程度。idle は 69.2%。「切り替え点を通らずに続いた最長」は未確認(枠の名前が無く、`(root)` が 6,138 ms と出た)。`link.map` と最適化後の `engine.wasm` の番号が一致する保証は無い。
 - 作業者の見立て(PM へ): (1) 関数の番号を名前に戻す手段が要る。(2) `maxRefillStallMs`(555〜572 ms)と、連続 underrun の最長(35〜39 quanta、約 100〜115 ms)が合わない。計数の定義を検証する。(3) 押下より前の停止は数えていない。依頼者の実機の 343 は押下の後の数字で、この定義で合うかは未確認。(4) 前景の待ちに約 1 時間使った(下の設計の (iv))。
 
+### 3 回目の試行(run 45084966641。約 4 時間 47 分。受け入れに届かず判定が落ちた。作業は `work.diff` として artifact に残った)
+
+- 受け入れの実測(最終の版。n=3。窓は idle の +10 秒から +70 秒。`measure.mjs --boot`。runner の値):
+
+| 回 | bootLast60sAt10s | bootLast60sAt70s | maxRefillStallMs (ms) | 連続 underrun の最長 (quanta) | quantaDelta | screenDevicePx | ctxState |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 878 | 0 | 722.0 | 63 | 20672 | 3240x1863 | running |
+| 2 | 1112 | 0 | 710.1 | 69 | 20672 | 3240x1863 | running |
+| 3 | 978 | 0 | 700.9 | 60 | 20675 | 3240x1863 | running |
+
+- 結果: `bootLast60sAt70s` は 3 回とも 0(定常は 0)。`bootLast60sAt10s` は 878〜1112(目標 0)。`maxRefillStallMs` は 700〜722 ms(目標 60 以下)。2 回目の試行の 3 回は 447〜556 だった。同じ構成でも値がばらつくため、1 回の比較は弱い。
+- 作業ツリーに残った変更(`work.diff`。5 パス。次の作業者は、取り込まれた物を取り除かずに使う):
+  - `lift/runtime/fle_thread.c`: `fle_progress_slice` のコールバックの分岐で、`fle_audio_poll_in_callback` を呼ぶ(1 行)。
+  - `lift/runtime/fle_dsound.c`: `fle_audio_poll_in_callback`。外部の音声の消費者(AudioWorklet)があるときだけ `audio_sync` を呼ぶ。native の動作は変えない。
+  - `lift/runtime/fle_audio_transport.c`: `fleAudioWorkerState` に `maxPubGapMs`(publish の間隔の最大。出力が両方の区間で進んだときだけ数える。計数のみ)。
+  - `tools/p3-audio-probe/measure.mjs`: `--boot`(既存の窓・`--load ui`・出力の項目は変えていない)。
+  - `pm-work/findings/boot-stall-1334.md`(新規。3 回の実測・関数の表・深さ 2 の実験・計数の食い違い)。
+- 関数の特定(CDP の `Profiler`。engine の Worker。接続〜idle+15 秒。1 回。名前を付けた一時の版で取った。製品には残していない):
+  - idle の後の自己時間(ms。括弧は、呼び出しスタックに連続して在った最長。idle の後だけ): `f_344fcf0` 1713(101)、`f_27ad5f8` 642(68)、`fle_mx_addsd` 461(1.6)、`fle_mx_subsd` 277(1.3)、`fle_mx_addss` 266(5.9)、`fle_mx_mulsd` 171(2.0)、`f_33d6e70` 133(6.7)、`fle_mx_mulss` 121(1.5)、`fle_lg_psrldq` 112(5.6)、`f_27acd60` 107(43)、`fle_hyb_dispatch` 37(163。呼び出しの鎖を含む)。名前は生成器の VA(`f_<16 進>`)。`fle_mx_*`・`fle_lg_*` は SSE 命令のランタイム(演算ごとの呼び出し)。
+  - idle の前(約 8.5 秒まで): メインのスレッドが `DispatchMessageW → call_wndproc` の中に 367 ms 連続で在った(推定: 起動直後の連続はこの間の物)。`vs_sha256_hex` の連続は 131 ms。コールバック内では切り替えが飛ばされる(`fle_progress_slice`)。
+  - idle の後: engine の Worker は 62% が idle(CPU は平均では飽和していない)。長い計算の根は `fle_wasm_thread_entry`(guest のスレッド)。
+- 深さ 2 の実験(1 回。`FLE_PREEMPT_MAX_DEPTH` を 1 → 2。ウィンドウ手続きの中で切り替えを許す): `bootLast60sAt10s` 959 → 764、`maxRefillStallMs` 681 → 1215。停止は悪化したので採らず、戻した。
+- 計数の食い違い(未確認): `maxRefillStallMs`(約 700 ms)に対し、連続 underrun の最長は 60〜69 quanta(約 175〜200 ms)。推定: `maxRefillStallMs` は publish の間隔の最大で、欠落の長さではない(先読み 60 ms を超えて ring に残っていれば、間隔が長くても欠落にならない)。定義の出典: `app/src/audio/page-audio.ts` 234 行(`winMs = 60000`)と 250 行(`underrunQuantaLast60s = c.urQuanta - base.ur`)、`app/src/audio/fle-out.worklet.js` の `UR_QUANTA`、`app/src/audio/status.ts` 18〜19 行。
+- 名前の付いた版を作った経路(一時。製品には残していない): 生成器の関数名の出力は既定で無効(CLI からは有効にできない)。wasm-opt の `-g`、hybrid の wasm-merge の `-g`、link の `--profiling-funcs` が要った(`-g1` では名前が残らなかった)。C 部分の名前の節は約 2.2 MB。名前の節を `engine.wasm` に入れると大きさが増えるので、製品の名前は別のファイルに出す(下の「作業の順序」2)。
+- 判定の結果: 受け入れは exit 1 で通らず、判定は push しなかった。時間の制約で、製品の追加の修正と再ビルドは行わなかった。
+- ビルドの所要(参考): engine の `fe-build engine` は約 35 分、`fe-build bundle` は約 11 分、受け入れの 3 回は約 50 分。
+
 ## 作業の順序
 
-1. **修正を入れ直す**: 前節 5 の修正(`lift/runtime/fle_thread.c` と `lift/runtime/fle_dsound.c`)。単独では 0 にならないことは実測済み。以降の作業の土台にする。
-2. **長く走る関数を特定する**(計測。一時的な変更として入れ、受け入れの前に取り除く)。
-   - 前提(コードの読みで確かめた。計測ではない): 切り替えの計数は、guest の間接呼び出しでしか進まない(`lift/runtime/fle_dispatch.h` の 177 行の `++fle_progress_count`)。直接の呼び出しと、ループの後方辺では進まない。スライスは 4096 回の間接呼び出しごと(`lift/runtime/fle_thread.h` の `FLE_PREEMPT_SLICE_DISPATCHES`)。だから、間接呼び出しの無い長いループは、切り替えを通らずに走りうる。
-   - 方法: CDP の `Profiler` で、engine の Worker に接続し(`Target.setAutoAttach` で Worker の対象へ。`Profiler.start` と `Profiler.stop`)、wasm の関数の自己時間を取る。関数名が取れない場合は、`lift/` の生成物の関数の名前(`lower 0x…` など)から、guest の RVA に対応づける。取り方は作業者が決め、報告に書く。
-   - 対象: 起動の直後(engine の idle の前後 0〜30 秒)。出すもの: (a) 自己時間の上位 20 関数(割合と ms)。(b) 各関数について、切り替え点を通らずに続いた最長の時間(ms)。
-   - 計測の切り替えは、既存の仕組み(既存の記録の経路や、既存の引数)だけで行う。新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数は作らない。既定では無効にする。
-3. **切り替え点を入れる**(特定した長い計算に)。方式は作業者が選び、実測で比べ、理由を報告に書く。
-   - (a) 生成器(`lift/crates/fe-lift`・`fe-wasmgen`・`fe-build`)で、ループの後方辺と関数の入口に、カウンタの減算と、0 以下で協調スケジューラへ戻る呼び出しを入れる。全関数ではなく、特定した上位の関数と、そこから呼ばれるループの多い関数に限ってよい。全関数に入れる場合は、P3 の再生中の性能への影響を実測し、許容範囲に収める。
-   - (b) 該当の guest の処理が、特定の API(`WaitForSingleObject`・`Sleep`・`SwitchToThread` など)を呼ぶ所で、切り替えを増やす。
-   - どちらの方式でも、音声を作る guest のスレッドが、締め切り(先読み 60 ms)の前に必ず走ることを保つ。
-   - 製品に新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。既定の動作として直す。
-4. **測定の道具に起動段の測定を足す**: `tools/p3-audio-probe/measure.mjs` に `--boot` を足す。既存の窓・`--load ui`・既存の出力の項目は変えない。
-   - 画面: CSS 1836×1056・DPR 1.7647(依頼者の実機と同じ。guest の画面は 3240×1863 の物理画素。`Emulation.setDeviceMetricsOverride` などで作る)。
-   - 0 とする時刻: `window.__app.state` が `engine-idle` を最初に観測した時刻(ポーリングは 50 ms 以下)。
-   - 窓: idle の +10 秒から +70 秒。
-   - 押下: AudioContext を running にするための、状態の行への押下を 1 回だけ、窓の前に行ってよい(`startAudio` と同じ。ゲストには届かない)。窓の中では、何も操作しない。Space を押さない。ゲストの同意の箱(No thanks)を押さない。マウスを動かさない。
-   - JSON(stdout に 1 行): `error`・`state`・`standIn`・`screenDevicePx`(`window.__app.screen.guest` の幅×高さ。例 `3240x1863`)・`dpr`・`ctxState`(窓の終わりの AudioContext の状態)・`quantaDelta`(idle+10 から +70 の `quantaWhilePlaying` の増分。期待値は約 20,600)・`bootLast60sAt10s`(idle+10 秒に読んだ `underrunQuantaLast60s`)・`bootLast60sAt70s`(idle+70 秒に読んだ値)・`maxRefillStallMs`・`nproc`・`loadavg`。
-   - `maxRefillStallMs`: 音声の補充の停止の最大(ms)。音声の出力が PLAYING になった時刻から、idle の +70 秒まで、engine が出力のリングへ補充した時刻の、連続する 2 回の差の最大。取り方(engine 側の一時的な計数か、ページ側の標本か)は作業者が決め、報告に書く。
+作業の始めに、前回の作業が作業ツリーに載っている(`.prior-work.md` が指示する。衝突が在れば、その解消から始める)。前回の変更は取り除かず、残りを行う。
 
-## 設計の追加(2 回目の試行の結果から)
+1. **作業ツリーの確認**: `git status`・`git diff HEAD` で、上の「3 回目の試行」の 5 パスの変更が載っていることを確かめる。違えば、違いを報告に書いてから進む。
+2. **関数名の表(必須)**: 生成器(`lift/crates/fe-wasmgen`・`fe-build`)が、ビルドのたびに、wasm の関数の番号 → guest の RVA(VA)・関数名の対応を、`lift/out-app/gen/wasm-func-names.tsv` に書く(タブ区切り。1 行 1 関数。C の runtime の関数(`fle_progress_slice` など)も行に入れる)。配信の対象に入れない。`engine.wasm` の大きさを増やさない(名前の節を入れない)。新しい旗・環境変数・`#ifdef` は足さない。名前の取り方(生成器の既定で無効の関数名の出力を使う、link の map を使う、など)は作業者が選び、理由を報告に書く。
+3. **表で関数名に戻す**: CDP の `Profiler` の結果を、この表で関数名に戻す手段を `tools/p3-audio-probe/` に置く(一時の解析でよい。受け入れには入れない)。
+4. **計数の定義の検証**(3 回目の試行の計数の食い違い): publish ごとの `WR − RD` と、worklet の quantum ごとの `fill` を、同じ時刻で記録し、`maxRefillStallMs`(publish の間隔の最大)と連続 underrun の最長が何を測っているかを確かめる。計測の切り替えは、既存の経路(CDP で読む値)だけで行い、製品に新しい旗を足さない。結果は `pm-work/findings/boot-stall-1334.md` に書く。
+5. **押下の 2 条件**: `measure.mjs --boot` の押下を、idle の +1 秒と +30 秒の 2 条件で測り、両方の結果を `pm-work/findings/boot-stall-1334.md` に表で出す(押下の条件ごとの `bootLast60sAt70s`・`maxRefillStallMs`)。
+6. **受け入れと commit**: 下の受け入れを 1 回通す。作業ツリーを commit する(受け入れが通れば push される)。通らなければ、その出力を報告に貼り、commit する。
 
-- (i) **関数の名前の表**: 生成器(`lift/crates/fe-wasmgen`・`fe-build`)は、ビルドのたびに、wasm の関数の番号 → guest の RVA と関数名の対応を、`lift/out-app/gen/` の下の別のファイルに書く。配信の対象に入れない(engine.wasm の大きさを増やさない)。新しい旗・環境変数は足さない。測定の道具は、CDP の `Profiler` の結果を、この表で関数の名前に戻す。
-- (ii) **計数の定義の検証**: `maxRefillStallMs` と連続 underrun の最長が合わない理由(単位・起点・quantum の長さ・先読みの扱い)を、コードを読んで特定し、直す。受け入れが読む `bootLast60sAt10s`・`bootLast60sAt70s` が、アプリのヘッダーの `直近 60 秒の途切れ` と同じ定義であることを、該当の行(ファイル・行番号)を引いて報告に書く(`app/src/audio/page-audio.ts` の `detail()`、`app/src/audio/status.ts`)。
-- (iii) **押下より前**: AudioContext を始める利用者の操作(押下)より前は、消費者が無いので途切れとして数えない(アプリの定義どおり)。押下の直後の数秒には、起動の直後の山が残ることがある。測定の道具は、押下を idle の直後(+1 秒)に行う条件(既定。受け入れが読む。起動の山を含むため、厳しい方)と、idle の +30 秒に行う条件の両方を測り、報告に表で出す。
-- (iv) **作業の進め方**: ビルドの完了は、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000)を渡して待つ。バックグラウンドで起動して、完了の通知を待つ形にしない(ターンを終えると作業が止まる)。受け入れが通らなくても、作業の最後に作業ツリーを commit する(判定は commit 済みを要求する。通らなければ push されず、差分が保存される)。
+## 設計の追加(2・3 回目の試行の結果から)
+
+- (i) 関数名の表: 上の「作業の順序」2 と 3。生成器が、wasm の関数の番号 → guest の RVA・関数名を、`lift/out-app/gen/` の下の別のファイルに書く。配信の対象に入れない。
+- (ii) 計数の定義: 上の「作業の順序」4。受け入れが読む `bootLast60sAt10s`・`bootLast60sAt70s` は、アプリのヘッダーの `直近 60 秒の途切れ` と同じ定義(`app/src/audio/page-audio.ts` の `detail()`)。この Issue はその定義を変えない。
+- (iii) 押下より前: 上の「作業の順序」5。AudioContext を始める押下より前は、消費者が無いので途切れとして数えない(アプリの定義どおり)。
+- (iv) 作業の進め方: ビルドの完了は、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000)を渡して待つ。バックグラウンドで起動して、完了の通知を待つ形にしない(ターンを終えると作業が止まる)。受け入れが通らなくても、作業の最後に作業ツリーを commit する。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.screenDevicePx==="3240x1863"&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt10s===0&&r.bootLast60sAt70s===0&&r.maxRefillStallMs!==null&&r.maxRefillStallMs<=60)?0:1)' && rm -rf .tmp-1334
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1334 && for i in 1 2 3; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --boot > ".tmp-1334/boot-$i.json" || exit 1; done && node -e 'const fs=require("fs");const L=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-1334/boot-"+i+".json","utf8").trim()));const px=(r)=>Math.floor(1836*r.dpr)+"x"+Math.floor(1056*r.dpr);process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.ctxState==="running"&&r.quantaDelta>=19000&&r.bootLast60sAt70s===0&&r.screenDevicePx===px(r))?0:1)' && test "$(wc -l < lift/out-app/gen/wasm-func-names.tsv)" -ge 100000 && grep -q fle_progress_slice lift/out-app/gen/wasm-func-names.tsv && test -f pm-work/findings/boot-stall-1334.md && rm -rf .tmp-1334
 ```
 
-判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`screenDevicePx` が 3240x1863、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt10s` と `bootLast60sAt70s` が 0、`maxRefillStallMs` が 60 以下。
+判定の基準(道具の 3 回すべて): `error` が null、`state` が engine-idle、`standIn` が false、`ctxState` が running、`quantaDelta` が 19,000 以上(窓の 60 秒で音声が動いていたことの確認)、`bootLast60sAt70s` が 0、`screenDevicePx` が、道具の `dpr`(既定 30/17 ≈ 1.7647)から `Math.floor(1836 × dpr)` × `Math.floor(1056 × dpr)` になる。切り捨ては、アプリの `chooseGuestScreen`(`app/src/ui/screen-fit.ts`)と同じ。丸めると高さが 1864 になり、実測の 1863 と合わない。
 
-0 にできないときは、到達した値(3 回の `bootLast60sAt10s`・`bootLast60sAt70s`・`maxRefillStallMs`)と、残る関数(上位 5 件)を報告に書く。その場合、受け入れは通らないので、PM が判定を見直す(「差し戻し」とは書かない)。
+関数名の表 `lift/out-app/gen/wasm-func-names.tsv` が在り、行数が 100,000 以上で、`fle_progress_slice` の行を含む。`pm-work/findings/boot-stall-1334.md` が在る。
+
+`bootLast60sAt10s` と `maxRefillStallMs` の目標値は、この Issue の受け入れに入れない(`#{{112}}` が行う)。報告に 3 回分の値を書き、0 にできなかった理由(推定でよい)を書く。
 
 ## 報告の規則
 
@@ -137,6 +164,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 他のタスクとの関係
 
 - blocked_by: #{{002}}(分離の前後の測定と、残る要因の候補)。
-- #{{109}}(実機の条件の段階的な測定)は、この Issue の後に、段 1〜3(マウス 1000 Hz・再生)を直す。段 0(無音・無操作)は、この Issue で直す。
+- #{{112}}(起動して 10 秒後・無操作の途切れを 0 にする。切り替え点の実装)は、この Issue の後に行う。この Issue の道具(`measure.mjs --boot`・関数名の表・`pm-work/findings/boot-stall-1334.md`)を使う。
+- #{{109}}(実機の条件の段階的な測定)は、この Issue の後に、段 1〜3(マウス 1000 Hz・再生)を直す。段 0(無音・無操作)は #{{112}} が直す。
 - #{{004}}(所定のプロジェクトの実測)と #{{027}}〜#{{029}}(外部プラグインの処理)は、この Issue の完了を待つ。音声の経路が決まってから、プラグインの処理を入れるため。
 - 描画の Worker を変えるので、同じ経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を変える #{{006}}(HiDPI)と #{{010}}(メニュー)と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
