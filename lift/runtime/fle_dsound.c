@@ -389,7 +389,7 @@ static void fire_notifications(ds_buf *b, uint64_t from_abs, uint64_t to_abs)
                 uint32_t off = b->notify[k].off;
 
                 if (off == DSBPN_OFFSETSTOP) continue;
-                off /= b->fmt.align;
+                off = (uint32_t)(((uint64_t)off + b->fmt.align - 1u) / b->fmt.align);
                 if (started && off <= last) continue;
                 if (!have || off < best) {
                     best = off;
@@ -402,7 +402,7 @@ static void fire_notifications(ds_buf *b, uint64_t from_abs, uint64_t to_abs)
 
                 if (a > from_abs && a <= to_abs)
                     for (k = 0; k < b->nnotify; k++)
-                        if (b->notify[k].off != DSBPN_OFFSETSTOP && b->notify[k].off / b->fmt.align == best) {
+                        if (b->notify[k].off != DSBPN_OFFSETSTOP && ((uint64_t)b->notify[k].off + b->fmt.align - 1u) / b->fmt.align == best) {
                             if (fle_event_host_set(b->notify[k].h)) stats.notifications++;
                         }
             }
@@ -491,7 +491,7 @@ int fle_audio_next_tick(uint64_t *out)
             uint64_t off, a;
 
             if (b->notify[k].off == DSBPN_OFFSETSTOP) continue;
-            off = b->notify[k].off / b->fmt.align;
+            off = ((uint64_t)b->notify[k].off + b->fmt.align - 1u) / b->fmt.align;
             a = (cur / sf) * sf + off;
             if (a <= cur) a += sf;
             if (!have || a < best) {
@@ -1338,7 +1338,7 @@ static void m_n_setpos(void)
     for (k = 0; k < n; k++) {
         a[k].off = (uint32_t)fle_ld(p + 16u * k, 4);
         a[k].h = fle_ld(p + 16u * k + 8, 8);
-        if ((a[k].off != DSBPN_OFFSETSTOP && (a[k].off >= b->size || a[k].off % b->fmt.align)) || fle_event_state(a[k].h) < 0 || (a[k].off == DSBPN_OFFSETSTOP && k + 1 != n)) {
+        if ((a[k].off != DSBPN_OFFSETSTOP && a[k].off >= b->size) || fle_event_state(a[k].h) < 0 || (a[k].off == DSBPN_OFFSETSTOP && k + 1 != n)) {
             free(a);
             ret(HR_INVALIDPARAM);
             return;

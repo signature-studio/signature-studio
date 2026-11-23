@@ -169,7 +169,7 @@ fn the_list_of_scenarios() {
     let r = run(&["list"]);
     assert_eq!(r.code, Some(0));
     let names: Vec<&str> = r.out.iter().map(|s| s.as_str()).collect();
-    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
+    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "notify_bytes", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
         "stop_after_release (stops)", "stop_resample (stops)", "stop_second_primary (stops)", "stop_writeprimary (stops)", "stop_bad_this (stops)"]);
 }
 
@@ -406,6 +406,16 @@ fn the_virtual_clock_moves_to_the_next_notification_when_every_thread_waits() {
     for (k, l) in w.iter().enumerate() {
         assert!(l.starts_with(&format!("main alone with a sleeper: woke index {} at {} ticks", k % 2, 36_000_000_000u64 + 100_000 * (k as u64 + 1))), "{l}");
     }
+}
+
+#[test]
+fn byte_offsets_round_up_to_frames_and_the_last_byte_notifies_at_wrap() {
+    let o = ok(&["notify_bytes"]);
+    assert!(o.iter().any(|l| l == "SetNotificationPositions(byte offsets 1, 3527) 0"), "{o:?}");
+    let notices: Vec<&String> = o.iter().filter(|l| l.starts_with("byte notification:")).collect();
+    assert_eq!(notices.len(), 2, "{o:?}");
+    assert!(notices[0].starts_with("byte notification: index 0 at 36000000227 ticks"), "{}", notices[0]);
+    assert!(notices[1].starts_with("byte notification: index 1 at 36000200000 ticks"), "{}", notices[1]);
 }
 
 #[test]
