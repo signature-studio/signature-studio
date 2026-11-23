@@ -177,11 +177,10 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
   else flushDesk(false);
 }
 
-/** the counters and the instants of the presents, at most every 100 ms (1 s when nothing was presented); `answers`: the inputs the present in this message answers */
+/** Report changed presents promptly: the page uses their delivery to request its next rAF for input latency. Batching them adds reporting delay to that metric. No-picture reports remain limited to once a second. */
 function flushDesk(force: boolean, answerList?: number[]): void {
   if (!presenter) return;
   const now = performance.now();
-  if (!force && now - lastReport < 100) return;
   if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
   lastReport = now;
   post({ t: 'desk', stats: { ...presenter.stats, displayFrames, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
