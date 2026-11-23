@@ -64,17 +64,27 @@ project: signature-studio/3
 - 前回の一時的な実験の切り替え(`FLE_EXP_*`)と、停止時の診断は、commit の前に外されている。作業ツリーに残っていたら外す。
 - 測定の道具 `tools/feat-c1-hidpi/measure-size.mjs` は前回の差分にあり、上の表の値を出せる。ただし DPR の乱数の範囲は 1.00〜3.00 のままなので、この Issue で 1.00〜2.25 に直す(下の「残りの作業」)。
 
+### 4 回目の試行(最新。run 45120123750)
+
+上の 3 回目までの記述より後の、最新の試行。
+
+- 受け入れの全段が 0 で通った。DPR 1・1.25・1.5・1.7647・2 と、乱数 1.13・1.7 の全てで、guest = round(部屋 × DPR)、LOGPIXELSY = round(96 × DPR)、canvas = display が一致した。`FL64.exe` のマニフェストは `dpiAware True/PM`。
+- 判定の段の `guard/flags.sh`(「製品に新しい旗を作らない」の検査)が落とした: `newflag lift/runtime/fle_screen.h:32`。判定は受け入れの後に走るので、受け入れが通った作業を判定が止めた。
+- 原因: `lift/runtime/fle_screen.h` に、新しい関数 `fle_screen_env`(中身は `return getenv(name);`)を足し、`fle_screen_dim` の `getenv(name)` の行を、それを呼ぶ形に書き換えた。検査は追加行の `getenv(` を見るので、この書き換えで落ちた。
+- 作業は差分(`work.diff`)として保存された。判定を通らなかったので main には入っていない。
+- PM の判断: `FLE_MONITOR_DPR` は、`FLE_MONITOR_W`・`FLE_MONITOR_H`・`FLE_DWM_HZ` と同じ、ページが engine へ渡す実行時の入力で、利用者向けの選択肢ではない。ただし `guard/flags.sh` は回避しない・弱めない。
+- 直し方: 下の「残りの作業」。`fle_screen_env` を取り消し、`fle_screen_dim` の `getenv(name)` の行は元のまま残す。DPR は整数(DPR × 10000)で渡し、既存の `fle_screen_dim` で読む。
+
 ## 残りの作業(この Issue の範囲)
 
-前回の差分の上に、残りだけを行う。前回の試行の結果の再測定は、この Issue では行わない。
+4 回目の差分の上に、直しだけを行う。受け入れの全段は 4 回目で通っている。直しの後、受け入れの全段がもう一度走る(測定の値は、直しの後の受け入れの出力で取る)。
 
-1. 載った作業ツリーを確かめる: `git status`・`git diff HEAD`。`.prior-work.md` を読む。差分が、上の式(`fle_screen_scale_percent`・`fle_screen_dpi`・`chooseGuestScreen`)と、測定の道具・読みの道具を含むことを確かめる。
-2. 測定の道具 `tools/feat-c1-hidpi/measure-size.mjs` を、この Issue の受け入れに必要な項目に絞る。
-   - 引数を次の形にする: `--dprs <一覧>`(既定 `1,1.25,1.5,1.7647,2`)・`--random <個数>`(既定 `2`)・`--random-range <最小,最大>`(既定 `1.00,2.25`)。乱数は 0.01 刻みで、起動のたびに crypto の乱数で種を選ぶ(前回の差分のとおり)。`#{{114}}` も同じ道具を、`--dprs 1,1.7647,2,2.5,3 --random 2 --random-range 2.25,3` で使う。
-   - 行の項目は、受け入れに使う `dpr`・`randomDprs`・`room`・`state`・`standIn`・`error`・`guest`・`dpi`・`canvas`・`display` を、この Issue の範囲で正しく出す。`flScalingPercent`・`mainGuiScaling`・`parts`・`edgeWidth`・`blackShare`・`debugLog` は、この Issue では測らず null のままにする(`#{{113}}` が埋める。`blackShare` の矩形は `#{{115}}` が決める)。
-   - 既定の実行の最後に、DPR 2.5 と 3.0 を起動し、engine-idle に届いたかを、JSON の 1 行 `{"highDpr":{"2.5":"engine-idle" または "stopped","3":"engine-idle" または "stopped"}}` で出す。この 1 行は判定に入れない(終了コードにも入れない)。報告に書く。
-3. 作業ツリーに残った一時的な変更を確かめる: `grep -rn "FLE_EXP_" lift app/src` が 0 件であること。
-4. 作業ツリーを commit する(受け入れが通れば push される。通らなくても commit する。通らなければ push されず、差分が次の run で続きから取り込まれる)。
+1. 載った作業ツリーを確かめる: `git status`・`git diff HEAD`。`.prior-work.md` を読む。
+2. `lift/runtime/fle_screen.h` の `fle_screen_env` を取り消し、`fle_screen_dim` の `getenv(name)` の行を、元と 1 文字も変えずに戻す。基点は `git merge-base HEAD origin/main`。`git diff <基点> -- lift/runtime/fle_screen.h` の追加行に `getenv(` が無いこと。`fle_screen.h` の `getenv(` は `fle_screen_dim` の中の 1 箇所だけにする(`lift/crates/fe-lift/tests/screen1.rs` がこの数を見る)。
+3. DPR を整数で渡す。ページ(`app/src`)は、DPR を `Math.round(dpr * 10000)` にして `FLE_MONITOR_DPR` で渡す(例: 1.5 は 15000)。runtime は `fle_screen_dim("FLE_MONITOR_DPR", 10000u, 2500u, 50000u)` で読む。既定の 10000 は DPR 1(100%)で、未指定のときは今の版と同じ 96 DPI になる。2500 と 50000 は範囲の下限と上限(DPR 0.25 と 5.0)。小数の構文解析(`fle_screen_dpr_parse`)は要らないので消す。拡大率(%)と DPI は、この整数から、上の式(`fle_screen_scale_percent`・`fle_screen_dpi`)で導く。
+4. 単体テストを、この変更に合わせる: `lift/crates/fe-lift/tests/gdc.rs`・`screen1.rs`・`wall_s.rs`・`app/test/unit/screen-fit.test.ts`。`screen1.rs` は `fle_screen.h` に `devicePixelRatio`・`screen.width` などの語が無いことも見る。
+5. 作業の最後に、`bash guard/flags.sh "$(git merge-base HEAD origin/main)" HEAD` が通ることを確かめる。判定の段も、受け入れの後に同じ検査を走らせる。
+6. 受け入れの結果を報告に貼り、作業ツリーを commit する。受け入れが通らなくても commit する(通らなければ push されず、差分が次の run で続きから取り込まれる)。
 
 ## 起動用の実行ファイル(ラベル fl-exe)
 
