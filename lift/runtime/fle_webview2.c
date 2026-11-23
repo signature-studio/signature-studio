@@ -19,12 +19,17 @@
  * The first navigation is about:blank, made when the controller is ready: after the controller's completed handler has returned, the four events of a navigation
  * (NavigationStarting, SourceChanged, ContentLoading, NavigationCompleted, in that order: the order the ICoreWebView2 docs give) are called on the handlers the page
  * registered (a handler that is not registered is skipped). The docs do not say that the first about:blank raises them; that is unconfirmed (webview2-calls-1355.md).
- * A Navigate or NavigateToString fires the same four with its own URI (NavigateToString: about:blank, CHOICE). The arguments: IsSuccess TRUE, WebErrorStatus 0,
- * NavigationId 1, IsNewDocument TRUE, IsErrorPage FALSE, Cancel FALSE (CHOICE). Each fired event is one log line: `webview2: fire <event> (<interface>) <arguments>`.
+ * A Navigate or NavigateToString after that is logged (its URI or HTML) and fires nothing; the page stays as it was (CHOICE, #1355). The reason is the probe of
+ * FL's Browser tab (tools/browser-panel/probe-navigate.mjs): the cloud tab navigates to FL's error-offline.html, FL's NavigationStarting handler then calls a
+ * window procedure that is a MakeObjectInstance thunk on a page the runtime does not run (decision 0119: not called), and the engine exits. The four events of
+ * the first about:blank are fired (their arguments: IsSuccess TRUE, WebErrorStatus 0, NavigationId 1, IsNewDocument TRUE, IsErrorPage FALSE, Cancel FALSE,
+ * RequestHeaders with no header: CHOICE). Each fired event is one log line: `webview2: fire <event> (<interface>) <arguments>`.
  * Choices without a source (each is a CHOICE): the runtime version is "131.0.0.0"; ExecuteScript completes with the JSON "null";
  * AddScriptToExecuteOnDocumentCreated completes with the id "1"; the zoom factor reads 1.0; the settings read TRUE and the counts read 0; a method that the
- * model does not answer returns E_NOTIMPL. A QueryInterface for an IID other than IUnknown returns E_NOINTERFACE (the IID is in the log). Nothing is freed:
- * the objects live as long as the run.
+ * model does not answer returns E_NOTIMPL. A QueryInterface for an IID other than IUnknown returns E_NOINTERFACE (the IID is in the log). The objects live as long
+ * as the run; the strings are CoTaskMemAlloc blocks (fle_ole.c's task memory) that the guest frees with CoTaskMemFree, as the docs say.
+ * The vtables of the request headers and of their iterator follow the go-webview2 package's (wailsapp/go-webview2, pkg/edge); the vtables of the event arguments of
+ * NavigationStarting, SourceChanged and ContentLoading follow the IDL order as the author recalls it (unconfirmed: pm-work/findings/webview2-calls-1355.md).
  *
  * Plain C: the guest memory is the only host state the model reads and writes (fle_ld / fle_st). */
 #include <stdarg.h>
@@ -36,6 +41,7 @@
 #include "fle_runtime.h"
 #include "fle_env.h"
 #include "fle_callback.h"
+#include "fle_ole.h"
 #include "fle_webview2.h"
 
 uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9) __attribute__((weak));
@@ -52,10 +58,11 @@ uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, ui
 #define WV_VERSION        "131.0.0.0"
 #define IID_IUNKNOWN      "{00000000-0000-0000-c000-000000000046}"
 
-enum { IF_ENV, IF_CTRL, IF_VIEW, IF_SET, IF_NAVARGS, IF_NAVSTART, IF_SRC, IF_CONTENT, IF_COUNT };
+enum { IF_ENV, IF_CTRL, IF_VIEW, IF_SET, IF_NAVARGS, IF_NAVSTART, IF_SRC, IF_CONTENT, IF_HEADERS, IF_HITER, IF_COUNT };
 static const char *const iface_name[IF_COUNT] = {
     "ICoreWebView2Environment", "ICoreWebView2Controller", "ICoreWebView2", "ICoreWebView2Settings", "ICoreWebView2NavigationCompletedEventArgs",
-    "ICoreWebView2NavigationStartingEventArgs", "ICoreWebView2SourceChangedEventArgs", "ICoreWebView2ContentLoadingEventArgs",
+    "ICoreWebView2NavigationStartingEventArgs", "ICoreWebView2SourceChangedEventArgs", "ICoreWebView2ContentLoadingEventArgs", "ICoreWebView2HttpRequestHeaders",
+    "ICoreWebView2HttpHeadersCollectionIterator",
 };
 
 /* the events of a navigation that the model fires, and the view's slot of each handler */
@@ -68,6 +75,7 @@ enum {
     K_CREATE_CTRL,                                   /* ICoreWebView2Environment::CreateCoreWebView2Controller */
     K_GET_WSTR, K_GET_OBJ, K_GET_VISIBLE, K_PUT_VISIBLE, K_GET_BOOL, K_PUT_BOOL, K_GET_U32, K_GET_U64,
     K_GET_RECT, K_PUT_RECT, K_GET_HWND, K_PUT_HWND, K_GET_DBL, K_PUT_DBL, K_GET_URI,
+    K_HDR_VALUE, K_HDR_CONTAINS,                     /* header lookups by name: the name is R[2], the result is written through R[8] */
     K_ADD, K_ADD_EV, K_ADD_SCRIPT, K_REMOVE,         /* event registrations (a token is written; K_ADD_EV keeps the handler: arg is its EV_) and their removal */
     K_NAVIGATE, K_NAV_HTML, K_EXEC, K_POST,
 };
@@ -208,7 +216,7 @@ static const struct slot tab_navstart[] = {
     { "get_Uri", K_GET_URI, 0, 0 },
     { "get_IsUserInitiated", K_GET_BOOL, 0, 0 },
     { "get_IsRedirected", K_GET_BOOL, 0, 0 },
-    { "get_RequestHeaders", K_NOTIMPL, 0, 0 },
+    { "get_RequestHeaders", K_GET_OBJ, IF_HEADERS, 0 },
     { "get_Cancel", K_GET_BOOL, 0, 0 },
     { "put_Cancel", K_PUT_BOOL, 0, 0 },
     { "get_NavigationId", K_GET_U64, 1, 0 },
@@ -227,11 +235,35 @@ static const struct slot tab_content[] = {
     { "get_NavigationId", K_GET_U64, 1, 0 },
 };
 
-static const struct slot *const tabs[IF_COUNT] = { tab_env, tab_ctrl, tab_view, tab_set, tab_navargs, tab_navstart, tab_src, tab_content };
+/* ICoreWebView2HttpRequestHeaders (slots 3..8, the order of the go-webview2 package's vtable, which follows the IDL): the request's headers are none (CHOICE:
+ * a header reads as "", none is contained); GetHeaders is not answered (E_NOTIMPL). GetIterator gives an empty iterator (the FL's loop ends at once). */
+static const struct slot tab_headers[] = {
+    IU,
+    { "GetHeader", K_HDR_VALUE, 0, 0 },
+    { "GetHeaders", K_NOTIMPL, 0, 0 },
+    { "Contains", K_HDR_CONTAINS, 0, 0 },
+    { "SetHeader", K_NOP, 0, 0 },
+    { "RemoveHeader", K_NOP, 0, 0 },
+    { "GetIterator", K_GET_OBJ, IF_HITER, 0 },
+};
+
+/* ICoreWebView2HttpHeadersCollectionIterator (slots 3..5, the same source): empty, so get_HasCurrentHeader and MoveNext read FALSE; GetCurrentHeader is not
+ * answered (E_NOTIMPL: it fails when there is no current header, as the docs say) */
+static const struct slot tab_hiter[] = {
+    IU,
+    { "GetCurrentHeader", K_NOTIMPL, 0, 0 },
+    { "get_HasCurrentHeader", K_GET_BOOL, 0, 0 },
+    { "MoveNext", K_GET_BOOL, 0, 0 },
+};
+
+static const struct slot *const tabs[IF_COUNT] = {
+    tab_env, tab_ctrl, tab_view, tab_set, tab_navargs, tab_navstart, tab_src, tab_content, tab_headers, tab_hiter,
+};
 static const unsigned ntabs[IF_COUNT] = {
     sizeof tab_env / sizeof tab_env[0], sizeof tab_ctrl / sizeof tab_ctrl[0], sizeof tab_view / sizeof tab_view[0],
     sizeof tab_set / sizeof tab_set[0], sizeof tab_navargs / sizeof tab_navargs[0], sizeof tab_navstart / sizeof tab_navstart[0],
-    sizeof tab_src / sizeof tab_src[0], sizeof tab_content / sizeof tab_content[0],
+    sizeof tab_src / sizeof tab_src[0], sizeof tab_content / sizeof tab_content[0], sizeof tab_headers / sizeof tab_headers[0],
+    sizeof tab_hiter / sizeof tab_hiter[0],
 };
 
 static uint64_t vtab[IF_COUNT][WV_SLOTS_MAX];   /* the vtables the guest reads: the slot pseudo-VAs */
@@ -283,8 +315,6 @@ static wv2_obj *new_obj(unsigned iface)
 
 static unsigned wv_lines;
 static uint64_t wv_token;
-static const uint16_t json_null[] = { 'n', 'u', 'l', 'l', 0 };
-static const uint16_t script_id[] = { '1', 0 };
 
 /* one line of the log: `webview2: <method> (<interface>) <arguments>`; after WV_LOG_MAX lines the log stops */
 static void wlog(const char *method, const char *iface, const char *fmt, ...)
@@ -351,13 +381,26 @@ static void guid_of(uint64_t p, char *out, size_t cap)
              (unsigned)fle_ld(p + 13, 1), (unsigned)fle_ld(p + 14, 1), (unsigned)fle_ld(p + 15, 1));
 }
 
-/* a new UTF-16 string for the guest (the guest frees it, if it frees it at all: the run keeps it) */
+/* a block of the task memory: CoTaskMemAlloc of the guest-facing stub (fle_ole.c), so that the guest's CoTaskMemFree frees it (the docs: the caller of a method that
+ * returns a string frees it with CoTaskMemFree; a block that is not from CoTaskMemAlloc stops the run) */
+static uint16_t *task_wstr(size_t units)
+{
+    uint64_t save[3] = { R[0], R[1], R[4] }, p;
+
+    R[1] = (uint64_t)(units * sizeof(uint16_t));
+    fle_imp_CoTaskMemAlloc();
+    p = R[0];
+    R[0] = save[0]; R[1] = save[1]; R[4] = save[2];
+    if (p == 0) fle_stop("WebView2", "no task memory for a string of the model");
+    return (uint16_t *)(uintptr_t)p;
+}
+
+/* a new UTF-16 string for the guest (a task-memory block) */
 static uint64_t wstr_new(const char *s)
 {
     size_t n = strlen(s), k;
-    uint16_t *w = malloc((n + 1) * sizeof *w);
+    uint16_t *w = task_wstr(n + 1);
 
-    if (w == NULL) fle_stop("WebView2", "no memory for a string of the model");
     for (k = 0; k <= n; k++) w[k] = (uint16_t)(unsigned char)s[k];
     return (uint64_t)(uintptr_t)w;
 }
@@ -370,8 +413,7 @@ static uint64_t utf16_copy(uint64_t p)
 
     if (p == 0) return 0;
     while (n < WV_SCAN_MAX && fle_ld(p + 2u * n, 2) != 0) n++;
-    w = malloc((n + 1) * sizeof *w);
-    if (w == NULL) fle_stop("WebView2", "no memory for a string of the model");
+    w = task_wstr(n + 1);
     for (k = 0; k < n; k++) w[k] = (uint16_t)fle_ld(p + 2u * k, 2);
     w[n] = 0;
     return (uint64_t)(uintptr_t)w;
@@ -554,6 +596,18 @@ static void call_slot(unsigned iface, unsigned k)
         if (a2 == 0) ret = WV_E_INVALIDARG;
         else fle_st(a2, 8, utf16_copy(o->uri));
         break;
+    case K_HDR_VALUE:
+        text_of(a2, t, sizeof t, &n);
+        wlog(s->name, in, "name=\"%s\" -> \"\"", t);
+        if (a8 == 0) ret = WV_E_INVALIDARG;
+        else fle_st(a8, 8, wstr_new(""));
+        break;
+    case K_HDR_CONTAINS:
+        text_of(a2, t, sizeof t, &n);
+        wlog(s->name, in, "name=\"%s\" -> 0", t);
+        if (a8 == 0) ret = WV_E_INVALIDARG;
+        else fle_st(a8, 4, 0);
+        break;
     case K_ADD:
         if (a8 != 0) fle_st(a8, 8, ++wv_token);
         wlog(s->name, in, "handler=%#llx token=%llu", (unsigned long long)a2, (unsigned long long)(a8 != 0 ? wv_token : 0));
@@ -566,7 +620,7 @@ static void call_slot(unsigned iface, unsigned k)
     case K_ADD_SCRIPT:
         text_of(a2, t, sizeof t, &n);
         wlog(s->name, in, "script=\"%s\" units=%zu handler=%#llx", t, n, (unsigned long long)a8);
-        complete(a8, WV_S_OK, (uint64_t)(uintptr_t)script_id);
+        complete(a8, WV_S_OK, wstr_new("1"));
         break;
     case K_REMOVE:
         wlog(s->name, in, "token=%llu", (unsigned long long)a2);
@@ -574,17 +628,15 @@ static void call_slot(unsigned iface, unsigned k)
     case K_NAVIGATE:
         text_of(a2, t, sizeof t, &n);
         wlog(s->name, in, "uri=\"%s\" units=%zu", t, n);
-        fire_navigation(o, utf16_copy(a2));
         break;
     case K_NAV_HTML:
         text_of(a2, t, sizeof t, &n);
         wlog(s->name, in, "html=\"%s\" units=%zu", t, n);
-        fire_navigation(o, wstr_new("about:blank"));
         break;
     case K_EXEC:
         text_of(a2, t, sizeof t, &n);
         wlog(s->name, in, "script=\"%s\" units=%zu handler=%#llx", t, n, (unsigned long long)a8);
-        complete(a8, WV_S_OK, (uint64_t)(uintptr_t)json_null);
+        complete(a8, WV_S_OK, wstr_new("null"));
         break;
     case K_POST:
         text_of(a2, t, sizeof t, &n);
