@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { waveformSummary } from './waveform.mjs';
 
 const execFileAsync = promisify(execFile);
 const fail = (error) => {
@@ -19,7 +20,7 @@ function args(argv) {
   return { tab, condition, durationMs, inputHz };
 }
 
-async function browserMeasure(c) {
+async function browserMeasure(c, summarizeWaveform) {
     const a = window.__app;
     const read = () => {
       const s = a.perf.snapshot();
@@ -33,6 +34,8 @@ async function browserMeasure(c) {
     const wrong = Object.entries({ app: state.app, engine: state.engine === 'engine-idle', fileDialog: state.fileDialog === false, audio: state.audio === 'playing' && state.context === 'running', visibility: state.visibility === 'visible' }).filter(([, ok]) => !ok).map(([name]) => name);
     if (wrong.length) return { ok: false, failure: 'precondition', state, mismatches: wrong };
     const before = read();
+    const captureIndex = a.audio.captures.length;
+    if (c.durationMs >= 10_000) a.audio.armCapture(Math.floor(Atomics.load(a.audio.header, 3) * 8), true);
     let sent = 0, lastSent = null, maxIntervalMs = null;
     let worker = null, url = null, timer = null, listener = null;
     try {
@@ -111,7 +114,10 @@ async function browserMeasure(c) {
         lifetimeMaxMs: lastPulse.threads[thread][1],
       }));
       const elapsedMs = after.at - before.at;
-      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+      const captured = c.durationMs >= 10_000 ? a.audio.captures[captureIndex] : null;
+      const waveform = summarizeWaveform(captured);
+      if (captured) a.audio.captures.splice(captureIndex, 1);
+      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, waveform, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, mixer: lastPulse?.mixer ?? null, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
     } finally {
       if (timer !== null) clearTimeout(timer);
       if (worker && listener) worker.removeEventListener('message', listener);
@@ -121,7 +127,7 @@ async function browserMeasure(c) {
 }
 
 function expression({ condition, durationMs, inputHz }) {
-  return `(${browserMeasure.toString()})(${JSON.stringify({ condition, durationMs, inputHz })})`;
+  return `(${browserMeasure.toString()})(${JSON.stringify({ condition, durationMs, inputHz })},(${waveformSummary.toString()}))`;
 }
 
 try {
