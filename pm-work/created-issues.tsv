@@ -53,3 +53,5 @@
 113	#1353	FL の UI の拡大を、FL 自身の情報で測る: F10 の Display の節・Debug ログ・DPI の API の全呼び出し・採用した拡大率・部品の位置・縁の遷移の幅	Task
 114	#1354	DPI 240 以上(DPR 2.5 以上)で FL が起動しない障害を直す: LOGPIXELSY の値で起きる再帰の閉路を特定し、runtime の応答を Windows と同じにする	Task
 115	#1355	Browser のパネル(左の黒い領域)を FL と同じにする: 黒いのが描かれていないのか空の一覧なのかを切り分け、一覧に要るフォルダの階層を seed に入れ、中身は起動後に取る	Task
+116	#1357	回帰: Welcome 窓を閉じる(No thanks・Escape・Default の選択)と engine が trap する。ホストのファイルの解放の後の読みを直す	Task
+117	#1358	F10 の General settings(Display の節・Debug タブ・Info タブ)を開き、FL 自身のログと設定を取る	Task
