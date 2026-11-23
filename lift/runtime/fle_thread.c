@@ -791,6 +791,7 @@ void fle_progress_slice(void)
     if (t->state != T_RUNNING) return;
     if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
         pst.deferred++;
+        if (fle_audio_poll) fle_audio_poll();
         return;
     }
     pst.slices++;

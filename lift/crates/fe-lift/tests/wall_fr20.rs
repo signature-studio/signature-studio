@@ -463,6 +463,59 @@ fn a_slice_inside_a_callback_of_the_runtime_is_skipped_and_the_clock_does_not_mo
 }
 
 #[test]
+fn deferred_callback_slices_poll_audio_without_advancing_time_or_switching_even_when_audio_signals_a_waiter() {
+    let top = format!(
+        r#"{VA}
+static uint64_t ev;
+static unsigned polls, resumed;
+void fle_audio_poll(void) {{
+    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {{
+        polls++;
+        fle_event_host_set(ev);
+    }}
+}}
+static void th_b(void) {{ W1(ev, INF); resumed++; R[0] = 0; }}
+static void inner(void) {{
+    uint64_t saved_r[16];
+    fle_xmm saved_x[16];
+    fle_eflags saved_fl = FL;
+    memcpy(saved_r, R, sizeof R);
+    memcpy(saved_x, X, sizeof X);
+    work(12288);
+    printf("inner: depth %u polls %u resumed %u clock %llu registers %d\n",
+        fle_callback_depth(), polls, resumed, U(REL()),
+        memcmp(saved_r, R, sizeof R) == 0 && memcmp(saved_x, X, sizeof X) == 0 && memcmp(&saved_fl, &FL, sizeof FL) == 0);
+    R[0] = 0;
+}}
+static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
+{}"#,
+        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
+    );
+    for opt in ["-O0", "-O2"] {
+        let l = lines_with(
+            "p-callback-audio",
+            &top,
+            r#"
+    ev = H_EVENT(1, 0);
+    H_CREATE(VA_B, 0, 0, 0);
+    SLEEP(0);
+    fle_call_guest(VA_OUTER, 0, 0, 0, 0);
+    stats("after callback");
+    SLEEP(0);
+    printf("after yield: resumed %u\n", resumed);
+"#,
+            opt,
+            &[],
+        );
+        assert_eq!(l, [
+            "inner: depth 2 polls 3 resumed 0 clock 0 registers 1",
+            "after callback: armed 1 slices 0 deferred 3 switches 0 ticks 0",
+            "after yield: resumed 1",
+        ], "{opt}");
+    }
+}
+
+#[test]
 fn two_busy_threads_take_turns_one_slice_each_in_creation_order() {
     // Hand derivation (count 0 at CreateThread, limit 4096; decision 0279: slice n ends at clock 2,500 * n ticks and the clocks are printed in ticks: slice 2 = 5000, 3 = 7500, 4 = 10000, 5 = 12500, 6 = 15000). Main: work(4096) = calls 1..4096; the last one is slice 1 (clock 1 ms): B (ready, unstarted) runs, its start is call 4097, B: work(4096) = 4098..8193;
     // slice 2 at 8192 (clock 2 ms) is in B and gives the processor back to main (ready): main finishes work #1 and prints "M round 0 clock 2". Main work #2 = 8193..12288, slice 3 at 12288 (clock 3): to B, which
