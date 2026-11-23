@@ -4,7 +4,9 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 const fail = (error) => {
-  process.stdout.write(`${JSON.stringify({ ok: false, error: String(error?.message ?? error) })}\n`);
+  // execFile's message repeats the entire injected script. Keep failed runs compact.
+  const message = error?.cmd ? String(error.stderr?.trim() || 'browse eval failed').slice(0, 4096) : String(error?.message ?? error);
+  process.stdout.write(`${JSON.stringify({ ok: false, error: message, ...(error?.code !== undefined ? { code: error.code } : {}), ...(error?.signal ? { signal: error.signal } : {}) })}\n`);
   process.exitCode = 1;
 };
 
@@ -22,7 +24,9 @@ async function browserMeasure(c) {
     const read = () => {
       const s = a.perf.snapshot();
       const d = a.audio?.detail?.() ?? null;
-      return { bundleVersion: s.bundle?.version ?? a.manifest?.bundle?.version ?? null, guestScreen: s.guestScreen ?? a.screen?.guest ?? null, hz: s.hz ?? null, at: performance.now(), state: a.state, audio: d, pulses: a.audio?.pulses?.slice() ?? [], desk: a.deskStats ? { ...a.deskStats } : null, driver: a.driverStats ? { ...a.driverStats } : null, perf: { input: s.input, engineRun: s.engineRun } };
+      const r = a.audio?.reports?.at(-1);
+      const worker = r ? { waits: r.waits, maxWaitDrift: r.maxWaitDrift, pace: r.pace ? { ...r.pace } : null } : null;
+      return { bundleVersion: s.bundle?.version ?? a.manifest?.bundle?.version ?? null, guestScreen: s.guestScreen ?? a.screen?.guest ?? null, hz: s.hz ?? null, at: performance.now(), state: a.state, audio: d, worker, pulses: a.audio?.pulses?.slice() ?? [], desk: a.deskStats ? { ...a.deskStats } : null, driver: a.driverStats ? { ...a.driverStats } : null, perf: { input: s.input, engineRun: s.engineRun } };
     };
     const detail = a?.audio?.detail?.();
     const state = { app: Boolean(a), engine: a?.state, fileDialog: a?.fileDlg?.open, audio: detail?.deviceState, context: detail?.ctxState, visibility: document.visibilityState };
@@ -63,6 +67,13 @@ async function browserMeasure(c) {
       const delta = (x, y) => typeof x === 'number' && typeof y === 'number' ? y - x : null;
       const metricNames = ['underrunQuanta', 'engineGapFrames', 'engineSkippedFrames', 'engineLateWriteLost', 'nonSilentQuanta'];
       const audio = Object.fromEntries(metricNames.map((k) => [k, delta(before.audio?.[k], after.audio?.[k])]));
+      const audioWait = {
+        waits: delta(before.worker?.waits, after.worker?.waits),
+        waitMs: delta(before.worker?.pace?.waitMs, after.worker?.pace?.waitMs),
+        late: delta(before.worker?.pace?.late, after.worker?.pace?.late),
+        lateMs: delta(before.worker?.pace?.lateMs, after.worker?.pace?.lateMs),
+        lifetimeMaxWaitDriftMs: after.worker?.maxWaitDrift ?? null,
+      };
       const deskKeys = ['displayFrames', 'presents', 'composeMs', 'putMs', 'drawMs', 'uploadBytes', 'uploads', 'draws'];
       const desk = Object.fromEntries(deskKeys.map((k) => [k, delta(before.desk?.[k], after.desk?.[k])]));
       const driver = Object.fromEntries([...new Set([...Object.keys(before.driver ?? {}), ...Object.keys(after.driver ?? {})])].map((k) => [k, delta(before.driver?.[k], after.driver?.[k])]));
@@ -80,7 +91,7 @@ async function browserMeasure(c) {
         lifetimeMaxMs: lastPulse.threads[thread][1],
       }));
       const elapsedMs = after.at - before.at;
-      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
     } finally {
       if (timer !== null) clearTimeout(timer);
       if (worker && listener) worker.removeEventListener('message', listener);
