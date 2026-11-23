@@ -7,6 +7,7 @@
 # ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
 # 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
+# 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
 # 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。
@@ -313,6 +314,51 @@ jobs:
           path: ${{ runner.temp }}/extra-plugins
           key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
 
+      - name: 起動用の実行ファイルのキャッシュ(R2)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,')
+        id: exe
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
+      - name: 起動用の実行ファイルを取り出す(キャッシュが無いときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,') && steps.exe.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-exe" --file 'FL64.exe' --file 'FL64 (scaled).exe'
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+      - name: 起動用の実行ファイルをキャッシュに保存する(取ったときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,') && steps.exe.outputs.cache-hit != 'true'
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
   work:
     name: '作業 #${{ matrix.issue }}'
     needs: [select, start, extract]
@@ -530,6 +576,31 @@ jobs:
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-plugins" lift/out-app/host-extra/plugins
           test -f lift/out-app/host-extra/plugins/MANIFEST.tsv
+
+      - name: 起動用の実行ファイルを R2 のキャッシュから取る(fl-exe の作業だけ)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',fl-exe,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          fail-on-cache-miss: true
+
+      - name: 取った物を lift/out-app/host-extra/exe に置く(fl-exe の作業だけ。commit はしない)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',fl-exe,')
+        run: |
+          mkdir -p lift/out-app/host-extra
+          mv "$RUNNER_TEMP/extra-exe" lift/out-app/host-extra/exe
+          test -f lift/out-app/host-extra/exe/FL64.exe
+          test -f "lift/out-app/host-extra/exe/FL64 (scaled).exe"
 
       - name: 前回の作業を取り込む
         # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
