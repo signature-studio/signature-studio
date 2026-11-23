@@ -45,6 +45,9 @@ let waiting = false;
 let loopOn = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 let firstPixel = false;
+// Canvas updates deduplicated per Worker rAF; not GPU completion or physical display evidence.
+let drewSinceFrame = false;
+let displayFrames: number | null = typeof self.requestAnimationFrame === 'function' ? 0 : null;
 let lastReport = 0;
 const presentedAt: number[] = [];
 let answers: number[] = [];
@@ -67,6 +70,10 @@ function nextFrame(): void {
 
 function frame(): void {
   if (!loopOn) return;
+  if (drewSinceFrame) {
+    if (displayFrames !== null) displayFrames++;
+    drewSinceFrame = false;
+  }
   if (ask()) counters.ticks++;
   if (quiet.sleepAfterFrame(performance.now())) { loopOn = false; sleepPoll(); return; }
   nextFrame();
@@ -154,6 +161,7 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
     if (f.changed && presenter && memory) {
       const shown = presenter.present();
       if (shown > 0) {
+        drewSinceFrame = true;
         presentedAt.push(nowAbs());
         if (!firstPixel) { firstPixel = true; mark('first_pixel', { source: 'desktop', width: canvas?.width, height: canvas?.height }); }
         if (f.answers) answers.push(...f.answers);
@@ -176,7 +184,7 @@ function flushDesk(force: boolean, answerList?: number[]): void {
   if (!force && now - lastReport < 100) return;
   if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
   lastReport = now;
-  post({ t: 'desk', stats: { ...presenter.stats, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
+  post({ t: 'desk', stats: { ...presenter.stats, displayFrames, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
 }
 
 async function readback(key: string): Promise<void> {

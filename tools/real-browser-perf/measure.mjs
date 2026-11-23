@@ -1,0 +1,105 @@
+#!/usr/bin/env node
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+const fail = (error) => {
+  process.stdout.write(`${JSON.stringify({ ok: false, error: String(error?.message ?? error) })}\n`);
+  process.exitCode = 1;
+};
+
+function args(argv) {
+  const [tab, condition, durationText, hzText, ...extra] = argv;
+  const durationMs = Number(durationText), inputHz = Number(hzText);
+  if (extra.length || !tab || !['none', 'center', 'toolbar'].includes(condition) || !Number.isSafeInteger(durationMs) || durationMs < 1 || durationMs > 3_600_000 || !Number.isFinite(inputHz) || inputHz <= 0 || inputHz > 10_000 || (condition === 'none' && hzText === undefined)) {
+    throw new Error('usage: measure.mjs tab condition(none|center|toolbar) durationMs inputHz; duration 1..3600000, inputHz >0..10000');
+  }
+  return { tab, condition, durationMs, inputHz };
+}
+
+async function browserMeasure(c) {
+    const a = window.__app;
+    const read = () => {
+      const s = a.perf.snapshot();
+      const d = a.audio?.detail?.() ?? null;
+      return { bundleVersion: s.bundle?.version ?? a.manifest?.bundle?.version ?? null, guestScreen: s.guestScreen ?? a.screen?.guest ?? null, hz: s.hz ?? null, at: performance.now(), state: a.state, audio: d, pulses: a.audio?.pulses?.slice() ?? [], desk: a.deskStats ? { ...a.deskStats } : null, driver: a.driverStats ? { ...a.driverStats } : null, perf: { input: s.input, engineRun: s.engineRun } };
+    };
+    const detail = a?.audio?.detail?.();
+    const state = { app: Boolean(a), engine: a?.state, fileDialog: a?.fileDlg?.open, audio: detail?.deviceState, context: detail?.ctxState, visibility: document.visibilityState };
+    const wrong = Object.entries({ app: state.app, engine: state.engine === 'engine-idle', fileDialog: state.fileDialog === false, audio: state.audio === 'playing' && state.context === 'running', visibility: state.visibility === 'visible' }).filter(([, ok]) => !ok).map(([name]) => name);
+    if (wrong.length) return { ok: false, failure: 'precondition', state, mismatches: wrong };
+    const before = read();
+    let sent = 0, lastSent = null, maxIntervalMs = null;
+    let worker = null, url = null, timer = null, listener = null;
+    try {
+      if (c.condition === 'none') {
+        await new Promise((resolve) => { timer = setTimeout(resolve, c.durationMs); });
+      } else {
+        const source = 'onmessage = ({data}) => { const end = performance.now() + data.duration; const step = 1000 / data.hz; let due = performance.now() + step; while (performance.now() < due) {} while (due < end) { postMessage(due); due += step; while (performance.now() < due) {} } postMessage({done:true}); };';
+        url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+        worker = new Worker(url);
+        listener = (event) => {
+          if (event.data?.done) return;
+          const received = performance.now();
+          const { width: w, height: h } = a.screen.guest;
+          const phase = (received - before.at) * 2 * Math.PI / 1000;
+          const x = c.condition === 'center' ? w / 2 + Math.min(300, w / 10) * Math.sin(phase) : w / 4 + w / 5 * Math.sin(phase);
+          const y = c.condition === 'center' ? h / 3 + Math.min(200, h / 8) * Math.cos(phase) : 30;
+          a.sendRaw({ k: 'mouse', kind: 1, x: Math.round(x), y: Math.round(y), data: 0 });
+          if (lastSent !== null) maxIntervalMs = Math.max(maxIntervalMs ?? 0, received - lastSent);
+          lastSent = received;
+          sent++;
+        };
+        worker.addEventListener('message', listener);
+        const done = new Promise((resolve, reject) => {
+          worker.addEventListener('message', (e) => { if (e.data?.done) resolve(); });
+          worker.addEventListener('error', reject, { once: true });
+          timer = setTimeout(() => reject(new Error('worker timed out')), c.durationMs + 10_000);
+        });
+        worker.postMessage({ duration: c.durationMs, hz: c.inputHz });
+        await done;
+      }
+      const after = read();
+      const delta = (x, y) => typeof x === 'number' && typeof y === 'number' ? y - x : null;
+      const metricNames = ['underrunQuanta', 'engineGapFrames', 'engineSkippedFrames', 'engineLateWriteLost', 'nonSilentQuanta'];
+      const audio = Object.fromEntries(metricNames.map((k) => [k, delta(before.audio?.[k], after.audio?.[k])]));
+      const deskKeys = ['displayFrames', 'presents', 'composeMs', 'putMs', 'drawMs', 'uploadBytes', 'uploads', 'draws'];
+      const desk = Object.fromEntries(deskKeys.map((k) => [k, delta(before.desk?.[k], after.desk?.[k])]));
+      const driver = Object.fromEntries([...new Set([...Object.keys(before.driver ?? {}), ...Object.keys(after.driver ?? {})])].map((k) => [k, delta(before.driver?.[k], after.driver?.[k])]));
+      const recentPulses = after.pulses.filter((p) => p.page >= before.at && p.page <= after.at);
+      const firstPulse = before.pulses.at(-1), lastPulse = after.pulses.at(-1);
+      const unlockCompute = Object.fromEntries(['n', 'sumMs', 'over78'].map(k => [k, delta(firstPulse?.unlockCompute?.[k], lastPulse?.unlockCompute?.[k])]));
+      unlockCompute.lifetimeMaxMs = lastPulse?.unlockCompute?.maxMs ?? null;
+      // These counters attribute wall time between guest switches, including
+      // waits; they are not a CPU sample profile. Keep output bounded even for
+      // a long soak rather than returning every cumulative telemetry sample.
+      const threadPulses = Array.from({ length: lastPulse?.threads?.length ?? 0 }, (_, thread) => ({
+        thread,
+        attributedWallMs: delta(firstPulse?.threads?.[thread]?.[0], lastPulse?.threads?.[thread]?.[0]),
+        switches: delta(firstPulse?.threads?.[thread]?.[2], lastPulse?.threads?.[thread]?.[2]),
+        lifetimeMaxMs: lastPulse.threads[thread][1],
+      }));
+      const elapsedMs = after.at - before.at;
+      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+      if (worker && listener) worker.removeEventListener('message', listener);
+      worker?.terminate();
+      if (url) URL.revokeObjectURL(url);
+    }
+}
+
+function expression({ condition, durationMs, inputHz }) {
+  return `(${browserMeasure.toString()})(${JSON.stringify({ condition, durationMs, inputHz })})`;
+}
+
+try {
+  const input = args(process.argv.slice(2));
+  const timeout = input.durationMs + 30_000;
+  const { stdout } = await execFileAsync('browse', ['eval', '--json', JSON.stringify({ tab: input.tab, world: 'main', expression: expression(input), timeout })], { timeout: timeout + 5_000, maxBuffer: 8 * 1024 * 1024 });
+  const result = JSON.parse(stdout);
+  process.stdout.write(`${JSON.stringify(result)}\n`);
+  if (result.ok === false) process.exitCode = 1;
+} catch (error) {
+  fail(error);
+}

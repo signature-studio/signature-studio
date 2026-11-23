@@ -19,6 +19,17 @@ describe('deskCounters / deskBeacon', () => {
     const d = deskBeacon(stats2d, prev, 40_000);
     expect(d?.since).toMatchObject({ seconds: 30, presents: 60, mpx: 4, composeMs: 221.5, putMs: 48.8, rects: 100 });
   });
+  it('displayFrames stays unmeasured for old/fallback samples and differences require both measurements', () => {
+    const measured = { ...statsGl, displayFrames: 60 };
+    expect(deskBeacon(measured, { stats: { ...statsGl, displayFrames: 20 }, atMs: 0 }, 1000)).toMatchObject({ displayFrames: 60, since: { displayFrames: 40 } });
+    for (const value of [undefined, null, NaN, Infinity]) {
+      const old = { ...statsGl, displayFrames: value };
+      expect(deskCounters(old)).not.toHaveProperty('displayFrames');
+      expect(deskBeacon(measured, { stats: old, atMs: 0 }, 1000)?.since).not.toHaveProperty('displayFrames');
+      expect(deskBeacon(old, { stats: measured, atMs: 0 }, 1000)?.since).not.toHaveProperty('displayFrames');
+    }
+    expect(deskCounters({ displayFrames: 0 })).toHaveProperty('displayFrames', 0);
+  });
   it('a value that is not a finite number counts as 0', () => {
     expect(deskCounters({ presents: 'x', pixels: NaN, composeMs: Infinity })?.presents).toBe(0);
   });

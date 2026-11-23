@@ -62,7 +62,7 @@ export interface BeaconPayload {
   engineRun?: EngineRunBeacon;
 }
 
-export interface DeskCounters { presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
+export interface DeskCounters { /** Canvas updates deduplicated per Worker rAF; absent when unmeasured, not GPU/physical display evidence. */ displayFrames?: number; presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
 export interface DeskBeacon extends DeskCounters { mode: 'gl' | '2d'; since: (DeskCounters & { seconds: number }) | null }
 export interface EngineRunBeacon { windowSeconds: number; idles: number; busyFraction: number; busyMsMedian: number; busyMsP95: number; virtualPerWall: number }
 
@@ -71,13 +71,13 @@ export function deskCounters(s: Record<string, unknown> | null | undefined): Des
   if (!s) return null;
   const n = (k: string): number => (typeof s[k] === 'number' && Number.isFinite(s[k] as number) ? (s[k] as number) : 0);
   const r = (x: number, d: number): number => Math.round(x * 10 ** d) / 10 ** d;
-  return { presents: n('presents'), rects: n('rects'), mpx: r(n('pixels') / 1e6, 3), composeMs: r(n('composeMs'), 1), putMs: r(n('putMs'), 1), drawMs: r(n('drawMs'), 1), uploads: n('uploads'), draws: n('draws'), whole: n('whole'), ticks: n('ticks'), idleTicks: n('idleTicks'), wakes: n('wakes'), sleeps: n('sleeps') };
+  return { ...(typeof s.displayFrames === 'number' && Number.isFinite(s.displayFrames) ? { displayFrames: s.displayFrames } : {}), presents: n('presents'), rects: n('rects'), mpx: r(n('pixels') / 1e6, 3), composeMs: r(n('composeMs'), 1), putMs: r(n('putMs'), 1), drawMs: r(n('drawMs'), 1), uploads: n('uploads'), draws: n('draws'), whole: n('whole'), ticks: n('ticks'), idleTicks: n('idleTicks'), wakes: n('wakes'), sleeps: n('sleeps') };
 }
 export function deskBeacon(now: Record<string, unknown> | null | undefined, prev: { stats: Record<string, unknown>; atMs: number } | null, atMs: number): DeskBeacon | null {
   const c = deskCounters(now);
   if (!c) return null;
   const p = prev ? deskCounters(prev.stats) : null;
-  const since = p && prev ? { seconds: Math.round((atMs - prev.atMs) / 100) / 10, presents: c.presents - p.presents, rects: c.rects - p.rects, mpx: Math.round((c.mpx - p.mpx) * 1000) / 1000, composeMs: Math.round((c.composeMs - p.composeMs) * 10) / 10, putMs: Math.round((c.putMs - p.putMs) * 10) / 10, drawMs: Math.round((c.drawMs - p.drawMs) * 10) / 10, uploads: c.uploads - p.uploads, draws: c.draws - p.draws, whole: c.whole - p.whole, ticks: c.ticks - p.ticks, idleTicks: c.idleTicks - p.idleTicks, wakes: c.wakes - p.wakes, sleeps: c.sleeps - p.sleeps } : null;
+  const since = p && prev ? { ...(c.displayFrames !== undefined && p.displayFrames !== undefined ? { displayFrames: c.displayFrames - p.displayFrames } : {}), seconds: Math.round((atMs - prev.atMs) / 100) / 10, presents: c.presents - p.presents, rects: c.rects - p.rects, mpx: Math.round((c.mpx - p.mpx) * 1000) / 1000, composeMs: Math.round((c.composeMs - p.composeMs) * 10) / 10, putMs: Math.round((c.putMs - p.putMs) * 10) / 10, drawMs: Math.round((c.drawMs - p.drawMs) * 10) / 10, uploads: c.uploads - p.uploads, draws: c.draws - p.draws, whole: c.whole - p.whole, ticks: c.ticks - p.ticks, idleTicks: c.idleTicks - p.idleTicks, wakes: c.wakes - p.wakes, sleeps: c.sleeps - p.sleeps } : null;
   return { mode: typeof (now as Record<string, unknown>).draws === 'number' ? 'gl' : '2d', ...c, since };
 }
 /** the idle reports of the last `windowMs` before `atMs` (wall ms, performance.timeOrigin based like `at`); `now` is the virtual clock in 100 ns ticks (10,000 per ms) */
