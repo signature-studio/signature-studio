@@ -5,7 +5,7 @@ type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
 blocked_by: []
-labels: ["hidpi"]
+labels: ["hidpi", "fl-exe"]
 size: XL
 priority: Urgent
 project: signature-studio/3
@@ -29,6 +29,58 @@ project: signature-studio/3
 4. 結果として、UI の大きさは拡大率 100% の時と同じ見かけの大きさになり、かつ鮮明になる。
 
 禁止: 論理の小さい画面を作り、DPR 倍に拡大して表示する実装(ぼやけた画面)は、中間の版としても作らない。この方式の成果物は依頼者が棄却する。受け入れが通らない時は、判定の段で止まり、push されない。通らなかった理由と到達点を報告に書く。
+
+## 前回の試行で分かったこと
+
+前回の試行(run 45061489176。約 4 時間 40 分)は、受け入れに届かず落ちた。作業は保存されている(artifact `agent-1347` の `work.diff`)。`failed` を外すと、次の run がその差分を作業ツリーに載せ、`.prior-work.md` で続きから行うよう指示する。判定を通らなかったので、commit はされていない。最初から作り直さない。
+
+保存された差分に含まれるもの: `app/src/ui/`(`screen-fit.ts`・`desktop.ts`)・`app/src/main.ts`・`app/test/unit/screen-fit.test.ts`・`lift/runtime/`(`fle_screen.h`・`fle_gdc.h`・`fle_sysmetrics.c`・`fle_appfile.c`・`fle_proc.c`・`fle_proc.h`)・`lift/crates/fe-lift/tests/`(`gdc.rs`・`screen1.rs`・`wall_s.rs`)・`tools/feat-c1-hidpi/measure-size.mjs`・`pm-work/findings/hidpi-fl-scaling.md`。
+
+できたこと(実測。engine の作り直し・単体テストの通過まで):
+
+- guest の画面 = `round(部屋 × DPR)`。DPR 1・1.25・1.5・1.7647・2 で、canvas = 表示の物理画素。
+- 拡大率と DPI は式で求める。`lift/runtime/fle_screen.h` の `fle_screen_scale_percent`(拡大率 = round(DPR × 100))と `fle_screen_dpi`(DPI = MulDiv(96, 拡大率, 100))。
+- GetDeviceCaps・GetDpiForMonitor・font の高さ・アイコンとカーソルの寸法が、DPI に従う。
+- `app/src/ui/screen-fit.ts`・`desktop.ts`・`main.ts` で、物理画素の画面にした(拡大して表示しない)。単体テスト 1333 件が通った。
+- 特定の拡大率・DPI・DPR の値は、製品・seed・設定・テストに入れていない。
+
+できていないこと:
+
+- (a) DPI・画面の API の記録(起動の時点から有効にする仕組み)。
+- (c) F10 の Display の節。(d) FL が採用した拡大率の実測。(e) Windows の値との突き合わせ。(g)〜(j) Debug ログ・前後の比較・他のタブ・`debugLog`。
+- `dpi`・`flScalingPercent`・`parts`・`edgeWidth` は全 DPR で未測定(null)。`debugLog` は `captured: false`。
+- ポインタの座標の変換(±1 画素)は未実施。崩壊(Browser の黒い領域・Mixer の位置)は未分析。`blackShare` は DPR 1〜2 で約 0.91 で同じ、DPR 1.87 で 0.976。
+- 認識の値(per-monitor = 2)は推定。FL の実行ファイルのマニフェストは、作業の場所に無かったので読めていない。
+
+新しい障害: DPI が 240 以上(DPR 2.5 以上)で、FL が起動しない。`[js] fle thread 2 failed: RangeError: Maximum call stack size exceeded`。
+
+- 画面の大きさ・アイコンとカーソルの寸法・認識の値は原因ではない(実験 A・B。部屋 1000×600・DPR 2.5 の 2500×1500 の画面でも、DPI 240 で止まった)。
+- DPI の値を使う経路(font の高さ `FLE_SPI_FONT_HEIGHT`・`GetDeviceCaps` の LOGPIXELS・`GetDpiForMonitor`)のどれかと推定する。未分離。DPI 216 は未確認。
+- 乱数の DPR 3.00 で、idle に達しない。
+
+環境変数: `FLE_MONITOR_DPR` を、前回の作業が新しく足した(下の「制約」を参照)。
+
+## 起動用の実行ファイル(ラベル fl-exe)
+
+この Issue には、ラベル `fl-exe` が付いている。そのため、作業の run では、作業ツリーの `lift/out-app/host-extra/exe/` に、起動用の実行ファイル(`FL64.exe`・`FL64 (scaled).exe`)が在る(commit はしない。git の対象外)。
+
+- 両方のマニフェスト(PE の `RT_MANIFEST` の資源。`dpiAware`・`dpiAwareness`・`gdiScaling`・`longPathAware` など)を、node の PE の読みで取り出し、2 つの違いを表にする。
+- **2 つの違いが、FL が DPI をどう扱うかの一次の情報**。`FL64 (scaled).exe` は、Windows が拡大する(DPI 非対応として扱う)ための起動用と推定する(未確認。マニフェストの違いで確かめる)。
+- ゲストの「プロセス」の DPI の認識は、起動用の実行ファイルのマニフェストが決める。この製品は実行ファイルを実行せず FLEngine の DLL を読むので、runtime は、マニフェストの宣言どおりの認識を返す。
+- 製品には入れない。読みの道具は `tools/` か、その場の `.tmp-*` の script にする(commit はしない)。
+
+## 優先順位(前回の試行の後に定めた。この順に行う)
+
+1. **最初に、メトリクスの取得を終える**(実装を増やす前に)。
+   - マニフェストの読み(`FL64.exe`・`FL64 (scaled).exe`。上の「起動用の実行ファイル」)。
+   - DPI・画面の API の記録(起動の時点から有効にする仕組み。(a) の対象の API と `GetDeviceCaps`)。
+   - F10 の Display の節・Debug タブ・Info タブの取得(`debugLog`。(c)・(g)・(i))。
+   - DPI を変えた起動での FL の拡大率の実測(`flScalingPercent`。(d))。
+   - 部品の位置(`parts`)・縁の遷移の幅(`edgeWidth`)。
+   - 測定の道具(`tools/feat-c1-hidpi/measure-size.mjs`)が、`dpi`・`parts`・`edgeWidth`・`debugLog` を全て出すようにする。null のままの値を残さない。
+2. **DPI 240 以上の停止を直す**。最初の実験として、切り分けを行う。(i) font の高さだけを DPI 96 にする → (ii) `GetDeviceCaps` の LOGPIXELS だけを 96 にする → (iii) `GetDpiForMonitor` だけを 96 にする。原因を特定して直す。DPI 216(DPR 2.25)も確かめる。受け入れは、乱数の DPR が 1.00〜3.00 なので、DPR 2.5 以上でも idle に達することを求める。
+3. **認識の値**: 推定の「2」でなく、マニフェストの宣言から決める。
+4. 崩壊(`blackShare` が DPR 1.87 で 0.976)・ポインタの座標の変換(物理画素の位置。±1 画素)・`WM_DPICHANGED` の扱い(起動時の DPR のままでよい。再起動の案内は #{{108}})。
 
 ## 背景
 
@@ -82,6 +134,8 @@ Windows の仕様(確かめる対象。DPI の公式の文書で確認する):
 
 ## やること
 
+上の「優先順位」の順に行う。(a)〜(j) の測定は、実装より先に終える。
+
 1. メトリクスの取得(実装より先に、必ず行う)。道具 `tools/feat-c1-hidpi/measure-size.mjs`(新規)で測り、以下の (a)〜(j) の結果を、`pm-work/findings/hidpi-fl-scaling.md`(新規。PM の資料)に保存する。生のログの長い引用は載せず、行数と要点と表にする。
    - (a) 記録の仕組み: 既定では出さない。測定の道具だけが有効にできる既存の仕組みで、FL の起動から idle までの、DPI・拡大率・画面の大きさ・システムのメトリクスに関係する全ての呼び出しを、順序・API 名・引数・戻り値・呼び出し元のモジュールとアドレスつきで記録する。対象: DPI の API(`SetProcessDpiAwarenessContext`・`SetProcessDpiAwareness`・`SetProcessDPIAware`・`GetProcessDpiAwareness`・`GetThreadDpiAwarenessContext`・`GetAwarenessFromDpiAwarenessContext`・`GetDpiForWindow`・`GetDpiForSystem`・`GetDpiForMonitor`・`GetSystemMetricsForDpi`・`SystemParametersInfoForDpi`・`AdjustWindowRectExForDpi`・`EnableNonClientDpiScaling`・`SHGetScaleFactorForMonitor`・`GetScaleFactorForMonitor`・`GetScaleFactorForDevice`)、`GetDeviceCaps` の全ての index と戻り値(`LOGPIXELSX/Y`・`HORZSIZE/VERTSIZE`・`HORZRES/VERTRES`・`DESKTOPHORZRES/DESKTOPVERTRES`・`BITSPIXEL`・`SCALINGFACTORX/Y`・`ASPECTX/Y` など)、`GetSystemMetrics` の全ての index と戻り値(`SM_CXSCREEN/SM_CYSCREEN`・`SM_CXVSCROLL`・`SM_CYHSCROLL`・`SM_CYCAPTION`・`SM_CXFRAME`・`SM_CXICON`・`SM_CXSMICON`・`SM_CXCURSOR` など。Windows に公開されている定数だけを使う。戻った値は呼び出しごとに 1 行)、`SystemParametersInfoW` の全ての `uiAction` と戻り値(`SPI_GETNONCLIENTMETRICS`・`SPI_GETICONMETRICS`・`SPI_GETWORKAREA`・`SPI_GETMOUSE`・`SPI_GETSCREENREADER` など)、`EnumDisplayMonitors`・`GetMonitorInfoW`・`EnumDisplaySettingsW`・`MonitorFromWindow` の戻り値、レジストリの読み(キーの名前・値の名前・戻り値。DPI 関係では `HKCU\Control Panel\Desktop` の `LogPixels`・`Win8DpiScaling`、`HKCU\Control Panel\Desktop\WindowMetrics` の `AppliedDPI`、`HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\FontDPI` の各値。FL 自身の設定のキーの値: FL が `HKCU\Software\` の下に持つ、GUI の拡大・Main GUI Scaling・Legacy scaling・Pop-ups・Toolbars・Cursors scaling に当たる値)、設定ファイルの読み(FL の設定フォルダ `Settings\` の下のファイルの名前と大きさ)、カーソルの大きさに関係する呼び出し(`GetCursorInfo`・`GetIconInfo`・`LoadCursor`・`LoadImage`)。
    - (b) seed の確認: `lift/harness/seeds/` の seed 表・レジストリの seed・設定ファイルの seed に、GUI の拡大に関係する値がどう入っているかを調べ、表にする。Main GUI Scaling が System か、数値に固定されていないかを確かめる。数値に固定されていれば、値を記号の `System` に直す(seed に数値の拡大率を書かない)。
@@ -107,7 +161,7 @@ Windows の仕様(確かめる対象。DPI の公式の文書で確認する):
    - ブラウザ側: canvas の描画領域 = 表示領域の物理画素(`ResizeObserver` の `devicePixelContentBoxSize` を使い、端数の CSS 寸法でも表示の物理画素に揃える)。1 guest 画素 = 1 物理画素。`image-rendering` などで誤魔化さない。
    - ポインタ: ブラウザのポインタ(CSS 座標、小数)を、物理画素の位置で guest の画素に変換する(`floor(clientX × DPR)` と同じ。ずれは ±1 画素以内)。
    - 単体テスト `app/test/unit/screen-fit.test.ts` の #1306 の期待値を、物理画素の規則に合わせて直す。期待値は、DPR から式で計算して書く(値の表を埋め込まない)。
-   - 画面の大きさと DPI が実行中に変わった時(動的な変化)は、既存の `WM_DISPLAYCHANGE` の経路で engine に伝える。`WM_DPICHANGED` の扱いは #1348 が検証する。この Issue の受け入れは、起動時の DPR で正しいこと。
+   - 画面の大きさと DPI が実行中に変わった時(動的な変化)は、既存の `WM_DISPLAYCHANGE` の経路で engine に伝える。`WM_DPICHANGED` の扱いは #{{108}} が検証する。この Issue の受け入れは、起動時の DPR で正しいこと。
    - 崩壊: Browser のパネルの黒い領域、Mixer の位置、配置のずれが、物理画素の画面で出ないこと。原因が guest の画面の大きさ(部品の座標の計算)なのか、render Worker(WebGL2・1 窓 1 テクスチャ・テクスチャの大きさの上限・描画の矩形の通知)なのかを切り分けて直し、報告に書く。
    - FL が自分で拡大しないと実測で分かった場合は、受け入れを満たせない。その証拠(呼ばれた API・返した値・マニフェストの値・Debug ログの行)を報告に書く。拡大して表示する版で代えない。
 8. 測定の道具 `tools/feat-c1-hidpi/measure-size.mjs` を完成させる。道具の先頭に、部品の位置の求め方と、各閾値の根拠を書く。DPR の入力は、固定の一覧(1・1.25・1.5・1.7647・2)に、乱数の 2 つを加える。乱数は、起動のたびに crypto の乱数で種を選び、その種から範囲 1.00〜3.00・0.01 刻みの値を 2 つ決める。種と 2 つの値を、JSON の `randomDprs` に出す。固定の一覧は DPR の入力としてだけ使い、期待値には使わない。期待値は、各行の DPR から式で計算する。
@@ -156,11 +210,12 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 1 の (b) の seed の表、(c) の F10 の読み取った選択値、(d) の表(DPR・DPI・FL の拡大率と、FL の丸め方)、(e) の表(Windows の計算値と記録の突き合わせ。食い違う行を全て列挙)、(g)〜(i) の Debug ログの取得方法と絞った行、(h) の前後の差、FL が拡大を決める情報(マニフェストの値、呼ばれた API と戻り値)、DPR ごとの表(guest・dpi・flScalingPercent・部品の座標・edgeWidth・blackShare・debugLog の captured と lines)、`randomDprs` の種と値、崩壊の原因(切り分けの結果)、変えたパス(app/・lift/・tools/ を含む)、拡大率を導く式の場所(ファイルと行)、特定の値を用意していないことの確認(上の source の検査の grep の出力。一致 0 件)、拡大して表示する版を入れていないことの確認、#1348 に残した点。
+- 報告に書く: 1 の (b) の seed の表、(c) の F10 の読み取った選択値、(d) の表(DPR・DPI・FL の拡大率と、FL の丸め方)、(e) の表(Windows の計算値と記録の突き合わせ。食い違う行を全て列挙)、(g)〜(i) の Debug ログの取得方法と絞った行、(h) の前後の差、FL が拡大を決める情報(マニフェストの値、呼ばれた API と戻り値)、DPR ごとの表(guest・dpi・flScalingPercent・部品の座標・edgeWidth・blackShare・debugLog の captured と lines)、`randomDprs` の種と値、崩壊の原因(切り分けの結果)、変えたパス(app/・lift/・tools/ を含む)、拡大率を導く式の場所(ファイルと行)、特定の値を用意していないことの確認(上の source の検査の grep の出力。一致 0 件)、拡大して表示する版を入れていないことの確認、#{{108}} に残した点。
 
 ## 制約
 
-- 製品に新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。既定で動く形にする。
+- 製品に、利用者向けの新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。既定で動く形にする。
+- `FLE_MONITOR_DPR` は、`FLE_MONITOR_W/H` と同じ、ホストが engine へ渡す実行時の入力で、利用者向けの選択肢ではない。前回の作業が、この経路に置いた。新しい利用者向けの旗・URL パラメータ・ビルド変数は作らない。
 - 特定の拡大率・DPI・DPR の値を、runtime・app・seed・設定・テストに、定数・表・分岐・seed の値として入れない。この Issue の本文に書いた例の数字(100・125・150・175・176・200%、DPI の 96 以外の値、DPR 1.7647 など)も、製品には入れない。拡大率は、実行時の DPR から式で導く。
 - 論理の小さい画面を DPR 倍に拡大して表示する実装を、中間の版としても作らない。
 - 製品の既定の動作を、測定のためだけに変えない。
@@ -169,10 +224,17 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - 依頼者の資格情報・設定に触れない。
 - Python は製品に使わない(調査と検証にだけ使う)。
 
+## 作業の進め方
+
+- engine の作り直しは約 30 分。ビルドは、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000)を渡して待つ。
+- 1 回の試行(最大約 5.5 時間)で、ビルドは数回までなので、実験はビルドをまとめて計画する。
+- 作業の最後に、受け入れが通らなくても、作業ツリーを commit する。通らなければ push されず、差分が保存される(次の run が続きから取り込む)。
+
 ## 他のタスクとの関係
 
-- #1348(動的な変化と、全ての拡大率・全ての窓の種類の検証)は、この Issue の後に行う。
+- #{{108}}(動的な変化と、全ての拡大率・全ての窓の種類の検証)は、この Issue の後に行う。
 - #1349(音が途切れる現象)は、この Issue の後の物理画素の画面で測る。
 - #1334(音声の圧迫)と同じ描画の経路(`app/src/engine/client.ts`・`desk.ts`・`render-worker.ts`)を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 - #1306・#1308 の結果(DPI の経路と、その実測)は、この Issue が置き換える。
 - #1346(トップバーの右クリック)は、部品の座標を使う。この Issue で座標の基準が変わる場合は、同じ手順で main を取り込む。
+

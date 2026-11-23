@@ -441,11 +441,11 @@ NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
-ok "新しい段: 551a4e59 より後の段は、extract に 12 件、work に 8 件(抽出物の追加の段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=12 work=8"
+ok "新しい段: 551a4e59 より後の段は、extract に 15 件、work に 10 件(抽出物の追加の段と、起動用の実行ファイルの段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=15 work=10"
 ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
 ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
-ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 20
-ok "新しい段: R2 の鍵を使うのは、extract の 4 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract"
+ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 25
+ok "新しい段: R2 の鍵を使うのは、extract の 5 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し・起動用の実行ファイルの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
@@ -455,8 +455,8 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
 ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
-ok "保存の段: runs-on/cache/save が 4 つ(一覧・外部・言語等・内蔵のプラグイン)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "4 true"
-ok "復元の段: work の R2 の復元は 5 つ(既存の 1、一覧・外部・言語等・内蔵のプラグイン)、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true,true,true"
+ok "保存の段: runs-on/cache/save が 5 つ(一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイル)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "5 true"
+ok "復元の段: work の R2 の復元は 6 つ(既存の 1、一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイル)、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true,true,true,true"
 ok "作業ツリーへの配置は commit しない(inputs/ に置く段に git が無い)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("inputs/ に置く")) | .run] | .[0] // "" | contains("git ")' "$J")" false
 ok "node の道具は、一覧と外部の検査で呼ぶ(fl-installer-files と external-inputs/check)" "$(grep -cF 'node tools/fl-installer-files.mjs' "$A")/$(grep -cF 'node tools/external-inputs/check.mjs' "$A")" "1/2"
 ok "agent.yml: python を使わない(製品の検査の規則)" "$(grep -ciE 'python' "$A")" 0
@@ -478,7 +478,7 @@ NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
-ok "抽出物の追加: 新しい段は extract に 6 件、work に 4 件" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=6 work=4"
+ok "抽出物の追加: 新しい段は extract に 9 件、work に 6 件(resources・plugin-builtin の 6 と 4、fl-exe の 3 と 2)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=9 work=6"
 ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
 ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
 ok "抽出物の追加: resources の段は 5 件、plugin-builtin の段は 5 件(判定に、そのラベルを含む)" "$(jq -r '[(map(.["if"] // "" | select(test(",resources,"))) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "5/5"
@@ -499,12 +499,35 @@ ok "抽出物の追加: 言語等の取り出しは、接頭辞の 6 件を、�
 ok "抽出物の追加: 内蔵のプラグインの取り出しは、接頭辞の 2 件を、取り出しの道具で extra-plugins に書く(行の完全一致)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0]' "$J" | grep -cxF -f "$T/want-plg.txt")" 1
 ok "抽出物の追加: 言語等の鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-resources-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-res.txt")"
 ok "抽出物の追加: 内蔵のプラグインの鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-plugins-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-plg.txt")"
-ok "抽出物の追加: 作業の場所は、RUNNER_TEMP の extra-resources と extra-plugins(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-plugins ${{ runner.temp }}/extra-resources'
+ok "抽出物の追加: 作業の場所は、RUNNER_TEMP の extra-exe・extra-plugins・extra-resources(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-exe ${{ runner.temp }}/extra-plugins ${{ runner.temp }}/extra-resources'
 ok "抽出物の追加: 言語等の復元の段の id は resources、内蔵のプラグインの復元の段の id は plugins" "$(jq -r '[(.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)") | .id), (.jobs.extract.steps[] | select(.name == "内蔵のプラグインのキャッシュ(R2)") | .id)] | join(" ")' "$J")" "resources plugins"
 ok "抽出物の追加: 取り出しと保存の 4 つの段は、cache-hit が偽のときだけ動く(言語等は resources、プラグインは plugins の復元を見る)" "$(jq -r '[.jobs.extract.steps[] | select(.name | test("^インストーラの言語・テーマ・テンプレート・プロジェクト(を取り出す|をキャッシュに保存)|^内蔵のプラグインの DLL を取り出す|^内蔵のプラグインをキャッシュに保存")) | .["if"] | (contains("cache-hit != ") and contains(",resources,") or contains("cache-hit != ") and contains(",plugin-builtin,"))] | "\(length) \(all)"' "$J")" "4 true"
 ok "抽出物の追加: 作業の段は、取った物を lift/out-app/host-extra/resources と lift/out-app/host-extra/plugins に置く(mv 2 件)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(test("mv .*lift/out-app/host-extra/(resources|plugins)"))) | length' "$J")" 2
 ok "抽出物の追加: 作業の段の配置は、git を呼ばない(commit は作業者が行う。ここでは置くだけ)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(contains("git "))) | length' "$J")" 0
 ok "抽出物の追加: 作業ツリーの lift/out-app/host-extra は git の対象外(判定の git status を汚さない)" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/resources/x && git -C "$top" check-ignore -q lift/out-app/host-extra/plugins/x && echo yes)" yes
+# (p) 起動用の実行ファイル(fl-exe: FL64.exe と FL64 (scaled).exe。根の直下なので、接頭辞でなく完全なパスを --file で取る)。ラベルの Issue だけ、extract で R2 のキャッシュに置き、work で lift/out-app/host-extra/exe に置く(commit はしない)
+cat > "$T/want-exe-run.txt" <<'WANT'
+node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-exe" --file 'FL64.exe' --file 'FL64 (scaled).exe'
+WANT
+cat > "$T/want-key-exe.txt" <<'WANT'
+extra-fl-exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+WANT
+EXR='起動用の実行ファイルを取り出す(キャッシュが無いときだけ)'; EXRE='起動用の実行ファイルのキャッシュ(R2)'; EXS='起動用の実行ファイルをキャッシュに保存する(取ったときだけ)'
+WKR='起動用の実行ファイルを R2 のキャッシュから取る(fl-exe の作業だけ)'; WKP='取った物を lift/out-app/host-extra/exe に置く(fl-exe の作業だけ。commit はしない)'
+ok "fl-exe: 2 つの完全なパスは一覧の guest の列に在り、接頭辞 FL64 に当たる物は 2 件だけ" "$(cut -f1 "$top/inputs/fl-installer-files.tsv" | grep -cxF -e 'FL64.exe' -e 'FL64 (scaled).exe')/$(cut -f1 "$top/inputs/fl-installer-files.tsv" | grep -c '^FL64')" "2/2"
+ok "fl-exe: 取り出しは、2 つの完全なパスを --file で、取り出しの道具に渡し、extra-exe に書く(行の完全一致)" "$(jq -r --arg n "$EXR" '[.jobs.extract.steps[] | select(.name == $n) | .run][0]' "$J" | grep -cxF -f "$T/want-exe-run.txt")" 1
+ok "fl-exe: 取り出しの段の入力は、R2_ARTIFACT の鍵だけ(キャッシュの鍵は使わない)" "$(jq -r --arg n "$EXR" '[.jobs.extract.steps[] | select(.name == $n) | .env.AWS_ACCESS_KEY_ID] | .[0]' "$J")" '${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}'
+ok "fl-exe: 鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-fl-exe-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-exe.txt")"
+ok "fl-exe: 作業の場所は、RUNNER_TEMP の extra-exe(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-exe"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-exe'
+ok "fl-exe: 取り出し・保存・復元の 3 段の判定は、fl-exe のラベルを labels で見る(作業の 2 段は issue_labels)" "$(jq -r '[(.jobs.extract.steps[] | select(.name | test("^起動用の実行ファイル")) | .["if"] | select(contains(",fl-exe,") and contains("needs.select.outputs.labels"))), (.jobs.work.steps[] | select(.name | test("fl-exe の作業だけ")) | .["if"] | select(contains(",fl-exe,") and contains("needs.select.outputs.issue_labels")))] | length' "$J")" 5
+ok "fl-exe: 取り出しと保存の 2 段は、cache-hit が偽のときだけ動く(復元の段の id は exe)" "$(jq -r --arg e "$EXRE" '[(.jobs.extract.steps[] | select(.name == $e) | .id), ([.jobs.extract.steps[] | select(.name | test("^起動用の実行ファイル(を取り出す|をキャッシュに保存)")) | .["if"] | select(contains("steps.exe.outputs.cache-hit"))] | length | tostring)] | join("/")' "$J")" "exe/2"
+ok "fl-exe: 復元の段は、作業の復元で fail-on-cache-miss: true、uses は runs-on/cache/restore" "$(jq -r --arg w "$WKR" '[.jobs.work.steps[] | select(.name == $w) | "\(.uses)/\(.with["fail-on-cache-miss"])"] | .[0]' "$J")" 'runs-on/cache/restore@v5/true'
+WRUN=$(jq -r --arg w "$WKP" '[.jobs.work.steps[] | select(.name == $w) | .run][0]' "$J")
+ok "fl-exe: 作業の段は mv で extra-exe を lift/out-app/host-extra/exe に置き、2 つのファイルを確かめる(git を呼ばない)" "$(echo "$WRUN" | grep -cF 'mv "$RUNNER_TEMP/extra-exe" lift/out-app/host-extra/exe')/$(echo "$WRUN" | grep -cF 'test -f lift/out-app/host-extra/exe/FL64.exe')/$(echo "$WRUN" | grep -cF 'test -f "lift/out-app/host-extra/exe/FL64 (scaled).exe"')/$(echo "$WRUN" | grep -c 'git ')" "1/1/1/0"
+ok "fl-exe: 作業の段の順は、plugins の置く段の後、fl-exe の復元、fl-exe の置く段、取り込みの段の前" "$(jq -r --arg w "$WKR" --arg p "$WKP" '[.jobs.work.steps[].name] as $n | ($n | index("取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)")) as $q | ($n | index($w)) as $r | ($n | index($p)) as $e | ($n | index("前回の作業を取り込む")) as $t | ($q != null and $r != null and $e != null and $t != null and $q < $r and $r < $e and $e < $t)' "$J")" true
+ok "fl-exe: extract の段の順は、内蔵のプラグインの保存の後で、fl-exe の 3 段(復元・取り出し・保存)" "$(jq -r --arg e "$EXRE" --arg x "$EXR" --arg s "$EXS" '[.jobs.extract.steps[].name] as $n | ($n | index("内蔵のプラグインをキャッシュに保存する(取ったときだけ)")) as $p | ($n | index($e)) as $a | ($n | index($x)) as $b | ($n | index($s)) as $c | ($p != null and $a != null and $b != null and $c != null and $p < $a and $a < $b and $b < $c)' "$J")" true
+ok "fl-exe: 作業ジョブに R2_ARTIFACT の鍵を使う段が無い(取り出しは extract だけ)" "$(jq -r '[.jobs.work.steps[] | tostring | test("R2_ARTIFACT")] | any' "$J")" false
+ok "fl-exe: 作業ツリーの lift/out-app/host-extra/exe は git の対象外" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/exe/FL64.exe && echo yes)" yes
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
@@ -635,7 +658,7 @@ ok "取り込みの段の位置: キャッシュの復元(runs-on/cache/restore 
   | ($n | index("作業者を 1 回動かす")) as $w
   | [.jobs.work.steps | to_entries[] | select((.value.uses // "") | startswith("runs-on/cache/restore")) | .key] as $r
   | [.jobs.work.steps | to_entries[] | select((.value.name // "") | test("^(抽出物を lift/out-app/host に置く|一覧を作業ツリーの inputs/ に置く|外部プラグインを lift/out-app/external に置き|取った物を lift/out-app/host-extra/)")) | .key] as $p
-  | "\($r | length)/\($p | length)/\(($i != null) and ($w != null) and (((($r + $p) | max) < $i)) and ($i < $w))"' "$J")" "5/5/true"
+  | "\($r | length)/\($p | length)/\(($i != null) and ($w != null) and (((($r + $p) | max) < $i)) and ($i < $w))"' "$J")" "6/6/true"
 ok "取り込みの段の位置: 取った物の置く段(plugin-builtin)の後で、タスクの段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[].name] as $n | ($n | index($p)) as $i | ($n | index("取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)")) as $q | ($n | index("タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す")) as $t | ($i != null and $q != null and $t != null and $q < $i and $i < $t)' "$J")" true
 ok "作業者の段に env が無い(取り込みの token を渡さない)" "$(jq -r --arg n "作業者を 1 回動かす" '[.jobs.work.steps[] | select(.name == $n) | has("env")] | .[0] | tostring' "$J")" false
 ok "work の権限: actions が read(取り込みの段が、保存された artifact を読む)。contents と issues は read のまま" "$(jq -r '.jobs.work.permissions | "\(.actions)/\(.contents)/\(.issues)"' "$J")" "read/read/read"
