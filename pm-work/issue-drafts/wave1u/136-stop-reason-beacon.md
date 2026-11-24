@@ -81,14 +81,14 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm test --prefix app && node tools/perf-beacons/summary.mjs tools/perf-beacons/fixtures/stop --exits --now 2026-11-24T08:00:00Z | grep -q 'StopFixture' && bash guard/scan.sh && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-boot.json","utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const A=L.find((r)=>r.flow==="A");const ok=!!A&&A.error===null&&A.state==="engine-idle"&&A.standIn===false&&A.trapped===false&&A.hostErrors===0&&A.opened===true&&A.elapsedMs<=12500&&A.preBootBytes<=314342986;process.exit(ok?0:1)'; rc=$?; rm -f .tmp-boot.json .tmp-flow.jsonl; exit $rc
+npm test --prefix app && node tools/perf-beacons/summary.mjs tools/perf-beacons/fixtures/stop --exits --now 2026-11-24T08:00:00Z | grep -q 'StopFixture' && bash guard/scan.sh && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-boot.json","utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const A=L.find((r)=>r.flow==="A");const ok=!!A&&A.error===null&&A.state==="engine-idle"&&A.standIn===false&&A.trapped===false&&A.hostErrors===0&&A.opened===true&&A.elapsedMs<=12500&&A.preBootBytes<=314368711;process.exit(ok?0:1)'; rc=$?; rm -f .tmp-boot.json .tmp-flow.jsonl; exit $rc
 ```
 
 判定の基準:
 - 受け入れの 1 行が通る(単体試験・fixture の表に `StopFixture` が出る・`guard/scan.sh` が 0 件・ビルド・起動確認・流れ A)。
 - 流れ A の行: `error` が null・`state` が engine-idle・`standIn` が false・`trapped` が false・`hostErrors` が 0・`opened` が true。
 - 流れ A の `elapsedMs` が 12,500 以下(絶対値)。
-- 流れ A の `preBootBytes` が 314,342,986 以下。基準は 314,326,602 B(#1355 の実測。`pm-work/findings/browser-panel-1355.md`)+ 16,384 B。
+- 流れ A の `preBootBytes` が 314,368,711 以下。基準は 314,352,327 B(#1362 の後の main の実測)+ 16,384 B。
 - 報告に、停止の項目が実機で出たかどうかは書かない(この Issue では停止が起きない)。確かめられていないと書く。
 
 ## 報告の規則
