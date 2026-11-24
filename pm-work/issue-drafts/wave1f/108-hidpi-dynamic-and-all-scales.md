@@ -4,7 +4,7 @@ title: "Fractional Scaling の動的な変化と、全ての拡大率(100%〜300
 type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
-blocked_by: ["107", "113", "114"]
+blocked_by: ["107", "113", "114", "149"]
 labels: ["hidpi", "verify"]
 size: L
 priority: High
@@ -28,12 +28,48 @@ project: signature-studio/3
 - Windows の FL の実際の挙動は、この機械では確かめられない。確認できない部分は「確認できない」と報告に書く。
 - 起動用の実行ファイル: `FL64.exe`(マニフェストに `dpiAware True/PM`)と `FL64 (scaled).exe`(DPI の宣言なし。Windows が拡大する形と読める。推定)。この製品は `FL64.exe` の振る舞いに合わせる。`(scaled)` の方式は、この Issue の範囲外。
 - 既存の経路: 画面の大きさの更新は `app/src/main.ts`(`applyScreenParam`・`applyDisplay`・DPR の監視)と `lift/runtime` の `WM_DISPLAYCHANGE`(`grep -rn WM_DISPLAYCHANGE lift/runtime` で探す)。
-- DPI が 240 以上(DPR 2.5 以上)の起動は、#{{114}} で直った。この Issue では DPR 2.5〜3.0 を含めて確かめる。
+- DPI が 240 以上(DPR 2.5 以上)の起動は、#{{114}} で直った。しかし、#{{112}} 段 A(commit `eb118ef2`)で、この修正の効果は無効になった(起動が止まる。下の「前回の試行で分かったこと」の 3)。原因の Issue は #{{149}}。この Issue では DPR 2.5〜3.0 を含めて確かめるが、DPR 2.5 の行は #{{149}} の後に測る。
 - #{{113}}(FL の UI の拡大の実測)と #{{115}}(Browser のパネル)と #{{118}}(WebView2 の面)の結果を使う。
 
-## 前回の試行で分かったこと
+## 前回の試行で分かったこと(run 45357788913)
 
-前回の試行: run 45327829718(3 時間 37 分)。判定は終了コード 1 で、push は無し。作業は保存され、次の試行は、その差分を `.prior-work.md` と共に作業ツリーで受け取る(取り込めたかは、`.prior-work.md` と `git status` で確かめる)。
+前回の試行: run 45357788913(約 3 時間)。判定は終了コード 1 で、push は無し。作業は commit `89d21bb9` として保存された。次の試行は、その差分(前回の作業)を作業ツリーで受け取る(`git status` で載っているかを確かめる。`.prior-work.md` が在れば先に読む)。engine の実験の変更は取り除いてあり、`lift/runtime/fle_thread.c` は HEAD に戻してある。
+
+- 実測の値は runner の値(nproc 4・loadavg 1.1〜1.9)。採用段は FL のログ行 `Main GUI scaling factor` の値。DPI は round(96 × DPR)。
+
+| DPR(実測) | DPI | 採用段(実測) | main の縁 (px) | menu の縁 (px) |
+|---|---|---|---|---|
+| 1 | 96 | 100 | 2.243 | 2.194 |
+| 1.25 | 120 | 125 | 2.410 | 2.194 |
+| 1.5 | 144 | 150 | 2.536 | 2.194 |
+| 1.55(乱数) | 149 | 150 | 2.532 | 2.194 |
+| 1.7(乱数) | 163 | 175 | 2.635 | 2.194 |
+| 1.75 | 168 | 175 | 2.635 | 2.194 |
+| 1.88(乱数) | 180 | 200 | 3.199 | 3.038 |
+| 2 | 192 | 200 | 3.199 | 3.038 |
+| 2.5 | 240 | 起動せず(3 の節) | 未確認 | 未確認 |
+| 3 | 288 | 300 | 3.048 | 0.800(修正後。4 の節) |
+
+- 静的の 10 段の結果: 起動できた 9 段で、窓 8 種のうち、plugin と tooltip 以外は開けた。plugin はこのプロジェクトに内蔵プラグインを挿入する手順が無く、tooltip は上部バーに乗せても新しい最上位の窓が出なかった(#{{137}} で扱う)。主窓の `pointerErrPx` は 9 段で 0。Debug ログは 72 行が captured、`scalingLines` の error・warn は 0 行。
+- 動的(1 → 1.21 → 2 → 1。実測): 全段 ok。`WM_DISPLAYCHANGE` は段 2・3・4 で 1 件ずつ(段 1 は 0)、`WM_DPICHANGED` は 0 件。DPI(96)と採用段(100)は起動時の値のまま。再起動の案内は段 2・3 だけに出た。canvas と表示は一致し、ページの例外は 0。
+- 乱数: `randomDprs` の種 376198107、値 1.55・1.88・1.7。動的の中間 1.21。Tempo 枠の検出が外れたのは、乱数 3 点と動的の段 2・3(判定の外。#{{137}})。
+- ページの画面の黒(`tools/browser-panel/measure.mjs`、DPR 1): 0。
+- 3. DPR 2.5 の起動の停止(原因は #{{149}}。推定)
+  - HEAD の engine: DPR 2.5 は 5 回中 4 回が、180 秒経っても engine-idle に届かなかった(engine のログ 0 行、メモリの値 null、ページの例外 0、console 0)。DPR 3 は 9 回中 1 回が止まった。
+  - app の変更を HEAD に戻した版でも、DPR 2.5 は 3 回中 3 回止まった(同じ engine で計 8 回中 7 回)。app は原因ではない。
+  - 実験(製品には入れていない。取り消し済み): `fle_loop_slice` を何もしない版では、DPR 2.5 は 3 回中 3 回 engine-idle に届いた(採用段 250、edgeWidth 3.543)。
+  - 判定の段の 1 回では、DPR 3 が 180 秒で止まり、乱数の DPR 2.4 は CDP の `Runtime.evaluate` が 30 秒で timeout した(ページの JS が返らない。止まり方が違う)。乱数の DPR 2.14 は通った。
+  - 推定の原因: #{{112}} 段 A の後ろ向きの goto の切り替え(`fle_loop_tick`・`fle_loop_slice`)。止まる仕組みは未確認。切り替えを外す修正は、#{{112}} の効果を失うので採らない(#{{149}} で直す)。
+- 4. menu の縁(DPR 3): 外側は黒(0)、4 px の枠(28)、内側は 192。縁のコントラストが 28 で、閾値 40 を下回ったため null だった(描画の遅れではない)。直し方: menu の縁だけ、コントラスト 20 以上で向きを問わず測る(`MENU_MIN_CONTRAST`)。main と他の窓の閾値は 40 のまま。結果は DPR 3 で 0.80 px。
+- 5. 採用段の式(前回の判定が落ちた理由の 1)。実測の点は、上の表の 9 点と、判定の段の DPR 2.14(DPI 205。採用段 200)。
+  - 床の式(DPI ÷ 96 × 4 の切り捨て × 25): DPR 1.7 と 1.88 で外れる(実測 175・200 に対して 150・175)。
+  - 25% 刻みの最近接: 判定の段の DPR 2.14 で外れる(225 になる。実測は 200)。
+  - 225 の段を外した最近接(次の式。下の「次の試行の決まり」の ①): 上の 9 点と 2.14 の全てに合う。225 の段が無いことは、実測の 1 点(DPI 205 → 200)からの推定。
+- 6. 判定の結果: 作業者の判定は、DPR 2.5 の起動の停止(3 の節)と、乱数 1.7・1.88 の採用段の式(5 の節)で落ちた。判定の段(別の実行。乱数 2.14・2.4・1.56)は、DPR 2.5・3 と乱数 2.4 の起動、および main の 3 点のポインタで落ちた。受け入れは、どの試行でも通っていない。
+
+## 1 回前の試行で分かったこと
+
+1 回前の試行: run 45327829718(3 時間 37 分)。判定は終了コード 1 で、push は無し。作業は保存され、その差分を `.prior-work.md` と共に作業ツリーで受け取った(取り込めたかは、`.prior-work.md` と `git status` で確かめる)。
 
 - 製品の変更(前回の作業の中身。作業ツリーに在る):
   - `app/src/main.ts`: DPR の変化を、部屋の測り直しと画面の追随へ渡す。`matchMedia` の参照を保持し、`resize` と 250 ms の確認を足した。
@@ -56,6 +92,16 @@ project: signature-studio/3
   5. blackShare が guest の canvas の黒を見ていた。
   6. 縁が null のとき「null ≤ 2」が真になり、測れなかった縁が通った。
   7. ソースの検査の grep が `refs/judge/main` を使い、作業者のセッションでは空振りした(判定の段では有る)。
+
+## 次の試行の決まり(PM の決定)
+
+1. **採用段の式を、最近接の段の式に直す**(判定の (a) の式。計算であり、定数・表ではない)。p = DPI ÷ 96 × 100 を求め、25 刻みの最近接に丸める(`Math.round(p / 25) * 25`)。丸めた値が 225 の時は、p < 225 なら 200、それ以外は 250 とする。判定は、FL のログの factor × 100 がこの値と一致すること。1 段ずれた行は落ちる。
+   - 根拠(実測): 上の表の 9 点、判定の段の DPR 2.14 と 1.56、実験の DPR 2.5(採用段 250)を、この式が全て満たす。床の式は 2 点、25 刻みの最近接は 1 点(2.14)で外れる。
+   - 225 の段を外すのは、実測の 1 点(DPI 205 → 200)からの推定。DPI 211〜230(DPR 2.2〜2.4)は未測定。#{{149}} の後に DPR 2.2〜2.4 を測り、式が合うかを確かめる。合わなければ、式を直して報告に書く。
+2. **menu の縁**: `MENU_MIN_CONTRAST`(コントラスト 20 以上・向きを問わず)を残す。main と他の窓の閾値は 40 のまま。
+3. **DPR 2.5 と 2.69**: #{{149}} が直った後に測る。それまでは、この Issue の受け入れを走らせない(DPR 2.5 の起動が止まり、判定が落ちるだけになる)。
+4. **乱数の DPR**: 受け入れのたびに選ぶ(固定の値に合わせた実装は通らない)。
+5. **前回の作業**: 差分を作業ツリーで受け取り、上の 1 と 2 を当てた上で、受け入れを通す。
 
 ## 読む物
 
@@ -81,7 +127,7 @@ project: signature-studio/3
    - 利用者への案内: 既存の `#restart-note` で、拡大率の変更は FL を再起動すると適用される旨を出す。自動で再起動を提案しない(FL の再起動は利用者の操作)。
    - 転送後の canvas の幅を、設定しない(例外になる)。
    - 新しい環境変数・URL パラメータ・ビルド変数を作らない。拡大率の数値を runtime・app・seed に書かない。
-5. menu の縁: DPR 2.5・2.69・3 で測れなかった原因を調べ、測れるようにする(測り方か、窓の開き方を直す。製品の既定の動作は、測定のためだけに変えない)。
+5. menu の縁: DPR 2.5・2.69・3 で測れなかった原因を調べ、測れるようにする(測り方か、窓の開き方を直す。製品の既定の動作は、測定のためだけに変えない)。前回の試行で、DPR 3 の原因(縁のコントラストの閾値)は直した(`MENU_MIN_CONTRAST`。残す)。DPR 2.5 と 2.69 は、起動が直った後(#{{149}})に測る。
 6. 部品の座標と Tempo 枠の検出: 判定から外す。報告には、乱数の DPR と動的の段 2・3 で外れた値を書く。理由の調査は #{{137}} で行う。
 7. ポインタ: 静的の主窓で、3 部品の中心を押し、engine が受け取った画素と押した画素の差(`pointerErrPx`)が 1 以下であること。
 8. plugin・tooltip の窓: この Issue では開けなくてよい(行の `error` に理由を書く)。#{{137}} で扱う。
@@ -90,12 +136,12 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && D=$(node -e 'process.stdout.write((require("crypto").randomInt(101,301)/100).toFixed(2))') && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1,1.25,1.5,1.75,2,2.5,3 --windows main,welcome,mixer,playlist,piano-roll,plugin,tooltip,menu --random 3 --random-range 1,3 --dynamic 1,$D,2,1 > "$RUNNER_TEMP/fs.jsonl" && node tools/browser-panel/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/browser.json" && node -e 'const fs = require("fs"); const L = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map((l) => JSON.parse(l)); const B = JSON.parse(fs.readFileSync(process.argv[2], "utf8")); const W = ["main", "welcome", "mixer", "playlist", "piano-roll", "plugin", "tooltip", "menu"]; const REQ = ["main", "menu"]; const eq = (x, y) => Math.abs(x - y) < 0.0001; const S = L.filter((x) => x.mode === "static"); const Dy = L.filter((x) => x.mode === "dynamic"); const R = S.length ? S[0].randomDprs.values : []; const F = [1, 1.25, 1.5, 1.75, 2, 2.5, 3].concat(R); const a = S.find((x) => eq(x.dpr, 1) && x.window === "main"); if (!a || a.edgeWidth === null || !a.room) { console.log("judge: DPR 1 の主窓の行が無い、または縁が測れない"); process.exit(1); } const adp = (x) => Math.floor(x.dpi / 96 * 4 + 1e-9) * 25; const boot = (x) => x.state === "engine-idle" && x.standIn === false && x.room !== null && x.guest !== null && x.canvas !== null && x.display !== null && x.dpi !== null; const reqOk = (x) => !REQ.includes(x.window) || x.error === null; const geo = (x) => Math.abs(x.guest.w - Math.round(x.room.w * x.dpr)) <= 1 && Math.abs(x.guest.h - Math.round(x.room.h * x.dpr)) <= 1 && Math.abs(x.canvas.w - x.display.w) <= 1 && Math.abs(x.canvas.h - x.display.h) <= 1; const dbg = (x) => x.debugLog.captured === true && x.debugLog.lines >= 1 && !x.debugLog.scalingLines.some((l) => /error|warn/i.test(l)); const baseOf = (w) => { const b = S.find((x) => eq(x.dpr, 1) && x.window === w); return b ? b.edgeWidth : null; }; const edge = (x) => { if (x.edgeWidth === null) return !REQ.includes(x.window); const b = baseOf(x.window); return b === null || x.edgeWidth <= b * (1 + (x.dpr - 1) / 2) + 0.5; }; const sRow = (x) => boot(x) && reqOk(x) && geo(x) && x.mainGuiScaling === "System" && dbg(x) && Math.abs(x.dpi - Math.round(96 * x.dpr)) <= 1 && x.debugLog.scalingFactor !== null && Math.round(x.debugLog.scalingFactor.factor * 100) === adp(x) && edge(x); const dRow = (x) => boot(x) && reqOk(x) && geo(x) && dbg(x) && x.dpi === a.dpi && x.flScalingPercent === adp(a) && edge(x) && x.restartNotice === (Math.round(x.dpr * 100) !== Math.round(a.dpr * 100)); const ptrOk = (x) => x.pointerErrPx !== null && x.pointerErrPx <= 1; const bad = (rows, f) => rows.filter((x) => !f(x)).map((x) => `${x.window}@${x.dpr}${x.mode === "dynamic" ? " step " + x.step : ""}`); const last = Dy.length === 4 ? Dy[3] : { edgeWidth: null }; const checks = { rows: S.length === 80 && Dy.length === 4, dprs: F.every((d) => W.every((w) => S.some((x) => eq(x.dpr, d) && x.window === w))), rnd: R.length === 3 && R.every((d) => d >= 1 && d <= 3), room: Math.abs(a.room.w - 1836) <= 2 && Math.abs(a.room.h - 1056) <= 2, static: S.every(sRow), pointer: S.filter((x) => x.window === "main").every(ptrOk), steps: Dy.length === 4 && Dy.every((x, i) => x.step === i + 1) && eq(Dy[0].dpr, 1) && Dy[1].dpr > 1 && Dy[1].dpr <= 3 && eq(Dy[2].dpr, 2) && eq(Dy[3].dpr, 1), dynamic: Dy.every(dRow), last: last.edgeWidth !== null && Math.abs(last.edgeWidth - a.edgeWidth) <= 0.5, browser: B.error === null && B.state === "engine-idle" && B.standIn === false && B.blackShare !== null && B.blackShare < 0.5, }; for (const k of Object.keys(checks)) if (!checks[k]) console.log(`judge: 失敗 ${k}`); const badS = bad(S, sRow); if (badS.length) console.log(`judge: 静的の行で外れた: ${badS.join(", ")}`); const badD = bad(Dy, dRow); if (badD.length) console.log(`judge: 動的の行で外れた: ${badD.join(", ")}`); const badP = S.filter((x) => x.window === "main" && !ptrOk(x)).map((x) => `main@${x.dpr}`); if (badP.length) console.log(`judge: ポインタが外れた: ${badP.join(", ")}`); console.log(`judge: ${Object.entries(checks).map(([k, v]) => `${k}=${v}`).join(" ")}`); const ok = Object.values(checks).every(Boolean); console.log(ok ? "judge: 通った" : "judge: 通らない"); process.exit(ok ? 0 : 1);' "$RUNNER_TEMP/fs.jsonl" "$RUNNER_TEMP/browser.json" && b=$(git merge-base HEAD origin/main) && d=$(git diff -U0 "$b" -- lift/runtime lift/harness app/src) && ! grep -E '^\+[^+]' <<<"$d" | grep -qE '\b(125|150|168|169|175|176)\b|1\.75\b|1\.7647|0\.5667' && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && D=$(node -e 'process.stdout.write((require("crypto").randomInt(101,301)/100).toFixed(2))') && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1,1.25,1.5,1.75,2,2.5,3 --windows main,welcome,mixer,playlist,piano-roll,plugin,tooltip,menu --random 3 --random-range 1,3 --dynamic 1,$D,2,1 > "$RUNNER_TEMP/fs.jsonl" && node tools/browser-panel/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/browser.json" && node -e 'const fs = require("fs"); const L = fs.readFileSync(process.argv[1], "utf8").trim().split("\n").map((l) => JSON.parse(l)); const B = JSON.parse(fs.readFileSync(process.argv[2], "utf8")); const W = ["main", "welcome", "mixer", "playlist", "piano-roll", "plugin", "tooltip", "menu"]; const REQ = ["main", "menu"]; const eq = (x, y) => Math.abs(x - y) < 0.0001; const S = L.filter((x) => x.mode === "static"); const Dy = L.filter((x) => x.mode === "dynamic"); const R = S.length ? S[0].randomDprs.values : []; const F = [1, 1.25, 1.5, 1.75, 2, 2.5, 3].concat(R); const a = S.find((x) => eq(x.dpr, 1) && x.window === "main"); if (!a || a.edgeWidth === null || !a.room) { console.log("judge: DPR 1 の主窓の行が無い、または縁が測れない"); process.exit(1); } const adp = (x) => { const p = x.dpi / 96 * 100; const s = Math.round(p / 25) * 25; return s === 225 ? (p < 225 ? 200 : 250) : s; }; const boot = (x) => x.state === "engine-idle" && x.standIn === false && x.room !== null && x.guest !== null && x.canvas !== null && x.display !== null && x.dpi !== null; const reqOk = (x) => !REQ.includes(x.window) || x.error === null; const geo = (x) => Math.abs(x.guest.w - Math.round(x.room.w * x.dpr)) <= 1 && Math.abs(x.guest.h - Math.round(x.room.h * x.dpr)) <= 1 && Math.abs(x.canvas.w - x.display.w) <= 1 && Math.abs(x.canvas.h - x.display.h) <= 1; const dbg = (x) => x.debugLog.captured === true && x.debugLog.lines >= 1 && !x.debugLog.scalingLines.some((l) => /error|warn/i.test(l)); const baseOf = (w) => { const b = S.find((x) => eq(x.dpr, 1) && x.window === w); return b ? b.edgeWidth : null; }; const edge = (x) => { if (x.edgeWidth === null) return !REQ.includes(x.window); const b = baseOf(x.window); return b === null || x.edgeWidth <= b * (1 + (x.dpr - 1) / 2) + 0.5; }; const sRow = (x) => boot(x) && reqOk(x) && geo(x) && x.mainGuiScaling === "System" && dbg(x) && Math.abs(x.dpi - Math.round(96 * x.dpr)) <= 1 && x.debugLog.scalingFactor !== null && Math.round(x.debugLog.scalingFactor.factor * 100) === adp(x) && edge(x); const dRow = (x) => boot(x) && reqOk(x) && geo(x) && dbg(x) && x.dpi === a.dpi && x.flScalingPercent === adp(a) && edge(x) && x.restartNotice === (Math.round(x.dpr * 100) !== Math.round(a.dpr * 100)); const ptrOk = (x) => x.pointerErrPx !== null && x.pointerErrPx <= 1; const bad = (rows, f) => rows.filter((x) => !f(x)).map((x) => `${x.window}@${x.dpr}${x.mode === "dynamic" ? " step " + x.step : ""}`); const last = Dy.length === 4 ? Dy[3] : { edgeWidth: null }; const checks = { rows: S.length === 80 && Dy.length === 4, dprs: F.every((d) => W.every((w) => S.some((x) => eq(x.dpr, d) && x.window === w))), rnd: R.length === 3 && R.every((d) => d >= 1 && d <= 3), room: Math.abs(a.room.w - 1836) <= 2 && Math.abs(a.room.h - 1056) <= 2, static: S.every(sRow), pointer: S.filter((x) => x.window === "main").every(ptrOk), steps: Dy.length === 4 && Dy.every((x, i) => x.step === i + 1) && eq(Dy[0].dpr, 1) && Dy[1].dpr > 1 && Dy[1].dpr <= 3 && eq(Dy[2].dpr, 2) && eq(Dy[3].dpr, 1), dynamic: Dy.every(dRow), last: last.edgeWidth !== null && Math.abs(last.edgeWidth - a.edgeWidth) <= 0.5, browser: B.error === null && B.state === "engine-idle" && B.standIn === false && B.blackShare !== null && B.blackShare < 0.5, }; for (const k of Object.keys(checks)) if (!checks[k]) console.log(`judge: 失敗 ${k}`); const badS = bad(S, sRow); if (badS.length) console.log(`judge: 静的の行で外れた: ${badS.join(", ")}`); const badD = bad(Dy, dRow); if (badD.length) console.log(`judge: 動的の行で外れた: ${badD.join(", ")}`); const badP = S.filter((x) => x.window === "main" && !ptrOk(x)).map((x) => `main@${x.dpr}`); if (badP.length) console.log(`judge: ポインタが外れた: ${badP.join(", ")}`); console.log(`judge: ${Object.entries(checks).map(([k, v]) => `${k}=${v}`).join(" ")}`); const ok = Object.values(checks).every(Boolean); console.log(ok ? "judge: 通った" : "judge: 通らない"); process.exit(ok ? 0 : 1);' "$RUNNER_TEMP/fs.jsonl" "$RUNNER_TEMP/browser.json" && b=$(git merge-base HEAD origin/main) && d=$(git diff -U0 "$b" -- lift/runtime lift/harness app/src) && ! grep -E '^\+[^+]' <<<"$d" | grep -qE '\b(125|150|168|169|175|176)\b|1\.75\b|1\.7647|0\.5667' && npm test --prefix app
 ```
 
 判定の基準(道具の出力の生の値を、上の node -e が読む。3 本の出力: `fs.jsonl`(測定)・`browser.json`(ページの画面の黒)・ソースの検査):
 
-- (a) 静的の行は 80 行。固定の 7 点と `randomDprs.values` の 3 点の全てに、窓 8 種の行が在る。全ての行で、state が engine-idle、standIn が false、guest が round(部屋 × DPR) の ±1 画素、canvas と display が ±1 画素、dpi が round(96 × DPR) の ±1、Main GUI Scaling が "System"、debugLog が captured(lines が 1 以上、error・warn の行が無い)。FL の採用段(`debugLog.scalingFactor` の factor × 100)が、DPI ÷ 96 × 4 を切り捨てて 25 を掛けた値と一致する。
+- (a) 静的の行は 80 行。固定の 7 点と `randomDprs.values` の 3 点の全てに、窓 8 種の行が在る。全ての行で、state が engine-idle、standIn が false、guest が round(部屋 × DPR) の ±1 画素、canvas と display が ±1 画素、dpi が round(96 × DPR) の ±1、Main GUI Scaling が "System"、debugLog が captured(lines が 1 以上、error・warn の行が無い)。FL の採用段(`debugLog.scalingFactor` の factor × 100)が、`adp`(DPI ÷ 96 × 100 を 25 刻みの最近接に丸める。丸めが 225 の時は、p < 225 なら 200、それ以外は 250。「次の試行の決まり」の 1)と一致する。
 - (b) 窓: main と menu は、error が null で、縁(`edgeWidth`)が測れている。他の窓(welcome・mixer・playlist・piano-roll・plugin・tooltip)は、error と null を許す。縁が測れた行は、同じ窓の DPR 1 の縁(`base`。DPR 1 が測れていなければ判定しない)に対して、`edgeWidth` ≤ base × (1 + (DPR − 1) ÷ 2) + 0.5 画素を満たす。拡大による縁のぼやけは、DPR に比例して縁が広がるので、この上限を超える。
 - (c) 主窓の静的の行: `pointerErrPx` が 1 以下。
 - (d) 動的の行は 4 行(段 1〜4)。段 1 と 4 は DPR 1、段 2 は乱数の中間(1.01〜3.00)、段 3 は DPR 2。各段で、guest・canvas と display・debugLog の基準を満たし、DPI が起動時(DPR 1)の値のまま、FL の採用段が起動時の値のまま、縁が (b) の基準を満たす。`restartNotice` が、DPR の百分率が DPR 1 と違う段だけ true。段 4 の縁は、DPR 1 の主窓の縁と ±0.5 画素以内。
@@ -130,7 +176,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: #{{107}}(起動時の DPR に対する Windows と同じ Fractional Scaling)、#{{113}}(FL の UI の拡大の実測)、#{{114}}(DPI 240 以上の停止)。
+- blocked_by: #{{107}}(起動時の DPR に対する Windows と同じ Fractional Scaling)、#{{113}}(FL の UI の拡大の実測)、#{{114}}(DPI 240 以上の停止。効果は #{{112}} 段 A で無効になった)、#{{149}}(DPR 2.5 以上の起動が first idle に届かない障害。この Issue の DPR 2.5 の行は、#{{149}} が直るまで測れない)。
 - #{{137}}(plugin と tooltip の窓。Tempo 枠の検出の理由の調査)は、この Issue の判定の外。
 - #{{109}}(音が途切れる現象)は、この Issue と並行して進めてよい。ただし、物理画素の画面で測る。
-- 同じ描画の経路を変える #1334 と #1346 と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- 同じ描画の経路を変える #{{040}} と #{{106}} と衝突しうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
