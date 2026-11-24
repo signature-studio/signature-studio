@@ -77,12 +77,11 @@ jobs:
           jq -e --arg o resources/System/Internet/error-offline.html \
             '.lazy | any(.path == $o)' \
             lift/out-app/bundle/raw/fl-Oz/manifest.json
-          jq -e '[.files[].path] as $f | all(
-            "seed/resources/System/Languages/de.moe",
-            "seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf",
-            "seed/resources/Data/Templates/Other/Blocks/Blocks.flp";
-            . as $x | $f | any(. == $x))' \
-            lift/out-app/seed/seed.bin.manifest.json
+          for p in System/Languages/de.moe \
+            Artwork/Fonts/Cuprum/Cuprum.ttf \
+            Data/Templates/Other/Blocks/Blocks.flp; do
+            grep -aqF "\"seed/resources/$p\"" lift/out-app/seed/seed.bin
+          done
       - run: lift/target/release/fe-build upload
       - name: 本番の manifest を確かめる
         run: |
