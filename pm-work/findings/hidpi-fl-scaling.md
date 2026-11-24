@@ -193,6 +193,128 @@ FL のウェルカム窓(`TWelcomeWizard`)の幅 ÷ DPR 1 の幅(874)× 100 を�
 ### 9.7 次にやること
 
 1. 100 と 125 の境界(DPI 109〜111)を確かめる。段の式は直さない(runtime で段を作って合わせない)。FL が段を決める規則が FL 自身か Windows の値の違いかは、Windows の実機の値が無いと判定できない(未確認)。
-2. Main GUI Scaling(F10 の設定の窓)・Debug ログ・Info・Display の節は #1358。
+2. Main GUI Scaling(F10 の設定の窓)・Debug ログ・Info・Display の節は #1358 → 節 10 を参照(Debug ログと係数はゲストのメモリから読めた。Display の選択と Info は未確認)。
 3. DPR 2.5 と 3 は停止する(#1354。`fle thread 2 failed: RangeError: Maximum call stack`)。
 4. 主窓の部品の中心を押す測り方は、Welcome 窓を閉じられるようになった後(#1357)に行える。任意。
+
+## 10. Issue #1358 の測定(F10 の設定窓・Display・Debug・Info。数値の判定は受理)
+
+測定の値は runner の値。この機械とは別枠。nproc = 4。loadavg(測定の前)= 0.37 / 0.40 / 0.26、(測定の後)= 0.36 / 0.92 / 1.48。実エンジン: `measure-size.mjs` を、この作業の差分を載せた main で作った bundle `fl-Oz` に対して実行(固定 5 点・乱数 2 点・DPR 2.5 と 3)。2 回実行した。1 回目は乱数が 1.42・1.47、2 回目は乱数が 2.02・2.01。下の表は 2 回目の出力(`size.jsonl` の 7 行 + 高い DPR の 1 行)。数値の判定は 2 回目の出力に当てた。
+
+### 10.0 窓の文字を読む経路(実測)
+
+- 窓の表の文字(前回の経路)では、Debug の本文は `text ""` のまま(この実測でも同じ。`settings.debugMemo`)。この経路は使わない。
+- 今回は、ゲストのメモリ(wasm の線形メモリ。DPR 1 で 1,074,462,720 B)を、読むだけで走査した。経路: `window.__app.guestText(markers, radius)` → `app/src/engine/client.ts` の `guestText` → Worker の `guest-text`(`app/src/engine/worker.ts` の `guestText`)。既定では呼ばれない(測定の道具だけが呼ぶ)。
+- 目印: FL の起動の行の先頭(`Browser caching took 0 milliseconds.`・`There were no updates for MIDI scripts.`・`There were no updates for themes.`・`Mixer track map: 1,2,3,4`・`There were no updates for`・`Browser caching took`)。ASCII と UTF-16LE の両方で探し、見つかった場所の前後の印字可能な文字の連続を、改行で行に分けた。行の最も多い文字列を取った。
+- 見つかった時刻(`debugLog.foundAt`: 行の多い読みの時刻): 起動の idle(Debug 頁を押す前)か、Debug 頁を押した後か。DPR 1・1.25・1.5・1.7647 は **idle** の読みが選ばれた(105 行)。DPR 2・2.02・2.01 は **Debug 頁を押した後**の読みが選ばれた(174 行)。
+- 見つかった形式: 目印は全て **ASCII**(UTF-8 と同じ)で見つかった。UTF-16LE の目印では、行の最も多い文字列にならなかった。
+
+### 10.1 F10 の設定窓・タブ(実測)
+
+| DPR | 帯に出た頁 | Debug の頁 |
+|---|---|---|
+| 1 | MIDI・Audio・General・Theme・Project・Account・About | 無 |
+| 1.25 | 同上 | 無 |
+| 1.5 | MIDI・Audio・General・Theme・Project・Account(About は届かず) | 無 |
+| 1.7647 | MIDI・Audio・General・Theme・Project・Account・About | 無 |
+| 2・2.02・2.01 | MIDI・Audio・General・Theme・Project・Debug・Account・About | 有(本文は `text ""`) |
+
+- File・Info は、どの DPR でも帯に出なかった。Info の頁は押せず、Info の欄は読めていない(10.5)。
+- General 頁の見出し(窓の表。9 件): `System`・`Display (requires a restart to take effect)`・`Advanced`・`Miscellaneous`・`Input`・`Updates and privacy`・`Language (requires a restart to take effect)`・`Hints and warnings`・`Undo history`。窓の表で非 ASCII の文字は `?` と出る(`u16_ascii` の変換。見出しの空白の一部)。
+
+### 10.2 Debug ログ(実測)
+
+- 中身は FL の起動のログの行。ファイル名は `FL Studio\Support\Logs\Startup\Startup 2021-01-01_000000.log`(ゲストの時計は 2021-01-01 00:00:00)。
+- 行数(`debugLog.lines`・`captured`・`method`): DPR 1 → 105 行、1.25 → 105、1.5 → 105、1.7647 → 105、2 → 174(Debug 頁を押した後)、2.02 → 174、2.01 → 174。7 行とも `captured` true・`method` `"guest-memory-scan"`。(1 回目の実測では DPR 1 が 109 行。起動の後の行の数が時刻で変わる。)
+- 先頭 30 行(DPR 1。idle の読み):
+
+```
+[01/01/2021 00:00:00] C:\Users\user\Documents\Image-Line\FL Studio\Support\Logs\Startup\Startup 2021-01-01_000000.log
+[01/01/2021 00:00:00] HostVersion=1 Flags=00000000
+[01/01/2021 00:00:00] Init module
+[01/01/2021 00:00:00] Init core paths
+[01/01/2021 00:00:00] FL Studio v26.1.7.5653
+[01/01/2021 00:00:00] BeforeRunning
+[01/01/2021 00:00:00] Starting at 12:00:00 AM
+64Bit addressing mode
+3DNow! support: no
+SSE    support: yes
+SSE2   support: yes
+SSE3   support: no
+SSSE3  support: no
+AVX    support: no
+Touchscreen not available
+Main GUI scaling factor: 1 (system set to 96PPI)
+Temporary folder for this session:
+C:\Windows\Image-Line\4096-{1C588F8C-DCE4-4D23-BFD8-2E006150E3EF}\
+FL Studio language: English (US)
+Windows display language: en-US
+---
+[01/01/2021 00:00:00] Loading tags started...
+[01/01/2021 00:00:00] Browser caching took 2 milliseconds.
+[01/01/2021 00:00:00] ReadIniFile
+[01/01/2021 00:00:00]   Restore window state
+[01/01/2021 00:00:00]   Restore settings window
+[01/01/2021 00:00:00]     Assigned(MIDIForm) = 
+[01/01/2021 00:00:00]   Read various options
+[01/01/2021 00:00:00]   Read more options
+[01/01/2021 00:00:00]   Load MRU list
+```
+
+- 絞った行(`scalingLines`・DPR 1。8 行。`dpi`・`scal`・`screen`・`monitor`・`display`・`resol`・`zoom`・`window`・`error`・`warn` を含む行): `Touchscreen not available`・`Main GUI scaling factor: 1 (system set to 96PPI)`・`C:\Windows\Image-Line\4096-{…}\`・`Windows display language: en-US`・`Restore window state`・`Restore settings window`・`Restore more window settings`・`Restore settings for most windows`。
+
+### 10.3 FL 自身の拡大率の記録(実測)
+
+FL のログの行 `Main GUI scaling factor: F (system set to N PPI)` が、FL の使った係数 F と、そのもとのシステムの PPI N を書く。
+
+| DPR | 係数 F(ログ) | PPI N(ログ) | N ÷ 96 | 拡大率 `flScalingPercent` |
+|---|---|---|---|---|
+| 1 | 1 | 96 | 1.000 | 100 |
+| 1.25 | 1.25 | 120 | 1.250 | 125 |
+| 1.5 | 1.5 | 144 | 1.500 | 150 |
+| 1.7647 | 1.75 | 169 | 1.760 | 175 |
+| 2 | 2 | 192 | 2.000 | 200 |
+| 2.02 | 2 | 194 | 2.021 | 200 |
+| 2.01 | 2 | 193 | 2.010 | 200 |
+| (1 回目)1.42 | 1.5 | 136 | 1.417 | 150 |
+| (1 回目)1.47 | 1.5 | 141 | 1.469 | 150 |
+
+- 実測: 係数 F は、N ÷ 96 を 0.25 の段に丸めた値と、9 行とも一致した(FL のログの値。FL 自身の規則の材料)。Windows 側の値の違いは、この機械では判定できない(未確認)。
+- 推定: ログは `system set to N PPI` と書くので、Main GUI Scaling は System だと推定する。ただし、選択の欄そのものは読めていない(10.4)。
+
+### 10.4 Display(Main GUI Scaling)(実測と未確認)
+
+- `Main GUI Scaling` の文字(ASCII・UTF-16LE)は、メモリに **見つからなかった**(0 箇所)。
+- `Pop-ups` の近傍(ASCII 2 箇所・UTF-16LE 1 箇所)に、選択肢の列 `100%`・`125%`・`150%`・`175%`・`200%`・`250%`・`300%`・`350%`・`400%` が出た(9 件)。同じ近傍に `System` は出なかった。
+- 選ばれている添字は読めていない。よって `display` は null、`displayChoices` は 5 項目とも null(**未確認**)。Main GUI Scaling が System か否かは、判定できない(推定は上の 10.3)。
+- `Toolbars` の近傍(21 箇所)は、操作の名前(`RealignWindowsActionH`・`ArrangeWindowsIntoWorkSpaceActionP`・…)で、選択肢ではない。近傍の探索は 24 箇所で打ち切ったため、`Cursors`・`Legacy scaling` は一覧に入らなかった(**未確認**)。
+
+### 10.5 Info 頁(未確認)
+
+- Info の頁は、どの DPR でも帯に出ず、押せなかった。`info` は null(**未確認**)。
+- 前の版は Info の欄の代わりに、別のプラグインの説明文を拾っていた(`Windows`・`FL Studio` の目印の近傍)。それは取り除いた。Info の頁を押した後の読みだけを `info` に入れる。
+
+### 10.6 FL の設定の読み(実測)
+
+- `scalingRegistry`(名前に `scaling`・`GUI`・`uiscale`・`PPI` を含む `RegQueryValueExW`): 7 行とも null。FL は、この経路では拡大率の設定を読んでいない。係数は起動のログに書かれている(10.3)。
+
+### 10.7 判定(受け入れ)
+
+- 数値の判定(2 回目の出力の 7 行): `error` null・`state` engine-idle・`standIn` false・`flScalingPercent`(100・125・150・175・200・200・200)・`edgeWidth`(2.261・2.425・2.527・2.626・3.199・3.199・3.199)・`pointerErrPx` 0(全行)・`parts` 有限。→ **受理**(`#1353` の判定のまま)。
+- DPR 1 と DPR 1.7647 の Debug ログ: `captured` true・`lines` 105・`method` `"guest-memory-scan"`。→ **受理**。
+- ソースの検査: 追加行に 125・150・168・169・175・176・1.75・1.7647・0.5667 は無い(`refs/judge/main` は、この機械には無いので、HEAD との差分で代わりに確かめた。0 件)。→ **受理**。
+- 単体テスト `npm test --prefix app`: 68 ファイル合格(1 件スキップ)、1335 件合格(10 件スキップ)、終了 0。→ **受理**。
+- DPR 2.5・3: 停止(`fle thread 2 failed: RangeError: Maximum call stack size exceeded`。`#1354`。判定から外す)。
+- 判定から外した項目(JSON と報告には出す): `display`・`displayChoices`・`info`(未確認)、`scalingRegistry`(null)、`canvasDisplay`(canvas と一致)。
+
+### 10.8 道具の変更(今回)
+
+- `app/src/engine/worker.ts`: `guest-text` の要求(`guestText`。メモリの読みのみ。目印を ASCII と UTF-16LE で探し、行に分け、近傍の印字可能な連続を取る)。`app/src/engine/client.ts`: `guestText`。`app/src/engine/protocol.ts`: 要求と応答の型。`app/src/main.ts`: `window.__app.guestText`(測定の道具だけが呼ぶ)。
+- `tools/feat-c1-hidpi/measure-size.mjs`: `debugLog`(起動の idle と Debug 頁の後の 2 回の読み。`foundAt`・`marker`・`enc`・`offset`・`head`・`scalingLines`・`scalingFactor`)、`displayNear`・`displayChoices`・`display`(Display の節。未確認は null)、`info`(Info 頁を押した後の読み)、`canvasDisplay`(canvas の寸法。旧 `display`)。`mainGuiScaling` の欄は `settings.scalingRegistry` に移した。
+- 製品の既定の動作(利用者の画面)は変えていない。新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数は足していない。ゲストのメモリには書かない(読むだけ)。
+
+### 10.9 次にやること(#1358 の後)
+
+1. Display の選択値: `Pop-ups` の近傍の選択肢の列(100% … 400%)を持つ構造を、メモリの中で探し、選ばれている添字を読む。`System` の選択肢が同じ列にあるかも確かめる。
+2. 近傍の探索の上限(24 箇所)を、目印ごとに分ける(`Cursors`・`Legacy scaling` を一覧に入れる)。
+3. Info の頁を帯に出す条件(窓の幅・FL の設定)を確かめる。

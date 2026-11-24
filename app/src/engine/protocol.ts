@@ -11,6 +11,11 @@ export interface DeskHandover { ring: SharedArrayBuffer; ctl: SharedArrayBuffer;
 /** C-2: what the page hands the render Worker: the ONE canvas of the desktop (transferred), the port to the engine Worker and the handshake block (desk-link.ts). It draws the picture the engine composed. */
 export interface RenderHandover { canvas: OffscreenCanvas; port: MessagePort; ctl: SharedArrayBuffer }
 
+/** #1358 (a test aid): a text the engine's memory holds, the one with the most lines: the marker it was found by, its encoding (ASCII, or UTF-16LE), the place (byte offset in the memory), and its non-empty lines */
+export interface GuestTextBest { marker: string; enc: 'ascii' | 'utf16le'; offset: number; lineCount: number; lines: string[] }
+/** #1358 (a test aid): the printable runs (of at least two characters) within the radius of a place a marker was found at */
+export interface GuestTextNear { marker: string; enc: 'ascii' | 'utf16le'; offset: number; runs: string[] }
+
 /** What the page loaded and verified for the engine (transferred to the Worker). `lazy`: the manifest's lazy files, in its order (none when absent); their bytes come later, through shared memory (lazy-file.ts), so they are not transferred. */
 export interface BundleAssets {
   module: WebAssembly.Module; seed: Uint8Array; glue: Uint8Array; dll: Uint8Array;
@@ -31,6 +36,8 @@ export type ToWorker =
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
   | { cmd: 'desk-peek' }
+  /** #1358 (a test aid, any display method): the text the engine's memory holds for the markers (read only; radius > 0 also lists the printable runs near each place) */
+  | { cmd: 'guest-text'; markers: string[]; radius: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
   | { cmd: 'ping'; id: number };
@@ -82,6 +89,7 @@ export type FromWorker =
   | { t: 'pong'; id: number }
   | { t: 'desk-dump'; width: number; height: number; data: ArrayBuffer; /** the compositor's line per window drawn */ windows: string }
   | { t: 'desk-dump-error'; message: string }
+  | { t: 'guest-text'; memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
   | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }

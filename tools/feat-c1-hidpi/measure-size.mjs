@@ -14,7 +14,7 @@
 //    api: the DPI answers of the trace (LOGPIXELSX / Y, HORZRES / VERTRES, the GetSystemMetrics values of the screen, icons and cursors, GetDpiForMonitor, GetProcessDpiAwareness).
 //    The trace is on from the start: window.__app.windowApiTrace(true) runs as soon as the page exists, and the start takes it (main.ts apiTraceWanted; fruity.ts traceOn).
 //  - canvas: canvas[data-desk="1"] width and height (the drawing buffer = the guest's screen in device pixels).
-//  - display: the canvas's getBoundingClientRect x dpr, rounded (the device pixels the canvas covers). The acceptance wants it to match canvas within 1 pixel.
+//  - canvasDisplay: the canvas's getBoundingClientRect x dpr, rounded (the device pixels the canvas covers). It should match canvas within 1 pixel (#1353).
 //  - asked: the size and the environment the page passed to the engine (window.__app.screen.asked).
 //  - scale (#1353): the picture (window.__app.deskDumpBase64) and the window table. flScalingPercent = round(100 x the Welcome window's width / its width at the DPR 1 reference of the
 //    calibration boot): FL's own window, the only one of its size in the table that does not move. scale.tempoLen: the Tempo box's bright interior in guest pixels (DPR 1: 54), a cross-check.
@@ -29,9 +29,18 @@
 //    pointerDiag: the page's input count (__app.inputEvents) and the log's line count before and after the presses, the element under each press, the log's last lines.
 //  - engineFaults: the guest thread failures ("fle thread N failed") in the engine's log before the pointer test. A failed guest thread stops the engine's thread switch (fle_thread_lib.js fail:
 //    nothing is handed over), so the engine answers no press while the page still shows "engine-idle": such a row has no "hit" line (pointerErrPx null). Not retried: one boot per row.
-//  - mainGuiScaling: FL's last registry read of a value whose name has "scaling", "GUI" or "uiscale" (window-api: RegQueryValueExW, from the trace), { found, value, line }; null when FL read none.
-//    The trace of the start-up has no such read (the General settings are read when the settings window opens; #1353).
-//  - debugLog: { captured: false } here. The Debug tab is not reached: the Welcome window closes only by No thanks or Escape, and both trap the engine (HostFilesUnsupported).
+//  - settings (#1358): the Settings window (F10, class TMIDIForm) after the Welcome window and the dialog after it are closed with Escape. The tab bar (TQuickSheetSelector) has no windows of its own:
+//    ten press points are split evenly across its rectangle (from the window table, scaled by the canvas); each press shows a page (the visible TVectorSheet, whose text is its caption) and the window's title.
+//    captions: the pages reached, in order of first press; generalPanels: the captions of the panels of the General page; debugTab / infoTab: the Debug or Info page is in the bar; scalingRegistry: FL's last registry read
+//    of a value whose name has "scaling", "GUI", "uiscale" or "PPI" (window-api: RegQueryValueExW, from the trace), { found, value, line }; null when none. why: the reason for a null.
+//    debugMemo: the Debug page's memo text in the window table (text "" in this build: the memo's text is not kept there); debugScan / infoScan / displayNear: the guest memory's text (see below).
+//  - guest memory (#1358; read only, window.__app.guestText, the Worker's guestText): the start-up lines FL prints (DEBUG_MARKERS) are looked for in the engine's memory as ASCII and as UTF-16LE,
+//    at the first idle (debugLog.foundAt "idle") and again after the Debug tab is pressed ("debug-tab"); the text with the most lines is the Debug log: debugLog { captured, lines, method "guest-memory-scan",
+//    foundAt, marker, enc, offset (the place in the memory), head (the first 30 lines), scalingLines (the lines with dpi, scal, screen, monitor, display, resol, zoom, window, error or warn),
+//    scalingFactor ({ factor, systemPpi, line }: FL's own line "Main GUI scaling factor: F (system set to N PPI)" in the log; null when none), why }.
+//  - display (#1358): FL's Main GUI Scaling selection (General tab). null: the selection is not identified (scalingFactor is FL's record of the factor it used, not the selection).
+//    displayNear: the printable runs within 512 bytes of each label (DISPLAY_LABELS) in the memory. displayChoices: each label's selection (null: not identified).
+//  - info (#1358): the Info page's text (pressed in the bar; INFO_MARKERS in the memory): its lines that mention FL, the version, the OS or the screen (40 at most); null when the page is not reached.
 //  - NOT MEASURED here (null): blackShare (the Browser's rectangle is #1355's).
 //  - the room: the calibration. The viewport is set (Emulation.setDeviceMetricsOverride) so that the room is ROOM_CSS (1836 x 1056). The first boot (DPR 1) reads the room the page
 //    used; the viewport is corrected by the difference and booted again (at most three boots; the layout outside the stage is assumed to be a fixed offset, and the boots check it).
@@ -205,9 +214,9 @@ export function windowRect(windows, cls) {
   return null;
 }
 
-/** FL's reading of the Main GUI Scaling setting: the last registry read (window-api: RegQueryValueExW) of a value whose name has "scaling", "GUI" or "uiscale" in it: { found, value, line }; null when FL read no such value */
+/** FL's reading of the scaling settings: the last registry read (window-api: RegQueryValueExW) of a value whose name has "scaling", "GUI", "uiscale" or "PPI" in it (FL's "Main PPI" etc. in Software\Image-Line\Shared\General): { found, value, line }; null when FL read no such value */
 export function mainGuiScalingRead(lines) {
-  const hits = lines.map(String).filter((l) => /RegQueryValueExW "[^"]*" "[^"]*(scaling|gui|uiscale)[^"]*" -> /i.test(l));
+  const hits = lines.map(String).filter((l) => /RegQueryValueExW "[^"]*" "[^"]*(scaling|gui|uiscale|ppi)[^"]*" -> /i.test(l));
   if (hits.length === 0) return null;
   const last = hits[hits.length - 1];
   const m = /value="([^"]*)"|value=(-?\d+)/.exec(last);
@@ -220,6 +229,83 @@ export function pointerDowns(lines) {
   for (const l of lines.map(String)) {
     const m = /hit: down .* ptr=(-?\d+),(-?\d+)/.exec(l);
     if (m) out.push({ x: Number(m[1]), y: Number(m[2]) });
+  }
+  return out;
+}
+
+const CHILD_RE = /^child lid (\d+) parent lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+) vis (\d) class "([^"]*)" text "([^"]*)"\s*$/;
+const TOP_RE = /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+) .*class "([^"]*)" title "([^"]*)"\s*$/;
+const SETTINGS_SLOTS = 10;
+// #1358: the start-up lines of FL (the first words of each line; the whole lines first, then the shorter ones) and the labels of the General page's Display section
+const DEBUG_MARKERS = ['Browser caching took 0 milliseconds.', 'There were no updates for MIDI scripts.', 'There were no updates for themes.', 'Mixer track map: 1,2,3,4', 'There were no updates for', 'Browser caching took'];
+const INFO_MARKERS = ['FL Studio', 'Windows'];
+const DISPLAY_LABELS = ['Main GUI Scaling', 'Pop-ups', 'Toolbars', 'Cursors', 'Legacy scaling'];
+const DEBUG_HEAD = 30;
+const SCALING_RE = /dpi|scal|screen|monitor|display|resol|zoom|window|error|warn/i;
+const SCALING_FACTOR_RE = /Main GUI scaling factor: ([\d.]+) \(system set to (\d+)PPI\)/;
+const INFO_KEEP = /FL Studio|version|build|windows|\bos\b|screen|display|dpi|monitor|resol|scal|graphic|gpu|opengl|direct/i;
+
+/** the text with the most lines among the scans ([foundAt, scan] pairs; a scan is the guestText answer, or an error): { foundAt, best, memBytes } or null */
+export function bestText(scans) {
+  let pick = null;
+  for (const [foundAt, s] of scans) {
+    if (!s || !s.best) continue;
+    if (pick === null || s.best.lineCount > pick.best.lineCount) pick = { foundAt, best: s.best, memBytes: s.memBytes };
+  }
+  return pick;
+}
+
+/** #1358: the Debug page's log as the guest memory holds it (the start-up lines); captured when it has a line */
+export function debugLogOf(scans, why) {
+  const pick = bestText(scans);
+  const lines = pick ? pick.best.lines : [];
+  const n = pick ? pick.best.lineCount : 0;
+  const f = lines.map((l) => SCALING_FACTOR_RE.exec(l)).find((m) => m) ?? null;
+  return {
+    captured: n >= 1,
+    lines: n,
+    method: 'guest-memory-scan',
+    foundAt: pick ? pick.foundAt : null,
+    marker: pick ? pick.best.marker : null,
+    enc: pick ? pick.best.enc : null,
+    offset: pick ? pick.best.offset : null,
+    head: pick ? lines.slice(0, DEBUG_HEAD) : null,
+    scalingLines: pick ? lines.filter((l) => SCALING_RE.test(l)).slice(0, 200).map((l) => l.slice(0, 200)) : null,
+    scalingFactor: f ? { factor: Number(f[1]), systemPpi: Number(f[2]), line: f[0] } : null,
+    why: n >= 1 ? null : why,
+  };
+}
+
+/** #1358: the Info text's lines that mention FL, its version, the OS or the screen (40 at most); null when there is no Info text */
+export function infoOf(scans) {
+  const pick = bestText(scans);
+  if (!pick) return null;
+  const keep = pick.best.lines.filter((l) => INFO_KEEP.test(l)).slice(0, 40).map((l) => l.slice(0, 200));
+  return keep.length ? keep : null;
+}
+
+/** the child windows of a window list (the page's text of the window table: "child lid N parent lid M at (x, y) WxH vis V class "..." text "..."") */
+export function childWindows(windows) {
+  return windows.split('\n').map((l) => CHILD_RE.exec(l)).filter(Boolean).map((m) => ({ lid: Number(m[1]), parent: Number(m[2]), x: Number(m[3]), y: Number(m[4]), w: Number(m[5]), h: Number(m[6]), vis: m[7] === '1', cls: m[8], text: m[9] }));
+}
+
+/** the top-level window of a class: { lid, x, y, w, h, title }, or null */
+export function topWindow(windows, cls) {
+  for (const l of windows.split('\n')) {
+    const m = TOP_RE.exec(l);
+    if (m && m[6] === cls) return { lid: Number(m[1]), x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]), title: m[7] };
+  }
+  return null;
+}
+
+/** the windows under `lid` (its children, grandchildren ...), in window-table order */
+export function descendantsOf(children, lid) {
+  const out = [];
+  let frontier = [lid];
+  while (frontier.length) {
+    const next = children.filter((c) => frontier.includes(c.parent));
+    out.push(...next);
+    frontier = next.map((c) => c.lid);
   }
   return out;
 }
@@ -325,11 +411,99 @@ async function pictureMeasures(ev) {
   };
 }
 
+// #1358: the text the guest's memory holds for the markers (window.__app.guestText). A failure is an { error } value: it does not fail the row
+const scanSafe = (ev, markers, radius = 0) => ev(`window.__app.guestText(${JSON.stringify(markers)}, ${radius})`).catch((e) => ({ error: String(e?.message ?? e).slice(0, 200) }));
+
+/** #1358: the Settings window (F10). The Welcome window and the dialog after it are closed with Escape (while listed, at most four times); F10 opens the Settings window; the tab bar's ten press points
+ * (its rectangle split evenly; a press is a click of the page's own pointer path) show the pages in turn: each one's caption is the visible TVectorSheet's text, and the title is the window's own.
+ * The guest memory is read after the Debug page and the Info page are pressed (debugScan, infoScan), and near the Display labels of the General page (displayNear). A null always says why (settings.why, debugLog.why). */
+async function settingsPhase(S, ev, v) {
+  const ret = { opened: false, title: null, bar: null, tabs: [], captions: [], generalPanels: [], debugTab: false, infoTab: false, debugMemo: null, debugScan: null, infoScan: null, displayNear: null, displayWhy: null, scalingRegistry: null, textDrawingReached: 0, why: null };
+  const windows = async () => String(await ev(`(async () => (await window.__app.deskDumpBase64(true)).windows)()`));
+  const focusDesk = () => ev(`document.getElementById('desktop')?.focus()`);
+  const pressKey = async (code, vk) => {
+    await focusDesk();
+    await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', code, key: code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+    await sleep(40);
+    await S('Input.dispatchKeyEvent', { type: 'keyUp', code, key: code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+    await sleep(700);
+  };
+  const rect = v.canvasRect;
+  const pressGuest = async (gx, gy) => {
+    await cdpPress(S, rect.x + (gx + 0.5) / v.dpr, rect.y + (gy + 0.5) / v.dpr);
+    await sleep(600);
+  };
+  for (let i = 0; i < 4; i++) {
+    if (!/TWelcomeWizard|TMissingPluginsForm/.test(await windows())) break;
+    await pressKey('Escape', 27);
+    await sleep(2000);
+  }
+  await pressKey('F10', 121);
+  let w = '', top = null;
+  for (let i = 0; i < 15 && !top; i++) {
+    await sleep(1000);
+    w = await windows();
+    top = topWindow(w, 'TMIDIForm');
+  }
+  if (!top) {
+    ret.why = 'the Settings window (TMIDIForm) did not open within 15 s of F10';
+    return ret;
+  }
+  ret.opened = true;
+  ret.title = top.title;
+  const bar = childWindows(w).find((c) => c.parent === top.lid && c.cls === 'TQuickSheetSelector');
+  if (!bar) {
+    ret.why = 'no tab bar (TQuickSheetSelector) in the Settings window';
+    return ret;
+  }
+  ret.bar = { x: bar.x, y: bar.y, w: bar.w, h: bar.h };
+  const pageNow = (kids) => kids.find((c) => c.parent === top.lid && c.cls === 'TVectorSheet' && c.vis) ?? null;
+  for (let s = 0; s < SETTINGS_SLOTS; s++) {
+    await pressGuest(top.x + bar.x + ((s + 0.5) * bar.w) / SETTINGS_SLOTS, top.y + bar.y + bar.h / 2);
+    const cw = await windows();
+    const page = pageNow(childWindows(cw));
+    ret.tabs.push({ slot: s, page: page ? page.text : null, title: topWindow(cw, 'TMIDIForm')?.title ?? null });
+  }
+  ret.captions = [...new Set(ret.tabs.map((t) => t.page).filter((p) => p))];
+  const slotOf = (caption) => ret.tabs.find((t) => t.page === caption)?.slot ?? -1;
+  const general = slotOf('General');
+  if (general >= 0) {
+    await pressGuest(top.x + bar.x + ((general + 0.5) * bar.w) / SETTINGS_SLOTS, top.y + bar.y + bar.h / 2);
+    const kids = childWindows(await windows());
+    const page = pageNow(kids);
+    ret.generalPanels = page ? descendantsOf(kids, page.lid).filter((c) => c.cls === 'TVectorPanel' && c.text).map((c) => c.text) : [];
+    ret.displayNear = await scanSafe(ev, DISPLAY_LABELS, 512);
+    ret.displayWhy = 'the selections are not identified: the window table keeps no text of them (FL paints them: QuickFontCache, Blend2D), and the memory holds the labels only as the runs in displayNear';
+  }
+  const debug = slotOf('Debug');
+  ret.debugTab = debug >= 0;
+  if (debug >= 0) {
+    await pressGuest(top.x + bar.x + ((debug + 0.5) * bar.w) / SETTINGS_SLOTS, top.y + bar.y + bar.h / 2);
+    const kids = childWindows(await windows());
+    const page = pageNow(kids);
+    const memo = page ? descendantsOf(kids, page.lid).find((c) => c.cls === 'TQuickMemo') : null;
+    ret.debugMemo = memo ? { lid: memo.lid, text: memo.text } : null;
+    ret.debugScan = await scanSafe(ev, DEBUG_MARKERS);
+  }
+  const info = slotOf('Info');
+  ret.infoTab = info >= 0;
+  if (info >= 0) {
+    await pressGuest(top.x + bar.x + ((info + 0.5) * bar.w) / SETTINGS_SLOTS, top.y + bar.y + bar.h / 2);
+    ret.infoScan = await scanSafe(ev, INFO_MARKERS);
+  }
+  const log = await ev(`window.__app.engineLog().map((l) => String(l))`);
+  ret.scalingRegistry = mainGuiScalingRead(log);
+  ret.textDrawingReached = log.filter((l) => /TEXT DRAWING REACHED/.test(l)).length;
+  if (general < 0) ret.why = `the General page was not reached (the presses showed: ${JSON.stringify(ret.captions)})`;
+  else if (!ret.debugTab) ret.why = `no Debug page in the tab bar at this window size (the presses showed: ${JSON.stringify(ret.captions)})`;
+  return ret;
+}
+
 // one boot at one ratio. The row's state is the last state the page showed ("engine-idle" when the engine reached its first idle); a stop shows as another state or as no idle within the limit
 async function runOnce(dpr, viewport, port, root, rnd) {
   const out = { dpr, randomDprs: rnd, room: null, state: null, standIn: null, error: null, guest: null, dpi: null, api: null, asked: null,
-    flScalingPercent: null, mainGuiScaling: null, parts: null, canvas: null, display: null, edgeWidth: null, blackShare: null,
-    debugLog: { captured: false, lines: 0, method: null, scalingLines: null, why: 'not reached: the Welcome window closes only by No thanks or Escape, and both trap the engine (HostFilesUnsupported) in this build; F10 opens nothing while it is open' },
+    flScalingPercent: null, parts: null, canvas: null, canvasDisplay: null, display: null, displayChoices: null, info: null, edgeWidth: null, blackShare: null, settings: null,
+    debugLog: { captured: false, lines: 0, method: null, foundAt: null, marker: null, enc: null, offset: null, head: null, scalingLines: null, why: 'the engine did not reach its first idle' },
     pointerErrPx: null, pointerSentErrPx: null, pointerPoints: null, pointerDiag: null, engineFaults: null, scale: null };
   const profile = path.join(root, `profile-${++runNo}`);
   let chrome = null, cdp = null;
@@ -357,7 +531,9 @@ async function runOnce(dpr, viewport, port, root, rnd) {
     for (let i = 0; i < SETTLE_S; i++) await sleep(1000);
     const lines = await ev(`(() => { const a = window.__app; return a ? a.engineLog().map((l) => String(l)) : []; })()`);
     out.api = dpiAnswers(lines);
-    out.mainGuiScaling = mainGuiScalingRead(lines);
+    // #1358: FL's start-up lines in the guest's memory, read at the first idle (before the Debug page is pressed)
+    const idleScans = { debug: await scanSafe(ev, DEBUG_MARKERS) };
+    out.debugLog = debugLogOf([['idle', idleScans.debug]], 'the Settings window was not reached');
     // the engine's faults in its log before the pointer test: a guest thread that fails halts the engine's thread switch (fle_thread_lib.js fail: nothing is handed over), and the page stays "engine-idle"
     const faults = lines.filter((l) => /fle thread \d+ failed/.test(String(l)));
     out.engineFaults = { threadFailed: faults.length, first: faults.length ? faults[0].slice(0, 200) : null };
@@ -373,7 +549,7 @@ async function runOnce(dpr, viewport, port, root, rnd) {
     out.asked = v.asked;
     if (!v.canvas || !v.canvasRect) throw new Error('no canvas[data-desk="1"] in the page');
     out.canvas = { w: v.canvas.w, h: v.canvas.h };
-    out.display = { w: Math.round(v.canvasRect.w * v.dpr), h: Math.round(v.canvasRect.h * v.dpr) };
+    out.canvasDisplay = { w: Math.round(v.canvasRect.w * v.dpr), h: Math.round(v.canvasRect.h * v.dpr) };
     const pm = await pictureMeasures(ev);
     out.scale = { welcomeW: pm.welcomeW, tempoLen: pm.tempo ? pm.tempo.len : null, ratio: pm.scale };
     if (REF && REF.welcomeW && pm.welcomeW) out.flScalingPercent = Math.round((100 * pm.welcomeW) / REF.welcomeW);
@@ -414,6 +590,14 @@ async function runOnce(dpr, viewport, port, root, rnd) {
       out.pointerSentErrPx = sent.length === expect.length ? Math.max(...expect.map((e, i) => Math.max(Math.abs(sent[i].x - e.want.x), Math.abs(sent[i].y - e.want.y)))) : null;
       out.pointerDiag = { before, after: await ev(inputState), at, downsBefore, downs: pointerDowns(lines).length, tail: lines.slice(-4).map((l) => String(l).slice(0, 160)) };
     }
+    // #1358: the Settings window (F10): its pages, the General page's panels, the Debug page's memo, and FL's scaling registry reads
+    out.settings = await settingsPhase(S, ev, v);
+    const s = out.settings;
+    const why = s.why ?? 'no start-up line of FL in the guest memory at the first idle or after the Debug tab was pressed (the markers: DEBUG_MARKERS)';
+    out.debugLog = debugLogOf([['idle', idleScans.debug], ['debug-tab', s.debugScan]], why);
+    out.info = infoOf([['info-tab', s.infoScan]]);
+    out.displayChoices = Object.fromEntries(DISPLAY_LABELS.map((l) => [l, null]));
+    out.display = null;
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
   } finally {

@@ -7254,6 +7254,41 @@ unsigned fle_win_input_toplevels(uint64_t *handles, unsigned max)
     return c;
 }
 
+/* #1358 (the measurement's view of the child windows; read only, nothing is changed): one line for each live child window of the table, in table order, written into out (whole lines only, cap bytes):
+ * "child lid N parent lid M at (x, y) WxH vis V class \"C\" text \"T\"". (x, y) is the window's rectangle in its parent's client coordinates; vis is 1 when the window and all its parents have WS_VISIBLE.
+ * The text is the one the window kept (WM_SETTEXT, SetWindowTextW, the name given at creation); the class is the name of its atom. The quote and the backslash become '?' (the line is read back by a regular expression). Returns the number of lines. */
+unsigned fle_win_child_lines(char *out, size_t cap)
+{
+    int64_t i;
+    size_t n = 0;
+    unsigned c = 0;
+
+    if (cap == 0) return 0;
+    out[0] = 0;
+    for (i = 0; i < (int64_t)tab_n; i++) {
+        char cls[FLE_CLASS_NAME_MAX_UNITS + 1], txt[FLE_WIN_TEXT_MAX_UNITS + 1];
+        uint16_t nm[FLE_CLASS_NAME_MAX_UNITS + 1], nl = 0;
+        int vis = 1, w;
+        size_t k;
+        int64_t j;
+
+        if (!tab[i].live || tab[i].parent < 0) continue;
+        for (j = i; j >= 0 && vis; j = tab[j].parent)
+            if (!tab[j].visible) vis = 0;
+        cls[0] = 0;
+        if (fle_class_name_of(tab[i].atom, nm, &nl)) u16_ascii(cls, sizeof cls, nm, nl);
+        u16_ascii(txt, sizeof txt, tab[i].text, tab[i].text_len);
+        for (k = 0; cls[k]; k++) if (cls[k] == '"' || cls[k] == '\\') cls[k] = '?';
+        for (k = 0; txt[k]; k++) if (txt[k] == '"' || txt[k] == '\\') txt[k] = '?';
+        w = snprintf(out + n, cap - n, "child lid %u parent lid %u at (%d, %d) %dx%d vis %d class \"%s\" text \"%s\"\n", (unsigned)tab[i].lid, (unsigned)tab[tab[i].parent].lid,
+                     (int)tab[i].px, (int)tab[i].py, (int)tab[i].pcx, (int)tab[i].pcy, vis, cls, txt);
+        if (w < 0 || (size_t)w >= cap - n) break;
+        n += (size_t)w;
+        c++;
+    }
+    return c;
+}
+
 /* Decision 0212 (PROVISIONAL; S-remaximize; the page no longer sends an environment switch for it and the runtime reads none, so this always runs; an inference without a page: a window that was maximized is resized by Windows when the display changes, and this model does not do it by itself).
  * Every live top-level window in the zoomed state (ShowWindow SW_SHOWMAXIMIZED) keeps its position and is given the size it had PLUS the change of the screen (dw, dh): a window that covered the screen with an outset (the guest sets
  * (-5, -6, W + 10, H + 12) on its main form) keeps the outset. Done as the guest's own SetWindowPos would do it (WM_WINDOWPOSCHANGING, the position change, WM_SIZE with SIZE_MAXIMIZED). Returns the number of windows moved. */
