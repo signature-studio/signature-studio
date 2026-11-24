@@ -60,7 +60,24 @@ jobs:
             all(.[]; .error == null and .trapped == false and
             .state == "engine-idle" and .opened and .welcomeClosed)
           ' "$RUNNER_TEMP/flow.jsonl"
+      # 検証済みにする: 検査が通った engine(commit はしない)
+      - name: 検証済みにする
+        run: |
+          M=lift/out-app/bundle/raw/fl-Oz/manifest.json
+          S=$(jq -r '.engine.wasm.sha256' "$M")
+          grep -qxE '[0-9a-f]{64}' <<<"$S"
+          grep -qxF "$S" lift/harness/web/verified.txt ||
+            echo "$S" >> lift/harness/web/verified.txt
+          echo "verified: ${S:0:12}"
       - run: lift/target/release/fe-build upload
+      - name: 本番の manifest を確かめる
+        run: |
+          L="$RUNNER_TEMP/live.json"
+          aws s3 cp s3://fl-web-assets/manifest.json "$L"
+          cmp -s "$L" lift/out-app/bundle/raw/fl-Oz/manifest.json || {
+            echo "manifest: 本番が差し替わっていない"; exit 1
+          }
+          echo "manifest: この build と一致"
       - uses: cloudflare/wrangler-action@v4.1.3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
