@@ -92,3 +92,9 @@ cargo test --locked --manifest-path lift/Cargo.toml -p fe-build blend2d_fetch_ &
 - この Issue は、受け入れの連鎖を使う全ての Issue の判定の失敗を減らす。他の Issue の本文は変えない。
 - R2 のキャッシュ(`agent.yml` の extract ジョブで 1 回取って保存し、作業ジョブが復元する形)は、PM が行う。この Issue の範囲外。
 - `fe-build` は `deploy.yml` からも呼ばれる。`deploy.yml` の手順は変えない。
+
+## 前回の試行で分かったこと(2 回目の試行の前に)
+
+1 回目の試行(run 45348033333)は、判定が通ったが、main への push で `lift/crates/fe-build/src/main.rs` が衝突した。同じ時間に、deploy の門の廃止(`upload_gated_steps` と `verified`・`root` の読みの削除。commit `669c09f2`)が、同じファイルに入ったため。
+
+前回の変更(commit `1edc54fa`: blend2d の取得を tarball + SHA-256 照合 + 最大 4 回の再試行(待ち 10・30・60 秒) + 取得済みの再利用に変えた。試験は取得と待ちを差し替えて、ネットワークを使わない)は、作業ツリーに載る(`.prior-work.md`)。**載せる時に `main.rs` が衝突したら、前回の変更の意図を保ち、main の変更(`upload_gated_steps` の削除)を消さずに、解く**。解いた後、`cargo test -p fe-build`(再試行の試験)と受け入れを通す。既存の失敗 `plans_match_recorded_texts`(`engine.txt` の rt の件数 91 と 90)は、範囲外。
