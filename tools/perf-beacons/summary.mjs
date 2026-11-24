@@ -1,16 +1,18 @@
 // The measurement beacons that real visitors' browsers sent (decision 0152, 0224), read from a directory of the objects the Worker stores (perf/<UTC date>/<sid>-<seq>.json:
 // one line each, { t, remote, perf }). Prints Markdown: one row per bundle version (the engine's sha256 prefix) in two tables (identity; what the page told and what the engine ran),
 // the sessions at a device pixel ratio of 1.7 (per day, or all), and the shapes of the records.
-// usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all]
+// usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits]
 //   dir: default lift/out-app/host-extra/perf (the work step puts the objects of the last three days there; nothing is committed)
 //   --day: the sessions table is limited to this UTC date (default: today in UTC); all: every date
+//   --exits: instead of the tables above, one row per session that ended or failed in the last 48 hours (UTC): an engine.exit, an engine.state other than engine-idle, an error or a failure report
 // Only counts and derived numbers are printed: no session id, no remote class, no user agent text, no address, no path or name of a visitor.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DIR = 'lift/out-app/host-extra/perf';
-const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all]';
+const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits]';
+const EXITS_HOURS = 48;
 
 function fail(msg) {
   console.error(`summary: ${msg}`);
@@ -21,15 +23,17 @@ function fail(msg) {
 function parseArgs(argv) {
   let dir = DEFAULT_DIR;
   let day = new Date().toISOString().slice(0, 10);
+  let exits = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--day') {
       day = argv[++i];
       if (!day) fail('--day needs a value');
-    } else if (a.startsWith('--')) fail(`unknown option ${a}`);
+    } else if (a === '--exits') exits = true;
+    else if (a.startsWith('--')) fail(`unknown option ${a}`);
     else dir = a;
   }
-  return { dir, day };
+  return { dir, day, exits };
 }
 
 function jsonFiles(dir) {
@@ -121,7 +125,7 @@ function sessionsOf(recs) {
 }
 
 // a window size would be a key that names a window and its width, height or size (engineRun.windowSeconds is a time span; the page's client.viewport is the browser's, not the engine's window)
-const WINDOW_SIZE_KEY = /window.*(width|height|size)|(width|height|size).*window/i;
+const WINDOW_SIZE_KEY = /window.*(width|height|size)|(width|height|size).*window|^uiWindows$/i;
 function hasWindowSizeKey(o, depth = 0) {
   if (!o || typeof o !== 'object' || depth > 4) return false;
   return Object.entries(o).some(([k, v]) => WINDOW_SIZE_KEY.test(k) || hasWindowSizeKey(v, depth + 1));
@@ -183,10 +187,93 @@ function shapeOf(p) {
   return `desk ${on('desk')} / engineRun ${on('engineRun')} / files ${on('files')} / assets ${on('assets')}`;
 }
 
+/** a record that says how the engine ended or failed: an engine.exit, an engine.state other than engine-idle (a failure report has no engine block, so no state: it counts too), an error or a failure */
+export function isExitRecord(p) {
+  return !!(p.engine?.exit && typeof p.engine.exit === 'object') || str(p.engine?.state) !== 'engine-idle' || !!p.error || !!p.failure;
+}
+
+/** the page's words as the table prints them: the page has removed the personal parts already; this takes out what could still name a person (an address, a mail address, a path under a user's folder) and what breaks a table. The engine's own paths (C:\Windows, C:\Program Files) stay. */
+const VM_PATH = /^[A-Za-z]:\\(?:Windows|Program Files(?: \(x86\))?|ProgramData)(?:\\|$)/i;
+const WIN_PATH = /(?:[A-Za-z]:\\|\\\\[^\s\\/:]+\\)(?:[^\\"'<>|*?;:,]+\\)*[^\s\\"'<>|*?;:,]*/g;
+const POSIX_PATH = /(?<![\w.:\\<])\/(?:[^\s/"'<>|*?;,:]+\/)+[^\s/"'<>|*?;,:]*/g;
+export function scrubWords(text) {
+  return String(text)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ')
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '<url>')
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, '<email>')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '<ip>')
+    .replace(WIN_PATH, (p) => (VM_PATH.test(p) && !/^[A-Za-z]:\\Users(?:\\|$)/i.test(p) ? p : '<path>'))
+    .replace(POSIX_PATH, (p) => (/^\/(?:proc|dev|sys)(?:\/|$)/.test(p) ? p : '<path>'))
+    .replace(/\|/g, '\\|')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+    .slice(0, 400);
+}
+
+/** the last value that `pick` gives for the records of a session, in time order (null: none of them has it) */
+const lastWith = (rs, pick) => {
+  for (let i = rs.length - 1; i >= 0; i--) {
+    const v = pick(rs[i].p);
+    if (v !== undefined && v !== null) return v;
+  }
+  return null;
+};
+const objOf = (x) => (x && typeof x === 'object' ? x : null);
+
+/** one row per session: the first and the last instant, the version and the device pixel ratio (the last one that has it), the count of records, and the last value of each field the table shows */
+function exitRow(rs) {
+  const last = rs[rs.length - 1];
+  const dpr = lastWith(rs, (p) => dprOf(p));
+  const exit = lastWith(rs, (p) => objOf(p.engine?.exit));
+  const err = lastWith(rs, (p) => objOf(p.error));
+  const fail = lastWith(rs, (p) => objOf(p.failure));
+  const state = lastWith(rs, (p) => str(p.engine?.state));
+  const top = Object.entries(objOf(last.p.timeline) ?? {}).filter(([, ms]) => num(ms) !== null).sort((a, b) => b[1] - a[1])[0];
+  return [
+    when(rs[0].t), when(last.t), last.p.bundle?.version ?? '(無し)',
+    dpr === null ? '-' : `${dpr} (${dpiClass(dpiOf(dpr))})`,
+    rs.length,
+    state ?? '(無し)',
+    exit ? str(exit.reason) ?? '-' : '-',
+    exit ? num(exit.code) ?? '-' : '-',
+    exit && str(exit.message) ? scrubWords(exit.message) : '-',
+    err ? scrubWords(str(err.what) ?? '-') : fail ? `failure: ${str(fail.kind) ?? '-'}` : '-',
+    err ? scrubWords(str(err.where) ?? '-') : fail && str(fail.where) ? scrubWords(fail.where) : '-',
+    num(last.p.pageMs) === null ? '-' : f1(last.p.pageMs / 1000),
+    top ? `${top[0]} (${f1(top[1] / 1000)} s)` : '-',
+  ];
+}
+
+/** the sessions that ended or failed in the `EXITS_HOURS` before `nowMs` (UTC): a count line, the kinds of the engine's exits, and one row per session (the sid is never printed) */
+export function exitsReport(recs, nowMs = Date.now()) {
+  const since = nowMs - EXITS_HOURS * 3_600_000;
+  const win = recs.filter((r) => Date.parse(r.t) >= since);
+  const flagged = win.filter((r) => isExitRecord(r.p));
+  const sessions = sessionsOf(win).filter((rs) => rs.some((r) => isExitRecord(r.p)));
+  const kinds = counted(flagged.filter((r) => objOf(r.p.engine?.exit)).map((r) => `${str(r.p.engine.exit.reason) ?? '(無し)'} (code ${num(r.p.engine.exit.code) ?? '-'})`));
+  const out = [];
+  out.push(`# 実機のビーコン: 終了と失敗(直近 ${EXITS_HOURS} 時間、UTC)`);
+  out.push('');
+  out.push(`- 期間(UTC): ${when(new Date(since).toISOString())} から ${when(new Date(nowMs).toISOString())} まで(直近 ${EXITS_HOURS} 時間)。記録: ${win.length} 件`);
+  out.push(`- 終了・失敗の記録: ${flagged.length} 件(engine.exit が在る記録、engine.state が engine-idle でない記録、error か failure が在る記録)、セッション: ${sessions.length}`);
+  out.push(`- engine.exit の内訳(記録ごと): ${kinds.length ? kinds.map(([k, n]) => `${k} ×${n}`).join(', ') : '-'}`);
+  out.push(`- error の記録: ${flagged.filter((r) => r.p.error).length} 件、failure の記録: ${flagged.filter((r) => r.p.failure).length} 件`);
+  out.push('');
+  out.push('1 行が 1 セッション(読み込みごとの乱数で束ねた。乱数は出さない)。各項目は、そのセッションの最後の記録の値(項目ごとに、値の在る最後の記録)。pageMs は最後の記録の、起動からの時間(秒)。timeline の最後の印は、最後の記録で最も遅い印。');
+  out.push('');
+  out.push(table(['最初 (UTC)', '最後 (UTC)', '版 (bundle.version)', 'DPR の区分', '記録数', 'engine.state', 'engine.exit.reason', 'engine.exit.code', 'engine.exit.message', 'error.what', 'error.where', 'pageMs (秒)', 'timeline の最後の印'],
+    sessions.map(exitRow)));
+  return out.join('\n');
+}
+
 function main() {
-  const { dir, day } = parseArgs(process.argv.slice(2));
+  const { dir, day, exits } = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) fail(`not a directory: ${dir}`);
   const { recs, unreadable } = readRecords(dir);
+  if (exits) {
+    console.log(exitsReport(recs));
+    return;
+  }
   const out = [];
   const sessionCount = new Set(recs.map((r, i) => str(r.p.sid) ?? `(無し)#${i}`)).size;
   const headless = recs.filter((r) => r.p.client?.browser?.headless === true).length;
@@ -196,7 +283,7 @@ function main() {
   out.push(`- 記録: ${recs.length} 件、セッション(読み込み): ${sessionCount}、読めなかった: ${unreadable} 件(件数だけ)、ヘッドレスの記録: ${headless} 件`);
   out.push(`- 期間(UTC): ${recs.length ? `${when(recs[0].t)} から ${when(recs[recs.length - 1].t)} まで` : '記録なし'}`);
   out.push(`- 日ごとの記録: ${byDay.length ? byDay.map(([d, n]) => `${d} ${n} 件`).join(', ') : '-'}`);
-  out.push(`- FL の窓の大きさ(キー名に window と width・height・size を含む項目)のある記録: ${recs.filter((r) => hasWindowSizeKey(r.p)).length} 件(ブラウザの表示域 client.viewport は、窓の大きさではない)`);
+  out.push(`- FL の窓の大きさ(キー名に window と width・height・size を含む項目、または uiWindows(Issue #1364)のある記録): ${recs.filter((r) => hasWindowSizeKey(r.p)).length} 件(ブラウザの表示域 client.viewport は、窓の大きさではない)`);
   out.push('');
 
   const versions = [...new Map(recs.map((r) => [r.p.bundle?.version ?? '(無し)', true])).keys()];
