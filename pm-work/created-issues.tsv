@@ -56,3 +56,5 @@
 116	#1357	回帰: Welcome 窓を閉じる(No thanks・Escape・Default の選択)と engine が trap する。ホストのファイルの解放の後の読みを直す	Task
 117	#1358	F10 の General settings(Display の節・Debug タブ・Info タブ)を開き、FL 自身のログと設定を取る	Task
 118	#1362	Browser のパネル: WebView2 の窓の面を、ページ側の iframe に写し、オフラインのページ(error-offline.html)を出す	Task
+119	#1363	本番の実機のビーコンを読む: 版・DPR・DPI(DPR から求める)・途切れ・起動時間を、直近の記録から表にする	Task
+120	#1364	ビーコンに、FL の窓の大きさ(上位 8 窓: クラス名・幅・高さ)を足し、実機の FL の UI の拡大率を、記録から求められるようにする	Task
