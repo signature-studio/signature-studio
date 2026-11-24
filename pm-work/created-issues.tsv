@@ -68,3 +68,4 @@
 128	#1372	demo の曲 Exoplanet を File > Open で開くと、Fruity Balance の読み込みの後に engine が exit 0 で止まる(ExitProcess)を直す	Task
 129	#1373	demo 2 件(DEDZII・Mehran Abbasi)の素材を、起動の後の取得で配信し、P3 の入力に音が出る demo があるかを確かめる	Task
 130	#1374	fe-build の blend2d のソースの取得を、一時の失敗に強くする(再試行と、取得済みの物の再利用)	Task
+131	#1375	起動直後の途切れを 0 にする(段 B): 残りの 421 ms の区間(wasm の C++ 描画と C の関数)に切り替え点を入れ、補充の最大の間隔を窓の値にする	Task
