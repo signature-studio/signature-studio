@@ -268,6 +268,8 @@ static uint64_t thunk_target(const char *api, uint64_t proc, const fle_sys_regio
  * finds a value that is not a function entry (fle_dispatch_miss asks fle_win_try_thunk first and only that), so the slots are answered here, before the thunk shape check: 1 and the method has run, or 0 and the check goes on. The
  * generated code, and with it every object compiled from it, is not changed. */
 int fle_com_try_slot(uint64_t va) __attribute__((weak));
+/* Issue #1355: the method slots of the WebView2 model (fle_webview2.c, its own range: FLE_WV2_SLOT_BASE) are answered the same way. */
+int fle_wv2_try_slot(uint64_t va) __attribute__((weak));
 
 int fle_win_try_thunk(uint64_t va)
 {
@@ -275,6 +277,7 @@ int fle_win_try_thunk(uint64_t va)
     uint64_t jump;
 
     if (fle_com_try_slot && fle_com_try_slot(va)) return 1;
+    if (fle_wv2_try_slot && fle_wv2_try_slot(va)) return 1;
     if (!fle_sys_region_at || !fle_sys_region_at(va, &rv)) return 0;
     jump = thunk_target("indirect call", va, &rv);
     fle_dispatch(jump);

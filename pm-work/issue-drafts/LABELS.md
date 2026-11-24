@@ -28,5 +28,6 @@
 | `plugin-builtin` | `e4e669` | 内蔵のエフェクトとインストゥルメント |
 | `plugin-external` | `0052cc` | 外部プラグイン(Serum 2・OTT・Vital) |
 | `perf` | `d4c5f9` | エンジンの性能(直接 wasm 化) |
+| `perf-beacons` | `ededed` | 実機のビーコン(依頼者の実機の測定の記録。`agent.yml` が R2 から取り、作業に置く) |
 | `startup` | `c5def5` | 起動の時間(P1)とサイズ |
 | `verify` | `ededed` | 測定と検証(道具を含む) |

@@ -1,0 +1,2 @@
+Plugins\Fruity\Effects\
+Plugins\Fruity\Generators\

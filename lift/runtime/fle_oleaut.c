@@ -373,9 +373,23 @@ static uint32_t array_copy(const char *api, uint64_t src, uint64_t *out)
 
 /* ---- VARIANT ---- */
 
+/* uint64_t fle_call_guest(...): the callback mechanism (fle_callback.c, decision 0064). Weak: a link without it keeps the stop by name. */
+uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9) __attribute__((weak));
+
+/* Release of an interface that a VARIANT owns (Issue #1355: a host object that FLEngine passes to WebView2 is released by VariantClear): the guest's own IUnknown::Release,
+ * slot 2 of its vtable, called with the object as `this` through fle_call_guest (the call-back of the page's Release, which the guest's Delphi object implements). */
+static void release_iface(const char *api, uint64_t obj)
+{
+    uint64_t vt, fn;
+
+    if (fle_call_guest == NULL) fle_stop(api, "VT_UNKNOWN/VT_DISPATCH with an object needs IUnknown::Release (guest call-back), and the callback mechanism is not linked");
+    vt = fle_ld(obj, 8);
+    fn = fle_ld(vt + 2u * 8u, 8);
+    fle_call_guest(fn, obj, 0, 0, 0);
+}
+
 /* VariantClear semantics (page): the contents are released first (VT_BSTR: the string is freed; VT_ARRAY: the array is
- * freed, DISP_E_ARRAYISLOCKED when it is locked; VT_DISPATCH/VT_UNKNOWN: Release, a call-back, so a non-NULL pointer
- * stops; a NULL interface pointer has nothing to release, inference), VT_BYREF variants own nothing (page: for
+ * freed, DISP_E_ARRAYISLOCKED when it is locked; VT_DISPATCH/VT_UNKNOWN: Release, a call-back, a NULL interface pointer has nothing to release, inference), VT_BYREF variants own nothing (page: for
  * object references; extended to the other by-reference types because VT_BYREF is "a void pointer for local use"), then
  * vt is set to VT_EMPTY. An invalid vt is DISP_E_BADVARTYPE and nothing changes. */
 static uint32_t var_clear(const char *api, uint64_t p)
@@ -389,7 +403,7 @@ static uint32_t var_clear(const char *api, uint64_t p)
         bstr_free(api, fle_ld(p + VAR_VAL, 8));
         break;
     case K_UNK:
-        if (fle_ld(p + VAR_VAL, 8) != 0) fle_stop(api, "VT_UNKNOWN/VT_DISPATCH with an object needs IUnknown::Release (guest call-back)");
+        if (fle_ld(p + VAR_VAL, 8) != 0) release_iface(api, fle_ld(p + VAR_VAL, 8));
         break;
     case K_ARRAY: {
         uint32_t hr = array_release(api, fle_ld(p + VAR_VAL, 8));

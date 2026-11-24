@@ -775,6 +775,11 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     ("user32.dll", "SetWindowPlacement", "fle_imp_SetWindowPlacement", "jmp_imp:SetWindowPlacement"),
     // Decision 0372 (R5-3h; appended: decision 0015, append only): ole32!CoInitializeEx, reached by GetProcAddress (runtime/fle_ole.c; only dwCoInit 2 is answered).
     ("ole32.dll", "CoInitializeEx", "fle_imp_CoInitializeEx", "jmp_imp:CoInitializeEx"),
+    // Issue #1355 (provisional; appended: decision 0015, append only): the WebView2 loader's exports, reached by GetProcAddress from the virtual module webview2loader.dll (N = 42, runtime/fle_modules.c); runtime/fle_webview2.c.
+    ("webview2loader.dll", "CreateCoreWebView2EnvironmentWithOptions", "fle_imp_CreateCoreWebView2EnvironmentWithOptions", "jmp_imp:CreateCoreWebView2EnvironmentWithOptions"),
+    ("webview2loader.dll", "CreateCoreWebView2Environment", "fle_imp_CreateCoreWebView2Environment", "jmp_imp:CreateCoreWebView2Environment"),
+    ("webview2loader.dll", "GetAvailableCoreWebView2BrowserVersionString", "fle_imp_GetAvailableCoreWebView2BrowserVersionString", "jmp_imp:GetAvailableCoreWebView2BrowserVersionString"),
+    ("webview2loader.dll", "CompareBrowserVersions", "fle_imp_CompareBrowserVersions", "jmp_imp:CompareBrowserVersions"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of
