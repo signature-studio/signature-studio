@@ -81,7 +81,9 @@ export class PluginInstance {
         } else if (m.type === 'done') {
           resolveDone({ rc: m.rc, served: m.served, result: m.result, lines: m.lines, missing: m.missing });
         } else {
-          const e = new Error('plugin worker: ' + m.error);
+          const [first, ...rest] = m.error.split('\n');
+          const harness = m.lines.length ? ` [harness: ${m.lines.join(' | ')}]` : '';
+          const e = new Error([`plugin worker: ${first}${harness}`, ...rest].join('\n'));
           if (!inst) reject(e);
           rejectDone(e);
         }

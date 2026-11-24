@@ -1010,7 +1010,7 @@ ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build 
 BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
 BCM=$T/bc-m.json; BCQ=$T/bc-s.bin
 sf() { printf 'FLSEEDP1....{"version":1,"files":[%s]}' "$(printf '{"path":"seed/resources/%s"},' "$@" | sed 's/,$//')"; }
-printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"}]}' > "$BCM"
+printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"},{"name":"serum2.wasm","path":"plugins/serum2.wasm"}]}' > "$BCM"
 sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$BCQ"
 bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)と任意の 3 つめ(pack.args の代わり)。一時の木で bundle の中身の段を走らせ、終了コードを出す
   rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed" "$T/bc/lift/harness/web"
@@ -1154,6 +1154,8 @@ ok "本番(v): pack.args の lift/out-app/ の元の dir(先頭 3 段)は、全�
 ok "本番(v): 外部のインストーラは、fe-build bundle より前に fe-build external で取る(deploy.yml の行の順)" "$(a=$(grep -n 'fe-build external' "$DYML" | cut -d: -f1 | head -1); b=$(grep -n 'fe-build bundle' "$DYML" | cut -d: -f1 | head -1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] && echo yes)" yes
 OTTP=$(grep -n 'plugin-worker/build.sh ott' "$PLAN/bundle.txt" | cut -d: -f1 | head -1); PKP=$(grep -n 'pack-assets' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
 ok "本番(v): bundle の計画は、OTT の wasm の作る段(build.sh ott)を pack-assets より前に持つ" "$([ -n "$OTTP" ] && [ -n "$PKP" ] && [ "$OTTP" -lt "$PKP" ] && echo yes)" yes
+SERP=$(grep -n 'plugin-worker/build.sh serum2' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
+ok "本番(v): bundle の計画は、Serum 2 の wasm の作る段(build.sh serum2)を pack-assets より前に持つ" "$([ -n "$SERP" ] && [ -n "$PKP" ] && [ "$SERP" -lt "$PKP" ] && echo yes)" yes
 ok "本番(v): OTT の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/ott/vst-ext.wasm)と同じ名前" "$(grep -qF '"$OUT/vst-ext.wasm"' "$top/lift/harness/web/mt1/plugin-worker/build.sh" && grep -qF 'lift/out-app/plugins/ott/vst-ext.wasm' "$PA" && echo yes)" yes
 ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
 ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
@@ -1161,6 +1163,6 @@ ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
 ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
-ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott・serum2 の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 4 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

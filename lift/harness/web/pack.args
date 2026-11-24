@@ -184,3 +184,5 @@ lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_4.wa
 lift/out-app/host/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp=seed/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp
 --lazy-file
 lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm
+--lazy-file
+lift/out-app/plugins/serum2/vst-ext.wasm=plugins/serum2.wasm
