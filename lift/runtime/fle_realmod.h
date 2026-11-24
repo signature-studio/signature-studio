@@ -78,6 +78,9 @@ void fle_realmod_thread_notify(uint32_t reason) FLE_REALMOD_REF;
 /* Base of the real module with index idx (0-based, in table order), or 0 when idx is not below the number of real modules. */
 uint64_t fle_realmod_base_of(int idx) FLE_REALMOD_REF;
 
+/* 1 when the image of real module idx is in memory (every image when the link maps them all at start; else once fle_realmod_load has read its headers, at the first LoadLibrary, issue #1341), else 0. */
+int fle_realmod_image_mapped(int idx) FLE_REALMOD_REF;
+
 /* The module's own file name: the Name field of its export directory (IMAGE_EXPORT_DIRECTORY.Name, ASCII), copied to out (n bytes
  * including the NUL). Returns its length, or -1 when the image has no export directory or the name does not fit or is not ASCII.
  * A module that is not loaded stops. Decision 0104 (provisional): used for GetModuleFileNameW of a real module (fle_vfs.c). */

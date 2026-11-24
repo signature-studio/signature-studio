@@ -4,6 +4,7 @@
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
 // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+// end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -101,12 +102,14 @@ async function main() {
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
   let server = null, chrome = null, cdp = null, navAt = null;
-  let probeError = null;
+  let probeError = null, evAfterError = null;
   const fromAudio = (d) => Object.assign(out, {
     ctxState: d.ctxState, status: d.status, quantaWhilePlaying: d.quantaWhilePlaying, underrunQuanta: d.underrunQuanta, engineGapFrames: d.engineGapFrames,
     playingSeconds: d.playingSeconds, deviceState: d.deviceState, underrunQuantaSinceFirstIdle: d.underrunQuantaSinceFirstIdle, underrunEpisodes: d.episodes,
     longestRunQuanta: d.longestRunQuanta, nonSilentQuanta: d.nonSilentQuanta, engineGapFramesLast60s: d.engineGapFramesLast60s,
   });
+  // the engine's state, the page's title and the last 400 log lines (its own stop lines, e.g. "fle: LockResource: ...") at the end of a run or after an error (Issue #1365)
+  const engineEnd = () => (evAfterError === null ? null : evAfterError("(() => { const a = window.__app; if (!a) return null; const log = a.engineLog() ?? []; return { state: a.state, title: a.pageTitle().title, tail: log.slice(-400) }; })()").catch((x) => String(x?.message ?? x).slice(0, 200)));
   try {
     stageAssets({ rawDir: bundleDir, brDir, assets, bundle: BUNDLE });
     process.env.FL_ASSETS_DIR = assets;
@@ -131,6 +134,7 @@ async function main() {
       if (r.exceptionDetails) throw new Error(`evaluate: ${r.exceptionDetails.text}`);
       return r.result.value;
     };
+    evAfterError = ev;
     const audioNow = () => ev('window.__app && window.__app.audio ? window.__app.audio.detail() : null');
     const presentsNow = () => ev('window.__app && window.__app.deskStats ? window.__app.deskStats.presents : null');
     await S('Page.enable');
@@ -205,8 +209,10 @@ async function main() {
     fromAudio(d1);
     Object.assign(out, { presentsDelta: p0 === null || p1 === null ? null : p1 - p0, quantaDelta: d1.quantaWhilePlaying - d0.quantaWhilePlaying, underrunDelta: d1.underrunQuanta - d0.underrunQuanta });
     if (d1.error) probeError = d1.error;
+    out.end = await engineEnd();
   } catch (e) {
     probeError = String(e?.message ?? e).slice(0, 500);
+    if (evAfterError) out.end = await engineEnd();
   } finally {
     out.error = probeError;
     if (navAt !== null) out.elapsedMs = Date.now() - navAt;
@@ -445,10 +451,17 @@ async function openProject(S, ev, file) {
   await sleep(4000);
 }
 
+// the "Problems loading the project" box is seen by the front window's title (pageTitle: the box is the active window while it is shown) or by its entry in the window list
+async function problemsOpen(ev) {
+  const front = (await ev("window.__app ? window.__app.pageTitle().title : ''")) ?? '';
+  if (PROBLEMS_TITLE.test(front)) return true;
+  return (await windowsOf(ev)).some((w) => PROBLEMS_TITLE.test(w.title));
+}
+
 // the engine's "Problems loading the project" box is modal: Enter closes it (its default button). Returns how many were closed.
 async function dismissProblems(S, ev) {
   let n = 0;
-  for (let i = 0; i < 4 && (await windowsOf(ev)).some((w) => PROBLEMS_TITLE.test(w.title)); i++) {
+  for (let i = 0; i < 4 && (await problemsOpen(ev)); i++) {
     const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 0x0d, nativeVirtualKeyCode: 0x0d };
     await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key });
     await sleep(40);
@@ -497,13 +510,11 @@ async function until(fn, ms, what) {
 // Issue #1366: what the guest shows once the project is open. The "Problems loading the project" box is a window of its own, so projectDialogs lists the windows with that title. The box comes with the load: the windows are polled for PROJECT_DIALOG_MS after the open, and the list is empty only when no such box came in that time. projectWindows: the windows at the end (title and class). projectMissing: the sample requests of the open that found nothing (the engine's missing-path lines of a .wav, from the log after logBefore).
 async function projectReport(ev, out, logBefore) {
   const t0 = Date.now();
-  let wins = [];
-  for (;;) {
-    wins = await windowsOf(ev);
-    if (wins.some((w) => PROBLEMS_TITLE.test(w.title)) || Date.now() - t0 >= PROJECT_DIALOG_MS) break;
-    await sleep(POLL_MS);
-  }
+  while (!(await problemsOpen(ev)) && Date.now() - t0 < PROJECT_DIALOG_MS) await sleep(POLL_MS);
+  const wins = await windowsOf(ev);
   out.projectDialogs = wins.filter((w) => PROBLEMS_TITLE.test(w.title)).map((w) => ({ cls: w.cls, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h }));
+  const front = (await ev("window.__app ? window.__app.pageTitle().title : ''")) ?? '';
+  if (out.projectDialogs.length === 0 && PROBLEMS_TITLE.test(front)) out.projectDialogs = [{ cls: '', title: front }];
   out.projectWindows = wins.map((w) => ({ cls: w.cls, title: w.title }));
   const log = await ev('window.__app.engineLog()');
   const missing = log.slice(logBefore).filter((l) => SAMPLE_MISSING.test(l));

@@ -148,6 +148,13 @@ int fle_realmod_find_handle(uint64_t h)
  * PE image at the table's base, before the headers are read below. A link without it maps every image at start, as before. */
 void fle_realmod_map_image(const char *api, int idx) __attribute__((weak));
 
+/* 1 when the image of real module idx is in memory: always, when the link maps every image at start (no fle_realmod_map_image); otherwise once its headers are read (fle_realmod_load, the first LoadLibrary). */
+int fle_realmod_image_mapped(int idx)
+{
+    table_check("fle_realmod_image_mapped");
+    return idx >= 0 && (uint64_t)idx < fle_realmod_count && (!fle_realmod_map_image || mods[idx].headers);
+}
+
 /* The PE headers of the image that the harness mapped at the base: DOS and NT signatures, PE32+, entry point and export directory. */
 static void read_headers(const char *api, int idx)
 {
