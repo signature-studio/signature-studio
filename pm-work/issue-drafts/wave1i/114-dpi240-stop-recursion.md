@@ -1,6 +1,6 @@
 ---
 draft: "114"
-title: "DPI 240 以上(DPR 2.5 以上)で FL が起動しない障害を直す: LOGPIXELSY の値で起きる再帰の閉路を特定し、runtime の応答を Windows と同じにする"
+title: "DPI 240 以上(DPR 2.5 以上)で FL が起動しない障害を直す: lift が作るバイト表の後戻りの再帰(fle_dispatch)が、JS のスタックを超える"
 type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
