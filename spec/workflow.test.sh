@@ -550,6 +550,10 @@ ok "接頭辞(r2): Shared\\Python\\ の dll・exe の大きさの合計は 14,93
 ok "接頭辞(r2): 追加の Riff machine の 4 件の大きさは、一覧の bytes の合計で 21,119 B" "$(for p in "${NEWP[@]:2}"; do P="$p" awk -F'\t' 'NR>2 && index(tolower($1), tolower(ENVIRON["P"]))==1 && $2!="" {s+=$2} END{print s+0}' "$INST"; done | awk '{s+=$1} END{print s+0}')" 21119
 ok "接頭辞(r2): 一覧は、System\\Tools\\・Shared\\・Data\\Patches\\Scores\\ の全体を持たない(必要最小。全体は System\\Tools\\ 419 件・Shared\\ 123 件・Data\\Patches\\Scores\\ 2,334 件)" "$(grep -cxF -e 'System\Tools\' -e 'Shared\' -e 'Data\Patches\Scores\' "$RPF")" 0
 ok "接頭辞(r2): 設計の文書の接頭辞の節に、追加の 6 件をそれぞれ 1 行で書いた" "$(for p in "${NEWP[@]}"; do P="$p" awk 'index($0, ENVIRON["P"]) > 0 {n++} END{print (n >= 1)}' "$top/pm-work/workflow-design.md"; done | paste -sd/ -)" "1/1/1/1/1/1"
+# (r3) #1387 の Riff machine の実物(一覧の Data\System\Riff machine\ の 8 件)は、接頭辞の一覧の Data\System\ の 1 行で取り出される。Riff machine の接頭辞は足さない(必要最小は 0 件。Data\System\ を消すと、この検査が落ちる)
+RIF='Data\System\Riff machine\'
+ok "接頭辞(r3): 一覧の Data\System\Riff machine\ は 8 件で、大きさの合計は 17,346 B" "$(P="$RIF" awk -F'\t' 'NR>2 && index($1, ENVIRON["P"])==1 {n++; s+=$2} END{print n+0"/"s+0}' "$INST")" "8/17346"
+ok "接頭辞(r3): その 8 件は全て、接頭辞の一覧のいずれかで取り出される(一覧の Data\System\ が、この 8 件を覆う)" "$(RIF="$RIF" awk -F'\t' 'FNR==NR {if ($0 != "") p[++n]=$0; next} index($1, ENVIRON["RIF"])==1 {t++; for (i=1; i<=n; i++) if (index($1, p[i])==1) {c++; break}} END{print c+0"/"t+0}' "$RPF" "$INST")" "8/8"
 RRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 PRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 ok "接頭辞(r): 言語等の取り出しは、一覧のファイルを読む 1 行と、配列を渡す 1 行で、接頭辞の直書きが無い" "$(grep -cxF 'mapfile -t prefixes < ci/resources-prefixes.txt' <<<"$RRUN")/$(grep -cF '"${prefixes[@]}"' <<<"$RRUN")/$(grep -cE "'[A-Za-z]+[\\]" <<<"$RRUN")" "1/1/0"
