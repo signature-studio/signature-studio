@@ -72,6 +72,18 @@ project: signature-studio/3
   4. 原因の特定: 生成物を 1 つずつ前の固定の表に戻す実験(モジュールの番号・`pack.args`・seed の表)で、止まりが消える物を探し、直す。どれが原因かを報告に書く。(4) の reads の確認は、この後で行う。
   5. 範囲: 生成の段・試験・必要なら固定の表。`app/`・`lift/` を変えると main の `deploy.yml` が動く(報告に書く)。
 
+## 前回の試行で分かったこと(3 回目。run 45380263553。`failed`)
+
+- 受け入れは全て通った(commit `66f1553c`。判定も通った)。落ちたのは **main への push** だけ: 取り込みの後の push が、衝突で拒否された。
+- 衝突したファイル: `lift/harness/web/pack.args`・`lift/crates/fe-build/tests/plan/bundle.txt`。原因: **他の Issue(#1337 の OTT)が先に main に入り、同じ 2 ファイルに `--lazy-file lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm` の行を足していた**(main の `pack.args` の 192 行目。`bundle.txt` の同じ語)。
+- 作業ツリーには前回の作業が載る(`.prior-work.md` に書く)。衝突の印を解消してから、受け入れを行う。解消の方法:
+  1. main の版を取る。
+  2. この Issue の変更を取り直す: 生成の段が `pack.args` を生成する形(`--args`・`--lazy-dll`・`--lazy-file` の行)と、`bundle.txt` の計画の期待値(生成物を読む形)。
+  3. **#1337 の OTT の `--lazy-file`(`lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm`)は消さない。** 生成の結果の `pack.args` にも、この行が 1 つ在ること(`grep -c 'vst-ext.wasm' <生成した pack.args>` が 1)。OTT は `lift/plugins/` の対象ではないので、`pack.args` の固定の行として残すか、生成の段が出す(どちらでもよい)。
+  4. 両方の変更を残す。衝突の印(`<<<<<<<`・`>>>>>>>`)を 1 つも残さない。
+- `vst-ext.wasm` が deploy の連鎖で作られることは、別の作業者が `deploy.yml` を直している。この Issue は `.github/` を変えない。
+- push の前に、`git pull --no-rebase --no-edit` で main を取り込み、衝突が無いことを確かめる。
+
 ## 1 プラグインを足す手順(今の表)と、この設計での置き場所
 
 | 置く場所 | 1 プラグインごとの行 | 固有か共有か | この設計 |

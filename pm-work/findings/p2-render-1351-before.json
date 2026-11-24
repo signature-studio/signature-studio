@@ -1,0 +1,11 @@
+{
+  "note": "実測(runner の値。nproc 4。loadavg 1.7〜5.3)。変更の前の engine の n = 3 の平均。前回の試行 run 45371958340 の作業の、変更の前の計測。受け入れはこの値を読む。測り直さない(ビルドは 1 回)。presents は 30 秒の窓の提示の回数(desk.presents)。",
+  "default": {
+    "a": { "presents": 134.33, "gpuProcessMsPerPresent": 432.0, "drawPixelShare": 1.0, "inputToPresentMsP95": 253.93, "cpuPerPresentMsP95": 343.9 },
+    "b": { "presents": 144.33, "gpuProcessMsPerPresent": 426.3, "drawPixelShare": 1.0, "inputToPresentMsP95": 244.07, "cpuPerPresentMsP95": 244.2 }
+  },
+  "one": {
+    "a": { "presents": 435.0, "gpuProcessMsPerPresent": 139.0, "drawPixelShare": 0.4, "inputToPresentMsP95": 83.3, "cpuPerPresentMsP95": 92.3 },
+    "b": { "presents": 445.33, "gpuProcessMsPerPresent": 135.4, "drawPixelShare": 0.25, "inputToPresentMsP95": 76.93, "cpuPerPresentMsP95": 69.2 }
+  }
+}

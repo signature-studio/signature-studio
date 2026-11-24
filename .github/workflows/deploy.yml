@@ -49,6 +49,7 @@ jobs:
           mapfile -t p < ci/resources-prefixes.txt
           node tools/fl-installer-extract.mjs "$RUNNER_TEMP/i.exe" \
             lift/out-app/host-extra/resources "${p[@]}"
+          lift/target/release/fe-build external
       - uses: emscripten-core/setup-emsdk@v16
         with:
           version: 7.0.0
@@ -75,10 +76,11 @@ jobs:
       - name: bundle の中身を確かめる
         run: |
           jq -e --arg o resources/System/Internet/error-offline.html \
-            '.lazy | any(.path == $o)' \
+            --rawfile a lift/harness/web/pack.args '(.lazy | any(.path == $o))
+            and ([$a | split("\n")[] | select(test("^lift/out-app/plugins/"))
+            | split("=")[1]] - [.lazy[].path] == [])' \
             lift/out-app/bundle/raw/fl-Oz/manifest.json
-          for p in System/Languages/de.moe \
-            Artwork/Fonts/Cuprum/Cuprum.ttf \
+          for p in System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf \
             Data/Templates/Other/Blocks/Blocks.flp; do
             grep -aqF "\"seed/resources/$p\"" lift/out-app/seed/seed.bin
           done

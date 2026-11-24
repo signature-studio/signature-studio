@@ -4,7 +4,7 @@ title: "FL のテーマを切り替えると engine が止まる(crash)を直す
 type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
-blocked_by: []
+blocked_by: ["149"]
 labels: ["resources", "verify"]
 size: M
 priority: Urgent
@@ -29,6 +29,21 @@ project: signature-studio/3
 - 設定窓(F10)の Theme 頁: 頁の一覧に在る(`pm-work/findings/hidpi-fl-scaling.md` の 10.1)。テーマを切り替える操作は、この頁で行うと推定する(未確認。再現の手順で確かめる)。
 - 原因は、まだ分かっていない。この節の推定は、再現の前の材料であり、結論ではない。
 
+## 前回の試行で分かったこと(run 45364890408。`failed`)
+
+- 作業は保存された(commit `418c3ee9`。push はしていない。作業ツリーに載る。`.prior-work.md` を読む)。判定は差し戻し: 道具の `switched` は 1 / 13(DEDZII Light の 1 件だけ提示が増えた)。残りの 12 件は、押す前に trap で止まった。受け入れは通らなかった。
+- 停止は 3 段階あった。段階ごとに、直したか・未修正かを分けて書く。
+
+**段階 1(直した。実測)**: `GetProcAddress kernel32.dll "CompareStringOrdinal"` が 0 を返し(runtime に無い)、guest がその 0 を呼んで `fle: indirect call to 0 is not a known function entry` で止まった。戻り番地 `0x44b9f1` は関数 `f_44b9b0` で、大域の関数ポインタ `0x15ec808` を呼ぶ。そのポインタは `f_44b7e0` が `GetProcAddress` の結果で入れる。直し方: `CompareStringOrdinal` を `lift/runtime/fle_locale.c`・`fle_locale.h` に実装し、`lift/crates/fe-lift/src/imports_table.rs` の応答表に行を足した。
+
+**段階 2(直した。実測)**: テーマの `BackHTMLFileName=D:\Projects\...` の絶対パスを、ゲストが `Themes\DEDZII\` の下に連結した。途中のディレクトリの成分の `:` を、VFS が `fle: GetFileAttributesW: reserved character in a path component` で止めた。Windows の文法では名前の誤り(`ERROR_INVALID_NAME` 123)。直し方: 途中の成分の `:` は 123 で失敗させ(`lift/runtime/fle_vfs.c` の `GetFileAttributesW`・`GetFileAttributesExW`・`CreateFileW`・`FindFirstFileW`)、最後の成分の `:` は従来どおり止める。
+
+**段階 3(未修正。推定を含む)**: `missing-proc: GetProcAddress kernel32.dll "K32GetProcessMemoryInfo" 127`(6 回)の後、wasm の trap: `Aborted(Assertion failed: ... "pthread mutex deadlock detected" ...pthread_mutex_timedlock.c,95)`。戻り番地は取れていない(trap は guest の間接呼び出しではない)。推定: 協調スレッドは JSPI で切り替えるが、全部が 1 つの OS スレッド上で動く。中断されたスレッドが握った libc の mutex を、別のスレッドが取ると、同じ tid と判定されて止まる。候補は Blend2D の内部の lock(未確認)。切り替えは `fle_dispatch` の進行カウンタ(擬似的な割り込み)から、任意の間接呼び出しで起こりうる(未確認)。
+
+- `K32GetProcessMemoryInfo` の `GetProcAddress` の失敗(6 回)は、#1391(上部バーの Memory Usage の数値)が実装する。この Issue では、その応答を足さない。
+- 起動と流れ A〜D は通った(起動 8.2 s、起動前の資産 311,111,686 B)。単体テストは通った。
+- DPR 1 の 1 回の起動が 180 秒 `running` のまま止まった(6 回の起動のうち 1 回。原因は未確認)。#1393(起動の間欠の停止。協調スイッチの切り替え点)と同じ根の可能性がある。そのため、`blocked_by` に #1393 を足した。
+
 ## 読む物
 
 - `lift/runtime/fle_vfs.c`・`lift/runtime/fle_vfs.h`(`CreateFileW`・`CreateDirectoryW`・`GetFileAttributesW`・`fle_stop` の条件)
@@ -50,6 +65,7 @@ project: signature-studio/3
 2. 原因の特定と修正。停止の理由から、未実装の API・欠けたファイルやフォルダ・メモリの不足・画像の読みのどれかを特定し、既定の動作として直す(オプトインを作らない)。戻り番地は `lift/out-app/gen/wasm-func-names.tsv` で関数名に引き、どの guest の処理が切り替えの時に呼んだかを書く。推定と実測を分けて報告に書く。
 3. 全てのテーマ(13 件)に切り替えても止まらないことを、道具で確かめる。切り替えの前後で、画面が変わったこと(画素が異なる)と、主窓の背景色が変わったこと(テーマごとに色が異なる)を、道具の JSON に出す。
 4. 報告に、停止の全文、特定した原因の commit、直した方式、13 件の切り替えの表(テーマ名・提示の前後の数・画面の変化)を書く。
+5. 段階 3(前回の試行の `pthread mutex deadlock detected`)の調査と直し。#{{149}} を直した後も同じ trap が出るなら、mutex の保持者を特定する(`pthread_mutex_lock` を包み、保持の間は協調スレッドの切り替えをしない。切り替え点で、保持中のカウンタが 0 でなければ切り替えない、など)。#{{149}} の修正の方式に合わせる。戻り番地が取れない時は、trap の直前の engine のログの末尾と、`fle_dispatch` の呼び出しの並びを報告に書く。
 
 ## 受け入れ
 
@@ -92,4 +108,6 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 - 配信の一覧は #{{105}} で入った。この Issue は、配信された物を切り替えた時の停止だけを扱う。
 - #{{136}}(停止の理由を記録に残す)は、実機の停止の理由を取る。この Issue は、手元の再現の理由で直す。
+- #{{149}}(起動の間欠の停止。協調スイッチの切り替え点)は、この Issue の前に入る(blocked_by)。段階 3 の mutex の trap は、同じ根の可能性が高い(推定)。
+- #1391(上部バーの数値)が、`K32GetProcessMemoryInfo` の応答を入れる。
 - #{{145}}(ユーザーのフォルダの保存)と、`Settings\Themes\` の書き込みが重なる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。

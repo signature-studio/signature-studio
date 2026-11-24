@@ -19,8 +19,6 @@ const SEED_ROOT: &str = "lift/out-idle1/inputs/install";
 const EXTRA_IMPORTS: &str = "lift/harness/seeds/ship6-imports.txt";
 const HOOK_EXISTING: &str = "lift/harness/hooks/fruity-delphi-effect-hook-points.txt";
 const XMOD_DIR: &str = "lift/out-app/xmod";
-/// The OTT plugin-worker wasm (#1337; built by lift/harness/web/mt1/plugin-worker/build.sh). Its lazy file is in pack.args only when it is built.
-const OTT_WASM: &str = "lift/out-app/plugins/ott/vst-ext.wasm";
 const N0_ARGS: &str = "lift/harness/hyb/n0.args";
 const ALIGN: u64 = 0x1_0000;
 const GLOBAL_BASE: u64 = 0x1000_0000;
@@ -469,9 +467,6 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     let mut pack = pack_args(&read_text(FIXED_PACK_ARGS)?, &pairs)?;
     if Path::new(super::OFFLINE_PAGE_SRC).is_file() {
         pack.push_str(&format!("--lazy-file\n{}={}\n", super::OFFLINE_PAGE_SRC, super::OFFLINE_PAGE_PATH));
-    }
-    if Path::new(OTT_WASM).is_file() {
-        pack.push_str(&format!("--lazy-file\n{OTT_WASM}=plugins/ott.wasm\n"));
     }
     write(&format!("{OUT_DIR}/pack.args"), &pack)?;
     println!("plugins: {} DLLs; bases {}", dlls.len(), bases.iter().map(|b| format!("0x{b:x}")).collect::<Vec<_>>().join(" "));

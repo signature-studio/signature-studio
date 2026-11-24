@@ -88,3 +88,8 @@
 144	#1392	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 2): FL 自身のカーソル(Piano roll の鉛筆など)を、資源の画素のまま出す	Task
 149	#1393	起動が first idle に届かず state running のまま止まる(間欠・DPR 2.5 で 5 回中 4 回)を、再現して直す: 後ろ向きの goto の切り替え点(fle_loop_tick・fle_loop_slice)	Task
 151	#1394	コード進行ツールの Start creating で、Piano roll にノートが作られる(FL の Python のスクリプトの実行: flpianoroll と標準ライブラリ)	Task
+154	#1395	FL を英語以外の言語で起動できる: ILSvg_x64.dll を real module にし、言語のファイル(.moe・.svg)を seed にする	Task
+152	#1396	ゲストの wasm の関数名の表を、全ての関数に付ける: 名前の無い 12,770 件を無くす(プロファイルの未分類を 5% 以下にする)	Task
+153	#1397	マウス入力(1000 Hz 以上)の場面で Worker の時間の 44.5% がブラウザ内部、27.2% がアプリの JS(postMessage・decode・setTimeout): 内訳を特定し、入力 1 件あたりの費用を減らす	Task
+155	#1398	ビーコンに、実機の提示の頻度(直近 10 秒の fps)と、入力から提示までの遅延(p50・p95)を足し、読み手(summary.mjs)の表に出す	Task
+156	#1399	実機のビーコンで、起動が first idle に届かず離脱した割合を、版ごとに集計する(起動の間欠の停止が、本番に出ているかを知る)	Task

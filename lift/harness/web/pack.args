@@ -182,3 +182,5 @@ lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_3.wa
 lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_4.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_4.wav
 --lazy-file
 lift/out-app/host/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp=seed/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp
+--lazy-file
+lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm

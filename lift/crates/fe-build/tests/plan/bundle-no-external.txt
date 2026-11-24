@@ -1,0 +1,3 @@
+stage bundle: 2 step(s)
+  node app/scripts/pack-seed.mjs @words lift/out-app/plugins/seed.args
+  node app/scripts/pack-assets.mjs --version b440e13a623a @lines lift/out-app/plugins/pack.args, without the external plugins' lazy files
