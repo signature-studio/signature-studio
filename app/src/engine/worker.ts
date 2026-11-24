@@ -83,6 +83,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
+    case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -121,6 +122,8 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
     idle: onEngineIdle,
     fileDlg: (id, request) => { mark('filedlg_request', { id }); post({ t: 'filedlg-request', id, request: request as FileDlgRequest }); },
     fileDlgProgress: (id, done, total) => post({ t: 'filedlg-progress', id, done, total }),
+    clipWrite: (text) => post({ t: 'clipboard-write', text }),   // #1389: the engine's Copy goes to the page
+    clipRead: (id) => post({ t: 'clipboard-read', id }),        // #1389: the engine's Paste asks the page for the clipboard text
     inputPoll,
     inputDone,
   };

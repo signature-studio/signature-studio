@@ -2,7 +2,7 @@
 # usage: OBJ=<build_nmod_wasm.sh OBJ> bash link-web.sh OUTDIR [EXTRA LINK INPUTS...]
 # Links the objects of that build for the browser (decision 0128; decision 0243: one configuration): ES module glue (-sEXPORT_ES6=1, an engine MODULE worker import()s it), no file system (-sFILESYSTEM=0: the page answers the engine's
 # file reads from the pack bytes, decision 0221), JSPI and the wasm setjmp/longjmp, ONE shared memory with emscripten's pthread libc (Blend2D and the libc need pthread_mutex_* and pthread_rwlock_*; decision 0234), the thread-local
-# register block (the C part exports __tls_base for the direct wasm), the file-dialog JS library (decision 0193).
+# register block (the C part exports __tls_base for the direct wasm), the file-dialog JS library (decision 0193), the clipboard JS library (#1389).
 # The extra inputs are objects, libraries and linker arguments that depend on the build (the Blend2D adapter, upstream Blend2D, the export list and the link map of the hybrid).
 set -u -o pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -20,6 +20,7 @@ mkdir -p "$OUTD"
     -sSUPPORT_LONGJMP=wasm -sJSPI \
     --js-library "$LIFT/harness/web/threads/fle_thread_lib.js" -sEXPORTED_FUNCTIONS=_main,_fle_wasm_thread_entry,_fle_host_post_input --js-library "$LIFT/harness/web/fruity/fle_idle_lib.js" -sEXPORTED_RUNTIME_METHODS=ENV,wasmExports,stackRestore \
     --js-library "$LIFT/harness/web/filedlg/fle_filedlg_lib.js" \
+    --js-library "$LIFT/harness/web/clip/fle_clip_lib.js" \
     -pthread -sPTHREAD_POOL_SIZE=0 -sINITIAL_MEMORY=671088640 -sMAXIMUM_MEMORY=2147483648 -Wl,--export-memory -Wl,--export=__tls_base \
     -Wl,--allow-undefined -sERROR_ON_UNDEFINED_SYMBOLS=0 -sWARN_ON_UNDEFINED_SYMBOLS=0 \
     -Wl,--wrap=__cyg_profile_func_enter -Wl,--wrap=fle_raster_wrote \

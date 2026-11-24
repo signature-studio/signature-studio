@@ -37,6 +37,10 @@ export interface ClientEvents {
   taskbar?(m: Extract<FromWorker, { t: 'taskbar' }>): void;
   /** Issue #1362: what the engine's WebView2 model was asked (the Browser panel's face shows it) */
   webview2?(m: Extract<FromWorker, { t: 'webview2' }>): void;
+  /** #1389: the engine's Copy: the text to write to the operating system's clipboard */
+  clipboardWrite?(text: string): void;
+  /** #1389: the engine's Paste asks for the operating system's clipboard text; answer with EngineClient.clipboardAnswer(id, text | null) */
+  clipboardRead?(id: number): void;
 }
 
 export class EngineClient {
@@ -126,6 +130,8 @@ export class EngineClient {
   webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
   /** Issue #1362: a message the face's document posted (window.chrome.webview.postMessage) */
   webview2Message(json: string): void { this.worker?.postMessage({ cmd: 'webview2-message', json } satisfies ToWorker); }
+  /** #1389: the operating system's clipboard text the page read for the engine's Paste (null: none, or the page could not read it) */
+  clipboardAnswer(id: number, text: string | null): void { this.worker?.postMessage({ cmd: 'clipboard-text', id, text } satisfies ToWorker); }
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
@@ -200,6 +206,8 @@ export class EngineClient {
       case 'desk': this.events.desk?.(m); break;
       case 'taskbar': this.events.taskbar?.(m); break;
       case 'webview2': this.events.webview2?.(m); break;
+      case 'clipboard-write': this.events.clipboardWrite?.(m.text); break;
+      case 'clipboard-read': this.events.clipboardRead?.(m.id); break;
     }
   }
 }

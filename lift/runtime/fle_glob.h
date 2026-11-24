@@ -42,6 +42,12 @@ void fle_imp_GlobalFindAtomW(void);
 void fle_imp_MulDiv(void);
 void fle_imp_lstrlenW(void);
 
+/* For the clipboard (fle_clip.c, #1389): a new GMEM_MOVEABLE object copied from `src` (0 when the host refuses the memory); the bytes of a live
+ * movable object without a lock (0 for any other handle); the release of a movable object the runtime made. */
+uint64_t fle_glob_movable_from(const void *src, uint64_t bytes);
+int fle_glob_movable_bytes(uint64_t h, const uint8_t **p, uint64_t *n);
+void fle_glob_movable_drop(uint64_t h);
+
 /* Number of live GMEM_MOVEABLE objects and of live fixed blocks, and of live string atoms in the local and the
  * global table (for tests and tools). */
 uint64_t fle_glob_movable_count(void);

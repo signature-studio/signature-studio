@@ -1160,7 +1160,7 @@ ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインス�
 ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
-ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行と、plugins/ の --lazy-file を持たない" "$(grep -cE 'plugin-worker/build[.]sh|lift/out-app/plugins/' "$NX" 2> /dev/null)" 0
-ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行と plugins/ の --lazy-file の対だけを除いた物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's| --lazy-file lift/out-app/plugins/[^ ]*||') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

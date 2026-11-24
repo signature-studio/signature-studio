@@ -34,6 +34,7 @@ import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
 import { bindAudioStatus } from './audio/status.ts';
 import { FileDialogView, SavedFilesView } from './ui/filedlg.ts';
+import { PageClipboard, type ClipboardState } from './engine/clipboard.ts';
 import type { FileDlgRequest } from './engine/filedlg.ts';
 import { mountFiles } from './files/mount.ts';
 import { EngineFiles } from './files/engine-dialog.ts';
@@ -107,6 +108,8 @@ interface AppApi {
   /** decision 0193: the page's answers to the engine's file dialogs (no file names) and the files the engine wrote (Save dialog targets) */
   fileDlg: { readonly open: boolean; readonly history: FileDialogView['history']; /** for the record of decision 0193: whether the page had a transient user activation (navigator.userActivation.isActive) and how long ago the page's last trusted pointer or key event was, when each engine request arrived */ readonly requests: { id: number; save: boolean; at: number; activationActive: boolean | null; msSinceInput: number | null; /** what the engine asked (its own strings: types, title, folder, suggested name) */ request: FileDlgRequest }[] };
   saved: SavedFilesView['files'];
+  /** #1389: the page's clipboard (the engine's Copy and Paste with the operating system's clipboard): the browser's permission states, the calls and the reason last shown */
+  clipboard: ClipboardState;
   /** decision 0223: the desktop presenter's counters (as of its last report), and the SHA-256 of the desktop canvas read back in the Worker */
   deskStats: unknown;
   readbackDesk(): Promise<{ width: number; height: number; sha256: string }>;
@@ -174,6 +177,9 @@ let endRequested = false;
 
 /** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
 let apiTraceWanted = false;
+// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts)
+const pageClipboard = new PageClipboard(document);
+void pageClipboard.refresh();
 const app: AppApi = {
   assetsReport: () => assetsNow(),
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
@@ -184,6 +190,7 @@ const app: AppApi = {
   audio,
   fileDlg: { get open() { return fileDlgView.open; }, history: fileDlgView.history, requests: [] },
   saved: savedView.files,
+  clipboard: pageClipboard.state,
   sendRaw: (ev) => sendRaw(ev, 'test'),
   taskbar: null as unknown as TaskbarRestore,
   deskStats: null,
@@ -594,6 +601,14 @@ const client = new EngineClient({
   },
   taskbar(m) { app.taskbar.update(m.lid); },
   webview2(m) { face.handle(m); },
+  clipboardWrite(text) {
+    addLog('info', `the engine's Copy: ${text.length} characters for the clipboard`);
+    void pageClipboard.write(text);
+  },
+  clipboardRead(id) {
+    addLog('info', `the engine's Paste asks for the clipboard text (request ${id})`);
+    pageClipboard.read().then((text) => client.clipboardAnswer(id, text)).catch(() => client.clipboardAnswer(id, null));
+  },
   desk(m) {
     app.deskStats = m.stats;
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);

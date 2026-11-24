@@ -74,6 +74,8 @@ const timed = (p, ms, what) => {
 // Issue #1342: the scene of the guest's request for Fruity Balance (see the header). The room and the places of the controls are those of tools/smoke/welcome-flow.mjs (its offsets are measured at the room 1836 x 1056).
 const SCENE_FILE = ['Data', 'Demo projects', 'NewStuff.flp'];
 const SCENE_ROOM_W = 1836, SCENE_ROOM_H = 1056;
+// the view before the navigation (as tools/smoke/welcome-flow.mjs): the Welcome window is placed when it is created, so a smaller view puts it at (0, 0) for the whole scene
+const SCENE_VIEW_START = { width: 2176, height: 1092 };
 const SCENE_WIZARD = 'TWelcomeWizard';
 const SCENE_NO_THANKS = { dx: 512, dy: 307 };
 const SCENE_LIST = { dx: 235, dy: 180 };
@@ -330,6 +332,7 @@ async function measureOnce(port) {
       return r.result.value;
     };
     await S('Page.enable');
+    await S('Emulation.setDeviceMetricsOverride', { width: SCENE_VIEW_START.width, height: SCENE_VIEW_START.height, deviceScaleFactor: 1, mobile: false });
     const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
     if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
     const navAt = Date.now();
@@ -359,7 +362,10 @@ async function measureOnce(port) {
     else if (snap.state !== 'engine-idle') out.error = `state ${snap.state} at the end (no engine-idle within ${WAIT_LIMIT_MS} ms)`;
     if (snap?.state === 'engine-idle' && out.elapsedMs === null) out.error = 'the engine is idle but the page has no idle mark';
     if (snap?.state === 'engine-idle') {
-      const projectPath = path.join(bundleDir, '..', '..', '..', 'host-extra', 'resources', ...SCENE_FILE);
+      // host-extra/resources is restored only by the resources task; the same file (the installer's, the same SHA-256) is in the host tree of the seed
+      const extraPath = path.join(bundleDir, '..', '..', '..', 'host-extra', 'resources', ...SCENE_FILE);
+      const seedPath = path.join(bundleDir, '..', '..', '..', 'host', 'lift', 'out-idle1', 'inputs', 'install', 'Data', 'Demo projects', 'NewStuff.flp');
+      const projectPath = fs.existsSync(extraPath) ? extraPath : seedPath;
       const sc = await runScene({ S, ev, cdp, browserContextId, projectPath, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
       out.scene = { steps: sc.steps, error: sc.error, state: sc.state, welcome: sc.welcome, workers: sc.workers, logTail: sc.logTail, logEnd: sc.logEnd, exit: sc.exit };
       if (sc.reads) out.reads = sc.reads;
