@@ -24,6 +24,7 @@
 | 変更後 | 3 | 25 | 0 | 0 | 549.8 | 25 | 20,671 | 3240x1864 |
 
 - 全 run: `error` null、`state` engine-idle、`standIn` false、`ctxState` running。`quantaDelta` は 19,000 以上。画面は `Math.round(1836 × dpr)` × `Math.round(1056 × dpr)` = 3240x1864 と一致。
+- 受け入れコマンドそのもの(commit `eb118ef2` の作業ツリーで、Issue の `accept` を 1 本で実行。終了コード 0)の窓の 3 回: `bootLast60sAt10s` 0・1・4、`bootLast60sAt70s` 0・0・0、`quantaDelta` 20,669・20,672・20,672、`maxRefillStallMs` 549.9・540・540。変更後は合わせて 6 回の実測で、`bootLast60sAt10s` は 0〜25(中央値の 70% の 1,449 を大きく下回る)。
 - 参考(基準の前の回。同じ HEAD の別ビルド): `bootLast60sAt10s` 2,175・2,074・1,999、プロファイル付きの 1 回 2,105。ビルドを替えても基準の範囲は同じ。
 - `maxRefillStallMs` は、エンジンの起動からの最大の公開の間隔(`fleAudioWorkerState.maxPubGapMs`)。窓の値ではない。基準・変更後とも 540〜600 ms。起動直後(押下の前)の間隔が含まれると推定。段 B の対象。
 - 連続 underrun の最長(`longestRunQuanta`): 基準 117・124・118 → 変更後 4・4・25。
