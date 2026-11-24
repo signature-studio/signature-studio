@@ -1,9 +1,10 @@
 /* The plugin-worker entry of one lifted VST3 module (lift/harness/web/mt1/plugin-worker/build.sh; app/src/plugins/plugin-worker.ts). The start-up is the VST3 host
  * sequence of main_vst3a.c, in the same order: LoadLibraryW of the module (DllMain runs inside), InitDll, GetPluginFactory, the classes, createInstance(IComponent),
  * IComponent::initialize, IAudioProcessor, the controller (its own class or the component itself), the connection, the buses and their arrangements,
- * setupProcessing, setActive(true), setProcessing(true). Then the block loop: mt1_ext_wait returns 1 with the input block in the two buffers, mt1_ext_done takes
- * the output block; 0 ends the loop (the Worker asked to quit). The first mt1_ext_wait is READY for the host. process() is not called here: that is the next
- * stage (#1368), so the output blocks are the zeroed buffers. The teardown after the loop mirrors main_vst3a.c. */
+ * setupProcessing, setActive(true), setProcessing(true). Then the block loop: mt1_ext_wait returns 1 with the input block in the two buffers, one process() call runs
+ * on it (the ProcessData of main_vst3a.c: bus 0 is the two buffers, the parameter and event lists are the host's), and mt1_ext_done takes the output block; 0 ends
+ * the loop (the Worker asked to quit). The first mt1_ext_wait is READY for the host. The teardown after the loop mirrors main_vst3a.c. */
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,7 +38,28 @@ typedef struct {
 } proc_setup;
 _Static_assert(sizeof(proc_setup) == 24, "ProcessSetup");
 
+/* guest structures (main_vst3a.c): every pointer is a 64-bit guest address (also in the wasm32 build) */
+typedef struct { int32_t nch; int32_t pad; uint64_t silence; uint64_t buf; } abb;
+_Static_assert(sizeof(abb) == 24, "AudioBusBuffers");
+typedef struct {
+    int32_t mode, ssize, nsamples, nin, nout; int32_t pad;
+    uint64_t in, out, inpc, outpc, inev, outev, ctx;
+} proc_data;
+_Static_assert(sizeof(proc_data) == 80, "ProcessData");
+typedef struct {
+    uint32_t state; uint32_t pad0; double rate; int64_t proj_samples; int64_t sys_time; int64_t cont_samples; double proj_music, bar_music, cyc_start, cyc_end, tempo;
+    int32_t ts_num, ts_den; uint8_t chord[4]; int32_t smpte_off; uint32_t fps, fps_flags; int32_t to_clock; int32_t pad1;
+} proc_ctx;
+_Static_assert(sizeof(proc_ctx) == 112, "ProcessContext");
+
 #define ULL(x) ((unsigned long long)(x))
+
+static uint64_t fnv(uint64_t h, const void *p, size_t n)
+{
+    const uint8_t *b = p;
+    for (size_t i = 0; i < n; i++) { h ^= b[i]; h *= UINT64_C(0x100000001b3); }
+    return h;
+}
 
 static uint64_t export_va(uint64_t base, const char *name)
 {
@@ -151,6 +173,8 @@ int main(int argc, char **argv)
     int ncls, audio_cls = -1;
     char cid[16];
     int ctrl_same = 0;
+    int nin = 0, nout = 0, ch_in[8] = {0}, ch_out[8] = {0};
+    int failed = 0;
 
     setvbuf(stdout, NULL, _IOLBF, 0);
     for (int i = 1; i < argc; i++) {
@@ -277,11 +301,11 @@ int main(int argc, char **argv)
     }
     /* ---- buses and arrangements ---- */
     {
-        int nin = (int)vcall(comp, 7, 0, 0, 0, 0), nout = (int)vcall(comp, 7, 0, 1, 0, 0);
         uint64_t bi = (uint64_t)(uintptr_t)calloc(1, 300);
         uint64_t arr_in = (uint64_t)(uintptr_t)calloc(8, 8), arr_out = (uint64_t)(uintptr_t)calloc(8, 8), r;
-        int ev_in = (int)vcall(comp, 7, 1, 0, 0, 0), ev_out = (int)vcall(comp, 7, 1, 1, 0, 0);
-        int ch_in[8] = {0}, ch_out[8] = {0};
+        int ev_in, ev_out;
+        nin = (int)vcall(comp, 7, 0, 0, 0, 0); nout = (int)vcall(comp, 7, 0, 1, 0, 0);
+        ev_in = (int)vcall(comp, 7, 1, 0, 0, 0); ev_out = (int)vcall(comp, 7, 1, 1, 0, 0);
         printf("vst: getBusCount(audio,in)=%d (audio,out)=%d  events in=%d out=%d\n", nin, nout, ev_in, ev_out);
         if (nin > 8 || nout > 8) { fprintf(stderr, "vst: more than 8 audio buses\n"); return 3; }
         for (int d = 0; d < 2; d++) {
@@ -321,15 +345,61 @@ int main(int argc, char **argv)
         r = vcall(proc, 8, 1, 0, 0, 0);
         printf("vst: setProcessing(true) -> %#llx\n", ULL(r & 0xffffffffu));
     }
-    /* ---- the block loop: READY at the first wait; process() is the next stage (#1368), so the output blocks stay zero ---- */
+    /* ---- the block loop: one process() call per block, between mt1_ext_wait (the input block is in inL/inR) and mt1_ext_done (the output block is outL/outR) ---- */
     {
         uint32_t inL = (uint32_t)(uintptr_t)calloc((size_t)frames, 4), inR = (uint32_t)(uintptr_t)calloc((size_t)frames, 4);
         uint32_t outL = (uint32_t)(uintptr_t)calloc((size_t)frames, 4), outR = (uint32_t)(uintptr_t)calloc((size_t)frames, 4);
+        static abb ibs[8], obs[8];
+        static uint64_t ip[8][2], op[8][2]; /* float** as the guest sees it, one pair per bus; bus 0 is the block buffers, the other buses are silence */
+        proc_data *pd = calloc(1, sizeof *pd);
+        proc_ctx *pc = calloc(1, sizeof *pc);
+        uint64_t h = UINT64_C(0xcbf29ce484222325), n0 = 0;
+        long nonfinite = 0, nsamp = 0, nonzero = 0;
+        double maxabs = 0, sumsq = 0;
         uint32_t b = 0;
-        while (mt1_ext_wait(inL, inR, (uint32_t)frames, b)) {
-            mt1_ext_done(outL, outR, (uint32_t)frames, b);
-            b++;
+        for (int k = 0; k < nin; k++) {
+            ip[k][0] = k ? (uint64_t)(uintptr_t)calloc((size_t)frames, 4) : inL;
+            ip[k][1] = k ? (uint64_t)(uintptr_t)calloc((size_t)frames, 4) : inR;
+            ibs[k].nch = ch_in[k] > 2 ? 2 : ch_in[k]; ibs[k].silence = 0; ibs[k].buf = (uint64_t)(uintptr_t)ip[k];
         }
+        for (int k = 0; k < nout; k++) {
+            op[k][0] = k ? (uint64_t)(uintptr_t)calloc((size_t)frames, 4) : outL;
+            op[k][1] = k ? (uint64_t)(uintptr_t)calloc((size_t)frames, 4) : outR;
+            obs[k].nch = ch_out[k] > 2 ? 2 : ch_out[k]; obs[k].silence = 0; obs[k].buf = (uint64_t)(uintptr_t)op[k];
+        }
+        pd->mode = 0; pd->ssize = 0; pd->nin = nin; pd->nout = nout;
+        pd->in = nin ? (uint64_t)(uintptr_t)ibs : 0; pd->out = nout ? (uint64_t)(uintptr_t)obs : 0;
+        pd->inpc = host.param_changes; pd->outpc = host.out_changes; pd->inev = host.event_list; pd->outev = host.event_list; pd->ctx = (uint64_t)(uintptr_t)pc;
+        pc->rate = rate; pc->tempo = 200.0; pc->ts_num = 4; pc->ts_den = 4;
+        pc->state = (1u << 1) | (1u << 10) | (1u << 13) | (1u << 9);
+        while (mt1_ext_wait(inL, inR, (uint32_t)frames, b)) {
+            uint64_t r;
+            pd->nsamples = frames;
+            pc->proj_samples = (int64_t)n0;
+            pc->proj_music = (double)n0 / rate * pc->tempo / 60.0;
+            vst_ev_clear();
+            r = vcall(proc, 9, (uint64_t)(uintptr_t)pd, 0, 0, 0);
+            if (b == 0) vst_pc_clear();
+            if ((r & 0xffffffffu) != 0) {
+                printf("vst: process returned %#llx at block %u\n", ULL(r & 0xffffffffu), b);
+                failed = 1;
+            }
+            for (int c = 0; nout && c < obs[0].nch; c++) {
+                const float *o = (const float *)(uintptr_t)(c ? outR : outL);
+                for (int i = 0; i < frames; i++) {
+                    float v = o[i];
+                    if (!isfinite(v)) nonfinite++;
+                    else { double av = fabs((double)v); if (av > maxabs) maxabs = av; if (v != 0.0f) nonzero++; sumsq += (double)v * (double)v; }
+                    nsamp++;
+                }
+                h = fnv(h, o, (size_t)frames * 4);
+            }
+            mt1_ext_done(outL, outR, (uint32_t)frames, b);
+            n0 += (uint64_t)frames;
+            b++;
+            if (failed) break;
+        }
+        printf("RESULT out_hash=%016llx nonfinite=%ld samples=%ld nonzero=%ld maxabs=%.6f rms=%.6f blocks=%u\n", ULL(h), nonfinite, nsamp, nonzero, maxabs, sqrt(sumsq / (double)(nsamp ? nsamp : 1)), b);
         printf("vst: block loop ended after %u blocks\n", b);
     }
     /* ---- teardown (main_vst3a.c) ---- */
@@ -351,5 +421,5 @@ int main(int argc, char **argv)
         }
     }
     printf("vst: done\n");
-    return 0;
+    return failed ? 3 : 0;
 }
