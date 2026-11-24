@@ -33,9 +33,45 @@ Browser のパネルは、WebView2(Web のエンジンそのもの)の窓であ�
 - **クラウドのタブ(起動の時点で選ばれている。guest 267,125 付近)を押すと、`Navigate` が 1 回呼ばれる**: `uri="file://<インストール先>\System\Internet\error-offline.html"`(82 単位)。その後、`put_Bounds` が 0,0,365,299 → 0,0,365,329 に変わる。`error-offline.html` は、インストーラの `System\Internet\error-offline.html`(`inputs/fl-installer-files.tsv` の 26934 行。中身は記録に無い)。**オフラインの時に出す、FL 自身のページ**。
 - 他のタブ(波形・星など)を押すと、`put_IsVisible 0`(WebView2 を隠す)。`NavigateToString` は、どの操作でも呼ばれなかった。
 - **最初の版の障害(#1355)**: `Navigate` にも `about:blank` と同じ 4 つのイベントを返す版では、クラウドのタブを押すと、`fire NavigationStarting` の後に次の行が出て、エンジンが終わった(`exited`)。`fle: indirect call: the window procedure 0x… lies in a page of a VirtualAlloc region that is not marked for running code: not called (decision 0119)`。FL の `NavigationStarting` の受け口が、Delphi の MakeObjectInstance の thunk(窓のプロシージャ)を呼び、その thunk のページが実行可能として記録されていなかった(`lift/runtime/fle_win.c` の `thunk_target`)。今の版は、このため `Navigate` の後のイベントを返さない(CHOICE)。この Issue は、イベントを返すので、この障害を先に直す(下の「やること」の 2)。
-- 基準(変更の前。runner の値): `blackShare` 0.929158(guest の画面の黒の割合。`iframe` の無い版の値)、`elapsedMs` 9034〜9064(#1355 の版。#1355 の前の基準は 7751)、`preBootBytes` 314,326,602。受け入れの判定は、下の値で行う。
+- 基準(変更の前。runner の値): `blackShare` 0.929158(guest の画面の黒の割合。`iframe` の無い版の値)、`elapsedMs` 9034〜9064(#1355 の版。#1355 の前の基準は 7751)、`preBootBytes` 314,326,602(#1355 より前の値。受け入れの基準は下の判定の基準の値)。受け入れの判定は、下の値で行う。
 - **この runner(と、依頼者のブラウザ)は、FL のサーバーに通信できない**(名前解決の失敗 12007)。オンラインの内容は対象にしない。オフラインのページ(`error-offline.html`)だけを出す。
 - **前提(PM が確認)**: resources の取り出し(`.github/workflows/agent.yml` の extract の行。`node tools/fl-installer-extract.mjs ... 'System\Languages\' 'Artwork\' 'Data\Templates\' 'Data\Demo projects\' 'Data\System\' 'Data\Projects\'`)の接頭辞に、`System\Internet\` は無い。作業者は `.github/` を変えない。`lift/out-app/host-extra/resources/` の下に `System/Internet/error-offline.html` が無い時は、無いことを報告に書いて終える(PM が接頭辞を足して再試行する)。
+
+## 前回の試行で分かったこと
+
+1 回目の試行(開始から約 3 時間)は `failed` で終わった。受け入れで落ちた理由は 1 つ(`preBootBytes`。下の 5)で、それ以外は全て通った。作業の差分は保存されていて、次の作業の開始時に作業ツリーに載っている(取り込みの結果は `.prior-work.md`)。載っていなければ、報告に書いて終える。
+
+1. 測定(判定用の 3 回。runner の値)
+   - `blackShare`(ページの画面): 基準 0.929158 → 0(3 回とも)。`guestBlackShare` は 0.929158 のまま(面は黒の上に載るので、guest の画面の黒は残る。判定は `blackShare`)。
+   - `iframeCount` 1。`iframeRect` = `boundsRect` = (0,145,364,905)。`boundsMatch` true。
+   - `elapsedMs` 11131・10689・11183(上限 12500 以内)。
+   - 流れ A〜D: 4 行とも `error` null・`state` engine-idle・`standIn` false・`trapped` false・`hostErrors` 0・`opened` true。B と D は `welcomeClosed` true。
+   - `npm test --prefix app`: 69 ファイル合格(1 件スキップ)、1344 件合格。
+   - 目視(`shot4-after.png`): iframe の中に「You're offline」のボックスが CSS つきで出る。フォントは CSP の `font-src` で止まり、フォールバックの書体になる。
+2. 起動の障害(#1355 の版の障害。前回の試行で直した)
+   - 原因(推定。再現で確かめた): モデルが、FL が `add_*` で渡したハンドラに参照(`AddRef`)を足していなかった。FL が参照を手放すとハンドラが解放され、その thunk の領域が `VirtualFree` される。古い thunk を呼ぶと、`fle_call_guest: the callback address is 0` や `indirect call to 0xffff… is not a known function entry` で止まった。
+   - 直し方: `lift/runtime/fle_webview2.c` の `hold_handler`。`add_*` の時に IUnknown の `AddRef` を呼ぶ。`remove_*` では戻さない(CHOICE)。直すと、`NavigationStarting`・`SourceChanged`・`ContentLoading`・`NavigationCompleted` が出て、エンジンは終わらない。`thunk_target` の判定は変えていない。解放の経路そのものは trace していない。
+3. 写し方(前回の差分。やること 3 の「橋」は、この方式に替える)
+   - 位置: `put_Bounds` の矩形に、窓の client の画面上の位置(`origin=X,Y`。`fle_win_client_origin`)を足し、CSS 画素にする。実測は origin 0,145・bounds 0,0,364,905 → iframe (0,145,364,905)。一覧の窓の origin は負(-5,139 など)のまま置き、`#desktop` で切る。
+   - 押下の後の `put_Bounds`: 一時的に `origin=366,145` を経て、`Navigate` の後に `0,0,364,905 origin=0,145` へ戻る。面は最後の値に従い、判定は一致した。
+   - CSP: アプリの CSP(`script-src 'self'`・`style-src 'self'`)が、`srcdoc` の中のインラインの `<style>`・`<script>` を止める。そのため、読み込み前に注入するスクリプトは動かない。iframe は `sandbox="allow-same-origin"`(スクリプトは動かさない)にし、親ページが読み込み後に、`<style>` を CSSOM(`adoptedStyleSheets`)に入れ、背景(#142028)を設定し、`window.chrome.webview` を `contentWindow` に作る。CSSOM の操作は CSP で止まらない。
+   - `error-offline.html`: 44,729 B。自己完結で、相対の参照(`src`・`href`・`url()`)は無い。`blob:` への書き換えは要らなかった。前提の資源(`lift/out-app/host-extra/resources/System/Internet/error-offline.html`)は、前回の試行で在った。`fe-build` の pack は、ファイルが在る時だけ lazy 資源として足す(前回の差分)。
+4. 押し方(測定の道具)
+   - 起動の時点で選ばれているクラウドのタブ(267,125)を、そのまま押しても `Navigate` は出ない。別のタブ(35,125)を押してから 267,125 を押すと、`Navigate` が 1 回出る。測定の道具は、この順で押す。押す前に、Welcome 窓を Escape で閉じ、「Problems loading」を閉じる(前面に窓があると、押下が Browser に届かない)。
+   - 押下の後の `webview2Fired` は 4 つのイベント。
+5. 未確認・残り
+   - `preBootBytes` の超過: 314,352,327(基準 314,330,698 を 21,629 B 超過)。内訳は engine.wasm 169,038,721・seed 66,702,132・DLL 77,444,112・glue 1,167,362。この変更が増やしたのは約 2.0 KB(wasm)と 717 B(glue)。残りの約 19 KB は、基準の後に main に入った変更によるもの(推定)。基準は下の判定の基準で直す(314,368,711 B)。
+   - 目標 2(起動の中で `Navigate` が出ない理由)は、FL の起動の手続きを読んでいないので未確認。
+   - 目標 3(入力の遮断)は、送って確かめていない。面の上の操作が `#desktop` に届かない、は仕組み上の推定。
+   - 単一のコントローラーを前提にしている(`wv_view` は最初の view)。`PostWebMessageAsJson` は面に通知するだけで、`ExecuteScript` は実行しない。ページ → FL の `WebMessageReceived` は、モデルに無いので渡していない。
+
+## 残りのやること
+
+「やること」の 0〜6 は、前回の試行でほぼ済んでいる(上の節)。残りは次の順で行う。
+1. 作業ツリーの前回の差分を確かめる(`git status`・`git diff --stat`。前回の記録は `pm-work/findings/browser-panel-118.md`。差分に載っている)。
+2. 受け入れを通す(下の `accept` の 1 行を、そのまま実行する)。再ビルドと測定が要る(engine のビルドは約 35 分)。
+3. 通っても通らなくても、作業ツリーを commit する(報告の規則どおり)。
+4. 余裕があれば、目標 2・3 を確かめる。必須ではない。受け入れには入れない。確かめた結果を報告に書く。目標 2 は、FL の起動の手続きで `Navigate` を呼ぶ箇所を読む(材料は「未確認・残り」の節)。目標 3 は、面の上でクリックとキーを送って確かめる。
 
 ## 読む物
 
@@ -84,7 +120,7 @@ Browser のパネルは、WebView2(Web のエンジンそのもの)の窓であ�
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-118 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/browser-panel/measure.mjs "$B" > ".tmp-118/m$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-118/m"+i+".json","utf8").trim()));const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.dpr===1&&r.iframeCount>=1&&r.boundsMatch===true&&r.blackShare<=0.5&&r.elapsedMs<=12500&&r.preBootBytes<=314330698;process.exit(R.length===3&&R.every(ok)?0:1)' && node tools/smoke/welcome-flow.mjs "$B" > ".tmp-118/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' ".tmp-118/flow.jsonl" && rm -rf .tmp-118 && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-118 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/browser-panel/measure.mjs "$B" > ".tmp-118/m$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=[1,2,3].map((i)=>JSON.parse(fs.readFileSync(".tmp-118/m"+i+".json","utf8").trim()));const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.dpr===1&&r.iframeCount>=1&&r.boundsMatch===true&&r.blackShare<=0.5&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(R.length===3&&R.every(ok)?0:1)' && node tools/smoke/welcome-flow.mjs "$B" > ".tmp-118/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' ".tmp-118/flow.jsonl" && rm -rf .tmp-118 && npm test --prefix app
 ```
 
 判定の基準(DPR 1。測定の 3 回の全て):
@@ -92,7 +128,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - `iframeCount` が 1 以上。`boundsMatch` が true(`iframeRect` と `boundsRect` が ±2 CSS 画素以内)。
 - `blackShare` が 0.5 以下(ページの実際の画面で測る。基準は 0.929158)。
 - `elapsedMs` の 3 回の最大が 12500 以下。
-- `preBootBytes` が 314,330,698 以下(#1341 の基準。起動前の取得を増やさない)。
+- `preBootBytes` が 314,368,711 以下(前回の試行の実測 314,352,327 B に、余裕 16,384 B を足した値。起動前の取得を増やさない)。
 - 流れ A・B・C・D(`tools/smoke/welcome-flow.mjs`): 各行が、`error` が null・`state` が engine-idle・`standIn` が false・`trapped` が false・`hostErrors` が 0・`opened` が true。流れ B と D は `welcomeClosed` が true。
 - 単体テスト(`npm test --prefix app`)が通る。
 - 足した物に、利用者向けの新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を書かない。

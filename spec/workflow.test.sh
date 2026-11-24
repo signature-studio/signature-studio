@@ -88,6 +88,7 @@ ok "report: gh issue close は 1 回だけ、Issue が open のときの if の�
 ok "report: 閉じられなかったときの注記を、コメントに書く" "$(grep -cF 'close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する' <<<"$R")" 1
 ok "report: 成功の段は、running を close の後に外す" "$(awk '/gh issue close/{c=NR} /--remove-label running/{if (!r) r=NR} END{print (c && r && c < r) ? "yes" : "no"}' <<<"$R")" yes
 ok "agent.yml・deploy.yml・tools/ に、アカウント ID の値を直書きしていない" "$(acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" 2>/dev/null | cut -d'"' -f4); if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/tools/*.mjs | grep -cF -- "$acct"; else echo none; fi)" 0
+ok "agent.yml・deploy.yml に、マスクの命令(add-mask)が無い(値は隠さず、出さない形に直す)" "$(cat "$A" "$top/.github/workflows/deploy.yml" | grep -c 'add-mask')" 0
 # (g) tools/select-targets.mjs を、偽の gh と偽のイベントで試す
 FX=$T/fx; GHLOG=$T/gh.log; mkdir -p "$FX" "$T/bin"; : > "$GHLOG"
 cat > "$T/bin/gh" <<'GH'
