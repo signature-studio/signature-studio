@@ -53,3 +53,7 @@ L-051	2026-11-23	依頼者	マウスの動きは最低 1000 Hz で測る(依頼�
 L-052	2026-11-23	依頼者	FL のネイティブでは、Main GUI Scaling の System が OS の拡大率(175%)に自動で従う。今の版では従っていない。DPI・拡大率に関するメトリクスを、きちんと取ること。メトリクスには、Settings → Debug のログも含める	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
 L-053	2026-11-23	依頼者	175% などの数字を、予め用意しない。拡大率は、環境(DPR)から、Windows と同じ計算で導く	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
 L-054	2026-11-23	依頼者	起動して 10 秒後、一度も再生を押さず、操作もしない状態で、直近 60 秒の途切れが 343 ある。使い物にならない。再生もマウス操作も無い状態で、途切れを 0 にする	pm-work/issue-drafts/wave1f/109-audio-under-physical-screen-mouse.md
+L-055	2026-11-24	依頼者	HiDPI 対応は正常に動作している(確認)	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md・pm-work/issue-drafts/wave1i/113-fl-ui-scale-measure.md
+L-056	2026-11-24	依頼者	Browser の Sounds タブの中身が、Welcome・Channel Rack などの FL のウィンドウより前面に出る。File メニューを開くと下部が隠れる。FL のウィンドウの前後関係を守ること	pm-work/issue-drafts/wave1s/132-browser-face-front-windows.md
+L-057	2026-11-24	依頼者	評価用プロジェクトを開こうとすると落ちる	pm-work/issue-drafts/wave1s/133-demo-exit-beacon-reason.md
+L-058	2026-11-24	依頼者	main が更新されたら、デプロイされるはず。デプロイを迂回する仕組みがあるとしたら、廃止する	pm-work/issue-drafts/wave1s/134-deploy-gate-remove.md

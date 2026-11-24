@@ -496,7 +496,7 @@ fn aws_step(args: &[&str]) -> Step {
     Step::Run(argv)
 }
 
-/// The three `aws s3` calls that do not depend on a gate: the Brotli bundle and the raw bundle.
+/// The `aws s3 sync` calls that upload the bundle: the Brotli files, then the raw files.
 fn upload_sync_steps() -> Vec<Step> {
     let br_dir = format!("{OUT_APP_DIR}/bundle/br");
     let raw_dir = format!("{OUT_APP_DIR}/bundle/raw");
@@ -506,33 +506,19 @@ fn upload_sync_steps() -> Vec<Step> {
     ]
 }
 
-/// The copies of the manifest: the engine's sha256 must be a line of verified.txt, and a non-empty root.txt names
-/// the key that is copied over the manifest.
-fn upload_gated_steps(sha: &str, verified: &str, root: &str) -> Vec<Step> {
+/// The copy that makes the new bundle live. It is always the last step of upload(), after the bundle's files are up,
+/// so the manifest never names a file that is not there yet.
+fn upload_manifest_step() -> Step {
+    let manifest_file = format!("{OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json");
     let manifest_key = format!("{R2_BUCKET}manifest.json");
-    let mut steps = Vec::new();
-    if verified.lines().any(|line| line == sha) {
-        let manifest_file = format!("{OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json");
-        steps.push(aws_step(&["s3", "cp", &manifest_file, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"]));
-    }
-    if !root.is_empty() {
-        let src = format!("{R2_BUCKET}{}", root.trim_end_matches('\n'));
-        steps.push(aws_step(&["s3", "cp", &src, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"]));
-    }
-    steps
+    aws_step(&["s3", "cp", &manifest_file, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"])
 }
 
 fn upload() -> Result<(), String> {
     for step in &upload_sync_steps() {
         run(step)?;
     }
-    let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
-    let verified = fs::read_to_string(format!("{HARNESS_DIR}/web/verified.txt")).map_err(|e| format!("verified.txt: {e}"))?;
-    let root = fs::read_to_string(format!("{HARNESS_DIR}/web/root.txt")).unwrap_or_default();
-    for step in &upload_gated_steps(&sha, &verified, &root) {
-        run(step)?;
-    }
-    Ok(())
+    run(&upload_manifest_step())
 }
 
 fn endpoint() -> Result<(), String> {
@@ -601,7 +587,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_gated_steps, upload_sync_steps};
+    use super::{bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
     use std::path::Path;
 
     const SHA: &str = "b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043";
@@ -613,8 +599,8 @@ mod tests {
         assert_eq!(glue(input), expected);
     }
 
-    /// The plans of the four commands equal the texts recorded before the `--plan` flag was removed (tests/plan/*.txt).
-    /// The engine's binary directory is written as `<bin>`. The upload gate takes the sha, verified.txt and root.txt as text.
+    /// The plans of the engine, bundle and extract commands equal the texts recorded before the `--plan` flag was removed
+    /// (tests/plan/*.txt). The engine's binary directory is written as `<bin>`. The upload plan is tested by upload_plan_matches_recorded_text.
     #[test]
     fn plans_match_recorded_texts() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
@@ -623,9 +609,13 @@ mod tests {
         assert_eq!(engine.join("\n") + "\n", include_str!("../tests/plan/engine.txt"));
         let bundle = bundle_plan_steps(SHA).expect("bundle plan");
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle.txt"));
-        let mut upload = upload_sync_steps();
-        upload.extend(upload_gated_steps(SHA, SHA, ""));
-        assert_eq!(stage_lines("upload", &upload).join("\n") + "\n", include_str!("../tests/plan/upload.txt"));
         assert_eq!(stage_lines("extract", &extract_steps()).join("\n") + "\n", include_str!("../tests/plan/extract.txt"));
+    }
+
+    #[test]
+    fn upload_plan_matches_recorded_text() {
+        let mut upload = upload_sync_steps();
+        upload.push(upload_manifest_step());
+        assert_eq!(stage_lines("upload", &upload).join("\n") + "\n", include_str!("../tests/plan/upload.txt"));
     }
 }

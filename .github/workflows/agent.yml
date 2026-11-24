@@ -120,7 +120,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
 
       - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -516,7 +516,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
           fail-on-cache-miss: true
 
       - name: 抽出物を lift/out-app/host に置く
@@ -783,7 +783,7 @@ jobs:
           APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
         run: |
           git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"
-          git commit --allow-empty -m "$(cat "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
+          git commit --allow-empty -m "$(sed -E 's/skip ci|ci skip|no ci|skip actions|actions skip|NO_CI//gI' "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
           mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH

@@ -17,18 +17,17 @@ project: signature-studio/3
 
 出来上がりの形は 1 プラグイン 1 wasm。`app/src/plugins/plugin-worker.ts` が起動する wasm(`vst-ext.wasm`)を OTT について作り、道具 `tools/plugin-run/measure.mjs` で、その Worker が READY(setupProcessing と setActive が済んだ状態)になるまでを測る。
 
-## 前回までの試行で分かったこと
+## 前回の試行で分かったこと
 
-run 45253143948(2026-11-23 19:52Z。#1337 の作業。#1336・#1338 も同じ壁で落ちた)の結果。
+run 45316190489(#{{123}} の 2 回目の試行。判定の段で落ちた。作業は保存された: `work.diff`。コミット 04fc7321・6d29ce64・23986780 を含む。次の試行は、その差分が載った作業ツリーから始まる)。
 
-1. 受け入れの入力 `$RUNNER_TEMP/external/ott.exe` は存在しない。作業の段が `$RUNNER_TEMP/external/*` を `lift/out-app/external/` へ `mv` するので、その dir は空になる(`.github/workflows/agent.yml` の 569〜575 行)。入力は `lift/out-app/external/` の中の、`ci/artifacts.lock` の 3 行目の名前のファイル(8,397,928 B。SHA-256 の先頭 d4e1d3f6…)。照合は通った。
-2. インストーラの中の VST3 本体(`OTT.vst3`)は 3,244,032 B(SHA-256 の先頭 8965c711…。`inputs/external-plugins.tsv` の OTT の行と一致)。PE32+、x86-64。export は GetPluginFactory・InitDll・ExitDll。import は 8 DLL(kernel32・user32・gdi32・gdiplus・ole32・shell32・winmm・imm32)で、大半は GUI の import。
-3. 素の `fe-lift lift` は 1.1 秒で終わり、6,676 関数・532,220 行・44.6 MB を出した。VEX 系の命令 87 行が「最小集合の外」(`lift/crates/fe-lift/src/vex.rs` は VMOVUPS などの一部だけを持ち、他は `Err`)。扱いは #{{124}} で決める。
-4. 基盤の header が無い。`lift/harness/vst/` は git の履歴に一度も無い。`archive/gen4-2026-11-18` のタグは、この clone にも remote にも無い。`lift/harness/vst3a/main_vst3a.c` が include する `vst_host.h`(と `vst_hm.def`)が無く、コンパイルは `fatal error: 'vst_host.h' file not found` で止まる。
-5. 生成の道具が無い: `lift/harness/vst/gen_vst.sh`・`mkrows.sh`・`imports-vst.txt`(`gen_vst3a.sh` が呼ぶ)と、Python の `mk_stubs.py`・`patch_ordinals.py`・`patch_shd.py`・`patch_bmi.py`。
-6. 製品の wasm の元も無い: `lift/harness/web/mt1/plugin-worker/build.sh` と `main_vst_ext.c`(`app/src/plugins/ott-host.ts` と `app/test/unit/plugins-ott.test.ts` の注釈が指す)。seed の表(`vfs-seed-vst.tsv`)も無い。
-7. 測定の道具 `tools/plugin-run/measure.mjs` は無い(受け入れは `MODULE_NOT_FOUND` で終わった)。
-8. 受け入れの鎖は、`npm run build`・`cargo build`・`fe-build engine`・`fe-build bundle`・`boot-bundle.mjs` まで通る(engine-idle、error null、standIn false。elapsedMs は 8,100〜12,600。runner の値)。ビルドは約 35 分。
+1. 受け入れの鎖は通った(実測。runner の値。nproc 4)。`build.sh ott`、`npm run build`、`cargo build`、`fe-build engine`(45 分 37 秒)、`fe-build bundle`、`boot-bundle.mjs`(`engine-idle`・error null・standIn false・elapsedMs 10,508)、`measure.mjs` が 0 で終わった。`measure.mjs` の 1 行: `{"plugin":"ott","instantiated":true,"blockFrames":0,"nonSilent":false,"error":null}`(wall 0.38 s、RSS 175 MB)。判定の段は、受け入れが 0 で終わった後で `guard/scan.sh` に進んだ。
+2. 落ちた理由: `guard/scan.sh` が `python` を 1 件見つけた。`lift/harness/vst3a/build_vst3a_native.sh:35`(`if [ ! -e "$SRCD/countf_arrays.c" ]; then python3 "$HERE/count_fn.py" ...`)。この行は、COUNT=1 の経路(既定の COUNT=0 では実行されない)。`count_fn.py` は repo にも git の履歴にも無い。製品の経路の規則(Python を入れない)に反するので、直す。
+3. 直すこと(次の試行の最初): その 1 行を、Python を使わない明示の失敗に変える。例: `if [ ! -e "$SRCD/countf_arrays.c" ]; then echo "COUNT=1 の数え上げの生成(count_fn)は、この版に無い。$SRCD/countf_arrays.c を先に置く" >&2; exit 1; fi`。OTT の経路には影響しない。直したら `bash guard/scan.sh lift/harness/vst3a/build_vst3a_native.sh` が 0 件。
+4. 作った物(差分に入っている。元の物が無いので、推定で書いた): `lift/harness/vst/`(`vst_host.h`・`vst_hm.def`・`mkrows.sh`・`imports-vst.txt`・`gen_vst.sh`・node の `mk_stubs.mjs`・`merge_tables.mjs`・`seeds_scan.mjs`・`vfs-seed-vst.tsv`)、`lift/harness/web/mt1/plugin-worker/`(`build.sh`・`main_vst_ext.c`・`thread_stub.c`・`seeds/ott.txt` 1,994 件)、`tools/plugin-run/measure.mjs`、`app/src/plugins/ott-host.ts`(wasm の import の追加 7 件)、`lift/harness/vst3a/vst3a_imp.c`(答えの追加。重複定義 5 件の削除)、`build_vst3a_wasm.sh`・`build_vst3a_native.sh`・`gen_vst3a.sh`(ImageBase は `fe-pe pe-info`、stub 表は `mk_stubs.mjs`。patch の 3 段は外した)。
+5. OTT の lift(実測): rebase(ImageBase 0x180000000 → 0x2000000)。関数 10,233(`.pdata` だけでは 6,676。reloc・switch 表・lea の seed を足した)。未対応の行 2,135(V・P で始まる命令が約 1,080。VEX 系と SSE 整数系。#{{124}} の対象)。import 380(名前付き 379・序数 1)。名前付きの停止 119、序数の停止 1。答えの行は harness 28・runtime 24。
+6. 未確認: Serum 2 と Vital の build(`build.sh` は受けるが、この段では動かしていない)。`app/test/unit/plugins-ott.test.ts`(hash が #{{124}} の処理の後で決まるので、この段では走らせていない)。`vst3a_imp.c` の追加の答えを、Serum 2 の native harness で再試験していない。
+7. `tools/` を変えたので、判定は `spec/guard.test.sh`・`spec/workflow.test.sh`・`spec/driver.test.sh` を走らせる。作業者も、commit の前に走らせて通す。
 
 ## 既に在る物(再利用する。作り直さない)
 
@@ -53,13 +52,11 @@ run 45253143948(2026-11-23 19:52Z。#1337 の作業。#1336・#1338 も同じ壁
 
 ## やること
 
-1. 基盤の header を作る。`lift/harness/vst/vst_host.h` を、`lift/harness/vst3a/` の C の 5 ファイルが使う名前(`vst_host`・`vst_iid`・`vst_iid_make`・`VST_HM_*`・`VST_HM_VA`・`K_RESULT_OK` など。`grep` で全部を数える)から書く。`vst_hm.def`・`mkrows.sh`・`imports-vst.txt`・`gen_vst.sh` も、`gen_vst3a.sh` と `main_vst3a.c` が要る分だけ作る。元の物は無いので、推定で書いた物は報告に「推定」と書く。
-2. Python を使わない生成の段を node か Rust で作る。`mk_stubs.py` の役(import の stub の表)と、`patch_ordinals.py`・`patch_shd.py`・`patch_bmi.py` の役(lift した C の後処理)を、同じ入出力の形で置き換える。`build_vst3a_wasm.sh` の 29 行の `python3 -c`(PE の ImageBase を読む)も同じく置き換える。製品と本番の経路に Python を入れない(依頼者の規則)。
-3. OTT の PE を ImageBase 0x2000000 に rebase し(`lift/crates/fe-pe/src/rebase.rs` の `rebase`。決定 0177 の先例)、`fe-lift lift --pdata` で C にする。seed は 2 の固定点で集める。import は 8 DLL の stub にし、既存の応答(`fle_imports.c`・`vst3a_imp.c` の行)で答える。答えの無い import は、名前のある停止(`vst3a_unanswered` の形)にする。
-4. 製品の受け口の wasm を作る: `lift/harness/web/mt1/plugin-worker/build.sh`(新規)と `main_vst_ext.c`(新規)。`main_vst3a.c` の呼び出し順を、plugin-worker の口に合わせる(init で DllMain から setActive まで。その後は mt1_ext_wait で待つ。process は #{{124}})。wasm が import する名前は、`ott-host.ts` が満たす形にする。
-   - build.sh の契約: `bash lift/harness/web/mt1/plugin-worker/build.sh <ott|serum2|vital> <インストーラの dir> <出力の dir>`。段は、(a) `check.mjs` で照合、(b) `extract.mjs` で VST3 本体を取り出し、(c) rebase、(d) lift、(e) emcc で wasm、(f) 出力は `<出力>/vst-ext.wasm`・`<出力>/<名前>.vst3`・`<出力>/seed.tsv`(app/test の MT1_OTT_DIR と同じ形)。どの段が失敗しても非 0 で終わり、標準エラーに段の名前を出す。
-5. 道具 `tools/plugin-run/measure.mjs`(新規。node)を作る。契約は下の「測定の道具」。
-6. 受け入れの式(下)を通す。通らなければ、作業ツリーを commit して終える。
+1. 作業の最初に `date -u` を記録する。`.prior-work.md` が在れば読む。`git status` と `git diff --stat` で、前回の差分(上の 4)が載っているかを確かめる。載っていなければ、上の 4 の物を、同じ内容で作る。
+2. 上の「前回の試行で分かったこと」の 2・3 を直す(`build_vst3a_native.sh` の count_fn の行を、Python の無い形に)。
+3. 受け入れを通す。engine のビルドを含み、約 35〜46 分。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数は 5400000 にする。
+4. `tools/` を変えたので、`spec/guard.test.sh`・`spec/workflow.test.sh`・`spec/driver.test.sh` を通す。
+5. commit する(受け入れが通らなくても、作業の最後に作業ツリーを commit する)。push はしない。
 
 ## 測定の道具 `tools/plugin-run/measure.mjs`
 
