@@ -4,7 +4,7 @@ title: "内蔵の音源 Sytrus を起動の後に 1 プラグイン 1 wasm で�
 type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "022"
-blocked_by: ["128", "129"]
+blocked_by: ["128", "129", "125"]
 labels: ["plugin-builtin"]
 size: L
 priority: High
@@ -27,7 +27,7 @@ project: signature-studio/3
 - seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)には、Sytrus の DLL の行が無い(`Plugins\Fruity\Generators\` の行は、`GM CCs.txt` の 1 件だけ。DLL ではない)。
 - 既存の型: Fruity Balance は `77a7550f`・`212eaf59`(#1342)で、Fruity Filter と Fruity Delay 2 は `b0183525`(#1319)で、1 プラグイン 1 wasm として起動の後に取る形になった。足した場所は、`lift/harness/hyb/hyb-args.tsv` の行・`lift/harness/hyb/hybrid.cmd` の `--separate`・`lift/harness/web/pack.args` の `--lazy-dll` と `--lazy-file` の組・`lift/crates/fe-build/tests/plan/bundle.txt`・seed 表の行。`git show 212eaf59 --stat` と `git show b0183525 -- lift/harness/web/pack.args` で、同じ書き方を見られる。
 - 親: #1323(E 内蔵インストゥルメント)の 1 群。Generators の DLL を抽出の表に揃える(#1321)は済み。
-- 注意: #1372(Fruity Balance の入口と続きが、別の側で lift されている件)は、同じ hybrid の分割が原因。`lift/harness/hyb/hyb-args.tsv`・`lift/harness/web/pack.args`・`lift/crates/fe-build/tests/plan/bundle.txt` を、#1372 と #1373 の Issue と同じく変える。この Issue は、それらの Issue が閉じた後に起動する(blocked by)。
+- 注意: #1372(Fruity Balance の入口と続きが、別の側で lift されている件)は、同じ hybrid の分割が原因。#1369 の後は、共有の表(`hyb-args.tsv`・`pack.args`・`bundle.txt` など)は生成物になり、この Issue は表を編集しない。この Issue は、#1369・#1372・#1373 が閉じた後に起動する(blocked by)。
 
 ## 読む物
 
@@ -42,7 +42,7 @@ project: signature-studio/3
 ## やること
 
 1. 作業の最初に `date -u` を記録する。`.prior-work.md` が在れば、最初に読む。
-2. Sytrus を、Balance・Filter・Delay 2 と同じ型で、1 プラグイン 1 wasm として足す: hyb の行と `--separate`、lift の対象、seed 表の行(DLL の guest のパスと、取り出した物の host のパス)、`pack.args` の `--lazy-dll` と `--lazy-file` の組、`bundle.txt` の計画の対応。書き方は上の 2 つのコミットに合わせる。
+2. Sytrus は、`lift/plugins/sytrus/plugin.tsv`(`inputs/plugin-classes.tsv`・`inputs/plugin-hooks.tsv` の行から)で足す。`plugin.tsv` の列・形は、#1369 の本文の「設計」(1)に従う(`key`・`guest`・`role`・`sha256`・`size`・`hook`・`args`)。`hook` は、`inputs/plugin-hooks.tsv` の Sytrus の 3 点が在れば `rva:` で書く。**共有の表(`hyb-args.tsv`・`hybrid.cmd`・`lowered-all.txt`・`pack.args`・`bundle.txt`・`seed` の表など)を編集しない。** 生成の段が、それらを作る。#1369 の本文の手順に従う。
 3. 内蔵のプラグインの DLL を、受け入れの入力の場所に写す段が要るかを、Balance の経路(`fe-build bundle` が読む場所)で確かめ、足す。
 4. 起動の前に取る量を増やさない: Sytrus の wasm は、起動の後に取る(起動の前の seed に入れない)。`preBootBytes` の値を報告に書く。
 5. 停止が出たら(`ExitProcess`・longjmp の登録の欠け・`LoadLibraryW` の失敗など)、`pm-work/findings/exoplanet-exit-1372.md` の型(入口と続きが別の側)で同じ原因か確かめる。原因が同じなら、#1372 の直しの後に入る形で書く。
@@ -86,5 +86,5 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 ## 他のタスクとの関係
 
 - 親: #1323(E 内蔵インストゥルメント)。
-- blocked_by: #1372(Balance の入口と続きの件)と #1373(demo の素材。同じ `pack.args`・`bundle.txt`・seed 表を変える)。
+- blocked_by: #1369(プラグインを `lift/plugins/<名前>/plugin.tsv` の追加だけで足す基盤。この Issue はその形で Sytrus を足す)、#1372(Balance の入口と続きの件)と #1373(demo の素材)。#1369 の前に、共有の表を編集しない。
 - この Issue が閉じると、#1387(Riff machine の窓)が起動する。
