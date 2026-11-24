@@ -1,0 +1,11 @@
+-c -msimd128 -matomics -mbulk-memory
+-std=gnu11
+-O2
+-w
+-fno-builtin-fprintf
+-fno-builtin-fputs
+-ffp-contract=off
+-fno-fast-math
+-sSUPPORT_LONGJMP=wasm
+-Ilift/runtime
+-DFLE_ALWAYS_INLINE
