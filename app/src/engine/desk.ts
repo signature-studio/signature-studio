@@ -43,6 +43,8 @@ export interface DeskApi {
   /** decision 0240: fle_desk_scene() and fle_desk_scene_mode(), or absent when the wasm was built before them */
   scene?(): number;
   sceneMode?(on: number): void;
+  /** Issue #1376: fle_webview2_front(), the windows painted over the WebView2 face (word 0: their number, then l, t, r, b each), or absent when the wasm was built before it */
+  front?(): number;
 }
 
 export interface DeskContext { putImageData(data: ImageData, dx: number, dy: number, sx: number, sy: number, sw: number, sh: number): void }

@@ -670,6 +670,78 @@ static void u16_ascii(char *out, size_t cap, const uint16_t *u, size_t n)
 }
 
 /* One line for a window of the table (decision 0126: the G2 evidence of the main form and the first non-background pixel print the table in this form: class, title, rectangle, styles, parent, owner, visible, z position). */
+/* Issue #1376 (the WebView2 face): the windows painted over a window of the table. The paint order is the window table's: a top-level window from the bottom of the z-order up, each one followed by its children from the bottom up.
+ * zrank: the position of x in its group, top first (zl is top first). chain: the windows from the top-level window down to i. */
+static uint32_t zrank(int64_t x)
+{
+    uint32_t k, n = 0;
+
+    for (k = 0; k < zl_n; k++) {
+        if (zl[k] == x) return n;
+        if (in_group(zl[k], tab[x].parent)) n++;
+    }
+    return n;
+}
+
+static int chain_of(int64_t i, int64_t *ch)
+{
+    int n = 0, a, b;
+    int64_t j;
+
+    for (j = i; j >= 0 && n < 64; j = tab[j].parent) ch[n++] = j;
+    for (a = 0, b = n - 1; a < b; a++, b--) {
+        int64_t t = ch[a];
+
+        ch[a] = ch[b];
+        ch[b] = t;
+    }
+    return n;
+}
+
+/* the screen rectangles of the visible windows that are painted over window `h` (not its ancestors and not its descendants) and meet [l, r) x [t, b): each rectangle is the window's, clipped by the windows that contain it (not by [l, r) x [t, b)); 4 words per window into out (at most cap windows). Returns the count. */
+unsigned fle_win_front_rects(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, int32_t *out, unsigned cap)
+{
+    int64_t i = index_of_fwd(h), ci[64], cj[64];
+    int64_t j;
+    unsigned n = 0;
+    int ni, nj, k;
+
+    if (i < 0 || cap == 0) return 0;
+    ni = chain_of(i, ci);
+    for (j = 0; j < (int64_t)tab_n && n < cap; j++) {
+        int32_t x0, y0, x1, y1, ox, oy;
+        int front = 0;
+
+        if (!tab[j].live || tab[j].msgonly || j == i || !is_visible(j)) continue;
+        nj = chain_of(j, cj);
+        client_origin(j, &ox, &oy);
+        x0 = ox;
+        y0 = oy;
+        x1 = ox + tab[j].pcx;
+        y1 = oy + tab[j].pcy;
+        for (k = 0; k < nj - 1; k++) {
+            client_origin(cj[k], &ox, &oy);
+            if (x0 < ox) x0 = ox;
+            if (y0 < oy) y0 = oy;
+            if (x1 > ox + tab[cj[k]].pcx) x1 = ox + tab[cj[k]].pcx;
+            if (y1 > oy + tab[cj[k]].pcy) y1 = oy + tab[cj[k]].pcy;
+        }
+        if (x0 >= x1 || y0 >= y1 || x0 >= r || y0 >= b || x1 <= l || y1 <= t) continue;
+        for (k = 0; k < ni && k < nj; k++) {
+            if (ci[k] == cj[k]) continue;
+            front = zrank(cj[k]) < zrank(ci[k]);
+            break;
+        }
+        if (!front) continue;
+        out[4 * n] = x0;
+        out[4 * n + 1] = y0;
+        out[4 * n + 2] = x1;
+        out[4 * n + 3] = y1;
+        n++;
+    }
+    return n;
+}
+
 static void table_line(FILE *f, int64_t i)
 {
     char title[120], cls[80];

@@ -54,6 +54,10 @@ let pendingComposeMs = 0;
 let framesSent = 0;
 let pendingDump: string | null = null;
 let sharedWarned = false;
+/** Issue #1376: the windows painted over the WebView2 face are asked for when the picture changed or the face's bounds or visibility did; the list last sent, so that only a change is sent */
+const FRONT_MAX = 64;
+let frontDirty = true;
+let frontSent = '';
 
 const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
 
@@ -101,7 +105,10 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
       const r = IMAGE_READ.exec(line);   // Issue #1341: the read of a real module's image, with the page's time (the line's own clock is the engine's)
       if (r) mark('image_read', { name: r[1], requested: r[2] === '1' });
       const w = webView2Message(line);   // Issue #1362: what the WebView2 model was asked, for the page's face of the Browser panel
-      if (w) post(w);
+      if (w) {
+        if (w.op === 'bounds' || w.op === 'visible') frontDirty = true;
+        post(w);
+      }
     },
     log,
     idle: onEngineIdle,
@@ -369,6 +376,21 @@ function onRender(m: RenderToEngine): void {
   }
 }
 
+/** Issue #1376: the windows painted over the WebView2 face (fle_webview2_front), sent to the page when the list differs from the last one sent */
+function syncFront(): void {
+  const api = compositor(), mem = fruity?.memory;
+  frontDirty = false;
+  if (!api?.front || !mem) return;
+  const p = api.front();
+  const words = new Int32Array(mem.buffer, p, 1 + 4 * FRONT_MAX);
+  const n = Math.min(words[0] ?? 0, FRONT_MAX);
+  const rects = Array.from(words.subarray(1, 1 + 4 * n));
+  const key = rects.join(',');
+  if (key === frontSent) return;
+  frontSent = key;
+  post({ t: 'webview2', op: 'front', rects });
+}
+
 /** one compose (the picture brought up to date) and the hand-over to the render Worker: when the picture changed, it is told, with the inputs this change answers (`seqs`, and the inline ones); `reply`: the render Worker asked, so it is answered even when nothing changed. True when the picture changed */
 function deskTick(reply: boolean, seqs?: number[]): boolean {
   const api = compositor(), mem = fruity?.memory;
@@ -382,6 +404,7 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
   const buf = mem.buffer;   // after the compose: it can grow the memory
   const gen = ptr === 0 ? gate.published : deskScene ? sceneGen(buf, ptr) : deskGen(buf, ptr);
   const changed = ptr !== 0 && gen !== gate.published;
+  if (changed || frontDirty) syncFront();
   let answers: number[] | undefined;
   if (changed) {
     gate.publish(gen);
