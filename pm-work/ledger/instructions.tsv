@@ -66,3 +66,4 @@ L-060	2026-11-24	依頼者	トップバーの Memory Usage と CPU Load が 0MB 
 L-061	2026-11-24	依頼者	マウスカーソルが反映されていない。ウィンドウの端にカーソルを合わせても矢印に変化せず、Piano roll の Pencil Mode でも鉛筆カーソルにならない。形が似ているそれっぽいカーソルに当てはめないこと。実際のマウスカーソルのみ許可する	pm-work/issue-drafts/wave1w/139-cursor-standard-edge.md・pm-work/issue-drafts/wave1w/144-cursor-fl-resources.md
 L-065	2026-11-24	依頼者	コード進行ツールは "Start creating" を押下した瞬間クラッシュする	pm-work/issue-drafts/wave1y/146-piano-chord-tool-crash.md
 L-066	2026-11-24	依頼者	リフ マシーンは、起動しようとしても何も反応しない	pm-work/issue-drafts/wave1y/147-piano-riff-machine-no-response.md
+L-068	2026-11-24	依頼者	emscripten(またはそのグルーコード)が、使い物にならないほど重い原因ではないか、という問題提起(emscripten の採用取りやめ・zig cc の検討の動機)	pm-work/issue-drafts/wave1z/148-zig-cc-replace-emcc.md

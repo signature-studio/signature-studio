@@ -1,24 +1,159 @@
 ---
 draft: "148"
-title: "emscripten(emcc・em++・emar・emsdk)を使わず、zig cc で、生成した C の compile と link ができるかを、実測で決める: 速度・出力の同一性・JSPI と pthread の扱い"
+title: "重さの原因が emscripten のランタイム・グルーかを、実測の内訳で決め、その上で zig cc と自前のグルーで置き換えられるかを決める"
 type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: []
 labels: ["delivery"]
 size: L
-priority: High
+priority: Urgent
 project: signature-studio/3
 ---
 
 ## 目的
 
-依頼者は、emscripten の採用を取りやめ、zig cc の採用を検討していたと述べた(2026-11-24)。進捗を質問された。台帳・計画・設計・Issue・git log に、この件の記録は無かった。
+依頼者は、次の問題提起をした(2026-11-24。原文)。
 
-この Issue の目標は 3 つ。本番のビルド(`lift/crates/fe-build/` の emcc の呼び出し)は変えない。実測と判定だけを行う。
-1. emscripten を使っている箇所を、件数とファイル名で洗い出す(成果物 `pm-work/findings/emscripten-usage.md`)。
-2. 固定した版の zig cc で、emcc と同じ入力を、時間・サイズ・機能・実行の結果で比べる(成果物 `pm-work/findings/zig-vs-emcc.json`)。
-3. 判定を書く(成果物 `pm-work/findings/zig-cc-vs-emcc.md`)。置き換えられる(段階の計画つき)・置き換えられない(理由)・一部だけ置き換えられる、のどれか。
+> 一応言っておくと、**使い物にならないレベルで重すぎるのは emscripten(もしくは emscripten が吐き出すグルーコード)が原因だろ、という問題提起です**
+
+依頼者は、emscripten の採用を取りやめ、zig cc の採用を検討していたと述べた。進捗を質問された。この Issue の動機は、この問題提起にある。目的は性能であり、P3(Song Mode で音が途切れない)・P2(UI が 120 fps で動く)・P1(10 秒以内に起動する)の順に優先する。サイズは最後。
+
+仮説(未確認): 重さの主因は、emscripten のランタイム(JS のグルー・JSPI・pthread・ヒープの管理)である。この Issue は、まずこの仮説を実測で確かめる。仮説が外れたなら、重さの主因を、wasm の質・描画・runtime の C・ページ側の JS から探す。
+
+この Issue は次の順で進む。
+
+1. **段階 0(この Issue の受け入れ対象)**: 重さの内訳を実測する。重さが emscripten のランタイム・グルーに由来するのか、それ以外(lift した C の wasm の質・最適化の水準・Blend2D の描画・runtime の C・ページ側の JS)に由来するのかを、区分ごとの時間で決める。あわせて、サイズ優先の最適化の水準を速度優先に替えたときの差を測る。成果物は `pm-work/findings/engine-cost-attribution.md` と `.json`。
+2. **判定**: 段階 0 の結果で、emscripten のグルーを zig cc と自前のグルーに替える価値があるかを、下の「0-7 判定の規則」で決める。
+3. **段階 1(判定で「置き換える価値がある」場合だけ。この Issue の受け入れには含めない)**: emscripten を使わず、zig cc で、生成した C の compile と link ができるかを実測する(下の「段階 1」の節)。判定が「価値がない」なら行わない。
+
+この Issue は本番のビルドを変えない。段階 0 は、測定と判定だけを行う。
+
+## 既知の実測(数字と出典)
+
+以下は PM が `pm-work/findings/` と下書きで確かめた値。作業者は各出典を読み直し、食い違いがあれば報告に書く。
+
+1. **起動直後の途切れ**: `bootLast60sAt10s`(起動の 10 秒時点の直前 60 秒の underrun の数)。切り替え点を入れる前の基準は 2,071(n=3 の値は 2,071・2,105・2,003)。切り替え点を入れた版(main に入っている。#1352 の段 A)は 4・4・25(中央値 4)。切り替えを通らない最長の区間は、基準で 1,102 ms(主因は `f_344fcf0` など。wasm に載らない C)、切り替え点を入れた版で 421 ms(根の直下の `f_1375990` が 266 ms、主な葉の `bl::Pipeline::Reference`(Blend2D の塗り。wasm の C++)が 123 ms)。出典: `pm-work/findings/boot-burst-1352.md` の 0・1・4 節。
+2. **マウス 1000 Hz**: Worker の忙しい時間が、無入力の 1.49 秒/60 秒から 8.9 秒/60 秒に増えた。増えた上位は `(program)`・`f_863b50`・`postMessage`・`decode`・`setTimeout`・`fle_win_input_view`・`poll_waiters`。出典は下書き 109 の 7 番(`pm-work/issue-drafts/wave1f/109-audio-under-physical-screen-mouse.md`)。以前の記録にあった測定ファイル名(`measure-109-attempt2.md`)は `pm-work/findings/` に無い(未確認)。
+3. **起動の所要時間(`elapsedMs`)**: 6.8〜11.2 秒。10 秒を超える run がある(10,716 ms・10,870〜11,237 ms)。出典: `pm-work/findings/browser-panel-118.md`・`browser-panel-1355.md`・`blocks-samples-1366.md`。
+4. **最適化の水準(事実)**: 製品の wasm の最適化は、サイズ優先の `-Oz`。
+   - `lift/harness/web/wasm-opt-c.cmd:1`(`wasm-opt -Oz`。`lift/crates/fe-build/src/main.rs:314-316` の wasm-opt 段が使う)。
+   - `lift/harness/web/wasm-opt.args:1`(`-Oz`。`lift/harness/hyb/hybrid.cmd:20-21` が `--wasm-opt-args` として渡す。hybrid 段)。
+   - `lift/harness/web/cflags-u.args:1` と `lift/harness/web/cflags-ai.args:3`(gen の C の `-Oz`。`main.rs:274-278` が、`plain-units.txt` と `ai-units.txt` の単位に使う)。
+   - 製品の名前も `fl-Oz`・`fl-engine-Oz`(`lift/harness/web/pack.args:2,4`。`main.rs:512`)。
+   - 速度寄りの旗: runtime の C は `lift/harness/web/cflags-rt.args:1` の `-O2`、harness の C は `cflags-h.args:1` の `-O1`、b2d の C++ は `cflags-b2d.args:2` の `-O2`。Blend2D の em++ 旗(`main.rs:30-35`)は `-O2`・`-O3`・`-O2` の並び。後の旗が有効になると推定(未確認)。
+   - リンクは `lift/harness/web/link.rsp:1` の `-O0`。
+
+## 段階 0: 重さの内訳と最適化の水準
+
+### 0-1 道具
+
+- 新しく作る: `tools/engine-cost/measure.mjs`(測定)と `tools/engine-cost/run.sh`(ビルド・測定・成果物の作成。受け入れの入口)。
+- 再利用する: `tools/p3-audio-probe/measure.mjs`(`--profile` の CPU プロファイル。engine の Worker に対して `Profiler.enable`・`Profiler.start`・`Profiler.stop` を使う。#1352 の使い方)、`tools/p3-audio-probe/profile-names.mjs`(`wasm-function[N]` を名前に直す)、`tools/p2-frames/measure.mjs`(マウスを 1200 Hz で送る)。
+- 場面 (ii) の再生の方式は、#1349 の測定の道具(`measure-live.mjs`)にある。この道具は main に無く、`pm-work/findings/measure-live-109.patch` に在る。参考にしてよい。
+- 製品を変えない。計測と変種のための変更は `tools/engine-cost/` の中だけに置く。`app/`・`lift/`・`ci/` に触れる push は、本番のデプロイ(`.github/workflows/deploy.yml` の `on.push.paths`)を動かす。
+
+### 0-2 場面
+
+各場面は 60 秒の窓。`engine-idle` の時点を t0 とする。DPR は 2 点とする。1.00 と、1.01〜3.00 の範囲から無作為に選んだ 1 点(選んだ値を結果に書く)。各場面・各 DPR で n=3。
+
+- (i) 起動後・無操作・再生なし: t0+30 秒〜t0+90 秒。
+- (ii) 無操作の再生中: Playlist を再生し、再生が始まってから 60 秒。音が出なくてよい。
+- (iii) マウス 1000 Hz 以上(1200 Hz で送る)を 60 秒間。
+
+合計 18 run(3 場面 × 2 DPR × n=3)。
+
+### 0-3 区分(CPU プロファイルの自己時間)
+
+Worker の全て(engine のスレッドを持つ Worker。選び方は `tools/p3-audio-probe/measure.mjs` の `engineWorker` の通り)の、窓の中の自己時間を、次の区分に分ける。
+
+- **A. emscripten のランタイム・グルー**: 関数の所在(callFrame の url)が、emscripten の生成した glue(`engine-glue` の JS。`--js-library` の 3 件を含む)のもの。加えて、名前が `_emscripten_*`・`invoke_*`・`__syscall_*`・`emscripten_futex_wait`・`updateMemoryViews`・`HEAP*`・`Atomics.wait`、JSPI の包み、pthread の Worker の起動。
+- **B. lift した C 由来の wasm 関数**: 名前が `f_<16 進>`(`lift/out-app/gen/wasm-func-names.tsv` で引く)。
+- **C. C++ の描画**: 名前が `bl::`(Blend2D)で始まるもの。
+- **D. runtime の C**: `lift/runtime/` の関数(`fle_*`・`poll_waiters` など)。
+- **E. ページ側と Worker 側の JS**: app のビルド物の関数(url で判定)と、ブラウザ API の呼び出し(`postMessage`・`decode`・`setTimeout`・`structuredClone` など)。
+- **F. ブラウザの内部**: `(program)`・`(garbage collector)`・`(root)`。
+- `(idle)` は別に出す。忙しい時間には入れない。
+- 区分に入らないものは `unclassified` に出す。
+
+忙しい時間 = A + B + C + D + E + F + unclassified。`classifiedShare` = (A + B + C + D + E + F) ÷ 忙しい時間。受け入れは、全 run で 0.95 以上を求める。
+
+### 0-4 境界・JSPI・メモリ・待ち
+
+測れない項目は `null` と理由を書く。測定の道具の側で数え、製品のコードは変えない。
+
+- 境界の呼び出し(JS と wasm の間。秒あたり)。lift の import(`fle_imp_*`)と、emscripten の import を分けて数える。
+- JSPI の suspend と resume の回数と、合計の時間。
+- `memory.grow` の回数と時間。
+- 共有メモリ(pthread)の `Atomics.wait` の時間。
+
+### 0-5 対照実験(境界の費用)
+
+同じ wasm の、熱い import 1 本を、100 万回呼ぶ微小な測定を 2 通りで行う。(1) 今の emscripten の包み(JS のグルー経由)、(2) 包み無しの直接の import。1 回あたりの差(ns)を出す。微小な wasm の作り方は作業者が決めてよい。道具は `tools/engine-cost/` の中に置く。
+
+### 0-6 最適化の水準
+
+- 基準は、現行の `-Oz`(製品と同じ出力)。同じ 60 秒の窓で測る。
+- 速度寄りの変種 O2 と O3 を作る。変えるのは、gen の C(`cflags-u.args`・`cflags-ai.args` の `-Oz`)と、wasm-opt(`wasm-opt-c.cmd`・`wasm-opt.args` の `-Oz`)だけ。runtime(`-O2`)・harness(`-O1`)・b2d は現行のまま。
+- 旗は `tools/engine-cost/` の中の別ファイルで与える。`lift/` は変えない。出力は `lift/out-app/` の下の別の名前にし、本番の `fl-Oz` の出力を上書きしない。
+- 比べる: 場面 (i) と (iii)、DPR 1、n=3。忙しい時間・underrun の数(`underrunQuanta`)・`elapsedMs`・wasm のバイト数(`wasmBytes`)・起動前の取得の合計(`preBootBytes`。P1 に効く)。
+
+### 0-7 判定の規則
+
+この規則は、測る前に決めた。数字を変えてよいが、変えた理由を報告に書く。
+
+- **emscripten のグルーを替える価値がある**: 区分 A が、忙しい時間の **15% 以上**(場面 (iii) の平均)である。または、境界の呼び出し 1 回あたりの差が **50 ns 以上**で、呼び出しが秒あたり **10 万回以上**である。この場合、段階 1 を次の Issue の案として報告に書く(起票は PM)。
+- **価値がない**: 重さの主因は B・C・D(wasm の質・描画・runtime)で、emscripten の置き換えは主因に効かない。段階 1 は行わず、「判定により、行わない」と報告に書く。
+- **最適化の水準を先に変える**: O2 か O3 が、Oz より忙しい時間を **20% 以上**減らす。この場合、最適化の水準を変える Issue を先に起票する(報告に書く。起票は PM)。
+
+判定の結果は、場面 (iii) と、場面 (i)・(ii) の値を、区分ごとに並べて書く。
+
+### 0-8 成果物
+
+- `pm-work/findings/engine-cost-attribution.md`: 場面と DPR ごとの区分の表(A〜F・unclassified・idle の ms と割合)、境界・JSPI・`memory.grow`・`Atomics.wait`、対照実験、最適化の水準の比較、出力のバイト数、判定、測れなかった項目と理由。
+- `pm-work/findings/engine-cost-attribution.json`。形は次のとおり。
+
+```
+{
+  "nproc": number, "loadavg": [number, number, number],
+  "runs": [18 件: {"scene": "i"|"ii"|"iii", "dpr": number, "n": 1|2|3, "busyMs": number, "idleMs": number,
+            "classesMs": {"A": number, "B": number, "C": number, "D": number, "E": number, "F": number, "unclassified": number},
+            "classifiedShare": number, "boundaryCallsPerSec": number|null, "jspi": {"suspends": number, "resumes": number, "ms": number}|null,
+            "memoryGrow": {"count": number, "ms": number}|null, "atomicsWaitMs": number|null,
+            "underrunQuanta": number|null, "elapsedMs": number|null, "notes": string}],
+  "contrast": {"calls": 1000000, "nsPerCallEmscripten": number|null, "nsPerCallDirect": number|null, "notes": string},
+  "optLevels": [{"variant": "Oz"|"O2"|"O3", "busyMs": number|null, "underrunQuanta": number|null, "elapsedMs": number|null,
+                 "wasmBytes": number|null, "preBootBytes": number|null, "notes": string}]
+}
+```
+
+`busyMs` と `classesMs` は、60 秒の窓の値(ms)。
+
+### 0-9 作業の進め方
+
+- 最初に `date -u` で開始の時刻を記録する。**4 時間 30 分を過ぎたら**、受け入れが通っていなくても、作業ツリーを commit し、報告を書いて終える。
+- ビルドは約 35 分。現行の `-Oz`、変種 O2、変種 O3 の 3 回。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数に 5400000 を渡す。背景で起動して待たない。
+- sleep・timeout コマンド・nohup・disown・末尾の `&` は使わない。
+- 時間が足りないときは、(c) の場面を (iii) の 1 つに絞る(n=3 は保つ)。測れなかった項目は `null` と理由で書く。
+- 報告には、場面と DPR ごとの区分 A〜F の割合、判定、判定の数字を変えたか、最適化の水準の比較、測れなかった項目と理由、開始と終了の時刻を書く。
+- 段階 0 の成果物は、受け入れが通らなくても commit する。
+
+### 0-10 受け入れ(段階 0)
+
+```accept
+bash tools/engine-cost/run.sh && node -e 'const r=JSON.parse(require("fs").readFileSync("pm-work/findings/engine-cost-attribution.json","utf8"));const K=["A","B","C","D","E","F","unclassified"];const runs=Array.isArray(r.runs)&&r.runs.length===18&&r.runs.every((x)=>x&&typeof x.classifiedShare==="number"&&x.classifiedShare>=0.95&&x.classesMs&&K.every((k)=>typeof x.classesMs[k]==="number"));const opt=Array.isArray(r.optLevels)&&["Oz","O2","O3"].every((v)=>r.optLevels.some((x)=>x&&x.variant===v&&(typeof x.busyMs==="number"||(typeof x.notes==="string"&&x.notes.length>0))));const con=!!r.contrast&&(typeof r.contrast.nsPerCallEmscripten==="number"||(typeof r.contrast.notes==="string"&&r.contrast.notes.length>0));process.exit(runs&&opt&&con?0:1)' && test -s pm-work/findings/engine-cost-attribution.md && bash guard/scan.sh pm-work/findings/engine-cost-attribution.md pm-work/findings/engine-cost-attribution.json tools/engine-cost/*
+```
+
+判定の基準:
+- `bash tools/engine-cost/run.sh` が 0 で終わる。測れなかった項目は `null` と理由で書けば、0 で終わる(ビルドの失敗は 1)。
+- `pm-work/findings/engine-cost-attribution.json` の `runs` が 18 件で、各 run の `classifiedShare` が 0.95 以上、`classesMs` に A〜F と `unclassified` の数値がある。`optLevels` に Oz・O2・O3 があり、`busyMs` の数値か `notes` の理由がある。`contrast` がある。
+- `pm-work/findings/engine-cost-attribution.md` が空でない。
+- `guard/scan.sh` が 0 件。
+- `git diff --name-only` に `app/`・`lift/`・`ci/`・`.github/`・`inputs/` が含まれない(commit の前に確かめる)。
+
+## 段階 1 の本文(判定で「置き換える価値がある」場合に、次の Issue として行う)
+
+この Issue の受け入れには含めない。以下は、段階 1 の本文として残す。
 
 ## 背景
 
@@ -56,7 +191,7 @@ project: signature-studio/3
    - `lift/crates/fe-lift/tests/gs_stacklimit.rs`(543〜585 行)と `ldst_switch.rs`(257〜284 行)は `/opt/emsdk/upstream/emscripten/emcc` を決め打ちし、無ければ skip する。`tools/verify-kit/tools/run-e14-e2e.sh` も `/opt/emsdk/upstream/emscripten` を決め打ちする。
    - `ci/lib/common.sh` は `app/scripts/build-engine-bundle.sh` を呼ぶが、このファイルは tree に無い(`git ls-files` に無い)。`ci/lib/common.sh` を読むのは `lift/harness-docs-tools/alpha1/mk-wasm.sh` だけ。
    - 製品の段の外で emcc・em++・emar を呼ぶ `*.sh` は 6 件: `lift/harness/wasm/build.sh`・`lift/harness/vst3a/build_vst3a_wasm.sh`・`lift/harness/fp1/build_diff_wasm.sh`・`lift/harness/web/fruity/link-web.sh`・`lift/harness/web/mt1/plugin-worker/build.sh`・`tools/verify-kit/tools/run-e14-e2e.sh`(ほかに `ci/lib/common.sh`)。
-7. 取得の再試行。#{{130}}(blend2d の取得を、curl と固定の SHA-256 で行い、再試行する計画)は、main には入っていない。`fe-build` の取得は `git clone` のまま。この Issue の zig の取得は、同じ方式を `tools/zig-vs-emcc/run.sh` の中に書く。
+7. 取得の再試行。#1374(blend2d の取得を、curl と固定の SHA-256 で行い、再試行する計画)は、main には入っていない。`fe-build` の取得は `git clone` のまま。この Issue の zig の取得は、同じ方式を `tools/zig-vs-emcc/run.sh` の中に書く。
 8. zig の版。公式の配布の索引(download の index)による、安定版の最新は 0.17.1。その `x86_64-linux` の tarball `zig-x86_64-linux-0.17.1.tar.xz` の SHA-256 は `3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a`、サイズは 57411036 バイト。PM が、索引の値と実物の `sha256sum` の一致を確かめた。
 9. 受け入れの場所。受け入れの job は、`lift/out-app/host`(抽出物)をキャッシュから置き(`.github/workflows/agent.yml` の 522〜527 行)、emsdk を入れ(495 行)、`lift/target/release/fe-build` と `fe-lift` を作る。`lift/out-app/gen/` は fe-build の gen 段で作られる。その引数は `lift/harness/b2d2/gen.args`(実行ファイルは `lift/target/release/fe-lift gen-all`)。`lift/out-app/gen/` が無いときは、この引数で gen を実行してから測る。
 10. 版の固定の場所。`ci/` の変更は、`.github/workflows/deploy.yml` の `on.push.paths`(`ci/**`)により、main への push で本番のデプロイを動かす。この Issue は本番を動かさないため、zig の版は `ci/versions.env` に足さず、`tools/zig-vs-emcc/zig.env` に置く。
@@ -96,8 +231,9 @@ project: signature-studio/3
 
 ## 変えないもの(制約)
 
-- `lift/crates/fe-build/`・`.github/`・`app/`・`lift/runtime/`・`lift/harness/`(既存のビルドの中身)・`ci/`・`tools/`(既存の物)・`guard/`・`spec/`・`inputs/` は変えない。読むだけ。新しく作るのは、`tools/zig-vs-emcc/`・`pm-work/findings/` だけ。
-- 製品に、新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。測定の設定は `tools/zig-vs-emcc/` の中だけに置く(`-D__EMSCRIPTEN__` などを付けるかどうかは、測定の設定として報告に書く)。
+- `lift/crates/fe-build/`・`.github/`・`app/`・`lift/runtime/`・`lift/harness/`(既存のビルドの中身)・`ci/`・`tools/`(既存の物)・`guard/`・`spec/`・`inputs/` は変えない。読むだけ。段階 0 で新しく作るのは、`tools/engine-cost/`・`pm-work/findings/engine-cost-attribution.*` だけ。段階 1 で新しく作るのは、`tools/zig-vs-emcc/`・`pm-work/findings/` の zig に関する物だけ。
+- 段階 0 は、`app/`・`lift/`・`ci/`・`.github/` に触れる commit をしない。push が本番のデプロイ(`deploy.yml`)を動かすため。
+- 製品に、新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。測定の設定と、最適化の水準の変種の旗は `tools/engine-cost/` の中だけに置く。段階 1 の測定の設定は `tools/zig-vs-emcc/` の中だけに置く(`-D__EMSCRIPTEN__` などを付けるかどうかは、測定の設定として報告に書く)。
 - ベンダー名・Cloudflare の識別子を書かない。URL を本文と `pm-work/findings/` に書かない。
 - Python を使わない(調査と検証を含む。製品にも使わない)。
 - 一時ファイルは `.tmp-*` に置き、終わったら消す。
@@ -110,11 +246,7 @@ project: signature-studio/3
 - compile の測定は数分。フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(上限 5400000)を渡して直接実行する。背景で起動して待たない。
 - 全体の link を試すのは 1 回。
 
-## 受け入れ
-
-```accept
-bash tools/zig-vs-emcc/run.sh && node -e 'const fs=require("fs");const r=JSON.parse(fs.readFileSync("pm-work/findings/zig-vs-emcc.json","utf8"));const ok=Array.isArray(r.units)&&r.units.length>=3&&r.units.every((u)=>typeof u.emccSeconds==="number"&&typeof u.emccBytes==="number"&&(u.ok===true||(typeof u.notes==="string"&&u.notes.length>0)))&&typeof r.zigVersion==="string"&&typeof r.emccVersion==="string"&&!!r.link&&!!r.parity;process.exit(ok?0:1)' && test -s pm-work/findings/emscripten-usage.md && test -s pm-work/findings/zig-cc-vs-emcc.md && bash guard/scan.sh pm-work/findings/emscripten-usage.md pm-work/findings/zig-cc-vs-emcc.md pm-work/findings/zig-vs-emcc.json tools/zig-vs-emcc/*
-```
+## 段階 1 の受け入れ(この Issue では使わない。段階 1 の Issue の本文に accept として書く)
 
 判定の基準:
 - `bash tools/zig-vs-emcc/run.sh` が 0 で終わる。
@@ -134,4 +266,4 @@ bash tools/zig-vs-emcc/run.sh && node -e 'const fs=require("fs");const r=JSON.pa
 
 - blocked_by: なし。
 - この Issue は本番のビルドを変えない。置き換えの実装は、判定の後に PM が起票する。
-- `#{{130}}`(blend2d の取得の再試行)と、同じ方式を使う。別の Issue。`lift/crates/fe-build/src/main.rs` は `#{{130}}` が変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、`fe-build` の変更は触らない。
+- `#1374`(blend2d の取得の再試行)と、同じ方式を使う。別の Issue。`lift/crates/fe-build/src/main.rs` は `#1374` が変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、`fe-build` の変更は触らない。
