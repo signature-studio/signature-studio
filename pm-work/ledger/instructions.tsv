@@ -57,3 +57,12 @@ L-055	2026-11-24	依頼者	HiDPI 対応は正常に動作している(確認)	pm
 L-056	2026-11-24	依頼者	Browser の Sounds タブの中身が、Welcome・Channel Rack などの FL のウィンドウより前面に出る。File メニューを開くと下部が隠れる。FL のウィンドウの前後関係を守ること	pm-work/issue-drafts/wave1s/132-browser-face-front-windows.md
 L-057	2026-11-24	依頼者	評価用プロジェクトを開こうとすると落ちる	pm-work/issue-drafts/wave1s/133-demo-exit-beacon-reason.md
 L-058	2026-11-24	依頼者	main が更新されたら、デプロイされるはず。デプロイを迂回する仕組みがあるとしたら、廃止する	pm-work/issue-drafts/wave1s/134-deploy-gate-remove.md
+L-062	2026-11-24	依頼者	テーマを切り替えるとクラッシュします。	pm-work/issue-drafts/wave1x/141-theme-switch-crash.md
+L-063	2026-11-24	依頼者	言語を切り替えると再起動を求められますが(これ自体は正常な挙動)、再起動しても設定が反映されていません。ページを再読込すると Recent が消えるなど、一部のデータは保持されていないように見えます。	pm-work/issue-drafts/wave1x/142-settings-registry-persist.md・pm-work/issue-drafts/wave1x/145-user-files-persist.md
+L-064	2026-11-24	依頼者	Settings の General タブは、スクロールすると描画が崩壊する症状を維持しています。	pm-work/issue-drafts/wave1x/143-settings-general-scroll-draw.md
+L-067	2026-11-24	依頼者	emscripten の採用は取りやめる。zig cc の採用を検討していた(依頼者の発言。記録は無かった)。進捗を質問された	pm-work/issue-drafts/wave1z/148-zig-cc-replace-emcc.md
+L-059	2026-11-24	依頼者	クリップボードが反映されていない。Problems Loading the project ウィンドウで項目をクリックしたときに出る 'Copy' ツールチップを押しても、実際のクリップボードに入らない。navigator.permissions と Clipboard API を使うこと	pm-work/issue-drafts/wave1w/138-clipboard-page-api.md
+L-060	2026-11-24	依頼者	トップバーの Memory Usage と CPU Load が 0MB のまま、Frame Rate は 120 で固定されている。30fps すら満たしていないように見える。CPU Load History のグラフは値が出ている。実際の数値を反映すること	pm-work/issue-drafts/wave1w/140-topbar-metrics-real.md
+L-061	2026-11-24	依頼者	マウスカーソルが反映されていない。ウィンドウの端にカーソルを合わせても矢印に変化せず、Piano roll の Pencil Mode でも鉛筆カーソルにならない。形が似ているそれっぽいカーソルに当てはめないこと。実際のマウスカーソルのみ許可する	pm-work/issue-drafts/wave1w/139-cursor-standard-edge.md・pm-work/issue-drafts/wave1w/144-cursor-fl-resources.md
+L-065	2026-11-24	依頼者	コード進行ツールは "Start creating" を押下した瞬間クラッシュする	pm-work/issue-drafts/wave1y/146-piano-chord-tool-crash.md
+L-066	2026-11-24	依頼者	リフ マシーンは、起動しようとしても何も反応しない	pm-work/issue-drafts/wave1y/147-piano-riff-machine-no-response.md
