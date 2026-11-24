@@ -81,3 +81,4 @@
 145	#1385	FL のユーザーのファイル(Recent・Presets・Projects など)を、ページの再読込をまたいで保持する	Task
 146	#1386	Piano roll のコード進行ツールの Start creating を押すと engine が止まる(crash)を直す	Task
 147	#1387	Piano roll のリフ マシーン(Riff machine)が、起動しようとしても何も反応しない(窓が出ない)を直す	Task
+148	#1388	emscripten(emcc・em++・emar・emsdk)を使わず、zig cc で、生成した C の compile と link ができるかを、実測で決める: 速度・出力の同一性・JSPI と pthread の扱い	Task
