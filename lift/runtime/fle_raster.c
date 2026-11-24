@@ -264,6 +264,15 @@ uint64_t fle_r_rop_rect(const fle_rsurf *d, const fle_rrect *clip, fle_rrect r, 
 
     fle_r_clip(&r, &c);
     if (fle_r_empty(&r)) return 0;
+    if (!ud && d->bpp == 32) {
+        const uint8_t pixel[4] = { (uint8_t)(color >> 16), (uint8_t)(color >> 8), (uint8_t)color, 0 };
+        for (int64_t y = r.y0; y < r.y1; y++) {
+            uint8_t *row = fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u;
+            for (int64_t x = r.x0; x < r.x1; x++, row += 4u) memcpy(row, pixel, sizeof pixel);
+            n += (uint64_t)(r.x1 - r.x0);
+        }
+        return n;
+    }
     for (int64_t y = r.y0; y < r.y1; y++)
         for (int64_t x = r.x0; x < r.x1; x++) {
             uint32_t dc = ud ? fle_r_get(d, (uint32_t)x, (uint32_t)y) : 0u;

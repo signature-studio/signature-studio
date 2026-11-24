@@ -176,6 +176,37 @@ static void surface(void)
     CHECK(n == 0);                                                            /* an empty rectangle */
 }
 
+static void constant_fill_fastlane(void)
+{
+    enum { W = 7, H = 4, STRIDE = W * 4 + 8 };
+    uint8_t initial[STRIDE * H], pixels[STRIDE * H];
+    for (size_t i = 0; i < sizeof initial; i++) initial[i] = (uint8_t)(i * 29u + 7u);
+    for (unsigned bottom_up = 0; bottom_up < 2; bottom_up++) {
+        for (uint32_t idx = 0; idx < 256; idx++) {
+            if (fle_r_idx_uses_dest(idx)) continue;
+            memcpy(pixels, initial, sizeof pixels);
+            fle_rsurf d = {.bits=pixels,.width=W,.height=H,.stride=STRIDE,.bpp=32,.bottom_up=bottom_up};
+            fle_rrect clip = {1, 1, 6, 3}, rect = {-2, -1, 9, 6};
+            CHECK(fle_r_rop_rect(&d, &clip, rect, idx, 0x6BA392u) == 10);
+            uint32_t color = fle_r_rop3(idx, 0x6BA392u, 0, 0);
+            for (uint32_t y = 0; y < H; y++) {
+                uint32_t memory_y = bottom_up ? H - 1 - y : y;
+                for (uint32_t x = 0; x < W; x++) {
+                    size_t off = (size_t)memory_y * STRIDE + x * 4;
+                    if (x >= 1 && x < 6 && y >= 1 && y < 3) {
+                        CHECK(pixels[off] == (uint8_t)(color >> 16));
+                        CHECK(pixels[off + 1] == (uint8_t)(color >> 8));
+                        CHECK(pixels[off + 2] == (uint8_t)color);
+                        CHECK(pixels[off + 3] == 0);
+                    } else CHECK(memcmp(pixels + off, initial + off, 4) == 0);
+                }
+                size_t padding = (size_t)memory_y * STRIDE + W * 4;
+                CHECK(memcmp(pixels + padding, initial + padding, STRIDE - W * 4) == 0);
+            }
+        }
+    }
+}
+
 static void blit(void)
 {
     fle_rsurf g = mk(8, 1, 32, 0), h = mk(4, 1, 32, 0), t24 = mk(4, 1, 24, 0), h2 = mk(4, 1, 32, 0), h3 = mk(4, 1, 32, 0);
@@ -278,7 +309,7 @@ static void evidence(void)
 int main(int argc, char **argv)
 {
     static const struct { const char *name; void (*f)(void); } sec[] = {
-        { "named", named }, { "binary", binary }, { "surface", surface }, { "blit", blit }, { "stretch", stretch }, { "line", line }, { "window", window }, { "evidence", evidence },
+        { "named", named }, { "binary", binary }, { "surface", surface }, { "constant_fill_fastlane", constant_fill_fastlane }, { "blit", blit }, { "stretch", stretch }, { "line", line }, { "window", window }, { "evidence", evidence },
     };
 
     if (argc < 2) return 2;
@@ -438,6 +469,11 @@ fn the_sixteen_binary_modes() {
 #[test]
 fn surfaces_32_bit_top_down_and_24_bit_bottom_up_with_clipping() {
     run("surface");
+}
+
+#[test]
+fn destination_independent_rop_fills_preserve_clipped_padded_rows_and_zero_alpha() {
+    run("constant_fill_fastlane");
 }
 
 #[test]
