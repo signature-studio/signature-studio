@@ -1,0 +1,30 @@
+# The answers of the vst3a harness for imports (lift/harness/vst3a/vst3a_imp.c, vst_env3a.c): <dll> <API> <runtime function>, one row per line, '#' starts a comment.
+# Each function is defined in lift/harness/vst3a; the rows are read by fe-lift lift --extra-imports (gen_vst.sh). mk_stubs.mjs adds the rows of the other imports.
+kernel32.dll LCMapStringEx fle_imp_LCMapStringEx
+kernel32.dll AreFileApisANSI fle_imp_AreFileApisANSI
+kernel32.dll GetUserDefaultLCID fle_imp_GetUserDefaultLCID
+kernel32.dll CompareStringEx fle_imp_CompareStringEx
+kernel32.dll GetLocaleInfoEx fle_imp_GetLocaleInfoEx
+kernel32.dll InitOnceBeginInitialize fle_imp_InitOnceBeginInitialize
+kernel32.dll InitOnceComplete fle_imp_InitOnceComplete
+kernel32.dll TryAcquireSRWLockExclusive fle_imp_TryAcquireSRWLockExclusive
+kernel32.dll WaitForSingleObjectEx fle_imp_WaitForSingleObjectEx
+kernel32.dll FreeLibraryAndExitThread fle_imp_FreeLibraryAndExitThread
+kernel32.dll FindResourceA fle_imp_FindResourceA
+kernel32.dll InitializeSRWLock fle_imp_InitializeSRWLock
+kernel32.dll InitializeConditionVariable fle_imp_InitializeConditionVariable
+shell32.dll SHGetKnownFolderPath fle_imp_SHGetKnownFolderPath
+shell32.dll SHCreateDirectoryExW fle_imp_SHCreateDirectoryExW
+shell32.dll SHGetSpecialFolderPathW fle_imp_SHGetSpecialFolderPathW
+dwrite.dll DWriteCreateFactory fle_imp_DWriteCreateFactory
+gdiplus.dll GdiplusStartup fle_imp_GdiplusStartup
+gdiplus.dll GdiplusShutdown fle_imp_GdiplusShutdown
+gdiplus.dll GdipCreateBitmapFromScan0 fle_imp_GdipCreateBitmapFromScan0
+gdiplus.dll GdipGetImageGraphicsContext fle_imp_GdipGetImageGraphicsContext
+gdiplus.dll GdipDeleteGraphics fle_imp_GdipDeleteGraphics
+gdiplus.dll GdipDisposeImage fle_imp_GdipDisposeImage
+gdiplus.dll GdipBitmapLockBits fle_imp_GdipBitmapLockBits
+gdiplus.dll GdipBitmapUnlockBits fle_imp_GdipBitmapUnlockBits
+gdi32.dll AddFontResourceExW fle_imp_AddFontResourceExW
+ole32.dll CoCreateGuid fle_imp_CoCreateGuid
+user32.dll RegisterClassExW fle_imp_RegisterClassExW

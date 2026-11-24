@@ -31,12 +31,24 @@ jobs:
           path: lift/out-app/host
           key: >-
             host-${{ hashFiles('ci/**', 'app/scripts/**/*.mjs',
-            'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+            'lift/crates/fe-build/src/main.rs',
+            'lift/harness/seeds/os-fonts/**',
+            'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/**') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
         run: lift/target/release/fe-build extract
+      - name: resources を取り出す
+        env:
+          SRC: s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp "$SRC" "$RUNNER_TEMP/i.exe"
+          mapfile -t p < ci/resources-prefixes.txt
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/i.exe" \
+            lift/out-app/host-extra/resources "${p[@]}"
       - uses: emscripten-core/setup-emsdk@v16
         with:
           version: 7.0.0
@@ -60,15 +72,16 @@ jobs:
             all(.[]; .error == null and .trapped == false and
             .state == "engine-idle" and .opened and .welcomeClosed)
           ' "$RUNNER_TEMP/flow.jsonl"
-      # 検証済みにする: 検査が通った engine(commit はしない)
-      - name: 検証済みにする
+      - name: bundle の中身を確かめる
         run: |
-          M=lift/out-app/bundle/raw/fl-Oz/manifest.json
-          S=$(jq -r '.engine.wasm.sha256' "$M")
-          grep -qxE '[0-9a-f]{64}' <<<"$S"
-          grep -qxF "$S" lift/harness/web/verified.txt ||
-            echo "$S" >> lift/harness/web/verified.txt
-          echo "verified: ${S:0:12}"
+          jq -e --arg o resources/System/Internet/error-offline.html \
+            '.lazy | any(.path == $o)' \
+            lift/out-app/bundle/raw/fl-Oz/manifest.json
+          for p in System/Languages/de.moe \
+            Artwork/Fonts/Cuprum/Cuprum.ttf \
+            Data/Templates/Other/Blocks/Blocks.flp; do
+            grep -aqF "\"seed/resources/$p\"" lift/out-app/seed/seed.bin
+          done
       - run: lift/target/release/fe-build upload
       - name: 本番の manifest を確かめる
         run: |
