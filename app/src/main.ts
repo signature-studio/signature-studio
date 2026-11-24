@@ -42,7 +42,8 @@ import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
 import type { AssetRef, LazyRef } from './bundle/manifest.ts';
 import { downloadLazy, type LazyResult } from './bundle/lazy.ts';
-import { LazyFileFeed, makeLazyFileShared, type LazyFileShared } from './engine/lazy-file.ts';
+import { LAZY_FAILED, LAZY_READY, LazyFileFeed, makeLazyFileShared, type LazyFileShared } from './engine/lazy-file.ts';
+import { WebView2Face } from './ui/webview2-surface.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const manifestUrl = '/assets/manifest.json';
@@ -310,7 +311,22 @@ document.body.classList.add('screen-fit');
 }
 panelBtn.addEventListener('click', () => setPanel(!app.screen.panelOpen));
 setPanel(true);
-view.onLayoutChange(() => { applyDisplay(); renderDesktopInfo(); });
+// Issue #1362: the Browser panel's WebView2 face (ui/webview2-surface.ts). Its document is the bundle's lazy file that Navigate names: the bytes come once the download has arrived
+const lazyByPath = new Map<string, LazyFileShared>();
+async function lazyResource(path: string): Promise<Uint8Array | null> {
+  const s = lazyByPath.get(path);
+  if (!s) return null;
+  const state = new Int32Array(s.state);
+  for (let i = 0; i < 600; i++) {
+    const v = Atomics.load(state, 0);
+    if (v === LAZY_READY) return new Uint8Array(s.data).slice();
+    if (v === LAZY_FAILED) return null;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return null;
+}
+const face = new WebView2Face(view.root, { scale: () => view.currentScale, resource: lazyResource, loaded: () => client.webview2Loaded(), posted: (json) => client.webview2Message(json), log: addLog });
+view.onLayoutChange(() => { applyDisplay(); renderDesktopInfo(); face.relayout(); });
 window.addEventListener('resize', applyDisplay);
 // decision 0212: the room changes with the browser window and with the panel; the picture is rescaled at once, and what the engine is told waits until the room has been still for a moment (RoomDebouncer)
 const roomTimers = { set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms), clear: (h: unknown): void => clearTimeout(h as ReturnType<typeof setTimeout>) };
@@ -571,6 +587,7 @@ const client = new EngineClient({
     renderDesktopInfo();
   },
   taskbar(m) { app.taskbar.update(m.lid); },
+  webview2(m) { face.handle(m); },
   desk(m) {
     app.deskStats = m.stats;
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
@@ -745,6 +762,7 @@ async function boot(): Promise<void> {
     // Issue #1314: the lazy files are not part of the start-up downloads above; their shared buffers exist before the Worker does (the engine reads them through its host files)
     const lazyRefs = manifest.lazy ?? [];
     const lazyShared = lazyRefs.map((r) => makeLazyFileShared(r.name, r.path, r.size));
+    for (const s of lazyShared) lazyByPath.set(s.path, s);   // Issue #1362: the face finds its document by the path
     for (const [label, r] of refs) recorder.expect(label, r, base);
     for (const r of lazyRefs) recorder.expect(r.name, r, base);
     const keep: AssetRef[] = [...refs.map(([, r]) => r), ...lazyRefs];

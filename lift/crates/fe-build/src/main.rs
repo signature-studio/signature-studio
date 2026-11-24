@@ -15,6 +15,10 @@ use std::sync::Mutex;
 
 const OUT_APP_DIR: &str = "lift/out-app";
 const HARNESS_DIR: &str = "lift/harness";
+/// Issue #1362: the FL Cloud offline page of the installer (System\Internet, taken with the resources of an Issue that has the `resources` label). A lazy file of the bundle when it is there: the
+/// Browser panel's face shows it after the Navigate of the cloud tab (app/src/ui/webview2-surface.ts). Nothing is packed when it is not there.
+const OFFLINE_PAGE_SRC: &str = "lift/out-app/host-extra/resources/System/Internet/error-offline.html";
+const OFFLINE_PAGE_PATH: &str = "resources/System/Internet/error-offline.html";
 const R2_BUCKET: &str = "s3://fl-web-assets/";
 const INSTALLER: &str = "s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe";
 const BLEND2D_URL: &str = "https://github.com/blend2d/blend2d.git";
@@ -468,6 +472,10 @@ fn seed_step() -> Result<Step, String> {
 fn pack_step_for(sha: &str) -> Result<Step, String> {
     let mut argv: Vec<String> = vec!["node".into(), "app/scripts/pack-assets.mjs".into(), "--version".into(), sha[..12].into()];
     argv.extend(lines(&format!("{HARNESS_DIR}/web/pack.args"))?);
+    if Path::new(OFFLINE_PAGE_SRC).is_file() {
+        argv.push("--lazy-file".into());
+        argv.push(format!("{OFFLINE_PAGE_SRC}={OFFLINE_PAGE_PATH}"));
+    }
     Ok(Step::Run(argv))
 }
 

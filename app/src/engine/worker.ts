@@ -3,6 +3,7 @@
 // Input arrives through a SharedArrayBuffer ring (input/ring.ts), the cursor and the title as small messages.
 import { classifyEngineError, FruityEngine, type FruityHost } from './fruity.ts';
 import { hostPackFromBytes } from './hostfiles.ts';
+import { webView2Message } from './webview2-log.ts';
 import { LazyFileSource } from './lazy-file.ts';
 import { IdleDriver, newDriverStats } from './idle-driver.ts';
 import { IdleTrace } from './idle-trace.ts';
@@ -73,8 +74,17 @@ async function handle(m: ToWorker): Promise<void> {
     case 'desk-peek': deskDump(true); break;
     case 'guest-text': guestText(m.markers, m.radius); break;
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
+    case 'webview2-loaded': onWebView2Loaded(); break;
+    case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
+}
+
+// Issue #1362: the page's face has loaded the document of a Navigate. The engine's page event is set, and the engine is woken if it waits: its idle fires the navigation's events (fle_wv2_pump)
+function onWebView2Loaded(): void {
+  if (!fruity) return;
+  if (!fruity.wv2Loaded()) { log('warn', 'this engine build has no WebView2 page export (fle_g3_wv2_loaded): the navigation is not completed'); return; }
+  driver?.wake();
 }
 
 async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
@@ -90,6 +100,8 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
       pushLog('err', line);
       const r = IMAGE_READ.exec(line);   // Issue #1341: the read of a real module's image, with the page's time (the line's own clock is the engine's)
       if (r) mark('image_read', { name: r[1], requested: r[2] === '1' });
+      const w = webView2Message(line);   // Issue #1362: what the WebView2 model was asked, for the page's face of the Browser panel
+      if (w) post(w);
     },
     log,
     idle: onEngineIdle,
