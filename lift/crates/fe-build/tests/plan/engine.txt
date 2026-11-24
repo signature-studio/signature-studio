@@ -1,9 +1,9 @@
 stage plugins: 1 step(s)
   plugins: tables under lift/out-app/plugins from lift/plugins/*/plugin.tsv (bases: true)
 stage lists: 3 step(s), parallel
-  list effects.dummy-one.dummy_one_x64.dll: fe-pe rebase, fe-wasmgen report, hook points left out
-  list effects.dummy-two.dummy_two_x64.dll: fe-pe rebase, fe-wasmgen report, hook points left out
-  list generators.dummy-two.engine_x64.dll: fe-pe rebase, fe-wasmgen report, hook points left out
+  list effects.dummy-one.dummy_one_x64.dll: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out
+  list effects.dummy-two.dummy_two_x64.dll: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out
+  list generators.dummy-two.engine_x64.dll: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out
 stage lowered-all: 1 step(s)
   merge lift/out-app/plugins/lists into lift/out-app/plugins/lowered-all.txt
 stage blend2d: 8 step(s)

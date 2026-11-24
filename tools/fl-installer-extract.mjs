@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// tools/fl-installer-extract.mjs INSTALLER OUT_DIR [--file GUEST]... [PREFIX...] : FL Studio のインストーラ(NSIS)が入れるファイルのうち、接頭辞に一致する全ファイルと、--file の完全なパスの物を、OUT_DIR の下に、インストール先からの相対のパス(\ を / にして)で書く。
+// tools/fl-installer-extract.mjs INSTALLER OUT_DIR [--file GUEST]... [ENTRY...] : FL Studio のインストーラ(NSIS)が入れるファイルのうち、ENTRY に一致する物を、OUT_DIR の下に、インストール先からの相対のパス(\ を / にして)で書く。
+// ENTRY は、行の形で分ける: \ で終わる物は接頭辞(その下の全ファイル)、\ で終わらない物は完全なパス(--file GUEST と同じ)。ci/resources-prefixes.txt の 1 行は、どちらか 1 つ。
 // 読みは tools/fl-installer-files.mjs と同じ(app/scripts/lib の nsis.mjs と nsis-script.mjs を読むだけ。app/ は変えない)。
-// 接頭辞は \ で終わり、大文字・小文字を区別しない。--file GUEST は、インストール先からの完全なパス(根の直下の FL64.exe など。\ で終わらない)で、大文字・小文字を区別しない。一致する物が無い接頭辞・完全なパスは標準エラーに警告を出して続ける。一致が全く無ければ 1 で終わる。
+// 接頭辞と完全なパスは、大文字・小文字を区別しない。完全なパスは、インストール先からの完全なパス(根の直下の FL64.exe など)。一致する物が無い接頭辞は標準エラーに警告を出して続ける。一覧に無い完全なパスが 1 つでもあれば、1 で終わり、何も書かない。一致が全く無ければ 1 で終わる。
 // 同じ guest パスが 2 回出たら、後の物を使う(extract-fl.mjs と同じ)。OUT_DIR/MANIFEST.tsv に、guest・bytes・sha256 の表を書く(guest の小文字の順)。
 // 会社名を含む絶対パスは、どちらにも書かない(インストール先の接頭辞を外す)。
 import crypto from 'node:crypto';
@@ -60,24 +61,28 @@ function main(argv) {
   const guests = [];
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--file') guests.push(rest[++i]);
-    else prefixes.push(rest[i]);
+    else if (rest[i].endsWith('\\')) prefixes.push(rest[i]);
+    else guests.push(rest[i]);
   }
-  if (!installer || !outDir || (prefixes.length === 0 && guests.length === 0) || !prefixes.every((p) => p.length > 1 && p.endsWith('\\')) || !guests.every((g) => g && !g.endsWith('\\'))) {
-    console.log('usage: tools/fl-installer-extract.mjs INSTALLER OUT_DIR [--file GUEST]... [PREFIX...]   (PREFIX は \\ で終わる。GUEST は完全なパスで、\\ で終わらない)');
+  if (!installer || !outDir || (prefixes.length === 0 && guests.length === 0) || !prefixes.every((p) => p.length > 1) || !guests.every((g) => g && !g.endsWith('\\'))) {
+    console.log('usage: tools/fl-installer-extract.mjs INSTALLER OUT_DIR [--file GUEST]... [ENTRY...]   (\\ で終わる ENTRY は接頭辞。それ以外は完全なパスで、\\ で終わらない)');
     return 64;
   }
   const inst = new Installer(installer);
   try {
     const script = new Script(inst);
     const files = installTree(script, ROOT).map(([, p, off]) => [p.slice(ROOT.length + 1), off]);
+    const exact = selectExact(files, guests);
+    const missing = guests.filter((g) => !exact.some((r) => r.guest.toLowerCase() === g.toLowerCase()));
+    if (missing.length > 0) {
+      for (const g of missing) console.error(`fl-installer-extract: エラー: 一覧に無い完全なパス ${g}`);
+      return 1;
+    }
     const picked = new Map();
-    for (const r of [...selectFiles(files, prefixes), ...selectExact(files, guests)]) picked.set(r.guest.toLowerCase(), r);
+    for (const r of [...selectFiles(files, prefixes), ...exact]) picked.set(r.guest.toLowerCase(), r);
     const rows = [...picked.keys()].sort().map((key) => picked.get(key));
     for (const p of prefixes) {
       if (!rows.some((r) => r.guest.toLowerCase().startsWith(p.toLowerCase()))) console.error(`fl-installer-extract: 警告: 接頭辞 ${p} に一致する物が無い`);
-    }
-    for (const g of guests) {
-      if (!rows.some((r) => r.guest.toLowerCase() === g.toLowerCase())) console.error(`fl-installer-extract: 警告: 完全なパス ${g} に一致する物が無い`);
     }
     if (rows.length === 0) {
       console.error('fl-installer-extract: 一致が 1 件も無い');

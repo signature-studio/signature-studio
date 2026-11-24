@@ -22,12 +22,12 @@ const ok = (name, got, want) => {
   }
 };
 
-const HEADER = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args'].join('\t');
+const HEADER = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args', 'omit'].join('\t');
 const SHA_BALANCE = 'a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064';
 const SHA_FILTER = 'f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c';
 const SHA_DELAY = 'c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc';
 const GUEST = 'C:\\Program Files\\Image-Line\\FL Studio 21\\';
-const BALANCE_ROW = ['effects.fruity-balance.fruity_balance_x64.dll', 'Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll', '本体', SHA_BALANCE, '3718656', 'existing', '--pdata'].join('\t');
+const BALANCE_ROW = ['effects.fruity-balance.fruity_balance_x64.dll', 'Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll', '本体', SHA_BALANCE, '3718656', 'existing', '--pdata', '0x2c13a0'].join('\t');
 
 const tmp = fs.mkdtempSync(path.join(ROOT, '.tmp-spec-pr-'));
 // 一時のフォルダを作り、その中の plugin.tsv を書く(files: フォルダ名 → 中身)
@@ -60,8 +60,8 @@ try {
 
   // 2. 2 つのフォルダ。鍵の順に並ぶ(zeta は alpha の後)。補助の DLL も行になる
   const two = plugins({
-    zeta: `${HEADER}\neffects.zeta.z.dll\tPlugins\\Fruity\\Effects\\Zeta Box\\Zeta Box_x64.dll\t本体\t${SHA_FILTER}\t100\tnone\t\n`,
-    alpha: `# 注釈\n\n${HEADER}\neffects.alpha.a.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\Alpha Box_x64.dll\t本体\t${SHA_DELAY}\t200\trva:0x10,0x20,0x30\t--pdata --x\neffects.alpha.helper.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\helper.dll\t補助\t${SHA_BALANCE}\t300\tnone\t\n`,
+    zeta: `${HEADER}\neffects.zeta.z.dll\tPlugins\\Fruity\\Effects\\Zeta Box\\Zeta Box_x64.dll\t本体\t${SHA_FILTER}\t100\tnone\t\t-\n`,
+    alpha: `# 注釈\n\n${HEADER}\neffects.alpha.a.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\Alpha Box_x64.dll\t本体\t${SHA_DELAY}\t200\trva:0x10,0x20,0x30\t--pdata --x\t0x100,0x200\neffects.alpha.helper.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\helper.dll\t補助\t${SHA_BALANCE}\t300\tnone\t\t-\n`,
   });
   const r2 = pluginRows(two);
   ok('2 フォルダ: 抽出の行は鍵の順(alpha の 2 行、zeta の 1 行)',
@@ -83,7 +83,7 @@ try {
 
   // 4. 検査: 失敗する行は、例外になる(抽出は止まる)。失敗の文言に合う物を 'yes' とし、違えば文言を返す
   const fails = (dir, re) => (re.test(error(dir)) ? 'yes' : error(dir));
-  const row = (sha, role = '本体', guest = 'Plugins\\X\\Y\\One_x64.dll', extra = '1\tnone\t') => `${HEADER}\nk.dll\t${guest}\t${role}\t${sha}\t${extra}\n`;
+  const row = (sha, role = '本体', guest = 'Plugins\\X\\Y\\One_x64.dll', extra = '1\tnone\t\t-') => `${HEADER}\nk.dll\t${guest}\t${role}\t${sha}\t${extra}\n`;
   ok('検査: plugin.tsv の無いフォルダは、例外', fails(plugins({ 'no-file': null }), /ENOENT/), 'yes');
   ok('検査: 鍵が 2 つの plugin で重複すると、例外', fails(plugins({
     a: row(SHA_BALANCE),
@@ -93,13 +93,15 @@ try {
   ok('検査: sha256 が大文字の 16 進なら、例外', fails(plugins({ a: row(SHA_BALANCE.toUpperCase()) }), /sha256/), 'yes');
   ok('検査: 見出しが違えば、例外', fails(plugins({ a: `key\tguest\trole\tsha256\tsize\thook\n${row(SHA_BALANCE).split('\n')[1]}\n` }), /header/), 'yes');
   ok('検査: 役割が 本体・補助 以外なら、例外', fails(plugins({ a: row(SHA_BALANCE, 'main') }), /role/), 'yes');
-  ok('検査: 列が 7 つでなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\tnone') }), /fields/), 'yes');
+  ok('検査: 列が 7 つでなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\tnone\t') }), /fields/), 'yes');
+  ok('検査: omit が - でも 16 進の RVA の並びでもなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\tnone\t\tzz') }), /omit/), 'yes');
+  ok('検査: omit の列が空なら、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\tnone\t\t') }), /omit/), 'yes');
   ok('検査: フォルダの名前が小文字・数字・- 以外なら、例外', fails(plugins({ Fruity: `${HEADER}\n${BALANCE_ROW}\n` }), /folder name/), 'yes');
   ok('検査: guest の場所が同じ(大文字小文字を除く)なら、例外', fails(plugins({
     a: row(SHA_BALANCE),
     b: row(SHA_FILTER, '本体', 'plugins\\x\\y\\one_X64.dll').replace('k.dll', 'k2.dll'),
   }), /guest path is not unique/), 'yes');
-  ok('検査: hook の RVA が 3 つでなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\trva:0x10,0x20\t') }), /hook/), 'yes');
+  ok('検査: hook の RVA が 3 つでなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\trva:0x10,0x20\t\t-') }), /hook/), 'yes');
   ok('検査: 行が無い plugin.tsv は、例外', fails(plugins({ a: `${HEADER}\n` }), /no DLL row/), 'yes');
 
   // 5. 実物の lift/plugins(あれば)が検査を通る

@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, exitFacts, postBeacon, uiWindowsOf, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
+import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, deskBeacon, DeskHistory, exitFacts, postBeacon, uiWindowsOf, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
 import { engineStopFacts, type EngineStop } from '../../src/perf/exit-message.ts';
 import { collectBrowserInfo, collectClientInfo, hostKind, parseBrowser, webglRenderer, type BrowserInfo } from '../../src/perf/browser-info.ts';
 import { DisplayMeter, DisplayMonitor, hzFit, type DisplayHost, type DisplaySnapshot } from '../../src/perf/display.ts';
@@ -35,7 +35,7 @@ describe('buildBeacon', () => {
     expect(b.ui.updates).toEqual({ total: 500, recent10s: stat(10) });
     expect(b.ui.engineIdles).toEqual({ total: 40, recent10s: stat(5) });
     expect(b.ui.targetUpdatesPerSecond).toBe(120);
-    expect(b.input).toEqual({ ...input, targetP95Ms: 17 });
+    expect(b.input).toEqual({ ...input, targetP95Ms: 17, inputToPresentMsP50: 30, inputToPresentMsP95: 40 });
     expect(b.audio).toEqual({ underruns: null });
     expect(buildBeacon({ ...base, underruns: 2, audioDetail: { episodes: 1 } }).audio).toEqual({ underruns: 2, detail: { episodes: 1 } });
     expect(b.engine).toEqual({ present: 'D', updatesObservable: true, state: 'engine-idle', exit: null });
@@ -643,5 +643,59 @@ describe('browser and client info (decision 0192)', () => {
   it('collectClientInfo reads the colour depth, the viewport and how the page was reached; missing globals are null', () => {
     expect(client).toMatchObject({ colorDepth: 24, viewport: { width: 1900, height: 960 }, page: { secure: true, hostKind: 'ts.net' } });
     expect(collectClientInfo({})).toMatchObject({ browser: { name: 'unknown' }, colorDepth: null, viewport: null, page: { secure: null, hostKind: null } });
+  });
+});
+
+// ---- Issue #1398: the items the screen and the input read as one number each (rafIntervalMsP95, input.inputToPresentMsP50 / P95) and desk.recent10s ----
+
+describe('the items of Issue #1398 are the numbers the page already has, and the shape check says so', () => {
+  const rec = (over: Partial<BeaconInput> = {}) => JSON.parse(beaconText(v2(over)));
+  it('input.inputToPresentMsP50 / P95 are eventToRaf\'s p50Ms and p95Ms; rafIntervalMsP95 is display.raf.recent10s.p95Ms; without a display it is null', () => {
+    const b = v2();
+    expect(b.input.inputToPresentMsP50).toBe(b.input.eventToRaf.p50Ms);
+    expect(b.input.inputToPresentMsP95).toBe(b.input.eventToRaf.p95Ms);
+    expect(b.rafIntervalMsP95).toBe(b.display?.raf.recent10s.p95Ms);
+    expect(buildBeacon(base).rafIntervalMsP95).toBeNull();
+    expect(buildBeacon(base).input.inputToPresentMsP95).toBe(40);
+  });
+  it('a record of the parts that are there passes; a record from before these items has none of them and passes too', () => {
+    expect(beaconProblems(rec())).toEqual([]);
+    const old = JSON.parse(beaconText(v2()));
+    delete old.rafIntervalMsP95;
+    delete old.input.inputToPresentMsP50;
+    delete old.input.inputToPresentMsP95;
+    expect(beaconProblems(old)).toEqual([]);
+  });
+  it('a copy that is not the same number as its source is a problem (no second calculation)', () => {
+    const b1 = rec();
+    b1.input.inputToPresentMsP95 = 41;
+    expect(beaconProblems(b1).join('\n')).toContain('input.inputToPresentMsP95: not input.eventToRaf.p95Ms');
+    const b2 = rec();
+    b2.rafIntervalMsP95 = 1;
+    expect(beaconProblems(b2).join('\n')).toContain('rafIntervalMsP95: not display.raf.recent10s.p95Ms');
+    const b3 = rec({ display: null });
+    b3.rafIntervalMsP95 = 9;
+    expect(beaconProblems(b3).join('\n')).toContain('rafIntervalMsP95: not display.raf.recent10s.p95Ms');
+    const b4 = rec();
+    b4.input.inputToPresentMsP50 = -1;
+    expect(beaconProblems(b4).join('\n')).toContain('input.inputToPresentMsP50');
+  });
+  it('desk.recent10s: the rate is the presents over the seconds, and a rate needs a second; a record without it passes', () => {
+    const h = new DeskHistory();
+    for (let t = 0; t <= 12_000; t += 100) h.add(t, t / 100);
+    const good = JSON.parse(beaconText(v2({ desk: deskBeacon({ presents: 120, rects: 1, pixels: 1, composeMs: 1, putMs: 1, whole: 0, ticks: 1, idleTicks: 0, wakes: 0, sleeps: 0 }, null, 12_000, h.samples) })));
+    expect(good.desk.recent10s).toEqual({ seconds: 10, presents: 100, presentsPerSec: 10 });
+    expect(beaconProblems(good)).toEqual([]);
+    const probs = (r: unknown): string[] => beaconProblems({ v: 3, sid: SID, desk: { recent10s: r } }).filter((p) => p.startsWith('desk'));
+    expect(probs({ seconds: 10, presents: 100, presentsPerSec: 10 })).toEqual([]);
+    expect(probs({ seconds: 0, presents: 0, presentsPerSec: null })).toEqual([]);
+    expect(probs({ seconds: 10, presents: 100, presentsPerSec: 12 })).toEqual([expect.stringContaining('not presents / seconds')]);
+    expect(probs({ seconds: 0.5, presents: 5, presentsPerSec: 10 })).toEqual([expect.stringContaining('less than a second')]);
+    expect(probs({ seconds: 5, presents: 5, presentsPerSec: null })).toEqual([expect.stringContaining('no rate')]);
+    expect(probs({ seconds: 11, presents: 5, presentsPerSec: 0.45 })).toEqual([expect.stringContaining('desk.recent10s.seconds')]);
+    expect(probs('ten')).toEqual([expect.stringContaining('not an object')]);
+    const before = JSON.parse(JSON.stringify(good));
+    delete before.desk.recent10s;
+    expect(beaconProblems(before)).toEqual([]);
   });
 });

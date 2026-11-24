@@ -1,5 +1,5 @@
 // Engine cost, stage 0 (the baseline for the lift work): one scene of the product in headless Chrome at a device pixel ratio, with the CPU profile of every thread of the page (its main thread, and each Worker attached with Target.setAutoAttach) over the scene's window. The product is not changed: nothing is enabled for the measurement (no flag, no URL parameter, no environment variable).
-// Usage: node tools/engine-cost/measure.mjs --bundle <absolute path to raw/<name>> --names <absolute path to wasm-func-names.tsv> --scene i|ii|iii --dpr <number> --out <absolute path to the result JSON> [--keep-profiles]
+// Usage: node tools/engine-cost/measure.mjs --bundle <absolute path to raw/<name>> --names <absolute path to wasm-func-names.tsv> --scene i|ii|iii --dpr <number> --out <absolute path to the result JSON> [--window-s <seconds>] [--keep-profiles]
 // Scenes (t0 is the first observation of engine-idle). i: nothing is sent; the window is t0+30 s to t0+90 s. ii: at t0 the audio output is started (a press on the status line; a Shift key press if that does not start it), the welcome window is closed as tools/p2-frames does for load b, Space starts the transport, and the window is the 60 s from the first sign of playback (quantaWhilePlaying rises). iii: the welcome window is closed as above; the window is t0+30 s to t0+90 s, and the pointer goes round an ellipse over the Playlist at 1200 Hz (no wheel, no audio).
 // Classes of a profile's self time (the leaf frame of each sample, for its interval to the next sample; (idle) is not busy): A emscripten runtime and glue (the glue JS, emscripten names, and wasm functions with such names); B lifted C functions (wasm f_<hex>); C C++ drawing (wasm bl::); D runtime C (wasm fle_* and poll_waiters); E the app's JS (127.0.0.1 URLs) and browser APIs; F browser internals ((program), (garbage collector), (root)); unclassified the rest.
 // stdout and --out: one JSON line. Exit 0 when error is null, 1 when the run failed (the JSON is still written), 2 when the arguments are wrong (usage on stderr; nothing is written).
@@ -12,8 +12,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
-const USAGE = 'usage: node tools/engine-cost/measure.mjs --bundle <absolute path to raw/<name>> --names <absolute path to wasm-func-names.tsv> --scene i|ii|iii --dpr <number> --out <absolute path to the result JSON> [--keep-profiles]\n';
-const VALUE_FLAGS = ['--bundle', '--names', '--scene', '--dpr', '--out'];
+const USAGE = 'usage: node tools/engine-cost/measure.mjs --bundle <absolute path to raw/<name>> --names <absolute path to wasm-func-names.tsv> --scene i|ii|iii --dpr <number> --out <absolute path to the result JSON> [--window-s <seconds, default 60>] [--keep-profiles]\n';
+const VALUE_FLAGS = ['--bundle', '--names', '--scene', '--dpr', '--out', '--window-s'];
 const SCENES = ['i', 'ii', 'iii'];
 const argv = process.argv.slice(2);
 const valueOf = (flag) => { const i = argv.indexOf(flag); return i < 0 ? undefined : argv[i + 1]; };
@@ -28,10 +28,13 @@ const SCENE = valueOf('--scene');
 const dprArg = valueOf('--dpr');
 const OUT = valueOf('--out');
 const DPR = dprArg === undefined ? NaN : Number(dprArg);
+const windowArg = valueOf('--window-s');
+const WINDOW_S = windowArg === undefined ? 60 : Number(windowArg);
 const KEEP_PROFILES = argv.includes('--keep-profiles');
 const argsOk = shapeOk
   && [bundleArg, namesArg, OUT].every((p) => p !== undefined && path.isAbsolute(p))
-  && SCENES.includes(SCENE) && Number.isFinite(DPR) && DPR > 0;
+  && SCENES.includes(SCENE) && Number.isFinite(DPR) && DPR > 0
+  && Number.isFinite(WINDOW_S) && WINDOW_S > 0;
 if (!argsOk) {
   process.stderr.write(USAGE);
   process.exit(2);
@@ -50,9 +53,10 @@ const PROFILE_INTERVAL_US = 250;
 const PROFILE_STOP_MS = 300000;
 // the room of tools/p3-audio-probe (BOOT_VIEWPORT): the stage is 1836 x 1056 CSS px, with the 340 px panel and the 36 px header
 const VIEWPORT = { width: 1836 + 340, height: 1056 + 36 };
+// the window of a scene is WINDOW_S long from WINDOW_START_MS (60 s by default; run.sh --quick uses 30 s)
 const WINDOW_START_MS = 30000;
-const WINDOW_END_MS = 90000;
-const PLAY_WINDOW_MS = 60000;
+const WINDOW_END_MS = WINDOW_START_MS + WINDOW_S * 1000;
+const PLAY_WINDOW_MS = WINDOW_S * 1000;
 const PLAY_WAIT_MS = 15000;
 const AUDIO_WAIT_MS = 5000;
 // the pointer of tools/p2-frames load a: 1200 Hz (1000 is the least the input must reach), two turns a second, over the Playlist
@@ -103,7 +107,7 @@ const r3 = (x) => Math.round(x * 1000) / 1000;
 const errText = (e) => String(e?.message ?? e).slice(0, 300);
 const sleepUntil = async (at) => { const d = at - Date.now(); if (d > 0) await sleep(d); };
 
-// the names table (lift/out-app/gen/wasm-func-names.tsv: index, kind, va, name; a header line). kind f and ia are lifted code (f_<hex>, ia_<hex>); kind c is a C function by its symbol. A missing file or an unnamed row leaves the wasm frame unknown (unclassified).
+// the names table (lift/out-app/gen/wasm-func-names.tsv: index, kind, va, name; a header line). kind f and ia are lifted code (f_<hex>, ia_<hex>); kind c is a C function by its symbol, or unnamed_<index> for a function that has no name (Issue #1396). A missing file or an unnamed row leaves the wasm frame unknown (unclassified).
 function loadNames(file) {
   const names = new Map();
   if (!fs.existsSync(file)) return { names, found: false, count: 0 };
