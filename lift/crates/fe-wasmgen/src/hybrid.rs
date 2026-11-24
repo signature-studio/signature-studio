@@ -4,7 +4,7 @@
 //! hybrid: fe-wasmgen with the addresses of the link map of the C part; wasm-opt -Oz of each direct module; wasm-merge of the direct modules,
 //! then into the C part; the output has no import of module c and no import of a lifted function (f_<va>) from env.
 //! --separate NAMES (Issue #1342): the named modules are not merged; each is written to --separate-dir as <DLL stem>.wasm, a module of its own
-//! that the page instantiates. Its functions are the C part's f_<va> imports (the page supplies them), its imports are the C part's exports.
+//! that the page instantiates, without a names section (its table is wasm-func-names-<module>.tsv in the work directory). Its functions are the C part's f_<va> imports (the page supplies them), its imports are the C part's exports.
 //! A module whose list is missing or empty is skipped (as the shell did). The lists are lowered-<module>.txt in --lists, one VA per line.
 //! The merges keep the names (-g): the table of the function names (names_table) is written to the work directory, and the output has no names section.
 
@@ -252,20 +252,29 @@ fn function_names(b: &[u8]) -> Result<BTreeMap<u32, String>, String> {
     Ok(out)
 }
 
-/// The kind and the guest VA of a function name of the generator: `f_<va>` (a lifted function), `ia_<va>` (its adapter for an indirect call) and `t_<va>` (its test adapter). Any other name is a C function.
-fn classify(name: &str) -> (&'static str, String) {
+/// The kind, the guest VA and the name of a function name of the generator: `f_<va>` (a lifted function), `ia_<va>` (its adapter for an indirect call)
+/// and `t_<va>` (its test adapter). wasm-opt renames a second function of the same name to `<name>_<n>` (the hybrid wrapper of a lifted function
+/// has the name of the function, which is also the function's own name): the suffix is dropped. Any other name is a C function, kept as it is.
+fn classify(name: &str) -> (&'static str, String, String) {
     for (prefix, kind) in [("f_", "f"), ("ia_", "ia"), ("t_", "t")] {
-        if let Some(hex) = name.strip_prefix(prefix) {
+        if let Some(rest) = name.strip_prefix(prefix) {
+            let hex = match rest.split_once('_') {
+                Some((hex, n)) if !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()) => hex,
+                Some(_) => continue,
+                None => rest,
+            };
             if !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return (kind, format!("0x{hex}"));
+                return (kind, format!("0x{hex}"), format!("{prefix}{hex}"));
             }
         }
     }
-    ("c", String::new())
+    ("c", String::new(), name.to_string())
 }
 
 /// The table of the functions of a module (lift/out-app/gen/wasm-func-names.tsv): one line per function index, from the imports and then the defined functions,
-/// with the kind (import, f, ia, t, c, or - for a function without a name), the guest VA and the name.
+/// with the kind (import, f, ia, t or c), the guest VA and the name. A defined function without a name in the names section is a c function named
+/// unnamed_<index>: wasm-opt -Oz makes functions with none (the C part's, and some of the direct modules'), and some helpers of the generator have none.
+/// The hybrid wrappers are named f_<va> by the generator (their export), so they are lifted code and not in this group.
 fn names_table(b: &[u8]) -> Result<String, String> {
     let names = function_names(b)?;
     if names.is_empty() {
@@ -284,11 +293,8 @@ fn names_table(b: &[u8]) -> Result<String, String> {
         let (kind, va, name) = match imports.get(idx as usize) {
             Some((module, name)) => ("import", String::new(), format!("{module}.{name}")),
             None => match names.get(&(idx as u32)) {
-                Some(name) => {
-                    let (kind, va) = classify(name);
-                    (kind, va, name.clone())
-                }
-                None => ("-", String::new(), String::new()),
+                Some(name) => classify(name),
+                None => ("c", String::new(), format!("unnamed_{idx}")),
             },
         };
         out.push_str(&format!("{idx}\t{kind}\t{va}\t{name}\n"));
@@ -433,6 +439,22 @@ mod tests {
     }
 
     #[test]
+    fn a_defined_function_without_a_name_is_a_c_function_named_by_its_index() {
+        let sub: Vec<u8> = [&[1u8, 1, 4][..], b"f_40"].concat();
+        let names = sec(0, &[&[4u8][..], b"name", &[1, sub.len() as u8][..], &sub].concat());
+        let module = [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &sec(3, &[2, 0, 0]), &names].concat();
+        assert_eq!(names_table(&module).unwrap(), "index\tkind\tva\tname\n0\tc\t\tunnamed_0\n1\tf\t0x40\tf_40\n");
+    }
+
+    #[test]
+    fn a_name_that_wasm_opt_renamed_keeps_its_lift_name() {
+        let sub: Vec<u8> = [&[2u8, 0, 4][..], b"f_40", &[1, 9][..], b"f_40_5688"].concat();
+        let names = sec(0, &[&[4u8][..], b"name", &[1, sub.len() as u8][..], &sub].concat());
+        let module = [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &sec(3, &[2, 0, 0]), &names].concat();
+        assert_eq!(names_table(&module).unwrap(), "index\tkind\tva\tname\n0\tf\t0x40\tf_40\n1\tf\t0x40\tf_40\n");
+    }
+
+    #[test]
     fn function_exports_are_the_function_entries_of_the_export_section() {
         let b: Vec<u8> = [b"\0asm\x01\0\0\0".as_slice(), &[0x07, 0x0b, 0x02, 0x03, b'f', b'_', b'1', 0x00, 0x00, 0x01, b'm', 0x02, 0x00]].concat();
         assert_eq!(function_exports(&b).unwrap(), vec!["f_1".to_string()]);
@@ -544,7 +566,10 @@ fn hybrid(args: &[String]) -> Result<(), String> {
             let stem = Path::new(&m.pe).file_stem().and_then(|s| s.to_str()).ok_or_else(|| format!("no file stem in {}", m.pe))?;
             std::fs::create_dir_all(&sep_dir).map_err(|e| format!("{}: {e}", sep_dir.display()))?;
             let dst = sep_dir.join(format!("{stem}.wasm"));
-            std::fs::copy(&oz, &dst).map_err(|e| format!("{}: {e}", dst.display()))?;
+            // the shipped module has no names section (as the engine); its names are the table wasm-func-names-<module>.tsv of the work directory
+            let bytes = std::fs::read(&oz).map_err(|e| format!("{}: {e}", oz.display()))?;
+            std::fs::write(work.join(format!("wasm-func-names-{}.tsv", m.name)), names_table(&bytes)?).map_err(|e| format!("wasm-func-names-{}.tsv: {e}", m.name))?;
+            std::fs::write(&dst, without_names(&bytes)?).map_err(|e| format!("{}: {e}", dst.display()))?;
             separated.push(dst);
             built.insert(m.name.clone());
             continue;
