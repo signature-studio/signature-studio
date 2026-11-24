@@ -30,6 +30,19 @@ project: signature-studio/3
 - 事実 6(窓): 「Problems loading the project」の窓(`TMissingPluginsForm`)は、既存の記録に在る(`pm-work/findings/p3-blocks-1335.md`・`pm-work/findings/blocks-samples-1366.md`)。'Copy' を押した時に、ゲストが呼ぶ API の並びは、まだ記録されていない(この Issue で記録する)。
 - Web の仕様の要点(作業者が実測で確かめる): `navigator.clipboard.readText()` は `clipboard-read` の許可が要る。`writeText()` は、文書がフォーカスされていることが要る。`navigator.clipboard` は安全な文脈でのみ使える。`navigator.permissions.query({ name: 'clipboard-read' })` は、`granted`・`prompt`・`denied` のいずれかを返す。
 
+## 前回の試行で分かったこと(run 45365410794。`failed`)
+
+- 判定は全て通った(commit `a2902894`。`tools/clipboard/measure.mjs` の `copied`・`match`・`pasted`・`deniedHandled` が真。起動・流れ A〜D・`npm test` 1357 件も通った)。落ちたのは **main への push** だけ。衝突は `app/src/engine/protocol.ts` の 1 ファイル(`Automatic merge failed`)。main に先に入った変更と同じ箇所に、このメッセージ型を足したため。
+- 作業ツリーには前回の作業が載る(commit は main には無い。`.prior-work.md` を読む)。
+- 方式(実装済み。動いた):
+  - Copy: `SetClipboardData` の handle から文字列を Worker → page へ渡し、page が `navigator.clipboard.writeText` を呼ぶ。
+  - Paste: `GetClipboardData` と `IsClipboardFormatAvailable` を JSPI の非同期 import で止め、page が `readText` の結果を返す。権限は `navigator.permissions` で確かめ、page の `role="status"` の状態行に理由を出す。
+  - 形式: CF_TEXT・CF_OEMTEXT は UTF-16 から 1 文字 1 バイトに変換する(ASCII 以外は `?`)。FL は貼り付けの前に CF_TEXT の有無を見るため、CF_TEXT も答える。
+  - 権限の拒否や Clipboard API の無さでは、engine は止めない。読みの答えが無ければ 3 秒で NULL を返す。
+- 測定(runner の値): Ctrl+V から page の最初の読みの要求まで `pasteDelayMs` 47 ms と 51 ms(2 回)。Copy は約 1 秒後の読み戻しで一致した。
+- 未確認・未対応: (1) `clipboard-write: denied` の実測(この測定では確かめていない。単体テストだけ)。(2) `EnumClipboardFormats`・`CountClipboardFormats` は OS の文字列を数えない(未対応)。(3) 貼り付けごとに読みが 2 回出る(1 回に減らせば遅れも減る。この版には入れていない)。
+- push で衝突したら: main の版を取り、この Issue の変更だけを取り直し、**両方を残す**。`app/src/engine/protocol.ts`・`app/src/engine/worker.ts` は、#1390・#1391 もメッセージ型を足す。3 者の型を全部残す(どれも削除しない)。衝突の印を 1 つも残さない。
+
 ## 読む物
 
 - `lift/runtime/fle_clip.h`・`lift/runtime/fle_clip.c`(OpenClipboard・CloseClipboard・EmptyClipboard・IsClipboardFormatAvailable・CountClipboardFormats・EnumClipboardFormats・GetClipboardData・SetClipboardData と、注釈の決定 0171)
