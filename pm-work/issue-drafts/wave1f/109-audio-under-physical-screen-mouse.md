@@ -50,6 +50,7 @@ run 45253143948(2026-11-23 19:52Z 起動)の作業。runner の値(nproc 4)。�
 7. **判定の式を直した(逸脱。PM が見直す)**: 最初の式「60 秒のどの 1 秒も `--hz` 以上」では、1 回だけ 2 秒が 983〜985 に落ちて false になった。送り側が遅れた分は次の秒に届くので、60 秒の合計は揃っていた。式を「60 秒の合計 ≥ 0.99 × hz × 60 かつ、どの 1 秒も ≥ 0.95 × hz」に変えた。道具の `inputRateOk` は、この式で判定する。
 8. 未確認: 8000 Hz で届く頻度(失敗したため)。`guestMouseMovePerSec` は null(engine 側に WM_MOUSEMOVE の計数が無い。足すには製品の計数が要る)。描画・協調・音声書き込みの時間の内訳。
 9. 次の作業者へ: 段 2・3 の音の条件を満たす入力を先に揃える(#{{122}}・#{{121}})。それまでは、途切れの数と、音が出ないことを、分けて報告する。`pm-work/findings/measure-live-109.patch` は `git apply` で当てて使ってよい(当たらなければ書き直す)。
+10. 入力の判定を 0.95 倍にゆるめる変更は、依頼者の指示(最低でも 1000 Hz)に反するので、取り消した。公称を 1.2 倍にして、各秒 1000 件以上を、判定にする。
 
 ## 読む物
 
@@ -82,22 +83,22 @@ run 45253143948(2026-11-23 19:52Z 起動)の作業。runner の値(nproc 4)。�
    - bundle の絶対パス
    - `--dpr <値>`(既定 1.7647。部屋は 1836×1056 CSS px になるように窓の大きさを決める)
    - `--play <0|1>`(既定 1。1 なら窓の始まりに再生を始める(Space)。0 なら再生を押さない。出力は、engine が起動時に開始したままにする)
-   - `--hz <値>`(ポインタの移動の頻度。既定 1000。0 なら動かさない)
+   - `--hz <値>`(判定の基準の頻度。既定 1000。送りは公称 1.2 倍。0 なら動かさない)
    - `--mouse <秒>`(ポインタを動かし続ける秒数。既定 60。0 なら動かさない)
    - `--project <.flp の絶対パス>`(省略時は下の既定)
    プロジェクトの既定: 所定のプロジェクト(#{{004}} が決める。`inputs/p3-project.tsv` が在ればその 1 件。音の出る物)を開く。無ければ、スタートの Default のプロジェクトで、Sampler のチャンネルのパターンを再生する。再生を始める方法は、道具が確かめる(`nonSilentQuanta` が増えること)。
 2. ポインタの送り方(この Issue の要)。
    - 経路: 画面の広い範囲を通る円(半径 400 CSS px。部屋の中央)を、1 秒に 1〜2 周する。1 イベントあたり約 1〜5 物理画素になる速さ。ボタンは押さない(mouseMoved だけ)。
-   - 頻度: `--hz` の間隔で、`--mouse` の秒数の間、連続して送る。CDP の `Input.dispatchMouseEvent` を、応答を待たずに連続して(パイプラインで)送る、またはバッチにする。送り方の選択と理由は報告に書く。`setTimeout` の間隔に頼らない(タイマーの解像度で頻度が落ちる)。
-   - 届いたかの確認: ページ側で、`pointermove` の件数を 1 秒ごとに数える(`getCoalescedEvents()` の件数も記録する)。判定は `inputRateOk`: 窓の 60 秒の合計が `0.99 × --hz × 60` 以上で、かつどの 1 秒も `0.95 × --hz` 以上。届かない時は、送り方を直す(複数の接続、`Input.dispatchMouseEvent` の `timestamp`、ページ内で `PointerEvent` を合成する方法など。合成する時は、アプリの入力の処理が `isTrusted` を見ていないかを確かめる)。
-3. 出力: stdout に 1 行の JSON: `{"error","state","standIn","dpr","play","hz","mouseSec","screenDevicePx","playing","nonSilentQuanta","last60sUnderruns","last60sUnderrunsAtIdle10s","underrunDelta","inputRateOk","pointerEventsPerSecMin","inputSentPerSec","inputProcessedPerSec","engineCyclePerSec","guestMouseMovePerSec","quantaDelta","engineGapFrames","engineGapFramesDelta","presentsDelta"}`。
+   - 頻度: 公称の送る頻度は **`--hz` の 1.2 倍**(`--hz 1000` なら 1200 Hz。`--hz 8000` なら 9600 Hz)。`--mouse` の秒数の間、連続して送る。CDP の `Input.dispatchMouseEvent` を、応答を待たずに送る。送りの形は #{{110}}(P2 の道具)の `tools/p2-frames/measure.mjs` の `pointerLoop` と同じにする(その時刻までに due の分をまとめて送り、`sleep(2)` で回す)。`setTimeout` の一回ごとの送りに頼らない(タイマーの解像度で頻度が落ちる)。送り方の選択と理由は報告に書く。
+   - 届いたかの確認: ページ側で、`pointermove` の件数(`getCoalescedEvents()` の件数で数える)を 1 秒ごとに数える。判定は `inputRateOk`: **窓の 60 秒の全ての 1 秒で、件数が `--hz` 以上**(`--hz 1000` なら 1000 件以上)。前回の道具の `TOTAL_RATE_SHARE`・`SECOND_RATE_SHARE` と `MAX_IN_FLIGHT` の待ちは取り除き、この判定と送り方に合わせて直す。届かない時は、送り方を直す(複数の接続、`Input.dispatchMouseEvent` の `timestamp`、ページ内で `PointerEvent` を合成する方法など。合成する時は、アプリの入力の処理が `isTrusted` を見ていないかを確かめる)。
+3. 出力: stdout に 1 行の JSON: `{"error","state","standIn","dpr","play","hz","mouseSec","screenDevicePx","playing","nonSilentQuanta","last60sUnderruns","last60sUnderrunsAtIdle10s","underrunDelta","inputRateOk","pointerEventsPerSecMin","pointerEventsPerSecMean","inputSentPerSec","inputProcessedPerSec","engineCyclePerSec","guestMouseMovePerSec","quantaDelta","engineGapFrames","engineGapFramesDelta","presentsDelta"}`。
    - `last60sUnderruns`: 窓の終わり(idle の +130 秒)の `underrunQuantaLast60s`(ヘッダーの値と同じ。窓の 60 秒の途切れ)。`last60sUnderrunsAtIdle10s`: idle の +10 秒の同じ値(段 0 の参考。判定に入れない)。
    - `underrunDelta`: 窓の中の `underrunQuanta` の増分。
-   - `play`・`hz`・`mouseSec`: 引数の値。`inputRateOk`: `--hz` が 0 なら null。
+   - `play`・`hz`・`mouseSec`: 引数の値。`inputRateOk`: `--hz` が 0 なら null。それ以外は、窓の全ての 1 秒で `pointerEventsPerSecMin` が `--hz` 以上のとき true(他の式は使わない)。`pointerEventsPerSecMin`: 窓の各 1 秒の件数の最小。`pointerEventsPerSecMean`: 窓の全体の件数を秒数で割った平均。
    - `screenDevicePx`: guest の画面の物理画素(例 "3240x1863")。
    - `inputSentPerSec`・`inputProcessedPerSec`・`engineCyclePerSec`: `input: N sent`・`engine cycle` の増分を、窓の長さで割る。
    - `guestMouseMovePerSec`: guest が見た `WM_MOUSEMOVE` の数(engine の記録)。取れなければ null と書く。
-4. 参考として、同じ道具で、段 0(`--play 0 --hz 0 --mouse 0`。無音・無操作。判定に入れない。#{{112}} の領域)、再生しながら(`--play 1`)の 125 Hz(`--hz 125`)と 8000 Hz(`--hz 8000`。届かない時は、届いた頻度を書く)、DPR 1 で 1000 Hz(`--dpr 1 --play 1 --hz 1000`)を n=3 で測る。判定には入れない。表にして報告に書く。
+4. 参考として、同じ道具で、段 0(`--play 0 --hz 0 --mouse 0`。無音・無操作。判定に入れない。#{{112}} の領域)、再生しながら(`--play 1`)の 125 Hz(`--hz 125`。公称 150 Hz)と 8000 Hz(`--hz 8000`。公称 9600 Hz。届かない時は、届いた頻度を書く)、DPR 1 で 1000 Hz(`--dpr 1 --play 1 --hz 1000`)を n=3 で測る。判定には入れない。表にして報告に書く。
 5. 原因を特定する。段 1 と段 3 で、`engineCyclePerSec` が入力の数に比例して増えるかを、実測で確かめる(入力 1 件ごとに engine が 1 周しているか)。増えるなら、入力 1 件ごとに、guest の描画(GDI のラスタ・合成・提示)と協調スケジューラの切り替えが走っていないかを、時間の内訳で調べる。音声を作る側の時間を食う経路を、表にする。
 6. 直し方の指針(Windows と同じ振る舞いにする)。Windows では、`WM_MOUSEMOVE` は低い優先度の合成メッセージで、キューに未処理の物が在る間は、新しい移動は 1 つに合成される。アプリが次のメッセージを取りに来た時に、最新の位置の `WM_MOUSEMOVE` が 1 つ出る(高頻度の履歴は `GetMouseMovePointsEx` で取れるが、通常の描画は最新の位置だけを使う)。これを再現する。
    - ページから engine へは、入力を時刻と位置の列として共有メモリに積む(1000〜8000 Hz でも、ページ側の処理は軽くする)。
@@ -110,13 +111,13 @@ run 45253143948(2026-11-23 19:52Z 起動)の作業。runner の値(nproc 4)。�
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-109 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 1000 --mouse 60 > ".tmp-109/s1-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 0 --mouse 0 > ".tmp-109/s2-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 1000 --mouse 60 > ".tmp-109/s3-$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=(s,i)=>JSON.parse(fs.readFileSync(".tmp-109/s"+s+"-"+i+".json","utf8").trim());const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&Math.abs(r.dpr-1.7647)<0.0001;const all=(s,f)=>[1,2,3].every((i)=>f(R(s,i)));process.exit(all(1,(r)=>ok(r)&&r.play===0&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.last60sUnderruns<=1)&&all(2,(r)=>ok(r)&&r.play===1&&r.hz===0&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)&&all(3,(r)=>ok(r)&&r.play===1&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)?0:1)' && rm -rf .tmp-109
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-109 && B="$PWD/lift/out-app/bundle/raw/fl-Oz" && for i in 1 2 3; do node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 0 --hz 1000 --mouse 60 > ".tmp-109/s1-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 0 --mouse 0 > ".tmp-109/s2-$i.json" || exit 1; node tools/p3-audio-probe/measure-live.mjs "$B" --dpr 1.7647 --play 1 --hz 1000 --mouse 60 > ".tmp-109/s3-$i.json" || exit 1; done && node -e 'const fs=require("fs");const R=(s,i)=>JSON.parse(fs.readFileSync(".tmp-109/s"+s+"-"+i+".json","utf8").trim());const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&Math.abs(r.dpr-1.7647)<0.0001;const all=(s,f)=>[1,2,3].every((i)=>f(R(s,i)));process.exit(all(1,(r)=>ok(r)&&r.play===0&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.pointerEventsPerSecMin>=1000&&r.last60sUnderruns<=1)&&all(2,(r)=>ok(r)&&r.play===1&&r.hz===0&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)&&all(3,(r)=>ok(r)&&r.play===1&&r.hz===1000&&r.mouseSec===60&&r.inputRateOk===true&&r.pointerEventsPerSecMin>=1000&&r.nonSilentQuanta>0&&r.last60sUnderruns<=1)?0:1)' && rm -rf .tmp-109
 ```
 
 判定の基準(DPR 1.7647、画面は物理画素の 1836×1056 CSS px の部屋。段 1〜3 の各 n=3 の全て):
-- 段 1(無音・マウス 1000 Hz): `last60sUnderruns` が 1 以下で、`inputRateOk` が true。
+- 段 1(無音・マウス 1000 Hz): `last60sUnderruns` が 1 以下で、`inputRateOk` が true(窓の全ての 1 秒で、ページが受けたポインタの件数が 1000 以上)。
 - 段 2(再生・マウス無し): `nonSilentQuanta` が 0 より大きく、`last60sUnderruns` が 1 以下。
-- 段 3(再生・マウス 1000 Hz): `nonSilentQuanta` が 0 より大きく、`last60sUnderruns` が 1 以下で、`inputRateOk` が true。
+- 段 3(再生・マウス 1000 Hz): `nonSilentQuanta` が 0 より大きく、`last60sUnderruns` が 1 以下で、`inputRateOk` が true(窓の全ての 1 秒で、ページが受けたポインタの件数が 1000 以上)。
 
 段 1〜3 の窓は、idle の +70 秒から +130 秒。`last60sUnderruns` は窓の終わりに読む値で、ちょうど窓の 60 秒の途切れになる。段 0(無音・無操作)は判定に入れない。その参考の値(`last60sUnderrunsAtIdle10s`)は JSON と報告に出す(起動の山の直し `#{{112}}` の領域)。
 

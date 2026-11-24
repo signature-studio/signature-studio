@@ -45,6 +45,8 @@
 #include "fle_webview2.h"
 
 uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9) __attribute__((weak));
+/* Issue #1362 (fle_win.c): the screen position of the client area of a window of the table; 0 when `h` is not a live window */
+int fle_win_client_origin(uint64_t h, int32_t *ox, int32_t *oy) __attribute__((weak));
 
 #define WV_S_OK           0x00000000u
 #define WV_E_NOINTERFACE  0x80004002u
@@ -132,7 +134,7 @@ static const struct slot tab_ctrl[] = {
 static const struct slot tab_view[] = {
     IU,
     { "get_Settings", K_GET_OBJ, IF_SET, 0 },
-    { "get_Source", K_GET_WSTR, 0, "about:blank" },
+    { "get_Source", K_GET_URI, 0, 0 },
     { "Navigate", K_NAVIGATE, 0, 0 },
     { "NavigateToString", K_NAV_HTML, 0, 0 },
     { "add_NavigationStarting", K_ADD_EV, EV_NAV_STARTING, 0 },
@@ -297,6 +299,8 @@ typedef struct wv2_obj {
     struct wv2_obj *view;      /* controller: its CoreWebView2, made by get_CoreWebView2 */
     uint64_t ev[EV_COUNT];     /* view: the handlers of the events of a navigation (0 when none) */
     uint64_t uri;              /* view: the URI of the last navigation; NavigationStarting args: its URI. A UTF-16 copy (0 when none) */
+    uint64_t nav_uri;          /* view (Issue #1362): the URI of the navigation that Navigate asked for, a UTF-16 copy (0 when none) */
+    int nav_pending;           /* view (Issue #1362): the navigation has been asked and its events are not fired yet */
 } wv2_obj;
 
 static wv2_obj *new_obj(unsigned iface)
@@ -315,6 +319,9 @@ static wv2_obj *new_obj(unsigned iface)
 
 static unsigned wv_lines;
 static uint64_t wv_token;
+/* Issue #1362: the view that the controller gave (get_CoreWebView2), and whether the page has loaded the document of its navigation (fle_wv2_page_loaded) */
+static wv2_obj *wv_view;
+static int wv_loaded;
 
 /* one line of the log: `webview2: <method> (<interface>) <arguments>`; after WV_LOG_MAX lines the log stops */
 static void wlog(const char *method, const char *iface, const char *fmt, ...)
@@ -432,6 +439,19 @@ static void complete(uint64_t handler, uint64_t a, uint64_t b)
     fle_call_guest(fn, handler, a, b, 0);
 }
 
+/* Issue #1362: a handler that is registered (add_*) is kept by WebView2 until it is removed: the object holds a reference, which the guest's own release does not drop. Without it the
+ * guest frees the handler when its own reference ends (FL's local interface variable), and the model then calls freed memory: the vtable reads 0, or the thunk of a freed block (the
+ * page does not run it). The reference is the IUnknown::AddRef of the handler (slot 1 of its vtable). A removal is not counted back: the handler then lives as long as the run (a choice). */
+static void hold_handler(uint64_t handler)
+{
+    uint64_t vt, fn;
+
+    if (handler == 0 || fle_call_guest == NULL) return;
+    vt = fle_ld(handler, 8);
+    fn = fle_ld(vt + 1u * 8u, 8);
+    fle_call_guest(fn, handler, 0, 0, 0);
+}
+
 /* a navigation of the view to `uri` (a UTF-16 copy) has ended at once: its four events, in WebView2's order, each to the handler the page registered (a handler
  * that is not registered is skipped, and its line is not written). Each fired event writes `webview2: fire <event> (<interface>) <arguments>` */
 static void fire_navigation(wv2_obj *v, uint64_t uri)
@@ -463,6 +483,23 @@ static void fire_navigation(wv2_obj *v, uint64_t uri)
         wlog("fire NavigationCompleted", "ICoreWebView2", "isSuccess=1 webErrorStatus=0");
         complete(v->ev[EV_NAV_DONE], (uint64_t)(uintptr_t)v, (uint64_t)(uintptr_t)a);
     }
+}
+
+/* Issue #1362: the page (the Browser's face, app/src/ui/webview2-surface.ts) has loaded the document that a Navigate named. The engine's idle (fle_thread_idle_hook, fle_wv2_pump) fires the
+ * navigation's events then, on the guest's own thread: NavigationStarting, SourceChanged, ContentLoading and NavigationCompleted (IsSuccess TRUE), each to the handler the page registered. */
+void fle_wv2_page_loaded(void)
+{
+    wv_loaded = 1;
+}
+
+/* Issue #1362: the engine's idle calls this before it waits: when the page has loaded the document of a pending navigation, its events are fired (once). Nothing else is pending otherwise. */
+void fle_wv2_pump(void)
+{
+    if (!wv_loaded) return;
+    wv_loaded = 0;
+    if (wv_view == NULL || !wv_view->nav_pending) return;
+    wv_view->nav_pending = 0;
+    fire_navigation(wv_view, wv_view->nav_uri);
 }
 
 /* the method of a slot: the arguments are read first, because a completion handler (guest code) changes R */
@@ -524,6 +561,7 @@ static void call_slot(unsigned iface, unsigned k)
         if (o->iface == IF_CTRL && s->arg == IF_VIEW) {
             if (o->view == NULL) o->view = new_obj(IF_VIEW);
             x = o->view;
+            if (wv_view == NULL) wv_view = x;
         } else {
             x = new_obj(s->arg);
         }
@@ -564,15 +602,22 @@ static void call_slot(unsigned iface, unsigned k)
         if (a2 == 0) ret = WV_E_INVALIDARG;
         else for (i = 0; i < 4; i++) fle_st(a2 + 4u * i, 4, (uint32_t)o->bounds[i]);
         break;
-    case K_PUT_RECT:
+    case K_PUT_RECT: {
+        int32_t ox = 0, oy = 0;
+
         if (a2 == 0) {
             wlog(s->name, in, "bounds=NULL");
             ret = WV_E_INVALIDARG;
             break;
         }
         for (i = 0; i < 4; i++) o->bounds[i] = (int32_t)(uint32_t)fle_ld(a2 + 4u * i, 4);
-        wlog(s->name, in, "bounds=%d,%d,%d,%d", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3]);
+        /* Issue #1362: the window's client origin on the guest's screen, so that the page can place the face over the desktop (origin=none: the handle is not a live window) */
+        if (fle_win_client_origin && fle_win_client_origin(o->hwnd, &ox, &oy))
+            wlog(s->name, in, "bounds=%d,%d,%d,%d origin=%d,%d", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3], ox, oy);
+        else
+            wlog(s->name, in, "bounds=%d,%d,%d,%d origin=none", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3]);
         break;
+    }
     case K_GET_HWND:
         wlog(s->name, in, "-> %#llx", (unsigned long long)o->hwnd);
         if (a2 == 0) ret = WV_E_INVALIDARG;
@@ -591,10 +636,12 @@ static void call_slot(unsigned iface, unsigned k)
         wlog(s->name, in, "(the value is in xmm; not read)");
         break;
     case K_GET_URI:
-        text_of(o->uri, t, sizeof t, &n);
+        /* Issue #1362: get_Source answers the URI of the last navigation (the first about:blank); before any, the empty string */
+        if (o->uri != 0) text_of(o->uri, t, sizeof t, &n);
+        else snprintf(t, sizeof t, "%s", "");
         wlog(s->name, in, "-> \"%s\"", t);
         if (a2 == 0) ret = WV_E_INVALIDARG;
-        else fle_st(a2, 8, utf16_copy(o->uri));
+        else fle_st(a2, 8, o->uri != 0 ? utf16_copy(o->uri) : wstr_new(""));
         break;
     case K_HDR_VALUE:
         text_of(a2, t, sizeof t, &n);
@@ -609,10 +656,12 @@ static void call_slot(unsigned iface, unsigned k)
         else fle_st(a8, 4, 0);
         break;
     case K_ADD:
+        hold_handler(a2);
         if (a8 != 0) fle_st(a8, 8, ++wv_token);
         wlog(s->name, in, "handler=%#llx token=%llu", (unsigned long long)a2, (unsigned long long)(a8 != 0 ? wv_token : 0));
         break;
     case K_ADD_EV:
+        hold_handler(a2);
         if (a8 != 0) fle_st(a8, 8, ++wv_token);
         o->ev[s->arg] = a2;
         wlog(s->name, in, "handler=%#llx token=%llu", (unsigned long long)a2, (unsigned long long)(a8 != 0 ? wv_token : 0));
@@ -628,6 +677,27 @@ static void call_slot(unsigned iface, unsigned k)
     case K_NAVIGATE:
         text_of(a2, t, sizeof t, &n);
         wlog(s->name, in, "uri=\"%s\" units=%zu", t, n);
+        /* Issue #1362: where the guest asked for the navigation: the return address of the call ([rsp] on the slot's entry), then the values above it on the guest's stack that lie in
+         * the image's range (the return addresses of the callers; the analysis checks them against the code's labels) */
+        {
+            char st[1200];
+            size_t k = 0;
+            unsigned j;
+
+            st[0] = 0;
+            for (j = 1; j < 128u; j++) {
+                uint64_t v = fle_ld(R[4] + 8u * j, 8);
+
+                if (v < 0x400000u || v >= 0x13000000u || k + 20u >= sizeof st) continue;
+                k += (size_t)snprintf(st + k, sizeof st - k, "%s%#llx", k ? "," : "", (unsigned long long)v);
+            }
+            wlog("caller", in, "at=%#llx stack=%s", (unsigned long long)fle_ld(R[4], 8), st);
+        }
+        /* Issue #1362: the navigation is asked; its events are fired when the page has loaded the document (fle_wv2_pump) */
+        if (a2 != 0 && wv_view != NULL) {
+            wv_view->nav_uri = utf16_copy(a2);
+            wv_view->nav_pending = 1;
+        }
         break;
     case K_NAV_HTML:
         text_of(a2, t, sizeof t, &n);

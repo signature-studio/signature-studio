@@ -1,7 +1,7 @@
 // Messages between the page and the engine Worker (module worker). Plain structured-clone data plus the transferables named in the comments.
 import type { Manifest } from '../bundle/manifest.ts';
 import type { RawInput } from '../input/events.ts';
-import type { DriverStats } from './idle-driver.ts';
+import type { DriverStats, ResumeWhy } from './idle-driver.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import type { HostFileStats } from './hostfiles.ts';
 import type { LazyFileShared } from './lazy-file.ts';
@@ -40,6 +40,10 @@ export type ToWorker =
   | { cmd: 'guest-text'; markers: string[]; radius: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
+  /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
+  | { cmd: 'webview2-loaded' }
+  /** Issue #1362: a message the page posted to the engine's WebView2 (window.chrome.webview.postMessage in the face's document) */
+  | { cmd: 'webview2-message'; json: string }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
@@ -71,7 +75,7 @@ export type FromWorker =
   /** the engine entered its idle: its number, the virtual clock and its next deadline in ticks, how long it ran since it was last resumed (null: first idle), what the Worker did with the input so far */
   | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
   /** the engine was resumed (it computes until its next idle) */
-  | { t: 'resume'; abs: number; why: 'input' | 'deadline' | 'end' }
+  | { t: 'resume'; abs: number; why: ResumeWhy }
   /** events the engine has processed (it is idle again): when the page made them, when the Worker gave them to the engine, when the engine was idle again (all performance.timeOrigin-based ms) */
   | { t: 'input-done'; items: { seq: number; tPage: number; tInject: number; tIdle: number }[] }
   | { t: 'input-dropped'; seq: number; reason: string }
@@ -96,4 +100,10 @@ export type FromWorker =
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }
+  /** Issue #1362: what the engine's WebView2 model was asked (its log lines, read by the Worker): the controller's rectangle (bounds: left, top, right, bottom, in the guest's pixels relative to the controller's window) and the window's client origin on the guest's screen (null when the window is not known); its visibility; a navigation (its URI, and the resource of the bundle it names: resource is the lazy file's path, or null); a message the engine posts to the page; a script the engine runs (not run by the page) */
+  | { t: 'webview2'; op: 'bounds'; left: number; top: number; right: number; bottom: number; originX: number | null; originY: number | null }
+  | { t: 'webview2'; op: 'visible'; visible: boolean }
+  | { t: 'webview2'; op: 'navigate'; uri: string; resource: string | null }
+  | { t: 'webview2'; op: 'post'; json: string }
+  | { t: 'webview2'; op: 'exec'; script: string }
   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };

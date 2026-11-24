@@ -237,12 +237,12 @@ static uint64_t thunk_target(const char *api, uint64_t proc, const fle_sys_regio
     const fle_sys_region_view rv = *rvp;
     uint64_t target, jump, page;
     int32_t rel;
-    char why[200];
+    char why[320];
 
     if (proc + 5 + 8 + 8 > rv.base + rv.size) fle_stop(api, "the window procedure lies at the end of a VirtualAlloc region: not the thunk of MakeObjectInstance (decision 0119)");
     page = (proc - rv.base) / FLE_PAGE_SIZE;
     if (rv.pages[page] != 0x10u && rv.pages[page] != 0x20u && rv.pages[page] != 0x40u && rv.pages[page] != 0x80u) {
-        snprintf(why, sizeof why, "the window procedure 0x%" PRIx64 " lies in a page of a VirtualAlloc region that is not marked for running code: not called (decision 0119)", proc);
+        snprintf(why, sizeof why, "the window procedure 0x%" PRIx64 " lies in a page of a VirtualAlloc region that is not marked for running code: not called (decision 0119; region 0x%" PRIx64 " size 0x%" PRIx64 " alloc 0x%x page %u = 0x%x)", proc, rv.base, rv.size, (unsigned)rv.alloc_protect, (unsigned)page, (unsigned)rv.pages[page]);
         fle_stop(api, why);
     }
     if (fle_ld(proc, 1) != 0xE8u) {
@@ -472,6 +472,16 @@ static void client_origin(int64_t i, int32_t *ox, int32_t *oy)
     }
     *ox = x;
     *oy = y;
+}
+
+/* Issue #1362: the screen position of the client area of the window h (the WebView2 model puts its face there, fle_webview2.c). 1 and the origin, or 0 when h is not a live window of the table. */
+int fle_win_client_origin(uint64_t h, int32_t *ox, int32_t *oy)
+{
+    int64_t i = index_of_fwd(h);
+
+    if (i < 0) return 0;
+    client_origin(i, ox, oy);
+    return 1;
 }
 
 /* R3: the z-order is one explicit list per sibling group (the children of one parent window; parent -1 = the top-level windows of the desktop). `zl` holds the windows of ALL groups in one sequence, top first;

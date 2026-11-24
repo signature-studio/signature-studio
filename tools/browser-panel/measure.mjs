@@ -1,6 +1,9 @@
 // browser-panel: the measurement of the Browser panel on the left (#1355). It boots the bundle the way tools/boot-check/boot-bundle.mjs does (headless Chrome, a new profile, the page at "/",
 // no page parameters, the same isolation flags), at device pixel ratio 1, with the room (#stage) fitted to 1836 x 1056 CSS px as tools/p2-frames/measure.mjs does. It records and judges nothing else.
-// Usage: node tools/browser-panel/measure.mjs <absolute path to the bundle directory raw/<name>> > browser.json   (needs app/node_modules and app/dist). Exit 1 when error is set, 2 when no bundle directory is given.
+// Usage: node tools/browser-panel/measure.mjs <absolute path to the bundle directory raw/<name>> [<png prefix>] > browser.json   (needs app/node_modules and app/dist). Exit 1 when error is set, 2 when no bundle directory is given.
+//   Issue #1362: before the judgement the Welcome window is closed (Escape, and the project opens: flow B of tools/smoke/welcome-flow.mjs), the "Problems loading the project" box is closed (Escape),
+//   the first tab (guest 35,125) is pressed and then the cloud tab (guest 267,125): the cloud tab is selected at the start, and its Navigate comes from a press that selects it. <png prefix>, when given, writes
+//   <prefix>-before.png (before the cloud tab's press) and <prefix>-after.png (after the settle time): a test aid, nothing is removed.
 // stdout: ONE JSON line {dpr, state, standIn, error, blackShare, browserComponents, elapsedMs, preBootBytes, browserWindow}. stderr: one line per step (the room, the windows, the rectangle used).
 //   elapsedMs: from the navigation to the first poll that sees state 'engine-idle' (the poll is every 100 ms).
 //   preBootBytes: the decoded bytes of the start-up assets (window.__app.assetsReport().items, bytes), as the page's report lists them: the engine wasm, the DLL pack, the seed pack and the engine glue.
@@ -10,7 +13,12 @@
 //     of the main form (TWPControl, lid 49, with TSampleListForm, lid 68, in it; #1355 probe: the window-API trace gives its rectangle as abs (-5, 76) 364 x 974 in the guest, the list pane
 //     at (-5, 139) 364 x 905). So the fallback is that panel's rectangle, x 0, y 76, 364 x 974 CSS px from the room's origin (the room's origin is the guest's origin at DPR 1), clamped to the picture.
 //     The earlier rectangle (x 0, y 580, 400 x 470) covered only the lower part of the list and 36 px of the Playlist, so it is not used.
-//   blackShare: the fraction (0..1) of the pixels of the rectangle whose R, G and B are all <= 16 (the compositor's picture, window.__app.deskDumpBase64(true), guest px).
+//   blackShare (Issue #1362): the fraction (0..1) of the pixels whose R, G and B are all <= 16, in the PAGE's own picture (CDP Page.captureScreenshot of the Browser's area: x 0, y 76, 364 x 974 guest px at the desktop's scale).
+//   guestBlackShare: the same fraction of the compositor's picture (window.__app.deskDumpBase64(true), guest px), the measure of #1355. Not judged.
+//   cloudPressed: the cloud tab (guest 267,125) was pressed once before the judgement (probe-navigate.mjs's press).
+//   iframeCount: the iframes of the page that carry the mark data-fl-webview2 (the WebView2 face: app/src/ui/webview2-surface.ts). iframeRect: the first one's rectangle, CSS px from the room's origin (#stage), or null.
+//   boundsRect: the last put_Bounds of the engine's log (its bounds and origin=X,Y of the window: the guest's pixels) in the same frame, at the desktop's scale. A window whose origin is negative (the list pane: x -5) is placed at its negative origin, and the face is clipped to the desktop (its rectangle is not).
+//   boundsMatch: true when iframeCount >= 1 and each of x, y, w, h of iframeRect and boundsRect differs by at most 2 CSS px.
 //   browserComponents: the number of 8-connected groups of the pixels of the rectangle that are not the background colour (the most common of the four corners' colours), with at least 16 pixels.
 //   webview2Lines: the number of the engine's log lines that begin with "webview2: " (fle_webview2.c: what FLEngine hands to the WebView2 model; the engine's stderr, window.__app.engineLog()).
 //   webview2Methods: the names of the methods in those lines, in the order of their first appearance, each once (the fire lines are not methods: they are left out). The lines themselves go to stderr (the record of #1355). Judged: only that CreateCoreWebView2EnvironmentWithOptions is in it.
@@ -70,6 +78,20 @@ const FINAL = `(() => { const a = window.__app ?? null; return {
   dpr: window.devicePixelRatio,
 }; })()`;
 const PICTURE = `window.__app.deskDumpBase64(true)`;
+// Issue #1362: the cloud tab (guest 267,125; the press of probe-navigate.mjs), the face of the WebView2 (the iframe the page puts over the desktop), and the Browser's area in the page's own picture
+const TAB_CLOUD = { x: 267, y: 125 };
+const TAB_OTHER = { x: 35, y: 125 };
+const TAB_SETTLE_MS = 3000;
+const OPEN_WAIT_MS = 120000;
+const DISMISS_MS = 2000;
+const TITLE = `document.title`;
+const FACE_WAIT_MS = 15000;
+const BOUNDS_MATCH_CSS = 2;
+const BROWSER_GUEST = { x: 0, y: 76, w: 364, h: 974 };
+const FACE = `(() => { const s = document.getElementById('stage').getBoundingClientRect(); const d = document.getElementById('desktop').getBoundingClientRect(); const a = window.__app; const g = a && a.screen && a.screen.guest ? a.screen.guest : null; const frames = Array.from(document.querySelectorAll('iframe[data-fl-webview2]')); const f = frames[0] ? frames[0].getBoundingClientRect() : null; return { stage: { x: s.x, y: s.y }, desk: { x: d.x, y: d.y, w: d.width, h: d.height }, guestW: g ? g.width : null, count: frames.length, rect: f ? { x: f.x - s.x, y: f.y - s.y, w: f.width, h: f.height } : null, srcdocLength: frames[0] ? (frames[0].srcdoc || '').length : null, frameBackground: frames[0] ? getComputedStyle(frames[0]).backgroundColor : null }; })()`;
+const PUT_BOUNDS = /put_Bounds \(\S+\) bounds=(-?\d+),(-?\d+),(-?\d+),(-?\d+)(?: origin=(-?\d+),(-?\d+))?/;
+/** the number of pixels of a PNG (base64, decoded in the page) whose R, G and B are all <= BLACK_MAX, and the number of pixels */
+const countBlack = (b64) => `(async () => { const img = new Image(); img.src = 'data:image/png;base64,${b64}'; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, c.width, c.height).data; let black = 0; for (let i = 0; i < px.length; i += 4) if (px[i] <= ${BLACK_MAX} && px[i + 1] <= ${BLACK_MAX} && px[i + 2] <= ${BLACK_MAX}) black++; return { black, n: c.width * c.height }; })()`;
 const ENGINE_LOG = `window.__app.engineLog()`;
 const WEBVIEW2_LINE = /^(?:\[err\] )?webview2: (\S+)/;
 const WEBVIEW2_FIRE = /^(?:\[err\] )?webview2: fire (\S+)/;
@@ -80,6 +102,22 @@ const timed = (p, ms, what) => {
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`timeout ${ms} ms: ${what}`)), ms); })]).finally(() => clearTimeout(t));
 };
 const log = (...a) => process.stderr.write(a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ') + '\n');
+
+/** a key press and release (probe-navigate.mjs's key) */
+async function pressKey(S, name, vk) {
+  await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: name, key: name, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+  await sleep(40);
+  await S('Input.dispatchKeyEvent', { type: 'keyUp', code: name, key: name, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
+}
+
+/** a left click at the CSS point c (move, press, release: the press of probe-navigate.mjs) */
+async function pressCss(S, c) {
+  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y, button: 'none', buttons: 0, clickCount: 0, pointerType: 'mouse' });
+  await sleep(60);
+  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+  await sleep(50);
+  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+}
 
 /** a picture: the RGBA bytes of a dump (its rows may be longer than width x 4) */
 function picture(d) {
@@ -148,7 +186,7 @@ export function findBrowser(windows) {
 
 async function main() {
   const t0 = Date.now();
-  const out = { dpr: DPR, state: null, standIn: null, error: null, blackShare: null, browserComponents: null, elapsedMs: null, preBootBytes: null, browserWindow: null, webview2Lines: null, webview2Methods: null, webview2Fired: null, navigateCalls: null };
+  const out = { dpr: DPR, state: null, standIn: null, error: null, blackShare: null, guestBlackShare: null, browserComponents: null, elapsedMs: null, preBootBytes: null, browserWindow: null, webview2Lines: null, webview2Methods: null, webview2Fired: null, navigateCalls: null, cloudPressed: false, iframeCount: 0, iframeRect: null, boundsRect: null, boundsMatch: false };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-browser-panel-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
@@ -211,6 +249,35 @@ async function main() {
     out.dpr = room.dpr;
     log('room', { sw: room.sw, sh: room.sh, desktop: [room.x, room.y, room.w, room.h], dpr: room.dpr, guest: room.guest });
 
+    // Issue #1362: the judgement comes after the cloud tab has been pressed once (probe-navigate.mjs's press). The Welcome window covers the Browser at the start, and then the
+    // "Problems loading the project" box does: Escape closes the first (flow B: the project opens when the title changes), Escape the second (probe-navigate.mjs's steps)
+    const titleBefore = await ev(TITLE);
+    await pressKey(S, 'Escape', 27);
+    for (let t = 0; t < OPEN_WAIT_MS; t += POLL_MS) {
+      if ((await ev(TITLE)) !== titleBefore && (await ev(STATE))?.state === 'engine-idle') break;
+      await sleep(POLL_MS);
+    }
+    await sleep(2000);
+    await pressKey(S, 'Escape', 27);
+    await sleep(DISMISS_MS);
+    const face0 = await ev(FACE);
+    if (!face0.guestW) throw new Error('the guest screen is not known to the page');
+    const cssPerGuest0 = face0.desk.w / face0.guestW;
+    const logFrom = (await ev(ENGINE_LOG)).length;
+    if (process.argv[3]) fs.writeFileSync(`${process.argv[3]}-before.png`, Buffer.from((await S('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+    // the cloud tab is selected at the start, so its press selects it again: the first tab (the waveform, guest 35,125) is pressed before it (probe-navigate.mjs's order)
+    await pressCss(S, { x: face0.desk.x + (TAB_OTHER.x + 0.5) * cssPerGuest0, y: face0.desk.y + (TAB_OTHER.y + 0.5) * cssPerGuest0 });
+    await sleep(TAB_SETTLE_MS);
+    await pressCss(S, { x: face0.desk.x + (TAB_CLOUD.x + 0.5) * cssPerGuest0, y: face0.desk.y + (TAB_CLOUD.y + 0.5) * cssPerGuest0 });
+    out.cloudPressed = true;
+    for (let t = 0; t < FACE_WAIT_MS; t += POLL_MS) {
+      const after = (await ev(ENGINE_LOG)).slice(logFrom);
+      if (after.some((l) => /webview2: fire NavigationCompleted/.test(l))) break;
+      await sleep(POLL_MS);
+    }
+    await sleep(TAB_SETTLE_MS);
+    if (process.argv[3]) fs.writeFileSync(`${process.argv[3]}-after.png`, Buffer.from((await S('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+
     // the picture after the engine has been idle for a while (the lists are painted after the start-up)
     await sleep(SETTLE_MS);
     const fin = await ev(FINAL);
@@ -227,7 +294,26 @@ async function main() {
     out.webview2Fired = [...new Set(wv.filter((l) => WEBVIEW2_FIRE.test(l)).map((l) => WEBVIEW2_FIRE.exec(l)[1]))];
     out.navigateCalls = methods.filter((m) => NAVIGATE_METHODS.has(m)).length;
     for (const l of wv) process.stderr.write(l + '\n');
+    for (const l of (await ev(ENGINE_LOG)).filter((x) => /^(\[err\] )?fle[-:]/.test(x) && !/fle-prot: TEMP commit/.test(x))) process.stderr.write(l + '\n');   // the engine's own lines (its stop message, the protection trace)
 
+    // Issue #1362: the face (the iframe) against the last put_Bounds of the engine's log: its rectangle from the room's origin, and the same rectangle from the bounds
+    const face = await ev(FACE);
+    out.iframeCount = face.count;
+    out.iframeRect = face.rect ? { x: face.rect.x, y: face.rect.y, w: face.rect.w, h: face.rect.h } : null;
+    out.iframeSrcdocLength = face.srcdocLength;
+    out.iframeBackground = face.frameBackground;
+    const k = face.desk.w / face.guestW;
+    const lastBounds = [...wv].reverse().map((l) => PUT_BOUNDS.exec(l)).find((m) => m !== null) ?? null;
+    if (lastBounds) {
+      const ox = lastBounds[5] !== undefined ? +lastBounds[5] : 0, oy = lastBounds[6] !== undefined ? +lastBounds[6] : 0;
+      const [l, t, r, b] = lastBounds.slice(1, 5).map(Number);
+      out.boundsRect = { x: face.desk.x - face.stage.x + (ox + l) * k, y: face.desk.y - face.stage.y + (oy + t) * k, w: (r - l) * k, h: (b - t) * k };
+    }
+    out.boundsMatch = out.iframeCount >= 1 && out.iframeRect !== null && out.boundsRect !== null && ['x', 'y', 'w', 'h'].every((key) => Math.abs(out.iframeRect[key] - out.boundsRect[key]) <= BOUNDS_MATCH_CSS);
+    // the page's own picture of the Browser's area (CSS pixels of the room at DPR 1): what the person sees
+    const shot = await S('Page.captureScreenshot', { format: 'png', clip: { x: face.desk.x, y: face.desk.y + BROWSER_GUEST.y * k, width: BROWSER_GUEST.w * k, height: BROWSER_GUEST.h * k, scale: 1 }, captureBeyondViewport: false });
+    const shotBlack = await ev(countBlack(shot.data));
+    out.blackShare = shotBlack.n > 0 ? shotBlack.black / shotBlack.n : null;
     const d = await ev(PICTURE);
     const pic = picture(d);
     const scale = pic.w / room.w;
@@ -240,7 +326,7 @@ async function main() {
     }
     const cr = clampRect(pic, rect);
     const j = judgePicture(pic, cr);
-    out.blackShare = j.blackShare;
+    out.guestBlackShare = j.blackShare;
     out.browserComponents = j.browserComponents;
     out.browserWindow = { ...rect, x: cr.x, y: cr.y, w: cr.w, h: cr.h, cssRect: { x: cr.x / scale, y: cr.y / scale, w: cr.w / scale, h: cr.h / scale }, background: j.background, pixels: j.pixels };
     log('picture', { w: pic.w, h: pic.h, scale, rect: cr, background: j.background, pixels: j.pixels });

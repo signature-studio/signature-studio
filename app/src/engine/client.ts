@@ -35,6 +35,8 @@ export interface ClientEvents {
   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
   taskbar?(m: Extract<FromWorker, { t: 'taskbar' }>): void;
+  /** Issue #1362: what the engine's WebView2 model was asked (the Browser panel's face shows it) */
+  webview2?(m: Extract<FromWorker, { t: 'webview2' }>): void;
 }
 
 export class EngineClient {
@@ -120,6 +122,10 @@ export class EngineClient {
 
   start(): void { this.send({ cmd: 'start' }); }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
+  /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
+  webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
+  /** Issue #1362: a message the face's document posted (window.chrome.webview.postMessage) */
+  webview2Message(json: string): void { this.worker?.postMessage({ cmd: 'webview2-message', json } satisfies ToWorker); }
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
@@ -193,6 +199,7 @@ export class EngineClient {
       case 'osstate': this.events.osstate?.(m); break;
       case 'desk': this.events.desk?.(m); break;
       case 'taskbar': this.events.taskbar?.(m); break;
+      case 'webview2': this.events.webview2?.(m); break;
     }
   }
 }

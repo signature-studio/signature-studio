@@ -3,8 +3,9 @@
 // 入力: 分類の表(既定 inputs/plugin-classes.tsv。#1343 の成果)の Plugins\Fruity\Effects\ と Plugins\Fruity\Generators\ の DLL。単位はプラグインのフォルダ(Plugins\Fruity\<種別>\<フォルダ>\)で、本体と補助の DLL は同じフォルダに在る。
 // 除く: VFX 系のフォルダ(フォルダの DLL に VFX が yes の物が 1 つでも在る。補助の DLL が OpenGL を import する場合を含む)と、第 1 波の 3 フォルダ(Fruity Balance・Fruity Filter・Fruity Delay 2)。後回しの一覧(既定 inputs/vfx-deferred.tsv)は、VFX が yes の DLL と同じ集合でなければ拒否する。
 // 束: Effects と Generators を別々に、フォルダの名前順に 3 フォルダずつ(各種類の最後の束だけ端数)。下書き番号は --start(既定 041)から、Effects の束、Generators の束の順。親は Effects が 021、Generators が 022。
-// 本文: テンプレート(既定 pm-work/issue-drafts/wave2-template.md)の @@KIND@@・@@NAMES@@・@@PARENT_REF@@・@@PARENT_LABEL@@・@@PLUGINS@@・@@PATTERNS@@ を、束の内容で置き換える。@@PLUGINS@@ は、フォルダごとの本体の DLL(名前・大きさ・SHA-256・export・import・hook の要否)と補助の DLL(名前・大きさ・備考)。@@PATTERNS@@ は、本体の DLL ごとの名前の条件。
-// 拒否(終了コード 1。何も書かない): テンプレートに TODO(#1315 の結果で確定)が残る、本文に #数字 や L-0 が在る、置き換えの後に @@ が残る、後回しと VFX の DLL の集合が違う、後回し・第 1 波のフォルダが表に無い、本体の無いフォルダが在る。
+// 本文: テンプレート(既定 pm-work/issue-drafts/wave2-template.md)の @@KIND@@・@@NAMES@@・@@PARENT_REF@@・@@PARENT_LABEL@@・@@PLUGINS@@・@@ARGS@@ を、束の内容で置き換える。@@PLUGINS@@ は、フォルダごとの本体の DLL(名前・大きさ・SHA-256・export・import・hook の要否)と補助の DLL(名前・大きさ・備考)。@@ARGS@@ は、フォルダの名前を引用符で囲んだ並び(#{{125}} の道具の引数)。
+// 依存: blocked_by は 125・126・127(#{{125}} の仕組み、#{{126}} の 2 本目、#{{127}} の道具)。1 プラグインは lift/plugins/<名前>/plugin.tsv だけで入る(共有のファイルを変えない)。
+// 拒否(終了コード 1。何も書かない): テンプレートに TODO(#1315 の結果で確定)が残る、本文に #数字 や L-0 が在る、置き換えの後に @@ が残る、後回しと VFX の DLL の集合が違う、後回し・第 1 波のフォルダが表に無い、本体の無いフォルダが在る、フォルダの名前に引用符で囲めない字が在る。
 // --dry-run: 件数と、束の先頭 5 件を出す。検査は同じに行い、書かない(TODO が残るときは、件数を出した後に 1 で止まる)。
 // 出力: <出力先>/<NNN>-<effects|generators>-<NN>.md。出力先の同じ形式の古い下書きは消してから書く(他の名前のファイルは残す)。
 // 終了コード: 0 = 生成(--dry-run は検査が通った)、1 = 検査の失敗(理由を標準エラーに出す)、2 = 使い方の誤り。
@@ -23,7 +24,7 @@ const defaults = {
 const FLAGS = new Map([['--classes', 'classes'], ['--deferred', 'deferred'], ['--template', 'template'], ['--out', 'out'], ['--start', 'start']]);
 const TODO = 'TODO(#1315 の結果で確定)';
 const MILESTONE = 'M5 内蔵のエフェクトとインストゥルメント';
-const BLOCKED_BY = ['015', '019'];
+const BLOCKED_BY = ['125', '126', '127'];
 const PER_BUNDLE = 3;
 const PREFIX = 'Plugins\\Fruity\\';
 // 第 1 波で扱う 3 フォルダ(#1315 と #1319 の対象)
@@ -61,9 +62,8 @@ const splitList = (s) => s.split(';').filter(Boolean);
 const folderOf = (guest) => guest.split('\\').slice(0, 4).join('\\');
 const folderName = (folder) => folder.split('\\')[3];
 const baseName = (guest) => guest.slice(guest.lastIndexOf('\\') + 1).replace(/\.dll$/i, '').replace(/_x64$/i, '');
-const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-// accept の条件: 名前の空白・区切りを任意の 1 字に読む(大文字と小文字は無視)
-const patternOf = (name) => `/${name.split(/[ /]+/).map(escapeRe).join('.?').toLowerCase()}/i`;
+// accept の引数: フォルダの名前を、シングルクォートで囲んで 1 語にする(名前に ' と、シェルで展開される字が無いことを検査で確かめる)
+const quotedName = (name) => `'${name}'`;
 
 const [head, ...body] = rows(opt.classes);
 if (!head || head.join('\t') !== HEAD.join('\t')) die([`分類の表の見出しが違う(${opt.classes})`]);
@@ -152,15 +152,15 @@ for (const g of GROUPS) {
     const n = String(next++).padStart(3, '0');
     const members = items.slice(i, i + PER_BUNDLE);
     const names = members.map(([f]) => folderName(f));
+    for (const n of names) if (!/^[^'"\\$`\r\n]+$/.test(n)) errors.push(`フォルダの名前に accept の引数にできない字が在る: ${n}`);
     const title = `${g.word} ${index}: ${names.join('・')} を、1 プラグイン 1 wasm で入れる`;
-    const bodies = members.flatMap(([, list]) => list.filter((r) => r['本体か補助か'] === '本体'));
     const subst = [
       ['@@KIND@@', g.kind],
       ['@@NAMES@@', names.join('・')],
       ['@@PARENT_REF@@', `#{{${g.parent}}}`],
       ['@@PARENT_LABEL@@', g.label],
       ['@@PLUGINS@@', pluginList(members)],
-      ['@@PATTERNS@@', bodies.map((r) => patternOf(baseName(r['パス']))).join(', ')],
+      ['@@ARGS@@', names.map(quotedName).join(' ')],
     ];
     let text = template;
     for (const [k, v] of subst) text = text.split(k).join(v);

@@ -45,6 +45,8 @@ pub enum Kind {
     Abs64,
     /// 4-byte signed offsets from `base`: target = base + entry. The jump is `jmp reg`.
     Rel32 { base: u64 },
+    /// 1-byte unsigned offsets from `base`: target = base + entry. The jump is `jmp reg`.
+    Rel8 { base: u64 },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -184,6 +186,20 @@ pub const ILTOOLS_6000000: &[Spec] = &[Spec {
     kind: Kind::Abs64,
 }];
 
+/// The annotated jump of dsp_ippv2_x64.dll rebased to 0x2000000, at 0x27ad525 in the .pdata routine 0x27ad029..0x27add86: the remainder
+/// of a Duff's-device loop over the elements of a buffer. `movzx eax,[r15+r14+0x1ecf840]; lea rax,[r15+rax+0x7ad527]; jmp rax`: the
+/// table is 8 bytes at 0x3ecf840 (r15 holds the image base 0x2000000), and each byte is an offset from the first block 0x27ad527. The
+/// index is r1 - r13 (r13 = 8*k + 1 for the k groups done), which the loop keeps in 0..7 (inferred from the loop, not from a guard; an
+/// index outside stops in fle_jumptab_miss). Each target is a block of the same routine (a `switch` case), not a function of its own.
+pub const DSP_IPPV2_2000000: &[Spec] = &[Spec {
+    jmp_va: 0x27ad525,
+    code: &[0xff, 0xe0],
+    func: (0x27ad029, 0x27add86),
+    table: 0x3ecf840,
+    count: 8,
+    kind: Kind::Rel8 { base: 0x27ad527 },
+}];
+
 fn in_func(s: &Spec, va: u64) -> bool {
     va >= s.func.0 && va < s.func.1
 }
@@ -204,6 +220,7 @@ pub fn resolve(pe: &Pe<'_>, text: &Text<'_>, s: &Spec) -> Result<JumpTable, Stri
     let esz: u64 = match s.kind {
         Kind::Abs64 => 8,
         Kind::Rel32 { .. } => 4,
+        Kind::Rel8 { .. } => 1,
     };
     let size = esz * s.count as u64;
     // decision 0181 (hyb2): a table that lies outside .text (read-only data: the table-relative switch tables of the third-party plug-in, `Spec`s made by fe-wasmgen --rel-sites) need not be
@@ -227,6 +244,10 @@ pub fn resolve(pe: &Pe<'_>, text: &Text<'_>, s: &Spec) -> Result<JumpTable, Stri
                 let t = base.wrapping_add(i32::from_le_bytes(a) as i64 as u64);
                 (t, t)
             }
+            Kind::Rel8 { base } => {
+                let t = base.wrapping_add(raw[k] as u64);
+                (t, t)
+            }
         };
         if !text.contains(target) || !in_func(s, target) {
             return Err(format!("entry {k} target {target:#x} is outside the annotated function or .text"));
@@ -235,7 +256,7 @@ pub fn resolve(pe: &Pe<'_>, text: &Text<'_>, s: &Spec) -> Result<JumpTable, Stri
     }
     let select = match s.kind {
         Kind::Abs64 => Select::Slot,
-        Kind::Rel32 { .. } => Select::Target,
+        Kind::Rel32 { .. } | Kind::Rel8 { .. } => Select::Target,
     };
     Ok(JumpTable { select, cases: cases.into_iter().collect(), origin: Origin::Annotated })
 }

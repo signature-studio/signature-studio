@@ -21,6 +21,7 @@
 #include "fle_sys.h"
 #include "fle_thread.h"
 #include "fle_win.h"
+#include "fle_webview2.h"
 
 void fruity_surface_idle_event(unsigned idle_no);
 void fruity_surface_idle_sync(void);   /* decision 0145: the layered-window words of the surface table, before the page looks */
@@ -64,7 +65,9 @@ static unsigned idle_no, snap_calls;
 
 int fle_thread_idle_hook(uint64_t now, uint64_t next, uint64_t *advance_to) {
     double d;
-    int r = g3_script_idle(now, next, advance_to);
+    int r;
+    fle_wv2_pump();   /* Issue #1362: the navigation events of a page that has loaded are fired here, on the thread that waits */
+    r = g3_script_idle(now, next, advance_to);
     if (r >= 0) return r;
     idle_no++;
     fruity_surface_idle_sync();
@@ -75,6 +78,8 @@ int fle_thread_idle_hook(uint64_t now, uint64_t next, uint64_t *advance_to) {
     return 2;
 }
 
+/* Issue #1362: the page has loaded the document of the WebView2 navigation (called while the engine waits; the events are fired at its next idle) */
+EMSCRIPTEN_KEEPALIVE void fle_g3_wv2_loaded(void) { fle_wv2_page_loaded(); }
 EMSCRIPTEN_KEEPALIVE int fle_g3_mouse(int kind, int x, int y, int data) { return fle_input_host_mouse(kind, x, y, data); }
 EMSCRIPTEN_KEEPALIVE int fle_g3_key(int kind, unsigned vk, unsigned scan, int ext) { return fle_input_host_key(kind, vk, scan, ext); }
 /* decision 0212: the display changed to w x h (lift/runtime/fle_input.h fle_input_host_display); 1 = queued */

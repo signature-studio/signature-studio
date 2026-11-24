@@ -16,3 +16,8 @@ void fle_imp_CompareBrowserVersions(void);
 
 /* The method slot hook of fle_win_try_thunk (fle_win.c): 1 and the method has run when `va` is a slot of this model, else 0. */
 int fle_wv2_try_slot(uint64_t va);
+
+/* Issue #1362: the page has loaded the document of a Navigate (the engine's export fle_g3_wv2_loaded), and the engine's idle fires the navigation's events
+ * (fle_wv2_pump, called by fle_thread_idle_hook before it waits). */
+void fle_wv2_page_loaded(void);
+void fle_wv2_pump(void);

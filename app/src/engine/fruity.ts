@@ -221,6 +221,14 @@ export class FruityEngine {
   /** decision 0212: the wasm has the export that tells the guest the display changed (a bundle built before screen1 has none) */
   get hasDisplay(): boolean { return typeof (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_display === 'function'; }
 
+  /** Issue #1362: the page's face has loaded the document of a WebView2 navigation; the engine fires its events at its next idle (fle_g3_wv2_loaded, lift/harness/fruity_idle.c). False when the wasm has no such export. */
+  wv2Loaded(): boolean {
+    const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_wv2_loaded;
+    if (typeof f !== 'function') return false;
+    f();
+    return true;
+  }
+
   /** decision 0193: hands the person's answer to the suspended engine; false when the engine is not waiting for this dialog */
   answerFileDlg(id: number, answer: unknown): boolean { return this.opts.fleFileDlgAnswer ? this.opts.fleFileDlgAnswer(id, answer) : false; }
 
