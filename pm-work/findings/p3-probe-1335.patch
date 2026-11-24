@@ -1,0 +1,176 @@
+diff --git a/inputs/p3-project.tsv b/inputs/p3-project.tsv
+new file mode 100644
+index 00000000..705dc9c8
+--- /dev/null
++++ b/inputs/p3-project.tsv
+@@ -0,0 +1,2 @@
++guest	bytes	sha256	playlist
++Data\Templates\Other\Blocks\Blocks.flp	57737	3d3eee6d459e2af964fd8dc5e60bb076bb12f10c97a4ab299cf9c4bcf6252d57	260
+diff --git a/tools/p3-audio-probe/measure.mjs b/tools/p3-audio-probe/measure.mjs
+index 32568bcf..2940cd3a 100644
+--- a/tools/p3-audio-probe/measure.mjs
++++ b/tools/p3-audio-probe/measure.mjs
+@@ -3,6 +3,7 @@
+ // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
+ // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
+ // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
++// With a project file (#1335): the welcome wizard is closed with Escape (its X is outside a 780x480 screen), the project goes into the page's file manager and is opened by File > Open (the row, then OK), and the dialog of missing plugins or samples is closed with its Ok ("welcome", "projectDialogs"). "underrunSpans" lists the underrun spans of the page's audio output after the AudioContext started, from the page's history (ms after the start).
+ // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+ import fs from 'node:fs';
+ import os from 'node:os';
+@@ -56,6 +57,10 @@ const UI_STEP_MS = 50;
+ const AUDIO_WAIT_MS = 5000;
+ // the start-up consent box ("Help us improve FL Studio by sending usage data") is drawn in the guest picture (not a window). Its "No thanks" button is at this guest pixel on the 780x480 screen that the default window gives (measured with a screenshot: the box is gone after the press, the status line reads "last input: button L up at screen (513, 308)")
+ const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };
++// the engine's window list (windowsNow)
++const WINDOWS = `(async () => (await window.__app.deskDumpBase64(false)).windows)()`;
++// the underruns of the page's audio output from its history (one entry per worklet post, 50 ms: the page's time and the underrun quanta so far): the spans of posts whose count rose, as [fromMs, toMs] after the AudioContext started, with their quanta (a gap of 200 ms or less joins a span)
++const UNDERRUN_SPANS = `(() => { const a = window.__app.audio; const h = a.history; const t0 = a.startedAt; const out = []; let cur = null; for (let i = 1; i < h.length; i++) { const n = h[i].ur - h[i - 1].ur; if (n <= 0) continue; if (cur && h[i].page - cur.to <= 200) { cur.to = h[i].page; cur.quanta += n; } else { cur = { from: h[i].page, to: h[i].page, quanta: n }; out.push(cur); } } return { startedAtPage: t0 === null ? null : Math.round(t0), spans: out.map((s) => ({ fromMs: Math.round(s.from - t0), toMs: Math.round(s.to - t0), quanta: s.quanta })) }; })()`;
+ // --boot (#1334): the room (the stage: the viewport less the 340 px monitor panel and the 36 px header of style.css, screen-fit) is 1836x1056 CSS px at the device pixel ratio of the user's machine (1.7647 = 30/17: the guest screen is then 3240x1863 device px, floor of the room times the ratio); the poll of engine-idle; the three read times after engine-idle (+10, +70, +90 s; bootLast60sAt90s is the one the acceptance reads)
+ const BOOT_VIEWPORT = { width: 1836 + 340, height: 1056 + 36, dpr: 30 / 17 };
+ const BOOT_POLL_MS = 50;
+@@ -86,7 +91,7 @@ async function main() {
+   const t0 = Date.now();
+   const out = {
+     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
+-    state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null,
++    state: null, standIn: null, error: null, gesture: null, consent: null, welcome: null, projectDialogs: null, underrunSpans: null, keyAtGuest: null, before: null,
+     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
+     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
+     screenDevicePx: null, dpr: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
+@@ -115,16 +120,14 @@ async function main() {
+     const { browserContextId } = await cdp.send('Target.createBrowserContext', { disposeOnDetach: true });
+     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', browserContextId });
+     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
+-    const chooser = [];
+     const workers = [];
+     cdp.on((m) => {
+-      if (m.sessionId === sessionId && m.method === 'Page.fileChooserOpened') chooser.push(m.params);
+       if (m.sessionId === sessionId && m.method === 'Target.attachedToTarget' && m.params.targetInfo.type === 'worker') workers.push(m.params.sessionId);
+     });
+     const S = (method, params) => timed(cdp.send(method, params, sessionId), CDP_TIMEOUT_MS, method);
+     const ev = async (expression) => {
+       const r = await S('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+-      if (r.exceptionDetails) throw new Error(`evaluate: ${r.exceptionDetails.text}`);
++      if (r.exceptionDetails) throw new Error(`evaluate: ${r.exceptionDetails.text} ${String(r.exceptionDetails.exception?.description ?? '').split('\n')[0]}`.trim());
+       return r.result.value;
+     };
+     const audioNow = () => ev('window.__app && window.__app.audio ? window.__app.audio.detail() : null');
+@@ -170,7 +173,10 @@ async function main() {
+     out.consent = await dismissStartupBox(S, ev);
+     log('consent box', out.consent);
+ 
+-    if (projectFile !== null) await openProject(S, ev, chooser, projectFile);
++    if (projectFile !== null) {
++      out.welcome = await closeWelcome(S, ev);
++      out.projectDialogs = await openProject(S, ev, projectFile);
++    }
+     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+     await tapKey(S, 'Space', ' ', 32);
+     out.keyAtGuest = await keyShown(ev, 'vk 0x20', 2000);
+@@ -196,6 +202,7 @@ async function main() {
+     log('from', pickAudio(d0), 'to', pickAudio(d1));
+     fromAudio(d1);
+     Object.assign(out, { presentsDelta: p0 === null || p1 === null ? null : p1 - p0, quantaDelta: d1.quantaWhilePlaying - d0.quantaWhilePlaying, underrunDelta: d1.underrunQuanta - d0.underrunQuanta });
++    out.underrunSpans = await ev(UNDERRUN_SPANS);
+     if (d1.error) probeError = d1.error;
+   } catch (e) {
+     probeError = String(e?.message ?? e).slice(0, 500);
+@@ -372,22 +379,87 @@ async function dismissStartupBox(S, ev) {
+   return `"No thanks" at guest (${NO_THANKS.x}, ${NO_THANKS.y}) of ${NO_THANKS.gw}x${NO_THANKS.gh}`;
+ }
+ 
+-// the project file is opened with the engine's File > Open, the route of the other probes (tools/verify-kit/tools/sdriveg2-lat.mjs, openFile). Not run yet: no project file is in the repository.
+-async function openProject(S, ev, chooser, file) {
++// the engine's window list (the read of tools/p2-frames/measure.mjs), in guest pixels; read again while the page refuses it ("ask again": the picture is being shown)
++async function windowsNow(ev) {
++  const t0 = Date.now();
++  for (;;) {
++    try { return parseWindows(await ev(WINDOWS)); } catch (e) {
++      if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 15000) throw e;
++      await sleep(100);
++    }
++  }
++}
++
++function parseWindows(text) {
++  return text.split('\n').map((l) => /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
++    const names = /class "([^"]*)" title "([^"]*)"\s*$/.exec(m[6]);
++    return { cls: names ? names[1] : '', x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]) };
++  });
++}
++
++// the welcome wizard (TWelcomeWizard) is closed with Escape: its X lies outside the guest screen at this size (the wizard is 874 x 573 guest px on the 780 x 480 screen). The default project then loads, and its dialog of missing plugins and samples (see dismissMissing) comes up.
++async function closeWelcome(S, ev) {
++  if (!(await windowsNow(ev)).some((w) => w.cls === 'TWelcomeWizard')) return { wizard: 'none' };
++  await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
++  await tapKey(S, 'Escape', 'Escape', 27);
++  const t0 = Date.now();
++  while ((await windowsNow(ev)).some((w) => w.cls === 'TWelcomeWizard')) {
++    if (Date.now() - t0 >= 15000) throw new Error('the welcome wizard did not close (Escape)');
++    await sleep(POLL_MS);
++  }
++  return { wizard: 'closed', missing: await dismissMissing(S, ev, 10000) };
++}
++
++// the dialog "Problems loading the project" (TMissingPluginsForm: plugins or samples the project needs are missing; the engine loads the project anyway) is closed with its Ok. Its height follows the list (359 and 287 guest px were seen on this screen) and its buttons sit along the bottom: the Ok is at (368, h - 29) of a dialog 691 wide. Another width is left as it is. Returns what was done, or null when no such dialog came within ms.
++const MISSING = { w: 691, x: 368, fromBottom: 29 };
++async function dismissMissing(S, ev, ms) {
++  const t0 = Date.now();
++  for (;;) {
++    const m = (await windowsNow(ev)).find((w) => w.cls === 'TMissingPluginsForm');
++    if (m) {
++      if (m.w !== MISSING.w) return `not pressed: ${m.w}x${m.h}, the position is measured for a width of ${MISSING.w}`;
++      const at = { x: m.x + MISSING.x, y: m.y + m.h - MISSING.fromBottom };
++      await clickGuest(S, ev, at.x, at.y);
++      await sleep(1500);
++      return `Ok at guest (${at.x}, ${at.y}) of a ${m.w}x${m.h} dialog`;
++    }
++    if (Date.now() - t0 >= ms) return null;
++    await sleep(POLL_MS);
++  }
++}
++
++// the project file is opened the way the page's own Open works (decision 0216: the page's file manager is the dialog; the route of tools/verify-kit/tools/sdriveg2-lat.mjs, openProject). The file goes into the file manager (the Files window's own upload input), then File > Open of the engine lists it there: its row is chosen and OK pressed. The welcome wizard is closed first (closeWelcome). Returns the dialogs of missing plugins or samples that were closed while the project loaded.
++async function openProject(S, ev, file) {
+   const stem = path.basename(file, path.extname(file));
+-  await S('Page.setInterceptFileChooserDialog', { enabled: true });
++  const name = path.basename(file);
++  const row = (sel) => `[...document.querySelectorAll('${sel} .fx-row[data-name]')].some((r) => r.dataset.name === ${JSON.stringify(name)})`;
++  const missing = [];
++  await ev("(() => { document.querySelector('#files-btn').click(); return true; })()");
++  await until(() => ev("!!window.__files && !!window.__files.explorer && !!document.querySelector('#files-overlay #fx-list')"), 20000, 'the Files window');
++  await sleep(1200);
++  const { root } = await S('DOM.getDocument', { depth: 0 });
++  const { nodeId } = await S('DOM.querySelector', { nodeId: root.nodeId, selector: '#files-overlay #fx-input-files' });
++  await S('DOM.setFileInputFiles', { files: [file], nodeId });
++  await until(() => ev(`window.__files.explorer && !window.__files.explorer.busy && ${row('#files-overlay #fx-list')}`), 180000, `the upload of ${name}`);
++  await ev("(() => { document.querySelector('#files-overlay #fx-close').click(); return true; })()");
++  await sleep(500);
+   await clickGuest(S, ev, 18, 20);
+   await sleep(1500);
+   await clickGuest(S, ev, 48, 85);
+   await until(() => ev('window.__app.fileDlg.open === true'), 120000, 'the File > Open dialog');
+-  await sleep(500);
+-  const box = await ev("document.getElementById('filedlg-input').getBoundingClientRect().toJSON()");
+-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+-  await until(() => chooser.length > 0, 5000, 'the file chooser');
+-  await S('DOM.setFileInputFiles', { files: [file], backendNodeId: chooser[0].backendNodeId });
+-  await until(async () => ((await ev('window.__app.pageTitle().title')) ?? '').startsWith(stem), 180000, `the title of ${stem}`);
++  await sleep(800);
++  await until(() => ev(row('#filedlg #fx-list')), 30000, `the row of ${name} in the dialog`);
++  await ev(`(() => { const r = [...document.querySelectorAll('#filedlg #fx-list .fx-row[data-name]')].find((x) => x.dataset.name === ${JSON.stringify(name)}); r.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 })); return true; })()`);
++  await ev("(() => { document.querySelector('#filedlg #fx-ok').click(); return true; })()");
++  await until(async () => {
++    const d = await dismissMissing(S, ev, 0);
++    if (d !== null) missing.push(d);
++    return ((await ev('window.__app.pageTitle().title')) ?? '').startsWith(stem);
++  }, 180000, `the title of ${stem}`);
++  const late = await dismissMissing(S, ev, 5000);
++  if (late !== null) missing.push(late);
+   await sleep(4000);
++  return missing;
+ }
+ 
+ async function until(fn, ms, what) {
