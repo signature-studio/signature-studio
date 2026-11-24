@@ -1,0 +1,44 @@
+{
+  "t": "2026-11-24T07:10:00.000Z",
+  "remote": "workers",
+  "perf": {
+    "v": 3,
+    "seq": 2,
+    "sid": "8c3d0e2f5a71",
+    "reason": "periodic",
+    "pageMs": 311500.4,
+    "visibility": "visible",
+    "browser": { "hardwareConcurrency": 4, "deviceMemoryGB": 4, "userAgent": "Fixture/1.0", "screen": { "width": 1600, "height": 900 }, "devicePixelRatio": 1.5, "crossOriginIsolated": true, "isSecureContext": true, "webglRenderer": null, "jsHeap": null },
+    "bundle": { "name": "fixture", "version": "PerfFpsFixture", "engineKind": "emscripten-fruity-v1" },
+    "engine": { "present": "D", "updatesObservable": true, "state": "engine-idle", "exit": null },
+    "error": null,
+    "timeline": { "download_start": 150, "idle": 10400 },
+    "startup": { "firstIdleSeconds": 10.4, "targetSeconds": 10 },
+    "ui": { "updates": { "total": 900, "recent10s": { "n": 583, "intervalMedianMs": 16.6, "intervalP95Ms": 17.9, "perSecond": 58.3 } }, "engineIdles": { "total": 30, "recent10s": { "n": 5, "intervalMedianMs": 16, "intervalP95Ms": 20, "perSecond": 60 } }, "targetUpdatesPerSecond": 120 },
+    "input": { "sent": 9, "processed": 9, "dropped": 0, "pending": 0, "answered": 8, "late": 1, "noAnswer": 0, "targetP95Ms": 17, "eventToRaf": { "n": 8, "p50Ms": 24.5, "p95Ms": 33.8, "maxMs": 35.2, "lastMs": [22.1, 25.0, 24.5, 31.7, 23.8, 26.4, 33.8, 24.9] }, "listenerToPut": { "n": 8, "p50Ms": 9.2, "p95Ms": 12.4, "maxMs": 12.9, "lastMs": [8.7, 9.6, 9.2, 11.8, 8.9, 9.5, 12.4, 9.0] }, "lateVisible": null, "eventToRafWithLate": null, "stages": null, "inputToPresentMsP50": 24.5, "inputToPresentMsP95": 33.8 },
+    "audio": { "underruns": null },
+    "memory": { "wasmBytes": 1048576000, "wasmLimitBytes": 2147483648, "wasmFraction": 0.4883 },
+    "client": null,
+    "display": {
+      "rafSupported": true,
+      "mode": "burst",
+      "burst": { "onMs": 2000, "periodMs": 60000, "count": 6 },
+      "runningMs": 311500,
+      "visibility": { "visibleMs": 311500, "hiddenMs": 0, "changes": 0, "visibleNow": true },
+      "raf": {
+        "recent10s": { "n": 583, "perSecond": 58.3, "medianMs": 16.6, "p95Ms": 17.9, "p99Ms": 19.2, "maxMs": 21.4, "hz": 60.2, "peakHz": 61.5, "slow": 6, "over12p5": 0, "bins": [0, 0, 0, 563, 9, 6, 3, 2, 0, 0] },
+        "sinceIdle": null,
+        "total": { "n": 900, "perSecond": 58.3, "medianMs": 16.6, "p95Ms": 17.9, "p99Ms": 19.2, "maxMs": 21.4, "hz": 60.2, "peakHz": 61.5, "slow": 9, "over12p5": 0, "bins": [0, 0, 0, 866, 14, 9, 6, 3, 2, 0] },
+        "binEdgesMs": [6, 10.5, 14, 20, 30, 45, 70, 120, 250]
+      },
+      "canvas": null,
+      "longTasks": { "supported": true, "total": 1, "maxMs": 52.3, "sumMs": 52.3, "sinceIdle": 1, "maxSinceIdleMs": 52.3, "recent30s": 0 },
+      "events": { "supported": true, "thresholdMs": 16, "slow": 1, "inputsSent": 9, "delayMs": null, "durationMs": null, "firstInput": null }
+    },
+    "hz": null,
+    "rafIntervalMsP95": 17.9,
+    "guestScreen": { "mode": "fit", "source": "default", "follow": "live", "width": 1600, "height": 900, "dpi": null, "dpr": 1.5, "roomWidth": 1280, "roomHeight": 720, "reported": true },
+    "engineRun": { "windowSeconds": 10, "idles": 30, "busyFraction": 0.42, "busyMsMedian": 4.4, "busyMsP95": 11.8, "virtualPerWall": 0.97 },
+    "desk": { "mode": "gl", "presents": 900, "rects": 1010, "mpx": 130.2, "composeMs": 610.7, "putMs": 0, "whole": 2, "drawMs": 96.1, "uploads": 880, "draws": 900, "ticks": 980, "idleTicks": 210, "wakes": 25, "sleeps": 4, "since": null, "recent10s": { "seconds": 10, "presents": 583, "presentsPerSec": 58.3 } }
+  }
+}

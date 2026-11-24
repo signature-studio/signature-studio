@@ -1368,6 +1368,9 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
                 wasm::TLS_LOCAL.with(|x| x.set(u32::MAX));
             }
             let idx = module.add_func(FuncType { params: vec![], results: vec![] }, Body { locals, code: c });
+            if conf.names {
+                module.names.push((idx, format!("f_{k:x}")));
+            }
             exports.push((format!("f_{k:x}"), idx));
         }
         rep.wrapper_bytes = module.bodies[n0..].iter().map(|b| b.code.len() + 1).sum();
