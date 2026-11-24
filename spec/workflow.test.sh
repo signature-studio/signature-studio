@@ -950,7 +950,7 @@ ok "ビーコン(取り出し): 0 件でも段は通り、MANIFEST.tsv(0 件)を
 # (s) 本番の engine の門の廃止(#1378)。deploy に門の段は無く、upload は manifest を常に差し替える。upload の後に、本番の manifest がこの build の物と一致するかを確かめる
 DPRE=384b1e40; git -C "$top" show "$DPRE:.github/workflows/deploy.yml" > "$T/deploy-pre.yml" 2>/dev/null || echo "FAIL 変更前の deploy.yml を読めない($DPRE)"
 pj "$T/deploy-pre.yml" > "$T/deploy-pre.json" 2>>"$T/pj.err"; DP=$T/deploy-pre.json
-ok "deploy.yml(s): 門の段は無い(「検証済みにする」の段も、lift/harness/web を読み書きする段も無い)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "検証済みにする" or ((.run // "") | test("harness/web")))] | length' "$DJ")" 0
+ok "deploy.yml(s): 門の段は無い(「検証済みにする」の段も、lift/harness/web を読み書きする段も無い。例外は bundle の中身の段が pack.args を読むだけ)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "検証済みにする" or (((.run // "") | test("harness/web")) and .name != "bundle の中身を確かめる"))] | length' "$DJ")" 0
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、fe-build upload の後・wrangler の前に在る" "$(jq -r '
   ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
   | ([.jobs.deploy.steps | to_entries[] | select(.value.name == "本番の manifest を確かめる") | .key] | .[0]) as $r
@@ -1006,11 +1006,12 @@ ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build 
 BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
 BCM=$T/bc-m.json; BCQ=$T/bc-s.bin
 sf() { printf 'FLSEEDP1....{"version":1,"files":[%s]}' "$(printf '{"path":"seed/resources/%s"},' "$@" | sed 's/,$//')"; }
-printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"}]}' > "$BCM"
+printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"}]}' > "$BCM"
 sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$BCQ"
-bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)。一時の木で bundle の中身の段を走らせ、終了コードを出す
-  rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed"
+bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)と任意の 3 つめ(pack.args の代わり)。一時の木で bundle の中身の段を走らせ、終了コードを出す
+  rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed" "$T/bc/lift/harness/web"
   cp "$1" "$T/bc/lift/out-app/bundle/raw/fl-Oz/manifest.json"; cp "$2" "$T/bc/lift/out-app/seed/seed.bin"
+  cp "${3:-$top/lift/harness/web/pack.args}" "$T/bc/lift/harness/web/pack.args"
   ( cd "$T/bc" && bash -e "$BCS" > /dev/null 2>&1; echo $? )
 }
 ok "deploy.yml(t): bundle の中身: 代表 4 件(error-offline.html・言語・テーマ・テンプレート)が在れば 0 で通る" "$(test -s "$BCS" && bcrun "$BCM" "$BCQ")" 0
@@ -1024,6 +1025,10 @@ sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf > "$T/bc-s3.bin"
 ok "deploy.yml(t): bundle の中身: テンプレートの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s3.bin")" 1
 printf '%s\n' seed/resources/System/Languages/de.moe seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf seed/resources/Data/Templates/Other/Blocks/Blocks.flp > "$T/bc-s4.bin"
 ok "deploy.yml(t): bundle の中身: 引用符の無い語句だけでは、ヘッダの path と見なさない(3 件そろっても落ちる)" "$(bcrun "$BCM" "$T/bc-s4.bin")" 1
+BCP=$T/bc-m-noplg.json; printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"}]}' > "$BCP"
+ok "deploy.yml(t): bundle の中身: pack.args の外部プラグインの lazy(plugins/ott.wasm)が manifest に無ければ落ちる(本番に出ない wasm を見逃さない)" "$(bcrun "$BCP" "$BCQ")" 1
+sed '/^lift\/out-app\/plugins\//d' "$top/lift/harness/web/pack.args" > "$T/pack-noplg.args"
+ok "deploy.yml(t): bundle の中身: pack.args に外部プラグインの行が無ければ、manifest に無くても通る" "$(bcrun "$BCP" "$BCQ" "$T/pack-noplg.args")" 0
 # (u) main との衝突による push の失敗の自動の再試行(設計「4」「7」「8」)。push の段は衝突の印を残す。報告は印の数で retry か fail を決め、retry は failed を付けず、App の token で running を外して次の run を起こす
 AGPRE=f3abbf3c
 PREU=$T/agent-pre.yml; git -C "$top" show "$AGPRE:.github/workflows/agent.yml" > "$PREU" 2>/dev/null
@@ -1148,4 +1153,9 @@ ok "本番(v): OTT の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、p
 ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
 ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
 ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
+# (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
+NX=$PLAN/bundle-no-external.txt
+ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行と、plugins/ の --lazy-file を持たない" "$(grep -cE 'plugin-worker/build[.]sh|lift/out-app/plugins/' "$NX" 2> /dev/null)" 0
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行と plugins/ の --lazy-file の対だけを除いた物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's| --lazy-file lift/out-app/plugins/[^ ]*||') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

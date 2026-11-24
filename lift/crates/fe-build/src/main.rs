@@ -22,6 +22,8 @@ const OFFLINE_PAGE_SRC: &str = "lift/out-app/host-extra/resources/System/Interne
 const OFFLINE_PAGE_PATH: &str = "resources/System/Internet/error-offline.html";
 const R2_BUCKET: &str = "s3://fl-web-assets/";
 const ARTIFACT_BUCKET: &str = "s3://fl-web-artifacts/";
+/// The external plugins' wasm (the lazy files of pack.args whose source is here) is built from the installers (external_present).
+const PLUGINS_DIR: &str = "lift/out-app/plugins/";
 const INSTALLER: &str = "s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe";
 const BLEND2D_REV: &str = "a7f947677e85441abe1769586d3bb935b4086a07";
 /// The SHA-256 of the GitHub archive of BLEND2D_REV. GitHub can regenerate an archive, so a mismatch is a failed attempt
@@ -557,10 +559,29 @@ fn seed_step() -> Result<Step, String> {
     Ok(Step::Run(argv))
 }
 
+/// The arguments of pack.args (one per line). Without the external plugins' installers (`external` false), the --lazy-file
+/// of a plugin's wasm (its source under lift/out-app/plugins/) is left out, and each one is said on stderr.
+fn pack_args(external: bool) -> Result<Vec<String>, String> {
+    let args = lines(&format!("{HARNESS_DIR}/web/pack.args"))?;
+    let mut kept = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let plugin = args[i] == "--lazy-file" && args.get(i + 1).is_some_and(|v| v.starts_with(PLUGINS_DIR));
+        if plugin && !external {
+            eprintln!("fe-build: 外部プラグインのインストーラが無いので、省く: {}", args[i + 1]);
+            i += 2;
+        } else {
+            kept.push(args[i].clone());
+            i += 1;
+        }
+    }
+    Ok(kept)
+}
+
 /// The pack step for the engine with the sha256 `sha` (its first 12 digits name the version).
-fn pack_step_for(sha: &str) -> Result<Step, String> {
+fn pack_step_for(sha: &str, external: bool) -> Result<Step, String> {
     let mut argv: Vec<String> = vec!["node".into(), "app/scripts/pack-assets.mjs".into(), "--version".into(), sha[..12].into()];
-    argv.extend(lines(&format!("{HARNESS_DIR}/web/pack.args"))?);
+    argv.extend(pack_args(external)?);
     if Path::new(OFFLINE_PAGE_SRC).is_file() {
         argv.push("--lazy-file".into());
         argv.push(format!("{OFFLINE_PAGE_SRC}={OFFLINE_PAGE_PATH}"));
@@ -569,19 +590,23 @@ fn pack_step_for(sha: &str) -> Result<Step, String> {
 }
 
 #[cfg(test)]
-fn bundle_plan_steps(sha: &str) -> Result<Vec<Step>, String> {
-    let mut steps = ott_steps();
-    steps.extend([seed_step()?, pack_step_for(sha)?]);
+fn bundle_plan_steps(sha: &str, external: bool) -> Result<Vec<Step>, String> {
+    let mut steps = if external { ott_steps() } else { Vec::new() };
+    steps.extend([seed_step()?, pack_step_for(sha, external)?]);
     Ok(steps)
 }
 
+/// The bundle. The external plugins' wasm is in it only when their installers are there (external_present).
 fn bundle() -> Result<(), String> {
-    for step in &ott_steps() {
-        run(step)?;
+    let external = external_present()?;
+    if external {
+        for step in &ott_steps() {
+            run(step)?;
+        }
     }
     run(&seed_step()?)?;
     let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
-    run(&pack_step_for(&sha)?)
+    run(&pack_step_for(&sha, external)?)
 }
 
 /// The external plugins' installers (ci/artifacts.lock: the installers/ rows that are not FL Studio's), the input of build.sh of the OTT wasm.
@@ -610,8 +635,29 @@ fn external() -> Result<(), String> {
     Ok(())
 }
 
+/// The file names of the external plugins' installers (the names that `external` gives them in lift/out-app/external).
+fn external_names() -> Result<Vec<String>, String> {
+    Ok(external_keys()?.iter().map(|key| key.rsplit('/').next().unwrap_or(key).to_string()).collect())
+}
+
+/// Whether the external plugins' installers are in lift/out-app/external (`external` puts them there).
+fn external_present() -> Result<bool, String> {
+    external_in(&format!("{OUT_APP_DIR}/external"), &external_names()?)
+}
+
+/// Whether the installers `names` are in `dir`. None of them: false, and the bundle leaves the plugins out. Some of them, or a
+/// file that does not match ci/artifacts.lock: an error (the same check as `external`'s).
+fn external_in(dir: &str, names: &[String]) -> Result<bool, String> {
+    if !names.iter().any(|name| Path::new(dir).join(name).is_file()) {
+        return Ok(false);
+    }
+    run(&Step::Run(vec!["node".into(), "tools/external-inputs/check.mjs".into(), dir.into()]))?;
+    Ok(true)
+}
+
 /// The OTT wasm (#1337): build.sh reads the installers that `external` put in lift/out-app/external and writes
 /// lift/out-app/plugins/ott/vst-ext.wasm, the lazy file of the bundle (pack.args). The same build as the work chain's.
+/// The bundle runs it only when the installers are there (external_present).
 fn ott_steps() -> Vec<Step> {
     vec![Step::Run(vec![
         "bash".into(),
@@ -720,7 +766,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_steps, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
+    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_in, external_names, external_steps, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
     use std::cell::Cell;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -733,12 +779,12 @@ mod tests {
     const BAD: &[u8] = b"stale";
     const URL: &str = "https://example.invalid/blend2d.tar.gz";
 
-    /// A directory `.tmp-blend2d-fetch-<name>` in the repository root, removed when the test ends.
+    /// A directory `.tmp-fe-build-<name>` in the repository root, removed when the test ends.
     struct Scratch(PathBuf);
 
     impl Scratch {
         fn new(name: &str) -> Scratch {
-            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").join(format!(".tmp-blend2d-fetch-{name}"));
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").join(format!(".tmp-fe-build-{name}"));
             let _ = fs::remove_dir_all(&dir);
             fs::create_dir_all(&dir).expect("scratch directory");
             Scratch(dir)
@@ -746,6 +792,10 @@ mod tests {
 
         fn path(&self, name: &str) -> String {
             self.0.join(name).display().to_string()
+        }
+
+        fn dir(&self) -> String {
+            self.0.display().to_string()
         }
     }
 
@@ -845,18 +895,40 @@ mod tests {
         assert_eq!(glue(input), expected);
     }
 
+    /// The working directory is the repository root (the plans, ci/artifacts.lock and tools/ are read from there).
+    fn at_root() {
+        std::env::set_current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")).expect("the repository root");
+    }
+
     /// The plans of the engine, bundle, extract and external commands equal the texts recorded before the `--plan` flag was removed
     /// (tests/plan/*.txt). The engine's binary directory is written as `<bin>`. The upload plan is tested by upload_plan_matches_recorded_text.
+    /// The bundle has two plans: with the external plugins' installers (bundle.txt) and without them (bundle-no-external.txt).
     #[test]
     fn plans_match_recorded_texts() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-        std::env::set_current_dir(&root).expect("the repository root");
+        at_root();
         let engine = engine_plan_lines("<bin>").expect("engine plan");
         assert_eq!(engine.join("\n") + "\n", include_str!("../tests/plan/engine.txt"));
-        let bundle = bundle_plan_steps(SHA).expect("bundle plan");
+        let bundle = bundle_plan_steps(SHA, true).expect("bundle plan");
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle.txt"));
+        let bundle = bundle_plan_steps(SHA, false).expect("bundle plan without the external plugins");
+        assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle-no-external.txt"));
         assert_eq!(stage_lines("extract", &extract_steps()).join("\n") + "\n", include_str!("../tests/plan/extract.txt"));
         assert_eq!(stage_lines("external", &external_steps().expect("external plan")).join("\n") + "\n", include_str!("../tests/plan/external.txt"));
+    }
+
+    #[test]
+    fn external_absent_leaves_the_plugins_out() {
+        at_root();
+        let dir = Scratch::new("external-absent");
+        assert_eq!(external_in(&dir.dir(), &external_names().expect("ci/artifacts.lock")), Ok(false));
+    }
+
+    #[test]
+    fn external_partly_present_stops() {
+        at_root();
+        let dir = Scratch::new("external-partly");
+        fs::write(dir.path("VitalInstaller.exe"), EMPTY).expect("one installer");
+        assert!(external_in(&dir.dir(), &external_names().expect("ci/artifacts.lock")).is_err());
     }
 
     #[test]

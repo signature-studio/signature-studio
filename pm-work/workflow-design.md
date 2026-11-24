@@ -181,6 +181,8 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 作業者の受け入れの連鎖で作られる物は、deploy の連鎖でも作られる(`spec/workflow.test.sh` が、`pack.args` の参照を検査する。#1337 の OTT の wasm は `fe-build bundle` が作り、その入力は `fe-build external` が取る。deploy.yml は 100 行以内で、シェルスクリプトを run に書かないため、作る段は fe-build に置く)。
 
+外部プラグインの wasm(`pack.args` の `lift/out-app/plugins/` の lazy 指定)は、インストーラが `lift/out-app/external` に在る時だけ bundle に入る。作業者の run では、ラベル `plugin-external` の Issue だけがインストーラを置くので、他の Issue の受け入れの bundle は、その lazy 指定を省き、省いた物を標準エラーに 1 行ずつ出す。`fe-build bundle` は、3 件が 1 つも無ければ省き、一部だけ在る・一致しないときは止まる。deploy は「resources を取り出す」の段で 3 件を必ず取るので、wasm は必ず入り、「bundle の中身を確かめる」の段が、`pack.args` の外部プラグインの lazy の全てが manifest の lazy に在ることを確かめる(無ければ deploy を失敗にする)。将来、Serum 2・Vital の build が重くなったら、build の結果を R2 のキャッシュに置く(鍵は入力のハッシュ)。
+
 deploy で `[skip ci]` を使わない(依頼者の指示。main の push が deploy を迂回しないように)。judge が、作業の commit の題名と本文に、skip ci などの印が在れば落とす。push の段は、Issue の題名から印を落としてから空の commit を作る。pm-work だけの push は、paths の filter で deploy が起動しないので、印を付ける理由が無い。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
