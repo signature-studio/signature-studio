@@ -28,7 +28,7 @@ import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, 
 import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
 import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
 import { browserDisplayHost } from './perf/display-host.ts';
-import { engineExitMessage } from './perf/exit-message.ts';
+import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
 import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
 import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
@@ -455,6 +455,9 @@ function describeExit(info: ExitInfo, manifest: Manifest | null): { text: string
 const perfRecorder = new PerfRecorder();
 // decision 0209: the engine's last words (its own message, personal parts removed), made once when the engine ends; carried by the beacon as engine.exit.message and shown in the Performance panel
 let exitMessage: string | null = null;
+// Issue #1380: the stop report's facts (engine.exit.stop) and the first non-background pixel line (engine.exit.evidence), made with the message
+let exitStop: EngineStop | null = null;
+let exitEvidence: string | null = null;
 // decision 0175 (S-ur-window): the P3 row counts the underrun quanta since the engine's first idle (the start-up before it is not listened to); the note gives the last minute and the device state
 const audioMeasured = (): boolean => (audio?.detail().quantaWhilePlaying ?? 0) > 0;
 const audioP3 = (): number => { const d = audio?.detail(); return d ? (d.underrunQuantaSinceFirstIdle ?? d.underrunQuanta) : 0; };
@@ -492,7 +495,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
   return buildBeacon({
     seq, sid: beaconSid, reason, pageMs: performance.now(), visibility: document.visibilityState, browser: browserNow(),
     bundle: { name: app.manifest?.bundle.name ?? null, version: app.manifest?.bundle.version ?? null, engineKind: app.engineKind },
-    state: app.state, exit: app.exit ? { reason: app.exit.reason, code: app.exit.code, presents: app.exit.presents, message: exitMessage } : null, error: app.error,
+    state: app.state, exit: app.exit ? { reason: app.exit.reason, code: app.exit.code, presents: app.exit.presents, message: exitMessage, stop: exitStop, evidence: exitEvidence } : null, error: app.error,
     timeline: app.timeline, updates: snap.updates, idles: snap.idles,
     input: inputLatencyStats(lat.records, lat.totals(), undefined, lat.framesAreChanges),
     underruns: audioMeasured() ? audioP3() : null, // null: nothing measured (no AudioWorklet, or the audio output has not run yet: the browser starts it at the first gesture)
@@ -654,6 +657,9 @@ const client = new EngineClient({
     app.taskbar.clear();   // decision 0272: nor to restore a window
     app.exit = info;
     exitMessage = engineExitMessage(engineLog.lines, info);
+    const facts = engineStopFacts(engineLog.lines);
+    exitStop = facts.stop;
+    exitEvidence = facts.evidence;
     clock.ended = { reason: info.reason, code: info.code };
     stamp('exit');
     const d = describeExit(info, app.manifest);

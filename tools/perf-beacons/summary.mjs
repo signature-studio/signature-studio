@@ -5,13 +5,14 @@
 //   dir: default lift/out-app/host-extra/perf (the work step puts the objects of the last three days there; nothing is committed)
 //   --day: the sessions table is limited to this UTC date (default: today in UTC); all: every date
 //   --exits: instead of the tables above, one row per session that ended or failed in the last 48 hours (UTC): an engine.exit, an engine.state other than engine-idle, an error or a failure report
+//   --now <ISO time>: with --exits, the end of the 48 hours (a test aid; default: the current time)
 // Only counts and derived numbers are printed: no session id, no remote class, no user agent text, no address, no path or name of a visitor.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DIR = 'lift/out-app/host-extra/perf';
-const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits]';
+const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits [--now ISO time]]';
 const EXITS_HOURS = 48;
 
 function fail(msg) {
@@ -24,16 +25,19 @@ function parseArgs(argv) {
   let dir = DEFAULT_DIR;
   let day = new Date().toISOString().slice(0, 10);
   let exits = false;
+  let now = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--day') {
       day = argv[++i];
       if (!day) fail('--day needs a value');
     } else if (a === '--exits') exits = true;
+    else if (a === '--now') now = argv[++i] ?? '';
     else if (a.startsWith('--')) fail(`unknown option ${a}`);
     else dir = a;
   }
-  return { dir, day, exits };
+  if (now !== null && (Number.isNaN(Date.parse(now)) || !exits)) fail('--now needs an ISO time (e.g. 2026-11-24T08:00:00Z) and --exits');
+  return { dir, day, exits, nowMs: now === null ? Date.now() : Date.parse(now) };
 }
 
 function jsonFiles(dir) {
@@ -220,6 +224,18 @@ const lastWith = (rs, pick) => {
 };
 const objOf = (x) => (x && typeof x === 'object' ? x : null);
 
+/** the first `n` characters of a text, then the scrub (the table's words are short; the scrub takes out what could name a person) */
+const briefOf = (x, n = 160) => scrubWords(String(x).slice(0, n));
+const textOf = (x) => (str(x) ? briefOf(x) : '-');
+
+/** Issue #1380: the answers of the engine's file dialogs (files.engine, counts only): how many, and the Demo / .flp / size counts; a record from before them has no such counts ('-') */
+function answersOf(e) {
+  if (e === null) return '-';
+  const b = objOf(e.answeredBytes) ?? {};
+  const n = (x) => num(x) ?? '-';
+  return `答え ${n(e.answered)}(Demo ${n(e.answeredUnderDemo)}、.flp ${n(e.answeredFlp)}、64 KB 以下 ${n(b.k64)}、1 MB 以下 ${n(b.m1)}、16 MB 以下 ${n(b.m16)}、それより大きい ${n(b.more)})`;
+}
+
 /** one row per session: the first and the last instant, the version and the device pixel ratio (the last one that has it), the count of records, and the last value of each field the table shows */
 function exitRow(rs) {
   const last = rs[rs.length - 1];
@@ -228,7 +244,10 @@ function exitRow(rs) {
   const err = lastWith(rs, (p) => objOf(p.error));
   const fail = lastWith(rs, (p) => objOf(p.failure));
   const state = lastWith(rs, (p) => str(p.engine?.state));
+  const files = lastWith(rs, (p) => objOf(p.files?.engine));
   const top = Object.entries(objOf(last.p.timeline) ?? {}).filter(([, ms]) => num(ms) !== null).sort((a, b) => b[1] - a[1])[0];
+  // Issue #1380: the stop report's facts (engine.exit.stop) and the evidence line (engine.exit.evidence), as the record carries them
+  const stop = exit ? objOf(exit.stop) : null;
   return [
     when(rs[0].t), when(last.t), last.p.bundle?.version ?? '(無し)',
     dpr === null ? '-' : `${dpr} (${dpiClass(dpiOf(dpr))})`,
@@ -241,6 +260,12 @@ function exitRow(rs) {
     err ? scrubWords(str(err.where) ?? '-') : fail && str(fail.where) ? scrubWords(fail.where) : '-',
     num(last.p.pageMs) === null ? '-' : f1(last.p.pageMs / 1000),
     top ? `${top[0]} (${f1(top[1] / 1000)} s)` : '-',
+    stop ? textOf(stop.lastFle) : '-',
+    stop ? textOf(stop.stopLine) : '-',
+    stop ? textOf(stop.abortKind) : '-',
+    stop && num(stop.memoryBytes) !== null ? String(stop.memoryBytes) : '-',
+    exit ? textOf(exit.evidence) : '-',
+    answersOf(files),
   ];
 }
 
@@ -260,18 +285,20 @@ export function exitsReport(recs, nowMs = Date.now()) {
   out.push(`- error の記録: ${flagged.filter((r) => r.p.error).length} 件、failure の記録: ${flagged.filter((r) => r.p.failure).length} 件`);
   out.push('');
   out.push('1 行が 1 セッション(読み込みごとの乱数で束ねた。乱数は出さない)。各項目は、そのセッションの最後の記録の値(項目ごとに、値の在る最後の記録)。pageMs は最後の記録の、起動からの時間(秒)。timeline の最後の印は、最後の記録で最も遅い印。');
+  out.push('停止の列(lastFle・stopLine・abortKind・wasm メモリ)は engine.exit.stop、証拠の列は engine.exit.evidence(Issue #1380。古い記録には無いので -)。答えの列は files.engine の答えの種類(名前・パスは無い。数だけ)。');
   out.push('');
-  out.push(table(['最初 (UTC)', '最後 (UTC)', '版 (bundle.version)', 'DPR の区分', '記録数', 'engine.state', 'engine.exit.reason', 'engine.exit.code', 'engine.exit.message', 'error.what', 'error.where', 'pageMs (秒)', 'timeline の最後の印'],
+  out.push(table(['最初 (UTC)', '最後 (UTC)', '版 (bundle.version)', 'DPR の区分', '記録数', 'engine.state', 'engine.exit.reason', 'engine.exit.code', 'engine.exit.message', 'error.what', 'error.where', 'pageMs (秒)', 'timeline の最後の印',
+    '停止: 最後の fle: 行', '停止: == stop: 行', '停止: abort kind', '停止: wasm メモリ (bytes)', '証拠: first non-background pixel', '開く窓の答え (files.engine)'],
     sessions.map(exitRow)));
   return out.join('\n');
 }
 
 function main() {
-  const { dir, day, exits } = parseArgs(process.argv.slice(2));
+  const { dir, day, exits, nowMs } = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) fail(`not a directory: ${dir}`);
   const { recs, unreadable } = readRecords(dir);
   if (exits) {
-    console.log(exitsReport(recs));
+    console.log(exitsReport(recs, nowMs));
     return;
   }
   const out = [];
