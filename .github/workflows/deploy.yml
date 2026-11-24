@@ -31,7 +31,7 @@ jobs:
           path: lift/out-app/host
           key: >-
             host-${{ hashFiles('ci/**', 'app/scripts/**/*.mjs',
-            'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+            'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/**') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
