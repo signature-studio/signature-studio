@@ -5,6 +5,7 @@
 //   dir: default lift/out-app/host-extra/perf (the work step puts the objects of the last three days there; nothing is committed)
 //   --day: the sessions table is limited to this UTC date (default: today in UTC); all: every date
 //   --exits: instead of the tables above, one row per session that ended or failed in the last 48 hours (UTC): an engine.exit, an engine.state other than engine-idle, an error or a failure report
+//   --hangs: instead of the tables above, the sessions whose start did not reach the first idle (arrived / gone / suspect / unknown), by version and device pixel ratio (Issue #1399); the counts only
 //   --now <ISO time>: with --exits, the end of the 48 hours (a test aid; default: the current time)
 // Only counts and derived numbers are printed: no session id, no remote class, no user agent text, no address, no path or name of a visitor.
 import fs from 'node:fs';
@@ -12,7 +13,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DIR = 'lift/out-app/host-extra/perf';
-const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits [--now ISO time]]';
+const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits [--now ISO time] | --hangs]';
 const EXITS_HOURS = 48;
 
 function fail(msg) {
@@ -25,6 +26,7 @@ function parseArgs(argv) {
   let dir = DEFAULT_DIR;
   let day = new Date().toISOString().slice(0, 10);
   let exits = false;
+  let hangs = false;
   let now = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -32,12 +34,14 @@ function parseArgs(argv) {
       day = argv[++i];
       if (!day) fail('--day needs a value');
     } else if (a === '--exits') exits = true;
+    else if (a === '--hangs') hangs = true;
     else if (a === '--now') now = argv[++i] ?? '';
     else if (a.startsWith('--')) fail(`unknown option ${a}`);
     else dir = a;
   }
   if (now !== null && (Number.isNaN(Date.parse(now)) || !exits)) fail('--now needs an ISO time (e.g. 2026-11-24T08:00:00Z) and --exits');
-  return { dir, day, exits, nowMs: now === null ? Date.now() : Date.parse(now) };
+  if (exits && hangs) fail('--exits and --hangs cannot be used together');
+  return { dir, day, exits, hangs, nowMs: now === null ? Date.now() : Date.parse(now) };
 }
 
 function jsonFiles(dir) {
@@ -293,12 +297,86 @@ export function exitsReport(recs, nowMs = Date.now()) {
   return out.join('\n');
 }
 
+const HANG_PAGE_MS = 20_000;
+const DPR_ORDER = ['1 未満', '1', '1 超 2 未満', '2 以上 3 未満', '3 以上', '(無し)'];
+const DPR_ALWAYS = ['1', '1 超 2 未満', '2 以上 3 未満', '3 以上'];
+
+/** the device pixel ratio's class of the hangs table (Issue #1399); below 1 and no ratio have classes of their own */
+export function dprClassOf(dpr) {
+  if (dpr === null) return '(無し)';
+  if (dpr < 1) return '1 未満';
+  if (dpr === 1) return '1';
+  if (dpr < 2) return '1 超 2 未満';
+  if (dpr < 3) return '2 以上 3 未満';
+  return '3 以上';
+}
+
+/** the ratio of a session: the last one it has (the guest screen's, else the browser's own: a failure report has no guest screen) */
+const dprOfSession = (rs) => lastWith(rs, (p) => dprOf(p) ?? num(p.browser?.devicePixelRatio));
+
+/**
+ * one session's start (Issue #1399): `arrived` (the first idle's mark: an engine-idle state or a first-idle record); otherwise `gone` (a left-before-first-idle report, or the last record at 20 s or more),
+ * `suspect` (gone, and the last record at 20 s or more), `unknown` (under 20 s with no leave: not judged)
+ */
+export function startOf(rs) {
+  const page = num(rs[rs.length - 1].p.pageMs);
+  const long = page !== null && page >= HANG_PAGE_MS;
+  const arrived = rs.some((r) => str(r.p.engine?.state) === 'engine-idle' || r.p.reason === 'first-idle');
+  const left = rs.some((r) => r.p.failure?.kind === 'left-before-first-idle');
+  const gone = !arrived && (left || long);
+  return { arrived, gone, suspect: gone && long, unknown: !arrived && !gone };
+}
+
+const tallyOf = (xs) => ({
+  n: xs.length,
+  arrived: xs.filter((x) => x.s.arrived).length,
+  gone: xs.filter((x) => x.s.gone).length,
+  suspect: xs.filter((x) => x.s.suspect).length,
+  unknown: xs.filter((x) => x.s.unknown).length,
+});
+const rateOf = (t) => (t.arrived + t.gone === 0 ? '-' : ((100 * t.gone) / (t.arrived + t.gone)).toFixed(1));
+
+/** the sessions that did or did not reach the first idle (Issue #1399), by version and device pixel ratio class: counts and the share of the gone (the unknown ones are left out of the share); a zero class is still a row */
+export function hangsReport(recs) {
+  const sess = sessionsOf(recs).map((rs) => ({
+    version: rs[rs.length - 1].p.bundle?.version ?? '(無し)',
+    cls: dprClassOf(dprOfSession(rs)),
+    s: startOf(rs),
+    ended: rs.some((r) => objOf(r.p.engine?.exit) !== null || objOf(r.p.error) !== null),
+  }));
+  const versions = [...new Set(sess.map((x) => x.version))];
+  const classes = DPR_ORDER.filter((c) => DPR_ALWAYS.includes(c) || sess.some((x) => x.cls === c));
+  const out = [];
+  out.push('# 実機のビーコン: 起動が first idle に届かない(セッションの数)');
+  out.push('');
+  out.push(`- 期間(UTC、取り出した記録の最初と最後の時刻): ${recs.length ? `${when(recs[0].t)} から ${when(recs[recs.length - 1].t)} まで` : '記録なし'}`);
+  out.push(`- 記録: ${recs.length} 件、セッション(読み込み): ${sess.length}`);
+  out.push(`- 届いた: first idle の印(engine.state が engine-idle、または理由 first-idle の記録)が在る。届かず離脱: 印が無く、left-before-first-idle の記録が在るか、最後の記録の pageMs が 20 秒以上。うち停滞の疑い: 届かず離脱のうち、最後の記録の pageMs が 20 秒以上。判定できない: 印が無く、20 秒未満で記録が終わり、離脱の記録も無い。`);
+  out.push('- 割合 = 届かず離脱 ÷ (届いた + 届かず離脱)。判定できないは分母に入れない。版と DPR の区分は、セッションの最後の DPR(guest 画面の dpr。無ければ browser の devicePixelRatio)。');
+  out.push(`- 判定できない のうち、engine.exit か error の記録が在るもの: ${sess.filter((x) => x.s.unknown && x.ended).length} 件`);
+  out.push('');
+  const rows = [];
+  const line = (version, cls, t) => [version, cls, t.n, t.arrived, t.gone, t.suspect, t.unknown, rateOf(t)];
+  for (const v of versions.length ? versions : ['(記録なし)']) {
+    const vs = sess.filter((x) => x.version === v);
+    for (const c of classes) rows.push(line(v, c, tallyOf(vs.filter((x) => x.cls === c))));
+    rows.push(line(v, '合計', tallyOf(vs)));
+  }
+  rows.push(line('全部の版', '合計', tallyOf(sess)));
+  out.push(table(['版 (bundle.version)', 'DPR の区分', 'セッション', '届いた', '届かず離脱', 'うち停滞の疑い', '判定できない', '届かず離脱の割合 (%)'], rows));
+  return out.join('\n');
+}
+
 function main() {
-  const { dir, day, exits, nowMs } = parseArgs(process.argv.slice(2));
+  const { dir, day, exits, hangs, nowMs } = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) fail(`not a directory: ${dir}`);
   const { recs, unreadable } = readRecords(dir);
   if (exits) {
     console.log(exitsReport(recs, nowMs));
+    return;
+  }
+  if (hangs) {
+    console.log(hangsReport(recs));
     return;
   }
   const out = [];
