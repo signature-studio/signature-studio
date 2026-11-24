@@ -164,3 +164,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 `fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替える(`lift/crates/fe-build/src/main.rs` の `upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門が静かに閉じたままで、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(deploy は success のまま。#1363 の実機のビーコンで確かめた)。そこで、スモーク(起動の確認と、Welcome 窓の 4 つの流れ)が両方通った engine の sha256 を、deploy の作業ツリーの `verified.txt` に 1 行足す(`manifest.json` の `engine.wasm.sha256` から取る。既存の行は残す。commit はしない)。その後に `fe-build upload` が manifest を差し替え、upload の後の段が、本番の `manifest.json` とこの build の manifest を `cmp` で比べる。一致しなければ deploy は失敗し、wrangler は飛ぶ。スモークが落ちれば、門の段は動かず、manifest は替わらない(既定の `success()`)。deploy が success でも engine が替わったとは限らないので、替わったかは実機のビーコンの版で確かめる。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
+
+## 15. 公開のログに出さない値(endpoint とアカウント ID)
+
+このリポジトリのログは公開される。runner は `GITHUB_ENV` に書いた値を後続の全段の env 表示に出すため、endpoint とアカウント ID は `GITHUB_ENV` に書かず、runs-on/cache の段の `env:` には秘密(secrets)の値として渡す。runs-on/cache は endpoint を環境変数でしか受けないので、この移行は秘密の登録の後に行う(登録の前に移すと cache が壊れる。現行の書き方は、登録まで残る)。
