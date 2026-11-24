@@ -1,3 +1,3 @@
-key	guest	role	sha256	size	hook	args
-effects.dummy-two.dummy_two_x64.dll	Plugins\Fruity\Effects\Dummy Two\Dummy Two_x64.dll	本体	cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc	2000	none	--pdata
-generators.dummy-two.engine_x64.dll	Plugins\Fruity\Generators\Dummy Two\engine_x64.dll	補助	dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd	3000	rva:0x17bc0,0x31d70,0x31d90	--pdata
+key	guest	role	sha256	size	hook	args	omit
+effects.dummy-two.dummy_two_x64.dll	Plugins\Fruity\Effects\Dummy Two\Dummy Two_x64.dll	本体	cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc	2000	none	--pdata	-
+generators.dummy-two.engine_x64.dll	Plugins\Fruity\Generators\Dummy Two\engine_x64.dll	補助	dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd	3000	rva:0x17bc0,0x31d70,0x31d90	--pdata	0x5000
