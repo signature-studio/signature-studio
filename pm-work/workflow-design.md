@@ -35,10 +35,10 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 | job | needs | if | 権限 | 使う token | 役目 |
 | --- | --- | --- | --- | --- | --- |
 | select | なし | なし | `contents: read`・`issues: read` | GITHUB_TOKEN(読むだけ) | イベントから候補を集め、「5」の条件で対象を決める(`tools/select-targets.mjs select`) |
-| start | select | 対象が空でない | `contents: read`・`issues: write` | GITHUB_TOKEN(App の鍵は渡さない) | 対象を同じ条件でもう一度確かめ、`running` を付ける。`/retry` なら `failed` を外す(`claim`) |
+| start | select | 対象が空でない | `contents: read`・`issues: write` | GITHUB_TOKEN(App の鍵は渡さない。例外: Project の In Progress の段だけ App の鍵。「17」) | 対象を同じ条件でもう一度確かめ、`running` を付ける。`/retry` なら `failed` を外す(`claim`)。起動した Issue の Project の Status を In Progress に移す(「17」) |
 | extract | start | 起動された対象が空でない | 既定 | GITHUB_TOKEN なし(R2 の鍵のみ) | 抽出物を R2 のキャッシュから用意する(今の段をそのまま) |
 | work | start・extract | 起動された対象が空でない | `contents: read`・`issues: read` | GITHUB_TOKEN は、本文の取得と判定の道具の取り直しの段だけ。push の段だけ App の token(「8」)。作業者の段には無い | Issue ごとに: 本文と題名を取る → 受け入れコマンドを取り出す → 作業者を動かす → 判定 → 通れば push(空の commit で `Closes #N` を付ける) |
-| report | start・work | 常に(`always()`)。ただし start が成功し、起動された対象が空でない | `contents: read`・`actions: read`・`issues: write` | GITHUB_TOKEN(読みも書きも。App の鍵は渡さない) | Issue ごとに結果をコメントし、状態を変える |
+| report | start・work | 常に(`always()`)。ただし start が成功し、起動された対象が空でない | `contents: read`・`actions: read`・`issues: write` | GITHUB_TOKEN(読みも書きも。App の鍵は渡さない。例外: Project の In Review の段と、再試行の起動の段。「17」「16」) | Issue ごとに結果をコメントし、状態を変える。Project の Status を In Review に移す(「17」) |
 
 - `if:` を書いたジョブは、既定の `success()` の判定が外れるので、`start`・`extract`・`work` の `if` には `success() &&` を付ける(上流が落ちたときに、空の対象で後続が走らないため)。
 - work は `strategy.matrix.issue` で Issue の番号ごとに 1 ジョブ。`fail-fast: false` で、1 件の失敗が他を止めない。
@@ -108,7 +108,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 - ラベル(`running`・`failed`)とコメントは、start と report が GITHUB_TOKEN(`issues: write`)で行う。GITHUB_TOKEN で行った変更は次の run を起動しない(`workflow_dispatch`・`repository_dispatch` を除く)。そのため、start と report の書き込みで run が連鎖しない。
 - 通った Issue は、push の段が作る空の commit(`Closes #N`)で閉じる。push は App の token で行うので、この close は App の操作になり、`issues: closed` の run を起こすと想定する(未確認。「9」)。report は、Issue がまだ open のときだけ GITHUB_TOKEN で閉じる。GITHUB_TOKEN の close は run を起こさないため、後続は起動せず、PM が再評価する。
-- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・start・extract・report には渡さない。例外: report の自動の再試行の起動の段(「自動の再試行を起動する」)だけは、再試行の Issue があるときに限り、鍵を受け取る(running を外す App の操作の 1 回。「16」)。
+- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・extract には渡さない。例外: report の自動の再試行の起動の段(「自動の再試行を起動する」)だけは、再試行の Issue があるときに限り、鍵を受け取る(running を外す App の操作の 1 回。「16」)。同じく、Project の Status を動かす段(start の In Progress・report の In Review。「17」)だけは、鍵を受け取る。
 - 作業者の段(opencode)には、どの token も鍵も無い(今と同じ)。
 - 本文の取得と、判定の道具の取り直しの段にだけ、GITHUB_TOKEN(`issues: read`・`contents: read`)を渡す。
 
@@ -203,3 +203,13 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 - 起動の方式: GITHUB_TOKEN で行ったコメント・ラベルの変更は、次の run を起こさない。そこで、再試行の起動の段は App の token で `running` を外す。外すと `issues: unlabeled` のイベントが起き、select が Issue を選ぶ(`failed` が無く、`running` も無いため)。同じ Issue の run は concurrency(`agent-<番号>`、`cancel-in-progress: false`)で直列になるので、再試行の run は、今の run(報告まで)が終わってから始まる。再試行の run は、前回の作業(`work.diff`)を「前回の作業を取り込む」の段で載せてから始め、受け入れを通して push する。
 - 鍵: App の鍵を受け取るのは、報告の「自動の再試行を起動する」の段だけで、再試行の Issue があるときにだけ動く(「8」)。その段は、botid の設定を作り、`gh` の設定ディレクトリを使って `running` を外し、使い終えた鍵の一時ファイルと `hosts.yml` を消す。
 - 確認の状態: 印の数え方と判定と、`running` の除去の呼び出しは `spec/auto-retry.test.mjs` と `spec/workflow.test.sh` の (u) で確かめる。App の操作が run を起こすことと、報告の段が App の名義で `gh` を使えることは、実際の run で確かめるまで未確認(「9」)。
+
+## 17. Project の Status(In Progress・In Review)の更新
+
+- 対象: 組織のプロジェクト `signature-studio/3` の Status(単一選択)。start の段が、起動した Issue を `In Progress` に移し、report の段が、結果を書いた後に `In Review` に移す。道具は `tools/project-status.mjs set <選択肢の名前> <番号>...`。選択肢は名前で引き、大文字・小文字の違いは無視する(実物の選択肢は `In progress`・`In review`)。
+- 順序: In Progress は claim の後(エージェントの開始の直前)。In Review は、結果を書く段(閉じる処理を含む)の後で、自動の再試行の起動より前。再試行の run は、その後に起動するため、最後の Status は再試行の作業の In Progress になる。
+- 閉じた Issue は触らない。閉じた Issue は、Project の組み込みの自動化が Done にする。移すのは、Issue が open のときだけ。
+- 権限: 組織のプロジェクトは GITHUB_TOKEN では読み書きできないため、App の token を使う。App に組織のプロジェクトの読み書きの権限が要る(PM が App の設定で足す)。ローカルの gh の資格では、Status の選択肢(`In progress`・`In review` を含む)を読めた。App の権限は、run でしか確かめられないため未確認。
+- 失敗: 権限が無い・Project が読めない・選択肢が無い・gh が失敗したときは、理由を標準出力に 1 行ずつ出し、段は 0 で終わる(作業は止めない。`continue-on-error` は使わない)。権限が無いときは、Issue に注記を 1 回だけ書く(印 `<!-- project-status:no-access -->` のコメントが在れば書かない)。App の token を取れないときも、理由を出して 0 で終わる。
+- 鍵: App の鍵を受け取るのは、start と report の Project の段だけ。作業者の段と作業ジョブには渡さない。
+- 試験: `spec/project-status.test.mjs`(合成の応答と偽の gh で道具を試し、agent.yml の段の置き場所・条件・鍵を確かめる)。

@@ -7,6 +7,7 @@
 # ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。例外: 自動の再試行の起動の段は、running の除去だけを App の token で行う(その変更が次の run を起こす)。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
 # 鍵は、名義の設定の段と、最後の push の段と、報告の自動の再試行の起動の段(再試行の Issue があるときだけ)にだけ渡す。作業者の段には、どの token も無い。
+# Project の Status は、start の段が In Progress に、report の段が In Review に移す。その段だけ App の鍵を受け取り、失敗は理由を出して続ける(閉じた Issue は触らない。設計は pm-work/workflow-design.md の「17」)。
 # 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
@@ -89,6 +90,38 @@ jobs:
           out=$(node tools/select-targets.mjs claim "$TARGETS" "$RETRY")
           echo "$out"
           echo "claimed=$(jq -c .claimed <<<"$out")" >> "$GITHUB_OUTPUT"
+
+      - name: Project の Status を In Progress にする(App の token で。失敗は理由を出し、作業は止めない)
+        if: success() && steps.claim.outputs.claimed != '[]'
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+          GH_REPO: ${{ github.repository }}
+          CLAIMED: ${{ steps.claim.outputs.claimed }}
+        run: |
+          app() {
+            v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+            curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f" || return 1
+            echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c - > /dev/null || return 1
+            mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid || return 1
+            umask 077
+            jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+              '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+              > "$RUNNER_TEMP/botid-config.json" || return 1
+            cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json || return 1
+            "$b/botid" issue 2>/dev/null || return 1
+            e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE") || return 1
+            GH_CONFIG_DIR=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR) && export GH_CONFIG_DIR
+          }
+          if app; then
+            node tools/project-status.mjs set "In Progress" $(jq -r '.[]' <<<"$CLAIMED") || echo "project-status: skipped: 道具が落ちた"
+          else
+            echo "project-status: skipped: App の token を取れなかった(botid)"
+          fi
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json"
+          if [ -n "${GH_CONFIG_DIR:-}" ]; then rm -f "$GH_CONFIG_DIR/hosts.yml"; fi
+          exit 0
 
   extract:
     name: 抽出物を用意する
@@ -946,6 +979,36 @@ jobs:
             fi
             if [ "$s" != retry ]; then gh issue edit "$n" --repo "$GH_REPO" --remove-label running; fi
           done
+
+      - name: Project の Status を In Review にする(App の token で。閉じた Issue は触らない。失敗は理由を出し、作業は止めない)
+        if: always()
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          app() {
+            v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+            curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f" || return 1
+            echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c - > /dev/null || return 1
+            mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid || return 1
+            umask 077
+            jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+              '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+              > "$RUNNER_TEMP/botid-config.json" || return 1
+            cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json || return 1
+            "$b/botid" issue 2>/dev/null || return 1
+            e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE") || return 1
+            GH_CONFIG_DIR=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR) && export GH_CONFIG_DIR
+          }
+          if app; then
+            node tools/project-status.mjs set "In Review" $(jq -r '.[]' <<<"$CLAIMED") || echo "project-status: skipped: 道具が落ちた"
+          else
+            echo "project-status: skipped: App の token を取れなかった(botid)"
+          fi
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json"
+          if [ -n "${GH_CONFIG_DIR:-}" ]; then rm -f "$GH_CONFIG_DIR/hosts.yml"; fi
+          exit 0
 
       - name: 自動の再試行を起動する(App の token で running を外す。再試行の Issue だけ)
         # GITHUB_TOKEN の変更は次の run を起こさないため、running の除去だけを App の token で行う(unlabeled の run が、同じ Issue の run の後に起動する)
