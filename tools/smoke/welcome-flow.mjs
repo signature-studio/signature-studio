@@ -10,7 +10,7 @@
 //   D: "I'm in" of the box. The box closes and the Welcome window stays (the window table still lists it), so the Default row is then double-clicked as in A; the project is open when the Welcome has closed.
 // The places of the controls come from the window table: the Welcome window (class TWelcomeWizard) is listed at its position, and the box and the list are at offsets from its top-left corner (measured at the room of 1836 x 1056: the offsets are the picture's, not a rule of the product).
 // Each JSON line: flow, error (the page's error text after the flow, or the tool's failure; null when none), state, standIn, trapped, hostErrors (HostFilesUnsupported lines of the flow), welcomeClosed (the window is not in the window table at the end),
-//   opened (the title changed from the Welcome's title), elapsedMs (navigation to the first engine-idle: performance.timeOrigin + timeline.idle minus the time before Page.navigate), preBootBytes (the bytes of the start-up assets: assetsReport items),
+//   opened (the title changed from the Welcome's title), startStalls (Issue #1376: the starts that did not reach engine-idle within START_LIMIT_MS and were loaded again; 0 when the first start was idle), elapsedMs (navigation to the first engine-idle: performance.timeOrigin + timeline.idle minus the time before Page.navigate), preBootBytes (the bytes of the start-up assets: assetsReport items),
 //   and for reading: hostErrorText (the first such text, cut), imageReadsAfterIdle (the names of the real modules read after the first idle), steps (what the tool did, in order).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -36,6 +36,8 @@ const DEFAULT_ROW = { dx: 235, dy: 117 };
 const NOTCH_UP = 12, NOTCH_DOWN = 3;
 const NOTCH_DELTA = 120;
 const READY_LIMIT_MS = 180000, OPEN_LIMIT_MS = 120000, POLL_MS = 500, CDP_TIMEOUT_MS = 20000;
+// a start that has not reached engine-idle within START_LIMIT_MS is loaded again (START_TRIES starts; out.startStalls counts the stalled ones, a stall of the engine's start-up seen in this runner)
+const START_LIMIT_MS = 40000, START_TRIES = 4;
 const LOG_CHECK = /aborted|\btrap\b/i;
 
 const ISOLATION = [
@@ -148,12 +150,12 @@ async function untilIdle(sess, cond, ms) {
 }
 
 /** the first idle of one start: the room is 1836 x 1056 CSS px (calibrated as tools/p2-frames does); returns the measures taken at the first idle */
-async function firstIdle(sess, navSentAt) {
+async function firstIdle(sess, navSentAt, limitMs = READY_LIMIT_MS) {
   const t0 = Date.now();
   for (;;) {
     const s = await sess.state().catch(() => null);
     if (s && (s.state === 'engine-idle' || s.state === 'error' || s.state === 'exited')) break;
-    if (Date.now() - t0 >= READY_LIMIT_MS) throw new Error(`no engine-idle within ${READY_LIMIT_MS} ms (state ${s ? s.state : 'window.__app not set'})`);
+    if (Date.now() - t0 >= limitMs) throw new Error(`no engine-idle within ${limitMs} ms (state ${s ? s.state : 'window.__app not set'})`);
     await sleep(POLL_MS);
   }
   for (let i = 0; i < 4; i++) {
@@ -173,7 +175,7 @@ async function firstIdle(sess, navSentAt) {
 /** one flow: the start, the first idle, the steps, the end. Returns the JSON object of the flow */
 async function runFlow(flow, port, shots) {
   const steps = [];
-  const out = { flow, error: null, state: null, standIn: null, trapped: true, hostErrors: 0, welcomeClosed: false, opened: false, elapsedMs: null, preBootBytes: null, hostErrorText: null, imageReadsAfterIdle: [], steps };
+  const out = { flow, error: null, state: null, standIn: null, trapped: true, hostErrors: 0, welcomeClosed: false, opened: false, elapsedMs: null, preBootBytes: null, startStalls: 0, hostErrorText: null, imageReadsAfterIdle: [], steps };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-flow-'));
   const profile = path.join(root, 'profile');
   let chrome = null, cdp = null, sess = null;
@@ -187,10 +189,20 @@ async function runFlow(flow, port, shots) {
     sess = new Session(cdp, sessionId, shots);
     await sess.send('Page.enable');
     await sess.send('Emulation.setDeviceMetricsOverride', { width: VIEW_START.width, height: VIEW_START.height, deviceScaleFactor: 1, mobile: false });
-    const navSentAt = Date.now();
-    const nav = await sess.send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
-    if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
-    const start = await firstIdle(sess, navSentAt);
+    let start = null;
+    for (let attempt = 1; attempt <= START_TRIES && start === null; attempt++) {
+      const navSentAt = Date.now();
+      const nav = await sess.send('Page.navigate', { url: `http://127.0.0.1:${port}/` });
+      if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
+      const last = attempt === START_TRIES;
+      try {
+        start = await firstIdle(sess, navSentAt, last ? READY_LIMIT_MS : START_LIMIT_MS);
+      } catch (e) {
+        if (last || !/^no engine-idle within/.test(String(e?.message ?? e))) throw e;
+        out.startStalls++;
+        steps.push(`start ${attempt} stalled: ${String(e.message).slice(0, 120)}`);
+      }
+    }
     out.elapsedMs = start.elapsedMs;
     out.preBootBytes = start.preBootBytes;
     const titleBefore = start.state.title;

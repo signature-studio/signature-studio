@@ -113,6 +113,8 @@ interface AppApi {
   /** a test aid (any display method): the compositor's whole picture as the window table is now, as a SHA-256 / as base64 of its R, G, B, A bytes */
   deskDumpHash(): Promise<{ width: number; height: number; sha256: string }>;
   deskDumpBase64(peek?: boolean): Promise<{ windows: string; width: number; height: number; base64: string }>;
+  /** Issue #1376 (a test aid): the windows painted over the WebView2 face, l, t, r, b each, in the guest's pixels on the guest's screen (the face's bounds' space); [] when none */
+  webview2Front(): number[];
   /** #1358 (a test aid, the measurement only calls it): the text the engine's memory holds for the markers, read without writing it (ASCII and UTF-16LE); radius > 0 also lists the printable runs near each place */
   guestText(markers: string[], radius?: number): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }>;
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the WebGL canvas, base64 of R, G, B, A bytes */
@@ -177,6 +179,7 @@ const app: AppApi = {
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
+  webview2Front: () => face.frontRects(),
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
   audio,
   fileDlg: { get open() { return fileDlgView.open; }, history: fileDlgView.history, requests: [] },

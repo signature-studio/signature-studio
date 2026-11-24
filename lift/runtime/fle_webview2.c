@@ -47,6 +47,8 @@
 uint64_t fle_call_guest(uint64_t va, uint64_t rcx, uint64_t rdx, uint64_t r8, uint64_t r9) __attribute__((weak));
 /* Issue #1362 (fle_win.c): the screen position of the client area of a window of the table; 0 when `h` is not a live window */
 int fle_win_client_origin(uint64_t h, int32_t *ox, int32_t *oy) __attribute__((weak));
+/* Issue #1376 (fle_win.c): the windows painted over window h within [l, r) x [t, b) (screen coordinates), 4 words each into out; weak: a link without fle_win.c has none */
+unsigned fle_win_front_rects(uint64_t h, int32_t l, int32_t t, int32_t r, int32_t b, int32_t *out, unsigned cap) __attribute__((weak));
 
 #define WV_S_OK           0x00000000u
 #define WV_E_NOINTERFACE  0x80004002u
@@ -302,6 +304,11 @@ typedef struct wv2_obj {
     uint64_t nav_uri;          /* view (Issue #1362): the URI of the navigation that Navigate asked for, a UTF-16 copy (0 when none) */
     int nav_pending;           /* view (Issue #1362): the navigation has been asked and its events are not fired yet */
 } wv2_obj;
+
+/* Issue #1376: the window the face is put on (the controller's parent) and the bounds its controller was last given: fle_webview2_front reports the windows painted over them */
+static uint64_t face_hwnd;
+static int32_t face_bounds[4];
+static int face_set;
 
 static wv2_obj *new_obj(unsigned iface)
 {
@@ -611,6 +618,9 @@ static void call_slot(unsigned iface, unsigned k)
             break;
         }
         for (i = 0; i < 4; i++) o->bounds[i] = (int32_t)(uint32_t)fle_ld(a2 + 4u * i, 4);
+        face_hwnd = o->hwnd;
+        for (i = 0; i < 4; i++) face_bounds[i] = o->bounds[i];
+        face_set = 1;
         /* Issue #1362: the window's client origin on the guest's screen, so that the page can place the face over the desktop (origin=none: the handle is not a live window) */
         if (fle_win_client_origin && fle_win_client_origin(o->hwnd, &ox, &oy))
             wlog(s->name, in, "bounds=%d,%d,%d,%d origin=%d,%d", o->bounds[0], o->bounds[1], o->bounds[2], o->bounds[3], ox, oy);
@@ -844,4 +854,22 @@ void fle_imp_CompareBrowserVersions(void)
     wlog("CompareBrowserVersions", "WebView2Loader", "v1=\"%s\" v2=\"%s\" -> %d", ta, tb, r);
     fle_st(out, 4, (uint64_t)(int64_t)r);
     R[0] = WV_S_OK;
+}
+
+/* Issue #1376: the windows painted over the face (its window, and the bounds its controller was given last), for the page (app/src/ui/webview2-surface.ts clips the face by them):
+ * word 0 = the number of windows, then per window l, t, r, b on the guest's screen (the same space as the bounds' origin). The page asks when the picture or the face has changed. */
+#define WV_FRONT_MAX 64u
+static int32_t front_words[1 + 4 * WV_FRONT_MAX];
+
+__attribute__((used)) const int32_t *fle_webview2_front(void)
+{
+    int32_t ox = 0, oy = 0;
+    unsigned n;
+
+    front_words[0] = 0;
+    if (!face_set || !fle_win_front_rects || !fle_win_client_origin) return front_words;
+    if (!fle_win_client_origin(face_hwnd, &ox, &oy)) return front_words;
+    n = fle_win_front_rects(face_hwnd, ox + face_bounds[0], oy + face_bounds[1], ox + face_bounds[2], oy + face_bounds[3], front_words + 1, WV_FRONT_MAX);
+    front_words[0] = (int32_t)n;
+    return front_words;
 }

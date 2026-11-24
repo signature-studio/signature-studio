@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeText, resourceOf, webView2Message } from '../../src/engine/webview2-log.ts';
-import { dirOf, faceRect, joinPath, rewriteRefs, splitStyles } from '../../src/ui/webview2-surface.ts';
+import { dirOf, faceClipPath, faceRect, joinPath, rewriteRefs, splitStyles, subtractBoxes } from '../../src/ui/webview2-surface.ts';
 
 describe('the WebView2 model lines the page needs (Issue #1362)', () => {
   it('reads the controller bounds with the window origin', () => {
@@ -61,5 +61,38 @@ describe('the face of the Browser panel (Issue #1362)', () => {
     expect(out).toContain('href="#offlineData"');
     expect(out).toContain('src="https://example.invalid/z.png"');
     expect(out).toContain('src="img/missing.png"');
+  });
+});
+
+describe('the part of the face that the windows over it do not cover (Issue #1376)', () => {
+  const face = { left: 0, top: 0, right: 100, bottom: 80 };
+  const area = (boxes: { left: number; top: number; right: number; bottom: number }[]): number => boxes.reduce((s, b) => s + (b.right - b.left) * (b.bottom - b.top), 0);
+
+  it('is the whole face when no window is over it', () => {
+    expect(subtractBoxes(face, [])).toEqual([face]);
+    expect(faceClipPath(face, [])).toBe('');
+  });
+
+  it('is the face minus a window that is in the middle: disjoint parts with the area of the rest', () => {
+    const over = [{ left: 30, top: 20, right: 60, bottom: 50 }];
+    const parts = subtractBoxes(face, over);
+    expect(area(parts)).toBe(100 * 80 - 30 * 30);
+    for (const p of parts) expect(p.right > p.left && p.bottom > p.top).toBe(true);
+    expect(faceClipPath(face, over)).toBe('path(evenodd, "M0 0H100V20H0Z M0 50H100V80H0Z M0 20H30V50H0Z M60 20H100V50H60Z")');
+  });
+
+  it('subtracts overlapping windows once each, and a window that does not meet the face changes nothing', () => {
+    const over = [{ left: -10, top: -10, right: 50, bottom: 40 }, { left: 40, top: 30, right: 120, bottom: 100 }, { left: 200, top: 0, right: 300, bottom: 80 }];
+    const parts = subtractBoxes(face, over);
+    const covered = (x: number, y: number): boolean => over.some((o) => x >= o.left && x < o.right && y >= o.top && y < o.bottom);
+    for (let x = 0; x < 100; x += 1) for (let y = 0; y < 80; y += 1) {
+      const inside = parts.filter((p) => x >= p.left && x < p.right && y >= p.top && y < p.bottom).length;
+      expect(inside).toBe(covered(x + 0.5, y + 0.5) ? 0 : 1);
+    }
+  });
+
+  it('is empty when a window covers the whole face', () => {
+    expect(subtractBoxes(face, [{ left: -5, top: -5, right: 200, bottom: 200 }])).toEqual([]);
+    expect(faceClipPath(face, [{ left: -5, top: -5, right: 200, bottom: 200 }])).toBe('path(evenodd, "")');
   });
 });

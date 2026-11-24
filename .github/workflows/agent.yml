@@ -2,11 +2,11 @@
 # 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
 #   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
 #   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
-#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。時間切れで取り消された: failed と、作業の保存の有無。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。
+#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。時間切れで取り消された: failed と、作業の保存の有無。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。main との衝突で push できなかった作業は、衝突の印を数えて自動で再試行する(2 回まで。retry: 印の行をコメントし、failed は付けず、App の token で running を外して次の run を起こす。設計は pm-work/workflow-design.md の「7」)。
 # 同じ Issue のイベントの run は、concurrency で 1 本ずつ動く。work は最初に Issue の状態を確かめ、閉じた・failed・pm-hold の Issue の作業は飛ばす。報告の検査は、ベンダー名の文字列を伏せ字にして通す(ほかの指摘は失敗)。
-# ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
+# ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。例外: 自動の再試行の起動の段は、running の除去だけを App の token で行う(その変更が次の run を起こす)。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
-# 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
+# 鍵は、名義の設定の段と、最後の push の段と、報告の自動の再試行の起動の段(再試行の Issue があるときだけ)にだけ渡す。作業者の段には、どの token も無い。
 # 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
@@ -787,15 +787,24 @@ jobs:
           mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH
+          rm -f "$RUNNER_TEMP/out/push-conflict.txt"
           for i in 1 2 3; do
+            rm -f "$RUNNER_TEMP/conflict.txt"
             if git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main; then
               if git push origin HEAD:main; then git rev-parse HEAD > "$RUNNER_TEMP/out/commit.txt"; exit 0; fi
             else
               c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflict.txt"
               if [ -n "$c" ]; then echo "衝突: $c"; else echo "pull が失敗した($i 回目)"; fi
               git merge --abort 2>/dev/null || true
             fi
           done
+          # 最後の試行が衝突で落ちたときだけ、衝突の印を残す(報告が自動で再試行するかを決める)。一覧は pm-work/ の外の名前だけ
+          if [ -s "$RUNNER_TEMP/conflict.txt" ]; then
+            echo push_conflict=true >> "$GITHUB_OUTPUT"
+            grep -v '^pm-work/' "$RUNNER_TEMP/conflict.txt" > "$RUNNER_TEMP/out/push-conflict.txt" || true
+            echo "main との衝突で push できなかった。pm-work/ の外の衝突: $(paste -sd' ' - < "$RUNNER_TEMP/out/push-conflict.txt")"
+          fi
           exit 1
 
       - name: 押せなかった作業を保存する
@@ -867,6 +876,7 @@ jobs:
           persist-credentials: false
 
       - name: 結果を集める(GITHUB_TOKEN。読むだけ)
+        id: collect
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -881,6 +891,15 @@ jobs:
             sha=""; if [ -s "$d/commit.txt" ]; then sha=$(cat "$d/commit.txt"); fi
             state=$(gh api "repos/$GH_REPO/issues/$n" --jq .state 2>/dev/null || echo unknown)
             skipped=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me)][0].skipped // false' "$RUNNER_TEMP/report/jobs.json")
+            pc=false; if [ -e "$d/push-conflict.txt" ]; then pc=true; fi
+            k=0; dec=none
+            if [ "$conc" = failure ] && [ "$state" = open ]; then
+              if [ "$pc" = true ]; then
+                gh api --paginate "repos/$GH_REPO/issues/$n/comments?per_page=100" | jq -s '[.[][]]' > "$d/comments.json"
+                k=$(node tools/auto-retry.mjs count < "$d/comments.json")
+              fi
+              dec=$(node tools/auto-retry.mjs decide "$conc" "$pc" "$k")
+            fi
             if [ "$skipped" = true ]; then
               echo skipped > "$d/status"; : > "$d/comment.md"
             elif [ "$conc" = success ]; then
@@ -892,11 +911,15 @@ jobs:
             elif [ "$conc" = cancelled ]; then
               echo failure > "$d/status"
               { echo "時間切れで取り消された: $RUN_URL"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。判定の前に取り消された)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; else echo "作業を保存できなかった(差分が無い・空・50 MB を超えた、または保存の段が動かなかった)"; fi; } > "$d/comment.md"
+            elif [ "$dec" = retry ]; then
+              echo retry > "$d/status"
+              { echo "<!-- auto-retry:push-conflict -->"; echo "main との衝突で push できなかった。自動で 1 回やり直す($((k + 1))/2)。"; echo "落ちた: $RUN_URL"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "衝突したファイル(pm-work/ の外): $(paste -sd' ' - < "$d/push-conflict.txt")"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の run が、その作業を取り込んでから始める)"; else echo "作業を保存できなかった(次の run は、Issue の本文から作る)"; fi; } > "$d/comment.md"
             else
               echo failure > "$d/status"
-              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; } > "$d/comment.md"
+              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; if [ "$pc" = true ] && [ "$dec" = fail ]; then echo "自動の再試行を 2 回行ったが、衝突が続く。人手(PM)が見る"; fi; } > "$d/comment.md"
             fi
           done
+          if grep -qx retry "$RUNNER_TEMP"/report/*/status; then echo "retry=true" >> "$GITHUB_OUTPUT"; else echo "retry=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: 結果を Issue に書き、状態を変える(GITHUB_TOKEN で。通った Issue が開いたままなら、ここで閉じる)
         env:
@@ -915,11 +938,38 @@ jobs:
               fi
             elif [ "$s" = skipped ]; then
               :
-            elif [ "$s" = pushed-failed ]; then
+            elif [ "$s" = pushed-failed ] || [ "$s" = retry ]; then
               gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
             else
               gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
               gh issue edit "$n" --repo "$GH_REPO" --add-label failed
             fi
-            gh issue edit "$n" --repo "$GH_REPO" --remove-label running
+            if [ "$s" != retry ]; then gh issue edit "$n" --repo "$GH_REPO" --remove-label running; fi
           done
+
+      - name: 自動の再試行を起動する(App の token で running を外す。再試行の Issue だけ)
+        # GITHUB_TOKEN の変更は次の run を起こさないため、running の除去だけを App の token で行う(unlabeled の run が、同じ Issue の run の後に起動する)
+        if: steps.collect.outputs.retry == 'true'
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
+          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
+          umask 077
+          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+            > "$RUNNER_TEMP/botid-config.json"
+          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$b/botid" issue 2>/dev/null
+          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
+          d=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)
+          list=""
+          for n in $(jq -r '.[]' <<<"$CLAIMED"); do
+            if [ "$(cat "$RUNNER_TEMP/report/$n/status")" = retry ]; then list="$list $n"; fi
+          done
+          GH_CONFIG_DIR="$d" node tools/auto-retry.mjs trigger $list
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json" "$d/hosts.yml"

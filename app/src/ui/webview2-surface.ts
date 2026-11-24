@@ -20,6 +20,35 @@ export function faceRect(b: FaceBounds, origin: { x: number; y: number } | null,
   return { left: (ox + b.left) * scale, top: (oy + b.top) * scale, width: (b.right - b.left) * scale, height: (b.bottom - b.top) * scale };
 }
 
+export interface Box { left: number; top: number; right: number; bottom: number }
+
+/** the parts of `b` that no box of `over` covers: disjoint boxes, none of them empty (Issue #1376: the face minus the windows painted over it) */
+export function subtractBoxes(b: Box, over: Box[]): Box[] {
+  let parts: Box[] = [b];
+  for (const o of over) {
+    const next: Box[] = [];
+    for (const p of parts) {
+      if (o.left >= p.right || o.right <= p.left || o.top >= p.bottom || o.bottom <= p.top) { next.push(p); continue; }
+      const top = Math.max(o.top, p.top), bottom = Math.min(o.bottom, p.bottom);
+      if (o.top > p.top) next.push({ left: p.left, top: p.top, right: p.right, bottom: o.top });
+      if (o.bottom < p.bottom) next.push({ left: p.left, top: o.bottom, right: p.right, bottom: p.bottom });
+      if (o.left > p.left) next.push({ left: p.left, top: top, right: o.left, bottom: bottom });
+      if (o.right < p.right) next.push({ left: o.right, top: top, right: p.right, bottom: bottom });
+    }
+    parts = next;
+  }
+  return parts.filter((p) => p.right > p.left && p.bottom > p.top);
+}
+
+/** the clip-path of the face (`b`, in the face's own CSS pixels) for the windows `over` painted over it: the parts of the face that they do not cover, as path(evenodd, ...); '' when no window meets the face */
+export function faceClipPath(b: Box, over: Box[]): string {
+  const hit = over.filter((o) => o.left < b.right && o.right > b.left && o.top < b.bottom && o.bottom > b.top);
+  if (hit.length === 0) return '';
+  const r = (v: number): number => Math.round(v * 1000) / 1000;
+  const parts = subtractBoxes(b, hit);
+  return `path(evenodd, "${parts.map((p) => `M${r(p.left)} ${r(p.top)}H${r(p.right)}V${r(p.bottom)}H${r(p.left)}Z`).join(' ')}")`;
+}
+
 /** the document without its <style> blocks, and the blocks' CSS (the page sets them up as style sheets: installing them as elements would be refused by the CSP) */
 export function splitStyles(html: string): { markup: string; styles: string[] } {
   const styles: string[] = [];
@@ -89,6 +118,9 @@ export class WebView2Face {
   private frame: HTMLIFrameElement | null = null;
   private bounds: FaceBounds | null = null;
   private origin: { x: number; y: number } | null = null;
+  /** Issue #1376: the windows painted over the face, l, t, r, b each in the guest's pixels on the guest's screen (the same space as the bounds' origin) */
+  private front: number[] = [];
+  private clipValue = '';
   private visible = true;
   private navSeq = 0;
   private awaitingLoad = false;
@@ -109,12 +141,14 @@ export class WebView2Face {
         this.origin = m.originX !== null && m.originY !== null ? { x: m.originX, y: m.originY } : null;
         this.ensure();
         this.place();
+        this.clip();
         break;
       case 'visible':
         this.visible = m.visible;
         this.ensure();
         if (this.wrap) this.wrap.style.display = this.visible ? '' : 'none';
         break;
+      case 'front': this.front = m.rects; this.clip(); break;
       case 'navigate': void this.navigate(m.resource); break;
       case 'post': this.send(m.json); break;
       case 'exec': this.host.log('info', `the engine runs a script in WebView2 (${m.script.length} characters): the page does not run it`); break;
@@ -122,7 +156,29 @@ export class WebView2Face {
   }
 
   /** the desktop was laid out again: the scale may have changed */
-  relayout(): void { this.place(); }
+  relayout(): void { this.place(); this.clip(); }
+
+  /** the windows painted over the face (Issue #1376, a test aid): their rectangles, l, t, r, b each, in the guest's pixels */
+  frontRects(): number[] { return this.front.slice(); }
+
+  /** Issue #1376: the face shows the part of its rectangle that no window painted over it covers; the rest is the canvas's, which draws those windows. The clip-path is written only when it changes */
+  private clip(): void {
+    if (!this.frame) return;
+    let d = '';
+    if (this.bounds) {
+      const k = this.host.scale();
+      const r = faceRect(this.bounds, this.origin, k);
+      const over: Box[] = [];
+      for (let i = 0; i + 3 < this.front.length; i += 4) {
+        const [l, t, rt, b] = this.front.slice(i, i + 4) as [number, number, number, number];
+        over.push({ left: l * k - r.left, top: t * k - r.top, right: rt * k - r.left, bottom: b * k - r.top });
+      }
+      d = faceClipPath({ left: 0, top: 0, right: r.width, bottom: r.height }, over);
+    }
+    if (d === this.clipValue) return;
+    this.clipValue = d;
+    this.frame.style.clipPath = d;
+  }
 
   private ensure(): void {
     if (this.frame) return;
