@@ -10,3 +10,4 @@ lift/harness/hyb1/hybrid_glue.c
 lift/out-app/gen/realmod.c
 lift/harness/two/wrp1_vst3.c
 lift/harness/two/wrp1_vst3_imp.c
+lift/harness/two/xmod_glue.c

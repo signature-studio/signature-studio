@@ -23,3 +23,7 @@ lift/harness/web/wasm-opt.args
 wasm-merge
 --features
 lift/harness/hyb/wasm-features.txt
+--separate
+balance
+--separate-dir
+lift/out-app/xmod

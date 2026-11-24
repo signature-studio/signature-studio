@@ -50,6 +50,9 @@ static void (*find_fn(uint64_t va))(void) {
 void wrp1_after_image_load(uint64_t base, uint64_t size) __attribute__((weak));
 /* fruity.c (FLE_FRUITY builds, fruity.h) registers an image for the FRUITY harness; a weak reference keeps the other builds linking */
 void fruity_add_image(uint64_t base, uint64_t size) __attribute__((weak));
+/* Issue #1342: the page instantiates the separate wasm module of a real module (fe-wasmgen hybrid --separate; app/src/engine/xmod.ts) and returns 1; 0 when the module has none, and the page's
+ * import is missing in a link that has no separate module. Weak: a build without the import keeps building (the native harness). */
+int fle_xmod_load(const char *dll_path) __attribute__((weak));
 
 /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
  * MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
@@ -109,6 +112,11 @@ void fle_realmod_map_image(const char *api, int idx) {
            (unsigned long long)rimg.base, (unsigned long long)rimg.size,
            (unsigned long long)rimg.entry, rimg.nimports, rimg.nexports);
     printf("real module table: name=%s base=%#llx\n", fle_realmod_table[idx].name, (unsigned long long)fle_realmod_table[idx].base);
+    if (fle_xmod_load && fle_xmod_load(path)) { /* #1342: the code of this module is a separate wasm module, instantiated by the page at this request; one line, as image-read above */
+        char wname[256];
+        snprintf(wname, sizeof wname, "%.*s.wasm", (int)(strlen(name) - 4), name);
+        fprintf(stderr, "image-read: %s requested=1 %.1f\n", wname, ms_since_start());
+    }
     if (fruity_add_image) fruity_add_image(rimg.base, rimg.size);
     fle_vmap_register_image(rimg.base); /* decision 0123 */
     if (wrp1_after_image_load) wrp1_after_image_load(rimg.base, rimg.size); /* decision 0183 (harness/two/wrp1_vst3.c; for a module that is not at WRP1_VST3_BASE it does nothing) */

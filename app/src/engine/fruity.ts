@@ -15,6 +15,7 @@ import type { DeskApi } from './desk.ts';
 import { HostFiles, type HostFileStats, type HostPack, installHostFiles, SUPPORTED_EMSCRIPTEN, unsupportedImports } from './hostfiles.ts';
 import type { EngineInput } from './idle-driver.ts';
 import type { LazyFileSource } from './lazy-file.ts';
+import { installXmod, XmodLoader } from './xmod.ts';
 
 /** the engine-side Module object (what the glue is given); the glue adds FS, ENV and the idle functions to it */
 /** decision 0234: TextDecoder, ImageData and Blob refuse a view of a SharedArrayBuffer (Chrome 156, Firefox 158); a view of a shared memory is copied first (nothing happens for an ordinary memory) */
@@ -35,6 +36,8 @@ export interface FruityModuleOpts {
   /** decision 0280 (lift/harness/web/fruity/fle_idle_lib.js): the scheduler reads the page's input ring itself; the Worker stages the records into `ptr` (8 words each, at most `max`) and returns the count; fleInputDone(ptr, n) is told what the runtime did with them */
   fleInputPoll?: (ptr: number, max: number) => number;
   fleInputDone?: (ptr: number, n: number) => void;
+  /** Issue #1342 (lift/harness/two/xmod_glue.c, lift/harness/web/fruity/fle_idle_lib.js): the engine asks for a real module's separate wasm module (xmod.ts); 1 when it is instantiated, 0 when the DLL has none */
+  fleXmodLoad?: (ptr: number) => number;
   preRun: Array<() => void>;
   instantiateWasm: (imports: WebAssembly.Imports, done: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void) => object;
   ENV?: Record<string, string>;
@@ -108,6 +111,8 @@ export class FruityEngine {
     const root = this.options.root;
     const hostFiles = new HostFiles(() => this.memory);
     this.hostFiles = hostFiles;
+    // Issue #1342: the separate wasm modules of the real modules (xmod.ts); the engine reaches it through fleXmodLoad and the imports of its f_<va> functions
+    const xmod = new XmodLoader(root, assets.lazy ?? [], () => (this.instance?.exports ?? null) as Record<string, unknown> | null, () => this.memory);
     const opts: FruityModuleOpts = {
       locateFile: (p) => p,
       arguments: [...manifest.engine.args],
@@ -120,6 +125,7 @@ export class FruityEngine {
       fleProgress: (n) => host.progress?.(n),
       fleIdle: (n, now, next) => { this.idleSince = performance.now(); if (n === 1) { host.mark('idle', { n, now, next, hostFiles: { ...hostFiles.stats } }); hostFiles.release(); host.mark('host_files_released', { ...hostFiles.stats }); } host.idle(n, now, next); },
       fleThreadFailed: (idx, _e, msg) => host.stderr(`[js] ${msg} (guest thread ${idx})`),
+      fleXmodLoad: (ptr: number) => xmod.loadAt(ptr),
       ...(host.inputPoll ? { fleInputPoll: (ptr: number, max: number) => host.inputPoll?.(ptr, max) ?? 0, fleInputDone: (ptr: number, n: number) => host.inputDone?.(ptr, n) } : {}),
       ...(host.fileDlg ? { fleFileDlg: (id: number, request: unknown) => host.fileDlg?.(id, request), fleFileDlgProgress: (id: number, done: number, total: number) => host.fileDlgProgress?.(id, done, total) } : {}),
       preRun: [() => {
@@ -137,6 +143,8 @@ export class FruityEngine {
       instantiateWasm: (imports, done) => {
         void (async () => {
           installHostFiles(imports, hostFiles);
+          // Issue #1342: a real module's code may be a separate wasm module (xmod.ts): the engine's f_<va> imports for it are supplied here
+          installXmod(imports, assets.module, xmod);
           const instance = await WebAssembly.instantiate(assets.module, imports);
           const ex = instance.exports as Record<string, unknown>;
           const mem = ex.memory ?? (imports as { env?: { memory?: unknown } }).env?.memory;   // decision 0234 (a MT2_SHARED build imports its shared memory and exports none)

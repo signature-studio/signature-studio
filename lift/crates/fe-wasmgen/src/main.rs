@@ -4,7 +4,7 @@ mod hybrid;
 
 fn usage() -> ExitCode {
     eprintln!("usage: fe-wasmgen hybrid-n0 --modules TSV --lists DIR --dll-dir DIR --args FILE --work DIR --out-rsp FILE");
-    eprintln!("       fe-wasmgen hybrid --modules TSV --lists DIR --dll-dir DIR --args FILE --work DIR --link-map FILE --c-part FILE --out FILE --wasm-opt BIN --wasm-opt-args FILE --wasm-merge BIN --features FILE");
+    eprintln!("       fe-wasmgen hybrid --modules TSV --lists DIR --dll-dir DIR --args FILE --work DIR --link-map FILE --c-part FILE --out FILE --wasm-opt BIN --wasm-opt-args FILE --wasm-merge BIN --features FILE [--separate NAME[,NAME..] --separate-dir DIR]");
     eprintln!("usage: fe-wasmgen FILE OUT.wasm [--pdata] [--seeds SEEDS.txt] [--teb ADDR] [--hybrid-r ADDR --hybrid-x ADDR --hybrid-mx MXCSR BUF --hybrid-progress ADDR [--hybrid-dispatch LIMIT LANDING HOOK] [--tls-ctx OFFSET] --hybrid-only LIST --c-imports FILE --mem-import MODULE.NAME] [--report OUT.tsv]   (test and measurement entries: --export-all | --export VA[,VA..], --roots VA,.., --select-file FILE, --rel-sites FILE, --adapt-all, --census, --mx-force-slow)");
     ExitCode::from(64)
 }
