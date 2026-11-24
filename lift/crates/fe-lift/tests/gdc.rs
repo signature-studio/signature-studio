@@ -235,8 +235,10 @@ fn the_decided_values_and_index_numbers() {
     assert_eq!(def_const("fle_gdc.h", "FLE_GDC_VERTRES"), 1080);
     assert_eq!(def_const("fle_gdc.h", "FLE_GDC_BITSPIXEL"), 32);
     assert_eq!(def_const("fle_gdc.h", "FLE_GDC_PLANES"), 1);
-    assert_eq!(def_const("fle_gdc.h", "FLE_GDC_LOGPIXELSX"), 96);
-    assert_eq!(def_const("fle_gdc.h", "FLE_GDC_LOGPIXELSY"), 96);
+    // Issue #1347: the DPI follows the page's device pixel ratio; at the default (100%) it is 96 (fle_screen.h)
+    assert_eq!(def_const("fle_screen.h", "FLE_SCREEN_DPI_DEFAULT"), 96);
+    assert!(std::fs::read_to_string(runtime_dir().join("fle_gdc.h")).unwrap().contains("#define FLE_GDC_LOGPIXELSX FLE_SCREEN_PX_DPI"));
+    assert!(std::fs::read_to_string(runtime_dir().join("fle_gdc.h")).unwrap().contains("#define FLE_GDC_LOGPIXELSY FLE_SCREEN_PX_DPI"));
     assert_eq!(def_const("fle_gdc.h", "FLE_GDC_SIZEPALETTE"), 0);
     // index numbers: unofficial (mingw-w64 wingdi.h, windows-sys on docs.rs, the same in ReactOS and Wine); written here, not read
     // back from the header

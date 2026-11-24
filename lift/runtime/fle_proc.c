@@ -12,6 +12,9 @@
 #include "fle_env.h"
 #include "fle_proc.h"
 #include "fle_screen.h"
+#include "fle_win.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
 #include "fle_com.h"
 #include "fle_thread.h"
 #include "fle_sys.h"
@@ -389,9 +392,8 @@ void fle_imp_RaiseException(void)
  * Learn (shellscalingapi.h, Windows 8.1 and later, Shcore.dll): hprocess "NULL: the current process is queried"; S_OK, E_INVALIDARG ("the
  * handle or pointer passed in is not valid"), E_ACCESSDENIED. This environment has one process and cannot create another handle (no
  * OpenProcess), so NULL and the GetCurrentProcess pseudo handle are the current process and any other handle is not valid. The awareness of
- * the current process is a setting of this environment, not a rule of the page: PROCESS_DPI_UNAWARE (0), because nothing says that the host
- * process declares DPI awareness and the virtual screen is 96 DPI on one monitor (decision 0053). The delay-loaded guest asks only for
- * "is it per-monitor aware" (== 2), so 0 sends it down the non-per-monitor path. rcx, rdx. */
+ * the current process is a setting of this environment (Issue #1347): PROCESS_DPI_PER_MONITOR_AWARE (2), so that the process is told the DPI of
+ * the display (fle_screen.h, from the page's device pixel ratio) and the guest takes its per-monitor path (== 2). rcx, rdx. */
 void fle_imp_GetProcessDpiAwareness(void)
 {
     uint64_t h = R[1], pv = R[2];
@@ -401,7 +403,8 @@ void fle_imp_GetProcessDpiAwareness(void)
         R[0] = FLE_HR_E_INVALIDARG;
         return;
     }
-    fle_st(pv, 4, FLE_PROCESS_DPI_UNAWARE);
+    fle_st(pv, 4, FLE_PROCESS_DPI_PER_MONITOR_AWARE);
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "window-api: GetProcessDpiAwareness -> %u\n", (unsigned)FLE_PROCESS_DPI_PER_MONITOR_AWARE);
     R[0] = FLE_HR_S_OK;
 }
 

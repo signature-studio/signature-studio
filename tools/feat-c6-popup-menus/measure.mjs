@@ -19,7 +19,10 @@
 //   changedNearClick: the pixels of that square that change for the click and did not change with no input.
 //   menuBandChanged: the pixels that change for the click and not with no input, over the whole picture, grouped into 4-connected regions; true when one region has a bounding box of at least 120 px wide and 40 px high, and fills at least 0.8 of it.
 //   A point that no listed window holds gets the note "未確認" and menuBandChanged false (the clicks are still made and the counts still written).
-// stdout: ONE JSON line {state, standIn, error, nproc, loadavg, parts: [{name, x, y, inputLines, windowApiCalls, menuApiCalls, controlNearClick, changedNearClick, menuBandChanged, note}], logAdded}.
+// C-6 (#1346): the pointer path is also recorded while the window-API trace is on (the same switch, so the start-up writes none): hitCalls = the hit lines of the span (hit: <move|down|up> btn first final ht captured ptr, the window the event was
+//   first given to, the window it went to, the WM_NCHITTEST answer), wndprocCalls = the wndproc: lines of the span (a mouse, focus, capture or hit-test message to a window procedure, in and out with ret, and what DefWindowProc answers: def);
+//   windowApiCalls also has the capture and cursor calls (SetCapture, ReleaseCapture, GetCursorPos, WindowFromPoint, _TrackMouseEvent) and the window queries (IsWindowEnabled, IsWindowVisible, GetFocus, GetActiveWindow, GetForegroundWindow, GetKeyState, GetAsyncKeyState).
+// stdout: ONE JSON line {state, standIn, error, nproc, loadavg, parts: [{name, x, y, inputLines, windowApiCalls, menuApiCalls, hitCalls, wndprocCalls, controlNearClick, changedNearClick, menuBandChanged, note}], logAdded}.
 //   logAdded: the input:, menu-api: and window-api: lines added after the default project opened. stderr: one line per part, the windows at each step, and the number of window-api: lines the measurement wrote.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -120,7 +123,7 @@ function bandChanged(mask, w, h) {
 }
 
 const strip = (l) => l.replace(/^\[err\] /, '');
-const kindOf = (l) => /^(input|menu-api|window-api): /.exec(strip(l))?.[1] ?? null;
+const kindOf = (l) => /^(input|menu-api|window-api|hit|wndproc): /.exec(strip(l))?.[1] ?? null;
 
 async function waitFor(pred, ms, what) {
   const t0 = Date.now();
@@ -190,7 +193,7 @@ async function openDefault(page, pic) {
 }
 
 async function measurePart(page, p) {
-  const out = { name: p.name, x: p.x, y: p.y, inputLines: [], windowApiCalls: [], menuApiCalls: [], controlNearClick: 0, changedNearClick: 0, menuBandChanged: false, note: null };
+  const out = { name: p.name, x: p.x, y: p.y, inputLines: [], windowApiCalls: [], menuApiCalls: [], hitCalls: [], wndprocCalls: [], controlNearClick: 0, changedNearClick: 0, menuBandChanged: false, note: null };
   const c0 = await picAt(page);
   await sleep(WAIT_MS);
   const c1 = await picAt(page);
@@ -211,12 +214,14 @@ async function measurePart(page, p) {
   out.inputLines = span.filter((l) => kindOf(l) === 'input');
   out.windowApiCalls = span.filter((l) => kindOf(l) === 'window-api');
   out.menuApiCalls = span.filter((l) => kindOf(l) === 'menu-api');
+  out.hitCalls = span.filter((l) => kindOf(l) === 'hit');
+  out.wndprocCalls = span.filter((l) => kindOf(l) === 'wndproc');
   const moved = changedMask(c1, after);
   const residual = new Uint8Array(moved.length);
   for (let i = 0; i < moved.length; i++) residual[i] = moved[i] && !ctrl[i] ? 1 : 0;
   out.changedNearClick = nearCount(residual, c1, p);
   out.menuBandChanged = inWindow && bandChanged(residual, c1.w, c1.h);
-  process.stderr.write(`${p.name} (${p.x}, ${p.y}): control ${out.controlNearClick} changed ${out.changedNearClick} band ${out.menuBandChanged} input ${out.inputLines.length} window-api ${out.windowApiCalls.length} menu-api ${out.menuApiCalls.length}${out.note ? ` ${out.note}` : ''}\n`);
+  process.stderr.write(`${p.name} (${p.x}, ${p.y}): control ${out.controlNearClick} changed ${out.changedNearClick} band ${out.menuBandChanged} input ${out.inputLines.length} window-api ${out.windowApiCalls.length} menu-api ${out.menuApiCalls.length} hit ${out.hitCalls.length} wndproc ${out.wndprocCalls.length}${out.note ? ` ${out.note}` : ''}\n`);
   return out;
 }
 

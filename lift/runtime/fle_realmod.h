@@ -7,7 +7,8 @@
  * module exists, and the loader, GetModuleHandleW and GetProcAddress behave exactly as they did before this file.
  *
  * The handle of a real module is its base (decision 0080 D5; DllMain's hinstDLL is the same value). The image must be mapped at that
- * base before the first LoadLibrary of the module; its PE headers are read from memory then.
+ * base before the first LoadLibrary of the module; its PE headers are read from memory then. Issue #1341: the link may map it at that
+ * first LoadLibrary instead (fle_realmod_map_image, a weak hook of fle_realmod.c, defined by harness/two/main_two.c).
  *
  * fle_load.c and fle_modules.c reach these functions through weak references (FLE_REALMOD_PRESENT): a program that links neither
  * fle_realmod.c nor a table (the unit tests of the single-module runtime) is unchanged. */
@@ -76,6 +77,9 @@ void fle_realmod_thread_notify(uint32_t reason) FLE_REALMOD_REF;
 
 /* Base of the real module with index idx (0-based, in table order), or 0 when idx is not below the number of real modules. */
 uint64_t fle_realmod_base_of(int idx) FLE_REALMOD_REF;
+
+/* 1 when the image of real module idx is in memory (every image when the link maps them all at start; else once fle_realmod_load has read its headers, at the first LoadLibrary, issue #1341), else 0. */
+int fle_realmod_image_mapped(int idx) FLE_REALMOD_REF;
 
 /* The module's own file name: the Name field of its export directory (IMAGE_EXPORT_DIRECTORY.Name, ASCII), copied to out (n bytes
  * including the NUL). Returns its length, or -1 when the image has no export directory or the name does not fit or is not ASCII.

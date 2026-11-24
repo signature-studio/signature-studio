@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #define VL_MAX_STREAMS 16u   /* streams one index may have */
-#define VL_REG_MAX 32u       /* streams the volume holds (fle_vfs.c LAZY_MAX_STREAMS) */
+#define VL_REG_MAX 512u      /* streams the volume holds (fle_vfs.c LAZY_MAX_STREAMS): the index streams and one per file row of the seed list (#1345) */
 #define VL_MAX_ENTRIES 65536u
 #define VL_MAX_CHUNK (UINT64_C(8) << 20)
 #define VL_MAX_INDEX_BYTES (UINT64_C(16) << 20)
@@ -26,8 +26,10 @@
 #define VL_ATTR_SYSTEM 0x04u
 
 typedef struct {
-    char path[VS_HOST_MAX];
+    char *path;     /* the host file (malloc'd) */
     int fd;
+    char sha[65];   /* #1345: the SHA-256 the seed list gives for a seed file; '' for an index stream (the index file is checked at start) */
+    int checked;    /* #1345: set once the bytes of a seed file have been checked against sha (at its first read) */
 } vl_stream;
 
 static vl_stream vl_streams[VL_REG_MAX];
@@ -73,6 +75,40 @@ static const uint8_t *vl_take(vl_cur *c, uint64_t n)
     return r;
 }
 
+/* #1345: the bytes of a seed file are checked against its SHA-256 at its first read (the whole file is read and hashed once), so the start-up does not hash the list. A mismatch is reported by name and the read fails. */
+static int vl_check(vl_stream *s)
+{
+    struct stat st;
+    uint8_t *buf;
+    char got[65];
+    size_t done = 0;
+    if (fstat(s->fd, &st) != 0 || !S_ISREG(st.st_mode) || (uint64_t)st.st_size > VS_MAX_FILE_BYTES) {
+        fprintf(stderr, "vfs seed: %s: cannot be read whole for its SHA-256 check\n", s->path);
+        return -1;
+    }
+    buf = malloc(st.st_size ? (size_t)st.st_size : 1);
+    if (!buf) {
+        fprintf(stderr, "vfs seed: %s: out of memory for its SHA-256 check\n", s->path);
+        return -1;
+    }
+    while (done < (size_t)st.st_size) {
+        ssize_t k = pread(s->fd, buf + done, (size_t)st.st_size - done, (off_t)done);
+        if (k <= 0) {
+            free(buf);
+            fprintf(stderr, "vfs seed: %s: cannot be read whole for its SHA-256 check\n", s->path);
+            return -1;
+        }
+        done += (size_t)k;
+    }
+    vs_sha256_hex(buf, done, got);
+    free(buf);
+    if (strcmp(got, s->sha) != 0) {
+        fprintf(stderr, "vfs seed: %s: SHA-256 mismatch at the first read: expected %s, got %s\n", s->path, s->sha, got);
+        return -1;
+    }
+    return 0;
+}
+
 /* The read function of the runtime: the bytes [off, off + n) of the stream, by pread on the host file (opened on the first read). */
 static int vl_read(void *ctx, unsigned stream, uint64_t off, void *dst, size_t n)
 {
@@ -84,6 +120,10 @@ static int vl_read(void *ctx, unsigned stream, uint64_t off, void *dst, size_t n
     if (s->fd < 0) {
         s->fd = open(s->path, O_RDONLY);
         if (s->fd < 0) return 0;
+    }
+    if (s->sha[0] && !s->checked) {
+        if (vl_check(s) != 0) return 0;
+        s->checked = 1;
     }
     while (n) {
         ssize_t k = pread(s->fd, d, n, (off_t)off);
@@ -176,13 +216,17 @@ static int vl_parse(int dry, const char *list, unsigned line, const char *index_
         if (coding > 1) return vs_fail(list, line, "stream %u of the lazy index %s has coding %u (0 identity, 1 brotli)", s, index_host, coding);
         if (chunk == 0 || chunk > VL_MAX_CHUNK) return vs_fail(list, line, "stream %u of the lazy index %s has chunk size %llu (1..%llu)", s, index_host, (unsigned long long)chunk, (unsigned long long)VL_MAX_CHUNK);
         if (nchunks != (logical[s] + chunk - 1) / chunk) return vs_fail(list, line, "stream %u of the lazy index %s has %llu chunks for %llu bytes of %llu per chunk", s, index_host, (unsigned long long)nchunks, (unsigned long long)logical[s], (unsigned long long)chunk);
-        if (dl + name_len >= sizeof vl_streams[0].path) return vs_fail(list, line, "the host file name of stream %u is too long", s);
+        if (dl + name_len >= VS_HOST_MAX) return vs_fail(list, line, "the host file name of stream %u is too long", s);
         if (!dry) {
             vl_stream *vs = &vl_streams[base + s];
+            vs->path = malloc(dl + name_len + 1);
+            if (!vs->path) return vs_fail(list, line, "out of memory for stream %u of the lazy index", s);
             memcpy(vs->path, dir, dl);
             memcpy(vs->path + dl, name, (size_t)name_len);
             vs->path[dl + name_len] = 0;
             vs->fd = -1;
+            vs->sha[0] = 0;
+            vs->checked = 0;
             id = fle_vfs_lazy_add_stream(logical[s]);
             if (id != (int)(base + s)) return vs_fail(list, line, "the volume cannot take stream %u of the lazy index (%d)", s, id);
             vl_n_streams++;

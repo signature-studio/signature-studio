@@ -8,6 +8,9 @@
 #include "fle_runtime.h"
 #include "fle_env.h"
 #include "fle_gdc.h"
+#include "fle_win.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
 #include "fle_sysmetrics.h"
 
 /* Indexes that the guest's call sites pass (a literal in `mov ecx, imm`, or a value of the two scroll bar tables the guest
@@ -41,7 +44,14 @@ static const struct {
  *  - SM_TABLETPC 0, SM_MAXIMUMTOUCHES 0, SM_CONVERTIBLESLATEMODE 1, SM_SYSTEMDOCKED 0 (decision 0107, PROVISIONAL; the reasons are with the
  *    values in fle_sysmetrics.h).
  * Only the low DWORD of rcx is the index (an int). */
-void fle_imp_GetSystemMetrics(void)
+/* The size metrics are pixel sizes at 96 DPI; at the DPI of the display they are MulDiv(value, DPI, 96) (the rule of GetSystemMetricsForDpi).
+ * At 96 DPI this is the value itself. */
+static uint32_t fle_sm_scaled(uint32_t v)
+{
+    return (v * fle_screen_dpi() + 48u) / 96u;
+}
+
+static void fle_sm_answer(void)
 {
     static const char api[] = "GetSystemMetrics";
     uint32_t idx = (uint32_t)R[1];
@@ -51,12 +61,12 @@ void fle_imp_GetSystemMetrics(void)
     switch (idx) {
     case FLE_SM_IDX_CXSCREEN: R[0] = (uint32_t)FLE_GDC_HORZRES; return;
     case FLE_SM_IDX_CYSCREEN: R[0] = (uint32_t)FLE_GDC_VERTRES; return;
-    case FLE_SM_IDX_CXICON: R[0] = FLE_SM_CXICON; return;
-    case FLE_SM_IDX_CYICON: R[0] = FLE_SM_CYICON; return;
-    case FLE_SM_IDX_CXCURSOR: R[0] = FLE_SM_CXCURSOR; return;
-    case FLE_SM_IDX_CYCURSOR: R[0] = FLE_SM_CYCURSOR; return;
-    case FLE_SM_IDX_CXSMICON: R[0] = FLE_SM_CXSMICON; return;
-    case FLE_SM_IDX_CYSMICON: R[0] = FLE_SM_CYSMICON; return;
+    case FLE_SM_IDX_CXICON: R[0] = fle_sm_scaled(FLE_SM_CXICON); return;
+    case FLE_SM_IDX_CYICON: R[0] = fle_sm_scaled(FLE_SM_CYICON); return;
+    case FLE_SM_IDX_CXCURSOR: R[0] = fle_sm_scaled(FLE_SM_CXCURSOR); return;
+    case FLE_SM_IDX_CYCURSOR: R[0] = fle_sm_scaled(FLE_SM_CYCURSOR); return;
+    case FLE_SM_IDX_CXSMICON: R[0] = fle_sm_scaled(FLE_SM_CXSMICON); return;
+    case FLE_SM_IDX_CYSMICON: R[0] = fle_sm_scaled(FLE_SM_CYSMICON); return;
     case FLE_SM_IDX_MOUSEPRESENT: R[0] = FLE_SM_MOUSEPRESENT; return;
     case FLE_SM_IDX_MOUSEWHEELPRESENT: R[0] = FLE_SM_MOUSEWHEELPRESENT; return;
     case FLE_SM_IDX_XVIRTUALSCREEN: R[0] = FLE_SM_VIRTUALSCREEN_ORIGIN; return;
@@ -79,4 +89,12 @@ void fle_imp_GetSystemMetrics(void)
     }
     snprintf(why, sizeof why, "index %u is not answered (the guest's call sites do not use it)", (unsigned)idx);
     fle_stop(api, why);
+}
+
+void fle_imp_GetSystemMetrics(void)
+{
+    uint32_t idx = (uint32_t)R[1];
+
+    fle_sm_answer();
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "window-api: GetSystemMetrics index=%u -> %u\n", idx, (unsigned)(uint32_t)R[0]);
 }

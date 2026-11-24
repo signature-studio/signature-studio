@@ -16,6 +16,8 @@
 import { IN, type RawInput } from '../input/events.ts';
 
 export const TICKS_PER_MS = 10000;
+/** why the engine was resumed: an input, its deadline, the end of the session, or a page change (Issue #1362: a WebView2 page has loaded) */
+export type ResumeWhy = 'input' | 'deadline' | 'end' | 'page';
 
 export interface EngineInput {
   mouse(kind: number, x: number, y: number, data: number): number;
@@ -46,7 +48,7 @@ export interface DriverHooks {
   processed?(list: Injected[], tIdle: number): void;
   dropped?(seq: number, reason: string): void;
   idle?(n: number, nowTicks: number, nextTicks: number, busyMs: number | null, at: number): void;
-  resumed?(code: number, at: number, why: 'input' | 'deadline' | 'end'): void;
+  resumed?(code: number, at: number, why: ResumeWhy): void;
   /** the lag reached maxLagMs and `ticks` of it were cut (the virtual clock stays that far behind the wall clock for good) */
   lagCut?(ticks: number): void;
 }
@@ -179,6 +181,9 @@ export class IdleDriver {
   /** ends the session (the engine's fle_idle_wait returns < 0) */
   end(): boolean { this.turnStart = this.host.now(); return this.resume(-1, 'end'); }
 
+  /** Issue #1362: the engine waits and something outside its input has changed (a WebView2 page has loaded): it is resumed (code 0: the engine looks at what changed). False when it is not waiting. */
+  wake(): boolean { return this.idle !== null && this.resume(0, 'page'); }
+
   /** where the wall clock says the virtual clock should be at wall instant `w`, kept within [now - maxLead, now + maxLag] (the anchor is moved when it is cut) */
   private target(w: number, now: number): number {
     const a = this.anchor as { wall: number; ticks: number };
@@ -222,7 +227,7 @@ export class IdleDriver {
     }, waitMs);
   }
 
-  private resume(code: number, why: 'input' | 'deadline' | 'end'): boolean {
+  private resume(code: number, why: ResumeWhy): boolean {
     if (this.timer !== null) { this.host.clearTimer(this.timer); this.timer = null; }
     this.idle = null;
     const at = this.host.now();

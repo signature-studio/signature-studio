@@ -1,6 +1,6 @@
 // Decision 0209: the engine's last words as the beacon carries them (src/perf/exit-message.ts): which line is chosen, and that nothing personal (home directories, user names, file names, e-mail, URL, IP) leaves the page.
 import { describe, expect, it } from 'vitest';
-import { EXIT_MESSAGE_MAX, engineExitMessage, sanitizeEngineText } from '../../src/perf/exit-message.ts';
+import { EXIT_MESSAGE_MAX, engineExitMessage, engineStopFacts, sanitizeEngineText } from '../../src/perf/exit-message.ts';
 import { PERF_EXIT_MESSAGE_MAX, beaconProblems } from '../../shared/perf.ts';
 
 describe('sanitizeEngineText: home directories and names', () => {
@@ -109,5 +109,69 @@ describe('engineExitMessage: which line says why', () => {
     const t0 = performance.now();
     expect(engineExitMessage(lines.slice(0, -1), info)).toBeNull();
     expect(performance.now() - t0).toBeLessThan(200);
+  });
+});
+
+// Issue #1380: the stop report's facts (engine.exit.stop) and the evidence line (engine.exit.evidence), read from the same window of lines
+describe('engineStopFacts: the stop report, the evidence line', () => {
+  const EVIDENCE = 'first non-background pixel on a drawing surface (decision 0126): written by fixture into the surface of top-level window lid 3; function entries since the program began: 0';
+  const report = [
+    '[err] fle: StopFixture: the last fle line of a stop (synthetic)',
+    `[err] ${EVIDENCE}`,
+    'fruity: == stop: SIGABRT (runtime abort, see runtime message)',
+    `fruity: runtime message: ${EVIDENCE}`,
+    'fruity: abort kind: fle_stop (a runtime message that names an API and the reason)',
+    'wf1: shadow stack depth, the largest of the whole run (lifted frames, not wasm frames): 12; linear memory now 1114112000 bytes; entries since program start 99',
+    'fruity: guest stack at rsp (return address, 4 shadow slots, then stack arguments): 0x4505f9 0x1',
+  ];
+  it('the stop report: the last fle line (prefixes off), the stop line, the abort kind, the wasm memory in bytes; the evidence line without its [err] marker', () => {
+    const f = engineStopFacts(report);
+    expect(f.stop).toEqual({
+      lastFle: 'fle: StopFixture: the last fle line of a stop (synthetic)',
+      stopLine: '== stop: SIGABRT (runtime abort, see runtime message)',
+      abortKind: 'fle_stop (a runtime message that names an API and the reason)',
+      memoryBytes: 1114112000,
+    });
+    expect(f.evidence).toBe(EVIDENCE);
+  });
+  it('the wasm harness writes the stop lines without the "fruity: " prefix too', () => {
+    const f = engineStopFacts(['fle: A: why', '== stop: SIGABRT (runtime abort, see runtime message)', 'abort kind: (not a runtime message)', 'wf1: x; linear memory now 67108864 bytes; y']);
+    expect(f.stop).toEqual({ lastFle: 'fle: A: why', stopLine: '== stop: SIGABRT (runtime abort, see runtime message)', abortKind: '(not a runtime message)', memoryBytes: 67108864 });
+    expect(f.evidence).toBeNull();
+  });
+  it('no stop line: stop is null (no stop facts), but the evidence line is still there', () => {
+    const f = engineStopFacts(['[err] fle: A: why', `[err] ${EVIDENCE}`, 'fruity: abort kind: fle_stop']);
+    expect(f.stop).toBeNull();
+    expect(f.evidence).toBe(EVIDENCE);
+    expect(engineStopFacts(['x', 'y'])).toEqual({ stop: null, evidence: null });
+  });
+  it('the last of each kind is the one; a line outside the last 2,000 is not read', () => {
+    const f = engineStopFacts(['[err] fle: old: first', '[err] fle: new: second', '== stop: SIGABRT', '== stop: SIGSEGV']);
+    expect(f.stop?.lastFle).toBe('fle: new: second');
+    expect(f.stop?.stopLine).toBe('== stop: SIGSEGV');
+    const far = ['[err] fle: far away', ...Array.from({ length: 2000 }, (_, i) => `line ${i}`), '== stop: SIGABRT'];
+    expect(engineStopFacts(far).stop?.lastFle).toBeNull();
+  });
+  it('names and paths of the person go, the file name goes, the API and the reason stay', () => {
+    const f = engineStopFacts(['[err] fle: CreateFileW: C:\\Users\\Jane Doe\\Desktop\\mine.flp: not modelled', '== stop: SIGABRT', 'abort kind: fle_stop']);
+    expect(f.stop?.lastFle).toBe('fle: CreateFileW: <path>.flp: not modelled');
+    expect(JSON.stringify(f)).not.toMatch(/Jane|Desktop|mine/);
+    const g = engineStopFacts(['[err] fle: ReadFile: /home/ubuntu/work/ mail jane.doe@example.co.jp from https://example.com/x 10.0.0.1', '== stop: SIGABRT']);
+    expect(g.stop?.lastFle).toBe('fle: ReadFile: <path> mail <email> from <url> <ip>');
+    expect(JSON.stringify(g)).not.toMatch(/ubuntu|jane|example|10\.0\.0\.1/);
+    const h = engineStopFacts(['[err] first non-background pixel on a drawing surface: written into C:\\Users\\Jane\\a.flp', '== stop: SIGABRT']);
+    expect(h.evidence).toBe('first non-background pixel on a drawing surface: written into <path>.flp');
+  });
+  it('a text is cut at its own length: the last fle line at 400 characters, the stop line at 200, the kind at 80, the evidence at 400', () => {
+    const f = engineStopFacts(['[err] fle: ' + 'w'.repeat(900), '== stop: ' + 's'.repeat(400), 'abort kind: ' + 'k'.repeat(300), '[err] first non-background pixel ' + 'e'.repeat(900)]);
+    expect(f.stop?.lastFle).toHaveLength(400);
+    expect(f.stop?.stopLine).toHaveLength(200);
+    expect(f.stop?.abortKind).toHaveLength(80);
+    expect(f.evidence).toHaveLength(400);
+    expect(f.stop?.lastFle?.endsWith('…')).toBe(true);
+  });
+  it('an empty log gives nothing, and nothing throws on lines that are not text', () => {
+    expect(engineStopFacts([])).toEqual({ stop: null, evidence: null });
+    expect(() => engineStopFacts(['', 'fruity: ', '[err] ', '== stop:', 'wf1: linear memory now bytes'])).not.toThrow();
   });
 });

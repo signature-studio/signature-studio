@@ -105,12 +105,22 @@ uint64_t fle_audio_consumed(void)
     return acc_frames + (now - seg_t0) * (uint64_t)r->sample_rate / FLE_QPF_HZ;
 }
 
+/* The tick at which the play position reaches `frames` (0: not known). With an external consumer the position is the page's read count, which advances at the device's rate in real time; the scheduler's wait is paced with the wall
+ * clock (idle-driver.ts), so the frames still to be read are due at that rate from now. Without this the scheduler had no audio deadline in the browser, and an idle engine slept until its next input while the ring ran dry (#1334). */
 uint64_t fle_audio_tick_of_frame(uint64_t frames)
 {
     fle_audio_ring_t *r = fle_audio_ring_get();
-    uint64_t rel, num;
+    uint64_t rel, num, c;
 
-    if (fle_audio_external() || !clock_started || r->sample_rate == 0) return 0;
+    if (r->sample_rate == 0) return 0;
+    if (fle_audio_external()) {
+        c = fle_audio_consumed();
+        if (frames <= c) return fle_sys_clock_ticks();
+        rel = frames - c;
+        num = rel * FLE_QPF_HZ;
+        return fle_sys_clock_ticks() + (num + r->sample_rate - 1u) / r->sample_rate;
+    }
+    if (!clock_started) return 0;
     if (frames <= acc_frames) return seg_t0;
     rel = frames - acc_frames;
     num = rel * FLE_QPF_HZ;

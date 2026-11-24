@@ -7,9 +7,14 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <stdio.h>
+
 #include "fle_runtime.h"
 #include "fle_imports.h"
 #include "fle_reg.h"
+
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
 
 #define KEY_NAME_MAX   255u      /* MSDN: Registry Element Size Limits (key name) */
 #define VALUE_NAME_MAX 16383u    /* same page (value name) */
@@ -508,6 +513,54 @@ static uint32_t data_out(const char *api, const reg_value *v, uint64_t ptype, ui
     return 0;
 }
 
+/* The window-API trace (fle_win_api_trace_set) of a value read: one line with the key's path (from the predefined root), the value name, and what the read answered
+ * (the value's type and data for a string or a DWORD; the size otherwise). Diagnostics only: nothing here changes the answer. */
+static const char *root_name(const reg_key *k)
+{
+    static const char *names[5] = { "HKCR", "HKCU", "HKLM", "HKU", "HKCC" };
+    size_t i;
+
+    for (i = 0; i < 5; i++) if (k == &roots[i]) return names[i];
+    return NULL;
+}
+
+static void trace_put_units(const uint16_t *s, size_t n, size_t max)
+{
+    size_t i;
+
+    for (i = 0; i < n && i < max; i++) fputc(s[i] >= 0x20 && s[i] < 0x7f && s[i] != '"' ? (int)s[i] : '?', stderr);
+}
+
+static void trace_query(const reg_key *k, const uint16_t *name, size_t nl, const reg_value *v)
+{
+    const reg_key *chain[64];
+    size_t n = 0, i;
+
+    for (const reg_key *p = k; p && n < 64; p = p->parent) chain[n++] = p;
+    fprintf(stderr, "window-api: RegQueryValueExW \"");
+    for (i = n; i-- > 0;) {
+        const reg_key *p = chain[i];
+        if (!p->parent && root_name(p)) fprintf(stderr, "%s", root_name(p));
+        else {
+            if (i + 1 != n) fputc('\\', stderr);
+            trace_put_units(p->name, p->nlen, KEY_NAME_MAX);
+        }
+    }
+    fprintf(stderr, "\" \"");
+    trace_put_units(name ? name : empty_w, name ? nl : 0, VALUE_NAME_MAX);
+    fprintf(stderr, "\" -> ");
+    if (!v) { fprintf(stderr, "not found\n"); return; }
+    fprintf(stderr, "found type=%u size=%u", (unsigned)v->type, (unsigned)v->size);
+    if ((v->type == 1u || v->type == 2u) && v->size >= 2u) {
+        fprintf(stderr, " value=\"");
+        trace_put_units((const uint16_t *)(const void *)v->data, v->size / 2u, 120u);
+        fprintf(stderr, "\"");
+    } else if (v->type == 4u && v->size >= 4u) {
+        fprintf(stderr, " value=%u", (unsigned)(v->data[0] | (v->data[1] << 8) | (v->data[2] << 16) | ((uint32_t)v->data[3] << 24)));
+    }
+    fputc('\n', stderr);
+}
+
 /* advapi32!RegQueryValueExW (MSDN: RegQueryValueExW). hKey rcx (needs KEY_QUERY_VALUE: else 5, inference),
  * lpValueName rdx (NULL or "" is the unnamed value), lpReserved r8 (must be NULL: stops), lpType r9, lpData [5],
  * lpcbData [6]. A missing value returns ERROR_FILE_NOT_FOUND (2) (page). Data is returned as stored: strings
@@ -534,6 +587,7 @@ void fle_imp_RegQueryValueExW(void)
     }
     if (R[2] != 0) name = fle_w_read_alloc(api, R[2], VALUE_NAME_MAX, &nl);
     v = val_find(k, name ? name : empty_w, nl);
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) trace_query(k, name, nl, v);
     free(name);
     if (!v) {
         ret(FLE_W32_ERR_FILE_NOT_FOUND);

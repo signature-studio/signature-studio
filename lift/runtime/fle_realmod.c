@@ -144,6 +144,17 @@ int fle_realmod_find_handle(uint64_t h)
     return -1;
 }
 
+/* Issue #1341: the image of a real module is mapped when the guest first asks for the module (LoadLibrary), not at start. The link may define this (harness/two/main_two.c): it reads the module's file and maps the
+ * PE image at the table's base, before the headers are read below. A link without it maps every image at start, as before. */
+void fle_realmod_map_image(const char *api, int idx) __attribute__((weak));
+
+/* 1 when the image of real module idx is in memory: always, when the link maps every image at start (no fle_realmod_map_image); otherwise once its headers are read (fle_realmod_load, the first LoadLibrary). */
+int fle_realmod_image_mapped(int idx)
+{
+    table_check("fle_realmod_image_mapped");
+    return idx >= 0 && (uint64_t)idx < fle_realmod_count && (!fle_realmod_map_image || mods[idx].headers);
+}
+
 /* The PE headers of the image that the harness mapped at the base: DOS and NT signatures, PE32+, entry point and export directory. */
 static void read_headers(const char *api, int idx)
 {
@@ -152,6 +163,7 @@ static void read_headers(const char *api, int idx)
     char why[200];
 
     if (m->headers) return;
+    if (fle_realmod_map_image) fle_realmod_map_image(api, idx);
     if ((uint16_t)fle_ld(base, 2) != 0x5a4d || (lfanew = fle_ld(base + 0x3c, 4)) < 0x40 || lfanew > 0x1000 ||
         (uint32_t)fle_ld(base + lfanew, 4) != 0x4550) {
         snprintf(why, sizeof why, "real module \"%s\": no PE image is mapped at %#llx", fle_realmod_table[idx].name, (unsigned long long)base);

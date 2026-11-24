@@ -1,0 +1,1 @@
+-std=gnu11 -O3 -w -fno-builtin-fprintf -fno-builtin-fputs -ffp-contract=off -fno-fast-math -sSUPPORT_LONGJMP=wasm -Ilift/runtime -msimd128 -matomics -mbulk-memory

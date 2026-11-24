@@ -1,0 +1,6 @@
+stage external: 5 step(s)
+  mkdir -p lift/out-app/external
+  aws s3 cp s3://fl-web-artifacts/installers/Install_Xfer_Serum2_2.1.5.exe lift/out-app/external/Install_Xfer_Serum2_2.1.5.exe
+  aws s3 cp s3://fl-web-artifacts/installers/Install_Xfer_OTT_137.exe lift/out-app/external/Install_Xfer_OTT_137.exe
+  aws s3 cp s3://fl-web-artifacts/installers/VitalInstaller.exe lift/out-app/external/VitalInstaller.exe
+  node tools/external-inputs/check.mjs lift/out-app/external

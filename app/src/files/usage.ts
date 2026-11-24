@@ -2,7 +2,7 @@
 // No file or folder name, no path, no size of a single file, no content, no time of day: whole numbers, MiB rounded down, true/false, and failure CODES from a fixed list (never the text of an error: it can hold a name).
 // Why: the maintainers cannot see the client's browser; the beacon is how a Firefox 159 / Windows 10 run of Files (the real folder chooser, the real drop of a folder, persist()) becomes visible at all.
 
-import { PERF_FILES_FAIL_CODES } from '../../shared/perf.ts';
+import { PERF_ANSWER_BUCKETS, PERF_FILES_FAIL_CODES } from '../../shared/perf.ts';
 
 export const FILES_FAIL_CODES = PERF_FILES_FAIL_CODES;
 export type FailCode = (typeof FILES_FAIL_CODES)[number];
@@ -25,10 +25,16 @@ export interface FilesUsage {
   persist: { asked: number; granted: number; denied: number; pending: number };
   /** the last navigator.storage.estimate() and persisted(): MiB, null when the browser did not say */
   storage: { usedMiB: number | null; quotaMiB: number | null; persisted: boolean | null };
-  /** the engine's file dialogs answered by the window */
-  engine: { open: number; save: number; folder: number; answered: number; cancelled: number; zipUnpacked: number; savedBack: number; savedBackFailed: number };
+  /** the engine's file dialogs answered by the window. Issue #1380: what the answers were, as counts only (no name, no path): answeredUnderDemo / answeredFlp count the answers that had a file under a "Demo projects" folder / a .flp file; answeredBytes the answers that gave files, by the size of those files (answerBucket) */
+  engine: { open: number; save: number; folder: number; answered: number; cancelled: number; zipUnpacked: number; savedBack: number; savedBackFailed: number; answeredUnderDemo: number; answeredFlp: number; answeredBytes: Record<AnswerBucket, number> };
   /** failure codes -> how many times */
   fail: Partial<Record<FailCode, number>>;
+}
+
+/** Issue #1380: the size buckets of an answer's files (the same list as PERF_ANSWER_BUCKETS in shared/perf.ts): up to 64 KB, up to 1 MB, up to 16 MB, more */
+export type AnswerBucket = (typeof PERF_ANSWER_BUCKETS)[number];
+export function answerBucket(bytes: number): AnswerBucket {
+  return bytes <= 64 * 1024 ? 'k64' : bytes <= 1024 * 1024 ? 'm1' : bytes <= 16 * 1024 * 1024 ? 'm16' : 'more';
 }
 
 /** the text of an error or of a failure reason -> one of the fixed codes (the text itself never leaves the page) */
@@ -57,7 +63,7 @@ const zero = (): FilesUsage => ({
   v: 1, opens: 0, pick: { files: 0, folder: 0, zip: 0 }, drop: { files: 0, folders: 0, zips: 0 }, written: 0, skipped: 0, failed: 0, writtenMiB: 0,
   extract: { zips: 0, files: 0, cancelled: 0 }, download: { file: 0, folderZip: 0 }, ops: { mkdir: 0, rename: 0, delete: 0, copy: 0, move: 0 },
   persist: { asked: 0, granted: 0, denied: 0, pending: 0 }, storage: { usedMiB: null, quotaMiB: null, persisted: null },
-  engine: { open: 0, save: 0, folder: 0, answered: 0, cancelled: 0, zipUnpacked: 0, savedBack: 0, savedBackFailed: 0 }, fail: {},
+  engine: { open: 0, save: 0, folder: 0, answered: 0, cancelled: 0, zipUnpacked: 0, savedBack: 0, savedBackFailed: 0, answeredUnderDemo: 0, answeredFlp: 0, answeredBytes: { k64: 0, m1: 0, m16: 0, more: 0 } }, fail: {},
 });
 
 export class UsageCounter {
@@ -75,6 +81,17 @@ export class UsageCounter {
     for (const f of r.failed) this.fail(f.reason);
     this.bytes += r.bytes;
     c.writtenMiB = Math.floor(this.bytes / 1048576);
+  }
+  /**
+   * Issue #1380: an answer the engine's dialog was given (the items the window answered with: role, guest path, and the File for an item that has bytes; a Save answer has none). Counts only: the answer is under a Demo projects
+   * folder, is a .flp file, and the bytes of its files fall into a bucket. Names and paths are read here and never kept.
+   */
+  engineAnswer(items: readonly { path: string; file?: { size: number } | undefined }[]): void {
+    const e = this.c.engine;
+    if (items.some((i) => i.path.split(/[\\/]/).some((seg) => seg.toLowerCase() === 'demo projects'))) e.answeredUnderDemo++;
+    if (items.some((i) => i.path.toLowerCase().endsWith('.flp'))) e.answeredFlp++;
+    const withBytes = items.filter((i) => i.file !== undefined);
+    if (withBytes.length > 0) e.answeredBytes[answerBucket(withBytes.reduce((n, i) => n + (i.file?.size ?? 0), 0))]++;
   }
   storage(usage: number | null, quota: number | null, persisted: boolean | null): void {
     const s = this.c.storage;

@@ -15,6 +15,7 @@ import type { DeskApi } from './desk.ts';
 import { HostFiles, type HostFileStats, type HostPack, installHostFiles, SUPPORTED_EMSCRIPTEN, unsupportedImports } from './hostfiles.ts';
 import type { EngineInput } from './idle-driver.ts';
 import type { LazyFileSource } from './lazy-file.ts';
+import { installXmod, XmodLoader } from './xmod.ts';
 
 /** the engine-side Module object (what the glue is given); the glue adds FS, ENV and the idle functions to it */
 /** decision 0234: TextDecoder, ImageData and Blob refuse a view of a SharedArrayBuffer (Chrome 156, Firefox 158); a view of a shared memory is copied first (nothing happens for an ordinary memory) */
@@ -35,6 +36,8 @@ export interface FruityModuleOpts {
   /** decision 0280 (lift/harness/web/fruity/fle_idle_lib.js): the scheduler reads the page's input ring itself; the Worker stages the records into `ptr` (8 words each, at most `max`) and returns the count; fleInputDone(ptr, n) is told what the runtime did with them */
   fleInputPoll?: (ptr: number, max: number) => number;
   fleInputDone?: (ptr: number, n: number) => void;
+  /** Issue #1342 (lift/harness/two/xmod_glue.c, lift/harness/web/fruity/fle_idle_lib.js): the engine asks for a real module's separate wasm module (xmod.ts); 1 when it is instantiated, 0 when the DLL has none */
+  fleXmodLoad?: (ptr: number) => number;
   preRun: Array<() => void>;
   instantiateWasm: (imports: WebAssembly.Imports, done: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void) => object;
   ENV?: Record<string, string>;
@@ -108,6 +111,8 @@ export class FruityEngine {
     const root = this.options.root;
     const hostFiles = new HostFiles(() => this.memory);
     this.hostFiles = hostFiles;
+    // Issue #1342: the separate wasm modules of the real modules (xmod.ts); the engine reaches it through fleXmodLoad and the imports of its f_<va> functions
+    const xmod = new XmodLoader(root, assets.lazy ?? [], () => (this.instance?.exports ?? null) as Record<string, unknown> | null, () => this.memory);
     const opts: FruityModuleOpts = {
       locateFile: (p) => p,
       arguments: [...manifest.engine.args],
@@ -120,21 +125,26 @@ export class FruityEngine {
       fleProgress: (n) => host.progress?.(n),
       fleIdle: (n, now, next) => { this.idleSince = performance.now(); if (n === 1) { host.mark('idle', { n, now, next, hostFiles: { ...hostFiles.stats } }); hostFiles.release(); host.mark('host_files_released', { ...hostFiles.stats }); } host.idle(n, now, next); },
       fleThreadFailed: (idx, _e, msg) => host.stderr(`[js] ${msg} (guest thread ${idx})`),
+      fleXmodLoad: (ptr: number) => xmod.loadAt(ptr),
       ...(host.inputPoll ? { fleInputPoll: (ptr: number, max: number) => host.inputPoll?.(ptr, max) ?? 0, fleInputDone: (ptr: number, n: number) => host.inputDone?.(ptr, n) } : {}),
       ...(host.fileDlg ? { fleFileDlg: (id: number, request: unknown) => host.fileDlg?.(id, request), fleFileDlgProgress: (id: number, done: number, total: number) => host.fileDlgProgress?.(id, done, total) } : {}),
       preRun: [() => {
         if (!opts.ENV) throw new Error('the emscripten glue exposes no ENV (link with -sEXPORTED_RUNTIME_METHODS=ENV,...)');
         const t0 = performance.now();
-        const dll = hostFiles.mountPack(root, assets.dll);
-        const seed = hostFiles.mountPack(root, assets.seed);
+        // Issue #1357: the packs are persistent (hostfiles.ts release): the guest reads them after the first idle too (a seed file at its first read, a real module at its LoadLibrary)
+        const dll = hostFiles.mountPack(root, assets.dll, true);
+        const seed = hostFiles.mountPack(root, assets.seed, true);
         // Issue #1314: a lazy file is persistent (hostfiles.ts addPersistent), so the release at the first idle does not take it away
         for (const f of assets.lazy ?? []) hostFiles.addPersistent(`${root}/${f.path}`, f);
         for (const [k, v] of Object.entries(manifest.engine.env)) opts.ENV[k] = v;
+        if (this.traceOn) this.windowApiTrace(true);   // #1347: the trace asked before the start is on from the first instruction
         host.mark('files_ready', { how: 'packs-v1', dllFiles: dll.files, dllBytes: dll.bytes, seedFiles: seed.files, seedBytes: seed.bytes, lazyFiles: assets.lazy?.length ?? 0, ms: +(performance.now() - t0).toFixed(1) });
       }],
       instantiateWasm: (imports, done) => {
         void (async () => {
           installHostFiles(imports, hostFiles);
+          // Issue #1342: a real module's code may be a separate wasm module (xmod.ts): the engine's f_<va> imports for it are supplied here
+          installXmod(imports, assets.module, xmod);
           const instance = await WebAssembly.instantiate(assets.module, imports);
           const ex = instance.exports as Record<string, unknown>;
           const mem = ex.memory ?? (imports as { env?: { memory?: unknown } }).env?.memory;   // decision 0234 (a MT2_SHARED build imports its shared memory and exports none)
@@ -151,6 +161,8 @@ export class FruityEngine {
   }
 
   private failure: ((e: unknown) => void) | null = null;
+  /** #1347: the window-API trace as last asked (windowApiTrace); the start applies it */
+  private traceOn = false;
   private fail(e: unknown): void { if (this.failure) this.failure(e); else this.host.log('error', String((e as Error)?.stack ?? e)); }
 
   /** imports the glue and builds the Module object; nothing of the engine runs yet */
@@ -200,6 +212,7 @@ export class FruityEngine {
 
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (fle_g3_window_api_trace, lift/harness/fruity_idle.c); false when the wasm has no such export */
   windowApiTrace(on: boolean): boolean {
+    this.traceOn = on;   // kept for the start (preRun): a trace asked before the engine runs is on from its first instruction
     const ex = this.instance?.exports as Record<string, unknown> | undefined;
     if (!ex || typeof ex.fle_g3_window_api_trace !== 'function') return false;
     (ex.fle_g3_window_api_trace as (on: number) => void)(on ? 1 : 0);
@@ -208,6 +221,14 @@ export class FruityEngine {
 
   /** decision 0212: the wasm has the export that tells the guest the display changed (a bundle built before screen1 has none) */
   get hasDisplay(): boolean { return typeof (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_display === 'function'; }
+
+  /** Issue #1362: the page's face has loaded the document of a WebView2 navigation; the engine fires its events at its next idle (fle_g3_wv2_loaded, lift/harness/fruity_idle.c). False when the wasm has no such export. */
+  wv2Loaded(): boolean {
+    const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_wv2_loaded;
+    if (typeof f !== 'function') return false;
+    f();
+    return true;
+  }
 
   /** decision 0193: hands the person's answer to the suspended engine; false when the engine is not waiting for this dialog */
   answerFileDlg(id: number, answer: unknown): boolean { return this.opts.fleFileDlgAnswer ? this.opts.fleFileDlgAnswer(id, answer) : false; }
@@ -237,12 +258,14 @@ export class FruityEngine {
     const describe = typeof ex.fle_desk_describe === 'function' ? (ex.fle_desk_describe as () => number) : null;
     const scene = typeof ex.fle_desk_scene === 'function' ? (ex.fle_desk_scene as () => number) : null;
     const sceneMode = typeof ex.fle_desk_scene_mode === 'function' ? (ex.fle_desk_scene_mode as (on: number) => void) : null;
+    const front = typeof ex.fle_webview2_front === 'function' ? (ex.fle_webview2_front as () => number) : null;
     const mem = this.memory;
     const decoder = new TextDecoder('latin1');
     return {
       compose: () => compose(),
       resync: () => resync(),
       ...(scene && sceneMode ? { scene: () => scene(), sceneMode: (on: number) => sceneMode(on) } : {}),
+      ...(front ? { front: () => front() } : {}),
       describe: () => {
         if (!describe) return '';
         const p = describe(), heap = new Uint8Array(mem.buffer);

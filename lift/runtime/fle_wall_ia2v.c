@@ -22,6 +22,9 @@
 #include "fle_vfs.h"
 #include "fle_wall_ia2.h"
 
+/* weak: a link without fle_win.c has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
+
 static int lc(int c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
 static int is_blank(int c) { return c == ' ' || c == '\t'; }
 
@@ -155,6 +158,15 @@ void fle_imp_GetPrivateProfileStringW(void)
         RD(app_g, app); RD(key_g, key); RD(def_g, def);
         RD(file_g, file);
         #undef RD
+    }
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) {
+        fprintf(stderr, "window-api: GetPrivateProfileStringW [");
+        for (k = 0; app && app[k]; k++) fputc(app[k] >= 0x20 && app[k] < 0x7f && app[k] != '"' ? (int)app[k] : '?', stderr);
+        fprintf(stderr, "] ");
+        for (k = 0; key && key[k]; k++) fputc(key[k] >= 0x20 && key[k] < 0x7f && key[k] != '"' ? (int)key[k] : '?', stderr);
+        fprintf(stderr, " file=");
+        for (k = 0; file[k]; k++) fputc(file[k] >= 0x20 && file[k] < 0x7f && file[k] != '"' ? (int)file[k] : '?', stderr);
+        fputc('\n', stderr);
     }
     /* the Windows directory for a name with no path (the page) */
     for (fl = 0; file[fl]; fl++) {}

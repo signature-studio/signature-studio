@@ -1,0 +1,14 @@
+System\Languages\
+Artwork\
+Data\Templates\
+Data\Demo projects\
+Data\System\
+Data\Projects\
+System\Internet\
+Data\Patches\Packs\Legacy\Drums\Dance\
+System\Tools\Chord progression\
+Shared\Python\
+Data\Patches\Scores\Arpeggiator\Riff machine\
+Data\Patches\Scores\Quantization\Riff machine\
+Data\Patches\Scores\Chopping\Riff machine step 1\
+Data\Patches\Scores\Chopping\Riff machine step 2\

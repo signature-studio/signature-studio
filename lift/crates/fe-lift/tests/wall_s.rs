@@ -462,7 +462,7 @@ fn shcore_is_the_35th_module_and_loads_by_every_spelling() {
             format!("{s} 5"),
             // the process loaded it at start: count 1 (FreeLibrary page), plus the four LoadLibrary calls
             "refs 5".to_string(),
-            "count 41 name34 shcore.dll".to_string(), // decision 0238: kernelbase.dll appended (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: count 36)
+            "count 42 name34 shcore.dll".to_string(), // decision 0238: kernelbase.dll appended (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: count 36)
         ]
     );
 }
@@ -475,17 +475,17 @@ fn shcore_has_only_the_two_dpi_rows() {
 }
 
 #[test]
-fn get_process_dpi_awareness_answers_the_current_process_as_dpi_unaware() {
+fn get_process_dpi_awareness_answers_the_current_process_as_per_monitor_aware() {
     // Learn (GetProcessDpiAwareness): hprocess NULL = the current process; S_OK (0) and E_INVALIDARG (0x80070057) for a handle or pointer that is
-    // not valid. Decision 0099: the current process (NULL or the GetCurrentProcess pseudo handle -1) is PROCESS_DPI_UNAWARE (0); another handle
+    // not valid. Decision 0099: the current process (NULL or the GetCurrentProcess pseudo handle -1) is PROCESS_DPI_PER_MONITOR_AWARE (2) (Issue #1347: the DPI of the display; was 0 before); another handle
     // (this environment cannot make one) and a NULL pointer are E_INVALIDARG. Only 4 bytes are written (the enum is an int); the last error is not touched.
     let got = lines("dpi");
     assert_eq!(
         got,
         [
             "found 5",
-            "cur 0 v=aaaaaaaa00000000 le=5",
-            "null 0 v=aaaaaaaa00000000",
+            "cur 0 v=aaaaaaaa00000002 le=5",
+            "null 0 v=aaaaaaaa00000002",
             "other 80070057 v=aaaaaaaaaaaaaaaa",
             "thread-pseudo 80070057 v=aaaaaaaaaaaaaaaa",
             "null-ptr 80070057",

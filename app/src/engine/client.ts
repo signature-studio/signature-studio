@@ -3,7 +3,7 @@ import type { Manifest } from '../bundle/manifest.ts';
 import type { RawInput } from '../input/events.ts';
 import { browserWorkerDiagHost, diagnoseWorkerStart, isPlainWorkerStartEvent } from './worker-diag.ts';
 import { parseRequest, type FileDlgAnswer, type FileDlgRequest } from './filedlg.ts';
-import type { BundleAssets, DeskHandover, FromWorker, RenderHandover, ToRender, ToWorker } from './protocol.ts';
+import type { BundleAssets, DeskHandover, FromWorker, GuestTextBest, GuestTextNear, RenderHandover, ToRender, ToWorker } from './protocol.ts';
 import { newRingBuffer, RingWriter } from '../input/ring.ts';
 import { newDeskControl } from './desk-link.ts';
 
@@ -35,6 +35,8 @@ export interface ClientEvents {
   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
   taskbar?(m: Extract<FromWorker, { t: 'taskbar' }>): void;
+  /** Issue #1362: what the engine's WebView2 model was asked (the Browser panel's face shows it) */
+  webview2?(m: Extract<FromWorker, { t: 'webview2' }>): void;
 }
 
 export class EngineClient {
@@ -55,8 +57,15 @@ export class EngineClient {
       this.send({ cmd: peek ? 'desk-peek' : 'desk-dump' });
     });
   }
+  /** #1358 (a test aid): the text the engine's memory holds for the markers (read only; the Worker's guestText) */
+  guestText(markers: string[], radius = 0): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }> {
+    return new Promise((res, rej) => {
+      this.dumpWaiter = (m) => { if (m.t === 'guest-text') res({ memBytes: m.memBytes, best: m.best, near: m.near }); else if (m.t === 'desk-dump-error') rej(new Error(m.message)); };
+      this.send({ cmd: 'guest-text', markers, radius });
+    });
+  }
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (the answer is the engine's stderr, not a message) */
-  windowApiTrace(on: boolean): void { this.send({ cmd: 'window-api-trace', on }); }
+  windowApiTrace(on: boolean): void { this.worker?.postMessage({ cmd: 'window-api-trace', on } satisfies ToWorker); }
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the GL canvas */
   deskGlPixels(): Promise<{ width: number; height: number; data: ArrayBuffer }> {
     return new Promise((res, rej) => {
@@ -113,6 +122,10 @@ export class EngineClient {
 
   start(): void { this.send({ cmd: 'start' }); }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
+  /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
+  webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
+  /** Issue #1362: a message the face's document posted (window.chrome.webview.postMessage) */
+  webview2Message(json: string): void { this.worker?.postMessage({ cmd: 'webview2-message', json } satisfies ToWorker); }
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
@@ -182,10 +195,11 @@ export class EngineClient {
       case 'filedlg-progress': this.events.fileDlgProgress?.(m.id, m.done, m.total); break;
       case 'saved-file': this.events.savedFile?.({ guestPath: m.guestPath, name: m.name, size: m.size, data: m.data }); break;
       case 'pong': break;
-      case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
+      case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': case 'guest-text': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
       case 'osstate': this.events.osstate?.(m); break;
       case 'desk': this.events.desk?.(m); break;
       case 'taskbar': this.events.taskbar?.(m); break;
+      case 'webview2': this.events.webview2?.(m); break;
     }
   }
 }

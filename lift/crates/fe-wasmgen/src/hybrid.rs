@@ -3,11 +3,17 @@
 //! direct code calls (the imports of module c) go to exports.rsp, sorted and without duplicates; a listed function that is not emitted is an error.
 //! hybrid: fe-wasmgen with the addresses of the link map of the C part; wasm-opt -Oz of each direct module; wasm-merge of the direct modules,
 //! then into the C part; the output has no import of module c and no import of a lifted function (f_<va>) from env.
+//! --separate NAMES (Issue #1342): the named modules are not merged; each is written to --separate-dir as <DLL stem>.wasm, a module of its own
+//! that the page instantiates. Its functions are the C part's f_<va> imports (the page supplies them), its imports are the C part's exports.
 //! A module whose list is missing or empty is skipped (as the shell did). The lists are lowered-<module>.txt in --lists, one VA per line.
+//! The merges keep the names (-g): the table of the function names (names_table) is written to the work directory, and the output has no names section.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+
+/// The table of the functions of the engine (names_table), written to the work directory; fe-build copies it to lift/out-app/gen.
+const FUNC_NAMES: &str = "wasm-func-names.tsv";
 
 struct Module {
     name: String,
@@ -186,6 +192,147 @@ fn function_imports(b: &[u8]) -> Result<Vec<(String, String)>, String> {
     Ok(out)
 }
 
+/// A section of a wasm module: its id, the offsets of its first byte and of its end, and its payload.
+struct Section<'a> {
+    id: u8,
+    start: usize,
+    end: usize,
+    body: &'a [u8],
+}
+
+fn sections(b: &[u8]) -> Result<Vec<Section<'_>>, String> {
+    if b.len() < 8 || &b[..4] != b"\0asm" {
+        return Err("not a wasm module".into());
+    }
+    let mut out = Vec::new();
+    let mut i = 8;
+    while i < b.len() {
+        let start = i;
+        let id = b[i];
+        i += 1;
+        let size = leb(b, &mut i)? as usize;
+        let end = i.checked_add(size).filter(|&e| e <= b.len()).ok_or("truncated section")?;
+        out.push(Section { id, start, end, body: &b[i..end] });
+        i = end;
+    }
+    Ok(out)
+}
+
+/// The rest of a custom section after its name, when the name is `name` (the names section); None for any other custom section.
+fn name_section(body: &[u8]) -> Result<Option<&[u8]>, String> {
+    let mut i = 0;
+    let n = leb(body, &mut i)? as usize;
+    Ok(if body.get(i..i + n) == Some(&b"name"[..]) { Some(&body[i + n..]) } else { None })
+}
+
+/// The names of the functions (the subsection 1 of the names section), by function index.
+fn function_names(b: &[u8]) -> Result<BTreeMap<u32, String>, String> {
+    let mut out = BTreeMap::new();
+    for s in sections(b)? {
+        let Some(mut rest) = (if s.id == 0 { name_section(s.body)? } else { None }) else { continue };
+        while !rest.is_empty() {
+            let id = rest[0];
+            let mut i = 1;
+            let size = leb(rest, &mut i)? as usize;
+            let sub = rest.get(i..i + size).ok_or("truncated name subsection")?;
+            rest = &rest[i + size..];
+            if id != 1 {
+                continue;
+            }
+            let mut j = 0;
+            for _ in 0..leb(sub, &mut j)? {
+                let idx = leb(sub, &mut j)? as u32;
+                let l = leb(sub, &mut j)? as usize;
+                let name = std::str::from_utf8(sub.get(j..j + l).ok_or("truncated function name")?).map_err(|e| e.to_string())?;
+                j += l;
+                out.insert(idx, name.to_string());
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// The kind and the guest VA of a function name of the generator: `f_<va>` (a lifted function), `ia_<va>` (its adapter for an indirect call) and `t_<va>` (its test adapter). Any other name is a C function.
+fn classify(name: &str) -> (&'static str, String) {
+    for (prefix, kind) in [("f_", "f"), ("ia_", "ia"), ("t_", "t")] {
+        if let Some(hex) = name.strip_prefix(prefix) {
+            if !hex.is_empty() && hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return (kind, format!("0x{hex}"));
+            }
+        }
+    }
+    ("c", String::new())
+}
+
+/// The table of the functions of a module (lift/out-app/gen/wasm-func-names.tsv): one line per function index, from the imports and then the defined functions,
+/// with the kind (import, f, ia, t, c, or - for a function without a name), the guest VA and the name.
+fn names_table(b: &[u8]) -> Result<String, String> {
+    let names = function_names(b)?;
+    if names.is_empty() {
+        return Err("the module has no function names (the names section is missing)".into());
+    }
+    let imports = function_imports(b)?;
+    let mut defined = 0u64;
+    for s in sections(b)? {
+        if s.id == 3 {
+            let mut i = 0;
+            defined = leb(s.body, &mut i)?;
+        }
+    }
+    let mut out = String::from("index\tkind\tva\tname\n");
+    for idx in 0..imports.len() as u64 + defined {
+        let (kind, va, name) = match imports.get(idx as usize) {
+            Some((module, name)) => ("import", String::new(), format!("{module}.{name}")),
+            None => match names.get(&(idx as u32)) {
+                Some(name) => {
+                    let (kind, va) = classify(name);
+                    (kind, va, name.clone())
+                }
+                None => ("-", String::new(), String::new()),
+            },
+        };
+        out.push_str(&format!("{idx}\t{kind}\t{va}\t{name}\n"));
+    }
+    Ok(out)
+}
+
+/// The module without its names section: the shipped engine has none (the table of names_table has them).
+fn without_names(b: &[u8]) -> Result<Vec<u8>, String> {
+    let secs = sections(b)?;
+    let mut out = b[..8].to_vec();
+    for s in secs {
+        if s.id == 0 && name_section(s.body)?.is_some() {
+            continue;
+        }
+        out.extend_from_slice(&b[s.start..s.end]);
+    }
+    Ok(out)
+}
+
+/// The names of the functions a wasm module exports (Issue #1342: what the C part's imports of a separate module must match).
+fn function_exports(b: &[u8]) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    for s in sections(b)? {
+        if s.id != 7 {
+            continue;
+        }
+        let body = s.body;
+        let mut i = 0;
+        for _ in 0..leb(body, &mut i)? {
+            let l = leb(body, &mut i)? as usize;
+            let name = std::str::from_utf8(body.get(i..i + l).ok_or("truncated export")?).map_err(|e| e.to_string())?.to_string();
+            i += l;
+            let kind = *body.get(i).ok_or("truncated export")?;
+            i += 1;
+            leb(body, &mut i)?;
+            if kind == 0 {
+                out.push(name);
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The addresses of the C part from its link map: the first line whose fields are the given shape and whose last field is the name.
 /// The shapes are the regular expressions of build-engine-bundle.sh: "hex", "dig" (decimal digits) or a literal in the field.
 struct Addrs {
@@ -269,6 +416,27 @@ mod tests {
         .concat();
         assert_eq!(function_imports(&b).unwrap(), vec![("c".to_string(), "f1".to_string())]);
     }
+
+    fn sec(id: u8, body: &[u8]) -> Vec<u8> {
+        [&[id, body.len() as u8][..], body].concat()
+    }
+
+    #[test]
+    fn names_table_lists_every_function_and_the_names_section_is_dropped() {
+        let sub: Vec<u8> = [&[2u8, 1, 4][..], b"f_40", &[2, 18][..], b"fle_progress_slice"].concat();
+        let names = sec(0, &[&[4u8][..], b"name", &[1, sub.len() as u8][..], &sub].concat());
+        let imp = sec(2, &[&[1u8, 1][..], b"c", &[2], b"f1", &[0, 0]].concat());
+        let module = [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &imp, &sec(3, &[2, 0, 0]), &names].concat();
+        let table = names_table(&module).unwrap();
+        assert_eq!(table, "index\tkind\tva\tname\n0\timport\t\tc.f1\n1\tf\t0x40\tf_40\n2\tc\t\tfle_progress_slice\n");
+        assert_eq!(without_names(&module).unwrap(), [&b"\0asm\x01\0\0\0"[..], &sec(1, &[1, 0x60, 0, 0]), &imp, &sec(3, &[2, 0, 0])].concat());
+    }
+
+    #[test]
+    fn function_exports_are_the_function_entries_of_the_export_section() {
+        let b: Vec<u8> = [b"\0asm\x01\0\0\0".as_slice(), &[0x07, 0x0b, 0x02, 0x03, b'f', b'_', b'1', 0x00, 0x00, 0x01, b'm', 0x02, 0x00]].concat();
+        assert_eq!(function_exports(&b).unwrap(), vec!["f_1".to_string()]);
+    }
 }
 
 pub fn run_n0(args: &[String]) -> ExitCode {
@@ -304,7 +472,8 @@ fn n0(args: &[String]) -> Result<(), String> {
         }
     }
     let rsp = req(&o, "out-rsp")?;
-    let text: String = used.iter().map(|n| format!("-Wl,--export-if-defined={n}\n")).collect();
+    // Issue #1342: a name the link wraps (--wrap, link.rsp) is defined as __wrap_<name>; the export of that wrapper lets a separate module's import reach it (xmod.ts)
+    let text: String = used.iter().map(|n| format!("-Wl,--export-if-defined={n}\n-Wl,--export-if-defined=__wrap_{n}\n")).collect();
     std::fs::write(rsp, text).map_err(|e| format!("{rsp}: {e}"))?;
     println!("exports.rsp: {} names", used.len());
     Ok(())
@@ -333,7 +502,8 @@ fn hybrid(args: &[String]) -> Result<(), String> {
     let opt_bin = req(&o, "wasm-opt")?;
     let opt_args = words(req(&o, "wasm-opt-args")?)?;
     let merge_bin = req(&o, "wasm-merge")?;
-    let features = words(req(&o, "features")?)?;
+    let mut features = words(req(&o, "features")?)?;
+    features.push("-g".into());
     let dir = work.join("dir");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let mut extra: Vec<String> = vec![
@@ -352,7 +522,13 @@ fn hybrid(args: &[String]) -> Result<(), String> {
         format!("0x{:x}", a.dispatch_hook),
     ];
     extra.extend(fixed);
+    // Issue #1342: the modules of --separate are not merged. Each is written to --separate-dir as <DLL stem>.wasm, and the page
+    // instantiates it at the guest's first LoadLibrary of the module (app/src/engine/xmod.ts). Its C imports are the engine's exports.
+    let separate: BTreeSet<String> = o.get("separate").map(|s| s.split(',').filter(|n| !n.is_empty()).map(str::to_string).collect()).unwrap_or_default();
+    let sep_dir = PathBuf::from(o.get("separate-dir").map(String::as_str).unwrap_or("."));
     let mut ins: Vec<(PathBuf, String)> = Vec::new();
+    let mut separated: Vec<PathBuf> = Vec::new();
+    let mut built: BTreeSet<String> = BTreeSet::new();
     for m in &modules {
         let Some(want) = list_of(&lists, &m.name)? else { continue };
         let list_path = lists.join(format!("lowered-{}.txt", m.name));
@@ -364,7 +540,19 @@ fn hybrid(args: &[String]) -> Result<(), String> {
         let mut argv = opt_args.clone();
         argv.extend(["-o".into(), oz.display().to_string(), raw.display().to_string()]);
         run_tool(&format!("wasm-opt of the direct module {}", m.name), opt_bin, &argv)?;
+        if separate.contains(&m.name) {
+            let stem = Path::new(&m.pe).file_stem().and_then(|s| s.to_str()).ok_or_else(|| format!("no file stem in {}", m.pe))?;
+            std::fs::create_dir_all(&sep_dir).map_err(|e| format!("{}: {e}", sep_dir.display()))?;
+            let dst = sep_dir.join(format!("{stem}.wasm"));
+            std::fs::copy(&oz, &dst).map_err(|e| format!("{}: {e}", dst.display()))?;
+            separated.push(dst);
+            built.insert(m.name.clone());
+            continue;
+        }
         ins.push((oz, format!("d{}", m.name)));
+    }
+    if let Some(name) = separate.difference(&built).next() {
+        return Err(format!("separate module {name} is not a module with a list"));
     }
     let direct = work.join("direct.wasm");
     let mut argv = features.clone();
@@ -384,10 +572,24 @@ fn hybrid(args: &[String]) -> Result<(), String> {
     if imps.iter().any(|(m, _)| m == "c") {
         return Err("the merged module still imports functions of the module c".into());
     }
-    if imps.iter().any(|(m, n)| m == "env" && n.starts_with("f_")) {
+    // Issue #1342: a lifted function of a separate module is the one import of env that the merged module keeps (the page supplies it)
+    let c_exports: BTreeSet<String> = function_exports(&std::fs::read(c_part).map_err(|e| format!("{c_part}: {e}"))?)?.into_iter().collect();
+    let mut provided: BTreeSet<String> = BTreeSet::new();
+    for dst in &separated {
+        let b = std::fs::read(dst).map_err(|e| format!("{}: {e}", dst.display()))?;
+        for (m, n) in function_imports(&b)? {
+            if m == "c" && !c_exports.contains(&n) && !c_exports.contains(&format!("__wrap_{n}")) {
+                return Err(format!("the separate module {} imports c.{n}, which the C part does not export", dst.display()));
+            }
+        }
+        provided.extend(function_exports(&b)?.into_iter().filter(|n| n.starts_with("f_")));
+    }
+    if imps.iter().any(|(m, n)| m == "env" && n.starts_with("f_") && !provided.contains(n)) {
         return Err("the merged module still imports a lifted function (f_<va>) from env: a listed function is not defined by the direct code".into());
     }
-    std::fs::copy(&merged, &out).map_err(|e| format!("{}: {e}", out.display()))?;
-    println!("hybrid: {} bytes, {} direct modules", bytes.len(), ins.len());
+    std::fs::write(work.join(FUNC_NAMES), names_table(&bytes)?).map_err(|e| format!("{FUNC_NAMES}: {e}"))?;
+    let shipped = without_names(&bytes)?;
+    std::fs::write(&out, &shipped).map_err(|e| format!("{}: {e}", out.display()))?;
+    println!("hybrid: {} bytes, {} direct modules, {} separate modules, the function names in {}", shipped.len(), ins.len(), separated.len(), work.join(FUNC_NAMES).display());
     Ok(())
 }

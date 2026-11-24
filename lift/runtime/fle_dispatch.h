@@ -36,6 +36,13 @@ __attribute__((weak)) uint64_t fle_progress_count = 0;
 __attribute__((weak)) uint64_t fle_progress_limit = UINT64_MAX;
 void fle_progress_slice(void) __attribute__((weak));
 
+/* #1352: a back edge of the lifted code (a goto back, which fe-lift puts in front of fle_loop_tick()) is a switch point too, for the loops that make no indirect call. It is counted in
+ * fle_loop_count, not in fle_progress_count: no virtual time passes for it (the clock moves with the indirect calls only). At fle_loop_limit fle_loop_slice() (fle_thread.c) is the scheduler's point:
+ * a ready thread may run and the audio device is refilled. Unarmed (the limit is UINT64_MAX) the only effect is the increment. */
+__attribute__((weak)) uint64_t fle_loop_count = 0;
+__attribute__((weak)) uint64_t fle_loop_limit = UINT64_MAX;
+void fle_loop_slice(void) __attribute__((weak));
+
 /* A value that is not a known function entry. Stop instead of guessing (except the thunk above). */
 static inline void fle_dispatch_miss(uint64_t va) {
     if (fle_win_try_thunk && fle_win_try_thunk(va)) return;
@@ -180,6 +187,10 @@ static inline void fle_dispatch(uint64_t va) {
         return;
     }
     fn();
+}
+
+static inline void fle_loop_tick(void) {
+    if (__builtin_expect(++fle_loop_count >= fle_loop_limit, 0) && fle_loop_slice) fle_loop_slice();
 }
 
 #endif

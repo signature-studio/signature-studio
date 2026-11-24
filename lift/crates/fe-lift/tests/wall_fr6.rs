@@ -1206,7 +1206,7 @@ fn wtsapi32_and_uxtheme_load_by_every_spelling_and_each_has_only_its_own_row() {
             format!("UxTheme.DLL {hu} 5"),
             format!("gmh-wts {hw} 5"),
             format!("gmh-ux {hu} 5"),
-            format!("count 41 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
+            format!("count 42 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
             // the process loaded each at start (count 1, FreeLibrary page) plus three LoadLibraryW calls
             "refs 4 4".to_string(),
             "wts!WTSRegisterSessionNotification found 5".to_string(),
@@ -1232,8 +1232,8 @@ fn the_four_names_that_remain_absent_still_fail_with_126() {
     let a = t.find("static const char *const fle_load_absent[] = {").expect("the list");
     let list = &t[a..a + t[a..].find("};").unwrap()];
     let names: Vec<&str> = list.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
-    // decision 0126 (wall 86, S-webview2-absent): old: the four names above; "webview2loader.dll" is the fifth (it fails with 126 too)
-    assert_eq!(names, ["imm32.dll", "msimg32.dll", "propsys.dll", "windowscodecs.dll", "webview2loader.dll"]);
+    // Issue #1355: old: the four names above and "webview2loader.dll" (decision 0126 wall 86, S-webview2-absent); webview2loader.dll is a virtual module now (N = 42)
+    assert_eq!(names, ["imm32.dll", "msimg32.dll", "propsys.dll", "windowscodecs.dll"]);
 }
 
 // ---- a second thread stops every new API ----

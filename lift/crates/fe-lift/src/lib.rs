@@ -65,6 +65,8 @@ pub struct Stats {
     pub bad_nodes: usize,
     pub tail_calls: usize,
     pub gotos: usize,
+    /// Gotos back (a loop's back edge), each with fle_loop_tick in front of it (#1352).
+    pub back_edges: usize,
     pub handled: BTreeMap<&'static str, usize>,
     pub unsupported: BTreeMap<String, usize>,
     pub unsupported_total: usize,
@@ -991,7 +993,9 @@ fn emit_order(f: u64, nodes: &BTreeMap<u64, Node>) -> Vec<u64> {
     keys
 }
 
-fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, st: &mut Stats) -> String {
+/// The successor `s` of the instruction at `from`. A goto back (`s <= from`) is a loop's back edge: it is a switch point of the cooperative
+/// threads first (fle_loop_tick, fle_dispatch.h). Every cycle of the blocks has such an edge, since the addresses along a cycle cannot all increase.
+fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, from: u64, st: &mut Stats) -> String {
     if s != cx.f && cx.entries.contains(&s) {
         st.tail_calls += 1;
         if cx.landings.contains(&s) {
@@ -1009,6 +1013,10 @@ fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, st: &mut Stats) -> Strin
     }
     if cx.nodes.contains_key(&s) {
         st.gotos += 1;
+        if s <= from {
+            st.back_edges += 1;
+            return format!("fle_loop_tick(); goto L_{s:x}; ");
+        }
         return format!("goto L_{s:x}; ");
     }
     st.unsupported_total += 1;
@@ -1019,12 +1027,12 @@ fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, st: &mut Stats) -> Strin
 fn emit_ctl(cx: &Cx<'_>, va: u64, i: &Instruction, l: Lifted, next_emitted: Option<u64>, st: &mut Stats) -> String {
     let next = va + i.len() as u64;
     match l.ctl {
-        Ctl::Seq => format!("{}{}", l.body, succ(cx, next, next_emitted, st)),
+        Ctl::Seq => format!("{}{}", l.body, succ(cx, next, next_emitted, va, st)),
         Ctl::Ret => l.body,
-        Ctl::Jmp(t) => format!("{}{}", l.body, succ(cx, t, None, st)),
+        Ctl::Jmp(t) => format!("{}{}", l.body, succ(cx, t, None, va, st)),
         Ctl::Jcc(t, cc) => {
-            let taken = succ(cx, t, None, st);
-            format!("if (fle_cc({cc})) {{ {taken}}} {}", succ(cx, next, next_emitted, st))
+            let taken = succ(cx, t, None, va, st);
+            format!("if (fle_cc({cc})) {{ {taken}}} {}", succ(cx, next, next_emitted, va, st))
         }
     }
 }

@@ -133,7 +133,7 @@ export const MANIFEST_SCHEMA: Schema = {
     },
     seedPack: packSchema,
     dllPack: packSchema,
-    lazy: { type: 'array', maxItems: 64, items: lazySchema },
+    lazy: { type: 'array', maxItems: 128, items: lazySchema },
   },
 };
 

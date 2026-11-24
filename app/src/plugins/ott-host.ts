@@ -1,5 +1,5 @@
 // A browser / node host for the emscripten-built VST3 harness wasm of a lifted plugin (lift/harness/vst, decision 0156/0164; the external-input variant is
-// lift/harness/web/mt1/plugin-worker/main_vst_ext.c, decision 0173). The wasm has no JS glue here: its 24 imports (emscripten syscalls, WASI, two mt1_ext_* hooks, the fle_js_* audio hooks the harness
+// lift/harness/web/mt1/plugin-worker/main_vst_ext.c, decision 0173). The wasm has no JS glue here: its imports (emscripten syscalls, WASI, two mt1_ext_* hooks, the fle_js_* audio hooks the harness
 // never calls) are implemented below on an in-memory file table, with stdout captured as lines and every clock answering with the host's monotonic clock (a Worker has no thread-CPU clock).
 // The Worker (plugin-worker.ts) is the only user; the file is environment-neutral (browser Worker or node worker_threads).
 
@@ -89,6 +89,21 @@ export function createHost(opts: HostOptions): Host {
     return 0;
   };
 
+  const statData = (data: Uint8Array | undefined, buf: number): number => {
+    if (!data) return -EBADF;
+    const d = dv();
+    for (let i = 0; i < 112; i += 4) d.setUint32(buf + i, 0, true);
+    d.setUint32(buf + 4, 0o100644, true);
+    d.setUint32(buf + 8, 1, true);
+    d.setBigInt64(buf + 24, BigInt(data.length), true);
+    d.setInt32(buf + 32, 4096, true);
+    return 0;
+  };
+  const statPath = (pathp: number, buf: number): number => {
+    const data = opts.files[cstr(pathp)];
+    return data ? statData(data, buf) : -ENOENT;
+  };
+
   const imports: WebAssembly.Imports = {
     env: {
       exit: (c: number) => {
@@ -104,6 +119,12 @@ export function createHost(opts: HostOptions): Host {
       fle_js_state: () => 0,
       fle_js_lead_ms: () => 0,
       fle_js_publish: () => 0,
+      fle_js_rewrite: () => undefined,
+      fle_js_pulse: () => undefined,
+      __asyncjs__fle_js_wait: () => 2,
+      _emscripten_throw_longjmp: () => {
+        throw new Error('wasm longjmp: not modelled by the plugin worker');
+      },
       mt1_ext_wait: (inL: number, inR: number, frames: number, block: number): number => {
         if (!opts.ext) return 0;
         return opts.ext.wait(mem(), inL, inR, frames, block);
@@ -138,17 +159,13 @@ export function createHost(opts: HostOptions): Host {
       __syscall_fcntl64: (): number => 0,
       // TIOCGWINSZ answers "a terminal" on stdout/stderr so that stdio is line buffered and every line reaches print() as it is written.
       __syscall_ioctl: (fd: number, op: number): number => ((fd === 1 || fd === 2) && op === TIOCGWINSZ ? 0 : -ENOTTY),
-      __syscall_stat64: (pathp: number, buf: number): number => {
-        const data = opts.files[cstr(pathp)];
-        if (!data) return -ENOENT;
-        const d = dv();
-        for (let i = 0; i < 112; i += 4) d.setUint32(buf + i, 0, true);
-        d.setUint32(buf + 4, 0o100644, true);
-        d.setUint32(buf + 8, 1, true);
-        d.setBigInt64(buf + 24, BigInt(data.length), true);
-        d.setInt32(buf + 32, 4096, true);
-        return 0;
+      __syscall_stat64: (pathp: number, buf: number): number => statPath(pathp, buf),
+      __syscall_lstat64: (pathp: number, buf: number): number => statPath(pathp, buf),
+      __syscall_newfstatat: (dirfd: number, pathp: number, buf: number): number => {
+        const name = cstr(pathp);
+        return name === '' ? statData(fds.get(dirfd)?.data, buf) : statPath(pathp, buf);
       },
+      __syscall_fstat64: (fd: number, buf: number): number => statData(fds.get(fd)?.data, buf),
     },
     wasi_snapshot_preview1: {
       clock_time_get: (id: number, _prec: Num, p: number): number => {

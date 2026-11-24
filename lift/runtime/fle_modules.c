@@ -95,6 +95,10 @@ static const char *const fle_modules[] = {
      * for with LoadLibraryExW to find RoInitialize / RoUninitialize) to it. Same shape as kernelbase.dll: the load succeeds, no response-table row has "combase.dll" in its dll column, so GetProcAddress on it gives NULL and 127 (S-load2-host-exports).
      * Appended after kernelbase.dll (decision 0015: append only). */
     "combase.dll",
+    /* N = 42, Issue #1355 (provisional): webview2loader.dll, the WebView2 loader of the Browser panel (a TEdgeBrowser of FLEngine loads it with LoadLibraryW). Its four exports are
+     * rows of the response table (fle_imports.c's TABLE) answered by fle_webview2.c, which models the COM interfaces behind them and writes what the guest hands to them. Appended after
+     * combase.dll (decision 0015: append only). It was the one name of fle_load_absent[] (decision 0126 wall 86); that name is withdrawn from the list. */
+    "webview2loader.dll",
 };
 #define FLE_MODULE_N (sizeof fle_modules / sizeof fle_modules[0])
 /* The deferred modules (decision 0096) are the FLE_DEFERRED_N entries from index FLE_DEFERRED_FIRST (blend2d.dll, quickfontcache_x64.dll).

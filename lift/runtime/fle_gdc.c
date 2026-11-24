@@ -4,6 +4,7 @@
  * guest does not use, stops the run through fle_stop (fle_env.h). Nothing here reads the host: no display, no DPI setting, no
  * window, no clock, no file. */
 #define _GNU_SOURCE
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +16,8 @@
 #include "fle_env.h"
 #include "fle_gdc.h"
 #include "fle_win.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
+int fle_win_api_trace_on(void) __attribute__((weak));
 #include "fle_thread.h"
 
 /* weak: a link without fle_win.c (the unit tests of this file) has no window table; a hWnd that is not NULL then stops as before */
@@ -433,17 +436,18 @@ void fle_imp_GetDeviceCaps(void)
     }
     if (!fle_gdc_is_live(h)) fle_stop(api, "hdc is not a live DC of GetDC(NULL) of this runtime (NULL, released, other kinds: not defined here)");
     switch (idx) {
-    case FLE_GDC_IDX_HORZRES: R[0] = FLE_GDC_HORZRES; return;
-    case FLE_GDC_IDX_VERTRES: R[0] = FLE_GDC_VERTRES; return;
-    case FLE_GDC_IDX_BITSPIXEL: R[0] = FLE_GDC_BITSPIXEL; return;
-    case FLE_GDC_IDX_PLANES: R[0] = FLE_GDC_PLANES; return;
-    case FLE_GDC_IDX_LOGPIXELSX: R[0] = FLE_GDC_LOGPIXELSX; return;
-    case FLE_GDC_IDX_LOGPIXELSY: R[0] = FLE_GDC_LOGPIXELSY; return;
-    case FLE_GDC_IDX_SIZEPALETTE: R[0] = FLE_GDC_SIZEPALETTE; return;
-    case FLE_GDC_IDX_HORZSIZE: R[0] = FLE_GDC_HORZSIZE; return;     /* decision 0121: derived from 1920 pixels at 96 DPI */
-    case FLE_GDC_IDX_VERTSIZE: R[0] = FLE_GDC_VERTSIZE; return;     /* decision 0121: 1080 pixels at 96 DPI = 285.75 mm, rounded */
+    case FLE_GDC_IDX_HORZRES: R[0] = FLE_GDC_HORZRES; break;
+    case FLE_GDC_IDX_VERTRES: R[0] = FLE_GDC_VERTRES; break;
+    case FLE_GDC_IDX_BITSPIXEL: R[0] = FLE_GDC_BITSPIXEL; break;
+    case FLE_GDC_IDX_PLANES: R[0] = FLE_GDC_PLANES; break;
+    case FLE_GDC_IDX_LOGPIXELSX: R[0] = FLE_GDC_LOGPIXELSX; break;
+    case FLE_GDC_IDX_LOGPIXELSY: R[0] = FLE_GDC_LOGPIXELSY; break;
+    case FLE_GDC_IDX_SIZEPALETTE: R[0] = FLE_GDC_SIZEPALETTE; break;
+    case FLE_GDC_IDX_HORZSIZE: R[0] = FLE_GDC_HORZSIZE; break;     /* decision 0121: derived from 1920 pixels at 96 DPI */
+    case FLE_GDC_IDX_VERTSIZE: R[0] = FLE_GDC_VERTSIZE; break;     /* decision 0121: 1080 pixels at 96 DPI = 285.75 mm, rounded */
     default:
         snprintf(why, sizeof why, "index %u is not answered (the guest's call sites do not use it)", (unsigned)idx);
         fle_stop(api, why);
     }
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "window-api: GetDeviceCaps index=%u -> %u from %#" PRIx64 "\n", (unsigned)idx, (unsigned)(uint32_t)R[0], fle_ld(R[4], 8));
 }

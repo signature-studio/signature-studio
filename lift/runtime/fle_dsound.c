@@ -420,7 +420,8 @@ static void audio_sync(void)
     uint32_t lead;
     fle_audio_ring_t *r;
 
-    if (play_count() == 0) return;
+    /* With an external consumer the ring is refilled while nothing plays too (silence, mix_chunk starts from zeros): the idle engine wakes for that refill (fle_audio_next_tick), so the output never runs dry for want of a publish (#1334). */
+    if (play_count() == 0 && !fle_audio_external()) return;
     r = fle_audio_ring_get();
     fle_audio_ring_sync_consumer();
     c = fle_audio_consumed();
@@ -470,13 +471,20 @@ static void audio_sync(void)
 
 void fle_audio_poll(void) { audio_sync(); }
 
+/* Called by the scheduler's slice end while the thread is inside a callback of the runtime (fle_progress_slice, fle_thread.c): there no thread switch happens, so the hand-over to an external consumer (the AudioWorklet) would wait for
+ * the callback's end. The hand-over is done here only for such a consumer; natively, and for the browser's device without one, nothing changes. audio_sync does not call guest code (mix_chunk is native), so it cannot re-enter. */
+void fle_audio_poll_in_callback(void)
+{
+    if (fle_audio_external()) audio_sync();
+}
+
 int fle_audio_next_tick(uint64_t *out)
 {
     unsigned bi;
     int found = 0;
     uint64_t c;
 
-    if (play_count() == 0) return 0;
+    if (play_count() == 0 && !fle_audio_external()) return 0;
     c = fle_audio_consumed();
     for (bi = 0; bi < MAX_BUF; bi++) {
         ds_buf *b = bufs[bi];
@@ -507,6 +515,17 @@ int fle_audio_next_tick(uint64_t *out)
                 *out = t;
                 found = 1;
             }
+        }
+    }
+    if (fle_audio_external()) {
+        /* the ring is refilled by audio_sync (at the scheduler's points): due when the output has read all but half the lead, so that a wait of the idle engine ends in time and the output never runs dry */
+        fle_audio_ring_t *r = fle_audio_ring_get();
+        uint64_t w = r->write_frames, half = fle_audio_lead_frames() / 2u, due = w > c + half ? w - half : c;
+        uint64_t t = fle_audio_tick_of_frame(due);
+
+        if (t != 0 && (!found || t < *out)) {
+            *out = t;
+            found = 1;
         }
     }
     return found;

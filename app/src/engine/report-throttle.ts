@@ -20,7 +20,7 @@ export class ReportThrottle {
     return true;
   }
 
-  resume(why: 'input' | 'deadline' | 'end'): boolean {
+  resume(why: 'input' | 'deadline' | 'end' | 'page'): boolean {
     if (why === 'deadline' && !this.pageSaysIdle) return false;
     this.pageSaysIdle = false;
     return true;

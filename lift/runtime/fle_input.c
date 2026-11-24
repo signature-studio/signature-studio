@@ -538,17 +538,28 @@ static uint64_t hit_walk(int32_t x, int32_t y, uint64_t first, unsigned thread, 
     return 0;
 }
 
+/* C-6 (#1346): one line for a mouse event that is translated while the window-API trace is on: the window the event was first given to (the capture window when one holds the capture), the window it went to
+ * (0 = none), the hit-test code (WM_NCHITTEST's answer; -1 when no window was found), whether a window holds the capture, and the pointer. */
+static void hit_line(const hwev *e, uint64_t first, uint64_t w, int ht, int cap)
+{
+    const char *what = e->kind == FLE_IN_MOVE ? "move" : e->kind == FLE_IN_BDOWN ? "down" : "up";
+
+    fprintf(stderr, "hit: %s btn=%d first=%#" PRIx64 " final=%#" PRIx64 " ht=%d captured=%d ptr=%d,%d\n", what, (int)e->data, first, w, ht, cap, (int)e->x, (int)e->y);
+}
+
 static void translate_mouse(const hwev *e)
 {
     unsigned tt = 0;
     int cap = 0;
     uint64_t w = mouse_target(e->x, e->y, &tt, &cap);
+    uint64_t first = w;
     fle_win_iview v;
-    int ht;
+    int ht = -1;
     uint64_t t = e->ticks;
     uint32_t mk = e->mk;
 
     if (!w || !fle_win_input_view(w, &v)) {
+        if (fle_win_api_trace_on()) hit_line(e, first, 0, ht, cap);
         pointer_over_nothing(e);
         return;
     }
@@ -557,6 +568,7 @@ static void translate_mouse(const hwev *e)
     } else {
         w = hit_walk(e->x, e->y, w, tt, &ht);
         if (!w || !fle_win_input_view(w, &v)) {
+            if (fle_win_api_trace_on()) hit_line(e, first, 0, ht, cap);
             pointer_over_nothing(e);
             return;
         }
@@ -570,6 +582,7 @@ static void translate_mouse(const hwev *e)
             return;
         }
     }
+    if (fle_win_api_trace_on()) hit_line(e, first, w, ht, cap);
     /* S-capture-client: while a window has the capture it gets the client messages (WM_MOUSEMOVE, WM_LBUTTONDOWN ... with coordinates relative to its client area, negative or beyond its size when the pointer is outside)
      * whatever WM_NCHITTEST answered (Learn WM_MOUSEMOVE: "the message is posted to the window that has captured the mouse"; the page says nothing of a non-client message to it). */
     if (cap) ht = FLE_HTCLIENT;
@@ -901,11 +914,20 @@ int fle_input_synth(unsigned t, uint64_t fh, uint32_t fmin, uint32_t fmax, int r
 /* ------------------------------------------------------------------------------------------------------------- DefWindowProcW, TranslateMessage */
 static int32_t sx16(uint64_t v) { return (int32_t)(int16_t)(uint16_t)v; }
 
+/* Learn WM_CONTEXTMENU: the message goes to `target` with wParam = `child` (the window the button was released in; kept when the message is passed to the parent) and the cursor position in screen coordinates
+ * in lParam. The line on stderr is the one the C-6 measurement reads (input: WM_CONTEXTMENU <target> <x>,<y> child=<window>). */
+static void contextmenu_send(const char *api, uint64_t target, uint64_t child, int32_t sx, int32_t sy)
+{
+    fprintf(stderr, "input: WM_CONTEXTMENU %#" PRIx64 " %d,%d child=%#" PRIx64 "\n", target, sx, sy, child);
+    (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, child, lparam_xy(sx, sy));
+}
+
 int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp, uint64_t lp, uint64_t *result)
 {
     fle_win_iview v;
 
     if (!fle_win_input_view(hwnd, &v)) return 0;
+    fle_win_trace_wndproc("def", api, hwnd, msg, wp, lp, 0, 0);
     switch (msg) {
     case 0x004Au:   /* WM_COPYDATA (decision 0144) */
         /* Learn WM_COPYDATA: "If the receiving application processes this message, it should return TRUE; otherwise, it should return FALSE." The default window procedure processes nothing: FALSE. The VCL's
@@ -983,15 +1005,11 @@ int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp,
         return 1;
     case FLE_WM_RBUTTONUP:
     case FLE_WM_NCRBUTTONUP: {
-        /* Learn WM_CONTEXTMENU: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the
-         * WM_RBUTTONUP or WM_NCRBUTTONUP message". wParam is the handle of the window in which the button was
-         * released; when that window is a child, the message is forwarded to the parent, but wParam keeps
-         * the child handle ("This can be a child window of the window receiving the message"). lParam is the
-         * cursor position in screen coordinates. For WM_RBUTTONUP lParam is client-relative; for
-         * WM_NCRBUTTONUP it is already screen-relative. Return value "If an application processes this
-         * message, it should return zero". */
+        /* Learn WM_CONTEXTMENU, Remarks: "DefWindowProc generates the WM_CONTEXTMENU message when it processes the WM_RBUTTONUP or WM_NCRBUTTONUP message". The message goes to the window that processed the
+         * button up (hwnd) with wParam = hwnd: its own window procedure sees it first (C-6, #1346: the message used to go straight to the parent, so a child's procedure never got it). What that procedure
+         * passes to DefWindowProc reaches the parent (WM_CONTEXTMENU below). lParam is the cursor position in screen coordinates. For WM_RBUTTONUP lParam is client-relative; for WM_NCRBUTTONUP it is
+         * already screen-relative. Return value "If an application processes this message, it should return zero". */
         int32_t sx, sy;
-        uint64_t target = v.parent ? v.parent : hwnd;
 
         if (msg == FLE_WM_RBUTTONUP) {
             sx = sx16(lp) + v.ox;
@@ -1000,18 +1018,24 @@ int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp,
             sx = sx16(lp);
             sy = sx16(lp >> 16);
         }
-        fprintf(stderr, "input: WM_CONTEXTMENU %#" PRIx64 " %d,%d child=%#" PRIx64 "\n", target, sx, sy, hwnd);
-        (void)fle_win_input_send(api, target, FLE_WM_CONTEXTMENU, hwnd, lparam_xy(sx, sy));
+        contextmenu_send(api, hwnd, hwnd, sx, sy);
         *result = 0;
         return 1;
     }
+    case FLE_WM_CONTEXTMENU:
+        /* Learn WM_CONTEXTMENU, Remarks: "If a window does not display a shortcut menu it should pass this message to the DefWindowProc function. If a window is a child window, DefWindowProc sends the message to the
+         * parent. Otherwise, DefWindowProc displays a default shortcut menu if the specified position is in the window's caption." The model has no frame and no default shortcut menu (decision 0123, no caption
+         * area): a top-level window does nothing. wParam (the window the button was released in) and lParam (the screen position) go to the parent unchanged. */
+        if (v.parent) contextmenu_send(api, v.parent, wp, sx16(lp), sx16(lp >> 16));
+        *result = 0;
+        return 1;
     default:
         break;
     }
     /* messages whose default processing has no effect in this model: the mouse and key messages of a window (Learn: "If an application processes this message, it should return zero"; the pages give no result of
-     * the default processing, S-mouse-default-zero), WM_MOUSEHOVER / WM_MOUSELEAVE / WM_NCMOUSELEAVE, WM_CONTEXTMENU */
+     * the default processing, S-mouse-default-zero), WM_MOUSEHOVER / WM_MOUSELEAVE / WM_NCMOUSELEAVE */
     if ((msg >= 0x0200u && msg <= 0x0209u) || (msg >= 0x0100u && msg <= 0x0109u && msg != FLE_WM_SYSKEYDOWN) || msg == FLE_WM_MOUSEHOVER || msg == FLE_WM_MOUSELEAVE || msg == FLE_WM_NCMOUSELEAVE ||
-        (msg >= 0x00A0u && msg <= 0x00A9u) || msg == 0x007Bu || msg == 0x0211u || msg == 0x0212u || msg == 0x0216u || msg == 0x0128u) {
+        (msg >= 0x00A0u && msg <= 0x00A9u) || msg == 0x0211u || msg == 0x0212u || msg == 0x0216u || msg == 0x0128u) {
         *result = 0;
         return 1;
     }

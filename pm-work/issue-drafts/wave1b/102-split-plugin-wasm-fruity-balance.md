@@ -5,7 +5,7 @@ type: Task
 milestone: "M4 FL に必要な物の配布"
 parent: "012"
 blocked_by: ["101"]
-labels: ["delivery", "plugin-builtin"]
+labels: ["delivery", "plugin-builtin", "resources"]
 size: XL
 priority: High
 project: signature-studio/3
@@ -25,6 +25,50 @@ project: signature-studio/3
 - 前の作業の結果(#{{015}}。runner の値): Balance の DLL は起動後の取得に移したが、Balance のコードは engine.wasm に入ったまま(168,996,523 B。前後で同じ)。取得を移しても、wasm の大きさは変わらない。
 - 方針(依頼者の指示): 1 プラグイン 1 wasm。Worker の上限に当たる場合を除く。難しいと判断した場合は、方針を変えてよい。変える時は、実測の根拠を報告に書く。
 
+## 前回の試行で分かったこと
+
+### 1 回目の試行(run 45124597952。約 4 時間 20 分。受け入れ (4) で落ち、判定は push しなかった。作業は `work.diff` として artifact `agent-1342` に残った。ローカルの commit `8080495b` は push されていない)
+
+次の run は、この `work.diff` を作業ツリーに取り込んでから始める(取り込みの結果は `.prior-work.md`)。artifact は次の作業者が読めないので、要点を本文に書く。
+
+- **変更の前(基準。runner の値。nproc 4、loadavg 1.4〜1.9)**: `engine.wasm` は 169,015,160 B(この Issue の 168,996,523 B とは一致しない)。起動は engine-idle、所要 10,993〜11,093 ms(measure の `elapsedMs`)、boot-check 12,224 ms。`reads` は DSP・Blend2D・QFC・FreeType・ILTools の 5 件だけで、Balance の要求は起動中に起きていない。
+- **分割の方式(b)**: 既存の hybrid の境界(`c.memory`・`c.fle_imp_*`・R[] の共有メモリ)を使い、`wasm-merge` の代わりに JS で別の instance に結ぶ。fe-wasmgen の one-module 版で Balance を direct に下ろすと、12,500 関数のうち 12,282 が ok(残り 218 は C 経路のまま)。
+- **選ばなかった (a)**: side module(emscripten の dylink)。165 MB の engine 全体を MAIN_MODULE で作り直すことになり、全体の codegen が変わる(P2・P3 への影響は未測定)。C の R[] と dispatch 表は別 instance に複製できないので、C 単独のリンクも不可。
+- **変更後の測定(3 回。runner の値)**:
+
+| 受け入れ | 判定 | 出力 |
+|---|---|---|
+| (1) engine-idle・standIn false・error null | 受理 | boot-check の `elapsedMs` 11468。measure の 3 回とも同じ |
+| (2) engine.wasm が 168,996,523 B 未満 | 受理 | `engine wasm` 165,079,668 B(3 回とも) |
+| (3) Balance の wasm が lazy。取得の開始が起動前の取得の完了以後 | 受理 | lazy `fruity_balance_x64.6800000.wasm` 10,452,743 B。取得の開始 4010・4154・4102 ms、起動前の完了 2436・2510・2416 ms |
+| (4) reads に Balance の instantiate(requested=true) | **未達** | 3 回とも Balance の行は `[]`。起動中に要求が無い(基準と同じ) |
+
+- **大きさ**: engine.wasm 169,015,160 → 165,079,668 B(−3,935,492 B)。Balance の wasm は 10,452,743 B。合計は 175,532,411 B で、基準より +6,517,251 B(+3.9%)。direct に下ろした Balance は、C 経路で engine に入っていた分より大きい(推定)。単一 wasm の上限(約 1GB)に対し、engine は約 15%、Balance は約 1%。
+- **起動時間(measure の `elapsedMs`)**: 基準 10,993・11,093・11,010 ms、変更後 10,747・10,785・10,667 ms。P1(10 秒)は両方で未達。
+- **実装の要点**(作業ツリーに在る): 分けた module は merge せず別のファイルに書く(`--separate`・`--separate-dir`)。n0 の exports に `__wrap_<名前>` も出す(`--wrap` の対象 `fle_imp_FormatMessageW`・`fle_imp_LockResource` が素の名前で export されず、hybrid の検査で落ちたため)。JS 側は素の名前が無いとき `__wrap_` 版を使う。`tests/plan/engine.txt`・`bundle.txt` を現在の入力に合わせた(`bundle.txt` は #{{019}} 以来古かった)。`fe-build engine` は hybrid 段で 1 回落ちた。直した後は、残りの段を `tests/plan/engine.txt` の同じコマンドで手で走らせた。
+- **未確認・リスク**: Worker の数と、各 Worker が持つ物(未測定)。MXCSR・x87 の状態は direct モジュールごとに持つので、Balance 側の写しが一つ増える。Balance のフックポイント(`fruity-delphi-effect-hook-points.txt` の 3 つ)は direct の経路に無いので適用していない。ゲストのスレッド(別の pthread Worker)から Balance を呼ぶと、その Worker に供給が無く、glue の欠落 import で止まる(fail-closed。未確認)。Balance 越しの longjmp は JS の stub を通るため通らない(未確認)。
+
+### 2 回目の試行(時間切れ。作業は失われた)
+
+run 45197326869。5 時間 50 分(上限 350 分)で時間切れ(`cancelled`)になり、作業は保存されず、`work.diff` は無い。報告(artifact `agent-1342`)では、作業者が 14:54 に engine のビルドを背景で起動し、`tail --pid` で待った。その待ちは 20:34 まで戻らず、ジョブが取り消された。ビルドが固まったのか、待ちが戻らなかったのかは、ログが無いため確認できない。
+
+作業は残っている。1 回目の作業ツリーの差分は `.prior-work.md` で載るので、次の作業者は「残りのやること」に従う。2 回目の試行で決めた場面と進め方は次のとおり(作業者の読み。未検証)。
+
+- (4) の場面は `tools/delivery-split/measure.mjs` に scene を足す: 「No thanks」(513, 308)→ Default の行(124, 81)をダブルクリック → Ctrl+O → ページの `#filedlg-input`(type=file)に、CDP の `DOM.setFileInputFiles` で `Fruity Balance.flp`(`Data/System/Render tests/Fruity Balance.flp`。ASCII で Balance を含む)を渡す。`reads`・`fetches`・最終の state は scene の後の snapshot で取る。
+- Worker の数は、Target の一覧と JS ヒープで数える(`fl-engine`・`fl-render`・`chunk-io`・pthread)。scene が失敗したときは、画面の写しを `.tmp-delivery-scene-fail.png` に残す。
+- 分けた module の import は `c` だけで、`c.memory` は engine の `--export-memory`。
+- この scene は作業ツリーの `measure.mjs` に書かれたが、ビルドの完了前に失われた。
+- Welcome を閉じる trap は #{{116}} で直った(`tools/smoke/welcome-flow.mjs` が在る)。受け入れの (4) の場面にある「別の Issue で直す予定」の文は、この修正で古くなった。場面で Welcome を閉じてよい。
+- ビルドの進め方: engine のビルドは約 35〜60 分。**フォアグラウンドで直接実行し、`timeout` 引数に 5400000 を渡す**。背景で起動して待たない(`tail --pid` が戻らず、時間切れになった)。**開始から 4 時間 30 分で commit して終える**。
+
+### 残りのやること
+
+(a) 作業ツリーを確かめる。`git status`・`git diff HEAD` で、次のパスの変更が載っていること: `lift/crates/fe-wasmgen/src/hybrid.rs`・`main.rs`、`lift/harness/hyb/`、`lift/harness/two/main_two.c`、`lift/harness/web/pack.args`、`app/src/engine/xmod.ts`(新規)・`fruity.ts`、`lift/crates/fe-build/tests/plan/*.txt`、`tools/delivery-split/measure.mjs`。載っていなければ、`work.diff` の内容から作り直す(違いは報告に書く)。
+(b) 下の「(4) の場面」で、Balance を要求させる場面を測定に入れる。
+(c) その場面で instantiate の経路が動くこと(`image-read: … requested=1` が出て、Balance の呼び出しが落ちないこと)を確かめる。動かなければ直す。
+(d) Worker の数と、各 Worker が持つ物を測り、報告に書く。
+(e) 作業ツリーを commit する(受け入れが通らなくても)。
+
 ## 読む物
 
 - `lift/crates/fe-build/src/main.rs`(231〜260 行: `plan` の gen 段。459〜475 行: `pack_step_for`・`bundle`)
@@ -40,6 +84,8 @@ project: signature-studio/3
 
 ## やること
 
+1 回目の試行で、1 から 4 の前半(測定・方式・fe-build・fe-wasmgen・harness・JS)は済んだ。方式は (b) のまま、方針は変えていない。残りは「残りのやること」。
+
 1. 変更の前に、測る: `engine.wasm` の大きさ(168,996,523 B)と、起動の経路の読み(`tools/delivery-split/measure.mjs` の 3 回の出力)を報告に書く。
 2. 分割の方式を決める。方式は作業者が決める。例: (a) wasm の動的リンク(side module)の形で、Balance を別の wasm にし、engine の runtime の関数を共有メモリと関数の表で呼ぶ。(b) モジュールごとに別の wasm を作り、engine との境界を、共有メモリと関数の表の呼び出しにする。選ばなかった方式の理由を報告に書く。
 3. `fe-build` を変える: gen-all の 10 モジュールの連結から、Balance を外し、別の wasm を作る段を足す。bundle の段(`pack_step_for`・`app/scripts/pack-assets.mjs`)で、その wasm を起動後の取得(manifest の `lazy`)に入れる。#{{101}} の遅延の仕組みを使う。名前には `balance` と `.wasm` を含める。
@@ -54,6 +100,16 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ```
 
 判定の基準: 3 回の起動で、(1) engine-idle・standIn が false・error が null、(2) engine wasm(`preStart` の `engine wasm`)が 168,996,523 B より小さい、(3) Balance の wasm(名前に `balance` と `.wasm`)が起動後の取得(`lazy`)に在り、取得の開始が起動前の取得の完了以後である、(4) `reads` に Balance の wasm の instantiate が、guest の要求(`requested` が true)で在る。
+
+### (4) の場面(Balance を要求させる)
+
+製品の既定の起動は変えない。測定(`tools/delivery-split/measure.mjs`)に、Balance を要求させる場面を入れる。場面は次の順に、作業者が実測で選ぶ。ラベル `resources` を付けた(`lift/out-app/host-extra/resources/` に、テンプレートとデモのプロジェクトが在る)。
+
+1. `lift/out-app/host-extra/resources/` の `.flp`(テンプレートとデモ)から、プラグイン名 `Fruity Balance`(ASCII か UTF-16 のバイト列)を含む物を探し、そのプロジェクトを FL の UI(スタート画面の一覧・File メニューの Open)で開く。`tools/feat-c6-popup-menus/` などが、メニューの項目を選ぶ方法を持つ。
+2. ミキサーの FX スロットのメニュー(#{{010}}・#{{106}} で、メニューが出る)から Balance を足す。
+3. 上の 2 つが使えなければ、`lift/harness/two/main_two.c` の試験の引数で、Balance を LoadLibrary する guest の手順を実行し、`fle_xmod_load` の経路を通す。
+
+どの場面でも、`reads` に Balance の wasm の instantiate が `requested: true` で出ることが、(4) の判定そのもの。Welcome の窓を閉じる操作(「No thanks」・Escape)は、今 engine が trap する既知の不具合があり、別の Issue で直す予定。閉じずに済む方法を先に探す。閉じないと測れない場合は、その旨を報告に書く。
 
 ## 報告の規則
 

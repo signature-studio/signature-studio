@@ -457,7 +457,7 @@ fn reference_counts_follow_load_and_free() {
     SHOW(fle_imp_FreeLibrary, fle_module_handle(k), 0, 0);
     SHOW(fle_imp_FreeLibrary, fle_module_handle(k), 0, 0);
     printf("k %u\n", fle_load_refcount(k));
-    printf("past %u\n", fle_load_refcount(41));
+    printf("past %u\n", fle_load_refcount(42));
 "#;
     let got = lines("refcount", body);
     let k = h(N_KERNEL32);
@@ -690,7 +690,7 @@ fn avrt_and_powrprof_follow_the_free_library_rule_of_the_other_virtual_modules()
     SHOW(fle_imp_FreeLibrary, fle_module_handle(31), 0, 0);
     SHOW(fle_imp_FreeLibrary, fle_module_handle(31), 0, 0);
     printf("count %u %u\n", fle_load_refcount(30), fle_load_refcount(31));
-    printf("past %u\n", fle_load_refcount(41)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (old: 39 after decision 0122, 38 with 38 modules) */
+    printf("past %u\n", fle_load_refcount(42)); /* Issue #1355: 42 modules (webview2loader.dll after combase.dll); 41 modules (old: decision 0238: 41 modules, combase.dll after kernelbase.dll) */
 "#;
     let got = lines("avrt-refs", body);
     let (a, p) = (h(N_AVRT), h(N_POWRPROF));
@@ -719,7 +719,7 @@ fn avrt_and_powrprof_follow_the_free_library_rule_of_the_other_virtual_modules()
                 "LLW(\"avrt\"); callv(fle_imp_FreeLibrary, fle_module_handle(30), 0, 0); callv(fle_imp_FreeLibrary, fle_module_handle(30), 0, 0);",
                 "reference count would reach zero",
             ),
-            ("past-the-new-end", "callv(fle_imp_FreeLibrary, fle_module_handle(41), 0, 0);", "not a virtual module handle"), // decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (old: 39 after decision 0122, 38 before)
+            ("past-the-new-end", "callv(fle_imp_FreeLibrary, fle_module_handle(42), 0, 0);", "not a virtual module handle"), // Issue #1355: 42 modules (webview2loader.dll is N = 42); 41 before (decision 0238: combase.dll is N = 41)
         ],
     );
 }

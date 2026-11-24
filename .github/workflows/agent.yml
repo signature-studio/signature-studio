@@ -2,15 +2,18 @@
 # 駆動は Issues のイベント。設計は pm-work/workflow-design.md。起動する Issue は tools/select-targets.mjs が決める。
 #   select: 候補を集め、起動してよい物を選ぶ。start: 起動する Issue に running を付ける(再確認してから)。
 #   extract: 抽出物を R2 のキャッシュから用意する。work: Issue ごとに作業し、判定し、通った変更だけを main に push する。
-#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。
+#   report: 結果を Issue に書き、状態を変える(通った: running を外す。落ちた: failed。時間切れで取り消された: failed と、作業の保存の有無。閉じていて main に入った作業は、後続の段が落ちても failed を付けない)。main との衝突で push できなかった作業は、衝突の印を数えて自動で再試行する(2 回まで。retry: 印の行をコメントし、failed は付けず、App の token で running を外して次の run を起こす。設計は pm-work/workflow-design.md の「7」)。
 # 同じ Issue のイベントの run は、concurrency で 1 本ずつ動く。work は最初に Issue の状態を確かめ、閉じた・failed・pm-hold の Issue の作業は飛ばす。報告の検査は、ベンダー名の文字列を伏せ字にして通す(ほかの指摘は失敗)。
-# ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。
+# ラベル・コメントは GITHUB_TOKEN で行う。GITHUB_TOKEN で行った変更は、次の run を起動しないため。例外: 自動の再試行の起動の段は、running の除去だけを App の token で行う(その変更が次の run を起こす)。
 # 通った Issue の close は、push する commit の Closes #N で行う。push は App の token で行うので、閉じた事象が次の run を起動する。
-# 鍵は、名義の設定の段と、最後の push の段にだけ渡す。作業者の段には、どの token も無い。
+# 鍵は、名義の設定の段と、最後の push の段と、報告の自動の再試行の起動の段(再試行の Issue があるときだけ)にだけ渡す。作業者の段には、どの token も無い。
+# Project の Status は、start の段が In Progress に、report の段が In Review に移す。その段だけ App の鍵を受け取り、失敗は理由を出して続ける(閉じた Issue は触らない。設計は pm-work/workflow-design.md の「17」)。
+# 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
-# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。
-# push が 3 回とも落ちたとき、および判定が落ちたときは、作業を差分(work.diff)で artifact に残す。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」)。
+# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。接頭辞の一覧は ci/resources-prefixes.txt・ci/plugin-builtin-prefixes.txt(1 行 1 接頭辞。鍵の入力に入る)。
+# 実機のビーコン(ラベル perf-beacons)は、extract が R2 の perf/ から取り、run ごとの鍵(perf-beacons-<run_id>)のキャッシュで work に渡す。公開の artifact には置かない(設計は pm-work/workflow-design.md の「3」)。
+# push が 3 回とも落ちたとき、判定が落ちたとき、および時間切れで取り消されたときは、作業を差分(work.diff)で artifact に残す(取り消しの猶予の約 5 分で終わるよう、保存の段は通信をしない)。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」「13」)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
 
@@ -88,6 +91,38 @@ jobs:
           echo "$out"
           echo "claimed=$(jq -c .claimed <<<"$out")" >> "$GITHUB_OUTPUT"
 
+      - name: Project の Status を In Progress にする(App の token で。失敗は理由を出し、作業は止めない)
+        if: success() && steps.claim.outputs.claimed != '[]'
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+          GH_REPO: ${{ github.repository }}
+          CLAIMED: ${{ steps.claim.outputs.claimed }}
+        run: |
+          app() {
+            v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+            curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f" || return 1
+            echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c - > /dev/null || return 1
+            mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid || return 1
+            umask 077
+            jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+              '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+              > "$RUNNER_TEMP/botid-config.json" || return 1
+            cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json || return 1
+            "$b/botid" issue 2>/dev/null || return 1
+            e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE") || return 1
+            GH_CONFIG_DIR=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR) && export GH_CONFIG_DIR
+          }
+          if app; then
+            node tools/project-status.mjs set "In Progress" $(jq -r '.[]' <<<"$CLAIMED") || echo "project-status: skipped: 道具が落ちた"
+          else
+            echo "project-status: skipped: App の token を取れなかった(botid)"
+          fi
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json"
+          if [ -n "${GH_CONFIG_DIR:-}" ]; then rm -f "$GH_CONFIG_DIR/hosts.yml"; fi
+          exit 0
+
   extract:
     name: 抽出物を用意する
     needs: [select, start]
@@ -118,7 +153,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
 
       - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -238,7 +273,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)
         if: contains(format(',{0},', needs.select.outputs.labels), ',resources,') && steps.resources.outputs.cache-hit != 'true'
@@ -249,7 +284,8 @@ jobs:
           export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
           mkdir -p "$RUNNER_TEMP/in"
           aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
-          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" 'System\Languages\' 'Artwork\' 'Data\Templates\' 'Data\Demo projects\' 'Data\System\' 'Data\Projects\'
+          mapfile -t prefixes < ci/resources-prefixes.txt
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-resources" "${prefixes[@]}"
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)
@@ -266,7 +302,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 
       - name: 内蔵のプラグインのキャッシュ(R2)
         if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-builtin,')
@@ -283,7 +319,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
 
       - name: 内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)
         if: contains(format(',{0},', needs.select.outputs.labels), ',plugin-builtin,') && steps.plugins.outputs.cache-hit != 'true'
@@ -294,7 +330,8 @@ jobs:
           export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
           mkdir -p "$RUNNER_TEMP/in"
           aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
-          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" 'Plugins\Fruity\Effects\' 'Plugins\Fruity\Generators\'
+          mapfile -t prefixes < ci/plugin-builtin-prefixes.txt
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-plugins" "${prefixes[@]}"
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
       - name: 内蔵のプラグインをキャッシュに保存する(取ったときだけ)
@@ -311,7 +348,94 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
+
+      - name: 起動用の実行ファイルのキャッシュ(R2)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,')
+        id: exe
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
+      - name: 起動用の実行ファイルを取り出す(キャッシュが無いときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,') && steps.exe.outputs.cache-hit != 'true'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          mkdir -p "$RUNNER_TEMP/in"
+          aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" --endpoint-url "https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-exe" --file 'FL64.exe' --file 'FL64 (scaled).exe'
+          rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
+
+      - name: 起動用の実行ファイルをキャッシュに保存する(取ったときだけ)
+        if: contains(format(',{0},', needs.select.outputs.labels), ',fl-exe,') && steps.exe.outputs.cache-hit != 'true'
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+
+      - name: 実機のビーコンを R2 から取る(perf-beacons の作業だけ。直近 3 日)
+        if: success() && contains(format(',{0},', needs.select.outputs.labels), ',perf-beacons,')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          ep="https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          out="$RUNNER_TEMP/perf"; mkdir -p "$out"
+          for k in 0 1 2; do
+            d=$(date -u -d "-$k day" +%Y-%m-%d)
+            aws s3api list-objects-v2 --endpoint-url "$ep" --bucket fl-web-cache --prefix "perf/$d/" --query 'Contents[].[Key,Size]' --output text > "$RUNNER_TEMP/perf-list-$k.txt" || { echo "ビーコンの一覧の取得に失敗した"; exit 1; }
+          done
+          n=0; total=0; : > "$RUNNER_TEMP/perf-pick.tsv"
+          while IFS=$'\t' read -r key size; do
+            case "$key" in *.json) ;; *) continue ;; esac
+            if [ "$n" -ge 1000 ] || [ $((total + size)) -gt 104857600 ]; then break; fi
+            printf '%s\t%s\n' "$key" "$size" >> "$RUNNER_TEMP/perf-pick.tsv"; n=$((n + 1)); total=$((total + size))
+          done < <(cat "$RUNNER_TEMP"/perf-list-*.txt)
+          while IFS=$'\t' read -r key size; do
+            d=$(cut -d/ -f2 <<<"$key"); mkdir -p "$out/$d"
+            aws s3api get-object --endpoint-url "$ep" --bucket fl-web-cache --key "$key" "$out/$d/$(basename "$key")" > /dev/null || { echo "ビーコンの取得に失敗した"; exit 1; }
+          done < "$RUNNER_TEMP/perf-pick.tsv"
+          printf 'files\t%s\nbytes\t%s\n' "$n" "$total" > "$out/MANIFEST.tsv"
+          echo "直近 3 日のビーコン: $n 件、合計 $total バイト"
+
+      - name: 実機のビーコンをキャッシュに保存する(perf-beacons の作業だけ。run ごとの鍵)
+        if: success() && contains(format(',{0},', needs.select.outputs.labels), ',perf-beacons,')
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/perf
+          key: perf-beacons-${{ github.run_id }}
 
   work:
     name: '作業 #${{ matrix.issue }}'
@@ -379,49 +503,6 @@ jobs:
           echo "BOTID_GH=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)" >> "$GITHUB_ENV"
           rm -f ~/.config/botid/config.json "$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)/hosts.yml"
 
-      - name: 前回の作業を取り込む
-        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
-        if: success() && steps.check.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          d="$RUNNER_TEMP/prior"; rm -rf "$d"; mkdir -p "$d"
-          gh api "repos/$GH_REPO/actions/artifacts?name=agent-$ISSUE&per_page=100" --jq '.artifacts | sort_by(.created_at) | reverse | .[] | select(.expired == false) | .workflow_run.id' > "$d/runs.txt"
-          run=""
-          for r in $(cat "$d/runs.txt"); do
-            mkdir -p "$d/$r"
-            if gh run download "$r" -n "agent-$ISSUE" -D "$d/$r" > /dev/null 2>&1 && [ -s "$d/$r/work.diff" ]; then run=$r; break; fi
-          done
-          if [ -z "$run" ]; then echo "前回の保存された作業は無い"; exit 0; fi
-          jt="$d/$run/judge.txt"
-          if [ -s "$jt" ] && grep -qx 'judge: 通った' "$jt"; then
-            rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
-            if [ "$rc" -eq 0 ]; then
-              if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
-              echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
-            else
-              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
-              if [ -n "$c" ]; then
-                echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
-              else
-                echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
-              fi
-            fi
-          else
-            # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
-            rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
-            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。判定の出力が無い)"; fi
-            if [ "$rc" -eq 0 ]; then
-              st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
-            else
-              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
-              if [ -n "$c" ]; then st="その作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消する。"; else st="その作業は取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。"; fi
-            fi
-            { echo "前回の run $run の作業は、途中で終わり、判定を通らなかった。理由(判定の出力の末尾 10 行。長い行は 200 字で切る):"; echo "$why"; echo "$st 最初からやり直さず、続きから行う。作業ツリーの状態(git status・git diff HEAD)と、Issue の本文の受け入れを照らし、残りを行い、受け入れを通して commit する。"; } > .prior-work.md
-          fi
-          echo "前回の作業の取り込み: run $run(終了コード $rc)"
-
       - name: 版の値を ci/versions.env から読む
         if: success() && steps.check.outputs.skip != 'true'
         run: |
@@ -468,7 +549,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
           fail-on-cache-miss: true
 
       - name: 抽出物を lift/out-app/host に置く
@@ -540,7 +621,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-resources
-          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)
@@ -564,7 +645,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/extra-plugins
-          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          key: extra-plugins-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/plugin-builtin-prefixes.txt') }}
           fail-on-cache-miss: true
 
       - name: 取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)
@@ -573,6 +654,98 @@ jobs:
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-plugins" lift/out-app/host-extra/plugins
           test -f lift/out-app/host-extra/plugins/MANIFEST.tsv
+
+      - name: 起動用の実行ファイルを R2 のキャッシュから取る(fl-exe の作業だけ)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',fl-exe,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/extra-exe
+          key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
+          fail-on-cache-miss: true
+
+      - name: 取った物を lift/out-app/host-extra/exe に置く(fl-exe の作業だけ。commit はしない)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',fl-exe,')
+        run: |
+          mkdir -p lift/out-app/host-extra
+          mv "$RUNNER_TEMP/extra-exe" lift/out-app/host-extra/exe
+          test -f lift/out-app/host-extra/exe/FL64.exe
+          test -f "lift/out-app/host-extra/exe/FL64 (scaled).exe"
+
+      - name: 実機のビーコンを R2 のキャッシュから取る(perf-beacons の作業だけ。run ごとの鍵)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',perf-beacons,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/perf
+          key: perf-beacons-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: 取った物を lift/out-app/host-extra/perf に置く(perf-beacons の作業だけ。commit はしない)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',perf-beacons,')
+        run: |
+          mkdir -p lift/out-app/host-extra
+          mv "$RUNNER_TEMP/perf" lift/out-app/host-extra/perf
+          test -f lift/out-app/host-extra/perf/MANIFEST.tsv
+
+      - name: 前回の作業を取り込む
+        # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
+        if: success() && steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          d="$RUNNER_TEMP/prior"; rm -rf "$d"; mkdir -p "$d"
+          gh api "repos/$GH_REPO/actions/artifacts?name=agent-$ISSUE&per_page=100" --jq '.artifacts | sort_by(.created_at) | reverse | .[] | select(.expired == false) | .workflow_run.id' > "$d/runs.txt"
+          run=""
+          for r in $(cat "$d/runs.txt"); do
+            mkdir -p "$d/$r"
+            if gh run download "$r" -n "agent-$ISSUE" -D "$d/$r" > /dev/null 2>&1 && [ -s "$d/$r/work.diff" ]; then run=$r; break; fi
+          done
+          if [ -z "$run" ]; then echo "前回の保存された作業は無い"; exit 0; fi
+          jt="$d/$run/judge.txt"
+          if [ -s "$jt" ] && grep -qx 'judge: 通った' "$jt"; then
+            rc=0; git apply --3way --index "$d/$run/work.diff" || rc=$?
+            if [ "$rc" -eq 0 ]; then
+              if ! git diff --cached --quiet; then git commit -q -m "前回の作業を取り込む(run $run)"; fi
+              echo "前回の run $run の作業が、衝突なく取り込まれた。受け入れコマンドを実行し、通れば何も足さずに終える。通らなければ、直す。この記述が在ることを、報告に書く" > .prior-work.md
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then
+                echo "前回の run $run の作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消し、受け入れを通して commit する。前回の作業の意図は、Issue の本文と、git diff --cached・git status で分かる。" > .prior-work.md
+              else
+                echo "前回の run $run の作業を取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。" > .prior-work.md
+              fi
+            fi
+          else
+            # 判定を通らなかった作業は commit しない。作業ツリーに載せ、続きから行わせる(判定の出力が無ければ、判定に至らなかった作業)
+            rc=0; git apply --3way "$d/$run/work.diff" || rc=$?
+            if [ -s "$jt" ]; then why=$(tail -n 10 "$jt" | cut -c1-200); else why="(判定に至らなかった。前回の run が、判定の前に取り消された(時間切れ)ため、判定の出力が無い)"; fi
+            if [ "$rc" -eq 0 ]; then
+              st="その作業は、commit せずに作業ツリーに載せてある(前回の commit 済みの変更も含む。git status・git diff HEAD で見える)。"
+            else
+              c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              if [ -n "$c" ]; then st="その作業を取り込んだ所、次のファイルで衝突した: $c。衝突の印(<<<<<<<)を解消する。"; else st="その作業は取り込めなかった(git apply の終了コード $rc。衝突の印は無い)。Issue の本文から作る。"; fi
+            fi
+            { echo "前回の run $run の作業は、途中で終わり、判定を通らなかった。理由(判定の出力の末尾 10 行。長い行は 200 字で切る):"; echo "$why"; echo "$st 最初からやり直さず、続きから行う。作業ツリーの状態(git status・git diff HEAD)と、Issue の本文の受け入れを照らし、残りを行い、受け入れを通して commit する。"; } > .prior-work.md
+          fi
+          echo "前回の作業の取り込み: run $run(終了コード $rc)"
 
       - name: タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す
         if: success() && steps.check.outputs.skip != 'true'
@@ -643,24 +816,33 @@ jobs:
           APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
         run: |
           git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"
-          git commit --allow-empty -m "$(cat "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
+          git commit --allow-empty -m "$(sed -E 's/skip ci|ci skip|no ci|skip actions|actions skip|NO_CI//gI' "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
           mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH
+          rm -f "$RUNNER_TEMP/out/push-conflict.txt"
           for i in 1 2 3; do
+            rm -f "$RUNNER_TEMP/conflict.txt"
             if git pull --no-rebase --no-edit "https://github.com/$GITHUB_REPOSITORY.git" main; then
               if git push origin HEAD:main; then git rev-parse HEAD > "$RUNNER_TEMP/out/commit.txt"; exit 0; fi
             else
               c=$(git diff --name-only --diff-filter=U | paste -sd' ' -)
+              git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflict.txt"
               if [ -n "$c" ]; then echo "衝突: $c"; else echo "pull が失敗した($i 回目)"; fi
               git merge --abort 2>/dev/null || true
             fi
           done
+          # 最後の試行が衝突で落ちたときだけ、衝突の印を残す(報告が自動で再試行するかを決める)。一覧は pm-work/ の外の名前だけ
+          if [ -s "$RUNNER_TEMP/conflict.txt" ]; then
+            echo push_conflict=true >> "$GITHUB_OUTPUT"
+            grep -v '^pm-work/' "$RUNNER_TEMP/conflict.txt" > "$RUNNER_TEMP/out/push-conflict.txt" || true
+            echo "main との衝突で push できなかった。pm-work/ の外の衝突: $(paste -sd' ' - < "$RUNNER_TEMP/out/push-conflict.txt")"
+          fi
           exit 1
 
       - name: 押せなかった作業を保存する
-        # push の段が落ちたときだけ。基点は push の前に残した HEAD(work-tip.txt)と refs/judge/main の merge-base。pull で取り込んだ main の変更は含めない
-        if: failure() && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'
+        # push の段が落ちたとき、または時間切れで取り消されたときだけ。基点は push の前に残した HEAD(work-tip.txt)と refs/judge/main の merge-base。pull で取り込んだ main の変更は含めない
+        if: (failure() || cancelled()) && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           if [ ! -s "$RUNNER_TEMP/work-tip.txt" ]; then echo "保存する作業が無い(push の段が始まる前に落ちた)"; exit 0; fi
@@ -671,12 +853,13 @@ jobs:
           echo "押せなかった作業を保存した($(wc -c < "$RUNNER_TEMP/out/work.diff") バイト)"
 
       - name: 判定が落ちた作業を保存する
-        # 判定の段が落ちて push が飛んだとき(作業者が動いた後)だけ。作業ツリーの全差分(commit 済み・未 commit・未追跡。.gitignore の物を除く)を、基点(refs/judge/main との merge-base)からの差分にする。次の再試行は、判定を通らなかった作業として続きから取り込む
-        if: failure() && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'
+        # 判定の段が落ちて push が飛んだとき、または時間切れで取り消されて push が飛んだとき(作業者が動いた後)だけ。作業ツリーの全差分(commit 済み・未 commit・未追跡。.gitignore の物を除く)を、基点(refs/judge/main との merge-base)からの差分にする。次の再試行は、判定を通らなかった作業として続きから取り込む。取り消しの猶予(約 5 分)で終わるよう、通信はせず、取り消しで残った index.lock だけを外す
+        if: (failure() || cancelled()) && steps.push.conclusion == 'skipped' && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/out"
           if [ ! -e "$RUNNER_TEMP/out/report.md" ]; then echo "作業者が動いていない。保存する作業が無い"; exit 0; fi
           base=$(git merge-base HEAD refs/judge/main 2>/dev/null || git merge-base HEAD origin/main)
+          rm -f .git/index.lock
           git add -A
           git diff --cached --binary "$base" > "$RUNNER_TEMP/out/work.diff"
           if [ ! -s "$RUNNER_TEMP/out/work.diff" ]; then rm -f "$RUNNER_TEMP/out/work.diff"; echo "保存する差分が空"; exit 0; fi
@@ -726,6 +909,7 @@ jobs:
           persist-credentials: false
 
       - name: 結果を集める(GITHUB_TOKEN。読むだけ)
+        id: collect
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -740,6 +924,15 @@ jobs:
             sha=""; if [ -s "$d/commit.txt" ]; then sha=$(cat "$d/commit.txt"); fi
             state=$(gh api "repos/$GH_REPO/issues/$n" --jq .state 2>/dev/null || echo unknown)
             skipped=$(jq -r --arg me "作業 #$n" '[.[] | select(.name == $me)][0].skipped // false' "$RUNNER_TEMP/report/jobs.json")
+            pc=false; if [ -e "$d/push-conflict.txt" ]; then pc=true; fi
+            k=0; dec=none
+            if [ "$conc" = failure ] && [ "$state" = open ]; then
+              if [ "$pc" = true ]; then
+                gh api --paginate "repos/$GH_REPO/issues/$n/comments?per_page=100" | jq -s '[.[][]]' > "$d/comments.json"
+                k=$(node tools/auto-retry.mjs count < "$d/comments.json")
+              fi
+              dec=$(node tools/auto-retry.mjs decide "$conc" "$pc" "$k")
+            fi
             if [ "$skipped" = true ]; then
               echo skipped > "$d/status"; : > "$d/comment.md"
             elif [ "$conc" = success ]; then
@@ -748,11 +941,18 @@ jobs:
             elif [ "$state" = closed ] && [ -n "$sha" ]; then
               echo pushed-failed > "$d/status"
               { echo "作業は完了し main に入った。後続の段(${failed:-(取れなかった。ジョブのログを見る)})が失敗した。"; echo "run: $RUN_URL"; } > "$d/comment.md"
+            elif [ "$conc" = cancelled ]; then
+              echo failure > "$d/status"
+              { echo "時間切れで取り消された: $RUN_URL"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。判定の前に取り消された)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; else echo "作業を保存できなかった(差分が無い・空・50 MB を超えた、または保存の段が動かなかった)"; fi; } > "$d/comment.md"
+            elif [ "$dec" = retry ]; then
+              echo retry > "$d/status"
+              { echo "<!-- auto-retry:push-conflict -->"; echo "main との衝突で push できなかった。自動で 1 回やり直す($((k + 1))/2)。"; echo "落ちた: $RUN_URL"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "衝突したファイル(pm-work/ の外): $(paste -sd' ' - < "$d/push-conflict.txt")"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の run が、その作業を取り込んでから始める)"; else echo "作業を保存できなかった(次の run は、Issue の本文から作る)"; fi; } > "$d/comment.md"
             else
               echo failure > "$d/status"
-              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; } > "$d/comment.md"
+              { echo "落ちた: $RUN_URL"; echo "作業の状態: $conc"; echo "失敗した段: ${failed:-(取れなかった。ジョブのログを見る)}"; echo "判定の出力(末尾 8 行):"; echo "${tail_:-(判定の出力が無い。ジョブのログを見る)}"; if [ -s "$d/work.diff" ]; then echo "作業を保存した(次の再試行で、前回の作業を取り込んでから始める。判定を通らなかった作業は commit せずに続きから取り込む)"; fi; if [ "$pc" = true ] && [ "$dec" = fail ]; then echo "自動の再試行を 2 回行ったが、衝突が続く。人手(PM)が見る"; fi; } > "$d/comment.md"
             fi
           done
+          if grep -qx retry "$RUNNER_TEMP"/report/*/status; then echo "retry=true" >> "$GITHUB_OUTPUT"; else echo "retry=false" >> "$GITHUB_OUTPUT"; fi
 
       - name: 結果を Issue に書き、状態を変える(GITHUB_TOKEN で。通った Issue が開いたままなら、ここで閉じる)
         env:
@@ -771,11 +971,68 @@ jobs:
               fi
             elif [ "$s" = skipped ]; then
               :
-            elif [ "$s" = pushed-failed ]; then
+            elif [ "$s" = pushed-failed ] || [ "$s" = retry ]; then
               gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
             else
               gh issue comment "$n" --repo "$GH_REPO" --body-file "$d/comment.md"
               gh issue edit "$n" --repo "$GH_REPO" --add-label failed
             fi
-            gh issue edit "$n" --repo "$GH_REPO" --remove-label running
+            if [ "$s" != retry ]; then gh issue edit "$n" --repo "$GH_REPO" --remove-label running; fi
           done
+
+      - name: Project の Status を In Review にする(App の token で。閉じた Issue は触らない。失敗は理由を出し、作業は止めない)
+        if: always()
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          app() {
+            v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+            curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f" || return 1
+            echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c - > /dev/null || return 1
+            mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid || return 1
+            umask 077
+            jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+              '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+              > "$RUNNER_TEMP/botid-config.json" || return 1
+            cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json || return 1
+            "$b/botid" issue 2>/dev/null || return 1
+            e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE") || return 1
+            GH_CONFIG_DIR=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR) && export GH_CONFIG_DIR
+          }
+          if app; then
+            node tools/project-status.mjs set "In Review" $(jq -r '.[]' <<<"$CLAIMED") || echo "project-status: skipped: 道具が落ちた"
+          else
+            echo "project-status: skipped: App の token を取れなかった(botid)"
+          fi
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json"
+          if [ -n "${GH_CONFIG_DIR:-}" ]; then rm -f "$GH_CONFIG_DIR/hosts.yml"; fi
+          exit 0
+
+      - name: 自動の再試行を起動する(App の token で running を外す。再試行の Issue だけ)
+        # GITHUB_TOKEN の変更は次の run を起こさないため、running の除去だけを App の token で行う(unlabeled の run が、同じ Issue の run の後に起動する)
+        if: steps.collect.outputs.retry == 'true'
+        env:
+          APP_CLIENT_ID: ${{ secrets.GH_APP_CLIENT_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.GH_APP_PEM }}
+          APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
+        run: |
+          v=0.2.3; f=botid_${v}_linux_amd64.tar.gz; b=$RUNNER_TEMP/botid-bin
+          curl -fsSL -o "$RUNNER_TEMP/$f" "https://github.com/pycabbage/botid/releases/download/v$v/$f"
+          echo "fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50  $RUNNER_TEMP/$f" | sha256sum -c -
+          mkdir -p "$b" ~/.config/botid && tar -xzf "$RUNNER_TEMP/$f" -C "$b" botid
+          umask 077
+          jq -n --arg c "$APP_CLIENT_ID" --arg k "$APP_PRIVATE_KEY" --argjson i "$APP_INSTALLATION_ID" \
+            '{default: "worker", identities: {worker: {clientId: $c, privateKey: $k, installationId: $i}}}' \
+            > "$RUNNER_TEMP/botid-config.json"
+          cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
+          "$b/botid" issue 2>/dev/null
+          e=$("$b/botid" env --format json --cwd "$GITHUB_WORKSPACE")
+          d=$(printf '%s' "$e" | jq -r .GH_CONFIG_DIR)
+          list=""
+          for n in $(jq -r '.[]' <<<"$CLAIMED"); do
+            if [ "$(cat "$RUNNER_TEMP/report/$n/status")" = retry ]; then list="$list $n"; fi
+          done
+          GH_CONFIG_DIR="$d" node tools/auto-retry.mjs trigger $list
+          rm -f ~/.config/botid/config.json "$RUNNER_TEMP/botid-config.json" "$d/hosts.yml"

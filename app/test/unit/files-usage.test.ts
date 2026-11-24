@@ -1,6 +1,6 @@
 // Decision 0216: what the page counts about Files for the measurement beacon (src/files/usage.ts), and that nothing personal can travel in it.
 import { describe, expect, it } from 'vitest';
-import { FILES_FAIL_CODES, UsageCounter, failCode } from '../../src/files/usage.ts';
+import { FILES_FAIL_CODES, UsageCounter, answerBucket, failCode, type AnswerBucket } from '../../src/files/usage.ts';
 import { buildBeacon, type BeaconInput } from '../../src/perf/beacon.ts';
 import type { BrowserInfo } from '../../src/perf/browser-info.ts';
 import { PERF_FILES_FAIL_CODES, beaconProblems } from '../../shared/perf.ts';
@@ -86,6 +86,7 @@ describe('UsageCounter', () => {
     const u = new UsageCounter();
     const names = ['Song.flp', '日本語 サンプル.wav', 'C:\\Users\\cabbage\\x.wav', '[fadr.com] Vocals - クリスマスセリナ.wav'];
     for (const n of names) { u.result({ written: 1, skipped: 0, failed: [{ reason: `${n}: NoModificationAllowedError` }, { reason: `${n} was not found` }, { reason: `${n} is gone` }], bytes: 10 }); u.fail(new Error(`${n} broke`)); }
+    for (const n of names) u.engineAnswer([{ path: `Demo projects/${n}`, file: { size: 5 } }]);
     u.c.pick.folder++; u.c.drop.folders++; u.c.engine.open++; u.c.persist.asked++;
     const json = JSON.stringify(u.snapshot());
     for (const n of names) expect(json).not.toContain(n.slice(0, 4));
@@ -94,7 +95,7 @@ describe('UsageCounter', () => {
       if (typeof v === 'string') throw new Error(`a string value at ${path}: ${v}`);
       if (typeof v === 'object') for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
         if (path === 'fail') expect((FILES_FAIL_CODES as readonly string[]).includes(k), `fail code ${k}`).toBe(true);
-        else expect(/^[a-zA-Z]{1,16}$/.test(k), `key ${k}`).toBe(true);
+        else expect(/^[a-zA-Z][a-zA-Z0-9]{0,19}$/.test(k), `key ${k}`).toBe(true);   // Issue #1380: answeredUnderDemo is 17 letters; the bucket keys have digits (k64, m1, m16)
         walk(x, path === '' ? k : `${path}.${k}`);
       }
     };
@@ -125,5 +126,53 @@ describe('the beacon block', () => {
     expect(bad((f) => { f.v = 2; }).join()).toMatch(/files.v/);
     expect(bad((f) => { delete f.engine; }).join()).toMatch(/files.engine/);
     expect(beaconProblems({ ...ok, files: 'x' }).join()).toMatch(/files: not an object/);
+  });
+});
+
+// Issue #1380: what kind of answer the engine's dialogs were given (counts only: no name, no path)
+describe('the answers of the engine\'s file dialogs (Issue #1380)', () => {
+  const sized = (path: string, size: number): { path: string; file: { size: number } } => ({ path, file: { size } });
+  it('counts a Demo projects folder (any letter case), a .flp file, and the bytes of the files by bucket; an answer without a file (Save) counts no bytes', () => {
+    const u = new UsageCounter();
+    u.engineAnswer([sized('C:\\Users\\user\\Downloads\\DEMO PROJECTS\\Hip Hop.flp', 70000), sized('C:\\Users\\user\\Downloads\\DEMO PROJECTS\\Hip Hop\\kick.wav', 10)]);
+    u.engineAnswer([sized('C:\\Users\\user\\Downloads\\Projects\\song.flp', 0)]);
+    u.engineAnswer([{ path: 'C:\\Users\\user\\Downloads\\out.wav' }]);
+    u.engineAnswer([{ path: 'C:\\Users\\user\\Demo projects backup\\x.wav', file: { size: 1 } }]);
+    expect(u.snapshot()?.engine).toMatchObject({ answeredUnderDemo: 1, answeredFlp: 2, answeredBytes: { k64: 2, m1: 1, m16: 0, more: 0 } });
+  });
+  it('the buckets: up to 64 KB, 1 MB, 16 MB, more (an edge is in the lower bucket)', () => {
+    expect(answerBucket(0)).toBe('k64');
+    expect(answerBucket(64 * 1024)).toBe('k64');
+    expect(answerBucket(64 * 1024 + 1)).toBe('m1');
+    expect(answerBucket(1024 * 1024)).toBe('m1');
+    expect(answerBucket(1024 * 1024 + 1)).toBe('m16');
+    expect(answerBucket(16 * 1024 * 1024)).toBe('m16');
+    expect(answerBucket(16 * 1024 * 1024 + 1)).toBe('more');
+    const u = new UsageCounter();
+    u.engineAnswer([sized('x.wav', 20 * 1024 * 1024)]);
+    const bucket: AnswerBucket = 'more';
+    expect(u.snapshot()?.engine.answeredBytes[bucket]).toBe(1);
+  });
+  it('the beacon carries the counts only: no name of an answer, no path; and the record passes the checks', () => {
+    const u = new UsageCounter();
+    u.engineAnswer([sized('C:\\Users\\user\\Downloads\\DEMO PROJECTS\\Hip Hop.flp', 70000), sized('C:\\Users\\user\\Downloads\\DEMO PROJECTS\\Hip Hop\\kick.wav', 10)]);
+    u.engineAnswer([sized('C:\\Users\\user\\Downloads\\Projects\\song.flp', 0)]);
+    const b = buildBeacon({ ...base, files: u.snapshot() });
+    expect(JSON.stringify(b)).not.toMatch(/Hip Hop|DEMO PROJECTS|Downloads|kick|song|Users/);
+    expect(b.files?.engine).toMatchObject({ answeredUnderDemo: 1, answeredFlp: 2 });
+    expect(beaconProblems(b)).toEqual([]);
+  });
+  it('a record from before these counts has none of them and passes; the checks find a bucket that is not one, a count that is not a whole number, and a block of the wrong shape', () => {
+    const u = new UsageCounter();
+    u.c.opens = 1;
+    const ok = buildBeacon({ ...base, files: u.snapshot() });
+    expect(beaconProblems(ok)).toEqual([]);
+    const bad = (mut: (e: Record<string, any>) => void): string[] => { const f = JSON.parse(JSON.stringify(ok.files)); mut(f.engine); return beaconProblems({ ...ok, files: f }); };
+    expect(bad((e) => { delete e.answeredUnderDemo; delete e.answeredFlp; delete e.answeredBytes; })).toEqual([]);
+    expect(bad((e) => { e.answeredBytes.huge = 1; }).join()).toMatch(/not a bucket/);
+    expect(bad((e) => { e.answeredFlp = 1.5; }).join()).toMatch(/whole number/);
+    expect(bad((e) => { e.answeredBytes = 3; }).join()).toMatch(/files.engine.answeredBytes: not an object/);
+    expect(bad((e) => { e.answeredBytes.k64 = -1; }).join()).toMatch(/outside/);
+    expect(bad((e) => { e.secret = 1; }).join()).toMatch(/files.engine.secret: not a counter of this block/);
   });
 });

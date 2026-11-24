@@ -171,7 +171,7 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
     let rows = resp_rows(&c);
     assert_eq!(rows.len(), st.resp_entries);
     let k = rows_0147::ROWS_0147.len();
-    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
+    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4; // WebView2 loader appends 4 rows (#1355). // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
     // decision 0015: append only. HEAD 7b82424 ends with user32!GetLayeredWindowAttributes (decision 0140); once decision 0144's rows are in the tree they come between (the check is "last row", not "after row 605")
     for (i, (dll, name)) in rows_0147::ROWS_0147.iter().enumerate() {
         assert_eq!((rows[n - k + i].0.as_str(), rows[n - k + i].1.as_str()), (*dll, *name), "row {i} of decision 0147");
@@ -185,7 +185,7 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
     // and in the source table, right before the row of decision 0267
     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
     let table: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len()].trim().to_string();
+    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4].trim().to_string();
     assert_eq!(last, "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
 }
 
@@ -534,7 +534,7 @@ fn deferred_callback_slices_poll_audio_without_advancing_time_or_switching_even_
 #define VA_DEEPEST 0x1060
 static uint64_t ev;
 static unsigned polls, resumed;
-void fle_audio_poll(void) {{
+void fle_audio_poll_in_callback(void) {{
     if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {{
         polls++;
         fle_event_host_set(ev);

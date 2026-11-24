@@ -1,7 +1,7 @@
 // Messages between the page and the engine Worker (module worker). Plain structured-clone data plus the transferables named in the comments.
 import type { Manifest } from '../bundle/manifest.ts';
 import type { RawInput } from '../input/events.ts';
-import type { DriverStats } from './idle-driver.ts';
+import type { DriverStats, ResumeWhy } from './idle-driver.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import type { HostFileStats } from './hostfiles.ts';
 import type { LazyFileShared } from './lazy-file.ts';
@@ -10,6 +10,11 @@ import type { LazyFileShared } from './lazy-file.ts';
 export interface DeskHandover { ring: SharedArrayBuffer; ctl: SharedArrayBuffer; port: MessagePort }
 /** C-2: what the page hands the render Worker: the ONE canvas of the desktop (transferred), the port to the engine Worker and the handshake block (desk-link.ts). It draws the picture the engine composed. */
 export interface RenderHandover { canvas: OffscreenCanvas; port: MessagePort; ctl: SharedArrayBuffer }
+
+/** #1358 (a test aid): a text the engine's memory holds, the one with the most lines: the marker it was found by, its encoding (ASCII, or UTF-16LE), the place (byte offset in the memory), and its non-empty lines */
+export interface GuestTextBest { marker: string; enc: 'ascii' | 'utf16le'; offset: number; lineCount: number; lines: string[] }
+/** #1358 (a test aid): the printable runs (of at least two characters) within the radius of a place a marker was found at */
+export interface GuestTextNear { marker: string; enc: 'ascii' | 'utf16le'; offset: number; runs: string[] }
 
 /** What the page loaded and verified for the engine (transferred to the Worker). `lazy`: the manifest's lazy files, in its order (none when absent); their bytes come later, through shared memory (lazy-file.ts), so they are not transferred. */
 export interface BundleAssets {
@@ -31,8 +36,14 @@ export type ToWorker =
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
   | { cmd: 'desk-peek' }
+  /** #1358 (a test aid, any display method): the text the engine's memory holds for the markers (read only; radius > 0 also lists the printable runs near each place) */
+  | { cmd: 'guest-text'; markers: string[]; radius: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
+  /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
+  | { cmd: 'webview2-loaded' }
+  /** Issue #1362: a message the page posted to the engine's WebView2 (window.chrome.webview.postMessage in the face's document) */
+  | { cmd: 'webview2-message'; json: string }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
@@ -64,7 +75,7 @@ export type FromWorker =
   /** the engine entered its idle: its number, the virtual clock and its next deadline in ticks, how long it ran since it was last resumed (null: first idle), what the Worker did with the input so far */
   | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
   /** the engine was resumed (it computes until its next idle) */
-  | { t: 'resume'; abs: number; why: 'input' | 'deadline' | 'end' }
+  | { t: 'resume'; abs: number; why: ResumeWhy }
   /** events the engine has processed (it is idle again): when the page made them, when the Worker gave them to the engine, when the engine was idle again (all performance.timeOrigin-based ms) */
   | { t: 'input-done'; items: { seq: number; tPage: number; tInject: number; tIdle: number }[] }
   | { t: 'input-dropped'; seq: number; reason: string }
@@ -82,10 +93,19 @@ export type FromWorker =
   | { t: 'pong'; id: number }
   | { t: 'desk-dump'; width: number; height: number; data: ArrayBuffer; /** the compositor's line per window drawn */ windows: string }
   | { t: 'desk-dump-error'; message: string }
+  | { t: 'guest-text'; memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
   | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }
+  /** Issue #1362: what the engine's WebView2 model was asked (its log lines, read by the Worker): the controller's rectangle (bounds: left, top, right, bottom, in the guest's pixels relative to the controller's window) and the window's client origin on the guest's screen (null when the window is not known); its visibility; a navigation (its URI, and the resource of the bundle it names: resource is the lazy file's path, or null); a message the engine posts to the page; a script the engine runs (not run by the page) */
+  | { t: 'webview2'; op: 'bounds'; left: number; top: number; right: number; bottom: number; originX: number | null; originY: number | null }
+  | { t: 'webview2'; op: 'visible'; visible: boolean }
+  | { t: 'webview2'; op: 'navigate'; uri: string; resource: string | null }
+  | { t: 'webview2'; op: 'post'; json: string }
+  | { t: 'webview2'; op: 'exec'; script: string }
+  /** Issue #1376: the windows painted over the face (the Browser's window, its bounds): rects is l, t, r, b per window on the guest's screen (the bounds' space). Sent when the picture or the face has changed, and only when the list has */
+  | { t: 'webview2'; op: 'front'; rects: number[] }
   | { t: 'desk'; stats: { /** Canvas updates deduplicated per render Worker rAF, not GPU completion or physical display; null without rAF. */ displayFrames?: number | null; presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };

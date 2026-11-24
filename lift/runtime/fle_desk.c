@@ -58,7 +58,10 @@ static unsigned nout;
 static uint32_t *scratch;                          /* a rectangle drawn before it is compared with the picture */
 static size_t scratch_px;
 static int need_full = 1;
-static char desc[FLE_DESK_MAX_WINDOWS * 300u + 64u];
+/* #1358: the child windows of the window table are appended to the description ("child lid ..." lines, fle_win.c fle_win_child_lines); weak: a link without fle_win.c has none */
+unsigned fle_win_child_lines(char *out, size_t cap) __attribute__((weak));
+#define DESK_CHILD_TEXT_MAX 262144u
+static char desc[FLE_DESK_MAX_WINDOWS * 300u + 64u + DESK_CHILD_TEXT_MAX];
 
 static int64_t imin(int64_t a, int64_t b) { return a < b ? a : b; }
 static int64_t imax(int64_t a, int64_t b) { return a > b ? a : b; }
@@ -437,6 +440,7 @@ static void build_desc(void)
                       (cur[i].lflags & LF_ALPHA) ? " alpha" : "", (cur[i].lflags & LF_KEY) ? " key" : "", gl, rg, cur[i].alpha, cur[i].key, cn, tt);
         if ((size_t)(d - desc) >= sizeof desc - 300u) break;
     }
+    if (fle_win_child_lines) fle_win_child_lines(d, sizeof desc - (size_t)(d - desc));
 }
 
 EMSCRIPTEN_KEEPALIVE const fle_desk_state *fle_desk_compose(void)

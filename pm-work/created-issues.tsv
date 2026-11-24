@@ -49,3 +49,47 @@
 109	#1349	実機の条件(再生しながら、マウスを 1000 Hz 以上で動かし続ける)で音が途切れる現象を再現し、取り除く	Task
 110	#1350	P2 を正しく測る: 画面に出た枚数と、入力から画面までの遅れを、決まった条件で測る道具に直す	Task
 111	#1351	描画の所要を、変化した面積に比例させ、物理画素の画面(6 Mpx)で 120 fps の予算に収める	Task
+112	#1352	起動直後の途切れの内訳を特定し、起動の最中の長い計算に切り替え点の第 1 手を入れる(段 A。途切れを 0 にするのは段 B)	Task
+113	#1353	FL の UI の拡大を、FL 自身の情報で測る: F10 の Display の節・Debug ログ・DPI の API の全呼び出し・採用した拡大率・部品の位置・縁の遷移の幅	Task
+114	#1354	DPI 240 以上(DPR 2.5 以上)で FL が起動しない障害を直す: LOGPIXELSY の値で起きる再帰の閉路を特定し、runtime の応答を Windows と同じにする	Task
+115	#1355	Browser のパネル(左の黒い領域)を FL と同じにする: 黒いのが描かれていないのか空の一覧なのかを切り分け、一覧に要るフォルダの階層を seed に入れ、中身は起動後に取る	Task
+116	#1357	回帰: Welcome 窓を閉じる(No thanks・Escape・Default の選択)と engine が trap する。ホストのファイルの解放の後の読みを直す	Task
+117	#1358	F10 の General settings(Display の節・Debug タブ・Info タブ)を開き、FL 自身のログと設定を取る	Task
+118	#1362	Browser のパネル: WebView2 の窓の面を、ページ側の iframe に写し、オフラインのページ(error-offline.html)を出す	Task
+119	#1363	本番の実機のビーコンを読む: 版・DPR・DPI(DPR から求める)・途切れ・起動時間を、直近の記録から表にする	Task
+120	#1364	ビーコンに、FL の窓の大きさ(上位 8 窓: クラス名・幅・高さ)を足し、実機の FL の UI の拡大率を、記録から求められるようにする	Task
+121	#1365	demo の曲 Exoplanet・DEDZII を File > Open で開くと、Song info の窓の後に engine が止まる(LockResource: no PE image is mapped)を直す	Task
+122	#1366	テンプレート Blocks が使う内蔵のサンプル(Data\Patches\Packs\Legacy の DNC_*.wav など)を、起動の後に取れるように配信する	Task
+123	#1367	VST3 ホストの最小を作る(1a): OTT の IComponent を作り、setupProcessing・setActive まで通す	Task
+124	#1368	VST3 ホストの最小を作る(1b): OTT が 1 ブロックの音声を処理し、非無音・非 NaN を測る(VEX 系の命令の経路を確かめる)	Task
+125	#1369	プラグインの追加を、共有のファイルの編集ではなく、1 プラグイン 1 ディレクトリ(lift/plugins/<名前>/)の追加だけにする	Task
+126	#1370	2 つ目のプラグイン(Fruity Filter)を、lift/plugins/fruity-filter/ の追加だけで足せることを確かめる(共有のファイルの変更は 0 行)	Task
+127	#1371	内蔵プラグインを 1 本ずつ確かめる道具: 任意のプラグインの名前を渡すと、起動 → 要求 → instantiate → 1 ブロックの処理まで走る	Task
+128	#1372	demo の曲 Exoplanet を File > Open で開くと、Fruity Balance の読み込みの後に engine が exit 0 で止まる(ExitProcess)を直す	Task
+129	#1373	demo 2 件(DEDZII・Mehran Abbasi)の素材を、起動の後の取得で配信し、P3 の入力に音が出る demo があるかを確かめる	Task
+130	#1374	fe-build の blend2d のソースの取得を、一時の失敗に強くする(再試行と、取得済みの物の再利用)	Task
+131	#1375	起動直後の途切れを 0 にする(段 B): 残りの 421 ms の区間(wasm の C++ 描画と C の関数)に切り替え点を入れ、補充の最大の間隔を窓の値にする	Task
+132	#1376	Browser の Sounds タブの面(iframe)が、FL のウィンドウの前後関係を守る: 前面の窓・メニュー・ダイアログの下に、面を出さない	Task
+133	#1377	実機の評価用プロジェクトを開いて落ちた時の、engine の終了の理由を、ビーコンから読む	Task
+134	#1378	本番の engine の『検証済みの一覧』の門を廃止する: main の deploy は、常に、その engine を本番に出す	Task
+135	#1379	ゲストのアドレス空間の配置: 内蔵プラグイン 160 本の像(約 609 MB)が入るように、GLOBAL_BASE と実行時の表の上限を決め、起動時間とメモリを実測する	Task
+136	#1380	停止(stopped / 134)の理由を、ビーコンに別の項目として残す: 最後の fle: の行・== stop: の行・abort の種類・開く窓の答えの種類(個人の名前・パスを除く)	Task
+137	#1381	plugin の窓と tooltip の窓を、全ての拡大率で開いて拡大を測る	Task
+141	#1382	FL のテーマを切り替えると engine が止まる(crash)を直す	Task
+142	#1383	FL の設定(言語など。レジストリの値)を、ページの再読込をまたいで保持する	Task
+143	#1384	F10 の Settings の General タブをスクロールすると、描画が崩壊する(症状の再現と修正)	Task
+145	#1385	FL のユーザーのファイル(Recent・Presets・Projects など)を、ページの再読込をまたいで保持する	Task
+146	#1386	Piano roll のコード進行ツールの Start creating を押すと engine が止まる(crash)を直す	Task
+147	#1387	Piano roll のリフ マシーン(Riff machine)が、起動しようとしても何も反応しない(窓が出ない)を直す	Task
+148	#1388	emscripten(emcc・em++・emar・emsdk)を使わず、zig cc で、生成した C の compile と link ができるかを、実測で決める: 速度・出力の同一性・JSPI と pthread の扱い	Task
+138	#1389	FL のクリップボード(コピー・貼り付け)を、ページの Clipboard API(navigator.clipboard)と navigator.permissions に結ぶ	Task
+139	#1390	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 1): 標準のカーソルと、窓の端のサイズ変更の矢印	Task
+140	#1391	FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際の値を出す	Task
+144	#1392	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 2): FL 自身のカーソル(Piano roll の鉛筆など)を、資源の画素のまま出す	Task
+149	#1393	起動が first idle に届かず state running のまま止まる(間欠・DPR 2.5 で 5 回中 4 回)を、再現して直す: 後ろ向きの goto の切り替え点(fle_loop_tick・fle_loop_slice)	Task
+151	#1394	コード進行ツールの Start creating で、Piano roll にノートが作られる(FL の Python のスクリプトの実行: flpianoroll と標準ライブラリ)	Task
+154	#1395	FL を英語以外の言語で起動できる: ILSvg_x64.dll を real module にし、言語のファイル(.moe・.svg)を seed にする	Task
+152	#1396	ゲストの wasm の関数名の表を、全ての関数に付ける: 名前の無い 12,770 件を無くす(プロファイルの未分類を 5% 以下にする)	Task
+153	#1397	マウス入力(1000 Hz 以上)の場面で Worker の時間の 44.5% がブラウザ内部、27.2% がアプリの JS(postMessage・decode・setTimeout): 内訳を特定し、入力 1 件あたりの費用を減らす	Task
+155	#1398	ビーコンに、実機の提示の頻度(直近 10 秒の fps)と、入力から提示までの遅延(p50・p95)を足し、読み手(summary.mjs)の表に出す	Task
+156	#1399	実機のビーコンで、起動が first idle に届かず離脱した割合を、版ごとに集計する(起動の間欠の停止が、本番に出ているかを知る)	Task

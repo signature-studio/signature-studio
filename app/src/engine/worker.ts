@@ -3,12 +3,13 @@
 // Input arrives through a SharedArrayBuffer ring (input/ring.ts), the cursor and the title as small messages.
 import { classifyEngineError, FruityEngine, type FruityHost } from './fruity.ts';
 import { hostPackFromBytes } from './hostfiles.ts';
+import { webView2Message } from './webview2-log.ts';
 import { LazyFileSource } from './lazy-file.ts';
 import { IdleDriver, newDriverStats } from './idle-driver.ts';
 import { IdleTrace } from './idle-trace.ts';
 import { ReportThrottle } from './report-throttle.ts';
 import { TaskbarReport } from './taskbar-report.ts';
-import type { EngineToRender, FromWorker, RenderToEngine, ToWorker } from './protocol.ts';
+import type { EngineToRender, FromWorker, GuestTextBest, GuestTextNear, RenderToEngine, ToWorker } from './protocol.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
 import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
@@ -28,6 +29,8 @@ const mark = (name: string, detail?: Record<string, unknown>): void => post({ t:
 
 /** Issue #1314: how long a read of a lazy file waits for its bytes before it fails (lazy-file.ts) */
 const LAZY_TIMEOUT_MS = 120000;
+/** Issue #1341: the engine's line for the read of a real module's image (harness/two/main_two.c): the file name and whether the guest asked for it */
+const IMAGE_READ = /^image-read: (.+) requested=([01]) /;
 let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
 const reports = new ReportThrottle();
@@ -51,6 +54,10 @@ let pendingComposeMs = 0;
 let framesSent = 0;
 let pendingDump: string | null = null;
 let sharedWarned = false;
+/** Issue #1376: the windows painted over the WebView2 face are asked for when the picture changed or the face's bounds or visibility did; the list last sent, so that only a change is sent */
+const FRONT_MAX = 64;
+let frontDirty = true;
+let frontSent = '';
 
 const curMemory = (): WebAssembly.Memory | null => fruity?.memory ?? null;
 
@@ -69,9 +76,19 @@ async function handle(m: ToWorker): Promise<void> {
     case 'wake': deskCounters.wakes++; drainRing(); break;
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
+    case 'guest-text': guestText(m.markers, m.radius); break;
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
+    case 'webview2-loaded': onWebView2Loaded(); break;
+    case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
+}
+
+// Issue #1362: the page's face has loaded the document of a Navigate. The engine's page event is set, and the engine is woken if it waits: its idle fires the navigation's events (fle_wv2_pump)
+function onWebView2Loaded(): void {
+  if (!fruity) return;
+  if (!fruity.wv2Loaded()) { log('warn', 'this engine build has no WebView2 page export (fle_g3_wv2_loaded): the navigation is not completed'); return; }
+  driver?.wake();
 }
 
 async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
@@ -83,7 +100,16 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   const host: FruityHost = {
     mark,
     stdout: (line) => pushLog('out', line),
-    stderr: (line) => pushLog('err', line),
+    stderr: (line) => {
+      pushLog('err', line);
+      const r = IMAGE_READ.exec(line);   // Issue #1341: the read of a real module's image, with the page's time (the line's own clock is the engine's)
+      if (r) mark('image_read', { name: r[1], requested: r[2] === '1' });
+      const w = webView2Message(line);   // Issue #1362: what the WebView2 model was asked, for the page's face of the Browser panel
+      if (w) {
+        if (w.op === 'bounds' || w.op === 'visible') frontDirty = true;
+        post(w);
+      }
+    },
     log,
     idle: onEngineIdle,
     fileDlg: (id, request) => { mark('filedlg_request', { id }); post({ t: 'filedlg-request', id, request: request as FileDlgRequest }); },
@@ -364,6 +390,22 @@ function serviceDeskRequest(): void {
   }
 }
 
+/** Issue #1376: the windows painted over the WebView2 face (fle_webview2_front), sent to the page when the list differs from the last one sent */
+function syncFront(): void {
+  const api = compositor(), mem = fruity?.memory;
+  frontDirty = false;
+  if (!api?.front || !mem) return;
+  const p = api.front();
+  const words = new Int32Array(mem.buffer, p, 1 + 4 * FRONT_MAX);
+  const n = Math.min(words[0] ?? 0, FRONT_MAX);
+  const rects = Array.from(words.subarray(1, 1 + 4 * n));
+  const key = rects.join(',');
+  if (key === frontSent) return;
+  frontSent = key;
+  post({ t: 'webview2', op: 'front', rects });
+
+}
+
 /** one compose (the picture brought up to date) and the hand-over to the render Worker: when the picture changed, it is told, with the inputs this change answers (`seqs`, and the inline ones); `reply`: the render Worker asked, so it is answered even when nothing changed. True when the picture changed */
 function deskTick(reply: boolean, seqs?: number[]): boolean {
   const api = compositor(), mem = fruity?.memory;
@@ -377,6 +419,7 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
   const buf = mem.buffer;   // after the compose: it can grow the memory
   const gen = ptr === 0 ? gate.published : deskScene ? sceneGen(buf, ptr) : deskGen(buf, ptr);
   const changed = ptr !== 0 && gen !== gate.published;
+  if (changed || frontDirty) syncFront();
   let answers: number[] | undefined;
   if (changed) {
     gate.publish(gen);
@@ -429,4 +472,94 @@ function deskDump(peek: boolean): void {
   const data = new Uint8Array(mem.buffer, st.pixels, st.height * st.stride).slice().buffer as ArrayBuffer;   // decision 0271: a SharedArrayBuffer's slice() is a SharedArrayBuffer, which cannot be in the transfer list (DataCloneError in Firefox without WebGL); a Uint8Array's slice() copies into a plain ArrayBuffer
   if (!peek) api.resync();
   post({ t: 'desk-dump', width: st.width, height: st.height, data, windows: api.describe() }, [data]);
+}
+
+// #1358 (a test aid, any display method): the text the guest's memory holds for each marker. Read only. A marker is searched as ASCII and as UTF-16LE.
+// Each place it is found at gives the printable run around it (forward and backward, TEXT_REACH bytes at most); the text with the most lines is the answer.
+// The markers are tried in order, and the search stops at the first text of three lines or more. radius > 0 also lists the printable runs near every place.
+const TEXT_REACH = 0x100000;
+const TEXT_HITS = 64;
+const TEXT_LINES = 2000;
+const TEXT_LINE_MAX = 400;
+const NEAR_PLACES = 24;
+const NEAR_RUNS = 200;
+
+const textUnit = (wide: boolean): number => (wide ? 2 : 1);
+const textChar = (b: Uint8Array, p: number, wide: boolean): number => (wide ? (b[p] ?? 0) | ((b[p + 1] ?? 0) << 8) : (b[p] ?? 0));
+const isText = (c: number): boolean => (c >= 0x20 && c <= 0x7e) || c === 0x09 || c === 0x0a || c === 0x0d;
+
+/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE: the first byte is found by indexOf and the rest compared */
+function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
+  const u = textUnit(wide);
+  const pat = new Uint8Array(s.length * u);
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    pat[i * u] = c & 0xff;
+    if (wide) pat[i * u + 1] = c >> 8;
+  }
+  const out: number[] = [];
+  const last = b.length - pat.length;
+  const first = pat[0] ?? 0;
+  let p = b.indexOf(first, 0);
+  while (p >= 0 && p <= last && out.length < TEXT_HITS) {
+    let k = 1;
+    while (k < pat.length && b[p + k] === pat[k]) k++;
+    if (k === pat.length) out.push(p);
+    p = b.indexOf(first, p + 1);
+  }
+  return out;
+}
+
+/** the printable run [start, end) through the place [at, at + len), at most TEXT_REACH bytes each way */
+function textBounds(b: Uint8Array, at: number, len: number, wide: boolean): [number, number] {
+  const u = textUnit(wide);
+  let s = at, e = at + len;
+  while (at - s < TEXT_REACH && s - u >= 0 && isText(textChar(b, s - u, wide))) s -= u;
+  while (e - at < TEXT_REACH && e + u <= b.length && isText(textChar(b, e, wide))) e += u;
+  return [s, e];
+}
+
+function decodeText(b: Uint8Array, s: number, e: number, wide: boolean): string {
+  let out = '';
+  for (let p = s; p < e; p += textUnit(wide)) out += String.fromCharCode(textChar(b, p, wide));
+  return out;
+}
+
+/** the printable runs (two characters and more) within `radius` bytes of the place `at` */
+function runsNear(b: Uint8Array, at: number, radius: number, wide: boolean): string[] {
+  const u = textUnit(wide);
+  const out: string[] = [];
+  let cur = '';
+  const to = Math.min(at + radius, b.length - u);
+  for (let p = Math.max(0, at - radius); p <= to; p += u) {
+    const c = textChar(b, p, wide);
+    if (c >= 0x20 && c <= 0x7e) cur += String.fromCharCode(c);
+    else {
+      if (cur.length >= 2 && out.length < NEAR_RUNS) out.push(cur.slice(0, TEXT_LINE_MAX));
+      cur = '';
+    }
+  }
+  if (cur.length >= 2 && out.length < NEAR_RUNS) out.push(cur.slice(0, TEXT_LINE_MAX));
+  return out;
+}
+
+function guestText(markers: string[], radius: number): void {
+  const mem = fruity?.memory;
+  if (!mem) { post({ t: 'desk-dump-error', message: 'the engine has no memory to read yet' }); return; }
+  const b = new Uint8Array(mem.buffer);
+  let best = null as GuestTextBest | null;
+  const near: GuestTextNear[] = [];
+  for (const marker of markers) {
+    for (const wide of [false, true]) {
+      const enc = wide ? 'utf16le' : 'ascii';
+      for (const at of findPlaces(b, marker, wide)) {
+        const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
+        const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
+        if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
+        if (radius > 0 && near.length < NEAR_PLACES) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
+      }
+    }
+    if (best !== null && best.lineCount >= 3) break;
+  }
+  post({ t: 'guest-text', memBytes: mem.buffer.byteLength, best, near });
 }

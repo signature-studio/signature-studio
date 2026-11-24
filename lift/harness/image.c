@@ -67,6 +67,7 @@ int image_load(const char *path, harness_image *img, char *err, size_t errlen) {
     fd = open(path, O_RDONLY);
     if (fd < 0) return fail(err, errlen, "open failed");
     n = pread(fd, hdr, sizeof hdr, 0);
+    if (n < 0) return fail(err, errlen, "read failed");
     if (n < 0x400) return fail(err, errlen, "file too small");
     if (memcmp(hdr, "MZ", 2) != 0) return fail(err, errlen, "no MZ signature");
     lfanew = rd32(hdr + 0x3c);

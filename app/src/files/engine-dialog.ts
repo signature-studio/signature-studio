@@ -55,7 +55,7 @@ export class EngineFiles {
         config,
         done: (r) => {
           if (r === null) { cancel('cancelled by the person'); return; }
-          void this.answer(id, ex, fs, config.mode, r.paths, r.filterIndex + 1).then((a) => { if (!disposed) { if (a) { filesUsage.c.engine.answered++; done(a); } else { filesUsage.fail(ex.log[ex.log.length - 1] ?? ''); ex.reopen(ex.log[ex.log.length - 1] ?? 'The engine could not be given that.'); } } });
+          void this.answer(id, ex, fs, config.mode, r.paths, r.filterIndex + 1).then((a) => { if (!disposed) { if (a) { filesUsage.c.engine.answered++; if (a.ok) filesUsage.engineAnswer(a.items); done(a); } else { filesUsage.fail(ex.log[ex.log.length - 1] ?? ''); ex.reopen(ex.log[ex.log.length - 1] ?? 'The engine could not be given that.'); } } });
         },
       });
       let start = config.startDir;

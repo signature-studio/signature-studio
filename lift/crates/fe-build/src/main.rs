@@ -2,7 +2,7 @@
 //! deploy step gave it, and the working directory is the repository root, so the source paths the compiler sees
 //! (and the strings it puts in the wasm) are the same as before. The lists and argument files stay where they are.
 //!
-//! usage: fe-build engine | extract | bundle | upload | endpoint
+//! usage: fe-build engine | extract | external | bundle | upload | endpoint
 //! The plans (the stages and steps in run order) are functions that the tests compare with tests/plan/*.txt.
 
 use std::env;
@@ -12,13 +12,26 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 const OUT_APP_DIR: &str = "lift/out-app";
 const HARNESS_DIR: &str = "lift/harness";
+/// Issue #1362: the FL Cloud offline page of the installer (System\Internet, taken with the resources of an Issue that has the `resources` label). A lazy file of the bundle when it is there: the
+/// Browser panel's face shows it after the Navigate of the cloud tab (app/src/ui/webview2-surface.ts). Nothing is packed when it is not there.
+const OFFLINE_PAGE_SRC: &str = "lift/out-app/host-extra/resources/System/Internet/error-offline.html";
+const OFFLINE_PAGE_PATH: &str = "resources/System/Internet/error-offline.html";
 const R2_BUCKET: &str = "s3://fl-web-assets/";
+const ARTIFACT_BUCKET: &str = "s3://fl-web-artifacts/";
+/// The external plugins' wasm (the lazy files of pack.args whose source is here) is built from the installers (external_present).
+const PLUGINS_DIR: &str = "lift/out-app/plugins/";
 const INSTALLER: &str = "s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe";
-const BLEND2D_URL: &str = "https://github.com/blend2d/blend2d.git";
 const BLEND2D_REV: &str = "a7f947677e85441abe1769586d3bb935b4086a07";
+/// The SHA-256 of the GitHub archive of BLEND2D_REV. GitHub can regenerate an archive, so a mismatch is a failed attempt
+/// and the value is not changed to match (Issue #1374).
+const BLEND2D_TARBALL_SHA256: &str = "391a57ad2508ab2291ad04b39b0a82d78473662b6d3029dbaf18de06165ea1f0";
+/// The attempts of the archive fetch (the first one included) and the waits after the failed ones (none after the last).
+const BLEND2D_ATTEMPTS: usize = 4;
+const BLEND2D_WAITS: [Duration; 3] = [Duration::from_secs(10), Duration::from_secs(30), Duration::from_secs(60)];
 const BLEND2D_SRC: &str = "lift/out-app/b2d-src/src";
 const BLEND2D_LIB: &str = "lift/out-app/b2d/build/libblend2d.a";
 /// The flags of the em++ line that the upstream CMake build ran for each source, in its order (the line without
@@ -36,8 +49,11 @@ enum Step {
     Run(Vec<String>),
     RunStdin(Vec<String>, String),
     RemoveFile(String),
+    RemoveDir(String),
+    Fetch(String, String, String),
     CheckSources(String),
     CopyDlls,
+    Copy(String, String),
     Glue,
 }
 
@@ -55,8 +71,11 @@ impl Step {
             Step::Run(argv) => argv.join(" "),
             Step::RunStdin(argv, stdin_file) => format!("{} < {stdin_file}", argv.join(" ")),
             Step::RemoveFile(path) => format!("rm -f {path}"),
+            Step::RemoveDir(dir) => format!("rm -rf {dir}"),
+            Step::Fetch(url, tarball, sha) => format!("fetch {url} to {tarball} (sha256 {sha})"),
             Step::CheckSources(list_file) => format!("check {list_file} against the .cpp files under {BLEND2D_SRC}"),
             Step::CopyDlls => format!("copy {OUT_APP_DIR}/gen/dll/*.dll and {OUT_APP_DIR}/host/binaries/win64/FLEngine_x64.dll to {OUT_APP_DIR}/dll/"),
+            Step::Copy(from, to) => format!("copy {from} to {to}"),
             Step::Glue => format!("glue {OUT_APP_DIR}/web/flengine6.js -> {OUT_APP_DIR}/web/engine-glue.js (the two rules of {HARNESS_DIR}/web/glue.sed)"),
         }
     }
@@ -162,12 +181,84 @@ fn blend2d_units() -> Result<Vec<(String, String)>, String> {
     Ok(lines(&blend2d_list_file())?.into_iter().map(|rel| (format!("{BLEND2D_SRC}/{rel}"), format!("{OUT_APP_DIR}/b2d/obj/{rel}.o"))).collect())
 }
 
-fn blend2d_clone() -> Vec<Step> {
+/// The GitHub archive (a tarball of the commit's tree, with one top-level directory that `tar` strips).
+fn blend2d_archive_url() -> String {
+    format!("https://github.com/blend2d/blend2d/archive/{BLEND2D_REV}.tar.gz")
+}
+
+/// Kept under OUT_APP_DIR, which is git-ignored (`lift/out*/`).
+fn blend2d_tarball() -> String {
+    format!("{OUT_APP_DIR}/blend2d-{BLEND2D_REV}.tar.gz")
+}
+
+/// One download with curl. `-f` makes an HTTP error (403, 404) a failure, and `--max-time` makes a stalled transfer one too
+/// (so that it is retried, not left to the job's time limit). The message is curl's last line on stderr.
+fn curl_fetch(url: &str, path: &str) -> Result<(), String> {
+    let out = Command::new("curl").args(["-sSLf", "--connect-timeout", "30", "--max-time", "600", "-o", path, url]).output().map_err(|e| format!("curl: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let line = stderr.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim();
+    Err(format!("curl {}: {line}", out.status))
+}
+
+/// Puts the archive at `tarball`, unless a tarball with the SHA-256 `sha` is there already. An attempt is `fetch(url, part)`
+/// and then the SHA-256 check of `part`, where `part` is `<tarball>.part` until the check passes. A failed attempt is
+/// retried after its wait (BLEND2D_WAITS), up to BLEND2D_ATTEMPTS.
+fn blend2d_fetch_with(
+    url: &str,
+    tarball: &str,
+    sha: &str,
+    fetch: &mut dyn FnMut(&str, &str) -> Result<(), String>,
+    wait: &mut dyn FnMut(Duration),
+) -> Result<(), String> {
+    if Path::new(tarball).is_file() {
+        match sha256_hex(tarball) {
+            Ok(got) if got == sha => {
+                println!("blend2d: {tarball} has the SHA-256 of {BLEND2D_REV}: not fetched");
+                return Ok(());
+            }
+            Ok(got) => eprintln!("fe-build: {tarball} has SHA-256 {got}, expected {sha}: discarded"),
+            Err(message) => eprintln!("fe-build: {tarball}: {message}: discarded"),
+        }
+        fs::remove_file(tarball).map_err(|e| format!("{tarball}: {e}"))?;
+    }
+    let part = format!("{tarball}.part");
+    let mut attempt = 1;
+    loop {
+        let Err(message) = fetch(url, &part).and_then(|()| {
+            let got = sha256_hex(&part)?;
+            if got == sha {
+                Ok(())
+            } else {
+                Err(format!("SHA-256 {got}, expected {sha}"))
+            }
+        }) else {
+            break;
+        };
+        let _ = fs::remove_file(&part);
+        if attempt == BLEND2D_ATTEMPTS {
+            eprintln!("fe-build: blend2d attempt {attempt}/{BLEND2D_ATTEMPTS} failed ({url}): {message}; giving up");
+            return Err(format!("blend2d: no archive after {BLEND2D_ATTEMPTS} attempts"));
+        }
+        let pause = BLEND2D_WAITS[attempt - 1];
+        eprintln!("fe-build: blend2d attempt {attempt}/{BLEND2D_ATTEMPTS} failed ({url}): {message}; waiting {} s", pause.as_secs());
+        wait(pause);
+        attempt += 1;
+    }
+    fs::rename(&part, tarball).map_err(|e| format!("{part} to {tarball}: {e}"))
+}
+
+/// The archive of the fixed commit, unpacked fresh each time (the old tree is removed), then the patch and the check.
+fn blend2d_source_steps() -> Vec<Step> {
     let src = format!("{OUT_APP_DIR}/b2d-src");
     vec![
         Step::Mkdir(vec![OUT_APP_DIR.into()]),
-        Step::Run(vec!["git".into(), "clone".into(), "-q".into(), BLEND2D_URL.into(), src.clone()]),
-        Step::Run(vec!["git".into(), "-C".into(), src.clone(), "checkout".into(), "-q".into(), BLEND2D_REV.into()]),
+        Step::Fetch(blend2d_archive_url(), blend2d_tarball(), BLEND2D_TARBALL_SHA256.into()),
+        Step::RemoveDir(src.clone()),
+        Step::Mkdir(vec![src.clone()]),
+        Step::Run(vec!["tar".into(), "-xzf".into(), blend2d_tarball(), "-C".into(), src.clone(), "--strip-components=1".into()]),
         Step::RunStdin(
             vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
             format!("{HARNESS_DIR}/b2d1/b2d3-compop.patch"),
@@ -232,7 +323,7 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
     let fe_lift = format!("{bin}/fe-lift");
     let fe_wasmgen = format!("{bin}/fe-wasmgen");
     let units = blend2d_units()?;
-    let mut blend2d_steps = blend2d_clone();
+    let mut blend2d_steps = blend2d_source_steps();
     blend2d_steps.push(Step::Mkdir(blend2d_dirs(&units)));
     let mut stages = vec![Stage { name: "blend2d".into(), steps: blend2d_steps, parallel: false }];
     stages.push(Stage { name: "blend2d-compile".into(), steps: blend2d_compile_steps(&units), parallel: true });
@@ -311,7 +402,8 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
 
     let mut hybrid_argv = vec![fe_wasmgen];
     hybrid_argv.extend(lines(&format!("{HARNESS_DIR}/hyb/hybrid.cmd"))?);
-    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::Run(hybrid_argv), Step::Glue], parallel: false });
+    let func_names = format!("{OUT_APP_DIR}/hyb/wasm-func-names.tsv");
+    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::Run(hybrid_argv), Step::Copy(func_names, format!("{OUT_APP_DIR}/gen/wasm-func-names.tsv")), Step::Glue], parallel: false });
     Ok(stages)
 }
 
@@ -359,8 +451,20 @@ fn run(step: &Step) -> Result<(), String> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(format!("rm {path}: {error}")),
         },
+        Step::RemoveDir(dir) => match fs::remove_dir_all(dir) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!("rm -rf {dir}: {error}")),
+        },
+        Step::Fetch(url, tarball, sha) => blend2d_fetch_with(url, tarball, sha, &mut curl_fetch, &mut std::thread::sleep),
         Step::CheckSources(list_file) => check_blend2d_sources(list_file),
         Step::CopyDlls => copy_dlls(),
+        Step::Copy(from, to) => {
+            if let Some(dir) = Path::new(to).parent() {
+                fs::create_dir_all(dir).map_err(|e| format!("mkdir {}: {e}", dir.display()))?;
+            }
+            fs::copy(from, to).map(|_| ()).map_err(|e| format!("copy {from} to {to}: {e}"))
+        }
         Step::Glue => {
             let from = format!("{OUT_APP_DIR}/web/flengine6.js");
             let text = fs::read_to_string(&from).map_err(|e| format!("{from}: {e}"))?;
@@ -455,22 +559,113 @@ fn seed_step() -> Result<Step, String> {
     Ok(Step::Run(argv))
 }
 
+/// The arguments of pack.args (one per line). Without the external plugins' installers (`external` false), the --lazy-file
+/// of a plugin's wasm (its source under lift/out-app/plugins/) is left out, and each one is said on stderr.
+fn pack_args(external: bool) -> Result<Vec<String>, String> {
+    let args = lines(&format!("{HARNESS_DIR}/web/pack.args"))?;
+    let mut kept = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let plugin = args[i] == "--lazy-file" && args.get(i + 1).is_some_and(|v| v.starts_with(PLUGINS_DIR));
+        if plugin && !external {
+            eprintln!("fe-build: 外部プラグインのインストーラが無いので、省く: {}", args[i + 1]);
+            i += 2;
+        } else {
+            kept.push(args[i].clone());
+            i += 1;
+        }
+    }
+    Ok(kept)
+}
+
 /// The pack step for the engine with the sha256 `sha` (its first 12 digits name the version).
-fn pack_step_for(sha: &str) -> Result<Step, String> {
+fn pack_step_for(sha: &str, external: bool) -> Result<Step, String> {
     let mut argv: Vec<String> = vec!["node".into(), "app/scripts/pack-assets.mjs".into(), "--version".into(), sha[..12].into()];
-    argv.extend(lines(&format!("{HARNESS_DIR}/web/pack.args"))?);
+    argv.extend(pack_args(external)?);
+    if Path::new(OFFLINE_PAGE_SRC).is_file() {
+        argv.push("--lazy-file".into());
+        argv.push(format!("{OFFLINE_PAGE_SRC}={OFFLINE_PAGE_PATH}"));
+    }
     Ok(Step::Run(argv))
 }
 
 #[cfg(test)]
-fn bundle_plan_steps(sha: &str) -> Result<Vec<Step>, String> {
-    Ok(vec![seed_step()?, pack_step_for(sha)?])
+fn bundle_plan_steps(sha: &str, external: bool) -> Result<Vec<Step>, String> {
+    let mut steps = if external { ott_steps() } else { Vec::new() };
+    steps.extend([seed_step()?, pack_step_for(sha, external)?]);
+    Ok(steps)
 }
 
+/// The bundle. The external plugins' wasm is in it only when their installers are there (external_present).
 fn bundle() -> Result<(), String> {
+    let external = external_present()?;
+    if external {
+        for step in &ott_steps() {
+            run(step)?;
+        }
+    }
     run(&seed_step()?)?;
     let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
-    run(&pack_step_for(&sha)?)
+    run(&pack_step_for(&sha, external)?)
+}
+
+/// The external plugins' installers (ci/artifacts.lock: the installers/ rows that are not FL Studio's), the input of build.sh of the OTT wasm.
+fn external_keys() -> Result<Vec<String>, String> {
+    let text = fs::read_to_string("ci/artifacts.lock").map_err(|e| format!("ci/artifacts.lock: {e}"))?;
+    let rows = text.lines().filter(|l| !l.starts_with('#') && !l.is_empty());
+    Ok(rows.filter_map(|l| l.split('\t').next()).filter(|k| k.starts_with("installers/") && !k.starts_with("installers/flstudio_")).map(String::from).collect())
+}
+
+/// The installers into lift/out-app/external, then the check of them against ci/artifacts.lock (the check of build.sh reads all of them).
+fn external_steps() -> Result<Vec<Step>, String> {
+    let dir = format!("{OUT_APP_DIR}/external");
+    let mut steps = vec![Step::Mkdir(vec![dir.clone()])];
+    for key in external_keys()? {
+        let name = key.rsplit('/').next().unwrap_or(&key).to_string();
+        steps.push(aws_step(&["s3", "cp", &format!("{ARTIFACT_BUCKET}{key}"), &format!("{dir}/{name}")]));
+    }
+    steps.push(Step::Run(vec!["node".into(), "tools/external-inputs/check.mjs".into(), dir]));
+    Ok(steps)
+}
+
+fn external() -> Result<(), String> {
+    for step in &external_steps()? {
+        run(step)?;
+    }
+    Ok(())
+}
+
+/// The file names of the external plugins' installers (the names that `external` gives them in lift/out-app/external).
+fn external_names() -> Result<Vec<String>, String> {
+    Ok(external_keys()?.iter().map(|key| key.rsplit('/').next().unwrap_or(key).to_string()).collect())
+}
+
+/// Whether the external plugins' installers are in lift/out-app/external (`external` puts them there).
+fn external_present() -> Result<bool, String> {
+    external_in(&format!("{OUT_APP_DIR}/external"), &external_names()?)
+}
+
+/// Whether the installers `names` are in `dir`. None of them: false, and the bundle leaves the plugins out. Some of them, or a
+/// file that does not match ci/artifacts.lock: an error (the same check as `external`'s).
+fn external_in(dir: &str, names: &[String]) -> Result<bool, String> {
+    if !names.iter().any(|name| Path::new(dir).join(name).is_file()) {
+        return Ok(false);
+    }
+    run(&Step::Run(vec!["node".into(), "tools/external-inputs/check.mjs".into(), dir.into()]))?;
+    Ok(true)
+}
+
+/// The OTT wasm (#1337): build.sh reads the installers that `external` put in lift/out-app/external and writes
+/// lift/out-app/plugins/ott/vst-ext.wasm, the lazy file of the bundle (pack.args). The same build as the work chain's.
+/// The bundle runs it only when the installers are there (external_present).
+fn ott_steps() -> Vec<Step> {
+    vec![Step::Run(vec![
+        "bash".into(),
+        format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
+        "ott".into(),
+        format!("{OUT_APP_DIR}/external"),
+        format!("{OUT_APP_DIR}/plugins/ott"),
+    ])]
 }
 
 fn aws_step(args: &[&str]) -> Step {
@@ -479,7 +674,7 @@ fn aws_step(args: &[&str]) -> Step {
     Step::Run(argv)
 }
 
-/// The three `aws s3` calls that do not depend on a gate: the Brotli bundle and the raw bundle.
+/// The `aws s3 sync` calls that upload the bundle: the Brotli files, then the raw files.
 fn upload_sync_steps() -> Vec<Step> {
     let br_dir = format!("{OUT_APP_DIR}/bundle/br");
     let raw_dir = format!("{OUT_APP_DIR}/bundle/raw");
@@ -489,33 +684,19 @@ fn upload_sync_steps() -> Vec<Step> {
     ]
 }
 
-/// The copies of the manifest: the engine's sha256 must be a line of verified.txt, and a non-empty root.txt names
-/// the key that is copied over the manifest.
-fn upload_gated_steps(sha: &str, verified: &str, root: &str) -> Vec<Step> {
+/// The copy that makes the new bundle live. It is always the last step of upload(), after the bundle's files are up,
+/// so the manifest never names a file that is not there yet.
+fn upload_manifest_step() -> Step {
+    let manifest_file = format!("{OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json");
     let manifest_key = format!("{R2_BUCKET}manifest.json");
-    let mut steps = Vec::new();
-    if verified.lines().any(|line| line == sha) {
-        let manifest_file = format!("{OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json");
-        steps.push(aws_step(&["s3", "cp", &manifest_file, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"]));
-    }
-    if !root.is_empty() {
-        let src = format!("{R2_BUCKET}{}", root.trim_end_matches('\n'));
-        steps.push(aws_step(&["s3", "cp", &src, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"]));
-    }
-    steps
+    aws_step(&["s3", "cp", &manifest_file, &manifest_key, "--cache-control", "no-cache", "--content-type", "application/json"])
 }
 
 fn upload() -> Result<(), String> {
     for step in &upload_sync_steps() {
         run(step)?;
     }
-    let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
-    let verified = fs::read_to_string(format!("{HARNESS_DIR}/web/verified.txt")).map_err(|e| format!("verified.txt: {e}"))?;
-    let root = fs::read_to_string(format!("{HARNESS_DIR}/web/root.txt")).unwrap_or_default();
-    for step in &upload_gated_steps(&sha, &verified, &root) {
-        run(step)?;
-    }
-    Ok(())
+    run(&upload_manifest_step())
 }
 
 fn endpoint() -> Result<(), String> {
@@ -565,11 +746,12 @@ fn main() -> ExitCode {
             }
         }
         Some("extract") => extract(),
+        Some("external") => external(),
         Some("bundle") => bundle(),
         Some("upload") => upload(),
         Some("endpoint") => endpoint(),
         _ => {
-            eprintln!("usage: fe-build engine | extract | bundle | upload | endpoint");
+            eprintln!("usage: fe-build engine | extract | external | bundle | upload | endpoint");
             return ExitCode::from(2);
         }
     };
@@ -584,10 +766,127 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_gated_steps, upload_sync_steps};
-    use std::path::Path;
+    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_in, external_names, external_steps, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
+    use std::cell::Cell;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::Duration;
 
     const SHA: &str = "b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043";
+    /// The SHA-256 of an empty file. The fetch tests use an empty file (matches) or the bytes BAD (does not match).
+    const EMPTY_SHA: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    const EMPTY: &[u8] = b"";
+    const BAD: &[u8] = b"stale";
+    const URL: &str = "https://example.invalid/blend2d.tar.gz";
+
+    /// A directory `.tmp-fe-build-<name>` in the repository root, removed when the test ends.
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").join(format!(".tmp-fe-build-{name}"));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).expect("scratch directory");
+            Scratch(dir)
+        }
+
+        fn path(&self, name: &str) -> String {
+            self.0.join(name).display().to_string()
+        }
+
+        fn dir(&self) -> String {
+            self.0.display().to_string()
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// A fetch that answers the attempts in order: Ok(bytes) writes them to the file, Err(message) fails.
+    fn scripted<'a>(outcomes: &'a [Result<&'static [u8], &'static str>], calls: &'a Cell<usize>) -> impl FnMut(&str, &str) -> Result<(), String> + 'a {
+        move |_url: &str, part: &str| -> Result<(), String> {
+            let n = calls.get();
+            calls.set(n + 1);
+            match outcomes.get(n).ok_or("no outcome for this attempt")? {
+                Ok(bytes) => fs::write(part, bytes).map_err(|e| e.to_string()),
+                Err(message) => Err(message.to_string()),
+            }
+        }
+    }
+
+    #[test]
+    fn blend2d_fetch_retries_then_succeeds() {
+        let dir = Scratch::new("retry");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Err("curl exit status: 22: curl: (22) The requested URL returned error: 403"), Err("curl exit status: 28: curl: (28) timed out"), Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 3);
+        assert_eq!(waits, [Duration::from_secs(10), Duration::from_secs(30)]);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+        assert!(!Path::new(&dir.path("blend2d.tar.gz.part")).exists());
+    }
+
+    #[test]
+    fn blend2d_fetch_gives_up_after_four_attempts() {
+        let dir = Scratch::new("give-up");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Err("curl exit status: 6: curl: (6) Could not resolve host"); 4];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert!(result.is_err());
+        assert_eq!(calls.get(), 4);
+        assert_eq!(waits, [Duration::from_secs(10), Duration::from_secs(30), Duration::from_secs(60)]);
+        assert!(!Path::new(&tarball).exists());
+        assert!(!Path::new(&dir.path("blend2d.tar.gz.part")).exists());
+    }
+
+    #[test]
+    fn blend2d_fetch_retries_on_a_sha_mismatch() {
+        let dir = Scratch::new("sha-retry");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Ok(BAD), Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 2);
+        assert_eq!(waits, [Duration::from_secs(10)]);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+    }
+
+    #[test]
+    fn blend2d_fetch_reuses_a_matching_tarball() {
+        let dir = Scratch::new("reuse");
+        let tarball = dir.path("blend2d.tar.gz");
+        fs::write(&tarball, EMPTY).expect("the tarball");
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&[], &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 0);
+        assert!(waits.is_empty());
+    }
+
+    #[test]
+    fn blend2d_fetch_discards_a_mismatched_tarball() {
+        let dir = Scratch::new("discard");
+        let tarball = dir.path("blend2d.tar.gz");
+        fs::write(&tarball, BAD).expect("the tarball");
+        let outcomes = [Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert!(calls.get() >= 1);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+    }
 
     #[test]
     fn glue_matches_sed() {
@@ -596,19 +895,46 @@ mod tests {
         assert_eq!(glue(input), expected);
     }
 
-    /// The plans of the four commands equal the texts recorded before the `--plan` flag was removed (tests/plan/*.txt).
-    /// The engine's binary directory is written as `<bin>`. The upload gate takes the sha, verified.txt and root.txt as text.
+    /// The working directory is the repository root (the plans, ci/artifacts.lock and tools/ are read from there).
+    fn at_root() {
+        std::env::set_current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")).expect("the repository root");
+    }
+
+    /// The plans of the engine, bundle, extract and external commands equal the texts recorded before the `--plan` flag was removed
+    /// (tests/plan/*.txt). The engine's binary directory is written as `<bin>`. The upload plan is tested by upload_plan_matches_recorded_text.
+    /// The bundle has two plans: with the external plugins' installers (bundle.txt) and without them (bundle-no-external.txt).
     #[test]
     fn plans_match_recorded_texts() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-        std::env::set_current_dir(&root).expect("the repository root");
+        at_root();
         let engine = engine_plan_lines("<bin>").expect("engine plan");
         assert_eq!(engine.join("\n") + "\n", include_str!("../tests/plan/engine.txt"));
-        let bundle = bundle_plan_steps(SHA).expect("bundle plan");
+        let bundle = bundle_plan_steps(SHA, true).expect("bundle plan");
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle.txt"));
-        let mut upload = upload_sync_steps();
-        upload.extend(upload_gated_steps(SHA, SHA, ""));
-        assert_eq!(stage_lines("upload", &upload).join("\n") + "\n", include_str!("../tests/plan/upload.txt"));
+        let bundle = bundle_plan_steps(SHA, false).expect("bundle plan without the external plugins");
+        assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle-no-external.txt"));
         assert_eq!(stage_lines("extract", &extract_steps()).join("\n") + "\n", include_str!("../tests/plan/extract.txt"));
+        assert_eq!(stage_lines("external", &external_steps().expect("external plan")).join("\n") + "\n", include_str!("../tests/plan/external.txt"));
+    }
+
+    #[test]
+    fn external_absent_leaves_the_plugins_out() {
+        at_root();
+        let dir = Scratch::new("external-absent");
+        assert_eq!(external_in(&dir.dir(), &external_names().expect("ci/artifacts.lock")), Ok(false));
+    }
+
+    #[test]
+    fn external_partly_present_stops() {
+        at_root();
+        let dir = Scratch::new("external-partly");
+        fs::write(dir.path("VitalInstaller.exe"), EMPTY).expect("one installer");
+        assert!(external_in(&dir.dir(), &external_names().expect("ci/artifacts.lock")).is_err());
+    }
+
+    #[test]
+    fn upload_plan_matches_recorded_text() {
+        let mut upload = upload_sync_steps();
+        upload.push(upload_manifest_step());
+        assert_eq!(stage_lines("upload", &upload).join("\n") + "\n", include_str!("../tests/plan/upload.txt"));
     }
 }

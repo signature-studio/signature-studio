@@ -1,0 +1,16 @@
+-O3
+-g
+--enable-bulk-memory
+--enable-exception-handling
+--enable-sign-ext
+--enable-mutable-globals
+--enable-nontrapping-float-to-int
+--enable-multivalue
+--enable-reference-types
+--enable-simd
+--enable-threads
+--enable-tail-call
+--enable-extended-const
+-o
+lift/out-app/variants/O3/web/flengine6.c.opt.wasm
+lift/out-app/variants/O3/web/flengine6.wasm

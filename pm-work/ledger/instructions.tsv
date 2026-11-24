@@ -53,7 +53,24 @@ L-051	2026-11-23	依頼者	マウスの動きは最低 1000 Hz で測る(依頼�
 L-052	2026-11-23	依頼者	FL のネイティブでは、Main GUI Scaling の System が OS の拡大率(175%)に自動で従う。今の版では従っていない。DPI・拡大率に関するメトリクスを、きちんと取ること。メトリクスには、Settings → Debug のログも含める	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
 L-053	2026-11-23	依頼者	175% などの数字を、予め用意しない。拡大率は、環境(DPR)から、Windows と同じ計算で導く	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md
 L-054	2026-11-23	依頼者	起動して 10 秒後、一度も再生を押さず、操作もしない状態で、直近 60 秒の途切れが 343 ある。使い物にならない。再生もマウス操作も無い状態で、途切れを 0 にする	pm-work/issue-drafts/wave1f/109-audio-under-physical-screen-mouse.md
-L-055	2026-11-23	依頼者	pull 後の専用ブランチと worktree で実ブラウザの性能調査と改善を続ける。このマシンで製品編集・テスト・ビルド・サーバー起動を許可する。専用ブランチの commit・push と単一 Discussion の新規作成・作業メモを許可する。main と Issues/PR への書き込みは禁止する。約24時間後まで基準達成に向けた改善を続ける。探索とログ要約は luna subagent に委ねてトークンを節約する	perf/windows-browser。main・Issues・PR に書き込まない
-L-056	2026-11-23	依頼者	指定の評価用フォルダを Upload folder で丸ごと OPFS に取り込み、serina1-serum2_2.flp を開いて性能を評価する	評価用76ファイルを相対パス付きで取り込み、全ファイルのサイズ・SHA-256を照合する。個人のプロジェクトデータはリポジトリに追加しない
-L-057	2026-11-23	依頼者	Discussionsに現在の進捗・状況・方針を報告し、先頭4行に[!NOTE]引用ブロックで概要を書く	単一のDiscussion #1356へ報告。以降の作業メモも同じDiscussionに集約する
-L-058	2026-11-23	依頼者	音声途切れと低フレームレートの両方を同時に解決する必要はなく、片方のみ・片方ずつの取り組み方を任せる	進行中のスケジューラ比較後、UI描画負荷と継続操作の表示遅延を優先して調査し、音声の回帰も確認する
+L-055	2026-11-24	依頼者	HiDPI 対応は正常に動作している(確認)	pm-work/issue-drafts/wave1f/107-hidpi-fractional-scaling.md・pm-work/issue-drafts/wave1i/113-fl-ui-scale-measure.md
+L-056	2026-11-24	依頼者	Browser の Sounds タブの中身が、Welcome・Channel Rack などの FL のウィンドウより前面に出る。File メニューを開くと下部が隠れる。FL のウィンドウの前後関係を守ること	pm-work/issue-drafts/wave1s/132-browser-face-front-windows.md
+L-057	2026-11-24	依頼者	評価用プロジェクトを開こうとすると落ちる	pm-work/issue-drafts/wave1s/133-demo-exit-beacon-reason.md
+L-058	2026-11-24	依頼者	main が更新されたら、デプロイされるはず。デプロイを迂回する仕組みがあるとしたら、廃止する	pm-work/issue-drafts/wave1s/134-deploy-gate-remove.md
+L-062	2026-11-24	依頼者	テーマを切り替えるとクラッシュします。	pm-work/issue-drafts/wave1x/141-theme-switch-crash.md
+L-063	2026-11-24	依頼者	言語を切り替えると再起動を求められますが(これ自体は正常な挙動)、再起動しても設定が反映されていません。ページを再読込すると Recent が消えるなど、一部のデータは保持されていないように見えます。	pm-work/issue-drafts/wave1x/142-settings-registry-persist.md・pm-work/issue-drafts/wave1x/145-user-files-persist.md
+L-064	2026-11-24	依頼者	Settings の General タブは、スクロールすると描画が崩壊する症状を維持しています。	pm-work/issue-drafts/wave1x/143-settings-general-scroll-draw.md
+L-067	2026-11-24	依頼者	emscripten の採用は取りやめる。zig cc の採用を検討していた(依頼者の発言。記録は無かった)。進捗を質問された	pm-work/issue-drafts/wave1z/148-zig-cc-replace-emcc.md
+L-059	2026-11-24	依頼者	クリップボードが反映されていない。Problems Loading the project ウィンドウで項目をクリックしたときに出る 'Copy' ツールチップを押しても、実際のクリップボードに入らない。navigator.permissions と Clipboard API を使うこと	pm-work/issue-drafts/wave1w/138-clipboard-page-api.md
+L-060	2026-11-24	依頼者	トップバーの Memory Usage と CPU Load が 0MB のまま、Frame Rate は 120 で固定されている。30fps すら満たしていないように見える。CPU Load History のグラフは値が出ている。実際の数値を反映すること	pm-work/issue-drafts/wave1w/140-topbar-metrics-real.md
+L-061	2026-11-24	依頼者	マウスカーソルが反映されていない。ウィンドウの端にカーソルを合わせても矢印に変化せず、Piano roll の Pencil Mode でも鉛筆カーソルにならない。形が似ているそれっぽいカーソルに当てはめないこと。実際のマウスカーソルのみ許可する	pm-work/issue-drafts/wave1w/139-cursor-standard-edge.md・pm-work/issue-drafts/wave1w/144-cursor-fl-resources.md
+L-065	2026-11-24	依頼者	コード進行ツールは "Start creating" を押下した瞬間クラッシュする	pm-work/issue-drafts/wave1y/146-piano-chord-tool-crash.md
+L-066	2026-11-24	依頼者	リフ マシーンは、起動しようとしても何も反応しない	pm-work/issue-drafts/wave1y/147-piano-riff-machine-no-response.md
+L-068	2026-11-24	依頼者	emscripten(またはそのグルーコード)が、使い物にならないほど重い原因ではないか、という問題提起(emscripten の採用取りやめ・zig cc の検討の動機)	pm-work/issue-drafts/wave1z/148-zig-cc-replace-emcc.md
+L-069	2026-11-24	依頼者	agent.yml: エージェントの開始の直前に、Project の Status を In Progress に移す。終了時に In Review に移す	.github/workflows/agent.yml
+L-070	2026-11-23	依頼者	pull 後の専用ブランチと worktree で実ブラウザの性能調査と改善を続ける。このマシンで製品編集・テスト・ビルド・サーバー起動を許可する。専用ブランチの commit・push と単一 Discussion の新規作成・作業メモを許可する。main と Issues/PR への書き込みは禁止する。約24時間後まで基準達成に向けた改善を続ける。探索とログ要約は luna subagent に委ねてトークンを節約する	perf/windows-browser。main・Issues・PR に書き込まない
+L-071	2026-11-23	依頼者	指定の評価用フォルダを Upload folder で丸ごと OPFS に取り込み、serina1-serum2_2.flp を開いて性能を評価する	評価用76ファイルを相対パス付きで取り込み、全ファイルのサイズ・SHA-256を照合する。個人のプロジェクトデータはリポジトリに追加しない
+L-072	2026-11-23	依頼者	Discussionsに現在の進捗・状況・方針を報告し、先頭4行に[!NOTE]引用ブロックで概要を書く	単一のDiscussion #1356へ報告。以降の作業メモも同じDiscussionに集約する
+L-073	2026-11-23	依頼者	音声途切れと低フレームレートの両方を同時に解決する必要はなく、片方のみ・片方ずつの取り組み方を任せる	進行中のスケジューラ比較後、UI描画負荷と継続操作の表示遅延を優先して調査し、音声の回帰も確認する
+
+L-074	2026-11-25	依頼者	進んだmainから使える変更を積極的に取り入れる	perf/windows-browserへ最新mainを統合し、競合解消と性能・音声の回帰確認を行う

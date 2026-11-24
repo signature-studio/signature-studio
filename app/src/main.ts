@@ -13,6 +13,7 @@ import { blockingMissing, describeMissing, detectFeatures, type FeatureReport } 
 import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
 import type { AppView } from './engine/appview.ts';
 import type { HostFileStats } from './engine/hostfiles.ts';
+import type { GuestTextBest, GuestTextNear } from './engine/protocol.ts';
 import { cursorCss } from './ui/cursor.ts';
 import { DesktopView } from './ui/desktop.ts';
 import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
@@ -24,10 +25,10 @@ import { ProgressView } from './ui/progress.ts';
 import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
-import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
 import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
 import { browserDisplayHost } from './perf/display-host.ts';
-import { engineExitMessage } from './perf/exit-message.ts';
+import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
 import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
 import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
@@ -41,7 +42,8 @@ import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
 import type { AssetRef, LazyRef } from './bundle/manifest.ts';
 import { downloadLazy, type LazyResult } from './bundle/lazy.ts';
-import { LazyFileFeed, makeLazyFileShared, type LazyFileShared } from './engine/lazy-file.ts';
+import { LAZY_FAILED, LAZY_READY, LazyFileFeed, makeLazyFileShared, type LazyFileShared } from './engine/lazy-file.ts';
+import { WebView2Face } from './ui/webview2-surface.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const manifestUrl = '/assets/manifest.json';
@@ -67,6 +69,8 @@ interface AppApi {
   assetsReport(): AssetsReport | null;
   /** Issue #1314: the lazy files (manifest.lazy) as their downloads ended, in the order they ended: verified or failed (empty until the first one ends) */
   lazy: LazyResult[];
+  /** Issue #1341: the engine's reads of a real module's image (its line image-read: on the engine's stderr), in the order they happened: the file name, whether the guest asked for it, and the time (ms since the navigation) */
+  imageReads: { name: string; requested: boolean; atMs: number }[];
   /** what the engine's printed lines say (stop message, windows, threads, surface reports); filled when the engine has exited */
   summary: EngineLogSummary | null;
   engineLog(): string[];
@@ -109,6 +113,10 @@ interface AppApi {
   /** a test aid (any display method): the compositor's whole picture as the window table is now, as a SHA-256 / as base64 of its R, G, B, A bytes */
   deskDumpHash(): Promise<{ width: number; height: number; sha256: string }>;
   deskDumpBase64(peek?: boolean): Promise<{ windows: string; width: number; height: number; base64: string }>;
+  /** Issue #1376 (a test aid): the windows painted over the WebView2 face, l, t, r, b each, in the guest's pixels on the guest's screen (the face's bounds' space); [] when none */
+  webview2Front(): number[];
+  /** #1358 (a test aid, the measurement only calls it): the text the engine's memory holds for the markers, read without writing it (ASCII and UTF-16LE); radius > 0 also lists the printable runs near each place */
+  guestText(markers: string[], radius?: number): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }>;
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the WebGL canvas, base64 of R, G, B, A bytes */
   deskGlPixelsBase64(): Promise<{ width: number; height: number; base64: string }>;
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines in engineLog()) on or off; off at the start */
@@ -164,11 +172,14 @@ let cycleLast: number | null = null;
 let cycleLastN = 0;
 let endRequested = false;
 
+/** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
+let apiTraceWanted = false;
 const app: AppApi = {
   assetsReport: () => assetsNow(),
-  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
+  webview2Front: () => face.frontRects(),
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
   audio,
   fileDlg: { get open() { return fileDlgView.open; }, history: fileDlgView.history, requests: [] },
@@ -178,8 +189,9 @@ const app: AppApi = {
   deskStats: null,
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
+  guestText: (markers, radius = 0) => client.guestText(markers, radius),
   deskDumpBase64: async (peek = false) => { const d = await client.deskDump(peek); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { windows: d.windows, width: d.width, height: d.height, base64: btoa(s) }; },
-  windowApiTrace: (on) => client.windowApiTrace(on),
+  windowApiTrace: (on) => { apiTraceWanted = on; client.windowApiTrace(on); },
   deskGlPixelsBase64: async () => { const d = await client.deskGlPixels(); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { width: d.width, height: d.height, base64: btoa(s) }; },
   perf: null as unknown as AppApi['perf'],
   pageTitle: () => deskTitle(baseTitle),
@@ -278,7 +290,7 @@ function applyDisplay(): void {
   const d = drawScale(g, room, honoured);
   const scale = Math.max(0.05, d.scale);
   view.setScreen(g.width, g.height);
-  view.setScale(scale, d.snap);
+  view.setScale(scale);
   $('canvas-info').textContent = `guest screen ${g.width}x${g.height} device px in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
 }
 // decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
@@ -302,7 +314,22 @@ document.body.classList.add('screen-fit');
 }
 panelBtn.addEventListener('click', () => setPanel(!app.screen.panelOpen));
 setPanel(true);
-view.onLayoutChange(() => { applyDisplay(); renderDesktopInfo(); });
+// Issue #1362: the Browser panel's WebView2 face (ui/webview2-surface.ts). Its document is the bundle's lazy file that Navigate names: the bytes come once the download has arrived
+const lazyByPath = new Map<string, LazyFileShared>();
+async function lazyResource(path: string): Promise<Uint8Array | null> {
+  const s = lazyByPath.get(path);
+  if (!s) return null;
+  const state = new Int32Array(s.state);
+  for (let i = 0; i < 600; i++) {
+    const v = Atomics.load(state, 0);
+    if (v === LAZY_READY) return new Uint8Array(s.data).slice();
+    if (v === LAZY_FAILED) return null;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return null;
+}
+const face = new WebView2Face(view.root, { scale: () => view.currentScale, resource: lazyResource, loaded: () => client.webview2Loaded(), posted: (json) => client.webview2Message(json), log: addLog });
+view.onLayoutChange(() => { applyDisplay(); renderDesktopInfo(); face.relayout(); });
 window.addEventListener('resize', applyDisplay);
 // decision 0212: the room changes with the browser window and with the panel; the picture is rescaled at once, and what the engine is told waits until the room has been still for a moment (RoomDebouncer)
 const roomTimers = { set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms), clear: (h: unknown): void => clearTimeout(h as ReturnType<typeof setTimeout>) };
@@ -339,7 +366,7 @@ function followRoom(room: Room): void {
   if (!inputEnabled()) return;   // before the first idle: followRoom runs again at the first idle
   sendRaw({ k: 'display', kind: IN.DISPLAY, width: g.width, height: g.height }, 'room', undefined, false);
   rec.sent = true;
-  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height) };
+  app.screen.asked = { width: g.width, height: g.height, env: screenEnv(g.width, g.height, room.dpr) };
   addLog('info', `the room is now ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px: the engine is told its display is now ${g.width}x${g.height}`);
 }
 
@@ -347,7 +374,7 @@ function followRoom(room: Room): void {
 function applyScreenParam(manifest: Manifest): void {
   const room = measureRoom();
   const g = chooseGuestScreen(room);
-  const env = screenEnv(g.width, g.height);
+  const env = screenEnv(g.width, g.height, room.dpr);
   Object.assign(manifest.engine.env, env);
   app.screen.asked = { width: g.width, height: g.height, env };
   app.screen.guest = { width: g.width, height: g.height };
@@ -431,6 +458,9 @@ function describeExit(info: ExitInfo, manifest: Manifest | null): { text: string
 const perfRecorder = new PerfRecorder();
 // decision 0209: the engine's last words (its own message, personal parts removed), made once when the engine ends; carried by the beacon as engine.exit.message and shown in the Performance panel
 let exitMessage: string | null = null;
+// Issue #1380: the stop report's facts (engine.exit.stop) and the first non-background pixel line (engine.exit.evidence), made with the message
+let exitStop: EngineStop | null = null;
+let exitEvidence: string | null = null;
 // decision 0175 (S-ur-window): the P3 row counts the underrun quanta since the engine's first idle (the start-up before it is not listened to); the note gives the last minute and the device state
 const audioMeasured = (): boolean => (audio?.detail().quantaWhilePlaying ?? 0) > 0;
 const audioP3 = (): number => { const d = audio?.detail(); return d ? (d.underrunQuantaSinceFirstIdle ?? d.underrunQuanta) : 0; };
@@ -468,7 +498,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
   return buildBeacon({
     seq, sid: beaconSid, reason, pageMs: performance.now(), visibility: document.visibilityState, browser: browserNow(),
     bundle: { name: app.manifest?.bundle.name ?? null, version: app.manifest?.bundle.version ?? null, engineKind: app.engineKind },
-    state: app.state, exit: app.exit ? { reason: app.exit.reason, code: app.exit.code, presents: app.exit.presents, message: exitMessage } : null, error: app.error,
+    state: app.state, exit: app.exit ? { reason: app.exit.reason, code: app.exit.code, presents: app.exit.presents, message: exitMessage, stop: exitStop, evidence: exitEvidence } : null, error: app.error,
     timeline: app.timeline, updates: snap.updates, idles: snap.idles,
     input: inputLatencyStats(lat.records, lat.totals(), undefined, lat.framesAreChanges),
     underruns: audioMeasured() ? audioP3() : null, // null: nothing measured (no AudioWorklet, or the audio output has not run yet: the browser starts it at the first gesture)
@@ -482,6 +512,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     assets: assetsNow(),
     desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs()) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
+    uiWindows: uiWindowsOf(app.summary?.windows), // Issue #1364: the window table the page already reads for its panel (refreshPanels); none before the first idle
   });
 }
 const perfState = { sent: 0, accepted: 0, stored: 0, lastNote: null as string | null, disabled: null as string | null, history: [] as AppApi['perf']['history'] };
@@ -562,6 +593,7 @@ const client = new EngineClient({
     renderDesktopInfo();
   },
   taskbar(m) { app.taskbar.update(m.lid); },
+  webview2(m) { face.handle(m); },
   desk(m) {
     app.deskStats = m.stats;
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
@@ -569,6 +601,7 @@ const client = new EngineClient({
   },
   log: addLog,
   mark(name, at, detail) {
+    if (name === 'image_read') { app.imageReads.push({ name: String(detail?.name), requested: detail?.requested === true, atMs: at }); return; }   // Issue #1341
     stamp(name, at);
     if (detail) app.details[name] = detail;
     if (name === 'first_pixel') { if (stateAfterFirstPixel(app.state) === 'running') setState('running', 'running · first pixel'); addLog('info', `first pixel at ${(at / 1000).toFixed(1)} s`); }
@@ -627,6 +660,9 @@ const client = new EngineClient({
     app.taskbar.clear();   // decision 0272: nor to restore a window
     app.exit = info;
     exitMessage = engineExitMessage(engineLog.lines, info);
+    const facts = engineStopFacts(engineLog.lines);
+    exitStop = facts.stop;
+    exitEvidence = facts.evidence;
     clock.ended = { reason: info.reason, code: info.code };
     stamp('exit');
     const d = describeExit(info, app.manifest);
@@ -735,6 +771,7 @@ async function boot(): Promise<void> {
     // Issue #1314: the lazy files are not part of the start-up downloads above; their shared buffers exist before the Worker does (the engine reads them through its host files)
     const lazyRefs = manifest.lazy ?? [];
     const lazyShared = lazyRefs.map((r) => makeLazyFileShared(r.name, r.path, r.size));
+    for (const s of lazyShared) lazyByPath.set(s.path, s);   // Issue #1362: the face finds its document by the path
     for (const [label, r] of refs) recorder.expect(label, r, base);
     for (const r of lazyRefs) recorder.expect(r.name, r, base);
     const keep: AssetRef[] = [...refs.map(([, r]) => r), ...lazyRefs];
@@ -758,6 +795,7 @@ async function boot(): Promise<void> {
     perfRecorder.start(clock.startedAt);
     $('stop-btn').hidden = false;
     $('stop-btn').textContent = 'Stop engine';
+    if (apiTraceWanted) client.windowApiTrace(true);   // #1347: on before the engine's first instruction, so the start-up's DPI answers are traced
     client.start();
     startLazy(lazyRefs, lazyShared, store, recorder, keep);
   } catch (e) {

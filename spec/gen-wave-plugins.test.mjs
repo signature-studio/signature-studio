@@ -35,14 +35,15 @@ const field = (text, key) => (text.match(new RegExp(`^${key}: (.*)$`, 'm')) ?? [
 const countDrafts = (dir) => (fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.md')).length : 0);
 
 try {
-  // 実物: テンプレートには TODO が在り、生成は TODO の理由で止まる(何も書かない)
-  ok('実物のテンプレートに TODO が在る(確定の前は生成を拒否する)', fs.readFileSync(REAL.template, 'utf8').includes(TODO), true);
+  // 実物: テンプレートに TODO は無く、生成は 45 束を一時の場所に書く(repo の下書きには書かない)
+  ok('実物のテンプレートに TODO が無い(手順は #1342 の結果で確定した)', fs.readFileSync(REAL.template, 'utf8').includes(TODO), false);
   const outReal = path.join(tmp, 'real-out');
   const real = gen(['--classes', REAL.classes, '--deferred', REAL.deferred, '--template', REAL.template, '--out', outReal]);
-  ok('実物の生成は、TODO の理由で 1 で止まり、何も書かない', [real.status, real.stderr.includes(TODO), countDrafts(outReal)], [1, true, 0]);
-  const realDry = gen(['--dry-run', '--classes', REAL.classes, '--deferred', REAL.deferred, '--template', REAL.template, '--out', outReal]);
+  ok('実物の生成は 0 で終わり、45 束を書く', [real.status, countDrafts(outReal)], [0, 45]);
+  const outRealDry = path.join(tmp, 'real-dry');
+  const realDry = gen(['--dry-run', '--classes', REAL.classes, '--deferred', REAL.deferred, '--template', REAL.template, '--out', outRealDry]);
   const rd = realDry.stdout;
-  ok('実物の --dry-run は、件数を出してから TODO で 1 で止まり、何も書かない', [realDry.status, realDry.stderr.includes(TODO), countDrafts(outReal)], [1, true, 0]);
+  ok('実物の --dry-run は 0 で、何も書かない', [realDry.status, fs.existsSync(outRealDry)], [0, false]);
   ok('実物の --dry-run: DLL と フォルダの数(Effects 112・Generators 70。フォルダ 90・51)', [/DLL: Effects 112 件、Generators 70 件\(計 182 件\)/.test(rd), /フォルダ: Effects 90、Generators 51\(計 141\)/.test(rd)], [true, true]);
   ok('実物の --dry-run: 除く(VFX 系 7 フォルダ・DLL 19 件。第 1 波 3 フォルダ)', [/除く: VFX 系 7 フォルダ\(Effects 2・Generators 5。DLL 19 件\)、第 1 波 3 フォルダ\(DLL 3 件\)/.test(rd)], [true]);
   ok('実物の --dry-run: 残りと束(Effects 85 フォルダ・Generators 46 フォルダ。29 束・16 束。041〜085)', [/残り: Effects 85 フォルダ\(本体 86 件\)、Generators 46 フォルダ\(本体 46 件\)/.test(rd), /束\(3 フォルダずつ\): Effects 29 束、Generators 16 束。計 45 束。下書き番号 041〜085/.test(rd)], [true, true]);
@@ -111,10 +112,10 @@ try {
     ['"042"', '"021"', `"${MILESTONE}"`],
     ['"043"', '"022"', `"${MILESTONE}"`],
   ]);
-  ok('front matter: type は Task、blocked_by は 015 と 019、labels は plugin-builtin、size M、priority Medium、project', drafts.map((b) => ['type', 'blocked_by', 'labels', 'size', 'priority', 'project'].map((k) => field(b, k)).join(' | ')), [
-    '"Task" | ["015","019"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
-    '"Task" | ["015","019"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
-    '"Task" | ["015","019"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
+  ok('front matter: type は Task、blocked_by は 125・126・127、labels は plugin-builtin、size M、priority Medium、project', drafts.map((b) => ['type', 'blocked_by', 'labels', 'size', 'priority', 'project'].map((k) => field(b, k)).join(' | ')), [
+    '"Task" | ["125","126","127"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
+    '"Task" | ["125","126","127"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
+    '"Task" | ["125","126","127"] | ["plugin-builtin"] | "M" | "Medium" | "signature-studio/3"',
   ]);
   const bodies = drafts.map((b) => b.slice(b.indexOf('\n---\n') + 5));
   ok('各 Issue の本文は互いに異なる(3 件とも違う)', new Set(bodies).size, 3);
@@ -132,16 +133,19 @@ try {
   ok('同じフォルダに本体が 2 つ在るとき、両方を書く(042 の Fake Two と Fake Sub)', [b042.includes(`- フォルダ \`${P}Effects\\Fake Two\\\`(本体 2・補助 0)`), b042.includes('  - 本体: `' + `${P}Effects\\Fake Two\\Fake Two_x64.dll` + '`'), b042.includes('  - 本体: `' + `${P}Effects\\Fake Two\\Sub\\Fake Sub_x64.dll` + '`')], [true, true, true]);
   ok('本文に、第 1 波と VFX のフォルダのパスが入らない', drafts.map((b) => /Fruity (Balance|Filter|Delay 2)\\|Fake (V|Gl)\\/.test(b)), [false, false, false]);
   ok('本文の参照は #{{NNN}} の形だけ(#数字・{{ の残り・@@・L-0 が無い)', drafts.map((b) => [/#\d/.test(b), b.replace(/#\{\{\d{3}\}\}/g, '').includes('{{'), b.includes('@@'), b.includes('L-0')]), [[false, false, false, false], [false, false, false, false], [false, false, false, false]]);
-  ok('本文の参照: 親と blocked_by を、#{{NNN}} で書く(#{{015}}・#{{019}}・#{{021}}・#{{022}})', [b041.includes('#{{015}}') && b041.includes('#{{019}}') && b041.includes('#{{021}}'), b043.includes('#{{022}}')], [true, true]);
+  ok('本文の参照: 依存と親を、#{{NNN}} で書く(#{{125}}・#{{126}}・#{{127}}・#{{021}}・#{{022}})', [b041.includes('#{{125}}') && b041.includes('#{{126}}') && b041.includes('#{{127}}') && b041.includes('#{{021}}'), b043.includes('#{{022}}')], [true, true]);
   ok('accept: 各 Issue に 1 つ・1 行。task-accept が通る', drafts.map((b) => {
     const a = spawnSync(process.execPath, [TASK_ACCEPT], { input: b, encoding: 'utf8' });
     return [a.status, a.stdout.startsWith('accept: ')];
   }), [[0, true], [0, true], [0, true]]);
-  ok('accept: 本体の DLL ごとの名前の条件を差し込む(042 は 2 つの本体)', [b041.includes('P=[/fake.?a/i, /fake.?b/i, /fake.?c/i]'), b042.includes('P=[/fake.?d/i, /fake.?two/i, /fake.?sub/i]'), b043.includes('P=[/fake.?g1/i, /fake.?g2/i]')], [true, true, true]);
+  ok('accept: フォルダの名前を引用符で囲んだ引数を差し込む(041 は 3 フォルダ、042 は Fake Two を含む 2 フォルダ)', [b041.includes("'Fake A' 'Fake B' 'Fake C'"), b042.includes("'Fake D' 'Fake Two'"), b043.includes("'Fake G1' 'Fake G2'")], [true, true, true]);
 
-  // 既存の表(実物)を読む create-issues の dry-run で、parent・blocked_by・本文の参照が解決され、検査が通る
-  const cdry = spawnSync(process.execPath, [CI, '--drafts', out, '--existing', REAL.table, '--milestones', REAL.milestones, '--state', path.join(tmp, 'st.json')], { encoding: 'utf8' });
-  ok('生成した下書きは、create-issues の検査を通る(既存の表の参照を解決する)', [cdry.status, /015 -> #1315/.test(cdry.stdout), /019 -> #1319/.test(cdry.stdout), /021 -> #1322/.test(cdry.stdout), /022 -> #1323/.test(cdry.stdout), fs.existsSync(path.join(tmp, 'st.json'))], [0, true, true, true, true, false]);
+  // 既存の表(実物の写し。125〜127 は試験用の番号)を読む create-issues の dry-run で、parent・blocked_by・本文の参照が解決され、検査が通る
+  const table = path.join(tmp, 'table.tsv');
+  const realRows = fs.readFileSync(REAL.table, 'utf8').split('\n').filter((l) => !/^12[567]\t/.test(l)).join('\n').replace(/\n*$/, '');
+  fs.writeFileSync(table, [realRows, '125\t#90125\t試験\tTask', '126\t#90126\t試験\tTask', '127\t#90127\t試験\tTask', ''].join('\n'));
+  const cdry = spawnSync(process.execPath, [CI, '--drafts', out, '--existing', table, '--milestones', REAL.milestones, '--state', path.join(tmp, 'st.json')], { encoding: 'utf8' });
+  ok('生成した下書きは、create-issues の検査を通る(既存の表と、125〜127 の参照を解決する)', [cdry.status, /021 -> #1322/.test(cdry.stdout), /022 -> #1323/.test(cdry.stdout), /125 -> #90125/.test(cdry.stdout), /126 -> #90126/.test(cdry.stdout), /127 -> #90127/.test(cdry.stdout), fs.existsSync(path.join(tmp, 'st.json'))], [0, true, true, true, true, true, false]);
 
   // TODO が残る(テンプレートを差し替えた)ときは、何も書かない
   const todoTpl = path.join(tmp, 'template-todo.md');
@@ -173,6 +177,13 @@ try {
   const outNo = path.join(tmp, 'fix-nobody');
   const nb = gen(['--classes', noBody, '--deferred', fixDef, '--template', fixTpl, '--out', outNo]);
   ok('本体の無いフォルダが在れば、1 で止まり、何も書かない', [nb.status, nb.stderr.includes('本体の無いフォルダ'), countDrafts(outNo)], [1, true, 0]);
+
+  // accept の引数に引用できない字(')が在るフォルダの名前は、1 で止まり、何も書かない
+  const quoteCls = path.join(tmp, 'classes-quote.tsv');
+  fs.writeFileSync(quoteCls, [HEAD.join('\t'), ...classes, row(`${P}Effects\\Fake's\\Fake's_x64.dll`, 10, '本体', '不要', 'no', B, K, '引用符を含む名前'), ''].join('\n'));
+  const outQuote = path.join(tmp, 'fix-quote');
+  const qt = gen(['--classes', quoteCls, '--deferred', fixDef, '--template', fixTpl, '--out', outQuote]);
+  ok('フォルダの名前に引用符が在れば、1 で止まり、何も書かない', [qt.status, qt.stderr.includes('accept の引数'), countDrafts(outQuote)], [1, true, 0]);
 
   const u = gen(['--start', 'x', ...fixArgs]);
   ok('使い方の誤り(--start が 3 桁でない)は 2', u.status, 2);

@@ -14,8 +14,9 @@
  *               the list, at these paths, and the directories on the way.
  *   host file   an absolute path, or a path relative to $FLE_VFS_SEED_ROOT (an absolute directory; a relative path without it, or with a
  *               ".." component, is refused). The repository holds no absolute host path.
- *   SHA-256     checked before anything is written: every entry is read and hashed first, and one mismatch (or an unreadable file, or a
- *               file over 64 MiB, or a duplicate guest path) stops the harness by name, with nothing written to the volume.
+ *   SHA-256     checked when the guest first reads the file (#1345: the start-up neither reads nor hashes the files of the list; pack-seed.mjs
+ *               checks them when the pack is made). A file that cannot be stat'ed, one over 64 MiB, or a duplicate guest path stops the harness
+ *               by name before the guest runs; a mismatch stops the run by name at that read.
  * Decision 0129 (PROVISIONAL, an extension of this mechanism): a line whose guest path ends with a backslash and whose two other fields are both the single character '-' makes the directory (and the
  * directories above it) without any file in it: the installed product has directories that hold files this list does not give, and the guest looks at the directory itself (GetFileAttributesW,
  * FindFirstFileW). The limit of entries is VS_MAX_ENTRIES (2,048 since decision 0129; it was 256).
@@ -54,6 +55,7 @@
 #define VS_ATTR_NORMAL 0x80u
 #define VS_CALL_RETURN_ADDRESS UINT64_C(0xdead5eed)
 #define VS_LAZY_PREFIX "@lazy:"   /* decision 0314: the host field of a lazy-index line (harness/vfs_lazy.h) */
+#define VS_LAZYFILE_PREFIX "@lazy-file:"   /* #1345: the host field of a row whose bytes the page serves after the engine has started: the file is put on the volume by its size and read when the guest asks */
 
 typedef struct {
     char guest[VS_GUEST_BYTES];
@@ -299,6 +301,7 @@ static int vs_parse(const char *list, vs_entry *ent, size_t *count)
         *t2 = 0;
         ent[n].is_dir = 0;
         ent[n].is_lazy = 0;
+        if (strncmp(t1 + 1, VS_LAZYFILE_PREFIX, sizeof VS_LAZYFILE_PREFIX - 1) == 0) t1 += sizeof VS_LAZYFILE_PREFIX - 1;   /* #1345: the host field now starts after the prefix */
         if (strncmp(t1 + 1, VS_LAZY_PREFIX, sizeof VS_LAZY_PREFIX - 1) == 0) {
             size_t gl = strlen(buf);
             if (gl < 4 || buf[gl - 1] != '\\') {
@@ -447,34 +450,43 @@ static int vs_ensure_dirs(const char *list, const vs_entry *e, size_t *ndirs)
     return 0;
 }
 
-/* Writes one file, reads it back through the same handle and compares it with the host bytes, closes the handle. */
-static int vs_put(const char *list, const vs_entry *e, size_t *ndirs)
+/* #1345: a file row's host file is a regular file of at most 64 MiB (checked for every row before anything is put) */
+static int vs_host_check(const char *list, const vs_entry *e)
 {
+    struct stat st;
+    if (stat(e->host, &st) != 0 || !S_ISREG(st.st_mode)) return vs_fail(list, e->line, "cannot stat the host file %s", e->host);
+    if ((uint64_t)st.st_size > VS_MAX_FILE_BYTES) return vs_fail(list, e->line, "the host file %s is larger than 64 MiB", e->host);
+    return 0;
+}
+
+/* #1345: a file row of the list. The volume gets its name and size (the host file is stat'ed; an open and a stat never wait: lazy-file.ts) and its bytes are read when the guest reads them (vl_read),
+ * which checks them against the list's SHA-256 first. So the start-up neither reads nor hashes the files, and a file that the guest never reads costs nothing more than its name. */
+static int vs_put_lazy_file(const char *list, vs_entry *e, size_t *ndirs)
+{
+    struct stat st;
     uint16_t w[VS_GUEST_MAX + 1];
-    uint32_t cnt = 0;
-    uint64_t h;
+    uint64_t ft;
+    size_t hl = strlen(e->host);
+    int id, rc;
+    if (stat(e->host, &st) != 0 || !S_ISREG(st.st_mode)) return vs_fail(list, e->line, "cannot stat the host file %s", e->host);
+    if ((uint64_t)st.st_size > VS_MAX_FILE_BYTES) return vs_fail(list, e->line, "the host file %s is larger than 64 MiB", e->host);
+    if (vl_n_streams >= VL_REG_MAX) return vs_fail(list, e->line, "more than %u seed files", (unsigned)VL_REG_MAX);
     if (vs_ensure_dirs(list, e, ndirs) != 0) return -1;
+    vl_streams[vl_n_streams].path = malloc(hl + 1);
+    if (!vl_streams[vl_n_streams].path) return vs_fail(list, e->line, "out of memory for %s", e->host);
+    memcpy(vl_streams[vl_n_streams].path, e->host, hl + 1);
+    vl_streams[vl_n_streams].fd = -1;
+    vl_streams[vl_n_streams].checked = 0;
+    memcpy(vl_streams[vl_n_streams].sha, e->sha, sizeof vl_streams[0].sha);
+    id = fle_vfs_lazy_add_stream((uint64_t)st.st_size);
+    if (id != (int)vl_n_streams) return vs_fail(list, e->line, "the volume cannot take the file %s (%d)", e->guest, id);
+    vl_n_streams++;
+    fle_vfs_lazy_set_reader(vl_read, NULL);
+    ft = (uint64_t)st.st_mtime * UINT64_C(10000000) + UINT64_C(116444736000000000);
     vs_wide(w, e->guest, strlen(e->guest));
-    h = VS_CALL(fle_imp_CreateFileW, VS_A(w), VS_GENERIC_READ_WRITE, 0, 0, VS_CREATE_NEW, VS_ATTR_NORMAL, 0);
-    if (h == FLE_INVALID_HANDLE_VALUE) return vs_fail(list, e->line, "CreateFileW(CREATE_NEW) failed for %s", e->guest);
-    if (e->size) {
-        uint8_t *back = malloc(e->size);
-        int same;
-        if (!back) return vs_fail(list, e->line, "out of memory for the read-back of %s", e->guest);
-        if (VS_CALL(fle_imp_WriteFile, h, VS_A(e->data), (uint64_t)e->size, VS_A(&cnt), 0) != 1 || cnt != e->size) {
-            free(back);
-            return vs_fail(list, e->line, "WriteFile did not write all %zu bytes of %s", e->size, e->guest);
-        }
-        if ((uint32_t)VS_CALL(fle_imp_SetFilePointer, h, 0, 0, 0) != 0) {
-            free(back);
-            return vs_fail(list, e->line, "SetFilePointer(FILE_BEGIN) failed for %s", e->guest);
-        }
-        cnt = 0;
-        same = VS_CALL(fle_imp_ReadFile, h, VS_A(back), (uint64_t)e->size, VS_A(&cnt), 0) == 1 && cnt == e->size && memcmp(back, e->data, e->size) == 0;
-        free(back);
-        if (!same) return vs_fail(list, e->line, "the virtual file %s does not read back as the host bytes", e->guest);
-    }
-    if (VS_CALL(fle_imp_CloseHandle, h) != 1) return vs_fail(list, e->line, "CloseHandle failed for %s", e->guest);
+    rc = fle_vfs_put_lazy_file(w, (unsigned)id, 0, (uint64_t)st.st_size, VL_ATTR_ARCHIVE, ft);
+    if (rc != 0) return vs_fail(list, e->line, "file %s: the volume answered %d", e->guest, rc);
+    e->size = (size_t)st.st_size;
     return 0;
 }
 
@@ -485,9 +497,11 @@ static int vs_run(const char *list)
     int rc = -1;
     if (!ent) return vs_fail(list, 0, "out of memory");
     if (vs_parse(list, ent, &n) != 0) goto done;
+    for (i = 0; i < n; i++)   /* #1345: every host file is looked at before the first file is put, so a refused list writes nothing */
+        if (!ent[i].is_dir && !ent[i].is_lazy && vs_host_check(list, &ent[i]) != 0) goto done;
     for (i = 0; i < n; i++) {
         char got[65];
-        if (ent[i].is_dir) continue;
+        if (!ent[i].is_lazy) continue;   /* the index file is read here; its streams are read when the guest reads them (vfs_lazy.h) */
         if (vs_read_host(list, ent[i].line, &ent[i]) != 0) goto done;
         vs_sha256_hex(ent[i].data, ent[i].size, got);
         if (strcmp(got, ent[i].sha) != 0) {
@@ -504,8 +518,8 @@ static int vs_run(const char *list)
             printf("vfs seed: %s\\ (directory)\n", ent[i].guest);
             continue;
         }
-        if (vs_put(list, &ent[i], &ndirs) != 0) goto done;
-        printf("vfs seed: %s <- %s (%zu bytes, sha256 %s)\n", ent[i].guest, ent[i].host, ent[i].size, ent[i].sha);
+        if (vs_put_lazy_file(list, &ent[i], &ndirs) != 0) goto done;
+        printf("vfs seed: %s <- %s (%zu bytes, read when the guest reads it, sha256 %s)\n", ent[i].guest, ent[i].host, ent[i].size, ent[i].sha);
     }
     for (i = 0; i < n; i++) {
         uint64_t lfiles = 0, ldirs = 0, lskipped = 0, lbytes = 0;
@@ -529,7 +543,9 @@ static int vfs_seed_from_env(void)
     int rc;
     if (!list || !list[0]) return 0;
     memcpy(saved, R, sizeof saved);
+    fle_vfs_note_quiet(1);   /* #1345: the directories made here are looked up first; those lookups are not the guest's requests */
     rc = vs_run(list);
+    fle_vfs_note_quiet(0);
     memcpy(R, saved, sizeof saved);
     if (rc == 0) fle_set_last_error(0);
     return rc;
