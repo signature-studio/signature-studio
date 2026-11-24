@@ -26,7 +26,7 @@ BI="-fno-builtin-fprintf -fno-builtin-fputs"
 sed 's/ *__attribute__((noreturn))//' "$RT/fle_modules.h" > "$D/shadow/fle_modules.h"
 GEN="-std=gnu11 -$OPT $XCF -w $BI -ffp-contract=off -fno-fast-math -ferror-limit=0 -I$D/shadow -I$RT -I$VST -I$HERE"
 RMNAME=${RMNAME:-serum2.vst3}
-RMBASE=$(python3 -c "import struct,sys; d=open(sys.argv[1],'rb').read(0x400); l=struct.unpack_from('<I',d,0x3c)[0]; print(hex(struct.unpack_from('<Q',d,l+24+24)[0]))" "$FILE")
+RMBASE=$("$LIFT/target/release/fe-pe" pe-info "$FILE" | awk '$1=="image_base"{print $2}')   # the ImageBase of the PE (#1367: no Python)
 compile_one() {   # $1 source, $2 object, $3 flags
     [ "$2" -nt "$1" ] && return 0
     ( ulimit -v "$EMCC_VMEM_KB"; /usr/bin/time -f "%e s %M KB" -o "$2.time" emcc -c $3 "$1" -o "$2" > "$2.log" 2>&1 ) || { echo "FAILED $1 (see $2.log)"; return 1; }

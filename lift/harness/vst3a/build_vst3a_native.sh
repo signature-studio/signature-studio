@@ -32,7 +32,7 @@ GEN="-std=gnu11 $OPTF $SANF $XCF -w $BI -ffp-contract=off -fPIE -I$D/shadow -I$R
 SRCD="$OUT/src"
 if [ "$COUNT" != 0 ]; then
     SRCD="$OUT/src-countf"
-    if [ ! -e "$SRCD/countf_arrays.c" ]; then python3 "$HERE/count_fn.py" "$SRCD" "$OUT"/src/$TAG-[0-9][0-9].c || exit 1; fi
+    if [ ! -e "$SRCD/countf_arrays.c" ]; then echo "COUNT=1 の数え上げの生成(count_fn)は、この版に無い。$SRCD/countf_arrays.c を先に置く" >&2; exit 1; fi
     [ -e "$SRCD/common-$TAG.c" ] || cp "$OUT/src/common-$TAG.c" "$SRCD/common-$TAG.c"
 fi
 ls "$SRCD"/$TAG-[0-9][0-9].c "$SRCD"/common-$TAG.c | xargs -P "$JOBS" -I{} bash -c 'b=$(basename {} .c); [ -e '"$D"'/obj/$b.o ] || $CC '"$GEN"' -c {} -o '"$D"'/obj/$b.o' || exit 1
@@ -41,7 +41,7 @@ for f in "$RT"/fle_*.c; do b=$(basename "$f" .c); [ "$D/rt/$b.o" -nt "$f" ] || $
 [ -e "$D/h/image.o" ] || $CC -std=gnu11 -O1 $SANF -Wall -Wextra -fPIE -I"$RT" -I"$LIFT/harness" -c "$LIFT/harness/image.c" -o "$D/h/image.o" || exit 1
 FILE=${FILE:?FILE (the PE) is not set}
 RMNAME=${RMNAME:-$(basename "$FILE" | tr 'A-Z' 'a-z')}
-RMBASE=$(python3 -c "import struct,sys; d=open(sys.argv[1],'rb').read(0x400); l=struct.unpack_from('<I',d,0x3c)[0]; print(hex(struct.unpack_from('<Q',d,l+24+24)[0]))" "$FILE")
+RMBASE=$("$LIFT/target/release/fe-pe" pe-info "$FILE" | awk '$1=="image_base"{print $2}')   # the ImageBase of the PE (#1367: no Python)
 HF=""
 for f in "$VST"/*.c; do b=$(basename "$f"); case $b in main_vst.c|vst_host.c|vst_env.c|hybrid_glue.c) continue;; esac; HF="$HF $f"; done
 HF="$HF $HERE/main_vst3a.c $HERE/vst_host3a.c $HERE/vst_env3a.c $HERE/vst3a_imp.c $HERE/vst_stream3a.c $HERE/vst_msg3a.c $HERE/vst_exc3a.c $OUT/rows/vst3a_stubs.c"

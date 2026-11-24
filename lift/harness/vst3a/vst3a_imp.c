@@ -1,5 +1,6 @@
-/* Answers of the vst3a harness for the imports of Serum2.vst3 that the runtime's import table lacks (decision 0165, PROVISIONAL). Reached through rows of
- * imports-vst3a-rows.txt (mk_stubs.py): fe-lift --extra-imports. Convention of fle_imports.h: arguments in R[1], R[2], R[8], R[9] and the stack, the result in R[0],
+/* Answers of the vst3a harness for the imports of Serum2.vst3 that the runtime's import table lacks (decision 0165, PROVISIONAL). #1367: the locale Ex forms, GetUserDefaultLCID
+ * and SHGetKnownFolderPath are answered by the runtime itself now (fle_wall_dec1.c, fle_filedlg.c), so they are not defined here (a second definition does not link). Reached through rows of
+ * lift/harness/vst/imports-vst.txt (the rows; fe-lift --extra-imports, gen_vst.sh). Convention of fle_imports.h: arguments in R[1], R[2], R[8], R[9] and the stack, the result in R[0],
  * the guest return address stays on the stack. A function that is not defined here is a weak stopping stub (vst3a_stubs.c). */
 #include <stdint.h>
 #include <stdio.h>
@@ -10,6 +11,7 @@
 #include "fle_imports.h"
 #include "fle_runtime.h"
 #include "vst3a.h"
+#include "boot.h"
 
 static unsigned long long g_notes_n;
 void vst3a_note(const char *api) { (void)api; g_notes_n++; }
@@ -29,62 +31,177 @@ void vst3a_stop(const char *what, const char *why)
     exit(98);
 }
 
-/* ---- kernel32 locale: the Ex forms (name instead of LCID) ---- */
-static uint32_t lcid_of_name(const char *api, uint64_t pname)
-{
-    char nm[32];
-    size_t i;
-    if (pname == 0) return 0; /* LOCALE_NAME_USER_DEFAULT: fle_imp_LCMapStringW takes LCID 0 as the user default for the two case flags (decision 0087) */
-    for (i = 0; i + 1 < sizeof nm; i++) {
-        uint16_t c = (uint16_t)fle_ld(pname + 2 * i, 2);
-        if (!c) break;
-        nm[i] = c < 0x80 ? (char)c : '?';
-    }
-    nm[i] = 0;
-    if (!strcmp(nm, "en-US")) return 0x0409u;
-    fprintf(stderr, "vst3a: %s: locale name \"%s\" is not modelled\n", api, nm);
-    vst3a_stop(api, "locale name other than NULL / en-US");
-}
-
-void fle_imp_LCMapStringW(void);
-/* kernel32!LCMapStringEx(LPCWSTR name rcx, DWORD flags edx, LPCWSTR src r8, int cchSrc r9d, LPWSTR dst [+0x28], int cchDst [+0x30], LPNLSVERSIONINFO, LPVOID, LPARAM): int.
- * Learn: same as LCMapStringW but the locale is a name. The last three parameters are ignored when NULL/0 (the CRT passes NULL, NULL, 0); a non-NULL one stops. The call is
- * LCMapStringW with the LCID of the name (S-vst3a-locale-ex: NULL = user default = the emulated en-US, "en-US" = 0x0409, any other name stops). */
-void fle_imp_LCMapStringEx(void)
-{
-    uint64_t name = R[1];
-    if (vst3a_arg(7) || vst3a_arg(8) || vst3a_arg(9)) vst3a_stop("LCMapStringEx", "lpVersionInformation / lpReserved / sortHandle is not NULL/0");
-    R[1] = lcid_of_name("LCMapStringEx", name);
-    fle_imp_LCMapStringW();
-}
-
 #include "fle_locale.h"
 
+/* ole32!CoCreateGuid(GUID *pguid rcx): HRESULT. Learn: "creates a GUID, a globally unique identifier" (S_OK; E_POINTER for NULL). No random source is modelled: the
+ * GUIDs are numbered in the order of the calls, so that a run gives the same identifiers every time (#1367). */
+void fle_imp_CoCreateGuid(void)
+{
+    static uint32_t n;
+    uint64_t p = R[1];
+    vst3a_note("CoCreateGuid");
+    if (!p) { R[0] = 0x80004003u; return; }
+    n++;
+    for (int i = 0; i < 16; i++) fle_st(p + (uint64_t)i, 1, ((n >> ((i & 3) * 8)) ^ (uint32_t)i) & 0xffu);
+    fle_st(p + 7, 1, 0x40u);
+    fle_st(p + 8, 1, 0x80u);
+    R[0] = 0;
+}
+
+void fle_imp_RegisterClassW(void);
+/* user32!RegisterClassExW(const WNDCLASSEXW *lpwcx rcx): ATOM. Learn: as RegisterClassW, with cbSize and hIconSm in front of and behind the WNDCLASSW fields. The copy
+ * of the fields (style at 4 and the pointers from 8 on, 64 bytes) goes to a WNDCLASSW in host memory, and RegisterClassW (runtime/fle_class.c) answers (#1367). */
+void fle_imp_RegisterClassExW(void)
+{
+    static uint8_t wc[72];
+    const uint8_t *src = (const uint8_t *)(uintptr_t)R[1];
+    vst3a_note("RegisterClassExW");
+    if (!src) { R[0] = 0; fle_set_last_error(87); return; }
+    memset(wc, 0, sizeof wc);
+    memcpy(wc, src + 4, 4);
+    memcpy(wc + 8, src + 8, 64);
+    R[1] = (uint64_t)(uintptr_t)wc;
+    fle_imp_RegisterClassW();
+}
+
+void fle_imp_SHGetFolderPathW(void);
+/* shell32!SHGetSpecialFolderPathW(HWND hwnd rcx, LPWSTR pszPath rdx, int csidl r8d, BOOL fCreate r9d): BOOL. Learn: the path of a special folder, "as
+ * SHGetFolderPath". Answered by SHGetFolderPathW (its fifth argument, pszPath, goes on the stack: the call is made on a frame of its own, as main_vst3a.c seeds the
+ * registry). hToken NULL and SHGFP_TYPE_CURRENT (0). fCreate is not used by the runtime's folders (they exist in the volume's seed). BOOL TRUE when the HRESULT is S_OK (#1367). */
+void fle_imp_SHGetSpecialFolderPathW(void)
+{
+    static uint64_t stk[16];
+    uint64_t save4 = R[4], hwnd = R[1], path = R[2], csidl = R[8];
+    uint64_t hr;
+    vst3a_note("SHGetSpecialFolderPathW");
+    memset(stk, 0, sizeof stk);
+    stk[0] = HARNESS_SENTINEL_RET;
+    stk[5] = path;
+    R[1] = hwnd; R[2] = csidl; R[8] = 0; R[9] = 0;
+    R[4] = (uint64_t)(uintptr_t)stk;
+    fle_imp_SHGetFolderPathW();
+    hr = R[0] & 0xffffffffu;
+    R[4] = save4;
+    R[0] = hr == 0 ? 1 : 0;
+}
+
+void fle_imp_FindResourceW(void);
+/* kernel32!FindResourceA(HMODULE rcx, LPCSTR lpName rdx, LPCSTR lpType r8): HRSRC. Learn: as FindResourceW with ANSI strings; an integer name or type (below 0x10000,
+ * MAKEINTRESOURCE) is passed as it is. The strings are converted to UTF-16 (the code page of the names is the one of the ASCII names the plugin uses) and
+ * FindResourceW (runtime/fle_res.c) answers (#1367). */
+static uint64_t ansi_to_w_arg(uint64_t p, uint16_t *buf, size_t cap)
+{
+    size_t i;
+    if (p < 0x10000u) return p;
+    if (!p) return 0;
+    for (i = 0; i + 1 < cap; i++) {
+        uint8_t c = (uint8_t)fle_ld(p + i, 1);
+        if (!c) break;
+        buf[i] = c;
+    }
+    buf[i] = 0;
+    return (uint64_t)(uintptr_t)buf;
+}
+void fle_imp_FindResourceA(void)
+{
+    static uint16_t wname[256], wtype[256];
+    vst3a_note("FindResourceA");
+    R[2] = ansi_to_w_arg(R[2], wname, sizeof wname / sizeof wname[0]);
+    R[8] = ansi_to_w_arg(R[8], wtype, sizeof wtype / sizeof wtype[0]);
+    fle_imp_FindResourceW();
+}
+
+/* kernel32!InitializeSRWLock(PSRWLOCK rcx): VOID, and InitializeConditionVariable(PCONDITION_VARIABLE rcx): VOID. Learn: both initialise the object to its unlocked /
+ * empty state, which is the zero word (the wrappers in vst_env3a.c keep the held state of a lock by address, and the waits of a condition variable are the ones there) (#1367). */
+void fle_imp_InitializeSRWLock(void)
+{
+    vst3a_note("InitializeSRWLock");
+    if (R[1]) fle_st(R[1], 8, 0);
+}
+void fle_imp_InitializeConditionVariable(void)
+{
+    vst3a_note("InitializeConditionVariable");
+    if (R[1]) fle_st(R[1], 8, 0);
+}
+
+/* gdiplus!GdiplusStartup(ULONG_PTR *token rcx, const GdiplusStartupInput *input rdx, GdiplusStartupOutput *output r8): Status. Learn: "initializes GDI+"; Ok (0) and a
+ * token (non-zero). The plugin asks for it in its start-up (the resources of its UI); no drawing is modelled, so a later GDI+ drawing call stops by name (#1367). */
+void fle_imp_GdiplusStartup(void)
+{
+    vst3a_note("GdiplusStartup");
+    if (!R[1]) { R[0] = 1; return; }
+    fle_st(R[1], 8, 1);
+    if (R[8]) fle_st(R[8], 8, 0);
+    R[0] = 0;
+}
+/* gdiplus!GdiplusShutdown(ULONG_PTR token rcx): VOID. Learn: "cleans up GDI+ resources" (no resources are kept here). */
+void fle_imp_GdiplusShutdown(void) { vst3a_note("GdiplusShutdown"); }
+
+/* GDI+ objects are opaque handles here: a creation answers a new handle (a counter, never a real object), a disposal answers Ok. No drawing is modelled: a drawing call
+ * (GdipDrawString, GdipFillRectangle, ...) is not answered and stops by name. gdiplus!GdipCreateBitmapFromScan0(width rcx, height rdx, stride r8, format r9,
+ * scan0 [+0x28], GpBitmap **bitmap [+0x30]): Status. The pixels of the bitmap are not kept (scan0 is NULL in the plugin's start-up). (#1367) */
+static uint64_t gdip_next = 0x10000;
+/* a bitmap made by GdipCreateBitmapFromScan0 with a NULL scan0: 32 bpp, zeroed pixels, kept here by its handle (at most 16 bitmaps) */
+static struct { uint64_t h; uint32_t w, hgt; uint8_t *px; } gdip_bm[16];
+static int gdip_nbm;
+static void gdip_new_handle(uint64_t out)
+{
+    gdip_next += 0x10;
+    if (out) fle_st(out, 8, gdip_next);
+}
+void fle_imp_GdipCreateBitmapFromScan0(void)
+{
+    uint32_t w = (uint32_t)R[1], h = (uint32_t)R[2];
+    vst3a_note("GdipCreateBitmapFromScan0");
+    if (!vst3a_arg(6)) { R[0] = 2; return; }
+    if (vst3a_arg(5) || gdip_nbm >= 16 || !w || !h) vst3a_stop("GdipCreateBitmapFromScan0", "a caller's scan0 buffer, or more than 16 bitmaps, is not modelled");
+    gdip_new_handle(vst3a_arg(6));
+    gdip_bm[gdip_nbm].h = gdip_next; gdip_bm[gdip_nbm].w = w; gdip_bm[gdip_nbm].hgt = h;
+    gdip_bm[gdip_nbm].px = calloc((size_t)w * h, 4);
+    gdip_nbm++;
+    R[0] = 0;
+}
+/* GdipBitmapLockBits(GpBitmap *bitmap rcx, const GpRect *rect rdx, UINT flags r8, PixelFormat format r9, BitmapData *lockedBitmapData [+0x28]): Status.
+ * The whole bitmap (the rect is not modelled: NULL or the whole bitmap). BitmapData = { Width, Height, Stride, PixelFormat, Scan0, Reserved } (#1367) */
+void fle_imp_GdipBitmapLockBits(void)
+{
+    uint64_t bm = R[1], bd = vst3a_arg(5);
+    int i;
+    vst3a_note("GdipBitmapLockBits");
+    for (i = 0; i < gdip_nbm; i++) if (gdip_bm[i].h == bm) break;
+    if (i == gdip_nbm || !bd) { R[0] = 2; return; }
+    fle_st(bd, 4, gdip_bm[i].w);
+    fle_st(bd + 4, 4, gdip_bm[i].hgt);
+    fle_st(bd + 8, 4, gdip_bm[i].w * 4u);
+    fle_st(bd + 12, 4, R[9]);
+    fle_st(bd + 16, 8, (uint64_t)(uintptr_t)gdip_bm[i].px);
+    fle_st(bd + 24, 8, 0);
+    R[0] = 0;
+}
+void fle_imp_GdipBitmapUnlockBits(void) { vst3a_note("GdipBitmapUnlockBits"); R[0] = 0; }
+
+void fle_imp_GdipGetImageGraphicsContext(void)
+{
+    vst3a_note("GdipGetImageGraphicsContext");
+    if (!R[9]) { R[0] = 2; return; }
+    gdip_new_handle(R[9]);
+    R[0] = 0;
+}
+void fle_imp_GdipDeleteGraphics(void) { vst3a_note("GdipDeleteGraphics"); R[0] = 0; }
+void fle_imp_GdipDisposeImage(void) { vst3a_note("GdipDisposeImage"); R[0] = 0; }
+
+/* gdi32!AddFontResourceExW(LPCWSTR name rcx, DWORD fl rdx, PVOID res r8): int. Learn: "the number of fonts added"; a font file is not loaded in this environment, so 0
+ * fonts are added and the last error is ERROR_NOT_SUPPORTED (50): the caller then uses the fonts it has (#1367). */
+void fle_imp_AddFontResourceExW(void)
+{
+    vst3a_note("AddFontResourceExW");
+    R[0] = 0;
+    fle_set_last_error(50);
+}
 /* kernel32!AreFileApisANSI(): BOOL. Learn: TRUE if the file I/O functions use the ANSI character set, FALSE for OEM. A process starts with ANSI (SetFileApisToOEM is the only way
  * to change it and nothing here calls it): TRUE. (S-vst3a-fileapis-ansi: the runtime has no SetFileApisToOEM row, so the state cannot change.) */
 void fle_imp_AreFileApisANSI(void) { vst3a_note("AreFileApisANSI"); R[0] = 1; }
 
-/* kernel32!GetUserDefaultLCID(): LCID. Learn: the user's default locale identifier; here the emulated locale of the runtime (fle_emulated_locale, en-US 0x0409). */
-void fle_imp_GetUserDefaultLCID(void) { vst3a_note("GetUserDefaultLCID"); R[0] = fle_emulated_locale.lcid; }
-
-void fle_imp_CompareStringW(void);
-/* kernel32!CompareStringEx(name rcx, flags edx, s1 r8, c1 r9d, s2 [+0x28], c2 [+0x30], version [+0x38], reserved [+0x40], lParam [+0x48]): CompareStringW with the LCID of the name (S-vst3a-locale-ex). */
-void fle_imp_CompareStringEx(void)
-{
-    if (vst3a_arg(7) || vst3a_arg(8) || vst3a_arg(9)) vst3a_stop("CompareStringEx", "lpVersionInformation / lpReserved / lParam is not NULL/0");
-    R[1] = lcid_of_name("CompareStringEx", R[1]);
-    if (R[1] == 0) R[1] = fle_emulated_locale.lcid;
-    fle_imp_CompareStringW();
-}
-
-void fle_imp_GetLocaleInfoW(void);
-/* kernel32!GetLocaleInfoEx(name rcx, LCType edx, buf r8, cch r9d): GetLocaleInfoW with the LCID of the name (S-vst3a-locale-ex). */
-void fle_imp_GetLocaleInfoEx(void)
-{
-    R[1] = lcid_of_name("GetLocaleInfoEx", R[1]);
-    if (R[1] == 0) R[1] = fle_emulated_locale.lcid;
-    fle_imp_GetLocaleInfoW();
-}
 
 /* kernel32!InitOnceBeginInitialize(INIT_ONCE *rcx, DWORD flags edx, BOOL *fPending r8, LPVOID *ctx r9) and InitOnceComplete(INIT_ONCE *rcx, DWORD flags edx, LPVOID ctx r8): BOOL.
  * Learn: a one-time initialisation object (a pointer-sized word, 0 at start). Synchronous use, one thread: state 0 -> Begin sets "pending" (1) and reports fPending TRUE; Complete stores
@@ -118,57 +235,6 @@ void fle_imp_InitOnceComplete(void)
     R[0] = 1;
 }
 
-/* ---- shell32!SHGetKnownFolderPath(REFKNOWNFOLDERID rfid rcx, DWORD dwFlags edx, HANDLE hToken r8, PWSTR *ppszPath r9): HRESULT ----
- * Learn: "Retrieves the full path of a known folder identified by the folder's KNOWNFOLDERID"; the caller frees *ppszPath with CoTaskMemFree. The GUIDs and their CSIDL equivalents are those of
- * the Learn page KNOWNFOLDERID (fetched 2026-11-03): RoamingAppData {3EB685DB-65F9-4CF6-A03A-E3EF65729F3D} = CSIDL_APPDATA, LocalAppData {F1B32785-6FBA-4FCF-9D55-7B8E7F157091} = CSIDL_LOCAL_APPDATA,
- * Documents {FDD39AD0-238F-46AF-ADB4-6C85480369C7} = CSIDL_PERSONAL, ProgramData {62AB5D82-FDC1-4DC3-A9DD-070D1D495D97} = CSIDL_COMMON_APPDATA, Profile {5E6C858F-0E22-4760-9AFE-EA3317B67173} =
- * CSIDL_PROFILE, ProgramFilesCommon {F7F1ED05-9F6D-47A2-AAAE-29D317C6F066} = CSIDL_PROGRAM_FILES_COMMON. The path is that of fle_imp_SHGetFolderPathW (the virtual volume's profile folders, decisions 0103/0107/0126), so the two APIs agree. Another folder id stops by name with its
- * GUID; hToken must be 0; dwFlags KF_FLAG_CREATE (0x8000) is accepted and creates nothing (the folders exist in the volume's seed), any other flag stops (S-vst3a-known-folder). */
-void fle_imp_SHGetFolderPathW(void);
-void fle_imp_CoTaskMemAlloc(void);
-void fle_imp_SHGetKnownFolderPath(void)
-{
-    static const struct { uint8_t g[16]; int csidl; } kf[] = {
-        { { 0xDB, 0x85, 0xB6, 0x3E, 0xF9, 0x65, 0xF6, 0x4C, 0xA0, 0x3A, 0xE3, 0xEF, 0x65, 0x72, 0x9F, 0x3D }, 0x1a },
-        { { 0x85, 0x27, 0xB3, 0xF1, 0xBA, 0x6F, 0xCF, 0x4F, 0x9D, 0x55, 0x7B, 0x8E, 0x7F, 0x15, 0x70, 0x91 }, 0x1c },
-        { { 0xD0, 0x9A, 0xD3, 0xFD, 0x8F, 0x23, 0xAF, 0x46, 0xAD, 0xB4, 0x6C, 0x85, 0x48, 0x03, 0x69, 0xC7 }, 0x05 },
-        { { 0x82, 0x5D, 0xAB, 0x62, 0xC1, 0xFD, 0xC3, 0x4D, 0xA9, 0xDD, 0x07, 0x0D, 0x1D, 0x49, 0x5D, 0x97 }, 0x23 },
-        { { 0x05, 0xED, 0xF1, 0xF7, 0x6D, 0x9F, 0xA2, 0x47, 0xAA, 0xAE, 0x29, 0xD3, 0x17, 0xC6, 0xF0, 0x66 }, 0x2b },
-        { { 0x8F, 0x85, 0x6C, 0x5E, 0x22, 0x0E, 0x60, 0x47, 0x9A, 0xFE, 0xEA, 0x33, 0x17, 0xB6, 0x71, 0x73 }, 0x28 },
-    };
-    uint64_t pg = R[1], out = R[9];
-    uint32_t fl = (uint32_t)R[2];
-    uint8_t g[16];
-    uint16_t buf[300];
-    uint64_t saved, blk;
-    size_t n;
-    int csidl = -1;
-    vst3a_note("SHGetKnownFolderPath");
-    for (int i = 0; i < 16; i++) g[i] = (uint8_t)fle_ld(pg + i, 1);
-    for (size_t k = 0; k < sizeof kf / sizeof kf[0]; k++) if (!memcmp(g, kf[k].g, 16)) csidl = kf[k].csidl;
-    if (csidl < 0) {
-        char s[64];
-        for (int i = 0; i < 16; i++) snprintf(s + 2 * i, 3, "%02X", g[i]);
-        fprintf(stderr, "vst3a: SHGetKnownFolderPath: FOLDERID bytes %s\n", s);
-        vst3a_stop("SHGetKnownFolderPath", "a folder id that is not modelled");
-    }
-    if (R[8] != 0) vst3a_stop("SHGetKnownFolderPath", "hToken is not NULL");
-    if (fl & ~0x8000u) vst3a_stop("SHGetKnownFolderPath", "dwFlags other than 0 / KF_FLAG_CREATE");
-    saved = fle_ld(R[4] + 0x28u, 8);
-    fle_st(R[4] + 0x28u, 8, (uint64_t)(uintptr_t)buf);
-    R[1] = 0; R[2] = (uint64_t)csidl; R[8] = 0; R[9] = 0;
-    fle_imp_SHGetFolderPathW();
-    fle_st(R[4] + 0x28u, 8, saved);
-    if ((uint32_t)R[0] != 0) { fle_st(out, 8, 0); R[0] = 0x80004005u; return; }
-    for (n = 0; buf[n]; n++) {}
-    R[1] = 2 * (n + 1);
-    fle_imp_CoTaskMemAlloc();
-    blk = R[0];
-    if (!blk) { fle_st(out, 8, 0); R[0] = 0x8007000Eu; return; }
-    memcpy((void *)(uintptr_t)blk, buf, 2 * (n + 1));
-    fle_st(out, 8, blk);
-    R[0] = 0;
-}
 
 /* d2d1.dll!#1 (D2D1CreateFactory(D2D1_FACTORY_TYPE factoryType ecx, REFIID riid rdx, const D2D1_FACTORY_OPTIONS *pFactoryOptions r8, void **ppIFactory r9): HRESULT). Serum 2 calls it
  * while InitDll runs (the Direct2D factory of its editor). There is no Direct2D here; the answer is a failure: E_FAIL (0x80004005) with *ppIFactory = NULL (S-vst3a-d2d-fail: the choice of
