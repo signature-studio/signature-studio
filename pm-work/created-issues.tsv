@@ -75,3 +75,14 @@
 135	#1379	ゲストのアドレス空間の配置: 内蔵プラグイン 160 本の像(約 609 MB)が入るように、GLOBAL_BASE と実行時の表の上限を決め、起動時間とメモリを実測する	Task
 136	#1380	停止(stopped / 134)の理由を、ビーコンに別の項目として残す: 最後の fle: の行・== stop: の行・abort の種類・開く窓の答えの種類(個人の名前・パスを除く)	Task
 137	#1381	plugin の窓と tooltip の窓を、全ての拡大率で開いて拡大を測る	Task
+141	#1382	FL のテーマを切り替えると engine が止まる(crash)を直す	Task
+142	#1383	FL の設定(言語など。レジストリの値)を、ページの再読込をまたいで保持する	Task
+143	#1384	F10 の Settings の General タブをスクロールすると、描画が崩壊する(症状の再現と修正)	Task
+145	#1385	FL のユーザーのファイル(Recent・Presets・Projects など)を、ページの再読込をまたいで保持する	Task
+146	#1386	Piano roll のコード進行ツールの Start creating を押すと engine が止まる(crash)を直す	Task
+147	#1387	Piano roll のリフ マシーン(Riff machine)が、起動しようとしても何も反応しない(窓が出ない)を直す	Task
+148	#1388	emscripten(emcc・em++・emar・emsdk)を使わず、zig cc で、生成した C の compile と link ができるかを、実測で決める: 速度・出力の同一性・JSPI と pthread の扱い	Task
+138	#1389	FL のクリップボード(コピー・貼り付け)を、ページの Clipboard API(navigator.clipboard)と navigator.permissions に結ぶ	Task
+139	#1390	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 1): 標準のカーソルと、窓の端のサイズ変更の矢印	Task
+140	#1391	FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際の値を出す	Task
+144	#1392	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 2): FL 自身のカーソル(Piano roll の鉛筆など)を、資源の画素のまま出す	Task

@@ -31,3 +31,8 @@
 | `perf-beacons` | `ededed` | 実機のビーコン(依頼者の実機の測定の記録。`agent.yml` が R2 から取り、作業に置く) |
 | `startup` | `c5def5` | 起動の時間(P1)とサイズ |
 | `verify` | `ededed` | 測定と検証(道具を含む) |
+| `clipboard` | `bfdadc` | FL のクリップボード(ページの Clipboard API と結ぶ) |
+| `cursor` | `f7c6c7` | マウスカーソル(標準のカーソル・窓の端・FL 自身の資源のカーソル) |
+| `input` | `d1ddf0` | 入力(マウス・キー)の経路 |
+| `topbar` | `fde7a3` | トップバー(上部の表示の値) |
+| `fl-exe` | `c7d7e8` | 起動用の FL の実行ファイル(FL64.exe)を、作業の段で取り出す |

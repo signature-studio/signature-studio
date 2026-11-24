@@ -537,11 +537,19 @@ ok "fl-exe: 作業ジョブに R2_ARTIFACT の鍵を使う段が無い(取り出
 ok "fl-exe: 作業ツリーの lift/out-app/host-extra/exe は git の対象外" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/exe/FL64.exe && echo yes)" yes
 # (r) 接頭辞の一覧は、ci/ の 1 行 1 接頭辞のファイル(resources・plugin-builtin)。extract の取り出しは一覧を読み、鍵の hashFiles に一覧のファイルを入れる(一覧を変えると鍵が変わり、古いキャッシュは使われない)。fl-exe の完全なパスは鍵の文字列に入れる
 RPF=$top/ci/resources-prefixes.txt; PPF=$top/ci/plugin-builtin-prefixes.txt
-ok "接頭辞(r): ci/resources-prefixes.txt は、この 8 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\'
+ok "接頭辞(r): ci/resources-prefixes.txt は、この 14 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む。末尾の 6 件は #1386 の Chord progression・Python の実行環境と、#1387 の Riff machine)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\|System\Tools\Chord progression\|Shared\Python\|Data\Patches\Scores\Arpeggiator\Riff machine\|Data\Patches\Scores\Quantization\Riff machine\|Data\Patches\Scores\Chopping\Riff machine step 1\|Data\Patches\Scores\Chopping\Riff machine step 2\'
 ok "接頭辞(r): ci/plugin-builtin-prefixes.txt は、この 2 件を、この順で、1 行 1 接頭辞で持つ" "$(paste -sd'|' "$PPF" 2>/dev/null)" 'Plugins\Fruity\Effects\|Plugins\Fruity\Generators\'
-ok "接頭辞(r): 2 つのファイルは、合わせて 10 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "10/0/0"
+ok "接頭辞(r): 2 つのファイルは、合わせて 16 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "16/0/0"
 ok "接頭辞(r): 一覧は、Blocks が使う DNC_*.wav(Data\Patches\Packs\Legacy\Drums\Dance\ の下)を取り出す接頭辞を 1 つ持つ(\\ で終わる行が 1 つ)" "$(grep -cxF 'Data\Patches\Packs\Legacy\Drums\Dance\' "$RPF" 2>/dev/null)" 1
 ok "接頭辞(r): その接頭辞の下の DNC_*.wav は、インストーラの一覧で 21 件(接頭辞の取り出しで全件が入る)" "$(grep -cF 'Data\Patches\Packs\Legacy\Drums\Dance\DNC_' "$top/inputs/fl-installer-files.tsv")" 21
+# (r2) #1386・#1387 の 6 件: Chord progression(FL 内蔵の Python のスクリプト)・Python の実行環境・Riff machine の資料。件数と大きさは一覧で数える(大きさは dll・exe と Data\ の物だけ)
+NEWP=('System\Tools\Chord progression\' 'Shared\Python\' 'Data\Patches\Scores\Arpeggiator\Riff machine\' 'Data\Patches\Scores\Quantization\Riff machine\' 'Data\Patches\Scores\Chopping\Riff machine step 1\' 'Data\Patches\Scores\Chopping\Riff machine step 2\')
+INST=$top/inputs/fl-installer-files.tsv
+ok "接頭辞(r2): 追加の 6 件は、インストーラの一覧で件数が 59・37・40・9・24・19 件(接頭辞の取り出しで全件が入る)" "$(for p in "${NEWP[@]}"; do P="$p" awk -F'\t' 'NR>2 && index(tolower($1), tolower(ENVIRON["P"]))==1 {n++} END{print n+0}' "$INST"; done | paste -sd/ -)" "59/37/40/9/24/19"
+ok "接頭辞(r2): Shared\\Python\\ の dll・exe の大きさの合計は 14,939,080 B(他の 27 件は一覧に大きさが無い。30 MB 以下の根拠)" "$(P='Shared\Python\' awk -F'\t' 'NR>2 && index(tolower($1), tolower(ENVIRON["P"]))==1 && $2!="" {s+=$2} END{print s+0}' "$INST")" 14939080
+ok "接頭辞(r2): 追加の Riff machine の 4 件の大きさは、一覧の bytes の合計で 21,119 B" "$(for p in "${NEWP[@]:2}"; do P="$p" awk -F'\t' 'NR>2 && index(tolower($1), tolower(ENVIRON["P"]))==1 && $2!="" {s+=$2} END{print s+0}' "$INST"; done | awk '{s+=$1} END{print s+0}')" 21119
+ok "接頭辞(r2): 一覧は、System\\Tools\\・Shared\\・Data\\Patches\\Scores\\ の全体を持たない(必要最小。全体は System\\Tools\\ 419 件・Shared\\ 123 件・Data\\Patches\\Scores\\ 2,334 件)" "$(grep -cxF -e 'System\Tools\' -e 'Shared\' -e 'Data\Patches\Scores\' "$RPF")" 0
+ok "接頭辞(r2): 設計の文書の接頭辞の節に、追加の 6 件をそれぞれ 1 行で書いた" "$(for p in "${NEWP[@]}"; do P="$p" awk 'index($0, ENVIRON["P"]) > 0 {n++} END{print (n >= 1)}' "$top/pm-work/workflow-design.md"; done | paste -sd/ -)" "1/1/1/1/1/1"
 RRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 PRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 ok "接頭辞(r): 言語等の取り出しは、一覧のファイルを読む 1 行と、配列を渡す 1 行で、接頭辞の直書きが無い" "$(grep -cxF 'mapfile -t prefixes < ci/resources-prefixes.txt' <<<"$RRUN")/$(grep -cF '"${prefixes[@]}"' <<<"$RRUN")/$(grep -cE "'[A-Za-z]+[\\]" <<<"$RRUN")" "1/1/0"
@@ -992,21 +1000,24 @@ ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build 
   | ([.jobs.deploy.steps[] | select(.name == $b) | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any) as $x
   | "\([.jobs.deploy.steps[] | select(.name == $b)] | length) \($f != null and $c != null and $u != null and $f < $c and $c < $u) \($x)"' "$DJ")" "1 true false"
 BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
-BCM=$T/bc-m.json; BCQ=$T/bc-s.json
+BCM=$T/bc-m.json; BCQ=$T/bc-s.bin
+sf() { printf 'FLSEEDP1....{"version":1,"files":[%s]}' "$(printf '{"path":"seed/resources/%s"},' "$@" | sed 's/,$//')"; }
 printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"}]}' > "$BCM"
-printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$BCQ"
-bcrun() { # 引数: 2 つの manifest(bundle・seed)。一時の木で bundle の中身の段を走らせ、終了コードを出す
+sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$BCQ"
+bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)。一時の木で bundle の中身の段を走らせ、終了コードを出す
   rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed"
-  cp "$1" "$T/bc/lift/out-app/bundle/raw/fl-Oz/manifest.json"; cp "$2" "$T/bc/lift/out-app/seed/seed.bin.manifest.json"
+  cp "$1" "$T/bc/lift/out-app/bundle/raw/fl-Oz/manifest.json"; cp "$2" "$T/bc/lift/out-app/seed/seed.bin"
   ( cd "$T/bc" && bash -e "$BCS" > /dev/null 2>&1; echo $? )
 }
 ok "deploy.yml(t): bundle の中身: 代表 4 件(error-offline.html・言語・テーマ・テンプレート)が在れば 0 で通る" "$(test -s "$BCS" && bcrun "$BCM" "$BCQ")" 0
 printf '%s\n' '{"lazy":[]}' > "$T/bc-m0.json"
 ok "deploy.yml(t): bundle の中身: error-offline.html が無ければ落ちる(本番に出ない物を見逃さない)" "$(bcrun "$T/bc-m0.json" "$BCQ")" 1
-printf '%s\n' '{"files":[{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$T/bc-s1.json"
-ok "deploy.yml(t): bundle の中身: 言語パックの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s1.json")" 1
-printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$T/bc-s2.json"
-ok "deploy.yml(t): bundle の中身: テーマの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s2.json")" 1
-printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"}]}' > "$T/bc-s3.json"
-ok "deploy.yml(t): bundle の中身: テンプレートの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s3.json")" 1
+sf Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$T/bc-s1.bin"
+ok "deploy.yml(t): bundle の中身: 言語パックの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s1.bin")" 1
+sf System/Languages/de.moe Data/Templates/Other/Blocks/Blocks.flp > "$T/bc-s2.bin"
+ok "deploy.yml(t): bundle の中身: テーマの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s2.bin")" 1
+sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf > "$T/bc-s3.bin"
+ok "deploy.yml(t): bundle の中身: テンプレートの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s3.bin")" 1
+printf '%s\n' seed/resources/System/Languages/de.moe seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf seed/resources/Data/Templates/Other/Blocks/Blocks.flp > "$T/bc-s4.bin"
+ok "deploy.yml(t): bundle の中身: 引用符の無い語句だけでは、ヘッダの path と見なさない(3 件そろっても落ちる)" "$(bcrun "$BCM" "$T/bc-s4.bin")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
