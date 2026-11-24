@@ -81,6 +81,8 @@ const median = (a) => {
 };
 const maxOf = (a) => { const v = a.filter((x) => x !== null); return v.length ? Math.max(...v) : null; };
 const f1 = (x) => (x === null ? '-' : x < 10 ? x.toFixed(1) : x.toFixed(0));
+/** a median and the number of records it is over (a record without the item is not counted) */
+const med = (m) => (m.n ? `${f1(m.median)} (${m.n} 記録)` : '-');
 const when = (t) => `${t.slice(0, 16).replace('T', ' ')}Z`;
 const counted = (items) => {
   const m = new Map();
@@ -119,7 +121,11 @@ const guestOf = (p) => (num(p.guestScreen?.width) !== null && num(p.guestScreen?
 const roomOf = (p) => (num(p.guestScreen?.roomWidth) !== null && num(p.guestScreen?.roomHeight) !== null ? { w: p.guestScreen.roomWidth, h: p.guestScreen.roomHeight } : null);
 const firstIdleOf = (p) => num(p.startup?.firstIdleSeconds);
 const underrunsOf = (p) => num(p.audio?.underruns);
-const p95Of = (p) => num(p.input?.eventToRaf?.p95Ms);
+// Issue #1398: the input numbers read the items the page writes (input.inputToPresentMsP50 / P95), else eventToRaf's (the same numbers in an older record)
+const p50Of = (p) => num(p.input?.inputToPresentMsP50) ?? num(p.input?.eventToRaf?.p50Ms);
+const p95Of = (p) => num(p.input?.inputToPresentMsP95) ?? num(p.input?.eventToRaf?.p95Ms);
+const fpsOf = (p) => num(p.desk?.recent10s?.presentsPerSec);
+const rafP95Of = (p) => num(p.rafIntervalMsP95);
 
 // the sessions of a list of records (in time order): one list per page load, grouped by its random token (never printed)
 function sessionsOf(recs) {
@@ -143,7 +149,10 @@ function versionRow(version, recs) {
   const sess = sessionsOf(recs);
   const firstIdles = sess.map((rs) => rs.map((r) => firstIdleOf(r.p)).find((x) => x !== null) ?? null).filter((x) => x !== null);
   const underruns = sess.map((rs) => rs.map((r) => underrunsOf(r.p)).filter((x) => x !== null).pop() ?? null).filter((x) => x !== null);
+  const p50 = recs.map((r) => p50Of(r.p));
   const p95 = recs.map((r) => p95Of(r.p));
+  const fps = recs.map((r) => fpsOf(r.p));
+  const rafP95 = recs.map((r) => rafP95Of(r.p));
   const exits = recs.filter((r) => r.p.engine && r.p.engine.exit && typeof r.p.engine.exit === 'object');
   return {
     version,
@@ -161,6 +170,9 @@ function versionRow(version, recs) {
     firstIdle: { median: median(firstIdles), max: maxOf(firstIdles), n: firstIdles.length, over10: firstIdles.filter((x) => x > 10).length },
     underruns: { max: maxOf(underruns), n: underruns.length },
     input: { median: median(p95), n: p95.filter((x) => x !== null).length },
+    inputP50: { median: median(p50), n: p50.filter((x) => x !== null).length },
+    fps: { median: median(fps), n: fps.filter((x) => x !== null).length },
+    rafP95: { median: median(rafP95), n: rafP95.filter((x) => x !== null).length },
     states: listOf(recs.map((r) => str(r.p.engine?.state) ?? '(無し)'), 6),
     exits: exits.length ? listOf(exits.map((r) => `${str(r.p.engine.exit.reason) ?? '(無し)'} (code ${num(r.p.engine.exit.code) ?? '-'})`), 4) : '-',
   };
@@ -401,13 +413,15 @@ function main() {
   out.push('');
   out.push('## 版ごと: DPR・DPI・画面・起動・途切れ・入力・engine の状態');
   out.push('');
-  out.push('DPI は DPR から MulDiv(96, round(DPR × 100), 100) で求めた値。起動は、セッションごとの最初の first-idle の値。途切れは、セッションごとの最後の値の最大。入力は、記録ごとの eventToRaf.p95Ms の中央値。');
+  out.push('DPI は DPR から MulDiv(96, round(DPR × 100), 100) で求めた値。起動は、セッションごとの最初の first-idle の値。途切れは、セッションごとの最後の値の最大。');
+  out.push('提示 fps は、記録ごとの desk.recent10s.presentsPerSec(直近 10 秒の提示の回数 ÷ 秒数。1 秒未満は無し)の中央値。入力 p50・p95 は、記録ごとの入力から提示までの中央値(eventToRaf の直近 20 回の p50・p95)。rAF 間隔 p95 は、記録ごとの rafIntervalMsP95(display.raf.recent10s.p95Ms と同じ値。バースト方式では最後のバースト(約 2 秒)の分)の中央値。');
+  out.push('各値の (n 記録) は、その項目を持つ記録の数。項目の無い古い記録は数えない。実機の値は、依頼者の実機の利用者の記録による。');
   out.push('');
-  out.push(table(['版', 'DPR (記録数)', 'DPI (DPR から)', 'dpi の項目', 'guest 画面 (記録数)', '部屋 (CSS)', '起動 中央値 / 最大 (s)', '途切れ 最大', '入力 p95 中央値 (ms)', 'engine.state (記録数)', 'engine.exit (記録数)'],
+  out.push(table(['版', 'DPR (記録数)', 'DPI (DPR から)', 'dpi の項目', 'guest 画面 (記録数)', '部屋 (CSS)', '起動 中央値 / 最大 (s)', '途切れ 最大', '提示 fps 中央値 (直近 10 秒)', '入力 p50 中央値 (ms)', '入力 p95 中央値 (ms)', 'rAF 間隔 p95 中央値 (ms)', 'engine.state (記録数)', 'engine.exit (記録数)'],
     rows.map((x) => [x.version, x.dpr, x.dpi, x.dpiField, x.guest, x.room,
       `${f1(x.firstIdle.median)} / ${f1(x.firstIdle.max)} (${x.firstIdle.n} セッション、10 秒超 ${x.firstIdle.over10})`,
       x.underruns.n ? `${x.underruns.max} (${x.underruns.n} セッション)` : '計測なし',
-      x.input.n ? `${f1(x.input.median)} (${x.input.n} 記録)` : '-', x.states, x.exits])));
+      med(x.fps), med(x.inputP50), med(x.input), med(x.rafP95), x.states, x.exits])));
   out.push('');
 
   const low = recs.filter((r) => dprOf(r.p) !== null && dprOf(r.p) >= 1.7 && dprOf(r.p) < 1.8);

@@ -25,7 +25,7 @@ import { ProgressView } from './ui/progress.ts';
 import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
-import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, DeskHistory, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
 import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
@@ -499,6 +499,8 @@ function hzInfo(): HzInfo {
 }
 /** decision 0240: the presenter's counters as of the previous beacon that was sent (the next beacon reports the difference) */
 let prevDeskBeacon: { stats: Record<string, unknown>; atMs: number } | null = null;
+/** Issue #1398: the presenter's count as the page received each report, for the presents of the last 10 s */
+const deskHistory = new DeskHistory();
 function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
   const snap = perfRecorder.snapshot(nowAbs());
   const lat = app.latency;
@@ -517,7 +519,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     guestScreen: guestScreenInfo(),
     files: filesUsage.snapshot(),
     assets: assetsNow(),
-    desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs()) : null,
+    desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs(), deskHistory.samples) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
     uiWindows: uiWindowsOf(app.summary?.windows), // Issue #1364: the window table the page already reads for its panel (refreshPanels); none before the first idle
   });
@@ -611,6 +613,7 @@ const client = new EngineClient({
   },
   desk(m) {
     app.deskStats = m.stats;
+    deskHistory.add(nowAbs(), m.stats.presents);
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
     for (const t of m.at) { app.latency.frame(DESKTOP, t, t, t); app.lastChanged = { at: t }; perfRecorder.update(t); }
   },
