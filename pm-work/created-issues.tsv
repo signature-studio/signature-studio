@@ -60,3 +60,5 @@
 120	#1364	ビーコンに、FL の窓の大きさ(上位 8 窓: クラス名・幅・高さ)を足し、実機の FL の UI の拡大率を、記録から求められるようにする	Task
 121	#1365	demo の曲 Exoplanet・DEDZII を File > Open で開くと、Song info の窓の後に engine が止まる(LockResource: no PE image is mapped)を直す	Task
 122	#1366	テンプレート Blocks が使う内蔵のサンプル(Data\Patches\Packs\Legacy の DNC_*.wav など)を、起動の後に取れるように配信する	Task
+123	#1367	VST3 ホストの最小を作る(1a): OTT の IComponent を作り、setupProcessing・setActive まで通す	Task
+124	#1368	VST3 ホストの最小を作る(1b): OTT が 1 ブロックの音声を処理し、非無音・非 NaN を測る(VEX 系の命令の経路を確かめる)	Task
