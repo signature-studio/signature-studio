@@ -783,7 +783,7 @@ jobs:
           APP_INSTALLATION_ID: ${{ vars.GH_APP_INSTALLATION_ID }}
         run: |
           git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"
-          git commit --allow-empty -m "$(cat "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
+          git commit --allow-empty -m "$(sed -E 's/skip ci|ci skip|no ci|skip actions|actions skip|NO_CI//gI' "$RUNNER_TEMP/title.txt"): 完了 (Closes #$ISSUE)"
           mkdir -p ~/.config/botid && cp "$RUNNER_TEMP/botid-config.json" ~/.config/botid/config.json
           "$RUNNER_TEMP/botid-bin/botid" issue 2>/dev/null
           export GH_CONFIG_DIR=$BOTID_GH

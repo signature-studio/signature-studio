@@ -168,7 +168,9 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 抽出の木の鍵(`host-`)は、インストーラの名前と抽出の引数(`lift/crates/fe-build/src/main.rs`)と、extract-fl が repo から読む `lift/harness/seeds/os-fonts/` の 4 件を含む。含まないと、これらを変えても古い木が使われ、変更が本番に出ない(#1378 で足した)。
 
-既知の残り(#1378 の範囲外。次の Issue の候補): (1) deploy の手順は `host` だけを取るため、`lift/out-app/host-extra/resources/System/Internet/error-offline.html` は無く、`fe-build bundle` はそれを黙って省く(`pack_step_for` の分岐)。本番の bundle に、オフラインの頁が入らない。(2) commit の題名に `[skip ci]` が在る push では、GitHub が deploy を起動しない。
+本番の bundle の入力(作業者の受け入れと同じにする)。`fe-build bundle` が読むのは、seed 表の行の host ファイル(`pack-seed.mjs` が SHA-256 を照合して入れる)と、`pack.args` の lazy 指定、それに `pack_step_for` が見つけた `error-offline.html`(`lift/out-app/host-extra/resources/System/Internet/`)だけである。seed 表の行は、言語・テーマ・テンプレート・demo・Blocks・内蔵プラグインの DLL の多くを含み、deploy は `extract-fl` で host に取り出す。作業者の resources の木(`ci/resources-prefixes.txt`)は、deploy の「resources を取り出す」の段も取り出すので、オフラインの頁が本番の bundle に入る(それまでは、deploy の木に無いので黙って省かれた)。木の中の余分な物は、seed 表に無いため bundle に入らない(写しの要らない理由)。内蔵プラグインの木(`host-extra/plugins`)と起動用の実行ファイル(`host-extra/exe`)は、bundle の入力ではなく、道具(tools/plugin-hooks・tools/feat-c1-hidpi)だけが読む。bundle の中身は、「bundle の中身を確かめる」の段が、オフラインの頁と、言語・テーマ・テンプレートの代表 1 件ずつを manifest で確かめる。
+
+deploy で `[skip ci]` を使わない(依頼者の指示。main の push が deploy を迂回しないように)。judge が、作業の commit の題名と本文に、skip ci などの印が在れば落とす。push の段は、Issue の題名から印を落としてから空の commit を作る。pm-work だけの push は、paths の filter で deploy が起動しないので、印を付ける理由が無い。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
 

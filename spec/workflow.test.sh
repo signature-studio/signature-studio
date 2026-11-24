@@ -82,6 +82,8 @@ ok "report: 結果を Issue に書く段の GH_TOKEN は github.token" "$(jq -r 
 ok "work: タスクの段が、題名を RUNNER_TEMP/title.txt に残す(push の段の commit に使う)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("タスク")) | .run] | .[0]' "$J" | grep -q 'title[.]txt' && echo yes)" yes
 P=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
 ok "push: 判定の後に、題名と Closes #\$ISSUE の空の commit を作り、その後に push する" "$(c=$(grep -n 'git commit --allow-empty' <<<"$P" | cut -d: -f1); p=$(grep -n 'git push origin HEAD:main' <<<"$P" | cut -d: -f1); [ -n "$c" ] && [ -n "$p" ] && [ "$c" -lt "$p" ] && grep -qF 'Closes #$ISSUE' <<<"$P" && grep -qF 'title.txt' <<<"$P" && echo yes)" yes
+SEDX='s/skip ci|ci skip|no ci|skip actions|actions skip|NO_CI//gI'
+ok "push: 題名の空の commit は、deploy を止める印を落としてから作る(Issue の題名に印が在っても、main の deploy は止まらない)" "$(grep -cF "sed -E '$SEDX'" <<<"$P")/$(printf '%s' '題名 [skip ci] [ci skip] [No CI] NO_CI x' | sed -E "$SEDX" | grep -ciE 'skip ci|ci skip|no ci|skip actions|actions skip|NO_CI')" "1/0"
 ok "push: 変更が無くても止めない(「変更なし」で終わる経路が無い)" "$(grep -c '変更なし' <<<"$P")" 0
 ok "push: commit の名義を書かない(git -c・--author・GIT_AUTHOR・GIT_COMMITTER・git config user を使わない)" "$(grep -cE 'git -c |--author|GIT_AUTHOR|GIT_COMMITTER|git config user' "$A")" 0
 ok "push の段は、判定の段より後にあり、if は成功の後で、確認の skip が偽のとき" "$(jq -r '[.jobs.work.steps | to_entries[] | select(.value.name | test("^判定[(]")) | .key] as $j | [.jobs.work.steps | to_entries[] | select(.value.name | test("通った変更を main に push")) | .key] as $p | "\($j[0] < $p[0])/\(.jobs.work.steps[$p[0]].if == "success() && steps.check.outputs.skip != '"'"'true'"'"'")"' "$J")" "true/true"
@@ -552,7 +554,7 @@ ok "接頭辞(r): 内蔵のプラグインの鍵(保存・復元の 3 つ)の ha
 EXRUN=$(jq -r --arg n "$EXR" '[.jobs.extract.steps[] | select(.name == $n) | .run][0]' "$J")
 EXNAMES=$(grep -oE "[-]-file '[^']*'" <<<"$EXRUN" | sed -E "s/^[-]-file '//; s/'\$//" | tr -d '()' | tr ' ' '-' | paste -sd- -)
 ok "接頭辞(r): fl-exe の鍵(保存・復元の 3 つ)の文字列は、--file の 2 つの完全なパスを空白と括弧を除いて - でつないだ物を含む($EXNAMES)" "$(grep -cF "extra-fl-exe-$EXNAMES-" <<<"$KE")/$(wc -l <<<"$KE" | tr -d ' ')" "3/3"
-ok "接頭辞(r): 設計の文書に、一覧のファイルと鍵の関係を書いた" "$(grep -c 'ci/resources-prefixes[.]txt' "$top/pm-work/workflow-design.md")/$(grep -c 'ci/plugin-builtin-prefixes[.]txt' "$top/pm-work/workflow-design.md")" "1/1"
+ok "接頭辞(r): 設計の文書に、一覧のファイルと鍵の関係を書いた" "$(grep -c 'ci/resources-prefixes[.]txt' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 1)}')/$(grep -c 'ci/plugin-builtin-prefixes[.]txt' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 1)}')" "1/1"
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
@@ -671,7 +673,7 @@ ok "保存の段: 名前が 1 つ。push の段(id push)の後で、報告の検
 ok "保存の段の if: 判定が通り push が落ちたとき、または時間切れで取り消されたときだけ(判定の失敗では保存しない。確認の skip も偽)" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "(failure() || cancelled()) && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'"
 ok "push の段: id は push" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .id] | .[0]' "$J")" push
 PSH=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
-ok "push の段: 変更前の run と比べ、保存の基点の 1 行(work-tip)の追加だけ" "$(a=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B" | grep -v 'work-tip[.]txt'); b=$(grep -v 'work-tip[.]txt' <<<"$PSH"); [ "$a" = "$b" ] && echo same)" same
+ok "push の段: 変更前の run と比べ、保存の基点の 1 行(work-tip)と、題名から印を落とす commit の 1 行の違いだけ" "$(a=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B" | grep -vE 'work-tip[.]txt|git commit --allow-empty'); b=$(grep -vE 'work-tip[.]txt|git commit --allow-empty' <<<"$PSH"); [ "$a" = "$b" ] && echo same)" same
 ok "push の段: env は変更前と一致する(App の鍵は、この段と名義の段だけ)" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[$b[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env] == [$n[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env]')" true
 ok "push の段: push 前の HEAD を RUNNER_TEMP/work-tip.txt に、空の commit を作る前に残す(pull の後の HEAD は保存の基点にしない)" "$(t=$(grep -n 'git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"' <<<"$PSH" | cut -d: -f1); c=$(grep -n 'git commit --allow-empty' <<<"$PSH" | cut -d: -f1); [ -n "$t" ] && [ -n "$c" ] && [ "$t" -lt "$c" ] && echo yes)" yes
 ok "取り込みの段: 名前が 1 つ。名義の段の後で、作業者の段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | .name] as $n | ($n | index($p)) as $i | ($n | index("名義を設定する(token は消す)")) as $g | ($n | index("作業者を 1 回動かす")) as $w | "\($n | map(select(. == $p)) | length) \($g != null and $i != null and $w != null and $g < $i and $i < $w)"' "$J")" "1 true"
@@ -822,7 +824,7 @@ ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落�
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^本番の manifest を確かめる$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる)$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
 ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
@@ -945,7 +947,7 @@ ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段に if・env・uses・continue-on-error が無い(既定の success()。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
 RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | .run] | .[0] // ""' "$DJ")
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
-ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^本番の manifest を確かめる$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる)$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "fe-build upload は門を読まない(main.rs に、門の語 verified・gated と、root の一覧の読みが無い)" "$(grep -ciE 'verified|root[.]txt|gated' "$top/lift/crates/fe-build/src/main.rs")" 0
 OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
@@ -971,4 +973,40 @@ rc=$(rbrun "$T/live-same.json" 1)
 ok "本番の確認(取得できず): 取れなければ 0 にならない" "$( [ "$rc" != 0 ] && echo fails)" fails
 S14=$(awk '/^## 14[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "deploy.yml(s): 設計の 14 節に、門を廃止した事実(静かに本番に出なかったこと)と理由を書いた" "$(ge1 "$(grep -c '廃止' <<<"$S14")")/$(ge1 "$(grep -c '静かに' <<<"$S14")")" "yes/yes"
+# (t) 本番の bundle の入力は、作業者の受け入れの入力と同じ(#1378 の後)。resources の木(error-offline.html など)を deploy が取り出し、bundle の前に lift/out-app/host-extra/resources に置く(fe-build bundle の OFFLINE_PAGE_SRC が読む)。bundle の中身は、manifest の一覧で確かめる
+RN='resources を取り出す'; BN='bundle の中身を確かめる'
+ok "deploy.yml(t): resources の段は 1 つで、fe-build extract の後・fe-build bundle の前に在る" "$(jq -r --arg r "$RN" '
+  ([.jobs.deploy.steps | to_entries[] | select(.value.name == $r) | .key] | length) as $n
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build extract$")) | .key] | .[0]) as $e
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build bundle$")) | .key] | .[0]) as $b
+  | ([.jobs.deploy.steps | to_entries[] | select(.value.name == $r) | .key] | .[0]) as $r0
+  | "\($n) \($e != null and $b != null and $e < $r0 and $r0 < $b)"' "$DJ")" "1 true"
+RSN=$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | .run][0] // ""' "$DJ")
+ok "deploy.yml(t): resources の段は、作業者と同じ fl-installer-extract を、ci/resources-prefixes.txt の接頭辞で呼び、lift/out-app/host-extra/resources に置く" "$(grep -cF 'tools/fl-installer-extract.mjs' <<<"$RSN")/$(grep -cF 'ci/resources-prefixes.txt' <<<"$RSN")/$(grep -cF 'lift/out-app/host-extra/resources' <<<"$RSN")" "1/1/1"
+ok "deploy.yml(t): resources の段のインストーラの URL は、fe-build の INSTALLER と同じ" "$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | .env.SRC][0] // ""' "$DJ" | xargs -I{} grep -cF {} "$top/lift/crates/fe-build/src/main.rs")" 1
+ok "deploy.yml(t): resources の段は、R2_ARTIFACT の鍵だけを渡し、公開の artifact と gh を使わない" "$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | "\(.env.AWS_ACCESS_KEY_ID)|\(.env.AWS_SECRET_ACCESS_KEY)|\(tostring | test("upload-artifact|download-artifact|gh "))"][0]' "$DJ")" '${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}|${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}|false'
+ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build upload の前に在り、既定の success() で、if・env・uses・continue-on-error が無い" "$(jq -r --arg b "$BN" '
+  ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("flow[.]jsonl") and test("jq -e")) | .key] | .[0]) as $f
+  | ([.jobs.deploy.steps | to_entries[] | select(.value.name == $b) | .key] | .[0]) as $c
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
+  | ([.jobs.deploy.steps[] | select(.name == $b) | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any) as $x
+  | "\([.jobs.deploy.steps[] | select(.name == $b)] | length) \($f != null and $c != null and $u != null and $f < $c and $c < $u) \($x)"' "$DJ")" "1 true false"
+BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
+BCM=$T/bc-m.json; BCQ=$T/bc-s.json
+printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"}]}' > "$BCM"
+printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$BCQ"
+bcrun() { # 引数: 2 つの manifest(bundle・seed)。一時の木で bundle の中身の段を走らせ、終了コードを出す
+  rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed"
+  cp "$1" "$T/bc/lift/out-app/bundle/raw/fl-Oz/manifest.json"; cp "$2" "$T/bc/lift/out-app/seed/seed.bin.manifest.json"
+  ( cd "$T/bc" && bash -e "$BCS" > /dev/null 2>&1; echo $? )
+}
+ok "deploy.yml(t): bundle の中身: 代表 4 件(error-offline.html・言語・テーマ・テンプレート)が在れば 0 で通る" "$(test -s "$BCS" && bcrun "$BCM" "$BCQ")" 0
+printf '%s\n' '{"lazy":[]}' > "$T/bc-m0.json"
+ok "deploy.yml(t): bundle の中身: error-offline.html が無ければ落ちる(本番に出ない物を見逃さない)" "$(bcrun "$T/bc-m0.json" "$BCQ")" 1
+printf '%s\n' '{"files":[{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$T/bc-s1.json"
+ok "deploy.yml(t): bundle の中身: 言語パックの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s1.json")" 1
+printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Data/Templates/Other/Blocks/Blocks.flp"}]}' > "$T/bc-s2.json"
+ok "deploy.yml(t): bundle の中身: テーマの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s2.json")" 1
+printf '%s\n' '{"files":[{"path":"seed/resources/System/Languages/de.moe"},{"path":"seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf"}]}' > "$T/bc-s3.json"
+ok "deploy.yml(t): bundle の中身: テンプレートの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s3.json")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
