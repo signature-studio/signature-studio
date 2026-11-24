@@ -4,7 +4,7 @@ title: "plugin の窓と tooltip の窓を、全ての拡大率で開いて拡�
 type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
-blocked_by: ["127"]
+blocked_by: ["127", "108"]
 labels: ["hidpi", "verify"]
 size: S
 priority: Medium
