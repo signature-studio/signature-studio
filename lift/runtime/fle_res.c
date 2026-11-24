@@ -76,7 +76,11 @@ static void img_open(const char *api, res_img *im, uint64_t b)
     uint32_t lfanew, nrva;
 
     im->base = b;
-    if ((uint16_t)fle_ld(b, 2) != 0x5a4d) fle_stop(api, "no PE image is mapped at 0x400000 (no MZ signature)");
+    if ((uint16_t)fle_ld(b, 2) != 0x5a4d) {
+        char why[120];
+        snprintf(why, sizeof why, "no PE image is mapped at %#llx (no MZ signature)", (unsigned long long)b);
+        fle_stop(api, why);
+    }
     lfanew = (uint32_t)fle_ld(b + 0x3c, 4);
     if (lfanew < 0x40 || lfanew > 0x1000) fle_stop(api, "e_lfanew of the mapped image is out of range");
     nt = b + lfanew;
@@ -299,6 +303,8 @@ void fle_imp_LockResource(void)
     if (hres == 0) fle_stop(api, "hResData is NULL (the page allows only a successful LoadResource result)");
     found = walk(api, &im, WALK_DATA, hres) != UINT32_MAX;
     for (k = 0; !found && FLE_REALMOD_PRESENT() && (b = fle_realmod_base_of(k)) != 0; k++) {
+        /* a module whose image is not mapped yet (fle_realmod_load maps it) gave no LoadResource result: its image is not read */
+        if (!fle_realmod_image_mapped(k)) continue;
         img_open(api, &im, b);
         found = walk(api, &im, WALK_DATA, hres) != UINT32_MAX;
     }

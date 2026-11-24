@@ -106,4 +106,6 @@ export type FromWorker =
   | { t: 'webview2'; op: 'navigate'; uri: string; resource: string | null }
   | { t: 'webview2'; op: 'post'; json: string }
   | { t: 'webview2'; op: 'exec'; script: string }
+  /** Issue #1376: the windows painted over the face (the Browser's window, its bounds): rects is l, t, r, b per window on the guest's screen (the bounds' space). Sent when the picture or the face has changed, and only when the list has */
+  | { t: 'webview2'; op: 'front'; rects: number[] }
   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
