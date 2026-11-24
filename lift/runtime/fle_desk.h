@@ -12,7 +12,7 @@
  *   - decision 0244 (alpha1): a window whose frame is extended into its client area (DwmExtendFrameIntoClientArea; a negative margin is the sheet of glass = the whole window) is drawn, outside the inner rectangle that the margins leave,
  *     as a premultiplied ARGB over what is below with the same formula (the fourth byte of its surface is the alpha: a BitBlt from a 32-bit DIB carries it, fle_gdi.c); inside the inner rectangle it is opaque as any window;
  *   - decision 0244: a window that has a window region (SetWindowRgn) is drawn inside the region only ("The system does not display any portion of a window that lies outside of the window region").
- * The line of fle_desk_describe for a window ends with its class and its title; the layer words before them are: layered premultiplied alpha key glass(x0,y0,x1,y1) region(l,t,r,b).
+ * The line of fle_desk_describe for a window ends with its class and its title; after its size it has the window style (style 0x........, #1390: the sizing frame WS_THICKFRAME is read from it); the layer words before the class are: layered premultiplied alpha key glass(x0,y0,x1,y1) region(l,t,r,b).
  * Where no window is, the picture has the colour FLE_DESK_BACKGROUND (a choice: the colour of the page that showed the windows before this compositor, #05070a).
  *
  * Only the damaged part is drawn again: a rectangle of a window's surface that was written (fle_raster_wrote -> fle_desk_wrote), and the old and the new rectangle of a window whose position, size, visibility or

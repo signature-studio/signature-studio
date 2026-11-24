@@ -12,6 +12,7 @@
 
 #include "fle_runtime.h"
 #include "fle_cursor.h"
+#include "fle_gdi.h"
 #include "fle_input.h"
 #include "fle_appview.h"
 #include "fle_screen.h"
@@ -24,6 +25,7 @@ _Static_assert(offsetof(fle_av_state, windows) == 68, "AV_HEADER_BYTES");
 
 extern uint64_t fle_gdi_cursor_current(void) __attribute__((weak));
 extern int fle_cursor_is_shared_handle(uint64_t h) __attribute__((weak));
+extern int fle_gdi_kind(uint64_t h) __attribute__((weak));
 
 static void copy_ascii(char *dst, unsigned cap, const char *src)
 {
@@ -50,6 +52,7 @@ EMSCRIPTEN_KEEPALIVE const fle_av_state *fle_av_poll(void)
     if (cur) {
         st.cursor_idc = fle_cursor_image_idc_of(cur);
         st.cursor_shared = st.cursor_idc == 0 && fle_cursor_is_shared_handle && fle_cursor_is_shared_handle(cur) ? 1u : 0u;
+        st.cursor_made = st.cursor_idc == 0 && st.cursor_shared == 0 && fle_gdi_kind && fle_gdi_kind(cur) == FLE_GDI_KIND_ICONCUR ? 1u : 0u;
     }
     fle_win_pointer_get(&st.pointer_x, &st.pointer_y);
     st.pending_events = fle_input_host_pending();
