@@ -36,6 +36,9 @@ export interface FruityModuleOpts {
   /** decision 0280 (lift/harness/web/fruity/fle_idle_lib.js): the scheduler reads the page's input ring itself; the Worker stages the records into `ptr` (8 words each, at most `max`) and returns the count; fleInputDone(ptr, n) is told what the runtime did with them */
   fleInputPoll?: (ptr: number, max: number) => number;
   fleInputDone?: (ptr: number, n: number) => void;
+  /** Issue #1383 (lift/harness/web/fruity/fle_idle_lib.js): the saved records of the registry's HKCU tree, replayed before the guest runs; and the change of one record, which the page keeps */
+  fleRegSaved?: () => Uint8Array | null;
+  fleRegPut?: (record: Uint8Array) => void;
   /** Issue #1342 (lift/harness/two/xmod_glue.c, lift/harness/web/fruity/fle_idle_lib.js): the engine asks for a real module's separate wasm module (xmod.ts); 1 when it is instantiated, 0 when the DLL has none */
   fleXmodLoad?: (ptr: number) => number;
   preRun: Array<() => void>;
@@ -65,6 +68,9 @@ export interface FruityHost {
   /** decision 0280: see FruityModuleOpts.fleInputPoll / fleInputDone; absent = the input is taken at the idle only */
   inputPoll?(ptr: number, max: number): number;
   inputDone?(ptr: number, n: number): void;
+  /** Issue #1383: the page's keeping of the registry's HKCU tree (regstore.ts): the saved records (null: none), and the change of one record; absent = nothing is kept */
+  regSaved?(): Uint8Array | null;
+  regPut?(record: Uint8Array): void;
 }
 
 export type FruityExit =
@@ -127,6 +133,8 @@ export class FruityEngine {
       fleThreadFailed: (idx, _e, msg) => host.stderr(`[js] ${msg} (guest thread ${idx})`),
       fleXmodLoad: (ptr: number) => xmod.loadAt(ptr),
       ...(host.inputPoll ? { fleInputPoll: (ptr: number, max: number) => host.inputPoll?.(ptr, max) ?? 0, fleInputDone: (ptr: number, n: number) => host.inputDone?.(ptr, n) } : {}),
+      ...(host.regSaved ? { fleRegSaved: () => host.regSaved?.() ?? null } : {}),
+      ...(host.regPut ? { fleRegPut: (record: Uint8Array) => host.regPut?.(record) } : {}),
       ...(host.fileDlg ? { fleFileDlg: (id: number, request: unknown) => host.fileDlg?.(id, request), fleFileDlgProgress: (id: number, done: number, total: number) => host.fileDlgProgress?.(id, done, total) } : {}),
       preRun: [() => {
         if (!opts.ENV) throw new Error('the emscripten glue exposes no ENV (link with -sEXPORTED_RUNTIME_METHODS=ENV,...)');

@@ -16,6 +16,7 @@ import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts'
 import { sceneGen } from './desk-gl.ts';
 import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
+import { openRegState, type RegState } from './regstore.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -33,6 +34,8 @@ const LAZY_TIMEOUT_MS = 120000;
 const IMAGE_READ = /^image-read: (.+) requested=([01]) /;
 let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
+/** Issue #1383: the saved HKCU tree of the virtual registry (regstore.ts); null when the browser keeps none */
+let regState: RegState | null = null;
 const reports = new ReportThrottle();
 const trace = new IdleTrace();
 const checkpoints: { n: number; hash: number }[] = [];
@@ -97,7 +100,11 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   port.onmessage = (ev: MessageEvent<RenderToEngine>) => onRender(ev.data);
   gate = new DeskGate(m.desk.ctl);
   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');
+  regState = await openRegState(log);
+  if (regState) mark('reg_state', { saved: regState.saved.length, bytes: regState.bytes });
   const host: FruityHost = {
+    regSaved: () => regState?.saved ?? null,
+    regPut: (record) => { regState?.put(record); },
     mark,
     stdout: (line) => pushLog('out', line),
     stderr: (line) => {
@@ -311,9 +318,20 @@ async function start(): Promise<void> {
   await startFruity(fruity);
 }
 
+/** Issue #1383: the saved registry is closed when the run ends; after an error it is dropped first (the next start begins from the seed: the saved values may be what stopped it) */
+function closeRegState(dropped: boolean): void {
+  if (regState && dropped) {
+    regState.discard();
+    log('warn', 'the engine stopped with an error: the saved registry is dropped, and the next start begins from the seed');
+  }
+  regState?.close();
+  regState = null;
+}
+
 async function startFruity(f: FruityEngine): Promise<void> {
   mark('engine_start');
   const result = await f.run();
+  closeRegState(result.kind === 'trap' || (result.kind === 'exit' && result.code !== 0));
   stopAudioReport();
   flushLogs();
   try { deskTick(false); } catch (e) { log('error', `final desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
