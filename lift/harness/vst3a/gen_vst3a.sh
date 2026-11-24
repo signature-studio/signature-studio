@@ -6,7 +6,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 LIFT=${LIFT:-$(cd "$HERE/../.." && pwd)}
 OUT=${OUT:?}; TAG=${TAG:?}; FILE=${FILE:?}; FEBIN=${FEBIN:?}; SEEDS=${SEEDS:?}
 mkdir -p "$OUT/rows" "$OUT/log" "$OUT/gen"
-python3 "$HERE/mk_stubs.py" "$FILE" "$LIFT/crates/fe-lift/src/imports_table.rs" "$LIFT/harness/vst/imports-vst.txt" "$OUT/rows/stub-rows-$TAG.txt" "$OUT/rows/vst3a_stubs.c" "$OUT/rows/ord-rows-$TAG.txt" || exit 1
+node "$LIFT/harness/vst/mk_stubs.mjs" "$FILE" "$LIFT/crates/fe-lift/src/imports_table.rs" "$LIFT/harness/vst/imports-vst.txt" "$LIFT/runtime" "$OUT/rows/stub-rows-$TAG.txt" "$OUT/rows/vst3a_stubs.c" "$OUT/rows/ord-rows-$TAG.txt" || exit 1
 cat "$LIFT/harness/vst/imports-vst.txt" "$OUT/rows/stub-rows-$TAG.txt" > "$OUT/rows/imports-$TAG.txt"
 bash "$LIFT/harness/vst/mkrows.sh" "$OUT/rows/host-rows.txt"
 cat "$OUT/rows/ord-rows-$TAG.txt" >> "$OUT/rows/host-rows.txt"
@@ -16,9 +16,6 @@ k=0; for n in qi addref release read write seek tell; do printf '0x%x vst3a_stre
 mkdir -p "$OUT/gen"
 if [ ! -e "$OUT/gen/$TAG.c" ]; then
     "$FEBIN/fe-lift" lift "$FILE" "$OUT/gen/$TAG.c" --pdata --seeds "$SEEDS" --extra-imports "$OUT/rows/imports-$TAG.txt" > "$OUT/log/gen-$TAG.txt" 2> "$OUT/log/gen-$TAG.err" || exit 1
-    python3 "$HERE/patch_ordinals.py" "$FILE" "$OUT/gen/$TAG.c" "$OUT/rows/ord-rows-$TAG.txt.slots" | tee -a "$OUT/log/gen-$TAG.txt"
-    python3 "$HERE/patch_shd.py" "$FILE" "$OUT/gen/$TAG.c" | tee -a "$OUT/log/gen-$TAG.txt"
-    python3 "$HERE/patch_bmi.py" "$FILE" "$OUT/gen/$TAG.c" "$FEBIN" "$OUT/gen" "$TAG" --pdata --seeds "$SEEDS" --extra-imports "$OUT/rows/imports-$TAG.txt" | tee -a "$OUT/log/gen-$TAG.txt"
 fi
-OUT="$OUT" TAG="$TAG" FILE="$FILE" FEBIN="$FEBIN" LIFT_ARGS="--pdata --seeds $SEEDS --extra-imports $OUT/rows/imports-$TAG.txt" ROWS="$OUT/rows/host-rows.txt" PER=${PER:-4000000} \
+RMNAME="${RMNAME:-serum2.vst3}" RMBASE="${RMBASE:-$("$FEBIN/fe-pe" pe-info "$FILE" | awk '$1=="image_base"{print $2}')}" OUT="$OUT" TAG="$TAG" FILE="$FILE" FEBIN="$FEBIN" LIFT_ARGS="--pdata --seeds $SEEDS --extra-imports $OUT/rows/imports-$TAG.txt" ROWS="$OUT/rows/host-rows.txt" PER=${PER:-4000000} \
     bash "$LIFT/harness/vst/gen_vst.sh"

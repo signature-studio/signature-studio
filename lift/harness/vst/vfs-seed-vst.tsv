@@ -1,0 +1,8 @@
+# seed list of the plugin-worker (vfs_seed.h): <guest path> TAB <host file> TAB <SHA-256>; a guest path ending in a backslash with "-" in the other two fields is a directory.
+C:\vst\	-	-
+C:\Windows\	-	-
+C:\Program Files\	-	-
+C:\ProgramData\	-	-
+C:\Users\user\AppData\Roaming\	-	-
+C:\Users\user\AppData\Local\	-	-
+C:\Users\user\Documents\	-	-
