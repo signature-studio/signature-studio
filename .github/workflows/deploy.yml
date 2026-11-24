@@ -31,6 +31,8 @@ jobs:
           path: lift/out-app/host
           key: >-
             host-${{ hashFiles('ci/**', 'app/scripts/**/*.mjs',
+            'lift/crates/fe-build/src/main.rs',
+            'lift/harness/seeds/os-fonts/**',
             'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/**') }}
       - if: steps.cache.outputs.cache-hit != 'true'
         env:
@@ -60,15 +62,6 @@ jobs:
             all(.[]; .error == null and .trapped == false and
             .state == "engine-idle" and .opened and .welcomeClosed)
           ' "$RUNNER_TEMP/flow.jsonl"
-      # 検証済みにする: 検査が通った engine(commit はしない)
-      - name: 検証済みにする
-        run: |
-          M=lift/out-app/bundle/raw/fl-Oz/manifest.json
-          S=$(jq -r '.engine.wasm.sha256' "$M")
-          grep -qxE '[0-9a-f]{64}' <<<"$S"
-          grep -qxF "$S" lift/harness/web/verified.txt ||
-            echo "$S" >> lift/harness/web/verified.txt
-          echo "verified: ${S:0:12}"
       - run: lift/target/release/fe-build upload
       - name: 本番の manifest を確かめる
         run: |

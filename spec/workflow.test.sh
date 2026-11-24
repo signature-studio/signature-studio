@@ -809,19 +809,20 @@ ok "plugins: agent.yml の抽出の木の鍵(保存・復元の 2 つ)と deploy
 ok "plugins: 旧版との比較の前に、鍵から lift/plugins の 1 項目を除くと、lift/plugins の文字が残らない" "$(grep -c 'lift/plugins' "$T/new-noplg.yml")/$(grep -c 'lift/plugins' "$T/deploy-noplg.yml")" "0/0"
 ok "plugins: extract-fl.mjs は lift/plugins の行を lib/plugin-rows.mjs で読む(import と呼び出しの 2 行)" "$(grep -c 'pluginRows' "$top/app/scripts/extract-fl.mjs")" 2
 ok "deploy.yml: 抽出の木の鍵は、fe-build extract が読む表(ci/extract-dlls.tsv・seed 表)と extract-fl.mjs を全て覆う" "$(cover "hashFiles('ci/extract-dlls.tsv', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'app/scripts/extract-fl.mjs')" "$DK")" covered
+ok "deploy.yml: 抽出の木の鍵は、インストーラの名前と抽出の引数(fe-build の main.rs)と、extract-fl.mjs が repo から読む os-fonts の 4 件を覆う" "$(cover "hashFiles('lift/crates/fe-build/src/main.rs', 'lift/harness/seeds/os-fonts/**')" "$DK")" covered
 # (m) 本番へ上げる前のスモーク(deploy.yml): 起動の確認と、Welcome 窓の 4 つの流れ。上げる段(upload・wrangler)より前に在り、既定の success() で、落ちれば後を飛ばす
 D=$top/.github/workflows/deploy.yml; DOLD=cf3e7dc9
 git -C "$top" show "$DOLD:.github/workflows/deploy.yml" > "$T/deploy-old.yml" 2>/dev/null || echo "FAIL 変更前の deploy.yml を読めない($DOLD)"
 pj "$T/deploy-old.yml" > "$T/deploy-old.json" 2>>"$T/pj.err"; DO=$T/deploy-old.json
 SMOKE='boot-bundle|welcome-flow|jq -e'
-KINDS='[.jobs.deploy.steps[] | (.run // "") as $r | if .uses then (if (.uses | test("wrangler")) then "wrangler" else "uses" end) elif ($r | test("fe-build bundle$")) then "bundle" elif ($r | test("boot-bundle[.]mjs")) then "boot" elif ($r | test("jq -e") and test("boot[.]json")) then "bootgate" elif ($r | test("welcome-flow[.]mjs")) then "flow" elif ($r | test("jq -e") and test("flow[.]jsonl")) then "flowgate" elif ($r | test("verified[.]txt")) then "verify" elif ($r | test("cmp ")) then "readback" elif ($r | test("fe-build upload$")) then "upload" else "other" end] | map(select(. != "other" and . != "uses")) | join(" ")'
-ok "deploy.yml(m): 順は fe-build bundle → 起動の確認 → 起動の判定 → Welcome 窓の流れ → 流れの判定 → 検証済みにする → fe-build upload → 本番の manifest の確認 → wrangler" "$(jq -r "$KINDS" "$DJ")" "bundle boot bootgate flow flowgate verify upload readback wrangler"
+KINDS='[.jobs.deploy.steps[] | (.run // "") as $r | if .uses then (if (.uses | test("wrangler")) then "wrangler" else "uses" end) elif ($r | test("fe-build bundle$")) then "bundle" elif ($r | test("boot-bundle[.]mjs")) then "boot" elif ($r | test("jq -e") and test("boot[.]json")) then "bootgate" elif ($r | test("welcome-flow[.]mjs")) then "flow" elif ($r | test("jq -e") and test("flow[.]jsonl")) then "flowgate" elif ($r | test("cmp ")) then "readback" elif ($r | test("fe-build upload$")) then "upload" else "other" end] | map(select(. != "other" and . != "uses")) | join(" ")'
+ok "deploy.yml(m): 順は fe-build bundle → 起動の確認 → 起動の判定 → Welcome 窓の流れ → 流れの判定 → fe-build upload → 本番の manifest の確認 → wrangler" "$(jq -r "$KINDS" "$DJ")" "bundle boot bootgate flow flowgate upload readback wrangler"
 ok "deploy.yml(m): 起動の確認と Welcome 窓の流れの段は、それぞれ 1 つ" "$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("boot-bundle[.]mjs"))] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("welcome-flow[.]mjs"))] | length' "$DJ")" "1/1"
 ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落ちれば後の段を飛ばす)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"if\")] | any" "$DJ")" false
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと門の 2 段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(検証済みにする|本番の manifest を確かめる)$' --arg sm "$SMOKE" "([\$n[0].jobs.deploy.steps[] | select(((.run // \"\") | test(\$sm)) | not) | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
+ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^本番の manifest を確かめる$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
 ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
@@ -932,43 +933,22 @@ RD=$T/pd; rc=$(pxrun "$PXA" "list" "$RD")
 ok "ビーコン(取り出し): 一覧の取得が失敗すれば、段は失敗する(取得の鍵は 1 つも取らない)" "$rc/$(wc -l < "$PXGOT" | tr -d ' ')" "1/0"
 RE=$T/pe; rc=$(pxrun "" "" "$RE")
 ok "ビーコン(取り出し): 0 件でも段は通り、MANIFEST.tsv(0 件)を作る(キャッシュの保存が空の木にならない)" "$rc/$(sed -n 1p "$RE/perf/MANIFEST.tsv")" "0/files	0"
-# (s) 本番の engine の門(検証済みの sha だけが本番の manifest になる)。スモークが通った engine の sha を、作業ツリーの verified.txt に 1 行足す(commit はしない)。upload の後に、本番の manifest がこの build の物と一致するかを確かめる
+# (s) 本番の engine の門の廃止(#1378)。deploy に門の段は無く、upload は manifest を常に差し替える。upload の後に、本番の manifest がこの build の物と一致するかを確かめる
 DPRE=384b1e40; git -C "$top" show "$DPRE:.github/workflows/deploy.yml" > "$T/deploy-pre.yml" 2>/dev/null || echo "FAIL 変更前の deploy.yml を読めない($DPRE)"
 pj "$T/deploy-pre.yml" > "$T/deploy-pre.json" 2>>"$T/pj.err"; DP=$T/deploy-pre.json
-ok "deploy.yml(s): 「検証済みにする」の段は 1 つで、「流れの判定」の後・fe-build upload の前に在る" "$(jq -r '
-  ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("flow[.]jsonl") and test("jq -e")) | .key] | .[0]) as $f
-  | ([.jobs.deploy.steps | to_entries[] | select(.value.name == "検証済みにする") | .key] | .[0]) as $v
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
-  | "\([.jobs.deploy.steps[] | select(.name == "検証済みにする")] | length) \($f != null and $v != null and $u != null and $f < $v and $v < $u)"' "$DJ")" "1 true"
+ok "deploy.yml(s): 門の段は無い(「検証済みにする」の段も、lift/harness/web を読み書きする段も無い)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "検証済みにする" or ((.run // "") | test("harness/web")))] | length' "$DJ")" 0
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、fe-build upload の後・wrangler の前に在る" "$(jq -r '
   ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
   | ([.jobs.deploy.steps | to_entries[] | select(.value.name == "本番の manifest を確かめる") | .key] | .[0]) as $r
   | ([.jobs.deploy.steps | to_entries[] | select((.value.uses // "") | test("wrangler")) | .key] | .[0]) as $w
   | "\([.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる")] | length) \($u != null and $r != null and $w != null and $u < $r and $r < $w)"' "$DJ")" "1 true"
-ok "deploy.yml(s): 門の 2 段に if・env・uses・continue-on-error が無い(既定の success(). 落ちれば後を飛ばす。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "検証済みにする" or .name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
-VSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "検証済みにする") | .run] | .[0] // ""' "$DJ")
+ok "deploy.yml(s): 「本番の manifest を確かめる」の段に if・env・uses・continue-on-error が無い(既定の success()。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
 RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | .run] | .[0] // ""' "$DJ")
-ok "deploy.yml(s): 「検証済みにする」は verified.txt へ 1 行足すだけ(commit・push・add・gh・wrangler・tee・sed -i は無く、書き込みの先は 1 つ)" "$(grep -cE 'git |gh |wrangler|tee|sed -i' <<<"$VSN")/$(grep -c '>' <<<"$VSN")/$(grep -c '>> lift/harness/web/verified[.]txt' <<<"$VSN")" "0/1/1"
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
-ok "deploy.yml(s): 検証済みの sha は manifest の engine.wasm.sha256 から取り、pack-assets がその形で manifest に書く" "$(grep -c "engine: { kind: 'emscripten-fruity-v1', wasm," "$top/app/scripts/pack-assets.mjs")/$(grep -c 'engine[.]wasm[.]sha256' <<<"$VSN")" "1/1"
-ok "deploy.yml(s): 門の 2 段を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(検証済みにする|本番の manifest を確かめる)$' "([\$n[0].jobs.deploy.steps[] | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
-VS=$T/vs.sh; printf '%s\n' "$VSN" > "$VS"
-OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64)); UPSHA=$(printf 'C%.0s' $(seq 1 64))
+ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^本番の manifest を確かめる$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "fe-build upload は門を読まない(main.rs に、門の語 verified・gated と、root の一覧の読みが無い)" "$(grep -ciE 'verified|root[.]txt|gated' "$top/lift/crates/fe-build/src/main.rs")" 0
+OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
-vset() { rm -rf "$T/vr"; mkdir -p "$T/vr/lift/out-app/bundle/raw/fl-Oz" "$T/vr/lift/harness/web" "$T/vr/rt"; vm "$1" > "$T/vr/lift/out-app/bundle/raw/fl-Oz/manifest.json"; printf '%s\n' "$OLDSHA" > "$T/vr/lift/harness/web/verified.txt"; }
-vrun() { ( cd "$T/vr" && env RUNNER_TEMP="$T/vr/rt" bash -e "$VS" > "$T/vr.log" 2>&1; echo $? ); }
-VF="$T/vr/lift/harness/web/verified.txt"
-vset "\"$NEWSHA\""; r1=$(vrun)
-ok "検証済みにする(通った sha): 0 で終わり、既存の行を残し、sha を末尾に 1 行足す" "$r1/$(wc -l < "$VF" | tr -d ' ')/$(sed -n 1p "$VF")/$(tail -n 1 "$VF")" "0/2/$OLDSHA/$NEWSHA"
-ok "検証済みにする(通った sha): 追記した旨を「verified: 先頭 12 桁」で出す" "$(grep -cx "verified: ${NEWSHA:0:12}" "$T/vr.log")" 1
-r2=$(vrun)
-ok "検証済みにする(同じ sha の再 deploy): 0 で終わり、同じ行を 2 度書かない" "$r2/$(grep -cx "$NEWSHA" "$VF")/$(wc -l < "$VF" | tr -d ' ')" "0/1/2"
-vset null; rb=$(vrun)
-ok "検証済みにする(sha が無い): 0 にならず、verified.txt は変えない" "$( [ "$rb" != 0 ] && [ "$(cat "$VF")" = "$OLDSHA" ] && echo same)" same
-vset "\"xyz\""; rb=$(vrun)
-ok "検証済みにする(sha が 64 桁の小文字の hex でない): 0 にならず、verified.txt は変えない" "$( [ "$rb" != 0 ] && [ "$(cat "$VF")" = "$OLDSHA" ] && echo same)" same
-vset "\"$UPSHA\""; rb=$(vrun)
-ok "検証済みにする(大文字の hex): 0 にならず、verified.txt は変えない" "$( [ "$rb" != 0 ] && [ "$(cat "$VF")" = "$OLDSHA" ] && echo same)" same
 RS=$T/rs.sh; printf '%s\n' "$RSN" > "$RS"; RBIN=$T/rbbin; RBLOG=$T/rb-aws.log; mkdir -p "$RBIN"
 cat > "$RBIN/aws" <<'RAWS'
 #!/usr/bin/env bash
@@ -989,5 +969,6 @@ rc=$(rbrun "$T/live-old.json" 0)
 ok "本番の確認(差し替わらず): 本番の manifest が古いままなら 0 にならず、deploy を失敗にする" "$( [ "$rc" != 0 ] && echo fails)" fails
 rc=$(rbrun "$T/live-same.json" 1)
 ok "本番の確認(取得できず): 取れなければ 0 にならない" "$( [ "$rc" != 0 ] && echo fails)" fails
-ok "deploy.yml(s): 設計の文書に、門(verified.txt)と、閉じたまま success だった事実(静かに)を書いた" "$(ge1 "$(grep -c 'verified.txt' "$top/pm-work/workflow-design.md")")/$(ge1 "$(grep -c '静かに' "$top/pm-work/workflow-design.md")")" "yes/yes"
+S14=$(awk '/^## 14[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
+ok "deploy.yml(s): 設計の 14 節に、門を廃止した事実(静かに本番に出なかったこと)と理由を書いた" "$(ge1 "$(grep -c '廃止' <<<"$S14")")/$(ge1 "$(grep -c '静かに' <<<"$S14")")" "yes/yes"
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

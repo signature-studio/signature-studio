@@ -160,9 +160,15 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 ジョブの上限(work は 350 分)に達すると、ジョブは取り消され、`failure()` は動かず、`cancelled()` の段だけが猶予(約 5 分)の中で動く。#1342 の 2 回目の試行(run 45197326869)では、作業者が背景のビルドを `tail --pid` で待ち、その待ちが戻らず、ジョブが時間切れで取り消され、作業が全て失われた(作業の保存の段が動かなかった)。そこで、押せなかった作業と判定が落ちた作業の保存の条件を `(failure() || cancelled())` にし、保存の段は通信をせず、取り消しで残った `.git/index.lock` を外してから差分を作る。報告の段は、取り消された作業を `failed` にし、保存の有無をコメントに書く。次の再試行は、判定の出力が無い保存を、判定の前の取り消しとして続きから取り込む。
 
-## 14. 本番の engine の門(検証済みの sha だけが本番の manifest になる)
+## 14. 本番の engine の門(廃止)
 
-`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替える(`lift/crates/fe-build/src/main.rs` の `upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門が静かに閉じたままで、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(deploy は success のまま。#1363 の実機のビーコンで確かめた)。そこで、スモーク(起動の確認と、Welcome 窓の 4 つの流れ)が両方通った engine の sha256 を、deploy の作業ツリーの `verified.txt` に 1 行足す(`manifest.json` の `engine.wasm.sha256` から取る。既存の行は残す。commit はしない)。その後に `fe-build upload` が manifest を差し替え、upload の後の段が、本番の `manifest.json` とこの build の manifest を `cmp` で比べる。一致しなければ deploy は失敗し、wrangler は飛ぶ。スモークが落ちれば、門の段は動かず、manifest は替わらない(既定の `success()`)。deploy が success でも engine が替わったとは限らないので、替わったかは実機のビーコンの版で確かめる。
+`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替えていた(`upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門は静かに閉じたままだった。手順は落ちず、deploy は success のままだった。その結果、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(#1363 の実機のビーコンで確かめた)。940e08fd は、スモークが通った sha を deploy が門の行に足す暫定の形にしたが、門そのものが deploy の迂回なので、門を廃止した(#1378)。
+
+今の形: `fe-build upload` は、常に bundle のファイルを上げ(`upload_sync_steps`)、最後に `manifest.json` を差し替える(`upload_manifest_step`)。順は変えない(ファイル → manifest)。main の deploy は、スモーク(起動の確認と Welcome 窓の流れ)が通った engine を、常に本番に出す。スモークが落ちれば deploy は失敗し、本番は替わらない(既定の `success()`)。upload の後の「本番の manifest を確かめる」は、本番の manifest とこの build の manifest を `cmp` で比べ、違えば deploy を失敗にする。deploy が success でも、engine が替わったかは実機のビーコンの版で確かめる。
+
+抽出の木の鍵(`host-`)は、インストーラの名前と抽出の引数(`lift/crates/fe-build/src/main.rs`)と、extract-fl が repo から読む `lift/harness/seeds/os-fonts/` の 4 件を含む。含まないと、これらを変えても古い木が使われ、変更が本番に出ない(#1378 で足した)。
+
+既知の残り(#1378 の範囲外。次の Issue の候補): (1) deploy の手順は `host` だけを取るため、`lift/out-app/host-extra/resources/System/Internet/error-offline.html` は無く、`fe-build bundle` はそれを黙って省く(`pack_step_for` の分岐)。本番の bundle に、オフラインの頁が入らない。(2) commit の題名に `[skip ci]` が在る push では、GitHub が deploy を起動しない。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
 

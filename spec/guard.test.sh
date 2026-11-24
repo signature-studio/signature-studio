@@ -16,6 +16,9 @@ ok "deploy-lint: 守っている物は通る" "$(rc bash "$g/deploy-lint.sh" "$T
 printf 'jobs:\n  a:\n    steps:\n      - run: bash ci/x.sh\n' > "$T/sh.yml"; ok "deploy-lint: シェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/sh.yml")" 1
 printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/y\n' > "$T/local.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/local.yml")" 1
 printf 'on:\n  workflow_call:\n' > "$T/reuse.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/reuse.yml")" 1
+mkdir -p "$T/cwd/.github/workflows"
+ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
+ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cp "$T/good.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 0
 # 内容の検査(scan.sh は相対パスで規則の範囲を決めるので、一時ディレクトリの中で走らせる)
 mkdir -p "$T/app"
 v1=anthr; v2=opic
