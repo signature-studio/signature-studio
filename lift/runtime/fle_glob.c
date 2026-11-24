@@ -122,6 +122,57 @@ static fle_movable *mv_of(uint64_t h)
     return &mv[i];
 }
 
+/* For the clipboard (fle_clip.c, #1389): a GMEM_MOVEABLE object of `bytes` bytes copied from `src` (what GlobalAlloc with GMEM_MOVEABLE and a copy would give);
+ * 0 when the host refuses the memory. The handle is one the guest may GlobalLock like any other. */
+uint64_t fle_glob_movable_from(const void *src, uint64_t bytes)
+{
+    fle_movable *o;
+    void *p;
+
+    if (mv_n + 2 >= FLE_GLOBAL_REGION_SIZE / FLE_GLOBAL_HANDLE_STEP) fle_stop("GlobalAlloc", "movable handle region exhausted");
+    p = !fle_host_size_fits(bytes) ? NULL : malloc((size_t)(bytes ? bytes : 1));
+    if (!p) return 0;
+    if (bytes) memcpy(p, src, (size_t)bytes);
+    if (mv_n == mv_cap) {
+        uint64_t nc = mv_cap ? mv_cap * 2 : 64;
+        fle_movable *nm = realloc(mv, nc * sizeof *nm);
+
+        if (!nm) fle_stop("GlobalAlloc", "out of memory");
+        mv = nm;
+        mv_cap = nc;
+    }
+    o = &mv[mv_n++];
+    o->mem = p;
+    o->size = bytes;
+    o->lock = 0;
+    o->live = 1;
+    mv_live++;
+    return FLE_GLOBAL_HANDLE_BASE + FLE_GLOBAL_HANDLE_STEP * mv_n;
+}
+
+/* The bytes of a live movable object, read without a lock (the clipboard reads what SetClipboardData was given). False for any other handle. */
+int fle_glob_movable_bytes(uint64_t h, const uint8_t **p, uint64_t *n)
+{
+    fle_movable *o = mv_of(h);
+
+    if (!o || !o->mem) return 0;
+    *p = (const uint8_t *)o->mem;
+    *n = o->size;
+    return 1;
+}
+
+/* Frees a movable object that the runtime made (fle_glob_movable_from). A handle that is not live is left alone. */
+void fle_glob_movable_drop(uint64_t h)
+{
+    fle_movable *o = mv_of(h);
+
+    if (!o) return;
+    free(o->mem);
+    o->mem = NULL;
+    o->live = 0;
+    mv_live--;
+}
+
 /* kernel32!GlobalAlloc: HGLOBAL GlobalAlloc(UINT uFlags rcx (ecx), SIZE_T dwBytes rdx). The page: zero flags is
  * GMEM_FIXED; GMEM_MOVEABLE with dwBytes 0 returns a handle to a discarded object; failure returns NULL and the code
  * is on GetLastError (the page names none; ERROR_NOT_ENOUGH_MEMORY 8 is an assumption, the only failure here is an

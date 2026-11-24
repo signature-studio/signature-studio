@@ -1,5 +1,5 @@
 --tsv
-lift/harness/seeds/vfs-seed-idle1.tsv
+lift/out-app/plugins/vfs-seed-idle1.tsv
 --extra
 lift/harness/seeds/reg-seed-nsis.tsv
 --extra
@@ -10,8 +10,6 @@ lift/harness/seeds/authenticode-claims.tsv
 lift/out-app/host
 --out
 lift/out-app/seed/seed.bin
---lazy
-lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll
 --lazy
 lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Filter_x64.dll
 --lazy

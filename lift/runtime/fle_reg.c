@@ -15,6 +15,9 @@
 
 /* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
 int fle_win_api_trace_on(void) __attribute__((weak));
+/* Issue #1383: the page keeps the HKCU tree (see "persistence" below). Defined by the browser build (harness/fruity_idle.c, which calls the page's library); weak: a native build has none. */
+void fle_reg_page_put(const uint8_t *buf, uint32_t len) __attribute__((weak));
+uint32_t fle_reg_page_saved(uint8_t *buf, uint32_t cap) __attribute__((weak));
 
 #define KEY_NAME_MAX   255u      /* MSDN: Registry Element Size Limits (key name) */
 #define VALUE_NAME_MAX 16383u    /* same page (value name) */
@@ -107,6 +110,70 @@ static reg_value *val_find(const reg_key *k, const uint16_t *n, size_t nl)
     for (i = 0; i < k->nvals; i++)
         if (fle_w_icmp(k->vals[i].name, k->vals[i].nlen, n, nl) == 0) return &k->vals[i];
     return NULL;
+}
+
+static void trace_path(const reg_key *k);
+static void trace_set(const reg_key *k, const reg_value *v);
+
+/* ---- persistence (Issue #1383) ----
+ * The HKCU tree is kept by the page (app/src/engine/regstore.ts). After each change under HKCU, reg_journal hands one record to the page (fle_reg_page_put, a
+ * synchronous import: the page appends it to its saved log and flushes it before the guest goes on). Before the guest runs, the saved records are read back and
+ * replayed after the seed values (fle_reg_restore_saved), so a saved value replaces the seed's. Nothing is recorded before the replay (the seed is not recorded).
+ * A record (little endian): u8 op | u32 k | k bytes (the key's path below HKCU, UTF-16LE, no leading backslash) | u32 n | n bytes (the value name, UTF-16LE) |
+ * u32 type | u32 d | d bytes (the data: only for op 2). op 1: the key exists; op 2: the value is set; op 3: the value is deleted; op 4: the key and all under it are deleted. */
+#define REG_OP_KEY 1u
+#define REG_OP_VALUE 2u
+#define REG_OP_DEL_VALUE 3u
+#define REG_OP_DEL_KEY 4u
+static int reg_journal_on;
+
+static void put_u32(uint8_t *b, size_t *at, uint32_t v)
+{
+    b[(*at)++] = (uint8_t)v;
+    b[(*at)++] = (uint8_t)(v >> 8);
+    b[(*at)++] = (uint8_t)(v >> 16);
+    b[(*at)++] = (uint8_t)(v >> 24);
+}
+
+static void put_unit(uint8_t *b, size_t *at, uint16_t u)
+{
+    b[(*at)++] = (uint8_t)u;
+    b[(*at)++] = (uint8_t)(u >> 8);
+}
+
+static void reg_journal(uint8_t op, const reg_key *k, const uint16_t *name, size_t nl, uint32_t type, const uint8_t *data, uint32_t size)
+{
+    const reg_key *chain[TREE_DEPTH_MAX + 1], *p = k;
+    size_t depth = 0, units = 0, i, j, at = 0, total;
+    uint8_t *b;
+
+    if (!reg_journal_on || !fle_reg_page_put) return;
+    for (; p->parent; p = p->parent) {
+        if (depth > TREE_DEPTH_MAX) return;
+        chain[depth++] = p;
+    }
+    if (p != &roots[1]) return;   /* only HKCU is kept */
+    for (i = 0; i < depth; i++) units += chain[i]->nlen;
+    if (depth > 1) units += depth - 1;
+    total = 1 + 4 + 2 * units + 4 + 2 * nl + 4 + 4 + (op == REG_OP_VALUE ? size : 0);
+    b = malloc(total);
+    if (!b) fle_stop("registry", "out of memory");
+    b[at++] = op;
+    put_u32(b, &at, (uint32_t)(2 * units));
+    for (i = depth; i-- > 0;) {
+        if (i + 1 != depth) put_unit(b, &at, '\\');
+        for (j = 0; j < chain[i]->nlen; j++) put_unit(b, &at, chain[i]->name[j]);
+    }
+    put_u32(b, &at, (uint32_t)(2 * nl));
+    for (j = 0; j < nl; j++) put_unit(b, &at, name[j]);
+    put_u32(b, &at, type);
+    put_u32(b, &at, op == REG_OP_VALUE ? size : 0);
+    if (op == REG_OP_VALUE && size) {
+        memcpy(b + at, data, size);
+        at += size;
+    }
+    fle_reg_page_put(b, (uint32_t)total);
+    free(b);
 }
 
 /* Decision 0085 (provisional): HKEY_LOCAL_MACHINE starts with one empty key, Software (Learn: Registry Hives and
@@ -408,6 +475,14 @@ void fle_imp_RegCreateKeyExW(void)
         cur = k;
     }
     free(s);
+    if (disp == 1) {
+        reg_journal(REG_OP_KEY, cur, NULL, 0, 0, NULL, 0);
+        if (fle_win_api_trace_on && fle_win_api_trace_on()) {
+            fprintf(stderr, "window-api: RegCreateKeyExW created \"");
+            trace_path(cur);
+            fprintf(stderr, "\"\n");
+        }
+    }
     if (pdisp) fle_st(pdisp, 4, disp);
     fle_st(pout, 8, kh_alloc(cur, sam));
     ret(0);
@@ -419,6 +494,43 @@ static int type_ok(uint32_t t)
 {
     return t == FLE_REG_NONE || t == FLE_REG_SZ || t == FLE_REG_EXPAND_SZ || t == FLE_REG_BINARY ||
            t == FLE_REG_DWORD || t == FLE_REG_MULTI_SZ || t == FLE_REG_QWORD;
+}
+
+/* Stores a value under k: the name is copied, the data (cb bytes, or NULL when cb is 0) is taken over. The change is recorded for the page (reg_journal). */
+static reg_value *value_set(reg_key *k, const uint16_t *name, size_t nl, uint32_t type, uint8_t *data, uint32_t cb)
+{
+    reg_value *v = val_find(k, name, nl);
+    if (v) {
+        free(v->data);
+    } else {
+        if (k->nvals == k->vcap) {
+            size_t nc = k->vcap ? k->vcap * 2 : 8;
+            reg_value *nv = realloc(k->vals, nc * sizeof *nv);
+            if (!nv) fle_stop("registry", "out of memory");
+            k->vals = nv;
+            k->vcap = nc;
+        }
+        v = &k->vals[k->nvals++];
+        v->name = dup_w(name, nl);
+        v->nlen = nl;
+    }
+    v->type = type;
+    v->data = data;
+    v->size = cb;
+    k->wt = rtick();
+    reg_journal(REG_OP_VALUE, k, v->name, v->nlen, v->type, v->data, v->size);
+    return v;
+}
+
+/* Removes a value of k (the change is recorded for the page first: reg_journal). */
+static void value_remove(reg_key *k, reg_value *v)
+{
+    reg_journal(REG_OP_DEL_VALUE, k, v->name, v->nlen, 0, NULL, 0);
+    free(v->name);
+    free(v->data);
+    memmove(v, v + 1, (size_t)(k->vals + k->nvals - (v + 1)) * sizeof *v);
+    k->nvals--;
+    k->wt = rtick();
 }
 
 /* advapi32!RegSetValueExW (MSDN: RegSetValueExW, Registry Value Types). hKey rcx, lpValueName rdx (NULL or ""
@@ -469,26 +581,9 @@ void fle_imp_RegSetValueExW(void)
         if (!copy) fle_stop(api, "out of memory");
         memcpy(copy, (const void *)fle_addr(pd, (unsigned)cb, 0), cb);
     }
-    v = val_find(k, name, nl);
-    if (v) {
-        free(v->data);
-        free(name);
-    } else {
-        if (k->nvals == k->vcap) {
-            size_t nc = k->vcap ? k->vcap * 2 : 8;
-            reg_value *nv = realloc(k->vals, nc * sizeof *nv);
-            if (!nv) fle_stop(api, "out of memory");
-            k->vals = nv;
-            k->vcap = nc;
-        }
-        v = &k->vals[k->nvals++];
-        v->name = name;
-        v->nlen = nl;
-    }
-    v->type = type;
-    v->data = copy;
-    v->size = cb;
-    k->wt = rtick();
+    v = value_set(k, name, nl, type, copy, cb);
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) trace_set(k, v);
+    free(name);
     ret(0);
 }
 
@@ -531,13 +626,12 @@ static void trace_put_units(const uint16_t *s, size_t n, size_t max)
     for (i = 0; i < n && i < max; i++) fputc(s[i] >= 0x20 && s[i] < 0x7f && s[i] != '"' ? (int)s[i] : '?', stderr);
 }
 
-static void trace_query(const reg_key *k, const uint16_t *name, size_t nl, const reg_value *v)
+static void trace_path(const reg_key *k)
 {
     const reg_key *chain[64];
     size_t n = 0, i;
 
     for (const reg_key *p = k; p && n < 64; p = p->parent) chain[n++] = p;
-    fprintf(stderr, "window-api: RegQueryValueExW \"");
     for (i = n; i-- > 0;) {
         const reg_key *p = chain[i];
         if (!p->parent && root_name(p)) fprintf(stderr, "%s", root_name(p));
@@ -546,6 +640,30 @@ static void trace_query(const reg_key *k, const uint16_t *name, size_t nl, const
             trace_put_units(p->name, p->nlen, KEY_NAME_MAX);
         }
     }
+}
+
+/* Issue #1383 (diagnostics, as the query line): one line for a value that was set, with the value as the query line shows it */
+static void trace_set(const reg_key *k, const reg_value *v)
+{
+    fprintf(stderr, "window-api: RegSetValueExW \"");
+    trace_path(k);
+    fprintf(stderr, "\" \"");
+    trace_put_units(v->name, v->nlen, VALUE_NAME_MAX);
+    fprintf(stderr, "\" type=%u size=%u", (unsigned)v->type, (unsigned)v->size);
+    if ((v->type == 1u || v->type == 2u) && v->size >= 2u) {
+        fprintf(stderr, " value=\"");
+        trace_put_units((const uint16_t *)(const void *)v->data, v->size / 2u, 120u);
+        fprintf(stderr, "\"");
+    } else if (v->type == 4u && v->size >= 4u) {
+        fprintf(stderr, " value=%u", (unsigned)(v->data[0] | (v->data[1] << 8) | (v->data[2] << 16) | ((uint32_t)v->data[3] << 24)));
+    }
+    fputc('\n', stderr);
+}
+
+static void trace_query(const reg_key *k, const uint16_t *name, size_t nl, const reg_value *v)
+{
+    fprintf(stderr, "window-api: RegQueryValueExW \"");
+    trace_path(k);
     fprintf(stderr, "\" \"");
     trace_put_units(name ? name : empty_w, name ? nl : 0, VALUE_NAME_MAX);
     fprintf(stderr, "\" -> ");
@@ -622,11 +740,7 @@ void fle_imp_RegDeleteValueW(void)
         ret(FLE_W32_ERR_FILE_NOT_FOUND);
         return;
     }
-    free(v->name);
-    free(v->data);
-    memmove(v, v + 1, (size_t)(k->vals + k->nvals - (v + 1)) * sizeof *v);
-    k->nvals--;
-    k->wt = rtick();
+    value_remove(k, v);
     ret(0);
 }
 
@@ -782,6 +896,30 @@ void fle_imp_RegQueryInfoKeyW(void)
     ret(0);
 }
 
+/* Removes k with its values and its subkeys. RegDeleteKeyW removes a leaf only; the replay of a saved deletion (fle_reg_restore_saved) removes the whole key. */
+static void key_free(reg_key *k)
+{
+    reg_key *p = k->parent;
+    size_t j;
+    while (k->nkids) key_free(k->kids[k->nkids - 1]);
+    for (j = 0; p && j < p->nkids; j++) {
+        if (p->kids[j] == k) {
+            memmove(&p->kids[j], &p->kids[j + 1], (p->nkids - j - 1) * sizeof p->kids[0]);
+            p->nkids--;
+            break;
+        }
+    }
+    if (p) p->wt = rtick();
+    for (j = 0; j < k->nvals; j++) {
+        free(k->vals[j].name);
+        free(k->vals[j].data);
+    }
+    free(k->vals);
+    free(k->kids);
+    free(k->name);
+    free(k);
+}
+
 /* advapi32!RegDeleteKeyW (MSDN: RegDeleteKeyW). hKey rcx (access rights do not matter, page), lpSubKey rdx
  * (NULL stops, page: cannot be NULL; an empty string stops, the page does not define it). The key must exist
  * (2: inference) and have no subkeys: the page says it cannot, without a code, so ERROR_ACCESS_DENIED (5) is
@@ -818,26 +956,8 @@ void fle_imp_RegDeleteKeyW(void)
         return;
     }
     if (cur->opens) fle_stop(api, "deleting a key that still has open handles is not implemented");
-    {
-        reg_key *p = cur->parent;
-        size_t j;
-        for (j = 0; j < p->nkids; j++) {
-            if (p->kids[j] == cur) {
-                memmove(&p->kids[j], &p->kids[j + 1], (p->nkids - j - 1) * sizeof p->kids[0]);
-                p->nkids--;
-                break;
-            }
-        }
-        p->wt = rtick();
-        for (j = 0; j < cur->nvals; j++) {
-            free(cur->vals[j].name);
-            free(cur->vals[j].data);
-        }
-        free(cur->vals);
-        free(cur->kids);
-        free(cur->name);
-        free(cur);
-    }
+    reg_journal(REG_OP_DEL_KEY, cur, NULL, 0, 0, NULL, 0);
+    key_free(cur);
     ret(0);
 }
 
@@ -852,4 +972,117 @@ void fle_imp_RegFlushKey(void)
         return;
     }
     ret(0);
+}
+
+/* ---- restore (Issue #1383) ---- */
+
+static uint32_t get_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+
+/* the UTF-16LE bytes of a path or a name as units (a new array of bytes/2 units) */
+static uint16_t *units_of(const uint8_t *p, size_t bytes)
+{
+    uint16_t *s = malloc(bytes + 2);
+    size_t i;
+    if (!s) fle_stop("registry", "out of memory");
+    for (i = 0; i < bytes / 2; i++) s[i] = (uint16_t)(p[2 * i] | p[2 * i + 1] << 8);
+    return s;
+}
+
+/* The key at a path below HKCU (units, no leading backslash); create: the missing keys on the way are made. NULL when the path does not exist. */
+static reg_key *path_key(const uint16_t *s, size_t units, int create)
+{
+    reg_key *cur = &roots[1];
+    size_t i = 0;
+    if (units == 0) return cur;
+    for (;;) {
+        size_t j = i;
+        reg_key *k;
+        while (j < units && s[j] != '\\') j++;
+        if (j == i || j - i > KEY_NAME_MAX) return NULL;
+        k = kid_find(cur, s + i, j - i);
+        if (!k && create) k = kid_add(cur, s + i, j - i);
+        if (!k) return NULL;
+        cur = k;
+        if (j >= units) break;
+        i = j + 1;
+    }
+    return cur;
+}
+
+/* Replays the records the page saved (the format is above reg_journal). A record cut short ends the replay. */
+static void restore_records(const uint8_t *buf, size_t n)
+{
+    size_t at = 0;
+    while (at < n) {
+        uint8_t op = buf[at];
+        size_t p = at + 1, kl, nl, dl;
+        uint32_t type;
+        const uint8_t *kp, *np, *dp;
+        uint16_t *ks, *ns;
+        reg_key *k;
+
+        if (n - p < 4) break;
+        kl = get_u32(buf + p);
+        p += 4;
+        if (kl > n - p || kl % 2) break;
+        kp = buf + p;
+        p += kl;
+        if (n - p < 4) break;
+        nl = get_u32(buf + p);
+        p += 4;
+        if (nl > n - p || nl % 2) break;
+        np = buf + p;
+        p += nl;
+        if (n - p < 8) break;
+        type = get_u32(buf + p);
+        p += 4;
+        dl = get_u32(buf + p);
+        p += 4;
+        if (dl > n - p) break;
+        dp = buf + p;
+        p += dl;
+        at = p;
+        if (op < REG_OP_KEY || op > REG_OP_DEL_KEY) break;
+        ks = units_of(kp, kl);
+        ns = units_of(np, nl);
+        k = path_key(ks, kl / 2, op == REG_OP_KEY || op == REG_OP_VALUE);
+        if (k && op == REG_OP_VALUE) {
+            uint8_t *copy = NULL;
+            if (dl) {
+                copy = malloc(dl);
+                if (!copy) fle_stop("registry", "out of memory");
+                memcpy(copy, dp, dl);
+            }
+            value_set(k, ns, nl / 2, type, copy, (uint32_t)dl);
+        } else if (k && op == REG_OP_DEL_VALUE) {
+            reg_value *v = val_find(k, ns, nl / 2);
+            if (v) value_remove(k, v);
+        } else if (k && op == REG_OP_DEL_KEY && k != &roots[1]) {
+            key_free(k);
+        }
+        free(ks);
+        free(ns);
+    }
+}
+
+/* Called once, after the seed values and before the guest runs (main_two.c). The page gives the saved records (the count first, then the bytes); they are replayed,
+ * and from then on every change under HKCU is recorded. Without the page's library (a native build) this does nothing. */
+void fle_reg_restore_saved(void)
+{
+    uint32_t n;
+    uint8_t *buf;
+
+    if (!fle_reg_page_saved) return;
+    n = fle_reg_page_saved(NULL, 0);
+    if (n) {
+        buf = malloc(n);
+        if (!buf) fle_stop("registry", "out of memory");
+        if (fle_reg_page_saved(buf, n) != n) fle_stop("registry", "the saved registry changed between the two reads");
+        restore_records(buf, n);
+        free(buf);
+    }
+    reg_journal_on = 1;
 }

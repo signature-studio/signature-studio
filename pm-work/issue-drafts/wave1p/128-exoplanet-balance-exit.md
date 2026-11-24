@@ -51,6 +51,36 @@ project: signature-studio/3
 6. 前回の作業の保存(`work.diff`): `pm-work/findings/exoplanet-exit-1372.md`(調査の記録。commit `8ca2d33e`)。次の再試行で取り込まれる。作業者は同じパスのファイルを作らない(衝突する)。
 7. 未確認: DEDZII の File > Open(回帰)は測っていない。受け入れは通っていない。
 
+## 2 回目の試行で分かったこと
+
+- 2 回目: run 45436306690(job「作業 #1372」、判定の段)。作業者の受け入れは通った(commit `a3880663`。Exoplanet・DEDZII とも `error` null・`state` engine-idle・`quantaWhilePlaying` 1 以上)。判定の段が 18:11:51Z に落ちた。runner の値。
+- 判定の取り直し(run のログ。実測):
+  - ビルドと `fe-build bundle` は通った。起動確認(`boot.json`)は engine-idle。判定の行: `judge: 起動確認の結果: {"state":"engine-idle","error":null,"standIn":false,"elapsedMs":11228}`。ログの engine-idle の行は 18:10:36Z と 18:11:19Z に出ている。
+  - Exoplanet の計測は 18:11:43Z の trace の行で終わった。DEDZII の計測は出力が無いまま、18:11:51Z に `judge: 受け入れコマンドが失敗した` で落ちた。
+  - 計測の JSON は判定のログに出ない(`$RUNNER_TEMP/open-*.json`)。よって、DEDZII の失敗の原因は、このログからは確認できない。
+  - #1393 の型(`no first idle … within 180000 ms`)は、この run には出ていない。#1398 と同じ停止とは断定しない。
+- 前回の調査の記録(`pm-work/findings/exoplanet-exit-1372.md`)と、前回の作業の commit(`8ca2d33e`・`a3880663`)は、main に無い(判定が通らず、push されていない)。
+- 前回の差分(2 つの一覧からの 1 行削除)は、今の main に当てはまらない。#1369(commit `c696e348`)が `lift/harness/hyb/lists/lowered-balance.txt` と `lift/harness/hyb/lowered-all.txt` を消し、直接 wasm の一覧は `lift/out-app/plugins/lists/` へ生成されるようになった。
+- 読んだ結果(コードの読み。実測ではない):
+  - 直接 wasm の一覧は、`lift/crates/fe-build/src/plugins.rs` の `run_list` が、fe-wasmgen の report の ok から hook 点を引いて作る。`gen-all` は `--omit-list lowered-all.txt`(一覧の和)を読むので、一覧に在る VA は C で lift されない。
+  - 呼び出し元の入口 `0x6ac13a0` が直接 wasm のとき、続き `0x6ac13c0` の登録(`fle_landing_push`)は作られない。登録は、呼び出し元を C で lift したとき、`lift/crates/fe-lift/src/lib.rs` の `succ`(1001–1006 行)が作る。
+  - 続きの seed は、`lift/crates/fe-lift/src/main.rs` の `extra_seeds`(45 行)が、`--seeds` が無くても常に足す。前回の候補 (b)(`--seeds` の行)は効かない見込み。
+  - RVA は base に依らない。`0x6ac13a0` − 旧 base `0x6800000`(判定の run の base。一覧の名前 `fruity_balance_x64.6800000` と同じ)= `0x2c13a0`。続きは `0x2c13c0`。
+- 前回の候補 (a)・(b) は、次の節の方針に置き換える。
+- 判定の段は計測の JSON を出さないため、落ちた理由が見えない。`guard/judge.sh` で計測の `error` を判定の出力に出すのは、ハーネスの別の Issue として切る案。
+
+## 次にやること
+
+1. 直す方式: 一覧から外す入口を、`lift/plugins/fruity-balance/plugin.tsv` の新しい列 `omit` で指定する。hook 列は使わない。
+   - hook 列(`none`・`existing`・`rva:` の RVA をちょうど 3 個)は、Delphi ランタイムが実行時に書き換える関数の印(`fe-lift --hook-points`。ガードと登録表が付く)。setjmp の入口は、その型ではない。`parse_hook` は 3 個に限るので、入口を足せない。
+   - `omit`(8 列目。DLL の RVA を 16 進で、カンマ区切り。無いときは `-`)の RVA は、直接 wasm の一覧から外れ、C が残す。`run_list` は ok から hook 点と `omit` の両方を引く。`lowered-all` は一覧の和なので、C の lift に自動で入る。
+   - Balance の行: `omit` は `0x2c13a0`。`hook` は `existing` のまま。ヘッダと `COLUMNS`・`parse_plugin` の列数を 8 にする。
+   - `lift/crates/fe-build/tests/plugins/*/plugin.tsv` の 2 件も 8 列に揃える。単体試験: `omit` の VA が一覧から外れる・列の数の誤りを拒む・RVA の形。
+2. 長期の注意(setjmp の入口。第 2 波の DLL にも同じ問題が出うる): 入口が setjmp を呼ぶ関数は、直接 wasm にしない、を自動で判定する。案: fe-wasmgen(fe-decode に依存済み)の `--report` で、`fe_decode::setjmp::landings` の `call_va` を含む関数の status を ok にしない。`run_list` が一覧から自動で外す。この Issue の範囲に入るなら入れる。入らなければ、報告に「次の Issue の案」と書く。
+3. 生成物で確かめる(ビルドの後): `lift/out-app/plugins/lists/lowered-balance.txt` に、入口(base + `0x2c13a0`)が無いこと。`lift/out-app/gen/src/*.c` に `fle_landing_push(&lj, UINT64_C(` で始まり、続き(base + `0x2c13c0`)を指す登録が 1 件あること。base は `lift/out-app/plugins/plugins.tsv` の値。
+4. 受け入れ(③。保つ): Exoplanet と DEDZII の両方で、`error` null・engine-idle・`quantaWhilePlaying` 1 以上。判定の段が落ちたら、その行を報告に貼る。
+5. 変えるパス: `lift/crates/fe-build/src/plugins.rs`・`lift/plugins/fruity-balance/plugin.tsv`・`lift/crates/fe-build/tests/plugins/`(長期の案を入れるなら `lift/crates/fe-wasmgen/src/` の report も)。`lift/` を変えると main の deploy が動く。報告に書く。
+
 ## 読む物
 
 - `pm-work/findings/exoplanet-exit-1372.md`(前回の調査の記録。取り込まれていれば)
@@ -104,3 +134,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - #1335・#1335(P3 の測定の入力)。
 - #1342・#1319(Fruity Balance と Fruity Filter の、起動後の取得)が、同じ経路を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 - #1400(Sytrus を、同じ型で 1 プラグイン 1 wasm として届ける)は、この Issue の直しの後に入る(blocked by の関係は `#1400` 側に在る)。
+
+

@@ -3,7 +3,7 @@
 //   Nothing else: no other origin (the CSP says connect-src 'self'), no cookie of the app's own (credentials: 'same-origin': the only cookie that can go with it is Cloudflare Access's CF_Authorization, which Access needs to let the POST through to the Worker; the Worker keeps neither it nor the identity, worker/perf-store.ts), no IP address, no field input.
 import type { BrowserInfo, ClientInfo } from './browser-info.ts';
 import type { DisplaySnapshot, HzInfo } from './display.ts';
-import { TARGETS, WASM_MEMORY_LIMIT_BYTES, type InputLatencyStats, type IntervalStats } from './stats.ts';
+import { RECENT_WINDOW_MS, TARGETS, WASM_MEMORY_LIMIT_BYTES, type InputLatencyStats, type IntervalStats } from './stats.ts';
 import { PERF_PATH, PERF_MAX_BODY, PERF_STORED_HEADER, PERF_UI_CLASS_MAX, PERF_UI_WINDOWS_MAX, PERF_EXIT_EVIDENCE_MAX, PERF_EXIT_FACTS_MAX_BYTES, PERF_EXIT_KIND_MAX, PERF_EXIT_LAST_FLE_MAX, PERF_EXIT_STOP_LINE_MAX, utf8Length } from '../../shared/perf.ts';
 import { sanitizeEngineText, type EngineStop } from './exit-message.ts';
 import type { GuestScreenInfo } from '../ui/screen-fit.ts';
@@ -22,6 +22,8 @@ export const BEACON_MAX_PERIODIC = 20;
  * does not know it ignores it (the server stores the object as it is; shared/perf.ts beaconProblems checks the field only when it is there), and a record without it is a record of the engine before this change. * Still 3 (Issue #1364): `uiWindows` is an OPTIONAL array of the top-level windows of the engine's window table (class name and size, at most 8, the front first; no title, no position). The page works out no scale: the size of the FL window against the device pixel ratio is read from the records. Absent: the log has no window table yet (a record from before this change). * Decision 0205 (still version 3: it has not been deployed): the answer is the frame posted in the processing window; `input.answered / late / noAnswer` count the processed inputs by how they were answered, and an input with no answer is not in the percentiles.
  * Still 3 (Issue #1380): `engine.exit.stop` (the stop report's facts: lastFle, stopLine, abortKind, memoryBytes) and `engine.exit.evidence` (the first non-background pixel line) are OPTIONAL, added to `engine.exit`; `files.engine` gets the
  * answers' kinds (`answeredUnderDemo`, `answeredFlp`, `answeredBytes`: counts only). A record without them is a record from before this change.
+ * Still 3 (Issue #1398): `desk.recent10s` (the presents of the last 10 s and their rate), `input.inputToPresentMsP50` / `input.inputToPresentMsP95` (the same numbers as `input.eventToRaf`'s p50Ms / p95Ms) and the top-level `rafIntervalMsP95`
+ * (the same number as `display.raf.recent10s.p95Ms`) are OPTIONAL: a record from before this change has none of them.
  */
 export const BEACON_VERSION = 3;
 
@@ -42,7 +44,8 @@ export interface BeaconPayload {
   timeline: Record<string, number>;
   startup: { firstIdleSeconds: number | null; targetSeconds: number };
   ui: { updates: { total: number; recent10s: IntervalStats } | null; engineIdles: { total: number; recent10s: IntervalStats }; targetUpdatesPerSecond: number };
-  input: InputLatencyStats & { targetP95Ms: number };
+  /** Issue #1398: inputToPresentMsP50 / P95 are input.eventToRaf's p50Ms / p95Ms of the last 20 inputs, read as the page reads them; absent: a record from before this field */
+  input: InputLatencyStats & { targetP95Ms: number; inputToPresentMsP50?: number | null; inputToPresentMsP95?: number | null };
   /** AudioWorklet under-runs; null: nothing is measured (no AudioWorklet, or the audio output has not run yet) */
   audio: { underruns: number | null; /** decision 0175/0211: present when the page has an audio output (everywhere but a browser without AudioWorklet): status, ctxState, sampleRate, baseLatencyMs, outputLatencyMs, autoplayPolicy, gestures, lastResume, fillFrames, underruns ... (PageAudio.detail()) */ detail?: Record<string, unknown> };
   /** decision 0170: the size of the engine's wasm memory at the last idle report, the limit of its memory section, and the fraction (null: no engine memory yet) */
@@ -65,6 +68,8 @@ export interface BeaconPayload {
   engineRun?: EngineRunBeacon;
   /** Issue #1364: the top-level windows of the engine's window table (uiWindowsOf): class name and size, at most 8, the front first; absent: no window table in the log yet, or a record from before this field */
   uiWindows?: UiWindow[];
+  /** Issue #1398: the p95 of the rAF intervals of the display meter's recent window (display.raf.recent10s.p95Ms, the same number: the last 10 s, or in burst mode the latest burst); null: no display meter (or no interval yet); absent: a record from before this field */
+  rafIntervalMsP95?: number | null;
 }
 
 /** Issue #1364: one top-level window of the engine's window table: its class name and its size in guest pixels (no title, no position) */
@@ -84,7 +89,13 @@ export function uiWindowsOf(windows: readonly EngineWindow[] | null | undefined)
 }
 
 export interface DeskCounters { presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
-export interface DeskBeacon extends DeskCounters { mode: 'gl' | '2d'; since: (DeskCounters & { seconds: number }) | null }
+export interface DeskBeacon extends DeskCounters { mode: 'gl' | '2d'; since: (DeskCounters & { seconds: number }) | null; /** Issue #1398: the presents of the last 10 s (deskRecent) */ recent10s: DeskRecent }
+/** Issue #1398: one report of the presenter's cumulative count, at the page's clock (when the page received the Worker's report) */
+export interface DeskSample { at: number; presents: number }
+/** Issue #1398: the presents of the last 10 s: the count in the window, the seconds the window covers, and the rate (null: under one second, or no report yet) */
+export interface DeskRecent { seconds: number; presents: number; presentsPerSec: number | null }
+/** Issue #1398: the most reports the page keeps (a report comes at most every 100 ms while the presenter presents: about 100 in 10 s) */
+export const DESK_HISTORY_MAX = 512;
 export interface EngineRunBeacon { windowSeconds: number; idles: number; busyFraction: number; busyMsMedian: number; busyMsP95: number; virtualPerWall: number }
 
 /** the presenter's counters as the Worker reports them (engine/protocol.ts 'desk' message; the GL presenter adds drawMs, uploads, draws) in the beacon's units */
@@ -94,12 +105,44 @@ export function deskCounters(s: Record<string, unknown> | null | undefined): Des
   const r = (x: number, d: number): number => Math.round(x * 10 ** d) / 10 ** d;
   return { presents: n('presents'), rects: n('rects'), mpx: r(n('pixels') / 1e6, 3), composeMs: r(n('composeMs'), 1), putMs: r(n('putMs'), 1), drawMs: r(n('drawMs'), 1), uploads: n('uploads'), draws: n('draws'), whole: n('whole'), ticks: n('ticks'), idleTicks: n('idleTicks'), wakes: n('wakes'), sleeps: n('sleeps') };
 }
-export function deskBeacon(now: Record<string, unknown> | null | undefined, prev: { stats: Record<string, unknown>; atMs: number } | null, atMs: number): DeskBeacon | null {
+/** Issue #1398: the page's history of the presenter's count: each report the page receives (`add`), kept for the last 10 s and at most DESK_HISTORY_MAX. A count that goes down is a new presenter: the history starts again. */
+export class DeskHistory {
+  private readonly list: DeskSample[] = [];
+  add(at: number, presents: number): void {
+    if (!Number.isFinite(presents)) return;
+    const last = this.list[this.list.length - 1];
+    if (last && presents < last.presents) this.list.length = 0;
+    this.list.push({ at, presents });
+    // the newest report at or before the window's start stays (the base of the window); the older ones go
+    while (this.list.length > 1 && (this.list[1] as DeskSample).at <= at - RECENT_WINDOW_MS) this.list.shift();
+    if (this.list.length > DESK_HISTORY_MAX) this.list.splice(0, this.list.length - DESK_HISTORY_MAX);
+  }
+  get samples(): readonly DeskSample[] { return this.list; }
+}
+
+/**
+ * Issue #1398: the presents of the last `windowMs` before `now`, from the reports (the count is a step: it holds from one report to the next). The window starts at the newest report at or before `now - windowMs`;
+ * a history that does not reach back that far starts at its first report (the presents before it are not known). presentsPerSec = presents / seconds, rounded to 2 decimals; null under one second (too short for a rate) and when there is no report.
+ */
+export function deskRecent(samples: readonly DeskSample[], now: number, windowMs = RECENT_WINDOW_MS): DeskRecent {
+  const seen = samples.filter((s) => s.at <= now);
+  const latest = seen[seen.length - 1];
+  if (!latest) return { seconds: 0, presents: 0, presentsPerSec: null };
+  const from = now - windowMs;
+  const before = seen.filter((s) => s.at <= from).pop();
+  const start = before ?? (seen[0] as DeskSample);
+  const seconds = Math.round(now - (before ? from : start.at)) / 1000;
+  const presents = latest.presents - start.presents;
+  return { seconds, presents, presentsPerSec: seconds >= 1 ? Math.round((presents / seconds) * 100) / 100 : null };
+}
+
+/** `history`: the page's reports of the presenter's count (DeskHistory.samples); the presents of the last 10 s come from them */
+export function deskBeacon(now: Record<string, unknown> | null | undefined, prev: { stats: Record<string, unknown>; atMs: number } | null, atMs: number, history: readonly DeskSample[] = []): DeskBeacon | null {
   const c = deskCounters(now);
   if (!c) return null;
   const p = prev ? deskCounters(prev.stats) : null;
   const since = p && prev ? { seconds: Math.round((atMs - prev.atMs) / 100) / 10, presents: c.presents - p.presents, rects: c.rects - p.rects, mpx: Math.round((c.mpx - p.mpx) * 1000) / 1000, composeMs: Math.round((c.composeMs - p.composeMs) * 10) / 10, putMs: Math.round((c.putMs - p.putMs) * 10) / 10, drawMs: Math.round((c.drawMs - p.drawMs) * 10) / 10, uploads: c.uploads - p.uploads, draws: c.draws - p.draws, whole: c.whole - p.whole, ticks: c.ticks - p.ticks, idleTicks: c.idleTicks - p.idleTicks, wakes: c.wakes - p.wakes, sleeps: c.sleeps - p.sleeps } : null;
-  return { mode: typeof (now as Record<string, unknown>).draws === 'number' ? 'gl' : '2d', ...c, since };
+  return { mode: typeof (now as Record<string, unknown>).draws === 'number' ? 'gl' : '2d', ...c, since, recent10s: deskRecent(history, atMs) };
 }
 /** the idle reports of the last `windowMs` before `atMs` (wall ms, performance.timeOrigin based like `at`); `now` is the virtual clock in 100 ns ticks (10,000 per ms) */
 export function engineRunBeacon(idles: readonly { at: number; busyMs: number | null; now: number }[], atMs: number, windowMs = 10_000): EngineRunBeacon | null {
@@ -182,12 +225,13 @@ export function buildBeacon(i: BeaconInput): BeaconPayload {
     timeline: i.timeline,
     startup: { firstIdleSeconds: typeof idleMs === 'number' ? idleMs / 1000 : null, targetSeconds: TARGETS.startupSeconds },
     ui: { updates: { total: i.updates.total, recent10s: i.updates.recent }, engineIdles: { total: i.idles.total, recent10s: i.idles.recent }, targetUpdatesPerSecond: TARGETS.updatesPerSecond },
-    input: { ...i.input, targetP95Ms: TARGETS.inputToUpdateP95Ms },
+    input: { ...i.input, targetP95Ms: TARGETS.inputToUpdateP95Ms, inputToPresentMsP50: i.input?.eventToRaf?.p50Ms ?? null, inputToPresentMsP95: i.input?.eventToRaf?.p95Ms ?? null },
     audio: { underruns: i.underruns, ...(i.audioDetail ? { detail: i.audioDetail } : {}) },
     memory: { wasmBytes: i.wasmMemoryBytes ?? null, wasmLimitBytes: WASM_MEMORY_LIMIT_BYTES, wasmFraction: i.wasmMemoryBytes ? i.wasmMemoryBytes / WASM_MEMORY_LIMIT_BYTES : null },
     client: i.client ?? null,
     display: i.display ?? null,
     hz: i.hz ?? null,
+    rafIntervalMsP95: i.display ? i.display.raf.recent10s.p95Ms : null,
     guestScreen: i.guestScreen ?? null,
     ...(i.files ? { files: i.files } : {}),
     ...(i.assets ? { assets: i.assets } : {}),

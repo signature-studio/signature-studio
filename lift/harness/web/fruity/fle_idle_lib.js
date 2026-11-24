@@ -16,6 +16,12 @@ addToLibrary({
   // Issue #1342: the page loads a real module's separate wasm module (harness/two/xmod_glue.c; app/src/engine/xmod.ts): 1 when it is instantiated, 0 when the DLL has none
   fle_js_xmod_load__sig: 'ii',
   fle_js_xmod_load: (ptr) => { const f = Module['fleXmodLoad']; return f ? f(ptr) : 0; },
+  // Issue #1383: the page keeps the virtual registry's HKCU tree (app/src/engine/regstore.ts; the records are described at reg_journal in runtime/fle_reg.c). fle_js_reg_put hands one record to the page, which has
+  // saved it when the call returns; fle_js_reg_saved gives the byte count of the saved records (buf 0: the count only) and copies them into buf when cap is enough. Plain synchronous imports.
+  fle_js_reg_put__sig: 'vii',
+  fle_js_reg_put: (buf, len) => { const f = Module['fleRegPut']; if (f) f(HEAPU8.slice(buf, buf + len)); },
+  fle_js_reg_saved__sig: 'iii',
+  fle_js_reg_saved: (buf, cap) => { const f = Module['fleRegSaved']; const d = f ? f() : null; if (!d) return 0; if (buf && cap >= d.length) HEAPU8.set(d, buf); return d.length; },
   fle_idle_wait: (nowTicks, nextTicks) => {
     const S = FleIdle;
     S.count++;
