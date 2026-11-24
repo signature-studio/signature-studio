@@ -441,10 +441,10 @@ NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
-ok "新しい段: 551a4e59 より後の段は、extract に 15 件、work に 10 件(抽出物の追加の段と、起動用の実行ファイルの段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=15 work=10"
+ok "新しい段: 551a4e59 より後の段は、extract に 17 件、work に 12 件(抽出物の追加の段と、起動用の実行ファイルの段と、実機のビーコンの段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=17 work=12"
 ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
 ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
-ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 25
+ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 29
 ok "新しい段: R2 の鍵を使うのは、extract の 5 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し・起動用の実行ファイルの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
@@ -455,8 +455,8 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
 ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
-ok "保存の段: runs-on/cache/save が 5 つ(一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイル)、取り直したときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | map(test("cache-hit != .true.")) | "\(length) \(all)"' "$J")" "5 true"
-ok "復元の段: work の R2 の復元は 6 つ(既存の 1、一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイル)、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true,true,true,true"
+ok "保存の段: runs-on/cache/save が 6 つ。一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイルの 5 つは取り直したときだけ動き、実機のビーコンの 1 つはラベルの作業のときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | "\(length)/\(map(select(test("cache-hit != .true."))) | length)/\(map(select(test("perf-beacons"))) | length)"' "$J")" "6/5/1"
+ok "復元の段: work の R2 の復元は 7 つ(既存の 1、一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイル・実機のビーコン)、すべてが fail-on-cache-miss を持つ" "$(jq -r '[.jobs.work.steps[] | select(.uses == "runs-on/cache/restore@v5") | .with["fail-on-cache-miss"]] | map(tostring) | join(",")' "$J")" "true,true,true,true,true,true,true"
 ok "作業ツリーへの配置は commit しない(inputs/ に置く段に git が無い)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("inputs/ に置く")) | .run] | .[0] // "" | contains("git ")' "$J")" false
 ok "node の道具は、一覧と外部の検査で呼ぶ(fl-installer-files と external-inputs/check)" "$(grep -cF 'node tools/fl-installer-files.mjs' "$A")/$(grep -cF 'node tools/external-inputs/check.mjs' "$A")" "1/2"
 ok "agent.yml: python を使わない(製品の検査の規則)" "$(grep -ciE 'python' "$A")" 0
@@ -478,7 +478,7 @@ NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name]) as $old
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
-ok "抽出物の追加: 新しい段は extract に 9 件、work に 6 件(resources・plugin-builtin の 6 と 4、fl-exe の 3 と 2)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=9 work=6"
+ok "抽出物の追加: 新しい段は extract に 11 件、work に 8 件(resources・plugin-builtin・fl-exe の段に、実機のビーコンの 2 と 2 を足した)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=11 work=8"
 ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
 ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
 ok "抽出物の追加: resources の段は 5 件、plugin-builtin の段は 5 件(判定に、そのラベルを含む)" "$(jq -r '[(map(.["if"] // "" | select(test(",resources,"))) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "5/5"
@@ -672,13 +672,13 @@ ok "push の段: push 前の HEAD を RUNNER_TEMP/work-tip.txt に、空の comm
 ok "取り込みの段: 名前が 1 つ。名義の段の後で、作業者の段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | .name] as $n | ($n | index($p)) as $i | ($n | index("名義を設定する(token は消す)")) as $g | ($n | index("作業者を 1 回動かす")) as $w | "\($n | map(select(. == $p)) | length) \($g != null and $i != null and $w != null and $g < $i and $i < $w)"' "$J")" "1 true"
 ok "取り込みの段の if: 作業の前の確認が通った(skip が偽)ときだけ" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .["if"]] | .[0]' "$J")" "success() && steps.check.outputs.skip != 'true'"
 ok "取り込みの段の env: GH_TOKEN は github.token で、secrets を使わない" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | select(.name == $p) | .env] | .[0] | "\(.GH_TOKEN)/\(tostring | test("secrets"))"' "$J")" '${{ github.token }}/false'
-ok "取り込みの段の位置: キャッシュの復元(runs-on/cache/restore の 5 つ)と、取った物の置く段の全てより後で、作業者の段の前に在る(鍵は取り込み前の main のファイルで計算される)" "$(jq -r --arg p "$PRN" '
+ok "取り込みの段の位置: キャッシュの復元(runs-on/cache/restore の全て)と、取った物の置く段の全てより後で、作業者の段の前に在る(鍵は取り込み前の main のファイルで計算される)" "$(jq -r --arg p "$PRN" '
   [.jobs.work.steps[].name] as $n
   | ($n | index($p)) as $i
   | ($n | index("作業者を 1 回動かす")) as $w
   | [.jobs.work.steps | to_entries[] | select((.value.uses // "") | startswith("runs-on/cache/restore")) | .key] as $r
   | [.jobs.work.steps | to_entries[] | select((.value.name // "") | test("^(抽出物を lift/out-app/host に置く|一覧を作業ツリーの inputs/ に置く|外部プラグインを lift/out-app/external に置き|取った物を lift/out-app/host-extra/)")) | .key] as $p
-  | "\($r | length)/\($p | length)/\(($i != null) and ($w != null) and (((($r + $p) | max) < $i)) and ($i < $w))"' "$J")" "6/6/true"
+  | "\($r | length)/\($p | length)/\(($i != null) and ($w != null) and (((($r + $p) | max) < $i)) and ($i < $w))"' "$J")" "7/7/true"
 ok "取り込みの段の位置: 取った物の置く段(plugin-builtin)の後で、タスクの段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[].name] as $n | ($n | index($p)) as $i | ($n | index("取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)")) as $q | ($n | index("タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す")) as $t | ($i != null and $q != null and $t != null and $q < $i and $i < $t)' "$J")" true
 ok "作業者の段に env が無い(取り込みの token を渡さない)" "$(jq -r --arg n "作業者を 1 回動かす" '[.jobs.work.steps[] | select(.name == $n) | has("env")] | .[0] | tostring' "$J")" false
 ok "work の権限: actions が read(取り込みの段が、保存された artifact を読む)。contents と issues は read のまま" "$(jq -r '.jobs.work.permissions | "\(.actions)/\(.contents)/\(.issues)"' "$J")" "read/read/read"
@@ -863,4 +863,64 @@ ok "取り消し(AGENTS): timeout 引数の上限は 最大 5400000(90 分)で�
 ok "取り消し(AGENTS): 作業は開始から 5 時間以内に終え、4 時間 30 分を過ぎたら commit して終える" "$(grep -c '5 時間以内に終える' <<<"$A2")/$(grep -c '4 時間 30 分を過ぎたら' <<<"$A2")/$(grep -c 'date -u' <<<"$A2")" "1/1/1"
 ok "取り消し(AGENTS): 旧い規則(timeout の 0 で無効・背景の完了を同じターンで待つ)を残さない" "$(grep -c '0 で無効\|同じターンの中で、出力のファイルを読んで確かめる' <<<"$A2")" 0
 ok "取り消し(設計): 時間切れの保存と、待ちの固まりの規則を、設計の文書に書いた" "$(grep -cE '時間切れ.*保存|待ちの固まり' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 2) ? "yes" : "no"}')" yes
+# (r) 実機のビーコン(ラベル perf-beacons)。extract が R2 の fl-web-cache から直近 3 日の perf/ を取り、run ごとの鍵のキャッシュに保存する。work は同じ鍵で復元し、lift/out-app/host-extra/perf に置く。公開の artifact は使わない。ラベルの無い run では、新しい段は動かない
+ge1() { if [ "$1" -ge 1 ]; then echo yes; else echo no; fi; }
+PX='実機のビーコンを R2 から取る(perf-beacons の作業だけ。直近 3 日)'; PS='実機のビーコンをキャッシュに保存する(perf-beacons の作業だけ。run ごとの鍵)'
+PR='実機のビーコンを R2 のキャッシュから取る(perf-beacons の作業だけ。run ごとの鍵)'; PP='取った物を lift/out-app/host-extra/perf に置く(perf-beacons の作業だけ。commit はしない)'
+IFE="success() && contains(format(',{0},', needs.select.outputs.labels), ',perf-beacons,')"
+IFW="success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',perf-beacons,')"
+PXR=$(jq -r --arg x "$PX" '[.jobs.extract.steps[] | select(.name == $x) | .run][0] // ""' "$J")
+ok "ビーコン: 段は extract に 2 つ(取り出し・保存)、work に 2 つ(復元・配置)" "$(jq -r --arg x "$PX" --arg s "$PS" --arg r "$PR" --arg p "$PP" '"\([.jobs.extract.steps[].name] | map(select(. == $x or . == $s)) | length)/\([.jobs.work.steps[].name] | map(select(. == $r or . == $p)) | length)"' "$J")" "2/2"
+ok "ビーコン: extract の 2 段の if は、labels の判定を持つ(success() を付け、カンマで囲む)" "$(jq -r --arg x "$PX" --arg s "$PS" --arg c "$IFE" '[.jobs.extract.steps[] | select(.name == $x or .name == $s) | .["if"] == $c] | all' "$J")" true
+ok "ビーコン: work の 2 段の if は、issue_labels の判定と、確認の skip の判定を持つ" "$(jq -r --arg r "$PR" --arg p "$PP" --arg c "$IFW" '[.jobs.work.steps[] | select(.name == $r or .name == $p) | .["if"] == $c] | all' "$J")" true
+ok "ビーコン: 鍵は perf-beacons-<run_id>(保存と復元が同じ式。run ごとに変わる)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("perf-beacons-"))) | "\(length)/\(unique | join(" "))"' "$J")" '2/perf-beacons-${{ github.run_id }}'
+ok "ビーコン: 保存は runs-on/cache/save@v5 で、path は runner.temp の perf" "$(jq -r --arg x "$PS" '[.jobs.extract.steps[] | select(.name == $x) | "\(.uses)|\(.with.path)"][0]' "$J")" 'runs-on/cache/save@v5|${{ runner.temp }}/perf'
+ok "ビーコン: 復元は runs-on/cache/restore@v5 で、path は runner.temp の perf、fail-on-cache-miss: true" "$(jq -r --arg r "$PR" '[.jobs.work.steps[] | select(.name == $r) | "\(.uses)|\(.with.path)|\(.with["fail-on-cache-miss"])"][0]' "$J")" 'runs-on/cache/restore@v5|${{ runner.temp }}/perf|true'
+ok "ビーコン: 取り出しの鍵は R2_CACHE_ASSETS(fl-web-cache の鍵)で、R2_ARTIFACT を使わない" "$(jq -r --arg x "$PX" '[.jobs.extract.steps[] | select(.name == $x) | "\(.env.AWS_ACCESS_KEY_ID)|\(.env.AWS_SECRET_ACCESS_KEY)"][0]' "$J")" '${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}|${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}'
+ok "ビーコン: 公開の artifact を使わない(ビーコンの 4 段に、upload・download・gh run download・agent- が無い)" "$(jq -r --arg x "$PX" --arg s "$PS" --arg r "$PR" --arg p "$PP" '[.jobs.extract.steps[], .jobs.work.steps[] | select(.name == $x or .name == $s or .name == $r or .name == $p) | tostring | test("upload-artifact|download-artifact|gh run download|agent-")] | any' "$J")" false
+ok "ビーコン: 作業者の段に、R2 の鍵もビーコンの段の名前も無い" "$(jq -r '[.jobs.work.steps[] | select(.name == "作業者を 1 回動かす") | tostring | (test("R2_") or test("perf"))] | any' "$J")" false
+ok "ビーコン: 取り出しは fl-web-cache の perf/ を読み、件数(1000)と合計(104857600 バイト)で止める" "$(ge1 "$(grep -cF -- '--bucket fl-web-cache' <<<"$PXR")")/$(ge1 "$(grep -cF 'perf/' <<<"$PXR")")/$(ge1 "$(grep -cF '1000' <<<"$PXR")")/$(ge1 "$(grep -cF '104857600' <<<"$PXR")")" "yes/yes/yes/yes"
+ok "ビーコン: 取り出しの run は、鍵・中身・アカウントを出さない(set -x・printenv・鍵や入口の echo が無い)" "$(grep -cE 'set -x|printenv|echo .*[$](key|ep)' <<<"$PXR")" 0
+ok "ビーコン: 取り出し・保存は、fl-exe の保存の後に在り、取り出しの後に保存が在る" "$(jq -r --arg x "$PX" --arg s "$PS" --arg e "$EXS" '[.jobs.extract.steps[].name] as $n | ($n | index($e)) as $a | ($n | index($x)) as $b | ($n | index($s)) as $c | ($a != null and $b != null and $c != null and $a < $b and $b < $c)' "$J")" true
+ok "ビーコン: 配置は fl-exe の配置の後・取り込みの段より前で、復元の後に在る" "$(jq -r --arg r "$PR" --arg p "$PP" --arg e "$WKP" --arg q "前回の作業を取り込む" '[.jobs.work.steps[].name] as $n | ($n | index($e)) as $a | ($n | index($r)) as $b | ($n | index($p)) as $c | ($n | index($q)) as $d | ($a != null and $b != null and $c != null and $d != null and $a < $b and $b < $c and $c < $d)' "$J")" true
+ok "ビーコン: 設計の文書に、run ごとの鍵と、公開の artifact を使わない理由を書いた" "$(ge1 "$(grep -c 'perf-beacons' "$top/pm-work/workflow-design.md")")/$(ge1 "$(grep -c 'run ごと' "$top/pm-work/workflow-design.md")")/$(ge1 "$(grep -c '公開の artifact' "$top/pm-work/workflow-design.md")")" "yes/yes/yes"
+# 取り出しの run を、偽の aws で動かす。一覧は鍵と大きさの表、取得は鍵を記録する
+PXS=$T/pxs.sh; printf '%s\n' "$PXR" > "$PXS"
+PXB=$T/pxbin; PXLOG=$T/pxaws.log; PXGOT=$T/pxgot; mkdir -p "$PXB"
+cat > "$PXB/aws" <<'PXAWS'
+#!/usr/bin/env bash
+# 偽の aws(試験用)。一覧は PXLIST(鍵と大きさの表)を --prefix で絞って返す(空なら None)。取得は鍵を PXGOT に残し、空の物を作る。PXFAIL=list なら一覧で失敗する
+echo "$*" >> "$PXLOG"
+case "$1 $2" in
+  "s3api list-objects-v2")
+    shift 2; p=""; while [ $# -gt 0 ]; do case "$1" in --prefix) p=$2; shift ;; esac; shift; done
+    [ "$PXFAIL" = list ] && { echo "fake aws: 失敗" >&2; exit 255; }
+    out=$(awk -F'\t' -v p="$p" 'index($1, p) == 1' "$PXLIST"); if [ -z "$out" ]; then echo None; else printf '%s\n' "$out"; fi ;;
+  "s3api get-object")
+    shift 2; key=""; file=""; while [ $# -gt 0 ]; do case "$1" in --key) key=$2; shift ;; --endpoint-url|--bucket) shift ;; *) file=$1 ;; esac; shift; done
+    echo "$key" >> "$PXGOT"; printf '{}\n' > "$file" ;;
+  *) echo "fake aws: 未対応: $*" >&2; exit 1 ;;
+esac
+PXAWS
+chmod +x "$PXB/aws"
+D0=$(date -u +%Y-%m-%d); D1=$(date -u -d '-1 day' +%Y-%m-%d); D2=$(date -u -d '-2 day' +%Y-%m-%d); D3=$(date -u -d '-3 day' +%Y-%m-%d)
+mkl() { for p in "$@"; do printf '%s\t%s\n' "${p% *}" "${p##* }"; done; }
+pxrun() { # 引数: 一覧の表、失敗の種類(無ければ空)、RUNNER_TEMP。標準出力に終了コード
+  mkdir -p "$3"; : > "$PXGOT"; : > "$PXLOG"; printf '%s\n' "$1" > "$T/pxlist.tsv"
+  ( cd "$T" && env PATH="$PXB:$PATH" PXLIST="$T/pxlist.tsv" PXGOT="$PXGOT" PXLOG="$PXLOG" PXFAIL="$2" CF_ACCOUNT=0123456789 AWS_ACCESS_KEY_ID=x AWS_SECRET_ACCESS_KEY=y RUNNER_TEMP="$3" bash -eo pipefail "$PXS" > "$3.log" 2>&1; echo $? )
+}
+PXA=$(mkl "perf/$D0/a-1.json 1000" "perf/$D0/a-2.json 2000" "perf/$D0/x.txt 10" "perf/$D1/b-1.json 300" "perf/$D2/c-1.json 400" "perf/$D3/d-1.json 500")
+RA=$T/pa; rc=$(pxrun "$PXA" "" "$RA")
+ok "ビーコン(取り出し): 直近 3 日(今日・前日・前々日)の .json だけを取る(3 日より前と、.json でない物は取らない)" "$rc/$(sort "$PXGOT" | paste -sd' ' -)" "0/$(printf '%s\n' "perf/$D0/a-1.json" "perf/$D0/a-2.json" "perf/$D1/b-1.json" "perf/$D2/c-1.json" | sort | paste -sd' ' -)"
+ok "ビーコン(取り出し): 日付ごとの置き場に分け、MANIFEST.tsv に件数と合計を書く(4 件・3700 バイト)" "$(test -f "$RA/perf/$D0/a-1.json" && test ! -e "$RA/perf/$D3" && echo placed)/$(sed -n 1p "$RA/perf/MANIFEST.tsv")/$(sed -n 2p "$RA/perf/MANIFEST.tsv")" "placed/files	4/bytes	3700"
+PXB1=$(for i in $(seq 1 1005); do printf 'perf/%s/n-%s.json\t1\n' "$D0" "$i"; done)
+RB=$T/pb; rc=$(pxrun "$PXB1" "" "$RB")
+ok "ビーコン(取り出し): 件数は 1000 で止まる(1005 件のうち 1000 件を取る)" "$rc/$(wc -l < "$PXGOT" | tr -d ' ')/$(sed -n 1p "$RB/perf/MANIFEST.tsv")" "0/1000/files	1000"
+PXC=$(mkl "perf/$D0/e-1.json 40000000" "perf/$D0/e-2.json 40000000" "perf/$D0/e-3.json 40000000")
+RC=$T/pc; rc=$(pxrun "$PXC" "" "$RC")
+ok "ビーコン(取り出し): 合計 100 MB で止まる(40 MB が 3 件なら 2 件まで。3 件目は 120 MB で超える)" "$rc/$(sort "$PXGOT" | paste -sd' ' -)/$(sed -n 2p "$RC/perf/MANIFEST.tsv")" "0/perf/$D0/e-1.json perf/$D0/e-2.json/bytes	80000000"
+RD=$T/pd; rc=$(pxrun "$PXA" "list" "$RD")
+ok "ビーコン(取り出し): 一覧の取得が失敗すれば、段は失敗する(取得の鍵は 1 つも取らない)" "$rc/$(wc -l < "$PXGOT" | tr -d ' ')" "1/0"
+RE=$T/pe; rc=$(pxrun "" "" "$RE")
+ok "ビーコン(取り出し): 0 件でも段は通り、MANIFEST.tsv(0 件)を作る(キャッシュの保存が空の木にならない)" "$rc/$(sed -n 1p "$RE/perf/MANIFEST.tsv")" "0/files	0"
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

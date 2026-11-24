@@ -46,6 +46,8 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 - 対象が空なら start 以降は skip される。runner を使うのは select(数十秒)だけ。
 - 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 接頭辞)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。
 
+- 実機のビーコン(ラベル `perf-beacons` の作業だけ)。extract が R2 の `fl-web-cache` の `perf/` から、直近 3 日(UTC の今日と前の 2 日)の `*.json` を、最大 1000 件・合計 100 MB で取り、`$RUNNER_TEMP/perf` に置いて、鍵 `perf-beacons-${{ github.run_id }}` でキャッシュに保存する。work は同じ鍵で復元し、`lift/out-app/host-extra/perf/` に置く(commit はしない)。鍵を run ごとにするのは、ビーコンが増え続けて内容で決まる鍵が使えず、同じ run の extract と work だけが同じ鍵を読むため。公開の artifact は使わない。リポジトリは公開で、artifact も公開されるため、依頼者の実機のビーコン(個人を特定しうる値を含む)を置けない。R2 の鍵は extract だけが持ち、作業者の段には渡さない。ラベルの無い run では、これらの段は動かない。
+
 ## 4. 作業の段の中身
 
 1. 本文と題名を取る: `gh api repos/<repo>/issues/<番号>` の結果を `$RUNNER_TEMP/issue.json` に置き、本文を `task.md`、題名を `title.txt` に取り出す。

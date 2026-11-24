@@ -11,6 +11,7 @@
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
 # 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。接頭辞の一覧は ci/resources-prefixes.txt・ci/plugin-builtin-prefixes.txt(1 行 1 接頭辞。鍵の入力に入る)。
+# 実機のビーコン(ラベル perf-beacons)は、extract が R2 の perf/ から取り、run ごとの鍵(perf-beacons-<run_id>)のキャッシュで work に渡す。公開の artifact には置かない(設計は pm-work/workflow-design.md の「3」)。
 # push が 3 回とも落ちたとき、判定が落ちたとき、および時間切れで取り消されたときは、作業を差分(work.diff)で artifact に残す(取り消しの猶予の約 5 分で終わるよう、保存の段は通信をしない)。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」「13」)。
 name: agent
 run-name: agent ${{ github.event_name }} #${{ github.event.issue.number }}
@@ -361,6 +362,48 @@ jobs:
           path: ${{ runner.temp }}/extra-exe
           key: extra-fl-exe-FL64.exe-FL64-scaled.exe-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs') }}
 
+      - name: 実機のビーコンを R2 から取る(perf-beacons の作業だけ。直近 3 日)
+        if: success() && contains(format(',{0},', needs.select.outputs.labels), ',perf-beacons,')
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        run: |
+          export AWS_DEFAULT_REGION=auto AWS_EC2_METADATA_DISABLED=true AWS_REQUEST_CHECKSUM_CALCULATION=when_required AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
+          ep="https://${CF_ACCOUNT}.r2.cloudflarestorage.com"
+          out="$RUNNER_TEMP/perf"; mkdir -p "$out"
+          for k in 0 1 2; do
+            d=$(date -u -d "-$k day" +%Y-%m-%d)
+            aws s3api list-objects-v2 --endpoint-url "$ep" --bucket fl-web-cache --prefix "perf/$d/" --query 'Contents[].[Key,Size]' --output text > "$RUNNER_TEMP/perf-list-$k.txt" || { echo "ビーコンの一覧の取得に失敗した"; exit 1; }
+          done
+          n=0; total=0; : > "$RUNNER_TEMP/perf-pick.tsv"
+          while IFS=$'\t' read -r key size; do
+            case "$key" in *.json) ;; *) continue ;; esac
+            if [ "$n" -ge 1000 ] || [ $((total + size)) -gt 104857600 ]; then break; fi
+            printf '%s\t%s\n' "$key" "$size" >> "$RUNNER_TEMP/perf-pick.tsv"; n=$((n + 1)); total=$((total + size))
+          done < <(cat "$RUNNER_TEMP"/perf-list-*.txt)
+          while IFS=$'\t' read -r key size; do
+            d=$(cut -d/ -f2 <<<"$key"); mkdir -p "$out/$d"
+            aws s3api get-object --endpoint-url "$ep" --bucket fl-web-cache --key "$key" "$out/$d/$(basename "$key")" > /dev/null || { echo "ビーコンの取得に失敗した"; exit 1; }
+          done < "$RUNNER_TEMP/perf-pick.tsv"
+          printf 'files\t%s\nbytes\t%s\n' "$n" "$total" > "$out/MANIFEST.tsv"
+          echo "直近 3 日のビーコン: $n 件、合計 $total バイト"
+
+      - name: 実機のビーコンをキャッシュに保存する(perf-beacons の作業だけ。run ごとの鍵)
+        if: success() && contains(format(',{0},', needs.select.outputs.labels), ',perf-beacons,')
+        uses: runs-on/cache/save@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/perf
+          key: perf-beacons-${{ github.run_id }}
+
   work:
     name: '作業 #${{ matrix.issue }}'
     needs: [select, start, extract]
@@ -603,6 +646,30 @@ jobs:
           mv "$RUNNER_TEMP/extra-exe" lift/out-app/host-extra/exe
           test -f lift/out-app/host-extra/exe/FL64.exe
           test -f "lift/out-app/host-extra/exe/FL64 (scaled).exe"
+
+      - name: 実機のビーコンを R2 のキャッシュから取る(perf-beacons の作業だけ。run ごとの鍵)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',perf-beacons,')
+        uses: runs-on/cache/restore@v5
+        env:
+          RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
+          RUNS_ON_S3_BUCKET_ENDPOINT: https://${{ env.CF_ACCOUNT }}.r2.cloudflarestorage.com
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true"
+          AWS_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
+        with:
+          path: ${{ runner.temp }}/perf
+          key: perf-beacons-${{ github.run_id }}
+          fail-on-cache-miss: true
+
+      - name: 取った物を lift/out-app/host-extra/perf に置く(perf-beacons の作業だけ。commit はしない)
+        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',perf-beacons,')
+        run: |
+          mkdir -p lift/out-app/host-extra
+          mv "$RUNNER_TEMP/perf" lift/out-app/host-extra/perf
+          test -f lift/out-app/host-extra/perf/MANIFEST.tsv
 
       - name: 前回の作業を取り込む
         # 保存された差分(agent-<番号> の work.diff)が在るときだけ載せる。判定を通った作業(push だけ落ちた)は commit し、判定を通らなかった作業は commit せず作業ツリーに載せる。衝突は残し、作業ツリーのルートの .prior-work.md に書く
