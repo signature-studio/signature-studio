@@ -2,7 +2,7 @@
 //! deploy step gave it, and the working directory is the repository root, so the source paths the compiler sees
 //! (and the strings it puts in the wasm) are the same as before. The lists and argument files stay where they are.
 //!
-//! usage: fe-build engine | extract | bundle | upload | endpoint
+//! usage: fe-build engine | extract | external | bundle | upload | endpoint
 //! The plans (the stages and steps in run order) are functions that the tests compare with tests/plan/*.txt.
 
 use std::env;
@@ -21,6 +21,7 @@ const HARNESS_DIR: &str = "lift/harness";
 const OFFLINE_PAGE_SRC: &str = "lift/out-app/host-extra/resources/System/Internet/error-offline.html";
 const OFFLINE_PAGE_PATH: &str = "resources/System/Internet/error-offline.html";
 const R2_BUCKET: &str = "s3://fl-web-assets/";
+const ARTIFACT_BUCKET: &str = "s3://fl-web-artifacts/";
 const INSTALLER: &str = "s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe";
 const BLEND2D_REV: &str = "a7f947677e85441abe1769586d3bb935b4086a07";
 /// The SHA-256 of the GitHub archive of BLEND2D_REV. GitHub can regenerate an archive, so a mismatch is a failed attempt
@@ -569,13 +570,56 @@ fn pack_step_for(sha: &str) -> Result<Step, String> {
 
 #[cfg(test)]
 fn bundle_plan_steps(sha: &str) -> Result<Vec<Step>, String> {
-    Ok(vec![seed_step()?, pack_step_for(sha)?])
+    let mut steps = ott_steps();
+    steps.extend([seed_step()?, pack_step_for(sha)?]);
+    Ok(steps)
 }
 
 fn bundle() -> Result<(), String> {
+    for step in &ott_steps() {
+        run(step)?;
+    }
     run(&seed_step()?)?;
     let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
     run(&pack_step_for(&sha)?)
+}
+
+/// The external plugins' installers (ci/artifacts.lock: the installers/ rows that are not FL Studio's), the input of build.sh of the OTT wasm.
+fn external_keys() -> Result<Vec<String>, String> {
+    let text = fs::read_to_string("ci/artifacts.lock").map_err(|e| format!("ci/artifacts.lock: {e}"))?;
+    let rows = text.lines().filter(|l| !l.starts_with('#') && !l.is_empty());
+    Ok(rows.filter_map(|l| l.split('\t').next()).filter(|k| k.starts_with("installers/") && !k.starts_with("installers/flstudio_")).map(String::from).collect())
+}
+
+/// The installers into lift/out-app/external, then the check of them against ci/artifacts.lock (the check of build.sh reads all of them).
+fn external_steps() -> Result<Vec<Step>, String> {
+    let dir = format!("{OUT_APP_DIR}/external");
+    let mut steps = vec![Step::Mkdir(vec![dir.clone()])];
+    for key in external_keys()? {
+        let name = key.rsplit('/').next().unwrap_or(&key).to_string();
+        steps.push(aws_step(&["s3", "cp", &format!("{ARTIFACT_BUCKET}{key}"), &format!("{dir}/{name}")]));
+    }
+    steps.push(Step::Run(vec!["node".into(), "tools/external-inputs/check.mjs".into(), dir]));
+    Ok(steps)
+}
+
+fn external() -> Result<(), String> {
+    for step in &external_steps()? {
+        run(step)?;
+    }
+    Ok(())
+}
+
+/// The OTT wasm (#1337): build.sh reads the installers that `external` put in lift/out-app/external and writes
+/// lift/out-app/plugins/ott/vst-ext.wasm, the lazy file of the bundle (pack.args). The same build as the work chain's.
+fn ott_steps() -> Vec<Step> {
+    vec![Step::Run(vec![
+        "bash".into(),
+        format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
+        "ott".into(),
+        format!("{OUT_APP_DIR}/external"),
+        format!("{OUT_APP_DIR}/plugins/ott"),
+    ])]
 }
 
 fn aws_step(args: &[&str]) -> Step {
@@ -656,11 +700,12 @@ fn main() -> ExitCode {
             }
         }
         Some("extract") => extract(),
+        Some("external") => external(),
         Some("bundle") => bundle(),
         Some("upload") => upload(),
         Some("endpoint") => endpoint(),
         _ => {
-            eprintln!("usage: fe-build engine | extract | bundle | upload | endpoint");
+            eprintln!("usage: fe-build engine | extract | external | bundle | upload | endpoint");
             return ExitCode::from(2);
         }
     };
@@ -675,7 +720,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
+    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_steps, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
     use std::cell::Cell;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -800,7 +845,7 @@ mod tests {
         assert_eq!(glue(input), expected);
     }
 
-    /// The plans of the engine, bundle and extract commands equal the texts recorded before the `--plan` flag was removed
+    /// The plans of the engine, bundle, extract and external commands equal the texts recorded before the `--plan` flag was removed
     /// (tests/plan/*.txt). The engine's binary directory is written as `<bin>`. The upload plan is tested by upload_plan_matches_recorded_text.
     #[test]
     fn plans_match_recorded_texts() {
@@ -811,6 +856,7 @@ mod tests {
         let bundle = bundle_plan_steps(SHA).expect("bundle plan");
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle.txt"));
         assert_eq!(stage_lines("extract", &extract_steps()).join("\n") + "\n", include_str!("../tests/plan/extract.txt"));
+        assert_eq!(stage_lines("external", &external_steps().expect("external plan")).join("\n") + "\n", include_str!("../tests/plan/external.txt"));
     }
 
     #[test]

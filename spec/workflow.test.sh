@@ -1133,4 +1133,19 @@ DSG=$top/pm-work/workflow-design.md
 DSS=$(awk '/^## .*衝突の自動の再試行/{f=1;next} /^## /{f=0} f' "$DSG")
 ok "設計(u): 「衝突の自動の再試行」の節が在り、印・上限 2・remote rejected の対象外・起動の方式(unlabeled)を書く" "$(for w in 'auto-retry:push-conflict' '上限' 'remote rejected' 'unlabeled' 'App'; do grep -cF "$w" <<<"$DSS"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(u): 「8」のトークンの節は、報告の起動の段に App の鍵を渡すことを書く" "$(awk '/^## 8[.]/{f=1;next} /^## /{f=0} f' "$DSG" | grep -cF '自動の再試行の起動の段')" 1
+# (v) 本番の連鎖(deploy.yml → fe-build)が作る物(#1337 の欠陥の再発防止)。pack.args が読む lift/out-app/ の元は、作る段が本番の連鎖(plan の記録か deploy.yml)に在る。作業者の受け入れの連鎖にしか無い物は、本番で作られず落ちる
+DYML=$top/.github/workflows/deploy.yml; PA=$top/lift/harness/web/pack.args; PLAN=$top/lift/crates/fe-build/tests/plan
+LZ=$(awk 'prev == "--lazy-file" { sub(/=.*/, ""); print } { prev = $0 }' "$PA" | grep '^lift/out-app/')
+TOPS=$(printf '%s\n' "$LZ" | while IFS= read -r p; do printf '%s\n' "$p" | cut -d/ -f1-3; done | sort -u)
+MISS=$(for d in $TOPS; do
+  grep -vh 'pack-assets' "$PLAN/bundle.txt" "$PLAN/engine.txt" "$PLAN/extract.txt" "$PLAN/external.txt" 2> /dev/null | grep -qF "$d" || grep -qF "$d" "$DYML" || echo "$d"
+done | paste -sd' ' -)
+ok "本番(v): pack.args の lift/out-app/ の元の dir(先頭 3 段)は、全て作る段が本番の連鎖に在る(在らない dir の一覧)" "$MISS" ""
+ok "本番(v): 外部のインストーラは、fe-build bundle より前に fe-build external で取る(deploy.yml の行の順)" "$(a=$(grep -n 'fe-build external' "$DYML" | cut -d: -f1 | head -1); b=$(grep -n 'fe-build bundle' "$DYML" | cut -d: -f1 | head -1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] && echo yes)" yes
+OTTP=$(grep -n 'plugin-worker/build.sh ott' "$PLAN/bundle.txt" | cut -d: -f1 | head -1); PKP=$(grep -n 'pack-assets' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
+ok "本番(v): bundle の計画は、OTT の wasm の作る段(build.sh ott)を pack-assets より前に持つ" "$([ -n "$OTTP" ] && [ -n "$PKP" ] && [ "$OTTP" -lt "$PKP" ] && echo yes)" yes
+ok "本番(v): OTT の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/ott/vst-ext.wasm)と同じ名前" "$(grep -qF '"$OUT/vst-ext.wasm"' "$top/lift/harness/web/mt1/plugin-worker/build.sh" && grep -qF 'lift/out-app/plugins/ott/vst-ext.wasm' "$PA" && echo yes)" yes
+ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
+ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
+ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

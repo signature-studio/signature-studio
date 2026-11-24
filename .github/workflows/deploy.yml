@@ -49,6 +49,7 @@ jobs:
           mapfile -t p < ci/resources-prefixes.txt
           node tools/fl-installer-extract.mjs "$RUNNER_TEMP/i.exe" \
             lift/out-app/host-extra/resources "${p[@]}"
+          lift/target/release/fe-build external
       - uses: emscripten-core/setup-emsdk@v16
         with:
           version: 7.0.0
