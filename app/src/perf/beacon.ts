@@ -4,11 +4,12 @@
 import type { BrowserInfo, ClientInfo } from './browser-info.ts';
 import type { DisplaySnapshot, HzInfo } from './display.ts';
 import { TARGETS, WASM_MEMORY_LIMIT_BYTES, type InputLatencyStats, type IntervalStats } from './stats.ts';
-import { PERF_PATH, PERF_MAX_BODY, PERF_STORED_HEADER } from '../../shared/perf.ts';
+import { PERF_PATH, PERF_MAX_BODY, PERF_STORED_HEADER, PERF_UI_CLASS_MAX, PERF_UI_WINDOWS_MAX } from '../../shared/perf.ts';
 import { sanitizeEngineText } from './exit-message.ts';
 import type { GuestScreenInfo } from '../ui/screen-fit.ts';
 import type { FilesUsage } from '../files/usage.ts';
 import type { AssetsReport } from '../bundle/assets-report.ts';
+import type { EngineWindow } from '../engine/fruity-log.ts';
 
 export type BeaconReason = 'first-idle' | 'periodic' | 'exit' | 'error';
 export const BEACON_PERIOD_MS = 30_000;
@@ -18,7 +19,7 @@ export const BEACON_MAX_PERIODIC = 20;
  * 3 (decision 0202): `input` measures from the DOM event's own timeStamp to the next animation frame after the answer was drawn (`input.eventToRaf`, the P2 number) and keeps version 2's definition under `input.listenerToPut`; the
  * flat `input.n / p50Ms / p95Ms / maxMs / lastMs` of versions 1 and 2 (listener -> putImageData) are gone from `input`, so that nothing reads the old definition as the new one. `input.stages` says where the time goes.
  * Still 3 (decision 0209): `engine.exit.message` is an OPTIONAL string added to the existing `engine.exit` object (the engine's last words, at most 400 characters, personal parts removed: exit-message.ts). A version 3 reader that
- * does not know it ignores it (the server stores the object as it is; shared/perf.ts beaconProblems checks the field only when it is there), and a record without it is a record of the engine before this change. * Decision 0205 (still version 3: it has not been deployed): the answer is the frame posted in the processing window; `input.answered / late / noAnswer` count the processed inputs by how they were answered, and an input with no answer is not in the percentiles.
+ * does not know it ignores it (the server stores the object as it is; shared/perf.ts beaconProblems checks the field only when it is there), and a record without it is a record of the engine before this change. * Still 3 (Issue #1364): `uiWindows` is an OPTIONAL array of the top-level windows of the engine's window table (class name and size, at most 8, the front first; no title, no position). The page works out no scale: the size of the FL window against the device pixel ratio is read from the records. Absent: the log has no window table yet (a record from before this change). * Decision 0205 (still version 3: it has not been deployed): the answer is the frame posted in the processing window; `input.answered / late / noAnswer` count the processed inputs by how they were answered, and an input with no answer is not in the percentiles.
  */
 export const BEACON_VERSION = 3;
 
@@ -60,6 +61,24 @@ export interface BeaconPayload {
   desk?: DeskBeacon;
   /** decision 0240: how the engine itself ran in the last (at most) 10 s before this beacon, from its idle reports: the share of the wall time it was running (busyFraction = sum of the 'ran since it was last resumed' times / the wall time), those times' median and p95, and the virtual clock's advance per wall ms (1: real time; below 1: the guest cannot keep up); absent: fewer than 2 idles in the window */
   engineRun?: EngineRunBeacon;
+  /** Issue #1364: the top-level windows of the engine's window table (uiWindowsOf): class name and size, at most 8, the front first; absent: no window table in the log yet, or a record from before this field */
+  uiWindows?: UiWindow[];
+}
+
+/** Issue #1364: one top-level window of the engine's window table: its class name and its size in guest pixels (no title, no position) */
+export interface UiWindow { cls: string; w: number; h: number }
+
+/**
+ * Issue #1364: the top-level windows of the engine's window table, the front first (the smallest z), at most PERF_UI_WINDOWS_MAX. The log says `parent <handle>` for a child window and `owner <handle>` for every other one (`owner 0` when it has no
+ * owner: lift/runtime/fle_win.c table_line), so a top-level window is one that is not a child, not one with an empty relation. Null: no window table in the log (none, or no window in it).
+ */
+export function uiWindowsOf(windows: readonly EngineWindow[] | null | undefined): UiWindow[] | null {
+  if (!windows || windows.length === 0) return null;
+  return windows
+    .filter((w) => !w.relation.startsWith('parent '))
+    .sort((a, b) => a.z - b.z)
+    .slice(0, PERF_UI_WINDOWS_MAX)
+    .map((w) => ({ cls: sanitizeEngineText(w.className, PERF_UI_CLASS_MAX), w: w.width, h: w.height }));
 }
 
 export interface DeskCounters { presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
@@ -121,6 +140,8 @@ export interface BeaconInput {
   /** decision 0240 */
   desk?: DeskBeacon | null;
   engineRun?: EngineRunBeacon | null;
+  /** Issue #1364 (uiWindowsOf): absent or null: no window table in the log yet */
+  uiWindows?: UiWindow[] | null;
 }
 
 /** the `engine.exit` object: the message goes through the same cleaning as when the page chose it (idempotent), so that no caller can send a path or a name by passing a raw string */
@@ -151,6 +172,7 @@ export function buildBeacon(i: BeaconInput): BeaconPayload {
     ...(i.assets ? { assets: i.assets } : {}),
     ...(i.desk ? { desk: i.desk } : {}),
     ...(i.engineRun ? { engineRun: i.engineRun } : {}),
+    ...(i.uiWindows ? { uiWindows: i.uiWindows } : {}),
   };
 }
 
