@@ -75,7 +75,7 @@ ok "push の段: push できた SHA を out/commit.txt に残す" "$(grep -cF 'g
 ok "どの段にも continue-on-error が無い" "$(grep -c 'continue-on-error' "$A")" 0
 ok "agent.yml: タブ文字が無い" "$(grep -c "$(printf '\t')" "$A")" 0
 # (j) start と report の書き込みは GITHUB_TOKEN で行う(App の token は使わない)。App の鍵は、名義の段と push の段だけ。Issue の close は、push する commit の Closes #N で行う
-ok "start・report: botid・GH_APP_ の secrets・GH_CONFIG_DIR を使わない" "$(jq -r '[.jobs.start, .jobs.report] | map(tostring | test("botid|GH_APP_|GH_CONFIG_DIR")) | join("/")' "$J")" "false/false"
+ok "start: botid・GH_APP_ の secrets・GH_CONFIG_DIR を使わない(報告の App の段は「(u)」で確かめる)" "$(jq -r '[.jobs.start] | map(tostring | test("botid|GH_APP_|GH_CONFIG_DIR")) | join("/")' "$J")" "false"
 ok "work: GH_APP_ の secrets を持つ段は、名義の段と push の段だけ" "$(jq -r '[.jobs.work.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "名義を設定する(token は消す)|通った変更を main に push する(token はこの段で発行する)"
 ok "start: running を付ける段の GH_TOKEN は github.token" "$(jq -r '[.jobs.start.steps[] | select(.name | test("running を付ける")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
 ok "report: 結果を Issue に書く段の GH_TOKEN は github.token" "$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
@@ -573,7 +573,7 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
 ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
-for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract plugin-rows; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
+for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract plugin-rows auto-retry; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 # (n) 同じ Issue の直列化、作業の前の Issue の状態の確認、報告の伏せ字、報告の判定(閉じて main に入った作業は、失敗の印を付けない)。偽の gh と fixture で、段の実際の動きを確かめる
 v1=anthr; v2=opic
 ok "concurrency: workflow の最上位が、Issue の番号ごとの group で、cancel-in-progress は false" "$(jq -r '.concurrency | "\(.group)/\(.["cancel-in-progress"] | tostring)"' "$J")" 'agent-${{ github.event.issue.number }}/false'
@@ -653,7 +653,7 @@ jq -n --arg sk "$SKN" --arg ck "$CKN" --arg sc "$SCN" '{jobs: [
 ]}' > "$NFX/repos__o__r__actions__runs__77__jobs.json"
 mkdir -p "$NFX/art-11" "$NFX/art-13" "$NFX/art-15"; printf '0123abc\n' > "$NFX/art-11/commit.txt"; printf '4567def\n' > "$NFX/art-13/commit.txt"; printf 'diff\n' > "$NFX/art-15/work.diff"
 printf '%s\n' "$R1" > "$T/nrep1.sh"; printf '%s\n' "$R2" > "$T/nrep2.sh"
-nrun() { ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NFX" NGL="$NGL" NGB="$NGB" GH_TOKEN=x GH_REPO=o/r RUN_ID=77 RUN_URL=https://example.test/run/77 SERVER=https://example.test CLAIMED='[11,12,13,14,15]' RUNNER_TEMP="$T/nrt" bash -e "$T/$1" > "$T/$1.log" 2>&1; echo $? ); }
+nrun() { ( cd "$top" && env PATH="$NFB:$PATH" NFX="$NFX" NGL="$NGL" NGB="$NGB" GH_TOKEN=x GH_REPO=o/r RUN_ID=77 RUN_URL=https://example.test/run/77 SERVER=https://example.test CLAIMED='[11,12,13,14,15]' RUNNER_TEMP="$T/nrt" GITHUB_OUTPUT="$T/ngho" bash -e "$T/$1" > "$T/$1.log" 2>&1; echo $? ); }
 mkdir -p "$T/nrt"
 ok "報告の 1 段目(結果を集める)が、0 で終わる" "$(nrun nrep1.sh)" 0
 ok "報告の 2 段目(結果を書き、状態を変える)が、0 で終わる" "$(nrun nrep2.sh)" 0
@@ -681,7 +681,7 @@ ok "保存の段: 名前が 1 つ。push の段(id push)の後で、報告の検
 ok "保存の段の if: 判定が通り push が落ちたとき、または時間切れで取り消されたときだけ(判定の失敗では保存しない。確認の skip も偽)" "$(jq -r --arg s "$SVN" '[.jobs.work.steps[] | select(.name == $s) | .["if"]] | .[0]' "$J")" "(failure() || cancelled()) && steps.push.conclusion == 'failure' && steps.check.outputs.skip != 'true'"
 ok "push の段: id は push" "$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .id] | .[0]' "$J")" push
 PSH=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$J")
-ok "push の段: 変更前の run と比べ、保存の基点の 1 行(work-tip)と、題名から印を落とす commit の 1 行の違いだけ" "$(a=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B" | grep -vE 'work-tip[.]txt|git commit --allow-empty'); b=$(grep -vE 'work-tip[.]txt|git commit --allow-empty' <<<"$PSH"); [ "$a" = "$b" ] && echo same)" same
+ok "push の段: 変更前(551a4e59)の run の行は、残る。削除されるのは題名の印を落とす commit の行の書き換えだけ(それ以外の行の削除・書き換えが無い)" "$(diff <(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0]' "$B") <(printf '%s\n' "$PSH") | awk '/^</ && !/git commit --allow-empty/ && NF > 1' | wc -l | tr -d ' ')" 0
 ok "push の段: env は変更前と一致する(App の鍵は、この段と名義の段だけ)" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[$b[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env] == [$n[0].jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .env]')" true
 ok "push の段: push 前の HEAD を RUNNER_TEMP/work-tip.txt に、空の commit を作る前に残す(pull の後の HEAD は保存の基点にしない)" "$(t=$(grep -n 'git rev-parse HEAD > "$RUNNER_TEMP/work-tip.txt"' <<<"$PSH" | cut -d: -f1); c=$(grep -n 'git commit --allow-empty' <<<"$PSH" | cut -d: -f1); [ -n "$t" ] && [ -n "$c" ] && [ "$t" -lt "$c" ] && echo yes)" yes
 ok "取り込みの段: 名前が 1 つ。名義の段の後で、作業者の段の前に在る" "$(jq -r --arg p "$PRN" '[.jobs.work.steps[] | .name] as $n | ($n | index($p)) as $i | ($n | index("名義を設定する(token は消す)")) as $g | ($n | index("作業者を 1 回動かす")) as $w | "\($n | map(select(. == $p)) | length) \($g != null and $i != null and $w != null and $g < $i and $i < $w)"' "$J")" "1 true"
@@ -868,7 +868,7 @@ jq -n --arg ck "$CKN" '{jobs: [
   {name: "作業 #17", conclusion: "cancelled", steps: [{name: $ck, conclusion: "success"}, {name: "作業者を 1 回動かす", conclusion: "cancelled"}]}
 ]}' > "$NCF/repos__o__r__actions__runs__78__jobs.json"
 mkdir -p "$NCF/art-16"; printf 'diff\n' > "$NCF/art-16/work.diff"
-ncrun() { ( cd "$T" && env PATH="$NFB:$PATH" NFX="$NCF" NGL="$NCL" NGB="$NCB" GH_TOKEN=x GH_REPO=o/r RUN_ID=78 RUN_URL=https://example.test/run/78 SERVER=https://example.test CLAIMED='[16,17]' RUNNER_TEMP="$NCRT" bash -e "$T/$1" > "$T/$1.nc.log" 2>&1; echo $? ); }
+ncrun() { ( cd "$top" && env PATH="$NFB:$PATH" NFX="$NCF" NGL="$NCL" NGB="$NCB" GH_TOKEN=x GH_REPO=o/r RUN_ID=78 RUN_URL=https://example.test/run/78 SERVER=https://example.test CLAIMED='[16,17]' RUNNER_TEMP="$NCRT" GITHUB_OUTPUT="$T/ncgho" bash -e "$T/$1" > "$T/$1.nc.log" 2>&1; echo $? ); }
 ncr=$(ncrun nrep1.sh)/$(ncrun nrep2.sh)
 ncb() { awk -v n="$1" '$0 ~ ("^BODY " n " ") {f=1; next} /^BODY /{f=0} f' "$NCB"; }
 ok "取り消し(報告): 2 段とも 0 で終わる" "$ncr" "0/0"
@@ -1020,4 +1020,113 @@ sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf > "$T/bc-s3.bin"
 ok "deploy.yml(t): bundle の中身: テンプレートの代表が無ければ落ちる" "$(bcrun "$BCM" "$T/bc-s3.bin")" 1
 printf '%s\n' seed/resources/System/Languages/de.moe seed/resources/Artwork/Fonts/Cuprum/Cuprum.ttf seed/resources/Data/Templates/Other/Blocks/Blocks.flp > "$T/bc-s4.bin"
 ok "deploy.yml(t): bundle の中身: 引用符の無い語句だけでは、ヘッダの path と見なさない(3 件そろっても落ちる)" "$(bcrun "$BCM" "$T/bc-s4.bin")" 1
+# (u) main との衝突による push の失敗の自動の再試行(設計「4」「7」「8」)。push の段は衝突の印を残す。報告は印の数で retry か fail を決め、retry は failed を付けず、App の token で running を外して次の run を起こす
+AGPRE=f3abbf3c
+PREU=$T/agent-pre.yml; git -C "$top" show "$AGPRE:.github/workflows/agent.yml" > "$PREU" 2>/dev/null
+pj "$PREU" > "$T/agent-pre.json" 2>>"$T/pj.err"; PREJ=$T/agent-pre.json
+PREP=$(jq -r '[.jobs.work.steps[] | select(.name | test("通った変更を main に push")) | .run] | .[0] // ""' "$PREJ")
+PSHS=$T/push-u.sh; printf '%s\n' "$PSH" > "$PSHS"
+ok "push(u1): 変更前(f3abbf3c)の push の段の行は、全て今の段に残る(削除・書き換えが無い。追加だけ)" "$(diff <(printf '%s\n' "$PREP") "$PSHS" | grep -c '^<')" 0
+ok "push(u2): 衝突の印を GITHUB_OUTPUT に書く行が 1 つ在る" "$(grep -cF 'echo push_conflict=true >> "$GITHUB_OUTPUT"' <<<"$PSH")" 1
+ok "push(u3): 衝突の一覧は pm-work/ の外の名前だけを out/push-conflict.txt に残す(同じ行で絞って書く)" "$(grep -F "grep -v '^pm-work/'" <<<"$PSH" | grep -cF 'out/push-conflict.txt')" 1
+PH=$T/ph; mkdir -p "$PH/bin"
+cat > "$PH/bin/git" <<'FGIT'
+#!/usr/bin/env bash
+# 偽の git(試験用)。pull と push の試行ごとの結果を、FG_PULL・FG_PUSH の 1 文字ずつで決める(c = 衝突、o = 成功、r = 拒否)。衝突の一覧は FG_FILES(空白区切り)。計数は FG_D の下
+step() { local i; i=$(( $(cat "$2" 2>/dev/null || echo 0) + 1 )); echo "$i" > "$2"; printf '%s' "${1:$((i - 1)):1}"; }
+case "$1" in
+  rev-parse) echo 0123456789abcdef0123456789abcdef01234567 ;;
+  commit|merge) exit 0 ;;
+  pull) [ "$(step "$FG_PULL" "$FG_D/pull")" = c ] && { echo 'Automatic merge failed' >&2; exit 1; }; exit 0 ;;
+  push) [ "$(step "$FG_PUSH" "$FG_D/push")" = o ] && exit 0; echo ' ! [remote rejected] HEAD -> main' >&2; exit 1 ;;
+  diff) if [ -n "$FG_FILES" ]; then printf '%s\n' $FG_FILES; fi ;;
+  *) echo "fake git: 未対応: $*" >&2; exit 1 ;;
+esac
+FGIT
+chmod +x "$PH/bin/git"
+pscn() { # 引数: 名前、pull の列、push の列、衝突の一覧。標準出力に終了コード
+  local d=$PH/$1; rm -rf "$d"; mkdir -p "$d/rt/out" "$d/rt/botid-bin" "$d/home" "$d/repo"
+  printf 'タイトル\n' > "$d/rt/title.txt"; printf '{}\n' > "$d/rt/botid-config.json"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$d/rt/botid-bin/botid"; chmod +x "$d/rt/botid-bin/botid"; : > "$d/gho"
+  ( cd "$d/repo" && env PATH="$PH/bin:$PATH" HOME="$d/home" RUNNER_TEMP="$d/rt" GITHUB_OUTPUT="$d/gho" GITHUB_REPOSITORY=o/r ISSUE=5 BOTID_GH="$d/ghcfg" FG_PULL="$2" FG_PUSH="$3" FG_FILES="$4" FG_D="$d" bash -eo pipefail "$PSHS" > "$d/log" 2>&1; echo $? )
+}
+r=$(pscn p1 ccc "" "a.txt pm-work/x.md lift/y.rs")
+ok "push(u4): 衝突で 3 回とも落ちたら 1 で終わり、衝突の印(push_conflict=true)を残す" "$r/$(grep -cx 'push_conflict=true' "$PH/p1/gho")" "1/1"
+ok "push(u5): 衝突の一覧は pm-work/ の外の名前だけ(a.txt と lift/y.rs)を残す" "$(paste -sd, - < "$PH/p1/rt/out/push-conflict.txt")" "a.txt,lift/y.rs"
+ok "push(u6): 衝突のたびに、既存の「衝突: 一覧」の行を出す(3 回)" "$(grep -cF '衝突: a.txt pm-work/x.md lift/y.rs' "$PH/p1/log")" 3
+r=$(pscn p2 ooo rrr "")
+ok "push(u7): push の拒否(衝突でない)で 3 回とも落ちたら 1 で終わるが、衝突の印は残さない(remote rejected は再試行の対象外)" "$r/$(grep -c 'push_conflict' "$PH/p2/gho")/$(test -e "$PH/p2/rt/out/push-conflict.txt" && echo made || echo none)" "1/0/none"
+r=$(pscn p3 ccc "" "")
+ok "push(u8): pull が失敗しても衝突の一覧が空なら、衝突の印を残さない" "$r/$(grep -c 'push_conflict' "$PH/p3/gho")/$(test -e "$PH/p3/rt/out/push-conflict.txt" && echo made || echo none)" "1/0/none"
+r=$(pscn p4 oco ro "a.txt")
+ok "push(u9): 途中で衝突しても、最後の試行が成功すれば 0 で終わり、印を残さず、commit.txt を残す" "$r/$(grep -c 'push_conflict' "$PH/p4/gho")/$(test -e "$PH/p4/rt/out/push-conflict.txt" && echo made || echo none)/$(test -s "$PH/p4/rt/out/commit.txt" && echo sha)" "0/0/none/sha"
+r=$(pscn p5 cco rrr "a.txt")
+ok "push(u10): 最後の試行が拒否なら(前の試行が衝突でも)、衝突の印は残さない(最後の試行の原因で判定する)" "$r/$(grep -c 'push_conflict' "$PH/p5/gho")/$(test -e "$PH/p5/rt/out/push-conflict.txt" && echo made || echo none)" "1/0/none"
+r=$(pscn p6 ooc rr "a.txt lift/q.rs")
+ok "push(u11): 最後の試行だけ衝突で落ちたら、印と一覧を残す(拒否の後の衝突)" "$r/$(grep -cx 'push_conflict=true' "$PH/p6/gho")/$(paste -sd, - < "$PH/p6/rt/out/push-conflict.txt")" "1/1/a.txt,lift/q.rs"
+r=$(pscn p7 ooo ooo "")
+ok "push(u12): 成功なら 0 で終わり、印も一覧も残さず、commit.txt を残す" "$r/$(test -e "$PH/p7/rt/out/push-conflict.txt" && echo made || echo none)/$(test -s "$PH/p7/rt/out/commit.txt" && echo sha)" "0/none/sha"
+# (u) 報告: 印の数で retry か fail を決める。retry は failed を付けず、印の行を書く。App の段は、再試行の Issue があるときだけ
+MK='<!-- auto-retry:push-conflict -->'
+NV=$T/nv; NVO=$T/nv-gho; NVL=$T/nvgh.log; NVBD=$T/nvgh-bodies.txt; NVRT=$T/nvrt; mkdir -p "$NV"; : > "$NVL"; : > "$NVBD"; : > "$NVO"
+nvfx() { printf '%s' "$2" > "$NV/repos__o__r__issues__$1.json"; }
+nvfx 18 '{"number":18,"state":"open","labels":[{"name":"running"}]}'
+nvfx 19 '{"number":19,"state":"open","labels":[{"name":"running"}]}'
+nvfx 20 '{"number":20,"state":"open","labels":[{"name":"running"}]}'
+nvfx 21 '{"number":21,"state":"open","labels":[{"name":"running"}]}'
+nvfx 22 '{"number":22,"state":"closed","labels":[{"name":"running"}]}'
+printf '%s' '[]' > "$NV/repos__o__r__issues__18__comments.json"
+printf '%s' "[{\"body\":\"$MK\\n(1/2)\"},{\"body\":\"$MK\\n(2/2)\"}]" > "$NV/repos__o__r__issues__19__comments.json"
+printf '%s' '[]' > "$NV/repos__o__r__issues__20__comments.json"
+printf '%s' "[{\"body\":\"$MK\\n(1/2)\"}]" > "$NV/repos__o__r__issues__21__comments.json"
+printf '%s' '[]' > "$NV/repos__o__r__issues__22__comments.json"
+PUSHN='通った変更を main に push する(token はこの段で発行する)'; CKN=$(jq -r '[.jobs.work.steps[] | select(.id == "check") | .name][0]' "$J")
+jq -n --arg p "$PUSHN" --arg ck "$CKN" '{jobs: [
+  {name: "起動する Issue を決める", conclusion: "success", steps: []},
+  {name: "作業 #18", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $p, conclusion: "failure"}]},
+  {name: "作業 #19", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $p, conclusion: "failure"}]},
+  {name: "作業 #20", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: "作業者を 1 回動かす", conclusion: "failure"}]},
+  {name: "作業 #21", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $p, conclusion: "failure"}]},
+  {name: "作業 #22", conclusion: "failure", steps: [{name: $ck, conclusion: "success"}, {name: $p, conclusion: "failure"}]}
+]}' > "$NV/repos__o__r__actions__runs__79__jobs.json"
+for n in 18 19 21 22; do mkdir -p "$NV/art-$n"; printf 'lift/a.rs\n' > "$NV/art-$n/push-conflict.txt"; printf 'diff\n' > "$NV/art-$n/work.diff"; printf 'judge: 通った\n' > "$NV/art-$n/judge.txt"; done
+mkdir -p "$NV/art-20"; printf 'diff\n' > "$NV/art-20/work.diff"; printf 'judge: 通った\n' > "$NV/art-20/judge.txt"
+nvrun() { # 引数: 報告のスクリプト名。標準出力に終了コード
+  ( cd "$top" && env PATH="$NFB:$PATH" NFX="$NV" NGL="$NVL" NGB="$NVBD" GH_TOKEN=x GH_REPO=o/r RUN_ID=79 RUN_URL=https://example.test/run/79 SERVER=https://example.test CLAIMED='[18,19,20,21,22]' RUNNER_TEMP="$NVRT" GITHUB_OUTPUT="$NVO" bash -e "$T/$1" > "$T/$1.nv.log" 2>&1; echo $? )
+}
+rm -rf "$NVRT"; mkdir -p "$NVRT"
+ok "報告(u13): 結果を集める段は、5 件とも 0 で終わる" "$(nvrun nrep1.sh)" 0
+ok "報告(u14): 結果を書く段は、5 件とも 0 で終わる" "$(nvrun nrep2.sh)" 0
+ok "報告(u15): 衝突があり印が 0 の 18 は retry、印が 1 の 21 も retry、印が 2 の 19 は failure、衝突の印が無い 20 と閉じた 22 は failure" "$(cat "$NVRT/report/18/status")/$(cat "$NVRT/report/21/status")/$(cat "$NVRT/report/19/status")/$(cat "$NVRT/report/20/status")/$(cat "$NVRT/report/22/status")" "retry/retry/failure/failure/failure"
+ok "報告(u16): 再試行が在るので、起動の段の if のための出力 retry=true を残す" "$(grep -cx 'retry=true' "$NVO")" 1
+ok "報告(u17): 再試行の印の行は、18 が 1/2、21 が 2/2 と書く(印の行を含むコメント)" "$(grep -cF "$MK" "$NVRT/report/18/comment.md")/$(grep -cF '(1/2)' "$NVRT/report/18/comment.md")/$(grep -cF '(2/2)' "$NVRT/report/21/comment.md")" "1/1/1"
+nvb() { awk -v n="$1" '$0 ~ ("^BODY " n " ") {f=1; next} /^BODY /{f=0} f' "$NVBD"; }
+ok "報告(u18): retry の 18 と 21 は、印の行を含むコメントを書く(GITHUB_TOKEN で)" "$(nvb 18 | grep -cF "$MK")/$(nvb 21 | grep -cF "$MK")" "1/1"
+ok "報告(u19): retry の 18・21 は failed を付けず、running も GITHUB_TOKEN では外さない(外すのは App の段)" "$(grep -c '^issue edit 18 .*add-label failed' "$NVL")/$(grep -c '^issue edit 18 .*remove-label running' "$NVL")/$(grep -c '^issue edit 21 .*add-label failed' "$NVL")/$(grep -c '^issue edit 21 .*remove-label running' "$NVL")" "0/0/0/0"
+ok "報告(u20): 印が 2 の 19 は failed を付け、running を外し、再試行の上限の旨を書く(印の行は書かない)" "$(grep -c '^issue edit 19 .*add-label failed' "$NVL")/$(grep -c '^issue edit 19 .*remove-label running' "$NVL")/$(nvb 19 | grep -cF '自動の再試行を 2 回行ったが、衝突が続く。人手(PM)が見る')/$(nvb 19 | grep -cF "$MK")" "1/1/1/0"
+ok "報告(u21): 衝突の印が無い 20(拒否)は failed を付け、自動の再試行の旨を書かない" "$(grep -c '^issue edit 20 .*add-label failed' "$NVL")/$(nvb 20 | grep -c '自動の再試行')" "1/0"
+ok "報告(u22): 閉じている 22 は、衝突でも自動の再試行をせず、failed を付ける" "$(grep -c '^issue edit 22 .*add-label failed' "$NVL")/$(nvb 22 | grep -cF "$MK")" "1/0"
+ok "報告(u23): 再試行の印のコメントに、保存した作業の旨を書く" "$(nvb 18 | grep -cF '作業を保存した')" 1
+APPN='自動の再試行を起動する(App の token で running を外す。再試行の Issue だけ)'
+ok "報告(u24): botid(App の名義)を使う段は 1 つだけで、その名前は再試行の起動の段" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("botid")) | .name] | join("|")' "$J")" "$APPN"
+ok "報告(u25): App の鍵を使う段は、報告の中でも、その起動の段だけ" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "$APPN"
+ok "報告(u26): 起動の段は、結果を集める段の出力 retry が真のときだけ動く" "$(jq -r --arg a "$APPN" '[.jobs.report.steps[] | select(.name == $a) | .["if"]] | .[0]' "$J")" "steps.collect.outputs.retry == 'true'"
+ok "報告(u27): 結果を集める段に id collect がある" "$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を集める")) | .id] | .[0]' "$J")" collect
+ok "報告(u28): 起動の段は GH_TOKEN を持たない(gh は App の設定だけを使う)" "$(jq -r --arg a "$APPN" '[.jobs.report.steps[] | select(.name == $a) | (.env // {} | has("GH_TOKEN"))] | .[0] | tostring' "$J")" false
+ok "報告(u29): 起動の段は、結果を書く段の後に在る" "$(jq -r --arg a "$APPN" '[.jobs.report.steps[].name] as $n | ($n | index("結果を Issue に書き、状態を変える(GITHUB_TOKEN で。通った Issue が開いたままなら、ここで閉じる)")) as $w | ($n | index($a)) as $p | "\($w != null and $p != null and $p > $w)"' "$J")" true
+APPR=$(jq -r --arg a "$APPN" '[.jobs.report.steps[] | select(.name == $a) | .run] | .[0] // ""' "$J")
+ok "報告(u30): 起動の段は、道具の trigger を呼び、botid の設定で GH_CONFIG_DIR を得る" "$(grep -cF 'node tools/auto-retry.mjs trigger' <<<"$APPR")/$(grep -cF 'GH_CONFIG_DIR' <<<"$APPR")" "1/2"
+ok "報告(u31): 起動の段は、使い終える行で、鍵の一時ファイル(botid-config.json)と hosts.yml を消す" "$(grep -cE 'rm -f .*botid-config[.]json.*hosts[.]yml' <<<"$APPR")" 1
+ok "報告(u32): 起動の段の botid の取得は、push の段と同じ版と sha256(botid 0.2.3・fffa02…)" "$(grep -cF 'v=0.2.3' <<<"$APPR")/$(grep -cF 'fffa02853f88cf20637970f219f682c7a7768427169d4dc883491995d019fc50' <<<"$APPR")" "1/1"
+R1U=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を集める")) | .run][0] // ""' "$J")
+ok "報告(u33): 結果を集める段は、印の数を道具の count で数え、decide で決め、retry を GITHUB_OUTPUT に書く" "$(grep -cF 'node tools/auto-retry.mjs count' <<<"$R1U")/$(grep -cF 'node tools/auto-retry.mjs decide' <<<"$R1U")/$(grep -cF 'echo "retry=' <<<"$R1U")" "1/1/1"
+RW=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .run][0] // ""' "$J")
+ok "報告(u34): 結果を書く段は、retry の Issue に GITHUB_TOKEN で running を外さない(除去は if の外で、retry を除く)" "$(grep -cF 'if [ "$s" != retry ]' <<<"$RW")/$(grep -cF 'remove-label running' <<<"$RW")" "1/1"
+ok "報告(u35): 再試行の印の文字列は、報告の段と道具で同じ" "$(grep -cF "$MK" <<<"$R1U")/$(grep -cF "$MK" "$top/tools/auto-retry.mjs")" "1/1"
+ok "報告(u36): 再試行の上限は、道具の定数 2 と、報告の表示の 2 で、同じ(2/2 と 2 回)" "$(grep -cF 'MAX = 2' "$top/tools/auto-retry.mjs")/$(grep -cF '/2)' <<<"$R1U")" "1/1"
+ok "(u) 道具: tools/auto-retry.mjs と spec/auto-retry.test.mjs が在る" "$(test -f "$top/tools/auto-retry.mjs" && test -f "$top/spec/auto-retry.test.mjs" && echo yes)" yes
+DSG=$top/pm-work/workflow-design.md
+DSS=$(awk '/^## .*衝突の自動の再試行/{f=1;next} /^## /{f=0} f' "$DSG")
+ok "設計(u): 「衝突の自動の再試行」の節が在り、印・上限 2・remote rejected の対象外・起動の方式(unlabeled)を書く" "$(for w in 'auto-retry:push-conflict' '上限' 'remote rejected' 'unlabeled' 'App'; do grep -cF "$w" <<<"$DSS"; done | awk '{s+=($1>0)} END{print s}')" 5
+ok "設計(u): 「8」のトークンの節は、報告の起動の段に App の鍵を渡すことを書く" "$(awk '/^## 8[.]/{f=1;next} /^## /{f=0} f' "$DSG" | grep -cF '自動の再試行の起動の段')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
