@@ -55,7 +55,7 @@ project: signature-studio/3
 
 - 2 回目: run 45436306690(job「作業 #1372」、判定の段)。作業者の受け入れは通った(commit `a3880663`。Exoplanet・DEDZII とも `error` null・`state` engine-idle・`quantaWhilePlaying` 1 以上)。判定の段が 18:11:51Z に落ちた。runner の値。
 - 判定の取り直し(run のログ。実測):
-  - ビルドと `fe-build bundle` は通った。起動確認は 2 回とも engine-idle(18:10:36Z・18:11:19Z)。判定の行: `judge: 起動確認の結果: {"state":"engine-idle","error":null,"standIn":false,"elapsedMs":11228}`。
+  - ビルドと `fe-build bundle` は通った。起動確認(`boot.json`)は engine-idle。判定の行: `judge: 起動確認の結果: {"state":"engine-idle","error":null,"standIn":false,"elapsedMs":11228}`。ログの engine-idle の行は 18:10:36Z と 18:11:19Z に出ている。
   - Exoplanet の計測は 18:11:43Z の trace の行で終わった。DEDZII の計測は出力が無いまま、18:11:51Z に `judge: 受け入れコマンドが失敗した` で落ちた。
   - 計測の JSON は判定のログに出ない(`$RUNNER_TEMP/open-*.json`)。よって、DEDZII の失敗の原因は、このログからは確認できない。
   - #1393 の型(`no first idle … within 180000 ms`)は、この run には出ていない。#1398 と同じ停止とは断定しない。
@@ -134,4 +134,5 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - #1335・#1335(P3 の測定の入力)。
 - #1342・#1319(Fruity Balance と Fruity Filter の、起動後の取得)が、同じ経路を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 - #1400(Sytrus を、同じ型で 1 プラグイン 1 wasm として届ける)は、この Issue の直しの後に入る(blocked by の関係は `#1400` 側に在る)。
+
 
