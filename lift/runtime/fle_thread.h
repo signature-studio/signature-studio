@@ -92,6 +92,8 @@ uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
 /* #1352: a back edge of the lifted code (fle_loop_tick, fle_dispatch.h) is a scheduler point every FLE_LOOP_SLICE_BACKEDGES back edges from the first CreateThread on. Unlike a slice it moves no
  * clock (the clock is the indirect calls' progress, decision 0147), and the rule for a callback is the same (no switch at a depth above FLE_PREEMPT_MAX_DEPTH; the audio device is refilled there). */
 #define FLE_LOOP_SLICE_BACKEDGES     1024u
+/* #1393: a spin-wait back edge inside a callback gives the processor only after this many back edges (fle_spin_slice): a spin that ends sooner is not interrupted, a stuck one is. */
+#define FLE_SPIN_DEEP_BACKEDGES      1048576u
 
 typedef struct {
     int armed;                     /* the first CreateThread has happened and FLE_PREEMPT is not 0 */
@@ -100,6 +102,8 @@ typedef struct {
     uint64_t switches;             /* slice ends that gave the processor to another thread */
     uint64_t ticks;                /* virtual ticks added by slices */
     uint64_t progress;             /* fle_progress_count now */
+    uint64_t spins;                /* spin-wait back edges that gave the processor, #1393 (fle_spin_slice) */
+    uint64_t spins_deep;           /* the same, inside a callback of the runtime (depth above FLE_PREEMPT_MAX_DEPTH) */
 } fle_preempt_stats;
 
 /* ---- the message queue of one thread (used by fle_win.c; Learn "About Messages and Message Queues") ---- */
