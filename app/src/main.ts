@@ -25,7 +25,7 @@ import { ProgressView } from './ui/progress.ts';
 import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
-import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
 import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage } from './perf/exit-message.ts';
@@ -490,6 +490,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     assets: assetsNow(),
     desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs()) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
+    uiWindows: uiWindowsOf(app.summary?.windows), // Issue #1364: the window table the page already reads for its panel (refreshPanels); none before the first idle
   });
 }
 const perfState = { sent: 0, accepted: 0, stored: 0, lastNote: null as string | null, disabled: null as string | null, history: [] as AppApi['perf']['history'] };

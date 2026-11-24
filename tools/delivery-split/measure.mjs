@@ -3,6 +3,11 @@
 // Usage: node tools/delivery-split/measure.mjs <absolute path to the bundle directory raw/<name>> [runs, 1..5, default 3] > delivery.jsonl
 // stdout: one JSON object per run, on its own line: {"state","standIn","error","elapsedMs","preStart":[{"name","bytes"}],"lazy":[{"name","bytes"}],"preStartDoneMs","lazyStartMs","lazyDoneMs","lazyWaitFirstMs","lazyWaitLast","fetches":[{"name","startMs","endMs"}],"reads":[{"name","atMs","requested"}]}
 //   reads (Issue #1341): the engine's reads of a real module's image, from its line `image-read: <file name> requested=<0|1> <ms>` (the page takes the time of the line: atMs, ms since the navigation, the clock of elapsedMs; requested true when the guest asked for the module). Always an array; [] when the engine read none.
+//   Issue #1342: the same line also names the instantiation of a real module's separate wasm module (`image-read: fruity_balance_x64.6800000.wasm requested=1 <ms>`, written when the guest asks for the module; xmod.ts).
+//   scene (Issue #1342): after the first idle (the numbers above are taken before it), the scene asks the guest for Fruity Balance: the Welcome window is closed as tools/smoke/welcome-flow.mjs does (flow A),
+//   Ctrl+O opens the engine's Open dialog (the page's file manager in selection mode), the project Data/Demo projects/NewStuff.flp (host-extra/resources of the bundle's out directory; its project names Fruity Balance, and the guest asks for the plug-in when it opens)
+//   is copied in, chosen and opened. The reads above are the reads after the scene. (Fruity Balance.flp in Data/System/Render tests does not name the plug-in in its project: the guest never asks for Balance.)
+//   scene: { steps, error, state (the page's state after the scene), welcome ('listed' | 'none'), workers: [{ type, script }] (the Workers of the browser context at the end) }; null when the first idle was not reached.
 //   lazyWaitFirstMs: the time of the first read of a lazy file that had to wait for its bytes (the page mark lazy_wait, ms since the navigation); lazyWaitLast: the last such read (its path and ms). null: no read waited.
 //   state: the page's state at the end ('engine-idle' is the good one); standIn: whether the text "STAND-IN" is in the page body (a reading, as in boot-bundle.mjs); error: null, or what failed.
 //   preStart / lazy: the manifest's assets, `bytes` = the decoded size (what the page counts). preStartDoneMs: the page's timeline mark download_done (ms since the navigation started).
@@ -66,6 +71,212 @@ const timed = (p, ms, what) => {
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`timeout ${ms} ms: ${what}`)), ms); })]).finally(() => clearTimeout(t));
 };
 
+// Issue #1342: the scene of the guest's request for Fruity Balance (see the header). The room and the places of the controls are those of tools/smoke/welcome-flow.mjs (its offsets are measured at the room 1836 x 1056).
+const SCENE_FILE = ['Data', 'Demo projects', 'NewStuff.flp'];
+const SCENE_ROOM_W = 1836, SCENE_ROOM_H = 1056;
+const SCENE_WIZARD = 'TWelcomeWizard';
+const SCENE_NO_THANKS = { dx: 512, dy: 307 };
+const SCENE_LIST = { dx: 235, dy: 180 };
+const SCENE_DEFAULT_ROW = { dx: 235, dy: 117 };
+const SCENE_STEP_LIMIT_MS = 120000;
+const SCENE_GEOMETRY = `(() => { const r = document.getElementById('desktop').getBoundingClientRect(); const g = window.__app.screen.guest; return { x: r.x, y: r.y, w: r.width, h: r.height, gw: g.width, gh: g.height }; })()`;
+const SCENE_ROOM = `(() => { const s = document.getElementById('stage').getBoundingClientRect(); return { sw: s.width, sh: s.height, iw: window.innerWidth, ih: window.innerHeight }; })()`;
+const SCENE_WINDOWS = `(async () => (await window.__app.deskDumpBase64(false)).windows)()`;
+
+/** the windows of a window list: the lid at (x, y) and the class of each line (the page's format: lid N at (x, y) WxH ... class "..." title "...") */
+function parseWindows(text) {
+  return text.split('\n').map((l) => /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
+    const names = /class "([^"]*)"/.exec(m[6]);
+    const title = /title "([^"]*)"/.exec(m[6]);
+    return { x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]), cls: names ? names[1] : '', title: title ? title[1] : '' };
+  });
+}
+
+/** the scene: Welcome closed ("No thanks", then the Default row by a double click), Ctrl+O, the project given to the open box; returns what it did and the reads after it */
+async function runScene({ S, ev, cdp, browserContextId, projectPath, shotPath }) {
+  const steps = [];
+  const out = { steps, error: null, state: null, welcome: null, workers: null, reads: null };
+  const windows = async () => {
+    const t0 = Date.now();
+    for (;;) {
+      try { return parseWindows(await ev(SCENE_WINDOWS)); } catch (e) {
+        if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 15000) throw e;
+        await sleep(100);
+      }
+    }
+  };
+  const wizard = async () => (await windows()).find((w) => w.cls === SCENE_WIZARD) ?? null;
+  const pointAt = async (gx, gy) => {
+    const g = await ev(SCENE_GEOMETRY);
+    return { x: g.x + (gx + 0.5) * (g.w / g.gw), y: g.y + (gy + 0.5) * (g.h / g.gh) };
+  };
+  const click = async (gx, gy, clicks = 1) => {
+    const c = await pointAt(gx, gy);
+    await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+    await sleep(60);
+    for (let k = 1; k <= clicks; k++) {
+      await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', buttons: 1, clickCount: k, pointerType: 'mouse' });
+      await sleep(50);
+      await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', buttons: 0, clickCount: k, pointerType: 'mouse' });
+      await sleep(100);
+    }
+  };
+  const wheel = async (gx, gy, notches, deltaY) => {
+    const c = await pointAt(gx, gy);
+    for (let i = 0; i < notches; i++) {
+      await S('Input.dispatchMouseEvent', { type: 'mouseWheel', x: c.x, y: c.y, deltaX: 0, deltaY, pointerType: 'mouse' });
+      await sleep(300);
+    }
+  };
+  // the engine's "Problems loading the project" box (the Default project's plug-ins and samples) is modal: Enter closes it (its default button)
+  const dismissProblems = async () => {
+    let n = 0;
+    for (let i = 0; i < 4 && (await windows()).some((w) => /Problems loading/.test(w.title)); i++) {
+      const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 0x0d, nativeVirtualKeyCode: 0x0d };
+      await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key });
+      await sleep(40);
+      await S('Input.dispatchKeyEvent', { type: 'keyUp', ...key });
+      await sleep(1000);
+      n++;
+    }
+    return n;
+  };
+  const ctrlO = async () => {
+    await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+    await sleep(100);
+    // the engine reads the Ctrl state from its own key messages: Control goes down first (VK_LCONTROL, as keymap.ts has it)
+    const ctrl = { code: 'ControlLeft', key: 'Control', windowsVirtualKeyCode: 0xa2, nativeVirtualKeyCode: 0xa2 };
+    const key = { code: 'KeyO', key: 'o', windowsVirtualKeyCode: 79, nativeVirtualKeyCode: 79 };
+    await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...ctrl, modifiers: 2 });
+    await sleep(40);
+    await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key, modifiers: 2 });
+    await sleep(40);
+    await S('Input.dispatchKeyEvent', { type: 'keyUp', ...key, modifiers: 2 });
+    await sleep(40);
+    await S('Input.dispatchKeyEvent', { type: 'keyUp', ...ctrl, modifiers: 0 });
+  };
+  const untilIdle = async (cond, what) => {
+    const t0 = Date.now();
+    for (;;) {
+      const s = await ev(SNAPSHOT).catch(() => null);
+      if (s && (s.state === 'error' || s.state === 'exited')) return s;
+      if (s && s.state === 'engine-idle' && (await cond())) return s;
+      if (Date.now() - t0 >= SCENE_STEP_LIMIT_MS) throw new Error(`${what}: not within ${SCENE_STEP_LIMIT_MS} ms`);
+      await sleep(1000);
+    }
+  };
+  try {
+    for (let i = 0; i < 4; i++) {
+      const r = await ev(SCENE_ROOM);
+      if (Math.abs(r.sw - SCENE_ROOM_W) <= 0.5 && Math.abs(r.sh - SCENE_ROOM_H) <= 0.5) break;
+      await S('Emulation.setDeviceMetricsOverride', { width: Math.round(r.iw + (SCENE_ROOM_W - r.sw)), height: Math.round(r.ih + (SCENE_ROOM_H - r.sh)), deviceScaleFactor: 1, mobile: false });
+      await sleep(1500);
+    }
+    await sleep(1500);
+    const titleBefore = await ev('document.title');
+    const w0 = await wizard();
+    out.welcome = w0 ? 'listed' : 'none';
+    if (w0) {
+      steps.push(`the Welcome window at (${w0.x}, ${w0.y}) ${w0.w}x${w0.h}`);
+      await click(w0.x + SCENE_NO_THANKS.dx, w0.y + SCENE_NO_THANKS.dy);
+      steps.push(`No thanks at guest (${w0.x + SCENE_NO_THANKS.dx}, ${w0.y + SCENE_NO_THANKS.dy})`);
+      await sleep(2500);
+      await untilIdle(async () => true, 'after No thanks');
+      const w1 = await wizard();
+      if (w1) {
+        await wheel(w1.x + SCENE_LIST.dx, w1.y + SCENE_LIST.dy, 12, -120);
+        await wheel(w1.x + SCENE_LIST.dx, w1.y + SCENE_LIST.dy, 3, 120);
+        await sleep(400);
+        await click(w1.x + SCENE_DEFAULT_ROW.dx, w1.y + SCENE_DEFAULT_ROW.dy, 2);
+        steps.push('the Default row, 2 clicks');
+      }
+    }
+    await untilIdle(async () => (await ev('document.title')) !== titleBefore && !(await wizard()), 'the project open');
+    steps.push('the project is open (the title changed, the Welcome closed)');
+    const dismissed = await dismissProblems();
+    if (dismissed) steps.push(`the Problems box closed ${dismissed} time(s) before Ctrl+O`);
+    await ctrlO();
+    steps.push('Ctrl+O');
+    if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
+    // the open box is the page's file box (#filedlg-input), or the file manager in selection mode (#fx-input-files: the file is copied in, then chosen in the list and Open is pressed)
+    const t0 = Date.now();
+    let box = null;
+    let again = false;
+    while (!box && Date.now() - t0 < 40000) {
+      box = await ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
+      if (!box && (await dismissProblems())) {
+        steps.push('the Problems box closed, Ctrl+O again');
+        if (!again) { again = true; await ctrlO(); }
+      }
+      if (!box) await sleep(500);
+    }
+    if (!box) throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
+    const name = path.basename(projectPath);
+    const setFile = async (selector) => {
+      const doc = await S('DOM.getDocument', {});
+      const q = await S('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
+      if (!q.nodeId) throw new Error(`${selector} is not a node`);
+      await S('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [projectPath] });
+    };
+    const clickSelector = async (selector) => {
+      const r = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+      if (!r) throw new Error(`no element ${selector}`);
+      await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+      await sleep(60);
+      await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x, y: r.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+      await sleep(50);
+      await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x, y: r.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+      await sleep(300);
+    };
+    if (box === 'filedlg') {
+      await setFile('#filedlg-input');
+      steps.push(`${name} given to #filedlg-input`);
+    } else {
+      await setFile('#fx-input-files');
+      const row = `#fx-list [data-name="${name}"]`;
+      const t2 = Date.now();
+      while (!(await ev(`!!document.querySelector(${JSON.stringify(row)})`))) {
+        if (Date.now() - t2 >= 30000) throw new Error(`${name} is not listed in the file manager 30 s after the upload`);
+        await sleep(500);
+      }
+      await clickSelector(row);
+      await clickSelector('#fx-ok');
+      steps.push(`${name} uploaded into the file manager, chosen and Open pressed`);
+    }
+    const t1 = Date.now();
+    let snap = null;
+    for (;;) {
+      await dismissProblems().catch(() => 0);
+      snap = await ev(SNAPSHOT).catch(() => null);
+      if (snap && snap.imageReads.some((r) => /balance/i.test(r.name))) break;
+      if (snap && (snap.state === 'error' || snap.state === 'exited')) break;
+      if (Date.now() - t1 >= SCENE_STEP_LIMIT_MS) break;
+      await sleep(1000);
+    }
+    await sleep(3000);
+    snap = await ev(SNAPSHOT).catch(() => null);
+    out.state = snap?.state ?? null;
+    out.reads = (snap?.imageReads ?? []).map((r) => ({ name: r.name, atMs: num(r.atMs), requested: r.requested === true }));
+    steps.push(`reads after the scene: ${out.reads.map((r) => `${r.name} requested=${r.requested}`).join(', ') || 'none'}`);
+    out.logTail = await ev("window.__app.engineLog().filter((l) => /balance|real module|image-read|LoadLibrary|Problems|\\.flp|filedlg|opened|plug|xmod|trap|abort|exit|stop/i.test(l)).slice(-60)").catch(() => null);
+    out.logEnd = await ev("window.__app.engineLog().slice(-25)").catch(() => null);
+    out.exit = await ev("JSON.stringify({ state: window.__app.state, exit: window.__app.exit, error: window.__app.error })").catch(() => null);
+    const end = await S('Page.captureScreenshot', { format: 'png' }).catch(() => null);
+    if (end) fs.writeFileSync(path.join(repo, '.tmp-delivery-scene-end.png'), Buffer.from(end.data, 'base64'));
+    if (snap?.error) out.error = `${snap.error.what} [${snap.error.where}]`;
+    else if (snap && snap.state !== 'engine-idle') out.error = `state ${snap.state} after the scene`;
+  } catch (e) {
+    out.error = String(e?.message ?? e).slice(0, 500);
+    const s = await S('Page.captureScreenshot', { format: 'png' }).catch(() => null);
+    if (s) fs.writeFileSync(shotPath, Buffer.from(s.data, 'base64'));
+  }
+  const targets = (await cdp.send('Target.getTargets', {}).catch(() => ({ targetInfos: [] }))).targetInfos;
+  out.workers = targets
+    .filter((t) => t.browserContextId === browserContextId && ['worker', 'shared_worker', 'service_worker', 'worklet'].includes(t.type))
+    .map((t) => ({ type: t.type, title: t.title, script: t.url.startsWith('blob:') ? 'blob' : (new URL(t.url, 'http://x/').pathname.split('/').pop() || t.url) }));
+  return out;
+}
+
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
 
 /** the manifest's assets: the pre-start ones under the labels of the page (main.ts), and the lazy ones under their names */
@@ -102,7 +313,7 @@ function fetchesOf(resources, byUrl) {
 
 async function measureOnce(port) {
   const t0 = Date.now();
-  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [] };
+  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [], scene: null };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-delivery-run-'));
   let chrome = null, cdp = null;
   try {
@@ -147,6 +358,13 @@ async function measureOnce(port) {
     else if (snap.error) out.error = `${snap.error.what} [${snap.error.where}]`;
     else if (snap.state !== 'engine-idle') out.error = `state ${snap.state} at the end (no engine-idle within ${WAIT_LIMIT_MS} ms)`;
     if (snap?.state === 'engine-idle' && out.elapsedMs === null) out.error = 'the engine is idle but the page has no idle mark';
+    if (snap?.state === 'engine-idle') {
+      const projectPath = path.join(bundleDir, '..', '..', '..', 'host-extra', 'resources', ...SCENE_FILE);
+      const sc = await runScene({ S, ev, cdp, browserContextId, projectPath, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
+      out.scene = { steps: sc.steps, error: sc.error, state: sc.state, welcome: sc.welcome, workers: sc.workers, logTail: sc.logTail, logEnd: sc.logEnd, exit: sc.exit };
+      if (sc.reads) out.reads = sc.reads;
+      process.stderr.write(`scene: ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);
+    }
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
   } finally {

@@ -144,3 +144,5 @@ lift/out-app/host/resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Tre
 lift/out-app/host/resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Umziky - All the same.flp=seed/resources/Data/Demo projects/Visual/ZGameEditor Visualizer/Treben - Umziky - All the same.flp
 --lazy-file
 lift/out-app/host/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp=seed/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp
+--lazy-file
+lift/out-app/xmod/fruity_balance_x64.6800000.wasm=fruity_balance_x64.6800000.wasm

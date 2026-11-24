@@ -13,6 +13,9 @@ addToLibrary({
   fle_js_input_poll: (buf, max) => { const f = Module['fleInputPoll']; return f ? f(buf, max) : 0; },
   fle_js_input_done__sig: 'vii',
   fle_js_input_done: (buf, n) => { const f = Module['fleInputDone']; if (f) f(buf, n); },
+  // Issue #1342: the page loads a real module's separate wasm module (harness/two/xmod_glue.c; app/src/engine/xmod.ts): 1 when it is instantiated, 0 when the DLL has none
+  fle_js_xmod_load__sig: 'ii',
+  fle_js_xmod_load: (ptr) => { const f = Module['fleXmodLoad']; return f ? f(ptr) : 0; },
   fle_idle_wait: (nowTicks, nextTicks) => {
     const S = FleIdle;
     S.count++;
