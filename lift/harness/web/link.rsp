@@ -16,6 +16,8 @@ lift/harness/web/threads/fle_thread_lib.js
 lift/harness/web/fruity/fle_idle_lib.js
 --js-library
 lift/harness/web/filedlg/fle_filedlg_lib.js
+--js-library
+lift/harness/web/clip/fle_clip_lib.js
 -sEXPORTED_FUNCTIONS=_main,_fle_wasm_thread_entry,_fle_host_post_input
 -sEXPORTED_RUNTIME_METHODS=ENV,wasmExports,stackRestore
 -pthread

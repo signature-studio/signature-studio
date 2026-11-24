@@ -49,6 +49,12 @@ static unsigned ngcalls;
 static void (*guest_hook)(void);
 uint64_t fle_call_guest(uint64_t va, uint64_t a, uint64_t b, uint64_t c, uint64_t d) { (void)c; (void)d; if (ngcalls < 64) { gcalls[ngcalls][0] = va; gcalls[ngcalls][1] = a; gcalls[ngcalls][2] = b; } ngcalls++; if (guest_hook) guest_hook(); return 1; }
 void fle_stop(const char *api, const char *why) { printf("STOP %s: %s\n", api, why); exit(3); }
+/* #1389: the page's clipboard library and the movable-block helpers of fle_glob.c are not linked here: the page has no text and no block is live */
+void fle_clip_host_write(const void *units, uint32_t bytes) { (void)units; (void)bytes; }
+void *fle_clip_host_read(void) { return NULL; }
+uint64_t fle_glob_movable_from(const void *src, uint64_t bytes) { (void)src; (void)bytes; return 0; }
+int fle_glob_movable_bytes(uint64_t h, const uint8_t **p, uint64_t *n) { (void)h; (void)p; (void)n; return 0; }
+void fle_glob_movable_drop(uint64_t h) { (void)h; }
 "#;
 
 /// Compiles `PRE + body` with fle_clip.c, runs it, returns (exit code, stdout lines).
@@ -238,26 +244,13 @@ fn the_data_stays_after_close_and_text_formats_are_synthesized() {
     printf("count %llu\n", U(call0(fle_imp_CountClipboardFormats)));
     call1(fle_imp_OpenClipboard, 0);
     printf("get_unicode %llx\n", U(call1(fle_imp_GetClipboardData, 13)));
-    printf("get_text\n");
-    call1(fle_imp_GetClipboardData, 1);
-    printf("not reached\n");
+    printf("get_text %llx\n", U(call1(fle_imp_GetClipboardData, 1)));
+    printf("reached\n");
 "#,
         ),
     );
-    assert_eq!(rc, 3, "a synthesized format is converted by the system: the runtime stops by name");
-    assert_eq!(
-        l,
-        [
-            "unicode 1",
-            "text 1",
-            "oem 1",
-            "bitmap 0",
-            "count 3",
-            "get_unicode 7000",
-            "get_text",
-            "STOP GetClipboardData: a synthesized format (the system converts the data): not implemented"
-        ]
-    );
+    assert_eq!(rc, 0, "CF_TEXT made from the guest's CF_UNICODETEXT is converted by the runtime (#1389); the handle 0x7000 is no live block, so the answer is 0");
+    assert_eq!(l, ["unicode 1", "text 1", "oem 1", "bitmap 0", "count 3", "get_unicode 7000", "get_text 0", "reached"]);
 }
 
 #[test]
