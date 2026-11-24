@@ -5,3 +5,4 @@ Data\Demo projects\
 Data\System\
 Data\Projects\
 System\Internet\
+Data\Patches\Packs\Legacy\Drums\Dance\
