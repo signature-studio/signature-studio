@@ -44,7 +44,7 @@ project: signature-studio/3
   - 注意 1: `EXTRA_IMPORTS` を変えたら、release の `fe-build` を作り直す。`cargo test` は試験用のバイナリしか作らないので、古い `fe-build` で `engine` を作ると、変更が入らない。
   - 注意 2: `WaitForSingleObjectEx` は `lift/harness/two/wrp1_vst3_imp.c` に在る。semaphore 側の同じ名前と衝突するので、`fle_imp_sem_WaitForSingleObjectEx` にした。
   - `preBootBytes` は 311,109,738 → 313,128,824(+2,019,086 B)。増えた内訳は測っていない。上限まで約 1.24 MB。
-  - 起動が `state running` で止まったのは、流れ A〜D と道具の試行で 2 回。#{{149}}(起動の間欠の停止。完了 22:28Z)で直ったとされる。この試行の後の出来事で、この Issue では未確認。
+  - 起動が `state running` で止まったのは、1 回目の試行の 2 回(起動の前に viewport を変えた起動)。2 回目の試行では、流れ A〜D と道具の試行で止まらなかった(0 回)。#{{149}}(起動の間欠の停止。完了 22:28Z)で直ったとされる。この試行の後の出来事で、この Issue では未確認。
 - 未確認: ia2-W21(チャンネルラックの設定アイコン)の画面は測っていない。`LoadLibraryW` の引数の形(絶対の Shared の path と推定)は、成功の行(`realmod: loaded`)で確かめられた。
 - 仮説の結果: 1 回目の仮説(126 の後に不正な値を読んで止まる)は、seed の行を足すと、止まる場所が `realmod` の読み込みの後の CRT の import へ移ったことで確かめられた。
 
