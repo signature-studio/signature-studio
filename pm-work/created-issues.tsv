@@ -87,3 +87,4 @@
 140	#1391	FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際の値を出す	Task
 144	#1392	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 2): FL 自身のカーソル(Piano roll の鉛筆など)を、資源の画素のまま出す	Task
 149	#1393	起動が first idle に届かず state running のまま止まる(間欠・DPR 2.5 で 5 回中 4 回)を、再現して直す: 後ろ向きの goto の切り替え点(fle_loop_tick・fle_loop_slice)	Task
+151	#1394	コード進行ツールの Start creating で、Piano roll にノートが作られる(FL の Python のスクリプトの実行: flpianoroll と標準ライブラリ)	Task
