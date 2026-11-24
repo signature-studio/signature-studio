@@ -62,3 +62,6 @@
 122	#1366	テンプレート Blocks が使う内蔵のサンプル(Data\Patches\Packs\Legacy の DNC_*.wav など)を、起動の後に取れるように配信する	Task
 123	#1367	VST3 ホストの最小を作る(1a): OTT の IComponent を作り、setupProcessing・setActive まで通す	Task
 124	#1368	VST3 ホストの最小を作る(1b): OTT が 1 ブロックの音声を処理し、非無音・非 NaN を測る(VEX 系の命令の経路を確かめる)	Task
+125	#1369	プラグインの追加を、共有のファイルの編集ではなく、1 プラグイン 1 ディレクトリ(lift/plugins/<名前>/)の追加だけにする	Task
+126	#1370	2 つ目のプラグイン(Fruity Filter)を、lift/plugins/fruity-filter/ の追加だけで足せることを確かめる(共有のファイルの変更は 0 行)	Task
+127	#1371	内蔵プラグインを 1 本ずつ確かめる道具: 任意のプラグインの名前を渡すと、起動 → 要求 → instantiate → 1 ブロックの処理まで走る	Task

@@ -142,7 +142,8 @@ try {
 
   // 既存の表(実物の写し。125〜127 は試験用の番号)を読む create-issues の dry-run で、parent・blocked_by・本文の参照が解決され、検査が通る
   const table = path.join(tmp, 'table.tsv');
-  fs.writeFileSync(table, [fs.readFileSync(REAL.table, 'utf8').replace(/\n*$/, ''), '125\t#90125\t試験\tTask', '126\t#90126\t試験\tTask', '127\t#90127\t試験\tTask', ''].join('\n'));
+  const realRows = fs.readFileSync(REAL.table, 'utf8').split('\n').filter((l) => !/^12[567]\t/.test(l)).join('\n').replace(/\n*$/, '');
+  fs.writeFileSync(table, [realRows, '125\t#90125\t試験\tTask', '126\t#90126\t試験\tTask', '127\t#90127\t試験\tTask', ''].join('\n'));
   const cdry = spawnSync(process.execPath, [CI, '--drafts', out, '--existing', table, '--milestones', REAL.milestones, '--state', path.join(tmp, 'st.json')], { encoding: 'utf8' });
   ok('生成した下書きは、create-issues の検査を通る(既存の表と、125〜127 の参照を解決する)', [cdry.status, /021 -> #1322/.test(cdry.stdout), /022 -> #1323/.test(cdry.stdout), /125 -> #90125/.test(cdry.stdout), /126 -> #90126/.test(cdry.stdout), /127 -> #90127/.test(cdry.stdout), fs.existsSync(path.join(tmp, 'st.json'))], [0, true, true, true, true, true, false]);
 
