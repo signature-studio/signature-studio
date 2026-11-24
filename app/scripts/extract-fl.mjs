@@ -2,13 +2,15 @@
 // Extracts, from the FL Studio NSIS installer, the product files that the engine bundle build reads, into HOST_ROOT, and checks every file's SHA-256.
 // The port of ci/lib/extract_fl.py (the same rows, the same checks, the same manifest); the NSIS reading is in lib/nsis.mjs and lib/nsis-script.mjs.
 //
-//   node app/scripts/extract-fl.mjs INSTALLER HOST_ROOT --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv [--manifest OUT.sha256]
+//   node app/scripts/extract-fl.mjs INSTALLER HOST_ROOT --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv [--plugins lift/plugins] [--manifest OUT.sha256]
 //
 //   * --dlls: the engine DLL and the bundled DLLs, found by name in the installer's EXTRACTFILE list, each with the SHA-256 it must have.
 //   * --seed: every row of the VFS seed list that has a host file (guest path TAB host path TAB SHA-256): the guest path is looked up in the install tree of the NSIS
 //             script (decision 0129), the stream is extracted to HOST_ROOT/<host path>.
 //             Exception (decision 0236): a row whose host path is under lift/harness/seeds/os-fonts/ names a file of THIS repository: it is copied to HOST_ROOT/<host path>
 //             and checked against the row's SHA-256 like the others.
+//   * --plugins: the folder of the plugins (Issue #1369). Each lift/plugins/<name>/plugin.tsv adds its DLL rows to --dlls and its seed rows to --seed (lib/plugin-rows.mjs).
+//             Without the folder, nothing is added.
 // The installer is only read. Nothing is written when a SHA-256 differs: the run stops with exit 2.
 // --manifest writes `SHA-256  relative path` for every written file (sorted): its SHA-256 is the identity of the extraction.
 import crypto from 'node:crypto';
@@ -17,8 +19,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Installer, extractFiles, parseBlocks, readHeader, streamFile } from './lib/nsis.mjs';
 import { Script, installTree } from './lib/nsis-script.mjs';
+import { pluginRows } from './lib/plugin-rows.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const PLUGINS = 'lift/plugins';
 const REPO_ROWS = 'lift/harness/seeds/os-fonts/';
 const LAZY_FILE = '@lazy-file:';   // Issue #1345: the host field of a row the page serves after the start (the file is still extracted)
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex');
@@ -44,13 +48,20 @@ function main(argv) {
   const opt = (k) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : undefined);
   const dlls = opt('--dlls'), seed = opt('--seed'), manifest = opt('--manifest');
   const root = path.resolve(rootArg);
+  let extra;
+  try {
+    extra = pluginRows(opt('--plugins') ?? PLUGINS);
+  } catch (e) {
+    console.error(`extract_fl: ${e.message}`);
+    return 2;
+  }
   const written = new Map();
   const inst = new Installer(instFile);
   try {
     const { hdr, info } = readHeader(inst);
     const entries = extractFiles(hdr, parseBlocks(hdr).blocks);
     const ds = info.dataStart;
-    for (const [name, rel, want] of rows(dlls)) {
+    for (const [name, rel, want] of [...rows(dlls), ...extra.extract]) {
       const cands = [...new Set(entries.filter(([, n]) => n.toLowerCase().endsWith(name.toLowerCase())).map(([, , off]) => off))].sort((a, b) => a - b);
       let ok = false;
       for (const off of cands) {
@@ -70,7 +81,7 @@ function main(argv) {
     const tree = new Map();
     for (const [, p, off] of installTree(new Script(inst))) tree.set(p.toLowerCase(), off);
     let n = 0;
-    for (const r of rows(seed)) {
+    for (const r of [...rows(seed), ...extra.seed]) {
       if (r.length < 3 || r[1] === '-') continue;
       const [guest, host, want] = r;
       const rel = host.startsWith(LAZY_FILE) ? host.slice(LAZY_FILE.length) : host;

@@ -16,6 +16,9 @@ ok "deploy-lint: 守っている物は通る" "$(rc bash "$g/deploy-lint.sh" "$T
 printf 'jobs:\n  a:\n    steps:\n      - run: bash ci/x.sh\n' > "$T/sh.yml"; ok "deploy-lint: シェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/sh.yml")" 1
 printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/y\n' > "$T/local.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/local.yml")" 1
 printf 'on:\n  workflow_call:\n' > "$T/reuse.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/reuse.yml")" 1
+mkdir -p "$T/cwd/.github/workflows"
+ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
+ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cp "$T/good.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 0
 # 内容の検査(scan.sh は相対パスで規則の範囲を決めるので、一時ディレクトリの中で走らせる)
 mkdir -p "$T/app"
 v1=anthr; v2=opic
@@ -116,6 +119,12 @@ if git var GIT_AUTHOR_IDENT >/dev/null 2>&1; then
   ( cd "$R" && ok "judge: base の ref が読めなければ「通った」を出さない" "$(bash "$g/judge.sh" no-such-ref "$T/task-ok.md" 2>&1 | grep -c '通った')" 0 )
   ( cd "$R" && ok "flags: base の ref が読めなければ落ちる" "$(rc bash "$g/flags.sh" no-such-ref HEAD)" 1 )
   ( cd "$R" && ok "judge: 変更が無い base(HEAD)なら、通った旨を出して通る" "$(bash "$g/judge.sh" HEAD "$T/task-ok.md" 2>&1 | tail -1)" "judge: 通った" )
+  # deploy を止める印(skip ci など)は、commit の題名と本文に使わせない(main の deploy を迂回させない。依頼者の指示)
+  printf 'int z;\n' > "$R/lift/runtime/z.c"; cm "題名 [skip ci]"; base=$(git -C "$R" rev-parse HEAD~1)
+  ( cd "$R" && ok "judge: commit の題名に deploy を止める印(skip ci)があれば落ちる" "$(rc bash "$g/judge.sh" "$base" "$T/task-none.md")" 1 )
+  ( cd "$R" && ok "judge: deploy を止める印があれば、その旨を 1 行で出す" "$(bash "$g/judge.sh" "$base" "$T/task-none.md" 2>&1 | grep -c '止める印')" 1 )
+  printf 'int w;\n' > "$R/lift/runtime/w.c"; cm "題名(印なし)"; base=$(git -C "$R" rev-parse HEAD~1)
+  ( cd "$R" && ok "judge: 印の無い commit は、ほかが通れば通る" "$(rc bash "$g/judge.sh" "$base" "$T/task-none.md")" 0 )
   # 受け入れが boot.json(起動確認)を使うとき: 判定の再実行の前に boot.json を消し、失敗したら、その結果か「無い」を 1 行で出す(受け入れの再試行は足さない)
   rt=$T/rt; mkdir -p "$rt"
   bj() { ( cd "$R" && RUNNER_TEMP="$rt" bash "$g/judge.sh" HEAD "$1" > "$T/bj.out" 2>&1; echo "$?" > "$T/bj.rc" ); }

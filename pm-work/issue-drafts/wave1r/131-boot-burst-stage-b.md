@@ -48,6 +48,26 @@ project: signature-studio/3
 - 段 A の性能(窓の +10〜+70 s。profile 付きの 1 回ずつ): 再生中の engine の 1 周あたりの busy は 88.2 µs(基準)→ 78.5 µs(段 A)。profile 無しの周あたりは未測定。
 - Blend2D の C++(wasm。emcc でコンパイル)は、`lift/harness/b2d1/`(`blend2d-sources.txt`・`b2d_swap.cpp`・`b2d3-compop.patch`)と、`fe-build` の `blend2d_clone`(`lift/crates/fe-build/src/main.rs` の 171 行付近)で作られる。ゲストの Blend2D.dll の入口は、`b2d_swap.cpp` の `fle_swap_*` で差し替えている(決定 0160)。
 
+## 前回の試行で分かったこと(run 45349174478。`failed`)
+
+- 作業は保存された。差分は取り込みの段で作業ツリーに載る。作業者の commit は `7147005b`(作業者のツリーの commit。main には無い)。判定の受け入れは通った。落ちたのは main への push だけ: `CONFLICT (content): Merge conflict in lift/crates/fe-build/tests/plan/engine.txt`(他の Issue が同じ記録を変えたため)。
+- 衝突の直し方: `engine.txt` が衝突したら、main の版を取り、この Issue の変更が計画に与える差(段の件数・引数の行)だけを取り直す。記録の再生成は、`lift/crates/fe-build/tests/` の試験(`plans_match_recorded_texts`)を読んで決める。両方の変更を残す。この Issue が記録に与える差: (a) blend2d の段の手順が 6 から 7 になる(`lift/harness/b2d1/b2d4-tick.patch` の行が増える)。(b) 記録に `fle_webview2.c` の行が要る(#1355 で増えた物。main が既に直していれば、取り込みで消える)。
+- 変更の要点(作業者の実装):
+  - 切り替え点: Blend2D の塗りの行ループ 5 か所に `fle_b2d_tick(units)` を入れた(パッチは `lift/harness/b2d1/b2d4-tick.patch`。本体は `b2d_swap.cpp`。units は行の幅に比例: px / 128 + 1)。仮想時計は進めない。計数の粒度は変えない。
+  - 読むだけの計数(`fle_thread.c`・`fle_audio_ring.c`・`fle_audio_transport.c`。`FLE_AUDIO_EXPORT` で JS から読む)。振る舞いは変えない。
+  - 計測の道具: `tools/p3-audio-probe/measure.mjs`(補充の時刻 `--pubs`、窓の最大 `maxRefillStallInWindowMs`)と `tools/p3-audio-probe/gap-report.mjs`(補充の停止と CPU サンプルの突き合わせ)。
+  - `fe-build` の手順に新しいパッチを加え、計画の試験の期待値を更新した(上の (a)(b))。
+- 段 A の区間の結論は**誤り**だった: 段 A の CPU サンプルの区間解析は、短い切り替えの枠を写さない(サンプルは約 0.3 ms 間隔)。段 B では、補充の記録(`fle_js_publish`)から停止を数え直した。段 A の報告の「区間 2〜5 は C の関数」は、補充の停止の上位には現れなかった。
+- 段 B の値(runner の値。nproc 4。判定の段の loadavg 2.7 前後):
+  - 受け入れの 3 回(作業者): `bootLast60sAt10s` 0・0・0、`bootLast60sAt70s`・`bootLast60sAt90s` 0、`maxRefillStallInWindowMs` 15.5・14.0・17.7。`screenDevicePx` 3240x1864。
+  - 判定の段の 3 回: `bootLast60sAt10s` 0・0・0、`maxRefillStallInWindowMs` 15.2・15.4・17。`quantaDelta` 20,671〜20,675。`ctxState` running。
+  - 段 A の値(前段の引用): `bootLast60sAt10s` 4・4・25。窓の最大は、この段の計測で 16.8 と 15.6。
+  - 起動: 起動確認は engine-idle・`elapsedMs` 8,116(作業者)。流れ A は通った。
+  - 再生中(作業者。読み込んだ曲は無く、音の中身は無い): 無音・再生・再生+マウス 1000 Hz(60 s)の underrun の増分は 0。マウスは約 1000 件/s。
+  - 1 周あたりの busy(profile 付き・同じ道具・同じ窓): 段 A 95.4 µs、段 B 95.6 µs(誤差の範囲。profile 無しは未確認)。
+- 残り(未確認): 補充の停止が 20〜31 ms で、C の `f_33d6e70`(双線形ワープ)が 8 件。このループには切り替えの計数が入っているのに、補充が出ない理由は特定できていない。窓の中の切り替えの約 46% は深さ 2 以上で起き、深さ 1 で実際にスレッドが切り替わったのは 11 回。押下直後の `(program)` 98 ms(音が動く前。underrun にはならない)。`wasm-function[21846]` と `fle_imp_VirtualAlloc` の 6〜23 ms。
+- 次の試行でやること: 差分を取り込み、`engine.txt` の衝突を上のやり方で直し、受け入れを通す。残りの停止は、報告に書く。`lift/` を変えたので、push で `deploy.yml` が動く。
+
 ## 読む物
 
 - `pm-work/findings/boot-burst-1352.md`(全文。特に 2〜5 節)、`pm-work/findings/boot-baseline-112.json`、`pm-work/findings/boot-stall-1334.md`(計数の検証)
@@ -56,7 +76,7 @@ project: signature-studio/3
 - `lift/harness/b2d1/`(`blend2d-sources.txt`・`b2d_swap.cpp`・`b2d3-compop.patch`)、`lift/crates/fe-build/src/main.rs`(`blend2d_clone`。パッチの当て方)、`lift/harness/web/cflags-b2d.args`
 - `lift/runtime/fle_raster.c`(`fle_r_blit`)、`lift/runtime/fle_gdi.c`(`EACH_CLIP` の呼び出し)
 - `lift/crates/fe-wasmgen`(hybrid の対象。段 A の結論どおり、生成器の入口・ループへの切り替えは C の関数に届かない)
-- `tools/p3-audio-probe/measure.mjs`(`--boot`・`--profile`・`maxPubGapMs` の読み)、`tools/p3-audio-probe/burst-report.mjs`・`profile-names.mjs`(段 A で追加・既存)、`pm-work/findings/measure-live-109.patch`(#1349 の道具の差分。main に無ければ使う)
+- `tools/p3-audio-probe/measure.mjs`(`--boot`・`--profile`・`maxPubGapMs` の読み)、`tools/p3-audio-probe/burst-report.mjs`・`profile-names.mjs`(段 A で追加・既存)、`tools/p3-audio-probe/measure-live.mjs`(#1349 の道具。main に在る)
 - `tools/smoke/welcome-flow.mjs`(流れ A の確認)、`tools/boot-check/boot-bundle.mjs`(`elapsedMs` は engine-idle までの時間)
 
 ## やること
@@ -81,7 +101,7 @@ project: signature-studio/3
    - 再生中の性能への影響を、4 の計測で確かめる。
 4. **ビルドは 3 回まで**(1 回約 35 分)。1 回目: 1 の計測の道具と、段 A の版の上の profile。2 回目: 3 の切り替え点。3 回目: 2 回目の結果に基づく修正の 1 回だけ。
 5. **受け入れの測定**: 下の受け入れのコマンドで、`measure.mjs --boot` を n=3 で行い、判定の基準の全てを満たすか確かめる。満たせないときは、到達した値と、残る区間の上位 5 件(関数名・鎖・長さ)を報告に書く(判定は PM が見直す)。
-6. **再生中の性能**: 無音・再生・マウス 1000 Hz の途切れ(`measure-live.mjs`。#1349 の道具。main に無ければ `pm-work/findings/measure-live-109.patch` を `git apply` で当てて使う。当たらなければ `measure.mjs --load ui`(50 ms 間隔)で代え、1000 Hz は未確認と書く)が 0 のまま。engine の 1 周あたりの時間(profile 無しの測定で。段 A の版は 78.5 µs)を、基準と比べて報告に書く。
+6. **再生中の性能**: 無音・再生・マウス 1000 Hz の途切れ(`tools/p3-audio-probe/measure-live.mjs`。#1349 の道具。main に在る。当たらなければ `measure.mjs --load ui`(50 ms 間隔)で代え、1000 Hz は未確認と書く)が 0 のまま。engine の 1 周あたりの時間(profile 無しの測定で。段 A の版は 78.5 µs)を、基準と比べて報告に書く。
 7. 計測のための変更は、受け入れの前に取り除く(読むだけの関数は残してよい)。
 8. 作業ツリーを commit する(受け入れが通らなくても、作業の最後に必ず commit する)。
 
@@ -118,7 +138,8 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 作業の進め方
 
-- ビルドは 1 回約 35 分。フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 5400000。上限)を渡して待つ。
+- ビルドは 1 回約 35 分(直近は約 33 分)。フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 5400000。上限)を渡して待つ。背景で起動して待たない。
+- **4 時間 30 分を過ぎたら**、受け入れが通らなくても、作業ツリーを commit し、報告を書いて終える(ジョブの上限は 5 時間 50 分)。
 - blend2d の取得(GitHub)が 403 で落ちたら一時的。受け入れのコマンドは `lift/out-app/b2d-src` を消してから作り直すので、そのまま再試行する。
 - 作業の最後に、受け入れが通らなくても、作業ツリーを commit する。未 commit の変更が残ると、判定は失敗する。
 

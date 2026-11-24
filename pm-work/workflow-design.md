@@ -45,6 +45,15 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 - work の `concurrency` は `group: task-<番号>`、`cancel-in-progress: false`。同じ Issue の作業は直列になる。
 - 対象が空なら start 以降は skip される。runner を使うのは select(数十秒)だけ。
 - 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 接頭辞)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。新しい seed の行を足す Issue は、実物の接頭辞が `ci/resources-prefixes.txt` に在ることを、起票の前に確かめる(無ければ、先に足す。足す前に、作業者は受け入れを通せない)。
+  - #1386・#1387 で足した 6 件(`ci/resources-prefixes.txt` の 9〜14 行目。どの接頭辞も `\` で終わる folder 単位。ファイル単位の指定は無い)。大きさは、一覧の bytes(dll・exe と Data\ の物だけ在る)の合計。
+    - `System\Tools\Chord progression\`: 59 件。大きさは一覧に無い。FL 内蔵のコード進行ツールの Python のスクリプト(#1386)。
+    - `Shared\Python\`: 37 件。dll・exe の合計は 14,939,080 B。他の 27 件は大きさが一覧に無い。FL 内蔵の Python の実行環境(`Python\Python312.dll` を読む物。#1386)。接頭辞はこの folder 全体になる。
+    - `Data\Patches\Scores\Arpeggiator\Riff machine\`: 40 件・8,093 B(#1387)。
+    - `Data\Patches\Scores\Quantization\Riff machine\`: 9 件・3,908 B(#1387)。
+    - `Data\Patches\Scores\Chopping\Riff machine step 1\`: 24 件・6,311 B(#1387)。
+    - `Data\Patches\Scores\Chopping\Riff machine step 2\`: 19 件・2,807 B(#1387)。
+  - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入るだけ。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
+- 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
 
 - 実機のビーコン(ラベル `perf-beacons` の作業だけ)。extract が R2 の `fl-web-cache` の `perf/` から、直近 3 日(UTC の今日と前の 2 日)の `*.json` を、最大 1000 件・合計 100 MB で取り、`$RUNNER_TEMP/perf` に置いて、鍵 `perf-beacons-${{ github.run_id }}` でキャッシュに保存する。work は同じ鍵で復元し、`lift/out-app/host-extra/perf/` に置く(commit はしない)。鍵を run ごとにするのは、ビーコンが増え続けて内容で決まる鍵が使えず、同じ run の extract と work だけが同じ鍵を読むため。公開の artifact は使わない。リポジトリは公開で、artifact も公開されるため、依頼者の実機のビーコン(個人を特定しうる値を含む)を置けない。R2 の鍵は extract だけが持ち、作業者の段には渡さない。ラベルの無い run では、これらの段は動かない。
 
@@ -91,7 +100,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - 通った: push の段が作った `Closes #N` の空の commit で、GitHub が Issue を閉じる(未確認。「9」)。report は「通った: <run の URL>」「commit: <SHA の URL>」「受け入れの出力(末尾 8 行)」をコメントする。Issue がまだ open のときは、「close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する」を追記し、GITHUB_TOKEN で閉じる。そのあと `running` を外す(開いたまま外すと、同じ Issue への別の run が、`running` の無い状態を見て再起動し得るため)。
 - 落ちた: 「落ちた: <run の URL>」「作業の状態」「失敗した段」「判定の出力(末尾 8 行)」をコメントし、`failed` を付けてから `running` を外す(逆順だと、外した直後の別の run が、`failed` の無い状態を見て再起動する)。
 - 取り消された(cancelled)・ジョブが動かなかった: 落ちたのと同じく `failed` を付ける。時間切れで取り消された作業は、取り消しの後の保存の段が `work.diff` に残し、コメントに「時間切れで取り消された」と「作業を保存した」(または「作業を保存できなかった」)を書く(「13」)。
-- push の段で落ちた(判定は通った): 作業は「4」の 8 の `work.diff` として artifact に残る。落ちた旨のコメントに「作業を保存した」を書く。次の再試行は、その差分を作業の前に取り込んでから始める。
+- push の段で落ちた(判定は通った): 作業は「4」の 8 の `work.diff` として artifact に残る。落ちた旨のコメントに「作業を保存した」を書く。次の再試行は、その差分を作業の前に取り込んでから始める。main との衝突で落ちたときは、「16」の自動の再試行の対象になる(拒否で落ちたときは対象外)。
 - 判定の段で落ちた(判定は通らなかった): 「4」の「判定が落ちた作業の保存と続きからの取り込み」のとおり、作業ツリーの差分を `work.diff` に残し、コメントに「作業を保存した」を書く。次の再試行は、それを commit せず続きから取り込む。
 - 再試行: Issue に `/retry` と書く、または `failed` ラベルを外す。`/retry` のときは start が `running` を付けてから `failed` を外す(逆順だと、外した直後の別の run が、`running` の無い状態を見て二重に起動し得る)。
 
@@ -99,7 +108,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 - ラベル(`running`・`failed`)とコメントは、start と report が GITHUB_TOKEN(`issues: write`)で行う。GITHUB_TOKEN で行った変更は次の run を起動しない(`workflow_dispatch`・`repository_dispatch` を除く)。そのため、start と report の書き込みで run が連鎖しない。
 - 通った Issue は、push の段が作る空の commit(`Closes #N`)で閉じる。push は App の token で行うので、この close は App の操作になり、`issues: closed` の run を起こすと想定する(未確認。「9」)。report は、Issue がまだ open のときだけ GITHUB_TOKEN で閉じる。GITHUB_TOKEN の close は run を起こさないため、後続は起動せず、PM が再評価する。
-- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・start・extract・report には渡さない。
+- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・start・extract・report には渡さない。例外: report の自動の再試行の起動の段(「自動の再試行を起動する」)だけは、再試行の Issue があるときに限り、鍵を受け取る(running を外す App の操作の 1 回。「16」)。
 - 作業者の段(opencode)には、どの token も鍵も無い(今と同じ)。
 - 本文の取得と、判定の道具の取り直しの段にだけ、GITHUB_TOKEN(`issues: read`・`contents: read`)を渡す。
 
@@ -113,6 +122,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - 作業ジョブの鍵の一時ファイル(`$RUNNER_TEMP/botid-config.json`)は、作業の段から読める(旧設計から同じ)。
 - **未確認**: `Closes #N` の空の commit で Issue が閉じるか。pull で merge commit ができたときも閉じるか。閉じなかった場合は、report が GITHUB_TOKEN で閉じ、後続は起動しない(「7」)。
 - **未確認**: App の操作で閉じた Issue が `issues: closed` の run を起こし、ブロックされていた後続を select が選ぶか。起きなければ、後続の Issue の本文を編集して `edited` を起こし、再評価する(上の `blocked_by_removed` と同じ手順)。
+- **未確認**: App の操作で外した `running`(`issues: unlabeled`)が run を起こし、select が Issue を選ぶか(「16」の再試行の起動)。起きなければ、再試行は起動せず、Issue に `running` が残る。PM が外す。
 
 ## 10. PM の決定
 
@@ -159,12 +169,33 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 ジョブの上限(work は 350 分)に達すると、ジョブは取り消され、`failure()` は動かず、`cancelled()` の段だけが猶予(約 5 分)の中で動く。#1342 の 2 回目の試行(run 45197326869)では、作業者が背景のビルドを `tail --pid` で待ち、その待ちが戻らず、ジョブが時間切れで取り消され、作業が全て失われた(作業の保存の段が動かなかった)。そこで、押せなかった作業と判定が落ちた作業の保存の条件を `(failure() || cancelled())` にし、保存の段は通信をせず、取り消しで残った `.git/index.lock` を外してから差分を作る。報告の段は、取り消された作業を `failed` にし、保存の有無をコメントに書く。次の再試行は、判定の出力が無い保存を、判定の前の取り消しとして続きから取り込む。
 
-## 14. 本番の engine の門(検証済みの sha だけが本番の manifest になる)
+## 14. 本番の engine の門(廃止)
 
-`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替える(`lift/crates/fe-build/src/main.rs` の `upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門が静かに閉じたままで、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(deploy は success のまま。#1363 の実機のビーコンで確かめた)。そこで、スモーク(起動の確認と、Welcome 窓の 4 つの流れ)が両方通った engine の sha256 を、deploy の作業ツリーの `verified.txt` に 1 行足す(`manifest.json` の `engine.wasm.sha256` から取る。既存の行は残す。commit はしない)。その後に `fe-build upload` が manifest を差し替え、upload の後の段が、本番の `manifest.json` とこの build の manifest を `cmp` で比べる。一致しなければ deploy は失敗し、wrangler は飛ぶ。スモークが落ちれば、門の段は動かず、manifest は替わらない(既定の `success()`)。deploy が success でも engine が替わったとは限らないので、替わったかは実機のビーコンの版で確かめる。
+`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替えていた(`upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門は静かに閉じたままだった。手順は落ちず、deploy は success のままだった。その結果、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(#1363 の実機のビーコンで確かめた)。940e08fd は、スモークが通った sha を deploy が門の行に足す暫定の形にしたが、門そのものが deploy の迂回なので、門を廃止した(#1378)。
+
+今の形: `fe-build upload` は、常に bundle のファイルを上げ(`upload_sync_steps`)、最後に `manifest.json` を差し替える(`upload_manifest_step`)。順は変えない(ファイル → manifest)。main の deploy は、スモーク(起動の確認と Welcome 窓の流れ)が通った engine を、常に本番に出す。スモークが落ちれば deploy は失敗し、本番は替わらない(既定の `success()`)。upload の後の「本番の manifest を確かめる」は、本番の manifest とこの build の manifest を `cmp` で比べ、違えば deploy を失敗にする。deploy が success でも、engine が替わったかは実機のビーコンの版で確かめる。
+
+抽出の木の鍵(`host-`)は、インストーラの名前と抽出の引数(`lift/crates/fe-build/src/main.rs`)と、extract-fl が repo から読む `lift/harness/seeds/os-fonts/` の 4 件を含む。含まないと、これらを変えても古い木が使われ、変更が本番に出ない(#1378 で足した)。
+
+本番の bundle の入力(作業者の受け入れと同じにする)。`fe-build bundle` が読むのは、seed 表の行の host ファイル(`pack-seed.mjs` が SHA-256 を照合して入れる)と、`pack.args` の lazy 指定、それに `pack_step_for` が見つけた `error-offline.html`(`lift/out-app/host-extra/resources/System/Internet/`)だけである。seed 表の行は、言語・テーマ・テンプレート・demo・Blocks・内蔵プラグインの DLL の多くを含み、deploy は `extract-fl` で host に取り出す。作業者の resources の木(`ci/resources-prefixes.txt`)は、deploy の「resources を取り出す」の段も取り出すので、オフラインの頁が本番の bundle に入る(それまでは、deploy の木に無いので黙って省かれた)。木の中の余分な物は、seed 表に無いため bundle に入らない(写しの要らない理由)。内蔵プラグインの木(`host-extra/plugins`)と起動用の実行ファイル(`host-extra/exe`)は、bundle の入力ではなく、道具(tools/plugin-hooks・tools/feat-c1-hidpi)だけが読む。bundle の中身は、「bundle の中身を確かめる」の段が、オフラインの頁と、言語・テーマ・テンプレートの代表 1 件ずつを manifest で確かめる。
+
+deploy で `[skip ci]` を使わない(依頼者の指示。main の push が deploy を迂回しないように)。judge が、作業の commit の題名と本文に、skip ci などの印が在れば落とす。push の段は、Issue の題名から印を落としてから空の commit を作る。pm-work だけの push は、paths の filter で deploy が起動しないので、印を付ける理由が無い。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
 
 ## 15. 公開のログに出さない値(endpoint とアカウント ID)
 
 このリポジトリのログは公開される。runner は `GITHUB_ENV` に書いた値を後続の全段の env 表示に出すため、endpoint とアカウント ID は `GITHUB_ENV` に書かず、runs-on/cache の段の `env:` には秘密(secrets)の値として渡す。runs-on/cache は endpoint を環境変数でしか受けないので、この移行は秘密の登録の後に行う(登録の前に移すと cache が壊れる。現行の書き方は、登録まで残る)。
+
+## 16. push の衝突の自動の再試行
+
+作業ジョブの「通った変更を main に push する」の段が、main との衝突(`git pull` の merge の衝突)で 3 回とも落ち、最後の試行が衝突だったときは、同じ Issue を自動で再試行する(手で `/retry` しなくてよい)。push の拒否(`remote rejected`・権限・保護による失敗)は対象外で、従来どおり `failed` を付ける(再試行しても同じ結果になるため)。
+
+- 印: push の段は、衝突のときだけ、GITHUB_OUTPUT に `push_conflict=true` を書き、衝突したファイルのうち `pm-work/` の外の名前を `out/push-conflict.txt` に残す(成果物 `agent-<番号>` に入る)。最後の試行が拒否なら、前の試行が衝突でも印を残さない。
+- 判定: 報告の「結果を集める」段が、作業ジョブの結論が failure で、Issue が open で、印(`out/push-conflict.txt`)が在るとき、Issue のコメントのうち印の行 `<!-- auto-retry:push-conflict -->` を含む物の数 k を数える。`tools/auto-retry.mjs decide` が、k が 2 未満なら `retry`、2 以上なら `fail` を出す。
+- retry(k が 2 未満): 報告が、印の行と「自動で 1 回やり直す(k+1/2)」を含むコメントを書く(GITHUB_TOKEN)。`failed` は付けない。`running` の除去は、報告の最後の段(App の token)で行う。
+- fail(k が 2 以上): 従来どおり `failed` を付け、「自動の再試行を 2 回行ったが、衝突が続く。人手(PM)が見る」と書く。
+- 上限: 1 つの Issue につき自動の再試行は 2 回まで(初回と合わせて最大 3 回の push)。数えるのは印の行の入ったコメントだけなので、人の `/retry` は数えを増やさず、上限も変わらない。
+- 起動の方式: GITHUB_TOKEN で行ったコメント・ラベルの変更は、次の run を起こさない。そこで、再試行の起動の段は App の token で `running` を外す。外すと `issues: unlabeled` のイベントが起き、select が Issue を選ぶ(`failed` が無く、`running` も無いため)。同じ Issue の run は concurrency(`agent-<番号>`、`cancel-in-progress: false`)で直列になるので、再試行の run は、今の run(報告まで)が終わってから始まる。再試行の run は、前回の作業(`work.diff`)を「前回の作業を取り込む」の段で載せてから始め、受け入れを通して push する。
+- 鍵: App の鍵を受け取るのは、報告の「自動の再試行を起動する」の段だけで、再試行の Issue があるときにだけ動く(「8」)。その段は、botid の設定を作り、`gh` の設定ディレクトリを使って `running` を外し、使い終えた鍵の一時ファイルと `hosts.yml` を消す。
+- 確認の状態: 印の数え方と判定と、`running` の除去の呼び出しは `spec/auto-retry.test.mjs` と `spec/workflow.test.sh` の (u) で確かめる。App の操作が run を起こすことと、報告の段が App の名義で `gh` を使えることは、実際の run で確かめるまで未確認(「9」)。

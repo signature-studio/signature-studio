@@ -4,6 +4,7 @@
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
 // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+// With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -62,6 +63,11 @@ const BOOT_POLL_MS = 50;
 const BOOT_READ_MS = { first: 10000, last: 70000, final: 90000 };
 const TRACE_MS = 50;
 const PROFILE_INTERVAL_US = 250;
+// Issue #1366: the window list of the guest (the page's deskDumpBase64, as tools/delivery-split/measure.mjs reads it); the box's title; a sample request that found nothing (a .wav in the engine's missing-path line)
+const WINDOWS_TEXT = '(async () => (await window.__app.deskDumpBase64(false)).windows)()';
+const PROBLEMS_TITLE = /Problems loading/;
+const SAMPLE_MISSING = /^(?:\[err\] )?missing-path: .*\\Data\\Patches\\.*\.wav"$/i;
+const PROJECT_DIALOG_MS = 15000;
 
 // the isolation flags of tools/boot-check/boot-bundle.mjs (copied: that file does not export them)
 const ISOLATION = [
@@ -86,7 +92,7 @@ async function main() {
   const t0 = Date.now();
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
-    state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null,
+    state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
@@ -115,10 +121,8 @@ async function main() {
     const { browserContextId } = await cdp.send('Target.createBrowserContext', { disposeOnDetach: true });
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank', browserContextId });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
-    const chooser = [];
     const workers = [];
     cdp.on((m) => {
-      if (m.sessionId === sessionId && m.method === 'Page.fileChooserOpened') chooser.push(m.params);
       if (m.sessionId === sessionId && m.method === 'Target.attachedToTarget' && m.params.targetInfo.type === 'worker') workers.push(m.params.sessionId);
     });
     const S = (method, params) => timed(cdp.send(method, params, sessionId), CDP_TIMEOUT_MS, method);
@@ -170,7 +174,11 @@ async function main() {
     out.consent = await dismissStartupBox(S, ev);
     log('consent box', out.consent);
 
-    if (projectFile !== null) await openProject(S, ev, chooser, projectFile);
+    if (projectFile !== null) {
+      const logBefore = await ev('window.__app.engineLog().length');
+      await openProject(S, ev, projectFile);
+      await projectReport(ev, out, logBefore);
+    }
     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
     await tapKey(S, 'Space', ' ', 32);
     out.keyAtGuest = await keyShown(ev, 'vk 0x20', 2000);
@@ -381,22 +389,100 @@ async function dismissStartupBox(S, ev) {
   return `"No thanks" at guest (${NO_THANKS.x}, ${NO_THANKS.y}) of ${NO_THANKS.gw}x${NO_THANKS.gh}`;
 }
 
-// the project file is opened with the engine's File > Open, the route of the other probes (tools/verify-kit/tools/sdriveg2-lat.mjs, openFile). Not run yet: no project file is in the repository.
-async function openProject(S, ev, chooser, file) {
+// The project is opened with Ctrl+O. The usage-data box's "No thanks" (above) leaves the Welcome window up: it is closed with Escape (Issue #1366), not by opening its Default row, because the Default project's load stopped the engine (exit code 134, after Python312.dll was not found) before the open box came. Then Ctrl+O gives the engine's open box: the page's file box (#filedlg-input), or the file manager in selection mode (#fx-input-files: the file is uploaded, chosen in its list, and Open is pressed). The engine's "Problems loading the project" box, if any, is closed by Enter.
+const WELCOME_CLASS = 'TWelcomeWizard';
+async function openProject(S, ev, file) {
   const stem = path.basename(file, path.extname(file));
-  await S('Page.setInterceptFileChooserDialog', { enabled: true });
-  await clickGuest(S, ev, 18, 20);
-  await sleep(1500);
-  await clickGuest(S, ev, 48, 85);
-  await until(() => ev('window.__app.fileDlg.open === true'), 120000, 'the File > Open dialog');
-  await sleep(500);
-  const box = await ev("document.getElementById('filedlg-input').getBoundingClientRect().toJSON()");
-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
-  await until(() => chooser.length > 0, 5000, 'the file chooser');
-  await S('DOM.setFileInputFiles', { files: [file], backendNodeId: chooser[0].backendNodeId });
-  await until(async () => ((await ev('window.__app.pageTitle().title')) ?? '').startsWith(stem), 180000, `the title of ${stem}`);
+  const name = path.basename(file);
+  const welcomeListed = (await windowsOf(ev)).some((w) => w.cls === WELCOME_CLASS);
+  if (welcomeListed) {
+    await tapKey(S, 'Escape', 'Escape', 0x1b);
+    await until(async () => !(await windowsOf(ev)).some((w) => w.cls === WELCOME_CLASS), 30000, 'the Welcome window closed with Escape');
+  }
+  await dismissProblems(S, ev);
+  log('before Ctrl+O', { welcome: welcomeListed, title: await ev('window.__app.pageTitle().title'), windows: (await windowsOf(ev)).map((w) => `${w.cls}|${w.title}`) });
+  await ctrlO(S, ev);
+  let box = null;
+  let again = false;
+  const t0 = Date.now();
+  while (!box && Date.now() - t0 < 40000) {
+    box = await ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
+    if (!box && (await dismissProblems(S, ev)) > 0 && !again) {
+      again = true;
+      await ctrlO(S, ev);
+    }
+    if (!box) await sleep(500);
+  }
+  if (!box) {
+    const elog = await ev('window.__app.engineLog()');
+    log('no open box', { title: await ev('window.__app.pageTitle().title'), windows: (await windowsOf(ev)).map((w) => `${w.cls}|${w.title}`), engineLine: await ev("(document.getElementById('engine-line')?.textContent ?? '')"), tail: elog.slice(-6).map((l) => l.slice(0, 160)) });
+    throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
+  }
+  const selector = box === 'filedlg' ? '#filedlg-input' : '#fx-input-files';
+  const doc = await S('DOM.getDocument', {});
+  const q = await S('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
+  if (!q.nodeId) throw new Error(`${selector} is not a node`);
+  await S('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [file] });
+  if (box === 'explorer') {
+    const row = `#fx-list [data-name="${name}"]`;
+    const t2 = Date.now();
+    while (!(await ev(`!!document.querySelector(${JSON.stringify(row)})`))) {
+      if (Date.now() - t2 >= 30000) throw new Error(`${name} is not listed in the file manager 30 s after the upload`);
+      await sleep(500);
+    }
+    await clickSelector(S, ev, row);
+    await clickSelector(S, ev, '#fx-ok');
+  }
+  // the title is the project's name as the guest shows it (its case may differ from the file name), or the "Problems loading the project" box's title while that box is the active window (the box is then the one projectReport reads)
+  const title = () => ev('window.__app.pageTitle().title');
+  const opened = async () => { const t = (await title()) ?? ''; return t.toLowerCase().startsWith(stem.toLowerCase()) || PROBLEMS_TITLE.test(t); };
+  try {
+    await until(opened, 180000, `the title of ${stem}`);
+  } catch (e) {
+    throw new Error(`${e.message} (the title is ${JSON.stringify(await title())})`);
+  }
+  log('project open', { title: await title() });
   await sleep(4000);
+}
+
+// the engine's "Problems loading the project" box is modal: Enter closes it (its default button). Returns how many were closed.
+async function dismissProblems(S, ev) {
+  let n = 0;
+  for (let i = 0; i < 4 && (await windowsOf(ev)).some((w) => PROBLEMS_TITLE.test(w.title)); i++) {
+    const key = { code: 'Enter', key: 'Enter', windowsVirtualKeyCode: 0x0d, nativeVirtualKeyCode: 0x0d };
+    await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key });
+    await sleep(40);
+    await S('Input.dispatchKeyEvent', { type: 'keyUp', ...key });
+    await sleep(1000);
+    n++;
+  }
+  return n;
+}
+
+// Ctrl+O: the engine reads the Ctrl state from its own key messages, so Control goes down first (VK_LCONTROL, as tools/delivery-split/measure.mjs sends it)
+async function ctrlO(S, ev) {
+  await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+  await sleep(100);
+  const ctrl = { code: 'ControlLeft', key: 'Control', windowsVirtualKeyCode: 0xa2, nativeVirtualKeyCode: 0xa2 };
+  const key = { code: 'KeyO', key: 'o', windowsVirtualKeyCode: 79, nativeVirtualKeyCode: 79 };
+  await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...ctrl, modifiers: 2 });
+  await sleep(40);
+  await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key, modifiers: 2 });
+  await sleep(40);
+  await S('Input.dispatchKeyEvent', { type: 'keyUp', ...key, modifiers: 2 });
+  await sleep(40);
+  await S('Input.dispatchKeyEvent', { type: 'keyUp', ...ctrl, modifiers: 0 });
+}
+
+async function clickSelector(S, ev, selector) {
+  const r = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+  if (!r) throw new Error(`no element ${selector}`);
+  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+  await sleep(60);
+  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x, y: r.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+  await sleep(50);
+  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x, y: r.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+  await sleep(300);
 }
 
 async function until(fn, ms, what) {
@@ -408,16 +494,63 @@ async function until(fn, ms, what) {
   }
 }
 
+// Issue #1366: what the guest shows once the project is open. The "Problems loading the project" box is a window of its own, so projectDialogs lists the windows with that title. The box comes with the load: the windows are polled for PROJECT_DIALOG_MS after the open, and the list is empty only when no such box came in that time. projectWindows: the windows at the end (title and class). projectMissing: the sample requests of the open that found nothing (the engine's missing-path lines of a .wav, from the log after logBefore).
+async function projectReport(ev, out, logBefore) {
+  const t0 = Date.now();
+  let wins = [];
+  for (;;) {
+    wins = await windowsOf(ev);
+    if (wins.some((w) => PROBLEMS_TITLE.test(w.title)) || Date.now() - t0 >= PROJECT_DIALOG_MS) break;
+    await sleep(POLL_MS);
+  }
+  out.projectDialogs = wins.filter((w) => PROBLEMS_TITLE.test(w.title)).map((w) => ({ cls: w.cls, title: w.title, x: w.x, y: w.y, w: w.w, h: w.h }));
+  out.projectWindows = wins.map((w) => ({ cls: w.cls, title: w.title }));
+  const log = await ev('window.__app.engineLog()');
+  const missing = log.slice(logBefore).filter((l) => SAMPLE_MISSING.test(l));
+  out.projectMissingLines = missing.length;
+  out.projectMissing = [...new Set(missing)];
+  process.stderr.write(`project: ${out.projectDialogs.length} problem box(es), ${out.projectMissing.length} distinct factory sample request(s) not found (${out.projectMissingLines} lines)\n`);
+}
+
+// the guest's windows, read again for a while when the page answers "ask again" (the picture is being drawn: tools/delivery-split/measure.mjs does the same)
+async function windowsOf(ev) {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      return parseWindows(await ev(WINDOWS_TEXT));
+    } catch (e) {
+      if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 15000) throw e;
+      await sleep(100);
+    }
+  }
+}
+
+/** the windows of a window list (the page's format: lid N at (x, y) WxH ... class "..." title "..."), as tools/delivery-split/measure.mjs reads them */
+function parseWindows(text) {
+  return text.split('\n').map((l) => /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
+    const names = /class "([^"]*)"/.exec(m[6]);
+    const title = /title "([^"]*)"/.exec(m[6]);
+    return { x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]), cls: names ? names[1] : '', title: title ? title[1] : '' };
+  });
+}
+
 // guest pixel to client pixel of the desktop element (the guest's screen is fitted into the element)
-async function clickGuest(S, ev, gx, gy) {
+async function guestPoint(ev, gx, gy) {
   const g = await ev(`(() => { const r = document.getElementById('desktop').getBoundingClientRect(); const s = window.__app.screen.guest; return { x: r.x, y: r.y, w: r.width, h: r.height, gw: s.width, gh: s.height }; })()`);
-  const x = g.x + (gx + 0.5) * (g.w / g.gw), y = g.y + (gy + 0.5) * (g.h / g.gh);
+  return { x: g.x + (gx + 0.5) * (g.w / g.gw), y: g.y + (gy + 0.5) * (g.h / g.gh) };
+}
+
+// a left click at a guest pixel; clicks = 2 is a double click (clickCount 1, then 2)
+async function clickGuest(S, ev, gx, gy, clicks = 1) {
+  const { x, y } = await guestPoint(ev, gx, gy);
   await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0, pointerType: 'mouse' });
   await sleep(120);
-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-  await sleep(70);
-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
-  await sleep(60);
+  for (let k = 1; k <= clicks; k++) {
+    await S('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: k, pointerType: 'mouse' });
+    await sleep(70);
+    await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: k, pointerType: 'mouse' });
+    await sleep(60);
+  }
 }
 
 // --load ui: a small circle of pointer moves over the centre of the guest's screen (the main window fills it), one move per 50 ms
