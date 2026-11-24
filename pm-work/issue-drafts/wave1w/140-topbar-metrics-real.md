@@ -4,7 +4,7 @@ title: "FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際�
 type: Task
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: "009"
-blocked_by: ["139"]
+blocked_by: []
 labels: ["topbar", "verify"]
 size: L
 priority: High
@@ -103,3 +103,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - blocked_by: #{{139}}(マウスカーソル段 1。同じ engine から page への通知の経路を使うので、直列にする)。
 - #1351(P2 の描画の費用。Frame Rate が低いと出た時の原因の側。この Issue では扱わない)。
 - #{{138}}・#{{144}} とは、直列の順(138 → 139 → 144・140)。
+
+## 他の Issue との重なり
+
+#{{139}}(マウスカーソル 段 1)と #{{138}}(クリップボード)が、同じ時期に、`app/src/engine/protocol.ts` と `app/src/engine/worker.ts` に、engine から page への通知のメッセージ型を足す。**足す変更どうしなので、`main` への push で衝突したら、両方の型・handler を残して解く**(片方を消さない)。解いた後、`npm test --prefix app` と受け入れを通す。
