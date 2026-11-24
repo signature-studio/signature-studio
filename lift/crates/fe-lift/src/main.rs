@@ -135,9 +135,14 @@ fn run(
         gopt.prune = prune_entries(&data, p)?;
     }
     let gopt = &gopt;
-    // The annotated jumps (decision 0036) name VAs: those of FLEngine at 0x400000 and those of ILTools at 0x6000000 (decision 0104). An
-    // annotation is used only when an unresolved jump sits at its address, so the other images are not affected.
-    let specs: Vec<fe_decode::Spec> = fe_decode::jumptab::FLENGINE.iter().chain(fe_decode::jumptab::ILTOOLS_6000000).copied().collect();
+    // The annotated jumps (decision 0036) name VAs: those of FLEngine at 0x400000, those of ILTools at 0x6000000 (decision 0104) and those of
+    // dsp_ippv2 at 0x2000000. An annotation is used only when an unresolved jump sits at its address, so the other images are not affected.
+    let specs: Vec<fe_decode::Spec> = fe_decode::jumptab::FLENGINE
+        .iter()
+        .chain(fe_decode::jumptab::ILTOOLS_6000000)
+        .chain(fe_decode::jumptab::DSP_IPPV2_2000000)
+        .copied()
+        .collect();
     let st = match split {
         Some(sp) => {
             let mut buf = Vec::new();

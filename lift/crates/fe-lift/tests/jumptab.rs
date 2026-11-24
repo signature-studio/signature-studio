@@ -125,6 +125,12 @@ fn build() -> Vec<u8> {
     for m in 0..3u32 {
         put(0x1140 + 8 * m, &[0xb8, m as u8, 0x04, 0, 0, 0xc3]); // mov eax,0x400+m; ret
     }
+    // F3 at 0x1300: jmp rax; table of 8 byte offsets at 0x1310 from base 0x1320 (the dsp_ippv2 form); blocks at 0x1320: mov eax,0x500+m; ret
+    put(0x1300, &[0xff, 0xe0]);
+    put(0x1310, &[0x00, 0x08, 0x10, 0x08, 0x00, 0x10, 0x08, 0x00]);
+    for m in 0..3u32 {
+        put(0x1320 + 8 * m, &[0xb8, m as u8, 0x05, 0, 0, 0xc3]);
+    }
     // main at 0x1200: call F1; call F2; ret
     put(0x1200, &[&[0xe8][..], &rel(0x1205, 0x1000)].concat());
     put(0x1205, &[&[0xe8][..], &rel(0x120a, 0x1100)].concat());
@@ -132,7 +138,7 @@ fn build() -> Vec<u8> {
     b
 }
 
-fn specs() -> [fe_decode::Spec; 2] {
+fn specs() -> [fe_decode::Spec; 3] {
     use fe_decode::jumptab::{Kind, Spec};
     [
         Spec {
@@ -150,6 +156,14 @@ fn specs() -> [fe_decode::Spec; 2] {
             table: IB + 0x1130,
             count: 4,
             kind: Kind::Rel32 { base: IB + 0x1130 },
+        },
+        Spec {
+            jmp_va: IB + 0x1300,
+            code: &[0xff, 0xe0],
+            func: (IB + 0x1300, IB + 0x1340),
+            table: IB + 0x1310,
+            count: 8,
+            kind: Kind::Rel8 { base: IB + 0x1320 },
         },
     ]
 }
@@ -219,15 +233,24 @@ fn syn_exe() -> (PathBuf, PathBuf) {
 #[test]
 fn synthetic_generator_output() {
     let mut out = Vec::new();
-    let st = generate_with_specs(&build(), &[], &specs(), &mut out).expect("generate");
+    // F3 is not reachable from main: it is a seed
+    let st = generate_with_specs(&build(), &[IB + 0x1300], &specs(), &mut out).expect("generate");
     let c = String::from_utf8(out).unwrap();
-    assert_eq!(st.jumptabs, 2);
+    assert_eq!(st.jumptabs, 3);
     assert!(st.jumptab_rejected.is_empty(), "{:?}", st.jumptab_rejected);
     assert_eq!(st.unsupported_total, 0, "{:?}", st.unsupported);
-    assert_eq!(st.handled["jmp_ind:table"], 2);
-    // only the register-operand jump counts as a register jmp (F1's jmp is memory-form)
-    assert_eq!(st.register_jmp_sites, 1);
-    assert_eq!(st.register_jmps["jmp_ind:table"], 1, "{:?}", st.register_jmps);
+    assert_eq!(st.handled["jmp_ind:table"], 3);
+    // only the register-operand jumps count as register jmps (F1's jmp is memory-form)
+    assert_eq!(st.register_jmp_sites, 2);
+    assert_eq!(st.register_jmps["jmp_ind:table"], 2, "{:?}", st.register_jmps);
+    // F3: the byte offsets from 0x1320 give three blocks of the same routine (no function of their own), so they are switch cases with gotos
+    for m in 0..3u64 {
+        let t = IB + 0x1320 + 8 * m;
+        assert!(c.contains(&format!("case UINT64_C({t:#x}): goto L_{t:x}; ")), "F3 target {m}");
+        assert!(c.contains(&format!("L_{t:x}: ")), "F3 block {m} in the body");
+        assert!(!c.contains(&format!("void f_{t:x}(void)")), "F3 block {m} must not be a function");
+    }
+    assert_eq!(c.matches(&format!("fle_jumptab_miss(UINT64_C({:#x}), t)", IB + 0x1300)).count(), 1);
     // F1: one case per slot address, 8 cases, selector is the effective address
     for j in 0..8u64 {
         assert!(c.contains(&format!("case UINT64_C({:#x}): ", IB + 0x1014 + 8 * j)), "slot {j}");
