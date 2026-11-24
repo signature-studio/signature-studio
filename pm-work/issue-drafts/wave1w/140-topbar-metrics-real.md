@@ -18,7 +18,7 @@ project: signature-studio/3
 この Issue の目標は次の 3 つ。
 1. Memory Usage が、エンジンが実際に使っているゲストのメモリの量を、MB で出す(0 でない。ページ側の実測と近い)。
 2. CPU Load が、エンジンの Worker が実際に計算していた割合を出す(無操作の時と、再生の時で、値が違う。Worker の実測と近い)。
-3. Frame Rate が、FL が実際に画面を提示した回数(実時間あたり)を出す(120 の固定ではない。ページの実測と近い)。
+3. Frame Rate が、FL が実際に画面を提示した回数(実時間あたり)を出す(120 の固定ではない。engine の提示の増分 ÷ 実時間と ±15% で一致する)。
 
 PM の決定(定義): 数値は、実際の値を出す。値を良く見せるために、数字を作らない。低い値が本当なら、そのまま出す(低い理由は #1351 の描画の費用で扱う)。
 
@@ -87,7 +87,7 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
 
 - Memory Usage = エンジンが実際に確保しているゲストのメモリの量(MB)。runtime の VirtualAlloc・HeapAlloc・像の読み込みの積算。ページ側の実測(`WebAssembly.Memory.buffer.byteLength` の和。`performance.measureUserAgentSpecificMemory` が使える時はその値)と比べ、前者が嘘でないことを確かめる。
 - CPU Load = エンジンの Worker(音声・計算の thread)が、実時間のうち、実際に計算していた割合(%)。`busyMs` ÷ 経過した実時間。Worker ごとに計り、FL が読んでいる API の形(GetSystemTimes の差など)に合わせる。
-- Frame Rate = FL が実際に画面を提示した回数 ÷ 実時間(秒)。実時間は、仮想の時計ではなく、実際の時刻(`performance.now` の相当)で数える。どの形で FL の表示に入れるかは、FL の呼び出しの記録を見て決める。
+- Frame Rate = FL が実際に画面を提示した回数 ÷ 実時間(秒)。実時間は、仮想の時計ではなく、実際の時刻(`performance.now` の相当)で数える。どの形で FL の表示に入れるかは、FL の呼び出しの記録を見て決める。 真の値は、engine の提示(presents)の増分 ÷ 実時間(PM の決定)。ページの rAF(約 60 /秒)は表示の更新の上限(参考値)で、FL の値の基準にしない。
 
 ## やること
 
@@ -114,21 +114,21 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
    - 式と、FL がどの値をどう計算するかを、確かめた順に本文に書き足す。確かめられない物は「未確認」と書く。
    - 仮想の時計(決定 0122)を変える時は、起動と音声への影響を測り、報告に書く。表示のための数字だけを、実時間で割る形もある(時計の挙動は変えない)。どちらを選ぶかは、測定の結果で決める。
 7. 数える処理は、音声を止めない(P3)。数えるのは、既存の情報(busyMs・presents)だけ。新しい周期の処理を増やさない。
-8. 測定の道具 `tools/topbar-metrics/measure.mjs`(前回の差分に在る。作業ツリーで確かめる)。Playlist を再生する版と、無操作の版の 2 つを取る。Frame Rate は、DPR 1 と、乱数の DPR(1.01〜3.00)の 2 点で取る。ページの rAF の数は、道具の中だけで連続に数えてよい(製品は、既定の burst のまま。決定 0202)。stdout に JSON を 1 行。`panelMb`・`shown` の読みは、まだ確定していない(前回の試行で分かったこと、を見る)。
+8. 測定の道具 `tools/topbar-metrics/measure.mjs`(前回の差分に在る。作業ツリーで確かめる)。Playlist を再生する版と、無操作の版の 2 つを取る。Frame Rate は、DPR 1 と、乱数の DPR(1.01〜3.00)の 2 点で取る。ページの rAF の数は、道具の中だけで連続に数えてよい(製品は、既定の burst のまま。決定 0202)。stdout に JSON を 1 行(`rafPerSec` を含むが、判定には入れない)。`panelMb`・`shown` の読みは、まだ確定していない(前回の試行で分かったこと、を見る)。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=r.fps.samples;process.exit(r.error===null&&r.memory.panelMb>0&&r.memory.ratio>=0.5&&r.memory.ratio<=1.5&&r.cpu.playingPct>r.cpu.idlePct+1&&Math.abs(r.cpu.playingPct-r.cpu.busyPct)<=10&&s.length===2&&s.every((x)=>Math.abs(x.shown-x.rafPerSec)<=0.15*x.rafPerSec)&&!s.every((x)=>x.shown===120)?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=r.fps.samples;process.exit(r.error===null&&r.memory.panelMb>0&&r.memory.ratio>=0.5&&r.memory.ratio<=1.5&&r.cpu.playingPct>r.cpu.idlePct+1&&Math.abs(r.cpu.playingPct-r.cpu.busyPct)<=10&&s.length===2&&s.every((x)=>typeof x.shown==="number"&&typeof x.presentsPerSec==="number"&&x.presentsPerSec>0&&Math.abs(x.shown-x.presentsPerSec)<=0.15*x.presentsPerSec)&&!s.every((x)=>x.shown===120)?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準(`tools/topbar-metrics/measure.mjs` の JSON の項目):
 - `error`: null。
 - `memory.panelMb`: 上部バーの Memory Usage の値(MB。0 より大きい)。`memory.pageBytes`: ページ側の実測(`WebAssembly.Memory` の大きさの和)。`memory.ratio` = `panelMb` × 1,048,576 ÷ `pageBytes`。0.5 以上 1.5 以下。
 - `cpu.idlePct`: 無操作の時の CPU Load(%)。`cpu.playingPct`: Playlist を再生している時の CPU Load(%)。`cpu.busyPct`: 再生の時の Worker の忙しい時間の実測(%。Worker の計測。FL の表示とは別の経路)。判定: `playingPct` が `idlePct` より 1 ポイント以上大きい、かつ `|playingPct − busyPct|` が 10 ポイント以下。
-- `fps.samples`: 2 点(DPR 1 と乱数の DPR)。各点: `dpr`・`shown`(上部バーの Frame Rate の値)・`rafPerSec`(ページの rAF の数 ÷ 秒。同じ区間)・`presentsPerSec`(engine の提示の増分 ÷ 秒。同じ区間)。判定: 各点で `|shown − rafPerSec|` が `rafPerSec` の 15% 以内。2 点とも 120 ではない、という条件は満たさなくてもよいが、2 点とも 120 なら不合格(`!s.every((x)=>x.shown===120)`)。
+- `fps.samples`: 2 点(DPR 1 と乱数の DPR)。各点: `dpr`・`shown`(上部バーの Frame Rate の値)・`rafPerSec`(ページの rAF の数 ÷ 秒。同じ区間。JSON に出すが、判定には入れない)・`presentsPerSec`(engine の提示の増分 ÷ 秒。同じ区間)。判定: 各点で、`shown` が数値、`presentsPerSec` が 0 より大きい数値で、`|shown − presentsPerSec|` が `presentsPerSec` の 15% 以内。2 点とも 120 ではない、という条件は満たさなくてもよいが、2 点とも 120 なら不合格(`!s.every((x)=>x.shown===120)`)。
 - `cpu.idlePct`・`cpu.playingPct` が null のままなら、判定は落ちる(未実装のまま通さない)。
-- 注(定義との食い違い): 判定の `rafPerSec`(ページの rAF の数)は、FL の提示の数とは別の量で、約 60 /秒に固定される。定義どおり `shown` を FL の提示の回数(`presentsPerSec`。前回の実測で再生中は約 11 /秒)に近づけると、この判定は落ちる。**判定の式は変えない**。食い違いは報告に書く。`shown` を `rafPerSec` に合わせる数字を作らない。
+- 判定の決定(PM): FL の Frame Rate の真の値は、engine の提示(presents)の増分 ÷ 実時間(FL 自身が画面を更新した回数)。ページの rAF(約 60 /秒)は表示の更新の上限(参考値)で、FL の値の基準にしない。判定は「FL の表示値(`shown`)が、同じ区間の `presentsPerSec` と ±15% で一致」。FL の値が 120 の固定でないこと(DPR 1 と乱数の DPR の 2 点、再生中と無操作で、値が変わりうる)も保つ。前回の実測では、再生中の提示は約 11 /秒。
 
 ## 報告の規則
 
