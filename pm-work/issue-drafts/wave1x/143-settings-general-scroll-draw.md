@@ -4,7 +4,7 @@ title: "F10 の Settings の General タブをスクロールすると、描画�
 type: Task
 milestone: "M2 HiDPI と P2 の測定(P2)"
 parent: "005"
-blocked_by: []
+blocked_by: ["149"]
 labels: ["render", "hidpi", "verify"]
 size: M
 priority: High
@@ -35,6 +35,19 @@ project: signature-studio/3
   - H3: 子の窓(項目)が、親の面と別に描かれ、親のスクロールで移動した子の領域が、次の描画で再び描かれない。
 - 推測しない。どの H が当たるかは、再現の測定で決める。
 
+## 前回の試行で分かったこと(2 回目)
+
+- 2 回目の試行(run 45364914105。作業 #1384)は差し戻し。commit は作ったが、判定が通らず push していない。判定を通らなかった作業の差分は、次の試行の作業ツリーに載る(`.prior-work.md` が書かれる)。
+- 受け入れの値(runner の値。この機械とは別枠。nproc 4): DPR 1 で、直す前の木の (a) `mismatchPath` は 0.5116、最後の木は 0.5484。(b) `mismatchRedraw` は最後の木で 0.6804(直す前は、強制の再描画の口が無いので測れなかった)。(c) `blankMax` は 0 で通る。`elapsedMs` 7229・`preBootBytes` 311110408 は通る。
+- 見立て(実測): H1(ビットが動かずに返る)は外れた。`scroll_copy_region` は毎フレーム動く(`ScrollWindowEx bits: 1 rects, 2070360 bytes, moved by (0,-19)`)。H2(後備えに落ちる)も外れた。`fle_win_scroll` は毎フレーム答えている。H3 は一部当たり: 1 ノッチで、頁の窓(lid 21)に `ScrollWindowEx(dy, flags=0)` が約 11 回入る。その後、項目 9 件が `EndDeferWindowPos` で `flags=0x1d`(`SWP_NOCOPYBITS` が無い)で動く。項目の文字と枠は、スクロールの後に描き直されない。強制の再描画の画だけが正しく、これが基準(`pm-work/findings/settings-scroll-1384-dpr1-p50-redraw.png`)。
+- 窓の作成の trace: 親の窓(頁)は `WS_CLIPCHILDREN` だが、スクロールされる窓 lid 21 は `cf=0x2`(`WS_CLIPCHILDREN` が無い)。
+- 未確定: 子の `WM_PAINT` が届いているか、届いた時の clip が正しいか。trace に `WM_PAINT` の行が出ていない。
+- 試して効かなかった物(戻した): (1) 動いた子を、親の枠に関わらず全体を無効にして描き直す → (a) 0.50 のまま。(2) 露出した帯を、フラグに関わらず消去付きで無効にする → (a) 0.50 のまま。(3) 一緒に運ばれた子の後の移動で、ビットを二重に運ばない + 全体を描き直す → (a) 0.52、(b) 0.65。(4) 入力を 1 つ入れてから画を取る → 数値は同じ(入力待ちで止まっているのではない)。
+- 製品に入ったもの(測定だけが呼ぶ。既定の動作は変わらない): `window.__app.settingsRedraw(lid)` → Worker の `settings-redraw` → engine の `fle_g3_redraw_tree` → `fle_win_redraw_tree`。engine のログの一時の記録は戻した。
+- 測定の道具 `tools/settings-scroll/measure.mjs`: (a) はホイールでは位置が揃わない(頁の範囲 M が 96 の倍数にならない)ため、つまみのドラッグの位置で揃える。ホイールは (c) の材料だけに使う。(b) は下から来た時の画で計る。乱数の DPR は 1.01〜2.25 にする(2.5 以上は起動が止まる。#{{149}} で扱う)。
+- ホイールは DPR ≠ 1 で頁を動かさない(M = 0)。下の次にやること 5 で扱う。
+- 起動の間欠の停止(#{{149}}): 同じ bundle で、流れ A〜D のうち 2 本が `no engine-idle within 180000 ms (state running)` で失敗した(失敗する起動は毎回違った)。前回の試行の別の回では 4 本とも通った。乱数 DPR の boot も、180 秒で engine-idle に届かない回が 2 回あった。
+
 ## 読む物
 
 - `lift/runtime/fle_win.c`(3629〜3800 行: 模型と `scroll_copy_region`。3200 行付近の類似の経路。`fle_imp_InvalidateRect`・`fle_imp_UpdateWindow`・`fle_imp_RedrawWindow`)
@@ -47,7 +60,7 @@ project: signature-studio/3
 ## やること
 
 0. 作業ツリーの確認。`.prior-work.md` があれば最初に読む。
-1. 再現の道具 `tools/settings-scroll/measure.mjs`(新規)を作る。
+1. 再現の道具 `tools/settings-scroll/measure.mjs` を使う(前回の試行で作った。作業ツリーに差分として載る。無ければ新規に作る)。
    - 起動し、Welcome 窓と確認ダイアログを閉じる(`tools/smoke/welcome-flow.mjs` の手順)。F10 で設定窓を開き、General 頁を押す(頁の位置は窓の表の帯から取る。固定の座標を使わない)。
    - スクロールする経路は 2 つ: (a) 頁の上でホイール(窓の表の頁の矩形の中心)、(b) 右のスクロールバーのつまみのドラッグ。どちらも、上端から下端まで、下端から上端まで行う。
    - 同じスクロール位置の画面を取る。位置は、スクロールの範囲(上端と下端の差)の 0%・25%・50%・75%・100% の 5 点。画面は `window.__app.deskDumpBase64(true)` の RGBA を、設定窓の矩形で切り出す。
@@ -60,13 +73,23 @@ project: signature-studio/3
 3. 直す。既定の動作として直す(オプトインを作らない)。模型の早い戻りを、面が直接でない時にも正しく動かす。後備えに落ちる時は、後備えの答えが、模型と同じ移動になるように直す。
 4. 道具の結果が、受け入れの判定を満たすことを確かめる(DPR 1 と、乱数の DPR)。
 
+## 次にやること(2 回目の試行の後)
+
+目標(受け入れの (a)(b)(c))は変えない。次の順に直す。
+
+1. `SetWindowPos`・`DeferWindowPos`・`EndDeferWindowPos` で `SWP_NOCOPYBITS` が無い時の Windows の挙動を、`lift/runtime/fle_win.c` に実装する: 子の窓のクライアントのビット(その窓の面)を、新しい位置へ複写し、露出した部分と、複写の元の位置に重なる親の領域を無効にする。
+2. `ScrollWindowEx` が `flags=0` の時は、露出した領域を無効にしない(Windows と同じ。無効にするのは呼び出し側の FL)。`SW_INVALIDATE`・`SW_SCROLLCHILDREN`・`SW_ERASE` の旗ごとの動作を、Windows の公開の文書に合わせる。
+3. 子の `WM_PAINT` が届くか、届いた時の clip が正しいかを、trace で確かめる。trace は engine のログに出す(測定の時だけ。環境変数・`#ifdef` を足さない。報告の後で消す)。
+4. 窓 lid 21 の `WS_CLIPCHILDREN` の有無が、描画に効くかを確かめる。
+5. DPR ≠ 1 でホイールが頁を動かさない件を確かめる。
+
 ## 受け入れ
 
 ```accept
 npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/settings-scroll/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/scroll.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.mismatchPath<=0.001&&r.mismatchRedraw<=0.001&&r.blankMax<=0.01&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===2&&L.every(ok)?0:1)' "$RUNNER_TEMP/scroll.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
-判定の基準(道具の出力は 2 行: DPR 1 と乱数の DPR 1.01〜3.00):
+判定の基準(道具の出力は 2 行: DPR 1 と乱数の DPR 1.01〜2.25。2.5 以上は #{{149}} が直るまで使わない):
 - (a) `mismatchPath` が 0.001(0.1%)以下。上端から来た時と下端から来た時の、同じ 5 点の画面の画素の不一致の割合。
 - (b) `mismatchRedraw` が 0.001(0.1%)以下。スクロールのまま取った画面と、強制の再描画の後の画面の不一致の割合。
 - (c) `blankMax` が 0.01(1%)以下。スクロール中に、黒い・未描画の領域が窓の面積に占める割合の最大。
@@ -93,7 +116,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 作業の進め方
 
 - 最初に `date -u` で開始の時刻を記録する。4 時間 30 分を過ぎたら、受け入れが通っていなくても、作業ツリーを commit し、報告を書いて終える(ジョブの上限は 5 時間 50 分)。
-- engine の作り直しは約 35 分。ビルドは、フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000。上限 5400000)を渡して待つ。背景で起動して待たない。
+- ビルドは約 35 分。フォアグラウンドで直接、シェルツールの `timeout` 引数は最大 5400000 を渡して待つ。背景で起動して待たない。4 時間 30 分で、受け入れが通らなくても、commit して終える。
 - 1 回の試行で、ビルドは数回まで。道具・記録・直しは、まとめて 1 回のビルドで行う。
 - 作業の最後に、受け入れが通らなくても、作業ツリーを commit する。
 
@@ -102,3 +125,4 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - #{{117}}(F10 の設定窓の読み)の道具の窓の操作を使う。#{{117}} の判定は変えない。
 - #{{110}}(P2 の測定の道具)と #{{111}}(描画の所要が変化した面積に比例する)は、描画の経路が重なりうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 - #{{108}}(動的な変化と全ての拡大率)は、この Issue の後に行う。
+- #{{149}}(起動が first idle に届かない。間欠の停止)を `blocked_by` に足した。この Issue の受け入れの起動確認・流れ A〜D・乱数 DPR の起動は、#{{149}} の間欠の停止で落ちるため。#{{149}} が閉じるまで、この Issue は起動しない。

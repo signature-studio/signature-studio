@@ -26,6 +26,17 @@ project: signature-studio/3
   - 固有の論点(未確認): `IPPCODE`・`IPPDATA` という名前のセクションがあり、性能ライブラリの命令の切り替えの部分と見られる。fe-lift が扱える命令かどうかは未確認。`msvcp140`(C++ の標準ライブラリ)と `dbghelp` の import の扱いが要る。
 - 基盤: #{{123}}(VST3 ホストの header と生成の道具、OTT の wasm)と #{{124}}(1 ブロックの処理)。
 
+## 前回の試行で分かったこと(2 回目)
+
+- 2 回目の試行(run 45379401811。作業 #1338)で、判定(取り直した main の `guard/judge.sh` と、この受け入れの全体)は通った。`measure.mjs` の 1 行: `{"plugin":"vital","instantiated":true,"blockFrames":4096,"nonSilent":true,"error":null}`。出力の行: `RESULT out_hash=7d2d71f375347b15 nonfinite=0 samples=8192 nonzero=8192 maxabs=0.357191 rms=0.143032 blocks=1`。元の VST3 本体の SHA-256 は `inputs/external-plugins.tsv` と一致する(`check.mjs` の 3 件も一致)。
+- 落ちたのは main への push だけ。衝突したのは `lift/harness/web/pack.args` と `lift/crates/fe-build/tests/plan/bundle.txt` の 2 件。#{{028}}(OTT)が、同じ位置の隣に OTT の `--lazy-file` の行を足していたため。
+- 衝突したときの直し方: (1) main の版を取る。(2) この Issue の変更(`pack.args` の `--lazy-file lift/out-app/plugins/vital/vst-ext.wasm=plugins/vital.wasm`・`bundle.txt` の同じ引数)だけを取り直す。(3) **OTT の行(#{{028}})は消さず、両方を残す**。(4) `bundle.txt` が、#{{125}} で固定のダミーの計画(`lift/plugins`・`tests/plugins/`)になっていたら、この Issue の外部プラグインの引数は計画の期待値に影響しない形になるので、`bundle.txt` の期待値を `fe-build` の出力から再生成する。
+- deploy の連鎖の一致: `pack.args` に足す `--lazy-file` の wasm は、`fe-build bundle` の計画の中で作られること。計画は、#{{028}} の修正(#1337)で、`build.sh ott` を最初に呼び、`fe-build external` がインストーラを取る形になった。衝突を直すときは、`lift/crates/fe-build/src/main.rs` の OTT の段・`lift/crates/fe-build/tests/plan/bundle.txt`・`external.txt` を読み、同じ形で `build.sh vital lift/out-app/external lift/out-app/plugins/vital` を計画に足す。`spec/workflow.test.sh` の (v) の検査が、これを見る(足さないと落ちる)。この Issue が先に main に入った場合、#{{027}} は、その計画の形の上に足す。`bundle.txt` の衝突は、両方を残す。
+- 前回の変更(判定は通り、push だけ落ちた commit 1 件。次の試行で commit として取り込まれる): `lift/harness/web/mt1/plugin-worker/vst_crt.c`(新規。CRT の初期化・onexit・数学・書式・RTTI・時刻・`ReplaceFileW` などに答える。答えた import は 81 件)、`seeds/vital.txt`(新規。間接呼び出しの飛び先の種)、`build.sh`、`main_vst_ext.c`(イベント入力を持つ plugin に、ブロック 0 で C4 のノートオン)、`lift/harness/vst/mk_stubs.mjs`(C++ のマングル名を C の識別子に変える)、`pack.args`・`bundle.txt`、`pm-work/findings/vital-read-1338.md`(新規)。
+- 実測(runner の値。この機械とは別枠。nproc 4): lift の関数 27,077・扱えない命令 204,668(種類 229。大半は IPPCODE の AVX・AVX-512)。`vst-ext.wasm` 115,536,635 B(manifest の br 7,330,260 B)。manifest の lazy に `vital.wasm` が入った。`boot.json` は engine-idle・error null・standIn false、`elapsedMs` 10,566(P1 の 10 秒を超える。原因は未確認)。
+- import: 非 TABLE の 286 件のうち、runtime の既存の定義が 26、`vst_crt.c` の答えが 81、名前のある停止のままが 179(msvcp140 58、kernel32 20、winmm 15 など。全件は `pm-work/findings/vital-read-1338.md`)。
+- 注意: 起動確認(`boot-bundle.mjs`)は、#{{149}} の間欠の停止(`state running` のまま 180 秒)で落ちうる。その時は、この Issue の変更を直さず、報告に書く。
+
 ## 読む物
 
 - #{{123}} と #{{124}} の成果物(`lift/harness/web/mt1/plugin-worker/build.sh`・`main_vst_ext.c`・`tools/plugin-run/measure.mjs`)
