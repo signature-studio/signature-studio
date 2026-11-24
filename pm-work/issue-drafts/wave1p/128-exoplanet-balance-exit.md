@@ -17,36 +17,57 @@ project: signature-studio/3
 
 この Issue の目標: Exoplanet を File > Open で開いて、止まらず engine-idle のまま、再生の quantum が進むこと。DEDZII も同じ道具で開けること(回帰の確認)。
 
-#{{121}} の段階 1(LockResource の停止)を直すと、この停止が見えるようになった。Exoplanet の停止は、LockResource とは別の原因。P3 の測定(#{{004}}・#1335)の入力を広げるため High。
+#1365 の段階 1(LockResource の停止)を直すと、この停止が見えるようになった。P3 の測定(#1335・#1335)の入力を広げるため High。
 
 ## 前回までの試行で分かったこと
 
-run 45315619741(#{{121}} の作業。この停止は、その作業の中で調べた。段階 1 の判定を通すため、この Issue に分けた)。調べるための一時の診断の出力は、調査の後に全部除去した(作業の差分には入っていない)。
+- 前回の試行: run 45392098052(job「作業 #1372」)。前提の #1365 段階 1(commit `18a7fded`)は main に在る。開始 12:19:59 UTC、終了 15:04 UTC ごろ。判定は「差し戻し」。直してはいない(push していない)。runner の値。nproc 4、loadavg 0.23 0.84 1.32。
+- 以下は前回の実測と、そこから読んだ推定。
 
-1. 再現(実測): LockResource の修正の後の engine で Exoplanet を File > Open で開くと、ログ末尾が `[err] image-read: fruity_balance_x64.6800000.wasm requested=1 14060.4` の後に `[err] fle: ExitProcess: the program asked to end the process (exit code 0); stopped here, not exited` になる。測定の `error` は `state exited while exoplanet was opened`、タイトルは Song info のまま。
-2. ExitProcess の戻り先(実測。一時の診断): `0x680e3d2`(Fruity Balance の像。基準 0x6800000 の中)。Balance の DllMain(reason 1)は戻らず、`load` の行は出ない。
-3. 経路(objdump。推定の材料): `0x680e3d2` は、CRT の終了処理 `0x680e270` が ExitProcess の thunk `0x6804bf0` を呼んだ先。`0x680e270` は Balance の entry point(AddressOfEntryPoint `0x2c13a0`。基準を足すと `0x6ac13a0`)の末尾 `0x6ac13ff` から呼ばれる。`exit(code)` は `0x680e400`。thunk の対応: `0x6804bc0` = GetCurrentThreadId、`0x6804c50` = FreeLibrary、`0x6804bf0` = ExitProcess。
-4. 推定: CRT の状態 `[0x6b14c80]` が 0 のとき、終了処理が ExitProcess に進む。この状態は `0x680db20`(DllMain の CRT の部分)の入口で `rcx` から作られる。`0x68189c0` は `rcx` をそのまま `0x680db20` へ渡すので、初期値は非 0 のはず。0 のまま終わる理由は、未確認。
-5. 関係の記録: commit `212eaf59`(#{{102}})の記録に「Balance を要求した後に SIGABRT(134)で止まる。分けない対照でも止まる。原因は未確認」とある。プラグインを分けたことが原因ではない(推定)。
-6. ログに、スレッドの開始・終了の記録は無い。DllMain の reason 2・3 を送る経路は `lift/runtime/fle_thread.c` にある。どれが ExitProcess に至るかは、未確認。
-7. 次に確かめること: `0x68189c0`・`0x680db20`・`0x680e130` の引数と戻り値を、runtime の入力(DllMain の引数・GetCurrentThreadId・FreeLibrary の戻り値)と照らす。`0x680e130`(構造体の復元)の経路が、終了処理に入るかを決める(推定)。
-8. 前回の作業は 5 時間弱。原因は未特定。ExitProcess を出す呼び出し元は、既存の道具(ゲストの呼び出し経路の記録)が無いため、一時の診断で調べた。
+1. 再現(実測。4 回目の計測で再現): 測定の JSON は `state` が engine-idle、`error` が "timeout 180000 ms: the title of exoplanet (the title is "Song info")"、`end.state` が exited、`end.title` が Song info。ログ末尾(一時の診断。除去済み):
+```
+[err] dbg-dllmain enter idx=7 reason=1 base=0x6800000
+[err] dbg-L-dispatch top=0 sp=0x1312fba0
+[err] dbg-dump exit: landing_top=0
+[err] dbg-dump  mod fruity_balance_x64.dll base=0x6800000 state=1 A=0 st=0 B=0
+[err] fle: ExitProcess: the program asked to end the process (exit code 0); stopped here, not exited
+```
+   対照: Fruity Filter の DllMain(reason 1)は戻る(`dbg-dllmain return idx=8 reason=1 r=1`)。
+2. 特定(事実): Balance の入口 `0x6ac13a0` の setjmp の続き `0x6ac13c0`(landing L)へ longjmp が来た時、登録の一覧 `fle_landing_top` は空(`top=0`)。
+   - 入口は Balance の wasm 側(`lift/out-app/hyb/n0-balance.tsv` に ok。直接 wasm)。続きは C 側(`lift/out-app/gen/src/m8-03.c` の `f_6ac13c0`)。入口と続きが、別の側で lift されている。
+   - 登録を作る wrapper(`fle_landing_push`)は、生成物に Balance の分が無い(`gen` の登録は 5 件。いずれも Balance ではない)。
+   - Balance は `lift/harness/hyb/hyb-args.tsv` の `balance` 行(`--pdata` だけ。seeds の指定が無い)で lift される。このため、setjmp の続きの seed が無い。
+   - ExitProcess の戻り先 `0x680e3d2` は、出口 `0x680e270`(枠 `[0x6b14c80]` が 0 なら ExitProcess)の枝。実測の `A=0`・state 0 と合う。
+3. 推定(コードの読みから。実測ではない):
+   - longjmp が L に届いた時、登録が無いので、L は普通の関数として黙って呼ばれる。その戻りが出口に続き、枠が 0 なので ExitProcess(0) になる。
+   - 原因は lift の分割(入口と続きが別の側)。runtime の応答は結果であり、runtime だけを直しても、Windows と同じ経路にはならないと見られる。
+   - 他の exit 経路(`0x4072b0` の 4 か所)は、非 0 のコード(0xe7・0xd2・0xd9)かテーブルの値で、ExitProcess(0) の経路ではない(実測の範囲)。
+   - 停止した DllMain は reason 1(プロセスへの接続)で、スレッドの通知(reason 2・3)の経路ではない(`dbg-dllmain enter idx=7 reason=1`)。
+4. 直し方の候補(作業者が 1 つ選ぶ。既定の動作として直す。オプトインを作らない):
+   - (a) Balance の入口と続きを、同じ側で lift する(hyb の分割。`lift/crates/fe-wasmgen/src/hybrid.rs`・`lift/harness/hyb/hyb-args.tsv` の `balance` 行・`lift/harness/hyb/hybrid.cmd` の `--separate`)。
+   - (b) 入口の登録(wrapper)を、分割した側でも生成させる(fe-lift の landing の seed を balance に足す。`--seeds` の行)。
+   - 選んだ理由と、変えたパスを報告に書く。`app/`・`lift/` を変えると main の deploy が動く。
+5. 阻害(解消済み): `lift/harness/web/pack.args` の OTT の `--lazy-file`(0688430b)は、外部のインストーラが無い作業者の run で `fe-build bundle` を止めていた。main の 4d73666a で、外部の wasm が無い時は省く版になった。この Issue の受け入れは、その上で通る。
+6. 前回の作業の保存(`work.diff`): `pm-work/findings/exoplanet-exit-1372.md`(調査の記録。commit `8ca2d33e`)。次の再試行で取り込まれる。作業者は同じパスのファイルを作らない(衝突する)。
+7. 未確認: DEDZII の File > Open(回帰)は測っていない。受け入れは通っていない。
 
 ## 読む物
 
-- `lift/runtime/fle_realmod.c`・`fle_realmod.h`・`fle_res.c`(#{{121}} の差分で入る。`fle_realmod_image_mapped`)
+- `pm-work/findings/exoplanet-exit-1372.md`(前回の調査の記録。取り込まれていれば)
+- `lift/crates/fe-wasmgen/src/hybrid.rs`・`lift/harness/hyb/hyb-args.tsv`・`lift/harness/hyb/hybrid.cmd`
+- `git show 212eaf59 --stat`・`git show 212eaf59 -- lift/harness/hyb/hyb-args.tsv lift/harness/hyb/hybrid.cmd`(Balance を分けた時の差分)
+- `lift/runtime/fle_dispatch`・`fle_landing_try`・`fle_landing_push` の定義(`grep -rn "fle_landing_try\|fle_landing_push" lift/runtime | head`)
 - `lift/runtime/fle_thread.c`(DllMain の reason 2・3 を送る経路)
-- ExitProcess の応答: `grep -rn "ExitProcess" lift/runtime lift/harness | head`
 - `tools/p3-audio-probe/measure.mjs`(開く手順。失敗時のログ末尾 `end.tail`)
-- `git show 212eaf59 --stat`、`git log --oneline -- lift/runtime lift/harness app/src/engine`(近い変更)
 
 ## やること
 
-1. 作業の最初に `date -u` を記録する。`git log --oneline -5` で、#{{121}} の段階 1 が main に入っているかを確かめる。入っていなければ、受け入れを実行せず、「前提未達」と報告に書いて終える。
-2. 再現する: Exoplanet を、道具で File > Open で開く。`end.tail` で、ExitProcess の直前のログを読む。
-3. 特定する: 上の 4 の推定を、事実にする(ExitProcess を呼ぶ直前の関数と、CRT の状態 `[0x6b14c80]` を 0 にする書き込み)。道具は、既存の仕組み(ログ・`engineLog()`)か、一時の診断を使う。一時の診断は、最後に必ず除去する。結果を、確かめた事実と推定に分けて報告に書く。
-4. 直す: Windows と同じ結果になるように、runtime の応答を直す。既定の動作として直す(オプトインを作らない)。
-5. 確かめる: 受け入れを通す。
+1. 作業の最初に `date -u` を記録する。`.prior-work.md` が在れば、最初に読む。前回の調査の記録(`pm-work/findings/exoplanet-exit-1372.md`)を読む。
+2. 事実を確かめる: 生成物で、Balance の入口(`0x6ac13a0`)の登録(wrapper)の有無、続きの `f_6ac13c0` の出どころ(C 側)を、`lift/out-app/gen` と `lift/out-app/hyb` で確かめる。
+3. 直す: 上の 4 の (a) か (b) の 1 つ。Balance の入口と続きが同じ経路で登録されるようにする。runtime だけを変えて済ませない(推定)。
+4. 診断の一時の差分を入れた時は、必ず除去してから commit する(差分に残さない)。
+5. 受け入れを通す。通らなければ、作業ツリーを commit して終える。
+6. commit する。push はしない。
 
 ## 受け入れ
 
@@ -61,7 +82,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 停止の再現(Exoplanet の JSON の行と、ログ末尾の行)、特定の経路(事実と推定)、直した方式と理由、変えたパス(`app/`・`lift/` を含む。`app/` と `lift/` を変えると main の deploy が動く)。
+- 報告に書く: 停止の再現(Exoplanet の JSON の行と、ログ末尾の行)、特定の経路(事実と推定)、直した方式と理由(上の 4 の (a) か (b))、変えたパス(`app/`・`lift/` を含む。`app/` と `lift/` を変えると main の deploy が動く)、DEDZII の結果。
 
 ## 制約
 
@@ -79,6 +100,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- #{{121}}(LockResource の段階 1)が前提。同じ `lift/runtime/fle_res.c`・`fle_realmod.c` を読む。
-- #{{004}}・#1335(P3 の測定の入力)。
-- #{{102}}・#{{019}}(Fruity Balance と Fruity Filter の、起動後の取得)が、同じ経路を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- #1365(LockResource の段階 1)が前提。同じ `lift/runtime/fle_res.c`・`fle_realmod.c` を読む。
+- #1335・#1335(P3 の測定の入力)。
+- #1342・#1319(Fruity Balance と Fruity Filter の、起動後の取得)が、同じ経路を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
+- #1400(Sytrus を、同じ型で 1 プラグイン 1 wasm として届ける)は、この Issue の直しの後に入る(blocked by の関係は `#1400` 側に在る)。
