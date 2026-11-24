@@ -578,7 +578,10 @@ fn hybrid(args: &[String]) -> Result<(), String> {
     for dst in &separated {
         let b = std::fs::read(dst).map_err(|e| format!("{}: {e}", dst.display()))?;
         for (m, n) in function_imports(&b)? {
-            if m == "c" && !c_exports.contains(&n) && !c_exports.contains(&format!("__wrap_{n}")) {
+            if m != "c" {
+                return Err(format!("the separate module {} imports {m}.{n}: a separate module imports only the C part (module c), so no call reaches another separate module", dst.display()));
+            }
+            if !c_exports.contains(&n) && !c_exports.contains(&format!("__wrap_{n}")) {
                 return Err(format!("the separate module {} imports c.{n}, which the C part does not export", dst.display()));
             }
         }

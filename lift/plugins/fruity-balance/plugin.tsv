@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args
+effects.fruity-balance.fruity_balance_x64.dll	Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll	本体	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064	3718656	existing	--pdata

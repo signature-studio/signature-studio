@@ -1,4 +1,4 @@
 stage extract: 3 step(s)
   mkdir -p lift/out-app/host
   aws s3 cp s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe lift/out-app/in.exe
-  node app/scripts/extract-fl.mjs lift/out-app/in.exe lift/out-app/host --dlls ci/extract-dlls.tsv --seed lift/harness/seeds/vfs-seed-idle1.tsv
+  node app/scripts/extract-fl.mjs lift/out-app/in.exe lift/out-app/host --dlls lift/out-app/plugins/extract-dlls.tsv --seed lift/out-app/plugins/vfs-seed-idle1.tsv
