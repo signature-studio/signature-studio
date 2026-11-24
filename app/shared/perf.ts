@@ -128,6 +128,9 @@ export function perfLine(value: Record<string, unknown>, now: Date, remote: Remo
 export const PERF_RAF_BINS = 10;
 /** decision 0209: the longest `engine.exit.message` (characters); src/perf/exit-message.ts EXIT_MESSAGE_MAX is the same number */
 export const PERF_EXIT_MESSAGE_MAX = 400;
+/** Issue #1364: the most top-level windows of the optional `uiWindows` block, and the longest class name of one (src/perf/beacon.ts uiWindowsOf keeps both) */
+export const PERF_UI_WINDOWS_MAX = 8;
+export const PERF_UI_CLASS_MAX = 60;
 const HZ_FITS = ['match', 'engine-slower', 'display-slower', 'page-behind', 'unknown'];
 /** decision 0216: the failure codes of the optional `files` block (src/files/usage.ts FailCode is this list); a code outside it is a problem, so a name cannot travel as a "code" */
 export const PERF_FILES_FAIL_CODES = ['name', 'conflict', 'quota', 'locked', 'notfound', 'kind', 'zip-format', 'zip-crc', 'zip-method', 'zip-encrypted', 'zip-size', 'unsafe-path', 'cancelled', 'unsupported', 'security', 'io', 'other'] as const;
@@ -331,6 +334,21 @@ export function beaconProblems(b: unknown): string[] {
       num('guestScreen.dpi', g.dpi, 96, 384, true, true); num('guestScreen.dpr', g.dpr, 0.1, 16);
       num('guestScreen.roomWidth', g.roomWidth, 0, 16384, false, true); num('guestScreen.roomHeight', g.roomHeight, 0, 16384, false, true);
       if (typeof g.reported !== 'boolean') out.push('guestScreen.reported: not a boolean');
+    }
+  }
+  // Issue #1364: optional `uiWindows`: the top-level windows of the engine's window table, the front first, at most 8; a class name and the size, and nothing else (no title, no position). Absent: no window table in the log yet.
+  const uw = b.uiWindows;
+  if (uw !== undefined) {
+    if (!Array.isArray(uw)) out.push('uiWindows: not an array');
+    else {
+      if (uw.length > PERF_UI_WINDOWS_MAX) out.push(`uiWindows: ${uw.length} windows, at most ${PERF_UI_WINDOWS_MAX}`);
+      uw.forEach((x: unknown, i: number) => {
+        if (!isObj(x)) { out.push(`uiWindows[${i}]: not an object`); return; }
+        str(`uiWindows[${i}].cls`, x.cls, PERF_UI_CLASS_MAX);
+        num(`uiWindows[${i}].w`, x.w, 0, 1e5, true);
+        num(`uiWindows[${i}].h`, x.h, 0, 1e5, true);
+        for (const k of Object.keys(x)) if (k !== 'cls' && k !== 'w' && k !== 'h') out.push(`uiWindows[${i}].${k}: not a field of this block`);
+      });
     }
   }
   return out;

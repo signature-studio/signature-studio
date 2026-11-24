@@ -1,8 +1,9 @@
 // Decision 0152: the beacon the page sends (src/perf/beacon.ts, browser-info.ts) and when it sends it.
 import { describe, expect, it } from 'vitest';
-import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, postBeacon, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
+import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, postBeacon, uiWindowsOf, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
 import { collectBrowserInfo, collectClientInfo, hostKind, parseBrowser, webglRenderer, type BrowserInfo } from '../../src/perf/browser-info.ts';
 import { DisplayMeter, DisplayMonitor, hzFit, type DisplayHost, type DisplaySnapshot } from '../../src/perf/display.ts';
+import type { EngineWindow } from '../../src/engine/fruity-log.ts';
 import { PERF_MAX_BODY, beaconProblems } from '../../shared/perf.ts';
 
 const browser: BrowserInfo = { hardwareConcurrency: 8, deviceMemoryGB: 8, userAgent: 'UA/1', screen: { width: 2560, height: 1440 }, devicePixelRatio: 1.5, crossOriginIsolated: true, isSecureContext: true, webglRenderer: 'ANGLE (X)', jsHeap: { usedBytes: 1, totalBytes: 2, limitBytes: 3 } };
@@ -439,6 +440,77 @@ describe('beaconProblems: numbers that cannot be true are found', () => {
     expect(j.input.eventToRafWithLate.lastMs).toHaveLength(5);
     expect(j.input.eventToRaf.p95Ms).toBe(30);
     expect(beaconProblems(j)).toEqual([]);
+  });
+});
+
+// ---- Issue #1364: the top-level windows of the engine's window table (the optional `uiWindows` block) ----
+
+const eng = (over: Partial<EngineWindow>): EngineWindow => ({ handle: '0x7f990034', lid: 1, className: 'TFLMain', title: 'FL Studio', x: 0, y: 0, width: 1930, height: 1092, visible: true, enabled: true, relation: 'owner 0', z: 0, ...over });
+// the order the log gives: the top-level windows, each followed by its children; the titles carry a path and a name, which must not travel
+const table: EngineWindow[] = [
+  eng({ lid: 50, className: 'TQuickControlBar', title: '', relation: 'parent 0x7f990034', z: 5, x: 5, y: 6, width: 1920, height: 82 }),
+  eng({ lid: 48, className: 'TWelcomeWizard', title: 'Welcome to FL Studio', x: 523, y: 255, width: 874, height: 570, z: 1 }),
+  eng({ lid: 13, className: 'TFLMain', title: 'C:\\Users\\Jane\\mix.flp', width: 1930, height: 1092, z: 0 }),
+  eng({ lid: 54, className: 'TPluginForm', title: 'Plug-in', relation: 'owner 0x7f990034', width: 568, height: 466, z: 2 }),
+];
+
+describe('the optional uiWindows block of the beacon (Issue #1364)', () => {
+  it('(a) a window table gives uiWindows: the top-level windows as class and size, the front first, no child, no title; each one has exactly those three fields', () => {
+    const b = buildBeacon({ ...base, uiWindows: uiWindowsOf(table) });
+    expect(b.v).toBe(3);
+    expect(b.uiWindows).toEqual([{ cls: 'TFLMain', w: 1930, h: 1092 }, { cls: 'TWelcomeWizard', w: 874, h: 570 }, { cls: 'TPluginForm', w: 568, h: 466 }]);
+    for (const w of b.uiWindows ?? []) expect(Object.keys(w).sort()).toEqual(['cls', 'h', 'w']);
+    expect(JSON.stringify(b.uiWindows)).not.toMatch(/Welcome to|Jane|mix\.flp|Plug-in|QuickControlBar/);
+  });
+  it('(a) at most 8, the front first (the smallest z), and a class name longer than 60 characters is cut', () => {
+    const many = Array.from({ length: 12 }, (_, i) => eng({ className: `TWin${i}`, width: 100 + i, height: 50, z: 11 - i }));
+    const u = uiWindowsOf(many);
+    expect(u).toHaveLength(8);
+    expect(u?.map((x) => x.cls)).toEqual(Array.from({ length: 8 }, (_, k) => `TWin${11 - k}`));
+    expect(buildBeacon({ ...base, uiWindows: u }).uiWindows).toHaveLength(8);
+    expect(uiWindowsOf([eng({ className: 'C'.repeat(100) })])?.[0]?.cls).toHaveLength(60);
+  });
+  it('(a) the list the page holds is not changed by the choice (a copy is sorted, not the log\'s own list)', () => {
+    const before = table.map((w) => w.lid);
+    uiWindowsOf(table);
+    expect(table.map((w) => w.lid)).toEqual(before);
+  });
+  it('(b) no window table (no log yet, or none of its lines is a window) gives no uiWindows: the field is absent, not an empty list', () => {
+    expect(uiWindowsOf(undefined)).toBeNull();
+    expect(uiWindowsOf(null)).toBeNull();
+    expect(uiWindowsOf([])).toBeNull();
+    expect(buildBeacon(base)).not.toHaveProperty('uiWindows');
+    expect(buildBeacon({ ...base, uiWindows: uiWindowsOf([]) })).not.toHaveProperty('uiWindows');
+    expect(JSON.parse(beaconText(buildBeacon(base)))).not.toHaveProperty('uiWindows');
+  });
+  it('(b) a table whose windows are all children gives an empty list (the table exists; no top-level window in it)', () => {
+    expect(uiWindowsOf([eng({ relation: 'parent 0x1' })])).toEqual([]);
+  });
+  it('(c) beaconProblems: a right block passes (and so does a record without it); a block of the wrong shape is a problem', () => {
+    expect(beaconProblems(JSON.parse(beaconText(buildBeacon({ ...base, sid: SID, uiWindows: uiWindowsOf(table) }))))).toEqual([]);
+    expect(beaconProblems(JSON.parse(beaconText(buildBeacon({ ...base, sid: SID }))))).toEqual([]);
+    const probs = (uw: unknown): string[] => beaconProblems({ v: 3, sid: SID, uiWindows: uw }).filter((p) => p.startsWith('uiWindows'));
+    expect(probs([{ cls: 'TFLMain', w: 1930, h: 1092 }])).toEqual([]);
+    expect(probs([])).toEqual([]);
+    expect(probs(null)).toEqual([expect.stringContaining('not an array')]);
+    expect(probs({ cls: 'TFLMain', w: 1, h: 1 })).toEqual([expect.stringContaining('not an array')]);
+    expect(probs(Array.from({ length: 9 }, () => ({ cls: 'a', w: 1, h: 1 })))).toEqual([expect.stringContaining('at most 8')]);
+    expect(probs(['TFLMain'])).toEqual([expect.stringContaining('not an object')]);
+    expect(probs([{ cls: 5, w: 1, h: 1 }])).toEqual([expect.stringContaining('not a string')]);
+    expect(probs([{ cls: 'C'.repeat(61), w: 1, h: 1 }])).toEqual([expect.stringContaining('longer than 60')]);
+    expect(probs([{ cls: 'a', w: -1, h: 1 }])).toEqual([expect.stringContaining('outside')]);
+    expect(probs([{ cls: 'a', w: 1, h: 1.5 }])).toEqual([expect.stringContaining('whole number')]);
+    expect(probs([{ cls: 'a', w: 1, h: '1' }])).toEqual([expect.stringContaining('finite number')]);
+    expect(probs([{ cls: 'a', w: 1 }])).toEqual([expect.stringContaining('uiWindows[0].h')]);
+    expect(probs([{ cls: 'a', w: 1, h: 1, title: 'Welcome to FL Studio' }])).toEqual([expect.stringContaining('uiWindows[0].title: not a field of this block')]);
+  });
+  it('size: eight windows with the longest class names still fit in the worst case (the page-load token and the block survive the cut)', () => {
+    const eight = uiWindowsOf(Array.from({ length: 8 }, (_, i) => eng({ className: 'K'.repeat(100), width: 99999, height: 99999, z: i })));
+    const worst = v2({ uiWindows: eight, browser: { ...browser, userAgent: 'U'.repeat(300), webglRenderer: 'G'.repeat(200) }, timeline: Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`mark_${i}`, i * 1.123456789])), error: { what: 'w'.repeat(400), where: 'h'.repeat(200) } });
+    const text = beaconText(worst);
+    expect(text.length).toBeLessThanOrEqual(PERF_MAX_BODY - 512);
+    expect(JSON.parse(text).sid).toBe(SID);
+    expect(beaconProblems(JSON.parse(text))).toEqual([]);
   });
 });
 
