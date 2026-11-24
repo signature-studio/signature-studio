@@ -44,7 +44,8 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 - work は `strategy.matrix.issue` で Issue の番号ごとに 1 ジョブ。`fail-fast: false` で、1 件の失敗が他を止めない。
 - work の `concurrency` は `group: task-<番号>`、`cancel-in-progress: false`。同じ Issue の作業は直列になる。
 - 対象が空なら start 以降は skip される。runner を使うのは select(数十秒)だけ。
-- 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 接頭辞)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。新しい seed の行を足す Issue は、実物の接頭辞が `ci/resources-prefixes.txt` に在ることを、起票の前に確かめる(無ければ、先に足す。足す前に、作業者は受け入れを通せない)。
+- 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 項目。`\` で終わる行は接頭辞、それ以外は完全なパス)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。新しい seed の行を足す Issue は、実物の接頭辞が `ci/resources-prefixes.txt` に在ることを、起票の前に確かめる(無ければ、先に足す。足す前に、作業者は受け入れを通せない)。
+  - `ci/resources-prefixes.txt` は、接頭辞(`\` で終わる行)とファイル(`\` で終わらない行。インストール先からの完全なパス。インストーラの一覧の guest と、大文字・小文字を区別せず一致する)の両方を受ける。道具(`tools/fl-installer-extract.mjs`)が行の形で分け、ファイルの行が一覧に無ければ失敗する。ファイルの行の大きさの合計は 30 MB 以下(一覧の bytes。一覧に大きさが無い物は 0 で数える)。
   - #1386・#1387 で足した 6 件(`ci/resources-prefixes.txt` の 9〜14 行目。どの接頭辞も `\` で終わる folder 単位。ファイル単位の指定は無い)。大きさは、一覧の bytes(dll・exe と Data\ の物だけ在る)の合計。
     - `System\Tools\Chord progression\`: 59 件。大きさは一覧に無い。FL 内蔵のコード進行ツールの Python のスクリプト(#1386)。
     - `Shared\Python\`: 37 件。dll・exe の合計は 14,939,080 B。他の 27 件は大きさが一覧に無い。FL 内蔵の Python の実行環境(`Python\Python312.dll` を読む物。#1386)。接頭辞はこの folder 全体になる。
