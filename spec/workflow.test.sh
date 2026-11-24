@@ -16,6 +16,8 @@ print(json.dumps(d, ensure_ascii=False))' "$1"; }
 pj "$A" > "$T/new.json" 2>"$T/pj.err"; pj "$T/old.yml" > "$T/old.json" 2>>"$T/pj.err"
 ok "agent.yml: YAML として読める(旧版も読める)" "$(test -s "$T/new.json" && test -s "$T/old.json" && echo yes)" yes
 J=$T/new.json; O=$T/old.json
+# 抽出の木の鍵に lift/plugins の plugin.tsv を足した(Issue #1369)。旧版との比較は、その足した 1 項目を除いた版(JN・DJN)で行う。他の変更は比較に掛かる
+sed -e "s/, 'lift\/plugins\/[^']*'//" "$A" > "$T/new-noplg.yml"; pj "$T/new-noplg.yml" > "$T/new-noplg.json" 2>>"$T/pj.err"; JN=$T/new-noplg.json
 # (b) on: issues と issue_comment だけ。workflow_dispatch・schedule・push・pull_request は置かない
 ok "agent.yml: on のキーは issues と issue_comment だけ" "$(jq -c '.on | keys' "$J")" '["issue_comment","issues"]'
 ok "agent.yml: issues の types は、許可の一覧(opened・edited・reopened・closed・labeled・unlabeled・typed・untyped)の部分集合" "$(jq -r '(.on.issues.types - ["opened","edited","reopened","closed","labeled","unlabeled","typed","untyped"]) | length' "$J")" 0
@@ -52,13 +54,13 @@ ok "opencode: プロンプトは、AGENTS.md と Issue の本文から作る(別
 # 変えない段は、旧版と中身が一致する(run・uses・env・with・if)
 KEEP=("リポジトリを取得する(資格は残さない)" "名義を設定する(token は消す)" "版の値を ci/versions.env から読む" "Node を入れる" "rust をそろえ、app の依存を入れてビルドし、fe-build を用意する" "emsdk を入れる" "アカウント ID を app/wrangler.jsonc から読む" "抽出物を R2 のキャッシュから取る(公開の artifact は使わない)" "抽出物を lift/out-app/host に置く")
 diffs=""; for n in "${KEEP[@]}"; do
-  o=$(jq -S --arg n "$n" '[.jobs.run.steps[] | select(.name == $n) | del(.if)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | del(.if)] | .[0]' "$J")
+  o=$(jq -S --arg n "$n" '[.jobs.run.steps[] | select(.name == $n) | del(.if)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.work.steps[] | select(.name == $n) | del(.if)] | .[0]' "$JN")
   [ "$o" != null ] && [ "$o" = "$w" ] || diffs="$diffs|$n"
 done
 ok "作業の段: 変えない段は旧版と中身が一致する(差の一覧)" "$diffs" ""
 EKEEP=("抽出物のキャッシュ(R2)" "インストーラを取り、抽出する(キャッシュが無いときだけ)")
 diffs=""; for n in "${EKEEP[@]}"; do
-  o=$(jq -S --arg n "$n" '[.jobs.extract.steps[] | select(.name == $n)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.extract.steps[] | select(.name == $n)] | .[0]' "$J")
+  o=$(jq -S --arg n "$n" '[.jobs.extract.steps[] | select(.name == $n)] | .[0]' "$O"); w=$(jq -S --arg n "$n" '[.jobs.extract.steps[] | select(.name == $n)] | .[0]' "$JN")
   [ "$o" != null ] && [ "$o" = "$w" ] || diffs="$diffs|$n"
 done
 ok "抽出の段: R2 のキャッシュの段は旧版と中身が一致する(差の一覧)" "$diffs" ""
@@ -448,7 +450,7 @@ ok "新しい段: extract は labels、work は issue_labels で判定する" "$
 ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 29
 ok "新しい段: R2 の鍵を使うのは、extract の 5 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し・起動用の実行ファイルの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
-ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
+ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$JN" '
   def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
@@ -555,13 +557,13 @@ EORD='["外部プラグインのインストーラをキャッシュに保存す
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
 ok "抽出物の追加: work の段の順は、lift/out-app/host の後に、言語等と内蔵のプラグインを置き、タスクの前" "$(jq -r --argjson o "$WORD" '[.jobs.work.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
-ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
+ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$JN" '
   def unskip: if . == null then null else (sub(" && steps[.]check[.]outputs[.]skip != .true."; "") | sub("^success[(][)] && "; "") | if . == "success()" or . == "" then null else . end) end;
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
 ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
-for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
+for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract plugin-rows; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 # (n) 同じ Issue の直列化、作業の前の Issue の状態の確認、報告の伏せ字、報告の判定(閉じて main に入った作業は、失敗の印を付けない)。偽の gh と fixture で、段の実際の動きを確かめる
 v1=anthr; v2=opic
 ok "concurrency: workflow の最上位が、Issue の番号ごとの group で、cancel-in-progress は false" "$(jq -r '.concurrency | "\(.group)/\(.["cancel-in-progress"] | tostring)"' "$J")" 'agent-${{ github.event.issue.number }}/false'
@@ -783,6 +785,7 @@ rc=$(prun "$CN" "$FJ2" "$JR/rj3")
 ok "取り込み(判定の出力が無い): 判定に至らなかった作業として、commit せずに取り込み、その旨を書く" "$rc/$(( $(git -C "$CN" rev-list --count HEAD) - n0 ))/$(grep -c '判定に至らなかった' "$CN/.prior-work.md")" "0/0/1"
 # (k) 本番のデプロイ(deploy.yml)の抽出の木の鍵は、作業ジョブの抽出の木の鍵(agent.yml の extract-tree-)が読む入力を全て覆う。覆わないと、表を変えても古い木が使われる
 pj "$top/.github/workflows/deploy.yml" > "$T/deploy.json" 2>>"$T/pj.err"; DJ=$T/deploy.json
+sed -e "s/, 'lift\/plugins\/[^']*'//" "$top/.github/workflows/deploy.yml" > "$T/deploy-noplg.yml"; pj "$T/deploy-noplg.yml" > "$T/deploy-noplg.json" 2>>"$T/pj.err"; DJN=$T/deploy-noplg.json
 DK=$(jq -r '[.jobs.deploy.steps[] | select(.id == "cache") | .with.key][0]' "$DJ")
 AK=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("extract-tree-"))) | unique[0]' "$J")
 cover() { python3 - "$top" "$1" "$2" <<'PY'
@@ -802,6 +805,9 @@ PY
 }
 ok "deploy.yml: 抽出の木の鍵(id: cache)は host- で、seed 表(lift/harness/seeds/vfs-seed-idle1.tsv)を入力に含む" "$(case "$DK" in host-*"'lift/harness/seeds/vfs-seed-idle1.tsv'"*) echo yes;; *) echo no;; esac)" yes
 ok "deploy.yml: 抽出の木の鍵は、agent.yml の extract-tree- の鍵が読む入力(ファイルの集合)を全て覆う(覆われていない物の一覧)" "$(cover "$AK" "$DK")" covered
+ok "plugins: agent.yml の抽出の木の鍵(保存・復元の 2 つ)と deploy.yml の host の鍵が、lift/plugins の plugin.tsv を入力に含む" "$(grep -cF "'lift/plugins/*/plugin.tsv'" "$A")/$(grep -cF "'lift/plugins/**'" "$top/.github/workflows/deploy.yml")" "2/1"
+ok "plugins: 旧版との比較の前に、鍵から lift/plugins の 1 項目を除くと、lift/plugins の文字が残らない" "$(grep -c 'lift/plugins' "$T/new-noplg.yml")/$(grep -c 'lift/plugins' "$T/deploy-noplg.yml")" "0/0"
+ok "plugins: extract-fl.mjs は lift/plugins の行を lib/plugin-rows.mjs で読む(import と呼び出しの 2 行)" "$(grep -c 'pluginRows' "$top/app/scripts/extract-fl.mjs")" 2
 ok "deploy.yml: 抽出の木の鍵は、fe-build extract が読む表(ci/extract-dlls.tsv・seed 表)と extract-fl.mjs を全て覆う" "$(cover "hashFiles('ci/extract-dlls.tsv', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'app/scripts/extract-fl.mjs')" "$DK")" covered
 # (m) 本番へ上げる前のスモーク(deploy.yml): 起動の確認と、Welcome 窓の 4 つの流れ。上げる段(upload・wrangler)より前に在り、既定の success() で、落ちれば後を飛ばす
 D=$top/.github/workflows/deploy.yml; DOLD=cf3e7dc9
@@ -815,7 +821,7 @@ ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落�
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと門の 2 段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する" "$(jq -n -S --slurpfile n "$DJ" --slurpfile o "$DO" --arg re '^(検証済みにする|本番の manifest を確かめる)$' --arg sm "$SMOKE" "([\$n[0].jobs.deploy.steps[] | select(((.run // \"\") | test(\$sm)) | not) | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
+ok "deploy.yml(m): スモークと門の 2 段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(検証済みにする|本番の manifest を確かめる)$' --arg sm "$SMOKE" "([\$n[0].jobs.deploy.steps[] | select(((.run // \"\") | test(\$sm)) | not) | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
 ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
 ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
@@ -945,7 +951,7 @@ RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確�
 ok "deploy.yml(s): 「検証済みにする」は verified.txt へ 1 行足すだけ(commit・push・add・gh・wrangler・tee・sed -i は無く、書き込みの先は 1 つ)" "$(grep -cE 'git |gh |wrangler|tee|sed -i' <<<"$VSN")/$(grep -c '>' <<<"$VSN")/$(grep -c '>> lift/harness/web/verified[.]txt' <<<"$VSN")" "0/1/1"
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
 ok "deploy.yml(s): 検証済みの sha は manifest の engine.wasm.sha256 から取り、pack-assets がその形で manifest に書く" "$(grep -c "engine: { kind: 'emscripten-fruity-v1', wasm," "$top/app/scripts/pack-assets.mjs")/$(grep -c 'engine[.]wasm[.]sha256' <<<"$VSN")" "1/1"
-ok "deploy.yml(s): 門の 2 段を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する" "$(jq -n -S --slurpfile n "$DJ" --slurpfile o "$DP" --arg re '^(検証済みにする|本番の manifest を確かめる)$' "([\$n[0].jobs.deploy.steps[] | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
+ok "deploy.yml(s): 門の 2 段を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(検証済みにする|本番の manifest を確かめる)$' "([\$n[0].jobs.deploy.steps[] | select((.name // \"\") | test(\$re) | not)] == \$o[0].jobs.deploy.steps) and (\$n[0].jobs.deploy | del(.steps)) == (\$o[0].jobs.deploy | del(.steps)) and \$n[0].on == \$o[0].on")" true
 VS=$T/vs.sh; printf '%s\n' "$VSN" > "$VS"
 OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64)); UPSHA=$(printf 'C%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
