@@ -50,4 +50,7 @@ void fle_imp_RegDeleteValueW(void);
 void fle_imp_RegQueryInfoKeyW(void);
 void fle_imp_RegFlushKey(void);
 
+/* Issue #1383: replays the HKCU values the page saved, after the seed values, and starts recording the changes under HKCU (fle_reg.c) */
+void fle_reg_restore_saved(void);
+
 #endif
