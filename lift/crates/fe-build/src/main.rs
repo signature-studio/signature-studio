@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::time::Duration;
 
 const OUT_APP_DIR: &str = "lift/out-app";
 const HARNESS_DIR: &str = "lift/harness";
@@ -21,8 +22,13 @@ const OFFLINE_PAGE_SRC: &str = "lift/out-app/host-extra/resources/System/Interne
 const OFFLINE_PAGE_PATH: &str = "resources/System/Internet/error-offline.html";
 const R2_BUCKET: &str = "s3://fl-web-assets/";
 const INSTALLER: &str = "s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe";
-const BLEND2D_URL: &str = "https://github.com/blend2d/blend2d.git";
 const BLEND2D_REV: &str = "a7f947677e85441abe1769586d3bb935b4086a07";
+/// The SHA-256 of the GitHub archive of BLEND2D_REV. GitHub can regenerate an archive, so a mismatch is a failed attempt
+/// and the value is not changed to match (Issue #1374).
+const BLEND2D_TARBALL_SHA256: &str = "391a57ad2508ab2291ad04b39b0a82d78473662b6d3029dbaf18de06165ea1f0";
+/// The attempts of the archive fetch (the first one included) and the waits after the failed ones (none after the last).
+const BLEND2D_ATTEMPTS: usize = 4;
+const BLEND2D_WAITS: [Duration; 3] = [Duration::from_secs(10), Duration::from_secs(30), Duration::from_secs(60)];
 const BLEND2D_SRC: &str = "lift/out-app/b2d-src/src";
 const BLEND2D_LIB: &str = "lift/out-app/b2d/build/libblend2d.a";
 /// The flags of the em++ line that the upstream CMake build ran for each source, in its order (the line without
@@ -40,6 +46,8 @@ enum Step {
     Run(Vec<String>),
     RunStdin(Vec<String>, String),
     RemoveFile(String),
+    RemoveDir(String),
+    Fetch(String, String, String),
     CheckSources(String),
     CopyDlls,
     Copy(String, String),
@@ -60,6 +68,8 @@ impl Step {
             Step::Run(argv) => argv.join(" "),
             Step::RunStdin(argv, stdin_file) => format!("{} < {stdin_file}", argv.join(" ")),
             Step::RemoveFile(path) => format!("rm -f {path}"),
+            Step::RemoveDir(dir) => format!("rm -rf {dir}"),
+            Step::Fetch(url, tarball, sha) => format!("fetch {url} to {tarball} (sha256 {sha})"),
             Step::CheckSources(list_file) => format!("check {list_file} against the .cpp files under {BLEND2D_SRC}"),
             Step::CopyDlls => format!("copy {OUT_APP_DIR}/gen/dll/*.dll and {OUT_APP_DIR}/host/binaries/win64/FLEngine_x64.dll to {OUT_APP_DIR}/dll/"),
             Step::Copy(from, to) => format!("copy {from} to {to}"),
@@ -168,12 +178,84 @@ fn blend2d_units() -> Result<Vec<(String, String)>, String> {
     Ok(lines(&blend2d_list_file())?.into_iter().map(|rel| (format!("{BLEND2D_SRC}/{rel}"), format!("{OUT_APP_DIR}/b2d/obj/{rel}.o"))).collect())
 }
 
-fn blend2d_clone() -> Vec<Step> {
+/// The GitHub archive (a tarball of the commit's tree, with one top-level directory that `tar` strips).
+fn blend2d_archive_url() -> String {
+    format!("https://github.com/blend2d/blend2d/archive/{BLEND2D_REV}.tar.gz")
+}
+
+/// Kept under OUT_APP_DIR, which is git-ignored (`lift/out*/`).
+fn blend2d_tarball() -> String {
+    format!("{OUT_APP_DIR}/blend2d-{BLEND2D_REV}.tar.gz")
+}
+
+/// One download with curl. `-f` makes an HTTP error (403, 404) a failure, and `--max-time` makes a stalled transfer one too
+/// (so that it is retried, not left to the job's time limit). The message is curl's last line on stderr.
+fn curl_fetch(url: &str, path: &str) -> Result<(), String> {
+    let out = Command::new("curl").args(["-sSLf", "--connect-timeout", "30", "--max-time", "600", "-o", path, url]).output().map_err(|e| format!("curl: {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let line = stderr.lines().rev().find(|line| !line.trim().is_empty()).unwrap_or_default().trim();
+    Err(format!("curl {}: {line}", out.status))
+}
+
+/// Puts the archive at `tarball`, unless a tarball with the SHA-256 `sha` is there already. An attempt is `fetch(url, part)`
+/// and then the SHA-256 check of `part`, where `part` is `<tarball>.part` until the check passes. A failed attempt is
+/// retried after its wait (BLEND2D_WAITS), up to BLEND2D_ATTEMPTS.
+fn blend2d_fetch_with(
+    url: &str,
+    tarball: &str,
+    sha: &str,
+    fetch: &mut dyn FnMut(&str, &str) -> Result<(), String>,
+    wait: &mut dyn FnMut(Duration),
+) -> Result<(), String> {
+    if Path::new(tarball).is_file() {
+        match sha256_hex(tarball) {
+            Ok(got) if got == sha => {
+                println!("blend2d: {tarball} has the SHA-256 of {BLEND2D_REV}: not fetched");
+                return Ok(());
+            }
+            Ok(got) => eprintln!("fe-build: {tarball} has SHA-256 {got}, expected {sha}: discarded"),
+            Err(message) => eprintln!("fe-build: {tarball}: {message}: discarded"),
+        }
+        fs::remove_file(tarball).map_err(|e| format!("{tarball}: {e}"))?;
+    }
+    let part = format!("{tarball}.part");
+    let mut attempt = 1;
+    loop {
+        let Err(message) = fetch(url, &part).and_then(|()| {
+            let got = sha256_hex(&part)?;
+            if got == sha {
+                Ok(())
+            } else {
+                Err(format!("SHA-256 {got}, expected {sha}"))
+            }
+        }) else {
+            break;
+        };
+        let _ = fs::remove_file(&part);
+        if attempt == BLEND2D_ATTEMPTS {
+            eprintln!("fe-build: blend2d attempt {attempt}/{BLEND2D_ATTEMPTS} failed ({url}): {message}; giving up");
+            return Err(format!("blend2d: no archive after {BLEND2D_ATTEMPTS} attempts"));
+        }
+        let pause = BLEND2D_WAITS[attempt - 1];
+        eprintln!("fe-build: blend2d attempt {attempt}/{BLEND2D_ATTEMPTS} failed ({url}): {message}; waiting {} s", pause.as_secs());
+        wait(pause);
+        attempt += 1;
+    }
+    fs::rename(&part, tarball).map_err(|e| format!("{part} to {tarball}: {e}"))
+}
+
+/// The archive of the fixed commit, unpacked fresh each time (the old tree is removed), then the patch and the check.
+fn blend2d_source_steps() -> Vec<Step> {
     let src = format!("{OUT_APP_DIR}/b2d-src");
     vec![
         Step::Mkdir(vec![OUT_APP_DIR.into()]),
-        Step::Run(vec!["git".into(), "clone".into(), "-q".into(), BLEND2D_URL.into(), src.clone()]),
-        Step::Run(vec!["git".into(), "-C".into(), src.clone(), "checkout".into(), "-q".into(), BLEND2D_REV.into()]),
+        Step::Fetch(blend2d_archive_url(), blend2d_tarball(), BLEND2D_TARBALL_SHA256.into()),
+        Step::RemoveDir(src.clone()),
+        Step::Mkdir(vec![src.clone()]),
+        Step::Run(vec!["tar".into(), "-xzf".into(), blend2d_tarball(), "-C".into(), src.clone(), "--strip-components=1".into()]),
         Step::RunStdin(
             vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
             format!("{HARNESS_DIR}/b2d1/b2d3-compop.patch"),
@@ -238,7 +320,7 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
     let fe_lift = format!("{bin}/fe-lift");
     let fe_wasmgen = format!("{bin}/fe-wasmgen");
     let units = blend2d_units()?;
-    let mut blend2d_steps = blend2d_clone();
+    let mut blend2d_steps = blend2d_source_steps();
     blend2d_steps.push(Step::Mkdir(blend2d_dirs(&units)));
     let mut stages = vec![Stage { name: "blend2d".into(), steps: blend2d_steps, parallel: false }];
     stages.push(Stage { name: "blend2d-compile".into(), steps: blend2d_compile_steps(&units), parallel: true });
@@ -366,6 +448,12 @@ fn run(step: &Step) -> Result<(), String> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(error) => Err(format!("rm {path}: {error}")),
         },
+        Step::RemoveDir(dir) => match fs::remove_dir_all(dir) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(format!("rm -rf {dir}: {error}")),
+        },
+        Step::Fetch(url, tarball, sha) => blend2d_fetch_with(url, tarball, sha, &mut curl_fetch, &mut std::thread::sleep),
         Step::CheckSources(list_file) => check_blend2d_sources(list_file),
         Step::CopyDlls => copy_dlls(),
         Step::Copy(from, to) => {
@@ -587,10 +675,123 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
-    use std::path::Path;
+    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
+    use std::cell::Cell;
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::Duration;
 
     const SHA: &str = "b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043";
+    /// The SHA-256 of an empty file. The fetch tests use an empty file (matches) or the bytes BAD (does not match).
+    const EMPTY_SHA: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    const EMPTY: &[u8] = b"";
+    const BAD: &[u8] = b"stale";
+    const URL: &str = "https://example.invalid/blend2d.tar.gz";
+
+    /// A directory `.tmp-blend2d-fetch-<name>` in the repository root, removed when the test ends.
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Scratch {
+            let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..").join(format!(".tmp-blend2d-fetch-{name}"));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).expect("scratch directory");
+            Scratch(dir)
+        }
+
+        fn path(&self, name: &str) -> String {
+            self.0.join(name).display().to_string()
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    /// A fetch that answers the attempts in order: Ok(bytes) writes them to the file, Err(message) fails.
+    fn scripted<'a>(outcomes: &'a [Result<&'static [u8], &'static str>], calls: &'a Cell<usize>) -> impl FnMut(&str, &str) -> Result<(), String> + 'a {
+        move |_url: &str, part: &str| -> Result<(), String> {
+            let n = calls.get();
+            calls.set(n + 1);
+            match outcomes.get(n).ok_or("no outcome for this attempt")? {
+                Ok(bytes) => fs::write(part, bytes).map_err(|e| e.to_string()),
+                Err(message) => Err(message.to_string()),
+            }
+        }
+    }
+
+    #[test]
+    fn blend2d_fetch_retries_then_succeeds() {
+        let dir = Scratch::new("retry");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Err("curl exit status: 22: curl: (22) The requested URL returned error: 403"), Err("curl exit status: 28: curl: (28) timed out"), Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 3);
+        assert_eq!(waits, [Duration::from_secs(10), Duration::from_secs(30)]);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+        assert!(!Path::new(&dir.path("blend2d.tar.gz.part")).exists());
+    }
+
+    #[test]
+    fn blend2d_fetch_gives_up_after_four_attempts() {
+        let dir = Scratch::new("give-up");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Err("curl exit status: 6: curl: (6) Could not resolve host"); 4];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert!(result.is_err());
+        assert_eq!(calls.get(), 4);
+        assert_eq!(waits, [Duration::from_secs(10), Duration::from_secs(30), Duration::from_secs(60)]);
+        assert!(!Path::new(&tarball).exists());
+        assert!(!Path::new(&dir.path("blend2d.tar.gz.part")).exists());
+    }
+
+    #[test]
+    fn blend2d_fetch_retries_on_a_sha_mismatch() {
+        let dir = Scratch::new("sha-retry");
+        let tarball = dir.path("blend2d.tar.gz");
+        let outcomes = [Ok(BAD), Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 2);
+        assert_eq!(waits, [Duration::from_secs(10)]);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+    }
+
+    #[test]
+    fn blend2d_fetch_reuses_a_matching_tarball() {
+        let dir = Scratch::new("reuse");
+        let tarball = dir.path("blend2d.tar.gz");
+        fs::write(&tarball, EMPTY).expect("the tarball");
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&[], &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert_eq!(calls.get(), 0);
+        assert!(waits.is_empty());
+    }
+
+    #[test]
+    fn blend2d_fetch_discards_a_mismatched_tarball() {
+        let dir = Scratch::new("discard");
+        let tarball = dir.path("blend2d.tar.gz");
+        fs::write(&tarball, BAD).expect("the tarball");
+        let outcomes = [Ok(EMPTY)];
+        let calls = Cell::new(0);
+        let mut waits = Vec::new();
+        let result = blend2d_fetch_with(URL, &tarball, EMPTY_SHA, &mut scripted(&outcomes, &calls), &mut |wait: Duration| waits.push(wait));
+        assert_eq!(result, Ok(()));
+        assert!(calls.get() >= 1);
+        assert_eq!(fs::read(&tarball).expect("the tarball"), EMPTY);
+    }
 
     #[test]
     fn glue_matches_sed() {
