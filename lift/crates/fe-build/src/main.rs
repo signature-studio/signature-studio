@@ -95,7 +95,7 @@ impl Step {
             Step::Copy(from, to) => format!("copy {from} to {to}"),
             Step::Glue => format!("glue {OUT_APP_DIR}/web/flengine6.js -> {OUT_APP_DIR}/web/engine-glue.js (the two rules of {HARNESS_DIR}/web/glue.sed)"),
             Step::Generate(with_bases) => format!("plugins: tables under {} from lift/plugins/*/plugin.tsv (bases: {with_bases})", plugins::OUT_DIR),
-            Step::PluginList(key, _) => format!("list {key}: fe-pe rebase, fe-wasmgen report, hook points left out"),
+            Step::PluginList(key, _) => format!("list {key}: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out"),
             Step::MergeLists => format!("merge {}/lists into {}/lowered-all.txt", plugins::OUT_DIR, plugins::OUT_DIR),
             Step::CheckUnits(listed) => format!("check the {} units of {OUT_APP_DIR}/gen/src against the compile lists", listed.len()),
         }

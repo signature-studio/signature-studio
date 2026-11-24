@@ -4,7 +4,7 @@
 //! The generated rows of a plugin DLL come after the fixed rows of each table, in the order of `key`.
 //!
 //! The lists of the direct functions of a plugin DLL are not stored: the `lists` stage finds them by running fe-wasmgen on the DLL
-//! rebased at its base (PluginList), and the hook points of the DLL (their VAs) are left out of them (the C part keeps those).
+//! rebased at its base (PluginList), and the hook points of the DLL and its `omit` RVAs (the C part keeps those) are left out of them.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -33,7 +33,7 @@ const FIXED_HYB_ARGS: &str = "lift/harness/hyb/hyb-args.tsv";
 const FIXED_HYBRID_CMD: &str = "lift/harness/hyb/hybrid.cmd";
 const FIXED_PACK_ARGS: &str = "lift/harness/web/pack.args";
 const FIXED_LISTS: &str = "lift/harness/hyb/lists";
-const COLUMNS: [&str; 7] = ["key", "guest", "role", "sha256", "size", "hook", "args"];
+const COLUMNS: [&str; 8] = ["key", "guest", "role", "sha256", "size", "hook", "args", "omit"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -54,6 +54,8 @@ pub struct Dll {
     pub size: u64,
     pub hook: Hook,
     pub args: Vec<String>,
+    /// RVAs that are left out of the direct list (the C part lifts them). A setjmp's entry is one: the C caller registers the landing.
+    pub omit: Vec<u64>,
 }
 
 impl Dll {
@@ -118,8 +120,8 @@ pub fn parse_plugin(plugin: &str, text: &str) -> Result<Vec<Dll>, String> {
             header = true;
             continue;
         }
-        if f.len() != 7 {
-            return Err(at(&format!("{} fields, want 7", f.len())));
+        if f.len() != 8 {
+            return Err(at(&format!("{} fields, want 8", f.len())));
         }
         let main = match f[2] {
             "本体" => true,
@@ -129,7 +131,8 @@ pub fn parse_plugin(plugin: &str, text: &str) -> Result<Vec<Dll>, String> {
         let size = f[4].parse::<u64>().ok().filter(|v| *v > 0).ok_or_else(|| at("size must be a positive integer"))?;
         let hook = parse_hook(f[5]).map_err(|e| at(&e))?;
         let args = if f[6].trim().is_empty() { vec!["--pdata".to_string()] } else { f[6].split_whitespace().map(String::from).collect() };
-        out.push(Dll { plugin: plugin.to_string(), key: f[0].to_string(), guest: f[1].to_string(), main, sha256: f[3].to_string(), size, hook, args });
+        let omit = rvas_or_none(f[7]).map_err(|e| at(&format!("omit: {e}")))?;
+        out.push(Dll { plugin: plugin.to_string(), key: f[0].to_string(), guest: f[1].to_string(), main, sha256: f[3].to_string(), size, hook, args, omit });
     }
     if !header {
         return Err(format!("{plugin}/plugin.tsv: no header"));
@@ -157,6 +160,26 @@ fn parse_hook(text: &str) -> Result<Hook, String> {
 
 fn hex(text: &str) -> Result<u64, String> {
     u64::from_str_radix(text.trim().trim_start_matches("0x"), 16).map_err(|e| format!("bad hex {text}: {e}"))
+}
+
+/// The RVAs of an `omit` field: comma separated hex, or `-` for none.
+fn rvas_or_none(text: &str) -> Result<Vec<u64>, String> {
+    if text == "-" {
+        return Ok(Vec::new());
+    }
+    text.split(',').map(hex).collect()
+}
+
+/// The VAs of a plugins.tsv column (`vas_text`): comma separated hex, or `-` for none.
+fn vas_of(text: &str) -> Result<BTreeSet<u64>, String> {
+    Ok(rvas_or_none(text)?.into_iter().collect())
+}
+
+fn vas_text(vas: &[u64]) -> String {
+    if vas.is_empty() {
+        return "-".to_string();
+    }
+    vas.iter().map(|v| format!("0x{v:x}")).collect::<Vec<String>>().join(",")
 }
 
 fn valid_key(key: &str) -> bool {
@@ -451,8 +474,9 @@ pub fn generate(with_base: bool) -> Result<(), String> {
         let hook = hook_file(d)?;
         modules.push_str(&format!("{}\n", module_row(d, *base, hook.as_deref())));
         hyb.push_str(&format!("{}\n", hyb_row(d, *base)));
-        let vas: Vec<String> = hook_vas(d, *base)?.iter().map(|v| format!("0x{v:x}")).collect();
-        plan.push_str(&format!("{}\t{}\t{}\t{}\t0x{:x}\t{}\t{}\n", d.key, d.name(), d.rebased(*base), d.host_file(), base, d.args.join(" "), if vas.is_empty() { "-".to_string() } else { vas.join(",") }));
+        let hooks = vas_text(&hook_vas(d, *base)?);
+        let omit = vas_text(&d.omit.iter().map(|r| base + r).collect::<Vec<u64>>());
+        plan.push_str(&format!("{}\t{}\t{}\t{}\t0x{:x}\t{}\t{hooks}\t{omit}\n", d.key, d.name(), d.rebased(*base), d.host_file(), base, d.args.join(" ")));
     }
     write(&format!("{OUT_DIR}/modules.tsv"), &modules)?;
     write(&format!("{OUT_DIR}/hyb-args.tsv"), &hyb)?;
@@ -480,12 +504,17 @@ fn limit_of(path: &str, needle: &str) -> Result<usize, String> {
     digits.parse::<usize>().map_err(|_| format!("{path}: no number after {needle:?}"))
 }
 
+/// The direct list of a DLL: the functions fe-wasmgen emitted ok, without the left-out VAs (the hook points and the omit VAs).
+fn direct_list(ok: &BTreeSet<u64>, left_out: &BTreeSet<u64>) -> Vec<u64> {
+    ok.iter().copied().filter(|v| !left_out.contains(v)).collect()
+}
+
 /// The lists stage (one plugin DLL): the DLL rebased at its base, then the fe-wasmgen report of it (the direct functions: the ones
-/// that are emitted, `status` ok), without the hook points. The result is lists/lowered-<key>.txt.
+/// that are emitted, `status` ok), without the hook points and the omit VAs. The result is lists/lowered-<key>.txt.
 pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
     let text = read_text(&format!("{OUT_DIR}/plugins.tsv"))?;
     let row: Vec<&str> = text.lines().map(|l| l.split('\t').collect::<Vec<&str>>()).find(|f| f[0] == key).ok_or_else(|| format!("{key}: not in {OUT_DIR}/plugins.tsv"))?;
-    let (rebased_name, host, base_hex, args, hooks) = (row[2], row[3], row[4], row[5], row[6]);
+    let (rebased_name, host, base_hex, args, hooks, omit) = (row[2], row[3], row[4], row[5], row[6], row[7]);
     let work = format!("{OUT_DIR}/work");
     fs::create_dir_all(&work).map_err(|e| format!("{work}: {e}"))?;
     let rebased = format!("{work}/{rebased_name}");
@@ -499,15 +528,20 @@ pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
     argv.extend(["--report".to_string(), report.clone()]);
     run_cmd(&argv, "fe-wasmgen")?;
     let ok = report_ok(&fs::read_to_string(&report).map_err(|e| format!("{report}: {e}"))?)?;
-    let hooks: BTreeSet<u64> = if hooks == "-" { BTreeSet::new() } else { hooks.split(',').map(hex).collect::<Result<BTreeSet<u64>, String>>()? };
-    let listed: Vec<u64> = ok.iter().copied().filter(|v| !hooks.contains(v)).collect();
+    let omit = vas_of(omit)?;
+    if let Some(va) = omit.iter().find(|v| !ok.contains(v)) {
+        return Err(format!("{key}: the omit VA {va:#x} is not emitted ok (the omit column of plugin.tsv does not name a direct function)"));
+    }
+    let mut left_out = vas_of(hooks)?;
+    left_out.extend(omit.iter().copied());
+    let listed = direct_list(&ok, &left_out);
     if listed.is_empty() {
         return Err(format!("{key}: fe-wasmgen emitted no function"));
     }
     let out: String = listed.iter().map(|v| format!("0x{v:x}\n")).collect();
     let path = format!("{OUT_DIR}/lists/lowered-{key}.txt");
     write(&path, &out)?;
-    println!("list {key}: emitted ok {}, hook points left out {}, listed {}", ok.len(), ok.iter().filter(|v| hooks.contains(v)).count(), listed.len());
+    println!("list {key}: emitted ok {}, left out {} (omit {}), listed {}", ok.len(), ok.iter().filter(|v| left_out.contains(v)).count(), omit.len(), listed.len());
     Ok(())
 }
 
@@ -594,6 +628,7 @@ mod tests {
         assert_eq!(module_row(&d, 0x6800000, Some("lift/harness/hooks/fruity-delphi-effect-hook-points.txt")), "fruity_balance_x64.dll\tlift/out-plugins/fruity_balance_x64.dll\t0x6800000\t--pdata --hook-points lift/harness/hooks/fruity-delphi-effect-hook-points.txt --extra-imports lift/harness/seeds/ship6-imports.txt\tplugins/fruity/effects/fruity balance/fruity balance_x64.dll");
         assert_eq!(hyb_row(&d, 0x6800000), format!("{}\tfruity_balance_x64.6800000.dll\t--pdata", d.key));
         assert_eq!(d.hook, Hook::Existing);
+        assert_eq!(d.omit, vec![0x2c13a0]);
     }
 
     #[test]
@@ -608,6 +643,8 @@ mod tests {
         assert_eq!(dlls.iter().map(|d| d.key.as_str()).collect::<Vec<_>>(), ["effects.dummy-one.dummy_one_x64.dll", "effects.dummy-two.dummy_two_x64.dll", "generators.dummy-two.engine_x64.dll"]);
         assert_eq!(dlls[2].hook, Hook::Rva(vec![0x17bc0, 0x31d70, 0x31d90]));
         assert_eq!(dlls[2].args, vec!["--pdata".to_string()]);
+        assert_eq!(dlls[2].omit, vec![0x5000]);
+        assert!(dlls[0].omit.is_empty());
         assert_eq!(dlls[0].hook, Hook::None);
         let bases = assign_bases(0x7B8F200, &[0x3A1000, 0x10001, 0x20000]).unwrap();
         assert_eq!(bases, vec![0x7B90000, 0x7F40000, 0x7F60000]);
@@ -615,8 +652,8 @@ mod tests {
 
     #[test]
     fn bad_rows_stop_the_plugins() {
-        let good = "key\tguest\trole\tsha256\tsize\thook\targs\n";
-        let row = |k: &str, role: &str, sha: &str, size: &str, hook: &str| format!("{good}{k}\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t{role}\t{sha}\t{size}\t{hook}\t\n");
+        let good = "key\tguest\trole\tsha256\tsize\thook\targs\tomit\n";
+        let row = |k: &str, role: &str, sha: &str, size: &str, hook: &str| format!("{good}{k}\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t{role}\t{sha}\t{size}\t{hook}\t\t-\n");
         let sha = "a".repeat(64);
         assert!(parse_plugin("x", &row("a.b", "本体", &sha, "10", "none")).is_ok());
         assert!(parse_plugin("x", &row("a.b", "主", &sha, "10", "none")).is_err());
@@ -629,6 +666,29 @@ mod tests {
         assert!(validate(&both).is_err());
         assert!(validate(&parse_plugin("x", &row("A.b", "本体", &sha, "10", "none")).unwrap()).is_err());
         assert!(validate(&parse_plugin("x", &row("a.b", "本体", "XY", "10", "none")).unwrap()).is_err());
+    }
+
+    #[test]
+    fn the_omit_column_is_rvas_or_a_dash_and_the_row_has_eight_fields() {
+        let row = |omit: &str| format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\na.b\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t本体\t{}\t10\tnone\t\t{omit}\n", "a".repeat(64));
+        assert_eq!(parse_plugin("x", &row("0x2c13a0,0x10")).unwrap()[0].omit, vec![0x2c13a0, 0x10]);
+        assert!(parse_plugin("x", &row("-")).unwrap()[0].omit.is_empty());
+        assert!(parse_plugin("x", &row("")).is_err());
+        assert!(parse_plugin("x", &row("zz")).is_err());
+        let seven = format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\na.b\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t本体\t{}\t10\tnone\t\n", "a".repeat(64));
+        assert!(parse_plugin("x", &seven).is_err());
+        let no_column = format!("key\tguest\trole\tsha256\tsize\thook\targs\na.b\tPlugins\\Fruity\\Effects\\X\\X_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64));
+        assert!(parse_plugin("x", &no_column).is_err());
+    }
+
+    #[test]
+    fn the_omit_vas_leave_the_direct_list() {
+        let ok: BTreeSet<u64> = [0x10, 0x20, 0x30].into_iter().collect();
+        let left_out = vas_of("0x20,0x99").unwrap();
+        assert_eq!(direct_list(&ok, &left_out), vec![0x10, 0x30]);
+        assert_eq!(direct_list(&ok, &vas_of("-").unwrap()), vec![0x10, 0x20, 0x30]);
+        assert_eq!(vas_text(&[0x2c13a0, 0x6ac13a0]), "0x2c13a0,0x6ac13a0");
+        assert_eq!(vas_text(&[]), "-");
     }
 
     #[test]
