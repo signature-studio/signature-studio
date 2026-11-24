@@ -75,7 +75,8 @@ ok "push の段: push できた SHA を out/commit.txt に残す" "$(grep -cF 'g
 ok "どの段にも continue-on-error が無い" "$(grep -c 'continue-on-error' "$A")" 0
 ok "agent.yml: タブ文字が無い" "$(grep -c "$(printf '\t')" "$A")" 0
 # (j) start と report の書き込みは GITHUB_TOKEN で行う(App の token は使わない)。App の鍵は、名義の段と push の段だけ。Issue の close は、push する commit の Closes #N で行う
-ok "start: botid・GH_APP_ の secrets・GH_CONFIG_DIR を使わない(報告の App の段は「(u)」で確かめる)" "$(jq -r '[.jobs.start] | map(tostring | test("botid|GH_APP_|GH_CONFIG_DIR")) | join("/")' "$J")" "false"
+ok "start: botid・GH_APP_ の secrets・GH_CONFIG_DIR を使うのは、Project の In Progress の段を除いて無い(報告の App の段は「(u)」で確かめる)" "$(jq -r '(.jobs.start | .steps |= map(select(.name | startswith("Project の Status を In Progress") | not))) | tostring | test("botid|GH_APP_|GH_CONFIG_DIR")' "$J")" "false"
+ok "start: App の鍵(GH_APP_ の secrets)を使う段は、Project の In Progress の段だけ" "$(jq -r '[.jobs.start.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "Project の Status を In Progress にする(App の token で。失敗は理由を出し、作業は止めない)"
 ok "work: GH_APP_ の secrets を持つ段は、名義の段と push の段だけ" "$(jq -r '[.jobs.work.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "名義を設定する(token は消す)|通った変更を main に push する(token はこの段で発行する)"
 ok "start: running を付ける段の GH_TOKEN は github.token" "$(jq -r '[.jobs.start.steps[] | select(.name | test("running を付ける")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
 ok "report: 結果を Issue に書く段の GH_TOKEN は github.token" "$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書き")) | .env.GH_TOKEN][0]' "$J")" '${{ github.token }}'
@@ -457,7 +458,7 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
+ok "既存のジョブ: start・report と、extract・work の needs 以外の設定は、変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.start == ($n[0].jobs.start | .steps |= map(select(.name | startswith("Project の Status を In Progress") | not))), ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 ok "一覧の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("inventory-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 inventory-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs'"') }}'
 ok "外部の鍵: 保存と復元の 3 つ(extract の 2 つ・work の 1 つ)が、同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("external-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 external-"'${{ hashFiles('"'ci/artifacts.lock', 'tools/external-inputs/check.mjs'"') }}'
 ok "保存の段: runs-on/cache/save が 6 つ。一覧・外部・言語等・内蔵のプラグイン・起動用の実行ファイルの 5 つは取り直したときだけ動き、実機のビーコンの 1 つはラベルの作業のときだけ動く" "$(jq -r '[.jobs.extract.steps[] | select(.uses == "runs-on/cache/save@v5") | .["if"]] | "\(length)/\(map(select(test("cache-hit != .true."))) | length)/\(map(select(test("perf-beacons"))) | length)"' "$J")" "6/5/1"
@@ -576,7 +577,7 @@ ok "既存の段: extract・work の既存の段は、name・if・id・uses・wi
   def pick($steps; $names): [$steps[] | select(.name as $x | $names | any(. == $x)) | {name: .name, cond: (.["if"] | unskip), id: .id, uses: .uses, with: .with, env: .env, run: .run}];
   ([$b[0].jobs.extract.steps[].name] + [$b[0].jobs.work.steps[].name] - ["報告を検査して、成果物とサマリーに出す", "通った変更を main に push する(token はこの段で発行する)"]) as $names
   | (pick($b[0].jobs.extract.steps; $names) == pick($n[0].jobs.extract.steps; $names)) and (pick($b[0].jobs.work.steps; $names) == pick($n[0].jobs.work.steps; $names))')" true
-ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == $n[0].jobs.start, ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
+ok "既存のジョブ: select・start・report と、extract・work の needs 以外の設定は a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '[($b[0].jobs.extract | del(.steps, .needs)) == ($n[0].jobs.extract | del(.steps, .needs)), ($b[0].jobs.work | del(.steps, .needs, .name, .permissions)) == ($n[0].jobs.work | del(.steps, .needs, .name, .permissions)), $b[0].jobs.select == $n[0].jobs.select, $b[0].jobs.start == ($n[0].jobs.start | .steps |= map(select(.name | startswith("Project の Status を In Progress") | not))), ($b[0].jobs.report | del(.steps)) == ($n[0].jobs.report | del(.steps))] | all')" true
 for n in fl-installer-files external-inputs gen-wave-plugins fl-installer-extract plugin-rows auto-retry; do node "$here/$n.test.mjs" > "$T/$n.out" 2>&1; ok "試験: spec/$n.test.mjs が通る" "$?" 0; done
 # (n) 同じ Issue の直列化、作業の前の Issue の状態の確認、報告の伏せ字、報告の判定(閉じて main に入った作業は、失敗の印を付けない)。偽の gh と fixture で、段の実際の動きを確かめる
 v1=anthr; v2=opic
@@ -1117,8 +1118,9 @@ ok "報告(u21): 衝突の印が無い 20(拒否)は failed を付け、自動�
 ok "報告(u22): 閉じている 22 は、衝突でも自動の再試行をせず、failed を付ける" "$(grep -c '^issue edit 22 .*add-label failed' "$NVL")/$(nvb 22 | grep -cF "$MK")" "1/0"
 ok "報告(u23): 再試行の印のコメントに、保存した作業の旨を書く" "$(nvb 18 | grep -cF '作業を保存した')" 1
 APPN='自動の再試行を起動する(App の token で running を外す。再試行の Issue だけ)'
-ok "報告(u24): botid(App の名義)を使う段は 1 つだけで、その名前は再試行の起動の段" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("botid")) | .name] | join("|")' "$J")" "$APPN"
-ok "報告(u25): App の鍵を使う段は、報告の中でも、その起動の段だけ" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "$APPN"
+INREV='Project の Status を In Review にする(App の token で。閉じた Issue は触らない。失敗は理由を出し、作業は止めない)'
+ok "報告(u24): botid(App の名義)を使う段は、報告の中では Project の In Review の段と、再試行の起動の段の 2 つだけ" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("botid")) | .name] | join("|")' "$J")" "$INREV|$APPN"
+ok "報告(u25): App の鍵を使う段は、報告の中では Project の In Review の段と、その再試行の起動の段だけ" "$(jq -r '[.jobs.report.steps[] | select(tostring | test("secrets[.]GH_APP_")) | .name] | join("|")' "$J")" "$INREV|$APPN"
 ok "報告(u26): 起動の段は、結果を集める段の出力 retry が真のときだけ動く" "$(jq -r --arg a "$APPN" '[.jobs.report.steps[] | select(.name == $a) | .["if"]] | .[0]' "$J")" "steps.collect.outputs.retry == 'true'"
 ok "報告(u27): 結果を集める段に id collect がある" "$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を集める")) | .id] | .[0]' "$J")" collect
 ok "報告(u28): 起動の段は GH_TOKEN を持たない(gh は App の設定だけを使う)" "$(jq -r --arg a "$APPN" '[.jobs.report.steps[] | select(.name == $a) | (.env // {} | has("GH_TOKEN"))] | .[0] | tostring' "$J")" false
