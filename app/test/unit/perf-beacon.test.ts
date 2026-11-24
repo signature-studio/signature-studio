@@ -1,10 +1,15 @@
 // Decision 0152: the beacon the page sends (src/perf/beacon.ts, browser-info.ts) and when it sends it.
 import { describe, expect, it } from 'vitest';
-import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, postBeacon, uiWindowsOf, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { BEACON_MAX_PERIODIC, BEACON_PERIOD_MS, BeaconScheduler, buildBeacon, beaconText, exitFacts, postBeacon, uiWindowsOf, type BeaconInput, type BeaconReason } from '../../src/perf/beacon.ts';
+import { engineStopFacts, type EngineStop } from '../../src/perf/exit-message.ts';
 import { collectBrowserInfo, collectClientInfo, hostKind, parseBrowser, webglRenderer, type BrowserInfo } from '../../src/perf/browser-info.ts';
 import { DisplayMeter, DisplayMonitor, hzFit, type DisplayHost, type DisplaySnapshot } from '../../src/perf/display.ts';
 import type { EngineWindow } from '../../src/engine/fruity-log.ts';
-import { PERF_MAX_BODY, beaconProblems } from '../../shared/perf.ts';
+import { PERF_EXIT_FACTS_MAX_BYTES, PERF_MAX_BODY, beaconProblems, utf8Length } from '../../shared/perf.ts';
 
 const browser: BrowserInfo = { hardwareConcurrency: 8, deviceMemoryGB: 8, userAgent: 'UA/1', screen: { width: 2560, height: 1440 }, devicePixelRatio: 1.5, crossOriginIsolated: true, isSecureContext: true, webglRenderer: 'ANGLE (X)', jsHeap: { usedBytes: 1, totalBytes: 2, limitBytes: 3 } };
 const stat = (n: number): { n: number; intervalMedianMs: number | null; intervalP95Ms: number | null; perSecond: number | null } => ({ n, intervalMedianMs: 8, intervalP95Ms: 9, perSecond: 120 });
@@ -511,6 +516,99 @@ describe('the optional uiWindows block of the beacon (Issue #1364)', () => {
     expect(text.length).toBeLessThanOrEqual(PERF_MAX_BODY - 512);
     expect(JSON.parse(text).sid).toBe(SID);
     expect(beaconProblems(JSON.parse(text))).toEqual([]);
+  });
+});
+
+// Issue #1380: the stop facts of the engine's stop report (engine.exit.stop, engine.exit.evidence) are optional, cleaned, within 1,200 bytes together, and the last stage of beaconText drops them
+describe('engine.exit.stop and engine.exit.evidence (Issue #1380)', () => {
+  const EVIDENCE = 'first non-background pixel on a drawing surface (decision 0126): written by fixture into the surface of top-level window lid 3; function entries since the program began: 0';
+  const STOP: EngineStop = { lastFle: 'fle: StopFixture: the last fle line (synthetic)', stopLine: '== stop: SIGABRT (runtime abort, see runtime message)', abortKind: 'fle_stop (a runtime message that names an API and the reason)', memoryBytes: 1114112000 };
+  const exit = { reason: 'stopped', code: 134, presents: 3, message: 'fle: StopFixture: the last fle line (synthetic)' };
+  const total = (f: { stop: EngineStop | null; evidence: string | null }): number => utf8Length(JSON.stringify({ stop: f.stop, evidence: f.evidence }));
+  it('optional: a record from before these fields has none of them and passes the checks', () => {
+    const old = buildBeacon({ ...base, sid: SID, reason: 'exit', state: 'exited', exit: { ...exit } });
+    expect(old.engine.exit).not.toHaveProperty('stop');
+    expect(old.engine.exit).not.toHaveProperty('evidence');
+    expect(beaconProblems(JSON.parse(beaconText(old)))).toEqual([]);
+  });
+  it('a record with them carries them, and passes the checks', () => {
+    const b = buildBeacon({ ...base, sid: SID, reason: 'exit', state: 'exited', exit: { ...exit, stop: STOP, evidence: EVIDENCE } });
+    expect(b.engine.exit).toEqual({ ...exit, stop: STOP, evidence: EVIDENCE });
+    expect(b.v).toBe(3);
+    expect(beaconProblems(JSON.parse(beaconText(b)))).toEqual([]);
+  });
+  it('the facts are cleaned again here: a caller that passes raw text cannot send a path, a name, an address or a URL', () => {
+    const b = buildBeacon({ ...base, sid: SID, reason: 'exit', state: 'exited', exit: { ...exit, stop: { ...STOP, lastFle: 'fle: X: C:\\Users\\Jane Doe\\mix.flp and /home/ubuntu/a.b', abortKind: 'k /Users/taro/z' }, evidence: 'first non-background pixel: mail jane@example.co.jp https://x.y/z' } });
+    expect(JSON.stringify(b.engine.exit)).not.toMatch(/Jane|ubuntu|mix|taro|jane@|x\.y/);
+    expect(b.engine.exit?.stop?.stopLine).toBe(STOP.stopLine);
+  });
+  it('exitFacts: the stop and the evidence together are at most 1,200 bytes; over that the last fle line goes, then the evidence; the stop line, the kind and the memory stay', () => {
+    expect(exitFacts(STOP, EVIDENCE)).toEqual({ stop: STOP, evidence: EVIDENCE });
+    expect(exitFacts(null, null)).toEqual({ stop: null, evidence: null });
+    const big = exitFacts({ lastFle: 'é'.repeat(400), stopLine: '== stop: ' + 'é'.repeat(190), abortKind: 'é'.repeat(80), memoryBytes: 1 }, 'é'.repeat(400));
+    expect(big.stop?.lastFle).toBeNull();
+    expect(big.evidence).toBeNull();
+    expect(big.stop?.stopLine).toHaveLength(199);
+    expect(total(big)).toBeLessThanOrEqual(PERF_EXIT_FACTS_MAX_BYTES);
+    const worst = exitFacts({ lastFle: 'a"'.repeat(200), stopLine: '== stop: ' + '"'.repeat(200), abortKind: '\\'.repeat(80), memoryBytes: 0 }, '"'.repeat(400));
+    expect(total(worst)).toBeLessThanOrEqual(PERF_EXIT_FACTS_MAX_BYTES);
+  });
+  it('the longest facts of the engine\'s own text are under the server limit, and pass the checks', () => {
+    const longest = buildBeacon({ ...base, sid: SID, reason: 'exit', state: 'exited', exit: { ...exit, stop: { lastFle: 'fle: ' + 'w'.repeat(400), stopLine: '== stop: ' + 's'.repeat(200), abortKind: 'k'.repeat(80), memoryBytes: 4294967296 }, evidence: 'first non-background pixel ' + 'e'.repeat(400) } });
+    const text = beaconText(longest);
+    expect(text.length).toBeLessThanOrEqual(PERF_MAX_BODY - 512);
+    const back = JSON.parse(text);
+    expect(back.engine.exit.stop.memoryBytes).toBe(4294967296);
+    expect(utf8Length(JSON.stringify({ stop: back.engine.exit.stop, evidence: back.engine.exit.evidence }))).toBeLessThanOrEqual(PERF_EXIT_FACTS_MAX_BYTES);
+    expect(beaconProblems(back)).toEqual([]);
+  });
+  it('the last stage of beaconText: a record that is still too big loses the stop facts and stays under the server limit; a smaller one keeps them', () => {
+    const room = PERF_MAX_BODY - 512;
+    const mk = (pad: number, facts: boolean) => buildBeacon({ ...base, sid: SID, reason: 'exit', state: 'exited', audioDetail: { pad: 'p'.repeat(pad) }, exit: facts ? { ...exit, stop: STOP, evidence: EVIDENCE } : { ...exit } });
+    // the record without the facts is just under the room; with them (about 0.9 KB more) it is over the room, and the stages before the last one cannot make it smaller
+    const pad = room - 10 - JSON.stringify(mk(0, false)).length;
+    expect(beaconText(mk(pad, false)).length).toBeLessThanOrEqual(room);
+    const full = beaconText(mk(pad, true));
+    expect(full.length).toBeLessThanOrEqual(PERF_MAX_BODY);
+    expect(JSON.parse(full).engine.exit).not.toHaveProperty('stop');
+    expect(JSON.parse(full).engine.exit).not.toHaveProperty('evidence');
+    expect(JSON.parse(full).engine.exit.message).toBe(exit.message);
+    expect(JSON.parse(beaconText(mk(0, true))).engine.exit.stop).toEqual(STOP);
+  });
+  it('beaconProblems: the shape, the lengths, the personal parts, and the bytes of the two together', () => {
+    const probs = (x: Record<string, unknown>): string[] => beaconProblems({ v: 3, sid: SID, engine: { present: 'D', updatesObservable: true, state: 'exited', exit: { reason: 'stopped', code: 134, presents: 3, ...x } } }).filter((p) => p.startsWith('engine.exit'));
+    expect(probs({ stop: STOP, evidence: EVIDENCE })).toEqual([]);
+    expect(probs({ stop: { ...STOP, lastFle: null, abortKind: null, memoryBytes: null } })).toEqual([]);
+    expect(probs({ stop: { ...STOP, lastFle: 'x'.repeat(401) } })).toEqual([expect.stringContaining('engine.exit.stop.lastFle: longer than 400')]);
+    expect(probs({ stop: { ...STOP, stopLine: 'y'.repeat(201) } })).toEqual([expect.stringContaining('engine.exit.stop.stopLine: longer than 200')]);
+    expect(probs({ stop: { ...STOP, abortKind: 'k'.repeat(81) } })).toEqual([expect.stringContaining('engine.exit.stop.abortKind: longer than 80')]);
+    expect(probs({ stop: 'x' })).toEqual([expect.stringContaining('engine.exit.stop: not an object')]);
+    expect(probs({ stop: { ...STOP, memoryBytes: 1.5 } })).toEqual([expect.stringContaining('engine.exit.stop.memoryBytes: 1.5 is not a whole number')]);
+    expect(probs({ stop: { ...STOP, title: 'x' } })).toEqual([expect.stringContaining('engine.exit.stop.title: not a field of this block')]);
+    expect(probs({ stop: { ...STOP, lastFle: 'fle: a\nb' } })).toEqual([expect.stringContaining('engine.exit.stop.lastFle: contains a control character')]);
+    expect(probs({ stop: { ...STOP, lastFle: 'fle: open /home/ubuntu/x' } })).toEqual([expect.stringContaining('engine.exit.stop.lastFle: contains a home directory path')]);
+    expect(probs({ evidence: 'mail a@b.cc' })).toEqual([expect.stringContaining('engine.exit.evidence: contains an e-mail address')]);
+    expect(probs({ evidence: 'see https://x/y' })).toEqual([expect.stringContaining('engine.exit.evidence: contains a URL')]);
+    expect(probs({ evidence: 'x'.repeat(401) })).toEqual([expect.stringContaining('engine.exit.evidence: longer than 400')]);
+    expect(probs({ stop: { ...STOP, lastFle: 'a'.repeat(400) }, evidence: '"'.repeat(400) })).toEqual([expect.stringContaining(`more than ${PERF_EXIT_FACTS_MAX_BYTES} bytes together`)]);
+  });
+  it('the stop fixture (tools/perf-beacons/fixtures/stop): records the checks accept, which the summary reads (--exits)', () => {
+    const dir = fileURLToPath(new URL('../../../tools/perf-beacons/fixtures/stop/', import.meta.url));
+    const names = readdirSync(dir).filter((f) => f.endsWith('.json'));
+    expect(names.length).toBeGreaterThanOrEqual(1);
+    const recs = names.map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')) as { t: string; remote: string; perf: unknown });
+    for (const r of recs) {
+      expect(r.t.startsWith('2026-11-24T')).toBe(true);
+      expect(beaconProblems(r.perf)).toEqual([]);
+    }
+    expect(JSON.stringify(recs)).toContain('fle: StopFixture:');
+    const script = fileURLToPath(new URL('../../../tools/perf-beacons/summary.mjs', import.meta.url));
+    const out = execFileSync(process.execPath, [script, dir, '--exits', '--now', '2026-11-24T08:00:00Z'], { encoding: 'utf8' });
+    expect(out).toContain('StopFixture');
+    expect(out).toContain('== stop: SIGABRT (runtime abort, see runtime message)');
+    expect(out).toContain('1114112000');
+    expect(out).toContain('first non-background pixel on a drawing surface');
+    expect(out).toMatch(/答え 1\(Demo 1、\.flp 1、64 KB 以下 0、1 MB 以下 1、16 MB 以下 0、それより大きい 0\)/);
   });
 });
 

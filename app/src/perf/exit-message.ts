@@ -1,6 +1,7 @@
 // The engine's last words, as the measurement beacon carries them (decision 0209): when the engine stops, the beacon's `engine.exit.message` says WHY in the engine's own words ("fle: <api>: <why>", a limit of the
 // harness, an abort's VA name), so that the log of the server can tell which wall the people who use the page run into. The text comes from the lines the engine printed; it is cut to EXIT_MESSAGE_MAX characters and
 // stripped of anything that could name a person or a file of theirs (home directories, user names in paths, file names, e-mail addresses, URLs, IP addresses) BEFORE it leaves the page. Pure: lines in, text out.
+import { PERF_EXIT_EVIDENCE_MAX, PERF_EXIT_KIND_MAX, PERF_EXIT_LAST_FLE_MAX, PERF_EXIT_STOP_LINE_MAX } from '../../shared/perf.ts';
 export const EXIT_MESSAGE_MAX = 400;
 
 /** paths that belong to the virtual machine of the engine (lift/runtime/fle_env.h: C:\Windows, C:\Program Files\Image-Line\...) or to the host's own pseudo files: kept, because they say which module / file the engine asked for */
@@ -39,6 +40,39 @@ export function sanitizeEngineText(text: string, max = EXIT_MESSAGE_MAX): string
 
 const stripStream = (l: string): string => l.replace(/^\[err\] ?/, '');
 const stripFruity = (l: string): string => l.replace(/^fruity: /, '');
+
+/** Issue #1380: the stop report's facts that the message does not keep, as the beacon carries them in engine.exit.stop: the engine's last "fle: " line, the stop line, the abort kind, and the size of the wasm memory at the stop ("wf1:" line) */
+export interface EngineStop { lastFle: string | null; stopLine: string; abortKind: string | null; memoryBytes: number | null }
+
+const STOP_PREFIX = '== stop: ';
+const KIND_PREFIX = 'abort kind: ';
+const EVIDENCE_START = 'first non-background pixel';
+const MEMORY = /linear memory now (\d+) bytes/;
+
+/**
+ * Issue #1380: the stop report's facts, read from the last 2,000 lines (the same window as engineExitMessage). `stop` is null when there is no stop line ("== stop: ...", the harness' report of a stop); `evidence` is the last
+ * "first non-background pixel" line (decision 0126: the engine's evidence of its window, written at the first non-background pixel of a window's surface), with or without the report. Every text goes through sanitizeEngineText with its own length.
+ * Never throws; a line that does not match is ignored.
+ */
+export function engineStopFacts(lines: readonly string[]): { stop: EngineStop | null; evidence: string | null } {
+  const from = Math.max(0, lines.length - 2000);
+  let fle: string | null = null, stop: string | null = null, kind: string | null = null, mem: number | null = null, evidence: string | null = null;
+  for (let i = lines.length - 1; i >= from; i--) {
+    const raw = stripStream(lines[i] as string);
+    const l = stripFruity(raw);
+    let m: RegExpExecArray | null;
+    if (fle === null && l.startsWith('fle: ')) fle = l;
+    if (stop === null && l.startsWith(STOP_PREFIX)) stop = l;
+    if (kind === null && l.startsWith(KIND_PREFIX)) kind = l.slice(KIND_PREFIX.length);
+    if (mem === null && l.startsWith('wf1:') && (m = MEMORY.exec(l))) mem = Number(m[1]);
+    if (evidence === null && raw.startsWith(EVIDENCE_START)) evidence = raw;
+  }
+  const clean = (s: string | null, max: number): string | null => (s === null ? null : sanitizeEngineText(s, max) || null);
+  return {
+    stop: stop === null ? null : { lastFle: clean(fle, PERF_EXIT_LAST_FLE_MAX), stopLine: sanitizeEngineText(stop, PERF_EXIT_STOP_LINE_MAX), abortKind: clean(kind, PERF_EXIT_KIND_MAX), memoryBytes: mem },
+    evidence: clean(evidence, PERF_EXIT_EVIDENCE_MAX),
+  };
+}
 
 export interface ExitFacts { reason: string; code: number; message: string }
 

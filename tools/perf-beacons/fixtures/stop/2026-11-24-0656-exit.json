@@ -1,0 +1,44 @@
+{
+  "t": "2026-11-24T06:56:00.000Z",
+  "remote": "workers",
+  "perf": {
+    "v": 3,
+    "seq": 7,
+    "sid": "5a0f1e2d3c4b",
+    "reason": "exit",
+    "pageMs": 412345.6,
+    "visibility": "visible",
+    "browser": { "hardwareConcurrency": 8, "deviceMemoryGB": 8, "userAgent": "Fixture/1.0", "screen": { "width": 1920, "height": 1080 }, "devicePixelRatio": 1.75, "crossOriginIsolated": true, "isSecureContext": true, "webglRenderer": null, "jsHeap": null },
+    "bundle": { "name": "fixture", "version": "d7a6e6f392f2", "engineKind": "emscripten-fruity-v1" },
+    "engine": {
+      "present": "D",
+      "updatesObservable": true,
+      "state": "exited",
+      "exit": {
+        "reason": "stopped",
+        "code": 134,
+        "presents": 3,
+        "message": "fle: StopFixture: the last fle line of a stop (synthetic fixture)",
+        "stop": {
+          "lastFle": "fle: StopFixture: the last fle line of a stop (synthetic fixture)",
+          "stopLine": "== stop: SIGABRT (runtime abort, see runtime message)",
+          "abortKind": "fle_stop (a runtime message that names an API and the reason)",
+          "memoryBytes": 1114112000
+        },
+        "evidence": "first non-background pixel on a drawing surface (decision 0126): written by fixture into the surface of top-level window lid 3; function entries since the program began: 0"
+      }
+    },
+    "error": null,
+    "timeline": { "download_start": 120, "idle": 9800, "exit": 412000 },
+    "startup": { "firstIdleSeconds": 9.8, "targetSeconds": 10 },
+    "ui": { "updates": { "total": 300, "recent10s": { "n": 10, "intervalMedianMs": 8, "intervalP95Ms": 9, "perSecond": 120 } }, "engineIdles": { "total": 40, "recent10s": { "n": 5, "intervalMedianMs": 16, "intervalP95Ms": 20, "perSecond": 60 } }, "targetUpdatesPerSecond": 120 },
+    "input": { "sent": 12, "processed": 12, "dropped": 0, "pending": 0, "answered": 12, "late": 0, "noAnswer": 0, "targetP95Ms": 17, "eventToRaf": { "n": 12, "p50Ms": 22, "p95Ms": 31, "maxMs": 40, "lastMs": [22, 31] }, "listenerToPut": { "n": 12, "p50Ms": 6, "p95Ms": 9, "maxMs": 11, "lastMs": [6, 9] }, "lateVisible": null, "eventToRafWithLate": null, "stages": null },
+    "audio": { "underruns": null },
+    "memory": { "wasmBytes": 1114112000, "wasmLimitBytes": 2147483648, "wasmFraction": 0.5188 },
+    "client": null,
+    "display": null,
+    "hz": null,
+    "guestScreen": { "mode": "fit", "source": "default", "follow": "live", "width": 1920, "height": 1080, "dpi": null, "dpr": 1.75, "roomWidth": 1500, "roomHeight": 800, "reported": true },
+    "files": { "v": 1, "opens": 1, "pick": { "files": 0, "folder": 0, "zip": 0 }, "drop": { "files": 0, "folders": 0, "zips": 0 }, "written": 2, "skipped": 0, "failed": 0, "writtenMiB": 1, "extract": { "zips": 0, "files": 0, "cancelled": 0 }, "download": { "file": 0, "folderZip": 0 }, "ops": { "mkdir": 0, "rename": 0, "delete": 0, "copy": 0, "move": 0 }, "persist": { "asked": 0, "granted": 0, "denied": 0, "pending": 0 }, "storage": { "usedMiB": 1, "quotaMiB": 10240, "persisted": false }, "engine": { "open": 1, "save": 0, "folder": 0, "answered": 1, "cancelled": 0, "zipUnpacked": 0, "savedBack": 0, "savedBackFailed": 0, "answeredUnderDemo": 1, "answeredFlp": 1, "answeredBytes": { "k64": 0, "m1": 1, "m16": 0, "more": 0 } }, "fail": {} }
+  }
+}

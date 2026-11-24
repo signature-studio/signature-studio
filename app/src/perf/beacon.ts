@@ -4,8 +4,8 @@
 import type { BrowserInfo, ClientInfo } from './browser-info.ts';
 import type { DisplaySnapshot, HzInfo } from './display.ts';
 import { TARGETS, WASM_MEMORY_LIMIT_BYTES, type InputLatencyStats, type IntervalStats } from './stats.ts';
-import { PERF_PATH, PERF_MAX_BODY, PERF_STORED_HEADER, PERF_UI_CLASS_MAX, PERF_UI_WINDOWS_MAX } from '../../shared/perf.ts';
-import { sanitizeEngineText } from './exit-message.ts';
+import { PERF_PATH, PERF_MAX_BODY, PERF_STORED_HEADER, PERF_UI_CLASS_MAX, PERF_UI_WINDOWS_MAX, PERF_EXIT_EVIDENCE_MAX, PERF_EXIT_FACTS_MAX_BYTES, PERF_EXIT_KIND_MAX, PERF_EXIT_LAST_FLE_MAX, PERF_EXIT_STOP_LINE_MAX, utf8Length } from '../../shared/perf.ts';
+import { sanitizeEngineText, type EngineStop } from './exit-message.ts';
 import type { GuestScreenInfo } from '../ui/screen-fit.ts';
 import type { FilesUsage } from '../files/usage.ts';
 import type { AssetsReport } from '../bundle/assets-report.ts';
@@ -20,6 +20,8 @@ export const BEACON_MAX_PERIODIC = 20;
  * flat `input.n / p50Ms / p95Ms / maxMs / lastMs` of versions 1 and 2 (listener -> putImageData) are gone from `input`, so that nothing reads the old definition as the new one. `input.stages` says where the time goes.
  * Still 3 (decision 0209): `engine.exit.message` is an OPTIONAL string added to the existing `engine.exit` object (the engine's last words, at most 400 characters, personal parts removed: exit-message.ts). A version 3 reader that
  * does not know it ignores it (the server stores the object as it is; shared/perf.ts beaconProblems checks the field only when it is there), and a record without it is a record of the engine before this change. * Still 3 (Issue #1364): `uiWindows` is an OPTIONAL array of the top-level windows of the engine's window table (class name and size, at most 8, the front first; no title, no position). The page works out no scale: the size of the FL window against the device pixel ratio is read from the records. Absent: the log has no window table yet (a record from before this change). * Decision 0205 (still version 3: it has not been deployed): the answer is the frame posted in the processing window; `input.answered / late / noAnswer` count the processed inputs by how they were answered, and an input with no answer is not in the percentiles.
+ * Still 3 (Issue #1380): `engine.exit.stop` (the stop report's facts: lastFle, stopLine, abortKind, memoryBytes) and `engine.exit.evidence` (the first non-background pixel line) are OPTIONAL, added to `engine.exit`; `files.engine` gets the
+ * answers' kinds (`answeredUnderDemo`, `answeredFlp`, `answeredBytes`: counts only). A record without them is a record from before this change.
  */
 export const BEACON_VERSION = 3;
 
@@ -34,7 +36,7 @@ export interface BeaconPayload {
   visibility: string | null;
   browser: BrowserInfo;
   bundle: { name: string | null; version: string | null; engineKind: string | null };
-  engine: { present: 'D'; updatesObservable: true; state: string; exit: { reason: string; code: number; presents: number; /** decision 0209: the engine's last words (at most 400 characters, no paths or names); absent: none printed, or a record from before this field */ message?: string } | null };
+  engine: { present: 'D'; updatesObservable: true; state: string; exit: { reason: string; code: number; presents: number; /** decision 0209: the engine's last words (at most 400 characters, no paths or names); absent: none printed, or a record from before this field */ message?: string; /** Issue #1380: the stop report's facts (exit-message.ts engineStopFacts); absent: the log has no stop line */ stop?: EngineStop; /** Issue #1380: the first non-background pixel line (decision 0126); absent: none printed */ evidence?: string } | null };
   error: { what: string; where: string } | null;
   /** instants of the start-up in ms since the navigation started (window.__app.timeline) */
   timeline: Record<string, number>;
@@ -116,7 +118,7 @@ export interface BeaconInput {
   seq: number; sid?: string; reason: BeaconReason; pageMs: number; visibility: string | null; browser: BrowserInfo;
   bundle: { name: string | null; version: string | null; engineKind: string | null };
   state: string;
-  exit: { reason: string; code: number; presents: number; message?: string | null } | null;
+  exit: { reason: string; code: number; presents: number; message?: string | null; /** Issue #1380 */ stop?: EngineStop | null; evidence?: string | null } | null;
   error: { what: string; where: string } | null;
   timeline: Record<string, number>;
   updates: { total: number; recent: IntervalStats };
@@ -144,10 +146,29 @@ export interface BeaconInput {
   uiWindows?: UiWindow[] | null;
 }
 
-/** the `engine.exit` object: the message goes through the same cleaning as when the page chose it (idempotent), so that no caller can send a path or a name by passing a raw string */
+/** the `engine.exit` object: the message goes through the same cleaning as when the page chose it (idempotent), so that no caller can send a path or a name by passing a raw string; the stop facts likewise (exitFacts) */
 function exitBlock(e: NonNullable<BeaconInput['exit']>): NonNullable<BeaconPayload['engine']['exit']> {
   const message = typeof e.message === 'string' ? sanitizeEngineText(e.message) : '';
-  return { reason: e.reason, code: e.code, presents: e.presents, ...(message !== '' ? { message } : {}) };
+  const facts = exitFacts(e.stop ?? null, typeof e.evidence === 'string' ? e.evidence : null);
+  return { reason: e.reason, code: e.code, presents: e.presents, ...(message !== '' ? { message } : {}), ...(facts.stop ? { stop: facts.stop } : {}), ...(facts.evidence ? { evidence: facts.evidence } : {}) };
+}
+
+/**
+ * Issue #1380: the stop facts as the beacon carries them. Every text is cleaned here, each at its own length. Together, as JSON, they take at most PERF_EXIT_FACTS_MAX_BYTES bytes: over that, the last "fle: " line goes first, then the
+ * evidence (the stop line, the kind and the memory are short; they stay).
+ */
+export function exitFacts(stop: EngineStop | null, evidence: string | null): { stop: EngineStop | null; evidence: string | null } {
+  let s: EngineStop | null = stop === null ? null : {
+    lastFle: stop.lastFle === null ? null : sanitizeEngineText(stop.lastFle, PERF_EXIT_LAST_FLE_MAX),
+    stopLine: sanitizeEngineText(stop.stopLine, PERF_EXIT_STOP_LINE_MAX),
+    abortKind: stop.abortKind === null ? null : sanitizeEngineText(stop.abortKind, PERF_EXIT_KIND_MAX),
+    memoryBytes: stop.memoryBytes,
+  };
+  let ev: string | null = evidence === null ? null : sanitizeEngineText(evidence, PERF_EXIT_EVIDENCE_MAX);
+  const over = (): boolean => utf8Length(JSON.stringify({ stop: s, evidence: ev })) > PERF_EXIT_FACTS_MAX_BYTES;
+  if (over() && s) s = { ...s, lastFle: null };
+  if (over()) ev = null;
+  return { stop: s, evidence: ev || null };
 }
 
 export function buildBeacon(i: BeaconInput): BeaconPayload {
@@ -185,7 +206,17 @@ export function beaconText(p: BeaconPayload, max = PERF_MAX_BODY - 512): string 
   const thin = p.display ? { ...p.display, raf: { ...p.display.raf, sinceIdle: null, total: { ...p.display.raf.total, bins: [] }, recent10s: { ...p.display.raf.recent10s, bins: [] } }, canvas: p.display.canvas ? { ...p.display.canvas, sinceIdle: null } : null } : null;
   s = JSON.stringify({ ...p, display: thin, browser: { ...p.browser, userAgent: p.browser.userAgent.slice(0, 80), webglRenderer: p.browser.webglRenderer?.slice(0, 60) ?? null }, error: p.error ? { what: p.error.what.slice(0, 100), where: p.error.where.slice(0, 60) } : null });
   if (s.length <= max) return s;
-  return JSON.stringify({ ...p, display: thin, timeline: {}, input: { ...p.input, eventToRaf: { ...p.input.eventToRaf, lastMs: p.input.eventToRaf.lastMs.slice(-5) }, listenerToPut: { ...p.input.listenerToPut, lastMs: p.input.listenerToPut.lastMs.slice(-5) }, lateVisible: p.input.lateVisible ? { ...p.input.lateVisible, lastMs: p.input.lateVisible.lastMs.slice(-5) } : null, eventToRafWithLate: p.input.eventToRafWithLate ? { ...p.input.eventToRafWithLate, lastMs: p.input.eventToRafWithLate.lastMs.slice(-5) } : null }, error: null });
+  const lean = { ...p, display: thin, timeline: {}, input: { ...p.input, eventToRaf: { ...p.input.eventToRaf, lastMs: p.input.eventToRaf.lastMs.slice(-5) }, listenerToPut: { ...p.input.listenerToPut, lastMs: p.input.listenerToPut.lastMs.slice(-5) }, lateVisible: p.input.lateVisible ? { ...p.input.lateVisible, lastMs: p.input.lateVisible.lastMs.slice(-5) } : null, eventToRafWithLate: p.input.eventToRafWithLate ? { ...p.input.eventToRafWithLate, lastMs: p.input.eventToRafWithLate.lastMs.slice(-5) } : null }, error: null };
+  s = JSON.stringify(lean);
+  if (s.length <= max) return s;
+  // Issue #1380: the last stage: the engine's stop facts (engine.exit.stop, engine.exit.evidence, about 1.2 KB at most) go, so that the record stays under the server's limit
+  return JSON.stringify({ ...lean, engine: { ...p.engine, exit: exitWithoutFacts(p.engine.exit) } });
+}
+
+/** Issue #1380: the `engine.exit` block without its stop facts (the last stage of beaconText) */
+function exitWithoutFacts(e: BeaconPayload['engine']['exit']): BeaconPayload['engine']['exit'] {
+  if (!e) return e;
+  return { reason: e.reason, code: e.code, presents: e.presents, ...(e.message !== undefined ? { message: e.message } : {}) };
 }
 
 export interface SendResult { ok: boolean; status: number | null; stored: boolean | null; note: string }
