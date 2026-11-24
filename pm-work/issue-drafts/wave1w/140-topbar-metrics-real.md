@@ -55,6 +55,26 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
   - #1354(`pm-work/findings/dpi240-stop-1354.md`): バイト表の飛び(`jmp rax` を `fle_dispatch(R[0]); return;` にした形)が、入れ子の呼び出しの閉路になり、JS のスタックを超えた。直し方は表の注釈(`DSP_IPPV2_2000000`)と、種ファイルの 7 件の削除。同じ記録の §9 の末尾に、未確認の候補が 1 つ残る(`lift/harness/seeds/dsp-ippv2-2000000-seeds-idle1.txt` の `0x27afb9a`〜`0x27afc99` の 8 件)。
   - 前回の trap も、同じ型(閉路の入れ子)かもしれない(未確認。次の「やること」の 2〜3 で確かめる)。
 
+## 2 回目の試行で分かったこと
+
+- 2 回目: run 45421839235(15:08〜19:09 UTC)。判定(judge)は、外部プラグインのインストーラの検査で落ちた(`fe-build bundle` の段。この作業のラベルに `plugin-external` は無く、インストーラが無い)。この検査は main の commit `4d73666a` で直した(インストーラが 1 つも無ければ、外部プラグインを bundle から省く)。作業者の自己判定は「差し戻し」(計測の値が無効)。
+- 作業は commit されたが push されていない(判定で落ちたため)。差分は保存されている(`work.diff`・`report.md`・`pm-work/findings/topbar-metrics-1391.md`)。次の試行は、これを取り込んで続ける。
+- trap の原因(特定し、直した。`lift/crates/fe-decode`。環境変数・オプトインは作らない):
+  - 1 回目の trap: K32 の行で `GetProcAddress("K32GetProcessMemoryInfo")` が非 0 の擬似 VA を返すと、遅延読み込みの wrapper(x86 0x426570)が `call [0x13a9768]` で `.data` の枠を呼ぶ。この枠の初期値(PE の中)は wrapper 自身。リフトは書き込み可能な領域の初期値を定数とみなし、`call 12660`(自分自身への直接呼び出し)にした。その再帰が、GetProcAddress の 1,700 回の後に JS の枠を尽かせた。
+  - 直した点: 書き込み可能な領域の内容は定数としない(`dataflow::read8`。`indirect.rs` の `read_u64` も同じ読み)。その間接呼び出しは実行時の振り分け(`fle_dispatch`)で解決する。関数の探索は従来の読みで行う(`with_writable_reads`)。jmp の先が書き込み可能な領域から見つかった時は、関数の入口として登録する。
+  - 2 回目の trap(`fle: indirect call to 0x407310 is not a known function entry`): 0x407310 は遅延読み込み import(`kernel32.dll GetLogicalProcessorInformation`)の stub。上の jmp の探索で、入口として登録される。
+  - 採らなかった案: 遅延 import の表(Delay Import Directory)を名前付きの import として読む(`fe-pe`)。名前付きが 57 件になるが、TABLE に無い名前の 28 件の thunk を fe-wasmgen が出せず、`hybrid-n0` で engine のビルドが止まった。取り消した。`fe-pe` は main の版のまま。
+  - 新しい型の trap: 静的に解決された間接呼び出し(書き込み可能な領域の初期値)の自己呼び出し。#1354 の 3 分類(バイト表の閉路・切り替え・擬似 VA の再帰)のどれでもない。
+- 実測(runner の値。nproc 4、loadavg 1.3〜2.5。この機械とは別枠):
+  - engine は 5 回作り直した(1 回約 27 分)。`balance`: listed 12282・emitted ok 12282。
+  - `boot-bundle.mjs`: engine-idle・standIn false・error null・elapsedMs 9160。
+  - `welcome-flow.mjs`(流れ A〜D): trapped false・hostErrors 0・最大 elapsedMs 8774。
+  - `npm test --prefix app`: 通った。
+  - `measure.mjs`: error null で完了したが、値は無効。`panelMb` 500 は、設定の窓の候補(50・250・500 MB)の最頻値で、上部バーの値ではない。`cpu.idlePct`・`cpu.playingPct`・`cpu.busyPct` は null。Frame Rate の表示値(`shown`)は未読み取り。エンジンの提示は、無操作 0.999/s、再生中 11.74/s(DPR 1 で 11.49、DPR 2.81 で 11.865)。
+  - 計測の bundle は、外部プラグインの 1 行を外して手で作った(診断用。受け入れの bundle ではない)。
+- 間接呼び出しの内訳: 直した後の実物で、`call:unresolved` が 6,490 件。変更の前との差は、まだ取れていない(下の「やること」の 2)。
+- 書き込み可能な領域の読みを変えたので、内蔵・外部のプラグインの lift にも効く。その影響は、まだ確かめていない(下の「やること」の 4)。
+
 ## 背景
 
 依頼者の画面では、上部バーの Memory Usage と CPU Load が 0MB のまま。Frame Rate は 120 で固定。CPU Load History のグラフには、それらしい値が出ている。数値の出どころを、次の事実から確かめる。
@@ -91,30 +111,14 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
 
 ## やること
 
-0. 呼び出しの記録(直す前): 前回の試行で済み。結果は「前回の試行で分かったこと」に書いた。
-1. **trap の切り分け**(既定プロジェクトを開いた直後の trap を比べる。版ごとにビルドは 1 回):
-   - 版 1(基準): `TABLE` の行を消した版。前回の、行を足さない版(一時のトレースを含む)では trap しなかった。必要なら作り直す。
-   - 版 2: 行は残し、`fle_imp_K32GetProcessMemoryInfo` の中身を `R[0] = 0; return;` にした版(FL は呼ぶが、値は無い)。
-   - 版 3: 行を残し、実装を入れた版(前回の差分)。②の診断は、この版で取る。
-   - 読み: 版 2 も trap する → 値ではなく、擬似 VA を受けた後の FL の経路が原因。版 2 は trap せず、版 3 だけ trap する → 関数の中の処理(計上の値や、呼び出し先)が原因。
-2. **スタックの溢れの場所を特定する**(版 3 で。**製品に新しい環境変数・`#ifdef` を足さない**。診断は一時的で、commit しない):
-   - trap の時の JS のスタックを、枠の先頭 40 枠と末尾 40 枠で出す。`Error.stackTraceLimit` を大きくして取る(方法は `pm-work/findings/dpi240-stop-1354.md` の §7)。`app/src/engine/worker.ts` の `startFruity` は `result.message` を 1200 字で切って送るので、診断では全部を出す。
-   - wasm の枠(`wasm-function[N]`)は `lift/out-app/gen/wasm-func-names.tsv` の index 列で名前を引く(#1354 と同じ)。C の枠(`fle_dispatch` など)はそのまま読む。
-   - 繰り返す閉路(周期と回数)を特定し、その閉路が次のどれかで分ける:
-     (i) `fle_dispatch` と、`fle_dispatch(R[0]); return;` の飛び元の関数(`f_…`)→ バイト表の閉路(#1354 と同じ型)。
-     (ii) `fle_progress_slice`・`fle_loop_slice`・スレッドの切り替えを含む → 切り替えの経路(#{{149}} の領域)。
-     (iii) `fle_dispatch` と `fle_imp_*` や擬似 VA の応答だけ → 擬似 VA の呼び出しの再帰。
-3. **同じ型の閉路が、他に無いか**: `lift/out-app/gen/src/*.c` で `fle_dispatch(R[0]); return;` の数を数える(注釈の無い `jmp reg` の飛び)。注釈された表は今 `DSP_IPPV2_2000000` の 1 件だけ。種ファイルの `0x27afb9a`〜`0x27afc99`(8 件)は、別の表の候補(未確認)。
-4. **直す**: 閉路を断つ。製品の既定の動作として入れる(新しい環境変数・オプトインは作らない)。#1354 と同じ方式(表の注釈と、`goto` による飛び先の切り替え。種ファイルの該当件を消す)か、閉路をループにする。**閉路を隠す回避(深さの上限、要素数の抑え、関数の置き換え)は、制約により採らない**(`pm-work/findings/dpi240-stop-1354.md` の §5)。
-5. **Memory Usage**(元の ④): trap が無くなった後、`memory.panelMb` が 0 より大きく、ページ側の実測(`WebAssembly.Memory` の大きさの和)の ±50% に入る(`memory.ratio` が 0.5〜1.5)。候補は、上部バーの領域に絞って読む。
-6. **CPU Load と Frame Rate**(元の ⑤。④の後)。式はまだ確定していない。確かめた事実は「前回の試行で分かったこと」にある。次に確かめること:
-   - CPU: FL が名前で引く経路は見えていない。「0」の近くの値が、時計(GetTickCount・QueryPerformanceCounter の差)のどれと結び付くかを、トレースで確かめる。
-   - Frame Rate: 「120」の出どころ(DwmFlush の回数の 2 倍か)を、DwmFlush の呼び出しの戻り番地から確かめる。定義は「提示の回数 ÷ 実時間」なので、`presentsPerSec` と比べる。
-   - 500 ms の処理(0x866f90)の仮想呼び出しの先を、トレースで確かめる。
-   - 式と、FL がどの値をどう計算するかを、確かめた順に本文に書き足す。確かめられない物は「未確認」と書く。
-   - 仮想の時計(決定 0122)を変える時は、起動と音声への影響を測り、報告に書く。表示のための数字だけを、実時間で割る形もある(時計の挙動は変えない)。どちらを選ぶかは、測定の結果で決める。
-7. 数える処理は、音声を止めない(P3)。数えるのは、既存の情報(busyMs・presents)だけ。新しい周期の処理を増やさない。
-8. 測定の道具 `tools/topbar-metrics/measure.mjs`(前回の差分に在る。作業ツリーで確かめる)。Playlist を再生する版と、無操作の版の 2 つを取る。Frame Rate は、DPR 1 と、乱数の DPR(1.01〜3.00)の 2 点で取る。ページの rAF の数は、道具の中だけで連続に数えてよい(製品は、既定の burst のまま。決定 0202)。stdout に JSON を 1 行(`rafPerSec` を含むが、判定には入れない)。`panelMb`・`shown` の読みは、まだ確定していない(前回の試行で分かったこと、を見る)。
+0. 切り分けと閉路の特定(旧 1〜4)は、2 回目の試行で済んだ(上の「2 回目の試行で分かったこと」)。次の順で行う。
+1. **取り込みと単体試験**: 前回の差分(`.prior-work.md`・保存された差分)を載せ、`cargo test -p fe-decode` が通ることを確かめる。`fe-pe` は main の版のまま(遅延 import の読みは入れない)。
+2. **間接呼び出しの内訳**(変更の前後): 実物の DLL に対し、HEAD(変更の前)と作業ツリー(変更の後)で `fe-lift` の出力を取り、`call:unresolved`・`jmp:unresolved`・見つけた関数の数・`not a known function entry` の件数を、表にして報告に書く。
+3. **trap が消えたこと・K32 が呼ばれたこと・Memory Usage**: engine を作り直し、既定プロジェクトを開いて、K32 の入口に入ったことを一時の trace で確かめる(製品に残さない)。`measure.mjs` の `panelMb` は、上部バーの矩形(「判定の基準」を見る)に限って読む。設定の窓の候補は除く。道具 `tools/topbar-metrics/measure.mjs`(前回の差分に在る)は、無操作の版と再生の版の 2 つ、DPR 1 と乱数の DPR の 2 点を取る。
+4. **他の lift への影響**: `cargo test --workspace`(fe-decode・fe-pe・fe-lift・fe-wasmgen)を通す。起動確認(`boot-bundle.mjs`)、流れ A〜D(`welcome-flow.mjs`)、`npm test --prefix app` を、変更の前後で比べ、同じ結果であることを報告に書く。外部プラグインの instantiate(`tools/plugin-run/measure.mjs`)は、インストーラの無い job では確かめられない。その時は報告に「確認できない」と書く。
+5. **CPU Load と Frame Rate**(元の 6。式は未確定): CPU は、FL が名前で引く経路を呼び出しの記録で確かめる(GetTickCount・QueryPerformanceCounter の差か)。Frame Rate は、「120」の出どころを DwmFlush の戻り番地から確かめる。判定は `presentsPerSec` と比べる。確かめた順に本文に書き足す。確かめられない物は「未確認」と書く。
+6. **音声の保護**(P3): 数えるのは、既存の情報(busyMs・presents)だけ。新しい周期の処理を増やさない。仮想の時計(決定 0122)は変えない。
+7. **受け入れ**: 上の「受け入れ」のコマンドを、元のまま通す。
 
 ## 受け入れ
 
@@ -124,6 +128,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 判定の基準(`tools/topbar-metrics/measure.mjs` の JSON の項目):
 - `error`: null。
+- 注: 前回の道具の `panelMb` は、設定の窓の候補(50・250・500 MB)を含むので無効。上部バーの矩形に限って読む(「やること」の 3)。
 - `memory.panelMb`: 上部バーの Memory Usage の値(MB。0 より大きい)。`memory.pageBytes`: ページ側の実測(`WebAssembly.Memory` の大きさの和)。`memory.ratio` = `panelMb` × 1,048,576 ÷ `pageBytes`。0.5 以上 1.5 以下。
 - `cpu.idlePct`: 無操作の時の CPU Load(%)。`cpu.playingPct`: Playlist を再生している時の CPU Load(%)。`cpu.busyPct`: 再生の時の Worker の忙しい時間の実測(%。Worker の計測。FL の表示とは別の経路)。判定: `playingPct` が `idlePct` より 1 ポイント以上大きい、かつ `|playingPct − busyPct|` が 10 ポイント以下。
 - `fps.samples`: 2 点(DPR 1 と乱数の DPR)。各点: `dpr`・`shown`(上部バーの Frame Rate の値)・`rafPerSec`(ページの rAF の数 ÷ 秒。同じ区間。JSON に出すが、判定には入れない)・`presentsPerSec`(engine の提示の増分 ÷ 秒。同じ区間)。判定: 各点で、`shown` が数値、`presentsPerSec` が 0 より大きい数値で、`|shown − presentsPerSec|` が `presentsPerSec` の 15% 以内。2 点とも 120 ではない、という条件は満たさなくてもよいが、2 点とも 120 なら不合格(`!s.every((x)=>x.shown===120)`)。
@@ -158,7 +163,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
-- blocked_by: #{{139}}(マウスカーソル段 1。同じ engine から page への通知の経路を使うので、直列にする)。
+- #{{139}}(マウスカーソル段 1)とは並行(依存は無い)。同じ engine から page への通知の経路を使うので、「他の Issue との重なり」の規則で解く。
 - #1351(P2 の描画の費用。Frame Rate が低いと出た時の原因の側。この Issue では扱わない)。
 - #{{138}}・#{{144}} とは、直列の順(138 → 139 → 144・140)。
 - 起動の間欠の停止(#{{149}})で、流れ A〜D・起動確認が落ちたら、報告に書いて、commit して終える。再試行で続く。この Issue の依存には足さない。
