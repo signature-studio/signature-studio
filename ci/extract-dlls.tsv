@@ -184,5 +184,5 @@ Transistor Bass_x64.dll	plugins/Plugins/Fruity/Generators/Transistor Bass/Transi
 Wasp XT_x64.dll	plugins/Plugins/Fruity/Generators/Wasp XT/Wasp XT_x64.dll	561fd51a85f390c6e4753e92fe556894b91073b32d2f6194e6fb2bca26d79e5d
 Wasp_x64.dll	plugins/Plugins/Fruity/Generators/Wasp/Wasp_x64.dll	561fd51a85f390c6e4753e92fe556894b91073b32d2f6194e6fb2bca26d79e5d
 Wave Traveller_x64.dll	plugins/Plugins/Fruity/Generators/Wave Traveller/Wave Traveller_x64.dll	5b3c10affd99582514f9ccef55aa65f162d2e8bdfe3ac545ab5026c1d8a2d7d5
-# 2026-11-25 (#1395): ILSvg_x64.dll, the language DLL of the installer (1,504,256 B). Extracted to the host tree only; not lifted. When lift/plugins/ilsvg/plugin.tsv adds it, remove this row (the same DLL in two rows is extracted twice).
-ILSvg_x64.dll	Shared/ILSvg_x64.dll	92f76fefa88a8a70446492dc755324d2338bf382e11518e6f17d798f11342ba0
+# 2026-11-25 (#1395): ILSvg_x64.dll, the language DLL of the installer (1,504,256 B). Extracted to lift/out-plugins/ (the place the plugin段 of fe-build reads: plugins.rs host_file); not lifted. When lift/plugins/ilsvg/plugin.tsv adds it, remove this row (the same DLL in two rows is extracted twice).
+ILSvg_x64.dll	lift/out-plugins/ilsvg_x64.dll	92f76fefa88a8a70446492dc755324d2338bf382e11518e6f17d798f11342ba0
