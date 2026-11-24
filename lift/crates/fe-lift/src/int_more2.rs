@@ -274,6 +274,12 @@ fn jcxz(i: &Instruction, entries: &BTreeSet<u64>) -> Lift {
     super::need(i.op_count() == 1 && super::is_near(i), "jcxz operand must be a near target")?;
     let t = i.near_branch_target();
     let cond = if i.mnemonic() == Mnemonic::Jecxz { "(uint32_t)R[1] == 0" } else { "R[1] == 0" };
-    let go = if entries.contains(&t) { format!("{{ f_{t:x}(); return; }}") } else { format!("goto L_{t:x};") };
+    let go = if entries.contains(&t) {
+        format!("{{ f_{t:x}(); return; }}")
+    } else if t <= i.ip() {
+        format!("{{ fle_loop_tick(); goto L_{t:x}; }}")
+    } else {
+        format!("goto L_{t:x};")
+    };
     Ok((if i.mnemonic() == Mnemonic::Jecxz { "jecxz" } else { "jrcxz" }, format!("if ({cond}) {go} ")))
 }

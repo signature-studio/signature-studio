@@ -89,6 +89,9 @@ uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
 #define FLE_PREEMPT_SLICE_DISPATCHES 4096u   /* S-vclock-slice-progress */
 #define FLE_PREEMPT_SLICE_TICKS      2500u   /* S-vclock-slice-time: 0.25 ms of 100 ns ticks, so 4096 indirect calls = 0.25 ms, about 61 ns each (decision 0279; decision 0147 chose 10000u = 1 ms = 244 ns, 2.13 times the 114 ns the lifted mixer measured per indirect call in decision 0275) */
 #define FLE_PREEMPT_MAX_DEPTH        1u      /* S-vclock-depth */
+/* #1352: a back edge of the lifted code (fle_loop_tick, fle_dispatch.h) is a scheduler point every FLE_LOOP_SLICE_BACKEDGES back edges from the first CreateThread on. Unlike a slice it moves no
+ * clock (the clock is the indirect calls' progress, decision 0147), and the rule for a callback is the same (no switch at a depth above FLE_PREEMPT_MAX_DEPTH; the audio device is refilled there). */
+#define FLE_LOOP_SLICE_BACKEDGES     1024u
 
 typedef struct {
     int armed;                     /* the first CreateThread has happened and FLE_PREEMPT is not 0 */

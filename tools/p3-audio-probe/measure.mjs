@@ -2,7 +2,7 @@
 // Usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] > probe.json
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
-// --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
+// --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
 // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -89,7 +89,7 @@ async function main() {
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
-    screenDevicePx: null, dpr: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
+    screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
   };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-p3-probe-'));
   const assets = path.join(root, 'assets');
@@ -150,7 +150,7 @@ async function main() {
     out.standIn = await ev("document.body.innerText.includes('STAND-IN')");
     log('engine-idle', { ms: Date.now() - navAt });
     if (boot) {
-      await bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle);
+      await bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, sessionId);
       return;
     }
     const before = await audioNow();
@@ -213,13 +213,14 @@ async function main() {
 }
 
 // --boot (#1334): the one press that starts the AudioContext comes --press-at seconds after engine-idle (default 0; the status line, as startAudio does; no guest event). The window is t0+10 s to t0+70 s: nothing is sent to the guest in it, and the reads are taken at its two ends. The read at t0+90 s (bootLast60sAt90s: the last 60 s are t0+30 s to t0+90 s, past the start-up peak) comes after the one at +70 s.
-async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle) {
+async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, pageSession) {
   const engine = await engineWorker(cdp, workers);
   if ((tracePath !== null || profilePath !== null) && engine === null) throw new Error('no engine Worker with fleAudioWorkerState (--trace and --profile need it)');
   const stop = { done: false };
   const trace = tracePath !== null ? traceLoop(audioNow, cdp, engine, tIdle, stop) : null;
   try {
     if (profilePath !== null) await profileStart(cdp, engine);
+    if (profilePath !== null) await profileStart(cdp, pageSession);
     out.pressAtMs = Math.round(pressAt * 1000);
     const press = async () => {
       await sleepUntil(tIdle + out.pressAtMs);
@@ -256,7 +257,9 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle) 
     out.maxRefillStallMs = await enginePublishGap(cdp, workers);
     log('boot window', { at10, at70, at90, last60sAt10s: out.bootLast60sAt10s, last60sAt70s: out.bootLast60sAt70s, last60sAt90s: out.bootLast60sAt90s, quantaDelta: out.quantaDelta, maxRefillStallMs: out.maxRefillStallMs, ctxState: d90.ctxState });
     if (profilePath !== null) await profileStop(cdp, engine, profilePath);
+    if (profilePath !== null) await profileStop(cdp, pageSession, mainProfilePath(profilePath));
     out.profile = profilePath;
+    out.profileMain = profilePath === null ? null : mainProfilePath(profilePath);
   } finally {
     stop.done = true;
     if (trace) await trace;
@@ -299,6 +302,12 @@ async function profileStart(cdp, engine) {
   await timed(cdp.send('Profiler.enable', {}, engine), CDP_TIMEOUT_MS, 'Profiler.enable');
   await timed(cdp.send('Profiler.setSamplingInterval', { interval: PROFILE_INTERVAL_US }, engine), CDP_TIMEOUT_MS, 'Profiler.setSamplingInterval');
   await timed(cdp.send('Profiler.start', {}, engine), CDP_TIMEOUT_MS, 'Profiler.start');
+}
+
+// --profile (#1352): the page's main thread is profiled over the same window, to FILE with ".main" before its extension
+function mainProfilePath(file) {
+  const e = path.extname(file);
+  return file.slice(0, file.length - e.length) + '.main' + e;
 }
 
 async function profileStop(cdp, engine, file) {

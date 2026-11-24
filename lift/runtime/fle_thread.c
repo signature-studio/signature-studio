@@ -802,6 +802,25 @@ void fle_progress_slice(void)
     if (schedule_ex(1)) pst.switches++;
 }
 
+/* #1352: the scheduler point of a back edge of the lifted code (fle_loop_tick, fle_dispatch.h). The same rule as fle_progress_slice, but no virtual time moves: a loop that makes no indirect call
+ * advances nothing (the clock moves with the progress of the indirect calls), so only the threads whose time has come are woken. Inside a callback no switch happens, and the audio device is
+ * refilled there as at a slice (fle_audio_poll_in_callback). */
+void fle_loop_slice(void)
+{
+    thr *t;
+
+    fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
+    if (!preempt_armed || nthr < 2) return;
+    t = &T[cur];
+    if (t->state != T_RUNNING) return;
+    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
+        if (fle_audio_poll_in_callback) fle_audio_poll_in_callback();
+        return;
+    }
+    t->state = T_READY;
+    schedule_ex(1);
+}
+
 void fle_thread_preempt_stats(fle_preempt_stats *out)
 {
     *out = pst;
@@ -815,6 +834,7 @@ static void preempt_arm(void)
     preempt_env_read = 1;
     preempt_armed = 1;
     fle_progress_limit = fle_progress_count + slice_dispatches;
+    fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
 }
 
 /* ui1 (decision 0166): the refresh rate of the virtual display. FLE_DWM_HZ in the environment (read once) overrides the compile-time default FLE_DWM_HZ (60); 24..1000 are accepted. */

@@ -164,6 +164,7 @@ fn run(
     println!("bad_nodes              {}", st.bad_nodes);
     println!("tail_calls             {}", st.tail_calls);
     println!("gotos                  {}", st.gotos);
+    println!("back_edges             {}", st.back_edges);
     println!("c_lines                {}", st.c_lines);
     println!("c_bytes                {}", st.c_bytes);
     println!("handled");
