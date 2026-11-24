@@ -1,6 +1,6 @@
 ---
 draft: "121"
-title: "demo の曲 Exoplanet・DEDZII を File > Open で開くと、Song info の窓の後に engine が止まる(LockResource: no PE image is mapped)を直す"
+title: "demo の曲 DEDZII を File > Open で開くと、Song info の窓の後に engine が止まる(LockResource: no PE image is mapped)を直す"
 type: Task
 milestone: "M5 内蔵のエフェクトとインストゥルメント"
 parent: "018"
@@ -13,51 +13,60 @@ project: signature-studio/3
 
 ## 目的
 
-インストーラの demo の曲 `Eric Kauffmann & NrgMind - Exoplanet.flp`(playlist 4,440 項目)と `DEDZII - NIGHT TERROR.flp`(playlist 3,850 項目)を File > Open で開くと、Song info の窓(`TInfoForm`)が出た直後に engine が止まる(exit 134。SIGABRT 相当)。
+インストーラの demo の曲 `DEDZII - NIGHT TERROR.flp`(playlist 3,850 項目)を File > Open で開くと、Song info の窓(`TInfoForm`)が出た直後に engine が止まる(`fle: LockResource: no PE image is mapped at 0x400000 (no MZ signature)`)。
 
-この Issue の目標: この 2 件を File > Open で開いて、engine が止まらず idle の状態を保つこと(Song info の窓は閉じられる)。Blocks(テンプレート)と Default では起きない。
+この Issue(段階 1)の目標: DEDZII と Blocks(テンプレート)を File > Open で開いて、LockResource の停止が出ず、engine が idle のまま再生の quantum が進むこと。
 
-P3 の測定(#{{004}})は、音の出る demo を入力に使う。この 2 件は、playlist が長く、音の出る候補として一番に選ぶ物なので、開けないことが P3 の測定の入力を狭めている(P3 に関わるので High)。
+同じ demo の Exoplanet(playlist 4,440 項目)は、LockResource の停止の後に、別の停止(Fruity Balance の ExitProcess。終了コード 0)が出る。それは段階 2 の #{{128}} に分けた。
+
+P3 の測定(#{{004}})は、音の出る demo を入力に使う。この曲は開けないことが P3 の入力を狭めている(P3 に関わるので High)。
 
 ## 背景
 
-- 発生(前回の試行。run 45253143948。#{{004}} の作業者が、道具で開いて確かめた。実測): 2 件とも、Song info の窓が出た直後に、ログの末尾が `fle: LockResource: no PE image is mapped at 0x400000 (no MZ signature)` になり、停止する(exit 134)。停止の証拠として、画面に `first non-background pixel on a drawing surface (decision 0126): written by UpdateLayeredWindowIndirect` が出るが、これは記録であって停止の原因ではない(前回の報告の記述)。
-- 前回の報告では、この行は「プラグイン(Fruity Filter の DLL)の読み込みの途中」に出ていた(Exoplanet のログ)。DEDZII も同じ行で止まった。
-- Blocks.flp(テンプレート。260 項目)は、同じ道具で、読み込みが最後まで進んだ(サンプル不足の窓は出るが、engine は止まらなかった。#{{004}} の 3 回の測定)。
-- 0x400000 は、実行ファイルの既定のイメージの基準アドレス(推定)。LockResource に渡されたモジュールのイメージが、engine の中で PE として見えていない(推定。原因は未確認)。
-- 関係: #{{019}}(Fruity Filter の起動後の取得)と #{{102}}(プラグインのコードを分ける)が、同じ経路を変えうる。作業の最初に、`git log --oneline -- lift/runtime lift/harness app/src/engine` で、近い変更を確かめる。
-- 道具: `tools/p3-audio-probe/measure.mjs` の File > Open の手順は、`pm-work/findings/p3-probe-1335.patch` の版が要る(main に無ければ `git apply` で当てる)。前回の作業の報告は `pm-work/findings/p3-blocks-1335.md`。
+- 発生(run 45253143948。#{{004}} の作業者が、道具で開いて確かめた。実測): DEDZII と Exoplanet は、Song info の窓が出た直後に、ログ末尾が `fle: LockResource: no PE image is mapped at 0x400000 (no MZ signature)` になり、停止する。Blocks は止まらない(サンプル不足の窓は出るが、engine は止まらない。#{{004}} の 3 回の測定)。
+- 原因(前回の試行で特定。実測と推定。下の「前回の試行で分かったこと」): `LockResource` は、exe の木で見つからない資源を、実モジュールの表の順に `img_open` していた。#{{101}} 以降は、読み込み(LoadLibrary)の前の像が写されていないため、その像の MZ の検査で止まる。停止文言の `0x400000` は固定の文字列で、実際の基準ではない。
+- 関係: #{{019}}(Fruity Filter の起動後の取得)と #{{102}}(プラグインのコードを分ける)が、同じ経路(`fle_res.c`・`fle_realmod.c`)を変える。作業の最初に、`git log --oneline -- lift/runtime lift/harness app/src/engine` で、近い変更を確かめる。
+- 道具: `tools/p3-audio-probe/measure.mjs` の File > Open の手順は、前回の作業の差分(下の 6)に入っている。main の版は古い。
+
+## 前回の試行で分かったこと
+
+run 45315619741(2 回目。作業は保存された: `work.diff`。変えたのは `lift/runtime/fle_res.c`・`lift/runtime/fle_realmod.c`・`lift/runtime/fle_realmod.h`・`tools/p3-audio-probe/measure.mjs`。判定は差し戻し)。
+
+1. 原因(実測と推定): LockResource の修正前は、exe の木で見つからない `hResData` を、実モジュールの表の順に `img_open` していた。写されていない像(遅延の読み込みの対象。#{{101}})を読むと、MZ の検査で停止する。実測: `FindResourceW` の `h 0x7000000` から取れた資源を、LockResource が `found 1` で返す(0x7000000 は Fruity Filter の像)。
+2. 直した方式: `fle_realmod_image_mapped(idx)` を足した(像が写されたかを、`headers` で判定する)。`LockResource` は、写されていない実モジュールの像を読まずに飛ばす。NULL・見つからない時の停止・MZ の検査は残した。`img_open` の停止文言の `0x400000` は、実際の基準に直した。
+3. 修正後の実測(runner の値。nproc 4。loadavg 0.31 0.88 1.49): DEDZII は `error` null、`state` engine-idle、`quantaWhilePlaying` 9255、`quantaDelta` 3452、`underrunDelta` 0、`keyAtGuest` true。Blocks は `error` null、engine-idle、`quantaWhilePlaying` 9251、`quantaDelta` 3449、`underrunDelta` 0。LockResource の停止は、この 2 件では出なくなった(受理)。
+4. Exoplanet は別の停止: `[err] fle: ExitProcess: the program asked to end the process (exit code 0); stopped here, not exited`(Fruity Balance の読み込みの直後)。段階 2(#{{128}})へ分けた。
+5. 判定の段で落ちた理由: 受け入れの `fe-build engine` の blend2d の取得で、`github.com` への接続が 133 秒で失敗した(`fatal: unable to access ... github.com ...`)。通信の一時的な失敗で、作業者の実行では、この段は通っていた。次の試行は、取り直しで通る見込み(推定)。
+6. 測定の道具の直し(`tools/p3-audio-probe/measure.mjs`。差分に入っている): Welcome は Escape で閉じる。既定のプロジェクトの「Problems loading the project」は Enter で閉じる。File > Open は Ctrl+O で、ファイル窓の `#fx-input-files` に渡し、`#fx-ok` を押す。開いたかは、メインの窓の題名が変わったことで判定する(`pageTitle()` は前面の窓の題名なので、Song info の間は別の題名になる)。失敗時は、状態と engine のログの末尾 400 行を JSON に出す。
+7. 次の試行で必要なこと: 差分(上の 2・6)が載っていれば、それを使う。受け入れを通す(DEDZII と Blocks)。Exoplanet は、この Issue では測らない。
 
 ## 読む物
 
-- `pm-work/findings/p3-blocks-1335.md`(前回の報告。停止の時刻・ログの行・画面)
-- `lift/runtime/`・`lift/harness/` の `LockResource`(呼び出しの定義と、`no PE image is mapped` の出所)。`grep -rn "no PE image" lift app/src`
-- `lift/harness/` の PE のイメージの割り当て(`0x400000` を使う箇所)
-- `app/src/engine/`(ログの出力の窓口: `engineLog()`)
-- `tools/p3-audio-probe/measure.mjs`(再現に使う。File > Open の手順は上の道具の版)
+- `lift/runtime/fle_res.c`・`fle_realmod.c`・`fle_realmod.h`(`LockResource` と、写された像の判定)。`fle_seh.c` も同じ関数を使うが、LockResource の経路ではない。
+- `tools/p3-audio-probe/measure.mjs`(開く手順。失敗時のログ末尾)
+- `tools/smoke/welcome-flow.mjs`(Welcome の窓の閉じ方)
 
 ## やること
 
-0. 作業の最初に `date -u` を記録する。道具の直し(File > Open の手順)が main に無ければ、`git apply pm-work/findings/p3-probe-1335.patch` で当てる。
-1. 再現する: 2 件の `.flp` を展開の木から `.tmp-121/exoplanet.flp` と `.tmp-121/dedzii.flp` に置く(展開の木の場所は `inputs/fl-installer-files.tsv` の guest パスから引く。リポジトリには入れない)。同じ道具で開き、停止の行(`LockResource` の行)と、直前の呼び出しを出す。
-2. 特定する: `LockResource` に渡されたモジュールのハンドル(0x400000)が何か(実行ファイル・DLL・Song info の窓の資源)、どの FL の手続き(Song info の窓の資源か、Fruity Filter の資源か)が呼んだか、どのイメージを engine が PE として見ていないか。結果を、確かめた事実と推定に分けて報告に書く。
-3. 直す: 既定の動作として直す(オプトインを作らない)。Windows と同じ結果になるように、資源の読み(`LockResource`)が、読めるイメージを返すようにする。読めない資源を、空の代わりに返さない(検査を弱めない)。
-4. 確かめる: 2 件を開いて、engine が止まらず、Song info の窓が閉じられ、音の再生(Space)で `quantaWhilePlaying` が増えること。Blocks も、同じ道具で開けること。
+1. 作業の最初に `date -u` を記録する。`.prior-work.md` が在れば読む。`git status` と `git diff --stat` で、前回の差分(上の 2・6)が載っているかを確かめる。
+2. 差分が載っていなければ、上の 2 と 6 を、同じ内容で作る(推定ではなく、実測の値に合わせる)。
+3. 受け入れを通す(DEDZII と Blocks。Exoplanet は測らない)。
+4. commit する。受け入れが通らなくても、作業の最後に作業ツリーを commit する。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && test -s .tmp-121/exoplanet.flp && test -s .tmp-121/dedzii.flp && for f in exoplanet dedzii; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-121/$f.flp" > "$RUNNER_TEMP/open-$f.json" || exit 1; done && node -e 'const fs=require("fs");const L=["exoplanet","dedzii"].map((f)=>JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/open-"+f+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.quantaWhilePlaying>0)?0:1)'
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-121 && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp" .tmp-121/dedzii.flp && cp "lift/out-app/host/resources/Data/Templates/Other/Blocks/Blocks.flp" .tmp-121/blocks.flp && for f in dedzii blocks; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-121/$f.flp" > "$RUNNER_TEMP/open-$f.json"; done && node -e 'const fs=require("fs");const L=["dedzii","blocks"].map((f)=>JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/open-"+f+".json","utf8").trim()));process.exit(L.every((r)=>r.error===null&&r.state==="engine-idle"&&r.quantaWhilePlaying>0)?0:1)'
 ```
 
-判定の基準: 2 件とも、`error` が null、`state` が engine-idle、再生の quantum が 1 以上(engine が止まらず、再生まで進むこと)。
+判定の基準: DEDZII と Blocks の 2 件とも、`error` が null、`state` が engine-idle、再生の quantum が 1 以上(engine が止まらず、再生まで進むこと)。
 
 ## 報告の規則
 
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 停止の再現(2 件の JSON の行)、`LockResource` の呼び出しの特定、直した方式と理由、変えたパス(`app/`・`lift/` を含む。`app/` と `lift/` を変えると main の deploy が動く)。
+- 報告に書く: 2 件の JSON の行、LockResource の停止が消えたことの証拠(ログ末尾)、直した方式と理由、変えたパス(`app/`・`lift/` を含む。`app/` と `lift/` を変えると main の deploy が動く)。
 
 ## 制約
 
@@ -71,9 +80,11 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 - 作業の最初に `date -u` を記録する。4 時間 30 分を過ぎたら、受け入れが通っていなくても、作業ツリーを commit し、報告を書いて終える(ジョブの上限は 5 時間 50 分)。
 - 受け入れが通らなくても、作業の最後に作業ツリーを commit する。未 commit の変更が残ると、判定は失敗する。
-- エンジンのビルドは 1 回約 35〜46 分。
+- エンジンのビルドは 1 回約 35〜46 分。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数は最大 5400000(90 分)にする。`sleep`・`timeout` をコマンドの先頭に書かない。
 
 ## 他のタスクとの関係
 
-- #{{004}}(P3 の demo の測定)が、この 2 件を候補にしている。この Issue が閉じると、候補が広がる。
+- #{{128}}(段階 2: Exoplanet の ExitProcess)は、この Issue が閉じてから始まる(blocked by)。
+- #{{129}}(demo の素材の配信)は、この Issue と #{{122}} が閉じてから始まる。
+- #{{004}}(P3 の demo の測定)が、この Issue の結果を使う。
 - #{{019}}・#{{102}}(Fruity Filter と Fruity Balance の、起動後の取得)が、同じプラグインの読みの経路を変えうる。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
