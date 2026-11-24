@@ -44,7 +44,8 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
 - work は `strategy.matrix.issue` で Issue の番号ごとに 1 ジョブ。`fail-fast: false` で、1 件の失敗が他を止めない。
 - work の `concurrency` は `group: task-<番号>`、`cancel-in-progress: false`。同じ Issue の作業は直列になる。
 - 対象が空なら start 以降は skip される。runner を使うのは select(数十秒)だけ。
-- 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 接頭辞)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。
+- 抽出物の接頭辞の一覧は、リポジトリのファイル(`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`。1 行 1 接頭辞)に置き、extract の取り出しが読み、extract と work の鍵の hashFiles に入れる。一覧を変えると鍵が変わり、接頭辞の足りない古いキャッシュは使われない(fl-exe の 2 つの完全なパスは、鍵の文字列 `FL64.exe-FL64-scaled.exe` に入れる)。新しい seed の行を足す Issue は、実物の接頭辞が `ci/resources-prefixes.txt` に在ることを、起票の前に確かめる(無ければ、先に足す。足す前に、作業者は受け入れを通せない)。
+- 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
 
 - 実機のビーコン(ラベル `perf-beacons` の作業だけ)。extract が R2 の `fl-web-cache` の `perf/` から、直近 3 日(UTC の今日と前の 2 日)の `*.json` を、最大 1000 件・合計 100 MB で取り、`$RUNNER_TEMP/perf` に置いて、鍵 `perf-beacons-${{ github.run_id }}` でキャッシュに保存する。work は同じ鍵で復元し、`lift/out-app/host-extra/perf/` に置く(commit はしない)。鍵を run ごとにするのは、ビーコンが増え続けて内容で決まる鍵が使えず、同じ run の extract と work だけが同じ鍵を読むため。公開の artifact は使わない。リポジトリは公開で、artifact も公開されるため、依頼者の実機のビーコン(個人を特定しうる値を含む)を置けない。R2 の鍵は extract だけが持ち、作業者の段には渡さない。ラベルの無い run では、これらの段は動かない。
 
@@ -159,9 +160,17 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 ジョブの上限(work は 350 分)に達すると、ジョブは取り消され、`failure()` は動かず、`cancelled()` の段だけが猶予(約 5 分)の中で動く。#1342 の 2 回目の試行(run 45197326869)では、作業者が背景のビルドを `tail --pid` で待ち、その待ちが戻らず、ジョブが時間切れで取り消され、作業が全て失われた(作業の保存の段が動かなかった)。そこで、押せなかった作業と判定が落ちた作業の保存の条件を `(failure() || cancelled())` にし、保存の段は通信をせず、取り消しで残った `.git/index.lock` を外してから差分を作る。報告の段は、取り消された作業を `failed` にし、保存の有無をコメントに書く。次の再試行は、判定の出力が無い保存を、判定の前の取り消しとして続きから取り込む。
 
-## 14. 本番の engine の門(検証済みの sha だけが本番の manifest になる)
+## 14. 本番の engine の門(廃止)
 
-`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替える(`lift/crates/fe-build/src/main.rs` の `upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門が静かに閉じたままで、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(deploy は success のまま。#1363 の実機のビーコンで確かめた)。そこで、スモーク(起動の確認と、Welcome 窓の 4 つの流れ)が両方通った engine の sha256 を、deploy の作業ツリーの `verified.txt` に 1 行足す(`manifest.json` の `engine.wasm.sha256` から取る。既存の行は残す。commit はしない)。その後に `fe-build upload` が manifest を差し替え、upload の後の段が、本番の `manifest.json` とこの build の manifest を `cmp` で比べる。一致しなければ deploy は失敗し、wrangler は飛ぶ。スモークが落ちれば、門の段は動かず、manifest は替わらない(既定の `success()`)。deploy が success でも engine が替わったとは限らないので、替わったかは実機のビーコンの版で確かめる。
+`fe-build upload` は、engine の sha256 が `lift/harness/web/verified.txt` の行に在るときだけ、本番の `manifest.json` を差し替えていた(`upload_gated_steps`)。門の行は人が足す約束だったが、誰も足さなかったため、門は静かに閉じたままだった。手順は落ちず、deploy は success のままだった。その結果、2026-11-22 18:53Z から 11-24 00:40Z まで約 3 日間、全ての engine の変更(HiDPI・音声の補充・メニューなど)が本番に出ず、本番は `b440e13a623a` の版のままだった(#1363 の実機のビーコンで確かめた)。940e08fd は、スモークが通った sha を deploy が門の行に足す暫定の形にしたが、門そのものが deploy の迂回なので、門を廃止した(#1378)。
+
+今の形: `fe-build upload` は、常に bundle のファイルを上げ(`upload_sync_steps`)、最後に `manifest.json` を差し替える(`upload_manifest_step`)。順は変えない(ファイル → manifest)。main の deploy は、スモーク(起動の確認と Welcome 窓の流れ)が通った engine を、常に本番に出す。スモークが落ちれば deploy は失敗し、本番は替わらない(既定の `success()`)。upload の後の「本番の manifest を確かめる」は、本番の manifest とこの build の manifest を `cmp` で比べ、違えば deploy を失敗にする。deploy が success でも、engine が替わったかは実機のビーコンの版で確かめる。
+
+抽出の木の鍵(`host-`)は、インストーラの名前と抽出の引数(`lift/crates/fe-build/src/main.rs`)と、extract-fl が repo から読む `lift/harness/seeds/os-fonts/` の 4 件を含む。含まないと、これらを変えても古い木が使われ、変更が本番に出ない(#1378 で足した)。
+
+本番の bundle の入力(作業者の受け入れと同じにする)。`fe-build bundle` が読むのは、seed 表の行の host ファイル(`pack-seed.mjs` が SHA-256 を照合して入れる)と、`pack.args` の lazy 指定、それに `pack_step_for` が見つけた `error-offline.html`(`lift/out-app/host-extra/resources/System/Internet/`)だけである。seed 表の行は、言語・テーマ・テンプレート・demo・Blocks・内蔵プラグインの DLL の多くを含み、deploy は `extract-fl` で host に取り出す。作業者の resources の木(`ci/resources-prefixes.txt`)は、deploy の「resources を取り出す」の段も取り出すので、オフラインの頁が本番の bundle に入る(それまでは、deploy の木に無いので黙って省かれた)。木の中の余分な物は、seed 表に無いため bundle に入らない(写しの要らない理由)。内蔵プラグインの木(`host-extra/plugins`)と起動用の実行ファイル(`host-extra/exe`)は、bundle の入力ではなく、道具(tools/plugin-hooks・tools/feat-c1-hidpi)だけが読む。bundle の中身は、「bundle の中身を確かめる」の段が、オフラインの頁と、言語・テーマ・テンプレートの代表 1 件ずつを manifest で確かめる。
+
+deploy で `[skip ci]` を使わない(依頼者の指示。main の push が deploy を迂回しないように)。judge が、作業の commit の題名と本文に、skip ci などの印が在れば落とす。push の段は、Issue の題名から印を落としてから空の commit を作る。pm-work だけの push は、paths の filter で deploy が起動しないので、印を付ける理由が無い。
 
 待ちが 1 つでジョブの上限の全てを使わないよう、作業者への規則を `AGENTS.md` の「作業者の手順」に置く。ビルド・測定などの長いコマンドは、背景で起動して終了を待たず、フォアグラウンドで直接実行する。シェルツールの `timeout` 引数は最大 5400000(90 分)とし、90 分で戻らないコマンドは固まったとみなして状態(ログの末尾と `ps`)を確かめる。作業は開始から 4 時間 30 分を過ぎたら、受け入れが通っていなくても commit して報告を書いて終える(ジョブの上限 5 時間 50 分に対し、報告を書く余裕を残す)。
 

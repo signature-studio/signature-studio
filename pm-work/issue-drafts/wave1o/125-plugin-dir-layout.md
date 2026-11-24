@@ -15,11 +15,11 @@ project: signature-studio/3
 
 第 2 波(内蔵プラグインの約 45 束)を並行に動かすための基盤。1 プラグインを足す作業を、共有のファイル(表・引数・一覧)の編集から外し、`lift/plugins/<名前>/plugin.tsv` を 1 つ足すだけにする。共有の物は、プラグインの一覧(ディレクトリの走査の結果)から、ビルドが生成する。
 
-この Issue で、Fruity Balance(#{{102}} の分割)を、この形に移す。動作は今と同じにする。
+この Issue で、Fruity Balance(#1342 の分割)を、この形に移す。動作は今と同じにする。
 
 ## 背景(状況。実測)
 
-- 1 件(Fruity Balance)を足した変更は、commit `212eaf59`(#{{102}} の途中)。`git show --stat 212eaf59` で 16 ファイル。その commit の中で、1 プラグインごとに同じ形で編集された共有のファイルは次の 7 つ:
+- 1 件(Fruity Balance)を足した変更は、commit `212eaf59`(#1342 の途中)。`git show --stat 212eaf59` で 16 ファイル。その commit の中で、1 プラグインごとに同じ形で編集された共有のファイルは次の 7 つ:
   - `lift/harness/hyb/hyb-args.tsv`(1 行)
   - `lift/harness/hyb/hybrid.cmd`(`--separate balance` と `--separate-dir` の 4 行)
   - `lift/harness/hyb/lowered-all.txt`(12,282 行)
@@ -28,14 +28,28 @@ project: signature-studio/3
   - `lift/crates/fe-build/tests/plan/engine.txt`(7 行。`stage compile (... total 170)` の件数を含む)
   - `lift/crates/fe-build/tests/plan/bundle.txt`(2 行)
 - 1 度だけ必要な共有の変更(プラグインごとには要らない): `app/src/engine/fruity.ts`・`app/src/engine/xmod.ts`(新規)・`lift/crates/fe-wasmgen/src/hybrid.rs`・`lift/crates/fe-wasmgen/src/main.rs`・`lift/harness/two/harness-inputs.txt`・`lift/harness/two/main_two.c`・`lift/harness/two/xmod_glue.c`(新規)・`lift/harness/web/fruity/fle_idle_lib.js`・`tools/delivery-split/measure.mjs`。
-- 45 件を並行すると、同じ行(`pack.args` の `--args` の行、`hybrid.cmd` の `--separate` の行、`engine.txt` の件数、`lowered-all.txt`)を同時に編集し、衝突でほぼ全てが失敗する(#{{101}} と #{{102}} の試行の先例)。
+- 45 件を並行すると、同じ行(`pack.args` の `--args` の行、`hybrid.cmd` の `--separate` の行、`engine.txt` の件数、`lowered-all.txt`)を同時に編集し、衝突でほぼ全てが失敗する(#1341 と #1342 の試行の先例)。
 - `lift/harness/hyb/lowered-all.txt` は、プラグインの関数の一覧を全部持つ。Balance と同じ 1.2 万行の物が 132 本の本体に在ると、約 162 万行(推定。1 本ごとの実数は、この Issue で測る)。リポジトリが膨れる。
 - 第 2 波の対象は 160 本の DLL(本体 132 本)。`inputs/plugin-classes.tsv` の VFX 系の 7 フォルダ(19 本)と、第 1 波の 3 本を除く。生成器(`pm-work/tools/gen-wave-plugins.mjs --dry-run`)の値は、フォルダ 131(Effects 85・Generators 46)、束 45。DLL のファイルの大きさの和は 608,521,016 B(本体 576,925,696 B)。
 
 ### 第 1 波の残り(Filter と Delay 2)の現状
 
 - `lift/harness/b2d2/modules.tsv` に Fruity Filter(0x7000000)と Fruity Delay 2(0x7800000)の行が在る。gen-all で C に下ろされ、`engine.wasm` の中に入る。
-- `lift/harness/hyb/hyb-args.tsv` に、この 2 つの行は無い。分けた wasm になっていない。`lift/harness/web/pack.args` の `--lazy-dll` で、DLL のファイルだけを起動後に取得している(#{{019}} の結果)。つまり、#{{019}} で届いたのは DLL のファイルで、コードは engine.wasm に残る。
+- `lift/harness/hyb/hyb-args.tsv` に、この 2 つの行は無い。分けた wasm になっていない。`lift/harness/web/pack.args` の `--lazy-dll` で、DLL のファイルだけを起動後に取得している(#1319 の結果)。つまり、#1319 で届いたのは DLL のファイルで、コードは engine.wasm に残る。
+
+## 前回の試行で分かったこと(1 回目。run 45331544653。`failed`。約 2 時間 27 分)
+
+- 作業ツリーの状態: 前回の作業(前回の作業者の commit の内容。main には無い)は、取り込みの段が `git apply --3way` で未 commit のまま載せ、`.prior-work.md` に書く。今の main への当たりは、`lift/crates/fe-build/src/main.rs` の 1 箇所だけが衝突する(#1362 が `HARNESS_DIR` の直後に定数を足したため)。他の 21 ファイルは衝突せずに当たる。衝突の印を解消してから受け入れを行う。
+- 抽出: 前回の作業は Balance を静的な表から消し、`lift/plugins/fruity-balance/plugin.tsv` を 1 行足した。抽出は main の `app/scripts/extract-fl.mjs` が plugin.tsv の行を読む(main の 617e8339)。
+- 受け入れ(runner の値。nproc 4。loadavg 1.44〜1.69)。通った: npm build・fe-build(7 件)・fe-wasmgen・guard.test・(1) engine-idle・standIn false・error null(3 回)・(3) Balance の wasm は lazy(10,628,659 B)で、取得の開始 2,087・2,107・2,240 ms は起動前の取得の完了 1,916・1,934・1,988 ms の後・(4) reads に Balance の instantiate(requested=true)(3 回)・elapsedMs 7,210・7,419・7,632・共有の表の balance 0 件・流れ A(error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true)。落ちた: (2) engine.wasm が 165,084,314 B(3 回とも同じ)。改定前の閾値 165,079,668 B を 4,646 B 超えた。改定後の閾値 165,100,887 B では通る(余り 16,573 B)。起動の確認(boot-check)は elapsedMs 8,126(参考)。
+- (2) の内訳: 閾値 165,079,668 B は下書き 102 の値(Balance の hook 点を適用しない時の値)。#1342 の完了時は 165,084,503 B(今回は −189 B)。hook 点の 3 関数を C の経路に残したことによる増分は、785 + 171 + 483 = 1,439 B(関数番号 34626・34685・34686)。残りの約 3,207 B は**未特定**。
+- 生成物(`lift/out-app/plugins/`。コミットしない): modules.tsv 10 行 2,301 B・hyb-args.tsv 9 行 752 B・pack.args 11,507 B・extract-dlls.tsv 28,730 B・vfs-seed-idle1.tsv 98,294 B・hybrid.cmd 514 B・seed.args 492 B・plugins.tsv 188 B。lowered-all.txt は 19,045 件から hook 点 3 件を除いて 19,042 件(186,089 B)。Balance の一覧は ok 12,282 件(#1342 と同じ)で、hook 点を除いて 12,279 件。Balance の base は 0xc1d0000(下の (7))。
+- 共有の表の変更(行数): `modules.tsv` −1・`hyb-args.tsv` −1・`hybrid.cmd` +2 −6・`n0.cmd` +2 −2・`gen.args` +2 −2・`pack.args` +1 −7・`seed.args` +1 −3・`vfs-seed-idle1.tsv` −1・`ci/extract-dlls.tsv` −1・`lists/lowered-balance.txt` −12,282(削除)・`lowered-all.txt` −19,090(削除。生成物にした)・`.gitattributes` −1・追加 `plugin.tsv` +2。ほかに plugins.rs +641、main.rs +59 −21、`tests/plan/*.txt` の期待値(`rt` の 90 → 91 は、もとの期待値が古かったため)、`tests/plugins/` のダミー 2 本、`measure.mjs` +4 −1。
+- (7) の訂正は、下の設計 (7) を参照(旧記述の 0x7B8F200 は誤り。Balance は 0xc1d0000)。
+- (9)(10) の実測(静的。実行時の数は未確認): `fle_realmod_find(name)` は `fle_load.c:427`・`fle_modules.c:226` と `:232`・`fle_realmod.c:100`(定義は `fle_realmod.c:105`)。`fle_realmod_find_path` は `fle_load.c` と `fle_realmod.c` に各 1。realmod の名前は DLL の名のまま(素の名前の検索を変えないため)。分けた wasm の import は module `c` だけ(関数 606・memory 1・global 1)で、別の分けた wasm への直接の呼び出しは 0 件。
+- (11) 段の時間(前回の `fe-build engine`。23 分 26 秒。秒): plugins 0.0・lists 10.8・gen 31.6・compile 434.2(172 段、並列)・hybrid-n0 226.8・link 4.5・wasm-opt 341.4・hybrid 334.9(9 本)・blend2d 0.8 / 20.8 / 0.1・合計 約 1,406。1 本あたりは未測定(推定: hybrid は平均 約 37 秒。lists の 10.8 秒を 160 本に直列で掛けると 約 29 分)。
+- 設計からの変更: (a) realmod の名前は key ではなく DLL の名。(b) プラグインの行は静的な行の後ろ。Balance は m10(以前は m8)、Filter が m8、Delay 2 が m9。単位の名の集合は同じ。(c) 静的な一覧 8 本はコミットのまま残し、生成したのは Balance の一覧だけ。(d) 単位の一覧は走査せず、一致の検査だけ((13) は未実施)。(e) args が空なら `--pdata`。(f) modules が `RM_MAX` などを超えないかを生成の段で検査(10 ≤ 16)。(g) `fe-build tables`(抽出用の副命令)を足したが、抽出には使わない(残してよい)。
+- 未確認: 160 本の生成、案 B、wasm メモリの実測、段ごとの 1 本あたりの時間、素の名前の実行時の数、ダミー 2 本での計画全体の比較、動的な単位の一覧。
 
 ## 1 プラグインを足す手順(今の表)と、この設計での置き場所
 
@@ -58,7 +72,7 @@ project: signature-studio/3
 **(1) 固有の物: `lift/plugins/<名前>/plugin.tsv` を 1 つ。** `<名前>` は、プラグインのフォルダの名前を小文字にし、空白をハイフンにしたもの(例: `fruity-balance`)。1 フォルダの中の本体と補助の DLL は、1 つの `plugin.tsv` に行として並べる(補助も、それぞれ独立した wasm になる)。見出し付きの TAB 区切り。列は `key`・`guest`・`role`・`sha256`・`size`・`hook`・`args`。
 
 - `key`: DLL の一意の名。小文字。空白と `\`・`/`・`:` を含まない(realmod の名前の条件。`lift/runtime/fle_realmod.c` の `table_check`)。`<種別>.<フォルダ>.<DLL の名>` の形(例: `effects.fruity-balance.fruity_balance_x64.dll`)。DLL の名だけでは一意にならない(下の (9))。
-- `guest`: `Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll`(`C:\Program Files\Image-Line\FL Studio 21\` の後)。
+- `guest`: `Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll`(`C:\Program Files\<ベンダー>\FL Studio 21\` の後)。
 - `role`: `本体` か `補助`。
 - `sha256`・`size`: `inputs/plugin-classes.tsv` の値。
 - `hook`: `none`、または `existing`(`lift/harness/hooks/fruity-delphi-effect-hook-points.txt` の 3 点)、または `rva:0x...,0x...,0x...`(`inputs/plugin-hooks.tsv` の 3 点)。
@@ -77,13 +91,16 @@ project: signature-studio/3
 
 `gen.args` の `--omit-list` は、この生成物の path にする。
 
-**(4) 一覧(direct にできる関数の一覧)は保存せず、ビルドで求める。** 新しい段 `lists`(`gen` より前。DLL ごとに並列にする)。各 DLL を `fe-wasmgen <dll> <out> <n0 の引数> --report <tsv>` で、一覧なしで走らせ、status が `ok` の VA を `lift/out-app/plugins/lists/lowered-<key>.txt` に書く。既存の `hybrid-n0`・`hybrid` の段の `check_listed` が、一覧の全てが `ok` で出ることを確かめる(落ちたら止まる)。Balance の件数は、#{{102}} の記録では、12,500 関数のうち 12,282 が ok。この Issue で同じ件数を再現する。
+**(4) 一覧(direct にできる関数の一覧)は保存せず、ビルドで求める。** 新しい段 `lists`(`gen` より前。DLL ごとに並列にする)。各 DLL を `fe-wasmgen <dll> <out> <n0 の引数> --report <tsv>` で、一覧なしで走らせ、status が `ok` の VA を `lift/out-app/plugins/lists/lowered-<key>.txt` に書く。既存の `hybrid-n0`・`hybrid` の段の `check_listed` が、一覧の全てが `ok` で出ることを確かめる(落ちたら止まる)。Balance の件数は、#1342 の記録では、12,500 関数のうち 12,282 が ok。この Issue で同じ件数を再現する。
 
-**(5) hook 点は direct の一覧から外す。** 根拠(実測): `lift/crates/fe-wasmgen/src` に hook の処理は無い(`hook` の語は dispatch の表だけ)。hook の guard は `fe-lift lift --hook-points` の C の出力にだけ在る。Balance の 3 点(VA = base + RVA。0x6817bc0・0x6831d70・0x6831d90)は、`lift/harness/hyb/lists/lowered-balance.txt` の 582・1117・1118 行に在り、direct の wasm に下りている(guard が効かない)。既存の ILTools・QFC・FLEngine の hook 点は、共通の一覧(`lowered-all.txt`)に 0 件(確認済み)。この設計では、どのプラグインの hook 点も、一覧から外し、C の経路に残す。受け入れ: 生成した一覧に hook 点の VA が 0 件、C の出力に `hook_points 3`(fe-lift の出力の行)。Balance の効果は、この変更の後に、#{{127}} の道具で確かめる(未確認)。
+**(5) hook 点は direct の一覧から外す。** 根拠(実測): `lift/crates/fe-wasmgen/src` に hook の処理は無い(`hook` の語は dispatch の表だけ)。hook の guard は `fe-lift lift --hook-points` の C の出力にだけ在る。Balance の 3 点(VA = base + RVA。0x6817bc0・0x6831d70・0x6831d90)は、`lift/harness/hyb/lists/lowered-balance.txt` の 582・1117・1118 行に在り、direct の wasm に下りている(guard が効かない)。既存の ILTools・QFC・FLEngine の hook 点は、共通の一覧(`lowered-all.txt`)に 0 件(確認済み)。この設計では、どのプラグインの hook 点も、一覧から外し、C の経路に残す。受け入れ: 生成した一覧に hook 点の VA が 0 件、C の出力に `hook_points 3`(fe-lift の出力の行)。Balance の効果は、この変更の後に、#1371 の道具で確かめる(未確認)。
 
 **(6) base(像の番地)は生成時に割り当てる。** プラグインを `key` の順に並べ、既存の固定の番地の後ろから、各像を 64 KiB に揃えて置く。像の大きさは PE の SizeOfImage(ヘッダから読む)を 64 KiB に揃えた値。固定の番地は `plugin.tsv` に書かない(並行の Issue が番地で衝突するため)。番地が変わっても、一覧・hook 点・名前は生成物なので、影響は生成物の中だけ。
 
-**(7) 像の配置(この Issue で決める判断)。** 既存の像の末尾は 0x7B8F200。そこから GLOBAL_BASE(0x10000000)までの空きは 132 MB しかなく、第 2 波の 160 本(608.5 MB)は入らない。`lift/harness/web/link.rsp` は `-sGLOBAL_BASE=268435456`(データの先頭)・`-sINITIAL_MEMORY=671088640`(640 MB)・`-sMAXIMUM_MEMORY=2147483648`(2 GB)。像の領域を、データの先頭の上に置くか、データの先頭を上げるかは、ヒープ(伸びる先)との分け方で決まる。作業者が、案を 2 つ以上比べ、選んだ案と理由を、wasm のメモリの大きさ(実測)とともに報告に書く。ブラウザの上限は、未確認。
+**(7) 像の配置(案 A を採用。前回の試行で訂正した)。** 静的な像の末尾は oggio(base 0xc000000、SizeOfImage 0x1cf000)の 0xc1cf000。Balance は 0xc1d0000 に置く(SizeOfImage 0x3a1000)。GLOBAL_BASE(0x10000000)までの空きは 0x3E30000(約 62.2 MiB。65,208,320 B)。
+- 案 A(採用。像を GLOBAL_BASE より下に置く。動作は変えない): Balance(3.7 MB)は入る。同程度の大きさで約 17 本が上限で、第 2 波の 160 本(608.5 MB)は入らない。この Issue では案 A で Balance を置く。
+- 案 B(GLOBAL_BASE と INITIAL_MEMORY を上げ、像の領域をデータの先頭の上に置く。`lift/harness/web/link.rsp` を変える): 160 本が入る配置は、別の Issue(#{{135}})で決める。この Issue では行わない。
+- 旧記述の「既存の像の末尾は 0x7B8F200、空き 132 MB」は誤り(Delay 2 の像の末尾は 0x7BA5000 で、oggio はさらに後ろにある)。
 
 **(8) 実行時の表の上限を上げる。** `lift/runtime/fle_realmod.c` の `RM_MAX`(16)・`lift/runtime/fle_cursor.c` の `SHARED_MODULE_REALMODS`(16。RM_MAX と同じ値の複製)・`lift/harness/two/main_two.c` の `MAIN_REAL_MAX`(32。実モジュールのファイル数の上限)。上限は、生成した `modules.tsv` の行数(既存 + プラグイン)以上にし、生成の段で検査する。`#ifdef` は足さない(`guard/flags.sh` が見る)。`fle_cursor.c` のハンドルの式は、像の番地ではないが、行数に合うかを確かめる。
 
@@ -99,23 +116,35 @@ project: signature-studio/3
 
 **(14) 生成物にする物。** `.gitattributes` の `lift/harness/hyb/lowered-all.txt merge=union` の行を消し、コミットされた `lift/harness/hyb/lowered-all.txt` と `lift/harness/hyb/lists/lowered-*.txt` を消す(生成物になる)。
 
-**(15) Balance の移行(この Issue の commit)。** `lift/plugins/fruity-balance/plugin.tsv`(`effects.fruity-balance.fruity_balance_x64.dll` の 1 行。`hook` は `existing`)を足す。共有の表から Balance の行を消す: `modules.tsv`・`hyb-args.tsv`・`hybrid.cmd` の `--separate` の Balance・`pack.args` の `--args` と `--lazy-dll` の Balance・`lowered-all.txt`・`lists/lowered-balance.txt`・`ci/extract-dlls.tsv` の Balance の行・`vfs-seed-idle1.tsv` の Balance の行・`seed.args` の Balance の行。Filter と Delay 2 の行は、この Issue では消さない(#{{126}} で移す)。生成する base は、既存の固定の番地の後ろ(下の (6))なので、Filter(0x7000000)・Delay 2(0x7800000)と重ならない。
+**(15) Balance の移行(この Issue の commit)。** `lift/plugins/fruity-balance/plugin.tsv`(`effects.fruity-balance.fruity_balance_x64.dll` の 1 行。`hook` は `existing`)を足す。共有の表から Balance の行を消す: `modules.tsv`・`hyb-args.tsv`・`hybrid.cmd` の `--separate` の Balance・`pack.args` の `--args` と `--lazy-dll` の Balance・`lowered-all.txt`・`lists/lowered-balance.txt`・`ci/extract-dlls.tsv` の Balance の行・`vfs-seed-idle1.tsv` の Balance の行・`seed.args` の Balance の行。Filter と Delay 2 の行は、この Issue では消さない(#1370 で移す)。生成する base は、既存の固定の番地の後ろ(下の (6))なので、Filter(0x7000000)・Delay 2(0x7800000)と重ならない。前回の試行では Balance の base は 0xc1d0000 だった(下の (7))。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo test --locked --manifest-path lift/Cargo.toml -p fe-build -p fe-wasmgen && bash spec/guard.test.sh && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/delivery-split/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/split.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const B=(a)=>a.filter((f)=>/balance/i.test(f.name)&&/\.wasm$/i.test(f.name));const eng=(a)=>a.find((f)=>f.name==="engine wasm");const ok=L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&eng(r.preStart).bytes<=165079668&&B(r.lazy).length===1&&B(r.lazy)[0].bytes>0&&r.fetches.some((f)=>/balance/i.test(f.name)&&/\.wasm$/i.test(f.name)&&f.startMs>=r.preStartDoneMs)&&Array.isArray(r.reads)&&r.reads.some((x)=>/balance/i.test(x.name)&&/\.wasm$/i.test(x.name)&&x.requested===true)&&r.elapsedMs<=12500);process.exit(ok?0:1)' "$RUNNER_TEMP/split.jsonl" && ! grep -qi balance lift/harness/b2d2/modules.tsv lift/harness/hyb/hyb-args.tsv lift/harness/hyb/hybrid.cmd lift/harness/web/pack.args ci/extract-dlls.tsv lift/harness/seeds/vfs-seed-idle1.tsv lift/harness/web/seed.args && test -f lift/plugins/fruity-balance/plugin.tsv && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const a=L.find((r)=>r.flow==="A");process.exit(a&&a.error===null&&a.state==="engine-idle"&&a.standIn===false&&a.trapped===false&&a.hostErrors===0&&a.opened===true?0:1)' "$RUNNER_TEMP/flow.jsonl"
+npm run build --prefix app && cargo test --locked --manifest-path lift/Cargo.toml -p fe-build -p fe-wasmgen && bash spec/guard.test.sh && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/delivery-split/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/split.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const B=(a)=>a.filter((f)=>/balance/i.test(f.name)&&/\.wasm$/i.test(f.name));const eng=(a)=>a.find((f)=>f.name==="engine wasm");const ok=L.length===3&&L.every((r)=>r.state==="engine-idle"&&r.standIn===false&&r.error===null&&eng(r.preStart).bytes<=165100887&&B(r.lazy).length===1&&B(r.lazy)[0].bytes>0&&r.fetches.some((f)=>/balance/i.test(f.name)&&/\.wasm$/i.test(f.name)&&f.startMs>=r.preStartDoneMs)&&Array.isArray(r.reads)&&r.reads.some((x)=>/balance/i.test(x.name)&&/\.wasm$/i.test(x.name)&&x.requested===true)&&r.elapsedMs<=12500);process.exit(ok?0:1)' "$RUNNER_TEMP/split.jsonl" && ! grep -qi balance lift/harness/b2d2/modules.tsv lift/harness/hyb/hyb-args.tsv lift/harness/hyb/hybrid.cmd lift/harness/web/pack.args ci/extract-dlls.tsv lift/harness/seeds/vfs-seed-idle1.tsv lift/harness/web/seed.args && test -f lift/plugins/fruity-balance/plugin.tsv && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const a=L.find((r)=>r.flow==="A");process.exit(a&&a.error===null&&a.state==="engine-idle"&&a.standIn===false&&a.trapped===false&&a.hostErrors===0&&a.opened===true?0:1)' "$RUNNER_TEMP/flow.jsonl"
 ```
 
 判定の基準:
 - 生成の段が、`lift/plugins/*/plugin.tsv` だけから、共有の表と一覧を作る。`lift/out-app/plugins/` の生成物は、コミットしない。
-- Balance の 3 回の起動(`tools/delivery-split/measure.mjs`): (1) engine-idle・standIn が false・error が null、(2) engine wasm が 165,079,668 B 以下、(3) Balance の wasm が起動後の取得に在り、取得の開始が起動前の取得の完了以後、(4) `reads` に Balance の wasm の instantiate が `requested: true` で在る。
+- Balance の 3 回の起動(`tools/delivery-split/measure.mjs`): (1) engine-idle・standIn が false・error が null、(2) engine wasm が 165,100,887 B 以下(#1342 の完了時点の 165,084,503 B に 16,384 B を足した値)、(3) Balance の wasm が起動後の取得に在り、取得の開始が起動前の取得の完了以後、(4) `reads` に Balance の wasm の instantiate が `requested: true` で在る。
 - 生成した一覧に、Balance の hook 点の VA(0x6817bc0・0x6831d70・0x6831d90)が 0 件。C の出力に `hook_points 3`。
-- 生成した一覧の件数(Balance)を報告に書く(#{{102}} の 12,282 との比較)。
+- 生成した一覧の件数(Balance)を報告に書く(#1342 の 12,282 との比較)。
 - 共有の表から Balance の行が消えている(受け入れの `grep`)。
 - 3 回の起動の `elapsedMs` が、どれも 12500 以下。
 - 流れ A(`tools/smoke/welcome-flow.mjs`)が通る。
 - 報告に書く: (4)(7)(9)(11) の実測の値と、選んだ案と理由。
+
+## 範囲外の注
+
+- **抽出(agent.yml・deploy.yml)**: `app/scripts/extract-fl.mjs` は `lift/plugins/*/plugin.tsv` の行を読む(main の 617e8339。PM が対応)。この Issue の作業者は `.github/` を変えない(判定の凍結比較が通らない)。作業者の `fe-build` の `tables` 副命令は、抽出には使わない(残してよい)。
+- **Balance を読んだ後の終了**: `tools/delivery-split/measure.mjs` の scene の終わりで、engine が `ExitProcess`(終了コード 0。`state exited after the scene`)で止まる。原因は未確認。#1342 の記録では SIGABRT(134)だった。#1365(demo を開くと止まる)・#1372(Exoplanet)と同じ現象の可能性が高い(依頼者の『評価用プロジェクトを開こうとすると落ちる』)。この Issue では直さない。ただし、疑う commit・関数・呼び出しの並びを報告に書く。
+- **measure.mjs の読み先**: `host-extra/resources` が無いとき(CI の runner。resources の作業だけが復元する)は、host の同じ `NewStuff.flp`(インストーラ由来。SHA-256 が一致)を読む。前回の作業に入っている(+4 −1)。
+
+## 作業の進め方
+
+- 開始の時刻を、最初に `date -u` で記録する。**4 時間 30 分を過ぎたら**、受け入れが通らなくても、作業ツリーを commit して、報告を書いて終える。
+- ビルドは約 35 分(前回は 23 分 26 秒)。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数は最大の 5400000 にする。背景で起動して待たない。
+- 前回の作業は作業ツリーに載っている(上の「前回の試行で分かったこと」)。`git status` と `.prior-work.md` で状態を確かめてから、続きから行う。
 
 ## 報告の規則
 
@@ -135,7 +164,8 @@ npm run build --prefix app && cargo test --locked --manifest-path lift/Cargo.tom
 ## 他のタスクとの関係
 
 - blocked_by: なし。
-- #{{101}}(像の読みを guest の要求の時まで遅らせる)と #{{102}}(Balance の分割。この Issue の移行元)の結果を使う。
-- #{{126}}(Fruity Filter を、ディレクトリの追加だけで足す)と #{{127}}(内蔵のプラグインを 1 本ずつ確かめる道具)は、この Issue の後。
-- 第 2 波(下書き番号 041〜085 の束)は、この Issue と #{{126}} と #{{127}} が閉じた後に起票する(`pm-work/issue-drafts/WAVES.md`)。
+- #1341(像の読みを guest の要求の時まで遅らせる)と #1342(Balance の分割。この Issue の移行元)の結果を使う。
+- #{{135}}(内蔵のプラグイン 160 本の像の配置。上の (7) の案 B)は、この Issue の後に入る。この Issue の受け入れは案 A で通る。
+- #1370(Fruity Filter を、ディレクトリの追加だけで足す)と #1371(内蔵のプラグインを 1 本ずつ確かめる道具)は、この Issue の後。
+- 第 2 波(下書き番号 041〜085 の束)は、この Issue と #1370 と #1371 が閉じた後に起票する(`pm-work/issue-drafts/WAVES.md`)。
 - `lift/` の変更は、main の `deploy.yml` を動かす(報告に書く)。

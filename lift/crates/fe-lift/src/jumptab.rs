@@ -29,7 +29,7 @@ pub fn lift(i: &Instruction, va: u64, t: &JumpTable, cx: &Cx<'_>, st: &mut Stats
     };
     let mut s = format!("{{ uint64_t t = {sel}; switch (t) {{ ");
     for &(case, target) in &t.cases {
-        s.push_str(&format!("case UINT64_C({:#x}): {}", case, crate::succ(cx, target, None, st)));
+        s.push_str(&format!("case UINT64_C({:#x}): {}", case, crate::succ(cx, target, None, va, st)));
     }
     s.push_str(&format!("default: fle_jumptab_miss(UINT64_C({va:#x}), t); }} }}"));
     let handler = match t.origin {

@@ -245,7 +245,7 @@ fn synthetic_generator_output() {
         // one case per distinct target, each a goto to a label of the same function
         for l in ["t0", "t1", "t2"] {
             let va = IB + b.labels[l] as u64;
-            assert!(c.contains(&format!("case UINT64_C({va:#x}): goto L_{va:x}; ")), "{l}");
+            assert!(c.contains(&format!("case UINT64_C({va:#x}): goto L_{va:x}; ")) || c.contains(&format!("case UINT64_C({va:#x}): fle_loop_tick(); goto L_{va:x}; ")), "{l}");
             assert!(c.contains(&format!("L_{va:x}: {{ ")), "label of {l}");
         }
         assert_eq!(c.matches("case UINT64_C(").count(), 3);
@@ -518,7 +518,7 @@ fn real_blend2d_f_4709ea0_every_index_reaches_the_table_target_by_default() {
     assert_eq!(sw.matches("case UINT64_C(").count(), 6, "{sw}");
     for r in &t.rvas {
         let va = IBASE + *r as u64;
-        assert!(sw.contains(&format!("case UINT64_C({va:#x}): goto L_{va:x}; ")), "{va:#x}: {sw}");
+        assert!(sw.contains(&format!("case UINT64_C({va:#x}): goto L_{va:x}; ")) || sw.contains(&format!("case UINT64_C({va:#x}): fle_loop_tick(); goto L_{va:x}; ")), "{va:#x}: {sw}");
         assert_eq!(f.matches(&format!("L_{va:x}: {{ ")).count(), 1, "label {va:#x}");
     }
     assert!(sw.contains(&format!("fle_jumptab_miss(UINT64_C({SITE:#x}), t)")));
@@ -872,7 +872,7 @@ fn f16_native_and_lifted(f: &F16, dll: &Path, data: &[u8], seeds: &[u64]) {
     let sw = func.lines().find(|l| l.starts_with(&format!("L_{:x}: ", f.site))).unwrap_or_else(|| panic!("{}: no line of the site", f.tag));
     assert_eq!(sw.matches("case UINT64_C(").count() as u64, f.entries, "{}: {sw}", f.tag);
     for t in &table {
-        assert!(sw.contains(&format!("case UINT64_C({t:#x}): goto L_{t:x}; ")), "{}: {t:#x}", f.tag);
+        assert!(sw.contains(&format!("case UINT64_C({t:#x}): goto L_{t:x}; ")) || sw.contains(&format!("case UINT64_C({t:#x}): fle_loop_tick(); goto L_{t:x}; ")), "{}: {t:#x}", f.tag);
         assert_eq!(func.matches(&format!("L_{t:x}: {{ ")).count(), 1, "{}: label {t:#x}", f.tag);
     }
     assert!(sw.contains(&format!("fle_jumptab_miss(UINT64_C({:#x}), t)", f.site)), "{}", f.tag);
