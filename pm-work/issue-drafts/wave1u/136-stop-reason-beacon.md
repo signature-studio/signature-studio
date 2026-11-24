@@ -37,6 +37,22 @@ project: signature-studio/3
 - 注意: 停止の報告(stdout)と `fle:` の行(stderr)は、同じ束の中で順序が入れ替わる。だから、位置ではなく行の内容で探す。
 - 開く窓の答えの種類(`files.engine`): 答えは `app/src/files/engine-dialog.ts` の `select` で `filesUsage.c.engine.answered++` して `done(a)` に渡る。答えの項目(`a.items`)は guest パス(`guestPathOfOpfs`。`OPEN_FOLDER` の下)を持ち、読んだファイルの `file` は Open と folder の答えの項目に在る(Save の答えには無い)。名前とパスは記録しない(設計どおり)。
 
+## 前回の試行で分かったこと(run 45354929231。`failed`)
+
+- 作業は保存された。差分は取り込みの段で作業ツリーに載る。作業者の commit は `679df194`(作業者のツリーの commit。main には無い)。
+- 変更の要点(作業者の実装。受け入れのコマンドは変えていない):
+  - `app/src/perf/exit-message.ts`・`app/src/main.ts`: `engine.exit.stop`(`lastFle`・`stopLine`・`abortKind`・`memoryBytes`。`== stop:` の行が在る時だけ)と `engine.exit.evidence`(`first non-background pixel` の行)を、`engineLog.lines` の最後の 2,000 行から作る。`engine.exit.message` は変えていない。
+  - `app/src/files/usage.ts`・`app/src/files/engine-dialog.ts`・`app/shared/perf.ts`: `files.engine` に任意の鍵(`answeredUnderDemo`・`answeredFlp`・`answeredBytes` の 4 つのバケット)を足し、検査を足した。名前・パスは入れない。
+  - `app/src/perf/beacon.ts`: `stop` と `evidence` の合計を 1,200 バイト以下にし、`beaconText` の最後の段で捨てる段を足した。`BEACON_VERSION` は 3 のまま。
+  - `tools/perf-beacons/summary.mjs`: `--exits` の表に停止の項目と `files.engine` の数を出し、`--now <ISO 時刻>` を足した。
+  - 試験: `app/test/unit/exit-message.test.ts`・`perf-beacon.test.ts`・`files-usage.test.ts`。合成の fixture は `tools/perf-beacons/fixtures/stop/`(2 件)。
+  - 作業者の確認(runner の値。nproc 4、loadavg 2.1〜3.3): `npm test --prefix app` は 69 ファイル・1,370 件が合格。`guard/scan.sh` は 0 件。受け入れのコマンドは rc 0 で通った。
+- 作業者の実行の受け入れの値: 流れ A は `{"error":null,"state":"engine-idle","trapped":false,"hostErrors":0,"welcomeClosed":true,"opened":true,"elapsedMs":11541,"preBootBytes":311104861}`。流れ B・C・D の `elapsedMs` は 11,160〜11,495。
+- 判定の段で落ちた理由: 判定の段が受け入れを再実行した時、流れ A だけが `{"error":"timeout 20000 ms: Runtime.evaluate",...,"elapsedMs":11331}` で 1 回落ちた。流れ B・C・D は通った(`elapsedMs` 11,081・11,257・11,103)。判定の表示には「起動確認の結果が無い」も出た。
+- 推定(未確認): runner の一時的な負荷(loadavg 2.5 前後)。同じ bundle の流れ B・C・D が通るので、この変更の不具合とは考えにくい。
+- 次の試行でやること: 受け入れの式は変えない。流れ A の timeout への再試行は、本文に足さない(測定の道具の不具合なら、別の話)。取り込まれた差分を確かめ、受け入れをもう一度通す。流れ A がまた timeout で落ちたら、その行を報告に書く。
+- 報告に書く(前回の作業の分): 項目の形、停止の報告の中で取り出すようにした行(`fruity: abort kind`・`wf1:` の linear memory・最後の `fle:` の行・`== stop:`・`first non-background pixel`)、流れ A の JSON の 1 行。`app/` を変えたので、push で main の `deploy.yml` が動く。
+
 ## 読む物
 
 - `app/src/perf/exit-message.ts`(`engineExitMessage`・`sanitizeEngineText`・`EXIT_MESSAGE_MAX`)
@@ -113,7 +129,7 @@ npm test --prefix app && node tools/perf-beacons/summary.mjs tools/perf-beacons/
 ## 作業の進め方
 
 - 最初に `date -u` で開始の時刻を記録する。4 時間 30 分を過ぎたら、受け入れが通っていなくても、作業ツリーを commit し、報告を書いて終える(ジョブの上限は 5 時間 50 分)。
-- engine のビルドは約 35 分。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数は最大の 5400000 にする。背景で起動して待たない。
+- engine のビルドは約 35 分(直近は約 33 分。48 分かかった回もある)。フォアグラウンドで直接実行し、シェルツールの `timeout` 引数は最大の 5400000 にする。背景で起動して待たない。
 - `tools/smoke/welcome-flow.mjs` は流れを 4 つ(A・B・C・D)すべて走らせて 4 行を出す。判定に使うのは流れ A の行だけ。
 - blend2d の取得(GitHub)が 403 で落ちたら一時的。受け入れのコマンドは `lift/out-app/b2d-src` を消してから作り直すので、そのまま再試行する。
 - 作業の最後に、受け入れが通らなくても、作業ツリーを commit する。

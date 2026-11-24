@@ -100,7 +100,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - 通った: push の段が作った `Closes #N` の空の commit で、GitHub が Issue を閉じる(未確認。「9」)。report は「通った: <run の URL>」「commit: <SHA の URL>」「受け入れの出力(末尾 8 行)」をコメントする。Issue がまだ open のときは、「close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する」を追記し、GITHUB_TOKEN で閉じる。そのあと `running` を外す(開いたまま外すと、同じ Issue への別の run が、`running` の無い状態を見て再起動し得るため)。
 - 落ちた: 「落ちた: <run の URL>」「作業の状態」「失敗した段」「判定の出力(末尾 8 行)」をコメントし、`failed` を付けてから `running` を外す(逆順だと、外した直後の別の run が、`failed` の無い状態を見て再起動する)。
 - 取り消された(cancelled)・ジョブが動かなかった: 落ちたのと同じく `failed` を付ける。時間切れで取り消された作業は、取り消しの後の保存の段が `work.diff` に残し、コメントに「時間切れで取り消された」と「作業を保存した」(または「作業を保存できなかった」)を書く(「13」)。
-- push の段で落ちた(判定は通った): 作業は「4」の 8 の `work.diff` として artifact に残る。落ちた旨のコメントに「作業を保存した」を書く。次の再試行は、その差分を作業の前に取り込んでから始める。
+- push の段で落ちた(判定は通った): 作業は「4」の 8 の `work.diff` として artifact に残る。落ちた旨のコメントに「作業を保存した」を書く。次の再試行は、その差分を作業の前に取り込んでから始める。main との衝突で落ちたときは、「16」の自動の再試行の対象になる(拒否で落ちたときは対象外)。
 - 判定の段で落ちた(判定は通らなかった): 「4」の「判定が落ちた作業の保存と続きからの取り込み」のとおり、作業ツリーの差分を `work.diff` に残し、コメントに「作業を保存した」を書く。次の再試行は、それを commit せず続きから取り込む。
 - 再試行: Issue に `/retry` と書く、または `failed` ラベルを外す。`/retry` のときは start が `running` を付けてから `failed` を外す(逆順だと、外した直後の別の run が、`running` の無い状態を見て二重に起動し得る)。
 
@@ -108,7 +108,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 - ラベル(`running`・`failed`)とコメントは、start と report が GITHUB_TOKEN(`issues: write`)で行う。GITHUB_TOKEN で行った変更は次の run を起動しない(`workflow_dispatch`・`repository_dispatch` を除く)。そのため、start と report の書き込みで run が連鎖しない。
 - 通った Issue は、push の段が作る空の commit(`Closes #N`)で閉じる。push は App の token で行うので、この close は App の操作になり、`issues: closed` の run を起こすと想定する(未確認。「9」)。report は、Issue がまだ open のときだけ GITHUB_TOKEN で閉じる。GITHUB_TOKEN の close は run を起こさないため、後続は起動せず、PM が再評価する。
-- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・start・extract・report には渡さない。
+- App の鍵(`GH_APP_CLIENT_ID`・`GH_APP_PEM`、変数 `GH_APP_INSTALLATION_ID`)は、work ジョブの「名義を設定する」段と push の段にだけ渡す。select・start・extract・report には渡さない。例外: report の自動の再試行の起動の段(「自動の再試行を起動する」)だけは、再試行の Issue があるときに限り、鍵を受け取る(running を外す App の操作の 1 回。「16」)。
 - 作業者の段(opencode)には、どの token も鍵も無い(今と同じ)。
 - 本文の取得と、判定の道具の取り直しの段にだけ、GITHUB_TOKEN(`issues: read`・`contents: read`)を渡す。
 
@@ -122,6 +122,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - 作業ジョブの鍵の一時ファイル(`$RUNNER_TEMP/botid-config.json`)は、作業の段から読める(旧設計から同じ)。
 - **未確認**: `Closes #N` の空の commit で Issue が閉じるか。pull で merge commit ができたときも閉じるか。閉じなかった場合は、report が GITHUB_TOKEN で閉じ、後続は起動しない(「7」)。
 - **未確認**: App の操作で閉じた Issue が `issues: closed` の run を起こし、ブロックされていた後続を select が選ぶか。起きなければ、後続の Issue の本文を編集して `edited` を起こし、再評価する(上の `blocked_by_removed` と同じ手順)。
+- **未確認**: App の操作で外した `running`(`issues: unlabeled`)が run を起こし、select が Issue を選ぶか(「16」の再試行の起動)。起きなければ、再試行は起動せず、Issue に `running` が残る。PM が外す。
 
 ## 10. PM の決定
 
@@ -185,3 +186,16 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 ## 15. 公開のログに出さない値(endpoint とアカウント ID)
 
 このリポジトリのログは公開される。runner は `GITHUB_ENV` に書いた値を後続の全段の env 表示に出すため、endpoint とアカウント ID は `GITHUB_ENV` に書かず、runs-on/cache の段の `env:` には秘密(secrets)の値として渡す。runs-on/cache は endpoint を環境変数でしか受けないので、この移行は秘密の登録の後に行う(登録の前に移すと cache が壊れる。現行の書き方は、登録まで残る)。
+
+## 16. push の衝突の自動の再試行
+
+作業ジョブの「通った変更を main に push する」の段が、main との衝突(`git pull` の merge の衝突)で 3 回とも落ち、最後の試行が衝突だったときは、同じ Issue を自動で再試行する(手で `/retry` しなくてよい)。push の拒否(`remote rejected`・権限・保護による失敗)は対象外で、従来どおり `failed` を付ける(再試行しても同じ結果になるため)。
+
+- 印: push の段は、衝突のときだけ、GITHUB_OUTPUT に `push_conflict=true` を書き、衝突したファイルのうち `pm-work/` の外の名前を `out/push-conflict.txt` に残す(成果物 `agent-<番号>` に入る)。最後の試行が拒否なら、前の試行が衝突でも印を残さない。
+- 判定: 報告の「結果を集める」段が、作業ジョブの結論が failure で、Issue が open で、印(`out/push-conflict.txt`)が在るとき、Issue のコメントのうち印の行 `<!-- auto-retry:push-conflict -->` を含む物の数 k を数える。`tools/auto-retry.mjs decide` が、k が 2 未満なら `retry`、2 以上なら `fail` を出す。
+- retry(k が 2 未満): 報告が、印の行と「自動で 1 回やり直す(k+1/2)」を含むコメントを書く(GITHUB_TOKEN)。`failed` は付けない。`running` の除去は、報告の最後の段(App の token)で行う。
+- fail(k が 2 以上): 従来どおり `failed` を付け、「自動の再試行を 2 回行ったが、衝突が続く。人手(PM)が見る」と書く。
+- 上限: 1 つの Issue につき自動の再試行は 2 回まで(初回と合わせて最大 3 回の push)。数えるのは印の行の入ったコメントだけなので、人の `/retry` は数えを増やさず、上限も変わらない。
+- 起動の方式: GITHUB_TOKEN で行ったコメント・ラベルの変更は、次の run を起こさない。そこで、再試行の起動の段は App の token で `running` を外す。外すと `issues: unlabeled` のイベントが起き、select が Issue を選ぶ(`failed` が無く、`running` も無いため)。同じ Issue の run は concurrency(`agent-<番号>`、`cancel-in-progress: false`)で直列になるので、再試行の run は、今の run(報告まで)が終わってから始まる。再試行の run は、前回の作業(`work.diff`)を「前回の作業を取り込む」の段で載せてから始め、受け入れを通して push する。
+- 鍵: App の鍵を受け取るのは、報告の「自動の再試行を起動する」の段だけで、再試行の Issue があるときにだけ動く(「8」)。その段は、botid の設定を作り、`gh` の設定ディレクトリを使って `running` を外し、使い終えた鍵の一時ファイルと `hosts.yml` を消す。
+- 確認の状態: 印の数え方と判定と、`running` の除去の呼び出しは `spec/auto-retry.test.mjs` と `spec/workflow.test.sh` の (u) で確かめる。App の操作が run を起こすことと、報告の段が App の名義で `gh` を使えることは、実際の run で確かめるまで未確認(「9」)。

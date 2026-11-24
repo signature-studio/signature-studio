@@ -24,6 +24,12 @@
 //   webview2Methods: the names of the methods in those lines, in the order of their first appearance, each once (the fire lines are not methods: they are left out). The lines themselves go to stderr (the record of #1355). Judged: only that CreateCoreWebView2EnvironmentWithOptions is in it.
 //   webview2Fired: the event names of the fire lines (`webview2: fire <event> ...`, the events the model called on the page's handlers), in the order of their first appearance, each once. Judged: NavigationCompleted is in it.
 //   navigateCalls: the number of the lines of Navigate, NavigateToString, ExecuteScript, PostWebMessageAsJson and PostWebMessageAsString (what FL hands to the WebView2 for a page). Not judged (the record of #1355).
+//   Issue #1376: states.<welcome|frontWindow|fileMenu|none> (in this order, one start): the front windows are window.__app.webview2Front() (the windows painted over the face, from the window table).
+//     overlapped: a front rectangle meets the face's rectangle (not for none). frontRect: the front rectangle with the largest overlap (CSS px from #stage; null when none). frontCount: the front rectangles.
+//     overlapPoints: the grid points (2 CSS px) of every front rectangle shrunk by 2 CSS px that elementFromPoint gives the face for (judged 0). bottomHit (fileMenu): the tagName 4 CSS px inside the bottom edge of the largest (judged CANVAS).
+//     method: 'as-is' (overlapped without a move), 'drag' (the window that the list gives for the state was dragged from its top edge to BROWSER_TARGET, guest px), 'no window' (none was there to drag). window: {cls, title} of the dragged one.
+//     startStalls: the starts that did not reach engine-idle within START_LIMIT_MS and were loaded again (START_TRIES = 4; the judgement uses the start that reached it).
+//     none.clipMatchesBounds: boundsMatch and the face's clip-path is empty. The order: welcome (the start), Escape (the Welcome closes), frontWindow (the box, dragged over the Browser if it is not), Escape, the cloud tab's press, fileMenu (click at guest 18,20), Escape, none.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -88,7 +94,38 @@ const TITLE = `document.title`;
 const FACE_WAIT_MS = 15000;
 const BOUNDS_MATCH_CSS = 2;
 const BROWSER_GUEST = { x: 0, y: 76, w: 364, h: 974 };
-const FACE = `(() => { const s = document.getElementById('stage').getBoundingClientRect(); const d = document.getElementById('desktop').getBoundingClientRect(); const a = window.__app; const g = a && a.screen && a.screen.guest ? a.screen.guest : null; const frames = Array.from(document.querySelectorAll('iframe[data-fl-webview2]')); const f = frames[0] ? frames[0].getBoundingClientRect() : null; return { stage: { x: s.x, y: s.y }, desk: { x: d.x, y: d.y, w: d.width, h: d.height }, guestW: g ? g.width : null, count: frames.length, rect: f ? { x: f.x - s.x, y: f.y - s.y, w: f.width, h: f.height } : null, srcdocLength: frames[0] ? (frames[0].srcdoc || '').length : null, frameBackground: frames[0] ? getComputedStyle(frames[0]).backgroundColor : null }; })()`;
+// Issue #1376: the front windows (window.__app.webview2Front(): l, t, r, b per window painted over the face, guest px on the guest's screen) and the window list (the describe text of the picture)
+const FRONT = `window.__app.webview2Front()`;
+const WINDOWS = `(async () => (await window.__app.deskDumpBase64(false)).windows)()`;
+const WINDOW_LINE = /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+).* class "([^"]*)" title "([^"]*)"$/;
+const WELCOME_CLASS = 'TWelcomeWizard';
+const MENU_CLASS = 'TQuickPopupMenuWindow';
+const MENU_AT = { x: 18, y: 20 };                                  // the File menu: a click at guest (18, 20) (tools/verify-kit/tools/sdriveg2-export.mjs)
+const BROWSER_TARGET = { x: BROWSER_GUEST.x + 10, y: BROWSER_GUEST.y + 250 };   // a window that is moved over the Browser: its top-left corner goes to this guest point
+const MAIN_SHARE = 0.8;                                            // a top-level window of at least this share of the guest's screen in both directions is the main form
+const STATE_SETTLE_MS = 1500;
+const DRAG_SETTLE_MS = 1500;
+const DRAG_STEPS = 12;
+const CANDIDATE_WAIT_MS = 20000;
+const MENU_WAIT_MS = 6000;
+const WINDOW_POLL_MS = 500;
+const START_LIMIT_MS = 40000;                                   // a start that has not reached engine-idle by then is loaded again (START_TRIES times; the last one has WAIT_LIMIT_MS)
+const START_TRIES = 4;
+/** the top-level windows of a describe text (lid, x, y, w, h in guest px, cls, title) */
+export function parseWindows(text) {
+  return String(text ?? '').split('\n').map((l) => WINDOW_LINE.exec(l)).filter((m) => m !== null).map((m) => ({ lid: +m[1], x: +m[2], y: +m[3], w: +m[4], h: +m[5], cls: m[6], title: m[7] }));
+}
+/** the area in which two rectangles {x, y, w, h} overlap (0 when they do not) */
+export function overlapArea(a, b) {
+  const w = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return w > 0 && h > 0 ? w * h : 0;
+}
+/** the grid points (2 CSS px) of each front rectangle, shrunk by 2 CSS px on each side: the number of them, and of those where elementFromPoint gives the face (the mark FACE_ATTR) */
+const HIT_POINTS = (rects) => `(() => { const s = document.getElementById('stage').getBoundingClientRect(); let points = 0, hits = 0; for (const r of ${JSON.stringify(rects)}) { for (let x = r.x + 2; x <= r.x + r.w - 2; x += 2) for (let y = r.y + 2; y <= r.y + r.h - 2; y += 2) { points++; const e = document.elementFromPoint(Math.floor(s.x + x), Math.floor(s.y + y)); if (e && e.hasAttribute('data-fl-webview2')) hits++; } } return { points, hits }; })()`;
+/** the tagName of the element 4 CSS px inside the bottom edge of the rectangle r (the middle of its width) */
+const BOTTOM_HIT = (r) => `(() => { const s = document.getElementById('stage').getBoundingClientRect(); const e = document.elementFromPoint(Math.floor(s.x + ${r.x + r.w / 2}), Math.floor(s.y + ${r.y + r.h - 4})); return e ? e.tagName : null; })()`;
+const round3 = (r) => ({ x: Math.round(r.x * 1000) / 1000, y: Math.round(r.y * 1000) / 1000, w: Math.round(r.w * 1000) / 1000, h: Math.round(r.h * 1000) / 1000 });
+const FACE = `(() => { const s = document.getElementById('stage').getBoundingClientRect(); const d = document.getElementById('desktop').getBoundingClientRect(); const a = window.__app; const g = a && a.screen && a.screen.guest ? a.screen.guest : null; const frames = Array.from(document.querySelectorAll('iframe[data-fl-webview2]')); const f = frames[0] ? frames[0].getBoundingClientRect() : null; return { stage: { x: s.x, y: s.y }, desk: { x: d.x, y: d.y, w: d.width, h: d.height }, guestW: g ? g.width : null, guestH: g ? g.height : null, clip: frames[0] ? frames[0].style.clipPath : null, count: frames.length, rect: f ? { x: f.x - s.x, y: f.y - s.y, w: f.width, h: f.height } : null, srcdocLength: frames[0] ? (frames[0].srcdoc || '').length : null, frameBackground: frames[0] ? getComputedStyle(frames[0]).backgroundColor : null }; })()`;
 const PUT_BOUNDS = /put_Bounds \(\S+\) bounds=(-?\d+),(-?\d+),(-?\d+),(-?\d+)(?: origin=(-?\d+),(-?\d+))?/;
 /** the number of pixels of a PNG (base64, decoded in the page) whose R, G and B are all <= BLACK_MAX, and the number of pixels */
 const countBlack = (b64) => `(async () => { const img = new Image(); img.src = 'data:image/png;base64,${b64}'; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const g = c.getContext('2d'); g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, c.width, c.height).data; let black = 0; for (let i = 0; i < px.length; i += 4) if (px[i] <= ${BLACK_MAX} && px[i + 1] <= ${BLACK_MAX} && px[i + 2] <= ${BLACK_MAX}) black++; return { black, n: c.width * c.height }; })()`;
@@ -186,7 +223,7 @@ export function findBrowser(windows) {
 
 async function main() {
   const t0 = Date.now();
-  const out = { dpr: DPR, state: null, standIn: null, error: null, blackShare: null, guestBlackShare: null, browserComponents: null, elapsedMs: null, preBootBytes: null, browserWindow: null, webview2Lines: null, webview2Methods: null, webview2Fired: null, navigateCalls: null, cloudPressed: false, iframeCount: 0, iframeRect: null, boundsRect: null, boundsMatch: false };
+  const out = { dpr: DPR, state: null, standIn: null, error: null, blackShare: null, guestBlackShare: null, browserComponents: null, elapsedMs: null, preBootBytes: null, browserWindow: null, webview2Lines: null, webview2Methods: null, webview2Fired: null, navigateCalls: null, cloudPressed: false, iframeCount: 0, iframeRect: null, boundsRect: null, boundsMatch: false, startStalls: 0, states: {} };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-browser-panel-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
@@ -214,10 +251,6 @@ async function main() {
     await S('Page.enable');
     await S('Emulation.setDeviceMetricsOverride', { width: VIEW_START.width, height: VIEW_START.height, deviceScaleFactor: DPR, mobile: false });
 
-    // the first engine-idle: elapsedMs from the navigation
-    navAt = Date.now();
-    const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
-    if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
     const waitState = async (limitMs) => {
       const t = Date.now();
       for (;;) {
@@ -227,7 +260,18 @@ async function main() {
         await sleep(POLL_MS);
       }
     };
-    const first = await waitState(WAIT_LIMIT_MS);
+    // the first engine-idle: elapsedMs from the navigation. A start that is still 'running' after START_LIMIT_MS is loaded again (out.startStalls counts them: a stall of the engine's start-up
+    // was seen in this runner, with the bundle that starts in about 8 s otherwise); the last start has the whole WAIT_LIMIT_MS
+    let first = null;
+    for (let attempt = 1; attempt <= START_TRIES; attempt++) {
+      navAt = Date.now();
+      const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
+      if (nav.errorText) throw new Error(`navigate: ${nav.errorText}`);
+      first = await waitState(attempt < START_TRIES ? START_LIMIT_MS : WAIT_LIMIT_MS);
+      if (first.at !== null) break;
+      if (attempt < START_TRIES) out.startStalls++;
+      log('start', { attempt, state: first.state, stalled: true });
+    }
     out.state = first.state;
     out.elapsedMs = first.at !== null ? first.at - navAt : null;
     if (first.state !== 'engine-idle') throw new Error(`no engine-idle within ${WAIT_LIMIT_MS} ms (state ${first.state ?? 'window.__app not set'})`);
@@ -249,15 +293,82 @@ async function main() {
     out.dpr = room.dpr;
     log('room', { sw: room.sw, sh: room.sh, desktop: [room.x, room.y, room.w, room.h], dpr: room.dpr, guest: room.guest });
 
-    // Issue #1362: the judgement comes after the cloud tab has been pressed once (probe-navigate.mjs's press). The Welcome window covers the Browser at the start, and then the
-    // "Problems loading the project" box does: Escape closes the first (flow B: the project opens when the title changes), Escape the second (probe-navigate.mjs's steps)
+    // Issue #1376: the measurement of the four states of the front windows, in this order: welcome (the Welcome window, at the start), frontWindow (the "Problems loading the project" box, which the
+    // project's opening brings: a window in front of the main form), then, after the cloud tab's press (below), fileMenu (the File menu open) and none (it closed again). A window that does not
+    // overlap the Browser is moved over it by a drag from its top edge (method 'drag'); a state with no such window is 'no window' and not overlapped.
+    // the window list is refused while the picture is being shown ("ask again"): asked again after a moment
+    const windowsNow = async () => {
+      for (let t = 0; ; t++) {
+        try { return parseWindows(await ev(WINDOWS)); } catch (e) {
+          if (t >= 20 || !/ask again/.test(String(e?.message ?? e))) throw e;
+          await sleep(250);
+        }
+      }
+    };
+    const guestOf = async () => { const f = await ev(FACE); return { w: f.guestW, h: f.guestH }; };
+    const waitFor = async (fn, ms) => { for (let t = 0; t <= ms; t += WINDOW_POLL_MS) { const v = await fn(); if (v) return v; await sleep(WINDOW_POLL_MS); } return null; };
+    const measureState = async (name, bottom) => {
+      const f = await ev(FACE);
+      const k = f.desk.w / f.guestW;
+      const quads = await ev(FRONT);
+      const rects = [];
+      for (let i = 0; i + 3 < quads.length; i += 4) rects.push({ x: f.desk.x - f.stage.x + quads[i] * k, y: f.desk.y - f.stage.y + quads[i + 1] * k, w: (quads[i + 2] - quads[i]) * k, h: (quads[i + 3] - quads[i + 1]) * k });
+      const br = f.rect;
+      const over = br ? rects.filter((r) => overlapArea(r, br) > 0) : [];
+      const largest = over.length > 0 ? over.reduce((p, c) => (overlapArea(c, br) > overlapArea(p, br) ? c : p)) : null;
+      const hits = rects.length > 0 ? await ev(HIT_POINTS(rects)) : { points: 0, hits: 0 };
+      const st = { overlapped: over.length > 0, frontRect: largest ? round3(largest) : null, frontCount: rects.length, overlapPoints: hits.hits, overlapPointCount: hits.points, clip: f.clip };
+      if (bottom && largest) st.bottomHit = await ev(BOTTOM_HIT(largest));
+      return st;
+    };
+    const dragWindow = async (win, target) => {
+      const f = await ev(FACE);
+      const k = f.desk.w / f.guestW;
+      const at = (gx, gy) => ({ x: f.desk.x + (gx + 0.5) * k, y: f.desk.y + (gy + 0.5) * k });
+      const gx = win.x + Math.min(60, win.w / 2), gy = win.y + 6;
+      const dx = target.x - win.x, dy = target.y - win.y;
+      const p0 = at(gx, gy);
+      await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p0.x, y: p0.y, button: 'none', buttons: 0, clickCount: 0, pointerType: 'mouse' });
+      await sleep(60);
+      await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: p0.x, y: p0.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+      for (let i = 1; i <= DRAG_STEPS; i++) {
+        const p = at(gx + (dx * i) / DRAG_STEPS, gy + (dy * i) / DRAG_STEPS);
+        await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: 0, pointerType: 'mouse' });
+        await sleep(40);
+      }
+      const pe = at(gx + dx, gy + dy);
+      await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pe.x, y: pe.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+      log('drag', { window: win.cls, from: [win.x, win.y], to: [target.x, target.y], grab: [gx, gy] });
+    };
+    const judgeState = async (name, pick, bottom = false) => {
+      let st = await measureState(name, bottom);
+      let method = 'as-is', win = null;
+      if (pick && !st.overlapped) {
+        const g = await guestOf();
+        win = await waitFor(async () => pick(await windowsNow(), g), CANDIDATE_WAIT_MS);
+        if (win) {
+          await dragWindow(win, BROWSER_TARGET);
+          await sleep(DRAG_SETTLE_MS);
+          st = await measureState(name, bottom);
+          method = 'drag';
+        } else method = 'no window';
+      }
+      log('state', name, { method, window: win ? `${win.cls} | ${win.title}` : null, overlapped: st.overlapped, frontRect: st.frontRect, frontCount: st.frontCount, overlapPoints: st.overlapPoints, clip: st.clip, bottomHit: st.bottomHit ?? null });
+      log('top-level', name, (await windowsNow()).map((w) => `${w.cls}|${w.title}|${w.x},${w.y} ${w.w}x${w.h}`));
+      return { ...st, method, window: win ? { cls: win.cls, title: win.title } : null };
+    };
     const titleBefore = await ev(TITLE);
+    await sleep(STATE_SETTLE_MS);
+    out.states.welcome = await judgeState('welcome', (ws) => ws.find((w) => w.cls === WELCOME_CLASS) ?? null);
     await pressKey(S, 'Escape', 27);
     for (let t = 0; t < OPEN_WAIT_MS; t += POLL_MS) {
       if ((await ev(TITLE)) !== titleBefore && (await ev(STATE))?.state === 'engine-idle') break;
       await sleep(POLL_MS);
     }
     await sleep(2000);
+    await sleep(STATE_SETTLE_MS);
+    out.states.frontWindow = await judgeState('frontWindow', (ws, g) => ws.find((w) => w.cls !== WELCOME_CLASS && w.cls !== MENU_CLASS && !(w.w >= MAIN_SHARE * g.w && w.h >= MAIN_SHARE * g.h)) ?? null);
+    // the "Problems loading the project" box is closed (Escape, probe-navigate.mjs's second step): the cloud tab can be pressed
     await pressKey(S, 'Escape', 27);
     await sleep(DISMISS_MS);
     const face0 = await ev(FACE);
@@ -277,6 +388,17 @@ async function main() {
     }
     await sleep(TAB_SETTLE_MS);
     if (process.argv[3]) fs.writeFileSync(`${process.argv[3]}-after.png`, Buffer.from((await S('Page.captureScreenshot', { format: 'png' })).data, 'base64'));
+
+    // Issue #1376: fileMenu (the File menu opened by a click at guest (18, 20), its window in the list), then none (the menu closed with Escape; nothing is in front of the Browser)
+    await pressCss(S, { x: face0.desk.x + (MENU_AT.x + 0.5) * cssPerGuest0, y: face0.desk.y + (MENU_AT.y + 0.5) * cssPerGuest0 });
+    await waitFor(async () => (await windowsNow()).some((w) => w.cls === MENU_CLASS), MENU_WAIT_MS);
+    await sleep(STATE_SETTLE_MS);
+    out.states.fileMenu = await judgeState('fileMenu', null, true);
+    await pressKey(S, 'Escape', 27);
+    await waitFor(async () => !(await windowsNow()).some((w) => w.cls === MENU_CLASS), MENU_WAIT_MS);
+    await sleep(STATE_SETTLE_MS);
+    out.states.none = await judgeState('none', null);
+    delete out.states.none.overlapped;
 
     // the picture after the engine has been idle for a while (the lists are painted after the start-up)
     await sleep(SETTLE_MS);
@@ -310,6 +432,8 @@ async function main() {
       out.boundsRect = { x: face.desk.x - face.stage.x + (ox + l) * k, y: face.desk.y - face.stage.y + (oy + t) * k, w: (r - l) * k, h: (b - t) * k };
     }
     out.boundsMatch = out.iframeCount >= 1 && out.iframeRect !== null && out.boundsRect !== null && ['x', 'y', 'w', 'h'].every((key) => Math.abs(out.iframeRect[key] - out.boundsRect[key]) <= BOUNDS_MATCH_CSS);
+    if (out.states.none) out.states.none.clipMatchesBounds = out.boundsMatch === true && out.states.none.clip === '';
+    for (const st of Object.values(out.states)) delete st.clip;
     // the page's own picture of the Browser's area (CSS pixels of the room at DPR 1): what the person sees
     const shot = await S('Page.captureScreenshot', { format: 'png', clip: { x: face.desk.x, y: face.desk.y + BROWSER_GUEST.y * k, width: BROWSER_GUEST.w * k, height: BROWSER_GUEST.h * k, scale: 1 }, captureBeyondViewport: false });
     const shotBlack = await ev(countBlack(shot.data));
