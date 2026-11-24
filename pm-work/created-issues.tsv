@@ -82,3 +82,7 @@
 146	#1386	Piano roll のコード進行ツールの Start creating を押すと engine が止まる(crash)を直す	Task
 147	#1387	Piano roll のリフ マシーン(Riff machine)が、起動しようとしても何も反応しない(窓が出ない)を直す	Task
 148	#1388	emscripten(emcc・em++・emar・emsdk)を使わず、zig cc で、生成した C の compile と link ができるかを、実測で決める: 速度・出力の同一性・JSPI と pthread の扱い	Task
+138	#1389	FL のクリップボード(コピー・貼り付け)を、ページの Clipboard API(navigator.clipboard)と navigator.permissions に結ぶ	Task
+139	#1390	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 1): 標準のカーソルと、窓の端のサイズ変更の矢印	Task
+140	#1391	FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際の値を出す	Task
+144	#1392	FL のマウスカーソルを、ゲストが設定した実物のカーソルに従わせる(段 2): FL 自身のカーソル(Piano roll の鉛筆など)を、資源の画素のまま出す	Task
