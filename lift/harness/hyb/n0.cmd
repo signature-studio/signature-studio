@@ -1,7 +1,7 @@
 --modules
-lift/harness/hyb/hyb-args.tsv
+lift/out-app/plugins/hyb-args.tsv
 --lists
-lift/harness/hyb/lists
+lift/out-app/plugins/lists
 --dll-dir
 lift/out-app/dll
 --args

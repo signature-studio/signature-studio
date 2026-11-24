@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args
+effects.dummy-one.dummy_one_x64.dll	Plugins\Fruity\Effects\Dummy One\Dummy One_x64.dll	本体	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb	1000	none	

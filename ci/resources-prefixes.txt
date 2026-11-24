@@ -12,3 +12,5 @@ Data\Patches\Scores\Arpeggiator\Riff machine\
 Data\Patches\Scores\Quantization\Riff machine\
 Data\Patches\Scores\Chopping\Riff machine step 1\
 Data\Patches\Scores\Chopping\Riff machine step 2\
+Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\
+Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\

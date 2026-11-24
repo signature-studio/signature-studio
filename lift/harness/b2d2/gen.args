@@ -1,5 +1,5 @@
 --modules
-lift/harness/b2d2/modules.tsv
+lift/out-app/plugins/modules.tsv
 --fle-args
 lift/harness/b2d2/fle.args
 --host
@@ -9,6 +9,6 @@ lift/out-app/gen
 --split-bytes
 10000000
 --omit-list
-lift/harness/hyb/lowered-all.txt
+lift/out-app/plugins/lowered-all.txt
 --extra-rows
 lift/harness/fruity-rows.txt

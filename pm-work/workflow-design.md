@@ -52,6 +52,7 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
     - `Data\Patches\Scores\Quantization\Riff machine\`: 9 件・3,908 B(#1387)。
     - `Data\Patches\Scores\Chopping\Riff machine step 1\`: 24 件・6,311 B(#1387)。
     - `Data\Patches\Scores\Chopping\Riff machine step 2\`: 19 件・2,807 B(#1387)。
+  - #1373 で足した 2 件(`ci/resources-prefixes.txt` の 17〜18 行目。demo の曲の素材で、曲のフォルダ単位)。`Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\`: 4 件・877,543 B。`Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\`: 5 件・694,532 B。
   - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入るだけ。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
 - 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
 

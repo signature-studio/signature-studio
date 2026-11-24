@@ -538,9 +538,9 @@ ok "fl-exe: 作業ジョブに R2_ARTIFACT の鍵を使う段が無い(取り出
 ok "fl-exe: 作業ツリーの lift/out-app/host-extra/exe は git の対象外" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/exe/FL64.exe && echo yes)" yes
 # (r) 接頭辞の一覧は、ci/ の 1 行 1 接頭辞のファイル(resources・plugin-builtin)。extract の取り出しは一覧を読み、鍵の hashFiles に一覧のファイルを入れる(一覧を変えると鍵が変わり、古いキャッシュは使われない)。fl-exe の完全なパスは鍵の文字列に入れる
 RPF=$top/ci/resources-prefixes.txt; PPF=$top/ci/plugin-builtin-prefixes.txt
-ok "接頭辞(r): ci/resources-prefixes.txt は、この 14 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む。末尾の 6 件は #1386 の Chord progression・Python の実行環境と、#1387 の Riff machine)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\|System\Tools\Chord progression\|Shared\Python\|Data\Patches\Scores\Arpeggiator\Riff machine\|Data\Patches\Scores\Quantization\Riff machine\|Data\Patches\Scores\Chopping\Riff machine step 1\|Data\Patches\Scores\Chopping\Riff machine step 2\'
+ok "接頭辞(r): ci/resources-prefixes.txt は、この 16 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む。末尾の 6 件は #1386 の Chord progression・Python の実行環境と、#1387 の Riff machine。その後の 2 件は #1373 の demo の素材の 2 曲のフォルダ)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\|System\Tools\Chord progression\|Shared\Python\|Data\Patches\Scores\Arpeggiator\Riff machine\|Data\Patches\Scores\Quantization\Riff machine\|Data\Patches\Scores\Chopping\Riff machine step 1\|Data\Patches\Scores\Chopping\Riff machine step 2\|Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\|Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\'
 ok "接頭辞(r): ci/plugin-builtin-prefixes.txt は、この 2 件を、この順で、1 行 1 接頭辞で持つ" "$(paste -sd'|' "$PPF" 2>/dev/null)" 'Plugins\Fruity\Effects\|Plugins\Fruity\Generators\'
-ok "接頭辞(r): 2 つのファイルは、合わせて 16 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "16/0/0"
+ok "接頭辞(r): 2 つのファイルは、合わせて 18 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "18/0/0"
 ok "接頭辞(r): 一覧は、Blocks が使う DNC_*.wav(Data\Patches\Packs\Legacy\Drums\Dance\ の下)を取り出す接頭辞を 1 つ持つ(\\ で終わる行が 1 つ)" "$(grep -cxF 'Data\Patches\Packs\Legacy\Drums\Dance\' "$RPF" 2>/dev/null)" 1
 ok "接頭辞(r): その接頭辞の下の DNC_*.wav は、インストーラの一覧で 21 件(接頭辞の取り出しで全件が入る)" "$(grep -cF 'Data\Patches\Packs\Legacy\Drums\Dance\DNC_' "$top/inputs/fl-installer-files.tsv")" 21
 # (r2) #1386・#1387 の 6 件: Chord progression(FL 内蔵の Python のスクリプト)・Python の実行環境・Riff machine の資料。件数と大きさは一覧で数える(大きさは dll・exe と Data\ の物だけ)
@@ -555,6 +555,9 @@ ok "接頭辞(r2): 設計の文書の接頭辞の節に、追加の 6 件をそ�
 RIF='Data\System\Riff machine\'
 ok "接頭辞(r3): 一覧の Data\System\Riff machine\ は 8 件で、大きさの合計は 17,346 B" "$(P="$RIF" awk -F'\t' 'NR>2 && index($1, ENVIRON["P"])==1 {n++; s+=$2} END{print n+0"/"s+0}' "$INST")" "8/17346"
 ok "接頭辞(r3): その 8 件は全て、接頭辞の一覧のいずれかで取り出される(一覧の Data\System\ が、この 8 件を覆う)" "$(RIF="$RIF" awk -F'\t' 'FNR==NR {if ($0 != "") p[++n]=$0; next} index($1, ENVIRON["RIF"])==1 {t++; for (i=1; i<=n; i++) if (index($1, p[i])==1) {c++; break}} END{print c+0"/"t+0}' "$RPF" "$INST")" "8/8"
+# (r4) #1373 の demo の素材(Used by demo projects の 2 曲のフォルダ)は、曲のフォルダ単位の 2 件の接頭辞で取り出される(一覧の 9 件。DEDZII 4 件 877,543 B・Mehran Abbasi - With You 5 件 694,532 B)
+MD='Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\'; MM='Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\'
+ok "接頭辞(r4): 2 曲の接頭辞は、一覧で 4 件(877,543 B)と 5 件(694,532 B)を覆い、一覧の接頭辞の行に在る" "$(for P in "$MD" "$MM"; do P="$P" awk -F'\t' 'NR>2 && index($1, ENVIRON["P"])==1 {n++; s+=$2} END{print n+0"/"s+0}' "$INST"; done | paste -sd/ -)/$(grep -cxF -e "$MD" -e "$MM" "$RPF")" "4/877543/5/694532/2"
 RRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 PRUN=$(jq -r '[.jobs.extract.steps[] | select(.name == "内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)") | .run][0] // ""' "$J")
 ok "接頭辞(r): 言語等の取り出しは、一覧のファイルを読む 1 行と、配列を渡す 1 行で、接頭辞の直書きが無い" "$(grep -cxF 'mapfile -t prefixes < ci/resources-prefixes.txt' <<<"$RRUN")/$(grep -cF '"${prefixes[@]}"' <<<"$RRUN")/$(grep -cE "'[A-Za-z]+[\\]" <<<"$RRUN")" "1/1/0"
@@ -1157,7 +1160,7 @@ ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインス�
 ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
-ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行と、plugins/ の --lazy-file を持たない" "$(grep -cE 'plugin-worker/build[.]sh|lift/out-app/plugins/' "$NX" 2> /dev/null)" 0
-ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行と plugins/ の --lazy-file の対だけを除いた物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's| --lazy-file lift/out-app/plugins/[^ ]*||') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
