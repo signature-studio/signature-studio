@@ -487,15 +487,15 @@ const TEXT_REACH = 0x100000;
 const TEXT_HITS = 64;
 const TEXT_LINES = 2000;
 const TEXT_LINE_MAX = 400;
-const NEAR_PLACES = 24;
+const NEAR_PLACES = 400;
 const NEAR_RUNS = 200;
 
 const textUnit = (wide: boolean): number => (wide ? 2 : 1);
 const textChar = (b: Uint8Array, p: number, wide: boolean): number => (wide ? (b[p] ?? 0) | ((b[p + 1] ?? 0) << 8) : (b[p] ?? 0));
 const isText = (c: number): boolean => (c >= 0x20 && c <= 0x7e) || c === 0x09 || c === 0x0a || c === 0x0d;
 
-/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE: the first byte is found by indexOf and the rest compared */
-function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
+/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE, at most `limit`: the first byte is found by indexOf and the rest compared */
+function findPlaces(b: Uint8Array, s: string, wide: boolean, limit: number): number[] {
   const u = textUnit(wide);
   const pat = new Uint8Array(s.length * u);
   for (let i = 0; i < s.length; i++) {
@@ -507,7 +507,7 @@ function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
   const last = b.length - pat.length;
   const first = pat[0] ?? 0;
   let p = b.indexOf(first, 0);
-  while (p >= 0 && p <= last && out.length < TEXT_HITS) {
+  while (p >= 0 && p <= last && out.length < limit) {
     let k = 1;
     while (k < pat.length && b[p + k] === pat[k]) k++;
     if (k === pat.length) out.push(p);
@@ -558,11 +558,15 @@ function guestText(markers: string[], radius: number): void {
   for (const marker of markers) {
     for (const wide of [false, true]) {
       const enc = wide ? 'utf16le' : 'ascii';
-      for (const at of findPlaces(b, marker, wide)) {
-        const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
-        const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
-        if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
-        if (radius > 0 && near.length < NEAR_PLACES) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
+      // #1391: the runs near a place are listed for up to NEAR_PLACES places per encoding (the top bar's "<n> MB" is not cut off by the lowest addresses); the best text still comes from the first TEXT_HITS places
+      const places = findPlaces(b, marker, wide, radius > 0 ? NEAR_PLACES : TEXT_HITS);
+      for (const [i, at] of places.entries()) {
+        if (i < TEXT_HITS) {
+          const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
+          const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
+          if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
+        }
+        if (radius > 0) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
       }
     }
     if (best !== null && best.lineCount >= 3) break;
