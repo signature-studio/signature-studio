@@ -1324,7 +1324,9 @@ ok "E2E(x) 判定: 印の付いたシナリオが通ったら 0 のまま、警�
 ok "E2E(x) 判定: 印の無い全て正常なら、警告を出さない" "$(ej4 "$G")/$(grep -q '警告' "$T/ej.err" && echo warned || echo quiet)" "0/quiet"
 ok "E2E(x) 判定: 印の付いたシナリオの、ok が真で stuckToasts が 1 でも 0(印の Issue の欠陥)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true '"#1421"' 0 0 1 0),$(SC c true null 0 0 0 0)")")" 0
 EFD="$top/tools/e2e/scenarios/smoke/file-open-demo.mjs"
-ok "E2E(x): file-open-demo に、既知の欠陥の印(expectFail: '#<番号>')が付いている(既に在る欠陥で門を止めない)" "$(grep -cE "expectFail: '#[0-9]+'" "$EFD")" 1
+ok "E2E(x): file-open-demo の印は外れている(#1421 は完了。expectFail: null で、通らなければ門が止まる)" "$(grep -cE "expectFail: null" "$EFD")" 1
+ok "E2E(1484): plugin-manager-opens に、既知の欠陥の印(expectFail: '#1499')が付いている(窓が出る確認は #1499 で外す)" "$(grep -cE "expectFail: '#1499'" "$top/tools/e2e/scenarios/smoke/plugin-manager-opens.mjs")" 1
+ok "E2E(1484): smoke の index.mjs は Plugin Manager と Plugin database の 2 シナリオを並べる" "$(grep -cE '^import (pluginManager|pluginDatabase) from' "$top/tools/e2e/scenarios/smoke/index.mjs")" 2
 ok "E2E(x): 止まりの閾値(engine が running の時間)は 90 秒(この runner は GPU が無く、起動が遅い)" "$(grep -cF 'ms > 90000' "$top/tools/e2e/lib/detect.mjs")" 1
 ok "E2E(x): 窓の表の取得の再試行の回数を、シナリオの JSON に出す(dumpRetries)" "$(grep -cF 'out.dumpRetries = ' "$top/tools/e2e/run.mjs")" 1
 ok "E2E(x): 停止の理由を、シナリオの JSON に出す(engineStop)" "$(grep -cF 'out.engineStop = ' "$top/tools/e2e/run.mjs")" 1
