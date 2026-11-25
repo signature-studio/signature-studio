@@ -400,13 +400,15 @@ function applyScreenParam(manifest: Manifest): void {
 // the engine's state as the page sees it (src/ui/engine-status.ts)
 const clock: EngineClockState = { startedAt: null, firstIdleAt: null, lastIdleAt: null, lastResumeAt: null, ended: null, error: false, cycles: [] };
 let engineHasInput = false;
-const nowAbs = (): number => performance.timeOrigin + performance.now();
+const TIME_ORIGIN = performance.timeOrigin;   // constant for the document: read once (see input/pointer.ts)
+const nowAbs = (): number => TIME_ORIGIN + performance.now();
 const inputEnabled = (): boolean => engineHasInput && clock.firstIdleAt !== null && clock.ended === null && app.error === null;
 
 let inputSeq = 0;
 let lastInput: { desc: string; at: number; screen: { x: number; y: number } | null } | null = null;
 function sendRaw(ev: RawInput, from: string, meta?: InputMeta, user = true): void {
-  const tPage = nowAbs();
+  // a DOM input is sent from its listener, so the listener's start is the instant it was handled (one clock read per input, not two)
+  const tPage = meta ? meta.tListener : nowAbs();
   const seq = ++inputSeq;
   if (!user) { client.sendInput(seq, tPage, ev); return; }   // decision 0212: a display change is not a person's input: it is not counted and its answer is not a latency sample
   app.inputEvents++;

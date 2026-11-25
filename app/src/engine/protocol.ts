@@ -30,8 +30,6 @@ export type ToWorker =
   | { cmd: 'input'; seq: number; tPage: number; ev: RawInput }
   /** decision 0193: the person's answer to the engine's file dialog (the File objects are handed to the Worker, which reads them into the engine's memory) */
   | { cmd: 'filedlg-answer'; id: number; answer: FileDlgAnswer }
-  /** decision 0223: the page wrote to the input ring while the Worker was parked */
-  | { cmd: 'wake' }
   /** decision 0223 (a test aid, any display method): the compositor draws the whole desktop from the window table as it is now and the Worker sends the picture (R, G, B, A bytes) */
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
