@@ -851,6 +851,69 @@ void fle_spin_slice(void)
     if (schedule()) pst.switches++;
 }
 
+/* #1382: the libc's pthread mutexes (dlmalloc's global lock, and the others of the libc and Blend2D; lift/harness/web/link.rsp wraps pthread_mutex_lock and pthread_mutex_unlock). Every guest
+ * thread runs on the ONE host thread, so all of them have its tid, and musl's debug check (pthread_mutex_timedlock.c: "pthread mutex deadlock detected") traps when a thread takes a mutex
+ * that another thread holds. A mutex that another guest thread holds is waited for as Sleep(1) waits: the holder runs and releases it. A mutex that the same guest thread holds is not taken
+ * twice (the libc's mutexes are not recursive): that is a release that was skipped, and the run stops with the guest's rsp and the return address at it. */
+#include <errno.h>
+#include <pthread.h>
+#define FLE_MUTEX_HOLDERS    64u
+#define FLE_MUTEX_WAIT_LIMIT 100000u   /* Sleep(1) rounds (100 virtual seconds) before a wait is a deadlock */
+int __real_pthread_mutex_unlock(pthread_mutex_t *m);
+static struct { const pthread_mutex_t *m; unsigned thread; } mutex_held[FLE_MUTEX_HOLDERS];
+
+static int mutex_find(const pthread_mutex_t *m)
+{
+    unsigned k;
+    for (k = 0; k < FLE_MUTEX_HOLDERS; k++)
+        if (mutex_held[k].m == m) return (int)k;
+    return -1;
+}
+
+static void mutex_put(const pthread_mutex_t *m)
+{
+    unsigned k;
+    for (k = 0; k < FLE_MUTEX_HOLDERS; k++)
+        if (!mutex_held[k].m) {
+            mutex_held[k].m = m;
+            mutex_held[k].thread = cur;
+            return;
+        }
+    fle_stop("pthread_mutex_lock", "more mutexes held at once than the table keeps");
+}
+
+int __wrap_pthread_mutex_lock(pthread_mutex_t *m)
+{
+    unsigned waits = 0;
+    int r = pthread_mutex_trylock(m);
+
+    while (r == EBUSY) {
+        int k = mutex_find(m);
+
+        if (k < 0 || mutex_held[k].thread == cur) {
+            char why[200];
+            uint64_t rsp = R[4];
+
+            snprintf(why, sizeof why, "the mutex is held by this guest thread (%s): the libc's mutexes are not recursive, so a release was skipped (rsp %#llx, the return address at it %#llx)",
+                     k < 0 ? "not taken through the wrapper" : "taken through the wrapper", (unsigned long long)rsp, (unsigned long long)fle_ld(rsp, 8));
+            fle_stop("pthread_mutex_lock", why);
+        }
+        if (++waits > FLE_MUTEX_WAIT_LIMIT) fle_stop("pthread_mutex_lock", "deadlock: the mutex stays held by another thread");
+        fle_thread_sleep("pthread_mutex_lock", 1);
+        r = pthread_mutex_trylock(m);
+    }
+    if (r == 0) mutex_put(m);
+    return r;
+}
+
+int __wrap_pthread_mutex_unlock(pthread_mutex_t *m)
+{
+    int k = mutex_find(m);
+
+    if (k >= 0) mutex_held[k].m = NULL;
+    return __real_pthread_mutex_unlock(m);
+}
+
 void fle_thread_preempt_stats(fle_preempt_stats *out)
 {
     *out = pst;

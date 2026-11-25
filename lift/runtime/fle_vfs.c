@@ -462,6 +462,7 @@ typedef struct {
     int wild;        /* the last component has * or ? */
     uint16_t *own;
     size_t olen;     /* units of own: the path as the guest passed it (the log line of a missing path) */
+    int bad;         /* #1382: a colon in a directory component (not the drive, not a stream of the last component): the name is not valid (ERROR_INVALID_NAME) */
 } vpath;
 
 static int is_sep(uint16_t c) { return c == '\\' || c == '/'; }
@@ -517,12 +518,19 @@ static int is_device(const uint16_t *c, size_t cl)
 
 /* Naming rules from MSDN (Naming Files, Paths, and Namespaces). A name that breaks them is not given an error
  * code by the pages, so the run stops. */
-static void check_component(const char *api, vpath *v, const uint16_t *c, size_t cl, int wild_ok)
+static void check_component(const char *api, vpath *v, const uint16_t *c, size_t cl, int wild_ok, int last)
 {
     size_t k;
     if (cl > MAX_COMPONENT) fle_stop(api, "path component longer than 255 characters");
     for (k = 0; k < cl; k++) {
         uint16_t ch = c[k];
+        /* #1382 (inference from the Naming Files page: ':' is reserved for the volume and for the stream of a file, which is the last component's): a colon in a directory component
+         * is an invalid name, and the callers answer ERROR_INVALID_NAME (123) for it. The theme files of the install name a wallpaper with "D:\..." (BackHTMLFileName), which the guest
+         * joins to its folder. */
+        if (ch == ':' && !last) {
+            v->bad = 1;
+            return;
+        }
         if (ch < 32 || ch == '<' || ch == '>' || ch == '"' || ch == '|' || ch == ':')
             fle_stop(api, "reserved character in a path component (streams are not implemented)");
         if (ch == '*' || ch == '?') {
@@ -542,6 +550,7 @@ static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath 
     v->n = 0;
     v->trail = 0;
     v->wild = 0;
+    v->bad = 0;
     v->own = NULL;
     s = fle_w_read_alloc(api, guest, MAX_PATH_UNITS, &len);
     v->own = s;
@@ -575,7 +584,7 @@ static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath 
             } else if (cl == 2 && c[0] == '.' && c[1] == '.') {
                 if (v->n > 0) v->n--;
             } else {
-                check_component(api, v, c, cl, wild_last_ok && j == len);
+                check_component(api, v, c, cl, wild_last_ok && j == len, j == len);
                 vp_push(api, v, c, cl);
             }
         }
@@ -779,6 +788,11 @@ void fle_imp_CreateFileW(void)
     if (doc) del = 1;
 
     parse_path(api, R[1], 0, &v);
+    if (v.bad) {   /* #1382: ERROR_INVALID_NAME (123) for a colon in a directory component (parse_path) */
+        vp_free(&v);
+        fail(123, FLE_INVALID_HANDLE_VALUE);
+        return;
+    }
     if (v.trail) fle_stop(api, "a trailing separator in a CreateFile name is not defined");
     st = lookup(api, &v, &n, &par);
     if (st == 3) {
@@ -1269,6 +1283,11 @@ void fle_imp_FindFirstFileW(void)
 
     if (pdata == 0) fle_stop(api, "lpFindFileData is NULL");
     parse_path(api, R[1], 1, &v);
+    if (v.bad) {   /* #1382: ERROR_INVALID_NAME (123), as CreateFileW */
+        vp_free(&v);
+        fail(123, FLE_INVALID_HANDLE_VALUE);
+        return;
+    }
     if (v.trail || v.n == 0) {
         if (v.n == 0 && !v.trail) fle_stop(api, "a name that resolves to no component is not defined");
         vp_free(&v);
@@ -1442,6 +1461,11 @@ void fle_imp_GetFileAttributesW(void)
         return;
     }
     parse_path(api, R[1], 0, &v);
+    if (v.bad) {   /* #1382: ERROR_INVALID_NAME (123) for a colon in a directory component (parse_path) */
+        vp_free(&v);
+        fail(123, FLE_INVALID_FILE_ATTRIBUTES);
+        return;
+    }
     st = lookup(api, &v, &n, &par);
     if (st) note_missing(api, st, &v);
     vp_free(&v);
@@ -1483,6 +1507,11 @@ void fle_imp_GetFileAttributesExW(void)
         return;
     }
     parse_path(api, R[1], 0, &v);
+    if (v.bad) {   /* #1382: ERROR_INVALID_NAME (123) for a colon in a directory component (parse_path) */
+        vp_free(&v);
+        fail(123, 0);
+        return;
+    }
     st = lookup(api, &v, &n, &par);
     if (st) note_missing(api, st, &v);
     vp_free(&v);
