@@ -28,7 +28,27 @@ project: signature-studio/3
 - 事実 4(読み込みの経路 `lift/runtime/fle_load.c`・`lift/runtime/fle_wall_ia2.c` の `fle_ia2_path_absent`): 「Python\Python312.dll」の `LoadLibraryW` は、常に「見つからない(126)」と答える。この答えは、記録の上で選んだ choice(`fle_wall_ia2.c` の注と、`lift/harness/seeds/ia2-imports.txt` の W21 の行)。その注は「インストーラに Python312.dll が無い」と書くが、事実 2 の一覧には `Shared\Python\python312.dll` が在る。食い違い。この choice は、チャンネルラックの設定アイコン(ia2-W21)の要求にも効いている。
 - 事実 5(別の試行の記録 `pm-work/findings/blocks-samples-1366.md` の 4.3): Welcome の Default の行を開いた直後に、`[err] missing-path: LoadLibraryW 126 "Python\Python312.dll"` と `[err] fle: RaiseException: exception code 0xeedfade ...` が出て、engine が exit code 134 で止まった(測定の記録)。
 
-## 前回の試行で分かったこと(run 45540991873。3 回目)
+## 前回の試行で分かったこと(4 回目。run 45566401846。failed)
+
+数値は runner の値(nproc 4、loadavg 1.03 1.13 1.16)。
+
+- 判定は差し戻し。受け入れ未達(道具の `stopped` が true、`engine` が exited。DPR 1 と乱数の DPR)。`pythonLoaded` は true。作業の差分は work.diff に保存された(作業者の commit は作業者の環境の物で、main に無い)。次の試行は、`.prior-work.md` の取り込みで差分を載せてから続ける。記録は `pm-work/findings/chord-stop-1386.md` の「7」(差分に在る)。
+- 道具の JSON(最後の版。DPR 1): `{"tool":"chord-progression","dpr":1,"error":null,"engine":"exited","stopped":true,"presentedDelta":0,"pythonLoaded":true,"elapsedMs":11329,"preBootBytes":313241213}`。直前の版(DPR 1 と 2.25): `elapsedMs` 11,593 と 11,449、`preBootBytes` 313,240,871。
+- 流れ A〜D: 4 本とも条件を満たす(`elapsedMs` 11947・11744・12107・11750、中央値 約 11,849。`preBootBytes` 313,241,213)。
+- 単体: `npm test --prefix app` は 71 files・1,410 件が通る(10 件はスキップ)。`cargo test -p fe-build` は 23 件が通る(fixture `lift/crates/fe-build/tests/plan/engine.txt` を現在の plan の出力に合わせた。2 行の差)。`seh_rt`(fe-lift の試験)は 17 件が通る。`guard/scan.sh` は 0 件、`guard/flags.sh HEAD` は指摘なし。
+- 着地の RSP は正しい(候補 a は否定)。`fle: seh landing: target frame 0x63ae33, R13 0x4, the landing 0x63ae4e, the landing RSP 0x3e186120, RBP 0x3e186120 ... (establisher 0x3e186120)`。
+- 停止の記録(前回と同じ値): `fle: stop record: faulting address 0x5ee8604d8d490043; ... R1=0x5df6e7 ... R13=0x5df6e7 R14=0x5ee8604d8d48ffe3 R15=0`。
+- 停止の場所: 2 回目の着地 `0x63ae4e`(関数 `0x63ade0` の中)の後、`call [0x16b85b0]`(IAT)を経て Python の枠に入る。停止時のスタックで、Python の枠より上で最初に現れる FLEngine の戻り番地は `0xc3948f`(IAT 呼び出しの直後)。
+- Python 側の停止の命令は、`0x9b79c`(関数 `0x9b6e4`。`mov r13, r8` の後に検査し、`mov r14,[r13+0x10]` で読む)か `0x27ee7b`(関数 `0x27ee20`。`mov r13, rcx`)。どちらかは未確定。停止時の戻り番地の並びは、どちらの枠とも合わない。`0x9b6e4` の枠の戻り番地 `0x3e887` は `call 0x18003e960` の後で、`0x9b6e4` を直接呼んでいない。
+- 引数: `0x5df6e7`(FLEngine の戻り番地)が、Python の関数の引数に入っている。Python の検査 `0x1800f60f0` は、この値を「読める」と返す。なぜ入ったかは未確定。
+- 例外: `0xEEDFADE` が 2 回送出される。2 回目の送出の戻り番地 `0x5df6e7` は `0x3e13a088` に在り、着地 `0x63ade0` の RSP `0x3e13a120`(RBP)とアンワインド規則は整合する。例外のクラス名は、この試行では読んでいない。
+- 試して外した: 直近の間接呼び出しの記録(`fle_dispatch` で、戻り番地・`RCX`・`R13` を残す)。Python のモジュールでは `R` が別の値になり、記録が全て 0 だった。入れ直さない。
+- lazy: manifest の `lazy` は 131 件(外部 3 件を除く)で、上限 128 を超え、bundle が `/lazy: must have <= 128 items` で落ちた。段階 1 に要らない `sqlite3`・`_sqlite3`・`_lzma` の 3 件を外して 128 件にした。上限は main で 256 になった(#1414)。戻し方は「やること」③。
+- 生成物: `lift/out-app/plugins/pack.args` と `lift/out-app/plugins/vfs-seed-idle1.tsv` は、engine の段階で `lift/harness/` の表から作られる。作業ツリーの表だけを直すと、生成物は古いままになる(前回は `_lzma.pyd` の行が残り、起動の前に止まった)。表を直したら、engine と bundle を作り直す。
+- `lift/out-app/gen` が残っていると、`fe-build engine` が生成を二重に走らせて落ちる(この試行で 1 回起きた)。受け入れの `rm -rf lift/out-app/b2d-src lift/out-app/gen` は、engine の前に置く。
+- 抽出の木に `python.python312.dll` が無いと、`fe-build engine` が `lift/out-app/host/lift/out-plugins/python.python312.dll` の欠落で止まる。受け入れの写しの段で補う。
+
+## 1 つ前の試行で分かったこと(run 45540991873。3 回目)
 
 - 判定は差し戻し。受け入れコマンドが失敗した(判定の段で、道具の `stopped` が true、`engine` が exited。DPR 1 と 2.5 の両方)。作業は work.diff に保存された。作業者の commit(`c8000daf`・`a6f146d4` ほか)は main に無く、次の試行は、差分を main の上に取り込んで続ける。runner の値。nproc 4、loadavg 1.08〜1.96。
 - 測定(`measure.mjs --tool chord-progression`。DPR 1 と 2.25): `pythonLoaded` true、`stopped` true、`elapsedMs` 10,610 と 10,643、`preBootBytes` 312,235,140(2 回目の 312,215,074 から +20,066 B。内訳は未測定。上限 314,368,711 まで約 2.1 MB)。
@@ -115,6 +135,7 @@ fle: seh landing: target frame 0x63ae33, R13 0x4, the landing 0x63ae4e
 
 - ラベル `resources` の extract が、`ci/resources-prefixes.txt` の接頭辞で取り出し、作業ツリーの `lift/out-app/host-extra/resources/` に置く(`Shared\Python\` 37 件を含む)。
 - 受け入れの先頭で `mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/` を行い、ビルドの入力の場所へ写す(`fe-build bundle` の `pack-seed.mjs` は `lift/out-app/host/resources/` を読む)。
+- 受け入れの `python312.dll` の 2 箇所への写し(`fe-build engine` の前)は、抽出の木に python の plugin の DLL が無いときの手当て(前回の試行で必要だった)。この Issue の変更が main に入り(`lift/plugins/python312/plugin.tsv` が main に在る)、抽出が `lift/out-app/host/lift/out-plugins/python.python312.dll` を作るようになれば、要らない。
 - 起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)に行が無い物は、VFS に載らない。足りない実物の行は、作業者が seed 表に足してよい。host の欄を `@lazy-file:` で始めると、起動の後に取る(#{{105}} の方式)。段階 1 の lazy は 128 件(上限ちょうど。3 回目の試行で、段階 1 に要らない 6 件を外した)。`System\Tools\Chord progression\` の 59 件は段階 2 で扱い、上限を超えるなら報告に書いて終える。
 
 ## やること(段階 1)
@@ -123,7 +144,7 @@ fle: seh landing: target frame 0x63ae33, R13 0x4, the landing 0x63ae4e
 
 1. ①(実測で確かめる): 着地ごとに、着地の直前と直後の RSP、ハンドラを持つ関数の、その `call` の時点の RSP(入口の RSP から、プロローグの `sub rsp`・`push` の量で求める)を、`fle: seh landing` の行に足す(常に出る。環境変数・`#ifdef` は作らない)。`0x27ee20` の入口で `R1`(rcx)と戻り番地を記録し、(b) を確かめる。結果で、(a)(b) のどちらかに決める。
 2. ②(直す): (a) なら、着地の RSP を UNWIND_INFO の規則で求め直す(x64 の規則: 着地の RSP は、ハンドラを持つ関数の `call` の時点の値)。(b) なら、`R13` を書いた呼び出し元を、①の記録で特定して直す。直す前に、①で見つかったずれを再現する試験を `cargo test -p fe-lift --test seh_rt` に先に足し、red を確かめる。保存レジスタの復元だけの試験は、今の `fle_seh.c`(保存レジスタを復元する)で通るので、red にならない。この直しは、全ての Delphi の例外の着地に効く(#{{166}} の RaiseException も同じ経路)。
-3. ③(lazy): 128 件のまま。外した 6 件は戻さない。上限は #{{171}} が上げる。6 件を戻すのは段階 2。
+3. ③(lazy): 1 つ前の試行(run 45540991873)で外した 6 件と、前回(run 45566401846)で外した `sqlite3`・`_sqlite3`・`_lzma` の 3 件の、計 9 件を、`lift/harness/web/pack.args` と `lift/harness/seeds/vfs-seed-idle1.tsv` の行に、main の版と同じ位置で戻す(PM の決定)。上限は、`app/src/bundle/manifest.ts` の `lazy` の `maxItems`(#1414 で 256)。`lift/harness/vfs_lazy.h` の `VL_REG_MAX`(1024)も足りる。
 4. ④(測る): `preBootBytes` は 314,368,711 以下(今 312,235,140)、`elapsedMs` は 12,500 以下(今 10,610〜10,985)、流れ A〜D を保つ。直す前と後の道具の JSON の行を報告に書く。
 5. ⑤(受け入れ): 受け入れは元のまま(下の「受け入れ」)。
 
@@ -140,10 +161,20 @@ fle: seh landing: target frame 0x63ae33, R13 0x4, the landing 0x63ae4e
 - 停止の記録(`fle: stop record`)と SEH の記録(`fle: seh`)は消さない。常に出す(環境変数・`#ifdef` を足さない)。#{{154}} の作業者も同じ診断を入れる。両方の差分が衝突したら、両方を残す。
 - 名前の解決(`fle_realmod_find_path`)と、起動の後の取得(`@lazy-file:`)は、前の試行で動いた。
 
+## 次の一手(PM の決定。4 回目の後)
+
+着地の RSP と、Python の入り口の FLEngine の番地は分かった。停止の原因は、まだ分かっていない。次の試行は、次の記録を先に出し(常に出す。環境変数・`#ifdef` を足さない)、その結果で Python の入りを直す。
+
+- ⓐ 2 回送出される `0xEEDFADE` の例外オブジェクトの、クラス名(VMT の ClassName)を、`fle: seh raise` の行にも出す。クラスが `EOSError`(DLL の読み込みの失敗)・`EInOutError`(ファイル)・`EPythonError` などなら、その直前の失敗(欠けた DLL・ファイル)が、本当の原因の可能性が高い。その失敗を、停止の記録の前に出す。
+- ⓑ Python に入る経路: 停止時のスタックの FLEngine の戻り番地 `0xc3948f`(IAT 呼び出しの直後)から、呼んでいる Python の export を、IAT の名前(`0x16b85b0` の項目の名前)で特定する(`Py_Initialize`・`Py_InitializeEx`・`PyRun_SimpleString` など)。
+- ⓒ Python の初期化が読む物(`PYTHONHOME`・`PYTHONPATH`・`python312._pth`・`Lib\`・`encodings`)を、VFS とレジストリの読みで記録する。`Py_Initialize` が引数の少ない型で呼ばれている(呼び出し規約の不一致)と分かったら、停止の記録に、その IAT の名前と R1・R2・R8・R9 を出す。
+- ⓓ UCRT の import(`getenv`・`_wgetenv`・`fopen`・`_wfopen`・`GetModuleFileNameW`・`GetFullPathNameW`・`LoadLibraryExW`)の呼び出しを、`Py_Initialize` の前後で、名前と結果を記録する。
+- ④ 受け入れは、写しの段を除いて元のまま。この Issue は 1 回の試行で終わらない可能性が高い。次の試行は、ⓐ〜ⓓ の記録を先に出し、その結果を報告に書いて終える(commit は毎回する)。
+
 ## 受け入れ
 
 ```accept
-mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && D=$(node -e 'process.stdout.write((require("crypto").randomInt(101,301)/100).toFixed(2))') && node tools/piano-roll-tools/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --tool chord-progression --dprs 1,$D > "$RUNNER_TEMP/chord.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const ok=(r)=>r.error===null&&r.stopped===false&&r.engine==="engine-idle"&&r.presentedDelta>=1&&r.pythonLoaded===true&&!r.missingPaths.some((l)=>l.startsWith("missing-path: LoadLibraryW")&&l.includes("Python"))&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===2&&L[0].dpr===1&&L[1].dpr>=1.01&&L[1].dpr<=3&&L.every(ok)?0:1)' "$RUNNER_TEMP/chord.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const ms=L.map((r)=>r.elapsedMs).sort((a,b)=>a-b);const med=(ms[1]+ms[2])/2;const pb=Math.max(...L.map((r)=>r.preBootBytes));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&med<=12500&&pb<=314368711?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && mkdir -p lift/out-app/host/lift/out-plugins lift/out-app/host/lift/out-idle1/inputs/install/Shared && cp lift/out-app/host-extra/resources/Shared/Python/python312.dll lift/out-app/host/lift/out-plugins/python.python312.dll && cp lift/out-app/host-extra/resources/Shared/Python/python312.dll lift/out-app/host/lift/out-idle1/inputs/install/Shared/python.python312.dll && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && D=$(node -e 'process.stdout.write((require("crypto").randomInt(101,301)/100).toFixed(2))') && node tools/piano-roll-tools/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --tool chord-progression --dprs 1,$D > "$RUNNER_TEMP/chord.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const ok=(r)=>r.error===null&&r.stopped===false&&r.engine==="engine-idle"&&r.presentedDelta>=1&&r.pythonLoaded===true&&!r.missingPaths.some((l)=>l.startsWith("missing-path: LoadLibraryW")&&l.includes("Python"))&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===2&&L[0].dpr===1&&L[1].dpr>=1.01&&L[1].dpr<=3&&L.every(ok)?0:1)' "$RUNNER_TEMP/chord.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const ms=L.map((r)=>r.elapsedMs).sort((a,b)=>a-b);const med=(ms[1]+ms[2])/2;const pb=Math.max(...L.map((r)=>r.preBootBytes));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&med<=12500&&pb<=314368711?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準(段階 1):

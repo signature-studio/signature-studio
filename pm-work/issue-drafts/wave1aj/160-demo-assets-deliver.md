@@ -18,7 +18,7 @@ project: signature-studio/3
 目標:
 1. DEDZII と Mehran の両方で、`missingInInventory`(絶対パスの要求のうち、インストーラに在り、見つからなかった物。DLL を除く)が 0。`%変数%\…` の生の綴りの要求は、FL 自身の探索なので数えない(`rawVariableProbes` に出す。下の「測定の定義」)。
 2. 見つからなかった残りの内訳を出す: `notInInstaller` の件数と先頭 10 件(JSON と報告に出す)。
-3. DEDZII と Mehran が開く(`error` が null・`engine-idle`)。流れ A〜D が通り、`elapsedMs` と `preBootBytes` が基準を超えない。
+3. 流れ A〜D が通り、`elapsedMs` と `preBootBytes` が基準を超えない。DEDZII と Mehran が開くことは、この Issue の目標に入れない。開けない理由は、別の Issue で扱う(#1420 が Mehran の Elastique の停止。DEDZII の File > Open の停止は #1421(Urgent)。下の「前回の試行で分かったこと」)。
 
 ## 背景
 
@@ -53,6 +53,20 @@ run 45518902053(00:35〜02:11 UTC。`failed`)の結果。数値は runner の値
 - 配信が効けば、絶対パスの要求は成功し、`missingInInventory` は 0 になる見込み。
 - #1412 の試行の流れ A〜D は通った(`elapsedMs` 11514〜11901、`preBootBytes` 311145137)。boot は engine-idle・standIn が false・error が null(`elapsedMs` 12177)。
 
+## 前回の試行で分かったこと(4 回目。run 45566707815)
+
+数値は runner の値(nproc 4。loadavg 0.26・0.48・0.70)。前回の差分(`lift/harness/seeds/vfs-seed-idle1.tsv`・`lift/harness/web/pack.args`・`tools/p3-audio-probe/measure.mjs`)は、`.prior-work.md` の取り込みで入る。
+
+- 配信は動いた。seed 表に `@lazy-file:` の行を 27 行、`pack.args` に `--lazy-file` の組を 27 組足した。配信は 27 件・合計 4,830,812 B。manifest の lazy は 126 件(`maxItems` 128 の内。上限は変えていない)。一覧の 27 件は、大きさと sha256 が一覧の値と一致した。
+- 起動: `boot-bundle` で engine-idle・standIn false・error null・elapsedMs 10,223。
+- DEDZII(停止時点): `missingInInventory` 1。その 1 件は `Plugins\Fruity\Generators\Sytrus\Data\Default.dat`(絶対パスの `GetFileAttributesW`。インストーラの一覧に在り、1,832 B・sha256 `adc5842c…`)。この実物は、作業ツリーに無かった(`ci/resources-prefixes.txt` の取り出しは別ジョブ)。その後、#1414 で Sytrus の Data が lazy で配られるようになった(この再開の run で届く見込み)。
+- DEDZII の `rawVariableProbes` 0・`dll` 21・`notInInstaller` 45・`missingDistinct` 67・`inventory` 1。`notInInstallerFirst10` は、空の綴り・Dance の `Basic 808 *.ZGR` 4 件・`Presets\Plugin database\Installed\.Plugins.ini`・`FLEX.NFO`・`*.*`・`Emphasizer.NFO`・`C:\Windows\Fonts\OpenSans-Regular.ttf`。
+- DEDZII は、開く途中で `fle: CreateFileW: empty path is not defined` の行を出して止まる(exit 134。タイトルは「Song info」)。27 行を外した対照でも同じ停止。素材の配信とは無関係。PM の E2E の確認では、File > Open で約 5 秒後に終了コード 134 で止まった。これは #1421(Urgent)で扱う。
+- Mehran(停止時点): `missingInInventory` 0・`dll` 15・`missingDistinct` 33・`notInInstaller` 18・`inventory` 0。`fle: indirect call to 0xb2844c0 is not a known function entry` で止まる(exit 134。Elastique の像の内側)。対照でも同じ。この停止は、#1420 で扱う。
+- 停止の前に、27 件の `Patches` が要求されたかは、ログでは分からない(読み出しを残さない)。missing-path に出ていないことだけ確認した。
+- 流れ A〜D(最終の bundle で単独に実行): 4 行とも error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true。`elapsedMs` 8,780・8,832・8,928・8,838。`preBootBytes` 312,199,811。`npm test --prefix app`: 1,410 件が通る(71 files passed・1 skipped)。
+- 残りの課題: (1) DEDZII の `Default.dat` は、#1414 の配信で届く見込み。届いたら `missingInInventory` が 0 になる。(2) Sytrus の Data の 109 件を足すと、lazy の件数が上限(128)を超えうる。#1414 が件数をどう扱ったかを、この run で確かめる。超えるなら `maxItems` を上げる(既定の動作として)。(3) DEDZII の File > Open の停止と、Mehran の Elastique の停止は、この Issue の受け入れに入れない(上の目標 3)。
+
 ## 読む物
 
 - `pm-work/findings/demo-assets-inventory.tsv`(段階 1 の出力)
@@ -82,12 +96,12 @@ run 45518902053(00:35〜02:11 UTC。`failed`)の結果。数値は runner の値
 ## 受け入れ
 
 ```accept
-mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1403 && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp" .tmp-1403/dedzii.flp && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp" .tmp-1403/mehran.flp && for f in dedzii mehran; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-1403/$f.flp" > "$RUNNER_TEMP/open-$f.json"; done && node -e 'const fs=require("fs");const L=process.argv.slice(1).map((f)=>JSON.parse(fs.readFileSync(f,"utf8").trim()));const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.missingInInventory===0&&typeof r.rawVariableProbes==="object"&&r.rawVariableProbes!==null&&typeof r.rawVariableProbes.count==="number"&&typeof r.notInInstaller==="number"&&typeof r.dll==="number"&&Array.isArray(r.notInInstallerFirst10)&&r.notInInstallerFirst10.length<=10;process.exit(L.length===2&&L.every(ok)?0:1)' "$RUNNER_TEMP/open-dedzii.json" "$RUNNER_TEMP/open-mehran.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-1403 && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp" .tmp-1403/dedzii.flp && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/Mehran Abbasi - With You.flp" .tmp-1403/mehran.flp && for f in dedzii mehran; do node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-1403/$f.flp" > "$RUNNER_TEMP/open-$f.json"; done && node -e 'const fs=require("fs");const L=process.argv.slice(1).map((f)=>JSON.parse(fs.readFileSync(f,"utf8").trim()));const ok=(r)=>r.missingInInventory===0&&typeof r.rawVariableProbes==="object"&&r.rawVariableProbes!==null&&typeof r.rawVariableProbes.count==="number"&&typeof r.notInInstaller==="number"&&typeof r.dll==="number"&&Array.isArray(r.notInInstallerFirst10)&&r.notInInstallerFirst10.length<=10;process.exit(L.length===2&&L.every(ok)?0:1)' "$RUNNER_TEMP/open-dedzii.json" "$RUNNER_TEMP/open-mehran.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準:
 - 起動 1 回で、engine-idle・standIn が false・error が null(boot)。
-- DEDZII と Mehran の `measure.mjs` の行で、`error` が null・`state` が engine-idle・`missingInInventory` が 0(数値)。`rawVariableProbes` は `count` が数値の object。`notInInstaller` と `dll` が数値、`notInInstallerFirst10` が配列で 10 件以下。`inventory` は JSON に出すが、判定には使わない。
+- DEDZII と Mehran の `measure.mjs` の行で、`missingInInventory` が 0(数値)。`error`・`state` は判定に入れない(開けなかった理由は、JSON と報告に出す。上の目標 3)。DEDZII の `missingInInventory` が 0 にならない時は、残った要求の一覧(綴り・API)を報告に書く。`rawVariableProbes` は `count` が数値の object。`notInInstaller` と `dll` が数値、`notInInstallerFirst10` が配列で 10 件以下。`inventory` は JSON に出すが、判定には使わない。
 - 流れ A〜D(`welcome-flow.mjs`)の 4 行: 各行で `error` が null・`state` が engine-idle・`standIn` が false・`trapped` が false・`hostErrors` が 0・`opened` が true。B と D は `welcomeClosed` が true。各行の `elapsedMs` が 12,500 以下、`preBootBytes` が 314,368,711 以下。
 - 単体テスト(`npm test --prefix app`)が通る。
 
@@ -118,5 +132,7 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 
 - blocked_by: #1373(段階 1。素材の収集と、`ci/resources-prefixes.txt` の行)。閉じている。
 - #1412(ゲストの環境変数)とは独立。前回は blocked by にしていたが、外した。生の綴りは FL 自身の探索で、環境変数の展開では解けない(上の 3 回目の節)。
+- #1414(Sytrus の Data の配信)は閉じている。その配信が、DEDZII の `Default.dat` を届ける(前回の試行の節)。
+- #1420(Mehran の Elastique の間接呼び出し)と、#1421(DEDZII の File > Open の停止)は、この Issue の受け入れに入れない。
 - 後続: #1401(音が出る demo を決める)。#1401 は、この Issue の後に行う。#1335(P3 の測定)は #1401 を待つ。
 - #1387(Riff machine)・#1400(Sytrus)・#1395(言語)も、seed 表と `pack.args` を変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。

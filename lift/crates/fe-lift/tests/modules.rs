@@ -148,7 +148,7 @@ fn clang(name: &str, src: &str, extra_c: &[&str]) -> PathBuf {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"]).arg(&rt);
-    for f in ["fle_modules.c", "fle_imports.c", "fle_string.c", "fle_sys.c"].iter().chain(extra_c) {
+    for f in ["fle_modules.c", "fle_imports.c", "fle_string.c", "fle_sys.c", "fle_env.c"].iter().chain(extra_c) {
         cmd.arg(rt.join(f));
     }
 

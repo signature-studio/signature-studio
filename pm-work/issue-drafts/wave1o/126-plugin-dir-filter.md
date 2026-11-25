@@ -28,7 +28,15 @@ project: signature-studio/3
 - Fruity Delay 2 は、この Issue では移さない(共有の表に残る。#{{125}} の (15))。
 - `lift/harness/web/fruity/fle_idle_lib.js`・`lift/harness/two/main_two.c`・`app/src/engine/xmod.ts` は、#{{125}} で一般化された物で、この Issue では変えない。
 
-## 前回の試行で分かったこと(run 45505986680)
+## 前回の試行で分かったこと(run 45575191070)
+
+- 判定は差し戻し。落ちた段は、受け入れの後半の確認(場面の node の式と見られる。ログに式の出力は無い)。Exoplanet の場面は Sytrus の停止で終わる(別の Issue の範囲)。受け入れに cargo test は無い(判定の出力に cargo の行は無い)。
+- Filter の停止は直った。`fe-decode setjmp-entries` の自動の結果が、手書きの `omit` と一致する: Filter `0x2cdf20`・Balance `0x2c13a0`・Sytrus `0xcdccb70`。手順 8 ③ の確認は、この一致で済む。
+- imm32 の仮想モジュール(N = 43)で、Balance の停止も出なくなった(手順 5 の原因の確認)。
+- Asher Postman(Future House)の場面で、Balance・Filter とも `engine-idle`・`requested=true`(PM の確認)。
+- 場面の規則を変える(下の手順 4): Sytrus の名を含む .flp を除き、Fruity Filter の名を最も多く含む物を選ぶ。
+
+## 2 回前の試行で分かったこと(run 45505986680)
 
 - 判定は差し戻し。Balance の場面は通った。Filter の場面は `exited`(`ExitProcess`。終了コード 0)で、判定 (3) が不通。作業は 3 つの commit(`13372a12` 基盤・`8695b23e` imm32・`4cdd0985` 追加。作業者の環境。push していない。work.diff に保存された)。runner の値。nproc 4、測定の後の loadavg 3.08 2.06 2.06。
 - 基盤(共有の行の削除。共有は計 +1 −10 行): `ci/extract-dlls.tsv` +0−1、`lift/harness/b2d2/modules.tsv` +0−1、`lift/harness/seeds/vfs-seed-idle1.tsv` +0−1、`lift/harness/web/pack.args` +1−5、`lift/harness/web/seed.args` +0−2。`tools/delivery-split/measure.mjs` は +59 −13(場面の交互化)。
@@ -47,7 +55,7 @@ project: signature-studio/3
 - 見立て(PM。実測で確かめる): これは #{{128}} で直した Balance の問題と同じ型。Delphi の DllMain が `setjmp` を呼ぶ関数は、直接 wasm に lift せず、C で lift して、着地点(`fle_landing_push`。`lift/runtime/fle_dispatch.h`)を登録する必要がある。Balance は `plugin.tsv` の `omit` 列(RVA 0x2c13a0)で外している。Filter の `plugin.tsv` には `omit` が無いので、同じ型の関数が直接 wasm に入り、着地が無いまま `Halt` → `ExitProcess` に落ちる、と見られる。
 - 判定の確認: `spec/guard.test.sh`(67 件)・`spec/workflow.test.sh`(443 件)が通る。`lift/crates/fe-lift/tests/`(load.rs・wall_fr6.rs・wall_fr5.rs・msctf.rs)に、imm32 を「無い」とする前提の assert が残っている(やること 9)。
 
-## その前の試行で分かったこと
+## 3 回前の試行で分かったこと
 
 (run 45452762437。failed。作業は work.diff として保存された。commit は、この main に無い。次の試行は、その差分を main の上に取り込んで続ける。)
 
@@ -75,7 +83,7 @@ project: signature-studio/3
 1. **基盤の commit(追加の前)**: Fruity Filter の共有の行を消す(`modules.tsv`・`pack.args` の `--args` と `--lazy-dll` と `--lazy-file`・`ci/extract-dlls.tsv`・`vfs-seed-idle1.tsv`・`seed.args` の Filter の行)。`git grep -n -i "fruity.filter" -- ci lift/harness/b2d2 lift/harness/hyb lift/harness/web lift/harness/seeds` で、消し残しが無いことを確かめる(`lift/harness/hooks/` の見出しの文は対象外)。この commit の共有の変更は、この commit に全て含める。報告に、ファイルごとの行数を書く。
 2. **追加の commit**: `lift/plugins/fruity-filter/plugin.tsv` だけを足す。`key` は `effects.fruity-filter.fruity_filter_x64.dll`、`guest` は `Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll`、`role` は `本体`、`hook` は `existing`、`args` は `--pdata`。`sha256` と `size` は上の値。この commit の変更は、`lift/plugins/fruity-filter/` の 1 ファイルだけであること(`git show --stat` で確かめ、報告に書く)。
 3. **生成**: 生成の段が、Filter を分けた wasm(`lift/out-app/xmod/fruity_filter_x64.<生成した base>.wasm`)として作ること。Filter の一覧から、hook 点の VA(base + RVA)が 0 件であること。
-4. **測定の場面**: `tools/delivery-split/measure.mjs` は、run ごとに場面を交互に使う(1 回目 Balance、2 回目 Filter、3 回目 Balance)。Balance の場面は NewStuff.flp(#{{102}} の場面)。Filter の場面は、`host-extra/resources`(無ければ `host/resources`)の .flp のうち、Fruity Filter の名を最も多く含む物(ASCII と UTF-16LE の合計。同数なら、パス順の先)。前回の試行では Exoplanet.flp(20 回)が選ばれた。
+4. **測定の場面**: `tools/delivery-split/measure.mjs` は、run ごとに場面を交互に使う(1 回目 Balance、2 回目 Filter、3 回目 Balance)。Balance の場面は NewStuff.flp(#1342 の場面)。Filter の場面は、`host-extra/resources`(無ければ `host/resources`)の .flp のうち、Sytrus の名(ASCII と UTF-16LE)を含まない物の中で、Fruity Filter の名を最も多く含む物(ASCII と UTF-16LE の合計。同数なら、パス順の先)。候補が無ければ、場面は作らず失敗にする。前回の試行(run 45575191070)では Exoplanet.flp が選ばれ、その場面は Sytrus の停止で終わった(別の Issue の範囲)。
 5. **imm32.dll の確認(依頼者の決定)**: 前回の試行の停止(Fruity プラグインの要求の後の `LoadLibraryW 126 "imm32.dll"` と `ExitProcess`)が、Fruity プラグインの読み込みの後の停止の原因かを確かめる。確かめ方: engine のログで、126 の後の呼び出しと `ExitProcess` の経路を追う。
    - 原因なら、この Issue で直す。Windows に在る imm32.dll を runtime が提供する。IME が無効の Windows と同じ答えにする(`ImmGetContext`・`ImmReleaseContext`・`ImmAssociateContext`・`ImmGetCompositionStringW` など。FL が引く関数に限る。NULL か 0 を返す)。決定 0015(`lift/runtime/fle_load.c` の注)を見直し、理由を本文と報告に書く。これは第 2 波(全プラグイン)の共通の障害なので、ほかの Issue に送らない。
    - 原因でなければ、その根拠を報告に書いて止まる(直し方は PM が決める)。

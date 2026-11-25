@@ -67,6 +67,8 @@ int fle_audio_wait_until(uint64_t dl) __attribute__((weak));
  * (at most to `next`: the scheduler never skips a deadline): the scheduler goes on. A weak symbol that no link defines is NULL: a link
  * without the host's idle is unchanged. */
 int fle_thread_idle_hook(uint64_t now, uint64_t next, uint64_t *advance_to) __attribute__((weak));
+/* Issue #1418: the counts of the calls that are answered without a model (fle_env.c), printed at the idle reports; weak as the hook above */
+void fle_warn_idle(void) __attribute__((weak));
 /* Decision 0234 (mt3, PROVISIONAL): the priority level that SetThreadPriority kept for the first thread (fle_proc.c; the other threads keep theirs in `ps`). Weak: a link without fle_proc.c has only NORMAL. */
 int32_t fle_proc_first_thread_priority(void) __attribute__((weak));
 /* Decision 0280 (PROVISIONAL): harness/fruity_idle.c (wasm, FRUITY on): takes the input events that the page has put into its ring since the last look and queues them with fle_input_host_* (the same functions as the exports fle_g3_mouse / fle_g3_key that the Worker calls at the idle). Called from the scheduler only (schedule_ex), where the idle hook also runs. Weak: other links have no ring. */
@@ -706,6 +708,7 @@ static int schedule_ex(int slice)
             uint64_t nx = 0, adv = 0;
             int hr, have = next_deadline(&nx);
 
+            if (fle_warn_idle) fle_warn_idle();
             hr = fle_thread_idle_hook(now_ticks(), have ? nx : 0u, &adv);
             if (hr == 0) stop_report("MessageLoop", "idle: the host ended the wait (no event came; the session was closed)");
             if (hr == 2 && adv > now_ticks()) {
@@ -864,6 +867,24 @@ static void preempt_arm(void)
     fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
 }
 
+/* Issue #1402: the rate the page measured for requestAnimationFrame, put in at an idle (fle_g3_hz, lift/harness/fruity_idle.c). 0 = none put: the environment's rate stands. */
+static uint32_t display_hz_put;
+
+int fle_display_hz_put(uint32_t hz)
+{
+    if (hz < 24u || hz > 1000u) return 0;
+    display_hz_put = hz;
+    return 1;
+}
+
+/* Issue #1402: the number of DwmFlush calls so far (the page reads it at each idle; fle_g3_dwm_count). */
+static uint64_t dwm_flushes;
+
+uint64_t fle_thread_dwm_flushes(void)
+{
+    return dwm_flushes;
+}
+
 /* ui1 (decision 0166): the refresh rate of the virtual display. FLE_DWM_HZ in the environment (read once) overrides the compile-time default FLE_DWM_HZ (60); 24..1000 are accepted. */
 uint32_t fle_display_hz(void)
 {
@@ -882,7 +903,7 @@ uint32_t fle_display_hz(void)
             else fprintf(stderr, "fle: FLE_DWM_HZ=\"%s\" is not a number of hertz in 24..1000: ignored, %u Hz\n", e, (unsigned)hz);
         }
     }
-    return hz;
+    return display_hz_put ? display_hz_put : hz;
 }
 
 /* ui1 (decision 0166): the number EnumDisplaySettingsW reports (fle_monitor.c calls this through a weak reference). FLE_DISPLAYSETTINGS_FREQUENCY in the environment (24..1000) if set, else the same value as DwmFlush (fle_display_hz), else the compile-time default
@@ -892,6 +913,7 @@ uint32_t fle_display_settings_hz(void)
 {
     static uint32_t hz;
 
+    if (display_hz_put) return display_hz_put;
     if (!hz) {
         const char *e = getenv("FLE_DISPLAYSETTINGS_FREQUENCY");
         uint32_t dwm = fle_display_hz();
@@ -923,6 +945,7 @@ void fle_imp_DwmFlush(void)
 {
     uint64_t dl = fle_thread_next_frame_tick(now_ticks());
 
+    dwm_flushes++;
     if (nthr < 2) {
         fle_sys_clock_advance_to(dl);
         R[0] = 0;

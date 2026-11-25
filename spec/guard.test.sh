@@ -43,6 +43,19 @@ printf 'by %s%s and %s%s\n' "$v1" "$v2" "$v1" "$v2" > "$T/app/r6.txt"
 ( cd "$T" && printf 'host %s by %s%s\n' "$hs" "$v1" "$v2" > app/r3.txt && ok "redact: cfhost の指摘は伏せ字にしない(終了コード 1、ホスト名は残る)" "$(rc bash "$g/scan.sh" --redact app/r3.txt)/$(grep -cF -- "$hs" app/r3.txt)/$(grep -c '伏せ字' app/r3.txt)" "1/1/1" )
 ( cd "$T" && printf 'ok text\n' > app/r4.txt && ok "redact: 違反の無いファイルは 0 で終わり、redact の行を出さない" "$(rc bash "$g/scan.sh" --redact app/r4.txt)/$(bash "$g/scan.sh" --redact app/r4.txt 2>/dev/null | grep -c '^redact')" "0/0" )
 ( cd "$T" && ok "redact: PATH が無ければ使い方の誤り(2)" "$(rc bash "$g/scan.sh" --redact)" 2 )
+# cfhex(32 桁の 16 進)は、試験のデータ(lift/crates/*/tests/ の下の *.rs・*.txt・*.tsv・*.hex)の行だけ除く。他の規則は、その場所でも効く
+mkdir -p "$T/app/src" "$T/lift/crates/fe-lift/tests" "$T/lift/crates/fe-build/tests/plugins/d"
+printf 'const id = "%s";\n' "$hx" > "$T/app/src/x.ts"
+( cd "$T" && ok "cfhex: 製品の外(app/src/)で 32 桁の 16 進があれば落ちる" "$(rc bash "$g/scan.sh" app/src/x.ts)" 1 )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータ(lift/crates/*/tests/*.rs)の 32 桁の 16 進は通る" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs)" 0 )
+( cd "$T" && printf 'let s = "%s%s"; let id = "%s";\n' "$v1" "$v2" "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータでも、ベンダー名は vendor で落ちる(cfhex は除外、vendor は効く)" "$(bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs 2>/dev/null | cut -f1 | sort -u | paste -sd, -)" "vendor" )
+( cd "$T" && printf 'let h = "%s"; let id = "%s";\n' "$hs" "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータでも、cfhost の形は cfhost で落ちる(cfhex は除外、cfhost は効く)" "$(bash "$g/scan.sh" lift/crates/fe-lift/tests/x.rs 2>/dev/null | cut -f1 | sort -u | paste -sd, -)" "cfhost" )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.rs && ok "cfhex: 試験のデータの除外は、--redact の経路にも効く(伏せ字の後の再検査も通る)" "$(rc bash "$g/scan.sh" --redact lift/crates/fe-lift/tests/x.rs)" 0 )
+( cd "$T" && printf 'let data = "%s";\n' "$hx" > lift/crates/fe-lift/tests/x.txt && printf '%s\n' "$hx" > lift/crates/fe-build/tests/plugins/d/p.tsv && ok "cfhex: 試験の .txt・入れ子の .tsv も除外する" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.txt)/$(rc bash "$g/scan.sh" lift/crates/fe-build/tests/plugins/d/p.tsv)" "0/0" )
+( cd "$T" && printf '%s\n' "$hx" > lift/crates/fe-lift/src.rs && ok "cfhex: crate の tests/ の外(lift/crates/fe-lift/src.rs)は、今まで通り落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/src.rs)" 1 )
+( cd "$T" && printf '%s\n' "$hx" > lift/crates/fe-lift/tests/x.md && ok "cfhex: 試験の場所でも、対象の拡張子(.rs・.txt・.tsv・.hex)以外は今まで通り落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/tests/x.md)" 1 )
+( cd "$T" && mkdir -p lift/crates/fe-lift/src/tests && printf '%s\n' "$hx" > lift/crates/fe-lift/src/tests/x.rs && ok "cfhex: crate の src/ の下の tests/ は、試験の場所ではないので落ちる" "$(rc bash "$g/scan.sh" lift/crates/fe-lift/src/tests/x.rs)" 1 )
+( cd "$here/.." && ok "cfhex: 既存の試験の機械語・画素のデータ(gdi.rs・gdi_bulk.rs)は、scan で 0 件" "$(bash guard/scan.sh lift/crates/fe-lift/tests/gdi.rs lift/crates/fe-lift/tests/gdi_bulk.rs 2>/dev/null | wc -l | tr -d ' ')" 0 )
 ( cd "$T" && printf 'by %s%s\n' "$v1" "$v2" > app/r9.txt && ok "redact: --redact 無しの検査は、従来どおり vendor で失敗し、伏せ字にしない" "$(rc bash "$g/scan.sh" app/r9.txt)/$(grep -c "$v1$v2" app/r9.txt)" "1/1" )
 # 値を隠す命令(マスク)は、ワークフローに置かない(依頼者の指示 2026-11-20・L-031)。scan.sh の mask 規則は .github/workflows/ の下だけを見る
 ok "ワークフローに、値を隠す命令が無い(件数)" "$(cat "$here"/../.github/workflows/*.yml | grep -cF -- 'add-mask')" 0

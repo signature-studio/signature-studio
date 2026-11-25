@@ -1,0 +1,317 @@
+diff --git a/app/src/engine/desk-link.ts b/app/src/engine/desk-link.ts
+index cd13f375..8c0fbccb 100644
+--- a/app/src/engine/desk-link.ts
++++ b/app/src/engine/desk-link.ts
+@@ -2,7 +2,9 @@
+ // GEN is the generation of the picture the engine published last; ACK is the generation the render Worker has finished reading. The engine composes only while ACK = GEN, so the picture (which only
+ // fle_desk_compose writes) does not change while the render Worker reads it. Only the engine writes GEN and only the render Worker writes ACK.
+ 
+-const GEN = 0, ACK = 1;
++// REQUEST lets the engine see a frame request at a guest scheduler point even
++// while its JavaScript event loop cannot receive the accompanying wake message.
++const GEN = 0, ACK = 1, REQUEST = 2;
+ export const DESK_CTL_BYTES = 64;
+ 
+ export const newDeskControl = (): SharedArrayBuffer => new SharedArrayBuffer(DESK_CTL_BYTES);
+@@ -16,4 +18,6 @@ export class DeskGate {
+   get published(): number { return Atomics.load(this.ctl, GEN); }
+   publish(gen: number): void { Atomics.store(this.ctl, GEN, gen); }
+   ack(gen: number): void { Atomics.store(this.ctl, ACK, gen); }
++  request(): void { Atomics.store(this.ctl, REQUEST, 1); }
++  takeRequest(): boolean { return Atomics.exchange(this.ctl, REQUEST, 0) !== 0; }
+ }
+diff --git a/app/src/engine/fruity.ts b/app/src/engine/fruity.ts
+index 2ecdbf8a..be73b78c 100644
+--- a/app/src/engine/fruity.ts
++++ b/app/src/engine/fruity.ts
+@@ -211,9 +211,10 @@ export class FruityEngine {
+     const mouse = ex.fle_g3_mouse as (a: number, b: number, c: number, d: number) => number;
+     const key = ex.fle_g3_key as (a: number, b: number, c: number, d: number) => number;
+     const clk = ex.fle_g3_clock_to as (t: number) => void;
++    const ticks = typeof ex.fle_g3_ticks === 'function' ? ex.fle_g3_ticks as () => number : null;
+     const display = typeof ex.fle_g3_display === 'function' ? (ex.fle_g3_display as (w: number, h: number) => number) : null;
+     const syscmd = typeof ex.fle_g3_taskbar_iconic === 'function' && typeof ex.fle_g3_taskbar_syscommand === 'function' ? (ex.fle_g3_taskbar_syscommand as (lid: number, cmd: number) => number) : null;
+-    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
++    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(ticks ? { clockTicks: () => ticks() } : {}), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
+   }
+ 
+   /**
+diff --git a/app/src/engine/idle-driver.ts b/app/src/engine/idle-driver.ts
+index d4f1bd9e..226a0c85 100644
+--- a/app/src/engine/idle-driver.ts
++++ b/app/src/engine/idle-driver.ts
+@@ -27,6 +27,8 @@ export interface EngineInput {
+   /** decision 0272: the taskbar button of window `lid` was pressed (fle_g3_taskbar_syscommand); absent in a build that has no such export */
+   syscommand?(lid: number, cmd: number): number;
+   clockTo(ticks: number): void;
++  /** current guest time, read at a scheduler point while guest code is running */
++  clockTicks?(): number;
+ }
+ export interface DriverHost {
+   /** resumes the engine; false when it was not waiting */
+@@ -110,6 +112,19 @@ export class IdleDriver {
+   /** input events the engine has been given and has not yet finished with (decision 0182: the idle that ends them is the one at which the window list must be read) */
+   get awaitingCount(): number { return this.awaiting.length; }
+ 
++  /** A stream of input can keep the guest runnable indefinitely. Its clock
++   * must still follow real time, so expired timers and sleeping threads become
++   * runnable even when the guest has not returned to the host's idle wait. */
++  syncRunningClock(): void {
++    if (!this.started || this.idle || !this.anchor || !this.engine.clockTicks) return;
++    const now = this.engine.clockTicks();
++    const t = this.target(this.host.now(), now);
++    if (t > now) {
++      this.engine.clockTo(t);
++      this.stats.clockMovedTicks += t - now;
++    }
++  }
++
+   /** a raw event from the page */
+   submit(ev: RawInput, seq: number, tPage: number): 'dropped' | 'applied' | 'queued' {
+     if (!this.started) {
+diff --git a/app/src/engine/protocol.ts b/app/src/engine/protocol.ts
+index 429dc2c0..d924b36c 100644
+--- a/app/src/engine/protocol.ts
++++ b/app/src/engine/protocol.ts
+@@ -114,4 +114,4 @@ export type FromWorker =
+   | { t: 'clipboard-write'; text: string }
+   /** #1389: the engine's Paste asks for the operating system's text (GetClipboardData); the page answers with {cmd: 'clipboard-text'} (the same id) */
+   | { t: 'clipboard-read'; id: number }
+-  | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
++  | { t: 'desk'; stats: { /** Canvas updates deduplicated per render Worker rAF, not GPU completion or physical display; null without rAF. */ displayFrames?: number | null; presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };
+diff --git a/app/src/engine/render-worker.ts b/app/src/engine/render-worker.ts
+index 986e6758..6aab5dfe 100644
+--- a/app/src/engine/render-worker.ts
++++ b/app/src/engine/render-worker.ts
+@@ -45,6 +45,9 @@ let waiting = false;
+ let loopOn = false;
+ let pollTimer: ReturnType<typeof setTimeout> | null = null;
+ let firstPixel = false;
++// Canvas updates deduplicated per Worker rAF; not GPU completion or physical display evidence.
++let drewSinceFrame = false;
++let displayFrames: number | null = typeof self.requestAnimationFrame === 'function' ? 0 : null;
+ let lastReport = 0;
+ const presentedAt: number[] = [];
+ let answers: number[] = [];
+@@ -53,8 +56,9 @@ function toEngine(m: RenderToEngine, transfer: Transferable[] = []): void { port
+ 
+ /** asks the engine to compose; false when a question is still open */
+ function ask(): boolean {
+-  if (waiting || !port) return false;
++  if (waiting || !port || !gate) return false;
+   waiting = true;
++  gate.request();
+   toEngine({ cmd: 'want' });
+   return true;
+ }
+@@ -66,6 +70,10 @@ function nextFrame(): void {
+ 
+ function frame(): void {
+   if (!loopOn) return;
++  if (drewSinceFrame) {
++    if (displayFrames !== null) displayFrames++;
++    drewSinceFrame = false;
++  }
+   if (ask()) counters.ticks++;
+   if (quiet.sleepAfterFrame(performance.now())) { loopOn = false; sleepPoll(); return; }
+   nextFrame();
+@@ -153,6 +161,7 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
+     if (f.changed && presenter && memory) {
+       const shown = presenter.present();
+       if (shown > 0) {
++        drewSinceFrame = true;
+         presentedAt.push(nowAbs());
+         if (!firstPixel) { firstPixel = true; mark('first_pixel', { source: 'desktop', width: canvas?.width, height: canvas?.height }); }
+         if (f.answers) answers.push(...f.answers);
+@@ -168,14 +177,13 @@ function onFrame(f: Extract<EngineToRender, { t: 'frame' }>): void {
+   else flushDesk(false);
+ }
+ 
+-/** the counters and the instants of the presents, at most every 100 ms (1 s when nothing was presented); `answers`: the inputs the present in this message answers */
++/** Report changed presents promptly: the page uses their delivery to request its next rAF for input latency. Batching them adds reporting delay to that metric. No-picture reports remain limited to once a second. */
+ function flushDesk(force: boolean, answerList?: number[]): void {
+   if (!presenter) return;
+   const now = performance.now();
+-  if (!force && now - lastReport < 100) return;
+   if (presentedAt.length === 0 && !force && now - lastReport < 1000) return;
+   lastReport = now;
+-  post({ t: 'desk', stats: { ...presenter.stats, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
++  post({ t: 'desk', stats: { ...presenter.stats, displayFrames, composeMs: presenter.stats.composeMs + counters.engineComposeMs, ringReads: counters.ringReads, ringFull: 0, wakes: counters.wakes, ticks: counters.ticks, idleTicks: counters.idleTicks, sleeps: quiet.sleeps }, at: presentedAt.splice(0, 64), ...(answerList && answerList.length > 0 ? { answers: answerList } : {}), nWindows: 0 });
+ }
+ 
+ async function readback(key: string): Promise<void> {
+diff --git a/app/src/engine/worker.ts b/app/src/engine/worker.ts
+index 6a1e72f2..6e46fa91 100644
+--- a/app/src/engine/worker.ts
++++ b/app/src/engine/worker.ts
+@@ -204,6 +204,8 @@ function readSettled(ptr: number, max: number): number {
+ function inputPoll(ptr: number, max: number): number {
+   const d = driver, mem = fruity?.memory;
+   if (!ring || !d || !d.ready || !mem) return 0;
++  d.syncRunningClock();
++  serviceDeskRequest();
+   if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
+   if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
+   let i32: Int32Array | null = null;
+@@ -389,7 +391,7 @@ function sendDeskReady(): void {
+ /** the render Worker's messages: its question (compose now), the resync, the scene mode, and the answer to a test aid's read-pixels */
+ function onRender(m: RenderToEngine): void {
+   switch (m.cmd) {
+-    case 'want': sendDeskReady(); deskTick(true); break;
++    case 'want': serviceDeskRequest(); break;
+     case 'resync': compositor()?.resync(); break;
+     case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
+     case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
+@@ -397,6 +399,18 @@ function onRender(m: RenderToEngine): void {
+   }
+ }
+ 
++// The shared request is consumed once, either here in the event loop or at a
++// guest scheduler point. A wake message arriving afterwards does no extra work.
++function serviceDeskRequest(): void {
++  if (!gate?.takeRequest()) return;
++  sendDeskReady();
++  try { deskTick(true); }
++  catch (e) {
++    log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`);
++    renderNoChange();
++  }
++}
++
+ /** Issue #1376: the windows painted over the WebView2 face (fle_webview2_front), sent to the page when the list differs from the last one sent */
+ function syncFront(): void {
+   const api = compositor(), mem = fruity?.memory;
+@@ -410,6 +424,7 @@ function syncFront(): void {
+   if (key === frontSent) return;
+   frontSent = key;
+   post({ t: 'webview2', op: 'front', rects });
++
+ }
+ 
+ /** one compose (the picture brought up to date) and the hand-over to the render Worker: when the picture changed, it is told, with the inputs this change answers (`seqs`, and the inline ones); `reply`: the render Worker asked, so it is answered even when nothing changed. True when the picture changed */
+diff --git a/app/src/perf/beacon.ts b/app/src/perf/beacon.ts
+index 4ca423c4..bba28da2 100644
+--- a/app/src/perf/beacon.ts
++++ b/app/src/perf/beacon.ts
+@@ -88,7 +88,7 @@ export function uiWindowsOf(windows: readonly EngineWindow[] | null | undefined)
+     .map((w) => ({ cls: sanitizeEngineText(w.className, PERF_UI_CLASS_MAX), w: w.width, h: w.height }));
+ }
+ 
+-export interface DeskCounters { presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
++export interface DeskCounters { /** Canvas updates deduplicated per Worker rAF; absent when unmeasured, not GPU/physical display evidence. */ displayFrames?: number; presents: number; rects: number; mpx: number; composeMs: number; putMs: number; drawMs: number; uploads: number; draws: number; whole: number; ticks: number; idleTicks: number; wakes: number; sleeps: number }
+ export interface DeskBeacon extends DeskCounters { mode: 'gl' | '2d'; since: (DeskCounters & { seconds: number }) | null; /** Issue #1398: the presents of the last 10 s (deskRecent) */ recent10s: DeskRecent }
+ /** Issue #1398: one report of the presenter's cumulative count, at the page's clock (when the page received the Worker's report) */
+ export interface DeskSample { at: number; presents: number }
+@@ -103,7 +103,7 @@ export function deskCounters(s: Record<string, unknown> | null | undefined): Des
+   if (!s) return null;
+   const n = (k: string): number => (typeof s[k] === 'number' && Number.isFinite(s[k] as number) ? (s[k] as number) : 0);
+   const r = (x: number, d: number): number => Math.round(x * 10 ** d) / 10 ** d;
+-  return { presents: n('presents'), rects: n('rects'), mpx: r(n('pixels') / 1e6, 3), composeMs: r(n('composeMs'), 1), putMs: r(n('putMs'), 1), drawMs: r(n('drawMs'), 1), uploads: n('uploads'), draws: n('draws'), whole: n('whole'), ticks: n('ticks'), idleTicks: n('idleTicks'), wakes: n('wakes'), sleeps: n('sleeps') };
++  return { ...(typeof s.displayFrames === 'number' && Number.isFinite(s.displayFrames) ? { displayFrames: s.displayFrames } : {}), presents: n('presents'), rects: n('rects'), mpx: r(n('pixels') / 1e6, 3), composeMs: r(n('composeMs'), 1), putMs: r(n('putMs'), 1), drawMs: r(n('drawMs'), 1), uploads: n('uploads'), draws: n('draws'), whole: n('whole'), ticks: n('ticks'), idleTicks: n('idleTicks'), wakes: n('wakes'), sleeps: n('sleeps') };
+ }
+ /** Issue #1398: the page's history of the presenter's count: each report the page receives (`add`), kept for the last 10 s and at most DESK_HISTORY_MAX. A count that goes down is a new presenter: the history starts again. */
+ export class DeskHistory {
+@@ -141,7 +141,7 @@ export function deskBeacon(now: Record<string, unknown> | null | undefined, prev
+   const c = deskCounters(now);
+   if (!c) return null;
+   const p = prev ? deskCounters(prev.stats) : null;
+-  const since = p && prev ? { seconds: Math.round((atMs - prev.atMs) / 100) / 10, presents: c.presents - p.presents, rects: c.rects - p.rects, mpx: Math.round((c.mpx - p.mpx) * 1000) / 1000, composeMs: Math.round((c.composeMs - p.composeMs) * 10) / 10, putMs: Math.round((c.putMs - p.putMs) * 10) / 10, drawMs: Math.round((c.drawMs - p.drawMs) * 10) / 10, uploads: c.uploads - p.uploads, draws: c.draws - p.draws, whole: c.whole - p.whole, ticks: c.ticks - p.ticks, idleTicks: c.idleTicks - p.idleTicks, wakes: c.wakes - p.wakes, sleeps: c.sleeps - p.sleeps } : null;
++  const since = p && prev ? { ...(c.displayFrames !== undefined && p.displayFrames !== undefined ? { displayFrames: c.displayFrames - p.displayFrames } : {}), seconds: Math.round((atMs - prev.atMs) / 100) / 10, presents: c.presents - p.presents, rects: c.rects - p.rects, mpx: Math.round((c.mpx - p.mpx) * 1000) / 1000, composeMs: Math.round((c.composeMs - p.composeMs) * 10) / 10, putMs: Math.round((c.putMs - p.putMs) * 10) / 10, drawMs: Math.round((c.drawMs - p.drawMs) * 10) / 10, uploads: c.uploads - p.uploads, draws: c.draws - p.draws, whole: c.whole - p.whole, ticks: c.ticks - p.ticks, idleTicks: c.idleTicks - p.idleTicks, wakes: c.wakes - p.wakes, sleeps: c.sleeps - p.sleeps } : null;
+   return { mode: typeof (now as Record<string, unknown>).draws === 'number' ? 'gl' : '2d', ...c, since, recent10s: deskRecent(history, atMs) };
+ }
+ /** the idle reports of the last `windowMs` before `atMs` (wall ms, performance.timeOrigin based like `at`); `now` is the virtual clock in 100 ns ticks (10,000 per ms) */
+diff --git a/app/test/unit/desk-link.test.ts b/app/test/unit/desk-link.test.ts
+new file mode 100644
+index 00000000..ebe1f886
+--- /dev/null
++++ b/app/test/unit/desk-link.test.ts
+@@ -0,0 +1,19 @@
++import { expect, it } from 'vitest';
++import { DeskGate, newDeskControl } from '../../src/engine/desk-link.ts';
++
++it('serves a request through shared memory before the wake message is delivered', () => {
++  const control = newDeskControl();
++  const engine = new DeskGate(control), render = new DeskGate(control);
++  render.request();
++  // The guest is running: its scheduler services the request while the message
++  // queue is blocked. The delayed wake must not compose the same frame again.
++  expect(engine.takeRequest()).toBe(true);
++  engine.publish(1);
++  expect(engine.busy).toBe(true);
++  expect(engine.takeRequest()).toBe(false);
++  render.ack(1);
++  expect(engine.busy).toBe(false);
++  render.request();
++  expect(engine.takeRequest()).toBe(true);
++  expect(engine.takeRequest()).toBe(false);
++});
+diff --git a/app/test/unit/idle-driver.test.ts b/app/test/unit/idle-driver.test.ts
+index f8f33e75..2a79c276 100644
+--- a/app/test/unit/idle-driver.test.ts
++++ b/app/test/unit/idle-driver.test.ts
+@@ -4,7 +4,7 @@ import { IdleDriver, TICKS_PER_MS, type Injected } from '../../src/engine/idle-d
+ 
+ 
+ // a fake engine (records the calls), a fake host (a clock the test moves, timers it fires by hand)
+-function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number } = {}) {
++function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number; readClock?: () => number } = {}) {
+   const calls: string[] = [];
+   const delivered: number[] = [];
+   const timers: { fn: () => void; ms: number; id: number; live: boolean }[] = [];
+@@ -20,6 +20,7 @@ function rig(opts: { maxQueue?: number; rate?: number; mouseResult?: number } =
+       mouse: (k, x, y, data) => { calls.push(`mouse ${k} ${x} ${y} ${data}`); return opts.mouseResult ?? 1; },
+       key: (k, vk, sc, e) => { calls.push(`key ${k} ${vk.toString(16)} ${sc.toString(16)} ${e}`); return 1; },
+       clockTo: (ticks) => { calls.push(`clock ${ticks}`); },
++      ...(opts.readClock ? { clockTicks: opts.readClock } : {}),
+     },
+     {
+       deliver: (code) => { delivered.push(code); const w = waiting; waiting = false; return w; },
+@@ -40,6 +41,26 @@ const kd: RawInput = { k: 'key', kind: IN.KDOWN, vk: 0xd, scan: 0x1c, ext: 0 };
+ 
+ describe('IdleDriver: the engine\'s idle in wall-clock mode', () => {
+ 
++  it('keeps time moving while continuous input prevents the guest from idling', () => {
++    let ticks = 1_000_000;
++    const r = rig({ readClock: () => ticks });
++    r.d.syncRunningClock();
++    expect(r.calls).toEqual([]);
++    r.idle(1, ticks, ticks + 30 * TICKS_PER_MS);
++    r.advance(5);
++    r.d.syncRunningClock(); // the pending idle timer retains control while idle
++    expect(r.calls).toEqual([]);
++    r.d.submit(move(1, 1), 1, 0);
++    ticks += 5 * TICKS_PER_MS;
++    r.calls.length = 0;
++    r.advance(8);
++    r.d.syncRunningClock();
++    expect(r.calls).toEqual([`clock ${1_000_000 + 13 * TICKS_PER_MS}`]);
++    ticks = 1_000_000 + 20 * TICKS_PER_MS;
++    r.d.syncRunningClock(); // guest execution ahead of wall time never goes back
++    expect(r.calls).toHaveLength(1);
++  });
++
+   it('drops input that arrives before the first idle (S-input-before-idle) and says so', () => {
+     const r = rig();
+     expect(r.d.submit(move(1, 1), 1, 0)).toBe('dropped');
+diff --git a/app/test/unit/perf-beacon-desk.test.ts b/app/test/unit/perf-beacon-desk.test.ts
+index 3e80bd33..c100da02 100644
+--- a/app/test/unit/perf-beacon-desk.test.ts
++++ b/app/test/unit/perf-beacon-desk.test.ts
+@@ -24,6 +24,17 @@ describe('deskCounters / deskBeacon', () => {
+     const d = deskBeacon(stats2d, prev, 40_000);
+     expect(d?.since).toMatchObject({ seconds: 30, presents: 60, mpx: 4, composeMs: 221.5, putMs: 48.8, rects: 100 });
+   });
++  it('displayFrames stays unmeasured for old/fallback samples and differences require both measurements', () => {
++    const measured = { ...statsGl, displayFrames: 60 };
++    expect(deskBeacon(measured, { stats: { ...statsGl, displayFrames: 20 }, atMs: 0 }, 1000)).toMatchObject({ displayFrames: 60, since: { displayFrames: 40 } });
++    for (const value of [undefined, null, NaN, Infinity]) {
++      const old = { ...statsGl, displayFrames: value };
++      expect(deskCounters(old)).not.toHaveProperty('displayFrames');
++      expect(deskBeacon(measured, { stats: old, atMs: 0 }, 1000)?.since).not.toHaveProperty('displayFrames');
++      expect(deskBeacon(old, { stats: measured, atMs: 0 }, 1000)?.since).not.toHaveProperty('displayFrames');
++    }
++    expect(deskCounters({ displayFrames: 0 })).toHaveProperty('displayFrames', 0);
++  });
+   it('a value that is not a finite number counts as 0', () => {
+     expect(deskCounters({ presents: 'x', pixels: NaN, composeMs: Infinity })?.presents).toBe(0);
+   });

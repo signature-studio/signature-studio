@@ -150,6 +150,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 18. **M7 の目標**: P3 の再生中の命令数のうち、直接 wasm の割合が 99% 以上。
 19. **依存の変更**: 外部プラグインの 3 件(027・028・029)は、音声の経路の修正(040)の後に入れる。
 20. **同じファイルを変える Issue は `blocked by` でつなぐ**(PM の起票の規則)。同じ生成物の入力(`lift/harness/web/pack.args`・`lift/harness/web/seed.args`・`lift/crates/fe-build/tests/plan/*.txt` など)を変える Issue が並行すると、push の段の pull で衝突し、作業が失われる(#1341 は #1319 と衝突して 3 回失敗した)。後から起票する側を、先に入る側の `blocked by` にする。
+21. **cfhex の除外**: `guard/scan.sh` の 32 桁の 16 進の検査(cfhex)は、`lift/crates/*/tests/` の下の `*.rs`・`*.txt`・`*.tsv`・`*.hex` の行だけ除く。試験の機械語・画素のデータは 32 桁の 16 進を多く含み、識別子ではないため(`gdi.rs`・`gdi_bulk.rs` で 54 件の誤検出)。試験の外では今まで通り検査し、vendor・cfhost・python・mask・wranglergen は、試験の場所でも効く(`spec/guard.test.sh`)。
 
 ## 11. 依頼者の指示との対応
 
@@ -166,6 +167,8 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 ## 12. 本番のデプロイ前のスモーク(deploy.yml)
 
 `fe-build bundle` の後、`fe-build upload`・wrangler の前に、2 つの検査の段を置く。(1) `tools/boot-check/boot-bundle.mjs` で起動を確かめ、状態が `engine-idle`・`standIn` が偽・`error` が null のときだけ通す(boot-bundle の `error` が null でも、状態が idle とは限らないので、状態を別に見る)。(2) `tools/smoke/welcome-flow.mjs` で Welcome 窓の 4 つの閉じ方(「No thanks」→ Default、Escape、「No thanks」→ Default の 1 回クリック、「I'm in」→ Default)を、流れごとに別の起動で走らせ、4 件とも `error` が無く、trap せず、idle に戻り、プロジェクトが開き、窓が閉じたときだけ通す。判定は、deploy.yml の中の `jq -e` の段が行う(道具の終了コードは流れの成否を表さないため)。どちらかが落ちれば、後の upload・wrangler は飛び、本番は更新されない(既定の `success()`)。判定の式は `spec/workflow.test.sh` の (m) が、fixture で実際に動かして確かめる。`HostFilesUnsupported` の件数は、正常時の値が未確認のため判定に入れない。時間の上限は、起動の段 15 分、流れの段 30 分。Chrome は runner の画像の `google-chrome` を使う(作業ジョブの boot-check と同じ)。作業ジョブの判定(judge)には、まだ入れていない。判定には取り直した main の engine と bundle を作り直す段が要り、作業ジョブの時間が大きく増えるため、deploy のログで `fe-build engine` の所要時間を見てから決める。
+
+ビルド直後の初回は冷える(OS のファイルのキャッシュ)。`boot-bundle` は、2 回起動し、1 回目を `coldMs`、2 回目を `elapsedMs` とする。実機の初回の起動は、別の測定(実機のビーコン)で見る。
 
 ## 13. 時間切れと待ちの固まり
 

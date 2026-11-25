@@ -71,3 +71,5 @@ L-069	2026-11-24	依頼者	agent.yml: エージェントの開始の直前に、
 L-070	2026-11-25	依頼者	まだ非常にクラッシュしやすい。積極的に是正する	pm-work/issue-drafts/wave1ak/
 L-071	2026-11-25	依頼者	プラグインのノブの右クリックで、貼り付けのメニューと権限のトーストが出て、トーストが消えない。クリップボードの権限を求める処理が無い。貼り付けの必要が無い操作で出る	pm-work/issue-drafts/wave1al/163-clipboard-query-no-read.md
 L-072	2026-11-25	依頼者	E2E を GitHub Actions 上で、4K 120 Hz のブラウザで、Playwright など何でも使って、実行する	pm-work/issue-drafts/wave1al/164-e2e-foundation-4k-120hz.md・pm-work/issue-drafts/wave1al/165-e2e-regression-scenarios.md
+L-073	2026-11-25	依頼者	perf/windows-browser(#1356)の知見を拾い、性能改善タスクに活かす。そのブランチはマージされず、頃合いを見て削除される	pm-work/findings/perf-windows-browser/(ブランチの台帳の L-073〜L-084 とは番号が重なるが、main の次の番号を使う。ブランチ側の番号は、参照のとき「perf/windows-browser の L-0xx」と書く)
+L-074	2026-11-25	依頼者(そのエージェントへの指示)	各報告で同じ性能指標を示す。1000Hz マウス入力を継続しながら評価用プロジェクトを開いて再生し、音が途切れず画面が最低120fpsで更新されることを最低条件にする	pm-work/findings/perf-windows-browser/(perf/windows-browser の L-081 を写す。指標: 起動時間・実測入力 Hz・平均と 1 秒窓の最低 fps・音声途切れ増分・PCM の異常な反復)
