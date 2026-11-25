@@ -1,6 +1,9 @@
 // P2 frames measure (#1350). The page is the real engine's page in headless Chrome, in its own room at a device pixel ratio (the stage is 1836 x 1056 CSS px; the guest screen the page gives for it is 3240 x 1864 device px at 1.7647), with the pointer sent at 1000 Hz or more for 30 s.
-// Usage: node tools/p2-frames/measure.mjs <absolute path to the bundle directory raw/<name>> [--dpr <value>] [--load a|b] > p2.json   (needs app/node_modules and app/dist). Defaults: --dpr 1.7647 --load a. Exit 0 when error is null, 1 when the run failed, 2 when the arguments are wrong.
-// stdout: ONE JSON line {error,dpr,load,presentedPerSec,cpuPerPresentMsP50,cpuPerPresentMsP95,budgetRatioP95,inputToPresentMsP50,inputToPresentMsP95,inputRateOk,valid,desk,notes}. Nothing else goes to stdout.
+// Usage: node tools/p2-frames/measure.mjs <absolute path to the bundle directory raw/<name>> [--dpr <value>] [--load a|b] [--app <dir>] > p2.json   (needs app/node_modules and app/dist). Defaults: --dpr 1.7647 --load a, --app is this repository's app. Exit 0 when error is null, 1 when the run failed, 2 when the arguments are wrong.
+// --app <dir> (#1422): the page measured is the app of that directory (the A/B measurement's base build); its node_modules and dist are used.
+// stdout: ONE JSON line {error,dpr,load,presentedPerSec,minWindowFps,inputDropped,cpuPerPresentMsP50,cpuPerPresentMsP95,budgetRatioP95,inputToPresentMsP50,inputToPresentMsP95,inputRateOk,valid,desk,notes}. Nothing else goes to stdout.
+// minWindowFps (#1422): the least of the 30 one-second windows of the span, each one's presents (the engine's presents, deskStats) divided by its length. The mean is presentedPerSec; the least is the number P2 is judged on.
+// inputDropped (#1422): the inputs of the window that the page's latency records mark as dropped (the same count as droppedN in notes: the engine's input queue was full, or the input was merged into a later move).
 // desk (the breakdown of one present over the window, from the presenter's counters): presents, rectsPerPresent, pixelsPerPresent, pixelShare (of the guest screen), uploadsPerPresent, uploadBytesPerPresent, drawsPerPresent, drawMsPerPresent, drawPixelsPerPresent, drawPixelShare, composeMsPerPresent, putMsPerPresent, wholePerWindow, texAllocsPerWindow, and the CPU per present of the threads (chrome = the main thread (presumed), DedicatedWorker = the engine and render Workers, Compositor, GPU process).
 // What is counted (the definitions are in notes too):
 //   presentedPerSec   the frames the compositor drew to the display in the window: 'Display::DrawAndSwap' events of the trace category viz (a record of what was shown, not a count of rAF callbacks). The engine's own count of its presents (window.__app.deskStats.presents) is the cross-check in notes.
@@ -19,14 +22,15 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
-const USAGE = 'usage: node tools/p2-frames/measure.mjs <absolute path to the bundle directory raw/<name>> [--dpr <value>] [--load a|b]\n';
+const USAGE = 'usage: node tools/p2-frames/measure.mjs <absolute path to the bundle directory raw/<name>> [--dpr <value>] [--load a|b] [--app <dir>]\n';
 const argv = process.argv.slice(2);
 const valueOf = (flag) => { const i = argv.indexOf(flag); return i < 0 ? null : argv[i + 1] ?? null; };
 const dprText = valueOf('--dpr') ?? '1.7647';
 const load = valueOf('--load') ?? 'a';
-const positional = argv.filter((a, i) => !a.startsWith('--') && !['--dpr', '--load'].includes(argv[i - 1]));
+const appText = valueOf('--app');
+const positional = argv.filter((a, i) => !a.startsWith('--') && !['--dpr', '--load', '--app'].includes(argv[i - 1]));
 const DPR = Number(dprText);
-if (positional.length !== 1 || !(DPR > 0) || !['a', 'b'].includes(load)) {
+if (positional.length !== 1 || !(DPR > 0) || !['a', 'b'].includes(load) || (argv.includes('--app') && (appText === null || appText.startsWith('--')))) {
   process.stderr.write(USAGE);
   process.exit(2);
 }
@@ -35,7 +39,7 @@ const BUNDLE = path.basename(bundleDir);
 const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
-const appDir = path.join(repo, 'app');
+const appDir = appText === null ? path.join(repo, 'app') : path.resolve(appText);
 
 const ROOM_W = 1836, ROOM_H = 1056;
 // the window that gives the room above at the first layout (the page's right panel is 340 px wide and its header 36 px high; the fit below corrects a difference)
@@ -105,7 +109,7 @@ function parseWindows(text) {
 }
 
 async function main() {
-  const out = { error: null, dpr: DPR, load, presentedPerSec: null, cpuPerPresentMsP50: null, cpuPerPresentMsP95: null, budgetRatioP95: null, inputToPresentMsP50: null, inputToPresentMsP95: null, inputRateOk: null, valid: false, desk: null, notes: '' };
+  const out = { error: null, dpr: DPR, load, presentedPerSec: null, minWindowFps: null, inputDropped: null, cpuPerPresentMsP50: null, cpuPerPresentMsP95: null, budgetRatioP95: null, inputToPresentMsP50: null, inputToPresentMsP95: null, inputRateOk: null, valid: false, desk: null, notes: '' };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-p2-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
@@ -369,6 +373,10 @@ async function main() {
     const lat = answered.map((r) => r.answerAt - (r.tEvent ?? r.tPage)).filter((x) => x >= 0).sort((a, b) => a - b);
     const droppedN = inWin.filter((r) => r.dropped).length;
     const presentedPerSec = drawAndSwap / traceSeconds;
+    // #1422: the least one-second window of the span (the presents of each second over its length)
+    const windowFps = samples.every((s) => typeof s.presents === 'number') ? seconds.map((s) => s.presents / s.dt) : [];
+    out.minWindowFps = windowFps.length > 0 ? r2(Math.min(...windowFps)) : null;
+    out.inputDropped = droppedN;
     const CLK_TCK = 100;
     const threadMs = [...samples[samples.length - 1].cpu.threads].map(([comm, v]) => [comm, ((v - (samples[0].cpu.threads.get(comm) ?? 0)) / CLK_TCK) * 1000]).sort((a, b) => b[1] - a[1]);
     const threadsText = threadMs.slice(0, 6).map(([comm, ms]) => `${comm} ${ms.toFixed(0)} ms (${(ms / Math.max(1, presentsTotal)).toFixed(2)} ms per present)`).join(', ');
@@ -400,6 +408,7 @@ async function main() {
       frames: `the frames counted are Display::DrawAndSwap of the trace category viz in the ${traceSeconds.toFixed(2)} s window: ${drawAndSwap} (${presentedPerSec.toFixed(2)}/s). Cross-check, the engine's own presents: ${presentsTotal} (${(presentsTotal / winSeconds).toFixed(2)}/s). The display's rate limit of headless Chrome is in force (no frame-rate flag): above that rate nothing can be counted; the 120 fps verdict is not made here (not measured on a display).`,
       cpu: `cpuPerPresentMs: renderer process CPU (cpuTime of SystemInfo.getProcessInfo) in each of ${seconds.length} seconds over that second's engine presents; ${per.length} seconds had a present; mean ${(cpuTotal / Math.max(1, presentsTotal)).toFixed(3)} ms per present over the window (${cpuTotal.toFixed(0)} ms / ${presentsTotal}). GPU process CPU in the window: ${gpuTotal.toFixed(0)} ms (${(gpuTotal / Math.max(1, presentsTotal)).toFixed(3)} ms per present; not in cpuPerPresentMs).`,
       threads: `renderer threads by name over the window (the sum is the renderer's CPU above): ${threadsText}.`,
+      windows: `minWindowFps ${out.minWindowFps}: the least of the ${seconds.length} one-second windows (presents in the second / its length; the page's deskStats, read once a second). inputDropped ${droppedN} (the window's inputs the page marks as dropped: the engine's input queue full, or merged into a later move).`,
       sound: `the audio output's non-silent quanta: ${silent0} -> ${silent1} in the window${silent0 !== null && silent1 !== null && silent1 > silent0 ? ' (the output was not silent)' : ' (silent: no meter moved)'}.`,
       input: `the pointer was sent at ${SEND_HZ}/s nominal on an ellipse, ${REV_PER_S} turns a second: ${st.pointerSent} sent. The page received (pointermove, getCoalescedEvents) ${seconds.reduce((a, s) => a + s.pm, 0)} in the window: per second minimum ${minRate.toFixed(0)}, median ${medRate.toFixed(0)}; inputRateOk ${inputRateOk} (every one of the ${WINDOW_S} seconds at 1000 or more). Inputs the page sent to the engine in the window ${inWin.length}; answered by a present ${answered.length}; dropped by the engine ${droppedN}; latency from the DOM event timeStamp to the present that answered it.`,
       load: load === 'a'
