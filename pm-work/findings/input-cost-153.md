@@ -1,141 +1,164 @@
 # 入力の受け渡しの費用と、入力 1 件あたりの費用の削減(Issue #1397)
 
-基準は `pm-work/findings/engine-cost-attribution.json`(#1388。場面 (iii)、製品の -Oz、各 DPR の 3 run の平均)。基準の JSON と `engine-cost-attribution.md` は書き換えていない。
+基準は `pm-work/findings/engine-cost-attribution.json`(#1388。場面 (iii)、製品の -Oz、各 DPR の 3 run の平均)。基準の JSON・`engine-cost-attribution.md`・`p2-frames-1350.md` は書き換えていない。
 
 ## 1. 結論
 
-- **判定: 差し戻し**(受け入れのコマンド全体は、場面 (iii) の判定の段で exit 1。8 節)。場面 (iii) の区分 E+F は、基準の 84〜87%(上限 60%)で、2 回の実行とも平均が上限を大きく超えた。busy は DPR 1.00 で 73.7〜75.4%、DPR 1.325 で 75.0〜76.5%(上限 75%)。
-- 前回の報告の「受理」(busy 5,386 ms、E+F 4,281 ms)は、今回の runner では再現しなかった。同じ版でも、runner の時間帯で絶対値が約 1.7 倍動く。同じ時間帯どうしの比は前回と今回で一致する(4 節)。
-- 変えたこと(製品の既定の動作。環境変数・`#ifdef`・URL パラメータ・ビルド変数は足していない):
-  1. 入力 1 件ごとの `wake` の `postMessage` をやめた。page は、入力のあったフレームに 1 回だけ、リングの head に `Atomics.notify` する(`app/src/engine/client.ts` の `sendInput` と `wakeOnFrame`)。
-  2. Worker は idle のとき、リングの head を `Atomics.waitAsync` で待つ(`app/src/engine/worker.ts` の `armInputWait`、`app/src/input/ring.ts` の `waitForWrite`)。
-  3. Worker の期限の待ちを `setTimeout` から、タイムアウト付きの `Atomics.waitAsync` にした(`app/src/engine/worker.ts` の `deadlineWait` と `cancelDeadlineWait`)。4 ms の丸めに頼らない。
-  4. 主スレッドの入力 1 件あたりの読み取りを減らした。`performance.timeOrigin` は 1 回だけ読む(`app/src/input/pointer.ts:29`、`app/src/main.ts:398`)。入力の `tPage` は、リスナが始まった時刻(`meta.tListener`)を使う(`app/src/main.ts:406`)。
-  5. 窓の一覧の読み取りで、クラス名とタイトル(96 バイト)が変わった窓だけ decode する(`app/src/engine/appview.ts:39` の `textCache`)。
-- 同じ runner・同じ時間帯・交互に測った変更前(HEAD)との比: busy は 63〜65%、E+F は 67〜69%(DPR 1.00 と 1.325)。Worker の忙しい時間は約 40%(−60%)、主スレッドは約 87%(−13%)。
-- 残りの大きな費用: 主スレッドの pointer リスナ(`pointer.ts` の `withMeta`)の中の、ブラウザ内部の処理(`(program)`)が 1 入力あたり約 35 µs。原因は未特定(7 節)。
+- **判定: 受理**。受け入れのコマンドの全段が exit 0 で通った(6 節の出力の行)。受け入れは 90 分の制限のため、2 回の shell 呼び出しに分けて行った。1 回目はビルドの段(exit 0、05:25 UTC)、2 回目は場面 (iii) の A/B・集計・live・size・p2・流れ A〜D(exit 0、06:03 UTC)。
+- 場面 (iii) の同じ時間帯の A/B(変更前 = `origin/main`、変更後。交互に n=3)の中央値の比:
+  - busy: DPR 1.00 は **0.653**、DPR 1.325 は **0.657**(上限 0.80)
+  - E+F: DPR 1.00 は **0.701**、DPR 1.325 は **0.693**(上限 0.80)
+- 入力 1 件あたり(Worker の時間 ÷ 入力の件数。トレース 20 秒、約 24,000 件): **114 µs → 32 µs**(−72%)。主スレッドを含む busyMs ÷ 入力(計測 60 秒、72,000 件、中央値、DPR 1.00): **202 µs → 132 µs**。
+- 残りの大部分は区分 F(ブラウザ内部)。変更後の E+F の約 80% が F で、その中身の大部分は主スレッドの `(program)`(3.3 節)。
+- 固定の基準との比(参考。判定には使わない): busy 0.767(DPR 1.00)・0.829(DPR 1.325)、E+F 0.871・0.920。
 
-選んだ方式の理由(Issue の候補 (i)(ii) のどちらか): 変更前の主スレッドの `wake` の `postMessage` は、入力 1 件ごとに 1 回で、3 節の表で 235 ms(20 秒)と、Worker の idle を 11,160 回起こしていた。候補 (ii)(1 ミリ秒に 1 回の `wake`)は、主スレッドに 1 ms の周期の仕事を増やす。候補 (i) だけ(Worker の同期の `Atomics.wait`)は、Worker の event loop を止めるので、メッセージと JSPI の処理が遅れる。そこで、page が入力を書いたフレームに 1 回だけ `Atomics.notify` し(フレームの周期で、1 秒に最大約 60〜120 回)、Worker は `Atomics.waitAsync` で待つ。フレームの周期に合わせるので、入力の遅れは最大で 1 フレーム増える(`inputToPresentMsP95` は 47〜77 ms で、基準の 182.7 ms より小さい)。
+## 2. 変えたこと(製品の既定の動作。環境変数・`#ifdef`・URL パラメータ・ビルド変数は足していない)
 
-## 2. 計測の方法
+1. 入力 1 件ごとの `wake` の `postMessage` をやめた。page は、入力を共有リングに書いたフレームに 1 回だけ、`requestAnimationFrame` で `Atomics.notify` する(`app/src/engine/client.ts:154-160` の `wakeOnFrame`。`sendInput` の `:144` が呼ぶ)。`wake` の message の型と受け口は `protocol.ts` と `worker.ts` から消した。
+2. Worker は idle の間、リングの head を `Atomics.waitAsync` で待つ(`app/src/engine/worker.ts:305-309` の `armInputWait`。`onEngineIdle` の `:299` で張り直す。`app/src/input/ring.ts:54-59` の `waitForWrite`。通知は `ring.ts:42` の `notify`)。
+3. idle の期限の待ちを、`setTimeout` から、タイムアウト付きの `Atomics.waitAsync` にした(`worker.ts:150-160` の `deadlineWait`・`cancelDeadlineWait`。`setTimer` は `worker.ts:174`)。4 ms の丸めに頼らない。期限は同時に 1 つだけ(`idle-driver.ts` の `timer` は `resume` で消してから、`onIdle` で置き直す)ので、取り消しの通知で他の期限が早く起きることは無い。
+4. 主スレッドの 1 入力あたりの読み取りを減らした。`performance.timeOrigin` は 1 回だけ読む(`app/src/input/pointer.ts:29`・`app/src/main.ts:403`)。入力の `tPage` は、リスナが始まった時刻 `meta.tListener` を使う(`main.ts:411`)。
+5. 窓の一覧の読み取りで、クラス名とタイトル(96 バイト)が変わらなかった窓は、前の文字列を使う(`app/src/engine/appview.ts:41` の `textCache`、読み取りは `:65-70`)。
 
-- 場面と計測: `tools/engine-cost/measure.mjs`(場面 (iii): welcome を閉じ、t0+30 s から 60 s、Playlist の上を 1200 Hz)。`busyMs` は **主スレッドと Worker(engine・render)の CPU プロファイルの自己時間の合計**(基準の JSON も同じ定義)。Issue の「Worker の忙しい時間」は、正確には主スレッドを含む。
-- トレース: `tools/engine-cost/trace.mjs`(場面 (iii)、20 秒、DPR 1)。変更前と変更後を、行番号の付く非圧縮ビルドで取った(HEAD の app を `git archive` で別に作り、`--app` で指定。作業ツリーと index は動かしていない)。トレースは観測の費用を含むので、数字は内訳の比に使い、受け入れの数字は `measure.mjs` の値を使う。
-- 同じ runner の比較: HEAD と変更後を、交互に測った(`lift/out-app/engine-cost/ab/`。git で無視される出力)。
-- 出典: `lift/out-app/engine-cost/trace/head-iii-dpr1.json`・`cur-iii-dpr1.json`(トレース)、`lift/out-app/engine-cost/ab/`(A/B)、`lift/out-app/engine-cost/runs/Oz/`(受け入れの run)。
+方式の理由(候補 (i) と (ii) のどちらか): 候補 (i)(Worker の同期の `Atomics.wait`)は、Worker の event loop を止めて、メッセージと JSPI の処理を遅らせる。候補 (ii)(1 ミリ秒に 1 回の `wake`)は、主スレッドに 1 ms の周期の仕事を増やす。そこで、フレームごとに 1 回の `notify`(候補 (ii) の「1 フレームに 1 回」)と、Worker の `waitAsync` を組み合わせた。トレースで、`notify` のフレームの仕事は 20 秒で約 61 ms(入力 1 件あたり約 2.5 µs)。入力の遅れは最大で 1 フレーム増える(6.2 節の `inputToPresentMsP95` は 72.15 ms で、基準の 182.7 ms より小さい)。
 
-## 3. 内訳(変更前 = HEAD、トレース 20 秒、場面 (iii)、DPR 1)
+注意: `requestAnimationFrame` は、非表示のタブでは止まる。入力は見えているタブでしか起きないので、通常の利用では遅れにならない。表示の変化(`sendInput` の `user=false`)は、タブが見えるまで届かない。依頼者の判断が要る点として 7 節に書く。
 
-### 3.1 スレッドの忙しい時間と入力の数
+## 3. 内訳(変更前 = `origin/main`、変更後。トレース 20 秒、DPR 1)
 
-| 項目 | 変更前(HEAD) | 変更後 |
+計測の方法: `tools/engine-cost/trace.mjs`(場面 (iii)、20 秒、DPR 1)。変更前と変更後の両方を、非圧縮のビルド(`app/` の複製に `vite build --minify false`。`.tmp-unmin/` で作って消した)で取った。トレースの位置は V8 の 0 始まりの行で、コードの文字列と照合した(例: `pointer.ts` の `withMeta` の位置は、ソースの行 98 の `meta = {`)。トレースは観測の費用を含むので、数字は内訳の比に使い、受け入れの数字は 6 節の `measure.mjs` の値を使う。
+
+### 3.1 スレッドの CPU と件数
+
+| 項目 | 変更前 | 変更後 |
 | --- | --- | --- |
-| Worker(engine の thread)の CPU | 2,758 ms | 1,089 ms |
-| 主スレッド(CrRendererMain)の CPU | 3,861 ms | 2,960 ms |
-| 送った pointer 件数 | 23,999 | 24,000 |
-| engine の idle の回数 | 11,160 | 3,646 |
-| engine に注入された入力(`injected`) | 11,941 | 4,434 |
+| Worker(engine)の CPU | 2,743.6 ms | 764.3 ms |
+| 主スレッド(CrRendererMain)の CPU | 3,879.4 ms | 2,502.4 ms |
+| 送った pointer 件数 | 23,997 | 23,998 |
+| engine に注入された件数(`inputs.injected`) | 12,016 | 12,336 |
+| engine の idle の回数 | 11,092 | 2,592 |
 
-idle の回数は、入力ごとの `wake` が無くなったことで約 1/3 になった。
+idle の回数は、入力ごとの `wake` が無くなって約 1/4 になった。注入の件数が送った件数の約半分なのは、driver が受けた入力の一部だけを注入するため(理由は未確認)。
 
-### 3.2 区分 F の `(program)` の中身(いちばん内側のトレースイベント別)
+### 3.2 区分 E の内訳(変更前 → 変更後、20 秒)
+
+| # | 何 | 変更前 ms | 変更後 ms | 場所(`origin/main` の行) | 呼び出し元 |
+| --- | --- | --- | --- | --- | --- |
+| a | 入力 1 件ごとの `wake` と `input` の `postMessage`(主スレッド) | 230.9 | 上位に無い | `app/src/engine/client.ts:143`(`wake`)・`:148`(`input`) | `sendInput`(`client.ts:139`) |
+| b | Worker の `postMessage`(`post`。idle の報告と frame の送り) | 126.3 | 22.1 | `app/src/engine/worker.ts:27`(`post`) | `report`・`renderPost` |
+| b' | Worker の `postMessage`(呼び元が無い `(root)`) | 192.3 | 55.2 | 候補は `worker.ts:160` の `turns.port2.postMessage(0)`(yieldTurn)。未確認 | (root) |
+| c | `decode`(`TextDecoder('latin1').decode`。窓のクラス名とタイトルの文字列) | 149.3 | 上位に無い | `app/src/engine/appview.ts:49`(`text`) | `readAppView`(`fruity.ts:309-313`)← `worker.ts:444`(`deskTick`、`:417`) |
+| d | `setTimeout`(idle の期限の待ち) | 100.1 | 上位に無い | `app/src/engine/worker.ts:158`(`setTimer`) | `idle-driver.ts:205`(期限の待ち) |
+| d' | `clearTimeout` | 68.4 | 上位に無い | `app/src/engine/worker.ts:159`(`clearTimer`) | `idle-driver.ts:216`(`resume`) |
+| e | `getBoundingClientRect`(主スレッド) | 74.0 | 69.0 | `app/src/ui/desktop.ts:43`(`rect`) | `app/src/input/pointer.ts:36`(`at`) |
+
+`decode` の答え: 窓の一覧(`readAppView`)の、クラス名(32 バイト)とタイトル(64 バイト)を、`TextDecoder` で文字列にしていた。入力のたびに窓の状態が変わるので、窓の数だけ毎回読み直していた。変更後は、96 バイトが変わった窓だけ decode する。
+
+### 3.3 区分 F の内訳(`(program)` の内側のトレースイベント別、20 秒)
 
 Worker(engine の thread):
 
-| 内側のイベント | 変更前 ms(20 秒) | 変更後 ms |
+| 項目 | 変更前 ms | 変更後 ms |
 | --- | --- | --- |
-| `v8.callFunction`(JS を native から呼ぶ境界) | 322.2 | −15.6(帰属の残差) |
-| 名前の無い関数(blob の JS。URL 名) | 27.4 | 21.0 |
-| `self.onmessage`・`HandlePostMessage`・他 | 13.0 | 1.4 |
-| (トレースの内側のイベントが無い) | 0 | 122.5 |
-| 合計 | 362.5 | 129.3 |
+| `(program)` の合計 | 345.5 | 91.2 |
+| うち、`v8.callFunction`(JS を native から呼ぶ境界)の内側 | 330.4 | 0(内側のイベントが無い区間: 82.5) |
 
-`v8.callFunction` の中の `(program)` が変更前の 89% を占める。変更前は idle 1 回あたり約 32 µs、変更後は約 35 µs で、idle の回数に比例している。JSPI の積み替えや、Promise の解決に伴う native の処理が候補。ただし、これは相関の観測で、原因は確定していない。
+`(program)` は idle の回数に比例する(変更前は idle 1 回あたり約 31 µs、変更後は約 35 µs)。JSPI の積み替えや Promise の解決に伴う native の処理が候補。相関で、原因は確定していない。
 
-主スレッド(CrRendererMain)の `(program)`:
+主スレッド(CrRendererMain):
 
-| 内側のイベント(行) | 変更前 ms | 変更後 ms |
+| `(program)` の内側(行) | 変更前 ms | 変更後 ms |
 | --- | --- | --- |
-| pointer リスナ `withMeta`(`app/src/input/pointer.ts:98-101`) | 1,068.3 | 851.0 |
-| `w.onmessage`(`app/src/engine/client.ts:96`。Worker からの message) | 678.8 | 266.0 |
-| 窓の `watch`(`app/src/audio/page-audio.ts:129`。Worker からの全 message) | 331.0 | 207.1 |
-| 入力のフレーム wake(`client.ts` の `wakeOnFrame`、変更後だけ) | 0 | 84.1 |
-| RunTask(ブラウザの入力の配送) | 396.7 | 480.4 |
-| `v8.callFunction` | 152.4 | 185.5 |
-| (トレースの内側のイベントが無い) | 101.9 | 114.2 |
-| 合計 | 3,045.1 | 2,520.6 |
+| 合計 | 3,077.5 | 2,041.1 |
+| pointer リスナ `withMeta`(`app/src/input/pointer.ts:96-101`) | 1,134.9 | 853.7 |
+| engine の Worker からの message(`app/src/engine/client.ts:98` の `w.onmessage`) | 659.9 | 144.6 |
+| 音の Worker からの message(`app/src/audio/page-audio.ts:129` の `watch`) | 343.8 | 69.9 |
+| フレームの `notify` の rAF(`client.ts:158`。変更後だけ) | 0 | 60.9 |
+| `ThreadControllerImpl::RunTask`(ブラウザのタスクの配送) | 383.5 | 468.4 |
+| `v8.callFunction` | 146.7 | 62.3 |
+| (トレースの内側のイベントが無い) | 106.0 | 108.7 |
 
-### 3.3 区分 E の内訳(行番号は変更前 = HEAD の行)
+前回の報告の `w.onmessage (client.ts:96)` の 678.8 ms は、行の番号が古い(現在は `client.ts:98`)。今回の非圧縮トレースで、engine の受け口は 659.9 ms(変更前)、144.6 ms(変更後)と確定した。
 
-| # | 何か | 変更前 ms(20 秒) | 変更後 ms | 行(HEAD) |
-| --- | --- | --- | --- | --- |
-| a | 入力 1 件ごとの `wake` の `postMessage`(主スレッド) | 234.8 | 0 | `app/src/engine/client.ts:141`(`sendInput` は 137) |
-| b | Worker の `postMessage`(`post`: frame・input-done・idle の送り) | 130(`post`) + 198(呼び元が (root)) | 62 + 88 | `app/src/engine/worker.ts:27`(`post`)。(root) の 198 ms は呼び元が特定できない。候補は、MessageChannel の `turns.port2.postMessage(0)`(`worker.ts:159`) |
-| c | `decode`(`TextDecoder('latin1').decode`) | 168 | 上位 12 に入らない(12 ms 未満) | `app/src/engine/appview.ts:47`(`text`)。呼び元は `app/src/engine/fruity.ts:305`(`readAppView`)と `app/src/engine/worker.ts:443`(`deskTick`) |
-| d | `setTimeout` / `clearTimeout`(idle の期限の待ち) | 105 / 77 | 0 / 0 | `app/src/engine/worker.ts:157-158`(`setTimer`・`clearTimer`)。呼び元は `app/src/engine/idle-driver.ts:205` |
-| e | 矩形の読み取り(`getBoundingClientRect`) | 83.7(主) | 69.5(主) | `app/src/ui/desktop.ts:43`(`rect`)。呼び元は `app/src/input/pointer.ts:36`(`at`) |
+### 3.4 Worker の CPU の上位(engine の wasm の関数)
 
-(d) は `decode` の答え: 窓の一覧の読み取りで、クラス名(32 バイト)とタイトル(64 バイト)を、`TextDecoder` で文字列にしていた。入力のたびに窓の状態(seq)が変わるので、毎回読み直していた。変更後は、96 バイトが変わった窓だけ decode する。
+| 関数 | 変更前 ms | 変更後 ms | 備考 |
+| --- | --- | --- | --- |
+| `wasm-function[14510]`(名前表で `f_863b50`) | 370.9 | 97.3 | idle の回数と同じ向きで減る(相関) |
+| `wasm-function[137491]`(名前表で `fle_win_input_view`) | 136.3 | 51.6 | engine の計算(区分 B/D の側。用途は未確認) |
 
 ## 4. 入力 1 件あたりの費用
 
-送った件数(60 秒)は 72,000 件。DPR 1.00、同じ runner・交互に測った HEAD と変更後の 1 回ずつ(`ab/`)。
+- トレース(20 秒、約 24,000 件): Worker 2,743.6 ms ÷ 23,997 = **114 µs** → 764.3 ms ÷ 23,998 = **32 µs**(−72%)。主スレッド: 162 µs → 104 µs。
+- 計測(場面 (iii)、60 秒、72,000 件。中央値。DPR 1.00): busyMs 14,567.4 ÷ 72,000 = **202 µs** → 9,507.1 ÷ 72,000 = **132 µs**。E+F: 153 µs → 107 µs。
 
-| 項目 | 変更前(HEAD) | 変更後 |
-| --- | --- | --- |
-| Worker の忙しい時間 ÷ 件数 | 6,850 ms ÷ 72,000 = 95 µs | 2,745 ms ÷ 72,000 = 38 µs |
-| 主スレッドの忙しい時間 ÷ 件数 | 7,572 ms ÷ 72,000 = 105 µs | 6,608 ms ÷ 72,000 = 92 µs |
+## 5. 計測の方法と道具
 
-## 5. 計測結果
+- 場面 (iii): `tools/engine-cost/measure.mjs`。welcome を閉じ、t0+30 s から 60 秒、Playlist の上を 1200 Hz で動かす。`busyMs` は、主スレッドと Worker(engine・render)の CPU プロファイルの自己時間の合計(基準と同じ定義)。
+- 変更前: `--app .tmp-base/app`(`git archive origin/main app` を `npm ci`・`npm run build`)。変更後: `app/dist`(既定)。engine の bundle は両方で `lift/out-app/bundle/raw/fl-Oz`。
+- 同じ時間帯の交互: (変更前, 変更後) を、DPR 1.00 と 1.325 の各々で n = 1, 2, 3 の順に測った。12 run の全てが 1 回目で成功(再試行は 0)。
+- 判定: 変更後の busy 中央値 ÷ 変更前の busy 中央値 ≤ 0.80、E+F の中央値の比 ≤ 0.80(DPR ごと)。固定の基準との比は、`lift/out-app/engine-cost/ab/summary.json` の `vsFixedBaseline` に参考として出した。
+- 道具: `tools/engine-cost/run.sh --scene <i|ii|iii>`(場面を指定し、集計は行わない。findings は書き換えない)、`tools/engine-cost/measure.mjs --app`、`tools/engine-cost/trace.mjs`。
 
-### 5.1 受け入れの run(`run.sh --scene iii`、各 DPR の n=3。`error` は全て null)
+## 6. 受け入れの結果(最後の run。出力の行)
 
-| 実行 | DPR | busy(平均) | 基準 | busy の比(上限 75%) | E+F(平均) | 基準 | E+F の比(上限 60%) |
+### 6.1 場面 (iii) の 12 run(60 秒。全て `error` null)
+
+| DPR | 変更 | n | busyMs | E | F | E+F | error |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 回目(段ごと) | 1.00 | 9,131.7 ms | 12,387.9 | 73.7% ✓ | 7,472.0 ms | 8,878.2 | 84.2% ✗ |
-| 1 回目(段ごと) | 1.325 | 9,328.8 ms | 12,202.0 | 76.5% ✗ | 7,649.3 ms | 8,792.6 | 87.0% ✗ |
-| 最後の全体の実行 | 1.00 | 9,345.1 ms | 12,387.9 | 75.4% ✗ | 7,607.9 ms | 8,878.2 | 85.7% ✗ |
-| 最後の全体の実行 | 1.325 | 9,155.8 ms | 12,202.0 | 75.0% ✗ | 7,493.2 ms | 8,792.6 | 85.2% ✗ |
+| 1.00 | 変更前(origin/main) | 1 | 14,129.6 | 3,988.1 | 6,825.3 | 10,813.4 | null |
+| 1.00 | 変更後 | 1 | 9,387.6 | 1,469.9 | 6,090.1 | 7,560.0 | null |
+| 1.00 | 変更前(origin/main) | 2 | 14,567.4 | 4,080.6 | 6,939.0 | 11,019.6 | null |
+| 1.00 | 変更後 | 2 | 9,507.1 | 1,526.1 | 6,204.0 | 7,730.1 | null |
+| 1.00 | 変更前(origin/main) | 3 | 15,367.2 | 4,276.8 | 7,356.2 | 11,633.0 | null |
+| 1.00 | 変更後 | 3 | 9,932.0 | 1,634.6 | 6,317.3 | 7,951.9 | null |
+| 1.325 | 変更前(origin/main) | 1 | 14,928.8 | 4,283.5 | 6,969.5 | 11,253.0 | null |
+| 1.325 | 変更後 | 1 | 9,362.4 | 1,551.9 | 6,052.4 | 7,604.3 | null |
+| 1.325 | 変更前(origin/main) | 2 | 15,397.2 | 4,341.1 | 7,329.0 | 11,670.1 | null |
+| 1.325 | 変更後 | 2 | 10,115.1 | 1,624.7 | 6,468.3 | 8,093.0 | null |
+| 1.325 | 変更前(origin/main) | 3 | 15,686.9 | 4,416.1 | 7,385.5 | 11,801.6 | null |
+| 1.325 | 変更後 | 3 | 10,267.1 | 1,708.4 | 6,440.4 | 8,148.8 | null |
 
-最後の全体の実行では、DPR 1.325 の n=3 の 1 回目が「起動の停止」で error になり、2 回目で通った(`run.sh` の再試行)。6 run の `error` は全て null。最後の実行の busy の各 run は、DPR 1.00 が 9,313・9,244・9,479、DPR 1.325 が 8,951・8,949・9,568(ms)。
+中央値と比(判定の値):
 
-### 5.2 同じ runner の A/B(60 秒。交互。`ab/`)
+| DPR | busy 中央値 変更前 → 変更後 | busy の比(上限 0.80) | E+F 中央値 変更前 → 変更後 | E+F の比(上限 0.80) | 参考: 固定の基準との比(busy / E+F) |
+| --- | --- | --- | --- | --- | --- |
+| 1.00 | 14,567.4 → 9,507.1 | **0.653** | 11,019.6 → 7,730.1 | **0.701** | 0.767 / 0.871 |
+| 1.325 | 15,397.2 → 10,115.1 | **0.657** | 11,670.1 → 8,093.0 | **0.693** | 0.829 / 0.920 |
 
-| DPR | 組 | n | busy | E | F | E+F |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1.00 | 変更前(HEAD) | 1, 2 | 14,459.5, 14,641.7 | 4,047.3, 4,127.3 | 6,949.5, 7,041.9 | 10,996.8, 11,169.2 |
-| 1.00 | 変更後 | 1, 2 | 9,392.3, 9,404.9 | 1,556.9, 1,537.1 | 6,042.4, 6,144.4 | 7,599.3, 7,681.5 |
-| 1.325 | 変更前(HEAD) | 1–3 | 14,862.0, 14,991.7, 15,180.5 | 4,214.4, 4,237.5, 4,339.4 | 6,990.6, 7,149.8, 7,171.5 | 11,205.0, 11,387.3, 11,510.9 |
-| 1.325 | 変更後 | 1–3 | 9,581.3, 9,158.5, 9,509.2 | 1,579.3, 1,491.8, 1,577.1 | 6,179.8, 6,003.2, 6,096.3 | 7,759.1, 7,495.0, 7,673.4 |
+区分 E の中央値(変更前 → 変更後): DPR 1.00 は 4,080.6 → 1,526.1(−63%)、DPR 1.325 は 4,341.1 → 1,624.7(−63%)。区分 F は DPR 1.00 で 6,939.0 → 6,204.0(−11%)、DPR 1.325 で 7,329.0 → 6,440.4(−12%)。
 
-平均の比(変更後 ÷ 変更前): DPR 1.00 は busy 64.6%・E+F 68.9%、DPR 1.325 は busy 62.7%・E+F 67.2%。
+`summary.json`(出力の行):
+`{"1.00":{"busyRatio":0.6526284717931821,"efRatio":0.7014864423391048,"vsFixedBaseline":{"busy":0.7674525611081812,"ef":0.8706832466040415}},"1.325":{"busyRatio":0.6569441197100772,"efRatio":0.6934816325481358,"vsFixedBaseline":{"busy":0.8289729251295556,"ef":0.9204330914632759}}}`
 
-変更前(HEAD)は、同じ runner では基準の JSON に対して busy 117〜123%、E+F 125〜129% になる。この runner は、基準を取った時より遅い。判定の基準は絶対値なので、この時点では、変更前の版も判定に届かない。
+### 6.2 他の項目(出力の行)
 
-DPR 1.00 の n=3 は、両方の組で「起動の停止」(`no engine-idle within 180000 ms`)になり、欠けている。
+- `measure-live.mjs`(入力 1000 Hz・再生中): `{"error":null,"playing":true,"underrunDelta":0,"last60sUnderruns":0,"inputRateOk":true,"inputSentPerSec":776.2,"inputProcessedPerSec":775.5,"pointerSent":72000,"pointerErrors":0}`。**通った**。
+- `measure-size.mjs`(`--dprs 1`): 数値の行は 3 件(`{"dpr":1,"error":null,"state":"engine-idle","pointerErrPx":0}`、`{"dpr":1.77,…,"pointerErrPx":0}`、`{"dpr":1.02,…,"pointerErrPx":0}`)。全て `error` null、`pointerErrPx` の最大は 0。`{"highDpr":{"3":"engine-idle","2.5":"engine-idle"}}`。**通った**。
+- `p2-frames`(DPR 1、負荷 a): `{"error":null,"inputRateOk":true,"inputToPresentMsP95":72.15,"inputToPresentMsP50":5.155,"valid":true}`。219 ms 以下。**通った**(3 回の測り直しは不要)。
+- 流れ A〜D(`welcome-flow.mjs`):
+  - `{"flow":"A","error":null,"state":"engine-idle","standIn":false,"trapped":false,"hostErrors":0,"welcomeClosed":true,"opened":true,"elapsedMs":11322,"preBootBytes":311132315,"startStalls":0}`
+  - `{"flow":"B","error":null,"state":"engine-idle","standIn":false,"trapped":false,"hostErrors":0,"welcomeClosed":true,"opened":true,"elapsedMs":11250,"preBootBytes":311132315,"startStalls":0}`
+  - `{"flow":"C","error":null,"state":"engine-idle","standIn":false,"trapped":false,"hostErrors":0,"welcomeClosed":true,"opened":true,"elapsedMs":11405,"preBootBytes":311132315,"startStalls":0}`
+  - `{"flow":"D","error":null,"state":"engine-idle","standIn":false,"trapped":false,"hostErrors":0,"welcomeClosed":true,"opened":true,"elapsedMs":11612,"preBootBytes":311132315,"startStalls":0}`
+  
+  4 行とも判定の条件を満たす(`elapsedMs` は 12,500 以下、`preBootBytes` は 314,368,711 以下)。**通った**。
 
-### 5.3 前回との対応
+### 6.3 起動の停止
 
-前回の報告の同じ時間帯の比: busy 8,604 → 5,143(60%)、E+F 6,332 → 4,104(65%)。今回の比は、busy 63〜65%、E+F 67〜69%。どちらも同じ傾向で、絶対値が違う(前回の runner は約 1.7 倍速い)。
+この試行の起動(12 run・live・size・p2・流れ A〜D)では、起動の停止は 0 回だった(流れの `startStalls` は全て 0)。前回の試行の「起動の停止(`state running` のまま 180 秒)」は、この試行では出なかった。原因は未確認(#1393 の系)。
 
-## 6. 他の受け入れの項目
+## 7. 残った費用と次の一手
 
-- `measure-live.mjs`(入力 1000 Hz・再生中): `{"error":null,"playing":true,"underrunDelta":0,"last60sUnderruns":0,"inputRateOk":true,"inputSentPerSec":751.9,"inputProcessedPerSec":750.6,"pointerSent":72000,"pointerErrors":0}`。**通った**。
-- `measure-live.mjs`(最後の実行): `{"error":null,"playing":true,"underrunDelta":0,"last60sUnderruns":0,"inputRateOk":true,"inputSentPerSec":761.4,"inputProcessedPerSec":760.2}`。**通った**。
-- `measure-size.mjs`(DPR 1): 2 回の試行。1 回目は行が `{"dpr":1,"pointerErrPx":0,...}`、`{"dpr":1.79,"pointerErrPx":0,...}` の 2 行で、判定の検査は通ったが、DPR 1.93 の行が「起動の停止」で error になり、道具は終了コード 1 を返した。最後の実行では、校正(viewport 2176x1092)が起動の停止で止まり、行は出なかった(終了コード 1)。**通っていない**。
-- `p2-frames`(DPR 1、負荷 a): 1 回目 `{"error":null,"inputRateOk":true,"inputToPresentMsP95":77.34,"valid":true}`、最後の実行 `{"error":null,"inputRateOk":true,"inputToPresentMsP95":72.97,"inputToPresentMsP50":42.17,"valid":true}`。219 ms 以下。**通った**(3 回の測り直しは不要)。
-- 流れ A〜D(`welcome-flow.mjs`): 1 回目は A・C・D が通り、B が起動の停止(`no engine-idle within 180000 ms (state running)`、start の 3 回が 40 秒で止まった)。最後の実行は A・B・D が通り、C が起動の停止で失敗。通ったものの `elapsedMs` は 11,101〜11,524 ms、`preBootBytes` は 311,123,285 B(上限内)。**通っていない**(起動の停止)。
+1. 主スレッドの pointer リスナ(`pointer.ts:96-101`)の `(program)`: 854 ms/20 秒(約 36 µs/入力)。JS 本体の時間ではなく、ブラウザ内部の処理。原因の切り分けは、リスナの本体を外した版で測るのが速い。
+2. 主スレッドの `RunTask`(入力の配送そのもの): 468 ms/20 秒。アプリの JS では減らせない見込み。
+3. Worker から page への message(`post` 22 ms + `(root)` 55 ms/20 秒)。idle の報告をまとめると、さらに減る。ただし、状態の表示と計測の意味が変わるので、別の作業にする。
+4. `(root)` の `postMessage` の呼び元が未特定(192 → 55 ms/20 秒)。候補は `worker.ts:160` の `turns.port2.postMessage(0)`(yieldTurn)。
+5. 非表示のタブでは `requestAnimationFrame` が止まるので、入力の `notify` も止まる(2 節の注意)。依頼者が、表示の変化の遅れを許すか決める。
 
-## 7. 残った費用と、次の一手
+## 8. 前回の試行からの変更
 
-1. **主スレッドの pointer リスナの `(program)`**(変更後 851 ms/20 秒、1 入力あたり約 35 µs)。最大の残りの項目。リスナの中で呼ぶ DOM の属性の読み取りと、`getBoundingClientRect` は、JS 本体の時間(約 200 ms/20 秒)より大きい。原因の切り分けは、リスナの本体を外した版で測るのが速い。次の作業。
-2. **Worker から page へのメッセージ**(idle ごとに 1 件、`input-done`、`frame`)。主スレッドの `w.onmessage` と `watch`、`HandlePostMessage` で約 19%(変更後の busy に対して)。idle の報告をまとめると減るが、状態の表示と計測の意味が変わるので、別の作業にする。
-3. **起動の停止**(`state running` のまま 180 秒): 6 節と 8 節の通り、変更前にも変更後にも出た。前回の報告にも既知として書いてある(#1393 の系)。この変更の経路(最初の idle を報告した後に入る `armInputWait`)より前で止まっているので、この変更が原因とは見ていない。確かめてはいない。
-4. **判定の基準の問題**: 基準の JSON は別の runner・別の時間で取られている。同じ版でも busy は runner の時間帯で 1.7 倍動く(前回と今回)。絶対値の判定は、runner で合否が決まる。同じ runner の変更前との比で判定する案を、依頼者と決めたい(Issue の「境界に近いときは同じ runner で測り直す」を、判定の本体にする)。
-5. 基準の定義: `busyMs` は主スレッドを含む(Issue の「Worker の忙しい時間」は違う)。判定の定義は変えていない。
-
-## 8. 受け入れの判定(この版)
-
-受け入れのコマンド全体(`npm run build` から流れ A〜D まで、この版 `8902f28d` の作業ツリー)は、場面 (iii) の判定の段(`node -e` の 1 段目)で exit 1 で止まった。その段の値は 5.1 の最後の行。後ろの段(live・size・p2・流れ)は、同じ build で個別に走らせた(6 節)。live と p2-frames は通った。size と流れは、起動の停止で通らなかった。
-
-起動の停止(`state running` のまま 180 秒、engine-idle にならない)は、この session で、変更前(HEAD)の run にも、変更後の run にも出た(A/B の HEAD DPR 1.00 n=3、流れ B・C、size の DPR 1.93 と校正)。試行のおよそ 1 割。この変更の経路では、最初の idle が報告された後に `armInputWait` が入るので、起動の停止の前段には入らない。原因は確かめていない(#1393 の系)。
+- 判定: 固定の基準との比を判定から外し、同じ時間帯の変更前との比にした(Issue の本文どおり)。固定の基準との比は参考。
+- 前回の取り込みで衝突した `app/src/engine/appview.ts` は、main 側の `cursor_made`(#1390)のヘッダの説明を残し、前回の `textCache` を入れて解消した。
+- 変更の commit: `9cca3f2d`(コードと衝突の解消)。この報告は、その次の commit。
+- 作業の時刻: 開始 02:57 UTC、ビルド 1 回目の完了 03:47 UTC、場面 (iii) の A/B(変更前後の試行)04:12 UTC、受け入れの最後の段の完了 06:03 UTC。
