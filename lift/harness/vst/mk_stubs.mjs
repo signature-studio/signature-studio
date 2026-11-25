@@ -79,6 +79,14 @@ function runtimeDefined(dir) {
   return set;
 }
 
+/** the C name of the runtime function of an API: fle_imp_<API>. A C++ (mangled) API name has characters a C identifier cannot have; each of them becomes _<hex>_ */
+function imp_fn(api) {
+  return `fle_imp_${/^[A-Za-z0-9_]+$/.test(api) ? api : api.replace(/[^A-Za-z0-9_]/g, (c) => `_${c.charCodeAt(0).toString(16).padStart(2, '0')}_`)}`;
+}
+
+/** a C string literal of an API name (a ? is escaped, so that no trigraph can form) */
+const cstr = (s) => JSON.stringify(s).replace(/\?/g, '\\?');
+
 /** the TABLE rows of fe-lift's imports_table.rs: (dll, API) pairs, lower case dll */
 function tableRows(text) {
   const set = new Set();
@@ -100,6 +108,7 @@ const runtime = runtimeDefined(runtimeDir);
 const rows = [];
 const stubs = new Map();
 const seen = new Set();
+const fnOwner = new Map();
 const ords = [];
 for (const im of imports) {
   if (im.ordinal !== undefined) {
@@ -113,7 +122,9 @@ for (const im of imports) {
   const key = `${im.dll} ${im.api}`;
   if (seen.has(key) || table.has(key) || vstKeys.has(key)) continue;
   seen.add(key);
-  const fn = `fle_imp_${im.api}`;
+  const fn = imp_fn(im.api);
+  if (fnOwner.has(fn) && fnOwner.get(fn) !== im.api) throw new Error(`mk_stubs: two APIs share the name ${fn}`);
+  fnOwner.set(fn, im.api);
   rows.push(`${im.dll} ${im.api} ${fn}`);
   if (!runtime.has(im.api) && !vstFns.has(fn)) stubs.set(fn, { dll: im.dll, api: im.api });
 }
@@ -133,7 +144,7 @@ c.push(' * and the ordinal table (vst3a_ord_table) that iat_fixup reads. Do not 
 c.push('#include <stdint.h>');
 c.push('#include "vst3a.h"');
 c.push('');
-for (const [fn, { dll, api }] of stubs) c.push(`__attribute__((weak)) void ${fn}(void) { vst3a_unanswered(${JSON.stringify(dll)}, ${JSON.stringify(api)}); }`);
+for (const [fn, { dll, api }] of stubs) c.push(`__attribute__((weak)) void ${fn}(void) { vst3a_unanswered(${JSON.stringify(dll)}, ${cstr(api)}); }`);
 ords.forEach((o, k) => { if (!o.answer) c.push(`static void vst3a_ord_${k}_stop(void) { vst3a_unanswered(${JSON.stringify(o.dll)}, ${JSON.stringify('#' + o.ordinal)}); }`); });
 ords.forEach((o, k) => { if (!o.answer) c.push(`void vst3a_ord_${k}(void) { vst3a_ord_${k}_stop(); }`); });
 c.push('');

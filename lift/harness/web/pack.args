@@ -228,3 +228,5 @@ lift/out-app/host/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp=
 lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm
 --lazy-file
 lift/out-app/plugins/serum2/vst-ext.wasm=plugins/serum2.wasm
+--lazy-file
+lift/out-app/plugins/vital/vst-ext.wasm=plugins/vital.wasm
