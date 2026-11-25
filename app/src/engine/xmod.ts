@@ -5,10 +5,35 @@
 // A DLL with no such file is left alone (fle_xmod_load returns 0). Every failure throws: the engine's call stops by the error, never with a guessed answer.
 import type { LazyFileSource } from './lazy-file.ts';
 
-type Fn = (...args: unknown[]) => unknown;
+type Fn = () => void;
+
+const u32 = (n: number): number[] => { const out = []; do { const b = n & 127; n >>>= 7; out.push(b | (n ? 128 : 0)); } while (n); return out; };
+const str = (s: string): number[] => { const bytes = new TextEncoder().encode(s); return [...u32(bytes.length), ...bytes]; };
+const section = (id: number, body: number[]): number[] => [id, ...u32(body.length), ...body];
+
+// The f_<va> imports use the C ABI: no arguments/results, guest registers in
+// shared memory. A Wasm relay keeps JS frames out of calls that may suspend.
+// Its table is filled when the plugin becomes available, after engine instantiation.
+function forwarders(names: string[]): WebAssembly.Module {
+  const bodies = names.flatMap((_, i) => {
+    const slot = u32(i);
+    if (slot[slot.length - 1]! & 64) { slot[slot.length - 1]! |= 128; slot.push(0); } // i32.const uses signed LEB
+    const body = [0, 0x41, ...slot, 0x11, 0, 0, 0x0b];
+    return [...u32(body.length), ...body];
+  });
+  return new WebAssembly.Module(new Uint8Array([
+    0, 97, 115, 109, 1, 0, 0, 0,
+    ...section(1, [1, 0x60, 0, 0]),
+    ...section(2, [1, ...str('env'), ...str('table'), 1, 0x70, 0, ...u32(names.length)]),
+    ...section(3, [...u32(names.length), ...names.map(() => 0)]),
+    ...section(7, [...u32(names.length), ...names.flatMap((name, i) => [...str(name), 0, ...u32(i)])]),
+    ...section(10, [...u32(names.length), ...bodies]),
+  ]));
+}
 
 export class XmodLoader {
-  private readonly fns = new Map<string, Fn>();
+  private readonly slots = new Map<string, number>();
+  private table: WebAssembly.Table | null = null;
   private readonly loaded = new Set<string>();
   private readonly root: string;
   private readonly lazy: LazyFileSource[];
@@ -22,13 +47,12 @@ export class XmodLoader {
     this.memory = memory;
   }
 
-  /** the supply of the engine's import env.<name>: the function that the separate module exports under that name (an error while that module is not loaded) */
-  stub(name: string): Fn {
-    return (...args: unknown[]) => {
-      const fn = this.fns.get(name);
-      if (!fn) throw new Error(`xmod: ${name} is called before its module is loaded`);
-      return fn(...args);
-    };
+  /** Bind the engine's imports before it exists, without a JS forwarding frame. Unloaded slots trap. */
+  bind(names: string[]): Record<string, Fn> {
+    if (this.table) throw new Error('xmod: engine imports are already bound');
+    this.table = new WebAssembly.Table({ element: 'anyfunc', initial: names.length });
+    names.forEach((name, i) => this.slots.set(name, i));
+    return new WebAssembly.Instance(forwarders(names), { env: { table: this.table } }).exports as Record<string, Fn>;
   }
 
   /** fle_xmod_load: the C string at ptr is the DLL's path. 1 when the separate module of that DLL is instantiated (now, or before), 0 when the DLL has none */
@@ -37,8 +61,9 @@ export class XmodLoader {
     const ex = this.engineExports();
     if (!mem || !ex) throw new Error('xmod: the engine has no memory or exports yet');
     const bytes = new Uint8Array(mem.buffer);
-    let end = ptr;
-    while (bytes[end] !== 0) end++;
+    ptr >>>= 0;
+    const end = bytes.indexOf(0, ptr);
+    if (end < 0) throw new Error(`xmod: no terminated module path at ${ptr}`);
     const dll = new TextDecoder().decode(bytes.slice(ptr, end));
     const wasmPath = dll.replace(/\.dll$/i, '.wasm');
     if (wasmPath === dll) return 0;
@@ -57,7 +82,10 @@ export class XmodLoader {
       c[i.name] = v;
     }
     const inst = new WebAssembly.Instance(mod, { c } as WebAssembly.Imports);
-    for (const [k, v] of Object.entries(inst.exports)) if (k.startsWith('f_') && typeof v === 'function') this.fns.set(k, v as Fn);
+    for (const [k, v] of Object.entries(inst.exports)) {
+      const slot = this.slots.get(k);
+      if (slot !== undefined && typeof v === 'function') this.table!.set(slot, v);
+    }
     this.loaded.add(wasmPath);
     return 1;
   }
@@ -66,7 +94,6 @@ export class XmodLoader {
 /** the engine's imports for the separate modules: the supply of every env.f_<va> the engine imports (the glue may hold a placeholder for an undefined symbol; this replaces it). The engine's call of fle_xmod_load reaches loader.loadAt through the Module hook fleXmodLoad (fruity.ts) */
 export function installXmod(imports: WebAssembly.Imports, module: WebAssembly.Module, loader: XmodLoader): void {
   const env = (imports.env ??= {}) as Record<string, unknown>;
-  for (const i of WebAssembly.Module.imports(module)) {
-    if (i.module === 'env' && i.kind === 'function' && i.name.startsWith('f_')) env[i.name] = loader.stub(i.name);
-  }
+  const names = [...new Set(WebAssembly.Module.imports(module).filter((i) => i.module === 'env' && i.kind === 'function' && i.name.startsWith('f_')).map((i) => i.name))];
+  if (names.length) Object.assign(env, loader.bind(names));
 }
