@@ -122,3 +122,72 @@
 184	#1426	DirectSound の通知位置をバイト単位で受け、再生の状態は音声の準備の後に公開する(fle_dsound.c)	Task
 185	#1427	ファイル選択の回答を待つ間も、ゲストの他のスレッド(音声のミキサー)が回り、回答が届く: 選択の待ちを、ホストへ制御を返す協調的な待ちにする	Task
 186	#1428	パスの予約文字(コロン(NTFS のストリーム)・<・>・|・二重引用符など)を含む呼び出しで、engine を止めない: Windows の返り値に従う	Task
+187	#1429	リフ マシーンの窓を開くと、Sytrus の中の呼び出し(`indirect call to 0xcccccccccccccccc`)で engine が止まる: 原因を特定して直す	Task
+188	#1430	リフ マシーンで Accept を押すと、Piano roll にノートが作られる(`notes` ≥ 1)	Task
+190	#1432	起動から first idle の後、無入力の 10 秒で、音声の途切れが 1 件出る(DPR 1)	Task
+191	#1433	F10 の Settings の General タブをスクロールすると、DPR 1 で、窓の外の 683 画素が変わる(#1384 の直しが DPR 1 で不完全)	Task
+041	#1434	内蔵エフェクト 1: Control Surface・Distructor・EQUO を、1 プラグイン 1 wasm で入れる	Task
+042	#1435	内蔵エフェクト 2: Edison・Effector・Emphasis を、1 プラグイン 1 wasm で入れる	Task
+043	#1436	内蔵エフェクト 3: Emphasizer・FL Studio Mobile Rack FX・Frequency Shifter を、1 プラグイン 1 wasm で入れる	Task
+044	#1437	内蔵エフェクト 4: Frequency Splitter・Fruity 7 Band EQ・Fruity Bass Boost を、1 プラグイン 1 wasm で入れる	Task
+045	#1438	内蔵エフェクト 5: Fruity Big Clock・Fruity Blood Overdrive・Fruity Center を、1 プラグイン 1 wasm で入れる	Task
+046	#1439	内蔵エフェクト 6: Fruity Chorus・Fruity Compressor・Fruity Convolver を、1 プラグイン 1 wasm で入れる	Task
+047	#1440	内蔵エフェクト 7: Fruity Delay・Fruity Delay Bank・Fruity Fast Dist を、1 プラグイン 1 wasm で入れる	Task
+048	#1441	内蔵エフェクト 8: Fruity Fast LP・Fruity Flanger・Fruity Flangus を、1 プラグイン 1 wasm で入れる	Task
+049	#1442	内蔵エフェクト 9: Fruity Formula Controller・Fruity Free Filter・Fruity HTML NoteBook を、1 プラグイン 1 wasm で入れる	Task
+050	#1443	内蔵エフェクト 10: Fruity LSD・Fruity Limiter・Fruity Love Philter を、1 プラグイン 1 wasm で入れる	Task
+051	#1444	内蔵エフェクト 11: Fruity Multiband Compressor・Fruity Mute 2・Fruity NoteBook を、1 プラグイン 1 wasm で入れる	Task
+052	#1445	内蔵エフェクト 12: Fruity NoteBook 2・Fruity PanOMatic・Fruity Parametric EQ を、1 プラグイン 1 wasm で入れる	Task
+053	#1446	内蔵エフェクト 13: Fruity Parametric EQ 2・Fruity Peak Controller・Fruity Phase Inverter を、1 プラグイン 1 wasm で入れる	Task
+054	#1447	内蔵エフェクト 14: Fruity Phaser・Fruity Reeverb・Fruity Reeverb 2 を、1 プラグイン 1 wasm で入れる	Task
+055	#1448	内蔵エフェクト 15: Fruity Scratcher・Fruity Send・Fruity Soft Clipper を、1 プラグイン 1 wasm で入れる	Task
+056	#1449	内蔵エフェクト 16: Fruity Spectroman・Fruity Squeeze・Fruity Stereo Enhancer を、1 プラグイン 1 wasm で入れる	Task
+057	#1450	内蔵エフェクト 17: Fruity Stereo Shaper・Fruity Vocoder・Fruity WaveShaper を、1 プラグイン 1 wasm で入れる	Task
+058	#1451	内蔵エフェクト 18: Fruity Wrapper・Fruity X-Y Controller・Fruity X-Y-Z Controller を、1 プラグイン 1 wasm で入れる	Task
+059	#1452	内蔵エフェクト 19: Fruity dB Meter・Gross Beat・Hardcore を、1 プラグイン 1 wasm で入れる	Task
+060	#1453	内蔵エフェクト 20: Hyper Chorus・Low Lifter・Luxeverb を、1 プラグイン 1 wasm で入れる	Task
+061	#1454	内蔵エフェクト 21: Maximus・Multiband Delay・Newtime を、1 プラグイン 1 wasm で入れる	Task
+062	#1455	内蔵エフェクト 22: Newtone・Patcher・Pitch Shifter を、1 プラグイン 1 wasm で入れる	Task
+063	#1456	内蔵エフェクト 23: Pitcher・Razer Chroma・Soundgoodizer を、1 プラグイン 1 wasm で入れる	Task
+064	#1457	内蔵エフェクト 24: Spreader・Transient Processor・Transmitter を、1 プラグイン 1 wasm で入れる	Task
+065	#1458	内蔵エフェクト 25: Transporter・Tuner・VFX Color Mapper を、1 プラグイン 1 wasm で入れる	Task
+066	#1459	内蔵エフェクト 26: VFX Envelope・VFX Key Mapper・VFX Keyboard Splitter を、1 プラグイン 1 wasm で入れる	Task
+067	#1460	内蔵エフェクト 27: VFX Level Scaler・VFX Script・VFX Sequencer を、1 プラグイン 1 wasm で入れる	Task
+068	#1461	内蔵エフェクト 28: Vintage Chorus・Vintage Phaser・Vocodex を、1 プラグイン 1 wasm で入れる	Task
+069	#1462	内蔵エフェクト 29: Wave Candy を、1 プラグイン 1 wasm で入れる	Task
+070	#1463	内蔵インストゥルメント 1: 3x Osc・Autogun・BassDrum を、1 プラグイン 1 wasm で入れる	Task
+071	#1464	内蔵インストゥルメント 2: BeepMap・BooBass・Dashboard を、1 プラグイン 1 wasm で入れる	Task
+072	#1465	内蔵インストゥルメント 3: DirectWave・Drumaxx・Drumpad を、1 プラグイン 1 wasm で入れる	Task
+073	#1466	内蔵インストゥルメント 4: FL Keys・FL Slayer・FL Studio Mobile を、1 プラグイン 1 wasm で入れる	Task
+074	#1467	内蔵インストゥルメント 5: FL Studio Mobile Rack・FPC・Fruit Kick を、1 プラグイン 1 wasm で入れる	Task
+075	#1468	内蔵インストゥルメント 6: Fruity DX10・Fruity Dance・Fruity DrumSynth Live を、1 プラグイン 1 wasm で入れる	Task
+076	#1469	内蔵インストゥルメント 7: Fruity Envelope Controller・Fruity Granulizer・Fruity Keyboard Controller を、1 プラグイン 1 wasm で入れる	Task
+077	#1470	内蔵インストゥルメント 8: Fruity Slicer・Fruity Video Player・Fruity Voltage Controller を、1 プラグイン 1 wasm で入れる	Task
+078	#1471	内蔵インストゥルメント 9: Fruity Wrapper・GMS・Harmless を、1 プラグイン 1 wasm で入れる	Task
+079	#1472	内蔵インストゥルメント 10: Harmor・MIDI Out・Minisynth を、1 プラグイン 1 wasm で入れる	Task
+080	#1473	内蔵インストゥルメント 11: Morphine・Ogun・Patcher を、1 プラグイン 1 wasm で入れる	Task
+081	#1474	内蔵インストゥルメント 12: Plucked!・PoiZone・ReWired を、1 プラグイン 1 wasm で入れる	Task
+082	#1475	内蔵インストゥルメント 13: Sakura・Sawer・SimSynth を、1 プラグイン 1 wasm で入れる	Task
+083	#1476	内蔵インストゥルメント 14: Slicex・Soundfont Player・Toxic Biohazard を、1 プラグイン 1 wasm で入れる	Task
+084	#1477	内蔵インストゥルメント 15: Wasp・Wasp XT・Wave Traveller を、1 プラグイン 1 wasm で入れる	Task
+192	#1478	内蔵プラグインの Data(551 件・22 フォルダ)を、プラグインごとの `data.tsv` で宣言し、共有の seed 表に行を足さずに、起動の後の取得で配信する	Task
+193	#1479	第 2 波の束の `plugin.tsv` が入っても、`plugins.rs` の試験『160 本が像の領域に入る』が、同じ DLL の重複で落ちない形にする	Task
+194	#1480	マウスカーソルを、ゲストの画素 1 つ = 物理画素 1 つの大きさで出す: 高 DPR で、大きくならない	Task
+195	#1481	ページから、HTML のヘッダー・サイドバー・状態の表示を無くし、FL の画面だけを、ウィンドウいっぱいに出す	Task
+196	#1482	『貼り付け』だけのコンテキストメニューを出さない。クリップボードは Clipboard API だけを使い、ページ読み込み時に権限を求める。権限が無い時のトーストは出さない	Task
+197	#1483	ページ読み込み時の描画が、ランダムに不完全になる(画面の左側が真っ黒のまま残る)	Task
+198	#1484	Plugin Database が空で、Plugin Manager が起動しない: 内蔵プラグインを FL の一覧に出し、Plugin Manager を開けるようにする	Task
+199	#1485	E2E の基盤を、機能の一覧を軸にした形に拡げる: シナリオの登録・機能のインベントリ・網羅率(`coverage.json`)・シャード・DPR の指定	Task
+200	#1486	E2E の領域 page: ページとブラウザ(表示の鮮明さ・サイズ変更・DPR の変化・再読み込み・WebGL の喪失・console・配信のヘッダー・ビーコン)の、期待する結果のシナリオを機能ごとに足す	Task
+201	#1487	E2E の領域 input: マウス・キーボード・タッチ・カーソル・クリップボード・コンテキストメニュー・ツールチップの、期待する結果のシナリオを機能ごとに足す	Task
+202	#1488	E2E の領域 file: New・テンプレート・Open・Save・Export・Import・demo の曲・ドラッグ&ドロップ・再読み込みをまたぐ保持の、期待する結果のシナリオを機能ごとに足す	Task
+203	#1489	E2E の領域 menus: File・Edit・Add・Patterns・View・Options・Tools・Help の全ての項目(全階層)の効果を、期待する結果つきのシナリオで足す	Task
+204	#1490	E2E の領域 windows: Channel Rack・Playlist・Piano roll・Mixer・Browser・Step sequencer・Event editor・Plugin picker・Project picker と、窓の操作の、期待する結果のシナリオを機能ごとに足す	Task
+205	#1491	E2E の領域 audio: 再生・停止・録音・ループ・メトロノーム・テンポ・カウントイン・音量・ミュート・ソロ・レンダリングの、音声の期待する結果のシナリオを機能ごとに足す	Task
+206	#1492	E2E の領域 settings: F10 の設定の全 16 頁、言語 7、テーマ 13 の、効果と再読み込みをまたぐ保持のシナリオを機能ごとに足す	Task
+207	#1493	E2E の領域 plugins: 内蔵プラグインの全て(窓・パラメータ・音声)と外部プラグイン(OTT・Serum 2・Vital)の、期待する結果のシナリオを一覧から生成して足す	Task
+208	#1494	E2E の領域 topbar: 上部バーの約 40 個の部品の、左クリック・右クリック・ホイール・ドラッグの効果(表示の値を含む)のシナリオを機能ごとに足す	Task
+209	#1495	E2E の領域 resilience: ランダムな操作の列・アイドル・窓の開閉・プロジェクトの開閉・再読み込みの繰り返し・停止からの回復の、耐久のシナリオを足す	Task
+210	#1496	E2E の領域 visual: 窓の種類・テーマ・言語・DPR ごとの画素のゴールデン(ハッシュ)と、縁の鮮明さ・黒い領域 0 の、見た目のシナリオを足す	Task
+211	#1497	E2E の領域 perf: 起動の時間・描画の fps と遅延・アイドルの CPU・メモリ・マウス 1000 Hz の下の音声の途切れを、基準との比の粗い上限で門にするシナリオを足す	Task
+212	#1498	E2E の領域 delivery: manifest.json の lazy の全ての取得と sha256、ヘッダー・圧縮・オフライン・キャッシュ・ビーコンの形の、期待する結果のシナリオを足す	Task

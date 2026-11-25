@@ -19,8 +19,15 @@
 //   shownMb     the MiB floor of the last K32 answer when a candidate equals it; else the one candidate within +-1; else null (nothing is guessed).
 //   hash        method "band" (no rectangle of the label is taken): series and floors are reported; the check of the change timing is not judged for "band".
 // memory.guess (findLabel: the run that changed last) is kept for reference only; it is not the displayed value (pm-work/findings/topbar-metrics-1391.md).
-// Not done in this version: the top bar's CPU Load and Frame Rate figures are plain digits in the guest's memory (no unit, no text run that names them): they are not identified here, and cpu.idlePct,
-// cpu.playingPct and fps.samples[].shown stay null. The engine's own values (cpu.busyPct, presentsPerSec) are measured.
+// Not done in this version (#1402): the top bar's CPU Load is the top-left digits of the CPU panel (no unit); its Frame Rate is the bottom-right digits, which show the voice count until the CPU
+// panel's right-click menu selects "View FPS" (then "60 FPS" and the like). Both are plain digits in the guest's memory and are not read here: cpu.idlePct, cpu.playingPct and fps.samples[].shown
+// stay null (pm-work/findings/topbar-cpu-fps-1402.md §1 and §6). The engine's own values (cpu.busyPct, presentsPerSec) are measured.
+// #1402 (measured, not judged): clockRate per window = the virtual clock's speed against the wall clock (the idles' ticks over their absolute ms; 1 = the same speed);
+//   desk = the render Worker's counts per second over the window (ticksPerSec: the frames it asked the engine to compose; drawsPerSec: the pictures that changed (presents);
+//   composeMsPerSec: the engine's compose time); windows: the titles of the window table (the top bar has no window of its own, so none is named here).
+//   dwmPerSec per window = the engine's DwmFlush calls per second (the count reported with each idle, read at the window's ends).
+//   hz.steps (judgement ②): native, then slow (the page's rAF made about 30 Hz by this tool only: each callback one frame later), then back. Each step is read HZ_SETTLE_MS after the change over
+//   HZ_READ_MS: rafPerSec, envHz (window.__app.hz.hz), dwmPerSec. The page measures its rAF every 2 s and the engine takes a changed rate at its next idle (product: app/src/main.ts trackHz).
 // stdout: ONE JSON line. Exit 1 when error is set, 2 when the arguments are wrong.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -50,6 +57,8 @@ const VIEW_START = { width: 2176, height: 1092 };
 const READY_LIMIT_MS = 180000, IDLE_LIMIT_MS = 30000, CDP_TIMEOUT_MS = 20000, POLL_MS = 250;
 const AUDIO_WAIT_MS = 5000, PLAY_WAIT_MS = 8000;
 const IDLE_MS = 6000, MEASURE_MS = 8000;
+// #1402: each Hz step is read HZ_SETTLE_MS after its change (the page measures every 2 s, the engine takes the rate at its next idle), over HZ_READ_MS
+const HZ_SETTLE_MS = 10000, HZ_READ_MS = 5000;
 const MEMORY_SAMPLES = 40, MEMORY_EVERY_MS = 1000, BAND_H = 96;
 const METRONOME = { x: 750, y: 19 };
 const MIB = 1048576;
@@ -74,8 +83,13 @@ const AUDIO_AT = `(() => { const r = document.getElementById('audio-status').get
 const ROOM = `(() => { const s = document.getElementById('stage').getBoundingClientRect(); return { sw: s.width, sh: s.height, iw: window.innerWidth, ih: window.innerHeight }; })()`;
 const RAF_START = `(() => { window.__raf = { n: 0, on: true }; const f = () => { if (!window.__raf.on) return; window.__raf.n++; requestAnimationFrame(f); }; requestAnimationFrame(f); return true; })()`;
 // the Worker's idles carry the absolute time (app.idles[].at = performance.timeOrigin + now), so the window is in that time too
-const RAF_COUNT = `(() => ({ n: window.__raf.n, presents: window.__app.deskStats ? window.__app.deskStats.presents : null, t: performance.now(), abs: performance.timeOrigin + performance.now(), idles: window.__app.idles.map((x) => [x.at, x.busyMs]) }))()`;
+const RAF_COUNT = `(() => ({ n: window.__raf.n, presents: window.__app.deskStats ? window.__app.deskStats.presents : null, t: performance.now(), abs: performance.timeOrigin + performance.now(), idles: window.__app.idles.map((x) => [x.at, x.busyMs, x.now, x.dwm]), desk: window.__app.deskStats ? { ticks: window.__app.deskStats.ticks, idleTicks: window.__app.deskStats.idleTicks, draws: window.__app.deskStats.draws, composeMs: window.__app.deskStats.composeMs } : null }))()`;
 const RAF_STOP = `(() => { window.__raf.on = false; return true; })()`;
+// #1402 (Hz follow, the stage 2 judgement): the page's requestAnimationFrame is made slower by this tool only (not the product): while `slow` is on, each callback runs one frame later, so a
+// callback comes every second frame (about 30 Hz on a 60 Hz screen). The callbacks of every rAF of the page go through it (the product's too), and the tool's own counting loop too.
+const HZ_INSTALL = `(() => { if (window.__hzWrap) return true; const raw = window.requestAnimationFrame.bind(window); window.__hzWrap = { slow: false }; window.requestAnimationFrame = (cb) => raw((t) => { if (window.__hzWrap.slow) raw(() => cb(t)); else cb(t); }); return true; })()`;
+const HZ_SLOW = (on) => `(() => { window.__hzWrap.slow = ${on ? 'true' : 'false'}; return true; })()`;
+const HZ_ENV = `window.__app.hz.hz`;
 const K32_VALUES = `window.__app.engineLog().filter((l) => /memory-usage: K32GetProcessMemoryInfo/.test(l)).map((l) => l.trim())`;
 const PAGE_MEASURE = `(async () => { if (!crossOriginIsolated || typeof performance.measureUserAgentSpecificMemory !== 'function') return null; return (await performance.measureUserAgentSpecificMemory()).bytes; })()`;
 
@@ -165,17 +179,44 @@ async function window_(ev, ms) {
   const secs = (b.t - a.t) / 1000;
   const busyMs = b.idles.filter(([at]) => at > a.abs && at <= b.abs).reduce((s, [, busy]) => s + (typeof busy === 'number' ? busy : 0), 0);
   const first = b.idles.filter(([at]) => at > a.abs && at <= b.abs);
+  // the engine's virtual clock against the wall clock over the window (the idles carry both: ticks of 100 ns and the absolute ms); 1.000 = the clock runs at the wall's speed
+  const clockRate = first.length >= 2 ? r3(((first[first.length - 1][2] - first[0][2]) / 10000) / (first[first.length - 1][0] - first[0][0])) : null;
+  // the render Worker's counts (deskStats, the beacon's desk): ticks = the frames it asked the engine to compose, presents = the changed pictures, draws = the engine's draws, composeMs = the engine's compose time
+  const d = a.desk && b.desk ? { ticksPerSec: r3((b.desk.ticks - a.desk.ticks) / secs), idleTicksPerSec: r3((b.desk.idleTicks - a.desk.idleTicks) / secs), drawsPerSec: r3((b.desk.draws - a.desk.draws) / secs), composeMsPerSec: r3((b.desk.composeMs - a.desk.composeMs) / secs) } : null;
+  // #1402: DwmFlush calls per second (the engine's count, reported with its idles: the last report before each end of the window)
+  const dwmAt = (idles) => idles.reduce((v, x) => (typeof x[3] === 'number' ? x[3] : v), null);
+  const dwmA = dwmAt(a.idles), dwmB = dwmAt(b.idles);
   return {
     seconds: r3(secs),
     rafPerSec: r3((b.n - a.n) / secs),
+    dwmPerSec: dwmA === null || dwmB === null ? null : r3((dwmB - dwmA) / secs),
     presentsPerSec: a.presents === null || b.presents === null ? null : r3((b.presents - a.presents) / secs),
     busyPct: first.length >= 2 ? r3((100 * busyMs) / (b.abs - a.abs)) : null,
+    clockRate,
+    desk: d,
     idles: first.length,
   };
 }
 
+/** #1402 (judgement ②): native -> about 30 Hz -> native. Each step is changed, read HZ_SETTLE_MS later over HZ_READ_MS: rafPerSec (the page's rAF), envHz (window.__app.hz.hz: the rate the engine is given), dwmPerSec (the engine's DwmFlush calls) */
+async function hzSteps(ev, shot) {
+  await ev(HZ_INSTALL);
+  const steps = [];
+  for (const [name, slow] of [['native', false], ['slow', true], ['back', false]]) {
+    await ev(HZ_SLOW(slow));
+    await sleep(HZ_SETTLE_MS);
+    const w = await window_(ev, HZ_READ_MS);
+    const envHz = await ev(HZ_ENV);
+    await shot(`hz-${name}`);
+    steps.push({ name, slow, envHz, rafPerSec: w.rafPerSec, dwmPerSec: w.dwmPerSec, seconds: w.seconds, idles: w.idles });
+    log('hz', steps[steps.length - 1]);
+  }
+  await ev(HZ_SLOW(false));
+  return steps;
+}
+
 async function main() {
-  const out = { error: null, memory: null, cpu: { idlePct: null, playingPct: null, busyPct: null, note: 'the top bar CPU Load is not identified in this version (plain digits, no unit): null' }, fps: { samples: [], note: 'the top bar Frame Rate is not identified in this version: shown is null' }, phases: {}, notes: '' };
+  const out = { error: null, memory: null, cpu: { idlePct: null, playingPct: null, busyPct: null, note: 'the top bar CPU Load is not identified in this version (plain digits, no unit): null' }, fps: { samples: [], note: 'the top bar Frame Rate is not identified in this version: shown is null' }, hz: { steps: [], note: 'Issue #1402: native, slow (about 30 Hz: the tool makes the rAF slower), back; rafPerSec is the page rAF, envHz the rate the engine is given, dwmPerSec the engine DwmFlush calls per second' }, phases: {}, notes: '' };
   let ev0 = null;
   let shotN = 0;
   let shot = async () => {};
@@ -360,9 +401,11 @@ async function main() {
       await sleep(3000);
       const w = await window_(ev, MEASURE_MS);
       const room2 = await ev(ROOM);
-      out.fps.samples.push({ dpr, shown: null, rafPerSec: w.rafPerSec, presentsPerSec: w.presentsPerSec, seconds: w.seconds, roomCss: [room2.sw, room2.sh] });
+      out.fps.samples.push({ dpr, shown: null, rafPerSec: w.rafPerSec, presentsPerSec: w.presentsPerSec, clockRate: w.clockRate, desk: w.desk, seconds: w.seconds, roomCss: [room2.sw, room2.sh] });
       log('dpr', dpr, w);
     }
+    // #1402: the Hz follow (native, slow, back), in the playing state, at the DPR of the last Frame Rate sample
+    out.hz.steps = await hzSteps(ev, shot);
     // the K32 answers (the engine log's lines, in order), then a last reading of the guest's memory (after the last answer)
     out.memory.k32Bytes = await k32Values(ev);
     const fin = await readRuns(ev);
@@ -394,6 +437,7 @@ async function main() {
       : { method: 'WebAssembly.Memory (the guest-text memBytes)', bytes: pageBytes };
     out.memory.ratio = out.memory.shownMb === null || !out.memory.pageMeasure.bytes ? null : r3((out.memory.shownMb * MIB) / out.memory.pageMeasure.bytes);
     out.notes = `nproc ${os.availableParallelism?.() ?? os.cpus().length}, loadavg ${os.loadavg().map((x) => x.toFixed(2)).join(' ')}`;
+    out.windows = (await windowsNow()).filter((w) => w.title !== '' || w.cls !== '');
     if (DUMP) fs.writeFileSync(DUMP, String(await ev(`window.__app.engineLog().join('\\n')`, 60000).catch(() => '')));
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);

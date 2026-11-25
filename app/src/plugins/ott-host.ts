@@ -122,6 +122,8 @@ export function createHost(opts: HostOptions): Host {
       fle_js_rewrite: () => undefined,
       fle_js_pulse: () => undefined,
       fle_clip_host_read: () => 0,
+      // #1406: a question about the formats has no page here: no text
+      fle_clip_host_probe: () => 0,
       // #1389: the text a plugin copies has no page to go to here, so it is dropped
       fle_clip_host_write: () => undefined,
       __asyncjs__fle_js_wait: () => 2,

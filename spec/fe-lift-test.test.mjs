@@ -62,7 +62,7 @@ try {
   ok('parse: 結果の行が無い binary は、解析の上で止まった(resultSeen が偽)', [pc.blocks[0].resultSeen, pc.blocks[0].label], [false, 'wall_e1']);
 
   // known の一覧
-  ok('known: 実際の known-failures.txt は 59 件', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 59);
+  ok('known: 実際の known-failures.txt は 60 件(#1416 で int_more2 の CPU に依る 1 件を足した)', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 60);
   ok('known: 見出し・空行を読まず、CRLF も扱う', [...loadKnown('# a\r\n\r\nwall_r x y\r\n')], ['wall_r x y']);
 
   // 判定
@@ -134,13 +134,15 @@ process.stdout.write(out.join('\\n') + '\\n');
 process.exit(bad ? 101 : 0);
 `, { mode: 0o755 });
   let caseNo = 0;
-  const cli = (args, cfg, rows = ['wall_fr8 known_one', 'wall_fr8 known_two', 'wall_r gone']) => {
+  const cli = (args, cfg, rows = ['wall_fr8 known_one', 'wall_fr8 known_two', 'wall_r gone'], hostRows = []) => {
     caseNo++;
     const known = path.join(TMP, `known-${caseNo}.txt`);
+    const hostFile = path.join(TMP, `host-${caseNo}.txt`);
     const log = path.join(TMP, `log-${caseNo}.txt`);
     fs.writeFileSync(known, `${rows.join('\n')}\n`);
+    fs.writeFileSync(hostFile, `${hostRows.join('\n')}\n`);
     fs.writeFileSync(log, '');
-    const r = spawnSync(process.execPath, [TOOL, ...args, '--known', known], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, PATH: `${FAKE_DIR}:${process.env.PATH}`, FAKE_LOG: log, FAKE_CFG: JSON.stringify(cfg) } });
+    const r = spawnSync(process.execPath, [TOOL, ...args, '--known', known, '--host-dependent', hostFile], { cwd: ROOT, encoding: 'utf8', env: { ...process.env, PATH: `${FAKE_DIR}:${process.env.PATH}`, FAKE_LOG: log, FAKE_CFG: JSON.stringify(cfg) } });
     const calls = fs.readFileSync(log, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
     return { status: r.status, out: r.stdout, err: r.stderr, calls };
   };
@@ -170,6 +172,50 @@ process.exit(bad ? 101 : 0);
   ok('cli: 全体の実行(選択なし)は、最初の 1 回だけで終わり、試験の名前を指定しない', [j.status, j.calls.length, j.calls[0].length], [0, 1, 7]);
   const k = cli([], { all: [...cfgAll, 'lib', 'bin', 'doc'], builds: ['wall_fr8'], passes: {} }, ['wall_fr8 known_one']);
   ok('cli: 全体の実行で build の失敗が既知なら、失敗の binary を除いて残りを再実行する(文書の試験は別の呼び出し)', [k.status, k.calls.length, k.calls[2].includes('--doc'), k.calls[1].includes('wall_fr8'), k.calls[1].includes('--doc')], [0, 3, true, false, false]);
+
+  // host 依存の試験(tools/fe-lift-host-dependent.txt。CPU の種類で結果が変わる試験の一覧)
+  const hostDep = loadKnown('# 注釈\n\nwall_r host_one\nwall_fr8 known_two\n', 'fe-lift-host-dependent');
+  const hostFailedKeys = (r) => r.hostFailed.map((f) => `${f.label} ${f.name}`);
+  const h1 = judge({ runs: [run(binary('wall_r', [['host_one', 'FAILED'], ['ok_a', 'ok']]))], known, hostDependent: hostDep, expected: ['wall_r'] });
+  ok('host: host 依存の試験の失敗は、新しい失敗にも既知の失敗にも数えず、終了 0', [h1.exitCode, h1.newFailures.length, h1.knownFailed, hostFailedKeys(h1)], [0, 0, 0, ['wall_r host_one']]);
+  const h2 = judge({ runs: [run(binary('wall_fr8', [['known_two', 'ok']]))], known, hostDependent: hostDep, expected: ['wall_fr8'], strictKnown: true });
+  ok('host: 既知の一覧にも host 依存の一覧にも在る試験が通っても「直った」にせず、--strict-known でも終了 0', [h2.exitCode, h2.fixed.length, h2.hostFailed.length], [0, 0, 0]);
+  const h3 = judge({ runs: [run(binary('wall_fr8', [['known_two', 'FAILED'], ['known_one', 'FAILED']]))], known, hostDependent: hostDep, expected: ['wall_fr8'] });
+  ok('host: 既知の一覧と host 依存の一覧の両方に在る失敗は、host 依存として数える', [h3.exitCode, hostFailedKeys(h3), h3.knownFailed], [0, ['wall_fr8 known_two'], 1]);
+  const h4 = judge({ runs: [run(binary('wall_r', [['host_one', 'FAILED'], ['new_one', 'FAILED']]))], known, hostDependent: hostDep, expected: ['wall_r'] });
+  ok('host: 同じ binary でも一覧に無い失敗は、今まで通り新しい失敗(終了 1)', [h4.exitCode, h4.newFailures.map((f) => `${f.label} ${f.name}`), hostFailedKeys(h4)], [1, ['wall_r new_one'], ['wall_r host_one']]);
+  const h5 = judge({ runs: [run(binary('wall_fr8', [['host_one', 'FAILED']]))], known, hostDependent: hostDep, expected: ['wall_fr8'] });
+  ok('host: 試験の名前が同じでも binary が違えば別の試験(終了 1)', [h5.exitCode, h5.newFailures.length, hostFailedKeys(h5)], [1, 1, []]);
+  const h6 = judge({ runs: [run(binary('wall_r', [['host_one', 'FAILED']], { crash: true }))], known, hostDependent: hostDep, expected: ['wall_r'] });
+  ok('host: host 依存の失敗があっても、途中で止まった binary は新しい失敗(終了 1)', [h6.exitCode, h6.newFailures.map((f) => f.kind)], [1, ['crash']]);
+  const h7 = judge({ runs: [run(binary('wall_r', [['host_one', 'FAILED']]))], known, expected: ['wall_r'] });
+  ok('host: 一覧を渡さなければ、host 依存の失敗も新しい失敗(既定は空の一覧)', [h7.exitCode, h7.newFailures.length], [1, 1]);
+  const rep1 = formatReport(h1, { known });
+  ok('report: host 依存の失敗は件数と、binary と試験の名前を 1 行ずつ書く', [rep1.includes('ホスト依存の失敗: 1 件'), rep1.includes('    wall_r host_one')], [true, true]);
+  ok('report: host 依存の失敗は「新しい失敗」の行に出ない', rep1.some((l) => l.startsWith('新しい失敗')), false);
+  ok('report: host 依存の失敗が無くても、件数を 0 件と書く', formatReport(judge({ runs: [run(binary('wall_r', [['ok_a', 'ok']]))], known, expected: ['wall_r'] }), { known }).includes('ホスト依存の失敗: 0 件'), true);
+  ok('report: host 依存の試験が通っても「直った」と書かない', formatReport(h2, { known }).some((l) => l.startsWith('直った')), false);
+  ok('known: 試験名の無い行は、読んだ一覧の名前を付けて止まる', (() => { try { loadKnown('wall_r\n', 'fe-lift-host-dependent'); return false; } catch (e) { return e.message.includes('fe-lift-host-dependent の行に試験名が無い'); } })(), true);
+
+  const REAL_HOST = path.join(ROOT, 'tools/fe-lift-host-dependent.txt');
+  const realHostText = fs.existsSync(REAL_HOST) ? fs.readFileSync(REAL_HOST, 'utf8') : '';
+  const realHost = loadKnown(realHostText, 'fe-lift-host-dependent');
+  ok('host: 実際の一覧は 8 件(新しい失敗 7 件と int_more2 の 1 件)', realHost.size, 8);
+  ok('host: 先頭の注釈に、門を落とさない旨を書く', realHostText.includes('失敗しても門を落とさない。通れば、それでよい'), true);
+  const missingTests = [...realHost].filter((key) => {
+    const [label, name] = key.split(' ');
+    const file = [path.join(TESTS_DIR, `${label}.rs`), path.join(TESTS_DIR, label, 'main.rs')].find((f) => fs.existsSync(f));
+    return !file || !fs.readFileSync(file, 'utf8').includes(`fn ${name}(`);
+  });
+  ok('host: 一覧の試験は、どれも lift/crates/fe-lift/tests/ の binary に在る(名前の書き違いで効かないのを防ぐ)', missingTests, []);
+
+  const hm = spawnSync(process.execPath, [TOOL, '--host-dependent'], { cwd: ROOT, encoding: 'utf8' });
+  ok('cli: --host-dependent に値が無ければ終了 2', hm.status, 2);
+  const hc1 = cli(['--test', 'wall_r'], { fails: { wall_r: ['host_one'] } }, [], ['wall_r host_one']);
+  const lineOf = (out, prefix) => out.split('\n').some((l) => l.startsWith(prefix));
+  ok('cli: host 依存の失敗だけなら終了 0 で、件数と名前を書き、「新しい失敗」の行は出さない', [hc1.status, hc1.out.includes('ホスト依存の失敗: 1 件'), hc1.out.includes('    wall_r host_one'), lineOf(hc1.out, '新しい失敗')], [0, true, true, false]);
+  const hc2 = cli(['--test', 'wall_fr8', '--strict-known'], { passes: { wall_fr8: ['known_two'] } }, ['wall_fr8 known_two'], ['wall_fr8 known_two']);
+  ok('cli: host 依存の試験が通っても、--strict-known で終了 1 にせず、「直った」の行も出さない', [hc2.status, lineOf(hc2.out, '直った')], [0, false]);
 } finally {
   fs.rmSync(TMP, { recursive: true, force: true });
 }

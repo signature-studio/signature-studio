@@ -8,17 +8,50 @@ unset RUNNER_TEMP   # 判定の受け入れは RUNNER_TEMP の boot.json を使�
 here=$(cd "$(dirname "$0")" && pwd); g=$here/../guard; fail=0; T=$(mktemp -d "$here/../.tmp-spec.XXXXXX")
 ok() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected $3, got $2"; fail=1; : > "$T/failed"; fi; }
 rc() { "$@" >/dev/null 2>&1; echo $?; }
-# deploy.yml の制約
-printf 'on: push\njobs:\n  a:\n    steps:\n      - run: npm ci\n' > "$T/good.yml"
-ok "deploy-lint: 守っている物は通る" "$(rc bash "$g/deploy-lint.sh" "$T/good.yml")" 0
-{ for i in $(seq 1 101); do echo "# $i"; done; } > "$T/long.yml"; ok "deploy-lint: 101 行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/long.yml")" 1
-{ echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$T/wide.yml"; ok "deploy-lint: 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/wide.yml")" 1
-printf 'jobs:\n  a:\n    steps:\n      - run: bash ci/x.sh\n' > "$T/sh.yml"; ok "deploy-lint: シェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/sh.yml")" 1
-printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/y\n' > "$T/local.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/local.yml")" 1
-printf 'on:\n  workflow_call:\n' > "$T/reuse.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/reuse.yml")" 1
-mkdir -p "$T/cwd/.github/workflows"
-ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
-ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cp "$T/good.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 0
+# deploy.yml は 100 行以内、e2e.yml は 200 行以内(依頼者の決まり L-007 の 100 行。E2E を分けた e2e.yml は上限を別に持つ)。どちらも 1 行 80 字以内
+L=$T/lint; mkdir -p "$L/d" "$L/e" "$L/x" "$L/cwd/.github/workflows"
+pad() { { cat "$1"; for i in $(seq 1 "$2"); do echo "# $i"; done; } > "$3"; }
+cat > "$L/good-deploy.yml" <<'Y'
+on:
+  workflow_run: {workflows: [e2e], types: [completed]}
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - run: npm ci
+Y
+cat > "$L/good-e2e.yml" <<'Y'
+name: e2e
+on:
+  push: {branches: [main]}
+jobs:
+  build:
+    steps:
+      - {if: always(), run: npm ci}
+      - {if: steps.cache.outputs.cache-hit != 'true', run: npm ci}
+Y
+pad "$L/good-deploy.yml" 93 "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml が 100 行(ちょうど上限。守っている)なら通る" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 0
+pad "$L/good-deploy.yml" 94 "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml が 101 行なら見つかる(上限は 100 行)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+pad "$L/good-e2e.yml" 192 "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 0
+pad "$L/good-e2e.yml" 193 "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+cp "$L/good-e2e.yml" "$L/e/e2e.yml"; ok "deploy-lint: 守っている e2e.yml は通る(if: always() と cache-hit の条件を含む)" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 0
+{ cat "$L/good-deploy.yml"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - run: bash ci/x.sh"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: ./ci/x"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - uses: ./.github/actions/y"; } > "$L/d/deploy.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+printf 'on:\n  workflow_call:\n' > "$L/d/deploy.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "on: workflow_dispatch"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の workflow_dispatch は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "  schedule: [{cron: '0 0 * * *'}]"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の schedule は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: echo \"::add-mask::x\""; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml のマスク(add-mask)は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - run: echo \"[skip ci]\""; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の [skip ci] は見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-deploy.yml"; echo "      - {if: always(), run: npm ci}"; } > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の e2e の成功以外の if は見つかる(always)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+sed "s/== 'success'/== 'failure'/" "$L/good-deploy.yml" > "$L/d/deploy.yml"; ok "deploy-lint: deploy.yml の if が failure の形なら見つかる(成功の形だけ許す)" "$(rc bash "$g/deploy-lint.sh" "$L/d/deploy.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - {if: github.event_name == 'push', run: npm ci}"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の if でイベントで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+{ cat "$L/good-e2e.yml"; echo "      - {if: github.ref == 'refs/heads/main', run: npm ci}"; } > "$L/e/e2e.yml"; ok "deploy-lint: e2e.yml の if でブランチで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/e/e2e.yml")" 1
+cp "$L/good-e2e.yml" "$L/x/other.yml"; ok "deploy-lint: deploy.yml・e2e.yml 以外の名前は、上限が決まらないので見つかる" "$(rc bash "$g/deploy-lint.sh" "$L/x/other.yml")" 1
+pad "$L/good-deploy.yml" 94 "$L/cwd/.github/workflows/deploy.yml"; ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cd "$L/cwd" && rc bash "$g/deploy-lint.sh")" 1
+pad "$L/good-deploy.yml" 93 "$L/cwd/.github/workflows/deploy.yml"; ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cd "$L/cwd" && rc bash "$g/deploy-lint.sh")" 0
 # 内容の検査(scan.sh は相対パスで規則の範囲を決めるので、一時ディレクトリの中で走らせる)
 mkdir -p "$T/app"
 v1=anthr; v2=opic

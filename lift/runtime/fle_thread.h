@@ -78,6 +78,10 @@
 uint32_t fle_display_hz(void) FLE_THREAD_REF;
 /* The refresh rate EnumDisplaySettingsW reports (see fle_thread.c): FLE_DISPLAYSETTINGS_FREQUENCY in the environment, else fle_display_hz(). */
 uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
+/* Issue #1402: the page's measured rate of requestAnimationFrame, put in at an idle (fle_g3_hz): 24..1000, else 0 and nothing changes. Once put, fle_display_hz() and fle_display_settings_hz() answer it. */
+int fle_display_hz_put(uint32_t hz) FLE_THREAD_REF;
+/* Issue #1402: the number of DwmFlush calls so far. */
+uint64_t fle_thread_dwm_flushes(void) FLE_THREAD_REF;
 
 /* ---- decision 0147 (PROVISIONAL): deterministic pseudo-preemption (an exception to decision 0122's "a thread is given up only inside one of the waiting or yielding APIs") ----
  * From the first CreateThread on, every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest (fle_progress_count of fle_dispatch.h; the count is the same for native, wasm, -O0 and -O2) end one slice: the virtual

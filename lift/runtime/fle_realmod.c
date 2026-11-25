@@ -26,6 +26,7 @@ typedef struct {
     uint64_t entry;     /* VA of AddressOfEntryPoint (DllMain) */
     uint64_t exp_rva;   /* export directory */
     uint64_t exp_size;
+    uint32_t size;      /* SizeOfImage */
     unsigned state;
     uint32_t refs;
     int headers;        /* PE headers read */
@@ -176,7 +177,46 @@ static void read_headers(const char *api, int idx)
     m->entry = base + rva;
     m->exp_rva = fle_ld(opt + 112, 4);
     m->exp_size = fle_ld(opt + 116, 4);
+    m->size = (uint32_t)fle_ld(opt + 56, 4);
     m->headers = 1;
+}
+
+/* 1 when va lies in a section of the image at base that has IMAGE_SCN_MEM_EXECUTE (0x20000000). The section table follows the optional header (PE format). */
+static int in_code_section(uint64_t base, uint64_t va)
+{
+    uint64_t nt = base + fle_ld(base + 0x3c, 4), sh, rva = va - base, n, k;
+
+    n = fle_ld(nt + 6, 2);
+    sh = nt + 24 + fle_ld(nt + 20, 2);
+    for (k = 0; k < n; k++, sh += 40) {
+        uint64_t vsize = fle_ld(sh + 8, 4), vaddr = fle_ld(sh + 12, 4);
+        if (rva >= vaddr && rva - vaddr < vsize && (fle_ld(sh + 36, 4) & 0x20000000u)) return 1;
+    }
+    return 0;
+}
+
+/* Issue #1421: a `jmp [rip+disp32]` (FF 25, or 48 FF 25 as MSVC writes it in a thunk) in an executable section of a real module's image is the jump
+ * through its slot, which is what the lifted code of that instruction does. The lifter makes function entries of the code that a guest reaches by a
+ * call; a thunk that follows the padding of another function and is taken only by its address (a `lea`, then an indirect call or a jump through a
+ * stored pointer) is not one, and an indirect call to it misses the table (fle_dispatch_miss, which asks fle_win_try_thunk). 1 and *target = the slot's
+ * value when va is such a thunk, else 0 (the caller then stops by name, as before). */
+int fle_realmod_jmp_thunk(uint64_t va, uint64_t *target)
+{
+    uint64_t i, p;
+
+    table_check("fle_realmod_jmp_thunk");
+    for (i = 0; i < fle_realmod_count; i++) {
+        const rm_t *m = &mods[i];
+        uint64_t base = fle_realmod_table[i].base;
+
+        if (!m->headers || va < base || va - base >= m->size) continue;
+        if (!in_code_section(base, va)) return 0;
+        p = va + ((fle_ld(va, 1) & 0xF0u) == 0x40u ? 1 : 0);
+        if (fle_ld(p, 1) != 0xFFu || fle_ld(p + 1, 1) != 0x25u) return 0;
+        *target = fle_ld(p + 6 + (uint64_t)(int64_t)(int32_t)(uint32_t)fle_ld(p + 2, 4), 8);
+        return 1;
+    }
+    return 0;
 }
 
 /* DllMain(hinstDLL = base, reason, lpvReserved = NULL): lpvReserved is NULL for a dynamic load and for the call that follows a failed

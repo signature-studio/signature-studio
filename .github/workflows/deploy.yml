@@ -1,8 +1,10 @@
-on: {push: {branches: main,
-  paths: [app/**, lift/**, ci/**, .github/workflows/deploy.yml]}}
+# e2e.yml が成功した後にだけ動く(workflow_run)
+on:
+  workflow_run: {workflows: [e2e], types: [completed]}
 concurrency: deploy
 jobs:
   deploy:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
       RUNS_ON_S3_FORCE_PATH_STYLE: "true",
@@ -10,82 +12,19 @@ jobs:
       AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
     steps:
       - uses: actions/checkout@v7.0.1
+        with: {ref: "${{ github.event.workflow_run.head_sha }}"}
       - {uses: actions/setup-node@v7.1.0, with: {node-version: 26}}
       - run: npm ci --prefix app
-      - run: npm run build --prefix app
       - run: cargo build --release --locked --manifest-path lift/Cargo.toml
       - run: lift/target/release/fe-build endpoint
-      - {id: cache, uses: runs-on/cache@v5.0.7,
-        with: {path: lift/out-app/host, key: "host-${{ hashFiles('ci/**',
-          'app/scripts/**/*.mjs', 'lift/crates/fe-build/src/main.rs',
-          'lift/harness/seeds/os-fonts/**',
-          'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/**') }}"}}
-      - if: steps.cache.outputs.cache-hit != 'true'
-        env: {AWS_ACCESS_KEY_ID: "${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}",
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}"}
-        run: lift/target/release/fe-build extract
-      - name: resources を取り出す
-        env: {AWS_ACCESS_KEY_ID: "${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}",
-          AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}",
-          SRC: s3://fl-web-artifacts/installers/flstudio_win64_26.1.7.5653.exe}
-        run: |
-          aws s3 cp "$SRC" "$RUNNER_TEMP/i.exe"
-          mapfile -t p < ci/resources-prefixes.txt
-          node tools/fl-installer-extract.mjs "$RUNNER_TEMP/i.exe" \
-            lift/out-app/host-extra/resources "${p[@]}"
-          lift/target/release/fe-build external
-      - {uses: emscripten-core/setup-emsdk@v16, with: {version: 7.0.0}}
-      - run: lift/target/release/fe-build engine
-      - run: lift/target/release/fe-build bundle
-      - run: |
-          node tools/boot-check/boot-bundle.mjs \
-            "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json"
-        timeout-minutes: 15
-      - run: |
-          jq -e '.error == null and .standIn == false and
-            .state == "engine-idle"' "$RUNNER_TEMP/boot.json"
-      - run: |
-          node tools/smoke/welcome-flow.mjs \
-            "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl"
-        timeout-minutes: 30
-      - run: |
-          jq -e -s '
-            length == 4 and ([.[].flow] == ["A", "B", "C", "D"]) and
-            all(.[]; .error == null and .trapped == false and
-            .state == "engine-idle" and .opened and .welcomeClosed)
-          ' "$RUNNER_TEMP/flow.jsonl"
-      - name: bundle の中身を確かめる
-        run: |
-          jq -e --arg o resources/System/Internet/error-offline.html \
-            --rawfile a lift/harness/web/pack.args '(.lazy | any(.path == $o))
-            and ([$a | split("\n")[] | select(test("^lift/out-app/plugins/"))
-            | split("=")[1]] - [.lazy[].path] == [])' \
-            lift/out-app/bundle/raw/fl-Oz/manifest.json
-          for p in System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf \
-            Data/Templates/Other/Blocks/Blocks.flp; do
-            grep -aqF "\"seed/resources/$p\"" lift/out-app/seed/seed.bin
-          done
-      - run: |
-          (cd tools/e2e && npm ci && npx playwright install chromium)
-          node tools/e2e/run.mjs --scenarios smoke \
-            --displays 4k-dpr1,4k-dpr2,4k-random > "$RUNNER_TEMP/e2e.jsonl"
-          jq -e -s -f tools/e2e/judge.jq "$RUNNER_TEMP/e2e.jsonl"
-      - {if: always(), uses: actions/upload-artifact@v7.0.2,
-        with: {name: "e2e-${{ github.sha }}", retention-days: 30,
-          path: "${{ runner.temp }}/e2e.jsonl", if-no-files-found: ignore}}
-      - name: 関数名の表を版ごとに残す
-        id: fn
-        run: |
-          f=lift/out-app/gen/wasm-func-names.tsv
-          m=lift/out-app/bundle/raw/fl-Oz/manifest.json
-          v=$(jq -er .bundle.version "$m")
-          gzip -9 -c "$f" > "$RUNNER_TEMP/wasm-func-names.tsv.gz"
-          echo "v=$v" >> "$GITHUB_OUTPUT"
-          echo "$v: gzip -9 $(wc -c < "$RUNNER_TEMP/wasm-func-names.tsv.gz") B"
-      - name: 関数名の表を artifact に上げる
-        uses: actions/upload-artifact@v7.0.2
-        with: {name: "func-names-${{ steps.fn.outputs.v }}", retention-days: 90,
-          path: "${{ runner.temp }}/wasm-func-names.tsv.gz"}
+      - name: bundle をキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        with:
+          path: |
+            app/dist
+            lift/out-app/bundle
+          key: bundle-${{ github.event.workflow_run.head_sha }}
+          fail-on-cache-miss: true
       - run: lift/target/release/fe-build upload
       - name: 本番の manifest を確かめる
         run: |

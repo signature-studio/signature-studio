@@ -1,4 +1,4 @@
-// Boot check for an arbitrary bundle directory (copy of boot.mjs with the bundle named by argv[2]). Runs it once in headless Chrome (a new profile) and prints one JSON object on stdout. Exit 1 when the run failed ("error" set), 2 when no bundle directory is given.
+// Boot check for an arbitrary bundle directory (copy of boot.mjs with the bundle named by argv[2]). Runs it twice in headless Chrome (a new profile each time) and prints one JSON object on stdout: the second start's fields, with coldMs (the first start's elapsedMs; the first start after a build is the cold one, the OS file cache not yet warm). Exit 1 when a start failed ("error" set; a first start that is not engine-idle counts as failed), 2 when no bundle directory is given.
 // Usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory raw/<name>> > boot.json   (needs app/node_modules and app/dist). The page is opened at "/" with no parameters.
 // The brotli files of the bundle are in br/<name>/ next to raw/ (stage-assets.mjs links them for the app's /assets/ route). The temporary directory is inside the repository (.tmp-boot-*) and is removed.
 // standIn is only whether the text "STAND-IN" is in the page body; it is a reading, not a proof either way.
@@ -19,6 +19,7 @@ const appDir = path.join(repo, 'app');
 const WAIT_LIMIT_MS = 180000;
 const POLL_MS = 1000;
 const CDP_TIMEOUT_MS = 20000;
+const COLD_LIMIT_MS = 60000;
 
 // the isolation flags of archive/e2e-old/e2e/browser.mjs, without the net-log and the crash folder
 const ISOLATION = [
@@ -118,12 +119,26 @@ export async function bootBundle(bundleDir, { afterIdle } = {}) {
   return { out, engineLog };
 }
 
+/** The check's JSON from its two starts: the second start's fields; coldMs is the first start's elapsedMs. error is the first start's (its stop is not hidden), else the second's, else the first start's being too slow. */
+export function composeBoot(cold, warm) {
+  const coldError = cold.error ?? (cold.state !== 'engine-idle' ? `cold start: state ${cold.state}` : null);
+  const slow = cold.elapsedMs > COLD_LIMIT_MS ? `cold boot too slow: ${cold.elapsedMs} ms (limit ${COLD_LIMIT_MS} ms)` : null;
+  return { ...warm, coldMs: cold.elapsedMs, error: coldError ?? warm.error ?? slow };
+}
+
+/** The bundle started twice, one after the other, each in its own Chrome: `boot` is bootBundle (a spec passes a fake). */
+export async function bootTwice(bundleDir, boot = bootBundle) {
+  const { out: cold } = await boot(bundleDir);
+  const { out: warm } = await boot(bundleDir);
+  return composeBoot(cold, warm);
+}
+
 async function main() {
   if (!process.argv[2]) {
     process.stderr.write('usage: node tools/boot-check/boot-bundle.mjs <absolute path to the bundle directory>\n');
     process.exit(2);
   }
-  const { out } = await bootBundle(path.resolve(process.argv[2]));
+  const out = await bootTwice(path.resolve(process.argv[2]));
   process.stdout.write(JSON.stringify(out, null, 2) + '\n');
   process.exitCode = out.error ? 1 : 0;
 }

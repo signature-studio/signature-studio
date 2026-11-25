@@ -39,16 +39,24 @@ P3(再生中に音が途切れない)。main の今の版では、ファイル�
 ## 受け入れ
 
 ```accept
-rm -rf .tmp-base && mkdir .tmp-base && git archive "$(git merge-base HEAD origin/main)" | tar -x -C .tmp-base && (cd .tmp-base && npm ci --prefix app && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle) && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node --test spec/filedlg-bridge.test.mjs && cargo test --release --locked --manifest-path lift/Cargo.toml -p fe-lift --test wall_fpick1 && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-185-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-185-boot.json","utf8"));process.exit(r.error===null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-185-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-185-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' && node tools/ab/run.mjs p3 "$PWD/.tmp-base/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-185-ab-p3.json && node -e 'const s=JSON.parse(require("fs").readFileSync(".tmp-185-ab-p3.json","utf8"));process.exit(s.pass===true?0:1)'
+node tools/ab/base.mjs "$(git merge-base HEAD origin/main)" .tmp-base && (cd .tmp-base && npm ci --prefix app && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle) && node tools/ab/base.mjs --verify .tmp-base && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node --test spec/filedlg-bridge.test.mjs && cargo test --release --locked --manifest-path lift/Cargo.toml -p fe-lift --test wall_fpick1 && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-185-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-185-boot.json","utf8"));process.exit(r.error===null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-185-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-185-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' && node tools/ab/run.mjs p3 "$PWD/.tmp-base/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-185-ab-p3.json && node -e 'const s=JSON.parse(require("fs").readFileSync(".tmp-185-ab-p3.json","utf8"));process.exit(s.pass===true?0:1)'
 ```
 
 判定の基準:
+- p3 の判定(`tools/ab/gates.mjs`): 変更後の全 run で `error` が null・`playing` が true・`last60sUnderruns` が 0・`inputRateOk` が true・`nonSilentDelta` が 0 より大きい・`pcmRepeat8192` が null か 0.01 未満。加えて、`underrunDelta` の変更後の中央値が基準の中央値以下(絶対の 0 は求めない。起動後の途切れは、別の規則で見る)。
 - `spec/filedlg-bridge.test.mjs` と `wall_fpick1` が通る。
 - 起動の確認と流れ A〜D が全て合格(受け入れのとおり)。
 - `tools/ab/run.mjs` の `p3` が、回帰なしで `pass` が true(この Issue の操作は再生中のダイアログを含まない。回帰の確認だけ)。
 - 残す条件: 試験が、回答の届くことと、保留中の選択の消費が 1 回だけであることを示す。これが満たされないなら、取り消す。
 - 報告に書く: 試験の出力の行、流れ A〜D の 4 行、`p3` の 6 回の run の値と中央値。「達成」と書かず、「受理」か「差し戻し」を、出力の行で書く。
 - 実機の評価用の大きいファイル(リポジトリに無い)での確認は、この Issue の受け入れに入らない。報告に、未確認と書く。
+
+## 前回の試行で分かったこと
+
+- 基準の準備が通らなかった: `git archive` の複製には `lift/out-app/host` が無かった。`tools/ab/base.mjs` で持ち込むようにした。
+- 効果が出た: `p3` の `underrunDelta` が、基準 1・0・1 から、変更後 0・0・0(3 組)。`pass` は真。
+- 判断: 残す。前回の変更は main に入っていない。この Issue で、下の「やること」から作り直す。
+- `underrunDelta` は、中央値の相対で判定する(上の判定の式)。
 
 ## 作業の進め方
 

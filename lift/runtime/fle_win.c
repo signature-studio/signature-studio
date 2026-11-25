@@ -275,6 +275,9 @@ int fle_com_try_slot(uint64_t va) __attribute__((weak));
 /* Issue #1355: the method slots of the WebView2 model (fle_webview2.c, its own range: FLE_WV2_SLOT_BASE) are answered the same way. */
 int fle_wv2_try_slot(uint64_t va) __attribute__((weak));
 
+/* Issue #1421: a `jmp [rip+disp32]` in an executable section of a real module's image (fle_realmod.c). */
+int fle_realmod_jmp_thunk(uint64_t va, uint64_t *target) __attribute__((weak));
+
 int fle_win_try_thunk(uint64_t va)
 {
     fle_sys_region_view rv;
@@ -282,8 +285,10 @@ int fle_win_try_thunk(uint64_t va)
 
     if (fle_com_try_slot && fle_com_try_slot(va)) return 1;
     if (fle_wv2_try_slot && fle_wv2_try_slot(va)) return 1;
-    if (!fle_sys_region_at || !fle_sys_region_at(va, &rv)) return 0;
-    jump = thunk_target("indirect call", va, &rv);
+    if (!(fle_realmod_jmp_thunk && fle_realmod_jmp_thunk(va, &jump))) {
+        if (!fle_sys_region_at || !fle_sys_region_at(va, &rv)) return 0;
+        jump = thunk_target("indirect call", va, &rv);
+    }
     fle_dispatch(jump);
     return 1;
 }

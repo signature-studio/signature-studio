@@ -31,10 +31,10 @@ describe('the engine environment (decision 0182)', () => {
 });
 
 describe('the display rate: rounding a measured rate to the nearest standard rate (S-hz-standard, S-hz-round)', () => {
-  it('the standard list is the one in the decision', () => { expect(STANDARD_HZ).toEqual([60, 75, 90, 120]); });
+  it('the standard list is the one in the decision (Issue #1402: 30 added at the low end)', () => { expect(STANDARD_HZ).toEqual([30, 60, 75, 90, 120]); });
   it.each([
     [60, 60], [59.94, 60], [61, 60], [75, 75], [74.9, 75], [90, 90], [100, 90], [119.88, 120], [120, 120], [143.9, 120], [144, 120], [165, 120], [239.76, 120], [240, 120],
-    [30, 60], [48, 60], [50, 60], [24, 60], [360, 120], [1000, 120],
+    [30, 30], [29.9, 30], [31, 30], [24, 30], [48, 60], [50, 60], [360, 120], [1000, 120],
     [67, 60], [68, 75], [82, 75], [83, 90], [103, 90], [105, 120], [131, 120], [132, 120], [154, 120], [155, 120], [198, 120], [201, 120],
   ])('%f Hz -> %i', (m, want) => { expect(roundToStandardHz(m)).toBe(want); });
   it('decision 0268: no measured rate gives more than 120, and every rate above 120 gives exactly 120', () => {
@@ -50,7 +50,7 @@ describe('the display rate: rounding a measured rate to the nearest standard rat
 });
 
 describe('measureFrameRate (a fake frame clock)', () => {
-  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 120], [1000 / 165, 120], [1000 / 75, 75], [1000 / 240, 120], [1000 / 30, 60]])('steady frames %f ms -> %i Hz', async (iv, want) => {
+  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 120], [1000 / 165, 120], [1000 / 75, 75], [1000 / 240, 120], [1000 / 30, 30]])('steady frames %f ms -> %i Hz', async (iv, want) => {
     const f = fakeHost(() => iv);
     const p = measureFrameRate(f.host);
     run(f.host);

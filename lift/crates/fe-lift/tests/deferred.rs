@@ -290,10 +290,6 @@ const DRIVER: &str = r##"
 #include "fle_callback.h"
 #include "fle_realmod.h"
 
-/* #1389: the page's clipboard library is not linked into this driver (as in wall_ia1.rs): the page has no text and no clipboard */
-void fle_clip_host_write(const void *units, uint32_t bytes) { (void)units; (void)bytes; }
-void *fle_clip_host_read(void) { return NULL; }
-
 static uint8_t stk[1 << 16] __attribute__((aligned(16)));
 #define A(x) ((uint64_t)(uintptr_t)(x))
 #define U(x) ((unsigned long long)(x))

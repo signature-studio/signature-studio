@@ -14,9 +14,12 @@
 /* The page's side (harness/web/clip/fle_clip_lib.js). fle_clip_host_write: the text of a SetClipboardData(CF_UNICODETEXT), `bytes` bytes of UTF-16 without the NUL,
  * handed to the page, which writes it to the operating system's clipboard. fle_clip_host_read: an ASYNC import (JSPI, as fle_filedlg_host_pick): the engine waits until
  * the page answers with the operating system's text as a malloc'd NUL-terminated UTF-16LE string, or NULL (refused, unavailable, no text, no answer in time). The browser
- * build links the library that defines both; a native build defines them in its test link. fle_win_api_trace_on: the window-API trace (fle_win.h). */
+ * build links the library that defines both; a native build defines them in its test link. fle_win_api_trace_on: the window-API trace (fle_win.h).
+ * fle_clip_host_probe (#1406): an ASYNC import too. The question of a format (IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats) asks the page whether
+ * the operating system's clipboard holds text: 1 or 0, and no content is read for it. */
 extern void fle_clip_host_write(const void *units, uint32_t bytes);
 extern void *fle_clip_host_read(void);
+extern int fle_clip_host_probe(void);
 extern int fle_win_api_trace_on(void) __attribute__((weak));
 
 /* winerror.h: ERROR_CLIPBOARD_NOT_OPEN (Learn, System Error Codes 1400-1699: "Thread does not have a clipboard open.") */
@@ -85,16 +88,8 @@ static void os_text_release(void)
     clip_os_h = 0;
 }
 
-/* Outside a session (IsClipboardFormatAvailable is asked at a click, with no open) the text is read for the answer and released. */
-static int os_text_available(void)
-{
-    uint64_t h;
-
-    if (clip_open) return os_text_session() != 0;
-    h = os_text_read();
-    if (h) fle_glob_movable_drop(h);
-    return h != 0;
-}
+/* A question about the formats (#1406): whether the operating system's clipboard holds text, as the page answers fle_clip_host_probe (no content is read). */
+static int os_text_probe(void) { return fle_clip_host_probe() != 0; }
 
 /* the handle of the guest's own CF_UNICODETEXT on the virtual clipboard (0: none) */
 static uint64_t virtual_text_handle(void)
@@ -238,14 +233,29 @@ void fle_imp_EmptyClipboard(void)
     if (clip_trace()) fprintf(stderr, "window-api: EmptyClipboard\n");
 }
 
+/* The formats as a question sees them: all_formats, and the operating system's text formats (CF_UNICODETEXT, CF_TEXT, CF_OEMTEXT) when it holds text (#1406). */
+static unsigned formats_now(uint32_t *out, unsigned cap)
+{
+    static const uint32_t text[3] = { CF_UNICODETEXT, CF_TEXT, CF_OEMTEXT };
+    unsigned n = all_formats(out, cap - 3), k, j;
+
+    if (!os_text_probe()) return n;
+    for (k = 0; k < 3; k++) {
+        int dup = 0;
+        for (j = 0; j < n; j++) if (out[j] == text[k]) dup = 1;
+        if (!dup) out[n++] = text[k];
+    }
+    return n;
+}
+
 /* Learn IsClipboardFormatAvailable: "Determines whether the clipboard contains data in the specified format." Zero when the format is not there. No
  * clipboard open is needed. The page gives no last-error for "not available": it is left unchanged (S-ia1-clip-4). CF_UNICODETEXT is available when the
- * operating system's clipboard holds text (#1389). */
+ * operating system's clipboard holds text (#1389); the question does not read the text (#1406: fle_clip_host_probe). */
 void fle_imp_IsClipboardFormatAvailable(void)
 {
     uint32_t f = (uint32_t)R[1], all[CLIP_MAX * 3];
     unsigned n = all_formats(all, CLIP_MAX * 3), i;
-    int os = (f == CF_UNICODETEXT || f == CF_TEXT || f == CF_OEMTEXT) && os_text_available();
+    int os = (f == CF_UNICODETEXT || f == CF_TEXT || f == CF_OEMTEXT) && os_text_probe();
     R[0] = os ? 1 : 0;
     for (i = 0; i < n; i++) if (all[i] == f) R[0] = 1;
     if (clip_trace()) fprintf(stderr, "window-api: IsClipboardFormatAvailable fmt=%u -> %u (os text %d, open %d)\n", f, (unsigned)R[0], os, clip_open);
@@ -254,22 +264,22 @@ void fle_imp_IsClipboardFormatAvailable(void)
 /* Learn CountClipboardFormats: "the number of different data formats currently on the clipboard" (0 for an empty one). */
 void fle_imp_CountClipboardFormats(void)
 {
-    uint32_t all[CLIP_MAX * 3];
-    R[0] = all_formats(all, CLIP_MAX * 3);
+    uint32_t all[CLIP_MAX * 3 + 3];
+    R[0] = formats_now(all, CLIP_MAX * 3 + 3);
 }
 
 /* Learn EnumClipboardFormats: "format 0 to start the enumeration; the next format is returned; 0 at the end (GetLastError ERROR_SUCCESS)". The clipboard must
  * be open (the page: "you must open the clipboard before enumerating its formats"; ERROR_CLIPBOARD_NOT_OPEN when not, S-ia1-clip-3). */
 void fle_imp_EnumClipboardFormats(void)
 {
-    uint32_t f = (uint32_t)R[1], all[CLIP_MAX * 3];
+    uint32_t f = (uint32_t)R[1], all[CLIP_MAX * 3 + 3];
     unsigned n, i;
     if (!clip_open) {
         fle_set_last_error(FLE_CLIP_ERR_NOT_OPEN);
         R[0] = 0;
         return;
     }
-    n = all_formats(all, CLIP_MAX * 3);
+    n = formats_now(all, CLIP_MAX * 3 + 3);
     if (f == 0) {
         fle_set_last_error(FLE_W32_ERR_SUCCESS);
         R[0] = n ? all[0] : 0;
