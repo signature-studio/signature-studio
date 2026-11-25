@@ -11,6 +11,7 @@
 #include "fle_imports.h"
 #include "fle_modules.h"
 #include "fle_realmod.h"
+#include "fle_env.h"
 #include "fle_vfs.h"
 
 #define ATTR_READONLY  0x1u
@@ -2083,8 +2084,8 @@ void fle_imp_GetSystemDirectoryW(void)
  * Any other path: as before (decision 0098). This environment's file system holds only what the guest created (decision 0018), so a path that does not name a file there has no version
  * information: the answer is the failure the file system gives for that path (the same 2 or 3 as GetFileAttributesW), with *lpdwHandle set to zero. The guest's callers treat a size of 0 as "no version
  * information" (f_651ce0, f_44ada0). The page does not say if lpdwHandle is written when the call fails: it is written in every case (inference from "sets to zero").
- * Stops: a NULL name, a name with no directory part (the LoadLibrary search sequence is not modelled), and a path that exists in the virtual
- * file system (no version resource of a virtual file is modelled). */
+ * Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is modelled). Issue #1418: a name with no
+ * directory part is answered as a missing file (FALSE, ERROR_FILE_NOT_FOUND, warned once; the search sequence is #1415), an empty name is ERROR_BAD_PATHNAME (161). */
 /* Decision 0129: the RT_VERSION of the lifted DLL is read by fle_res.c. A weak reference, as fle_cursor.c has for fle_cursor_load_named (decision 0125): a build that does not link fle_res.c (most test drivers of
  * this file) stops by name for the engine path instead of failing to link. */
 extern int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size) __attribute__((weak));
@@ -2114,11 +2115,22 @@ void fle_imp_GetFileVersionInfoSizeW(void)
     if (name == 0) fle_stop(api, "lptstrFilename is NULL: the page does not define it (decision 0098)");
     if (handle != 0) fle_st(handle, 4, 0);
     s = fle_w_read_alloc(api, name, MAX_PATH_UNITS, &len);
+    if (len == 0) {
+        /* Wine (dlls/kernelbase/version.c, GetFileVersionInfoSizeExW): an empty name is ERROR_BAD_PATHNAME (161) */
+        free(s);
+        fail(FLE_W32_ERR_BAD_PATHNAME, 0);
+        return;
+    }
     for (i = 0; i < len; i++)
         if (is_sep(s[i]) || s[i] == ':') dir_part = 1;
     eng = is_engine_path(s, len);
     free(s);
-    if (!dir_part) fle_stop(api, "a file name with no directory part: the LoadLibrary search sequence is not modelled (decision 0098)");
+    if (!dir_part) {
+        /* Issue #1418: the search sequence of LoadLibrary is not modelled (#1415), so the name is answered as a file that is not there: the failure of a missing file (Wine, dlls/kernelbase/version.c, GetFileVersionInfoSizeExW: 0 with the CreateFileW error, ERROR_FILE_NOT_FOUND) */
+        fle_warn(api, 0);
+        fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
+        return;
+    }
     if (eng) {
         uint64_t va;
         uint32_t sz;
@@ -2151,8 +2163,9 @@ void fle_imp_GetFileVersionInfoSizeW(void)
  * bytes ("truncates"), return 1. The form of the block is the form of the resource (a VS_VERSIONINFO): Learn does not say what GetFileVersionInfo puts in the buffer (the page says only that VerQueryValue reads it);
  * giving the resource's bytes is a CHOICE WITHOUT A SOURCE (S-version-info-block-form), made so that no value is invented; VerQueryValueW below parses exactly this form. A NULL lpData or dwLen 0 for that path
  * stops (the page does not say). Any other path: as before (the answer of GetFileVersionInfoSizeW (decision 0098) for the same path: a path that does not name a file of the virtual file system has no
- * version information, so the call fails with the file-system error of that path (the same 2 or 3 as GetFileAttributesW), lpData is not touched, dwHandle and dwLen are not looked at). Stops: a NULL name, a
- * name with no directory part (the LoadLibrary search sequence is not modelled), and a path that exists in the virtual file system (no version resource of a virtual file is modelled). */
+ * version information, so the call fails with the file-system error of that path (the same 2 or 3 as GetFileAttributesW), lpData is not touched, dwHandle and dwLen are not looked at). Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is
+ * modelled). Issue #1418: a name with no directory part is answered as a missing file (FALSE, ERROR_FILE_NOT_FOUND, warned once), an empty name is
+ * ERROR_BAD_PATHNAME (161). */
 void fle_imp_GetFileVersionInfoW(void)
 {
     static const char api[] = "GetFileVersionInfoW";
@@ -2167,11 +2180,22 @@ void fle_imp_GetFileVersionInfoW(void)
 
     if (name == 0) fle_stop(api, "lptstrFilename is NULL: the page does not define it (decision 0112)");
     s = fle_w_read_alloc(api, name, MAX_PATH_UNITS, &len);
+    if (len == 0) {
+        /* Wine (dlls/kernelbase/version.c, GetFileVersionInfoSizeExW): an empty name is ERROR_BAD_PATHNAME (161) */
+        free(s);
+        fail(FLE_W32_ERR_BAD_PATHNAME, 0);
+        return;
+    }
     for (i = 0; i < len; i++)
         if (is_sep(s[i]) || s[i] == ':') dir_part = 1;
     eng = is_engine_path(s, len);
     free(s);
-    if (!dir_part) fle_stop(api, "a file name with no directory part: the LoadLibrary search sequence is not modelled (decisions 0098, 0112)");
+    if (!dir_part) {
+        /* Issue #1418: as GetFileVersionInfoSizeW above: the search sequence is not modelled (#1415): a missing file, so FALSE with ERROR_FILE_NOT_FOUND (2), the buffer untouched */
+        fle_warn(api, 0);
+        fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
+        return;
+    }
     if (eng) {
         uint64_t va;
         uint32_t sz, k, cnt;

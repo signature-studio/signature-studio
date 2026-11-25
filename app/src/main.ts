@@ -32,6 +32,7 @@ import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
 import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
+import { warnsOf } from './perf/warns.ts';
 import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
 import { bindAudioStatus } from './audio/status.ts';
@@ -560,6 +561,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     hz: displayMonitor.isRunning ? hzInfo() : null,
     guestScreen: guestScreenInfo(),
     files: filesUsage.snapshot(),
+    warns: warnsOf(engineLog.lines), // Issue #1418: the calls the engine answered without a model (its last counts line)
     assets: assetsNow(),
     desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs(), deskHistory.samples) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),

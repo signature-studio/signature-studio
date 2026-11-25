@@ -671,7 +671,12 @@ void fle_imp_RegSetValueExW(void)
     if ((uint32_t)R[8] != 0) fle_stop(api, "Reserved is not 0");
     if (!type_ok(type)) fle_stop(api, "value type is not implemented (REG_DWORD_BIG_ENDIAN, REG_LINK, others)");
     if (cb > VALUE_DATA_MAX) fle_stop(api, "value larger than 1 MiB");
-    if (pd == 0 && cb != 0) fle_stop(api, "lpData is NULL but cbData is not 0");
+    if (pd == 0 && cb != 0) {
+        /* Issue #1418: Wine's advapi32 tests (dlls/advapi32/tests/registry.c, RegSetValueExW with NULL data and cbData 4) give ERROR_NOACCESS (998) */
+        fle_warn(api, FLE_W32_ERR_NOACCESS);
+        ret(FLE_W32_ERR_NOACCESS);
+        return;
+    }
     if (type == FLE_REG_SZ || type == FLE_REG_EXPAND_SZ) {
         if (cb < 2 || cb % 2 || fle_ld(pd + cb - 2, 2) != 0) fle_stop(api, "string data is not NUL-terminated within cbData");
     } else if (type == FLE_REG_MULTI_SZ) {
@@ -931,7 +936,12 @@ void fle_imp_RegEnumValueW(void)
     uint32_t st;
 
     if (fle_arg(5) != 0) fle_stop(api, "lpReserved is not NULL");
-    if (pname == 0 || pcch == 0) fle_stop(api, "lpValueName or lpcchValueName is NULL");
+    if (pname == 0 || pcch == 0) {
+        /* Issue #1418: Wine's advapi32 tests (dlls/advapi32/tests/registry.c, RegEnumValueW with no value name or no count) give ERROR_INVALID_PARAMETER (87) */
+        fle_warn(api, FLE_W32_ERR_INVALID_PARAMETER);
+        ret(FLE_W32_ERR_INVALID_PARAMETER);
+        return;
+    }
     k = key_arg(api, R[1], &acc);
     if (!k) {
         ret(FLE_W32_ERR_INVALID_HANDLE);

@@ -601,8 +601,9 @@ fn version_info_size_stops_for_a_path_that_exists_in_the_virtual_file_system() {
 fn version_info_size_stops_for_the_forms_the_page_leaves_open() {
     // the handle variable is written (0) before the stop in every case where the pointer is given
     stops(&["fvs", "null", "buf"], "GetFileVersionInfoSizeW: lptstrFilename is NULL", 0, "55555555");
-    stops(&["fvs", "kernel32.dll", "buf"], "a file name with no directory part", 0, "00000000");
-    stops(&["fvs", "", "buf"], "a file name with no directory part", 0, "00000000");
+    // Issue #1418: a name with no directory part is not found in the current directory: 0 and ERROR_FILE_NOT_FOUND (the search sequence is not modelled; warned once)
+    assert_eq!(lines(&["fvs", "kernel32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "", "buf"]), ["ret 0 handle 0 le a1"]);
     // a name with a directory part is resolved by the file system rules of decision 0018 (here: C:\ + y.dll, missing)
     assert_eq!(lines(&["fvs", "x\\..\\y.dll", "null"]), ["ret 0 handle 55555555 le 2"]);
 }

@@ -6,9 +6,65 @@
 #include "fle_runtime.h"
 #include "fle_imports.h"
 #include "fle_env.h"
+#include "fle_callback.h"
+
+/* ---- calls that are answered without a model (Issue #1418) ----
+ * The table holds the APIs in the order they were first warned about; a name beyond FLE_WARN_NAMES_MAX is counted in warn_total only. */
+#define FLE_WARN_NAMES_MAX 64u
+#define FLE_WARN_IDLE_EVERY 64u
+
+typedef struct {
+    const char *api;
+    uint64_t calls;
+    int printed;
+} warn_ent;
+
+static warn_ent warn_tab[FLE_WARN_NAMES_MAX];
+static unsigned warn_n, warn_idles;
+static uint64_t warn_total, warn_reported_total;
+
+static void warn_counts_print(void)
+{
+    unsigned i;
+    if (warn_total == warn_reported_total) return;
+    warn_reported_total = warn_total;
+    fprintf(stderr, "fle-warns: {");
+    for (i = 0; i < warn_n; i++)
+        fprintf(stderr, "%s\"%s\":%llu", i ? "," : "", warn_tab[i].api, (unsigned long long)warn_tab[i].calls);
+    fprintf(stderr, "}\n");
+}
+
+void fle_warn(const char *api, uint64_t value)
+{
+    unsigned i;
+    warn_ent *e = NULL;
+    uint64_t ra = fle_ld(R[4], 8);
+
+    warn_total++;
+    for (i = 0; i < warn_n && !e; i++)
+        if (strcmp(warn_tab[i].api, api) == 0) e = &warn_tab[i];
+    if (!e && warn_n < FLE_WARN_NAMES_MAX) {
+        e = &warn_tab[warn_n++];
+        e->api = api;
+    }
+    if (e) e->calls++;
+    if (e && e->printed) return;
+    if (e) e->printed = 1;
+    fprintf(stderr, "fle: warn: %s: not modelled, returned %llu (caller ", api, (unsigned long long)value);
+    if (ra == FLE_CB_RETURN_ADDRESS) fprintf(stderr, "fle_call_guest)\n");
+    else fprintf(stderr, "0x%llx)\n", (unsigned long long)ra);
+}
+
+void fle_warn_idle(void)
+{
+    if (++warn_idles < FLE_WARN_IDLE_EVERY) return;
+    warn_idles = 0;
+    warn_counts_print();
+}
 
 void fle_stop(const char *api, const char *why)
 {
+    warn_counts_print();
     fprintf(stderr, "fle: %s: %s\n", api, why);
     abort();
 }
