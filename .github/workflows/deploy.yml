@@ -2,7 +2,7 @@ on: {push: {branches: main,
   paths: [app/**, lift/**, ci/**, .github/workflows/deploy.yml]}}
 concurrency: deploy
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
       RUNS_ON_S3_FORCE_PATH_STYLE: "true",
@@ -65,14 +65,6 @@ jobs:
             Data/Templates/Other/Blocks/Blocks.flp; do
             grep -aqF "\"seed/resources/$p\"" lift/out-app/seed/seed.bin
           done
-      - run: |
-          (cd tools/e2e && npm ci && npx playwright install chromium)
-          node tools/e2e/run.mjs --scenarios smoke \
-            --displays 4k-dpr1,4k-dpr2,4k-random > "$RUNNER_TEMP/e2e.jsonl"
-          jq -e -s -f tools/e2e/judge.jq "$RUNNER_TEMP/e2e.jsonl"
-      - {if: always(), uses: actions/upload-artifact@v7.0.2,
-        with: {name: "e2e-${{ github.sha }}", retention-days: 30,
-          path: "${{ runner.temp }}/e2e.jsonl", if-no-files-found: ignore}}
       - name: 関数名の表を版ごとに残す
         id: fn
         run: |
@@ -86,6 +78,74 @@ jobs:
         uses: actions/upload-artifact@v7.0.2
         with: {name: "func-names-${{ steps.fn.outputs.v }}", retention-days: 90,
           path: "${{ runner.temp }}/wasm-func-names.tsv.gz"}
+      - name: bundle をキャッシュに置く
+        uses: runs-on/cache@v5.0.7
+        with:
+          path: |
+            app/dist
+            lift/out-app/bundle
+          key: bundle-${{ github.sha }}
+  e2e:
+    name: e2e (${{ matrix.name }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: smoke-dpr1, args: "--scenarios smoke --displays 4k-dpr1"}
+          - {name: smoke-dpr2, args: "--scenarios smoke --displays 4k-dpr2"}
+          - {name: smoke-random, args: "--scenarios smoke --displays 4k-random"}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - {uses: actions/setup-node@v7.1.0, with: {node-version: 26}}
+      - run: npm ci --prefix app
+      - run: cargo build --release --locked --manifest-path lift/Cargo.toml
+      - run: lift/target/release/fe-build endpoint
+      - name: bundle をキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true",
+          AWS_ACCESS_KEY_ID: "${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}",
+          AWS_SECRET_ACCESS_KEY:
+            "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
+        with:
+          path: |
+            app/dist
+            lift/out-app/bundle
+          key: bundle-${{ github.sha }}
+          fail-on-cache-miss: true
+      - name: E2E(依存・実行・判定)
+        run: |
+          (cd tools/e2e && npm ci && npx playwright install chromium)
+          node tools/e2e/run.mjs ${{ matrix.args }} > "$RUNNER_TEMP/e2e.jsonl"
+          jq -e -s -f tools/e2e/judge.jq "$RUNNER_TEMP/e2e.jsonl"
+      - {if: always(), uses: actions/upload-artifact@v7.0.2,
+        with: {name: "e2e-${{ matrix.name }}-${{ github.sha }}",
+          retention-days: 30, path: "${{ runner.temp }}/e2e.jsonl",
+          if-no-files-found: ignore}}
+  deploy:
+    needs: [build, e2e]
+    runs-on: ubuntu-latest
+    env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
+      RUNS_ON_S3_FORCE_PATH_STYLE: "true",
+      AWS_ACCESS_KEY_ID: "${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}",
+      AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - {uses: actions/setup-node@v7.1.0, with: {node-version: 26}}
+      - run: npm ci --prefix app
+      - run: cargo build --release --locked --manifest-path lift/Cargo.toml
+      - run: lift/target/release/fe-build endpoint
+      - name: bundle をキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        with:
+          path: |
+            app/dist
+            lift/out-app/bundle
+          key: bundle-${{ github.sha }}
+          fail-on-cache-miss: true
       - run: lift/target/release/fe-build upload
       - name: 本番の manifest を確かめる
         run: |

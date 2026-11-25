@@ -11,13 +11,18 @@ rc() { "$@" >/dev/null 2>&1; echo $?; }
 # deploy.yml の制約
 printf 'on: push\njobs:\n  a:\n    steps:\n      - run: npm ci\n' > "$T/good.yml"
 ok "deploy-lint: 守っている物は通る" "$(rc bash "$g/deploy-lint.sh" "$T/good.yml")" 0
-{ for i in $(seq 1 101); do echo "# $i"; done; } > "$T/long.yml"; ok "deploy-lint: 101 行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/long.yml")" 1
+{ for i in $(seq 1 221); do echo "# $i"; done; } > "$T/long.yml"; ok "deploy-lint: ファイル全体が 221 行なら見つかる(上限は 220 行)" "$(rc bash "$g/deploy-lint.sh" "$T/long.yml")" 1
+{ echo "jobs:"; echo "  build:"; for i in $(seq 1 119); do echo "    # $i"; done; } > "$T/build120.yml"; ok "deploy-lint: build が 120 行(見出しを含む。ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$T/build120.yml")" 0
+{ echo "jobs:"; echo "  build:"; for i in $(seq 1 120); do echo "    # $i"; done; } > "$T/build121.yml"; ok "deploy-lint: build が 121 行なら見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/build121.yml")" 1
+{ echo "jobs:"; echo "  build:"; echo "    runs-on: x"; echo "  e2e:"; for i in $(seq 1 39); do echo "    # $i"; done; } > "$T/e2e40.yml"; ok "deploy-lint: e2e が 40 行(見出しを含む。ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$T/e2e40.yml")" 0
+{ echo "jobs:"; echo "  build:"; echo "    runs-on: x"; echo "  e2e:"; for i in $(seq 1 40); do echo "    # $i"; done; } > "$T/e2e41.yml"; ok "deploy-lint: e2e が 41 行なら見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/e2e41.yml")" 1
+{ echo "jobs:"; echo "  build:"; echo "    runs-on: x"; echo "  deploy:"; for i in $(seq 1 40); do echo "    # $i"; done; } > "$T/deploy41.yml"; ok "deploy-lint: deploy が 41 行なら見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/deploy41.yml")" 1
 { echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$T/wide.yml"; ok "deploy-lint: 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/wide.yml")" 1
 printf 'jobs:\n  a:\n    steps:\n      - run: bash ci/x.sh\n' > "$T/sh.yml"; ok "deploy-lint: シェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/sh.yml")" 1
 printf 'jobs:\n  a:\n    steps:\n      - uses: ./.github/actions/y\n' > "$T/local.yml"; ok "deploy-lint: ローカル action は見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/local.yml")" 1
 printf 'on:\n  workflow_call:\n' > "$T/reuse.yml"; ok "deploy-lint: 再利用ワークフローは見つかる" "$(rc bash "$g/deploy-lint.sh" "$T/reuse.yml")" 1
 mkdir -p "$T/cwd/.github/workflows"
-ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(101 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
+ok "deploy-lint: 引数が無ければ、いま居る所の .github/workflows/deploy.yml を見る(221 行なら見つかる)" "$(cp "$T/long.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 1
 ok "deploy-lint: 引数が無く、その deploy.yml が守っていれば 0" "$(cp "$T/good.yml" "$T/cwd/.github/workflows/deploy.yml" && cd "$T/cwd" && rc bash "$g/deploy-lint.sh")" 0
 # 内容の検査(scan.sh は相対パスで規則の範囲を決めるので、一時ディレクトリの中で走らせる)
 mkdir -p "$T/app"
