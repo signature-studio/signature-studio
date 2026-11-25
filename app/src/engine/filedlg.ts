@@ -34,7 +34,7 @@ export const FOS_ALLOWMULTISELECT = 0x200;
 
 /** the volume refuses a file over 256 MiB (fle_vfs.c MAX_FILE_BYTES) */
 export const MAX_FILE_BYTES = 256 * 1024 * 1024;
-/** S-fpick1-total: the engine's WebAssembly memory is at most 2 GiB and the engine itself uses about 1 GiB; what the person puts on the volume is limited to 384 MiB in all */
+/** S-fpick1-total: the engine's WebAssembly memory is at most 4 GiB (#1382; 2 GiB before) and the engine itself uses about 1 GiB; what the person puts on the volume is limited to 384 MiB in all */
 export const MAX_TOTAL_BYTES = 384 * 1024 * 1024;
 export const MAX_FILES = 512;
 export const MAX_PATH_UNITS = 259;

@@ -26,6 +26,8 @@
 #include "fle_callback.h"
 #include "fle_ole.h"
 #include "fle_filedlg.h"
+/* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c); Issue #1409: the trace of SHGetKnownFolderPath */
+int fle_win_api_trace_on(void) __attribute__((weak));
 
 #define HR_E_NOINTERFACE 0x80004002u
 #define HR_E_FAIL 0x80004005u
@@ -1585,6 +1587,7 @@ void fle_imp_SHGetKnownFolderPath(void)
     else if (guid_eq(&g, &FOLDERID_ProgramFilesCommon) || guid_eq(&g, &FOLDERID_ProgramFilesCommonX64)) text = "C:\\Program Files\\Common Files";
     else if (guid_eq(&g, &FOLDERID_ProgramFilesCommonX86)) text = "C:\\Program Files (x86)\\Common Files";
     else if (guid_eq(&g, &FOLDERID_ProgramData)) text = "C:\\ProgramData";
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) fprintf(stderr, "shell-api: SHGetKnownFolderPath %s -> %s\n", gt, text != NULL ? text : "(not modelled)");
     if (text == NULL) fle_stop(api, "a KNOWNFOLDERID that the model does not know (Profile, Documents, Desktop, Downloads, RoamingAppData, LocalAppData, ProgramFiles[X64|X86|Common|CommonX64|CommonX86], ProgramData only)");
     w = fle_w_from_ascii(text);
     fle_st(pp, 8, task_wstr(w, fle_w_len(w)));

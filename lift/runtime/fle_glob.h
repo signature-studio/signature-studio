@@ -54,4 +54,8 @@ uint64_t fle_glob_movable_count(void);
 uint64_t fle_glob_fixed_count(void);
 uint64_t fle_glob_atom_count(int global_table);
 
+/* The fixed blocks of LocalAlloc and FormatMessageW (ALLOCATE_BUFFER): registered on the allocation, and released by LocalFree only when live (fle_glob_fixed_release). */
+void fle_glob_fixed_add(void *p);
+int fle_glob_fixed_release(uint64_t h);
+
 #endif

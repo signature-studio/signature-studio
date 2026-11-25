@@ -782,6 +782,9 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     ("webview2loader.dll", "CompareBrowserVersions", "fle_imp_CompareBrowserVersions", "jmp_imp:CompareBrowserVersions"),
     // Issue #1391 (provisional; appended: decision 0015, append only): kernel32!K32GetProcessMemoryInfo, reached by GetProcAddress (FL's top bar Memory Usage; the call was measured as NULL and 127 before, runtime/fle_sysinfo.c).
     ("kernel32.dll", "K32GetProcessMemoryInfo", "fle_imp_K32GetProcessMemoryInfo", "jmp_imp:K32GetProcessMemoryInfo"),
+    // Issue #1382 (appended: decision 0015, append only): kernel32!CompareStringOrdinal (runtime/fle_locale.c), reached by GetProcAddress (no IAT slot). The Theme page's style code (f_44b7e0) asks for it;
+    // without the row the answer was 0 and the guest called 0 when a theme was chosen (f_44b9b0).
+    ("kernel32.dll", "CompareStringOrdinal", "fle_imp_CompareStringOrdinal", "jmp_imp:CompareStringOrdinal"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of

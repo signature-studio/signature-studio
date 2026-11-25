@@ -5,6 +5,7 @@
  * clock, no thread other than the id of the calling one. */
 #define _GNU_SOURCE
 #include <inttypes.h>
+#include <malloc.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -131,6 +132,7 @@ typedef struct {
 } gdi_obj;
 
 #define GF_PLACEHOLDER 1u                   /* the 1-by-1 monochrome bitmap of a memory DC */
+#define GF_DELETE_PENDING 8u                /* #1382: a bitmap whose DeleteObject was refused while it was selected into a DC; freed when it is no longer selected (bitmap_pending_free) */
 #define GF_OPAQUE_PAL  2u                   /* a halftone palette: the entries are an implementation detail (the page), none are kept */
 #define GF_MODICON     4u                   /* decision 0118: a shared icon loaded from a module's RT_GROUP_ICON by LoadIconW(hInstance, name) (kind FLE_GDI_KIND_ICON) */
 
@@ -308,6 +310,41 @@ static gdi_dc *screen_state(const char *api, uint64_t h);
 static void default_objects(const char *api);
 static void sel_add(uint64_t h);
 static void sel_drop(uint64_t h);
+static void bitmap_pending_free(gdi_obj *o);
+
+/* #1382: at a stop of CreateDIBSection (the wasm memory is full), the pixel blocks alive, the malloc's use and the guest return address, in one line of the stop. */
+void fle_raster_mem(uint64_t *n, uint64_t *bytes);
+static void mem_why(char *buf, size_t size)
+{
+    uint64_t k, live = 0, dib_n = 0, dib_b = 0, pend_n = 0, pend_b = 0, sel_n = 0, sel_b = 0, ddb_n = 0, ddb_b = 0, sur_n = 0, sur_b = 0;
+    struct mallinfo mi = mallinfo();
+
+    for (k = 0; k < objs_n; k++) {
+        gdi_obj *o = &objs[k];
+        uint64_t b;
+
+        if (o->state != ST_LIVE) continue;
+        live++;
+        if (o->kind != FLE_GDI_KIND_BITMAP || !o->ext) continue;
+        if (o->fmt == FLE_GDI_BMP_DIB) {
+            gdi_dib *d = (gdi_dib *)o->ext;
+            b = (uint64_t)d->stride * (uint64_t)(d->height < 0 ? -(int64_t)d->height : (int64_t)d->height);
+            dib_n++;
+            dib_b += b;
+            if (o->flags & GF_DELETE_PENDING) { pend_n++; pend_b += b; }
+            if (o->sel) { sel_n++; sel_b += b; }
+        } else {
+            gdi_ddb *d = (gdi_ddb *)o->ext;
+            ddb_n++;
+            ddb_b += (uint64_t)d->stride * o->bm[1];
+        }
+    }
+    fle_raster_mem(&sur_n, &sur_b);
+    snprintf(buf, size, "out of memory (guest return address %#llx): live handles %llu; DIB %llu blocks %llu bytes (pending delete %llu/%llu, selected %llu/%llu); DDB %llu blocks %llu bytes; window surfaces %llu blocks %llu bytes; malloc in use %llu bytes, free %llu bytes",
+             (unsigned long long)fle_ld(R[4], 8), (unsigned long long)live, (unsigned long long)dib_n, (unsigned long long)dib_b, (unsigned long long)pend_n, (unsigned long long)pend_b,
+             (unsigned long long)sel_n, (unsigned long long)sel_b, (unsigned long long)ddb_n, (unsigned long long)ddb_b, (unsigned long long)sur_n, (unsigned long long)sur_b,
+             (unsigned long long)mi.uordblks, (unsigned long long)mi.fordblks);
+}
 
 static gdi_dc *need_mem_dc(const char *api, uint64_t h, const char *screen_why)
 {
@@ -387,15 +424,29 @@ static void ddb_release(gdi_obj *o)
     o->ext = NULL;
 }
 
+/* #1382: a bitmap whose DeleteObject was refused (the page's 0: it is selected into a DC) is freed when the last DC lets go of it. The guest drops the handle at once: the destructor
+ * of f_6aff60 calls DeleteObject on the bitmap and only then DeleteDC on the DC that holds it, and zeroes both handles after. A bitmap that Windows keeps alive for good would hold its
+ * pixels for the rest of the run (25 MB per theme switch at this size), and the wasm heap has no room for that. The return value of the refused call stays 0. */
+static void bitmap_pending_free(gdi_obj *o)
+{
+    o->flags &= (uint8_t)~GF_DELETE_PENDING;
+    bmp_live--;
+    if (o->fmt == FLE_GDI_BMP_DIB) dib_release(o);
+    else ddb_release(o);
+    obj_kill(o);
+}
+
 /* Deletes the memory DC in objs[i]: the objects selected into it are no longer selected (they are not deleted: the SelectObject page asks the
  * application to select the original objects back and nothing in the pages says that the DC deletes what is selected into it), the placeholder
  * goes with the DC. The slot keeps its kind so that a second DeleteDC is told from a handle that was never a DC. */
 static void dc_destroy(int64_t i)
 {
     gdi_dc *dc = (gdi_dc *)objs[i].ext;
+    gdi_obj *bo = live_obj(dc->bmp);
     int64_t ph;
 
     sel_drop(dc->bmp);
+    if (bo && bo->sel == 0 && (bo->flags & GF_DELETE_PENDING)) bitmap_pending_free(bo);
     sel_drop(dc->brush);
     sel_drop(dc->pen);
     sel_drop(dc->font);
@@ -792,6 +843,7 @@ void fle_imp_DeleteObject(void)
     }
     if (o->kind == FLE_GDI_KIND_BITMAP && (o->flags & GF_PLACEHOLDER)) fle_stop(api, "handle is the placeholder bitmap of a memory DC: the pages give no rule for deleting it");
     if (o->sel) {
+        if (o->kind == FLE_GDI_KIND_BITMAP) o->flags |= GF_DELETE_PENDING;
         R[0] = 0;
         return;
     }
@@ -1302,7 +1354,12 @@ void fle_imp_CreateDIBSection(void)
     if (!fle_host_size_fits(bytes)) fle_stop(api, "out of memory");
     bits = (uint8_t *)calloc(1, (size_t)bytes);
     d = (gdi_dib *)calloc(1, sizeof *d);
-    if (!bits || !d) fle_stop(api, "out of memory");
+    if (!bits || !d) {
+        char why[480];
+
+        mem_why(why, sizeof why);
+        fle_stop(api, why);
+    }
     d->bits = bits;
     d->width = (uint32_t)w;
     d->height = h;

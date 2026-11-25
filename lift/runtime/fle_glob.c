@@ -109,6 +109,21 @@ static void fx_remove(uint64_t k)
 uint64_t fle_glob_movable_count(void) { return mv_live; }
 uint64_t fle_glob_fixed_count(void) { return fx_live; }
 
+/* #1382: LocalAlloc and FormatMessageW (ALLOCATE_BUFFER) blocks are fixed blocks too: on Windows the local and the global fixed blocks are one heap. */
+void fle_glob_fixed_add(void *p)
+{
+    if (p) fx_insert((uint64_t)(uintptr_t)p);
+}
+
+/* Frees the live fixed block h and returns 1; a value that is not a live fixed block frees nothing and returns 0 (the heap's free is not called with it). */
+int fle_glob_fixed_release(uint64_t h)
+{
+    if (!fx_has(h)) return 0;
+    fx_remove(h);
+    free((void *)(uintptr_t)h);
+    return 1;
+}
+
 /* The live movable object of a handle, or NULL when the value is not a movable handle that is live. */
 static fle_movable *mv_of(uint64_t h)
 {

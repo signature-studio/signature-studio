@@ -38,8 +38,8 @@ describe('engine stop (decision 0209)', () => {
 
 describe('engine memory (decision 0170)', () => {
   it('a dash before the first idle; the size and its share of the 2,048 MB limit after; never green or red (it is not one of P1-P3)', () => {
-    expect(row(perfRows(view()), 'wasm-memory')).toMatchObject({ value: '-', target: '< 2048 MB', status: 'na' });
-    expect(row(perfRows(view({ wasmMemoryBytes: 1473.4 * 1048576 })), 'wasm-memory')).toMatchObject({ value: '1473 MB (72% of 2048 MB)', status: 'na' });
+    expect(row(perfRows(view()), 'wasm-memory')).toMatchObject({ value: '-', target: '< 4096 MB', status: 'na' });
+    expect(row(perfRows(view({ wasmMemoryBytes: 1473.4 * 1048576 })), 'wasm-memory')).toMatchObject({ value: '1473 MB (36% of 4096 MB)', status: 'na' });
     expect(row(perfRows(view({ wasmMemoryBytes: 2000 * 1048576 })), 'wasm-memory').status).toBe('na');
   });
 });

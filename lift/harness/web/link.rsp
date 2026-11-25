@@ -23,7 +23,7 @@ lift/harness/web/clip/fle_clip_lib.js
 -pthread
 -sPTHREAD_POOL_SIZE=0
 -sINITIAL_MEMORY=1392312320
--sMAXIMUM_MEMORY=2147483648
+-sMAXIMUM_MEMORY=4294967296
 -Wl,--export-memory
 -Wl,--export=__tls_base
 -Wl,--allow-undefined
@@ -34,6 +34,8 @@ lift/harness/web/clip/fle_clip_lib.js
 -Wl,--wrap=fprintf
 -Wl,--wrap=fputs
 -Wl,--wrap=abort
+-Wl,--wrap=pthread_mutex_lock
+-Wl,--wrap=pthread_mutex_unlock
 -Wl,--wrap=fle_imp_LockResource
 -Wl,--wrap=fle_imp_FormatMessageW
 -Wl,--wrap=fle_imp_RtlPcToFileHeader

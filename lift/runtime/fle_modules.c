@@ -449,7 +449,12 @@ void fle_imp_GetProcAddress(void)
                 return;
             }
             R[0] = fle_realmod_getproc("GetProcAddress", rm, rname);
-            if (R[0] == 0) fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
+            if (R[0] == 0) {
+                char fname[260];
+                fle_realmod_file_name("GetProcAddress", rm, fname, sizeof fname);
+                fprintf(stderr, "missing-proc: GetProcAddress %s \"%s\" %u\n", fname, rname, (unsigned)FLE_ERROR_PROC_NOT_FOUND);
+                fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
+            }
             return;
         }
     }
@@ -484,6 +489,7 @@ void fle_imp_GetProcAddress(void)
             }
         }
     }
+    fprintf(stderr, "missing-proc: GetProcAddress %s \"%s\" %u\n", mod, name, (unsigned)FLE_ERROR_PROC_NOT_FOUND);
     fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);
     R[0] = 0;
 }
