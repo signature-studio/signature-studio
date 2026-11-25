@@ -31,6 +31,20 @@ project: signature-studio/3
 - インストーラの一覧(`inputs/fl-installer-files.tsv`)に、Recent の名前の行は 0 件。Settings の行は 1 件。
 - 判定の欠陥(#{{145}} で外した): 名前が FL のゲストのメモリに在るかで見ると、保存したプロジェクトのファイルが戻った時にも true になる。Recent の判定は、Recent の表示の文字列で見る(下の「やること」の 4)。
 
+## 前回の試行で分かったこと(この Issue の 1 回目。run 45557913513。runner の値。nproc 4、loadavg 1.4〜2.0)
+
+- 結果: 言語・起動の段は通る(ja。起動 7,615 ms。起動前 312,191,324 B)。ファイルの段は落ちる(`recentKept` false、`recentInSession` null)。流れ A〜D は 4 回とも engine-idle・error null・welcomeClosed true。`npm test --prefix app` は 71 files passed(1 skipped)、1,410 tests passed(10 skipped)。`spec/guard.test.sh` は 67 ok、`spec/workflow.test.sh` は 492 ok。`guard/scan.sh` は 0 件。
+- ①(同じ起動の中の表示)は未確認。ゲストのメモリで「Recent」の周りの文字を読むと、「Recent」は 56 箇所あったが、その周りは RTTI の名前(`gui.WelcomeWizard.TRecentFilesModule.TMRUItemData` など)で、一覧の項目の文字は無かった。GDI の文字描画(`ExtTextOutW`・`DrawTextW`)は、この run では呼ばれなかった(呼ばれると止める作り)。メニューバーは `DrawMenuBar` が何も描かない。文字を読む方法では①は決まらない。`recentInSession` は null にした(false とは言えない)。
+- ②(開く)の観測: `SHAddToRecentDocs flags=3 path="C:\Users\user\Downloads\<name>.flp"` が 2 回、`SHGetKnownFolderPath {FOLDERID_Documents}` が 2 回。engine は何もしない(Windows の最近使ったものへの呼び出し)。
+- ②(保存)の観測: Ctrl+S の窓の中は `vfs-open` の `.flp~` だけ。直後に「Buy FL Studio」の窓が出た(試用版で保存が無効)。その窓を閉じた後に、`vfs-kept` の `Downloads\<name>.flp~`・Backup・`Downloads\<name>.flp`、`RegSetValueExW` の `LastSavedBackup`。書かれたのは保存したプロジェクトとバックアップだけ。
+- ②(新規・閉じる): Ctrl+N は、最初の測定では保存の後の窓が閉じていなかったため届かなかった。窓を閉じた後の測定では、題名が変わらなかった(効いたかは未確認)。閉じる要求は 251〜262 ms で停止し、その間の書き込みは 0 件。
+- FL の一覧が、ファイル・レジストリ・Windows の Recent フォルダに書かれる箇所は、観測されなかった。`Settings\Browser\Recent files.scr` は作られない(起動の時に `GetFileAttributesW` が 2 を返す)。レジストリのファイル名を含む値も無い。`SHGetKnownFolderPath {FOLDERID_Recent}` は呼ばれていない。
+- 一覧の型 `TMRUItemData` の名前はゲストのメモリに在る(実測)。項目の中身は読めていない。関数名の表に Delphi の名前は無く、書き込み関数は名前で追えない。
+- 判定の欠陥(前回と同じ): 名前の一致で見ると、保存したプロジェクトのファイルが再読込の後に戻るため、Recent が無くても true になる(`recentAfter.found`)。名前の一致では判定しない。
+- 測定の道具の欠陥: `recentInSession` は true か null の 2 値で、false が無い。次の試行は、同じ起動で項目数が増えない時に false にする(下の「やること」の 1)。
+- 保存の時の書き込みは、保存の後の窓を閉じた後の区間に入った。区間は「直前の操作の終わりから次の操作の終わりまで」に直した(操作の開始からでは、遅れた行を取りこぼす)。
+- 前回の差分(work.diff。commit は main に無い): `lift/runtime/fle_appfile.c`・`fle_filedlg.c`(`SHAddToRecentDocs`・`SHGetKnownFolderPath` の呼び出しを、window-API trace が有効な時だけ `shell-api:` の行として出す。動作は変えない)、`tools/persist/measure.mjs`(files 段を、開く・保存・新規・閉じる要求の順の操作として記録する形に作り直した)、`pm-work/findings/recent-1409.md`(実測の記録)。
+
 ## 背景
 
 - 仮想ボリュームはメモリの上だけにある(`lift/runtime/fle_vfs.h`)。ページを再読込すると、ゲストのファイルは消える。
@@ -50,16 +64,19 @@ project: signature-studio/3
 
 ## やること
 
-0. 作業ツリーの確認。`.prior-work.md` が在れば最初に読む。#{{145}} の段階 1 が main に在ることを確かめる(`app/src/engine/worker.ts` の `pagehide` の終了の要求と、`lift/runtime/fle_vfs.c` の 0 バイトの扱い)。
-1. **同じ起動の中で Recent が動くかを確かめる(①)**: 起動 → Welcome を閉じる → File > Open で demo の曲を開く → File メニューの Open recent(または Welcome・Browser の Recent の表示)の文字に、開いた曲の名前が出るかを、`guestText` で読む。OCR を使わない。
-   - 出る: Recent は同じ起動の中で作られている。②で書く先を特定し、③の保持を作る。
-   - 出ない: FL は同じ起動の中でも Recent を作っていない。`inputs/fl-installer-files.tsv` と、`GetFileAttributesW` の探索の行から、FL の設定の既定の物と `Recent files.scr` の形式を調べる。JSON の `recentInSession` を false にする。
+0. 作業ツリーの確認。`.prior-work.md` が在れば最初に読む。#{{145}} の段階 1 が main に在ることを確かめる(`app/src/engine/worker.ts` の `pagehide` の終了の要求と、`lift/runtime/fle_vfs.c` の 0 バイトの扱い)。前回の差分(上の「前回の試行で分かったこと」の最後の項目)が載っているかを `git status` と `git diff --stat` で確かめる。載っている物は取り除かず、残りを行う。
+1. **同じ起動の中で Recent が動くかを、まず確かめる(①)**: 起動 → Welcome を閉じる → File > Open で demo の曲を開く → File の Open recent のサブメニューを、`tools/crash-hunt/` と同じ経路(メニューの項目を `#n` で指す。項目の文字は読まない)で開く。曲を開く前と後で、項目の数を比べる。項目の数は、Down キーの回数(ハイライトが一周する距離)と、窓の画素の変化で数える。OCR を使わない。
+   - 増える: Recent は同じ起動の中で作られている。`recentInSession` を true にし、②で書く先を特定して、③の保持を作る。
+   - 増えない: FL は、この VM で、同じ起動の中では Recent を作っていない(保持の前の問題)。`recentInSession` を false にして JSON に出す。FL が Recent を作る条件を調べる: `SHAddToRecentDocs` の成功、Windows の Recent フォルダの `.lnk` の存在、一覧(`TMRUItemData`)の更新。`inputs/fl-installer-files.tsv` と `GetFileAttributesW` の探索の行も使う。
+   - 数えられない: `recentInSession` は null のまま。false とは書かない。
 2. **書く操作と場所の特定(②)**: 次の操作ごとに、FL が行った全ての書き込みを、engine のログ(`fle:` の行)から一覧にする。対象は、ファイルの作成・書き込み・名前の変更(`MoveFileExW`・`ReplaceFileW`・`SetFileInformationByHandle`・一時ファイルへ書いて名前を変える)・削除、レジストリの書き込み(`RegSetValueExW` の全て)、`SHAddToRecentDocs`、Windows の Recent フォルダ(`SHGetKnownFolderPath(FOLDERID_Recent)` と `.lnk` の作成)。
-   操作: 開く(File > Open・Browser のダブルクリック・Welcome の項目)/ 保存(Save・Save as・Ctrl+S)/ 新規(New。Ctrl+N)/ プロジェクトを閉じる(Close)/ Browser の Recent タブを開く / FL の定期の保存(タイマー)/ 終了の要求。
+   操作: 開く(File > Open・Browser のダブルクリック・Welcome の項目)/ 保存(Save・Save as・Ctrl+S。試用版の「Buy FL Studio」の窓は閉じてから完了を見る)/ 新規(New。Ctrl+N)/ プロジェクトを閉じる(Close と、閉じる要求)/ 開いた後の待ち(120 秒)/ Browser の Recent タブを開く / File メニューを開いて閉じる / FL の定期の保存(タイマー)。
+   Windows の Recent フォルダ: Windows では `SHAddToRecentDocs(SHARD_PATHW)` が `%APPDATA%\Microsoft\Windows\Recent\<name>.lnk` を作る。FL が一覧をこの Recent フォルダから読むなら、`FindFirstFileW` で `Recent\*.lnk` を列挙する。`SHGetKnownFolderPath(FOLDERID_Recent)`・`Recent` を含むパスの `FindFirstFileW`・`CreateFileW` をログに出す。FL が Recent フォルダを読むなら、`SHAddToRecentDocs` を Windows と同じに実装する(`Recent\<name>.lnk` を VFS に作る。中身は ShellLink の最小(ターゲットのパス)。journal に載り、再読込で戻る)。
    ログが足りなければ、`lift/runtime/fle_vfs.c`・`lift/runtime/fle_reg.c` に、常に動く軽い記録を足す(環境変数・`#ifdef`・URL パラメータ・ビルド変数は足さない)。
-   結果は JSON の `recentOps`(操作ごとの書き込みの一覧。場所とパス)と、`recentWhere`(Recent が書かれた場所と時点。書かれなければ "none")に出す。
+   結果は JSON の `recentOps`(操作ごとの書き込みの一覧。場所とパス)と、`recentWhere`(Recent が書かれた場所と時点。書かれなければ "none")に出す。操作の区切りは、直前の操作の終わりから、その操作の終わりまで。
+   ④(RTTI)は、①〜③で書き先が見つからない時だけ。`TRecentFilesModule` の VMT から、一覧の書き込み関数を追う。
 3. **保持(③)**: ②で特定した、Recent の一覧が入る書き込みを、既存の journal(`/fl/state/hkcu.log`。#{{142}}・#{{145}} の形)に載せ、再読込の後に、FL が Recent を読めるようにする。場所(パス)の定数を runtime に入れない(書かれた物を、書かれた木のまま保つ)。`recentInSession` が false の時は、保持を作らず、②の一覧で終える。
-4. **判定(④)**: `tools/persist/measure.mjs` の files の段で、セッション A: 起動 → Welcome を閉じる → demo の曲を File > Open で開く → ②で特定した操作 → ページを離れる(`pagehide`)。セッション B(再読込): 起動 → Recent の表示を読む。`recentKept` は、Recent の表示(File メニューの Open recent の文字列、Welcome・Browser の Recent の表示の窓)に、開いた曲の名前が在る時だけ true にする。保存したプロジェクトのファイルの名前では true にならない定義にする(表示の窓の文字列から取る)。
+4. **判定(④)**: `tools/persist/measure.mjs` の files の段で、セッション A: 起動 → Welcome を閉じる → demo の曲を File > Open で開く → ②で特定した操作 → ページを離れる(`pagehide`)。セッション B(再読込): 起動 → File の Open recent を、①と同じ方法(サブメニューの項目数と画素)で数える。`recentKept` は、再読込の後の項目数が 1 以上の時だけ true にする。開いた曲の名前の一致では判定しない(保存したプロジェクトのファイルの名前は、再読込の後にゲストのメモリへ戻るため)。
 5. **受け入れ**: 下の 1 行を通す。
 
 ## 受け入れ
@@ -70,7 +87,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 判定の基準:
 - 言語・起動の段(`step` が `files` ではない行): `error` が null、`elapsedMs` が 12,500 以下、`preBootBytes` が 314,368,711 以下。
-- ファイルの段(`step` が `files` の行): `error` が null。次のどちらか。(a) `recentKept` が true(再読込の後、Recent の表示に開いた曲の名前が在る)。(b) `recentInSession` が false で、`recentOps`(②の一覧)が配列。`bytes` が 104,857,600 以下。
+- ファイルの段(`step` が `files` の行): `error` が null。次のどちらか。(a) `recentKept` が true(再読込の後、Recent の項目が 1 以上)。(b) `recentInSession` が false で、`recentOps`(②の一覧)が配列。false は、同じ起動で Recent の項目数が増えないことを①で確かめた時だけ(数えられない時は null で、(b) に当たらない)。`bytes` が 104,857,600 以下。
 - 流れ A〜D(`tools/smoke/welcome-flow.mjs`)が通る。単体テスト(`npm test --prefix app`)が通る。
 - 言語は無作為に 1 つ選ばれる(7 言語)。選ばれた es の時は、#{{154}} の範囲で、再読込の後に engine が `missing-ilsvg` で止まることがある。その時は、受け入れの判定は落ち、選んだ言語を報告に書く。
 
@@ -79,7 +96,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: ①の結果(`recentInSession`)、②の一覧(操作ごとの書き込みの場所とパス)、③の保持の有無、④の `recentKept` と、その根拠の行。
+- 報告に書く: ①の結果(`recentInSession`。項目数と画素で見た値。OCR は使わない)、②の一覧(操作ごとの書き込みの場所とパス)、③の保持の有無、④の `recentKept` と、その根拠の行。
 
 ## 制約
 
