@@ -901,7 +901,7 @@ async function boot(): Promise<void> {
     const lazyShared = lazyRefs.map((r) => makeLazyFileShared(r.name, r.path, r.size));
     for (const s of lazyShared) lazyByPath.set(s.path, s);   // Issue #1362: the face finds its document by the path
     for (const [label, r] of refs) recorder.expect(label, r, base);
-    for (const r of lazyRefs) recorder.expect(r.name, r, base);
+    for (const r of lazyRefs) recorder.expect(r.path, r, base);
     const keep: AssetRef[] = [...refs.map(([, r]) => r), ...lazyRefs];
     const opts = { onProgress, store, onTrace: recorder.trace };
     const [module, seed, dll, glue]: [WebAssembly.Module, LoadedPack, LoadedPack, Uint8Array] = await Promise.all([

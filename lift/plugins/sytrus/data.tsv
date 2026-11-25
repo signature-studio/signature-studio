@@ -1,0 +1,111 @@
+# Sytrus の Data(Issue #1414 から、Issue #1478 で宣言の形に移した)。guest: 取り出しと seed の綴り(インストール先の下の相対のパス)。installer: inputs/fl-installer-files.tsv の行と同じ綴り。sha256 と size は、その行の値。
+guest	installer	sha256	size
+Plugins\Fruity\Generators\Sytrus\Data\Default.dat	Plugins\Fruity\Generators\Sytrus\Data\Default.dat	adc5842c0d5d63c9dfa93e9ae3f9fb487f656eaafa3e79202ec61c519372430f	1832
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo1.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo1.dat	8dd3fff997ee007fcae1e3f636fc10c1c110212a3e48058a9452ddfa73a77e54	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo10.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo10.dat	fbe01593d3fe6fff5f57e1d32e11b63aa7587f7e2aba70e0399418ad00fb6178	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo11.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo11.dat	484953e45e9bedf6fbab214e35352638fe578a836c3c3b2ee5fce185865a15cb	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo12.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo12.dat	be6bb862be16945f8c78344ff122fa187b5c09dd8195411a3f4f7667c1c96297	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo13.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo13.dat	74556fda782d38ba870a4344556bc7ef8ba9e09abaae9d60fe7bfc6cf37ff682	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo14.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo14.dat	af8813a5a75b43d4f0609995f68909b15f65f7f80ee8fd2e2f273dc68b722f21	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo15.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo15.dat	d3e84f692fdafce6c945de71592662355e4e945f5dba7e65978e5f0e2963bb14	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo16.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo16.dat	98844310dd03d7ceef8db1851f461dd88353592a740804d315474bd0eddac3f3	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo17.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo17.dat	4d8d83581fde1365aad8817d9eba6afdaa6dcb954a668d6d503675cb91a3f6a4	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo18.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo18.dat	a7cf2f72136792bb4f9cfc7e39b7009e12a4410b626f1896b83059f4396a3aea	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo19.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo19.dat	5228b5c530d10fe25acf4e09728eb4f958b47c0e90600a82e7d16a44fb0480aa	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo2.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo2.dat	88c4148fa996838d245b306d35de652bcc233a526636eb776b85aa0e858565b2	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo20.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo20.dat	a55e413e5f11b816865e0f357edd61fc696a40908c2c9e44252c948e6c5c10ea	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo21.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo21.dat	c3c8d5b1b82d3ee278b85f5b72cc32192e095af09f0ba53b026f2b7f9f89ab3d	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo22.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo22.dat	f84188b678ef2131f3cef86222a0f1d91e12e7d66a474ee2739bae6f051c2ebe	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo23.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo23.dat	bf2bd46af44f84c31cd3f62745ca171f577765ff7db4dd9f09d31a1f2b429207	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo24.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo24.dat	a2b69220e663ed278b55c2d18532ddd0f7d14666081852aceffbcdb40f6d8f9c	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo25.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo25.dat	ca7d359c3576b251b277eaaee3e9738f862a07427fb996dc7350c1725982b14a	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo26.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo26.dat	68a233f1443806fa6c5cc35c58d2309aee2e348edc8fd540d67331b58b076d74	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo27.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo27.dat	8e0d0381ad98d93c947fcbe7ea18e471bbe6b6b2157f45e389ebdae270d33534	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo28.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo28.dat	0fa169621784f0f56a8464f8e6f277ee93f66bc58411813d41e9fb937c317961	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo29.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo29.dat	7ab687b3dd29b82cc1f35aaa331b97142fe7ff19a1027905224e521f4d9876a0	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo3.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo3.dat	f144887aa558fd60a2910023ac4cb7bf36c3f436a134a0eb80342e4652dc4c9f	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo30.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo30.dat	e2f46a7695759fa2dc76db566d4177bd06d0323a94d2bde11641612ec94d9344	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo31.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo31.dat	b67e0997c25c234dcc559803b83fdd232b24b4263b2fb4440a1f33fdcd19add5	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo32.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo32.dat	717c0f9d80ef21064d4c873a58e80caea0b6da97c3f7f823afa590ab44026909	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo4.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo4.dat	aec5194b77dd60c028da3e847dc612526e9b54858d38622f0fb50d242498f98b	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo5.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo5.dat	40e7ef0928405f7ff178b3ed3be37cd2e9bdd0836d376c8b088aecd0dc3e34b4	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo6.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo6.dat	80f78eb854be018402c3768b736a458397bafe15c85e7bd4a39f85606884a476	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo7.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo7.dat	e73c524e31db94f7e21e9f6a5331889c88cdc68db274959a9c2b924727812255	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo8.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo8.dat	606f29f56edc9e47a2b529750e2818d1a98ba3ccc253d4bdb9602cb7db7ad935	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo9.dat	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Algo9.dat	58385e94f96ae89e50145d31e3c19f16986b81d5134e7ae24a517ba7818a02dc	37613
+Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Conversion.rtf	Plugins\Fruity\Generators\Sytrus\Data\DX7Algos\Conversion.rtf	bf5b2b12c748ad0283f3a3f35f6beba6e4008dd7cfc6432f3d24c30c7a041378	291
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 1 1 2 3.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 1 1 2 3.fnv	3bedef3dc8d67d8b0859ab195bf99618dcf66665e17f0225868242407b7fba19	192
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 1 2 1 3.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 1 2 1 3.fnv	d766e407c06a7e0bd5e07486da643d2598b99f99123cf3b5cef2e0df4e8646fd	208
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 2 notes M.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - 2 notes M.fnv	bc4729a924a2ac755c487742594f7f771ba4f412a9d6ada2ef85a89e5d3a905e	160
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - big chaos.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - big chaos.fnv	10e7a0b73251cc8484897f9dc57cc91309241c9a2ff777f935d77d0e76fa85a0	288
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - blade runner.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - blade runner.fnv	adda0bb2f603b1cfb07211f81f398d0c652d8f0b8a96abbeaf2904139768b8da	208
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic down.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic down.fnv	516d0cee090160ed3aecb6e3bf6f8aa16e8f339339a9a35ee83cd24d0312634d	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic up-down.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic up-down.fnv	cd1aefa31594540d06d9307e0b9fbc9790fcc6c480512ca6ea2fa270acc1c7ec	192
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic up.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - classic up.fnv	791c121512030d27887109781ab310a3732485adc753e66e27e215366d6d398e	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - double and hold.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - double and hold.fnv	8810ca344f3cbda1df3f4d197de46e2f3e1ea4a93cd96dbdfa4fb78f7dc160ea	176
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - gated up.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - gated up.fnv	a34427c08c6554508ce0ccff3e6d432ff0eaa14a8c2c36b3a1f9014b0fec5e99	112
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - held up.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - held up.fnv	b621061c89d6573510246ae713f3d0778d3586e136fa88948cf00cc185c6cf27	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - little chaos.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - little chaos.fnv	28c6de483b19612ba657f7edaa15e173dcf8bd9c473fb4cc111b0c1e8ed6b54e	192
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 1.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 1.fnv	80b32e908ad68265643a992af3665dff8b7482956a3e7c1b9d293d018349bf4a	256
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 2.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 2.fnv	b1d81818a9a197d34b08cb56d3ffa584ed1691180deac9959d9055e5bf6d1003	304
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 3.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 3.fnv	2407503ff7a4ea4cc50ee28c935c1f35821733ceb6ececf7c78bcaeacd272d49	416
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 4.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 4.fnv	e1e0ad5cdb43e47cb4fdc349d0e8cb0d90c158376ceed4903927beba9256773e	240
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 5.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 5.fnv	fa2fedc1478453ac7114f7a8ceef6a51b4b8f26e82bf30967fef22d1c9feb759	272
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 6.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Arp - pattern 6.fnv	a3ddc6b2090353cd25c3375526c558ebf4e63e9faab72e839d2becf1491b98df	288
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Default ADSR.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Default ADSR.fnv	d5b3a966f2e407b732c08fc0b6b77aa16516bf0db7ba94ad81bae6375989e1e4	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\DX7.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\DX7.fnv	54e312e158f17c0901dd3b15af9c863362e0ea542d17d2d929035f02da254156	108
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 10.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 10.fnv	525b449bfd5a2fae92809d913f2e8a4e22130efe483d28d2fc818a61d3c4f5d4	324
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 11.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 11.fnv	39711efd5a9fc012a94cec1a635412e62b069c20aa65ebd67a4e0f30ea0eca27	300
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 12.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 12.fnv	793e7564d5052b85f7714baa70b53ab4018245b32cdbfa469631f0a91c112698	288
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 13.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 13.fnv	dc138b7322901b20a64f51039a5a18b210e44fa0b8127ee5ab371d4fdc1caf4b	336
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 14.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 14.fnv	a9f8925358c38501be2e1b52b4b3a94074bac69fae4543b38a03e4597430b541	216
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 15.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 15.fnv	1ad7b67d79299b8aad5dc53549076fbb5587e44e0dbf43dc7b081ef90c8e016c	204
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 16.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 16.fnv	49218222e4a091d153b5360c9d83e799e7cc037e8c5495817b99cb08ae9174b8	156
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 17.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 17.fnv	4d29b62f7ad4b5540184ffbbcd9fd3dcde96c9951aa90eca3da210ddfa30200a	480
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 2.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 2.fnv	90b6a9e9ddd650e8edfddacfcd2a07d13942a559d299680e3c3ed846162010aa	300
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 3.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 3.fnv	3dd6d36f613099148ca349f346ac3caab5f81adb870b3012660d514d0c4b28b9	300
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 4.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 4.fnv	431de9bbc97ea9b32c593f6a8cf5b601782516a74e202247ea832d657338c68b	696
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 5.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 5.fnv	3b9118392b7ccdad6b5ca0ed9145a4acc61b6712c6f99468557ebc2c26b74b6c	168
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 6.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 6.fnv	d04eb39cd4c30229112116fa18bace78d0b74dd0d8b6e3a9cd537fb57dfe2378	396
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 7.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 7.fnv	64b6bbf38ece82b6da93d0bfb9ae5bfadb2755e08412bf6ff87ca50d96536d1e	348
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 8.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 8.fnv	7c3d2fb5b12bdc561f49ee8e8a0166219994bd9cfdf7359c01f6555b484bdb67	432
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 9.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic 9.fnv	43a14d2031e3c3bfe17c5dfd0f5448151eafca66432ff1fe4a7cd731f5c9fb6e	408
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic switch.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic switch.fnv	4b6b81775f8f004e8f68e56d37cb717ee45f0023e89afe5f3125fad2591d5727	108
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - basic.fnv	e2f41b06ae0c76215a09004b795d31cbad40cea255f1e2bd645c353867a97825	204
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - pulse.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Gate - pulse.fnv	d64ea56b32fb662094f5b4e0a3f83f178b7720e367b43da314790fa392dede2f	132
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\No attack.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\No attack.fnv	1d7c1b3da1df95e1b404fc2632e172fdd484c70222793437218148e75dd894d4	72
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch arpeggiato 2.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch arpeggiato 2.fnv	b144e9ffe75d7d658174cd63ae9f399c3f0e1957b079a66eac13b3b2735d93c2	264
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch arpeggiato.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch arpeggiato.fnv	f89fd2ffc8a33f19ae4b3fe355d875f3caa3dbc011b4fcd08ba0f536a1969d4b	444
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch smooth arpeggiato.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Pitch smooth arpeggiato.fnv	15198016519ee7209aca0865f0653010778a7a9d278d4f152a9de5eb02d52aae	4632
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Porta - basic.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Porta - basic.fnv	102e684cf7b50b6757340ce214aef3bc455af7a6eed3ed1cf3920015c968dac0	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Porta - curved.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Porta - curved.fnv	efc939826121099a7421c8877786687543331ae41b24a243ac562986726e4d50	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Short burst.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Short burst.fnv	e1b21d6126e4b2a1eb1372100f242a3c01c2e846e5179aaf39f5a46ff84aca85	72
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Short decay.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Short decay.fnv	280d3100e6c18a80724acbf4291a8c06b4c63de29e9b2f13d2bde4bc5a8549ac	80
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Shortest attack.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Shortest attack.fnv	ca5b8c814436801e0cd2048c60d6b2cd31fabc8fa85039d7c074841705dd7f85	96
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Smoothing for FX.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Smoothing for FX.fnv	acbb9304112f68c5db11a9d20226e94651fb1dcb34299b6b47ece2cc3b9b45ba	80
+Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Strings.fnv	Plugins\Fruity\Generators\Sytrus\Data\Envelopes\Strings.fnv	0f7f79335c6e3476b787016048bb3fe98eb72e4a2ebda76fbbcae2edb3022479	96
+Plugins\Fruity\Generators\Sytrus\Data\LFO\1 bar triangle.fnv	Plugins\Fruity\Generators\Sytrus\Data\LFO\1 bar triangle.fnv	01c8a6c9d5bbcfe9399dfc2f605a62717d46cdb6fc5e3a63f57c2e180d990405	64
+Plugins\Fruity\Generators\Sytrus\Data\LFO\Default.fnv	Plugins\Fruity\Generators\Sytrus\Data\LFO\Default.fnv	b54a23d371cbb62ca02c0c8e6298864f7403a24cfc8745f2f9d49f5c9bd4555d	96
+Plugins\Fruity\Generators\Sytrus\Data\LFO\Immediate.fnv	Plugins\Fruity\Generators\Sytrus\Data\LFO\Immediate.fnv	123f1d39620a91db456b76bf1b0d91d9c6302fcdb343786ff73d96bbe870d6ee	84
+Plugins\Fruity\Generators\Sytrus\Data\LFO\Pitch vibrato.fnv	Plugins\Fruity\Generators\Sytrus\Data\LFO\Pitch vibrato.fnv	982ff348703792d8a5643c7324a6f15d8d4f321b54734b36f1778dbae1a129a4	72
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - asymmetry.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - asymmetry.fnv	0f5018572e28dc4c957487709262a13220965c43613906a8267c6c914ea91c29	104
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - default.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - default.fnv	e1bfe87814e9aca427d33d8cd9355dd3703298077e73db610d380d37f6b0d98f	104
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - flat.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - flat.fnv	690959bfcbe079ce51bb37e24127de0bd3590f732bac464c86cfe6ce5d67ca38	80
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - small knee.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Env filter - small knee.fnv	6f303fb90f008d80d1359199fbd208433513b6b2614e99c938e96d99038404fb	128
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Filter cutoff - key compensation.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Filter cutoff - key compensation.fnv	d1f8ff95f04d26f9c5a5933f4015302ed2838c4de430e284edd8a750a9b06f56	64
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Flat (centered).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Flat (centered).fnv	5b060f5b2acd30569f243d518b71e57f5b6ccbfdd24aaa9547260894ee9e286e	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Flat (top).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Flat (top).fnv	8591c8de3ad378536e241de4d70319f31f1eddd49e1ba8b65db33141b5fab0a4	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Little randomness (centered).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Little randomness (centered).fnv	74769a8635101b17d41cb7a13f438cf2f953527a895c065b4538825f98ef49c5	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Little randomness (top).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Little randomness (top).fnv	b76bfc89c710c5d5eeaecf6332fffbe23eae40d41356d25cc9f17d8f8aa41ecf	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Modulation - increasing.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Modulation - increasing.fnv	8a92843b8a9602ee1ba61226f892ca2edc1ddda361e64a9e4b4be7d4e167b05a	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - constant sub-oscillator.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - constant sub-oscillator.fnv	8cb5b91b7ceeddb0f0b594cf39b78d2585f11f0432b67fbf3be1f6eb3f39f3f6	192
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - just intonation (1 oct).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - just intonation (1 oct).fnv	25ecff9307858777c28c9484fa68b2e856e747fb146d7a8fbe86033db0be0ecf	2984
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - just intonation (2 oct).fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Pitch - just intonation (2 oct).fnv	31d178c718b47227c7b280103caa0a979860e58019c905ee487366c205bfb042	2984
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Plucked - default damp key mapping.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Plucked - default damp key mapping.fnv	5d20c86e130003afb5e2b5dd8feb8d4750f7754ac7eeba1876d184b4c01a5e0c	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - default.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - default.fnv	ba76b2f459bdcfa173dfa5dd3190e255e445170a980425552270af643392f62d	56
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - degrade.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - degrade.fnv	8c38d15a25e8a379470e2615902eb122e30c1be473e62dbf1f0842fb8cc7c8f8	304
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - fuzz.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - fuzz.fnv	2aa953cf48d1f8def61954d5dcd2d19d0d72645a6c29a91f08d1d9adf9de3143	428
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - harsh.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - harsh.fnv	949ed3110c04297f759942e8657cee41908f376d73abf3ac02658564831115be	68
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - limiter.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - limiter.fnv	b84abf652cd3e073010148f34c4b2f96a9c09329238f81a03ebd7fd309f243f9	68
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - soft sat.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - soft sat.fnv	c627bb5b4fc46a560918ac2968e0d0a5636b50d94b82a18e80e23395d23fc5cb	80
+Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - valve class B.fnv	Plugins\Fruity\Generators\Sytrus\Data\Maps\Waveshaper - valve class B.fnv	99437e65ada64f77312080e1a9557e48b157d51f29e6010e631755287f38b454	116

@@ -124,6 +124,30 @@ try {
 
   // 5. 実物の lift/plugins(あれば)が検査を通る
   ok('実物の lift/plugins(無ければ空)は検査を通る', (() => { try { pluginRows(path.join(ROOT, 'lift/plugins')); return 'pass'; } catch (e) { return e.message; } })(), 'pass');
+
+  // 6. data.tsv(Issue #1478): a Data row is a seed row (@lazy-file:, host = plugins/ and the guest path, \ as /, a space as _), and its name and size are the installer list's
+  const DATA_HEAD = 'guest\tinstaller\tsha256\tsize\n';
+  const SHA_BLUR = '5840b4347a0fdbc0dfe37d2fc372a2d181ea00b1fed6c9073268b729ca225030';
+  const BLUR = 'Plugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Blur - alt.fnv';
+  const dataDir = (dataText) => {
+    const dir = plugins({ edison: `${HEADER}\neffects.edison.edison_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Edison_x64.dll\t本体\t${SHA_BALANCE}\t1\tnone\t\t-\n` });
+    fs.writeFileSync(path.join(dir, 'edison', 'data.tsv'), dataText);
+    return dir;
+  };
+  const good = dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n`);
+  const rd = pluginRows(good);
+  ok('Data: 1 行は seed の行の後ろに、@lazy-file: と host(空白は _)と SHA-256 の行になる',
+    rd.seed.slice(1).map((r) => r.join('\t')), [`${GUEST}${BLUR}\t@lazy-file:plugins/Plugins/Fruity/Effects/Edison/Data/Maps/Blur_-_alt.fnv\t${SHA_BLUR}`]);
+  ok('Data: 抽出の行は増えない(DLL だけ)', rd.extract.length, 1);
+  ok('Data: data.tsv の無いフォルダは、行が無い', pluginRows(plugins({ a: `${HEADER}\n${BALANCE_ROW}\n` })).seed.length, 1);
+  ok('Data: 大きさが一覧と違えば、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t153\n`), /installer list says 152/), 'yes');
+  ok('Data: sha256 が一覧と違えば、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BALANCE}\t152\n`), /installer list/), 'yes');
+  ok('Data: 一覧に無い installer は、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\tPlugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Nope.fnv\t${SHA_BLUR}\t152\n`), /not a row of/), 'yes');
+  ok('Data: DLL の行は、data.tsv に書けない', fails(dataDir(`${DATA_HEAD}Plugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\t${SHA_BLUR}\t152\n`), /DLL/), 'yes');
+  ok('Data: 見出しが違えば、例外', fails(dataDir(`guest\tsha256\tsize\n${BLUR}\t${SHA_BLUR}\t152\n`), /header/), 'yes');
+  ok('Data: 同じ guest の行が 2 つなら、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n`), /not unique/), 'yes');
+  ok('Data: 実物の lift/plugins/sytrus/data.tsv の 109 行は、Sytrus の seed の行(@lazy-file:)になる',
+    pluginRows(path.join(ROOT, 'lift/plugins')).seed.filter((r) => r[1].startsWith('@lazy-file:plugins/Plugins/Fruity/Generators/Sytrus/Data/')).length, 109);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

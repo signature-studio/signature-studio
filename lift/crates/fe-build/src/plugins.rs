@@ -42,7 +42,10 @@ const FIXED_HYB_ARGS: &str = "lift/harness/hyb/hyb-args.tsv";
 const FIXED_HYBRID_CMD: &str = "lift/harness/hyb/hybrid.cmd";
 const FIXED_PACK_ARGS: &str = "lift/harness/web/pack.args";
 const FIXED_LISTS: &str = "lift/harness/hyb/lists";
+const INSTALLER_LIST: &str = "inputs/fl-installer-files.tsv";
 const COLUMNS: [&str; 8] = ["key", "guest", "role", "sha256", "size", "hook", "args", "omit"];
+const DATA_COLUMNS: [&str; 4] = ["guest", "installer", "sha256", "size"];
+const LAZY_FILE: &str = "@lazy-file:";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Hook {
@@ -153,6 +156,123 @@ pub fn parse_plugin(plugin: &str, text: &str) -> Result<Vec<Dll>, String> {
     Ok(out)
 }
 
+/// A row of `lift/plugins/<name>/data.tsv` (Issue #1478): a file of the plugin's Data folder, which the page serves after the engine has started.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Data {
+    pub plugin: String,
+    /// the path in the installer, without the install folder: `Plugins\Fruity\Generators\Sytrus\Data\Default.dat`
+    pub guest: String,
+    /// the same spelling as the row of inputs/fl-installer-files.tsv (the installer path; the same as guest, case-insensitive)
+    pub installer: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+impl Data {
+    pub fn guest_path(&self) -> String {
+        format!("{GUEST_ROOT}{}", self.guest)
+    }
+
+    /// the host file, relative to the host tree: the guest path with `/` for `\` and `_` for a space (the names of #1414)
+    pub fn host_file(&self) -> String {
+        format!("plugins/{}", self.guest.replace('\\', "/").replace(' ', "_"))
+    }
+
+    /// the seed row of the file: the guest path, the host field with `@lazy-file:`, the SHA-256
+    pub fn seed_row(&self) -> String {
+        format!("{}\t{LAZY_FILE}{}\t{}", self.guest_path(), self.host_file(), self.sha256)
+    }
+}
+
+/// `lift/plugins/<name>/data.tsv`: the header, then the rows of one plugin's Data (`#` lines are notes).
+pub fn parse_data(plugin: &str, text: &str) -> Result<Vec<Data>, String> {
+    let mut out = Vec::new();
+    let mut header = false;
+    for (n, line) in text.lines().enumerate() {
+        let at = |m: &str| format!("{plugin}/data.tsv line {}: {m}", n + 1);
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let f: Vec<&str> = line.split('\t').collect();
+        if !header {
+            if f.as_slice() != DATA_COLUMNS {
+                return Err(at("the header must be guest, installer, sha256, size (TAB separated)"));
+            }
+            header = true;
+            continue;
+        }
+        if f.len() != 4 {
+            return Err(at(&format!("{} fields, want 4", f.len())));
+        }
+        if !f[3].bytes().all(|b| b.is_ascii_digit()) {
+            return Err(at("size must be a positive integer"));
+        }
+        let size = f[3].parse::<u64>().ok().filter(|v| *v > 0).ok_or_else(|| at("size must be a positive integer"))?;
+        out.push(Data { plugin: plugin.to_string(), guest: f[0].to_string(), installer: f[1].to_string(), sha256: f[2].to_string(), size });
+    }
+    if !header {
+        return Err(format!("{plugin}/data.tsv: no header"));
+    }
+    Ok(out)
+}
+
+/// inputs/fl-installer-files.tsv: the installer path → (size, SHA-256) of each row.
+pub fn installer_list(path: &str) -> Result<BTreeMap<String, (u64, String)>, String> {
+    let mut out = BTreeMap::new();
+    for line in read_text(path)?.lines() {
+        if line.trim().is_empty() || line.starts_with('#') || line.starts_with("guest\t") {
+            continue;
+        }
+        let f: Vec<&str> = line.split('\t').collect();
+        if f.len() < 3 {
+            return Err(format!("{path}: a row of {} fields", f.len()));
+        }
+        out.insert(f[0].to_string(), (f[1].parse::<u64>().unwrap_or(0), f[2].to_string()));
+    }
+    Ok(out)
+}
+
+/// The checks of the Data rows (Issue #1478; plugins.rs and extract-fl.mjs read the same rows): the guest path is the folder's own Data
+/// (`Plugins\Fruity\<kind>\<folder>\Data\...`), it is not a DLL and not a DLL row's, and its installer row is in the list with the same
+/// SHA-256 and size. The guest paths and the host files are unique.
+pub fn validate_data(data: &[Data], dlls: &[Dll], list: &BTreeMap<String, (u64, String)>) -> Result<(), String> {
+    let mut guests: BTreeSet<String> = dlls.iter().map(|d| d.guest.to_lowercase()).collect();
+    let mut hosts = BTreeSet::new();
+    for d in data {
+        let at = |m: &str| format!("plugin {} ({}): {m}", d.plugin, d.guest);
+        let parts: Vec<&str> = d.guest.split('\\').collect();
+        let own = parts.len() >= 6 && parts[0] == "Plugins" && parts[1] == "Fruity" && matches!(parts[2], "Effects" | "Generators") && parts[4] == "Data" && !d.guest.contains('/');
+        if !own {
+            return Err(at("the guest path is Plugins\\Fruity\\<kind>\\<folder>\\Data\\... (the folder's own Data)"));
+        }
+        if d.guest.to_lowercase().ends_with(".dll") {
+            return Err(at("a DLL is a row of plugin.tsv, not of data.tsv"));
+        }
+        let Some((size, sha)) = list.get(&d.installer) else {
+            return Err(at(&format!("installer {}: not a row of {INSTALLER_LIST}", d.installer)));
+        };
+        if d.installer.to_lowercase() != d.guest.to_lowercase() {
+            return Err(at("the installer path is the guest path (the same spelling, case-insensitive)"));
+        }
+        if d.sha256.len() != 64 || !d.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
+            return Err(at("sha256 is 64 lower case hex digits"));
+        }
+        if *sha != d.sha256 {
+            return Err(at("sha256 is not the one of the installer list"));
+        }
+        if *size != d.size {
+            return Err(at(&format!("size {}: the installer list says {size}", d.size)));
+        }
+        if !guests.insert(d.guest.to_lowercase()) {
+            return Err(at("the guest path is not unique (a DLL or another Data row has it)"));
+        }
+        if !hosts.insert(d.host_file()) {
+            return Err(at("the host file is not unique (a space is _)"));
+        }
+    }
+    Ok(())
+}
+
 fn parse_hook(text: &str) -> Result<Hook, String> {
     match text {
         "none" => Ok(Hook::None),
@@ -238,8 +358,8 @@ pub fn read_plugins_from(dir: &str) -> Result<Vec<Dll>, String> {
     Ok(dlls)
 }
 
-/// The plugin rows of a plugins folder, sorted by key, without the checks of `validate` (read_plugins_from adds them).
-pub fn read_rows_from(dir: &str) -> Result<Vec<Dll>, String> {
+/// The folders of a plugins folder, sorted: each one is a plugin, and its name is lower case letters, digits and '-' only.
+fn plugin_folders(dir: &str) -> Result<Vec<String>, String> {
     let mut folders = Vec::new();
     for entry in fs::read_dir(dir).map_err(|e| format!("{dir}: {e}"))? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -248,21 +368,48 @@ pub fn read_rows_from(dir: &str) -> Result<Vec<Dll>, String> {
         }
     }
     folders.sort();
+    if let Some(folder) = folders.iter().find(|f| !valid_folder(f)) {
+        return Err(format!("{dir}/{folder}: the folder name is lower case letters, digits and '-' only"));
+    }
+    Ok(folders)
+}
+
+/// The plugin rows of a plugins folder, sorted by key, without the checks of `validate` (read_plugins_from adds them).
+pub fn read_rows_from(dir: &str) -> Result<Vec<Dll>, String> {
     let mut dlls = Vec::new();
-    for folder in &folders {
-        if !valid_folder(folder) {
-            return Err(format!("{dir}/{folder}: the folder name is lower case letters, digits and '-' only"));
-        }
+    for folder in plugin_folders(dir)? {
         let path = format!("{dir}/{folder}/plugin.tsv");
         let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
-        dlls.extend(parse_plugin(folder, &text)?);
+        dlls.extend(parse_plugin(&folder, &text)?);
     }
     dlls.sort_by(|a, b| a.key.cmp(&b.key));
     Ok(dlls)
 }
 
+/// The Data rows of a plugins folder, sorted by guest path: the data.tsv of each folder that has one (a folder without one has no Data).
+/// Without the checks of `validate_data` (read_data adds them).
+pub fn read_data_from(dir: &str) -> Result<Vec<Data>, String> {
+    let mut out = Vec::new();
+    for folder in plugin_folders(dir)? {
+        let path = format!("{dir}/{folder}/data.tsv");
+        if Path::new(&path).is_file() {
+            let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+            out.extend(parse_data(&folder, &text)?);
+        }
+    }
+    out.sort_by(|a, b| a.guest.cmp(&b.guest));
+    Ok(out)
+}
+
 pub fn read_plugins() -> Result<Vec<Dll>, String> {
     read_plugins_from(PLUGINS_DIR)
+}
+
+/// The Data rows of lift/plugins, after the checks against the installer list (validate_data).
+pub fn read_data(dlls: &[Dll]) -> Result<Vec<Data>, String> {
+    let data = read_data_from(PLUGINS_DIR)?;
+    validate_data(&data, dlls, &installer_list(INSTALLER_LIST)?)?;
+    Ok(data)
 }
 
 /// The keys in the order of the plan (the `lists` stage has one step for each).
@@ -431,8 +578,9 @@ fn plugin_db_rows(names: &[String]) -> Result<Vec<String>, String> {
     Ok(rows)
 }
 
-/// pack.args: the value of --args gets the DLLs at their bases; the DLL lazy files, their seed files and their separate modules are appended.
-pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)]) -> Result<String, String> {
+/// pack.args: the value of --args gets the DLLs at their bases; the DLL lazy files, their seed files and their separate modules are appended,
+/// then the Data files of the plugins (one --lazy-file each: the host file, and its path under seed/).
+pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)], data: &[Data]) -> Result<String, String> {
     let mut lines: Vec<String> = fixed.lines().map(String::from).collect();
     let at = lines.iter().position(|l| l == "--args").ok_or("pack.args has no --args line")?;
     let value = lines.get_mut(at + 1).ok_or("pack.args: --args has no value")?;
@@ -453,7 +601,23 @@ pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)]) -> Result<String, String> {
         lines.push("--lazy-file".into());
         lines.push(format!("{XMOD_DIR}/{wasm}={wasm}"));
     }
+    for d in data {
+        lines.push("--lazy-file".into());
+        lines.push(format!("{HOST_DIR}/{0}=seed/{0}", d.host_file()));
+    }
     Ok(lines.join("\n") + "\n")
+}
+
+/// The seed table of the build: the fixed rows, then the seed row of each DLL, then the seed row of each Data file (Issue #1478).
+pub fn seed_table(fixed: &str, dlls: &[Dll], data: &[Data]) -> String {
+    let mut seed = fixed.to_string();
+    for d in dlls {
+        seed.push_str(&format!("{}\n", seed_row(d)));
+    }
+    for d in data {
+        seed.push_str(&format!("{}\n", d.seed_row()));
+    }
+    seed
 }
 
 fn write(path: &str, text: &str) -> Result<(), String> {
@@ -465,21 +629,22 @@ fn write(path: &str, text: &str) -> Result<(), String> {
 /// fixed lists again (the lists stage then writes the plugins' lists, so no list of a removed plugin is left behind).
 pub fn generate(with_base: bool) -> Result<(), String> {
     let dlls = read_plugins()?;
+    let data = read_data(&dlls)?;
     fs::create_dir_all(OUT_DIR).map_err(|e| format!("{OUT_DIR}: {e}"))?;
     let mut extract = read_text(FIXED_EXTRACT)?;
-    let mut seed = read_text(FIXED_SEED)?;
     let mut seed_args = read_text(FIXED_SEED_ARGS)?;
     for d in &dlls {
         extract.push_str(&format!("{}\n", extract_row(d)));
-        seed.push_str(&format!("{}\n", seed_row(d)));
         seed_args.push_str(&format!("--lazy\n{}\n", d.seed_file()));
     }
     write(&format!("{OUT_DIR}/extract-dlls.tsv"), &extract)?;
+    let seed = seed_table(&read_text(FIXED_SEED)?, &dlls, &data);
     write(&format!("{OUT_DIR}/vfs-seed-extract.tsv"), &seed)?;
+    let mut idle1 = seed;
     for row in plugin_db_rows(&plugin_db_names(&dlls)?)? {
-        seed.push_str(&format!("{row}\n"));
+        idle1.push_str(&format!("{row}\n"));
     }
-    write(&format!("{OUT_DIR}/vfs-seed-idle1.tsv"), &seed)?;
+    write(&format!("{OUT_DIR}/vfs-seed-idle1.tsv"), &idle1)?;
     write(&format!("{OUT_DIR}/seed.args"), &seed_args)?;
     if !with_base {
         return Ok(());
@@ -545,12 +710,12 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     }
     hybrid_cmd.push_str(&format!("--separate-dir\n{XMOD_DIR}\n"));
     write(&format!("{OUT_DIR}/hybrid.cmd"), &hybrid_cmd)?;
-    let mut pack = pack_args(&read_text(FIXED_PACK_ARGS)?, &pairs)?;
+    let mut pack = pack_args(&read_text(FIXED_PACK_ARGS)?, &pairs, &data)?;
     if Path::new(super::OFFLINE_PAGE_SRC).is_file() {
         pack.push_str(&format!("--lazy-file\n{}={}\n", super::OFFLINE_PAGE_SRC, super::OFFLINE_PAGE_PATH));
     }
     write(&format!("{OUT_DIR}/pack.args"), &pack)?;
-    println!("plugins: {} DLLs; bases {}", dlls.len(), bases.iter().map(|b| format!("0x{b:x}")).collect::<Vec<_>>().join(" "));
+    println!("plugins: {} DLLs, {} data files; bases {}", dlls.len(), data.len(), bases.iter().map(|b| format!("0x{b:x}")).collect::<Vec<_>>().join(" "));
     Ok(())
 }
 
@@ -919,5 +1084,125 @@ mod tests {
         data[0x80 + 24 + 24..0x80 + 24 + 32].copy_from_slice(&0x6800000u64.to_le_bytes());
         data[0x80 + 24 + 56..0x80 + 24 + 60].copy_from_slice(&0x3a1000u32.to_le_bytes());
         assert_eq!(pe_image(&data).unwrap(), (0x6800000, 0x3a1000));
+    }
+
+    const BLUR_SHA: &str = "5840b4347a0fdbc0dfe37d2fc372a2d181ea00b1fed6c9073268b729ca225030";
+
+    fn installer() -> BTreeMap<String, (u64, String)> {
+        installer_list(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../inputs/fl-installer-files.tsv")).unwrap()
+    }
+
+    fn plugins_dir() -> &'static str {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")
+    }
+
+    /// The Data rows of the installer list (Issue #1478): one Edison file. Its seed row, its lazy file in pack.args, and the checks that refuse a wrong row.
+    #[test]
+    fn a_data_row_is_a_seed_row_and_a_lazy_file_of_its_host_file() {
+        let head = "guest\tinstaller\tsha256\tsize\n";
+        let guest = "Plugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Blur - alt.fnv";
+        let good = format!("{head}{guest}\t{guest}\t{BLUR_SHA}\t152\n");
+        let data = parse_data("edison", &good).unwrap();
+        validate_data(&data, &[], &installer()).unwrap();
+        assert_eq!(data[0].seed_row(), format!("{GUEST_ROOT}{guest}\t@lazy-file:plugins/Plugins/Fruity/Effects/Edison/Data/Maps/Blur_-_alt.fnv\t{BLUR_SHA}"));
+        let pack = pack_args("--args\nx\n", &[], &data).unwrap();
+        assert!(pack.ends_with("--lazy-file\nlift/out-app/host/plugins/Plugins/Fruity/Effects/Edison/Data/Maps/Blur_-_alt.fnv=seed/plugins/Plugins/Fruity/Effects/Edison/Data/Maps/Blur_-_alt.fnv\n"));
+        let refused = |text: String| validate_data(&parse_data("edison", &text).unwrap(), &[], &installer()).is_err();
+        assert!(refused(format!("{head}{guest}\t{guest}\t{}\t152\n", "a".repeat(64))), "a sha256 that the list does not have");
+        assert!(refused(format!("{head}{guest}\t{guest}\t{BLUR_SHA}\t153\n")), "a size that the list does not have");
+        assert!(refused(format!("{head}{guest}\tPlugins\\Fruity\\Effects\\Edison\\Data\\Maps\\Other.fnv\t{BLUR_SHA}\t152\n")), "an installer row that is not the guest path");
+        assert!(refused(format!("{head}Plugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Data\\Scripts\\Examples\\testdll_x64.dll\t{BLUR_SHA}\t152\n")), "a DLL");
+        assert!(parse_data("edison", "guest\tinstaller\tsha256\n").is_err(), "a header of 3 columns");
+        assert!(parse_data("edison", &format!("{head}{guest}\t{guest}\t{BLUR_SHA}\t0\n")).is_err(), "a size of 0");
+        assert!(validate_data(&[data[0].clone(), data[0].clone()], &[], &installer()).is_err(), "a guest path listed twice");
+    }
+
+    /// The Sytrus Data (109 files, lift/plugins/sytrus/data.tsv): the rows the shared seed table had (#1414), with the same host files and SHA-256s.
+    #[test]
+    fn the_sytrus_data_rows_are_the_ones_the_seed_table_had() {
+        let dlls = read_plugins_from(plugins_dir()).unwrap();
+        let data = read_data_from(plugins_dir()).unwrap();
+        validate_data(&data, &dlls, &installer()).unwrap();
+        assert_eq!(data.len(), 109);
+        assert!(data.iter().all(|d| d.plugin == "sytrus"));
+        assert_eq!(data.iter().map(|d| d.size).sum::<u64>(), 1_229_971);
+        let default = data.iter().find(|d| d.guest.ends_with("\\Data\\Default.dat")).unwrap();
+        assert_eq!(default.seed_row(), "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Generators\\Sytrus\\Data\\Default.dat\t@lazy-file:plugins/Plugins/Fruity/Generators/Sytrus/Data/Default.dat\tadc5842c0d5d63c9dfa93e9ae3f9fb487f656eaafa3e79202ec61c519372430f");
+    }
+
+    /// The second wave's Data (Issue #1478): the files of the 130 folders of tools/plugin-layout/wave2-plugins.mjs (plugin-classes.tsv's folders without a VFX DLL,
+    /// and not the first wave's), each one a non-DLL file of the folder's own Data. 551 files, 9,438,441 B (the drafts of the second wave say 551).
+    fn wave2_data_tsv() -> String {
+        let classes = include_str!("../../../../inputs/plugin-classes.tsv");
+        let list = include_str!("../../../../inputs/fl-installer-files.tsv");
+        let first_wave = ["Plugins\\Fruity\\Effects\\Fruity Balance", "Plugins\\Fruity\\Effects\\Fruity Filter", "Plugins\\Fruity\\Effects\\Fruity Delay 2", "Plugins\\Fruity\\Generators\\Sytrus"];
+        let folder = |path: &str| path.split('\\').take(4).collect::<Vec<&str>>().join("\\");
+        let vfx: BTreeSet<String> = classes.lines().skip(1).filter_map(|l| {
+            let f: Vec<&str> = l.split('\t').collect();
+            (f.get(8) == Some(&"yes")).then(|| folder(f[0]))
+        }).collect();
+        let mut out = String::from("guest\tinstaller\tsha256\tsize\n");
+        for line in list.lines().filter(|l| !l.starts_with('#') && !l.starts_with("guest\t")) {
+            let f: Vec<&str> = line.split('\t').collect();
+            let p: Vec<&str> = f[0].split('\\').collect();
+            let own = p.len() >= 6 && p[0] == "Plugins" && p[1] == "Fruity" && p[4] == "Data" && !f[0].to_lowercase().ends_with(".dll");
+            if own && !vfx.contains(&folder(f[0])) && !first_wave.contains(&folder(f[0]).as_str()) {
+                out.push_str(&format!("{}\t{}\t{}\t{}\n", f[0], f[0], f[2], f[1]));
+            }
+        }
+        out
+    }
+
+    fn wave2_dlls(dir: &str) -> Vec<Dll> {
+        let tool = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../tools/plugin-layout/wave2-plugins.mjs");
+        let _ = fs::remove_dir_all(dir);
+        assert!(Command::new("node").args([tool, dir]).status().expect("node").success());
+        let wave = read_rows_from(dir);
+        let _ = fs::remove_dir_all(dir);
+        wave.unwrap()
+    }
+
+    /// The counts of the second wave with the Data (Issue #1478): the lazy files of the manifest, the lazy rows of the seed table (one stream each) and the seed rows
+    /// fit the limits that the sources name (manifest.ts maxItems, fle_vfs.c LAZY_MAX_STREAMS, vfs_lazy.h VL_REG_MAX, vfs_seed.h VS_MAX_ENTRIES).
+    #[test]
+    fn the_second_wave_with_its_data_fits_the_limits() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-data");
+        let _ = fs::remove_dir_all(dir);
+        fs::create_dir_all(format!("{dir}/wave2")).unwrap();
+        fs::write(format!("{dir}/wave2/data.tsv"), wave2_data_tsv()).unwrap();
+        let wave = read_data_from(dir);
+        let _ = fs::remove_dir_all(dir);
+        let wave = wave.unwrap();
+        assert_eq!(wave.len(), 551);
+        assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 9_438_441);
+
+        let mut dlls = read_plugins_from(plugins_dir()).unwrap();
+        dlls.extend(wave2_dlls(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-count")));
+        dlls.sort_by(|a, b| a.key.cmp(&b.key));
+        validate(&dlls).unwrap();
+        let mut data = read_data_from(plugins_dir()).unwrap();
+        data.extend(wave);
+        data.sort_by(|a, b| a.guest.cmp(&b.guest));
+        validate_data(&data, &dlls, &installer()).unwrap();
+        assert_eq!(data.len(), 660);
+
+        let fixed_seed = read_text(concat!(env!("CARGO_MANIFEST_DIR"), "/../../harness/seeds/vfs-seed-idle1.tsv")).unwrap();
+        let seed = seed_table(&fixed_seed, &dlls, &data);
+        let plugins: BTreeSet<&str> = dlls.iter().map(|d| d.plugin.as_str()).collect();
+        let seed_rows = seed.lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count() + plugins.len();
+        let lazy_rows = seed.lines().filter(|l| l.split('\t').nth(1).is_some_and(|h| h.starts_with(LAZY_FILE))).count();
+        let pairs: Vec<(&Dll, u64)> = dlls.iter().map(|d| (d, 0u64)).collect();
+        let fixed_pack = read_text(concat!(env!("CARGO_MANIFEST_DIR"), "/../../harness/web/pack.args")).unwrap();
+        let pack = pack_args(&fixed_pack, &pairs, &data).unwrap();
+        let lazy_items = pack.lines().filter(|l| *l == "--lazy-dll" || *l == "--lazy-file").count() + 1;
+
+        let streams = limit_of(concat!(env!("CARGO_MANIFEST_DIR"), "/../../runtime/fle_vfs.c"), "#define LAZY_MAX_STREAMS ").unwrap();
+        let reg = limit_of(concat!(env!("CARGO_MANIFEST_DIR"), "/../../harness/vfs_lazy.h"), "#define VL_REG_MAX ").unwrap();
+        let entries = limit_of(concat!(env!("CARGO_MANIFEST_DIR"), "/../../harness/vfs_seed.h"), "#define VS_MAX_ENTRIES ").unwrap();
+        let items = limit_of(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../app/src/bundle/manifest.ts"), "lazy: { type: 'array', maxItems: ").unwrap();
+        eprintln!("plugins: with the second wave's Data: lazy items {lazy_items} of {items}; seed rows {seed_rows} of {entries}; lazy rows {lazy_rows} of {} streams", streams.min(reg));
+        assert!(lazy_rows <= streams.min(reg), "the lazy rows of the seed table are one stream each");
+        assert!(seed_rows <= entries, "the seed table's rows");
+        assert!(lazy_items <= items, "the lazy files of the manifest");
     }
 }
