@@ -46,3 +46,6 @@
 3. 拡張子と Presets は差の原因ではない: 直下の Data(551 件)にも .fnv・.bmp・.wv・.txt・.groovepat などの資料と、`Data\Presets\` の 4 件があり、同じ数え方で入る。差の 26 件の入れ子だけが .fst の Presets を含む。
 4. 未決(PM): 入れ子の `Vocodex\Synthesizer\Data\`(26 件・55,452 B)は、本体 `Synthesizer\Sytrus_x64.dll` の隣の Data。この作業の本文では宣言に含めず、報告に書かせる。含めるなら、Vocodex の Data は 54 件・計 443,736 B になり、#1478 の本文の 551 件・約 9.4 MB と、#1478 の件数の見積もり(577 件へ)を直す必要がある。
 5. 同じ内容の重複: Slicex(生成器の束)と Fruity Slicer 2(VFX の後回し)は、相対パスと SHA-256 が同じ 38 件を持つ。後回しを解くとき、同じ SHA-256 が 2 つの宣言に入るので、#1478 の検査でその扱いを確かめる。
+
+## (g) Vocodex の入れ子の Data(PM の決定)
+Vocodex の `Synthesizer\Data\`(26 件・55,452 B)は、入れ子の本体 `Sytrus_x64.dll` の Data で、同じプラグインの中で要求される。#1461 の `lift/plugins/vocodex/data.tsv` に含める(54 行・443,736 B)。#1461 の本文は直した。下書き 068 は再生成すると戻るので、再生成する時は、この節に合わせて直す。
