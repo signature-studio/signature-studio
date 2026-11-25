@@ -1359,3 +1359,20 @@ void fle_imp_HeapFree(void)
     free((void *)fle_addr_opt(R[8], 1, 1));
     R[0] = 1;
 }
+
+/* Issue #1391 (Memory Usage; read only): the bytes the guest holds now, as the runtime knows them: the committed pages of every VirtualAlloc region (a page that is only reserved holds
+ * nothing) and the requested sizes of the live HeapAlloc blocks (a freed block has UINT64_MAX in the table, a free slot 0). Images of the modules that are loaded are not counted here. */
+uint64_t fle_sys_in_use_bytes(void)
+{
+    uint64_t i, pg, n = 0;
+
+    for (i = 0; i < fle_region_n; i++) {
+        const fle_region *r = &fle_regions[i];
+
+        for (pg = 0; pg < r->size / FLE_PAGE_SIZE; pg++)
+            if (r->pages[pg] != FLE_PG_RESERVED) n += FLE_PAGE_SIZE;
+    }
+    for (i = 0; i < heap_blocks_cap; i++)
+        if (heap_blocks[i].block != 0 && heap_blocks[i].block != UINT64_MAX) n += heap_blocks[i].size;
+    return n;
+}

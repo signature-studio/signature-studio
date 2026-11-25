@@ -3,7 +3,7 @@
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
-// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. Except (Issue #1400): when the guest does not open the project, "error" says why and the exit is 0 (the open is a result to report, not a failure of the probe). The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 // end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
@@ -102,7 +102,7 @@ async function main() {
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
-    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
@@ -111,7 +111,7 @@ async function main() {
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
   let server = null, chrome = null, cdp = null, navAt = null;
-  let probeError = null, evAfterError = null;
+  let probeError = null, evAfterError = null, projectRefused = false;
   const fromAudio = (d) => Object.assign(out, {
     ctxState: d.ctxState, status: d.status, quantaWhilePlaying: d.quantaWhilePlaying, underrunQuanta: d.underrunQuanta, engineGapFrames: d.engineGapFrames,
     playingSeconds: d.playingSeconds, deviceState: d.deviceState, underrunQuantaSinceFirstIdle: d.underrunQuantaSinceFirstIdle, underrunEpisodes: d.episodes,
@@ -189,7 +189,7 @@ async function main() {
 
     if (projectFile !== null) {
       const logBefore = await ev('window.__app.engineLog().length');
-      await openProject(S, ev, projectFile);
+      await openProject(S, ev, projectFile).catch((e) => { projectRefused = true; throw e; });
       await projectReport(ev, out, logBefore);
     }
     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
@@ -226,12 +226,14 @@ async function main() {
     out.error = probeError;
     if (navAt !== null) out.elapsedMs = Date.now() - navAt;
     out.loadavg = os.loadavg();
+    // Issue #1400: the engine's reads of the real modules' images (name, requested) in the order they happened: a Sytrus row with requested true is the plugin DLL's image read by the guest
+    if (evAfterError) out.imageReads = await evAfterError("(() => { const a = window.__app; return a ? a.imageReads.map((r) => ({ name: r.name, requested: r.requested, atMs: r.atMs })) : null; })()").catch(() => null);
     if (cdp) await shutdown(chrome, cdp).catch(() => {});
     else if (chrome) chrome.proc.kill('SIGKILL');
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
     process.stdout.write(JSON.stringify(out) + '\n');
-    process.exitCode = out.error ? 1 : 0;
+    process.exitCode = out.error && !projectRefused ? 1 : 0;
   }
 }
 

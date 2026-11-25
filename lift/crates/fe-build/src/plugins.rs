@@ -13,6 +13,9 @@ use std::process::Command;
 
 pub const PLUGINS_DIR: &str = "lift/plugins";
 pub const OUT_DIR: &str = "lift/out-app/plugins";
+/// The sources and the objects of the plugins' units (gen's units that the fixed lists do not name), one per line: written by the units step.
+pub const EXTRA_UNITS: &str = "lift/out-app/plugins/extra-units.txt";
+pub const EXTRA_OBJS: &str = "lift/out-app/plugins/extra-objs.txt";
 const HOST_DIR: &str = "lift/out-app/host";
 const GUEST_ROOT: &str = "C:\\Program Files\\Image-Line\\FL Studio 21\\";
 const SEED_ROOT: &str = "lift/out-idle1/inputs/install";
@@ -588,8 +591,9 @@ pub fn merge_lists() -> Result<(), String> {
     Ok(())
 }
 
-/// The units the lift wrote (lift/out-app/gen/src/*.c) must be the ones of the compile lists: a unit that is not named is not built.
-pub fn check_units(listed: &[String]) -> Result<(), String> {
+/// The units the lift wrote (lift/out-app/gen/src/*.c). Every unit of the compile lists must be written. A unit that the lists do not name
+/// must be a plugin's unit (`m<K>-<NN>.c`, the module of a plugin, design (13)): it is compiled too, after the lists. Returns those units.
+pub fn check_units(listed: &[String]) -> Result<Vec<String>, String> {
     let mut found = BTreeSet::new();
     for entry in fs::read_dir("lift/out-app/gen/src").map_err(|e| format!("lift/out-app/gen/src: {e}"))? {
         let name = entry.map_err(|e| e.to_string())?.file_name().to_string_lossy().into_owned();
@@ -598,13 +602,21 @@ pub fn check_units(listed: &[String]) -> Result<(), String> {
         }
     }
     let want: BTreeSet<String> = listed.iter().map(|p| Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
-    if found == want {
-        Ok(())
-    } else {
-        let missing: Vec<&String> = found.difference(&want).collect();
-        let absent: Vec<&String> = want.difference(&found).collect();
-        Err(format!("the units of gen differ from the compile lists: not listed {missing:?}, not written {absent:?}"))
+    let absent: Vec<&String> = want.difference(&found).collect();
+    if !absent.is_empty() {
+        return Err(format!("the units of the compile lists are not written by gen: {absent:?}"));
     }
+    let extra: Vec<String> = found.difference(&want).cloned().collect();
+    if let Some(name) = extra.iter().find(|n| !is_plugin_unit(n)) {
+        return Err(format!("gen wrote {name}, which the compile lists do not name and which is not a plugin unit (m<K>-<NN>.c)"));
+    }
+    Ok(extra)
+}
+
+/// `m<K>-<NN>.c`: the unit NN of the module K (the modules of the plugins come after the fixed ones).
+fn is_plugin_unit(name: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    name.strip_prefix('m').and_then(|r| r.strip_suffix(".c")).and_then(|r| r.split_once('-')).is_some_and(|(k, n)| digits(k) && digits(n))
 }
 
 fn run_cmd(argv: &[String], label: &str) -> Result<(), String> {
@@ -692,6 +704,15 @@ mod tests {
     }
 
     #[test]
+    fn the_plugins_units_are_the_mk_nn_names_beyond_the_fixed_lists() {
+        assert!(is_plugin_unit("m11-06.c"));
+        assert!(is_plugin_unit("m10-00.c"));
+        assert!(!is_plugin_unit("fle-acm.c"));
+        assert!(!is_plugin_unit("m11-06.o"));
+        assert!(!is_plugin_unit("mx-00.c"));
+    }
+
+    #[test]
     fn the_omit_vas_leave_the_direct_list() {
         let ok: BTreeSet<u64> = [0x10, 0x20, 0x30].into_iter().collect();
         let left_out = vas_of("0x20,0x99").unwrap();
@@ -707,7 +728,7 @@ mod tests {
         assert!(link.lines().any(|l| l == format!("-sGLOBAL_BASE={GLOBAL_BASE}")), "link.rsp must have -sGLOBAL_BASE={GLOBAL_BASE}");
     }
 
-    /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 160 DLLs of the plan, with the first wave's Balance. Their file names are
+    /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 159 DLLs of the plan, with the first wave's Balance and Sytrus (lift/plugins). Their file names are
     /// not unique, and their keys are. With SizeOfImage (inputs/plugin-image-sizes.tsv, by SHA-256) they fit the image area: each base is 64 KiB
     /// aligned, after the one before it by that one's size, from Balance's base (0xC1D0000, after oggio's end 0xC1CF000) to below GLOBAL_BASE.
     #[test]
@@ -718,9 +739,9 @@ mod tests {
         let wave = read_rows_from(dir);
         let _ = fs::remove_dir_all(dir);
         let wave = wave.unwrap();
-        assert_eq!(wave.len(), 160);
-        assert_eq!(wave.iter().filter(|d| d.main).count(), 132);
-        assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 608_521_016);
+        assert_eq!(wave.len(), 159);
+        assert_eq!(wave.iter().filter(|d| d.main).count(), 131);
+        assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 602_251_576);
         let mut dlls = read_rows_from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")).unwrap();
         dlls.extend(wave);
         dlls.sort_by(|a, b| a.key.cmp(&b.key));

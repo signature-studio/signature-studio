@@ -1,0 +1,3 @@
+# Sytrus (Generators). hook: the three Delphi hook points (inputs/plugin-hooks.tsv). omit: the entry of the one function that calls the guest setjmp (the call sites of its shape, #1400).
+key	guest	role	sha256	size	hook	args	omit
+generators.sytrus.sytrus_x64.dll	Plugins\Fruity\Generators\Sytrus\Sytrus_x64.dll	本体	e1395e9775ddb6219d3f633fef075f32ffc3f705510654f00b2ad9d9b8fabee4	6269440	rva:0x1b930,0x38b80,0x38ba0	--pdata	0x48cb70
