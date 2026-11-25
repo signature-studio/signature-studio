@@ -87,7 +87,7 @@ function plan() {
   const pts = fixed.map((dpr) => ({ kind: 'fixed', dpr }));
   for (const [lo, hi, count] of randoms) for (let c = 0; c < count; c++) pts.push({ kind: 'random', lo, hi });
   const runs = [];
-  for (const p of pts) for (let k = 0; k < N; k++) runs.push(p);
+  for (const p of pts) for (let k = 0; k < N; k++) runs.push({ ...p, idx: k });
   return runs;
 }
 const drawDpr = (lo, hi) => Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
@@ -225,7 +225,8 @@ async function main() {
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
     const runs = plan();
     for (let k = 0; k < runs.length; k++) {
-      const viewStart = k % 2 === 0;
+      // #1393 / #1402: the alternation counts the starts of each point (idx), not the whole run: with the global index a point with one start always had no viewport change, so its DPR was never applied
+      const viewStart = runs[k].idx % 2 === 0;
       log('start', { k, kind: runs[k].kind, viewStart });
       const r = await start({ root, port, n: k }, runs[k], viewStart);
       out.runs.push(r);

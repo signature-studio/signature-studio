@@ -867,6 +867,24 @@ static void preempt_arm(void)
     fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
 }
 
+/* Issue #1402: the rate the page measured for requestAnimationFrame, put in at an idle (fle_g3_hz, lift/harness/fruity_idle.c). 0 = none put: the environment's rate stands. */
+static uint32_t display_hz_put;
+
+int fle_display_hz_put(uint32_t hz)
+{
+    if (hz < 24u || hz > 1000u) return 0;
+    display_hz_put = hz;
+    return 1;
+}
+
+/* Issue #1402: the number of DwmFlush calls so far (the page reads it at each idle; fle_g3_dwm_count). */
+static uint64_t dwm_flushes;
+
+uint64_t fle_thread_dwm_flushes(void)
+{
+    return dwm_flushes;
+}
+
 /* ui1 (decision 0166): the refresh rate of the virtual display. FLE_DWM_HZ in the environment (read once) overrides the compile-time default FLE_DWM_HZ (60); 24..1000 are accepted. */
 uint32_t fle_display_hz(void)
 {
@@ -885,7 +903,7 @@ uint32_t fle_display_hz(void)
             else fprintf(stderr, "fle: FLE_DWM_HZ=\"%s\" is not a number of hertz in 24..1000: ignored, %u Hz\n", e, (unsigned)hz);
         }
     }
-    return hz;
+    return display_hz_put ? display_hz_put : hz;
 }
 
 /* ui1 (decision 0166): the number EnumDisplaySettingsW reports (fle_monitor.c calls this through a weak reference). FLE_DISPLAYSETTINGS_FREQUENCY in the environment (24..1000) if set, else the same value as DwmFlush (fle_display_hz), else the compile-time default
@@ -895,6 +913,7 @@ uint32_t fle_display_settings_hz(void)
 {
     static uint32_t hz;
 
+    if (display_hz_put) return display_hz_put;
     if (!hz) {
         const char *e = getenv("FLE_DISPLAYSETTINGS_FREQUENCY");
         uint32_t dwm = fle_display_hz();
@@ -926,6 +945,7 @@ void fle_imp_DwmFlush(void)
 {
     uint64_t dl = fle_thread_next_frame_tick(now_ticks());
 
+    dwm_flushes++;
     if (nthr < 2) {
         fle_sys_clock_advance_to(dl);
         R[0] = 0;

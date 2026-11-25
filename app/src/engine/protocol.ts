@@ -41,6 +41,8 @@ export type ToWorker =
   | { cmd: 'settings-redraw'; lid: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
+  /** Issue #1402: the rate the page measured for requestAnimationFrame (24..1000); the engine is paced at it from its next idle (IdleDriver.setHz) */
+  | { cmd: 'hz'; hz: number }
   /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
   | { cmd: 'webview2-loaded' }
   /** Issue #1362: a message the page posted to the engine's WebView2 (window.chrome.webview.postMessage in the face's document) */
@@ -78,7 +80,7 @@ export type FromWorker =
   | { t: 'mark'; name: string; /** performance.timeOrigin + performance.now() of the Worker */ abs: number; detail?: Record<string, unknown> }
   | { t: 'engine-log'; stream: 'out' | 'err'; lines: string[] }
   /** the engine entered its idle: its number, the virtual clock and its next deadline in ticks, how long it ran since it was last resumed (null: first idle), what the Worker did with the input so far */
-  | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
+  | { t: 'idle'; n: number; now: number; next: number; busyMs: number | null; abs: number; stats: DriverStats; queued: number; caps: { input: boolean; appview: boolean; display?: boolean }; trace?: { n: number; hash: number }[]; memBytes?: number; /** Issue #1402: the number of DwmFlush calls so far (null: a build without the count) */ dwm?: number | null; /** decision 0221: what the engine has asked of its host files so far (a bundle of the current format; the reads all happen before the first idle) */ hostFiles?: HostFileStats; /** decision 0187 (only with ?dedupe=1): rectangles omitted as unchanged / sent, pixels compared */ dedupe?: { omitted: number; sent: number; comparedPixels: number } }
   /** the engine was resumed (it computes until its next idle) */
   | { t: 'resume'; abs: number; why: ResumeWhy }
   /** events the engine has processed (it is idle again): when the page made them, when the Worker gave them to the engine, when the engine was idle again (all performance.timeOrigin-based ms) */
