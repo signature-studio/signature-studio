@@ -2,7 +2,7 @@
 --profiling-funcs
 -sALLOW_MEMORY_GROWTH=1
 -sSTACK_SIZE=8MB
--sGLOBAL_BASE=268435456
+-sGLOBAL_BASE=989659136
 -sENVIRONMENT=web,worker
 -sMODULARIZE=1
 -sEXIT_RUNTIME=1
@@ -22,7 +22,7 @@ lift/harness/web/clip/fle_clip_lib.js
 -sEXPORTED_RUNTIME_METHODS=ENV,wasmExports,stackRestore
 -pthread
 -sPTHREAD_POOL_SIZE=0
--sINITIAL_MEMORY=671088640
+-sINITIAL_MEMORY=1392312320
 -sMAXIMUM_MEMORY=2147483648
 -Wl,--export-memory
 -Wl,--export=__tls_base

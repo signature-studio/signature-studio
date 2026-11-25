@@ -130,6 +130,15 @@ static void ev(const char *fmt, ...)
 static uint32_t ld32(uint64_t a) { return (uint32_t)fle_ld(a, 4); }
 static uint64_t ld64(uint64_t a) { return fle_ld(a, 8); }
 
+/* the probe that fle_thread_wasm.c defines in a wasm build (fle_seh.c reads it weakly): msync answers ENOMEM for an unmapped page */
+int fle_guest_readable(uint64_t a)
+{
+    uintptr_t p1 = (uintptr_t)a & ~(uintptr_t)4095u, p2 = (uintptr_t)(a + 7) & ~(uintptr_t)4095u;
+
+    if (msync((void *)p1, 4096, MS_ASYNC) != 0) return 0;
+    return p2 == p1 || msync((void *)p2, 4096, MS_ASYNC) == 0;
+}
+
 static void map_image(const char *path)
 {
     uint8_t hdr[0x1000];
@@ -191,12 +200,14 @@ void f_411d20(void)
     LEAVE();
 }
 
-/* f_411e80: push rbp; sub rsp,0x20; mov rbp,rsp */
+/* f_411e80: push rbp; sub rsp,0x20; mov rbp,rsp. With g_deep > 0 it calls itself (its return address 0x411e94 is in its own function), so that the chain can be made deeper. */
+static int g_deep;
 void f_411e80(void)
 {
     ENTER();
     PUSH(R[5]); R[4] -= 0x20; R[5] = R[4];
-    CALL(0x411e94, f_411d20);
+    if (g_deep > 0) { g_deep--; CALL(0x411e94, f_411e80); }
+    else CALL(0x411e94, f_411d20);
     R[4] = R[5] + 0x20; POP(R[5]);
     LEAVE();
 }
@@ -400,6 +411,7 @@ int main(int argc, char **argv)
            fle_callback_depth(), U(g_td));
         ev("frames searched by the last pass 1: %u, handler calls of the last pass 2: %u", fle_seh_stat_frames(), fle_seh_stat_unwind_calls());
     } else if (!strcmp(sc, "unhandled")) {
+        fle_teb_set_stack((uint64_t)(uintptr_t)stk, (uint64_t)(uintptr_t)stk + sizeof stk);   /* the record says how far below StackBase the search ended */
         R[4] -= 8; fle_st(R[4], 8, 0);                 /* the bottom of the stack: return address 0 */
         f_5df570();
     } else if (!strcmp(sc, "callback")) {
@@ -407,6 +419,16 @@ int main(int argc, char **argv)
     } else if (!strcmp(sc, "noreg")) {
         R[4] -= 8; fle_st(R[4], 8, 0x1234);
         f_63ade0_nowrap();
+    } else if (!strcmp(sc, "deep")) {
+        fle_teb_set_stack((uint64_t)(uintptr_t)stk, (uint64_t)(uintptr_t)stk + sizeof stk);
+        g_deep = 14;                                   /* 14 more frames of f_411e80 between the raise and f_5df540 (18 frames in all) */
+        R[4] -= 8; fle_st(R[4], 8, 0);                 /* the bottom of the stack: return address 0 */
+        f_5df570();
+    } else if (!strcmp(sc, "leaf")) {
+        fle_teb_set_stack((uint64_t)(uintptr_t)stk, (uint64_t)(uintptr_t)stk + sizeof stk);
+        R[4] -= 8; fle_st(R[4], 8, 0);                 /* the bottom of the stack: return address 0 */
+        R[4] -= 8; fle_st(R[4], 8, 0x42daaf);          /* the raise is called from 0x42daaf, which no RUNTIME_FUNCTION covers (the byte after 0x42daa0's end): a leaf by Learn */
+        raise_stub();
     } else if (!strcmp(sc, "nodispatch")) {
         R[1] = 0x1000; R[2] = 0x2000; R[8] = 0; R[9] = 0;
         fle_seh_unwind_ex();
@@ -499,6 +521,35 @@ fn wall_16_two_raises_run_the_handler_funclets_and_landings_in_the_order_of_the_
 #[test]
 fn an_exception_with_no_handler_in_any_frame_stops_by_name_with_the_frame_count() {
     stops("unhandled", 0, &["RaiseException", "exception code 0xeedfade", "flags 0x1", "8 argument(s)", "no frame-based handler took it", "4 frames searched"]);
+}
+
+#[test]
+fn the_stop_names_the_frames_where_the_search_ended_and_the_class_of_the_exception_object() {
+    // the record (decision 0132, #1410): the search ended at return address 0 after frame 4; the frames by ControlPc with their unwind data ("r" + the UNWIND flags,
+    // "-" when no RUNTIME_FUNCTION covers the address); argument 1 is the object (the handler's ExceptionInformation[1]) whose VMT's ClassName chain is EOleSysError < EOleError < Exception (the DLL's strings)
+    // the bottom slot is 0x108 below the top of the test stack (main pushes it at STK_TOP - 8), so the search ended 264 bytes below the stack base
+    stops("unhandled", 0, &["ended at return address 0 (read at", "264 bytes below the stack base", "after frame 4", "frames 1-4 [411e4d:r", "5df582:r", "arg1 class EOleSysError < EOleError < Exception"]);
+}
+
+#[test]
+fn a_deep_chain_records_its_first_twelve_frames_and_its_last_three() {
+    stops("deep", 0, &["18 frames searched", "after frame 18", "first frames 1-12 [411e4d:r", "last frames 16-18 [411e94:r", "5df582:r"]);
+}
+
+#[test]
+fn the_stop_line_of_a_deep_chain_keeps_the_end_of_the_chain_within_the_400_bytes_of_lastfle() {
+    // engine.exit.stop.lastFle is the whole "fle: " line cut to 400 bytes (app/src/perf/exit-message.ts): the end of the chain, its last frames and the class come before the first frames
+    let Some(o) = run("deep", 0) else { return };
+    let msg = o.stderr.lines().find(|l| l.starts_with("fle: ")).unwrap_or_else(|| panic!("no fle: message: {}", o.stderr));
+    let kept: String = msg.chars().take(400).collect();
+    for w in ["ended at return address 0 (read at", "264 bytes below the stack base", "last frames 16-18 [", "arg1 class EOleSysError"] {
+        assert!(kept.contains(w), "{w:?} is past the 400 bytes kept: {msg}");
+    }
+}
+
+#[test]
+fn a_return_address_that_no_function_covers_is_a_leaf_and_the_record_says_so() {
+    stops("leaf", 0, &["no frame-based handler took it (1 frames searched)", "42daaf:-"]);
 }
 
 #[test]

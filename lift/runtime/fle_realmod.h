@@ -22,7 +22,7 @@
  * ("dsp_ippv2_x64.dll"). `base` is the ImageBase of the mapped image (a multiple of 64 K, not FLE_EXE_HANDLE, not a virtual module
  * handle). The name must not be a virtual module name (except a deferred module's, decision 0096: blend2d.dll and
  * quickfontcache_x64.dll are in fle_modules[] until they are lifted, and a real module of the same name wins over them everywhere);
- * at most 16 modules (RM_MAX of fle_realmod.c), names and bases pairwise different. A table that breaks this stops the run on first use. */
+ * at most 192 modules (RM_MAX of fle_realmod.c, Issue #1379), names and bases pairwise different. A table that breaks this stops the run on first use. */
 typedef struct {
     const char *name;
     uint64_t base;

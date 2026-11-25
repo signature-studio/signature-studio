@@ -50,13 +50,13 @@ function error(dir) {
 }
 
 try {
-  // 1. Balance の 1 行。表の行(抽出の表と seed の表)と同じ文字列になる
+  // 1. Balance の 1 行。host の先は鍵(Issue #1379)。fe-build の plugins 段が読む名前と同じ
   const b = plugins({ 'fruity-balance': `${HEADER}\n${BALANCE_ROW}\n` });
   const rb = pluginRows(b);
-  ok('Balance: 抽出の行は、表の行と同じ(名前・host の先・SHA-256)',
-    rb.extract.map((r) => r.join('\t')), [`fruity balance_x64.dll\tlift/out-plugins/fruity_balance_x64.dll\t${SHA_BALANCE}`]);
-  ok('Balance: seed の行は、表の行と同じ(guest の絶対パス・host の先・SHA-256)',
-    rb.seed.map((r) => r.join('\t')), [`${GUEST}Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll\t${SHA_BALANCE}`]);
+  ok('Balance: 抽出の行は、鍵の名前の host の先(installer の名前・host の先・SHA-256)',
+    rb.extract.map((r) => r.join('\t')), [`fruity balance_x64.dll\tlift/out-plugins/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
+  ok('Balance: seed の行は、guest の絶対パス・host の先(末尾が鍵)・SHA-256',
+    rb.seed.map((r) => r.join('\t')), [`${GUEST}Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
 
   // 2. 2 つのフォルダ。鍵の順に並ぶ(zeta は alpha の後)。補助の DLL も行になる
   const two = plugins({
@@ -64,18 +64,35 @@ try {
     alpha: `# 注釈\n\n${HEADER}\neffects.alpha.a.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\Alpha Box_x64.dll\t本体\t${SHA_DELAY}\t200\trva:0x10,0x20,0x30\t--pdata --x\t0x100,0x200\neffects.alpha.helper.dll\tPlugins\\Fruity\\Effects\\Alpha Box\\helper.dll\t補助\t${SHA_BALANCE}\t300\tnone\t\t-\n`,
   });
   const r2 = pluginRows(two);
-  ok('2 フォルダ: 抽出の行は鍵の順(alpha の 2 行、zeta の 1 行)',
+  ok('2 フォルダ: 抽出の行は鍵の順(alpha の 2 行、zeta の 1 行)。host の先は鍵',
     r2.extract.map((r) => r.join('\t')), [
-      `alpha box_x64.dll\tlift/out-plugins/alpha_box_x64.dll\t${SHA_DELAY}`,
-      `helper.dll\tlift/out-plugins/helper.dll\t${SHA_BALANCE}`,
-      `zeta box_x64.dll\tlift/out-plugins/zeta_box_x64.dll\t${SHA_FILTER}`,
+      `alpha box_x64.dll\tlift/out-plugins/effects.alpha.a.dll\t${SHA_DELAY}`,
+      `helper.dll\tlift/out-plugins/effects.alpha.helper.dll\t${SHA_BALANCE}`,
+      `zeta box_x64.dll\tlift/out-plugins/effects.zeta.z.dll\t${SHA_FILTER}`,
     ]);
-  ok('2 フォルダ: seed の行は、guest の絶対パス・host の先(フォルダの階層・空白を _)・SHA-256',
+  ok('2 フォルダ: seed の行は、guest の絶対パス・host の先(フォルダの階層・末尾が鍵)・SHA-256',
     r2.seed.map((r) => r.join('\t')), [
-      `${GUEST}Plugins\\Fruity\\Effects\\Alpha Box\\Alpha Box_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/Alpha_Box_x64.dll\t${SHA_DELAY}`,
-      `${GUEST}Plugins\\Fruity\\Effects\\Alpha Box\\helper.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/helper.dll\t${SHA_BALANCE}`,
-      `${GUEST}Plugins\\Fruity\\Effects\\Zeta Box\\Zeta Box_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/Zeta_Box_x64.dll\t${SHA_FILTER}`,
+      `${GUEST}Plugins\\Fruity\\Effects\\Alpha Box\\Alpha Box_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.alpha.a.dll\t${SHA_DELAY}`,
+      `${GUEST}Plugins\\Fruity\\Effects\\Alpha Box\\helper.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.alpha.helper.dll\t${SHA_BALANCE}`,
+      `${GUEST}Plugins\\Fruity\\Effects\\Zeta Box\\Zeta Box_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.zeta.z.dll\t${SHA_FILTER}`,
     ]);
+
+  // 2b. ファイル名が同じ DLL が 2 本(Issue #1379: 18 本が engine_x64.dll)。鍵が違えば、検査は通り、host の先は鍵で別になる
+  const same = plugins({
+    'effects-a': `${HEADER}\neffects.a.engine_x64.dll\tPlugins\\Fruity\\Effects\\A\\engine_x64.dll\t本体\t${SHA_BALANCE}\t1\tnone\t\t-\n`,
+    'generators-b': `${HEADER}\ngenerators.b.engine_x64.dll\tPlugins\\Fruity\\Generators\\B\\engine_x64.dll\t本体\t${SHA_FILTER}\t1\tnone\t\t-\n`,
+  });
+  ok('同じ名前の DLL が 2 本: 検査は通り、抽出の行は鍵で別の host の先になる',
+    pluginRows(same).extract.map((r) => r.join('\t')), [
+      `engine_x64.dll\tlift/out-plugins/effects.a.engine_x64.dll\t${SHA_BALANCE}`,
+      `engine_x64.dll\tlift/out-plugins/generators.b.engine_x64.dll\t${SHA_FILTER}`,
+    ]);
+
+  // 2c. Rust(plugins.rs)の試験の期待値と、同じ行になる(JS と Rust が同じ名前を作ることの検査)
+  const rs = fs.readFileSync(path.join(ROOT, 'lift/crates/fe-build/src/plugins.rs'), 'utf8');
+  const rustLit = (s) => s.replaceAll('\\', '\\\\').replaceAll('\t', '\\t');
+  ok('Rust の試験の期待値(extract_row)と、同じ抽出の行', rs.includes(rustLit(rb.extract[0].join('\t'))), true);
+  ok('Rust の試験の期待値(seed_row)と、同じ seed の行', rs.includes(rustLit(rb.seed[0].join('\t'))), true);
 
   // 3. 無い フォルダ・フォルダの無い plugins は、行が無い(今の main と同じ動作)
   ok('lift/plugins が無ければ、行は無い', pluginRows(path.join(tmp, 'none')), { extract: [], seed: [] });
@@ -103,6 +120,7 @@ try {
   }), /guest path is not unique/), 'yes');
   ok('検査: hook の RVA が 3 つでなければ、例外', fails(plugins({ a: row(SHA_BALANCE, '本体', 'Plugins\\X\\Y\\One_x64.dll', '1\trva:0x10,0x20\t\t-') }), /hook/), 'yes');
   ok('検査: 行が無い plugin.tsv は、例外', fails(plugins({ a: `${HEADER}\n` }), /no DLL row/), 'yes');
+  ok('検査: 鍵が .dll で終わらないなら、例外', fails(plugins({ a: `${HEADER}\nk\tPlugins\\X\\Y\\One_x64.dll\t本体\t${SHA_BALANCE}\t1\tnone\t\t-\n` }), /ends with \.dll/), 'yes');
 
   // 5. 実物の lift/plugins(あれば)が検査を通る
   ok('実物の lift/plugins(無ければ空)は検査を通る', (() => { try { pluginRows(path.join(ROOT, 'lift/plugins')); return 'pass'; } catch (e) { return e.message; } })(), 'pass');

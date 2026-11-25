@@ -28,6 +28,19 @@ project: signature-studio/3
 - lazy の上限は `app/src/bundle/manifest.ts` の `maxItems`(128)。段階 1 の時点の件数に 27 を足すと、上限を超える可能性がある。実測で数え、超えるなら上げる(既定の動作として。オプトインを作らない)。
 - `app/scripts/pack-assets.mjs` は、URL の `#`・`%`・`?` を `%XX` にする(段階 1 で入った。`#` より後ろが fragment として切られて読めなかった Mehran の `.ogg` の修正)。新しい素材のファイル名に `#`・`%`・`?` が含まれるなら、この修正で読めることを確かめる。
 
+## 前回の試行で分かったこと(2 回目の試行)
+
+run 45518902053(00:35〜02:11 UTC。`failed`)の結果。数値は runner の値。
+
+- 配信: seed 表に `@lazy-file:` の行を 27 行、`pack.args` に `--lazy-file` の組を 27 組(54 行)足した。配信は 27 件・4,830,812 B。lazy の件数は manifest で 123(`maxItems` 128 の内。上限は変えていない)。
+- 読まれた 8 件(196,280 B)は、絶対パスの綴りで要求され、以後は `missing-path` に出ない。
+- 未解決の 19 件(DEDZII の `inventory`。4,634,532 B 分は配信済みだが読まれない)。19 件の要求は、どれも `%FLStudioFactoryData%\Data\Patches\…` の綴り(変数の根)で、`GetFileAttributesW` が「パスが無い」(3)を返す。内訳は Impulses 2 件と Packs 17 件。seed 表と `pack.args` は絶対パスの綴りだけを持つので、一致しない。
+- ゲストは `ExpandEnvironmentStringsW` を呼ばず、環境は起動の時に空。VFS は `%…%` を展開しない。Blocks.flp(テンプレート)の同じ測定は、`inventory` 0・変数の要求 0。
+- Mehran の `inventory` は 0。DEDZII と Mehran の両方で「Problems loading the project」(TMissingPluginsForm。プラグインの欠落)の窓が出る。この Issue の受け入れの外。
+- 流れ A〜D は通った(`elapsedMs` 9,083〜9,230、`preBootBytes` 311,137,416)。`npm test --prefix app`: 1,404 passed・10 skipped。
+- `notInInstallerFirst10`(両方共通): 空の綴り、Dance の `Basic 808` 系の `.ZGR` 4 件、`Presets\Plugin database\Installed\.Plugins.ini`、`FLEX.NFO`、`*.*`、`Emphasizer.NFO`、`Windows\Fonts\OpenSans-Regular.ttf`。
+- 決定(PM): 変数の根は、ゲストの環境ブロックで展開する(#1412)。この Issue は、#1412 が閉じた後に起動する(blocked by)。19 件の lazy 行は外さない。展開された綴りは、インストール先の絶対パスの行と一致する見込み。一致しなければ、その綴りを報告に書く。
+
 ## 読む物
 
 - `pm-work/findings/demo-assets-inventory.tsv`(段階 1 の出力)
@@ -72,7 +85,7 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 - 製品に、新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。遅延は既定の動作にする(オプトインを作らない)。
 - 空の代替(空ファイル・0 埋め)を置かない。大きさと SHA-256 は、一覧(インストーラの実物から取った値)と照合したものだけを置く。
 - インストーラに無い素材を、どこからも取らない(配信の対象外)。
-- ベンダー名・Cloudflare の識別子・インストール先の既定の値(絶対パス・工場データの変数の綴り)を、本文とファイルに書かない。
+- 名前の規則(訂正): 禁止されているのは、AI のベンダー名(`guard/scan.sh` が検査する)と、Cloudflare の識別子だけ。FL の製品名・`Image-Line` のインストール先・`%FLStudioFactoryData%` などの変数名は、ファイル・Issue の本文に書いてよい(`lift/crates/fe-build/src/plugins.rs` などが既に書いている)。
 - Python は製品に使わない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 
@@ -85,5 +98,6 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 ## 他のタスクとの関係
 
 - blocked_by: #1373(段階 1。素材の収集と、`ci/resources-prefixes.txt` の行)。閉じた後に起動する。
+- blocked_by: #1412(ゲストの環境変数。FL が `%FLStudioFactoryData%` などを展開できるようにする)。閉じた後に起動する。
 - 後続: #1401(音が出る demo を決める)。#1401 は、この Issue の後に行う。#1335(P3 の測定)は #1401 を待つ。
 - #1387(Riff machine)・#1400(Sytrus)・#1395(言語)も、seed 表と `pack.args` を変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。

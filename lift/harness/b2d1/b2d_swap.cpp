@@ -40,6 +40,35 @@ extern const uint64_t fle_dispatch_count;
 
 #define B2D1_BASE UINT64_C(0x4700000)   /* the load address of the lifted Blend2D (decision 0160) */
 
+/* #1375 (patch b2d4-tick.patch): a row of a fill of Blend2D calls fle_b2d_tick with the work of the row in units (fillgeneric_p.h). The units are added to the count of the lifted code's back edges
+ * (fle_loop_count, fle_dispatch.h), so the scheduler point of a long fill is the same one a loop of the guest has (fle_loop_slice, fle_thread.c); no virtual time moves. Declared weak: a link without
+ * the runtime (or without the patch, which is the only caller) still links. */
+extern "C" {
+extern uint64_t fle_loop_count __attribute__((weak));
+extern uint64_t fle_loop_limit __attribute__((weak));
+void fle_loop_slice(void) __attribute__((weak));
+unsigned fle_thread_current(void) __attribute__((weak));
+int fle_thread_switch(void) __attribute__((weak));
+}
+extern "C" void fle_b2d_tick(uint32_t units) {
+    fle_loop_count += units;
+    if (fle_loop_count >= fle_loop_limit && fle_loop_slice) fle_loop_slice();
+}
+
+/* #1375: a tick inside a fill lets another guest thread run while this one is inside Blend2D. Blend2D keeps its state in the runtime (a runtime function holds a position in its tables, as
+ * fle_progress_slice in fle_thread.c requires), so a call of another thread waits at the entry until the outermost call of the holder has ended. Without the tick the calls were atomic. */
+static const unsigned B2D_NO_OWNER = 0xffffffffu;
+static unsigned b2d_owner = B2D_NO_OWNER, b2d_holds;
+struct B2dEntry {
+    B2dEntry() {
+        unsigned me = fle_thread_current ? fle_thread_current() : 0u;
+        if (b2d_holds && b2d_owner == me) { b2d_holds++; return; }
+        while (b2d_holds && fle_thread_switch) fle_thread_switch();
+        b2d_owner = me; b2d_holds = 1;
+    }
+    ~B2dEntry() { if (--b2d_holds == 0) b2d_owner = B2D_NO_OWNER; }
+};
+
 [[noreturn]] static void die(const char *what, uint64_t a = 0, uint64_t b = 0) {
     fprintf(stderr, "fle: b2d1 (decision 0160): %s %#llx %#llx\n", what, (unsigned long long)a, (unsigned long long)b);
     abort();
@@ -370,6 +399,7 @@ extern "C" void sincos(double x, double *s, double *c) { *s = call_math(M_SIN, x
 
 static long live_ctx;   /* proxies created and not yet destroyed (B2D1_CHECK=1 stops at 64: the guest's release path must reach destroy) */
 extern "C" void fle_swap_ctx_init_as(void) {
+    B2dEntry b2d_entry_;
     uint64_t self = R[1], image = R[2], cci = R[8];
     static int up_init;
     if (!up_init) { blRuntimeInit(); up_init = 1; }   /* a static library: the first use initialises it (a repeated call only counts) */
@@ -404,6 +434,7 @@ extern "C" void fle_swap_ctx_init_as(void) {
 }
 
 extern "C" void fle_swap_ctx_destroy(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]);
     stat_add(4, 0, 0);
     live_ctx--;
@@ -416,17 +447,20 @@ extern "C" void fle_swap_ctx_destroy(void) {
 }
 
 extern "C" void fle_swap_ctx_apply_transform_op(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->applyTransformOp(ri, (BLTransformOp)(uint32_t)R[2], R[8] ? G(R[8]) : NULL));
     sync_state(p);
 }
 extern "C" void fle_swap_ctx_set_hint(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setHint(ri, (BLContextHint)(uint32_t)R[2], (uint32_t)R[8]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_style(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     StyleTmp st;
     const BLObjectCore *s = style_from_guest(&st, R[8]);
@@ -437,12 +471,14 @@ extern "C" void fle_swap_ctx_set_style(void) {
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_global_alpha(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setGlobalAlpha(ri, X[1].f64[0]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_comp_op(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     stat_add(1, (uint32_t)R[2], 0);
     RET(ri->virt->setCompOp(ri, (BLCompOp)(uint32_t)R[2]));
@@ -450,48 +486,56 @@ extern "C" void fle_swap_ctx_set_comp_op(void) {
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_fill_rule(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setFillRule(ri, (BLFillRule)(uint32_t)R[2]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_width(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeWidth(ri, X[1].f64[0]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_caps(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeCaps(ri, (BLStrokeCap)(uint32_t)R[2]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_join(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeJoin(ri, (BLStrokeJoin)(uint32_t)R[2]));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_clip_to_rect_d(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     { BLRect rc; memcpy(&rc, G(R[2]), sizeof rc); RET(ri->virt->clipToRectD(ri, &rc)); }
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_restore_clipping(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->restoreClipping(ri));
     sync_state(p);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_fill_all_rgba32(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     stat_add(2, p->gs.compOp, 51);
     DRAW_RET(ri->virt->fillAllRgba32(ri, (uint32_t)R[2]), 51, 0xffffffffu);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_fill_geometry(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p); GeomTmp g;
     const uint32_t gt = (uint32_t)R[2];
     stat_add(2, p->gs.compOp, 53);
@@ -501,6 +545,7 @@ extern "C" void fle_swap_ctx_fill_geometry(void) {
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_fill_geometry_rgba32(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p); GeomTmp g;
     const uint32_t gt = (uint32_t)R[2];
     stat_add(2, p->gs.compOp, 54);
@@ -510,6 +555,7 @@ extern "C" void fle_swap_ctx_fill_geometry_rgba32(void) {
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_stroke_geometry(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p); GeomTmp g;
     const uint32_t gt = (uint32_t)R[2];
     stat_add(2, p->gs.compOp, 71);
@@ -519,6 +565,7 @@ extern "C" void fle_swap_ctx_stroke_geometry(void) {
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_stroke_geometry_rgba32(void) {
+    B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p); GeomTmp g;
     const uint32_t gt = (uint32_t)R[2];
     stat_add(2, p->gs.compOp, 72);

@@ -61,6 +61,8 @@ export class EngineClient {
       this.send({ cmd: peek ? 'desk-peek' : 'desk-dump' });
     });
   }
+  /** #1384 (a test aid): the window `lid` and its descendants are drawn again (the Worker's settings-redraw; nothing is answered) */
+  settingsRedraw(lid: number): void { this.send({ cmd: 'settings-redraw', lid }); }
   /** #1358 (a test aid): the text the engine's memory holds for the markers (read only; the Worker's guestText) */
   guestText(markers: string[], radius = 0): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }> {
     return new Promise((res, rej) => {
@@ -125,6 +127,8 @@ export class EngineClient {
   }
 
   start(): void { this.send({ cmd: 'start' }); }
+  /** Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once) */
+  exitRequest(): void { this.worker?.postMessage({ cmd: 'exit-request' } satisfies ToWorker); }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
   /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
   webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }

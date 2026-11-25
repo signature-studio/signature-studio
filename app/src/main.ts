@@ -122,6 +122,8 @@ interface AppApi {
   webview2Front(): number[];
   /** #1358 (a test aid, the measurement only calls it): the text the engine's memory holds for the markers, read without writing it (ASCII and UTF-16LE); radius > 0 also lists the printable runs near each place */
   guestText(markers: string[], radius?: number): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }>;
+  /** #1384 (a test aid, the measurement only calls it): the window `lid` (the window table's logical id) and its descendants are drawn again; the picture is read after the engine has painted them */
+  settingsRedraw(lid: number): void;
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the WebGL canvas, base64 of R, G, B, A bytes */
   deskGlPixelsBase64(): Promise<{ width: number; height: number; base64: string }>;
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines in engineLog()) on or off; off at the start */
@@ -131,6 +133,8 @@ interface AppApi {
   /** decision 0272: the restore button of a minimized window (the Worker reports the window; a build without the engine's taskbar entry never does) */
   taskbar: TaskbarRestore;
   stop(): void;
+  /** Issue #1385: the engine is asked to close the FL main window now (the page's pagehide does this too; a test aid calls it to time the exit) */
+  exitRequest(): void;
   /** the measurement beacon (decision 0152): what the page measures about its own speed and sends to POST /__perf of this origin */
   perf: {
     recorder: PerfRecorder;
@@ -199,6 +203,7 @@ const app: AppApi = {
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
   guestText: (markers, radius = 0) => client.guestText(markers, radius),
+  settingsRedraw: (lid) => client.settingsRedraw(lid),
   deskDumpBase64: async (peek = false) => { const d = await client.deskDump(peek); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { windows: d.windows, width: d.width, height: d.height, base64: btoa(s) }; },
   windowApiTrace: (on) => { apiTraceWanted = on; client.windowApiTrace(on); },
   deskGlPixelsBase64: async () => { const d = await client.deskGlPixels(); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { width: d.width, height: d.height, base64: btoa(s) }; },
@@ -206,8 +211,12 @@ const app: AppApi = {
   pageTitle: () => deskTitle(baseTitle),
   whenExited: () => client.whenExited(),
   stop: () => { endRequested = true; client.stop(); },
+  exitRequest: () => client.exitRequest(),
 };
 window.__app = app;
+// Issue #1385: a page that is left (a reload, a close) asks FL to close, so that the files FL keeps open (a saved project) are closed and kept. pagehide only: visibilitychange also fires when the
+// person switches to another tab, and FL must not close then.
+window.addEventListener('pagehide', () => client.exitRequest());
 
 // decision 0223: the title of the foreground window as the Worker reported it (the page knows no window); the page's own title until there is one
 let osTitle = '';
