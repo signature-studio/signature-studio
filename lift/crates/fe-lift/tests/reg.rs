@@ -538,6 +538,148 @@ fn predefined_keys_accept_zero_and_sign_extended_forms() {
     assert_eq!(l, ["0", "2"]);
 }
 
+#[test]
+fn empty_components_return_the_verified_values() {
+    // Empty components of a key path. The Microsoft pages do not say what they answer. Wine's registry tests
+    // (dlls/advapi32/tests/registry.c: test_reg_open_key and test_reg_create_key; the wow64 variant of the leading
+    // case is the only one marked broken) do: a leading backslash is ERROR_BAD_PATHNAME (161) for RegOpenKeyEx and
+    // RegCreateKeyEx, and trailing backslashes name the key before them (ERROR_SUCCESS; the key is opened or created).
+    // A doubled backslash in the middle is in neither: 161 where the walk reaches it, 2 when a key before it is missing;
+    // RegCreateKeyExW creates nothing when the path has one; RegDeleteKeyW answers 161 for every empty component.
+    let l = lines(
+        "reg-empty-components",
+        &format!(
+            r#"
+    uint64_t k = 0, c = 0, h = 0, st;
+    uint32_t disp = 77, subs = 99;
+    CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("T"), 0, 0, 0, 0xF003F, 0, A(&k), 0);
+    CALL(fle_imp_RegCreateKeyExW, k, W("C"), 0, 0, 0, 0xF003F, 0, A(&c), 0);
+    CALL(fle_imp_RegCloseKey, c);
+    CALL(fle_imp_RegCloseKey, k);
+    printf("o-lead %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("\\T"), 0, 0x20019, A(&h))));
+    printf("o-lead-missing %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("\\Nope"), 0, 0x20019, A(&h))));
+    printf("o-lead-a %llu\n", U(CALL(fle_imp_RegOpenKeyExA, {HKCU}, A("\\T"), 0, 0x20019, A(&h))));
+    printf("o-lead-only %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("\\"), 0, 0x20019, A(&h))));
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\"), 0, 0x20019, A(&h));
+    subs = 99;
+    if (!st) CALL(fle_imp_RegQueryInfoKeyW, h, 0, 0, 0, A(&subs), 0, 0, 0, 0, 0, 0, 0);
+    printf("o-trail %llu subs=%u\n", U(st), subs);
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\\\"), 0, 0x20019, A(&h));
+    subs = 99;
+    if (!st) CALL(fle_imp_RegQueryInfoKeyW, h, 0, 0, 0, A(&subs), 0, 0, 0, 0, 0, 0, 0);
+    printf("o-trail2 %llu subs=%u\n", U(st), subs);
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    printf("o-trail-missing %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("Nope\\"), 0, 0x20019, A(&h))));
+    printf("o-doubled %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\\\C"), 0, 0x20019, A(&h))));
+    printf("o-doubled-missing %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("Nope\\\\C"), 0, 0x20019, A(&h))));
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\C\\\\"), 0, 0x20019, A(&h));
+    subs = 99;
+    if (!st) CALL(fle_imp_RegQueryInfoKeyW, h, 0, 0, 0, A(&subs), 0, 0, 0, 0, 0, 0, 0);
+    printf("o-deep-trail %llu subs=%u\n", U(st), subs);
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    printf("c-lead %llu\n", U(CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("\\X"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp))));
+    printf("c-lead-after %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("X"), 0, 0x20019, A(&h))));
+    st = CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("T\\\\"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp));
+    printf("c-trail-exist %llu disp=%u\n", U(st), disp);
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    disp = 77;
+    st = CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("New\\"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp));
+    printf("c-trail-new %llu disp=%u\n", U(st), disp);
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("New"), 0, 0x20019, A(&h));
+    printf("c-trail-new-open %llu\n", U(st));
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    printf("c-doubled-new %llu\n", U(CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("Fresh\\\\X"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp))));
+    printf("c-fresh-after %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("Fresh"), 0, 0x20019, A(&h))));
+    printf("c-doubled-exist %llu\n", U(CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("T\\\\Y"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp))));
+    printf("c-y-after %llu\n", U(CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\Y"), 0, 0x20019, A(&h))));
+    printf("d-lead %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("\\T"))));
+    printf("d-doubled-missing %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("Nope\\\\C"))));
+    printf("d-doubled %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("T\\\\C"))));
+    printf("d-trail %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("T\\"))));
+    printf("d-trail-missing %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("Nope\\"))));
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\C"), 0, 0x20019, A(&h));
+    printf("o-c-after %llu\n", U(st));
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    st = CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T"), 0, 0x20019, A(&h));
+    printf("o-t-after %llu\n", U(st));
+    if (!st) CALL(fle_imp_RegCloseKey, h);
+    printf("d-ok %llu\n", U(CALL(fle_imp_RegDeleteKeyW, {HKCU}, W("New"))));
+"#
+        ),
+    );
+    assert_eq!(
+        l,
+        [
+            "o-lead 161",
+            "o-lead-missing 161",
+            "o-lead-a 161",
+            "o-lead-only 161",
+            "o-trail 0 subs=1",
+            "o-trail2 0 subs=1",
+            "o-trail-missing 2",
+            "o-doubled 161",
+            "o-doubled-missing 2",
+            "o-deep-trail 0 subs=0",
+            "c-lead 161",
+            "c-lead-after 2",
+            "c-trail-exist 0 disp=2",
+            "c-trail-new 0 disp=1",
+            "c-trail-new-open 0",
+            "c-doubled-new 161",
+            "c-fresh-after 2",
+            "c-doubled-exist 161",
+            "c-y-after 2",
+            "d-lead 161",
+            "d-doubled-missing 2",
+            "d-doubled 161",
+            "d-trail 161",
+            "d-trail-missing 2",
+            "o-c-after 0",
+            "o-t-after 0",
+            "d-ok 0",
+        ]
+    );
+}
+
+#[test]
+fn empty_component_warning_is_printed_once_per_path() {
+    // One warning line per key path with an empty component (stderr, fle: warn:), the API name, the first 120
+    // characters of the path, and the guest return address at [rsp] of the call (0xdead0000 in this harness). A path
+    // that was warned about before is not printed again; a path without an empty component is not printed.
+    let long = format!("\\\\{}", "a".repeat(199));
+    let body = format!(
+        r#"
+    uint64_t h = 0;
+    uint32_t disp = 0;
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("\\T"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("\\T"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("\\T"), 0, 0, 0, 0xF003F, 0, A(&h), A(&disp));
+    CALL(fle_imp_RegOpenKeyExA, {HKCU}, A("\\U"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\\\C"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("T\\"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("{long}"), 0, 0x20019, A(&h));
+    CALL(fle_imp_RegOpenKeyExW, {HKCU}, W("{long}"), 0, 0x20019, A(&h));
+"#
+    );
+    let o = run("reg-empty-warning", &body);
+    assert!(o.ok, "did not exit normally: {}", o.stderr);
+    let warns: Vec<&str> = o.stderr.lines().filter(|l| l.starts_with("fle: warn:")).collect();
+    let long_line = format!("fle: warn: RegOpenKeyExW: empty component in \"\\{}\" (caller 0xdead0000)", "a".repeat(119));
+    assert_eq!(
+        warns,
+        [
+            "fle: warn: RegOpenKeyExW: empty component in \"\\T\" (caller 0xdead0000)",
+            "fle: warn: RegOpenKeyExA: empty component in \"\\U\" (caller 0xdead0000)",
+            "fle: warn: RegOpenKeyExW: empty component in \"T\\\\C\" (caller 0xdead0000)",
+            "fle: warn: RegOpenKeyExW: empty component in \"T\\\" (caller 0xdead0000)",
+            long_line.as_str(),
+        ]
+    );
+}
+
 // ---- stops ----
 
 #[test]
@@ -556,8 +698,6 @@ fn undefined_input_stops_the_run() {
         ("open-null-out", format!("CALL(fle_imp_RegOpenKeyExW, {HKCU}, W(\"T\"), 0, 0x20019, 0);")),
         // decision 0126 (wall 81, S-wow64-views): old: ("open-wow64-view", samDesired 0x20019 | 0x100) stopped; KEY_WOW64_64KEY / KEY_WOW64_32KEY are a choice of view and are accepted now (both at once: 87; tests/wall_fr11.rs)
         ("open-max-allowed", format!("CALL(fle_imp_RegOpenKeyExW, {HKCU}, W(\"T\"), 0, 0x02000000, A(&k));")),
-        ("open-leading-backslash", format!("CALL(fle_imp_RegOpenKeyExW, {HKCU}, W(\"\\\\T\"), 0, 0x20019, A(&k));")),
-        ("open-trailing-backslash", format!("CALL(fle_imp_RegOpenKeyExW, {HKCU}, W(\"T\\\\\"), 0, 0x20019, A(&k));")),
         ("open-foreign-handle", "CALL(fle_imp_RegOpenKeyExW, 0x1234, W(\"T\"), 0, 0x20019, A(&k));".into()),
         ("open-perf-data", "CALL(fle_imp_RegOpenKeyExW, 0x80000004ull, W(\"T\"), 0, 0x20019, A(&k));".into()),
         ("openA-non-ascii", format!("CALL(fle_imp_RegOpenKeyExA, {HKCU}, A(\"\\xe9\"), 0, 0x20019, A(&k));")),
