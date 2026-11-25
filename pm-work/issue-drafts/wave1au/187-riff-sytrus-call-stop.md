@@ -19,7 +19,7 @@ Riff machine(リフ マシーン)の窓が出た後で、engine が止まらな�
 
 ## 背景
 
-- #{{147}}(#1387)の段階 1 で、窓が出るようになった(run 45592009894)。窓は `TPRScoreCreatorForm`・visible・painted。警告は出ない。
+- #{{147}}の段階 1 で、窓が出るようになった(run 45592009894)。窓は `TPRScoreCreatorForm`・visible・painted。警告は出ない。
 - その後、窓が Sytrus を使い始めると、engine が止まる(終了コード 134)。行は `fle: indirect call to 0xcccccccccccccccc is not a known function entry`(DPR 1)、`... to 0`(DPR 1.32)、`... to 0x475c084fff0bac7`(別の回)。
 - Accept を押さない版(一時の写し。製品ではない)でも、同じ位置で止まった。止まりは Accept の操作と無関係で、窓を開いて Sytrus を使い始めた時の物。
 - 止まりの直前: `real module table: name=generators.sytrus.sytrus_x64.dll base=0xc580000` と `image-read: generators.sytrus...dll requested=1`。Sytrus のモジュールは読み込まれている。

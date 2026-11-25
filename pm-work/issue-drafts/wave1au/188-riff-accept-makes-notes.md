@@ -21,7 +21,7 @@ Riff machine(リフ マシーン)の窓の主ボタン(Accept)を押すと、Pia
 
 ## 背景
 
-- #{{147}}(#1387)の段階 1 で、窓は出て描かれる(run 45592009894)。ただし、Accept を押した後の画面は、まだ取れていない。窓の後に Sytrus の呼び出しで engine が止まるため(#{{187}})。
+- #{{147}}の段階 1 で、窓は出て描かれる(run 45592009894)。ただし、Accept を押した後の画面は、まだ取れていない。窓の後に Sytrus の呼び出しで engine が止まるため(#{{187}})。
 - 数え方は、#{{147}} の本文の「数え方(PM の決定)」と同じ。`countNotes(before, after, rect)` は、道具 `tools/piano-roll-tools/measure.mjs` に実装済み(#{{147}} の差分)。合成データ 15 件で確かめた(`spec/piano-roll-notes.test.mjs`)。
 - 前回の観測(run 45394680999): Accept を押すと、窓は閉じ、Piano roll(「Piano roll - Riff Machine - Squelch」)に F4 付近の音符の帯が画面に出た。画素の読みによる。数えていない。
 - Accept のボタンは、画面の右下の「Accept」。窓の表に文字は出ない(PNG で確かめた)。前回は、窓の矩形の比率で押した。この Issue では比率を定数にせず、見つける形にする。
