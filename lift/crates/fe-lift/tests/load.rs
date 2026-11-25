@@ -923,6 +923,7 @@ fn all_runtime_sources() -> Vec<PathBuf> {
         }
     }
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
     v
 }
 

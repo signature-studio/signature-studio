@@ -5,6 +5,7 @@ import type { DriverStats, ResumeWhy } from './idle-driver.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import type { HostFileStats } from './hostfiles.ts';
 import type { LazyFileShared } from './lazy-file.ts';
+import type { CursorPictureMsg } from './cursor-picture.ts';
 
 /** decision 0223: what the page hands the engine Worker for the desktop: the input ring (shared), the handshake block with the render Worker (desk-link.ts) and the port to the render Worker. The engine composes; it does not draw. */
 export interface DeskHandover { ring: SharedArrayBuffer; ctl: SharedArrayBuffer; port: MessagePort }
@@ -30,8 +31,6 @@ export type ToWorker =
   | { cmd: 'input'; seq: number; tPage: number; ev: RawInput }
   /** decision 0193: the person's answer to the engine's file dialog (the File objects are handed to the Worker, which reads them into the engine's memory) */
   | { cmd: 'filedlg-answer'; id: number; answer: FileDlgAnswer }
-  /** decision 0223: the page wrote to the input ring while the Worker was parked */
-  | { cmd: 'wake' }
   /** decision 0223 (a test aid, any display method): the compositor draws the whole desktop from the window table as it is now and the Worker sends the picture (R, G, B, A bytes) */
   | { cmd: 'desk-dump' }
   /** decision 0223 (a test aid, display method D): the picture as the compositor holds it now, without composing (what the canvas has been given is compared with it) */
@@ -103,6 +102,8 @@ export type FromWorker =
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
   | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; cursorMade: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
+  /** #1392: the picture of a cursor the guest loaded from one of its modules (the resource's own pixels) or made with CreateIconIndirect (its bitmaps), decision 0260; sent before each osstate that names the handle; `picture` is null when the engine has none (`why`) */
+  | { t: 'cursorpic'; handle: number; why: string; picture: CursorPictureMsg | null }
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }

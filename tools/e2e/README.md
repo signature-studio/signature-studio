@@ -14,7 +14,15 @@ bash tools/e2e/run.sh --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random > e
 - stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0。
 - `--displays`: `4k-dpr1`(3840 x 2160 CSS px・DPR 1)、`4k-dpr2`(1920 x 1080・DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ。行は 2 つ)。
 - `--clock raf|begin`: 既定は `raf`(下の「120 Hz」)。`begin` は BeginFrame の時計(検討の記録用に残した)。
+- `--only NAME[,NAME]`: 試験用。セットの中の名前のシナリオだけを動かす(例: `--only file-open-demo`)。行のシナリオ数は、動かした数になる。
 - `--shots DIR`: 試験用。各シナリオの最後の画面を PNG で書く。
+
+## 判定と印(expectFail)
+
+- 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
+- 印(`expectFail: '#<Issue の番号>'`)の付いたシナリオ(既に在る欠陥): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。通ったら標準エラーに警告を出す。
+- 門(deploy.yml)は `judge.jq` で判定する。`run.mjs` の終了コードは同じ規則(`rowPasses`)。
+- シナリオの JSON: `dumpRetries`(窓の表の取得が「ask again」で待った回数。上限は 60 秒)、`engineStop`(エンジンが止まったときの理由: 製品の beacon の `engine.exit`(`message`・`stop`・`evidence`)と、エンジンのログの停止の報告(`== stop:` の行から 40 行。R[0..15] と戻り番地を含む))、`engineRunningMaxMs`(`running` の最長。止まりの判定は 90 秒を超えたときだけ)。
 
 ## 構成
 
@@ -22,9 +30,9 @@ bash tools/e2e/run.sh --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random > e
 - `lib/served.mjs`: `servedHeadersMatch`。配信の応答のヘッダーを `app/shared/headers.ts` と比べる。`Content-Encoding` は、Worker を直接呼んだ応答で比べる(下の注)。
 - `lib/browser.mjs`: 表示(DPR・CSS の大きさ)、Chromium の起動、120 Hz の時計、rAF の計測。
 - `lib/guest.mjs`: 操作(クリック・右クリック・ダブルクリック・ホイール・ドラッグ・キー・Ctrl+キー)と読み取り(窓の表、エンジンの状態)。座標はゲストの画素から CSS px へ写す。
-- `lib/detect.mjs`: 検出(`pageerror`・`console.error`・失敗した要求と 4xx/5xx・消えない表示・エンジンの停止と `running` の 20 秒・クリップボードの呼び出しと権限の変化)。
+- `lib/detect.mjs`: 検出(`pageerror`・`console.error`・失敗した要求と 4xx/5xx・消えない表示・エンジンの停止と `running` の 90 秒(この runner は GPU が無く、4K の起動が 24 秒かかる。起動の止まりは boot-bundle.mjs と tools/boot-hang が見る)・クリップボードの呼び出しと権限の変化)。
 - `lib/flow.mjs`: 起動の手順(利用データの確認、Welcome を閉じる、「Problems loading」の箱、Ctrl+O で開く)。
-- `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(印 `#1406`)、(c) `file-open-demo`。
+- `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(印 `#1406`)、(c) `file-open-demo`(印 `#1421`: File > Open で DEDZII を開くと、約 5 秒後に engine が exit 134 で止まる)。
 
 ## 120 Hz の方法と実測
 

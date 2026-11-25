@@ -31,6 +31,8 @@ export interface ClientEvents {
   deskCanvas(): HTMLCanvasElement;
   /** decision 0223: the cursor and the title of the foreground window, when they changed */
   osstate?(m: Extract<FromWorker, { t: 'osstate' }>): void;
+  /** #1392: the picture of a cursor the guest loaded from one of its modules (sent before the osstate that names its handle) */
+  cursorPicture?(m: Extract<FromWorker, { t: 'cursorpic' }>): void;
   /** decision 0223: the desktop presenter's counters and the instants of its presents (at most every 100 ms) */
   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
@@ -81,8 +83,9 @@ export class EngineClient {
   }
   /** decision 0223: the page's end of the input ring */
   private ring: RingWriter | null = null;
-  /** events that did not fit in the ring and went as messages, and wake messages sent */
+  /** events that did not fit in the ring and went as messages, and the Workers woken on the ring (a parked Worker waits for a notify) */
   ringStats = { viaMessage: 0, wakes: 0 };
+  private wakePending = false;
 
   constructor(events: ClientEvents) { this.events = events; }
 
@@ -139,15 +142,24 @@ export class EngineClient {
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
-    // decision 0223: with display method D the event goes into the shared ring; a message wakes the Worker only if it is parked (idle, nothing but a message or a timer would run it)
+    // decision 0223: with display method D the event goes into the shared ring; the Worker waits on the ring while it is idle, and is woken once per frame (wakeOnFrame)
     if (this.ring) {
       if (this.ring.push(seq, tPage, ev)) {
-        if (this.ring.parked) { this.ringStats.wakes++; this.worker?.postMessage({ cmd: 'wake' } satisfies ToWorker); }
+        this.wakeOnFrame();
         return;
       }
       this.ringStats.viaMessage++;
     }
     this.worker?.postMessage({ cmd: 'input', seq, tPage, ev } satisfies ToWorker);
+  }
+  /**
+   * Issue #1397: the Worker is woken once per animation frame that has input, not once per event (a notify on the ring costs the page about as much as a message did): the records of the frame are taken in one pass
+   */
+  private wakeOnFrame(): void {
+    if (this.wakePending || !this.ring) return;
+    this.wakePending = true;
+    const ring = this.ring;
+    requestAnimationFrame(() => { this.wakePending = false; this.ringStats.wakes += ring.notify(); });
   }
   /**
    * The engine runs synchronously inside its wasm stack, so a running engine cannot be asked to stop: if it is idle (waiting for input) the session is ended,
@@ -207,6 +219,7 @@ export class EngineClient {
       case 'pong': break;
       case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': case 'guest-text': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
       case 'osstate': this.events.osstate?.(m); break;
+      case 'cursorpic': this.events.cursorPicture?.(m); break;
       case 'desk': this.events.desk?.(m); break;
       case 'taskbar': this.events.taskbar?.(m); break;
       case 'webview2': this.events.webview2?.(m); break;

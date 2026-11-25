@@ -77,7 +77,6 @@ async function handle(m: ToWorker): Promise<void> {
     case 'end-idle': if (fruity && !(driver ? driver.end() : fruity.endIdle())) log('warn', 'the engine is not idle: nothing to end'); break;
     case 'input': onInput(m.seq, m.tPage, m.ev); break;
     case 'filedlg-answer': onFileDlgAnswer(m.id, m.answer); break;
-    case 'wake': deskCounters.wakes++; drainRing(); break;
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
     case 'guest-text': guestText(m.markers, m.radius); break;
@@ -145,6 +144,23 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
 // ---- input (decision 0141): the page's raw events reach the IdleDriver; the engine takes them at its idle ----
 let lagCutTicks = 0;
 let lastLagLog = -1e9;
+// the driver's wait for a deadline is Atomics.waitAsync with a timeout on a word that only a cancel notifies (Issue #1397): a setTimeout whose nesting is deeper than five waits at least 4 ms, and the deadlines of
+// the idle chain are nested that way. A cancelled wait resolves at once (the notify) and does nothing when it does.
+interface DeadlineWait { live: boolean }
+type WaitAsyncResult = { async: false; value: 'not-equal' | 'timed-out' } | { async: true; value: Promise<'ok' | 'timed-out'> };
+const deadlineWord = new Int32Array(new SharedArrayBuffer(4));
+function deadlineWait(fn: () => void, ms: number): DeadlineWait {
+  const h: DeadlineWait = { live: true };
+  const fire = (): void => { if (h.live) { h.live = false; fn(); } };
+  const w = (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number, t: number): WaitAsyncResult }).waitAsync(deadlineWord, 0, 0, Math.max(0, ms));
+  if (w.async) void w.value.then(fire); else void Promise.resolve().then(fire);
+  return h;
+}
+function cancelDeadlineWait(h: DeadlineWait): void {
+  h.live = false;
+  Atomics.notify(deadlineWord, 0);
+}
+
 // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
 function ensureDriver(): IdleDriver | null {
   if (driver || !fruity) return driver;
@@ -157,8 +173,8 @@ function ensureDriver(): IdleDriver | null {
   driver = new IdleDriver(input, {
     deliver: (code) => fruity?.deliver(code) ?? false,
     now: () => nowAbs(),
-    setTimer: (fn, ms) => setTimeout(fn, ms),
-    clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+    setTimer: (fn, ms) => deadlineWait(fn, ms),
+    clearTimer: (h) => cancelDeadlineWait(h as DeadlineWait),
     yieldTurn: (fn) => { bounce = fn; turns.port2.postMessage(0); },
   }, {
     processed: (list, tIdle) => {
@@ -168,9 +184,9 @@ function ensureDriver(): IdleDriver | null {
       if (deskReady) { try { deskTick(false, list.map((x) => x.seq)); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
     },
     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
-    resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
+    resumed: (_code, abs, why) => { if (reports.resume(why)) post({ t: 'resume', abs, why }); },
     // reported here, before the driver decides what the engine does next: the page must see this idle before the resume that may follow it at once (decision 0170: the next deadline is often already due)
-    idle: (n, now, next, busyMs, at) => { ring?.setParked(true); reportIdle(n, now, next, busyMs, at); },
+    idle: (n, now, next, busyMs, at) => { reportIdle(n, now, next, busyMs, at); },
     lagCut: (ticks) => {
       lagCutTicks += ticks;
       const at = performance.now();
@@ -281,7 +297,17 @@ function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
   drainRing(); // the page's input waits in the ring: it is queued now and given to the engine by onIdle below
   if (driver) driver.onIdle(n, nowTicks, nextTicks);
   else reportIdle(n, nowTicks, nextTicks, null, nowAbs());
-  drainRing(); // an input that was written after the first look but before this idle was announced as parked
+  drainRing(); // an input that was written after the first look but before this idle was announced
+  armInputWait();
+}
+
+// the page writes a record and wakes this Worker with Atomics.notify on the ring (RingWriter.notify), not with a message: one wait on the ring is pending at a time, and it is armed again
+// when it returns, so a record written while the engine runs is taken at the next idle, as before
+let inputWaiting = false;
+function armInputWait(): void {
+  if (inputWaiting || !ring || !driver) return;   // without a driver nothing takes the records: a wait for them would return at once, again and again
+  inputWaiting = true;
+  void ring.waitForWrite().then(() => { inputWaiting = false; deskCounters.wakes++; drainRing(); armInputWait(); });
 }
 
 // ---- decision 0193: the engine's file dialogs. The engine is suspended in Show() (JSPI) while the page asks the person; the answer arrives as a message, the library reads the File into the engine's memory and resumes it ----
@@ -466,13 +492,25 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
       const os = osStateOf(v, lastTitle);
       lastTitle = os.title;
       const key = osStateKey(os);
-      if (key !== lastOs) { lastOs = key; post({ t: 'osstate', ...os, abs: nowAbs() }); }
+      if (key !== lastOs) {
+        lastOs = key;
+        if (os.cursorShared || os.cursorMade) sendCursorPicture(fruity, os.cursor);
+        post({ t: 'osstate', ...os, abs: nowAbs() });
+      }
     }
     // decision 0272: a minimized window with a taskbar button, as the engine says it (null: this build has no such export; nothing is posted)
     const tb = taskbarReport.next(fruity.taskbarIconic());
     if (tb !== null) post({ t: 'taskbar', lid: tb });
   }
   return changed;
+}
+
+/** #1392: the picture of a cursor the guest loaded from one of its modules or made with CreateIconIndirect, read now (before the osstate that names the handle, which is posted when the key changes: a handle number can be made again for another cursor, so it is not kept) */
+function sendCursorPicture(f: FruityEngine, handle: number): void {
+  const p = f.cursorPicture(handle);
+  if (p === null) { post({ t: 'cursorpic', handle, why: 'this engine build has no cursor picture export', picture: null }); return; }
+  if (!p.ok || p.picture === null) { post({ t: 'cursorpic', handle, why: p.why, picture: null }); return; }
+  post({ t: 'cursorpic', handle, why: '', picture: p.picture }, p.picture.raw ? [p.picture.rgba, p.picture.raw] : [p.picture.rgba]);
 }
 
 /** the answer to a question that found the picture busy: nothing changed (the render Worker's last picture is the one it has) */

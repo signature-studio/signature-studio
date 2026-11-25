@@ -1251,10 +1251,18 @@ EXB() { RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b false '"#1406"' "$1"
 ok "E2E(x) 判定: 印(#1406)の付いたシナリオは、ok が偽でも、カウンタが 0 なら 0(ok は問わない)" "$(ej4 "$(EXB 0 0 0 0)")" 0
 ok "E2E(x) 判定: 印の付いたシナリオの pageErrors が 1 なら 1" "$(ej4 "$(EXB 1 0 0 0)")" 1
 ok "E2E(x) 判定: 印の付いたシナリオの consoleErrors が 1 なら 1" "$(ej4 "$(EXB 0 1 0 0)")" 1
-ok "E2E(x) 判定: 印の付いたシナリオの stuckToasts が 1 なら 1" "$(ej4 "$(EXB 0 0 1 0)")" 1
+ok "E2E(x) 判定: 印の付いたシナリオの stuckToasts が 1 でも 0(その印の Issue が、その表示の欠陥を扱う)" "$(ej4 "$(EXB 0 0 1 0)")" 0
 ok "E2E(x) 判定: 印の付いたシナリオの failedRequests が 1 なら 1" "$(ej4 "$(EXB 0 0 0 1)")" 1
 ok "E2E(x) 判定: 印の付いたシナリオが通ったら 0 のまま、警告を標準エラーに出す(落とさない)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true '"#1406"' 0 0 0 0),$(SC c true null 0 0 0 0)")")/$(grep -q '警告' "$T/ej.err" && echo warned)" "0/warned"
 ok "E2E(x) 判定: 印の無い全て正常なら、警告を出さない" "$(ej4 "$G")/$(grep -q '警告' "$T/ej.err" && echo warned || echo quiet)" "0/quiet"
+ok "E2E(x) 判定: 印の付いたシナリオの、ok が真で stuckToasts が 1 でも 0(印の Issue の欠陥)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true '"#1421"' 0 0 1 0),$(SC c true null 0 0 0 0)")")" 0
+EFD="$top/tools/e2e/scenarios/smoke/file-open-demo.mjs"
+ok "E2E(x): file-open-demo に、既知の欠陥の印(expectFail: '#<番号>')が付いている(既に在る欠陥で門を止めない)" "$(grep -cE "expectFail: '#[0-9]+'" "$EFD")" 1
+ok "E2E(x): 止まりの閾値(engine が running の時間)は 90 秒(この runner は GPU が無く、起動が遅い)" "$(grep -cF 'ms > 90000' "$top/tools/e2e/lib/detect.mjs")" 1
+ok "E2E(x): 窓の表の取得の再試行の回数を、シナリオの JSON に出す(dumpRetries)" "$(grep -cF 'out.dumpRetries = ' "$top/tools/e2e/run.mjs")" 1
+ok "E2E(x): 停止の理由を、シナリオの JSON に出す(engineStop)" "$(grep -cF 'out.engineStop = ' "$top/tools/e2e/run.mjs")" 1
+ok "E2E(x): 1 本のシナリオだけを動かす --only が在り、名前が無ければ止まる(run.mjs)" "$(grep -cF 'args.only' "$top/tools/e2e/run.mjs" | awk '{print ($1>=1)?1:0}')/$(grep -cF 'is not a scenario of the set' "$top/tools/e2e/run.mjs")" "1/1"
 DS19=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(x): 「19」の節に、門の位置・判定・expectFail・artifact・120 Hz に届かない事実の扱い(落とさない)と judge.jq を書いた" "$(for w in 'e2e-' 'expectFail' '120 Hz' '落とさない' 'judge.jq'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 5
+ok "設計(x): 「19」の節に、既に在る欠陥は expectFail(Issue の番号つき)にして、門は新しい退行だけを止めること、expectFail でも pageErrors・consoleErrors・failedRequests は 0 を求めることを書いた" "$(for w in '既に在る欠陥' '新しい退行' 'pageErrors'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 3
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

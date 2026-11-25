@@ -94,4 +94,20 @@ describe('readAppView', () => {
     expect(v?.cursorShared).toBe(true);
     expect(v?.windows[0]?.title).toBe('abc');
   });
+  it('the strings of a window follow its bytes: a read after a change of the class or the title gives the new strings, and a read of the same bytes gives the same ones', () => {
+    const win = (cls: string, title: string) => [{ lid: 7, flags: 1, owner: 0, x: 0, y: 0, w: 1, h: 1, cls, title }];
+    const a = build({ seq: 1, windows: win('TOldClass', 'Old title') });
+    const first = readAppView(a.buf, a.ptr);
+    expect(first?.windows[0]?.className).toBe('TOldClass');
+    expect(first?.windows[0]?.title).toBe('Old title');
+    const again = readAppView(a.buf, a.ptr, 0);
+    expect(again?.windows[0]?.title).toBe('Old title');
+    const t = new Uint8Array(AV_TITLE_BYTES); t.set(new TextEncoder().encode('Renamed'));
+    new Uint8Array(a.buf, a.ptr + AV_HEADER_BYTES + 48 + AV_CLASS_BYTES, AV_TITLE_BYTES).set(t);
+    expect(readAppView(a.buf, a.ptr)?.windows[0]?.title).toBe('Renamed');
+    const b = build({ seq: 2, windows: win('TNewClass', 'New title') });
+    const changed = readAppView(b.buf, b.ptr, 1);
+    expect(changed?.windows[0]?.className).toBe('TNewClass');
+    expect(changed?.windows[0]?.title).toBe('New title');
+  });
 });

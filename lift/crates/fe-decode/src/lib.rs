@@ -23,6 +23,7 @@ pub mod jumptab;
 pub mod relocseeds;
 pub mod seh;
 pub mod setjmp;
+pub mod survey;
 
 pub use indirect::{How, Resolved};
 pub use jumptab::{JumpTable, Options, Origin, Select, Spec};

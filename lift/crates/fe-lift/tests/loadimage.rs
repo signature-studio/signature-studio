@@ -91,6 +91,17 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(name, &o, strict);
             v.push(o);
         }
+        let o = dir.join("win_trace_off.o");
+        let cc = Command::new("clang")
+            .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-c"])
+            .arg(manifest().join("tests/support/win_trace_off.c"))
+            .arg("-o")
+            .arg(&o)
+            .env("TMPDIR", work_dir().join("tmp"))
+            .output()
+            .expect("clang not found");
+        assert!(cc.status.success(), "clang failed for win_trace_off.c: {}", String::from_utf8_lossy(&cc.stderr));
+        v.push(o);
         let o = dir.join("image.o");
         let cc = Command::new("clang")
             .args(["-O0", "-std=gnu11", "-w", "-fPIE", "-c", "-I"])

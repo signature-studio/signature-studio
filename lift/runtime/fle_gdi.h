@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "fle_raster.h"
+#include "fle_cursor.h"
 
 /* Handles of the virtual GDI objects (decision 0054): FLE_GDI_HANDLE_BASE + 4 * (slot + 1). The pages give no value for a GDI
  * handle. The Learn page "Interprocess communication" (64-bit Windows programming) says that only the lower 32 bits of a handle
@@ -129,6 +130,10 @@ uint64_t fle_gdi_dc_font(uint64_t hdc);
  * number of live objects, the number of live created palettes, the number of entries of a live palette (0 otherwise) and its
  * entry i as the 32-bit little-endian value peRed | peGreen << 8 | peBlue << 16 | peFlags << 24 (0 when out of range). */
 int fle_gdi_kind(uint64_t h);
+
+/* Decision 0260 (PROVISIONAL), #1392: the picture of a cursor made by CreateIconIndirect (fIcon FALSE), read from the bitmaps it copied when it was made (fle_gdi.c, CreateIconIndirect). 1 with *out (out->raw
+ * holds the pixels, out->rgba is valid until the next call) for a live made cursor whose bitmaps have a form that is read; 0 with *why for any other handle (a resource cursor, an icon, a deleted handle) or a form that is not read. */
+int fle_gdi_cursor_picture(uint64_t h, fle_cursor_pic *out, const char **why);
 uint64_t fle_gdi_live_count(void);
 uint64_t fle_gdi_palette_live_count(void);
 uint32_t fle_gdi_palette_count(uint64_t h);

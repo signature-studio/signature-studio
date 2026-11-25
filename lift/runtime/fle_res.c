@@ -614,6 +614,203 @@ int fle_cursor_load_named(const char *api, uint64_t inst, uint64_t name, uint64_
     return 1;
 }
 
+/* Decision 0260 (PROVISIONAL), #1392: the picture of a cursor that fle_cursor_load_named answered (fle_res.h). The handle says which image and which entry: k = 0 is the lifted DLL, k >= 1 a real module
+ * (the handle is FLE_LI_MODULE_HANDLE_BASE + FLE_LI_REALMOD_STRIDE * k + 4 * q, fle_loadimage.h); q in FLE_LI_NAMED_FIRST.. is the position p of the name among the named RT_GROUP_CURSOR entries (the directory's order), q in 1..6 an
+ * ordinal 32762..32767. Learn (Resource File Formats, RESDIR; Cursor resources): the group is a NEWHEADER (Reserved 0, ResType 2) and its entries (14 bytes: width, height, planes, bit count, bytes, the id of the
+ * RT_CURSOR); the RT_CURSOR starts with the hot spot (two WORDs: x, y), then a BITMAPINFOHEADER (biHeight is twice the height), the palette of a 1, 4 or 8 bit DIB, the XOR mask and the AND mask (1 bit per
+ * pixel, each row padded to 4 bytes, the bottom row first). A group with other than one entry is not read here: the lifted DLL's groups have one entry each (measured), and the page gives no rule for a choice.
+ * Malformed data returns 0 with *why, and does not stop the run: the picture is asked for by the page, not by the guest. */
+static uint8_t cursor_pic_rgba[FLE_CURSOR_PIC_MAX * FLE_CURSOR_PIC_MAX * 4];
+
+static int cursor_pic_fail(const char **why, const char *msg)
+{
+    *why = msg;
+    return 0;
+}
+
+int fle_cursor_picture(uint64_t hnd, fle_cursor_pic *out, const char **why)
+{
+    static const char api[] = "fle_cursor_picture";
+    res_img im;
+    res_key kt, kn;
+    uint64_t base, off, data, cdata, p;
+    uint32_t q, k, pos = 0, ordinal = 0, named, f, off2, nn, a, entry, size, csize, cnt, cid, w, h2, hh, bpp, clr, palN, planes, comp, xstride, astride, xoff, aoff, x, y, src, bit, rawv, i, n;
+    uint32_t hx, hy, r = 0, g = 0, b = 0;
+    uint8_t pal[256][3];
+    uint8_t *d;
+
+    if (hnd < FLE_LI_MODULE_HANDLE_BASE) return cursor_pic_fail(why, "the handle is below the handles of the cursors of modules");
+    off = hnd - FLE_LI_MODULE_HANDLE_BASE;
+    if (off % 4u) return cursor_pic_fail(why, "the handle is not in the slot of a module cursor");
+    k = (uint32_t)(off / FLE_LI_REALMOD_STRIDE);
+    q = (uint32_t)((off % FLE_LI_REALMOD_STRIDE) / 4u);
+    if (k == 0) {
+        base = FLE_EXE_HANDLE;
+    } else {
+        if (!FLE_REALMOD_PRESENT() || k > fle_realmod_total() || !fle_realmod_image_mapped((int)k - 1)) return cursor_pic_fail(why, "the cursor is of a real module whose image is not mapped");
+        base = fle_realmod_base((int)k - 1);
+    }
+    if (q >= FLE_LI_NAMED_FIRST && q < FLE_LI_NAMED_FIRST + FLE_LI_NAMED_MAX) {
+        named = 1;
+        pos = q - FLE_LI_NAMED_FIRST;
+    } else if (q >= 1u && q <= (uint32_t)(FLE_LI_MODULE_LAST - FLE_LI_MODULE_FIRST + 1)) {
+        named = 0;
+        ordinal = (uint32_t)FLE_LI_MODULE_FIRST + q - 1u;
+    } else {
+        return cursor_pic_fail(why, "the handle is not a cursor that LoadCursorW loaded from a module");
+    }
+    img_open(api, &im, base);
+    kt.is_id = 1;
+    kt.id = 12u;   /* RT_GROUP_CURSOR */
+    kt.nlen = 0;
+    if (im.dir_rva == 0 || !table_find(api, &im, 0, &kt, &f)) return cursor_pic_fail(why, "the image has no RT_GROUP_CURSOR");
+    if (!(f >> 31)) fle_stop(api, "malformed resource directory (data entry at the type level)");
+    if (named) {
+        off2 = f & 0x7fffffffu;
+        nn = d16(api, &im, off2 + 12);
+        if (pos >= nn) return cursor_pic_fail(why, "the name's position is not one of the named RT_GROUP_CURSOR entries");
+        a = d32(api, &im, off2 + 16u + 8u * pos);
+        if (!(a >> 31)) fle_stop(api, "malformed resource directory (name entry without the string flag)");
+        a &= 0x7fffffffu;
+        n = d16(api, &im, a);
+        if (n > RES_NAME_MAX) return cursor_pic_fail(why, "the group's name is longer than the page's limit");
+        kn.is_id = 0;
+        kn.nlen = n;
+        for (i = 0; i < n; i++) kn.name[i] = d16(api, &im, a + 2u + 2u * i);
+        kn.name[n] = 0;
+        {
+            uint32_t j;
+            for (j = 0; j < n && j < 63u; j++) out->name[j] = kn.name[j] >= 0x20u && kn.name[j] < 0x7fu ? (char)kn.name[j] : '?';
+            out->name[j] = 0;
+        }
+    } else {
+        kn.is_id = 1;
+        kn.id = ordinal;
+        kn.nlen = 0;
+        out->name[0] = 0;
+    }
+    if (find_leaf(api, &im, &kt, &kn, &entry) != 0) return cursor_pic_fail(why, "the RT_GROUP_CURSOR of the handle is not in the image");
+    leaf_data(api, &im, entry, &data, &size);
+    if (size < 6u + 14u) return cursor_pic_fail(why, "the RT_GROUP_CURSOR is shorter than its NEWHEADER and one entry");
+    if ((uint16_t)fle_ld(data, 2) != 0 || (uint16_t)fle_ld(data + 2, 2) != 2) return cursor_pic_fail(why, "the RT_GROUP_CURSOR NEWHEADER is not (Reserved 0, ResType RES_CURSOR)");
+    cnt = (uint16_t)fle_ld(data + 4, 2);
+    if (cnt != 1u || 6ull + 14ull * cnt > size) return cursor_pic_fail(why, "the RT_GROUP_CURSOR does not have exactly one entry that fits: the size is not chosen (not read)");
+    cid = (uint16_t)fle_ld(data + 6u + 12u, 2);
+    kt.id = 1u;   /* RT_CURSOR */
+    kn.is_id = 1;
+    kn.id = cid;
+    kn.nlen = 0;
+    if (find_leaf(api, &im, &kt, &kn, &entry) != 0) return cursor_pic_fail(why, "the RT_CURSOR that the group names is not in the image");
+    leaf_data(api, &im, entry, &cdata, &csize);
+    if (csize < 4u + 40u) return cursor_pic_fail(why, "the RT_CURSOR is shorter than its hot spot and BITMAPINFOHEADER");
+    hx = (uint16_t)fle_ld(cdata, 2);
+    hy = (uint16_t)fle_ld(cdata + 2, 2);
+    p = cdata + 4u;
+    if ((uint32_t)fle_ld(p, 4) != 40u) return cursor_pic_fail(why, "the RT_CURSOR's DIB header is not a BITMAPINFOHEADER (size 40)");
+    w = (uint32_t)fle_ld(p + 4, 4);
+    h2 = (uint32_t)fle_ld(p + 8, 4);
+    planes = (uint16_t)fle_ld(p + 12, 2);
+    bpp = (uint16_t)fle_ld(p + 14, 2);
+    comp = (uint32_t)fle_ld(p + 16, 4);
+    clr = (uint32_t)fle_ld(p + 32, 4);
+    if (planes != 1u || comp != 0u) return cursor_pic_fail(why, "the RT_CURSOR's DIB is compressed or has more than one plane");
+    if (w == 0u || w > FLE_CURSOR_PIC_MAX || h2 == 0u || (h2 & 1u) || h2 / 2u > FLE_CURSOR_PIC_MAX) return cursor_pic_fail(why, "the RT_CURSOR's size is not read (above 256, or biHeight is not twice the height)");
+    hh = h2 / 2u;
+    if (bpp != 1u && bpp != 4u && bpp != 8u && bpp != 24u && bpp != 32u) return cursor_pic_fail(why, "the RT_CURSOR's bit count is not 1, 4, 8, 24 or 32");
+    palN = bpp <= 8u ? (clr ? clr : 1u << bpp) : 0u;
+    if (bpp <= 8u && palN > (1u << bpp)) return cursor_pic_fail(why, "the RT_CURSOR's palette has more entries than its bit count");
+    for (i = 0; i < palN; i++) {
+        p = cdata + 4u + 40u + 4u * i;
+        pal[i][0] = (uint8_t)fle_ld(p + 2, 1);
+        pal[i][1] = (uint8_t)fle_ld(p + 1, 1);
+        pal[i][2] = (uint8_t)fle_ld(p, 1);
+    }
+    xstride = ((w * bpp + 31u) / 32u) * 4u;
+    astride = ((w + 31u) / 32u) * 4u;
+    xoff = 4u + 40u + 4u * palN;
+    aoff = xoff + xstride * hh;
+    if ((uint64_t)aoff + (uint64_t)astride * hh > csize) return cursor_pic_fail(why, "the RT_CURSOR is shorter than its XOR and AND masks");
+    out->width = w;
+    out->height = hh;
+    out->hot_x = hx;
+    out->hot_y = hy;
+    out->cursor_id = cid;
+    out->named = named;
+    out->ordinal = named ? pos : ordinal;
+    out->invert = 0;
+    out->alpha = 0;
+    out->transparent = 0;
+    out->opaque = 0;
+    if (bpp == 32u) {   /* Learn (CreateIconIndirect): the colour bitmap with an alpha byte is drawn with it; the AND mask is then ignored (decision 0260) */
+        for (y = 0; y < hh && !out->alpha; y++) {
+            uint64_t row = cdata + xoff + (uint64_t)xstride * (hh - 1u - y);
+            for (x = 0; x < w && !out->alpha; x++) out->alpha = fle_ld(row + 4u * x + 3u, 1) != 0;
+        }
+    }
+    for (y = 0; y < hh; y++) {
+        src = hh - 1u - y;
+        for (x = 0; x < w; x++) {
+            uint64_t xrow = cdata + xoff + (uint64_t)xstride * src, arow = cdata + aoff + (uint64_t)astride * src;
+            d = cursor_pic_rgba + 4u * (y * w + x);
+            if (bpp == 32u && out->alpha) {
+                uint64_t px = xrow + 4u * x;   /* the bytes of a pixel: B, G, R, alpha */
+                d[0] = (uint8_t)fle_ld(px + 2, 1);
+                d[1] = (uint8_t)fle_ld(px + 1, 1);
+                d[2] = (uint8_t)fle_ld(px, 1);
+                d[3] = (uint8_t)fle_ld(px + 3, 1);
+                if (d[3] == 0) out->transparent++;
+                else if (d[3] == 255) out->opaque++;
+                continue;
+            }
+            bit = (uint32_t)((fle_ld(arow + (x >> 3), 1) >> (7u - (x & 7u))) & 1u);
+            if (bpp == 1u) {
+                rawv = (uint32_t)((fle_ld(xrow + (x >> 3), 1) >> (7u - (x & 7u))) & 1u);
+            } else if (bpp == 4u) {
+                uint32_t byte = (uint32_t)fle_ld(xrow + (x >> 1), 1);
+                rawv = (x & 1u) ? (byte & 15u) : (byte >> 4);
+            } else if (bpp == 8u) {
+                rawv = (uint32_t)fle_ld(xrow + x, 1);
+            } else {
+                uint64_t px = xrow + (uint64_t)(bpp / 8u) * x;
+                b = (uint32_t)fle_ld(px, 1);
+                g = (uint32_t)fle_ld(px + 1, 1);
+                r = (uint32_t)fle_ld(px + 2, 1);
+                rawv = r | (g << 8) | (b << 16);
+            }
+            if (bpp <= 8u) {
+                if (rawv >= palN) return cursor_pic_fail(why, "a pixel names a palette entry that the palette does not have");
+                r = pal[rawv][0];
+                g = pal[rawv][1];
+                b = pal[rawv][2];
+            }
+            if (bit) {
+                if (rawv != 0) {
+                    d[0] = 0;
+                    d[1] = 0;
+                    d[2] = 0;
+                    d[3] = 255;
+                    out->invert++;
+                } else {
+                    d[0] = 0;
+                    d[1] = 0;
+                    d[2] = 0;
+                    d[3] = 0;
+                    out->transparent++;
+                }
+            } else {
+                d[0] = (uint8_t)r;
+                d[1] = (uint8_t)g;
+                d[2] = (uint8_t)b;
+                d[3] = 255;
+                out->opaque++;
+            }
+        }
+    }
+    out->rgba = cursor_pic_rgba;
+    out->raw = NULL;
+    return 1;
+}
+
 /* Decision 0129 (PROVISIONAL), S-version-info-real-resource: the bytes of the RT_VERSION resource (type 16) of the image mapped at FLE_EXE_HANDLE (the lifted DLL, FLEngine_x64.dll), for
  * version!GetFileVersionInfoSizeW / GetFileVersionInfoW / VerQueryValueW (fle_vfs.c). It is the resource that the PE holds, byte for byte (a VS_VERSIONINFO: Learn "VS_VERSIONINFO structure" and
  * "Version Information"); no value is made here. Returns 1 with *va = the VA of the data inside the mapped image and *size = its size, or 0 when the image has no RT_VERSION resource (the leaf is

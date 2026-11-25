@@ -3,7 +3,7 @@
 //   failedRequests: requests that failed (requestfailed) and responses of 4xx or 5xx.
 //   stuckToasts: a live region (role=status, role=alert, aria-live) that is visible with text for more than 10 s without a change. The three persistent
 //     status regions of the page are not counted: #status (the engine's status line), #audio-status and #taskbar (both are on the page at all times).
-//   engineStops: the engine reported exited or error. engineStuckRunning: the engine stayed in `running` for more than 20 s.
+//   engineStops: the engine reported exited or error. engineStuckRunning: the engine stayed in `running` for more than 90 s.
 //   permissionChanges: a clipboard permission whose state changed during an action that must not change it (the scenario says which).
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MAX_DETAILS = 40;
@@ -87,7 +87,8 @@ export function watchEngine(guest) {
         if (runStart === null) runStart = now;
         const ms = now - runStart;
         if (ms > w.runningMs) w.runningMs = ms;
-        if (ms > 20000) w.stuckRunning = true;
+        // this runner has no GPU and the 4K start is slow (DPR 2.86: 24 s to the first idle); a start that never ends is the boot check's (boot-bundle.mjs, tools/boot-hang)
+        if (ms > 90000) w.stuckRunning = true;
       } else runStart = null;
       if (s && (s.state === 'exited' || s.state === 'error') && (w.last === null || w.last.state !== s.state)) {
         w.stops++;
@@ -100,4 +101,22 @@ export function watchEngine(guest) {
     busy = false;
   }, 250);
   return { w, stop: async () => { clearInterval(timer); for (let i = 0; i < 40 && busy; i++) await sleep(50); return w; } };
+}
+
+// the engine's stop, read after it stopped (a test aid): the beacon's engine.exit (the page's own record of the stop: message, stop {lastFle, stopLine, abortKind,
+// memoryBytes}, evidence; the page cleans the text before it leaves) and the stop report in the engine's log from its "== stop:" line on (the runtime message,
+// the abort kind, the guest registers R[0..15] and the return address at the stop). Read only: perf.snapshot builds a record and sends nothing.
+const EXIT_FACTS = `(() => {
+  const a = window.__app;
+  if (!a || !a.perf) return null;
+  const exit = a.perf.snapshot('exit').engine?.exit ?? null;
+  const lines = a.engineLog().map((l) => (l.startsWith('[err] ') ? l.slice(6) : l));
+  let at = -1;
+  for (let i = lines.length - 1; i >= 0 && at < 0; i--) if (lines[i].includes('== stop:')) at = i;
+  return { exit, report: at < 0 ? [] : lines.slice(at, at + 40).map((l) => l.slice(0, 200)) };
+})()`;
+
+/** the stop facts of the engine as the scenario's JSON carries them (null: the page has no engine yet) */
+export async function engineExitFacts(page) {
+  return page.evaluate(EXIT_FACTS);
 }

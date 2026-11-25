@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, SCREEN_MAX, SCREEN_MIN, type GuestScreenInfo, type Room } from '../../src/ui/screen-fit.ts';
+import { chooseGuestScreen, drawScale, restartNeeded, RoomDebouncer, screenEnv, SCREEN_DEFAULT, SCREEN_MAX, SCREEN_MIN, type GuestScreenInfo, type Room } from '../../src/ui/screen-fit.ts';
 import { beaconProblems } from '../../shared/perf.ts';
 import { AV_HEADER_BYTES, AV_MAGIC, AV_VERSION, AV_WINDOW_BYTES, readAppView } from '../../src/engine/appview.ts';
 import { clientToScreen } from '../../src/input/tracker.ts';
@@ -162,5 +162,19 @@ describe('what the engine reports about its screen (fle_av_poll words 12 and 13,
   });
   it('the one mode the page writes is accepted by the validator', () => {
     for (const mode of ['fit']) expect(beaconProblems({ v: 3, sid: '0123456789ab', guestScreen: { mode, source: 'default', width: 100, height: 100, reported: true, dpi: null, roomWidth: null, roomHeight: null, dpr: 1, follow: 'reload' } }).filter((p) => p.startsWith('guestScreen'))).toEqual([]);
+  });
+});
+
+describe('the restart notice (#1348: FL takes its scale at its start)', () => {
+  it('a ratio with the same percent as the start needs no restart; another percent does', () => {
+    const base = Math.PI / 2;
+    expect(restartNeeded(base, base)).toBe(false);
+    expect(restartNeeded(base, base + 0.004)).toBe(false);
+    expect(restartNeeded(base, base + 0.01)).toBe(true);
+    expect(restartNeeded(base + 0.01, base)).toBe(true);
+  });
+  it('a ratio that is not positive counts as 1', () => {
+    expect(restartNeeded(0, 1)).toBe(false);
+    expect(restartNeeded(1, 0)).toBe(false);
   });
 });

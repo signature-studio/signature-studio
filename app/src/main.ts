@@ -13,8 +13,10 @@ import { blockingMissing, describeMissing, detectFeatures, type FeatureReport } 
 import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
 import type { AppView } from './engine/appview.ts';
 import type { HostFileStats } from './engine/hostfiles.ts';
-import type { GuestTextBest, GuestTextNear } from './engine/protocol.ts';
-import { type CursorChoice, cursorCss } from './ui/cursor.ts';
+import type { FromWorker, GuestTextBest, GuestTextNear } from './engine/protocol.ts';
+import { scaleNearest } from './engine/cursor-picture.ts';
+import { CURSOR_IMAGE_MAX, type CursorChoice, type CursorPictureState, cursorCss } from './ui/cursor.ts';
+import { base64Of, pngDataUrl } from './ui/png.ts';
 import { DesktopView } from './ui/desktop.ts';
 import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
 import { LatencyTracker, toAnyFrame, type InputMeta } from './ui/latency.ts';
@@ -22,7 +24,7 @@ import { stopLines } from './ui/stop-message.ts';
 import { EngineLogView, renderThreads, renderWindows } from './ui/panels.ts';
 import { stageRows, Timeline, type StageId } from './ui/phases.ts';
 import { ProgressView } from './ui/progress.ts';
-import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
+import { chooseGuestScreen, drawScale, restartNeeded, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
 import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, DeskHistory, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
@@ -353,7 +355,32 @@ window.addEventListener('resize', applyDisplay);
 const roomTimers = { set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms), clear: (h: unknown): void => clearTimeout(h as ReturnType<typeof setTimeout>) };
 const roomFollower = new RoomDebouncer((room) => followRoom(room), roomTimers);
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { applyDisplay(); roomFollower.push(measureRoom()); }).observe($('stage'));
-window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', applyDisplay);
+// #1348: the ratio the engine started with (FL takes its scale and DPI at its start); null before the start
+let bootDpr: number | null = null;
+/** #1348: the restart notice (data-restart-notice): shown when the ratio now differs in percent from the one FL started with */
+function renderRestartNotice(): void {
+  $('restart-note').hidden = bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1);
+}
+// #1348: the ratio changes (a browser zoom, a move to another monitor): the room is measured again, so that the guest's screen follows it (the engine is told the new size),
+// and the restart notice is shown or hidden. The ratio is read again on each of three signals: the query for the ratio the page has (kept, and made again after each change: a
+// query is for one ratio), the window's resize, and a timer (250 ms) that reads the ratio itself, since a change of the ratio does not always reach the query.
+let lastDpr = window.devicePixelRatio || 1;
+function onDevicePixelRatio(): void {
+  const dpr = window.devicePixelRatio || 1;
+  if (dpr === lastDpr) return;
+  lastDpr = dpr;
+  applyDisplay();
+  roomFollower.push(measureRoom());
+  renderRestartNotice();
+}
+let dprQuery: MediaQueryList | null = null;
+function watchDevicePixelRatio(): void {
+  dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`) ?? null;
+  dprQuery?.addEventListener?.('change', () => { onDevicePixelRatio(); watchDevicePixelRatio(); }, { once: true });
+}
+watchDevicePixelRatio();
+window.addEventListener('resize', onDevicePixelRatio);
+setInterval(onDevicePixelRatio, 250);
 
 $('stop-btn').addEventListener('click', () => { endRequested = true; client.stop(); });
 
@@ -397,6 +424,8 @@ function applyScreenParam(manifest: Manifest): void {
   app.screen.asked = { width: g.width, height: g.height, env };
   app.screen.guest = { width: g.width, height: g.height };
   app.screen.room = room;
+  bootDpr = room.dpr;
+  renderRestartNotice();
   applyDisplay();
   addLog('info', `guest screen ${g.width}x${g.height} device px for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr} (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
   if (g.clamped) addLog('warn', `the room is outside what the engine accepts (${640}x${480}..${7680}x${4320}): the size was pulled inside it`);
@@ -406,13 +435,15 @@ function applyScreenParam(manifest: Manifest): void {
 // the engine's state as the page sees it (src/ui/engine-status.ts)
 const clock: EngineClockState = { startedAt: null, firstIdleAt: null, lastIdleAt: null, lastResumeAt: null, ended: null, error: false, cycles: [] };
 let engineHasInput = false;
-const nowAbs = (): number => performance.timeOrigin + performance.now();
+const TIME_ORIGIN = performance.timeOrigin;   // constant for the document: read once (see input/pointer.ts)
+const nowAbs = (): number => TIME_ORIGIN + performance.now();
 const inputEnabled = (): boolean => engineHasInput && clock.firstIdleAt !== null && clock.ended === null && app.error === null;
 
 let inputSeq = 0;
 let lastInput: { desc: string; at: number; screen: { x: number; y: number } | null } | null = null;
 function sendRaw(ev: RawInput, from: string, meta?: InputMeta, user = true): void {
-  const tPage = nowAbs();
+  // a DOM input is sent from its listener, so the listener's start is the instant it was handled (one clock read per input, not two)
+  const tPage = meta ? meta.tListener : nowAbs();
   const seq = ++inputSeq;
   if (!user) { client.sendInput(seq, tPage, ev); return; }   // decision 0212: a display change is not a person's input: it is not counted and its answer is not a latency sample
   app.inputEvents++;
@@ -601,6 +632,26 @@ perfPanel.addEventListener('toggle', () => { if (perfPanel.open) displayMonitor.
 $('perf-send-note').textContent = ' · 測定値はこのサーバーに送られます';
 setInterval(renderPerf, 1000);
 
+/** #1392: the pictures of the cursors the guest loaded from its modules or made with CreateIconIndirect, by handle (the engine sends one before each osstate that names its handle) */
+const cursorPictures = new Map<number, CursorPictureState>();
+/** #1392: the engine's picture of a cursor as the page shows it: the PNG of the engine's pixels, and its copies at 2x and 3x (nearest neighbour, the same pixels; only where the copy fits the browser's cursor size), with the hot spot */
+const pictureLogged = new Map<number, string>();
+function pictureState(m: Extract<FromWorker, { t: 'cursorpic' }>): CursorPictureState {
+  if (m.picture === null) return { ok: false, why: m.why };
+  const p = m.picture;
+  const source = p.made ? 'made by CreateIconIndirect' : p.named ? p.name : `ordinal ${p.ordinal}`;
+  const images = [1, 2, 3].filter((k) => p.width * k <= CURSOR_IMAGE_MAX && p.height * k <= CURSOR_IMAGE_MAX);
+  if (images.length === 0) return { ok: false, why: `the picture is ${p.width} x ${p.height}, larger than a cursor the browser shows (${CURSOR_IMAGE_MAX} px)` };
+  const rgba = new Uint8Array(p.rgba);
+  const what = `the guest's cursor ${source}${p.made ? '' : `: RT_CURSOR ${p.cursorId}`}, ${p.width} x ${p.height}, hot spot ${p.hotX}, ${p.hotY}; ${p.alpha ? `drawn with the alpha bytes (${p.transparent} transparent, ${p.opaque} opaque pixels)` : `${p.invert} pixels drawn black (AND 1, XOR not 0)`}`;
+  if (pictureLogged.get(m.handle) !== what) { pictureLogged.set(m.handle, what); addLog('info', what); }
+  return {
+    ok: true, images: images.map((k) => ({ scale: k, url: pngDataUrl(p.width * k, p.height * k, scaleNearest(p.width, p.height, rgba, k)) })),
+    hotX: p.hotX, hotY: p.hotY, source, cursorId: p.cursorId, width: p.width, height: p.height, invert: p.invert, alpha: p.alpha,
+    ...(p.raw !== null ? { raw: base64Of(new Uint8Array(p.raw)) } : {}),
+  };
+}
+
 /** #1390: what the engine's cursor reports were that the page could not show as they are (a count per report of a state, not per pointer move) */
 function recordCursor(c: CursorChoice): void {
   if (c.unmapped) {
@@ -612,13 +663,30 @@ function recordCursor(c: CursorChoice): void {
   if (c.unresolved) app.cursorRecord.unresolved++;
 }
 
+/** the guest's cursor as the last osstate named it (applied again when the device pixel ratio changes: the picture's copies depend on it) */
+let guestCursor: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared' | 'cursorMade'> | null = null;
+function applyGuestCursor(): CursorChoice {
+  const c = cursorCss(guestCursor, guestCursor ? cursorPictures.get(guestCursor.cursor) : undefined, window.devicePixelRatio);
+  app.cursor = c;
+  view.setCursor(c.css);
+  return c;
+}
+/** #1392: the device pixel ratio is read now and then: when it has changed (the window moved to a screen of another density), the cursor is given again for the new ratio */
+let shownDpr = window.devicePixelRatio;
+setInterval(() => {
+  if (window.devicePixelRatio === shownDpr) return;
+  shownDpr = window.devicePixelRatio;
+  applyGuestCursor();
+}, 250);
+
 const client = new EngineClient({
   deskCanvas: () => view.deskCanvas(),
+  cursorPicture(m) {
+    cursorPictures.set(m.handle, pictureState(m));
+  },
   osstate(m) {
-    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared, cursorMade: m.cursorMade });
-    app.cursor = c;
-    recordCursor(c);
-    view.setCursor(c.css);
+    guestCursor = { cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared, cursorMade: m.cursorMade };
+    recordCursor(applyGuestCursor());
     osTitle = m.title;
     syncPageTitle();
     syncGuestScreen({ screenW: m.screenW, screenH: m.screenH });

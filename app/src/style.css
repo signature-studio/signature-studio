@@ -69,6 +69,7 @@ details { margin-top: 8px; border-top: 1px solid #2a2e36; padding-top: 6px; } su
 #panel-toggle { background: #1d2128; color: #d8dce2; border: 1px solid #3a4150; font-size: 12px; padding: 2px 6px; cursor: pointer; }
 #display-box select:disabled { cursor: not-allowed; opacity: .7; }
 #resize-note { display: none; }
+#restart-note { display: none; }
 body.panel-off aside { display: none; }
 body.panel-off main { grid-template-columns: minmax(0, 1fr); }
 body.screen-fit { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
@@ -81,6 +82,7 @@ body.screen-fit #desktop { outline: none; }
 body.screen-fit aside { min-width: 0; min-height: 0; overflow: auto; padding: 0 8px 8px; border-left: 1px solid #2a2e36; box-sizing: border-box; }
 body.screen-fit #error, body.screen-fit #exit { position: absolute; top: 0; left: 0; right: 0; z-index: 2147482000; margin: 0; }
 body.screen-fit #resize-note:not([hidden]) { display: block; position: absolute; right: 12px; bottom: 12px; z-index: 2147482000; background: rgba(27, 34, 48, 0.94); border: 1px solid #5a8ad8; color: #e8ecf2; font-size: 13px; padding: 6px 10px; }
+body.screen-fit #restart-note:not([hidden]) { display: block; position: absolute; right: 12px; bottom: 44px; z-index: 2147482000; max-width: 60ch; background: rgba(27, 34, 48, 0.94); border: 1px solid #5a8ad8; color: #e8ecf2; font-size: 13px; padding: 6px 10px; }
 body.screen-fit #taskbar { position: absolute; left: 12px; bottom: 12px; z-index: 2147482000; }
 body.screen-fit #taskbar-restore { background: rgba(27, 34, 48, 0.94); color: #e8ecf2; border: 1px solid #5a8ad8; font-size: 13px; padding: 6px 12px; cursor: pointer; }
 body.screen-fit #taskbar-restore:focus-visible { outline: 2px solid #5a8ad8; outline-offset: 2px; }

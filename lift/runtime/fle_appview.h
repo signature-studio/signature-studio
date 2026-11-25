@@ -47,4 +47,19 @@ typedef struct {
 /* Fills the state and returns its address (always the same). Exported to JS in the browser build. */
 const fle_av_state *fle_av_poll(void);
 
+/* Decision 0260 (PROVISIONAL), #1392: the picture of a cursor that the guest loaded from a module or made with CreateIconIndirect (fle_cursor.h fle_cursor_pic), for the page, which shows it with CSS
+ * cursor: url(...). The worker asks for each handle that an osstate names (fle_cursor_picture_poll). All fields are little-endian 32-bit words in linear memory (app/src/engine/cursor-picture.ts reads them; app/test/unit/
+ * cursor-picture.test.ts pins the offsets to the static asserts of fle_appview.c). ok 0: no picture, and why holds the reason. named: 1 a resource loaded by name, 0 by ordinal, 2 made by
+ * CreateIconIndirect. alpha: 1 when the picture is drawn with the alpha bytes (fle_cursor.h). rgba_addr: the address of width * height * 4 bytes; raw_addr: for a made cursor the address of
+ * width * height * 6 bytes (fle_cursor.h), else 0 (both valid until the next call). */
+#define FLE_CP_MAGIC 0x50434c46u       /* "FLCP" as bytes 'F' 'L' 'C' 'P' */
+typedef struct {
+    uint32_t magic, ok, handle, width, height, hot_x, hot_y, cursor_id;   /* offsets 0 .. 31 */
+    uint32_t named, ordinal, invert, alpha, transparent, opaque, rgba_addr, raw_addr;   /* offsets 32 .. 63 */
+    char name[64];                     /* offset 64: the group's name when named is 1 (ASCII, NUL terminated) */
+    char why[128];                     /* offset 128: the reason when ok is 0 (ASCII, NUL terminated) */
+} fle_cursor_pic_state;                /* 256 bytes */
+
+const fle_cursor_pic_state *fle_cursor_picture_poll(uint32_t handle);
+
 #endif

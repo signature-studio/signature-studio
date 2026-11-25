@@ -1501,6 +1501,200 @@ void fle_imp_GetSysColor(void)
     R[0] = (idx >= 0 && idx < FLE_GDI_SYS_COLOR_COUNT) ? sys_colors[idx] : 0u;
 }
 
+/* ---- Decision 0260 (PROVISIONAL), #1392: the picture of a cursor made by CreateIconIndirect ---- */
+/* Learn (CreateIconIndirect): "The system copies the bitmaps in the ICONINFO structure before creating the icon or cursor", so the pixels are read at that call and kept with the cursor. Per pixel six
+ * bytes: a (the AND bit), nz (the XOR value is not 0), then the XOR colour r, g, b (a palette entry for a bitmap of 1, 4 or 8 bits, the colour of 24 or 32 bits), al (the alpha byte of 32 bits, else 0).
+ * A monochrome cursor (hbmColor NULL) has a mask twice the height: its top half is the AND mask and its bottom half the XOR mask (Learn ICONINFO). A DIB with a positive height is turned (its
+ * bottom row is the top row of the picture). A form that is not read (BI_RGB only; 1, 4, 8, 24 or 32 bits) leaves the cursor without a picture, and the reason is kept.
+ * The alpha byte of a 32-bit colour bitmap is kept too (per pixel the sixth byte): when one of them is not 0 the cursor is drawn with the alpha (fle_cursor.h). */
+typedef struct {
+    uint32_t w, h, hx, hy;
+    uint8_t *raw;                           /* w * h * 6 bytes; NULL when the form is not read */
+    const char *why;                        /* the reason when raw is NULL */
+    int alpha;                              /* 1: the colour bitmap is 32 bits and an alpha byte is not 0 */
+} gdi_cpic;
+
+static const uint8_t *cpic_row(const fle_rsurf *v, uint32_t row)
+{
+    uint32_t mem = v->bottom_up ? v->height - 1u - row : row;
+
+    return v->bits + (size_t)mem * v->stride;
+}
+
+/* The XOR value of pixel x of image row `row` of a view: out[0] = 1 when the value is not 0; out[1..3] = red, green, blue; out[4] = the alpha byte (32 bits only, else 0). 0 with *why when the form is not read. */
+static int cpic_xor(const fle_rsurf *v, uint32_t x, uint32_t row, uint8_t out[5], const char **why)
+{
+    const uint8_t *p = cpic_row(v, row);
+    uint32_t idx = 0, c = 0;
+
+    out[4] = 0;
+    switch (v->bpp) {
+    case 1: idx = (p[x >> 3] >> (7u - (x & 7u))) & 1u; break;
+    case 4: idx = (x & 1u) ? (p[x >> 1] & 15u) : (p[x >> 1] >> 4); break;
+    case 8: idx = p[x]; break;
+    case 24: c = p[3u * x] | ((uint32_t)p[3u * x + 1] << 8) | ((uint32_t)p[3u * x + 2] << 16); break;
+    case 32: c = p[4u * x] | ((uint32_t)p[4u * x + 1] << 8) | ((uint32_t)p[4u * x + 2] << 16); out[4] = p[4u * x + 3]; break;
+    default: *why = "a bitmap of this bit count is not read (1, 4, 8, 24 or 32 bits only)"; return 0;
+    }
+    if (v->bpp <= 8u) {
+        if (!v->clr || idx >= v->ncolors) { *why = "a pixel names a colour table entry that does not exist"; return 0; }
+        c = v->clr[idx];
+        out[0] = idx != 0;
+    } else {
+        out[0] = c != 0;
+    }
+    out[1] = (uint8_t)(c >> 16);
+    out[2] = (uint8_t)(c >> 8);
+    out[3] = (uint8_t)c;
+    return 1;
+}
+
+static gdi_cpic *cpic_make(uint64_t hmask, uint64_t hcolor, uint32_t hx, uint32_t hy)
+{
+    fle_rsurf mv, cv;
+    gdi_cpic *p = (gdi_cpic *)calloc(1, sizeof *p);
+    const char *why = NULL;
+    uint32_t w, mh, h, x, y, any_alpha = 0;
+    uint8_t xo[5];
+
+    if (!p) return NULL;
+    p->hx = hx;
+    p->hy = hy;
+    if (!fle_gdi_bitmap_view(hmask, &mv) || mv.bpp != 1u || mv.comp != 0u) {
+        p->why = "hbmMask is not a 1-bit bitmap of a form this model reads";
+        return p;
+    }
+    w = mv.width;
+    mh = mv.height;
+    if (hcolor == 0) {
+        if (mh < 2u || (mh & 1u)) {
+            p->why = "hbmMask of a monochrome cursor has an odd height";
+            return p;
+        }
+        h = mh / 2u;
+    } else {
+        if (!fle_gdi_bitmap_view(hcolor, &cv) || cv.comp != 0u || cv.width != w || cv.height != mh) {
+            p->why = "hbmColor is not a bitmap of a form this model reads (BI_RGB, the size of hbmMask)";
+            return p;
+        }
+        h = mh;
+    }
+    if (w == 0u || h == 0u || w > FLE_CURSOR_PIC_MAX || h > FLE_CURSOR_PIC_MAX) {
+        p->why = "the cursor is empty or larger than 256 pixels: not read";
+        return p;
+    }
+    p->raw = (uint8_t *)malloc((size_t)w * h * 6u);
+    if (!p->raw) {
+        p->why = "no memory for the picture of the cursor";
+        return p;
+    }
+    p->w = w;
+    p->h = h;
+    for (y = 0; y < h; y++) {
+        const uint8_t *mrow = cpic_row(&mv, y);
+
+        for (x = 0; x < w; x++) {
+            uint8_t *d = p->raw + 6u * (y * w + x);
+            int ok = hcolor == 0 ? cpic_xor(&mv, x, h + y, xo, &why) : cpic_xor(&cv, x, y, xo, &why);
+
+            if (!ok) {
+                free(p->raw);
+                p->raw = NULL;
+                p->why = why;
+                return p;
+            }
+            d[0] = (mrow[x >> 3] >> (7u - (x & 7u))) & 1u;
+            d[1] = xo[0];
+            d[2] = xo[1];
+            d[3] = xo[2];
+            d[4] = xo[3];
+            d[5] = xo[4];
+            any_alpha |= xo[4];
+        }
+    }
+    p->alpha = hcolor != 0 && cv.bpp == 32u && any_alpha != 0;
+    return p;
+}
+
+static void cpic_release(gdi_obj *o)
+{
+    gdi_cpic *p = (gdi_cpic *)o->ext;
+
+    if (p) free(p->raw);
+    free(p);
+    o->ext = NULL;
+}
+
+/* the rule of the decision (as fle_res.c, fle_cursor.h): with alpha, the alpha byte; else AND 0, the XOR colour, opaque; AND 1 and XOR 0, transparent; AND 1 and XOR not 0, opaque black (the screen is inverted there: no CSS form) */
+static uint8_t cpic_rgba[FLE_CURSOR_PIC_MAX * FLE_CURSOR_PIC_MAX * 4];
+
+int fle_gdi_cursor_picture(uint64_t h, fle_cursor_pic *out, const char **why)
+{
+    gdi_obj *o = live_obj(h);
+    const gdi_cpic *p;
+    uint32_t i, n;
+
+    if (!o || o->kind != FLE_GDI_KIND_ICONCUR) {
+        *why = "the handle is not a live cursor made by CreateIconIndirect";
+        return 0;
+    }
+    if (o->u[0]) {
+        *why = "an icon made by CreateIconIndirect: its picture is not read (a cursor's hot spot is the one it gives)";
+        return 0;
+    }
+    p = (const gdi_cpic *)o->ext;
+    if (!p) {
+        *why = "the cursor was made without its picture (no memory for it)";
+        return 0;
+    }
+    if (!p->raw) {
+        *why = p->why ? p->why : "the cursor's bitmaps are not read";
+        return 0;
+    }
+    memset(out, 0, sizeof *out);
+    out->width = p->w;
+    out->height = p->h;
+    out->hot_x = p->hx;
+    out->hot_y = p->hy;
+    out->named = 2;
+    out->alpha = p->alpha;
+    n = p->w * p->h;
+    for (i = 0; i < n; i++) {
+        const uint8_t *s = p->raw + 6u * i;
+        uint8_t *d = cpic_rgba + 4u * i;
+
+        if (p->alpha) {
+            d[0] = s[2];
+            d[1] = s[3];
+            d[2] = s[4];
+            d[3] = s[5];
+            if (s[5] == 0) out->transparent++;
+            else if (s[5] == 255) out->opaque++;
+        } else if (!s[0]) {
+            d[0] = s[2];
+            d[1] = s[3];
+            d[2] = s[4];
+            d[3] = 255;
+            out->opaque++;
+        } else if (s[1]) {
+            d[0] = 0;
+            d[1] = 0;
+            d[2] = 0;
+            d[3] = 255;
+            out->invert++;
+        } else {
+            d[0] = 0;
+            d[1] = 0;
+            d[2] = 0;
+            d[3] = 0;
+            out->transparent++;
+        }
+    }
+    out->rgba = cpic_rgba;
+    out->raw = p->raw;
+    return 1;
+}
+
 /* user32!CreateIconIndirect: HICON f(PICONINFO piconinfo rcx). Learn (CreateIconIndirect): "creates an icon or cursor from an ICONINFO structure"; "The system copies the bitmaps in the ICONINFO structure
  * before creating the icon or cursor. Because the system may temporarily select the bitmaps in a device context, the hbmMask and hbmColor members of the ICONINFO structure should not already be selected into
  * a device context. The application must continue to manage the original bitmaps and delete them"; Learn (ICONINFO): fIcon TRUE is an icon and FALSE a cursor; "If this structure defines an icon, the hot spot
@@ -1547,6 +1741,7 @@ void fle_imp_CreateIconIndirect(void)
     o->u[4] = m->bm[1];
     o->u[5] = (uint32_t)has_color;
     issue(o, FLE_GDI_KIND_ICONCUR);
+    if (!o->u[0]) o->ext = cpic_make(hmask, hcolor, hx, hy);   /* #1392 (decision 0260): the pixels of a cursor, read now */
     R[0] = slot_handle(slot);
 }
 
@@ -3184,6 +3379,7 @@ static void destroy_icon_or_cursor(const char *api, int cursor_only)
     if (cursor_only && o->u[0]) fle_stop(api, "hCursor is an icon (fIcon TRUE): DestroyCursor is defined for cursors, DestroyIcon for icons (decision 0111)");
     if (h == cur_cursor) fle_stop(api, "the handle is the current cursor of SetCursor: the page says the cursor must not be in use and gives no result for one that is");
     o->state = ST_DELETED;                  /* the kind stays (like a deleted DC): a second call is told from a handle that never was an icon */
+    cpic_release(o);                        /* #1392: the picture of a cursor made by CreateIconIndirect goes with it */
     objs_live--;
     slot_release((uint64_t)i);
     R[0] = 1;

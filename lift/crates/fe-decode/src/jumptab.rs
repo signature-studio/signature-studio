@@ -33,6 +33,11 @@
 //! front of it because the compiler scheduled other instructions into the gap (`recognize_msvc_scheduled`). Its N comes from every
 //! way into the idiom (`derive_scheduled_guard`: at most two, each a `cmp I,imm` and an unsigned branch; a loop-rotated switch has a
 //! second guard at the bottom of the loop) and the same two post-closure checks as the swapped form.
+//! Decision 0430 (issue #1413) adds three things, all on the default path: the table-relative form `movsxd rT,[B+I*4]` whose table
+//! starts at B (`table_load_rel`, `read_rel_targets`); the guard on a slot in memory, `cmp dword [M],N; ja; ...; movsxd I,[M]`, whose
+//! index is reloaded from the same slot (`index_reload`, `mem_key`); and the base proof through `mov B,S` copies (`prove_value`,
+//! with a copy cycle assumed for a pair (register, site) already on the stack). The repository has no decision log, so 0430 is not
+//! registered anywhere: the number only labels the change in these comments and in pm-work/findings/switch-tables.md.
 
 use crate::{Decoded, Text};
 use fe_pe::Pe;
@@ -106,6 +111,8 @@ pub enum Origin {
         function: u32,
         swapped: Option<u64>,
         entry2: Option<(u64, u64)>,
+        /// Decision 0430: the table-relative form (entries are signed offsets from the table, which starts at the base register's value).
+        rel: bool,
     },
 }
 
@@ -649,6 +656,9 @@ pub struct MsvcForm {
     /// block is its fall-through side). Decision 0109: also `Some` for the scheduled form (`SwapForm::scheduled`), whose guard is
     /// derived the same way, from all the ways into the idiom (`derive_scheduled_guard`).
     pub swapped: Option<SwapForm>,
+    /// Decision 0430: the table-relative form `movsxd rT,[B+I*4]`. The table starts at B itself (B is a `lea` of the table, not the
+    /// image base) and its entries are signed offsets from B. `t2` is then the RVA of that table (set by `resolve_msvc`).
+    pub rel: bool,
 }
 
 /// What `recognize_msvc` found of the swapped form `mov eX,[B+I*4+T2]; add B,rX; jmp B` (decision 0095).
@@ -724,6 +734,60 @@ fn table_load(i: &Instruction, rt: Register, b: Register) -> Option<(Register, u
     Some((idx, disp_u32(i)?))
 }
 
+/// `movsxd rT,dword [B + I*4]` (64-bit rT, no displacement, no segment override): the table-relative form, whose entries are signed
+/// offsets from B itself (the table starts at B). Returns I. Decision 0430.
+fn table_load_rel(i: &Instruction, rt: Register, b: Register) -> Option<Register> {
+    if i.mnemonic() != Mnemonic::Movsxd
+        || i.op_count() != 2
+        || i.op0_kind() != OpKind::Register
+        || i.op0_register() != rt
+        || i.op_kind(1) != OpKind::Memory
+        || i.memory_size().size() != 4
+        || i.segment_prefix() != Register::None
+        || i.is_ip_rel_memory_operand()
+        || i.memory_base() != b
+        || i.memory_index_scale() != 4
+        || i.memory_displacement64() != 0
+    {
+        return None;
+    }
+    let idx = i.memory_index();
+    if !idx.is_gpr64() || idx == b || idx == Register::RSP {
+        return None;
+    }
+    Some(idx)
+}
+
+/// `movsxd I,dword [M]` or `mov eI,dword [M]` (the index reloaded from a slot, decision 0430): I is `idx`, M a plain memory operand
+/// (a base and no index, no segment, no RIP base), with the base neither B nor I.
+fn index_reload(i: &Instruction, idx: Register, b: Register) -> bool {
+    matches!(i.mnemonic(), Mnemonic::Movsxd | Mnemonic::Mov)
+        && i.op_count() == 2
+        && i.op0_kind() == OpKind::Register
+        && i.op0_register().full_register() == idx
+        && i.op_kind(1) == OpKind::Memory
+        && i.memory_size().size() == 4
+        && i.segment_prefix() == Register::None
+        && !i.is_ip_rel_memory_operand()
+        && i.memory_index() == Register::None
+        && i.memory_base() != Register::None
+        && i.memory_base() != b
+        && i.memory_base() != idx
+}
+
+/// The address form of the one memory operand of `i`: two instructions name the same slot when these are equal.
+fn mem_key(i: &Instruction) -> (Register, Register, u32, u64, Register, bool, usize) {
+    (
+        i.memory_base(),
+        i.memory_index(),
+        i.memory_index_scale(),
+        i.memory_displacement64(),
+        i.segment_prefix(),
+        i.is_ip_rel_memory_operand(),
+        i.memory_size().size(),
+    )
+}
+
 /// `movzx eX,byte [B + I0 + T1]` with X = `x` (either order of the two registers): returns (I0, T1).
 fn byte_load(i: &Instruction, x: Register, b: Register) -> Option<(Register, u32)> {
     if i.mnemonic() != Mnemonic::Movzx
@@ -795,21 +859,30 @@ pub fn recognize_msvc_standard(insns: &BTreeMap<u64, Instruction>, va: u64, jmp:
     }
     let b = add.op1_register();
     let Some(ld) = prev_insn(insns, add.ip())? else { return Ok(None) };
-    let Some((idx, t2)) = table_load(ld, rt, b) else { return Ok(None) };
+    // decision 0430: the table-relative load `movsxd rT,[B+I*4]` (no two-stage form, the table starts at B)
+    let (idx, t2, rel) = match table_load(ld, rt, b) {
+        Some((idx, t2)) => (idx, t2, false),
+        None => match table_load_rel(ld, rt, b) {
+            Some(idx) => (idx, 0, true),
+            None => return Ok(None),
+        },
+    };
     // (c2) when the instruction before the load is the byte load of the index; otherwise (c1)
     let (first, i0, t1) = match prev_insn(insns, ld.ip())? {
-        Some(zx) => match byte_load(zx, idx, b) {
+        Some(zx) if !rel => match byte_load(zx, idx, b) {
             Some((i0, t1)) => (zx.ip(), i0, Some(t1)),
             None => (ld.ip(), idx, None),
         },
-        None => (ld.ip(), idx, None),
+        _ => (ld.ip(), idx, None),
     };
     // between the `ja` and the idiom only instructions that leave the checked index as it is: `lea B,[rip+d]` (writes B
     // only; B is not the index) and `cdqe` (the index is in rax and, after `cmp .., N; ja` with N < 4096, its value is
     // below 2^31, which `cdqe` keeps), and a padding `nop` (decision 0093: changes no register, flag or memory). At most
-    // MSVC_SKIP of them. Anything else: N is not derived.
+    // MSVC_SKIP of them. Anything else: N is not derived. Decision 0430: the index may also be reloaded from the slot the
+    // guard compares (`cmp dword [M],N; ja; movsxd I,[M]; ...`), one such reload, which counts against MSVC_SKIP too.
     let mut cur = first;
     let mut skipped = 0;
+    let mut reload: Option<Instruction> = None;
     let ja = loop {
         let Some(i) = prev_insn(insns, cur)? else {
             return Err(format!("N not derived: the closure decoded nothing before {cur:#x}"));
@@ -824,36 +897,54 @@ pub fn recognize_msvc_standard(insns: &BTreeMap<u64, Instruction>, va: u64, jmp:
                 && i.op_kind(1) == OpKind::Memory
                 && i.is_ip_rel_memory_operand())
             || is_padding_nop(i);
-        if !neutral {
+        let is_reload = !neutral && reload.is_none() && i0 == idx && index_reload(i, idx, b);
+        if !neutral && !is_reload {
             return Err("N not derived: no `ja` before the table idiom (only `cdqe`, `lea B,[rip+d]` and `nop` may sit between)".into());
         }
         skipped += 1;
         if skipped > MSVC_SKIP {
             return Err("N not derived: too many instructions between the `ja` and the table idiom".into());
         }
+        if is_reload {
+            reload = Some(*i);
+        }
         cur = i.ip();
     };
     let Some(cmp) = prev_insn(insns, ja.ip())? else {
         return Err("N not derived: the closure decoded nothing before the `ja`".into());
     };
-    if !(cmp.mnemonic() == Mnemonic::Cmp
-        && cmp.op_count() == 2
-        && cmp.op0_kind() == OpKind::Register
-        && matches!(cmp.op0_register().size(), 4 | 8)
-        && cmp.op0_register().full_register() == i0
-        && matches!(
-            cmp.op1_kind(),
-            OpKind::Immediate8 | OpKind::Immediate8to32 | OpKind::Immediate8to64 | OpKind::Immediate32 | OpKind::Immediate32to64
-        ))
-    {
+    let imm_op = matches!(
+        cmp.op1_kind(),
+        OpKind::Immediate8 | OpKind::Immediate8to32 | OpKind::Immediate8to64 | OpKind::Immediate32 | OpKind::Immediate32to64
+    );
+    let slot_guard = match &reload {
+        // the reloaded index is compared in its slot: `cmp dword [M],imm` on the same 32-bit slot
+        Some(r) => {
+            cmp.mnemonic() == Mnemonic::Cmp
+                && cmp.op_count() == 2
+                && cmp.op0_kind() == OpKind::Memory
+                && cmp.memory_size().size() == 4
+                && imm_op
+                && mem_key(&cmp) == mem_key(r)
+        }
+        None => {
+            cmp.mnemonic() == Mnemonic::Cmp
+                && cmp.op_count() == 2
+                && cmp.op0_kind() == OpKind::Register
+                && matches!(cmp.op0_register().size(), 4 | 8)
+                && cmp.op0_register().full_register() == i0
+                && imm_op
+        }
+    };
+    if !slot_guard {
         return Err("N not derived: no `cmp idx,imm` right before the `ja`".into());
     }
     let imm = cmp.immediate(1);
-    let n = if cmp.op0_register().size() == 4 { imm & 0xffff_ffff } else { imm };
+    let n = if reload.is_some() || cmp.op0_register().size() == 4 { imm & 0xffff_ffff } else { imm };
     if n >= MSVC_MAX_ENTRIES {
         return Err(format!("N not derived: the bound {n:#x} allows {MSVC_MAX_ENTRIES} or more entries"));
     }
-    Ok(Some(MsvcForm { first, from: ja.next_ip(), guard_ja: ja.ip(), guard_cmp: cmp.ip(), base: b, n, t1, t2, swapped: None }))
+    Ok(Some(MsvcForm { first, from: ja.next_ip(), guard_ja: ja.ip(), guard_cmp: cmp.ip(), base: b, n, t1, t2, swapped: None, rel }))
 }
 
 /// `jmp rT` at `va` is the end of an MSVC switch idiom of either form: the one of decisions 0089 and 0093 or, if that finds
@@ -866,6 +957,31 @@ pub fn recognize_msvc(insns: &BTreeMap<u64, Instruction>, va: u64, jmp: &Instruc
         Some(f) => Ok(Some(f)),
         None => recognize_msvc_swapped(insns, va, jmp),
     }
+}
+
+/// Whether the two instructions in front of the `jmp rT` at `va` are the `add rT,B` of the table idiom and the table load
+/// `[B+I*4+d]` before it (`mov eT` of decision 0089, or the table-relative `movsxd rT` of decision 0430), with or without a
+/// guard. The shape only: `fe-decode jmp-reg` uses it to tell a switch table from another `jmp reg` (`Ok(None)` of
+/// `recognize_msvc` says nothing about the shape).
+pub fn idiom_shape(insns: &BTreeMap<u64, Instruction>, va: u64, jmp: &Instruction) -> bool {
+    if jmp.mnemonic() != Mnemonic::Jmp || jmp.op_kind(0) != OpKind::Register || !jmp.op0_register().is_gpr64() {
+        return false;
+    }
+    let rt = jmp.op0_register();
+    let Ok(Some(add)) = prev_insn(insns, va) else { return false };
+    if !(add.mnemonic() == Mnemonic::Add
+        && add.op_count() == 2
+        && add.op0_kind() == OpKind::Register
+        && add.op0_register() == rt
+        && add.op1_kind() == OpKind::Register
+        && add.op1_register().is_gpr64()
+        && add.op1_register() != rt)
+    {
+        return false;
+    }
+    let b = add.op1_register();
+    let Ok(Some(ld)) = prev_insn(insns, add.ip()) else { return false };
+    table_load(ld, rt, b).is_some() || table_load_rel(ld, rt, b).is_some()
 }
 
 /// The standard table idiom `[movzx eX,byte [B+I0+T1];] mov eT,[B+I*4+T2]; add rT,B; jmp rT` read backwards from `jmp rT` at `va`,
@@ -893,13 +1009,19 @@ pub fn recognize_msvc_scheduled(insns: &BTreeMap<u64, Instruction>, va: u64, jmp
     }
     let b = add.op1_register();
     let Some(ld) = prev_insn(insns, add.ip())? else { return Ok(None) };
-    let Some((idx, t2)) = table_load(ld, rt, b) else { return Ok(None) };
+    let (idx, t2, rel) = match table_load(ld, rt, b) {
+        Some((idx, t2)) => (idx, t2, false),
+        None => match table_load_rel(ld, rt, b) {
+            Some(idx) => (idx, 0, true),
+            None => return Ok(None),
+        },
+    };
     let (first, i0, t1) = match prev_insn(insns, ld.ip())? {
-        Some(zx) => match byte_load(zx, idx, b) {
+        Some(zx) if !rel => match byte_load(zx, idx, b) {
             Some((i0, t1)) => (zx.ip(), i0, Some(t1)),
             None => (ld.ip(), idx, None),
         },
-        None => (ld.ip(), idx, None),
+        _ => (ld.ip(), idx, None),
     };
     Ok(Some(MsvcForm {
         first,
@@ -911,6 +1033,7 @@ pub fn recognize_msvc_scheduled(insns: &BTreeMap<u64, Instruction>, va: u64, jmp
         t1,
         t2,
         swapped: Some(SwapForm { load: first, add: add.ip(), index: i0, scheduled: true }),
+        rel,
     }))
 }
 
@@ -1015,6 +1138,7 @@ pub fn recognize_msvc_swapped(insns: &BTreeMap<u64, Instruction>, va: u64, jmp: 
         t1: None,
         t2,
         swapped: Some(SwapForm { load: ld.ip(), add: add.ip(), index: idx, scheduled: false }),
+        rel: false,
     }))
 }
 
@@ -1448,12 +1572,14 @@ fn cfg_succ(sw: &Sweep, k: usize, jmp: usize, targets: &[u64]) -> Vec<usize> {
 /// What defines B for `prove_base_reaching_defs`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum DefKind {
-    /// `lea B,[rip+d]` with rip+d = ImageBase
-    Lea,
+    /// `lea B,[rip+d]` (the address it loads is the value)
+    Lea(u64),
     /// any other write to B (also a `lea` of another address)
     Write,
     /// a call, when B is caller-saved: the callee may change it
     Call,
+    /// `mov B,S` with S a 64-bit register (decision 0430): B takes the value S has at this instruction
+    Move(Register),
 }
 
 #[derive(Clone, Copy)]
@@ -1490,15 +1616,42 @@ struct Def {
 /// enter the idiom after the load: `verify_msvc_swapped`, `landings_in_swapped_idioms`), and a definition that comes back
 /// to the load through the jump's own table or an indirect jump (the `add` included) is a non-`lea` definition that reaches it
 /// and rejects.
+///
+/// `expect`: the address every `lea` must load (the ImageBase for the standard form, decision 0094); `None` (decision 0430, the
+/// table-relative form): any address, but all the `lea`s that reach the site must load the same one. Returns that address.
 fn prove_base_reaching_defs(
-    pe: &Pe<'_>,
     sw: &Sweep,
     entry_va: u64,
     b: Register,
     jmp_va: u64,
     targets: &[u64],
     site_va: u64,
-) -> Result<(), String> {
+    expect: Option<u64>,
+) -> Result<u64, String> {
+    prove_value(sw, entry_va, b, jmp_va, targets, site_va, expect, expect, &mut Vec::new())
+}
+
+/// The most copies that `prove_value` nests (decision 0430): a `mov B,S` takes the value of S at that instruction.
+const COPY_DEPTH: usize = 8;
+
+/// `prove_base_reaching_defs` for register `b` at `site_va` (decision 0430). `expect` filters the `lea`s of this call (only the top
+/// call has it); `want` is the value every definition must give: given by the caller, or (top call, `None`) the one value of the
+/// `lea`s that reach the site directly. A `mov b,s` (64-bit both) gives the value that `s` has at that instruction, proven by a
+/// nested call for `s` at that instruction: the save and restore of the base across a call (`mov r12,r15` ... `mov r15,r12`).
+/// A cycle of such copies (a loop around the save and the restore) is assumed for the pair `(register, site)` already on the
+/// stack `hyp`: every value is fixed by the executions before it, so the assumption cannot hide a wrong value.
+#[allow(clippy::too_many_arguments)]
+fn prove_value(
+    sw: &Sweep,
+    entry_va: u64,
+    b: Register,
+    jmp_va: u64,
+    targets: &[u64],
+    site_va: u64,
+    expect: Option<u64>,
+    want: Option<u64>,
+    hyp: &mut Vec<(Register, u64)>,
+) -> Result<u64, String> {
     const ENTRY: usize = usize::MAX;
     let n = sw.insns.len();
     let entry = sw.index_of(entry_va).ok_or_else(|| format!("the function entry {entry_va:#x} does not decode in the sweep"))?;
@@ -1539,8 +1692,23 @@ fn prove_base_reaching_defs(
                 && i.op0_register() == b
                 && i.op_kind(1) == OpKind::Memory
                 && i.is_ip_rel_memory_operand()
-                && i.ip_rel_memory_address() == pe.optional.image_base;
-            defs[k] = Some(Def { kind: if is_lea { DefKind::Lea } else { DefKind::Write }, kills });
+                && expect.is_none_or(|v| i.ip_rel_memory_address() == v);
+            let is_move = i.mnemonic() == Mnemonic::Mov
+                && i.op_count() == 2
+                && i.op0_kind() == OpKind::Register
+                && i.op0_register() == b
+                && i.op1_kind() == OpKind::Register
+                && i.op1_register().is_gpr64()
+                && i.op1_register() != Register::RSP
+                && i.op1_register() != b;
+            let kind = if is_lea {
+                DefKind::Lea(i.ip_rel_memory_address())
+            } else if is_move {
+                DefKind::Move(i.op1_register())
+            } else {
+                DefKind::Write
+            };
+            defs[k] = Some(Def { kind, kills });
         }
     }
 
@@ -1603,8 +1771,9 @@ fn prove_base_reaching_defs(
     if let Some(d) = first(DefKind::Write) {
         let i = &sw.insns[d];
         let what = if i.mnemonic() == Mnemonic::Lea { "a `lea` of an address other than the ImageBase".to_string() } else { format!("`{:?}`", i.mnemonic()) };
+        let rule = if expect.is_some() { "with rip+d = ImageBase (decision 0094)" } else { "(decision 0430)" };
         return Err(format!(
-            "the definition of {b:?} at {:#x} ({what}) reaches {site_name} (directly, or through another indirect jump of the function, which lands anywhere) and is not `lea {b:?},[rip+d]` with rip+d = ImageBase (decision 0094)",
+            "the definition of {b:?} at {:#x} ({what}) reaches {site_name} (directly, or through another indirect jump of the function, which lands anywhere) and is not `lea {b:?},[rip+d]` {rule}",
             i.ip()
         ));
     }
@@ -1619,7 +1788,46 @@ fn prove_base_reaching_defs(
             "{b:?} is not defined on every path from the function entry {entry_va:#x} to {site_name}: a path arrives with the value of the caller (decision 0094; every reaching definition must be `lea {b:?},[rip+d]` = ImageBase)"
         ));
     }
-    Ok(())
+    let direct: BTreeSet<u64> = reaching
+        .iter()
+        .filter_map(|&d| match defs[d].map(|x| x.kind) {
+            Some(DefKind::Lea(v)) if d != ENTRY => Some(v),
+            _ => None,
+        })
+        .collect();
+    let want = match want {
+        Some(w) => w,
+        None => match direct.len() {
+            1 => *direct.iter().next().expect("one value"),
+            n => return Err(format!("the `lea` definitions of {b:?} that reach {site_name} load {n} different addresses (decision 0430)")),
+        },
+    };
+    if hyp.len() >= COPY_DEPTH {
+        return Err(format!("the copies of {b:?} before {site_name} are followed {COPY_DEPTH} deep (decision 0430)"));
+    }
+    hyp.push((b, site_va));
+    for &d in reaching.iter().filter(|&&d| d != ENTRY) {
+        match defs[d].map(|x| x.kind) {
+            Some(DefKind::Lea(v)) if v != want => {
+                return Err(format!("the `lea` at {:#x} loads {v:#x}, not {want:#x} (decision 0430)", sw.insns[d].ip()));
+            }
+            Some(DefKind::Move(src)) => {
+                let at = sw.insns[d].ip();
+                if hyp.contains(&(src, at)) {
+                    continue;
+                }
+                if let Err(e) = prove_value(sw, entry_va, src, jmp_va, targets, at, None, Some(want), hyp) {
+                    let rule = if expect.is_some() { "with rip+d = ImageBase (decision 0094)" } else { "(decision 0430)" };
+                    return Err(format!(
+                        "the definition of {b:?} at {at:#x} (`Mov`) reaches {site_name} (directly, or through another indirect jump of the function, which lands anywhere) and is not `lea {b:?},[rip+d]` {rule}: {src:?} is not proven at that copy ({e})"
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    hyp.pop();
+    Ok(want)
 }
 
 /// The base proof of decisions 0089, 1(a) and 0094: the definitions of B that reach the jump are all `lea B,[rip+d]` with rip+d = ImageBase
@@ -1628,7 +1836,7 @@ pub fn prove_base(pe: &Pe<'_>, sw: &Sweep, entry_va: u64, b: Register, jmp_va: u
     if !b.is_gpr64() || b == Register::RSP {
         return Err("the base register is not a general 64-bit register".into());
     }
-    prove_base_reaching_defs(pe, sw, entry_va, b, jmp_va, targets, jmp_va)
+    prove_base_reaching_defs(sw, entry_va, b, jmp_va, targets, jmp_va, Some(pe.optional.image_base)).map(|_| ())
 }
 
 /// Reads the tables of `f` and returns the distinct target VAs (ImageBase + RVA) in ascending order, or why they are not
@@ -1669,6 +1877,39 @@ fn read_msvc_targets(pe: &Pe<'_>, text: &Text<'_>, fm: &FuncMap, pieces: &[(u32,
         ));
     }
     Ok(rvas.into_iter().map(|r| pe.rva_to_va(r)).collect())
+}
+
+/// The targets of a table-relative switch (decision 0430): entry k (k in 0..=N) is the signed 32-bit offset of its target from
+/// `base`, the VA the table starts at. The checks are those of `read_msvc_targets`: each target lies in the pieces of the function,
+/// in an executable section, and decodes. Returns the distinct target VAs, ascending.
+fn read_rel_targets(pe: &Pe<'_>, text: &Text<'_>, pieces: &[(u32, u32)], base: u64, n: u64) -> Result<Vec<u64>, String> {
+    let count = n as usize + 1;
+    let rva = pe.va_to_rva(base).map_err(|e| format!("table address: {e}"))?;
+    let raw = pe.slice_at_rva(rva, 4 * count).map_err(|e| format!("table ({count} entries): {e}"))?;
+    let vas: BTreeSet<u64> =
+        raw.chunks_exact(4).map(|c| base.wrapping_add(i32::from_le_bytes([c[0], c[1], c[2], c[3]]) as i64 as u64)).collect();
+    let mut outside: Vec<String> = Vec::new();
+    for &va in &vas {
+        let inside = pe.va_to_rva(va).is_ok_and(|r| pieces.iter().any(|&(b, e)| r >= b && r < e)) && text.contains(va);
+        if !inside {
+            outside.push(format!("{va:#x}{}", if text.contains(va) { "" } else { " (not executable)" }));
+            continue;
+        }
+        if !matches!(text.decode(va), Decoded::Ok(_)) {
+            return Err(format!("target {va:#x} does not decode"));
+        }
+    }
+    if !outside.is_empty() {
+        let shown: Vec<&str> = outside.iter().take(8).map(String::as_str).collect();
+        return Err(format!(
+            "target outside the function: {} of {} distinct target(s): {}{}",
+            outside.len(),
+            vas.len(),
+            shown.join(", "),
+            if outside.len() > 8 { ", ..." } else { "" }
+        ));
+    }
+    Ok(vas.into_iter().collect())
 }
 
 /// The tables of a scheduled switch (decision 0109) must lie in sections without IMAGE_SCN_MEM_WRITE (or in the headers, which the
@@ -1742,13 +1983,26 @@ pub fn resolve_msvc(
             }
         }
     };
-    let targets = read_msvc_targets(pe, text, fm, pieces, &form);
-    if swapped.is_some() {
-        prove_base_reaching_defs(pe, sw, entry_va, form.base, jmp_va, targets.as_deref().unwrap_or(&[]), site)?;
+    let (form, targets) = if form.rel {
+        // decision 0430: the base is the table itself, so the value the reaching `lea`s load is the table's VA. The targets are read
+        // from that table; the proof is then run again with the jump's own targets as edges, and must load the same value
+        let probe = prove_base_reaching_defs(sw, entry_va, form.base, jmp_va, &[], site, None)?;
+        let targets = read_rel_targets(pe, text, pieces, probe, form.n)?;
+        let base = prove_base_reaching_defs(sw, entry_va, form.base, jmp_va, &targets, site, None)?;
+        if base != probe {
+            return Err(format!("the base loads {probe:#x} on one path and {base:#x} with the jump's own targets as edges (decision 0430)"));
+        }
+        let t2 = pe.va_to_rva(base).map_err(|e| format!("table address: {e}"))?;
+        (MsvcForm { t2, ..form }, targets)
     } else {
-        prove_base(pe, sw, entry_va, form.base, jmp_va, targets.as_deref().unwrap_or(&[]))?;
-    }
-    let targets = targets?;
+        let targets = read_msvc_targets(pe, text, fm, pieces, &form);
+        if swapped.is_some() {
+            prove_base_reaching_defs(sw, entry_va, form.base, jmp_va, targets.as_deref().unwrap_or(&[]), site, Some(pe.optional.image_base))?;
+        } else {
+            prove_base(pe, sw, entry_va, form.base, jmp_va, targets.as_deref().unwrap_or(&[]))?;
+        }
+        (form, targets?)
+    };
     // decision 0109: the gap of a scheduled idiom may hold stores, so the tables it reads must be where the program cannot change them
     if f.swapped.is_some_and(|s| s.scheduled) {
         scheduled_tables_are_read_only(pe, &form)?;
@@ -1769,6 +2023,7 @@ pub fn resolve_msvc(
             function: primary,
             swapped,
             entry2,
+            rel: form.rel,
         },
     })
 }
