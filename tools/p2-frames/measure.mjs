@@ -89,7 +89,6 @@ const TICK = `(() => { const s = window.__app.deskStats; return { t: performance
 // the presenter's cumulative counters (the page's deskStats: the render Worker's 'desk' report, at most every 100 ms); read at the window's two ends, the window's per-present values are their differences
 const DESK = `(() => { const s = window.__app.deskStats; if (!s) return null; const o = {}; for (const k of ['presents', 'rects', 'pixels', 'whole', 'composeMs', 'putMs', 'uploads', 'uploadBytes', 'draws', 'drawMs', 'drawPixels', 'texAllocs']) o[k] = typeof s[k] === 'number' ? s[k] : 0; return o; })()`;
 const AUDIO = `(() => { const a = window.__app; return a && a.audio ? a.audio.detail() : null; })()`;
-const AUDIO_AT = `(() => { const r = document.getElementById('audio-status').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
 const log = (...a) => process.stderr.write(`${new Date().toISOString().slice(11, 19)} ${a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')}\n`);
 const timed = (p, ms, what) => {
@@ -217,11 +216,9 @@ async function main() {
       await S('Input.dispatchKeyEvent', { type: 'keyUp', code, key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
     };
     if (load === 'b') {
-      // the audio output starts with a gesture of the page's own (the status line is outside the desktop: the guest gets no event)
-      const at = await ev(AUDIO_AT);
-      await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, button: 'none', buttons: 0, pointerType: 'mouse' });
-      await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-      await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+      // the audio output starts with a gesture of the page's own: a key press (Issue #1481: the page has no visible element to press; a modifier key alone is no gesture in Chrome, so F24)
+      await S('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: 'F24', key: 'F24', windowsVirtualKeyCode: 0x87, nativeVirtualKeyCode: 0x87 });
+      await S('Input.dispatchKeyEvent', { type: 'keyUp', code: 'F24', key: 'F24', windowsVirtualKeyCode: 0x87, nativeVirtualKeyCode: 0x87 });
       const running = async (ms) => {
         const t0 = Date.now();
         for (;;) {

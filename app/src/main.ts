@@ -39,8 +39,6 @@ import { bindAudioStatus } from './audio/status.ts';
 import { FileDialogView, SavedFilesView } from './ui/filedlg.ts';
 import { PageClipboard, type ClipboardState } from './engine/clipboard.ts';
 import type { FileDlgRequest } from './engine/filedlg.ts';
-import { mountFiles } from './files/mount.ts';
-import { EngineFiles } from './files/engine-dialog.ts';
 import { filesUsage } from './files/usage.ts';
 import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
@@ -109,7 +107,7 @@ interface AppApi {
   hz: { hz: number | null; measurement: HzMeasurement | null; warning: string | null };
   /** decision 0212: the guest's screen. `asked` is what the page put into the engine's environment (null: nothing, the engine's own 1920x1080); `reported` is what the engine says it uses (fle_av_poll: screen_w, screen_h; null until the first
    *  report, {0,0} from a build that does not report it); `guest` is what the desktop is drawn for now; `room` the room measured at the last layout */
-  screen: { panelOpen: boolean; engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; room: Room | null; notes: string[] };
+  screen: { engineFollows: boolean | null; resizes: { room: Room; guest: { width: number; height: number }; sent: boolean; at: number }[]; asked: { width: number; height: number; env: Record<string, string> } | null; reported: { width: number; height: number } | null; guest: { width: number; height: number }; room: Room | null; notes: string[] };
   /** decision 0193: the page's answers to the engine's file dialogs (no file names) and the files the engine wrote (Save dialog targets) */
   fileDlg: { readonly open: boolean; readonly history: FileDialogView['history']; /** for the record of decision 0193: whether the page had a transient user activation (navigator.userActivation.isActive) and how long ago the page's last trusted pointer or key event was, when each engine request arrived */ readonly requests: { id: number; save: boolean; at: number; activationActive: boolean | null; msSinceInput: number | null; /** what the engine asked (its own strings: types, title, folder, suggested name) */ request: FileDlgRequest }[] };
   saved: SavedFilesView['files'];
@@ -160,14 +158,9 @@ interface AppApi {
 declare global { interface Window { __app?: AppApi } }
 
 const view = new DesktopView($('desktop'));
-// decision 0193: the engine's file dialogs are answered here by the person; the answer (File objects) goes to the Worker, never to a server
-const engineFiles = new EngineFiles((kind, text) => addLog(kind, text));
-// decision 0216 stage 2 (opfs1): the engine's Open / Save are answered by the file manager window (OPFS)
-const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), select: engineFiles.select });
-// decision 0216 (opfs1): the browser-files window (OPFS); a header button and an overlay, the layout is untouched
-const filesHandle = mountFiles(document.querySelector('header') as HTMLElement, () => $('desktop').focus({ preventScroll: true }));
-(window as unknown as { __files: unknown }).__files = Object.assign(filesHandle, { engine: engineFiles });
-const savedView = new SavedFilesView($('saved-files'), $('saved-list'));
+// decision 0193 / Issue #1481: the engine's file dialogs are answered by the person through the browser's file chooser (ui/filedlg.ts); the answer (File objects) goes to the Worker, never to a server
+const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), log: (kind, text) => addLog(kind, text) });
+const savedView = new SavedFilesView();
 const logEl = $('log');
 const addLog = (level: string, text: string): void => {
   logEl.textContent += `[${level}] ${text}\n`;
@@ -192,7 +185,7 @@ void pageClipboard.refresh();
 const app: AppApi = {
   assetsReport: () => assetsNow(),
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, cursorRecord: { unmapped: [], made: 0, unresolved: 0 }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
-  screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
+  screen: { engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   webview2Front: () => face.frontRects(),
   engineStatus: () => engineState(clock, performance.timeOrigin + performance.now()),
@@ -281,6 +274,7 @@ function showError(what: string, where: string, stage: StageId | null = null, ki
   setState('error', 'failed');
   const el = $('error');
   el.hidden = false;
+  $('exit').hidden = true;   // one note at a time: the error is the one shown (Issue #1481)
   el.replaceChildren();
   const w = document.createElement('div');
   w.textContent = what;
@@ -314,27 +308,8 @@ function applyDisplay(): void {
   view.setScale(scale);
   $('canvas-info').textContent = `guest screen ${g.width}x${g.height} device px in a room of ${room.width.toFixed(0)}x${room.height.toFixed(0)} CSS px (scale ${scale.toFixed(4)} CSS px per guest px, device pixel ratio ${dpr}, ${(g.width * g.height / 1e6).toFixed(2)} Mpx)`;
 }
-// decision 0212: the toolbar and the engine's status lines are in the monitor panel so that the stage is the desktop and nothing else; the panel button; the room follower
-const panelBtn = $<HTMLButtonElement>('panel-toggle');
-function setPanel(open: boolean): void {
-  document.body.classList.toggle('panel-off', !open);
-  app.screen.panelOpen = open;
-  panelBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
-  panelBtn.textContent = open ? 'Monitor \u25B8' : '\u25C2 Monitor';
-  applyDisplay();
-}
-$('resize-reload').addEventListener('click', () => location.reload());
+// Issue #1481: the page is the guest's screen and nothing else (the header, the monitor panel and the notes are hidden in index.html; the stage fills the window)
 document.body.classList.add('screen-fit');
-{
-  const sec = document.createElement('section');
-  sec.id = 'display-section';
-  const h = document.createElement('h2');
-  h.textContent = 'Display and engine';
-  sec.append(h, $('toolbar'), $('engine-line'), $('pointer-info').parentElement as HTMLElement);
-  (document.querySelector('aside') as HTMLElement).prepend(sec);
-}
-panelBtn.addEventListener('click', () => setPanel(!app.screen.panelOpen));
-setPanel(true);
 // Issue #1362: the Browser panel's WebView2 face (ui/webview2-surface.ts). Its document is the bundle's lazy file that Navigate names: the bytes come once the download has arrived
 const lazyByPath = new Map<string, LazyFileShared>();
 async function lazyResource(path: string): Promise<Uint8Array | null> {
@@ -358,9 +333,12 @@ const roomFollower = new RoomDebouncer((room) => followRoom(room), roomTimers);
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { applyDisplay(); roomFollower.push(measureRoom()); }).observe($('stage'));
 // #1348: the ratio the engine started with (FL takes its scale and DPI at its start); null before the start
 let bootDpr: number | null = null;
-/** #1348: the restart notice (data-restart-notice): shown when the ratio now differs in percent from the one FL started with */
+/** #1348: the ratio now differs in percent from the one FL started with: the page's log says so once (Issue #1481: no notice is shown) */
+let restartNoted = false;
 function renderRestartNotice(): void {
-  $('restart-note').hidden = bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1);
+  if (restartNoted || bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1)) return;
+  restartNoted = true;
+  addLog('warn', 'the browser zoom changed after FL Studio started: FL Studio keeps the scale of its start until it is restarted');
 }
 // #1348: the ratio changes (a browser zoom, a move to another monitor): the room is measured again, so that the guest's screen follows it (the engine is told the new size),
 // and the restart notice is shown or hidden. The ratio is read again on each of three signals: the query for the ratio the page has (kept, and made again after each change: a
@@ -383,8 +361,6 @@ watchDevicePixelRatio();
 window.addEventListener('resize', onDevicePixelRatio);
 setInterval(onDevicePixelRatio, 250);
 
-$('stop-btn').addEventListener('click', () => { endRequested = true; client.stop(); });
-
 /** decision 0212: what the engine says about its screen (fle_av_poll); the desktop is drawn for what the engine uses, whatever the page asked for */
 function syncGuestScreen(v: Pick<AppView, 'screenW' | 'screenH'>): void {
   const rep = { width: v.screenW ?? 0, height: v.screenH ?? 0 };
@@ -404,11 +380,11 @@ function syncGuestScreen(v: Pick<AppView, 'screenW' | 'screenH'>): void {
 function followRoom(room: Room): void {
   const g = chooseGuestScreen(room);
   if (!app.screen.asked) return;
-  if (g.width === app.screen.asked.width && g.height === app.screen.asked.height) { $('resize-note').hidden = true; return; }
+  if (g.width === app.screen.asked.width && g.height === app.screen.asked.height) return;
   const rec = { room, guest: { width: g.width, height: g.height }, sent: false, at: nowAbs() };
   app.screen.resizes.push(rec);
   if (app.screen.resizes.length > 50) app.screen.resizes.shift();
-  if (app.screen.engineFollows === false) { const n = 'this engine build has no display-change entry (fle_g3_display); a reload takes the new size'; if (app.screen.notes[app.screen.notes.length - 1] !== n) { app.screen.notes.push(n); addLog('warn', n); } return; }
+  if (app.screen.engineFollows === false) { const n = 'this engine build has no display-change entry (fle_g3_display): the screen keeps the size it started with'; if (app.screen.notes[app.screen.notes.length - 1] !== n) { app.screen.notes.push(n); addLog('warn', n); } return; }
   if (!inputEnabled()) return;   // before the first idle: followRoom runs again at the first idle
   sendRaw({ k: 'display', kind: IN.DISPLAY, width: g.width, height: g.height }, 'room', undefined, false);
   rec.sent = true;
@@ -667,9 +643,10 @@ function recordCursor(c: CursorChoice): void {
 
 /** the guest's cursor as the last osstate named it (applied again when the device pixel ratio changes: the picture's copies depend on it) */
 let guestCursor: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared' | 'cursorMade'> | null = null;
+/** Issue #1481: the CSS of a cursor picture is a data: URL (the picture's PNG in Base64). The desktop gets the CSS; the page's state, its text and the tests' JSON name only its kind and length */
 function applyGuestCursor(): CursorChoice {
   const c = cursorCss(guestCursor, guestCursor ? cursorPictures.get(guestCursor.cursor) : undefined, window.devicePixelRatio);
-  app.cursor = c;
+  app.cursor = { ...c, css: c.css.includes('data:') ? `a picture (${c.css.length} characters of CSS)` : c.css };
   view.setCursor(c.css);
   return c;
 }
@@ -734,8 +711,6 @@ const client = new EngineClient({
       refreshPanels();
       endKind = 'idle';
       setState('engine-idle', 'engine idle (waiting for input)');
-      $('stop-btn').hidden = false;
-      $('stop-btn').textContent = 'End session';
       addLog('info', `engine idle (${m.n}) at virtual clock ${(m.now / 10000).toFixed(0)} ms; input ${m.caps.input ? 'is accepted from now on' : 'is NOT supported by this build'}; window list ${m.caps.appview ? 'is read from the engine' : 'is not available (no fle_av_poll)'}`);
       if (m.caps.input && document.activeElement === document.body) $('desktop').focus({ preventScroll: true });
       renderDesktopInfo();
@@ -743,7 +718,6 @@ const client = new EngineClient({
       beacons.firstIdle(); // after the state is "engine-idle": the beacon carries it
       if (app.screen.asked) followRoom(measureRoom());   // decision 0212: the room may have changed while the engine started
     }
-    fileDlgView.engineIdle();
     app.idles.push({ at, busyMs: m.busyMs, n: m.n, now: m.now, next: m.next, dwm: m.dwm ?? null });
     if (app.idles.length > 5000) app.idles.shift();
     const prev = cycleLast;
@@ -765,7 +739,6 @@ const client = new EngineClient({
   savedFile(f) {
     addLog('info', `the engine finished writing a file it was asked to save (${f.size} bytes); it is listed under "Files the engine wrote"`);
     savedView.add(f);
-    void engineFiles.onSavedFile(f);
   },
   inputDone: (items) => app.latency.done(items),
   inputDropped: (seq, reason) => app.latency.dropped(seq, reason),
@@ -788,7 +761,6 @@ const client = new EngineClient({
     el.dataset.kind = d.kind;
     el.replaceChildren(document.createTextNode(d.text));
     for (const n of d.notes) { const s = document.createElement('span'); s.className = 'note'; s.textContent = n; el.append(s); }
-    $('stop-btn').hidden = true;
     addLog(info.reason === 'trap' ? 'error' : 'info', `exit ${info.reason} code ${info.code}: ${info.message}`);
     renderPhases();
     if (phaseTimer) { clearInterval(phaseTimer); phaseTimer = null; }
@@ -921,8 +893,6 @@ async function boot(): Promise<void> {
     stamp('engine_start');
     clock.startedAt = nowAbs();
     perfRecorder.start(clock.startedAt);
-    $('stop-btn').hidden = false;
-    $('stop-btn').textContent = 'Stop engine';
     if (apiTraceWanted) client.windowApiTrace(true);   // #1347: on before the engine's first instruction, so the start-up's DPI answers are traced
     client.start();
     trackHz();

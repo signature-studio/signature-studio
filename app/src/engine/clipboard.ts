@@ -8,7 +8,7 @@
 //  - a paste: Ctrl+V gives the paste event's text (the browser fires paste for the focused desktop because the desktop does not cancel the key: see keymap.ts), which the next
 //    GetClipboardData gets, with no read and no prompt. Any other GetClipboardData (a paste from a menu) reads the clipboard: readText, which asks the person when the permission is
 //    'prompt'; 'denied' reads nothing and the reason is shown.
-// The reason of a refused paste or Copy is shown in the page's status line (#clipboard-status, role="status") for TOAST_MS (5 s), or until its close button. A question never shows it.
+// The reason of a refused paste or Copy is shown in the page's status line (#clipboard-status, role="status") for TOAST_MS (5 s), or until its close button. A question never shows it. Issue #1481: style.css hides that element (no notice is shown; the reason stays in state.message).
 // The browser decides what the page may do: navigator.permissions gives the state of 'clipboard-read' and 'clipboard-write'. The engine is not stopped by any of this.
 
 export type ClipboardPermission = 'clipboard-read' | 'clipboard-write';

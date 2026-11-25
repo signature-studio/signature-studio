@@ -1,7 +1,7 @@
 // P3 audio probe (Issue #1303): starts the page's AudioContext with CDP Input events (a press and a release on the page's status line, which the browser counts as a user gesture), starts the transport with a Space key, and reads the audio output's numbers (window.__app.audio.detail(): decision 0175 / 0211) over about 10 s. The product is not changed: every input is sent from here, and the start-up consent box is closed with "No thanks" from here too.
 // Usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--make-sound [--shot FILE]] > probe.json
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
-// --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
+// --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one key press (F24, the page has no status line to press since Issue #1481: it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
 // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. Except (Issue #1400, #1403): once the project is being opened, "error" says why (the guest does not open it, or the engine stops during the open) and the exit is 0 (the open is a result to report, not a failure of the probe). The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 // end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
@@ -81,8 +81,8 @@ const SOUND_WAIT_MS = 5000;
 const PCM_WAIT_MS = 5000;
 // the start-up consent box ("Help us improve FL Studio by sending usage data") is drawn in the guest picture (not a window). Its "No thanks" button is at this guest pixel on the 780x480 screen that the default window gives (measured with a screenshot: the box is gone after the press, the status line reads "last input: button L up at screen (513, 308)")
 const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };
-// --boot (#1334): the room (the stage: the viewport less the 340 px monitor panel and the 36 px header of style.css, screen-fit) is 1836x1056 CSS px at the device pixel ratio of the user's machine (1.7647 = 30/17: the guest screen is then 3240x1863 device px, floor of the room times the ratio); the poll of engine-idle; the three read times after engine-idle (+10, +70, +90 s; bootLast60sAt90s is the one the acceptance reads)
-const BOOT_VIEWPORT = { width: 1836 + 340, height: 1056 + 36, dpr: 30 / 17 };
+// --boot (#1334): the room (the stage: the whole viewport since Issue #1481, the header and the monitor panel are hidden) is 1836x1056 CSS px at the device pixel ratio of the user's machine (1.7647 = 30/17: the guest screen is then 3240x1863 device px, floor of the room times the ratio); the poll of engine-idle; the three read times after engine-idle (+10, +70, +90 s; bootLast60sAt90s is the one the acceptance reads)
+const BOOT_VIEWPORT = { width: 1836, height: 1056, dpr: 30 / 17 };
 const BOOT_POLL_MS = 50;
 const BOOT_READ_MS = { first: 10000, last: 70000, final: 90000 };
 const TRACE_MS = 50;
@@ -281,7 +281,7 @@ async function main() {
   }
 }
 
-// --boot (#1334): the one press that starts the AudioContext comes --press-at seconds after engine-idle (default 0; the status line, as startAudio does; no guest event). The window is t0+10 s to t0+70 s: nothing is sent to the guest in it, and the reads are taken at its two ends. The read at t0+90 s (bootLast60sAt90s: the last 60 s are t0+30 s to t0+90 s, past the start-up peak) comes after the one at +70 s.
+// --boot (#1334): the one press that starts the AudioContext comes --press-at seconds after engine-idle (default 0; a key press, as startAudio does (F24); no guest event). The window is t0+10 s to t0+70 s: nothing is sent to the guest in it, and the reads are taken at its two ends. The read at t0+90 s (bootLast60sAt90s: the last 60 s are t0+30 s to t0+90 s, past the start-up peak) comes after the one at +70 s.
 async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, pageSession) {
   const engine = await engineWorker(cdp, workers);
   if (engine === null) throw new Error('no engine Worker with fleAudioWorkerState (the boot window reads it)');
@@ -447,14 +447,10 @@ async function enginePublishGap(cdp, workers) {
   return null;
 }
 
-// the page's own start: a press and a release on the status line (outside the desktop, so the guest gets no pointer event). The browser counts them as a user gesture, and the page's listeners call resume(). A Shift key press is a second gesture, if the first one did not start the context.
+// the page's own start: a key press is a user gesture, and the page's listeners call resume() on it (audio/install.ts). Issue #1481: the page has no element of its own to press (its status line is hidden),
+// so the gesture is a key press. A modifier key alone is not a gesture in Chrome, so an ordinary key that the guest ignores is pressed (F24).
 async function startAudio(S, ev) {
-  const at = await ev("(() => { const r = document.getElementById('audio-status').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()");
-  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, button: 'none', buttons: 0, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
-  if (await audioRunning(ev, AUDIO_WAIT_MS)) return 'mouse';
-  await tapKey(S, 'ShiftLeft', 'Shift', 16);
+  await tapKey(S, 'F24', 'F24', 0x87);
   if (await audioRunning(ev, AUDIO_WAIT_MS)) return 'key';
   return null;
 }
@@ -508,6 +504,7 @@ async function openProject(S, ev, file) {
   }
   await dismissProblems(S, ev);
   log('before Ctrl+O', { welcome: welcomeListed, title: await ev('window.__app.pageTitle().title'), windows: (await windowsOf(ev)).map((w) => `${w.cls}|${w.title}`) });
+  await S('Page.setInterceptFileChooserDialog', { enabled: true });   // Issue #1481: the page's file input is hidden; the tool gives the file (no chooser is cancelled at once)
   await ctrlO(S, ev);
   let box = null;
   let again = false;

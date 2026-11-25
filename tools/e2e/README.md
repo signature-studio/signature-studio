@@ -34,7 +34,7 @@ bash tools/e2e/run.sh --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random > e
 - `lib/guest.mjs`: 操作(クリック・右クリック・ダブルクリック・ホイール・ドラッグ・キー・Ctrl+キー)と読み取り(窓の表、エンジンの状態)。座標はゲストの画素から CSS px へ写す。
 - `lib/detect.mjs`: 検出(`pageerror`・`console.error`・失敗した要求と 4xx/5xx・消えない表示・エンジンの停止と `running` の 90 秒(この runner は GPU が無く、4K の起動が 24 秒かかる。起動の止まりは boot-bundle.mjs と tools/boot-hang が見る)・クリップボードの呼び出しと権限の変化)。
 - `lib/flow.mjs`: 起動の手順(利用データの確認、Welcome を閉じる、「Problems loading」の箱、Ctrl+O で開く)。
-- `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(印 `#1406`)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)。
+- `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(印 `#1406`)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。
 
 ## 120 Hz の方法と実測
 
