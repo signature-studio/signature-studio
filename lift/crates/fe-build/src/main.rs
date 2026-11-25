@@ -284,6 +284,10 @@ fn blend2d_source_steps() -> Vec<Step> {
             vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
             format!("{HARNESS_DIR}/b2d1/b2d3-compop.patch"),
         ),
+        Step::RunStdin(
+            vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
+            format!("{HARNESS_DIR}/b2d1/b2d4-tick.patch"),
+        ),
         Step::CheckSources(blend2d_list_file()),
     ]
 }
@@ -704,11 +708,11 @@ fn external_in(dir: &str, names: &[String]) -> Result<bool, String> {
     Ok(true)
 }
 
-/// The external plugins' wasms (#1337 OTT, #1336 Serum 2): build.sh reads the installers that `external` put in lift/out-app/external and writes
+/// The external plugins' wasms (#1337 OTT, #1336 Serum 2, #1338 Vital): build.sh reads the installers that `external` put in lift/out-app/external and writes
 /// lift/out-app/plugins/<name>/vst-ext.wasm, the lazy files of the bundle (pack.args). The same builds as the work chain's.
 /// The bundle runs them only when the installers are there (external_present).
 fn plugin_steps() -> Vec<Step> {
-    ["ott", "serum2"]
+    ["ott", "serum2", "vital"]
         .iter()
         .map(|name| {
             Step::Run(vec![
