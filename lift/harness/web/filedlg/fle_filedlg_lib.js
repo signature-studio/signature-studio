@@ -1,5 +1,6 @@
 // JS side of the browser file dialog bridge (decision 0193, fpick1, PROVISIONAL; REPLACES the design sketch of decision 0178). An emscripten JS library, like harness/web/fruity/fle_idle_lib.js:
 // fle_filedlg_host_pick(requestPtr) starts a request without suspending the whole engine. IFileOpenDialog::Show waits through the guest scheduler and polls fle_filedlg_host_poll;
+// an unfinished poll yields one host task through JSPI so that answers arrive even when guest sleeps only advance virtual time.
 // the Worker posts the request to the page (Module.fleFileDlg), the PERSON chooses, and the Worker calls
 // Module.fleFileDlgAnswer(id, answer) with the chosen File objects. This file reads each File straight into a malloc'd block of the engine's memory (no second copy of the bytes in JS), then makes available
 // a malloc'd text the C side parses (fle_filedlg.c browser_picker): `OK` then one line per item `<role> TAB <ptr> TAB <size> TAB <guest path>`, or `CANCEL`.
@@ -61,8 +62,12 @@ addToLibrary({
   },
   fle_filedlg_host_poll__deps: ['$FleFileDlg'],
   fle_filedlg_host_poll__sig: 'p',
-  fle_filedlg_host_poll: () => {
+  fle_filedlg_host_poll__async: true,
+  fle_filedlg_host_poll: async () => {
     const S = FleFileDlg;
+    // Guest Sleep may only advance virtual time (for example with one thread).
+    // Let host messages and File stream reads run even when no guest becomes idle.
+    if (S.pending && !S.pending.result) await new Promise((resolve) => setTimeout(resolve, 0));
     if (!S.pending || !S.pending.result) return 0;
     const p = S.pending.result;
     S.pending = null;

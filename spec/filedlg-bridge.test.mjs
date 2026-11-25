@@ -15,6 +15,7 @@ function bridge() {
     _malloc(n) { const p = next; next += n; return p; },
     _free() {},
     HEAPU8: new Uint8Array(65536),
+    setTimeout,
     Module: { fleFileDlg(id, request) { requests.push({ id, request }); } },
   };
   vm.runInNewContext(fs.readFileSync(new URL('../lift/harness/web/filedlg/fle_filedlg_lib.js', import.meta.url), 'utf8'), scope);
@@ -22,17 +23,17 @@ function bridge() {
   return { lib, scope, texts, requests };
 }
 
-test('a pending picker returns immediately, and cancellation is consumed once', () => {
+test('a pending picker returns immediately, and cancellation is consumed once', async () => {
   const { lib, scope, texts, requests } = bridge();
   assert.equal(lib.fle_filedlg_host_pick(1), 0);
   assert.equal(lib.fle_filedlg_host_pick__async, undefined);
-  assert.equal(lib.fle_filedlg_host_poll(), 0);
+  assert.equal(await lib.fle_filedlg_host_poll(), 0);
   assert.equal(requests.length, 1);
   assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id + 1, { ok: false }), false);
   assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false }), true);
   assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false }), false);
-  assert.equal(texts.get(lib.fle_filedlg_host_poll()), 'CANCEL');
-  assert.equal(lib.fle_filedlg_host_poll(), 0);
+  assert.equal(texts.get(await lib.fle_filedlg_host_poll()), 'CANCEL');
+  assert.equal(await lib.fle_filedlg_host_poll(), 0);
   assert.equal(lib.fle_filedlg_host_pick(1), 0);
   assert.equal(requests.length, 2);
 });
@@ -47,11 +48,25 @@ test('file reading leaves the picker pending until every byte is available', asy
   } }; } };
   lib.fle_filedlg_host_pick(1);
   scope.Module.fleFileDlgAnswer(requests[0].id, { ok: true, typeIndex: 1, items: [{ role: 'R', path: 'C:\\test.flp', file }] });
-  assert.equal(lib.fle_filedlg_host_poll(), 0);
+  assert.equal(await lib.fle_filedlg_host_poll(), 0);
   complete({ done: false, value: bytes });
   await new Promise(resolve => setImmediate(resolve));
-  const answer = texts.get(lib.fle_filedlg_host_poll());
+  const answer = texts.get(await lib.fle_filedlg_host_poll());
   const match = answer.match(/^OK\nTYPE\t1\nR\t(\d+)\t3\tC:\\test.flp$/);
   assert.ok(match, answer);
   assert.deepEqual(scope.HEAPU8.slice(Number(match[1]), Number(match[1]) + 3), bytes);
+});
+
+test('polling yields a host task even when guest sleep never suspends', async () => {
+  const { lib, scope, texts, requests } = bridge();
+  lib.fle_filedlg_host_pick(1);
+  let delivered = false;
+  setTimeout(() => {
+    delivered = true;
+    scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false });
+  }, 0);
+  const answer = await lib.fle_filedlg_host_poll();
+  assert.equal(delivered, true);
+  assert.equal(texts.get(answer), 'CANCEL');
+  assert.equal(await lib.fle_filedlg_host_poll(), 0);
 });
