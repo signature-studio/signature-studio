@@ -102,21 +102,3 @@ export function watchEngine(guest) {
   }, 250);
   return { w, stop: async () => { clearInterval(timer); for (let i = 0; i < 40 && busy; i++) await sleep(50); return w; } };
 }
-
-// the engine's stop, read after it stopped (a test aid): the beacon's engine.exit (the page's own record of the stop: message, stop {lastFle, stopLine, abortKind,
-// memoryBytes}, evidence; the page cleans the text before it leaves) and the stop report in the engine's log from its "== stop:" line on (the runtime message,
-// the abort kind, the guest registers R[0..15] and the return address at the stop). Read only: perf.snapshot builds a record and sends nothing.
-const EXIT_FACTS = `(() => {
-  const a = window.__app;
-  if (!a || !a.perf) return null;
-  const exit = a.perf.snapshot('exit').engine?.exit ?? null;
-  const lines = a.engineLog().map((l) => (l.startsWith('[err] ') ? l.slice(6) : l));
-  let at = -1;
-  for (let i = lines.length - 1; i >= 0 && at < 0; i--) if (lines[i].includes('== stop:')) at = i;
-  return { exit, report: at < 0 ? [] : lines.slice(at, at + 40).map((l) => l.slice(0, 200)) };
-})()`;
-
-/** the stop facts of the engine as the scenario's JSON carries them (null: the page has no engine yet) */
-export async function engineExitFacts(page) {
-  return page.evaluate(EXIT_FACTS);
-}
