@@ -3,8 +3,25 @@ use fe_pe::Pe;
 use std::process::ExitCode;
 
 fn usage() -> ExitCode {
-    eprintln!("usage: fe-decode closure FILE [--mnemonics] [--pdata [--adjustors]] [--reloc-seeds] | fe-decode reloc-seeds FILE [--not-function] | fe-decode vcall-thunks FILE");
+    eprintln!("usage: fe-decode closure FILE [--mnemonics] [--pdata [--adjustors]] [--reloc-seeds] | fe-decode reloc-seeds FILE [--not-function] | fe-decode vcall-thunks FILE | fe-decode jmp-reg FILE");
     ExitCode::from(64)
+}
+
+/// `jmp-reg FILE`: every `jmp reg` the `.pdata` closure reaches, one line each (`fe_decode::survey`), then the summary.
+fn jmp_reg(path: &str) -> Result<(), String> {
+    let data = std::fs::read(path).map_err(|e| format!("{path}: {e}"))?;
+    let pe = Pe::parse(&data).map_err(|e| format!("{path}: {e}"))?;
+    let a = analyze_with_pdata(&pe)?;
+    let (lines, s) = fe_decode::survey::report(&pe, &a)?;
+    for l in &lines {
+        println!("{l}");
+    }
+    println!("summary sites {}", s.sites);
+    println!("summary resolved_tables {}", s.resolved_tables);
+    println!("summary unrecognized_table_shape {}", s.unrecognized_table_shape);
+    println!("summary unrecognized_other {}", s.unrecognized_other);
+    println!("summary misrecognized {}", s.misrecognized);
+    Ok(())
 }
 
 fn run(path: &str, mnemonics: bool, pdata: bool, adjustors: bool, reloc: bool) -> Result<(), String> {
@@ -133,6 +150,15 @@ fn main() -> ExitCode {
     let not_fn = args.len() == 4 && args[3] == "--not-function";
     if (args.len() == 3 || not_fn) && args[1] == "reloc-seeds" {
         return match reloc_seeds(&args[2], not_fn) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    if args.len() == 3 && args[1] == "jmp-reg" {
+        return match jmp_reg(&args[2]) {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 eprintln!("error: {e}");
