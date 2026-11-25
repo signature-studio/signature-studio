@@ -48,7 +48,7 @@
 |---|---|---|---|
 | 入力の Python が repo に無い: `tests/auth117/mk_signed_pe.py`・`mutate_real.py`・`tools/authenticode_check.py` | authenticode_check | 13 | 署名付き PE を作る生成器が必要。git の履歴にも無い。作るなら別の Issue |
 | `harness/noreturn-audit/noreturn_audit.py` が無い(`allow.tsv` だけがある) | noreturn_audit | 5 | 同上 |
-| `tests/realmod_s1/tools/patch_base_only.py`・`split_mod.py` が無い(`split_mod.py` は `harness/two/gen_two.sh` の `TOOLS` が指す先)。両方とも `lift/` 配下の `.py` で、scan の python 規則に当たる。`src/split.rs` は別の規則の移植で、同じ出力ではない。最初の失敗の後、`built()` の再初期化で `File exists` が連鎖する | realmod | 16 | 負の対照は Rust で書ける(試験内の `fs` 操作)。`split_mod.py` の再現は規則が要る。Python を `lift/` に入れる規則を決めてから直す |
+| `tests/realmod_s1/tools/patch_base_only.py`・`split_mod.py` が無い(`split_mod.py` は `harness/two/gen_two.sh` の `TOOLS` が指す先)。両方とも `lift/` 配下の `.py` で、scan の python 規則に当たる。`src/split.rs` は別の規則の移植で、同じ出力ではない。最初の失敗の後、`built()` の再初期化で `File exists` が連鎖する | realmod | 16 | 負の対照は Rust で書ける(試験内の `fs` 操作)。ただし `realmod.rs` には既に `python3` の行(139・169・271 行)があり、この file を変えると scan の python 規則に当たる。`split_mod.py` の再現は規則が要る。PM が規則を決めてから直す |
 | `harness/two/lowregs.py` が無い | size1_lowregs | 1 | 同上 |
 | `harness/two/split_bytes.py` が無い(規則は `src/split.rs` の冒頭に写してある) | split_units | 3 | 同上 |
 | `tests/x87_trans/gen_ref.py`・`check_bf.py` が無い | x87_trans | 2 | 同上 |
@@ -61,7 +61,7 @@
 ## 6. judge の状態(push の判断が要る)
 
 - 修正は 2 つの commit に分かれる。`6f9cfb95`(link と試験の修正。PM の merge `3b005901` に入っている)と、その後の commit(`patch_base_only.py` の削除だけ)。
-- `6f9cfb95` は judge の scan(cfhex)で落ちる。`tests/gdi.rs`(27 行)と `tests/gdi_bulk.rs`(25 行)に、既存の 32 桁の 16 進数(試験データ。`f4cffe71` の取り込みで入った)がある。scan は変更されたファイル全体を見るので、この 2 ファイルに何を足しても落ちる。試験データは変えていない。
+- `6f9cfb95` は judge の scan(cfhex)で落ちる。`tests/gdi.rs`(27 行)と `tests/gdi_bulk.rs`(27 行)に、既存の 32 桁の 16 進数(試験データ。`f4cffe71` の取り込みで入った)がある。scan は変更されたファイル全体を見るので、この 2 ファイルに何を足しても落ちる。試験データは変えていない。
 - この 2 ファイルは、trace の stub を入れることで gdi 84 件・gdi_bulk 35 件を通す。judge を通すには、(a) scan の cfhex を追加行だけに絞る改修、または (b) この 2 ファイルの例外、のどちらかを PM が決める必要がある。決まるまで push していない。
 - 後続の commit(`patch_base_only.py` の削除だけ)は、judge の対象のファイルが無い(削除は AM に入らない)。
 
