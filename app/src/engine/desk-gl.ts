@@ -1,7 +1,7 @@
 // Decision 0240 (gpu1): the desktop shown by WebGL2 instead of by putImageData of one composed picture. The worker chooses between the two once, by what the canvas can do (worker.ts makeDeskPresenter); nothing else chooses.
 // The runtime (lift/runtime/fle_desk.c, fle_desk_scene) does not compose: it describes the scene - the windows bottom to top with the origin on the picture, the surface (address, stride, size), the layering - and the rectangles of
 // the surfaces that were written since the last call. This file keeps one texture per window the runtime names and does exactly what the description says: texSubImage2D of each written rectangle straight from the engine's linear
-// memory (UNPACK_ROW_LENGTH = the surface's stride; no JS copy and no conversion: the surface is B, G, R, X and the fragment shader reorders the bytes), then draws every window as a quad in the order given. It knows nothing about
+// memory (UNPACK_ROW_LENGTH = the surface's stride; no JS copy and no conversion: the surface is B, G, R, X and the fragment shader reorders the bytes), then draws the windows as quads in the order given: only the rectangles that were written are drawn again (a scissor box each; the canvas keeps the rest of its picture), and an arrangement change draws the whole screen. It knows nothing about
 // windows: no class name, no window kind, no position is looked at, nothing is decided here. Moving, restacking or hiding a window uploads no pixel.
 import type { DeskPresentStats, DeskState } from './desk.ts';
 
@@ -134,9 +134,19 @@ export type Gl = WebGL2RenderingContext;
 export interface GlSurface { width: number; height: number; getContext(kind: 'webgl2', attrs?: WebGLContextAttributes): Gl | null }
 
 interface Tex { tex: WebGLTexture; w: number; h: number }
+interface Rect { x0: number; y0: number; x1: number; y1: number }
+/** more written rectangles than this in one present are drawn as their bounding box (one clear and one pass of the windows, not one each) */
+const MERGE_ABOVE = 8;
+
+/** the written rectangles on the screen, clipped to it and without the empty ones */
+function screenRects(list: Rect[], w: number, h: number): Rect[] {
+  const out = list.map((r) => ({ x0: Math.max(0, r.x0), y0: Math.max(0, r.y0), x1: Math.min(w, r.x1), y1: Math.min(h, r.y1) })).filter((r) => r.x0 < r.x1 && r.y0 < r.y1);
+  if (out.length <= MERGE_ABOVE) return out;
+  return [out.reduce((b, r) => ({ x0: Math.min(b.x0, r.x0), y0: Math.min(b.y0, r.y0), x1: Math.max(b.x1, r.x1), y1: Math.max(b.y1, r.y1) }))];
+}
 
 export class GlDeskPresenter implements DeskShow {
-  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0 };
+  readonly stats: DeskPresentStats & { drawMs: number; uploads: number; draws: number; texAllocs: number; uploadBytes: number; drawPixels: number } = { presents: 0, rects: 0, pixels: 0, composeMs: 0, putMs: 0, whole: 0, drawMs: 0, uploads: 0, draws: 0, texAllocs: 0, uploadBytes: 0, drawPixels: 0 };
   lastState: DeskState | null = null;
   private gl: Gl;
   private loc: Record<string, WebGLUniformLocation | null> = {};
@@ -156,7 +166,8 @@ export class GlDeskPresenter implements DeskShow {
     this.api = api;
     this.memory = memory;
     this.now = now;
-    const gl = surface.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+    // the picture stays in the canvas between two presents (preserveDrawingBuffer), so that a present draws only what was written (present: the rectangles of the windows that changed)
+    const gl = surface.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' });
     if (!gl) throw new Error('no webgl2 context for the desktop canvas');
     this.gl = gl;
     this.build();
@@ -213,6 +224,7 @@ export class GlDeskPresenter implements DeskShow {
     if (this.surface.width !== sc.width || this.surface.height !== sc.height) { this.surface.width = sc.width; this.surface.height = sc.height; this.needDraw = true; this.api.resync(); return this.present(); }
     const changed = (sc.flags & (SCENE_FLAG_CHANGED | SCENE_FLAG_WHOLE)) !== 0;
     if (sc.updates.length === 0 && !changed && !this.needDraw) return 0;
+    const whole = this.needDraw || changed || this.arrangementChanged(sc);
     const gl = this.gl;
     const live = new Set<number>();
     for (const w of sc.windows) live.add(w.lid);
@@ -236,6 +248,7 @@ export class GlDeskPresenter implements DeskShow {
     let px = 0;
     const byLid = new Map<number, SceneWin>();
     for (const w of sc.windows) byLid.set(w.lid, w);
+    const written: Rect[] = [];
     for (const u of sc.updates) {
       const w = byLid.get(u.lid), t = this.texs.get(u.lid);
       if (!w || !t) continue;
@@ -247,10 +260,11 @@ export class GlDeskPresenter implements DeskShow {
       px += cw * ch;
       this.stats.uploads++;
       this.stats.uploadBytes += cw * ch * 4;
+      written.push({ x0: w.x + u.x0, y0: w.y + u.y0, x1: w.x + u.x1, y1: w.y + u.y1 });
     }
     gl.pixelStorei(gl.UNPACK_ROW_LENGTH, 0);
     const t2 = this.now();
-    this.draw(sc);
+    this.stats.drawPixels += this.draw(sc, whole ? null : screenRects(written, sc.width, sc.height));
     const t3 = this.now();
     this.scene = sc;
     this.needDraw = false;
@@ -264,13 +278,45 @@ export class GlDeskPresenter implements DeskShow {
     return Math.max(1, sc.updates.length);
   }
 
-  private draw(sc: SceneState): void {
+  /** the windows' place, size, layering, region and surfaces are not those of the picture drawn last: the arrangement changed, so the whole screen is drawn again */
+  private arrangementChanged(sc: SceneState): boolean {
+    const prev = this.scene;
+    if (!prev || prev.windows.length !== sc.windows.length) return true;
+    return sc.windows.some((b, i) => {
+      const a = prev.windows[i];
+      if (!a) return true;
+      return a.lid !== b.lid || a.x !== b.x || a.y !== b.y || a.w !== b.w || a.h !== b.h || a.bits !== b.bits || a.stride !== b.stride || a.layer !== b.layer || a.alpha !== b.alpha || a.key !== b.key ||
+        a.gx0 !== b.gx0 || a.gy0 !== b.gy0 || a.gx1 !== b.gx1 || a.gy1 !== b.gy1 || a.cl !== b.cl || a.ct !== b.ct || a.cr !== b.cr || a.cb !== b.cb;
+    });
+  }
+
+  /** the picture, or only the rectangles of it that were written (rects; each is cleared and drawn under a scissor box, so the rest of the canvas keeps its picture); returns the pixels drawn */
+  private draw(sc: SceneState, rects: Rect[] | null): number {
     const gl = this.gl;
     gl.viewport(0, 0, sc.width, sc.height);
     gl.clearColor((sc.background & 255) / 255, ((sc.background >> 8) & 255) / 255, ((sc.background >> 16) & 255) / 255, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.uniform2f(this.loc.u_screen as WebGLUniformLocation, sc.width, sc.height);
     gl.activeTexture(gl.TEXTURE0);
+    if (rects === null) {
+      gl.disable(gl.SCISSOR_TEST);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      this.drawWindows(sc);
+      return sc.width * sc.height;
+    }
+    gl.enable(gl.SCISSOR_TEST);
+    let px = 0;
+    for (const r of rects) {
+      gl.scissor(r.x0, sc.height - r.y1, r.x1 - r.x0, r.y1 - r.y0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      this.drawWindows(sc);
+      px += (r.x1 - r.x0) * (r.y1 - r.y0);
+    }
+    gl.disable(gl.SCISSOR_TEST);
+    return px;
+  }
+
+  private drawWindows(sc: SceneState): void {
+    const gl = this.gl;
     for (const w of sc.windows) {
       const t = this.texs.get(w.lid);
       if (!t) continue;
@@ -297,7 +343,7 @@ export class GlDeskPresenter implements DeskShow {
     const sc = this.scene;
     if (!sc) return null;
     const gl = this.gl;
-    this.draw(sc);
+    this.draw(sc, null);
     const w = sc.width, h = sc.height;
     const raw = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, raw);

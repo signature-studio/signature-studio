@@ -1,0 +1,38 @@
+{
+  "note": "#1351 の受け入れが通った run(4 回目の試行。runner の値。nproc 4。Chrome 157.0.8103.78)。判定の JSON は受け入れの出力のまま。judged の個々の run の値は残っていない(受け入れの最後の段が .tmp-1351 を消すため)。judged の平均は、判定の比と変更の前の値(p2-render-1351-before.json)から逆算した値(参考)。rerun は、同じ測定を 1 回だけ、報告のために行い直した値(判定に使わない。n = 3)。",
+  "accept": {
+    "judge": "judge: 通った",
+    "validB": [false, false, false, false, false, false],
+    "ratios": {
+      "presentsDefault": { "a": 2.9951, "b": 1.8407 },
+      "presentsOne": { "a": 3.3801, "b": 2.5337 },
+      "gpuDefault": { "a": 0.1531, "b": 0.4009 },
+      "inputDefault": { "a": 0.6459, "b": 0.5719 }
+    },
+    "checks": { "presents_a": true, "gpu_a": true, "share_a": true, "input_a": true, "onePresents_a": true, "presents_b": true, "gpu_b": true, "share_b": true, "input_b": true, "onePresents_b": true, "validA": true, "proportional": true, "edge": true, "boot": true, "flows": true }
+  },
+  "judgedMeansDerivedFromRatios": {
+    "default_a": { "presents": 402.3, "gpuMsPerPresent": 66.2, "inputToPresentMsP95": 164.0 },
+    "default_b": { "presents": 265.6, "gpuMsPerPresent": 170.9, "inputToPresentMsP95": 139.6 },
+    "one_a": { "presents": 1470.3 },
+    "one_b": { "presents": 1128.3 }
+  },
+  "before": {
+    "default_a": { "presents": 134.33, "gpuMsPerPresent": 432.0, "drawPixelShare": 1.0, "inputToPresentMsP95": 253.93 },
+    "default_b": { "presents": 144.33, "gpuMsPerPresent": 426.3, "drawPixelShare": 1.0, "inputToPresentMsP95": 244.07 },
+    "one_a": { "presents": 435.0, "gpuMsPerPresent": 139.0, "drawPixelShare": 0.4 },
+    "one_b": { "presents": 445.33, "gpuMsPerPresent": 135.4, "drawPixelShare": 0.25 }
+  },
+  "rerun": {
+    "note": "報告用の再測定(判定に使わない)。n = 3 の各 run の値。",
+    "default_a": { "presents": [413, 399, 393], "gpuMsPerPresent": [65.303, 67.293, 68.728], "drawPixelShare": [0.1, 0.103, 0.107], "pixelShare": [0.1, 0.103, 0.107], "inputToPresentMsP95": [204.015, 84.19, 93.295], "valid": [true, true, true] },
+    "default_b": { "presents": [271, 268, 269], "gpuMsPerPresent": [171.956, 171.007, 171.561], "drawPixelShare": [0.344, 0.338, 0.339], "pixelShare": [0.344, 0.338, 0.339], "inputToPresentMsP95": [133.44, 137.47, 137.24], "valid": [false, false, false] },
+    "one_a": { "presents": [1531, 1472, 1471], "gpuMsPerPresent": [21.639, 22.209, 22.631], "drawPixelShare": [0.124, 0.127, 0.129], "pixelShare": [0.124, 0.127, 0.129], "inputToPresentMsP95": [68.515, 70.415, 68.085], "valid": [true, true, true] },
+    "one_b": { "presents": [1174, 1169, 1193], "gpuMsPerPresent": [19.727, 19.76, 19.22], "drawPixelShare": [0.103, 0.105, 0.1], "pixelShare": [0.103, 0.105, 0.1], "inputToPresentMsP95": [33.01, 36.145, 32.5], "valid": [false, false, false] },
+    "edge": { "dpr1": 2.2609, "randomDpr1.68": 2.6265, "limit": 3.5296, "highDpr": { "2.5": "engine-idle", "3": "engine-idle" } }
+  },
+  "boot": { "boot-bundle": { "state": "engine-idle", "standIn": false, "error": null, "elapsedMs": 11469 }, "boot3": "error null, bootLast60sAt70s 0, bootLast60sAt90s 0 (3 runs)" },
+  "flows": { "A": 11014, "B": 11125, "C": 10994, "D": 10894, "preBootBytes": 311124203, "elapsedMsLimit": 12500 },
+  "npmTest": { "files": "71 passed, 1 skipped", "tests": "1403 passed, 10 skipped" },
+  "inputReachReference": { "pointerEventsPerSecMin": 1198, "pointerEventsPerSecMean": 1199.9, "pointerSent": 36000, "pointerErrors": 0, "note": "measure-live.mjs --play 1 --hz 1000 --mouse 30(参考。判定に入れない)" }
+}
