@@ -28,7 +28,30 @@ project: signature-studio/3
 - #{{142}} の安全策(暫定): エンジンが異常に終わった回は、保存された木を捨てる(`app/src/engine/worker.ts` の `closeRegState`)。この Issue が英語以外の言語の起動を直せば、安全策が要るかを報告に書く。
 - #{{142}} の 2 回目の試行(run 45409012582)。英語以外の 7 言語のうち、`ILSvg_x64.dll` の停止は es・fr、`CompareStringW` の停止は de・ko・zh・ja・vi。止まる理由は言語と回で変わる。
 
-## 前回の試行で分かったこと(run 45504133372)
+## 前回の試行で分かったこと(run 45540989422)
+
+- 判定は差し戻し(失敗の段: 判定)。受け入れは未達。7 言語のうち engine-idle になったのは ja の 1 言語だけ。英語の起動・流れ A〜D・`npm test --prefix app` は受理。runner の値。nproc 4、loadavg 1.9〜2.1。
+- 前回の差分(`work.diff`)は、`.prior-work.md` の取り込みで入った。衝突は 3 ファイル(`plugins.rs`・`plugin-rows.mjs`・`pack.args`)。前の差分は、main の #{{125}} より前の命名(`seed_file` と `name()`)を戻していたので、main 側(key を名前にする)を採った。`pack.args` は main の Serum2・Vital の行と、言語の 14 組の両方を残した。
+- ILSvg を real module にした。`lift/plugins/ilsvg/plugin.tsv` を足し(key は `shared.ilsvg.ilsvg_x64.dll`)、同じ commit で `ci/extract-dlls.tsv` の ILSvg の行を消した。`args` は `--pdata --reloc-seeds --rva-tables lift/plugins/ilsvg/rva-tables.txt`(ビルド道具の引数。製品の旗ではない)。
+- 2 段の guest(`Shared\`)の seed の場所の二重の `/` を直した(`plugins.rs` と `plugin-rows.mjs`)。
+- 実物: 作業ツリーには取り出し済みの DLL が在り(SHA-256 `92f76fef…` が一覧と一致)、key 基準の 2 か所(host と seed)に同じ DLL を複写して試験した。複写は commit していない。CI の抽出は未実行(この作業環境にはインストーラが無い)。
+- SizeOfImage の表 `inputs/plugin-image-sizes.tsv` に ILSvg の行(1,527,808 B)を足した。`fe-build` の 1 件の落ちは、この表の不足だった。`fe-build` 22 件・`fe-lift --test locale` 39 件・`npm test --prefix app` 1,406 件が通る。
+- 言語の 14 件は lazy(seed 表の 14 行が `@lazy-file:`、`pack.args` に 14 組)。seed 表の言語の行は 16 行(7 言語×2、`en.svg`、フォルダ)。`en.svg` は pack に入る。#{{142}} の「`en.svg` だけ」は、この木では再現しなかった。
+- 数値(runner の値。統合後の木): `engine.wasm` 166,369,632 B(ILSvg 無しの同じ機械の 165,630,234 B との差 +739,398 B。統合後の main では再測していない)。ILSvg の wasm(lazy)7,695,230 B、DLL 1,504,256 B。lazy は 113 件(上限 128。`maxItems` は変えていない。内訳は seed 91・言語 14・ILSvg 3)。
+- 英語の起動(`boot-bundle.mjs`): engine-idle・standIn false・error null・elapsedMs 12,530(1 回目は 12,252。P1 の 10 秒は未達)。ja: `restartPrompted` true・`languageKept` true(352 画素)・`error` null・`elapsedMs` 11,544・`preBootBytes` 305,619,405。受理(ja の 1 言語だけ)。
+- 停止(de・es・fr・ko・zh の 5 言語): ILSvg を読んだ直後、同じ番地 `0x3280983d0`(8 バイトの読み込み)で止まる。スタックの 2 語目 `0x4136e9` は、本体(`FLEngine_x64.dll`。ImageBase `0x400000`)の関数 `0x4136a0`(Delphi の文字列の処理)の中、`call 0x412d60` の直後。停止の場所は ILSvg の中ではない(推定)。
+- 値 `0x3_2809_83D0` は、下位 32 ビットが wasm の番地として妥当で、上位 32 ビットが `3`。符号拡張(`0xFFFFFFFF`)でも 0 でもない。32 ビットの書き込みの結果の上位に、古い値が残った形が有力(推定。未確定)。
+- vi(`GetFileAttributesW`): 名前は `OpenSans-Thông thu?ng.ttf`(UTF-16 の 16 進で確認。`?` は `0x003F`)。インストーラの一覧には無い。`vi.moe` に `ư`(U+01B0)と `ờ`(U+1EDD)が在り、`ư` → `u` は best-fit が効いた。`ờ` は 1252 に行が無く、`?` になった。
+- ランタイムは、`?`・`*` を含むパスを `lift/runtime/fle_vfs.c` の `check_component` で止めていた(パスの API 21 箇所に効く)。この停止を Windows の返り値に直すのは、ランタイムの方針の変更(PM の決定 ①。下の「やること」11)。
+- best-fit の表: `lift/runtime/fle_bestfit_1252.inc`(442 行。WideCharToMultiByte(1252) で、0x400 が無い時に使う)。出所は `lift/harness/README.md` の「bestfit1252」節(取得日 2026-11-24、37,057 B、SHA-256 `72ea23c9…`。URL は README にだけ書いた)。
+- CompareStringW: page の collator(弱い参照 `fle_cmp_page` → `fle_js_collate`)で答える。測定の記録に `CompareStringW` の停止の行は 0 件。`Intl.Collator(en-US)` と Windows の sort 表の一致は未確認。
+- 停止の記録の診断(やること 8): `fle_addr_fault` で、戻り番地(wasm では 0)・`R[0..15]`・`R[4]` から 8 語のゲストのスタックを出す。最も近い名前つきの関数は C では出せない(JS 側のスタックが要る)。
+- 安全策 `closeRegState`: 残す。7 言語が実 DLL で `engine-idle` になっていない。
+- 前提の名前: 下の「前提」の `ilsvg_x64.dll` は古い。plugin 行の host 名は key 基準(`lift/out-app/host/lift/out-plugins/shared.ilsvg.ilsvg_x64.dll`。seed は `lift/out-idle1/inputs/install/shared.ilsvg.ilsvg_x64.dll`)。
+- 統合: main は 16 commit 進んでいた(間接呼び出しの解析・診断・E2E など)。統合後の木でビルドと測定をやり直し、結果は同じだった(ja だけ受理)。
+- 未確認: `Intl.Collator` と Windows の sort 表の一致。switch 表の残りの `jmp reg` 33 件(別の Issue)。
+
+## その前の試行で分かったこと(run 45504133372)
 
 - 判定は差し戻し(失敗の段: 判定)。受け入れは未達。7 言語のうち engine-idle になったのは ja の 1 言語だけ。作業は work.diff に保存された。作業者の commit は 2 本(`d8ca7a60`・`90db6f74`。作業者の環境。push していない)。次の試行は、その差分を main の上に取り込んで続ける。runner の値。nproc 4、loadavg 1.0〜2.5。
 - 受理(実測): 英語の起動(`boot-bundle.mjs`)は `engine-idle`・`standIn` false・`error` null・`elapsedMs` 8,158。ja(`measure.mjs --language ja`)は `engine-idle`・`languageKept` true(352 画素)。流れ A〜D は 4 本とも `engine-idle`・`standIn` false・`trapped` false・`hostErrors` 0・`opened` true、B と D は `welcomeClosed` true。単体は `npm test --prefix app` 1,401 件、`cargo test -p fe-build` 20 件、`fe-lift --test locale` 39 件が通る。
@@ -46,7 +69,7 @@ project: signature-studio/3
 - best-fit の表(やること 6): 出所は `lift/harness/README.md` の「bestfit1252」節(作業者の commit の中)。取得日 2026-11-24、取得物 37,057 B、SHA-256 `72ea23c9…`。WCTABLE 698 行から MBTABLE で戻る 256 行を除いた 442 行。テスト `bestfit_1252_table_is_the_wctable_rows_that_do_not_map_back` が照合する。`Intl.Collator(en-US)` と Windows の sort 表の一致は未確認。
 - vi の名前の `?` は、表示の欠落か、1252 に無い文字の変換の結果か未確認(やること 9)。
 
-## その前の試行で分かったこと(run 45458518648)
+## さらに前の試行で分かったこと(run 45458518648)
 
 - 判定は差し戻し(失敗の段: 判定)。作業は保存された。次の再試行で、その差分を取り込んでから始める。作業者の commit は `ea95d873`(作業者の環境。push していない)。runner の値。nproc 4、loadavg 1.4〜2.1。
 - 英語の起動(`boot-bundle.mjs`): `engine-idle`・`standIn` false・`elapsedMs` 8555。受理。
@@ -72,12 +95,14 @@ project: signature-studio/3
 - `app/src/bundle/manifest.ts`(lazy の配列の `maxItems`)
 - `lift/runtime/fle_locale.c`(`fle_imp_GetACP`・`fle_wide_to_mb_1252`・`fle_imp_WideCharToMultiByte`・範囲 D)、`lift/crates/fe-lift/tests/locale.rs`
 - `tools/persist/measure.mjs`(#{{142}} の道具)、`tools/smoke/welcome-flow.mjs`
+- `lift/runtime/fle_vfs.c`(`check_component`: `?`・`*` の停止。決定 ①)・`lift/runtime/fle_host.c`(`fle_addr_fault`)
+- `lift/crates/fe-wasmgen/`・`lift/crates/fe-lift/`(32 ビット命令の結果の上位 32 ビット。決定 ②)
 
 ## やること
 
-0. 作業ツリーの確認。`.prior-work.md` があれば最初に読む。保存された前回の差分(上の「前回の試行で分かったこと」の (1)〜(4))が取り込まれているかを確かめる。二重になっていないことを `grep -c` で確かめる。衝突の印が在れば解消する。
-1. `ILSvg_x64.dll` を real module にする。`lift/plugins/ilsvg/plugin.tsv` を 1 つ足す(見本は `lift/plugins/fruity-balance/plugin.tsv`)。列は 8 個: `key`・`guest`・`role`・`sha256`・`size`・`hook`・`args`・`omit`(`omit` は `-`)。`guest` は `Shared\ILSvg_x64.dll`、`role` は `本体`、`sha256` と `size` は `inputs/fl-installer-files.tsv` の値(`size` は 1504256)、`hook` は `none`、`args` は空。`key` は `<種別>.<フォルダ>.<DLL の名>` の小文字(`shared.ilsvg.ilsvg_x64.dll`)。共有の表(`modules.tsv`・`pack.args` など)は手で編集しない。`guest` の 2 段(`Shared\`)は、main の検査では拒否される(`app/scripts/lib/plugin-rows.mjs` の `validate` と `lift/crates/fe-build/src/plugins.rs` の `validate` は、3 段未満の guest を拒否する。2026-11-25 に、仮の plugin.tsv で確かめた)。main に 2 段の許可は無い。許可は作業者が `app/`・`lift/` で足す(保存された差分を取り込むときも、両方に許可が在るかを確かめる)。2 段のときの seed の場所は、両方の計算で `lift/out-idle1/inputs/install//ILSvg_x64.dll`(フォルダの部分が空になる)になるので、作業者が直す。
-   - 前提の確認: `test -f lift/out-app/host/lift/out-plugins/ilsvg_x64.dll`(下の「実物の置き場と前提」)。前提が無いときは、この行の plugin.tsv の commit は受け入れを通らない。その場合は、2〜7 の作業を進めて commit し、前提が無いことを報告に書いて終える。
+0. 作業ツリーの確認。`.prior-work.md` があれば最初に読む。保存された前回の差分(上の「前回の試行で分かったこと」(run 45540989422)の内容)が取り込まれているかを確かめる。二重になっていないことを `grep -c` で確かめる。衝突の印が在れば解消する。
+1. `ILSvg_x64.dll` を real module にする。`lift/plugins/ilsvg/plugin.tsv` を 1 つ足す(見本は `lift/plugins/fruity-balance/plugin.tsv`)。列は 8 個: `key`・`guest`・`role`・`sha256`・`size`・`hook`・`args`・`omit`(`omit` は `-`)。`guest` は `Shared\ILSvg_x64.dll`、`role` は `本体`、`sha256` と `size` は `inputs/fl-installer-files.tsv` の値(`size` は 1504256)、`hook` は `none`、`args` は空。`key` は `<種別>.<フォルダ>.<DLL の名>` の小文字(`shared.ilsvg.ilsvg_x64.dll`)。共有の表(`modules.tsv`・`pack.args` など)は手で編集しない。`guest` の 2 段(`Shared\`)は、main の検査では拒否される(`app/scripts/lib/plugin-rows.mjs` の `validate` と `lift/crates/fe-build/src/plugins.rs` の `validate` は、3 段未満の guest を拒否する。2026-11-25 に、仮の plugin.tsv で確かめた)。main に 2 段の許可は無い。許可は作業者が `app/`・`lift/` で足す(保存された差分を取り込むときも、両方に許可が在るかを確かめる)。2 段のときの seed の場所は、両方の計算で `lift/out-idle1/inputs/install//ILSvg_x64.dll`(フォルダの部分が空になる)になるので、作業者が直す。(前回の試行で直した。key 基準の seed の場所は `lift/out-idle1/inputs/install/shared.ilsvg.ilsvg_x64.dll`。)
+   - 前提の確認: `test -f lift/out-app/host/lift/out-plugins/shared.ilsvg.ilsvg_x64.dll`(下の「実物の置き場と前提」)。前提が無いときは、この行の plugin.tsv の commit は受け入れを通らない。その場合は、2〜7 の作業を進めて commit し、前提が無いことを報告に書いて終える。
    - 前提が在るときは、plugin.tsv を足す同じ commit で、`ci/extract-dlls.tsv` の ILSvg の行(その注釈 1 行を含む)を消す。
 2. 言語のファイル(7 言語 de・es・fr・ja・ko・vi・zh の `.moe`・`.svg`)の lazy 化は、保存された差分で済んでいる(seed 表の 14 行が `@lazy-file:`、`pack.args` に 14 組)。lazy の件数は 89(ILSvg を足すと 92)。上限 128 の内なので、`maxItems` は変えない。言語のファイルは、インストーラの一覧(`System\Languages\`)から生成し、コードに言語の名前を定数として書かない。
 3. seed に言語のファイルが入らなかった原因(#{{142}} の記録の `en.svg` だけ)は、前回の木では再現しなかった。生成した seed の表と、pack-seed の出力で、7 言語の `.moe`・`.svg` が入ることを確かめ、報告に書く。入らない物が在れば直す。
@@ -90,8 +115,10 @@ project: signature-studio/3
    - `lift/crates/fe-lift/tests/locale.rs` が範囲 D の外の停止を期待していたら直す。`cargo test -p fe-lift --test locale`(36 件)と `cargo test -p fe-build` が通ること。
 7. 報告に、`engine.wasm` の大きさの増分、`ILSvg_x64.dll` の wasm の大きさ、lazy の件数、選んだ案と理由、best-fit の表の出所と SHA-256(README の行)、`Intl.Collator` の未確認の点、`closeRegState` の扱いを書く。
 8. **停止の記録の診断(PM の決定。#{{146}} と同じ)**: `fle_addr_fault`(`lift/runtime/fle_host.c`。64 ビットの値を番地として読んだ停止。文言の見出しは `[fle_addr_hi32]`)が起きたとき、停止の記録として**常に**、呼び出し元の戻り番地・`R[0..15]`・最も近い名前つきの関数を出す。目的は、次の実機の停止で原因が分かること。環境変数・`#ifdef`・URL パラメータを足さない。#{{146}} の作業者も同じ診断を入れる。両方の差分が衝突したら、両方を残す。
-9. **vi の停止(PM の決定)**: ANSI のコードページは 1252 のまま(`GetACP` の答えを変えない)。停止の名前の正体を、**UTF-16 の 16 進**でログに出して特定する(`?` は表示の欠落のため)。`inputs/fl-installer-files.tsv` に、その名前の行が在るかを確かめる。在れば、その名前のまま(UTF-16)で `CreateFileW`・`FindFirstFileW` が答えられるかを確かめる。確かめる先は、seed の名前の符号化と、`lift/harness/web/pack.args` の URL の `%XX`。
+9. **vi の停止(PM の決定)**: ANSI のコードページは 1252 のまま(`GetACP` の答えを変えない)。停止の名前の正体を、**UTF-16 の 16 進**でログに出して特定する(`?` は表示の欠落のため)。`inputs/fl-installer-files.tsv` に、その名前の行が在るかを確かめる。在れば、その名前のまま(UTF-16)で `CreateFileW`・`FindFirstFileW` が答えられるかを確かめる。確かめる先は、seed の名前の符号化と、`lift/harness/web/pack.args` の URL の `%XX`。(前回の試行で済み。停止の方針は、下の 11 の PM の決定で置き換える。)
 10. **switch 表(別の Issue)**: ILSvg の残りの `jmp reg` 33 件の表(MSVC の、ガードの無い switch 表)は、この Issue では扱わない。switch 表の認識の拡張として、別の新しい Issue で扱う(PM が起票する。番号は未定)。`lift/plugins/ilsvg/rva-tables.txt` の 40 件の手作業の列挙は、それまでの暫定。
+11. **ファイル名の `?`・`*`(PM の決定 ①。停止の方針を変える)**: Windows では、ファイル名に `?`・`*` を含むパス(`\\?\` の接頭辞の無い物)を、`CreateFileW`・`GetFileAttributesW` などは `ERROR_INVALID_NAME`(123)で失敗させる。`FindFirstFileW` は `?`・`*` をワイルドカードとして扱い、失敗させない。ゲスト(FL)が `WideCharToMultiByte` で `?` を作った名前は、Windows でも同じ失敗になるので、FL はフォントが無いとして続ける。`lift/runtime/fle_vfs.c` の `check_component` で `?`・`*` の時に止めている箇所を、Windows の返り値(`INVALID_FILE_ATTRIBUTES`・`INVALID_HANDLE_VALUE`・`ERROR_INVALID_NAME`)に直す(API ごとに、正しい返り値を決める)。試験を先に red で書く(`cargo test`。`fe-lift` の locale か、ネイティブのランタイムの試験)。#{{175}}(暫定で止めている API の family「ファイル名」)と衝突したら、両方を残す。
+12. **ILSvg の 8 バイトの読み込み(PM の決定 ②。前回の停止の出どころ)**: 停止の番地 `0x3280983d0` の上位 32 ビットの `3` の出所を特定する。停止の場所は本体の `0x4136a0`(文字列の処理)の中の 8 バイトの読み込み(推定: ILSvg が返した値を、本体が後で読んでいる形)。停止の直前に、この 8 バイトが書かれた場所を、**診断のための一時の記録**(メモリの書き込みの記録。常時は動かさない)で追う。特定が済んだら、その記録は外す(commit しない)。候補は、32 ビット命令の結果の上位 32 ビットの扱い(x86-64 では 32 ビットの演算は上位 32 ビットを 0 にする)。`fe-wasmgen`(直接 wasm)と `fe-lift`(C の lift)の両方で、`mov r32,imm`・`mov r32,[mem]`・`xor r32,r32`・`lea r32,[..]`・`add`・`sub` などの結果が、上位 32 ビットを 0 にしているかを読んで確かめる。`cargo test -p fe-lift` に、32 ビット命令の上位 32 ビットの 0 化の試験を足す(先に red にして、直す)。直した後、5 言語(de・es・fr・ko・zh)の停止の番地が消えることを、実 DLL の起動で確かめる。
 
 ## 受け入れ
 
@@ -113,6 +140,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - 実測と推定を分ける。「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
 - 報告に、安全策(`closeRegState`)を残すか外すかを書く。
 - 報告に、best-fit の表の出所(README の節)と SHA-256、`Intl.Collator` の未確認の点を書く。
+- 報告に、決定 ① で返り値を変えた API の数と名前(`check_component` を呼ぶ API ごと)と、決定 ② の ILSvg の上位 32 ビットの出所(特定できた所まで)を書く。
 
 ## 制約
 
@@ -138,11 +166,12 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - #{{122}}(lazy の上限を 128 にした)の件数に影響する。
 - #{{160}}(段階 2 の素材の配信)も、seed 表と `pack.args` を変える。衝突したら、作業の最後に `git pull --no-rebase --no-edit` で main を取り込み、衝突を直し、受け入れをもう一度通す。
 - switch 表の認識の拡張(ILSvg の残りの `jmp reg` 33 件)は、別の新しい Issue で同じ形を扱う(PM が起票する)。この Issue の `rva-tables.txt` は、それまでの暫定。
+- #{{175}}(暫定で止めている API の family「ファイル名」)。決定 ① の返り値は、この family の一部。衝突したら、両方を残す。
 
 ## 実物の置き場と前提(PM の対応)
 
-- `Shared\ILSvg_x64.dll` の実物は、`ci/extract-dlls.tsv` の ILSvg の行(main の d29eaf6a で、抽出先を直した)で、作業ツリーの `lift/out-app/host/lift/out-plugins/ilsvg_x64.dll` に取り出される。lift はされていない。(0610ae87 の時点では `lift/out-app/host/Shared/ILSvg_x64.dll` に取り出されていた。)
-- ただし、plugin の段(`lift/crates/fe-build/src/plugins.rs` の `host_file()`)が読むのは `lift/out-app/host/lift/out-plugins/ilsvg_x64.dll` で、`Shared/` の下の物は読まない。前回の run は、この段で `No such file or directory` で止まった。
-- 前提(d29eaf6a で満たした。作業者は `ci/` を変えない): `lift/out-app/host/lift/out-plugins/ilsvg_x64.dll` が取り出されること(`ci/extract-dlls.tsv` の ILSvg の行の抽出先は `lift/out-plugins/ilsvg_x64.dll`。`fruity_filter_x64.dll` などの行と同じ形)。前提が満たされていないと、plugin.tsv を足した作業は、その run の中では受け入れを通らない(作業ジョブは、ベースの commit から取り出した木を使う)。
+- `Shared\ILSvg_x64.dll` の実物は、`ci/extract-dlls.tsv` の ILSvg の行(main の d29eaf6a で、抽出先を直した)で、作業ツリーの `lift/out-app/host/lift/out-plugins/shared.ilsvg.ilsvg_x64.dll`(plugin 行の key 基準の名前。旧名は `ilsvg_x64.dll`)に取り出される。lift はされていない。(0610ae87 の時点では `lift/out-app/host/Shared/ILSvg_x64.dll` に取り出されていた。)
+- ただし、plugin の段(`lift/crates/fe-build/src/plugins.rs` の `host_file()`)が読むのは `lift/out-app/host/lift/out-plugins/shared.ilsvg.ilsvg_x64.dll`(key 基準の名前。旧名の `ilsvg_x64.dll` は読まない)で、`Shared/` の下の物は読まない。前回の run は、この段で `No such file or directory` で止まった。
+- 前提(d29eaf6a で満たした。作業者は `ci/` を変えない): `lift/out-app/host/lift/out-plugins/shared.ilsvg.ilsvg_x64.dll` が取り出されること(旧の `ci/extract-dlls.tsv` の ILSvg の行の抽出先は `lift/out-plugins/ilsvg_x64.dll` だった。この行は、plugin.tsv を足す同じ commit で消す)。前提が満たされていないと、plugin.tsv を足した作業は、その run の中では受け入れを通らない(作業ジョブは、ベースの commit から取り出した木を使う)。
 - 前提が満たされた後は、plugin.tsv を足す同じ commit で、同じ DLL の `ci/extract-dlls.tsv` の行を消す(二重に取り出さないため。`plugin-rows.mjs`・`plugins.rs` は `ci/extract-dlls.tsv` を読まないので、重複は検査されない)。
 - `plugin.tsv` の行が main に入った後の run からは、取り出しの表は `ci/extract-dlls.tsv` と `plugin.tsv` の行の和になり、plugin の行の DLL は `lift/out-plugins/` に取り出される。

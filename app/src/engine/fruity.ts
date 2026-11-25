@@ -11,6 +11,7 @@
 
 import type { FruityOptions, Manifest } from '../bundle/manifest.ts';
 import { type AppView, readAppView } from './appview.ts';
+import { type CursorPictureRead, readCursorPicture } from './cursor-picture.ts';
 import type { DeskApi } from './desk.ts';
 import { HostFiles, type HostFileStats, type HostPack, installHostFiles, SUPPORTED_EMSCRIPTEN, unsupportedImports } from './hostfiles.ts';
 import type { EngineInput } from './idle-driver.ts';
@@ -318,6 +319,14 @@ export class FruityEngine {
     if (!ex || typeof ex.fle_av_poll !== 'function' || !this.memory) return null;
     const ptr = (ex.fle_av_poll as () => number)();
     return readAppView(this.memory.buffer, ptr, sinceSeq);
+  }
+
+  /** decision 0260 (#1392): the picture of the cursor with the low 32 bits `handle` that the guest loaded from a module (fle_cursor_picture_poll, lift/runtime/fle_appview.c); null when the wasm has no such export */
+  cursorPicture(handle: number): CursorPictureRead | null {
+    const ex = this.instance?.exports as Record<string, unknown> | undefined;
+    if (!ex || typeof ex.fle_cursor_picture_poll !== 'function' || !this.memory) return null;
+    const ptr = (ex.fle_cursor_picture_poll as (h: number) => number)(handle >>> 0);
+    return readCursorPicture(this.memory.buffer, ptr, handle);
   }
 
   get idle(): boolean { return this.opts.fleIdleWaiting ? this.opts.fleIdleWaiting() : false; }

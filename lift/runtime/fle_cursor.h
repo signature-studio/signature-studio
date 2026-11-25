@@ -47,6 +47,25 @@
 /* user32!LoadCursorW: HCURSOR f(HINSTANCE hInstance, LPCWSTR lpCursorName). rcx, rdx. */
 void fle_imp_LoadCursorW(void);
 
+/* Decision 0260 (PROVISIONAL), #1392: the picture of a cursor, for the page (which shows it with CSS cursor: url(...), app/src/ui/cursor.ts). Two sources: a resource of a module
+ * (fle_res.c fle_cursor_picture: the RT_CURSOR of the name or ordinal that LoadCursorW loaded) and the bitmaps of a cursor made by CreateIconIndirect (fle_gdi.c fle_gdi_cursor_picture).
+ * rgba is the picture (width * height * 4 bytes, the top row first, R G B A; transparent pixels are 0 0 0 0). The rule (Learn, CreateIconIndirect: the colour bitmap is the picture): when the colour
+ * bitmap is 32 bits and one alpha byte (the 4th byte of a pixel) is not 0, the alpha is used and the AND mask is ignored (alpha 1); else AND 0 is the XOR colour, opaque; AND 1 and XOR 0 is
+ * transparent; AND 1 and XOR not 0 is opaque black (the screen is inverted there: no CSS form; invert). The counts: invert, transparent (AND 1 and XOR 0, or alpha 0), opaque (AND 0, or alpha 255). */
+#define FLE_CURSOR_PIC_MAX 256u         /* the largest picture: a cursor is at most 256 pixels square here */
+
+typedef struct {
+    uint32_t width, height;             /* the pixels */
+    uint32_t hot_x, hot_y;              /* the hot spot */
+    uint32_t cursor_id;                 /* a resource: the id of the RT_CURSOR the group names; 0 for a made cursor */
+    uint32_t named;                     /* 1: a resource loaded by name (name holds it); 0: a resource loaded by ordinal (ordinal holds it); 2: made by CreateIconIndirect (no resource) */
+    uint32_t ordinal;                   /* 0: the ordinal 32762..32767; with named 1: the position of the name among the named groups of the directory */
+    uint32_t invert, alpha, transparent, opaque;   /* alpha: 1 when the picture is drawn with the alpha bytes (see above), else 0 */
+    char name[64];                      /* a resource loaded by name: the group's name (ASCII; any other character is '?') */
+    const uint8_t *rgba;                /* width * height * 4 bytes, top row first */
+    const uint8_t *raw;                 /* a made cursor: width * height * 6 bytes, per pixel a (the AND bit), nz (the XOR value is not 0), r, g, b (the XOR colour), al (the alpha byte, 0 unless 32 bits); else NULL */
+} fle_cursor_pic;
+
 /* user32!GetClipCursor (decision 0098, PROVISIONAL): BOOL f(LPRECT lpRect). rcx. This environment never confines the cursor (ClipCursor is not
  * answered and the guest does not import it), so the RECT receives "the dimensions of the screen" (Learn): the virtual display of decision 0053
  * with the origin of decision 0057, the same four numbers as the monitor rectangle of decision 0065 (fle_monitor.h). Returns 1. A NULL lpRect
