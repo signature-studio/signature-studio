@@ -46,15 +46,22 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-rm -rf .tmp-base && mkdir .tmp-base && git archive "$(git merge-base HEAD origin/main)" app | tar -x -C .tmp-base && npm ci --prefix .tmp-base/app && npm run build --prefix .tmp-base/app && npm run build --prefix app && npm test --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-181-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-181-boot.json","utf8"));process.exit(r.error===null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-181-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-181-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' && node tools/ab/run.mjs p2 "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-181-ab-p2.json && node tools/ab/run.mjs p3 "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-181-ab-p3.json
+node tools/ab/base.mjs "$(git merge-base HEAD origin/main)" .tmp-base app && npm ci --prefix .tmp-base/app && npm run build --prefix .tmp-base/app && npm run build --prefix app && npm test --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-181-boot.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-181-boot.json","utf8"));process.exit(r.error===null&&r.state==="engine-idle"&&r.standIn===false?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-181-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-181-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' && node tools/ab/run.mjs p2 "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-181-ab-p2.json && node tools/ab/run.mjs p3 "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-base/app" "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/app" 3 > .tmp-181-ab-p3.json
 ```
 
 判定の基準:
+- p3 の判定(`tools/ab/gates.mjs`): 変更後の全 run で `error` が null・`playing` が true・`last60sUnderruns` が 0・`inputRateOk` が true・`nonSilentDelta` が 0 より大きい・`pcmRepeat8192` が null か 0.01 未満。加えて、`underrunDelta` の変更後の中央値が基準の中央値以下(絶対の 0 は求めない。起動後の途切れは、別の規則で見る)。
 - `npm test --prefix app` が全て通る(新しい試験を含む)。
 - 起動の確認(`boot-bundle.mjs`)と流れ A〜D(`welcome-flow.mjs`)の 4 行が全て合格(受け入れのとおり)。
 - `tools/ab/run.mjs` の `p2` と `p3` が、`pass` が true で終わる(回帰が無い)。`p2` の判定には、`minWindowFps` の中央値 ≥ 基準 × 0.90 と、`inputToPresentMsP95` の中央値 ≤ 基準 × 1.20 が入る。
 - 効果の判定(この Issue の残す条件): `p2` の `minWindowFps` の変更後の中央値が、基準の 1.10 倍以上。届かないなら、この 3 点の変更を取り消し(製品の変更を残さない)、測定の表だけを `pm-work/findings/perf-windows-browser/181-result.md` に書いて commit する。受け入れのコマンドは、取り消し後も同じに通る(基準と変更後が同じになる)。
 - 報告に書く: 6 回の run ごとの `minWindowFps`・`inputToPresentMsP95`・`inputRateOk`・`p3` の `pcmRepeat8192`・`underrunDelta`、中央値、判定(残す・取り消す)。「達成」と書かず、「受理」か「差し戻し」を、出力の行で書く。
+
+## 前回の試行で分かったこと
+
+- まだ起動していない(依存の Issue が閉じるのを待っている)。
+- 基準の準備: `node tools/ab/base.mjs` で基準の複製を作る(git の追跡のファイルと、読むだけの入力 `lift/out-app/host` などのリンク)。この Issue の基準は `app` だけ。engine は変えないので、基準と変更後の bundle は同じ。
+- `underrunDelta` は、中央値の相対で判定する(上の判定の式)。基準の側で 0 にならない負荷の runner でも、比べられる。
 
 ## 作業の進め方
 

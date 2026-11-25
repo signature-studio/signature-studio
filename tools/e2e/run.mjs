@@ -6,18 +6,22 @@
 //   --displays: 4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080 CSS px, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR).
 //   --only: a test aid, only the named scenarios of the set are run (e.g. --only file-open-demo); each row then has that many scenarios.
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
+//   --engine-logs DIR: a test aid, the engine log of each scenario (every line the page keeps) is written to DIR/<display>-<dpr>-<scenario>.log (the directory is made).
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
 // 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect, named by its issue) has 0 pageErrors, 0 consoleErrors and 0 failedRequests
 // (its stuckToasts is only written to the JSON). Temporary files are in the repository's .tmp-e2e-* and are removed.
+// Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
+// stop report and the report's lines (lib/stop.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DISPLAY, launchBrowser, newPage, startFrameClock, installRafCounter, startRafSampler } from './lib/browser.mjs';
 import { Guest } from './lib/guest.mjs';
-import { attachDetectors, engineExitFacts, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
+import { attachDetectors, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
 import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
+import { stopOf } from './lib/stop.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
@@ -60,6 +64,13 @@ export function rowPasses(row, n = 3) {
       : s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
 }
 
+/** the engine's log of the page and its stop fact, read when the engine has stopped (lib/stop.mjs) */
+async function engineStopOf(page, cdp, origin) {
+  const g = new Guest(page, cdp, origin);
+  const lines = await g.ev("window.__app ? window.__app.engineLog() : []");
+  return stopOf(lines, (await g.state())?.exit ?? null);
+}
+
 async function runScenario(sc, d, env) {
   const { browser, browserCdp, delivery, shotsDir } = env;
   const out = {
@@ -95,7 +106,13 @@ async function runScenario(sc, d, env) {
     out.clock = env.clock;
     const eng = watch ? await watch.stop() : null;
     out.dumpRetries = guest ? guest.dumpRetries : 0;
-    if (eng && eng.stops > 0 && pg) out.engineStop = await engineExitFacts(pg.page).catch((e) => ({ error: String(e?.message ?? e).slice(0, 200) }));
+    const stopped = eng !== null && (eng.stops > 0 || out.engineState === 'error' || out.engineState === 'exited');
+    if (env.logsDir && pg) {
+      const lines = await new Guest(pg.page, pg.cdp, delivery.origin).ev('window.__app ? window.__app.engineLog() : []').catch(() => []);
+      fs.mkdirSync(env.logsDir, { recursive: true });
+      fs.writeFileSync(path.join(env.logsDir, `${d.name}-${String(d.dpr).replace('.', '_')}-${sc.name}.log`), `${lines.join('\n')}\n`);
+    }
+    if (stopped && pg) out.engineStop = await engineStopOf(pg.page, pg.cdp, delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
     const t = pg ? await toastState(pg.page).catch(() => ({ stuck: 0, ids: [] })) : { stuck: 0, ids: [] };
     out.stuckToasts = t.stuck;
     out.stuckIds = t.ids;
@@ -155,11 +172,12 @@ async function main() {
   const names = (args.displays ?? '4k-dpr1,4k-dpr2,4k-random').split(',').map((s) => s.trim()).filter(Boolean);
   const plan = names.flatMap((n) => displayRows(n).map((d) => ({ ...d, display: n })));
   const shotsDir = args.shots ? path.resolve(args.shots) : null;
+  const logsDir = args["engine-logs"] ? path.resolve(args["engine-logs"]) : null;
   if (!fs.existsSync(bundleDir)) throw new Error(`no bundle at ${bundleDir} (fe-build bundle)`);
   const workDir = fs.mkdtempSync(path.join(repo, '.tmp-e2e-'));
   const wranglerDir = path.join(appDir, '.wrangler');
   const hadWrangler = fs.existsSync(wranglerDir);
-  const env = { scenarios, shotsDir, clock: args.clock ?? 'raf', browser: null, browserCdp: null, delivery: null, served: null, setupError: null };
+  const env = { scenarios, shotsDir, logsDir, clock: args.clock ?? 'raf', browser: null, browserCdp: null, delivery: null, served: null, setupError: null };
   const rows = [];
   try {
     const objects = bundleObjects(bundleDir, brDir, BUNDLE);

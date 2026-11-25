@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // tools/fe-lift-test.mjs : `cargo test -p fe-lift` の失敗を、lift/crates/fe-lift/tests/known-failures.txt(1 行 1 件: <binary> <試験名>)と比べる。
-// usage: node tools/fe-lift-test.mjs [--test <binary>]... [--known FILE] [--strict-known]
+// usage: node tools/fe-lift-test.mjs [--test <binary>]... [--known FILE] [--host-dependent FILE] [--strict-known]
 //   --test: その試験の binary だけを走らせる(繰り返せる)。無ければ全体(cargo test -p fe-lift --no-fail-fast と同じ)。
 //   known の試験の失敗は数えて表示し、終了 0。known に無い失敗(試験・途中で止まった binary・known に無い binary の build の失敗)と、走らなかった試験の binary は、終了 1。
+//   host 依存の試験(--host-dependent。既定は tools/fe-lift-host-dependent.txt。host の CPU との比較で、CPU の種類により結果が変わる試験)の失敗は、数えて名前を出すだけで、終了 0。通っても何もしない(「直った」にも数えない)。known と両方に在る行は、host 依存を優先する。
 //   known の行の試験が通ったら「直った」と出す(known の行を消す合図)。--strict-known のとき、直った試験があれば終了 1。
 //   build の失敗(link など)が出ると cargo は他の試験を 1 つも走らせない。そのときは、失敗した binary を除いて、残りを cargo で走らせ直す。
 // 終了コード: 0 = 新しい失敗が無い。1 = 新しい失敗・走らなかった試験・内訳の読めない失敗がある。2 = 使い方の誤り。
@@ -18,8 +19,9 @@ const PACKAGE = 'fe-lift';
 const BIN = 'fe-lift';
 const TESTS_DIR = path.join(ROOT, 'lift/crates/fe-lift/tests');
 const DEFAULT_KNOWN = path.join(TESTS_DIR, 'known-failures.txt');
+const DEFAULT_HOST_DEPENDENT = path.join(ROOT, 'tools/fe-lift-host-dependent.txt');
 const BASE_ARGS = ['test', '--locked', '--manifest-path', MANIFEST, '-p', PACKAGE, '--no-fail-fast'];
-const USAGE = 'usage: node tools/fe-lift-test.mjs [--test <binary>]... [--known FILE] [--strict-known]';
+const USAGE = 'usage: node tools/fe-lift-test.mjs [--test <binary>]... [--known FILE] [--host-dependent FILE] [--strict-known]';
 
 class UsageError extends Error {}
 
@@ -79,13 +81,14 @@ function labelOfBuildItem(item) {
   return item;
 }
 
-export function loadKnown(text) {
+// 一覧(known-failures・host 依存の試験)を読む。what は、行の誤りを書くときの一覧の名前
+export function loadKnown(text, what = 'known-failures') {
   const keys = new Set();
   for (const raw of text.replace(/\r/g, '').split('\n')) {
     const line = raw.trim();
     if (line === '' || line.startsWith('#')) continue;
     const [label, ...rest] = line.split(/\s+/);
-    if (rest.length === 0) throw new Error(`known-failures の行に試験名が無い: ${line}`);
+    if (rest.length === 0) throw new Error(`${what} の行に試験名が無い: ${line}`);
     keys.add(`${label} ${rest.join(' ')}`);
   }
   return keys;
@@ -103,11 +106,13 @@ function detailOf(block, name) {
   return out;
 }
 
-// 判定。runs: [{ status, parsed }](cargo を走らせた回の、終了コードと解析の結果)。expected: 必ず走るべき試験の binary
-export function judge({ runs, known, expected = [], strictKnown = false }) {
-  const res = { newFailures: [], knownFailed: 0, knownBuild: new Set(), fixed: [], passed: 0, ran: new Set(), problems: [], knownTotal: known.size, exitCode: 0 };
+// 判定。runs: [{ status, parsed }](cargo を走らせた回の、終了コードと解析の結果)。expected: 必ず走るべき試験の binary。
+// hostDependent: host 依存の試験の一覧(loadKnown の形)。その試験の失敗は数えるだけで、終了コードに効かない。通っても何もしない(known と両方に在る行も含む)
+export function judge({ runs, known, hostDependent = new Set(), expected = [], strictKnown = false }) {
+  const res = { newFailures: [], knownFailed: 0, hostFailed: [], knownBuild: new Set(), fixed: [], passed: 0, ran: new Set(), problems: [], knownTotal: known.size, exitCode: 0 };
   const knownLabels = new Set([...known].map((k) => k.split(' ')[0]));
   const fixedKeys = new Set();
+  const hostKeys = new Set();
   const built = new Set();
   for (const { status, parsed } of runs) {
     let attributable = 0;
@@ -116,12 +121,18 @@ export function judge({ runs, known, expected = [], strictKnown = false }) {
       res.passed += b.passed.size;
       for (const name of b.failed) {
         attributable++;
-        if (known.has(`${b.label} ${name}`)) res.knownFailed++;
+        const key = `${b.label} ${name}`;
+        if (hostDependent.has(key)) {
+          if (!hostKeys.has(key)) {
+            hostKeys.add(key);
+            res.hostFailed.push({ label: b.label, name });
+          }
+        } else if (known.has(key)) res.knownFailed++;
         else res.newFailures.push({ kind: 'test', label: b.label, name, detail: detailOf(b, name) });
       }
       for (const name of b.passed) {
         const key = `${b.label} ${name}`;
-        if (known.has(key) && !fixedKeys.has(key)) {
+        if (known.has(key) && !hostDependent.has(key) && !fixedKeys.has(key)) {
           fixedKeys.add(key);
           res.fixed.push({ label: b.label, name });
         }
@@ -162,6 +173,8 @@ export function formatReport(res) {
     else if (f.kind === 'binary') lines.push(`新しい失敗: ${f.label} が失敗で終わった(失敗した試験の名前が出ない)`);
     else lines.push(`新しい失敗(ビルド): ${f.label}: ${f.message}`);
   }
+  lines.push(`ホスト依存の失敗: ${res.hostFailed.length} 件`);
+  for (const f of res.hostFailed) lines.push(`    ${f.label} ${f.name}`);
   for (const label of res.knownBuild) lines.push(`既知のビルドの失敗: ${label}(その binary は走らない。残りは走らせ直した)`);
   for (const p of res.problems) lines.push(`問題: ${p}`);
   lines.push(`fe-lift の試験: 通った ${res.passed} 件・既知の失敗 ${res.knownFailed} 件(既知の一覧 ${res.knownTotal} 件)・既知のビルドの失敗 ${res.knownBuild.length} 件・直った ${res.fixed.length} 件・新しい失敗 ${res.newFailures.length} 件・実行した binary ${res.ran.size} 件`);
@@ -178,13 +191,14 @@ export function discoverTests(dir = TESTS_DIR) {
 }
 
 function parseArgs(argv) {
-  const opt = { tests: [], known: DEFAULT_KNOWN, strictKnown: false };
+  const opt = { tests: [], known: DEFAULT_KNOWN, hostDependent: DEFAULT_HOST_DEPENDENT, strictKnown: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--test' || a === '--known') {
+    if (a === '--test' || a === '--known' || a === '--host-dependent') {
       const v = argv[++i];
       if (v === undefined || v.startsWith('--')) throw new UsageError(`${a} に値が無い`);
       if (a === '--known') opt.known = path.resolve(v);
+      else if (a === '--host-dependent') opt.hostDependent = path.resolve(v);
       else if (/^[A-Za-z0-9_-]+$/.test(v)) opt.tests.push(v);
       else throw new UsageError(`試験の binary の名前が不正: ${v}`);
     } else if (a === '--strict-known') opt.strictKnown = true;
@@ -255,11 +269,12 @@ async function main(argv) {
     return 2;
   }
   const known = loadKnown(fs.readFileSync(opt.known, 'utf8'));
+  const hostDependent = loadKnown(fs.readFileSync(opt.hostDependent, 'utf8'), 'fe-lift-host-dependent');
   const tmp = fs.mkdtempSync(path.join(ROOT, '.tmp-fe-lift-test-'));
   try {
     const { runs, items } = await runAll(opt.tests, tmp);
     const expected = items.filter((i) => i.args && i.args[0] === '--test').map((i) => i.label);
-    const res = judge({ runs, known, expected, strictKnown: opt.strictKnown });
+    const res = judge({ runs, known, hostDependent, expected, strictKnown: opt.strictKnown });
     for (const line of formatReport(res)) console.log(line);
     return res.exitCode;
   } finally {

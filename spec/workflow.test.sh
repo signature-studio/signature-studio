@@ -16,8 +16,8 @@ print(json.dumps(d, ensure_ascii=False))' "$1"; }
 pj "$A" > "$T/new.json" 2>"$T/pj.err"; pj "$T/old.yml" > "$T/old.json" 2>>"$T/pj.err"
 ok "agent.yml: YAML として読める(旧版も読める)" "$(test -s "$T/new.json" && test -s "$T/old.json" && echo yes)" yes
 J=$T/new.json; O=$T/old.json
-# 抽出の木の鍵に lift/plugins の plugin.tsv を足した(Issue #1369)。旧版との比較は、その足した 1 項目を除いた版(JN・DJN)で行う。他の変更は比較に掛かる
-sed -e "s/, 'lift\/plugins\/[^']*'//" "$A" > "$T/new-noplg.yml"; pj "$T/new-noplg.yml" > "$T/new-noplg.json" 2>>"$T/pj.err"; JN=$T/new-noplg.json
+# 抽出の木の鍵に lift/plugins の plugin.tsv(Issue #1369)と data.tsv(#1478)を足した。旧版との比較は、その足した 2 項目を除いた版(JN・DJN)で行う。他の変更は比較に掛かる(1 行に 2 項目が並ぶので g で全て除く)
+sed -e "s/, 'lift\/plugins\/\*\/\(plugin\|data\)\.tsv'//g" "$A" > "$T/new-noplg.yml"; pj "$T/new-noplg.yml" > "$T/new-noplg.json" 2>>"$T/pj.err"; JN=$T/new-noplg.json
 # (b) on: issues と issue_comment だけ。workflow_dispatch・schedule・push・pull_request は置かない
 ok "agent.yml: on のキーは issues と issue_comment だけ" "$(jq -c '.on | keys' "$J")" '["issue_comment","issues"]'
 ok "agent.yml: issues の types は、許可の一覧(opened・edited・reopened・closed・labeled・unlabeled・typed・untyped)の部分集合" "$(jq -r '(.on.issues.types - ["opened","edited","reopened","closed","labeled","unlabeled","typed","untyped"]) | length' "$J")" 0
@@ -92,8 +92,8 @@ R=$(jq -r '[.jobs.report.steps[] | select(.name | test("結果を Issue に書�
 ok "report: gh issue close は 1 回だけ、Issue が open のときの if の中にある" "$(grep -c 'gh issue close' <<<"$R")/$(awk '/= open \]; then/{f=1} /else/{f=0} /gh issue close/{print f}' <<<"$R")" "1/1"
 ok "report: 閉じられなかったときの注記を、コメントに書く" "$(grep -cF 'close を commit のキーワードで行えなかったので、後続の Issue は起動しない。PM が再評価する' <<<"$R")" 1
 ok "report: 成功の段は、running を close の後に外す" "$(awk '/gh issue close/{c=NR} /--remove-label running/{if (!r) r=NR} END{print (c && r && c < r) ? "yes" : "no"}' <<<"$R")" yes
-ok "agent.yml・deploy.yml・tools/ に、アカウント ID の値を直書きしていない" "$(acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" 2>/dev/null | cut -d'"' -f4); if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top"/tools/*.mjs | grep -cF -- "$acct"; else echo none; fi)" 0
-ok "agent.yml・deploy.yml に、マスクの命令(add-mask)が無い(値は隠さず、出さない形に直す)" "$(cat "$A" "$top/.github/workflows/deploy.yml" | grep -c 'add-mask')" 0
+ok "agent.yml・deploy.yml・e2e.yml・tools/ に、アカウント ID の値を直書きしていない" "$(acct=$(grep '"account_id"' "$top/app/wrangler.jsonc" 2>/dev/null | cut -d'"' -f4); if [ -n "$acct" ]; then cat "$A" "$top/.github/workflows/deploy.yml" "$top/.github/workflows/e2e.yml" "$top"/tools/*.mjs | grep -cF -- "$acct"; else echo none; fi)" 0
+ok "agent.yml・deploy.yml・e2e.yml に、マスクの命令(add-mask)が無い(値は隠さず、出さない形に直す)" "$(cat "$A" "$top/.github/workflows/deploy.yml" "$top/.github/workflows/e2e.yml" | grep -c 'add-mask')" 0
 # (g) tools/select-targets.mjs を、偽の gh と偽のイベントで試す
 FX=$T/fx; GHLOG=$T/gh.log; mkdir -p "$FX" "$T/bin"; : > "$GHLOG"
 cat > "$T/bin/gh" <<'GH'
@@ -350,11 +350,24 @@ ok "create: Priority が単一選択でなければ、書き込みを 1 件も�
 rm -f "$CS" "$CFX/seq"; : > "$CG"; DROP_TYPE=1 cr --apply >/dev/null 2>&1; rc=$?
 ok "create: 作成の応答に Issue Type が無い(捨てられた)なら、その場で 1 で止まり、次の Issue を作らない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(jq '.drafts | length' "$CS")" "1/1/1"
 ok "create: Type が違うと、標準エラーに Issue Type が Feature でない、と出す" "$(grep -c 'Issue Type が Feature でない' "$T/cr.err")" 1
-# (i2) 増分の起票(--existing): 既に作った下書き番号 → Issue 番号の表(pm-work/created-issues.tsv の形)で、第 2 波の参照(parent・blocked_by・#{{NNN}})を既存の Issue に解決する
-EX=$top/pm-work/created-issues.tsv; EXT=$T/w2-existing.tsv; WD=$T/w2d; WS=$T/w2state.json; EXF=$EXT
-cp "$EX" "$EXT"; mkdir -p "$WD"
+# (i2) 増分の起票(--existing): 既に作った下書き番号 → Issue 番号の表(表の形。検査の中に固定の写しを作る: 015・018 の行だけ)で、第 2 波の参照(parent・blocked_by・#{{NNN}})を既存の Issue に解決する。実物の表・実物の下書きには依存しない
+EX=$T/w2-base.tsv; EXT=$T/w2-existing.tsv; WD=$T/w2d; WS=$T/w2state.json; EXF=$EXT
+printf '下書き番号\tIssue 番号\t題名\tType\n015\t#1315\tFruity Balance を起動後の取得に移し、1 プラグイン 1 wasm で届ける(最初の 1 件)\tTask\n018\t#1318\tE 内蔵のエフェクトとインストゥルメント(DLL で 100 以上。OpenGL の VFX 系は後で入れる)\tFeature\n' > "$EX"; cp "$EX" "$EXT"; mkdir -p "$WD"
+WM=$T/w2-milestones.md
+cat > "$WM" <<'MS'
+# マイルストーン(テスト・増分)
+
+| 番号 | タイトル | 対応 |
+| --- | --- | --- |
+| M1 | M1 テスト(P3) | - |
+
+### M1 テスト(P3)
+
+- 説明: テスト用。
+- 完了の条件: 無し
+MS
 w2() { printf -- '---\n%s\n---\n\n%s\n' "$2" "$3" > "$WD/$1"; }
-w2 041-ext.md 'draft: "041"
+w2 991-ext.md 'draft: "991"
 title: "W2 1: 既存の親と既存の blocked_by"
 type: "Task"
 milestone: "M1 テスト(P3)"
@@ -364,33 +377,33 @@ labels: []
 size: "S"
 priority: "Medium"
 project: "signature-studio/3"' '既存の 015 の型(#{{015}})を使う。親は #{{018}}。'
-w2 042-batch.md 'draft: "042"
-title: "W2 2: 同じ束の 041 の後"
+w2 992-batch.md 'draft: "992"
+title: "W2 2: 同じ束の 991 の後"
 type: "Task"
 milestone: "M1 テスト(P3)"
 parent: "018"
-blocked_by: ["041"]
+blocked_by: ["991"]
 labels: []
 size: "S"
 priority: "Medium"
-project: "signature-studio/3"' '先行は #{{041}}。'
-cr2() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=$CFX FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${WDIR:-$WD}" --milestones "$CM" --existing "$EXF" --state "$WS" 2>"$T/cr.err" ); }
+project: "signature-studio/3"' '先行は #{{991}}。'
+cr2() { ( cd "$top" && GH_REPO=o/r GHLOG=$CG FX=$CFX FAIL_ON="${FAIL_ON:-}" FAIL_NTH="${FAIL_NTH:-0}" PATH=$T/cbin:$PATH node "$CI" "$@" --drafts "${WDIR:-$WD}" --milestones "$WM" --existing "$EXF" --state "$WS" 2>"$T/cr.err" ); }
 : > "$CG"; EXF=$EX cr2 > "$T/w2dry.out"; rc=$?
-ok "増分: dry-run は既存の表(実物)を読んで 0 で終わり、gh を呼ばず、状態ファイルも作らない" "$rc/$(wc -l < "$CG" | tr -d ' ')/$([ -e "$WS" ] && echo made || echo none)" "0/0/none"
+ok "増分: dry-run は既存の表(検査の中の写し)を読んで 0 で終わり、gh を呼ばず、状態ファイルも作らない" "$rc/$(wc -l < "$CG" | tr -d ' ')/$([ -e "$WS" ] && echo made || echo none)" "0/0/none"
 ok "増分: dry-run の計画に、既存への参照の対応(018 -> #1318・015 -> #1315)を出す" "$(grep -c '018 -> #1318' "$T/w2dry.out")/$(grep -c '015 -> #1315' "$T/w2dry.out")" "1/1"
 rm -f "$WS" "$CFX/seq"; : > "$CG"; cr2 --apply > "$T/w2apply.out"; rc=$?
 ok "増分: --apply は 0 で終わり、第 2 波の 2 件を作る" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')" "0/2"
 ok "増分: parent 018 は既存の #1318 に付く(子の id を付ける)" "$(jq -r 'select(.p|endswith("/sub_issues")) | "\(.p) \(.body.sub_issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/1318/sub_issues 40210,repos/o/r/issues/1318/sub_issues 40240"
-ok "増分: blocked_by 015 は既存の #1315 の id(13150)を、同じ束の 041 は新しい id(40210)を付ける" "$(jq -r 'select(.p|endswith("/dependencies/blocked_by")) | "\(.p) \(.body.issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/dependencies/blocked_by 13150,repos/o/r/issues/4024/dependencies/blocked_by 40210"
-ok "増分: 本文の #{{015}}・#{{018}} は既存の番号に直り、#{{041}} は新しい番号に直る" "$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4021") | .body.body' "$CG")/$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4024") | .body.body' "$CG")" "既存の 015 の型(#1315)を使う。親は #1318。/先行は #4021。"
-ok "増分: 作った 2 件を、既存の表に追記する(下書き番号・Issue 番号・Type)" "$(awk -F'\t' '$1=="041"||$1=="042"{print $1" "$2" "$4}' "$EXT" | paste -sd, -)" "041 #4021 Task,042 #4024 Task"
+ok "増分: blocked_by 015 は既存の #1315 の id(13150)を、同じ束の 991 は新しい id(40210)を付ける" "$(jq -r 'select(.p|endswith("/dependencies/blocked_by")) | "\(.p) \(.body.issue_id)"' "$CG" | paste -sd, -)" "repos/o/r/issues/4021/dependencies/blocked_by 13150,repos/o/r/issues/4024/dependencies/blocked_by 40210"
+ok "増分: 本文の #{{015}}・#{{018}} は既存の番号に直り、#{{991}} は新しい番号に直る" "$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4021") | .body.body' "$CG")/$(jq -r 'select(.m=="PATCH" and .p=="repos/o/r/issues/4024") | .body.body' "$CG")" "既存の 015 の型(#1315)を使う。親は #1318。/先行は #4021。"
+ok "増分: 作った 2 件を、既存の表に追記する(下書き番号・Issue 番号・Type)" "$(awk -F'\t' '$1=="991"||$1=="992"{print $1" "$2" "$4}' "$EXT" | paste -sd, -)" "991 #4021 Task,992 #4024 Task"
 ok "増分: 既存の表の行数は、元の行数に 2 を足した数" "$(( $(wc -l < "$EXT") - $(wc -l < "$EX") ))" 2
 : > "$CG"; cr2 --apply --resume >/dev/null 2>&1; rc=$?
 ok "増分: 完了の後の --resume は、作り直さず、表も増やさずに 1 で止まる(表に在る番号は重複)" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(( $(wc -l < "$EXT") - $(wc -l < "$EX") ))/$(grep -c '作成済み。重複' "$T/cr.err")" "1/0/2/2"
 EXF=$T/w2-existing2.tsv; cp "$EX" "$EXF"; rm -f "$WS" "$CFX/seq"; : > "$CG"; FAIL_ON='POST repos/o/r/issues' FAIL_NTH=2 cr2 --apply >/dev/null 2>&1; rc=$?
-ok "増分: 途中で落ちた(2 件目の作成)ときは 1 で止まり、表には 1 行も追記しない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))/$(jq '.drafts | keys | join(",")' "$WS")" '1/2/0/"041"'
+ok "増分: 途中で落ちた(2 件目の作成)ときは 1 で止まり、表には 1 行も追記しない" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | wc -l | tr -d ' ')/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))/$(jq '.drafts | keys | join(",")' "$WS")" '1/2/0/"991"'
 : > "$CG"; cr2 --apply --resume > /dev/null 2>&1; rc=$?
-ok "増分: --resume は作った 041 を作り直さず、残りの 042 だけを作り、表に 2 行追記する" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | paste -sd, -)/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))" "0/W2 2: 同じ束の 041 の後/2"
+ok "増分: --resume は作った 991 を作り直さず、残りの 992 だけを作り、表に 2 行追記する" "$rc/$(jq -r 'select(.m=="POST" and (.p|endswith("/issues"))) | .body.title' "$CG" | paste -sd, -)/$(( $(wc -l < "$EXF") - $(wc -l < "$EX") ))" "0/W2 2: 同じ束の 991 の後/2"
 UD=$T/w2u; rm -rf "$UD"; cp -r "$WD" "$UD"
 printf -- '---\n%s\n---\n\n%s\n' 'draft: "043"
 title: "W2 3: 未解決の blocked_by"
@@ -807,9 +820,18 @@ FJ2=$JR/fj2; pf "$FJ2" "$(cat "$FJ/list.json")"; mkdir -p "$FJ2/dl-950"; cp "$D"
 CN=$JR/cn; mkrepo "$CN"; sed -i '5s/.*/R5/' "$CN/a.txt"; git -C "$CN" commit -qam main-moved; n0=$(git -C "$CN" rev-list --count HEAD)
 rc=$(prun "$CN" "$FJ2" "$JR/rj3")
 ok "取り込み(判定の出力が無い): 判定に至らなかった作業として、commit せずに取り込み、その旨を書く" "$rc/$(( $(git -C "$CN" rev-list --count HEAD) - n0 ))/$(grep -c '判定に至らなかった' "$CN/.prior-work.md")" "0/0/1"
-# (k) 本番のデプロイ(deploy.yml)の抽出の木の鍵は、作業ジョブの抽出の木の鍵(agent.yml の extract-tree-)が読む入力を全て覆う。覆わないと、表を変えても古い木が使われる
-pj "$top/.github/workflows/deploy.yml" > "$T/deploy.json" 2>>"$T/pj.err"; DJ=$T/deploy.json
-sed -e "s/, 'lift\/plugins\/[^']*'//" "$top/.github/workflows/deploy.yml" > "$T/deploy-noplg.yml"; pj "$T/deploy-noplg.yml" > "$T/deploy-noplg.json" 2>>"$T/pj.err"; DJN=$T/deploy-noplg.json
+# (k) 本番の抽出の木の鍵は、作業ジョブの抽出の木の鍵(agent.yml の extract-tree-)が読む入力を全て覆う。覆わないと、表を変えても古い木が使われる
+E=$top/.github/workflows/e2e.yml; D=$top/.github/workflows/deploy.yml
+pj "$E" > "$T/e2e-raw.json" 2>>"$T/pj.err"; ER=$T/e2e-raw.json
+pj "$D" > "$T/deploy-raw.json" 2>>"$T/pj.err"; DR=$T/deploy-raw.json
+# 本番の連鎖は 2 つのワークフローに分かれる(e2e.yml の build・e2e と、deploy.yml の deploy)。以下の deploy.yml(m)(s)(t)(v)(w)(x) の名前の検査は、この連鎖の段を順に並べた一覧(DJ・DJN の .jobs.deploy.steps)で見る。job の所属と設定は ER(e2e.yml)と DR(deploy.yml)で見る
+CHAIN='{on: .[1].on, concurrency: .[1].concurrency, jobs: {build: .[0].jobs.build, e2e: .[0].jobs.e2e, deploy: .[1].jobs.deploy}}'
+jq -s "$CHAIN" "$ER" "$DR" > "$T/chain-raw.json"; DJR=$T/chain-raw.json
+DFLAT='.jobs.deploy.steps = ((.jobs.build.steps // []) + (.jobs.e2e.steps // []) + (.jobs.deploy.steps // []))'
+jq "$DFLAT" "$DJR" > "$T/deploy.json"; DJ=$T/deploy.json
+sed -e "s/, 'lift\/plugins\/[^']*'//" "$E" > "$T/e2e-noplg.yml"; pj "$T/e2e-noplg.yml" > "$T/e2e-noplg.json" 2>>"$T/pj.err"
+sed -e "s/, 'lift\/plugins\/[^']*'//" "$D" > "$T/deploy-noplg.yml"; pj "$T/deploy-noplg.yml" > "$T/deploy-noplg.json" 2>>"$T/pj.err"
+jq -s "$CHAIN" "$T/e2e-noplg.json" "$T/deploy-noplg.json" | jq "$DFLAT" > "$T/deploy-noplg-flat.json"; DJN=$T/deploy-noplg-flat.json
 DK=$(jq -r '[.jobs.deploy.steps[] | select(.id == "cache") | .with.key][0]' "$DJ")
 AK=$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty) | map(select(startswith("extract-tree-"))) | unique[0]' "$J")
 cover() { python3 - "$top" "$1" "$2" <<'PY'
@@ -829,13 +851,14 @@ PY
 }
 ok "deploy.yml: 抽出の木の鍵(id: cache)は host- で、seed 表(lift/harness/seeds/vfs-seed-idle1.tsv)を入力に含む" "$(case "$DK" in host-*"'lift/harness/seeds/vfs-seed-idle1.tsv'"*) echo yes;; *) echo no;; esac)" yes
 ok "deploy.yml: 抽出の木の鍵は、agent.yml の extract-tree- の鍵が読む入力(ファイルの集合)を全て覆う(覆われていない物の一覧)" "$(cover "$AK" "$DK")" covered
-ok "plugins: agent.yml の抽出の木の鍵(保存・復元の 2 つ)と deploy.yml の host の鍵が、lift/plugins の plugin.tsv を入力に含む" "$(grep -cF "'lift/plugins/*/plugin.tsv'" "$A")/$(grep -cF "'lift/plugins/**'" "$top/.github/workflows/deploy.yml")" "2/1"
-ok "plugins: 旧版との比較の前に、鍵から lift/plugins の 1 項目を除くと、lift/plugins の文字が残らない" "$(grep -c 'lift/plugins' "$T/new-noplg.yml")/$(grep -c 'lift/plugins' "$T/deploy-noplg.yml")" "0/0"
+ok "plugins: agent.yml の抽出の木の鍵(保存・復元の 2 つ)と e2e.yml の build の host の鍵が、lift/plugins の plugin.tsv を入力に含む" "$(grep -cF "'lift/plugins/*/plugin.tsv'" "$A")/$(grep -cF "'lift/plugins/**'" "$E")" "2/1"
+ok "plugins: agent.yml の抽出の木の鍵(保存・復元の 2 つ)が、lift/plugins の data.tsv を入力に含む" "$(grep -cF "'lift/plugins/*/data.tsv'" "$A")" 2
+ok "plugins: 旧版との比較の前に、鍵から lift/plugins の 2 項目(plugin.tsv・data.tsv)を除くと、lift/plugins の文字が残らない" "$(grep -c 'lift/plugins' "$T/new-noplg.yml")/$(grep -c 'lift/plugins' "$T/e2e-noplg.yml")" "0/0"
 ok "plugins: extract-fl.mjs は lift/plugins の行を lib/plugin-rows.mjs で読む(import と呼び出しの 2 行)" "$(grep -c 'pluginRows' "$top/app/scripts/extract-fl.mjs")" 2
 ok "deploy.yml: 抽出の木の鍵は、fe-build extract が読む表(ci/extract-dlls.tsv・seed 表)と extract-fl.mjs を全て覆う" "$(cover "hashFiles('ci/extract-dlls.tsv', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'app/scripts/extract-fl.mjs')" "$DK")" covered
 ok "deploy.yml: 抽出の木の鍵は、インストーラの名前と抽出の引数(fe-build の main.rs)と、extract-fl.mjs が repo から読む os-fonts の 4 件を覆う" "$(cover "hashFiles('lift/crates/fe-build/src/main.rs', 'lift/harness/seeds/os-fonts/**')" "$DK")" covered
-# (m) 本番へ上げる前のスモーク(deploy.yml): 起動の確認と、Welcome 窓の 4 つの流れ。上げる段(upload・wrangler)より前に在り、既定の success() で、落ちれば後を飛ばす
-D=$top/.github/workflows/deploy.yml; DOLD=cf3e7dc9
+# (m) 本番へ上げる前のスモーク(e2e.yml の build): 起動の確認と、Welcome 窓の 4 つの流れ。上げる段(deploy.yml の upload・wrangler)より前に在り、既定の success() で、落ちれば後を飛ばす。deploy.yml は e2e.yml が成功した後だけ動く(workflow_run)
+DOLD=cf3e7dc9
 git -C "$top" show "$DOLD:.github/workflows/deploy.yml" > "$T/deploy-old.yml" 2>/dev/null || echo "FAIL 変更前の deploy.yml を読めない($DOLD)"
 pj "$T/deploy-old.yml" > "$T/deploy-old.json" 2>>"$T/pj.err"; DO=$T/deploy-old.json
 SMOKE='boot-bundle|welcome-flow|jq -e'
@@ -846,9 +869,11 @@ ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落�
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' --arg sm "$SMOKE" 'def e2e: ((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-")); def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not) | select(e2e | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
-ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
-ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
+SUBSEQ='def sub($o; $n): reduce $o[] as $x ({r: $n, ok: true}; if .ok then (.r | map(. == $x) | index(true)) as $i | if $i == null then .ok = false else .r = .r[$i + 1:] end else . end) | .ok;'
+ok "deploy.yml(m): 変更前(cf3e7dc9)の段は、順と中身を保って残る(新しい段は間に入ってよい。e2e.yml の build・e2e と deploy.yml の deploy を、この順に並べて比べる。cache の鍵は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" "$SUBSEQ"' def nk: map(if .id == "cache" then del(.with.key) else . end); sub($o[0].jobs.deploy.steps | nk; $n[0].jobs.deploy.steps | nk)')" true
+ok "deploy.yml(m): job の設定(runs-on・env)は変更前(cf3e7dc9)と同じ(build は e2e.yml の build、deploy は deploy.yml の deploy。どちらも旧の deploy の設定)・deploy の concurrency も同じ" "$(jq -n -S --slurpfile e "$ER" --slurpfile d "$DR" --slurpfile o "$DO" '([$e[0].jobs.build | del(.steps)] == [$o[0].jobs.deploy | del(.steps)]) and ($d[0].jobs.deploy | del(.steps, .if)) == ($o[0].jobs.deploy | del(.steps)) and $d[0].concurrency == $o[0].concurrency')" true
+ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml と e2e.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)/$(bash "$top/guard/deploy-lint.sh" "$E" > /dev/null 2>&1; echo $?)" "0/0"
+ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$E")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
 bg() { mkdir -p "$T/rt"; printf '%s\n' "$1" > "$T/rt/boot.json"; ( cd "$T" && RUNNER_TEMP="$T/rt" bash -c "$BG" > /dev/null 2>&1 ); echo $?; }
 ok "deploy.yml(m): 起動の判定: idle・standIn 偽・error 無しで通る" "$(bg '{"error":null,"state":"engine-idle","standIn":false}')" 0
@@ -969,7 +994,9 @@ ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段に if・env・uses・continue-on-error が無い(既定の success()。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
 RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | .run] | .[0] // ""' "$DJ")
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
-ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' 'def e2e: ((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-")); def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not) | select(e2e | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+SUBSEQ2='def sub($o; $n): reduce $o[] as $x ({r: $n, ok: true}; if .ok then (.r | map(. == $x) | index(true)) as $i | if $i == null then .ok = false else .r = .r[$i + 1:] end else . end) | .ok;'
+ok "deploy.yml(s): 変更前(384b1e40)の段は、順と中身を保って残る(門の段以外。新しい段は間に入ってよい。cache の鍵は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" "$SUBSEQ2"' def nk: map(if .id == "cache" then del(.with.key) else . end); sub($o[0].jobs.deploy.steps | nk; $n[0].jobs.deploy.steps | nk)')" true
+ok "deploy.yml(s): 変更前(384b1e40)の job の設定は、e2e.yml の build と deploy.yml の deploy に残る(concurrency も同じ)" "$(jq -n -S --slurpfile e "$ER" --slurpfile d "$DR" --slurpfile o "$DP" '([$e[0].jobs.build | del(.steps)] == [$o[0].jobs.deploy | del(.steps)]) and ($d[0].jobs.deploy | del(.steps, .if)) == ($o[0].jobs.deploy | del(.steps)) and $d[0].concurrency == $o[0].concurrency')" true
 ok "fe-build upload は門を読まない(main.rs に、門の語 verified・gated と、root の一覧の読みが無い)" "$(grep -ciE 'verified|root[.]txt|gated' "$top/lift/crates/fe-build/src/main.rs")" 0
 OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
@@ -1151,15 +1178,15 @@ DSG=$top/pm-work/workflow-design.md
 DSS=$(awk '/^## .*衝突の自動の再試行/{f=1;next} /^## /{f=0} f' "$DSG")
 ok "設計(u): 「衝突の自動の再試行」の節が在り、印・上限 2・remote rejected の対象外・起動の方式(unlabeled)を書く" "$(for w in 'auto-retry:push-conflict' '上限' 'remote rejected' 'unlabeled' 'App'; do grep -cF "$w" <<<"$DSS"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(u): 「8」のトークンの節は、報告の起動の段に App の鍵を渡すことを書く" "$(awk '/^## 8[.]/{f=1;next} /^## /{f=0} f' "$DSG" | grep -cF '自動の再試行の起動の段')" 1
-# (v) 本番の連鎖(deploy.yml → fe-build)が作る物(#1337 の欠陥の再発防止)。pack.args が読む lift/out-app/ の元は、作る段が本番の連鎖(plan の記録か deploy.yml)に在る。作業者の受け入れの連鎖にしか無い物は、本番で作られず落ちる
-DYML=$top/.github/workflows/deploy.yml; PA=$top/lift/harness/web/pack.args; PLAN=$top/lift/crates/fe-build/tests/plan
+# (v) 本番の連鎖(e2e.yml と deploy.yml → fe-build)が作る物(#1337 の欠陥の再発防止)。pack.args が読む lift/out-app/ の元は、作る段が本番の連鎖(plan の記録か e2e.yml・deploy.yml)に在る。作業者の受け入れの連鎖にしか無い物は、本番で作られず落ちる
+DYML=$E; DDEP=$D; PA=$top/lift/harness/web/pack.args; PLAN=$top/lift/crates/fe-build/tests/plan
 LZ=$(awk 'prev == "--lazy-file" { sub(/=.*/, ""); print } { prev = $0 }' "$PA" | grep '^lift/out-app/')
 TOPS=$(printf '%s\n' "$LZ" | while IFS= read -r p; do printf '%s\n' "$p" | cut -d/ -f1-3; done | sort -u)
 MISS=$(for d in $TOPS; do
-  grep -vh 'pack-assets' "$PLAN/bundle.txt" "$PLAN/engine.txt" "$PLAN/extract.txt" "$PLAN/external.txt" 2> /dev/null | grep -qF "$d" || grep -qF "$d" "$DYML" || echo "$d"
+  grep -vh 'pack-assets' "$PLAN/bundle.txt" "$PLAN/engine.txt" "$PLAN/extract.txt" "$PLAN/external.txt" 2> /dev/null | grep -qF "$d" || grep -qF "$d" "$DYML" "$DDEP" || echo "$d"
 done | paste -sd' ' -)
 ok "本番(v): pack.args の lift/out-app/ の元の dir(先頭 3 段)は、全て作る段が本番の連鎖に在る(在らない dir の一覧)" "$MISS" ""
-ok "本番(v): 外部のインストーラは、fe-build bundle より前に fe-build external で取る(deploy.yml の行の順)" "$(a=$(grep -n 'fe-build external' "$DYML" | cut -d: -f1 | head -1); b=$(grep -n 'fe-build bundle' "$DYML" | cut -d: -f1 | head -1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] && echo yes)" yes
+ok "本番(v): 外部のインストーラは、fe-build bundle より前に fe-build external で取る(e2e.yml の行の順)" "$(a=$(grep -n 'fe-build external' "$DYML" | cut -d: -f1 | head -1); b=$(grep -n 'fe-build bundle' "$DYML" | cut -d: -f1 | head -1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] && echo yes)" yes
 OTTP=$(grep -n 'plugin-worker/build.sh ott' "$PLAN/bundle.txt" | cut -d: -f1 | head -1); PKP=$(grep -n 'pack-assets' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
 ok "本番(v): bundle の計画は、OTT の wasm の作る段(build.sh ott)を pack-assets より前に持つ" "$([ -n "$OTTP" ] && [ -n "$PKP" ] && [ "$OTTP" -lt "$PKP" ] && echo yes)" yes
 SERP=$(grep -n 'plugin-worker/build.sh serum2' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
@@ -1170,7 +1197,7 @@ ok "本番(v): bundle の計画は、Vital の wasm の作る段(build.sh vital)
 ok "本番(v): Vital の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/vital/vst-ext.wasm)と同じ名前" "$(grep -qF 'lift/out-app/plugins/vital/vst-ext.wasm' "$PA" && echo yes)" yes
 ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
 ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
-ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
+ok "本番(v): e2e.yml と deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、どちらの run にも書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML" "$DDEP" | awk -F: '{s+=$2} END{print s}')" 0
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
 ok "本番(v): 外部のインストーラが無い時の計画は、build.sh(ott・serum2・vital)の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
@@ -1192,8 +1219,8 @@ ok "deploy.yml(w): 表を残す段は、fe-build bundle の後・fe-build upload
   | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
   | ([.jobs.deploy.steps | to_entries[] | select(((.value.uses // "") | test("^actions/upload-artifact@")) and ((.value.with.name // "") | startswith("func-names-"))) | .key] | .[0]) as $a
   | "\($b < $f and $f + 1 == $a and $a < $u)"' "$DJ")" true
-ok "deploy.yml(w): actions.lock の deploy.yml の一覧に actions/upload-artifact@v7.0.2 が在る(gh actions-lock が作る)" "$(pj "$top/.github/workflows/actions.lock" | jq -r '.workflows[".github/workflows/deploy.yml"] | index("actions/upload-artifact@v7.0.2") != null')" true
-ok "deploy.yml(w): 100 行以内(deploy.yml の行数が 100 以下)" "$([ "$(wc -l < "$D")" -le 100 ] && echo yes)" yes
+ok "actions.lock: e2e.yml と deploy.yml の一覧は、それぞれの uses と一致する(gh actions-lock が作る)" "$(L=$(pj "$top/.github/workflows/actions.lock"); [ "$(jq -c '.workflows[".github/workflows/e2e.yml"] | sort' <<<"$L")" = "$(jq -c '[.. | objects | .uses? // empty] | unique | sort' "$ER")" ] && [ "$(jq -c '.workflows[".github/workflows/deploy.yml"] | sort' <<<"$L")" = "$(jq -c '[.. | objects | .uses? // empty] | unique | sort' "$DR")" ] && echo same)" same
+ok "deploy.yml・e2e.yml: 行数は deploy.yml が 100 行以下、e2e.yml が 200 行以下。1 行は 80 字以内(guard/deploy-lint.sh の制約。L-007)" "$( [ "$(wc -l < "$D")" -le 100 ] && [ "$(wc -l < "$E")" -le 200 ] && [ "$(cat "$D" "$E" | awk 'length($0)>80' | wc -l)" = 0 ] && echo yes || echo no)" yes
 FNR=$T/fnrun; rm -rf "$FNR"; mkdir -p "$FNR/lift/out-app/gen" "$FNR/lift/out-app/bundle/raw/fl-Oz" "$FNR/rt"
 printf 'index\tkind\tva\tname\n0\timport\t\tc.f1\n1\tf\t0x40\tf_40\n' > "$FNR/lift/out-app/gen/wasm-func-names.tsv"
 printf '{"bundle":{"name":"fl-Oz","version":"2578ea1e23f6"}}\n' > "$FNR/lift/out-app/bundle/raw/fl-Oz/manifest.json"
@@ -1207,39 +1234,79 @@ printf 'index\tkind\tva\tname\n' > "$FNR/lift/out-app/gen/wasm-func-names.tsv"; 
 ok "deploy.yml(w): 段の動き: manifest に版が無ければ落ちる(artifact の名前を決められない)" "$([ "$rc" != 0 ] && echo fails)/$(test -e "$FNR/out.txt" && echo wrote || echo none)" "fails/none"
 FNDS=$(awk '/^## 18[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(w): 「版ごとの関数名の表」の節に、artifact の名前(func-names-<版>)と取り出し(gh run download)と道具の引数(--func-names-dir)が在る" "$(for w in 'func-names-<版>' 'gh run download' '--func-names-dir'; do grep -cF -- "$w" <<<"$FNDS"; done | awk '{s+=($1>0)} END{print s}')" 3
+# (y) 2 つのワークフロー。e2e.yml は build(作り・検査し・bundle をキャッシュに置く)と、マトリクスの 1 シャードずつの e2e(キャッシュから取って動かし、判定する)。deploy.yml は、e2e.yml が成功した後だけ動き(workflow_run)、キャッシュから取って上げる。鍵は、要る段だけに渡す
+ok "e2e.yml(y): name は e2e(deploy.yml の workflow_run が、この名前の workflow を待つ)" "$(jq -r '.name' "$ER")" e2e
+ok "e2e.yml(y): job は build と e2e の 2 つだけ" "$(jq -r '.jobs | keys | sort | join(",")' "$ER")" "build,e2e"
+ok "e2e.yml(y): needs は、build が無し、e2e が build" "$(jq -r '[(.jobs.build.needs // "-"), (.jobs.e2e.needs // "-")] | join("/")' "$ER")" "-/build"
+ok "deploy.yml(y): job は deploy の 1 つだけ(build と e2e は持たない)" "$(jq -r '.jobs | keys | sort | join(",")' "$DR")" "deploy"
+ok "deploy.yml(y): needs を持たない(e2e の成功は workflow_run と if で確かめる)" "$(jq -r '.jobs.deploy | has("needs")' "$DR")" false
+ok "deploy.yml(y): on は workflow_run だけ。workflows は e2e、types は completed" "$(jq -c '[(.on | keys), .on.workflow_run.workflows, .on.workflow_run.types]' "$DR")" '[["workflow_run"],["e2e"],["completed"]]'
+ok "deploy.yml(y): job の if は e2e の成功の時だけ。ファイル内の if は、この 1 つだけ" "$(jq -r '.jobs.deploy.if' "$DR")/$(grep -cE "[{,[:space:]-]if:" "$D")" "github.event.workflow_run.conclusion == 'success'/1"
+ok "e2e.yml(y): on は push だけ。branches は main、paths は deploy.yml・e2e.yml・app・ci・guard・lift・tools/e2e" "$(jq -c '[(.on | keys), .on.push.branches, (.on.push.paths | sort)]' "$ER")" '[["push"],["main"],[".github/workflows/deploy.yml",".github/workflows/e2e.yml","app/**","ci/**","guard/**","lift/**","tools/e2e/**"]]'
+ok "deploy.yml(y): concurrency は deploy。e2e.yml の concurrency は e2e" "$(jq -r '.concurrency' "$DR")/$(jq -r '.concurrency' "$ER")" "deploy/e2e"
+ok "e2e.yml・deploy.yml: workflow_dispatch・schedule・[skip ci]・マスク(add-mask)を置かない" "$(grep -cE 'workflow_dispatch|schedule|skip ci|add-mask' "$E" "$D" | awk -F: '{s+=$2} END{print s}')" 0
+ok "e2e.yml(y): matrix の name は 3 つ(smoke-dpr1・smoke-dpr2・smoke-random。fail-fast は偽)" "$(jq -r '[.jobs.e2e.strategy.matrix.include[].name] | join(",")' "$ER")/$(jq -r '.jobs.e2e.strategy["fail-fast"] | tostring' "$ER")" "smoke-dpr1,smoke-dpr2,smoke-random/false"
+ok "e2e.yml(y): e2e の job 名は e2e (<matrix.name>)、時間の上限(timeout-minutes)を持つ" "$(jq -r '.jobs.e2e.name' "$ER")/$(jq -r '.jobs.e2e["timeout-minutes"] | type' "$ER")" 'e2e (${{ matrix.name }})/number'
+ok "キャッシュの鍵: e2e.yml の build は bundle-<sha> に保存し、e2e も同じ鍵で取る。deploy.yml は head_sha の鍵で取る" "$(jq -r '[.jobs.build.steps[-1].with.key, ([.jobs.e2e.steps[] | select((.uses // "") | test("runs-on/cache")) | .with.key][0])] | unique | join(" | ")' "$ER")/$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") | test("runs-on/cache")) | .with.key][0]' "$DR")" 'bundle-${{ github.sha }}/bundle-${{ github.event.workflow_run.head_sha }}'
+ok "キャッシュに置く物は app/dist と lift/out-app/bundle(保存と、取得の 2 か所とも同じ。deploy の取得も同じ)" "$(jq -r '[(.jobs.build.steps[-1].with.path), ([.jobs.e2e.steps[] | select((.uses // "") | test("runs-on/cache")) | .with.path][0])] | map(split("\n") | map(select(length > 0)) | join(",")) | unique | join(" | ")' "$ER")/$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") | test("runs-on/cache")) | .with.path][0] | split("\n") | map(select(length > 0)) | join(",")' "$DR")" "app/dist,lift/out-app/bundle/app/dist,lift/out-app/bundle"
+ok "取得の段は fail-on-cache-miss: true(鍵が無ければ、その場で落ちる)" "$(jq -r '[.jobs.e2e.steps[] | select((.uses // "") | test("runs-on/cache")) | .with["fail-on-cache-miss"]][0] | tostring' "$ER")/$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") | test("runs-on/cache")) | .with["fail-on-cache-miss"]][0] | tostring' "$DR")" "true/true"
+ok "e2e.yml(y): e2e の job が secrets を使うのは、キャッシュの取得の段だけで、その鍵は R2_CACHE_ASSETS の 2 つだけ" "$(jq -r '[.jobs.e2e.steps[] | select(tostring | test("secrets[.]")) | .uses] | unique | join(",")' "$ER")/$(jq -r '.jobs.e2e | tostring | [scan("secrets[.][A-Z0-9_]+")] | unique | join(",")' "$ER")" "runs-on/cache@v5.0.7/secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID,secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY"
+ok "deploy.yml(y): secrets は R2_CACHE_ASSETS の 2 つと CLOUDFLARE_API_TOKEN だけ(R2_ARTIFACT は無い)" "$(jq -r '.jobs.deploy | tostring | [scan("secrets[.][A-Z0-9_]+")] | unique | join(",")' "$DR")" "secrets.CLOUDFLARE_API_TOKEN,secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID,secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY"
+ok "CLOUDFLARE_API_TOKEN は deploy.yml の wrangler の段だけ(e2e.yml には無い)" "$(grep -c CLOUDFLARE_API_TOKEN "$E")/$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") | test("wrangler")) | .with.apiToken] | .[0] // ""' "$DR" | grep -c CLOUDFLARE_API_TOKEN)" "0/1"
+ok "R2_ARTIFACT の鍵は e2e.yml の build だけ(抽出とリソースの取り出し)。e2e の job と deploy.yml には無い" "$(jq -r '[.jobs.build, .jobs.e2e] | map(tostring | test("R2_ARTIFACT")) | join("/")' "$ER")/$(grep -c R2_ARTIFACT "$D")" "true/false/0"
+ok "公開の artifact を上げるのは e2e.yml の build(関数名の表)と e2e(判定の出力)だけ。deploy.yml は artifact を使わない" "$(jq -r '[.jobs.build, .jobs.e2e] | map(tostring | test("upload-artifact")) | join("/")' "$ER")/$(grep -c upload-artifact "$D")" "true/true/0"
+PRE='(.steps | to_entries) as $s | ([$s[] | select((.value.run // "") | test("cargo build --release --locked --manifest-path lift/Cargo.toml$")) | .key] | .[0]) as $b | ([$s[] | select((.value.run // "") | test("fe-build endpoint$")) | .key] | .[0]) as $e | ([$s[] | select((.value.uses // "") | test("runs-on/cache")) | .key] | .[0]) as $c | "\($b != null and $e != null and $c != null and $b < $e and $e < $c)"'
+ok "e2e.yml・deploy.yml: キャッシュの取得より前に fe-build を作り(cargo build)、endpoint を呼ぶ(runs-on/cache の接続先は GITHUB_ENV から読む)" "$(jq -r ".jobs.e2e | $PRE" "$ER")/$(jq -r ".jobs.deploy | $PRE" "$DR")" "true/true"
+ok "e2e.yml・deploy.yml は npm ci --prefix app と actions/checkout を持つ(wrangler と app/node_modules が要る。build と同じ作業ツリーを取る)" "$(jq -r '[.jobs.e2e.steps[] | select((.run // "") == "npm ci --prefix app")] | length' "$ER")/$(jq -r '[.jobs.deploy.steps[] | select((.run // "") == "npm ci --prefix app")] | length' "$DR")/$(jq -r '[.jobs.e2e.steps[] | select((.uses // "") == "actions/checkout@v7.0.1")] | length' "$ER")/$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") == "actions/checkout@v7.0.1")] | length' "$DR")" "1/1/1/1"
+ok "deploy.yml(y): checkout は workflow_run の head_sha を取る(e2e と同じ commit。既定ブランチの先端を取らない)" "$(jq -r '[.jobs.deploy.steps[] | select((.uses // "") == "actions/checkout@v7.0.1") | .with.ref][0]' "$DR")" '${{ github.event.workflow_run.head_sha }}'
+ok "deploy.yml(y): E2E の段(tools/e2e・e2e- の artifact)を持たない。E2E は e2e.yml だけ" "$(grep -cE 'tools/e2e|e2e-' "$D")" 0
 # (x) E2E の門(Issue #1407)。deploy.yml の E2E の段は、bundle の中身の後・関数名の表(fn)の前に在り、artifact の段はその直後に在る。判定は tools/e2e/judge.jq(合成の行で試す)
 EJ=$top/tools/e2e/judge.jq
 ok "E2E(x): 判定の jq(tools/e2e/judge.jq)が在る" "$(test -f "$EJ" && echo yes)" yes
 ok "E2E(x): 動かす段は 1 つ、artifact の段は 1 つ(名前が e2e- で始まる)" "$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs"))] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.with.name // "") | startswith("e2e-"))] | length' "$DJ")" "1/1"
-ok "E2E(x): 順は bundle の中身 → 動かす段 → artifact の段 → 関数名の表(fn)→ func-names の artifact → fe-build upload" "$(jq -r '
-  ([.jobs.deploy.steps | to_entries[] | select(.value.name == "bundle の中身を確かめる") | .key] | .[0]) as $c
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("tools/e2e/run[.]mjs")) | .key] | .[0]) as $r
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.with.name // "") | startswith("e2e-")) | .key] | .[0]) as $e
-  | ([.jobs.deploy.steps | to_entries[] | select(.value.id == "fn") | .key] | .[0]) as $f
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.with.name // "") | startswith("func-names-")) | .key] | .[0]) as $a
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
-  | "\($c != null and $c < $r and $r + 1 == $e and $e + 1 == $f and $f + 1 == $a and $a < $u)"' "$DJ")" true
+ok "E2E(x): build の順は bundle の中身 → 関数名の表(fn)→ func-names の artifact → bundle のキャッシュへの保存(最後)" "$(jq -r '
+  (.jobs.build.steps | to_entries) as $s
+  | ([$s[] | select(.value.name == "bundle の中身を確かめる") | .key] | .[0]) as $c
+  | ([$s[] | select(.value.id == "fn") | .key] | .[0]) as $f
+  | ([$s[] | select((.value.with.name // "") | startswith("func-names-")) | .key] | .[0]) as $a
+  | ([$s[] | select((.value.with.key // "") == "bundle-${{ github.sha }}") | .key] | .[0]) as $k
+  | "\($c != null and $c < $f and $f < $a and $a < $k and $k == (($s | length) - 1))"' "$DJR")" true
+ok "E2E(x): e2e の順は キャッシュの取得 → 動かす段(依存・実行・判定)→ artifact" "$(jq -r '
+  (.jobs.e2e.steps | to_entries) as $s
+  | ([$s[] | select((.value.uses // "") | test("runs-on/cache")) | .key] | .[0]) as $c
+  | ([$s[] | select((.value.run // "") | test("tools/e2e/run[.]mjs")) | .key] | .[0]) as $r
+  | ([$s[] | select((.value.with.name // "") | startswith("e2e-")) | .key] | .[0]) as $e
+  | "\($c != null and $c < $r and $r < $e)"' "$DJR")" true
+ok "E2E(x): deploy の順は キャッシュの取得 → fe-build upload → 本番の manifest の確認 → wrangler" "$(jq -r '
+  (.jobs.deploy.steps | to_entries) as $s
+  | ([$s[] | select((.value.uses // "") | test("runs-on/cache")) | .key] | .[0]) as $c
+  | ([$s[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
+  | ([$s[] | select(.value.name == "本番の manifest を確かめる") | .key] | .[0]) as $r
+  | ([$s[] | select((.value.uses // "") | test("wrangler")) | .key] | .[0]) as $w
+  | "\($c != null and $c < $u and $u < $r and $r < $w)"' "$DJR")" true
 ERUN=$(jq -r '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs")) | .run] | .[0] // ""' "$DJ")
 ok "E2E(x): 依存の取得は #1407 の受け入れと同じ(npm ci と npx playwright install chromium。--with-deps を使わない)" "$(grep -cF '(cd tools/e2e && npm ci && npx playwright install chromium)' <<<"$ERUN")/$(grep -c -- '--with-deps' <<<"$ERUN")" "1/0"
 ok "E2E(x): 動かす段は node で run.mjs を呼ぶ(シェルスクリプトを実行しない。依頼者の制約)" "$(grep -cE 'run[.]sh|bash|[.]sh([^a-z]|$)' <<<"$ERUN")" 0
-ok "E2E(x): 動かす段は smoke と 3 表示(4k-dpr1・4k-dpr2・4k-random)で、出力を \$RUNNER_TEMP/e2e.jsonl に書く" "$(grep -cF 'node tools/e2e/run.mjs --scenarios smoke' <<<"$ERUN")/$(grep -cF -- '--displays 4k-dpr1,4k-dpr2,4k-random' <<<"$ERUN")/$(grep -cF '> "$RUNNER_TEMP/e2e.jsonl"' <<<"$ERUN")" "1/1/1"
+ok "E2E(x): 動かす段は node で run.mjs に matrix の args を渡し、出力を \$RUNNER_TEMP/e2e.jsonl に書く" "$(grep -cF 'node tools/e2e/run.mjs ${{ matrix.args }} > "$RUNNER_TEMP/e2e.jsonl"' <<<"$ERUN")" 1
+ok "E2E(x): matrix の args は smoke の 3 シャード(4k-dpr1・4k-dpr2・4k-random。1 シャードに 1 表示)" "$(jq -c '[.jobs.e2e.strategy.matrix.include[].args]' "$DJR")" '["--scenarios smoke --displays 4k-dpr1","--scenarios smoke --displays 4k-dpr2","--scenarios smoke --displays 4k-random"]'
 ok "E2E(x): 判定は、動かした出力に対して jq -e -s -f tools/e2e/judge.jq(終了コードが判定になる)" "$(grep -cF 'jq -e -s -f tools/e2e/judge.jq "$RUNNER_TEMP/e2e.jsonl"' <<<"$ERUN")" 1
 ok "E2E(x): 動かす段は env を持たない(鍵と token を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs")) | has("env") | not] | .[0]' "$DJ")" true
 ok "E2E(x): 動かす段と artifact の段に、secrets・token・R2 の名前が無い" "$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-"))) | tostring | test("secrets|token|R2_")] | any' "$DJ")" false
 EUP=$(jq -c '[.jobs.deploy.steps[] | select((.with.name // "") | startswith("e2e-"))][0] // {}' "$DJ")
-ok "E2E(x): artifact の段は if: always()・upload-artifact@v7.0.2・名前 e2e-<github.sha>・30 日・無ければ無視・出力は e2e.jsonl" "$(jq -r '[.if, .uses, .with.name, .with["retention-days"], .with["if-no-files-found"], .with.path] | map(tostring) | join("|")' <<<"$EUP")" 'always()|actions/upload-artifact@v7.0.2|e2e-${{ github.sha }}|30|ignore|${{ runner.temp }}/e2e.jsonl'
+ok "E2E(x): artifact の段は if: always()・upload-artifact@v7.0.2・名前 e2e-<matrix.name>-<github.sha>・30 日・無ければ無視・出力は e2e.jsonl" "$(jq -r '[.if, .uses, .with.name, .with["retention-days"], .with["if-no-files-found"], .with.path] | map(tostring) | join("|")' <<<"$EUP")" 'always()|actions/upload-artifact@v7.0.2|e2e-${{ matrix.name }}-${{ github.sha }}|30|ignore|${{ runner.temp }}/e2e.jsonl'
 SC() { printf '{"name":"%s","ok":%s,"expectFail":%s,"pageErrors":%s,"consoleErrors":%s,"stuckToasts":%s,"failedRequests":%s}' "$1" "$2" "$3" "$4" "$5" "$6" "$7"; }
 RW() { printf '{"display":{"width":3840,"height":2160,"dpr":1,"refreshHzTarget":120,"achievedFps":%s},"servedHeadersMatch":%s,"error":%s,"scenarios":[%s]}' "$1" "$2" "$3" "$4"; }
 ej() { printf '%s\n' "$1" > "$T/ej.jsonl"; ( cd "$top" && jq -e -s -f "$EJ" "$T/ej.jsonl" > /dev/null 2> "$T/ej.err"; echo $? ); }
 ej4() { ej "$(printf '%s\n' "$1" "$1" "$1" "$1")"; }
 G3="$(SC a true null 0 0 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)"; G=$(RW 58.9 true null "$G3")
 ok "E2E(x) 判定: 全て正常の 4 行は 0" "$(ej4 "$G")" 0
-ok "E2E(x) 判定: 行が 3 つなら 1(表示は 4 行)" "$(ej "$(printf '%s\n' "$G" "$G" "$G")")" 1
-ok "E2E(x) 判定: 行が 5 つなら 1" "$(ej "$(printf '%s\n' "$G" "$G" "$G" "$G" "$G")")" 1
+ok "E2E(x) 判定: 行が 1 つ(1 表示のシャード)でも 0(行の数は matrix の表示の数で決まる)" "$(ej "$G")" 0
+ok "E2E(x) 判定: 行が 3 つ(random の 2 行を含む)でも 0" "$(ej "$(printf '%s\n' "$G" "$G" "$G")")" 0
 ok "E2E(x) 判定: 入力が空なら 1" "$(ej "")" 1
 ok "E2E(x) 判定: servedHeadersMatch が偽なら 1" "$(ej4 "$(RW 58.9 false null "$G3")")" 1
 ok "E2E(x) 判定: 行の error が有れば 1" "$(ej4 "$(RW 58.9 true '"boom"' "$G3")")" 1
-ok "E2E(x) 判定: シナリオが 2 つなら 1(3 つ必要)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: シナリオが 0 なら 1(1 つ以上必要)" "$(ej4 "$(RW 58.9 true null "")")" 1
+ok "E2E(x) 判定: シナリオが 2 つでも 0(数は問わない。シナリオが増えても門を変えない)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true null 0 0 0 0)")")" 0
 ok "E2E(x) 判定: achievedFps が数値でなければ 1" "$(ej4 "$(RW '"58.9"' true null "$G3")")" 1
 ok "E2E(x) 判定: achievedFps が 0 でも 0(120 Hz に届かない事実で落とさない)" "$(ej4 "$(RW 0 true null "$G3")")" 0
 ok "E2E(x) 判定: 印の無いシナリオの ok が偽なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a false null 0 0 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
@@ -1265,4 +1332,7 @@ ok "E2E(x): 1 本のシナリオだけを動かす --only が在り、名前が�
 DS19=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(x): 「19」の節に、門の位置・判定・expectFail・artifact・120 Hz に届かない事実の扱い(落とさない)と judge.jq を書いた" "$(for w in 'e2e-' 'expectFail' '120 Hz' '落とさない' 'judge.jq'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(x): 「19」の節に、既に在る欠陥は expectFail(Issue の番号つき)にして、門は新しい退行だけを止めること、expectFail でも pageErrors・consoleErrors・failedRequests は 0 を求めることを書いた" "$(for w in '既に在る欠陥' '新しい退行' 'pageErrors'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 3
+DS19B=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
+ok "設計(y): 「19」の節に、2 つのワークフロー・workflow_run・matrix のシャード・キャッシュの鍵 bundle-<sha>・deploy が e2e.yml の成功の後にだけ動くことを書いた" "$(for w in '2 つのワークフロー' 'workflow_run' 'matrix' 'bundle-' 'e2e.yml が成功した後'; do grep -cF -- "$w" <<<"$DS19B"; done | awk '{s+=($1>0)} END{print s}')" 5
+ok "設計(y): 「19」の節に、100 行の制約(L-007)を守った理由を書いた(deploy.yml 100 行・e2e.yml 200 行・80 字)" "$(for w in '100 行' '200 行' 'L-007' '80 字'; do grep -cF -- "$w" <<<"$DS19B"; done | awk '{s+=($1>0)} END{print s}')" 4
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

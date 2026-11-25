@@ -153,7 +153,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv', 'lift/plugins/*/data.tsv') }}
 
       - name: インストーラを取り、抽出する(キャッシュが無いときだけ)
         if: steps.cache.outputs.cache-hit != 'true'
@@ -549,7 +549,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}
         with:
           path: ${{ runner.temp }}/host
-          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv') }}
+          key: extract-tree-${{ hashFiles('ci/artifacts.lock', 'ci/extract-dlls.tsv', 'app/scripts/extract-fl.mjs', 'app/scripts/lib/*.mjs', 'lift/harness/seeds/vfs-seed-idle1.tsv', 'lift/plugins/*/plugin.tsv', 'lift/plugins/*/data.tsv') }}
           fail-on-cache-miss: true
 
       - name: 抽出物を lift/out-app/host に置く

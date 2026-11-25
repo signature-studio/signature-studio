@@ -73,3 +73,11 @@ L-071	2026-11-25	依頼者	プラグインのノブの右クリックで、貼�
 L-072	2026-11-25	依頼者	E2E を GitHub Actions 上で、4K 120 Hz のブラウザで、Playwright など何でも使って、実行する	pm-work/issue-drafts/wave1al/164-e2e-foundation-4k-120hz.md・pm-work/issue-drafts/wave1al/165-e2e-regression-scenarios.md
 L-073	2026-11-25	依頼者	perf/windows-browser(#1356)の知見を拾い、性能改善タスクに活かす。そのブランチはマージされず、頃合いを見て削除される	pm-work/findings/perf-windows-browser/(ブランチの台帳の L-073〜L-084 とは番号が重なるが、main の次の番号を使う。ブランチ側の番号は、参照のとき「perf/windows-browser の L-0xx」と書く)
 L-074	2026-11-25	依頼者(そのエージェントへの指示)	各報告で同じ性能指標を示す。1000Hz マウス入力を継続しながら評価用プロジェクトを開いて再生し、音が途切れず画面が最低120fpsで更新されることを最低条件にする	pm-work/findings/perf-windows-browser/(perf/windows-browser の L-081 を写す。指標: 起動時間・実測入力 Hz・平均と 1 秒窓の最低 fps・音声途切れ増分・PCM の異常な反復)
+L-075	2026-11-25	依頼者	マウスカーソルを、HiDPI(devicePixelRatio)を考慮して、大きすぎない大きさで出す	pm-work/issue-drafts/wave1ax/194-cursor-size-hidpi.md
+L-076	2026-11-25	依頼者	Plugin Database を、内蔵プラグインの一覧として出す。Plugin Manager を起動できるようにする	pm-work/issue-drafts/wave1ax/198-plugin-database-manager.md
+L-077	2026-11-25	依頼者	マウスカーソルの Base64 を表示しない。テレメトリに関する情報は依頼者へ連絡しない前提で、ページに HTML のヘッダー・サイドバーを置かない	pm-work/issue-drafts/wave1ax/195-page-no-html-chrome.md
+L-078	2026-11-25	依頼者	言語設定を変更した後、ページを再読み込みして engine が落ちないようにする	pm-work/issue-drafts/wave1x/142-settings-registry-persist.md・pm-work/issue-drafts/wave1ad/154-language-start.md
+L-079	2026-11-25	依頼者	「貼り付け」だけのコンテキストメニューを出さない。クリップボードは Clipboard API だけを使い、フォールバックを持たない。ページ読み込み時に権限を求め、権限が無い時のトーストを出さない	pm-work/issue-drafts/wave1ax/196-clipboard-api-only-no-menu.md
+L-080	2026-11-25	依頼者	ページ読み込み時の描画を、ランダムに不完全にしない(画面の左側が黒いまま残らない)	pm-work/issue-drafts/wave1ax/197-first-paint-complete.md
+L-081	2026-11-25	依頼者	E2E(Playwright)のシナリオを十分な数に用意し、実施する	pm-work/issue-drafts/wave1ay/
+L-082	2026-11-26	依頼者	存在する機能について、考えうる限り全ての E2E テストを追加する	pm-work/issue-drafts/wave1ay/
