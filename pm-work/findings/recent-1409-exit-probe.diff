@@ -1,0 +1,51 @@
+diff --git a/lift/harness/fruity.c b/lift/harness/fruity.c
+index aa6ab326..c4cf89f1 100644
+--- a/lift/harness/fruity.c
++++ b/lift/harness/fruity.c
+@@ -44,6 +44,7 @@
+ #include "fle_sys.h"   /* decision 0129: the virtual clock (ms) for the stable-idle report */
+ void fle_win_process_ended(void) __attribute__((weak));
+ uint32_t fle_win_visible_toplevel_count(void) __attribute__((weak));   /* decision 0222: weak, like the other runtime parts this harness may be linked without */
++int fle_win_api_trace_on(void) __attribute__((weak));   /* Issue #1409: the window-API trace (a test aid, fle_win.c); the exit probe below runs only while it is on */
+ #ifdef FLE_IDLE
+ #include "idle/idle.h" /* decision 0129: the stable-idle detector (only a build with IDLE=1 compiles it) */
+ #endif
+@@ -995,6 +996,30 @@ int fruity_precheck(void) {
+ }
+ 
+ /* ---- the call ---- */
++/* Issue #1409 (a measurement; it runs only while the window-API trace is on, so the default run is unchanged): FL64.exe calls instance->vtable[0](instance) when CreateFruityInstance
++ * returns 0 or 2 (the reading in fruity_run). The stage 1 harness does not make that call; with the trace on, this makes it, so the writes of the instance's own shutdown reach the trace. */
++static void exit_probe(uint64_t inst) {
++    uint64_t vt = 0, s0 = 0, r = 0, calls0;
++    char nb[160];
++    if (!inst || !(fle_win_api_trace_on && fle_win_api_trace_on())) return;
++    if (!peek(inst, &vt, 8) || !peek(vt, &s0, 8)) {
++        printf("fruity: exit probe: the instance %#llx is not readable\n", ULL(inst));
++        return;
++    }
++    printf("fruity: exit probe: calling instance->vtable[0] %#llx (%s) with rcx=instance %#llx\n", ULL(s0), func_name(s0, nb, sizeof nb), ULL(inst));
++    fflush(stdout);
++    calls0 = trace_call_count();
++    trace_set_call_limit(calls0 + cfg_max_calls);
++    trace_limit_hook = on_calls_limit;
++    if (fle_thread_set_idle_stop) fle_thread_set_idle_stop(1);   /* a wait for input with no event ends the probe by name (the page's idle would wait for it) */
++    active = 1;
++    r = fle_call_guest(s0, inst, 0, 0, 0);
++    active = 0;
++    trace_limit_hook = NULL;
++    printf("fruity: exit probe: returned rax=%#llx after %llu lifted entries\n", ULL(r), ULL(trace_call_count() - calls0));
++    fflush(stdout);
++}
++
+ int fruity_run(uint64_t entry_sp) {
+     uint64_t rax;
+     uint32_t ord = 0;
+@@ -1087,6 +1112,7 @@ int fruity_run(uint64_t entry_sp) {
+     printf("fruity: CreateFruityInstance RETURNED (eax=%d) after %llu lifted entries\n", eax, ULL(trace_call_count() - calls_at_start));
+     if ((eax & ~2) == 0) {
+         printf("fruity: FL64.exe would now call instance->vtable[0](instance) (0x140007789-0x1400077b9; a reading). NOT done in stage 1: recorded only\n");
++        exit_probe(instance_slot);
+     } else if (eax == -2) {
+         printf("fruity: FL64.exe would show MessageBoxA \"Verification error\" for -2 (0x140007791-0x1400077aa; a reading). Not done\n");
+     } else {

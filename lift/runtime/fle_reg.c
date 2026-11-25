@@ -465,6 +465,17 @@ void fle_imp_RegOpenKeyExW(void)
     size_t len = 0;
     if (R[2] != 0) s = fle_w_read_alloc(api, R[2], KEY_NAME_MAX * 512u, &len);
     open_common(api, R[1], s, len, (uint32_t)R[8], (uint32_t)R[9], fle_arg(5));
+    /* Issue #1409: the read side of the registry (a trace line only: the subkey asked for and the result) */
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) {
+        uint32_t bacc = 0;
+        reg_key *b = key_arg(api, R[1], &bacc);
+        fprintf(stderr, "window-api: RegOpenKeyExW \"");
+        if (b != NULL) trace_path(b);
+        else fprintf(stderr, "(no key %#llx)", (unsigned long long)R[1]);
+        fprintf(stderr, "\" \"");
+        trace_put_units(s != NULL ? s : empty_w, s != NULL ? len : 0, KEY_NAME_MAX * 512u);
+        fprintf(stderr, "\" -> %u\n", (unsigned)(uint32_t)R[0]);
+    }
     free(s);
 }
 
@@ -946,6 +957,11 @@ void fle_imp_RegEnumValueW(void)
     if (!k) {
         ret(FLE_W32_ERR_INVALID_HANDLE);
         return;
+    }
+    if (fle_win_api_trace_on && fle_win_api_trace_on()) {   /* Issue #1409: the read side of the registry (a trace line only) */
+        fprintf(stderr, "window-api: RegEnumValueW \"");
+        trace_path(k);
+        fprintf(stderr, "\" #%u of %u\n", idx, (unsigned)k->nvals);
     }
     if (!(acc & FLE_KEY_QUERY_VALUE)) {
         ret(FLE_W32_ERR_ACCESS_DENIED);

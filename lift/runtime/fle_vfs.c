@@ -384,6 +384,35 @@ static void open_trace(fle_node *n, uint32_t access, uint32_t disp)
     free(p);
 }
 
+/* the reads and the attribute queries of the user's files (Issue #1409, the read side of the Recent list: trace lines only, what the guest asks for and the place it asks in) */
+static void read_trace(fle_node *n, uint64_t at, uint64_t got)
+{
+    size_t len;
+    uint16_t *p;
+    char buf[MAX_PATH_UNITS * 6 + 1];
+    if (!kept_trace() || n == NULL) return;
+    p = node_path(n, &len);
+    if (under_profile(p, len)) {
+        quoted_units(buf, sizeof buf, p, len);
+        fprintf(stderr, "vfs-read: \"%s\" at %llu %llu bytes\n", buf, (unsigned long long)at, (unsigned long long)got);
+    }
+    free(p);
+}
+
+static void attr_trace(fle_node *n, uint32_t attrs)
+{
+    size_t len;
+    uint16_t *p;
+    char buf[MAX_PATH_UNITS * 6 + 1];
+    if (!kept_trace() || n == NULL) return;
+    p = node_path(n, &len);
+    if (under_profile(p, len)) {
+        quoted_units(buf, sizeof buf, p, len);
+        fprintf(stderr, "vfs-attr: \"%s\" -> %#x\n", buf, (unsigned)attrs);
+    }
+    free(p);
+}
+
 /* a node that has come to a place (a moved directory brings its children with it) */
 static void kept_tree(const char *api, fle_node *n)
 {
@@ -902,6 +931,7 @@ void fle_imp_ReadFile(void)
     k = n < avail ? n : avail;
     if (e->node->lazy) lazy_fetch(api, e->node, e->pos, (void *)fle_addr(buf, (unsigned)k, 1), (size_t)k);
     else memcpy((void *)fle_addr(buf, (unsigned)k, 1), e->node->data + e->pos, (size_t)k);
+    read_trace(e->node, e->pos, k);
     e->pos += k;
     fle_st(pr, 4, k);
     R[0] = 1;
@@ -1444,6 +1474,7 @@ void fle_imp_GetFileAttributesW(void)
     parse_path(api, R[1], 0, &v);
     st = lookup(api, &v, &n, &par);
     if (st) note_missing(api, st, &v);
+    if (!st) attr_trace(n, node_attrs(n));
     vp_free(&v);
     if (st) {
         fail(st, FLE_INVALID_FILE_ATTRIBUTES);
