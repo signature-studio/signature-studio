@@ -14,14 +14,15 @@ const fail = (error) => {
 function args(argv) {
   const [tab, condition, durationText, hzText, ...extra] = argv;
   const durationMs = Number(durationText), inputHz = Number(hzText);
-  if (extra.length || !tab || !['none', 'center', 'toolbar'].includes(condition) || !Number.isSafeInteger(durationMs) || durationMs < 1 || durationMs > 3_600_000 || !Number.isFinite(inputHz) || inputHz <= 0 || inputHz > 10_000 || (condition === 'none' && hzText === undefined)) {
-    throw new Error('usage: measure.mjs tab condition(none|center|toolbar) durationMs inputHz; duration 1..3600000, inputHz >0..10000');
+  if (extra.length || !tab || !['none', 'center', 'toolbar', 'pointer-center', 'pointer-toolbar'].includes(condition) || !Number.isSafeInteger(durationMs) || durationMs < 1 || durationMs > 3_600_000 || !Number.isFinite(inputHz) || inputHz <= 0 || inputHz > 10_000 || (condition === 'none' && hzText === undefined)) {
+    throw new Error('usage: measure.mjs tab condition(none|center|toolbar|pointer-center|pointer-toolbar) durationMs inputHz; duration 1..3600000, inputHz >0..10000');
   }
   return { tab, condition, durationMs, inputHz };
 }
 
 async function browserMeasure(c, summarizeWaveform) {
     const a = window.__app;
+    const fileDialogOpen = () => a?.fileDlg?.open === true || document.getElementById('filedlg')?.hidden === false;
     const read = () => {
       const s = a.perf.snapshot();
       const d = a.audio?.detail?.() ?? null;
@@ -30,10 +31,15 @@ async function browserMeasure(c, summarizeWaveform) {
       return { bundleVersion: s.bundle?.version ?? a.manifest?.bundle?.version ?? null, guestScreen: s.guestScreen ?? a.screen?.guest ?? null, hz: s.hz ?? null, at: performance.now(), state: a.state, audio: d, worker, pulses: a.audio?.pulses?.slice() ?? [], desk: a.deskStats ? { ...a.deskStats } : null, driver: a.driverStats ? { ...a.driverStats } : null, perf: { input: s.input, engineRun: s.engineRun } };
     };
     const detail = a?.audio?.detail?.();
-    const state = { app: Boolean(a), engine: a?.state, fileDialog: a?.fileDlg?.open, audio: detail?.deviceState, context: detail?.ctxState, visibility: document.visibilityState };
+    const state = { app: Boolean(a), engine: a?.state, fileDialog: fileDialogOpen(), audio: detail?.deviceState, context: detail?.ctxState, visibility: document.visibilityState };
     const wrong = Object.entries({ app: state.app, engine: state.engine === 'engine-idle', fileDialog: state.fileDialog === false, audio: state.audio === 'playing' && state.context === 'running', visibility: state.visibility === 'visible' }).filter(([, ok]) => !ok).map(([name]) => name);
     if (wrong.length) return { ok: false, failure: 'precondition', state, mismatches: wrong };
     const before = read();
+    const pointerMode = c.condition.startsWith('pointer-');
+    const beforeLatencySent = pointerMode ? a.latency.totals().sent : null;
+    let dispatchedDom = 0;
+    const desktop = pointerMode ? document.querySelector('#desktop') : null;
+    if (pointerMode && !desktop) return { ok: false, failure: 'precondition', state, mismatches: ['desktop'] };
     const captureIndex = a.audio.captures.length;
     if (c.durationMs >= 10_000) a.audio.armCapture(Math.floor(Atomics.load(a.audio.header, 3) * 8), true);
     let sent = 0, lastSent = null, maxIntervalMs = null;
@@ -72,10 +78,16 @@ async function browserMeasure(c, summarizeWaveform) {
           if (event.data?.done) return;
           const received = performance.now();
           const { width: w, height: h } = a.screen.guest;
-          const phase = (received - before.at) * 2 * Math.PI / 1000;
-          const x = c.condition === 'center' ? w / 2 + Math.min(300, w / 10) * Math.sin(phase) : w / 4 + w / 5 * Math.sin(phase);
-          const y = c.condition === 'center' ? h / 3 + Math.min(200, h / 8) * Math.cos(phase) : 30;
-          a.sendRaw({ k: 'mouse', kind: 1, x: Math.round(x), y: Math.round(y), data: 0 });
+          // Preserve the source trajectory when Worker messages arrive in a batch.
+          const phase = (pointerMode ? event.data : received - before.at) * 2 * Math.PI / 1000;
+          const center = c.condition === 'center' || c.condition === 'pointer-center';
+          const guestX = Math.round(center ? w / 2 + Math.min(300, w / 10) * Math.sin(phase) : w / 4 + w / 5 * Math.sin(phase));
+          const guestY = Math.round(center ? h / 3 + Math.min(200, h / 8) * Math.cos(phase) : 30);
+          if (pointerMode) {
+            const rect = desktop.getBoundingClientRect();
+            desktop.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientX: rect.left + guestX * rect.width / w, clientY: rect.top + guestY * rect.height / h, pointerType: 'mouse', pointerId: 1, isPrimary: true, buttons: 0 }));
+            dispatchedDom++;
+          } else a.sendRaw({ k: 'mouse', kind: 1, x: guestX, y: guestY, data: 0 });
           if (lastSent !== null) maxIntervalMs = Math.max(maxIntervalMs ?? 0, received - lastSent);
           lastSent = received;
           sent++;
@@ -91,6 +103,8 @@ async function browserMeasure(c, summarizeWaveform) {
       }
       sampleCanvas();
       const after = read();
+      const endState = { engine: a.state, fileDialog: fileDialogOpen(), audio: a.audio?.detail?.()?.deviceState, context: a.audio?.detail?.()?.ctxState, visibility: document.visibilityState };
+      const endedActive = endState.engine === 'engine-idle' && endState.fileDialog === false && endState.audio === 'playing' && endState.context === 'running';
       const delta = (x, y) => typeof x === 'number' && typeof y === 'number' ? y - x : null;
       const metricNames = ['underrunQuanta', 'engineGapFrames', 'engineSkippedFrames', 'engineLateWriteLost', 'nonSilentQuanta'];
       const audio = Object.fromEntries(metricNames.map((k) => [k, delta(before.audio?.[k], after.audio?.[k])]));
@@ -142,7 +156,10 @@ async function browserMeasure(c, summarizeWaveform) {
       const captured = c.durationMs >= 10_000 ? a.audio.captures[captureIndex] : null;
       const waveform = summarizeWaveform(captured);
       if (captured) a.audio.captures.splice(captureIndex, 1);
-      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, waveform, desk, meanCanvasFps, minOneSecondCanvasFps, canvasWindows: { recent: canvasWindows, total: canvasWindowCount }, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, mixer: lastPulse?.mixer ?? null, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+      const deliveredDelta = pointerMode ? delta(beforeLatencySent, a.latency.totals().sent) : null;
+      const deliveredRawHz = deliveredDelta !== null && elapsedMs > 0 ? deliveredDelta * 1000 / elapsedMs : null;
+      const dispatchedDomHz = pointerMode ? dispatchedDom * 1000 / elapsedMs : null;
+      return { ok: endedActive, ...(endedActive ? {} : { failure: 'end-state' }), condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, waveform, desk, meanCanvasFps, minOneSecondCanvasFps, canvasWindows: { recent: canvasWindows, total: canvasWindowCount }, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, mixer: lastPulse?.mixer ?? null, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, dispatchedDomHz, deliveredRawHz, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? (pointerMode ? deliveredRawHz : sent * 1000 / elapsedMs) >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, inputMethod: pointerMode ? 'DOM合成 PointerEvent。isTrusted=false。物理マウスは未測定。' : '__app.sendRaw による合成 raw injection。physical mouse は測定していない。', state, endState, measurementCompletedWhileEngineActive: endState.engine === 'engine-idle' };
     } finally {
       if (timer !== null) clearTimeout(timer);
       clearTimeout(canvasTimer);
