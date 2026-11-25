@@ -69,6 +69,7 @@ fn objs() -> &'static Vec<PathBuf> {
             ("fle_oleaut.c", true),
             ("fle_ole.c", true),
             ("fle_reg.c", false),
+            ("fle_vfs.c", false),
             ("fle_imports.c", false),
             ("fle_env.c", false),
         ] {

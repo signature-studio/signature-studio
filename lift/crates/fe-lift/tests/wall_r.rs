@@ -315,6 +315,7 @@ fn driver() -> &'static PathBuf {
         for f in RUNTIME_FILES {
             cmd.arg(rt.join(f));
         }
+        cmd.arg(manifest().join("tests/support/win_trace_off.c"));
         let cc = cmd.arg("-o").arg(&exe).arg(&main_c).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
         assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
         exe
@@ -973,6 +974,7 @@ int main(void)
         })
         .collect();
     files.sort();
+    files.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
     for f in &files {
         cmd.arg(f);
     }

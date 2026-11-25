@@ -136,6 +136,7 @@ fn runtime_sources(rt: &std::path::Path) -> Vec<PathBuf> {
         })
         .collect();
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
     v
 }
 
