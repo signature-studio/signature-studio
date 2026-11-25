@@ -1,0 +1,185 @@
+{
+ "note": "#1351 の受け入れの run の値(runner の値。nproc 4。loadavg(1 分値)は各 run の終わりの値で、d-a-1 4.22、d-b-3 3.38、o-a-1 3.08、o-b-3 3.82 を確かめた)。n = 3 の平均と、各 run の値。変更の後。変更の前は p2-render-1351-before.json。valid は負荷 b を含むが判定に入れない(validB)。",
+ "default": {
+  "a": {
+   "presents": 372.667,
+   "gpuProcessMsPerPresent": 71.629,
+   "drawPixelShare": 0.107,
+   "inputToPresentMsP95": 133.905
+  },
+  "b": {
+   "presents": 252.333,
+   "gpuProcessMsPerPresent": 176.538,
+   "drawPixelShare": 0.343,
+   "inputToPresentMsP95": 142.043
+  }
+ },
+ "one": {
+  "a": {
+   "presents": 1477.667,
+   "gpuProcessMsPerPresent": 21.859,
+   "drawPixelShare": 0.124,
+   "inputToPresentMsP95": 70.735
+  },
+  "b": {
+   "presents": 1108.667,
+   "gpuProcessMsPerPresent": 21.229,
+   "drawPixelShare": 0.109,
+   "inputToPresentMsP95": 37.443
+  }
+ },
+ "runs": [
+  {
+   "file": "d-a-1",
+   "dpr": 1.7647,
+   "load": "a",
+   "valid": true,
+   "presents": 372,
+   "gpuProcessMsPerPresent": 72.399,
+   "drawPixelShare": 0.109,
+   "pixelShare": 0.109,
+   "inputToPresentMsP95": 205.405,
+   "cpuPerPresentMsP95": 231.667
+  },
+  {
+   "file": "d-a-2",
+   "dpr": 1.7647,
+   "load": "a",
+   "valid": true,
+   "presents": 371,
+   "gpuProcessMsPerPresent": 70.728,
+   "drawPixelShare": 0.104,
+   "pixelShare": 0.104,
+   "inputToPresentMsP95": 87.935,
+   "cpuPerPresentMsP95": 177.778
+  },
+  {
+   "file": "d-a-3",
+   "dpr": 1.7647,
+   "load": "a",
+   "valid": true,
+   "presents": 375,
+   "gpuProcessMsPerPresent": 71.76,
+   "drawPixelShare": 0.108,
+   "pixelShare": 0.108,
+   "inputToPresentMsP95": 108.375,
+   "cpuPerPresentMsP95": 176.25
+  },
+  {
+   "file": "d-b-1",
+   "dpr": 1.7647,
+   "load": "b",
+   "valid": false,
+   "presents": 257,
+   "gpuProcessMsPerPresent": 173.735,
+   "drawPixelShare": 0.338,
+   "pixelShare": 0.338,
+   "inputToPresentMsP95": 142.69,
+   "cpuPerPresentMsP95": 150
+  },
+  {
+   "file": "d-b-2",
+   "dpr": 1.7647,
+   "load": "b",
+   "valid": false,
+   "presents": 250,
+   "gpuProcessMsPerPresent": 176.48,
+   "drawPixelShare": 0.343,
+   "pixelShare": 0.343,
+   "inputToPresentMsP95": 144.17,
+   "cpuPerPresentMsP95": 166.667
+  },
+  {
+   "file": "d-b-3",
+   "dpr": 1.7647,
+   "load": "b",
+   "valid": false,
+   "presents": 250,
+   "gpuProcessMsPerPresent": 179.4,
+   "drawPixelShare": 0.348,
+   "pixelShare": 0.348,
+   "inputToPresentMsP95": 139.27,
+   "cpuPerPresentMsP95": 152.5
+  },
+  {
+   "file": "o-a-1",
+   "dpr": 1,
+   "load": "a",
+   "valid": true,
+   "presents": 1325,
+   "gpuProcessMsPerPresent": 24.287,
+   "drawPixelShare": 0.138,
+   "pixelShare": 0.138,
+   "inputToPresentMsP95": 71.96,
+   "cpuPerPresentMsP95": 96.429
+  },
+  {
+   "file": "o-a-2",
+   "dpr": 1,
+   "load": "a",
+   "valid": true,
+   "presents": 1550,
+   "gpuProcessMsPerPresent": 20.942,
+   "drawPixelShare": 0.12,
+   "pixelShare": 0.12,
+   "inputToPresentMsP95": 70.26,
+   "cpuPerPresentMsP95": 84.286
+  },
+  {
+   "file": "o-a-3",
+   "dpr": 1,
+   "load": "a",
+   "valid": true,
+   "presents": 1558,
+   "gpuProcessMsPerPresent": 20.347,
+   "drawPixelShare": 0.115,
+   "pixelShare": 0.115,
+   "inputToPresentMsP95": 69.985,
+   "cpuPerPresentMsP95": 90.667
+  },
+  {
+   "file": "o-b-1",
+   "dpr": 1,
+   "load": "b",
+   "valid": false,
+   "presents": 1108,
+   "gpuProcessMsPerPresent": 21.588,
+   "drawPixelShare": 0.111,
+   "pixelShare": 0.111,
+   "inputToPresentMsP95": 36.265,
+   "cpuPerPresentMsP95": 39.091
+  },
+  {
+   "file": "o-b-2",
+   "dpr": 1,
+   "load": "b",
+   "valid": false,
+   "presents": 1103,
+   "gpuProcessMsPerPresent": 21.407,
+   "drawPixelShare": 0.11,
+   "pixelShare": 0.11,
+   "inputToPresentMsP95": 37.915,
+   "cpuPerPresentMsP95": 39.394
+  },
+  {
+   "file": "o-b-3",
+   "dpr": 1,
+   "load": "b",
+   "valid": false,
+   "presents": 1115,
+   "gpuProcessMsPerPresent": 20.691,
+   "drawPixelShare": 0.106,
+   "pixelShare": 0.106,
+   "inputToPresentMsP95": 38.15,
+   "cpuPerPresentMsP95": 39.706
+  }
+ ],
+ "edge": {
+  "dpr1": 2.2609,
+  "random": {
+   "dpr": 1.4,
+   "edgeWidth": 2.5274
+  },
+  "bound": 3.2131
+ }
+}

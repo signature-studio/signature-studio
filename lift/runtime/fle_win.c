@@ -116,6 +116,10 @@ typedef struct {
     int32_t upd_l, upd_t, upd_r, upd_b;         /* the update region as one bounding rectangle in client coordinates (empty = none) */
     int upd_erase;                              /* bErase of some InvalidateRect */
     int upd_delayed;                            /* decision 0323: WM_ERASEBKGND was sent for this update region and answered 0: it stays marked for erasing, without a second message (Wine 10.0: UPDATE_DELAYED_ERASE): BeginPaint then reports fErase = TRUE */
+    int pm_set;                                 /* decision 0319 (#1384): the last ScrollWindowEx of the parent (which has no WS_CLIPCHILDREN) moved this child's pixels by (pm_dx, pm_dy) with its bits; see apply_pos */
+    int32_t pm_dx, pm_dy;
+    int scroll_unc_set;                         /* decision 0319 (#1384): the last ScrollWindowEx left an uncovered area (scroll_unc, client coordinates); see fle_imp_InvalidateRect */
+    int32_t scroll_unc[4];
     fle_visrgn *updr;                           /* decision 0247 (alpha3): the update region when it is more than one rectangle (disjoint pieces, client coordinates; upd_l..upd_b is their bounding box); NULL = the region is the rectangle upd_l..upd_b */
     int paint_internal;                         /* RedrawWindow RDW_INTERNALPAINT (not used) */
     int in_paint;                               /* between BeginPaint and EndPaint */
@@ -1370,6 +1374,7 @@ void fle_imp_SetWindowLongPtrW(void)
          * is the call that notifies: here the state follows the bit without WM_ENABLE). */
         uint32_t ns = (uint32_t)np;
 
+        if (api_trace) fprintf(stderr, "window-api: SetWindowLongPtrW GWL_STYLE %#" PRIx64 " %#x -> %#x\n", h, (unsigned)tab[i].style, (unsigned)ns);   /* #1390: a sizing frame added later is seen here */
         R[0] = (uint64_t)(int64_t)(int32_t)tab[i].style;
         tab[i].style = ns;
         tab[i].visible = (ns & FLE_WS_VISIBLE) != 0;
@@ -3499,7 +3504,8 @@ static void apply_pos(const char *api, int64_t i, uint64_t after, int32_t x, int
     uint64_t h = handle_of(i);
     int32_t ox0 = tab[i].px, oy0 = tab[i].py, ocx = tab[i].pcx, ocy = tab[i].pcy;
     int32_t nx, ny, ncx, ncy;
-    int moved, sized;
+    int moved, sized, pm_carried;
+    int32_t cox0, coy0, cox1, coy1;
     uint32_t nflags;
     uint64_t nafter;
     uint32_t zflags;
@@ -3545,6 +3551,7 @@ static void apply_pos(const char *api, int64_t i, uint64_t after, int32_t x, int
         if (carried) unc_carry = NULL;
         usn = carried ? carried : unc_begin(i, (nflags & FLE_SWP_NOMOVE) ? tab[i].px : nx, (nflags & FLE_SWP_NOMOVE) ? tab[i].py : ny, (nflags & FLE_SWP_NOSIZE) ? tab[i].pcx : ncx, (nflags & FLE_SWP_NOSIZE) ? tab[i].pcy : ncy);
     }
+    client_origin(i, &cox0, &coy0);
     moved = !(nflags & FLE_SWP_NOMOVE) && (nx != tab[i].px || ny != tab[i].py);
     sized = !(nflags & FLE_SWP_NOSIZE) && (ncx != tab[i].pcx || ncy != tab[i].pcy);
     if (!(nflags & FLE_SWP_NOMOVE)) {
@@ -3695,7 +3702,10 @@ static void apply_pos(const char *api, int64_t i, uint64_t after, int32_t x, int
         upd_show_descendants(i);
     }
     if (nflags & FLE_SWP_SHOWWINDOW) note_visibility_changed();
-    unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS), !(nflags & FLE_SWP_NOREDRAW));
+    client_origin(i, &cox1, &coy1);
+    pm_carried = tab[i].pm_set && !sized && cox1 - cox0 == tab[i].pm_dx && coy1 - coy0 == tab[i].pm_dy;
+    tab[i].pm_set = 0;
+    unc_end(api, usn, !(flags & FLE_SWP_NOCOPYBITS) && !pm_carried, !(nflags & FLE_SWP_NOREDRAW));
 }
 
 /* ---- Decision 0319 (PROVISIONAL; PM 07:2x; O9 'Settings -> General: scrolling breaks the picture, only the hovered element is repaired'): the bits and the update area of user32!ScrollWindowEx / ScrollWindow on the window model of decision 0214 ----
@@ -3845,11 +3855,22 @@ int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const
     }
     /* the bits */
     if ((dx != 0 || dy != 0) && dgeo.n) scroll_copy_region(api, root, &dgeo, dx, dy);
+    /* decision 0319 (#1384): a window without WS_CLIPCHILDREN has the pixels of all its descendants in its bits (T2b): the descendants that the scroll touched were moved with them by (dx, dy). A later move of such a window by
+     * the same offset (on the screen) must not copy its bits again (apply_pos), or they are moved twice */
+    for (d = 0; d < tab_n; d++) {
+        if (!tab[d].live || (int64_t)d == i || !unc_is_desc((int64_t)d, i)) continue;
+        tab[d].pm_set = !(cf & FLE_VR_CLIPCHILDREN) && (dx != 0 || dy != 0) && unc_touch(unc_rect((int64_t)d, rx, ry), sr);
+        tab[d].pm_dx = dx;
+        tab[d].pm_dy = dy;
+    }
     /* the answer */
     res->parts = (int)geo.n;
+    tab[i].scroll_unc_set = 0;
     if (scroll_bounds_client(&geo, cl.x0, cl.y0, bb)) {
         res->unc[0] = bb[0]; res->unc[1] = bb[1]; res->unc[2] = bb[2]; res->unc[3] = bb[3];
         res->upd[0] = bb[0]; res->upd[1] = bb[1]; res->upd[2] = bb[2]; res->upd[3] = bb[3];
+        tab[i].scroll_unc_set = 1;
+        tab[i].scroll_unc[0] = bb[0]; tab[i].scroll_unc[1] = bb[1]; tab[i].scroll_unc[2] = bb[2]; tab[i].scroll_unc[3] = bb[3];
     }
     if (mv.n && scroll_bounds_client(&mv, cl.x0, cl.y0, bb)) {
         if (res->parts == 0) { res->upd[0] = bb[0]; res->upd[1] = bb[1]; res->upd[2] = bb[2]; res->upd[3] = bb[3]; }
@@ -3884,6 +3905,24 @@ int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const
         }
     }
     return 1;
+}
+
+/* Decision 0319 (#1384): the window and its visible descendants are invalidated as a whole (RedrawWindow RDW_INVALIDATE | RDW_ERASE | RDW_ALLCHILDREN); the engine paints them at its next message loop. Called by
+ * fle_imp_InvalidateRect when the caller invalidates the area that a ScrollWindowEx left uncovered, and by the measuring tool's request (window.__app.settingsRedraw, fruity_idle.c fle_g3_redraw_tree). */
+void fle_win_redraw_tree(uint64_t hwnd)
+{
+    int64_t root = live_index(hwnd), d;
+
+    if (root < 0) return;
+    for (d = 0; d < (int64_t)tab_n; d++) {
+        int64_t p = d;
+
+        if (!tab[d].live || tab[d].msgonly) continue;
+        while (p >= 0 && p != root) p = tab[p].parent;
+        if (p != root || !is_visible(d)) continue;
+        upd_set_full(d);
+        tab[d].upd_erase = 1;
+    }
 }
 
 /* DefWindowProcW(WM_WINDOWPOSCHANGED) sends WM_MOVE and WM_SIZE (Learn WM_WINDOWPOSCHANGED, WM_SIZE, WM_MOVE). Called from fle_imp_DefWindowProcW. */
@@ -5595,6 +5634,19 @@ void fle_imp_InvalidateRect(void)
         if (t2 < 0) t2 = 0;
         if (r > tab[i].pcx) r = tab[i].pcx;
         if (b > tab[i].pcy) b = tab[i].pcy;
+    }
+    /* decision 0319 (#1384): the uncovered area of the last ScrollWindowEx (the bits that moved away) is invalidated by the caller: the window and its visible descendants are then painted again as a whole (erased and
+     * painted, as the forced redraw does). A paint over the pixels that the bits left there is not the same picture: the guest draws its text again over its own pixels, and the antialiased edges drift by a colour level
+     * (pm-work/findings/settings-scroll-1384.md). The picture of a full paint does not depend on the way the window came to need it. */
+    if (tab[i].scroll_unc_set) {
+        int covered = l <= tab[i].scroll_unc[0] && t2 <= tab[i].scroll_unc[1] && r >= tab[i].scroll_unc[2] && b >= tab[i].scroll_unc[3];
+
+        tab[i].scroll_unc_set = 0;
+        if (covered) {
+            fle_win_redraw_tree(h);
+            R[0] = 1;
+            return;
+        }
     }
     if (r > l && b > t2) upd_invalidate(i, l, t2, r, b, erase != 0);   /* decision 0214 (GAP-U1): a window without WS_CLIPCHILDREN passes it on to the children it covers */
     R[0] = 1;
@@ -7364,6 +7416,10 @@ unsigned fle_win_child_lines(char *out, size_t cap)
         for (k = 0; txt[k]; k++) if (txt[k] == '"' || txt[k] == '\\') txt[k] = '?';
         w = snprintf(out + n, cap - n, "child lid %u parent lid %u at (%d, %d) %dx%d vis %d class \"%s\" text \"%s\"\n", (unsigned)tab[i].lid, (unsigned)tab[tab[i].parent].lid,
                      (int)tab[i].px, (int)tab[i].py, (int)tab[i].pcx, (int)tab[i].pcy, vis, cls, txt);
+        if (w < 0 || (size_t)w >= cap - n) break;
+        n += (size_t)w;
+        /* #1390: the style of the child, on its own line (the line above keeps its form: the readers of the window table parse it) */
+        w = snprintf(out + n, cap - n, "child style lid %u 0x%08x\n", (unsigned)tab[i].lid, (unsigned)tab[i].style);
         if (w < 0 || (size_t)w >= cap - n) break;
         n += (size_t)w;
         c++;

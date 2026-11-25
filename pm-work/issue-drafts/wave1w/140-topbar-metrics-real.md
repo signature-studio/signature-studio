@@ -23,6 +23,22 @@ project: signature-studio/3
 
 PM の決定(定義): 数値は、実際の値を出す。値を良く見せるために、数字を作らない。読み込んだ像(本体)の物理ページも使用量に数える(Windows のワーキングセットと同じ考え)。`WebAssembly.Memory` の大きさは使用量ではないので、判定の基準にしない。
 
+## 前回の試行で分かったこと(段階 1 の 2 回目。run 45499842130)
+
+- 前回: run 45499842130(22:19 → 02:15 UTC。判定は `failed`。差し戻し)。作業の commit は `fb8f8e87`(main には無い。差分は作業ツリーに載る)。詳細は `pm-work/findings/topbar-metrics-1391.md`。
+- K32GetProcessMemoryInfo は実値を返す。この実行で 79 回。MiB の floor の内訳: 167 が 1 回、163 が 2 回、166 が 25 回、164 が 51 回。最後の値は 172,480,092 B(164.49 MiB → 164)。
+- 読み取り直後の画面の上部バーは「164 MB」で、最後の K32 の値と一致した(作業者が画面で確かめた)。
+- 像: `fle_vmap_image_bytes()`(`lift/runtime/fle_vmap.c`)が、登録された像の SizeOfImage の合計を返す。定数は無い。本体の像は 0x18c0000 B(25.75 MiB)。K32 の使用量 = VirtualAlloc のページ + 生きている HeapAlloc のブロック + 像。
+- K32 の呼び出しごとに、engine の log に `memory-usage: K32GetProcessMemoryInfo WorkingSetSize <B>` が 1 行出る(log は 50,000 行まで残る)。測定の道具だけが読み、利用者向けの表示は増えていない。
+- `fle_sysinfo.c` の `fle_vmap_image_bytes` は weak 参照にした(試験の link に `fle_vmap.c` が無いため。既存の `fle_win_child_lines` と同じ書き方)。`sysinfo` の試験で増えた 11 件は通るようになった。残りの 12 件は HEAD でも落ちていた環境の不足(mingw・テスト用の C のリンク・ファイル)。ワークスペース全体の再実行は、この直しの後にはしていない。
+- 上部バーの文字は子窓ではない。FL 自身が、主窓の中に直接描く。文字の描画の API(`ExtTextOutW` など)は runtime で止まる(決定 0111)ため、描画の記録は取れない。
+- 表示の「N MB」の候補は、古い写しを複数持つ。K32 の値が変わると、同じ場所の文字がその場で書き換わる(例: 163 から 167 へ)。書き換わった候補を「最後に変わった値」として出す方法は、画面と照合した 4 回のうち 2 回が外れた(推定 167、画面 164)。外れた推定は表示の値にしないので、`shownMb` は null のまま。
+- 「N MB」は、Welcome 窓が閉じた後(プロジェクトを開いた後)にしか現れない。起動直後の標本は空だった。候補の検索は先頭から 64 件までの制限(`TEXT_HITS`)があり、後ろの表示は拾えなかった。目印を空白付きの「 MB」に絞り、標本は K32 の値が落ち着くまで約 40 秒取る形に直した。
+- 起動: bundle の直後の最初の起動が 180 秒 `running` のまま止まった(1 回。2 回目は engine-idle・timelineIdle 10.3 秒)。#{{149}} の間欠の停止と同じ型と見る(未確認)。
+- 流れ A〜D: trapped false・hostErrors 0・最大 elapsedMs 10,817・preBootBytes 311,100,730。`npm test --prefix app`: 1401 件通過・10 件 skip。
+- 測定(`tools/topbar-metrics/measure.mjs`): error null・`memory.k32Bytes` は整数 79 件・`memory.shownMb` は null。受け入れの式は、ここで落ちた。
+- 次の一手(未確認): 上部バーの文字を描く関数が使う文字列の番地を engine の側で確かめる。または、FL の表示部品の Caption を、ゲストのオブジェクトから辿る。どちらも、画面と照らしてから使う。
+
 ## 前回の試行で分かったこと(3 回目。run 45469639595)
 
 - 前回: run 45469639595(判定は `failed`。差し戻し)。作業の commit は `9f65327e`(fe-decode の試験の表を `.text` に移した)と `5e9c7fdd`(K32・道具・記録)。main には無い。差分は作業ツリーに載る。
@@ -121,35 +137,46 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
 
 ## 数値の定義(PM の決定)
 
-- **Memory Usage**(この段階の判定): エンジンが実際に確保しているゲストのメモリの量(MB)。K32GetProcessMemoryInfo が返す使用量と同じ定義で数える: コミットした VirtualAlloc のページ・生きている HeapAlloc のブロックの要求サイズ・読み込んだ像(本体)の大きさ。表示の MB は、この使用量の MB への切り捨て。判定は、表示の MB が、同じ実行で K32 が返した使用量の MB 切り捨てと ±1 MB で一致すること。
-- 参考(判定に入れない。JSON に出す): ページ側の実測(`performance.measureUserAgentSpecificMemory` が使えればその値。使えなければ、ワーカーの `WebAssembly.Memory` の大きさ)と、その比(`ratio` = 表示の MB × 1,048,576 ÷ ページ側の実測)。
+- **Memory Usage**(この段階の判定): エンジンが実際に確保しているゲストのメモリの量(MB)。K32GetProcessMemoryInfo が返す使用量と同じ定義で数える: コミットした VirtualAlloc のページ・生きている HeapAlloc のブロックの要求サイズ・読み込んだ像(`fle_vmap_image_bytes`)。
+- **表示の値の証拠**(判定は 2 つの証拠の組み合わせ。OCR は使わない):
+  - (i) ゲストのメモリの「N MB」の候補(UTF-16 と ANSI の両方)の集合の中に、K32 が最後に返した値の MiB の floor と ±1 で一致する候補が在る。その中に floor と同じ値が在れば、その値が `shownMb` に入る。無ければ、±1 の候補がちょうど 1 つの時だけ、その値が入る。かつ、K32 の最初の呼び出しの後にできた領域に、「0 MB」の候補が 1 つも無い(直す前は FL が「0 MB」を描いた)。
+  - (ii) 上部バーの小さい矩形(描画の差分の記録から取る。座標を定数にしない)の画素のハッシュが、K32 の floor が変わった時刻の 2 標本以内に変わり、floor が変わらない区間では変わらない(対応)。矩形が取れない時は、上部バーの帯全体のハッシュで代える。その時は (ii) を JSON に出すだけで、判定には入れない。
+  - 画素の文字は読まない。変化の時刻の対応だけを見る。
+- 参考(判定に入れない): `memory.guess`(前回の「最後に変わった候補」の推定)・ページ側の実測(`memory.pageMeasure`)と、その比(`memory.ratio`)。
 - CPU Load・Frame Rate: 段階 2(#{{159}})で定義する。この段階では扱わない。
 
 ## やること(段階 1)
 
-0. 作業ツリーに前回の差分(`9f65327e`・`5e9c7fdd` の内容)が在るかを、`git status` と `git log` で確かめる。在れば、その上で続ける。`pm-work/findings/topbar-metrics-1391.md` を読む。
-1. **像を数える**: 読み込んだ像(本体)の大きさを、runtime が知る経路(像の読み込みの記録)から取り、K32GetProcessMemoryInfo の使用量に足す。像の大きさを定数として書かない。取った値と取り方を、報告に書く。
-2. **K32 の返した値を記録する**: `K32GetProcessMemoryInfo` が返した使用量を、engine の記録(ページが読める形。既存の記録の仕組みを使う)に残す。利用者向けの表示は増やさない。測定の道具だけが読む。
-3. **表示を読む**: `tools/topbar-metrics/measure.mjs` で、上部バーの Memory Usage の値(「N MB」・空白 1 つ・上部バーの矩形に限る。設定の窓の候補は除く)を読み、`memory.shownMb` に出す。
-4. **判定の値を出す**: `memory.k32Bytes`(この実行で K32 が返した使用量の配列。整数。読んだ順)を出す。判定は受け入れの式で行う(道具の中では判定しない)。
-5. **参考の値を出す**: `memory.pageMeasure`(ページ側の実測)と `memory.ratio`。判定には入れない。
-6. **直した後の確認**: 前回の差分の範囲(fe-decode・K32・試験の表)が、他の lift・起動・流れ A〜D に影響しないことを確かめる。`cargo test --workspace --no-fail-fast` の失敗の一覧を、変更の前後で比べ、増えていないことを報告に書く。
-7. **受け入れ**: 下の「受け入れ」のコマンドを、そのまま通す。通らなければ、出力を報告に貼り、作業ツリーを commit する。
+0. 作業ツリーに前回の差分(`fb8f8e87` の内容)が在るかを、`git status` と `git log` で確かめる。在れば、その上で続ける。`pm-work/findings/topbar-metrics-1391.md` を読む。
+1. **像と K32(済)**: `fle_vmap_image_bytes` と、K32 の使用量(像を含む)・log の `memory-usage:` の行は、前回の差分のまま残す。
+2. **候補の集合**: 上部バーの文字は子窓にない。子窓の一覧は使わず、ゲストのメモリから「N MB」の候補を、UTF-16 と ANSI の両方で読む。読み取りの標本は、Welcome 窓が閉じた後から、1 秒ごと・40 秒。読み取りの時点の候補を、整数の集合(重複なし)`memory.candidates` に出す。候補の検索の上限(`TEXT_HITS` の 64 件)で後ろの表示を落とさないこと。
+3. **0 MB**: 「0 MB」の候補のうち、K32 の最初の呼び出しの後にできた領域に在る物の数を `memory.zeroMbNew` に出す。0 が正しい。
+4. **表示の値**: `candidates` のうち、K32 の最後の値(MiB の floor)と ±1 で一致する候補を取る。その中に floor と同じ値が在れば、その値を `memory.shownMb` に入れる(表示は K32 の値を切り捨てた値で出るため)。無ければ、±1 の候補がちょうど 1 つの時だけ、その値を入れる。どちらにも当たらない時は null(判定は落ちる。推定で埋めない)。
+5. **生きた文字列で絞る(任意)**: 候補の文字列の前の 8 バイト(参照数と長さ)で、長さ = 文字数、参照数が 1 以上の物だけに絞る。この絞りは、画面(読み取りの直後のスクリーンショット)と照合して外れない場合だけ採る。外れる絞りは使わない。
+6. **画素の変化(ii)**: 上部バーの小さい矩形を、描画の差分の記録(`#{{111}}` の画素の記録)から取る。取れない時は、上部バーの帯全体を使い、`memory.hash.method` を "band" にする(矩形は "rect")。標本は 1 秒ごと・40 個の `memory.hash.series`(画素列のハッシュ)。
+7. **K32 の floor**: 同じ 40 個の標本で、K32 の最後の値の MiB の floor を `memory.hash.floors` に出す。
+8. **判定の式**: 受け入れの式(下)で判定する。(ii) は、floor の変化が 1 回以上ある実行でだけ成り立つ。floor が 1 回も変わらない実行は、対応を確かめていないので不合格。
+9. **参考の値**: `memory.guess`(前回の推定)・`memory.pageMeasure`・`memory.ratio`。判定には入れない。
+10. **回帰の確認**: 前回の差分の範囲(fe-decode・K32・像・試験の表・weak 参照)が、他の lift・起動・流れ A〜D に影響しないことを確かめる。`cargo test --workspace --no-fail-fast` の失敗の一覧を、HEAD と比べ、増えていないことを報告に書く。
+11. **受け入れ**: 下の「受け入れ」のコマンドを、そのまま通す。通らなければ、出力を報告に貼り、作業ツリーを commit する。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const m=r.memory;process.exit(r.error===null&&Number.isFinite(m.shownMb)&&m.shownMb>0&&Array.isArray(m.k32Bytes)&&m.k32Bytes.length>=1&&m.k32Bytes.every((v)=>Number.isInteger(v))&&m.k32Bytes.some((v)=>Math.abs(m.shownMb-Math.floor(v/1048576))<=1)?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const m=r.memory;process.exit(r.error===null&&(()=>{const h=m.hash,hs=h.series,hf=h.floors,fl=Math.floor(m.k32Bytes[m.k32Bytes.length-1]/1048576),near=[...new Set(m.candidates.filter((q)=>Math.abs(q-fl)<=1))],ex=near.includes(fl),fc=[],hc=[];for(let i=1;i<hs.length;i++){if(hf[i]!==hf[i-1])fc.push(i);if(hs[i]!==hs[i-1])hc.push(i);}return m.k32Bytes.length>=1&&m.k32Bytes.every((v)=>Number.isInteger(v))&&near.length>=1&&(ex?m.shownMb===fl:(near.length===1&&m.shownMb===near[0]))&&m.zeroMbNew===0&&hs.length>=40&&hs.length===hf.length&&(h.method==="band"||(h.method==="rect"&&fc.length>=1&&hc.length>=fc.length&&hc.every((x)=>fc.some((j)=>j>=x-2&&j<=x))));})()?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
-判定の基準(`tools/topbar-metrics/measure.mjs` の JSON の項目):
+判定の基準(`tools/topbar-metrics/measure.mjs` の JSON の項目。受け入れの式の `m` は `memory`):
 - `error`: null。
-- `memory.shownMb`: 表示の Memory Usage の MB(数値。0 より大きい)。
-- `memory.k32Bytes`: この実行で K32 が返した使用量(B。整数の配列。1 件以上)。
-- 判定: `shownMb` が、`k32Bytes` のどれか 1 つの MB 切り捨て(`Math.floor(v / 1048576)`)と ±1 以内で一致する。
-- 参考(判定に入れない): `memory.pageMeasure`・`memory.ratio`。
-- 段階 2(CPU Load・Frame Rate)は、この判定に入れない。
-- 起動(`boot.json`)と流れ A〜D・`npm test` は、回帰の確認として従来どおり通す。
+- `memory.k32Bytes`: この実行で K32 が返した使用量(B。整数。呼び出し順。1 件以上)。判定では最後の値を使う。
+- `memory.candidates`: 読み取り時点の「N MB」の候補(MB の整数。重複なし)。
+- `memory.shownMb`: 表示の Memory Usage の値。K32 の最後の値の floor と同じ候補が在ればその値。無ければ、±1 の候補がちょうど 1 つの時のその値。どちらにも当たらない時は null(判定は落ちる。推定で埋めない)。
+- `memory.zeroMbNew`: K32 の最初の呼び出しの後にできた領域に在る「0 MB」の候補の数。0 が正しい。
+- `memory.hash`: `method`("rect" か "band")・`series`(上部バーの画素のハッシュ。1 秒ごと・40 個)・`floors`(K32 の最後の値の MiB の floor。同じ標本で 40 個)。
+- 判定 (i): 最後の K32 の値の MiB の floor と ±1 で一致する候補が `candidates` に在り、`shownMb` が上の規則で決まった値と一致し、`zeroMbNew` が 0。
+- 判定 (ii): `method` が "band" の時は (ii) を判定に入れない(JSON に出すだけ)。"rect" の時は、floor の変化が 1 回以上あり、画素の変化の回数が floor の変化の回数以上で、画素の各変化が、floor の変化の 0〜2 標本前(同じ標本を含む)にある。floor の変化が無い区間で画素は変わらない。
+- 参考(判定に入れない): `memory.guess`・`memory.pageMeasure`・`memory.ratio`。
+- 起動(`boot.json`)・流れ A〜D・`npm test` は、回帰の確認として従来どおり通す。
 
 ## 報告の規則
 

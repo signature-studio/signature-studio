@@ -1,0 +1,25 @@
+{
+  "note": "#1351 の 3 回目の試行(run 45489681775)。runner の値。nproc 4。n = 3 の平均。受け入れの段 measure-size(乱数の DPR 1.43)が #1393 の起動の止まり(180 秒 running)で落ち、以降の段(boot 3 回・流れ A〜D・npm test の受け入れの段)は走っていない。判定の式は走っていない。下の ratios は、測定の出力に同じ式を手で当てた値(参考)。",
+  "boot": { "boot-bundle": { "state": "engine-idle", "standIn": false, "error": null, "elapsedMs": 10493 } },
+  "default": {
+    "a": { "presents": [528, 535, 535], "mean": 532.67, "gpuProcessMsPerPresent": [46.951, 46.953, 45.888], "drawPixelShare": [0.079, 0.079, 0.075], "pixelShare": [0.079, 0.079, 0.075], "inputToPresentMsP95": [109.43, 158.36, 60.46], "valid": [true, true, true] },
+    "b": { "presents": [359, 353, 347], "mean": 353.0, "gpuProcessMsPerPresent": [125.125, 128.839, 130.836], "drawPixelShare": [0.293, 0.305, 0.309], "pixelShare": [0.293, 0.305, 0.309], "inputToPresentMsP95": [101.63, 102.01, 104.22], "valid": [false, false, false] }
+  },
+  "one": {
+    "a": { "presents": [2001, 2065, 2168], "mean": 2078.0, "gpuProcessMsPerPresent": [17.036, 16.315, 16.033], "drawPixelShare": [0.121, 0.116, 0.115], "pixelShare": [0.121, 0.116, 0.115], "inputToPresentMsP95": [51.86, 52.2, 50.395], "valid": [true, true, true] },
+    "b": { "presents": [1467, 1429, 1491], "mean": 1462.33, "gpuProcessMsPerPresent": [13.722, 14.696, 13.374], "drawPixelShare": [0.081, 0.087, 0.078], "pixelShare": [0.081, 0.087, 0.078], "inputToPresentMsP95": [23.345, 24.37, 23.9], "valid": [false, false, false] }
+  },
+  "ratios_vs_before_hand_computed": {
+    "presentsDefault": { "a": 3.965, "b": 2.446 },
+    "presentsOne": { "a": 4.777, "b": 3.284 },
+    "gpuDefault": { "a": 0.108, "b": 0.301 },
+    "inputDefault": { "a": 0.431, "b": 0.421 },
+    "note": "変更の前の値は pm-work/findings/p2-render-1351-before.json。閾値は presents 1.5 以上、gpu 0.6 以下、drawPixelShare 0.5 以下、input 1.1 以下。全部、閾値の内側。"
+  },
+  "edge": {
+    "dpr1": { "state": "engine-idle", "standIn": false, "error": null, "edgeWidth": 2.2609 },
+    "random_1.43": { "state": "running", "error": "no engine-idle within 180000 ms (#1393 の起動の止まり)", "edgeWidth": null },
+    "highDpr": { "2.5": "engine-idle", "3": "engine-idle" }
+  },
+  "input_reach_reference": { "pointerEventsPerSecMin": 1197, "pointerEventsPerSecMean": 1199.9, "pointerSent": 36000, "pointerErrors": 0, "elapsedMs": 140616, "note": "measure-live.mjs --play 1 --hz 1000 --mouse 30(参考。判定に入れない)" }
+}

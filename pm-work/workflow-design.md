@@ -215,3 +215,10 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 - 失敗: 権限が無い・Project が読めない・選択肢が無い・gh が失敗したときは、理由を標準出力に 1 行ずつ出し、段は 0 で終わる(作業は止めない。`continue-on-error` は使わない)。権限が無いときは、Issue に注記を 1 回だけ書く(印 `<!-- project-status:no-access -->` のコメントが在れば書かない)。App の token を取れないときも、理由を出して 0 で終わる。
 - 鍵: App の鍵を受け取るのは、start と report の Project の段だけ。作業者の段と作業ジョブには渡さない。
 - 試験: `spec/project-status.test.mjs`(合成の応答と偽の gh で道具を試し、agent.yml の段の置き場所・条件・鍵を確かめる)。
+
+## 18. 版ごとの関数名の表(実機の trap の関数を引く。#1404)
+
+- deploy は `fe-build bundle` の後・`fe-build upload` の前に、`lift/out-app/gen/wasm-func-names.tsv` を `gzip -9` して、artifact `func-names-<版>`(版は manifest の `bundle.version`。保存は 90 日)に上げる。表が無ければ段は落ち、deploy は止まる。スモークを通った版の物だけを上げる(upload・wrangler で落ちた版の artifact は残る)。
+- 取り出し: `gh run list -w deploy.yml` で版の run の ID を探し、`mkdir -p <dir>/func-names-<版> && gh run download <ID> -n func-names-<版> -D <dir>/func-names-<版>`。道具は `node tools/perf-beacons/summary.mjs <記録の dir> --stops --func-names-dir <dir>`(`--func-names <file>` は、フォルダ名 `func-names-<版>` の中の file だけ)。trap の `wasm-function[N]` は、記録の版の表で名前に引かれ、指紋に ` [fn=名前]` と出る。
+- 表が無い版は ` [fn=? 表が無い版]`、表に無い番号は ` [fn=? 表に無い番号]` と出る。この変更より前に deploy された版は artifact が無く、取り出せない(その版の trap は ` [fn=? 表が無い版]` のまま)。
+- 試験: `spec/perf-funcnames.test.mjs`(合成の表と記録)と、`spec/workflow.test.sh` の (w)(deploy の段の並び・名前・保存の日数・段の動き)。

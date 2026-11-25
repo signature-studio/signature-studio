@@ -215,6 +215,7 @@ void fle_win_report(FILE *f);
 #define FLE_WS_DISABLED    0x08000000u
 #define FLE_WS_MINIMIZE    0x20000000u
 #define FLE_WS_MAXIMIZE    0x01000000u
+#define FLE_WS_THICKFRAME  0x00040000u   /* Learn Window Styles: the sizing border (#1390) */
 #define FLE_WS_EX_TOPMOST  0x00000008u
 #define FLE_WS_EX_NOACTIVATE 0x08000000u
 #define FLE_WS_EX_NOPARENTNOTIFY 0x00000004u
@@ -304,6 +305,8 @@ typedef struct {
     int32_t upd[4];
 } fle_win_scroll_result;
 int fle_win_scroll(const char *api, uint64_t hwnd, int32_t dx, int32_t dy, const int32_t *scroll, const int32_t *clip, uint32_t flags, fle_win_scroll_result *res);
+/* Issue #1384: the window and its visible descendants are invalidated as a whole (the measuring tool's redraw request; fle_win.c) */
+void fle_win_redraw_tree(uint64_t hwnd);
 /* Decision 0140: UpdateLayeredWindow moves and resizes a layered window without messages (S-ulw-no-messages); see fle_layered.c. */
 int fle_win_layered_rect(uint64_t hwnd, int set_pos, int32_t x, int32_t y, int set_size, int32_t cx, int32_t cy);
 

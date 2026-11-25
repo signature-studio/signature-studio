@@ -14,3 +14,30 @@ Data\Patches\Scores\Chopping\Riff machine step 1\
 Data\Patches\Scores\Chopping\Riff machine step 2\
 Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\
 Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\
+Data\Patches\Impulses\Chambers\IMP warehouse_hall_dark_e.wv
+Data\Patches\Impulses\Reverb Devices\IMP Krg -  Fluttering Empty Room.wv
+Data\Patches\Packs\Drums (ModeAudio)\Claps\Attack Clap 08.wv
+Data\Patches\Packs\Drums (ModeAudio)\Claps\Attack Clap 10.wv
+Data\Patches\Packs\Drums (ModeAudio)\Claps\HouseGen Clap 02.wv
+Data\Patches\Packs\Drums (ModeAudio)\Claps\MA Halloween Clap.wv
+Data\Patches\Packs\Drums (ModeAudio)\Hi Hats\Collider Fifth OHat 01.wv
+Data\Patches\Packs\Drums (ModeAudio)\Hi Hats\HouseGen OHat 02.wv
+Data\Patches\Packs\Drums (ModeAudio)\Hi Hats\MA NorthernLights CHat.wv
+Data\Patches\Packs\Drums (ModeAudio)\Hi Hats\MA Sanctuary Hat 01.wv
+Data\Patches\Packs\Drums (ModeAudio)\Kicks\MA FrightNight Kick.wv
+Data\Patches\Packs\Drums (ModeAudio)\Kicks\Power ShortKick 17.wv
+Data\Patches\Packs\Drums (ModeAudio)\SFX\Hyper HouseParty Ghost FX.wv
+Data\Patches\Packs\Drums (ModeAudio)\SFX\Hyper StadiumHop Needler FX 02.wv
+Data\Patches\Packs\Drums\Kicks\Minimal Kick 36.wav
+Data\Patches\Packs\Drums\Kicks\Minimal Kick 37.wav
+Data\Patches\Packs\Drums\Kits\Jayce Lewis\JL Hat 184 Closed Hat 02.flac
+Data\Patches\Packs\Drums\SFX\Gill SFX 2.wav
+Data\Patches\Packs\Drums\SFX\Smigen Boom SFX.wav
+Data\Patches\Packs\Drums\Snares\FPC Snare 8.wav
+Data\Patches\Packs\Drums\Snares\Grv Snareclap 25.wav
+Data\Patches\Packs\Risers\Riser Flangy.wv
+Data\Patches\Packs\Risers\Riser Laboratory.wv
+Data\Patches\Packs\Risers\Riser Noise Glitchy.wv
+Data\Patches\Packs\Risers\Riser Vocal.wv
+Data\Patches\Packs\Risers\Riser Yoyo.wv
+Data\Patches\Packs\SFX\SFX SubBass Drop.wav

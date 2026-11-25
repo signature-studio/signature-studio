@@ -14,7 +14,7 @@ import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './eng
 import type { AppView } from './engine/appview.ts';
 import type { HostFileStats } from './engine/hostfiles.ts';
 import type { GuestTextBest, GuestTextNear } from './engine/protocol.ts';
-import { cursorCss } from './ui/cursor.ts';
+import { type CursorChoice, cursorCss } from './ui/cursor.ts';
 import { DesktopView } from './ui/desktop.ts';
 import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
 import { LatencyTracker, toAnyFrame, type InputMeta } from './ui/latency.ts';
@@ -83,7 +83,9 @@ interface AppApi {
   /** the input events with their latencies (page -> engine injection -> engine idle again -> frame drawn) */
   latency: LatencyTracker;
   /** the CSS cursor the desktop shows and why */
-  cursor: { css: string; why: string };
+  cursor: CursorChoice;
+  /** #1390: the cursors the engine reported that the page could not show as they are: the standard cursors with no CSS equivalent (name, value, how many times it was reported), the cursors the guest made itself (how many times) and the handles with no identity (how many times) */
+  cursorRecord: { unmapped: { name: string; value: number; count: number }[]; made: number; unresolved: number };
   /** what the status line says now */
   engineStatus(): ReturnType<typeof engineState>;
   /** what the engine did with the input (the Worker's counters of the last idle) */
@@ -120,6 +122,8 @@ interface AppApi {
   webview2Front(): number[];
   /** #1358 (a test aid, the measurement only calls it): the text the engine's memory holds for the markers, read without writing it (ASCII and UTF-16LE); radius > 0 also lists the printable runs near each place */
   guestText(markers: string[], radius?: number): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }>;
+  /** #1384 (a test aid, the measurement only calls it): the window `lid` (the window table's logical id) and its descendants are drawn again; the picture is read after the engine has painted them */
+  settingsRedraw(lid: number): void;
   /** decision 0240 (a test aid, when the desktop is shown with WebGL): the scene drawn again and read back from the WebGL canvas, base64 of R, G, B, A bytes */
   deskGlPixelsBase64(): Promise<{ width: number; height: number; base64: string }>;
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines in engineLog()) on or off; off at the start */
@@ -182,7 +186,7 @@ const pageClipboard = new PageClipboard(document);
 void pageClipboard.refresh();
 const app: AppApi = {
   assetsReport: () => assetsNow(),
-  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, cursorRecord: { unmapped: [], made: 0, unresolved: 0 }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   webview2Front: () => face.frontRects(),
@@ -197,6 +201,7 @@ const app: AppApi = {
   readbackDesk: () => client.readback('desk'),
   deskDumpHash: async () => { const d = await client.deskDump(); return { width: d.width, height: d.height, sha256: await sha256Hex(new Uint8Array(d.data)) }; },
   guestText: (markers, radius = 0) => client.guestText(markers, radius),
+  settingsRedraw: (lid) => client.settingsRedraw(lid),
   deskDumpBase64: async (peek = false) => { const d = await client.deskDump(peek); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { windows: d.windows, width: d.width, height: d.height, base64: btoa(s) }; },
   windowApiTrace: (on) => { apiTraceWanted = on; client.windowApiTrace(on); },
   deskGlPixelsBase64: async () => { const d = await client.deskGlPixels(); let s = ''; const u = new Uint8Array(d.data); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return { width: d.width, height: d.height, base64: btoa(s) }; },
@@ -590,11 +595,23 @@ perfPanel.addEventListener('toggle', () => { if (perfPanel.open) displayMonitor.
 $('perf-send-note').textContent = ' · 測定値はこのサーバーに送られます';
 setInterval(renderPerf, 1000);
 
+/** #1390: what the engine's cursor reports were that the page could not show as they are (a count per report of a state, not per pointer move) */
+function recordCursor(c: CursorChoice): void {
+  if (c.unmapped) {
+    const seen = app.cursorRecord.unmapped.find((u) => u.value === c.unmapped?.value);
+    if (seen) seen.count++;
+    else app.cursorRecord.unmapped.push({ ...c.unmapped, count: 1 });
+  }
+  if (c.made) app.cursorRecord.made++;
+  if (c.unresolved) app.cursorRecord.unresolved++;
+}
+
 const client = new EngineClient({
   deskCanvas: () => view.deskCanvas(),
   osstate(m) {
-    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared });
+    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared, cursorMade: m.cursorMade });
     app.cursor = c;
+    recordCursor(c);
     view.setCursor(c.css);
     osTitle = m.title;
     syncPageTitle();

@@ -55,9 +55,9 @@ void fruity_add_image(uint64_t base, uint64_t size) __attribute__((weak));
 int fle_xmod_load(const char *dll_path) __attribute__((weak));
 
 /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
- * MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (16) of fle_realmod.c on purpose: more files than the runtime
+ * MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (192) of fle_realmod.c on purpose: more files than the runtime
  * holds are stopped by the runtime (fle_realmod.c table_check, by name), not by a second limit here. */
-enum { MAIN_REAL_MAX = 32 };
+enum { MAIN_REAL_MAX = 192 };
 static char *rpath[MAIN_REAL_MAX];
 static int rm_file_of[MAIN_REAL_MAX];   /* #1341: the file (index into rpath) of each table entry, -1 when none */
 static struct timespec t_start;

@@ -39,26 +39,27 @@ function parsePlugin(plugin, text) {
   return out;
 }
 
+// The checks of plugins.rs validate(): the keys (the realmod names, and the stems of the rebased files) and the guest paths are unique;
+// the file names need not be (Issue #1379: 18 DLLs are engine_x64.dll).
 function validate(dlls) {
-  const keys = new Set(), guests = new Set(), names = new Set();
+  const keys = new Set(), guests = new Set();
   for (const d of dlls) {
     const at = (m) => new Error(`plugin ${d.plugin} (${d.key}): ${m}`);
     const base = d.guest.split('\\').pop();
-    const name = base.toLowerCase().replaceAll(' ', '_');
     if (!/^[a-z0-9._-]+$/.test(d.key)) throw at('the key is lower case letters, digits, \'.\', \'-\' and \'_\' only');
+    if (!d.key.endsWith('.dll')) throw at('the key ends with .dll (it is the realmod name and the stem of the rebased file)');
     if (keys.has(d.key)) throw at('the key is not unique');
     keys.add(d.key);
     if (d.guest.split('\\').length < 3 || d.guest.includes('/')) throw at('the guest path is Plugins\\...\\file (backslashes, at least three parts)');
     if (guests.has(d.guest.toLowerCase())) throw at('the guest path is not unique');
     guests.add(d.guest.toLowerCase());
     if (!base.toLowerCase().endsWith('.dll')) throw at('the file is not a DLL');
-    if (names.has(name)) throw at(`the file name ${name} is not unique (the realmod name must be unique)`);
-    names.add(name);
     if (!/^[0-9a-f]{64}$/.test(d.sha256)) throw at('sha256 is 64 lower case hex digits');
   }
 }
 
-// { extract: [[name, host path, SHA-256]], seed: [[guest path, host path, SHA-256]] }, in the order of the keys
+// { extract: [[installer name, host path, SHA-256]], seed: [[guest path, host path, SHA-256]] }, in the order of the keys.
+// The host path is named by the key (plugins.rs host_file, seed_file); the installer name is the file's name in lower case (installer_name).
 export function pluginRows(dir) {
   if (!fs.existsSync(dir)) return { extract: [], seed: [] };
   const folders = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isDirectory()).sort();
@@ -70,13 +71,10 @@ export function pluginRows(dir) {
   dlls.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   validate(dlls);
   return {
-    extract: dlls.map((d) => {
-      const base = d.guest.split('\\').pop();
-      return [base.toLowerCase(), `${HOST_ROOT}/${base.toLowerCase().replaceAll(' ', '_')}`, d.sha256];
-    }),
+    extract: dlls.map((d) => [d.guest.split('\\').pop().toLowerCase(), `${HOST_ROOT}/${d.key}`, d.sha256]),
     seed: dlls.map((d) => {
       const parts = d.guest.split('\\');
-      return [GUEST_ROOT + d.guest, `${SEED_ROOT}/${parts.slice(0, -2).join('/')}/${parts[parts.length - 1].replaceAll(' ', '_')}`, d.sha256];
+      return [GUEST_ROOT + d.guest, `${SEED_ROOT}/${parts.slice(0, -2).join('/')}/${d.key}`, d.sha256];
     }),
   };
 }

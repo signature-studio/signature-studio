@@ -644,7 +644,7 @@ fn pack_step_for(sha: &str, external: bool) -> Step {
 
 #[cfg(test)]
 fn bundle_plan_steps(sha: &str, external: bool) -> Vec<Step> {
-    let mut steps = if external { ott_steps() } else { Vec::new() };
+    let mut steps = if external { plugin_steps() } else { Vec::new() };
     steps.extend([seed_step(), pack_step_for(sha, external)]);
     steps
 }
@@ -653,7 +653,7 @@ fn bundle_plan_steps(sha: &str, external: bool) -> Vec<Step> {
 fn bundle() -> Result<(), String> {
     let external = external_present()?;
     if external {
-        for step in &ott_steps() {
+        for step in &plugin_steps() {
             run(step)?;
         }
     }
@@ -708,17 +708,22 @@ fn external_in(dir: &str, names: &[String]) -> Result<bool, String> {
     Ok(true)
 }
 
-/// The OTT wasm (#1337): build.sh reads the installers that `external` put in lift/out-app/external and writes
-/// lift/out-app/plugins/ott/vst-ext.wasm, the lazy file of the bundle (pack.args). The same build as the work chain's.
-/// The bundle runs it only when the installers are there (external_present).
-fn ott_steps() -> Vec<Step> {
-    vec![Step::Run(vec![
-        "bash".into(),
-        format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
-        "ott".into(),
-        format!("{OUT_APP_DIR}/external"),
-        format!("{OUT_APP_DIR}/plugins/ott"),
-    ])]
+/// The external plugins' wasms (#1337 OTT, #1336 Serum 2): build.sh reads the installers that `external` put in lift/out-app/external and writes
+/// lift/out-app/plugins/<name>/vst-ext.wasm, the lazy files of the bundle (pack.args). The same builds as the work chain's.
+/// The bundle runs them only when the installers are there (external_present).
+fn plugin_steps() -> Vec<Step> {
+    ["ott", "serum2"]
+        .iter()
+        .map(|name| {
+            Step::Run(vec![
+                "bash".into(),
+                format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
+                name.to_string(),
+                format!("{OUT_APP_DIR}/external"),
+                format!("{OUT_APP_DIR}/plugins/{name}"),
+            ])
+        })
+        .collect()
 }
 
 fn aws_step(args: &[&str]) -> Step {

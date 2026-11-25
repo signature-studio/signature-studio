@@ -80,6 +80,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
     case 'guest-text': guestText(m.markers, m.radius); break;
+    case 'settings-redraw': if (fruity?.redrawTree(m.lid)) driver?.wake(); break;
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;

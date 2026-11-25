@@ -38,6 +38,8 @@ export type ToWorker =
   | { cmd: 'desk-peek' }
   /** #1358 (a test aid, any display method): the text the engine's memory holds for the markers (read only; radius > 0 also lists the printable runs near each place) */
   | { cmd: 'guest-text'; markers: string[]; radius: number }
+  /** #1384 (a test aid): the window with logical id `lid` and its visible descendants are drawn again (fle_g3_redraw_tree); the engine is woken to paint them */
+  | { cmd: 'settings-redraw'; lid: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
   /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
@@ -98,7 +100,7 @@ export type FromWorker =
   | { t: 'guest-text'; memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
-  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
+  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; cursorMade: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }

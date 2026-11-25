@@ -3265,6 +3265,7 @@ void fle_imp_SetCursor(void)
         fle_stop(api, "hCursor is not a cursor of LoadCursorW, LoadImageW or CreateIconIndirect (an icon of LoadIconW, a deleted handle, another kind of handle): the page lists those four sources");
     prev = cur_cursor;
     cur_cursor = h;
+    if (fle_win_api_trace_on()) fprintf(stderr, "window-api: SetCursor %#" PRIx64 " idc=%u prev=%#" PRIx64 "\n", h, (h != 0 && fle_cursor_image_idc_of != NULL) ? (unsigned)fle_cursor_image_idc_of(h) : 0u, prev);
     R[0] = prev;
 }
 

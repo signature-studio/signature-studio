@@ -60,7 +60,7 @@ echo "build: extract $(wc -c < "$MOD") bytes" >&2
 # The work directory is kept between runs while the inputs are the same (the module's bytes, the tools and the sources): the lifted units, and the objects
 # that are newer than their sources, are then not made again. Any other input starts from an empty work directory.
 KEY=$( { sha256sum "$MOD"; sha256sum "$FE/fe-lift" "$FE/fe-pe" "$VST/gen_vst.sh" "$VST/merge_tables.mjs" \
-    "$VST/mk_stubs.mjs" "$VST/mkrows.sh" "$VST/imports-vst.txt" "$LIFT/crates/fe-lift/src/imports_table.rs" "$RT/fle_modules.h" \
+    "$VST/mk_stubs.mjs" "$VST/mkrows.sh" "$VST/imports-vst.txt" "$VST/ordinals-vst.txt" "$LIFT/crates/fe-lift/src/imports_table.rs" "$RT/fle_modules.h" \
     "$RT"/fle_*.c "$VST3A"/*.c "$VST3A/wraps.txt"; echo "$NAME $RMBASE $JOBS seeds-reloc-v1"; cat "$HERE/seeds/$NAME.txt" 2> /dev/null; } | sha256sum | cut -d' ' -f1)
 KEEP=0
 if [ "$(cat "$WORK/key" 2> /dev/null)" = "$KEY" ] && [ -s "$WORK/src/common-$NAME.c" ]; then KEEP=1; else
@@ -79,7 +79,7 @@ stage lift
 if [ "$KEEP" = 1 ]; then echo "build: lift kept (same inputs as the last run)" >&2; else
 bash "$VST/mkrows.sh" "$WORK/rows/hm.txt" || fail lift "mkrows.sh"
 node "$VST/mk_stubs.mjs" "$PE" "$LIFT/crates/fe-lift/src/imports_table.rs" "$VST/imports-vst.txt" "$RT" \
-    "$WORK/rows/stub-rows.txt" "$WORK/rows/vst3a_stubs.c" "$WORK/rows/ord-rows.txt" || fail lift "mk_stubs.mjs"
+    "$WORK/rows/stub-rows.txt" "$WORK/rows/vst3a_stubs.c" "$WORK/rows/ord-rows.txt" "$VST/ordinals-vst.txt" || fail lift "mk_stubs.mjs"
 { grep -v '^#' "$VST/imports-vst.txt"; cat "$WORK/rows/stub-rows.txt"; } > "$WORK/rows/imports.txt"
 cat "$WORK/rows/hm.txt" "$WORK/rows/ord-rows.txt" > "$WORK/rows/host-rows.txt"
 "$FE/fe-decode" reloc-seeds "$PE" --not-function > "$WORK/rows/reloc-seeds.txt" || fail lift "fe-decode reloc-seeds"
