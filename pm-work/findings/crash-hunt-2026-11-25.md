@@ -4,11 +4,11 @@
 
 ## 概要
 
-- probe: 441 件(DPR 別: 1: 213, 1.7: 228)。グループ別: a: 288, c: 9, b: 15, top: 83, plugin: 22, browser: 8, settings: 16。グループは a メニュー・b キー・c 右クリック・top 上部バーと Mixer インサートの右クリック・settings Settings の頁・browser Browser の頁の帯・plugin Mixer インサートの下位のメニュー。
-- 結果: ok: 433, stopped: 8。停止(期待される終了を除く): 6 件。期待される終了: 2 件(File の最後の項目 Exit)。
-- 予算: 50 分。経過: 50.0 分。完了: いいえ(remaining を見る)
-- DPR: 1, 1.7。停止の後の起動: 31 回(停止 7、期待される終了 1、窓の残り 21)。起動し直しの失敗: 0。CDP の Runtime.evaluate の再試行: 0。
-- menuItemsTotal(DPR 1 の走査): 202。DPR 別: 1 → 202, 1.7 → 251
+- probe: 562 件(DPR 別: 1: 213, 1.7: 349)。グループ別: a: 385, c: 18, b: 30, top: 83, plugin: 22, browser: 8, settings: 16。グループは a メニュー・b キー・c 右クリック・top 上部バーと Mixer インサートの右クリック・settings Settings の頁・browser Browser の頁の帯・plugin Mixer インサートの下位のメニュー。
+- 結果: ok: 554, stopped: 8。停止(期待される終了を除く): 6 件。期待される終了: 2 件(File の最後の項目 Exit)。
+- 予算: 40 分。経過: 16.8 分。完了: はい
+- DPR: 1, 1.7。停止の後の起動: 32 回(停止 7、期待される終了 1、窓の残り 21)。起動し直しの失敗: 0。CDP の Runtime.evaluate の再試行: 0。
+- menuItemsTotal(DPR 1 の走査): 202。DPR 別: 1 → 202, 1.7 → 258
 
 ## 指紋ごとの表(期待される終了を除く)
 
@@ -35,7 +35,7 @@
 
 ## 残り
 
-- 経路の残り: 115 件(先頭 10 件: `dpr 1.7: View > #12`, `dpr 1.7: View > #13`, `dpr 1.7: View > #14`, `dpr 1.7: View > #15`, `dpr 1.7: View > #16`, `dpr 1.7: View > #17`, `dpr 1.7: View > #18`, `dpr 1.7: View > #19`, `dpr 1.7: View > #20`, `dpr 1.7: View > #21`)
+- 経路の残り: 0 件(先頭 10 件: なし)
 - (d) not run: the Language (7) and Theme (13) switches: not done (the window table has no window per language or theme; the Settings tabs and their sections are walked)
 - (c) not run: the Mixer inserts other than the master insert's first slot (the rack is found in the window table; its first slot's menu is walked)
 - (f) not run: the built-in plugins one by one (#1371 tool not in the repository): the Mixer insert's submenus are walked (group plugin)
