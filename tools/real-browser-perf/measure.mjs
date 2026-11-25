@@ -38,6 +38,29 @@ async function browserMeasure(c, summarizeWaveform) {
     if (c.durationMs >= 10_000) a.audio.armCapture(Math.floor(Atomics.load(a.audio.header, 3) * 8), true);
     let sent = 0, lastSent = null, maxIntervalMs = null;
     let worker = null, url = null, timer = null, listener = null;
+    const canvasWindows = [];
+    let canvasWindowCount = 0, minOneSecondCanvasFps = null;
+    let canvasSampleAt = before.at, canvasFrames = before.desk?.displayFrames;
+    const sampleCanvas = () => {
+      const at = performance.now(), frames = a.deskStats?.displayFrames;
+      const elapsedMs = at - canvasSampleAt;
+      const frameDelta = Number.isFinite(canvasFrames) && Number.isFinite(frames) && frames >= canvasFrames ? frames - canvasFrames : null;
+      const fps = frameDelta === null || elapsedMs <= 0 ? null : frameDelta * 1000 / elapsedMs;
+      const window = { elapsedMs, frameDelta, fps };
+      canvasWindows.push(window);
+      if (canvasWindows.length > 60) canvasWindows.shift();
+      canvasWindowCount++;
+      if (elapsedMs >= 1000 && fps !== null) minOneSecondCanvasFps = Math.min(minOneSecondCanvasFps ?? fps, fps);
+      canvasSampleAt = at;
+      canvasFrames = frames;
+    };
+    let canvasTimer = null;
+    const sampleNextWindow = () => {
+      const remaining = 1000 - (performance.now() - canvasSampleAt);
+      if (remaining <= 0) sampleCanvas();
+      canvasTimer = setTimeout(sampleNextWindow, Math.max(1, remaining > 0 ? remaining : 1000));
+    };
+    canvasTimer = setTimeout(sampleNextWindow, 1000);
     try {
       if (c.condition === 'none') {
         await new Promise((resolve) => { timer = setTimeout(resolve, c.durationMs); });
@@ -66,6 +89,7 @@ async function browserMeasure(c, summarizeWaveform) {
         worker.postMessage({ duration: c.durationMs, hz: c.inputHz });
         await done;
       }
+      sampleCanvas();
       const after = read();
       const delta = (x, y) => typeof x === 'number' && typeof y === 'number' ? y - x : null;
       const metricNames = ['underrunQuanta', 'engineGapFrames', 'engineSkippedFrames', 'engineLateWriteLost', 'nonSilentQuanta'];
@@ -79,6 +103,7 @@ async function browserMeasure(c, summarizeWaveform) {
       };
       const deskKeys = ['displayFrames', 'presents', 'composeMs', 'putMs', 'drawMs', 'uploadBytes', 'uploads', 'draws'];
       const desk = Object.fromEntries(deskKeys.map((k) => [k, delta(before.desk?.[k], after.desk?.[k])]));
+      const meanCanvasFps = Number.isFinite(desk.displayFrames) && desk.displayFrames >= 0 && after.at > before.at ? desk.displayFrames * 1000 / (after.at - before.at) : null;
       const driver = Object.fromEntries([...new Set([...Object.keys(before.driver ?? {}), ...Object.keys(after.driver ?? {})])].map((k) => [k, delta(before.driver?.[k], after.driver?.[k])]));
       const recentPulses = after.pulses.filter((p) => p.page >= before.at && p.page <= after.at);
       const firstPulse = before.pulses.at(-1), lastPulse = after.pulses.at(-1);
@@ -117,9 +142,10 @@ async function browserMeasure(c, summarizeWaveform) {
       const captured = c.durationMs >= 10_000 ? a.audio.captures[captureIndex] : null;
       const waveform = summarizeWaveform(captured);
       if (captured) a.audio.captures.splice(captureIndex, 1);
-      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, waveform, desk, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, mixer: lastPulse?.mixer ?? null, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
+      return { ok: true, condition: c.condition, requested: { durationMs: c.durationMs, inputHz: c.condition === 'none' ? null : c.inputHz }, interval: { start: before.at, end: after.at, elapsedMs }, audio, audioWait, audioProducer, clock, waveform, desk, meanCanvasFps, minOneSecondCanvasFps, canvasWindows: { recent: canvasWindows, total: canvasWindowCount }, driver, realAudioObserved: typeof audio.nonSilentQuanta === 'number' && audio.nonSilentQuanta > 0, measurementPrerequisites: { bundleVersion: before.bundleVersion, guestScreen: before.guestScreen, hz: before.hz }, displayFramesMeaning: 'render Worker rAF周期で重複排除したcanvas更新。GPU完了や物理表示の証明ではない。未測定はnull。', audioPulse: { n: recentPulses.length, mixer: lastPulse?.mixer ?? null, threads: threadPulses, unlockCompute }, input: { sent, achievedHz: sent * 1000 / elapsedMs, maxIntervalMs, targetHz: c.condition === 'none' ? null : c.inputHz, target1250AchievedAtLeast1000Hz: c.condition === 'none' ? null : c.inputHz === 1250 ? sent * 1000 / elapsedMs >= 1000 : null, intervalStart: before.at, intervalEnd: after.at }, perf: after.perf, physicalMouseMeasured: false, note: '入力は page main の __app.sendRaw による合成 raw injection。physical mouse は測定していない。', state };
     } finally {
       if (timer !== null) clearTimeout(timer);
+      clearTimeout(canvasTimer);
       if (worker && listener) worker.removeEventListener('message', listener);
       worker?.terminate();
       if (url) URL.revokeObjectURL(url);
