@@ -1,0 +1,45 @@
+diff --git a/src/blend2d/pipeline/reference/fillgeneric_p.h b/src/blend2d/pipeline/reference/fillgeneric_p.h
+index af389f3..399fde8 100644
+--- a/src/blend2d/pipeline/reference/fillgeneric_p.h
++++ b/src/blend2d/pipeline/reference/fillgeneric_p.h
+@@ -12,6 +12,8 @@
+ #include "../../support/intops_p.h"
+ #include "../../support/ptrops_p.h"
+ 
++extern "C" void fle_b2d_tick(uint32_t units);
++
+ //! \cond INTERNAL
+ //! \addtogroup blend2d_pipeline_reference
+ //! \{
+@@ -47,6 +49,7 @@ struct FillBoxA_Base {
+     BL_ASSUME(h > 0);
+     if (CompOp::kOptimizeOpaque && msk == 255) {
+       while (h) {
++        fle_b2d_tick(w / 128u + 1u);
+         compOp.rectStartX(x0);
+         dstPtr = compOp.compositeCSpanOpaque(dstPtr, w);
+         dstPtr += dstStride;
+@@ -56,6 +59,7 @@ struct FillBoxA_Base {
+     }
+     else {
+       while (h) {
++        fle_b2d_tick(w / 128u + 1u);
+         compOp.rectStartX(x0);
+         dstPtr = compOp.compositeCSpanMasked(dstPtr, w, msk);
+         dstPtr += dstStride;
+@@ -86,6 +90,7 @@ struct FillMask_Base {
+     uint32_t h = uint32_t(fillData->box.y1) - y0;
+ 
+     for (;;) {
++      fle_b2d_tick(uint32_t(fillData->box.x1) / 128u + 1u);
+       uint32_t x1AndType = cmdPtr->_x1AndType;
+       uint32_t x = cmdPtr->x0();
+ 
+@@ -366,6 +371,7 @@ L_Scanline_Done1:
+       compOp.advanceY();
+ 
+ L_Scanline_Init:
++      fle_b2d_tick(uint32_t(xEnd) / 128u + 1u);
+       xOff = 0;
+       bitWord = 0;
+       bitPtrEnd = PtrOps::offset(bitPtr, bitStride);

@@ -14,18 +14,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
-const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--boot [--press-at S] [--trace FILE] [--profile FILE]]\n';
+const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]]\n';
 const argv = process.argv.slice(2);
 const boot = argv.includes('--boot');
 const li = argv.indexOf('--load');
 const load = li < 0 ? 'none' : argv[li + 1];
-const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile'];
+const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile', '--pubs'];
 const valueOf = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1]; };
 const bootOptUsed = BOOT_VALUE_OPTS.some((o) => argv.includes(o));
 const pressRaw = valueOf('--press-at');
 const pressAt = pressRaw === undefined ? 0 : Number(pressRaw);
 const tracePath = valueOf('--trace') ?? null;
 const profilePath = valueOf('--profile') ?? null;
+const pubsPath = valueOf('--pubs') ?? null;
 const skipped = new Set();
 argv.forEach((a, i) => {
   if (a === '--boot') skipped.add(i);
@@ -96,7 +97,7 @@ async function main() {
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
-    screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
+    screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
   };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-p3-probe-'));
   const assets = path.join(root, 'assets');
@@ -229,10 +230,13 @@ async function main() {
 // --boot (#1334): the one press that starts the AudioContext comes --press-at seconds after engine-idle (default 0; the status line, as startAudio does; no guest event). The window is t0+10 s to t0+70 s: nothing is sent to the guest in it, and the reads are taken at its two ends. The read at t0+90 s (bootLast60sAt90s: the last 60 s are t0+30 s to t0+90 s, past the start-up peak) comes after the one at +70 s.
 async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, pageSession) {
   const engine = await engineWorker(cdp, workers);
-  if ((tracePath !== null || profilePath !== null) && engine === null) throw new Error('no engine Worker with fleAudioWorkerState (--trace and --profile need it)');
+  if (engine === null) throw new Error('no engine Worker with fleAudioWorkerState (the boot window reads it)');
   const stop = { done: false };
   const trace = tracePath !== null ? traceLoop(audioNow, cdp, engine, tIdle, stop) : null;
   try {
+    // #1375: the publish log of the output ring (PUB_HOOK) is taken from the engine's Worker for the whole boot window; its window is read in the Worker's own clock (w0, w1)
+    const hooked = await workerEval(cdp, engine, PUB_HOOK);
+    let w0 = null, w1 = null, pubLog = null, s0 = null, s1 = null;
     if (profilePath !== null) await profileStart(cdp, engine);
     if (profilePath !== null) await profileStart(cdp, pageSession);
     out.pressAtMs = Math.round(pressAt * 1000);
@@ -253,6 +257,8 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
       d10 = await audioNow();
       if (d10 === null) throw new Error('the page has no audio output (window.__app.audio is null)');
       at10 = Date.now() - tIdle;
+      w0 = await workerEval(cdp, engine, 'performance.now()');
+      s0 = await workerEval(cdp, engine, SCHED_STATS);
     };
     // the read at +10 s comes before the press when the press is later than that (the reads are at their own times, in time order)
     if (out.pressAtMs <= BOOT_READ_MS.first) { await press(); await read10(); } else { await read10(); await press(); }
@@ -262,6 +268,10 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
     await sleepUntil(tIdle + BOOT_READ_MS.final);
     const d90 = await audioNow();
     const at90 = Date.now() - tIdle;
+    w1 = await workerEval(cdp, engine, 'performance.now()');
+    s1 = await workerEval(cdp, engine, SCHED_STATS);
+    pubLog = await workerEval(cdp, engine, PUB_LOG);
+    out.schedStats = { at10s: s0, at90s: s1, names: ['loopSlices', 'loopNoThreads', 'loopNotRunning', 'loopInCallback', 'loopDepth1', 'loopSwitched', 'progressSlices', 'progressInCallback'] };
     fromAudio(d90);
     out.readAtMs = [at10, at70, at90];
     out.bootLast60sAt10s = d10.underrunQuantaLast60s;
@@ -269,9 +279,16 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
     out.bootLast60sAt90s = d90.underrunQuantaLast60s;
     out.quantaDelta = d70.quantaWhilePlaying - d10.quantaWhilePlaying;
     out.maxRefillStallMs = await enginePublishGap(cdp, workers);
-    log('boot window', { at10, at70, at90, last60sAt10s: out.bootLast60sAt10s, last60sAt70s: out.bootLast60sAt70s, last60sAt90s: out.bootLast60sAt90s, quantaDelta: out.quantaDelta, maxRefillStallMs: out.maxRefillStallMs, ctxState: d90.ctxState });
-    if (profilePath !== null) await profileStop(cdp, engine, profilePath);
-    if (profilePath !== null) await profileStop(cdp, pageSession, mainProfilePath(profilePath));
+    if (hooked !== null && pubLog !== null) {
+      const win = windowMaxGap(pubLog, w0, w1);
+      out.maxRefillStallInWindowMs = win.maxMs;
+      out.publishesInWindow = win.publishes;
+      if (pubsPath !== null) fs.writeFileSync(pubsPath, JSON.stringify({ w0, w1, entries: pubLog }));
+      out.pubLog = pubsPath;
+    }
+    log('boot window', { at10, at70, at90, last60sAt10s: out.bootLast60sAt10s, last60sAt70s: out.bootLast60sAt70s, last60sAt90s: out.bootLast60sAt90s, quantaDelta: out.quantaDelta, maxRefillStallMs: out.maxRefillStallMs, maxRefillStallInWindowMs: out.maxRefillStallInWindowMs, ctxState: d90.ctxState });
+    if (profilePath !== null) await profileStop(cdp, engine, profilePath, true);
+    if (profilePath !== null) await profileStop(cdp, pageSession, mainProfilePath(profilePath), false);
     out.profile = profilePath;
     out.profileMain = profilePath === null ? null : mainProfilePath(profilePath);
   } finally {
@@ -324,8 +341,11 @@ function mainProfilePath(file) {
   return file.slice(0, file.length - e.length) + '.main' + e;
 }
 
-async function profileStop(cdp, engine, file) {
+// --profile (#1375): the Worker's performance.now() taken just before the stop, with the CDP clock at the end of the profile, so that the publish log (in the Worker's clock) can be put on the samples' timeline (profile.fleClock.offsetUs: CDP microseconds = performance.now() ms x 1000 + offsetUs)
+async function profileStop(cdp, engine, file, clock) {
+  const perfStop = clock ? await workerEval(cdp, engine, 'performance.now()') : null;
   const r = await timed(cdp.send('Profiler.stop', {}, engine), 300000, 'Profiler.stop');
+  if (perfStop !== null) r.profile.fleClock = { perfAtStopMs: perfStop, offsetUs: r.profile.endTime - perfStop * 1000 };
   fs.writeFileSync(file, JSON.stringify(r.profile));
   log('profile', { file, samples: r.profile.samples?.length ?? null });
 }
@@ -333,6 +353,33 @@ async function profileStop(cdp, engine, file) {
 async function sleepUntil(at) {
   const d = at - Date.now();
   if (d > 0) await sleep(d);
+}
+
+// #1375: the publish log of the output ring. fle_js_publish (fle_audio_transport.c) sets A.runPub (whether the output was running) and then assigns A.lastPub = now at the end of each publish; a setter on lastPub appends [now, running] to A.__pl. Only this probe reads it; the product is not changed.
+const PUB_HOOK = "(() => { const A = globalThis.__fleAud; if (!A) return null; if (!A.__pl) { let lp = A.lastPub; A.__pl = []; Object.defineProperty(A, 'lastPub', { configurable: true, enumerable: true, get() { return lp; }, set(v) { lp = v; A.__pl.push([v, A.runPub ? 1 : 0]); } }); } return performance.now(); })()";
+const PUB_LOG = "(() => { const A = globalThis.__fleAud; return A && A.__pl ? A.__pl : null; })()";
+// #1375: the counts of the scheduler points (fle_thread.c sched_stat, read through fle_audio_sched_stat in fle_audio_transport.c)
+const SCHED_STATS = 'globalThis.fleSchedStats ? globalThis.fleSchedStats() : null';
+
+// the engine's Worker: an expression's value (returnByValue)
+async function workerEval(cdp, sid, expression) {
+  const r = await timed(cdp.send('Runtime.evaluate', { expression, returnByValue: true }, sid), CDP_TIMEOUT_MS, 'the engine worker');
+  if (r.exceptionDetails) throw new Error(`worker evaluate: ${r.exceptionDetails.text}`);
+  return r.result.value;
+}
+
+// #1375: the longest interval between two publishes whose both ends are in [w0, w1] and which both found the output running (the engine's own rule for maxPubGap). publishes: the count of publishes in the window.
+function windowMaxGap(entries, w0, w1) {
+  let maxMs = 0, publishes = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const [t] = entries[i];
+    if (t >= w0 && t <= w1) publishes++;
+    if (i === 0) continue;
+    const [tp, rp] = entries[i - 1];
+    if (tp < w0 || t > w1) continue;
+    if (rp && entries[i][1] && t - tp > maxMs) maxMs = t - tp;
+  }
+  return { maxMs: Math.round(maxMs * 10) / 10, publishes };
 }
 
 // the engine's own count (fle_audio_transport.c: the longest interval between two refills of the output ring since its first one). The Worker's global is read through CDP; the other Workers (the renderer) have no fleAudioWorkerState and answer null.

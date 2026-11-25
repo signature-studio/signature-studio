@@ -6,13 +6,14 @@ stage lists: 3 step(s), parallel
   list generators.dummy-two.engine_x64.dll: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out
 stage lowered-all: 1 step(s)
   merge lift/out-app/plugins/lists into lift/out-app/plugins/lowered-all.txt
-stage blend2d: 8 step(s)
+stage blend2d: 9 step(s)
   mkdir -p lift/out-app
   fetch https://github.com/blend2d/blend2d/archive/a7f947677e85441abe1769586d3bb935b4086a07.tar.gz to lift/out-app/blend2d-a7f947677e85441abe1769586d3bb935b4086a07.tar.gz (sha256 391a57ad2508ab2291ad04b39b0a82d78473662b6d3029dbaf18de06165ea1f0)
   rm -rf lift/out-app/b2d-src
   mkdir -p lift/out-app/b2d-src
   tar -xzf lift/out-app/blend2d-a7f947677e85441abe1769586d3bb935b4086a07.tar.gz -C lift/out-app/b2d-src --strip-components=1
   patch -p1 -d lift/out-app/b2d-src < lift/harness/b2d1/b2d3-compop.patch
+  patch -p1 -d lift/out-app/b2d-src < lift/harness/b2d1/b2d4-tick.patch
   check lift/harness/b2d1/blend2d-sources.txt against the .cpp files under lift/out-app/b2d-src/src
   mkdir -p lift/out-app/b2d/build lift/out-app/b2d/obj/blend2d lift/out-app/b2d/obj/blend2d/codec lift/out-app/b2d/obj/blend2d/compression lift/out-app/b2d/obj/blend2d/opentype lift/out-app/b2d/obj/blend2d/pipeline lift/out-app/b2d/obj/blend2d/pipeline/jit lift/out-app/b2d/obj/blend2d/pipeline/reference lift/out-app/b2d/obj/blend2d/pixelops lift/out-app/b2d/obj/blend2d/raster lift/out-app/b2d/obj/blend2d/simd lift/out-app/b2d/obj/blend2d/support lift/out-app/b2d/obj/blend2d/tables lift/out-app/b2d/obj/blend2d/threading lift/out-app/b2d/obj/blend2d/unicode
 stage blend2d-compile: 159 step(s), parallel

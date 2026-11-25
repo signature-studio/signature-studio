@@ -284,6 +284,10 @@ fn blend2d_source_steps() -> Vec<Step> {
             vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
             format!("{HARNESS_DIR}/b2d1/b2d3-compop.patch"),
         ),
+        Step::RunStdin(
+            vec!["patch".into(), "-p1".into(), "-d".into(), src.clone()],
+            format!("{HARNESS_DIR}/b2d1/b2d4-tick.patch"),
+        ),
         Step::CheckSources(blend2d_list_file()),
     ]
 }
