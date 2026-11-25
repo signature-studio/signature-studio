@@ -3,7 +3,7 @@ import type { AppView, AvWindow } from '../../src/engine/appview.ts';
 import { osStateKey, osStateOf } from '../../src/engine/os-state.ts';
 
 const win = (o: Partial<AvWindow>): AvWindow => ({ lid: 1, hwnd: 1, flags: 0, ownerLid: 0, x: 0, y: 0, width: 10, height: 10, style: 0, exstyle: 0, thread: 0, className: 'AnyClass', title: '', visible: true, enabled: true, topmost: false, active: false, focus: false, capture: false, ...o });
-const view = (windows: AvWindow[], o: Partial<AppView> = {}): AppView => ({ seq: 2, cursor: 0, cursorIdc: 0, cursorShared: false, pointerX: 0, pointerY: 0, pendingEvents: 0, windows, ...o });
+const view = (windows: AvWindow[], o: Partial<AppView> = {}): AppView => ({ seq: 2, cursor: 0, cursorIdc: 0, cursorShared: false, cursorMade: false, pointerX: 0, pointerY: 0, pendingEvents: 0, windows, ...o });
 
 describe('the operating-system state the Worker reports (decision 0223)', () => {
   it('the title is the title of the active, visible window; the class of the window plays no part', () => {
@@ -30,7 +30,7 @@ describe('the operating-system state the Worker reports (decision 0223)', () => 
 
   it('the cursor and the screen size are passed through; a build that does not report the screen size gives 0', () => {
     const s = osStateOf(view([], { cursor: 0x10003, cursorIdc: 32649, cursorShared: true, screenW: 2060, screenH: 1264 }), '');
-    expect(s).toEqual({ cursor: 0x10003, cursorIdc: 32649, cursorShared: true, title: '', screenW: 2060, screenH: 1264 });
+    expect(s).toEqual({ cursor: 0x10003, cursorIdc: 32649, cursorShared: true, cursorMade: false, title: '', screenW: 2060, screenH: 1264 });
     expect(osStateOf(view([]), '')).toMatchObject({ screenW: 0, screenH: 0 });
   });
 

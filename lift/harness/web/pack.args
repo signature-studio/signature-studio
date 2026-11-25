@@ -181,6 +181,50 @@ lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_3.wa
 --lazy-file
 lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_4.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/DNC_Snare_4.wav
 --lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Clap.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Clap.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 HiHat.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 HiHat.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Kick.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Kick.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Snare.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Basic 808 Snare.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Clap.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Clap.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Hat.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Hat.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Kick.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Kick.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Snare.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/CB_Snare.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Clap Basic.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Clap Basic.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Hat Basic.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Hat Basic.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Kick Basic.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Kick Basic.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Packs/Legacy/Drums/Dance/Snare Basic.wav=seed/resources/Data/Patches/Packs/Legacy/Drums/Dance/Snare Basic.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/01 DEDZII - NIGHT TERROR - FLEX Croak.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/01 DEDZII - NIGHT TERROR - FLEX Croak.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/BlackHole_Hit02.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/BlackHole_Hit02.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/Burgundy_Rise.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/Burgundy_Rise.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/FLEX 808 Sub.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/DEDZII - NIGHT TERROR/FLEX 808 Sub.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/IL Kick_MT.wav=seed/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/IL Kick_MT.wav
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_01_A_D#m_Dry.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_01_A_D#m_Dry.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_01_B_D#m_Dry.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_01_B_D#m_Dry.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_02_D#m_Dry.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/PL_TLO_05_With You_104_Lead Vocals_02_D#m_Dry.ogg
+--lazy-file
+lift/out-app/host/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/Revers Vocal.ogg=seed/resources/Data/Patches/Misc/Used by demo projects/Mehran Abbasi - With You/Revers Vocal.ogg
+--lazy-file
 lift/out-app/host/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp=seed/lift/out-idle1/inputs/install/Data/Demo projects/NewStuff.flp
 --lazy-file
 lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm
+--lazy-file
+lift/out-app/plugins/serum2/vst-ext.wasm=plugins/serum2.wasm

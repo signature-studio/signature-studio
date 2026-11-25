@@ -100,7 +100,7 @@ export type FromWorker =
   | { t: 'guest-text'; memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
-  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
+  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; cursorMade: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }

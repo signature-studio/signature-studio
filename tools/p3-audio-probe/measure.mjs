@@ -6,6 +6,7 @@
 // stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 // end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
+// With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -69,6 +70,12 @@ const WINDOWS_TEXT = '(async () => (await window.__app.deskDumpBase64(false)).wi
 const PROBLEMS_TITLE = /Problems loading/;
 const SAMPLE_MISSING = /^(?:\[err\] )?missing-path: .*\\Data\\Patches\\.*\.wav"$/i;
 const PROJECT_DIALOG_MS = 15000;
+// Issue #1373: the missing-path line (the runtime's fle_vfs_note_missing); the installer's list (the guest column, one path per line after the comment and the header); the number of first paths the breakdown lists; the two shapes a factory root can take (an absolute path's leading folder, on any drive; a %...%\ variable)
+const MISSING_LINE = /^(?:\[err\] )?missing-path: (\S+) (\d+) "(.*)"$/;
+const INSTALLER_LIST = path.join(repo, 'inputs', 'fl-installer-files.tsv');
+const NOT_IN_INSTALLER_FIRST = 10;
+const ABSOLUTE_PATH = /^[A-Za-z]:\\/;
+const VARIABLE_PATH = /^%[^%\\]+%\\/;
 
 // the isolation flags of tools/boot-check/boot-bundle.mjs (copied: that file does not export them)
 const ISOLATION = [
@@ -94,6 +101,7 @@ async function main() {
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
@@ -521,6 +529,84 @@ async function projectReport(ev, out, logBefore) {
   out.projectMissingLines = missing.length;
   out.projectMissing = [...new Set(missing)];
   process.stderr.write(`project: ${out.projectDialogs.length} problem box(es), ${out.projectMissing.length} distinct factory sample request(s) not found (${out.projectMissingLines} lines)\n`);
+  Object.assign(out, missingBreakdown(log.slice(logBefore)));
+  process.stderr.write(`missing-path: ${out.missingDistinct} distinct: ${out.dll} dll, ${out.inventory} in the installer's list, ${out.notInInstaller} not in it\n`);
+}
+
+// Issue #1373: the installer's list as a map from the guest path (lower case) to its row: the guest's spelling, bytes and sha256 (inputs/fl-installer-files.tsv; the header and the comment are skipped)
+function installerRows() {
+  const rows = new Map();
+  for (const line of fs.readFileSync(INSTALLER_LIST, 'utf8').split('\n')) {
+    const [guest, bytes, sha256] = line.replace(/\r$/, '').split('\t');
+    if (!guest || guest.startsWith('#') || guest === 'guest') continue;
+    rows.set(guest.toLowerCase(), { guest, bytes: bytes === '' ? null : Number(bytes), sha256: sha256 === '' ? null : sha256 });
+  }
+  return rows;
+}
+
+// Issue #1373: the candidates for a factory root of a path, as [kind, root]: each leading part that ends in \ of an absolute path, and the %...%\ variable at its start
+function rootCandidates(full) {
+  const out = [];
+  const v = VARIABLE_PATH.exec(full);
+  if (v) out.push(['variable', v[0]]);
+  if (ABSOLUTE_PATH.test(full)) {
+    for (let i = full.indexOf('\\'); i >= 0; i = full.indexOf('\\', i + 1)) out.push(['absolute', full.slice(0, i + 1)]);
+  }
+  return out;
+}
+
+// Issue #1373: the two factory roots, read from the log. Each kind's root is the candidate (lower case) that takes the most of the distinct paths to a row of the installer's list; a kind with no such candidate has no root (null). Nothing is written here: the values come from the engine's own paths.
+function factoryRoots(paths, rows) {
+  const count = { absolute: new Map(), variable: new Map() };
+  for (const full of new Set(paths)) {
+    for (const [kind, root] of rootCandidates(full)) {
+      const key = root.toLowerCase();
+      if (rows.has(full.slice(root.length).toLowerCase())) count[kind].set(key, (count[kind].get(key) ?? 0) + 1);
+    }
+  }
+  const top = (m) => {
+    let best = null;
+    for (const [root, n] of m) if (best === null || n > best[1]) best = [root, n];
+    return best === null ? null : best[0];
+  };
+  return { absolute: top(count.absolute), variable: top(count.variable) };
+}
+
+// Issue #1373: which root a path has ('absolute', 'variable', or null), the lower-case roots of factoryRoots
+function rootKind(full, roots) {
+  for (const kind of ['absolute', 'variable']) {
+    const r = roots[kind];
+    if (r !== null && full.slice(0, r.length).toLowerCase() === r) return kind;
+  }
+  return null;
+}
+
+// Issue #1373: the breakdown of the missing-path lines of an engine log. The runtime writes a UTF-16 unit that is not printable ASCII (and the quote) as \uXXXX, which is decoded here. A request is keyed by its path without the factory root, in lower case; the first spelling seen is the one listed.
+function missingBreakdown(lines) {
+  const fulls = [];
+  for (const line of lines) {
+    const m = MISSING_LINE.exec(line);
+    if (m) fulls.push(m[3].replace(/\\u([0-9A-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))));
+  }
+  const rows = installerRows();
+  const roots = factoryRoots(fulls, rows);
+  const rootStripped = { absolute: 0, variable: 0 };
+  const seen = new Map();
+  for (const full of fulls) {
+    const kind = rootKind(full, roots);
+    if (kind !== null) rootStripped[kind]++;
+    const key = (kind === null ? full : full.slice(roots[kind].length)).toLowerCase();
+    if (!seen.has(key)) seen.set(key, full);
+  }
+  const dll = [];
+  const inList = [];
+  const notIn = [];
+  for (const [key, full] of seen) {
+    if (/\.dll$/i.test(full)) dll.push(full);
+    else if (rows.has(key)) inList.push(rows.get(key));
+    else notIn.push(full);
+  }
+  return { missingDistinct: seen.size, dll: dll.length, inventory: inList.length, inventoryList: inList, notInInstaller: notIn.length, notInInstallerFirst10: notIn.slice(0, NOT_IN_INSTALLER_FIRST), rootStripped };
 }
 
 // the guest's windows, read again for a while when the page answers "ask again" (the picture is being drawn: tools/delivery-split/measure.mjs does the same)

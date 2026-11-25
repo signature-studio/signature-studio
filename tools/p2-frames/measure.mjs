@@ -1,6 +1,7 @@
-// P2 frames measure (#1350). The page is the real engine's page in headless Chrome, in its own room at a device pixel ratio (the stage is 1836 x 1056 CSS px; the guest screen the page gives for it is 3239 x 1863 device px at 1.7647), with the pointer sent at 1000 Hz or more for 30 s.
+// P2 frames measure (#1350). The page is the real engine's page in headless Chrome, in its own room at a device pixel ratio (the stage is 1836 x 1056 CSS px; the guest screen the page gives for it is 3240 x 1864 device px at 1.7647), with the pointer sent at 1000 Hz or more for 30 s.
 // Usage: node tools/p2-frames/measure.mjs <absolute path to the bundle directory raw/<name>> [--dpr <value>] [--load a|b] > p2.json   (needs app/node_modules and app/dist). Defaults: --dpr 1.7647 --load a. Exit 0 when error is null, 1 when the run failed, 2 when the arguments are wrong.
-// stdout: ONE JSON line {error,dpr,load,presentedPerSec,cpuPerPresentMsP50,cpuPerPresentMsP95,budgetRatioP95,inputToPresentMsP50,inputToPresentMsP95,inputRateOk,valid,notes}. Nothing else goes to stdout.
+// stdout: ONE JSON line {error,dpr,load,presentedPerSec,cpuPerPresentMsP50,cpuPerPresentMsP95,budgetRatioP95,inputToPresentMsP50,inputToPresentMsP95,inputRateOk,valid,desk,notes}. Nothing else goes to stdout.
+// desk (the breakdown of one present over the window, from the presenter's counters): presents, rectsPerPresent, pixelsPerPresent, pixelShare (of the guest screen), uploadsPerPresent, uploadBytesPerPresent, drawsPerPresent, drawMsPerPresent, drawPixelsPerPresent, drawPixelShare, composeMsPerPresent, putMsPerPresent, wholePerWindow, texAllocsPerWindow, and the CPU per present of the threads (chrome = the main thread (presumed), DedicatedWorker = the engine and render Workers, Compositor, GPU process).
 // What is counted (the definitions are in notes too):
 //   presentedPerSec   the frames the compositor drew to the display in the window: 'Display::DrawAndSwap' events of the trace category viz (a record of what was shown, not a count of rAF callbacks). The engine's own count of its presents (window.__app.deskStats.presents) is the cross-check in notes.
 //   cpuPerPresentMs   the CPU time of the renderer process (SystemInfo.getProcessInfo cpuTime: the page's main thread, its Workers and its compositor) in each second of the window, divided by the engine's presents in that second. P50 and P95 over the seconds that had a present. budgetRatioP95 = P95 / (1000 / 120). The GPU process's CPU is in notes, not in this number.
@@ -52,7 +53,7 @@ const RECORD_POLL_MS = 100;
 const FRAME_BUDGET_MS = 1000 / 120;
 const READY_LIMIT_MS = 180000, IDLE_LIMIT_MS = 30000, CDP_TIMEOUT_MS = 20000, POLL_MS = 250;
 const AUDIO_WAIT_MS = 5000, PLAY_WAIT_MS = 5000;
-// the metronome button of the guest's top bar, in guest device px (the same place at every ratio: the top bar is laid out in guest pixels). Pressing it makes the Default project audible while it plays
+// the metronome button of the guest's top bar, in CSS px from the desktop's corner (the top bar is drawn at the same size in CSS px at every ratio: the guest's DPI follows the device pixel ratio, so the button is at DPR x these px in guest device px). Pressing it makes the Default project audible while it plays
 const METRONOME = { x: 750, y: 19 };
 
 // the isolation flags of tools/boot-check/boot-bundle.mjs (copied: that file does not export them). No frame-rate flag: the display's own rate limits the frames, as on a real screen.
@@ -81,6 +82,8 @@ const NOW = `(performance.timeOrigin + performance.now())`;
 const PAGE_NUMBERS = `(() => { const a = window.__app; const d = a.deskStats || {}; const e = a.perf.snapshot().input.eventToRaf; return { compose: d.composeMs ?? null, put: d.putMs ?? null, presents: d.presents ?? null, eventN: e.n, eventP50: e.p50Ms, eventP95: e.p95Ms }; })()`;
 // the page's clock, the pointer count and the engine's presents read at one instant (one evaluation), so that a second's count is exact
 const TICK = `(() => { const s = window.__app.deskStats; return { t: performance.now(), pm: window.__pm ? window.__pm.n : null, presents: s && typeof s.presents === 'number' ? s.presents : null }; })()`;
+// the presenter's cumulative counters (the page's deskStats: the render Worker's 'desk' report, at most every 100 ms); read at the window's two ends, the window's per-present values are their differences
+const DESK = `(() => { const s = window.__app.deskStats; if (!s) return null; const o = {}; for (const k of ['presents', 'rects', 'pixels', 'whole', 'composeMs', 'putMs', 'uploads', 'uploadBytes', 'draws', 'drawMs', 'drawPixels', 'texAllocs']) o[k] = typeof s[k] === 'number' ? s[k] : 0; return o; })()`;
 const AUDIO = `(() => { const a = window.__app; return a && a.audio ? a.audio.detail() : null; })()`;
 const AUDIO_AT = `(() => { const r = document.getElementById('audio-status').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
@@ -97,12 +100,12 @@ const r2 = (x) => (x === null ? null : Math.round(x * 100) / 100);
 function parseWindows(text) {
   return text.split('\n').map((l) => /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
     const names = /class "([^"]*)" title "([^"]*)"\s*$/.exec(m[6]);
-    return { cls: names ? names[1] : '', x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]) };
+    return { cls: names ? names[1] : '', title: names ? names[2] : '', x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]) };
   });
 }
 
 async function main() {
-  const out = { error: null, dpr: DPR, load, presentedPerSec: null, cpuPerPresentMsP50: null, cpuPerPresentMsP95: null, budgetRatioP95: null, inputToPresentMsP50: null, inputToPresentMsP95: null, inputRateOk: null, valid: false, notes: '' };
+  const out = { error: null, dpr: DPR, load, presentedPerSec: null, cpuPerPresentMsP50: null, cpuPerPresentMsP95: null, budgetRatioP95: null, inputToPresentMsP50: null, inputToPresentMsP95: null, inputRateOk: null, valid: false, desk: null, notes: '' };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-p2-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
@@ -189,6 +192,16 @@ async function main() {
         await sleep(POLL_MS);
       }
     }
+    // the project's own warning after the start (the plugins and samples it names could not be found): a modal dialog that takes the keys and the pointer until its OK is pressed; the OK is found by the dialog's window (title) and pressed at its place (the same fraction of the window at every ratio)
+    const WARN_TITLE = 'Problems loading the project';
+    const warnNow = async () => (await windowsNow()).find((w) => w.title === WARN_TITLE);
+    for (let i = 0; i < 40 && await warnNow(); i++) {
+      const w = await warnNow();
+      log('the warning dialog is open; its OK is pressed', { x: w.x, y: w.y, w: w.w, h: w.h });
+      await click(w.x + Math.round(w.w * 0.534), w.y + Math.round(w.h * 0.916), await ev(GEOMETRY));
+      await sleep(POLL_MS);
+    }
+    if (await warnNow()) throw new Error(`the dialog "${WARN_TITLE}" did not close`);
     await sleep(1500);
     if ((await waitIdle(IDLE_LIMIT_MS)) !== 'engine-idle') throw new Error('the engine did not return to engine-idle after the wizard');
     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
@@ -223,7 +236,7 @@ async function main() {
       await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
       await tap('Space', ' ', 32);
       await sleep(500);
-      await click(METRONOME.x, METRONOME.y, await ev(GEOMETRY));
+      await click(Math.round(METRONOME.x * DPR), Math.round(METRONOME.y * DPR), await ev(GEOMETRY));
       const n0 = (await ev(AUDIO)).nonSilentQuanta;
       const t0 = Date.now();
       for (;;) {
@@ -317,6 +330,7 @@ async function main() {
     await B('Tracing.start', { categories: 'viz', transferMode: 'ReportEvents' });
     const samples = [];
     const tWin0 = await ev(NOW);
+    const desk0 = await ev(DESK);
     const silent0 = (await ev(AUDIO))?.nonSilentQuanta ?? null;
     const pointerP = pointerLoop();
     const wheelP = wheelLoop();
@@ -328,6 +342,7 @@ async function main() {
       samples.push({ ...(await ev(TICK)), cpu });
     }
     const tWin1 = await ev(NOW);
+    const desk1 = await ev(DESK);
     const silent1 = (await ev(AUDIO))?.nonSilentQuanta ?? null;
     st.stopInput = true;
     await B('Tracing.end');
@@ -357,6 +372,21 @@ async function main() {
     const CLK_TCK = 100;
     const threadMs = [...samples[samples.length - 1].cpu.threads].map(([comm, v]) => [comm, ((v - (samples[0].cpu.threads.get(comm) ?? 0)) / CLK_TCK) * 1000]).sort((a, b) => b[1] - a[1]);
     const threadsText = threadMs.slice(0, 6).map(([comm, ms]) => `${comm} ${ms.toFixed(0)} ms (${(ms / Math.max(1, presentsTotal)).toFixed(2)} ms per present)`).join(', ');
+    // the work per present, from the presenter's counters over the window (the breakdown of #1351): rectangles, uploaded pixels and bytes, draws, and the time of compose, put and draw; the threads' CPU per present (main thread, engine and render Workers, compositor, GPU process)
+    const dp = desk0 && desk1 ? desk1.presents - desk0.presents : 0;
+    const deskPer = (k) => (dp > 0 ? (desk1[k] - desk0[k]) / dp : null);
+    const threadPer = (name) => { const e = threadMs.find(([c]) => c === name); return e && presentsTotal > 0 ? r3(e[1] / presentsTotal) : null; };
+    const screenPixels = room.guest.width * room.guest.height;
+    out.desk = dp > 0 ? {
+      presents: dp, screenPixels,
+      rectsPerPresent: r3(deskPer('rects')), pixelsPerPresent: r3(deskPer('pixels')), pixelShare: r3(deskPer('pixels') / screenPixels),
+      uploadsPerPresent: r3(deskPer('uploads')), uploadBytesPerPresent: r3(deskPer('uploadBytes')),
+      drawsPerPresent: r3(deskPer('draws')), drawMsPerPresent: r3(deskPer('drawMs')), drawPixelsPerPresent: r3(deskPer('drawPixels')), drawPixelShare: r3(deskPer('drawPixels') / screenPixels),
+      composeMsPerPresent: r3(deskPer('composeMs')), putMsPerPresent: r3(deskPer('putMs')),
+      wholePerWindow: desk1.whole - desk0.whole, texAllocsPerWindow: desk1.texAllocs - desk0.texAllocs,
+      chromeThreadMsPerPresent: threadPer('chrome'), dedicatedWorkerMsPerPresent: threadPer('DedicatedWorker'), compositorMsPerPresent: threadPer('Compositor'),
+      gpuProcessMsPerPresent: presentsTotal > 0 ? r3(gpuTotal / presentsTotal) : null,
+    } : null;
     out.presentedPerSec = r2(presentedPerSec);
     out.cpuPerPresentMsP50 = r3(percentile(per, 50));
     out.cpuPerPresentMsP95 = r3(percentile(per, 95));
@@ -374,7 +404,7 @@ async function main() {
       input: `the pointer was sent at ${SEND_HZ}/s nominal on an ellipse, ${REV_PER_S} turns a second: ${st.pointerSent} sent. The page received (pointermove, getCoalescedEvents) ${seconds.reduce((a, s) => a + s.pm, 0)} in the window: per second minimum ${minRate.toFixed(0)}, median ${medRate.toFixed(0)}; inputRateOk ${inputRateOk} (every one of the ${WINDOW_S} seconds at 1000 or more). Inputs the page sent to the engine in the window ${inWin.length}; answered by a present ${answered.length}; dropped by the engine ${droppedN}; latency from the DOM event timeStamp to the present that answered it.`,
       load: load === 'a'
         ? `load a: the wheel scrolls the Playlist (one notch every 50 ms, ${st.wheelSent} notches sent with the zoom bursts), ${st.zooms} Control+wheel bursts (zoom; whether the picture zoomed is not checked).`
-        : `load b: playback (Space) with the metronome on (its button in the top bar, guest px ${METRONOME.x},${METRONOME.y}), so the Default project makes sound and the Mixer meters move; the non-silent quanta rose during the start check; no wheel.`,
+        : `load b: playback (Space) with the metronome on (its button in the top bar, at ${METRONOME.x},${METRONOME.y} CSS px = guest px ${Math.round(METRONOME.x * DPR)},${Math.round(METRONOME.y * DPR)}), so the Default project makes sound and the Mixer meters move; the non-silent quanta rose during the start check; no wheel.`,
       room: `room (stage) ${room.sw}x${room.sh} CSS px at device pixel ratio ${room.dpr} (the desktop box ${room.w.toFixed(1)}x${room.h.toFixed(1)}); guest screen ${room.guest.width}x${room.guest.height} device px. Start: the Default project. Chrome ${chrome.version.Browser}.`,
       page: `the page's own input number (decision 0202, eventToRaf: DOM event timeStamp to the next animation frame after the present) over its last ${page.eventN} answered inputs at the end: p50 ${page.eventP50} ms, p95 ${page.eventP95} ms. The engine's cumulative compose ${(page.compose / Math.max(1, page.presents)).toFixed(3)} ms and put ${(page.put / Math.max(1, page.presents)).toFixed(3)} ms per present (deskStats totals over ${page.presents} presents since the engine started, the #1308 table's definition).`,
       runner: `nproc ${os.availableParallelism?.() ?? os.cpus().length}, loadavg ${os.loadavg().map((x) => x.toFixed(2)).join(' ')} (at the end of the run).`,

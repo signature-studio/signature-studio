@@ -48,12 +48,12 @@ uint32_t fle_cursor_image_idc_of(uint64_t h)
 
 /* The form of the handles that LoadImageW answers for a module's cursor (decisions 0061 and 0104). This file does not use the module that makes them (the source test of tests/cursor.rs
  * forbids it), so the numbers are written here and tests/wall_c1.rs pins them to the constants of the other module's header: base 0x7FDA0000, stride 0x1000 per real module
- * (index 0 = the lifted DLL, 1..SHARED_MODULE_REALMODS = a real module), 4 * (id - 32762 + 1) with id 32762 ..= 32767. SHARED_MODULE_REALMODS is the RM_MAX of fle_realmod.c (16 since the G9-c step; it was 8, and the
+ * (index 0 = the lifted DLL, 1..SHARED_MODULE_REALMODS = a real module), 4 * (id - 32762 + 1) with id 32762 ..= 32767. SHARED_MODULE_REALMODS is the RM_MAX of fle_realmod.c (192 since Issue #1379; 16 since the G9-c step; it was 8, and the
  * ninth real module, Fruity Filter, passed a cursor of its own to DestroyCursor that this function did not know as shared, so the run stopped: decision 0313). */
 #define SHARED_MODULE_BASE   UINT64_C(0x7FDA0000)
 #define SHARED_MODULE_STRIDE UINT64_C(0x1000)
 #define SHARED_MODULE_IDS    6u
-#define SHARED_MODULE_REALMODS 16u
+#define SHARED_MODULE_REALMODS 192u
 
 #define SHARED_NAMED_FIRST   0x100u
 #define SHARED_NAMED_COUNT   0x100u

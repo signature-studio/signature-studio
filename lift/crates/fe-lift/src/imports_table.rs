@@ -802,12 +802,22 @@ pub fn resp_wanted<'a>(mut imports: impl Iterator<Item = &'a str>) -> bool {
 type ExtraRow = (String, String, &'static str, &'static str);
 static EXTRA: std::sync::OnceLock<Vec<ExtraRow>> = std::sync::OnceLock::new();
 
+/// The part of an extra-imports line before its comment. A `#` starts a comment when it begins the line or is followed by a space or the end of the line;
+/// `#<n>` is the API of an ordinal import (`d2d1.dll #1 fle_imp_...`: the name fe-decode gives such an import is `d2d1.dll!#1`).
+fn before_comment(raw: &str) -> &str {
+    let cut = raw
+        .char_indices()
+        .find(|&(i, c)| c == '#' && (i == 0 || raw[i + 1..].chars().next().map_or(true, char::is_whitespace)))
+        .map_or(raw.len(), |(i, _)| i);
+    &raw[..cut]
+}
+
 /// Parses an extra-imports file: one row per line, `<dll> <API> <runtime function>` (e.g. `kernel32.dll InitializeCriticalSectionEx fle_imp_InitializeCriticalSectionEx`),
-/// `#` starts a comment. A row that is already in `TABLE` or repeated in the file is an error (it would change the meaning of an existing row).
+/// `#` starts a comment (see before_comment). A row that is already in `TABLE` or repeated in the file is an error (it would change the meaning of an existing row).
 pub fn set_extra(text: &str) -> Result<usize, String> {
     let mut v: Vec<ExtraRow> = Vec::new();
     for (n, raw) in text.lines().enumerate() {
-        let line = raw.split('#').next().unwrap_or("").trim();
+        let line = before_comment(raw).trim();
         if line.is_empty() {
             continue;
         }

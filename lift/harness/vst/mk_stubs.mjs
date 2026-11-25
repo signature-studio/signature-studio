@@ -1,21 +1,32 @@
 #!/usr/bin/env node
 // The import rows of one VST3 module (the node replacement of the mk_stubs.py that gen_vst3a.sh called).
-// usage: node mk_stubs.mjs PE IMPORTS_TABLE_RS IMPORTS_VST RUNTIME_DIR ROWS_OUT STUBS_C ORD_ROWS_OUT
+// usage: node mk_stubs.mjs PE IMPORTS_TABLE_RS IMPORTS_VST RUNTIME_DIR ROWS_OUT STUBS_C ORD_ROWS_OUT [ORD_ANSWERS]
 //   PE              the PE image (its import table gives the (DLL, API) names; an ordinal import has no name)
 //   IMPORTS_TABLE_RS lift/crates/fe-lift/src/imports_table.rs: the rows the lift already has (TABLE), not repeated
 //   IMPORTS_VST     lift/harness/vst/imports-vst.txt: the answers of the harness (vst3a C files), not repeated
 //   RUNTIME_DIR     lift/runtime: an API whose fle_imp_<API> is defined there gets a row to it
 //   ROWS_OUT        "<dll> <API> <runtime function>" lines (fe-lift --extra-imports), for every import not covered above
 //   STUBS_C         the weak stopping stubs of the APIs that no answer defines, and the ordinal table (vst3a_ord_table, vst3a.h)
-//   ORD_ROWS_OUT    "<0x pseudo-VA> <function>" dispatch rows of the ordinal stubs (merged with the host rows)
+//   ORD_ROWS_OUT    "<0x pseudo-VA> <function>" dispatch rows of the ordinal imports with no answer (merged with the host rows)
+//   ORD_ANSWERS     lift/harness/vst/ordinals-vst.txt (optional): "<dll> <ordinal> <API> <answer function>" rows. An ordinal with a row gets the extra-imports row
+//                   "<dll> #<ordinal> <answer function>" (its thunk calls the answer) and no stub; its IAT slot gets the lift's response row of "#<ordinal>" (main_vst_ext.c)
 // An API with no answer stops the run by name when it is called (vst3a_unanswered, vst3a_imp.c). Decision of #1367: no import is answered by a guess.
 import fs from 'node:fs';
 import path from 'node:path';
 
-const [pePath, tablePath, importsVstPath, runtimeDir, rowsOut, stubsOut, ordRowsOut] = process.argv.slice(2);
+const [pePath, tablePath, importsVstPath, runtimeDir, rowsOut, stubsOut, ordRowsOut, ordAnswersPath] = process.argv.slice(2);
 if (!ordRowsOut) {
-  console.error('usage: node mk_stubs.mjs PE IMPORTS_TABLE_RS IMPORTS_VST RUNTIME_DIR ROWS_OUT STUBS_C ORD_ROWS_OUT');
+  console.error('usage: node mk_stubs.mjs PE IMPORTS_TABLE_RS IMPORTS_VST RUNTIME_DIR ROWS_OUT STUBS_C ORD_ROWS_OUT [ORD_ANSWERS]');
   process.exit(64);
+}
+const ordAnswers = new Map();
+if (ordAnswersPath) {
+  for (const raw of fs.readFileSync(ordAnswersPath, 'utf8').split('\n')) {
+    const t = raw.split('#')[0].trim();
+    if (!t) continue;
+    const [dll, ordinal, , fn] = t.split(/\s+/);
+    ordAnswers.set(`${dll.toLowerCase()} ${Number(ordinal)}`, fn);
+  }
 }
 
 /** (dll, API) names of the import table of a PE image; an ordinal import is `{ dll, ordinal }` */
@@ -92,7 +103,11 @@ const seen = new Set();
 const ords = [];
 for (const im of imports) {
   if (im.ordinal !== undefined) {
-    if (!ords.some((o) => o.dll === im.dll && o.ordinal === im.ordinal)) ords.push({ dll: im.dll, ordinal: im.ordinal });
+    if (!ords.some((o) => o.dll === im.dll && o.ordinal === im.ordinal)) {
+      const answer = ordAnswers.get(`${im.dll} ${im.ordinal}`) ?? null;
+      ords.push({ dll: im.dll, ordinal: im.ordinal, answer });
+      if (answer) rows.push(`${im.dll} #${im.ordinal} ${answer}`);
+    }
     continue;
   }
   const key = `${im.dll} ${im.api}`;
@@ -106,6 +121,7 @@ for (const im of imports) {
 const ordRows = [];
 const ordEntries = [];
 ords.forEach((o, k) => {
+  if (o.answer) return;
   const va = 0x7FFC50000000 + 0x10 * (k + 1);
   ordRows.push(`0x${va.toString(16)} vst3a_ord_${k}`);
   ordEntries.push(`    { ${JSON.stringify(o.dll)}, ${o.ordinal}, UINT64_C(0x${va.toString(16)}), vst3a_ord_${k} },`);
@@ -118,14 +134,14 @@ c.push('#include <stdint.h>');
 c.push('#include "vst3a.h"');
 c.push('');
 for (const [fn, { dll, api }] of stubs) c.push(`__attribute__((weak)) void ${fn}(void) { vst3a_unanswered(${JSON.stringify(dll)}, ${JSON.stringify(api)}); }`);
-ords.forEach((o, k) => c.push(`static void vst3a_ord_${k}_stop(void) { vst3a_unanswered(${JSON.stringify(o.dll)}, ${JSON.stringify('#' + o.ordinal)}); }`));
-ords.forEach((_, k) => c.push(`void vst3a_ord_${k}(void) { vst3a_ord_${k}_stop(); }`));
+ords.forEach((o, k) => { if (!o.answer) c.push(`static void vst3a_ord_${k}_stop(void) { vst3a_unanswered(${JSON.stringify(o.dll)}, ${JSON.stringify('#' + o.ordinal)}); }`); });
+ords.forEach((o, k) => { if (!o.answer) c.push(`void vst3a_ord_${k}(void) { vst3a_ord_${k}_stop(); }`); });
 c.push('');
 c.push('const vst3a_ord_entry vst3a_ord_table[] = {');
 c.push(...ordEntries);
 c.push('    { NULL, 0, 0, NULL },');
 c.push('};');
-c.push(`const unsigned vst3a_ord_count = ${ords.length};`);
+c.push(`const unsigned vst3a_ord_count = ${ordEntries.length};`);
 c.push('');
 
 fs.writeFileSync(rowsOut, rows.join('\n') + (rows.length ? '\n' : ''));

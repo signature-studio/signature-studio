@@ -8,6 +8,8 @@
 //   Ctrl+O opens the engine's Open dialog (the page's file manager in selection mode), the project Data/Demo projects/NewStuff.flp (host-extra/resources of the bundle's out directory; its project names Fruity Balance, and the guest asks for the plug-in when it opens)
 //   is copied in, chosen and opened. The reads above are the reads after the scene. (Fruity Balance.flp in Data/System/Render tests does not name the plug-in in its project: the guest never asks for Balance.)
 //   scene: { steps, error, state (the page's state after the scene), welcome ('listed' | 'none'), workers: [{ type, script }] (the Workers of the browser context at the end) }; null when the first idle was not reached.
+//   rssMb (Issue #1379): the largest sum of the VmRSS (resident memory, 1 MB = 1,048,576 B) of the browser: the Chrome process and every process under it, sampled every second from the first idle to the end of the scene. null when no sample was taken. This is the memory the judge uses.
+//   engineMemoryBytes (Issue #1379, a reference only): window.__app.engineMemoryBytes at the first idle, the wasm memory's byteLength. It is address space, not resident memory: untouched pages are not in rssMb.
 //   lazyWaitFirstMs: the time of the first read of a lazy file that had to wait for its bytes (the page mark lazy_wait, ms since the navigation); lazyWaitLast: the last such read (its path and ms). null: no read waited.
 //   state: the page's state at the end ('engine-idle' is the good one); standIn: whether the text "STAND-IN" is in the page body (a reading, as in boot-bundle.mjs); error: null, or what failed.
 //   preStart / lazy: the manifest's assets, `bytes` = the decoded size (what the page counts). preStartDoneMs: the page's timeline mark download_done (ms since the navigation started).
@@ -19,7 +21,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
+import { Cdp, descendants, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
 const bundleArg = process.argv[2];
@@ -64,6 +66,7 @@ const SNAPSHOT = `(() => { const a = window.__app ?? null; return {
   standIn: document.body.innerText.includes('STAND-IN'),
   resources: performance.getEntriesByType('resource').map((e) => ({ name: e.name, startTime: e.startTime, responseEnd: e.responseEnd })),
   imageReads: a ? a.imageReads : [],
+  engineMemoryBytes: a ? a.engineMemoryBytes : null,
 }; })()`;
 
 const timed = (p, ms, what) => {
@@ -281,6 +284,18 @@ async function runScene({ S, ev, cdp, browserContextId, projectPath, shotPath })
 
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
 
+/** Issue #1379: the resident memory (VmRSS, KiB) of the browser: the Chrome process and every process under it (the renderers, the GPU process, ...). */
+function browserRssKiB(rootPid) {
+  let total = 0;
+  for (const pid of descendants(rootPid)) {
+    try {
+      const m = /^VmRSS:\s+(\d+) kB/m.exec(fs.readFileSync(`/proc/${pid}/status`, 'utf8'));
+      if (m) total += Number(m[1]);
+    } catch { /* the process has gone */ }
+  }
+  return total;
+}
+
 /** the manifest's assets: the pre-start ones under the labels of the page (main.ts), and the lazy ones under their names */
 function assetsOf(manifest) {
   if (!manifest) return { preStart: [], lazy: [], byUrl: new Map() };
@@ -315,7 +330,7 @@ function fetchesOf(resources, byUrl) {
 
 async function measureOnce(port) {
   const t0 = Date.now();
-  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [], scene: null };
+  const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [], scene: null, rssMb: null, engineMemoryBytes: null };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-delivery-run-'));
   let chrome = null, cdp = null;
   try {
@@ -355,6 +370,7 @@ async function measureOnce(port) {
     out.lazyWaitFirstMs = num(tl.lazy_wait);
     out.lazyWaitLast = snap?.details?.lazy_wait ?? null;
     out.elapsedMs = num(tl.idle);
+    out.engineMemoryBytes = snap?.engineMemoryBytes ?? null;
     out.fetches = fetchesOf(snap?.resources ?? [], a.byUrl);
     out.reads = (snap?.imageReads ?? []).map((r) => ({ name: r.name, atMs: num(r.atMs), requested: r.requested === true }));
     if (!snap) out.error = `window.__app not readable within ${WAIT_LIMIT_MS} ms`;
@@ -366,7 +382,19 @@ async function measureOnce(port) {
       const extraPath = path.join(bundleDir, '..', '..', '..', 'host-extra', 'resources', ...SCENE_FILE);
       const seedPath = path.join(bundleDir, '..', '..', '..', 'host', 'lift', 'out-idle1', 'inputs', 'install', 'Data', 'Demo projects', 'NewStuff.flp');
       const projectPath = fs.existsSync(extraPath) ? extraPath : seedPath;
-      const sc = await runScene({ S, ev, cdp, browserContextId, projectPath, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
+      // rssMb (Issue #1379): the largest sum of the browser's VmRSS, sampled now and every second until the scene has ended (the memory the engine uses, not the address space)
+      let rssKiB = null;
+      const sample = () => { const k = browserRssKiB(chrome.proc.pid); if (k > 0 && (rssKiB === null || k > rssKiB)) rssKiB = k; };
+      sample();
+      const sampler = setInterval(sample, 1000);
+      let sc;
+      try {
+        sc = await runScene({ S, ev, cdp, browserContextId, projectPath, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
+      } finally {
+        clearInterval(sampler);
+        sample();
+        out.rssMb = rssKiB === null ? null : Math.round((rssKiB / 1024) * 10) / 10;
+      }
       out.scene = { steps: sc.steps, error: sc.error, state: sc.state, welcome: sc.welcome, workers: sc.workers, logTail: sc.logTail, logEnd: sc.logEnd, exit: sc.exit };
       if (sc.reads) out.reads = sc.reads;
       process.stderr.write(`scene: ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);

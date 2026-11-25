@@ -215,6 +215,7 @@ void fle_win_report(FILE *f);
 #define FLE_WS_DISABLED    0x08000000u
 #define FLE_WS_MINIMIZE    0x20000000u
 #define FLE_WS_MAXIMIZE    0x01000000u
+#define FLE_WS_THICKFRAME  0x00040000u   /* Learn Window Styles: the sizing border (#1390) */
 #define FLE_WS_EX_TOPMOST  0x00000008u
 #define FLE_WS_EX_NOACTIVATE 0x08000000u
 #define FLE_WS_EX_NOPARENTNOTIFY 0x00000004u

@@ -21,7 +21,9 @@ const HOOK_EXISTING: &str = "lift/harness/hooks/fruity-delphi-effect-hook-points
 const XMOD_DIR: &str = "lift/out-app/xmod";
 const N0_ARGS: &str = "lift/harness/hyb/n0.args";
 const ALIGN: u64 = 0x1_0000;
-const GLOBAL_BASE: u64 = 0x1000_0000;
+/// The end of the image area (Issue #1379): Balance's base 0xC1D0000 + 750 MiB, which holds the 160 second-wave images (748,158,976 B of
+/// SizeOfImage, with 5% to spare). Must be the -sGLOBAL_BASE of link.rsp (the test the_global_base_is_the_one_of_the_link).
+const GLOBAL_BASE: u64 = 0x3AFD_0000;
 const FLENGINE_PE: &str = "binaries/win64/FLEngine_x64.dll";
 /// The sizes that bound the number of modules (realmods): the runtime's table, the handles of the cursor, and the harness's arrays.
 const LIMITS: [(&str, &str); 3] = [("lift/runtime/fle_realmod.c", "#define RM_MAX "), ("lift/runtime/fle_cursor.c", "#define SHARED_MODULE_REALMODS "), ("lift/harness/two/main_two.c", "MAIN_REAL_MAX = ")];
@@ -59,9 +61,10 @@ pub struct Dll {
 }
 
 impl Dll {
-    /// The DLL's name in the build: the file name in lower case with a space as `_` (`fruity_balance_x64.dll`). It is the name of the realmod.
+    /// The DLL's name in the build: its key (`effects.fruity-balance.fruity_balance_x64.dll`). The file names of the plugins are not unique
+    /// (Issue #1379: 18 DLLs are `engine_x64.dll`), the keys are; the name is the realmod's, and the stem of the host file and the rebased file.
     pub fn name(&self) -> String {
-        self.basename().to_lowercase().replace(' ', "_")
+        self.key.clone()
     }
 
     pub fn basename(&self) -> &str {
@@ -91,10 +94,10 @@ impl Dll {
         format!("{GUEST_ROOT}{}", self.guest)
     }
 
-    /// the file of the seed list (relative to HOST_DIR): the folders of the DLL's path above its own folder, and the file name with `_` for a space
+    /// the file of the seed list (relative to HOST_DIR): the folders of the DLL's path above its own folder, and the name (the key, unique)
     pub fn seed_file(&self) -> String {
         let parts: Vec<&str> = self.guest.split('\\').collect();
-        format!("{SEED_ROOT}/{}/{}", parts[..parts.len() - 2].join("/"), self.basename().replace(' ', "_"))
+        format!("{SEED_ROOT}/{}/{}", parts[..parts.len() - 2].join("/"), self.name())
     }
 
     /// the lower-case path suffix that LoadLibrary of the full path is matched with (fle_realmod_find_path)
@@ -186,13 +189,17 @@ fn valid_key(key: &str) -> bool {
     !key.is_empty() && key.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_'))
 }
 
-/// The checks of the rows of all plugins: the keys, the installer paths, the file names (the realmod names) and the hashes must be unique and well formed.
+/// The checks of the rows of all plugins: the keys (they are the realmod names) and the installer paths must be unique and well formed, and the
+/// hashes. The file names need not be unique (Issue #1379: the realmod's name is the key; the file name is only the installer's name).
 pub fn validate(dlls: &[Dll]) -> Result<(), String> {
-    let (mut keys, mut guests, mut names) = (BTreeSet::new(), BTreeSet::new(), BTreeSet::new());
+    let (mut keys, mut guests) = (BTreeSet::new(), BTreeSet::new());
     for d in dlls {
         let at = |m: &str| format!("plugin {} ({}): {m}", d.plugin, d.key);
         if !valid_key(&d.key) {
             return Err(at("the key is lower case letters, digits, '.', '-' and '_' only"));
+        }
+        if !d.key.ends_with(".dll") {
+            return Err(at("the key ends with .dll (it is the realmod name and the stem of the rebased file)"));
         }
         if !keys.insert(d.key.clone()) {
             return Err(at("the key is not unique"));
@@ -205,9 +212,6 @@ pub fn validate(dlls: &[Dll]) -> Result<(), String> {
         }
         if !d.basename().to_lowercase().ends_with(".dll") {
             return Err(at("the file is not a DLL"));
-        }
-        if !names.insert(d.name()) {
-            return Err(at(&format!("the file name {} is not unique (two DLLs of the plugins have it; the realmod name must be unique)", d.name())));
         }
         if d.sha256.len() != 64 || !d.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
             return Err(at("sha256 is 64 lower case hex digits"));
@@ -222,6 +226,13 @@ fn valid_folder(name: &str) -> bool {
 
 /// All plugin rows of a plugins folder, sorted by key, after the checks.
 pub fn read_plugins_from(dir: &str) -> Result<Vec<Dll>, String> {
+    let dlls = read_rows_from(dir)?;
+    validate(&dlls)?;
+    Ok(dlls)
+}
+
+/// The plugin rows of a plugins folder, sorted by key, without the checks of `validate` (read_plugins_from adds them).
+pub fn read_rows_from(dir: &str) -> Result<Vec<Dll>, String> {
     let mut folders = Vec::new();
     for entry in fs::read_dir(dir).map_err(|e| format!("{dir}: {e}"))? {
         let entry = entry.map_err(|e| e.to_string())?;
@@ -240,7 +251,6 @@ pub fn read_plugins_from(dir: &str) -> Result<Vec<Dll>, String> {
         dlls.extend(parse_plugin(folder, &text)?);
     }
     dlls.sort_by(|a, b| a.key.cmp(&b.key));
-    validate(&dlls)?;
     Ok(dlls)
 }
 
@@ -619,14 +629,14 @@ mod tests {
     #[test]
     fn the_balance_rows_are_the_ones_the_tables_had() {
         let d = balance();
-        assert_eq!(d.name(), "fruity_balance_x64.dll");
+        assert_eq!(d.name(), "effects.fruity-balance.fruity_balance_x64.dll");
         assert_eq!(d.installer_name(), "fruity balance_x64.dll");
-        assert_eq!(extract_row(&d), "fruity balance_x64.dll\tlift/out-plugins/fruity_balance_x64.dll\ta399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064");
-        assert_eq!(d.seed_file(), "lift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll");
-        assert_eq!(seed_row(&d), "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/Fruity_Balance_x64.dll\ta399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064");
+        assert_eq!(extract_row(&d), "fruity balance_x64.dll\tlift/out-plugins/effects.fruity-balance.fruity_balance_x64.dll\ta399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064");
+        assert_eq!(d.seed_file(), "lift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.fruity-balance.fruity_balance_x64.dll");
+        assert_eq!(seed_row(&d), "C:\\Program Files\\Image-Line\\FL Studio 21\\Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.fruity-balance.fruity_balance_x64.dll\ta399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064");
         assert_eq!(d.suffix(), "plugins/fruity/effects/fruity balance/fruity balance_x64.dll");
-        assert_eq!(module_row(&d, 0x6800000, Some("lift/harness/hooks/fruity-delphi-effect-hook-points.txt")), "fruity_balance_x64.dll\tlift/out-plugins/fruity_balance_x64.dll\t0x6800000\t--pdata --hook-points lift/harness/hooks/fruity-delphi-effect-hook-points.txt --extra-imports lift/harness/seeds/ship6-imports.txt\tplugins/fruity/effects/fruity balance/fruity balance_x64.dll");
-        assert_eq!(hyb_row(&d, 0x6800000), format!("{}\tfruity_balance_x64.6800000.dll\t--pdata", d.key));
+        assert_eq!(module_row(&d, 0x6800000, Some("lift/harness/hooks/fruity-delphi-effect-hook-points.txt")), "effects.fruity-balance.fruity_balance_x64.dll\tlift/out-plugins/effects.fruity-balance.fruity_balance_x64.dll\t0x6800000\t--pdata --hook-points lift/harness/hooks/fruity-delphi-effect-hook-points.txt --extra-imports lift/harness/seeds/ship6-imports.txt\tplugins/fruity/effects/fruity balance/fruity balance_x64.dll");
+        assert_eq!(hyb_row(&d, 0x6800000), format!("{}\teffects.fruity-balance.fruity_balance_x64.6800000.dll\t--pdata", d.key));
         assert_eq!(d.hook, Hook::Existing);
         assert_eq!(d.omit, vec![0x2c13a0]);
     }
@@ -689,6 +699,47 @@ mod tests {
         assert_eq!(direct_list(&ok, &vas_of("-").unwrap()), vec![0x10, 0x20, 0x30]);
         assert_eq!(vas_text(&[0x2c13a0, 0x6ac13a0]), "0x2c13a0,0x6ac13a0");
         assert_eq!(vas_text(&[]), "-");
+    }
+
+    #[test]
+    fn the_global_base_is_the_one_of_the_link() {
+        let link = include_str!("../../../harness/web/link.rsp");
+        assert!(link.lines().any(|l| l == format!("-sGLOBAL_BASE={GLOBAL_BASE}")), "link.rsp must have -sGLOBAL_BASE={GLOBAL_BASE}");
+    }
+
+    /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 160 DLLs of the plan, with the first wave's Balance. Their file names are
+    /// not unique, and their keys are. With SizeOfImage (inputs/plugin-image-sizes.tsv, by SHA-256) they fit the image area: each base is 64 KiB
+    /// aligned, after the one before it by that one's size, from Balance's base (0xC1D0000, after oggio's end 0xC1CF000) to below GLOBAL_BASE.
+    #[test]
+    fn the_second_wave_is_160_dlls_and_fits_the_image_area() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-plugins");
+        let tool = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../tools/plugin-layout/wave2-plugins.mjs");
+        assert!(Command::new("node").args([tool, dir]).status().expect("node").success());
+        let wave = read_rows_from(dir);
+        let _ = fs::remove_dir_all(dir);
+        let wave = wave.unwrap();
+        assert_eq!(wave.len(), 160);
+        assert_eq!(wave.iter().filter(|d| d.main).count(), 132);
+        assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 608_521_016);
+        let mut dlls = read_rows_from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")).unwrap();
+        dlls.extend(wave);
+        dlls.sort_by(|a, b| a.key.cmp(&b.key));
+        validate(&dlls).unwrap();
+        let sizes_text = include_str!("../../../../inputs/plugin-image-sizes.tsv");
+        let image_of = |d: &Dll| -> u64 {
+            let line = sizes_text.lines().find(|l| l.split('\t').next() == Some(d.sha256.as_str())).unwrap_or_else(|| panic!("{}: no SizeOfImage row", d.key));
+            line.split('\t').nth(2).unwrap().parse().unwrap()
+        };
+        let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
+        let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
+        assert_eq!(bases[0], 0xC1D0000);
+        let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance").map(|d| align_up(image_of(d), ALIGN)).sum();
+        assert_eq!(wave_total, 748_158_976);
+        for pair in bases.windows(2).zip(sizes.iter()) {
+            assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
+        }
+        assert!(bases.iter().all(|b| b % ALIGN == 0));
+        assert!(*bases.last().unwrap() + align_up(*sizes.last().unwrap(), ALIGN) <= GLOBAL_BASE);
     }
 
     #[test]

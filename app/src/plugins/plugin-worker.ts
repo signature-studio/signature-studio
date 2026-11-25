@@ -32,7 +32,7 @@ export interface InitMessage {
 export type WorkerOut =
   | { type: 'ready'; id: number; initMs: number; prerollLine: string | null }
   | { type: 'done'; id: number; rc: number; served: number; result: Record<string, string>; lines: string[]; missing: string[] }
-  | { type: 'error'; id: number; error: string };
+  | { type: 'error'; id: number; error: string; lines: string[] };
 
 interface Port {
   post(m: WorkerOut): void;
@@ -67,7 +67,7 @@ function parseResult(lines: string[]): Record<string, string> {
   return out;
 }
 
-async function run(port: Port, m: InitMessage): Promise<void> {
+async function run(port: Port, m: InitMessage, tail: string[]): Promise<void> {
   const slot = Slot.attach(m.sab);
   slot.setState(STATE.LOADING);
   const t0 = performance.now();
@@ -81,6 +81,8 @@ async function run(port: Port, m: InitMessage): Promise<void> {
     args: [m.pluginPath, '--ext', '--blocks', String(m.maxBlocks), '--frames', String(m.frames), '--rate', String(m.sampleRate), '--preroll', String(m.preroll), '--preroll-reset', String(m.prerollReset), ...m.extraArgs],
     env: m.env,
     print: (l) => {
+      tail.push(l.length > 200 ? l.slice(0, 200) : l);
+      if (tail.length > 8) tail.shift();
       if (l.startsWith('RESULT ') || l.startsWith('vst: ')) lines.push(l.length > 400 ? l.slice(0, 400) : l);
     },
     ext: {
@@ -130,12 +132,13 @@ const port = await openPort();
 port.onMessage((raw) => {
   const m = raw as InitMessage;
   if (m.type !== 'init') return;
-  run(port, m).catch((e: unknown) => {
+  const tail: string[] = [];
+  run(port, m, tail).catch((e: unknown) => {
     try {
       Slot.attach(m.sab).setState(STATE.FAILED);
     } catch {
       /* the slot itself was the problem */
     }
-    port.post({ type: 'error', id: m.id, error: e instanceof Error ? (e.stack ?? e.message) : String(e) });
+    port.post({ type: 'error', id: m.id, error: e instanceof Error ? (e.stack ?? e.message) : String(e), lines: tail });
   });
 });

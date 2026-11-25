@@ -107,7 +107,7 @@ fn pp(defs: &[&str]) -> String {
 #[test]
 fn rm_max_is_8() {
     let d = pp(&[]);
-    assert!(d.contains("static rm_t mods[16u];"), "RM_MAX must stay 16 (it was 8 until the G9-c step of decision 0313; decision 0243: the -DFLE_RM_MAX override is gone)");
+    assert!(d.contains("static rm_t mods[192u];"), "RM_MAX must stay 192 (Issue #1379; it was 16 until then, 8 before the G9-c step of decision 0313; decision 0243: the -DFLE_RM_MAX override is gone)");
 }
 
 fn vfs_pp(defs: &[&str]) -> String {
