@@ -124,3 +124,5 @@
 186	#1428	パスの予約文字(コロン(NTFS のストリーム)・<・>・|・二重引用符など)を含む呼び出しで、engine を止めない: Windows の返り値に従う	Task
 187	#1429	リフ マシーンの窓を開くと、Sytrus の中の呼び出し(`indirect call to 0xcccccccccccccccc`)で engine が止まる: 原因を特定して直す	Task
 188	#1430	リフ マシーンで Accept を押すと、Piano roll にノートが作られる(`notes` ≥ 1)	Task
+190	#1432	起動から first idle の後、無入力の 10 秒で、音声の途切れが 1 件出る(DPR 1)	Task
+191	#1433	F10 の Settings の General タブをスクロールすると、DPR 1 で、窓の外の 683 画素が変わる(#1384 の直しが DPR 1 で不完全)	Task
