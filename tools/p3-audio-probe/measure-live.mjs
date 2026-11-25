@@ -259,14 +259,9 @@ async function main() {
   }
 }
 
-// the press that starts the AudioContext: a press and a release on the status line; a Shift key press if the first did not start it (measure.mjs)
+// the press that starts the AudioContext: an ordinary key the guest ignores (F24; a modifier key alone is no gesture in Chrome). Issue #1481: the page has no visible element to press (measure.mjs)
 async function startAudio(S, ev) {
-  const at = await ev("(() => { const r = document.getElementById('audio-status').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()");
-  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: at.x, y: at.y, button: 'none', buttons: 0, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: at.x, y: at.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: at.x, y: at.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
-  if (await audioRunning(ev, 5000)) return 'mouse';
-  await tapKey(S, 'ShiftLeft', 'Shift', 16);
+  await tapKey(S, 'F24', 'F24', 0x87);
   if (await audioRunning(ev, 5000)) return 'key';
   return null;
 }
@@ -351,9 +346,8 @@ async function openProject(S, ev, chooser, file) {
   await S('Input.dispatchKeyEvent', { type: 'keyUp', code: 'ControlLeft', key: 'Control', windowsVirtualKeyCode: 17, nativeVirtualKeyCode: 17 });
   await until(() => ev('window.__app.fileDlg.open === true'), 120000, 'the File > Open dialog');
   await sleep(500);
-  const box = await ev("document.getElementById('filedlg-input').getBoundingClientRect().toJSON()");
-  await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
-  await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x + 10, y: box.y + box.height / 2, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+  // Issue #1481: the page's file input is hidden; its chooser opens at the next key press (or at once, while the browser still counts the Ctrl+O as a gesture)
+  await tapKey(S, 'F24', 'F24', 0x87);
   await until(() => chooser.length > 0, 5000, 'the file chooser');
   await S('DOM.setFileInputFiles', { files: [file], backendNodeId: chooser[0].backendNodeId });
   await until(async () => ((await ev('window.__app.pageTitle().title')) ?? '').startsWith(stem), 180000, `the title of ${stem}`);

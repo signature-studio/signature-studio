@@ -8,9 +8,9 @@
   <title>FL Studio web (private)</title>
 </head>
 <body>
-  <header>
+  <!-- Issue #1481: the page shows the engine's canvas and nothing else. Every element below except the canvas and the notes that appear when they are needed is hidden: their text stays in the DOM for the page's log and the tests. -->
+  <header hidden>
     <h1>FL Studio web <small>private build, F2</small></h1>
-    <span id="display-box"><button id="panel-toggle" type="button" aria-pressed="true">Monitor &#9656;</button></span>
     <div id="bundle-info" class="muted">no bundle loaded</div>
     <div id="audio-status" role="status" data-state="starting" class="muted">音: 準備中</div>
     <div id="status" role="status" data-state="idle">starting</div>
@@ -19,22 +19,18 @@
     <section id="stage" aria-label="main window">
       <div id="error" role="alert" hidden></div>
       <div id="exit" hidden></div>
-      <div id="resize-note" role="status" hidden><span lang="ja">表示サイズが変わりました。再読み込みで反映します。</span> <button id="resize-reload" type="button">再読み込み</button></div>
-      <div id="restart-note" role="status" data-restart-notice hidden><span lang="ja">表示の拡大率が変わりました。拡大率は FL Studio の再起動で適用されます(それまでは起動時の拡大率のまま動きます)。</span></div>
-      <div id="toolbar" aria-label="display">
+      <div id="toolbar" aria-label="display" hidden>
         <label title="Tab normally leaves the desktop (keyboard users could not get out otherwise). Tick this to send Tab to the engine."><input type="checkbox" id="send-tab"> send Tab to the engine</label>
         <span id="canvas-info" class="muted"></span>
-        <button id="stop-btn" type="button" hidden>Stop engine</button>
       </div>
-      <div id="engine-line"><span id="engine-state" data-state="not-started">Engine: not started</span> <span id="engine-metrics" class="muted"></span></div>
-      <div class="muted"><span id="pointer-info">pointer: -</span> · <span id="cursor-info">cursor: -</span></div>
+      <div id="engine-line" hidden><span id="engine-state" data-state="not-started">Engine: not started</span> <span id="engine-metrics" class="muted"></span></div>
+      <div hidden><span id="pointer-info">pointer: -</span> · <span id="cursor-info">cursor: -</span></div>
       <div id="desktop-box"><div id="desktop" tabindex="0" role="application" aria-label="FL Studio virtual desktop (click it to give it the keyboard)" data-input="off"></div></div>
       <div id="taskbar" role="status"><button id="taskbar-restore" type="button" hidden lang="ja" title="Restore the minimized window">最小化された窓を元に戻す</button></div>
       <div id="check" class="muted" hidden></div>
     </section>
-    <aside>
+    <aside hidden>
       <section><h2>Start-up</h2><ol id="phases"></ol><ul id="progress"></ul></section>
-      <section id="saved-files" hidden><h2>Files the engine wrote</h2><p class="muted">Kept in this tab's memory; nothing is uploaded. Download puts a copy in your browser's download folder.</p><ul id="saved-list"></ul></section>
       <details id="windows-panel"><summary>Guest top-level windows, top first (<span id="win-count">0</span>)</summary><div class="scroll"><table id="windows"><thead><tr><th>lid</th><th>class</th><th>title</th><th>x,y</th><th>size</th><th>vis</th><th>en</th><th>z</th></tr></thead><tbody></tbody></table></div></details>
       <details id="threads-panel"><summary>Guest threads (<span id="thr-count">0</span>)</summary><pre id="threads"></pre></details>
       <details id="engine-log-panel"><summary>Engine log (<span id="log-count">0</span> lines)</summary><pre id="engine-log"></pre></details>
@@ -42,7 +38,8 @@
       <details id="log-panel" open><summary>Page log</summary><pre id="log"></pre></details>
     </aside>
   </main>
-  <div id="filedlg" role="dialog" aria-modal="true" aria-labelledby="filedlg-title" hidden></div>
+  <!-- the engine's Open dialog: the browser's file chooser is opened from here (ui/filedlg.ts), no box is shown -->
+  <div id="filedlg"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

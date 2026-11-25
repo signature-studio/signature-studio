@@ -72,6 +72,8 @@ export async function dismissProblems(guest) {
 /** Ctrl+O opens the engine's Open box: the page's file box (#filedlg-input) or the file manager in selection mode (#fx-input-files) */
 export async function openProjectFile(guest, cdp, projectPath, log) {
   if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
+  // Issue #1481: the page's file chooser (its input is hidden) is taken by the tool, which gives the file itself; without this the headless browser cancels the chooser at once
+  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true });
   await guest.focusDesktop();
   await guest.ctrl('KeyO', 'o', 79);
   let box = null;
@@ -80,7 +82,11 @@ export async function openProjectFile(guest, cdp, projectPath, log) {
     box = await guest.ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
     if (!box) await sleep(500);
   }
-  if (!box) throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
+  if (!box) {
+    // what the page knows of the engine's Open request (the count, the answers, the page's own lines about it): the names of files are not in these
+    const diag = await guest.ev("(() => { const a = window.__app; const lg = document.getElementById('log'); return { requests: a.fileDlg.requests.length, history: a.fileDlg.history, open: a.fileDlg.open, lines: (lg ? lg.textContent : '').split('\\n').filter((l) => /dialog|chooser|Open|Save/.test(l)).slice(-8) }; })()").catch((e) => String(e?.message ?? e));
+    throw new Error(`no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O: ${JSON.stringify(diag)}`);
+  }
   const setFile = async (selector) => {
     const doc = await cdp.send('DOM.getDocument', {});
     const q = await cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector });

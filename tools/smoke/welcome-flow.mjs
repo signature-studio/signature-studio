@@ -25,7 +25,8 @@ const repo = path.resolve(here, '..', '..');
 const appDir = path.join(repo, 'app');
 
 const ROOM_W = 1836, ROOM_H = 1056;
-const VIEW_START = { width: 2176, height: 1092 };
+// Issue #1481: the stage is the whole window (the header and the monitor panel are hidden), so the room is the window
+const VIEW_START = { width: 1836, height: 1056 };
 const WIZARD = 'TWelcomeWizard';
 // guest pixels from the Welcome window's top-left corner (its window-table position). The box's "No thanks" is at (993, 548) and "I'm in" at (841, 548) for the window at (481, 241)
 const NO_THANKS = { dx: 512, dy: 307 };

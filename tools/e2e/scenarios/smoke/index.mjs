@@ -4,5 +4,6 @@ import knob from './knob-right-click-permissions.mjs';
 import fileOpen from './file-open-demo.mjs';
 import pluginManager from './plugin-manager-opens.mjs';
 import pluginDatabase from './plugin-database-lists-builtins.mjs';
+import pageChrome from './page-chrome.mjs';
 
-export default [start, knob, fileOpen, pluginManager, pluginDatabase];
+export default [start, knob, fileOpen, pluginManager, pluginDatabase, pageChrome];

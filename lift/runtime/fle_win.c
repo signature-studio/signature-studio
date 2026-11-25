@@ -339,6 +339,9 @@ int fle_win_api_trace_on(void) { return api_trace; }
 static const char *trace_msg_name(uint32_t msg)
 {
     switch (msg) {
+    case 0x0002u: return "WM_DESTROY";      /* Issue #1409: the close's messages (trace names only) */
+    case 0x0010u: return "WM_CLOSE";
+    case 0x0082u: return "WM_NCDESTROY";
     case 0x0006u: return "WM_ACTIVATE";
     case 0x0007u: return "WM_SETFOCUS";
     case 0x0008u: return "WM_KILLFOCUS";
@@ -2022,6 +2025,7 @@ void fle_imp_PostQuitMessage(void)
     fle_tqueue *q;
 
     fle_win_check_thread("PostQuitMessage");
+    if (api_trace) fprintf(stderr, "window-api: PostQuitMessage code=%d\n", (int32_t)(uint32_t)R[1]);   /* Issue #1409: the close (trace line only) */
     need_scheduler("PostQuitMessage");
     q = fle_thread_queue(fle_thread_current(), 1);
     q->quit = 1;
@@ -4883,6 +4887,8 @@ void fle_imp_DestroyWindow(void)
 {
     static const char api[] = "DestroyWindow";
     int64_t i = win_arg(R[1]);
+
+    if (api_trace) fprintf(stderr, "window-api: DestroyWindow %#" PRIx64 " index=%lld\n", R[1], (long long)i);   /* Issue #1409: the close (trace line only) */
 
     fle_win_check_thread(api);
     if (i < 0) return;
