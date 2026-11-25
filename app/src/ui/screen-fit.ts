@@ -75,6 +75,14 @@ export function screenDiffers(a: { width: number; height: number }, b: { width: 
 }
 
 /**
+ * #1348: FL takes its scale (and the DPI it sees) when it starts, and keeps them until it is restarted. A ratio whose percent differs from the one FL started with is
+ * a change the user has to restart FL for (the notice says so). `bootDpr` is the ratio of the start; the percent is Windows' round(ratio x 100), as the engine has it.
+ */
+export function restartNeeded(bootDpr: number, dpr: number): boolean {
+  return Math.round((dpr > 0 ? dpr : 1) * 100) !== Math.round((bootDpr > 0 ? bootDpr : 1) * 100);
+}
+
+/**
  * Collects a stream of room measurements (a window being dragged to a new size) into one: `push` the room whenever it changes; `onSettled` is called with the last room once no new one has come for
  * `quietMs`. The timer is injected (setTimeout/clearTimeout in the page, a fake in the unit test). S-screen1-quiet (a choice without a source): the default quiet time is 300 ms.
  */

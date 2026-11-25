@@ -22,7 +22,7 @@ import { stopLines } from './ui/stop-message.ts';
 import { EngineLogView, renderThreads, renderWindows } from './ui/panels.ts';
 import { stageRows, Timeline, type StageId } from './ui/phases.ts';
 import { ProgressView } from './ui/progress.ts';
-import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
+import { chooseGuestScreen, drawScale, restartNeeded, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
 import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, DeskHistory, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
@@ -347,7 +347,32 @@ window.addEventListener('resize', applyDisplay);
 const roomTimers = { set: (fn: () => void, ms: number): unknown => setTimeout(fn, ms), clear: (h: unknown): void => clearTimeout(h as ReturnType<typeof setTimeout>) };
 const roomFollower = new RoomDebouncer((room) => followRoom(room), roomTimers);
 if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { applyDisplay(); roomFollower.push(measureRoom()); }).observe($('stage'));
-window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', applyDisplay);
+// #1348: the ratio the engine started with (FL takes its scale and DPI at its start); null before the start
+let bootDpr: number | null = null;
+/** #1348: the restart notice (data-restart-notice): shown when the ratio now differs in percent from the one FL started with */
+function renderRestartNotice(): void {
+  $('restart-note').hidden = bootDpr === null || !restartNeeded(bootDpr, window.devicePixelRatio || 1);
+}
+// #1348: the ratio changes (a browser zoom, a move to another monitor): the room is measured again, so that the guest's screen follows it (the engine is told the new size),
+// and the restart notice is shown or hidden. The ratio is read again on each of three signals: the query for the ratio the page has (kept, and made again after each change: a
+// query is for one ratio), the window's resize, and a timer (250 ms) that reads the ratio itself, since a change of the ratio does not always reach the query.
+let lastDpr = window.devicePixelRatio || 1;
+function onDevicePixelRatio(): void {
+  const dpr = window.devicePixelRatio || 1;
+  if (dpr === lastDpr) return;
+  lastDpr = dpr;
+  applyDisplay();
+  roomFollower.push(measureRoom());
+  renderRestartNotice();
+}
+let dprQuery: MediaQueryList | null = null;
+function watchDevicePixelRatio(): void {
+  dprQuery = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`) ?? null;
+  dprQuery?.addEventListener?.('change', () => { onDevicePixelRatio(); watchDevicePixelRatio(); }, { once: true });
+}
+watchDevicePixelRatio();
+window.addEventListener('resize', onDevicePixelRatio);
+setInterval(onDevicePixelRatio, 250);
 
 $('stop-btn').addEventListener('click', () => { endRequested = true; client.stop(); });
 
@@ -391,6 +416,8 @@ function applyScreenParam(manifest: Manifest): void {
   app.screen.asked = { width: g.width, height: g.height, env };
   app.screen.guest = { width: g.width, height: g.height };
   app.screen.room = room;
+  bootDpr = room.dpr;
+  renderRestartNotice();
   applyDisplay();
   addLog('info', `guest screen ${g.width}x${g.height} device px for a room of ${room.width.toFixed(1)}x${room.height.toFixed(1)} CSS px at device pixel ratio ${room.dpr} (${Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ')})`);
   if (g.clamped) addLog('warn', `the room is outside what the engine accepts (${640}x${480}..${7680}x${4320}): the size was pulled inside it`);

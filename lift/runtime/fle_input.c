@@ -784,6 +784,8 @@ static void apply_display(const hwev *e)
     if (!fle_screen_set(w, h)) return;
     fle_win_pointer_reclamp();
     n = fle_win_input_toplevels(hs, 64);
+    /* Issue #1348: the engine's log of the change (the DPI is not changed: FL keeps the scale and the DPI it started with, and WM_DPICHANGED is not sent) */
+    fprintf(stderr, "input: WM_DISPLAYCHANGE %ux%u dpi %u to %u top-level windows\n", w, h, (unsigned)fle_screen_dpi(), (unsigned)n);
     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_DISPLAYCHANGE, FLE_GDC_BITSPIXEL, ((uint64_t)h << 16) | w);
     for (k = 0; k < n; k++) (void)fle_win_input_send("display-change", hs[k], FLE_WM_SETTINGCHANGE, FLE_SPI_SETWORKAREA, 0);
     (void)fle_win_input_remaximize((int32_t)w - (int32_t)ow, (int32_t)h - (int32_t)oh);
