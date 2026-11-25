@@ -87,7 +87,7 @@ static uint64_t tick(void)
  * A lazy file has its size, attributes and times in the node and its bytes in a stream the host owns (a stream = the concatenation of the files of one kind, as one logical byte string). The runtime never touches
  * the host file system itself: the harness gives it ONE read function (fle_vfs_lazy_set_reader) and the lengths of the streams. A read of a lazy file asks the host for exactly the bytes of the guest's buffer
  * (no copy in the volume); a write, SetEndOfFile, a mapping or a host-side peek first makes the file ordinary (copy-on-write of the whole file; nothing is written back to the stream). */
-#define LAZY_MAX_STREAMS 512u   /* #1345: one stream per file of the seed list (its bytes are read when the guest reads them), and the index streams (harness/vfs_lazy.h VL_REG_MAX) */
+#define LAZY_MAX_STREAMS 1024u  /* #1345: one stream per file of the seed list (its bytes are read when the guest reads them), and the index streams (harness/vfs_lazy.h VL_REG_MAX; #1414: 472 rows before the Sytrus Data's 109, and the plugins' rows, are about 600) */
 static uint64_t lazy_logical[LAZY_MAX_STREAMS];
 static unsigned n_lazy_streams;
 static fle_vfs_lazy_read_fn lazy_read_fn;

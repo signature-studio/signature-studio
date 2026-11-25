@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #define VL_MAX_STREAMS 16u   /* streams one index may have */
-#define VL_REG_MAX 512u      /* streams the volume holds (fle_vfs.c LAZY_MAX_STREAMS): the index streams and one per file row of the seed list (#1345) */
+#define VL_REG_MAX 1024u     /* streams the volume holds (fle_vfs.c LAZY_MAX_STREAMS): the index streams and one per file row of the seed list (#1345; 472 rows before the 109 of Sytrus's Data, #1414) */
 #define VL_MAX_ENTRIES 65536u
 #define VL_MAX_CHUNK (UINT64_C(8) << 20)
 #define VL_MAX_INDEX_BYTES (UINT64_C(16) << 20)
