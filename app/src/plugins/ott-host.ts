@@ -121,8 +121,9 @@ export function createHost(opts: HostOptions): Host {
       fle_js_publish: () => 0,
       fle_js_rewrite: () => undefined,
       fle_js_pulse: () => undefined,
-      // #1389: the text a plugin copies has no page to go to here, so it is dropped
+      // This worker has no page clipboard bridge: discard writes and return no host text.
       fle_clip_host_write: () => undefined,
+      fle_clip_host_read: () => 0,
       __asyncjs__fle_js_wait: () => 2,
       _emscripten_throw_longjmp: () => {
         throw new Error('wasm longjmp: not modelled by the plugin worker');
