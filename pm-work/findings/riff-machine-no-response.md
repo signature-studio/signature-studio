@@ -22,6 +22,8 @@ runner の値。この機械とは別枠。nproc 4。loadavg は JSON の各行(
 
 `npm test --prefix app`(16:26 UTC): Test Files 74 passed | 1 skipped (75)、Tests 1439 passed | 10 skipped (1449)。
 
+受け入れのコマンドを一本のまま通した(17:09〜17:12 UTC。engine の作り直しから。終了コード 0)。道具の DPR は 1 と 1.48。判定の式(窓・警告・資料・時間・bytes)と流れ A〜D の判定の式は、どちらも通った。流れ A〜D の `elapsedMs` は 9,092・9,145・9,171・9,762 ms(中央値 9,158)、`preBootBytes` は 312,311,979 B。
+
 ## 2. 直す前と後の道具の JSON(DPR 1)
 
 直す前(HEAD の seed 表。Riff の資料の行は無い。run 45592009894 の記録):
