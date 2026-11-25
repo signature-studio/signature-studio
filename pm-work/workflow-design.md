@@ -56,6 +56,7 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
   - #1373 で足した 2 件(`ci/resources-prefixes.txt` の 17〜18 行目。demo の曲の素材で、曲のフォルダ単位)。`Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\`: 4 件・877,543 B。`Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\`: 5 件・694,532 B。
   - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入るだけ。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
 - 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
+- プラグインの Data(素材)は `lift/plugins/<名前>/data.tsv` で宣言し(#1478)、同じ `plugin-rows.mjs` の `pluginRows()` が seed の行を作る。agent.yml の extract-tree-(保存・復元の 2 つ)の鍵は `lift/plugins/*/data.tsv` を入力に含む。spec/workflow.test.sh は、その 2 項目(plugin.tsv・data.tsv)を旧版との比較の前に除く。
 
 - 実機のビーコン(ラベル `perf-beacons` の作業だけ)。extract が R2 の `fl-web-cache` の `perf/` から、直近 3 日(UTC の今日と前の 2 日)の `*.json` を、最大 1000 件・合計 100 MB で取り、`$RUNNER_TEMP/perf` に置いて、鍵 `perf-beacons-${{ github.run_id }}` でキャッシュに保存する。work は同じ鍵で復元し、`lift/out-app/host-extra/perf/` に置く(commit はしない)。鍵を run ごとにするのは、ビーコンが増え続けて内容で決まる鍵が使えず、同じ run の extract と work だけが同じ鍵を読むため。公開の artifact は使わない。リポジトリは公開で、artifact も公開されるため、依頼者の実機のビーコン(個人を特定しうる値を含む)を置けない。R2 の鍵は extract だけが持ち、作業者の段には渡さない。ラベルの無い run では、これらの段は動かない。
 
