@@ -62,7 +62,7 @@ try {
   ok('parse: 結果の行が無い binary は、解析の上で止まった(resultSeen が偽)', [pc.blocks[0].resultSeen, pc.blocks[0].label], [false, 'wall_e1']);
 
   // known の一覧
-  ok('known: 実際の known-failures.txt は 59 件', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 59);
+  ok('known: 実際の known-failures.txt は 60 件(#1416 で int_more2 の CPU に依る 1 件を足した)', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 60);
   ok('known: 見出し・空行を読まず、CRLF も扱う', [...loadKnown('# a\r\n\r\nwall_r x y\r\n')], ['wall_r x y']);
 
   // 判定
