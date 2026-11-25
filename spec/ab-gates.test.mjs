@@ -41,10 +41,26 @@ test('p3: a null underrunDelta in the base cannot be compared, so the gate fails
   assert.equal(gateNamed(gates, 'underrunDelta').pass, false);
 });
 
-test('p3: last60sUnderruns is still 0 on every changed run', () => {
-  const runs = { base: [p3(0)], changed: [p3(0, { last60sUnderruns: 1 })] };
-  const gates = gatesOf('p3', runs, mediansOf('p3', runs.base, runs.changed));
-  assert.equal(gateNamed(gates, 'last60sUnderruns').pass, false);
+const last60s = (values) => values.map((v) => p3(0, { last60sUnderruns: v }));
+const last60sGate = (base, changed) => gateNamed(gatesOf('p3', { base, changed }, mediansOf('p3', base, changed)), 'last60sUnderruns');
+
+test('p3: last60sUnderruns passes when the changed median is at most the base median, even when the base is not 0', () => {
+  const base = last60s([14, 8, 4]);
+  const changed = last60s([4, 11, 4]);
+  assert.deepEqual(mediansOf('p3', base, changed).last60sUnderruns, { base: 8, after: 4 });
+  assert.equal(last60sGate(base, changed).pass, true);
+});
+
+test('p3: last60sUnderruns fails when the changed median is above the base median (base 0)', () => {
+  assert.equal(last60sGate(last60s([0, 0, 0]), last60s([3, 5, 2])).pass, false);
+});
+
+test('p3: last60sUnderruns is a median: one changed run of 14 passes when the changed median 7 is at most the base median 8', () => {
+  assert.equal(last60sGate(last60s([14, 8, 4]), last60s([7, 7, 14])).pass, true);
+});
+
+test('p3: a null last60sUnderruns in a run cannot be compared, so the gate fails', () => {
+  assert.equal(last60sGate(last60s([0, 0, 0]), last60s([null, 0, 0])).pass, false);
 });
 
 test('p2: the minWindowFps and inputToPresentMsP95 gates are the medians', () => {
