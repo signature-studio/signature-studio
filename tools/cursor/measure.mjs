@@ -1,6 +1,10 @@
 // The cursor measurement of #1390 (step 1: the sizing edges of the windows and the standard cursors). It records and measures only: the product is not changed, and the pointer only moves (and presses the buttons of the Welcome window and the Default row, as tools/smoke/welcome-flow.mjs does).
 // Usage: node tools/cursor/measure.mjs <absolute path to the bundle directory raw/<name>> [--force-sizable <lid>[,<lid>...]] > cursor.json   (needs app/node_modules and app/dist, as boot-bundle.mjs does). Exit 1 when error is set, 2 when no bundle directory is given.
 //   --force-sizable: a diagnostic for a bundle whose window table has no style of the child lines (the build before #1390): the windows with these lids are measured as sizable too (their style is then not read).
+//   --pencil (#1392): at the Piano roll (step 3), the pointer is put over its grid until the page shows a picture cursor (url(...)); the Draw key D is pressed when none does. The page's PNG is compared with a
+//     reference made outside the engine's pixel code: a resource's pixels are read from FLEngine_x64.dll (tools/cursor/resource-cursor.mjs); a cursor made by CreateIconIndirect has no resource, so its reference is
+//     built here from the raw copy of its bitmaps that the engine gives (pencilRaw). The check is made at device pixel ratio 1, 2 and a random one in 1.01..3.00 (pencilDprs; the room is set again for each);
+//     above 1 the page shows image-set of the copies (1x, 2x, 3x, nearest neighbour) and the copy of the ratio is compared with the reference's copy at the same scale. Fields: pencilOk, pencilResource, pencilCursorId, pencilSize, pencilHotspot(Match), pencilPixelsMatch, pencilMismatch, pencilInvertPixels, pencilAlpha, pencilCounts, pencilDprs, pencilTries, pencilCss, pencilRaw.
 // Order (on the engine's first idle, bootBundle's afterIdle):
 //   0. the room is set to 1836 x 1056 CSS px (the guest's screen; tools/smoke/welcome-flow.mjs calibrates it the same way);
 //   1. the window table (window.__app.deskDumpBase64(false): one line per drawn top-level window with its style; one line per child window, and a "child style" line with the child's style) is read: the Welcome window (class TWelcomeWizard) is found at its position;
@@ -23,6 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootBundle } from '../boot-check/boot-bundle.mjs';
 import { sleep } from '../boot-check/cdp.mjs';
+import { decodePngRgba, readPeResourceCursor, referenceFromRaw, scaleNearestRef } from './resource-cursor.mjs';
 
 // the room: the page's stage is 1836 x 1056 CSS px, which is the guest's screen (tools/smoke/welcome-flow.mjs and tools/p2-frames calibrate it); the Welcome window is centred in it
 const ROOM_W = 1836, ROOM_H = 1056;
@@ -34,7 +39,13 @@ const DEFAULT_ROW = { dx: 235, dy: 117 };
 const NOTCH_UP = 12, NOTCH_DOWN = 3, NOTCH_DELTA = 120;
 const PROBLEMS = 'TMissingPluginsForm';
 const PIANO_ROLL = 'TEventEditForm';
-const KEY_ESCAPE = 27, KEY_F7 = 118;
+const KEY_ESCAPE = 27, KEY_F7 = 118, KEY_D = 68;
+// #1392 (--pencil): the Piano roll's rectangle, as fractions of it, where the pointer is put in turn (the note grid is the middle; a point under another window is skipped)
+const PENCIL_POINTS = [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.75], [0.3, 0.75], [0.7, 0.75], [0.5, 0.3], [0.8, 0.9]];
+// the trace lines of a pencil probe: the hit test of the pointer, the cursor the guest set (SetCursor, with its handle and IDC) and the window messages of the cursor
+const PENCIL_TRACE_RE = '/hit: |SetCursor|WM_SETCURSOR|LoadCursor|CreateIconIndirect/';
+// the lifted DLL of the engine: the resources of FL's cursors are in its PE file (lift/out-app/host/binaries/win64/FLEngine_x64.dll, the image mapped at FLE_EXE_HANDLE)
+const FL_ENGINE_DLL = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../lift/out-app/host/binaries/win64/FLEngine_x64.dll');
 // the F-keys that open FL's own windows (a sweep: each key once, the windows it shows are looked at, then Escape closes them); a sizable window found there is measured while it is open
 const CTRL = 2;
 const SWEEP = [
@@ -165,15 +176,19 @@ async function dump(page) {
   }
 }
 
-async function setRoom(page) {
+/** the room of the guest (1836 x 1056 CSS px) at the device scale factor `dsf` (1 unless the pencil check asks for another); returns the page's device pixel ratio then */
+async function setRoom(page, dsf = 1) {
+  let dpr = null;
   for (let i = 0; i < 4; i++) {
     const r = await page.evaluate(ROOM);
-    log(`room: stage ${r.sw}x${r.sh}, window ${r.iw}x${r.ih}`);
-    if (Math.abs(r.sw - ROOM_W) <= 0.5 && Math.abs(r.sh - ROOM_H) <= 0.5) break;
-    await page.send('Emulation.setDeviceMetricsOverride', { width: Math.round(r.iw + (ROOM_W - r.sw)), height: Math.round(r.ih + (ROOM_H - r.sh)), deviceScaleFactor: 1, mobile: false });
+    dpr = await page.evaluate('window.devicePixelRatio');
+    log(`room: stage ${r.sw}x${r.sh}, window ${r.iw}x${r.ih}, device pixel ratio ${dpr}`);
+    if (Math.abs(r.sw - ROOM_W) <= 0.5 && Math.abs(r.sh - ROOM_H) <= 0.5 && Math.abs(dpr - dsf) < 1e-9) break;
+    await page.send('Emulation.setDeviceMetricsOverride', { width: Math.round(r.iw + (ROOM_W - r.sw)), height: Math.round(r.ih + (ROOM_H - r.sh)), deviceScaleFactor: dsf, mobile: false });
     await sleep(1500);
   }
   await sleep(1500);
+  return dpr === null ? null : page.evaluate('window.devicePixelRatio');
 }
 
 async function clickGuest(page, pic, p, clicks = 1) {
@@ -284,6 +299,114 @@ async function textCheck(page, pic, root = null, grid = true) {
   return { found: found !== null, candidates: cands.length, points: out.length, found_at: found, out };
 }
 
+/** #1392 (--pencil): the pencil of the Piano roll, at three device pixel ratios: 1, 2, and a random one in 1.01..3.00 (2 decimals). The pointer is put over the grid (PENCIL_POINTS) until a point
+ * shows a picture cursor (url(...) at 1, image-set(...) above 1); at 1, when none does, the Draw key D is pressed and the points are tried again. The page's picture (the PNG of the chosen copy and the hot
+ * spot in its css) is compared with the reference: the resource's own pixels read from FL_ENGINE_DLL by resource-cursor.mjs (never from the engine), or for a made cursor the copy of its bitmaps (raw).
+ * The copy for a ratio above 1 is the nearest-neighbour copy of the reference at the whole scale ceil(ratio) (the browser takes the copy for its density). */
+const isPicture = (css) => css.startsWith('url(') || css.startsWith('image-set(');
+/** the PNG candidates of a cursor value: [{ scale, data }] (a url without a scale is 1x) */
+function pngCandidates(css) {
+  const out = [];
+  const re = /url\("?(data:image\/png;base64,[A-Za-z0-9+/=]+)"?\)(?:\s+(\d+(?:\.\d+)?)x)?/g;
+  for (let m; (m = re.exec(css)) !== null;) out.push({ scale: m[2] === undefined ? 1 : Number(m[2]), data: m[1] });
+  return out;
+}
+/** the hot spot of a cursor value (the two numbers before its comma, after the image or the image-set) */
+const hotOf = (css) => { const m = /\)\s*(-?\d+)\s+(-?\d+)\s*,/.exec(css); return m ? [Number(m[1]), Number(m[2])] : null; };
+/** the scale of the copy a browser takes at a device pixel ratio (the smallest copy that is not smaller than the ratio, 3 at most) */
+const copyScale = (dpr) => (dpr > 1 ? Math.min(3, Math.ceil(dpr)) : 1);
+
+async function pencilCheck(page, pic, pr) {
+  const rect = await page.evaluate(RECT);
+  const tries = [];
+  const probe = async (round, rr) => {
+    for (const [fx, fy] of PENCIL_POINTS) {
+      const p = { x: Math.round(rr.x + fx * rr.w), y: Math.round(rr.y + fy * rr.h) };
+      if (topAt(pic.table.top, p.x, p.y) !== rr.root) { tries.push({ round, at: p, covered: true }); continue; }
+      const n0 = await page.evaluate(LOG_LEN);
+      const css = await cursorAt(page, pic, rect, p);
+      const trace = await page.evaluate(traceFrom(n0, PENCIL_TRACE_RE, 12));
+      tries.push({ round, at: p, covered: false, css: css.slice(0, 48), trace });
+      log(`pencil (${round}): cursor at (${p.x}, ${p.y}) is ${css.slice(0, 48)}`);
+      for (const l of trace) log(`  trace: ${l}`);
+      if (isPicture(css)) return { at: p, css };
+    }
+    return null;
+  };
+  /** the page's picture at the point, compared with the reference at the scale the ratio takes (the copy of the reference, nearest neighbour) */
+  const judge = async (hit, dpr) => {
+    const r = { dpr, pageDpr: null, ok: false, at: null, css: null, scale: null, source: null, cursorId: null, cursorIdMatch: null, size: null, hotspot: null, pageHotspot: null, hotMatch: false, pixelsMatch: false, mismatch: null, invert: null, counts: null, alpha: null, pageSize: null, raw: null, error: null };
+    if (!hit) { r.error = 'no point of the Piano roll shows a picture cursor'; return r; }
+    r.ok = dpr > 1 ? hit.css.startsWith('image-set(') : hit.css.startsWith('url(');
+    if (!r.ok) { r.error = `the cursor is not a picture at ${dpr}: ${hit.css.slice(0, 60)}`; return r; }
+    r.at = hit.at;
+    r.css = hit.css;
+    const info = await page.evaluate('window.__app.cursor.picture ?? null');
+    if (!info) { r.error = 'the page has no picture record for the cursor'; return r; }
+    r.source = info.source;
+    const made = /^made by /.test(info.source);
+    r.cursorId = made ? null : info.cursorId;
+    r.raw = info.raw ?? null;
+    let ref;
+    if (made) {
+      if (!info.raw) { r.error = 'the made cursor has no raw copy of its bitmaps'; return r; }
+      ref = referenceFromRaw(new Uint8Array(Buffer.from(info.raw, 'base64')), info.width, info.height, { hotX: info.hotX, hotY: info.hotY }, info.alpha === true);
+    } else {
+      const ord = /^ordinal (\d+)$/.exec(info.source);
+      ref = readPeResourceCursor(FL_ENGINE_DLL, ord ? { ordinal: Number(ord[1]) } : { name: info.source });
+    }
+    r.cursorIdMatch = made ? null : info.cursorId === ref.cursorId;
+    r.pageDpr = await page.evaluate('window.devicePixelRatio');
+    r.size = [ref.width, ref.height];
+    r.hotspot = [ref.hotX, ref.hotY];
+    r.alpha = ref.alpha;
+    r.invert = ref.counts.invert;
+    r.counts = ref.counts;
+    const scale = copyScale(dpr);
+    r.scale = scale;
+    const cands = pngCandidates(hit.css);
+    const cand = cands.find((c) => c.scale === scale) ?? cands[cands.length - 1];
+    r.pageHotspot = hotOf(hit.css);
+    r.hotMatch = r.pageHotspot !== null && r.pageHotspot[0] === ref.hotX && r.pageHotspot[1] === ref.hotY;
+    if (!cand) { r.error = `the cursor has no PNG copy: ${hit.css.slice(0, 60)}`; return r; }
+    const png = decodePngRgba(new Uint8Array(Buffer.from(cand.data.slice(cand.data.indexOf(',') + 1), 'base64')));
+    const want = cand.scale === scale ? scaleNearestRef(ref.width, ref.height, ref.rgba, scale) : null;
+    r.pageSize = [png.width, png.height];
+    let mismatch = 0;
+    if (!want || png.width !== ref.width * scale || png.height !== ref.height * scale) mismatch = png.width * png.height;
+    else for (let i = 0; i < want.length; i += 4) if (want[i] !== png.rgba[i] || want[i + 1] !== png.rgba[i + 1] || want[i + 2] !== png.rgba[i + 2] || want[i + 3] !== png.rgba[i + 3]) mismatch++;
+    r.mismatch = mismatch;
+    r.pixelsMatch = mismatch === 0;
+    log(`pencil at ${dpr}: ${info.source}${made ? '' : ` (RT_CURSOR ${ref.cursorId})`}, ${ref.width} x ${ref.height}, hot spot ${ref.hotX},${ref.hotY} (page ${r.pageHotspot}); copy ${scale}x ${png.width} x ${png.height}; pixels mismatched ${mismatch}; inverted ${ref.counts.invert}`);
+    return r;
+  };
+  let hit = await probe('the tool as the Piano roll shows it', pr);
+  let keyed = false;
+  if (!hit) {
+    await press(page, KEY_D, 'D');
+    keyed = true;
+    await sleep(800);
+    pic = await dump(page);
+    pr = pianoRollOf(pic.table) ?? pr;
+    hit = await probe('after the Draw key D', pr);
+  }
+  const first = await judge(hit, Number(await page.evaluate('window.devicePixelRatio')));
+  const dprs = [first];
+  const randomDpr = Math.round((1.01 + Math.random() * 1.99) * 100) / 100;
+  for (const want of [2, randomDpr]) {
+    const got = Math.round((await setRoom(page, want)) * 100) / 100;
+    pic = await dump(page);
+    const prd = pianoRollOf(pic.table);
+    if (Math.abs(got - want) > 0.005 || !prd) { dprs.push({ dpr: got, ok: false, error: !prd ? 'the Piano roll did not show at this ratio' : `the device pixel ratio is ${got}, not ${want}` }); continue; }
+    const h = await probe(`at device pixel ratio ${want}`, prd);
+    dprs.push(await judge(h, got));
+  }
+  await setRoom(page, 1);
+  pic = await dump(page);
+  const out = { ok: first.ok, tries, keyed, dprs, randomDpr, at: first.at, source: first.source, cursorId: first.cursorId, cursorIdMatch: first.cursorIdMatch, size: first.size, hotspot: first.hotspot, pageHotspot: first.pageHotspot, hotMatch: first.hotMatch, pixelsMatch: first.pixelsMatch, mismatch: first.mismatch, invert: first.invert, counts: first.counts, alpha: first.alpha, css: first.css, raw: first.raw, error: first.error };
+  return out;
+}
+
 async function session(page, res) {
   await setRoom(page);
   await page.evaluate(TRACE_ON);
@@ -312,6 +435,10 @@ async function session(page, res) {
   }
   res.pianoRoll = pr ? { lid: pr.lid, child: pr.child, style: hex8(pr.style), text: pr.title ?? pr.text } : null;
   log(`Piano roll: ${JSON.stringify(res.pianoRoll)}`);
+  if (res.pencilOn) {
+    try { res.pencil = pr ? await pencilCheck(page, pic, pr) : { ok: false, error: 'the Piano roll did not open' }; } catch (e) { res.pencilError = String(e?.message ?? e); }
+    pic = await dump(page);
+  }
   res.childClasses = [...new Set(pic.table.child.map((c) => c.cls))];
   log(`child classes: ${res.childClasses.join(', ')}`);
   res.sizable = [];
@@ -365,8 +492,10 @@ async function session(page, res) {
   res.thickframeAny = [...res.styles.entries()].filter(([, v]) => v.frame).map(([lid, v]) => ({ lid, ...v }));
   res.windowStyles = [...res.styles.entries()].map(([lid, v]) => ({ lid, ...v }));
   const tc = await textCheck(page, pic);
-  res.textOk = tc.found || res.textFound !== undefined && res.textFound !== null;
-  res.textFoundAt = tc.found_at ?? res.textFound ?? null;
+  // textOk: an I-beam was shown at some point of any search (the sweep's windows, then this last one); textEnd: this last search found one (the two can differ: the reason goes in the report)
+  res.textFoundAt = res.textFound ?? tc.found_at ?? null;
+  res.textOk = res.textFoundAt !== null;
+  res.textEnd = tc.found;
   res.textPoints = tc.points;
   res.textCandidates = tc.candidates;
   res.textDetail = tc.out;
@@ -374,6 +503,37 @@ async function session(page, res) {
   res.cursorRecord = rec.cursorRecord;
   res.cursorAtEnd = rec.cursorAtEnd;
   res.windowsAtEnd = pic.text.split('\n').filter(Boolean).slice(0, 120);
+}
+
+/** #1392 (--pencil): the pencil fields of the JSON line; null when the pencil was not asked for (--pencil absent) */
+function pencilFields(res) {
+  const p = res.pencil ?? null;
+  /** the device pixel ratios: [0] 1, [1] 2, [2] a random ratio in 1.01..3.00; each with the page's cursor and its match with the reference (the judged fields are ok at [0] and [2], and dpr at [1]) */
+  const dprs = (p?.dprs ?? []).map((d) => ({ dpr: d.dpr, pageDpr: d.pageDpr ?? null, ok: d.ok === true, at: d.at ?? null, scale: d.scale ?? null, source: d.source ?? null, pageSize: d.pageSize ?? null, hotspotMatch: d.hotMatch === true, pixelsMatch: d.pixelsMatch === true, mismatch: d.mismatch ?? null, css: d.css ? d.css.slice(0, 160) : null, error: d.error ?? null }));
+  return {
+    pencilOk: res.pencilOn ? p?.ok === true : null,
+    pencilResource: p?.source ?? null,
+    pencilCursorId: p?.cursorId ?? null,
+    pencilCursorIdMatch: p?.cursorIdMatch ?? null,
+    pencilSize: p?.size ?? null,
+    pencilHotspot: p?.hotspot ?? null,
+    pencilPageHotspot: p?.pageHotspot ?? null,
+    pencilHotspotMatch: p ? p.hotMatch === true : null,
+    pencilPixelsMatch: p ? p.pixelsMatch === true : null,
+    pencilMismatch: p?.mismatch ?? null,
+    pencilInvertPixels: p?.invert ?? null,
+    pencilAlpha: p?.alpha ?? null,
+    pencilCounts: p?.counts ?? null,
+    pencilAt: p?.at ?? null,
+    pencilKeyed: p ? p.keyed === true : null,
+    pencilTries: p?.tries ?? [],
+    pencilDprs: res.pencilOn ? dprs : null,
+    pencilRandomDpr: p?.randomDpr ?? null,
+    /** the page's cursor as it was shown (the css, with its PNG) and the raw copy of the made cursor's bitmaps (base64, six bytes per pixel) */
+    pencilCss: p?.css ? p.css.slice(0, 160) : null,
+    pencilRaw: p?.raw ?? null,
+    pencilError: p?.error ?? res.pencilError ?? null,
+  };
 }
 
 async function main() {
@@ -385,6 +545,7 @@ async function main() {
   const res = {};
   const f = process.argv.indexOf('--force-sizable');
   res.force = f > 0 ? String(process.argv[f + 1] ?? '').split(',').filter(Boolean).map(Number) : [];
+  res.pencilOn = process.argv.includes('--pencil');
   let ran = false;
   const { out } = await bootBundle(bundleDir, {
     afterIdle: async (page) => {
@@ -400,10 +561,11 @@ async function main() {
     error: out.error, state: out.state, standIn: out.standIn, nproc: os.availableParallelism(), loadavg: os.loadavg(),
     windowsAtStart: res.windowsAtStart ?? [], sizableAtStart: res.sizableAtStart ?? [], pianoRoll: res.pianoRoll ?? null, childClasses: res.childClasses ?? [],
     sizable: res.sizable ?? [], edgeWindows, edgeSamples: edgeDetail.length, edgeMatches: edgeDetail.filter((d) => d.match).length, edgeDetail, diagEdges: res.diagEdges ?? [], styleTrace: res.styleTrace ?? [], setPosCount: res.setPosCount ?? 0,
-    textOk: res.textOk ?? false, textFoundAt: res.textFoundAt ?? null, textPoints: res.textPoints ?? 0, textCandidates: res.textCandidates ?? 0, textDetail: res.textDetail ?? [], textWindows: res.textWindows ?? [],
+    textOk: res.textOk ?? false, textFoundAt: res.textFoundAt ?? null, textEnd: res.textEnd ?? false, textPoints: res.textPoints ?? 0, textCandidates: res.textCandidates ?? 0, textDetail: res.textDetail ?? [], textWindows: res.textWindows ?? [],
     mainFormEdges: res.mainFormEdges ?? null, thickframeAny: res.thickframeAny ?? [], windowStyles: res.windowStyles ?? [],
     unresolved: res.cursorRecord?.unresolved ?? null, unmapped: unmappedNames.length, unmappedNames, madeByGuest: res.cursorRecord?.made ?? null,
     cursorRecord: res.cursorRecord ?? null, cursorAtEnd: res.cursorAtEnd ?? null, windowsAtEnd: res.windowsAtEnd ?? [],
+    ...pencilFields(res),
   };
   if (edgeDetail.length !== 8 * edgeWindows) final.error = final.error ?? `edge samples ${edgeDetail.length} for ${edgeWindows} windows`;
   process.stdout.write(JSON.stringify(final) + '\n');

@@ -31,6 +31,8 @@ export interface ClientEvents {
   deskCanvas(): HTMLCanvasElement;
   /** decision 0223: the cursor and the title of the foreground window, when they changed */
   osstate?(m: Extract<FromWorker, { t: 'osstate' }>): void;
+  /** #1392: the picture of a cursor the guest loaded from one of its modules (sent before the osstate that names its handle) */
+  cursorPicture?(m: Extract<FromWorker, { t: 'cursorpic' }>): void;
   /** decision 0223: the desktop presenter's counters and the instants of its presents (at most every 100 ms) */
   desk?(m: Extract<FromWorker, { t: 'desk' }>): void;
   /** decision 0272: the engine's first minimized window with a taskbar button changed (0: none) */
@@ -205,6 +207,7 @@ export class EngineClient {
       case 'pong': break;
       case 'desk-dump': case 'desk-gl-pixels': case 'desk-dump-error': case 'guest-text': { const f = this.dumpWaiter; this.dumpWaiter = null; f?.(m); break; }
       case 'osstate': this.events.osstate?.(m); break;
+      case 'cursorpic': this.events.cursorPicture?.(m); break;
       case 'desk': this.events.desk?.(m); break;
       case 'taskbar': this.events.taskbar?.(m); break;
       case 'webview2': this.events.webview2?.(m); break;

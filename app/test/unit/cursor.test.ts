@@ -55,6 +55,44 @@ describe('the guest\'s cursor as a CSS cursor', () => {
     expect(c(0x7fba0100, 0, false, true).why).toContain('made itself');
     expect(c(0x7fba0100, 0, false, true).unresolved).toBeUndefined();
   });
+  it('a cursor of a module with its picture is the picture (url, then the hot spot), not the arrow (#1392)', () => {
+    const url = 'data:image/png;base64,AAAA';
+    const pic = { ok: true as const, images: [{ scale: 1, url }], hotX: 1, hotY: 1, source: 'EEPEN', cursorId: 26, width: 32, height: 32, invert: 0, alpha: false };
+    const r = cursorCss({ cursor: 0x7fda0008, cursorIdc: 0, cursorShared: true, cursorMade: false }, pic);
+    expect(r.css).toBe(`url("${url}") 1 1, default`);
+    expect(r.picture).toEqual({ source: 'EEPEN', cursorId: 26, width: 32, height: 32, hotX: 1, hotY: 1, invert: 0, alpha: false, css: `url("${url}") 1 1, default` });
+    expect(r.unpictured).toBeUndefined();
+  });
+  it('above a device pixel ratio of 1 the picture is image-set of its copies (1x, 2x, 3x), the same hot spot; at 1 it is the url (#1392)', () => {
+    const images = [{ scale: 1, url: 'A' }, { scale: 2, url: 'B' }, { scale: 3, url: 'C' }];
+    const pic = { ok: true as const, images, hotX: 1, hotY: 2, source: 'EEPEN', cursorId: 26, width: 32, height: 32, invert: 0, alpha: false };
+    const shared = { cursor: 0x7fda0008, cursorIdc: 0, cursorShared: true, cursorMade: false };
+    expect(cursorCss(shared, pic, 2).css).toBe('image-set(url("A") 1x, url("B") 2x, url("C") 3x) 1 2, default');
+    expect(cursorCss(shared, pic, 1.5).css).toBe('image-set(url("A") 1x, url("B") 2x, url("C") 3x) 1 2, default');
+    expect(cursorCss(shared, pic, 1).css).toBe('url("A") 1 2, default');
+    expect(cursorCss(shared, { ...pic, images: [images[0] as { scale: number; url: string }] }, 2).css).toBe('url("A") 1 2, default');
+  });
+  it('a module cursor whose picture is not known is the arrow, and says so (unpictured)', () => {
+    const none = c(0x7fda0008, 0, true);
+    expect(none).toMatchObject({ css: 'default', unpictured: true });
+    expect(none.why).toContain('has not come');
+    const failed = cursorCss({ cursor: 0x7fda0008, cursorIdc: 0, cursorShared: true, cursorMade: false }, { ok: false, why: 'the group has 2 entries' });
+    expect(failed).toMatchObject({ css: 'default', unpictured: true });
+    expect(failed.why).toContain('the group has 2 entries');
+  });
+  it('a standard cursor is not given a picture (the module picture is not used for it)', () => {
+    const pic = { ok: true as const, images: [{ scale: 1, url: 'data:image/png;base64,AAAA' }], hotX: 1, hotY: 1, source: 'EEPEN', cursorId: 26, width: 32, height: 32, invert: 0, alpha: false };
+    expect(cursorCss({ cursor: 1, cursorIdc: 32512, cursorShared: false, cursorMade: false }, pic).css).toBe('default');
+    expect(cursorCss({ cursor: 1, cursorIdc: 32513, cursorShared: false, cursorMade: false }, pic).css).toBe('text');
+  });
+  it('a cursor the guest made with CreateIconIndirect is its picture when the engine has one (#1392), reported as made', () => {
+    const pic = { ok: true as const, images: [{ scale: 1, url: 'data:image/png;base64,AAAA' }], hotX: 2, hotY: 3, source: 'made by CreateIconIndirect', cursorId: 0, width: 8, height: 8, invert: 1, alpha: true, raw: 'AAAA' };
+    const r = cursorCss({ cursor: 0x7fba0100, cursorIdc: 0, cursorShared: false, cursorMade: true }, pic);
+    expect(r.css).toBe('url("data:image/png;base64,AAAA") 2 3, default');
+    expect(r.made).toBe(true);
+    expect(r.picture).toMatchObject({ source: 'made by CreateIconIndirect', cursorId: 0, hotX: 2, hotY: 3, invert: 1, alpha: true, raw: 'AAAA' });
+    expect(cursorCss({ cursor: 0x7fba0100, cursorIdc: 0, cursorShared: false, cursorMade: true }, { ok: false, why: 'an icon' })).toMatchObject({ css: 'default', made: true, unpictured: true });
+  });
   it('a handle that is none of these has no identity: unresolved', () => {
     expect(c(0x7fba0100)).toMatchObject({ css: 'default', unresolved: true });
   });

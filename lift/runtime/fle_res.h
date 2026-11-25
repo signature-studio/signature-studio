@@ -8,6 +8,7 @@
 #define FLE_RES_H
 
 #include <stdint.h>
+#include "fle_cursor.h"
 
 /* System error codes set by FindResourceW (System Error Codes 1700-3999, Microsoft Learn). The API pages name
  * no code; which code goes with which failure is decision 0025. */
@@ -50,6 +51,11 @@ void fle_imp_FreeResource(void);
 /* Decision 0125 (PROVISIONAL), wall 54: user32!LoadCursorW(hInstance non-NULL, name) for a cursor of the lifted DLL or of a real module (the rules are in fle_res.c). Returns 1 with *handle set, or 0 with
  * *handle = 0 and the last error set. fle_cursor.c reaches it through a weak reference. */
 int fle_cursor_load_named(const char *api, uint64_t inst, uint64_t name, uint64_t *handle);
+
+/* Decision 0260 (PROVISIONAL), #1392: the picture of a cursor that fle_cursor_load_named answered (its handle, fle_cursor.h / fle_loadimage.h), read from the resource itself (fle_res.c). The
+ * pixels are the resource's own masks, with the rule of the decision (fle_cursor.h): a 32-bit XOR with a non-zero alpha byte is drawn with its alpha and the AND mask is ignored; else AND 0 is the
+ * XOR colour, opaque; AND 1 and XOR 0 is transparent; AND 1 and XOR not 0 is a screen inversion, drawn opaque black. The page gets no other picture. rgba is valid until the next call. A handle that is not such a cursor, or a resource that is not read, returns 0 with *why (a static text). */
+int fle_cursor_picture(uint64_t h, fle_cursor_pic *out, const char **why);
 
 /* Decision 0129 (PROVISIONAL, S-version-info-real-resource): the RT_VERSION resource of the image mapped at FLE_EXE_HANDLE: 1 with its VA and size, or 0 when there is none. See fle_res.c. */
 int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size);

@@ -447,13 +447,25 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
       const os = osStateOf(v, lastTitle);
       lastTitle = os.title;
       const key = osStateKey(os);
-      if (key !== lastOs) { lastOs = key; post({ t: 'osstate', ...os, abs: nowAbs() }); }
+      if (key !== lastOs) {
+        lastOs = key;
+        if (os.cursorShared || os.cursorMade) sendCursorPicture(fruity, os.cursor);
+        post({ t: 'osstate', ...os, abs: nowAbs() });
+      }
     }
     // decision 0272: a minimized window with a taskbar button, as the engine says it (null: this build has no such export; nothing is posted)
     const tb = taskbarReport.next(fruity.taskbarIconic());
     if (tb !== null) post({ t: 'taskbar', lid: tb });
   }
   return changed;
+}
+
+/** #1392: the picture of a cursor the guest loaded from one of its modules or made with CreateIconIndirect, read now (before the osstate that names the handle, which is posted when the key changes: a handle number can be made again for another cursor, so it is not kept) */
+function sendCursorPicture(f: FruityEngine, handle: number): void {
+  const p = f.cursorPicture(handle);
+  if (p === null) { post({ t: 'cursorpic', handle, why: 'this engine build has no cursor picture export', picture: null }); return; }
+  if (!p.ok || p.picture === null) { post({ t: 'cursorpic', handle, why: p.why, picture: null }); return; }
+  post({ t: 'cursorpic', handle, why: '', picture: p.picture }, p.picture.raw ? [p.picture.rgba, p.picture.raw] : [p.picture.rgba]);
 }
 
 /** the answer to a question that found the picture busy: nothing changed (the render Worker's last picture is the one it has) */
