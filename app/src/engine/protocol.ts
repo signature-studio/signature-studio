@@ -51,6 +51,8 @@ export type ToWorker =
   | { cmd: 'clipboard-text'; id: number; text: string | null }
   /** Issue #1385: the page is left (pagehide): the engine asks the FL main window to close, so FL closes the files it keeps open (the Worker's onExitRequest) */
   | { cmd: 'exit-request' }
+  /** #1406: the page's answer to a clipboard-probe request (whether the clipboard holds text; no content is read for it) */
+  | { cmd: 'clipboard-probe-answer'; id: number; has: boolean }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
@@ -121,4 +123,6 @@ export type FromWorker =
   | { t: 'clipboard-write'; text: string }
   /** #1389: the engine's Paste asks for the operating system's text (GetClipboardData); the page answers with {cmd: 'clipboard-text'} (the same id) */
   | { t: 'clipboard-read'; id: number }
+  /** #1406: a question about the formats (IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats) asks whether the clipboard holds text; the page answers with {cmd: 'clipboard-probe-answer'} (the same id) */
+  | { t: 'clipboard-probe'; id: number }
   | { t: 'desk'; stats: { presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };

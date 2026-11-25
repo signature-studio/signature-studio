@@ -42,7 +42,7 @@
 - 変えた試験だけ: `cargo test -p fe-lift --test <binary>` を走らせ、その binary の行と比べる。
 - 試験の link を増やすとき: 新しい `fle_*.c` が製品の未定義シンボル(`fle_clip_host_*`・`fle_win_api_trace_on`・`fle_vfs_restore_*` と同種)を持つと、同じ link の失敗が出る。上の一覧の場所に、試験専用の定義を足す(製品の runtime には入れない)。
 
-## 5. 残り(59 件)と理由
+## 5. 残り(60 件)と理由
 
 | 理由 | 試験(binary) | 件数 | 直し方 |
 |---|---|---|---|
@@ -56,6 +56,7 @@
 | `harness/idle/gen_idle_wraps.py` が無い(1 件)と、directory line の期待の差(1 件) | wall_fr12 | 2 | 生成器を書くか、試験を外す |
 | 製品の答えと試験の期待が違う(原因は未確認) | adjustor(58752 対 58695)・vcall_thunk_dll(58 対 1)・wall_c1(shared cursor handle)・wall_dlg1 2(attrs 20 対 80、vfs seed の出力)・wall_fr11(regtrail-double)・wall_fr8(42 対 41)・wall_s(leading-missing-key)・wall_fr20(row 0 が webview2loader 対 user32) | 9 | 製品側の変更か、試験の期待の更新。link の問題ではないので、本作業では触っていない |
 | `mutate.py` の結果が 0 件(CAUGHT なし)。未確認 | wall_fr18 | 1 | 原因を確かめる |
+| host の CPU に依る(#1416 の run の runner は AMD EPYC 7763)。BSF/BSR で源が 0 のとき、C が定義する CF が host の CF と違う。SDM は BSF の CF を未定義とするが、lift の model(decision 0023 の Scan)は CF を定義する。`fle_dispatch.h` の版を main に戻しても同じ失敗 | int_more2 | 1 | lift の model の CF を SDM に合わせるか、試験の比較を直す。製品の答えに関わるので別の Issue。#1416 の作業で既知に足した |
 | `fle_appfile.c` に `fprintf(` がある(製品の hygiene 検査)。`fle_appfile.c` の window-api trace の行 | wall_fr19 | 1 | 製品の変更。本作業では直していない |
 
 ## 6. judge の状態(push の判断が要る)

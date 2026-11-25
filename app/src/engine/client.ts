@@ -43,6 +43,8 @@ export interface ClientEvents {
   clipboardWrite?(text: string): void;
   /** #1389: the engine's Paste asks for the operating system's clipboard text; answer with EngineClient.clipboardAnswer(id, text | null) */
   clipboardRead?(id: number): void;
+  /** #1406: a question about the formats asks whether the operating system's clipboard holds text; answer with EngineClient.clipboardProbeAnswer(id, has) */
+  clipboardProbe?(id: number): void;
 }
 
 export class EngineClient {
@@ -141,6 +143,8 @@ export class EngineClient {
   webview2Message(json: string): void { this.worker?.postMessage({ cmd: 'webview2-message', json } satisfies ToWorker); }
   /** #1389: the operating system's clipboard text the page read for the engine's Paste (null: none, or the page could not read it) */
   clipboardAnswer(id: number, text: string | null): void { this.worker?.postMessage({ cmd: 'clipboard-text', id, text } satisfies ToWorker); }
+  /** #1406: the answer to a clipboardProbe request (whether the clipboard holds text; no content is read for it) */
+  clipboardProbeAnswer(id: number, has: boolean): void { this.worker?.postMessage({ cmd: 'clipboard-probe-answer', id, has } satisfies ToWorker); }
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
@@ -227,6 +231,7 @@ export class EngineClient {
       case 'webview2': this.events.webview2?.(m); break;
       case 'clipboard-write': this.events.clipboardWrite?.(m.text); break;
       case 'clipboard-read': this.events.clipboardRead?.(m.id); break;
+      case 'clipboard-probe': this.events.clipboardProbe?.(m.id); break;
     }
   }
 }

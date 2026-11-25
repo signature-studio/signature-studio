@@ -240,7 +240,7 @@ fn the_three_stops_end_by_name_with_the_thread_table_and_exit_134() {
     assert!(d.err.iter().any(|l| l.starts_with("threads: 2 (running index 1)")) && d.err.iter().any(|l| l.contains("thread 1: id 0x1002")));
     let b = run(&["stop_bad_start"]);
     assert_eq!(b.signal, Some(6));
-    assert!(b.err.iter().any(|l| l == "fle: indirect call to 0x5555 is not a known function entry"), "{:?}", b.err);
+    assert!(b.err.iter().any(|l| l.starts_with("fle: indirect call to 0x5555 is not a known function entry (caller ")), "{:?}", b.err);
     let t = run(&["stop_in_thread"]);
     assert_eq!(t.signal, Some(6));
     assert!(t.err.iter().any(|l| l == "fle: ResumeThread: thread handle value was never returned by CreateThread"), "{:?}", t.err);

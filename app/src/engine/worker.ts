@@ -87,6 +87,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
     case 'exit-request': onExitRequest(); break;
+    case 'clipboard-probe-answer': fruity?.answerClipProbe(m.id, m.has); break;   // #1406: the engine waits for this answer (a question about the formats)
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -127,6 +128,7 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
     fileDlgProgress: (id, done, total) => post({ t: 'filedlg-progress', id, done, total }),
     clipWrite: (text) => post({ t: 'clipboard-write', text }),   // #1389: the engine's Copy goes to the page
     clipRead: (id) => post({ t: 'clipboard-read', id }),        // #1389: the engine's Paste asks the page for the clipboard text
+    clipProbe: (id) => post({ t: 'clipboard-probe', id }),      // #1406: the engine's question about the formats asks the page whether there is text
     inputPoll,
     inputDone,
   };
