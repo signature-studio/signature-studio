@@ -1,0 +1,4 @@
+# The answers of the vst3a harness for ordinal imports (a PE import by number has no name; fe-decode names it dll!#<n>): <dll> <ordinal> <API name> <runtime function>, one row per line, '#' starts a comment.
+# mk_stubs.mjs gives such an import its row for the lifted thunk (`<dll> #<n> <runtime function>` in the extra-imports rows) and its IAT pseudo-VA the function. The runtime
+# function is defined in lift/harness/vst3a (vst3a_imp.c) and has the name fle_imp_<...>. An ordinal with no row here stops by number when it is called (vst3a_unanswered).
+d2d1.dll 1 D2D1CreateFactory fle_imp_ord_d2d1_1
