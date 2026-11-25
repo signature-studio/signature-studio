@@ -1,2 +1,4 @@
+# Issue #1379: the host file and the seed file of a plugin DLL are named by its key (not by its file name, which need not be unique). The
+# extraction tree's cache key reads this file, so the tree is extracted again with the new names (lift/crates/fe-build/src/plugins.rs is not in the key).
 key	guest	role	sha256	size	hook	args	omit
 effects.fruity-balance.fruity_balance_x64.dll	Plugins\Fruity\Effects\Fruity Balance\Fruity Balance_x64.dll	本体	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064	3718656	existing	--pdata	0x2c13a0
