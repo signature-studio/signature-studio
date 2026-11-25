@@ -16,6 +16,7 @@ import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts'
 import { sceneGen } from './desk-gl.ts';
 import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
+import { IN, SC } from '../input/events.ts';
 import { openRegState, type RegState } from './regstore.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
@@ -84,6 +85,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
+    case 'exit-request': onExitRequest(); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -358,9 +360,26 @@ function closeRegState(dropped: boolean): void {
   regState = null;
 }
 
+/** Issue #1385: the page is left (pagehide: a reload or a close). The FL main window is sent SC_CLOSE on the road the task bar's button takes (the IdleDriver, at the engine's idle), so FL
+ * does what it does when the person closes its window: it closes the files it keeps open (a saved project is written at its close, and each write reaches the page's journal then).
+ * Once; nothing when the engine has ended or has no such window. EXIT_SEQ is no input of the page's: the latency tracker takes no sample of it. */
+const EXIT_SEQ = -1;
+let runEnded = false;
+let exitSent = false;
+function onExitRequest(): void {
+  if (exitSent || runEnded || !fruity) return;
+  const lid = fruity.mainWindow();
+  const d = ensureDriver();
+  if (!lid || !d) { log('info', 'the page is left: the engine has no FL main window to close'); return; }
+  exitSent = true;
+  d.submit({ k: 'syscmd', kind: IN.SYSCMD, lid, cmd: SC.CLOSE }, EXIT_SEQ, nowAbs());
+  mark('exit_request', { lid });
+}
+
 async function startFruity(f: FruityEngine): Promise<void> {
   mark('engine_start');
   const result = await f.run();
+  runEnded = true;
   closeRegState(result.kind === 'trap' || (result.kind === 'exit' && result.code !== 0));
   stopAudioReport();
   flushLogs();
@@ -514,15 +533,15 @@ const TEXT_REACH = 0x100000;
 const TEXT_HITS = 64;
 const TEXT_LINES = 2000;
 const TEXT_LINE_MAX = 400;
-const NEAR_PLACES = 24;
+const NEAR_PLACES = 400;
 const NEAR_RUNS = 200;
 
 const textUnit = (wide: boolean): number => (wide ? 2 : 1);
 const textChar = (b: Uint8Array, p: number, wide: boolean): number => (wide ? (b[p] ?? 0) | ((b[p + 1] ?? 0) << 8) : (b[p] ?? 0));
 const isText = (c: number): boolean => (c >= 0x20 && c <= 0x7e) || c === 0x09 || c === 0x0a || c === 0x0d;
 
-/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE: the first byte is found by indexOf and the rest compared */
-function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
+/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE, at most `limit`: the first byte is found by indexOf and the rest compared */
+function findPlaces(b: Uint8Array, s: string, wide: boolean, limit: number): number[] {
   const u = textUnit(wide);
   const pat = new Uint8Array(s.length * u);
   for (let i = 0; i < s.length; i++) {
@@ -534,7 +553,7 @@ function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
   const last = b.length - pat.length;
   const first = pat[0] ?? 0;
   let p = b.indexOf(first, 0);
-  while (p >= 0 && p <= last && out.length < TEXT_HITS) {
+  while (p >= 0 && p <= last && out.length < limit) {
     let k = 1;
     while (k < pat.length && b[p + k] === pat[k]) k++;
     if (k === pat.length) out.push(p);
@@ -585,11 +604,15 @@ function guestText(markers: string[], radius: number): void {
   for (const marker of markers) {
     for (const wide of [false, true]) {
       const enc = wide ? 'utf16le' : 'ascii';
-      for (const at of findPlaces(b, marker, wide)) {
-        const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
-        const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
-        if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
-        if (radius > 0 && near.length < NEAR_PLACES) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
+      // #1391: the runs near a place are listed for up to NEAR_PLACES places per encoding (the top bar's "<n> MB" is not cut off by the lowest addresses); the best text still comes from the first TEXT_HITS places
+      const places = findPlaces(b, marker, wide, radius > 0 ? NEAR_PLACES : TEXT_HITS);
+      for (const [i, at] of places.entries()) {
+        if (i < TEXT_HITS) {
+          const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
+          const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
+          if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
+        }
+        if (radius > 0) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
       }
     }
     if (best !== null && best.lineCount >= 3) break;

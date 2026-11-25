@@ -28,7 +28,51 @@ project: signature-studio/3
 - 事実 4(読み込みの経路 `lift/runtime/fle_load.c`・`lift/runtime/fle_wall_ia2.c` の `fle_ia2_path_absent`): 「Python\Python312.dll」の `LoadLibraryW` は、常に「見つからない(126)」と答える。この答えは、記録の上で選んだ choice(`fle_wall_ia2.c` の注と、`lift/harness/seeds/ia2-imports.txt` の W21 の行)。その注は「インストーラに Python312.dll が無い」と書くが、事実 2 の一覧には `Shared\Python\python312.dll` が在る。食い違い。この choice は、チャンネルラックの設定アイコン(ia2-W21)の要求にも効いている。
 - 事実 5(別の試行の記録 `pm-work/findings/blocks-samples-1366.md` の 4.3): Welcome の Default の行を開いた直後に、`[err] missing-path: LoadLibraryW 126 "Python\Python312.dll"` と `[err] fle: RaiseException: exception code 0xeedfade ...` が出て、engine が exit code 134 で止まった(測定の記録)。
 
-## 前回の試行で分かったこと
+## 前回の試行で分かったこと(run 45540991873。3 回目)
+
+- 判定は差し戻し。受け入れコマンドが失敗した(判定の段で、道具の `stopped` が true、`engine` が exited。DPR 1 と 2.5 の両方)。作業は work.diff に保存された。作業者の commit(`c8000daf`・`a6f146d4` ほか)は main に無く、次の試行は、差分を main の上に取り込んで続ける。runner の値。nproc 4、loadavg 1.08〜1.96。
+- 測定(`measure.mjs --tool chord-progression`。DPR 1 と 2.25): `pythonLoaded` true、`stopped` true、`elapsedMs` 10,610 と 10,643、`preBootBytes` 312,235,140(2 回目の 312,215,074 から +20,066 B。内訳は未測定。上限 314,368,711 まで約 2.1 MB)。
+- 流れ A〜D(`welcome-flow.mjs`): 4 本とも条件を満たす。`elapsedMs` は 10,985・10,801・10,725・10,731(中央値 10,766)。
+- 単体: `npm test --prefix app` は 1,406 件が通る(10 件はスキップ)。`cargo test -p fe-build` は 22 件が通る。`guard/scan.sh`・`guard/flags.sh` は 0 件。
+- `pythonLoaded` の判定を直した。engine のログの行は `realmod: loaded python.python312.dll`(キーの接頭辞付き)なので、道具は接頭辞に依らず判定する。`LoadLibraryW` の Python の欠落は 0 件。残る 4 件の欠落(WavpackDLL など)は Python と無関係。
+- lazy の上限: bundle は `/lazy: must have <= 128 items` で落ち、134 件だった。段階 1 に要らない 6 件(`_msi.pyd`・`_wmi.pyd`・`_overlapped.pyd`・`winsound.pyd`・`_multiprocessing.pyd`・`pythonw.exe`)を、`pack.args`・seed 表・生成物の 3 箇所から外し、128 件にした。上限を上げるのは #{{171}} の作業。
+- 抽出の木が python312 の plugin の無い main の版から作られていたため、`python.python312.dll` が出力に無かった。前の試行と同じく、`host-extra/resources/Shared/Python/python312.dll`(SHA-256 `0cc4e557…`)を `lift/out-app/host/` の 2 箇所へ写して補った。`ci/` は作業者が変えない(PM が直す)。
+- 停止の場所(測定済み):
+  - 停止の番地 `0x5ee8604d8d490043`(8 バイトの load)は `R14 + 0x60`。`R14` = `0x5ee8604d8d48ffe3` は `[R13 + 0x10]` から読まれた。`R13` = `0x5df6e7` は、`R1`・`R6` とスタック上の値と同じ。
+  - `0x5df6f7` は FLEngine の `.text`(RVA `0x1df6f7`)の中。そのバイト列 `e3 ff 48 8d 4d 60 e8 5e` は命令。つまり、コードのバイト列を番地として読んでいる。
+  - `0x5df6e7` は、`f_5df610`(例外ハンドラ付き)の `call 0x411e80`(`0x5df6e2`)の戻り番地。
+  - `[R13 + 0x10]` で `R14` を読む命令は `python312.dll` に 2 箇所(RVA `0x9b79c`・`0x27ee7b`)。どちらが停止の RIP かは未確定。
+- 例外の経路(`fle: seh`。今回の記録。常に出る): Delphi の例外 `0xEEDFADE` が 2 回送出される(`f_411d20` → `RaiseException`)。1 回目は `f_5df610` 内の着地 `0x5df673`。2 回目は `0x63ae33` で受けられ、着地 `0x63ae4e`。送出と着地の計 4 つの記録の全てで、`R13 = 0x4`。
+- アンワインダは、`UWOP_PUSH_NONVOL`・`UWOP_SAVE_NONVOL`・`UWOP_SAVE_NONVOL_FAR` で保存レジスタを復元する(`lift/runtime/fle_seh.c` の `unwind_one`)。2 回目のアンワインドで `R13` の復元の記録は 0 件。つまり、途中のフレームに `R13` の保存が無く、アンワインドは `R13` を変えていない。前の読み(「復元しない」)は誤り。
+- `R13 = 0x5df6e7` が入ったのは、2 回目の着地の後(`f_63ae4e` 以降)。`f_63ae4e`・`f_41a770`・`f_411fc0`・`f_469080` に `R[13]` への代入は無い。
+- 候補(未確定): (a) 着地の時の RSP が 1 スロット(または 1 フレーム分)ずれ、後の `pop` が戻り番地 `0x5df6e7` を読んだ(PM の読み)。(b) `python312.dll` の `0x27ee20`(RVA)は `mov r13, rcx` で始まり、停止時の `R1`(rcx)も `0x5df6e7`。(b) なら、戻り番地が第 1 引数として渡されたことになる。
+- 見立て: 停止の原因は import の欠けではない。UCRT の (a)〜(h) は、この試行では実装していない。
+- 原文(比較用。3 回目の記録の抜粋。直した後も、同じ形の行を出す):
+
+```
+{"tool":"chord-progression","dpr":1,"error":null,"engine":"exited","stopped":true,"presentedDelta":0,"pythonLoaded":true,"elapsedMs":10610,"preBootBytes":312235140}
+fle: stop record: faulting address 0x5ee8604d8d490043; registers R0=0x3e1384d0 R1=0x5df6e7 R2=0xc815470 R3=0x3e1384d0 R4=0x3e1382b0 R5=0x3e138309 R6=0x5df6e7 R7=0x3e138540 R8=0 R9=0x3e1383b8 R10=0 R11=0 R12=0 R13=0x5df6e7 R14=0x5ee8604d8d48ffe3 R15=0
+fle: seh raise: code 0xeedfade, R13 0x4, R4 0x3e139ec8, the return address 0x411e4d
+fle: seh landing: target frame 0x63ae33, R13 0x4, the landing 0x63ae4e
+```
+
+## 2 回前の試行で分かったこと(run 45505988410)
+
+- 判定は差し戻し(段階 1 の受け入れは未達。`stopped` が true、`engine` が exited)。流れ A〜D と単体は通る。作業は work.diff に保存された。作業者の commit は `f8414a6b` を含む数本(作業者の環境。push していない)。runner の値。nproc 4、loadavg 1.59〜1.83。
+- 前回の差分(実装): UCRT の import を 66 件、`lift/runtime/fle_crt.c` に新設(stdio・FILE・書式付き出力・環境変数・時刻・変換・文字列・`_wstat64i32`・`localeconv`・PathCch・BCryptGenRandom・exit・abort・signal)。import の件数は、実装 262(既存 114 + ship7 の 148)・未対応 96・序数 3(合計 361)。`lift/harness/seeds/ship7-imports.txt` の末尾に 66 行を足した(既存の行の位置は変えない)。
+- `lift/harness/hyb/c-imports-engine.txt` に 115 件を足した(行のある python の import 116 件から、`WaitForSingleObjectEx` を除く)。`ReleaseSemaphore`・`_errno`・`__acrt_iob_func`・`_isatty` などを含む。この表が無いと、python の関数の多くが C に下ろされず(`not modelled`)、呼び出しが素通りする。
+- `Shared\Python\` の 35 件を lazy に(`lift/harness/seeds/vfs-seed-idle1.tsv` と `lift/harness/web/pack.args`)。`python312.dll` は plugin の行が配る。`Shared\Python\python.exe` は `guard/scan.sh` の python の規則に掛かるので、外した。
+- 止まり方の変化: 前回の `__stdio_common_vswprintf` の未実装は直った。今回は `fle_addr_fault`(`lift/runtime/fle_host.c`)で止まる。値 `0x5ee8604d8d490043` を番地として読んでいる。DPR 1 と DPR 2.55 の 2 点とも同じ値。直前は `realmod: loaded python312.dll`(`LoadLibraryW` の成功。`pythonLoaded` true)。止まる直前は `Python\Python312.dll` の探索の後で、ファイルは開かれていない。RIP は未特定。
+- 道具の値(最後の build。`measure.mjs --tool chord-progression`): DPR 1 は `elapsedMs` 11,198・`preBootBytes` 312,215,074・`stopped` true。DPR 2.55 は `elapsedMs` 11,399・`preBootBytes` 312,215,074・`stopped` true。
+- 流れ A〜D(同じ build。`welcome-flow.mjs`): 4 本とも `engine-idle`・`standIn` false・`trapped` false・`hostErrors` 0・`opened` true、B と D は `welcomeClosed` true。`elapsedMs` は 11,265・11,544・11,202・11,211(中央値 11,238。上限 12,500)。
+- `preBootBytes`: 直す前 311,109,738 → 前回の差分 313,128,824 → 今回 312,215,074(直す前より +1,105,336 B。増えた内訳は未測定。上限 314,368,711 に対し、残り約 2.1 MB)。
+- 値の解釈(未確定): `0x5ee8604d8d490043` は、`EncodePointer` の符号化の形ではない(`DecodePointer` で復号しても小さなポインタにならない)。BCryptGenRandom の出力の列にも現れない。未設定の TLS スロットの読み(`TlsGetValue`)も、原因ではなさそう。
+- 値のバイト列は、命令のバイト列に似る。メモリの並び(リトルエンディアン)では `43 00 49 8d 4d 60 e8 5e` で、`49 8d 4d 60` は `lea rcx,[r13+0x60]` の符号化に読める。PM の見立て: コードのバイト列を番地として読んでいる(やること 8)。
+- 単体: `npm test --prefix app` 1,401 件、`cargo test -p fe-build` 20 件が通る。`guard/flags.sh` が、`fle_imp_getenv`・`fle_imp__wgetenv` の名前を、`getenv(` の規則で新しい旗として検出したため、`fle_imp_crt_env_lookup`・`fle_imp_crt_wenv_lookup` に改名した。
+- このジョブの抽出キャッシュは `python312` の plugin.tsv より前の鍵で作られ、`lift/out-app/host/lift/out-plugins/python312.dll` と `lift/out-app/host/lift/out-idle1/inputs/install/Shared/python312.dll` が無かった。作業者は `host-extra/resources/Shared/Python/python312.dll`(SHA-256 `0cc4e557…`)を写して補った(`lift/out-app/` は commit されない)。次の試行でも同じ前提が要る。
+- 未測定: ia2-W21(チャンネルラックの設定アイコン)。`fle_ia2_path_absent` の choice は外したまま。
+
+## その前の試行で分かったこと
 
 2 回の試行の結果。作業は、どちらも work.diff に保存されている。commit は、この main に無い(1 回目の作業は main の 05577cf9 に道具と記録だけが入っている)。次の試行は、差分を main の上に取り込んで続ける。
 
@@ -71,29 +115,30 @@ project: signature-studio/3
 
 - ラベル `resources` の extract が、`ci/resources-prefixes.txt` の接頭辞で取り出し、作業ツリーの `lift/out-app/host-extra/resources/` に置く(`Shared\Python\` 37 件を含む)。
 - 受け入れの先頭で `mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/` を行い、ビルドの入力の場所へ写す(`fe-build bundle` の `pack-seed.mjs` は `lift/out-app/host/resources/` を読む)。
-- 起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)に行が無い物は、VFS に載らない。足りない実物の行は、作業者が seed 表に足してよい。host の欄を `@lazy-file:` で始めると、起動の後に取る(#{{105}} の方式)。段階 1 の lazy は、今の 75 件に `Shared\Python\` の 37 件を足して 112 件で、上限 128 以内。`System\Tools\Chord progression\` の 59 件は段階 2 で扱い、上限を超えるなら報告に書いて終える。
+- 起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)に行が無い物は、VFS に載らない。足りない実物の行は、作業者が seed 表に足してよい。host の欄を `@lazy-file:` で始めると、起動の後に取る(#{{105}} の方式)。段階 1 の lazy は 128 件(上限ちょうど。3 回目の試行で、段階 1 に要らない 6 件を外した)。`System\Tools\Chord progression\` の 59 件は段階 2 で扱い、上限を超えるなら報告に書いて終える。
 
 ## やること(段階 1)
 
-0. **済み(前回の差分)**: 道具 `tools/piano-roll-tools/measure.mjs` の `pythonLoaded`。engine のログの `realmod: loaded python312.dll` の行から取る。動作は変えない。`notes` は段階 2 で数える(段階 1 では null)。
-1. **済み(前回の差分)**: real module。`Shared\Python\python312.dll` を、#{{125}} の仕組み(`lift/plugins/python312/plugin.tsv`)で取り出し、lift する。前回の試行で、DllMain に入り、`LoadLibraryW` が成功することを確かめた。
-2. **UCRT の import を実装する(依頼者の決定)**: 未対応の 162 件から、Python の起動に要る物を、次の順で実装する。
-   - (a) 書式と stdio: `__stdio_common_vswprintf`・`__stdio_common_vfprintf`・`__stdio_common_vsscanf`・`_wfopen` など。書式は UCRT と同じ解釈にする(`%s`・`%ls`・`%d`・`%lld`・`%f`・`%g`・`%p`・`%x`・幅・精度・`%%`)。
-   - (b) ファイルと fd: `_get_osfhandle`・`_open_osfhandle`・`_wstat64` など。VFS の上の FILE・fd の model で作る。
-   - (c) 時刻: `_time64`・`localtime_s` など。
-   - (d) ロケール: `setlocale` など。
-   - (e) ヒープ: `malloc`・`free`・`realloc` など。
-   - (f) 変換: `strtod`・`_wcstod` など。
-   - (g) 環境: `getenv`・`_wgetenv`・`_putenv` など。
-   - (h) 終了: `exit`・`abort`・`_exit` など。
-   - 実装の場所は `lift/runtime/`(`fle_crt.c` は前回の差分に在る。これを足す)。依頼者の記録が挙げた `vst_crt.c` は、この main に無い(前回の試行で確かめた)。外部プラグインの作業の CRT が main に入ったら、そちらと共有する。入るまでは `fle_crt.c` に足す。
-   - Vital の作業(#{{029}})が同じ領域を変える。衝突は、両方を残す形で解く。
-   - 未対応の物は、呼ばれた時に止める(既存の方式)。stub を作らない。
-   - 実装の範囲と件数(実装・未対応)を、`pm-work/findings/python312-imports.md` に反映する。
-3. **名前の解決**: `LoadLibraryW "Python\Python312.dll"` が、`fle_realmod_find_path`(`lift/runtime/fle_realmod.c`)で real module の `python312.dll` を見つける(前回の試行で動いた。`plugin.tsv` の `guest` の値で通る)。
-4. **起動の後の取得**: Python の DLL と標準ライブラリは、起動の後に取る(`@lazy-file:`)。前回の試行で `preBootBytes` が +2,019,086 B 増えた。増えた内訳を測り、起動の前に取っている物を、起動の後の取得に移す(lazy の上限 128 以内)。`preBootBytes` を増やさないこと。
-5. **`fle_ia2_path_absent`(`Python\Python312.dll` を「見つからない」と答える choice)**: 前回の差分では外してある。ia2-W21(チャンネルラックの設定アイコン)の動作の変化は、未測定。測ってから、戻すか外したままにするかを決める。オプトインは作らない。報告に書く。
-6. **測る**: 道具で、DPR 1 と乱数の DPR(1.01〜3.00)の 2 点。直す前と後の JSON の行を報告に書く。
+3 回目の試行の後の順序(PM の決定)。①〜⑤を先に行い、残りは後ろの「持ち越し」に回す。
+
+1. ①(実測で確かめる): 着地ごとに、着地の直前と直後の RSP、ハンドラを持つ関数の、その `call` の時点の RSP(入口の RSP から、プロローグの `sub rsp`・`push` の量で求める)を、`fle: seh landing` の行に足す(常に出る。環境変数・`#ifdef` は作らない)。`0x27ee20` の入口で `R1`(rcx)と戻り番地を記録し、(b) を確かめる。結果で、(a)(b) のどちらかに決める。
+2. ②(直す): (a) なら、着地の RSP を UNWIND_INFO の規則で求め直す(x64 の規則: 着地の RSP は、ハンドラを持つ関数の `call` の時点の値)。(b) なら、`R13` を書いた呼び出し元を、①の記録で特定して直す。直す前に、①で見つかったずれを再現する試験を `cargo test -p fe-lift --test seh_rt` に先に足し、red を確かめる。保存レジスタの復元だけの試験は、今の `fle_seh.c`(保存レジスタを復元する)で通るので、red にならない。この直しは、全ての Delphi の例外の着地に効く(#{{166}} の RaiseException も同じ経路)。
+3. ③(lazy): 128 件のまま。外した 6 件は戻さない。上限は #{{171}} が上げる。6 件を戻すのは段階 2。
+4. ④(測る): `preBootBytes` は 314,368,711 以下(今 312,235,140)、`elapsedMs` は 12,500 以下(今 10,610〜10,985)、流れ A〜D を保つ。直す前と後の道具の JSON の行を報告に書く。
+5. ⑤(受け入れ): 受け入れは元のまま(下の「受け入れ」)。
+
+持ち越し(①〜⑤の後。前の試行からの項目):
+- UCRT の import(未対応は 2 回目の試行で 96 件。3 回目では数えていない)。依頼者の決定どおり、次の順で実装する。
+  - (a) 書式と stdio: `__stdio_common_vswprintf`・`__stdio_common_vfprintf`・`__stdio_common_vsscanf`・`_wfopen` など。書式は UCRT と同じ解釈にする(`%s`・`%ls`・`%d`・`%lld`・`%f`・`%g`・`%p`・`%x`・幅・精度・`%%`)。
+  - (b) ファイルと fd: `_get_osfhandle`・`_open_osfhandle`・`_wstat64` など。VFS の上の FILE・fd の model で作る。
+  - (c) 時刻: `_time64`・`localtime_s` など。(d) ロケール: `setlocale` など。(e) ヒープ: `malloc`・`free`・`realloc` など。
+  - (f) 変換: `strtod`・`_wcstod` など。(g) 環境: `getenv`・`_wgetenv`・`_putenv` など。(h) 終了: `exit`・`abort`・`_exit` など。
+  - 実装の場所は `lift/runtime/fle_crt.c`(前回の差分に在る)。依頼者の記録が挙げた `vst_crt.c` は、この main に無い。Vital の作業(#{{029}})が同じ領域を変える。衝突は、両方を残す形で解く。
+  - 未対応の物は、呼ばれた時に止める(既存の方式)。stub を作らない。実装の範囲と件数を、`pm-work/findings/python312-imports.md` に反映する。
+- `fle_ia2_path_absent`(`Python\Python312.dll` を「見つからない」と答える choice)は、前の差分で外してある。ia2-W21 は未測定。測ってから、戻すか外したままにするかを決める。オプトインは作らない。
+- 停止の RIP: `python312.dll` の 2 箇所(RVA `0x9b79c`・`0x27ee7b`)のどちらかを、①の記録で確かめる。
+- 停止の記録(`fle: stop record`)と SEH の記録(`fle: seh`)は消さない。常に出す(環境変数・`#ifdef` を足さない)。#{{154}} の作業者も同じ診断を入れる。両方の差分が衝突したら、両方を残す。
+- 名前の解決(`fle_realmod_find_path`)と、起動の後の取得(`@lazy-file:`)は、前の試行で動いた。
 
 ## 受け入れ
 
@@ -122,6 +167,8 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 - OCR を使わない。FL の画面の文字は、ゲストのメモリの走査か、エンジンの記録で読む。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。この機械で製品のビルドや測定をしない。
+- 禁止されているのは、AI のベンダー名と Cloudflare の識別子だけ。FL の製品名・インストール先の名前・変数名は、書いてよい。
+- 名前の扱い(依頼者の訂正): ファイルに書いてはならないのは、AI のベンダー名と、Cloudflare の識別子だけ(`guard/scan.sh` が検査する)。FL の製品名(FL Studio など)・`Image-Line` のインストール先の名前・`%FLStudioFactoryData%` などの変数名は、書いてよい。
 
 ## 作業の進め方
 

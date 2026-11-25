@@ -12,6 +12,7 @@
 #include "fle_runtime.h"
 #include "fle_imports.h"
 #include "fle_reg.h"
+#include "fle_callback.h"
 
 /* weak: a link without fle_win.c (the unit tests of this file) has no window-API trace (fle_win.c) */
 int fle_win_api_trace_on(void) __attribute__((weak));
@@ -114,13 +115,15 @@ static reg_value *val_find(const reg_key *k, const uint16_t *n, size_t nl)
 
 static void trace_path(const reg_key *k);
 static void trace_set(const reg_key *k, const reg_value *v);
+static void trace_put_units(const uint16_t *s, size_t n, size_t max);
 
 /* ---- persistence (Issue #1383) ----
  * The HKCU tree is kept by the page (app/src/engine/regstore.ts). After each change under HKCU, reg_journal hands one record to the page (fle_reg_page_put, a
  * synchronous import: the page appends it to its saved log and flushes it before the guest goes on). Before the guest runs, the saved records are read back and
  * replayed after the seed values (fle_reg_restore_saved), so a saved value replaces the seed's. Nothing is recorded before the replay (the seed is not recorded).
  * A record (little endian): u8 op | u32 k | k bytes (the key's path below HKCU, UTF-16LE, no leading backslash) | u32 n | n bytes (the value name, UTF-16LE) |
- * u32 type | u32 d | d bytes (the data: only for op 2). op 1: the key exists; op 2: the value is set; op 3: the value is deleted; op 4: the key and all under it are deleted. */
+ * u32 type | u32 d | d bytes (the data: only for op 2). op 1: the key exists; op 2: the value is set; op 3: the value is deleted; op 4: the key and all under it are deleted.
+ * The user's files (Issue #1385) use the same record with a path for the key: op 5 the file's content (d bytes), op 6 the file or directory tree is gone, op 7 the directory is made. */
 #define REG_OP_KEY 1u
 #define REG_OP_VALUE 2u
 #define REG_OP_DEL_VALUE 3u
@@ -140,6 +143,39 @@ static void put_unit(uint8_t *b, size_t *at, uint16_t u)
     b[(*at)++] = (uint8_t)u;
     b[(*at)++] = (uint8_t)(u >> 8);
 }
+
+/* Issue #1385: the user's files (fle_vfs.c "the user's files") use the same journal and the same format. The key is the path (C:\...), the name is empty, the type is 0.
+ * op 5: the file's content is put (the data); op 6: the file or the directory tree at the path is gone; op 7: the directory is made. */
+#define REG_OP_FILE_PUT 5u
+#define REG_OP_FILE_DEL 6u
+#define REG_OP_DIR_MAKE 7u
+
+static void file_record(uint8_t op, const uint16_t *w, size_t n, const uint8_t *data, uint64_t size)
+{
+    size_t total, at = 0, j;
+    uint8_t *b;
+
+    if (!reg_journal_on || !fle_reg_page_put) return;
+    total = 1 + 4 + 2 * n + 4 + 4 + 4 + (op == REG_OP_FILE_PUT ? size : 0);
+    b = malloc(total);
+    if (!b) fle_stop("files", "out of memory");
+    b[at++] = op;
+    put_u32(b, &at, (uint32_t)(2 * n));
+    for (j = 0; j < n; j++) put_unit(b, &at, w[j]);
+    put_u32(b, &at, 0);
+    put_u32(b, &at, 0);
+    put_u32(b, &at, op == REG_OP_FILE_PUT ? (uint32_t)size : 0);
+    if (op == REG_OP_FILE_PUT && size) {
+        memcpy(b + at, data, (size_t)size);
+        at += (size_t)size;
+    }
+    fle_reg_page_put(b, (uint32_t)total);
+    free(b);
+}
+
+void fle_kept_file_put(const uint16_t *w, size_t n, const uint8_t *data, uint64_t size) { file_record(REG_OP_FILE_PUT, w, n, data, size); }
+void fle_kept_file_del(const uint16_t *w, size_t n) { file_record(REG_OP_FILE_DEL, w, n, NULL, 0); }
+void fle_kept_dir_make(const uint16_t *w, size_t n) { file_record(REG_OP_DIR_MAKE, w, n, NULL, 0); }
 
 static void reg_journal(uint8_t op, const reg_key *k, const uint16_t *name, size_t nl, uint32_t type, const uint8_t *data, uint32_t size)
 {
@@ -267,17 +303,16 @@ static uint32_t check_sam(const char *api, uint32_t sam)
     return sam;
 }
 
-/* Splits a subkey path at backslashes. Empty components (leading, trailing or doubled backslashes) and
- * components over 255 characters are not defined by the pages and stop the run. With allow_empty (decision 0099: RegOpenKeyEx only) an
- * empty component is recorded with length 0 instead of stopping here, so that the caller walks the components in order and stops only if
- * the walk reaches it (a missing key before it ends the walk first: ERROR_FILE_NOT_FOUND). */
+/* Splits a subkey path at backslashes into kp (pointers into s). A component over 255 characters, or more components than max_levels,
+ * stops the run (the pages name these limits). An empty component (leading, trailing or doubled backslash) has length 0: each caller
+ * answers it (see the empty-component rule above open_common). The array holds TREE_DEPTH_MAX components: RegOpenKeyEx allows that many. */
 typedef struct {
-    const uint16_t *p[CREATE_LEVELS_MAX + 1];
-    size_t l[CREATE_LEVELS_MAX + 1];
+    const uint16_t *p[TREE_DEPTH_MAX + 1];
+    size_t l[TREE_DEPTH_MAX + 1];
     size_t n;
 } kpath;
 
-static void split_key(const char *api, const uint16_t *s, size_t len, kpath *kp, size_t max_levels, int allow_empty)
+static void split_key(const char *api, const uint16_t *s, size_t len, kpath *kp, size_t max_levels)
 {
     size_t i = 0;
     kp->n = 0;
@@ -285,7 +320,6 @@ static void split_key(const char *api, const uint16_t *s, size_t len, kpath *kp,
     for (;;) {
         size_t j = i;
         while (j < len && s[j] != '\\') j++;
-        if (j == i && !allow_empty) fle_stop(api, "an empty component (leading, trailing or doubled backslash) in a key path");
         if (j - i > KEY_NAME_MAX) fle_stop(api, "key name component longer than 255 characters");
         if (kp->n >= max_levels) fle_stop(api, "key path has more levels than the page allows per call");
         kp->p[kp->n] = s + i;
@@ -300,6 +334,69 @@ static uint32_t ret(uint32_t code)
 {
     R[0] = code;
     return code;
+}
+
+/* ---- empty components of a key path ----
+ * The Microsoft pages do not say what the calls answer for a key path with an empty component (leading, trailing or doubled
+ * backslash). The values here are Wine's, from dlls/advapi32/tests/registry.c (test_reg_open_key, test_reg_create_key; the Wine
+ * tests state the Windows answers, and only the wow64 variant of the leading case is marked broken):
+ *   - a leading backslash: ERROR_BAD_PATHNAME (161) for RegOpenKeyEx and RegCreateKeyEx, before any key is looked at;
+ *   - trailing backslashes: the key before them is opened or created (ERROR_SUCCESS): they are dropped (RegOpenKeyEx,
+ *     RegCreateKeyEx; decision 0126 had dropped one, wall 73);
+ *   - a doubled backslash in the middle: on no page and in no test. The walk answers 161 where it reaches the empty component,
+ *     after the keys before it exist (a missing key before it ends the walk with 2, as for any path). RegCreateKeyExW checks the
+ *     whole path first, so it creates nothing when there is an empty component (a choice). RegDeleteKeyW answers 161 for an empty
+ *     component at any place (inference: its last component would be empty; no page or test shows it).
+ * Each call that sees such a path writes one warning line to stderr (warn_empty_component), once per path. */
+
+static int has_empty_component(const uint16_t *s, size_t n)
+{
+    size_t i;
+    if (n == 0) return 0;
+    if (s[0] == '\\' || s[n - 1] == '\\') return 1;
+    for (i = 1; i < n; i++)
+        if (s[i] == '\\' && s[i - 1] == '\\') return 1;
+    return 0;
+}
+
+static void drop_trailing_separators(const uint16_t *s, size_t *n)
+{
+    while (*n && s[*n - 1] == '\\') (*n)--;
+}
+
+typedef struct {
+    uint16_t *s;
+    size_t n;
+} warned_path;
+static warned_path *warned;
+static size_t nwarned, cwarned;
+
+/* The one warning line of a path with an empty component: the API, the path (its first 120 characters, as the window-API trace
+ * writes them) and the guest return address at [rsp] of the call. A return address of FLE_CB_RETURN_ADDRESS is a call from the
+ * runtime (fle_call_guest), so the caller is named instead. The paths are compared without case, as the key names are. */
+static void warn_empty_component(const char *api, const uint16_t *s, size_t n)
+{
+    uint64_t ra;
+    size_t i;
+
+    if (!has_empty_component(s, n)) return;
+    for (i = 0; i < nwarned; i++)
+        if (fle_w_icmp(warned[i].s, warned[i].n, s, n) == 0) return;
+    if (nwarned == cwarned) {
+        size_t nc = cwarned ? cwarned * 2 : 16;
+        warned_path *nw = realloc(warned, nc * sizeof *nw);
+        if (!nw) fle_stop("registry", "out of memory");
+        warned = nw;
+        cwarned = nc;
+    }
+    warned[nwarned].s = dup_w(s, n);
+    warned[nwarned].n = n;
+    nwarned++;
+    ra = fle_ld(R[4], 8);
+    fprintf(stderr, "fle: warn: %s: empty component in \"", api);
+    trace_put_units(s, n, 120u);
+    if (ra == FLE_CB_RETURN_ADDRESS) fprintf(stderr, "\" (caller: fle_call_guest)\n");
+    else fprintf(stderr, "\" (caller 0x%llx)\n", (unsigned long long)ra);
 }
 
 /* ---- open ---- */
@@ -326,7 +423,13 @@ static void open_common(const char *api, uint64_t hkey, const uint16_t *sub, siz
         return;
     }
     is_pre = predefined(hkey) != NULL;
-    split_key(api, sub, sublen, &kp, 512, 1);
+    warn_empty_component(api, sub, sublen);
+    if (sublen && sub[0] == '\\') {
+        ret(FLE_W32_ERR_BAD_PATHNAME);
+        return;
+    }
+    drop_trailing_separators(sub, &sublen);
+    split_key(api, sub, sublen, &kp, 512);
     if (kp.n == 0 && is_pre) {
         /* Page: a NULL or empty subkey with a predefined key returns the same handle. */
         fle_st(pout, 8, hkey);
@@ -335,10 +438,11 @@ static void open_common(const char *api, uint64_t hkey, const uint16_t *sub, siz
     }
     cur = base;
     for (i = 0; i < kp.n; i++) {
-        /* Decision 0099 (provisional): the walk is in path order; an empty component is reached only when every key before it exists. What
-         * Windows does there is on no page (Learn does not say; a Microsoft blog says a doubled backslash is not legal), so it stops. */
-        if (kp.l[i] == 0)
-            fle_stop(api, "an empty component (leading, trailing or doubled backslash) in a key path, reached after the keys before it exist");
+        /* Walk in path order (the empty-component rule above open_common): a doubled backslash is answered where the walk reaches it. */
+        if (kp.l[i] == 0) {
+            ret(FLE_W32_ERR_BAD_PATHNAME);
+            return;
+        }
         cur = kid_find(cur, kp.p[i], kp.l[i]);
         if (!cur) {
             ret(FLE_W32_ERR_FILE_NOT_FOUND);
@@ -352,7 +456,8 @@ static void open_common(const char *api, uint64_t hkey, const uint16_t *sub, siz
 /* advapi32!RegOpenKeyExW (MSDN: RegOpenKeyExW). hKey rcx, lpSubKey rdx (optional), ulOptions r8d, samDesired
  * r9d, phkResult [5]. Key names are not case sensitive (page). A NULL or empty subkey with a predefined key
  * returns the same handle (page); with another key it returns a new handle to that key (page: "a new handle").
- * A missing key returns ERROR_FILE_NOT_FOUND (2) (page example). An invalid hKey returns 6 (inference). */
+ * A missing key returns ERROR_FILE_NOT_FOUND (2) (page example). An invalid hKey returns 6 (inference). An empty component of
+ * the path is answered as the rule above open_common says (161 for a leading backslash; trailing ones are dropped). */
 void fle_imp_RegOpenKeyExW(void)
 {
     static const char api[] = "RegOpenKeyExW";
@@ -456,12 +561,24 @@ void fle_imp_RegCreateKeyExW(void)
         ret(FLE_W32_ERR_INVALID_HANDLE);
         return;
     }
-    /* Decision 0126 (PROVISIONAL), wall 73 (S-regcreate-trailing-backslash): the guest creates "Software\Image-Line\Shared\" (a path that ends with ONE backslash: its Delphi code builds the key as a base path plus a "\" and the
-     * name that follows, and the name is empty here). The pages of RegCreateKeyExW say "creates all missing keys in the specified path" and "If lpSubKey is a pointer to an empty string, phkResult receives a new handle to
-     * the key specified by hKey" and say nothing of a backslash at the end of the path. A CHOICE WITHOUT A SOURCE: one trailing backslash is dropped (the key is the one the path names without it); a leading or a doubled
-     * backslash, and a path that is only a backslash, still stop. */
-    if (len >= 2 && s[len - 1] == '\\' && s[len - 2] != '\\') len--;
-    split_key(api, s, len, &kp, CREATE_LEVELS_MAX, 0);
+    /* Decision 0126 (PROVISIONAL), wall 73 (S-regcreate-trailing-backslash): the guest creates "Software\Image-Line\Shared\" (a path that ends with a backslash: its Delphi code builds the key as a base path plus a "\" and the
+     * name that follows, and the name is empty here). The pages of RegCreateKeyExW say nothing of a backslash at the end of the path; Wine's test creates "Subkey4\\" and gets ERROR_SUCCESS (the empty-component rule above
+     * open_common). The trailing backslashes are dropped; a leading backslash answers 161; a doubled one in the middle answers 161 before any key is created. */
+    warn_empty_component(api, s, len);
+    if (len && s[0] == '\\') {
+        free(s);
+        ret(FLE_W32_ERR_BAD_PATHNAME);
+        return;
+    }
+    drop_trailing_separators(s, &len);
+    split_key(api, s, len, &kp, CREATE_LEVELS_MAX);
+    for (i = 0; i < kp.n; i++) {
+        if (kp.l[i] == 0) {
+            free(s);
+            ret(FLE_W32_ERR_BAD_PATHNAME);
+            return;
+        }
+    }
     cur = base;
     for (i = 0; i < kp.n; i++) {
         reg_key *k = kid_find(cur, kp.p[i], kp.l[i]);
@@ -924,7 +1041,8 @@ static void key_free(reg_key *k)
  * (NULL stops, page: cannot be NULL; an empty string stops, the page does not define it). The key must exist
  * (2: inference) and have no subkeys: the page says it cannot, without a code, so ERROR_ACCESS_DENIED (5) is
  * an inference. The page says a deleted key goes away only when its last handle closes: deleting a key that
- * has an open handle is not implemented and stops. The path may have several components. */
+ * has an open handle is not implemented and stops. The path may have several components. An empty component
+ * is answered 161 where the walk reaches it (the empty-component rule above open_common). */
 void fle_imp_RegDeleteKeyW(void)
 {
     static const char api[] = "RegDeleteKeyW";
@@ -943,9 +1061,17 @@ void fle_imp_RegDeleteKeyW(void)
         ret(FLE_W32_ERR_INVALID_HANDLE);
         return;
     }
-    split_key(api, s, len, &kp, 512, 0);
+    warn_empty_component(api, s, len);
+    split_key(api, s, len, &kp, 512);
     cur = base;
-    for (i = 0; i < kp.n && cur; i++) cur = kid_find(cur, kp.p[i], kp.l[i]);
+    for (i = 0; i < kp.n && cur; i++) {
+        if (kp.l[i] == 0) {
+            free(s);
+            ret(FLE_W32_ERR_BAD_PATHNAME);
+            return;
+        }
+        cur = kid_find(cur, kp.p[i], kp.l[i]);
+    }
     free(s);
     if (!cur) {
         ret(FLE_W32_ERR_FILE_NOT_FOUND);
@@ -1045,9 +1171,27 @@ static void restore_records(const uint8_t *buf, size_t n)
         dp = buf + p;
         p += dl;
         at = p;
-        if (op < REG_OP_KEY || op > REG_OP_DEL_KEY) break;
+        if (op < REG_OP_KEY || op > REG_OP_DIR_MAKE) break;
         ks = units_of(kp, kl);
         ns = units_of(np, nl);
+        if (op >= REG_OP_FILE_PUT) {
+            if (op == REG_OP_FILE_PUT) {
+                uint8_t *copy = NULL;
+                if (dl) {
+                    copy = malloc(dl);
+                    if (!copy) fle_stop("files", "out of memory");
+                    memcpy(copy, dp, dl);
+                }
+                fle_vfs_restore_put(ks, kl / 2, copy, dl);
+            } else if (op == REG_OP_FILE_DEL) {
+                fle_vfs_restore_drop(ks, kl / 2);
+            } else {
+                fle_vfs_restore_mkdir(ks, kl / 2);
+            }
+            free(ks);
+            free(ns);
+            continue;
+        }
         k = path_key(ks, kl / 2, op == REG_OP_KEY || op == REG_OP_VALUE);
         if (k && op == REG_OP_VALUE) {
             uint8_t *copy = NULL;

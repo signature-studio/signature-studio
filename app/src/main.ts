@@ -133,6 +133,8 @@ interface AppApi {
   /** decision 0272: the restore button of a minimized window (the Worker reports the window; a build without the engine's taskbar entry never does) */
   taskbar: TaskbarRestore;
   stop(): void;
+  /** Issue #1385: the engine is asked to close the FL main window now (the page's pagehide does this too; a test aid calls it to time the exit) */
+  exitRequest(): void;
   /** the measurement beacon (decision 0152): what the page measures about its own speed and sends to POST /__perf of this origin */
   perf: {
     recorder: PerfRecorder;
@@ -209,8 +211,12 @@ const app: AppApi = {
   pageTitle: () => deskTitle(baseTitle),
   whenExited: () => client.whenExited(),
   stop: () => { endRequested = true; client.stop(); },
+  exitRequest: () => client.exitRequest(),
 };
 window.__app = app;
+// Issue #1385: a page that is left (a reload, a close) asks FL to close, so that the files FL keeps open (a saved project) are closed and kept. pagehide only: visibilitychange also fires when the
+// person switches to another tab, and FL must not close then.
+window.addEventListener('pagehide', () => client.exitRequest());
 
 // decision 0223: the title of the foreground window as the Worker reported it (the page knows no window); the page's own title until there is one
 let osTitle = '';

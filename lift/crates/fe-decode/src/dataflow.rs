@@ -80,6 +80,17 @@ pub struct Record {
 
 thread_local! {
     static LOG: RefCell<Vec<Record>> = const { RefCell::new(Vec::new()) };
+    /// Issue #1391: set by `with_writable_reads` (the discovery of the functions that a writable slot names).
+    static WRITABLE_READS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Runs `f` with the file content of the writable sections taken as constants, as before Issue #1391. Only the discovery of the functions
+/// uses it: a call through a writable slot is not emitted as a direct call (`read8`), but its target is still a function of the closure.
+pub fn with_writable_reads<T>(f: impl FnOnce() -> T) -> T {
+    let old = WRITABLE_READS.with(|c| c.replace(true));
+    let out = f();
+    WRITABLE_READS.with(|c| c.set(old));
+    out
 }
 
 /// Returns and clears the records made on this thread since the last call.
@@ -176,8 +187,13 @@ fn entry_env() -> Env {
     e
 }
 
-fn read8(pe: &Pe, va: u64) -> Option<u64> {
+/// The 8 bytes at `va` as the file has them. Issue #1391: a writable section changes while the program runs (a slot that the image
+/// fills with a GetProcAddress answer, whose file content is its first value, the wrapper's own entry), so its file content is not a constant: None.
+pub fn read8(pe: &Pe, va: u64) -> Option<u64> {
     let rva = pe.va_to_rva(va).ok()?;
+    if !WRITABLE_READS.with(|c| c.get()) && pe.sections.iter().any(|s| s.is_writable() && s.contains_rva(rva)) {
+        return None;
+    }
     let b = pe.slice_at_rva(rva, 8).ok()?;
     let mut a = [0u8; 8];
     a.copy_from_slice(b);
@@ -511,8 +527,10 @@ pub fn resolve(
     i: &Instruction,
 ) -> Verdict {
     let v = decide(pe, text, imports, leaders, block, va, i);
-    LOG.with(|l| {
-        l.borrow_mut().push(Record { block, va, is_call: i.flow_control() == FlowControl::IndirectCall, verdict: v.clone() })
-    });
+    if !WRITABLE_READS.with(|c| c.get()) {
+        LOG.with(|l| {
+            l.borrow_mut().push(Record { block, va, is_call: i.flow_control() == FlowControl::IndirectCall, verdict: v.clone() })
+        });
+    }
     v
 }

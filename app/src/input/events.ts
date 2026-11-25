@@ -2,7 +2,7 @@
 // the hit test, WM_NCHITTEST, WM_SETCURSOR, WM_MOUSEACTIVATE and WM_MOUSEMOVE / WM_*BUTTON* / WM_KEY* when the owning thread retrieves it).
 export const IN = { MOVE: 1, BDOWN: 2, BUP: 3, WHEEL: 4, KDOWN: 5, KUP: 6, DISPLAY: 7, SYSCMD: 8 } as const;
 /** the system commands the page may send (Learn WM_SYSCOMMAND; lift/runtime/fle_input.h fle_input_host_syscommand accepts SC_MINIMIZE 0xF020, SC_MAXIMIZE 0xF030, SC_CLOSE 0xF060 and SC_RESTORE 0xF120) */
-export const SC = { RESTORE: 0xf120 } as const;
+export const SC = { CLOSE: 0xf060, RESTORE: 0xf120 } as const;
 /** FLE_IN_BTN_L / R / M: note that the DOM numbers its buttons 0 = left, 1 = MIDDLE, 2 = right and its `buttons` mask 1 = left, 2 = RIGHT, 4 = MIDDLE */
 export const BTN = { L: 0, R: 1, M: 2 } as const;
 

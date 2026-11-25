@@ -46,6 +46,8 @@ export type ToWorker =
   | { cmd: 'webview2-message'; json: string }
   /** #1389: the page's answer to a clipboard-read request (the operating system's text, or null when the page could not read it) */
   | { cmd: 'clipboard-text'; id: number; text: string | null }
+  /** Issue #1385: the page is left (pagehide): the engine asks the FL main window to close, so FL closes the files it keeps open (the Worker's onExitRequest) */
+  | { cmd: 'exit-request' }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */

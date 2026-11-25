@@ -846,7 +846,7 @@ ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落�
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' --arg sm "$SMOKE" 'def e2e: ((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-")); def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not) | select(e2e | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
 ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
@@ -969,7 +969,7 @@ ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段に if・env・uses・continue-on-error が無い(既定の success()。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
 RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | .run] | .[0] // ""' "$DJ")
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
-ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' 'def e2e: ((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-")); def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not) | select(e2e | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "fe-build upload は門を読まない(main.rs に、門の語 verified・gated と、root の一覧の読みが無い)" "$(grep -ciE 'verified|root[.]txt|gated' "$top/lift/crates/fe-build/src/main.rs")" 0
 OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
@@ -1018,7 +1018,7 @@ ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build 
 BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
 BCM=$T/bc-m.json; BCQ=$T/bc-s.bin
 sf() { printf 'FLSEEDP1....{"version":1,"files":[%s]}' "$(printf '{"path":"seed/resources/%s"},' "$@" | sed 's/,$//')"; }
-printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"},{"name":"serum2.wasm","path":"plugins/serum2.wasm"}]}' > "$BCM"
+printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"},{"name":"serum2.wasm","path":"plugins/serum2.wasm"},{"name":"vital.wasm","path":"plugins/vital.wasm"}]}' > "$BCM"
 sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$BCQ"
 bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)と任意の 3 つめ(pack.args の代わり)。一時の木で bundle の中身の段を走らせ、終了コードを出す
   rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed" "$T/bc/lift/harness/web"
@@ -1165,21 +1165,24 @@ ok "本番(v): bundle の計画は、OTT の wasm の作る段(build.sh ott)を 
 SERP=$(grep -n 'plugin-worker/build.sh serum2' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
 ok "本番(v): bundle の計画は、Serum 2 の wasm の作る段(build.sh serum2)を pack-assets より前に持つ" "$([ -n "$SERP" ] && [ -n "$PKP" ] && [ "$SERP" -lt "$PKP" ] && echo yes)" yes
 ok "本番(v): OTT の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/ott/vst-ext.wasm)と同じ名前" "$(grep -qF '"$OUT/vst-ext.wasm"' "$top/lift/harness/web/mt1/plugin-worker/build.sh" && grep -qF 'lift/out-app/plugins/ott/vst-ext.wasm' "$PA" && echo yes)" yes
+VITP=$(grep -n 'plugin-worker/build.sh vital' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
+ok "本番(v): bundle の計画は、Vital の wasm の作る段(build.sh vital)を pack-assets より前に持つ" "$([ -n "$VITP" ] && [ -n "$PKP" ] && [ "$VITP" -lt "$PKP" ] && echo yes)" yes
+ok "本番(v): Vital の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/vital/vst-ext.wasm)と同じ名前" "$(grep -qF 'lift/out-app/plugins/vital/vst-ext.wasm' "$PA" && echo yes)" yes
 ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
 ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
 ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
-ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
-ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott・serum2 の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 4 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): 外部のインストーラが無い時の計画は、build.sh(ott・serum2・vital)の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh(ott・serum2・vital)の行を除き、段数を 2 にし、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: [0-9]* /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 # (w) 版ごとの関数名の表(#1404: 実機の wasm の trap の関数を、番号から名前に引くため)。deploy は、fe-build engine が作った lift/out-app/gen/wasm-func-names.tsv を gzip -9 し、版の名前の artifact に残す
 FNS=$(jq -r '[.jobs.deploy.steps[] | select(.id == "fn") | .run][0] // ""' "$DJ")
-FNU=$(jq -c '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@")) | .with][0] // {}' "$DJ")
-ok "deploy.yml(w): 表を残す段(id: fn)と、upload-artifact の段が、それぞれ 1 つ" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn")] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@"))] | length' "$DJ")" "1/1"
+FNU=$(jq -c '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@")) | select((.with.name // "") | startswith("func-names-")) | .with][0] // {}' "$DJ")
+ok "deploy.yml(w): 表を残す段(id: fn)と、func-names の artifact の段が、それぞれ 1 つ" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn")] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@")) | select((.with.name // "") | startswith("func-names-"))] | length' "$DJ")" "1/1"
 ok "deploy.yml(w): artifact の名前は func-names-<版>(版は、この段の出力 v = manifest の bundle.version)" "$(jq -r '.name' <<<"$FNU")" 'func-names-${{ steps.fn.outputs.v }}'
 ok "deploy.yml(w): artifact の保存は 90 日(retention-days: 90)" "$(jq -r '.["retention-days"]' <<<"$FNU")" 90
-ok "deploy.yml(w): 表を残す段と upload の段に if が無い(既定の success(). 表が無ければ落ちて、deploy を止める)" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn" or ((.uses // "") | test("^actions/upload-artifact@"))) | has("if")] | any' "$DJ")" false
+ok "deploy.yml(w): 表を残す段と upload の段に if が無い(既定の success(). 表が無ければ落ちて、deploy を止める)" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn" or (((.uses // "") | test("^actions/upload-artifact@")) and ((.with.name // "") | startswith("func-names-")))) | has("if")] | any' "$DJ")" false
 ok "deploy.yml(w): 表を残す段は gzip -9 で、RUNNER_TEMP に書く(upload の path と同じ物)" "$(grep -cF 'gzip -9 -c "$f" > "$RUNNER_TEMP/wasm-func-names.tsv.gz"' <<<"$FNS")/$(jq -r '.path' <<<"$FNU")" '1/${{ runner.temp }}/wasm-func-names.tsv.gz'
 ok "deploy.yml(w): 表は lift/out-app/gen/wasm-func-names.tsv、版は lift/out-app/bundle/raw/fl-Oz/manifest.json の .bundle.version(jq -er: 無ければ落ちる)" "$(grep -cF 'f=lift/out-app/gen/wasm-func-names.tsv' <<<"$FNS")/$(grep -cF 'lift/out-app/bundle/raw/fl-Oz/manifest.json' <<<"$FNS")/$(grep -cF 'jq -er .bundle.version' <<<"$FNS")" "1/1/1"
 ok "deploy.yml(w): 表を残す段は、大きさ(gzip 後)をログに出す" "$(grep -cF 'wc -c' <<<"$FNS")" 1
@@ -1187,7 +1190,7 @@ ok "deploy.yml(w): 表を残す段は、fe-build bundle の後・fe-build upload
   ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build bundle$")) | .key] | .[0]) as $b
   | ([.jobs.deploy.steps | to_entries[] | select(.value.id == "fn") | .key] | .[0]) as $f
   | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
-  | ([.jobs.deploy.steps | to_entries[] | select((.value.uses // "") | test("^actions/upload-artifact@")) | .key] | .[0]) as $a
+  | ([.jobs.deploy.steps | to_entries[] | select(((.value.uses // "") | test("^actions/upload-artifact@")) and ((.value.with.name // "") | startswith("func-names-"))) | .key] | .[0]) as $a
   | "\($b < $f and $f + 1 == $a and $a < $u)"' "$DJ")" true
 ok "deploy.yml(w): actions.lock の deploy.yml の一覧に actions/upload-artifact@v7.0.2 が在る(gh actions-lock が作る)" "$(pj "$top/.github/workflows/actions.lock" | jq -r '.workflows[".github/workflows/deploy.yml"] | index("actions/upload-artifact@v7.0.2") != null')" true
 ok "deploy.yml(w): 100 行以内(deploy.yml の行数が 100 以下)" "$([ "$(wc -l < "$D")" -le 100 ] && echo yes)" yes
@@ -1204,4 +1207,54 @@ printf 'index\tkind\tva\tname\n' > "$FNR/lift/out-app/gen/wasm-func-names.tsv"; 
 ok "deploy.yml(w): 段の動き: manifest に版が無ければ落ちる(artifact の名前を決められない)" "$([ "$rc" != 0 ] && echo fails)/$(test -e "$FNR/out.txt" && echo wrote || echo none)" "fails/none"
 FNDS=$(awk '/^## 18[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(w): 「版ごとの関数名の表」の節に、artifact の名前(func-names-<版>)と取り出し(gh run download)と道具の引数(--func-names-dir)が在る" "$(for w in 'func-names-<版>' 'gh run download' '--func-names-dir'; do grep -cF -- "$w" <<<"$FNDS"; done | awk '{s+=($1>0)} END{print s}')" 3
+# (x) E2E の門(Issue #1407)。deploy.yml の E2E の段は、bundle の中身の後・関数名の表(fn)の前に在り、artifact の段はその直後に在る。判定は tools/e2e/judge.jq(合成の行で試す)
+EJ=$top/tools/e2e/judge.jq
+ok "E2E(x): 判定の jq(tools/e2e/judge.jq)が在る" "$(test -f "$EJ" && echo yes)" yes
+ok "E2E(x): 動かす段は 1 つ、artifact の段は 1 つ(名前が e2e- で始まる)" "$(jq '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs"))] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.with.name // "") | startswith("e2e-"))] | length' "$DJ")" "1/1"
+ok "E2E(x): 順は bundle の中身 → 動かす段 → artifact の段 → 関数名の表(fn)→ func-names の artifact → fe-build upload" "$(jq -r '
+  ([.jobs.deploy.steps | to_entries[] | select(.value.name == "bundle の中身を確かめる") | .key] | .[0]) as $c
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("tools/e2e/run[.]mjs")) | .key] | .[0]) as $r
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.with.name // "") | startswith("e2e-")) | .key] | .[0]) as $e
+  | ([.jobs.deploy.steps | to_entries[] | select(.value.id == "fn") | .key] | .[0]) as $f
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.with.name // "") | startswith("func-names-")) | .key] | .[0]) as $a
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
+  | "\($c != null and $c < $r and $r + 1 == $e and $e + 1 == $f and $f + 1 == $a and $a < $u)"' "$DJ")" true
+ERUN=$(jq -r '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs")) | .run] | .[0] // ""' "$DJ")
+ok "E2E(x): 依存の取得は #1407 の受け入れと同じ(npm ci と npx playwright install chromium。--with-deps を使わない)" "$(grep -cF '(cd tools/e2e && npm ci && npx playwright install chromium)' <<<"$ERUN")/$(grep -c -- '--with-deps' <<<"$ERUN")" "1/0"
+ok "E2E(x): 動かす段は node で run.mjs を呼ぶ(シェルスクリプトを実行しない。依頼者の制約)" "$(grep -cE 'run[.]sh|bash|[.]sh([^a-z]|$)' <<<"$ERUN")" 0
+ok "E2E(x): 動かす段は smoke と 3 表示(4k-dpr1・4k-dpr2・4k-random)で、出力を \$RUNNER_TEMP/e2e.jsonl に書く" "$(grep -cF 'node tools/e2e/run.mjs --scenarios smoke' <<<"$ERUN")/$(grep -cF -- '--displays 4k-dpr1,4k-dpr2,4k-random' <<<"$ERUN")/$(grep -cF '> "$RUNNER_TEMP/e2e.jsonl"' <<<"$ERUN")" "1/1/1"
+ok "E2E(x): 判定は、動かした出力に対して jq -e -s -f tools/e2e/judge.jq(終了コードが判定になる)" "$(grep -cF 'jq -e -s -f tools/e2e/judge.jq "$RUNNER_TEMP/e2e.jsonl"' <<<"$ERUN")" 1
+ok "E2E(x): 動かす段は env を持たない(鍵と token を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs")) | has("env") | not] | .[0]' "$DJ")" true
+ok "E2E(x): 動かす段と artifact の段に、secrets・token・R2 の名前が無い" "$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("tools/e2e/")) or ((.with.name // "") | startswith("e2e-"))) | tostring | test("secrets|token|R2_")] | any' "$DJ")" false
+EUP=$(jq -c '[.jobs.deploy.steps[] | select((.with.name // "") | startswith("e2e-"))][0] // {}' "$DJ")
+ok "E2E(x): artifact の段は if: always()・upload-artifact@v7.0.2・名前 e2e-<github.sha>・30 日・無ければ無視・出力は e2e.jsonl" "$(jq -r '[.if, .uses, .with.name, .with["retention-days"], .with["if-no-files-found"], .with.path] | map(tostring) | join("|")' <<<"$EUP")" 'always()|actions/upload-artifact@v7.0.2|e2e-${{ github.sha }}|30|ignore|${{ runner.temp }}/e2e.jsonl'
+SC() { printf '{"name":"%s","ok":%s,"expectFail":%s,"pageErrors":%s,"consoleErrors":%s,"stuckToasts":%s,"failedRequests":%s}' "$1" "$2" "$3" "$4" "$5" "$6" "$7"; }
+RW() { printf '{"display":{"width":3840,"height":2160,"dpr":1,"refreshHzTarget":120,"achievedFps":%s},"servedHeadersMatch":%s,"error":%s,"scenarios":[%s]}' "$1" "$2" "$3" "$4"; }
+ej() { printf '%s\n' "$1" > "$T/ej.jsonl"; ( cd "$top" && jq -e -s -f "$EJ" "$T/ej.jsonl" > /dev/null 2> "$T/ej.err"; echo $? ); }
+ej4() { ej "$(printf '%s\n' "$1" "$1" "$1" "$1")"; }
+G3="$(SC a true null 0 0 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)"; G=$(RW 58.9 true null "$G3")
+ok "E2E(x) 判定: 全て正常の 4 行は 0" "$(ej4 "$G")" 0
+ok "E2E(x) 判定: 行が 3 つなら 1(表示は 4 行)" "$(ej "$(printf '%s\n' "$G" "$G" "$G")")" 1
+ok "E2E(x) 判定: 行が 5 つなら 1" "$(ej "$(printf '%s\n' "$G" "$G" "$G" "$G" "$G")")" 1
+ok "E2E(x) 判定: 入力が空なら 1" "$(ej "")" 1
+ok "E2E(x) 判定: servedHeadersMatch が偽なら 1" "$(ej4 "$(RW 58.9 false null "$G3")")" 1
+ok "E2E(x) 判定: 行の error が有れば 1" "$(ej4 "$(RW 58.9 true '"boom"' "$G3")")" 1
+ok "E2E(x) 判定: シナリオが 2 つなら 1(3 つ必要)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: achievedFps が数値でなければ 1" "$(ej4 "$(RW '"58.9"' true null "$G3")")" 1
+ok "E2E(x) 判定: achievedFps が 0 でも 0(120 Hz に届かない事実で落とさない)" "$(ej4 "$(RW 0 true null "$G3")")" 0
+ok "E2E(x) 判定: 印の無いシナリオの ok が偽なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a false null 0 0 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: 印の無いシナリオの pageErrors が 1 なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a true null 1 0 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: 印の無いシナリオの consoleErrors が 1 なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 1 0 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: 印の無いシナリオの stuckToasts が 1 なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 1 0),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
+ok "E2E(x) 判定: 印の無いシナリオの failedRequests が 1 なら 1" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 1),$(SC b true null 0 0 0 0),$(SC c true null 0 0 0 0)")")" 1
+EXB() { RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b false '"#1406"' "$1" "$2" "$3" "$4"),$(SC c true null 0 0 0 0)"; }
+ok "E2E(x) 判定: 印(#1406)の付いたシナリオは、ok が偽でも、カウンタが 0 なら 0(ok は問わない)" "$(ej4 "$(EXB 0 0 0 0)")" 0
+ok "E2E(x) 判定: 印の付いたシナリオの pageErrors が 1 なら 1" "$(ej4 "$(EXB 1 0 0 0)")" 1
+ok "E2E(x) 判定: 印の付いたシナリオの consoleErrors が 1 なら 1" "$(ej4 "$(EXB 0 1 0 0)")" 1
+ok "E2E(x) 判定: 印の付いたシナリオの stuckToasts が 1 なら 1" "$(ej4 "$(EXB 0 0 1 0)")" 1
+ok "E2E(x) 判定: 印の付いたシナリオの failedRequests が 1 なら 1" "$(ej4 "$(EXB 0 0 0 1)")" 1
+ok "E2E(x) 判定: 印の付いたシナリオが通ったら 0 のまま、警告を標準エラーに出す(落とさない)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true '"#1406"' 0 0 0 0),$(SC c true null 0 0 0 0)")")/$(grep -q '警告' "$T/ej.err" && echo warned)" "0/warned"
+ok "E2E(x) 判定: 印の無い全て正常なら、警告を出さない" "$(ej4 "$G")/$(grep -q '警告' "$T/ej.err" && echo warned || echo quiet)" "0/quiet"
+DS19=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
+ok "設計(x): 「19」の節に、門の位置・判定・expectFail・artifact・120 Hz に届かない事実の扱い(落とさない)と judge.jq を書いた" "$(for w in 'e2e-' 'expectFail' '120 Hz' '落とさない' 'judge.jq'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 5
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

@@ -780,6 +780,8 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     ("webview2loader.dll", "CreateCoreWebView2Environment", "fle_imp_CreateCoreWebView2Environment", "jmp_imp:CreateCoreWebView2Environment"),
     ("webview2loader.dll", "GetAvailableCoreWebView2BrowserVersionString", "fle_imp_GetAvailableCoreWebView2BrowserVersionString", "jmp_imp:GetAvailableCoreWebView2BrowserVersionString"),
     ("webview2loader.dll", "CompareBrowserVersions", "fle_imp_CompareBrowserVersions", "jmp_imp:CompareBrowserVersions"),
+    // Issue #1391 (provisional; appended: decision 0015, append only): kernel32!K32GetProcessMemoryInfo, reached by GetProcAddress (FL's top bar Memory Usage; the call was measured as NULL and 127 before, runtime/fle_sysinfo.c).
+    ("kernel32.dll", "K32GetProcessMemoryInfo", "fle_imp_K32GetProcessMemoryInfo", "jmp_imp:K32GetProcessMemoryInfo"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of

@@ -1,6 +1,7 @@
 // Issue #1383: the page keeps the virtual registry's HKCU tree (lift/runtime/fle_reg.c). The records are one file in the browser's OPFS, /fl/state/hkcu.log: the page's origin, so it is
 // kept when the page is reloaded or closed, and removed with the site's data. Only the engine's Worker opens it: a synchronous access handle, flushed after every record, so a record
 // is on the disk when the guest's call returns. Nothing leaves the browser (no beacon, no request carries the bytes).
+// Issue #1385: the same file keeps the user's files under the profile (C:\Users\user: the records filePut, dirMake and fileDel of reg-journal.ts). The name is kept from #1383.
 // The file holds the live records (reg-journal.ts). It is rewritten (compacted) when it is over 4 MiB and over twice the live records, and it never grows past REG_STATE_LIMIT.
 // /fl/state is a PROTECTED path of the file manager (paths.ts): the file manager cannot change it.
 

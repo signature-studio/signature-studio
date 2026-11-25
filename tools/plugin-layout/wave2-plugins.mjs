@@ -2,8 +2,8 @@
 // Issue #1379: the plugin folders of the second wave, as plugin.tsv files, for the layout test of fe-build (plugins.rs). Usage:
 //   node tools/plugin-layout/wave2-plugins.mjs <out dir>
 // Input: inputs/plugin-classes.tsv (the classes of the installer's DLLs). A unit is a plugin folder (Plugins\Fruity\<kind>\<folder>\); the folders
-// with a VFX DLL (VFX yes) and the three first-wave folders (Fruity Balance, Fruity Filter, Fruity Delay 2) are left out, as in
-// pm-work/tools/gen-wave-plugins.mjs. The result is 131 folders and 160 DLLs (132 本体, 576,925,696 B; 608,521,016 B in all).
+// with a VFX DLL (VFX yes) and the four first-wave folders (Fruity Balance, Fruity Filter, Fruity Delay 2, Sytrus) are left out, as in
+// pm-work/tools/gen-wave-plugins.mjs. The result is 130 folders and 159 DLLs (131 本体, 570,656,256 B; 602,251,576 B in all).
 // Output: <out dir>/<folder>/plugin.tsv, one per folder, in the format of lift/plugins/<name>/plugin.tsv. The hook column is "none" and the
 // omit column is "-" for every row (the hook points are not known to this test; the layout does not depend on them). The out dir must not be lift/plugins
 // (the test writes its files under the cargo target directory). Nothing else is written. Exit code 0 on success, 1 on a rejected input, 2 on a usage error.
@@ -24,7 +24,7 @@ if (out === join(root, 'lift', 'plugins') || out.startsWith(join(root, 'lift', '
 }
 
 const PREFIX = 'Plugins\\Fruity\\';
-const FIRST_WAVE = ['Plugins\\Fruity\\Effects\\Fruity Balance', 'Plugins\\Fruity\\Effects\\Fruity Filter', 'Plugins\\Fruity\\Effects\\Fruity Delay 2'];
+const FIRST_WAVE = ['Plugins\\Fruity\\Effects\\Fruity Balance', 'Plugins\\Fruity\\Effects\\Fruity Filter', 'Plugins\\Fruity\\Effects\\Fruity Delay 2', 'Plugins\\Fruity\\Generators\\Sytrus'];
 const KINDS = { Effects: 'effects', Generators: 'generators' };
 
 const text = readFileSync(join(root, 'inputs', 'plugin-classes.tsv'), 'utf8');
