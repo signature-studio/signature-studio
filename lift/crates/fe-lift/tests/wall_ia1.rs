@@ -52,6 +52,7 @@ void fle_stop(const char *api, const char *why) { printf("STOP %s: %s\n", api, w
 /* #1389: the page's clipboard library and the movable-block helpers of fle_glob.c are not linked here: the page has no text and no block is live */
 void fle_clip_host_write(const void *units, uint32_t bytes) { (void)units; (void)bytes; }
 void *fle_clip_host_read(void) { return NULL; }
+int fle_clip_host_probe(void) { return 0; }
 uint64_t fle_glob_movable_from(const void *src, uint64_t bytes) { (void)src; (void)bytes; return 0; }
 int fle_glob_movable_bytes(uint64_t h, const uint8_t **p, uint64_t *n) { (void)h; (void)p; (void)n; return 0; }
 void fle_glob_movable_drop(uint64_t h) { (void)h; }

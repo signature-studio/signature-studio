@@ -82,10 +82,12 @@ async function handle(m: ToWorker): Promise<void> {
     case 'guest-text': guestText(m.markers, m.radius); break;
     case 'settings-redraw': if (fruity?.redrawTree(m.lid)) driver?.wake(); break;
     case 'window-api-trace': fruity?.windowApiTrace(m.on); break;
+    case 'hz': hzWanted = m.hz; ensureDriver()?.setHz(m.hz); break;   // Issue #1402: the engine is paced at the page's rate from its next idle
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
     case 'exit-request': onExitRequest(); break;
+    case 'clipboard-probe-answer': fruity?.answerClipProbe(m.id, m.has); break;   // #1406: the engine waits for this answer (a question about the formats)
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -126,6 +128,7 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
     fileDlgProgress: (id, done, total) => post({ t: 'filedlg-progress', id, done, total }),
     clipWrite: (text) => post({ t: 'clipboard-write', text }),   // #1389: the engine's Copy goes to the page
     clipRead: (id) => post({ t: 'clipboard-read', id }),        // #1389: the engine's Paste asks the page for the clipboard text
+    clipProbe: (id) => post({ t: 'clipboard-probe', id }),      // #1406: the engine's question about the formats asks the page whether there is text
     inputPoll,
     inputDone,
   };
@@ -161,6 +164,8 @@ function cancelDeadlineWait(h: DeadlineWait): void {
   Atomics.notify(deadlineWord, 0);
 }
 
+/** Issue #1402: the page's last rate of requestAnimationFrame (cmd 'hz'), kept until the driver exists to take it */
+let hzWanted: number | null = null;
 // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
 function ensureDriver(): IdleDriver | null {
   if (driver || !fruity) return driver;
@@ -193,6 +198,7 @@ function ensureDriver(): IdleDriver | null {
       if (at - lastLagLog > 5000) { lastLagLog = at; log('warn', `the virtual clock fell ${(lagCutTicks / 10000).toFixed(0)} ms further behind the wall clock than the cap allows (S-clk-maxlag); it stays behind (no virtual time is skipped)`); lagCutTicks = 0; }
     },
   });
+  if (hzWanted !== null) driver.setHz(hzWanted);
   return driver;
 }
 
@@ -282,7 +288,7 @@ function answerInline(): void {
 function reportIdle(n: number, nowTicks: number, nextTicks: number, busyMs: number | null, abs: number): void {
   if (!reports.idle(n, abs)) return;
   const caps = { input: driver !== null, appview: fruity?.hasAppView ?? false, display: fruity?.hasDisplay ?? false };
-  post({ t: 'idle', n, now: nowTicks, next: nextTicks, busyMs, abs, caps, stats: driver?.stats ?? { ...newDriverStats(), idleCount: n }, queued: driver?.queued ?? 0, ...(checkpoints.length ? { trace: checkpoints.splice(0) } : {}), memBytes: curMemory()?.buffer.byteLength, ...(fruity?.hostFileStats ? { hostFiles: fruity.hostFileStats } : {}) });
+  post({ t: 'idle', n, now: nowTicks, next: nextTicks, busyMs, abs, caps, stats: driver?.stats ?? { ...newDriverStats(), idleCount: n }, queued: driver?.queued ?? 0, ...(checkpoints.length ? { trace: checkpoints.splice(0) } : {}), memBytes: curMemory()?.buffer.byteLength, dwm: fruity?.dwmFlushes() ?? null, ...(fruity?.hostFileStats ? { hostFiles: fruity.hostFileStats } : {}) });
 }
 
 // the engine is waiting: then let the driver decide (give queued input, or wait for the engine's next deadline). The picture is not composed here (C-2): the render Worker asks for it (onRender 'want'), and its own frame loop

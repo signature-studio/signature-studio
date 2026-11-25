@@ -53,6 +53,7 @@ export interface KeyDecision {
  *  - not forwarded and not suppressed (the browser keeps them): Tab (unless `sendTab`), Ctrl+W (and Cmd+W). Tab is how the keyboard leaves the desktop; Ctrl+W closes the tab (a page cannot stop it anyway).
  *  - F5 is the engine's (FL: show / hide the Playlist; Learn WM_KEYDOWN: a key message goes to the window with the focus): it is forwarded and the browser's reload is suppressed, like every other key of the table. Neither Chromium's reserved list (kReservedCommandIds) nor Firefox's `reserved="true"` keys contain F5, so a page may cancel it.
  *  - not forwarded: the Meta keys (the OS takes them), an IME composition (keyCode 229 / isComposing), a code the table does not know.
+ *  - Ctrl+V is forwarded and its browser action is NOT suppressed: the browser pastes, and fires the paste event on the focused desktop, which carries the text (app/src/engine/clipboard.ts #1406). A cancelled keydown fires no paste event.
  *  - every other key is forwarded and its browser action suppressed (space and arrows scroll, Backspace, Ctrl+S, Ctrl+P, F1, ...), only while the desktop has the focus (the caller attaches this to the desktop element).
  */
 export function keyPolicy(e: KeyEventLike, opts: { sendTab?: boolean } = {}): KeyDecision {
@@ -60,6 +61,7 @@ export function keyPolicy(e: KeyEventLike, opts: { sendTab?: boolean } = {}): Ke
   if (e.code === 'Tab' && !opts.sendTab) return { forward: false, prevent: false, why: 'tab-leaves-the-desktop' };
   if (e.code === 'KeyW' && (e.ctrlKey || e.metaKey)) return { forward: false, prevent: false, why: 'close-tab' };
   if (e.code === 'MetaLeft' || e.code === 'MetaRight') return { forward: false, prevent: false, why: 'meta' };
+  if (e.code === 'KeyV' && e.ctrlKey && !e.altKey && !e.metaKey) return { forward: true, prevent: false, why: 'paste' };
   if (!keyInfo(e.code)) return { forward: false, prevent: false, why: 'unknown-code' };
   return { forward: true, prevent: true, why: 'forward' };
 }

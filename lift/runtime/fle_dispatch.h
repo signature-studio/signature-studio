@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     uint64_t va;
@@ -42,13 +43,6 @@ void fle_progress_slice(void) __attribute__((weak));
 __attribute__((weak)) uint64_t fle_loop_count = 0;
 __attribute__((weak)) uint64_t fle_loop_limit = UINT64_MAX;
 void fle_loop_slice(void) __attribute__((weak));
-
-/* A value that is not a known function entry. Stop instead of guessing (except the thunk above). */
-static inline void fle_dispatch_miss(uint64_t va) {
-    if (fle_win_try_thunk && fle_win_try_thunk(va)) return;
-    fprintf(stderr, "fle: indirect call to %#llx is not a known function entry\n", (unsigned long long)va);
-    abort();
-}
 
 /* A jump through an annotated table (fe-decode jumptab) with a selector outside the table. */
 static inline void fle_jumptab_miss(uint64_t jmp_va, uint64_t sel) {
@@ -123,6 +117,54 @@ static inline void fle_landing_try(uint64_t va) {
                 (unsigned long long)va, (unsigned long long)R[4]);
         abort();
     }
+}
+
+/* Whether the 8 bytes at a guest address can be read without a fault (fle_thread_wasm.c defines it in a wasm build; a native build has no probe and reads the address). */
+int fle_guest_readable(uint64_t a) __attribute__((weak));
+
+/* #1416: the stop of a value that is not a known function entry. The caller is the return address that the guest's call pushed (the word at R[4]: fe-lift's
+ * dispatch.rs stores the next VA there before fle_dispatch). The near name is the row of fle_dispatch_table with the largest VA at or below the caller, the lifted
+ * name f_<VA> of the function that holds the caller, with the offset. "caller ?" when R[4] is 0 or cannot be read; "near ?" when no row is at or below the caller.
+ * The registers go to stderr first, so the message stays the last line. Out of line and cold: it is reached only on a stop. */
+static inline __attribute__((noinline, cold, noreturn)) void fle_dispatch_stop(uint64_t va) {
+    char caller[24] = "?", nearname[64] = "?";
+    uint64_t sp = R[4];
+
+    if (sp != 0 && (!fle_guest_readable || fle_guest_readable(sp))) {
+        uint64_t ra, lo = 0, hi = fle_dispatch_count;
+
+        memcpy(&ra, (const void *)(uintptr_t)sp, 8);
+        snprintf(caller, sizeof caller, "0x%llx", (unsigned long long)ra);
+        while (lo < hi) {
+            uint64_t mid = lo + (hi - lo) / 2;
+
+            if (fle_dispatch_table[mid].va <= ra) {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        if (lo > 0) {
+            uint64_t e = fle_dispatch_table[lo - 1].va;
+
+            snprintf(nearname, sizeof nearname, "f_%llx+0x%llx", (unsigned long long)e, (unsigned long long)(ra - e));
+        }
+    }
+    fprintf(stderr,
+            "fle: regs R[0]=0x%llx R[1]=0x%llx R[2]=0x%llx R[3]=0x%llx R[4]=0x%llx R[5]=0x%llx R[6]=0x%llx R[7]=0x%llx "
+            "R[8]=0x%llx R[9]=0x%llx R[10]=0x%llx R[11]=0x%llx R[12]=0x%llx R[13]=0x%llx R[14]=0x%llx R[15]=0x%llx\n",
+            (unsigned long long)R[0], (unsigned long long)R[1], (unsigned long long)R[2], (unsigned long long)R[3],
+            (unsigned long long)R[4], (unsigned long long)R[5], (unsigned long long)R[6], (unsigned long long)R[7],
+            (unsigned long long)R[8], (unsigned long long)R[9], (unsigned long long)R[10], (unsigned long long)R[11],
+            (unsigned long long)R[12], (unsigned long long)R[13], (unsigned long long)R[14], (unsigned long long)R[15]);
+    fprintf(stderr, "fle: indirect call to %#llx is not a known function entry (caller %s, near %s)\n", (unsigned long long)va, caller, nearname);
+    abort();
+}
+
+/* A value that is not a known function entry. Stop instead of guessing (except the thunk above). */
+static inline void fle_dispatch_miss(uint64_t va) {
+    if (fle_win_try_thunk && fle_win_try_thunk(va)) return;
+    fle_dispatch_stop(va);
 }
 
 /* Calls the function whose entry VA is `va`. Any other value aborts.

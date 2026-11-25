@@ -92,6 +92,10 @@ EMSCRIPTEN_KEEPALIVE int fle_g3_mouse(int kind, int x, int y, int data) { return
 EMSCRIPTEN_KEEPALIVE int fle_g3_key(int kind, unsigned vk, unsigned scan, int ext) { return fle_input_host_key(kind, vk, scan, ext); }
 /* decision 0212: the display changed to w x h (lift/runtime/fle_input.h fle_input_host_display); 1 = queued */
 EMSCRIPTEN_KEEPALIVE int fle_g3_display(unsigned w, unsigned h) { return fle_input_host_display(w, h); }
+/* Issue #1402: the page's measured rate of requestAnimationFrame, put at an idle: DwmFlush's frames and EnumDisplaySettingsW's frequency follow it from the next call (1 = taken, 0 = refused: outside 24..1000) */
+EMSCRIPTEN_KEEPALIVE int fle_g3_hz(unsigned hz) { return fle_display_hz_put(hz); }
+/* Issue #1402: the number of DwmFlush calls so far (the page reads it at each idle, for the rate the guest is paced at) */
+EMSCRIPTEN_KEEPALIVE double fle_g3_dwm_count(void) { return (double)fle_thread_dwm_flushes(); }
 /* decision 0267 (alpha10): the task bar of the host. fle_g3_taskbar_iconic: the logical window id (lid) of the first task bar button whose window is minimized, 0 when there is none (the page shows its restore button while this is
  * nonzero; the lid is the one of the window table and of the G3 record); fle_g3_taskbar_syscommand: the task bar tells that window a system command (SC_RESTORE 0xF120, SC_MINIMIZE 0xF020, SC_MAXIMIZE 0xF030, SC_CLOSE 0xF060);
  * 1 = queued (the window procedure gets WM_SYSCOMMAND when its thread next retrieves messages), 0 = refused (no such window, not a top-level window, another command, or the event queue is full). */

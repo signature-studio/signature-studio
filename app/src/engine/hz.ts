@@ -9,10 +9,11 @@ export const HZ_MAX = 1000;
 export const HZ_WINDOW_MS = 500;
 /** the engine's default (fle_thread.c FLE_DWM_HZ, fle_monitor.h FLE_DISPLAYSETTINGS_FREQUENCY): what the engine runs at until the screen's rate is measured */
 export const HZ_DEFAULT = 60;
-/** S-hz-standard: the refresh rates displays are sold with that the measured rate is rounded to (no source for the list; 50 and 100 Hz panels round to 60 and 90). Decision 0268: the list ends at 120, so 144, 165, 240 Hz and faster screens get 120. Why: the guest's drawing tick follows this rate, and above 120 it adds work (about 3 ms of the engine Worker per tick at idle) without a picture the display can use, and the work comes out of the mixer's share (decision 0263, measured: write rate 0.326 at 120 Hz, 0.310 at 144, 0.291 at 240). To be looked at again when the mixer keeps up (P3). */
-export const STANDARD_HZ: readonly number[] = [60, 75, 90, 120];
+/** S-hz-standard: the refresh rates displays are sold with that the measured rate is rounded to (no source for the list; 50 and 100 Hz panels round to 60 and 90). Decision 0268: the list ends at 120, so 144, 165, 240 Hz and faster screens get 120. Why: the guest's drawing tick follows this rate, and above 120 it adds work (about 3 ms of the engine Worker per tick at idle) without a picture the display can use, and the work comes out of the mixer's share (decision 0263, measured: write rate 0.326 at 120 Hz, 0.310 at 144, 0.291 at 240). To be looked at again when the mixer keeps up (P3).
+ * Issue #1402: 30 is the low end. A page whose requestAnimationFrame runs at about 30 (a throttled page) is paced at 30; with the list starting at 60 it was paced at 60 while the page drew at 30. */
+export const STANDARD_HZ: readonly number[] = [30, 60, 75, 90, 120];
 
-/** S-hz-round: the nearest standard rate by ratio (|ln(hz / s)|); at or below the lowest standard (60) and at or above the highest (120) the end value */
+/** S-hz-round: the nearest standard rate by ratio (|ln(hz / s)|); at or below the lowest standard (30) and at or above the highest (120) the end value */
 export function roundToStandardHz(measured: number): number {
   if (!(measured > 0) || !Number.isFinite(measured)) return HZ_DEFAULT;
   let best = STANDARD_HZ[0] as number, bestD = Infinity;

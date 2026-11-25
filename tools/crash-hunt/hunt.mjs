@@ -2,6 +2,7 @@
 // Usage: node tools/crash-hunt/hunt.mjs --out <directory> [--budget 50m] [--bundle <raw/<name>>] [--seed 20251125] [--resume]   (run through tools/crash-hunt/run.sh; needs app/node_modules and app/dist, as boot-bundle.mjs does).
 //   --budget: a number with s, m or h (50m). --bundle: the bundle directory (default lift/out-app/bundle/raw/fl-Oz). --seed: the seed of the random DPR (1.01 to 2.24).
 //   --resume: continues from <out>/crash-hunt-state.json. --skip-startup: a test aid (the startup check is not run; startup is then null).
+//   --only <id> (e.g. View/11/1): probes that item only (and the items on its path, which open its submenus), in the DPR 1 walk, and stops after that walk.
 // Walk: two walks, one per DPR (1, then the random one). Each walk: (a) the menus: the 8 top labels of the bar (their places are the bar's fractions, the bar is found in the window table),
 //   every item of each drop-down, and the submenus opened by an item (up to 3 levels); the right-click menus of the four windows (Channel rack, Mixer, Playlist, Browser) and of the Mixer's master insert (group plugin: its submenus);
 //   (b) the keys F5 to F12, Alt+F8, Ctrl+O/E/P/F/I, Space; (c) the top bar's parts (left, right, wheel, drag: group top), the Settings window's tabs (F10: group settings) and the sections of each page,
@@ -171,6 +172,8 @@ function parseArgs(argv) {
   if (!m) throw new Error(`--budget ${budgetText}: use a number with s, m or h`);
   const out = get('--out');
   if (!out) throw new Error('--out is required');
+  const only = get('--only');
+  if (only !== undefined && !/^[^/]+(\/\d+)+$/.test(only)) throw new Error(`--only ${only}: use a menu item id such as View/11/1`);
   return {
     budgetMs: Number(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2]],
     out: path.resolve(out),
@@ -178,8 +181,12 @@ function parseArgs(argv) {
     seed: Number(get('--seed') ?? 20251125),
     resume: argv.includes('--resume'),
     skipStartup: argv.includes('--skip-startup'),
+    only: only ?? null,
   };
 }
+
+/** --only <id> (a menu item such as View/11/1): the one walk probes the items on the path to it (their submenus open the next level) and the item itself; the other items are not probed. */
+export function onlyKeep(only, id) { return !only || only === id || only.startsWith(`${id}/`); }
 
 /** the startup check: welcome-flow.mjs flow A (its line only); ok when not trapped, the first idle within 12.5 s and the start-up bytes within the limit */
 function startupCheck(bundle) {
@@ -388,6 +395,7 @@ class Session {
     const w = this.walk;
     const items = [];
     for (const root of this.roots.keys()) {
+      if (w.only && w.only.split('/')[0] !== root) continue;
       const fresh = !w.nodes[root];
       if (fresh) {
         await this.closeAll();
@@ -599,6 +607,7 @@ async function walkInSession({ send, evaluate, ctx, walk, deadline, saveProbe })
     }
     const task = walk.queue.shift();
     const id = taskId(task);
+    if (!onlyKeep(walk.only, id)) continue;
     if (walk.doneIds.includes(id)) continue;
     walk.doneIds.push(id);
     const probe = await s.runTask(task);
@@ -753,12 +762,12 @@ async function main() {
   let consecutiveFailures = 0;
   for (;;) {
     if (Date.now() >= deadline) break;
-    if (state.walks.length && state.walks.at(-1).complete && state.walks.length >= 2) break;
+    if (state.walks.length && state.walks.at(-1).complete && (state.walks.length >= 2 || opts.only)) break;
     if (!state.walks.length || state.walks.at(-1).complete) {
       const dpr = state.walks.length === 0 ? 1 : randomDpr(opts.seed);
       // the second walk reuses the counts of the first (the menus are the same at every DPR): its submenus are opened from these counts
       const nodes = state.walks.length ? JSON.parse(JSON.stringify(state.walks[0].nodes)) : {};
-      state.walks.push({ dpr, enumerated: false, extended: false, complete: false, nodes, queue: [], doneIds: [], expanded: [], pages: [] });
+      state.walks.push({ dpr, enumerated: false, extended: false, complete: false, nodes, queue: [], doneIds: [], expanded: [], pages: [], only: opts.only });
       save();
     }
     const walk = state.walks.at(-1);

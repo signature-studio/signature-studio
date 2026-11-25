@@ -122,3 +122,51 @@
 184	#1426	DirectSound の通知位置をバイト単位で受け、再生の状態は音声の準備の後に公開する(fle_dsound.c)	Task
 185	#1427	ファイル選択の回答を待つ間も、ゲストの他のスレッド(音声のミキサー)が回り、回答が届く: 選択の待ちを、ホストへ制御を返す協調的な待ちにする	Task
 186	#1428	パスの予約文字(コロン(NTFS のストリーム)・<・>・|・二重引用符など)を含む呼び出しで、engine を止めない: Windows の返り値に従う	Task
+187	#1429	リフ マシーンの窓を開くと、Sytrus の中の呼び出し(`indirect call to 0xcccccccccccccccc`)で engine が止まる: 原因を特定して直す	Task
+188	#1430	リフ マシーンで Accept を押すと、Piano roll にノートが作られる(`notes` ≥ 1)	Task
+190	#1432	起動から first idle の後、無入力の 10 秒で、音声の途切れが 1 件出る(DPR 1)	Task
+191	#1433	F10 の Settings の General タブをスクロールすると、DPR 1 で、窓の外の 683 画素が変わる(#1384 の直しが DPR 1 で不完全)	Task
+041	#1434	内蔵エフェクト 1: Control Surface・Distructor・EQUO を、1 プラグイン 1 wasm で入れる	Task
+042	#1435	内蔵エフェクト 2: Edison・Effector・Emphasis を、1 プラグイン 1 wasm で入れる	Task
+043	#1436	内蔵エフェクト 3: Emphasizer・FL Studio Mobile Rack FX・Frequency Shifter を、1 プラグイン 1 wasm で入れる	Task
+044	#1437	内蔵エフェクト 4: Frequency Splitter・Fruity 7 Band EQ・Fruity Bass Boost を、1 プラグイン 1 wasm で入れる	Task
+045	#1438	内蔵エフェクト 5: Fruity Big Clock・Fruity Blood Overdrive・Fruity Center を、1 プラグイン 1 wasm で入れる	Task
+046	#1439	内蔵エフェクト 6: Fruity Chorus・Fruity Compressor・Fruity Convolver を、1 プラグイン 1 wasm で入れる	Task
+047	#1440	内蔵エフェクト 7: Fruity Delay・Fruity Delay Bank・Fruity Fast Dist を、1 プラグイン 1 wasm で入れる	Task
+048	#1441	内蔵エフェクト 8: Fruity Fast LP・Fruity Flanger・Fruity Flangus を、1 プラグイン 1 wasm で入れる	Task
+049	#1442	内蔵エフェクト 9: Fruity Formula Controller・Fruity Free Filter・Fruity HTML NoteBook を、1 プラグイン 1 wasm で入れる	Task
+050	#1443	内蔵エフェクト 10: Fruity LSD・Fruity Limiter・Fruity Love Philter を、1 プラグイン 1 wasm で入れる	Task
+051	#1444	内蔵エフェクト 11: Fruity Multiband Compressor・Fruity Mute 2・Fruity NoteBook を、1 プラグイン 1 wasm で入れる	Task
+052	#1445	内蔵エフェクト 12: Fruity NoteBook 2・Fruity PanOMatic・Fruity Parametric EQ を、1 プラグイン 1 wasm で入れる	Task
+053	#1446	内蔵エフェクト 13: Fruity Parametric EQ 2・Fruity Peak Controller・Fruity Phase Inverter を、1 プラグイン 1 wasm で入れる	Task
+054	#1447	内蔵エフェクト 14: Fruity Phaser・Fruity Reeverb・Fruity Reeverb 2 を、1 プラグイン 1 wasm で入れる	Task
+055	#1448	内蔵エフェクト 15: Fruity Scratcher・Fruity Send・Fruity Soft Clipper を、1 プラグイン 1 wasm で入れる	Task
+056	#1449	内蔵エフェクト 16: Fruity Spectroman・Fruity Squeeze・Fruity Stereo Enhancer を、1 プラグイン 1 wasm で入れる	Task
+057	#1450	内蔵エフェクト 17: Fruity Stereo Shaper・Fruity Vocoder・Fruity WaveShaper を、1 プラグイン 1 wasm で入れる	Task
+058	#1451	内蔵エフェクト 18: Fruity Wrapper・Fruity X-Y Controller・Fruity X-Y-Z Controller を、1 プラグイン 1 wasm で入れる	Task
+059	#1452	内蔵エフェクト 19: Fruity dB Meter・Gross Beat・Hardcore を、1 プラグイン 1 wasm で入れる	Task
+060	#1453	内蔵エフェクト 20: Hyper Chorus・Low Lifter・Luxeverb を、1 プラグイン 1 wasm で入れる	Task
+061	#1454	内蔵エフェクト 21: Maximus・Multiband Delay・Newtime を、1 プラグイン 1 wasm で入れる	Task
+062	#1455	内蔵エフェクト 22: Newtone・Patcher・Pitch Shifter を、1 プラグイン 1 wasm で入れる	Task
+063	#1456	内蔵エフェクト 23: Pitcher・Razer Chroma・Soundgoodizer を、1 プラグイン 1 wasm で入れる	Task
+064	#1457	内蔵エフェクト 24: Spreader・Transient Processor・Transmitter を、1 プラグイン 1 wasm で入れる	Task
+065	#1458	内蔵エフェクト 25: Transporter・Tuner・VFX Color Mapper を、1 プラグイン 1 wasm で入れる	Task
+066	#1459	内蔵エフェクト 26: VFX Envelope・VFX Key Mapper・VFX Keyboard Splitter を、1 プラグイン 1 wasm で入れる	Task
+067	#1460	内蔵エフェクト 27: VFX Level Scaler・VFX Script・VFX Sequencer を、1 プラグイン 1 wasm で入れる	Task
+068	#1461	内蔵エフェクト 28: Vintage Chorus・Vintage Phaser・Vocodex を、1 プラグイン 1 wasm で入れる	Task
+069	#1462	内蔵エフェクト 29: Wave Candy を、1 プラグイン 1 wasm で入れる	Task
+070	#1463	内蔵インストゥルメント 1: 3x Osc・Autogun・BassDrum を、1 プラグイン 1 wasm で入れる	Task
+071	#1464	内蔵インストゥルメント 2: BeepMap・BooBass・Dashboard を、1 プラグイン 1 wasm で入れる	Task
+072	#1465	内蔵インストゥルメント 3: DirectWave・Drumaxx・Drumpad を、1 プラグイン 1 wasm で入れる	Task
+073	#1466	内蔵インストゥルメント 4: FL Keys・FL Slayer・FL Studio Mobile を、1 プラグイン 1 wasm で入れる	Task
+074	#1467	内蔵インストゥルメント 5: FL Studio Mobile Rack・FPC・Fruit Kick を、1 プラグイン 1 wasm で入れる	Task
+075	#1468	内蔵インストゥルメント 6: Fruity DX10・Fruity Dance・Fruity DrumSynth Live を、1 プラグイン 1 wasm で入れる	Task
+076	#1469	内蔵インストゥルメント 7: Fruity Envelope Controller・Fruity Granulizer・Fruity Keyboard Controller を、1 プラグイン 1 wasm で入れる	Task
+077	#1470	内蔵インストゥルメント 8: Fruity Slicer・Fruity Video Player・Fruity Voltage Controller を、1 プラグイン 1 wasm で入れる	Task
+078	#1471	内蔵インストゥルメント 9: Fruity Wrapper・GMS・Harmless を、1 プラグイン 1 wasm で入れる	Task
+079	#1472	内蔵インストゥルメント 10: Harmor・MIDI Out・Minisynth を、1 プラグイン 1 wasm で入れる	Task
+080	#1473	内蔵インストゥルメント 11: Morphine・Ogun・Patcher を、1 プラグイン 1 wasm で入れる	Task
+081	#1474	内蔵インストゥルメント 12: Plucked!・PoiZone・ReWired を、1 プラグイン 1 wasm で入れる	Task
+082	#1475	内蔵インストゥルメント 13: Sakura・Sawer・SimSynth を、1 プラグイン 1 wasm で入れる	Task
+083	#1476	内蔵インストゥルメント 14: Slicex・Soundfont Player・Toxic Biohazard を、1 プラグイン 1 wasm で入れる	Task
+084	#1477	内蔵インストゥルメント 15: Wasp・Wasp XT・Wave Traveller を、1 プラグイン 1 wasm で入れる	Task

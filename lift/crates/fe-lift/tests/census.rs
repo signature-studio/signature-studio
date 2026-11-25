@@ -279,10 +279,10 @@ fn the_record_of_a_stop_has_the_message_the_top_function_and_the_import() {
     assert_eq!(u12[6], "kernel32.dll!FakeApi");
     // a call to an import pseudo-VA (fle_dispatch_miss) names it too
     let u13 = row(&rs, 13);
-    assert_eq!(u13[15], "fle: indirect call to 0x1100400 is not a known function entry");
+    assert!(u13[15].starts_with("fle: indirect call to 0x1100400 is not a known function entry (caller 0x"), "{u13:?}");
     assert_eq!(u13[6], "kernel32.dll!FakeApi");
     // a null function pointer is a dispatch miss to 0
-    assert_eq!(row(&rs, 14)[15], "fle: indirect call to 0 is not a known function entry");
+    assert!(row(&rs, 14)[15].starts_with("fle: indirect call to 0 is not a known function entry (caller 0x"), "{:?}", row(&rs, 14));
 }
 
 #[test]
