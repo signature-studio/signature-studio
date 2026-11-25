@@ -68,7 +68,15 @@ fn build(tag: &str, files: &[&str]) -> Vec<PathBuf> {
 /// fle_gdi.c and the files it links with, WITHOUT fle_visrgn.c (its hooks are weak: the link is the one of every test that does not know decision 0142).
 fn gdi_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    O.get_or_init(|| build("obj-fr21-gdi", &["fle_gdi.c", "fle_raster.c", "fle_gdc.c", "fle_imports.c", "fle_env.c", "fle_cursor.c"]))
+    O.get_or_init(|| {
+        let mut v = build("obj-fr21-gdi", &["fle_gdi.c", "fle_raster.c", "fle_gdc.c", "fle_imports.c", "fle_env.c", "fle_cursor.c"]);
+        let dir = work_dir().join(etxt_common::per_process("obj-fr21-trace"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let o = dir.join("win_trace_off.o");
+        clang_c(&manifest().join("tests/support/win_trace_off.c"), &o);
+        v.push(o);
+        v
+    })
 }
 /// fle_raster.c (the window surfaces) and fle_visrgn.c (the dump) with the clock of fle_sys.c.
 fn vis_objs() -> &'static Vec<PathBuf> {

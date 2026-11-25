@@ -75,6 +75,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, ours);
             v.push(o);
         }
+        let o = dir.join("win_trace_off.o");
+        clang_c(&manifest().join("tests/support/win_trace_off.c"), &o, false);
+        v.push(o);
         v
     })
 }

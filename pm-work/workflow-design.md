@@ -150,6 +150,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 18. **M7 の目標**: P3 の再生中の命令数のうち、直接 wasm の割合が 99% 以上。
 19. **依存の変更**: 外部プラグインの 3 件(027・028・029)は、音声の経路の修正(040)の後に入れる。
 20. **同じファイルを変える Issue は `blocked by` でつなぐ**(PM の起票の規則)。同じ生成物の入力(`lift/harness/web/pack.args`・`lift/harness/web/seed.args`・`lift/crates/fe-build/tests/plan/*.txt` など)を変える Issue が並行すると、push の段の pull で衝突し、作業が失われる(#1341 は #1319 と衝突して 3 回失敗した)。後から起票する側を、先に入る側の `blocked by` にする。
+21. **cfhex の除外**: `guard/scan.sh` の 32 桁の 16 進の検査(cfhex)は、`lift/crates/*/tests/` の下の `*.rs`・`*.txt`・`*.tsv`・`*.hex` の行だけ除く。試験の機械語・画素のデータは 32 桁の 16 進を多く含み、識別子ではないため(`gdi.rs`・`gdi_bulk.rs` で 54 件の誤検出)。試験の外では今まで通り検査し、vendor・cfhost・python・mask・wranglergen は、試験の場所でも効く(`spec/guard.test.sh`)。
 
 ## 11. 依頼者の指示との対応
 
@@ -226,7 +227,9 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 ## 19. E2E の門(deploy.yml。Issue #1407)
 
 - 位置と段: 「bundle の中身を確かめる」の後・関数名の表と `fe-build upload` の前に、2 段。`node tools/e2e/run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random`(Chromium・本番と同じ配信。依存は `npx playwright install chromium`、--with-deps は使わない)と、`jq -e -s -f tools/e2e/judge.jq`(判定)。artifact は `e2e-<github.sha>`(30 日、`if: always()`)。
-- 判定: 全 4 行が servedHeadersMatch で error が無く、各シナリオの pageErrors・consoleErrors・stuckToasts・failedRequests が 0。印(`expectFail`。例 #1406)の付いたシナリオは ok を問わず、通ったら標準エラーに警告を出す(落とさない)。
+- 判定: 全 4 行が servedHeadersMatch で error が無く、印(`expectFail`)の無いシナリオは ok が真で、pageErrors・consoleErrors・stuckToasts・failedRequests が 0。印(`expectFail`。例 #1406)の付いたシナリオは ok を問わず、通ったら標準エラーに警告を出す(落とさない)。
+- 既に在る欠陥は、`expectFail`(Issue の番号つき)にして、門は新しい退行だけを止める。`expectFail` のシナリオの、`pageErrors`・`consoleErrors`・`failedRequests` は 0 を求める(`stuckToasts` は、その Issue が扱う表示の欠陥なので問わない。数は JSON に出る)。
+- 停止の理由(`engineStop`: 製品の beacon の `engine.exit` と、エンジンのログの停止の報告)と、窓の表の取得の再試行の数(`dumpRetries`)は、シナリオの JSON に出す。1 本だけ動かすのは `--only <シナリオ名>`(試験の道具。門は使わない)。
 - 120 Hz に届かない事実(achievedFps)は JSON に出るが、門は落とさない(runner に GPU が無い)。
 - 落ちれば E2E の段が失敗し、後の関数名の表・upload・wrangler は飛ぶ(既定の `success()`)。§14 の門(人が verified.txt に足す形)とは別物で、毎回の run の結果で決まり、静かには閉じない。
 - 既知の限界: 段に時間の上限を付けていない(100 行の制約の内。ハングすれば deploy が止まるので、その時は run を取り消す)。

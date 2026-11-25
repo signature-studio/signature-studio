@@ -63,7 +63,15 @@ fn build_objs(tag: &str, files: &[(&str, bool)]) -> Vec<PathBuf> {
 
 fn gdi_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    O.get_or_init(|| build_objs("obj-fr7-gdi", &[("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_env.c", false), ("fle_cursor.c", false)]))
+    O.get_or_init(|| {
+        let mut v = build_objs("obj-fr7-gdi", &[("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", true), ("fle_imports.c", false), ("fle_env.c", false), ("fle_cursor.c", false)]);
+        let dir = work_dir().join(etxt_common::per_process("obj-fr7-trace"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let o = dir.join("win_trace_off.o");
+        clang_obj(&manifest().join("tests/support/win_trace_off.c"), &o, false);
+        v.push(o);
+        v
+    })
 }
 fn win_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();

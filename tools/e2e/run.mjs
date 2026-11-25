@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 // E2E (Issue #1407): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
 // physical pixels, 120 Hz by the BeginFrame clock (lib/browser.mjs), with real mouse and key events (lib/guest.mjs).
-// Usage: node tools/e2e/run.mjs [--scenarios smoke] [--displays 4k-dpr1,4k-dpr2,4k-random] [--clock raf|begin] [--shots DIR]     (run.sh does the same from the repository)
+// Usage: node tools/e2e/run.mjs [--scenarios smoke] [--only NAME[,NAME]] [--displays 4k-dpr1,4k-dpr2,4k-random] [--clock raf|begin] [--shots DIR]     (run.sh does the same from the repository)
 //   --clock: raf (default: the page's own rAF, the frame-rate limit off) or begin (120 Hz by the BeginFrame clock; see lib/browser.mjs).
 //   --displays: 4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080 CSS px, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR).
+//   --only: a test aid, only the named scenarios of the set are run (e.g. --only file-open-demo); each row then has that many scenarios.
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
-// Exit 0 only when every row meets the acceptance: servedHeadersMatch; three scenarios; each scenario that has no expectFail is ok with 0 pageErrors, 0 consoleErrors,
-// 0 stuckToasts and 0 failedRequests. Temporary files are in the repository's .tmp-e2e-* and are removed.
+// Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
+// 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect, named by its issue) has 0 pageErrors, 0 consoleErrors and 0 failedRequests
+// (its stuckToasts is only written to the JSON). Temporary files are in the repository's .tmp-e2e-* and are removed.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DISPLAY, launchBrowser, newPage, startFrameClock, installRafCounter, startRafSampler } from './lib/browser.mjs';
 import { Guest } from './lib/guest.mjs';
-import { attachDetectors, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
+import { attachDetectors, engineExitFacts, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
 import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 
@@ -50,24 +52,26 @@ export function displayRows(name, rnd = Math.random) {
   throw new Error(`no display ${name} (4k-dpr1, 4k-dpr2, 4k-random)`);
 }
 
-/** the acceptance of one row (the same rule as the job's check) */
-export function rowPasses(row) {
-  return row.servedHeadersMatch === true && row.error === null && row.scenarios.length === 3
-    && row.scenarios.every((s) => s.expectFail !== null || (s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
+/** the acceptance of one row of `n` scenarios (the same rule as judge.jq, which the job runs on the output) */
+export function rowPasses(row, n = 3) {
+  return row.servedHeadersMatch === true && row.error === null && row.scenarios.length === n
+    && row.scenarios.every((s) => (s.expectFail !== null
+      ? s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0
+      : s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
 }
 
 async function runScenario(sc, d, env) {
   const { browser, browserCdp, delivery, shotsDir } = env;
   const out = {
     name: sc.name, ok: false, expectFail: sc.expectFail ?? null, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0,
-    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [],
+    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [],
   };
-  let pg = null, clock = null, sampler = null, watch = null, det = null;
+  let pg = null, clock = null, sampler = null, watch = null, det = null, guest = null;
   const frames = { n: 0, s: 0 };
   try {
     pg = await newPage(browser, { cssWidth: d.cssWidth, cssHeight: d.cssHeight, dpr: d.dpr, origin: delivery.origin, token: delivery.newToken() });
     det = attachDetectors(pg.page);
-    const guest = new Guest(pg.page, pg.cdp, delivery.origin);
+    guest = new Guest(pg.page, pg.cdp, delivery.origin);
     guest.shots = shotsDir ? path.join(shotsDir, `${d.name}-${String(d.dpr).replace('.', '_')}`, sc.name) : null;
     if (guest.shots) fs.mkdirSync(guest.shots, { recursive: true });
     await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
@@ -90,6 +94,8 @@ async function runScenario(sc, d, env) {
     if (clock) { await clock.stop(); const st = clock.stats(); out.beginFrames = st.frames; out.beginFrameErrors = st.errors; }
     out.clock = env.clock;
     const eng = watch ? await watch.stop() : null;
+    out.dumpRetries = guest ? guest.dumpRetries : 0;
+    if (eng && eng.stops > 0 && pg) out.engineStop = await engineExitFacts(pg.page).catch((e) => ({ error: String(e?.message ?? e).slice(0, 200) }));
     const t = pg ? await toastState(pg.page).catch(() => ({ stuck: 0, ids: [] })) : { stuck: 0, ids: [] };
     out.stuckToasts = t.stuck;
     out.stuckIds = t.ids;
@@ -140,7 +146,12 @@ async function runRow(d, env, served) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const set = args.scenarios ?? 'smoke';
-  const scenarios = (await import(`./scenarios/${set}/index.mjs`)).default;
+  const all = (await import(`./scenarios/${set}/index.mjs`)).default;
+  const only = args.only === undefined ? null : args.only.split(',').map((s) => s.trim()).filter(Boolean);
+  if (only !== null && (only.length === 0 || only.some((n) => !all.some((s) => s.name === n)))) {
+    throw new Error(`--only: ${args.only} is not a scenario of the set ${set} (${all.map((s) => s.name).join(', ')})`);
+  }
+  const scenarios = only === null ? all : all.filter((s) => only.includes(s.name));
   const names = (args.displays ?? '4k-dpr1,4k-dpr2,4k-random').split(',').map((s) => s.trim()).filter(Boolean);
   const plan = names.flatMap((n) => displayRows(n).map((d) => ({ ...d, display: n })));
   const shotsDir = args.shots ? path.resolve(args.shots) : null;
@@ -178,7 +189,7 @@ async function main() {
     fs.rmSync(workDir, { recursive: true, force: true });
     if (!hadWrangler) fs.rmSync(wranglerDir, { recursive: true, force: true });
   }
-  const ok = rows.length === plan.length && rows.every(rowPasses);
+  const ok = rows.length === plan.length && rows.every((r) => rowPasses(r, scenarios.length));
   log(`rows ${rows.length}, accepted ${ok}`);
   return ok ? 0 : 1;
 }

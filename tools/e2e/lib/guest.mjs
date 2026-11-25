@@ -26,6 +26,7 @@ export class Guest {
     this.page = page;
     this.cdp = cdp;
     this.origin = origin;
+    this.dumpRetries = 0;
   }
   send(method, params = {}) { return timed(this.cdp.send(method, params), method); }
   async ev(expression) {
@@ -33,6 +34,7 @@ export class Guest {
     return r;
   }
   state() { return this.ev(STATE); }
+  /** the window table. The page answers "ask again" while the picture is being shown (the render Worker has not read the last one): it is asked again every 100 ms, for up to 60 s; the number of asks is in dumpRetries (the scenario's JSON) */
   async windows() {
     const t0 = Date.now();
     for (;;) {
@@ -40,6 +42,7 @@ export class Guest {
         return parseWindows(await timed(this.page.evaluate(async () => (await window.__app.deskDumpBase64(false)).windows), 'windows'));
       } catch (e) {
         if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 60000) throw e;
+        this.dumpRetries++;
         await sleep(100);
       }
     }

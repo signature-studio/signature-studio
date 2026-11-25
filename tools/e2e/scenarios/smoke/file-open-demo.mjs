@@ -1,5 +1,6 @@
 // (c) file-open-demo: Welcome closed with Escape (the default project opens), then File > Open (its shortcut Ctrl+O, the engine's Open) and the installer's
 // demo song "DEDZII - NIGHT TERROR" (Data/Demo projects/Demo songs of the bundle's installer resources) given to the open box. The engine does not stop and the project opens.
+// Issue #1421 (the expected failure): the engine stops with exit code 134 about 5 s after the open; the stop reason is in the scenario's JSON (engineStop).
 import path from 'node:path';
 import { dismissProblems, noThanks, openProjectFile, sleep, waitProjectOpen, waitStable } from '../../lib/flow.mjs';
 
@@ -7,7 +8,7 @@ export const DEMO = path.join('Data', 'Demo projects', 'Demo songs', 'DEDZII - N
 
 export default {
   name: 'file-open-demo',
-  expectFail: null,
+  expectFail: '#1421',
   async run({ guest, cdp, repo, log }) {
     const notes = [];
     const first = await waitStable(guest, 180000);

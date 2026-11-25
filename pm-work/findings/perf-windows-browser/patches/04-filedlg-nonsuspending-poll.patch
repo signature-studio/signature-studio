@@ -1,0 +1,255 @@
+diff --git a/lift/harness/web/filedlg/fle_filedlg_lib.js b/lift/harness/web/filedlg/fle_filedlg_lib.js
+index c96361e0..717e4263 100644
+--- a/lift/harness/web/filedlg/fle_filedlg_lib.js
++++ b/lift/harness/web/filedlg/fle_filedlg_lib.js
+@@ -1,7 +1,8 @@
+ // JS side of the browser file dialog bridge (decision 0193, fpick1, PROVISIONAL; REPLACES the design sketch of decision 0178). An emscripten JS library, like harness/web/fruity/fle_idle_lib.js:
+-// link with -sJSPI --js-library <this file>. fle_filedlg_host_pick(requestPtr) is an ASYNC import (WebAssembly.Suspending): the engine's
+-// IFileOpenDialog::Show suspends on it; the Worker posts the request to the page (Module.fleFileDlg), the PERSON at the page chooses (the page's overlay; a file picker needs a click of the person), and the Worker calls
+-// Module.fleFileDlgAnswer(id, answer) with the chosen File objects. This file reads each File straight into a malloc'd block of the engine's memory (no second copy of the bytes in JS), then resolves the Promise with
++// fle_filedlg_host_pick(requestPtr) starts a request without suspending the whole engine. IFileOpenDialog::Show waits through the guest scheduler and polls fle_filedlg_host_poll;
++// an unfinished poll yields one host task through JSPI so that answers arrive even when guest sleeps only advance virtual time.
++// the Worker posts the request to the page (Module.fleFileDlg), the PERSON chooses, and the Worker calls
++// Module.fleFileDlgAnswer(id, answer) with the chosen File objects. This file reads each File straight into a malloc'd block of the engine's memory (no second copy of the bytes in JS), then makes available
+ // a malloc'd text the C side parses (fle_filedlg.c browser_picker): `OK` then one line per item `<role> TAB <ptr> TAB <size> TAB <guest path>`, or `CANCEL`.
+ // answer = { ok: false } | { ok: true, typeIndex?: <1-based file type the person picked>, items: [{ role: 'R' | 'E' | 'S' | 'D', path: <guest path, C:\...>, file?: File }] }.  The library holds no policy: the paths and the limit come from the page's plan (app/src/engine/filedlg.ts).
+ // Module.fleFileDlgProgress(id, doneBytes, totalBytes), when set, is called while a large file is being read.
+@@ -9,54 +10,67 @@ addToLibrary({
+   $FleFileDlg: { count: 0, pending: null, maxBytes: 256 * 1024 * 1024 },
+   fle_filedlg_host_pick__deps: ['$FleFileDlg', '$UTF8ToString', '$stringToUTF8', '$lengthBytesUTF8', 'malloc', 'free'],
+   fle_filedlg_host_pick__sig: 'ip',
+-  fle_filedlg_host_pick__async: true,
+   fle_filedlg_host_pick: (requestJsonPtr) => {
+     const S = FleFileDlg;
+     const request = JSON.parse(UTF8ToString(requestJsonPtr));
+     const id = ++S.count;
+     const toC = (text) => { const n = lengthBytesUTF8(text) + 1; const p = _malloc(n); stringToUTF8(text, p, n); return p; };
+-    return new Promise((resolve) => {
+-      const done = (text) => { if (S.pending && S.pending.id === id) S.pending = null; resolve(toC(text)); };
+-      S.pending = { id, done };
+-      Module['fleFileDlgAnswer'] = (answerId, answer) => {
+-        if (!S.pending || S.pending.id !== answerId) return false;
+-        (async () => {
+-          if (!answer || !answer.ok || !Array.isArray(answer.items) || answer.items.length === 0) { done('CANCEL'); return; }
+-          const lines = ['OK'];
+-          if (Number.isInteger(answer.typeIndex) && answer.typeIndex >= 1) lines.push(`TYPE\t${answer.typeIndex}`);   // decision 0216: the file type the person picked (1-based), for GetFileTypeIndex
+-          const blocks = [];
+-          const fail = () => { for (const b of blocks) _free(b); done('CANCEL'); };   // the blocks of the files already read belong to nobody
+-          let total = 0, read = 0;
+-          for (const it of answer.items) total += it.file ? it.file.size : 0;
+-          for (const it of answer.items) {
+-            if (!it || (it.role !== 'R' && it.role !== 'E' && it.role !== 'S' && it.role !== 'D') || typeof it.path !== 'string' || /[\t\r\n\u0000]/.test(it.path)) { fail(); return; }
+-            if (it.role === 'S' || it.role === 'D') { lines.push(`${it.role}\t0\t0\t${it.path}`); continue; }   // D (decision 0216): the folder a folder dialog returns
+-            const file = it.file;
+-            if (!file || file.size > S.maxBytes) { fail(); return; }
+-            const size = file.size;
+-            const ptr = size > 0 ? _malloc(size) : 0;
+-            if (size > 0 && ptr === 0) { fail(); return; }
+-            if (ptr) blocks.push(ptr);
+-            const reader = file.stream().getReader();
+-            let off = 0;
+-            for (;;) {
+-              const { done: eof, value } = await reader.read();
+-              if (eof) break;
+-              if (off + value.length > size) { fail(); return; }
+-              HEAPU8.set(value, ptr + off);   // HEAPU8 is looked up again at every chunk: the engine's memory may have grown meanwhile
+-              off += value.length;
+-              read += value.length;
+-              if (typeof Module['fleFileDlgProgress'] === 'function') Module['fleFileDlgProgress'](id, read, total);
+-            }
+-            if (off !== size) { fail(); return; }
+-            lines.push(`${it.role}\t${ptr}\t${size}\t${it.path}`);
++    if (S.pending) return toC('CANCEL');
++    const done = (text) => { S.pending.result = toC(text); };
++    S.pending = { id, done, result: 0, answered: false };
++    Module['fleFileDlgAnswer'] = (answerId, answer) => {
++      if (!S.pending || S.pending.id !== answerId || S.pending.answered) return false;
++      S.pending.answered = true;
++      (async () => {
++        if (!answer || !answer.ok || !Array.isArray(answer.items) || answer.items.length === 0) { done('CANCEL'); return; }
++        const lines = ['OK'];
++        if (Number.isInteger(answer.typeIndex) && answer.typeIndex >= 1) lines.push(`TYPE\t${answer.typeIndex}`);   // decision 0216: the file type the person picked (1-based), for GetFileTypeIndex
++        const blocks = [];
++        const fail = () => { for (const b of blocks) _free(b); done('CANCEL'); };   // the blocks of the files already read belong to nobody
++        let total = 0, read = 0;
++        for (const it of answer.items) total += it.file ? it.file.size : 0;
++        for (const it of answer.items) {
++          if (!it || (it.role !== 'R' && it.role !== 'E' && it.role !== 'S' && it.role !== 'D') || typeof it.path !== 'string' || /[\t\r\n\u0000]/.test(it.path)) { fail(); return; }
++          if (it.role === 'S' || it.role === 'D') { lines.push(`${it.role}\t0\t0\t${it.path}`); continue; }   // D (decision 0216): the folder a folder dialog returns
++          const file = it.file;
++          if (!file || file.size > S.maxBytes) { fail(); return; }
++          const size = file.size;
++          const ptr = size > 0 ? _malloc(size) : 0;
++          if (size > 0 && ptr === 0) { fail(); return; }
++          if (ptr) blocks.push(ptr);
++          const reader = file.stream().getReader();
++          let off = 0;
++          for (;;) {
++            const { done: eof, value } = await reader.read();
++            if (eof) break;
++            if (off + value.length > size) { fail(); return; }
++            HEAPU8.set(value, ptr + off);   // HEAPU8 is looked up again at every chunk: the engine's memory may have grown meanwhile
++            off += value.length;
++            read += value.length;
++            if (typeof Module['fleFileDlgProgress'] === 'function') Module['fleFileDlgProgress'](id, read, total);
+           }
+-          done(lines.join('\n'));
+-        })().catch(() => done('CANCEL'));   // (a block read before the throw is lost: a failure of the stream itself, not expected)
+-        return true;
+-      };
+-      if (typeof Module['fleFileDlg'] === 'function') Module['fleFileDlg'](id, request);   // the Worker posts {t: 'filedlg-request'} to the page
+-      else done('CANCEL');                                                                // no host: nobody to ask
+-    });
++          if (off !== size) { fail(); return; }
++          lines.push(`${it.role}\t${ptr}\t${size}\t${it.path}`);
++        }
++        done(lines.join('\n'));
++      })().catch(() => done('CANCEL'));   // (a block read before the throw is lost: a failure of the stream itself, not expected)
++      return true;
++    };
++    if (typeof Module['fleFileDlg'] === 'function') Module['fleFileDlg'](id, request);   // the Worker posts {t: 'filedlg-request'} to the page
++    else done('CANCEL');                                                                // no host: nobody to ask
++    return 0;
++  },
++  fle_filedlg_host_poll__deps: ['$FleFileDlg'],
++  fle_filedlg_host_poll__sig: 'p',
++  fle_filedlg_host_poll__async: true,
++  fle_filedlg_host_poll: async () => {
++    const S = FleFileDlg;
++    // Guest Sleep may only advance virtual time (for example with one thread).
++    // Let host messages and File stream reads run even when no guest becomes idle.
++    if (S.pending && !S.pending.result) await new Promise((resolve) => setTimeout(resolve, 0));
++    if (!S.pending || !S.pending.result) return 0;
++    const p = S.pending.result;
++    S.pending = null;
++    return p;
+   },
+ });
+diff --git a/lift/runtime/fle_filedlg.c b/lift/runtime/fle_filedlg.c
+index 2484695e..b2df9fa6 100644
+--- a/lift/runtime/fle_filedlg.c
++++ b/lift/runtime/fle_filedlg.c
+@@ -26,6 +26,7 @@
+ #include "fle_callback.h"
+ #include "fle_ole.h"
+ #include "fle_filedlg.h"
++#include "fle_thread.h"
+ 
+ #define HR_E_NOINTERFACE 0x80004002u
+ #define HR_E_FAIL 0x80004005u
+@@ -806,18 +807,20 @@ static int env_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsigned
+ }
+ 
+ /* ---- the browser picker (decision 0193, fpick1, PROVISIONAL; always compiled since decision 0243) ----
+- * The user is the person at the page. Show() hands the request to the page through fle_filedlg_host_pick (an ASYNC import, JSPI: harness/web/filedlg/fle_filedlg_lib.js; the native test supplies a stub), the engine's
+- * stack is suspended while the person chooses, and the answer comes back as text, one line per item: `<role> TAB <ptr> TAB <size> TAB <guest path, UTF-8>`, after a first line `OK` (or `CANCEL`, then the lines are ignored).
++ * Show() starts the page's picker and waits cooperatively for its answer, so the other guest threads (especially the mixer) keep running while the person chooses.
++ * The answer is text, one line per item: `<role> TAB <ptr> TAB <size> TAB <guest path, UTF-8>`, after a first line `OK` (or `CANCEL`, then the lines are ignored).
+  * role R = a chosen file: its bytes were read into a malloc'd block (ptr, size) by the page's script and are put on the virtual volume here; E = an extra file of the same choice (a sibling of the project, put on
+  * the volume, not part of the dialog's result); S = a Save target (no bytes yet; the engine writes it). The environment variables of the native harness (FLE_FILEDLG_PICK*, FLE_FILEDLG_SAVE*) are read first and win. */
+ #ifdef __EMSCRIPTEN__
+ extern const char *fle_filedlg_host_pick(const char *request_json);   /* the page's JS library (fle_filedlg_lib.js) */
++extern const char *fle_filedlg_host_poll(void);
+ #define FLE_HAS_HOST_PICK 1
+ #else
+ int fle_vfs_make_dirs(const uint16_t *wdir) __attribute__((weak));
+ int fle_vfs_put_file(const uint16_t *wpath, uint8_t *data, uint64_t size) __attribute__((weak));
+ int fle_vfs_file_state(const uint16_t *wpath, uint64_t *size, unsigned *opens, uint64_t *wt, const uint8_t **data) __attribute__((weak));
+ extern const char *fle_filedlg_host_pick(const char *request_json) __attribute__((weak));   /* a native link list may supply a stub (the tests); without it the harness environment answers */
++extern const char *fle_filedlg_host_poll(void) __attribute__((weak));
+ #define FLE_HAS_HOST_PICK (fle_filedlg_host_pick != NULL)
+ #endif
+ 
+@@ -940,8 +943,13 @@ static int browser_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsi
+     }
+     fputs("]}", f);
+     fclose(f);
+-    ans = (char *)fle_filedlg_host_pick(buf);   /* suspends the engine until the person has answered */
++    ans = (char *)fle_filedlg_host_pick(buf);
+     free(buf);
++    while (ans == NULL && fle_filedlg_host_poll) {
++        if (!fle_thread_sleep) fle_stop("filedlg", "the asynchronous picker needs the guest scheduler");
++        fle_thread_sleep("filedlg", 1);
++        ans = (char *)fle_filedlg_host_poll();
++    }
+     if (ans == NULL) return 0;
+     copy = ans;
+     v = calloc(64, sizeof *v);
+diff --git a/spec/filedlg-bridge.test.mjs b/spec/filedlg-bridge.test.mjs
+new file mode 100644
+index 00000000..2e019816
+--- /dev/null
++++ b/spec/filedlg-bridge.test.mjs
+@@ -0,0 +1,72 @@
++import assert from 'node:assert/strict';
++import fs from 'node:fs';
++import vm from 'node:vm';
++import { test } from 'node:test';
++
++function bridge() {
++  const texts = new Map([[1, JSON.stringify({ save: false, filters: [] })]]);
++  const requests = [];
++  let next = 1024, lib;
++  const scope = {
++    addToLibrary(value) { lib = value; },
++    UTF8ToString: p => texts.get(p),
++    stringToUTF8: (s, p) => texts.set(p, s),
++    lengthBytesUTF8: s => Buffer.byteLength(s),
++    _malloc(n) { const p = next; next += n; return p; },
++    _free() {},
++    HEAPU8: new Uint8Array(65536),
++    setTimeout,
++    Module: { fleFileDlg(id, request) { requests.push({ id, request }); } },
++  };
++  vm.runInNewContext(fs.readFileSync(new URL('../lift/harness/web/filedlg/fle_filedlg_lib.js', import.meta.url), 'utf8'), scope);
++  scope.FleFileDlg = lib.$FleFileDlg;
++  return { lib, scope, texts, requests };
++}
++
++test('a pending picker returns immediately, and cancellation is consumed once', async () => {
++  const { lib, scope, texts, requests } = bridge();
++  assert.equal(lib.fle_filedlg_host_pick(1), 0);
++  assert.equal(lib.fle_filedlg_host_pick__async, undefined);
++  assert.equal(await lib.fle_filedlg_host_poll(), 0);
++  assert.equal(requests.length, 1);
++  assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id + 1, { ok: false }), false);
++  assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false }), true);
++  assert.equal(scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false }), false);
++  assert.equal(texts.get(await lib.fle_filedlg_host_poll()), 'CANCEL');
++  assert.equal(await lib.fle_filedlg_host_poll(), 0);
++  assert.equal(lib.fle_filedlg_host_pick(1), 0);
++  assert.equal(requests.length, 2);
++});
++
++test('file reading leaves the picker pending until every byte is available', async () => {
++  const { lib, scope, texts, requests } = bridge();
++  let complete;
++  const bytes = new Uint8Array([3, 1, 4]);
++  const file = { size: 3, stream() { return { getReader() {
++    let first = true;
++    return { read() { if (!first) return Promise.resolve({ done: true }); first = false; return new Promise(resolve => { complete = resolve; }); } };
++  } }; } };
++  lib.fle_filedlg_host_pick(1);
++  scope.Module.fleFileDlgAnswer(requests[0].id, { ok: true, typeIndex: 1, items: [{ role: 'R', path: 'C:\\test.flp', file }] });
++  assert.equal(await lib.fle_filedlg_host_poll(), 0);
++  complete({ done: false, value: bytes });
++  await new Promise(resolve => setImmediate(resolve));
++  const answer = texts.get(await lib.fle_filedlg_host_poll());
++  const match = answer.match(/^OK\nTYPE\t1\nR\t(\d+)\t3\tC:\\test.flp$/);
++  assert.ok(match, answer);
++  assert.deepEqual(scope.HEAPU8.slice(Number(match[1]), Number(match[1]) + 3), bytes);
++});
++
++test('polling yields a host task even when guest sleep never suspends', async () => {
++  const { lib, scope, texts, requests } = bridge();
++  lib.fle_filedlg_host_pick(1);
++  let delivered = false;
++  setTimeout(() => {
++    delivered = true;
++    scope.Module.fleFileDlgAnswer(requests[0].id, { ok: false });
++  }, 0);
++  const answer = await lib.fle_filedlg_host_poll();
++  assert.equal(delivered, true);
++  assert.equal(texts.get(answer), 'CANCEL');
++  assert.equal(await lib.fle_filedlg_host_poll(), 0);
++});

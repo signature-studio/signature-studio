@@ -1,0 +1,101 @@
+diff --git a/lift/harness/web/g3/g3_scenarios.c b/lift/harness/web/g3/g3_scenarios.c
+index 84348be7..d98d07a0 100644
+--- a/lift/harness/web/g3/g3_scenarios.c
++++ b/lift/harness/web/g3/g3_scenarios.c
+@@ -220,15 +220,49 @@ static void sc_move(void)
+     fle_imp_GetCursorPos();
+ }
+ static void sc_coalesce(void)
++{
++    int a, b, c;
++
++    world();
++    a = fle_input_host_mouse(FLE_IN_MOVE, 300, 250, 0);
++    b = fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
++    c = fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
++    printf("move injections accepted %d %d %d\n", a, b, c);
++    printf("pending before pump %u\n", fle_input_host_pending());
++    printf("pump %d\n", pump());
++    uint64_t p = A(&stk[0x100]);
++    CALL4(fle_imp_GetCursorPos, p, 0, 0, 0);
++    printf("cursor %u %u\n", (unsigned)fle_ld(p, 4), (unsigned)fle_ld(p + 4, 4));
++}
++static void sc_coalesce_boundaries(void)
+ {
+     world();
+     fle_input_host_mouse(FLE_IN_MOVE, 300, 250, 0);
+     fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
++    fle_input_host_mouse(FLE_IN_BDOWN, 310, 260, FLE_IN_BTN_L);
+     fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
+-    printf("pump %d\n", pump());
++    fle_input_host_mouse(FLE_IN_WHEEL, 320, 270, 120);
++    fle_input_host_mouse(FLE_IN_MOVE, 330, 280, 0);
++    fle_input_host_key(FLE_IN_KDOWN, 0x41, 0, 0);
++    fle_input_host_mouse(FLE_IN_MOVE, 340, 290, 0);
++    printf("pending across button/wheel/key boundaries %u\n", fle_input_host_pending());
++}
++static void sc_coalesce_full(void)
++{
++    unsigned i, wheels = 0;
+     uint64_t p = A(&stk[0x100]);
++
++    world();
++    for (i = 0; i < 511; i++) wheels += (unsigned)fle_input_host_mouse(FLE_IN_WHEEL, 300, 250, 120);
++    i = (unsigned)fle_input_host_mouse(FLE_IN_MOVE, 310, 260, 0);
++    {
++        unsigned replaced = (unsigned)fle_input_host_mouse(FLE_IN_MOVE, 320, 270, 0);
++        unsigned button = (unsigned)fle_input_host_mouse(FLE_IN_BDOWN, 320, 270, FLE_IN_BTN_L);
++
++        printf("full queue: wheels %u initial move %u replacement %u button %u pending %u\n", wheels, i, replaced, button, fle_input_host_pending());
++    }
+     CALL4(fle_imp_GetCursorPos, p, 0, 0, 0);
+-    printf("cursor %u %u\n", (unsigned)fle_ld(p, 4), (unsigned)fle_ld(p + 4, 4));
++    printf("cursor after full-queue replacement %u %u\n", (unsigned)fle_ld(p, 4), (unsigned)fle_ld(p + 4, 4));
+ }
+ static void sc_click(void)
+ {
+@@ -665,7 +699,7 @@ static void sc_idle_hook(void)
+ 
+ typedef struct { const char *name; void (*fn)(void); int idle; } scenario;
+ static const scenario S[] = {
+-    { "move", sc_move, 0 }, { "coalesce", sc_coalesce, 0 }, { "click", sc_click, 0 }, { "capture", sc_capture, 0 }, { "disabled", sc_disabled, 0 }, { "dblclk", sc_dblclk, 0 },
++    { "move", sc_move, 0 }, { "coalesce", sc_coalesce, 0 }, { "coalesce_boundaries", sc_coalesce_boundaries, 0 }, { "coalesce_full", sc_coalesce_full, 0 }, { "click", sc_click, 0 }, { "capture", sc_capture, 0 }, { "disabled", sc_disabled, 0 }, { "dblclk", sc_dblclk, 0 },
+     { "hit_transparent", sc_hit_transparent, 0 }, { "mouseactivate", sc_mouseactivate, 0 }, { "mouseactivate_no", sc_mouseactivate_no, 0 },
+     { "track_leave", sc_track_leave, 0 }, { "track_hover", sc_track_hover, 0 }, { "track_hover_edge", sc_track_hover_edge, 0 }, { "key_target", sc_key_target, 0 }, { "key_dead_window", sc_key_dead_window, 0 }, { "post_dead_window", sc_post_dead_window, 0 }, { "token", sc_token, 0 }, { "cmp_control", sc_cmp_control, 0 }, { "track_cancel", sc_track_cancel, 0 },
+     { "keys", sc_keys, 0 }, { "syskeys", sc_syskeys, 0 }, { "keystate", sc_keystate, 0 }, { "msgpos", sc_msgpos, 0 },
+diff --git a/lift/runtime/fle_input.c b/lift/runtime/fle_input.c
+index 444bbeb7..cc65c339 100644
+--- a/lift/runtime/fle_input.c
++++ b/lift/runtime/fle_input.c
+@@ -136,9 +136,11 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
+ {
+     hwev *e;
+     unsigned b;
++    int replace_move;
+ 
+     if (kind != FLE_IN_MOVE && kind != FLE_IN_BDOWN && kind != FLE_IN_BUP && kind != FLE_IN_WHEEL) return 0;
+-    if (ev_n >= EV_MAX) return 0;
++    replace_move = kind == FLE_IN_MOVE && ev_n != 0 && evq[(ev_head + ev_n - 1u) % EV_MAX].kind == FLE_IN_MOVE;
++    if (ev_n >= EV_MAX && !replace_move) return 0;
+     /* S-pointer-clamp: the pointer cannot leave the virtual screen (the page of SetCursorPos adjusts a point outside the clip rectangle; the screen is the rectangle, as fle_win.c's setter does) */
+     if (x < 0) x = 0;
+     if (y < 0) y = 0;
+@@ -150,15 +152,15 @@ int fle_input_host_mouse(int kind, int32_t x, int32_t y, int32_t data)
+         b = data == (int32_t)FLE_IN_BTN_R ? VK_RBUTTON_ : data == (int32_t)FLE_IN_BTN_M ? VK_MBUTTON_ : VK_LBUTTON_;
+         set_key(key_async, b, kind == FLE_IN_BDOWN);
+     }
+-    e = &evq[(ev_head + ev_n) % EV_MAX];
+-    memset(e, 0, sizeof *e);
++    e = replace_move ? &evq[(ev_head + ev_n - 1u) % EV_MAX] : &evq[(ev_head + ev_n) % EV_MAX];
++    if (!replace_move) memset(e, 0, sizeof *e);
+     e->kind = kind;
+     e->x = x;
+     e->y = y;
+     e->data = data;
+     e->mk = mk_flags();
+     e->ticks = clk();
+-    ev_n++;
++    if (!replace_move) ev_n++;
+     note_changebits(e);
+     fle_thread_wake_check();
+     return 1;
