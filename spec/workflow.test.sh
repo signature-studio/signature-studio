@@ -846,7 +846,7 @@ ok "deploy.yml(m): スモークの段に if が無い(既定の success(). 落�
 ok "deploy.yml(m): 起動の確認と流れの段は時間の上限(timeout-minutes)を持つ" "$(jq '[.jobs.deploy.steps[] | select(((.run // "") | test("boot-bundle|welcome-flow"))) | has("timeout-minutes")] | length == 2 and all' "$DJ")" true
 ok "deploy.yml(m): スモークの段は env を持たない(鍵と token を渡さない)" "$(jq "[.jobs.deploy.steps[] | select(((.run // \"\") | test(\"$SMOKE\"))) | has(\"env\")] | any" "$DJ")" false
 ok "deploy.yml(m): どの段にも continue-on-error が無い" "$(jq '[.jobs.deploy.steps[] | has("continue-on-error")] | any' "$DJ")" false
-ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる)$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(m): スモークと本番の manifest の確認の段以外の段と job の設定と on は、変更前(cf3e7dc9)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DO" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' --arg sm "$SMOKE" 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select(((.run // "") | test($sm)) | not) | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "deploy.yml(m): guard/deploy-lint.sh が deploy.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$D" > /dev/null 2>&1; echo $?)" 0
 ok "deploy.yml(m): スモークが読む bundle は、fe-build の upload が読む場所と同じ(raw/fl-Oz)" "$(grep -cF '"$PWD/lift/out-app/bundle/raw/fl-Oz"' "$D")/$(grep -cF 'OUT_APP_DIR}/bundle/raw/fl-Oz/manifest.json' "$top/lift/crates/fe-build/src/main.rs")" "2/1"
 BG=$(jq -r '[.jobs.deploy.steps[] | select(((.run // "") | test("jq -e")) and ((.run // "") | test("boot[.]json"))) | .run] | .[0] // ""' "$DJ")
@@ -969,7 +969,7 @@ ok "deploy.yml(s): 「本番の manifest を確かめる」の段は 1 つで、
 ok "deploy.yml(s): 「本番の manifest を確かめる」の段に if・env・uses・continue-on-error が無い(既定の success()。鍵を渡さない)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | (has("if") or has("env") or has("uses") or has("continue-on-error"))] | any' "$DJ")" false
 RSN=$(jq -r '[.jobs.deploy.steps[] | select(.name == "本番の manifest を確かめる") | .run] | .[0] // ""' "$DJ")
 ok "deploy.yml(s): 「本番の manifest を確かめる」は読むだけ(commit・push・gh・wrangler・書き込みの記号は無い)" "$(grep -cE 'git |gh |wrangler|>|tee' <<<"$RSN")" 0
-ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる)$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
+ok "deploy.yml(s): 「本番の manifest を確かめる」を除き、job の設定と on と、既存の段の中身は、変更前(384b1e40)と一致する(抽出の木の鍵の式と、resources・bundle の段は除く)" "$(jq -n -S --slurpfile n "$DJN" --slurpfile o "$DP" --arg re '^(本番の manifest を確かめる|resources を取り出す|bundle の中身を確かめる|関数名の表を版ごとに残す|関数名の表を artifact に上げる)$' 'def nk: map(if .id == "cache" then del(.with.key) else . end); ([$n[0].jobs.deploy.steps[] | select((.name // "") | test($re) | not)] | nk) == ($o[0].jobs.deploy.steps | nk) and ($n[0].jobs.deploy | del(.steps)) == ($o[0].jobs.deploy | del(.steps)) and $n[0].on == $o[0].on')" true
 ok "fe-build upload は門を読まない(main.rs に、門の語 verified・gated と、root の一覧の読みが無い)" "$(grep -ciE 'verified|root[.]txt|gated' "$top/lift/crates/fe-build/src/main.rs")" 0
 OLDSHA=b440e13a623aa949ccce21db53566658425743bb2b21263bcf773d278396e043; NEWSHA=$(printf 'c%.0s' $(seq 1 64))
 vm() { printf '{"engine":{"wasm":{"sha256":%s}}}\n' "$1"; }
@@ -1173,4 +1173,35 @@ NX=$PLAN/bundle-no-external.txt
 ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
 ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott・serum2 の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 4 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
+# (w) 版ごとの関数名の表(#1404: 実機の wasm の trap の関数を、番号から名前に引くため)。deploy は、fe-build engine が作った lift/out-app/gen/wasm-func-names.tsv を gzip -9 し、版の名前の artifact に残す
+FNS=$(jq -r '[.jobs.deploy.steps[] | select(.id == "fn") | .run][0] // ""' "$DJ")
+FNU=$(jq -c '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@")) | .with][0] // {}' "$DJ")
+ok "deploy.yml(w): 表を残す段(id: fn)と、upload-artifact の段が、それぞれ 1 つ" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn")] | length' "$DJ")/$(jq '[.jobs.deploy.steps[] | select((.uses // "") | test("^actions/upload-artifact@"))] | length' "$DJ")" "1/1"
+ok "deploy.yml(w): artifact の名前は func-names-<版>(版は、この段の出力 v = manifest の bundle.version)" "$(jq -r '.name' <<<"$FNU")" 'func-names-${{ steps.fn.outputs.v }}'
+ok "deploy.yml(w): artifact の保存は 90 日(retention-days: 90)" "$(jq -r '.["retention-days"]' <<<"$FNU")" 90
+ok "deploy.yml(w): 表を残す段と upload の段に if が無い(既定の success(). 表が無ければ落ちて、deploy を止める)" "$(jq '[.jobs.deploy.steps[] | select(.id == "fn" or ((.uses // "") | test("^actions/upload-artifact@"))) | has("if")] | any' "$DJ")" false
+ok "deploy.yml(w): 表を残す段は gzip -9 で、RUNNER_TEMP に書く(upload の path と同じ物)" "$(grep -cF 'gzip -9 -c "$f" > "$RUNNER_TEMP/wasm-func-names.tsv.gz"' <<<"$FNS")/$(jq -r '.path' <<<"$FNU")" '1/${{ runner.temp }}/wasm-func-names.tsv.gz'
+ok "deploy.yml(w): 表は lift/out-app/gen/wasm-func-names.tsv、版は lift/out-app/bundle/raw/fl-Oz/manifest.json の .bundle.version(jq -er: 無ければ落ちる)" "$(grep -cF 'f=lift/out-app/gen/wasm-func-names.tsv' <<<"$FNS")/$(grep -cF 'lift/out-app/bundle/raw/fl-Oz/manifest.json' <<<"$FNS")/$(grep -cF 'jq -er .bundle.version' <<<"$FNS")" "1/1/1"
+ok "deploy.yml(w): 表を残す段は、大きさ(gzip 後)をログに出す" "$(grep -cF 'wc -c' <<<"$FNS")" 1
+ok "deploy.yml(w): 表を残す段は、fe-build bundle の後・fe-build upload の前に在り、upload の段は、その直後に在る" "$(jq -r '
+  ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build bundle$")) | .key] | .[0]) as $b
+  | ([.jobs.deploy.steps | to_entries[] | select(.value.id == "fn") | .key] | .[0]) as $f
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.run // "") | test("fe-build upload$")) | .key] | .[0]) as $u
+  | ([.jobs.deploy.steps | to_entries[] | select((.value.uses // "") | test("^actions/upload-artifact@")) | .key] | .[0]) as $a
+  | "\($b < $f and $f + 1 == $a and $a < $u)"' "$DJ")" true
+ok "deploy.yml(w): actions.lock の deploy.yml の一覧に actions/upload-artifact@v7.0.2 が在る(gh actions-lock が作る)" "$(pj "$top/.github/workflows/actions.lock" | jq -r '.workflows[".github/workflows/deploy.yml"] | index("actions/upload-artifact@v7.0.2") != null')" true
+ok "deploy.yml(w): 100 行以内(deploy.yml の行数が 100 以下)" "$([ "$(wc -l < "$D")" -le 100 ] && echo yes)" yes
+FNR=$T/fnrun; rm -rf "$FNR"; mkdir -p "$FNR/lift/out-app/gen" "$FNR/lift/out-app/bundle/raw/fl-Oz" "$FNR/rt"
+printf 'index\tkind\tva\tname\n0\timport\t\tc.f1\n1\tf\t0x40\tf_40\n' > "$FNR/lift/out-app/gen/wasm-func-names.tsv"
+printf '{"bundle":{"name":"fl-Oz","version":"2578ea1e23f6"}}\n' > "$FNR/lift/out-app/bundle/raw/fl-Oz/manifest.json"
+printf '%s\n' "$FNS" > "$T/fnstep.sh"
+fnrun() { ( cd "$FNR" && rm -f "$FNR/out.txt" && env RUNNER_TEMP="$FNR/rt" GITHUB_OUTPUT="$FNR/out.txt" bash -e "$T/fnstep.sh" > "$T/fn.log" 2>&1; echo $? ); }
+rc=$(fnrun)
+ok "deploy.yml(w): 段の動き: 表と版が在れば 0 で終わり、gzip の中身は表と同じ、GITHUB_OUTPUT に v=<版> を書く" "$rc/$(gunzip -c "$FNR/rt/wasm-func-names.tsv.gz" 2>/dev/null | cmp -s - "$FNR/lift/out-app/gen/wasm-func-names.tsv" && echo same)/$(grep -cx 'v=2578ea1e23f6' "$FNR/out.txt" 2>/dev/null)" "0/same/1"
+rm -f "$FNR/lift/out-app/gen/wasm-func-names.tsv"; rc=$(fnrun)
+ok "deploy.yml(w): 段の動き: 表が無ければ(ビルドの変更)落ちる(無音で飛ばさない)" "$([ "$rc" != 0 ] && echo fails)/$(test -e "$FNR/out.txt" && echo wrote || echo none)" "fails/none"
+printf 'index\tkind\tva\tname\n' > "$FNR/lift/out-app/gen/wasm-func-names.tsv"; printf '{"bundle":{"name":"fl-Oz"}}\n' > "$FNR/lift/out-app/bundle/raw/fl-Oz/manifest.json"; rc=$(fnrun)
+ok "deploy.yml(w): 段の動き: manifest に版が無ければ落ちる(artifact の名前を決められない)" "$([ "$rc" != 0 ] && echo fails)/$(test -e "$FNR/out.txt" && echo wrote || echo none)" "fails/none"
+FNDS=$(awk '/^## 18[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
+ok "設計(w): 「版ごとの関数名の表」の節に、artifact の名前(func-names-<版>)と取り出し(gh run download)と道具の引数(--func-names-dir)が在る" "$(for w in 'func-names-<版>' 'gh run download' '--func-names-dir'; do grep -cF -- "$w" <<<"$FNDS"; done | awk '{s+=($1>0)} END{print s}')" 3
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
