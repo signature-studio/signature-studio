@@ -11,7 +11,7 @@
 # 起動用の実行ファイル(FL64.exe と FL64 (scaled).exe。ラベル fl-exe)も同じ作りで、取り出しは --file の完全なパスで行い、作業の段で lift/out-app/host-extra/exe に置く(commit はしない)。
 # 抽出物(FL の DLL など)は R2 のキャッシュだけに置き、公開の artifact には置かない。
 # インストーラの一覧(inventory)と外部プラグイン(plugin-external)は、そのラベルの Issue が起動したときだけ、extract の段で取り、R2 のキャッシュに置く。作業の段は、キャッシュから inputs/ と lift/out-app/external/ に置く(commit はしない)。
-# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。一覧は ci/resources-prefixes.txt・ci/plugin-builtin-prefixes.txt(1 行 1 項目。\ で終わる行は接頭辞(その下の全ファイル)、\ で終わらない行は完全なパス。鍵の入力に入る)。
+# 言語・テーマ・テンプレート・プロジェクト(resources)と内蔵のプラグインの DLL(plugin-builtin)も同じ作りで、取り出した物は、インストール先の相対のパスの木として、作業の段で lift/out-app/host-extra/ に置く。言語等(resources)は例外で、ラベルによらず全ての作業で取り、bundle が読む lift/out-app/host/resources にも置く(seed 表の resources/ の行は、作業の途中で main を取り込むと増え、開始時の抽出の木に無いことがあるため。fe-build bundle が読むのは lift/out-app/host だけ)。一覧は ci/resources-prefixes.txt・ci/plugin-builtin-prefixes.txt(1 行 1 項目。\ で終わる行は接頭辞(その下の全ファイル)、\ で終わらない行は完全なパス。鍵の入力に入る)。
 # 実機のビーコン(ラベル perf-beacons)は、extract が R2 の perf/ から取り、run ごとの鍵(perf-beacons-<run_id>)のキャッシュで work に渡す。公開の artifact には置かない(設計は pm-work/workflow-design.md の「3」)。
 # push が 3 回とも落ちたとき、判定が落ちたとき、および時間切れで取り消されたときは、作業を差分(work.diff)で artifact に残す(取り消しの猶予の約 5 分で終わるよう、保存の段は通信をしない)。同じ Issue の次の run は、それを作業の前に取り込む(判定を通らなかった作業は commit せず、続きから行う。設計は pm-work/workflow-design.md の「4」「7」「13」)。
 name: agent
@@ -259,7 +259,6 @@ jobs:
           key: external-${{ hashFiles('ci/artifacts.lock', 'tools/external-inputs/check.mjs') }}
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)
-        if: contains(format(',{0},', needs.select.outputs.labels), ',resources,')
         id: resources
         uses: runs-on/cache/restore@v5
         env:
@@ -276,7 +275,7 @@ jobs:
           key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)
-        if: contains(format(',{0},', needs.select.outputs.labels), ',resources,') && steps.resources.outputs.cache-hit != 'true'
+        if: steps.resources.outputs.cache-hit != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}
@@ -289,7 +288,7 @@ jobs:
           rm -f "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe"
 
       - name: インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)
-        if: contains(format(',{0},', needs.select.outputs.labels), ',resources,') && steps.resources.outputs.cache-hit != 'true'
+        if: steps.resources.outputs.cache-hit != 'true'
         uses: runs-on/cache/save@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -607,8 +606,8 @@ jobs:
           mv "$RUNNER_TEMP/external"/* lift/out-app/external/
           node tools/external-inputs/check.mjs lift/out-app/external | tee "$RUNNER_TEMP/out/external-check.txt"
 
-      - name: 言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)
-        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
+      - name: 言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(全ての作業)
+        if: success() && steps.check.outputs.skip != 'true'
         uses: runs-on/cache/restore@v5
         env:
           RUNS_ON_S3_BUCKET_CACHE: fl-web-cache
@@ -624,12 +623,14 @@ jobs:
           key: extra-resources-${{ hashFiles('ci/artifacts.lock', 'tools/fl-installer-extract.mjs', 'tools/fl-installer-files.mjs', 'app/scripts/lib/*.mjs', 'ci/resources-prefixes.txt') }}
           fail-on-cache-miss: true
 
-      - name: 取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)
-        if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',resources,')
+      - name: 取った物を lift/out-app/host-extra/resources と lift/out-app/host/resources に置く(全ての作業。commit はしない)
+        if: success() && steps.check.outputs.skip != 'true'
         run: |
           mkdir -p lift/out-app/host-extra
           mv "$RUNNER_TEMP/extra-resources" lift/out-app/host-extra/resources
           test -f lift/out-app/host-extra/resources/MANIFEST.tsv
+          mkdir -p lift/out-app/host/resources
+          cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/
 
       - name: 内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)
         if: success() && steps.check.outputs.skip != 'true' && contains(format(',{0},', fromJSON(needs.select.outputs.issue_labels)[format('{0}', matrix.issue)]), ',plugin-builtin,')
