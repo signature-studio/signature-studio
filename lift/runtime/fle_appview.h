@@ -39,7 +39,8 @@ typedef struct {
     uint32_t pending_events;           /* raw input events queued by the host and not yet turned into messages */
     uint32_t n_windows;
     uint32_t screen_w, screen_h;       /* decision 0212: the size of the virtual screen the guest is told (fle_screen.h); 0 in a build older than this field: the page then takes 1920 x 1080 */
-    uint32_t reserved[3];
+    uint32_t cursor_made;              /* #1390: 1 when the handle is an icon or a cursor the guest made itself (CreateIconIndirect, fle_gdi.c: FLE_GDI_KIND_ICONCUR), else 0 */
+    uint32_t reserved[2];
     fle_av_window windows[FLE_AV_MAX_WINDOWS];
 } fle_av_state;
 

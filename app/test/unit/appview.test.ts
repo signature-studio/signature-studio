@@ -27,7 +27,7 @@ describe('the layout is the one of lift/runtime/fle_appview.h (read from the fil
     const win = /typedef struct \{([^}]*)\} fle_av_window;/.exec(h)?.[1] ?? '';
     expect(win.replace(/\s+/g, ' ')).toContain('uint32_t lid, hwnd, flags, owner_lid; int32_t x, y, width, height; uint32_t style, exstyle, thread, reserved; char cls[FLE_AV_CLASS_BYTES]; char title[FLE_AV_TITLE_BYTES];');
     const st = /typedef struct \{([^}]*)\} fle_av_state;/.exec(h)?.[1] ?? '';
-    expect(st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ')).toContain('uint32_t magic, version, entry_size, max_windows; uint32_t seq; uint32_t cursor; uint32_t cursor_idc; uint32_t cursor_shared; int32_t pointer_x, pointer_y; uint32_t pending_events; uint32_t n_windows; uint32_t screen_w, screen_h; uint32_t reserved[3]; fle_av_window windows[FLE_AV_MAX_WINDOWS];');
+    expect(st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ')).toContain('uint32_t magic, version, entry_size, max_windows; uint32_t seq; uint32_t cursor; uint32_t cursor_idc; uint32_t cursor_shared; int32_t pointer_x, pointer_y; uint32_t pending_events; uint32_t n_windows; uint32_t screen_w, screen_h; uint32_t cursor_made; uint32_t reserved[2]; fle_av_window windows[FLE_AV_MAX_WINDOWS];');
   });
 });
 

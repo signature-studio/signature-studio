@@ -121,6 +121,15 @@ uint64_t fle_class_hcursor_of(uint16_t atom);                     /* fle_class.c
 #define FLE_HTTRANSPARENT     (-1)
 #define FLE_HTNOWHERE         0
 #define FLE_HTCLIENT          1
+/* the sizing codes (Learn WM_NCHITTEST, the values of winuser.h; #1390) */
+#define FLE_HTLEFT            10
+#define FLE_HTRIGHT           11
+#define FLE_HTTOP             12
+#define FLE_HTTOPLEFT         13
+#define FLE_HTTOPRIGHT        14
+#define FLE_HTBOTTOM          15
+#define FLE_HTBOTTOMLEFT      16
+#define FLE_HTBOTTOMRIGHT     17
 #define FLE_MA_ACTIVATE       1u
 #define FLE_MA_ACTIVATEANDEAT 2u
 #define FLE_MA_NOACTIVATE     3u
