@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EngineClient } from '../../src/engine/client.ts';
 import type { ToRender, ToWorker } from '../../src/engine/protocol.ts';
 import type { Manifest } from '../../src/bundle/manifest.ts';
@@ -15,9 +15,12 @@ class FakeWorker {
   postMessage(m: ToWorker | ToRender): void { sent.push(m); }
   terminate(): void { /* nothing */ }
 }
-const g = globalThis as unknown as { Worker?: unknown };
+const g = globalThis as unknown as { Worker?: unknown; requestAnimationFrame?: unknown };
 const original = g.Worker;
-afterEach(() => { g.Worker = original; sent.length = 0; });
+// the frames the page asks for (EngineClient wakes the Worker in the frame's callback): run by the test
+const frames: (() => void)[] = [];
+beforeEach(() => { g.requestAnimationFrame = (cb: () => void) => { frames.push(cb); return frames.length; }; });
+afterEach(() => { g.Worker = original; sent.length = 0; frames.length = 0; delete g.requestAnimationFrame; });
 
 const manifest = { engine: { kind: 'emscripten-fruity-v1', env: {} } } as unknown as Manifest;
 const assets = { module: {} as WebAssembly.Module, seed: new Uint8Array(0), glue: new Uint8Array(0), dll: new Uint8Array(0) };
@@ -52,7 +55,7 @@ describe('EngineClient.init message', () => {
     expect(Object.keys(a).sort()).toEqual(['assets', 'cmd', 'desk', 'manifest']);
     expect(Object.keys(a.desk).sort()).toEqual(['ctl', 'port', 'ring']);
   });
-  it('an input event goes into the ring and a message wakes the Worker only if it is parked', () => {
+  it('an input event goes into the ring and no message is sent: the Worker is woken once per frame by a notify', () => {
     g.Worker = FakeWorker;
     const c = new EngineClient({ ...events, ...canvasOf() });
     void c.init(manifest, assets);
@@ -60,10 +63,13 @@ describe('EngineClient.init message', () => {
     sent.length = 0;
     const ev = { k: 'mouse', kind: 1, x: 5, y: 6, data: 0 } as const;
     c.sendInput(1, 100, ev);
-    expect(sent.length).toBe(0);                       // not parked: nothing but the ring
-    new Int32Array(init.desk.ring)[2] = 1;             // the Worker says it is parked
     c.sendInput(2, 101, ev);
-    expect(sent).toEqual([{ cmd: 'wake' }]);
-    expect(c.ringStats.wakes).toBe(1);
+    expect(sent.length).toBe(0);
+    expect(new Int32Array(init.desk.ring)[0]).toBe(2);   // HEAD: both records are in the ring
+    expect(frames.length).toBe(1);                       // one wake for the frame, not one per event
+    frames[0]?.();
+    expect(c.ringStats.wakes).toBe(0);                   // no Worker waits in this test: nobody is woken
+    c.sendInput(3, 102, ev);
+    expect(frames.length).toBe(2);
   });
 });

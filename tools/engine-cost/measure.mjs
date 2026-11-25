@@ -13,7 +13,7 @@ import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
 const USAGE = 'usage: node tools/engine-cost/measure.mjs --bundle <absolute path to raw/<name>> --names <absolute path to wasm-func-names.tsv> --scene i|ii|iii --dpr <number> --out <absolute path to the result JSON> [--window-s <seconds, default 60>] [--keep-profiles]\n';
-const VALUE_FLAGS = ['--bundle', '--names', '--scene', '--dpr', '--out', '--window-s'];
+const VALUE_FLAGS = ['--bundle', '--names', '--scene', '--dpr', '--out', '--window-s', '--app'];
 const SCENES = ['i', 'ii', 'iii'];
 const argv = process.argv.slice(2);
 const valueOf = (flag) => { const i = argv.indexOf(flag); return i < 0 ? undefined : argv[i + 1]; };
@@ -44,7 +44,7 @@ const BUNDLE = path.basename(bundleDir);
 const NAMES = path.resolve(namesArg);
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
-const appDir = path.join(repo, 'app');
+const appDir = valueOf('--app') ?? path.join(repo, 'app');   // --app: the app served (an absolute path with a built dist); default: this repository's app
 const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
 const WAIT_LIMIT_MS = 180000;
 const POLL_MS = 50;

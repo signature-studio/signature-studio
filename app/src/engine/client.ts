@@ -81,8 +81,9 @@ export class EngineClient {
   }
   /** decision 0223: the page's end of the input ring */
   private ring: RingWriter | null = null;
-  /** events that did not fit in the ring and went as messages, and wake messages sent */
+  /** events that did not fit in the ring and went as messages, and the Workers woken on the ring (a parked Worker waits for a notify) */
   ringStats = { viaMessage: 0, wakes: 0 };
+  private wakePending = false;
 
   constructor(events: ClientEvents) { this.events = events; }
 
@@ -127,6 +128,8 @@ export class EngineClient {
   }
 
   start(): void { this.send({ cmd: 'start' }); }
+  /** Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once) */
+  exitRequest(): void { this.worker?.postMessage({ cmd: 'exit-request' } satisfies ToWorker); }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
   /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
   webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
@@ -137,15 +140,24 @@ export class EngineClient {
   answerFileDlg(id: number, answer: FileDlgAnswer): void { this.worker?.postMessage({ cmd: 'filedlg-answer', id, answer } satisfies ToWorker); }
   /** a raw input event for the engine (decision 0141); `tPage` is the instant the DOM event was handled */
   sendInput(seq: number, tPage: number, ev: RawInput): void {
-    // decision 0223: with display method D the event goes into the shared ring; a message wakes the Worker only if it is parked (idle, nothing but a message or a timer would run it)
+    // decision 0223: with display method D the event goes into the shared ring; the Worker waits on the ring while it is idle, and is woken once per frame (wakeOnFrame)
     if (this.ring) {
       if (this.ring.push(seq, tPage, ev)) {
-        if (this.ring.parked) { this.ringStats.wakes++; this.worker?.postMessage({ cmd: 'wake' } satisfies ToWorker); }
+        this.wakeOnFrame();
         return;
       }
       this.ringStats.viaMessage++;
     }
     this.worker?.postMessage({ cmd: 'input', seq, tPage, ev } satisfies ToWorker);
+  }
+  /**
+   * Issue #1397: the Worker is woken once per animation frame that has input, not once per event (a notify on the ring costs the page about as much as a message did): the records of the frame are taken in one pass
+   */
+  private wakeOnFrame(): void {
+    if (this.wakePending || !this.ring) return;
+    this.wakePending = true;
+    const ring = this.ring;
+    requestAnimationFrame(() => { this.wakePending = false; this.ringStats.wakes += ring.notify(); });
   }
   /**
    * The engine runs synchronously inside its wasm stack, so a running engine cannot be asked to stop: if it is idle (waiting for input) the session is ended,

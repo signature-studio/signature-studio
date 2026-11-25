@@ -108,3 +108,7 @@
 169	#1412	ゲストの環境変数を、Windows と同じ振る舞いにする: FL が `%FLStudioFactoryData%` などを展開できるようにする	Task
 170	#1413	MSVC の switch 表の飛び先(ガード `cmp`・`ja` が無い形)を、lift が認識する: 『indirect call to … is not a known function entry』で止まらない	Task
 171	#1414	Sytrus の Data(109 件)を、起動の後の取得で配信し、`Default.dat` の空のパスで止まらない	Task
+172	#1415	GetFileVersionInfoSizeW などの、ディレクトリ部が無いファイル名の呼び出しで、engine を止めない: LoadLibrary と同じ探索の順序を実装する	Task
+173	#1416	View メニューの項目(View > #11 > #1)で、null の関数の呼び出し(indirect call to 0)で engine が止まる: 呼び出し元と、null になった理由を特定して直す	Task
+174	#1417	crash-hunt の続き: 残りの経路・Settings の全タブと言語・テーマの切り替え・Browser の各タブ・上部バーの部品と Mixer のインサートを踏み、停止を集める	Task
+175	#1418	暫定で止めている API(1,261 箇所)を、Windows の失敗の返り値で続けるように直す: 返り値の規約ごとに分類し、失敗が正規の結果である API から直す	Task
