@@ -1,20 +1,22 @@
 // The measurement beacons that real visitors' browsers sent (decision 0152, 0224), read from a directory of the objects the Worker stores (perf/<UTC date>/<sid>-<seq>.json:
 // one line each, { t, remote, perf }). Prints Markdown: one row per bundle version (the engine's sha256 prefix) in two tables (identity; what the page told and what the engine ran),
 // the sessions at a device pixel ratio of 1.7 (per day, or all), and the shapes of the records.
-// usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits]
+// usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits | --hangs | --stops]
 //   dir: default lift/out-app/host-extra/perf (the work step puts the objects of the last three days there; nothing is committed)
 //   --day: the sessions table is limited to this UTC date (default: today in UTC); all: every date
 //   --exits: instead of the tables above, one row per session that ended or failed in the last 48 hours (UTC): an engine.exit, an engine.state other than engine-idle, an error or a failure report
 //   --hangs: instead of the tables above, the sessions whose start did not reach the first idle (arrived / gone / suspect / unknown), by version and device pixel ratio (Issue #1399); the counts only
-//   --now <ISO time>: with --exits, the end of the 48 hours (a test aid; default: the current time)
+//   --stops: instead of the tables above, the sessions that stopped in the last 72 hours (UTC) (an engine.exit that says stopped or error, an error, or no first idle), one table per version by stop fingerprint (Issue #1404); the counts only
+//   --now <ISO time>: with --exits or --stops, the end of the window (a test aid; default: the current time)
 // Only counts and derived numbers are printed: no session id, no remote class, no user agent text, no address, no path or name of a visitor.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_DIR = 'lift/out-app/host-extra/perf';
-const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits [--now ISO time] | --hangs]';
+const USAGE = 'usage: node tools/perf-beacons/summary.mjs [dir] [--day YYYY-MM-DD | --day all | --exits [--now ISO time] | --hangs | --stops [--now ISO time]]';
 const EXITS_HOURS = 48;
+const STOPS_HOURS = 72;
 
 function fail(msg) {
   console.error(`summary: ${msg}`);
@@ -27,6 +29,7 @@ function parseArgs(argv) {
   let day = new Date().toISOString().slice(0, 10);
   let exits = false;
   let hangs = false;
+  let stops = false;
   let now = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -35,13 +38,14 @@ function parseArgs(argv) {
       if (!day) fail('--day needs a value');
     } else if (a === '--exits') exits = true;
     else if (a === '--hangs') hangs = true;
+    else if (a === '--stops') stops = true;
     else if (a === '--now') now = argv[++i] ?? '';
     else if (a.startsWith('--')) fail(`unknown option ${a}`);
     else dir = a;
   }
-  if (now !== null && (Number.isNaN(Date.parse(now)) || !exits)) fail('--now needs an ISO time (e.g. 2026-11-24T08:00:00Z) and --exits');
-  if (exits && hangs) fail('--exits and --hangs cannot be used together');
-  return { dir, day, exits, hangs, nowMs: now === null ? Date.now() : Date.parse(now) };
+  if (now !== null && (Number.isNaN(Date.parse(now)) || (!exits && !stops))) fail('--now needs an ISO time (e.g. 2026-11-24T08:00:00Z) and --exits or --stops');
+  if ([exits, hangs, stops].filter(Boolean).length > 1) fail('--exits, --hangs and --stops cannot be used together');
+  return { dir, day, exits, hangs, stops, nowMs: now === null ? Date.now() : Date.parse(now) };
 }
 
 function jsonFiles(dir) {
@@ -379,8 +383,119 @@ export function hangsReport(recs) {
   return out.join('\n');
 }
 
+const STOP_FP_LAST_FLE = 80;
+const STOP_FP_MAX = 240;
+const STOP_KINDS = ['停止', 'エラー', '届かず離脱'];
+const ANSWER_KINDS = ['あり', 'なし', '記録無し'];
+const PAGE_CLASSES = ['10 秒未満', '10 秒以上 60 秒未満', '60 秒以上', '(無し)'];
+const STOP_PATH = /[A-Za-z]:\\(?:[^\\"'<>|*?;:,]+\\)*[^\s\\"'<>|*?;:,]*/g;
+
+/** one part of a stop fingerprint (Issue #1404): control characters go; a URL, an e-mail address, an IPv4 address and every path (a drive letter "X:\" or a POSIX path) become <url>, <email>, <ip>, <path>; a hex address (0x...) and a number become #; a "|" becomes "/" (the separator of the fingerprint is " | ") */
+export function fingerprintPart(x) {
+  return String(x)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ')
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '<url>')
+    .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g, '<email>')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '<ip>')
+    .replace(STOP_PATH, '<path>')
+    .replace(POSIX_PATH, '<path>')
+    .replace(/\b0x[0-9a-fA-F]+\b/g, '#')
+    .replace(/\b\d+\b/g, '#')
+    .replace(/\|/g, '/')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+}
+
+/** a session's stop fingerprint (Issue #1404): five parts in this order, joined by " | " and cut to 240 characters: the engine's last "fle: " line (its first 80 characters), the stop line, the abort kind (engine.exit.stop), and the error's what and where; "-" for a part the session does not have */
+export function stopFingerprint(rs) {
+  const stop = lastWith(rs, (p) => objOf(p.engine?.exit?.stop));
+  const err = lastWith(rs, (p) => objOf(p.error));
+  const part = (x, n = Infinity) => (str(x) ? fingerprintPart(x.slice(0, n)) : '-');
+  return [part(stop?.lastFle, STOP_FP_LAST_FLE), part(stop?.stopLine), part(stop?.abortKind), part(err?.what), part(err?.where)].join(' | ').slice(0, STOP_FP_MAX);
+}
+
+const pageClassOf = (ms) => (ms === null ? '(無し)' : ms < 10_000 ? '10 秒未満' : ms < 60_000 ? '10 秒以上 60 秒未満' : '60 秒以上');
+/** the answers of the engine's file dialogs (files.engine, Issue #1380): 'あり' when the count is above 0, 'なし' when it is 0, '記録無し' when the record has no count */
+const answerOf = (files, key) => {
+  const n = num(files?.[key]);
+  return n === null ? '記録無し' : n > 0 ? 'あり' : 'なし';
+};
+
+/** the stop of one session, or null: it stopped when an engine.exit says stopped or error, when an error is recorded, or when it did not reach the first idle (the same test as --hangs: gone) */
+function stopInfoOf(rs) {
+  const s = startOf(rs);
+  const stopped = rs.some((r) => str(r.p.engine?.exit?.reason) === 'stopped');
+  const errored = rs.some((r) => str(r.p.engine?.exit?.reason) === 'error' || objOf(r.p.error) !== null);
+  if (!stopped && !errored && !s.gone) return null;
+  const files = lastWith(rs, (p) => objOf(p.files?.engine));
+  return {
+    version: lastWith(rs, (p) => str(p.bundle?.version)) ?? '(無し)',
+    fp: stopFingerprint(rs),
+    records: rs.length,
+    first: rs[0].t,
+    last: rs[rs.length - 1].t,
+    dpr: dprClassOf(dprOfSession(rs)),
+    kinds: [stopped && '停止', errored && 'エラー', s.gone && '届かず離脱'].filter(Boolean),
+    demo: answerOf(files, 'answeredUnderDemo'),
+    flp: answerOf(files, 'answeredFlp'),
+    page: pageClassOf(lastWith(rs, (p) => num(p.pageMs))),
+  };
+}
+
+/** the counts of the items that are in `order`, in that order ("k ×n"); "-" when there are none */
+const fixedCounts = (items, order) => {
+  const parts = order.map((k) => [k, items.filter((x) => x === k).length]).filter(([, n]) => n > 0).map(([k, n]) => `${k} ×${n}`);
+  return parts.length ? parts.join(', ') : '-';
+};
+
+/** the sessions that stopped in the `STOPS_HOURS` before `nowMs` (UTC) (Issue #1404): a count line, then one table per version, one row per stop fingerprint (the most records first); no session id, no address */
+export function stopsReport(recs, nowMs = Date.now()) {
+  const since = nowMs - STOPS_HOURS * 3_600_000;
+  const win = recs.filter((r) => Date.parse(r.t) >= since && Date.parse(r.t) <= nowMs);
+  const sess = sessionsOf(win);
+  const stops = sess.map(stopInfoOf).filter((x) => x !== null);
+  const versions = [...new Set(stops.map((x) => x.version))];
+  const out = [];
+  out.push(`# 実機のビーコン: 停止したセッション(直近 ${STOPS_HOURS} 時間、UTC)`);
+  out.push('');
+  out.push(`- 期間(UTC): ${when(new Date(since).toISOString())} から ${when(new Date(nowMs).toISOString())} まで(直近 ${STOPS_HOURS} 時間)。記録: ${win.length} 件、セッション: ${sess.length}`);
+  out.push(`- 停止したセッション: ${stops.length} 件(記録 ${stops.reduce((a, x) => a + x.records, 0)} 件)。内訳: ${STOP_KINDS.map((k) => `${k} ${stops.filter((x) => x.kinds.includes(k)).length} 件`).join('、')}(1 つのセッションが複数に入ることがある)`);
+  out.push(`- 版ごと(停止したセッション数): ${versions.length ? versions.map((v) => `${v} ${stops.filter((x) => x.version === v).length} 件`).join(', ') : '-'}`);
+  out.push('- 停止したセッションは、engine.exit.reason が stopped か error の記録が在るもの、error の記録が在るもの、最初の idle に届かなかったもの(--hangs と同じ定義)。');
+  out.push('- 指紋は、engine.exit.stop の lastFle(先頭 80 字)・stopLine・abortKind と、error の what・where を ` | ` でつないだもの(先頭 240 字)。数字と 16 進の番地は #、X:\\ で始まるパスは <path>。件数(記録)は、その指紋のセッションの記録の数(全部)。並びは件数の多い順。');
+  out.push('');
+  if (stops.length === 0) {
+    out.push('停止したセッションは無い。版ごとの表は出さない。');
+    return out.join('\n');
+  }
+  for (const v of versions) {
+    const xs = stops.filter((x) => x.version === v);
+    const rows = [...new Set(xs.map((x) => x.fp))].map((fp) => {
+      const g = xs.filter((x) => x.fp === fp);
+      return {
+        fp,
+        records: g.reduce((a, x) => a + x.records, 0),
+        sessions: g.length,
+        kinds: fixedCounts(g.flatMap((x) => x.kinds), STOP_KINDS),
+        first: g.map((x) => x.first).sort()[0],
+        last: g.map((x) => x.last).sort().reverse()[0],
+        dpr: fixedCounts(g.map((x) => x.dpr), DPR_ORDER),
+        demo: fixedCounts(g.map((x) => x.demo), ANSWER_KINDS),
+        flp: fixedCounts(g.map((x) => x.flp), ANSWER_KINDS),
+        page: fixedCounts(g.map((x) => x.page), PAGE_CLASSES),
+      };
+    }).sort((a, b) => b.records - a.records || b.sessions - a.sessions || (a.fp < b.fp ? -1 : a.fp > b.fp ? 1 : 0));
+    out.push(`## 版 ${v}(停止したセッション ${xs.length} 件)`);
+    out.push('');
+    out.push(table(['指紋 (lastFle・stopLine・abortKind・error.what・error.where の順)', '件数 (記録)', 'セッション', '終わり方', '最初 (UTC)', '最後 (UTC)', 'DPR の区分', '開く窓の答え: Demo の下 (files.engine)', '開く窓の答え: .flp (files.engine)', '起動からの時間 (pageMs)'],
+      rows.map((x) => [x.fp.replace(/\|/g, '\\|'), x.records, x.sessions, x.kinds, when(x.first), when(x.last), x.dpr, x.demo, x.flp, x.page])));
+    out.push('');
+  }
+  return out.join('\n');
+}
+
 function main() {
-  const { dir, day, exits, hangs, nowMs } = parseArgs(process.argv.slice(2));
+  const { dir, day, exits, hangs, stops, nowMs } = parseArgs(process.argv.slice(2));
   if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) fail(`not a directory: ${dir}`);
   const { recs, unreadable } = readRecords(dir);
   if (exits) {
@@ -389,6 +504,10 @@ function main() {
   }
   if (hangs) {
     console.log(hangsReport(recs));
+    return;
+  }
+  if (stops) {
+    console.log(stopsReport(recs, nowMs));
     return;
   }
   const out = [];
