@@ -28,7 +28,26 @@ project: signature-studio/3
 - Fruity Delay 2 は、この Issue では移さない(共有の表に残る。#{{125}} の (15))。
 - `lift/harness/web/fruity/fle_idle_lib.js`・`lift/harness/two/main_two.c`・`app/src/engine/xmod.ts` は、#{{125}} で一般化された物で、この Issue では変えない。
 
-## 前回の試行で分かったこと
+## 前回の試行で分かったこと(run 45505986680)
+
+- 判定は差し戻し。Balance の場面は通った。Filter の場面は `exited`(`ExitProcess`。終了コード 0)で、判定 (3) が不通。作業は 3 つの commit(`13372a12` 基盤・`8695b23e` imm32・`4cdd0985` 追加。作業者の環境。push していない。work.diff に保存された)。runner の値。nproc 4、測定の後の loadavg 3.08 2.06 2.06。
+- 基盤(共有の行の削除。共有は計 +1 −10 行): `ci/extract-dlls.tsv` +0−1、`lift/harness/b2d2/modules.tsv` +0−1、`lift/harness/seeds/vfs-seed-idle1.tsv` +0−1、`lift/harness/web/pack.args` +1−5、`lift/harness/web/seed.args` +0−2。`tools/delivery-split/measure.mjs` は +59 −13(場面の交互化)。
+- 追加: `lift/plugins/fruity-filter/plugin.tsv` の 1 ファイル。前回の index の plugin.tsv は 7 列で、パーサ(8 列)に合わなかったため、`omit` 列 `-` を足した。`git grep -i "fruity.filter" -- ci lift/harness/b2d2 lift/harness/hyb lift/harness/web lift/harness/seeds` は 0 件。
+- imm32(決定 0015 の見直し): `imm32.dll` を仮想モジュール(N = 43)にし、FLEngine と Fruity の DLL が遅延 import する 7 関数(ImmSetOpenStatus・ImmSetConversionStatus・ImmGetConversionStatus・ImmAssociateContextEx・ImmReleaseContext・ImmGetContext・ImmIsIME)を、IME の無い Windows と同じ答えにした(`ImmGetContext` は NULL、BOOL は 0)。変更は `fle_modules.c`・`fle_load.c`・`fle_win.c`・`fle_win.h`・`fe-lift/src/imports_table.rs`。
+- 結果(3 回の起動。場面は Balance・Filter・Balance。`measure.mjs`):
+  - 1 回目 Balance(NewStuff.flp): `elapsedMs` 11,406.2。`fruity_balance_x64.c1d0000.wasm` が `requested=true`。場面の後は `engine-idle`。
+  - 2 回目 Filter(Exoplanet.flp): `elapsedMs` 11,004.1。`fruity_filter_x64.c580000.wasm` が `requested=true`。場面の後は `exited`。
+  - 3 回目 Balance(NewStuff.flp): `elapsedMs` 11,180.0。`requested=true`。場面の後は `engine-idle`。
+  - 起動確認(`boot-bundle.mjs`): `engine-idle`・`standIn` false・`error` null(`timelineIdle` 12,176.7 ms。判定の対象外)。
+  - 前回(run 45452762437)の `LoadLibraryW 126 "imm32.dll"` の後の `ExitProcess` は、Balance の場面では出なくなった。ただし、成功した読み込みはログに出ないため、直接の確認ではない。
+- 生成: `plugins: 2 DLLs; bases 0xc1d0000 0xc580000`(Balance は変わらず、Filter は固定の 0x7000000 から 0xc580000 へ)。Filter の wasm は 11,315,994 B(DLL 3,780,608 B)。`emitted ok 12283, left out 3 (omit 0), listed 12280`。hook 点の VA(0xc597bc0・0xc5b1d70・0xc5b1d90)は一覧に 0 件。
+- `engine.wasm`: 165,623,930 B(変更の前)→ 158,407,386 B(−7,216,544 B、−4.36%)。前回の試行の 158,399,383 B より +8,003 B(imm32 の行)。hybrid: 8 direct modules、2 separate modules。
+- Filter の場面の停止の順序: `image-read: fruity_filter_x64.c580000.wasm requested=1` → DllMain(attach。`reason=1`)→ `FindFirstFileW` が `Shared\FruityPlug_x64.en-US`・`.en`・`.ENU`・`.EN` の 4 件を探す(いずれも無い)→ `ExitProcess`。Balance も同じ 4 件を探すが、その後は止まらない。スレッド通知(`reason` 2・3)は無関係(Balance は受けても止まらない)。
+- 静的解析(objdump・Python。一時ファイルは消した): Filter の AddressOfEntryPoint は VA 0x6cdf20(イメージのベース 0x400000 なので RVA 0x2cdf20)。DllMain は `setjmp`(VA 0x40e120。両方の DLL で同じ番地)の結果が 0 なら本体(VA 0x4189c0)を呼び、戻ると `Halt`(VA 0x40e270)を呼ぶ。`Halt` は、グローバル `[0x721cb0]` が 0 なら `ExitProcess`、0 でなければ DllMain へ戻る。`ExitProcess` の呼び出しは、Filter の DLL で `Halt` 経由の 1 箇所だけ。`[0x721cb0]` は、Filter の DLL でも Balance の DLL でも書かれていない。
+- 見立て(PM。実測で確かめる): これは #{{128}} で直した Balance の問題と同じ型。Delphi の DllMain が `setjmp` を呼ぶ関数は、直接 wasm に lift せず、C で lift して、着地点(`fle_landing_push`。`lift/runtime/fle_dispatch.h`)を登録する必要がある。Balance は `plugin.tsv` の `omit` 列(RVA 0x2c13a0)で外している。Filter の `plugin.tsv` には `omit` が無いので、同じ型の関数が直接 wasm に入り、着地が無いまま `Halt` → `ExitProcess` に落ちる、と見られる。
+- 判定の確認: `spec/guard.test.sh`(67 件)・`spec/workflow.test.sh`(443 件)が通る。`lift/crates/fe-lift/tests/`(load.rs・wall_fr6.rs・wall_fr5.rs・msctf.rs)に、imm32 を「無い」とする前提の assert が残っている(やること 9)。
+
+## その前の試行で分かったこと
 
 (run 45452762437。failed。作業は work.diff として保存された。commit は、この main に無い。次の試行は、その差分を main の上に取り込んで続ける。)
 
@@ -62,6 +81,11 @@ project: signature-studio/3
    - 原因でなければ、その根拠を報告に書いて止まる(直し方は PM が決める)。
 6. **受け入れ**: 3 回の起動で、Balance の場面と Filter の場面が、それぞれ `requested=true` で、その後も engine が `engine-idle` のまま(`ExitProcess` で止まらない)こと。両方を 1 回の起動で要求できる場面が見つかれば、報告に書く(受け入れは場面ごとに判定する)。
 7. **共有のファイルの変更は 0 行**(Filter の追加の commit)。
+8. **Filter の停止(PM の指示。#{{128}} と同じ型)**: 上の「前回の試行で分かったこと」の見立てを、実測で確かめ、直す。
+   - ① `lift/plugins/fruity-filter/plugin.tsv` の `omit` 列に、DllMain の入口の RVA(0x2cdf20。VA 0x6cdf20 から 0x400000 を引いた値。**要確認**)を足して試す。`omit` の値は RVA(`lift/crates/fe-build/src/plugins.rs` の `rvas_or_none`。16 進のカンマ区切り)。
+   - ② 第 2 波(約 45 の内蔵プラグイン。同じ Delphi の形)に備え、`omit` を手で書かず、`setjmp`(VA 0x40e120)を呼ぶ関数から機械的に決める。既存の仕組みを確かめて、使う物を選ぶ(候補: `lift/crates/fe-decode/src/setjmp.rs` の `landings`。`lift/crates/fe-lift/src/lib.rs` の 1186 行付近で既に使われている。または `fe-wasmgen` の報告)。
+   - ③ 手で書いた `omit`(Balance の 0x2c13a0)と、自動の結果が一致することを、`cargo test -p fe-build` で確かめる(Balance の自動の結果は 0x2c13a0 を含む)。自動で決まるなら、`omit` 列は「自動の結果に足す手の指定」の意味にする。
+9. **fe-lift の試験の更新(PM の指示)**: `lift/crates/fe-lift/tests/`(load.rs・wall_fr6.rs・wall_fr5.rs・msctf.rs)の、imm32 を「無い」とする前提の assert を、今回の変更に合わせて直す。`cargo test -p fe-lift` の通過件数を、変更の前後で報告に書く(新しい失敗は 0 件)。
 
 ## 受け入れ
 
@@ -94,6 +118,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 - ベンダー名と Cloudflare の識別子を書かない。Python は製品に使わない。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。この機械で製品のビルドや測定をしない。
+- 名前の扱い(依頼者の訂正): ファイルに書いてはならないのは、AI のベンダー名と、Cloudflare の識別子だけ(`guard/scan.sh` が検査する)。FL の製品名(FL Studio など)・`Image-Line` のインストール先の名前・`%FLStudioFactoryData%` などの変数名は、書いてよい。
 
 ## 作業の進め方
 

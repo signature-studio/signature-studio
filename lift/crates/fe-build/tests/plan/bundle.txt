@@ -1,5 +1,6 @@
-stage bundle: 4 step(s)
+stage bundle: 5 step(s)
   bash lift/harness/web/mt1/plugin-worker/build.sh ott lift/out-app/external lift/out-app/plugins/ott
   bash lift/harness/web/mt1/plugin-worker/build.sh serum2 lift/out-app/external lift/out-app/plugins/serum2
+  bash lift/harness/web/mt1/plugin-worker/build.sh vital lift/out-app/external lift/out-app/plugins/vital
   node app/scripts/pack-seed.mjs @words lift/out-app/plugins/seed.args
   node app/scripts/pack-assets.mjs --version b440e13a623a @lines lift/out-app/plugins/pack.args

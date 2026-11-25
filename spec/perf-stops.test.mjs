@@ -18,7 +18,7 @@ const ok = (name, got, want) => {
   }
 };
 const run = (args) => spawnSync(process.execPath, [TOOL, ...args], { encoding: 'utf8' });
-const { fingerprintPart } = await import(pathToFileURL(TOOL).href);
+const { fingerprintPart, stopFingerprint } = await import(pathToFileURL(TOOL).href);
 
 try {
   ok('part: a drive path is <path> (folders with spaces included), numbers and hex addresses are #, "|" is "/"',
@@ -51,17 +51,35 @@ try {
   const fx = run([FIXTURE, '--stops', '--now', '2026-11-24T08:00:00Z']);
   ok('cli: the fixture with --stops exits 0', fx.status, 0);
   ok('cli: the fixture names its stop and its version, and prints no session id', [fx.stdout.includes('StopFixture'), fx.stdout.includes('## 版 d7a6e6f392f2'), fx.stdout.includes('5a0f1e2d3c4b')], [true, true, false]);
-  ok('cli: the fixture fingerprint is the five parts joined by " | " (escaped in the cell)', fx.stdout.includes('fle: StopFixture: the last fle line of a stop (synthetic fixture) \\| == stop: SIGABRT (runtime abort, see runtime message) \\| fle_stop (a runtime message that names an API and the reason) \\| - \\| -'), true);
+  ok('cli: the fixture fingerprint in the table is cut to 100 characters (the cell escapes "|")', fx.stdout.includes('fle: StopFixture: the last fle line of a stop (synthetic fixture) \\| == stop: SIGABRT (runtime abort…'), true);
+  const fxJson = (() => { try { return JSON.parse(run([FIXTURE, '--stops', '--json', '--now', '2026-11-24T08:00:00Z']).stdout).rows.map((x) => x.fingerprint); } catch { return []; } })();
+  ok('cli --json: the fixture fingerprint is the five parts joined by " | " in full', fxJson, ['fle: StopFixture: the last fle line of a stop (synthetic fixture) | == stop: SIGABRT (runtime abort, see runtime message) | fle_stop (a runtime message that names an API and the reason) | - | -']);
 
   const out = run([dir, '--stops', '--now', '2026-11-24T12:00:00Z']);
   ok('cli: the built records exit 0', out.status, 0);
   ok('cli: 3 sessions stopped (a stop, a session that never reached the first idle, an error); the started one is not counted',
     [out.stdout.includes('停止したセッション: 3 件(記録 4 件)'), out.stdout.includes('停止 1 件、エラー 1 件、届かず離脱 1 件')], [true, true]);
   ok('cli: the gone session row: the fingerprint is "-" in all five parts, kind 届かず離脱', out.stdout.includes('| - \\| - \\| - \\| - \\| - | 1 | 1 | 届かず離脱 ×1 |'), true);
-  ok('cli: the stop row: records, sessions, kind, times, DPR class, file answers (no record), page time class', out.stdout.includes('| fle: RegOpenKeyExW: an empty component, reached after # keys \\| == stop: SIGABRT (runtime abort, see runtime message) \\| (not a runtime message) \\| - \\| - | 2 | 1 | 停止 ×1 | 2026-11-24 10:00Z | 2026-11-24 10:00Z | 1 超 2 未満 ×1 | 記録無し ×1 | 記録無し ×1 | 60 秒以上 ×1 |'), true);
-  ok('cli: the error row: its what and where, kind エラー', out.stdout.includes('| - \\| - \\| - \\| trap at wasm-function[#]:# \\| engine worker, running | 1 | 1 | エラー ×1 |'), true);
+  ok('cli: the stop row: records, sessions, kind, times, DPR class, file answers (no record), page time class (the fingerprint is cut to 100 in the table)', out.stdout.includes('| fle: RegOpenKeyExW: an empty component, reached after # keys \\| == stop: SIGABRT (runtime abort, see… | 2 | 1 | 停止 ×1 | 2026-11-24 10:00Z | 2026-11-24 10:00Z | 1 超 2 未満 ×1 | 記録無し ×1 | 記録無し ×1 | 60 秒以上 ×1 |'), true);
+  ok('cli: the error row: its what (the function is not in a table: fn=? 表が無い版) and where, kind エラー', out.stdout.includes('| - \\| - \\| - \\| trap at wasm-function[#]:# [fn=? 表が無い版] \\| engine worker, running | 1 | 1 | エラー ×1 |'), true);
+
+  const fle = (tail) => `fle: RaiseException: exception code 0xeedfade, flags 0x1, 8 argument(s) raised; ${tail}`;
+  const LA = fle('no frame-based handler took it (11 frames searched)');
+  const LB = fle('a frame-based handler took it, then the exit (11 frames searched)');
+  const stopRs = (lastFle) => [{ t: '2026-11-24T10:00:00.000Z', p: { engine: { exit: { reason: 'stopped', code: 134, stop: { lastFle, stopLine: '== stop: SIGABRT (runtime abort, see runtime message)', abortKind: '(not a runtime message)' } } } } }];
+  ok('stop: the first 80 characters of the two last fle lines are the same (the old cut could not tell them apart)', [LA.slice(0, 80) === LB.slice(0, 80)], [true]);
+  ok('stop: the same type of stop with another reason after 80 characters has another fingerprint', stopFingerprint(stopRs(LA)) !== stopFingerprint(stopRs(LB)), true);
+  ok('stop: the last fle line is cut at 200 characters (the first part of the fingerprint)', stopFingerprint(stopRs('a'.repeat(300))).split(' | ')[0].length, 200);
+  ok('stop: numbers in the last fle line are still #: the same wall at other numbers has the same fingerprint', stopFingerprint(stopRs('fle: RegOpenKeyExW: reached after 3 keys')) === stopFingerprint(stopRs('fle: RegOpenKeyExW: reached after 5 keys')), true);
+  ok('stop: the whole fingerprint is at most 600 characters', stopFingerprint([{ t: '2026-11-24T10:00:00.000Z', p: { error: { what: 'w'.repeat(900), where: 'x' } } }]).length <= 600, true);
   const rows = out.stdout.split('\n').filter((l) => l.startsWith('| '));
   ok('table: every line has the same cell count as the header (the cell separator is escaped)', [...new Set(rows.map((l) => l.replace(/\\\|/g, '').split('|').length))], [12]);
+  const cellOf = (line) => line.slice(2).split(' | ')[0].replace(/\\\|/g, '|');
+  const reg = rows.find((l) => l.startsWith('| fle: RegOpenKeyExW'));
+  ok('table: a fingerprint longer than 100 characters is cut to 100 in the table, and the cut ends with …', reg && [cellOf(reg).length, cellOf(reg).endsWith('…')], [100, true]);
+  const jsonOut = run([dir, '--stops', '--json', '--now', '2026-11-24T12:00:00Z']).stdout;
+  const full = (() => { try { return JSON.parse(jsonOut); } catch { return null; } })();
+  ok('--json: the full fingerprint of the stop is printed (its last fle line in full)', !!full && full.rows.some((x) => x.fingerprint === 'fle: RegOpenKeyExW: an empty component, reached after # keys | == stop: SIGABRT (runtime abort, see runtime message) | (not a runtime message) | - | -'), true);
   const empty = run([dir, '--stops', '--now', '2030-01-01T00:00:00Z']);
   ok('empty window: exits 0 and prints the counts, no table', [empty.status, empty.stdout.includes('停止したセッションは無い'), empty.stdout.includes('| --- |')], [0, true, false]);
   const both = run([dir, '--stops', '--exits']);

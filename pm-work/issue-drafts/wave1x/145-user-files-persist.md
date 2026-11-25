@@ -41,7 +41,7 @@ project: signature-studio/3
 - Recent は FL が書いていない(差し戻し): `Settings\Browser\Recent files.scr` は起動の時に探され(`GetFileAttributesW` → 2。無い)、プロジェクトを開いた後も、保存(Ctrl+S)の後も作られない。レジストリに Recent の値は無い(保存の記録に、ファイル名を含む値は無い)。「終了の時に書く」は、上の 258 ms の間の書き込みが 0 なので、この VM では否定。Ctrl+N の試しは engine の行が出ず、結論が出なかった。→ 段階 2 として #{{168}} に移す。
 - 判定の式の欠陥: `recentKept` は、名前が FL のゲストのメモリに在るかを見る。保存したプロジェクトが戻ると、名前がメモリに出るため、Recent の記録が無くても true になる(保存の run で `recentKept` は true だが、`recentFiles` は [])。判定から外した。JSON には出し続ける(`recentKept`・`recentWhere`・`recentFiles`)。
 - 作業者の判断(PM が採る): `visibilitychange` は使わず `pagehide` だけにした(タブの切り替えで FL が閉じるのを避ける)。1.5 秒の待ちは入れていない(ページは unload を待てない)。pagehide の中で保存が書き終わる時間は未確認。
-- 言語の段: 言語は無作為に 1 つ選ぶ(7 言語)。es を選んだ回は、再読込の後に engine が `missing-ilsvg` で止まり、2 回目で回復した(#{{154}} の範囲)。この段が落ちたら、選んだ言語を報告に書く。
+- 言語の段: 言語は無作為に 1 つ選ぶ(7 言語)。es を選んだ回は、再読込の後に engine が `missing-ilsvg` で止まり、2 回目で回復した(#{{154}} の範囲)。この止まりは判定に入れない(PM の決定。JSON の `engineStoppedAfterReload`・`stopReason` に出す)。
 - ログ: Startup ログの件数は、FL がそのログを閉じるかどうかで決まる。この run では閉じず、件数は 0 のまま。FL が終了の時にログを閉じると、内容が保存されて件数が増える(未確認)。
 - 段階 1 の範囲: 「やること」の 1・3・5・6・7 は前回の差分で入った(受け入れの判定で確かめる)。2 は #{{168}} に移した。4 は未確認のまま。受け入れの判定は、下のとおり変えた(`--save-after-open` を足す。`savedFiles`・0 バイトの判定を足し、`recentKept` を外す)。
 
@@ -80,15 +80,17 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/persist/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --save-after-open > "$RUNNER_TEMP/persist.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const lang=L.find((r)=>"language" in r);const f=L.find((r)=>r.step==="files");process.exit(lang&&f&&lang.error===null&&lang.languageKept===true&&lang.restartPrompted===true&&f.error===null&&f.savedFiles>=1&&f.savedPaths.every((p)=>p.bytes>0)&&f.bytes<=104857600&&Number.isInteger(f.logFilesBefore)&&f.logFilesBefore===f.logFilesAfter&&lang.elapsedMs<=12500&&lang.preBootBytes<=314368711?0:1)' "$RUNNER_TEMP/persist.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/persist/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --save-after-open > "$RUNNER_TEMP/persist.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const lang=L.find((r)=>"language" in r);const f=L.find((r)=>r.step==="files");process.exit(lang&&f&&lang.defaultReloadState==="engine-idle"&&lang.registryKept===true&&f.error===null&&f.savedFiles>=1&&f.savedPaths.every((p)=>p.bytes>0)&&f.bytes<=104857600&&Number.isInteger(f.logFilesBefore)&&f.logFilesBefore===f.logFilesAfter&&lang.elapsedMs<=12500&&lang.preBootBytes<=314368711?0:1)' "$RUNNER_TEMP/persist.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
+
+`--save-after-open` は前回の差分(run 45499845007 の `tools/persist/measure.mjs`)に在る道具の機能で、次の試行は `.prior-work.md` でその差分を作業ツリーに載せてから行う。
 
 判定の基準:
 - ファイルの段(`step` が `files` の行): `error` が null。`savedFiles` が 1 以上(`--save-after-open` の run で、保存したプロジェクトとバックアップが、再読込の後の保存の記録に在る)。`savedPaths` の全ての `bytes` が 0 より大きい(0 バイトは保存しない)。`bytes` が 104,857,600 以下。
 - `recentKept`・`recentWhere`・`recentFiles` は JSON に出し続けるが、判定には使わない(上の 4 回目の節。Recent は #{{168}} が扱う)。
 - ログの件数: 同じ行の `logFilesBefore` と `logFilesAfter`(`Support\Logs` の下の Startup ログの件数。再読込の前と後)が、同じ整数。0 バイトの版が再読込のたびに増えないことを確かめる。
-- 言語の段(#{{142}} の判定のまま): `languageKept` が true、`restartPrompted` が true。
-- `elapsedMs` が 12,500 以下。`preBootBytes` が 314,368,711 以下。
+- 言語の段(`step` が `files` ではない行): 英語(既定)の再読込(`defaultReloadState`)が `engine-idle` に届き、選んだ言語の値が再読込の後の起動で読まれている(`registryKept` が true)。言語は無作為に 1 つ選ぶ。非英語の再読込の後に engine が止まったかは、`engineStoppedAfterReload`・`stopReason` として JSON に出すだけで、判定に入れない(#{{154}} の範囲)。`restartPrompted` も判定に入れない(JSON には出し続ける)。
+- 起動の段(言語の行): `elapsedMs` が 12,500 以下。`preBootBytes` が 314,368,711 以下。
 - 流れ A〜D(`tools/smoke/welcome-flow.mjs`)が通る。単体テスト(`npm test --prefix app`)が通る。
 
 ## 報告の規則

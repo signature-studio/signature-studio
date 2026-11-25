@@ -28,7 +28,23 @@ project: signature-studio/3
 - 事実 4(読み込みの経路 `lift/runtime/fle_load.c`・`lift/runtime/fle_wall_ia2.c` の `fle_ia2_path_absent`): 「Python\Python312.dll」の `LoadLibraryW` は、常に「見つからない(126)」と答える。この答えは、記録の上で選んだ choice(`fle_wall_ia2.c` の注と、`lift/harness/seeds/ia2-imports.txt` の W21 の行)。その注は「インストーラに Python312.dll が無い」と書くが、事実 2 の一覧には `Shared\Python\python312.dll` が在る。食い違い。この choice は、チャンネルラックの設定アイコン(ia2-W21)の要求にも効いている。
 - 事実 5(別の試行の記録 `pm-work/findings/blocks-samples-1366.md` の 4.3): Welcome の Default の行を開いた直後に、`[err] missing-path: LoadLibraryW 126 "Python\Python312.dll"` と `[err] fle: RaiseException: exception code 0xeedfade ...` が出て、engine が exit code 134 で止まった(測定の記録)。
 
-## 前回の試行で分かったこと
+## 前回の試行で分かったこと(run 45505988410)
+
+- 判定は差し戻し(段階 1 の受け入れは未達。`stopped` が true、`engine` が exited)。流れ A〜D と単体は通る。作業は work.diff に保存された。作業者の commit は `f8414a6b` を含む数本(作業者の環境。push していない)。runner の値。nproc 4、loadavg 1.59〜1.83。
+- 前回の差分(実装): UCRT の import を 66 件、`lift/runtime/fle_crt.c` に新設(stdio・FILE・書式付き出力・環境変数・時刻・変換・文字列・`_wstat64i32`・`localeconv`・PathCch・BCryptGenRandom・exit・abort・signal)。import の件数は、実装 262(既存 114 + ship7 の 148)・未対応 96・序数 3(合計 361)。`lift/harness/seeds/ship7-imports.txt` の末尾に 66 行を足した(既存の行の位置は変えない)。
+- `lift/harness/hyb/c-imports-engine.txt` に 115 件を足した(行のある python の import 116 件から、`WaitForSingleObjectEx` を除く)。`ReleaseSemaphore`・`_errno`・`__acrt_iob_func`・`_isatty` などを含む。この表が無いと、python の関数の多くが C に下ろされず(`not modelled`)、呼び出しが素通りする。
+- `Shared\Python\` の 35 件を lazy に(`lift/harness/seeds/vfs-seed-idle1.tsv` と `lift/harness/web/pack.args`)。`python312.dll` は plugin の行が配る。`Shared\Python\python.exe` は `guard/scan.sh` の python の規則に掛かるので、外した。
+- 止まり方の変化: 前回の `__stdio_common_vswprintf` の未実装は直った。今回は `fle_addr_fault`(`lift/runtime/fle_host.c`)で止まる。値 `0x5ee8604d8d490043` を番地として読んでいる。DPR 1 と DPR 2.55 の 2 点とも同じ値。直前は `realmod: loaded python312.dll`(`LoadLibraryW` の成功。`pythonLoaded` true)。止まる直前は `Python\Python312.dll` の探索の後で、ファイルは開かれていない。RIP は未特定。
+- 道具の値(最後の build。`measure.mjs --tool chord-progression`): DPR 1 は `elapsedMs` 11,198・`preBootBytes` 312,215,074・`stopped` true。DPR 2.55 は `elapsedMs` 11,399・`preBootBytes` 312,215,074・`stopped` true。
+- 流れ A〜D(同じ build。`welcome-flow.mjs`): 4 本とも `engine-idle`・`standIn` false・`trapped` false・`hostErrors` 0・`opened` true、B と D は `welcomeClosed` true。`elapsedMs` は 11,265・11,544・11,202・11,211(中央値 11,238。上限 12,500)。
+- `preBootBytes`: 直す前 311,109,738 → 前回の差分 313,128,824 → 今回 312,215,074(直す前より +1,105,336 B。増えた内訳は未測定。上限 314,368,711 に対し、残り約 2.1 MB)。
+- 値の解釈(未確定): `0x5ee8604d8d490043` は、`EncodePointer` の符号化の形ではない(`DecodePointer` で復号しても小さなポインタにならない)。BCryptGenRandom の出力の列にも現れない。未設定の TLS スロットの読み(`TlsGetValue`)も、原因ではなさそう。
+- 値のバイト列は、命令のバイト列に似る。メモリの並び(リトルエンディアン)では `43 00 49 8d 4d 60 e8 5e` で、`49 8d 4d 60` は `lea rcx,[r13+0x60]` の符号化に読める。PM の見立て: コードのバイト列を番地として読んでいる(やること 8)。
+- 単体: `npm test --prefix app` 1,401 件、`cargo test -p fe-build` 20 件が通る。`guard/flags.sh` が、`fle_imp_getenv`・`fle_imp__wgetenv` の名前を、`getenv(` の規則で新しい旗として検出したため、`fle_imp_crt_env_lookup`・`fle_imp_crt_wenv_lookup` に改名した。
+- このジョブの抽出キャッシュは `python312` の plugin.tsv より前の鍵で作られ、`lift/out-app/host/lift/out-plugins/python312.dll` と `lift/out-app/host/lift/out-idle1/inputs/install/Shared/python312.dll` が無かった。作業者は `host-extra/resources/Shared/Python/python312.dll`(SHA-256 `0cc4e557…`)を写して補った(`lift/out-app/` は commit されない)。次の試行でも同じ前提が要る。
+- 未測定: ia2-W21(チャンネルラックの設定アイコン)。`fle_ia2_path_absent` の choice は外したまま。
+
+## その前の試行で分かったこと
 
 2 回の試行の結果。作業は、どちらも work.diff に保存されている。commit は、この main に無い(1 回目の作業は main の 05577cf9 に道具と記録だけが入っている)。次の試行は、差分を main の上に取り込んで続ける。
 
@@ -94,6 +110,8 @@ project: signature-studio/3
 4. **起動の後の取得**: Python の DLL と標準ライブラリは、起動の後に取る(`@lazy-file:`)。前回の試行で `preBootBytes` が +2,019,086 B 増えた。増えた内訳を測り、起動の前に取っている物を、起動の後の取得に移す(lazy の上限 128 以内)。`preBootBytes` を増やさないこと。
 5. **`fle_ia2_path_absent`(`Python\Python312.dll` を「見つからない」と答える choice)**: 前回の差分では外してある。ia2-W21(チャンネルラックの設定アイコン)の動作の変化は、未測定。測ってから、戻すか外したままにするかを決める。オプトインは作らない。報告に書く。
 6. **測る**: 道具で、DPR 1 と乱数の DPR(1.01〜3.00)の 2 点。直す前と後の JSON の行を報告に書く。
+7. **停止の記録の診断(PM の決定。#{{154}} と同じ)**: `fle_addr_fault`(`lift/runtime/fle_host.c`。64 ビットの値を番地として読んだ停止)の停止の記録として、**常に**、呼び出し元の戻り番地・`R[0..15]`・最も近い名前つきの関数を出す。環境変数・`#ifdef` を足さない。#{{154}} の作業者も同じ診断を入れる。両方の差分が衝突したら、両方を残す。
+8. **読みの出所(PM の決定)**: 値 `0x5ee8604d8d490043` を読んでいる命令(RIP)を特定する。診断で、`R[0..15]` の中から、番地が `Python312.dll` の像(イメージ)の中に入る値を探す。見つかれば、その番地を `Python312.dll` の逆アセンブルで確かめる。可能性: コードのバイト列を番地として読んでいる(関数の入口でない所をデータとして読んでいる)、または、`Python312.dll` の IAT・thunk の、間違った番地を読んでいる。特定したら、結果を報告に書く。直し方は段階 1 の範囲に収まるときだけ直し、収まらなければ報告に書いて終える。
 
 ## 受け入れ
 
@@ -122,6 +140,7 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 - OCR を使わない。FL の画面の文字は、ゲストのメモリの走査か、エンジンの記録で読む。
 - sleep・timeout・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。この機械で製品のビルドや測定をしない。
+- 名前の扱い(依頼者の訂正): ファイルに書いてはならないのは、AI のベンダー名と、Cloudflare の識別子だけ(`guard/scan.sh` が検査する)。FL の製品名(FL Studio など)・`Image-Line` のインストール先の名前・`%FLStudioFactoryData%` などの変数名は、書いてよい。
 
 ## 作業の進め方
 

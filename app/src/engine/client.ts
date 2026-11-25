@@ -61,6 +61,8 @@ export class EngineClient {
       this.send({ cmd: peek ? 'desk-peek' : 'desk-dump' });
     });
   }
+  /** #1384 (a test aid): the window `lid` and its descendants are drawn again (the Worker's settings-redraw; nothing is answered) */
+  settingsRedraw(lid: number): void { this.send({ cmd: 'settings-redraw', lid }); }
   /** #1358 (a test aid): the text the engine's memory holds for the markers (read only; the Worker's guestText) */
   guestText(markers: string[], radius = 0): Promise<{ memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }> {
     return new Promise((res, rej) => {
