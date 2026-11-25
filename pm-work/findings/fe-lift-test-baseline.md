@@ -33,7 +33,7 @@
   - clip: `call_iat`・`callback`・`deferred`・`hle_entries`・`hook_points`・`k32_dsp`・`load`・`modules`・`msctf`・`null0`・`site_override`・`srw`・`sysinfo`・`uilang`・`wall_b`・`wall_c1`・`wall_e1`・`wall_fr11`・`wall_fr3`・`wall_fr4`・`wall_fr5`・`wall_fr6`・`wall_q`・`wall_r`・`wall_r2`・`wall_s`・`wall_tbl1`(`fle_*.c` を集めた直後に push)
   - trace: `gdi`・`gdi_bulk`・`cursor`・`loadimage`・`wall_fr7`(gdi 側)・`wall_fr21`(gdi 側)・`wall_r`(固定リストの driver)
 - `tests/oleaut_ole.rs`: link の一覧に `fle_vfs.c` を加えた。
-- `tests/realmod_s1/tools/patch_base_only.py`(新規。試験入力の生成のみ): 負の対照。PE32+ の ImageBase だけを書き換える。これが無いと、`realmod` の初期化が最初に落ち、後続の試験が同じ出力先に `create_new` して `File exists` で落ちていた。今回の修正で、この連鎖の根は消えた(ただし、§5 の `split_mod.py` は残っている)。
+- `tests/realmod_s1/tools/patch_base_only.py`: 最初は負の対照の入力として足した(ImageBase だけを書き換える PE32+ の複製)。しかし `lift/` 配下の `.py` は `guard/scan.sh` の python 規則(L-008)に当たるので、commit から外した。realmod の結果は元と同じ(16 件が落ちる)。realmod の初期化が落ちた後に `File exists` で連鎖する仕組みは、§5 のとおり。
 - `tests/known-failures.txt`(新規): 残り 59 件の名前。形式は `<binary> <試験名>`。
 
 ## 4. 検証の手順(試験の判定に使う)
@@ -48,7 +48,7 @@
 |---|---|---|---|
 | 入力の Python が repo に無い: `tests/auth117/mk_signed_pe.py`・`mutate_real.py`・`tools/authenticode_check.py` | authenticode_check | 13 | 署名付き PE を作る生成器が必要。git の履歴にも無い。作るなら別の Issue |
 | `harness/noreturn-audit/noreturn_audit.py` が無い(`allow.tsv` だけがある) | noreturn_audit | 5 | 同上 |
-| `tests/realmod_s1/tools/split_mod.py` が無い(`harness/two/gen_two.sh` の `TOOLS` が指す先)。Rust の `src/split.rs` は別の規則の移植で、同じ出力ではない。残りの 15 件は、この最初の失敗の後の `File exists` の連鎖 | realmod | 16 | 古い規則の再現が要る。Python を書くか、試験を Rust の関数に切り替えるかを決める |
+| `tests/realmod_s1/tools/patch_base_only.py`・`split_mod.py` が無い(`split_mod.py` は `harness/two/gen_two.sh` の `TOOLS` が指す先)。両方とも `lift/` 配下の `.py` で、scan の python 規則に当たる。`src/split.rs` は別の規則の移植で、同じ出力ではない。最初の失敗の後、`built()` の再初期化で `File exists` が連鎖する | realmod | 16 | 負の対照は Rust で書ける(試験内の `fs` 操作)。`split_mod.py` の再現は規則が要る。Python を `lift/` に入れる規則を決めてから直す |
 | `harness/two/lowregs.py` が無い | size1_lowregs | 1 | 同上 |
 | `harness/two/split_bytes.py` が無い(規則は `src/split.rs` の冒頭に写してある) | split_units | 3 | 同上 |
 | `tests/x87_trans/gen_ref.py`・`check_bf.py` が無い | x87_trans | 2 | 同上 |
@@ -58,7 +58,14 @@
 | `mutate.py` の結果が 0 件(CAUGHT なし)。未確認 | wall_fr18 | 1 | 原因を確かめる |
 | `fle_appfile.c` に `fprintf(` がある(製品の hygiene 検査)。`fle_appfile.c` の window-api trace の行 | wall_fr19 | 1 | 製品の変更。本作業では直していない |
 
-## 6. 数字の由来
+## 6. judge の状態(push の判断が要る)
+
+- 修正は 2 つの commit に分かれる。`6f9cfb95`(link と試験の修正。PM の merge `3b005901` に入っている)と、その後の commit(`patch_base_only.py` の削除だけ)。
+- `6f9cfb95` は judge の scan(cfhex)で落ちる。`tests/gdi.rs`(27 行)と `tests/gdi_bulk.rs`(25 行)に、既存の 32 桁の 16 進数(試験データ。`f4cffe71` の取り込みで入った)がある。scan は変更されたファイル全体を見るので、この 2 ファイルに何を足しても落ちる。試験データは変えていない。
+- この 2 ファイルは、trace の stub を入れることで gdi 84 件・gdi_bulk 35 件を通す。judge を通すには、(a) scan の cfhex を追加行だけに絞る改修、または (b) この 2 ファイルの例外、のどちらかを PM が決める必要がある。決まるまで push していない。
+- 後続の commit(`patch_base_only.py` の削除だけ)は、judge の対象のファイルが無い(削除は AM に入らない)。
+
+## 7. 数字の由来
 
 - 変更前: `cargo test -p fe-lift --no-fail-fast`(HEAD `34684635`、直す前)。
 - 変更後: 2 回走らせた。1 回目は stub に `NULL` の include 漏れがあり、link が 275 件落ちた(stub を直して、もう一度走らせた)。2 回目の結果が上の 59 件。
