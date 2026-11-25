@@ -728,39 +728,132 @@ mod tests {
         assert!(link.lines().any(|l| l == format!("-sGLOBAL_BASE={GLOBAL_BASE}")), "link.rsp must have -sGLOBAL_BASE={GLOBAL_BASE}");
     }
 
+    /// A scratch folder of a test: it is removed before the test and when the test ends (also when it fails).
+    struct Scratch(&'static str);
+
+    impl Scratch {
+        fn new(path: &'static str) -> Scratch {
+            let _ = fs::remove_dir_all(path);
+            Scratch(path)
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(self.0);
+        }
+    }
+
+    fn copy_dir(from: &Path, to: &Path) {
+        fs::create_dir_all(to).unwrap();
+        for entry in fs::read_dir(from).unwrap() {
+            let entry = entry.unwrap();
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy_dir(&entry.path(), &target);
+            } else {
+                fs::copy(entry.path(), &target).unwrap();
+            }
+        }
+    }
+
+    /// The second wave's folders as pm-work/tools/gen-wave-plugins.mjs writes them: the folder without its kind prefix (with the prefix when
+    /// another folder has the same name), and the keys `<kind>.<folder>.<file>`. The table's folders are `<kind>-<folder>` with their keys
+    /// `<kind>.<kind>-<folder>.<file>`, so the keys differ, and the guest paths are the same.
+    fn write_wave_folders(table: &str, state: &str) {
+        let folders: Vec<String> = fs::read_dir(table).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        let name_of = |folder: &str| folder.split_once('-').unwrap().1.to_string();
+        for folder in &folders {
+            let kind = folder.split_once('-').unwrap().0;
+            let shared = folders.iter().filter(|f| name_of(f) == name_of(folder)).count() > 1;
+            let dir = if shared { folder.clone() } else { name_of(folder) };
+            let text = fs::read_to_string(format!("{table}/{folder}/plugin.tsv")).unwrap();
+            fs::create_dir(format!("{state}/{dir}")).unwrap();
+            fs::write(format!("{state}/{dir}/plugin.tsv"), gen_form(kind, &dir, &text)).unwrap();
+        }
+    }
+
+    fn gen_form(kind: &str, dir: &str, text: &str) -> String {
+        let mut out = String::new();
+        for line in text.lines() {
+            match line.split_once('\t') {
+                Some((key, rest)) if key != "key" => {
+                    let guest = rest.split('\t').next().unwrap_or_default();
+                    let file: String = guest.rsplit('\\').next().unwrap_or_default().to_lowercase().chars().map(|c| if matches!(c, 'a'..='z' | '0'..='9' | '.' | '_' | '-') { c } else { '_' }).collect();
+                    out.push_str(&format!("{kind}.{dir}.{file}\t{rest}\n"));
+                }
+                _ => out.push_str(&format!("{line}\n")),
+            }
+        }
+        out
+    }
+
     /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 159 DLLs of the plan, with the first wave's Balance and Sytrus (lift/plugins). Their file names are
     /// not unique, and their keys are. With SizeOfImage (inputs/plugin-image-sizes.tsv, by SHA-256) they fit the image area: each base is 64 KiB
     /// aligned, after the one before it by that one's size, from Balance's base (0xC1D0000, after oggio's end 0xC1CF000) to below GLOBAL_BASE.
+    /// The wave's folders may be in lift/plugins already (Issue #1479): the test runs on a copy that has them, and on lift/plugins as it is.
     #[test]
     fn the_second_wave_is_160_dlls_and_fits_the_image_area() {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-plugins");
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-plugins");
+        let _scratch = Scratch::new(root);
         let tool = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../tools/plugin-layout/wave2-plugins.mjs");
-        assert!(Command::new("node").args([tool, dir]).status().expect("node").success());
-        let wave = read_rows_from(dir);
-        let _ = fs::remove_dir_all(dir);
-        let wave = wave.unwrap();
+        let table = format!("{root}/table");
+        assert!(Command::new("node").args([tool, table.as_str()]).status().expect("node").success());
+        let wave = read_rows_from(&table).unwrap();
         assert_eq!(wave.len(), 159);
         assert_eq!(wave.iter().filter(|d| d.main).count(), 131);
         assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 602_251_576);
-        let mut dlls = read_rows_from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")).unwrap();
-        dlls.extend(wave);
-        dlls.sort_by(|a, b| a.key.cmp(&b.key));
-        validate(&dlls).unwrap();
+        let state = format!("{root}/state");
+        copy_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")), Path::new(&state));
+        write_wave_folders(&table, &state);
+        assert_eq!(read_rows_from(&state).unwrap().len(), 161, "the copy of lift/plugins and the wave's 159 rows");
+        let stale = format!("{root}/stale");
+        fs::create_dir_all(format!("{stale}/old")).unwrap();
+        fs::write(format!("{stale}/old/plugin.tsv"), format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.old.old_x64.dll\tPlugins\\Fruity\\Effects\\Old\\Old_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64))).unwrap();
+        assert!(second_wave_dlls(&stale, &wave).unwrap_err().contains("out of date"), "a row that is neither in the table nor in the first wave's folders must stop the test");
         let sizes_text = include_str!("../../../../inputs/plugin-image-sizes.tsv");
         let image_of = |d: &Dll| -> u64 {
             let line = sizes_text.lines().find(|l| l.split('\t').next() == Some(d.sha256.as_str())).unwrap_or_else(|| panic!("{}: no SizeOfImage row", d.key));
             line.split('\t').nth(2).unwrap().parse().unwrap()
         };
-        let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
-        let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
-        assert_eq!(bases[0], 0xC1D0000);
-        let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance").map(|d| align_up(image_of(d), ALIGN)).sum();
-        assert_eq!(wave_total, 748_158_976);
-        for pair in bases.windows(2).zip(sizes.iter()) {
-            assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
+        for plugins in [state.as_str(), concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")] {
+            let dlls = second_wave_dlls(plugins, &wave).unwrap();
+            assert_eq!(dlls.len(), 161);
+            let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
+            let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
+            assert_eq!(bases[0], 0xC1D0000);
+            let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance").map(|d| align_up(image_of(d), ALIGN)).sum();
+            assert_eq!(wave_total, 748_158_976);
+            for pair in bases.windows(2).zip(sizes.iter()) {
+                assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
+            }
+            assert!(bases.iter().all(|b| b % ALIGN == 0));
+            assert!(*bases.last().unwrap() + align_up(*sizes.last().unwrap(), ALIGN) <= GLOBAL_BASE);
         }
-        assert!(bases.iter().all(|b| b % ALIGN == 0));
-        assert!(*bases.last().unwrap() + align_up(*sizes.last().unwrap(), ALIGN) <= GLOBAL_BASE);
+    }
+
+    /// The DLLs of the second wave, from a plugins folder (lift/plugins, or a copy with the wave's folders) and the table's rows. A DLL is counted
+    /// once, by its guest path: the folder's row is the one kept (its key is the realmod's name). A row of the folder that is neither in the
+    /// table nor in the first wave's folders means that the table is out of date.
+    fn second_wave_dlls(plugins: &str, table: &[Dll]) -> Result<Vec<Dll>, String> {
+        let rows = read_rows_from(plugins)?;
+        let table_guests: BTreeSet<String> = table.iter().map(|d| d.guest.to_lowercase()).collect();
+        if let Some(d) = rows.iter().find(|d| !table_guests.contains(&d.guest.to_lowercase()) && !first_wave_folder(&d.guest)) {
+            return Err(format!("{plugins}: {} ({}) is neither in the table nor in the first wave's folders: the table is out of date", d.key, d.guest));
+        }
+        let folder_guests: BTreeSet<String> = rows.iter().map(|d| d.guest.to_lowercase()).collect();
+        let mut dlls = rows;
+        dlls.extend(table.iter().filter(|d| !folder_guests.contains(&d.guest.to_lowercase())).cloned());
+        dlls.sort_by(|a, b| a.key.cmp(&b.key));
+        validate(&dlls)?;
+        Ok(dlls)
+    }
+
+    /// The first wave's folders (tools/plugin-layout/wave2-plugins.mjs, FIRST_WAVE): their DLLs are in lift/plugins, and not in the table.
+    fn first_wave_folder(guest: &str) -> bool {
+        const FIRST_WAVE: [&str; 4] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus"];
+        let folder = guest.split('\\').take(4).collect::<Vec<&str>>().join("\\");
+        FIRST_WAVE.iter().any(|f| f.eq_ignore_ascii_case(&folder))
     }
 
     #[test]
