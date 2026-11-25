@@ -32,7 +32,31 @@ FL は、素材(サンプル)のパスを `%FLStudioFactoryData%\Data\Patches\�
 - 事実 5(仮想の値): `lift/runtime/fle_env.h` の `FLE_VIRTUAL_*`(Windows のディレクトリ `C:\Windows`・`C:\Windows\System32`、ユーザーのプロファイル `C:\Users\user`、ユーザー名 `user`、コンピュータ名 `DESKTOP-0000001`、DLL と EXE のパス)。`SHGetFolderPathW`(`fle_env.c` の 500 行付近)の答えは、これらの値から作られている。初期のブロックの値は、これと一致させる。
 - 関係: #1386 の作業は、UCRT の環境変数の関数(`_wgetenv`・`_putenv`・`_wputenv_s`・`getenv`・`_dupenv_s`)を `lift/runtime/fle_crt.c` に足す。この Issue を書いた時点で、それは main に無い。UCRT の関数も、この Issue と同じブロックを読む形にする。#1386 が main に入る前は、Win32 の API だけを直し、UCRT の関数の扱いを報告に書く。
 
-## 前回の試行で分かったこと(run 45541813190。03:42〜07:03 UTC。`failed`)
+## 前回の試行で分かったこと(run 45566655916。failed)
+
+数値は runner の値(nproc 4、loadavg 1.05 1.17 1.76)。
+
+- 判定は差し戻し。DEDZII(File > Open)の段で止まった。`error` は `timeout 180000 ms: the title of dedzii (the title is "Song info")`、`end.state` は exited。受け入れの他の段は通った(下の行)。作業は work.diff に保存された。次の試行は、`.prior-work.md` の取り込みで差分を載せてから続ける。
+- 止まり方: 選んだファイルの後に `[err] filedlg: THE SELECTION WAS MADE BY THE PERSON AT THE PAGE (1 item)`、続けて `[err] fle: CreateFileW: empty path is not defined`。最初の呼び出しは `GetFileAttributesW 3 ""`。`fle_filedlg.c` は、選んだパス(`C:\Users\user\Downloads\dedzii.flp`)を空にしていない。空のパスは FL の後続の処理で作られる。どこで作られるかは未確認。
+- HEAD の版(環境の変更なし)でも、同じ DEDZII が同じ位置で止まる。元のファイル名でも同じ。環境の変更が原因ではない。PM の決定で、開く段の判定を受け入れから外した(別の Issue #1421 が扱う)。
+- 観測(起動の時の記録。停止までの全ログ):
+  ```
+  env: SetEnvironmentVariableW "FLStudioUserData" set 44
+  env: SetEnvironmentVariableW "FLStudioFactoryData" set 40
+  env: SetEnvironmentVariableW "ILSharedData" set 35
+  env: ExpandEnvironmentStringsW "%FLStudioUserData%\Presets\Plugin database\" expanded 69
+  env: ExpandEnvironmentStringsW "%FLStudioFactoryData%\Data\Demo projects\" expanded 60
+  ```
+- ほかの Set は `FLStudioDownloadsData`(44)・`FLStudioUserCommonConfig`(53)・`FLStudioData`(45)など。`GetEnvironmentStringsW` は 3 回(ブロック 645 バイト)。`GetEnvironmentVariableW` は 6 回で、すべて absent(`LANG` ×4・`CLAP_PATH`・`OneDrive`)。`ExpandEnvironmentStringsW` の記録は上限の 200 に達した。
+- 初期のブロック: `env_std` の 22 件(`SystemRoot`・`SystemDrive`・`windir`・`USERNAME`・`USERPROFILE`・`APPDATA`・`LOCALAPPDATA`・`ProgramData`・`ProgramFiles`・`ProgramFiles(x86)`・`CommonProgramFiles`・`TEMP`・`TMP`・`COMPUTERNAME`・`OS`・`PATH`・`PATHEXT`・`NUMBER_OF_PROCESSORS`・`PROCESSOR_ARCHITECTURE`・`HOMEDRIVE`・`HOMEPATH`・`USERDOMAIN`)。値は `FLE_VIRTUAL_*` と `SHGetFolderPathW` の答えから作る。`OS`(`Windows_NT`)と `PATHEXT` だけは直書き。
+- 試験: `env.rs` は 13 件が通る。新しい 5 件(標準の変数・大文字小文字・一つのブロック・観測の 200 件・SHGetFolderPath との一致)は、HEAD の版で赤になることを確かめた。`k32_dsp.rs`・`wall_b.rs` は、「空のブロック」の前提を標準の並びに直した。両方は `fle_clip_host_read/write` の未定義(#1389)でリンクできないため、リンク条件を一時に緩めて 14 件・13 件が通るのを確かめ、元に戻した。`wall_r2.rs`・`wall_fr3.rs` の失敗は、この変更の外(`fle_clip` のリンク・`archive/harness-attic/a4-multi.sh` の無さ)。
+- 受け入れの他の段: boot は engine-idle・standIn false・error null(`elapsedMs` 12202)。流れ A〜D は 4 行とも条件を満たす(`elapsedMs` 11529・11642・11460・11466、`preBootBytes` 312195974)。`npm test --prefix app` は 1410 件が通り、10 件はスキップ。
+- `GetTempPathW` は TMP(`C:\Users\user\AppData\Local\Temp\`)を返すようになった。VFS にそのフォルダは無い。`GetTempFileNameW` は一時ファイルを作らない。作成の失敗の仕方は従来と同じと見られる(エンジン上では未確認)。
+- `measure.mjs` の `envLog` は、`projectReport`(開く段の成功の後)でしか作られない。前回は開く段で止まったため、`envLog` は null だった。直しは「やること」4。
+- 前回の差分は、`tools/p3-audio-probe/measure.mjs` で main の `imageReads`(#1400)と衝突した。両方を残す形で解いてある(差分の中)。
+- UCRT の環境関数(`_wgetenv`・`_putenv`)は、main に `fle_crt.c` が無いため未実装。#1386 のマージ後に、同じ `env_find`・`env_store` を使う。
+
+## 2 回前の試行で分かったこと(run 45541813190。03:42〜07:03 UTC。`failed`)
 
 数値は runner の値(nproc 4)。
 
@@ -66,18 +90,20 @@ FL は、素材(サンプル)のパスを `%FLStudioFactoryData%\Data\Patches\�
    - FL の変数: FL が起動の時に自分で `SetEnvironmentVariableW` で設定する(前回の試行で確認)。そのため、レジストリや種のファイルには入れない。前回の差分に `HKCU\Environment` の読みや種の行が在れば、外す。試験で、FL が設定するのと同じ名前と値を Set し、Get と Expand で読めることを確かめる。
    - 生の `%…%` の綴りを `GetFileAttributesW` に渡す要求は、この Issue では直さない(FL 自身の探索。素材の配信は #1403)。
 3. 試験(`lift/crates/fe-lift/tests/env.rs`)は、前回の 13 件を保ち、FL が設定する変数の Set→Get→Expand の試験を足す。新しい試験は、実装の前に red を確かめる。`cargo test` で通ることを確かめる。
-4. 測定。DEDZII を File > Open で開き、`tools/p3-audio-probe/measure.mjs` の出力の `envLog` に、FL の 3 つの `SetEnvironmentVariableW` の行と、`ExpandEnvironmentStringsW` の行が出ることを見る。`inventory`・`rootStripped` も JSON に出るが、判定には使わない(#1403 の範囲)。
+4. 測定。DEDZII を File > Open で開き、`tools/p3-audio-probe/measure.mjs` の出力の `envLog` に、FL の 3 つの `SetEnvironmentVariableW` の行と、`ExpandEnvironmentStringsW` の行が出ることを見る。開く段で止まっても(前回の試行で止まった。別の Issue #1421 が扱う)、`envLog` は JSON に出す。`envLog` は今、`projectReport`(開く段が成功した後)でしか作られないので、`openProject` が失敗したときも、起動から今までの engine のログの `env:` の行を `envLog` に入れる。止まった時の `error` は判定に使わない。道具は開く段の失敗では終了コード 0 を返す(#1400 の規則)。`inventory`・`rootStripped` も JSON に出るが、判定には使わない(#1403 の範囲)。
 5. 受け入れを通す。通らなければ、作業ツリーを commit して終える。
+
+前回の差分は、`.prior-work.md` の取り込みで作業ツリーに入る。足すのは、上の 4 の `envLog` の直し(開く段が失敗したときも出す)だけ。それ以外の新しい変更は足さない。この Issue は、ほぼ完了している。
 
 ## 受け入れ
 
 ```accept
-mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && cargo test --locked --manifest-path lift/Cargo.toml -p fe-lift --test env && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-env && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp" .tmp-env/dedzii.flp && node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-env/dedzii.flp" > "$RUNNER_TEMP/open-dedzii.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").trim());const L=Array.isArray(r.envLog)?r.envLog:[];const has=(re)=>L.some((l)=>re.test(l));process.exit(r.error===null&&r.state==="engine-idle"&&has(/^(\[err\] )?env: SetEnvironmentVariableW "FLStudioFactoryData" set \d+$/)&&has(/^(\[err\] )?env: SetEnvironmentVariableW "FLStudioUserData" set \d+$/)&&has(/^(\[err\] )?env: SetEnvironmentVariableW "ILSharedData" set \d+$/)&&has(/^(\[err\] )?env: ExpandEnvironmentStringsW ".*" expanded \d+$/)?0:1)' "$RUNNER_TEMP/open-dedzii.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/ && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && cargo test --locked --manifest-path lift/Cargo.toml -p fe-lift --test env && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && mkdir -p .tmp-env && cp "lift/out-app/host/resources/Data/Demo projects/Demo songs/DEDZII - NIGHT TERROR.flp" .tmp-env/dedzii.flp && node tools/p3-audio-probe/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" "$PWD/.tmp-env/dedzii.flp" > "$RUNNER_TEMP/open-dedzii.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8").trim());const L=Array.isArray(r.envLog)?r.envLog:[];const has=(re)=>L.some((l)=>re.test(l));process.exit(has(/^(\[err\] )?env: SetEnvironmentVariableW "FLStudioFactoryData" set \d+$/)&&has(/^(\[err\] )?env: SetEnvironmentVariableW "FLStudioUserData" set \d+$/)&&has(/^(\[err\] )?env: SetEnvironmentVariableW "ILSharedData" set \d+$/)&&has(/^(\[err\] )?env: ExpandEnvironmentStringsW ".*" expanded \d+$/)?0:1)' "$RUNNER_TEMP/open-dedzii.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準:
 - 起動 1 回で、engine-idle・standIn が false・error が null(boot)。
-- DEDZII の測定で、`error` が null・`state` が engine-idle。`envLog` に、`SetEnvironmentVariableW` の `FLStudioFactoryData`・`FLStudioUserData`・`ILSharedData` の各 1 行(`set <n>`)と、`ExpandEnvironmentStringsW` の 1 行(`expanded <n>`)が在る。`inventory`・`rootStripped` は判定に使わない。
+- DEDZII の測定(File > Open)で、`envLog` に、`SetEnvironmentVariableW` の `FLStudioFactoryData`・`FLStudioUserData`・`ILSharedData` の各 1 行(`set <n>`)と、`ExpandEnvironmentStringsW` の 1 行(`expanded <n>`)が在る。起動の時の記録で足りる(開く段より前の行)。`error`・`state`・`inventory`・`rootStripped` は判定に使わない。開く段の停止(`error`)は、別の Issue #1421 が扱う。
 - 流れ A〜D(`welcome-flow.mjs`)の 4 行: 各行で `error` が null・`state` が engine-idle・`standIn` が false・`trapped` が false・`hostErrors` が 0・`opened` が true。B と D は `welcomeClosed` が true。`elapsedMs` が 12,500 以下、`preBootBytes` が 314,368,711 以下。
 - 環境の試験(`cargo test -p fe-lift --test env`)と、単体テスト(`npm test --prefix app`)が通る。
 
@@ -86,7 +112,7 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 観測の結果(どの API を、どの名前で、どの順で呼んだか。FL の変数の Set・Get・Expand)、初期のブロックの値、`envLog` の FL の行(3 つの Set と Expand)、`inventory`・`rootStripped`(判定には使わない。参考)、流れ A〜D の 4 行、`elapsedMs`・`preBootBytes`、`lift/`・`app/` を変えたこと(push すると `deploy.yml` が動く)。
+- 報告に書く: 観測の結果(どの API を、どの名前で、どの順で呼んだか。FL の変数の Set・Get・Expand)、初期のブロックの値、`envLog` の FL の行(3 つの Set と Expand)、`error`(開く段の停止の理由。判定には使わない)、`inventory`・`rootStripped`(判定には使わない。参考)、流れ A〜D の 4 行、`elapsedMs`・`preBootBytes`、`lift/`・`app/` を変えたこと(push すると `deploy.yml` が動く)。
 
 ## 制約
 
@@ -108,4 +134,5 @@ mkdir -p lift/out-app/host/resources && cp -a lift/out-app/host-extra/resources/
 
 - 後続: #1403(demo 2 件の素材の配信。段階 2)は、この Issue とは独立に起動する(前回は blocked by にしていたが、外した)。欠けた素材の配信は #1403 の範囲で、この Issue の受け入れには入れない。
 - #1386(UCRT の環境変数の関数。`lift/runtime/fle_crt.c`)と、同じ環境ブロックを使う。
+- UCRT の環境関数(`_wgetenv`・`_putenv`)は、#1386 のマージ後に、同じ `env_find`・`env_store` を使う。#1386 が main に入るまでは、UCRT の関数に手を付けず、報告の「未確認・残り」に書く。
 - #1400(Sytrus)・#1387(Riff machine)とは独立。

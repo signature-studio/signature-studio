@@ -1,0 +1,211 @@
+diff --git a/lift/harness/web/threads/thread_scenarios.c b/lift/harness/web/threads/thread_scenarios.c
+index b260f11d..5d2a000a 100644
+--- a/lift/harness/web/threads/thread_scenarios.c
++++ b/lift/harness/web/threads/thread_scenarios.c
+@@ -552,7 +552,6 @@ static uint64_t H_CREATE_PRIO(uint64_t start, uint64_t param, int32_t level)
+ static void sc_priority_yield(void)
+ {
+     uint64_t h[3]; int i;
+-    fle_thread_set_priorities(1);
+     h[0] = H_CREATE_PRIO(VA(5), 0, 0); h[1] = H_CREATE_PRIO(VA(6), 0, 2); h[2] = H_CREATE_PRIO(VA(7), 0, -1);
+     for (i = 0; i < 3; i++) W1(h[i], INF);
+     print_order();
+diff --git a/lift/runtime/fle_callback.c b/lift/runtime/fle_callback.c
+index 3630cb50..8672a764 100644
+--- a/lift/runtime/fle_callback.c
++++ b/lift/runtime/fle_callback.c
+@@ -15,6 +15,7 @@ extern uint8_t fle_teb[] __attribute__((weak));
+ extern uint8_t *fle_teb_cur __attribute__((weak));
+ 
+ static unsigned depth;
++static int depth2_allowed;
+ 
+ unsigned fle_callback_depth(void)
+ {
+@@ -27,6 +28,16 @@ void fle_callback_depth_set(unsigned d)
+     depth = d;
+ }
+ 
++int fle_callback_depth2_allowed(void)
++{
++    return depth2_allowed;
++}
++
++void fle_callback_depth2_allow(int allow)
++{
++    depth2_allowed = allow != 0;
++}
++
+ /* The guest registers that a Win64 callee must preserve and that live in R[]: rbx 3, rbp 5, rsi 6, rdi 7, r12-r15 12..15 (rsp is
+  * R[4], checked separately). */
+ static const unsigned preserved[] = { 3, 5, 6, 7, 12, 13, 14, 15 };
+diff --git a/lift/runtime/fle_callback.h b/lift/runtime/fle_callback.h
+index c1eb3642..8acc97d3 100644
+--- a/lift/runtime/fle_callback.h
++++ b/lift/runtime/fle_callback.h
+@@ -60,4 +60,8 @@ unsigned fle_callback_depth(void);
+ /* Decision 0122: sets the nesting. Only fle_thread.c calls it (the depth belongs to the running guest thread and is switched with it). */
+ void fle_callback_depth_set(unsigned d);
+ 
++/* Scoped exception for DispatchMessage's depth-2 callback; saved with the running thread context. */
++int fle_callback_depth2_allowed(void);
++void fle_callback_depth2_allow(int allow);
++
+ #endif
+diff --git a/lift/runtime/fle_thread.c b/lift/runtime/fle_thread.c
+index d7744577..cd380a9d 100644
+--- a/lift/runtime/fle_thread.c
++++ b/lift/runtime/fle_thread.c
+@@ -99,6 +99,7 @@ typedef struct {
+     struct fle_seh_reg *seh;       /* decision 0132: the registrations of functions with an except landing, and the exception being dispatched */
+     struct fle_seh_disp *sehd;
+     unsigned cbdepth;
++    unsigned cbdepth2_allowed;
+     size_t tdepth;
+ } gctx;
+ 
+@@ -213,6 +214,7 @@ static void save_ctx(gctx *c)
+     c->seh = fle_seh_top;
+     c->sehd = fle_seh_cur;
+     c->cbdepth = fle_callback_depth();
++    c->cbdepth2_allowed = (unsigned)fle_callback_depth2_allowed();
+     c->tdepth = trace_depth ? trace_depth() : 0;
+ }
+ 
+@@ -231,6 +233,7 @@ static void load_ctx(const gctx *c)
+     fle_seh_top = c->seh;
+     fle_seh_cur = c->sehd;
+     fle_callback_depth_set(c->cbdepth);
++    fle_callback_depth2_allow((int)c->cbdepth2_allowed);
+     if (trace_set_depth) trace_set_depth(c->tdepth);
+ }
+ 
+@@ -500,15 +503,15 @@ static void switch_to(unsigned to)
+  * the highest priority. If none of these threads are ready to run, the system assigns time slices in a round-robin fashion to all threads with the next highest priority. If a higher-priority thread becomes available to run, the system
+  * ceases to execute the lower-priority thread (without allowing it to finish using its time slice) and assigns a full time slice to the higher-priority thread." The base priority is made of the priority class of the process and the
+  * priority level of the thread (the same page); all threads of this environment are in ONE process, so only the level orders them: for every class the table of the page is non-decreasing in the level (IDLE -15, LOWEST -2, BELOW_NORMAL -1, NORMAL 0,
+- * ABOVE_NORMAL 1, HIGHEST 2, TIME_CRITICAL 15; the REALTIME levels -7..6 between them), so the level stands for the base priority. Off by default (fle_thread_set_priorities): every thread then counts as priority 0 and the rotation of decision 0122 is unchanged. Not modelled: the dynamic boosts (Learn "Priority Boosts"), THREAD_MODE_BACKGROUND_BEGIN's effect on the CPU priority (the pages say nothing about its value). */
+-static int prio_on;
++ * ABOVE_NORMAL 1, HIGHEST 2, TIME_CRITICAL 15; the REALTIME levels -7..6 between them), so the level stands for the base priority. Enabled by default; fle_thread_set_priorities can disable priority ordering, in which case every thread counts as priority 0 and the rotation of decision 0122 is unchanged. Not modelled: the dynamic boosts (Learn "Priority Boosts"), THREAD_MODE_BACKGROUND_BEGIN's effect on the CPU priority (the pages say nothing about its value). */
++static int prio_on = 1;
+ void fle_thread_set_priorities(int on) { prio_on = on; }
+-static int32_t prio_of(unsigned i)
++static int32_t base_prio_of(unsigned i)
+ {
+-    if (!prio_on) return 0;
+     if (i == 0) return fle_proc_first_thread_priority ? fle_proc_first_thread_priority() : 0;
+     return T[i].ps.prio;
+ }
++static int32_t prio_of(unsigned i) { return prio_on ? base_prio_of(i) : 0; }
+ 
+ /* The runnable thread (never `cur` itself) that the scheduler takes next, or -1: the one with the highest priority, and among those with the same priority the first after `cur` in creation order (the round-robin). When all runnable
+  * threads have the same priority this is the rotation of decision 0122. */
+@@ -583,9 +586,9 @@ static void report_threads(FILE *f)
+         for (s = q->sent_head; s; s = s->next) nsent++;
+         wd[0] = 0;
+         if (t->state == T_WAITING) describe_wait(t, wd, sizeof wd);
+-        fprintf(f, "  thread %u: id %#x handle %#" PRIx64 " %s%s start %#" PRIx64 " param %#" PRIx64 " exit %u suspend %u rsp %#" PRIx64 "; queue %s%u posted %u sent%s\n", i, (unsigned)t->vid,
++        fprintf(f, "  thread %u: id %#x handle %#" PRIx64 " %s%s start %#" PRIx64 " param %#" PRIx64 " exit %u suspend %u rsp %#" PRIx64 "; prio %d/%d; queue %s%u posted %u sent%s\n", i, (unsigned)t->vid,
+                 i ? handle_of(i) : (uint64_t)0, state_name(t), t->closed ? " (handle closed)" : "", t->start, t->param, (unsigned)t->exit_code, (unsigned)t->suspend,
+-                i == cur ? R[4] : t->g.r[4], q->exists ? "" : "none ", q->exists ? (unsigned)q->count : 0u, nsent, q->quit ? " QUIT pending" : "");
++                i == cur ? R[4] : t->g.r[4], (int)prio_of(i), (int)base_prio_of(i), q->exists ? "" : "none ", q->exists ? (unsigned)q->count : 0u, nsent, q->quit ? " QUIT pending" : "");
+         if (wd[0]) fprintf(f, "      waiting: %s\n", wd);
+         if (q->exists) {
+             uint32_t k;
+@@ -607,10 +610,15 @@ static void report_preempt(FILE *f)
+                 slice_dispatches, slice_ticks, pst.slices, pst.deferred, pst.switches, fle_progress_count);
+ }
+ 
+-void fle_thread_report(FILE *f)
++void fle_thread_report_state(FILE *f)
+ {
+     report_threads(f);
+     report_preempt(f);
++}
++
++void fle_thread_report(FILE *f)
++{
++    fle_thread_report_state(f);
+     if (fle_win_report) fle_win_report(f);
+ }
+ 
+@@ -790,9 +798,11 @@ void fle_progress_slice(void)
+     if (!preempt_armed || nthr < 2) return;
+     t = &T[cur];
+     if (t->state != T_RUNNING) return;
+-    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {
++    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH &&
++        !(fle_callback_depth() == 2 && fle_callback_depth2_allowed())) {
+         pst.deferred++;
+         if (fle_audio_poll_in_callback) fle_audio_poll_in_callback();
++
+         return;
+     }
+     pst.slices++;
+diff --git a/lift/runtime/fle_thread.h b/lift/runtime/fle_thread.h
+index 2e9cb4ba..a3bd7c35 100644
+--- a/lift/runtime/fle_thread.h
++++ b/lift/runtime/fle_thread.h
+@@ -3,7 +3,7 @@
+  * The guest's threads run the guest's own instructions, one at a time, all on the one host thread (so fle_host_tid() and the 14 single-thread checks
+  * of decision 0054 are unchanged). A thread is given up only inside one of the waiting or yielding APIs below; between two of them a thread runs
+  * without interruption -- EXCEPT for the deterministic pseudo-preemption of decision 0147 (the block "decision 0147" below): after the first CreateThread, a slice ends
+- * every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest and may give the processor to another ready thread. Which thread runs next is a CHOICE WITHOUT A SOURCE (decision 0122): round robin by creation order, priorities ignored; with fle_thread_set_priorities(1) (decision 0234 (mt3), Learn "Scheduling Priorities") the ready thread of the highest priority, the same priority in rotation. When
++ * every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest and may give the processor to another ready thread. Which thread runs next is a CHOICE WITHOUT A SOURCE (decision 0122): by default the ready thread of highest scheduling priority, same priority in creation-order rotation; fle_thread_set_priorities(0) restores round robin with priorities ignored. When
+  * every thread waits, the virtual clock (fle_sys.h) is moved to the smallest deadline; when no thread can ever run again, the run stops by name.
+  *
+  * The FIRST thread (the one that called into the guest: the harness's) keeps the legacy single-thread storage (fle_tls_values, the last error of
+@@ -82,8 +82,7 @@ uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
+ /* ---- decision 0147 (PROVISIONAL): deterministic pseudo-preemption (an exception to decision 0122's "a thread is given up only inside one of the waiting or yielding APIs") ----
+  * From the first CreateThread on, every FLE_PREEMPT_SLICE_DISPATCHES indirect calls of the guest (fle_progress_count of fle_dispatch.h; the count is the same for native, wasm, -O0 and -O2) end one slice: the virtual
+  * clock is moved by FLE_PREEMPT_SLICE_TICKS, the waits whose time has come are tested and the next ready thread (creation order; with fle_thread_set_priorities(1) one of the same or a higher priority than the running one) runs; the preempted thread stays ready. A slice ends a thread's turn only while the
+- * thread is not inside a callback of the runtime (fle_callback_depth() <= FLE_PREEMPT_MAX_DEPTH: the thread's own outermost guest call is depth 1, a window procedure called by DispatchMessageW is depth 2); inside a
+- * callback the slice is skipped (the clock is not moved either), so a window procedure, EnumWindows callback or timer procedure still runs without interruption, as under decision 0122. Every value is a CHOICE
++ * thread is not inside a callback of the runtime beyond depth 1, except for the scoped depth-2 WndProc/TIMERPROC calls made by DispatchMessageW. A slice in every other depth-2 callback, and every callback at depth 3 or more, is deferred without moving the clock. Every value is a CHOICE
+  * WITHOUT A SOURCE (S-vclock-*, decision 0147; FLE_PREEMPT_SLICE_TICKS was corrected by decision 0279). There is NO environment variable for them: FLE_PREEMPT, FLE_PREEMPT_DISPATCHES and FLE_PREEMPT_TICKS,
+  * which decision 0147 named, do not exist in this runtime (nothing reads them; decision 0243 folded them into these constants). */
+ #define FLE_PREEMPT_SLICE_DISPATCHES 4096u   /* S-vclock-slice-progress */
+@@ -223,9 +222,10 @@ void fle_thread_set_idle_stop(int on) FLE_THREAD_REF;
+ void fle_thread_preempt_stats(fle_preempt_stats *out) FLE_THREAD_REF;
+ /* Prints the thread table, the queues and the virtual clock (the harness report). */
+ void fle_thread_report(FILE *f) FLE_THREAD_REF;
++void fle_thread_report_state(FILE *f) FLE_THREAD_REF;
+ /* A trace of every switch on stderr (write(2)), for diagnosis. */
+ void fle_thread_set_trace(int on) FLE_THREAD_REF;
+-/* Decision 0234 (mt3, PROVISIONAL): 1 = the scheduler orders the ready threads by their scheduling priority (Learn "Scheduling Priorities": the levels SetThreadPriority kept), 0 (the default) = the rotation in creation order of decision 0122, the priorities are only kept. */
++/* Decision 0234 (mt3, PROVISIONAL): 1 (the default) = order ready threads by their scheduling priority (the levels SetThreadPriority kept); 0 = ignore priorities and use the rotation in creation order of decision 0122. */
+ void fle_thread_set_priorities(int on) FLE_THREAD_REF;
+ 
+ #endif
+diff --git a/lift/runtime/fle_win.c b/lift/runtime/fle_win.c
+index b730e886..e316a905 100644
+--- a/lift/runtime/fle_win.c
++++ b/lift/runtime/fle_win.c
+@@ -2115,8 +2115,12 @@ static void dispatch_message(const char *api, int ansi)
+     if (msg == FLE_WM_TIMER && lp != 0) {
+         /* Learn WM_TIMER / SetTimer: "DispatchMessage will call the TimerProc callback function specified in the call to the SetTimer" and "the DispatchMessage calls the callback function instead of calling the window
+          * procedure when it processes WM_TIMER with a non-NULL lParam"; TIMERPROC(HWND, UINT, UINT_PTR, DWORD): the window, WM_TIMER, the timer id, the milliseconds since the system started (the virtual clock). */
++        unsigned allow_depth2 = fle_callback_depth() == 1;
++        int old_allow = fle_callback_depth2_allowed();
++        if (allow_depth2) fle_callback_depth2_allow(1);
+         R[0] = 0;
+         (void)fle_call_guest(lp, h, FLE_WM_TIMER, wp, (uint32_t)(clk_now() / FLE_TICKS_PER_MS));
++        if (allow_depth2) fle_callback_depth2_allow(old_allow);
+         R[0] = 0;
+         return;
+     }
+@@ -2126,7 +2130,13 @@ static void dispatch_message(const char *api, int ansi)
+         return;
+     }
+     if (tab[i].owner != fle_thread_current()) fle_stop(api, "the message is for a window that another thread owns: the page gives no behaviour");
+-    R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
++    {
++        unsigned allow_depth2 = fle_callback_depth() == 1;
++        int old_allow = fle_callback_depth2_allowed();
++        if (allow_depth2) fle_callback_depth2_allow(1);
++        R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
++        if (allow_depth2) fle_callback_depth2_allow(old_allow);
++    }
+ }
+ 
+ void fle_imp_DispatchMessageW(void) { dispatch_message("DispatchMessageW", 0); }

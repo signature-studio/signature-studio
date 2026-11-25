@@ -150,6 +150,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 18. **M7 の目標**: P3 の再生中の命令数のうち、直接 wasm の割合が 99% 以上。
 19. **依存の変更**: 外部プラグインの 3 件(027・028・029)は、音声の経路の修正(040)の後に入れる。
 20. **同じファイルを変える Issue は `blocked by` でつなぐ**(PM の起票の規則)。同じ生成物の入力(`lift/harness/web/pack.args`・`lift/harness/web/seed.args`・`lift/crates/fe-build/tests/plan/*.txt` など)を変える Issue が並行すると、push の段の pull で衝突し、作業が失われる(#1341 は #1319 と衝突して 3 回失敗した)。後から起票する側を、先に入る側の `blocked by` にする。
+21. **cfhex の除外**: `guard/scan.sh` の 32 桁の 16 進の検査(cfhex)は、`lift/crates/*/tests/` の下の `*.rs`・`*.txt`・`*.tsv`・`*.hex` の行だけ除く。試験の機械語・画素のデータは 32 桁の 16 進を多く含み、識別子ではないため(`gdi.rs`・`gdi_bulk.rs` で 54 件の誤検出)。試験の外では今まで通り検査し、vendor・cfhost・python・mask・wranglergen は、試験の場所でも効く(`spec/guard.test.sh`)。
 
 ## 11. 依頼者の指示との対応
 

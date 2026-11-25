@@ -2,10 +2,11 @@
 # guard/scan.sh [--redact] [PATH...] : 依頼者の決まりへの違反を、ファイルの内容から見つける。作業ジョブの判定の段で呼ぶ。
 # PATH が無いときは、BASE(既定 origin/main)からの変更ファイルを検査する。終了コード 0 = 指摘なし、1 = 指摘あり、2 = 使い方の誤り。
 # --redact PATH...: PATH の中の vendor の一致を [伏せ字] に置き換えてから、同じ検査をする(報告の検査の段だけで使う)。置き換えた行は「redact ファイル:行」を出す(値は出さない)。ほかの規則の指摘は、従来どおり失敗にする。
-# 規則名・ファイル・行番号を出す。規則: vendor(台帳 L-005)、cfhex・cfhost(L-006)、python(L-008)、mask(L-031: .github/workflows/ の下だけ)、wranglergen(L-032: wrangler の設定ファイルを作る・書く行。spec/・pm-work/・*.md は対象外)。scan 自身は一時ファイルを作らない(--redact は sed -i で書き換える)。
+# 規則名・ファイル・行番号を出す。規則: vendor(台帳 L-005)、cfhex(lift/crates/*/tests/ の試験のデータを除く)・cfhost(L-006)、python(L-008)、mask(L-031: .github/workflows/ の下だけ)、wranglergen(L-032: wrangler の設定ファイルを作る・書く行。spec/・pm-work/・*.md は対象外)。scan 自身は一時ファイルを作らない(--redact は sed -i で書き換える)。
 set -o pipefail
 v1=anthr; v2=opic; vendor="$v1$v2"   # 名前を、このファイル自身に含めないため、半分ずつ
 cfhex='(^|[^0-9A-Za-z])[0-9a-fA-F]{32}($|[^0-9A-Za-z])'
+tdata='^lift/crates/[^/]+/tests/.+[.](rs|txt|tsv|hex)$'   # 試験のデータの場所(cfhex の対象から除く)
 cfhost='[A-Za-z0-9-]+\.r2\.cloudflarestorage\.com|[A-Za-z0-9-]+\.workers\.dev'
 pyword='(^|[^[:alnum:]_.-])python3?(\.[0-9]+)*(\.exe)?($|[^[:alnum:]_./\\-]|\\$)'
 mask='add-mask'   # 値を隠す命令(台帳 L-031)。ワークフローの中にだけ、規則として見る
@@ -41,7 +42,8 @@ for f in "${files[@]}"; do
   [[ "${f,,}" == *"$vendor"* ]] && rep vendor "$f:0"
   grep -qI . "$f" 2>/dev/null || continue   # バイナリは内容を見ない
   while read -r l; do rep vendor "$f:$l"; done < <(grep -niE -- "$vendor" "$f" | cut -d: -f1)
-  while read -r l; do rep cfhex "$f:$l"; done < <(grep -nE -- "$cfhex" "$f" | cut -d: -f1)
+  # 試験の機械語・画素のデータは、32 桁の 16 進を多く含み、識別子ではない。試験の外の場所では、今まで通り検査する
+  [[ "$f" =~ $tdata ]] || while read -r l; do rep cfhex "$f:$l"; done < <(grep -nE -- "$cfhex" "$f" | cut -d: -f1)
   while read -r l; do rep cfhost "$f:$l"; done < <(grep -nE -- "$cfhost" "$f" | cut -d: -f1)
   case "$f" in .github/workflows/*) while read -r l; do rep mask "$f:$l"; done < <(grep -nF -- "$mask" "$f" | cut -d: -f1) ;; esac
   case "$f" in spec/*|pm-work/*|*.md) ;; *)

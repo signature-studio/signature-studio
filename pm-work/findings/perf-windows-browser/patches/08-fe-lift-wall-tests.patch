@@ -1,0 +1,389 @@
+diff --git a/lift/crates/fe-lift/tests/wall_fpick1.rs b/lift/crates/fe-lift/tests/wall_fpick1.rs
+index dcae4b7f..9f1f8538 100644
+--- a/lift/crates/fe-lift/tests/wall_fpick1.rs
++++ b/lift/crates/fe-lift/tests/wall_fpick1.rs
+@@ -162,6 +162,26 @@ fn run(name: &str, globals: &str, main: &str) -> (i32, Vec<String>) {
+     run_env(name, globals, main, &[])
+ }
+ 
++#[test]
++fn a_pending_picker_yields_the_guest_thread_until_the_answer_is_ready() {
++    let globals = r#"
++static unsigned yields, polls;
++const char *fle_filedlg_host_pick(const char *req) { (void)req; return NULL; }
++const char *fle_filedlg_host_poll(void) { polls++; return yields >= 3 ? strdup("CANCEL") : NULL; }
++void fle_thread_sleep(const char *api, uint32_t ms) {
++    if (strcmp(api, "filedlg") || ms != 1) abort();
++    yields++;
++}
++"#;
++    let main = format!(r#"{OPEN}
++    uint64_t result = vcall(d, 3, 0, 0, 0);
++    printf("show %#llx yields %u polls %u\n", U(result), yields, polls);
++"#);
++    let (rc, lines) = run("fpick-cooperative", globals, &main);
++    assert_eq!(rc, 0, "{lines:?}");
++    assert_eq!(lines, ["show 0x800704c7 yields 3 polls 3"]);
++}
++
+ const OPEN: &str = r#"
+     uint64_t d = 0;
+     uint64_t hr = cocreate(CLSID_FOD, 0, IID_FOD, &d);
+diff --git a/lift/crates/fe-lift/tests/wall_fr14.rs b/lift/crates/fe-lift/tests/wall_fr14.rs
+index e937310c..cc61cb4f 100644
+--- a/lift/crates/fe-lift/tests/wall_fr14.rs
++++ b/lift/crates/fe-lift/tests/wall_fr14.rs
+@@ -88,11 +88,11 @@ fn msgs(name: &str, keep_setcursor: bool) -> Vec<String> {
+ }
+ 
+ #[test]
+-fn the_scenario_list_has_24_scenarios() {
++fn the_scenario_list_has_26_scenarios() {
+     let r = Command::new(scen_exe()).arg("list").output().unwrap();
+     let l: Vec<String> = String::from_utf8_lossy(&r.stdout).lines().map(|s| s.to_string()).collect();
+-    assert_eq!(l.len(), 24, "{l:?}");
+-    for must in ["move", "click", "capture", "track_leave", "track_hover", "track_hover_edge", "key_target", "key_dead_window", "post_dead_window", "token", "cmp_control", "keys", "syskeys", "timer_periodic", "idle_hook"] {
++    assert_eq!(l.len(), 26, "{l:?}");
++    for must in ["move", "coalesce_boundaries", "coalesce_full", "click", "capture", "track_leave", "track_hover", "track_hover_edge", "key_target", "key_dead_window", "post_dead_window", "token", "cmp_control", "keys", "syskeys", "timer_periodic", "idle_hook"] {
+         assert!(l.iter().any(|x| x == must), "{must}");
+     }
+ }
+@@ -124,7 +124,20 @@ fn a_move_is_a_hit_test_then_wm_setcursor_then_wm_mousemove_in_client_coordinate
+ fn consecutive_moves_are_one_wm_mousemove_at_the_last_point_and_getcursorpos_has_it() {
+     // S-mousemove-coalesce (a choice: Windows combines consecutive moves; the pages read do not say how)
+     let o = msgs("coalesce", false);
+-    assert_eq!(o, ["  A msg 84 NCHITTEST x 320 y 270", "  A msg 200 wp 0 x 220 y 170", "pump 1", "cursor 320 270"]);
++    assert_eq!(o, ["move injections accepted 1 1 1", "pending before pump 1", "  A msg 84 NCHITTEST x 320 y 270", "  A msg 200 wp 0 x 220 y 170", "pump 1", "cursor 320 270"]);
++}
++
++#[test]
++fn a_move_replaces_only_a_pending_tail_move_and_never_crosses_button_wheel_or_key_events() {
++    let o = run("coalesce_boundaries");
++    assert!(o.iter().any(|l| l == "pending across button/wheel/key boundaries 7"), "{o:?}");
++}
++
++#[test]
++fn a_pending_move_can_be_replaced_when_the_event_queue_is_full_without_losing_the_new_input() {
++    let o = run("coalesce_full");
++    assert!(o.iter().any(|l| l == "full queue: wheels 511 initial move 1 replacement 1 button 0 pending 512"), "{o:?}");
++    assert!(o.iter().any(|l| l == "cursor after full-queue replacement 320 270"), "{o:?}");
+ }
+ 
+ #[test]
+diff --git a/lift/crates/fe-lift/tests/wall_fr15.rs b/lift/crates/fe-lift/tests/wall_fr15.rs
+index 050a5a9f..3504e329 100644
+--- a/lift/crates/fe-lift/tests/wall_fr15.rs
++++ b/lift/crates/fe-lift/tests/wall_fr15.rs
+@@ -169,7 +169,7 @@ fn the_list_of_scenarios() {
+     let r = run(&["list"]);
+     assert_eq!(r.code, Some(0));
+     let names: Vec<&str> = r.out.iter().map(|s| s.as_str()).collect();
+-    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
++    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "notify_bytes", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
+         "stop_after_release (stops)", "stop_resample (stops)", "stop_second_primary (stops)", "stop_writeprimary (stops)", "stop_bad_this (stops)"]);
+ }
+ 
+@@ -408,6 +408,16 @@ fn the_virtual_clock_moves_to_the_next_notification_when_every_thread_waits() {
+     }
+ }
+ 
++#[test]
++fn byte_offsets_round_up_to_frames_and_the_last_byte_notifies_at_wrap() {
++    let o = ok(&["notify_bytes"]);
++    assert!(o.iter().any(|l| l == "SetNotificationPositions(byte offsets 1, 3527) 0"), "{o:?}");
++    let notices: Vec<&String> = o.iter().filter(|l| l.starts_with("byte notification:")).collect();
++    assert_eq!(notices.len(), 2, "{o:?}");
++    assert!(notices[0].starts_with("byte notification: index 0 at 36000000227 ticks"), "{}", notices[0]);
++    assert!(notices[1].starts_with("byte notification: index 1 at 36000200000 ticks"), "{}", notices[1]);
++}
++
+ #[test]
+ fn formats_volume_pan_and_mixing_produce_the_samples_of_the_pages_rules() {
+     let o = ok(&["formats"]);
+diff --git a/lift/crates/fe-lift/tests/wall_fr20.rs b/lift/crates/fe-lift/tests/wall_fr20.rs
+index b7bca752..4312884f 100644
+--- a/lift/crates/fe-lift/tests/wall_fr20.rs
++++ b/lift/crates/fe-lift/tests/wall_fr20.rs
+@@ -171,7 +171,7 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+     let rows = resp_rows(&c);
+     assert_eq!(rows.len(), st.resp_entries);
+     let k = rows_0147::ROWS_0147.len();
+-    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
++    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4; // WebView2 loader appends 4 rows (#1355). // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
+     // decision 0015: append only. HEAD 7b82424 ends with user32!GetLayeredWindowAttributes (decision 0140); once decision 0144's rows are in the tree they come between (the check is "last row", not "after row 605")
+     for (i, (dll, name)) in rows_0147::ROWS_0147.iter().enumerate() {
+         assert_eq!((rows[n - k + i].0.as_str(), rows[n - k + i].1.as_str()), (*dll, *name), "row {i} of decision 0147");
+@@ -185,7 +185,7 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+     // and in the source table, right before the row of decision 0267
+     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+     let table: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
+-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len()].trim().to_string();
++    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4].trim().to_string();
+     assert_eq!(last, "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
+ }
+ 
+@@ -433,9 +433,9 @@ fn a_slice_inside_a_callback_of_the_runtime_is_skipped_and_the_clock_does_not_mo
+     // (Decision 0279: a slice moves the clock 2,500 ticks; the clock is printed in ticks.) OUTER: work(8192) = calls 3..8194: slice 1 at 4096 (clock 2500), slice 2 at 8192 (clock 5000). fle_call_guest(INNER) is call 8195 (depth 2); INNER work(12288) = 8196..20483: the limit passes
+     // 12288, 16384, 20480 inside the callback: 3 skipped, no clock. Back in OUTER (depth 1), work(8192) = 20484..28675: slice 3 at 24576 (clock 7500), slice 4 at 28672 (clock 10000).
+     let top = format!(
+-        "{VA}\nstatic uint64_t ev;\nstatic void th_b(void) {{ W1(ev, INF); R[0] = 0; }}\nstatic void outer(void) {{ work(8192); fle_call_guest(VA_INNER, 0, 0, 0, 0); work(8192); R[0] = 0; }}\n\
+-         static void inner(void) {{ printf(\"inner depth %u clock %llu\\n\", fle_callback_depth(), U(REL())); work(12288); printf(\"inner end clock %llu\\n\", U(REL())); R[0] = 0; }}\n{}",
+-        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
++        "{VA}\n#define VA_DEEPEST 0x1060\nstatic uint64_t ev;\nstatic void th_b(void) {{ W1(ev, INF); R[0] = 0; }}\nstatic void outer(void) {{ work(8192); fle_call_guest(VA_INNER, 0, 0, 0, 0); work(8192); R[0] = 0; }}\n\
++         static void deepest(void) {{ printf(\"inner depth %u clock %llu\\n\", fle_callback_depth(), U(REL())); work(12288); printf(\"inner end clock %llu\\n\", U(REL())); R[0] = 0; }}\nstatic void inner(void) {{ fle_call_guest(VA_DEEPEST, 0, 0, 0, 0); R[0] = 0; }}\n{}",
++        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner"), ("VA_DEEPEST", "deepest")])
+     );
+     let l = lines(
+         "p-callback",
+@@ -454,14 +454,134 @@ fn a_slice_inside_a_callback_of_the_runtime_is_skipped_and_the_clock_does_not_mo
+         l,
+         [
+             "count after start 1",
+-            "inner depth 2 clock 5000",
++            "inner depth 3 clock 5000",
+             "inner end clock 5000",
+-            "end count 28675 clock 10000",
++            "end count 28676 clock 10000",
+             "stats: armed 1 slices 4 deferred 3 switches 0 ticks 10000",
+         ]
+     );
+ }
+ 
++#[test]
++fn a_depth_two_callback_can_switch_threads_and_restores_guest_state_and_callback_depth() {
++    // After Sleep(0), B's work reaches slice 1 and returns to main. The callback's work reaches slice 2;
++    // B resumes, yields with Sleep(0), then main resumes the callback. Both slice ends switch threads.
++    let top = format!(
++        r#"{VA}
++static void th_b(void) {{
++    uint64_t entry_r3 = R[3]; fle_xmm entry_x[16]; fle_eflags entry_fl = FL;
++    memcpy(entry_x, X, sizeof X);
++    work(4096);
++    R[3] = UINT64_C(0x55555555); memset(X, 0x5a, sizeof X); memset(&FL, 0, sizeof FL); FL.cf = 1;
++    SLEEP(0);
++    R[3] = entry_r3; memcpy(X, entry_x, sizeof X); FL = entry_fl; R[0] = 0;
++}}
++static void inner(void) {{
++    uint64_t entry_r3 = R[3]; fle_xmm entry_x[16]; fle_eflags entry_fl = FL;
++    memcpy(entry_x, X, sizeof X);
++    R[3] = UINT64_C(0x33333333); memset(X, 0x11, sizeof X); memset(&FL, 0, sizeof FL); FL.zf = 1;
++    uint64_t saved_r[16]; fle_xmm saved_x[16]; fle_eflags saved_fl = FL;
++    memcpy(saved_r, R, sizeof R); memcpy(saved_x, X, sizeof X);
++    work(4096);
++    printf("depth %u restored %d\n", fle_callback_depth(),
++        memcmp(saved_r, R, sizeof R) == 0 && memcmp(saved_x, X, sizeof X) == 0 && memcmp(&saved_fl, &FL, sizeof FL) == 0);
++    R[3] = entry_r3; memcpy(X, entry_x, sizeof X); FL = entry_fl;
++    R[0] = 0;
++}}
++static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
++{}"#,
++        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner")])
++    );
++    let l = lines(
++        "p-depth-two-switch",
++        &top,
++        r#"
++    H_CREATE(VA_B, 0, 0, 0);
++    SLEEP(0);
++    fle_callback_depth2_allow(1);
++    fle_call_guest(VA_OUTER, 0, 0, 0, 0);
++    fle_callback_depth2_allow(0);
++    stats("stats");
++"#,
++    );
++    assert_eq!(l, ["depth 2 restored 1", "stats: armed 1 slices 2 deferred 0 switches 2 ticks 5000"]);
++}
++
++#[test]
++fn depth_two_permission_is_not_inherited_by_a_new_thread() {
++    let top = format!(
++        "{VA}\nstatic unsigned child_allowed;\nstatic void th_b(void) {{ child_allowed = (unsigned)fle_callback_depth2_allowed(); R[0] = 0; }}\n{}",
++        table(&[("VA_B", "th_b")])
++    );
++    let l = lines(
++        "p-depth-two-thread-state",
++        &top,
++        r#"
++    fle_callback_depth2_allow(1);
++    H_CREATE(VA_B, 0, 0, 0);
++    SLEEP(0);
++    printf("child %u parent %d\n", child_allowed, fle_callback_depth2_allowed());
++    fle_callback_depth2_allow(0);
++"#,
++    );
++    assert_eq!(l, ["child 0 parent 1"]);
++}
++
++#[test]
++fn deferred_callback_slices_poll_audio_without_advancing_time_or_switching_even_when_audio_signals_a_waiter() {
++    let top = format!(
++        r#"{VA}
++#define VA_DEEPEST 0x1060
++static uint64_t ev;
++static unsigned polls, resumed;
++void fle_audio_poll_in_callback(void) {{
++    if (fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH) {{
++        polls++;
++        fle_event_host_set(ev);
++    }}
++}}
++static void th_b(void) {{ W1(ev, INF); resumed++; R[0] = 0; }}
++static void deepest(void) {{
++    uint64_t saved_r[16];
++    fle_xmm saved_x[16];
++    fle_eflags saved_fl = FL;
++    memcpy(saved_r, R, sizeof R);
++    memcpy(saved_x, X, sizeof X);
++    work(12288);
++    printf("inner: depth %u polls %u resumed %u clock %llu registers %d\n",
++        fle_callback_depth(), polls, resumed, U(REL()),
++        memcmp(saved_r, R, sizeof R) == 0 && memcmp(saved_x, X, sizeof X) == 0 && memcmp(&saved_fl, &FL, sizeof FL) == 0);
++    R[0] = 0;
++}}
++static void inner(void) {{ fle_call_guest(VA_DEEPEST, 0, 0, 0, 0); R[0] = 0; }}
++static void outer(void) {{ fle_call_guest(VA_INNER, 0, 0, 0, 0); R[0] = 0; }}
++{}"#,
++        table(&[("VA_B", "th_b"), ("VA_OUTER", "outer"), ("VA_INNER", "inner"), ("VA_DEEPEST", "deepest")])
++    );
++    for opt in ["-O0", "-O2"] {
++        let l = lines_with(
++            "p-callback-audio",
++            &top,
++            r#"
++    ev = H_EVENT(1, 0);
++    H_CREATE(VA_B, 0, 0, 0);
++    SLEEP(0);
++    fle_call_guest(VA_OUTER, 0, 0, 0, 0);
++    stats("after callback");
++    SLEEP(0);
++    printf("after yield: resumed %u\n", resumed);
++"#,
++            opt,
++            &[],
++        );
++        assert_eq!(l, [
++            "inner: depth 3 polls 3 resumed 0 clock 0 registers 1",
++            "after callback: armed 1 slices 0 deferred 3 switches 0 ticks 0",
++            "after yield: resumed 1",
++        ], "{opt}");
++    }
++}
++
+ #[test]
+ fn two_busy_threads_take_turns_one_slice_each_in_creation_order() {
+     // Hand derivation (count 0 at CreateThread, limit 4096; decision 0279: slice n ends at clock 2,500 * n ticks and the clocks are printed in ticks: slice 2 = 5000, 3 = 7500, 4 = 10000, 5 = 12500, 6 = 15000). Main: work(4096) = calls 1..4096; the last one is slice 1 (clock 1 ms): B (ready, unstarted) runs, its start is call 4097, B: work(4096) = 4098..8193;
+diff --git a/lift/crates/fe-lift/tests/wall_fr8.rs b/lift/crates/fe-lift/tests/wall_fr8.rs
+index b5935a25..65c012a5 100644
+--- a/lift/crates/fe-lift/tests/wall_fr8.rs
++++ b/lift/crates/fe-lift/tests/wall_fr8.rs
+@@ -820,11 +820,12 @@ fn a_thread_start_address_that_is_not_a_function_entry_stops_by_name_when_the_th
+ /// CreateWindowExW (WS_EX_TOOLWINDOW, WS_POPUP, size 0, hInstance the guest's 0x400000), as decision 0071 answers it.
+ const WM_STUB: &str = r#"
+ #define VA_WP 0x2000
+-static int wp_calls; static uint64_t wp_log[64][5]; static unsigned wp_thread[64];
++static int wp_calls; static uint64_t wp_log[64][5]; static unsigned wp_thread[64]; static void (*wp_probe)(void);
+ static void wndproc(void)
+ {
+     if (wp_calls < 64) { wp_log[wp_calls][0] = R[1]; wp_log[wp_calls][1] = R[2]; wp_log[wp_calls][2] = R[8]; wp_log[wp_calls][3] = R[9]; wp_thread[wp_calls] = fle_thread_current(); }
+     wp_calls++;
++    if (R[2] == 0x8023 && wp_probe) wp_probe();
+     if (R[2] == 0x81) { R[0] = 1; return; }
+     if (R[2] == 0x83) { R[0] = 0; return; }
+     if (R[2] == 0x01) { R[0] = 0; return; }
+@@ -1154,6 +1155,82 @@ fn dispatch_message_calls_the_window_procedure_in_the_receivers_context_and_a_th
+     assert_eq!(l, ["translate 0", "dispatch 9021 calls 1", "log hwnd 7f990004 msg 8021 wp 5 lp 6", "thread-msg 0 calls 1"]);
+ }
+ 
++#[test]
++fn dispatch_w_and_a_allow_scoped_depth_two_but_send_message_and_depth_three_do_not() {
++    let extra = r#"
++#define VA_DRIVER 0x1060
++#define VA_TIMER 0x1070
++#define VA_NESTED 0x1080
++#define VA_NOP 0x1090
++static void nop(void) { }
++static void work(unsigned n) { unsigned i; for (i = 0; i < n; i++) fle_dispatch(VA_NOP); }
++static uint64_t probe_event;
++static MSGX probe_msg;
++static unsigned mode, worker_runs, stop_worker, nested_depth, nested_allowed, nested_worker_runs;
++static int callback_depth, callback_allowed;
++static void nested_cb(void) {
++    nested_depth = fle_callback_depth(); nested_allowed = fle_callback_depth2_allowed();
++    work(4096); nested_worker_runs = worker_runs; R[0] = 0;
++}
++static void wnd_probe(void) {
++    callback_depth = (int)fle_callback_depth(); callback_allowed = fle_callback_depth2_allowed();
++    SETEV(probe_event);
++    if (mode == 0) fle_call_guest(VA_NESTED, 0, 0, 0, 0);
++    work(4096);
++}
++static void timer_proc(void) {
++    callback_depth = (int)fle_callback_depth(); callback_allowed = fle_callback_depth2_allowed();
++    SETEV(probe_event); work(4096); R[0] = 0;
++}
++static void worker(void) {
++    for (;;) { W1(probe_event, INF); if (stop_worker) break; worker_runs++; }
++    R[0] = 0;
++}
++static void driver(void) {
++    if (mode == 0) CALL4(fle_imp_DispatchMessageW, A(&probe_msg), 0, 0, 0);
++    else if (mode == 1) CALL4(fle_imp_DispatchMessageA, A(&probe_msg), 0, 0, 0);
++    else if (mode == 2) CALL4(fle_imp_DispatchMessageW, A(&probe_msg), 0, 0, 0);
++    else if (mode == 3) CALL4(fle_imp_DispatchMessageA, A(&probe_msg), 0, 0, 0);
++    else CALL4(fle_imp_SendMessageW, probe_msg.hwnd, probe_msg.msg, probe_msg.wp, probe_msg.lp);
++    R[0] = 0;
++}
++"#;
++    let top = msg_top(extra, &[("VA_A", "worker"), ("VA_DRIVER", "driver"), ("VA_TIMER", "timer_proc"), ("VA_NESTED", "nested_cb"), ("VA_NOP", "nop")]);
++    let l = lines(
++        "m-dispatch-depth2-scope",
++        &top,
++        r#"
++    uint64_t w = mkwnd(), h;
++    probe_event = H_EVENT(0, 0);
++    wp_probe = wnd_probe;
++    h = H_CREATE(VA_A, 0, 0, 0);
++    SLEEP(0);
++    for (mode = 0; mode < 5; mode++) {
++        probe_msg.hwnd = w;
++        probe_msg.msg = mode < 2 || mode == 4 ? 0x8023 : 0x0113;
++        probe_msg.wp = mode;
++        probe_msg.lp = mode >= 2 && mode <= 3 ? VA_TIMER : 0;
++        fle_call_guest(VA_DRIVER, 0, 0, 0, 0);
++        printf("mode %u callback %d/%d nested %u/%u/%u worker %u scope %d\n", mode,
++            callback_depth, callback_allowed, nested_depth, nested_allowed, nested_worker_runs,
++            worker_runs, fle_callback_depth2_allowed());
++        if (mode == 1 || mode == 3 || mode == 4) { SLEEP(0); printf("yield %u worker %u\n", mode, worker_runs); }
++    }
++    stop_worker = 1; SETEV(probe_event); W1(h, INF);
++"#,
++    );
++    assert_eq!(l, [
++        "mode 0 callback 2/1 nested 3/1/0 worker 1 scope 0",
++        "mode 1 callback 2/1 nested 3/1/0 worker 2 scope 0",
++        "yield 1 worker 2",
++        "mode 2 callback 2/1 nested 3/1/0 worker 3 scope 0",
++        "mode 3 callback 2/1 nested 3/1/0 worker 4 scope 0",
++        "yield 3 worker 4",
++        "mode 4 callback 2/0 nested 3/1/0 worker 4 scope 0",
++        "yield 4 worker 5",
++    ]);
++}
++
+ #[test]
+ fn dispatch_message_a_goes_to_the_window_procedure_and_a_message_of_a_window_that_is_gone_answers_zero() {
+     // decision 0222 (sweep1's wall at user32!DispatchMessageA): the A variant dispatches like the W variant (Learn: one page); a message whose window was destroyed after the retrieval has no window procedure
+@@ -1450,11 +1527,12 @@ fn dwmapi_is_virtual_module_39_with_the_handle_of_the_formula_and_dwm_flush_is_i
+     let list = &t[a..a + t[a..].find("};").unwrap()];
+     let stripped = strip_comments(list);
+     let names: Vec<&str> = stripped.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
+-    assert_eq!(names.len(), 41);   // decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
++    assert_eq!(names.len(), 42);   // decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
+     assert_eq!(names[38], "dwmapi.dll");
+     assert_eq!(names[37], "uxtheme.dll");
+     assert_eq!(names[39], "kernelbase.dll");
+     assert_eq!(names[40], "combase.dll");
++    assert_eq!(names[41], "webview2loader.dll");
+ }
+ 
+ #[test]
