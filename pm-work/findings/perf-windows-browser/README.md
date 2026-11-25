@@ -77,16 +77,17 @@
   - `08-fe-lift-wall-tests.patch`: fe-lift の壁の試験の追随（wall_*.rs）。
 - `tools/`: `real-browser-perf/`（measure・interaction・interaction-aggregate・waveform・README の写し）と `spec/real-browser-waveform.test.mjs`（写し）。
 
-## 6. この知見から作った Issue（下書き 180〜185）
+## 6. この知見から作った Issue（下書き 180〜185 → #1422〜#1427）
 
-- 180（計測）: `tools/p2-frames` に 1 秒窓の最小 fps（`minWindowFps`）と入力の落ち数（`inputDropped`）、`tools/p3-audio-probe` に PCM の 8192 反復（`pcmRepeat8192`）を足す。
-- 181（P2）: 描画要求をスケジューラ地点で受ける・描画通知を 100 ms まとめない・仮想時計を実時間に合わせる（#2・#1・#3）。
-- 182（P2）: 保留中の連続した MOVE を 1 件にまとめる（#8）。
-- 183（P3）: 深度 2 の限定的な切り替えと、優先度の既定（#7）。
-- 184（P3）: DirectSound のバイト単位の通知と、再生の公開順（#5・#6）。
-- 185（P3）: ファイル選択を、ゲストを止めない待ちにする（#4）。
+- 180 → #1422（計測・P2 と P3。High・M）: `tools/p2-frames` に 1 秒窓の最小 fps（`minWindowFps`）と入力の落ち数（`inputDropped`）、`tools/p3-audio-probe` に PCM の 8192 反復（`pcmRepeat8192`）を足す。A/B の道具 `tools/ab/run.mjs` を作る。
+- 181 → #1423（P2・High・M）: 描画要求をスケジューラ地点で受ける・描画通知を 100 ms まとめない・仮想時計を実時間に合わせる（表の 1・2・3）。
+- 182 → #1424（P2・High・S）: 保留中の連続した MOVE を 1 件にまとめる（表の 8）。
+- 183 → #1425（P3・Urgent・M）: 深度 2 の限定的な切り替えと、優先度の既定（表の 7）。
+- 184 → #1426（P3・Urgent・M）: DirectSound のバイト単位の通知と、再生の公開順（表の 5・6）。
+- 185 → #1427（P3・Urgent・M）: ファイル選択を、ゲストを止めない待ちにする（表の 4）。
 
-取り込まない候補: #10（コードが origin に無い）・#11（runner の headless では再現しない）・#12（製品の fps 未測定。次の波）・#15（関数の特定が未了）。
+依存: 181〜185 は #1422 に blocked by。181 は #1402・#1406・#1395 に、183 は #1382・#1402・#1416 に、それぞれ blocked by。#1422 は起動済み（`running`）。
+取り込まない候補（表の 10・11・12・15）: 10 はコードが origin に無い。11 は runner の headless では再現しない（実機が要る）。12 は製品の fps が未測定（次の波）。15 は関数の特定が未了（次の波）。表の 8（入力の統合）は #1424 に入れた。
 
 ## 7. main との突き合わせ（確認した箇所）
 
