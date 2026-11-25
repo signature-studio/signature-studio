@@ -17,6 +17,18 @@ project: signature-studio/3
 
 この Issue の目標は、FL が**ファイル**として書くユーザーのデータ(Recent の一覧が、ファイルに書かれる場合を含む。Presets・Projects・設定のファイル)を、ページの再読込をまたいで保持すること。レジストリの値(言語など)は #{{142}} が扱う。
 
+## 前回の試行で分かったこと(3 回目。run 45458518648)
+
+- 前回: run 45458518648(判定は `failed`。差し戻し)。作業の commit は `f66c479d`(main には無い。差分は作業ツリーに載る)。詳細は `pm-work/findings/persist-files-1385.md`(前回の記録)。
+- 実装したもの(`f66c479d`): 保存の対象は `C:\Users\user\` の下で FL が書いたファイルとディレクトリ。閉じた時と flush の時(内容が変わった時だけ)に、削除・移動・作成・コピーを記録する。保存の形式は既存の journal(`/fl/state/hkcu.log`。#{{142}})に、キーがパスの 3 種類の記録(5・6・7)を足した。読み戻しは `fle_reg_restore_saved` の中(seed の後)。
+- 測定(runner の値): 保存の領域は再読込の後で 11,027 B(上限 100 MiB は #{{142}} と共通)。`preBootBytes` は 311,126,361 B(起動の前の量は増えていない)。`languageKept`・`restartPrompted` は true。`elapsedMs` は 11,336。流れ A〜D は 4 回とも engine-idle・error null・trapped false・hostErrors 0・opened true・welcomeClosed true(elapsedMs 11,403〜12,233)。`npm test`: 1392 件通過。型検査は通った。
+- 判定で落ちたのは Recent だけ: `recentKept` が false(`recentWhere` は unknown)。
+- Recent の保存先の実測: レジストリにもファイルにも無い。プロジェクトを開いた後の `RegSetValueExW` は起動時の設定の 11 件だけで、ファイル名を含む値は無い。`Settings\Browser\Recent files.scr` は、プロジェクトを開いた後も、120 秒待った後も開かれなかった(`vfs-open` の行で確認。開いたのは、プロジェクトの読み取り、起動ログ、書き込みの確認用の一時ファイルだけ)。
+- 推定(未確認): FL は Recent を engine の終了の時に書く。再読込では終了の処理が走らないので残らない。Alt+F4 で終了を試したが、Chrome がタブを閉じてしまい、確かめられなかった。
+- ログ: FL は起動時に `Startup <日時>.log` を、`CREATE_ALWAYS` で作って閉じ、その後は `OPEN_EXISTING` の書き込みハンドルを開いたまま書き続ける。このため保存されるのは作った時の 0 バイトの版だけになる。再読込のたびに 0 バイトの版が 1 件ずつ増えた。
+- 停止の回: 試行の中で engine が `exit code 134`(SIGABRT)で終わった回があり、その回は保存を捨てた(#{{142}} の暫定)。journal が 0 バイトになり、ユーザーのファイルも失われた(#{{154}} が直るまでの暫定)。
+- 開けた demo: `nucleon - Housework.flp`(`Demo projects` の下)と Sacco の demo は開けた(engine は idle のまま)。`--project` の path は `Demo projects` の下で、`Demo songs` の下ではない。道具は、起動に失敗した時は次の候補を試す。
+
 ## 背景
 
 - 前提: #{{142}} が入った後に行う。保存の仕組み(ページの OPFS へ書く方式と、起動の前の読み戻し)は #{{142}} の物を使う。
@@ -24,7 +36,7 @@ project: signature-studio/3
 - ユーザーのフォルダの場所(仮想。`lift/runtime/fle_env.h`・`fle_env.c`・`fle_filedlg.c`): `C:\Users\user`(`FLE_VIRTUAL_USER_PROFILE_DIR`)。Documents は `C:\Users\user\Documents`。`CSIDL_APPDATA` は `C:\Users\user\AppData\Roaming`。
 - 記録に出ている FL のユーザーのフォルダ(`pm-work/findings/missing-paths.md`): `C:\Users\user\Documents\Image-Line\FL Studio\` の下(`Settings\`・`Support\Logs\Startup\`・`Settings\Themes\`・`Settings\Languages\`)と、`C:\Users\user\Documents\Image-Line\Downloads\`。共有の既定の場所は `C:\Users\user\Documents\Image-Line\`(seed `lift/harness/seeds/reg-seed-app.tsv` の `Shared data`)。
 - 保存の経路が既にあるもの: 開く・保存の窓の橋(`app/src/files/select.ts` の 62〜65 行の注釈。選んだファイルは仮想ボリュームの `OPEN_FOLDER\<OPFS のパス>` へコピーされ、保存の先は engine が書いた後で OPFS へ戻される。decision 0193 の `saved-file` の橋)。ただし、FL が自分で書く設定・一覧のファイルは、この橋を通らない。
-- Recent の一覧の保存先は、まだ分からない(未確認)。レジストリに書かれるなら #{{142}} の保存で足りる。ファイルに書かれるなら、この Issue が保存の対象に入れる。どちらかは、この Issue の再現で確かめ、報告に書く。
+- Recent の一覧の保存先: 前回の試行で、レジストリにもファイル(`Settings\Browser\Recent files.scr`)にも書かれないと分かった(上の節)。FL が書くのは engine の終了の時と推定する(未確認)。
 - 起動の記録で、FL は起動のたびに `Support\Logs\Startup\Startup <日時>.log` を作る(`pm-work/findings/hidpi-fl-scaling.md` の 10.2)。ログの大きさは、保存の上限の見積もりに入れる。
 - 推測しない。上の「未確認」の項目は、再現と測定で埋める。
 
@@ -39,28 +51,25 @@ project: signature-studio/3
 
 ## やること
 
-0. 作業ツリーの確認。`.prior-work.md` があれば最初に読む。#{{142}} の保存の経路が main に在ることを確かめる。
-1. Recent の保存先を確かめる。`tools/persist/measure.mjs` に、ファイルの段を足す。
-   - 新しいプロファイルで起動し、`tools/p3-audio-probe/measure.mjs` の `openProject` の手順で、OPFS のプロジェクトのファイル(`.flp`)を File > Open で開く。
-   - Recent の一覧に、そのファイル名が出るかを確かめる(窓の文字は `guestText` の読み。#{{117}} の方式)。
-   - ページを再読込し、engine が idle に戻るまで待つ。Recent の一覧に、同じファイル名が残るかを確かめる(`recentKept`)。
-   - 残らなければ、消えたファイルの名前と場所(仮想ボリュームの木の、`Documents\Image-Line\FL Studio\` の下の物を、列挙で数える)を報告に書く。
-   - 道具の出力は、#{{142}} の行(`language` の行)の後に、もう 1 行: `{"step":"files","recentKept":…,"recentWhere":"registry|file|unknown","bytes":…,"error":null}`。
-2. Recent がレジストリに在ると分かったら、この Issue は道具の確認だけにし、#{{142}} の判定で保持を確かめる(報告に書く)。ファイルに在る場合は次の 3 を行う。
-3. 保存の対象を決める(既定の動作として入れる。オプトインを作らない)。
-   - 対象: ユーザーのフォルダの下の、FL が書いた物(`C:\Users\user\` の下)。ただし、`Support\Logs\` の下のログは、大きさを測って除くかを決め、理由を書く。
-   - 保存の時期と方式は #{{142}} と同じ(書いた都度。ページの OPFS へ。同じ Worker から)。
-   - 起動の前に、保存された物を仮想ボリュームへ入れる(`lift/harness/vfs_seed.h` の経路を使うか、同等の経路を作るかは作業者が決め、報告に書く)。起動の前に取る量(`preBootBytes`)を増やさない。
-4. 上限: 保存の領域は合計 100 MB 以下(#{{142}} と同じ)。
+0. 作業ツリーの確認。`.prior-work.md` があれば最初に読む。前回の差分(`f66c479d`・`pm-work/findings/persist-files-1385.md`)が在るかを確かめる。#{{142}} の保存の経路が main に在ることを確かめる。
+1. **0 バイトの版を保存しない**: 閉じた時に中身が 0 バイトのファイルは保存しない。場所(パス)の定数は runtime に入れず、中身の有無で決める。実際に中身が書かれたファイル(Recent・設定・プリセット・プロジェクト)は保存する。
+2. **Recent の書き込みの時期と場所を実測する**: FL が Recent をいつ・どこに書くかを、`tools/persist/measure.mjs` の files の段で確かめる。推定は「engine の終了の時」。書く時期が、終了の時でなく、プロジェクトを開いた時なら、その時期に合わせる。
+3. **終了の要求(推定が正しい時)**: ページが `visibilitychange`(`hidden`)と `pagehide` で、engine に「終了の要求」を出す。engine は FL の主窓に `WM_CLOSE`・`WM_QUERYENDSESSION`・`WM_ENDSESSION` を、Windows のセッションの終了と同じ順で送る。FL が終了の処理(Recent・設定の書き込み)を行い、その書き込みが journal に flush されるのを、最大 1.5 秒待つ。保存されていないプロジェクトの確認(「Save changes?」)の窓が出る時は、待たずに、そのまま閉じる(窓は FL の画面に出るが、ページは閉じる)。
+4. **書き終わるかの実測**: headless の測定で、`page.close({ runBeforeUnload: true })` と、再読込の前の `visibilitychange` の発火で、この方式が `pagehide` の短い時間で書き終わるかを確かめる。書き終わる時間(ms)と、書かれた件数を報告に書く。書き終わらない時は、その事実を報告に書く(推測で待ち時間を延ばさない)。
+5. **停止の回の保存**: engine が異常に終わった回は、保存を全て捨てる。この扱いは変えない(#{{154}} が直るまでの暫定)。
+6. **ログの数**: 測定の道具に、再読込の前後の `Support\Logs` の下の Startup ログの件数(`logFilesBefore`・`logFilesAfter`)を出す。再読込のたびに 0 バイトの版が増えないことを、受け入れで確かめる。
+7. **上限と起動**: 保存の領域は合計 100 MiB 以下(#{{142}} と同じ)。起動の前に取る量(`preBootBytes`)を増やさない。
+8. **受け入れ**: 下の「受け入れ」のコマンドを、そのまま通す。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/persist/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/persist.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const lang=L.find((r)=>"language" in r);const f=L.find((r)=>r.step==="files");process.exit(lang&&f&&lang.error===null&&lang.languageKept===true&&lang.restartPrompted===true&&f.error===null&&f.recentKept===true&&f.bytes<=104857600&&lang.elapsedMs<=12500&&lang.preBootBytes<=314368711?0:1)' "$RUNNER_TEMP/persist.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/persist/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/persist.jsonl" && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const lang=L.find((r)=>"language" in r);const f=L.find((r)=>r.step==="files");process.exit(lang&&f&&lang.error===null&&lang.languageKept===true&&lang.restartPrompted===true&&f.error===null&&f.recentKept===true&&f.bytes<=104857600&&Number.isInteger(f.logFilesBefore)&&f.logFilesBefore===f.logFilesAfter&&lang.elapsedMs<=12500&&lang.preBootBytes<=314368711?0:1)' "$RUNNER_TEMP/persist.jsonl" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準:
 - ファイルの段(`step` が `files` の行): `error` が null、`recentKept` が true(再読込の後も、Recent の一覧に同じファイル名が在る)、`bytes` が 104,857,600 以下。
+- ログの件数: 同じ行の `logFilesBefore` と `logFilesAfter`(`Support\Logs` の下の Startup ログの件数。再読込の前と後)が、同じ整数。0 バイトの版が再読込のたびに増えないことを確かめる。
 - 言語の段(#{{142}} の判定のまま): `languageKept` が true、`restartPrompted` が true。
 - `elapsedMs` が 12,500 以下。`preBootBytes` が 314,368,711 以下。
 - 流れ A〜D(`tools/smoke/welcome-flow.mjs`)が通る。単体テスト(`npm test --prefix app`)が通る。

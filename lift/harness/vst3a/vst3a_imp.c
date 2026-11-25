@@ -237,14 +237,14 @@ void fle_imp_InitOnceComplete(void)
 
 
 /* d2d1.dll!#1 (D2D1CreateFactory(D2D1_FACTORY_TYPE factoryType ecx, REFIID riid rdx, const D2D1_FACTORY_OPTIONS *pFactoryOptions r8, void **ppIFactory r9): HRESULT). Serum 2 calls it
- * while InitDll runs (the Direct2D factory of its editor). There is no Direct2D here; the answer is a failure: E_FAIL (0x80004005) with *ppIFactory = NULL (S-vst3a-d2d-fail: the choice of
- * failure code is mine; the page lists no code for "Direct2D absent"; a plugin that cannot take a failure stops where it dereferences the NULL, which is reported). */
+ * while InitDll runs (the Direct2D factory of its editor). There is no Direct2D here: the answer is the failure of a machine without a hardware device, D2DERR_NO_HARDWARE_DEVICE
+ * (0x8899000B, d2derr.h), with *ppIFactory = NULL. The row is in lift/harness/vst/ordinals-vst.txt (#1336). No other ordinal is answered. */
 void fle_imp_ord_d2d1_1(void)
 {
     vst3a_note("D2D1CreateFactory");
-    fprintf(stdout, "vst3a: D2D1CreateFactory(type %u) -> E_FAIL, *ppIFactory = NULL\n", (unsigned)R[1]);
+    fprintf(stdout, "vst3a: D2D1CreateFactory(type %u) -> D2DERR_NO_HARDWARE_DEVICE, *ppIFactory = NULL\n", (unsigned)R[1]);
     if (R[9]) fle_st(R[9], 8, 0);
-    R[0] = 0x80004005u;
+    R[0] = 0x8899000Bu;
 }
 
 /* dwrite.dll!DWriteCreateFactory(DWRITE_FACTORY_TYPE factoryType ecx, REFIID iid rdx, IUnknown **factory r8): HRESULT. Serum 2 calls it in InitDll right after D2D1CreateFactory. No DirectWrite

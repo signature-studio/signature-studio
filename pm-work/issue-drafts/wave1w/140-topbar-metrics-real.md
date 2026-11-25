@@ -1,6 +1,6 @@
 ---
 draft: "140"
-title: "FL の上部バーの Memory Usage・CPU Load・Frame Rate が、実際の値を出す"
+title: "上部バーの Memory Usage が、実際の値を出す(段階 1)"
 type: Task
 milestone: "M3 トップバーのコンテキストメニュー(P2)"
 parent: "009"
@@ -15,12 +15,28 @@ project: signature-studio/3
 
 依頼者の指示(原文): 「トップバーの Memory Usage と CPU Load はずっと 0MB のまま、Frame Rate は 120 で固定されていますが、どう見ても 30fps すら満たしていません。(CPU Load History グラフはそれっぽい値が出ています)実際の数値を反映するようにしてください。」
 
-この Issue の目標は次の 3 つ。
-1. Memory Usage が、エンジンが実際に使っているゲストのメモリの量を、MB で出す(0 でない。ページ側の実測と近い)。
-2. CPU Load が、エンジンの Worker が実際に計算していた割合を出す(無操作の時と、再生の時で、値が違う。Worker の実測と近い)。
-3. Frame Rate が、FL が実際に画面を提示した回数(実時間あたり)を出す(120 の固定ではない。engine の提示の増分 ÷ 実時間と ±15% で一致する)。
+この Issue は**段階 1(Memory Usage)**。CPU Load と Frame Rate は段階 2(#{{159}})で行う。段階 2 は、この Issue が閉じた後に起動する(blocked by)。この Issue の判定は、Memory Usage だけで行う。
 
-PM の決定(定義): 数値は、実際の値を出す。値を良く見せるために、数字を作らない。低い値が本当なら、そのまま出す(低い理由は #1351 の描画の費用で扱う)。
+この Issue の目標(段階 1):
+1. Memory Usage が、エンジンが実際に確保しているゲストのメモリの量を、MB で出す。
+2. 表示の値が、K32GetProcessMemoryInfo が返した使用量の MB 切り捨てと、±1 MB で一致する。0 ではない。
+
+PM の決定(定義): 数値は、実際の値を出す。値を良く見せるために、数字を作らない。読み込んだ像(本体)の物理ページも使用量に数える(Windows のワーキングセットと同じ考え)。`WebAssembly.Memory` の大きさは使用量ではないので、判定の基準にしない。
+
+## 前回の試行で分かったこと(3 回目。run 45469639595)
+
+- 前回: run 45469639595(判定は `failed`。差し戻し)。作業の commit は `9f65327e`(fe-decode の試験の表を `.text` に移した)と `5e9c7fdd`(K32・道具・記録)。main には無い。差分は作業ツリーに載る。
+- 表示の値は「92 MB」。K32 が返した使用量は 99,430,852 B(MB に切り捨てると 94)と 96,872,028 B(92)。FL の表示(94・92)は、K32 の値の MB 切り捨てと一致した。K32 は、使用量を 100,292,252 → 99,430,852 → 96,872,028 B と減らしながら返した。
+- 判定の比(表示 92 MB ÷ `WebAssembly.Memory` の大きさ)は 0.09。`WebAssembly.Memory` は約 1 GB の予約で、使用量ではない。このため、判定の基準を変える(下の「数値の定義」)。
+- 像(本体の約 25.8 MB)は数えていない。製品に像の大きさを読む値が無く、`fe-vmap` の画像の登録は harness だけが行う(未確認)。像を数えると約 118 MB、比は 0.11(推定)。
+- trap は最終版の engine で 0 件。`not a known function entry` も 0 件。前回の trap は、書き込み可能な領域の内容を定数としていたための自己呼び出しで、`lift/crates/fe-decode` の変更で直した(その間接呼び出しは実行時の振り分けになった)。
+- 間接呼び出し(実物の DLL。`real_dll_resolution_counts`。HEAD と変更後): `call:rip_table` 12 件・`jmp:rip_table` 14 件を、実行時の振り分けに移した。関数の数は +14。
+- `cargo test --workspace --no-fail-fast`: HEAD で 270 件が落ちる(環境の不足: mingw が無い、テスト用の C の link の失敗、ファイルが無い)。変更後は 276 件。増えた 6 件は、表の末尾の行の数と順を固定した試験で、K32 の 1 行の分を式に足して直し、その 8 本を再実行して通った。全体の再実行は、直した後にはしていない。
+- 流れ A〜D: 4 流れすべて通った(trapped false・hostErrors 0・最大 elapsedMs 7434・preBootBytes 311100079)。`npm test --prefix app`: 1388 件通過。起動確認: engine-idle・error null・elapsedMs 8134。
+- 道具(`tools/topbar-metrics/measure.mjs`): 画面の大きさは、engine-idle の後に変える(先に変えると engine が起動しなかった)。Memory は「N MB」(空白 1 つ)の文字だけを、上部バーの領域で読む。設定の窓の候補(50MB など)は空白が無いので除かれる。Worker の忙しい時間(`busyPct`)は、時刻の基準を絶対時刻に揃えて取れるようになった(段階 2 の値)。
+- 作業中に Python を 3 回使った(DLL の文字列の検索・trace の挿入・試験の表の編集)。この Issue の制約に反する。製品・道具には残っていない(一時の trace は取り除いた)。
+- 変えたパス(前回): `lift/crates/fe-decode`・`lift/crates/fe-lift`(試験の表)・`lift/runtime/fle_sysinfo.c`・`lift/runtime/fle_sys.c`・`lift/runtime/fle_sys.h`・`lift/crates/fe-lift/src/imports_table.rs`(1 行)・`tools/topbar-metrics/measure.mjs`・`pm-work/findings/topbar-metrics-1391.md`。
+- 未確認: 像の物理ページの大きさを、製品のどの値から取るか。K32 が返す値を、ページから読める形でどう残すか。
 
 ## 前回の試行で分かったこと
 
@@ -52,7 +68,7 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
   - `K32GetProcessMemoryInfo` の文字列は、`binaries/` の DLL のどれにも無い(ASCII・UTF-16 とも)。`GetProcessMemoryInfo` と `PSAPI` は UTF-16 で各 1 件。FL は名前を組み立てている可能性がある(未確認)。
 - 関係する仕組み:
   - `fle_dispatch`(`lift/runtime/fle_dispatch.h`)は、擬似 VA の関数を `fn()` で直接呼ぶ。K32 の行が効けば、FL の呼び出しは `fle_imp_K32GetProcessMemoryInfo` に入るはず。入らなかった理由は未確認。
-  - #1354(`pm-work/findings/dpi240-stop-1354.md`): バイト表の飛び(`jmp rax` を `fle_dispatch(R[0]); return;` にした形)が、入れ子の呼び出しの閉路になり、JS のスタックを超えた。直し方は表の注釈(`DSP_IPPV2_2000000`)と、種ファイルの 7 件の削除。同じ記録の §9 の末尾に、未確認の候補が 1 つ残る(`lift/harness/seeds/dsp-ippv2-2000000-seeds-idle1.txt` の `0x27afb9a`〜`0x27afc99` の 8 件)。
+  - #{{114}}(`pm-work/findings/dpi240-stop-1354.md`): バイト表の飛び(`jmp rax` を `fle_dispatch(R[0]); return;` にした形)が、入れ子の呼び出しの閉路になり、JS のスタックを超えた。直し方は表の注釈(`DSP_IPPV2_2000000`)と、種ファイルの 7 件の削除。同じ記録の §9 の末尾に、未確認の候補が 1 つ残る(`lift/harness/seeds/dsp-ippv2-2000000-seeds-idle1.txt` の `0x27afb9a`〜`0x27afc99` の 8 件)。
   - 前回の trap も、同じ型(閉路の入れ子)かもしれない(未確認。次の「やること」の 2〜3 で確かめる)。
 
 ## 2 回目の試行で分かったこと
@@ -64,7 +80,7 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
   - 直した点: 書き込み可能な領域の内容は定数としない(`dataflow::read8`。`indirect.rs` の `read_u64` も同じ読み)。その間接呼び出しは実行時の振り分け(`fle_dispatch`)で解決する。関数の探索は従来の読みで行う(`with_writable_reads`)。jmp の先が書き込み可能な領域から見つかった時は、関数の入口として登録する。
   - 2 回目の trap(`fle: indirect call to 0x407310 is not a known function entry`): 0x407310 は遅延読み込み import(`kernel32.dll GetLogicalProcessorInformation`)の stub。上の jmp の探索で、入口として登録される。
   - 採らなかった案: 遅延 import の表(Delay Import Directory)を名前付きの import として読む(`fe-pe`)。名前付きが 57 件になるが、TABLE に無い名前の 28 件の thunk を fe-wasmgen が出せず、`hybrid-n0` で engine のビルドが止まった。取り消した。`fe-pe` は main の版のまま。
-  - 新しい型の trap: 静的に解決された間接呼び出し(書き込み可能な領域の初期値)の自己呼び出し。#1354 の 3 分類(バイト表の閉路・切り替え・擬似 VA の再帰)のどれでもない。
+  - 新しい型の trap: 静的に解決された間接呼び出し(書き込み可能な領域の初期値)の自己呼び出し。#{{114}} の 3 分類(バイト表の閉路・切り替え・擬似 VA の再帰)のどれでもない。
 - 実測(runner の値。nproc 4、loadavg 1.3〜2.5。この機械とは別枠):
   - engine は 5 回作り直した(1 回約 27 分)。`balance`: listed 12282・emitted ok 12282。
   - `boot-bundle.mjs`: engine-idle・standIn false・error null・elapsedMs 9160。
@@ -89,7 +105,7 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
 - 事実 8(エンジンの忙しい時間): `app/src/engine/worker.ts` の driver の `idle(n, now, next, busyMs, at)` は、1 回の idle の busyMs を受け取る。上部バーには届いていない(推定。確かめる)。
 - 事実 9(提示の数): engine の提示の回数(presents)は、`app/src/perf/beacon.ts` の DeskCounters と、終了の記録(`app/src/main.ts` の exit)に在る。
 - 事実 10(ページの表示): `app/src/perf/display.ts` の表示の計測は、既定では rAF を連続で回さない(burst。決定 0202)。
-- 事実 11(文字の読み): 上部バーの値の文字は、ゲストのメモリの中の文字列として読める(`app/src/engine/worker.ts` の `guestText`。#1358 と #1376 の方式。`pm-work/findings/hidpi-fl-scaling.md` の 207 行付近。OCR は使わない)。
+- 事実 11(文字の読み): 上部バーの値の文字は、ゲストのメモリの中の文字列として読める(`app/src/engine/worker.ts` の `guestText`。#{{117}} と #{{132}} の方式。`pm-work/findings/hidpi-fl-scaling.md` の 207 行付近。OCR は使わない)。
 
 ## 読む物
 
@@ -105,50 +121,50 @@ PM の決定(定義): 数値は、実際の値を出す。値を良く見せる�
 
 ## 数値の定義(PM の決定)
 
-- Memory Usage = エンジンが実際に確保しているゲストのメモリの量(MB)。runtime の VirtualAlloc・HeapAlloc・像の読み込みの積算。ページ側の実測(`WebAssembly.Memory.buffer.byteLength` の和。`performance.measureUserAgentSpecificMemory` が使える時はその値)と比べ、前者が嘘でないことを確かめる。
-- CPU Load = エンジンの Worker(音声・計算の thread)が、実時間のうち、実際に計算していた割合(%)。`busyMs` ÷ 経過した実時間。Worker ごとに計り、FL が読んでいる API の形(GetSystemTimes の差など)に合わせる。
-- Frame Rate = FL が実際に画面を提示した回数 ÷ 実時間(秒)。実時間は、仮想の時計ではなく、実際の時刻(`performance.now` の相当)で数える。どの形で FL の表示に入れるかは、FL の呼び出しの記録を見て決める。 真の値は、engine の提示(presents)の増分 ÷ 実時間(PM の決定)。ページの rAF(約 60 /秒)は表示の更新の上限(参考値)で、FL の値の基準にしない。
+- **Memory Usage**(この段階の判定): エンジンが実際に確保しているゲストのメモリの量(MB)。K32GetProcessMemoryInfo が返す使用量と同じ定義で数える: コミットした VirtualAlloc のページ・生きている HeapAlloc のブロックの要求サイズ・読み込んだ像(本体)の大きさ。表示の MB は、この使用量の MB への切り捨て。判定は、表示の MB が、同じ実行で K32 が返した使用量の MB 切り捨てと ±1 MB で一致すること。
+- 参考(判定に入れない。JSON に出す): ページ側の実測(`performance.measureUserAgentSpecificMemory` が使えればその値。使えなければ、ワーカーの `WebAssembly.Memory` の大きさ)と、その比(`ratio` = 表示の MB × 1,048,576 ÷ ページ側の実測)。
+- CPU Load・Frame Rate: 段階 2(#{{159}})で定義する。この段階では扱わない。
 
-## やること
+## やること(段階 1)
 
-0. 切り分けと閉路の特定(旧 1〜4)は、2 回目の試行で済んだ(上の「2 回目の試行で分かったこと」)。次の順で行う。
-1. **取り込みと単体試験**: 前回の差分(`.prior-work.md`・保存された差分)を載せ、`cargo test -p fe-decode` が通ることを確かめる。`fe-pe` は main の版のまま(遅延 import の読みは入れない)。
-2. **間接呼び出しの内訳**(変更の前後): 実物の DLL に対し、HEAD(変更の前)と作業ツリー(変更の後)で `fe-lift` の出力を取り、`call:unresolved`・`jmp:unresolved`・見つけた関数の数・`not a known function entry` の件数を、表にして報告に書く。
-3. **trap が消えたこと・K32 が呼ばれたこと・Memory Usage**: engine を作り直し、既定プロジェクトを開いて、K32 の入口に入ったことを一時の trace で確かめる(製品に残さない)。`measure.mjs` の `panelMb` は、上部バーの矩形(「判定の基準」を見る)に限って読む。設定の窓の候補は除く。道具 `tools/topbar-metrics/measure.mjs`(前回の差分に在る)は、無操作の版と再生の版の 2 つ、DPR 1 と乱数の DPR の 2 点を取る。
-4. **他の lift への影響**: `cargo test --workspace`(fe-decode・fe-pe・fe-lift・fe-wasmgen)を通す。起動確認(`boot-bundle.mjs`)、流れ A〜D(`welcome-flow.mjs`)、`npm test --prefix app` を、変更の前後で比べ、同じ結果であることを報告に書く。外部プラグインの instantiate(`tools/plugin-run/measure.mjs`)は、インストーラの無い job では確かめられない。その時は報告に「確認できない」と書く。
-5. **CPU Load と Frame Rate**(元の 6。式は未確定): CPU は、FL が名前で引く経路を呼び出しの記録で確かめる(GetTickCount・QueryPerformanceCounter の差か)。Frame Rate は、「120」の出どころを DwmFlush の戻り番地から確かめる。判定は `presentsPerSec` と比べる。確かめた順に本文に書き足す。確かめられない物は「未確認」と書く。
-6. **音声の保護**(P3): 数えるのは、既存の情報(busyMs・presents)だけ。新しい周期の処理を増やさない。仮想の時計(決定 0122)は変えない。
-7. **受け入れ**: 上の「受け入れ」のコマンドを、元のまま通す。
+0. 作業ツリーに前回の差分(`9f65327e`・`5e9c7fdd` の内容)が在るかを、`git status` と `git log` で確かめる。在れば、その上で続ける。`pm-work/findings/topbar-metrics-1391.md` を読む。
+1. **像を数える**: 読み込んだ像(本体)の大きさを、runtime が知る経路(像の読み込みの記録)から取り、K32GetProcessMemoryInfo の使用量に足す。像の大きさを定数として書かない。取った値と取り方を、報告に書く。
+2. **K32 の返した値を記録する**: `K32GetProcessMemoryInfo` が返した使用量を、engine の記録(ページが読める形。既存の記録の仕組みを使う)に残す。利用者向けの表示は増やさない。測定の道具だけが読む。
+3. **表示を読む**: `tools/topbar-metrics/measure.mjs` で、上部バーの Memory Usage の値(「N MB」・空白 1 つ・上部バーの矩形に限る。設定の窓の候補は除く)を読み、`memory.shownMb` に出す。
+4. **判定の値を出す**: `memory.k32Bytes`(この実行で K32 が返した使用量の配列。整数。読んだ順)を出す。判定は受け入れの式で行う(道具の中では判定しない)。
+5. **参考の値を出す**: `memory.pageMeasure`(ページ側の実測)と `memory.ratio`。判定には入れない。
+6. **直した後の確認**: 前回の差分の範囲(fe-decode・K32・試験の表)が、他の lift・起動・流れ A〜D に影響しないことを確かめる。`cargo test --workspace --no-fail-fast` の失敗の一覧を、変更の前後で比べ、増えていないことを報告に書く。
+7. **受け入れ**: 下の「受け入れ」のコマンドを、そのまま通す。通らなければ、出力を報告に貼り、作業ツリーを commit する。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const s=r.fps.samples;process.exit(r.error===null&&r.memory.panelMb>0&&r.memory.ratio>=0.5&&r.memory.ratio<=1.5&&r.cpu.playingPct>r.cpu.idlePct+1&&Math.abs(r.cpu.playingPct-r.cpu.busyPct)<=10&&s.length===2&&s.every((x)=>typeof x.shown==="number"&&typeof x.presentsPerSec==="number"&&x.presentsPerSec>0&&Math.abs(x.shown-x.presentsPerSec)<=0.15*x.presentsPerSec)&&!s.every((x)=>x.shown===120)?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false?0:1)' "$RUNNER_TEMP/boot.json" && node tools/topbar-metrics/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/metrics.json" && node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const m=r.memory;process.exit(r.error===null&&Number.isFinite(m.shownMb)&&m.shownMb>0&&Array.isArray(m.k32Bytes)&&m.k32Bytes.length>=1&&m.k32Bytes.every((v)=>Number.isInteger(v))&&m.k32Bytes.some((v)=>Math.abs(m.shownMb-Math.floor(v/1048576))<=1)?0:1)' "$RUNNER_TEMP/metrics.json" && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true;const pb=Math.max(...L.map((r)=>r.preBootBytes));const el=Math.max(...L.map((r)=>r.elapsedMs));process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true&&el<=12500&&pb<=314385095?0:1)' "$RUNNER_TEMP/flow.jsonl" && npm test --prefix app
 ```
 
 判定の基準(`tools/topbar-metrics/measure.mjs` の JSON の項目):
 - `error`: null。
-- 注: 前回の道具の `panelMb` は、設定の窓の候補(50・250・500 MB)を含むので無効。上部バーの矩形に限って読む(「やること」の 3)。
-- `memory.panelMb`: 上部バーの Memory Usage の値(MB。0 より大きい)。`memory.pageBytes`: ページ側の実測(`WebAssembly.Memory` の大きさの和)。`memory.ratio` = `panelMb` × 1,048,576 ÷ `pageBytes`。0.5 以上 1.5 以下。
-- `cpu.idlePct`: 無操作の時の CPU Load(%)。`cpu.playingPct`: Playlist を再生している時の CPU Load(%)。`cpu.busyPct`: 再生の時の Worker の忙しい時間の実測(%。Worker の計測。FL の表示とは別の経路)。判定: `playingPct` が `idlePct` より 1 ポイント以上大きい、かつ `|playingPct − busyPct|` が 10 ポイント以下。
-- `fps.samples`: 2 点(DPR 1 と乱数の DPR)。各点: `dpr`・`shown`(上部バーの Frame Rate の値)・`rafPerSec`(ページの rAF の数 ÷ 秒。同じ区間。JSON に出すが、判定には入れない)・`presentsPerSec`(engine の提示の増分 ÷ 秒。同じ区間)。判定: 各点で、`shown` が数値、`presentsPerSec` が 0 より大きい数値で、`|shown − presentsPerSec|` が `presentsPerSec` の 15% 以内。2 点とも 120 ではない、という条件は満たさなくてもよいが、2 点とも 120 なら不合格(`!s.every((x)=>x.shown===120)`)。
-- `cpu.idlePct`・`cpu.playingPct` が null のままなら、判定は落ちる(未実装のまま通さない)。
-- 判定の決定(PM): FL の Frame Rate の真の値は、engine の提示(presents)の増分 ÷ 実時間(FL 自身が画面を更新した回数)。ページの rAF(約 60 /秒)は表示の更新の上限(参考値)で、FL の値の基準にしない。判定は「FL の表示値(`shown`)が、同じ区間の `presentsPerSec` と ±15% で一致」。FL の値が 120 の固定でないこと(DPR 1 と乱数の DPR の 2 点、再生中と無操作で、値が変わりうる)も保つ。前回の実測では、再生中の提示は約 11 /秒。
+- `memory.shownMb`: 表示の Memory Usage の MB(数値。0 より大きい)。
+- `memory.k32Bytes`: この実行で K32 が返した使用量(B。整数の配列。1 件以上)。
+- 判定: `shownMb` が、`k32Bytes` のどれか 1 つの MB 切り捨て(`Math.floor(v / 1048576)`)と ±1 以内で一致する。
+- 参考(判定に入れない): `memory.pageMeasure`・`memory.ratio`。
+- 段階 2(CPU Load・Frame Rate)は、この判定に入れない。
+- 起動(`boot.json`)と流れ A〜D・`npm test` は、回帰の確認として従来どおり通す。
 
 ## 報告の規則
 
 - 1 行目は「実エンジン: <何を実行し、どの出力を観測したか>」で始める。
 - 測定の値には「runner の値。この機械とは別枠」と書き、nproc と loadavg を添える。
 - 「達成」と書かず、「受理」「差し戻し」「未確認」のいずれかにする。出力の行を付ける。
-- 報告に書く: 直す前の値の出どころの表(FL が呼んだ API と戻り値)、直した後の定義と経路、仮想の時計を変えたか(変えたなら起動と音声への影響)、3 つの値の直す前と後、低い値が出た時は、その理由(描画の費用・#1351 との関係)。
+- 報告に書く: 直す前の値の出どころの表(FL が呼んだ API と戻り値)、直した後の定義と経路、仮想の時計を変えたか(変えたなら起動と音声への影響)、3 つの値の直す前と後、低い値が出た時は、その理由(描画の費用・#{{111}} との関係)。
 - trap が出た時は、「やること」の 1 の版ごとの結果と、2 の閉路(周期・回数・構成の関数)を報告に書く。
 
 ## 制約
 
-- 製品に、利用者向けの新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。オプトインを作らない。既存の FLE_DWM_HZ を読むのは可。診断(trap の枠の出力など)は一時的にし、commit しない。
-- 数字を作らない。値を良く見せない。低い値が本当なら、そのまま出す。
+- 製品に、利用者向けの新しい環境変数・`#ifdef`・URL パラメータ・ビルド変数を足さない。オプトインを作らない。
 - ゲストのメモリには書かない(読むだけ)。
-- Python は使わない(製品にも、調査にも)。OCR は使わない。
+- Python は使わない(製品にも、調査にも)。前回の試行では 3 回使い、制約に反した。OCR は使わない。
+- 数字を作らない。表示の値を、K32 の返した値と無関係に書き換えない。
 - ベンダー名と Cloudflare の識別子を、ファイルに書かない。
 - sleep・timeout コマンド・nohup・末尾の `&` は使わない。一時ファイルは `.tmp-*` に置き、終わったら消す。
 - 製品の作業は Actions で行う。この機械で製品のビルドや測定をしない。
@@ -163,8 +179,9 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 ## 他のタスクとの関係
 
+- 段階 2(#{{159}}: CPU Load と Frame Rate)は、この Issue の後に行う(blocked by)。
 - #{{139}}(マウスカーソル段 1)とは並行(依存は無い)。同じ engine から page への通知の経路を使うので、「他の Issue との重なり」の規則で解く。
-- #1351(P2 の描画の費用。Frame Rate が低いと出た時の原因の側。この Issue では扱わない)。
+- #{{111}}(P2 の描画の費用。Frame Rate が低いと出た時の原因の側。この Issue では扱わない)。
 - #{{138}}・#{{144}} とは、直列の順(138 → 139 → 144・140)。
 - 起動の間欠の停止(#{{149}})で、流れ A〜D・起動確認が落ちたら、報告に書いて、commit して終える。再試行で続く。この Issue の依存には足さない。
 

@@ -993,8 +993,13 @@ fn emit_order(f: u64, nodes: &BTreeMap<u64, Node>) -> Vec<u64> {
     keys
 }
 
+/// A back edge from `from` to `s` closes a spin-wait when the loop holds a `pause` (the code of a spin lock: #1393). The loop is the code from `s` to `from`.
+fn is_spin_loop(cx: &Cx<'_>, s: u64, from: u64) -> bool {
+    cx.nodes.range(s..=from).any(|(_, n)| matches!(n, Node::Insn(i) if i.mnemonic() == Mnemonic::Pause))
+}
+
 /// The successor `s` of the instruction at `from`. A goto back (`s <= from`) is a loop's back edge: it is a switch point of the cooperative
-/// threads first (fle_loop_tick, fle_dispatch.h). Every cycle of the blocks has such an edge, since the addresses along a cycle cannot all increase.
+/// threads first (fle_loop_tick, fle_dispatch.h). A spin-wait's back edge is fle_spin_tick instead (#1393: a long spin yields inside a callback too). Every cycle of the blocks has such an edge, since the addresses along a cycle cannot all increase.
 fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, from: u64, st: &mut Stats) -> String {
     if s != cx.f && cx.entries.contains(&s) {
         st.tail_calls += 1;
@@ -1015,6 +1020,9 @@ fn succ(cx: &Cx<'_>, s: u64, next_emitted: Option<u64>, from: u64, st: &mut Stat
         st.gotos += 1;
         if s <= from {
             st.back_edges += 1;
+            if is_spin_loop(cx, s, from) {
+                return format!("fle_spin_tick(); goto L_{s:x}; ");
+            }
             return format!("fle_loop_tick(); goto L_{s:x}; ");
         }
         return format!("goto L_{s:x}; ");

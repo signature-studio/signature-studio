@@ -202,7 +202,7 @@ try {
   const cli = spawnSync(process.execPath, [TOOL], { encoding: 'utf8' });
   ok('CLI: 引数が無ければ使い方を出し、終了コード 64', cli.status, 64);
   const noSlash = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o2'), 'Artwork'], { encoding: 'utf8' });
-  ok('CLI: 接頭辞が \\ で終わらなければ、終了コード 64 で、何も書かない', [noSlash.status, fs.existsSync(path.join(T, 'o2'))], [64, false]);
+  ok('CLI: \\ で終わらない引数は完全なパスとして扱う。一覧に無ければ、終了コード 1 で、何も書かない', [noSlash.status, fs.existsSync(path.join(T, 'o2'))], [1, false]);
   const none = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o3'), 'Data\\Projects\\', 'Help\\'], { encoding: 'utf8' });
   ok('CLI: 一致が 1 件も無ければ 1 で終わり、何も書かない', [none.status, fs.existsSync(path.join(T, 'o3'))], [1, false]);
   ok('CLI: 一致が無い接頭辞は、接頭辞ごとに警告を出す(2 件)', none.stderr.split('\n').filter((l) => l.includes('警告')).length, 2);
@@ -216,7 +216,19 @@ try {
   ok('CLI --file: 書かれた物は、指定の完全なパスの物と MANIFEST だけ', exactListed, ['Artwork/Themes/Ash.flstheme', 'MANIFEST.tsv', 'Program.exe']);
   ok('CLI --file: 中身はインストーラの物と同じ', [fs.readFileSync(path.join(exactOut, 'Program.exe'), 'utf8'), fs.readFileSync(path.join(exactOut, 'Artwork/Themes/Ash.flstheme'), 'utf8')], ['MZ outside', 'theme']);
   const exactNone = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o6'), '--file', 'Nope.exe'], { encoding: 'utf8' });
-  ok('CLI --file: 一致が無ければ 1 で終わり、何も書かず、警告を 1 件出す', [exactNone.status, fs.existsSync(path.join(T, 'o6')), exactNone.stderr.split('\n').filter((l) => l.includes('警告') && l.includes('Nope.exe')).length], [1, false, 1]);
+  ok('CLI --file: 一致が無ければ 1 で終わり、何も書かず、エラーを 1 件出す', [exactNone.status, fs.existsSync(path.join(T, 'o6')), exactNone.stderr.split('\n').filter((l) => l.includes('エラー') && l.includes('Nope.exe')).length], [1, false, 1]);
+  // 一覧(ci/resources-prefixes.txt)の行は、行の形で分ける: \ で終わる物は接頭辞(その下の全ファイル)、\ で終わらない物は完全なパス(一覧に無ければ失敗)
+  const mixOut = path.join(T, 'o9');
+  const mix = spawnSync(process.execPath, [TOOL, inst, mixOut, 'Plugins\\Fruity\\Effects\\', 'artwork\\THEMES\\ash.flstheme'], { encoding: 'utf8' });
+  ok('CLI 混在: 接頭辞の行と完全なパスの行が、どちらも一致すれば、終了コード 0', mix.status, 0);
+  const mixListed = fs.existsSync(mixOut) ? fs.readdirSync(mixOut, { recursive: true }).filter((f) => fs.statSync(path.join(mixOut, f)).isFile()).sort() : [];
+  ok('CLI 混在: 書かれた物は、接頭辞の下の全ファイルと、完全なパスの物(MANIFEST を含む)だけ', mixListed, ['Artwork/Themes/Ash.flstheme', 'MANIFEST.tsv', 'Plugins/Fruity/Effects/DUP.dll', 'Plugins/Fruity/Effects/Fruity Balance_x64.dll', 'Plugins/Fruity/Effects/Readme.txt'].sort());
+  const mixMiss = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o10'), 'Artwork\\', 'Artwork\\Themes\\nope.flstheme'], { encoding: 'utf8' });
+  ok('CLI 混在: 一覧に無い完全なパスの行があれば、終了コード 1 で、何も書かず、そのパスをエラーに出す', [mixMiss.status, fs.existsSync(path.join(T, 'o10')), mixMiss.stderr.includes('Artwork\\Themes\\nope.flstheme')], [1, false, true]);
+  const bare = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o11'), ''], { encoding: 'utf8' });
+  ok('CLI: 空の引数は、終了コード 64 で、何も書かない', [bare.status, fs.existsSync(path.join(T, 'o11'))], [64, false]);
+  const lone = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o12'), '\\'], { encoding: 'utf8' });
+  ok('CLI: 長さ 1 の \\ だけの引数は、接頭辞として不正で、終了コード 64 で、何も書かない', [lone.status, fs.existsSync(path.join(T, 'o12'))], [64, false]);
   const exactSlash = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o7'), '--file', 'Artwork\\'], { encoding: 'utf8' });
   ok('CLI --file: 末尾が \\ の物は完全なパスではないので、終了コード 64 で、何も書かない', [exactSlash.status, fs.existsSync(path.join(T, 'o7'))], [64, false]);
   const exactNoValue = spawnSync(process.execPath, [TOOL, inst, path.join(T, 'o8'), '--file'], { encoding: 'utf8' });

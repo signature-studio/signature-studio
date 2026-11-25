@@ -79,18 +79,21 @@ static uint64_t export_va(uint64_t base, const char *name)
     return 0;
 }
 
-/* implicit TLS of the module (the loader's work for a PE with a TLS directory; see main_vst3a.c). The TLS callbacks are not called (OTT has none). */
+/* implicit TLS of the module (the loader's work for a PE with a TLS directory; see main_vst3a.c). The TLS callbacks of the directory are kept; main calls them
+ * with DLL_PROCESS_ATTACH before DllMain. */
+static uint64_t tls_cb[8];
+static int ntls_cb;
 static int tls_setup(uint64_t base, uint64_t size)
 {
     const uint8_t *m = (const uint8_t *)(uintptr_t)base;
     uint32_t lfa, rva, sz, zero;
-    uint64_t start, end, idxva, block, idx;
+    uint64_t start, end, idxva, cbva, block, idx;
     size_t n;
     memcpy(&lfa, m + 0x3c, 4);
     memcpy(&rva, m + lfa + 24 + 112 + 9 * 8, 4);
     memcpy(&sz, m + lfa + 24 + 112 + 9 * 8 + 4, 4);
     if (!rva || sz < 0x28) return 0;
-    memcpy(&start, m + rva, 8); memcpy(&end, m + rva + 8, 8); memcpy(&idxva, m + rva + 16, 8); memcpy(&zero, m + rva + 32, 4);
+    memcpy(&start, m + rva, 8); memcpy(&end, m + rva + 8, 8); memcpy(&idxva, m + rva + 16, 8); memcpy(&cbva, m + rva + 24, 8); memcpy(&zero, m + rva + 32, 4);
     if (end < start || start < base || end > base + size) { fprintf(stderr, "vst: bad TLS directory\n"); exit(2); }
     n = (size_t)(end - start) + zero;
     block = (uint64_t)(uintptr_t)aligned_alloc(64, (n + 63) & ~(size_t)63);
@@ -100,6 +103,7 @@ static int tls_setup(uint64_t base, uint64_t size)
     idx = (uint32_t)R[0];
     fle_tls_values[idx] = block;
     fle_st(idxva, 4, idx);
+    if (cbva) for (int k = 0; k < 8 && fle_ld(cbva + 8u * k, 8); k++) tls_cb[ntls_cb++] = fle_ld(cbva + 8u * k, 8);
     return 1;
 }
 
@@ -123,6 +127,12 @@ static int iat_fixup(uint64_t base)
             memcpy(&th, m + (oft ? oft : ft) + 8u * k, 8);
             if (!th) break;
             if (th >> 63) {
+                /* an ordinal import: the response row of "#<n>" when the lift has one (an answer of lift/harness/vst/ordinals-vst.txt), else the stop by number */
+                char on[16];
+                snprintf(on, sizeof on, "#%u", (unsigned)(th & 0xffff));
+                for (j = 0; j < fle_resp_count; j++)
+                    if (!strcmp(fle_resp_table[j].dll, dll) && !strcmp(fle_resp_table[j].name, on)) break;
+                if (j < fle_resp_count) { fle_st(base + ft + 8u * k, 8, fle_resp_table[j].va); nfix++; continue; }
                 for (unsigned o = 0; o < vst3a_ord_count; o++)
                     if (!strcmp(vst3a_ord_table[o].dll, dll) && vst3a_ord_table[o].ordinal == (int)(th & 0xffff)) { fle_st(base + ft + 8u * k, 8, vst3a_ord_table[o].va); nfix++; break; }
                 continue;
@@ -174,6 +184,7 @@ int main(int argc, char **argv)
     char cid[16];
     int ctrl_same = 0;
     int nin = 0, nout = 0, ch_in[8] = {0}, ch_out[8] = {0};
+    int ev_in = 0;
     int failed = 0;
 
     setvbuf(stdout, NULL, _IOLBF, 0);
@@ -200,6 +211,12 @@ int main(int argc, char **argv)
     if (vfs_seed_from_env() != 0) return 2;
     vst_host_init(&host);
 
+    /* ---- the module's TLS callbacks with DLL_PROCESS_ATTACH, before DllMain (main_vst3a.c) ---- */
+    for (int k = 0; k < ntls_cb; k++) {
+        const uint64_t a[6] = { img.base, 1, 0, 0, 0, 0 };
+        gcall(tls_cb[k], a, NULL);
+        printf("vst: TLS callback %d at %#llx (DLL_PROCESS_ATTACH) returned\n", k, ULL(tls_cb[k]));
+    }
     /* ---- LoadLibraryW of the module: DllMain runs inside (fle_realmod_load) ---- */
     {
         uint16_t wname[128];
@@ -303,7 +320,7 @@ int main(int argc, char **argv)
     {
         uint64_t bi = (uint64_t)(uintptr_t)calloc(1, 300);
         uint64_t arr_in = (uint64_t)(uintptr_t)calloc(8, 8), arr_out = (uint64_t)(uintptr_t)calloc(8, 8), r;
-        int ev_in, ev_out;
+        int ev_out;
         nin = (int)vcall(comp, 7, 0, 0, 0, 0); nout = (int)vcall(comp, 7, 0, 1, 0, 0);
         ev_in = (int)vcall(comp, 7, 1, 0, 0, 0); ev_out = (int)vcall(comp, 7, 1, 1, 0, 0);
         printf("vst: getBusCount(audio,in)=%d (audio,out)=%d  events in=%d out=%d\n", nin, nout, ev_in, ev_out);
@@ -378,6 +395,8 @@ int main(int argc, char **argv)
             pc->proj_samples = (int64_t)n0;
             pc->proj_music = (double)n0 / rate * pc->tempo / 60.0;
             vst_ev_clear();
+            /* an instrument (it has an event input bus) gets one note-on in the first block: middle C at 100/127 (main_vst3a.c --note) */
+            if (b == 0 && ev_in > 0) vst_ev_note(1, 60, 100.0f / 127.0f, 0, 1);
             r = vcall(proc, 9, (uint64_t)(uintptr_t)pd, 0, 0, 0);
             if (b == 0) vst_pc_clear();
             if ((r & 0xffffffffu) != 0) {
