@@ -3,10 +3,11 @@
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
-// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. Except (Issue #1400): when the guest does not open the project, "error" says why and the exit is 0 (the open is a result to report, not a failure of the probe). The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. Except (Issue #1400, #1403): once the project is being opened, "error" says why (the guest does not open it, or the engine stops during the open) and the exit is 0 (the open is a result to report, not a failure of the probe). The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 // end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
+// With a project (Issue #1403): missingInInventory (the distinct absolute spellings that a GetFileAttributesW, CreateFileW or FindFirstFileW request found nothing for, which the list has once the absolute root is taken off, and which are not .dll; missingInInventoryFirst10: {api, path} of the first 10), rawVariableProbes ({count, first10}: the distinct %...%\ spellings as the guest wrote them; FL's own probes, not counted in the others). notInInstaller then excludes the %...%\ spellings and the .dll ones. After an error during the open, the same fields are read from the whole log of the open (not only the end tail).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -77,6 +78,9 @@ const INSTALLER_LIST = path.join(repo, 'inputs', 'fl-installer-files.tsv');
 const NOT_IN_INSTALLER_FIRST = 10;
 const ABSOLUTE_PATH = /^[A-Za-z]:\\/;
 const VARIABLE_PATH = /^%[^%\\]+%\\/;
+// Issue #1403: the guest file requests that count as missingInInventory (a module load, LoadLibraryW, does not)
+const FILE_APIS = new Set(['GetFileAttributesW', 'CreateFileW', 'FindFirstFileW']);
+const MISSING_FIRST = 10;
 
 // the isolation flags of tools/boot-check/boot-bundle.mjs (copied: that file does not export them)
 const ISOLATION = [
@@ -102,7 +106,7 @@ async function main() {
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
-    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
@@ -111,7 +115,7 @@ async function main() {
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
   let server = null, chrome = null, cdp = null, navAt = null;
-  let probeError = null, evAfterError = null, projectRefused = false;
+  let probeError = null, evAfterError = null, openLogFrom = null;
   const fromAudio = (d) => Object.assign(out, {
     ctxState: d.ctxState, status: d.status, quantaWhilePlaying: d.quantaWhilePlaying, underrunQuanta: d.underrunQuanta, engineGapFrames: d.engineGapFrames,
     playingSeconds: d.playingSeconds, deviceState: d.deviceState, underrunQuantaSinceFirstIdle: d.underrunQuantaSinceFirstIdle, underrunEpisodes: d.episodes,
@@ -189,7 +193,8 @@ async function main() {
 
     if (projectFile !== null) {
       const logBefore = await ev('window.__app.engineLog().length');
-      await openProject(S, ev, projectFile).catch((e) => { projectRefused = true; throw e; });
+      openLogFrom = logBefore;
+      await openProject(S, ev, projectFile);
       await projectReport(ev, out, logBefore);
     }
     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
@@ -222,6 +227,7 @@ async function main() {
   } catch (e) {
     probeError = String(e?.message ?? e).slice(0, 500);
     if (evAfterError) out.end = await engineEnd();
+    if (evAfterError && openLogFrom !== null) await openBreakdownAfterError(evAfterError, openLogFrom, out);
   } finally {
     out.error = probeError;
     if (navAt !== null) out.elapsedMs = Date.now() - navAt;
@@ -233,7 +239,7 @@ async function main() {
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
     process.stdout.write(JSON.stringify(out) + '\n');
-    process.exitCode = out.error && !projectRefused ? 1 : 0;
+    process.exitCode = out.error && openLogFrom === null ? 1 : 0;
   }
 }
 
@@ -579,7 +585,13 @@ async function projectReport(ev, out, logBefore) {
   out.projectMissing = [...new Set(missing)];
   process.stderr.write(`project: ${out.projectDialogs.length} problem box(es), ${out.projectMissing.length} distinct factory sample request(s) not found (${out.projectMissingLines} lines)\n`);
   Object.assign(out, missingBreakdown(log.slice(logBefore)));
-  process.stderr.write(`missing-path: ${out.missingDistinct} distinct: ${out.dll} dll, ${out.inventory} in the installer's list, ${out.notInInstaller} not in it\n`);
+  process.stderr.write(`missing-path: ${out.missingDistinct} distinct: ${out.dll} dll, ${out.missingInInventory} absolute file requests in the installer's list, ${out.rawVariableProbes.count} %...% probes, ${out.notInInstaller} not in it\n`);
+}
+
+// Issue #1403: the breakdown of the whole log of the open, when the engine stopped during it (the end tail is only the last 400 lines, so the requests before it would be missed)
+async function openBreakdownAfterError(ev, from, out) {
+  const log = await ev('window.__app.engineLog()').catch(() => null);
+  if (Array.isArray(log)) Object.assign(out, missingBreakdown(log.slice(from)));
 }
 
 // Issue #1373: the installer's list as a map from the guest path (lower case) to its row: the guest's spelling, bytes and sha256 (inputs/fl-installer-files.tsv; the header and the comment are skipped)
@@ -631,21 +643,33 @@ function rootKind(full, roots) {
 }
 
 // Issue #1373: the breakdown of the missing-path lines of an engine log. The runtime writes a UTF-16 unit that is not printable ASCII (and the quote) as \uXXXX, which is decoded here. A request is keyed by its path without the factory root, in lower case; the first spelling seen is the one listed.
+// Issue #1403: missingInInventory counts the absolute spellings (lower case, once each) of a FILE_APIS request, once the absolute root is taken off they are a row of the list, and they are not a .dll. rawVariableProbes counts the %...%\ spellings (lower case, once each). notInInstaller is the rest: not a .dll, not in the list, not a %...%\ spelling.
 function missingBreakdown(lines) {
-  const fulls = [];
+  const reqs = [];
   for (const line of lines) {
     const m = MISSING_LINE.exec(line);
-    if (m) fulls.push(m[3].replace(/\\u([0-9A-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))));
+    if (m) reqs.push({ api: m[1], full: m[3].replace(/\\u([0-9A-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))) });
   }
   const rows = installerRows();
-  const roots = factoryRoots(fulls, rows);
+  const roots = factoryRoots(reqs.map((r) => r.full), rows);
   const rootStripped = { absolute: 0, variable: 0 };
   const seen = new Map();
-  for (const full of fulls) {
+  const rawVariable = new Map();
+  const absFile = new Map();
+  for (const { api, full } of reqs) {
     const kind = rootKind(full, roots);
     if (kind !== null) rootStripped[kind]++;
     const key = (kind === null ? full : full.slice(roots[kind].length)).toLowerCase();
     if (!seen.has(key)) seen.set(key, full);
+    const low = full.toLowerCase();
+    if (VARIABLE_PATH.test(full) && !rawVariable.has(low)) rawVariable.set(low, full);
+    if (FILE_APIS.has(api) && ABSOLUTE_PATH.test(full) && !absFile.has(low)) absFile.set(low, { api, full });
+  }
+  const missing = [];
+  for (const [low, { api, full }] of absFile) {
+    if (roots.absolute === null || !low.startsWith(roots.absolute)) continue;
+    if (/\.dll$/i.test(full) || !rows.has(low.slice(roots.absolute.length))) continue;
+    missing.push({ api, path: full });
   }
   const dll = [];
   const inList = [];
@@ -653,9 +677,14 @@ function missingBreakdown(lines) {
   for (const [key, full] of seen) {
     if (/\.dll$/i.test(full)) dll.push(full);
     else if (rows.has(key)) inList.push(rows.get(key));
-    else notIn.push(full);
+    else if (!VARIABLE_PATH.test(full)) notIn.push(full);
   }
-  return { missingDistinct: seen.size, dll: dll.length, inventory: inList.length, inventoryList: inList, notInInstaller: notIn.length, notInInstallerFirst10: notIn.slice(0, NOT_IN_INSTALLER_FIRST), rootStripped };
+  return {
+    missingDistinct: seen.size, dll: dll.length, inventory: inList.length, inventoryList: inList,
+    missingInInventory: missing.length, missingInInventoryFirst10: missing.slice(0, MISSING_FIRST),
+    rawVariableProbes: { count: rawVariable.size, first10: [...rawVariable.values()].slice(0, MISSING_FIRST) },
+    notInInstaller: notIn.length, notInInstallerFirst10: notIn.slice(0, NOT_IN_INSTALLER_FIRST), rootStripped,
+  };
 }
 
 // the guest's windows, read again for a while when the page answers "ask again" (the picture is being drawn: tools/delivery-split/measure.mjs does the same)
