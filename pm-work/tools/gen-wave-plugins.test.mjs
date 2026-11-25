@@ -58,16 +58,37 @@ test('each draft has the front matter of the wave: Task, M5, parent, High, proje
   }
 });
 
-test('the blocked_by follow the stages: stage 1 waits for 126 and 127; stage 2 and 3 also wait for the first three of the stage before', () => {
+test('the blocked_by follow the stages: stage 1 waits for 126 and 127; stage 2 and 3 also wait for the first three of the stage before; a bundle with Data also waits for 192 (#1478)', () => {
   const names = readdirSync(out).sort();
   const dn = (i) => names[i].slice(0, 3);
   for (let i = 0; i < names.length; i++) {
-    const { fm } = parse(names[i]);
+    const { fm, body } = parse(names[i]);
     const want = ['"126"', '"127"'];
+    if (/Data: [1-9][0-9]* ファイル/.test(body)) want.push('"192"');
     if (i >= 15 && i < 30) want.push(`"${dn(0)}"`, `"${dn(1)}"`, `"${dn(2)}"`);
     if (i >= 30) want.push(`"${dn(15)}"`, `"${dn(16)}"`, `"${dn(17)}"`);
     assert.equal(fm.blocked_by, `[${want.join(',')}]`, names[i]);
   }
+});
+
+test('a bundle with Data declares each folder in its data.tsv: the acceptance checks the file and the row count, and the Data missing count is 0 (19 bundles)', () => {
+  let bundles = 0;
+  for (const f of readdirSync(out)) {
+    const { body, accepts } = parse(f);
+    const folders = [...body.matchAll(/^- [^\n]+?\(`lift\/plugins\/([a-z0-9-]+)\/data\.tsv`\): (\d+) ファイル/gm)];
+    if (folders.length === 0) {
+      assert.ok(!body.includes('data.tsv'), f);
+      continue;
+    }
+    bundles++;
+    const a = accepts[0];
+    for (const [, dir, n] of folders) {
+      assert.ok(a.includes(`test -f lift/plugins/${dir}/data.tsv`), `${f}: ${dir}`);
+      assert.ok(a.includes(`process.exit(L.length===${n}?0:1)`), `${f}: ${dir} rows ${n}`);
+    }
+    assert.ok(a.includes('r.missingInInventory===0'), f);
+  }
+  assert.equal(bundles, 19);
 });
 
 test('each body has one accept line that runs the plugin tool on its own folders, and keeps the other files as they are', () => {

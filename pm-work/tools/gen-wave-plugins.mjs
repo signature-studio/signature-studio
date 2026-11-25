@@ -10,6 +10,7 @@
 // 本文: テンプレート(既定 pm-work/issue-drafts/wave2-template.md)の @@...@@ を束の内容で置き換える。plugin.tsv の行は、本文の tsv の段に全文で書く。
 // 拒否(終了コード 1。何も書かない): テンプレートに @@ 以外の未確定の語が在る、本文に #数字 や L-0 が在る、置き換えの後に @@ が残る、後回しと VFX の DLL の集合が違う、第 1 波の 4 フォルダが表に無い、本体の無いフォルダが在る、dir・key・guest が一意でない、禁止の数値が散文に在る(SHA-256 の列を除く)。
 // --dry-run: 件数と段と先頭 5 件を出す。検査は同じに行い、書かない。
+// Data(#1478): 束が持つ Data は、フォルダ直下の <フォルダ>\Data\ の下の DLL でない行(宣言する Data)。その束は、Data の節(lift/plugins/<dir>/data.tsv)・受け入れの件数と missingInInventory・blocked_by(下書き 192 = #1478)を足す。入れ子の Data(Vocodex の Synthesizer\Data\)と VFX の Data は宣言しない。内訳は dry-run が出す。
 // 出力: <出力先>/<NNN>-<effects|generators>-<NN>.md。出力先の同じ形式の古い下書きは消してから書く(他の名前のファイルは残す)。
 // 終了コード: 0 = 生成(--dry-run は検査が通った)、1 = 検査の失敗(理由を標準エラーに出す)、2 = 使い方の誤り。
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -42,6 +43,10 @@ const HEAD = ['パス', '大きさ', 'SHA-256', '種別', '本体か補助か', 
 const HOOK_NEED = ['要', '既存', '不要'];
 const TSV_HEAD = 'key\tguest\trole\tsha256\tsize\thook\targs\tomit';
 const FORBIDDEN_NUMBERS = /175|168|169|1\.7647/;
+// #1478(Data の宣言の仕組み)の下書き番号(pm-work/created-issues.tsv の 192 = #1478)
+const DATA_DRAFT = '192';
+// #1371(1 本ずつの道具 tools/plugin-run/run.mjs)の下書き番号
+const TOOL_DRAFT = '127';
 const OUT_NAME = /^\d{3}-(effects|generators)-\d{2}\.md$/;
 
 const die = (lines, code = 1) => {
@@ -168,6 +173,28 @@ const data = (f) => {
   }
   return { n, bytes };
 };
+// Data(#1478): the Data rows of the wave in the installer's list, split into what is declared (directly under the folder's Data\, not a DLL of the folder), the folders with a VFX DLL (deferred), the Data\ under a sub-folder of a folder (not declared), and the DLLs of the folder
+const vfxFolders = new Set([...folders].filter(([, list]) => isVfx(list)).map(([f]) => f));
+const fruityAll = [...installer.keys()].filter((g) => g.startsWith(PREFIX) && g.includes('\\Data\\'));
+const fruityData = fruityAll.filter((g) => folders.has(folderOf(g)));
+const doneOf = (g) => DONE.some((n) => g.startsWith(`${PREFIX}${n}\\`));
+const fruityWave = fruityData.filter((g) => !doneOf(g));
+const vfxRows = fruityWave.filter((g) => vfxFolders.has(folderOf(g)));
+const restRows = fruityWave.filter((g) => !vfxFolders.has(folderOf(g)));
+const memberRows = restRows.filter((g) => guests.has(g));
+const directRows = restRows.filter((g) => !guests.has(g) && g.startsWith(`${folderOf(g)}\\Data\\`));
+const nestedRows = restRows.filter((g) => !guests.has(g) && !g.startsWith(`${folderOf(g)}\\Data\\`));
+const declaredTotal = left.reduce((s, [f]) => s + data(f).n, 0);
+if (directRows.length !== declaredTotal) die([`Data の内訳が合わない: 直下 ${directRows.length} と、フォルダごとの合計 ${declaredTotal}`]);
+const nestedOf = (f) => nestedRows.filter((g) => folderOf(g) === f);
+const nestedGroups = (f) => {
+  const groups = new Map();
+  for (const g of nestedOf(f)) {
+    const k = g.slice(0, g.indexOf('\\Data\\') + '\\Data\\'.length);
+    groups.set(k, [...(groups.get(k) ?? []), g]);
+  }
+  return [...groups].map(([k, list]) => ({ k, n: list.length, bytes: list.reduce((s, g) => s + installer.get(g), 0) }));
+};
 
 const pluginTsv = (members) => [TSV_HEAD, ...members.map((d) => [d.key, d.row['パス'], d.role, d.row['SHA-256'], d.row['大きさ'], d.hook, '--pdata', '-'].join('\t'))].join('\n');
 
@@ -189,13 +216,15 @@ const sizeFor = (n) => (n <= 3 ? 'S' : n <= 9 ? 'M' : 'L');
 const planned = bundles.map((b, g) => {
   const n = nums[g];
   const stage = stageOf(g);
+  const hasData = b.members.some((m) => data(m.f).n > 0);
   const blocked = [...BASE_BLOCKED];
+  if (hasData) blocked.push(DATA_DRAFT);
   if (stage >= 2) blocked.push(...stageFirst(stage - 1));
   const names = b.members.map((m) => folderName(m.f));
   const title = `${b.kind.word} ${b.index}: ${names.join('・')} を、1 プラグイン 1 wasm で入れる`;
   const dllsCount = dllsIn(b);
   const bodies = bodiesIn(b);
-  return { g, n, stage, blocked, names, title, dllsCount, bodies, kind: b.kind, index: b.index, members: b.members, size: sizeFor(dllsCount) };
+  return { g, n, stage, blocked, hasData, names, title, dllsCount, bodies, kind: b.kind, index: b.index, members: b.members, size: sizeFor(dllsCount) };
 });
 
 const template = (() => {
@@ -210,13 +239,17 @@ const acceptOf = (p) => {
   const tests = dirsOf.map((d) => `test -f lift/plugins/${d}/plugin.tsv`).join(' && ');
   const slugArgs = dirsOf.map(quoted).join(' ');
   const processed = p.kind.dir === 'Effects' ? '&&r.processed===true' : '';
+  const withData = p.members.filter((m) => data(m.f).n > 0);
+  const dataTests = withData.map((m) => `test -f lift/plugins/${dirs[m.i]}/data.tsv && node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").split("\\n").filter((l)=>l.trim()!==""&&!l.startsWith("#")&&!l.startsWith("guest\\t"));process.exit(L.length===${data(m.f).n}?0:1)' lift/plugins/${dirs[m.i]}/data.tsv`);
+  const dataMissing = withData.length > 0 ? '&&r.missingInInventory===0' : '';
   return [
     tests,
+    ...dataTests,
     'npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle',
     'node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json"',
     `node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false&&r.elapsedMs<=12500?0:1)' "$RUNNER_TEMP/boot.json"`,
     `node tools/plugin-run/run.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" ${slugArgs} > "$RUNNER_TEMP/plugin-run.jsonl"`,
-    `node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\\n").map((l)=>JSON.parse(l));process.exit(L.length===${p.bodies}&&L.every((r)=>r.instantiated===true&&r.error===null&&r.elapsedMs<=12500${processed})?0:1)' "$RUNNER_TEMP/plugin-run.jsonl"`,
+    `node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\\n").map((l)=>JSON.parse(l));process.exit(L.length===${p.bodies}&&L.every((r)=>r.instantiated===true&&r.error===null&&r.elapsedMs<=12500${processed}${dataMissing})?0:1)' "$RUNNER_TEMP/plugin-run.jsonl"`,
     'node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/flow.jsonl"',
     `node -e 'const L=require("fs").readFileSync(process.argv[1],"utf8").trim().split("\\n").map((l)=>JSON.parse(l));const ok=(r)=>r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711&&(!/^[BD]$/.test(r.flow)||r.welcomeClosed===true);process.exit(L.length===4&&L.map((r)=>r.flow).join("")==="ABCD"&&L.every(ok)?0:1)' "$RUNNER_TEMP/flow.jsonl"`,
     `test -z "$(git diff --name-only origin/main...HEAD -- . ':!lift/plugins')"`,
@@ -224,10 +257,49 @@ const acceptOf = (p) => {
 };
 
 const dependsText = (p) => {
-  const base = "#{{126}}(第 2 波の 2 本目の型)・#{{127}}(1 本ずつの道具)";
-  if (p.stage === 1) return `${base}。段 1 の束は、この 2 件が閉じたら起動する`;
-  const first = p.blocked.slice(2).map((n) => `#{{${n}}}`).join('・');
+  const dataDep = p.hasData ? `・#{{${DATA_DRAFT}}}(Data の宣言の仕組み)` : '';
+  const base = `#{{126}}(第 2 波の 2 本目の型)・#{{127}}(1 本ずつの道具)${dataDep}`;
+  if (p.stage === 1) return `${base}。段 1 の束は、${p.hasData ? 'この 3 件' : 'この 2 件'}が閉じたら起動する`;
+  const first = stageFirst(p.stage - 1).map((n) => `#{{${n}}}`).join('・');
   return `${base}・段 ${p.stage - 1} の先頭 3 束(${first})。段 ${p.stage - 1} の先頭 3 束が閉じるまで、この束は起動しない`;
+};
+
+// Data(#1478): the parts of a draft with Data that differ from the template. Each old line must be in the template once (else the template changed: stop).
+const replaceLine = (text, re, make) => {
+  const hits = text.match(new RegExp(re.source, 'gm')) ?? [];
+  if (hits.length !== 1) die([`テンプレートの行が 1 つでない(${hits.length}): ${re.source}`]);
+  return text.replace(new RegExp(re.source, 'm'), (line) => make(line));
+};
+const dataSection = (p) => {
+  const rows = p.members.map((m) => ({ m, ...data(m.f) })).filter((x) => x.n > 0);
+  const n = rows.reduce((s, x) => s + x.n, 0);
+  const bytes = rows.reduce((s, x) => s + x.bytes, 0);
+  const nested = rows.some((x) => nestedGroups(x.m.f).length > 0);
+  const lines = [
+    '## Data の宣言(この束)',
+    '',
+    `- 宣言の場所: 下の各フォルダに、\`lift/plugins/<dir>/data.tsv\` を 1 つ足す。書式(4 列: \`guest\`・\`installer\`・\`sha256\`・\`size\`。TAB 区切り)と、取り出し・配信の仕組みは #{{${DATA_DRAFT}}} の本文のとおり。`,
+    ...rows.map((x) => `- ${folderName(x.m.f)}(\`lift/plugins/${dirs[x.m.i]}/data.tsv\`): ${x.n} ファイル・${x.bytes.toLocaleString('en-US')} B。直下の \`${x.m.f}\\Data\\\` の下の行のうち、この束の DLL でない物。`),
+    `- この束の Data: ${rows.length} フォルダ・${n} ファイル・計 ${bytes.toLocaleString('en-US')} B。`,
+    '- 行の値は、`inputs/fl-installer-files.tsv` の該当行(guest・大きさ・SHA-256)から写す。一覧に無い行は書かない。宣言する行の数は、上の件数と同じにする。',
+    `- 道具の出力: \`tools/plugin-run/run.mjs\`(#{{${TOOL_DRAFT}}})の各行に \`missingInInventory\` を載せる。#{{${TOOL_DRAFT}}} の本文の項目に無ければ、\`tools/p3-audio-probe/measure.mjs\` の \`missingInInventory\` と同じ数え方(インストーラの一覧に在る絶対パスの要求で、見つからず、.dll でない物。名前も同じ)で、道具に足す。`,
+    ...(nested ? ['- 宣言に含めない物: 「本文に書いた表」の「Data の外(入れ子)」の行。'] : []),
+    '- 共有のファイル(`lift/harness/seeds/vfs-seed-idle1.tsv`・`lift/harness/web/pack.args`)には 1 行も足さない。',
+    '',
+  ];
+  return lines.join('\n');
+};
+const dataVariant = (text, p) => {
+  const dep = `#{{${DATA_DRAFT}}}`;
+  let t = replaceLine(text, /^- 範囲に入れない物: Data\(.*$/, () => `- 範囲: Data(\`Plugins\\...\\Data\\\` の下のファイル)は、この束の \`lift/plugins/<dir>/data.tsv\` で宣言する(下の「Data の宣言(この束)」)。宣言の書式と配信の仕組みは ${dep} の本文のとおり。`);
+  t = replaceLine(t, /^- 1 本ずつの道具.*$/, (l) => `${l}\n- Data(\`lift/plugins/<dir>/data.tsv\`): 宣言した行数が、上の Data の節の件数と同じ。道具の出力の各行の \`missingInInventory\` が 0(Data を要求して見つけられない件数。\`tools/p3-audio-probe/measure.mjs\` の \`missingInInventory\` と同じ数え方)。`);
+  t = replaceLine(t, /^- `tools\/plugin-run\/run\.mjs`.*$/, (l) => `${l}\n- ${dep}(Data の宣言の仕組み)の本文: \`data.tsv\` の書式(列と件数の数え方)と、取り出し・配信の仕組み。`);
+  t = replaceLine(t, /^\| `CreateFileW: empty path`・Data の欠落 .*$/, () => '| `CreateFileW: empty path`・Data の欠落 | `data.tsv` の宣言の不足。上の Data の節の行を足す。節に無い物を要求したら、報告して止まる |');
+  t = replaceLine(t, /^直してよいのは、.*$/, () => '直してよいのは、`lift/plugins/<dir>/plugin.tsv` の中の値(`hook`・`args`・`omit`)と、Data の節どおりの `lift/plugins/<dir>/data.tsv` の行だけ。それ以外の直しは、報告に書いて止まる。');
+  t = replaceLine(t, /^- 共有のファイルを変えない.*$/, (l) => l.replace('直してよいのは `lift/plugins/<dir>/plugin.tsv` の中の値だけ。', '直してよいのは `lift/plugins/<dir>/plugin.tsv` の中の値と、Data の節どおりの `data.tsv` の行だけ。'));
+  t = replaceLine(t, /^- 報告に書く: .*$/, (l) => l.replace('Data の扱い。', 'Data の扱い(宣言した `data.tsv` の行数(フォルダごと)と、道具の出力の `missingInInventory`)。'));
+  t = replaceLine(t, /^## 停止が出たときの型$/, (l) => `${dataSection(p)}\n${l}`);
+  return t;
 };
 
 const sectionOf = (p) => {
@@ -240,7 +312,8 @@ const sectionOf = (p) => {
     const aux = list.filter((x) => x.role === '補助');
     out.push(`### ${folderName(f)}(\`lift/plugins/${dirs[m.i]}/plugin.tsv\`)`);
     out.push('');
-    out.push(`- 種別: ${p.kind.kindJa}。本体 ${bodies.length}・補助 ${aux.length}。Data: ${d.n === 0 ? 'なし' : `${d.n} ファイル(${d.bytes.toLocaleString('en-US')} B。この束は配信しない)`}`);
+    out.push(`- 種別: ${p.kind.kindJa}。本体 ${bodies.length}・補助 ${aux.length}。Data: ${d.n === 0 ? 'なし' : `${d.n} ファイル(${d.bytes.toLocaleString('en-US')} B。\`lift/plugins/${dirs[m.i]}/data.tsv\` で宣言する)`}`);
+    if (d.n > 0) for (const g of nestedGroups(f)) out.push(`- Data の外(入れ子): \`${g.k}\` の ${g.n} ファイル(${g.bytes.toLocaleString('en-US')} B)。直下の \`${f}\\Data\\\` ではないので、宣言に含めない(#{{${DATA_DRAFT}}} の定義)。この Data が要る停止が出たら、報告に書く。`);
     for (const x of bodies) {
       out.push(`- 本体: \`${x.row['パス']}\``);
       out.push(`  - 大きさ ${x.row['大きさ']} B・SHA-256 ${x.row['SHA-256']}`);
@@ -280,6 +353,7 @@ for (const p of planned) {
   };
   let text = template;
   for (const [k, v] of Object.entries(fill)) text = text.split(k).join(v);
+  if (p.hasData) text = dataVariant(text, p);
   const fm = [
     '---',
     `draft: ${JSON.stringify(p.n)}`,
@@ -335,7 +409,8 @@ const plan = [
   `束(${HEAD_BLOCK} フォルダずつ): Effects ${counts('Effects')} 束、Generators ${counts('Generators')} 束。計 ${drafts.length} 束。下書き番号 ${drafts[0]?.n ?? '-'}〜${drafts.at(-1)?.n ?? '-'}`,
   `段(${STAGE_SIZE} 束ずつ): 段 1 ${stageRange(1)}(${stageCount(1)} 束)、段 2 ${stageRange(2)}(${stageCount(2)} 束)、段 3 ${stageRange(3)}(${stageCount(3)} 束)`,
   `dir: ${dirs.filter((d) => d.startsWith('effects-') || d.startsWith('generators-')).join(', ') || '(種別を付けたものは無い)'}`,
-  `Data(配信しない): ${left.reduce((s, [f]) => s + data(f).n, 0)} ファイル(${left.filter(([f]) => data(f).n > 0).length} フォルダ)`,
+  `Data(data.tsv で宣言): ${declaredTotal} ファイル(${left.filter(([f]) => data(f).n > 0).length} フォルダ、計 ${left.reduce((s, [f]) => s + data(f).bytes, 0).toLocaleString('en-US')} B)`,
+  `Data の内訳: 一覧の Plugins\\Fruity\\ の \\Data\\ の行 ${fruityAll.length}(表に無いフォルダ ${fruityAll.length - fruityData.length}・Sytrus ${fruityData.length - fruityWave.length} を除く ${fruityWave.length})= 宣言する ${directRows.length} + VFX の後回し ${vfxRows.length} + 入れ子 ${nestedRows.length}(宣言しない)+ 本体か補助の DLL ${memberRows.length}`,
   '先頭 5 件:',
   ...drafts.slice(0, 5).map((d) => `  ${d.n} ${d.title}`),
 ];

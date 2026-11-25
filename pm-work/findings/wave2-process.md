@@ -8,11 +8,11 @@
 - hook: 本体の 要・既存 は `inputs/plugin-hooks.tsv` の 3 RVA(121 行が `rva:`)。`inputs/plugin-hooks.tsv` は編集しない(132 本体の行が在る)。残りは `none`(38 行)。
 - omit: `-`。setjmp の入口は #1370 の自動の検出が決める(手で書かない)。
 - `ci/plugin-builtin-prefixes.txt` は編集しない(2 接頭辞が全フォルダを覆う)。`ci/extract-dlls.tsv` の #1321 の行(167 件)は残す(二重に取り出すが害は無かった。#1400)。
-- Data: 551 ファイル・22 フォルダ。**この束は配信しない**(下の (d) の 1)。
+- Data: 551 ファイル・22 フォルダ(直下の `<フォルダ>\Data\` の下の、DLL でない行)。Data を持つ 19 束は、`lift/plugins/<dir>/data.tsv` で宣言する(#1478。下の (d) の 1、(f))。
 
 ## (b) 共有のファイルの編集: 0 行
 
-受け入れの最後の判定が `git diff --name-only origin/main...HEAD -- . ':!lift/plugins'` の空を見る。束どうしは別のディレクトリに書くので衝突しない。
+受け入れの最後の判定が `git diff --name-only origin/main...HEAD -- . ':!lift/plugins'` の空を見る。束どうしは別のディレクトリに書くので衝突しない。Data の宣言は `lift/plugins/<dir>/data.tsv`(#1478 の形)で、共有の seed 表・`pack.args` には足さない。
 
 要対応: `lift/crates/fe-build/src/plugins.rs` の試験 `the_second_wave_is_160_dlls_and_fits_the_image_area` は `lift/plugins/` を読み、159 行を足す。束の行が main に入ると key が重複して落ちる。受け入れは `cargo test` を走らせないので束は通るが、main の試験は落ちる。段 1 の前に、試験を直す(`lift/plugins/` の既存の行を数えない形)。`tools/plugin-layout/wave2-plugins.mjs` の dir の付け方(種別を前に付ける)は、この型と違う。試験の表としてだけ使う。
 
@@ -29,7 +29,7 @@
 
 ## (d) PM の判断が要る点
 
-1. **Data(551 ファイル)**: seed 表は共有のファイルで、束が書くと衝突する。案: 生成の段(`plugins.rs`・`plugin-rows.mjs`)が `lift/plugins/<dir>/data.tsv` を読んで seed の行を足す、前提の Issue を作り、段 1 の blocked_by に足す。この作業では起票していない。
+1. **Data(551 ファイル)**: 解決: #1478 が `lift/plugins/<dir>/data.tsv` で宣言する形を作る(共有の seed 表には書かない)。Data を持つ 19 束は、本文に Data の節と受け入れを足し、#1478 を blocked_by に足した(下書き 192)。入れ子の Data の扱いは PM の判断待ち(下の (f) の 4)。
 2. **段**: 段 1 の 15 束は、#1370・#1371 が閉じると同時に走る。段 2 は段 1 の先頭 3 束、段 3 は段 2 の先頭 3 束が閉じるまで待つ。
 3. **インストゥルメント(Generators)**: #1371 の道具は効果だけ。Generators の受け入れは `processed` を見ず、`instantiated` と `error` を見る。道具がインストゥルメントを要求できるかは未確認(段 2 の前に確かめる)。
 4. **列挙の対応**: `requested` は #1371 の出力の `instantiated` に当てた。`engine-idle` は boot-bundle と welcome-flow の `state`。`stops` は、どの道具の出力にも無いので判定に入れていない。
@@ -38,3 +38,11 @@
 ## (e) 所要の見積もり(推定。実測ではない)
 
 第 1 波の実測から: `fe-build engine` は 23 から 35 分(9 モジュール)。1 モジュールの追加は約 1〜1.5 分(hybrid-n0・hybrid・lists・単位のコンパイル)。6 DLL の束で +10 分弱。道具・起動の確認・流れ A〜D は約 10 分。1 回の試行は約 60 分の見込みで、4 時間 30 分の枠に 2〜3 回入る。
+
+## (f) Data の件数の照合(一覧 616 件と、下書き 551 件)
+
+1. 一覧(`inputs/fl-installer-files.tsv`)の `Plugins\Fruity\` の `\Data\` の行は 725 件。Sytrus(109 件。#1400・#1414)を除くと 616 件。下書きの 551 件は、フォルダ直下の `<フォルダ>\Data\` の下の行のうち DLL でない物(生成器の `data()`。dry-run が内訳を出す)。この数え方は #1478 の定義(`Plugins\Fruity\<種別>\<フォルダ>\Data\`)と合うので、生成器は直さなかった。
+2. 差の 65 件: VFX の後回し 38 件(Fruity Slicer 2。Slicex の Data と同じ 38 件・16,856 B)、入れ子の Data 26 件(`Vocodex\Synthesizer\Data\`。Default.dat 1 件と Presets\*.fst 25 件・55,452 B)、本体・補助の DLL 1 件(`Edison\Data\Scripts\Examples\testdll_x64.dll`。plugin.tsv の補助)。
+3. 拡張子と Presets は差の原因ではない: 直下の Data(551 件)にも .fnv・.bmp・.wv・.txt・.groovepat などの資料と、`Data\Presets\` の 4 件があり、同じ数え方で入る。差の 26 件の入れ子だけが .fst の Presets を含む。
+4. 未決(PM): 入れ子の `Vocodex\Synthesizer\Data\`(26 件・55,452 B)は、本体 `Synthesizer\Sytrus_x64.dll` の隣の Data。この作業の本文では宣言に含めず、報告に書かせる。含めるなら、Vocodex の Data は 54 件・計 443,736 B になり、#1478 の本文の 551 件・約 9.4 MB と、#1478 の件数の見積もり(577 件へ)を直す必要がある。
+5. 同じ内容の重複: Slicex(生成器の束)と Fruity Slicer 2(VFX の後回し)は、相対パスと SHA-256 が同じ 38 件を持つ。後回しを解くとき、同じ SHA-256 が 2 つの宣言に入るので、#1478 の検査でその扱いを確かめる。
