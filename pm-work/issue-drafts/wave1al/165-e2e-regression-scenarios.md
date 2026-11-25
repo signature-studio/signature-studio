@@ -34,7 +34,7 @@ project: signature-studio/3
 - R07(#1402): Frame Rate の表示 24 に対し、rAF は 124.8(DPR 1)・123.2(DPR 2)。Memory `100 MB`・CPU `1 %` は値が出た。近くの文字列は符号の断片で、上段の値と結び付けられない。数字は読まない。判定は、FL に渡す入力(envHz・dwmPerSec)が rAF に追随するかで見る(下の R07 の欄)。
 - R10(#1382): 窓の表に、テーマの一覧が無い(頁の caption は Presets・Adjustments・Options だけ)。タイルは描画された画素で、スクロールする一覧の中にあり、1 つも押せていない。未確認。
 - R11(#1395・#1419): DPR 1 は 7 言語とも、書き込み・再起動の案内・読み戻し(`kept true`)が通る。再読込のたびに engine が exited し、ページの再読込で engine-idle に戻る。Console は 23,102 件。DPR 2 は `de` の再読込の後に exited、`es` は通り、`fr` は General に届かず中断(`ja`・`ko`・`vi`・`zh` は未実施)。Console は 9,079 件。前回は 21,758 件・8,385 件で、数が違う。
-- R11 の注意: `rowPasses`(main の bc740423)は、印が有っても `consoleErrors` が 0 であることを求める。#1419 が main に入るまで、R11 の行は落ちる。
+- R11 の注意: main の `rowPasses`(bc740423)は、印が有っても `consoleErrors` が 0 であることを求める。deploy の門の規則なので変えない。回帰の判定は、印の付いたシナリオで `pageErrors` だけを求める(下の「判定の基準」。PM の決定)。
 - R14(#1386): 両表示で engine が exited(絵は変わる: 327,012 px・1,057,064 px)。R15(#1387): リフ マシーンの窓が出ない(engine は idle)。
 - R16(#1406): 3 部品の値は変わる(DPR 1: Tempo 698 px、Song Position 659 px、Pattern Selector 293 px)。`clipboard-status` が 10 秒を超えて残り、stuck 1 で落ちた。
 - R06(#1406): prompt は読み 2 回・表示が 1.5 s と 6.5 s で残る。denied は読み 0・表示が残る。granted は読み 4・表示なし。期待(読み 0・表示なし)とずれ、印の通り。
@@ -122,12 +122,13 @@ project: signature-studio/3
    - 各シナリオの名前・期待・印は、シナリオの先頭に、1 つの定数の表として書く。
 2. 印の使い方。
    - 印(`expectFail`)の値は、上の「開いている Issue」の番号に限る(`'#番号'` の形)。`ALLOWED_MARKS` に、その一覧を入れる。一覧に無い失敗は、印を付けずに落とす。報告に書く。
-   - 印の付いたシナリオは、`ok` と `stuckToasts` を問わない。`pageErrors`・`consoleErrors`・`failedRequests` は 0 を求める(main の `rowPasses` と `judge.jq` と同じ規則)。
+   - 印の付いたシナリオは、`pageErrors` が 0 であることだけを求める。`ok`・`consoleErrors`・`failedRequests`・`stuckToasts` は問わない(JSON には数を出す)。印の無いシナリオは、`ok` と全てのカウンタ 0 を求める。
+   - deploy の門(`tools/e2e/judge.jq`)と `tools/e2e/run.mjs` の `rowPasses` は変えない(deploy の門は、印があっても `pageErrors`・`consoleErrors`・`failedRequests` が 0)。
    - 印の付いたシナリオが通ったら、警告として stderr に出す(`warning: expectFail scenario passed: <name> <issue>. remove the mark`)。失敗にはしない。
    - JSON の行の `expectFail` の欄に、印の一覧(`[{"name","issue"}]`。R11 は 2 件)を出す。
 3. 出力。表示ごとに 1 行の JSON(`4k-dpr1` と `4k-dpr2` の 2 行)。`scenarios` の各件に `expectFail`(印か null)を出し、行の末尾に `expectFail`(印の一覧)を出す。
 4. シナリオが実行時間を超えないこと。1 表示あたり 40 分以内(18 本)。長ければ、シナリオの待ち(条件で待つ)を縮める。固定の待ち時間は使わない。
-5. 受け入れの node の式を、合成データ(印の有無、`consoleErrors` が 0 と 1 の行、`servedHeadersMatch` が偽の行)で確かめてから commit する。確かめに使う一時ファイルは `.tmp-*` に置き、終わったら消す。
+5. 受け入れの node の式を、合成データで確かめてから commit する(印の無いシナリオの `consoleErrors` が 1、印のある R11 の `consoleErrors` が 23,102 で `pageErrors` が 0 の行は通る、印のある `pageErrors` が 1 の行は落ちる、`servedHeadersMatch` が偽の行は落ちる)。確かめに使う一時ファイルは `.tmp-*` に置き、終わったら消す。
 
 ## 印の一覧(この本文を直した時点)
 
@@ -149,17 +150,17 @@ project: signature-studio/3
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && (cd tools/e2e && npm ci && npx playwright install chromium) && bash tools/e2e/run.sh --scenarios regression --displays 4k-dpr1,4k-dpr2 > "$RUNNER_TEMP/e2e-reg.jsonl" && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const good=L.length===2&&L.every((r)=>r.servedHeadersMatch===true&&r.error===null&&Array.isArray(r.expectFail)&&r.expectFail.every((x)=>x&&typeof x.name==="string"&&typeof x.issue==="string")&&r.scenarios.length>=15&&r.scenarios.every((s)=>s.expectFail!==null?(s.pageErrors===0&&s.consoleErrors===0&&s.failedRequests===0):(s.ok===true&&s.pageErrors===0&&s.consoleErrors===0&&s.stuckToasts===0&&s.failedRequests===0)));process.stdout.write(JSON.stringify(L.map((r)=>({display:r.name,expectFail:r.expectFail})))+"\n");process.exit(good?0:1)' "$RUNNER_TEMP/e2e-reg.jsonl"
+npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && (cd tools/e2e && npm ci && npx playwright install chromium) && (bash tools/e2e/run.sh --scenarios regression --displays 4k-dpr1,4k-dpr2 > "$RUNNER_TEMP/e2e-reg.jsonl" || true) && node -e 'const fs=require("fs");const L=fs.readFileSync(process.argv[1],"utf8").trim().split("\n").map((l)=>JSON.parse(l));const mk=(s)=>s.expectFail!==null;const good=L.length===2&&L.every((r)=>r.servedHeadersMatch===true&&r.error===null&&Array.isArray(r.expectFail)&&r.expectFail.every((x)=>x&&typeof x.name==="string"&&typeof x.issue==="string")&&r.scenarios.length>=15&&r.scenarios.every((s)=>mk(s)?s.pageErrors===0:(s.ok===true&&s.pageErrors===0&&s.consoleErrors===0&&s.failedRequests===0&&s.stuckToasts===0)));process.stdout.write(JSON.stringify(L.map((r)=>({display:r.name,expectFail:r.expectFail,marked:r.scenarios.filter(mk).map((s)=>({name:s.name,ok:s.ok,pageErrors:s.pageErrors,consoleErrors:s.consoleErrors,failedRequests:s.failedRequests,stuckToasts:s.stuckToasts}))})))+"\n");process.exit(good?0:1)' "$RUNNER_TEMP/e2e-reg.jsonl"
 ```
 
 判定の基準:
-- `run.sh` の終了コードが 0(main の `rowPasses` の規則)。JSON の行が 2 件(`4k-dpr1`・`4k-dpr2`)。`servedHeadersMatch` が真。
-- 各行で、シナリオが 15 本以上。
-- 印の無いシナリオが全て `ok` が真、`stuckToasts` が 0、`pageErrors`・`consoleErrors`・`failedRequests` が 0。
-- 印の付いたシナリオは、`pageErrors`・`consoleErrors`・`failedRequests` が 0(`ok` は問わない)。
+- 回帰の判定は、上の node の式だけで行う。`run.sh` の終了コードは判定に使わない(`|| true` で受ける。deploy の門ではないため)。
+- JSON の行が 2 件(`4k-dpr1`・`4k-dpr2`)。`servedHeadersMatch` が真、`error` が null。各行でシナリオが 15 本以上。
+- 印の無いシナリオが全て `ok` が真、かつ `pageErrors`・`consoleErrors`・`failedRequests`・`stuckToasts` が 0。
+- 印の付いたシナリオは、`pageErrors` が 0 であることだけを求める(`ok`・`consoleErrors`・`failedRequests`・`stuckToasts` は問わない)。JSON の `marked` に、その数を出す。R11 の `consoleErrors` は #1419 が直るまで 0 にならない(前回は 23,102 件)。それでも、印の付いたシナリオの `pageErrors` が 0 なら通る。
 - 印の一覧(行の `expectFail` の欄)は、印ごとに `{name, issue}` の 1 件。R11 は 2 件。印の番号は、上の「印の一覧」の番号に限る。
-- 印の付いたシナリオは、結果を報告に書く(通った物は、印を外す提案を書く)。
-- `judge.jq`(deploy の E2E の門)は、smoke の 3 本を見る。この集合の判定は、`run.sh` の終了コード(`rowPasses`)で行う。
+- 印の付いたシナリオは、結果を報告に書く(通った物は、印を外す提案を書く。`consoleErrors`・`failedRequests`・`stuckToasts` が 0 でない印の付いたシナリオは、その数を報告に書く)。
+- `judge.jq`(deploy の E2E の門)と `run.mjs` の `rowPasses` は変えない。
 
 ## 報告の規則
 
@@ -182,7 +183,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 作業の進め方
 
 - 開始の時刻を、最初に `date -u` で記録する。4 時間 30 分を過ぎたら、受け入れが通らなくても、作業ツリーを commit し、報告を書いて終える。
-- 最初に `git pull --no-rebase --no-edit` で main を取り込む(bc740423 の判定と `--only` が入っている)。前回の差分と衝突したら、main の規則を採る。
+- 最初に `git pull --no-rebase --no-edit` で main を取り込む(bc740423 の判定と `--only` が入っている)。前回の差分と衝突したら、deploy の規則(main の `judge.jq`・`rowPasses`)は main のまま残し、回帰の判定は上の node の式に合わせる。
 - 順序: (1) 基盤(#{{164}} の `tools/e2e/`)と main の判定を読み、smoke の 3 本が動くことを確かめる。(2) 依頼者の報告を、1 件ずつシナリオにする。(3) 2 表示で通す。
 - engine の作り直しは約 35 分。ビルドは、フォアグラウンドで、シェルツールの `timeout` 引数に 5400000 を渡して待つ。背景で起動して待たない。
 - 作業の最後に、受け入れが通らなくても、作業ツリーを commit する。
@@ -190,7 +191,7 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 ## 他のタスクとの関係
 
 - blocked_by: #{{164}}(E2E の基盤。閉じている)。
-- R11 の行は、#1419 が main に入るまで、`consoleErrors` の判定で落ちうる(`rowPasses` は印の有無に関わらず 0 を求める)。その時は、R11 が #1419 待ちだと報告に書いて終える。判定の式は緩めない。
+- R11 の `consoleErrors` は、#1419 が main に入るまで 0 にならない。回帰の判定(印の付いたシナリオは `pageErrors` だけ)では、それで落ちない。`pageErrors` が 1 以上なら落ちる。
 - #1421(DEDZII の停止)の印は、main の file-open-demo と R03 の両方に付く。#1421 が直ったら、両方の印を外す。
 - #1406 が直ったら、R06 と R16 の印を外す。#1419 が直ったら、R11 の #1419 の印を外す(R11 の `consoleErrors` も 0 になる)。#1395 が直ったら、R11 の #1395 の印を外す。
 - #1382・#1386・#1387・#1409 が直ったら、R10・R14・R15・R12 の印を外す。
