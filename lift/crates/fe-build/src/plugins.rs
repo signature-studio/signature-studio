@@ -32,6 +32,10 @@ const FLENGINE_PE: &str = "binaries/win64/FLEngine_x64.dll";
 const LIMITS: [(&str, &str); 3] = [("lift/runtime/fle_realmod.c", "#define RM_MAX "), ("lift/runtime/fle_cursor.c", "#define SHARED_MODULE_REALMODS "), ("lift/harness/two/main_two.c", "MAIN_REAL_MAX = ")];
 const FIXED_EXTRACT: &str = "ci/extract-dlls.tsv";
 const FIXED_SEED: &str = "lift/harness/seeds/vfs-seed-idle1.tsv";
+/// The Plugin database of the user's data (Issue #1484): the Browser lists the entries of its Installed folder. One `<name>.nfo` per built-in plugin
+/// is put there from the plugins' rows; the files are made in the host tree (`PLUGIN_DB_HOST`, under HOST_DIR) for the seed pack.
+const PLUGIN_DB_GUEST: &str = "C:\\Users\\user\\Documents\\Image-Line\\FL Studio\\Presets\\Plugin database\\Installed\\";
+const PLUGIN_DB_HOST: &str = "lift/out-plugindb";
 const FIXED_SEED_ARGS: &str = "lift/harness/web/seed.args";
 const FIXED_MODULES: &str = "lift/harness/b2d2/modules.tsv";
 const FIXED_HYB_ARGS: &str = "lift/harness/hyb/hyb-args.tsv";
@@ -391,6 +395,42 @@ pub fn seed_row(d: &Dll) -> String {
     format!("{}\t{}\t{}", d.guest_path(), d.seed_file(), d.sha256)
 }
 
+/// The names of the Plugin database's entries: one per plugin, the folder of its main DLL in the installer (`Plugins\Fruity\Effects\Fruity Balance\...`
+/// gives `Fruity Balance`). A plugin has one main DLL, and the names are unique and usable as file names.
+pub fn plugin_db_names(dlls: &[Dll]) -> Result<Vec<String>, String> {
+    let mut plugins: BTreeMap<&str, Vec<&Dll>> = BTreeMap::new();
+    for d in dlls {
+        plugins.entry(d.plugin.as_str()).or_default().push(d);
+    }
+    let mut names = BTreeSet::new();
+    for (plugin, rows) in &plugins {
+        let mains: Vec<&&Dll> = rows.iter().filter(|d| d.main).collect();
+        if mains.len() != 1 {
+            return Err(format!("{plugin}/plugin.tsv: {} rows of 本体, want one (the plugin's Plugin database entry is its main DLL)", mains.len()));
+        }
+        let parts: Vec<&str> = mains[0].guest.split('\\').collect();
+        let name = parts[parts.len() - 2];
+        if name.is_empty() || name.chars().any(|c| "\\/:*?\"<>|".contains(c)) || !names.insert(name.to_string()) {
+            return Err(format!("{plugin}/plugin.tsv: the Plugin database name {name} is empty, not a file name, or another plugin's"));
+        }
+    }
+    Ok(names.into_iter().collect())
+}
+
+/// The seed rows of the Plugin database entries (`PLUGIN_DB_GUEST`): each `<name>.nfo` is written to the host tree first, and its row names its SHA-256.
+fn plugin_db_rows(names: &[String]) -> Result<Vec<String>, String> {
+    let dir = format!("{HOST_DIR}/{PLUGIN_DB_HOST}");
+    fs::create_dir_all(&dir).map_err(|e| format!("{dir}: {e}"))?;
+    let mut rows = Vec::new();
+    for name in names {
+        let rel = format!("{PLUGIN_DB_HOST}/{name}.nfo");
+        let path = format!("{HOST_DIR}/{rel}");
+        write(&path, &format!("Tip={name}\r\n"))?;
+        rows.push(format!("{PLUGIN_DB_GUEST}{name}.nfo\t{rel}\t{}", crate::sha256_hex(&path)?));
+    }
+    Ok(rows)
+}
+
 /// pack.args: the value of --args gets the DLLs at their bases; the DLL lazy files, their seed files and their separate modules are appended.
 pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)]) -> Result<String, String> {
     let mut lines: Vec<String> = fixed.lines().map(String::from).collect();
@@ -435,6 +475,10 @@ pub fn generate(with_base: bool) -> Result<(), String> {
         seed_args.push_str(&format!("--lazy\n{}\n", d.seed_file()));
     }
     write(&format!("{OUT_DIR}/extract-dlls.tsv"), &extract)?;
+    write(&format!("{OUT_DIR}/vfs-seed-extract.tsv"), &seed)?;
+    for row in plugin_db_rows(&plugin_db_names(&dlls)?)? {
+        seed.push_str(&format!("{row}\n"));
+    }
     write(&format!("{OUT_DIR}/vfs-seed-idle1.tsv"), &seed)?;
     write(&format!("{OUT_DIR}/seed.args"), &seed_args)?;
     if !with_base {
@@ -651,6 +695,14 @@ mod tests {
         assert_eq!(hyb_row(&d, 0x6800000), format!("{}\teffects.fruity-balance.fruity_balance_x64.6800000.dll\t--pdata", d.key));
         assert_eq!(d.hook, Hook::Existing);
         assert_eq!(d.omit, vec![0x2c13a0]);
+    }
+
+    #[test]
+    fn the_plugin_database_names_are_the_folders_of_the_main_dlls() {
+        let mut dlls = vec![balance()];
+        dlls.extend(parse_plugin("sytrus", include_str!("../../../plugins/sytrus/plugin.tsv")).unwrap());
+        assert_eq!(plugin_db_names(&dlls).unwrap(), ["Fruity Balance", "Sytrus"]);
+        assert!(plugin_db_names(&[balance(), balance()]).is_err());
     }
 
     #[test]
