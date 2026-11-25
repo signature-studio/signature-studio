@@ -71,6 +71,7 @@ typedef struct fle_node {
     size_t nkids, kcap;
     unsigned opens;
     int pending;                 /* deleted when the last handle closes */
+    unsigned dirty;              /* Issue #1385: the content changed since the user's files were last recorded (fle_vfs.c kept_file) */
 } fle_node;
 
 static fle_node root_node = { .is_dir = 1, .ct = FLE_VFS_CLOCK_START, .at = FLE_VFS_CLOCK_START, .wt = FLE_VFS_CLOCK_START };
@@ -289,6 +290,165 @@ static uint16_t *node_path(const fle_node *n, size_t *len)
     s[o] = 0;
     *len = o;
     return s;
+}
+
+/* ---- the user's files (Issue #1385) ----
+ * The files and directories under the user's profile (FLE_VIRTUAL_USER_PROFILE_DIR) are kept by the page: fle_reg.c hands one record per change to the page's journal (the one
+ * the registry uses, fle_reg.c "persistence"). A change is recorded when a file's last write is closed or flushed, when a file or a directory is deleted or moved, when a
+ * directory or a copy is made. Attributes and times are not kept. Before the guest runs, the saved records are put back (fle_reg.c restore_records, fle_vfs_restore_*). */
+void fle_kept_file_put(const uint16_t *w, size_t n, const uint8_t *data, uint64_t size) __attribute__((weak));
+void fle_kept_file_del(const uint16_t *w, size_t n) __attribute__((weak));
+void fle_kept_dir_make(const uint16_t *w, size_t n) __attribute__((weak));
+/* the window-API trace (fle_win.c; a test aid: the page turns it on): the lines of the user's files are written to the engine's stderr only while it is on */
+int fle_win_api_trace_on(void) __attribute__((weak));
+
+static int under_profile(const uint16_t *w, size_t n)
+{
+    static const char prof[] = FLE_VIRTUAL_USER_PROFILE_DIR;
+    size_t i, pl = sizeof prof - 1;
+    if (n <= pl || w[pl] != '\\') return 0;
+    for (i = 0; i < pl; i++)
+        if (fle_w_fold(w[i]) != fle_w_fold((uint16_t)(unsigned char)prof[i])) return 0;
+    return 1;
+}
+
+static int kept_trace(void) { return fle_win_api_trace_on && fle_win_api_trace_on(); }
+
+/* one trace line about a user's file: what, the path (as the guest passed it), the size */
+static void kept_say(const char *what, const uint16_t *w, size_t n, uint64_t size)
+{
+    char buf[MAX_PATH_UNITS * 6 + 1];
+    if (!kept_trace()) return;
+    quoted_units(buf, sizeof buf, w, n);
+    fprintf(stderr, "vfs-%s: \"%s\" %llu bytes\n", what, buf, (unsigned long long)size);
+}
+
+/* a file's content, as it is now, when it changed since it was last recorded (a lazy file is read first: it is written by the guest). An empty file is not kept (Issue #1385):
+ * its path's record, if an earlier close kept one, is taken out (the deletion is not kept, fle_reg.c file_record) */
+static void kept_file(const char *api, fle_node *n)
+{
+    size_t len;
+    uint16_t *p;
+    if (n->is_dir || n->pending || !n->dirty) return;
+    n->dirty = 0;
+    p = node_path(n, &len);
+    if (fle_kept_file_put && fle_kept_file_del && under_profile(p, len)) {
+        node_materialize(api, n);
+        if (n->size == 0) {
+            kept_say("empty", p, len, 0);
+            fle_kept_file_del(p, len);
+        } else {
+            kept_say("kept", p, len, n->size);
+            fle_kept_file_put(p, len, n->data, n->size);
+        }
+    }
+    free(p);
+}
+
+/* a file or a directory tree is gone from its path (the record deletes what is under the path too) */
+static void kept_gone(fle_node *n)
+{
+    size_t len;
+    uint16_t *p = node_path(n, &len);
+    if (fle_kept_file_del && under_profile(p, len)) {
+        kept_say("gone", p, len, 0);
+        fle_kept_file_del(p, len);
+    }
+    free(p);
+}
+
+static void kept_dir(fle_node *n)
+{
+    size_t len;
+    uint16_t *p = node_path(n, &len);
+    if (fle_kept_dir_make && under_profile(p, len)) {
+        kept_say("dir", p, len, 0);
+        fle_kept_dir_make(p, len);
+    }
+    free(p);
+}
+
+/* the open of a file of the user's profile (a trace line only: what the guest asks for) */
+static void open_trace(fle_node *n, uint32_t access, uint32_t disp)
+{
+    size_t len;
+    uint16_t *p;
+    char buf[MAX_PATH_UNITS * 6 + 1];
+    if (!kept_trace() || n == NULL) return;
+    p = node_path(n, &len);
+    if (under_profile(p, len)) {
+        quoted_units(buf, sizeof buf, p, len);
+        fprintf(stderr, "vfs-open: \"%s\" access=%#x disp=%u\n", buf, (unsigned)access, (unsigned)disp);
+    }
+    free(p);
+}
+
+/* a node that has come to a place (a moved directory brings its children with it) */
+static void kept_tree(const char *api, fle_node *n)
+{
+    size_t i;
+    if (!n->is_dir) {
+        n->dirty = 1;   /* at a new path, the record is made whether or not the content changed */
+        kept_file(api, n);
+        return;
+    }
+    kept_dir(n);
+    for (i = 0; i < n->nkids; i++) kept_tree(api, n->kids[i]);
+}
+
+static void free_tree(fle_node *n)
+{
+    size_t i;
+    for (i = 0; i < n->nkids; i++) free_tree(n->kids[i]);
+    free(n->data);
+    free(n->name);
+    free(n->kids);
+    free(n);
+}
+
+static uint16_t *units_z(const uint16_t *w, size_t n)
+{
+    uint16_t *p = malloc((n + 1) * sizeof *p);
+    if (!p) fle_stop("registry", "out of memory");
+    memcpy(p, w, n * sizeof *p);
+    p[n] = 0;
+    return p;
+}
+
+/* The replay of the user's files (fle_reg.c, before the guest runs; nothing is open and nothing is recorded). fle_vfs_restore_put takes `data` over (malloc'd, or NULL for size 0). */
+void fle_vfs_restore_put(const uint16_t *w, size_t n, uint8_t *data, uint64_t size)
+{
+    uint16_t *p = units_z(w, n);
+    kept_say("restored", w, n, size);
+    (void)fle_vfs_put_file(p, data, size);
+    free(p);
+}
+
+void fle_vfs_restore_mkdir(const uint16_t *w, size_t n)
+{
+    uint16_t *p = units_z(w, n);
+    (void)fle_vfs_make_dirs(p);
+    free(p);
+}
+
+void fle_vfs_restore_drop(const uint16_t *w, size_t n)
+{
+    size_t i = 3;
+    fle_node *cur = &root_node;
+    if (n < 4 || fle_w_fold(w[0]) != 'c' || w[1] != ':' || w[2] != '\\') return;
+    while (i < n) {
+        size_t k = i;
+        fle_node *c;
+        while (k < n && w[k] != '\\') k++;
+        c = find_kid(cur, w + i, k - i);
+        if (c == NULL) return;
+        cur = c;
+        i = k + 1;
+    }
+    if (cur == &root_node) return;
+    kept_say("dropped", w, n, 0);
+    detach(cur);
+    free_tree(cur);
 }
 
 /* ---- paths ---- */
@@ -674,15 +834,18 @@ void fle_imp_CreateFileW(void)
         if (disp == 2 || disp == 5) {
             node_truncate(n);
             n->wt = n->at = tick();
+            n->dirty = 1;
         }
     }
     vp_free(&v);
+    if (created) n->dirty = 1;
     h = fh_alloc(n, rd, wr, app, del, wattr, share, (int)doc);
     if (created) {
         if (disp == 2 || disp == 4) fle_set_last_error(0);
     } else if (disp == 2 || disp == 4) {
         fle_set_last_error(183);
     }
+    open_trace(n, access, disp);
     R[0] = h;
 }
 
@@ -781,6 +944,7 @@ void fle_imp_WriteFile(void)
     if (at + n > e->node->size) e->node->size = at + n;
     e->pos = at + n;
     e->node->wt = e->node->at = tick();
+    e->node->dirty = 1;
     fle_st(pw, 4, n);
     R[0] = 1;
 }
@@ -840,6 +1004,7 @@ int fle_vfs_file_set_end(const char *api, uint64_t h)
     }
     e->node->size = e->pos;
     e->node->wt = e->node->at = tick();
+    e->node->dirty = 1;
     return 1;
 }
 
@@ -855,6 +1020,8 @@ void fle_imp_CloseHandle(void)
         fail(6, 0);
         return;
     }
+    if (e->delete_on_close && e->node->opens == 1) kept_gone(e->node);
+    kept_file(api, e->node);
     fh_close(e);
     R[0] = 1;
 }
@@ -951,6 +1118,7 @@ void fle_imp_FlushFileBuffers(void)
         fail(5, 0);
         return;
     }
+    kept_file("FlushFileBuffers", e->node);
     R[0] = 1;
 }
 
@@ -1381,7 +1549,7 @@ void fle_imp_CreateDirectoryW(void)
         fail(3, 0);
         return;
     }
-    node_new(par, v.p[v.n - 1], v.l[v.n - 1], 1, 0);
+    kept_dir(node_new(par, v.p[v.n - 1], v.l[v.n - 1], 1, 0));
     vp_free(&v);
     R[0] = 1;
 }
@@ -1420,6 +1588,7 @@ void fle_imp_RemoveDirectoryW(void)
         fail(32, 0);
         return;
     }
+    kept_gone(n);
     node_free(n);
     R[0] = 1;
 }
@@ -1450,6 +1619,7 @@ void fle_imp_DeleteFileW(void)
         fail(32, 0);
         return;
     }
+    kept_gone(n);
     if (n->opens) n->pending = 1;
     else node_free(n);
     R[0] = 1;
@@ -1535,6 +1705,8 @@ void fle_imp_CopyFileW(void)
     dn->bits = sn->bits;
     dn->wt = sn->wt;
     dn->at = tick();
+    dn->dirty = 1;
+    kept_file(api, dn);
     vp_free(&s);
     vp_free(&d);
     R[0] = 1;
@@ -1597,9 +1769,11 @@ void fle_imp_MoveFileW(void)
         fail(32, 0);
         return;
     }
+    kept_gone(sn);
     detach(sn);
     set_name(sn, d.p[d.n - 1], d.l[d.n - 1]);
     attach(dp, sn);
+    kept_tree(api, sn);
     vp_free(&s);
     vp_free(&d);
     R[0] = 1;

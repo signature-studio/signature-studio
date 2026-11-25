@@ -168,4 +168,11 @@ int fle_vfs_put_lazy_file(const uint16_t *wpath, unsigned stream, uint64_t off, 
 int fle_vfs_put_dir(const uint16_t *wdir, uint32_t attrs, uint64_t filetime);
 uint64_t fle_vfs_lazy_files(uint64_t *bytes);
 
+/* Issue #1385, for fle_reg.c (restore_records): the user's files the page saved are put back before the guest runs. The paths are UTF-16 units without a NUL (n units).
+ * fle_vfs_restore_put takes `data` over (malloc'd, or NULL for size 0; the file replaces one of the same name); fle_vfs_restore_mkdir makes a directory with the ones above it;
+ * fle_vfs_restore_drop removes the file or the directory tree at the path (nothing if it is not there). */
+void fle_vfs_restore_put(const uint16_t *w, size_t n, uint8_t *data, uint64_t size);
+void fle_vfs_restore_mkdir(const uint16_t *w, size_t n);
+void fle_vfs_restore_drop(const uint16_t *w, size_t n);
+
 #endif

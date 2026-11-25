@@ -89,6 +89,12 @@ void fle_thread_wasm_stack_free(unsigned idx)
     region[idx] = NULL;
 }
 
+/* fle_seh.c's probe of a guest address outside the images (its stop record reads a Delphi object's class): the linear memory holds the address's 8 bytes. */
+int fle_guest_readable(uint64_t a)
+{
+    return a + 8 <= (uint64_t)__builtin_wasm_memory_size(0) * 65536u;
+}
+
 size_t fle_cstack_left(void)
 {
     uintptr_t sp = (uintptr_t)emscripten_stack_get_current();

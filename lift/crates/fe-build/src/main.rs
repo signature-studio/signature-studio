@@ -68,7 +68,10 @@ enum Step {
     /// the direct list of one plugin DLL (key, the engine's bin directory)
     PluginList(String, String),
     MergeLists,
-    CheckUnits(Vec<String>),
+    /// the units gen wrote that the listed ones do not name: their sources and objects go to plugins::EXTRA_UNITS and plugins::EXTRA_OBJS
+    FindUnits(Vec<String>),
+    /// the arguments are the compiler's flags file; each line of the list file (read when the step runs) is a source, compiled to obj/mod
+    CompileList(String, String),
 }
 
 struct Stage {
@@ -97,7 +100,8 @@ impl Step {
             Step::Generate(with_bases) => format!("plugins: tables under {} from lift/plugins/*/plugin.tsv (bases: {with_bases})", plugins::OUT_DIR),
             Step::PluginList(key, _) => format!("list {key}: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out"),
             Step::MergeLists => format!("merge {}/lists into {}/lowered-all.txt", plugins::OUT_DIR, plugins::OUT_DIR),
-            Step::CheckUnits(listed) => format!("check the {} units of {OUT_APP_DIR}/gen/src against the compile lists", listed.len()),
+            Step::FindUnits(listed) => format!("find the units of {OUT_APP_DIR}/gen/src that the {} listed units do not name (the plugins' units, compiled after)", listed.len()),
+            Step::CompileList(flags, list_file) => format!("compile the sources in {list_file} with {flags} to {OUT_APP_DIR}/obj/mod"),
         }
     }
 }
@@ -371,7 +375,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
     stages.push(Stage { name: "gen".into(), steps: gen_steps, parallel: false });
     let mut listed_units = words(&format!("{HARNESS_DIR}/two/plain-units.txt"))?;
     listed_units.extend(words(&format!("{HARNESS_DIR}/two/ai-units.txt"))?);
-    stages.push(Stage { name: "units".into(), steps: vec![Step::CheckUnits(listed_units)], parallel: false });
+    stages.push(Stage { name: "units".into(), steps: vec![Step::FindUnits(listed_units)], parallel: false });
 
     let (rt_flags, h_flags) = (format!("{HARNESS_DIR}/web/cflags-rt.args"), format!("{HARNESS_DIR}/web/cflags-h.args"));
     let (unit_flags, ai_flags) = (format!("{HARNESS_DIR}/web/cflags-u.args"), format!("{HARNESS_DIR}/web/cflags-ai.args"));
@@ -416,6 +420,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
         compile.len()
     );
     stages.push(Stage { name, steps: compile, parallel: true });
+    stages.push(Stage { name: "compile-extra (the plugins' units that gen wrote)".into(), steps: vec![Step::CompileList(unit_flags.clone(), plugins::EXTRA_UNITS.into())], parallel: false });
 
     let hybrid_n0_file = format!("{HARNESS_DIR}/hyb/n0.cmd");
     let mut hybrid_n0_argv = vec![fe_wasmgen.clone(), "hybrid-n0".into()];
@@ -431,7 +436,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
     ] {
         link_argv.extend(sorted(group.clone()));
     }
-    stages.push(Stage { name: "link".into(), steps: vec![Step::Run(link_argv)], parallel: false });
+    stages.push(Stage { name: "link".into(), steps: vec![Step::RunWords(link_argv, plugins::EXTRA_OBJS.into())], parallel: false });
 
     let mut wasm_opt_argv = vec!["wasm-opt".to_string()];
     wasm_opt_argv.extend(lines(&format!("{HARNESS_DIR}/web/wasm-opt-c.cmd"))?);
@@ -496,7 +501,11 @@ fn run(step: &Step) -> Result<(), String> {
         Step::Generate(with_bases) => plugins::generate(*with_bases),
         Step::PluginList(key, bin) => plugins::run_list(key, bin),
         Step::MergeLists => plugins::merge_lists(),
-        Step::CheckUnits(listed) => plugins::check_units(listed),
+        Step::FindUnits(listed) => find_units(listed),
+        Step::CompileList(flags, list_file) => {
+            let steps: Vec<Step> = lines(list_file)?.iter().map(|src| compile_unit(flags, &[], src, &format!("{OUT_APP_DIR}/obj/mod/{}.o", stem(src)))).collect();
+            run_parallel(&steps)
+        }
         Step::RunStdin(argv, stdin_file) => {
             let file = fs::File::open(stdin_file).map_err(|e| format!("{stdin_file}: {e}"))?;
             exec(Command::new(&argv[0]).args(&argv[1..]).stdin(Stdio::from(file)), &argv[0])
@@ -526,6 +535,17 @@ fn run(step: &Step) -> Result<(), String> {
             fs::write(format!("{OUT_APP_DIR}/web/engine-glue.js"), glue(&text)).map_err(|e| format!("engine-glue.js: {e}"))
         }
     }
+}
+
+/// The units gen wrote beyond the listed ones (the plugins' units): their sources and objects are written for the steps after.
+fn find_units(listed: &[String]) -> Result<(), String> {
+    let extra = plugins::check_units(listed)?;
+    let srcs: String = extra.iter().map(|name| format!("{OUT_APP_DIR}/gen/src/{name}\n")).collect();
+    let objs: String = extra.iter().map(|name| format!("{OUT_APP_DIR}/obj/mod/{}.o\n", stem(name))).collect();
+    fs::write(plugins::EXTRA_UNITS, srcs).map_err(|e| format!("{}: {e}", plugins::EXTRA_UNITS))?;
+    fs::write(plugins::EXTRA_OBJS, objs).map_err(|e| format!("{}: {e}", plugins::EXTRA_OBJS))?;
+    println!("units: {} more than the lists: {}", extra.len(), extra.join(" "));
+    Ok(())
 }
 
 fn run_parallel(steps: &[Step]) -> Result<(), String> {
@@ -964,7 +984,7 @@ mod tests {
         let names: Vec<String> = plan("<bin>").expect("plan").iter().map(|s| s.name.split(" (").next().unwrap_or_default().to_string()).collect();
         assert_eq!(
             names,
-            ["plugins", "lists", "lowered-all", "blend2d", "blend2d-compile", "blend2d-archive", "gen", "units", "compile", "hybrid-n0", "link", "wasm-opt", "hybrid"]
+            ["plugins", "lists", "lowered-all", "blend2d", "blend2d-compile", "blend2d-archive", "gen", "units", "compile", "compile-extra", "hybrid-n0", "link", "wasm-opt", "hybrid"]
         );
     }
 

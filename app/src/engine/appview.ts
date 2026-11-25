@@ -34,6 +34,16 @@ export interface AppView {
   windows: AvWindow[];
 }
 
+// the class name and the title of a window entry are the 96 bytes at TEXT_AT; their strings depend on nothing else, so a slot whose words did not change keeps its strings
+// (the decoding of the two strings of every window was the largest part of a read, and a read follows each change of the picture: the pointer moves it)
+const TEXT_AT = 48;
+const TEXT_WORDS = (AV_CLASS_BYTES + AV_TITLE_BYTES) / 4;
+const textCache: { words: Uint32Array; className: string; title: string }[] = [];
+function sameWords(dv: DataView, at: number, words: Uint32Array): boolean {
+  for (let k = 0; k < TEXT_WORDS; k++) if (words[k] !== dv.getUint32(at + 4 * k, true)) return false;
+  return true;
+}
+
 /** header: 12 words + screen_w, screen_h + cursor_made + reserved[2] = 68 bytes; then max_windows entries of 144 bytes (the C struct is fle_av_state; fle_appview.c asserts offsetof(windows) == 68) */
 export function readAppView(buffer: ArrayBufferLike, ptr: number, sinceSeq?: number): AppView | null {
   const dv = new DataView(buffer, ptr);
@@ -52,11 +62,18 @@ export function readAppView(buffer: ArrayBufferLike, ptr: number, sinceSeq?: num
   for (let i = 0; i < n; i++) {
     const b = AV_HEADER_BYTES + i * AV_WINDOW_BYTES;
     const flags = dv.getUint32(b + 8, true);
+    let names = textCache[i];
+    if (names === undefined || !sameWords(dv, b + TEXT_AT, names.words)) {
+      const words = new Uint32Array(TEXT_WORDS);
+      for (let k = 0; k < TEXT_WORDS; k++) words[k] = dv.getUint32(b + TEXT_AT + 4 * k, true);
+      names = { words, className: text(b + TEXT_AT, AV_CLASS_BYTES), title: text(b + TEXT_AT + AV_CLASS_BYTES, AV_TITLE_BYTES) };
+      textCache[i] = names;
+    }
     windows.push({
       lid: dv.getUint32(b, true), hwnd: dv.getUint32(b + 4, true), flags, ownerLid: dv.getUint32(b + 12, true),
       x: dv.getInt32(b + 16, true), y: dv.getInt32(b + 20, true), width: dv.getInt32(b + 24, true), height: dv.getInt32(b + 28, true),
       style: dv.getUint32(b + 32, true), exstyle: dv.getUint32(b + 36, true), thread: dv.getUint32(b + 40, true),
-      className: text(b + 48, AV_CLASS_BYTES), title: text(b + 48 + AV_CLASS_BYTES, AV_TITLE_BYTES),
+      className: names.className, title: names.title,
       visible: (flags & W_VISIBLE) !== 0, enabled: (flags & W_ENABLED) !== 0, topmost: (flags & W_TOPMOST) !== 0, active: (flags & W_ACTIVE) !== 0, focus: (flags & W_FOCUS) !== 0, capture: (flags & W_CAPTURE) !== 0,
     });
   }

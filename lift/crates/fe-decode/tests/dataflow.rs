@@ -39,11 +39,11 @@ fn cat(parts: &[&[u8]]) -> Vec<u8> {
 }
 
 /// Synthetic PE32+: `.text` at RVA 0x1000, `.data` at 0x2000 with an import
-/// (`k.dll!Fn`, IAT slot 0x2200) and a function-pointer slot at 0x2500 -> 0x1130.
+/// (`k.dll!Fn`, IAT slot 0x2200) and (Issue #1391: in `.text`, read only, so that its content is a constant) a function-pointer slot at 0x1380 -> 0x1130.
 ///
 /// `.text` (RVA):
 /// - 0x1000 dispatcher: `call` 0x1020, 0x1040, 0x1050, 0x1090, 0x1200; `ret`.
-/// - 0x1020 `mov rax,[rip+0x2500]; xor ecx,ecx; call rax; ret`.
+/// - 0x1020 `mov rax,[rip+0x1380]; xor ecx,ecx; call rax; ret`.
 ///   Expect: call at 0x1029 -> 0x1130, `RegTable`.
 /// - 0x1040 `call [rcx+8]; ret`. Expect: call at 0x1040 unresolved, `Arg`.
 /// - 0x1050 `lea rax,[rip+0x1080]; nop; nop; call rax; ret`, with 0x1058 a leader
@@ -100,14 +100,14 @@ fn build() -> Vec<u8> {
     w64(&mut b, data_at(0x2200), 0x2400);
     b[data_at(0x2300)..data_at(0x2300) + 6].copy_from_slice(b"k.dll\0");
     b[data_at(0x2402)..data_at(0x2402) + 3].copy_from_slice(b"Fn\0");
-    w64(&mut b, data_at(0x2500), IB + 0x1130);
+    w64(&mut b, TEXT_RAW + 0x380, IB + 0x1130);
 
     let t = |rva: u32| TEXT_RAW + (rva - TEXT_RVA) as usize;
     let call = |from: u32, to: u32| cat(&[&[0xe8], &rel(from + 5, to)]);
     let lea_rip = |at: u32, to: u32| cat(&[&[0x48, 0x8d, 0x05], &rel(at + 7, to)]);
     let code: Vec<(u32, Vec<u8>)> = vec![
         (0x1000, cat(&[&call(0x1000, 0x1020), &call(0x1005, 0x1040), &call(0x100a, 0x1050), &call(0x100f, 0x1090), &call(0x1014, 0x1200), &[0xc3]])),
-        (0x1020, cat(&[&[0x48, 0x8b, 0x05], &rel(0x1027, 0x2500), &[0x31, 0xc9, 0xff, 0xd0, 0xc3]])),
+        (0x1020, cat(&[&[0x48, 0x8b, 0x05], &rel(0x1027, 0x1380), &[0x31, 0xc9, 0xff, 0xd0, 0xc3]])),
         (0x1040, vec![0xff, 0x51, 0x08, 0xc3]),
         (0x1050, cat(&[&lea_rip(0x1050, 0x1080), &[0x90, 0x90, 0xff, 0xd0, 0xc3]])),
         (0x1070, vec![0xeb, 0xe6, 0xc3]),
@@ -180,8 +180,8 @@ fn stores_to_slots_before_branch_are_not_trusted() {
     // the slot content may have changed at run time, so it must not be used.
     let mut img = build();
     let t = |rva: u32| TEXT_RAW + (rva - TEXT_RVA) as usize;
-    // 0x1020: mov rax,[rip+0x2500] (7) ; mov [rdx],rcx (48 89 0a, 3) ; xor ecx,ecx ; call rax
-    let bytes = cat(&[&[0x48, 0x8b, 0x05], &rel(0x1027, 0x2500), &[0x48, 0x89, 0x0a, 0x31, 0xc9, 0xff, 0xd0, 0xc3]]);
+    // 0x1020: mov rax,[rip+0x1380] (7) ; mov [rdx],rcx (48 89 0a, 3) ; xor ecx,ecx ; call rax
+    let bytes = cat(&[&[0x48, 0x8b, 0x05], &rel(0x1027, 0x1380), &[0x48, 0x89, 0x0a, 0x31, 0xc9, 0xff, 0xd0, 0xc3]]);
     img[t(0x1020)..t(0x1020) + bytes.len()].copy_from_slice(&bytes);
     let pe = Pe::parse(&img).unwrap();
     let _ = take_log();

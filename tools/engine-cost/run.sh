@@ -2,6 +2,8 @@
 # 段階 0 の入口(Issue #1388): 製品のビルド(-Oz)、変種のビルド(O2・O3)、計測(18 run と変種の 12 run)、対照実験、集計を、この順に行う。
 # 各段は、出力が在れば飛ばす(途中で止まっても、続きから行える)。段を指定すると、その段だけ行う: bash tools/engine-cost/run.sh baseline runs-oz variants runs-variants contrast aggregate
 # --quick(Issue #1396): 製品のビルドの後、場面 i・ii・iii を DPR 1.00・n=1 で、窓を 30 秒にして 1 回ずつ測る(runs/Oz/quick-<場面>-dpr1.00-n1.json)。集計は行わない。
+# 場面を一つだけ(Issue #1397): bash tools/engine-cost/run.sh --scene i|ii|iii。製品のビルドと、その場面の Oz の run(DPR 2 つ・n=3)だけを行い、集計は行わない(findings は書き換えない)。
+# Issue #1397 の場面 (iii) の run: bash tools/engine-cost/run.sh --scene iii
 # 製品の wasm は lift/out-app/ の下にしか作らない(git で無視される)。本番の fl-Oz を変種が上書きしない。
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -11,6 +13,7 @@ LOG=$OUT/run.log
 # the second DPR: drawn at random from 1.01 to 3.00 (node Math.random, 2026-11-24); the first is 1.00
 DPR_A=1.00
 DPR_B=1.325
+SCENES_RUN=(i ii iii)
 BASE=lift/out-app/bundle/raw/fl-Oz
 NAMES=lift/out-app/gen/wasm-func-names.tsv
 mkdir -p "$OUT"
@@ -51,7 +54,7 @@ ROOT_DIR=$PWD
 stage_runs_oz() {
   for dpr in "$DPR_A" "$DPR_B"; do
     for n in 1 2 3; do
-      for scene in i ii iii; do
+      for scene in "${SCENES_RUN[@]}"; do
         run_one Oz "$scene" "$dpr" "$n" "$BASE" "$NAMES"
       done
     done
@@ -99,6 +102,16 @@ if [ "${1:-}" = "--quick" ]; then
   set -- baseline quick
 fi
 stages=("$@")
+if [ "${1:-}" = "--scene" ]; then
+  # Issue #1397: the runs of one scene only (the product's build and the 6 runs of Oz at the two DPRs); no aggregate, so the findings are not written
+  case "${2:-}" in
+    i|ii|iii) SCENES_RUN=("$2") ;;
+    *) say "usage: run.sh --scene i|ii|iii"; exit 2 ;;
+  esac
+  shift 2
+  stages=("$@")
+  if [ ${#stages[@]} -eq 0 ]; then stages=(baseline runs-oz); fi
+fi
 if [ ${#stages[@]} -eq 0 ]; then stages=(baseline runs-oz variants runs-variants contrast aggregate); fi
 for s in "${stages[@]}"; do
   case "$s" in

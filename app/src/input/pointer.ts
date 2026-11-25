@@ -25,6 +25,8 @@ export interface DesktopInputOptions {
 }
 
 type AnyListener = (e: never) => void;
+// the time origin of the document is a constant: read once (a getter call per input event was a part of the page's cost)
+const TIME_ORIGIN = performance.timeOrigin;
 
 export interface DesktopInput { tracker: InputTracker; detach(): void }
 
@@ -95,7 +97,7 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions): 
   const stamped = new Set(['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel', 'keydown', 'keyup']);
   const withMeta = (type: string, fn: AnyListener): AnyListener => (stamped.has(type)
     ? ((e: Event): void => {
-      meta = { tEvent: performance.timeOrigin + e.timeStamp, tListener: performance.timeOrigin + performance.now() };
+      meta = { tEvent: TIME_ORIGIN + e.timeStamp, tListener: TIME_ORIGIN + performance.now() };
       try { (fn as (e: Event) => void)(e); } finally { meta = undefined; }
     }) as unknown as AnyListener
     : fn);
