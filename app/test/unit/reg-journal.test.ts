@@ -103,3 +103,44 @@ describe('reg-journal: the state the records make', () => {
     expect(j.liveBytes).toBe(j.image().length);
   });
 });
+
+describe('reg-journal: the user\'s files (Issue #1385)', () => {
+  it('refuses data on a directory or a deletion, and takes data on a file', () => {
+    expect(parseRecord(rec(REG_OP.dirMake, 'C:\\A', '', 0, [1]), 0)).toBeNull();
+    expect(parseRecord(rec(REG_OP.fileDel, 'C:\\A', '', 0, [1]), 0)).toBeNull();
+    const f = rec(REG_OP.filePut, 'C:\\A\\f', '', 0, [1, 2]);
+    expect(parseRecord(f, 0)?.end).toBe(f.length);
+  });
+
+  it('keeps the last content of a file (paths compare without regard to ASCII case) and the directories made', () => {
+    const j = new RegJournal();
+    const dir = rec(REG_OP.dirMake, 'C:\\Users\\user\\Documents');
+    const first = rec(REG_OP.filePut, 'C:\\Users\\user\\Documents\\a.scr', '', 0, [1, 2]);
+    const last = rec(REG_OP.filePut, 'c:\\users\\user\\documents\\A.scr', '', 0, [3]);
+    j.load(cat(dir, first, last));
+    expect(j.image()).toEqual(cat(dir, last));
+    expect(j.liveBytes).toBe(dir.length + last.length);
+  });
+
+  it('a deletion takes the file, or the directory tree, out, and not another path that starts the same', () => {
+    const j = new RegJournal();
+    j.load(cat(
+      rec(REG_OP.filePut, 'C:\\Users\\user\\X\\f', '', 0, [1]),
+      rec(REG_OP.filePut, 'C:\\Users\\user\\Xy\\g', '', 0, [2]),
+      rec(REG_OP.dirMake, 'C:\\Users\\user\\X\\sub'),
+      rec(REG_OP.fileDel, 'C:\\Users\\user\\X'),
+    ));
+    expect(ops(j.image())).toEqual([REG_OP.filePut]);
+    expect(parseRecord(j.image(), 0)?.key).toBe('C:\\Users\\user\\Xy\\g');
+  });
+
+  it('a deleted file is gone from the image, and the image loads back to the same records', () => {
+    const j = new RegJournal();
+    const kept = rec(REG_OP.filePut, 'C:\\Users\\user\\k', '', 0, [9]);
+    j.load(cat(rec(REG_OP.filePut, 'C:\\Users\\user\\d', '', 0, [1]), kept, rec(REG_OP.fileDel, 'C:\\Users\\user\\d')));
+    expect(j.image()).toEqual(kept);
+    const again = new RegJournal();
+    again.load(j.image());
+    expect(again.image()).toEqual(kept);
+  });
+});

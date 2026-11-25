@@ -16,6 +16,7 @@ import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts'
 import { sceneGen } from './desk-gl.ts';
 import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
+import { IN, SC } from '../input/events.ts';
 import { openRegState, type RegState } from './regstore.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
@@ -85,6 +86,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
+    case 'exit-request': onExitRequest(); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -332,9 +334,26 @@ function closeRegState(dropped: boolean): void {
   regState = null;
 }
 
+/** Issue #1385: the page is left (pagehide: a reload or a close). The FL main window is sent SC_CLOSE on the road the task bar's button takes (the IdleDriver, at the engine's idle), so FL
+ * does what it does when the person closes its window: it closes the files it keeps open (a saved project is written at its close, and each write reaches the page's journal then).
+ * Once; nothing when the engine has ended or has no such window. EXIT_SEQ is no input of the page's: the latency tracker takes no sample of it. */
+const EXIT_SEQ = -1;
+let runEnded = false;
+let exitSent = false;
+function onExitRequest(): void {
+  if (exitSent || runEnded || !fruity) return;
+  const lid = fruity.mainWindow();
+  const d = ensureDriver();
+  if (!lid || !d) { log('info', 'the page is left: the engine has no FL main window to close'); return; }
+  exitSent = true;
+  d.submit({ k: 'syscmd', kind: IN.SYSCMD, lid, cmd: SC.CLOSE }, EXIT_SEQ, nowAbs());
+  mark('exit_request', { lid });
+}
+
 async function startFruity(f: FruityEngine): Promise<void> {
   mark('engine_start');
   const result = await f.run();
+  runEnded = true;
   closeRegState(result.kind === 'trap' || (result.kind === 'exit' && result.code !== 0));
   stopAudioReport();
   flushLogs();

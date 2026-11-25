@@ -120,7 +120,8 @@ static void trace_set(const reg_key *k, const reg_value *v);
  * synchronous import: the page appends it to its saved log and flushes it before the guest goes on). Before the guest runs, the saved records are read back and
  * replayed after the seed values (fle_reg_restore_saved), so a saved value replaces the seed's. Nothing is recorded before the replay (the seed is not recorded).
  * A record (little endian): u8 op | u32 k | k bytes (the key's path below HKCU, UTF-16LE, no leading backslash) | u32 n | n bytes (the value name, UTF-16LE) |
- * u32 type | u32 d | d bytes (the data: only for op 2). op 1: the key exists; op 2: the value is set; op 3: the value is deleted; op 4: the key and all under it are deleted. */
+ * u32 type | u32 d | d bytes (the data: only for op 2). op 1: the key exists; op 2: the value is set; op 3: the value is deleted; op 4: the key and all under it are deleted.
+ * The user's files (Issue #1385) use the same record with a path for the key: op 5 the file's content (d bytes), op 6 the file or directory tree is gone, op 7 the directory is made. */
 #define REG_OP_KEY 1u
 #define REG_OP_VALUE 2u
 #define REG_OP_DEL_VALUE 3u
@@ -140,6 +141,39 @@ static void put_unit(uint8_t *b, size_t *at, uint16_t u)
     b[(*at)++] = (uint8_t)u;
     b[(*at)++] = (uint8_t)(u >> 8);
 }
+
+/* Issue #1385: the user's files (fle_vfs.c "the user's files") use the same journal and the same format. The key is the path (C:\...), the name is empty, the type is 0.
+ * op 5: the file's content is put (the data); op 6: the file or the directory tree at the path is gone; op 7: the directory is made. */
+#define REG_OP_FILE_PUT 5u
+#define REG_OP_FILE_DEL 6u
+#define REG_OP_DIR_MAKE 7u
+
+static void file_record(uint8_t op, const uint16_t *w, size_t n, const uint8_t *data, uint64_t size)
+{
+    size_t total, at = 0, j;
+    uint8_t *b;
+
+    if (!reg_journal_on || !fle_reg_page_put) return;
+    total = 1 + 4 + 2 * n + 4 + 4 + 4 + (op == REG_OP_FILE_PUT ? size : 0);
+    b = malloc(total);
+    if (!b) fle_stop("files", "out of memory");
+    b[at++] = op;
+    put_u32(b, &at, (uint32_t)(2 * n));
+    for (j = 0; j < n; j++) put_unit(b, &at, w[j]);
+    put_u32(b, &at, 0);
+    put_u32(b, &at, 0);
+    put_u32(b, &at, op == REG_OP_FILE_PUT ? (uint32_t)size : 0);
+    if (op == REG_OP_FILE_PUT && size) {
+        memcpy(b + at, data, (size_t)size);
+        at += (size_t)size;
+    }
+    fle_reg_page_put(b, (uint32_t)total);
+    free(b);
+}
+
+void fle_kept_file_put(const uint16_t *w, size_t n, const uint8_t *data, uint64_t size) { file_record(REG_OP_FILE_PUT, w, n, data, size); }
+void fle_kept_file_del(const uint16_t *w, size_t n) { file_record(REG_OP_FILE_DEL, w, n, NULL, 0); }
+void fle_kept_dir_make(const uint16_t *w, size_t n) { file_record(REG_OP_DIR_MAKE, w, n, NULL, 0); }
 
 static void reg_journal(uint8_t op, const reg_key *k, const uint16_t *name, size_t nl, uint32_t type, const uint8_t *data, uint32_t size)
 {
@@ -1045,9 +1079,27 @@ static void restore_records(const uint8_t *buf, size_t n)
         dp = buf + p;
         p += dl;
         at = p;
-        if (op < REG_OP_KEY || op > REG_OP_DEL_KEY) break;
+        if (op < REG_OP_KEY || op > REG_OP_DIR_MAKE) break;
         ks = units_of(kp, kl);
         ns = units_of(np, nl);
+        if (op >= REG_OP_FILE_PUT) {
+            if (op == REG_OP_FILE_PUT) {
+                uint8_t *copy = NULL;
+                if (dl) {
+                    copy = malloc(dl);
+                    if (!copy) fle_stop("files", "out of memory");
+                    memcpy(copy, dp, dl);
+                }
+                fle_vfs_restore_put(ks, kl / 2, copy, dl);
+            } else if (op == REG_OP_FILE_DEL) {
+                fle_vfs_restore_drop(ks, kl / 2);
+            } else {
+                fle_vfs_restore_mkdir(ks, kl / 2);
+            }
+            free(ks);
+            free(ns);
+            continue;
+        }
         k = path_key(ks, kl / 2, op == REG_OP_KEY || op == REG_OP_VALUE);
         if (k && op == REG_OP_VALUE) {
             uint8_t *copy = NULL;

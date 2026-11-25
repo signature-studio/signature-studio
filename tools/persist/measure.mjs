@@ -11,10 +11,23 @@
 // Default run (another profile, English): the engine's first idle, then Page.reload; defaultReloadState is the engine's state after that reload.
 // bytes: the size of /fl/state in the browser's OPFS (the saved registry) after the change, before the reload; bytesAfterReload: after the reload.
 // elapsedMs: navigation to the first engine-idle; reloadElapsedMs: Page.reload to the idle after it; preBootBytes: the start-up assets (assetsReport, as welcome-flow.mjs reads them) at the first idle.
-// Usage: node tools/persist/measure.mjs <absolute path to the bundle directory raw/<name>> [--shots <directory>] [--language CODE] > persist.json   (needs app/node_modules and app/dist, as boot-bundle.mjs does).
+// Issue #1385, the files row (step "files"): a new profile; the Welcome window is closed (Escape) and the start-up consent box is pressed at its measured guest pixel (on the 780x480 screen only);
+// the project is opened with File > Open (Ctrl+O, the file box: openProjectFile follows tools/p3-audio-probe/measure.mjs openProject, which is only read). The project is the smallest .flp at the top of
+// the installer's demo folder (lift/out-app/host-extra/resources/Data/Demo projects, put there by the workflow). recentBefore: the project's file name is in the guest memory (guestText, as #1358) after the open.
+// The page is reloaded and the engine is idle again; recentKept: the file name is in the guest memory after the reload (the Recent list). recentWhere: the saved records (the page's log, /fl/state/hkcu.log,
+// parsed here as lift/runtime/fle_reg.c writes them) say where the name is kept: "file" when a saved file (op 5) holds the name (ASCII or UTF-16LE), "registry" when a saved value (op 2) does, else "unknown".
+// recentFiles: the saved files that hold the name; savedFiles and savedPaths: the saved files (their count and paths, the first 200); bytes: the size of /fl/state after the reload.
+// logFilesBefore / logFilesAfter: the Startup logs the page keeps (the saved records under Support\Logs\Startup\, read before the reload and after it). A log whose content is empty is not kept,
+// so the count does not grow with each reload. The page's pagehide asks FL to close (Worker exit-request): FL closes the files it keeps open, and a closed file's write is recorded.
+// exitRun (--exit-before-reload, a test aid): the same request at once, with the time to the engine's stop and the engine's lines from it (closeLines).
+// saveRun (--save-after-open, a test aid): File > Save (Ctrl+S) of the open project before the reload; its engine lines are read by index (the engine log is read in batches,
+// so a line that comes late is not in it: savedPaths is the record to read).
+// The output is two JSON lines: the language row (as before, with languageKept = registryKept) and the files row.
+// Usage: node tools/persist/measure.mjs <absolute path to the bundle directory raw/<name>> [--shots <directory>] [--language CODE] > persist.jsonl   (needs app/node_modules and app/dist, as boot-bundle.mjs does).
 //   --language CODE (a test aid; the default is the random choice): the language to choose (de, es, fr, ja, ko, vi or zh).
-//   --shots DIR (a test aid): the page's PNGs (general, language-open, language-after, reload) are written to DIR (the directory is made; nothing is removed).
-// stdout: one JSON line (the result). Everything else goes to stderr. Exit 0 when the tool ran (the result's error says whether the run was good), 1 when the tool itself failed, 2 without a bundle directory.
+//   --shots DIR (a test aid): the page's PNGs (general, language-open, language-after, reload, and in the files run files-start, files-consent, files-welcome, files-opened, files-reloaded) are written to DIR (the directory is made; nothing is removed).
+//   --files-only (a test aid): the files run alone (the language and the default runs are not made; their row is then empty).
+// stdout: two JSON lines (the language row, the files row). Everything else goes to stderr. Exit 0 when the tool ran (the rows' error says whether the run was good), 1 when the tool itself failed, 2 without a bundle directory.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,6 +50,24 @@ const NAME_OF = {
 };
 const RESTART_TITLE = 'Language change';
 const WELCOME = 'TWelcomeWizard';
+const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };   // the start-up consent box's "No thanks" (tools/p3-audio-probe/measure.mjs, measured on this screen)
+const PROBLEMS_TITLE = /Problems loading/;
+const DEMO_DIR = ['lift', 'out-app', 'host-extra', 'resources', 'Data', 'Demo projects'];
+const LIST_MAX = 200;
+const EXIT_LIMIT_MS = 30000, EXIT_SETTLE_MS = 3000;
+// how long the files run waits after the open before the reload (a test aid: --wait-after-open SECONDS)
+let waitAfterOpenMs = 15000;
+const JOURNAL_FILE = 'hkcu.log';
+const JOURNAL_BASE64 = `(async () => {
+  let d = await navigator.storage.getDirectory();
+  try { for (const s of ['fl', 'state']) d = await d.getDirectoryHandle(s); } catch { return null; }
+  let f;
+  try { f = await d.getFileHandle(${JSON.stringify(JOURNAL_FILE)}); } catch { return null; }
+  const u = new Uint8Array(await (await f.getFile()).arrayBuffer());
+  let s = '';
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+})()`;
 const SET_LINE = /window-api: RegSetValueExW "[^"]*" "Program language" type=1 size=\d+ value="([^"]*)"/i;
 const FOUND_LINE = /window-api: RegQueryValueExW "[^"]*" "Program language" -> found type=1 size=\d+ value="([^"]*)"/i;
 const STOP_LINE = /missing-path: LoadLibraryW \d+ "ILSvg_x64\.dll"/;
@@ -139,6 +170,33 @@ class Sess {
     await sleep(40);
     await this.send('Input.dispatchKeyEvent', { type: 'keyUp', code, key: code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk });
     await sleep(800);
+  }
+  /** File > Open: Ctrl+O (the key path of tools/p3-audio-probe/measure.mjs ctrlO) */
+  async ctrlO() { return this.ctrlKey('KeyO', 'o', 79); }
+  /** Ctrl + a letter (the key path of ctrlO) */
+  async ctrlKey(code, key, vk) {
+    await this.ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+    await sleep(100);
+    const ctrl = { code: 'ControlLeft', key: 'Control', windowsVirtualKeyCode: 0xa2, nativeVirtualKeyCode: 0xa2 };
+    const key2 = { code, key, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk };
+    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...ctrl, modifiers: 2 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...key2, modifiers: 2 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...key2, modifiers: 2 });
+    await sleep(40);
+    await this.send('Input.dispatchKeyEvent', { type: 'keyUp', ...ctrl, modifiers: 0 });
+  }
+  /** a press and a release at the centre of a page element (the page's own position of it) */
+  async clickSelector(selector) {
+    const r = await this.ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    if (!r) throw new Error(`no element ${selector}`);
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+    await sleep(60);
+    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x, y: r.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+    await sleep(50);
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x, y: r.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+    await sleep(300);
   }
   async log() { return this.ev(LOG, 60000); }
 }
@@ -321,6 +379,7 @@ async function languageRun(sess, port, out, forced) {
   }
   out.registryLine = read.line;
   out.registryKept = read.value !== null && read.value === out.language;
+  out.languageKept = out.registryKept;
   out.bytesAfterReload = (await sess.ev(SIZE_OF_STATE)).bytes;
 
   if (second.state.state !== 'engine-idle') {
@@ -353,6 +412,258 @@ async function defaultRun(sess, port, out) {
   out.steps.push(`default reload: state ${second.state.state} (${second.elapsedMs} ms)`);
 }
 
+/** the saved records of the page, replayed as the page replays them (lift/runtime/fle_reg.c; app/src/engine/reg-journal.ts): the live records in order. Keys: the registry's (ops 1 to 4) and the user's files' (ops 5 to 7) */
+export function liveRecords(buf) {
+  const live = new Map();
+  const fold = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+  const drop = (pred) => { for (const id of [...live.keys()]) if (pred(id)) live.delete(id); };
+  let at = 0;
+  for (;;) {
+    if (at + 5 > buf.length) break;
+    const op = buf[at];
+    if (op < 1 || op > 7) break;
+    let p = at + 1;
+    const kl = buf.readUInt32LE(p); p += 4;
+    if (kl % 2 !== 0 || p + kl + 4 > buf.length) break;
+    const key = buf.subarray(p, p + kl).toString('utf16le'); p += kl;
+    const nl = buf.readUInt32LE(p); p += 4;
+    if (nl % 2 !== 0 || p + nl + 8 > buf.length) break;
+    const name = buf.subarray(p, p + nl).toString('utf16le'); p += nl;
+    const type = buf.readUInt32LE(p); p += 4;
+    const dl = buf.readUInt32LE(p); p += 4;
+    if (p + dl > buf.length) break;
+    const rec = { op, key, name, type, data: buf.subarray(p, p + dl) };
+    p += dl;
+    at = p;
+    const k = fold(key);
+    if (op === 1) live.set(`k\0${k}`, rec);
+    else if (op === 2 || op === 3) live.set(`v\0${k}\0${fold(name)}`, rec);
+    else if (op === 4) { drop((id) => id.startsWith(`k\0${k}\\`) || id.startsWith(`v\0${k}\\`) || id.startsWith(`v\0${k}\0`)); live.set(`k\0${k}`, rec); }
+    else if (op === 5) live.set(`f\0${k}`, rec);
+    else if (op === 7) live.set(`d\0${k}`, rec);
+    else drop((id) => id === `f\0${k}` || id === `d\0${k}` || id.startsWith(`f\0${k}\\`) || id.startsWith(`d\0${k}\\`));
+  }
+  return { live: [...live.values()], total: buf.length, consumed: at };
+}
+
+/** the name as the guest writes it: ASCII or UTF-16LE */
+const holds = (data, name) => data.includes(Buffer.from(name, 'utf16le')) || data.includes(Buffer.from(name, 'latin1'));
+
+/** the page's own log lines about the saved records (regstore.ts: "not kept", "dropped", "not kept any more"); the page log is the element #log */
+const pageSaveLines = (sess) => sess.ev(`(document.getElementById('log')?.textContent ?? '').split('\\n').filter((l) => /kept|dropped|registry|saved/i.test(l)).slice(-30).map((l) => l.slice(0, 300))`);
+
+/** the trace lines of the user's files (lift/runtime/fle_vfs.c: vfs-open, vfs-kept, vfs-gone, vfs-dir, vfs-dropped, vfs-restored), as the engine's log has them */
+const TRACE_RE = /vfs-(open|kept|empty|gone|dir|dropped|restored): /;
+const TRACE_MAX = 300;
+const traceLines = (lines) => lines.map((l) => String(l)).filter((l) => TRACE_RE.test(l)).slice(0, TRACE_MAX).map((l) => l.slice(0, 300));
+/** the lines of a close of the files (what FL writes as it closes, the Recent list among them) */
+const CLOSE_RE = /vfs-(kept|empty|gone|dropped): |Recent/;
+/** the page's journal, as liveRecords reads it (an empty one when the browser keeps no file) */
+const journalOf = async (sess) => {
+  const b64 = await sess.ev(JOURNAL_BASE64, 120000);
+  return b64 === null ? { live: [], total: 0, consumed: 0 } : liveRecords(Buffer.from(b64, 'base64'));
+};
+/** the Startup logs the page keeps (saved file records under Support\Logs\Startup\; the count the page holds, not the guest's own listing: the page has no listing of the guest's files) */
+const STARTUP_LOG = /\\Support\\Logs\\Startup\\/i;
+const startupLogs = (live) => live.filter((r) => r.op === 5 && STARTUP_LOG.test(r.key)).length;
+
+/** the smallest .flp at the top of the installer's demo folder (the workflow puts the installer's resources there); null when there is none */
+function demoProjects() {
+  const root = path.join(repo, ...DEMO_DIR);
+  if (!fs.existsSync(root)) return [];
+  const out = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.flp$/i.test(e.name)) out.push({ file: p, size: fs.statSync(p).size });
+    }
+  };
+  walk(root);
+  return out.sort((a, b) => a.size - b.size || (a.file < b.file ? -1 : 1));
+}
+
+/** the window table, asked again a few times: right after the first idle the engine may still be loading its lazy files (a table request then waits) */
+async function tableWhenReady(sess) {
+  for (let i = 0; ; i++) {
+    try {
+      return await sess.table();
+    } catch (e) {
+      if (i >= 4) throw e;
+      await sleep(3000);
+    }
+  }
+}
+
+/** the Welcome window is closed with Escape while it is listed (as openGeneral does) */
+async function closeWelcome(sess) {
+  for (let i = 0; i < 4; i++) {
+    const t = await tableWhenReady(sess);
+    if (!t.tops.some((w) => w.cls === WELCOME || w.cls === 'TMissingPluginsForm')) return true;
+    await sess.key('Escape', 27);
+    await sleep(1500);
+  }
+  return false;
+}
+
+/** the start-up consent box is pressed at its measured guest pixel on the screen it was measured on (tools/p3-audio-probe/measure.mjs dismissStartupBox) */
+async function dismissConsent(sess, files) {
+  const s = await sess.ev('(() => { const g = window.__app.screen.guest; return { gw: g.width, gh: g.height }; })()');
+  if (s.gw !== NO_THANKS.gw || s.gh !== NO_THANKS.gh) {
+    files.steps.push(`consent box not pressed: the guest screen is ${s.gw}x${s.gh}`);
+    return;
+  }
+  await sess.click(NO_THANKS.x, NO_THANKS.y);
+  await sleep(1500);
+  files.steps.push(`consent box: "No thanks" at guest (${NO_THANKS.x}, ${NO_THANKS.y})`);
+}
+
+/** a "Problems loading the project" box (the front window's title) is closed with Enter; true when one was */
+async function dismissProblems(sess) {
+  const front = (await sess.ev("window.__app ? window.__app.pageTitle().title : ''")) ?? '';
+  if (!PROBLEMS_TITLE.test(front)) return false;
+  await sess.key('Enter', 13);
+  return true;
+}
+
+/** File > Open of the host file: Ctrl+O, the file box (#filedlg-input, or the file manager's #fx-input-files: the file is chosen in its list and Open is pressed), the title is the project's (tools/p3-audio-probe/measure.mjs openProject, read only) */
+async function openProjectFile(sess, file, name, files) {
+  const stem = path.basename(name, path.extname(name));
+  await sess.ctrlO();
+  let box = null, again = false;
+  const t0 = Date.now();
+  while (!box && Date.now() - t0 < 40000) {
+    box = await sess.ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
+    if (!box && (await dismissProblems(sess)) && !again) {
+      again = true;
+      await sess.ctrlO();
+    }
+    if (!box) await sleep(500);
+  }
+  if (!box) throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
+  const selector = box === 'filedlg' ? '#filedlg-input' : '#fx-input-files';
+  const doc = await sess.send('DOM.getDocument', {});
+  const q = await sess.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
+  if (!q.nodeId) throw new Error(`${selector} is not a node`);
+  await sess.send('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [file] });
+  if (box === 'explorer') {
+    const row = `#fx-list [data-name="${name}"]`;
+    const t2 = Date.now();
+    while (!(await sess.ev(`!!document.querySelector(${JSON.stringify(row)})`))) {
+      if (Date.now() - t2 >= 30000) throw new Error(`${name} is not listed in the file manager 30 s after the upload`);
+      await sleep(500);
+    }
+    await sess.clickSelector(row);
+    await sess.clickSelector('#fx-ok');
+  }
+  await sleep(3000);
+  await sess.shot('files-uploaded.png');
+  // the title is read for the record only: it may be another window's while the project loads (the name is looked for in the guest memory below)
+  const t3 = Date.now();
+  let title = '';
+  for (;;) {
+    title = (await sess.ev('window.__app.pageTitle().title')) ?? '';
+    if (title.toLowerCase().startsWith(stem.toLowerCase())) break;
+    if (PROBLEMS_TITLE.test(title)) await dismissProblems(sess);
+    if (Date.now() - t3 >= 60000) break;
+    await sleep(POLL_MS);
+  }
+  files.projectTitle = title;
+  files.steps.push(`opened ${name}: title ${JSON.stringify(title)}`);
+  await sleep(waitAfterOpenMs);
+  if (await dismissProblems(sess)) files.steps.push('the "Problems loading the project" box was closed with Enter');
+  await sess.shot('files-opened.png');
+}
+
+/** the file name as the guest's memory holds it (guestText, as #1358): the text lines at the places of the name, ASCII or UTF-16LE */
+async function nameInGuest(sess, name) {
+  try {
+    const r = await sess.ev(`window.__app.guestText(${JSON.stringify([name])}, 256)`, 120000);
+    const lines = [...(r.best?.lines ?? []), ...r.near.flatMap((n) => n.runs)].filter((l) => l.includes(name));
+    return { found: lines.length > 0, memBytes: r.memBytes, lines: lines.slice(0, 3).map((l) => l.slice(0, 300)) };
+  } catch (e) {
+    return { found: false, error: String(e?.message ?? e).slice(0, 200) };
+  }
+}
+
+/** the files run (Issue #1385): the project is opened, the page is reloaded, and the name is looked for after the reload; the saved records say where the name is kept. Fills files */
+async function filesRun(sess, port, files, project, opts) {
+  const first = await start(sess, navigateTo(sess, port), files, 'filesStalls');
+  files.firstElapsedMs = first.elapsedMs;
+  if (first.state.state !== 'engine-idle') throw new Error(`no engine-idle at the files start (state ${first.state.state}: ${first.state.error ?? ''})`);
+  await sleep(5000);
+  await sess.shot('files-start.png');
+  await dismissConsent(sess, files);
+  await sess.shot('files-consent.png');
+  if (!(await closeWelcome(sess))) files.steps.push('the Welcome window did not close with Escape');
+  await sess.shot('files-welcome.png');
+  await openProjectFile(sess, project.file, project.name, files);
+  await sess.shot('files-opened.png');
+  files.stateAfterOpen = await sess.state();
+  files.stopLines = (await sess.log()).map((l) => String(l)).slice(-60).map((l) => l.slice(0, 300));
+  const regSets = (await sess.log()).map((l) => String(l)).filter((l) => /RegSetValueExW/.test(l));
+  files.registrySets = { count: regSets.length, lines: regSets.slice(-12).map((l) => l.slice(0, 240)) };
+  if (files.stateAfterOpen?.state !== 'engine-idle') throw new Error(`the engine did not stay up after the open (state ${files.stateAfterOpen?.state})`);
+  files.projectName = project.name;
+  files.recentBefore = await nameInGuest(sess, project.name);
+  files.steps.push(`before the reload: the name in the guest memory ${files.recentBefore.found}`);
+  if (opts.saveAfterOpen) {
+    // a test aid (--save-after-open): File > Save (Ctrl+S) of the open project; the engine's lines from the key on are kept (the file lines, the registry sets and the Recent lines)
+    const logAt = (await sess.log()).length;
+    await sess.ctrlKey('KeyS', 's', 83);
+    await sleep(EXIT_SETTLE_MS);
+    const lines = (await sess.log()).slice(logAt).map((l) => String(l));
+    const pick = lines.filter((l) => TRACE_RE.test(l) || /RegSetValueExW|Recent/.test(l));
+    files.saveRun = { state: (await sess.state())?.state ?? null, afterLines: lines.length, fileLines: pick.slice(-120).map((l) => l.slice(0, 300)), tail: lines.slice(-30).map((l) => l.slice(0, 200)) };
+    await sess.shot('files-saved.png');
+    files.steps.push(`File > Save: ${files.saveRun.afterLines} engine lines, ${pick.length} file or registry lines`);
+  }
+  if (opts.exitBefore) {
+    // a test aid (--exit-before-reload, after the save when --save-after-open is given): the page asks the engine to close FL now (what the page does when it is left) and the time to the engine's stop is measured;
+    // the engine's lines from the request on are kept by index (closeLines: what FL wrote at its close)
+    const bytes0 = (await sess.ev(SIZE_OF_STATE)).bytes;
+    const logAt = (await sess.log()).length;
+    const t4 = Date.now();
+    await sess.ev('window.__app.exitRequest(); true');
+    let st = await sess.state();
+    while (st && st.state === 'engine-idle' && Date.now() - t4 < EXIT_LIMIT_MS) { await sleep(250); st = await sess.state(); }
+    const ms = Date.now() - t4;
+    await sleep(EXIT_SETTLE_MS);
+    const afterLines = (await sess.log()).slice(logAt).map((l) => String(l));
+    const closeLines = afterLines.filter((l) => CLOSE_RE.test(l) || /RegSetValueExW|CreateFileW|WriteFile|CloseHandle/.test(l));
+    files.exitRun = { state: st?.state ?? null, ms, afterLines: afterLines.length, bytesBefore: bytes0, bytesAfter: (await sess.ev(SIZE_OF_STATE)).bytes, closeLines: closeLines.slice(-120).map((l) => l.slice(0, 300)) };
+    files.steps.push(`exit request: the engine ${files.exitRun.state} after ${ms} ms (${closeLines.length} close lines)`);
+  }
+  files.keptBefore = traceLines(await sess.log());
+  files.pageLogBefore = await pageSaveLines(sess);
+  files.bytesBefore = (await sess.ev(SIZE_OF_STATE)).bytes;
+  files.logFilesBefore = startupLogs((await journalOf(sess)).live);
+
+  const second = await start(sess, reloadPage(sess), files, 'filesReloadStalls');
+  files.filesReloadElapsedMs = second.elapsedMs;
+  files.filesReloadState = second.state.state;
+  if (second.state.state !== 'engine-idle') throw new Error(`no engine-idle after the reload (state ${second.state.state}: ${second.state.error ?? ''})`);
+  await sleep(3000);
+  await sess.shot('files-reloaded.png');
+  files.restoredAfter = traceLines(await sess.log());
+  files.pageLogAfter = await pageSaveLines(sess);
+  files.recentAfter = await nameInGuest(sess, project.name);
+  files.recentKept = files.recentAfter.found;
+  files.steps.push(`after the reload: the name in the guest memory ${files.recentKept}`);
+
+  const { live, total, consumed } = await journalOf(sess);
+  files.logFilesAfter = startupLogs(live);
+  const saved = live.filter((r) => r.op === 5);
+  const holding = saved.filter((r) => holds(r.data, project.name));
+  files.savedFiles = saved.length;
+  files.savedPaths = saved.slice(0, LIST_MAX).map((r) => ({ path: r.key, bytes: r.data.length }));
+  files.recentFiles = holding.map((r) => r.key);
+  files.recentWhere = holding.length > 0 ? 'file' : live.some((r) => r.op === 2 && holds(r.data, project.name)) ? 'registry' : 'unknown';
+  files.journalBytes = total;
+  files.journalParsed = consumed === total;
+  files.bytes = (await sess.ev(SIZE_OF_STATE)).bytes;
+}
+
 /** one page in a Chrome of its own (a new profile); fn gets the session */
 async function withPage(port, profile, shots, fn) {
   let chrome = null, cdp = null;
@@ -381,19 +692,44 @@ async function run(port, root, shots, opts) {
     defaultReloadState: null, defaultReloadElapsedMs: null, bytes: null, bytesAfterReload: null, engineTail: null, stopLine: null, error: null,
     elapsedMs: null, reloadElapsedMs: null, preBootBytes: null, startStalls: 0, reloadStalls: 0, recoverStalls: 0, defaultStalls: 0, defaultReloadStalls: 0, steps: [],
   };
-  try {
-    await withPage(port, path.join(root, 'profile'), shots, (sess) => languageRun(sess, port, out, opts.language));
-  } catch (e) {
-    out.error = String(e?.message ?? e).slice(0, 600);
-    out.steps.push(`failed: ${out.error}`);
+  if (!opts.filesOnly) {
+    try {
+      await withPage(port, path.join(root, 'profile'), shots, (sess) => languageRun(sess, port, out, opts.language));
+    } catch (e) {
+      out.error = String(e?.message ?? e).slice(0, 600);
+      out.steps.push(`failed: ${out.error}`);
+    }
+    try {
+      await withPage(port, path.join(root, 'profile-default'), null, (sess) => defaultRun(sess, port, out));
+    } catch (e) {
+      out.error = out.error ?? String(e?.message ?? e).slice(0, 600);
+      out.steps.push(`default run failed: ${String(e?.message ?? e).slice(0, 300)}`);
+    }
   }
-  try {
-    await withPage(port, path.join(root, 'profile-default'), null, (sess) => defaultRun(sess, port, out));
-  } catch (e) {
-    out.error = out.error ?? String(e?.message ?? e).slice(0, 600);
-    out.steps.push(`default run failed: ${String(e?.message ?? e).slice(0, 300)}`);
+  const newFiles = () => ({ step: 'files', projectName: null, projectTitle: null, recentBefore: null, recentAfter: null, recentKept: false, recentWhere: 'unknown', recentFiles: [], savedFiles: 0, savedPaths: [], journalBytes: null, journalParsed: null, bytesBefore: null, bytes: null, firstElapsedMs: null, filesReloadElapsedMs: null, filesReloadState: null, filesStalls: 0, filesReloadStalls: 0, keptBefore: [], restoredAfter: [], pageLogBefore: null, pageLogAfter: null, stateAfterOpen: null, stopLines: [], exitRun: null, saveRun: null, logFilesBefore: null, logFilesAfter: null, project: null, tried: [], steps: [], error: null });
+  // the projects to try, in order: the one given (--project), else the smallest demo projects (at most three; the next one is tried when the engine stops during the open)
+  const candidates = opts.project ? [{ file: opts.project }] : demoProjects().slice(0, 3);
+  let files = newFiles();
+  if (candidates.length === 0) files.error = `no .flp under ${path.join(...DEMO_DIR)}`;
+  for (const demo of candidates) {
+    files = newFiles();
+    // a copy under a name of its own: the installer's own files hold the demo's name (the seed's table), so the name would be found in the guest memory before any open
+    const name = `persist-check-${process.pid}-${files.tried.length}.flp`;
+    const project = { name, file: path.join(root, name), from: path.basename(demo.file) };
+    fs.copyFileSync(demo.file, project.file);
+    files.project = project.from;
+    try {
+      await withPage(port, path.join(root, `profile-files-${files.tried.length}`), shots, (sess) => filesRun(sess, port, files, project, opts));
+    } catch (e) {
+      files.error = String(e?.message ?? e).slice(0, 600);
+      files.steps.push(`files run failed: ${files.error}`);
+    }
+    files.tried.push(project.from);
+    if (files.stateAfterOpen?.state === 'engine-idle') break;
+    files.steps.push(`${project.from}: the engine did not stay up after the open; the next project is tried`);
   }
-  return out;
+  out.languageKept = out.registryKept;
+  return { lang: out, files };
 }
 
 async function main() {
@@ -402,7 +738,10 @@ async function main() {
   const shots = shotsAt >= 0 ? path.resolve(argv[shotsAt + 1] ?? '') : null;
   const langAt = argv.indexOf('--language');
   const language = langAt >= 0 ? argv[langAt + 1] ?? '' : null;
-  const valued = [shotsAt, langAt].filter((i) => i >= 0).map((i) => i + 1);
+  const projAt = argv.indexOf('--project');
+  const waitAt = argv.indexOf('--wait-after-open');
+  if (waitAt >= 0) waitAfterOpenMs = Number(argv[waitAt + 1]) * 1000;
+  const valued = [shotsAt, langAt, projAt, waitAt].filter((i) => i >= 0).map((i) => i + 1);
   const positional = argv.filter((a, i) => !a.startsWith('--') && !valued.includes(i));
   if (positional.length !== 1 || (shotsAt >= 0 && !argv[shotsAt + 1]) || (language !== null && !LANGUAGES.includes(language))) {
     process.stderr.write(`usage: node tools/persist/measure.mjs <absolute path to the bundle directory raw/<name>> [--shots <directory>] [--language ${LANGUAGES.join('|')}]\n`);
@@ -421,14 +760,15 @@ async function main() {
     const vite = await import(pathToFileURL(createRequire(path.join(appDir, 'package.json')).resolve('vite')).href);
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
-    result = await run(port, root, shots, { language });
+    result = await run(port, root, shots, { language, filesOnly: argv.includes('--files-only'), exitBefore: argv.includes('--exit-before-reload'), saveAfterOpen: argv.includes('--save-after-open'), project: projAt >= 0 ? path.resolve(argv[projAt + 1] ?? '') : null });
   } finally {
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
   }
-  for (const s of result.steps) log(s);
+  for (const s of result.lang.steps) log(s);
+  for (const s of result.files.steps) log(s);
   log('loadavg', os.loadavg(), 'nproc', os.availableParallelism());
-  process.stdout.write(JSON.stringify(result) + '\n');
+  process.stdout.write(JSON.stringify(result.lang) + '\n' + JSON.stringify(result.files) + '\n');
 }
 
 const self = process.argv[1] ? fs.realpathSync(process.argv[1]) : null;
