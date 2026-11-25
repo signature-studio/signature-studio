@@ -47,6 +47,8 @@ void fle_imp_GetLocaleInfoW(void);
 void fle_imp_LCMapStringW(void);
 /* kernel32!CompareStringW: int CompareStringW(LCID, DWORD, PCNZWCH, int, PCNZWCH, int). */
 void fle_imp_CompareStringW(void);
+/* #1382: kernel32!CompareStringOrdinal (fle_locale.c). */
+void fle_imp_CompareStringOrdinal(void);
 /* kernel32!MultiByteToWideChar: int f(UINT, DWORD, LPCCH, int, LPWSTR, int). */
 void fle_imp_MultiByteToWideChar(void);
 /* kernel32!WideCharToMultiByte: int f(UINT, DWORD, LPCWCH, int, LPSTR, int, LPCCH, LPBOOL). */

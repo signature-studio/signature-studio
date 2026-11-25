@@ -678,6 +678,20 @@ fle_rsurf *fle_raster_window_surface(uint32_t lid, uint32_t w, uint32_t h)
     return &s->view;
 }
 
+/* #1382: the live drawing surfaces, their number and bytes (for the stop line of fle_gdi.c, mem_why). */
+void fle_raster_mem(uint64_t *n, uint64_t *bytes)
+{
+    uint32_t k;
+
+    *n = 0;
+    *bytes = 0;
+    for (k = 0; k < ws_n; k++)
+        if (ws[k]->live && ws[k]->bits) {
+            (*n)++;
+            *bytes += (uint64_t)ws[k]->w * ws[k]->h * 4u;
+        }
+}
+
 void fle_raster_window_destroyed(uint32_t lid)
 {
     wsurf *s = ws_find(lid);

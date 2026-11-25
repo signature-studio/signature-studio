@@ -1601,3 +1601,44 @@ void fle_imp_LocaleNameToLCID(void)
     }
     fle_locale_stop(api, "a locale name that this environment does not have (only the emulated locale's name, NULL, the system-default name and the empty name are answered)");
 }
+
+/* #1382: kernel32!CompareStringOrdinal (MSDN: CompareStringOrdinal, Windows Vista and later): int f(LPCWCH lpString1 rcx, int cchCount1 edx, LPCWCH lpString2 r8, int cchCount2 r9d,
+ * BOOL bIgnoreCase [5]). Returns CSTR_LESS_THAN 1, CSTR_EQUAL 2 or CSTR_GREATER_THAN 3 (the CompareStringEx page's values): the first unit that differs decides by its value, and a string
+ * that is a prefix of the other is the smaller. A count of -1 means the string runs up to its NUL (the page). With bIgnoreCase the ASCII letters are compared in upper case (the page says
+ * the comparison ignores the case; only the ASCII letters are folded here: a pair of differing units with a non-ASCII unit stops, as no case table is modelled). A count below -1, and a NULL
+ * string with a count other than 0, stop (the page names no return value for them). The last error is left alone. The engine takes it with GetProcAddress (the Theme page's style code, f_44b7e0).
+ * It is answered here so that the guest's call does not go through the NULL that GetProcAddress gave for a name the runtime did not have (decision 0015: a row of fle_resp_table). */
+void fle_imp_CompareStringOrdinal(void)
+{
+    static const char api[] = "CompareStringOrdinal";
+    uint64_t p1 = R[1], p2 = R[8];
+    int32_t c1 = (int32_t)(uint32_t)R[2], c2 = (int32_t)(uint32_t)R[9];
+    int ic = (uint32_t)fle_stack_arg(5) != 0;
+    size_t n1 = 0, n2 = 0, i;
+
+    if (c1 < -1 || c2 < -1) fle_locale_stop(api, "a count below -1 is not defined (the page names no value for it)");
+    if ((c1 != 0 && p1 == 0) || (c2 != 0 && p2 == 0)) fle_locale_stop(api, "a NULL string with a count other than 0 is not defined");
+    if (c1 == -1) {
+        while (fle_ld(p1 + 2 * n1, 2) != 0) n1++;
+    } else {
+        n1 = (size_t)c1;
+    }
+    if (c2 == -1) {
+        while (fle_ld(p2 + 2 * n2, 2) != 0) n2++;
+    } else {
+        n2 = (size_t)c2;
+    }
+    for (i = 0; i < n1 && i < n2; i++) {
+        uint16_t a = (uint16_t)fle_ld(p1 + 2 * i, 2), b = (uint16_t)fle_ld(p2 + 2 * i, 2);
+        if (a == b) continue;
+        if (ic) {
+            if (a > 0x7f || b > 0x7f) fle_locale_stop(api, "bIgnoreCase with a non-ASCII unit that differs is not modelled (no case table)");
+            if (a >= 'a' && a <= 'z') a = (uint16_t)(a - 32);
+            if (b >= 'a' && b <= 'z') b = (uint16_t)(b - 32);
+            if (a == b) continue;
+        }
+        R[0] = a < b ? 1 : 3;
+        return;
+    }
+    R[0] = n1 == n2 ? 2 : (n1 < n2 ? 1 : 3);
+}

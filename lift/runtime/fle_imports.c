@@ -10,6 +10,7 @@
 #include "fle_imports.h"
 #include "fle_thread.h"
 #include "fle_env.h"
+#include "fle_glob.h"
 
 /* MSDN GetCurrentThreadId: DWORD, "the thread identifier of the calling thread", unique in the system until the
  * thread ends. The run has one guest thread, so the answer is the fixed FLE_EMULATED_TID on native and wasm alike
@@ -63,6 +64,7 @@ void fle_imp_LocalAlloc(void)
     }
     if (bytes == 0) bytes = 1;
     p = !fle_host_size_fits(bytes) ? NULL : (flags & FLE_LMEM_ZEROINIT) ? calloc(1, (size_t)bytes) : malloc((size_t)bytes);
+    fle_glob_fixed_add(p);
     R[0] = (uint64_t)(uintptr_t)p;
 }
 
@@ -167,6 +169,9 @@ void fle_imp_FormatMessageW(void)
     for (i = 0; !text && (flags & FLE_FMT_FROM_SYSTEM) && i < sizeof fle_errmsg_hresult / sizeof fle_errmsg_hresult[0]; i++)
         if (fle_errmsg_hresult[i].code == id) text = fle_errmsg_hresult[i].text;
     if (!text) {
+        static unsigned misses;
+
+        if (misses++ < 8) fprintf(stderr, "fle: FormatMessageW: message %u is in none of the tables (dwFlags %#x, lpSource %#llx): 0 is returned and lpBuffer is not set\n", (unsigned)id, (unsigned)flags, (unsigned long long)R[2]);
         fle_set_last_error(317u);
         R[0] = 0;
         return;
@@ -181,6 +186,7 @@ void fle_imp_FormatMessageW(void)
             R[0] = 0;
             return;
         }
+        fle_glob_fixed_add(p);
         for (i = 0; i < n; i++) p[i] = (uint8_t)text[i];
         fle_st(buf, 8, (uint64_t)(uintptr_t)p);
         R[0] = n;
@@ -439,14 +445,26 @@ void fle_imp_VerSetConditionMask(void)
 
 /* kernel32!LocalFree: HLOCAL LocalFree(HLOCAL hMem). hMem in rcx (R[1]). Success returns
  * NULL (MSDN: LocalFree, Return value). A NULL hMem is ignored and returns NULL (MSDN:
- * LocalFree, Remarks). The handles here come only from fle_imp_LocalAlloc, which returns
- * malloc/calloc pointers (LMEM_MOVEABLE stops the run there), so free() applies. A pointer
- * not from LocalAlloc is not checked (assumption). Locking is not implemented, so no
+ * LocalFree, Remarks). The handles are the live fixed blocks of LocalAlloc and FormatMessageW
+ * (fle_glob.c). A value that is not a live block is not freed: MSDN, Return value: "If the
+ * function fails, the return value is equal to a handle to the local memory object", so hMem
+ * is returned, with ERROR_INVALID_HANDLE (6; the page names no code: assumption). #1382: a
+ * guest that frees an uninitialised lpBuffer of a failed FormatMessageW passed a stale value
+ * here; free() of such a value corrupts the heap (dlmalloc's usage check is __builtin_unreachable
+ * in release builds) and left the allocator's lock taken. Locking is not implemented, so no
  * handle is locked. */
+#define FLE_ERROR_INVALID_HANDLE 6u
+
 void fle_imp_LocalFree(void)
 {
-    free((void *)fle_addr_opt(R[1], 1, 1));
-    R[0] = 0;
+    uint64_t h = R[1];
+
+    if (h == 0 || fle_glob_fixed_release(h)) {
+        R[0] = 0;
+        return;
+    }
+    fle_set_last_error(FLE_ERROR_INVALID_HANDLE);
+    R[0] = h;
 }
 
 /* Setter for the last error above, for runtime files outside this one (fle_osver.c). Same

@@ -461,9 +461,9 @@ NEWS=$(jq -n -S --slurpfile b "$B" --slurpfile n "$J" '
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
 ok "新しい段: 551a4e59 より後の段は、extract に 17 件、work に 12 件(抽出物の追加の段と、起動用の実行ファイルの段と、実機のビーコンの段を含む)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS")" "extract=17 work=12"
-ok "新しい段: すべて、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
-ok "新しい段: extract は labels、work は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
-ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)" "$(grep -cF "format(',{0},'" "$A")" 29
+ok "新しい段: 言語等(resources)の段を除き、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(select(.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not) | .["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS")" true
+ok "新しい段: extract は labels、work は issue_labels で判定する(言語等の段を除く)" "$(jq -r 'map(select(.job == "extract" and (.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not)) | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS")/$(jq -r 'map(select(.job == "work" and (.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not)) | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS")" "true/true"
+ok "新しい段: ラベルの判定は、カンマで囲んで行う(部分一致を避ける)。言語等の 5 段は判定を持たないので、その分を数えない(29 から 5 を引いた 24)" "$(grep -cF "format(',{0},'" "$A")" 24
 ok "新しい段: R2 の鍵を使うのは、extract の 5 つ(一覧の作成・外部の取得・言語等の取り出し・内蔵のプラグインの取り出し・起動用の実行ファイルの取り出し)だけ" "$(jq -r '[.[] | select(tostring | contains("R2_ARTIFACT")) | .job] | join(",")' <<<"$NEWS")" "extract,extract,extract,extract,extract"
 ok "work: R2_ARTIFACT の鍵が無い(作業ジョブは R2 の鍵を持たない)" "$(jq -r '.jobs.work | tostring | contains("R2_ARTIFACT")' "$J")" false
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が変更前と一致する" "$(jq -n -S --slurpfile b "$B" --slurpfile n "$JN" '
@@ -489,7 +489,7 @@ ok "select: 2 件の対象の labels は、重複なしのカンマ区切り。i
 ok "select: ラベルの無い対象は、labels が空の文字列、issue_labels は空の値" "$(sel issues '{"action":"opened","issue":{"number":33},"sender":'"$W"'}' | jq -c '[.labels, .issue_labels]' 2>/dev/null)" '["",{"33":""}]'
 ok "select: 起動しない対象だけなら、labels は空(対象が空)" "$(sel issues '{"action":"opened","issue":{"number":20},"sender":'"$W"'}' | jq -c '[.targets, .labels]' 2>/dev/null)" '[[],""]'
 # (l) 抽出物の追加(インストーラの言語・テーマ・テンプレート・プロジェクト(resources)と、内蔵のプラグインの DLL(plugin-builtin))。変更前の agent.yml(B3)と比べる。
-# 新しい段は、対象の Issue のラベルで条件を付けた段だけ。既存の段とジョブの設定は変更前と一致する。ラベルの無い run では、判定の文字列は ',,' で、どのラベルも含まない(新しい段は skip される)
+# 新しい段は、対象の Issue のラベルで条件を付けた段だけ(言語等の段を除く)。既存の段とジョブの設定は変更前と一致する。ラベルの無い run では、ラベルで条件を付けた新しい段は skip される。言語等の段は、ラベルによらず全ての作業で動く(seed 表の resources/ の行は、作業の途中で main を取り込むと増え、bundle が読むため)
 B3=a7f153b4
 git -C "$top" show "$B3:.github/workflows/agent.yml" > "$T/base3.yml" 2>/dev/null || echo "FAIL 変更前の agent.yml を読めない($B3)"
 pj "$T/base3.yml" > "$T/base3.json" 2>>"$T/pj.err"; B3J=$T/base3.json
@@ -498,9 +498,10 @@ NEWS3=$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$J" '
   | [ ($n[0].jobs.extract.steps[] | . + {job: "extract"}), ($n[0].jobs.work.steps[] | . + {job: "work"}) ]
   | map(select((.name) as $x | ($old | any(. == $x)) | not)) | map(select(.name | test("^作業の前に Issue|^作業を飛ばした旨|^前回の作業を取り込む$|^押せなかった作業を保存する$|^判定が落ちた作業を保存する$") | not))')
 ok "抽出物の追加: 新しい段は extract に 11 件、work に 8 件(resources・plugin-builtin・fl-exe の段に、実機のビーコンの 2 と 2 を足した)" "$(jq -r 'group_by(.job) | map("\(.[0].job)=\(length)") | join(" ")' <<<"$NEWS3")" "extract=11 work=8"
-ok "抽出物の追加: 新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(.["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
-ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する" "$(jq -r 'map(select(.job == "extract") | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work") | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
-ok "抽出物の追加: resources の段は 5 件、plugin-builtin の段は 5 件(判定に、そのラベルを含む)" "$(jq -r '[(map(.["if"] // "" | select(test(",resources,"))) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "5/5"
+ok "抽出物の追加: 言語等(resources)の段を除く新しい段は全て、対象の Issue のラベルの判定を if に持つ" "$(jq -r 'map(select(.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not) | .["if"] // "" | test("needs[.]select[.]outputs[.](labels|issue_labels)")) | all' <<<"$NEWS3")" true
+ok "抽出物の追加: 言語等(resources)の段は、ラベルの判定を持たない(全ての作業で動く。作業の途中で main の seed 表に resources/ の行が増えても、bundle の木が揃うため)" "$(jq -r 'map(select(.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources")) | .["if"] // "" | test("needs[.]select[.]outputs[.]")) | any | not' <<<"$NEWS3")" true
+ok "抽出物の追加: extract の新しい段は labels、work の新しい段は issue_labels で判定する(言語等の段を除く)" "$(jq -r 'map(select(.job == "extract" and (.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not)) | .["if"] | test("needs[.]select[.]outputs[.]labels")) | all' <<<"$NEWS3")/$(jq -r 'map(select(.job == "work" and (.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources") | not)) | .["if"] | test("needs[.]select[.]outputs[.]issue_labels")) | all' <<<"$NEWS3")" "true/true"
+ok "抽出物の追加: 言語等の段は 5 件で、判定にラベルを含まない。plugin-builtin の段は 5 件で、判定にそのラベルを含む" "$(jq -r '[(map(select(.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources")) | .["if"] // "" | select(test(",resources,"))) | length), (map(select(.name | test("言語・テーマ・テンプレート・プロジェクト|host-extra/resources")) | 1) | length), (map(.["if"] // "" | select(test(",plugin-builtin,"))) | length)] | join("/")' <<<"$NEWS3")" "0/5/5"
 ok "抽出物の追加: 新しい段に App の鍵・token を使う段が無い" "$(jq -r 'map(tostring | test("GH_APP_|GITHUB_TOKEN|github[.]token|GH_TOKEN")) | any' <<<"$NEWS3")" false
 cat > "$T/want-res.txt" <<'WANT'
 mapfile -t prefixes < ci/resources-prefixes.txt
@@ -522,10 +523,20 @@ ok "抽出物の追加: 言語等の鍵は、保存・復元の 3 つ(extract �
 ok "抽出物の追加: 内蔵のプラグインの鍵は、保存・復元の 3 つ(extract の 2 つと work の 1 つ)で同じ式" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.key? // empty | select(startswith("extra-plugins-"))) | "\(length) \(unique | length) \(unique[0])"' "$J")" "3 1 $(cat "$T/want-key-plg.txt")"
 ok "抽出物の追加: 作業の場所は、RUNNER_TEMP の extra-exe・extra-plugins・extra-resources(取り出し・保存・復元で同じ)" "$(jq -r '[.jobs.extract.steps[], .jobs.work.steps[]] | map(.with.path? // empty | select(test("extra-"))) | unique | join(" ")' "$J")" '${{ runner.temp }}/extra-exe ${{ runner.temp }}/extra-plugins ${{ runner.temp }}/extra-resources'
 ok "抽出物の追加: 言語等の復元の段の id は resources、内蔵のプラグインの復元の段の id は plugins" "$(jq -r '[(.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)") | .id), (.jobs.extract.steps[] | select(.name == "内蔵のプラグインのキャッシュ(R2)") | .id)] | join(" ")' "$J")" "resources plugins"
-ok "抽出物の追加: 取り出しと保存の 4 つの段は、cache-hit が偽のときだけ動く(言語等は resources、プラグインは plugins の復元を見る)" "$(jq -r '[.jobs.extract.steps[] | select(.name | test("^インストーラの言語・テーマ・テンプレート・プロジェクト(を取り出す|をキャッシュに保存)|^内蔵のプラグインの DLL を取り出す|^内蔵のプラグインをキャッシュに保存")) | .["if"] | (contains("cache-hit != ") and contains(",resources,") or contains("cache-hit != ") and contains(",plugin-builtin,"))] | "\(length) \(all)"' "$J")" "4 true"
+ok "抽出物の追加: 言語等の取り出しと保存の 2 つは、resources の復元の cache-hit が偽のときだけ動く(ラベルを見ない)" "$(jq -r --arg c "steps.resources.outputs.cache-hit != 'true'" '[.jobs.extract.steps[] | select(.name | test("^インストーラの言語・テーマ・テンプレート・プロジェクト(を取り出す|をキャッシュに保存)")) | .["if"] == $c] | "\(length) \(all)"' "$J")" "2 true"
+ok "抽出物の追加: 内蔵のプラグインの取り出しと保存の 2 つは、cache-hit が偽のときに、plugin-builtin のラベルで動く(復元の段の id は plugins)" "$(jq -r '[.jobs.extract.steps[] | select(.name | test("^内蔵のプラグインの DLL を取り出す|^内蔵のプラグインをキャッシュに保存")) | .["if"] | (contains("cache-hit != ") and contains(",plugin-builtin,"))] | "\(length) \(all)"' "$J")" "2 true"
+ok "抽出物の追加: 言語等の復元(extract)の段には判定が無い(全ての作業で、キャッシュを取る。無いと作業の段が取れない)" "$(jq -r '[.jobs.extract.steps[] | select(.name == "インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)") | (.["if"] // "none")] | .[0]' "$J")" none
 ok "抽出物の追加: 作業の段は、取った物を lift/out-app/host-extra/resources と lift/out-app/host-extra/plugins に置く(mv 2 件)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(test("mv .*lift/out-app/host-extra/(resources|plugins)"))) | length' "$J")" 2
 ok "抽出物の追加: 作業の段の配置は、git を呼ばない(commit は作業者が行う。ここでは置くだけ)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/")) | .run] | map(select(contains("git "))) | length' "$J")" 0
 ok "抽出物の追加: 作業ツリーの lift/out-app/host-extra は git の対象外(判定の git status を汚さない)" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/resources/x && git -C "$top" check-ignore -q lift/out-app/host-extra/plugins/x && echo yes)" yes
+ok "抽出物の追加: 言語等の作業の復元と置く段は、判定が success と skip の確認だけ(ラベルを見ない)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^言語・テーマ・テンプレート・プロジェクトを R2|^取った物を lift/out-app/host-extra/resources")) | .["if"]] | unique | .[]' "$J")" "success() && steps.check.outputs.skip != 'true'"
+ok "抽出物の追加: 言語等の作業の復元は fail-on-cache-miss: true(extract が保存した鍵を、全ての作業が取る)" "$(jq -r '[.jobs.work.steps[] | select(.name | test("^言語・テーマ・テンプレート・プロジェクトを R2")) | .with["fail-on-cache-miss"]] | .[0]' "$J")" true
+WRES=$(jq -r '[.jobs.work.steps[] | select(.name | test("^取った物を lift/out-app/host-extra/resources")) | .run][0] // ""' "$J")
+wm=$(grep -nxF 'mv "$RUNNER_TEMP/extra-resources" lift/out-app/host-extra/resources' <<<"$WRES" | cut -d: -f1)
+wk=$(grep -nxF 'mkdir -p lift/out-app/host/resources' <<<"$WRES" | cut -d: -f1)
+wc=$(grep -nxF 'cp -a lift/out-app/host-extra/resources/. lift/out-app/host/resources/' <<<"$WRES" | cut -d: -f1)
+ok "抽出物の追加: 言語等の配置は、host-extra/resources に mv し、その後で host/resources に cp -a する(bundle は host を読む。mv・mkdir・cp の順)" "$([ -n "$wm" ] && [ -n "$wk" ] && [ -n "$wc" ] && [ "$wm" -lt "$wk" ] && [ "$wk" -lt "$wc" ] && echo ok || echo ng)" ok
+ok "抽出物の追加: 作業ツリーの lift/out-app/host/resources は git の対象外(bundle の木を置いても、判定の git status を汚さない)" "$(git -C "$top" check-ignore -q lift/out-app/host/resources/x && echo yes)" yes
 # (p) 起動用の実行ファイル(fl-exe: FL64.exe と FL64 (scaled).exe。根の直下なので、接頭辞でなく完全なパスを --file で取る)。ラベルの Issue だけ、extract で R2 のキャッシュに置き、work で lift/out-app/host-extra/exe に置く(commit はしない)
 cat > "$T/want-exe-run.txt" <<'WANT'
 node tools/fl-installer-extract.mjs "$RUNNER_TEMP/in/flstudio_win64_26.1.7.5653.exe" "$RUNNER_TEMP/extra-exe" --file 'FL64.exe' --file 'FL64 (scaled).exe'
@@ -591,7 +602,7 @@ ok "接頭辞(r5): 設計の文書に、一覧の行の形と、完全なパス�
 ILSI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\ILSvg_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r7): ci/extract-dlls.tsv に ILSvg_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/ilsvg_x64.dll(plugin の段が読む場所)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$ILSI" 'BEGIN{split(I, a, "\t")} $1 == "ILSvg_x64.dll" {n++; if ($2 == "lift/out-plugins/ilsvg_x64.dll" && $3 == a[2] && a[1] == "1504256") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
-WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
+WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(全ての作業)","取った物を lift/out-app/host-extra/resources と lift/out-app/host/resources に置く(全ての作業。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
 ok "抽出物の追加: work の段の順は、lift/out-app/host の後に、言語等と内蔵のプラグインを置き、タスクの前" "$(jq -r --argjson o "$WORD" '[.jobs.work.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
 ok "既存の段: extract・work の既存の段は、name・if・id・uses・with・env・run が a7f153b4 と一致する" "$(jq -n -S --slurpfile b "$B3J" --slurpfile n "$JN" '
@@ -1324,11 +1335,13 @@ ok "E2E(x) 判定: 印の付いたシナリオが通ったら 0 のまま、警�
 ok "E2E(x) 判定: 印の無い全て正常なら、警告を出さない" "$(ej4 "$G")/$(grep -q '警告' "$T/ej.err" && echo warned || echo quiet)" "0/quiet"
 ok "E2E(x) 判定: 印の付いたシナリオの、ok が真で stuckToasts が 1 でも 0(印の Issue の欠陥)" "$(ej4 "$(RW 58.9 true null "$(SC a true null 0 0 0 0),$(SC b true '"#1421"' 0 0 1 0),$(SC c true null 0 0 0 0)")")" 0
 EFD="$top/tools/e2e/scenarios/smoke/file-open-demo.mjs"
-ok "E2E(x): file-open-demo に、既知の欠陥の印(expectFail: '#<番号>')が付いている(既に在る欠陥で門を止めない)" "$(grep -cE "expectFail: '#[0-9]+'" "$EFD")" 1
+ok "E2E(x): file-open-demo の印は外れている(#1421 は完了。expectFail: null で、通らなければ門が止まる)" "$(grep -cE "expectFail: null" "$EFD")" 1
+ok "E2E(1484): plugin-manager-opens に、既知の欠陥の印(expectFail: '#1499')が付いている(窓が出る確認は #1499 で外す)" "$(grep -cE "expectFail: '#1499'" "$top/tools/e2e/scenarios/smoke/plugin-manager-opens.mjs")" 1
+ok "E2E(1484): smoke の index.mjs は Plugin Manager と Plugin database の 2 シナリオを並べる" "$(grep -cE '^import (pluginManager|pluginDatabase) from' "$top/tools/e2e/scenarios/smoke/index.mjs")" 2
 ok "E2E(x): 止まりの閾値(engine が running の時間)は 90 秒(この runner は GPU が無く、起動が遅い)" "$(grep -cF 'ms > 90000' "$top/tools/e2e/lib/detect.mjs")" 1
-ok "E2E(x): 窓の表の取得の再試行の回数を、シナリオの JSON に出す(dumpRetries)" "$(grep -cF 'out.dumpRetries = ' "$top/tools/e2e/run.mjs")" 1
-ok "E2E(x): 停止の理由を、シナリオの JSON に出す(engineStop)" "$(grep -cF 'out.engineStop = ' "$top/tools/e2e/run.mjs")" 1
-ok "E2E(x): 1 本のシナリオだけを動かす --only が在り、名前が無ければ止まる(run.mjs)" "$(grep -cF 'args.only' "$top/tools/e2e/run.mjs" | awk '{print ($1>=1)?1:0}')/$(grep -cF 'is not a scenario of the set' "$top/tools/e2e/run.mjs")" "1/1"
+ok "E2E(x): 窓の表の取得の再試行の回数を、シナリオの JSON に出す(dumpRetries)" "$(grep -cF 'out.dumpRetries = ' "$top/tools/e2e/run.mjs" "$top"/tools/e2e/lib/*.mjs | awk -F: '{n+=$NF} END{print (n>=1)?1:0}')" 1
+ok "E2E(x): 停止の理由を、シナリオの JSON に出す(engineStop)" "$(grep -cF 'out.engineStop = ' "$top/tools/e2e/run.mjs" "$top"/tools/e2e/lib/*.mjs | awk -F: '{n+=$NF} END{print (n>=1)?1:0}')" 1
+ok "E2E(x): 1 本のシナリオだけを動かす --only が在り、名前が無ければ止まる(run.mjs)" "$(grep -cF 'args.only' "$top/tools/e2e/run.mjs" | awk '{print ($1>=1)?1:0}')/$(grep -cF 'is not a scenario of the set' "$top/tools/e2e/run.mjs" "$top"/tools/e2e/lib/*.mjs | awk -F: '{n+=$NF} END{print (n>=1)?1:0}')" "1/1"
 DS19=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(x): 「19」の節に、門の位置・判定・expectFail・artifact・120 Hz に届かない事実の扱い(落とさない)と judge.jq を書いた" "$(for w in 'e2e-' 'expectFail' '120 Hz' '落とさない' 'judge.jq'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(x): 「19」の節に、既に在る欠陥は expectFail(Issue の番号つき)にして、門は新しい退行だけを止めること、expectFail でも pageErrors・consoleErrors・failedRequests は 0 を求めることを書いた" "$(for w in '既に在る欠陥' '新しい退行' 'pageErrors'; do grep -cF -- "$w" <<<"$DS19"; done | awk '{s+=($1>0)} END{print s}')" 3

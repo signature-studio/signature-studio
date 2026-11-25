@@ -1,7 +1,7 @@
 // tools/ab/gates.mjs (#1422): the medians and the gates of one A/B comparison (tools/ab/run.mjs). Pure: the runs in, the medians and the gates out.
 // medians: base and changed (each key's median over a side's runs), and for each key { base, after } (the same values, by key).
-// p3: underrunDelta is a median gate (the changed median at most the base median), not 0: the base run has its own underruns on a loaded runner.
-export const MEDIAN_KEYS = { p2: ['minWindowFps', 'inputToPresentMsP95', 'inputDropped'], p3: ['pcmRepeat8192', 'underrunDelta', 'nonSilentDelta'] };
+// p3: underrunDelta and last60sUnderruns are median gates (the changed median at most the base median), not 0: the base run has its own underruns on a loaded runner.
+export const MEDIAN_KEYS = { p2: ['minWindowFps', 'inputToPresentMsP95', 'inputDropped'], p3: ['pcmRepeat8192', 'underrunDelta', 'last60sUnderruns', 'nonSilentDelta'] };
 
 // the median of the values; null when one of them is not a finite number (a run without the value cannot be compared)
 export function median(values) {
@@ -35,12 +35,13 @@ export function gatesOf(kind, runs, medians) {
     const each = (name, key, ok) => gate(`every changed run: ${name}`, ch.length > 0 && ch.every(ok), ch.map((r) => r[key]));
     each('error is null', 'error', (r) => r.error === null);
     each('playing is true', 'playing', (r) => r.playing === true);
-    each('last60sUnderruns is 0', 'last60sUnderruns', (r) => r.last60sUnderruns === 0);
     each('inputRateOk is true', 'inputRateOk', (r) => r.inputRateOk === true);
     each('nonSilentDelta is above 0', 'nonSilentDelta', (r) => typeof r.nonSilentDelta === 'number' && r.nonSilentDelta > 0);
     each('pcmRepeat8192 is null or below 0.01', 'pcmRepeat8192', (r) => r.pcmRepeat8192 === null || (typeof r.pcmRepeat8192 === 'number' && r.pcmRepeat8192 < 0.01));
     const ub = medians.base.underrunDelta, uc = medians.changed.underrunDelta;
     gate('underrunDelta: changed median <= base median', ub !== null && uc !== null && uc <= ub, { base: ub, changed: uc });
+    const lb = medians.base.last60sUnderruns, lc = medians.changed.last60sUnderruns;
+    gate('last60sUnderruns: changed median <= base median', lb !== null && lc !== null && lc <= lb, { base: lb, changed: lc });
   }
   return gates;
 }

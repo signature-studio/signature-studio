@@ -54,7 +54,8 @@ select ──(対象が空なら終わり)──> start ──> extract ──> 
     - `Data\Patches\Scores\Chopping\Riff machine step 1\`: 24 件・6,311 B(#1387)。
     - `Data\Patches\Scores\Chopping\Riff machine step 2\`: 19 件・2,807 B(#1387)。
   - #1373 で足した 2 件(`ci/resources-prefixes.txt` の 17〜18 行目。demo の曲の素材で、曲のフォルダ単位)。`Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\`: 4 件・877,543 B。`Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\`: 5 件・694,532 B。
-  - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入るだけ。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
+  - 接頭辞で取った物は、作業ツリーの `lift/out-app/host-extra/resources/` に入り、ラベルによらず全ての作業で、その写しを `lift/out-app/host/resources/` に置く(`fe-build bundle` が読むのは host だけ。下の「問題 A」)。エンジンの VFS に載るのは、起動の seed 表(`lift/harness/seeds/vfs-seed-idle1.tsv`)か、pack の lazy 指定に行が在る物だけ。接頭辞を足した Issue は、その行も足す。
+  - 問題 A(#1480 の判定の落ち方。決定): 作業の抽出の木(`host/`)は、作業の開始時の commit の seed 表で作られる。作業者が main を取り込むと seed 表の `resources/` の行(#1387 の Riff machine の 100 件)が増え、木に無いファイルを `pack-seed.mjs` が読んで ENOENT で落ちた。言語等の取り出し(`extra-resources`)を、ラベル `resources` によらず全ての作業で取り(鍵は変えない。fail-on-cache-miss のため extract が必ず保存する)、`host/resources/` に cp -a で置く。seed 表の `resources/` の行は 373 件(`@lazy-file:` を含む。pack-seed は lazy の行も読む)で、接頭辞の一覧が全て覆う(検査済み)。作業の途中で木を作り直す案は、インストーラを作業の中で読むため、採らない。
 - 抽出の表は、`ci/extract-dlls.tsv` と `lift/plugins/*/plugin.tsv` の行の和で、後者は `app/scripts/extract-fl.mjs` が `app/scripts/lib/plugin-rows.mjs` で読んで足す。抽出の鍵(agent.yml の extract-tree-・deploy.yml の host-)は、その plugin.tsv を入力に含む。
 - プラグインの Data(素材)は `lift/plugins/<名前>/data.tsv` で宣言し(#1478)、同じ `plugin-rows.mjs` の `pluginRows()` が seed の行を作る。agent.yml の extract-tree-(保存・復元の 2 つ)の鍵は `lift/plugins/*/data.tsv` を入力に含む。spec/workflow.test.sh は、その 2 項目(plugin.tsv・data.tsv)を旧版との比較の前に除く。
 
@@ -169,7 +170,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 
 `fe-build bundle` の後、`fe-build upload`・wrangler の前に、2 つの検査の段を置く。(1) `tools/boot-check/boot-bundle.mjs` で起動を確かめ、状態が `engine-idle`・`standIn` が偽・`error` が null のときだけ通す(boot-bundle の `error` が null でも、状態が idle とは限らないので、状態を別に見る)。(2) `tools/smoke/welcome-flow.mjs` で Welcome 窓の 4 つの閉じ方(「No thanks」→ Default、Escape、「No thanks」→ Default の 1 回クリック、「I'm in」→ Default)を、流れごとに別の起動で走らせ、4 件とも `error` が無く、trap せず、idle に戻り、プロジェクトが開き、窓が閉じたときだけ通す。判定は、e2e.yml の build の中の `jq -e` の段が行う(道具の終了コードは流れの成否を表さないため)。どちらかが落ちれば、build は落ち、e2e と deploy は動かず、本番は更新されない(既定の `success()`)。判定の式は `spec/workflow.test.sh` の (m) が、fixture で実際に動かして確かめる。`HostFilesUnsupported` の件数は、正常時の値が未確認のため判定に入れない。時間の上限は、起動の段 15 分、流れの段 30 分。Chrome は runner の画像の `google-chrome` を使う(作業ジョブの boot-check と同じ)。作業ジョブの判定(judge)には、まだ入れていない。判定には取り直した main の engine と bundle を作り直す段が要り、作業ジョブの時間が大きく増えるため、deploy のログで `fe-build engine` の所要時間を見てから決める。
 
-ビルド直後の初回は冷える(OS のファイルのキャッシュ)。`boot-bundle` は、2 回起動し、1 回目を `coldMs`、2 回目を `elapsedMs` とする。実機の初回の起動は、別の測定(実機のビーコン)で見る。
+ビルド直後の初回は冷える(OS のファイルのキャッシュ)。`boot-bundle` は、冷たい起動を 1 回(`coldMs`)と、温かい起動を 3 回行い、`elapsedMs` は温かい 3 回の中央値、`samples` に 3 回の値を出す(問題 B: runner の揺れ(7〜17 秒)で、変更と無関係な作業が 12,500 ms の門で偶然落ちた(#1401・#1415)ため。受け入れの式は変えず、見る値の揺れを減らす)。`welcome-flow` の流れごとの値は変えない。実機の初回の起動は、別の測定(実機のビーコン)で見る。
 
 ## 13. 時間切れと待ちの固まり
 
