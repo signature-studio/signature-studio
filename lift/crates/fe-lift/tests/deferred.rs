@@ -290,6 +290,10 @@ const DRIVER: &str = r##"
 #include "fle_callback.h"
 #include "fle_realmod.h"
 
+/* #1389: the page's clipboard library is not linked into this driver (as in wall_ia1.rs): the page has no text and no clipboard */
+void fle_clip_host_write(const void *units, uint32_t bytes) { (void)units; (void)bytes; }
+void *fle_clip_host_read(void) { return NULL; }
+
 static uint8_t stk[1 << 16] __attribute__((aligned(16)));
 #define A(x) ((uint64_t)(uintptr_t)(x))
 #define U(x) ((unsigned long long)(x))
@@ -485,6 +489,7 @@ int main(int argc, char **argv)
         printf("two frees\n"); fflush(stdout);
         free_lib(RM_BASE);
     } else if (!strcmp(s, "real-free-before-load")) { free_lib(RM_BASE);
+    } else if (!strcmp(s, "real-gpa-before-load")) { gpa(RM_BASE, "AggCreateInstance");
     } else if (!strcmp(s, "real-stop-deferred-qfc")) {
         uint64_t va;
         LLW("blend2d.dll");
@@ -856,6 +861,21 @@ fn a_real_blend2d_follows_the_real_module_rules_of_free_library() {
     assert_eq!(o.stdout.lines().filter(|l| *l == "1 5").count(), 3);
     // FreeLibrary of the base before the load: the real-module stop
     aborts_with(d, "real-free-before-load", "FreeLibrary of a real module that is not loaded");
+}
+
+#[test]
+fn get_proc_address_of_a_real_module_that_is_not_loaded_returns_null_and_module_not_found() {
+    // Issue #1418 (family: GetProcAddress NULL). A handle that is not a live module gives NULL and ERROR_MOD_NOT_FOUND (126): Wine's
+    // kernel32 tests (dlls/kernel32/tests/module.c, testGetProcAddress_Wrong: GetProcAddress((HMODULE)0xdeadbeef, ...) gives
+    // ERROR_MOD_NOT_FOUND). The real module is not loaded here (its base is the handle the table gives). One warning line.
+    let d = real_driver();
+    let o = run_with(d, "real-gpa-before-load");
+    assert!(o.ok, "real-gpa-before-load: did not exit normally (signal {:?}): {}\n{}", o.signal, o.stderr, o.stdout);
+    assert_eq!(o.stdout.lines().collect::<Vec<_>>(), ["0 126"]);
+    assert_eq!(
+        o.stderr.lines().filter(|l| l.starts_with("fle: warn: GetProcAddress")).collect::<Vec<_>>(),
+        ["fle: warn: GetProcAddress: not modelled, returned 0 (caller 0xdead0000)"]
+    );
 }
 
 #[test]

@@ -70,6 +70,8 @@ uint64_t fle_realmod_module_handle(const char *api, int idx) FLE_REALMOD_REF;
 /* kernel32!GetProcAddress by name over the export directory of the mapped image: base + export RVA, or 0 when the name is not
  * exported. A forwarder, a module that is not loaded and a malformed export table stop. */
 uint64_t fle_realmod_getproc(const char *api, int idx, const char *name) FLE_REALMOD_REF;
+/* Issue #1418: 0 while the module is not loaded (no DllMain has run and it is not mapped), else 1 (LOADING counts as loaded, as for fle_realmod_getproc). */
+int fle_realmod_loaded(int idx) FLE_REALMOD_REF;
 
 /* Decision 0122 (PM item 6): DLL_THREAD_ATTACH (2) / DLL_THREAD_DETACH (3) for the real modules that are loaded now: DllMain(hinst = base, reason, NULL) in the context of the running thread. Attach goes in load order,
  * detach in the reverse order (a choice: Learn gives no order). With the environment variable FLE_THREAD_NO_DLL_NOTIFY=1 nothing is delivered (the "not delivered" fallback of the decision, which is NOT what Windows does). */

@@ -283,12 +283,17 @@ int fle_realmod_file_name(const char *api, int idx, char *out, unsigned n)
     return -1;
 }
 
+int fle_realmod_loaded(int idx)
+{
+    return mods[idx].state != ST_NOT_LOADED;
+}
+
 uint64_t fle_realmod_getproc(const char *api, int idx, const char *name)
 {
     rm_t *m = &mods[idx];
     uint64_t base = fle_realmod_table[idx].base, e, nfunc, nnames, afunc, anames, aord, i;
 
-    if (m->state == ST_NOT_LOADED) fle_stop(api, "GetProcAddress on a real module that is not loaded");
+    if (m->state == ST_NOT_LOADED) return 0;   /* Issue #1418: the caller answers a module that is not loaded (fle_modules.c, ERROR_MOD_NOT_FOUND) */
     if (m->exp_rva == 0) return 0;
     if (m->exp_size < 40) fle_stop(api, "the export directory of a real module is too small");
     e = base + m->exp_rva;

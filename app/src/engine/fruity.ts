@@ -214,7 +214,15 @@ export class FruityEngine {
     const clk = ex.fle_g3_clock_to as (t: number) => void;
     const display = typeof ex.fle_g3_display === 'function' ? (ex.fle_g3_display as (w: number, h: number) => number) : null;
     const syscmd = typeof ex.fle_g3_taskbar_iconic === 'function' && typeof ex.fle_g3_taskbar_syscommand === 'function' ? (ex.fle_g3_taskbar_syscommand as (lid: number, cmd: number) => number) : null;
-    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}) };
+    const hz = typeof ex.fle_g3_hz === 'function' ? (ex.fle_g3_hz as (hz: number) => number) : null;
+    return { mouse: (k, x, y, d) => mouse(k, x, y, d), key: (k, vk, sc, e) => key(k, vk, sc, e), clockTo: (t) => clk(t), ...(display ? { display: (w: number, h: number) => display(w, h) } : {}), ...(syscmd ? { syscommand: (lid: number, cmd: number) => syscmd(lid, cmd) } : {}), ...(hz ? { hz: (v: number) => hz(v) } : {}) };
+  }
+
+  /** Issue #1402 (lift/harness/fruity_idle.c fle_g3_dwm_count): the number of DwmFlush calls so far, or null when the wasm has no such export. Read at each idle (the rate the guest is paced at, as the page sees it). */
+  dwmFlushes(): number | null {
+    const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_dwm_count;
+    if (typeof f !== 'function') return null;
+    return (f as () => number)();
   }
 
   /**

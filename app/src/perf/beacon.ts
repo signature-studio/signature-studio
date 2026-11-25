@@ -24,6 +24,7 @@ export const BEACON_MAX_PERIODIC = 20;
  * answers' kinds (`answeredUnderDemo`, `answeredFlp`, `answeredBytes`: counts only). A record without them is a record from before this change.
  * Still 3 (Issue #1398): `desk.recent10s` (the presents of the last 10 s and their rate), `input.inputToPresentMsP50` / `input.inputToPresentMsP95` (the same numbers as `input.eventToRaf`'s p50Ms / p95Ms) and the top-level `rafIntervalMsP95`
  * (the same number as `display.raf.recent10s.p95Ms`) are OPTIONAL: a record from before this change has none of them.
+ * Still 3 (Issue #1418): `warns` (API name -> calls, the top 20: the calls the engine answered without a model, warns.ts) is present in every record of this change, `{}` when there were none; a record from before this change has no `warns`.
  */
 export const BEACON_VERSION = 3;
 
@@ -60,6 +61,8 @@ export interface BeaconPayload {
   guestScreen: GuestScreenInfo | null;
   /** decision 0216: what the page counted about its file manager and the engine's file dialogs (counts and failure codes only, no names); absent until Files was used. Still beacon version 3: optional block, like engine.exit.message */
   files?: FilesUsage;
+  /** Issue #1418: the calls the engine answered without a model, by API name (warns.ts warnsOf: the top 20, most calls first); `{}` when none; absent: a record from before this field */
+  warns?: Record<string, number>;
   /** decision 0220: where the four start-up assets came from (network / HTTP cache / the page's own stored copy) and where the time went; absent: a page from before this change. Still beacon version 3: optional block, like `files` */
   assets?: AssetsReport;
   /** decision 0240: what the desktop presenter did - the way the desktop is shown ('gl': WebGL2 from the runtime's scene description, '2d': putImageData of the composed picture), the Worker's counters since the page loaded and since the previous beacon (the previous one that was SENT); absent: the stand-in or a page from before this change. Still beacon version 3: optional block, like `assets` */
@@ -180,6 +183,8 @@ export interface BeaconInput {
   guestScreen?: GuestScreenInfo | null;
   /** decision 0216 */
   files?: FilesUsage | null;
+  /** Issue #1418 (warns.ts): the engine's counts of the calls answered without a model; absent or null: none */
+  warns?: Record<string, number> | null;
   /** decision 0220 */
   assets?: AssetsReport | null;
   /** decision 0240 */
@@ -234,6 +239,7 @@ export function buildBeacon(i: BeaconInput): BeaconPayload {
     rafIntervalMsP95: i.display ? i.display.raf.recent10s.p95Ms : null,
     guestScreen: i.guestScreen ?? null,
     ...(i.files ? { files: i.files } : {}),
+    warns: i.warns ?? {},
     ...(i.assets ? { assets: i.assets } : {}),
     ...(i.desk ? { desk: i.desk } : {}),
     ...(i.engineRun ? { engineRun: i.engineRun } : {}),

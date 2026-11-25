@@ -8,7 +8,7 @@ import { sha256Hex } from './bundle/sha256.ts';
 import type { FruityOptions, Manifest } from './bundle/manifest.ts';
 import { EngineClient, type ExitInfo } from './engine/client.ts';
 import { stateAfterFirstPixel } from './engine/start-state.ts';
-import { applyHz, HZ_DEFAULT, measureFrameRate, type FrameHost, type HzMeasurement } from './engine/hz.ts';
+import { applyHz, HZ_DEFAULT, measureFrameRate, roundToStandardHz, type FrameHost, type HzMeasurement } from './engine/hz.ts';
 import { blockingMissing, describeMissing, detectFeatures, type FeatureReport } from './engine/features.ts';
 import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './engine/fruity-log.ts';
 import type { AppView } from './engine/appview.ts';
@@ -32,6 +32,7 @@ import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
 import { perfNotice, perfRows, renderPerfPanel, type PanelView } from './perf/panel.ts';
+import { warnsOf } from './perf/warns.ts';
 import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
 import { bindAudioStatus } from './audio/status.ts';
@@ -95,7 +96,7 @@ interface AppApi {
   /** the last time the picture changed (for the stop message) */
   lastChanged: { at: number } | null;
   /** every idle the engine reported: when (ms, performance.timeOrigin based), how long it had computed since it was last resumed, its virtual clock and next deadline in ticks */
-  idles: { at: number; busyMs: number | null; n: number; now: number; next: number }[];
+  idles: { at: number; busyMs: number | null; n: number; now: number; next: number; dwm: number | null }[];
   /** decision 0170: the size of the engine's wasm memory (bytes) as of the last idle report; null before the first. It only grows: a steady climb during playback is the engine's own allocation */
   engineMemoryBytes: number | null;
   /** decision 0221: what the engine has asked of its host files (open / stat / read counts and bytes; null: an old-format bundle) */
@@ -560,6 +561,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     hz: displayMonitor.isRunning ? hzInfo() : null,
     guestScreen: guestScreenInfo(),
     files: filesUsage.snapshot(),
+    warns: warnsOf(engineLog.lines), // Issue #1418: the calls the engine answered without a model (its last counts line)
     assets: assetsNow(),
     desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs(), deskHistory.samples) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
@@ -739,7 +741,7 @@ const client = new EngineClient({
       if (app.screen.asked) followRoom(measureRoom());   // decision 0212: the room may have changed while the engine started
     }
     fileDlgView.engineIdle();
-    app.idles.push({ at, busyMs: m.busyMs, n: m.n, now: m.now, next: m.next });
+    app.idles.push({ at, busyMs: m.busyMs, n: m.n, now: m.now, next: m.next, dwm: m.dwm ?? null });
     if (app.idles.length > 5000) app.idles.shift();
     const prev = cycleLast;
     if (prev !== null) { (clock.cycles as number[]).push((at - prev) / Math.max(1, sinceN)); if (clock.cycles.length > 100) (clock.cycles as number[]).shift(); }
@@ -802,6 +804,20 @@ function applyHzParam(manifest: Manifest, measured: HzMeasurement | null): void 
   app.hz.hz = r.hz;
   app.hz.warning = r.warning;
   for (const l of r.lines) addLog(l.level, l.text);
+}
+
+// Issue #1402: the page's rate of requestAnimationFrame is measured again every HZ_TRACK_MS while the engine runs (a window of HZ_TRACK_WINDOW_MS, the start-up's measure). When the rounded rate
+// changes, the engine is told (client.setHz) and takes it at its next idle: its frames (DwmFlush) and the rate EnumDisplaySettingsW reports follow the page. A window with no frames (a hidden tab) changes nothing.
+const HZ_TRACK_MS = 2000, HZ_TRACK_WINDOW_MS = 500;
+function trackHz(): void {
+  void measureFrameRate(hzFrames, { skipIntervals: 2, windowMs: HZ_TRACK_WINDOW_MS, minIntervals: 8, giveUpMs: 1500 }).then((m) => {
+    if (m.measuredHz === null) return;
+    const hz = roundToStandardHz(m.measuredHz);
+    if (hz === app.hz.hz) return;
+    addLog('info', `display refresh rate ${hz} Hz for the engine (the page's requestAnimationFrame measures ${m.measuredHz.toFixed(1)} Hz now)`);
+    app.hz.hz = hz;
+    client.setHz(hz);
+  }).finally(() => { setTimeout(trackHz, HZ_TRACK_MS); });
 }
 
 
@@ -906,6 +922,7 @@ async function boot(): Promise<void> {
     $('stop-btn').textContent = 'Stop engine';
     if (apiTraceWanted) client.windowApiTrace(true);   // #1347: on before the engine's first instruction, so the start-up's DPI answers are traced
     client.start();
+    trackHz();
     startLazy(lazyRefs, lazyShared, store, recorder, keep);
   } catch (e) {
     if (e instanceof LoadError) {

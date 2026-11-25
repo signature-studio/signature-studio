@@ -5,6 +5,7 @@
 #include "fle_imports.h"
 #include "fle_modules.h"
 #include "fle_realmod.h"
+#include "fle_env.h"
 
 /* Virtual module table (decision 0015). The handle of entry i is FLE_MODULE_HANDLE_BASE +
  * FLE_MODULE_HANDLE_STEP * (i + 1), so the order below fixes the handles: append new names at the
@@ -439,6 +440,13 @@ void fle_imp_GetProcAddress(void)
                 }
                 rname[n] = (char)fle_ld(np + n, 1);
                 if (rname[n] == 0) break;
+            }
+            if (!fle_realmod_loaded(rm)) {
+                /* Issue #1418: a handle that is not a live module gives NULL and ERROR_MOD_NOT_FOUND (126) (Wine, dlls/kernel32/tests/module.c, testGetProcAddress_Wrong) */
+                fle_warn("GetProcAddress", 0);
+                fle_set_last_error(FLE_ERROR_MOD_NOT_FOUND);
+                R[0] = 0;
+                return;
             }
             R[0] = fle_realmod_getproc("GetProcAddress", rm, rname);
             if (R[0] == 0) fle_set_last_error(FLE_ERROR_PROC_NOT_FOUND);

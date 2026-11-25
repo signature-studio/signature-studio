@@ -680,6 +680,51 @@ fn empty_component_warning_is_printed_once_per_path() {
     );
 }
 
+#[test]
+fn null_data_and_null_name_return_the_windows_values_and_warn_once() {
+    // Issue #1418 (family: the registry). RegSetValueExW with lpData NULL and cbData not 0 returns ERROR_NOACCESS (998), and
+    // RegEnumValueW with a NULL lpValueName or lpcchValueName returns ERROR_INVALID_PARAMETER (87): both as the Wine tests
+    // of advapi32 (dlls/advapi32/tests/registry.c, RegSetValueExW "REG_SZ, NULL, 4" and RegEnumValueW "no valueW parameter").
+    // Not a stop any more; one warning line per API (stderr, fle: warn:), and the value is the Windows one.
+    let body = format!(
+        r#"
+    uint64_t k = 0;
+    uint32_t cb = 4;
+    static uint8_t b[16];
+    CALL(fle_imp_RegCreateKeyExW, {HKCU}, W("T"), 0, 0, 0, 0xF003F, 0, A(&k), 0);
+    printf("set-null-data %llu\n", U(CALL(fle_imp_RegSetValueExW, k, W("v"), 0, 3, 0, 4)));
+    printf("set-null-data-again %llu\n", U(CALL(fle_imp_RegSetValueExW, k, W("v"), 0, 3, 0, 8)));
+    printf("set-null-data-zero %llu\n", U(CALL(fle_imp_RegSetValueExW, k, W("v"), 0, 3, 0, 0)));
+    printf("enum-null-name %llu\n", U(CALL(fle_imp_RegEnumValueW, k, 0, 0, A(&cb), 0, 0, 0, 0)));
+    printf("enum-null-name-again %llu\n", U(CALL(fle_imp_RegEnumValueW, k, 0, 0, A(&cb), 0, 0, 0, 0)));
+    printf("enum-null-count %llu\n", U(CALL(fle_imp_RegEnumValueW, k, 0, A(b), 0, 0, 0, 0, 0)));
+    printf("value-still-there %llu\n", U(CALL(fle_imp_RegQueryValueExW, k, W("v"), 0, 0, 0, 0)));
+"#
+    );
+    let o = run("reg-null-returns", &body);
+    assert!(o.ok, "did not exit normally: {}", o.stderr);
+    assert_eq!(
+        o.stdout.lines().collect::<Vec<_>>(),
+        [
+            "set-null-data 998",
+            "set-null-data-again 998",
+            "set-null-data-zero 0",
+            "enum-null-name 87",
+            "enum-null-name-again 87",
+            "enum-null-count 87",
+            "value-still-there 0",
+        ]
+    );
+    let warns: Vec<&str> = o.stderr.lines().filter(|l| l.starts_with("fle: warn:")).collect();
+    assert_eq!(
+        warns,
+        [
+            "fle: warn: RegSetValueExW: not modelled, returned 998 (caller 0xdead0000)",
+            "fle: warn: RegEnumValueW: not modelled, returned 87 (caller 0xdead0000)",
+        ]
+    );
+}
+
 // ---- stops ----
 
 #[test]
@@ -722,13 +767,11 @@ fn undefined_input_stops_the_run() {
         ("set-sz-odd-size", "CALL(fle_imp_RegSetValueExW, k, W(\"v\"), 0, 1, W(\"ab\"), 5);".into()),
         ("set-multi-one-nul", "CALL(fle_imp_RegSetValueExW, k, W(\"v\"), 0, 7, W(\"ab\"), 6);".into()),
         ("set-dword-size", "CALL(fle_imp_RegSetValueExW, k, W(\"v\"), 0, 4, A(b), 3);".into()),
-        ("set-null-data-size", "CALL(fle_imp_RegSetValueExW, k, W(\"v\"), 0, 3, 0, 4);".into()),
         ("set-too-big", "CALL(fle_imp_RegSetValueExW, k, W(\"v\"), 0, 3, A(b), 0x200000);".into()),
         ("query-reserved", "CALL(fle_imp_RegQueryValueExW, k, W(\"v\"), 1, 0, 0, 0);".into()),
         ("query-data-without-size", "CALL(fle_imp_RegQueryValueExW, k, W(\"v\"), 0, 0, A(b), 0);".into()),
         ("enumkey-reserved", "CALL(fle_imp_RegEnumKeyExW, k, 0, A(b), A(&cb), 1, 0, 0, 0);".into()),
         ("enumkey-null-name", "CALL(fle_imp_RegEnumKeyExW, k, 0, 0, A(&cb), 0, 0, 0, 0);".into()),
-        ("enumvalue-null-name", "CALL(fle_imp_RegEnumValueW, k, 0, 0, A(&cb), 0, 0, 0, 0);".into()),
         ("info-security-descriptor", "CALL(fle_imp_RegQueryInfoKeyW, k, 0, 0, 0, 0, 0, 0, 0, 0, 0, A(&cb), 0);".into()),
         ("deletekey-null", format!("CALL(fle_imp_RegDeleteKeyW, {HKCU}, 0);")),
         ("deletekey-empty", format!("CALL(fle_imp_RegDeleteKeyW, {HKCU}, W(\"\"));")),
