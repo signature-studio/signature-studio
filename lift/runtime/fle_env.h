@@ -30,6 +30,7 @@
 #define FLE_W32_ERR_INVALID_NAME        123u
 #define FLE_W32_ERR_NEGATIVE_SEEK       131u
 #define FLE_W32_ERR_DIR_NOT_EMPTY       145u
+#define FLE_W32_ERR_BAD_PATHNAME        161u
 #define FLE_W32_ERR_ALREADY_EXISTS      183u
 #define FLE_W32_ERR_ENVVAR_NOT_FOUND    203u
 #define FLE_W32_ERR_MORE_DATA           234u

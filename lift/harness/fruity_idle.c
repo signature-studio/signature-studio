@@ -15,6 +15,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "a4.h"
 #include "fle_input.h"
@@ -101,6 +102,19 @@ EMSCRIPTEN_KEEPALIVE unsigned fle_g3_taskbar_iconic(void) {
     return 0;
 }
 EMSCRIPTEN_KEEPALIVE int fle_g3_taskbar_syscommand(unsigned lid, unsigned cmd) { return fle_input_host_syscommand(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid, cmd); }
+/* Issue #1385: the logical window id of the FL Studio main window: the first task bar button, in creation order, whose text names FL Studio (0: none). The page asks the engine to close it when the page is
+ * left (pagehide), on the road of fle_g3_taskbar_syscommand (SC_CLOSE): FL closes its files then, and the files it keeps open are recorded (the page's journal). */
+EMSCRIPTEN_KEEPALIVE unsigned fle_g3_main_window(void) {
+    fle_taskbar_button tb[16];
+    unsigned n = fle_win_taskbar_buttons(tb, 16), k;
+    char text[256];
+    for (k = 0; k < n; k++) {
+        uint32_t owner = 0;
+        fle_win_input_text(tb[k].hwnd, text, sizeof text, &owner);
+        if (strstr(text, "FL Studio") != NULL) return tb[k].lid;
+    }
+    return 0;
+}
 EMSCRIPTEN_KEEPALIVE int fle_g3_pending(void) { return (int)fle_input_host_pending(); }
 EMSCRIPTEN_KEEPALIVE double fle_g3_ticks(void) { return (double)fle_sys_clock_ticks(); }
 /* the clock moves to `ticks` (never backwards) before an event is queued: the time a wall-clock page has let pass while the engine was idle */
@@ -117,6 +131,8 @@ EMSCRIPTEN_KEEPALIVE void fle_g3_snapshot(void) {
 /* a timer made by the host for the window with logical id `lid` (a probe of the G3 record, not a call of the guest: runtime fle_win_host_timer) */
 EMSCRIPTEN_KEEPALIVE int fle_g3_probe_timer(unsigned lid, unsigned id, unsigned ms) { return fle_win_host_timer(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid, id, ms); }
 EMSCRIPTEN_KEEPALIVE void fle_g3_timers(void) { g3_timer_log(stdout); fflush(stdout); }
+/* Issue #1384 (a test aid, called by the measuring tool only): the window with logical id `lid` and its visible descendants are drawn again (fle_win_redraw_tree); the engine paints them at its next message loop */
+EMSCRIPTEN_KEEPALIVE void fle_g3_redraw_tree(unsigned lid) { fle_win_redraw_tree(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid); }
 /* C-6 (#1310, a test aid): the window-API trace (window-api: lines on stderr, fle_win.c) on (1) or off (0). Off until the page turns it on, so a start-up writes none of them */
 EMSCRIPTEN_KEEPALIVE void fle_g3_window_api_trace(int on) { fle_win_api_trace_set(on); }
 

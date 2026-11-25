@@ -42,6 +42,8 @@ void fle_sys_clock_yield(void);
 
 /* Number of live VirtualAlloc regions (for tests and tools). */
 uint64_t fle_sys_region_count(void);
+/* Issue #1391: the committed bytes of the VirtualAlloc regions plus the live HeapAlloc blocks (fle_sysinfo.c, K32GetProcessMemoryInfo). */
+uint64_t fle_sys_in_use_bytes(void);
 
 /* Read access to the VirtualAlloc region holding `addr`, for fle_vmap.c (VirtualQuery, VirtualProtect;
  * decision 0024). pages[i] is 0 while page i is only reserved, else the PAGE_* value of the committed page.

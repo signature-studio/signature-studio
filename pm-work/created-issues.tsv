@@ -105,3 +105,6 @@
 168	#1409	FL の Recent(最近開いたファイル)を、ページの再読込をまたいで保持する: FL が Recent をどこへ・いつ書くかを、実測で特定する	Task
 166	#1410	FL の例外(コード 0xEEDFADE。Delphi の raise と推定)が、枠の探索で取られず、engine が止まる: 実機の停止の上位を直す	Task
 167	#1411	RegOpenKeyExW などの、鍵の経路に空の要素(先頭・末尾・連続の区切り)が在る呼び出しで、engine を止めない: Windows の返り値を返し、鍵の名前を記録する	Task
+169	#1412	ゲストの環境変数を、Windows と同じ振る舞いにする: FL が `%FLStudioFactoryData%` などを展開できるようにする	Task
+170	#1413	MSVC の switch 表の飛び先(ガード `cmp`・`ja` が無い形)を、lift が認識する: 『indirect call to … is not a known function entry』で止まらない	Task
+171	#1414	Sytrus の Data(109 件)を、起動の後の取得で配信し、`Default.dat` の空のパスで止まらない	Task

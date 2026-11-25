@@ -186,6 +186,20 @@ fn is_direct_near(i: &Instruction) -> bool {
     matches!(i.op_kind(0), OpKind::NearBranch16 | OpKind::NearBranch32 | OpKind::NearBranch64)
 }
 
+/// Issue #1391: the code target that the discovery of the functions follows at an indirect site. A slot in a writable section is not
+/// a constant (`dataflow::read8`), so the site is emitted as an unresolved call (the run-time dispatch); its target is still a
+/// function of the closure, as it was before, from the same resolution with the writable reads taken as constants.
+fn discovery_target(r: &Resolved, again: impl FnOnce() -> Resolved) -> Option<u64> {
+    match r {
+        Resolved::Code { target, .. } => Some(*target),
+        Resolved::Unresolved => match indirect::dataflow::with_writable_reads(again) {
+            Resolved::Code { target, .. } => Some(target),
+            _ => None,
+        },
+        Resolved::Import { .. } => None,
+    }
+}
+
 pub fn analyze(pe: &Pe<'_>) -> Result<Analysis, String> {
     analyze_with_seeds(pe, &[])
 }
@@ -409,8 +423,8 @@ pub fn analyze_with_prune(
                         }
                         let r = resolver.resolve(b, va, &i, before.as_ref());
                         cl.indirect.record("call", &r);
-                        if let Resolved::Code { target, .. } = &r {
-                            fn_queue.push_back((*target, None));
+                        if let Some(target) = discovery_target(&r, || resolver.resolve(b, va, &i, before.as_ref())) {
+                            fn_queue.push_back((target, None));
                         }
                         resolved.insert(va, r);
                         va = next;
@@ -426,11 +440,13 @@ pub fn analyze_with_prune(
                         }
                         let r = resolver.resolve(b, va, &i, before.as_ref());
                         cl.indirect.record("jmp", &r);
-                        if let Resolved::Code { target, .. } = &r {
-                            if prune.contains(target) {
-                                fn_queue.push_back((*target, None));
+                        // Issue #1391: a target that only a writable slot names is a function entry (the stub of a delay-load import, which the slot holds
+                        // until the first call), so that the run-time dispatch finds it
+                        if let Some(target) = discovery_target(&r, || resolver.resolve(b, va, &i, before.as_ref())) {
+                            if prune.contains(&target) || r == Resolved::Unresolved {
+                                fn_queue.push_back((target, None));
                             } else {
-                                blocks.push_back(*target);
+                                blocks.push_back(target);
                             }
                         }
                         if r == Resolved::Unresolved {

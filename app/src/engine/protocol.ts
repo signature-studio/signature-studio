@@ -38,6 +38,8 @@ export type ToWorker =
   | { cmd: 'desk-peek' }
   /** #1358 (a test aid, any display method): the text the engine's memory holds for the markers (read only; radius > 0 also lists the printable runs near each place) */
   | { cmd: 'guest-text'; markers: string[]; radius: number }
+  /** #1384 (a test aid): the window with logical id `lid` and its visible descendants are drawn again (fle_g3_redraw_tree); the engine is woken to paint them */
+  | { cmd: 'settings-redraw'; lid: number }
   /** C-6 (#1310, a test aid): the engine's window-API trace (window-api: lines on its stderr) on or off; off at the start */
   | { cmd: 'window-api-trace'; on: boolean }
   /** Issue #1362: the page's face of the Browser's WebView2 has loaded the document of the navigation that the engine asked for: the engine fires the navigation's events at its next idle */
@@ -46,6 +48,8 @@ export type ToWorker =
   | { cmd: 'webview2-message'; json: string }
   /** #1389: the page's answer to a clipboard-read request (the operating system's text, or null when the page could not read it) */
   | { cmd: 'clipboard-text'; id: number; text: string | null }
+  /** Issue #1385: the page is left (pagehide): the engine asks the FL main window to close, so FL closes the files it keeps open (the Worker's onExitRequest) */
+  | { cmd: 'exit-request' }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */

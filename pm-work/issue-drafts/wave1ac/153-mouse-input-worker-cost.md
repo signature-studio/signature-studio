@@ -57,26 +57,28 @@ project: signature-studio/3
 ## 判定の基準
 
 下の受け入れのコマンドが、次を全て確かめる。
-- 場面 (iii) の 6 run(DPR 1.00 と 1.325。各 n=3)が全て `error` が null。
-- DPR ごとに、区分 E+F の平均が、基準(上の表)の 60% 以下。
-- DPR ごとに、busyMs の平均が、基準の 75% 以下。
+- 場面 (iii) の A/B(同じ run の中の比)。変更前と変更後を、同じ時間帯に、交互に 3 回ずつ測る(DPR 1.00 と 1.325。各 n=3。DPR ごとに、変更前・変更後の順を n = 1, 2, 3 で繰り返す)。変更前は `origin/main` の `app/`(この Issue の変更を含まない main の版。作業の commit を含む HEAD は使わない)を `npm ci`・`npm run build` して、`tools/engine-cost/measure.mjs --app` で測る。変更後は `app/dist` を、既定の `measure.mjs` で測る。engine の bundle は両方で同じ物を使う。
+- 12 run の全ての `error` が null。
+- DPR ごとに、変更後の busyMs の中央値 ÷ 変更前の busyMs の中央値 が 0.80 以下。区分 E+F の中央値の比も、0.80 以下。
+- 0.80 の理由: 変更前と変更後は同じ時間帯に同じ runner で測るので、runner の重さの揺れは比で打ち消される。固定の基準との比より、効果を正確に測れる。前回の交互の測定の比は、busy 0.63〜0.65、E+F 0.67〜0.69 だった。0.80 は、その余裕。
+- 固定の基準(`pm-work/findings/engine-cost-attribution.json`)との比は、判定に使わない。`lift/out-app/engine-cost/ab/summary.json` の `vsFixedBaseline` に参考として出す。
 - `measure-live.mjs`(入力 1000 Hz・再生中): `error` が null、`playing` が true、`underrunDelta` と `last60sUnderruns` が 0、`inputRateOk` が true。
 - `pointerErrPx`: `measure-live.mjs` の出力には無い。`tools/feat-c1-hidpi/measure-size.mjs`(DPR 1)の出力の `pointerErrPx` が、数値の行が 1 件以上あり、全て 1 以下。
 - `inputToPresentMsP95`(`tools/p2-frames/measure.mjs`、DPR 1、負荷 a): `error` が null、`inputRateOk` が true、値が 219 ms 以下。基準は `pm-work/findings/p2-frames-1350.md` の DPR 1・負荷 a の 3 回の中央値 182.7 ms の 1.2 倍。1 回の値は 82〜185 ms に散るので、219 ms を超えたら 3 回測り、3 回の値を報告に書く。
 - 流れ A〜D(`tools/smoke/welcome-flow.mjs`): 4 行が全て、`error` が null・`state` が engine-idle・`standIn` が false・`trapped` が false・`hostErrors` が 0・`opened` が true。流れ B と D は `welcomeClosed` が true。各行の `elapsedMs` が 12,500 以下、`preBootBytes` が 314,368,711 B 以下。
 
-基準は `pm-work/findings/engine-cost-attribution.json` の値を使う。判定が境界に近いときは、変更前の engine を同じ runner で測り直し、両方の値を報告に書く。
+場面 (iii) の 12 run ごとの busyMs・区分 E・区分 F、中央値の比、`vsFixedBaseline` を、報告に全て書く。
 
 ## 受け入れ
 
 ```accept
-npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && rm -rf lift/out-app/engine-cost/runs && bash tools/engine-cost/run.sh --scene iii && node -e 'const fs=require("fs");const b=require("./pm-work/findings/engine-cost-attribution.json");const mean=(a)=>a.reduce((x,y)=>x+y,0)/a.length;const ef=(r)=>r.classesMs.E+r.classesMs.F;let ok=true;for(const [d,k] of [["1.00",1],["1.325",1.325]]){const now=[1,2,3].map((n)=>JSON.parse(fs.readFileSync(`lift/out-app/engine-cost/runs/Oz/iii-dpr${d}-n${n}.json`,"utf8")));const base=b.runs.filter((r)=>r.scene==="iii"&&r.dpr===k);if(!now.every((r)=>r.error===null)||mean(now.map(ef))>0.6*mean(base.map(ef))||mean(now.map((r)=>r.busyMs))>0.75*mean(base.map((r)=>r.busyMs)))ok=false;}process.exit(ok?0:1)' && node tools/p3-audio-probe/measure-live.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --play 1 --hz 1000 --mouse 60 > .tmp-153-live.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-153-live.json","utf8"));process.exit(r.error===null&&r.playing===true&&r.underrunDelta===0&&r.last60sUnderruns===0&&r.inputRateOk===true?0:1)' && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1 > .tmp-153-size.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-153-size.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const p=L.filter((r)=>typeof r.pointerErrPx==="number");process.exit(p.length>0&&p.every((r)=>r.pointerErrPx<=1)?0:1)' && node tools/p2-frames/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dpr 1 --load a > .tmp-153-p2.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-153-p2.json","utf8"));process.exit(r.error===null&&r.inputRateOk===true&&r.inputToPresentMsP95<=219?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-153-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-153-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)'
+rm -rf .tmp-base && mkdir -p .tmp-base && git archive origin/main app | tar -x -C .tmp-base && npm ci --prefix .tmp-base/app && npm run build --prefix .tmp-base/app && npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle && rm -rf lift/out-app/engine-cost/ab && node -e 'const {spawnSync}=require("child_process");const fs=require("fs");const P=process.cwd();const ok=(f)=>{try{return JSON.parse(fs.readFileSync(f,"utf8")).error===null}catch(e){return false}};for(const n of [1,2,3])for(const d of ["1.00","1.325"])for(const v of ["base","after"]){const out=`${P}/lift/out-app/engine-cost/ab/${v}-iii-dpr${d}-n${n}.json`;const a=["tools/engine-cost/measure.mjs","--bundle",`${P}/lift/out-app/bundle/raw/fl-Oz`,"--names",`${P}/lift/out-app/gen/wasm-func-names.tsv`,"--scene","iii","--dpr",d,"--out",out];if(v==="base")a.push("--app",`${P}/.tmp-base/app`);for(let t=0;t<2&&!ok(out);t++)spawnSync("node",a,{stdio:["ignore","ignore","inherit"]});if(!ok(out))process.exit(1)}' && node -e 'const fs=require("fs");const D="lift/out-app/engine-cost/ab";const b=require("./pm-work/findings/engine-cost-attribution.json");const rd=(v,d,n)=>JSON.parse(fs.readFileSync(`${D}/${v}-iii-dpr${d}-n${n}.json`,"utf8"));const med=(a)=>[...a].sort((x,y)=>x-y)[1];const ef=(r)=>r.classesMs.E+r.classesMs.F;const all=[];for(const d of ["1.00","1.325"])for(const n of [1,2,3])for(const v of ["base","after"])all.push(rd(v,d,n));if(!all.every((r)=>r.error===null))process.exit(1);const S={};let ok=true;for(const [d,k] of [["1.00",1],["1.325",1.325]]){const B=[1,2,3].map((n)=>rd("base",d,n));const A=[1,2,3].map((n)=>rd("after",d,n));const busy=med(A.map((r)=>r.busyMs))/med(B.map((r)=>r.busyMs));const e=med(A.map(ef))/med(B.map(ef));const bl=b.runs.filter((r)=>r.scene==="iii"&&r.dpr===k);const fb=bl.reduce((x,r)=>x+r.busyMs,0)/bl.length;const fe=bl.reduce((x,r)=>x+ef(r),0)/bl.length;S[d]={busyRatio:busy,efRatio:e,vsFixedBaseline:{busy:med(A.map((r)=>r.busyMs))/fb,ef:med(A.map(ef))/fe}};if(!(busy<=0.8&&e<=0.8))ok=false}fs.writeFileSync(`${D}/summary.json`,JSON.stringify(S)+"\n");console.log(JSON.stringify(S));process.exit(ok?0:1)' && node tools/p3-audio-probe/measure-live.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --play 1 --hz 1000 --mouse 60 > .tmp-153-live.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-153-live.json","utf8"));process.exit(r.error===null&&r.playing===true&&r.underrunDelta===0&&r.last60sUnderruns===0&&r.inputRateOk===true?0:1)' && node tools/feat-c1-hidpi/measure-size.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dprs 1 > .tmp-153-size.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-153-size.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const p=L.filter((r)=>typeof r.pointerErrPx==="number");process.exit(p.length>0&&p.every((r)=>r.pointerErrPx<=1)?0:1)' && node tools/p2-frames/measure.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" --dpr 1 --load a > .tmp-153-p2.json && node -e 'const r=JSON.parse(require("fs").readFileSync(".tmp-153-p2.json","utf8"));process.exit(r.error===null&&r.inputRateOk===true&&r.inputToPresentMsP95<=219?0:1)' && node tools/smoke/welcome-flow.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > .tmp-153-flow.jsonl && node -e 'const L=require("fs").readFileSync(".tmp-153-flow.jsonl","utf8").trim().split("\n").map((l)=>JSON.parse(l));const F=(f)=>L.find((r)=>r.flow===f);const ok=(r)=>!!r&&r.error===null&&r.state==="engine-idle"&&r.standIn===false&&r.trapped===false&&r.hostErrors===0&&r.opened===true&&r.elapsedMs<=12500&&r.preBootBytes<=314368711;process.exit(L.length===4&&["A","B","C","D"].every((f)=>ok(F(f)))&&F("B").welcomeClosed===true&&F("D").welcomeClosed===true?0:1)'
 ```
 
 ## 作業の進め方
 
 - engine のビルドは約 35 分。フォアグラウンドで、シェルツールの `timeout` 引数に大きい値(例 3600000。上限 5400000)を渡して、直接実行する。背景で起動して、終わるのを待たない。
-- 受け入れのコマンドは、段ごと(ビルド・`run.sh --scene iii`・計測の道具)に分けて実行してよい。最後の 1 回は、コマンド全体を通す。
+- 受け入れのコマンドは、段ごと(ビルド・変更前と変更後の場面 (iii)・計測の道具)に分けて実行してよい。最後の 1 回は、コマンド全体を通す。場面 (iii) の run は、起動の停止で失敗したら、受け入れの中で、その run だけ 1 回やり直す(run ごとに 2 回まで)。
 - 内訳の特定は、変える前の engine で行い、方向を決めてから直す。
 - 作業は開始から 5 時間以内に終える。最初に `date -u` で開始を記録する。4 時間 30 分を過ぎたら、受け入れが通っていなくても、作業ツリーを commit して、報告を書いて終える。
 - 受け入れが通らなくても、作業の最後に作業ツリーを commit する(commit しないと判定が落ちる)。
@@ -101,3 +103,25 @@ npm run build --prefix app && cargo build --release --locked --manifest-path lif
 
 - blocked_by: なし。
 - 計測の道具と基準は `#1388`(段階 0)の `tools/engine-cost/` と `pm-work/findings/engine-cost-attribution.*`。
+
+## 前回の試行の結果(2 回目の前に)
+
+前回の試行は、判定が、外部プラグインのインストーラの検査で落ちた(修正済み)。
+
+**結果の要点: 入力 1 件ごとの wake の `postMessage` をやめ、フレームごと 1 回にし(`Atomics.waitAsync` で Worker が待つ)、E+F は、基準の DPR 1.00 で 91%、DPR 1.325 で 86%、busy は 83%・76% に下がった。目標(E+F ≤ 60%、busy ≤ 75%)には届いていない**。残りの大部分は F(ブラウザ内部)で、**入力の配送そのもの**。
+
+**注意: 測定は、CDP の `Input.dispatchMouseEvent` を 1200 Hz で送る。CDP の注入の費用は、ブラウザのプロセスと、ページの主スレッドに掛かる(測定の道具の費用)が、Worker の F(`(program)`)の中身が、何か(入力のメッセージの受信・`structuredClone`・`Atomics`・native)を、Worker の trace(`Tracing`)のイベントの自己時間で特定することが、次の仕事。測定の道具の費用を、製品の費用と数えない**(Worker のプロファイルだけを使う)。
+
+## 前回の試行の結果(4 回目の前に)
+
+前回の run(`failed`)は、場面 (iii) の判定の段で落ちた。ほかの項目は、起動の停止が出た箇所を除いて通った(下の 7)。前回の作業の差分は、次の試行が取り込んで続ける。
+
+1. **変更の内容**: 入力 1 件ごとの `wake` をやめ、入力のあったフレームに 1 回だけ `Atomics.notify` する。Worker は idle の間 `Atomics.waitAsync` で待ち、期限の待ちも `setTimeout` から `waitAsync` にした。主スレッドの `performance` の読み取りを減らし、窓の文字列は、バイトが変わった窓だけ decode する。`run.sh --scene`・`measure.mjs --app`・`trace.mjs` を足した(既定の動作は変えていない)。
+2. **効果は出ている**: 同じ時間帯に、変更前(`origin/main` の版)と変更後を交互に 3 回ずつ測ると、変更後の比は busy 0.63〜0.65、E+F 0.67〜0.69(DPR 1.00 と 1.325)。60 秒のトレースで、Worker の時間は入力 1 件あたり 95 µs から 38 µs になった。
+3. **落ちた理由**: 判定は固定の基準(busy 12,388 ms、E+F の平均)との比だった。この runner では、変更前の版そのものが基準より重く(busy 14,459 ms)、上限(E+F は 60% 以下、busy は 75% 以下)に届かなかった。最後の build の値は、DPR 1.00 で E+F 85.7%・busy 75.5%、DPR 1.325 で E+F 85.2%・busy 75.0%。全ての run の `error` は null。runner で合否が変わるので、判定は同じ run の中の比にした(「判定の基準」)。
+4. **残りの費用**: 変更前の 20 秒のトレースで、主スレッドの `(program)` は約 3,045 ms。その最大は、ポインタのリスナの中(約 1,068 ms)。リスナの JS 本体は小さく、残りは区分 F(ブラウザ内部)の処理と見られる(1 入力あたり約 35 µs。原因は未特定)。Worker の `(program)` は idle の回数に比例し(1 回あたり約 32〜35 µs。相関だけ)、`getCoalescedEvents` は使っていない。残りの費用は、アプリの JS だけでは大きくは減らせない見込み。
+5. **起動の停止**: `state running` のまま 180 秒の停止が、前回の木の測定で約 1 割出た(変更前にも変更後にも)。この run は #1393 が main に入る前の木で動いていた。#1393 の後の main では、198 回の起動で止まりは 0 件。
+6. **内蔵プラグインの名前の不整合**: 古い main の run は、内蔵プラグインの DLL の名前の不整合で `fe-build engine` が落ちた。main で直った(4d757064)。
+7. **他の項目**: `measure-live` は通った(`inputRateOk` が true、`underrunDelta` が 0)。`p2-frames` の `inputToPresentMsP95` は 72.97 ms と 77.34 ms(上限 219 ms。通った)。`measure-size` は、DPR 1 の行の `pointerErrPx` が 0 で通ったが、別の DPR の行が起動の停止で error になった。流れ A〜D は、A・D が通り、B か C が起動の停止で 1 回ずつ落ちた。
+8. **判定の変更**: 固定の基準との比は、runner の速さで合否が決まるので判定から外し、同じ時間帯の変更前との比にした。他の項目は変えていない。
+

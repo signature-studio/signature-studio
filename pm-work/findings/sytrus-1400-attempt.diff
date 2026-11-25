@@ -1,0 +1,241 @@
+diff --git a/lift/crates/fe-build/src/main.rs b/lift/crates/fe-build/src/main.rs
+index 6ec6c7bf..58a0a4f7 100644
+--- a/lift/crates/fe-build/src/main.rs
++++ b/lift/crates/fe-build/src/main.rs
+@@ -68,7 +68,10 @@ enum Step {
+     /// the direct list of one plugin DLL (key, the engine's bin directory)
+     PluginList(String, String),
+     MergeLists,
+-    CheckUnits(Vec<String>),
++    /// the units gen wrote that the listed ones do not name: their sources and objects go to plugins::EXTRA_UNITS and plugins::EXTRA_OBJS
++    FindUnits(Vec<String>),
++    /// the arguments are the compiler's flags file; each line of the list file (read when the step runs) is a source, compiled to obj/mod
++    CompileList(String, String),
+ }
+ 
+ struct Stage {
+@@ -97,7 +100,8 @@ impl Step {
+             Step::Generate(with_bases) => format!("plugins: tables under {} from lift/plugins/*/plugin.tsv (bases: {with_bases})", plugins::OUT_DIR),
+             Step::PluginList(key, _) => format!("list {key}: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out"),
+             Step::MergeLists => format!("merge {}/lists into {}/lowered-all.txt", plugins::OUT_DIR, plugins::OUT_DIR),
+-            Step::CheckUnits(listed) => format!("check the {} units of {OUT_APP_DIR}/gen/src against the compile lists", listed.len()),
++            Step::FindUnits(listed) => format!("find the units of {OUT_APP_DIR}/gen/src that the {} listed units do not name (the plugins' units, compiled after)", listed.len()),
++            Step::CompileList(flags, list_file) => format!("compile the sources in {list_file} with {flags} to {OUT_APP_DIR}/obj/mod"),
+         }
+     }
+ }
+@@ -367,7 +371,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
+     stages.push(Stage { name: "gen".into(), steps: gen_steps, parallel: false });
+     let mut listed_units = words(&format!("{HARNESS_DIR}/two/plain-units.txt"))?;
+     listed_units.extend(words(&format!("{HARNESS_DIR}/two/ai-units.txt"))?);
+-    stages.push(Stage { name: "units".into(), steps: vec![Step::CheckUnits(listed_units)], parallel: false });
++    stages.push(Stage { name: "units".into(), steps: vec![Step::FindUnits(listed_units)], parallel: false });
+ 
+     let (rt_flags, h_flags) = (format!("{HARNESS_DIR}/web/cflags-rt.args"), format!("{HARNESS_DIR}/web/cflags-h.args"));
+     let (unit_flags, ai_flags) = (format!("{HARNESS_DIR}/web/cflags-u.args"), format!("{HARNESS_DIR}/web/cflags-ai.args"));
+@@ -412,6 +416,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
+         compile.len()
+     );
+     stages.push(Stage { name, steps: compile, parallel: true });
++    stages.push(Stage { name: "compile-extra (the plugins' units that gen wrote)".into(), steps: vec![Step::CompileList(unit_flags.clone(), plugins::EXTRA_UNITS.into())], parallel: false });
+ 
+     let hybrid_n0_file = format!("{HARNESS_DIR}/hyb/n0.cmd");
+     let mut hybrid_n0_argv = vec![fe_wasmgen.clone(), "hybrid-n0".into()];
+@@ -427,7 +432,7 @@ fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
+     ] {
+         link_argv.extend(sorted(group.clone()));
+     }
+-    stages.push(Stage { name: "link".into(), steps: vec![Step::Run(link_argv)], parallel: false });
++    stages.push(Stage { name: "link".into(), steps: vec![Step::RunWords(link_argv, plugins::EXTRA_OBJS.into())], parallel: false });
+ 
+     let mut wasm_opt_argv = vec!["wasm-opt".to_string()];
+     wasm_opt_argv.extend(lines(&format!("{HARNESS_DIR}/web/wasm-opt-c.cmd"))?);
+@@ -492,7 +497,11 @@ fn run(step: &Step) -> Result<(), String> {
+         Step::Generate(with_bases) => plugins::generate(*with_bases),
+         Step::PluginList(key, bin) => plugins::run_list(key, bin),
+         Step::MergeLists => plugins::merge_lists(),
+-        Step::CheckUnits(listed) => plugins::check_units(listed),
++        Step::FindUnits(listed) => find_units(listed),
++        Step::CompileList(flags, list_file) => {
++            let steps: Vec<Step> = lines(list_file)?.iter().map(|src| compile_unit(flags, &[], src, &format!("{OUT_APP_DIR}/obj/mod/{}.o", stem(src)))).collect();
++            run_parallel(&steps)
++        }
+         Step::RunStdin(argv, stdin_file) => {
+             let file = fs::File::open(stdin_file).map_err(|e| format!("{stdin_file}: {e}"))?;
+             exec(Command::new(&argv[0]).args(&argv[1..]).stdin(Stdio::from(file)), &argv[0])
+@@ -524,6 +533,17 @@ fn run(step: &Step) -> Result<(), String> {
+     }
+ }
+ 
++/// The units gen wrote beyond the listed ones (the plugins' units): their sources and objects are written for the steps after.
++fn find_units(listed: &[String]) -> Result<(), String> {
++    let extra = plugins::check_units(listed)?;
++    let srcs: String = extra.iter().map(|name| format!("{OUT_APP_DIR}/gen/src/{name}\n")).collect();
++    let objs: String = extra.iter().map(|name| format!("{OUT_APP_DIR}/obj/mod/{}.o\n", stem(name))).collect();
++    fs::write(plugins::EXTRA_UNITS, srcs).map_err(|e| format!("{}: {e}", plugins::EXTRA_UNITS))?;
++    fs::write(plugins::EXTRA_OBJS, objs).map_err(|e| format!("{}: {e}", plugins::EXTRA_OBJS))?;
++    println!("units: {} more than the lists: {}", extra.len(), extra.join(" "));
++    Ok(())
++}
++
+ fn run_parallel(steps: &[Step]) -> Result<(), String> {
+     let next = AtomicUsize::new(0);
+     let failed: Mutex<Option<String>> = Mutex::new(None);
+@@ -960,7 +980,7 @@ mod tests {
+         let names: Vec<String> = plan("<bin>").expect("plan").iter().map(|s| s.name.split(" (").next().unwrap_or_default().to_string()).collect();
+         assert_eq!(
+             names,
+-            ["plugins", "lists", "lowered-all", "blend2d", "blend2d-compile", "blend2d-archive", "gen", "units", "compile", "hybrid-n0", "link", "wasm-opt", "hybrid"]
++            ["plugins", "lists", "lowered-all", "blend2d", "blend2d-compile", "blend2d-archive", "gen", "units", "compile", "compile-extra", "hybrid-n0", "link", "wasm-opt", "hybrid"]
+         );
+     }
+ 
+diff --git a/lift/crates/fe-build/src/plugins.rs b/lift/crates/fe-build/src/plugins.rs
+index bb59a9a3..545e6707 100644
+--- a/lift/crates/fe-build/src/plugins.rs
++++ b/lift/crates/fe-build/src/plugins.rs
+@@ -13,6 +13,9 @@ use std::process::Command;
+ 
+ pub const PLUGINS_DIR: &str = "lift/plugins";
+ pub const OUT_DIR: &str = "lift/out-app/plugins";
++/// The sources and the objects of the plugins' units (gen's units that the fixed lists do not name), one per line: written by the units step.
++pub const EXTRA_UNITS: &str = "lift/out-app/plugins/extra-units.txt";
++pub const EXTRA_OBJS: &str = "lift/out-app/plugins/extra-objs.txt";
+ const HOST_DIR: &str = "lift/out-app/host";
+ const GUEST_ROOT: &str = "C:\\Program Files\\Image-Line\\FL Studio 21\\";
+ const SEED_ROOT: &str = "lift/out-idle1/inputs/install";
+@@ -578,8 +581,9 @@ pub fn merge_lists() -> Result<(), String> {
+     Ok(())
+ }
+ 
+-/// The units the lift wrote (lift/out-app/gen/src/*.c) must be the ones of the compile lists: a unit that is not named is not built.
+-pub fn check_units(listed: &[String]) -> Result<(), String> {
++/// The units the lift wrote (lift/out-app/gen/src/*.c). Every unit of the compile lists must be written. A unit that the lists do not name
++/// must be a plugin's unit (`m<K>-<NN>.c`, the module of a plugin, design (13)): it is compiled too, after the lists. Returns those units.
++pub fn check_units(listed: &[String]) -> Result<Vec<String>, String> {
+     let mut found = BTreeSet::new();
+     for entry in fs::read_dir("lift/out-app/gen/src").map_err(|e| format!("lift/out-app/gen/src: {e}"))? {
+         let name = entry.map_err(|e| e.to_string())?.file_name().to_string_lossy().into_owned();
+@@ -588,13 +592,21 @@ pub fn check_units(listed: &[String]) -> Result<(), String> {
+         }
+     }
+     let want: BTreeSet<String> = listed.iter().map(|p| Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
+-    if found == want {
+-        Ok(())
+-    } else {
+-        let missing: Vec<&String> = found.difference(&want).collect();
+-        let absent: Vec<&String> = want.difference(&found).collect();
+-        Err(format!("the units of gen differ from the compile lists: not listed {missing:?}, not written {absent:?}"))
++    let absent: Vec<&String> = want.difference(&found).collect();
++    if !absent.is_empty() {
++        return Err(format!("the units of the compile lists are not written by gen: {absent:?}"));
+     }
++    let extra: Vec<String> = found.difference(&want).cloned().collect();
++    if let Some(name) = extra.iter().find(|n| !is_plugin_unit(n)) {
++        return Err(format!("gen wrote {name}, which the compile lists do not name and which is not a plugin unit (m<K>-<NN>.c)"));
++    }
++    Ok(extra)
++}
++
++/// `m<K>-<NN>.c`: the unit NN of the module K (the modules of the plugins come after the fixed ones).
++fn is_plugin_unit(name: &str) -> bool {
++    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
++    name.strip_prefix('m').and_then(|r| r.strip_suffix(".c")).and_then(|r| r.split_once('-')).is_some_and(|(k, n)| digits(k) && digits(n))
+ }
+ 
+ fn run_cmd(argv: &[String], label: &str) -> Result<(), String> {
+@@ -681,6 +693,15 @@ mod tests {
+         assert!(parse_plugin("x", &no_column).is_err());
+     }
+ 
++    #[test]
++    fn the_plugins_units_are_the_mk_nn_names_beyond_the_fixed_lists() {
++        assert!(is_plugin_unit("m11-06.c"));
++        assert!(is_plugin_unit("m10-00.c"));
++        assert!(!is_plugin_unit("fle-acm.c"));
++        assert!(!is_plugin_unit("m11-06.o"));
++        assert!(!is_plugin_unit("mx-00.c"));
++    }
++
+     #[test]
+     fn the_omit_vas_leave_the_direct_list() {
+         let ok: BTreeSet<u64> = [0x10, 0x20, 0x30].into_iter().collect();
+diff --git a/lift/crates/fe-build/tests/plan/engine.txt b/lift/crates/fe-build/tests/plan/engine.txt
+index 96d354b9..186b2a5b 100644
+--- a/lift/crates/fe-build/tests/plan/engine.txt
++++ b/lift/crates/fe-build/tests/plan/engine.txt
+@@ -184,7 +184,7 @@ stage gen: 3 step(s)
+   <bin>/fe-lift gen-all --modules lift/out-app/plugins/modules.tsv --fle-args lift/harness/b2d2/fle.args --host lift/out-app/host --out lift/out-app/gen --split-bytes 10000000 --omit-list lift/out-app/plugins/lowered-all.txt --extra-rows lift/harness/fruity-rows.txt
+   copy lift/out-app/gen/dll/*.dll and lift/out-app/host/binaries/win64/FLEngine_x64.dll to lift/out-app/dll/
+ stage units: 1 step(s)
+-  check the 65 units of lift/out-app/gen/src against the compile lists
++  find the units of lift/out-app/gen/src that the 65 listed units do not name (the plugins' units, compiled after)
+ stage compile (rt 91, h 14, gen 66 = fle 23 + mod 43 incl. common.c, b2d 1; total 172): 172 step(s), parallel
+   emcc -c @lift/harness/web/cflags-rt.args lift/runtime/fle_acm.c -o lift/out-app/obj/rt/fle_acm.o
+   emcc -c @lift/harness/web/cflags-rt.args lift/runtime/fle_act1_net.c -o lift/out-app/obj/rt/fle_act1_net.o
+@@ -358,10 +358,12 @@ stage compile (rt 91, h 14, gen 66 = fle 23 + mod 43 incl. common.c, b2d 1; tota
+   emcc -c @lift/harness/web/cflags-ai.args lift/out-app/gen/src/m1-06.c -o lift/out-app/obj/mod/m1-06.o
+   emcc -c @lift/harness/web/cflags-u.args lift/out-app/gen/common.c -o lift/out-app/obj/mod/common.o
+   emcc @lift/harness/web/cflags-b2d.args lift/harness/b2d1/b2d_swap.cpp
++stage compile-extra (the plugins' units that gen wrote): 1 step(s)
++  compile the sources in lift/out-app/plugins/extra-units.txt with lift/harness/web/cflags-u.args to lift/out-app/obj/mod
+ stage hybrid-n0: 1 step(s)
+   <bin>/fe-wasmgen hybrid-n0 --modules lift/out-app/plugins/hyb-args.tsv --lists lift/out-app/plugins/lists --dll-dir lift/out-app/dll --args lift/harness/hyb/n0.args --work lift/out-app/hyb --out-rsp lift/out-app/exports.rsp
+ stage link: 1 step(s)
+-  emcc @lift/harness/web/link.rsp @lift/out-app/exports.rsp lift/out-app/obj/h/a4.o lift/out-app/obj/h/fruity.o lift/out-app/obj/h/fruity_g3.o lift/out-app/obj/h/fruity_idle.o lift/out-app/obj/h/fruity_surface.o lift/out-app/obj/h/hybrid_glue.o lift/out-app/obj/h/image.o lift/out-app/obj/h/main_two.o lift/out-app/obj/h/ra0.o lift/out-app/obj/h/realmod.o lift/out-app/obj/h/trace_fruity.o lift/out-app/obj/h/wrp1_vst3.o lift/out-app/obj/h/wrp1_vst3_imp.o lift/out-app/obj/h/xmod_glue.o lift/out-app/obj/mod/common.o lift/out-app/obj/mod/m1-00.o lift/out-app/obj/mod/m1-01.o lift/out-app/obj/mod/m1-02.o lift/out-app/obj/mod/m1-03.o lift/out-app/obj/mod/m1-04.o lift/out-app/obj/mod/m1-05.o lift/out-app/obj/mod/m1-06.o lift/out-app/obj/mod/m1-07.o lift/out-app/obj/mod/m1-08.o lift/out-app/obj/mod/m1-09.o lift/out-app/obj/mod/m1-10.o lift/out-app/obj/mod/m1-11.o lift/out-app/obj/mod/m10-00.o lift/out-app/obj/mod/m10-01.o lift/out-app/obj/mod/m10-02.o lift/out-app/obj/mod/m10-03.o lift/out-app/obj/mod/m2-00.o lift/out-app/obj/mod/m3-00.o lift/out-app/obj/mod/m3-01.o lift/out-app/obj/mod/m4-00.o lift/out-app/obj/mod/m5-00.o lift/out-app/obj/mod/m5-01.o lift/out-app/obj/mod/m5-02.o lift/out-app/obj/mod/m5-03.o lift/out-app/obj/mod/m6-00.o lift/out-app/obj/mod/m6-01.o lift/out-app/obj/mod/m6-02.o lift/out-app/obj/mod/m7-00.o lift/out-app/obj/mod/m7-01.o lift/out-app/obj/mod/m7-02.o lift/out-app/obj/mod/m7-03.o lift/out-app/obj/mod/m7-04.o lift/out-app/obj/mod/m7-05.o lift/out-app/obj/mod/m7-06.o lift/out-app/obj/mod/m8-00.o lift/out-app/obj/mod/m8-01.o lift/out-app/obj/mod/m8-02.o lift/out-app/obj/mod/m8-03.o lift/out-app/obj/mod/m9-00.o lift/out-app/obj/mod/m9-01.o lift/out-app/obj/mod/m9-02.o lift/out-app/obj/mod/m9-03.o lift/out-app/obj/fle/fle-00.o lift/out-app/obj/fle/fle-01.o lift/out-app/obj/fle/fle-02.o lift/out-app/obj/fle/fle-03.o lift/out-app/obj/fle/fle-04.o lift/out-app/obj/fle/fle-05.o lift/out-app/obj/fle/fle-06.o lift/out-app/obj/fle/fle-07.o lift/out-app/obj/fle/fle-08.o lift/out-app/obj/fle/fle-09.o lift/out-app/obj/fle/fle-10.o lift/out-app/obj/fle/fle-11.o lift/out-app/obj/fle/fle-12.o lift/out-app/obj/fle/fle-13.o lift/out-app/obj/fle/fle-14.o lift/out-app/obj/fle/fle-15.o lift/out-app/obj/fle/fle-16.o lift/out-app/obj/fle/fle-17.o lift/out-app/obj/fle/fle-18.o lift/out-app/obj/fle/fle-19.o lift/out-app/obj/fle/fle-20.o lift/out-app/obj/fle/fle-21.o lift/out-app/obj/fle/fle-22.o lift/out-app/obj/rt/fle_acm.o lift/out-app/obj/rt/fle_act1_net.o lift/out-app/obj/rt/fle_api2_call.o lift/out-app/obj/rt/fle_api2_shell.o lift/out-app/obj/rt/fle_api2_str.o lift/out-app/obj/rt/fle_api2_sys.o lift/out-app/obj/rt/fle_appfile.o lift/out-app/obj/rt/fle_appview.o lift/out-app/obj/rt/fle_audio_ring.o lift/out-app/obj/rt/fle_audio_transport.o lift/out-app/obj/rt/fle_callback.o lift/out-app/obj/rt/fle_class.o lift/out-app/obj/rt/fle_clip.o lift/out-app/obj/rt/fle_comctl.o lift/out-app/obj/rt/fle_cpuid.o lift/out-app/obj/rt/fle_crash1_drag.o lift/out-app/obj/rt/fle_crash1_lcmap.o lift/out-app/obj/rt/fle_crash1_menu.o lift/out-app/obj/rt/fle_crypt.o lift/out-app/obj/rt/fle_ctx_tls.o lift/out-app/obj/rt/fle_cursor.o lift/out-app/obj/rt/fle_desk.o lift/out-app/obj/rt/fle_dsound.o lift/out-app/obj/rt/fle_dwm.o lift/out-app/obj/rt/fle_env.o lift/out-app/obj/rt/fle_event.o lift/out-app/obj/rt/fle_filedlg.o lift/out-app/obj/rt/fle_gdc.o lift/out-app/obj/rt/fle_gdi.o lift/out-app/obj/rt/fle_glob.o lift/out-app/obj/rt/fle_hle.o lift/out-app/obj/rt/fle_host.o lift/out-app/obj/rt/fle_imagehlp.o lift/out-app/obj/rt/fle_imagelist.o lift/out-app/obj/rt/fle_imports.o lift/out-app/obj/rt/fle_input.o lift/out-app/obj/rt/fle_int_ext.o lift/out-app/obj/rt/fle_int_more.o lift/out-app/obj/rt/fle_kbd.o lift/out-app/obj/rt/fle_layered.o lift/out-app/obj/rt/fle_load.o lift/out-app/obj/rt/fle_loadimage.o lift/out-app/obj/rt/fle_locale.o lift/out-app/obj/rt/fle_malloc16.o lift/out-app/obj/rt/fle_modules.o lift/out-app/obj/rt/fle_monitor.o lift/out-app/obj/rt/fle_msctf.o lift/out-app/obj/rt/fle_mxcsr.o lift/out-app/obj/rt/fle_ole.o lift/out-app/obj/rt/fle_oleaut.o lift/out-app/obj/rt/fle_osver.o lift/out-app/obj/rt/fle_proc.o lift/out-app/obj/rt/fle_raster.o lift/out-app/obj/rt/fle_realmod.o lift/out-app/obj/rt/fle_reg.o lift/out-app/obj/rt/fle_res.o lift/out-app/obj/rt/fle_seh.o lift/out-app/obj/rt/fle_shell.o lift/out-app/obj/rt/fle_spi.o lift/out-app/obj/rt/fle_sse_more.o lift/out-app/obj/rt/fle_string.o lift/out-app/obj/rt/fle_sweep1_kbd.o lift/out-app/obj/rt/fle_sys.o lift/out-app/obj/rt/fle_sysinfo.o lift/out-app/obj/rt/fle_sysmetrics.o lift/out-app/obj/rt/fle_thread.o lift/out-app/obj/rt/fle_thread_wasm.o lift/out-app/obj/rt/fle_time.o lift/out-app/obj/rt/fle_timerq.o lift/out-app/obj/rt/fle_token.o lift/out-app/obj/rt/fle_uilang.o lift/out-app/obj/rt/fle_uipref.o lift/out-app/obj/rt/fle_user_nowin.o lift/out-app/obj/rt/fle_vfs.o lift/out-app/obj/rt/fle_visrgn.o lift/out-app/obj/rt/fle_vmap.o lift/out-app/obj/rt/fle_vol.o lift/out-app/obj/rt/fle_wall_dec1.o lift/out-app/obj/rt/fle_wall_dlg1.o lift/out-app/obj/rt/fle_wall_exp1.o lift/out-app/obj/rt/fle_wall_ia2.o lift/out-app/obj/rt/fle_wall_ia2t.o lift/out-app/obj/rt/fle_wall_ia2v.o lift/out-app/obj/rt/fle_wall_ia2w.o lift/out-app/obj/rt/fle_wall_wrp1.o lift/out-app/obj/rt/fle_webview2.o lift/out-app/obj/rt/fle_win.o lift/out-app/obj/rt/fle_wininet.o lift/out-app/obj/rt/fle_winmm.o lift/out-app/obj/rt/fle_x87.o lift/out-app/obj/rt/fle_x87ctl.o
++  emcc @lift/harness/web/link.rsp @lift/out-app/exports.rsp lift/out-app/obj/h/a4.o lift/out-app/obj/h/fruity.o lift/out-app/obj/h/fruity_g3.o lift/out-app/obj/h/fruity_idle.o lift/out-app/obj/h/fruity_surface.o lift/out-app/obj/h/hybrid_glue.o lift/out-app/obj/h/image.o lift/out-app/obj/h/main_two.o lift/out-app/obj/h/ra0.o lift/out-app/obj/h/realmod.o lift/out-app/obj/h/trace_fruity.o lift/out-app/obj/h/wrp1_vst3.o lift/out-app/obj/h/wrp1_vst3_imp.o lift/out-app/obj/h/xmod_glue.o lift/out-app/obj/mod/common.o lift/out-app/obj/mod/m1-00.o lift/out-app/obj/mod/m1-01.o lift/out-app/obj/mod/m1-02.o lift/out-app/obj/mod/m1-03.o lift/out-app/obj/mod/m1-04.o lift/out-app/obj/mod/m1-05.o lift/out-app/obj/mod/m1-06.o lift/out-app/obj/mod/m1-07.o lift/out-app/obj/mod/m1-08.o lift/out-app/obj/mod/m1-09.o lift/out-app/obj/mod/m1-10.o lift/out-app/obj/mod/m1-11.o lift/out-app/obj/mod/m10-00.o lift/out-app/obj/mod/m10-01.o lift/out-app/obj/mod/m10-02.o lift/out-app/obj/mod/m10-03.o lift/out-app/obj/mod/m2-00.o lift/out-app/obj/mod/m3-00.o lift/out-app/obj/mod/m3-01.o lift/out-app/obj/mod/m4-00.o lift/out-app/obj/mod/m5-00.o lift/out-app/obj/mod/m5-01.o lift/out-app/obj/mod/m5-02.o lift/out-app/obj/mod/m5-03.o lift/out-app/obj/mod/m6-00.o lift/out-app/obj/mod/m6-01.o lift/out-app/obj/mod/m6-02.o lift/out-app/obj/mod/m7-00.o lift/out-app/obj/mod/m7-01.o lift/out-app/obj/mod/m7-02.o lift/out-app/obj/mod/m7-03.o lift/out-app/obj/mod/m7-04.o lift/out-app/obj/mod/m7-05.o lift/out-app/obj/mod/m7-06.o lift/out-app/obj/mod/m8-00.o lift/out-app/obj/mod/m8-01.o lift/out-app/obj/mod/m8-02.o lift/out-app/obj/mod/m8-03.o lift/out-app/obj/mod/m9-00.o lift/out-app/obj/mod/m9-01.o lift/out-app/obj/mod/m9-02.o lift/out-app/obj/mod/m9-03.o lift/out-app/obj/fle/fle-00.o lift/out-app/obj/fle/fle-01.o lift/out-app/obj/fle/fle-02.o lift/out-app/obj/fle/fle-03.o lift/out-app/obj/fle/fle-04.o lift/out-app/obj/fle/fle-05.o lift/out-app/obj/fle/fle-06.o lift/out-app/obj/fle/fle-07.o lift/out-app/obj/fle/fle-08.o lift/out-app/obj/fle/fle-09.o lift/out-app/obj/fle/fle-10.o lift/out-app/obj/fle/fle-11.o lift/out-app/obj/fle/fle-12.o lift/out-app/obj/fle/fle-13.o lift/out-app/obj/fle/fle-14.o lift/out-app/obj/fle/fle-15.o lift/out-app/obj/fle/fle-16.o lift/out-app/obj/fle/fle-17.o lift/out-app/obj/fle/fle-18.o lift/out-app/obj/fle/fle-19.o lift/out-app/obj/fle/fle-20.o lift/out-app/obj/fle/fle-21.o lift/out-app/obj/fle/fle-22.o lift/out-app/obj/rt/fle_acm.o lift/out-app/obj/rt/fle_act1_net.o lift/out-app/obj/rt/fle_api2_call.o lift/out-app/obj/rt/fle_api2_shell.o lift/out-app/obj/rt/fle_api2_str.o lift/out-app/obj/rt/fle_api2_sys.o lift/out-app/obj/rt/fle_appfile.o lift/out-app/obj/rt/fle_appview.o lift/out-app/obj/rt/fle_audio_ring.o lift/out-app/obj/rt/fle_audio_transport.o lift/out-app/obj/rt/fle_callback.o lift/out-app/obj/rt/fle_class.o lift/out-app/obj/rt/fle_clip.o lift/out-app/obj/rt/fle_comctl.o lift/out-app/obj/rt/fle_cpuid.o lift/out-app/obj/rt/fle_crash1_drag.o lift/out-app/obj/rt/fle_crash1_lcmap.o lift/out-app/obj/rt/fle_crash1_menu.o lift/out-app/obj/rt/fle_crypt.o lift/out-app/obj/rt/fle_ctx_tls.o lift/out-app/obj/rt/fle_cursor.o lift/out-app/obj/rt/fle_desk.o lift/out-app/obj/rt/fle_dsound.o lift/out-app/obj/rt/fle_dwm.o lift/out-app/obj/rt/fle_env.o lift/out-app/obj/rt/fle_event.o lift/out-app/obj/rt/fle_filedlg.o lift/out-app/obj/rt/fle_gdc.o lift/out-app/obj/rt/fle_gdi.o lift/out-app/obj/rt/fle_glob.o lift/out-app/obj/rt/fle_hle.o lift/out-app/obj/rt/fle_host.o lift/out-app/obj/rt/fle_imagehlp.o lift/out-app/obj/rt/fle_imagelist.o lift/out-app/obj/rt/fle_imports.o lift/out-app/obj/rt/fle_input.o lift/out-app/obj/rt/fle_int_ext.o lift/out-app/obj/rt/fle_int_more.o lift/out-app/obj/rt/fle_kbd.o lift/out-app/obj/rt/fle_layered.o lift/out-app/obj/rt/fle_load.o lift/out-app/obj/rt/fle_loadimage.o lift/out-app/obj/rt/fle_locale.o lift/out-app/obj/rt/fle_malloc16.o lift/out-app/obj/rt/fle_modules.o lift/out-app/obj/rt/fle_monitor.o lift/out-app/obj/rt/fle_msctf.o lift/out-app/obj/rt/fle_mxcsr.o lift/out-app/obj/rt/fle_ole.o lift/out-app/obj/rt/fle_oleaut.o lift/out-app/obj/rt/fle_osver.o lift/out-app/obj/rt/fle_proc.o lift/out-app/obj/rt/fle_raster.o lift/out-app/obj/rt/fle_realmod.o lift/out-app/obj/rt/fle_reg.o lift/out-app/obj/rt/fle_res.o lift/out-app/obj/rt/fle_seh.o lift/out-app/obj/rt/fle_shell.o lift/out-app/obj/rt/fle_spi.o lift/out-app/obj/rt/fle_sse_more.o lift/out-app/obj/rt/fle_string.o lift/out-app/obj/rt/fle_sweep1_kbd.o lift/out-app/obj/rt/fle_sys.o lift/out-app/obj/rt/fle_sysinfo.o lift/out-app/obj/rt/fle_sysmetrics.o lift/out-app/obj/rt/fle_thread.o lift/out-app/obj/rt/fle_thread_wasm.o lift/out-app/obj/rt/fle_time.o lift/out-app/obj/rt/fle_timerq.o lift/out-app/obj/rt/fle_token.o lift/out-app/obj/rt/fle_uilang.o lift/out-app/obj/rt/fle_uipref.o lift/out-app/obj/rt/fle_user_nowin.o lift/out-app/obj/rt/fle_vfs.o lift/out-app/obj/rt/fle_visrgn.o lift/out-app/obj/rt/fle_vmap.o lift/out-app/obj/rt/fle_vol.o lift/out-app/obj/rt/fle_wall_dec1.o lift/out-app/obj/rt/fle_wall_dlg1.o lift/out-app/obj/rt/fle_wall_exp1.o lift/out-app/obj/rt/fle_wall_ia2.o lift/out-app/obj/rt/fle_wall_ia2t.o lift/out-app/obj/rt/fle_wall_ia2v.o lift/out-app/obj/rt/fle_wall_ia2w.o lift/out-app/obj/rt/fle_wall_wrp1.o lift/out-app/obj/rt/fle_webview2.o lift/out-app/obj/rt/fle_win.o lift/out-app/obj/rt/fle_wininet.o lift/out-app/obj/rt/fle_winmm.o lift/out-app/obj/rt/fle_x87.o lift/out-app/obj/rt/fle_x87ctl.o @words lift/out-app/plugins/extra-objs.txt
+ stage wasm-opt: 1 step(s)
+   wasm-opt -Oz -g --enable-bulk-memory --enable-exception-handling --enable-sign-ext --enable-mutable-globals --enable-nontrapping-float-to-int --enable-multivalue --enable-reference-types --enable-simd --enable-threads --enable-tail-call --enable-extended-const -o lift/out-app/web/flengine6.c.opt.wasm lift/out-app/web/flengine6.wasm
+ stage hybrid: 3 step(s)
+diff --git a/lift/plugins/sytrus/plugin.tsv b/lift/plugins/sytrus/plugin.tsv
+new file mode 100644
+index 00000000..68a35332
+--- /dev/null
++++ b/lift/plugins/sytrus/plugin.tsv
+@@ -0,0 +1,3 @@
++# Sytrus (Generators). hook: the three Delphi hook points (inputs/plugin-hooks.tsv). omit: the entry of the one function that calls the guest setjmp (the call sites of its shape, #1400).
++key	guest	role	sha256	size	hook	args	omit
++generators.sytrus.sytrus_x64.dll	Plugins\Fruity\Generators\Sytrus\Sytrus_x64.dll	本体	e1395e9775ddb6219d3f633fef075f32ffc3f705510654f00b2ad9d9b8fabee4	6269440	rva:0x1b930,0x38b80,0x38ba0	--pdata	0x48cb70
+diff --git a/pm-work/findings/sytrus-1400.md b/pm-work/findings/sytrus-1400.md
+new file mode 100644
+index 00000000..53776c65
+--- /dev/null
++++ b/pm-work/findings/sytrus-1400.md
+@@ -0,0 +1,37 @@
++# #1400 内蔵の音源 Sytrus の読み込み(作業の記録)
++
++実エンジン: 作業ツリー(runner の値。nproc 4。loadavg 1.1〜1.9。この機械とは別枠)で、`fe-build engine`・`fe-build bundle`・`boot-check`・`tools/p3-audio-probe/measure.mjs` を実行した。
++
++## 追加したもの(受理)
++
++- `lift/plugins/sytrus/plugin.tsv` の 1 行: `generators.sytrus.sytrus_x64.dll`、`Plugins\Fruity\Generators\Sytrus\Sytrus_x64.dll`、本体、6,269,440 B、SHA-256 `e1395e97…`、hook `rva:0x1b930,0x38b80,0x38ba0`(`inputs/plugin-hooks.tsv` の 3 点。先頭バイトは既存の Delphi の 3 点と同じ)、omit `0x48cb70`。
++- omit の根拠: Sytrus の中の guest の setjmp(register 保存の形)を呼ぶ関数は 1 つだけ(`call` の並びを調べた。呼び出しは `0x48cb8b` → 中継 `0x11ab0`、続きは `0x48cb90`)。Balance の 0x2c13a0(呼び出し 0x2c13bb → 中継 0xe120、続き 0x2c13c0)と同じ形。
++- 共有の表は編集していない。抽出と seed は `app/scripts/lib/plugin-rows.mjs` の行から、取り出しは `ci/extract-dlls.tsv` の既存の行(Generators の Sytrus は 181 行目に在る。`ci/` は変えていない)。
++
++## 単位の段の直し(受理。設計 125 の (13))
++
++- 症状: `fe-build engine` が `units` の段で止まった(`not listed ["m11-00.c" … "m11-06.c"]`)。単位の一覧は `lift/harness/two/plain-units.txt` の静的な行で、プラグインを足すと必ず共有の表の編集が要った。
++- 直し: `units` の段は、一覧に無い `m<K>-<NN>.c` を gen の出力から求め(`plugins::check_units`)、`lift/out-app/plugins/extra-units.txt`・`extra-objs.txt` に書く。新しい段 `compile-extra` がそれをコンパイルし、`link` は `extra-objs.txt` の語を末尾に足す(`Step::RunWords`)。静的な一覧に無い単位がプラグインの形でない場合は止まる。
++- 試験: `cargo test -p fe-build -p fe-wasmgen`(20 件など)が通る。`tests/plan/engine.txt` を新しい表示に合わせた。
++
++## 実測(作業ツリーの値)
++
++- engine: `list generators.sytrus.sytrus_x64.dll: emitted ok 18658, left out 4 (omit 1), listed 18654`。`units: 7 more than the lists: m11-00.c … m11-06.c`。`hybrid: 8 direct modules, 2 separate modules`。exit 0(35 分)。
++- bundle: `lazy 6269440 B … Sytrus_x64.dll (after the engine starts)`、`lazy 21486577 B … sytrus_x64.c580000.wasm (after the engine starts)`。Balance の base(c1d0000)と重ならない(c580000)。
++- boot-check(committed 状態): `state engine-idle`・`standIn false`・`error null`・`elapsedMs 12241`(P1 の 10 秒は未達。負荷 1.1〜1.9 の runner)。
++- preBootBytes: 64,093,397 B(manifest・engine の br・glue・seed の pack・dll の pack の和。`tools/engine-cost/build-variant.mjs` と同じ式による静的な値。上限 314,368,711 B 以内)。
++- 警告: `couldn't be found` は出ない(ログの `image-read: sytrus_x64.c580000.dll requested=1` が出る)。`LoadLibraryW` の失敗は `imm32.dll` のみ(Sytrus とは無関係)。
++
++## demo 2 件(差し戻し)
++
++- `Synth_dfr - Overcome - Sytrus.flp`・`Olbaid - Sytrus Essentials.flp` とも、読み込みの後に `fle: CreateFileW: empty path is not defined`(`lift/runtime/fle_vfs.c:388` の `fle_stop`)で engine が exit する。`error` は「the title of … (the title is \"Song info\")」の時間切れ(180 秒)。`end.state` は `exited`。
++- 原因 1(確かめた): Sytrus の `Data\Default.dat` が VFS に無い。`Default.dat`(1,832 B)1 件だけを seed の表に足すと、この停止は消えた。
++- 原因 2(確かめた。未修正): `indirect call to 0xc9cf273 is not a known function entry`。`0xc9cf273` は rebase の像の VA で、元の RVA は `0x44f273`。これは関数 `0x44f130` の途中の case の位置で、`mov eax,[rcx+rax*4+0x4520d0]; add rax,rcx; jmp rax`(MSVC の switch 表)の飛び先。lift の MSVC 表の認識(`fe-decode` の jumptab)は、ガード(`cmp/ja`)が無いため N を決められず(`msvc_rejected 0xc9cf271`)、間接の飛びは既知の関数の入口だけへの呼び出しになって止まる。
++- 原因 3(確かめた。未対応): Sytrus の `Data` の 109 件(約 1.2 MB。`inputs/fl-installer-files.tsv`)を全部 seed に足すと、boot の段で `[err] vfs-seed: … more than 512 seed files` で止まる。`--lazy` 指定は pack-seed の上限 128 件(`must have <= 128 items`)。Data を入れる仕組み(plugin.tsv の行の種類)は未設計。
++
++## 次にやること(#1400 の残り)
++
++1. 原因 2 の直し: fe-decode の jumptab で、ガードの無い MSVC 表(`mov eX,[B+I*4+T]; add rX,B; jmp rX` で I と X が同じ)の N を、表の本体の終わり(既知の入口へ向かない所)で決める。あるいは、既知の入口に無い switch の飛び先を seed にする。どちらも lift 側の決めごと(decision 記録が要る)。
++2. 原因 1・3: Sytrus の Data を、plugin.tsv の行の種類(データ)で seed に足す。上限 512(boot の vfs-seed)と 128(`--lazy`)を確かめて、lazy の 128 件の上限を超えない形にする。
++3. 受け入れの `cp -a lift/out-app/host-extra/resources/. …` は、`resources` のラベルが Issue に無いと失敗する(`host-extra/resources` が作られない)。ラベルを付けるか、受け入れを直す(PM の決め)。
++4. #1387(Riff machine の窓)は、この Issue が閉じるまで起動しない。

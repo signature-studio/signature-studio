@@ -1,0 +1,10 @@
+{
+  "name": "fl-studio-web-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "E2E harness (Issue #1407): Playwright drives the production delivery (the Worker under wrangler dev --local, the bundle in its R2) at 3840 x 2160. Not part of the product.",
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

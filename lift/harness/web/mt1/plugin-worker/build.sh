@@ -9,7 +9,7 @@
 #   lift     mkrows.sh (host rows), mk_stubs.mjs (import rows, stubs), fe-decode reloc-seeds (the addresses that the image's pointers name and that are not
 #            function starts), seeds/<name>.txt (the switch-table and lea seeds, lift/harness/vst/seeds_scan.mjs), gen_vst.sh (fe-lift lift into units,
 #            merged dispatch table, realmod table)
-#   compile  emcc: the units, the runtime (lift/runtime/fle_*.c), image.c, the harness (vst3a C files and main_vst_ext.c)
+#   compile  emcc: the units, the runtime (lift/runtime/fle_*.c), image.c, the harness (vst3a C files, main_vst_ext.c, and vst_crt.c: the C runtime answers, #1338)
 #   link     emcc -> vst.wasm -> <output>/vst-ext.wasm
 # The work directory is .tmp-plugin-<name> in the repository (removed at the start; kept after the run for the next reading of the logs).
 set -u -o pipefail
@@ -112,7 +112,7 @@ export -f cc_one
     for f in "$RT"/fle_*.c; do echo "$f $WORK/rt/$(basename "$f" .c).o rt"; done
     echo "$LIFT/harness/image.c $WORK/h/image.o img"
     for f in "$VST3A"/vst_host3a.c "$VST3A"/vst_env3a.c "$VST3A"/vst3a_imp.c "$VST3A"/vst_stream3a.c "$VST3A"/vst_msg3a.c "$VST3A"/vst_exc3a.c "$VST3A"/wasm_cpuclock.c \
-             "$HERE/main_vst_ext.c" "$HERE/thread_stub.c" "$WORK/rows/vst3a_stubs.c"; do echo "$f $WORK/h/$(basename "$f" .c).o harness"; done
+             "$HERE/main_vst_ext.c" "$HERE/thread_stub.c" "$HERE/vst_crt.c" "$WORK/rows/vst3a_stubs.c"; do echo "$f $WORK/h/$(basename "$f" .c).o harness"; done
 } > "$WORK/compile.list"
 xargs -P "$JOBS" -n 3 bash -c 'cc_one "$0" "$1" "$2"' < "$WORK/compile.list" || fail compile "see the messages above"
 for f in "$WORK/units"/*.o "$WORK/rt"/*.o "$WORK/h"/*.o; do [ -s "$f" ] || fail compile "$f is empty"; done

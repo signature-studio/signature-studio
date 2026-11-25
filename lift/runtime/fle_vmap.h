@@ -35,6 +35,8 @@
  * mmap) is registered with fle_vmap_register_stack(lo, hi) as MEM_PRIVATE / MEM_COMMIT / PAGE_READWRITE, so that a query inside it answers (not free). */
 void fle_vmap_register_image(uint64_t base);
 void fle_vmap_register_range(uint64_t base, uint64_t size, uint32_t protect, uint32_t type);
+/* Issue #1391: the bytes of the registered images (SizeOfImage, page-rounded, as read from the headers in memory). */
+uint64_t fle_vmap_image_bytes(void);
 
 /* kernel32!VirtualProtect: BOOL f(LPVOID, SIZE_T, DWORD flNewProtect, PDWORD lpflOldProtect).
  * kernel32!VirtualQuery: SIZE_T f(LPCVOID, PMEMORY_BASIC_INFORMATION, SIZE_T dwLength). */

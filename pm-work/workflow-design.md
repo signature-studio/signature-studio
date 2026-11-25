@@ -222,3 +222,11 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 - 取り出し: `gh run list -w deploy.yml` で版の run の ID を探し、`mkdir -p <dir>/func-names-<版> && gh run download <ID> -n func-names-<版> -D <dir>/func-names-<版>`。道具は `node tools/perf-beacons/summary.mjs <記録の dir> --stops --func-names-dir <dir>`(`--func-names <file>` は、フォルダ名 `func-names-<版>` の中の file だけ)。trap の `wasm-function[N]` は、記録の版の表で名前に引かれ、指紋に ` [fn=名前]` と出る。
 - 表が無い版は ` [fn=? 表が無い版]`、表に無い番号は ` [fn=? 表に無い番号]` と出る。この変更より前に deploy された版は artifact が無く、取り出せない(その版の trap は ` [fn=? 表が無い版]` のまま)。
 - 試験: `spec/perf-funcnames.test.mjs`(合成の表と記録)と、`spec/workflow.test.sh` の (w)(deploy の段の並び・名前・保存の日数・段の動き)。
+
+## 19. E2E の門(deploy.yml。Issue #1407)
+
+- 位置と段: 「bundle の中身を確かめる」の後・関数名の表と `fe-build upload` の前に、2 段。`node tools/e2e/run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2,4k-random`(Chromium・本番と同じ配信。依存は `npx playwright install chromium`、--with-deps は使わない)と、`jq -e -s -f tools/e2e/judge.jq`(判定)。artifact は `e2e-<github.sha>`(30 日、`if: always()`)。
+- 判定: 全 4 行が servedHeadersMatch で error が無く、各シナリオの pageErrors・consoleErrors・stuckToasts・failedRequests が 0。印(`expectFail`。例 #1406)の付いたシナリオは ok を問わず、通ったら標準エラーに警告を出す(落とさない)。
+- 120 Hz に届かない事実(achievedFps)は JSON に出るが、門は落とさない(runner に GPU が無い)。
+- 落ちれば E2E の段が失敗し、後の関数名の表・upload・wrangler は飛ぶ(既定の `success()`)。§14 の門(人が verified.txt に足す形)とは別物で、毎回の run の結果で決まり、静かには閉じない。
+- 既知の限界: 段に時間の上限を付けていない(100 行の制約の内。ハングすれば deploy が止まるので、その時は run を取り消す)。

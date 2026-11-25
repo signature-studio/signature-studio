@@ -3,7 +3,7 @@
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
-// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
+// stdout: one JSON line. stderr: the log. Exit 1 when "error" is set, 2 when the arguments are wrong. Except (Issue #1400): when the guest does not open the project, "error" says why and the exit is 0 (the open is a result to report, not a failure of the probe). The temporary directory is inside the repository (.tmp-p3-probe-*) and is removed.
 // end (Issue #1365): the engine's state, the page's title and its last 400 log lines, at the end of a run or after an error.
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
@@ -15,18 +15,19 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 
-const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--boot [--press-at S] [--trace FILE] [--profile FILE]]\n';
+const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]]\n';
 const argv = process.argv.slice(2);
 const boot = argv.includes('--boot');
 const li = argv.indexOf('--load');
 const load = li < 0 ? 'none' : argv[li + 1];
-const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile'];
+const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile', '--pubs'];
 const valueOf = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1]; };
 const bootOptUsed = BOOT_VALUE_OPTS.some((o) => argv.includes(o));
 const pressRaw = valueOf('--press-at');
 const pressAt = pressRaw === undefined ? 0 : Number(pressRaw);
 const tracePath = valueOf('--trace') ?? null;
 const profilePath = valueOf('--profile') ?? null;
+const pubsPath = valueOf('--pubs') ?? null;
 const skipped = new Set();
 argv.forEach((a, i) => {
   if (a === '--boot') skipped.add(i);
@@ -101,16 +102,16 @@ async function main() {
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
-    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
-    screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, readAtMs: null,
+    screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
   };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-p3-probe-'));
   const assets = path.join(root, 'assets');
   const profile = path.join(root, 'profile');
   let server = null, chrome = null, cdp = null, navAt = null;
-  let probeError = null, evAfterError = null;
+  let probeError = null, evAfterError = null, projectRefused = false;
   const fromAudio = (d) => Object.assign(out, {
     ctxState: d.ctxState, status: d.status, quantaWhilePlaying: d.quantaWhilePlaying, underrunQuanta: d.underrunQuanta, engineGapFrames: d.engineGapFrames,
     playingSeconds: d.playingSeconds, deviceState: d.deviceState, underrunQuantaSinceFirstIdle: d.underrunQuantaSinceFirstIdle, underrunEpisodes: d.episodes,
@@ -188,7 +189,7 @@ async function main() {
 
     if (projectFile !== null) {
       const logBefore = await ev('window.__app.engineLog().length');
-      await openProject(S, ev, projectFile);
+      await openProject(S, ev, projectFile).catch((e) => { projectRefused = true; throw e; });
       await projectReport(ev, out, logBefore);
     }
     await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
@@ -225,22 +226,27 @@ async function main() {
     out.error = probeError;
     if (navAt !== null) out.elapsedMs = Date.now() - navAt;
     out.loadavg = os.loadavg();
+    // Issue #1400: the engine's reads of the real modules' images (name, requested) in the order they happened: a Sytrus row with requested true is the plugin DLL's image read by the guest
+    if (evAfterError) out.imageReads = await evAfterError("(() => { const a = window.__app; return a ? a.imageReads.map((r) => ({ name: r.name, requested: r.requested, atMs: r.atMs })) : null; })()").catch(() => null);
     if (cdp) await shutdown(chrome, cdp).catch(() => {});
     else if (chrome) chrome.proc.kill('SIGKILL');
     if (server) await server.close().catch(() => {});
     fs.rmSync(root, { recursive: true, force: true });
     process.stdout.write(JSON.stringify(out) + '\n');
-    process.exitCode = out.error ? 1 : 0;
+    process.exitCode = out.error && !projectRefused ? 1 : 0;
   }
 }
 
 // --boot (#1334): the one press that starts the AudioContext comes --press-at seconds after engine-idle (default 0; the status line, as startAudio does; no guest event). The window is t0+10 s to t0+70 s: nothing is sent to the guest in it, and the reads are taken at its two ends. The read at t0+90 s (bootLast60sAt90s: the last 60 s are t0+30 s to t0+90 s, past the start-up peak) comes after the one at +70 s.
 async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, pageSession) {
   const engine = await engineWorker(cdp, workers);
-  if ((tracePath !== null || profilePath !== null) && engine === null) throw new Error('no engine Worker with fleAudioWorkerState (--trace and --profile need it)');
+  if (engine === null) throw new Error('no engine Worker with fleAudioWorkerState (the boot window reads it)');
   const stop = { done: false };
   const trace = tracePath !== null ? traceLoop(audioNow, cdp, engine, tIdle, stop) : null;
   try {
+    // #1375: the publish log of the output ring (PUB_HOOK) is taken from the engine's Worker for the whole boot window; its window is read in the Worker's own clock (w0, w1)
+    const hooked = await workerEval(cdp, engine, PUB_HOOK);
+    let w0 = null, w1 = null, pubLog = null, s0 = null, s1 = null;
     if (profilePath !== null) await profileStart(cdp, engine);
     if (profilePath !== null) await profileStart(cdp, pageSession);
     out.pressAtMs = Math.round(pressAt * 1000);
@@ -261,6 +267,8 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
       d10 = await audioNow();
       if (d10 === null) throw new Error('the page has no audio output (window.__app.audio is null)');
       at10 = Date.now() - tIdle;
+      w0 = await workerEval(cdp, engine, 'performance.now()');
+      s0 = await workerEval(cdp, engine, SCHED_STATS);
     };
     // the read at +10 s comes before the press when the press is later than that (the reads are at their own times, in time order)
     if (out.pressAtMs <= BOOT_READ_MS.first) { await press(); await read10(); } else { await read10(); await press(); }
@@ -270,6 +278,10 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
     await sleepUntil(tIdle + BOOT_READ_MS.final);
     const d90 = await audioNow();
     const at90 = Date.now() - tIdle;
+    w1 = await workerEval(cdp, engine, 'performance.now()');
+    s1 = await workerEval(cdp, engine, SCHED_STATS);
+    pubLog = await workerEval(cdp, engine, PUB_LOG);
+    out.schedStats = { at10s: s0, at90s: s1, names: ['loopSlices', 'loopNoThreads', 'loopNotRunning', 'loopInCallback', 'loopDepth1', 'loopSwitched', 'progressSlices', 'progressInCallback'] };
     fromAudio(d90);
     out.readAtMs = [at10, at70, at90];
     out.bootLast60sAt10s = d10.underrunQuantaLast60s;
@@ -277,9 +289,16 @@ async function bootWindow(S, ev, audioNow, fromAudio, cdp, workers, out, tIdle, 
     out.bootLast60sAt90s = d90.underrunQuantaLast60s;
     out.quantaDelta = d70.quantaWhilePlaying - d10.quantaWhilePlaying;
     out.maxRefillStallMs = await enginePublishGap(cdp, workers);
-    log('boot window', { at10, at70, at90, last60sAt10s: out.bootLast60sAt10s, last60sAt70s: out.bootLast60sAt70s, last60sAt90s: out.bootLast60sAt90s, quantaDelta: out.quantaDelta, maxRefillStallMs: out.maxRefillStallMs, ctxState: d90.ctxState });
-    if (profilePath !== null) await profileStop(cdp, engine, profilePath);
-    if (profilePath !== null) await profileStop(cdp, pageSession, mainProfilePath(profilePath));
+    if (hooked !== null && pubLog !== null) {
+      const win = windowMaxGap(pubLog, w0, w1);
+      out.maxRefillStallInWindowMs = win.maxMs;
+      out.publishesInWindow = win.publishes;
+      if (pubsPath !== null) fs.writeFileSync(pubsPath, JSON.stringify({ w0, w1, entries: pubLog }));
+      out.pubLog = pubsPath;
+    }
+    log('boot window', { at10, at70, at90, last60sAt10s: out.bootLast60sAt10s, last60sAt70s: out.bootLast60sAt70s, last60sAt90s: out.bootLast60sAt90s, quantaDelta: out.quantaDelta, maxRefillStallMs: out.maxRefillStallMs, maxRefillStallInWindowMs: out.maxRefillStallInWindowMs, ctxState: d90.ctxState });
+    if (profilePath !== null) await profileStop(cdp, engine, profilePath, true);
+    if (profilePath !== null) await profileStop(cdp, pageSession, mainProfilePath(profilePath), false);
     out.profile = profilePath;
     out.profileMain = profilePath === null ? null : mainProfilePath(profilePath);
   } finally {
@@ -332,8 +351,11 @@ function mainProfilePath(file) {
   return file.slice(0, file.length - e.length) + '.main' + e;
 }
 
-async function profileStop(cdp, engine, file) {
+// --profile (#1375): the Worker's performance.now() taken just before the stop, with the CDP clock at the end of the profile, so that the publish log (in the Worker's clock) can be put on the samples' timeline (profile.fleClock.offsetUs: CDP microseconds = performance.now() ms x 1000 + offsetUs)
+async function profileStop(cdp, engine, file, clock) {
+  const perfStop = clock ? await workerEval(cdp, engine, 'performance.now()') : null;
   const r = await timed(cdp.send('Profiler.stop', {}, engine), 300000, 'Profiler.stop');
+  if (perfStop !== null) r.profile.fleClock = { perfAtStopMs: perfStop, offsetUs: r.profile.endTime - perfStop * 1000 };
   fs.writeFileSync(file, JSON.stringify(r.profile));
   log('profile', { file, samples: r.profile.samples?.length ?? null });
 }
@@ -341,6 +363,33 @@ async function profileStop(cdp, engine, file) {
 async function sleepUntil(at) {
   const d = at - Date.now();
   if (d > 0) await sleep(d);
+}
+
+// #1375: the publish log of the output ring. fle_js_publish (fle_audio_transport.c) sets A.runPub (whether the output was running) and then assigns A.lastPub = now at the end of each publish; a setter on lastPub appends [now, running] to A.__pl. Only this probe reads it; the product is not changed.
+const PUB_HOOK = "(() => { const A = globalThis.__fleAud; if (!A) return null; if (!A.__pl) { let lp = A.lastPub; A.__pl = []; Object.defineProperty(A, 'lastPub', { configurable: true, enumerable: true, get() { return lp; }, set(v) { lp = v; A.__pl.push([v, A.runPub ? 1 : 0]); } }); } return performance.now(); })()";
+const PUB_LOG = "(() => { const A = globalThis.__fleAud; return A && A.__pl ? A.__pl : null; })()";
+// #1375: the counts of the scheduler points (fle_thread.c sched_stat, read through fle_audio_sched_stat in fle_audio_transport.c)
+const SCHED_STATS = 'globalThis.fleSchedStats ? globalThis.fleSchedStats() : null';
+
+// the engine's Worker: an expression's value (returnByValue)
+async function workerEval(cdp, sid, expression) {
+  const r = await timed(cdp.send('Runtime.evaluate', { expression, returnByValue: true }, sid), CDP_TIMEOUT_MS, 'the engine worker');
+  if (r.exceptionDetails) throw new Error(`worker evaluate: ${r.exceptionDetails.text}`);
+  return r.result.value;
+}
+
+// #1375: the longest interval between two publishes whose both ends are in [w0, w1] and which both found the output running (the engine's own rule for maxPubGap). publishes: the count of publishes in the window.
+function windowMaxGap(entries, w0, w1) {
+  let maxMs = 0, publishes = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const [t] = entries[i];
+    if (t >= w0 && t <= w1) publishes++;
+    if (i === 0) continue;
+    const [tp, rp] = entries[i - 1];
+    if (tp < w0 || t > w1) continue;
+    if (rp && entries[i][1] && t - tp > maxMs) maxMs = t - tp;
+  }
+  return { maxMs: Math.round(maxMs * 10) / 10, publishes };
 }
 
 // the engine's own count (fle_audio_transport.c: the longest interval between two refills of the output ring since its first one). The Worker's global is read through CDP; the other Workers (the renderer) have no fleAudioWorkerState and answer null.
