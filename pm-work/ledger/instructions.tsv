@@ -68,3 +68,4 @@ L-065	2026-11-24	依頼者	コード進行ツールは "Start creating" を押�
 L-066	2026-11-24	依頼者	リフ マシーンは、起動しようとしても何も反応しない	pm-work/issue-drafts/wave1y/147-piano-riff-machine-no-response.md
 L-068	2026-11-24	依頼者	emscripten(またはそのグルーコード)が、使い物にならないほど重い原因ではないか、という問題提起(emscripten の採用取りやめ・zig cc の検討の動機)	pm-work/issue-drafts/wave1z/148-zig-cc-replace-emcc.md
 L-069	2026-11-24	依頼者	agent.yml: エージェントの開始の直前に、Project の Status を In Progress に移す。終了時に In Review に移す	.github/workflows/agent.yml
+L-070	2026-11-25	依頼者	まだ非常にクラッシュしやすい。積極的に是正する	pm-work/issue-drafts/wave1ak/
