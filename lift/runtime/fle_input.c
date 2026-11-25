@@ -20,6 +20,7 @@
 #include "fle_win.h"
 #include "fle_cursor.h"
 #include "fle_input.h"
+#include "fle_sysmetrics.h"
 
 void fle_imp_SetCursor(void) __attribute__((weak));
 static uint64_t clk(void) { return fle_sys_clock_ticks(); }
@@ -405,6 +406,31 @@ static uint64_t mouse_target(int32_t x, int32_t y, unsigned *thread, int *captur
 static int send_hittest(const char *api, uint64_t h, int32_t x, int32_t y)
 {
     return (int16_t)(uint16_t)fle_win_input_send(api, h, FLE_WM_NCHITTEST, 0, lparam_xy(x, y));
+}
+
+/* #1390: the default answer of DefWindowProc to WM_NCHITTEST for a sizable window (WS_THICKFRAME, not maximised, not minimised), used only when the window's own procedure does not answer. Windows draws the frame outside the
+ * client area; this model's windows have no frame (decision 0123, S-nc-zero), so the border is the band inside the window, SM_CXSIZEFRAME + SM_CXPADDEDBORDER (fle_sysmetrics.h) wide at the DPI of the screen. Learn WM_NCHITTEST: the sizing
+ * codes are the eight directions; a corner is the square where two bands meet. Returns the sizing code of the point (x, y) in v, or 0 when v has no border or the point is not in one. */
+static int sizing_ht(const fle_win_iview *v, int32_t x, int32_t y)
+{
+    int32_t b = (int32_t)(((uint32_t)(FLE_SM_SIZEFRAME_96 + FLE_SM_PADDEDBORDER_96) * fle_screen_dpi() + 48u) / 96u);
+    int l, r, t, bt;
+
+    if (!(v->style & FLE_WS_THICKFRAME) || (v->style & (FLE_WS_MAXIMIZE | FLE_WS_MINIMIZE))) return 0;
+    if (x < v->ox || y < v->oy || x >= v->ox + v->cx || y >= v->oy + v->cy) return 0;
+    l = x < v->ox + b;
+    r = x >= v->ox + v->cx - b;
+    t = y < v->oy + b;
+    bt = y >= v->oy + v->cy - b;
+    if (t && l) return FLE_HTTOPLEFT;
+    if (t && r) return FLE_HTTOPRIGHT;
+    if (bt && l) return FLE_HTBOTTOMLEFT;
+    if (bt && r) return FLE_HTBOTTOMRIGHT;
+    if (l) return FLE_HTLEFT;
+    if (r) return FLE_HTRIGHT;
+    if (t) return FLE_HTTOP;
+    if (bt) return FLE_HTBOTTOM;
+    return 0;
 }
 
 /* The thread the head event is for. */
@@ -934,10 +960,16 @@ int fle_input_defproc(const char *api, uint64_t hwnd, uint32_t msg, uint64_t wp,
         return 1;
     case FLE_WM_NCHITTEST: {
         /* Learn WM_NCHITTEST: "The return value of the DefWindowProc function is one of the following values, indicating the position of the cursor hot spot". The model's windows have no frame (decision 0123, S-nc-zero):
-         * the point is in the client area (HTCLIENT) when it lies inside the window's rectangle, else HTNOWHERE. S-nchittest-client. */
+         * the point is in the client area (HTCLIENT) when it lies inside the window's rectangle, else HTNOWHERE (S-nchittest-client). #1390: inside the sizing border of a sizable window (sizing_ht) the answer is its sizing code. */
         int32_t x = sx16(lp), y = sx16(lp >> 16);
+        int sz;
 
-        *result = (x >= v.ox && y >= v.oy && x < v.ox + v.cx && y < v.oy + v.cy) ? (uint64_t)FLE_HTCLIENT : (uint64_t)FLE_HTNOWHERE;
+        if (!(x >= v.ox && y >= v.oy && x < v.ox + v.cx && y < v.oy + v.cy)) {
+            *result = (uint64_t)FLE_HTNOWHERE;
+            return 1;
+        }
+        sz = sizing_ht(&v, x, y);
+        *result = (uint64_t)(sz ? sz : FLE_HTCLIENT);
         return 1;
     }
     case FLE_WM_SETCURSOR: {

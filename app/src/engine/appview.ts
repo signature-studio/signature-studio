@@ -2,7 +2,7 @@
 // The structure is filled by the exported C function fle_av_poll() and read from the engine's linear memory as little-endian words. The layout below is pinned by test/unit/appview.test.ts to the C header.
 export const AV_MAGIC = 0x50414c46; // bytes 'F' 'L' 'A' 'P'
 export const AV_VERSION = 1;
-export const AV_HEADER_BYTES = 68;   // 17 words: magic, version, entry_size, max_windows, seq, cursor, cursor_idc, cursor_shared, pointer_x, pointer_y, pending_events, n_windows, screen_w, screen_h (decision 0212), reserved[3]
+export const AV_HEADER_BYTES = 68;   // 17 words: magic, version, entry_size, max_windows, seq, cursor, cursor_idc, cursor_shared, pointer_x, pointer_y, pending_events, n_windows, screen_w, screen_h (decision 0212), cursor_made (#1390), reserved[2]
 export const AV_WINDOW_BYTES = 144;
 export const AV_CLASS_BYTES = 32;
 export const AV_TITLE_BYTES = 64;
@@ -24,6 +24,8 @@ export interface AppView {
   cursor: number;
   cursorIdc: number;
   cursorShared: boolean;
+  /** #1390: the cursor is an icon or a cursor the guest made itself (CreateIconIndirect), not a standard one nor a module's */
+  cursorMade: boolean;
   pointerX: number; pointerY: number;
   pendingEvents: number;
   /** decision 0212: the size of the virtual screen the guest is told (lift/runtime/fle_screen.h); 0 from a build that does not report it (the page then takes 1920 x 1080) */
@@ -32,7 +34,7 @@ export interface AppView {
   windows: AvWindow[];
 }
 
-/** header: 12 words + screen_w, screen_h + reserved[3] = 68 bytes; then max_windows entries of 144 bytes (the C struct is fle_av_state; fle_appview.c asserts offsetof(windows) == 68) */
+/** header: 12 words + screen_w, screen_h + cursor_made + reserved[2] = 68 bytes; then max_windows entries of 144 bytes (the C struct is fle_av_state; fle_appview.c asserts offsetof(windows) == 68) */
 export function readAppView(buffer: ArrayBufferLike, ptr: number, sinceSeq?: number): AppView | null {
   const dv = new DataView(buffer, ptr);
   if (dv.getUint32(0, true) !== AV_MAGIC || dv.getUint32(4, true) !== AV_VERSION || dv.getUint32(8, true) !== AV_WINDOW_BYTES) return null;
@@ -59,7 +61,7 @@ export function readAppView(buffer: ArrayBufferLike, ptr: number, sinceSeq?: num
     });
   }
   return {
-    seq: dv.getUint32(16, true), cursor: dv.getUint32(20, true), cursorIdc: dv.getUint32(24, true), cursorShared: dv.getUint32(28, true) !== 0,
+    seq: dv.getUint32(16, true), cursor: dv.getUint32(20, true), cursorIdc: dv.getUint32(24, true), cursorShared: dv.getUint32(28, true) !== 0, cursorMade: dv.getUint32(56, true) !== 0,
     pointerX: dv.getInt32(32, true), pointerY: dv.getInt32(36, true), pendingEvents: dv.getUint32(40, true), screenW: dv.getUint32(48, true), screenH: dv.getUint32(52, true), windows,
   };
 }

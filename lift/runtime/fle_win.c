@@ -1370,6 +1370,7 @@ void fle_imp_SetWindowLongPtrW(void)
          * is the call that notifies: here the state follows the bit without WM_ENABLE). */
         uint32_t ns = (uint32_t)np;
 
+        if (api_trace) fprintf(stderr, "window-api: SetWindowLongPtrW GWL_STYLE %#" PRIx64 " %#x -> %#x\n", h, (unsigned)tab[i].style, (unsigned)ns);   /* #1390: a sizing frame added later is seen here */
         R[0] = (uint64_t)(int64_t)(int32_t)tab[i].style;
         tab[i].style = ns;
         tab[i].visible = (ns & FLE_WS_VISIBLE) != 0;
@@ -7364,6 +7365,10 @@ unsigned fle_win_child_lines(char *out, size_t cap)
         for (k = 0; txt[k]; k++) if (txt[k] == '"' || txt[k] == '\\') txt[k] = '?';
         w = snprintf(out + n, cap - n, "child lid %u parent lid %u at (%d, %d) %dx%d vis %d class \"%s\" text \"%s\"\n", (unsigned)tab[i].lid, (unsigned)tab[tab[i].parent].lid,
                      (int)tab[i].px, (int)tab[i].py, (int)tab[i].pcx, (int)tab[i].pcy, vis, cls, txt);
+        if (w < 0 || (size_t)w >= cap - n) break;
+        n += (size_t)w;
+        /* #1390: the style of the child, on its own line (the line above keeps its form: the readers of the window table parse it) */
+        w = snprintf(out + n, cap - n, "child style lid %u 0x%08x\n", (unsigned)tab[i].lid, (unsigned)tab[i].style);
         if (w < 0 || (size_t)w >= cap - n) break;
         n += (size_t)w;
         c++;

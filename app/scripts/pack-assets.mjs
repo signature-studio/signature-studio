@@ -89,7 +89,8 @@ async function main() {
     fs.mkdirSync(path.dirname(brFile), { recursive: true });
     const size = fs.statSync(srcFile).size;
     const encSize = await compressFile(srcFile, brFile, quality);
-    return { url: urlBase + fname, size, sha256: sha, compression: 'br', encodedSize: encSize };
+    // Issue #1373: a # in a name would end the URL's path at the fragment, so the URL writes # % ? as escapes (the file keeps its name)
+    return { url: urlBase + fname.replace(/[%#?]/g, (c) => encodeURIComponent(c)), size, sha256: sha, compression: 'br', encodedSize: encSize };
   }
 
   const wasm = await emit(wasmSrc, 'engine', 'wasm');

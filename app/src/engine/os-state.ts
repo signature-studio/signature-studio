@@ -3,7 +3,7 @@
 // general fact of the operating system and names no FL window: the title is the one a window shows in its title bar, and the foreground window is the one Windows calls active (Learn, GetForegroundWindow / WM_ACTIVATE).
 import type { AppView } from './appview.ts';
 
-export interface OsState { cursor: number; cursorIdc: number; cursorShared: boolean; title: string; screenW: number; screenH: number }
+export interface OsState { cursor: number; cursorIdc: number; cursorShared: boolean; cursorMade: boolean; title: string; screenW: number; screenH: number }
 
 /**
  * `lastTitle` is the title shown so far. The new title is the title of the active, visible window whose title is not empty (a menu or a tooltip is a window with an empty title; it is active for a moment and must not blank the
@@ -11,8 +11,8 @@ export interface OsState { cursor: number; cursorIdc: number; cursorShared: bool
  */
 export function osStateOf(v: AppView, lastTitle: string): OsState {
   const act = v.windows.find((w) => w.active && w.visible && w.title.trim() !== '');
-  return { cursor: v.cursor, cursorIdc: v.cursorIdc, cursorShared: v.cursorShared, title: act ? act.title.trim() : lastTitle, screenW: v.screenW ?? 0, screenH: v.screenH ?? 0 };
+  return { cursor: v.cursor, cursorIdc: v.cursorIdc, cursorShared: v.cursorShared, cursorMade: v.cursorMade, title: act ? act.title.trim() : lastTitle, screenW: v.screenW ?? 0, screenH: v.screenH ?? 0 };
 }
 
 /** a change of the key is a change of the state: the Worker posts `osstate` only then */
-export const osStateKey = (s: OsState): string => `${s.cursor}/${s.cursorIdc}/${s.cursorShared ? 1 : 0}/${s.screenW}x${s.screenH}/${s.title}`;
+export const osStateKey = (s: OsState): string => `${s.cursor}/${s.cursorIdc}/${s.cursorShared ? 1 : 0}/${s.cursorMade ? 1 : 0}/${s.screenW}x${s.screenH}/${s.title}`;
