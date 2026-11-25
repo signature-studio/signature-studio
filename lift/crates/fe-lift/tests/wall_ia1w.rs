@@ -174,6 +174,7 @@ static uint64_t cw(uint64_t style, int32_t x, int32_t y, int32_t w, int32_t hh, 
 /* #1389: the page's clipboard library (harness/web/clip/fle_clip_lib.js) is not linked here: the page has no text */
 void fle_clip_host_write(const void *units, uint32_t bytes) { (void)units; (void)bytes; }
 void *fle_clip_host_read(void) { return NULL; }
+int fle_clip_host_probe(void) { return 0; }
 "##;
 
 fn run_src(name: &str, body: &str) -> Out {

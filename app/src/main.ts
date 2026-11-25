@@ -702,6 +702,9 @@ const client = new EngineClient({
     addLog('info', `the engine's Paste asks for the clipboard text (request ${id})`);
     pageClipboard.read().then((text) => client.clipboardAnswer(id, text)).catch(() => client.clipboardAnswer(id, null));
   },
+  clipboardProbe(id) {
+    pageClipboard.probe().then((has) => client.clipboardProbeAnswer(id, has)).catch(() => client.clipboardProbeAnswer(id, false));
+  },
   desk(m) {
     app.deskStats = m.stats;
     deskHistory.add(nowAbs(), m.stats.presents);
