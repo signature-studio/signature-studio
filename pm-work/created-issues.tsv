@@ -170,3 +170,5 @@
 082	#1475	内蔵インストゥルメント 13: Sakura・Sawer・SimSynth を、1 プラグイン 1 wasm で入れる	Task
 083	#1476	内蔵インストゥルメント 14: Slicex・Soundfont Player・Toxic Biohazard を、1 プラグイン 1 wasm で入れる	Task
 084	#1477	内蔵インストゥルメント 15: Wasp・Wasp XT・Wave Traveller を、1 プラグイン 1 wasm で入れる	Task
+192	#1478	内蔵プラグインの Data(551 件・22 フォルダ)を、プラグインごとの `data.tsv` で宣言し、共有の seed 表に行を足さずに、起動の後の取得で配信する	Task
+193	#1479	第 2 波の束の `plugin.tsv` が入っても、`plugins.rs` の試験『160 本が像の領域に入る』が、同じ DLL の重複で落ちない形にする	Task
