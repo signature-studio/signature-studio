@@ -461,7 +461,7 @@ fn the_4_rows_of_decision_0140_are_the_last_rows_in_the_order_given_and_no_pseud
     let rows = resp_rows(&c);
     assert_eq!(rows.len(), st.resp_entries);
     let k = rows_0140::ROWS_0140.len();
-    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4; // Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
+    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1; // Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
     // the rows before are the 3 of decision 0139 (tests/wall_fr15.rs), whose last row is dsound!DirectSoundEnumerateW; HEAD 93881c0 has 601 rows (598 of decision 0136 + 3), decision 0140 appends 4 (decision 0015: append only)
     assert_eq!(n, 601 + k, "the 601 rows of HEAD 93881c0 and the {k} of decision 0140");
     assert_eq!((rows[n - k - 1].0.as_str(), rows[n - k - 1].1.as_str()), ("dsound.dll", "DirectSoundEnumerateW"), "the row before the new ones is the last row of decision 0139");

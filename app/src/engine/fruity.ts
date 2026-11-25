@@ -227,6 +227,13 @@ export class FruityEngine {
     return (ex.fle_g3_taskbar_iconic as () => number)() >>> 0;
   }
 
+  /** Issue #1385 (lift/harness/fruity_idle.c fle_g3_main_window): the lid of the FL Studio main window (0: none), or null when the wasm has no such export */
+  mainWindow(): number | null {
+    const ex = this.instance?.exports as Record<string, unknown> | undefined;
+    if (!ex || typeof ex.fle_g3_main_window !== 'function') return null;
+    return (ex.fle_g3_main_window as () => number)() >>> 0;
+  }
+
   /** C-6 (#1310, a test aid): the engine's window-API trace on or off (fle_g3_window_api_trace, lift/harness/fruity_idle.c); false when the wasm has no such export */
   windowApiTrace(on: boolean): boolean {
     this.traceOn = on;   // kept for the start (preRun): a trace asked before the engine runs is on from its first instruction

@@ -88,8 +88,8 @@ mod tests {
     }
 
     /// Same layout as the fe-decode test: `.text` at 0x1000, `.data` at 0x2000.
-    /// `call [rip+0x2500]` (rip table -> 0x1040), `call [rip+0x2200]` (IAT),
-    /// `jmp [rip+0x2508]` (rip table -> 0x1030), `call rbx` (unresolved).
+    /// `call [rip+0x1300]` (rip table -> 0x1040), `call [rip+0x2200]` (IAT),
+    /// `jmp [rip+0x1308]` (rip table -> 0x1030), `call rbx` (unresolved).
     fn build() -> Vec<u8> {
         let mut b = vec![0u8; FILE_LEN];
         w16(&mut b, 0, 0x5a4d);
@@ -135,14 +135,14 @@ mod tests {
         w64(&mut b, data_at(0x2200), 0x2400);
         b[data_at(0x2300)..data_at(0x2300) + 6].copy_from_slice(b"k.dll\0");
         b[data_at(0x2402)..data_at(0x2402) + 3].copy_from_slice(b"Fn\0");
-        w64(&mut b, data_at(0x2500), IB + 0x1040);
-        w64(&mut b, data_at(0x2508), IB + 0x1030);
+        w64(&mut b, TEXT_RAW + 0x300, IB + 0x1040);
+        w64(&mut b, TEXT_RAW + 0x308, IB + 0x1030);
 
         let t = TEXT_RAW;
         let code: &[(u32, Vec<u8>)] = &[
-            (0x1000, [&[0xff, 0x15][..], &rel(0x1006, 0x2500)].concat()),
+            (0x1000, [&[0xff, 0x15][..], &rel(0x1006, 0x1300)].concat()),
             (0x1006, [&[0xff, 0x15][..], &rel(0x100c, 0x2200)].concat()),
-            (0x100c, [&[0xff, 0x25][..], &rel(0x1012, 0x2508)].concat()),
+            (0x100c, [&[0xff, 0x25][..], &rel(0x1012, 0x1308)].concat()),
             (0x1030, vec![0xc3]),
             (0x1040, vec![0xc3]),
         ];
@@ -153,6 +153,8 @@ mod tests {
         b
     }
 
+    /// The rip tables are in `.text` (read only): a slot of a writable section is not a constant (Issue #1391), so the call through it is
+    /// the run-time dispatch, not a direct call.
     #[test]
     fn rip_table_call_and_jmp_are_direct_and_iat_stays_unsupported() {
         let img = build();

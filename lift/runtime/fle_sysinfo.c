@@ -2,6 +2,7 @@
  * Microsoft page fixes are settings of this virtual environment (fle_sysinfo.h). */
 #define _GNU_SOURCE
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -12,6 +13,9 @@
 #include "fle_proc.h"
 #include "fle_sys.h"
 #include "fle_sysinfo.h"
+
+/* Issue #1391: the registered images (fle_vmap.c). Weak: a link without fle_vmap.c (the sysinfo tests) counts no image. */
+uint64_t fle_vmap_image_bytes(void) __attribute__((weak));
 
 /* Same rule as the other runtime files: the first caller owns the state, another thread stops the run. */
 static long fle_sysinfo_owner_tid;
@@ -205,6 +209,46 @@ void fle_imp_GlobalMemoryStatus(void)
     memcpy(ms + 4, &load, 4);
     memcpy(ms + 8, v, sizeof v);
     memcpy((void *)fle_addr(out, (unsigned)sizeof ms, 1), ms, sizeof ms);
+}
+
+/* ---- Process memory (Issue #1391, the top bar's Memory Usage) ----
+ * kernel32!K32GetProcessMemoryInfo, the kernel32 name of psapi!GetProcessMemoryInfo: BOOL f(HANDLE hProcess rcx, PPROCESS_MEMORY_COUNTERS ppsmemCounters rdx, DWORD cb r8d).
+ * FLEngine does not import it: it asks for it with GetProcAddress("K32GetProcessMemoryInfo") (its row is in imports_table.rs). MSDN (GetProcessMemoryInfo): the handle needs query rights; this environment
+ * hands out only the GetCurrentProcess pseudo handle for a process, so any other handle stops the run (as IsWow64Process does). ppsmemCounters NULL is not defined by the page: the run stops. A cb smaller than the
+ * structure fails; the page does not name the error, ERROR_BAD_LENGTH (24) is an assumption.
+ * The 64-bit PROCESS_MEMORY_COUNTERS (72 bytes): cb 0, PageFaultCount 4 (0: not counted here), PeakWorkingSetSize 8, WorkingSetSize 16, QuotaPeakPagedPoolUsage 24, QuotaPagedPoolUsage 32,
+ * QuotaPeakNonPagedPoolUsage 40, QuotaNonPagedPoolUsage 48 (0: pool use is not tracked), PagefileUsage 56, PeakPagefileUsage 64. WorkingSetSize and PagefileUsage are the bytes the guest holds now
+ * (fle_sys_in_use_bytes: the committed VirtualAlloc pages and the live HeapAlloc blocks, plus fle_vmap_image_bytes: the registered images, each SizeOfImage read from its headers; read, not made up),
+ * the peaks are the largest of those values this call has reported. Each call writes one "memory-usage:" line to the engine's log (the page reads it: measure.mjs). */
+#define FLE_PMC_SIZE         72u
+#define FLE_ERROR_BAD_LENGTH 24u
+
+void fle_imp_K32GetProcessMemoryInfo(void)
+{
+    static uint64_t peak;
+    uint64_t h = R[1], out = R[2], use;
+    uint32_t cb = (uint32_t)R[8], size = FLE_PMC_SIZE;
+    uint8_t pmc[FLE_PMC_SIZE];
+
+    fle_sysinfo_check_thread("K32GetProcessMemoryInfo");
+    if (h != FLE_PSEUDO_PROCESS_HANDLE) fle_stop("K32GetProcessMemoryInfo", "a handle that GetCurrentProcess did not return");
+    if (out == 0) fle_stop("K32GetProcessMemoryInfo", "ppsmemCounters is NULL (the page does not define it)");
+    if (cb < FLE_PMC_SIZE) {
+        fle_set_last_error(FLE_ERROR_BAD_LENGTH);
+        R[0] = 0;
+        return;
+    }
+    use = fle_sys_in_use_bytes() + (fle_vmap_image_bytes ? fle_vmap_image_bytes() : 0);
+    if (use > peak) peak = use;
+    fprintf(stderr, "memory-usage: K32GetProcessMemoryInfo WorkingSetSize %llu\n", (unsigned long long)use);
+    memset(pmc, 0, sizeof pmc);
+    memcpy(pmc + 0, &size, 4);
+    memcpy(pmc + 8, &peak, 8);
+    memcpy(pmc + 16, &use, 8);
+    memcpy(pmc + 56, &use, 8);
+    memcpy(pmc + 64, &peak, 8);
+    memcpy((void *)fle_addr(out, (unsigned)sizeof pmc, 1), pmc, sizeof pmc);
+    R[0] = 1;
 }
 
 /* ---- Process affinity ----

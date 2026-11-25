@@ -152,13 +152,156 @@ static uint64_t find_rf(const img_t *im, uint32_t rva)
     return 0;
 }
 
+/* ---- the record of a search (#1410): what a stop by name says about the frames searched, so that the next stop shows where the search ended ---- */
+#define TRAIL_HEAD 12u      /* the first frames searched */
+#define TRAIL_TAIL 3u       /* the last frames searched: the end of the chain, where the return address was 0 or the stop came */
+typedef struct {
+    uint64_t pc;            /* ControlPc of the frame */
+    uint64_t sp;            /* the stack slot that held the frame's return address, the next ControlPc (entry_sp) */
+    int has_rf;             /* the frame has a RUNTIME_FUNCTION (a leaf has none) */
+    uint32_t flags;         /* UNWIND_INFO flags of the frame (1 = UNW_EHANDLER, 2 = UNW_UHANDLER) */
+} trail_ent;
+static trail_ent trail_head[TRAIL_HEAD], trail_tail[TRAIL_TAIL];
+static unsigned trail_n;    /* frames searched by the current search */
+static uint64_t trail_args; /* the ExceptionInformation of the exception being dispatched, and its count */
+static unsigned trail_nargs;
+
+static void trail_reset(uint64_t args, unsigned nargs)
+{
+    trail_n = 0;
+    trail_args = args;
+    trail_nargs = nargs;
+}
+
+static void trail_add(const frame_t *f)
+{
+    trail_ent e;
+
+    e.pc = f->control_pc;
+    e.sp = f->entry_sp;
+    e.has_rf = f->has_rf;
+    e.flags = f->flags;
+    if (trail_n < TRAIL_HEAD) trail_head[trail_n] = e;
+    trail_tail[trail_n % TRAIL_TAIL] = e;
+    trail_n++;
+}
+
+/* snprintf that appends to b (of `used` bytes) and never writes past cap; returns the new length. */
+static size_t rec_put(char *b, size_t cap, size_t used, const char *fmt, ...)
+{
+    va_list ap;
+    int k;
+
+    if (used + 1 >= cap) return used;
+    va_start(ap, fmt);
+    k = vsnprintf(b + used, cap - used, fmt, ap);
+    va_end(ap);
+    if (k < 0) return used;
+    return used + (size_t)k < cap ? used + (size_t)k : cap - 1;
+}
+
+/* The probe of an address outside the images (a Delphi object is a heap block): fle_thread_wasm.c defines it in a wasm build (the address lies inside the linear memory); a build
+ * without it reads no object, so the record names the stop and leaves the object out. */
+int fle_guest_readable(uint64_t a) __attribute__((weak));
+
+/* Whether the 8 bytes at a guest address can be read without a fault: an address in a mapped image is read directly, any other only when the probe says so. */
+static int readable8(uint64_t a)
+{
+    if (a < 0x10000u) return 0;
+    if (img_of(a)) return 1;
+    if (fle_guest_readable == NULL) return 0;
+    return fle_guest_readable(a) != 0;
+}
+
+/* The class of the object at obj and its ancestors, "EOleSysError < EOleError < Exception < TObject" (Delphi: the VMT is the object's first word; its ClassName is the ShortString
+ * at VMT - 0x88, its parent the VMT whose address is the pointer at VMT - 0x78; the test of seh_rt.rs has the same layout). Four names at most. Read only when the object is
+ * readable (readable8), and each VMT, name and parent pointer lies in an image. Returns 1 when the first name was read. */
+static int class_of(uint64_t obj, char *dst, size_t dn)
+{
+    uint64_t vmt, np, pp;
+    unsigned lev, used = 0, len, k;
+
+    dst[0] = 0;
+    if (obj == 0 || !readable8(obj)) return 0;
+    vmt = ld64(obj);
+    for (lev = 0; lev < 4 && vmt != 0 && img_of(vmt) && img_of(vmt - 0x88); lev++) {
+        np = ld64(vmt - 0x88);
+        if (!img_of(np)) break;
+        len = ld8(np);
+        if (len == 0 || !img_of(np + len)) break;
+        if (lev > 0 && used + 3 < dn) used += (unsigned)snprintf(dst + used, dn - used, " < ");
+        for (k = 0; k < len && used + 1 < dn; k++) {
+            uint8_t c = ld8(np + 1 + k);
+
+            dst[used++] = (c >= 0x20 && c < 0x7f) ? (char)c : '?';
+        }
+        dst[used] = 0;
+        pp = ld64(vmt - 0x78);
+        vmt = (pp != 0 && img_of(pp)) ? ld64(pp) : 0;
+    }
+    return used > 0;
+}
+
+static size_t trail_put(char *b, size_t cap, size_t used, const trail_ent *e, int sep)
+{
+    if (e->has_rf) return rec_put(b, cap, used, "%s%llx:r%x", sep ? " " : "", (unsigned long long)e->pc, (unsigned)e->flags);
+    return rec_put(b, cap, used, "%s%llx:-", sep ? " " : "", (unsigned long long)e->pc);
+}
+
+/* The StackBase of the running guest thread (NT_TIB.StackBase at TEB + 8, fle_callback.c reads the same TEB; 0 when no TEB is linked). A return address 0 read far below the base
+ * is in the middle of the stack (a bad unwind); one at the top of the stack is the root of the thread. */
+extern uint8_t fle_teb[] __attribute__((weak));
+extern uint8_t *fle_teb_cur __attribute__((weak));
+static uint64_t guest_stack_base(void)
+{
+    const uint8_t *cur = NULL, *teb;
+    uint64_t base = 0;
+
+    if (&fle_teb_cur != NULL) cur = fle_teb_cur;
+    teb = cur ? cur : fle_teb;
+    if (teb) memcpy(&base, teb + 0x8, sizeof base);
+    return base;
+}
+
+/* Appends the record of the search to b (its text is used bytes long). The stop line keeps 400 bytes (engine.exit.stop.lastFle), so the order is the order of what matters:
+ * where the search ended (`ended`: the return address 0 after the last frame, read from the slot of that frame), the last frames (the chain's end, the root of the stack), the
+ * classes of the first two arguments (the object of a Delphi exception is the second), and the first frames (TRAIL_HEAD). A frame is ControlPc:r<UNWIND flags> or ControlPc:- (no RUNTIME_FUNCTION). */
+static size_t record_append(char *b, size_t cap, size_t used, int ended)
+{
+    unsigned i, head = trail_n < TRAIL_HEAD ? trail_n : TRAIL_HEAD, k0;
+
+    if (ended && trail_n > 0) {
+        uint64_t slot = trail_tail[(trail_n - 1) % TRAIL_TAIL].sp, base = guest_stack_base();
+
+        if (base > slot) used = rec_put(b, cap, used, "; ended at return address 0 (read at %#llx, %llu bytes below the stack base) after frame %u", (unsigned long long)slot, (unsigned long long)(base - slot), trail_n);
+        else used = rec_put(b, cap, used, "; ended at return address 0 (read at %#llx) after frame %u", (unsigned long long)slot, trail_n);
+    }
+    if (trail_n > TRAIL_HEAD) {
+        k0 = trail_n - TRAIL_TAIL > TRAIL_HEAD ? trail_n - TRAIL_TAIL : TRAIL_HEAD;
+        used = rec_put(b, cap, used, "; last frames %u-%u [", k0 + 1, trail_n);
+        for (i = k0; i < trail_n; i++) used = trail_put(b, cap, used, &trail_tail[i % TRAIL_TAIL], i > k0);
+        used = rec_put(b, cap, used, "]");
+    }
+    for (i = 0; i < 2 && i < trail_nargs; i++) {
+        char cls[120];
+
+        if (class_of(ld64(trail_args + 8ull * i), cls, sizeof cls)) used = rec_put(b, cap, used, "; arg%u class %s", i, cls);
+    }
+    if (head > 0) {
+        used = rec_put(b, cap, used, "; first frames 1-%u [", head);
+        for (i = 0; i < head; i++) used = trail_put(b, cap, used, &trail_head[i], i > 0);
+        used = rec_put(b, cap, used, "]");
+    }
+    return used;
+}
+
 /* ---- the virtual unwind of one frame (Learn: x64 exception handling, "Unwind procedure" and "UNWIND_CODE") ---- */
 static uint32_t ia2_last_code;      /* decision 0191 (diagnostics only): the code and the argument pointer of the RaiseException being dispatched, to name a delay-load failure in the stop below */
 static uint64_t ia2_last_args;
 static void delay_names(uint64_t args, char *dll, size_t dn, char *proc, size_t pn);
 static void stop_at(const char *api, const char *what, uint64_t pc)
 {
-    char why[420];
+    char why[640];
     size_t used;
 
     snprintf(why, sizeof why, "%s (ControlPc %#llx)", what, (unsigned long long)pc);
@@ -166,8 +309,9 @@ static void stop_at(const char *api, const char *what, uint64_t pc)
     if ((ia2_last_code == 0xC06D007Fu || ia2_last_code == 0xC06D007Eu) && ia2_last_args != 0) {
         char dll[64], proc[96];
         delay_names(ia2_last_args, dll, sizeof dll, proc, sizeof proc);
-        snprintf(why + used, sizeof why - used, " [delay-load failure %#x: dll %.60s proc %.90s]", (unsigned)ia2_last_code, dll, proc);
+        used = rec_put(why, sizeof why, used, " [delay-load failure %#x: dll %.60s proc %.90s]", (unsigned)ia2_last_code, dll, proc);
     }
+    record_append(why, sizeof why, used, 0);
     fle_stop(api, why);
 }
 
@@ -391,6 +535,7 @@ void fle_seh_raise(void)
     uint64_t args = R[9], k;
     uctx c;
     unsigned i, frames = 0;
+    size_t used;
     char why[520];
 
     if (fle_seh_cur) {
@@ -427,14 +572,20 @@ void fle_seh_raise(void)
     fle_seh_cur = &d;
     ia2_last_code = (uint32_t)code;
     ia2_last_args = n >= 1 ? args : 0;
+    trail_reset(args, n);
     c = d.raise;
     for (;;) {
         frame_t f;
         uctx next = c;
 
-        if (++frames > FRAME_LIMIT) fle_stop(api, "more than 100000 frames searched (a loop in the virtual unwind)");
+        if (++frames > FRAME_LIMIT) {
+            snprintf(why, sizeof why, "more than 100000 frames searched (a loop in the virtual unwind)");
+            record_append(why, sizeof why, strlen(why), 0);
+            fle_stop(api, why);
+        }
         stat_frames = frames;
         unwind_one(&next, &f, UNW_EHANDLER, api);
+        trail_add(&f);
         if (f.handler_va) {
             uint64_t r;
             int32_t disp;
@@ -457,13 +608,14 @@ void fle_seh_raise(void)
         if (c.rip == 0) break;
     }
     snprintf(why, sizeof why, "exception code %#x, flags %#x, %u argument(s) raised; no frame-based handler took it (%u frames searched)", (unsigned)code, (unsigned)flags, (unsigned)n, frames);
+    used = strlen(why);
     if ((code == 0xC06D007Fu || code == 0xC06D007Eu) && n >= 1) {
         char dll[64], proc[96];
-        size_t used = strlen(why);
 
         delay_names(args, dll, sizeof dll, proc, sizeof proc);
-        snprintf(why + used, sizeof why - used, " [delay-load: dll %.60s proc %.90s]", dll, proc);
+        used = rec_put(why, sizeof why, used, " [delay-load: dll %.60s proc %.90s]", dll, proc);
     }
+    record_append(why, sizeof why, used, 1);
     fle_stop(api, why);
     abort();
 }
@@ -487,14 +639,20 @@ void fle_seh_unwind_ex(void)
     rec = rec_in ? rec_in : d->rec;
     fle_st(rec + 4, 4, ld32(rec + 4) | EXC_UNWINDING);   /* S-seh-unwind-flags */
     d->pass = 2;
+    trail_n = 0;
     c = d->raise;
     for (;;) {
         frame_t f;
         uctx next = c;
         int is_target;
 
-        if (++frames > FRAME_LIMIT) fle_stop(api, "more than 100000 frames unwound (a loop in the virtual unwind)");
+        if (++frames > FRAME_LIMIT) {
+            snprintf(why, sizeof why, "more than 100000 frames unwound (a loop in the virtual unwind)");
+            record_append(why, sizeof why, strlen(why), 0);
+            fle_stop(api, why);
+        }
         unwind_one(&next, &f, UNW_UHANDLER, api);
+        trail_add(&f);
         is_target = f.has_rf && f.establisher == target_frame;
         if (f.has_rf && f.establisher > target_frame) {
             snprintf(why, sizeof why, "the unwind passed TargetFrame %#llx without meeting a frame with that EstablisherFrame (STATUS_INVALID_UNWIND_TARGET)", (unsigned long long)target_frame);
@@ -549,6 +707,11 @@ void fle_seh_unwind_ex(void)
             _longjmp(reg->jb, 1);
         }
         c = next;
-        if (c.rip == 0) fle_stop(api, "the unwind reached the end of the stack without meeting TargetFrame");
+        if (c.rip == 0) {
+            size_t used = (size_t)snprintf(why, sizeof why, "the unwind reached the end of the stack without meeting TargetFrame");
+
+            record_append(why, sizeof why, used, 1);
+            fle_stop(api, why);
+        }
     }
 }

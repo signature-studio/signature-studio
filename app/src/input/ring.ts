@@ -1,11 +1,11 @@
 // Decision 0223 (desk1): the raw input events from the page to the engine Worker through a SharedArrayBuffer ring, instead of a postMessage per event. One producer (the page's main thread), one consumer
-// (the Worker). The Worker reads the ring at every idle of the engine and when the page wakes it; the page wakes it (one small message) only if the Worker has said it is parked, i.e. the engine is idle and
-// nothing but a message or a timer would run the Worker's code. The order is the usual one for a flag and a queue (Dekker): the producer writes the record, then stores `head`, then reads `parked`; the consumer
-// stores `parked`, then reads `head`; with Atomics (sequentially consistent) one of the two sees the other.
+// (the Worker). The Worker reads the ring at every idle of the engine: while it is idle it waits on `head` (Atomics.waitAsync, no message), and the page's write of a record is one Atomics.notify on `head`
+// (no message either, so a record costs the page no postMessage and the Worker no message task). The wait compares `head` with the value it read when it found the ring empty, so a record written in between is
+// never missed (waitAsync returns at once when the value differs), and the producer's store of `head` comes before its notify (Atomics are sequentially consistent).
 import { IN, type DisplayRaw, type KeyRaw, type MouseRaw, type RawInput, type SyscmdRaw } from './events.ts';
 
 export const RING_CAPACITY = 1024;
-const HEAD = 0, TAIL = 1, PARKED = 2, FULL = 3;
+const HEAD = 0, TAIL = 1, FULL = 3;   // word 2 is not used
 const HEADER_WORDS = 16;           // 64 bytes: the records start 8-byte aligned
 const REC_WORDS = 8;               // seq, type, kind, a, b, c (word 5), tPage as a Float64 (words 6 and 7)
 export const RING_BYTES = (HEADER_WORDS + RING_CAPACITY * REC_WORDS) * 4;
@@ -13,6 +13,8 @@ export const RING_BYTES = (HEADER_WORDS + RING_CAPACITY * REC_WORDS) * 4;
 const T_MOUSE = 1, T_KEY = 2, T_DISPLAY = 3, T_SYSCMD = 4;
 
 export const newRingBuffer = (): SharedArrayBuffer => new SharedArrayBuffer(RING_BYTES);
+
+type WaitAsync = (ia: Int32Array, i: number, v: number, t?: number) => { async: false; value: 'not-equal' | 'timed-out' } | { async: true; value: Promise<'ok' | 'timed-out'> };
 
 export interface RingRecord { seq: number; tPage: number; ev: RawInput }
 
@@ -36,8 +38,8 @@ export class RingWriter {
     return true;
   }
 
-  /** the Worker has said that only a message or a timer runs its code */
-  get parked(): boolean { return Atomics.load(this.i32, PARKED) === 1; }
+  /** wakes the Worker if it waits for a record (waitForWrite); the number of waiters woken */
+  notify(): number { return Atomics.notify(this.i32, HEAD); }
   get fullCount(): number { return Atomics.load(this.i32, FULL); }
 }
 
@@ -48,7 +50,13 @@ export class RingReader {
 
   get pending(): number { return Atomics.load(this.i32, HEAD) - Atomics.load(this.i32, TAIL); }
 
-  setParked(v: boolean): void { Atomics.store(this.i32, PARKED, v ? 1 : 0); }
+  /** resolves 'ok' when a record is waiting or the page writes one (RingWriter.notify); 'not-equal' when the head moved before the wait began (the caller reads the ring again) */
+  waitForWrite(): Promise<'ok' | 'not-equal'> {
+    const head = Atomics.load(this.i32, HEAD);
+    if (head !== Atomics.load(this.i32, TAIL)) return Promise.resolve('ok');
+    const w = (Atomics as unknown as { waitAsync: WaitAsync }).waitAsync(this.i32, HEAD, head);
+    return w.async ? w.value.then((v) => (v === 'ok' ? 'ok' : 'not-equal')) : Promise.resolve('not-equal');
+  }
 
   /** hands every waiting record to `fn` in order; the count */
   drain(fn: (r: RingRecord) => void): number { return this.drainN(Infinity, fn); }

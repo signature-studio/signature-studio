@@ -48,14 +48,6 @@ describe('the input ring', () => {
     r.drain((x) => seen2.push(x.seq));
     expect(seen2).toEqual(Array.from({ length: 10 }, (_, i) => RING_CAPACITY + i));
   });
-  it('the parked flag goes from the reader to the writer', () => {
-    const sab = newRingBuffer(), w = new RingWriter(sab), r = new RingReader(sab);
-    expect(w.parked).toBe(false);
-    r.setParked(true);
-    expect(w.parked).toBe(true);
-    r.setParked(false);
-    expect(w.parked).toBe(false);
-  });
   it('decision 0280 (L1c, alpha11): the scheduler point takes mouse, key and display only; a syscmd (the task bar\'s restore) is not taken and stays first in the ring, with what follows it, for the IdleDriver', () => {
     const sab = newRingBuffer(), w = new RingWriter(sab), r = new RingReader(sab);
     const kinds: RawInput[] = [
@@ -95,5 +87,15 @@ describe('the input ring', () => {
     expect(b).toEqual(Array.from({ length: 24 }, (_, k) => k + 17));
     expect(r.drainN(16, () => { throw new Error('nothing is left'); })).toBe(0);
     expect(r.drainN(0, () => { throw new Error('max 0 takes nothing'); })).toBe(0);
+  });
+  it('a waiting Reader is woken by the writer\'s notify, and a record already in the ring is not waited for', async () => {
+    const sab = newRingBuffer(), w = new RingWriter(sab), r = new RingReader(sab);
+    const pending = r.waitForWrite();
+    expect(w.notify()).toBe(1);
+    expect(await pending).toBe('ok');
+    expect(w.notify()).toBe(0);
+    w.push(1, 0, mouse(IN.MOVE, 1, 2));
+    expect(await r.waitForWrite()).toBe('ok');
+    expect(r.pending).toBe(1);
   });
 });

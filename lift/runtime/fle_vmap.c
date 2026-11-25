@@ -253,6 +253,16 @@ void fle_vmap_register_image(uint64_t base)
     vq_nimages++;
 }
 
+/* Issue #1391 (Memory Usage; read only): the bytes of the registered images, each SizeOfImage rounded up to the page size as it was read from the headers in memory (fle_vmap_register_image). */
+uint64_t fle_vmap_image_bytes(void)
+{
+    uint64_t n = 0;
+    unsigned i;
+
+    for (i = 0; i < vq_nimages; i++) n += vq_images[i].size;
+    return n;
+}
+
 void fle_vmap_register_range(uint64_t base, uint64_t size, uint32_t protect, uint32_t type)
 {
     if (vq_nranges >= VQ_MAX_RANGES) fle_stop("VirtualQuery", "more registered ranges than the runtime holds");

@@ -1,8 +1,10 @@
 // Issue #1383: the records of the virtual registry's HKCU tree (the format is at reg_journal in lift/runtime/fle_reg.c) and the state they make. The saved log keeps the last record
 // of each key and each value (names compare without regard to ASCII case, as the registry does). A deletion stays as a record: a seed value that the deletion removed must stay
 // removed at the next start, and the seed is applied again at every start. Pure: the file is in regstore.ts.
+// Issue #1385: the same log keeps the user's files (under the user's profile, C:\Users\user): a file's content (filePut), a directory (dirMake) and a deletion of a file or a
+// directory tree (fileDel). Their key is the path. Nothing is seeded under the profile, so a deletion leaves no record: it takes the live records of the path out.
 
-export const REG_OP = { key: 1, value: 2, delValue: 3, delKey: 4 } as const;
+export const REG_OP = { key: 1, value: 2, delValue: 3, delKey: 4, filePut: 5, fileDel: 6, dirMake: 7 } as const;
 
 export interface RegRecord {
   op: number;
@@ -29,7 +31,7 @@ export function parseRecord(b: Uint8Array, at = 0): RegRecord | null {
     return v >>> 0;
   };
   const op = b[p];
-  if (op === undefined || op < REG_OP.key || op > REG_OP.delKey) return null;
+  if (op === undefined || op < REG_OP.key || op > REG_OP.dirMake) return null;
   p++;
   const kl = u32();
   if (kl === null || kl % 2 !== 0 || p + kl > b.length) return null;
@@ -42,7 +44,7 @@ export function parseRecord(b: Uint8Array, at = 0): RegRecord | null {
   const type = u32();
   if (type === null) return null;
   const dl = u32();
-  if (dl === null || p + dl > b.length || (dl > 0 && op !== REG_OP.value)) return null;
+  if (dl === null || p + dl > b.length || (dl > 0 && op !== REG_OP.value && op !== REG_OP.filePut)) return null;
   p += dl;
   return { op, key, name, type, bytes: b.slice(at, p), end: p };
 }
@@ -50,6 +52,8 @@ export function parseRecord(b: Uint8Array, at = 0): RegRecord | null {
 const fold = (s: string): string => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
 const keyId = (key: string): string => `k\u0000${fold(key)}`;
 const valueId = (key: string, name: string): string => `v\u0000${fold(key)}\u0000${fold(name)}`;
+const fileId = (path: string): string => `f\u0000${fold(path)}`;
+const dirId = (path: string): string => `d\u0000${fold(path)}`;
 
 export class RegJournal {
   private readonly live = new Map<string, Uint8Array>();
@@ -77,6 +81,16 @@ export class RegJournal {
       this.set(keyId(r.key), r.bytes);
     } else if (r.op === REG_OP.value || r.op === REG_OP.delValue) {
       this.set(valueId(r.key, r.name), r.bytes);
+    } else if (r.op === REG_OP.filePut) {
+      this.set(fileId(r.key), r.bytes);
+    } else if (r.op === REG_OP.dirMake) {
+      this.set(dirId(r.key), r.bytes);
+    } else if (r.op === REG_OP.fileDel) {
+      // the file or the directory tree at the path leaves the live set (the deletion itself is not kept: nothing is seeded under the profile)
+      const f = fileId(r.key), d = dirId(r.key);
+      for (const id of [...this.live.keys()]) {
+        if (id === f || id === d || id.startsWith(`${f}\\`) || id.startsWith(`${d}\\`)) this.delete(id);
+      }
     } else {
       // the key and what is under it leave the live set; the deletion of the key itself stays as a record
       const k = fold(r.key), own = keyId(r.key);

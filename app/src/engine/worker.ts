@@ -16,6 +16,7 @@ import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts'
 import { sceneGen } from './desk-gl.ts';
 import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
+import { IN, SC } from '../input/events.ts';
 import { openRegState, type RegState } from './regstore.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
@@ -76,7 +77,6 @@ async function handle(m: ToWorker): Promise<void> {
     case 'end-idle': if (fruity && !(driver ? driver.end() : fruity.endIdle())) log('warn', 'the engine is not idle: nothing to end'); break;
     case 'input': onInput(m.seq, m.tPage, m.ev); break;
     case 'filedlg-answer': onFileDlgAnswer(m.id, m.answer); break;
-    case 'wake': deskCounters.wakes++; drainRing(); break;
     case 'desk-dump': deskDump(false); break;
     case 'desk-peek': deskDump(true); break;
     case 'guest-text': guestText(m.markers, m.radius); break;
@@ -85,6 +85,7 @@ async function handle(m: ToWorker): Promise<void> {
     case 'webview2-loaded': onWebView2Loaded(); break;
     case 'webview2-message': log('info', `the page posted a message to the engine's WebView2 (${m.json.length} characters): the engine has no WebMessageReceived model yet, so it is not delivered`); break;
     case 'clipboard-text': fruity?.answerClipRead(m.id, m.text); break;   // #1389: the engine waits for this answer (its JSPI import)
+    case 'exit-request': onExitRequest(); break;
     case 'ping': post({ t: 'pong', id: m.id }); break;
   }
 }
@@ -143,6 +144,23 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
 // ---- input (decision 0141): the page's raw events reach the IdleDriver; the engine takes them at its idle ----
 let lagCutTicks = 0;
 let lastLagLog = -1e9;
+// the driver's wait for a deadline is Atomics.waitAsync with a timeout on a word that only a cancel notifies (Issue #1397): a setTimeout whose nesting is deeper than five waits at least 4 ms, and the deadlines of
+// the idle chain are nested that way. A cancelled wait resolves at once (the notify) and does nothing when it does.
+interface DeadlineWait { live: boolean }
+type WaitAsyncResult = { async: false; value: 'not-equal' | 'timed-out' } | { async: true; value: Promise<'ok' | 'timed-out'> };
+const deadlineWord = new Int32Array(new SharedArrayBuffer(4));
+function deadlineWait(fn: () => void, ms: number): DeadlineWait {
+  const h: DeadlineWait = { live: true };
+  const fire = (): void => { if (h.live) { h.live = false; fn(); } };
+  const w = (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number, t: number): WaitAsyncResult }).waitAsync(deadlineWord, 0, 0, Math.max(0, ms));
+  if (w.async) void w.value.then(fire); else void Promise.resolve().then(fire);
+  return h;
+}
+function cancelDeadlineWait(h: DeadlineWait): void {
+  h.live = false;
+  Atomics.notify(deadlineWord, 0);
+}
+
 // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
 function ensureDriver(): IdleDriver | null {
   if (driver || !fruity) return driver;
@@ -155,8 +173,8 @@ function ensureDriver(): IdleDriver | null {
   driver = new IdleDriver(input, {
     deliver: (code) => fruity?.deliver(code) ?? false,
     now: () => nowAbs(),
-    setTimer: (fn, ms) => setTimeout(fn, ms),
-    clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+    setTimer: (fn, ms) => deadlineWait(fn, ms),
+    clearTimer: (h) => cancelDeadlineWait(h as DeadlineWait),
     yieldTurn: (fn) => { bounce = fn; turns.port2.postMessage(0); },
   }, {
     processed: (list, tIdle) => {
@@ -166,9 +184,9 @@ function ensureDriver(): IdleDriver | null {
       if (deskReady) { try { deskTick(false, list.map((x) => x.seq)); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
     },
     dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
-    resumed: (_code, abs, why) => { ring?.setParked(false); if (reports.resume(why)) post({ t: 'resume', abs, why }); },
+    resumed: (_code, abs, why) => { if (reports.resume(why)) post({ t: 'resume', abs, why }); },
     // reported here, before the driver decides what the engine does next: the page must see this idle before the resume that may follow it at once (decision 0170: the next deadline is often already due)
-    idle: (n, now, next, busyMs, at) => { ring?.setParked(true); reportIdle(n, now, next, busyMs, at); },
+    idle: (n, now, next, busyMs, at) => { reportIdle(n, now, next, busyMs, at); },
     lagCut: (ticks) => {
       lagCutTicks += ticks;
       const at = performance.now();
@@ -279,7 +297,17 @@ function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
   drainRing(); // the page's input waits in the ring: it is queued now and given to the engine by onIdle below
   if (driver) driver.onIdle(n, nowTicks, nextTicks);
   else reportIdle(n, nowTicks, nextTicks, null, nowAbs());
-  drainRing(); // an input that was written after the first look but before this idle was announced as parked
+  drainRing(); // an input that was written after the first look but before this idle was announced
+  armInputWait();
+}
+
+// the page writes a record and wakes this Worker with Atomics.notify on the ring (RingWriter.notify), not with a message: one wait on the ring is pending at a time, and it is armed again
+// when it returns, so a record written while the engine runs is taken at the next idle, as before
+let inputWaiting = false;
+function armInputWait(): void {
+  if (inputWaiting || !ring || !driver) return;   // without a driver nothing takes the records: a wait for them would return at once, again and again
+  inputWaiting = true;
+  void ring.waitForWrite().then(() => { inputWaiting = false; deskCounters.wakes++; drainRing(); armInputWait(); });
 }
 
 // ---- decision 0193: the engine's file dialogs. The engine is suspended in Show() (JSPI) while the page asks the person; the answer arrives as a message, the library reads the File into the engine's memory and resumes it ----
@@ -332,9 +360,26 @@ function closeRegState(dropped: boolean): void {
   regState = null;
 }
 
+/** Issue #1385: the page is left (pagehide: a reload or a close). The FL main window is sent SC_CLOSE on the road the task bar's button takes (the IdleDriver, at the engine's idle), so FL
+ * does what it does when the person closes its window: it closes the files it keeps open (a saved project is written at its close, and each write reaches the page's journal then).
+ * Once; nothing when the engine has ended or has no such window. EXIT_SEQ is no input of the page's: the latency tracker takes no sample of it. */
+const EXIT_SEQ = -1;
+let runEnded = false;
+let exitSent = false;
+function onExitRequest(): void {
+  if (exitSent || runEnded || !fruity) return;
+  const lid = fruity.mainWindow();
+  const d = ensureDriver();
+  if (!lid || !d) { log('info', 'the page is left: the engine has no FL main window to close'); return; }
+  exitSent = true;
+  d.submit({ k: 'syscmd', kind: IN.SYSCMD, lid, cmd: SC.CLOSE }, EXIT_SEQ, nowAbs());
+  mark('exit_request', { lid });
+}
+
 async function startFruity(f: FruityEngine): Promise<void> {
   mark('engine_start');
   const result = await f.run();
+  runEnded = true;
   closeRegState(result.kind === 'trap' || (result.kind === 'exit' && result.code !== 0));
   stopAudioReport();
   flushLogs();
@@ -500,15 +545,15 @@ const TEXT_REACH = 0x100000;
 const TEXT_HITS = 64;
 const TEXT_LINES = 2000;
 const TEXT_LINE_MAX = 400;
-const NEAR_PLACES = 24;
+const NEAR_PLACES = 400;
 const NEAR_RUNS = 200;
 
 const textUnit = (wide: boolean): number => (wide ? 2 : 1);
 const textChar = (b: Uint8Array, p: number, wide: boolean): number => (wide ? (b[p] ?? 0) | ((b[p + 1] ?? 0) << 8) : (b[p] ?? 0));
 const isText = (c: number): boolean => (c >= 0x20 && c <= 0x7e) || c === 0x09 || c === 0x0a || c === 0x0d;
 
-/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE: the first byte is found by indexOf and the rest compared */
-function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
+/** the places (byte offsets) of `s` in the memory, as ASCII or as UTF-16LE, at most `limit`: the first byte is found by indexOf and the rest compared */
+function findPlaces(b: Uint8Array, s: string, wide: boolean, limit: number): number[] {
   const u = textUnit(wide);
   const pat = new Uint8Array(s.length * u);
   for (let i = 0; i < s.length; i++) {
@@ -520,7 +565,7 @@ function findPlaces(b: Uint8Array, s: string, wide: boolean): number[] {
   const last = b.length - pat.length;
   const first = pat[0] ?? 0;
   let p = b.indexOf(first, 0);
-  while (p >= 0 && p <= last && out.length < TEXT_HITS) {
+  while (p >= 0 && p <= last && out.length < limit) {
     let k = 1;
     while (k < pat.length && b[p + k] === pat[k]) k++;
     if (k === pat.length) out.push(p);
@@ -571,11 +616,15 @@ function guestText(markers: string[], radius: number): void {
   for (const marker of markers) {
     for (const wide of [false, true]) {
       const enc = wide ? 'utf16le' : 'ascii';
-      for (const at of findPlaces(b, marker, wide)) {
-        const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
-        const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
-        if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
-        if (radius > 0 && near.length < NEAR_PLACES) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
+      // #1391: the runs near a place are listed for up to NEAR_PLACES places per encoding (the top bar's "<n> MB" is not cut off by the lowest addresses); the best text still comes from the first TEXT_HITS places
+      const places = findPlaces(b, marker, wide, radius > 0 ? NEAR_PLACES : TEXT_HITS);
+      for (const [i, at] of places.entries()) {
+        if (i < TEXT_HITS) {
+          const [s, e] = textBounds(b, at, marker.length * textUnit(wide), wide);
+          const lines = decodeText(b, s, e, wide).split(/\r\n|\r|\n/).filter((l) => l.length > 0);
+          if (best === null || lines.length > best.lineCount) best = { marker, enc, offset: at, lineCount: lines.length, lines: lines.slice(0, TEXT_LINES).map((l) => l.slice(0, TEXT_LINE_MAX)) };
+        }
+        if (radius > 0) near.push({ marker, enc, offset: at, runs: runsNear(b, at, radius, wide) });
       }
     }
     if (best !== null && best.lineCount >= 3) break;

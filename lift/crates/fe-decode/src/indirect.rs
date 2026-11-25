@@ -113,11 +113,7 @@ impl<'r, 'a> Resolver<'r, 'a> {
     }
 
     fn read_u64(&self, va: u64) -> Option<u64> {
-        let rva = self.pe.va_to_rva(va).ok()?;
-        let b = self.pe.slice_at_rva(rva, 8).ok()?;
-        let mut a = [0u8; 8];
-        a.copy_from_slice(b);
-        Some(u64::from_le_bytes(a))
+        dataflow::read8(self.pe, va)
     }
 
     fn through_slot(&self, slot: u64, how: How) -> Resolved {
@@ -253,16 +249,16 @@ mod tests {
 
     /// Synthetic PE32+ with `.text` (RVA 0x1000) and `.data` (RVA 0x2000).
     ///
-    /// `.data`: import of `k.dll!Fn` (IAT slot at 0x2200); rip table slot 0x2500 -> F2;
-    /// jump slot 0x2508 -> 0x1030.
+    /// `.data`: import of `k.dll!Fn` (IAT slot at 0x2200). The tables are in `.text` (read only; a writable slot is not a constant, see
+    /// `writable_slot_content_is_not_a_constant`): rip table slot 0x1300 -> F2; jump slot 0x1308 -> 0x1030.
     ///
     /// `.text`:
-    /// - 0x1000 `call [rip+0x2500]`      (rip table -> 0x1040)
+    /// - 0x1000 `call [rip+0x1300]`      (rip table -> 0x1040)
     /// - 0x1006 `call [rip+0x2200]`      (IAT)
     /// - 0x100c `lea rax,[rip+0x1080]`; 0x1013 `call rax`   (reg const -> 0x1080)
-    /// - 0x1015 `lea rcx,[rip+0x2500]`; 0x101c `call [rcx]`  (reg table -> 0x1040)
+    /// - 0x1015 `lea rcx,[rip+0x1300]`; 0x101c `call [rcx]`  (reg table -> 0x1040)
     /// - 0x101f `call rbx`               (unresolved)
-    /// - 0x1021 `jmp [rip+0x2508]`       (rip table -> 0x1030, same function)
+    /// - 0x1021 `jmp [rip+0x1308]`       (rip table -> 0x1030, same function)
     /// - 0x1030 `ret`, 0x1040 `ret`, 0x1080 `ret`
     fn build() -> Vec<u8> {
         let mut b = vec![0u8; FILE_LEN];
@@ -310,19 +306,19 @@ mod tests {
         w64(&mut b, data_at(0x2200), 0x2400);
         b[data_at(0x2300)..data_at(0x2300) + 6].copy_from_slice(b"k.dll\0");
         b[data_at(0x2402)..data_at(0x2402) + 3].copy_from_slice(b"Fn\0");
-        w64(&mut b, data_at(0x2500), IB + 0x1040);
-        w64(&mut b, data_at(0x2508), IB + 0x1030);
+        w64(&mut b, text_at(0x1300), IB + 0x1040);
+        w64(&mut b, text_at(0x1308), IB + 0x1030);
 
         let t = text_at(TEXT_RVA);
         let code: &[(u32, Vec<u8>)] = &[
-            (0x1000, [&[0xff, 0x15][..], &rel(0x1006, 0x2500)].concat()),
+            (0x1000, [&[0xff, 0x15][..], &rel(0x1006, 0x1300)].concat()),
             (0x1006, [&[0xff, 0x15][..], &rel(0x100c, 0x2200)].concat()),
             (0x100c, [&[0x48, 0x8d, 0x05][..], &rel(0x1013, 0x1080)].concat()),
             (0x1013, vec![0xff, 0xd0]),
-            (0x1015, [&[0x48, 0x8d, 0x0d][..], &rel(0x101c, 0x2500)].concat()),
+            (0x1015, [&[0x48, 0x8d, 0x0d][..], &rel(0x101c, 0x1300)].concat()),
             (0x101c, vec![0xff, 0x51, 0x00]),
             (0x101f, vec![0xff, 0xd3]),
-            (0x1021, [&[0xff, 0x25][..], &rel(0x1027, 0x2508)].concat()),
+            (0x1021, [&[0xff, 0x25][..], &rel(0x1027, 0x1308)].concat()),
             (0x1030, vec![0xc3]),
             (0x1040, vec![0xc3]),
             (0x1080, vec![0xc3]),
@@ -365,6 +361,33 @@ mod tests {
         assert_eq!(a.closure.indirect_calls_other, 4);
         assert_eq!(a.closure.import_jumps, 0);
         assert_eq!(a.closure.indirect_jumps_other, 1);
+    }
+
+    /// Issue #1391: the file content of a writable section is not a constant, even when it is a code address (the image's own wrapper slot,
+    /// filled by GetProcAddress at run time). The same content in a read-only section still reads.
+    #[test]
+    fn writable_slot_content_is_not_a_constant() {
+        let mut img = build();
+        w64(&mut img, data_at(0x2500), IB + 0x1040);
+        let pe = Pe::parse(&img).unwrap();
+        assert_eq!(dataflow::read8(&pe, IB + 0x2500), None);
+        assert_eq!(dataflow::read8(&pe, IB + 0x1300), Some(IB + 0x1040));
+    }
+
+    /// Issue #1391: a call through a writable slot is emitted unresolved (dispatched at run time), and the function its slot names is still
+    /// found by the discovery, as before. The site at 0x1100 is a seed: `call [rip+0x2500]` with 0x2500 -> 0x1140 (a `ret`).
+    #[test]
+    fn writable_slot_call_is_unresolved_and_its_target_is_found() {
+        let mut img = build();
+        w64(&mut img, data_at(0x2500), IB + 0x1140);
+        let t = text_at(0x1100);
+        img[t..t + 6].copy_from_slice(&[&[0xff, 0x15][..], &rel(0x1106, 0x2500)].concat());
+        img[t + 6] = 0xc3;
+        img[text_at(0x1140)] = 0xc3;
+        let pe = Pe::parse(&img).unwrap();
+        let a = crate::analyze_with_seeds(&pe, &[IB + 0x1100]).unwrap();
+        assert_eq!(a.resolved[&(IB + 0x1100)], Resolved::Unresolved);
+        assert!(a.functions.contains_key(&(IB + 0x1140)));
     }
 
     /// Counts on the real DLL (`$FLENGINE_DLL`, else the repo copy). Skipped when absent.
