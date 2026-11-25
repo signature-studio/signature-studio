@@ -136,7 +136,13 @@ uint16_t *fle_w_from_ascii(const char *s)
 /* ---- environment block ---- */
 
 #define FLE_ENV_VALUE_MAX 32767u
+#define FLE_ENV_LOG_MAX 200u
+#define FLE_EXPAND_MAX 0x100000u
 
+/* Issue #1412: one block for the process. Get, Set, Expand and GetEnvironmentStrings (W and A) read and write it through the functions
+ * below (the UCRT environment functions of #1386 are to use it too). It is built at its first use, as Windows builds a process's block
+ * when the process starts, from the Windows session's standard variables (env_std). The FL variables (FLStudioFactoryData and the others)
+ * are not in it at the start: the guest's own SetEnvironmentVariableW adds them when FL starts. */
 typedef struct {
     uint16_t *name;
     size_t nlen;
@@ -145,131 +151,91 @@ typedef struct {
 
 static fle_env_entry *env_v;
 static size_t env_n, env_cap;
+static int env_booted;
+
+/* The standard variables of the session (the names of the Windows environment). The values are the virtual paths and the SHGetFolderPathW
+ * answers of fle_env.h; the Windows values of OS, PATHEXT, NUMBER_OF_PROCESSORS and PROCESSOR_ARCHITECTURE are written here. */
+static const struct {
+    const char *name;
+    const char *value;
+} env_std[] = {
+    { "SystemRoot", FLE_VIRTUAL_WINDOWS_DIR },
+    { "SystemDrive", FLE_VIRTUAL_DRIVE },
+    { "windir", FLE_VIRTUAL_WINDOWS_DIR },
+    { "USERNAME", FLE_VIRTUAL_USER_NAME },
+    { "USERPROFILE", FLE_VIRTUAL_USER_PROFILE_DIR },
+    { "APPDATA", FLE_VIRTUAL_APPDATA_DIR },
+    { "LOCALAPPDATA", FLE_VIRTUAL_LOCALAPPDATA_DIR },
+    { "ProgramData", FLE_VIRTUAL_COMMON_APPDATA_DIR },
+    { "ProgramFiles", FLE_VIRTUAL_PROGRAM_FILES_DIR },
+    { "ProgramFiles(x86)", FLE_VIRTUAL_PROGRAM_FILES_DIR },
+    { "CommonProgramFiles", FLE_VIRTUAL_COMMON_FILES_DIR },
+    { "TEMP", FLE_VIRTUAL_TEMP_DIR },
+    { "TMP", FLE_VIRTUAL_TEMP_DIR },
+    { "COMPUTERNAME", FLE_VIRTUAL_COMPUTER_NAME },
+    { "OS", "Windows_NT" },
+    { "PATH", FLE_VIRTUAL_SYSTEM_DIR ";" FLE_VIRTUAL_WINDOWS_DIR },
+    { "PATHEXT", ".COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC" },
+    { "NUMBER_OF_PROCESSORS", FLE_VIRTUAL_NUMBER_OF_PROCESSORS },
+    { "PROCESSOR_ARCHITECTURE", FLE_VIRTUAL_PROCESSOR_ARCHITECTURE },
+    { "HOMEDRIVE", FLE_VIRTUAL_DRIVE },
+    { "HOMEPATH", &FLE_VIRTUAL_USER_PROFILE_DIR[2] },
+    { "USERDOMAIN", FLE_VIRTUAL_COMPUTER_NAME },
+};
+
+/* Issue #1412 (observation, always on): the first FLE_ENV_LOG_MAX lines of each API are written to stderr, as "env: <API> "<name>" <what> <n>":
+ * the name (for Expand, the source text), what happened (found, absent, set, deleted, expanded, block) and the length. Units that are not
+ * printable ASCII, and the quote, are written as '?'. The counters are one per API (the callers' `seen`). */
+static void env_log(unsigned *seen, const char *api, const uint16_t *name, size_t nl, const char *what, size_t n)
+{
+    size_t i;
+    if (*seen >= FLE_ENV_LOG_MAX) return;
+    (*seen)++;
+    fprintf(stderr, "env: %s \"", api);
+    for (i = 0; i < nl; i++) fputc(name[i] >= 0x20 && name[i] < 0x7f && name[i] != '"' ? (int)name[i] : '?', stderr);
+    fprintf(stderr, "\" %s %zu\n", what, n);
+}
+
+static void env_boot(void);
 
 static long env_find(const uint16_t *name, size_t nlen)
 {
     size_t i;
+    if (!env_booted) env_boot();
     for (i = 0; i < env_n; i++)
         if (fle_w_icmp(env_v[i].name, env_v[i].nlen, name, nlen) == 0) return (long)i;
     return -1;
 }
 
-const uint16_t *fle_env_get(const uint16_t *name)
+/* Puts name = value into the block, taking both (malloc'd). A name that is there (case ignored) keeps its first spelling and gets the value. */
+static void env_store(uint16_t *name, size_t nl, uint16_t *value)
 {
-    long i = env_find(name, fle_w_len(name));
-    return i < 0 ? NULL : env_v[i].value;
-}
-
-/* The name rules come from MSDN (Environment Variables: the name cannot include '='). A NULL, empty or
- * '='-containing name is not defined by the GetEnvironmentVariableW / SetEnvironmentVariable pages and stops
- * the run. */
-static uint16_t *env_name(const char *api, uint64_t p, size_t *len)
-{
-    size_t i;
-    uint16_t *n = fle_w_read_alloc(api, p, FLE_ENV_VALUE_MAX, len);
-    if (*len == 0) fle_stop(api, "empty variable name is not defined");
-    for (i = 0; i < *len; i++)
-        if (n[i] == '=') fle_stop(api, "variable name containing '=' is not defined");
-    return n;
-}
-
-/* kernel32!GetEnvironmentVariableW (MSDN: GetEnvironmentVariableW). lpName rcx, lpBuffer rdx, nSize r8.
- * Not found: return 0 and last error ERROR_ENVVAR_NOT_FOUND (203). Found: when nSize is larger than the length
- * (room for the NUL) the value and NUL are stored and the length without NUL is returned; otherwise the
- * required size including the NUL is returned and the buffer is left alone (the page calls it undefined).
- * A found variable with an empty value returns 0 and does not touch the last error (the page is silent). */
-void fle_imp_GetEnvironmentVariableW(void)
-{
-    static const char api[] = "GetEnvironmentVariableW";
-    uint64_t pb = R[2];
-    uint32_t nsize = (uint32_t)R[8];
-    size_t nl, vl;
-    uint16_t *name = env_name(api, R[1], &nl);
     long i = env_find(name, nl);
-
-    free(name);
-    if (i < 0) {
-        fle_set_last_error(FLE_W32_ERR_ENVVAR_NOT_FOUND);
-        R[0] = 0;
-        return;
-    }
-    vl = fle_w_len(env_v[i].value);
-    if (nsize > vl) {
-        if (pb == 0) fle_stop(api, "lpBuffer is NULL but nSize leaves room for the value");
-        fle_w_write(pb, env_v[i].value, vl + 1);
-        R[0] = (uint32_t)vl;
-        return;
-    }
-    R[0] = (uint32_t)(vl + 1);
-}
-
-/* kernel32!SetEnvironmentVariableW (MSDN: SetEnvironmentVariable). lpName rcx, lpValue rdx. A NULL value deletes
- * the variable. Deleting a variable that is not there is not defined by the page and stops the run. A value
- * above 32,767 characters (the documented maximum) stops. Success returns 1. */
-void fle_imp_SetEnvironmentVariableW(void)
-{
-    static const char api[] = "SetEnvironmentVariableW";
-    size_t nl, vl = 0;
-    uint16_t *name = env_name(api, R[1], &nl);
-    uint16_t *val = NULL;
-    long i = env_find(name, nl);
-
-    if (R[2] != 0) {
-        val = fle_w_read_alloc(api, R[2], FLE_ENV_VALUE_MAX, &vl);
-    }
-    if (val == NULL) {
-        if (i < 0) fle_stop(api, "deleting a variable that does not exist is not defined");
-        free(env_v[i].name);
-        free(env_v[i].value);
-        memmove(&env_v[i], &env_v[i + 1], (env_n - (size_t)i - 1) * sizeof env_v[0]);
-        env_n--;
-        free(name);
-        R[0] = 1;
-        return;
-    }
     if (i >= 0) {
         free(env_v[i].value);
-        env_v[i].value = val;
+        env_v[i].value = value;
         free(name);
-    } else {
-        if (env_n == env_cap) {
-            size_t nc = env_cap ? env_cap * 2 : 16;
-            fle_env_entry *nv = realloc(env_v, nc * sizeof *nv);
-            if (!nv) fle_stop(api, "out of memory");
-            env_v = nv;
-            env_cap = nc;
-        }
-        env_v[env_n].name = name;
-        env_v[env_n].nlen = nl;
-        env_v[env_n].value = val;
-        env_n++;
+        return;
     }
-    R[0] = 1;
+    if (env_n == env_cap) {
+        size_t nc = env_cap ? env_cap * 2 : 16;
+        fle_env_entry *nv = realloc(env_v, nc * sizeof *nv);
+        if (!nv) fle_stop("environment", "out of memory");
+        env_v = nv;
+        env_cap = nc;
+    }
+    env_v[env_n].name = name;
+    env_v[env_n].nlen = nl;
+    env_v[env_n].value = value;
+    env_n++;
 }
 
-/* kernel32!ExpandEnvironmentStringsW (MSDN: ExpandEnvironmentStringsW). lpSrc rcx, lpDst rdx, nSize r8.
- * %name% is replaced by the value (case ignored); a name that is not found stays as written (page). The page
- * does not define: a '%' without a closing '%', an empty %%, lpSrc == lpDst (the page forbids it), a NULL lpDst
- * with nSize > 0. Those stop the run. After a name that is not found, scanning continues after its closing '%'
- * (inference; the page is silent). Return: the size including the NUL; when nSize is smaller than that, the
- * required size is returned and lpDst is left alone. */
-#define FLE_EXPAND_MAX 0x100000u
-
-void fle_imp_ExpandEnvironmentStringsW(void)
+/* The expansion of ExpandEnvironmentStringsW (the rules are on its stub below). Returns a malloc'd NUL-terminated copy; *len is its length without the NUL. */
+static uint16_t *expand_units(const char *api, const uint16_t *s, size_t sl, size_t *len)
 {
-    static const char api[] = "ExpandEnvironmentStringsW";
-    uint64_t src = R[1], dst = R[2];
-    uint32_t nsize = (uint32_t)R[8];
-    size_t sl, i = 0, on = 0, ocap = 256;
-    uint16_t *s, *out;
-
-    if (src == 0) fle_stop(api, "lpSrc is NULL");
-    if (dst != 0 && dst == src) fle_stop(api, "lpDst equals lpSrc (the page forbids it)");
-    if (dst == 0 && nsize > 0) fle_stop(api, "lpDst is NULL with nSize > 0");
-    s = fle_w_read_alloc(api, src, FLE_ENV_VALUE_MAX * 2, &sl);
-    out = malloc(ocap * sizeof *out);
+    size_t i = 0, on = 0, ocap = 256;
+    uint16_t *out = malloc(ocap * sizeof *out);
     if (!out) fle_stop(api, "out of memory");
-
     while (i < sl) {
         size_t j, span, add;
         const uint16_t *piece;
@@ -305,6 +271,125 @@ void fle_imp_ExpandEnvironmentStringsW(void)
         i += span;
     }
     out[on] = 0;
+    *len = on;
+    return out;
+}
+
+static void env_boot(void)
+{
+    size_t i;
+    env_booted = 1;
+    for (i = 0; i < sizeof env_std / sizeof env_std[0]; i++) {
+        size_t nl = strlen(env_std[i].name);
+        uint16_t *n = fle_w_from_ascii(env_std[i].name);
+        env_store(n, nl, fle_w_from_ascii(env_std[i].value));
+    }
+}
+
+const uint16_t *fle_env_get(const uint16_t *name)
+{
+    long i = env_find(name, fle_w_len(name));
+    return i < 0 ? NULL : env_v[i].value;
+}
+
+/* The name rules come from MSDN (Environment Variables: the name cannot include '='). A NULL, empty or
+ * '='-containing name is not defined by the GetEnvironmentVariableW / SetEnvironmentVariable pages and stops
+ * the run. */
+static uint16_t *env_name(const char *api, uint64_t p, size_t *len)
+{
+    size_t i;
+    uint16_t *n = fle_w_read_alloc(api, p, FLE_ENV_VALUE_MAX, len);
+    if (*len == 0) fle_stop(api, "empty variable name is not defined");
+    for (i = 0; i < *len; i++)
+        if (n[i] == '=') fle_stop(api, "variable name containing '=' is not defined");
+    return n;
+}
+
+/* kernel32!GetEnvironmentVariableW (MSDN: GetEnvironmentVariableW). lpName rcx, lpBuffer rdx, nSize r8.
+ * Not found: return 0 and last error ERROR_ENVVAR_NOT_FOUND (203). Found: when nSize is larger than the length
+ * (room for the NUL) the value and NUL are stored and the length without NUL is returned; otherwise the
+ * required size including the NUL is returned and the buffer is left alone (the page calls it undefined).
+ * A found variable with an empty value returns 0 and does not touch the last error (the page is silent). */
+void fle_imp_GetEnvironmentVariableW(void)
+{
+    static const char api[] = "GetEnvironmentVariableW";
+    static unsigned seen;
+    uint64_t pb = R[2];
+    uint32_t nsize = (uint32_t)R[8];
+    size_t nl, vl;
+    uint16_t *name = env_name(api, R[1], &nl);
+    long i = env_find(name, nl);
+
+    if (i < 0) env_log(&seen, api, name, nl, "absent", 0);
+    else env_log(&seen, api, name, nl, "found", fle_w_len(env_v[i].value));
+    free(name);
+    if (i < 0) {
+        fle_set_last_error(FLE_W32_ERR_ENVVAR_NOT_FOUND);
+        R[0] = 0;
+        return;
+    }
+    vl = fle_w_len(env_v[i].value);
+    if (nsize > vl) {
+        if (pb == 0) fle_stop(api, "lpBuffer is NULL but nSize leaves room for the value");
+        fle_w_write(pb, env_v[i].value, vl + 1);
+        R[0] = (uint32_t)vl;
+        return;
+    }
+    R[0] = (uint32_t)(vl + 1);
+}
+
+/* kernel32!SetEnvironmentVariableW (MSDN: SetEnvironmentVariable). lpName rcx, lpValue rdx. A NULL value deletes
+ * the variable. Deleting a variable that is not there is not defined by the page and stops the run. A value
+ * above 32,767 characters (the documented maximum) stops. Success returns 1. */
+void fle_imp_SetEnvironmentVariableW(void)
+{
+    static const char api[] = "SetEnvironmentVariableW";
+    static unsigned seen;
+    size_t nl, vl = 0;
+    uint16_t *name = env_name(api, R[1], &nl);
+    uint16_t *val = NULL;
+    long i = env_find(name, nl);
+
+    if (R[2] != 0) {
+        val = fle_w_read_alloc(api, R[2], FLE_ENV_VALUE_MAX, &vl);
+    }
+    if (val == NULL) {
+        if (i < 0) fle_stop(api, "deleting a variable that does not exist is not defined");
+        env_log(&seen, api, name, nl, "deleted", 0);
+        free(env_v[i].name);
+        free(env_v[i].value);
+        memmove(&env_v[i], &env_v[i + 1], (env_n - (size_t)i - 1) * sizeof env_v[0]);
+        env_n--;
+        free(name);
+        R[0] = 1;
+        return;
+    }
+    env_log(&seen, api, name, nl, "set", vl);
+    env_store(name, nl, val);
+    R[0] = 1;
+}
+
+/* kernel32!ExpandEnvironmentStringsW (MSDN: ExpandEnvironmentStringsW). lpSrc rcx, lpDst rdx, nSize r8.
+ * %name% is replaced by the value (case ignored); a name that is not found stays as written (page). The page
+ * does not define: a '%' without a closing '%', an empty %%, lpSrc == lpDst (the page forbids it), a NULL lpDst
+ * with nSize > 0. Those stop the run. After a name that is not found, scanning continues after its closing '%'
+ * (inference; the page is silent). Return: the size including the NUL; when nSize is smaller than that, the
+ * required size is returned and lpDst is left alone. */
+void fle_imp_ExpandEnvironmentStringsW(void)
+{
+    static const char api[] = "ExpandEnvironmentStringsW";
+    static unsigned seen;
+    uint64_t src = R[1], dst = R[2];
+    uint32_t nsize = (uint32_t)R[8];
+    size_t sl, on;
+    uint16_t *s, *out;
+
+    if (src == 0) fle_stop(api, "lpSrc is NULL");
+    if (dst != 0 && dst == src) fle_stop(api, "lpDst equals lpSrc (the page forbids it)");
+    if (dst == 0 && nsize > 0) fle_stop(api, "lpDst is NULL with nSize > 0");
+    s = fle_w_read_alloc(api, src, FLE_ENV_VALUE_MAX * 2, &sl);
+    out = expand_units(api, s, sl, &on);
+    env_log(&seen, api, s, sl, "expanded", on);
     if (dst != 0 && nsize >= on + 1) fle_w_write(dst, out, on + 1);
     R[0] = (uint32_t)(on + 1);
     free(out);
@@ -359,8 +444,8 @@ void fle_imp_GetCommandLineA(void)
 
 /* kernel32!GetEnvironmentStringsW / FreeEnvironmentStringsW (MSDN, decision 0078). The page's block format is
  * "Var1=Value1\0 Var2=Value2\0 ... VarN=ValueN\0\0": each variable NUL-terminated and one more NUL at the end. A copy of the virtual
- * environment (it starts empty, so the first block is the single terminating NUL until SetEnvironmentVariableW adds one) is made on
- * every call, in the order of the table. "If the function fails, the return value is NULL" (a failed malloc). The block is read-only for
+ * environment (the standard variables of env_std, then the ones SetEnvironmentVariableW added) is made on every call, in the order
+ * of the block. "If the function fails, the return value is NULL" (a failed malloc). The block is read-only for
  * the guest and "should be freed by calling FreeEnvironmentStrings"; FreeEnvironmentStringsW takes "a pointer to a block of environment
  * strings ... obtained by calling the GetEnvironmentStringsW function": any other pointer is not defined by the page (it names no error
  * code for the failure) and stops the run. Success is nonzero. The last error is not touched. */
@@ -370,10 +455,13 @@ static size_t env_blocks_n, env_blocks_cap;
 void fle_imp_GetEnvironmentStringsW(void)
 {
     static const char api[] = "GetEnvironmentStringsW";
+    static unsigned seen;
     size_t i, total = 1, at = 0;
     uint16_t *blk;
 
+    if (!env_booted) env_boot();
     for (i = 0; i < env_n; i++) total += env_v[i].nlen + 1 + fle_w_len(env_v[i].value) + 1;
+    env_log(&seen, api, NULL, 0, "block", total);
     blk = malloc(total * sizeof *blk);
     if (!blk) {
         R[0] = 0;
@@ -459,10 +547,13 @@ static size_t envA_blocks_n, envA_blocks_cap;
 void fle_imp_GetEnvironmentStrings(void)
 {
     static const char api[] = "GetEnvironmentStrings";
+    static unsigned seen;
     size_t i, j, total = 1, at = 0;
     char *blk;
 
+    if (!env_booted) env_boot();
     for (i = 0; i < env_n; i++) total += env_v[i].nlen + 1 + fle_w_len(env_v[i].value) + 1;
+    env_log(&seen, api, NULL, 0, "block", total);
     blk = malloc(total);
     if (!blk) {
         R[0] = 0;
@@ -549,9 +640,7 @@ void fle_imp_FreeEnvironmentStringsA(void)
 #define FLE_CSIDL_PROGRAM_FILESX86 0x002a
 #define FLE_CSIDL_PROGRAM_FILES_COMMON 0x002b
 #define FLE_CSIDL_PROGRAM_FILES_COMMONX86 0x002c
-#define FLE_LOCALAPPDATA_SUBDIR "\\AppData\\Local"
 #define FLE_FONTS_SUBDIR "\\Fonts"
-#define FLE_APPDATA_SUBDIR "\\AppData\\Roaming"
 
 void fle_imp_SHGetFolderPathW(void)
 {
@@ -566,29 +655,29 @@ void fle_imp_SHGetFolderPathW(void)
     if (csidl == FLE_CSIDL_FONTS) {
         text = FLE_VIRTUAL_WINDOWS_DIR FLE_FONTS_SUBDIR;
     } else if (csidl == FLE_CSIDL_APPDATA) {
-        text = FLE_VIRTUAL_USER_PROFILE_DIR FLE_APPDATA_SUBDIR;
+        text = FLE_VIRTUAL_APPDATA_DIR;
     } else if (csidl == FLE_CSIDL_WINDOWS) {
         text = FLE_VIRTUAL_WINDOWS_DIR;
     } else if (csidl == FLE_CSIDL_LOCAL_APPDATA) {
-        text = FLE_VIRTUAL_USER_PROFILE_DIR FLE_LOCALAPPDATA_SUBDIR;
+        text = FLE_VIRTUAL_LOCALAPPDATA_DIR;
     } else if (csidl == FLE_CSIDL_PROGRAM_FILES || csidl == FLE_CSIDL_PROGRAM_FILESX86) {
         /* Decision 0126 (PROVISIONAL), wall 80 (S-programfiles): CSIDL_PROGRAM_FILES: "The Program Files folder. A typical path is C:\Program Files" (learn/CSIDL.txt). CSIDL_PROGRAM_FILESX86 (0x2a) is on the page with FOLDERID_ProgramFilesX86
          * and NO typical path: this machine is a 64-bit environment whose product lives under "C:\Program Files" (FLE_VIRTUAL_DLL_PATH), and has no 32-bit Program Files folder; the guest (a 64-bit program asking for
          * the 32-bit folder, to look for 32-bit plugins) gets the same path as CSIDL_PROGRAM_FILES: a CHOICE WITHOUT A SOURCE (the real answer is "C:\Program Files (x86)", which the page does not give). */
-        text = "C:\\Program Files";
+        text = FLE_VIRTUAL_PROGRAM_FILES_DIR;
     } else if (csidl == FLE_CSIDL_PROFILE || csidl == FLE_CSIDL_PERSONAL) {
         /* Decision 0126 (S-profile-personal): CSIDL_PROFILE (0x28): "The user's profile folder. A typical path is C:\Users\username" (the page): FLE_VIRTUAL_USER_PROFILE_DIR. CSIDL_PERSONAL (0x05): the page lists CSIDL_PERSONAL
          * with CSIDL_MYDOCUMENTS and no typical path of its own; the guest's own "Documents\Image-Line\" base (reg seed [Shared data] C:\Users\user\Documents\Image-Line\) shows that Documents is under the profile:
          * FLE_VIRTUAL_USER_PROFILE_DIR + "\\Documents" (a choice). */
-        text = csidl == FLE_CSIDL_PROFILE ? FLE_VIRTUAL_USER_PROFILE_DIR : FLE_VIRTUAL_USER_PROFILE_DIR "\\Documents";
+        text = csidl == FLE_CSIDL_PROFILE ? FLE_VIRTUAL_USER_PROFILE_DIR : FLE_VIRTUAL_DOCUMENTS_DIR;
     } else if (csidl == FLE_CSIDL_PROGRAM_FILES_COMMON || csidl == FLE_CSIDL_PROGRAM_FILES_COMMONX86) {
         /* Decision 0126 (S-programfiles-common, wall 80b): CSIDL_PROGRAM_FILES_COMMON (0x2b): "A folder for components that are shared across applications. A typical path is C:\Program Files\Common" (the page; it adds "Valid
          * only for Windows XP"); CSIDL_PROGRAM_FILES_COMMONX86 (0x2c) has no typical path on the page. The real path is "C:\Program Files\Common Files": a choice without a source. Both answer it. */
-        text = "C:\\Program Files\\Common Files";
+        text = FLE_VIRTUAL_COMMON_FILES_DIR;
     } else if (csidl == FLE_CSIDL_COMMON_APPDATA) {
         /* Decision 0126 (S-commonappdata): CSIDL_COMMON_APPDATA (0x23, FOLDERID_ProgramData): "application data for all users. A typical path is C:\Documents and Settings\All Users\Application Data" (Windows XP's); the Vista and
          * later path of FOLDERID_ProgramData is "C:\ProgramData": a choice without a source (the page gives the XP path only). */
-        text = "C:\\ProgramData";
+        text = FLE_VIRTUAL_COMMON_APPDATA_DIR;
     } else {
         snprintf(why, sizeof why, "csidl %#x is not answered (answered: 0x05 PERSONAL, 0x14 FONTS, 0x1a APPDATA, 0x1c LOCAL_APPDATA, 0x23 COMMON_APPDATA, 0x24 WINDOWS, 0x26 PROGRAM_FILES, 0x28 PROFILE, 0x2a PROGRAM_FILESX86, 0x2b/0x2c PROGRAM_FILES_COMMON[X86])", csidl);
         fle_stop(api, why);

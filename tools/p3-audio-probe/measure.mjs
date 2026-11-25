@@ -8,6 +8,7 @@
 // With a project (Issue #1366): projectDialogs (the "Problems loading the project" boxes after the open; [] when none), projectWindows (the windows at the end), projectMissing (the distinct requests of the open for a .wav under Data\Patches\ that found nothing, as the engine logged them), projectMissingLines (their number of lines).
 // --app <dir> (#1422): the page measured is the app of that directory (default: this repository's app). --sound (#1422, run mode only): after Space the metronome button is pressed (the Default project then makes sound); soundStartMs is the time to a rise of 20 non-silent quanta (5 s at most, else the run fails).
 // PCM repeat (#1422, run mode): the output of the 10 s window's first 8 s is taken and summarised in the page (tools/p3-audio-probe/waveform.mjs): pcmRepeat8192, pcmEligible, pcmNeighbors, pcmCaptureFrames, pcmCaptureValid, pcmNonFiniteSamples.
+// With a project (Issue #1412): envLog (the engine's environment-block lines, "env: <API> "<name>" <what> <n>", the first 200 of each API, from the start of the run to the end of the open, or to the failure of the open).
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
 // With a project (Issue #1403): missingInInventory (the distinct absolute spellings that a GetFileAttributesW, CreateFileW or FindFirstFileW request found nothing for, which the list has once the absolute root is taken off, and which are not .dll; missingInInventoryFirst10: {api, path} of the first 10), rawVariableProbes ({count, first10}: the distinct %...%\ spellings as the guest wrote them; FL's own probes, not counted in the others). notInInstaller then excludes the %...%\ spellings and the .dll ones. After an error during the open, the same fields are read from the whole log of the open (not only the end tail).
 import fs from 'node:fs';
@@ -86,6 +87,8 @@ const SAMPLE_MISSING = /^(?:\[err\] )?missing-path: .*\\Data\\Patches\\.*\.wav"$
 const PROJECT_DIALOG_MS = 15000;
 // Issue #1373: the missing-path line (the runtime's fle_vfs_note_missing); the installer's list (the guest column, one path per line after the comment and the header); the number of first paths the breakdown lists; the two shapes a factory root can take (an absolute path's leading folder, on any drive; a %...%\ variable)
 const MISSING_LINE = /^(?:\[err\] )?missing-path: (\S+) (\d+) "(.*)"$/;
+// Issue #1412: the environment block's observation lines (the runtime's fle_env.c, first 200 per API): envLog is every one in the engine's log
+const ENV_LINE = /^(?:\[err\] )?env: /;
 const INSTALLER_LIST = path.join(repo, 'inputs', 'fl-installer-files.tsv');
 const NOT_IN_INSTALLER_FIRST = 10;
 const ABSOLUTE_PATH = /^[A-Za-z]:\\/;
@@ -118,7 +121,7 @@ async function main() {
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
     state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
-    missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null, envLog: null, variableMissing: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
@@ -248,6 +251,8 @@ async function main() {
     probeError = String(e?.message ?? e).slice(0, 500);
     if (evAfterError) out.end = await engineEnd();
     if (evAfterError && openLogFrom !== null) await openBreakdownAfterError(evAfterError, openLogFrom, out);
+    // Issue #1412: projectReport did not run (the open failed or stopped), so envLog is the environment lines of the engine's log from the start of the run
+    if (projectFile !== null && out.envLog === null && evAfterError) out.envLog = await evAfterError("(window.__app ? window.__app.engineLog() : [])").then((log) => log.filter((l) => ENV_LINE.test(l))).catch(() => null);
   } finally {
     out.error = probeError;
     if (navAt !== null) out.elapsedMs = Date.now() - navAt;
@@ -600,6 +605,9 @@ async function projectReport(ev, out, logBefore) {
   if (out.projectDialogs.length === 0 && PROBLEMS_TITLE.test(front)) out.projectDialogs = [{ cls: '', title: front }];
   out.projectWindows = wins.map((w) => ({ cls: w.cls, title: w.title }));
   const log = await ev('window.__app.engineLog()');
+  out.envLog = log.filter((l) => ENV_LINE.test(l));
+  // Issue #1412: the missing-path lines of a request that still spells a %...% variable (the API and the code are in each line; the first 40)
+  out.variableMissing = log.filter((l) => MISSING_LINE.test(l) && l.includes('"%')).slice(0, 40);
   const missing = log.slice(logBefore).filter((l) => SAMPLE_MISSING.test(l));
   out.projectMissingLines = missing.length;
   out.projectMissing = [...new Set(missing)];

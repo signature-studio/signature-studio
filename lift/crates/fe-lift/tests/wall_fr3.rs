@@ -528,9 +528,11 @@ fn the_csidl_constants_and_virtual_paths_of_the_new_functions_are_those_of_sh_ge
     assert!(env.contains("#define FLE_CSIDL_FONTS 0x0014") && ole.contains("#define FLE_SPECIAL_CSIDL_FONTS   0x0014u"));
     assert!(env.contains("#define FLE_CSIDL_APPDATA 0x001a") && ole.contains("#define FLE_SPECIAL_CSIDL_APPDATA 0x001au"));
     assert!(env.contains("#define FLE_FONTS_SUBDIR \"\\\\Fonts\"") && ole.contains("FLE_VIRTUAL_WINDOWS_DIR \"\\\\Fonts\""));
-    assert!(env.contains("#define FLE_APPDATA_SUBDIR \"\\\\AppData\\\\Roaming\"") && ole.contains("FLE_VIRTUAL_USER_PROFILE_DIR \"\\\\AppData\\\\Roaming\""));
+    // Issue #1412: the AppData folder is a macro of fle_env.h (SHGetFolderPathW and the environment block take it from there)
+    let envh = std::fs::read_to_string(rt_dir().join("fle_env.h")).unwrap();
+    assert!(envh.contains("FLE_VIRTUAL_USER_PROFILE_DIR \"\\\\AppData\\\\Roaming\"") && ole.contains("FLE_VIRTUAL_USER_PROFILE_DIR \"\\\\AppData\\\\Roaming\""));
     // and SHGetFolderPathW itself still answers exactly the same paths (the existing tests of decision 0107 pin the text; this pins the pair)
-    assert!(env.contains("FLE_VIRTUAL_WINDOWS_DIR FLE_FONTS_SUBDIR") && env.contains("FLE_VIRTUAL_USER_PROFILE_DIR FLE_APPDATA_SUBDIR"));
+    assert!(env.contains("FLE_VIRTUAL_WINDOWS_DIR FLE_FONTS_SUBDIR") && env.contains("text = FLE_VIRTUAL_APPDATA_DIR;"));
 }
 
 // ---------------------------------------------------------------------------------------------

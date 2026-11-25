@@ -1,6 +1,6 @@
 /* Virtual process environment: environment block, command line, startup info
- * (docs/decisions/0018-virtual-fs-reg-env.md). Nothing is read from the host: the environment block
- * starts empty and only SetEnvironmentVariableW fills it.
+ * (docs/decisions/0018-virtual-fs-reg-env.md). Nothing is read from the host. The environment block is built at its
+ * first use from the Windows session's standard variables (fle_env.c, Issue #1412); SetEnvironmentVariableW changes it.
  *
  * This header is also the common base of fle_vfs.c and fle_reg.c: Win32 error numbers, the stop helper,
  * the wide-string helpers and the stack-argument reader live here so that the three files agree.
@@ -57,6 +57,21 @@
 #define FLE_VIRTUAL_USER_NAME     "user"
 #define FLE_VIRTUAL_COMPUTER_NAME "DESKTOP-0000001"
 #define FLE_COMPUTERNAME_NETBIOS_MAX 15u
+
+/* Issue #1412: the folders of the virtual Windows session. SHGetFolderPathW (fle_env.c) answers these and the standard environment
+ * variables of the block (fle_env.c, env_std) take their values from them, so each text is written once. Where no Microsoft page gives
+ * the value, it is a choice of this environment (the comments at each use say which). */
+#define FLE_VIRTUAL_DRIVE                "C:"
+#define FLE_VIRTUAL_PROGRAM_FILES_DIR    "C:\\Program Files"
+#define FLE_VIRTUAL_COMMON_FILES_DIR     FLE_VIRTUAL_PROGRAM_FILES_DIR "\\Common Files"
+#define FLE_VIRTUAL_COMMON_APPDATA_DIR   "C:\\ProgramData"
+#define FLE_VIRTUAL_APPDATA_DIR          FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Roaming"
+#define FLE_VIRTUAL_LOCALAPPDATA_DIR     FLE_VIRTUAL_USER_PROFILE_DIR "\\AppData\\Local"
+#define FLE_VIRTUAL_TEMP_DIR             FLE_VIRTUAL_LOCALAPPDATA_DIR "\\Temp"
+#define FLE_VIRTUAL_DOCUMENTS_DIR        FLE_VIRTUAL_USER_PROFILE_DIR "\\Documents"
+/* the answer of GetSystemInfo (fle_sys.c: dwNumberOfProcessors 1, wProcessorArchitecture AMD64) as the environment variables spell it */
+#define FLE_VIRTUAL_NUMBER_OF_PROCESSORS "1"
+#define FLE_VIRTUAL_PROCESSOR_ARCHITECTURE "AMD64"
 
 /* Stops the run: prints "fle: <api>: <why>" and aborts. Used for every input that the Microsoft pages
  * leave undefined (nothing is silently turned into a success). */

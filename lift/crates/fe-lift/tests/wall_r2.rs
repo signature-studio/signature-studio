@@ -620,7 +620,8 @@ fn csidl_appdata_is_the_virtual_roaming_app_data_folder_through_either_dll() {
     let h = std::fs::read_to_string(rt_dir().join("fle_env.h")).unwrap();
     assert!(h.contains("#define FLE_VIRTUAL_USER_PROFILE_DIR \"C:\\\\Users\\\\user\""), "fle_env.h");
     let c = std::fs::read_to_string(rt_dir().join("fle_env.c")).unwrap();
-    assert!(c.contains("#define FLE_APPDATA_SUBDIR \"\\\\AppData\\\\Roaming\""), "fle_env.c");
+    assert!(h.contains("FLE_VIRTUAL_USER_PROFILE_DIR \"\\\\AppData\\\\Roaming\""), "fle_env.h");
+    assert!(c.contains("text = FLE_VIRTUAL_APPDATA_DIR;"), "fle_env.c");
     assert!(c.contains("#define FLE_CSIDL_APPDATA 0x001a"), "fle_env.c");
 }
 

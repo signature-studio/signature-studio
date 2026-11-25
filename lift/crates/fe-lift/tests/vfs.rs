@@ -800,14 +800,18 @@ fn module_file_name_is_the_virtual_exe_path_for_null_and_the_dll_path_for_0x4000
 
 #[test]
 fn temp_windows_and_system_directories() {
-    // MSDN GetTempPathW: TMP, TEMP, USERPROFILE, then the Windows directory, ending with a backslash. The virtual
-    // environment starts empty, so the Windows directory (decision 0018: C:\Windows) is the answer at first.
+    // MSDN GetTempPathW: TMP, TEMP, USERPROFILE, then the Windows directory, ending with a backslash. The block starts with
+    // the standard session variables (Issue #1412: TMP and TEMP are set there), so the three names are removed first and the
+    // Windows directory (decision 0018: C:\Windows) is the answer then.
     let l = lines(
         "vfs-temp",
         &format!(
             r#"
     uint16_t b[64];
     uint64_t n;
+    CALL(fle_imp_SetEnvironmentVariableW, W("TMP"), 0);
+    CALL(fle_imp_SetEnvironmentVariableW, W("TEMP"), 0);
+    CALL(fle_imp_SetEnvironmentVariableW, W("USERPROFILE"), 0);
     n = CALL(fle_imp_GetTempPathW, 64, A(b)); printf("%llu %s\n", U(n), AS(b));
     CALL(fle_imp_SetEnvironmentVariableW, W("USERPROFILE"), {up});
     n = CALL(fle_imp_GetTempPathW, 64, A(b)); printf("%llu %s\n", U(n), AS(b));
