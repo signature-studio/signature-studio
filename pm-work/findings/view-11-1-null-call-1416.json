@@ -1,0 +1,327 @@
+{
+ "issue": 1416,
+ "run": "tools/crash-hunt/run.sh --budget 15m --out <tmp> --only View/11/1 --bundle raw/fl-Oz (DPR 1)",
+ "nproc": 4,
+ "probes": [
+  {
+   "id": "View/11",
+   "path": "View > #11",
+   "dpr": 1,
+   "group": "a",
+   "result": "ok",
+   "submenu": 18,
+   "notes": [],
+   "newWindows": [
+    {
+     "cls": "TQuickPopupMenuWindow",
+     "title": ""
+    },
+    {
+     "cls": "TQuickPopupMenuWindow",
+     "title": ""
+    }
+   ],
+   "state": "engine-idle",
+   "stop": null,
+   "fingerprint": null,
+   "logTail": [
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 174842108",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612",
+    "[err] memory-usage: K32GetProcessMemoryInfo WorkingSetSize 173790612"
+   ],
+   "logLines": 6,
+   "elapsedMs": 30704
+  },
+  {
+   "id": "View/11/1",
+   "path": "View > #11 > #1",
+   "dpr": 1,
+   "group": "a",
+   "result": "stopped",
+   "submenu": null,
+   "notes": [
+    "left open: TQuickPopupMenuWindow, TWinControlProxy, TWinControlProxy, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWPControl, TWinControlProxy"
+   ],
+   "newWindows": [
+    {
+     "cls": "TQuickPopupMenuWindow",
+     "title": ""
+    },
+    {
+     "cls": "TWinControlProxy",
+     "title": ""
+    },
+    {
+     "cls": "TWinControlProxy",
+     "title": ""
+    },
+    {
+     "cls": "TWPControl",
+     "title": ""
+    },
+    {
+     "cls": "TWPControl",
+     "title": "SpacePanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "FixedSpacePanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "PositionToolbar"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "TimePanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "PatternPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "MonitorPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "CPUPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "MenuPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "DownloaderBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "VolumePanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "PitchPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "MetronomeBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "StartOnInputBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "PrecountBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "BlendRecordBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "LoopRecordBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewPLBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewPRBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewSSBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewFXBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewSBBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewProjPickerBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewPlugPickerBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewTTBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ViewKbBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "UndoBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "SaveAsBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "RenderBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "EditAudioBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "RecAudioBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "SongSetBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "GopherBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "HelpBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ArrangeBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "KbToMIDIBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "AutoScrollBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "StepEditBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "EnableGroupsBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "SnapPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "StopSoundBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "MultiLinkBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "CtrlKeyBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "AltKeyBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ShiftKeyBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "CutBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "CopyBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "PasteBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "AddStuffBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ParamCtrlBigBtn"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "ChordDetectionPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": "FlagBtnPanel"
+    },
+    {
+     "cls": "TWPControl",
+     "title": ""
+    },
+    {
+     "cls": "TWinControlProxy",
+     "title": ""
+    }
+   ],
+   "state": "exited",
+   "stop": {
+    "lastFle": "fle: indirect call to 0 is not a known function entry (caller 0x66dd61, near f_66dcf0+0x71)",
+    "stopLine": "== stop: SIGABRT (runtime abort, see runtime message)",
+    "abortKind": "fle_dispatch_miss",
+    "memoryBytes": 1778188288
+   },
+   "fingerprint": "fle: indirect call to # is not a known function entry (caller #, near f_#dcf#+#)",
+   "logTail": [
+    "handle 0x7f99001c lid 7 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 5 thread 0",
+    "handle 0x7f990014 lid 5 class \"TApplication\" title \"\" rect (390, 240, 0 x 0) style 0x84ca0000 exstyle 0x80 owner 0 visible 0 enabled 1 z 6 thread 0",
+    "handle 0x7f990010 lid 4 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 7 thread 0",
+    "handle 0x7f99000c lid 3 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 8 thread 0",
+    "handle 0x7f990008 lid 2 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 9 thread 0",
+    "handle 0x7f990004 lid 1 class \"TPUtilWindow\" title \"\" rect (0, 0, 0 x 0) style 0x80000000 exstyle 0x80 owner 0 visible 0 enabled 1 z 10 thread 0",
+    "fruity: the host object is at 0x3c80c9f0 (vtable 0x3c80ca30, base directory \"C:\\Program Files\\Image-Line\\FL Studio 21\\\"); instance slot at 0x3b3d2770 holds 0x3e7a7380",
+    "fruity: exit code 134 (the codes of harness/wasm/trace_native.c: 134 SIGABRT, 139 SIGSEGV, 135 SIGBUS, 132 SIGILL, 136 SIGFPE, 4 wall time, 3 entry limit; 6 = named stop of this file)",
+    "[err] missing-path: GetFileAttributesW 2 \"C:\\Windows\\Fonts\\OpenSans-CondLight.ttf\"",
+    "[err] missing-path: GetFileAttributesW 2 \"<path>.svg\"",
+    "[err] missing-path: GetFileAttributesW 2 \"<path>.svg\"",
+    "[err] missing-path: GetFileAttributesW 3 \"<path>.svg\"",
+    "[err] missing-path: GetFileAttributesW 3 \"<path>.svg\"",
+    "[err] missing-path: GetFileAttributesW 2 \"C:\\Program Files\\Image-Line\\FL Studio 21\\ILSvg_x64.dll\"",
+    "[err] missing-path: GetFileAttributesW 2 \"ILSvg_x64.dll\"",
+    "[err] missing-path: GetFileAttributesW 2 \"C:\\Program Files\\Image-Line\\FL Studio 21\\Shared\\ILSvg_x64.dll\"",
+    "[err] missing-path: GetFileAttributesW 2 \"C:\\Program Files\\Image-Line\\FL Studio 21\\ILSvg_x64.dll\"",
+    "[err] missing-path: LoadLibraryW 126 \"ILSvg_x64.dll\"",
+    "[err] fle: regs R[0]=0x4094c3e0 R[1]=0x3f27c600 R[2]=0x4094c3f0 R[3]=0x40f71770 R[4]=0x3e1554f8 R[5]=0x3e155500 R[6]=0x3e1558c0 R[7]=0x0 R[8]=0x4094c3f4 R[9]=0x385 R[10]=0x0 R[11]=0x0 R[12]=0x0 R[13]…",
+    "[err] fle: indirect call to 0 is not a known function entry (caller 0x66dd61, near f_66dcf0+0x71)"
+   ],
+   "logLines": 530,
+   "elapsedMs": 18575,
+   "leftover": true
+  }
+ ]
+}

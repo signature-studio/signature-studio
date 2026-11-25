@@ -113,6 +113,15 @@ int main(int argc, char **argv) {
         printf("not aborted\n");
         return 0;
     }
+    if (argc > 1 && strcmp(argv[1], "called") == 0) {
+        static uint64_t stack[4];
+        R[4] = (uint64_t)(uintptr_t)&stack[2];
+        stack[2] = UINT64_C(0x25);
+        R[0] = UINT64_C(0x1234);
+        fle_dispatch(UINT64_C(0x30));
+        printf("not aborted\n");
+        return 0;
+    }
     fle_dispatch(UINT64_C(0x20));
     fle_dispatch(UINT64_C(0x10));
     fle_dispatch(UINT64_C(0x20));
@@ -151,6 +160,34 @@ fn dispatch_calls_table_entry_and_aborts_on_miss() {
         String::from_utf8_lossy(&miss.stderr)
     );
     assert!(!String::from_utf8_lossy(&miss.stdout).contains("not aborted"));
+}
+
+/// #1416: the stop of a miss names the caller (the return address the call pushed), the registers (one stderr line before the message), and the
+/// nearest function entry at or below the caller. Without a return address (R[4] is 0) it says `caller ?` and `near ?`.
+#[test]
+fn dispatch_miss_names_the_caller_the_registers_and_the_nearest_entry() {
+    let tag = etxt_common::uniq("dispatch_miss_names");
+    let src = out_dir().join(format!("{tag}.c"));
+    std::fs::write(&src, HARNESS).expect("write harness");
+    let bin = out_dir().join(&tag);
+    let c = clang(&["-o", bin.to_str().unwrap(), src.to_str().unwrap()]);
+    assert!(c.status.success(), "clang failed: {}", String::from_utf8_lossy(&c.stderr));
+
+    let called = Command::new(&bin).arg("called").output().expect("run harness called");
+    assert!(!called.status.success(), "called did not stop the program");
+    let err = String::from_utf8_lossy(&called.stderr).into_owned();
+    let last = err.lines().last().unwrap_or("");
+    assert_eq!(last, "fle: indirect call to 0x30 is not a known function entry (caller 0x25, near f_20+0x5)", "stderr: {err}");
+    assert!(err.lines().any(|l| l.starts_with("fle: regs R[0]=0x1234 R[1]=0x0 ") && l.ends_with("R[15]=0x0")), "stderr: {err}");
+
+    let miss = Command::new(&bin).arg("miss").output().expect("run harness miss");
+    assert!(!miss.status.success(), "miss did not stop the program");
+    let err = String::from_utf8_lossy(&miss.stderr).into_owned();
+    assert_eq!(
+        err.lines().last().unwrap_or(""),
+        "fle: indirect call to 0x30 is not a known function entry (caller ?, near ?)",
+        "stderr: {err}"
+    );
 }
 
 #[test]
