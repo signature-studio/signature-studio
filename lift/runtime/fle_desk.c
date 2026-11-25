@@ -41,6 +41,7 @@ typedef struct {
     int32_t x, y;                       /* the window's origin on the screen */
     uint32_t w, h;                      /* the size of its surface */
     uint32_t layered, lflags, alpha, key;
+    uint32_t style;                     /* the window style (WS_THICKFRAME 0x00040000 and the others): fle_desk_describe only, for the cursor measurement (tools/cursor) */
     int32_t cl, ct, cr, cb;             /* decision 0244: the box of the window region (SetWindowRgn) in the window's own coordinates, inside [0, w] x [0, h]; the whole window when it has none */
     int32_t gx0, gy0, gx1, gy1;         /* decision 0244, LF_GLASS: the inner rectangle of the client area that the extended frame does not reach (the fourth byte is not read there); empty for the sheet of glass */
     const fle_rsurf *surf;
@@ -350,6 +351,7 @@ static void gather(void)
         w->y = v.oy;
         w->w = s->width;
         w->h = s->height;
+        w->style = v.style;
         w->surf = s;
         if (fle_layered_query(hs[k], &li)) {
             if (li.mode == FLE_LAYER_NONE) continue;    /* "the layered window will not become visible until" a call of UpdateLayeredWindow or SetLayeredWindowAttributes */
@@ -436,7 +438,7 @@ static void build_desc(void)
         /* decision 0244: the words of the extended frame (the inner rectangle the frame does not reach) and of the window region, with the other layer words: the line still ends with the class and the title */
         if (cur[i].lflags & LF_GLASS) snprintf(gl, sizeof gl, " glass(%d,%d,%d,%d)", cur[i].gx0, cur[i].gy0, cur[i].gx1, cur[i].gy1);
         if (cur[i].cl != 0 || cur[i].ct != 0 || cur[i].cr != (int32_t)cur[i].w || cur[i].cb != (int32_t)cur[i].h) snprintf(rg, sizeof rg, " region(%d,%d,%d,%d)", cur[i].cl, cur[i].ct, cur[i].cr, cur[i].cb);
-        d += snprintf(d, sizeof desc - (size_t)(d - desc), "lid %u at (%d, %d) %ux%u%s%s%s%s%s%s alpha %u key %06x class \"%s\" title \"%s\"\n", cur[i].lid, cur[i].x, cur[i].y, cur[i].w, cur[i].h, cur[i].layered ? " layered" : "", (cur[i].lflags & LF_PREMUL) ? " premultiplied" : "",
+        d += snprintf(d, sizeof desc - (size_t)(d - desc), "lid %u at (%d, %d) %ux%u style 0x%08x%s%s%s%s%s%s alpha %u key %06x class \"%s\" title \"%s\"\n", cur[i].lid, cur[i].x, cur[i].y, cur[i].w, cur[i].h, cur[i].style, cur[i].layered ? " layered" : "", (cur[i].lflags & LF_PREMUL) ? " premultiplied" : "",
                       (cur[i].lflags & LF_ALPHA) ? " alpha" : "", (cur[i].lflags & LF_KEY) ? " key" : "", gl, rg, cur[i].alpha, cur[i].key, cn, tt);
         if ((size_t)(d - desc) >= sizeof desc - 300u) break;
     }

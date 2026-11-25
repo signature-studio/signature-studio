@@ -193,4 +193,11 @@ static inline void fle_loop_tick(void) {
     if (__builtin_expect(++fle_loop_count >= fle_loop_limit, 0) && fle_loop_slice) fle_loop_slice();
 }
 
+/* #1393: the back edge of a spin-wait (a loop with a pause, fe-lift). A spinning thread waits for another thread to release what it holds: inside a callback it gives the processor after a long spin
+ * (fle_spin_slice, FLE_SPIN_DEEP_BACKEDGES); fle_loop_slice keeps the depth rule for every other loop. Counted in fle_loop_count like fle_loop_tick. */
+void fle_spin_slice(void) __attribute__((weak));
+static inline void fle_spin_tick(void) {
+    if (__builtin_expect(++fle_loop_count >= fle_loop_limit, 0) && fle_spin_slice) fle_spin_slice();
+}
+
 #endif

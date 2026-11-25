@@ -44,6 +44,8 @@ export type ToWorker =
   | { cmd: 'webview2-loaded' }
   /** Issue #1362: a message the page posted to the engine's WebView2 (window.chrome.webview.postMessage in the face's document) */
   | { cmd: 'webview2-message'; json: string }
+  /** #1389: the page's answer to a clipboard-read request (the operating system's text, or null when the page could not read it) */
+  | { cmd: 'clipboard-text'; id: number; text: string | null }
   | { cmd: 'ping'; id: number };
 
 /** C-2: the messages the page sends the render Worker (the canvas is drawn only here) */
@@ -96,7 +98,7 @@ export type FromWorker =
   | { t: 'guest-text'; memBytes: number; best: GuestTextBest | null; near: GuestTextNear[] }
   | { t: 'desk-gl-pixels'; width: number; height: number; data: ArrayBuffer }
   /** decision 0223: what the operating system says that is not a picture: the cursor SetCursor chose (low 32 bits of the handle, standard cursor identifier, module cursor) and the title of the foreground (active) window; sent when it changed */
-  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
+  | { t: 'osstate'; cursor: number; cursorIdc: number; cursorShared: boolean; cursorMade: boolean; title: string; /** the size of the virtual screen the guest is told (0 from a build that does not report it) */ screenW: number; screenH: number; abs: number }
   /** decision 0223: the desktop presenter's counters and the instants (performance.timeOrigin + performance.now() of the Worker) of the presents since the last report, at most every 100 ms; `windows` is the compositor's text (?debug=1 only) */
   /** decision 0272: the first minimized window that has a taskbar button, as the engine says it (fle_g3_taskbar_iconic; 0: none); sent when it changed, never by a build without the export */
   | { t: 'taskbar'; lid: number }
@@ -108,4 +110,8 @@ export type FromWorker =
   | { t: 'webview2'; op: 'exec'; script: string }
   /** Issue #1376: the windows painted over the face (the Browser's window, its bounds): rects is l, t, r, b per window on the guest's screen (the bounds' space). Sent when the picture or the face has changed, and only when the list has */
   | { t: 'webview2'; op: 'front'; rects: number[] }
+  /** #1389: the engine's Copy (SetClipboardData, CF_UNICODETEXT): the text the page writes to the operating system's clipboard */
+  | { t: 'clipboard-write'; text: string }
+  /** #1389: the engine's Paste asks for the operating system's text (GetClipboardData); the page answers with {cmd: 'clipboard-text'} (the same id) */
+  | { t: 'clipboard-read'; id: number }
   | { t: 'desk'; stats: { /** Canvas updates deduplicated per render Worker rAF, not GPU completion or physical display; null without rAF. */ displayFrames?: number | null; presents: number; rects: number; pixels: number; composeMs: number; putMs: number; whole: number; ringReads: number; ringFull: number; wakes: number; /** C-2: compose requests made by the render Worker's frame loop (its animation frames) / compose requests made while the picture did not move (its wake-up poll, render-worker.ts DESK_WAKE_MS) */ ticks: number; idleTicks: number; /** times the Worker stopped asking for animation frames because the picture did not change (desk2) */ sleeps: number }; at: number[]; /** the inputs the present in this message answers (decision 0223: the Worker made it in the turn that processed them) */ answers?: number[]; nWindows: number };

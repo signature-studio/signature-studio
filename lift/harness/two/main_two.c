@@ -233,6 +233,8 @@ int main(int argc, char **argv) {
     /* FLE_REG_SEED=<list>[:<list>...] (decision 0116, provisional): values written to the virtual registry before the guest runs. Compiled only into
      * a FRUITY build. Unset: reg_seed_from_env returns 0 and does nothing. R[] is put back as it was. */
     if (reg_seed_from_env() != 0) return 2;
+    /* Issue #1383: the HKCU values the page saved are replayed after the seed (a saved value replaces the seed's); the page's library only (fle_reg.c) */
+    fle_reg_restore_saved();
     /* FLE_AUTH_CLAIMS=<tsv> (decision 0117, provisional): the claims of tools/authenticode_check.py registered with the runtime under their guest paths. Compiled only
      * into a FRUITY build. Unset: auth_claims_from_env returns 0 and registers nothing (the runtime's table stays empty and WinVerifyTrust stops by name). */
     if (auth_claims_from_env(path) != 0) return 2;

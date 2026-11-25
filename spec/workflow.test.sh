@@ -538,9 +538,9 @@ ok "fl-exe: 作業ジョブに R2_ARTIFACT の鍵を使う段が無い(取り出
 ok "fl-exe: 作業ツリーの lift/out-app/host-extra/exe は git の対象外" "$(git -C "$top" check-ignore -q lift/out-app/host-extra/exe/FL64.exe && echo yes)" yes
 # (r) 接頭辞の一覧は、ci/ の 1 行 1 接頭辞のファイル(resources・plugin-builtin)。extract の取り出しは一覧を読み、鍵の hashFiles に一覧のファイルを入れる(一覧を変えると鍵が変わり、古いキャッシュは使われない)。fl-exe の完全なパスは鍵の文字列に入れる
 RPF=$top/ci/resources-prefixes.txt; PPF=$top/ci/plugin-builtin-prefixes.txt
-ok "接頭辞(r): ci/resources-prefixes.txt は、この 16 件を、この順で、1 行 1 接頭辞で持つ(Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む。末尾の 6 件は #1386 の Chord progression・Python の実行環境と、#1387 の Riff machine。その後の 2 件は #1373 の demo の素材の 2 曲のフォルダ)" "$(paste -sd'|' "$RPF" 2>/dev/null)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\|System\Tools\Chord progression\|Shared\Python\|Data\Patches\Scores\Arpeggiator\Riff machine\|Data\Patches\Scores\Quantization\Riff machine\|Data\Patches\Scores\Chopping\Riff machine step 1\|Data\Patches\Scores\Chopping\Riff machine step 2\|Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\|Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\'
+ok "接頭辞(r): ci/resources-prefixes.txt の \\ で終わる行は、この 16 件を、この順で、1 行 1 接頭辞で持つ(\\ で終わらない完全なパスの行は (r5) が検査する。Internet の接頭辞と、Blocks の DNC_*.wav の接頭辞を含む。末尾の 6 件は #1386 の Chord progression・Python の実行環境と、#1387 の Riff machine。その後の 2 件は #1373 の demo の素材の 2 曲のフォルダ)" "$(grep -E '\\$' "$RPF" 2>/dev/null | paste -sd'|' -)" 'System\Languages\|Artwork\|Data\Templates\|Data\Demo projects\|Data\System\|Data\Projects\|System\Internet\|Data\Patches\Packs\Legacy\Drums\Dance\|System\Tools\Chord progression\|Shared\Python\|Data\Patches\Scores\Arpeggiator\Riff machine\|Data\Patches\Scores\Quantization\Riff machine\|Data\Patches\Scores\Chopping\Riff machine step 1\|Data\Patches\Scores\Chopping\Riff machine step 2\|Data\Patches\Misc\Used by demo projects\DEDZII - NIGHT TERROR\|Data\Patches\Misc\Used by demo projects\Mehran Abbasi - With You\'
 ok "接頭辞(r): ci/plugin-builtin-prefixes.txt は、この 2 件を、この順で、1 行 1 接頭辞で持つ" "$(paste -sd'|' "$PPF" 2>/dev/null)" 'Plugins\Fruity\Effects\|Plugins\Fruity\Generators\'
-ok "接頭辞(r): 2 つのファイルは、合わせて 18 行で、\\ で終わる行だけ(空の行と CR が無い)" "$(cat "$RPF" "$PPF" 2>/dev/null | wc -l | tr -d ' ')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cvE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "18/0/0"
+ok "接頭辞(r): 2 つのファイルの \\ で終わる行は合わせて 18 行で、空の行と CR が無い(\\ で終わらない行は完全なパス。(r5) が検査する)" "$(cat "$RPF" "$PPF" 2>/dev/null | grep -cE '\\$')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -cxF '')/$(cat "$RPF" "$PPF" 2>/dev/null | grep -c $'\r')" "18/0/0"
 ok "接頭辞(r): 一覧は、Blocks が使う DNC_*.wav(Data\Patches\Packs\Legacy\Drums\Dance\ の下)を取り出す接頭辞を 1 つ持つ(\\ で終わる行が 1 つ)" "$(grep -cxF 'Data\Patches\Packs\Legacy\Drums\Dance\' "$RPF" 2>/dev/null)" 1
 ok "接頭辞(r): その接頭辞の下の DNC_*.wav は、インストーラの一覧で 21 件(接頭辞の取り出しで全件が入る)" "$(grep -cF 'Data\Patches\Packs\Legacy\Drums\Dance\DNC_' "$top/inputs/fl-installer-files.tsv")" 21
 # (r2) #1386・#1387 の 6 件: Chord progression(FL 内蔵の Python のスクリプト)・Python の実行環境・Riff machine の資料。件数と大きさは一覧で数える(大きさは dll・exe と Data\ の物だけ)
@@ -571,6 +571,12 @@ EXRUN=$(jq -r --arg n "$EXR" '[.jobs.extract.steps[] | select(.name == $n) | .ru
 EXNAMES=$(grep -oE "[-]-file '[^']*'" <<<"$EXRUN" | sed -E "s/^[-]-file '//; s/'\$//" | tr -d '()' | tr ' ' '-' | paste -sd- -)
 ok "接頭辞(r): fl-exe の鍵(保存・復元の 3 つ)の文字列は、--file の 2 つの完全なパスを空白と括弧を除いて - でつないだ物を含む($EXNAMES)" "$(grep -cF "extra-fl-exe-$EXNAMES-" <<<"$KE")/$(wc -l <<<"$KE" | tr -d ' ')" "3/3"
 ok "接頭辞(r): 設計の文書に、一覧のファイルと鍵の関係を書いた" "$(grep -c 'ci/resources-prefixes[.]txt' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 1)}')/$(grep -c 'ci/plugin-builtin-prefixes[.]txt' "$top/pm-work/workflow-design.md" | awk '{print ($1 >= 1)}')" "1/1"
+# (r5) 一覧の行の形: \ で終わる行は接頭辞、それ以外は完全なパス。完全なパスは、インストーラの一覧の guest に在り(大文字・小文字を区別しない)、その大きさの合計は 30 MB 以下(一覧に大きさが無い物は 0。接頭辞の行は、既存の大きさが 30 MB を超えるので、ここでは数えない)
+ok "接頭辞(r5): 一覧の完全なパスの行(\\ で終わらない行)は、全てインストーラの一覧の guest に在り、大きさの合計は 30,000,000 B 以下" "$(awk -F'\t' 'FNR==NR {if ($0 != "" && $0 !~ /\\$/) want[tolower($0)]=1; next} FNR>2 && (tolower($1) in want) {found[tolower($1)]=1; if ($2 != "") s+=$2} END{n=0; for (k in want) n++; m=0; for (k in found) m++; print ((n==m) ? "found" : "missing") "/" ((s <= 30000000) ? "ok" : "over")}' "$RPF" "$INST")" "found/ok"
+ok "接頭辞(r5): 設計の文書に、一覧の行の形と、完全なパスの大きさの上限を書いた" "$(grep -cF 'インストール先からの完全なパス。インストーラの一覧の guest' "$top/pm-work/workflow-design.md")" 1
+# (r7) #1395 の DLL(Shared\ILSvg_x64.dll)は、抽出の表の 1 行で作業ツリーに取り出す(lift はしない)。抽出先は plugin の行が作る形(lift/out-plugins/<小文字の名>。plugins.rs の host_file)。大きさと SHA-256 は一覧の値
+ILSI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\ILSvg_x64.dll" {print $2"\t"$3}' "$INST")
+ok "抽出の表(r7): ci/extract-dlls.tsv に ILSvg_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/ilsvg_x64.dll(plugin の段が読む場所)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$ILSI" 'BEGIN{split(I, a, "\t")} $1 == "ILSvg_x64.dll" {n++; if ($2 == "lift/out-plugins/ilsvg_x64.dll" && $3 == a[2] && a[1] == "1504256") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
 EORD='["外部プラグインのインストーラをキャッシュに保存する(取ったときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトのキャッシュ(R2)","インストーラの言語・テーマ・テンプレート・プロジェクトを取り出す(キャッシュが無いときだけ)","インストーラの言語・テーマ・テンプレート・プロジェクトをキャッシュに保存する(取ったときだけ)","内蔵のプラグインのキャッシュ(R2)","内蔵のプラグインの DLL を取り出す(キャッシュが無いときだけ)","内蔵のプラグインをキャッシュに保存する(取ったときだけ)"]'
 WORD='["抽出物を lift/out-app/host に置く","言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(resources の作業だけ)","取った物を lift/out-app/host-extra/resources に置く(resources の作業だけ。commit はしない)","内蔵のプラグインを R2 のキャッシュから取る(plugin-builtin の作業だけ)","取った物を lift/out-app/host-extra/plugins に置く(plugin-builtin の作業だけ。commit はしない)","タスク(Issue の本文と題名)を取り、受け入れコマンドを取り出す"]'
 ok "抽出物の追加: extract の段の順は、外部の保存の後に、言語等、内蔵のプラグイン" "$(jq -r --argjson o "$EORD" '[.jobs.extract.steps[].name] as $n | [$o[] as $x | $n | index($x)] | (all(. != null)) and (. == (sort))' "$J")" true
@@ -999,6 +1005,8 @@ ok "deploy.yml(t): resources の段は 1 つで、fe-build extract の後・fe-b
   | "\($n) \($e != null and $b != null and $e < $r0 and $r0 < $b)"' "$DJ")" "1 true"
 RSN=$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | .run][0] // ""' "$DJ")
 ok "deploy.yml(t): resources の段は、作業者と同じ fl-installer-extract を、ci/resources-prefixes.txt の接頭辞で呼び、lift/out-app/host-extra/resources に置く" "$(grep -cF 'tools/fl-installer-extract.mjs' <<<"$RSN")/$(grep -cF 'ci/resources-prefixes.txt' <<<"$RSN")/$(grep -cF 'lift/out-app/host-extra/resources' <<<"$RSN")" "1/1/1"
+RDP=$(jq -r '[.jobs.deploy.steps[] | select(.name == "resources を取り出す") | .run][0] // ""' "$DJ")
+ok "接頭辞(r6): 本番の resources の取り出しは、一覧を配列で、取り出しの道具に渡す(行の形で分けるのは道具の役目。段で grep などで分けない)" "$(grep -cxF 'mapfile -t p < ci/resources-prefixes.txt' <<<"$RDP")/$(grep -cF '"${p[@]}"' <<<"$RDP")/$(grep -cF 'node tools/fl-installer-extract.mjs' <<<"$RDP")/$(grep -c 'grep' <<<"$RDP")" "1/1/1/0"
 ok "deploy.yml(t): resources の段のインストーラの URL は、fe-build の INSTALLER と同じ" "$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | .env.SRC][0] // ""' "$DJ" | xargs -I{} grep -cF {} "$top/lift/crates/fe-build/src/main.rs")" 1
 ok "deploy.yml(t): resources の段は、R2_ARTIFACT の鍵だけを渡し、公開の artifact と gh を使わない" "$(jq -r --arg r "$RN" '[.jobs.deploy.steps[] | select(.name == $r) | "\(.env.AWS_ACCESS_KEY_ID)|\(.env.AWS_SECRET_ACCESS_KEY)|\(tostring | test("upload-artifact|download-artifact|gh "))"][0]' "$DJ")" '${{ secrets.R2_ARTIFACT_ACCESS_KEY_ID }}|${{ secrets.R2_ARTIFACT_SECRET_ACCESS_KEY }}|false'
 ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build upload の前に在り、既定の success() で、if・env・uses・continue-on-error が無い" "$(jq -r --arg b "$BN" '
@@ -1010,7 +1018,7 @@ ok "deploy.yml(t): bundle の中身の段は、流れの判定の後・fe-build 
 BCS=$T/bc.sh; jq -r --arg b "$BN" '[.jobs.deploy.steps[] | select(.name == $b) | .run][0] // ""' "$DJ" > "$BCS"
 BCM=$T/bc-m.json; BCQ=$T/bc-s.bin
 sf() { printf 'FLSEEDP1....{"version":1,"files":[%s]}' "$(printf '{"path":"seed/resources/%s"},' "$@" | sed 's/,$//')"; }
-printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"}]}' > "$BCM"
+printf '%s\n' '{"lazy":[{"name":"error-offline.html","path":"resources/System/Internet/error-offline.html"},{"name":"vst-ext.wasm","path":"plugins/ott.wasm"},{"name":"serum2.wasm","path":"plugins/serum2.wasm"}]}' > "$BCM"
 sf System/Languages/de.moe Artwork/Fonts/Cuprum/Cuprum.ttf Data/Templates/Other/Blocks/Blocks.flp > "$BCQ"
 bcrun() { # 引数: 2 つ(bundle の manifest・seed.bin)と任意の 3 つめ(pack.args の代わり)。一時の木で bundle の中身の段を走らせ、終了コードを出す
   rm -rf "$T/bc"; mkdir -p "$T/bc/lift/out-app/bundle/raw/fl-Oz" "$T/bc/lift/out-app/seed" "$T/bc/lift/harness/web"
@@ -1154,13 +1162,15 @@ ok "本番(v): pack.args の lift/out-app/ の元の dir(先頭 3 段)は、全�
 ok "本番(v): 外部のインストーラは、fe-build bundle より前に fe-build external で取る(deploy.yml の行の順)" "$(a=$(grep -n 'fe-build external' "$DYML" | cut -d: -f1 | head -1); b=$(grep -n 'fe-build bundle' "$DYML" | cut -d: -f1 | head -1); [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] && echo yes)" yes
 OTTP=$(grep -n 'plugin-worker/build.sh ott' "$PLAN/bundle.txt" | cut -d: -f1 | head -1); PKP=$(grep -n 'pack-assets' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
 ok "本番(v): bundle の計画は、OTT の wasm の作る段(build.sh ott)を pack-assets より前に持つ" "$([ -n "$OTTP" ] && [ -n "$PKP" ] && [ "$OTTP" -lt "$PKP" ] && echo yes)" yes
+SERP=$(grep -n 'plugin-worker/build.sh serum2' "$PLAN/bundle.txt" | cut -d: -f1 | head -1)
+ok "本番(v): bundle の計画は、Serum 2 の wasm の作る段(build.sh serum2)を pack-assets より前に持つ" "$([ -n "$SERP" ] && [ -n "$PKP" ] && [ "$SERP" -lt "$PKP" ] && echo yes)" yes
 ok "本番(v): OTT の作る段の出力(build.sh の \$OUT/vst-ext.wasm)は、pack.args の --lazy-file の元(plugins/ott/vst-ext.wasm)と同じ名前" "$(grep -qF '"$OUT/vst-ext.wasm"' "$top/lift/harness/web/mt1/plugin-worker/build.sh" && grep -qF 'lift/out-app/plugins/ott/vst-ext.wasm' "$PA" && echo yes)" yes
 ok "本番(v): OTT の作る段の入力(インストーラの dir)は、fe-build external が作る dir と同じ" "$(grep -qF 'lift/out-app/external' "$PLAN/bundle.txt" && grep -qF 'lift/out-app/external' "$PLAN/external.txt" && echo yes)" yes
 ok "本番(v): fe-build external は、ci/artifacts.lock の外部のインストーラを全て取り、照合する(check.mjs)" "$(grep -cF 'tools/external-inputs/check.mjs lift/out-app/external' "$PLAN/external.txt")" 1
 ok "本番(v): deploy.yml は fe-build の副命令を呼ぶだけ(OTT の作る段は、deploy.yml の run に書かない)" "$(grep -cE 'plugin-worker|build[.]sh' "$DYML")" 0
 # (v) の後半(外部のインストーラの有無で bundle が変わる)。有る時の計画が bundle.txt、無い時の計画が bundle-no-external.txt。deploy は必ず有る時の計画を作る
 NX=$PLAN/bundle-no-external.txt
-ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行と、plugins/ の --lazy-file を持たない" "$(grep -cE 'plugin-worker/build[.]sh|lift/out-app/plugins/' "$NX" 2> /dev/null)" 0
-ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott の行と plugins/ の --lazy-file の対だけを除いた物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 3 /stage bundle: 2 /' -e 's| --lazy-file lift/out-app/plugins/[^ ]*||') "$NX" > /dev/null 2>&1 && echo yes)" yes
+ok "本番(v): 外部のインストーラが無い時の計画は、build.sh ott の行を持たず、pack.args の行に外部の lazy を省く旨を書く(省く処理は keep_lazies。fe-build の試験で確かめる)" "$(grep -cE 'plugin-worker/build[.]sh' "$NX" 2> /dev/null)" 0
+ok "本番(v): 外部のインストーラが無い時の計画は、有る時の計画から、build.sh ott・serum2 の行を除き、pack.args の行に「外部の lazy を省く」の語を足した物" "$(diff <(grep -v 'plugin-worker/build[.]sh' "$PLAN/bundle.txt" | sed -e 's/^stage bundle: 4 /stage bundle: 2 /' -e 's/pack[.]args$/&, without the external plugins'"'"' lazy files/') "$NX" > /dev/null 2>&1 && echo yes)" yes
 ok "本番(v): bundle の中身の段は、pack.args の外部プラグインの lazy を manifest で検査する(pack.args を jq に読ませる)" "$(jq -r '[.jobs.deploy.steps[] | select(.name == "bundle の中身を確かめる") | .run][0] // ""' "$DJ" | grep -cF 'lift/harness/web/pack.args')" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

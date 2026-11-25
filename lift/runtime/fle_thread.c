@@ -831,6 +831,33 @@ void fle_loop_slice(void)
     schedule_ex(1);
 }
 
+/* #1393: the back edge of a spin-wait (fle_spin_tick, fle_dispatch.h). The thread waits for the holder of the lock it spins on, and only a ready thread can release it: the holder may
+ * be preempted inside the lock, and inside a callback (depth above FLE_PREEMPT_MAX_DEPTH) fle_loop_slice never gives the processor. So a spin that has run inside a callback for
+ * FLE_SPIN_DEEP_BACKEDGES back edges gives the processor to any ready thread (schedule(), as Sleep(0) does). A shorter spin is not interrupted there, and outside a callback every spin
+ * gives it at each slice, as fle_loop_slice does. A spin inside a window procedure keeps the callback state of its own thread (save_ctx, load_ctx), as a wait or a Sleep there does. */
+static int spin_deep_armed;
+
+void fle_spin_slice(void)
+{
+    thr *t;
+    int deep = fle_callback_depth() > FLE_PREEMPT_MAX_DEPTH;
+
+    fle_loop_limit = fle_loop_count + FLE_LOOP_SLICE_BACKEDGES;
+    if (!preempt_armed || nthr < 2) return;
+    t = &T[cur];
+    if (t->state != T_RUNNING) return;
+    if (deep && !spin_deep_armed) {
+        spin_deep_armed = 1;
+        fle_loop_limit = fle_loop_count + FLE_SPIN_DEEP_BACKEDGES;
+        return;
+    }
+    spin_deep_armed = 0;
+    pst.spins++;
+    if (deep) pst.spins_deep++;
+    t->state = T_READY;
+    if (schedule()) pst.switches++;
+}
+
 void fle_thread_preempt_stats(fle_preempt_stats *out)
 {
     *out = pst;

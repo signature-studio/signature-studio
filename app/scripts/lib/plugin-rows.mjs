@@ -1,11 +1,11 @@
-// The rows of the plugins for the extraction (Issue #1369). Each folder lift/plugins/<name>/ holds one plugin.tsv: a header line (key, guest, role, sha256, size, hook, args),
+// The rows of the plugins for the extraction (Issue #1369). Each folder lift/plugins/<name>/ holds one plugin.tsv: a header line (key, guest, role, sha256, size, hook, args, omit),
 // then one row per DLL of the plugin. pluginRows() turns those rows into rows of the DLL table (extract-fl.mjs --dlls: name, host path, SHA-256)
 // and of the seed table (--seed: guest path, host path, SHA-256), the same rows as fe-build's plugins stage writes (lift/crates/fe-build/src/plugins.rs). The two must agree.
 // A folder without plugin.tsv is not a plugin: a missing lift/plugins gives no rows.
 import fs from 'node:fs';
 import path from 'node:path';
 
-const COLUMNS = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args'];
+const COLUMNS = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args', 'omit'];
 const GUEST_ROOT = 'C:\\Program Files\\Image-Line\\FL Studio 21\\';
 const SEED_ROOT = 'lift/out-idle1/inputs/install';
 const HOST_ROOT = 'lift/out-plugins';
@@ -19,18 +19,19 @@ function parsePlugin(plugin, text) {
     const at = (m) => new Error(`${plugin}/plugin.tsv line ${i + 1}: ${m}`);
     const f = line.split('\t');
     if (!header) {
-      if (f.join('\t') !== COLUMNS.join('\t')) throw at('the header must be key, guest, role, sha256, size, hook, args (TAB separated)');
+      if (f.join('\t') !== COLUMNS.join('\t')) throw at('the header must be key, guest, role, sha256, size, hook, args, omit (TAB separated)');
       header = true;
       return;
     }
-    if (f.length !== 7) throw at(`${f.length} fields, want 7`);
-    const [key, guest, role, sha256, size, hook] = f;
+    if (f.length !== 8) throw at(`${f.length} fields, want 8`);
+    const [key, guest, role, sha256, size, hook, , omit] = f;
     if (role !== '本体' && role !== '補助') throw at(`role ${role}: want 本体 or 補助`);
     if (!/^[0-9]+$/.test(size) || Number(size) <= 0) throw at('size must be a positive integer');
     if (!['none', 'existing'].includes(hook)) {
       const rvas = /^rva:(.*)$/.exec(hook)?.[1].split(',') ?? [];
       if (rvas.length !== 3 || !rvas.every((v) => /^(0x)?[0-9a-fA-F]+$/.test(v.trim()))) throw at(`hook ${hook}: want none, existing or rva:0x..,0x..,0x..`);
     }
+    if (omit !== '-' && !omit.split(',').every((v) => /^(0x)?[0-9a-fA-F]+$/.test(v))) throw at(`omit ${omit}: want - or comma separated hex RVAs`);
     out.push({ plugin, key, guest, sha256 });
   });
   if (!header) throw new Error(`${plugin}/plugin.tsv: no header`);

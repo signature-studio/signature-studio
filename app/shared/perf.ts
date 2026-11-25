@@ -318,6 +318,30 @@ export function beaconProblems(b: unknown): string[] {
       str('hz.param', h.param, 40, true); str('hz.note', h.note, 400);
     }
   }
+  // Issue #1398: optional `desk.recent10s` (the presents of the last 10 s: a count, the seconds it covers and the rate; no rate under a second) and the top-level `rafIntervalMsP95` (the same number as display.raf.recent10s.p95Ms)
+  const ds = b.desk;
+  if (isObj(ds) && ds.recent10s !== undefined) {
+    const rc = ds.recent10s;
+    if (!isObj(rc)) out.push('desk.recent10s: not an object');
+    else {
+      num('desk.recent10s.seconds', rc.seconds, 0, 10);
+      num('desk.recent10s.presents', rc.presents, 0, 1e12, true);
+      num('desk.recent10s.presentsPerSec', rc.presentsPerSec, 0, 1e5, false, true);
+      if (typeof rc.seconds === 'number' && typeof rc.presents === 'number') {
+        const pps = rc.presentsPerSec;
+        if (rc.seconds < 1 && pps !== null) out.push('desk.recent10s: a rate over less than a second');
+        if (rc.seconds >= 1 && pps === null) out.push('desk.recent10s: no rate over a second or more');
+        if (rc.seconds === 0 && rc.presents !== 0) out.push('desk.recent10s: presents over no seconds');
+        if (typeof pps === 'number' && rc.seconds >= 1 && Math.abs(pps - rc.presents / rc.seconds) > 0.01) out.push('desk.recent10s.presentsPerSec: not presents / seconds');
+      }
+    }
+  }
+  const dsp = isObj(b.display) ? b.display : null;
+  const dR10 = dsp && isObj(dsp.raf) && isObj(dsp.raf.recent10s) ? dsp.raf.recent10s : null;
+  if (b.rafIntervalMsP95 !== undefined) {
+    num('rafIntervalMsP95', b.rafIntervalMsP95, 0, 3.6e6, false, true);
+    if (b.rafIntervalMsP95 !== (dR10 ? dR10.p95Ms ?? null : null)) out.push('rafIntervalMsP95: not display.raf.recent10s.p95Ms (the same number, not a second calculation)');
+  }
   const fl = b.files;
   if (fl !== undefined) {
     if (!isObj(fl)) out.push('files: not an object');
@@ -475,6 +499,12 @@ function inputBlock(v: unknown, num: (path: string, v: unknown, lo: number, hi: 
     if (typeof s.n === 'number' && s.n === 0 && s.p50Ms !== null) out.push(`input.${k}: no values but a median`);
   }
   if ((v.lateVisible === null) !== (v.eventToRafWithLate === null)) out.push('input: lateVisible and eventToRafWithLate must both be null or both be there');
+  // Issue #1398: optional; the same numbers as eventToRaf's p50Ms / p95Ms (a copy, not a second calculation)
+  for (const [k, src] of [['inputToPresentMsP50', 'p50Ms'], ['inputToPresentMsP95', 'p95Ms']] as const) {
+    if (v[k] === undefined) continue;
+    num(`input.${k}`, v[k], 0, 3.6e6, false, true);
+    if (isObj(v.eventToRaf) && v[k] !== (v.eventToRaf[src] ?? null)) out.push(`input.${k}: not input.eventToRaf.${src} (the same number, not a second calculation)`);
+  }
   const st = v.stages;
   if (st === null) return;
   if (!isObj(st)) { out.push('input.stages: not an object or null'); return; }

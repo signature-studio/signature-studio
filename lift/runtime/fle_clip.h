@@ -1,7 +1,9 @@
-/* The virtual clipboard (decision 0171, wall ia1-W1: user32!IsClipboardFormatAvailable at the first mouse click on the main window).
+/* The clipboard (decision 0171, wall ia1-W1: user32!IsClipboardFormatAvailable at the first mouse click on the main window; #1389 for the host clipboard).
  *
- * One process, one clipboard, no host clipboard: the clipboard of this environment starts EMPTY (no format) and holds what the guest puts there with
- * SetClipboardData. Nothing is read from or written to the host's clipboard. Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx),
+ * The clipboard of this environment starts EMPTY (no format) and holds what the guest puts there with SetClipboardData. The text of a CF_UNICODETEXT that the
+ * guest sets goes to the page (fle_clip_host_write: the page writes it to the operating system's clipboard). The text of CF_UNICODETEXT that the guest asks
+ * for is the operating system's (fle_clip_host_read: an ASYNC import, the page reads it, the engine waits for the answer): it is read once per open of the
+ * clipboard, and the virtual formats answer when the page has no text. Same convention as fle_imports.h: arguments in R[1] (rcx), R[2] (rdx),
  * R[8] (r8), R[9] (r9); the Win32 return value in R[0]; the guest return address stays on the stack for the caller's ret.
  *
  * Rules are from Microsoft Learn (OpenClipboard, CloseClipboard, EmptyClipboard, IsClipboardFormatAvailable, CountClipboardFormats, EnumClipboardFormats,

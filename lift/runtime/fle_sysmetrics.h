@@ -38,6 +38,11 @@
 #define FLE_SM_IDX_CONVERTIBLESLATEMODE 0x2003
 #define FLE_SM_IDX_SYSTEMDOCKED     0x2004
 
+/* #1390 (PROVISIONAL): the sizing border of a window with WS_THICKFRAME is SM_CXSIZEFRAME (index 32) + SM_CXPADDEDBORDER (index 92) pixels wide at 96 DPI: 4 + 4, the Windows 10 values
+ * (no page of this set gives them). GetSystemMetrics still stops on index 32 (the guest asks it, no value is decided for it): these two are not answered to the guest. The band of fle_input.c is their sum at the DPI of the screen. */
+#define FLE_SM_SIZEFRAME_96     4
+#define FLE_SM_PADDEDBORDER_96  4
+
 /* Decided values (decision 0057). CXSCREEN, CYSCREEN, CXVIRTUALSCREEN, CYVIRTUALSCREEN are FLE_GDC_HORZRES and FLE_GDC_VERTRES
  * (fle_gdc.h): the page says SM_CXSCREEN / SM_CYSCREEN equal GetDeviceCaps(HORZRES / VERTRES). */
 /* System icon sizes: the Learn page "About Icons" (System icon sizes) lists, at 96 DPI, SM_CXSMICON / SM_CYSMICON 16x16 and

@@ -36,6 +36,9 @@ export interface FruityModuleOpts {
   /** decision 0280 (lift/harness/web/fruity/fle_idle_lib.js): the scheduler reads the page's input ring itself; the Worker stages the records into `ptr` (8 words each, at most `max`) and returns the count; fleInputDone(ptr, n) is told what the runtime did with them */
   fleInputPoll?: (ptr: number, max: number) => number;
   fleInputDone?: (ptr: number, n: number) => void;
+  /** Issue #1383 (lift/harness/web/fruity/fle_idle_lib.js): the saved records of the registry's HKCU tree, replayed before the guest runs; and the change of one record, which the page keeps */
+  fleRegSaved?: () => Uint8Array | null;
+  fleRegPut?: (record: Uint8Array) => void;
   /** Issue #1342 (lift/harness/two/xmod_glue.c, lift/harness/web/fruity/fle_idle_lib.js): the engine asks for a real module's separate wasm module (xmod.ts); 1 when it is instantiated, 0 when the DLL has none */
   fleXmodLoad?: (ptr: number) => number;
   preRun: Array<() => void>;
@@ -47,6 +50,10 @@ export interface FruityModuleOpts {
   fleFileDlg?: (id: number, request: unknown) => void;
   fleFileDlgAnswer?: (id: number, answer: unknown) => boolean;
   fleFileDlgProgress?: (id: number, done: number, total: number) => void;
+  /** #1389 (lift/harness/web/clip/fle_clip_lib.js): the engine's Copy text goes to the host; the engine asks the host for the operating system's clipboard text (fleClipRequest), the host answers through fleClipAnswer (set by the library) */
+  fleClipWrite?: (text: string) => void;
+  fleClipRequest?: (id: number) => void;
+  fleClipAnswer?: (id: number, text: string | null) => void;
 }
 export type CreateModule = (opts: FruityModuleOpts) => Promise<unknown>;
 export type GlueImporter = (glue: Uint8Array) => Promise<CreateModule>;
@@ -62,9 +69,15 @@ export interface FruityHost {
   /** decision 0193: absent = the engine's file dialogs are cancelled at once (nobody to ask) */
   fileDlg?(id: number, request: unknown): void;
   fileDlgProgress?(id: number, done: number, total: number): void;
+  /** #1389: the text of the engine's Copy; the operating system's clipboard text is asked by clipRead(id) and answered with answerClipRead */
+  clipWrite?(text: string): void;
+  clipRead?(id: number): void;
   /** decision 0280: see FruityModuleOpts.fleInputPoll / fleInputDone; absent = the input is taken at the idle only */
   inputPoll?(ptr: number, max: number): number;
   inputDone?(ptr: number, n: number): void;
+  /** Issue #1383: the page's keeping of the registry's HKCU tree (regstore.ts): the saved records (null: none), and the change of one record; absent = nothing is kept */
+  regSaved?(): Uint8Array | null;
+  regPut?(record: Uint8Array): void;
 }
 
 export type FruityExit =
@@ -127,7 +140,11 @@ export class FruityEngine {
       fleThreadFailed: (idx, _e, msg) => host.stderr(`[js] ${msg} (guest thread ${idx})`),
       fleXmodLoad: (ptr: number) => xmod.loadAt(ptr),
       ...(host.inputPoll ? { fleInputPoll: (ptr: number, max: number) => host.inputPoll?.(ptr, max) ?? 0, fleInputDone: (ptr: number, n: number) => host.inputDone?.(ptr, n) } : {}),
+      ...(host.regSaved ? { fleRegSaved: () => host.regSaved?.() ?? null } : {}),
+      ...(host.regPut ? { fleRegPut: (record: Uint8Array) => host.regPut?.(record) } : {}),
       ...(host.fileDlg ? { fleFileDlg: (id: number, request: unknown) => host.fileDlg?.(id, request), fleFileDlgProgress: (id: number, done: number, total: number) => host.fileDlgProgress?.(id, done, total) } : {}),
+      ...(host.clipWrite ? { fleClipWrite: (text: string) => host.clipWrite?.(text) } : {}),
+      ...(host.clipRead ? { fleClipRequest: (id: number) => host.clipRead?.(id) } : {}),
       preRun: [() => {
         if (!opts.ENV) throw new Error('the emscripten glue exposes no ENV (link with -sEXPORTED_RUNTIME_METHODS=ENV,...)');
         const t0 = performance.now();
@@ -232,6 +249,9 @@ export class FruityEngine {
 
   /** decision 0193: hands the person's answer to the suspended engine; false when the engine is not waiting for this dialog */
   answerFileDlg(id: number, answer: unknown): boolean { return this.opts.fleFileDlgAnswer ? this.opts.fleFileDlgAnswer(id, answer) : false; }
+
+  /** #1389: hands the operating system's clipboard text (or null: none) to the suspended engine; the library ignores an id it does not wait for */
+  answerClipRead(id: number, text: string | null): void { this.opts.fleClipAnswer?.(id, text); }
 
   /** decision 0193: the next Save target the engine has finished writing (fle_filedlg_saved_poll of lift/runtime/fle_filedlg.c), or null; the bytes are copied */
   pollSaved(): { guestPath: string; size: number; data: Uint8Array } | null {

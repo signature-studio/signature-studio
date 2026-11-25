@@ -14,7 +14,7 @@ import { matchStopNotes, summarizeEngineLog, type EngineLogSummary } from './eng
 import type { AppView } from './engine/appview.ts';
 import type { HostFileStats } from './engine/hostfiles.ts';
 import type { GuestTextBest, GuestTextNear } from './engine/protocol.ts';
-import { cursorCss } from './ui/cursor.ts';
+import { type CursorChoice, cursorCss } from './ui/cursor.ts';
 import { DesktopView } from './ui/desktop.ts';
 import { engineState, meanCycle, type EngineClockState } from './ui/engine-status.ts';
 import { LatencyTracker, toAnyFrame, type InputMeta } from './ui/latency.ts';
@@ -25,7 +25,7 @@ import { ProgressView } from './ui/progress.ts';
 import { chooseGuestScreen, drawScale, RoomDebouncer, screenEnv, SCREEN_DEFAULT, type GuestScreenInfo, type Room } from './ui/screen-fit.ts';
 import { collectBrowserInfo, collectClientInfo, webglRenderer, type BrowserInfo } from './perf/browser-info.ts';
 import { FailureReporter, detectCapabilities, installFailureWatch, postFailure, type FailureKind } from './perf/failure-beacon.ts';
-import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
+import { BeaconScheduler, beaconText, buildBeacon, deskBeacon, DeskHistory, engineRunBeacon, postBeacon, uiWindowsOf, type BeaconPayload, type BeaconReason, type SendResult } from './perf/beacon.ts';
 import { DisplayMonitor, hzFit, type DisplaySnapshot, type HzInfo } from './perf/display.ts';
 import { browserDisplayHost } from './perf/display-host.ts';
 import { engineExitMessage, engineStopFacts, type EngineStop } from './perf/exit-message.ts';
@@ -34,6 +34,7 @@ import { inputLatencyStats, PerfRecorder } from './perf/stats.ts';
 import { audioOffReason, installAudio } from './audio/install.ts';
 import { bindAudioStatus } from './audio/status.ts';
 import { FileDialogView, SavedFilesView } from './ui/filedlg.ts';
+import { PageClipboard, type ClipboardState } from './engine/clipboard.ts';
 import type { FileDlgRequest } from './engine/filedlg.ts';
 import { mountFiles } from './files/mount.ts';
 import { EngineFiles } from './files/engine-dialog.ts';
@@ -82,7 +83,9 @@ interface AppApi {
   /** the input events with their latencies (page -> engine injection -> engine idle again -> frame drawn) */
   latency: LatencyTracker;
   /** the CSS cursor the desktop shows and why */
-  cursor: { css: string; why: string };
+  cursor: CursorChoice;
+  /** #1390: the cursors the engine reported that the page could not show as they are: the standard cursors with no CSS equivalent (name, value, how many times it was reported), the cursors the guest made itself (how many times) and the handles with no identity (how many times) */
+  cursorRecord: { unmapped: { name: string; value: number; count: number }[]; made: number; unresolved: number };
   /** what the status line says now */
   engineStatus(): ReturnType<typeof engineState>;
   /** what the engine did with the input (the Worker's counters of the last idle) */
@@ -107,6 +110,8 @@ interface AppApi {
   /** decision 0193: the page's answers to the engine's file dialogs (no file names) and the files the engine wrote (Save dialog targets) */
   fileDlg: { readonly open: boolean; readonly history: FileDialogView['history']; /** for the record of decision 0193: whether the page had a transient user activation (navigator.userActivation.isActive) and how long ago the page's last trusted pointer or key event was, when each engine request arrived */ readonly requests: { id: number; save: boolean; at: number; activationActive: boolean | null; msSinceInput: number | null; /** what the engine asked (its own strings: types, title, folder, suggested name) */ request: FileDlgRequest }[] };
   saved: SavedFilesView['files'];
+  /** #1389: the page's clipboard (the engine's Copy and Paste with the operating system's clipboard): the browser's permission states, the calls and the reason last shown */
+  clipboard: ClipboardState;
   /** decision 0223: the desktop presenter's counters (as of its last report), and the SHA-256 of the desktop canvas read back in the Worker */
   deskStats: unknown;
   readbackDesk(): Promise<{ width: number; height: number; sha256: string }>;
@@ -174,9 +179,12 @@ let endRequested = false;
 
 /** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
 let apiTraceWanted = false;
+// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts)
+const pageClipboard = new PageClipboard(document);
+void pageClipboard.refresh();
 const app: AppApi = {
   assetsReport: () => assetsNow(),
-  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
+  state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, cursorRecord: { unmapped: [], made: 0, unresolved: 0 }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },
   screen: { panelOpen: true, engineFollows: null, resizes: [], asked: null, reported: null, guest: { width: SCREEN_DEFAULT.width, height: SCREEN_DEFAULT.height }, room: null, notes: [] },
   engineLog: () => engineLog.lines,
   webview2Front: () => face.frontRects(),
@@ -184,6 +192,7 @@ const app: AppApi = {
   audio,
   fileDlg: { get open() { return fileDlgView.open; }, history: fileDlgView.history, requests: [] },
   saved: savedView.files,
+  clipboard: pageClipboard.state,
   sendRaw: (ev) => sendRaw(ev, 'test'),
   taskbar: null as unknown as TaskbarRestore,
   deskStats: null,
@@ -492,6 +501,8 @@ function hzInfo(): HzInfo {
 }
 /** decision 0240: the presenter's counters as of the previous beacon that was sent (the next beacon reports the difference) */
 let prevDeskBeacon: { stats: Record<string, unknown>; atMs: number } | null = null;
+/** Issue #1398: the presenter's count as the page received each report, for the presents of the last 10 s */
+const deskHistory = new DeskHistory();
 function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
   const snap = perfRecorder.snapshot(nowAbs());
   const lat = app.latency;
@@ -510,7 +521,7 @@ function makeBeacon(reason: BeaconReason, seq: number): BeaconPayload {
     guestScreen: guestScreenInfo(),
     files: filesUsage.snapshot(),
     assets: assetsNow(),
-    desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs()) : null,
+    desk: app.engineKind === 'emscripten-fruity-v1' ? deskBeacon(app.deskStats as Record<string, unknown> | null, prevDeskBeacon, nowAbs(), deskHistory.samples) : null,
     engineRun: engineRunBeacon(app.idles, nowAbs()),
     uiWindows: uiWindowsOf(app.summary?.windows), // Issue #1364: the window table the page already reads for its panel (refreshPanels); none before the first idle
   });
@@ -581,11 +592,23 @@ perfPanel.addEventListener('toggle', () => { if (perfPanel.open) displayMonitor.
 $('perf-send-note').textContent = ' · 測定値はこのサーバーに送られます';
 setInterval(renderPerf, 1000);
 
+/** #1390: what the engine's cursor reports were that the page could not show as they are (a count per report of a state, not per pointer move) */
+function recordCursor(c: CursorChoice): void {
+  if (c.unmapped) {
+    const seen = app.cursorRecord.unmapped.find((u) => u.value === c.unmapped?.value);
+    if (seen) seen.count++;
+    else app.cursorRecord.unmapped.push({ ...c.unmapped, count: 1 });
+  }
+  if (c.made) app.cursorRecord.made++;
+  if (c.unresolved) app.cursorRecord.unresolved++;
+}
+
 const client = new EngineClient({
   deskCanvas: () => view.deskCanvas(),
   osstate(m) {
-    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared });
+    const c = cursorCss({ cursor: m.cursor, cursorIdc: m.cursorIdc, cursorShared: m.cursorShared, cursorMade: m.cursorMade });
     app.cursor = c;
+    recordCursor(c);
     view.setCursor(c.css);
     osTitle = m.title;
     syncPageTitle();
@@ -594,8 +617,17 @@ const client = new EngineClient({
   },
   taskbar(m) { app.taskbar.update(m.lid); },
   webview2(m) { face.handle(m); },
+  clipboardWrite(text) {
+    addLog('info', `the engine's Copy: ${text.length} characters for the clipboard`);
+    void pageClipboard.write(text);
+  },
+  clipboardRead(id) {
+    addLog('info', `the engine's Paste asks for the clipboard text (request ${id})`);
+    pageClipboard.read().then((text) => client.clipboardAnswer(id, text)).catch(() => client.clipboardAnswer(id, null));
+  },
   desk(m) {
     app.deskStats = m.stats;
+    deskHistory.add(nowAbs(), m.stats.presents);
     if (m.answers && m.at.length > 0) app.latency.answer(m.answers, DESKTOP, m.at[m.at.length - 1] as number);
     for (const t of m.at) { app.latency.frame(DESKTOP, t, t, t); app.lastChanged = { at: t }; perfRecorder.update(t); }
   },

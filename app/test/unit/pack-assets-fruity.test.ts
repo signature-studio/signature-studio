@@ -187,3 +187,23 @@ describe('pack-assets.mjs: a lazy file that is in no pack (Issue #1315)', () => 
     expect(gone.stderr).toContain('no such file');
   });
 });
+
+describe('pack-assets.mjs: a lazy file whose name has a # (Issue #1373)', () => {
+  const host = path.join(tmp, 'host-hash');
+  fs.mkdirSync(host, { recursive: true });
+  const body = Buffer.from('OggS-hash');
+  const src = path.join(host, 'PL_TLO_05_D#m_Dry.ogg');
+  fs.writeFileSync(src, body);
+  const dll4 = path.join(tmp, 'dll-hash');
+  fs.mkdirSync(dll4);
+  fs.writeFileSync(path.join(dll4, 'FLEngine_x64.dll'), Buffer.from('MZ-engine'));
+  const hr = run(['--dll-dir', dll4, '--lazy-file', `${src}=seed/Misc/PL_TLO_05_D#m_Dry.ogg`, '--glue', path.join(tmp, 'glue.js'), '--args', '/data/FLEngine_x64.dll'], 'out-hash');
+  const hm = JSON.parse(fs.readFileSync(path.join(tmp, 'out-hash', 'raw', 'fl-x', 'manifest.json'), 'utf8'));
+
+  it('writes the URL with the # as %23 (a # would end the path at the fragment), and the file under its own name', () => {
+    expect(hr.status, hr.stderr).toBe(0);
+    expect(hm.lazy[0]).toMatchObject({ name: 'PL_TLO_05_D#m_Dry.ogg', path: 'seed/Misc/PL_TLO_05_D#m_Dry.ogg', sha256: sha(body) });
+    expect(hm.lazy[0].url).toMatch(/^\/assets\/fl-x\/PL_TLO_05_D%23m_Dry\.[0-9a-f]{12}\.ogg$/);
+    expect(fs.readdirSync(path.join(tmp, 'out-hash', 'br', 'fl-x')).some((f) => /^PL_TLO_05_D#m_Dry\.[0-9a-f]{12}\.ogg$/.test(f))).toBe(true);
+  });
+});

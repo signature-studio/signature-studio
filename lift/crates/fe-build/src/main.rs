@@ -2,7 +2,7 @@
 //! deploy step gave it, and the working directory is the repository root, so the source paths the compiler sees
 //! (and the strings it puts in the wasm) are the same as before. The lists and argument files stay where they are.
 //!
-//! usage: fe-build engine | extract | external | bundle | upload | endpoint
+//! usage: fe-build engine | extract | external | tables | bundle | upload | endpoint
 //! The plans (the stages and steps in run order) are functions that the tests compare with tests/plan/*.txt.
 
 use std::env;
@@ -13,6 +13,8 @@ use std::process::{Command, ExitCode, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
+
+mod plugins;
 
 const OUT_APP_DIR: &str = "lift/out-app";
 const HARNESS_DIR: &str = "lift/harness";
@@ -47,6 +49,12 @@ const ENGINE_DIRS: [&str; 10] = ["obj/rt", "obj/h", "obj/fle", "obj/mod", "obj/b
 enum Step {
     Mkdir(Vec<String>),
     Run(Vec<String>),
+    /// the arguments are the command's, then one argument per line of the file (read when the step runs: the file is generated)
+    RunLines(Vec<String>, String),
+    /// the arguments are the command's, then the lines of pack.args (read when the step runs; without the external plugins, their lazy files are left out)
+    RunPack(Vec<String>, bool),
+    /// the arguments are the command's, then the words of the file (read when the step runs: the file is generated)
+    RunWords(Vec<String>, String),
     RunStdin(Vec<String>, String),
     RemoveFile(String),
     RemoveDir(String),
@@ -55,6 +63,12 @@ enum Step {
     CopyDlls,
     Copy(String, String),
     Glue,
+    /// the plugin tables under lift/out-app/plugins (with the bases when true)
+    Generate(bool),
+    /// the direct list of one plugin DLL (key, the engine's bin directory)
+    PluginList(String, String),
+    MergeLists,
+    CheckUnits(Vec<String>),
 }
 
 struct Stage {
@@ -69,6 +83,9 @@ impl Step {
         match self {
             Step::Mkdir(dirs) => format!("mkdir -p {}", dirs.join(" ")),
             Step::Run(argv) => argv.join(" "),
+            Step::RunLines(argv, file) => format!("{} @lines {file}", argv.join(" ")),
+            Step::RunPack(argv, external) => format!("{} @lines {}/pack.args{}", argv.join(" "), plugins::OUT_DIR, if *external { "" } else { ", without the external plugins' lazy files" }),
+            Step::RunWords(argv, file) => format!("{} @words {file}", argv.join(" ")),
             Step::RunStdin(argv, stdin_file) => format!("{} < {stdin_file}", argv.join(" ")),
             Step::RemoveFile(path) => format!("rm -f {path}"),
             Step::RemoveDir(dir) => format!("rm -rf {dir}"),
@@ -77,6 +94,10 @@ impl Step {
             Step::CopyDlls => format!("copy {OUT_APP_DIR}/gen/dll/*.dll and {OUT_APP_DIR}/host/binaries/win64/FLEngine_x64.dll to {OUT_APP_DIR}/dll/"),
             Step::Copy(from, to) => format!("copy {from} to {to}"),
             Step::Glue => format!("glue {OUT_APP_DIR}/web/flengine6.js -> {OUT_APP_DIR}/web/engine-glue.js (the two rules of {HARNESS_DIR}/web/glue.sed)"),
+            Step::Generate(with_bases) => format!("plugins: tables under {} from lift/plugins/*/plugin.tsv (bases: {with_bases})", plugins::OUT_DIR),
+            Step::PluginList(key, _) => format!("list {key}: fe-pe rebase, fe-wasmgen report, hook points and omit VAs left out"),
+            Step::MergeLists => format!("merge {}/lists into {}/lowered-all.txt", plugins::OUT_DIR, plugins::OUT_DIR),
+            Step::CheckUnits(listed) => format!("check the {} units of {OUT_APP_DIR}/gen/src against the compile lists", listed.len()),
         }
     }
 }
@@ -320,12 +341,21 @@ fn check_blend2d_sources(list_file: &str) -> Result<(), String> {
 }
 
 fn plan(bin: &str) -> Result<Vec<Stage>, String> {
+    plan_with(bin, &plugins::keys()?)
+}
+
+/// The stages of the engine build for the plugins with these keys (the lists stage has one step for each key).
+fn plan_with(bin: &str, keys: &[String]) -> Result<Vec<Stage>, String> {
     let fe_lift = format!("{bin}/fe-lift");
     let fe_wasmgen = format!("{bin}/fe-wasmgen");
+    let mut stages = vec![Stage { name: "plugins".into(), steps: vec![Step::Generate(true)], parallel: false }];
+    let plugin_steps = keys.iter().map(|key| Step::PluginList(key.clone(), bin.to_string())).collect();
+    stages.push(Stage { name: "lists".into(), steps: plugin_steps, parallel: true });
+    stages.push(Stage { name: "lowered-all".into(), steps: vec![Step::MergeLists], parallel: false });
     let units = blend2d_units()?;
     let mut blend2d_steps = blend2d_source_steps();
     blend2d_steps.push(Step::Mkdir(blend2d_dirs(&units)));
-    let mut stages = vec![Stage { name: "blend2d".into(), steps: blend2d_steps, parallel: false }];
+    stages.push(Stage { name: "blend2d".into(), steps: blend2d_steps, parallel: false });
     stages.push(Stage { name: "blend2d-compile".into(), steps: blend2d_compile_steps(&units), parallel: true });
     stages.push(Stage { name: "blend2d-archive".into(), steps: blend2d_archive_steps(&units), parallel: false });
 
@@ -335,6 +365,9 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
     gen_steps.push(Step::Run(gen_args));
     gen_steps.push(Step::CopyDlls);
     stages.push(Stage { name: "gen".into(), steps: gen_steps, parallel: false });
+    let mut listed_units = words(&format!("{HARNESS_DIR}/two/plain-units.txt"))?;
+    listed_units.extend(words(&format!("{HARNESS_DIR}/two/ai-units.txt"))?);
+    stages.push(Stage { name: "units".into(), steps: vec![Step::CheckUnits(listed_units)], parallel: false });
 
     let (rt_flags, h_flags) = (format!("{HARNESS_DIR}/web/cflags-rt.args"), format!("{HARNESS_DIR}/web/cflags-h.args"));
     let (unit_flags, ai_flags) = (format!("{HARNESS_DIR}/web/cflags-u.args"), format!("{HARNESS_DIR}/web/cflags-ai.args"));
@@ -400,10 +433,9 @@ fn plan(bin: &str) -> Result<Vec<Stage>, String> {
     wasm_opt_argv.extend(lines(&format!("{HARNESS_DIR}/web/wasm-opt-c.cmd"))?);
     stages.push(Stage { name: "wasm-opt".into(), steps: vec![Step::Run(wasm_opt_argv)], parallel: false });
 
-    let mut hybrid_argv = vec![fe_wasmgen];
-    hybrid_argv.extend(lines(&format!("{HARNESS_DIR}/hyb/hybrid.cmd"))?);
+    let hybrid_cmd = format!("{}/hybrid.cmd", plugins::OUT_DIR);
     let func_names = format!("{OUT_APP_DIR}/hyb/wasm-func-names.tsv");
-    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::Run(hybrid_argv), Step::Copy(func_names, format!("{OUT_APP_DIR}/gen/wasm-func-names.tsv")), Step::Glue], parallel: false });
+    stages.push(Stage { name: "hybrid".into(), steps: vec![Step::RunLines(vec![fe_wasmgen], hybrid_cmd), Step::Copy(func_names, format!("{OUT_APP_DIR}/gen/wasm-func-names.tsv")), Step::Glue], parallel: false });
     Ok(stages)
 }
 
@@ -442,6 +474,25 @@ fn run(step: &Step) -> Result<(), String> {
             Ok(())
         }
         Step::Run(argv) => exec(Command::new(&argv[0]).args(&argv[1..]), &argv[0]),
+        Step::RunLines(argv, file) => {
+            let mut all = argv.clone();
+            all.extend(lines(file)?);
+            exec(Command::new(&all[0]).args(&all[1..]), &all[0])
+        }
+        Step::RunWords(argv, file) => {
+            let mut all = argv.clone();
+            all.extend(words(file)?);
+            exec(Command::new(&all[0]).args(&all[1..]), &all[0])
+        }
+        Step::RunPack(argv, external) => {
+            let mut all = argv.clone();
+            all.extend(pack_args(*external)?);
+            exec(Command::new(&all[0]).args(&all[1..]), &all[0])
+        }
+        Step::Generate(with_bases) => plugins::generate(*with_bases),
+        Step::PluginList(key, bin) => plugins::run_list(key, bin),
+        Step::MergeLists => plugins::merge_lists(),
+        Step::CheckUnits(listed) => plugins::check_units(listed),
         Step::RunStdin(argv, stdin_file) => {
             let file = fs::File::open(stdin_file).map_err(|e| format!("{stdin_file}: {e}"))?;
             exec(Command::new(&argv[0]).args(&argv[1..]).stdin(Stdio::from(file)), &argv[0])
@@ -505,10 +556,10 @@ fn toolchain_bin() -> Result<String, String> {
 }
 
 #[cfg(test)]
-/// The stages and steps of the engine build in run order, as text (one stage line, then its steps).
-fn engine_plan_lines(bin: &str) -> Result<Vec<String>, String> {
+/// The stages and steps of the engine build in run order, as text (one stage line, then its steps), for the plugins with these keys.
+fn engine_plan_lines(bin: &str, keys: &[String]) -> Result<Vec<String>, String> {
     let mut out = Vec::new();
-    for stage in plan(bin)? {
+    for stage in plan_with(bin, keys)? {
         let par = if stage.parallel { ", parallel" } else { "" };
         out.push(format!("stage {}: {} step(s){par}", stage.name, stage.steps.len()));
         out.extend(stage.steps.iter().map(|step| format!("  {}", step.show())));
@@ -525,6 +576,7 @@ fn engine() -> Result<(), String> {
     for stage in plan(&bin)? {
         let par = if stage.parallel { ", parallel" } else { "" };
         println!("stage {}: {} step(s){par}", stage.name, stage.steps.len());
+        let started = std::time::Instant::now();
         if stage.parallel {
             run_parallel(&stage.steps)?;
         } else {
@@ -532,6 +584,7 @@ fn engine() -> Result<(), String> {
                 run(step)?;
             }
         }
+        println!("stage {} took {:.1} s", stage.name, started.elapsed().as_secs_f64());
     }
     Ok(())
 }
@@ -553,16 +606,17 @@ fn stage_lines(name: &str, steps: &[Step]) -> Vec<String> {
     out
 }
 
-fn seed_step() -> Result<Step, String> {
-    let mut argv: Vec<String> = vec!["node".into(), "app/scripts/pack-seed.mjs".into()];
-    argv.extend(words(&format!("{HARNESS_DIR}/web/seed.args"))?);
-    Ok(Step::Run(argv))
+fn seed_step() -> Step {
+    Step::RunWords(vec!["node".into(), "app/scripts/pack-seed.mjs".into()], format!("{}/seed.args", plugins::OUT_DIR))
 }
 
-/// The arguments of pack.args (one per line). Without the external plugins' installers (`external` false), the --lazy-file
-/// of a plugin's wasm (its source under lift/out-app/plugins/) is left out, and each one is said on stderr.
+/// The arguments of pack.args (one per line; plugins::generate writes it). Without the external plugins' installers (`external` false),
+/// the --lazy-file of a plugin's wasm (its source under lift/out-app/plugins/) is left out, and each one is said on stderr.
 fn pack_args(external: bool) -> Result<Vec<String>, String> {
-    let args = lines(&format!("{HARNESS_DIR}/web/pack.args"))?;
+    Ok(keep_lazies(&lines(&format!("{}/pack.args", plugins::OUT_DIR))?, external))
+}
+
+fn keep_lazies(args: &[String], external: bool) -> Vec<String> {
     let mut kept = Vec::new();
     let mut i = 0;
     while i < args.len() {
@@ -575,38 +629,33 @@ fn pack_args(external: bool) -> Result<Vec<String>, String> {
             i += 1;
         }
     }
-    Ok(kept)
+    kept
 }
 
-/// The pack step for the engine with the sha256 `sha` (its first 12 digits name the version).
-fn pack_step_for(sha: &str, external: bool) -> Result<Step, String> {
-    let mut argv: Vec<String> = vec!["node".into(), "app/scripts/pack-assets.mjs".into(), "--version".into(), sha[..12].into()];
-    argv.extend(pack_args(external)?);
-    if Path::new(OFFLINE_PAGE_SRC).is_file() {
-        argv.push("--lazy-file".into());
-        argv.push(format!("{OFFLINE_PAGE_SRC}={OFFLINE_PAGE_PATH}"));
-    }
-    Ok(Step::Run(argv))
+/// The pack step for the engine with the sha256 `sha` (its first 12 digits name the version). Its lazy files are the lines of pack.args,
+/// read when the step runs (the offline page is one of them when it is there).
+fn pack_step_for(sha: &str, external: bool) -> Step {
+    Step::RunPack(vec!["node".into(), "app/scripts/pack-assets.mjs".into(), "--version".into(), sha[..12].into()], external)
 }
 
 #[cfg(test)]
-fn bundle_plan_steps(sha: &str, external: bool) -> Result<Vec<Step>, String> {
-    let mut steps = if external { ott_steps() } else { Vec::new() };
-    steps.extend([seed_step()?, pack_step_for(sha, external)?]);
-    Ok(steps)
+fn bundle_plan_steps(sha: &str, external: bool) -> Vec<Step> {
+    let mut steps = if external { plugin_steps() } else { Vec::new() };
+    steps.extend([seed_step(), pack_step_for(sha, external)]);
+    steps
 }
 
 /// The bundle. The external plugins' wasm is in it only when their installers are there (external_present).
 fn bundle() -> Result<(), String> {
     let external = external_present()?;
     if external {
-        for step in &ott_steps() {
+        for step in &plugin_steps() {
             run(step)?;
         }
     }
-    run(&seed_step()?)?;
+    run(&seed_step())?;
     let sha = sha256_hex(&format!("{OUT_APP_DIR}/web/engine.wasm"))?;
-    run(&pack_step_for(&sha, external)?)
+    run(&pack_step_for(&sha, external))
 }
 
 /// The external plugins' installers (ci/artifacts.lock: the installers/ rows that are not FL Studio's), the input of build.sh of the OTT wasm.
@@ -655,17 +704,22 @@ fn external_in(dir: &str, names: &[String]) -> Result<bool, String> {
     Ok(true)
 }
 
-/// The OTT wasm (#1337): build.sh reads the installers that `external` put in lift/out-app/external and writes
-/// lift/out-app/plugins/ott/vst-ext.wasm, the lazy file of the bundle (pack.args). The same build as the work chain's.
-/// The bundle runs it only when the installers are there (external_present).
-fn ott_steps() -> Vec<Step> {
-    vec![Step::Run(vec![
-        "bash".into(),
-        format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
-        "ott".into(),
-        format!("{OUT_APP_DIR}/external"),
-        format!("{OUT_APP_DIR}/plugins/ott"),
-    ])]
+/// The external plugins' wasms (#1337 OTT, #1336 Serum 2): build.sh reads the installers that `external` put in lift/out-app/external and writes
+/// lift/out-app/plugins/<name>/vst-ext.wasm, the lazy files of the bundle (pack.args). The same builds as the work chain's.
+/// The bundle runs them only when the installers are there (external_present).
+fn plugin_steps() -> Vec<Step> {
+    ["ott", "serum2"]
+        .iter()
+        .map(|name| {
+            Step::Run(vec![
+                "bash".into(),
+                format!("{HARNESS_DIR}/web/mt1/plugin-worker/build.sh"),
+                name.to_string(),
+                format!("{OUT_APP_DIR}/external"),
+                format!("{OUT_APP_DIR}/plugins/{name}"),
+            ])
+        })
+        .collect()
 }
 
 fn aws_step(args: &[&str]) -> Step {
@@ -721,14 +775,15 @@ fn extract_steps() -> Vec<Step> {
             installer,
             host,
             "--dlls".into(),
-            "ci/extract-dlls.tsv".into(),
+            format!("{}/extract-dlls.tsv", plugins::OUT_DIR),
             "--seed".into(),
-            format!("{HARNESS_DIR}/seeds/vfs-seed-idle1.tsv"),
+            format!("{}/vfs-seed-idle1.tsv", plugins::OUT_DIR),
         ]),
     ]
 }
 
 fn extract() -> Result<(), String> {
+    plugins::generate(false)?;
     for step in &extract_steps() {
         run(step)?;
     }
@@ -747,11 +802,12 @@ fn main() -> ExitCode {
         }
         Some("extract") => extract(),
         Some("external") => external(),
+        Some("tables") => plugins::generate(false),
         Some("bundle") => bundle(),
         Some("upload") => upload(),
         Some("endpoint") => endpoint(),
         _ => {
-            eprintln!("usage: fe-build engine | extract | external | bundle | upload | endpoint");
+            eprintln!("usage: fe-build engine | extract | external | tables | bundle | upload | endpoint");
             return ExitCode::from(2);
         }
     };
@@ -766,7 +822,7 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_in, external_names, external_steps, extract_steps, glue, stage_lines, upload_manifest_step, upload_sync_steps};
+    use super::{blend2d_fetch_with, bundle_plan_steps, engine_plan_lines, external_in, external_names, external_steps, extract_steps, glue, keep_lazies, plan, plugins, stage_lines, upload_manifest_step, upload_sync_steps};
     use std::cell::Cell;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -895,6 +951,19 @@ mod tests {
         assert_eq!(glue(input), expected);
     }
 
+    /// The engine plan for the two fixed dummy plugins (tests/plugins), so that the recorded text does not change when a plugin is added.
+    /// The real plugins only have their stages checked (the names and the order below).
+    #[test]
+    fn the_real_plan_has_its_stages_in_order() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+        std::env::set_current_dir(&root).expect("the repository root");
+        let names: Vec<String> = plan("<bin>").expect("plan").iter().map(|s| s.name.split(" (").next().unwrap_or_default().to_string()).collect();
+        assert_eq!(
+            names,
+            ["plugins", "lists", "lowered-all", "blend2d", "blend2d-compile", "blend2d-archive", "gen", "units", "compile", "hybrid-n0", "link", "wasm-opt", "hybrid"]
+        );
+    }
+
     /// The working directory is the repository root (the plans, ci/artifacts.lock and tools/ are read from there).
     fn at_root() {
         std::env::set_current_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..")).expect("the repository root");
@@ -906,14 +975,23 @@ mod tests {
     #[test]
     fn plans_match_recorded_texts() {
         at_root();
-        let engine = engine_plan_lines("<bin>").expect("engine plan");
+        let dummies: Vec<String> = plugins::read_plugins_from("lift/crates/fe-build/tests/plugins").expect("the dummy plugins").into_iter().map(|d| d.key).collect();
+        let engine = engine_plan_lines("<bin>", &dummies).expect("engine plan");
         assert_eq!(engine.join("\n") + "\n", include_str!("../tests/plan/engine.txt"));
-        let bundle = bundle_plan_steps(SHA, true).expect("bundle plan");
+        let bundle = bundle_plan_steps(SHA, true);
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle.txt"));
-        let bundle = bundle_plan_steps(SHA, false).expect("bundle plan without the external plugins");
+        let bundle = bundle_plan_steps(SHA, false);
         assert_eq!(stage_lines("bundle", &bundle).join("\n") + "\n", include_str!("../tests/plan/bundle-no-external.txt"));
         assert_eq!(stage_lines("extract", &extract_steps()).join("\n") + "\n", include_str!("../tests/plan/extract.txt"));
         assert_eq!(stage_lines("external", &external_steps().expect("external plan")).join("\n") + "\n", include_str!("../tests/plan/external.txt"));
+    }
+
+    #[test]
+    fn external_lazy_files_are_left_out_without_their_installers() {
+        let lazy = |v: &str| [String::from("--lazy-file"), v.to_string()];
+        let args: Vec<String> = [lazy("lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm"), lazy("lift/out-app/xmod/a.wasm=a.wasm")].concat();
+        assert_eq!(keep_lazies(&args, true), args);
+        assert_eq!(keep_lazies(&args, false), lazy("lift/out-app/xmod/a.wasm=a.wasm").to_vec());
     }
 
     #[test]

@@ -31,6 +31,13 @@ int g3_script_idle(uint64_t now, uint64_t next, uint64_t *adv);
 void fle_sys_clock_advance_to(uint64_t ticks);
 /* the async import (a WebAssembly.Suspending function under -sJSPI; harness/web/fruity/fle_idle_lib.js) */
 double fle_idle_wait(double now_ticks, double next_ticks);
+/* Issue #1383: the virtual registry's HKCU tree is kept by the page (runtime/fle_reg.c, reg_journal and fle_reg_restore_saved). These two are the registry's hooks into the page's library
+ * (fle_idle_lib.js: fle_js_reg_put, fle_js_reg_saved; plain synchronous imports). The runtime reaches them weakly, as it reaches fle_input_ring_poll. */
+void fle_js_reg_put(const uint8_t *buf, uint32_t len);
+uint32_t fle_js_reg_saved(uint8_t *buf, uint32_t cap);
+void fle_reg_page_put(const uint8_t *buf, uint32_t len) { fle_js_reg_put(buf, len); }
+uint32_t fle_reg_page_saved(uint8_t *buf, uint32_t cap) { return fle_js_reg_saved(buf, cap); }
+
 /* RING-POLL-BEGIN (tests/gpu7_ring_poll.rs cuts the text between these two markers out of this file and compiles it natively with fake imports) */
 /* Decision 0280 (PROVISIONAL): the page's input ring, read by the scheduler. fle_js_input_poll (fle_idle_lib.js; a plain synchronous import) copies up to `max` records of the Worker's ring into `buf` (8 words each: 0 type 1 mouse / 2 key / 3 display, 1 kind, 2..4 the values of the event as for fle_g3_mouse / fle_g3_key / fle_g3_display, 5 the page's sequence number, 6 the answer of the runtime, 7 unused) and returns the count (0 when
  * the ring is empty: one Atomics.load pair); the runtime queues each with the SAME functions the exports use, writes 1 (queued) or 0 (refused) into word 6, and tells the Worker with fle_js_input_done. No wasm export is called from JS, so nothing re-enters the engine. */

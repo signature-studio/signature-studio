@@ -12,7 +12,6 @@ oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084
 elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3
 # 2026-11-16 (R6-12): the two Fruity plugin DLLs of gen-direct.sh (decision 0313 G9-c) were not extracted by this table, so the gen stage failed in the workflow.
 # Their SHA-256 are those the extractor verified from the installer 26.1.7.5653 (evidence/R6-12.md section 5: extract_fl.py exit 0, "all SHA-256 verified").
-fruity balance_x64.dll	lift/out-plugins/fruity_balance_x64.dll	a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064
 fruity filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
 # 2026-11-17 (R5-6a, decision 0408): Fruity Delay 2, the tenth module. The SHA-256 is the one extract_fl.py verifies from the installer 26.1.7.5653 (evidence/R5-6a.md section 2).
 fruity delay 2_x64.dll	lift/out-plugins/fruity_delay2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc
@@ -185,3 +184,5 @@ Transistor Bass_x64.dll	plugins/Plugins/Fruity/Generators/Transistor Bass/Transi
 Wasp XT_x64.dll	plugins/Plugins/Fruity/Generators/Wasp XT/Wasp XT_x64.dll	561fd51a85f390c6e4753e92fe556894b91073b32d2f6194e6fb2bca26d79e5d
 Wasp_x64.dll	plugins/Plugins/Fruity/Generators/Wasp/Wasp_x64.dll	561fd51a85f390c6e4753e92fe556894b91073b32d2f6194e6fb2bca26d79e5d
 Wave Traveller_x64.dll	plugins/Plugins/Fruity/Generators/Wave Traveller/Wave Traveller_x64.dll	5b3c10affd99582514f9ccef55aa65f162d2e8bdfe3ac545ab5026c1d8a2d7d5
+# 2026-11-25 (#1395): ILSvg_x64.dll, the language DLL of the installer (1,504,256 B). Extracted to lift/out-plugins/ (the place the plugin段 of fe-build reads: plugins.rs host_file); not lifted. When lift/plugins/ilsvg/plugin.tsv adds it, remove this row (the same DLL in two rows is extracted twice).
+ILSvg_x64.dll	lift/out-plugins/ilsvg_x64.dll	92f76fefa88a8a70446492dc755324d2338bf382e11518e6f17d798f11342ba0

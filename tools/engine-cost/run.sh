@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 段階 0 の入口(Issue #1388): 製品のビルド(-Oz)、変種のビルド(O2・O3)、計測(18 run と変種の 12 run)、対照実験、集計を、この順に行う。
 # 各段は、出力が在れば飛ばす(途中で止まっても、続きから行える)。段を指定すると、その段だけ行う: bash tools/engine-cost/run.sh baseline runs-oz variants runs-variants contrast aggregate
+# --quick(Issue #1396): 製品のビルドの後、場面 i・ii・iii を DPR 1.00・n=1 で、窓を 30 秒にして 1 回ずつ測る(runs/Oz/quick-<場面>-dpr1.00-n1.json)。集計は行わない。
 # 製品の wasm は lift/out-app/ の下にしか作らない(git で無視される)。本番の fl-Oz を変種が上書きしない。
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -31,15 +32,15 @@ stage_baseline() {
   say "baseline: done"
 }
 
-# one run: the scene, the DPR, the bundle and its names table, the output. A run with error null is kept; any other is run again (twice at most).
+# one run: the scene, the DPR, the bundle and its names table, the output (its name starts with prefix; window is the extra arguments of measure.mjs). A run with error null is kept; any other is run again (twice at most).
 run_one() {
-  local variant=$1 scene=$2 dpr=$3 n=$4 bundle=$5 names=$6
-  local out="$RUNS/$variant/$scene-dpr$dpr-n$n.json"
+  local variant=$1 scene=$2 dpr=$3 n=$4 bundle=$5 names=$6 prefix=${7:-} window=${8:-}
+  local out="$RUNS/$variant/$prefix$scene-dpr$dpr-n$n.json"
   mkdir -p "$RUNS/$variant"
   if [ -s "$out" ] && grep -q '"error":null' "$out"; then return 0; fi
   for attempt in 1 2; do
-    say "run $variant scene $scene dpr $dpr n $n (attempt $attempt)"
-    node tools/engine-cost/measure.mjs --bundle "$ROOT_DIR/$bundle" --names "$ROOT_DIR/$names" --scene "$scene" --dpr "$dpr" --out "$ROOT_DIR/$out" > /dev/null 2>> "$LOG" || true
+    say "run $variant scene $scene dpr $dpr n $n $window (attempt $attempt)"
+    node tools/engine-cost/measure.mjs --bundle "$ROOT_DIR/$bundle" --names "$ROOT_DIR/$names" --scene "$scene" --dpr "$dpr" --out "$ROOT_DIR/$out" $window > /dev/null 2>> "$LOG" || true
     if [ -s "$out" ] && grep -q '"error":null' "$out"; then return 0; fi
   done
   say "run $variant scene $scene dpr $dpr n $n: failed twice (see $out)"
@@ -54,6 +55,13 @@ stage_runs_oz() {
         run_one Oz "$scene" "$dpr" "$n" "$BASE" "$NAMES"
       done
     done
+  done
+}
+
+# the short check (Issue #1396): the three scenes at DPR 1.00, n=1, with a 30 s window
+stage_quick() {
+  for scene in i ii iii; do
+    run_one Oz "$scene" "$DPR_A" 1 "$BASE" "$NAMES" "quick-" "--window-s 30"
   done
 }
 
@@ -86,11 +94,16 @@ stage_aggregate() {
   node tools/engine-cost/aggregate.mjs
 }
 
+if [ "${1:-}" = "--quick" ]; then
+  [ $# -eq 1 ] || { say "--quick takes no other argument"; exit 2; }
+  set -- baseline quick
+fi
 stages=("$@")
 if [ ${#stages[@]} -eq 0 ]; then stages=(baseline runs-oz variants runs-variants contrast aggregate); fi
 for s in "${stages[@]}"; do
   case "$s" in
     baseline) stage_baseline ;;
+    quick) stage_quick ;;
     runs-oz) stage_runs_oz ;;
     variants) stage_variants ;;
     runs-variants) stage_runs_variants ;;
