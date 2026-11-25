@@ -1,5 +1,5 @@
 // P3 audio probe (Issue #1303): starts the page's AudioContext with CDP Input events (a press and a release on the page's status line, which the browser counts as a user gesture), starts the transport with a Space key, and reads the audio output's numbers (window.__app.audio.detail(): decision 0175 / 0211) over about 10 s. The product is not changed: every input is sent from here, and the start-up consent box is closed with "No thanks" from here too.
-// Usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] > probe.json
+// Usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--make-sound [--shot FILE]] > probe.json
 // --load ui: during the 10 s run the pointer moves over the guest's main window every 50 ms (CDP Input.dispatchMouseEvent), so the engine has UI work to do (#1304). The default is none.
 // --boot (#1334): the start-up window with nothing sent to the guest. The room is 1836x1056 CSS px at DPR 1.7647 (the guest screen is 3240x1863 device px). t0 is the first observation of engine-idle; the one press on the status line (it starts the AudioContext, no guest event) comes before the window; the numbers are read at t0+10 s and t0+70 s. maxRefillStallMs is the engine's own longest interval between two refills of the output ring (fle_audio_transport.c, the Worker's fleAudioWorkerState).
 // --boot options (#1334, only with --boot): --press-at S: the press that starts the AudioContext comes S seconds (0 to 60) after engine-idle (default 0). --trace FILE: every 50 ms in the window, the page's underrun quanta and playing quanta and the engine's WR, RD (frames), publishes and maxPubGapMs, as TSV (tools/p3-audio-probe/trace-stats.mjs reads it). --profile FILE: the CDP CPU profile of the engine's Worker over the window (tools/p3-audio-probe/profile-names.mjs maps its wasm-function[N] to names); the page's main thread is profiled over the same window to FILE with ".main" before its extension (#1352). Both are measurements: they add CDP calls, so their runs are not the acceptance runs.
@@ -11,18 +11,22 @@
 // With a project (Issue #1412): envLog (the engine's environment-block lines, "env: <API> "<name>" <what> <n>", the first 200 of each API, from the start of the run to the end of the open, or to the failure of the open).
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
 // With a project (Issue #1403): missingInInventory (the distinct absolute spellings that a GetFileAttributesW, CreateFileW or FindFirstFileW request found nothing for, which the list has once the absolute root is taken off, and which are not .dll; missingInInventoryFirst10: {api, path} of the first 10), rawVariableProbes ({count, first10}: the distinct %...%\ spellings as the guest wrote them; FL's own probes, not counted in the others). notInInstaller then excludes the %...%\ spellings and the .dll ones. After an error during the open, the same fields are read from the whole log of the open (not only the end tail).
+// Issue #1401: notInInstallerList (every path that notInInstaller counts, not only the first 10; scan-demos.mjs reads it). The wait for the project's title ends at once when the engine is 'exited' or 'error' (the state), not after its 180 s limit.
+// --make-sound (Issue #1401): the sound is made by the FL operations, not read from a project. The room is 1836 x 1056 CSS px at DPR 1 (as tools/smoke/welcome-flow.mjs sets it). The Welcome's usage-data box is closed with "No thanks" and its Default row is double-clicked (flow A of welcome-flow.mjs); the project's "Problems loading the project" box is closed with Enter and the "Remix a song" box with Escape. Then the Channel rack's (TStepSeqForm) Kick row is clicked step by step (the points are fractions of the rack's rectangle); a step is lit when the rectangle's picture changes between the clicks. Then Space starts the transport and the probe reads the audio for 10 s as in a run. makeSound: the steps' result (litSteps, the rack, the boxes, the Basic 808 lines of the engine's log). --shot FILE (a test aid): a PNG of the page after the steps is written to FILE. Not combined with a project, --load or --boot.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 import { armExpression, takeExpression, pcmReport } from './waveform.mjs';
 
-const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]]\n';
+const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]] [--make-sound [--shot FILE]]\n';
 const argv = process.argv.slice(2);
 const boot = argv.includes('--boot');
+const makeSound = argv.includes('--make-sound');
 const li = argv.indexOf('--load');
 const load = li < 0 ? 'none' : argv[li + 1];
 const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile', '--pubs'];
@@ -36,17 +40,20 @@ const pubsPath = valueOf('--pubs') ?? null;
 // #1422: --app <dir> (the page measured; default this repository's app), --sound (the metronome button is pressed after the transport starts: the steps of measure-live.mjs --sound)
 const appRaw = valueOf('--app');
 const soundOn = argv.includes('--sound');
+const shotPath = valueOf('--shot') ?? null;
 const skipped = new Set();
 argv.forEach((a, i) => {
-  if (a === '--boot' || a === '--sound') skipped.add(i);
-  if (a === '--load' || a === '--app' || BOOT_VALUE_OPTS.includes(a)) { skipped.add(i); skipped.add(i + 1); }
+  if (a === '--boot' || a === '--sound' || a === '--make-sound') skipped.add(i);
+  if (a === '--load' || a === '--app' || a === '--shot' || BOOT_VALUE_OPTS.includes(a)) { skipped.add(i); skipped.add(i + 1); }
 });
 const positional = argv.filter((a, i) => !skipped.has(i));
 const pressOk = pressRaw === undefined || (Number.isFinite(pressAt) && pressAt >= 0 && pressAt <= 60);
 const bootOk = !bootOptUsed || boot;
 const valuesOk = BOOT_VALUE_OPTS.every((o) => !argv.includes(o) || (valueOf(o) !== undefined && !valueOf(o).startsWith('--')));
 const appOk = !argv.includes('--app') || (appRaw !== undefined && !appRaw.startsWith('--'));
-if (positional.length < 1 || positional.length > 2 || (load !== 'none' && load !== 'ui') || (boot && (li >= 0 || positional.length !== 1 || soundOn)) || !pressOk || !bootOk || !valuesOk || !appOk) {
+const soundOk = !makeSound || (!boot && li < 0 && !soundOn && positional.length === 1);
+const shotOk = !argv.includes('--shot') || (makeSound && shotPath !== null && !shotPath.startsWith('--'));
+if (positional.length < 1 || positional.length > 2 || (load !== 'none' && load !== 'ui') || (boot && (li >= 0 || positional.length !== 1 || soundOn)) || !pressOk || !bootOk || !valuesOk || !appOk || !soundOk || !shotOk) {
   process.stderr.write(USAGE);
   process.exit(2);
 }
@@ -119,9 +126,9 @@ const pickAudio = (d) => ({ status: d.status, ctxState: d.ctxState, nodeReady: d
 async function main() {
   const t0 = Date.now();
   const out = {
-    startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
-    state: null, standIn: null, error: null, gesture: null, consent: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
-    missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, rootStripped: null, imageReads: null, envLog: null, variableMissing: null,
+    startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : makeSound ? 'make-sound' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
+    state: null, standIn: null, error: null, gesture: null, consent: null, makeSound: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
+    missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, notInInstallerList: null, rootStripped: null, imageReads: null, envLog: null, variableMissing: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
     screenDevicePx: null, dpr: null, profileMain: null, quantaDelta: null, bootLast60sAt10s: null, bootLast60sAt70s: null, bootLast60sAt90s: null, maxRefillStallMs: null, maxRefillStallInWindowMs: null, pubLog: null, publishesInWindow: null, readAtMs: null,
@@ -203,8 +210,13 @@ async function main() {
       return;
     }
 
-    out.consent = await dismissStartupBox(S, ev);
-    log('consent box', out.consent);
+    if (makeSound) {
+      out.makeSound = await makeSoundSteps(S, ev);
+      log('make sound', out.makeSound);
+    } else {
+      out.consent = await dismissStartupBox(S, ev);
+      log('consent box', out.consent);
+    }
 
     if (projectFile !== null) {
       const logBefore = await ev('window.__app.engineLog().length');
@@ -243,8 +255,9 @@ async function main() {
     const p1 = await presentsNow();
     log('from', pickAudio(d0), 'to', pickAudio(d1));
     fromAudio(d1);
-    Object.assign(out, { presentsDelta: p0 === null || p1 === null ? null : p1 - p0, quantaDelta: d1.quantaWhilePlaying - d0.quantaWhilePlaying, underrunDelta: d1.underrunQuanta - d0.underrunQuanta });
+    Object.assign(out, { presentsDelta: p0 === null || p1 === null ? null : p1 - p0, quantaDelta: d1.quantaWhilePlaying - d0.quantaWhilePlaying, underrunDelta: d1.underrunQuanta - d0.underrunQuanta, nonSilentDelta: d1.nonSilentQuanta - d0.nonSilentQuanta });
     if (pcmIdx !== null) Object.assign(out, await takePcm(ev, pcmIdx));
+    if (makeSound) out.makeSound.log = await soundLog(ev);
     if (d1.error) probeError = d1.error;
     out.end = await engineEnd();
   } catch (e) {
@@ -529,7 +542,12 @@ async function openProject(S, ev, file) {
   }
   // the title is the project's name as the guest shows it (its case may differ from the file name), or the "Problems loading the project" box's title while that box is the active window (the box is then the one projectReport reads)
   const title = () => ev('window.__app.pageTitle().title');
-  const opened = async () => { const t = (await title()) ?? ''; return t.toLowerCase().startsWith(stem.toLowerCase()) || PROBLEMS_TITLE.test(t); };
+  const opened = async () => {
+    const st = await ev('window.__app ? window.__app.state : null');
+    if (st === 'exited' || st === 'error') throw new Error(`the engine is ${st} during the open`);
+    const t = (await title()) ?? '';
+    return t.toLowerCase().startsWith(stem.toLowerCase()) || PROBLEMS_TITLE.test(t);
+  };
   try {
     await until(opened, 180000, `the title of ${stem}`);
   } catch (e) {
@@ -711,7 +729,7 @@ function missingBreakdown(lines) {
     missingDistinct: seen.size, dll: dll.length, inventory: inList.length, inventoryList: inList,
     missingInInventory: missing.length, missingInInventoryFirst10: missing.slice(0, MISSING_FIRST),
     rawVariableProbes: { count: rawVariable.size, first10: [...rawVariable.values()].slice(0, MISSING_FIRST) },
-    notInInstaller: notIn.length, notInInstallerFirst10: notIn.slice(0, NOT_IN_INSTALLER_FIRST), rootStripped,
+    notInInstaller: notIn.length, notInInstallerFirst10: notIn.slice(0, NOT_IN_INSTALLER_FIRST), notInInstallerList: notIn, rootStripped,
   };
 }
 
@@ -805,6 +823,171 @@ async function uiLoop(S, ev, stop) {
     await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: Math.round(c.x + 30 * Math.cos(a)), y: Math.round(c.y + 30 * Math.sin(a)), button: 'none', buttons: 0, pointerType: 'mouse' });
     await sleep(UI_STEP_MS);
   }
+}
+
+// Issue #1401 --make-sound: the room (1836 x 1056 CSS px at DPR 1, as tools/smoke/welcome-flow.mjs sets it); the Welcome's usage-data box and its Default row (flow A of welcome-flow.mjs: the offsets from the Welcome window's top-left corner, measured at this room); the Channel rack's Kick row (its fractions of the rack's rectangle, measured from the picture at this room)
+const MS_VIEW = { width: 2176, height: 1092 };
+const ROOM = { w: 1836, h: 1056 };
+const STAGE_TEXT = "(() => { const s = document.getElementById('stage').getBoundingClientRect(); return { sw: s.width, sh: s.height, iw: window.innerWidth, ih: window.innerHeight }; })()";
+const WELCOME_TITLE = /^Welcome to FL Studio/;
+const NO_THANKS_AT = { dx: 512, dy: 307 };
+const LIST_AT = { dx: 235, dy: 180 };
+const DEFAULT_ROW_AT = { dx: 235, dy: 117 };
+const NOTCH = { up: 12, down: 3, delta: 120 };
+const REMIX_CLASS = 'TDemucsForm';
+const RACK_CLASS = 'TStepSeqForm';
+// the Channel rack's Kick row (the first channel): fy is the centre of the row as a fraction of the rack's height; the steps are n points whose centres run from fx0 to fx1 (fractions of the rack's width), spaced evenly. Measured from the picture at this room (the rack at 872, 82, 499 x 246 guest px): the buttons are 16 px apart, the first centre at x 1096, the last at x 1336, the row's centre at y 145.
+const KICK_ROW = { fy: 0.256 };
+const STEPS = { n: 16, fx0: 0.448, fx1: 0.929 };
+const STEP_SETTLE_MS = 150;
+const WELCOME_WAIT_MS = 30000, OPEN_WAIT_MS = 120000, RACK_WAIT_MS = 15000;
+const ESCAPE_VK = 27;
+const WINDOWS_TABLE = '(async () => (await window.__app.deskDumpBase64(false)).windows)()';
+const PICTURE_TEXT = '(async () => { const d = await window.__app.deskDumpBase64(true); return { width: d.width, height: d.height, base64: d.base64 }; })()';
+
+// the calls that the page answers "ask again" to (the picture or the window table is being drawn) are asked again every 100 ms, for up to 15 s
+async function askAgain(fn) {
+  const t0 = Date.now();
+  for (;;) {
+    try {
+      return await fn();
+    } catch (e) {
+      if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 15000) throw e;
+      await sleep(100);
+    }
+  }
+}
+
+/** the window table with the children (Issue #1401): { child, lid, parent, x, y, w, h, cls, text }; a child's x and y are relative to its parent (absolutePosition adds them) */
+function parseTable(text) {
+  return text.split('\n').map((l) => /^(child )?lid (\d+)(?: parent lid (\d+))? at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
+    const cls = /class "([^"]*)"/.exec(m[8]);
+    const cap = /(?:text|title) "([^"]*)"\s*$/.exec(m[8]);
+    return { child: !!m[1], lid: Number(m[2]), parent: m[3] ? Number(m[3]) : null, x: Number(m[4]), y: Number(m[5]), w: Number(m[6]), h: Number(m[7]), cls: cls ? cls[1] : '', text: cap ? cap[1] : '' };
+  });
+}
+
+/** the guest position of a window: a child's position is added to its parents' */
+function absolutePosition(list, win) {
+  let x = win.x, y = win.y, cur = win;
+  while (cur.child && cur.parent !== null) {
+    const up = list.find((w) => w.lid === cur.parent);
+    if (!up) break;
+    x += up.x; y += up.y;
+    cur = up;
+  }
+  return { x, y };
+}
+
+async function tableOf(ev) { return parseTable(await askAgain(() => ev(WINDOWS_TABLE))); }
+
+/** the hash of a rectangle of the guest's picture (4 bytes a pixel): the picture changes when a step is lit */
+function rectHash(picture, rect) {
+  const bytes = Buffer.from(picture.base64, 'base64');
+  const stride = bytes.length / picture.height;
+  const h = createHash('sha1');
+  const x0 = Math.max(0, rect.x), x1 = Math.min(picture.width, rect.x + rect.w);
+  for (let y = Math.max(0, rect.y); y < Math.min(picture.height, rect.y + rect.h); y++) h.update(bytes.subarray(y * stride + x0 * 4, y * stride + x1 * 4));
+  return h.digest('hex');
+}
+
+/** polls fn every POLL_MS until it returns a true value; throws after ms */
+async function pollFor(fn, ms, what) {
+  const t = Date.now();
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() - t >= ms) throw new Error(`timeout ${ms} ms: ${what}`);
+    await sleep(POLL_MS);
+  }
+}
+
+// a wheel of notches over a guest pixel (deltaY: NOTCH.delta down, -NOTCH.delta up)
+async function wheelGuest(S, ev, gx, gy, notches, deltaY) {
+  const { x, y } = await guestPoint(ev, gx, gy);
+  for (let i = 0; i < notches; i++) {
+    await S('Input.dispatchMouseEvent', { type: 'mouseWheel', x, y, deltaX: 0, deltaY, pointerType: 'mouse' });
+    await sleep(300);
+  }
+}
+
+// --make-sound (Issue #1401): the Welcome's "No thanks" and Default row (flow A), the project's boxes, then the Kick row of the Channel rack is clicked step by step. The record (makeSound in the JSON): the room, the Welcome window, the title the project opened with, the boxes closed, the rack's rectangle, clicks, litSteps (the steps whose rectangle's picture changed) and the shot.
+async function makeSoundSteps(S, ev) {
+  const steps = [];
+  const rec = { room: null, welcome: null, opened: null, problemBoxes: 0, remixClosed: null, channelRack: null, stepPoints: STEPS.n, clicks: 0, litSteps: 0, shot: null, steps };
+  await S('Emulation.setDeviceMetricsOverride', { width: MS_VIEW.width, height: MS_VIEW.height, deviceScaleFactor: 1, mobile: false });
+  await sleep(1500);
+  for (let i = 0; i < 4; i++) {
+    const s = await ev(STAGE_TEXT);
+    if (Math.abs(s.sw - ROOM.w) <= 0.5 && Math.abs(s.sh - ROOM.h) <= 0.5) break;
+    await S('Emulation.setDeviceMetricsOverride', { width: Math.round(s.iw + (ROOM.w - s.sw)), height: Math.round(s.ih + (ROOM.h - s.sh)), deviceScaleFactor: 1, mobile: false });
+    await sleep(1500);
+  }
+  rec.room = `${ROOM.w}x${ROOM.h}`;
+  const welcome = await pollFor(async () => (await tableOf(ev)).find((w) => w.cls === WELCOME_CLASS && !w.child) ?? null, WELCOME_WAIT_MS, 'the Welcome window');
+  rec.welcome = { x: welcome.x, y: welcome.y, w: welcome.w, h: welcome.h };
+  await clickGuest(S, ev, welcome.x + NO_THANKS_AT.dx, welcome.y + NO_THANKS_AT.dy);
+  steps.push(`"No thanks" at guest (${welcome.x + NO_THANKS_AT.dx}, ${welcome.y + NO_THANKS_AT.dy})`);
+  await sleep(2500);
+  await wheelGuest(S, ev, welcome.x + LIST_AT.dx, welcome.y + LIST_AT.dy, NOTCH.up, -NOTCH.delta);
+  await wheelGuest(S, ev, welcome.x + LIST_AT.dx, welcome.y + LIST_AT.dy, NOTCH.down, NOTCH.delta);
+  await sleep(400);
+  await clickGuest(S, ev, welcome.x + DEFAULT_ROW_AT.dx, welcome.y + DEFAULT_ROW_AT.dy, 2);
+  steps.push('Default row double-clicked');
+  const opened = await pollFor(async () => {
+    const st = await ev('window.__app ? window.__app.state : null');
+    if (st === 'error' || st === 'exited') throw new Error(`state ${st} while the default project opens`);
+    const title = (await ev('window.__app.pageTitle().title')) ?? '';
+    const welcomeListed = (await tableOf(ev)).some((w) => w.cls === WELCOME_CLASS);
+    return st === 'engine-idle' && title !== '' && !WELCOME_TITLE.test(title) && !welcomeListed ? title : null;
+  }, OPEN_WAIT_MS, 'the default project opens');
+  rec.opened = opened;
+  await sleep(2000);
+  rec.problemBoxes = await dismissProblems(S, ev);
+  await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+  for (let i = 0; i < 3 && (await tableOf(ev)).some((w) => w.cls === REMIX_CLASS); i++) {
+    await tapKey(S, 'Escape', 'Escape', ESCAPE_VK);
+    await sleep(1500);
+  }
+  rec.remixClosed = !(await tableOf(ev)).some((w) => w.cls === REMIX_CLASS);
+  steps.push(`project open: title "${opened}", ${rec.problemBoxes} Problems box(es) closed, Remix box closed ${rec.remixClosed}`);
+  const rack = await pollFor(async () => {
+    const t = await tableOf(ev);
+    const w = t.find((x) => x.cls === RACK_CLASS);
+    return w ? { lid: w.lid, w: w.w, h: w.h, at: absolutePosition(t, w) } : null;
+  }, RACK_WAIT_MS, 'the Channel rack (TStepSeqForm)');
+  const rect = { x: rack.at.x, y: rack.at.y, w: rack.w, h: rack.h };
+  rec.channelRack = { lid: rack.lid, ...rect };
+  const neutral = await ev("(() => { const r = document.getElementById('audio-status').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()");
+  const away = () => S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: neutral.x, y: neutral.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+  for (let i = 0; i < STEPS.n; i++) {
+    const gx = Math.round(rect.x + (STEPS.fx0 + ((STEPS.fx1 - STEPS.fx0) * i) / (STEPS.n - 1)) * rect.w);
+    const gy = Math.round(rect.y + KICK_ROW.fy * rect.h);
+    await away();
+    await sleep(STEP_SETTLE_MS);
+    const before = rectHash(await askAgain(() => ev(PICTURE_TEXT)), rect);
+    await clickGuest(S, ev, gx, gy);
+    await away();
+    await sleep(STEP_SETTLE_MS);
+    const after = rectHash(await askAgain(() => ev(PICTURE_TEXT)), rect);
+    rec.clicks++;
+    if (after !== before) rec.litSteps++;
+  }
+  steps.push(`${rec.clicks} clicks on the Kick row, ${rec.litSteps} lit`);
+  if (shotPath !== null) {
+    const s = await S('Page.captureScreenshot', { format: 'png' });
+    fs.writeFileSync(shotPath, Buffer.from(s.data, 'base64'));
+    rec.shot = shotPath;
+  }
+  return rec;
+}
+
+// --make-sound: the engine's lines about the Default project's sample files (Basic 808 *.wav): how many, how many of them missing-path lines (basic808MissingWav: those for a .wav, which the sample needs), and the first 5 (cut to 200 characters)
+async function soundLog(ev) {
+  const lines = (await ev('window.__app.engineLog()')).map((l) => l.replace(/^\[err\] /, ''));
+  const b = lines.filter((l) => /Basic 808/.test(l));
+  const missing = b.filter((l) => l.startsWith('missing-path:'));
+  return { basic808Lines: b.length, basic808Missing: missing.length, basic808MissingWav: missing.filter((l) => /\.wav"$/i.test(l)).length, basic808First: b.slice(0, 5).map((l) => l.slice(0, 200)) };
 }
 
 await main();
