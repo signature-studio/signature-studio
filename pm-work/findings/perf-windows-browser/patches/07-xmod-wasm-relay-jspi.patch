@@ -1,0 +1,192 @@
+diff --git a/app/src/engine/xmod.ts b/app/src/engine/xmod.ts
+index e5c5479c..fab1c527 100644
+--- a/app/src/engine/xmod.ts
++++ b/app/src/engine/xmod.ts
+@@ -5,10 +5,35 @@
+ // A DLL with no such file is left alone (fle_xmod_load returns 0). Every failure throws: the engine's call stops by the error, never with a guessed answer.
+ import type { LazyFileSource } from './lazy-file.ts';
+ 
+-type Fn = (...args: unknown[]) => unknown;
++type Fn = () => void;
++
++const u32 = (n: number): number[] => { const out = []; do { const b = n & 127; n >>>= 7; out.push(b | (n ? 128 : 0)); } while (n); return out; };
++const str = (s: string): number[] => { const bytes = new TextEncoder().encode(s); return [...u32(bytes.length), ...bytes]; };
++const section = (id: number, body: number[]): number[] => [id, ...u32(body.length), ...body];
++
++// The f_<va> imports use the C ABI: no arguments/results, guest registers in
++// shared memory. A Wasm relay keeps JS frames out of calls that may suspend.
++// Its table is filled when the plugin becomes available, after engine instantiation.
++function forwarders(names: string[]): WebAssembly.Module {
++  const bodies = names.flatMap((_, i) => {
++    const slot = u32(i);
++    if (slot[slot.length - 1]! & 64) { slot[slot.length - 1]! |= 128; slot.push(0); } // i32.const uses signed LEB
++    const body = [0, 0x41, ...slot, 0x11, 0, 0, 0x0b];
++    return [...u32(body.length), ...body];
++  });
++  return new WebAssembly.Module(new Uint8Array([
++    0, 97, 115, 109, 1, 0, 0, 0,
++    ...section(1, [1, 0x60, 0, 0]),
++    ...section(2, [1, ...str('env'), ...str('table'), 1, 0x70, 0, ...u32(names.length)]),
++    ...section(3, [...u32(names.length), ...names.map(() => 0)]),
++    ...section(7, [...u32(names.length), ...names.flatMap((name, i) => [...str(name), 0, ...u32(i)])]),
++    ...section(10, [...u32(names.length), ...bodies]),
++  ]));
++}
+ 
+ export class XmodLoader {
+-  private readonly fns = new Map<string, Fn>();
++  private readonly slots = new Map<string, number>();
++  private table: WebAssembly.Table | null = null;
+   private readonly loaded = new Set<string>();
+   private readonly root: string;
+   private readonly lazy: LazyFileSource[];
+@@ -22,13 +47,12 @@ export class XmodLoader {
+     this.memory = memory;
+   }
+ 
+-  /** the supply of the engine's import env.<name>: the function that the separate module exports under that name (an error while that module is not loaded) */
+-  stub(name: string): Fn {
+-    return (...args: unknown[]) => {
+-      const fn = this.fns.get(name);
+-      if (!fn) throw new Error(`xmod: ${name} is called before its module is loaded`);
+-      return fn(...args);
+-    };
++  /** Bind the engine's imports before it exists, without a JS forwarding frame. Unloaded slots trap. */
++  bind(names: string[]): Record<string, Fn> {
++    if (this.table) throw new Error('xmod: engine imports are already bound');
++    this.table = new WebAssembly.Table({ element: 'anyfunc', initial: names.length });
++    names.forEach((name, i) => this.slots.set(name, i));
++    return new WebAssembly.Instance(forwarders(names), { env: { table: this.table } }).exports as Record<string, Fn>;
+   }
+ 
+   /** fle_xmod_load: the C string at ptr is the DLL's path. 1 when the separate module of that DLL is instantiated (now, or before), 0 when the DLL has none */
+@@ -37,8 +61,9 @@ export class XmodLoader {
+     const ex = this.engineExports();
+     if (!mem || !ex) throw new Error('xmod: the engine has no memory or exports yet');
+     const bytes = new Uint8Array(mem.buffer);
+-    let end = ptr;
+-    while (bytes[end] !== 0) end++;
++    ptr >>>= 0;
++    const end = bytes.indexOf(0, ptr);
++    if (end < 0) throw new Error(`xmod: no terminated module path at ${ptr}`);
+     const dll = new TextDecoder().decode(bytes.slice(ptr, end));
+     const wasmPath = dll.replace(/\.dll$/i, '.wasm');
+     if (wasmPath === dll) return 0;
+@@ -57,7 +82,10 @@ export class XmodLoader {
+       c[i.name] = v;
+     }
+     const inst = new WebAssembly.Instance(mod, { c } as WebAssembly.Imports);
+-    for (const [k, v] of Object.entries(inst.exports)) if (k.startsWith('f_') && typeof v === 'function') this.fns.set(k, v as Fn);
++    for (const [k, v] of Object.entries(inst.exports)) {
++      const slot = this.slots.get(k);
++      if (slot !== undefined && typeof v === 'function') this.table!.set(slot, v);
++    }
+     this.loaded.add(wasmPath);
+     return 1;
+   }
+@@ -66,7 +94,6 @@ export class XmodLoader {
+ /** the engine's imports for the separate modules: the supply of every env.f_<va> the engine imports (the glue may hold a placeholder for an undefined symbol; this replaces it). The engine's call of fle_xmod_load reaches loader.loadAt through the Module hook fleXmodLoad (fruity.ts) */
+ export function installXmod(imports: WebAssembly.Imports, module: WebAssembly.Module, loader: XmodLoader): void {
+   const env = (imports.env ??= {}) as Record<string, unknown>;
+-  for (const i of WebAssembly.Module.imports(module)) {
+-    if (i.module === 'env' && i.kind === 'function' && i.name.startsWith('f_')) env[i.name] = loader.stub(i.name);
+-  }
++  const names = [...new Set(WebAssembly.Module.imports(module).filter((i) => i.module === 'env' && i.kind === 'function' && i.name.startsWith('f_')).map((i) => i.name))];
++  if (names.length) Object.assign(env, loader.bind(names));
+ }
+diff --git a/app/src/plugins/ott-host.ts b/app/src/plugins/ott-host.ts
+index 1e24c430..e441df1e 100644
+--- a/app/src/plugins/ott-host.ts
++++ b/app/src/plugins/ott-host.ts
+@@ -121,8 +121,9 @@ export function createHost(opts: HostOptions): Host {
+       fle_js_publish: () => 0,
+       fle_js_rewrite: () => undefined,
+       fle_js_pulse: () => undefined,
+-      // #1389: the text a plugin copies has no page to go to here, so it is dropped
++      // This worker has no page clipboard bridge: discard writes and return no host text.
+       fle_clip_host_write: () => undefined,
++      fle_clip_host_read: () => 0,
+       __asyncjs__fle_js_wait: () => 2,
+       _emscripten_throw_longjmp: () => {
+         throw new Error('wasm longjmp: not modelled by the plugin worker');
+diff --git a/app/test/unit/xmod.test.ts b/app/test/unit/xmod.test.ts
+new file mode 100644
+index 00000000..810cc619
+--- /dev/null
++++ b/app/test/unit/xmod.test.ts
+@@ -0,0 +1,75 @@
++import { expect, it } from 'vitest';
++import { installXmod, XmodLoader } from '../../src/engine/xmod.ts';
++import { LazyFileFeed, LazyFileSource, makeLazyFileShared } from '../../src/engine/lazy-file.ts';
++
++const u32 = (n: number): number[] => { const out = []; do { const b = n & 127; n >>>= 7; out.push(b | (n ? 128 : 0)); } while (n); return out; };
++const str = (s: string): number[] => [...u32(s.length), ...new TextEncoder().encode(s)];
++const section = (id: number, body: number[]): number[] => [id, ...u32(body.length), ...body];
++
++it('rejects out-of-bounds and unterminated module paths without scanning forever', () => {
++  const memory = new WebAssembly.Memory({ initial: 1 });
++  const loader = new XmodLoader('/data', [], () => ({}), () => memory);
++  new Uint8Array(memory.buffer)[65535] = 120;
++  for (const ptr of [65535, 65536, -1]) expect(() => loader.loadAt(ptr)).toThrow('no terminated module path');
++});
++
++// Each defined function calls one import. The engine calls the lazy plugin,
++// which calls back into the engine's wait function, which suspends asynchronously.
++function fixture(imports: [string, string][], exports: [string, number][]): Uint8Array<ArrayBuffer> {
++  const bodies = exports.flatMap(([, target]) => { const body = [0, 0x10, ...u32(target), 0x0b]; return [...u32(body.length), ...body]; });
++  return new Uint8Array([
++    0, 97, 115, 109, 1, 0, 0, 0,
++    ...section(1, [1, 0x60, 0, 0]),
++    ...section(2, [...u32(imports.length), ...imports.flatMap(([m, n]) => [...str(m), ...str(n), 0, 0])]),
++    ...section(3, [...u32(exports.length), ...exports.map(() => 0)]),
++    ...section(7, [...u32(exports.length), ...exports.flatMap(([name], i) => [...str(name), 0, ...u32(imports.length + i)])]),
++    ...section(10, [...u32(exports.length), ...bodies]),
++  ]);
++}
++
++it('resumes a lazy plugin call that suspends through an engine callback', async () => {
++  const jspi = WebAssembly as typeof WebAssembly & {
++    Suspending: new (fn: () => Promise<void>) => WebAssembly.ImportValue;
++    promising: (fn: WebAssembly.ExportValue) => () => Promise<void>;
++  };
++  const plugin = fixture([['c', 'wait']], [['f_10', 0]]);
++  const shared = makeLazyFileShared('demo.wasm', 'demo.wasm', plugin.length);
++  new LazyFileFeed(shared).deliver(plugin);
++  const memory = new WebAssembly.Memory({ initial: 1 });
++  new Uint8Array(memory.buffer).set(new TextEncoder().encode('/data/demo.dll\0'), 16);
++  let engine: WebAssembly.Instance | null = null;
++  const loader = new XmodLoader('/data', [new LazyFileSource(shared)], () => engine?.exports ?? null, () => memory);
++  const events: string[] = [];
++  const imports: WebAssembly.Imports = { env: { pause: new jspi.Suspending(async () => {
++    events.push('suspend');
++    await Promise.resolve();
++    events.push('resume');
++  }) } };
++  const module = new WebAssembly.Module(fixture([['env', 'f_10'], ['env', 'pause']], [['run', 0], ['wait', 1]]));
++  installXmod(imports, module, loader);
++  engine = new WebAssembly.Instance(module, imports);
++  expect(() => (engine!.exports.run as () => void)()).toThrow();
++  expect(loader.loadAt(16)).toBe(1);
++  expect(loader.loadAt(16)).toBe(1);
++  await expect(jspi.promising(engine.exports.run)()).resolves.toBeUndefined();
++  expect(events).toEqual(['suspend', 'resume']);
++});
++
++it('forwards slots beyond signed LEB boundaries in a large plugin', () => {
++  const names = Array.from({ length: 8193 }, (_, i) => `f_${i.toString(16)}`);
++  const plugin = fixture([['c', 'mark']], names.map((name) => [name, 0]));
++  const shared = makeLazyFileShared('demo.wasm', 'demo.wasm', plugin.length);
++  new LazyFileFeed(shared).deliver(plugin);
++  const memory = new WebAssembly.Memory({ initial: 1 });
++  new Uint8Array(memory.buffer).set(new TextEncoder().encode('/data/demo.dll\0'), 16);
++  let calls = 0;
++  const loader = new XmodLoader('/data', [new LazyFileSource(shared)], () => ({ mark: () => { calls++; } }), () => memory);
++  const probes = [63, 64, 127, 8192];
++  const module = new WebAssembly.Module(fixture(names.map((name) => ['env', name]), probes.map((i) => [`probe_${i}`, i])));
++  const imports: WebAssembly.Imports = {};
++  installXmod(imports, module, loader);
++  const engine = new WebAssembly.Instance(module, imports);
++  loader.loadAt(16);
++  for (const i of probes) (engine.exports[`probe_${i}`] as () => void)();
++  expect(calls).toBe(probes.length);
++});
