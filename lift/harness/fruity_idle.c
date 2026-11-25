@@ -117,6 +117,8 @@ EMSCRIPTEN_KEEPALIVE void fle_g3_snapshot(void) {
 /* a timer made by the host for the window with logical id `lid` (a probe of the G3 record, not a call of the guest: runtime fle_win_host_timer) */
 EMSCRIPTEN_KEEPALIVE int fle_g3_probe_timer(unsigned lid, unsigned id, unsigned ms) { return fle_win_host_timer(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid, id, ms); }
 EMSCRIPTEN_KEEPALIVE void fle_g3_timers(void) { g3_timer_log(stdout); fflush(stdout); }
+/* Issue #1384 (a test aid, called by the measuring tool only): the window with logical id `lid` and its visible descendants are drawn again (fle_win_redraw_tree); the engine paints them at its next message loop */
+EMSCRIPTEN_KEEPALIVE void fle_g3_redraw_tree(unsigned lid) { fle_win_redraw_tree(FLE_WIN_HANDLE_BASE + 4u * (uint64_t)lid); }
 /* C-6 (#1310, a test aid): the window-API trace (window-api: lines on stderr, fle_win.c) on (1) or off (0). Off until the page turns it on, so a start-up writes none of them */
 EMSCRIPTEN_KEEPALIVE void fle_g3_window_api_trace(int on) { fle_win_api_trace_set(on); }
 

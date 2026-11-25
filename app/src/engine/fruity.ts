@@ -238,6 +238,14 @@ export class FruityEngine {
   /** decision 0212: the wasm has the export that tells the guest the display changed (a bundle built before screen1 has none) */
   get hasDisplay(): boolean { return typeof (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_display === 'function'; }
 
+  /** #1384 (a test aid): the window `lid` and its visible descendants are drawn again at the engine's next message loop (fle_g3_redraw_tree); false when the wasm has no such export */
+  redrawTree(lid: number): boolean {
+    const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_redraw_tree;
+    if (typeof f !== 'function') return false;
+    (f as (lid: number) => void)(lid);
+    return true;
+  }
+
   /** Issue #1362: the page's face has loaded the document of a WebView2 navigation; the engine fires its events at its next idle (fle_g3_wv2_loaded, lift/harness/fruity_idle.c). False when the wasm has no such export. */
   wv2Loaded(): boolean {
     const f = (this.instance?.exports as Record<string, unknown> | undefined)?.fle_g3_wv2_loaded;
