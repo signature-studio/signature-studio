@@ -25,6 +25,7 @@
 #define FLE_W32_ERR_HANDLE_EOF          38u
 #define FLE_W32_ERR_FILE_EXISTS         80u
 #define FLE_W32_ERR_INVALID_PARAMETER   87u
+#define FLE_W32_ERR_NOACCESS            998u
 #define FLE_W32_ERR_BUFFER_OVERFLOW     111u
 #define FLE_W32_ERR_INSUFFICIENT_BUFFER 122u
 #define FLE_W32_ERR_INVALID_NAME        123u
@@ -60,6 +61,15 @@
 /* Stops the run: prints "fle: <api>: <why>" and aborts. Used for every input that the Microsoft pages
  * leave undefined (nothing is silently turned into a success). */
 void fle_stop(const char *api, const char *why) __attribute__((noreturn));
+
+/* Issue #1418: a call that the runtime does not model is answered with the Windows failure `value` (the one the Microsoft or Wine
+ * sources give for it) instead of stopping the run. The first call of each `api` (a string literal) prints the line
+ *   fle: warn: <api>: not modelled, returned <value> (caller 0x...)
+ * and every call is counted. The counts go to stderr as one line "fle-warns: {"api":calls,...}" (in the order the APIs were first
+ * warned about, the last line wins for the beacon): when the scheduler is idle (fle_warn_idle, every 64 idle reports) and before a
+ * stop (fle_stop), when they changed since the line was last printed. */
+void fle_warn(const char *api, uint64_t value);
+void fle_warn_idle(void);
 
 /* Argument n (1-based) of the Microsoft x64 call. Arguments 1-4 are in rcx, rdx, r8, r9; argument n >= 5 is at
  * [rsp + 0x28 + 8 * (n - 5)] when the stub starts, because [rsp] holds the guest return address and

@@ -485,6 +485,7 @@ fn driver() -> &'static PathBuf {
             })
             .collect();
         srcs.sort();
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -719,8 +720,8 @@ fn get_file_version_info_w_fails_like_the_size_call_for_a_path_that_is_not_in_th
 #[test]
 fn what_get_file_version_info_w_does_not_define_stops_by_name() {
     aborts(&["fvi", "null", "buf"], "GetFileVersionInfoW: lptstrFilename is NULL");
-    // f_44ada0 asks for "comctl32.dll": a name with no directory part needs the LoadLibrary search sequence, which is not modelled (the size call stops first there)
-    aborts(&["fvi", "comctl32.dll", "buf"], "GetFileVersionInfoW: a file name with no directory part");
+    // f_44ada0 asks for "comctl32.dll": a name with no directory part. Issue #1418: the search sequence is not modelled, the file is not in the current directory: FALSE and ERROR_FILE_NOT_FOUND (2), the data is untouched
+    assert_eq!(lines(&["fvi", "comctl32.dll", "buf"]), ["ret 0 le 2 data untouched".to_string()]);
     // a path that exists in the virtual file system (a directory or a file): no version resource of a virtual file is modelled
     aborts(&["fvi", "C:\\d\\f.dll", "buf", "mkdir=C:\\d", "mkfile=C:\\d\\f.dll"], "GetFileVersionInfoW: the path exists in the virtual file system");
     aborts(&["fvi", "C:\\d", "buf", "mkdir=C:\\d"], "GetFileVersionInfoW: the path exists in the virtual file system");

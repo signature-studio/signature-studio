@@ -136,6 +136,7 @@ fn runtime_sources(rt: &std::path::Path) -> Vec<PathBuf> {
         })
         .collect();
     v.sort();
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
     v
 }
 
@@ -147,7 +148,7 @@ fn clang(name: &str, src: &str, extra_c: &[&str]) -> PathBuf {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"]).arg(&rt);
-    for f in ["fle_modules.c", "fle_imports.c", "fle_string.c", "fle_sys.c"].iter().chain(extra_c) {
+    for f in ["fle_modules.c", "fle_imports.c", "fle_string.c", "fle_sys.c", "fle_env.c"].iter().chain(extra_c) {
         cmd.arg(rt.join(f));
     }
 
