@@ -1,1 +1,24 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+settings/window/f10	window	Settings window (F10): opens, Escape closes, F10 opens it again after a reload	the window TMIDIForm is in the window table; Escape removes it; after a reload F10 opens it again	key F10; Escape; reload (persist)
+settings/choice/general-language	choice	Language drop-down (General > Language)	the list opens (one popup); the chosen language changes the panel's picture; after a reload the engine stops for 7 of 7 languages (expectFail new)	click the Language panel at (60, 30); the item i of the 8 (English, German, Spanish, French, Japanese, Korean, Vietnamese, Chinese)
+settings/choice/display-main-gui-scaling	choice	Main GUI scaling drop-down (General > Display)	the list opens (one popup); Escape closes it	click the Display panel at (40, 40)
+settings/choice/display-pop-ups-scaling	choice	Pop-ups scaling drop-down (General > Display)	the list opens (one popup); the chosen item changes the picture; keeping after a reload is not gated	click the Display panel at (40, 124)
+settings/choice/display-toolbars-scaling	choice	Toolbars scaling drop-down (General > Display)	the list opens; Escape closes it	click the Display panel at (40, 151)
+settings/choice/display-animations	choice	Animations drop-down (General > Display)	the list opens (one popup); the chosen item changes the picture; keeping after a reload is not gated	click the Display panel at (40, 205)
+settings/choice/display-animation-refresh-rate	choice	Animation refresh rate drop-down (General > Display)	the list opens; Escape closes it	click the Display panel at (40, 266)
+settings/choice/display-colorful-waveforms	choice	Colorful waveforms drop-down (General > Display)	the list opens (one popup); the chosen item changes the picture; keeping after a reload is not gated	click the Display panel at (320, 320)
+settings/choice/audio-output-device	choice	Output device drop-down (Audio > Input / output)	the list opens (one popup); the chosen item changes the picture; keeping after a reload is not gated	click the Input / output panel at (100, 40)
+settings/check/display-high-visibility	check	High visibility check box (General > Display)	one click changes the box; keeping after a reload is not gated	click the Display panel at (21, 316)
+settings/check/display-force-refreshes	check	Force refreshes check box (General > Display)	one click changes the box; keeping after a reload is not gated	click the Display panel at (309, 266)
+settings/check/display-transparent-menus	check	Transparent menus check box (General > Display)	one click changes the box; keeping after a reload is not gated	click the Display panel at (309, 287)
+settings/check/input-click-and-hold	check	Click-and-hold check box (General > Input)	one click changes the box; keeping after a reload is not gated	click the Input panel at (21, 65)
+settings/value/debug-log	value	Debug log text (guest memory)	the Debug page's memory text has at least 50 lines of the Startup log, also after a reload	read the guest memory for the start-up markers
+settings/value/info-text	value	Info text (guest memory)	the Info text is in the guest memory	read the guest memory for the Info text marker
+settings/value/about-text	value	About text (guest memory)	the About text is in the guest memory	read the guest memory for the About text marker
+settings/value/data-folder-path	value	Data folder path (Project > Data folder)	the path of the default data folder is in the guest memory	read the guest memory for the path text
+settings/value/midi-output-device	value	MIDI output device list (MIDI > Output)	clicking the first row changes its picture	click the Output list's first row
+settings/value/midi-input-device	value	MIDI input device list (MIDI > Input)	clicking the first row changes its picture	click the Input list's first row
+settings/value/autosave-interval	value	Autosave interval	not covered: the control's place is not in the window table (drawn only); no scenario yet	-
+settings/value/backup-enabled	value	Backup (File > Backup) on/off	not covered: the control's place is not in the window table (drawn only); no scenario yet	-
+settings/value/audio-buffer	value	Audio buffer size (Audio > CPU or Input / output)	not covered: the control's place is not located; no scenario yet	-
+settings/value/ui-scale-window-size	value	UI scale effect on the window size (restart required)	not covered: the check needs the change applied after a restart, and the scale's expected size is not measured yet	-

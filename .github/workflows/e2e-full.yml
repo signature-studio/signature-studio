@@ -1,0 +1,160 @@
+# 全シナリオの E2E(非ゲート)。e2e が成功した後に動く。
+# deploy の前提ではない。設計は pm-work の「20」。
+name: e2e-full
+on:
+  workflow_run: {workflows: [e2e], types: [completed]}
+concurrency: {group: e2e-full, cancel-in-progress: true}
+jobs:
+  shard:
+    name: e2e-full (${{ matrix.area }} ${{ matrix.i }}/${{ matrix.n }})
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {area: page, i: 1, n: 3}
+          - {area: page, i: 2, n: 3}
+          - {area: page, i: 3, n: 3}
+          - {area: input, i: 1, n: 3}
+          - {area: input, i: 2, n: 3}
+          - {area: input, i: 3, n: 3}
+          - {area: file, i: 1, n: 3}
+          - {area: file, i: 2, n: 3}
+          - {area: file, i: 3, n: 3}
+          - {area: menus, i: 1, n: 3}
+          - {area: menus, i: 2, n: 3}
+          - {area: menus, i: 3, n: 3}
+          - {area: windows, i: 1, n: 9}
+          - {area: windows, i: 2, n: 9}
+          - {area: windows, i: 3, n: 9}
+          - {area: windows, i: 4, n: 9}
+          - {area: windows, i: 5, n: 9}
+          - {area: windows, i: 6, n: 9}
+          - {area: windows, i: 7, n: 9}
+          - {area: windows, i: 8, n: 9}
+          - {area: windows, i: 9, n: 9}
+          - {area: audio, i: 1, n: 3}
+          - {area: audio, i: 2, n: 3}
+          - {area: audio, i: 3, n: 3}
+          - {area: settings, i: 1, n: 5}
+          - {area: settings, i: 2, n: 5}
+          - {area: settings, i: 3, n: 5}
+          - {area: settings, i: 4, n: 5}
+          - {area: settings, i: 5, n: 5}
+          - {area: plugins, i: 1, n: 11}
+          - {area: plugins, i: 2, n: 11}
+          - {area: plugins, i: 3, n: 11}
+          - {area: plugins, i: 4, n: 11}
+          - {area: plugins, i: 5, n: 11}
+          - {area: plugins, i: 6, n: 11}
+          - {area: plugins, i: 7, n: 11}
+          - {area: plugins, i: 8, n: 11}
+          - {area: plugins, i: 9, n: 11}
+          - {area: plugins, i: 10, n: 11}
+          - {area: plugins, i: 11, n: 11}
+          - {area: topbar, i: 1, n: 3}
+          - {area: topbar, i: 2, n: 3}
+          - {area: topbar, i: 3, n: 3}
+          - {area: resilience, i: 1, n: 2}
+          - {area: resilience, i: 2, n: 2}
+          - {area: visual, i: 1, n: 3}
+          - {area: visual, i: 2, n: 3}
+          - {area: visual, i: 3, n: 3}
+          - {area: perf, i: 1, n: 2}
+          - {area: perf, i: 2, n: 2}
+          - {area: delivery, i: 1, n: 2}
+          - {area: delivery, i: 2, n: 2}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with: {ref: "${{ github.event.workflow_run.head_sha }}"}
+      - {uses: actions/setup-node@v7.1.0, with: {node-version: 26}}
+      - run: npm ci --prefix app
+      - run: cargo build --release --locked --manifest-path lift/Cargo.toml
+      - run: lift/target/release/fe-build endpoint
+      - name: bundle をキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true",
+          AWS_ACCESS_KEY_ID: "${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}",
+          AWS_SECRET_ACCESS_KEY:
+            "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
+        with:
+          path: |
+            app/dist
+            lift/out-app/bundle
+          key: bundle-${{ github.event.workflow_run.head_sha }}
+          fail-on-cache-miss: true
+      - name: demo の曲のフォルダをキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true",
+          AWS_ACCESS_KEY_ID: "${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}",
+          AWS_SECRET_ACCESS_KEY:
+            "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
+        with:
+          path: lift/out-app/host-extra/resources/Data/Demo projects
+          key: demo-${{ github.event.workflow_run.head_sha }}
+          fail-on-cache-miss: true
+      - name: demo の曲を host/resources に置く
+        run: |
+          mkdir -p lift/out-app/host/resources/Data
+          cp -a "lift/out-app/host-extra/resources/Data/Demo projects" \
+            lift/out-app/host/resources/Data/
+      - name: E2E(依存・実行)
+        run: |
+          (cd tools/e2e && npm ci && npx playwright install chromium)
+          node tools/e2e/run.mjs --area ${{ matrix.area }} \
+            --shard ${{ matrix.i }}/${{ matrix.n }} --budget 35m \
+            --displays 4k-dpr1,4k-dpr2 > "$RUNNER_TEMP/e2e.jsonl"
+      - {if: always(), uses: actions/upload-artifact@v7.0.2,
+        with: {name: "e2e-full-${{ matrix.area }}-${{ matrix.i }}",
+          retention-days: 14, path: "${{ runner.temp }}/e2e.jsonl",
+          if-no-files-found: ignore}}
+  report:
+    name: e2e-full (網羅の表)
+    needs: shard
+    if: always() && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with: {ref: "${{ github.event.workflow_run.head_sha }}"}
+      - {uses: actions/setup-node@v7.1.0, with: {node-version: 26}}
+      - {uses: actions/download-artifact@v7.0.0,
+        with: {pattern: "e2e-full-*", path: "${{ runner.temp }}/results"}}
+      - name: 網羅と結果の表
+        run: |
+          mapfile -t runs < <(find "$RUNNER_TEMP/results" -name '*.jsonl')
+          args=(); for f in "${runs[@]}"; do args+=(--run "$f"); done
+          node tools/e2e/coverage.mjs --features tools/e2e/features \
+            "${args[@]}" --out "$RUNNER_TEMP/coverage.json"
+          jq -rs --slurpfile c "$RUNNER_TEMP/coverage.json" '
+            def pass: .skipped != true and .ok == true and .pageErrors == 0
+              and .consoleErrors == 0 and .failedRequests == 0
+              and .stuckToasts == 0;
+            [.[] as $row | $row.scenarios[] | . + {d: $row.name}] as $s
+            | "| 領域 | シナリオ | 結果 | ok | 印つき | 印なし |"
+              + " 網羅 | 通った / 最小 |",
+              "|---|---:|---:|---:|---:|---:|---:|---:|",
+              ($c[0].perArea | to_entries[] | .key as $a | .value as $v
+                | [$s[] | select(.area == $a)] as $r
+                | [($r | map(.id) | unique | length), ($r | length),
+                   ([$r[] | select(pass)] | length),
+                   ([$r[] | select(.expectFail != null and (pass | not))]
+                     | length),
+                   ([$r[] | select(.expectFail == null and (pass | not))]
+                     | length)] | map(tostring) as $n
+                | "| \($a) | \($n | join(" | "))"
+                  + " | \($v.covered)/\($v.features) (\($v.ratio))"
+                  + " | \($v.scenarios) / \($v.min.scenarios) |"),
+              "",
+              "印なしの失敗(シナリオと表示):",
+              ([$s[] | select(.expectFail == null and (pass | not))
+                | "- \(.id) (\(.d))"] | .[:60][])
+          ' "${runs[@]:-/dev/null}" >> "$GITHUB_STEP_SUMMARY"
+      - {if: always(), uses: actions/upload-artifact@v7.0.2,
+        with: {name: e2e-full-coverage, retention-days: 14,
+          path: "${{ runner.temp }}/coverage.json"}}
+      - name: 網羅の判定
+        run: jq -e -f tools/e2e/judge-coverage.jq "$RUNNER_TEMP/coverage.json"
