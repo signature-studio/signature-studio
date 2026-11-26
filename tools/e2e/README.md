@@ -76,7 +76,7 @@ export default defineScenario({
 | file | `new-project-empty`・`menu-first-item-chosen`・`open-box-shows` |
 | menus | `file-popup-opens`・`edit-popup-opens`・`down-moves-highlight` |
 | windows | `f8-opens-plugin-list`・`main-form-present`・`right-click-mixer-menu` |
-| audio | `output-starts-on-click`(通る)・`quanta-while-open`・`no-underrun-while-idle`(印 `new`、後述) |
+| audio | `output-starts-on-click`・`quanta-while-open`・`no-underrun-while-idle`(#1491 で通るようにした。下の「音声の領域」) |
 | settings | `f10-opens-midi-settings`・`pages-listed`・`sections-under-midi` |
 | plugins | `balance-lazy-entry`・`sytrus-lazy-entry`・`manifest-lists-plugins` |
 | topbar | `menu-bar-visible`・`toolbar-panels-present`・`control-bar-present` |
@@ -101,12 +101,20 @@ export default defineScenario({
 - `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
 - 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
 - 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+## 音声の領域(#1491)
+
+- `tools/e2e/lib/audio.mjs`: 操作と読み取りの共通部品と、判定(`CHECKS`)。各シナリオ(`scenarios/audio/`)は、判定の名前と引数を `runCheck` に渡す。
+- 読み方: 装置(`deviceState` と量子)は、エンジンの起動から再生中であり、無音でも量子を取る。**トランスポートが動いているかは、上部バーの時刻表示の画素(`TIME_REGION`)が動くこと、または非無音の量子が増えること**で見る(`isPlaying`)。量子の数だけでは再生を判定できない。
+- 途切れ(underrun)は、再生の窓の前に 1.5 秒の warm-up を置き、その後の窓で数える(`underrunQuanta` の差)。
+- 位置(`PLACE`)は、3840 x 2160 のゲストの画素(4k-dpr1)。期待値ではなく、押す場所。
+- 機能の表 `features/audio.tsv`(43 件)のうち、覆えたものは 34 件(79%)。覆えていないのは 9 件: 拍子・ソロ・ルーティング・パン・Export の wav の 2 件(操作を確かめていない)と、録音の待機(印 `new`)に依る 3 件(録音のボタン・録音の再生・カウントインの音)。
+- 印 `new` の 7 本: `record-arm-then-play`・`count-in-clicks-before-record`・`record-button-toggle`・`record-button-toggle-wide`(録音の待機で Space が再生を始めない・ボタンの画素が変わらない)、`cycles-3`・`repeat-12288`・`master-fader-down-200`(前の録音の場面の後に音が無い・フェーダーが既に下がっていた。原因は未確認)。
 
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
 - 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。通ったら標準エラーに警告を出す(`judge.jq`)。
-- `new` の印を付けた見本: `audio/quanta-while-open`・`audio/no-underrun-while-idle`。音声のワークレットは読み込まれる(`nodeReady` が真。`audio/output-starts-on-click` は通る)が、音声の標本(クォンタ)が測った間に増えない(`quanta +0`)。試験の環境の音声出力か製品かは未確認。印は、原因を見て Issue を起こし、外す。
+- 音声の領域(#1491)の印 `new` の 7 本は、`audio/record-arm-then-play` ほか(音声の領域の節を見る)。`audio/quanta-while-open` と `audio/no-underrun-while-idle` は、旧い印の原因が、測り方(`quantaWhileOpen` は再生の量子を含まない)だったため、印を外した。
 - ワークレットの読み込みは、以前は HTTP 403 だった(Worker の Access の検査が、ワークレットの要求にトークンのヘッダーを付けられていなかった)。試験の中継(`lib/delivery.mjs` の `startAccessProxy`)が、トークンの無い要求にだけ付けて直した。
 
 ## 機能の一覧(`inventory.mjs`)と網羅率(`coverage.mjs`)

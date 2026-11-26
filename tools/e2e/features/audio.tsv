@@ -1,1 +1,44 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+audio/output/worklet-loaded	output	出力のワークレット(fle-out)が読み込まれる	nodeReady が真で、error が無い	detail().nodeReady, error
+audio/output/context-running	output	最初の操作の後、AudioContext が動く	ctxState が running、status が running	detail().ctxState, status
+audio/output/sample-rate	output	出力の標本レートが設定の値と一致する	context と ring の rate が設定の値と同じ	audio.opts.sampleRate, ctx.sampleRate, counters().rate
+audio/output/device-playing	output	再生の操作で、出力の装置が playing になる	トランスポートが動き、deviceState が playing	detail().deviceState と時刻表示の画素
+audio/output/keeps-after-stop	output	停止の後も出力は量子を取り続け、トランスポートは止まる	停止の後も量子が増え、欠けが 0、トランスポートの表示は動かない	quanta の差・underrunQuanta の差・時刻表示の画素
+audio/output/quanta-while-open	output	出力を開いている間、量子を取り続ける	量子(開いている + 再生中の合計)が増える	detail().quantaWhileOpen + quantaWhilePlaying
+audio/output/no-gap	output	再生中、エンジンの書き込みの穴が増えない	engineGapFrames と engineSkippedFrames の差が 0	detail().engineGapFrames, engineSkippedFrames
+audio/output/fill-margin	output	再生中、読み出しの先の余裕が 1 量子(128)以上	fill() の最小が 128 以上	audio.fill() の標本
+audio/output/latency	output	Space から最初の非無音の量子までの遅延	1000 ms 以内(lib/audio.mjs の LATENCY_BOUND_MS)	performance.now と nonSilentQuanta の増え
+audio/output/resume-after-stop	output	停止の後の開始で、また音が出る	各開始の非無音の増えが 20 より大きい	nonSilentQuanta の差
+audio/transport/play	transport	Space で再生が始まる	再生の量子(playing)が増える	quantaWhilePlaying の差
+audio/transport/stop	transport	Space で停止し、再生の量子が止まる	停止の後の playing の差が 0	quantaWhilePlaying の差
+audio/transport/pause-resume	transport	停止して、もう一度開始すると再開する	停止中は playing が増えず、再開後は増える	quantaWhilePlaying の差
+audio/transport/record-toggle	transport	録音ボタンで録音の待機が切り替わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(録音のボタン)
+audio/transport/record-play	transport	録音を待機にして Space を押すと再生が始まる	再生の量子が増える	quantaWhilePlaying の差
+audio/transport/count-in-toggle	transport	カウントインのボタンで状態が変わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(カウントインのボタン)
+audio/transport/count-in-clicks	transport	カウントイン(録音の前の拍)が音になる	録音待機で Space の後、4 秒以内に非無音になる	nonSilentQuanta の増え
+audio/transport/pattern-song	transport	PAT と SONG の切り替え	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(PAT/SONG)
+audio/transport/song-play	transport	Song モードで再生が始まる	再生の量子が増える	quantaWhilePlaying の差
+audio/transport/pattern-play	transport	Pattern モードで再生が始まる	再生の量子が増える	quantaWhilePlaying の差
+audio/transport/loop-toggle	transport	上部バーのループのボタンで状態が変わる	ボタンの画素が変わり、二回目で戻る(ボタンの役は未確認)	pixelHashRegion(ループのボタン)
+audio/transport/tempo-change	transport	テンポの値が変わる	テンポの箱の画素が変わる(ホイールで 3 目盛り)	pixelHashRegion(テンポの箱)
+audio/transport/tempo-speed	transport	テンポを下げると拍が減り、上げると増える	8 秒のクリック数が、回した向きに従う	キャプチャの立ち上がり(onset)の数
+audio/transport/time-signature	transport	拍子を変えると拍の数が変わる	(未覆: 拍子の部品を特定していない)	—
+audio/metronome/on	metronome	メトロノームを入れると、再生中に音が出る	非無音が 20 量子より多く増え、途切れが 0	nonSilentQuanta, underrunQuanta
+audio/metronome/off	metronome	メトロノームを切ると、再生は続くが音は消える	非無音が 2 量子以下、再生の量子は増える	nonSilentQuanta, quantaWhilePlaying
+audio/metronome/button-changes	metronome	メトロノームのボタンで表示が変わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(メトロノームのボタン)
+audio/underrun/idle	underrun	アイドルで途切れが 0	途切れの差が 0 で、量子が増える	detail().underrunQuanta
+audio/underrun/playing	underrun	再生中(音あり)で途切れが 0	再生後の途切れの差が 0(warm-up の後)	detail().underrunQuanta
+audio/underrun/mouse-1000hz	underrun	マウス移動 1000 Hz の下で途切れが 0	途切れの差が 0。送った移動が目標の半分以上	underrunQuanta と mouseStorm の達成 Hz
+audio/underrun/cycles	underrun	開始と停止を繰り返しても、再生中の途切れが 0	各回の途切れの差が 0	underrunQuanta の差(回ごと)
+audio/pcm/repeat	pcm	同じ音の繰り返し(lag 8192 など)の割合が小さい	割合が 0.01 未満(比較の数 1000 以上)	pcmRepeat8192 と pcmNeighbors
+audio/pcm/capture-valid	pcm	8 秒の出力の取り込みに欠けが無い	pcmCaptureValid が真、フレーム数が 0 より多い	pcmCaptureValid, pcmCaptureFrames
+audio/pcm/finite	pcm	取り込んだ標本が全て有限の数	pcmNonFiniteSamples が 0	pcmNonFiniteSamples
+audio/pcm/beat-clicks	pcm	メトロノームのクリックの数が、テンポに従う	(transport/tempo-speed と同じ読み)	キャプチャの立ち上がり(onset)の数
+audio/volume/master-fader	volume	マスターのフェーダーで出力の大きさが変わる	下げると peak が 0.8 倍未満、上げると rms が増える	キャプチャの peak と rms
+audio/mute/master-led	mute	マスターの LED で出力が消え、戻すと鳴る	消えた間の非無音が 2 以下、戻すと 20 より多く増える	nonSilentQuanta
+audio/mute/channel-led	mute	チャンネルの LED で表示が変わる	画素が変わり、二回目で戻る(音は測っていない)	pixelHashRegion(チャンネルの LED)
+audio/solo/insert-1	solo	インサートのソロで、他のチャンネルの音が消える	(未覆: ソロの操作を確かめていない)	—
+audio/route/insert-output	route	ミキサーの出力先を変えると、音の経路が変わる	(未覆: 出力先の操作を確かめていない)	—
+audio/pan/master	pan	パンを変えると左右の比が変わる	(未覆: パンのつまみを特定していない)	—
+audio/export/wav-nonsilent	export	Export の wav の出力が非無音	(未覆: 保存の窓の応答を扱っていない)	—
+audio/export/wav-length	export	wav の長さが再生の長さと合う	(未覆: 同上)	—

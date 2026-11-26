@@ -6,7 +6,7 @@ const AT_STATUS = "(() => { const e = document.getElementById('status') || docum
 
 export default defineScenario({
   id: 'audio/output-starts-on-click',
-  covers: ['page/module/audio-start'],
+  covers: ['page/module/audio-start', 'audio/output/context-running'],
   async run({ guest }) {
     const c = await guest.ev(AT_STATUS);
     await guest.move(c);
