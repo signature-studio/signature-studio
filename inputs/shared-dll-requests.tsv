@@ -1,0 +1,12 @@
+dll	guest	trigger	count	stoppedAfter
+dsp_ippv2_x64.dll	Shared\dsp_ippv2_x64.dll	start/boot	136	false
+QuickFontCache_x64.dll	Shared\QuickFontCache_x64.dll	start/boot	228	false
+Blend2D.dll	Shared\Blend2D.dll	start/boot	92	false
+freetype_x64.dll	Shared\freetype_x64.dll	start/boot	44	false
+ILTools_x64.dll	Shared\ILTools_x64.dll	start/boot	48	false
+FLEngine_x64.dll	FLEngine_x64.dll	start/boot	87	false
+wavpackdll_x64.dll	Shared\wavpackdll_x64.dll	start/welcome-default	60	false
+ILVideo_x64.dll	Shared\ffmpeg\x64\ILVideo_x64.dll	start/welcome-default	70	false
+LAMEenc_x64.dll	Shared\LAMEenc_x64.dll	file-9/file-9-1	10	true
+oggio_x64.dll	Shared\oggio_x64.dll	file-9/file-9-2	4	false
+Reverb_x64.dll	Shared\Reverb_x64.dll	tools/tools-4	5	true

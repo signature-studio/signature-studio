@@ -8,8 +8,10 @@ import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
 const repo = process.env.GH_REPO || process.env.GITHUB_REPOSITORY;
-const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
-const api = (path) => JSON.parse(gh('api', path));
+// 既定の maxBuffer(1 MB)では、閉じた Issue のブロッカーの一覧(本文を含む)が ENOBUFS になる。読む項目は --jq で絞る。
+const maxBuffer = 256 * 1024 * 1024;
+const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8', maxBuffer, stdio: ['ignore', 'pipe', 'inherit'] });
+const api = (path, jq) => JSON.parse(gh('api', path, ...(jq ? ['--jq', jq] : [])));
 const names = (issue) => new Set((issue.labels ?? []).map((l) => l.name));
 const log = (message) => process.stderr.write(`select: ${message}\n`);
 
@@ -26,10 +28,10 @@ function reason(issue, { openBlockers, subIssues }, retry) {
 }
 
 function state(n) {
-  const issue = api(`repos/${repo}/issues/${n}`);
+  const issue = api(`repos/${repo}/issues/${n}`, '{number, state, pull_request, type, labels: [.labels[]? | {name}]}');
   if (issue.pull_request) return { issue, openBlockers: 0, subIssues: 0 };
-  const blocked = api(`repos/${repo}/issues/${n}/dependencies/blocked_by?per_page=100`);
-  const subs = api(`repos/${repo}/issues/${n}/sub_issues?per_page=100`);
+  const blocked = api(`repos/${repo}/issues/${n}/dependencies/blocked_by?per_page=100`, '[.[] | {number, state}]');
+  const subs = api(`repos/${repo}/issues/${n}/sub_issues?per_page=100`, '[.[] | {number}]');
   return { issue, openBlockers: blocked.filter((b) => b.state === 'open').length, subIssues: subs.length };
 }
 
@@ -56,7 +58,7 @@ function candidates(eventName, event) {
     return { numbers: [event.issue.number], retry: /^\/retry(\s|$)/.test(event.comment.body.trimStart()) };
   }
   if (event.action === 'closed') {
-    const blocking = api(`repos/${repo}/issues/${event.issue.number}/dependencies/blocking?per_page=100`);
+    const blocking = api(`repos/${repo}/issues/${event.issue.number}/dependencies/blocking?per_page=100`, '[.[] | {number}]');
     return { numbers: blocking.map((b) => b.number), retry: false };
   }
   return { numbers: [event.issue.number], retry: false };
