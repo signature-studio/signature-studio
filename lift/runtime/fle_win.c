@@ -1087,6 +1087,51 @@ uint32_t fle_win_buffered_paint_init_count(void)
     return buffered_paint_init_count;
 }
 
+/* imm32 (Issue #1370, provisional): the seven IME functions that FLEngine delay-loads. The answer is that of a Windows with no IME: there is no
+ * input context, so ImmGetContext gives NULL (Learn: "If the function fails, the return value is NULL"), and the BOOL functions give FALSE (Learn: "If the
+ * function fails, the return value is zero"). ImmGetConversionStatus writes nothing through its pointers (it fails). No IME state is modelled. */
+void fle_imp_ImmGetContext(void)
+{
+    fle_win_check_thread("ImmGetContext");
+    R[0] = 0;
+}
+
+void fle_imp_ImmReleaseContext(void)
+{
+    fle_win_check_thread("ImmReleaseContext");
+    R[0] = 0;
+}
+
+void fle_imp_ImmAssociateContextEx(void)
+{
+    fle_win_check_thread("ImmAssociateContextEx");
+    R[0] = 0;
+}
+
+void fle_imp_ImmIsIME(void)
+{
+    fle_win_check_thread("ImmIsIME");
+    R[0] = 0;
+}
+
+void fle_imp_ImmGetConversionStatus(void)
+{
+    fle_win_check_thread("ImmGetConversionStatus");
+    R[0] = 0;
+}
+
+void fle_imp_ImmSetConversionStatus(void)
+{
+    fle_win_check_thread("ImmSetConversionStatus");
+    R[0] = 0;
+}
+
+void fle_imp_ImmSetOpenStatus(void)
+{
+    fle_win_check_thread("ImmSetOpenStatus");
+    R[0] = 0;
+}
+
 /* user32!CreateWindowExW; see fle_win.h for the arguments. Learn: a handle to the new window on success, NULL on failure
  * (GetLastError, no value given: not touched); "sends WM_NCCREATE, WM_NCCALCSIZE, and WM_CREATE messages to the window being
  * created" before it returns (and, Managing Application State, WM_NCCREATE before WM_CREATE); WM_NCCREATE: "return TRUE to

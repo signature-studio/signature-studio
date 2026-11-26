@@ -20,7 +20,7 @@
 
 use crate::Text;
 use iced_x86::{Decoder, DecoderOptions, FlowControl, Instruction, Mnemonic, OpKind, Register};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 const SAVES: [(Register, i64); 8] = [
     (Register::RBX, 0x10),
@@ -143,6 +143,13 @@ pub struct Landing {
     pub call_va: u64,
     /// The call target (the `setjmp` or its trampoline).
     pub callee: u64,
+}
+
+/// The function entries that hold a `call` of the guest's `setjmp` (a landing's call, `functions`: `Analysis::functions`). A plug-in's
+/// `omit` list takes them (Issue #1370): their code is lifted in C, where the landing is registered, not as a direct wasm function.
+pub fn caller_entries(functions: &BTreeMap<u64, Vec<u64>>, landings: &BTreeMap<u64, Landing>) -> BTreeSet<u64> {
+    let calls: BTreeSet<u64> = landings.values().map(|l| l.call_va).collect();
+    functions.iter().filter(|(_, vas)| vas.iter().any(|va| calls.contains(va))).map(|(&entry, _)| entry).collect()
 }
 
 /// Every landing of the instructions `insns` (the closure of a run), keyed by its VA (the return address of the `call`).

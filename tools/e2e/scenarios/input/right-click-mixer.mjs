@@ -3,11 +3,13 @@ import { defineScenario } from '../../lib/scenario.mjs';
 import { absoluteRect, childrenOfClass } from '../../lib/dump.mjs';
 import { closeNew, newWindows, openLids, windowTable } from '../../lib/common.mjs';
 import { sleep } from '../../lib/flow.mjs';
+import * as I from '../../lib/input.mjs';
 
 export default defineScenario({
   id: 'input/right-click-mixer',
-  covers: ['windows/popup/right-click-mixer'],
+  covers: ['input/mouse/right-click'],
   async run({ guest }) {
+    await I.ensureMixer(guest);
     const t = await windowTable(guest);
     const w = childrenOfClass(t, ['TFXForm']).find((c) => c.vis);
     if (!w) return { ok: false, notes: ['no shown Mixer in the window table'] };

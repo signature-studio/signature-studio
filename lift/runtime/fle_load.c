@@ -52,7 +52,10 @@
 /* Names (lower-case, with extension) that are not loaded in the virtual process and that this environment is
  * defined to lack: exactly the nine DLLs that the PE only delay-loads, which decision 0015 (PM) already says are
  * "not loaded" (GetModuleHandleW gives 126 for them): dwmapi, imm32, msimg32, propsys, rpcrt4, shcore, uxtheme,
- * windowscodecs, wtsapi32. Nothing else is added here: a Windows DLL that decision 0015 does not name (ws2_32,
+ * windowscodecs, wtsapi32. Issue #1370 reviews the decision for imm32: a Windows has imm32.dll (the IME library). An earlier run
+ * (run 45452762437) took LoadLibraryW 126 for it and then ExitProcess; that was not seen again on main 7fc24d8f (the Balance scene
+ * ends engine-idle), so the cause is not confirmed. imm32.dll is virtual module N = 43 now (fle_modules.c), with its seven
+ * delay-loaded functions answered as a Windows with no IME does (fle_win.c), so it is taken out of this list. Nothing else is added here: a Windows DLL that decision 0015 does not name (ws2_32,
  * mswsock, psapi, riched20, urlmon, ...) and every plug-in or tool DLL stops the run (case 3 above), because a
  * "does not exist" answer for it would be a claim about the environment that nobody has decided.
  * (Decision 0088 made avrt.dll and powrprof.dll virtual modules, N = 31, 32; the other ten names it lists, these
@@ -68,7 +71,7 @@
  * WebView2Loader.dll" differs from a real installation (where the loader is in the application directory). Withdrawn when a module lane (M2) loads the product's DLLs or a WebView2 model exists.
  * Issue #1355 withdrew it: webview2loader.dll is a virtual module now (fle_modules.c, N = 42), and its exports are modelled by fle_webview2.c (the record of what FLEngine hands to WebView2).) */
 static const char *const fle_load_absent[] = {
-    "imm32.dll", "msimg32.dll", "propsys.dll",
+    "msimg32.dll", "propsys.dll",
     "windowscodecs.dll",
 };
 #define LOAD_ABSENT_N (sizeof fle_load_absent / sizeof fle_load_absent[0])

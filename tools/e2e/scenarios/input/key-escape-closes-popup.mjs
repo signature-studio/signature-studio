@@ -5,7 +5,7 @@ import { sleep } from '../../lib/flow.mjs';
 
 export default defineScenario({
   id: 'input/key-escape-closes-popup',
-  covers: ['menus/menu/file'],
+  covers: ['input/key/escape'],
   async run({ guest }) {
     const base = await openLids(guest);
     await openMenu(guest, 'File');
