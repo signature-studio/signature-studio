@@ -571,17 +571,15 @@ static void check_component(const char *api, vpath *v, const uint16_t *c, size_t
     if (is_device(c, cl)) fle_stop(api, "reserved device name in a path (devices are not implemented)");
 }
 
-static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath *v)
+/* the path s (len units) is read; v takes ownership of s (vp_free frees it) */
+static void parse_units(const char *api, uint16_t *s, size_t len, int wild_last_ok, vpath *v)
 {
-    size_t len, i;
-    uint16_t *s;
+    size_t i;
 
     v->n = 0;
     v->trail = 0;
     v->wild = 0;
     v->bad = 0;
-    v->own = NULL;
-    s = fle_w_read_alloc(api, guest, MAX_PATH_UNITS, &len);
     v->own = s;
     v->olen = len;
     if (len == 0) fle_stop(api, "empty path is not defined");
@@ -619,6 +617,14 @@ static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath 
         }
         i = j + 1;
     }
+}
+
+static void parse_path(const char *api, uint64_t guest, int wild_last_ok, vpath *v)
+{
+    size_t len;
+    uint16_t *s = fle_w_read_alloc(api, guest, MAX_PATH_UNITS, &len);
+
+    parse_units(api, s, len, wild_last_ok, v);
 }
 
 /* 0 found; 2 the last component is missing (its directory exists); 3 an earlier component is missing or is a
@@ -2144,11 +2150,14 @@ void fle_imp_GetSystemDirectoryW(void)
  * Any other path: as before (decision 0098). This environment's file system holds only what the guest created (decision 0018), so a path that does not name a file there has no version
  * information: the answer is the failure the file system gives for that path (the same 2 or 3 as GetFileAttributesW), with *lpdwHandle set to zero. The guest's callers treat a size of 0 as "no version
  * information" (f_651ce0, f_44ada0). The page does not say if lpdwHandle is written when the call fails: it is written in every case (inference from "sets to zero").
- * Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is modelled). Issue #1418: a name with no
- * directory part is answered as a missing file (FALSE, ERROR_FILE_NOT_FOUND, warned once; the search sequence is #1415), an empty name is ERROR_BAD_PATHNAME (161). */
+ * #1415: a name with no directory part is searched in the LoadLibrary order (version_path, fle_load_find_file): the file it finds is the answer's path (the engine's own file, or a virtual file, which stops by
+ * name with its path); none found is ERROR_FILE_NOT_FOUND (2) and a log line (decision 0098: the volume holds the files; a module of the table has none). An empty name is ERROR_BAD_PATHNAME (161) (Issue #1418).
+ * Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is modelled). */
 /* Decision 0129: the RT_VERSION of the lifted DLL is read by fle_res.c. A weak reference, as fle_cursor.c has for fle_cursor_load_named (decision 0125): a build that does not link fle_res.c (most test drivers of
  * this file) stops by name for the engine path instead of failing to link. */
 extern int fle_res_version_block(const char *api, uint64_t *va, uint32_t *size) __attribute__((weak));
+/* #1415: the search of a name with no directory part (fle_load.c, the LoadLibrary order). Weak, as fle_res_version_block: a link without fle_load.c stops by name for such a name. */
+extern uint16_t *fle_load_find_file(const char *api, const uint16_t *u, size_t n) __attribute__((weak));
 
 static int is_engine_path(const uint16_t *s, size_t len)
 {
@@ -2161,40 +2170,92 @@ static int is_engine_path(const uint16_t *s, size_t len)
     return 1;
 }
 
+/* #1415: the path that a version call answers for. A name with a directory part is the path as the guest wrote it (*path, a copy, freed by the caller). A name with none is the file that the LoadLibrary search
+ * finds (fle_load_find_file: the same order as LoadLibraryW). When the search finds none, the call fails with ERROR_FILE_NOT_FOUND (a missing file: the log line says so, as for any missing path). An empty name is
+ * ERROR_BAD_PATHNAME (161): Wine (dlls/kernelbase/version.c, GetFileVersionInfoSizeExW). Returns 0 with *path set, else the Windows error. */
+static uint32_t version_path(const char *api, uint64_t guest, uint16_t **path, size_t *plen)
+{
+    uint16_t *s = fle_w_read_alloc(api, guest, MAX_PATH_UNITS, plen);
+    size_t i;
+    int dir_part = 0;
+
+    if (*plen == 0) {
+        free(s);
+        return FLE_W32_ERR_BAD_PATHNAME;
+    }
+    for (i = 0; i < *plen; i++)
+        if (is_sep(s[i]) || s[i] == ':') dir_part = 1;
+    if (dir_part) {
+        *path = s;
+        return 0;
+    }
+    if (!fle_load_find_file) fle_stop(api, "a file name with no directory part, and the loader's search is not linked (fle_load.c, decision 0233)");
+    *path = fle_load_find_file(api, s, *plen);
+    if (*path == NULL) {
+        fle_vfs_note_missing(api, FLE_W32_ERR_FILE_NOT_FOUND, s, *plen);
+        free(s);
+        return FLE_W32_ERR_FILE_NOT_FOUND;
+    }
+    free(s);
+    *plen = fle_w_len(*path);
+    return 0;
+}
+
+/* the UTF-16 path as ASCII for a message: a unit above 0x7F is '?' */
+static void path_ascii(char *out, size_t cap, const uint16_t *w)
+{
+    size_t i;
+    for (i = 0; w[i] && i + 1 < cap; i++) out[i] = w[i] < 0x80 ? (char)w[i] : '?';
+    out[i] = 0;
+}
+
+/* a path of the virtual volume that is not the engine's own: a path that is not there gives the file system's error (fail, 2 or 3); a path that is there is a stop that names it (no version resource of a
+ * virtual file is modelled, decision 0098). */
+static void version_volume(const char *api, uint16_t *p, size_t plen)
+{
+    vpath v;
+    fle_node *n, *par;
+    uint32_t st;
+    char shown[MAX_PATH_UNITS + 1], why[MAX_PATH_UNITS + 160];
+
+    path_ascii(shown, sizeof shown, p);
+    parse_units(api, p, plen, 0, &v);
+    if (v.bad) {   /* #1382: a colon in a directory component: ERROR_INVALID_NAME (123), as the other path calls answer */
+        vp_free(&v);
+        fail(FLE_W32_ERR_INVALID_NAME, 0);
+        return;
+    }
+    st = lookup(api, &v, &n, &par);
+    if (st) note_missing(api, st, &v);
+    vp_free(&v);
+    if (st) {
+        fail(st, 0);
+        return;
+    }
+    snprintf(why, sizeof why, "the path exists in the virtual file system: \"%s\": no version resource of a virtual file is modelled (decision 0098)", shown);
+    fle_stop(api, why);
+}
+
 void fle_imp_GetFileVersionInfoSizeW(void)
 {
     static const char api[] = "GetFileVersionInfoSizeW";
     uint64_t name = R[1], handle = R[2];
-    vpath v;
-    fle_node *n, *par;
-    uint32_t st;
-    uint16_t *s;
-    size_t len, i;
-    int dir_part = 0, eng;
+    uint16_t *p;
+    size_t plen;
+    uint32_t err;
 
     if (name == 0) fle_stop(api, "lptstrFilename is NULL: the page does not define it (decision 0098)");
     if (handle != 0) fle_st(handle, 4, 0);
-    s = fle_w_read_alloc(api, name, MAX_PATH_UNITS, &len);
-    if (len == 0) {
-        /* Wine (dlls/kernelbase/version.c, GetFileVersionInfoSizeExW): an empty name is ERROR_BAD_PATHNAME (161) */
-        free(s);
-        fail(FLE_W32_ERR_BAD_PATHNAME, 0);
+    err = version_path(api, name, &p, &plen);
+    if (err) {
+        fail(err, 0);
         return;
     }
-    for (i = 0; i < len; i++)
-        if (is_sep(s[i]) || s[i] == ':') dir_part = 1;
-    eng = is_engine_path(s, len);
-    free(s);
-    if (!dir_part) {
-        /* Issue #1418: the search sequence of LoadLibrary is not modelled (#1415), so the name is answered as a file that is not there: the failure of a missing file (Wine, dlls/kernelbase/version.c, GetFileVersionInfoSizeExW: 0 with the CreateFileW error, ERROR_FILE_NOT_FOUND) */
-        fle_warn(api, 0);
-        fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
-        return;
-    }
-    if (eng) {
+    if (is_engine_path(p, plen)) {
         uint64_t va;
         uint32_t sz;
 
+        free(p);
         if (!fle_res_version_block) fle_stop(api, "the path is the engine's own and no resource reader is linked (fle_res.c): decision 0129");
         if (fle_res_version_block(api, &va, &sz)) {
             R[0] = sz;
@@ -2203,15 +2264,7 @@ void fle_imp_GetFileVersionInfoSizeW(void)
         fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);   /* a PE without a version resource: the page names no code; the file-system error that a missing file gives */
         return;
     }
-    parse_path(api, name, 0, &v);
-    st = lookup(api, &v, &n, &par);
-    if (st) note_missing(api, st, &v);
-    vp_free(&v);
-    if (st) {
-        fail(st, 0);
-        return;
-    }
-    fle_stop(api, "the path exists in the virtual file system: no version resource of a virtual file is modelled (decision 0098)");
+    version_volume(api, p, plen);
 }
 
 /* version!GetFileVersionInfoW (decision 0112, PROVISIONAL; decision 0129 adds the product's own module): BOOL f(LPCWSTR lptstrFilename rcx, DWORD dwHandle edx, DWORD dwLen r8d, LPVOID lpData r9). Learn
@@ -2223,43 +2276,28 @@ void fle_imp_GetFileVersionInfoSizeW(void)
  * bytes ("truncates"), return 1. The form of the block is the form of the resource (a VS_VERSIONINFO): Learn does not say what GetFileVersionInfo puts in the buffer (the page says only that VerQueryValue reads it);
  * giving the resource's bytes is a CHOICE WITHOUT A SOURCE (S-version-info-block-form), made so that no value is invented; VerQueryValueW below parses exactly this form. A NULL lpData or dwLen 0 for that path
  * stops (the page does not say). Any other path: as before (the answer of GetFileVersionInfoSizeW (decision 0098) for the same path: a path that does not name a file of the virtual file system has no
- * version information, so the call fails with the file-system error of that path (the same 2 or 3 as GetFileAttributesW), lpData is not touched, dwHandle and dwLen are not looked at). Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is
- * modelled). Issue #1418: a name with no directory part is answered as a missing file (FALSE, ERROR_FILE_NOT_FOUND, warned once), an empty name is
- * ERROR_BAD_PATHNAME (161). */
+ * version information, so the call fails with the file-system error of that path (the same 2 or 3 as GetFileAttributesW), lpData is not touched, dwHandle and dwLen are not looked at). A name with no directory part
+ * is searched as in GetFileVersionInfoSizeW (#1415), an empty name is ERROR_BAD_PATHNAME (161) (Issue #1418). Stops: a NULL name, and a path that exists in the virtual file system (no version resource of a virtual file is modelled). */
 void fle_imp_GetFileVersionInfoW(void)
 {
     static const char api[] = "GetFileVersionInfoW";
     uint64_t name = R[1], data = R[9];
     uint32_t len32 = (uint32_t)R[8];
-    vpath v;
-    fle_node *n, *par;
-    uint32_t st;
-    uint16_t *s;
-    size_t len, i;
-    int dir_part = 0, eng;
+    uint16_t *p;
+    size_t plen;
+    uint32_t err;
 
     if (name == 0) fle_stop(api, "lptstrFilename is NULL: the page does not define it (decision 0112)");
-    s = fle_w_read_alloc(api, name, MAX_PATH_UNITS, &len);
-    if (len == 0) {
-        /* Wine (dlls/kernelbase/version.c, GetFileVersionInfoSizeExW): an empty name is ERROR_BAD_PATHNAME (161) */
-        free(s);
-        fail(FLE_W32_ERR_BAD_PATHNAME, 0);
+    err = version_path(api, name, &p, &plen);
+    if (err) {
+        fail(err, 0);
         return;
     }
-    for (i = 0; i < len; i++)
-        if (is_sep(s[i]) || s[i] == ':') dir_part = 1;
-    eng = is_engine_path(s, len);
-    free(s);
-    if (!dir_part) {
-        /* Issue #1418: as GetFileVersionInfoSizeW above: the search sequence is not modelled (#1415): a missing file, so FALSE with ERROR_FILE_NOT_FOUND (2), the buffer untouched */
-        fle_warn(api, 0);
-        fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
-        return;
-    }
-    if (eng) {
+    if (is_engine_path(p, plen)) {
         uint64_t va;
         uint32_t sz, k, cnt;
 
+        free(p);
         if (!fle_res_version_block) fle_stop(api, "the path is the engine's own and no resource reader is linked (fle_res.c): decision 0129");
         if (!fle_res_version_block(api, &va, &sz)) {
             fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
@@ -2271,15 +2309,7 @@ void fle_imp_GetFileVersionInfoW(void)
         R[0] = 1;
         return;
     }
-    parse_path(api, name, 0, &v);
-    st = lookup(api, &v, &n, &par);
-    if (st) note_missing(api, st, &v);
-    vp_free(&v);
-    if (st) {
-        fail(st, 0);
-        return;
-    }
-    fle_stop(api, "the path exists in the virtual file system: no version resource of a virtual file is modelled (decisions 0098, 0112)");
+    version_volume(api, p, plen);
 }
 
 /* version!VerQueryValueW (decision 0112, PROVISIONAL; decision 0129 answers it for the block of GetFileVersionInfoW): BOOL f(LPCVOID pBlock rcx, LPCWSTR lpSubBlock rdx, LPVOID *lplpBuffer r8, PUINT puLen r9). Learn
