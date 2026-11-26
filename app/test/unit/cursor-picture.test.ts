@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CP_BYTES, CP_MAGIC, readCursorPicture, scaleNearest } from '../../src/engine/cursor-picture.ts';
+import { CP_BYTES, CP_MAGIC, readCursorPicture } from '../../src/engine/cursor-picture.ts';
 
 const REPO = process.env.APP_REPO_ROOT || path.resolve(__dirname, '../../..');
 const rt = (f: string): string => fs.readFileSync(path.join(REPO, 'lift/runtime', f), 'utf8');
@@ -31,14 +31,6 @@ describe('the layout of the picture is the one of lift/runtime/fle_appview.h (re
     const st = /typedef struct \{([^}]*)\} fle_cursor_pic_state;/.exec(h)?.[1] ?? '';
     const words = st.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ' ');
     expect(words).toContain('uint32_t magic, ok, handle, width, height, hot_x, hot_y, cursor_id; uint32_t named, ordinal, invert, alpha, transparent, opaque, rgba_addr, raw_addr; char name[64]; char why[128];');
-  });
-});
-
-describe('the copies of a picture for the device pixel ratio (nearest neighbour)', () => {
-  it('each pixel is repeated k x k times and no colour is made (the pixels are the same)', () => {
-    const px = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
-    expect(Array.from(scaleNearest(2, 1, px, 2))).toEqual([1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 5, 6, 7, 8, 1, 2, 3, 4, 1, 2, 3, 4, 5, 6, 7, 8, 5, 6, 7, 8]);
-    expect(Array.from(scaleNearest(2, 1, px, 1))).toEqual(Array.from(px));
   });
 });
 

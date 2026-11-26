@@ -5,7 +5,8 @@
 // A cursor the guest loaded from one of its own modules (fle_cursor_is_shared_handle) is shown as the picture of its resource (#1392, decision 0260): the engine gives the resource's pixels
 // with each osstate that names the handle (cursor-picture.ts), and the page shows them as a PNG of the same pixels (png.ts), not scaled. Until the picture has come, or when the engine has none, it is the arrow and the reason says so.
 // A cursor the guest made itself (CreateIconIndirect, cursorMade) is shown as the picture of its bitmaps (the engine copies them when the cursor is made; #1392), and reported as `made`.
-// Above a device pixel ratio of 1 the picture is given as image-set of its copies at 1x, 2x and 3x (nearest neighbour; the browser takes the one for its density); at 1 it is the url of the 1x picture.
+// The picture is given once, as image-set of its PNG at the page's device pixel ratio (the ratio as it is, a fraction too): the browser shows it at its pixels ÷ the ratio in CSS px,
+// so one picture pixel is one device pixel (#1480). The hot spot is in CSS px as well (Chromium rounds it to a whole number; see pictured).
 import type { AppView } from '../engine/appview.ts';
 
 export const IDC_CSS: Readonly<Record<number, string>> = {
@@ -29,12 +30,14 @@ export const IDC_UNMAPPED: Readonly<Record<number, string>> = {
   32516: 'IDC_UPARROW',
 };
 
-/** #1392: the picture of a cursor of a module or made by CreateIconIndirect, as the page shows it: its PNGs (`images`: the picture at scale 1, then the nearest-neighbour copies at 2 and 3 when they fit) and the hot spot; `raw` (base64) is what the picture was made of (a made cursor); or the reason there is none */
+/** #1392: the picture of a cursor of a module or made by CreateIconIndirect, as the page shows it: its PNG (`url`: the picture's own pixels, not scaled) and the hot spot in those pixels; `raw` (base64) is what the picture was made of (a made cursor); or the reason there is none */
 export type CursorPictureState =
-  | { ok: true; images: { scale: number; url: string }[]; hotX: number; hotY: number; source: string; cursorId: number; width: number; height: number; invert: number; alpha: boolean; raw?: string }
+  | { ok: true; url: string; hotX: number; hotY: number; source: string; cursorId: number; width: number; height: number; invert: number; alpha: boolean; raw?: string }
   | { ok: false; why: string };
 
-/** the largest cursor image the page gives (device pixels: a larger cursor is not shown by the browser, so no copy of that size is made) */
+/** the largest cursor the browser shows, in CSS px (#1480). Chromium drops a custom cursor whose size, ceil(pixels ÷ the resolution of its image-set), is over 128 CSS px
+ *  (ui/base/cursor/cursor.cc, Cursor::AreDimensionsValidForWeb; read on Chromium's main branch) and takes the next entry of the cursor list, here `default`. pictured makes the same test
+ *  with the page's ratio: over it, the arrow is shown and the reason says so */
 export const CURSOR_IMAGE_MAX = 128;
 
 export interface CursorChoice {
@@ -46,14 +49,14 @@ export interface CursorChoice {
   made?: boolean;
   /** a cursor of a module of the guest whose picture is not shown (none from the engine yet, or none at all): the arrow is shown */
   unpictured?: boolean;
-  /** a cursor shown as its picture (a module's resource, or made by CreateIconIndirect when cursorId is 0): its name or ordinal, the RT_CURSOR id, the size, the hot spot, the inverted pixels, whether the alpha was used, the CSS the picture is shown with (`url` at DPR 1, `image-set` above it), and (made) the pixels it was made of, base64 */
+  /** a cursor shown as its picture (a module's resource, or made by CreateIconIndirect when cursorId is 0): its name or ordinal, the RT_CURSOR id, the size, the hot spot, the inverted pixels, whether the alpha was used, the CSS the picture is shown with (image-set at the page's ratio), and (made) the pixels it was made of, base64 */
   picture?: { source: string; cursorId: number; width: number; height: number; hotX: number; hotY: number; invert: number; alpha: boolean; css: string; raw?: string };
   /** the handle is not none, not a standard cursor, not a cursor of a module and not one the guest made: the engine has no identity for it */
   unresolved?: boolean;
 }
 
-/** `dpr` is the page's device pixel ratio (window.devicePixelRatio): above 1 a picture is given as image-set of its copies (the browser takes the one for the density), at 1 as the picture itself */
-export function cursorCss(v: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared' | 'cursorMade'> | null, picture?: CursorPictureState, dpr = 1): CursorChoice {
+/** `dpr` is the page's device pixel ratio (window.devicePixelRatio), read each time the cursor is given (#1480: a change of the ratio gives the cursor again) */
+export function cursorCss(v: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShared' | 'cursorMade'> | null, dpr: number, picture?: CursorPictureState): CursorChoice {
   if (!v) return { css: 'default', why: 'the engine reports no cursor' };
   if (v.cursor === 0) return { css: 'none', why: 'SetCursor(NULL): the guest removed the cursor' };
   if (v.cursorIdc !== 0) {
@@ -77,16 +80,22 @@ export function cursorCss(v: Pick<AppView, 'cursor' | 'cursorIdc' | 'cursorShare
   return { css: 'default', why: `a handle with no identity (0x${v.cursor.toString(16)}): shown as the arrow`, unresolved: true };
 }
 
-/** the CSS of a picture at the hot spot: `url` of the picture at DPR 1; above 1, image-set of its copies (1x, 2x, 3x; the browser takes the one for its density); then the arrow as the fallback (no look-alike is put in its place) */
+/** the CSS of a picture at the hot spot (#1480): image-set of its PNG at the page's device pixel ratio, the same PNG for every ratio (the browser shows it at its pixels ÷ the ratio CSS px,
+ *  which is one device pixel per picture pixel). The hot spot is in CSS px (event_handler.cc, SelectCursor: the hot spot is multiplied by the image-set's resolution and rounded, and then
+ *  clamped to the picture), so it is the picture's hot spot ÷ the ratio, rounded to a whole CSS px: the browser's hot spot is then off by at most ratio ÷ 2 device px (plus half a device px of its own rounding).
+ *  Chromium also drops a picture whose rectangle would leave the visual viewport (event_handler.cc, frame_rect.Contains): at the page's edge the arrow is shown. Then the arrow as the fallback (no look-alike is put in its place) */
 function pictured(picture: Extract<CursorPictureState, { ok: true }>, handle: string, dpr: number): CursorChoice {
   const what = picture.cursorId === 0 ? 'made by CreateIconIndirect' : `RT_CURSOR ${picture.cursorId}`;
-  const hot = `${picture.hotX} ${picture.hotY}`;
-  const [first] = picture.images;
-  const set = picture.images.map((i) => `url("${i.url}") ${i.scale}x`).join(', ');
-  const shown = dpr > 1 && picture.images.length > 1 ? `image-set(${set}) ${hot}, default` : `url("${first?.url ?? ''}") ${hot}, default`;
+  const from = `the guest's cursor ${picture.source} (${handle}): ${what}, ${picture.width} x ${picture.height}, hot spot ${picture.hotX}, ${picture.hotY}`;
+  const cssW = Math.ceil(picture.width / dpr), cssH = Math.ceil(picture.height / dpr);
+  if (cssW > CURSOR_IMAGE_MAX || cssH > CURSOR_IMAGE_MAX) {
+    return { css: 'default', why: `${from}: ${cssW} x ${cssH} CSS px at device pixel ratio ${dpr}, larger than the ${CURSOR_IMAGE_MAX} CSS px the browser shows: shown as the arrow`, unpictured: true };
+  }
+  const hot = `${Math.round(picture.hotX / dpr)} ${Math.round(picture.hotY / dpr)}`;
+  const shown = `image-set(url("${picture.url}") ${dpr}x) ${hot}, default`;
   return {
     css: shown,
-    why: `the guest's cursor ${picture.source} (${handle}): ${what}, ${picture.width} x ${picture.height}, hot spot ${picture.hotX}, ${picture.hotY}`,
+    why: `${from}, shown at device pixel ratio ${dpr} (${cssW} x ${cssH} CSS px)`,
     picture: { source: picture.source, cursorId: picture.cursorId, width: picture.width, height: picture.height, hotX: picture.hotX, hotY: picture.hotY, invert: picture.invert, alpha: picture.alpha, css: shown, ...(picture.raw !== undefined ? { raw: picture.raw } : {}) },
   };
 }

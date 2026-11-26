@@ -172,18 +172,6 @@ export function referenceFromRaw(raw, width, height, hot, alpha = false) {
   return { width, height, hotX: hot.hotX, hotY: hot.hotY, rgba, counts, alpha };
 }
 
-/** the picture at the whole scale k: each pixel repeated k x k times (nearest neighbour, no interpolation); the reference of a copy the page shows at a device pixel ratio above 1 */
-export function scaleNearestRef(width, height, rgba, k) {
-  const w = width * k, out = new Uint8Array(w * height * k * 4);
-  for (let y = 0; y < height * k; y++) {
-    for (let x = 0; x < w; x++) {
-      const s = (Math.floor(y / k) * width + Math.floor(x / k)) * 4, d = (y * w + x) * 4;
-      out.set(rgba.subarray(s, s + 4), d);
-    }
-  }
-  return out;
-}
-
 /** an 8-bit RGBA PNG (colour type 6, no interlace) as {width, height, rgba}; throws on anything else */
 export function decodePngRgba(bytes) {
   const sig = [137, 80, 78, 71, 13, 10, 26, 10];

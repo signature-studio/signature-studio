@@ -36,19 +36,6 @@ const LATIN1_CHAR = (u8: Uint8Array, off: number, len: number): string => {
   return s;
 };
 
-/** the picture scaled by the whole number k, each pixel repeated k x k times (nearest neighbour: no interpolation, so the pixels are the same) */
-export function scaleNearest(width: number, height: number, rgba: Uint8Array, k: number): Uint8Array {
-  const w = width * k, out = new Uint8Array(w * height * k * 4);
-  for (let y = 0; y < height * k; y++) {
-    const srow = Math.floor(y / k) * width;
-    for (let x = 0; x < w; x++) {
-      const s = (srow + Math.floor(x / k)) * 4, d = (y * w + x) * 4;
-      out[d] = rgba[s] ?? 0; out[d + 1] = rgba[s + 1] ?? 0; out[d + 2] = rgba[s + 2] ?? 0; out[d + 3] = rgba[s + 3] ?? 0;
-    }
-  }
-  return out;
-}
-
 /** the structure at `ptr` in the engine's memory; null when the magic does not match (a build without the export, or a structure of another layout) */
 export function readCursorPicture(buffer: ArrayBufferLike, ptr: number, handle: number): CursorPictureRead | null {
   const dv = new DataView(buffer, ptr, CP_BYTES);

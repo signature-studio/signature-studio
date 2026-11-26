@@ -4,7 +4,7 @@
 //   --pencil (#1392): at the Piano roll (step 3), the pointer is put over its grid until the page shows a picture cursor (url(...)); the Draw key D is pressed when none does. The page's PNG is compared with a
 //     reference made outside the engine's pixel code: a resource's pixels are read from FLEngine_x64.dll (tools/cursor/resource-cursor.mjs); a cursor made by CreateIconIndirect has no resource, so its reference is
 //     built here from the raw copy of its bitmaps that the engine gives (pencilRaw). The check is made at device pixel ratio 1, 2 and a random one in 1.01..3.00 (pencilDprs; the room is set again for each);
-//     above 1 the page shows image-set of the copies (1x, 2x, 3x, nearest neighbour) and the copy of the ratio is compared with the reference's copy at the same scale. Fields: pencilOk, pencilResource, pencilCursorId, pencilSize, pencilHotspot(Match), pencilPixelsMatch, pencilMismatch, pencilInvertPixels, pencilAlpha, pencilCounts, pencilDprs, pencilTries, pencilCss, pencilRaw.
+//     at every ratio the page shows image-set of its PNG at the ratio (#1480: one copy, the picture's own pixels) and the PNG is compared with the reference's pixels as they are. Fields: pencilOk, pencilResource, pencilCursorId, pencilSize, pencilHotspot(Match), pencilPixelsMatch, pencilMismatch, pencilInvertPixels, pencilAlpha, pencilCounts, pencilDprs, pencilTries, pencilCss, pencilRaw.
 // Order (on the engine's first idle, bootBundle's afterIdle):
 //   0. the room is set to 1836 x 1056 CSS px (the guest's screen; tools/smoke/welcome-flow.mjs calibrates it the same way);
 //   1. the window table (window.__app.deskDumpBase64(false): one line per drawn top-level window with its style; one line per child window, and a "child style" line with the child's style) is read: the Welcome window (class TWelcomeWizard) is found at its position;
@@ -27,7 +27,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bootBundle } from '../boot-check/boot-bundle.mjs';
 import { sleep } from '../boot-check/cdp.mjs';
-import { decodePngRgba, readPeResourceCursor, referenceFromRaw, scaleNearestRef } from './resource-cursor.mjs';
+import { decodePngRgba, readPeResourceCursor, referenceFromRaw } from './resource-cursor.mjs';
 
 // the room: the page's stage is 1836 x 1056 CSS px, which is the guest's screen (tools/smoke/welcome-flow.mjs and tools/p2-frames calibrate it); the Welcome window is centred in it
 const ROOM_W = 1836, ROOM_H = 1056;
@@ -300,21 +300,19 @@ async function textCheck(page, pic, root = null, grid = true) {
 }
 
 /** #1392 (--pencil): the pencil of the Piano roll, at three device pixel ratios: 1, 2, and a random one in 1.01..3.00 (2 decimals). The pointer is put over the grid (PENCIL_POINTS) until a point
- * shows a picture cursor (url(...) at 1, image-set(...) above 1); at 1, when none does, the Draw key D is pressed and the points are tried again. The page's picture (the PNG of the chosen copy and the hot
- * spot in its css) is compared with the reference: the resource's own pixels read from FL_ENGINE_DLL by resource-cursor.mjs (never from the engine), or for a made cursor the copy of its bitmaps (raw).
- * The copy for a ratio above 1 is the nearest-neighbour copy of the reference at the whole scale ceil(ratio) (the browser takes the copy for its density). */
-const isPicture = (css) => css.startsWith('url(') || css.startsWith('image-set(');
-/** the PNG candidates of a cursor value: [{ scale, data }] (a url without a scale is 1x) */
+ * shows a picture cursor (image-set(...) at every ratio, #1480); at 1, when none does, the Draw key D is pressed and the points are tried again. The page's picture (its PNG and the hot spot in
+ * its css) is compared with the reference: the resource's own pixels read from FL_ENGINE_DLL by resource-cursor.mjs (never from the engine), or for a made cursor the copy of its bitmaps (raw).
+ * The page's PNG is the reference's pixels as they are (one copy, not scaled); its hot spot is the reference's ÷ the ratio, rounded (Chromium reads the hot spot as a whole CSS px). */
+const isPicture = (css) => css.startsWith('image-set(');
+/** the PNG candidates of a cursor value: [{ scale, data }] (the declared resolution of the image-set entry; a url without one is 1x) */
 function pngCandidates(css) {
   const out = [];
-  const re = /url\("?(data:image\/png;base64,[A-Za-z0-9+/=]+)"?\)(?:\s+(\d+(?:\.\d+)?)x)?/g;
+  const re = /url\("?(data:image\/png;base64,[A-Za-z0-9+/=]+)"?\)(?:\s+(\d+(?:\.\d+)?)(?:dppx|x))?/g;
   for (let m; (m = re.exec(css)) !== null;) out.push({ scale: m[2] === undefined ? 1 : Number(m[2]), data: m[1] });
   return out;
 }
 /** the hot spot of a cursor value (the two numbers before its comma, after the image or the image-set) */
 const hotOf = (css) => { const m = /\)\s*(-?\d+)\s+(-?\d+)\s*,/.exec(css); return m ? [Number(m[1]), Number(m[2])] : null; };
-/** the scale of the copy a browser takes at a device pixel ratio (the smallest copy that is not smaller than the ratio, 3 at most) */
-const copyScale = (dpr) => (dpr > 1 ? Math.min(3, Math.ceil(dpr)) : 1);
 
 async function pencilCheck(page, pic, pr) {
   const rect = await page.evaluate(RECT);
@@ -333,11 +331,11 @@ async function pencilCheck(page, pic, pr) {
     }
     return null;
   };
-  /** the page's picture at the point, compared with the reference at the scale the ratio takes (the copy of the reference, nearest neighbour) */
+  /** the page's picture at the point, compared with the reference pixel for pixel (#1480: no copy is made at a ratio) */
   const judge = async (hit, dpr) => {
     const r = { dpr, pageDpr: null, ok: false, at: null, css: null, scale: null, source: null, cursorId: null, cursorIdMatch: null, size: null, hotspot: null, pageHotspot: null, hotMatch: false, pixelsMatch: false, mismatch: null, invert: null, counts: null, alpha: null, pageSize: null, raw: null, error: null };
     if (!hit) { r.error = 'no point of the Piano roll shows a picture cursor'; return r; }
-    r.ok = dpr > 1 ? hit.css.startsWith('image-set(') : hit.css.startsWith('url(');
+    r.ok = hit.css.startsWith('image-set(');
     if (!r.ok) { r.error = `the cursor is not a picture at ${dpr}: ${hit.css.slice(0, 60)}`; return r; }
     r.at = hit.at;
     r.css = hit.css;
@@ -362,22 +360,19 @@ async function pencilCheck(page, pic, pr) {
     r.alpha = ref.alpha;
     r.invert = ref.counts.invert;
     r.counts = ref.counts;
-    const scale = copyScale(dpr);
-    r.scale = scale;
-    const cands = pngCandidates(hit.css);
-    const cand = cands.find((c) => c.scale === scale) ?? cands[cands.length - 1];
+    r.scale = dpr;
+    const cand = pngCandidates(hit.css)[0];
     r.pageHotspot = hotOf(hit.css);
-    r.hotMatch = r.pageHotspot !== null && r.pageHotspot[0] === ref.hotX && r.pageHotspot[1] === ref.hotY;
-    if (!cand) { r.error = `the cursor has no PNG copy: ${hit.css.slice(0, 60)}`; return r; }
+    r.hotMatch = r.pageHotspot !== null && r.pageHotspot[0] === Math.round(ref.hotX / dpr) && r.pageHotspot[1] === Math.round(ref.hotY / dpr);
+    if (!cand) { r.error = `the cursor has no PNG: ${hit.css.slice(0, 60)}`; return r; }
     const png = decodePngRgba(new Uint8Array(Buffer.from(cand.data.slice(cand.data.indexOf(',') + 1), 'base64')));
-    const want = cand.scale === scale ? scaleNearestRef(ref.width, ref.height, ref.rgba, scale) : null;
     r.pageSize = [png.width, png.height];
     let mismatch = 0;
-    if (!want || png.width !== ref.width * scale || png.height !== ref.height * scale) mismatch = png.width * png.height;
-    else for (let i = 0; i < want.length; i += 4) if (want[i] !== png.rgba[i] || want[i + 1] !== png.rgba[i + 1] || want[i + 2] !== png.rgba[i + 2] || want[i + 3] !== png.rgba[i + 3]) mismatch++;
+    if (png.width !== ref.width || png.height !== ref.height) mismatch = png.width * png.height;
+    else for (let i = 0; i < ref.rgba.length; i += 4) if (ref.rgba[i] !== png.rgba[i] || ref.rgba[i + 1] !== png.rgba[i + 1] || ref.rgba[i + 2] !== png.rgba[i + 2] || ref.rgba[i + 3] !== png.rgba[i + 3]) mismatch++;
     r.mismatch = mismatch;
     r.pixelsMatch = mismatch === 0;
-    log(`pencil at ${dpr}: ${info.source}${made ? '' : ` (RT_CURSOR ${ref.cursorId})`}, ${ref.width} x ${ref.height}, hot spot ${ref.hotX},${ref.hotY} (page ${r.pageHotspot}); copy ${scale}x ${png.width} x ${png.height}; pixels mismatched ${mismatch}; inverted ${ref.counts.invert}`);
+    log(`pencil at ${dpr}: ${info.source}${made ? '' : ` (RT_CURSOR ${ref.cursorId})`}, ${ref.width} x ${ref.height}, hot spot ${ref.hotX},${ref.hotY} (page ${r.pageHotspot}); png ${png.width} x ${png.height}; pixels mismatched ${mismatch}; inverted ${ref.counts.invert}`);
     return r;
   };
   let hit = await probe('the tool as the Piano roll shows it', pr);
