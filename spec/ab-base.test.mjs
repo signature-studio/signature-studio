@@ -124,3 +124,16 @@ test('verify without a manifest is not ok', (t) => {
   const v = verifyBase({ tree, dest: path.join(root, 'nothing') });
   assert.equal(v.ok, false);
 });
+
+test('the plugin database the engine build writes into the host tree is not linked, so a build of the base writes its own copy', (t) => {
+  const root = scratch(t);
+  const { tree, tracked } = fixture(root);
+  write(path.join(tree, 'lift/out-app/host/lift/out-plugindb/Sytrus.nfo'), 'NFO');
+  const dest = path.join(root, 'base');
+  prepareBase({ tree, dest, archive: archiveFrom(tracked) });
+  assert.equal(fs.existsSync(path.join(dest, 'lift/out-app/host/lift/out-plugindb/Sytrus.nfo')), false);
+  fs.mkdirSync(path.join(dest, 'lift/out-app/host/lift/out-plugindb'), { recursive: true });
+  fs.writeFileSync(path.join(dest, 'lift/out-app/host/lift/out-plugindb/Sytrus.nfo'), 'NFO-BASE');
+  assert.equal(fs.readFileSync(path.join(tree, 'lift/out-app/host/lift/out-plugindb/Sytrus.nfo'), 'utf8'), 'NFO');
+  assert.deepEqual(verifyBase({ tree, dest }), { ok: true, changed: [] });
+});
