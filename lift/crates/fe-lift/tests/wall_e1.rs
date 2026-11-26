@@ -486,6 +486,7 @@ fn driver() -> &'static PathBuf {
             .collect();
         srcs.sort();
         srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -720,8 +721,14 @@ fn get_file_version_info_w_fails_like_the_size_call_for_a_path_that_is_not_in_th
 #[test]
 fn what_get_file_version_info_w_does_not_define_stops_by_name() {
     aborts(&["fvi", "null", "buf"], "GetFileVersionInfoW: lptstrFilename is NULL");
-    // f_44ada0 asks for "comctl32.dll": a name with no directory part. Issue #1418: the search sequence is not modelled, the file is not in the current directory: FALSE and ERROR_FILE_NOT_FOUND (2), the data is untouched
-    assert_eq!(lines(&["fvi", "comctl32.dll", "buf"]), ["ret 0 le 2 data untouched".to_string()]);
+    // f_44ada0 asks for "comctl32.dll": a name with no directory part is searched in the LoadLibrary order (#1415). comctl32.dll is a virtual module with no file on the volume: not found (decision 0098)
+    assert_eq!(lines(&["fvi", "comctl32.dll", "buf"]), ["ret 0 le 2 data untouched"]);
+    // #1415: a bare name that the search finds in the application folder is stopped with that path (the file's version is not modelled)
+    aborts(&["fvi", "appmod.dll", "buf", "mkdir=C:\\Program Files", "mkdir=C:\\Program Files\\Image-Line", "mkdir=C:\\Program Files\\Image-Line\\FL Studio 21", "mkfile=C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll"], "GetFileVersionInfoW: the path exists in the virtual file system: \"C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll\"");
+    // and a bare name that no folder of the search holds is not found: 0 and ERROR_FILE_NOT_FOUND (the handle is ignored)
+    assert_eq!(lines(&["fvi", "ILSvg_x64.dll", "buf"]), ["ret 0 le 2 data untouched"]);
+    // Issue #1418: an empty name is ERROR_BAD_PATHNAME (Wine, dlls/kernelbase/version.c, GetFileVersionInfoSizeExW)
+    assert_eq!(lines(&["fvi", "", "buf"]), ["ret 0 le 161 data untouched"]);
     // a path that exists in the virtual file system (a directory or a file): no version resource of a virtual file is modelled
     aborts(&["fvi", "C:\\d\\f.dll", "buf", "mkdir=C:\\d", "mkfile=C:\\d\\f.dll"], "GetFileVersionInfoW: the path exists in the virtual file system");
     aborts(&["fvi", "C:\\d", "buf", "mkdir=C:\\d"], "GetFileVersionInfoW: the path exists in the virtual file system");

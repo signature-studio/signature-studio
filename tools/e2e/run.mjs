@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // E2E (Issue #1407, extended by #1485): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
 // physical pixels, 120 Hz by the BeginFrame clock (lib/browser.mjs), with real mouse and key events (lib/guest.mjs).
-// Usage: node tools/e2e/run.mjs [--scenarios smoke | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
-//                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR]     (run.sh does the same from the repository)
+// Usage: node tools/e2e/run.mjs [--scenarios smoke | browser-face | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
+//                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR] [--report-only]     (run.sh does the same from the repository)
 //   --area <領域>: the scenarios of tools/e2e/scenarios/<領域>/ (the 13 areas: page input file menus windows audio settings plugins topbar resilience visual perf delivery).
 //     Each file there default-exports defineScenario({ id, covers, displays, expectFail, run }) (lib/scenario.mjs). The files are found by the runner (no table to edit).
-//   --scenarios smoke: the older set (scenarios/smoke/index.mjs, { name, expectFail, run } objects); each of them runs in a page of its own, as before.
+//   --scenarios <set>: an older set (scenarios/<set>/index.mjs, { name, expectFail, run } objects: smoke, browser-face); each of them runs in a page of its own, as before.
 //   --list: starts nothing. One JSON line per area: { area, scenarios, covers, features } (features: the rows of tools/e2e/features/). With --area, that area's line only.
 //   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
 //   --budget: a number with s, m or h. A scenario that would start after the budget is not run: it is written with skipped: true (the row then fails).
@@ -15,11 +15,13 @@
 //   --clock: raf (default: the page's own rAF, the frame-rate limit off) or begin (120 Hz by the BeginFrame clock; see lib/browser.mjs).
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
 //   --engine-logs DIR: a test aid, the engine log of each scenario (the lines the page keeps, from the scenario's start) is written to DIR/<display>-<dpr>-<id>.log.
+//   --report-only: the run reports and does not judge the scenarios. Exit 0 when every row is printed with all its scenario lines and its error is null (runPasses), whatever the scenarios' ok and counters
+//     (the caller checks the rows' structure, e.g. servedHeadersMatch). A row or line missing, or an error (the setup, a row), still exits 1. The log says 'report-only: exit 0'.
 // A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
 // 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests
-// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed.
+// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed. The count of scenarios is that of the set (browser-face: 1).
 // Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
 // stop report and the report's lines (lib/stop.mjs).
 import fs from 'node:fs';
@@ -32,7 +34,7 @@ import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
 import { AREAS, legacyScenario } from './lib/scenario.mjs';
-import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses } from './lib/plan.mjs';
+import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses, runPasses } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
 
@@ -68,10 +70,12 @@ export async function loadArea(area) {
   return out;
 }
 
-/** the older smoke set: its objects as legacy scenarios */
-export async function loadSmoke() {
-  const all = (await import(pathToFileURL(path.join(scenariosDir, 'smoke', 'index.mjs')).href)).default;
-  return all.map(legacyScenario);
+/** an older set (scenarios/<set>/index.mjs): its objects as legacy scenarios of that set */
+export async function loadLegacySet(set) {
+  const file = path.join(scenariosDir, set, 'index.mjs');
+  if (!/^[a-z][a-z0-9-]*$/.test(set) || !fs.existsSync(file)) throw new Error(`--scenarios ${set}: no set at scenarios/${set}/index.mjs (smoke, browser-face; or --area <領域>)`);
+  const all = (await import(pathToFileURL(file).href)).default;
+  return all.map((s) => legacyScenario(s, set));
 }
 
 /** the engine's stop of the page (its log and state), through lib/stop.mjs */
@@ -288,9 +292,7 @@ async function loadSet(args) {
     if (!AREAS.includes(args.area)) throw new Error(`--area ${args.area}: the areas are ${AREAS.join(', ')}`);
     return loadArea(args.area);
   }
-  const set = args.scenarios ?? 'smoke';
-  if (set === 'smoke') return loadSmoke();
-  throw new Error(`--scenarios ${set}: only smoke (or --area <領域>)`);
+  return loadLegacySet(args.scenarios ?? 'smoke');
 }
 
 /** the --list lines: one per area (or the one area given) */
@@ -362,9 +364,12 @@ async function main() {
     fs.rmSync(workDir, { recursive: true, force: true });
     wranglerDirs.forEach((d, i) => { if (!hadWrangler[i]) fs.rmSync(d, { recursive: true, force: true }); });
   }
-  const ok = rows.length === expected.length && rows.every((r, i) => rowPasses(r, expected[i]));
-  log(`rows ${rows.length}, accepted ${ok}`);
-  return ok ? 0 : 1;
+  const accepted = runPasses(rows, expected);
+  log(`rows ${rows.length}, accepted ${accepted}`);
+  if (args['report-only'] !== true) return accepted ? 0 : 1;
+  const reported = runPasses(rows, expected, { reportOnly: true });
+  if (reported) log('report-only: exit 0');
+  return reported ? 0 : 1;
 }
 
 const self = process.argv[1] ? fs.realpathSync(process.argv[1]) : null;

@@ -144,7 +144,7 @@ fn run_env(name: &str, globals: &str, main: &str, envs: &[(&str, &str)]) -> (i32
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Wno-unused-function", "-Wno-unused-parameter", "-fPIE", "-pie"]);
     cmd.arg("-I").arg(rt()).arg(&c);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c", "fle_filedlg.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c", "fle_filedlg.c"] {
         cmd.arg(rt().join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

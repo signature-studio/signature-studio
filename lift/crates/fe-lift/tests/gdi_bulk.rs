@@ -42,7 +42,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd
         .arg("-I")
@@ -66,7 +66,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-gdi-bulk"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_env.c", false), ("fle_cursor.c", false)] {
+        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false), ("fle_cursor.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);

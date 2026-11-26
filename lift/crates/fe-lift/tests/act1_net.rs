@@ -85,7 +85,7 @@ fn run(name: &str, files: &[&str], defs: &[&str], body: &str) -> Out {
     Out { stdout: String::from_utf8_lossy(&r.stdout).to_string(), stderr: String::from_utf8_lossy(&r.stderr).to_string(), signal: r.status.signal(), ok: r.status.success() }
 }
 
-const FILES: [&str; 4] = ["fle_act1_net.c", "fle_wininet.c", "fle_imports.c", "fle_env.c"];
+const FILES: [&str; 5] = ["fle_act1_net.c", "fle_wininet.c", "fle_imports.c", "fle_glob.c", "fle_env.c"];
 
 /// The guest's own sequence of f_64d520 (read from the disassembly, docs/investigations/act1/logs/dis-64d520.txt): the POST helper opens a session, connects (HTTP, port 443), opens the request with
 /// flags 0x4c00000 (NO_CACHE_WRITE | KEEP_CONNECTION | SECURE), adds headers, HttpSendRequestExW(req, NULL, NULL, 0, 0), writes the body, ends, queries, reads and closes.
@@ -227,7 +227,7 @@ fn a_null_verb_is_get_and_the_header_length_may_be_explicit() {
 
 #[test]
 fn without_the_act1_file_closing_an_unknown_handle_stops_as_before() {
-    let o = run("act1-absent", &["fle_wininet.c", "fle_imports.c", "fle_env.c"], &[], "    cN(fle_imp_InternetCloseHandle, 0x7FFAB1000004ull, 0, 0, 0, 0, 0, 0, 0);");
+    let o = run("act1-absent", &["fle_wininet.c", "fle_imports.c", "fle_glob.c", "fle_env.c"], &[], "    cN(fle_imp_InternetCloseHandle, 0x7FFAB1000004ull, 0, 0, 0, 0, 0, 0, 0);");
     assert!(!o.ok, "{}", o.stdout);
     assert_eq!(o.signal, Some(6), "{}", o.stderr);
     assert!(o.stderr.contains("InternetCloseHandle") && o.stderr.contains("not a live session"), "{}", o.stderr);

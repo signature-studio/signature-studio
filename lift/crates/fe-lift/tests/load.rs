@@ -234,7 +234,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (f, strict) in [("fle_load", true), ("fle_imagehlp", true), ("fle_env", false), ("fle_imports", false), ("fle_modules", false), ("fle_string", false)] {
+        for (f, strict) in [("fle_load", true), ("fle_imagehlp", true), ("fle_env", false), ("fle_imports", false), ("fle_glob", false), ("fle_modules", false), ("fle_string", false)] {
             let src = if f == "fle_load" || f == "fle_imagehlp" { src_dir().join(format!("{f}.c")) } else { runtime_dir().join(format!("{f}.c")) };
             let obj = dir.join(format!("{f}.o"));
             clang_obj(&src, &obj, strict);
@@ -924,6 +924,7 @@ fn all_runtime_sources() -> Vec<PathBuf> {
     }
     v.sort();
     v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     v
 }
 
@@ -1098,6 +1099,23 @@ fn load1_a_file_of_the_volume_that_is_not_a_module_of_the_build_stops_by_name() 
         assert!(o.stderr.contains("not a module of this build"), "{label}: {}", o.stderr);
         assert_eq!(o.signal, Some(6), "{label}: not SIGABRT");
     }
+}
+
+#[test]
+fn load1_a_bare_name_searches_the_current_folder_after_the_windows_folder() {
+    // #1415: Dynamic-link library search order (Microsoft Learn, 2023): the standard order of an unpackaged app (safe DLL search mode) is the application folder, the system folder, the 16-bit system folder, the Windows folder,
+    // the current folder, PATH. A file of the Windows folder wins over the same name in the current folder.
+    let body = r#"
+    put_file(u"C:\\Users\\user\\Downloads", u"C:\\Users\\user\\Downloads\\x.dll");
+    put_file(u"C:\\Windows\\System32", u"C:\\Windows\\System32\\x.dll");
+    callv(fle_imp_SetCurrentDirectoryW, A(u"C:\\Users\\user\\Downloads"), 0, 0);
+    callv(fle_imp_LoadLibraryW, A(u"x.dll"), 0, 0);
+    printf("returned %llx\n", U(R[0]));
+"#;
+    let o = run_main_with_prelude("l1-order-current-last", body);
+    assert!(!o.ok, "expected a stop, stdout {}", o.stdout);
+    assert!(!o.stdout.contains("returned"), "{}", o.stdout);
+    assert!(o.stderr.contains("holds a file at \"C:\\Windows\\System32\\x.dll\""), "{}", o.stderr);
 }
 
 #[test]

@@ -49,6 +49,20 @@ test('a legacy scenario keeps its name and runs in a page of its own', () => {
   assert.equal(l.id, 'file-open-demo');
   assert.equal(l.expectFail, '#1421');
   assert.deepEqual(l.displays, ['4k-dpr1', '4k-dpr2', '4k-random']);
+  assert.equal(l.area, 'smoke');
+  assert.equal(legacyScenario({ name: 'browser-face-tabs', expectFail: null, run: () => ({ ok: true }) }, 'browser-face').area, 'browser-face');
+});
+
+test('a legacy scenario keeps its beforeLoad (the permission and the counter are set before the page loads)', () => {
+  const beforeLoad = async () => {};
+  const l = legacyScenario({ name: 'clipboard-no-toast', expectFail: null, beforeLoad, run: () => ({ ok: true }) });
+  assert.equal(l.beforeLoad, beforeLoad);
+});
+
+test('the smoke set keeps the beforeLoad of its two clipboard scenarios as legacy scenarios', async () => {
+  const smoke = (await import('../scenarios/smoke/index.mjs')).default;
+  assert.deepEqual(smoke.filter((s) => s.beforeLoad).map((s) => s.name).sort(), ['clipboard-load-permission', 'clipboard-no-toast']);
+  for (const s of smoke) assert.equal(legacyScenario(s).beforeLoad, s.beforeLoad, s.name);
 });
 
 test('shards are deterministic: the sorted index modulo n', () => {

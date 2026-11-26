@@ -942,7 +942,7 @@ int main(int argc, char **argv)
         .arg(&rtd)
         .arg(&c)
         .arg(rtd.join("fle_locale.c"))
-        .arg(rtd.join("fle_imports.c"))
+        .arg(rtd.join("fle_imports.c")).arg(rtd.join("fle_glob.c")).arg(rtd.join("fle_env.c"))
         .arg("-o")
         .arg(&exe)
         .env("TMPDIR", dir.join("tmp"))
@@ -1008,7 +1008,7 @@ int main(void)
     let harness = manifest().join("../../harness");
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pie", "-I"]).arg(&rtd).arg("-I").arg(&harness).arg(&c);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c", "fle_wall_dlg1.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c", "fle_wall_dlg1.c"] {
         cmd.arg(rtd.join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

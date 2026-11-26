@@ -15,7 +15,7 @@ node tools/e2e/run.mjs --list
 
 前提: `app/node_modules` と `app/dist`(`npm run build --prefix app`)、bundle(`lift/out-app/bundle/{raw,br}/fl-Oz`、`fe-build bundle`)。
 
-- stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0。
+- stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0(`--report-only` のときは、下の「判定の基準」の規則)。
 - 試験: `node --test tools/e2e/test/*.test.mjs`(Playwright を使わない。純粋な部分の試験)。
 
 ## 引数(`run.mjs`)
@@ -23,6 +23,7 @@ node tools/e2e/run.mjs --list
 | 引数 | 意味 |
 |---|---|
 | `--scenarios smoke` | 旧い形の集合(`scenarios/smoke/index.mjs`)。各シナリオは、それぞれ新しいページで動く(従来どおり)。 |
+| `--scenarios browser-face` | 旧い形の集合(`scenarios/browser-face/index.mjs`、#1419)。Browser の面のタブを切り替え、console エラーを数える。各シナリオは、それぞれ新しいページで動く。 |
 | `--area <領域>` | `scenarios/<領域>/` の全て。13 領域: `page` `input` `file` `menus` `windows` `audio` `settings` `plugins` `topbar` `resilience` `visual` `perf` `delivery`。 |
 | `--list` | 起動しない。領域ごとに 1 行の JSON: `{"area","scenarios","covers","features"}`(`--area` を付けると、その 1 行)。 |
 | `--shard i/n` | シナリオの ID を昇順に並べ、`index % n === i - 1` のものを動かす(決定的)。 |
@@ -30,6 +31,7 @@ node tools/e2e/run.mjs --list
 | `--only ID[,ID]` | 領域の ID(`page/canvas-fills-viewport`)か、旧い名前(`file-open-demo`)。 |
 | `--budget 40m` | 単位 `s`・`m`・`h`。時間を過ぎたら、新しいシナリオを始めない。始めなかったものは `skipped: true`(その行は受け入れない)。 |
 | `--displays` | `4k-dpr1`(3840 x 2160 CSS px、DPR 1)、`4k-dpr2`(1920 x 1080、DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ)、`dpr:<数>`(例 `dpr:1.25`。CSS px は 3840 ÷ DPR、2160 ÷ DPR)。 |
+| `--report-only` | 結果を報告するだけで、シナリオの ok・カウンターでは落とさない。全ての行が出て(シナリオの行の数が揃い)、行の `error` が null なら終了コード 0。行や行の欠け・`error` は、従来どおり 1。ログに `report-only: exit 0`。行の構造(`servedHeadersMatch` など)は、呼び出す側が見る(受け入れの `node -e`)。 |
 | `--clock raf\|begin` | 既定は `raf`(下の「120 Hz」)。 |
 | `--shots DIR` / `--engine-logs DIR` | 試験用。画面の PNG と、エンジンのログ。 |
 
@@ -170,6 +172,7 @@ export default defineScenario({
 - `servedHeadersMatch` が真。`error` が無い。
 - 印の無いシナリオ: `ok`・`pageErrors` 0・`consoleErrors` 0・`stuckToasts` 0・`failedRequests` 0。`skipped` が無い。
 - 印の有るシナリオ: `pageErrors`・`consoleErrors`・`failedRequests` が 0。
+- `--report-only`(`runPasses`): 判定の代わりに、行の数とシナリオの行の数が揃い、行の `error` が null であること。シナリオの結果では落とさない。領域の受け入れは、これを使う(個々の ok と印は、`e2e-full` が見る)。
 
 ## 構成
 
@@ -184,6 +187,7 @@ export default defineScenario({
 - `features/`: 手で書く見出し行と `.min`、`generated/`(一覧の生成物。コミットする)。
 - `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(Issue #1482: 印は外した。右クリックで読まず、通知が出ない)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。
   - Issue #1482 の 3 件: (g) `context-menu-none`(各領域で右クリック 20 回。ブラウザのメニューが抑止されること)、(h) `clipboard-load-permission`(権限 prompt で読み込み、最初のクリック後に readText の要求が 1 回以上あること)、(i) `clipboard-no-toast`(権限 denied で Ctrl+V・Ctrl+C をし、通知の要素が出ないこと)。
+- `scenarios/browser-face/`(Issue #1419): (a) `browser-face-tabs`。Browser の面のタブを切り替えて 10 秒待ち、console エラーを数える。集合の件数は 1(`run.mjs` の行の判定は、集合の件数で数える)。
 
 ## 120 Hz の方法と実測
 

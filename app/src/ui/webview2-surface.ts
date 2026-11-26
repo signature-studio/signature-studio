@@ -60,6 +60,23 @@ export function splitStyles(html: string): { markup: string; styles: string[] } 
   return { markup, styles };
 }
 
+/** the document without its scripts and its event handlers (Issue #1419): the frame has no allow-scripts, so it cannot run them, and each one that the page reaches logs
+ *  "Blocked script execution" as an error on every load of the document; the handlers are removed from their tags, the rest of the markup is kept */
+export function withoutScripts(html: string): string {
+  return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, '')
+    .replace(/<script\b[^>]*>/gi, '')
+    .replace(/<[a-z][^>]*>/gi, (tag) => tag.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi, ''));
+}
+
+/** the document without what the page's CSP (shared/headers.ts: style-src and font-src 'self') stops in the frame: its inline style attributes and its data: fonts (Issue #1419);
+ *  each one logs an error on every load. A font that cannot load is the fallback font, which is the face's look without the rule */
+export function withoutCspBlocked(html: string): string {
+  return html
+    .replace(/<[a-z][^>]*>/gi, (tag) => tag.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s"'>]+)/gi, ''))
+    .replace(/@font-face\s*\{[^}]*\bdata:[^}]*\}/gi, '');
+}
+
 /** a reference that names a file of the bundle (not an absolute URL, a fragment, or a root-relative path) */
 export const isRelativeRef = (v: string): boolean => v !== '' && !/^([a-z][a-z0-9+.-]*:|#|\/)/i.test(v);
 
@@ -257,7 +274,7 @@ export class WebView2Face {
     let markup = '', styles: string[] = [];
     if (bytes && resource !== null) {
       const html = new TextDecoder().decode(bytes);
-      const refs = await rewriteRefs(html, dirOf(resource), (p) => this.host.resource(p), (b) => URL.createObjectURL(new Blob([b.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' })));
+      const refs = await rewriteRefs(withoutCspBlocked(withoutScripts(html)), dirOf(resource), (p) => this.host.resource(p), (b) => URL.createObjectURL(new Blob([b.slice().buffer as ArrayBuffer], { type: 'application/octet-stream' })));
       ({ markup, styles } = splitStyles(refs));
     }
     if (seq !== this.navSeq || !this.frame) return;

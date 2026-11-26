@@ -411,9 +411,19 @@ fn global_memory_cases_outside_the_pages_stop_the_run() {
             ("unlock-stray", "CALL(fle_imp_GlobalUnlock, A(stray));"),
             ("handle-never-issued", "CALL(fle_imp_GlobalLock, FLE_GLOBAL_HANDLE_BASE + 16 * 500);"),
             ("handle-not-aligned", "uint64_t h = CALL(fle_imp_GlobalAlloc, 2, 8); CALL(fle_imp_GlobalLock, h + 1);"),
-            ("localalloc-block", "uint64_t p; R[1] = 0; R[2] = 8; fle_imp_LocalAlloc(); p = R[0]; CALL(fle_imp_GlobalFree, p);"),
         ],
     );
+}
+
+// #1382: a LocalAlloc block is a fixed block of the one heap (fle_imports.c registers it with fle_glob_fixed_add), so GlobalFree releases it; it no longer stops
+#[test]
+fn a_localalloc_block_is_released_by_globalfree_because_the_local_and_global_fixed_blocks_are_one_heap() {
+    let o = run(
+        "glob-localalloc-globalfree",
+        "    uint64_t p; R[1] = 0; R[2] = 8; fle_imp_LocalAlloc(); p = R[0];\n    printf(\"alloc %d\\n\", p != 0);\n    printf(\"free %llu\\n\", U(CALL(fle_imp_GlobalFree, p)));",
+    );
+    assert!(o.ok, "{}", o.stderr);
+    assert_eq!(o.stdout, "alloc 1\nfree 0\n");
 }
 
 #[test]

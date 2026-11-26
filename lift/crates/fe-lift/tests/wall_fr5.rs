@@ -174,7 +174,7 @@ fn the_uuid_create_row_is_the_last_row_and_no_pseudo_va_moved() {
     // decision 0015: append only. The last row of decision 0117 is GetUserPreferredUILanguages; the one row of decision 0118 follows it. Decision 0119 appended 8 rows
     // after it (tests/wall_fr6.rs; old: the UuidCreate row was the last one, `rows[n - 1]`), decision 0122 another 15 (tests/wall_fr8.rs), decision 0123 another 73 (tests/wall_fr9.rs), decision 0125 another 2 (tests/wall_fr10.rs): LATER_ROWS = 98 (decision 0123: 96; decision 0122: 23; decision 0119 only: 8).
     // decision 0126 appended 33 more (tests/wall_fr11.rs; old value 8 + 15 + 73 + 2).
-    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len() + 4 + 1; // Issue #1391: + the K32GetProcessMemoryInfo row (the last of TABLE); Issue #1355: + the four rows of the webview2loader.dll exports (the last rows of fle_imports.c's TABLE); decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
+    const LATER_ROWS: usize = 8 + 15 + 73 + 2 + 33 + 4 + rows_0132::ROWS_0132.len() + 10 + rows_0139::ROWS_0139.len() + rows_0140::ROWS_0140.len() + rows_0144::ROWS_0144.len() + rows_0147::ROWS_0147.len() + rows_0267::ROWS_0267.len() + rows_0372::ROWS_0372.len() + 4 + 1 + 1; // Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1391: + the K32GetProcessMemoryInfo row (the last of TABLE); Issue #1355: + the four rows of the webview2loader.dll exports (the last rows of fle_imports.c's TABLE); decision 0372: + the row of tests/rows_0372/mod.rs after that of decision 0267; decision 0267: + the row of tests/rows_0267/mod.rs after that of decision 0147; decision 0147: + the row of tests/rows_0147/mod.rs after those of decision 0144; decision 0136: + the 10 rows of tests/wall_fr14.rs, appended after those of decision 0132; decision 0139: + tests/rows_0139/mod.rs after those
     // decision 0129 (old: ... + 33): + 4 rows (tests/wall_fr12.rs); decision 0132: + tests/rows_0132/mod.rs
     assert_eq!((rows[n - LATER_ROWS - 2].0.as_str(), rows[n - LATER_ROWS - 2].1.as_str()), ("kernel32.dll", "GetUserPreferredUILanguages"));
     assert_eq!((rows[n - LATER_ROWS - 1].0.as_str(), rows[n - LATER_ROWS - 1].1.as_str()), ("rpcrt4.dll", "UuidCreate"));
@@ -368,6 +368,7 @@ fn driver() -> &'static PathBuf {
             .collect();
         srcs.sort();
         srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt).arg("-I").arg(harness_dir());

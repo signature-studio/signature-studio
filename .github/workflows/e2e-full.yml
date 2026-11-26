@@ -86,6 +86,22 @@ jobs:
             lift/out-app/bundle
           key: bundle-${{ github.event.workflow_run.head_sha }}
           fail-on-cache-miss: true
+      - name: demo の曲のフォルダをキャッシュから取る
+        uses: runs-on/cache@v5.0.7
+        env: {AWS_REGION: auto, RUNS_ON_S3_BUCKET_CACHE: fl-web-cache,
+          RUNS_ON_S3_FORCE_PATH_STYLE: "true",
+          AWS_ACCESS_KEY_ID: "${{ secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID }}",
+          AWS_SECRET_ACCESS_KEY:
+            "${{ secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY }}"}
+        with:
+          path: lift/out-app/host-extra/resources/Data/Demo projects
+          key: demo-${{ github.event.workflow_run.head_sha }}
+          fail-on-cache-miss: true
+      - name: demo の曲を host/resources に置く
+        run: |
+          mkdir -p lift/out-app/host/resources/Data
+          cp -a "lift/out-app/host-extra/resources/Data/Demo projects" \
+            lift/out-app/host/resources/Data/
       - name: E2E(依存・実行)
         run: |
           (cd tools/e2e && npm ci && npx playwright install chromium)

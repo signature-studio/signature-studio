@@ -291,6 +291,7 @@ fn driver() -> &'static PathBuf {
             .collect();
         srcs.sort();
         srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         assert!(srcs.iter().any(|p| p.ends_with("fle_hle.c")), "runtime/fle_hle.c is missing");
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");

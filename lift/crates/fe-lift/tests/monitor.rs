@@ -244,7 +244,7 @@ fn driver() -> &'static PathBuf {
         }
         let cc = cmd
             .arg(rt.join("fle_env.c"))
-            .arg(rt.join("fle_imports.c"))
+            .arg(rt.join("fle_imports.c")).arg(rt.join("fle_glob.c"))
             .arg("-o")
             .arg(&exe)
             .arg(&main_c)

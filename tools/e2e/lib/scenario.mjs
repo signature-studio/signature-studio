@@ -43,9 +43,9 @@ export function defineScenario(s) {
   return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail: checkMark(s.expectFail), run: s.run };
 }
 
-/** a scenario of the older set form ({ name, expectFail, run }; scenarios/smoke): it has no area and no covers, and each runs in a page of its own */
-export function legacyScenario(s) {
-  return { kind: 'legacy', id: s.name, name: s.name, area: 'smoke', covers: [], displays: ['4k-dpr1', '4k-dpr2', '4k-random'], expectFail: checkMark(s.expectFail ?? null), run: s.run };
+/** a scenario of the older set form ({ name, expectFail, beforeLoad?, run }; scenarios/<set>/index.mjs, set = smoke or browser-face): it has no covers, and each runs in a page of its own */
+export function legacyScenario(s, set = 'smoke') {
+  return { kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: ['4k-dpr1', '4k-dpr2', '4k-random'], expectFail: checkMark(s.expectFail ?? null), beforeLoad: s.beforeLoad, run: s.run };
 }
 
 /** the sort order of the shards and of the output: the IDs in ascending string order */

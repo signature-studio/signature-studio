@@ -40,7 +40,7 @@ fn work_dir() -> PathBuf {
 
 fn clang_c(src: &Path, obj: &Path) {
     let cc = Command::new("clang")
-        .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-fPIE", "-c"])
+        .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-deprecated-declarations", "-fPIE", "-c"])
         .arg("-I")
         .arg(rt_dir())
         .arg(src)
@@ -69,7 +69,7 @@ fn build(tag: &str, files: &[&str]) -> Vec<PathBuf> {
 fn gdi_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
     O.get_or_init(|| {
-        let mut v = build("obj-fr21-gdi", &["fle_gdi.c", "fle_raster.c", "fle_gdc.c", "fle_imports.c", "fle_env.c", "fle_cursor.c"]);
+        let mut v = build("obj-fr21-gdi", &["fle_gdi.c", "fle_raster.c", "fle_gdc.c", "fle_imports.c", "fle_glob.c", "fle_env.c", "fle_cursor.c"]);
         let dir = work_dir().join(etxt_common::per_process("obj-fr21-trace"));
         std::fs::create_dir_all(&dir).unwrap();
         let o = dir.join("win_trace_off.o");
@@ -81,7 +81,7 @@ fn gdi_objs() -> &'static Vec<PathBuf> {
 /// fle_raster.c (the window surfaces) and fle_visrgn.c (the dump) with the clock of fle_sys.c.
 fn vis_objs() -> &'static Vec<PathBuf> {
     static O: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    O.get_or_init(|| build("obj-fr21-vis", &["fle_raster.c", "fle_visrgn.c", "fle_sys.c", "fle_imports.c", "fle_env.c", "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"]))
+    O.get_or_init(|| build("obj-fr21-vis", &["fle_raster.c", "fle_visrgn.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_env.c", "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"]))
 }
 
 struct Out {
