@@ -1,1 +1,590 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+plugins/window/effects-control-surface-control-surface-x64	window	Control Surface	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-control-surface-control-surface-x64	param	Control Surface	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-control-surface-control-surface-x64	audio	Control Surface	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-control-surface-control-surface-x64	stop	Control Surface	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-distructor-distructor-x64	window	Distructor	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-distructor-distructor-x64	param	Distructor	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-distructor-distructor-x64	audio	Distructor	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-distructor-distructor-x64	stop	Distructor	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-edison-edison-x64	window	Edison	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-edison-edison-x64	param	Edison	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-edison-edison-x64	audio	Edison	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-edison-edison-x64	stop	Edison	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-effector-effector-x64	window	Effector	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-effector-effector-x64	param	Effector	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-effector-effector-x64	audio	Effector	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-effector-effector-x64	stop	Effector	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-emphasis-emphasis-x64	window	Emphasis	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-emphasis-emphasis-x64	param	Emphasis	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-emphasis-emphasis-x64	audio	Emphasis	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-emphasis-emphasis-x64	stop	Emphasis	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-emphasizer-emphasizer-x64	window	Emphasizer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-emphasizer-emphasizer-x64	param	Emphasizer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-emphasizer-emphasizer-x64	audio	Emphasizer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-emphasizer-emphasizer-x64	stop	Emphasizer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-equo-equo-x64	window	EQUO	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-equo-equo-x64	param	EQUO	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-equo-equo-x64	audio	EQUO	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-equo-equo-x64	stop	EQUO	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fl-studio-mobile-rack-fx-fl-studio-mobile-rack-fx-x64	window	FL Studio Mobile Rack FX	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fl-studio-mobile-rack-fx-fl-studio-mobile-rack-fx-x64	param	FL Studio Mobile Rack FX	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fl-studio-mobile-rack-fx-fl-studio-mobile-rack-fx-x64	audio	FL Studio Mobile Rack FX	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fl-studio-mobile-rack-fx-fl-studio-mobile-rack-fx-x64	stop	FL Studio Mobile Rack FX	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-frequency-shifter-frequency-shifter-x64	window	Frequency Shifter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-frequency-shifter-frequency-shifter-x64	param	Frequency Shifter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-frequency-shifter-frequency-shifter-x64	audio	Frequency Shifter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-frequency-shifter-frequency-shifter-x64	stop	Frequency Shifter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-frequency-splitter-frequency-splitter-x64	window	Frequency Splitter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-frequency-splitter-frequency-splitter-x64	param	Frequency Splitter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-frequency-splitter-frequency-splitter-x64	audio	Frequency Splitter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-frequency-splitter-frequency-splitter-x64	stop	Frequency Splitter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-7-band-eq-fruity-7-band-eq-x64	window	Fruity 7 Band EQ	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-7-band-eq-fruity-7-band-eq-x64	param	Fruity 7 Band EQ	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-7-band-eq-fruity-7-band-eq-x64	audio	Fruity 7 Band EQ	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-7-band-eq-fruity-7-band-eq-x64	stop	Fruity 7 Band EQ	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-balance-fruity-balance-x64	window	Fruity Balance	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-balance-fruity-balance-x64	param	Fruity Balance	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-balance-fruity-balance-x64	audio	Fruity Balance	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-balance-fruity-balance-x64	stop	Fruity Balance	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-bass-boost-fruity-bass-boost-x64	window	Fruity Bass Boost	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-bass-boost-fruity-bass-boost-x64	param	Fruity Bass Boost	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-bass-boost-fruity-bass-boost-x64	audio	Fruity Bass Boost	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-bass-boost-fruity-bass-boost-x64	stop	Fruity Bass Boost	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-big-clock-fruity-big-clock-x64	window	Fruity Big Clock	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-big-clock-fruity-big-clock-x64	param	Fruity Big Clock	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-big-clock-fruity-big-clock-x64	audio	Fruity Big Clock	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-big-clock-fruity-big-clock-x64	stop	Fruity Big Clock	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-blood-overdrive-fruity-blood-overdrive-x64	window	Fruity Blood Overdrive	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-blood-overdrive-fruity-blood-overdrive-x64	param	Fruity Blood Overdrive	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-blood-overdrive-fruity-blood-overdrive-x64	audio	Fruity Blood Overdrive	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-blood-overdrive-fruity-blood-overdrive-x64	stop	Fruity Blood Overdrive	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-center-fruity-center-x64	window	Fruity Center	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-center-fruity-center-x64	param	Fruity Center	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-center-fruity-center-x64	audio	Fruity Center	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-center-fruity-center-x64	stop	Fruity Center	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-chorus-fruity-chorus-x64	window	Fruity Chorus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-chorus-fruity-chorus-x64	param	Fruity Chorus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-chorus-fruity-chorus-x64	audio	Fruity Chorus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-chorus-fruity-chorus-x64	stop	Fruity Chorus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-compressor-fruity-compressor-x64	window	Fruity Compressor	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-compressor-fruity-compressor-x64	param	Fruity Compressor	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-compressor-fruity-compressor-x64	audio	Fruity Compressor	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-compressor-fruity-compressor-x64	stop	Fruity Compressor	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-convolver-fruity-convolver-x64	window	Fruity Convolver	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-convolver-fruity-convolver-x64	param	Fruity Convolver	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-convolver-fruity-convolver-x64	audio	Fruity Convolver	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-convolver-fruity-convolver-x64	stop	Fruity Convolver	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-db-meter-fruity-db-meter-x64	window	Fruity dB Meter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-db-meter-fruity-db-meter-x64	param	Fruity dB Meter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-db-meter-fruity-db-meter-x64	audio	Fruity dB Meter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-db-meter-fruity-db-meter-x64	stop	Fruity dB Meter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-delay-2-fruity-delay-2-x64	window	Fruity Delay 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-delay-2-fruity-delay-2-x64	param	Fruity Delay 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-delay-2-fruity-delay-2-x64	audio	Fruity Delay 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-delay-2-fruity-delay-2-x64	stop	Fruity Delay 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-delay-3-fruity-delay-3-x64	window	Fruity Delay 3	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-delay-3-fruity-delay-3-x64	param	Fruity Delay 3	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-delay-3-fruity-delay-3-x64	audio	Fruity Delay 3	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-delay-3-fruity-delay-3-x64	stop	Fruity Delay 3	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-delay-bank-fruity-delay-bank-x64	window	Fruity Delay Bank	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-delay-bank-fruity-delay-bank-x64	param	Fruity Delay Bank	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-delay-bank-fruity-delay-bank-x64	audio	Fruity Delay Bank	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-delay-bank-fruity-delay-bank-x64	stop	Fruity Delay Bank	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-delay-fruity-delay-x64	window	Fruity Delay	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-delay-fruity-delay-x64	param	Fruity Delay	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-delay-fruity-delay-x64	audio	Fruity Delay	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-delay-fruity-delay-x64	stop	Fruity Delay	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-fast-dist-fruity-fast-dist-x64	window	Fruity Fast Dist	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-fast-dist-fruity-fast-dist-x64	param	Fruity Fast Dist	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-fast-dist-fruity-fast-dist-x64	audio	Fruity Fast Dist	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-fast-dist-fruity-fast-dist-x64	stop	Fruity Fast Dist	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-fast-lp-fruity-fast-lp-x64	window	Fruity Fast LP	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-fast-lp-fruity-fast-lp-x64	param	Fruity Fast LP	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-fast-lp-fruity-fast-lp-x64	audio	Fruity Fast LP	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-fast-lp-fruity-fast-lp-x64	stop	Fruity Fast LP	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-filter-fruity-filter-x64	window	Fruity Filter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-filter-fruity-filter-x64	param	Fruity Filter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-filter-fruity-filter-x64	audio	Fruity Filter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-filter-fruity-filter-x64	stop	Fruity Filter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-flanger-fruity-flanger-x64	window	Fruity Flanger	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-flanger-fruity-flanger-x64	param	Fruity Flanger	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-flanger-fruity-flanger-x64	audio	Fruity Flanger	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-flanger-fruity-flanger-x64	stop	Fruity Flanger	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-flangus-fruity-flangus-x64	window	Fruity Flangus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-flangus-fruity-flangus-x64	param	Fruity Flangus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-flangus-fruity-flangus-x64	audio	Fruity Flangus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-flangus-fruity-flangus-x64	stop	Fruity Flangus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-formula-controller-fruity-formula-controller-x64	window	Fruity Formula Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-formula-controller-fruity-formula-controller-x64	param	Fruity Formula Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-formula-controller-fruity-formula-controller-x64	audio	Fruity Formula Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-formula-controller-fruity-formula-controller-x64	stop	Fruity Formula Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-free-filter-fruity-free-filter-x64	window	Fruity Free Filter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-free-filter-fruity-free-filter-x64	param	Fruity Free Filter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-free-filter-fruity-free-filter-x64	audio	Fruity Free Filter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-free-filter-fruity-free-filter-x64	stop	Fruity Free Filter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-html-notebook-fruity-html-notebook-x64	window	Fruity HTML NoteBook	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-html-notebook-fruity-html-notebook-x64	param	Fruity HTML NoteBook	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-html-notebook-fruity-html-notebook-x64	audio	Fruity HTML NoteBook	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-html-notebook-fruity-html-notebook-x64	stop	Fruity HTML NoteBook	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-limiter-fruity-limiter-x64	window	Fruity Limiter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-limiter-fruity-limiter-x64	param	Fruity Limiter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-limiter-fruity-limiter-x64	audio	Fruity Limiter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-limiter-fruity-limiter-x64	stop	Fruity Limiter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-love-philter-fruity-love-philter-x64	window	Fruity Love Philter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-love-philter-fruity-love-philter-x64	param	Fruity Love Philter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-love-philter-fruity-love-philter-x64	audio	Fruity Love Philter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-love-philter-fruity-love-philter-x64	stop	Fruity Love Philter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-lsd-fruity-lsd-x64	window	Fruity LSD	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-lsd-fruity-lsd-x64	param	Fruity LSD	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-lsd-fruity-lsd-x64	audio	Fruity LSD	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-lsd-fruity-lsd-x64	stop	Fruity LSD	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-multiband-compressor-fruity-multiband-compressor-x64	window	Fruity Multiband Compressor	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-multiband-compressor-fruity-multiband-compressor-x64	param	Fruity Multiband Compressor	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-multiband-compressor-fruity-multiband-compressor-x64	audio	Fruity Multiband Compressor	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-multiband-compressor-fruity-multiband-compressor-x64	stop	Fruity Multiband Compressor	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-mute-2-fruity-mute-2-x64	window	Fruity Mute 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-mute-2-fruity-mute-2-x64	param	Fruity Mute 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-mute-2-fruity-mute-2-x64	audio	Fruity Mute 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-mute-2-fruity-mute-2-x64	stop	Fruity Mute 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-notebook-2-fruity-notebook-2-x64	window	Fruity NoteBook 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-notebook-2-fruity-notebook-2-x64	param	Fruity NoteBook 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-notebook-2-fruity-notebook-2-x64	audio	Fruity NoteBook 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-notebook-2-fruity-notebook-2-x64	stop	Fruity NoteBook 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-notebook-fruity-notebook-x64	window	Fruity NoteBook	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-notebook-fruity-notebook-x64	param	Fruity NoteBook	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-notebook-fruity-notebook-x64	audio	Fruity NoteBook	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-notebook-fruity-notebook-x64	stop	Fruity NoteBook	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-panomatic-fruity-panomatic-x64	window	Fruity PanOMatic	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-panomatic-fruity-panomatic-x64	param	Fruity PanOMatic	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-panomatic-fruity-panomatic-x64	audio	Fruity PanOMatic	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-panomatic-fruity-panomatic-x64	stop	Fruity PanOMatic	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-parametric-eq-2-fruity-parametric-eq-2-x64	window	Fruity Parametric EQ 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-parametric-eq-2-fruity-parametric-eq-2-x64	param	Fruity Parametric EQ 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-parametric-eq-2-fruity-parametric-eq-2-x64	audio	Fruity Parametric EQ 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-parametric-eq-2-fruity-parametric-eq-2-x64	stop	Fruity Parametric EQ 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-parametric-eq-fruity-parametric-eq-x64	window	Fruity Parametric EQ	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-parametric-eq-fruity-parametric-eq-x64	param	Fruity Parametric EQ	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-parametric-eq-fruity-parametric-eq-x64	audio	Fruity Parametric EQ	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-parametric-eq-fruity-parametric-eq-x64	stop	Fruity Parametric EQ	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-peak-controller-fruity-peak-controller-x64	window	Fruity Peak Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-peak-controller-fruity-peak-controller-x64	param	Fruity Peak Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-peak-controller-fruity-peak-controller-x64	audio	Fruity Peak Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-peak-controller-fruity-peak-controller-x64	stop	Fruity Peak Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-phase-inverter-fruity-phase-inverter-x64	window	Fruity Phase Inverter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-phase-inverter-fruity-phase-inverter-x64	param	Fruity Phase Inverter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-phase-inverter-fruity-phase-inverter-x64	audio	Fruity Phase Inverter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-phase-inverter-fruity-phase-inverter-x64	stop	Fruity Phase Inverter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-phaser-fruity-phaser-x64	window	Fruity Phaser	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-phaser-fruity-phaser-x64	param	Fruity Phaser	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-phaser-fruity-phaser-x64	audio	Fruity Phaser	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-phaser-fruity-phaser-x64	stop	Fruity Phaser	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-reeverb-2-fruity-reeverb-2-x64	window	Fruity Reeverb 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-reeverb-2-fruity-reeverb-2-x64	param	Fruity Reeverb 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-reeverb-2-fruity-reeverb-2-x64	audio	Fruity Reeverb 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-reeverb-2-fruity-reeverb-2-x64	stop	Fruity Reeverb 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-reeverb-fruity-reeverb-x64	window	Fruity Reeverb	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-reeverb-fruity-reeverb-x64	param	Fruity Reeverb	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-reeverb-fruity-reeverb-x64	audio	Fruity Reeverb	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-reeverb-fruity-reeverb-x64	stop	Fruity Reeverb	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-scratcher-fruity-scratcher-x64	window	Fruity Scratcher	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-scratcher-fruity-scratcher-x64	param	Fruity Scratcher	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-scratcher-fruity-scratcher-x64	audio	Fruity Scratcher	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-scratcher-fruity-scratcher-x64	stop	Fruity Scratcher	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-send-fruity-send-x64	window	Fruity Send	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-send-fruity-send-x64	param	Fruity Send	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-send-fruity-send-x64	audio	Fruity Send	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-send-fruity-send-x64	stop	Fruity Send	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-soft-clipper-fruity-soft-clipper-x64	window	Fruity Soft Clipper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-soft-clipper-fruity-soft-clipper-x64	param	Fruity Soft Clipper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-soft-clipper-fruity-soft-clipper-x64	audio	Fruity Soft Clipper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-soft-clipper-fruity-soft-clipper-x64	stop	Fruity Soft Clipper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-spectroman-fruity-spectroman-x64	window	Fruity Spectroman	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-spectroman-fruity-spectroman-x64	param	Fruity Spectroman	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-spectroman-fruity-spectroman-x64	audio	Fruity Spectroman	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-spectroman-fruity-spectroman-x64	stop	Fruity Spectroman	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-squeeze-fruity-squeeze-x64	window	Fruity Squeeze	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-squeeze-fruity-squeeze-x64	param	Fruity Squeeze	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-squeeze-fruity-squeeze-x64	audio	Fruity Squeeze	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-squeeze-fruity-squeeze-x64	stop	Fruity Squeeze	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-stereo-enhancer-fruity-stereo-enhancer-x64	window	Fruity Stereo Enhancer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-stereo-enhancer-fruity-stereo-enhancer-x64	param	Fruity Stereo Enhancer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-stereo-enhancer-fruity-stereo-enhancer-x64	audio	Fruity Stereo Enhancer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-stereo-enhancer-fruity-stereo-enhancer-x64	stop	Fruity Stereo Enhancer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-stereo-shaper-fruity-stereo-shaper-x64	window	Fruity Stereo Shaper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-stereo-shaper-fruity-stereo-shaper-x64	param	Fruity Stereo Shaper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-stereo-shaper-fruity-stereo-shaper-x64	audio	Fruity Stereo Shaper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-stereo-shaper-fruity-stereo-shaper-x64	stop	Fruity Stereo Shaper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-vocoder-fruity-vocoder-x64	window	Fruity Vocoder	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-vocoder-fruity-vocoder-x64	param	Fruity Vocoder	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-vocoder-fruity-vocoder-x64	audio	Fruity Vocoder	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-vocoder-fruity-vocoder-x64	stop	Fruity Vocoder	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-waveshaper-fruity-waveshaper-x64	window	Fruity WaveShaper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-waveshaper-fruity-waveshaper-x64	param	Fruity WaveShaper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-waveshaper-fruity-waveshaper-x64	audio	Fruity WaveShaper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-waveshaper-fruity-waveshaper-x64	stop	Fruity WaveShaper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-wrapper-fruity-wrapper-x64	window	Fruity Wrapper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-wrapper-fruity-wrapper-x64	param	Fruity Wrapper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-wrapper-fruity-wrapper-x64	audio	Fruity Wrapper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-wrapper-fruity-wrapper-x64	stop	Fruity Wrapper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-x-y-controller-fruity-x-y-controller-x64	window	Fruity X-Y Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-x-y-controller-fruity-x-y-controller-x64	param	Fruity X-Y Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-x-y-controller-fruity-x-y-controller-x64	audio	Fruity X-Y Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-x-y-controller-fruity-x-y-controller-x64	stop	Fruity X-Y Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-fruity-x-y-z-controller-fruity-x-y-z-controller-x64	window	Fruity X-Y-Z Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-fruity-x-y-z-controller-fruity-x-y-z-controller-x64	param	Fruity X-Y-Z Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-fruity-x-y-z-controller-fruity-x-y-z-controller-x64	audio	Fruity X-Y-Z Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-fruity-x-y-z-controller-fruity-x-y-z-controller-x64	stop	Fruity X-Y-Z Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-gross-beat-gross-beat-x64	window	Gross Beat	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-gross-beat-gross-beat-x64	param	Gross Beat	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-gross-beat-gross-beat-x64	audio	Gross Beat	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-gross-beat-gross-beat-x64	stop	Gross Beat	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-hardcore-hardcore-x64	window	Hardcore	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-hardcore-hardcore-x64	param	Hardcore	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-hardcore-hardcore-x64	audio	Hardcore	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-hardcore-hardcore-x64	stop	Hardcore	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-hyper-chorus-hyper-chorus-x64	window	Hyper Chorus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-hyper-chorus-hyper-chorus-x64	param	Hyper Chorus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-hyper-chorus-hyper-chorus-x64	audio	Hyper Chorus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-hyper-chorus-hyper-chorus-x64	stop	Hyper Chorus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-low-lifter-low-lifter-x64	window	Low Lifter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-low-lifter-low-lifter-x64	param	Low Lifter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-low-lifter-low-lifter-x64	audio	Low Lifter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-low-lifter-low-lifter-x64	stop	Low Lifter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-luxeverb-luxeverb-x64	window	Luxeverb	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-luxeverb-luxeverb-x64	param	Luxeverb	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-luxeverb-luxeverb-x64	audio	Luxeverb	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-luxeverb-luxeverb-x64	stop	Luxeverb	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-maximus-maximus-x64	window	Maximus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-maximus-maximus-x64	param	Maximus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-maximus-maximus-x64	audio	Maximus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-maximus-maximus-x64	stop	Maximus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-multiband-delay-multiband-delay-x64	window	Multiband Delay	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-multiband-delay-multiband-delay-x64	param	Multiband Delay	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-multiband-delay-multiband-delay-x64	audio	Multiband Delay	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-multiband-delay-multiband-delay-x64	stop	Multiband Delay	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-newtime-newtime-x64	window	Newtime	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-newtime-newtime-x64	param	Newtime	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-newtime-newtime-x64	audio	Newtime	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-newtime-newtime-x64	stop	Newtime	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-newtone-newtone-x64	window	Newtone	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-newtone-newtone-x64	param	Newtone	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-newtone-newtone-x64	audio	Newtone	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-newtone-newtone-x64	stop	Newtone	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-patcher-patcher-x64	window	Patcher	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-patcher-patcher-x64	param	Patcher	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-patcher-patcher-x64	audio	Patcher	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-patcher-patcher-x64	stop	Patcher	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-pitch-shifter-pitch-shifter-x64	window	Pitch Shifter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-pitch-shifter-pitch-shifter-x64	param	Pitch Shifter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-pitch-shifter-pitch-shifter-x64	audio	Pitch Shifter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-pitch-shifter-pitch-shifter-x64	stop	Pitch Shifter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-pitcher-pitcher-x64	window	Pitcher	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-pitcher-pitcher-x64	param	Pitcher	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-pitcher-pitcher-x64	audio	Pitcher	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-pitcher-pitcher-x64	stop	Pitcher	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-razer-chroma-razer-chroma-x64	window	Razer Chroma	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-razer-chroma-razer-chroma-x64	param	Razer Chroma	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-razer-chroma-razer-chroma-x64	audio	Razer Chroma	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-razer-chroma-razer-chroma-x64	stop	Razer Chroma	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-soundgoodizer-soundgoodizer-x64	window	Soundgoodizer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-soundgoodizer-soundgoodizer-x64	param	Soundgoodizer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-soundgoodizer-soundgoodizer-x64	audio	Soundgoodizer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-soundgoodizer-soundgoodizer-x64	stop	Soundgoodizer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-spreader-spreader-x64	window	Spreader	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-spreader-spreader-x64	param	Spreader	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-spreader-spreader-x64	audio	Spreader	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-spreader-spreader-x64	stop	Spreader	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-transient-processor-transient-processor-x64	window	Transient Processor	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-transient-processor-transient-processor-x64	param	Transient Processor	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-transient-processor-transient-processor-x64	audio	Transient Processor	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-transient-processor-transient-processor-x64	stop	Transient Processor	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-transmitter-transmitter-x64	window	Transmitter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-transmitter-transmitter-x64	param	Transmitter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-transmitter-transmitter-x64	audio	Transmitter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-transmitter-transmitter-x64	stop	Transmitter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-transporter-transporter-x64	window	Transporter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-transporter-transporter-x64	param	Transporter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-transporter-transporter-x64	audio	Transporter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-transporter-transporter-x64	stop	Transporter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-tuner-tuner-x64	window	Tuner	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-tuner-tuner-x64	param	Tuner	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-tuner-tuner-x64	audio	Tuner	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-tuner-tuner-x64	stop	Tuner	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-color-mapper-vfx-color-mapper-x64	window	VFX Color Mapper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-color-mapper-vfx-color-mapper-x64	param	VFX Color Mapper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-color-mapper-vfx-color-mapper-x64	audio	VFX Color Mapper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-color-mapper-vfx-color-mapper-x64	stop	VFX Color Mapper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-envelope-vfx-envelope-x64	window	VFX Envelope	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-envelope-vfx-envelope-x64	param	VFX Envelope	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-envelope-vfx-envelope-x64	audio	VFX Envelope	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-envelope-vfx-envelope-x64	stop	VFX Envelope	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-key-mapper-vfx-key-mapper-x64	window	VFX Key Mapper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-key-mapper-vfx-key-mapper-x64	param	VFX Key Mapper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-key-mapper-vfx-key-mapper-x64	audio	VFX Key Mapper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-key-mapper-vfx-key-mapper-x64	stop	VFX Key Mapper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-keyboard-splitter-vfx-keyboard-splitter-x64	window	VFX Keyboard Splitter	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-keyboard-splitter-vfx-keyboard-splitter-x64	param	VFX Keyboard Splitter	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-keyboard-splitter-vfx-keyboard-splitter-x64	audio	VFX Keyboard Splitter	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-keyboard-splitter-vfx-keyboard-splitter-x64	stop	VFX Keyboard Splitter	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-level-scaler-vfx-level-scaler-x64	window	VFX Level Scaler	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-level-scaler-vfx-level-scaler-x64	param	VFX Level Scaler	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-level-scaler-vfx-level-scaler-x64	audio	VFX Level Scaler	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-level-scaler-vfx-level-scaler-x64	stop	VFX Level Scaler	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-script-vfx-script-x64	window	VFX Script	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-script-vfx-script-x64	param	VFX Script	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-script-vfx-script-x64	audio	VFX Script	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-script-vfx-script-x64	stop	VFX Script	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vfx-sequencer-vfx-sequencer-x64	window	VFX Sequencer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vfx-sequencer-vfx-sequencer-x64	param	VFX Sequencer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vfx-sequencer-vfx-sequencer-x64	audio	VFX Sequencer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vfx-sequencer-vfx-sequencer-x64	stop	VFX Sequencer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vintage-chorus-vintage-chorus-x64	window	Vintage Chorus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vintage-chorus-vintage-chorus-x64	param	Vintage Chorus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vintage-chorus-vintage-chorus-x64	audio	Vintage Chorus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vintage-chorus-vintage-chorus-x64	stop	Vintage Chorus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vintage-phaser-vintage-phaser-x64	window	Vintage Phaser	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vintage-phaser-vintage-phaser-x64	param	Vintage Phaser	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vintage-phaser-vintage-phaser-x64	audio	Vintage Phaser	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vintage-phaser-vintage-phaser-x64	stop	Vintage Phaser	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vocodex-synthesizer-sytrus-x64	window	Vocodex	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vocodex-synthesizer-sytrus-x64	param	Vocodex	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vocodex-synthesizer-sytrus-x64	audio	Vocodex	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vocodex-synthesizer-sytrus-x64	stop	Vocodex	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-vocodex-vocodex-x64	window	Vocodex	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-vocodex-vocodex-x64	param	Vocodex	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-vocodex-vocodex-x64	audio	Vocodex	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-vocodex-vocodex-x64	stop	Vocodex	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-wave-candy-wave-candy-x64	window	Wave Candy	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-wave-candy-wave-candy-x64	param	Wave Candy	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-wave-candy-wave-candy-x64	audio	Wave Candy	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-wave-candy-wave-candy-x64	stop	Wave Candy	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64	window	ZGameEditor Visualizer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64	param	ZGameEditor Visualizer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64	audio	ZGameEditor Visualizer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/effects-zgameeditor-visualizer-zgameeditor-visualizer-x64	stop	ZGameEditor Visualizer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-3x-osc-3x-osc-x64	window	3x Osc	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-3x-osc-3x-osc-x64	param	3x Osc	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-3x-osc-3x-osc-x64	audio	3x Osc	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-3x-osc-3x-osc-x64	stop	3x Osc	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-autogun-autogun-x64	window	Autogun	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-autogun-autogun-x64	param	Autogun	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-autogun-autogun-x64	audio	Autogun	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-autogun-autogun-x64	stop	Autogun	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-bassdrum-bassdrum-x64	window	BassDrum	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-bassdrum-bassdrum-x64	param	BassDrum	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-bassdrum-bassdrum-x64	audio	BassDrum	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-bassdrum-bassdrum-x64	stop	BassDrum	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-beepmap-beepmap-x64	window	BeepMap	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-beepmap-beepmap-x64	param	BeepMap	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-beepmap-beepmap-x64	audio	BeepMap	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-beepmap-beepmap-x64	stop	BeepMap	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-boobass-boobass-x64	window	BooBass	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-boobass-boobass-x64	param	BooBass	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-boobass-boobass-x64	audio	BooBass	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-boobass-boobass-x64	stop	BooBass	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-dashboard-dashboard-x64	window	Dashboard	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-dashboard-dashboard-x64	param	Dashboard	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-dashboard-dashboard-x64	audio	Dashboard	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-dashboard-dashboard-x64	stop	Dashboard	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-directwave-directwave-x64	window	DirectWave	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-directwave-directwave-x64	param	DirectWave	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-directwave-directwave-x64	audio	DirectWave	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-directwave-directwave-x64	stop	DirectWave	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-drumaxx-drumaxx-x64	window	Drumaxx	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-drumaxx-drumaxx-x64	param	Drumaxx	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-drumaxx-drumaxx-x64	audio	Drumaxx	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-drumaxx-drumaxx-x64	stop	Drumaxx	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-drumpad-drumpad-x64	window	Drumpad	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-drumpad-drumpad-x64	param	Drumpad	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-drumpad-drumpad-x64	audio	Drumpad	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-drumpad-drumpad-x64	stop	Drumpad	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fl-keys-fl-keys-x64	window	FL Keys	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fl-keys-fl-keys-x64	param	FL Keys	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fl-keys-fl-keys-x64	audio	FL Keys	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fl-keys-fl-keys-x64	stop	FL Keys	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fl-slayer-fl-slayer-x64	window	FL Slayer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fl-slayer-fl-slayer-x64	param	FL Slayer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fl-slayer-fl-slayer-x64	audio	FL Slayer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fl-slayer-fl-slayer-x64	stop	FL Slayer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fl-studio-mobile-rack-fl-studio-mobile-rack-x64	window	FL Studio Mobile Rack	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fl-studio-mobile-rack-fl-studio-mobile-rack-x64	param	FL Studio Mobile Rack	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fl-studio-mobile-rack-fl-studio-mobile-rack-x64	audio	FL Studio Mobile Rack	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fl-studio-mobile-rack-fl-studio-mobile-rack-x64	stop	FL Studio Mobile Rack	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fl-studio-mobile-fl-studio-mobile-x64	window	FL Studio Mobile	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fl-studio-mobile-fl-studio-mobile-x64	param	FL Studio Mobile	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fl-studio-mobile-fl-studio-mobile-x64	audio	FL Studio Mobile	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fl-studio-mobile-fl-studio-mobile-x64	stop	FL Studio Mobile	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-flex-flex-x64	window	FLEX	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-flex-flex-x64	param	FLEX	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-flex-flex-x64	audio	FLEX	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-flex-flex-x64	stop	FLEX	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fpc-fpc-x64	window	FPC	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fpc-fpc-x64	param	FPC	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fpc-fpc-x64	audio	FPC	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fpc-fpc-x64	stop	FPC	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruit-kick-fruit-kick-x64	window	Fruit Kick	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruit-kick-fruit-kick-x64	param	Fruit Kick	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruit-kick-fruit-kick-x64	audio	Fruit Kick	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruit-kick-fruit-kick-x64	stop	Fruit Kick	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-dance-fruity-dance-x64	window	Fruity Dance	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-dance-fruity-dance-x64	param	Fruity Dance	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-dance-fruity-dance-x64	audio	Fruity Dance	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-dance-fruity-dance-x64	stop	Fruity Dance	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-drumsynth-live-fruity-drumsynth-live-x64	window	Fruity DrumSynth Live	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-drumsynth-live-fruity-drumsynth-live-x64	param	Fruity DrumSynth Live	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-drumsynth-live-fruity-drumsynth-live-x64	audio	Fruity DrumSynth Live	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-drumsynth-live-fruity-drumsynth-live-x64	stop	Fruity DrumSynth Live	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-dx10-fruity-dx10-x64	window	Fruity DX10	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-dx10-fruity-dx10-x64	param	Fruity DX10	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-dx10-fruity-dx10-x64	audio	Fruity DX10	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-dx10-fruity-dx10-x64	stop	Fruity DX10	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-envelope-controller-fruity-envelope-controller-x64	window	Fruity Envelope Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-envelope-controller-fruity-envelope-controller-x64	param	Fruity Envelope Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-envelope-controller-fruity-envelope-controller-x64	audio	Fruity Envelope Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-envelope-controller-fruity-envelope-controller-x64	stop	Fruity Envelope Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-granulizer-fruity-granulizer-x64	window	Fruity Granulizer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-granulizer-fruity-granulizer-x64	param	Fruity Granulizer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-granulizer-fruity-granulizer-x64	audio	Fruity Granulizer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-granulizer-fruity-granulizer-x64	stop	Fruity Granulizer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-keyboard-controller-fruity-keyboard-controller-x64	window	Fruity Keyboard Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-keyboard-controller-fruity-keyboard-controller-x64	param	Fruity Keyboard Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-keyboard-controller-fruity-keyboard-controller-x64	audio	Fruity Keyboard Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-keyboard-controller-fruity-keyboard-controller-x64	stop	Fruity Keyboard Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-slicer-2-fruity-slicer-2-x64	window	Fruity Slicer 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-slicer-2-fruity-slicer-2-x64	param	Fruity Slicer 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-slicer-2-fruity-slicer-2-x64	audio	Fruity Slicer 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-slicer-2-fruity-slicer-2-x64	stop	Fruity Slicer 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-slicer-fruity-slicer-x64	window	Fruity Slicer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-slicer-fruity-slicer-x64	param	Fruity Slicer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-slicer-fruity-slicer-x64	audio	Fruity Slicer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-slicer-fruity-slicer-x64	stop	Fruity Slicer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-video-player-fruity-video-player-x64	window	Fruity Video Player	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-video-player-fruity-video-player-x64	param	Fruity Video Player	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-video-player-fruity-video-player-x64	audio	Fruity Video Player	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-video-player-fruity-video-player-x64	stop	Fruity Video Player	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-voltage-controller-fruity-voltage-controller-x64	window	Fruity Voltage Controller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-voltage-controller-fruity-voltage-controller-x64	param	Fruity Voltage Controller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-voltage-controller-fruity-voltage-controller-x64	audio	Fruity Voltage Controller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-voltage-controller-fruity-voltage-controller-x64	stop	Fruity Voltage Controller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-fruity-wrapper-fruity-wrapper-x64	window	Fruity Wrapper	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-fruity-wrapper-fruity-wrapper-x64	param	Fruity Wrapper	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-fruity-wrapper-fruity-wrapper-x64	audio	Fruity Wrapper	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-fruity-wrapper-fruity-wrapper-x64	stop	Fruity Wrapper	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-gms-gms-x64	window	GMS	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-gms-gms-x64	param	GMS	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-gms-gms-x64	audio	GMS	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-gms-gms-x64	stop	GMS	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-harmless-harmless-x64	window	Harmless	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-harmless-harmless-x64	param	Harmless	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-harmless-harmless-x64	audio	Harmless	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-harmless-harmless-x64	stop	Harmless	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-harmor-harmor-x64	window	Harmor	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-harmor-harmor-x64	param	Harmor	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-harmor-harmor-x64	audio	Harmor	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-harmor-harmor-x64	stop	Harmor	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-kepler-exo-kepler-exo-x64	window	Kepler Exo	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-kepler-exo-kepler-exo-x64	param	Kepler Exo	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-kepler-exo-kepler-exo-x64	audio	Kepler Exo	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-kepler-exo-kepler-exo-x64	stop	Kepler Exo	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-kepler-kepler-x64	window	Kepler	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-kepler-kepler-x64	param	Kepler	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-kepler-kepler-x64	audio	Kepler	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-kepler-kepler-x64	stop	Kepler	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-midi-out-midi-out-x64	window	MIDI Out	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-midi-out-midi-out-x64	param	MIDI Out	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-midi-out-midi-out-x64	audio	MIDI Out	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-midi-out-midi-out-x64	stop	MIDI Out	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-minisynth-minisynth-x64	window	Minisynth	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-minisynth-minisynth-x64	param	Minisynth	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-minisynth-minisynth-x64	audio	Minisynth	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-minisynth-minisynth-x64	stop	Minisynth	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-morphine-morphine-x64	window	Morphine	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-morphine-morphine-x64	param	Morphine	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-morphine-morphine-x64	audio	Morphine	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-morphine-morphine-x64	stop	Morphine	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-ogun-ogun-x64	window	Ogun	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-ogun-ogun-x64	param	Ogun	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-ogun-ogun-x64	audio	Ogun	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-ogun-ogun-x64	stop	Ogun	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-patcher-patcher-x64	window	Patcher	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-patcher-patcher-x64	param	Patcher	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-patcher-patcher-x64	audio	Patcher	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-patcher-patcher-x64	stop	Patcher	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-plucked-plucked-x64	window	Plucked!	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-plucked-plucked-x64	param	Plucked!	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-plucked-plucked-x64	audio	Plucked!	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-plucked-plucked-x64	stop	Plucked!	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-poizone-poizone-x64	window	PoiZone	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-poizone-poizone-x64	param	PoiZone	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-poizone-poizone-x64	audio	PoiZone	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-poizone-poizone-x64	stop	PoiZone	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-rewired-rewired-x64	window	ReWired	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-rewired-rewired-x64	param	ReWired	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-rewired-rewired-x64	audio	ReWired	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-rewired-rewired-x64	stop	ReWired	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-sakura-sakura-x64	window	Sakura	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-sakura-sakura-x64	param	Sakura	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-sakura-sakura-x64	audio	Sakura	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-sakura-sakura-x64	stop	Sakura	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-sawer-sawer-x64	window	Sawer	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-sawer-sawer-x64	param	Sawer	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-sawer-sawer-x64	audio	Sawer	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-sawer-sawer-x64	stop	Sawer	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-simsynth-simsynth-x64	window	SimSynth	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-simsynth-simsynth-x64	param	SimSynth	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-simsynth-simsynth-x64	audio	SimSynth	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-simsynth-simsynth-x64	stop	SimSynth	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-slicex-slicex-x64	window	Slicex	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-slicex-slicex-x64	param	Slicex	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-slicex-slicex-x64	audio	Slicex	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-slicex-slicex-x64	stop	Slicex	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-soundfont-player-soundfont-player-x64	window	Soundfont Player	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-soundfont-player-soundfont-player-x64	param	Soundfont Player	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-soundfont-player-soundfont-player-x64	audio	Soundfont Player	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-soundfont-player-soundfont-player-x64	stop	Soundfont Player	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-sytrus-sytrus-x64	window	Sytrus	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-sytrus-sytrus-x64	param	Sytrus	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-sytrus-sytrus-x64	audio	Sytrus	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-sytrus-sytrus-x64	stop	Sytrus	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-toxic-biohazard-toxic-biohazard-x64	window	Toxic Biohazard	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-toxic-biohazard-toxic-biohazard-x64	param	Toxic Biohazard	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-toxic-biohazard-toxic-biohazard-x64	audio	Toxic Biohazard	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-toxic-biohazard-toxic-biohazard-x64	stop	Toxic Biohazard	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-transistor-bass-transistor-bass-x64	window	Transistor Bass	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-transistor-bass-transistor-bass-x64	param	Transistor Bass	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-transistor-bass-transistor-bass-x64	audio	Transistor Bass	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-transistor-bass-transistor-bass-x64	stop	Transistor Bass	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-wasp-xt-wasp-xt-x64	window	Wasp XT	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-wasp-xt-wasp-xt-x64	param	Wasp XT	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-wasp-xt-wasp-xt-x64	audio	Wasp XT	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-wasp-xt-wasp-xt-x64	stop	Wasp XT	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-wasp-wasp-x64	window	Wasp	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-wasp-wasp-x64	param	Wasp	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-wasp-wasp-x64	audio	Wasp	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-wasp-wasp-x64	stop	Wasp	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/generators-wave-traveller-wave-traveller-x64	window	Wave Traveller	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/generators-wave-traveller-wave-traveller-x64	param	Wave Traveller	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/generators-wave-traveller-wave-traveller-x64	audio	Wave Traveller	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/generators-wave-traveller-wave-traveller-x64	stop	Wave Traveller	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/serum-2	window	Serum 2	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/serum-2	param	Serum 2	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/serum-2	audio	Serum 2	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/serum-2	stop	Serum 2	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/ott	window	OTT	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/ott	param	OTT	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/ott	audio	OTT	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/ott	stop	OTT	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/vital	window	Vital	窓が開く(窓の表のクラス・題名に、プラグインの名前が出る)	Mixer の挿入 1 の Slot 1 → picker → Plugin database の項目
+plugins/param/vital	param	Vital	パラメータを 1 つ変える(窓の画素の SHA-256 が変わる)	窓の中を縦にドラッグする(40 画素)
+plugins/audio/vital	audio	Vital	音声を処理する(Generators は再生中の非無音の量子が 0 より大きい)	Space で再生し、audio.detail().nonSilentQuanta を 2 秒見る
+plugins/stop/vital	stop	Vital	engine が止まらない(engine-idle のまま)	手順の後の engine の状態
+plugins/window/mixer-slot-picker	window	Mixer の挿入スロットの picker	picker の drop-down が開く(More plugins・Plugin database・表示の切替)	Insert 1 を 2 回押し(遅い二度押し) → Slot 1 を押す
+plugins/window/plugin-database	window	Plugin database(Browser の窓)	picker の Plugin database の項目で、Browser が Plugin database を出し、engine が Installed を読む	picker の項目(DB_ITEM)
+plugins/list/plugin-database-entries	list	Plugin database の件数	Installed の一覧の件数が出る(engine の enum-dir の行)	Plugin database を開いた後の engine のログ
+plugins/select/plugin-database-item	select	Plugin database の項目を選ぶ	項目を選ぶと、Browser の画素が変わる	Installed の行を押す
+plugins/window/plugin-manager	window	Plugin Manager の窓	Options の項目で PluginManager.exe が起動し、Plugin Manager の窓が出る(#1499)	Options の項目を順に選ぶ
+plugins/stop/plugin-manager	stop	Plugin Manager の起動後の engine	Plugin Manager を起動した後、10 秒 engine-idle のまま	Options の項目の後
+plugins/preset/sytrus-load	preset	Sytrus のプリセットの読み込み	プリセットを読み込み、パラメータの値が変わる	Plugin database の Sytrus の項目
+plugins/preset/fruity-balance-load	preset	Fruity Balance のプリセットの読み込み	プリセットを読み込み、パラメータの値が変わる	Plugin database の Fruity Balance の項目
+plugins/preset/serum-2-load	preset	Serum 2 のプリセットの読み込み	プリセットを読み込み、パラメータの値が変わる	Plugin database の Serum 2 の項目

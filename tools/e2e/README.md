@@ -96,6 +96,12 @@ export default defineScenario({
 - `persist(page, guest)`: 再読み込みの後に、起動し直して曲が開くかを確かめる。
 - `resetProject(guest)`(File > New)・`startProject(guest)`(利用データの箱・Welcome・Problems の箱を閉じ、既定の曲を開く)。
 
+### プラグインの領域(#1493)
+
+- `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
+- 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
+- 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
