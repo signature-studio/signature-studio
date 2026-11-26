@@ -1,0 +1,4 @@
+# Reverb_x64.dll (Issue #1429): the reverb DLL of the installer's Shared folder. Sytrus loads it by its bare name (LoadLibraryW "Reverb_x64.dll", the 126 that stopped the engine
+# before this row), so the key is the bare name: fle_realmod_find compares it with the normalized name. A helper (補助): a library that Sytrus loads, not a plugin of the Browser (no Plugin database entry).
+key	guest	role	sha256	size	hook	args	omit
+reverb_x64.dll	Shared\Reverb_x64.dll	補助	892423bcce3d516eb42d303566e8a15a23a9ae9014fbc589c79afa542019ba40	492544	none	--pdata	-

@@ -26,6 +26,7 @@ const HEADER = ['key', 'guest', 'role', 'sha256', 'size', 'hook', 'args', 'omit'
 const SHA_BALANCE = 'a399cbe060ec3002a920f62fdcc2a2fb36bb1f3918281e01cdd5fc70724b8064';
 const SHA_FILTER = 'f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c';
 const SHA_DELAY = 'c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc';
+const SHA_REVERB = '892423bcce3d516eb42d303566e8a15a23a9ae9014fbc589c79afa542019ba40';
 const GUEST = 'C:\\Program Files\\Image-Line\\FL Studio 21\\';
 const BALANCE_ROW = ['effects.fruity-balance.fruity_balance_x64.dll', 'Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll', '本体', SHA_BALANCE, '3718656', 'existing', '--pdata', '0x2c13a0'].join('\t');
 
@@ -57,6 +58,12 @@ try {
     rb.extract.map((r) => r.join('\t')), [`fruity balance_x64.dll\tlift/out-plugins/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
   ok('Balance: seed の行は、guest の絶対パス・host の先(末尾が鍵)・SHA-256',
     rb.seed.map((r) => r.join('\t')), [`${GUEST}Plugins\\Fruity\\Effects\\Fruity Balance\\Fruity Balance_x64.dll\tlift/out-idle1/inputs/install/Plugins/Fruity/Effects/effects.fruity-balance.fruity_balance_x64.dll\t${SHA_BALANCE}`]);
+
+  // 1b. Shared\Reverb_x64.dll(#1429): 親のフォルダが無いので、seed の先は inputs/install の直下(鍵の名前)。補助の行
+  const rv = pluginRows(plugins({ reverb: `${HEADER}\nreverb_x64.dll\tShared\\Reverb_x64.dll\t補助\t${SHA_REVERB}\t492544\tnone\t--pdata\t-\n` }));
+  ok('Shared: 抽出の行は、installer の名前・host の先(鍵)・SHA-256。seed の先は inputs/install の直下',
+    [rv.extract.map((r) => r.join('\t')), rv.seed.map((r) => r.join('\t'))],
+    [[`reverb_x64.dll\tlift/out-plugins/reverb_x64.dll\t${SHA_REVERB}`], [`${GUEST}Shared\\Reverb_x64.dll\tlift/out-idle1/inputs/install/reverb_x64.dll\t${SHA_REVERB}`]]);
 
   // 2. 2 つのフォルダ。鍵の順に並ぶ(zeta は alpha の後)。補助の DLL も行になる
   const two = plugins({

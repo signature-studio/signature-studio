@@ -105,10 +105,14 @@ impl Dll {
         format!("{GUEST_ROOT}{}", self.guest)
     }
 
-    /// the file of the seed list (relative to HOST_DIR): the folders of the DLL's path above its own folder, and the name (the key, unique)
+    /// the file of the seed list (relative to HOST_DIR): the folders of the DLL's path above its own folder, and the name (the key, unique).
+    /// A `Shared\file` DLL has no folder above its own: its seed file is directly in the install folder.
     pub fn seed_file(&self) -> String {
         let parts: Vec<&str> = self.guest.split('\\').collect();
-        format!("{SEED_ROOT}/{}/{}", parts[..parts.len() - 2].join("/"), self.name())
+        let mut path = vec![SEED_ROOT.to_string()];
+        path.extend(parts[..parts.len() - 2].iter().map(|p| p.to_string()));
+        path.push(self.name());
+        path.join("/")
     }
 
     /// the lower-case path suffix that LoadLibrary of the full path is matched with (fle_realmod_find_path)
@@ -332,8 +336,9 @@ pub fn validate(dlls: &[Dll]) -> Result<(), String> {
         if !keys.insert(d.key.clone()) {
             return Err(at("the key is not unique"));
         }
-        if d.guest.split('\\').count() < 3 || d.guest.contains('/') {
-            return Err(at("the guest path is Plugins\\...\\file (backslashes, at least three parts)"));
+        let parts = d.guest.split('\\').count();
+        if (parts < 3 && !(parts == 2 && d.guest.starts_with("Shared\\"))) || d.guest.contains('/') {
+            return Err(at("the guest path is Plugins\\...\\file (backslashes, at least three parts) or Shared\\file (Issue #1429)"));
         }
         if !guests.insert(d.guest.to_lowercase()) {
             return Err(at("the guest path is not unique"));
@@ -399,6 +404,48 @@ pub fn read_data_from(dir: &str) -> Result<Vec<Data>, String> {
         }
     }
     out.sort_by(|a, b| a.guest.cmp(&b.guest));
+    Ok(out)
+}
+
+/// `lift/plugins/<name>/seeds.tsv` (Issue #1429): a function of a DLL that the DLL reaches only through a pointer in its data and that has no
+/// `.pdata` entry, so the lift does not find it. A row is the DLL's key and the RVA of the function; the lift of the DLL takes it as a seed (see generate).
+pub fn parse_seeds(plugin: &str, text: &str) -> Result<Vec<(String, u64)>, String> {
+    let mut out = Vec::new();
+    let mut header = false;
+    for (n, line) in text.lines().enumerate() {
+        let at = |m: &str| format!("{plugin}/seeds.tsv line {}: {m}", n + 1);
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let f: Vec<&str> = line.split('\t').collect();
+        if !header {
+            if f != ["key", "rva"] {
+                return Err(at("the header must be key, rva (TAB separated)"));
+            }
+            header = true;
+            continue;
+        }
+        if f.len() != 2 {
+            return Err(at(&format!("{} fields, want 2", f.len())));
+        }
+        out.push((f[0].to_string(), hex(f[1]).map_err(|e| at(&e))?));
+    }
+    if !header {
+        return Err(format!("{plugin}/seeds.tsv: no header"));
+    }
+    Ok(out)
+}
+
+/// The seed rows of a plugins folder: the seeds.tsv of each folder that has one (a folder without one has no seeds).
+pub fn read_seeds_from(dir: &str) -> Result<Vec<(String, u64)>, String> {
+    let mut out = Vec::new();
+    for folder in plugin_folders(dir)? {
+        let path = format!("{dir}/{folder}/seeds.tsv");
+        if Path::new(&path).is_file() {
+            let text = fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))?;
+            out.extend(parse_seeds(&folder, &text)?);
+        }
+    }
     Ok(out)
 }
 
@@ -544,7 +591,8 @@ pub fn seed_row(d: &Dll) -> String {
 }
 
 /// The names of the Plugin database's entries: one per plugin, the folder of its main DLL in the installer (`Plugins\Fruity\Effects\Fruity Balance\...`
-/// gives `Fruity Balance`). A plugin has one main DLL, and the names are unique and usable as file names.
+/// gives `Fruity Balance`). A plugin has one main DLL, and the names are unique and usable as file names. A folder that has only helpers (補助,
+/// e.g. `Shared\Reverb_x64.dll`, a library that a plugin loads) is no plugin: it has no entry (Issue #1429).
 pub fn plugin_db_names(dlls: &[Dll]) -> Result<Vec<String>, String> {
     let mut plugins: BTreeMap<&str, Vec<&Dll>> = BTreeMap::new();
     for d in dlls {
@@ -553,10 +601,16 @@ pub fn plugin_db_names(dlls: &[Dll]) -> Result<Vec<String>, String> {
     let mut names = BTreeSet::new();
     for (plugin, rows) in &plugins {
         let mains: Vec<&&Dll> = rows.iter().filter(|d| d.main).collect();
+        if mains.is_empty() {
+            continue;
+        }
         if mains.len() != 1 {
             return Err(format!("{plugin}/plugin.tsv: {} rows of 本体, want one (the plugin's Plugin database entry is its main DLL)", mains.len()));
         }
         let parts: Vec<&str> = mains[0].guest.split('\\').collect();
+        if parts.len() < 3 {
+            return Err(format!("{plugin}/plugin.tsv: the main DLL {} has no folder of its own (the Plugin database entry is that folder)", mains[0].guest));
+        }
         let name = parts[parts.len() - 2];
         if name.is_empty() || name.chars().any(|c| "\\/:*?\"<>|".contains(c)) || !names.insert(name.to_string()) {
             return Err(format!("{plugin}/plugin.tsv: the Plugin database name {name} is empty, not a file name, or another plugin's"));
@@ -629,7 +683,7 @@ fn write(path: &str, text: &str) -> Result<(), String> {
 /// extraction table and the seed table do not depend on the bases, and the lists are left alone. With the bases, lists/ gets the
 /// fixed lists again (the lists stage then writes the plugins' lists, so no list of a removed plugin is left behind).
 pub fn generate(with_base: bool) -> Result<(), String> {
-    let dlls = read_plugins()?;
+    let mut dlls = read_plugins()?;
     let data = read_data(&dlls)?;
     fs::create_dir_all(OUT_DIR).map_err(|e| format!("{OUT_DIR}: {e}"))?;
     let mut extract = read_text(FIXED_EXTRACT)?;
@@ -689,6 +743,21 @@ pub fn generate(with_base: bool) -> Result<(), String> {
         return Err(format!("{} modules, the runtime holds {limit} (the limits of {LIMITS:?})", fixed.len() + dlls.len()));
     }
 
+    let seeds = read_seeds_from(PLUGINS_DIR)?;
+    if let Some((key, _)) = seeds.iter().find(|(k, _)| !dlls.iter().any(|d| &d.key == k)) {
+        return Err(format!("seeds.tsv: the key {key} is not the key of a plugin DLL"));
+    }
+    for (d, base) in dlls.iter_mut().zip(bases.iter().copied()) {
+        let rows: String = seeds.iter().filter(|(k, _)| *k == d.key).map(|(_, rva)| format!("0x{:x}\n", base + rva)).collect();
+        if rows.is_empty() {
+            continue;
+        }
+        fs::create_dir_all(format!("{OUT_DIR}/seeds")).map_err(|e| format!("{OUT_DIR}/seeds: {e}"))?;
+        let path = format!("{OUT_DIR}/seeds/{}.txt", d.key);
+        write(&path, &rows)?;
+        d.args.push("--seeds".into());
+        d.args.push(path);
+    }
     let pairs: Vec<(&Dll, u64)> = dlls.iter().zip(bases.iter().copied()).collect();
     let mut modules = read_text(FIXED_MODULES)?;
     let mut hyb = read_text(FIXED_HYB_ARGS)?;
@@ -900,6 +969,39 @@ mod tests {
     }
 
     #[test]
+    fn the_reverb_seeds_are_distinct_rvas_of_its_key_and_the_format_is_checked() {
+        let rows = parse_seeds("reverb", include_str!("../../../plugins/reverb/seeds.tsv")).unwrap();
+        assert_eq!(rows.len(), 28);
+        assert!(rows.iter().all(|(k, _)| k == "reverb_x64.dll"));
+        assert!(rows.contains(&("reverb_x64.dll".to_string(), 0x17ef0)), "the first entry of the function table at RVA 0x628d0");
+        let mut distinct: Vec<u64> = rows.iter().map(|(_, r)| *r).collect();
+        distinct.sort_unstable();
+        distinct.dedup();
+        assert_eq!(distinct.len(), 28);
+        assert!(parse_seeds("x", "key\tva\nreverb_x64.dll\t0x10\n").is_err());
+        assert!(parse_seeds("x", "key\trva\nreverb_x64.dll\tzz\n").is_err());
+        assert!(parse_seeds("x", "key\trva\nreverb_x64.dll\t0x10\textra\n").is_err());
+    }
+
+    #[test]
+    fn a_shared_helper_is_no_plugin_and_has_no_plugin_database_entry() {
+        let mut dlls = vec![balance()];
+        dlls.extend(parse_plugin("sytrus", include_str!("../../../plugins/sytrus/plugin.tsv")).unwrap());
+        dlls.extend(parse_plugin("reverb", include_str!("../../../plugins/reverb/plugin.tsv")).unwrap());
+        assert_eq!(dlls[2].guest, "Shared\\Reverb_x64.dll");
+        assert!(!dlls[2].main);
+        assert_eq!(plugin_db_names(&dlls).unwrap(), ["Fruity Balance", "Sytrus"]);
+        assert!(validate(&dlls).is_ok());
+        assert_eq!(dlls[2].seed_file(), "lift/out-idle1/inputs/install/reverb_x64.dll");
+        assert_eq!(dlls[2].host_file(), "lift/out-plugins/reverb_x64.dll");
+        assert_eq!(dlls[2].suffix(), "shared/reverb_x64.dll");
+        assert_eq!(seed_row(&dlls[2]), "C:\\Program Files\\Image-Line\\FL Studio 21\\Shared\\Reverb_x64.dll\tlift/out-idle1/inputs/install/reverb_x64.dll\t892423bcce3d516eb42d303566e8a15a23a9ae9014fbc589c79afa542019ba40");
+        let mut main_in_shared = parse_plugin("reverb", include_str!("../../../plugins/reverb/plugin.tsv")).unwrap();
+        main_in_shared[0].main = true;
+        assert!(plugin_db_names(&main_in_shared).is_err());
+    }
+
+    #[test]
     fn the_hook_points_of_balance_are_the_three_of_the_delphi_runtime() {
         let rvas = rvas_of_hook_file(include_str!("../../../harness/hooks/fruity-delphi-effect-hook-points.txt")).unwrap();
         assert_eq!(rvas.iter().map(|r| 0x6800000 + r).collect::<Vec<u64>>(), vec![0x6817bc0, 0x6831d70, 0x6831d90]);
@@ -1052,7 +1154,7 @@ mod tests {
         let state = format!("{root}/state");
         copy_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")), Path::new(&state));
         write_wave_folders(&table, &state);
-        assert_eq!(read_rows_from(&state).unwrap().len(), 162, "the copy of lift/plugins (Balance, Filter, Sytrus) and the wave's 159 rows");
+        assert_eq!(read_rows_from(&state).unwrap().len(), 163, "the copy of lift/plugins (Balance, Filter, Sytrus, Reverb) and the wave's 159 rows");
         let stale = format!("{root}/stale");
         fs::create_dir_all(format!("{stale}/old")).unwrap();
         fs::write(format!("{stale}/old/plugin.tsv"), format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.old.old_x64.dll\tPlugins\\Fruity\\Effects\\Old\\Old_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64))).unwrap();
@@ -1064,12 +1166,12 @@ mod tests {
         };
         for plugins in [state.as_str(), concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")] {
             let dlls = second_wave_dlls(plugins, &wave).unwrap();
-            assert_eq!(dlls.len(), 162);
+            assert_eq!(dlls.len(), 163);
             let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
             let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
             assert_eq!(bases[0], 0xC1D0000);
             let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance" && d.plugin != "fruity-filter").map(|d| align_up(image_of(d), ALIGN)).sum();
-            assert_eq!(wave_total, 748_158_976);
+            assert_eq!(wave_total, 748_158_976 + 524_288, "the wave's 748,158,976 B and Reverb's 516,096 B of SizeOfImage (aligned: 524,288)");
             for pair in bases.windows(2).zip(sizes.iter()) {
                 assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
             }
@@ -1096,8 +1198,9 @@ mod tests {
     }
 
     /// The first wave's folders (tools/plugin-layout/wave2-plugins.mjs, FIRST_WAVE): their DLLs are in lift/plugins, and not in the table.
+    /// Reverb_x64.dll (Issue #1429, a helper of Sytrus in Shared) is in lift/plugins too, and not in the table.
     fn first_wave_folder(guest: &str) -> bool {
-        const FIRST_WAVE: [&str; 4] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus"];
+        const FIRST_WAVE: [&str; 5] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus", r"Shared\Reverb_x64.dll"];
         let folder = guest.split('\\').take(4).collect::<Vec<&str>>().join("\\");
         FIRST_WAVE.iter().any(|f| f.eq_ignore_ascii_case(&folder))
     }

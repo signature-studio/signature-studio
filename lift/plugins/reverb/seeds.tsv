@@ -1,0 +1,35 @@
+# Issue #1429: small functions of Reverb_x64.dll that the DLL reaches only through a pointer in its data (a 16-byte table of {function, 0} at RVA 0x628d0,
+# a table of code pointers at RVA 0x61908, and others), and that have no .pdata entry, so the lift does not find them. Without them the engine stops at the
+# first call through one of them ("indirect call to 0xcbb7ef0 is not a known function entry": RVA 0x17ef0, the first entry of the table at RVA 0x628d0).
+# Found by reading the 8-byte values of .rdata and .data that point into .text: 88 such values, 33 of them not a .pdata start, 28 distinct RVAs. Each RVA
+# was checked by its bytes (a short function that starts after a return, an int3 or a zero byte of padding). plugins.rs turns each row into a VA at the
+# DLL's base and passes the file to the lift and to the wasm generator (--seeds).
+key	rva
+reverb_x64.dll	0x1301c
+reverb_x64.dll	0x13020
+reverb_x64.dll	0x131d4
+reverb_x64.dll	0x131d8
+reverb_x64.dll	0x131e0
+reverb_x64.dll	0x131e4
+reverb_x64.dll	0x131e8
+reverb_x64.dll	0x13098
+reverb_x64.dll	0x112b8
+reverb_x64.dll	0x11270
+reverb_x64.dll	0x11348
+reverb_x64.dll	0xf4d0
+reverb_x64.dll	0xf4dc
+reverb_x64.dll	0xf544
+reverb_x64.dll	0x3f80
+reverb_x64.dll	0x3f90
+reverb_x64.dll	0x46b0
+reverb_x64.dll	0x4f58
+reverb_x64.dll	0x42b60
+reverb_x64.dll	0x45828
+reverb_x64.dll	0x49b88
+reverb_x64.dll	0x17eec
+reverb_x64.dll	0x17ef0
+reverb_x64.dll	0x17f28
+reverb_x64.dll	0x17f2c
+reverb_x64.dll	0x17f40
+reverb_x64.dll	0x17f44
+reverb_x64.dll	0x17f88
