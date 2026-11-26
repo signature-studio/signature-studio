@@ -1363,7 +1363,7 @@ XF=$top/.github/workflows/e2e-full.yml; pj "$XF" > "$T/xf.json" 2>>"$T/pj.err"; 
 ok "e2e-full(z): YAML として読める" "$(test -s "$XJ" && echo yes)" yes
 ok "e2e-full(z): on は workflow_run だけ。workflows は e2e、types は completed" "$(jq -c '[(.on | keys), .on.workflow_run.workflows, .on.workflow_run.types]' "$XJ")" '[["workflow_run"],["e2e"],["completed"]]'
 ok "e2e-full(z): schedule・workflow_dispatch・workflow_call を置かない(行の数)" "$(grep -cE 'schedule|workflow_dispatch|workflow_call' "$XF")" 0
-ok "e2e-full(z): concurrency は group e2e-full の固定で、cancel-in-progress は真" "$(jq -Sc '.concurrency' "$XJ")" '{"cancel-in-progress":true,"group":"e2e-full"}'
+ok "e2e-full(z): concurrency の group は、e2e の結論が success の時だけ e2e-full-main、それ以外は run ごと(run_id)。cancel-in-progress は真" "$(jq -Sc '.concurrency' "$XJ")" "{\"cancel-in-progress\":true,\"group\":\"e2e-full-\${{ github.event.workflow_run.conclusion == 'success' && 'main' || github.run_id }}\"}"
 ok "e2e-full(z): job は shard と report の 2 つ。report は shard の後" "$(jq -r '[(.jobs | keys | sort | join(",")), .jobs.report.needs] | join("/")' "$XJ")" "report,shard/shard"
 ok "e2e-full(z): shard は e2e の成功の時だけ動く(job の if)" "$(jq -r '.jobs.shard.if' "$XJ")" "github.event.workflow_run.conclusion == 'success'"
 ok "e2e-full(z): report は always() で、e2e の成功の時だけ動く(shard が落ちても表を作る)" "$(jq -r '.jobs.report.if' "$XJ")" "always() && github.event.workflow_run.conclusion == 'success'"
@@ -1412,5 +1412,6 @@ ok "actions.lock: e2e-full.yml の一覧は、その uses と一致する(gh act
 XD=$(awk '/^## 20[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(z): 「20」の節に、非ゲート・deploy の前提ではない・matrix の決め方・網羅の表の読み方を書いた" "$(for w in '非ゲート' 'deploy' 'matrix' '網羅' '印なし'; do grep -cF -- "$w" <<<"$XD"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(z): 「20」の節は 10 行以内" "$([ "$(grep -c . <<<"$XD")" -le 10 ] && echo yes)" yes
+ok "設計(z): 「20」の節に、群の理由(skip の run が、正しい run を取り消す)を書いた" "$(for w in '群' 'skip' '取り消'; do grep -cF -- "$w" <<<"$XD"; done | awk '{s+=($1>0)} END{print s}')" 3
 ok "AGENTS.md: 置き場所の .github/workflows/ の行に e2e-full.yml(全シナリオ・非ゲート)が在る" "$(grep -cF 'e2e-full.yml' <(awk '/^## 置き場所/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md"))" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

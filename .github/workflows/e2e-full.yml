@@ -3,7 +3,10 @@
 name: e2e-full
 on:
   workflow_run: {workflows: [e2e], types: [completed]}
-concurrency: {group: e2e-full, cancel-in-progress: true}
+concurrency:
+  group: "e2e-full-${{ github.event.workflow_run.conclusion == 'success'
+    && 'main' || github.run_id }}"
+  cancel-in-progress: true
 jobs:
   shard:
     name: e2e-full (${{ matrix.area }} ${{ matrix.i }}/${{ matrix.n }})
