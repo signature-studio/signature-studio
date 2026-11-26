@@ -204,3 +204,6 @@
 223	#1509	E2E の topbar・page・resilience・perf を直す	Task
 224	#1510	F8 で Plugin list を開くと Channel rack が見えないままになり、F12 で Plugin list が残る	Task
 225	#1511	FL が読み込もうとして見つからない共有の DLL を、全て棚卸しし、足す束の Issue の下書きを作る(Shared・ffmpeg・Python・System の DLL)	Task
+226	#1512	共有の DLL 1: LAMEenc_x64.dll を実モジュールにして、MP3 の書き出しの止まりを直す	Task
+227	#1513	共有の DLL 2: WavpackDLL_x64.dll と oggio_x64.dll を実モジュールにして、既定の曲の読み込みの 126 と OGG の書き出しを揃える	Task
+228	#1514	共有の DLL 3: EasyFLAC_x64.dll を実モジュールにして、FLAC の音声の読み書きを揃える	Task
