@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // E2E (Issue #1407, extended by #1485): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
 // physical pixels, 120 Hz by the BeginFrame clock (lib/browser.mjs), with real mouse and key events (lib/guest.mjs).
-// Usage: node tools/e2e/run.mjs [--scenarios smoke | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
+// Usage: node tools/e2e/run.mjs [--scenarios smoke | browser-face | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
 //                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR] [--report-only]     (run.sh does the same from the repository)
 //   --area <領域>: the scenarios of tools/e2e/scenarios/<領域>/ (the 13 areas: page input file menus windows audio settings plugins topbar resilience visual perf delivery).
 //     Each file there default-exports defineScenario({ id, covers, displays, expectFail, run }) (lib/scenario.mjs). The files are found by the runner (no table to edit).
-//   --scenarios smoke: the older set (scenarios/smoke/index.mjs, { name, expectFail, run } objects); each of them runs in a page of its own, as before.
+//   --scenarios <set>: an older set (scenarios/<set>/index.mjs, { name, expectFail, run } objects: smoke, browser-face); each of them runs in a page of its own, as before.
 //   --list: starts nothing. One JSON line per area: { area, scenarios, covers, features } (features: the rows of tools/e2e/features/). With --area, that area's line only.
 //   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
 //   --budget: a number with s, m or h. A scenario that would start after the budget is not run: it is written with skipped: true (the row then fails).
@@ -21,7 +21,7 @@
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
 // 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests
-// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed.
+// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed. The count of scenarios is that of the set (browser-face: 1).
 // Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
 // stop report and the report's lines (lib/stop.mjs).
 import fs from 'node:fs';
@@ -70,10 +70,12 @@ export async function loadArea(area) {
   return out;
 }
 
-/** the older smoke set: its objects as legacy scenarios */
-export async function loadSmoke() {
-  const all = (await import(pathToFileURL(path.join(scenariosDir, 'smoke', 'index.mjs')).href)).default;
-  return all.map(legacyScenario);
+/** an older set (scenarios/<set>/index.mjs): its objects as legacy scenarios of that set */
+export async function loadLegacySet(set) {
+  const file = path.join(scenariosDir, set, 'index.mjs');
+  if (!/^[a-z][a-z0-9-]*$/.test(set) || !fs.existsSync(file)) throw new Error(`--scenarios ${set}: no set at scenarios/${set}/index.mjs (smoke, browser-face; or --area <領域>)`);
+  const all = (await import(pathToFileURL(file).href)).default;
+  return all.map((s) => legacyScenario(s, set));
 }
 
 /** the engine's stop of the page (its log and state), through lib/stop.mjs */
@@ -300,9 +302,7 @@ async function loadSet(args) {
     if (!AREAS.includes(args.area)) throw new Error(`--area ${args.area}: the areas are ${AREAS.join(', ')}`);
     return loadArea(args.area);
   }
-  const set = args.scenarios ?? 'smoke';
-  if (set === 'smoke') return loadSmoke();
-  throw new Error(`--scenarios ${set}: only smoke (or --area <領域>)`);
+  return loadLegacySet(args.scenarios ?? 'smoke');
 }
 
 /** the --list lines: one per area (or the one area given) */

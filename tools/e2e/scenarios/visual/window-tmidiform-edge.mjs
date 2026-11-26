@@ -1,0 +1,12 @@
+// visual/window-tmidiform-edge: the Settings window (F10): its four edges are sharp and 2 device px wide at most.
+// Known (Issue #1496 run, 2026-11-26): the window's top side reads a 3 device px frame (the criterion is 1 or 2); whether the product draws it or the reading counts a gradient is not checked yet.
+import { defineScenario } from '../../lib/scenario.mjs';
+import { windowEdge } from '../../lib/visual.mjs';
+
+export default defineScenario({
+  id: 'visual/window-tmidiform-edge',
+  covers: ['visual/edge/tmidiform'],
+  displays: ['4k-dpr1'],
+  expectFail: 'new',
+  run: (ctx) => windowEdge(ctx, "tmidiform"),
+});

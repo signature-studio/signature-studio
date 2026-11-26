@@ -12,6 +12,9 @@
 // With a project (Issue #1373): missingDistinct (the distinct missing-path requests of the open, any extension; a request is keyed by its path without the factory root, case ignored), dll (those ending in .dll), inventory (the rest that inputs/fl-installer-files.tsv lists, with the root taken off; inventoryList: their guest spelling, bytes and sha256 from that list), notInInstaller (the rest), notInInstallerFirst10 (the first 10 of the rest, as the engine wrote them), rootStripped ({absolute, variable}: the requests each root was taken off). The two roots are read from the log, not written here: the absolute install folder and the %...% variable that the most requests lead to a row of the list under.
 // With a project (Issue #1403): missingInInventory (the distinct absolute spellings that a GetFileAttributesW, CreateFileW or FindFirstFileW request found nothing for, which the list has once the absolute root is taken off, and which are not .dll; missingInInventoryFirst10: {api, path} of the first 10), rawVariableProbes ({count, first10}: the distinct %...%\ spellings as the guest wrote them; FL's own probes, not counted in the others). notInInstaller then excludes the %...%\ spellings and the .dll ones. After an error during the open, the same fields are read from the whole log of the open (not only the end tail).
 // Issue #1401: notInInstallerList (every path that notInInstaller counts, not only the first 10; scan-demos.mjs reads it). The wait for the project's title ends at once when the engine is 'exited' or 'error' (the state), not after its 180 s limit.
+// Issue #1335: underrunSpans (the page's underrun spans after the AudioContext started, from its history: ms after the start and the quanta; read at the end of a run). The title wait of a project also ends on a title that changed from the one before the open (other than "Song info").
+// --make-sound --song (Issue #1335): after the Kick row, the top bar's PAT/SONG switch is pressed (songMode: its box changes), the Playlist (class TEventEditForm, caption "Playlist -"; F5 opens it when it is not listed) gets a clip of Pattern 1 drawn at the first bar of Track 1 (playlistClips: the clip box changes). songPixels: the changed pixels of the switch's box and of the clip box. Then Space and the 10 s window as in --make-sound.
+// --profile FILE in a run (Issue #1339, with or without --make-sound --song): the window is 10 s from the playback's start (the non-silent quanta rise after the Space key: playbackWaitMs is the wait); the CDP CPU profile of the engine's Worker covers the window (the boot's settings; the profile is a measurement and adds CDP calls). The profile's "profile" field is the file.
 // --make-sound (Issue #1401): the sound is made by the FL operations, not read from a project. The room is 1836 x 1056 CSS px at DPR 1 (as tools/smoke/welcome-flow.mjs sets it). The Welcome's usage-data box is closed with "No thanks" and its Default row is double-clicked (flow A of welcome-flow.mjs); the project's "Problems loading the project" box is closed with Enter and the "Remix a song" box with Escape. Then the Channel rack's (TStepSeqForm) Kick row is clicked step by step (the points are fractions of the rack's rectangle); a step is lit when the rectangle's picture changes between the clicks. Then Space starts the transport and the probe reads the audio for 10 s as in a run. makeSound: the steps' result (litSteps, the rack, the boxes, the Basic 808 lines of the engine's log). --shot FILE (a test aid): a PNG of the page after the steps is written to FILE. Not combined with a project, --load or --boot.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -23,15 +26,16 @@ import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 import { armExpression, takeExpression, pcmReport } from './waveform.mjs';
 
-const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]] [--make-sound [--shot FILE]]\n';
+const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--profile FILE] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]] [--make-sound [--song] [--shot FILE]]\n';
 const argv = process.argv.slice(2);
 const boot = argv.includes('--boot');
 const makeSound = argv.includes('--make-sound');
+const songOn = argv.includes('--song');
 const li = argv.indexOf('--load');
 const load = li < 0 ? 'none' : argv[li + 1];
 const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile', '--pubs'];
 const valueOf = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1]; };
-const bootOptUsed = BOOT_VALUE_OPTS.some((o) => argv.includes(o));
+const bootOptUsed = ['--press-at', '--trace', '--pubs'].some((o) => argv.includes(o));
 const pressRaw = valueOf('--press-at');
 const pressAt = pressRaw === undefined ? 0 : Number(pressRaw);
 const tracePath = valueOf('--trace') ?? null;
@@ -43,7 +47,7 @@ const soundOn = argv.includes('--sound');
 const shotPath = valueOf('--shot') ?? null;
 const skipped = new Set();
 argv.forEach((a, i) => {
-  if (a === '--boot' || a === '--sound' || a === '--make-sound') skipped.add(i);
+  if (a === '--boot' || a === '--sound' || a === '--make-sound' || a === '--song') skipped.add(i);
   if (a === '--load' || a === '--app' || a === '--shot' || BOOT_VALUE_OPTS.includes(a)) { skipped.add(i); skipped.add(i + 1); }
 });
 const positional = argv.filter((a, i) => !skipped.has(i));
@@ -53,7 +57,8 @@ const valuesOk = BOOT_VALUE_OPTS.every((o) => !argv.includes(o) || (valueOf(o) !
 const appOk = !argv.includes('--app') || (appRaw !== undefined && !appRaw.startsWith('--'));
 const soundOk = !makeSound || (!boot && li < 0 && !soundOn && positional.length === 1);
 const shotOk = !argv.includes('--shot') || (makeSound && shotPath !== null && !shotPath.startsWith('--'));
-if (positional.length < 1 || positional.length > 2 || (load !== 'none' && load !== 'ui') || (boot && (li >= 0 || positional.length !== 1 || soundOn)) || !pressOk || !bootOk || !valuesOk || !appOk || !soundOk || !shotOk) {
+const songOk = !songOn || makeSound;
+if (positional.length < 1 || positional.length > 2 || (load !== 'none' && load !== 'ui') || (boot && (li >= 0 || positional.length !== 1 || soundOn)) || !pressOk || !bootOk || !valuesOk || !appOk || !soundOk || !shotOk || !songOk) {
   process.stderr.write(USAGE);
   process.exit(2);
 }
@@ -79,6 +84,8 @@ const METRONOME = { x: 750, y: 19 };
 const SOUND_RISE_QUANTA = 20;
 const SOUND_WAIT_MS = 5000;
 const PCM_WAIT_MS = 5000;
+// Issue #1339: --profile waits this long at most for the playback's start after the Space key
+const PROFILE_START_MS = 10000;
 // the start-up consent box ("Help us improve FL Studio by sending usage data") is drawn in the guest picture (not a window). Its "No thanks" button is at this guest pixel on the 780x480 screen that the default window gives (measured with a screenshot: the box is gone after the press, the status line reads "last input: button L up at screen (513, 308)")
 const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };
 // --boot (#1334): the room (the stage: the whole viewport since Issue #1481, the header and the monitor panel are hidden) is 1836x1056 CSS px at the device pixel ratio of the user's machine (1.7647 = 30/17: the guest screen is then 3240x1863 device px, floor of the room times the ratio); the poll of engine-idle; the three read times after engine-idle (+10, +70, +90 s; bootLast60sAt90s is the one the acceptance reads)
@@ -92,6 +99,8 @@ const WINDOWS_TEXT = '(async () => (await window.__app.deskDumpBase64(false)).wi
 const PROBLEMS_TITLE = /Problems loading/;
 const SAMPLE_MISSING = /^(?:\[err\] )?missing-path: .*\\Data\\Patches\\.*\.wav"$/i;
 const PROJECT_DIALOG_MS = 15000;
+// Issue #1335: the underruns of the page's audio output from its history (one entry per worklet post, 50 ms): the spans of posts whose count rose, as [fromMs, toMs] after the AudioContext started, with their quanta (a gap of 200 ms or less joins a span)
+const UNDERRUN_SPANS = `(() => { const a = window.__app.audio; const h = a.history; const t0 = a.startedAt; const out = []; let cur = null; for (let i = 1; i < h.length; i++) { const n = h[i].ur - h[i - 1].ur; if (n <= 0) continue; if (cur && h[i].page - cur.to <= 200) { cur.to = h[i].page; cur.quanta += n; } else { cur = { from: h[i].page, to: h[i].page, quanta: n }; out.push(cur); } } return { startedAtPage: t0 === null ? null : Math.round(t0), spans: out.map((s) => ({ fromMs: Math.round(s.from - t0), toMs: Math.round(s.to - t0), quanta: s.quanta })) }; })()`;
 // Issue #1373: the missing-path line (the runtime's fle_vfs_note_missing); the installer's list (the guest column, one path per line after the comment and the header); the number of first paths the breakdown lists; the two shapes a factory root can take (an absolute path's leading folder, on any drive; a %...%\ variable)
 const MISSING_LINE = /^(?:\[err\] )?missing-path: (\S+) (\d+) "(.*)"$/;
 // Issue #1412: the environment block's observation lines (the runtime's fle_env.c, first 200 per API): envLog is every one in the engine's log
@@ -127,7 +136,7 @@ async function main() {
   const t0 = Date.now();
   const out = {
     startedAt: new Date(t0).toISOString(), bundle: BUNDLE, mode: boot ? 'boot' : makeSound ? 'make-sound' : 'run', load, project: projectFile === null ? null : path.basename(projectFile),
-    state: null, standIn: null, error: null, gesture: null, consent: null, makeSound: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
+    state: null, standIn: null, error: null, gesture: null, consent: null, makeSound: null, underrunSpans: null, keyAtGuest: null, before: null, projectDialogs: null, projectWindows: null, projectMissing: null, projectMissingLines: null,
     missingDistinct: null, dll: null, inventory: null, inventoryList: null, missingInInventory: null, missingInInventoryFirst10: null, rawVariableProbes: null, notInInstaller: null, notInInstallerFirst10: null, notInInstallerList: null, rootStripped: null, imageReads: null, envLog: null, variableMissing: null,
     ctxState: null, status: null, quantaWhilePlaying: null, underrunQuanta: null, engineGapFrames: null, playingSeconds: null, deviceState: null,
     presentsDelta: null, measuredMs: null, elapsedMs: null, chromeVersion: null, nproc: os.availableParallelism?.() ?? os.cpus().length, loadavg: null,
@@ -176,7 +185,7 @@ async function main() {
     await S('Page.enable');
     // --sound (#1422) uses the boot room too: the metronome button's place is measured in that room (tools/p2-frames/measure.mjs)
     if (boot || soundOn) await S('Emulation.setDeviceMetricsOverride', { width: BOOT_VIEWPORT.width, height: BOOT_VIEWPORT.height, deviceScaleFactor: BOOT_VIEWPORT.dpr, mobile: false });
-    if (boot) await S('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+    if (boot || profilePath !== null) await S('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
 
     navAt = Date.now();
     const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
@@ -235,6 +244,20 @@ async function main() {
       log('sound', { startMs: out.soundStartMs });
     }
 
+    // Issue #1339: --profile in a run: the window starts at the playback's start (the non-silent quanta rise by SOUND_RISE_QUANTA after the Space key, as --sound counts it), and the engine Worker's CPU profile covers the same 10 s
+    const engine = profilePath === null ? null : await engineWorker(cdp, workers);
+    if (profilePath !== null && engine === null) throw new Error('no engine Worker with fleAudioWorkerState (--profile needs it)');
+    if (engine !== null) {
+      const n0 = (await audioNow()).nonSilentQuanta;
+      const tp = Date.now();
+      for (;;) {
+        if ((await audioNow()).nonSilentQuanta > n0 + SOUND_RISE_QUANTA) break;
+        if (Date.now() - tp >= PROFILE_START_MS) throw new Error(`the playback did not start within ${PROFILE_START_MS} ms after the Space key (nonSilentQuanta stayed at ${n0})`);
+        await sleep(50);
+      }
+      out.playbackWaitMs = Date.now() - tp;
+      await profileStart(cdp, engine);
+    }
     const pcmIdx = await ev(armExpression());
     const d0 = await audioNow();
     const p0 = await presentsNow();
@@ -250,12 +273,14 @@ async function main() {
     }
     stop.done = true;
     if (ui) await ui;
+    if (engine !== null) { await profileStop(cdp, engine, profilePath, true); out.profile = profilePath; }
     out.measuredMs = Date.now() - m0;
     const d1 = await audioNow();
     const p1 = await presentsNow();
     log('from', pickAudio(d0), 'to', pickAudio(d1));
     fromAudio(d1);
     Object.assign(out, { presentsDelta: p0 === null || p1 === null ? null : p1 - p0, quantaDelta: d1.quantaWhilePlaying - d0.quantaWhilePlaying, underrunDelta: d1.underrunQuanta - d0.underrunQuanta, nonSilentDelta: d1.nonSilentQuanta - d0.nonSilentQuanta });
+    out.underrunSpans = await ev(UNDERRUN_SPANS);
     if (pcmIdx !== null) Object.assign(out, await takePcm(ev, pcmIdx));
     if (makeSound) out.makeSound.log = await soundLog(ev);
     if (d1.error) probeError = d1.error;
@@ -522,6 +547,7 @@ async function openProject(S, ev, file) {
     log('no open box', { title: await ev('window.__app.pageTitle().title'), windows: (await windowsOf(ev)).map((w) => `${w.cls}|${w.title}`), engineLine: await ev("(document.getElementById('engine-line')?.textContent ?? '')"), tail: elog.slice(-6).map((l) => l.slice(0, 160)) });
     throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
   }
+  const before = (await ev('window.__app.pageTitle().title')) ?? '';
   const selector = box === 'filedlg' ? '#filedlg-input' : '#fx-input-files';
   const doc = await S('DOM.getDocument', {});
   const q = await S('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
@@ -537,13 +563,13 @@ async function openProject(S, ev, file) {
     await clickSelector(S, ev, row);
     await clickSelector(S, ev, '#fx-ok');
   }
-  // the title is the project's name as the guest shows it (its case may differ from the file name), or the "Problems loading the project" box's title while that box is the active window (the box is then the one projectReport reads)
+  // the title is the project's name as the guest shows it (its case may differ from the file name), or the "Problems loading the project" box's title while that box is the active window (the box is then the one projectReport reads). Issue #1335: or a title that changed from the one before the open (a project may carry another name than its file, e.g. Electric Loop), other than "Song info"
   const title = () => ev('window.__app.pageTitle().title');
   const opened = async () => {
     const st = await ev('window.__app ? window.__app.state : null');
     if (st === 'exited' || st === 'error') throw new Error(`the engine is ${st} during the open`);
     const t = (await title()) ?? '';
-    return t.toLowerCase().startsWith(stem.toLowerCase()) || PROBLEMS_TITLE.test(t);
+    return t.toLowerCase().startsWith(stem.toLowerCase()) || PROBLEMS_TITLE.test(t) || (t !== '' && t !== before && !t.startsWith('Song info'));
   };
   try {
     await until(opened, 180000, `the title of ${stem}`);
@@ -841,6 +867,21 @@ const WELCOME_WAIT_MS = 30000, OPEN_WAIT_MS = 120000, RACK_WAIT_MS = 15000;
 const ESCAPE_VK = 27;
 const WINDOWS_TABLE = '(async () => (await window.__app.deskDumpBase64(false)).windows)()';
 const PICTURE_TEXT = '(async () => { const d = await window.__app.deskDumpBase64(true); return { width: d.width, height: d.height, base64: d.base64 }; })()';
+// --song (Issue #1335), in guest px of the room (DPR 1): the PAT/SONG switch of the top bar (its "PAT" over "SONG", at the left of the transport) and the box its picture is compared in; the Playlist (class TEventEditForm, caption "Playlist -"); the click on Track 1 at the first bar, as offsets from the Playlist's top-left corner; the box of that clip in the picture. Measured from the picture at this room (the Playlist at (1371, 82): the grid's first bar starts at x 1650 (60 px a bar), Track 1 is the row from y 151 to 197; the green mark at x 1648 is the song's start, not a clip, and a click at x 1649 is left of the grid: no clip).
+const PAT_SONG = { x: 321, y: 19, box: { x: 303, y: 4, w: 37, h: 30 } };
+const PLAYLIST_CLASS = 'TEventEditForm';
+const PLAYLIST_CAPTION = /^Playlist -/;
+const PLAYLIST_AT = { dx: 281, dy: 93 };
+const CLIP_BOX = { dx: 280, dy: 72, w: 58, h: 40 };
+// the Draw (pencil) tool of the Playlist's toolbar (the second icon after the snap magnet; the Paint brush is the one lit at the start), and the box its lit state is compared in
+const PENCIL = { dx: 64, dy: 15 };
+const TOOL_BOX = { dx: 40, dy: 4, w: 60, h: 22 };
+// the changed pixels that count as a change of the switch's box and of the clip's box (the picture is compared, not read; measured: the switch changes by about 900 pixels, the clip box by about 80 when only a sliver was drawn)
+const SWITCH_MIN_PIXELS = 100;
+const CLIP_MIN_PIXELS = 400;
+const SONG_SETTLE_MS = 400;
+const PLAYLIST_WAIT_MS = 10000;
+const F5_KEY = { code: 'F5', key: 'F5', vk: 116 };
 
 // the calls that the page answers "ask again" to (the picture or the window table is being drawn) are asked again every 100 ms, for up to 15 s
 async function askAgain(fn) {
@@ -971,12 +1012,104 @@ async function makeSoundSteps(S, ev) {
     if (after !== before) rec.litSteps++;
   }
   steps.push(`${rec.clicks} clicks on the Kick row, ${rec.litSteps} lit`);
+  if (songOn) await songSteps(S, ev, rec, steps, away);
   if (shotPath !== null) {
     const s = await S('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(shotPath, Buffer.from(s.data, 'base64'));
     rec.shot = shotPath;
+    if (rec.playlist) {
+      const pl = rec.playlist;
+      const z = await S('Page.captureScreenshot', { format: 'png', clip: { x: pl.x, y: pl.y, width: 200, height: 130, scale: 4 } });
+      const zoomPath = shotPath.replace(/\.png$/i, '') + '-playlist.png';
+      fs.writeFileSync(zoomPath, Buffer.from(z.data, 'base64'));
+      rec.shotPlaylist = zoomPath;
+    }
   }
   return rec;
+}
+
+/** the pixels of a rectangle that differ between two pictures (4 bytes a pixel) */
+function changedPixels(a, b, rect) {
+  const pa = Buffer.from(a.base64, 'base64');
+  const pb = Buffer.from(b.base64, 'base64');
+  const stride = pa.length / a.height;
+  const x0 = Math.max(0, rect.x), x1 = Math.min(a.width, rect.x + rect.w);
+  let n = 0;
+  for (let y = Math.max(0, rect.y); y < Math.min(a.height, rect.y + rect.h); y++) {
+    for (let x = x0; x < x1; x++) {
+      const o = y * stride + x * 4;
+      if (pa.readUInt32LE(o) !== pb.readUInt32LE(o)) n++;
+    }
+  }
+  return n;
+}
+
+/** the bounding box of the pixels that differ between two pictures inside a rectangle (null when none) */
+function changedBounds(a, b, rect) {
+  const pa = Buffer.from(a.base64, 'base64');
+  const pb = Buffer.from(b.base64, 'base64');
+  const stride = pa.length / a.height;
+  const box = { x0: Infinity, y0: Infinity, x1: -1, y1: -1, n: 0 };
+  for (let y = Math.max(0, rect.y); y < Math.min(a.height, rect.y + rect.h); y++) {
+    for (let x = Math.max(0, rect.x); x < Math.min(a.width, rect.x + rect.w); x++) {
+      const o = y * stride + x * 4;
+      if (pa.readUInt32LE(o) === pb.readUInt32LE(o)) continue;
+      box.n++;
+      box.x0 = Math.min(box.x0, x); box.y0 = Math.min(box.y0, y); box.x1 = Math.max(box.x1, x); box.y1 = Math.max(box.y1, y);
+    }
+  }
+  return box.n === 0 ? null : box;
+}
+
+/** the Playlist of a window table: its guest position (the child's place is added to its parents'), size and caption; null when it is not listed */
+function playlistOf(list) {
+  const w = list.find((x) => x.cls === PLAYLIST_CLASS && PLAYLIST_CAPTION.test(x.text));
+  if (!w) return null;
+  return { lid: w.lid, ...absolutePosition(list, w), w: w.w, h: w.h, caption: w.text };
+}
+
+// --make-sound --song (Issue #1335): a. the PAT/SONG switch is pressed (songMode: its box changed); b. the Playlist is found in the window table (F5 opens it when it is not listed); c. a clip of the selected pattern is drawn with the Draw (pencil) tool at the first bar of Track 1 (playlistClips: the clip box changed). songPixels: the changed pixels of the two boxes.
+async function songSteps(S, ev, rec, steps, away) {
+  const picture = () => askAgain(() => ev(PICTURE_TEXT));
+  await away();
+  await sleep(STEP_SETTLE_MS);
+  const sw0 = await picture();
+  await clickGuest(S, ev, PAT_SONG.x, PAT_SONG.y);
+  await away();
+  await sleep(SONG_SETTLE_MS);
+  const sw1 = await picture();
+  const switchPixels = changedPixels(sw0, sw1, PAT_SONG.box);
+  rec.songMode = switchPixels >= SWITCH_MIN_PIXELS;
+  steps.push(`PAT/SONG switch clicked at (${PAT_SONG.x}, ${PAT_SONG.y}): ${switchPixels} pixels changed`);
+  let pl = playlistOf(await tableOf(ev));
+  if (pl === null) {
+    await tapKey(S, F5_KEY.code, F5_KEY.key, F5_KEY.vk);
+    pl = await pollFor(async () => playlistOf(await tableOf(ev)), PLAYLIST_WAIT_MS, 'the Playlist window (F5)');
+  }
+  rec.playlist = pl;
+  const at = { x: pl.x + PLAYLIST_AT.dx, y: pl.y + PLAYLIST_AT.dy };
+  const box = { x: pl.x + CLIP_BOX.dx, y: pl.y + CLIP_BOX.dy, w: CLIP_BOX.w, h: CLIP_BOX.h };
+  const tool = { x: pl.x + TOOL_BOX.dx, y: pl.y + TOOL_BOX.dy, w: TOOL_BOX.w, h: TOOL_BOX.h };
+  await away();
+  await sleep(STEP_SETTLE_MS);
+  const t0 = await picture();
+  await clickGuest(S, ev, pl.x + PENCIL.dx, pl.y + PENCIL.dy);
+  await away();
+  await sleep(STEP_SETTLE_MS);
+  const t1 = await picture();
+  const toolPixels = changedPixels(t0, t1, tool);
+  await away();
+  await sleep(STEP_SETTLE_MS);
+  const c0 = await picture();
+  await clickGuest(S, ev, at.x, at.y);
+  await away();
+  await sleep(SONG_SETTLE_MS);
+  const c1 = await picture();
+  const clipPixels = changedPixels(c0, c1, box);
+  rec.playlistClips = clipPixels >= CLIP_MIN_PIXELS ? 1 : 0;
+  rec.songPixels = { switch: switchPixels, tool: toolPixels, clip: clipPixels };
+  rec.clipChanged = changedBounds(c0, c1, box);
+  steps.push(`playlist (lid ${pl.lid}, ${pl.x}, ${pl.y}, ${pl.w}x${pl.h}) clip at (${at.x}, ${at.y}): ${clipPixels} pixels changed`);
 }
 
 // --make-sound: the engine's lines about the Default project's sample files (Basic 808 *.wav): how many, how many of them missing-path lines (basic808MissingWav: those for a .wav, which the sample needs), and the first 5 (cut to 200 characters)
