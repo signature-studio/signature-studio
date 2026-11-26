@@ -1,1 +1,55 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+visual/window/right-click-channel-rack	window	the drop-down of the Channel rack (right-click on the rack)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key right-click-channel-rack@dpr<ratio>
+visual/window/right-click-mixer	window	the drop-down of the Mixer (right-click on the mixer)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key right-click-mixer@dpr<ratio>
+visual/window/right-click-playlist	window	the drop-down of the Playlist (right-click on the playlist)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key right-click-playlist@dpr<ratio>
+visual/window/tedgebrowser	window	the Browser panel (TEdgeBrowser, the web view of the Browser)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key tedgebrowser@dpr<ratio>
+visual/window/tpluglistform	window	the plugin list (F8)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key tpluglistform@dpr<ratio>
+visual/window/tmidiform	window	the Settings window (F10)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key tmidiform@dpr<ratio>
+visual/window/tmidiform-2	window	the Settings window again (F11)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key tmidiform-2@dpr<ratio>
+visual/window/tpluglistform-2	window	the plugin list again (Alt+F8)	the window's picture equals the golden within the tolerance (or is recorded on the first run)	golden window.tsv key tpluglistform-2@dpr<ratio>
+visual/edge/right-click-channel-rack	edge	the edges of the drop-down of the Channel rack (right-click on the rack)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/right-click-mixer	edge	the edges of the drop-down of the Mixer (right-click on the mixer)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/right-click-playlist	edge	the edges of the drop-down of the Playlist (right-click on the playlist)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/tedgebrowser	edge	the edges of the Browser panel (TEdgeBrowser, the web view of the Browser)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/tpluglistform	edge	the edges of the plugin list (F8)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/tmidiform	edge	the edges of the Settings window (F10)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/tmidiform-2	edge	the edges of the Settings window again (F11)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/edge/tpluglistform-2	edge	the edges of the plugin list again (Alt+F8)	each measured side has a contrast of 20 or more, a frame of 2 device px or less and no soft band	edgeReadings (sideProfile, sideReading) on the window rectangle
+visual/theme/ash	theme	Ash	the main window's picture equals the golden of the theme	golden theme.tsv key ash@dpr<ratio>
+visual/theme/dedzii	theme	DEDZII	the main window's picture equals the golden of the theme	golden theme.tsv key dedzii@dpr<ratio>
+visual/theme/dedzii-light	theme	DEDZII Light	the main window's picture equals the golden of the theme	golden theme.tsv key dedzii-light@dpr<ratio>
+visual/theme/dark	theme	Dark	the main window's picture equals the golden of the theme	golden theme.tsv key dark@dpr<ratio>
+visual/theme/dark-orange	theme	Dark orange	the main window's picture equals the golden of the theme	golden theme.tsv key dark-orange@dpr<ratio>
+visual/theme/light-cherry	theme	Light cherry	the main window's picture equals the golden of the theme	golden theme.tsv key light-cherry@dpr<ratio>
+visual/theme/light-pear	theme	Light pear	the main window's picture equals the golden of the theme	golden theme.tsv key light-pear@dpr<ratio>
+visual/theme/light-tangerine	theme	Light tangerine	the main window's picture equals the golden of the theme	golden theme.tsv key light-tangerine@dpr<ratio>
+visual/theme/ppriime-dark	theme	PPRIIME Dark	the main window's picture equals the golden of the theme	golden theme.tsv key ppriime-dark@dpr<ratio>
+visual/theme/ppriime-light	theme	PPRIIME Light	the main window's picture equals the golden of the theme	golden theme.tsv key ppriime-light@dpr<ratio>
+visual/theme/sytrus	theme	Sytrus	the main window's picture equals the golden of the theme	golden theme.tsv key sytrus@dpr<ratio>
+visual/theme/ultra-green	theme	Ultra green	the main window's picture equals the golden of the theme	golden theme.tsv key ultra-green@dpr<ratio>
+visual/theme/veela	theme	Veela	the main window's picture equals the golden of the theme	golden theme.tsv key veela@dpr<ratio>
+visual/language/de	language	de	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys de/topbar@dpr<ratio> and de/settings@dpr<ratio>
+visual/language/es	language	es	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys es/topbar@dpr<ratio> and es/settings@dpr<ratio>
+visual/language/fr	language	fr	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys fr/topbar@dpr<ratio> and fr/settings@dpr<ratio>
+visual/language/ja	language	ja	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys ja/topbar@dpr<ratio> and ja/settings@dpr<ratio>
+visual/language/ko	language	ko	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys ko/topbar@dpr<ratio> and ko/settings@dpr<ratio>
+visual/language/vi	language	vi	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys vi/topbar@dpr<ratio> and vi/settings@dpr<ratio>
+visual/language/zh	language	zh	the top bar and the Settings window equal their goldens of the language	golden language.tsv keys zh/topbar@dpr<ratio> and zh/settings@dpr<ratio>
+visual/dpr/1	dpr	ratio 1	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr1
+visual/dpr/1-25	dpr	ratio 1.25	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr1.25
+visual/dpr/1-5	dpr	ratio 1.5	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr1.5
+visual/dpr/1-75	dpr	ratio 1.75	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr1.75
+visual/dpr/2	dpr	ratio 2	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr2
+visual/dpr/2-5	dpr	ratio 2.5	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr2.5
+visual/dpr/3	dpr	ratio 3	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr3
+visual/dpr/random-1	dpr	ratio 2.07	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr2.07
+visual/dpr/random-2	dpr	ratio 2.06	the top bar's picture equals the golden of the ratio (the key carries the ratio)	golden dpr.tsv key topbar@dpr2.06
+visual/black/initial	black	at the start	no all-black 64 x 64 tile in the whole picture	noBlackRegions
+visual/black/after-window	black	after a window is opened	no all-black 64 x 64 tile in the whole picture	noBlackRegions after openWindow
+visual/black/after-theme	black	after a theme is set	no all-black 64 x 64 tile in the whole picture	noBlackRegions after pickTheme
+visual/black/after-language	black	after a language is set	no all-black 64 x 64 tile in the whole picture	noBlackRegions after pickLanguage
+visual/text/topbar	text	the menu bar's text is drawn	the menu bar has 8 or more colours and a luminance range of 40 or more	textReading on the TNewMenu rectangle
+visual/cursor/window-edge	cursor	the cursor over a window edge	the desktop's cursor is an image-set whose declared resolution is the ratio (within 0.01)	cursorReading of getComputedStyle(#desktop).cursor
+visual/cursor/text-field	cursor	the cursor over a text field	the desktop's cursor is an image-set whose declared resolution is the ratio (within 0.01)	cursorReading of getComputedStyle(#desktop).cursor
+visual/picture/start	picture	the whole picture at the start	the picture equals the golden of the start	golden start.tsv key picture@dpr<ratio>
+visual/black/after-dpr	black	after the ratio is set (the page emulation, then put back)	no all-black 64 x 64 tile outside the Browser panel at each ratio of the set	blackDpr: noBlackRegions-style count (blackReport) after setDpr
