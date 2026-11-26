@@ -41,3 +41,4 @@ Data\Patches\Packs\Risers\Riser Noise Glitchy.wv
 Data\Patches\Packs\Risers\Riser Vocal.wv
 Data\Patches\Packs\Risers\Riser Yoyo.wv
 Data\Patches\Packs\SFX\SFX SubBass Drop.wav
+System\Tools\Plugin Manager\PluginManager.exe

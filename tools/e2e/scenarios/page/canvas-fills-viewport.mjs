@@ -3,7 +3,7 @@ import { defineScenario } from '../../lib/scenario.mjs';
 
 export default defineScenario({
   id: 'page/canvas-fills-viewport',
-  covers: ['page/module/resize'],
+  covers: ['page/module/resize', 'page/canvas/fills-window'],
   async run({ guest, page }) {
     const v = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio }));
     const d = await guest.desk();

@@ -1,0 +1,12 @@
+// settings/section-project-data-folder-geometry: settings/section/data-folder (sectionRun).
+import { defineScenario } from '../../lib/scenario.mjs';
+import * as S from '../../lib/settings.mjs';
+
+export default defineScenario({
+  id: 'settings/section-project-data-folder-geometry',
+  covers: ["settings/section/data-folder"],
+  expectFail: null,
+  run(ctx) {
+    return S.sectionRun(ctx, "Project", "Data folder", 'geometry');
+  },
+});

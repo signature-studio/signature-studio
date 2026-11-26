@@ -1,21 +1,22 @@
-// perf/engine-idle-after-menu: after a drop-down is opened and closed, the engine is idle again (not running) within 5 s.
+// perf/engine-idle-after-menu: after the File drop-down is opened and closed, the engine is idle again (its state engine-idle; not running).
 import { defineScenario } from '../../lib/scenario.mjs';
-import { closeNew, openLids, openMenu } from '../../lib/common.mjs';
-import { sleep } from '../../lib/flow.mjs';
+import { Judge, openAndClose, sleep } from '../../lib/perf.mjs';
 
 export default defineScenario({
   id: 'perf/engine-idle-after-menu',
-  covers: [],
-  async run({ guest }) {
-    const base = await openLids(guest);
-    await openMenu(guest, 'File');
-    await closeNew(guest, base);
+  covers: ['perf/engine/idle-after-menu'],
+  displays: ['4k-dpr1'],
+  async run(ctx) {
+    const j = new Judge(new Map());
+    await openAndClose(ctx.guest, 'File');
     let st = null;
-    for (let i = 0; i < 17; i++) {
-      st = await guest.state();
-      if (st.state === 'engine-idle') break;
-      await sleep(300);
+    for (let i = 0; i < 25; i++) {
+      st = await ctx.guest.state();
+      if (st?.state === 'engine-idle') break;
+      await sleep(200);
     }
-    return { ok: st.state === 'engine-idle', engineState: st.state, notes: [`state ${st.state} after the close`] };
+    const ok = j.flag('engine.idleAfterMenu', st?.state === 'engine-idle' ? 1 : 0, st?.state === 'engine-idle');
+    j.notes.push(`state ${st?.state ?? 'none'} after the close`);
+    return { ok, engineState: st?.state ?? null, notes: j.notes, results: j.results() };
   },
 });

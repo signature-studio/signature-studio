@@ -1,9 +1,9 @@
 // A/B measurement (#1422): the base build and the changed build are measured in turns (base, changed = one pair; n pairs), each run by the tool of its kind: p2 is tools/p2-frames/measure.mjs, p3 is tools/p3-audio-probe/measure-live.mjs. The medians are compared and the gates decide the pass.
 // The base tree is prepared by tools/ab/base.mjs (the acceptance does it before the builds; its inputs are checked with --verify after them).
 // Usage: node tools/ab/run.mjs <p2|p3> <base bundle raw/<name>> <base app dir> <changed bundle raw/<name>> <changed app dir> [n=3] > ab.json
-// stdout: ONE JSON line {kind,n,base,changed,runs,medians,gates,pass}. medians: {base, changed} and, per key, {base, after}. Each run's output is kept in lift/out-app/ab/ (git-ignored). Exit 0 when pass is true, 1 when it is not, 2 when the arguments are wrong.
+// stdout: ONE JSON line {kind,n,base,changed,runs,medians,gates,pass}. medians: {base, changed} (each key's median per side), baseMax (each key's largest base run) and, per key, {base, after}. Each run's output is kept in lift/out-app/ab/ (git-ignored). Exit 0 when pass is true, 1 when it is not, 2 when the arguments are wrong.
 // p2 gates: every run has error null and inputRateOk true; the changed median minWindowFps is at least 0.90 x the base median; the changed median inputToPresentMsP95 is at most 1.20 x the base median.
-// p3 gates (every changed run): error null, playing true, inputRateOk true, nonSilentDelta above 0, pcmRepeat8192 null or below 0.01; and the changed medians underrunDelta and last60sUnderruns at most the base medians (a median against the base run of the same pair, not 0: the base run has its own underruns on a loaded runner).
+// p3 gates (every changed run): error null, playing true, inputRateOk true, nonSilentDelta above 0, pcmRepeat8192 null or below 0.01; and the changed medians underrunDelta and last60sUnderruns at most the largest base run + 4 (not 0, and not the base median: the same build gives 4 to 14 underruns across runs on a loaded runner, #1426).
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
