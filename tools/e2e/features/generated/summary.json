@@ -1,8 +1,8 @@
 {
-  "total": 762,
+  "total": 763,
   "perArea": {
     "menus": 155,
-    "windows": 7,
+    "windows": 8,
     "topbar": 22,
     "settings": 97,
     "plugins": 147,
@@ -12,7 +12,7 @@
   },
   "unnamed": {
     "menus": 155,
-    "windows": 3,
+    "windows": 4,
     "topbar": 21,
     "settings": 35,
     "plugins": 2,
@@ -23,13 +23,13 @@
     "ok": true,
     "error": null,
     "menus": 155,
-    "windows": 7,
+    "windows": 8,
     "topbar": 22,
     "settings": 77
   },
   "perFile": {
     "menus": 155,
-    "windows": 7,
+    "windows": 8,
     "topbar": 22,
     "settings": 77,
     "plugins": 147,

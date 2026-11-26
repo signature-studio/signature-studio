@@ -2,6 +2,7 @@ id	kind	name	source	how	nameSource
 windows/popup/right-click-channel-rack	popup	right-click Channel rack	TStepSeqForm lid 17, offset 20,60 in its rectangle	drop-down lid 170 at 392,142 162x344	index
 windows/popup/right-click-mixer	popup	right-click Mixer	TFXForm lid 64, offset 20,60 in its rectangle	drop-down lid 171 at 439,1417 251x727	index
 windows/popup/right-click-playlist	popup	right-click Playlist	TEventEditForm lid 53, offset 20,60 in its rectangle	drop-down lid 172 at 878,147 103x96	index
+windows/child/tedgebrowser	child	TEdgeBrowser #70 under the Browser	lid 70 TEdgeBrowser under lid 68 TSampleListForm	at 0,0 364x2009 (the Browser's web content)	index
 windows/window/tpluglistform	window	PlugList	key F8 -> lid 270 class TPlugListForm	top-level, at 0,0 3840x2160	memory
 windows/window/tmidiform	window	Settings - MIDI input / output devices	key F10 -> lid 22 class TMIDIForm	top-level, at 1586,630 668x900	memory
 windows/window/tmidiform-2	window	Settings - Project credits	key F11 -> lid 22 class TMIDIForm	top-level, at 1586,630 668x900	memory

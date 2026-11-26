@@ -5,7 +5,8 @@
 //   menus.tsv    the 8 labels of the menu bar (their places are the bar's fractions: MENU_LABELS) and each drop-down's items: the count is the number of Down presses until
 //                the drop-down's picture repeats (its rectangle's hash); an item is `File > #n` (its number: the names are not read from the picture, no OCR). The memory names
 //                (the page's guestText) are not tied to a drop-down's record here, so every item is named by its number (nameSource index).
-//   windows.tsv  the top-level windows that the keys F5 to F12 and Alt+F8 open, and the drop-downs of the right-click menus of the Channel rack, Mixer, Playlist and Browser.
+//   windows.tsv  the top-level windows that the keys F5 to F12 and Alt+F8 open, the drop-downs of the right-click menus of the Channel rack, Mixer, Playlist and Browser,
+//                and the Browser's web content (TEdgeBrowser, a child window). The Mixer's inserts and the piano roll are not in the table (not read).
 //   topbar.tsv   the top bar's parts: the TWPControl, TQuickControlBar, TQuickEditToolBar, TQuickEditToolbarPanel and TNewMenu windows under the main form (their texts are the names).
 //   settings.tsv the F10 settings window's sheets (pages, by their texts), and the sections, lists, selectors and controls under them (by their classes).
 // The repository side (lib/inventory.mjs): plugins.tsv, file.tsv, resources.tsv, page.tsv, delivery.tsv. summary.json: { total, perArea, unnamed, fl }.
@@ -147,6 +148,17 @@ async function rightClickRows(guest) {
   return rows;
 }
 
+/** the Browser (TSampleListForm) and the child window of its web content (TEdgeBrowser), when the Browser is shown */
+async function browserRows(guest) {
+  const table = await windowTable(guest);
+  const b = [...table.top, ...table.children].find((w) => w.cls === 'TSampleListForm' && w.vis !== false);
+  if (!b) return [];
+  return subtree(table, b.lid).filter((c) => c.cls === 'TEdgeBrowser').map((c) => ({
+    id: 'windows/child/tedgebrowser', kind: 'child', name: `TEdgeBrowser #${c.lid} under the Browser`, source: `lid ${c.lid} TEdgeBrowser under lid ${b.lid} TSampleListForm`,
+    how: `at ${c.x},${c.y} ${c.w}x${c.h} (the Browser's web content)`, nameSource: 'index',
+  }));
+}
+
 /** the top bar's parts under the main form */
 async function topbarRows(guest) {
   const table = await windowTable(guest);
@@ -252,8 +264,9 @@ async function main() {
     if (!budget.expired()) { flRows.topbar = await topbarRows(guest); }
     // the right-click reads come before the settings window: its clicks and its Escape leave the Channel rack and the Playlist out of the table
     const rightRows = budget.expired() ? [] : await rightClickRows(guest);
+    const browserList = budget.expired() ? [] : await browserRows(guest);
     if (!budget.expired()) { flRows.settings = await settingsRows(guest); }
-    if (!budget.expired()) { flRows.windows = [...rightRows, ...(await keyWindowRows(guest))]; }
+    if (!budget.expired()) { flRows.windows = [...rightRows, ...browserList, ...(await keyWindowRows(guest))]; }
     fl.menus = flRows.menus.length; fl.windows = flRows.windows.length; fl.topbar = flRows.topbar.length; fl.settings = flRows.settings.length;
     fl.ok = true;
     await pg.context.close().catch(() => {});
