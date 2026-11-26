@@ -53,6 +53,26 @@ void fruity_add_image(uint64_t base, uint64_t size) __attribute__((weak));
 /* Issue #1342: the page instantiates the separate wasm module of a real module (fe-wasmgen hybrid --separate; app/src/engine/xmod.ts) and returns 1; 0 when the module has none, and the page's
  * import is missing in a link that has no separate module. Weak: a build without the import keeps building (the native harness). */
 int fle_xmod_load(const char *dll_path) __attribute__((weak));
+void fle_thread_set_priorities(int on) __attribute__((weak));
+
+void fle_host_on_idle(void)
+{
+    static int done;
+    static const uint8_t pat[7] = { 0x83, 0xb8, 0x64, 0x01, 0x00, 0x00, 0x00 };
+    uint64_t app;
+
+    if (done) return;
+    if (memcmp((const void *)(uintptr_t)0x86b500u, pat, sizeof pat) != 0) {
+        done = 1;
+        return;
+    }
+    app = fle_ld(0x15f7190u, 8);
+    if (app > 0x100000u && (app >> 32) == 0u) {
+        uint32_t cur = (uint32_t)fle_ld(app + 0x164u, 4);
+        if (cur == 0u) fle_st(app + 0x164u, 4, 100u);
+        done = 1;
+    }
+}
 
 /* N real modules: argv[2] is one file or several separated by ':'. One file: the output is the one of the one-module main_two.c.
  * MAIN_REAL_MAX only sizes these arrays. It is larger than the RM_MAX (192) of fle_realmod.c on purpose: more files than the runtime
@@ -287,6 +307,7 @@ int main(int argc, char **argv) {
 
     R[4] -= 8;
     fle_st(R[4], 8, HARNESS_SENTINEL_RET);
+    if (fle_thread_set_priorities) fle_thread_set_priorities(1);
     fn();
     R[4] += 8;
 

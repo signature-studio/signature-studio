@@ -38,10 +38,10 @@ static inline FLE_AI uint64_t fle_nf_shl(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
-    return (uint64_t)((unsigned __int128)a << c) & m;
+    return (a << c) & m;
 }
 
 static inline FLE_AI uint64_t fle_nf_shr(unsigned w, uint64_t a, uint64_t cnt) {
@@ -51,7 +51,7 @@ static inline FLE_AI uint64_t fle_nf_shr(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
     return a >> c;
@@ -64,7 +64,7 @@ static inline FLE_AI uint64_t fle_nf_sar(unsigned w, uint64_t a, uint64_t cnt) {
     if (c == 0) {
         return a;
     }
-    if (c > w) {
+    if (__builtin_expect(c > w, 0)) {
         fle_bad_count();
     }
     return (uint64_t)(fle_sext(w, a) >> c) & m;

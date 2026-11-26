@@ -36,5 +36,8 @@ void fle_tp_rewrite(const float *lr, uint32_t n, double first, uint32_t guard)
 double fle_tp_now(void) { return 0.0; }
 int fle_tp_wait(double ms) { (void)ms; return 2; }
 int fle_tp_can_wait(void) { return 0; }
+uint32_t fle_tp_quantum_frames(void) { return 1u; }
+double fle_tp_rd_age_ms(void) { return 0.0; }
+void fle_audio_idle_begin(unsigned from) { (void)from; }
 void fle_audio_unlock_note(double first_frame, uint32_t frames) { (void)first_frame; (void)frames; }
 void fle_audio_switch_note(unsigned from, unsigned to) { (void)from; (void)to; }

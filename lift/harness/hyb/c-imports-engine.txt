@@ -144,7 +144,7 @@ FlsFree
 FlsGetValue
 FlsSetValue
 FlushFileBuffers
-FormatMessageW
+FormatMessageW=__wrap_fle_imp_FormatMessageW
 FrameRect
 FrameRgn
 FreeEnvironmentStringsA
@@ -378,7 +378,7 @@ LocalAlloc
 LocaleNameToLCID
 LocalFileTimeToFileTime
 LocalFree
-LockResource
+LockResource=__wrap_fle_imp_LockResource
 LockWindowUpdate
 LPtoDP
 lstrlenW

@@ -91,7 +91,7 @@ uint32_t fle_display_settings_hz(void) FLE_THREAD_REF;
 #define FLE_PREEMPT_MAX_DEPTH        1u      /* S-vclock-depth */
 /* #1352: a back edge of the lifted code (fle_loop_tick, fle_dispatch.h) is a scheduler point every FLE_LOOP_SLICE_BACKEDGES back edges from the first CreateThread on. Unlike a slice it moves no
  * clock (the clock is the indirect calls' progress, decision 0147), and the rule for a callback is the same (no switch at a depth above FLE_PREEMPT_MAX_DEPTH; the audio device is refilled there). */
-#define FLE_LOOP_SLICE_BACKEDGES     1024u
+#define FLE_LOOP_SLICE_BACKEDGES     4096u
 /* #1393: a spin-wait back edge inside a callback gives the processor only after this many back edges (fle_spin_slice): a spin that ends sooner is not interrupted, a stuck one is. */
 #define FLE_SPIN_DEEP_BACKEDGES      1048576u
 
@@ -178,6 +178,8 @@ int fle_thread_owns_handle(uint64_t h) FLE_THREAD_REF;
 void fle_thread_wait_cs(const char *api, uint64_t addr) FLE_THREAD_REF;
 /* Something that a waiting thread may wait for happened (an event was set, a section left, a message posted ...): the waiting threads are tested now, in the order they began to wait. */
 void fle_thread_wake_check(void) FLE_THREAD_REF;
+void fle_thread_wake_cs(uint64_t addr) FLE_THREAD_REF;
+void fle_thread_wake_event(uint64_t h) FLE_THREAD_REF;
 /* Slots of the running thread, NULL for the first thread (which keeps the legacy storage of its file). */
 uint64_t *fle_thread_tls_values(void) FLE_THREAD_REF;
 uint32_t *fle_thread_slot_last_error(void) FLE_THREAD_REF;

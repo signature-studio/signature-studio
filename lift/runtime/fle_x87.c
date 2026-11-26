@@ -56,6 +56,18 @@ static void fail(const char *m) {
 
 static int clz64(uint64_t x) { return __builtin_clzll(x); }
 
+static inline __attribute__((always_inline)) void mul64x64_128(uint64_t a, uint64_t b, uint64_t *hi_out, uint64_t *lo_out) {
+    uint64_t a0 = (uint32_t)a, a1 = a >> 32;
+    uint64_t b0 = (uint32_t)b, b1 = b >> 32;
+    uint64_t p00 = a0 * b0;
+    uint64_t p01 = a0 * b1;
+    uint64_t p10 = a1 * b0;
+    uint64_t p11 = a1 * b1;
+    uint64_t mid = (p00 >> 32) + (uint32_t)p01 + (uint32_t)p10;
+    *lo_out = (p00 & UINT64_C(0xffffffff)) | (mid << 32);
+    *hi_out = p11 + (p01 >> 32) + (p10 >> 32) + (mid >> 32);
+}
+
 static int clz128(u128 x) {
     uint64_t h = (uint64_t)(x >> 64);
     return h ? __builtin_clzll(h) : 64 + __builtin_clzll((uint64_t)x);
@@ -70,21 +82,21 @@ static fle_f80 mk(int sign, unsigned e, uint64_t m) {
 
 /* ---- control, stack ---- */
 
-static unsigned top(void) { return (fle_x87.sw >> 11) & 7u; }
+static inline unsigned top(void) { return (fle_x87.sw >> 11) & 7u; }
 
-static void set_top(unsigned t) { fle_x87.sw = (uint16_t)((fle_x87.sw & ~0x3800u) | ((t & 7u) << 11)); }
+static inline void set_top(unsigned t) { fle_x87.sw = (uint16_t)((fle_x87.sw & ~0x3800u) | ((t & 7u) << 11)); }
 
-static unsigned phys(unsigned i) { return (top() + i) & 7u; }
+static inline unsigned phys(unsigned i) { return (top() + i) & 7u; }
 
-static unsigned tag_of(unsigned p) { return (fle_x87.tw >> (2 * p)) & 3u; }
+static inline unsigned tag_of(unsigned p) { return (fle_x87.tw >> (2 * p)) & 3u; }
 
-static void set_tag(unsigned p, unsigned t) {
+static inline void set_tag(unsigned p, unsigned t) {
     fle_x87.tw = (uint16_t)((fle_x87.tw & ~(3u << (2 * p))) | (t << (2 * p)));
 }
 
-static int rc_mode(void) { return (fle_x87.cw >> 10) & 3; }
+static inline int rc_mode(void) { return (fle_x87.cw >> 10) & 3; }
 
-static int pc_bits(void) {
+static inline int pc_bits(void) {
     switch ((fle_x87.cw >> 8) & 3) {
     case 0: return 24;
     case 2: return 53;
@@ -92,51 +104,59 @@ static int pc_bits(void) {
     }
 }
 
-static unsigned tag_for(fle_f80 v) {
-    unsigned e = v.se & 0x7fff;
-    if (e == 0 && v.m == 0) return 1;
-    if (e != 0 && e != 0x7fff && (v.m >> 63)) return 0;
-    return 2;
+static inline unsigned tag_for(fle_f80 v) {
+    unsigned e = v.se & 0x7fffu;
+    if (__builtin_expect(((e - 1u) < 0x7ffeu) & ((v.m >> 63) != 0u), 1)) return 0u;
+    if (e == 0 && v.m == 0) return 1u;
+    return 2u;
 }
 
-static void begin(void) {
+static inline void begin(void) {
     X = 0;
-    if (fle_x87_mmx_active) {
+    if (__builtin_expect(fle_x87_mmx_active != 0, 0)) {
         if (fle_x87.tw == 0xFFFF) fle_x87_mmx_active = 0;
         else fail("x87 instruction while MMX state is live (no EMMS); MM and ST are not aliased");
     }
-    if (fle_x87.sw & ~fle_x87.cw & 0x3Fu) fail("pending exception flag is unmasked (#MF not modelled)");
+    if (__builtin_expect((fle_x87.sw & ~fle_x87.cw & 0x3Fu) != 0, 0)) fail("pending exception flag is unmasked (#MF not modelled)");
+}
+
+static inline __attribute__((always_inline)) void begin_fast(void) {
+    if (__builtin_expect((fle_x87_mmx_active != 0) | ((fle_x87.sw & ~fle_x87.cw & 0x3Fu) != 0), 0)) {
+        begin();
+    }
 }
 
 /* Records the exceptions and C1, then stops when one of them is unmasked. */
-static void commit(unsigned c1) {
-    if (X & (EX_IE | EX_ZE)) X &= ~EX_DE; /* IE and ZE take precedence over DE (host, decision 0033) */
+static inline void commit(unsigned c1) {
+    if (__builtin_expect((X & (EX_IE | EX_ZE)) != 0, 0)) X &= ~EX_DE; /* IE and ZE take precedence over DE (host, decision 0033) */
     fle_x87.sw = (uint16_t)((fle_x87.sw & ~SW_C1) | (c1 ? SW_C1 : 0u));
     fle_x87.sw |= (uint16_t)(X & 0x3Fu);
-    if (X & ~fle_x87.cw & 0x3Fu) fail("unmasked exception (#MF not modelled)");
+    if (__builtin_expect((X & ~fle_x87.cw & 0x3Fu) != 0, 0)) fail("unmasked exception (#MF not modelled)");
 }
 
-static void need_nonempty(unsigned i) {
-    if (tag_of(phys(i)) == 3) fail("stack underflow (empty ST(i)); stack faults are not modelled");
+static inline void need_nonempty(unsigned i) {
+    if (__builtin_expect(tag_of(phys(i)) == 3, 0)) fail("stack underflow (empty ST(i)); stack faults are not modelled");
 }
 
-static void need_room(void) {
-    if (tag_of((top() + 7u) & 7u) != 3) fail("stack overflow (ST(7) not empty); stack faults are not modelled");
+static inline void need_room(void) {
+    if (__builtin_expect(tag_of((top() + 7u) & 7u) != 3, 0)) fail("stack overflow (ST(7) not empty); stack faults are not modelled");
 }
 
-static void put(unsigned i, fle_f80 v) {
-    fle_x87_r[phys(i)] = v;
-    set_tag(phys(i), tag_for(v));
+static inline void put(unsigned i, fle_f80 v) {
+    unsigned p = phys(i);
+    fle_x87_r[p] = v;
+    set_tag(p, tag_for(v));
 }
 
-static void push(fle_f80 v) {
+static inline void push(fle_f80 v) {
     set_top(top() - 1u);
     put(0, v);
 }
 
-static void pop(void) {
-    set_tag(top(), 3);
-    set_top(top() + 1u);
+static inline void pop(void) {
+    unsigned t = top();
+    set_tag(t, 3);
+    set_top(t + 1u);
 }
 
 /* ---- unpack, round, pack ---- */
@@ -284,6 +304,81 @@ static fle_f80 round80(int sign, int64_t e, u128 M, int sticky, int pbits, int *
     return pack80(round_pack(sign, e, M, sticky, pbits, pbits, -16382, 16383, rc_mode(), up));
 }
 
+/* Fast normal path for round80 when e is strictly inside [-16382, 16382] and bit 63 of hi is set. */
+static fle_f80 round80_fast(int sign, int64_t e, uint64_t hi, uint64_t lo, int sticky, int pbits, int rc, int *up, unsigned *x_flags) {
+    if (__builtin_expect(e < -16382 || e >= 16383, 0)) {
+        X = *x_flags;
+        {
+            fle_f80 res = round80(sign, e, ((u128)hi << 64) | (u128)lo, sticky, pbits, up);
+            *x_flags = X;
+            return res;
+        }
+    }
+    if (__builtin_expect(pbits == 64 && rc == 0, 1)) {
+        int rb = (int)(lo >> 63);
+        int st = ((lo << 1) != 0) | sticky;
+        int inexact = rb | st;
+        int inc = rb && (st || (hi & 1u));
+        uint64_t m = hi + (uint64_t)inc;
+        *up = inc;
+        if (inexact) *x_flags |= EX_PE;
+        if (__builtin_expect(m == 0 && inc, 0)) {
+            e++;
+            m = UINT64_C(0x8000000000000000);
+        }
+        return mk(sign, (unsigned)(e + 16383), m);
+    }
+    uint64_t keep, m;
+    int rb, st, inc = 0;
+    if (pbits == 64) {
+        keep = hi;
+        rb = (int)(lo >> 63);
+        st = ((lo << 1) != 0) | sticky;
+    } else if (pbits == 53) {
+        keep = hi >> 11;
+        rb = (int)((hi >> 10) & 1u);
+        st = (((hi & 0x3ffu) | lo) != 0) | sticky;
+    } else {
+        keep = hi >> 40;
+        rb = (int)((hi >> 39) & 1u);
+        st = (((hi & ((UINT64_C(1) << 39) - 1u)) | lo) != 0) | sticky;
+    }
+    int inexact = rb | st;
+    if (__builtin_expect(rc == 0, 1)) {
+        inc = rb && (st || (keep & 1u));
+    } else if (rc == 1) {
+        inc = inexact && sign;
+    } else if (rc == 2) {
+        inc = inexact && !sign;
+    }
+    *up = inc;
+    if (inexact) *x_flags |= EX_PE;
+    keep += (uint64_t)inc;
+    if (pbits == 64) {
+        if (__builtin_expect(keep == 0 && inc, 0)) {
+            e++;
+            m = UINT64_C(0x8000000000000000);
+        } else {
+            m = keep;
+        }
+    } else if (pbits == 53) {
+        if (__builtin_expect((keep >> 53) != 0, 0)) {
+            e++;
+            m = UINT64_C(0x8000000000000000);
+        } else {
+            m = keep << 11;
+        }
+    } else {
+        if (__builtin_expect((keep >> 24) != 0, 0)) {
+            e++;
+            m = UINT64_C(0x8000000000000000);
+        } else {
+            m = keep << 40;
+        }
+    }
+    return mk(sign, (unsigned)(e + 16383), m);
+}
+
 /* ---- conversions to and from f80 ---- */
 
 static fle_f80 from_f32(uint32_t b) {
@@ -360,6 +455,31 @@ static uint64_t to_float(fle_f80 x, int dbl, int *up) {
     {
         int64_t emin = dbl ? -1022 : -126, emax = dbl ? 1023 : 127;
         int bias = dbl ? 1023 : 127;
+        if (__builtin_expect(a.k == K_NORM && a.e >= emin && a.e < emax, 1)) {
+            int rc = rc_mode();
+            unsigned sh = (unsigned)(63 - fb);
+            uint64_t keep = a.m >> sh;
+            uint64_t rem = a.m & ((UINT64_C(1) << sh) - 1u);
+            int rb = (int)((rem >> (sh - 1u)) & 1u);
+            int st = (rem & ((UINT64_C(1) << (sh - 1u)) - 1u)) != 0;
+            int inexact = rb | st, inc = 0;
+            if (__builtin_expect(rc == 0, 1)) {
+                inc = rb && (st || (keep & 1u));
+            } else if (rc == 1) {
+                inc = inexact && a.sign;
+            } else if (rc == 2) {
+                inc = inexact && !a.sign;
+            }
+            *up = inc;
+            if (inexact) X |= EX_PE;
+            keep += (uint64_t)inc;
+            int64_t e2 = a.e;
+            if (__builtin_expect((keep >> (fb + 1)) != 0, 0)) {
+                keep >>= 1;
+                e2++;
+            }
+            return sg | ((uint64_t)(e2 + bias) << fb) | (keep & (((uint64_t)1 << fb) - 1u));
+        }
         rr r = round_pack(a.sign, a.e, (u128)a.m << 64, 0, fb + 1, fb + 1, emin, emax, rc_mode(), up);
         switch (r.kind) {
         case 0: return sg;
@@ -397,9 +517,58 @@ static int64_t load_int(uint64_t a, unsigned size) {
 
 void fle_x87_fld_m(uint64_t a, unsigned size) {
     fle_f80 v;
-    begin();
-    need_room();
-    v = load_mem(a, size);
+    unsigned t = top(), p = (t - 1u) & 7u;
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * p)) & 3u) != 3u, 0)) {
+        fail("stack overflow (ST(7) not empty); stack faults are not modelled");
+    }
+    if (__builtin_expect(size == 8, 1)) {
+        uint64_t bits;
+        if (__builtin_expect(((a | (a + 7u)) >> 32) == 0u, 1)) memcpy(&bits, (const void *)(uintptr_t)a, 8);
+        else bits = fle_ld(a, 8);
+        unsigned e = (unsigned)((bits >> 52) & 0x7ffu);
+        if (__builtin_expect((e - 1u) < 0x7feu, 1)) {
+            v.m = UINT64_C(0x8000000000000000) | ((bits & UINT64_C(0xfffffffffffff)) << 11);
+            v.se = (uint16_t)(((bits >> 48) & 0x8000u) | (e + (16383u - 1023u)));
+            fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (p << 11));
+            fle_x87_r[p] = v;
+            fle_x87.tw = (uint16_t)(tg & ~(3u << (2u * p)));
+            return;
+        }
+        if ((bits & UINT64_C(0x7fffffffffffffff)) == 0u) {
+            fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (p << 11));
+            fle_x87_r[p] = mk((int)(bits >> 63), 0, 0);
+            fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * p))) | (1u << (2u * p)));
+            return;
+        }
+        X = 0;
+        v = from_f64(bits);
+    } else if (__builtin_expect(size == 4, 1)) {
+        uint32_t bits;
+        if (__builtin_expect(((a | (a + 3u)) >> 32) == 0u, 1)) memcpy(&bits, (const void *)(uintptr_t)a, 4);
+        else bits = (uint32_t)fle_ld(a, 4);
+        unsigned e = (bits >> 23) & 0xffu;
+        if (__builtin_expect((e - 1u) < 0xfeu, 1)) {
+            v.m = UINT64_C(0x8000000000000000) | ((uint64_t)(bits & 0x7fffffu) << 40);
+            v.se = (uint16_t)(((bits >> 16) & 0x8000u) | (e + (16383u - 127u)));
+            fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (p << 11));
+            fle_x87_r[p] = v;
+            fle_x87.tw = (uint16_t)(tg & ~(3u << (2u * p)));
+            return;
+        }
+        if ((bits & 0x7fffffffu) == 0u) {
+            fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (p << 11));
+            fle_x87_r[p] = mk((int)(bits >> 31), 0, 0);
+            fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * p))) | (1u << (2u * p)));
+            return;
+        }
+        X = 0;
+        v = from_f32(bits);
+    } else {
+        X = 0;
+        v = load_mem(a, size);
+    }
     commit(0);
     push(v);
 }
@@ -414,13 +583,21 @@ void fle_x87_fild(uint64_t a, unsigned size) {
 }
 
 void fle_x87_fld_st(unsigned i) {
-    fle_f80 v;
-    begin();
-    need_nonempty(i);
-    need_room();
-    v = fle_x87_r[phys(i)];
-    commit(0);
-    push(v);
+    unsigned t = top(), ps = (t + i) & 7u, p_new = (t - 1u) & 7u;
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * ps)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    if (__builtin_expect(((tg >> (2u * p_new)) & 3u) != 3u, 0)) {
+        fail("stack overflow (ST(7) not empty); stack faults are not modelled");
+    }
+    {
+        unsigned src_tag = (tg >> (2u * ps)) & 3u;
+        fle_x87_r[p_new] = fle_x87_r[ps];
+        fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * p_new))) | (src_tag << (2u * p_new)));
+        fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (p_new << 11));
+    }
 }
 
 void fle_x87_fld_const(unsigned k) {
@@ -444,10 +621,86 @@ void fle_x87_fld_const(unsigned k) {
 
 void fle_x87_fst_m(uint64_t a, unsigned size, unsigned popit) {
     fle_f80 v;
-    int up = 0;
-    begin();
-    need_nonempty(0);
-    v = fle_x87_r[phys(0)];
+    int up = 0, fast_inc = 0;
+    unsigned fast_pe = 0u;
+    uint64_t out_bits = 0u;
+    unsigned t = top();
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    v = fle_x87_r[t];
+    if (__builtin_expect(size == 8, 1)) {
+        unsigned raw_e = v.se & 0x7fffu;
+        if (__builtin_expect(((raw_e - 15361u) < 2045u) & ((v.m >> 63) != 0u), 1)) {
+            uint64_t rem = v.m & 0x7ffu;
+            uint64_t keep = v.m >> 11;
+            unsigned e_biased = raw_e - (16383u - 1023u);
+            if (__builtin_expect(rem == 0u, 1)) {
+                out_bits = ((uint64_t)(v.se & 0x8000u) << 48) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
+                goto fast_store;
+            }
+            {
+                int sign = v.se >> 15;
+                int rc = rc_mode();
+                int rb = (int)((rem >> 10) & 1u);
+                int st = (rem & 0x3ffu) != 0u;
+                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
+                keep += (uint64_t)inc;
+                if (__builtin_expect((keep >> 53) != 0u, 0)) {
+                    keep >>= 1;
+                    e_biased++;
+                }
+                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
+                    X = EX_PE;
+                    commit((unsigned)inc);
+                }
+                out_bits = ((uint64_t)sign << 63) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
+                fast_inc = inc;
+                fast_pe = EX_PE;
+                goto fast_store;
+            }
+        } else if (raw_e == 0u && v.m == 0u) {
+            out_bits = (uint64_t)(v.se & 0x8000u) << 48;
+            goto fast_store;
+        }
+    } else if (__builtin_expect(size == 4, 1)) {
+        unsigned raw_e = v.se & 0x7fffu;
+        if (__builtin_expect(((raw_e - 16257u) < 253u) & ((v.m >> 63) != 0u), 1)) {
+            uint64_t rem = v.m & UINT64_C(0xffffffffff);
+            uint64_t keep = v.m >> 40;
+            unsigned e_biased = raw_e - (16383u - 127u);
+            if (rem == 0u) {
+                out_bits = ((uint64_t)(v.se & 0x8000u) << 16) | ((uint64_t)e_biased << 23) | (keep & 0x7fffffu);
+                goto fast_store;
+            }
+            {
+                int sign = v.se >> 15;
+                int rc = rc_mode();
+                int rb = (int)((rem >> 39) & 1u);
+                int st = (rem & UINT64_C(0x7fffffffff)) != 0u;
+                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
+                keep += (uint64_t)inc;
+                if (__builtin_expect((keep >> 24) != 0u, 0)) {
+                    keep >>= 1;
+                    e_biased++;
+                }
+                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
+                    X = EX_PE;
+                    commit((unsigned)inc);
+                }
+                out_bits = ((uint64_t)sign << 31) | ((uint64_t)e_biased << 23) | (keep & 0x7fffffu);
+                fast_inc = inc;
+                fast_pe = EX_PE;
+                goto fast_store;
+            }
+        } else if (raw_e == 0u && v.m == 0u) {
+            out_bits = (uint64_t)(v.se & 0x8000u) << 16;
+            goto fast_store;
+        }
+    }
+    X = 0;
     if (size == 10) {
         commit(0);
         fle_st(a, 8, v.m);
@@ -458,17 +711,50 @@ void fle_x87_fst_m(uint64_t a, unsigned size, unsigned popit) {
         fle_st(a, size, b);
     }
     if (popit) pop();
+    return;
+
+fast_store:
+    if (size == 8u) {
+        if (__builtin_expect(((a | (a + 7u)) >> 32) == 0u, 1)) memcpy((void *)(uintptr_t)a, &out_bits, 8);
+        else fle_st(a, 8, out_bits);
+    } else {
+        uint32_t out32 = (uint32_t)out_bits;
+        if (__builtin_expect(((a | (a + 3u)) >> 32) == 0u, 1)) memcpy((void *)(uintptr_t)a, &out32, 4);
+        else fle_st(a, 4, out32);
+    }
+    if (popit) {
+        fle_x87.tw = (uint16_t)(tg | (3u << (2u * t)));
+        fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (fast_inc ? SW_C1 : 0u) | fast_pe | (((t + 1u) & 7u) << 11));
+    } else {
+        fle_x87.sw = (uint16_t)((fle_x87.sw & ~SW_C1) | (fast_inc ? SW_C1 : 0u) | fast_pe);
+    }
 }
 
 void fle_x87_fst_st(unsigned i, unsigned popit) {
-    fle_f80 v;
-    begin();
-    need_nonempty(0);
-    if (i != 0 || !popit) need_nonempty(0);
-    v = fle_x87_r[phys(0)];
-    commit(0);
-    if (!(i == 0 && !popit)) put(i, v);
-    if (popit) pop();
+    unsigned t = top();
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    if (popit) {
+        if (i != 0u) {
+            unsigned pd = (t + i) & 7u;
+            unsigned st0_tag = (tg >> (2u * t)) & 3u;
+            fle_x87_r[pd] = fle_x87_r[t];
+            tg = (tg & ~(3u << (2u * pd))) | (st0_tag << (2u * pd));
+        }
+        fle_x87.tw = (uint16_t)(tg | (3u << (2u * t)));
+        fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (((t + 1u) & 7u) << 11));
+    } else {
+        fle_x87.sw &= (uint16_t)~SW_C1;
+        if (i != 0u) {
+            unsigned pd = (t + i) & 7u;
+            unsigned st0_tag = (tg >> (2u * t)) & 3u;
+            fle_x87_r[pd] = fle_x87_r[t];
+            fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * pd))) | (st0_tag << (2u * pd)));
+        }
+    }
 }
 
 /* ---- integer stores ---- */
@@ -573,6 +859,232 @@ static int nan_operands(fle_f80 ra, fle_f80 rb, fp a, fp b, fle_f80 *out) {
 
 static fle_f80 f_inf(int sign) { return mk(sign, 0x7fff, UINT64_C(0x8000000000000000)); }
 
+static inline __attribute__((always_inline)) void commit_known(unsigned t, unsigned pd, unsigned popit, uint64_t rm, uint16_t rse, unsigned tag, int up, unsigned x_flags) {
+    fle_x87_r[pd].m = rm;
+    fle_x87_r[pd].se = rse;
+    {
+        uint16_t sw = (uint16_t)((fle_x87.sw & ~SW_C1) | (up ? SW_C1 : 0u) | (x_flags & 0x3Fu));
+        if (popit) {
+            unsigned tg = (unsigned)fle_x87.tw;
+            if (pd == t) {
+                tg |= (3u << (2u * t));
+            } else {
+                tg = (tg & ~(3u << (2u * pd))) | (tag << (2u * pd));
+                tg |= (3u << (2u * t));
+            }
+            fle_x87.tw = (uint16_t)tg;
+            fle_x87.sw = (uint16_t)((sw & ~0x3800u) | (((t + 1u) & 7u) << 11));
+        } else {
+            fle_x87.sw = sw;
+            set_tag(pd, tag);
+        }
+    }
+}
+
+static __attribute__((noinline, cold)) void round80_and_commit_slow(int sign, int64_t e, uint64_t hi, uint64_t lo, int sticky, int pbits, int rc, unsigned t, unsigned pd, unsigned popit) {
+    unsigned x_flags = 0u;
+    int up = 0;
+    fle_f80 res = round80_fast(sign, e, hi, lo, sticky, pbits, rc, &up, &x_flags);
+    unsigned tag = tag_for(res);
+    if (__builtin_expect((x_flags & (EX_IE | EX_ZE)) != 0u, 0)) x_flags &= ~EX_DE;
+    commit_known(t, pd, popit, res.m, res.se, tag, up, x_flags);
+}
+
+/* Fast normal rounding + register commit helper kept out-of-line so binop_fast_commit stays compact under -Oz. */
+static __attribute__((noinline)) void round_commit_fast(int sign, int64_t e, uint64_t hi, uint64_t lo, int sticky, int pbits, int rc, unsigned t, unsigned pd, unsigned popit) {
+    if (__builtin_expect(e < -16382 || e >= 16383, 0)) {
+        round80_and_commit_slow(sign, e, hi, lo, sticky, pbits, rc, t, pd, popit);
+        return;
+    }
+    uint64_t m;
+    int rb, st, inc = 0;
+    if (__builtin_expect(pbits == 64 && rc == 0, 1)) {
+        rb = (int)(lo >> 63);
+        st = ((lo << 1) != 0) | sticky;
+        inc = rb && (st || (hi & 1u));
+        m = hi + (uint64_t)inc;
+        if (__builtin_expect(m == 0 && inc, 0)) {
+            e++;
+            m = UINT64_C(0x8000000000000000);
+        }
+        commit_known(t, pd, popit, m, (uint16_t)((sign ? 0x8000u : 0u) | (unsigned)(e + 16383)), 0u, inc, (rb | st) ? EX_PE : 0u);
+        return;
+    }
+    {
+        uint64_t keep;
+        if (pbits == 64) {
+            keep = hi;
+            rb = (int)(lo >> 63);
+            st = ((lo << 1) != 0) | sticky;
+        } else if (pbits == 53) {
+            keep = hi >> 11;
+            rb = (int)((hi >> 10) & 1u);
+            st = (((hi & 0x3ffu) | lo) != 0) | sticky;
+        } else {
+            keep = hi >> 40;
+            rb = (int)((hi >> 39) & 1u);
+            st = (((hi & UINT64_C(0x7fffffffff)) | lo) != 0) | sticky;
+        }
+        int inexact = rb | st;
+        if (__builtin_expect(rc == 0, 1)) {
+            inc = rb && (st || (keep & 1u));
+        } else if (rc == 1) {
+            inc = inexact && sign;
+        } else if (rc == 2) {
+            inc = inexact && !sign;
+        }
+        keep += (uint64_t)inc;
+        if (pbits == 64) {
+            if (__builtin_expect(keep == 0 && inc, 0)) {
+                e++;
+                m = UINT64_C(0x8000000000000000);
+            } else {
+                m = keep;
+            }
+        } else if (pbits == 53) {
+            if (__builtin_expect((keep >> 53) != 0u, 0)) {
+                keep >>= 1;
+                e++;
+            }
+            m = keep << 11;
+        } else {
+            if (__builtin_expect((keep >> 24) != 0u, 0)) {
+                keep >>= 1;
+                e++;
+            }
+            m = keep << 40;
+        }
+        commit_known(t, pd, popit, m, (uint16_t)((sign ? 0x8000u : 0u) | (unsigned)(e + 16383)), 0u, inc, inexact ? EX_PE : 0u);
+    }
+}
+
+/* Fast path for ADD/SUB/SUBR/MUL when exceptions are masked and both operands are finite normals or zeros; commits directly with zero pointer out-params. */
+static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am, uint16_t ase, uint64_t bm, uint16_t bse, unsigned t, unsigned pd, unsigned popit, uint16_t cw) {
+    uint32_t ea = ase & 0x7fffu, eb = bse & 0x7fffu;
+    unsigned pc = (cw >> 8) & 3u;
+    int pbits = (pc == 3u || pc == 1u) ? 64 : (pc == 2u ? 53 : 24);
+    int rc = (cw >> 10) & 3;
+    int a_norm, b_norm;
+
+    if (__builtin_expect(((cw & 0x3Fu) != 0x3Fu) | (op > FLE_X87_MUL), 0)) {
+        return 0;
+    }
+    a_norm = ((ea - 1u) < 0x7ffeu) && ((am >> 63) != 0u);
+    b_norm = ((eb - 1u) < 0x7ffeu) && ((bm >> 63) != 0u);
+    if (__builtin_expect(!(a_norm & b_norm), 0)) {
+        int a_zero = (ea == 0u && am == 0u);
+        int b_zero = (eb == 0u && bm == 0u);
+        if (!((a_norm | a_zero) & (b_norm | b_zero))) {
+            return 0;
+        }
+        if (op == FLE_X87_MUL) {
+            fle_f80 res = mk((int)((ase ^ bse) >> 15), 0, 0);
+            commit_known(t, pd, popit, res.m, res.se, 1u, 0, 0u);
+            return 1;
+        }
+        {
+            int sa = (int)(ase >> 15) ^ (op == FLE_X87_SUBR);
+            int sb = (int)(bse >> 15) ^ (op == FLE_X87_SUB);
+            if (a_zero && b_zero) {
+                fle_f80 res = mk(sa == sb ? sa : (rc == 1), 0, 0);
+                commit_known(t, pd, popit, res.m, res.se, 1u, 0, 0u);
+                return 1;
+            }
+            {
+                int sx = a_zero ? sb : sa;
+                uint32_t ex = a_zero ? eb : ea;
+                uint64_t xm = a_zero ? bm : am;
+                if (__builtin_expect((pbits == 64) || (pbits == 53 && (xm & 0x7ffu) == 0u) || (pbits == 24 && (xm & UINT64_C(0xffffffffff)) == 0u), 1)) {
+                    fle_f80 res = mk(sx, ex, xm);
+                    commit_known(t, pd, popit, res.m, res.se, 0u, 0, 0u);
+                    return 1;
+                }
+                round_commit_fast(sx, (int64_t)ex - 16383, xm, 0, 0, pbits, rc, t, pd, popit);
+                return 1;
+            }
+        }
+    }
+    if (op == FLE_X87_MUL) {
+        int sign = (int)((ase ^ bse) >> 15);
+        uint64_t hi, lo;
+        int64_t e = (int64_t)ea + (int64_t)eb - 32765;
+        mul64x64_128(am, bm, &hi, &lo);
+        if (!(hi >> 63)) {
+            hi = (hi << 1) | (lo >> 63);
+            lo <<= 1;
+            e -= 1;
+        }
+        round_commit_fast(sign, e, hi, lo, 0, pbits, rc, t, pd, popit);
+        return 1;
+    }
+    {
+        int sa = (int)(ase >> 15) ^ (op == FLE_X87_SUBR);
+        int sb = (int)(bse >> 15) ^ (op == FLE_X87_SUB);
+        int swap = (ea < eb) || (ea == eb && am < bm);
+        uint32_t ex = swap ? eb : ea, ey = swap ? ea : eb;
+        uint64_t xm = swap ? bm : am, ym = swap ? am : bm;
+        int sx = swap ? sb : sa, sy = swap ? sa : sb;
+        uint32_t d = ex - ey;
+        int64_t e = (int64_t)ex - 16383;
+        uint64_t y_hi, y_lo;
+        int sticky = 0;
+        if (d == 0u) {
+            y_hi = ym;
+            y_lo = 0;
+        } else if (d < 64u) {
+            y_hi = ym >> d;
+            y_lo = ym << (64u - d);
+        } else if (d == 64u) {
+            y_hi = 0;
+            y_lo = ym;
+        } else if (d < 128u) {
+            y_hi = 0;
+            y_lo = ym >> (d - 64u);
+            sticky = (ym << (128u - d)) != 0;
+        } else {
+            y_hi = 0;
+            y_lo = 0;
+            sticky = 1;
+        }
+        if (sx == sy) {
+            uint64_t lo = y_lo;
+            uint64_t hi = xm + y_hi;
+            if (hi < xm) {
+                sticky |= (int)(lo & 1u);
+                lo = (lo >> 1) | (hi << 63);
+                hi = (hi >> 1) | UINT64_C(0x8000000000000000);
+                e += 1;
+            }
+            round_commit_fast(sx, e, hi, lo, sticky, pbits, rc, t, pd, popit);
+            return 1;
+        } else {
+            uint64_t lo = sticky ? ~y_lo : (UINT64_C(0) - y_lo);
+            uint64_t borrow = (sticky || y_lo != 0) ? 1u : 0u;
+            uint64_t hi = xm - y_hi - borrow;
+            if (hi == 0 && lo == 0) {
+                fle_f80 res = mk(rc == 1, 0, 0);
+                commit_known(t, pd, popit, res.m, res.se, 1u, 0, 0u);
+                return 1;
+            }
+            if (hi) {
+                int s = clz64(hi);
+                if (s) {
+                    hi = (hi << s) | (lo >> (64 - s));
+                    lo <<= s;
+                    e -= s;
+                }
+            } else {
+                int s = clz64(lo);
+                hi = lo << s;
+                lo = 0;
+                e -= 64 + s;
+            }
+            round_commit_fast(sx, e, hi, lo, sticky, pbits, rc, t, pd, popit);
+            return 1;
+        }
+    }
+}
+
 /* Result of dst op src. a is the destination operand, b the source. Sets *up. */
 static fle_f80 binop(unsigned op, fle_f80 ra, fle_f80 rb, int *up) {
     fp a = unpack(ra), b = unpack(rb), t;
@@ -595,7 +1107,6 @@ static fle_f80 binop(unsigned op, fle_f80 ra, fle_f80 rb, int *up) {
         int sa = a.sign, sb = b.sign ^ (op == FLE_X87_SUB);
         int eff_sub, sign, sticky = 0;
         int64_t e;
-        u128 A, B, S;
         if (a.k == K_INF || b.k == K_INF) {
             if (a.k == K_INF && b.k == K_INF && sa != sb) {
                 X |= EX_IE;
@@ -606,51 +1117,69 @@ static fle_f80 binop(unsigned op, fle_f80 ra, fle_f80 rb, int *up) {
         if (a.k == K_ZERO && b.k == K_ZERO) return mk(sa == sb ? sa : (rc == 1), 0, 0);
         if (a.k == K_ZERO || b.k == K_ZERO) {
             fp n = a.k == K_ZERO ? b : a;
-            return round80(a.k == K_ZERO ? sb : sa, n.e, (u128)n.m << 64, 0, pbits, up);
+            return round80_fast(a.k == K_ZERO ? sb : sa, n.e, n.m, 0, 0, pbits, rc, up, &X);
         }
         /* order by magnitude: x is the larger */
-        {
-            int swap = a.e < b.e || (a.e == b.e && a.m < b.m);
-            fp x = swap ? b : a, y = swap ? a : b;
-            int sx = swap ? sb : sa, sy = swap ? sa : sb;
-            unsigned d = (unsigned)(x.e - y.e);
-            eff_sub = sx != sy;
-            sign = sx;
-            e = x.e;
-            A = (u128)x.m << 64;
-            B = (u128)y.m << 64;
-            if (d >= 128) {
-                B = 0;
-                sticky = 1;
-            } else if (d) {
-                u128 lost = B & (((u128)1 << d) - 1);
-                B >>= d;
-                sticky = lost != 0;
-            }
+        int swap = a.e < b.e || (a.e == b.e && a.m < b.m);
+        fp x = swap ? b : a, y = swap ? a : b;
+        int sx = swap ? sb : sa, sy = swap ? sa : sb;
+        unsigned d = (unsigned)(x.e - y.e);
+        uint64_t y_hi, y_lo;
+        eff_sub = sx != sy;
+        sign = sx;
+        e = x.e;
+        if (d >= 128) {
+            y_hi = 0;
+            y_lo = 0;
+            sticky = 1;
+        } else if (d > 64) {
+            y_hi = 0;
+            y_lo = y.m >> (d - 64);
+            sticky = (y.m << (128 - d)) != 0;
+        } else if (d == 64) {
+            y_hi = 0;
+            y_lo = y.m;
+        } else if (d > 0) {
+            y_hi = y.m >> d;
+            y_lo = y.m << (64 - d);
+        } else {
+            y_hi = y.m;
+            y_lo = 0;
         }
         if (!eff_sub) {
-            S = A + B;
-            if (S < A) {
-                sticky |= (int)(S & 1);
-                S = (S >> 1) | ((u128)1 << 127);
+            uint64_t lo = y_lo;
+            uint64_t hi = x.m + y_hi;
+            if (hi < x.m) {
+                sticky |= (int)(lo & 1u);
+                lo = (lo >> 1) | (hi << 63);
+                hi = (hi >> 1) | UINT64_C(0x8000000000000000);
                 e += 1;
             }
+            return round80_fast(sign, e, hi, lo, sticky, pbits, rc, up, &X);
         } else {
-            S = A - B;
-            if (sticky) S -= 1;
-            if (S == 0 && !sticky) return mk(rc == 1, 0, 0);
-            {
-                int s = clz128(S);
-                S <<= s;
-                e -= s;
+            uint64_t lo = sticky ? ~y_lo : (UINT64_C(0) - y_lo);
+            uint64_t borrow = (sticky || y_lo != 0) ? 1u : 0u;
+            uint64_t hi = x.m - y_hi - borrow;
+            if (hi == 0 && lo == 0) return mk(rc == 1, 0, 0);
+            if (hi) {
+                int s = clz64(hi);
+                if (s) {
+                    hi = (hi << s) | (lo >> (64 - s));
+                    lo <<= s;
+                    e -= s;
+                }
+            } else {
+                int s = clz64(lo);
+                hi = lo << s;
+                lo = 0;
+                e -= 64 + s;
             }
+            return round80_fast(sign, e, hi, lo, sticky, pbits, rc, up, &X);
         }
-        return round80(sign, e, S, sticky, pbits, up);
     }
     if (op == FLE_X87_MUL) {
         int sign = a.sign ^ b.sign;
-        u128 P;
-        int s;
+        uint64_t hi, lo;
         int64_t e;
         if ((a.k == K_INF && b.k == K_ZERO) || (a.k == K_ZERO && b.k == K_INF)) {
             X |= EX_IE;
@@ -658,12 +1187,14 @@ static fle_f80 binop(unsigned op, fle_f80 ra, fle_f80 rb, int *up) {
         }
         if (a.k == K_INF || b.k == K_INF) return f_inf(sign);
         if (a.k == K_ZERO || b.k == K_ZERO) return mk(sign, 0, 0);
-        P = (u128)a.m * b.m;
+        mul64x64_128(a.m, b.m, &hi, &lo);
         e = a.e + b.e + 1;
-        s = clz128(P);
-        P <<= s;
-        e -= s;
-        return round80(sign, e, P, 0, pbits, up);
+        if (!(hi >> 63)) {
+            hi = (hi << 1) | (lo >> 63);
+            lo <<= 1;
+            e -= 1;
+        }
+        return round80_fast(sign, e, hi, lo, 0, pbits, rc, up, &X);
     }
     {
         int sign = a.sign ^ b.sign;
@@ -701,29 +1232,115 @@ static fle_f80 src_value(unsigned i) {
     return fle_x87_r[phys(i)];
 }
 
-void fle_x87_arith_st(unsigned op, unsigned dst, unsigned src, unsigned popit) {
-    fle_f80 a, b, r;
-    int up;
-    begin();
-    a = src_value(dst);
-    b = src_value(src);
-    r = binop(op, a, b, &up);
+static inline void finish_op(unsigned pd, fle_f80 r, int up, unsigned popit) {
+    unsigned t = top();
+    fle_x87_r[pd] = r;
     commit((unsigned)up);
-    put(dst, r);
-    if (popit) pop();
+    if (popit) {
+        unsigned tg = (unsigned)fle_x87.tw;
+        if (pd == t) {
+            tg |= (3u << (2u * t));
+        } else {
+            tg = (tg & ~(3u << (2u * pd))) | (tag_for(r) << (2u * pd));
+            tg |= (3u << (2u * t));
+        }
+        fle_x87.tw = (uint16_t)tg;
+        set_top(t + 1u);
+    } else {
+        set_tag(pd, tag_for(r));
+    }
+}
+
+static __attribute__((noinline, cold)) void arith_st_slow(unsigned op, fle_f80 a, fle_f80 b, unsigned pd, unsigned popit) {
+    int up;
+    fle_f80 r;
+    X = 0;
+    r = binop(op, a, b, &up);
+    finish_op(pd, r, up, popit);
+}
+
+static __attribute__((noinline, cold)) void arith_m_slow(unsigned op, fle_f80 a, uint64_t addr, unsigned size, unsigned t, int have_b, fle_f80 b) {
+    int up;
+    fle_f80 r;
+    if (!have_b) {
+        X = 0;
+        keep_snan = 1;
+        b = load_mem(addr, size);
+        keep_snan = 0;
+    } else {
+        X = 0;
+    }
+    r = binop(op, a, b, &up);
+    finish_op(t, r, up, 0);
+}
+
+void fle_x87_arith_st(unsigned op, unsigned dst, unsigned src, unsigned popit) {
+    unsigned t = top(), pd = (t + dst) & 7u, ps = (t + src) & 7u;
+    uint16_t cw;
+    fle_f80 a, b;
+    begin_fast();
+    if (__builtin_expect(((fle_x87.tw >> (2u * pd)) & 3u) == 3u || ((fle_x87.tw >> (2u * ps)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    cw = fle_x87.cw;
+    a = fle_x87_r[pd];
+    b = fle_x87_r[ps];
+    if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, pd, popit, cw), 1)) {
+        return;
+    }
+    arith_st_slow(op, a, b, pd, popit);
 }
 
 void fle_x87_arith_m(unsigned op, uint64_t addr, unsigned size) {
-    fle_f80 a, b, r;
-    int up;
-    begin();
-    a = src_value(0);
-    keep_snan = 1;
-    b = load_mem(addr, size);
-    keep_snan = 0;
-    r = binop(op, a, b, &up);
-    commit((unsigned)up);
-    put(0, r);
+    fle_f80 a, b;
+    unsigned t = top();
+    uint16_t cw;
+    begin_fast();
+    if (__builtin_expect(((fle_x87.tw >> (2u * t)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    cw = fle_x87.cw;
+    a = fle_x87_r[t];
+    if (__builtin_expect(size == 8, 1)) {
+        uint64_t bits;
+        if (__builtin_expect(((addr | (addr + 7u)) >> 32) == 0u, 1)) memcpy(&bits, (const void *)(uintptr_t)addr, 8);
+        else bits = fle_ld(addr, 8);
+        unsigned e = (unsigned)((bits >> 52) & 0x7ffu);
+        if (__builtin_expect((e - 1u) < 0x7feu, 1)) {
+            b.m = UINT64_C(0x8000000000000000) | ((bits & UINT64_C(0xfffffffffffff)) << 11);
+            b.se = (uint16_t)(((bits >> 48) & 0x8000u) | (e + (16383u - 1023u)));
+            if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, t, 0u, cw), 1)) return;
+            arith_m_slow(op, a, addr, size, t, 1, b);
+            return;
+        }
+        if ((bits & UINT64_C(0x7fffffffffffffff)) == 0u) {
+            b.m = 0u;
+            b.se = (uint16_t)((bits >> 48) & 0x8000u);
+            if (binop_fast_commit(op, a.m, a.se, 0u, b.se, t, t, 0u, cw)) return;
+            arith_m_slow(op, a, addr, size, t, 1, b);
+            return;
+        }
+    } else if (__builtin_expect(size == 4, 1)) {
+        uint32_t bits;
+        if (__builtin_expect(((addr | (addr + 3u)) >> 32) == 0u, 1)) memcpy(&bits, (const void *)(uintptr_t)addr, 4);
+        else bits = (uint32_t)fle_ld(addr, 4);
+        unsigned e = (bits >> 23) & 0xffu;
+        if (__builtin_expect((e - 1u) < 0xfeu, 1)) {
+            b.m = UINT64_C(0x8000000000000000) | ((uint64_t)(bits & 0x7fffffu) << 40);
+            b.se = (uint16_t)(((bits >> 16) & 0x8000u) | (e + (16383u - 127u)));
+            if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, t, 0u, cw), 1)) return;
+            arith_m_slow(op, a, addr, size, t, 1, b);
+            return;
+        }
+        if ((bits & 0x7fffffffu) == 0u) {
+            b.m = 0u;
+            b.se = (uint16_t)((bits >> 16) & 0x8000u);
+            if (binop_fast_commit(op, a.m, a.se, 0u, b.se, t, t, 0u, cw)) return;
+            arith_m_slow(op, a, addr, size, t, 1, b);
+            return;
+        }
+    }
+    arith_m_slow(op, a, addr, size, t, 0, a);
 }
 
 void fle_x87_arith_i(unsigned op, uint64_t addr, unsigned size) {
@@ -779,13 +1396,58 @@ static void set_cc(unsigned cc) {
 }
 
 void fle_x87_com_st(unsigned i, unsigned pops, unsigned unordered) {
-    unsigned cc;
-    begin();
-    cc = compare(src_value(0), src_value(i), (int)unordered);
-    commit(0);
-    set_cc(cc);
-    if (pops >= 1) pop();
-    if (pops >= 2) pop();
+    unsigned t = top(), pi = (t + i) & 7u;
+    unsigned tg = fle_x87.tw;
+    fle_f80 ra, rb;
+    uint32_t ea, eb;
+    int a_ok, b_ok;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u || ((tg >> (2u * pi)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    ra = fle_x87_r[t];
+    rb = fle_x87_r[pi];
+    ea = ra.se & 0x7fffu;
+    eb = rb.se & 0x7fffu;
+    a_ok = (((ea - 1u) < 0x7ffeu) && ((ra.m >> 63) != 0u)) || (ea == 0u && ra.m == 0u);
+    b_ok = (((eb - 1u) < 0x7ffeu) && ((rb.m >> 63) != 0u)) || (eb == 0u && rb.m == 0u);
+    if (__builtin_expect(a_ok & b_ok, 1)) {
+        unsigned cc;
+        int a_zero = (ea == 0u), b_zero = (eb == 0u);
+        if (a_zero && b_zero) {
+            cc = SW_C3;
+        } else if (a_zero) {
+            cc = (rb.se >> 15) ? 0u : SW_C0;
+        } else if (b_zero) {
+            cc = (ra.se >> 15) ? SW_C0 : 0u;
+        } else {
+            unsigned sa = ra.se >> 15, sb = rb.se >> 15;
+            if (sa != sb) {
+                cc = sa ? SW_C0 : 0u;
+            } else if (ea != eb) {
+                cc = ((ea > eb) ^ sa) ? 0u : SW_C0;
+            } else if (ra.m != rb.m) {
+                cc = ((ra.m > rb.m) ^ sa) ? 0u : SW_C0;
+            } else {
+                cc = SW_C3;
+            }
+        }
+        fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C0 | SW_C1 | SW_C2 | SW_C3 | (pops ? 0x3800u : 0u))) | cc | (pops ? (((t + pops) & 7u) << 11) : 0u));
+        if (pops) {
+            tg |= (3u << (2u * t));
+            if (pops >= 2u) tg |= (3u << (2u * ((t + 1u) & 7u)));
+            fle_x87.tw = (uint16_t)tg;
+        }
+        return;
+    }
+    X = 0;
+    {
+        unsigned cc = compare(ra, rb, (int)unordered);
+        commit(0);
+        set_cc(cc);
+    }
+    if (pops >= 1u) pop();
+    if (pops >= 2u) pop();
 }
 
 void fle_x87_com_m(uint64_t addr, unsigned size, unsigned popit) {
@@ -855,13 +1517,21 @@ void fle_x87_fxam(void) {
 /* ---- register moves and sign ---- */
 
 void fle_x87_fxch(unsigned i) {
-    fle_f80 a, b;
-    begin();
-    a = src_value(0);
-    b = src_value(i);
-    commit(0);
-    put(0, b);
-    put(i, a);
+    unsigned t = top(), pi = (t + i) & 7u;
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u || ((tg >> (2u * pi)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    fle_x87.sw &= (uint16_t)~SW_C1;
+    if (pi != t) {
+        fle_f80 a = fle_x87_r[t], b = fle_x87_r[pi];
+        unsigned ta = (tg >> (2u * t)) & 3u, tb = (tg >> (2u * pi)) & 3u;
+        fle_x87_r[t] = b;
+        fle_x87_r[pi] = a;
+        tg = (tg & ~((3u << (2u * t)) | (3u << (2u * pi)))) | (tb << (2u * t)) | (ta << (2u * pi));
+        fle_x87.tw = (uint16_t)tg;
+    }
 }
 
 void fle_x87_fcmov(unsigned i, unsigned cond) {
@@ -1080,10 +1750,12 @@ static uint32_t limb_at(const uint32_t *w, int n, int64_t i) { return (i >= 0 &&
 
 /* The 32 bits p .. p+31 of the n-limb integer w (bits outside it are 0). */
 static uint32_t bits32(const uint32_t *w, int n, int64_t p) {
-    int64_t li = p >= 0 ? p / 32 : -((-p + 31) / 32);
-    unsigned sh = (unsigned)(p - li * 32);
-    uint64_t v = ((uint64_t)limb_at(w, n, li + 1) << 32) | limb_at(w, n, li);
-    return (uint32_t)(v >> sh);
+    int64_t li = p >> 5;
+    unsigned sh = (unsigned)(p & 31);
+    uint32_t lo = limb_at(w, n, li);
+    if (!sh) return lo;
+    uint32_t hi = limb_at(w, n, li + 1);
+    return (lo >> sh) | (hi << (32u - sh));
 }
 
 /* a = W * 2^s with W of n limbs, normalized to 256 bits (truncated). */
@@ -1335,6 +2007,195 @@ static fle_f80 tv_round(const tv *t, int *up, const char *who) {
     return pack80(a.r);
 }
 
+/* Fast 128-bit interval arithmetic for F2XM1 / FSINCOS with automatic fallback to 256-bit bf_*. */
+typedef struct {
+    int sign;
+    int z;
+    int64_t e;
+    u128 m;
+} bf2;
+
+static const bf2 BF2_LN2 = { 0, 0, -1, (((u128)0xb17217f7d1cf79abULL) << 64) | (u128)0xc9e3b39803f2f6afULL };
+
+static inline void bf2_norm(bf2 *a, int sign, u128 m, int64_t s) {
+    if (!m) {
+        a->z = 1;
+        a->sign = 0;
+        a->e = 0;
+        a->m = 0;
+        return;
+    }
+    int l = clz128(m);
+    a->z = 0;
+    a->sign = sign;
+    a->m = m << l;
+    a->e = (127 - l) + s;
+}
+
+static inline void bf2_mul(bf2 *r, const bf2 *a, const bf2 *b) {
+    if (a->z || b->z) {
+        r->z = 1;
+        r->sign = 0;
+        r->e = 0;
+        r->m = 0;
+        return;
+    }
+    uint64_t ah = (uint64_t)(a->m >> 64), al = (uint64_t)a->m;
+    uint64_t bh = (uint64_t)(b->m >> 64), bl = (uint64_t)b->m;
+    u128 hh = (u128)ah * bh;
+    u128 hl = (u128)ah * bl;
+    u128 lh = (u128)al * bh;
+    u128 ll = (u128)al * bl;
+    u128 mid = (ll >> 64) + (uint64_t)hl + (uint64_t)lh;
+    u128 phi = hh + (hl >> 64) + (lh >> 64) + (mid >> 64);
+    int64_t e = a->e + b->e + 1;
+    if (!(phi >> 127)) {
+        phi = (phi << 1) | ((mid >> 63) & 1u);
+        e--;
+    }
+    r->z = 0;
+    r->sign = a->sign ^ b->sign;
+    r->e = e;
+    r->m = phi;
+}
+
+static void bf2_add(bf2 *r, const bf2 *pa, const bf2 *pb) {
+    if (pa->z) { *r = *pb; return; }
+    if (pb->z) { *r = *pa; return; }
+    const bf2 *x = pa, *y = pb;
+    if (x->e < y->e || (x->e == y->e && x->m < y->m)) {
+        x = pb;
+        y = pa;
+    }
+    int64_t d = x->e - y->e;
+    if (d >= 128) {
+        *r = *x;
+        return;
+    }
+    u128 yb = d ? (y->m >> d) : y->m;
+    if (x->sign == y->sign) {
+        u128 S = x->m + yb;
+        int64_t e = x->e;
+        if (S < x->m) {
+            S = (S >> 1) | ((u128)1 << 127);
+            e++;
+        }
+        r->z = 0;
+        r->sign = x->sign;
+        r->e = e;
+        r->m = S;
+    } else {
+        bf2_norm(r, x->sign, x->m - yb, x->e - 127);
+    }
+}
+
+static void bf2_div_small(bf2 *r, const bf2 *a, uint32_t d) {
+    if (a->z) { *r = *a; return; }
+    uint32_t m0 = (uint32_t)a->m, m1 = (uint32_t)(a->m >> 32), m2 = (uint32_t)(a->m >> 64), m3 = (uint32_t)(a->m >> 96);
+    uint64_t rem = 0, cur;
+    uint32_t q4, q3, q2, q1, q0;
+    cur = m3;               q4 = (uint32_t)(cur / d); rem = cur % d;
+    cur = (rem << 32) | m2; q3 = (uint32_t)(cur / d); rem = cur % d;
+    cur = (rem << 32) | m1; q2 = (uint32_t)(cur / d); rem = cur % d;
+    cur = (rem << 32) | m0; q1 = (uint32_t)(cur / d); rem = cur % d;
+    cur = (rem << 32);      q0 = (uint32_t)(cur / d);
+    if (__builtin_expect(q4 != 0, 1)) {
+        u128 top = ((u128)q4 << 96) | ((u128)q3 << 64) | ((u128)q2 << 32) | (u128)q1;
+        int l = __builtin_clz(q4);
+        r->z = 0;
+        r->sign = a->sign;
+        r->e = a->e - l;
+        r->m = l ? ((top << l) | (u128)(q0 >> (32 - l))) : top;
+    } else {
+        u128 full = ((u128)q3 << 96) | ((u128)q2 << 64) | ((u128)q1 << 32) | (u128)q0;
+        bf2_norm(r, a->sign, full, a->e - 159);
+    }
+}
+
+static int bf2_try_round(const bf2 *v, int *up, fle_f80 *out) {
+    if (v->z || v->m <= (u128)0x200000ULL) return 0;
+    bf2 lo, hi;
+    const u128 eps = (u128)0x100000ULL;
+    u128 lm = v->m - eps;
+    int ls = clz128(lm);
+    lo.e = v->e - ls;
+    lo.m = lm << ls;
+    u128 hm = v->m + eps;
+    if (hm < v->m) {
+        hi.e = v->e + 1;
+        hi.m = (hm >> 1) | ((u128)1 << 127);
+    } else {
+        hi.e = v->e;
+        hi.m = hm;
+    }
+    rnd1 a = rnd_window(v->sign, lo.e, lo.m, 1);
+    rnd1 b = rnd_window(v->sign, hi.e, hi.m, 1);
+    if (!same_round(&a, &b)) return 0;
+    X |= a.x;
+    *up = a.up;
+    *out = pack80(a.r);
+    return 1;
+}
+
+static int bf2_expm1_round(int sign, uint64_t m, int64_t e, int *up, fle_f80 *out) {
+    bf2 y, t, s, u;
+    uint32_t n;
+    bf2_norm(&y, sign, (u128)m, e - 63);
+    bf2_mul(&y, &y, &BF2_LN2);
+    t = y;
+    s = y;
+    for (n = 2; n < 80; n++) {
+        bf2_mul(&u, &t, &y);
+        bf2_div_small(&t, &u, n);
+        if (t.z) break;
+        bf2_add(&s, &s, &t);
+        if (t.e < s.e - 115) break;
+    }
+    if (n >= 80) return 0;
+    return bf2_try_round(&s, up, out);
+}
+
+static int bf2_sincos_round(int sign_a, int quad, int neg_r, u128 Rrem, int *up, fle_f80 *rs, fle_f80 *rc) {
+    bf2 r, r2, t, s, c, u;
+    bf2_norm(&r, neg_r, Rrem, -65);
+    if (r.z) return 0;
+    if (r.e < -70) return 0;
+    bf2_mul(&r2, &r, &r);
+    t = r;
+    s = r;
+    for (uint32_t n = 1; n < 40; n++) {
+        bf2_mul(&u, &t, &r2);
+        bf2_div_small(&t, &u, (2u * n) * (2u * n + 1u));
+        if (t.z) break;
+        t.sign ^= 1;
+        bf2_add(&s, &s, &t);
+        if (t.e < s.e - 115) break;
+    }
+    bf2_norm(&t, 0, (u128)1, 0);
+    c = t;
+    for (uint32_t n = 1; n < 40; n++) {
+        bf2_mul(&u, &t, &r2);
+        bf2_div_small(&t, &u, (2u * n - 1u) * (2u * n));
+        if (t.z) break;
+        t.sign ^= 1;
+        bf2_add(&c, &c, &t);
+        if (t.e < c.e - 115) break;
+    }
+    bf2 sn, cs;
+    switch (quad) {
+    case 0: sn = s; cs = c; break;
+    case 1: sn = c; cs = s; cs.sign ^= 1; break;
+    case 2: sn = s; cs = c; sn.sign ^= 1; cs.sign ^= 1; break;
+    default: sn = c; cs = s; sn.sign ^= 1; break;
+    }
+    if (sign_a) sn.sign ^= 1;
+    int upc = 0;
+    unsigned sx = X;
+    if (!bf2_try_round(&sn, up, rs)) { X = sx; return 0; }
+    if (!bf2_try_round(&cs, &upc, rc)) { X = sx; return 0; }
+    return 1;
+}
+
 void fle_x87_f2xm1(void) {
     fle_f80 v, r;
     fp a;
@@ -1352,7 +2213,7 @@ void fle_x87_f2xm1(void) {
         fail("F2XM1: operand outside -1.0 .. +1.0 (the SDM leaves the result undefined); not modelled");
     } else if (a.e == 0) {
         r = a.sign ? mk(1, 0x3ffe, UINT64_C(0x8000000000000000)) : mk(0, 0x3fff, UINT64_C(0x8000000000000000));
-    } else {
+    } else if (!bf2_expm1_round(a.sign, a.m, a.e, &up, &r)) {
         bf y, s;
         tv t;
         bf_from_u128(&y, a.sign, a.m, a.e - 63);
@@ -1374,10 +2235,41 @@ static void sincos_round(fp a, fle_f80 *rs, fle_f80 *rc, int *up) {
     tv ts, tc, sn, cs;
     int quad = 0, upc = 0;
     if (a.e < -2) {
+        /* Note: when a.e is negative (e.g. < -2), compute with quad=0 directly. */
+        if (a.e >= -70) {
+            bf2 r2, t, sb, cb, u;
+            bf2_norm(&r2, 0, (u128)a.m, a.e - 63);
+            bf2_mul(&r2, &r2, &r2);
+            bf2_norm(&sb, 0, (u128)a.m, a.e - 63);
+            t = sb;
+            for (uint32_t n = 1; n < 40; n++) {
+                bf2_mul(&u, &t, &r2);
+                bf2_div_small(&t, &u, (2u * n) * (2u * n + 1u));
+                if (t.z) break;
+                t.sign ^= 1;
+                bf2_add(&sb, &sb, &t);
+                if (t.e < sb.e - 115) break;
+            }
+            bf2_norm(&t, 0, (u128)1, 0);
+            cb = t;
+            for (uint32_t n = 1; n < 40; n++) {
+                bf2_mul(&u, &t, &r2);
+                bf2_div_small(&t, &u, (2u * n - 1u) * (2u * n));
+                if (t.z) break;
+                t.sign ^= 1;
+                bf2_add(&cb, &cb, &t);
+                if (t.e < cb.e - 115) break;
+            }
+            sb.sign ^= a.sign;
+            unsigned sx = X;
+            if (bf2_try_round(&sb, up, rs) && bf2_try_round(&cb, &upc, rc)) return;
+            X = sx;
+        }
         bf_from_u128(&r, 0, a.m, a.e - 63);
     } else {
         u128 A = (u128)a.m << (a.e + 2);
-        u128 q = A / D, rem = A % D, Rrem = rem;
+        u128 q = A / D, rem = A % D;
+        u128 Rrem = rem;
         int neg = 0;
         if (rem * 2 > D) {
             q += 1;
@@ -1385,6 +2277,7 @@ static void sincos_round(fp a, fle_f80 *rs, fle_f80 *rc, int *up) {
             neg = 1;
         }
         quad = (int)(q & 3);
+        if (bf2_sincos_round(a.sign, quad, neg, Rrem, up, rs, rc)) return;
         bf_from_u128(&r, neg, Rrem, -65);
     }
     if (r.z) fail("FSINCOS: reduced argument is zero");

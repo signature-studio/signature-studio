@@ -462,8 +462,8 @@ FLE_MXV_AI fle_xmm fle_mxv_op2(int op, int f64, int scalar, fle_xmm d, fle_xmm s
     uint32_t mx = fle_mxcsr;
     int id = op + 8 * f64 + 16 * !scalar;
     fle_xmm r;
-    if (((op == FLE_MXO_MIN || op == FLE_MXO_MAX) && FLE_MXV_CTL_OK(mx)) || ((op != FLE_MXO_MIN && op != FLE_MXO_MAX) && FLE_MXV_NP0(mx))) {
-        if (scalar ? (f64 ? fle_mxv_sd(op, d, s, &r) : fle_mxv_ss(op, d, s, &r)) : (f64 ? fle_mxv_pd(op, d, s, &r) : fle_mxv_ps(op, d, s, &r))) {
+    if (__builtin_expect(((op == FLE_MXO_MIN || op == FLE_MXO_MAX) && FLE_MXV_CTL_OK(mx)) || ((op != FLE_MXO_MIN && op != FLE_MXO_MAX) && FLE_MXV_NP0(mx)), 1)) {
+        if (__builtin_expect(scalar ? (f64 ? fle_mxv_sd(op, d, s, &r) : fle_mxv_ss(op, d, s, &r)) : (f64 ? fle_mxv_pd(op, d, s, &r) : fle_mxv_ps(op, d, s, &r)), 1)) {
             FLE_MXVS(0, id);
             return r;
         }

@@ -1,6 +1,6 @@
 // Page side of the engine Worker: spawns it and the render Worker (C-2), sends the loaded bundle, hands the engine the input ring and the link to the render Worker, and hands the render Worker the one desktop canvas (decision 0223).
 import type { Manifest } from '../bundle/manifest.ts';
-import type { RawInput } from '../input/events.ts';
+import { IN, type RawInput } from '../input/events.ts';
 import { browserWorkerDiagHost, diagnoseWorkerStart, isPlainWorkerStartEvent } from './worker-diag.ts';
 import { parseRequest, type FileDlgAnswer, type FileDlgRequest } from './filedlg.ts';
 import type { BundleAssets, DeskHandover, FromWorker, GuestTextBest, GuestTextNear, RenderHandover, ToRender, ToWorker } from './protocol.ts';
@@ -145,7 +145,8 @@ export class EngineClient {
     // decision 0223: with display method D the event goes into the shared ring; the Worker waits on the ring while it is idle, and is woken once per frame (wakeOnFrame)
     if (this.ring) {
       if (this.ring.push(seq, tPage, ev)) {
-        this.wakeOnFrame();
+        if (ev.k !== 'mouse' || ev.kind !== IN.MOVE) this.ringStats.wakes += this.ring.notify();
+        else this.wakeOnFrame();
         return;
       }
       this.ringStats.viaMessage++;

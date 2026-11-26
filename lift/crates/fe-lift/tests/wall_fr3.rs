@@ -646,11 +646,16 @@ fn a_build_without_fle_fruity_contains_no_registry_seeding_and_the_fruity_build_
 
 #[test]
 fn the_two_seed_files_say_where_their_values_come_from() {
-    // reg-seed-app.tsv is NOT from the installer (the installer never writes "Shared data"): its header says so, and it holds exactly one value
+    // reg-seed-app.tsv is NOT from the installer (the installer never writes these app defaults): its header says so
     let t = std::fs::read_to_string(harness_dir().join("seeds/reg-seed-app.tsv")).unwrap();
     assert!(t.lines().next().unwrap().starts_with("# NOT FROM THE INSTALLER"), "{t}");
     let data: Vec<&str> = t.lines().filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
-    assert_eq!(data, ["HKCU\\Software\\Image-Line\\Shared\\Paths\tShared data\tREG_SZ\tC:\\Users\\user\\Documents\\Image-Line\\"]);
+    assert_eq!(data, [
+        "HKCU\\Software\\Image-Line\\Shared\\Paths\tShared data\tREG_SZ\tC:\\Users\\user\\Documents\\Image-Line\\",
+        "HKCU\\Software\\Image-Line\\FL Studio 26\\General\\MIDIForm\tAnimRefreshRateCombo\tREG_SZ\t2",
+        "HKCU\\Software\\Image-Line\\FL Studio 26\\General\\MIDIForm\tPollBox\tREG_SZ\t0",
+        "HKCU\\Software\\Image-Line\\FL Studio 26\\General\\MIDIForm\tPBTrackingModeBox\tREG_SZ\t1",
+    ]);
     // reg-seed-nsis.tsv is the installer's: the NSIS script (read with tools/nsis_script_dump.py) writes "FL Studio", "FL Studio engine" under HKLM and HKCU
     // Software\Image-Line\Shared\Paths and "Install path" under HKCU; it does not write "Shared data", so the file has no such line
     let t = std::fs::read_to_string(harness_dir().join("seeds/reg-seed-nsis.tsv")).unwrap();

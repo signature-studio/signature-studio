@@ -10,8 +10,16 @@ export class DesktopView {
   private screen: { width: number; height: number } = { width: SCREEN.width, height: SCREEN.height };
   private desk: HTMLCanvasElement | null = null;
   private onLayout: (() => void) | null = null;
+  private cachedRect: ViewRect | null = null;
+  private lastCursor = '';
   constructor(root: HTMLElement) {
     this.root = root;
+    const invalidate = (): void => { this.cachedRect = null; };
+    if (typeof ResizeObserver === 'function') new ResizeObserver(invalidate).observe(this.root);
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('resize', invalidate);
+      window.addEventListener('scroll', invalidate, { capture: true, passive: true });
+    }
   }
 
   onLayoutChange(fn: () => void): void { this.onLayout = fn; }
@@ -34,15 +42,26 @@ export class DesktopView {
 
   setScale(scale: number): void { if (scale === this.scale) return; this.scale = scale; this.apply(); }
   get currentScale(): number { return this.scale; }
-  setCursor(css: string): void { this.root.style.cursor = css; }
+  setCursor(css: string): void {
+    if (css === this.lastCursor) return;
+    this.lastCursor = css;
+    this.root.style.cursor = css;
+  }
 
   setScreen(width: number, height: number): void { if (width === this.screen.width && height === this.screen.height) return; this.screen = { width, height }; this.apply(); }
   get screenSize(): { width: number; height: number } { return this.screen; }
   /** the CSS size of the screen: not rounded (#1347). At 1 / devicePixelRatio it is whole device pixels; rounding it to whole CSS pixels would make the canvas differ from the device pixels. */
   get screenCssSize(): { width: number; height: number } { return { width: this.screen.width * this.scale, height: this.screen.height * this.scale }; }
-  rect(): ViewRect { const r = this.root.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; }
+  rect(): ViewRect {
+    if (this.cachedRect) return this.cachedRect;
+    const r = this.root.getBoundingClientRect();
+    const vr = { left: r.left, top: r.top, width: r.width, height: r.height };
+    if (vr.width > 0 && vr.height > 0) this.cachedRect = vr;
+    return vr;
+  }
 
   private apply(): void {
+    this.cachedRect = null;
     const size = this.screenCssSize;
     this.root.style.width = `${size.width}px`;
     this.root.style.height = `${size.height}px`;

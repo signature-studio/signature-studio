@@ -867,6 +867,23 @@ static void invalid_window(void)
  * "specifies the result of the message processing; it depends on the message sent". HWND_BROADCAST (0xFFFF) is defined by the page (all
  * top-level windows): not modelled, stops. A window of this table gets the message through fle_call_guest and the result is the whole
  * 64 bits of the procedure's return value. An hWnd that is not a live window of this table (NULL included): 0 and last error 1400. */
+static uint64_t g_action_sweep_ms;
+static uint64_t g_action_sweep_gen = 1;
+static uint64_t g_action_allowed_gen;
+static int g_action_dirty = 1;
+
+static void action_note_msg(uint32_t msg)
+{
+    g_action_sweep_gen++;
+    if (msg == 0x0006u || msg == 0x0007u || msg == 0x001Cu ||
+        (msg >= 0x0100u && msg <= 0x0108u) ||
+        msg == 0x0111u || msg == 0x0112u ||
+        (msg >= 0x0201u && msg <= 0x020Eu) ||
+        msg == 0x0215u) {
+        g_action_dirty = 1;
+    }
+}
+
 void fle_imp_SendMessageW(void)
 {
     static const char api[] = "SendMessageW";
@@ -897,6 +914,21 @@ void fle_imp_SendMessageW(void)
         fle_thread_wait_sent(api, &sm, tab[i].owner);
         R[0] = sm.result;
         return;
+    }
+    /* Gate redundant CM_ACTIONUPDATE (0xB03F) sweeps during uninterrupted playback or 1000Hz cursor motion: run immediately on state-changing messages, else at most once per 200 ms. */
+    if (msg == 0xB03Fu) {
+        if (g_action_allowed_gen != g_action_sweep_gen) {
+            uint64_t now_ms = clk_now() / FLE_TICKS_PER_MS;
+            if (!g_action_dirty && g_action_sweep_ms != 0 && now_ms >= g_action_sweep_ms && (now_ms - g_action_sweep_ms) < 200u) {
+                R[0] = 0;
+                return;
+            }
+            g_action_allowed_gen = g_action_sweep_gen;
+            g_action_sweep_ms = now_ms;
+            g_action_dirty = 0;
+        }
+    } else if (msg == 0x0006u || msg == 0x0007u || msg == 0x0111u || msg == 0x0112u) {
+        action_note_msg(msg);
     }
     callwndproc_hooks(i, h, msg, wp, lp);
     R[0] = call_wndproc(api, tab[i].wndproc, h, msg, wp, lp);
@@ -1877,6 +1909,7 @@ void fle_imp_GetMessageW(void)
         if (pos >= 0) {
             fle_tmsg m = fle_thread_queue_remove(q, pos);
 
+            action_note_msg(m.msg);
             fill_msg(pmsg, &m);
             q->changebits = 0;
             R[0] = 1;
@@ -1888,6 +1921,7 @@ void fle_imp_GetMessageW(void)
             fle_tmsg sm;
 
             if (fle_win_synth_message(fle_thread_current(), fh, fmin, fmax, 1, 0xFFFFu, &sm)) {
+                action_note_msg(sm.msg);
                 fill_msg(pmsg, &sm);
                 q->changebits = 0;
                 R[0] = 1;
@@ -1900,6 +1934,7 @@ void fle_imp_GetMessageW(void)
             memset(&m, 0, sizeof m);
             m.msg = FLE_WM_QUIT_ID;
             m.wp = (uint64_t)(int64_t)q->quit_code;
+            action_note_msg(m.msg);
             fill_msg(pmsg, &m);
             q->quit = 0;
             q->changebits = 0;
@@ -1952,6 +1987,7 @@ void fle_imp_PeekMessageW(void)
     if (pos >= 0) {
         fle_tmsg m = (rm & FLE_PM_REMOVE) ? fle_thread_queue_remove(q, pos) : q->q[(q->head + (uint32_t)pos) % q->cap];
 
+        action_note_msg(m.msg);
         fill_msg(pmsg, &m);
         q->changebits = 0;
         R[0] = 1;
@@ -1961,6 +1997,7 @@ void fle_imp_PeekMessageW(void)
         fle_tmsg sm;
 
         if (fle_win_synth_message(fle_thread_current(), fh, fmin, fmax, (rm & FLE_PM_REMOVE) != 0, qs, &sm)) {
+            action_note_msg(sm.msg);
             fill_msg(pmsg, &sm);
             q->changebits = 0;
             R[0] = 1;
@@ -1973,6 +2010,7 @@ void fle_imp_PeekMessageW(void)
         memset(&m, 0, sizeof m);
         m.msg = FLE_WM_QUIT_ID;
         m.wp = (uint64_t)(int64_t)q->quit_code;
+        action_note_msg(m.msg);
         fill_msg(pmsg, &m);
         if (rm & FLE_PM_REMOVE) q->quit = 0;
         q->changebits = 0;
@@ -2006,6 +2044,7 @@ void fle_imp_WaitMessage(void)
         }
         fle_thread_wait_message(api, 2, 0, 0, 0);
     }
+    g_action_sweep_gen++;
     q->changebits = 0;
     R[0] = 1;
 }

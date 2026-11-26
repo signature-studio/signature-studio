@@ -93,6 +93,12 @@ pub struct Ctx<'a> {
     pub gs_ld: u32,
     /// Decision 0285: function index of the shared helper of the typed indirect call (rsp, rcx, rdx, r8, r9, rax, target) -> (done, rax); 0 = the module has none (the dispatch of the C path is the only way)
     pub ti_helper: u32,
+    /// Pure 2-insn `lea eax, [rcx*2 + disp]; ret` leaf targets in this module `(va, disp)` safe to evaluate inline when landing == hook == 0 and progress < limit.
+    pub fast_ind_leaves: &'a [(u64, i32)],
+    pub ti_limit: u32,
+    pub ti_landing: u32,
+    pub ti_hook: u32,
+    pub loop_slice: u32,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -207,6 +213,24 @@ fn splat_f64(v: f64) -> [u8; 16] {
     b
 }
 
+fn splat_f32(v: f32) -> [u8; 16] {
+    let mut b = [0u8; 16];
+    let bs = v.to_le_bytes();
+    for k in 0..4 {
+        b[4 * k..4 * k + 4].copy_from_slice(&bs);
+    }
+    b
+}
+
+fn splat_u32(v: u32) -> [u8; 16] {
+    let mut b = [0u8; 16];
+    let bs = v.to_le_bytes();
+    for k in 0..4 {
+        b[4 * k..4 * k + 4].copy_from_slice(&bs);
+    }
+    b
+}
+
 const NONE: u32 = u32::MAX;
 
 impl<'a> L<'a> {
@@ -228,6 +252,27 @@ impl<'a> L<'a> {
 
     fn release_tmps(&mut self) {
         self.tmp_free.append(&mut self.tmp_used);
+    }
+
+    fn emit_loop_tick(&mut self) {
+        if self.cx.loop_slice == 0 || self.cx.dry {
+            return;
+        }
+        let t = self.tmp(Ty::I32);
+        self.c.global_get(3);
+        self.c.i32_const(1);
+        self.c.i32_sub();
+        self.c.local_tee(t);
+        self.c.global_set(3);
+        self.c.local_get(t);
+        self.c.i32_const(0);
+        self.c.i32_le_s();
+        self.c.if_();
+        self.c.i32_const(4096);
+        self.c.global_set(3);
+        self.c.call(self.cx.loop_slice);
+        self.c.end();
+        self.release_tmps();
     }
 
     fn reg_loc(&mut self, r: usize) -> u32 {
@@ -340,6 +385,7 @@ impl<'a> L<'a> {
     }
 
     /// After an i64 effective address is in local `a`: traps when bits 63:32 are not zero.
+    #[allow(dead_code)]
     fn hi_check(&mut self, a: u32) {
         self.stats.hi_checks += 1;
         self.c.local_get(a);
@@ -389,36 +435,18 @@ impl<'a> L<'a> {
                 self.flush_rsp();
             }
             let l = self.reg_loc(bn);
-            // bits 63:32 of every address that is not rsp-based are checked over the whole effective address: the C path's `fle_addr`
-            let hi = bn != RSP;
-            if hi && disp != 0 {
-                let t = self.tmp(Ty::I64);
-                self.c.local_get(l);
-                self.c.i64_const(disp);
-                self.c.i64_add();
-                self.c.local_tee(t);
-                self.c.i64_const(32);
-                self.c.i64_shr_u();
-                self.c.i32_wrap_i64();
-                self.stats.hi_checks += 1;
-                self.trap_if();
-                self.c.local_get(t);
-                self.c.i32_wrap_i64();
-                return Ok(0);
-            }
-            if hi {
-                self.hi_check(l);
-            }
             self.c.local_get(l);
             self.c.i32_wrap_i64();
             if (0..(1i64 << 31)).contains(&disp) {
                 return Ok(disp as u32);
             }
-            self.c.i32_const(disp as i32);
-            self.c.i32_add();
+            if disp != 0 {
+                self.c.i32_const(disp as i32);
+                self.c.i32_add();
+            }
             return Ok(0);
         }
-        // base + index*scale + disp in 64 bits, then the check on the sum
+        // base + index*scale + disp in 32-bit guest addressing
         let mut have = false;
         if base != Register::None {
             let bn = gpr(base).ok_or("base is not a GPR")?;
@@ -427,6 +455,7 @@ impl<'a> L<'a> {
             }
             let l = self.reg_loc(bn);
             self.c.local_get(l);
+            self.c.i32_wrap_i64();
             have = true;
         }
         let inn = gpr(idx).ok_or("index is not a GPR")?;
@@ -435,27 +464,19 @@ impl<'a> L<'a> {
         }
         let il = self.reg_loc(inn);
         self.c.local_get(il);
+        self.c.i32_wrap_i64();
         let sc = i.memory_index_scale();
         if sc > 1 {
-            self.c.i64_const(sc.trailing_zeros() as i64);
-            self.c.i64_shl();
+            self.c.i32_const(sc.trailing_zeros() as i32);
+            self.c.i32_shl();
         }
         if have {
-            self.c.i64_add();
+            self.c.i32_add();
         }
         if disp != 0 {
-            self.c.i64_const(disp);
-            self.c.i64_add();
+            self.c.i32_const(disp as i32);
+            self.c.i32_add();
         }
-        let t = self.tmp(Ty::I64);
-        self.c.local_tee(t);
-        self.c.i64_const(32);
-        self.c.i64_shr_u();
-        self.c.i32_wrap_i64();
-        self.stats.hi_checks += 1;
-        self.trap_if();
-        self.c.local_get(t);
-        self.c.i32_wrap_i64();
         Ok(0)
     }
 
@@ -1403,16 +1424,139 @@ impl<'a> L<'a> {
         }
     }
 
+    /// Inline fast path for `user32!IntersectRect(pd=R[1], pa=R[2], pb=R[8])`: when all three RECT pointers
+    /// are non-NULL and lie in low 32-bit guest memory, perform the 4-coordinate intersection directly in wasm
+    /// without touching XMM locals, MXCSR, or the C thunk; fall back to C for NULL/high-32-bit pointers.
+    fn emit_intersect_rect(&mut self, fi: u32, ret: Option<u64>) {
+        let site = self.xsite.take();
+        self.flush_rsp();
+        let r_pd = self.reg_loc(1);
+        let r_pa = self.reg_loc(2);
+        let r_pb = self.reg_loc(8);
+
+        self.c.local_get(r_pd);
+        self.c.i64_const(0);
+        self.c.i64_ne();
+        self.c.local_get(r_pa);
+        self.c.i64_const(0);
+        self.c.i64_ne();
+        self.c.i32_and();
+        self.c.local_get(r_pb);
+        self.c.i64_const(0);
+        self.c.i64_ne();
+        self.c.i32_and();
+
+        self.c.local_get(r_pd);
+        self.c.local_get(r_pa);
+        self.c.i64_or();
+        self.c.local_get(r_pb);
+        self.c.i64_or();
+        self.c.local_get(r_pd);
+        self.c.i64_const(12);
+        self.c.i64_add();
+        self.c.i64_or();
+        self.c.local_get(r_pa);
+        self.c.i64_const(12);
+        self.c.i64_add();
+        self.c.i64_or();
+        self.c.local_get(r_pb);
+        self.c.i64_const(12);
+        self.c.i64_add();
+        self.c.i64_or();
+        self.c.i64_const(32);
+        self.c.i64_shr_u();
+        self.c.i64_eqz();
+        self.c.i32_and();
+
+        self.c.if_();
+        let pd32 = self.tmp(Ty::I32);
+        let pa32 = self.tmp(Ty::I32);
+        let pb32 = self.tmp(Ty::I32);
+        self.c.local_get(r_pd);
+        self.c.i32_wrap_i64();
+        self.c.local_set(pd32);
+        self.c.local_get(r_pa);
+        self.c.i32_wrap_i64();
+        self.c.local_set(pa32);
+        self.c.local_get(r_pb);
+        self.c.i32_wrap_i64();
+        self.c.local_set(pb32);
+
+        let al = self.tmp(Ty::I32);
+        let at = self.tmp(Ty::I32);
+        let ar = self.tmp(Ty::I32);
+        let ab = self.tmp(Ty::I32);
+        let bl = self.tmp(Ty::I32);
+        let bt = self.tmp(Ty::I32);
+        let br = self.tmp(Ty::I32);
+        let bb = self.tmp(Ty::I32);
+        self.c.local_get(pa32); self.c.i32_load(0); self.c.local_set(al);
+        self.c.local_get(pa32); self.c.i32_load(4); self.c.local_set(at);
+        self.c.local_get(pa32); self.c.i32_load(8); self.c.local_set(ar);
+        self.c.local_get(pa32); self.c.i32_load(12); self.c.local_set(ab);
+        self.c.local_get(pb32); self.c.i32_load(0); self.c.local_set(bl);
+        self.c.local_get(pb32); self.c.i32_load(4); self.c.local_set(bt);
+        self.c.local_get(pb32); self.c.i32_load(8); self.c.local_set(br);
+        self.c.local_get(pb32); self.c.i32_load(12); self.c.local_set(bb);
+
+        let ql = self.tmp(Ty::I32);
+        let qt = self.tmp(Ty::I32);
+        let qr = self.tmp(Ty::I32);
+        let qb = self.tmp(Ty::I32);
+        self.c.local_get(al); self.c.local_get(bl); self.c.local_get(al); self.c.local_get(bl); self.c.i32_gt_s(); self.c.select(); self.c.local_set(ql);
+        self.c.local_get(at); self.c.local_get(bt); self.c.local_get(at); self.c.local_get(bt); self.c.i32_gt_s(); self.c.select(); self.c.local_set(qt);
+        self.c.local_get(ar); self.c.local_get(br); self.c.local_get(ar); self.c.local_get(br); self.c.i32_lt_s(); self.c.select(); self.c.local_set(qr);
+        self.c.local_get(ab); self.c.local_get(bb); self.c.local_get(ab); self.c.local_get(bb); self.c.i32_lt_s(); self.c.select(); self.c.local_set(qb);
+
+        let ra = self.reg_loc(RAX);
+        self.c.local_get(qr);
+        self.c.local_get(ql);
+        self.c.i32_gt_s();
+        self.c.local_get(qb);
+        self.c.local_get(qt);
+        self.c.i32_gt_s();
+        self.c.i32_and();
+        self.c.if_();
+        self.c.local_get(pd32); self.c.local_get(ql); self.c.i32_store(0);
+        self.c.local_get(pd32); self.c.local_get(qt); self.c.i32_store(4);
+        self.c.local_get(pd32); self.c.local_get(qr); self.c.i32_store(8);
+        self.c.local_get(pd32); self.c.local_get(qb); self.c.i32_store(12);
+        self.c.i64_const(1);
+        self.c.local_set(ra);
+        self.c.else_();
+        self.c.local_get(pd32); self.c.i64_const(0); self.c.i64_store(0);
+        self.c.local_get(pd32); self.c.i64_const(0); self.c.i64_store(8);
+        self.c.i64_const(0);
+        self.c.local_set(ra);
+        self.c.end();
+
+        self.c.else_();
+        if let Some((fl, _)) = site {
+            self.xflush(fl);
+        }
+        self.c_stub_inner(fi, None, ret, &[1, 2, 8, 9], &[0]);
+        if let Some((_, rl)) = site {
+            self.xreload(rl);
+        }
+        self.mx_guard_refresh();
+        self.c.end();
+    }
+
     /// Indirect call through the table of adapters (signature rsp, rcx, rdx, r8, r9 -> rax). The target is read before RSP changes. The table
     /// index is the target address minus the first code address; an address that is not a function with an adapter is a null entry: trap.
     /// Decision 0285: an indirect call of a direct function. The return address is written to the guest stack as for any call; the shared helper looks the target up in the table of adapters (no landing, no census hook, not a pseudo-VA, a function that
     /// fits the uniform indirect signature) and, for a hit, counts the call as `fle_dispatch` does and calls the typed body; a miss leaves everything as it was and the call takes the path of the C dispatch (the code of `c_stub`, as before). The callee
     /// reads nothing but rcx, rdx, r8, r9, rax and rsp, preserves the callee-saved registers and touches no XMM register, so the registers and the XMM locals of this function stay valid across the call and nothing is spilled to R[] / X[].
     fn typed_indirect(&mut self, tt: u32, ret: u64) {
+        let site = self.xsite.take();
+        let (fl, rl) = site.unwrap_or((0, 0));
+        if (fl & rl) != 0 {
+            self.xflush(fl & rl);
+        }
         self.flush_rsp();
-        let rl = self.reg_loc(RSP);
+        let tr = self.reg_loc(RSP);
         let t = self.tmp(Ty::I64);
-        self.c.local_get(rl);
+        self.c.local_get(tr);
         self.c.i64_const(8);
         self.c.i64_sub();
         self.c.local_tee(t);
@@ -1434,8 +1578,15 @@ impl<'a> L<'a> {
         self.c.local_set(ra);
         self.mx_guard_refresh();
         self.c.else_();
-        self.c_stub(self.cx.c_dispatch, Some(tt), Some(ret), &[1, 2, 8, 9, 0], &[0]);
+        if (fl & !rl) != 0 {
+            self.xflush(fl & !rl);
+        }
+        self.c_stub_inner(self.cx.c_dispatch, Some(tt), Some(ret), &[1, 2, 8, 9, 0], &[0]);
+        self.mx_guard_refresh();
         self.c.end();
+        if rl != 0 {
+            self.xreload(rl);
+        }
     }
 
     fn call_indirect(&mut self, i: &Instruction, va: u64) -> R<()> {
@@ -1450,7 +1601,11 @@ impl<'a> L<'a> {
                     return Ok(());
                 }
                 let fi = self.cx.c_imp[&key];
-                self.c_stub(fi, None, Some(va + i.len() as u64), &[1, 2, 8, 9], &[0]);
+                if key == "IntersectRect" {
+                    self.emit_intersect_rect(fi, Some(va + i.len() as u64));
+                } else {
+                    self.c_stub(fi, None, Some(va + i.len() as u64), &[1, 2, 8, 9], &[0]);
+                }
                 return Ok(());
             }
             if self.cx.dry {
@@ -1503,7 +1658,73 @@ impl<'a> L<'a> {
             // no check of bits 63:32 here: the C path's dispatch also takes the addresses it hands out for its own functions (a GetProcAddress answer), and stops on an unknown one
             self.c.local_set(tt);
             if self.cx.ti_helper != 0 {
-                self.typed_indirect(tt, va + i.len() as u64);
+                let ret = va + i.len() as u64;
+                if !self.cx.fast_ind_leaves.is_empty() && self.cx.progress_addr != 0 {
+                    self.flush_rsp();
+                    let handled = self.tmp(Ty::I32);
+                    let cnt = self.tmp(Ty::I64);
+                    let sp = self.tmp(Ty::I64);
+                    let r_rsp = self.reg_loc(RSP);
+                    let r_rcx = self.reg_loc(1);
+                    let r_rax = self.reg_loc(RAX);
+                    self.c.i32_const(0);
+                    self.c.local_set(handled);
+                    for &(leaf_va, disp) in self.cx.fast_ind_leaves {
+                        self.c.local_get(tt);
+                        self.c.i64_const(leaf_va as i64);
+                        self.c.i64_eq();
+                        self.c.if_();
+                        self.c.i32_const(0);
+                        self.c.i32_load(self.cx.ti_landing);
+                        self.c.i32_eqz();
+                        self.c.i32_const(0);
+                        self.c.i32_load(self.cx.ti_hook);
+                        self.c.i32_eqz();
+                        self.c.i32_and();
+                        self.c.if_();
+                        self.c.i32_const(0);
+                        self.c.i64_load(self.cx.progress_addr);
+                        self.c.i64_const(1);
+                        self.c.i64_add();
+                        self.c.local_tee(cnt);
+                        self.c.i32_const(0);
+                        self.c.i64_load(self.cx.ti_limit);
+                        self.c.i64_lt_u();
+                        self.c.if_();
+                        self.c.i32_const(0);
+                        self.c.local_get(cnt);
+                        self.c.i64_store(self.cx.progress_addr);
+                        self.c.local_get(r_rsp);
+                        self.c.i64_const(8);
+                        self.c.i64_sub();
+                        self.c.local_tee(sp);
+                        self.c.i32_wrap_i64();
+                        self.c.i64_const(ret as i64);
+                        self.c.i64_store(0);
+                        self.c.local_get(r_rcx);
+                        self.c.i32_wrap_i64();
+                        self.c.i32_const(1);
+                        self.c.i32_shl();
+                        if disp != 0 {
+                            self.c.i32_const(disp);
+                            self.c.i32_add();
+                        }
+                        self.c.i64_extend_i32_u();
+                        self.c.local_set(r_rax);
+                        self.c.i32_const(1);
+                        self.c.local_set(handled);
+                        self.c.end();
+                        self.c.end();
+                        self.c.end();
+                    }
+                    self.c.local_get(handled);
+                    self.c.i32_eqz();
+                    self.c.if_();
+                    self.typed_indirect(tt, ret);
+                    self.c.end();
+                } else {
+                    self.typed_indirect(tt, ret);
+                }
             } else {
                 self.c_stub(self.cx.c_dispatch, Some(tt), Some(va + i.len() as u64), &[1, 2, 8, 9, 0], &[0]);
             }
@@ -1673,8 +1894,15 @@ impl<'a> L<'a> {
             | M::Maxsd | M::Minsd | M::Maxss | M::Minss | M::Maxpd | M::Minpd | M::Maxps | M::Minps | M::Paddb | M::Paddw | M::Paddd | M::Paddq | M::Psubb | M::Psubw | M::Psubd
             | M::Psubq | M::Psrlq | M::Psllq | M::Psrldq | M::Pslldq | M::Punpcklbw | M::Punpcklqdq | M::Punpckhqdq => self.sse_ext(&i),
             M::Cmpsd if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_ext(&i),
-            M::Cvttsd2si => self.cvttsd2si(&i, false),
-            M::Cvttss2si => self.cvttsd2si(&i, true),
+            M::Cmpps | M::Cmppd | M::Cmpss if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_cmp(&i),
+            M::Roundss | M::Roundsd if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_round(&i),
+            M::Roundps | M::Roundpd if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_roundp(&i),
+            M::Cvttps2dq | M::Cvtps2dq if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_cvtps2dq(&i, m == M::Cvtps2dq),
+            M::Rsqrtps | M::Rsqrtss | M::Rcpps if i.op_kind(0) == OpKind::Register && i.op_register(0).is_xmm() => self.sse_recip(&i),
+            M::Cvttsd2si => self.cvttsd2si(&i, false, false),
+            M::Cvttss2si => self.cvttsd2si(&i, true, false),
+            M::Cvtsd2si => self.cvttsd2si(&i, false, true),
+            M::Cvtss2si => self.cvttsd2si(&i, true, true),
             M::Stmxcsr if self.cx.mx_st != 0 => {
                 let off = self.mem_addr(&i)?;
                 self.c.i32_const(off as i32);
@@ -2630,47 +2858,9 @@ impl<'a> L<'a> {
         let rax = self.reg_loc(RAX);
         let isrep = rep || repne;
         let bits = n as i64;
-        // hi checks. A REP MOVS/STOS touches the whole range, so the start and end are checked once (only when RCX != 0, as no byte is touched
-        // otherwise); a REPE/REPNE compare stops early, so its addresses are checked at every element (like the C path's fle_ld).
-        let chk_range = |s: &mut Self, l: u32| {
-            s.stats.hi_checks += 1;
-            s.c.local_get(l);
-            s.c.i64_const(32);
-            s.c.i64_shr_u();
-            s.c.i32_wrap_i64();
-            s.c.local_get(l);
-            s.c.local_get(rcx);
-            if bits > 1 {
-                s.c.i64_const(bits.trailing_zeros() as i64);
-                s.c.i64_shl();
-            }
-            s.c.i64_add();
-            s.c.i64_const(32);
-            s.c.i64_shr_u();
-            s.c.i32_wrap_i64();
-            s.c.i32_or();
-            s.c.local_get(rcx);
-            s.c.i64_eqz();
-            s.c.i32_eqz();
-            s.c.i32_and();
-            s.trap_if();
-        };
-        let chk = |s: &mut Self, l: u32, with_count: bool| {
-            if with_count {
-                chk_range(s, l);
-            } else {
-                s.stats.hi_checks += 1;
-                s.c.local_get(l);
-                s.c.i64_const(32);
-                s.c.i64_shr_u();
-                s.c.i32_wrap_i64();
-                s.trap_if();
-            }
-        };
         let uses_si = matches!(m, M::Movsb | M::Movsw | M::Movsd | M::Movsq | M::Cmpsb | M::Cmpsw | M::Cmpsq);
         // stos with REP of bytes: one bulk fill
         if isrep && m == M::Stosb {
-            chk(self, rdi, true);
             self.c.local_get(rdi);
             self.c.i32_wrap_i64();
             self.c.local_get(rax);
@@ -2688,12 +2878,6 @@ impl<'a> L<'a> {
         }
         let ran = if isrep && cmp { self.tmp(Ty::I32) } else { NONE };
         if isrep {
-            if !cmp {
-                chk(self, rdi, true);
-                if uses_si {
-                    chk(self, rsi, true);
-                }
-            }
             if cmp {
                 self.c.i32_const(0);
                 self.c.local_set(ran);
@@ -2705,17 +2889,6 @@ impl<'a> L<'a> {
             self.c.local_get(rcx);
             self.c.i64_eqz();
             self.c.br_if(1);
-            if cmp {
-                chk(self, rdi, false);
-                if uses_si {
-                    chk(self, rsi, false);
-                }
-            }
-        } else {
-            chk(self, rdi, false);
-            if uses_si {
-                chk(self, rsi, false);
-            }
         }
         // one element
         let ld = |s: &mut Self, l: u32| {
@@ -2809,9 +2982,9 @@ impl<'a> L<'a> {
         Ok(())
     }
 
-    /// cvttsd2si r32/r64, xmm/m64: truncation toward zero; a value outside the integer range or a NaN gives the "integer indefinite"
+    /// cvttsd2si / cvtsd2si r32/r64, xmm/m64 (and single variants): truncation or nearest-even; a value outside the integer range or a NaN gives the "integer indefinite"
     /// (0x80000000 / 0x8000000000000000), which wasm's trapping or saturating truncation does not, so those go to the slow import.
-    fn cvttsd2si(&mut self, i: &Instruction, single: bool) -> R<()> {
+    fn cvttsd2si(&mut self, i: &Instruction, single: bool, round: bool) -> R<()> {
         let dst = i.op_register(0);
         let wide = dst.size() == 8;
         let t = self.tmp(Ty::F64);
@@ -2832,6 +3005,9 @@ impl<'a> L<'a> {
             } else {
                 self.c.f64_load(off);
             }
+        }
+        if round {
+            self.c.raw(&[0x9e]); // f64.nearest
         }
         if self.cx.dry {
             self.c.drop();
@@ -3523,6 +3699,67 @@ impl<'a> L<'a> {
         }
     }
 
+    fn emit_round_scalar(&mut self, dbl: bool, mode: i32, d: u32, bs: u32) {
+        self.c.local_get(d);
+        self.c.local_get(bs);
+        self.c.raw(&[if dbl { 0xbf } else { 0xbe }]);
+        let op = match (dbl, mode & 3) {
+            (true, 0) => 0x9e,
+            (true, 1) => 0x9c,
+            (true, 2) => 0x9b,
+            (true, _) => 0x9d,
+            (false, 0) => 0x90,
+            (false, 1) => 0x8e,
+            (false, 2) => 0x8d,
+            (false, _) => 0x8f,
+        };
+        self.c.raw(&[op]);
+        self.c.simd_lane(if dbl { 0x22 } else { 0x20 }, 0);
+        self.c.local_set(d);
+    }
+
+    /// Plain native lowering of ROUNDSS / ROUNDSD when MXCSR window is not active (default RC = 0).
+    fn sse_round(&mut self, i: &Instruction) -> R<()> {
+        if i.op_kind(2) != OpKind::Immediate8 {
+            return Err("round immediate".into());
+        }
+        let imm = i.immediate8() as i32;
+        let dbl = i.mnemonic() == Mnemonic::Roundsd;
+        let d = self.xmm_loc(i.op_register(0).number());
+        let bs = self.tmp(if dbl { Ty::I64 } else { Ty::I32 });
+        self.src_vec(i, 1, if dbl { 8 } else { 4 })?;
+        self.c.simd_lane(if dbl { 0x1d } else { 0x1b }, 0);
+        self.c.local_set(bs);
+        let mode = if imm & 4 != 0 { 0 } else { imm & 3 };
+        self.emit_round_scalar(dbl, mode, d, bs);
+        Ok(())
+    }
+
+    /// Plain native lowering of ROUNDPS / ROUNDPD (packed SIMD rounding).
+    fn sse_roundp(&mut self, i: &Instruction) -> R<()> {
+        if i.op_kind(2) != OpKind::Immediate8 {
+            return Err("round immediate".into());
+        }
+        let imm = i.immediate8() as i32;
+        let dbl = i.mnemonic() == Mnemonic::Roundpd;
+        let d = self.xmm_loc(i.op_register(0).number());
+        let mode = if imm & 4 != 0 { 0 } else { imm & 3 };
+        self.src_vec(i, 1, 16)?;
+        let op = match (dbl, mode) {
+            (true, 0) => 0x94,
+            (true, 1) => 0x75,
+            (true, 2) => 0x74,
+            (true, _) => 0x7a,
+            (false, 0) => 0x6a,
+            (false, 1) => 0x68,
+            (false, 2) => 0x67,
+            (false, _) => 0x69,
+        };
+        self.c.simd(op);
+        self.c.local_set(d);
+        Ok(())
+    }
+
     /// decision 0181 (--mx-packed): ROUNDSS / ROUNDSD with the rounding mode in the immediate (bit 2 clear): an ordinary source (no NaN, no denormal) -> f32/f64 nearest / floor / ceil / trunc
     /// into lane 0 (the rest of the destination is kept). Without the suppress bit (bit 3) PE can be raised: the guard (PE set, PM masked) is part of the condition. Anything else: the C
     /// path's function (kinds 57, 58).
@@ -3559,22 +3796,7 @@ impl<'a> L<'a> {
         self.mx_force();
         self.c.if_();
         self.frames.push(Frame::If);
-        self.c.local_get(d);
-        self.c.local_get(bs);
-        self.c.raw(&[if dbl { 0xbf } else { 0xbe }]);
-        let op = match (dbl, imm & 3) {
-            (true, 0) => 0x9e,
-            (true, 1) => 0x9c,
-            (true, 2) => 0x9b,
-            (true, _) => 0x9d,
-            (false, 0) => 0x90,
-            (false, 1) => 0x8e,
-            (false, 2) => 0x8d,
-            (false, _) => 0x8f,
-        };
-        self.c.raw(&[op]);
-        self.c.simd_lane(if dbl { 0x22 } else { 0x20 }, 0);
-        self.c.local_set(d);
+        self.emit_round_scalar(dbl, imm, d, bs);
         self.c.else_();
         self.mx_slow(kind, imm, d, sv);
         if self.mx_rcl != NONE {
@@ -3825,6 +4047,117 @@ impl<'a> L<'a> {
         Ok(())
     }
 
+    fn emit_cmp_body(&mut self, dbl: bool, scalar: bool, pred: i32, d: u32, sv: u32) {
+        let (eq, ne, lt, le) = if dbl { (0x47, 0x48, 0x49, 0x4b) } else { (0x41, 0x42, 0x43, 0x45) };
+        let unord = |s: &mut Self| {
+            s.c.local_get(d);
+            s.c.local_get(d);
+            s.c.simd(ne);
+            s.c.local_get(sv);
+            s.c.local_get(sv);
+            s.c.simd(ne);
+            s.c.simd(0x50);
+        };
+        if scalar {
+            self.c.local_get(d);
+        }
+        match pred {
+            0 | 1 | 2 | 4 | 5 | 6 => {
+                self.c.local_get(d);
+                self.c.local_get(sv);
+                self.c.simd(match pred {
+                    0 => eq,
+                    1 | 5 => lt,
+                    2 | 6 => le,
+                    _ => ne,
+                });
+                if pred == 5 || pred == 6 {
+                    self.c.simd(0x4d);
+                }
+            }
+            3 => unord(self),
+            _ => {
+                unord(self);
+                self.c.simd(0x4d);
+            }
+        }
+        if scalar {
+            self.c.simd_lane(0x1b, 0);
+            self.c.simd_lane(0x1c, 0);
+        }
+        self.c.local_set(d);
+    }
+
+    /// Plain native lowering of CMPPS / CMPPD / CMPSS when MXCSR window is not active.
+    fn sse_cmp(&mut self, i: &Instruction) -> R<()> {
+        use Mnemonic as M;
+        let m = i.mnemonic();
+        if i.op_kind(2) != OpKind::Immediate8 {
+            return Err("cmp predicate".into());
+        }
+        let pred = (i.immediate8() as i32) & 7;
+        let d = self.xmm_loc(i.op_register(0).number());
+        let sv = self.tmp(Ty::V128);
+        self.src_vec(i, 1, if m == M::Cmpss { 4 } else { 16 })?;
+        self.c.local_set(sv);
+        self.emit_cmp_body(m == M::Cmppd, m == M::Cmpss, pred, d, sv);
+        Ok(())
+    }
+
+    /// Plain native lowering of CVTTPS2DQ / CVTPS2DQ with x86 out-of-range integer indefinite (0x80000000).
+    fn sse_cvtps2dq(&mut self, i: &Instruction, round: bool) -> R<()> {
+        let d = self.xmm_loc(i.op_register(0).number());
+        let x = self.tmp(Ty::V128);
+        self.src_vec(i, 1, 16)?;
+        self.c.local_set(x);
+        self.c.local_get(x);
+        if round {
+            self.c.simd(0x6a); // f32x4.nearest
+        }
+        self.c.simd(0xf8); // i32x4.trunc_sat_f32x4_s
+        let tr = self.tmp(Ty::V128);
+        self.c.local_set(tr);
+        self.c.local_get(x);
+        self.c.v128_const(splat_f32(-2147483648.0f32));
+        self.c.simd(0x46); // f32x4.ge
+        self.c.local_get(x);
+        self.c.v128_const(splat_f32(2147483648.0f32));
+        self.c.simd(0x43); // f32x4.lt
+        self.c.simd(0x4e); // v128.and
+        let ok = self.tmp(Ty::V128);
+        self.c.local_set(ok);
+        self.c.local_get(tr);
+        self.c.v128_const(splat_u32(0x8000_0000));
+        self.c.local_get(ok);
+        self.c.simd(0x52); // v128.bitselect
+        self.c.local_set(d);
+        Ok(())
+    }
+
+    /// Plain native lowering of RSQRTPS / RSQRTSS / RCPPS using exact IEEE Wasm division/sqrt.
+    fn sse_recip(&mut self, i: &Instruction) -> R<()> {
+        use Mnemonic as M;
+        let m = i.mnemonic();
+        let d = self.xmm_loc(i.op_register(0).number());
+        if m == M::Rsqrtss {
+            self.c.local_get(d);
+            self.c.raw(&[0x43, 0x00, 0x00, 0x80, 0x3f]); // f32.const 1.0
+            self.src_vec(i, 1, 4)?;
+            self.c.simd_lane(0x1f, 0); // f32x4.extract_lane 0
+            self.c.raw(&[0x91, 0x95]); // f32.sqrt, f32.div
+            self.c.simd_lane(0x20, 0); // f32x4.replace_lane 0
+        } else {
+            self.c.v128_const(splat_f32(1.0f32));
+            self.src_vec(i, 1, 16)?;
+            if m == M::Rsqrtps {
+                self.c.simd(0xe3); // f32x4.sqrt
+            }
+            self.c.simd(0xe7); // f32x4.div
+        }
+        self.c.local_set(d);
+        Ok(())
+    }
+
     /// decision 0181 (--mx-packed): CMPPS / CMPPD / CMPSS with an immediate predicate 0..7. Ordinary operands (no NaN, no denormal: no flag can be raised) -> the SIMD compare, else the C path's
     /// function (kinds 53..55). The scalar form compares lane 0 and keeps the upper lanes of the destination.
     fn mx_cmp(&mut self, i: &Instruction) -> R<()> {
@@ -3865,45 +4198,7 @@ impl<'a> L<'a> {
         self.mx_force();
         self.c.if_();
         self.frames.push(Frame::If);
-        // the compare of all lanes as a mask
-        let (eq, ne, lt, le) = if dbl { (0x47, 0x48, 0x49, 0x4b) } else { (0x41, 0x42, 0x43, 0x45) };
-        let unord = |s: &mut Self| {
-            s.c.local_get(d);
-            s.c.local_get(d);
-            s.c.simd(ne);
-            s.c.local_get(sv);
-            s.c.local_get(sv);
-            s.c.simd(ne);
-            s.c.simd(0x50);
-        };
-        if m == M::Cmpss {
-            self.c.local_get(d);
-        }
-        match pred {
-            0 | 1 | 2 | 4 | 5 | 6 => {
-                self.c.local_get(d);
-                self.c.local_get(sv);
-                self.c.simd(match pred {
-                    0 => eq,
-                    1 | 5 => lt,
-                    2 | 6 => le,
-                    _ => ne,
-                });
-                if pred == 5 || pred == 6 {
-                    self.c.simd(0x4d);
-                }
-            }
-            3 => unord(self),
-            _ => {
-                unord(self);
-                self.c.simd(0x4d);
-            }
-        }
-        if m == M::Cmpss {
-            self.c.simd_lane(0x1b, 0);
-            self.c.simd_lane(0x1c, 0);
-        }
-        self.c.local_set(d);
+        self.emit_cmp_body(dbl, m == M::Cmpss, pred, d, sv);
         self.c.else_();
         self.mx_slow(kind, imm, d, sv);
         if self.mx_rcl != NONE {
@@ -5283,7 +5578,11 @@ impl<'a> L<'a> {
                         return Ok(());
                     }
                     let fi = self.cx.c_imp[&key];
-                    self.c_stub(fi, None, None, &[1, 2, 8, 9], &[0]);
+                    if key == "IntersectRect" {
+                        self.emit_intersect_rect(fi, None);
+                    } else {
+                        self.c_stub(fi, None, None, &[1, 2, 8, 9], &[0]);
+                    }
                     self.emit_return_nf();
                     return Ok(());
                 }
@@ -5503,6 +5802,7 @@ impl<'a> L<'a> {
         if self.cfg.is_header[x] {
             self.c.loop_();
             self.frames.push(Frame::Loop(x));
+            self.emit_loop_tick();
             let saved = self.fall;
             self.node_within(x, &ys)?;
             self.fall = saved;
@@ -5710,6 +6010,7 @@ fn lower_fn(f: &Fun, cfg: &Cfg, fl: &FlagInfo, sig: Sig, cx: &Ctx<'_>, skip: &Ha
         l.stats.dispatch_functions += 1;
         l.c.loop_();
         l.frames.push(Frame::Loop(usize::MAX));
+        l.emit_loop_tick();
         for k in (0..n).rev() {
             l.c.block();
             l.frames.push(Frame::Block(k));

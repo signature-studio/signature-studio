@@ -10,6 +10,7 @@ import { IdleTrace } from './idle-trace.ts';
 import { ReportThrottle } from './report-throttle.ts';
 import { TaskbarReport } from './taskbar-report.ts';
 import type { EngineToRender, FromWorker, GuestTextBest, GuestTextNear, RenderToEngine, ToWorker } from './protocol.ts';
+import type { CursorPictureMsg } from './cursor-picture.ts';
 import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
 import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
@@ -58,6 +59,7 @@ let pendingComposeMs = 0;
 let framesSent = 0;
 let pendingDump: string | null = null;
 let sharedWarned = false;
+let lastSentSharedBuf: SharedArrayBuffer | null = null;
 /** Issue #1376: the windows painted over the WebView2 face are asked for when the picture changed or the face's bounds or visibility did; the list last sent, so that only a change is sent */
 const FRONT_MAX = 64;
 let frontDirty = true;
@@ -146,19 +148,26 @@ let lagCutTicks = 0;
 let lastLagLog = -1e9;
 // the driver's wait for a deadline is Atomics.waitAsync with a timeout on a word that only a cancel notifies (Issue #1397): a setTimeout whose nesting is deeper than five waits at least 4 ms, and the deadlines of
 // the idle chain are nested that way. A cancelled wait resolves at once (the notify) and does nothing when it does.
-interface DeadlineWait { live: boolean }
+interface DeadlineWait { live: boolean; slot: number }
 type WaitAsyncResult = { async: false; value: 'not-equal' | 'timed-out' } | { async: true; value: Promise<'ok' | 'timed-out'> };
-const deadlineWord = new Int32Array(new SharedArrayBuffer(4));
+const DEADLINE_SLOTS = 16;
+const deadlineWords = new Int32Array(new SharedArrayBuffer(DEADLINE_SLOTS * 4));
+let nextDeadlineSlot = 0;
 function deadlineWait(fn: () => void, ms: number): DeadlineWait {
-  const h: DeadlineWait = { live: true };
+  const slot = nextDeadlineSlot++ & (DEADLINE_SLOTS - 1);
+  const h: DeadlineWait = { live: true, slot };
   const fire = (): void => { if (h.live) { h.live = false; fn(); } };
-  const w = (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number, t: number): WaitAsyncResult }).waitAsync(deadlineWord, 0, 0, Math.max(0, ms));
-  if (w.async) void w.value.then(fire); else void Promise.resolve().then(fire);
+  const expected = Atomics.load(deadlineWords, slot);
+  const w = (Atomics as unknown as { waitAsync(ia: Int32Array, i: number, v: number, t: number): WaitAsyncResult }).waitAsync(deadlineWords, slot, expected, Math.max(0, ms));
+  if (w.async) void w.value.then((v) => { if (v === 'timed-out') fire(); });
+  else if (w.value === 'timed-out') void Promise.resolve().then(fire);
   return h;
 }
 function cancelDeadlineWait(h: DeadlineWait): void {
+  if (!h.live) return;
   h.live = false;
-  Atomics.notify(deadlineWord, 0);
+  Atomics.add(deadlineWords, h.slot, 1);
+  Atomics.notify(deadlineWords, h.slot);
 }
 
 // the engine instance exists only once run() has instantiated the wasm, so the driver is made at the first idle or the first input
@@ -178,12 +187,36 @@ function ensureDriver(): IdleDriver | null {
     yieldTurn: (fn) => { bounce = fn; turns.port2.postMessage(0); },
   }, {
     processed: (list, tIdle) => {
+      inlineSettledCount = 0;
+      inlineSince = 0;
       flushLogs();
-      post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle })) });
-      // decision 0223: what the engine drew in answer to the input is shown now, not at the next animation frame (S-desk-input-present); the compositor holds the frame until the display's next refresh either way
-      if (deskReady) { try { deskTick(false, list.map((x) => x.seq)); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); } }
+      const expanded: { seq: number; tPage: number; tInject: number; tIdle: number }[] = [];
+      for (const x of list) {
+        const extra = mergedMoveSeqs.get(x.seq);
+        if (extra) {
+          mergedMoveSeqs.delete(x.seq);
+          for (const m of extra) expanded.push({ seq: m.seq, tPage: m.tPage, tInject: x.tInject, tIdle });
+        }
+        expanded.push({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle });
+      }
+      post({ t: 'input-done', items: expanded });
+      // decision 0223: what the engine drew in answer to the input is shown now when the render Worker wants a frame or after a brief quiet gap; otherwise attach seqs to the next rAF present to avoid mid-rAF duplicate uploads
+      if (deskReady) {
+        const seqs = expanded.map((x) => x.seq);
+        try {
+          if (!gate?.busy && (gate?.want || performance.now() - lastWantAt >= 50)) deskTick(false, seqs);
+          else pushDeferredAnswers(seqs);
+        } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+      }
     },
-    dropped: (seq, reason) => post({ t: 'input-dropped', seq, reason }),
+    dropped: (seq, reason) => {
+      const extra = mergedMoveSeqs.get(seq);
+      if (extra) {
+        mergedMoveSeqs.delete(seq);
+        for (const m of extra) post({ t: 'input-dropped', seq: m.seq, reason });
+      }
+      post({ t: 'input-dropped', seq, reason });
+    },
     resumed: (_code, abs, why) => { if (reports.resume(why)) post({ t: 'resume', abs, why }); },
     // reported here, before the driver decides what the engine does next: the page must see this idle before the resume that may follow it at once (decision 0170: the next deadline is often already due)
     idle: (n, now, next, busyMs, at) => { reportIdle(n, now, next, busyMs, at); },
@@ -192,7 +225,7 @@ function ensureDriver(): IdleDriver | null {
       const at = performance.now();
       if (at - lastLagLog > 5000) { lastLagLog = at; log('warn', `the virtual clock fell ${(lagCutTicks / 10000).toFixed(0)} ms further behind the wall clock than the cap allows (S-clk-maxlag); it stays behind (no virtual time is skipped)`); lagCutTicks = 0; }
     },
-  });
+  }, { maxLeadMs: 1, maxLagMs: 10 });
   return driver;
 }
 
@@ -206,64 +239,136 @@ function onInput(seq: number, tPage: number, ev: import('../input/events.ts').Ra
 // Before: an input waited in the ring until the engine reached an idle (the Worker's event loop ran only then), 133 ms (median, a click during playback) when the mixer is behind real time. Now the runtime takes the records at its next
 // scheduler point and queues them with the functions the exports use; this file stages the records into the runtime's buffer and keeps the books; the answer (a present that changed a pixel) is tried every INLINE_TRY_MS from here
 // too, since the Worker's own turn comes only at the idle. Nothing here calls a wasm export except deskTick (the present), which the idle path calls as well.
-const RING_REC = 8, INLINE_TRY_MS = 6, INLINE_GIVEUP_MS = 150;
-let inlineStaged: { seq: number; tPage: number; ev: import('../input/events.ts').RawInput }[] = [];
+const RING_REC = 8, INLINE_TRY_MS = 4, INLINE_GIVEUP_MS = 150, MOVE_PACE_MS = 8;
+type StagedSeq = { seq: number; tPage: number };
+type SchedulableInput = import('../input/events.ts').MouseRaw | import('../input/events.ts').KeyRaw | import('../input/events.ts').DisplayRaw;
+let pendingMove: { ev: import('../input/events.ts').MouseRaw; seqs: StagedSeq[] } | null = null;
+let lastMoveInjectAt = 0;
+let moveFlushTimer: DeadlineWait | null = null;
+const mergedMoveSeqs = new Map<number, StagedSeq[]>();
+const inlineStaged: { ev: SchedulableInput; seqs: StagedSeq[] }[] = [];
 let inlineTryAt = 0;
 let inlineSince = 0;
+let lastWantAt = 0;
+let deferredSince = 0;
+const deferredAnswerSeqs: number[] = [];
+function pushDeferredAnswers(seqs: number[]): void {
+  if (seqs.length === 0) return;
+  const now = performance.now();
+  if (deferredAnswerSeqs.length > 512 || (deferredAnswerSeqs.length > 0 && now - deferredSince >= 150)) {
+    deferredAnswerSeqs.length = 0;
+  }
+  if (deferredAnswerSeqs.length === 0) deferredSince = now;
+  deferredAnswerSeqs.push(...seqs);
+}
+function takeDeferredAnswers(now: number): number[] | undefined {
+  if (deferredAnswerSeqs.length === 0) return undefined;
+  const fresh = now - deferredSince < 150 ? deferredAnswerSeqs.slice() : undefined;
+  deferredAnswerSeqs.length = 0;
+  return fresh;
+}
 // decision 0280, L1c (PROVISIONAL): which present may answer an inline input. The runtime writes fle_input_settled() into the word after the records (fruity_idle.c): 1 = the guest has taken every event the page sent out of its queue, has retrieved every message made of
 // them, and the thread that did waits in its message loop again. An input is answered only by a present that was started after a scheduler point that reported 1 (the picture then holds what the guest drew for it); a present before that, which shows
 // only another change (the playhead), does not answer. No class name, no window kind.
-let inlineSettled = false, settledBuf: ArrayBuffer | null = null, settledView: Int32Array | null = null;
+let inlineSettledCount = 0, memI32Buf: ArrayBuffer | null = null, memI32View: Int32Array | null = null;
+function ensureMemI32(mem: WebAssembly.Memory): Int32Array {
+  if (memI32Buf !== mem.buffer) { memI32Buf = mem.buffer; memI32View = new Int32Array(memI32Buf); }
+  return memI32View as Int32Array;
+}
 function readSettled(ptr: number, max: number): number {
   const mem = fruity?.memory;
   if (!mem) return 0;
-  if (settledBuf !== mem.buffer) { settledBuf = mem.buffer; settledView = new Int32Array(settledBuf); }
-  return (settledView as Int32Array)[(ptr >> 2) + max * RING_REC] ?? 0;
+  return ensureMemI32(mem)[(ptr >> 2) + max * RING_REC] ?? 0;
+}
+function serviceRenderWant(): void {
+  if (!deskReady || !gate || !gate.want || gate.busy) return;
+  const api = compositor();
+  if (deskScene && api?.sceneDirty && api.sceneDirty() === 0) return;
+  try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+}
+function clearMoveTimer(): void {
+  if (moveFlushTimer !== null) { cancelDeadlineWait(moveFlushTimer); moveFlushTimer = null; }
 }
 function inputPoll(ptr: number, max: number): number {
   const d = driver, mem = fruity?.memory;
   if (!ring || !d || !d.ready || !mem) return 0;
-  if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
-  if (ring.pending === 0) { if (d.awaitingCount > 0) answerInline(); return 0; }
-  let i32: Int32Array | null = null;
-  inlineStaged = [];
-  const n = ring.drainN(max, (r) => {
-    const o = inlineStaged.length * RING_REC, e = r.ev;
+  if (d.awaitingCount > inlineSettledCount && inlineSince !== 0 && readSettled(ptr, max) === 1) {
+    inlineSettledCount = d.awaitingCount;
+  }
+  serviceRenderWant();
+  if (ring.pending === 0 && pendingMove === null) { if (d.awaitingCount > 0) answerInline(); return 0; }
+  const i32 = ensureMemI32(mem), base = ptr >> 2;
+  inlineStaged.length = 0;
+  const stage = (ev: SchedulableInput, seqs: StagedSeq[]): void => {
+    const o = base + inlineStaged.length * RING_REC;
+    if (ev.k === 'mouse') { i32[o] = 1; i32[o + 1] = ev.kind; i32[o + 2] = ev.x; i32[o + 3] = ev.y; i32[o + 4] = ev.data; }
+    else if (ev.k === 'key') { i32[o] = 2; i32[o + 1] = ev.kind; i32[o + 2] = ev.vk; i32[o + 3] = ev.scan; i32[o + 4] = ev.ext; }
+    else { i32[o] = 3; i32[o + 1] = ev.kind; i32[o + 2] = ev.width; i32[o + 3] = ev.height; i32[o + 4] = 0; }
+    i32[o + 5] = seqs[seqs.length - 1]!.seq; i32[o + 6] = 0; i32[o + 7] = 0;
+    inlineStaged.push({ ev, seqs });
+  };
+  let drained = false;
+  ring.drainN(Infinity, (r) => {
+    const e = r.ev;
     if (!takenAtSchedulerPoint(e)) return false;   // syscmd and any later kind stay in the ring (with what follows them) for the IdleDriver at the next idle
-    if (i32 === null) i32 = new Int32Array(mem.buffer, ptr, max * RING_REC);
-    if (e.k === 'mouse') { i32[o] = 1; i32[o + 1] = e.kind; i32[o + 2] = e.x; i32[o + 3] = e.y; i32[o + 4] = e.data; }
-    else if (e.k === 'key') { i32[o] = 2; i32[o + 1] = e.kind; i32[o + 2] = e.vk; i32[o + 3] = e.scan; i32[o + 4] = e.ext; }
-    else { i32[o] = 3; i32[o + 1] = e.kind; i32[o + 2] = e.width; i32[o + 3] = e.height; i32[o + 4] = 0; }
-    i32[o + 5] = r.seq; i32[o + 6] = 0; i32[o + 7] = 0;
-    inlineStaged.push(r);
+    drained = true;
+    if (e.k === 'mouse' && e.kind === IN.MOVE) {
+      if (pendingMove === null) pendingMove = { ev: e, seqs: [{ seq: r.seq, tPage: r.tPage }] };
+      else { pendingMove.ev = e; pendingMove.seqs.push({ seq: r.seq, tPage: r.tPage }); }
+      return true;
+    }
+    const needSlots = pendingMove !== null ? 2 : 1;
+    if (inlineStaged.length + needSlots > max) return false;
+    if (pendingMove !== null) {
+      clearMoveTimer();
+      stage(pendingMove.ev, pendingMove.seqs);
+      pendingMove = null;
+      lastMoveInjectAt = performance.now();
+    }
+    stage(e, [{ seq: r.seq, tPage: r.tPage }]);
+    return true;
   });
-  deskCounters.ringReads++;
-  if (n === 0 && d.awaitingCount > 0) answerInline();   // a record that stays in the ring (a syscmd waiting for the idle) must not stop the answers of the inputs taken before it
-  return n;
+  if (pendingMove !== null && inlineStaged.length < max) {
+    const now = performance.now();
+    if (now - lastMoveInjectAt >= MOVE_PACE_MS) {
+      clearMoveTimer();
+      stage(pendingMove.ev, pendingMove.seqs);
+      pendingMove = null;
+      lastMoveInjectAt = now;
+    }
+  }
+  if (drained) deskCounters.ringReads++;
+  if (inlineStaged.length === 0 && d.awaitingCount > 0) answerInline();   // a record that stays in the ring (a syscmd waiting for the idle) must not stop the answers of the inputs taken before it
+  return inlineStaged.length;
 }
 function inputDone(ptr: number, n: number): void {
   const d = driver, mem = fruity?.memory;
-  if (!d || !mem) { inlineStaged = []; return; }
-  const i32 = new Int32Array(mem.buffer, ptr, n * RING_REC), at = nowAbs();
+  if (!d || !mem) { inlineStaged.length = 0; return; }
+  const i32 = ensureMemI32(mem), base = ptr >> 2, at = nowAbs();
   const done: { seq: number; tPage: number; tInject: number; ev: import('../input/events.ts').RawInput }[] = [];
   for (let i = 0; i < n; i++) {
-    const r = inlineStaged[i];
-    if (!r) continue;
-    if (i32[i * RING_REC + 6] === 1) done.push({ seq: r.seq, tPage: r.tPage, tInject: at, ev: r.ev });
-    else post({ t: 'input-dropped', seq: r.seq, reason: 'the engine refused the event (its input queue is full)' });
+    const st = inlineStaged[i];
+    if (!st) continue;
+    const accepted = i32[base + i * RING_REC + 6] === 1;
+    for (const s of st.seqs) {
+      if (accepted) done.push({ seq: s.seq, tPage: s.tPage, tInject: at, ev: st.ev });
+      else post({ t: 'input-dropped', seq: s.seq, reason: 'the engine refused the event (its input queue is full)' });
+    }
   }
-  inlineStaged = [];
-  if (done.length > 0) { if (d.awaitingCount === 0) inlineSince = performance.now(); inlineSettled = false; d.injectedInline(done); }
+  inlineStaged.length = 0;
+  if (done.length > 0) { if (d.awaitingCount === 0) inlineSince = performance.now(); d.injectedInline(done); }
 }
 // the answer to the inputs the runtime took inline: the first compose that changed a pixel after the injection, by whichever path made it (this function, the render Worker's question: deskTick calls completeInline when it changes
 // something and inputs await); this function tries a compose every INLINE_TRY_MS, and after INLINE_GIVEUP_MS without a change the inputs are finished without an answer (an input that changes no pixel)
 /** the inputs the runtime took inline are done; `shown`: the present that answers them showed a change (their sequence numbers are returned, for the render Worker's latency report) */
-function completeInline(shown: boolean): number[] | undefined {
+function completeInline(shown: boolean, count?: number): number[] | undefined {
   const d = driver;
   if (!d || d.awaitingCount === 0 || inlineSince === 0) return undefined;
-  const list = d.takeAwaiting(), at = nowAbs();
-  inlineSince = 0;
-  inlineSettled = false;
+  const list = count !== undefined ? d.takeAwaiting(count) : d.takeAwaiting();
+  if (list.length === 0) return undefined;
+  const at = nowAbs();
+  inlineSettledCount = Math.max(0, inlineSettledCount - list.length);
+  inlineSince = d.awaitingCount > 0 ? performance.now() : 0;
   post({ t: 'input-done', items: list.map((x) => ({ seq: x.seq, tPage: x.tPage, tInject: x.tInject, tIdle: at })) });
   return shown ? list.map((x) => x.seq) : undefined;
 }
@@ -271,10 +376,15 @@ function answerInline(): void {
   const d = driver;
   if (!d || d.awaitingCount === 0 || !deskReady || inlineSince === 0) return;
   const t = performance.now();
-  if (!inlineSettled) { if (t - inlineSince >= INLINE_GIVEUP_MS) completeInline(false); return; }
-  if (t - inlineTryAt < INLINE_TRY_MS) return;
-  inlineTryAt = t;
-  try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+  if (inlineSettledCount === 0) { if (t - inlineSince >= INLINE_GIVEUP_MS) completeInline(false); return; }
+  if (gate?.busy) return;
+  if (gate?.want) {
+    inlineTryAt = t;
+    try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+  } else if (t - inlineTryAt >= INLINE_TRY_MS && t - lastWantAt >= 50) {
+    inlineTryAt = t;
+    try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
+  }
   if (d.awaitingCount > 0 && performance.now() - inlineSince >= INLINE_GIVEUP_MS) completeInline(false);
 }
 
@@ -292,6 +402,7 @@ function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
   if (ck) checkpoints.push(ck);
   flushLogs();
   sendDeskReady();
+  serviceRenderWant();
   if (saveArmed) pollSavedFiles();
   ensureDriver();
   drainRing(); // the page's input waits in the ring: it is queued now and given to the engine by onIdle below
@@ -380,6 +491,8 @@ async function startFruity(f: FruityEngine): Promise<void> {
   mark('engine_start');
   const result = await f.run();
   runEnded = true;
+  clearMoveTimer();
+  pendingMove = null;
   closeRegState(result.kind === 'trap' || (result.kind === 'exit' && result.code !== 0));
   stopAudioReport();
   flushLogs();
@@ -398,11 +511,35 @@ async function startFruity(f: FruityEngine): Promise<void> {
 
 // ---- decision 0223: the desktop (the picture is drawn by the render Worker, render-worker.ts; C-2) ----
 // The input: the page writes raw events into the ring (input/ring.ts); they are read here at every idle of the engine and when the page wakes the Worker. Nothing else changed in how the engine is given input.
+function flushPendingMoveToDriver(): void {
+  if (!pendingMove || !driver) return;
+  clearMoveTimer();
+  const pm = pendingMove;
+  pendingMove = null;
+  lastMoveInjectAt = performance.now();
+  const last = pm.seqs[pm.seqs.length - 1]!;
+  if (pm.seqs.length > 1) mergedMoveSeqs.set(last.seq, pm.seqs.slice(0, -1));
+  driver.submit(pm.ev, last.seq, last.tPage);
+}
 function drainRing(): void {
   if (!ring) return;
   ensureDriver();
   if (!driver) return;
-  const n = ring.drain((r) => driver?.submit(r.ev, r.seq, r.tPage));
+  const n = ring.drain((r) => {
+    const e = r.ev;
+    if (e.k === 'mouse' && e.kind === IN.MOVE) {
+      if (pendingMove === null) pendingMove = { ev: e, seqs: [{ seq: r.seq, tPage: r.tPage }] };
+      else { pendingMove.ev = e; pendingMove.seqs.push({ seq: r.seq, tPage: r.tPage }); }
+      return;
+    }
+    flushPendingMoveToDriver();
+    driver?.submit(e, r.seq, r.tPage);
+  });
+  if (pendingMove !== null) {
+    const elapsed = performance.now() - lastMoveInjectAt;
+    if (elapsed >= MOVE_PACE_MS || !driver.ready) flushPendingMoveToDriver();
+    else if (moveFlushTimer === null) moveFlushTimer = deadlineWait(() => { moveFlushTimer = null; flushPendingMoveToDriver(); }, Math.max(0.5, MOVE_PACE_MS - elapsed));
+  }
   if (n) deskCounters.ringReads++;
 }
 
@@ -435,7 +572,11 @@ function sendDeskReady(): void {
 /** the render Worker's messages: its question (compose now), the resync, the scene mode, and the answer to a test aid's read-pixels */
 function onRender(m: RenderToEngine): void {
   switch (m.cmd) {
-    case 'want': sendDeskReady(); deskTick(true); break;
+    case 'want':
+      sendDeskReady();
+      if (gate && !gate.want) break;
+      else deskTick(true);
+      break;
     case 'resync': compositor()?.resync(); break;
     case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
     case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
@@ -463,7 +604,7 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
   const api = compositor(), mem = fruity?.memory;
   if (!api || !mem || !gate) { if (reply) renderNoChange(); return false; }
   if (gate.busy) { if (reply) renderNoChange(); return false; }
-  const gate0 = inlineSettled;   // decision 0280, L1c: read before the compose: the picture of this compose is composed after it
+  const settledN = inlineSettledCount;   // decision 0280, L1c: read before the compose: the picture of this compose is composed after it
   const t0 = performance.now();
   const ptr = deskScene && api.scene ? api.scene() : api.compose();
   pendingComposeMs += performance.now() - t0;
@@ -474,15 +615,24 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
   if (changed || frontDirty) syncFront();
   let answers: number[] | undefined;
   if (changed) {
+    const now = performance.now();
+    gate.clearWant();
+    lastWantAt = now;
     gate.publish(gen);
     framesSent++;
-    if (gate0) answers = completeInline(true);   // decision 0280: the inputs the runtime took inline are answered by the first change that shows something
-    if (seqs) answers = [...(answers ?? []), ...seqs];
+    if (settledN > 0) answers = completeInline(true, settledN);   // decision 0280: the inputs the runtime took inline are answered by the first change that shows something
+    const deferred = takeDeferredAnswers(now);
+    if (deferred) answers = answers ? [...answers, ...deferred] : deferred;
+    if (seqs) answers = answers ? [...answers, ...seqs] : seqs;
+  } else if (seqs) {
+    pushDeferredAnswers(seqs);
   }
   if (changed || reply) {
     const shared = buf instanceof SharedArrayBuffer ? buf : null;
     if (!shared && !sharedWarned) { sharedWarned = true; log('error', 'the engine memory is not shared: the render Worker cannot read the picture from it'); }
-    renderPost({ t: 'frame', changed, gen: gate.published, ptr, ...(shared ? { buffer: shared } : {}), composeMs: pendingComposeMs, ringReads: deskCounters.ringReads, wakes: deskCounters.wakes, ...(answers && answers.length > 0 ? { answers } : {}) });
+    const sendBuf = shared !== null && shared !== lastSentSharedBuf ? shared : null;
+    if (sendBuf) lastSentSharedBuf = sendBuf;
+    renderPost({ t: 'frame', changed, gen: gate.published, ptr, ...(sendBuf ? { buffer: sendBuf } : {}), composeMs: pendingComposeMs, ringReads: deskCounters.ringReads, wakes: deskCounters.wakes, ...(answers && answers.length > 0 ? { answers } : {}) });
     pendingComposeMs = 0;
   }
   if (fruity) {
@@ -494,7 +644,11 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
       const key = osStateKey(os);
       if (key !== lastOs) {
         lastOs = key;
-        if (os.cursorShared || os.cursorMade) sendCursorPicture(fruity, os.cursor);
+        if (os.cursorShared) {
+          if (!sentSharedCursors.has(os.cursor)) sendCursorPicture(fruity, os.cursor, true);
+        } else if (os.cursorMade) {
+          sendCursorPicture(fruity, os.cursor, false);
+        }
         post({ t: 'osstate', ...os, abs: nowAbs() });
       }
     }
@@ -505,11 +659,33 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
   return changed;
 }
 
+const sentSharedCursors = new Set<number>();
+const sentMadeCursorSig = new Map<number, string>();
+function cursorPicSig(p: CursorPictureMsg): string {
+  const words = new Uint32Array(p.rgba);
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i] as number;
+    h1 = Math.imul(h1 ^ w, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 ^ ((w << 13) | (w >>> 19)), 0x85ebca6b) >>> 0;
+  }
+  return `${p.width}x${p.height}:${p.hotX},${p.hotY}:${p.alpha ? 1 : 0}:${p.invert}:${p.transparent}:${p.opaque}:${h1.toString(16)}_${h2.toString(16)}`;
+}
+
 /** #1392: the picture of a cursor the guest loaded from one of its modules or made with CreateIconIndirect, read now (before the osstate that names the handle, which is posted when the key changes: a handle number can be made again for another cursor, so it is not kept) */
-function sendCursorPicture(f: FruityEngine, handle: number): void {
+function sendCursorPicture(f: FruityEngine, handle: number, shared: boolean): void {
   const p = f.cursorPicture(handle);
   if (p === null) { post({ t: 'cursorpic', handle, why: 'this engine build has no cursor picture export', picture: null }); return; }
   if (!p.ok || p.picture === null) { post({ t: 'cursorpic', handle, why: p.why, picture: null }); return; }
+  if (shared) {
+    sentSharedCursors.add(handle);
+  } else {
+    const sig = cursorPicSig(p.picture);
+    if (sentMadeCursorSig.get(handle) === sig) return;
+    if (sentMadeCursorSig.size >= 256) sentMadeCursorSig.clear();
+    sentMadeCursorSig.set(handle, sig);
+  }
   post({ t: 'cursorpic', handle, why: '', picture: p.picture }, p.picture.raw ? [p.picture.rgba, p.picture.raw] : [p.picture.rgba]);
 }
 

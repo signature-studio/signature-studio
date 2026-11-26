@@ -17,5 +17,9 @@ double fle_tp_now(void);
 /* waits ms of real time (2 after the time-out); fle_tp_can_wait is 0 when the build cannot wait */
 int fle_tp_wait(double ms);
 int fle_tp_can_wait(void);
+/* consumer quantum size in frames (128 for external AudioWorklet, 1 otherwise) and elapsed ms since RD last moved */
+uint32_t fle_tp_quantum_frames(void);
+double fle_tp_rd_age_ms(void);
+void fle_audio_idle_begin(unsigned from);
 
 #endif

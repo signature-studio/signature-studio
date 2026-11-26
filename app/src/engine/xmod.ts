@@ -10,6 +10,8 @@ type Fn = (...args: unknown[]) => unknown;
 export class XmodLoader {
   private readonly fns = new Map<string, Fn>();
   private readonly loaded = new Set<string>();
+  private readonly importNameByFuncIdx = new Map<string, string>();
+  private tableSlotsByName: Map<string, number[]> | null = null;
   private readonly root: string;
   private readonly lazy: LazyFileSource[];
   private readonly engineExports: () => Record<string, unknown> | null;
@@ -20,6 +22,27 @@ export class XmodLoader {
     this.lazy = lazy;
     this.engineExports = engineExports;
     this.memory = memory;
+  }
+
+  registerImportIndex(funcIdx: number, name: string): void {
+    this.importNameByFuncIdx.set(String(funcIdx), name);
+  }
+
+  private indexTable(table: WebAssembly.Table): Map<string, number[]> {
+    const slotsByName = new Map<string, number[]>();
+    for (let slot = 0; slot < table.length; slot++) {
+      const entry = table.get(slot);
+      if (typeof entry !== 'function') continue;
+      const name = this.importNameByFuncIdx.get(entry.name);
+      if (!name) continue;
+      let list = slotsByName.get(name);
+      if (!list) {
+        list = [];
+        slotsByName.set(name, list);
+      }
+      list.push(slot);
+    }
+    return slotsByName;
   }
 
   /** the supply of the engine's import env.<name>: the function that the separate module exports under that name (an error while that module is not loaded) */
@@ -57,7 +80,20 @@ export class XmodLoader {
       c[i.name] = v;
     }
     const inst = new WebAssembly.Instance(mod, { c } as WebAssembly.Imports);
-    for (const [k, v] of Object.entries(inst.exports)) if (k.startsWith('f_') && typeof v === 'function') this.fns.set(k, v as Fn);
+    const table = ex['__indirect_function_table'];
+    if (table instanceof WebAssembly.Table) {
+      this.tableSlotsByName ??= this.indexTable(table);
+    }
+    for (const [k, v] of Object.entries(inst.exports)) {
+      if (k.startsWith('f_') && typeof v === 'function') {
+        this.fns.set(k, v as Fn);
+        if (table instanceof WebAssembly.Table && this.tableSlotsByName) {
+          for (const slot of this.tableSlotsByName.get(k) ?? []) {
+            table.set(slot, v);
+          }
+        }
+      }
+    }
     this.loaded.add(wasmPath);
     return 1;
   }
@@ -66,7 +102,13 @@ export class XmodLoader {
 /** the engine's imports for the separate modules: the supply of every env.f_<va> the engine imports (the glue may hold a placeholder for an undefined symbol; this replaces it). The engine's call of fle_xmod_load reaches loader.loadAt through the Module hook fleXmodLoad (fruity.ts) */
 export function installXmod(imports: WebAssembly.Imports, module: WebAssembly.Module, loader: XmodLoader): void {
   const env = (imports.env ??= {}) as Record<string, unknown>;
+  let funcIdx = 0;
   for (const i of WebAssembly.Module.imports(module)) {
-    if (i.module === 'env' && i.kind === 'function' && i.name.startsWith('f_')) env[i.name] = loader.stub(i.name);
+    if (i.kind !== 'function') continue;
+    if (i.module === 'env' && i.name.startsWith('f_')) {
+      loader.registerImportIndex(funcIdx, i.name);
+      env[i.name] = loader.stub(i.name);
+    }
+    funcIdx++;
   }
 }

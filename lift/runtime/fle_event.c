@@ -173,7 +173,8 @@ void fle_imp_SetEvent(void)
     if (!e) return;
     e->signaled = 1;
     R[0] = 1;
-    if (fle_thread_wake_check) fle_thread_wake_check(); /* decision 0122: a thread that waits for this event becomes ready (an auto-reset event goes to the first waiter) */
+    if (fle_thread_wake_event) fle_thread_wake_event(R[1]);
+    else if (fle_thread_wake_check) fle_thread_wake_check(); /* decision 0122: a thread that waits for this event becomes ready (an auto-reset event goes to the first waiter) */
 }
 
 /* kernel32!ResetEvent: BOOL f(hEvent rcx). Learn (ResetEvent): the event becomes nonsignaled for both kinds; "resetting

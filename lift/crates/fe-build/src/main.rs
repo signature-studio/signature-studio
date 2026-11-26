@@ -38,11 +38,10 @@ const BLEND2D_SRC: &str = "lift/out-app/b2d-src/src";
 const BLEND2D_LIB: &str = "lift/out-app/b2d/build/libblend2d.a";
 /// The flags of the em++ line that the upstream CMake build ran for each source, in its order (the line without
 /// the dependency files, the output name and the source).
-const BLEND2D_CXX_FLAGS: [&str; 24] = [
-    "-O2", "-fno-exceptions", "-fno-rtti", "-matomics", "-mbulk-memory", "-O3", "-DNDEBUG", "-std=gnu++11", "-fvisibility=hidden", "-Wall",
-    "-Wextra", "-fno-exceptions", "-fno-rtti", "-fno-math-errno", "-fno-trapping-math", "-fno-finite-math-only", "-mllvm",
-    "--disable-loop-idiom-all", "-fno-threadsafe-statics", "-DBL_STATIC", "-DBL_BUILD_NO_JIT", "-O2", "-fmerge-all-constants",
-    "-ftree-vectorize",
+const BLEND2D_CXX_FLAGS: [&str; 21] = [
+    "-fno-exceptions", "-fno-rtti", "-msimd128", "-matomics", "-mbulk-memory", "-O3", "-DNDEBUG", "-std=gnu++11", "-fvisibility=hidden", "-Wall",
+    "-Wextra", "-fno-exceptions", "-fno-rtti", "-fno-math-errno", "-fno-trapping-math", "-fno-finite-math-only", "-fno-threadsafe-statics",
+    "-DBL_STATIC", "-DBL_BUILD_NO_JIT", "-fmerge-all-constants", "-ftree-vectorize",
 ];
 const ENGINE_DIRS: [&str; 10] = ["obj/rt", "obj/h", "obj/fle", "obj/mod", "obj/b2d", "web", "hyb", "seed", "dll", "bundle"];
 

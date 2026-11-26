@@ -1,6 +1,6 @@
 -c -msimd128 -matomics -mbulk-memory
 -std=gnu11
--Oz
+-O3
 -w
 -fno-builtin-fprintf
 -fno-builtin-fputs

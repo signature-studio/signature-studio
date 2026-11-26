@@ -115,22 +115,24 @@ static uint64_t fle_unw_need(const char *api, uint64_t p, const char *what)
     return p;
 }
 
-static fle_unw_rect fle_unw_get(uint64_t p)
+_Static_assert(sizeof(fle_unw_rect) == FLE_UNW_RECT_SIZE, "RECT must be 16 bytes");
+
+static inline fle_unw_rect fle_unw_get(uint64_t p)
 {
     fle_unw_rect q;
-    q.l = (int32_t)(uint32_t)fle_ld(p, 4);
-    q.t = (int32_t)(uint32_t)fle_ld(p + 4, 4);
-    q.r = (int32_t)(uint32_t)fle_ld(p + 8, 4);
-    q.b = (int32_t)(uint32_t)fle_ld(p + 12, 4);
+    const void *src = (const void *)fle_addr(p, FLE_UNW_RECT_SIZE, 0);
+
+    if (__builtin_expect(((p + 12u) >> 32) != 0u, 0)) (void)fle_addr(p + 12u, 4u, 0);
+    memcpy(&q, src, FLE_UNW_RECT_SIZE);
     return q;
 }
 
-static void fle_unw_put(uint64_t p, fle_unw_rect q)
+static inline void fle_unw_put(uint64_t p, fle_unw_rect q)
 {
-    fle_st(p, 4, (uint32_t)q.l);
-    fle_st(p + 4, 4, (uint32_t)q.t);
-    fle_st(p + 8, 4, (uint32_t)q.r);
-    fle_st(p + 12, 4, (uint32_t)q.b);
+    void *dst = (void *)fle_addr(p, FLE_UNW_RECT_SIZE, 1);
+
+    if (__builtin_expect(((p + 12u) >> 32) != 0u, 0)) (void)fle_addr(p + 12u, 4u, 1);
+    memcpy(dst, &q, FLE_UNW_RECT_SIZE);
 }
 
 /* MSDN IsRectEmpty: empty means right <= left or bottom <= top. */
@@ -158,23 +160,34 @@ void fle_imp_SetRect(void)
 void fle_imp_IntersectRect(void)
 {
     static const char *api = "IntersectRect";
-    uint64_t pd = fle_unw_need(api, R[1], "lprcDst is NULL (the page: cannot be NULL)");
-    uint64_t pa = fle_unw_need(api, R[2], "lprcSrc1 is NULL (not described by the page)");
-    uint64_t pb = fle_unw_need(api, R[8], "lprcSrc2 is NULL (not described by the page)");
-    fle_unw_rect a = fle_unw_get(pa), b = fle_unw_get(pb), q;
+    uint64_t pd = R[1], pa = R[2], pb = R[8];
+    fle_unw_rect a, b, q;
+    int empty;
 
+    if (__builtin_expect((pd == 0) | (pa == 0) | (pb == 0), 0)) {
+        pd = fle_unw_need(api, pd, "lprcDst is NULL (the page: cannot be NULL)");
+        pa = fle_unw_need(api, pa, "lprcSrc1 is NULL (not described by the page)");
+        pb = fle_unw_need(api, pb, "lprcSrc2 is NULL (not described by the page)");
+    }
+    if (__builtin_expect(((pd | pa | pb | (pd + 12u) | (pa + 12u) | (pb + 12u)) >> 32) == 0u, 1)) {
+        memcpy(&a, (const void *)(uintptr_t)pa, FLE_UNW_RECT_SIZE);
+        memcpy(&b, (const void *)(uintptr_t)pb, FLE_UNW_RECT_SIZE);
+    } else {
+        a = fle_unw_get(pa);
+        b = fle_unw_get(pb);
+    }
     q.l = a.l > b.l ? a.l : b.l;
     q.t = a.t > b.t ? a.t : b.t;
     q.r = a.r < b.r ? a.r : b.r;
     q.b = a.b < b.b ? a.b : b.b;
-    if (fle_unw_empty(q)) {
-        q.l = q.t = q.r = q.b = 0;
+    empty = fle_unw_empty(q);
+    if (empty) q.l = q.t = q.r = q.b = 0;
+    if (__builtin_expect(((pd | (pd + 12u)) >> 32) == 0u, 1)) {
+        memcpy((void *)(uintptr_t)pd, &q, FLE_UNW_RECT_SIZE);
+    } else {
         fle_unw_put(pd, q);
-        R[0] = 0;
-        return;
     }
-    fle_unw_put(pd, q);
-    R[0] = 1;
+    R[0] = empty ? 0u : 1u;
 }
 
 /* MSDN UnionRect: the smallest rectangle containing both sources; "the system ignores the dimensions of an empty

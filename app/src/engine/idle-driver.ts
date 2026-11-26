@@ -147,8 +147,16 @@ export class IdleDriver {
     this.hooks.injected?.(done);
   }
 
-  /** the inputs injected inline since the last answer (the caller answers them with a present; cleared) */
-  takeAwaiting(): Injected[] { const l = this.awaiting; this.awaiting = []; return l; }
+  /** the inputs injected inline since the last answer, or the oldest `count` of them (the caller answers them with a present; cleared) */
+  takeAwaiting(count?: number): Injected[] {
+    if (count === undefined || count >= this.awaiting.length) {
+      const l = this.awaiting;
+      this.awaiting = [];
+      return l;
+    }
+    if (count <= 0) return [];
+    return this.awaiting.splice(0, count);
+  }
 
   /** Module.fleIdle(n, nowTicks, nextTicks): the engine is waiting */
   onIdle(n: number, nowTicks: number, nextTicks: number): void {

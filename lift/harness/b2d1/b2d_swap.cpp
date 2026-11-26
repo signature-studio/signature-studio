@@ -199,32 +199,59 @@ static void fill_table(Proxy *p) {
 }
 
 /* ---- conversions of what the guest holds in its own layout ---- */
-struct TmpPath { BLPathCore p; int live; };
+#define B2D_PATH_POOL_CAP 4
+struct PathPoolSlot { BLPathCore p; uint8_t inited; uint8_t busy; };
+static PathPoolSlot b2d_path_pool[B2D_PATH_POOL_CAP];
+struct TmpPath { BLPathCore p; int live; int pool_idx; };
 static void path_from_guest(TmpPath *t, uint64_t core) {
-    blPathInit(&t->p); t->live = 1;
+    t->pool_idx = -1;
+    BLPathCore *dst = &t->p;
+    for (int i = 0; i < B2D_PATH_POOL_CAP; i++) {
+        if (!b2d_path_pool[i].busy) {
+            b2d_path_pool[i].busy = 1;
+            if (!b2d_path_pool[i].inited) { blPathInit(&b2d_path_pool[i].p); b2d_path_pool[i].inited = 1; }
+            t->pool_idx = i;
+            dst = &b2d_path_pool[i].p;
+            break;
+        }
+    }
+    if (t->pool_idx < 0) blPathInit(&t->p);
+    t->live = 1;
     uint64_t impl = ld64(core);
-    if (!impl) return;
+    if (!impl) { if (t->pool_idx >= 0) blPathClear(dst); return; }
     uint64_t cmd = ld64(impl + 0), vtx = ld64(impl + 8), n = ld64(impl + 0x10);
-    if (!n) return;
+    if (!n) { if (t->pool_idx >= 0) blPathClear(dst); return; }
     uint8_t *cd; BLPoint *vd;
-    if (blPathModifyOp(&t->p, BL_MODIFY_OP_ASSIGN_FIT, (size_t)n, &cd, &vd) != BL_SUCCESS) die("path copy failed", n);
+    if (blPathModifyOp(dst, BL_MODIFY_OP_ASSIGN_GROW, (size_t)n, &cd, &vd) != BL_SUCCESS) die("path copy failed", n);
     memcpy(cd, G(cmd), (size_t)n);
     memcpy(vd, G(vtx), (size_t)n * 16);
 }
 
 struct GeomTmp { TmpPath path; BLArrayView<BLPoint> view; const void *data; };
 static void geom_from_guest(GeomTmp *g, uint32_t type, uint64_t data) {
-    g->path.live = 0;
+    g->path.live = 0; g->path.pool_idx = -1;
     if (type >= BL_GEOMETRY_TYPE_BOXI && type <= BL_GEOMETRY_TYPE_TRIANGLE) { g->data = G(data); return; }
     if (type >= BL_GEOMETRY_TYPE_POLYLINEI && type <= BL_GEOMETRY_TYPE_ARRAY_VIEW_RECTD) {
         /* BLArrayView<T> of the guest layout: {u64 data, u64 size}; the element types hold no pointers */
         g->view.data = (const BLPoint *)G(ld64(data)); g->view.size = (size_t)ld64(data + 8);
         g->data = &g->view; return;
     }
-    if (type == BL_GEOMETRY_TYPE_PATH) { path_from_guest(&g->path, data); g->data = &g->path.p; return; }
+    if (type == BL_GEOMETRY_TYPE_PATH) {
+        path_from_guest(&g->path, data);
+        g->data = (g->path.pool_idx >= 0) ? &b2d_path_pool[g->path.pool_idx].p : &g->path.p;
+        return;
+    }
     die("geometry type not handled", type);
 }
-static void geom_done(GeomTmp *g) { if (g->path.live) blPathReset(&g->path.p); }
+static void geom_done(GeomTmp *g) {
+    if (!g->path.live) return;
+    if (g->path.pool_idx >= 0) {
+        blPathClear(&b2d_path_pool[g->path.pool_idx].p);
+        b2d_path_pool[g->path.pool_idx].busy = 0;
+    } else {
+        blPathReset(&g->path.p);
+    }
+}
 
 /* a style object: colours (RGBA, RGBA32, RGBA64: no pointer, copied as 16 bytes) and gradients (converted); anything else stops */
 struct StyleTmp { BLObjectCore core; BLGradientCore grad; int live_grad; };
@@ -362,37 +389,6 @@ static void b2d3_unimpl_note(void *proxy, unsigned slot, uint32_t geom) {
             (slot == 54 || slot == 72 || slot == 51) ? (unsigned)BL_OBJECT_TYPE_RGBA32 : (unsigned)p->gs.styleType[fs], p->gtype[fs], p->gext[fs], p->fmt);
 }
 
-/* ---- libm: the lifted DLL computes sin/cos/tan/atan2/acos/pow/fmod with its own (MSVC) C runtime, which is not always the correctly rounded result that the host's libm gives (measured:
- * sin(pi/4) and cos(1.0) differ in the last bit, runs/rotprobe-*.txt). Upstream Blend2D calls these through <math.h>; the symbols below (decision 0243: always) take precedence over the
- * host's libm and call the DLL's lifted functions (RVAs found by calling the candidates and matching the results, tests libmprobe), so that rotations, arcs, stroke joins and so on
- * are computed by the same code as in the unswapped build. cbrt is not in the DLL's runtime as far as found: left to the host. The call is a guest call: the arguments in X[0], X[1], a
- * return slot pushed on the guest stack, the result in X[0]. Everything the adapter needs from R[] and X[] is read before any such call. ---- */
-enum { M_SIN, M_COS, M_TAN, M_ATAN2, M_ACOS, M_POW, M_FMOD, M_N };
-static const uint32_t math_rva[M_N] = {0x1b4480, 0x1b24d0, 0x1b4b60, 0x1b1de4, 0x1b1b40, 0x1b2de0, 0x1b2b00};
-static void (*math_fn[M_N])(void);
-static double call_math(int id, double a, double b) {
-    if (!math_fn[id]) {
-        for (uint64_t i = 0; i < fle_dispatch_count; i++) if (fle_dispatch_table[i].va == B2D1_BASE + math_rva[id]) math_fn[id] = fle_dispatch_table[i].fn;
-        if (!math_fn[id]) die("a lifted C-runtime math function is not in the dispatch table", B2D1_BASE + math_rva[id]);
-    }
-    memcpy(&X[0].u64[0], &a, 8); X[0].u64[1] = 0; memcpy(&X[1].u64[0], &b, 8); X[1].u64[1] = 0;
-    uint64_t saved_sp = R[4];
-    R[4] = ((saved_sp - 0x40) & ~UINT64_C(15)) - 8;   /* a call from a 16-byte aligned frame: rsp = 8 mod 16 at the callee's entry (the lifted code uses aligned SSE stores on its stack) */
-    st64(R[4], 0);
-    math_fn[id]();
-    R[4] = saved_sp;
-    double r; memcpy(&r, &X[0].u64[0], 8);
-    return r;
-}
-extern "C" double sin(double x) { return call_math(M_SIN, x, 0); }
-extern "C" double cos(double x) { return call_math(M_COS, x, 0); }
-extern "C" double tan(double x) { return call_math(M_TAN, x, 0); }
-extern "C" double atan2(double y, double x) { return call_math(M_ATAN2, y, x); }
-extern "C" double acos(double x) { return call_math(M_ACOS, x, 0); }
-extern "C" double pow(double x, double y) { return call_math(M_POW, x, y); }
-extern "C" double fmod(double x, double y) { return call_math(M_FMOD, x, y); }
-extern "C" void sincos(double x, double *s, double *c) { *s = call_math(M_SIN, x, 0); *c = call_math(M_COS, x, 0); }
-
 /* ---- the swapped functions ---- */
 #define RET(x) (R[0] = (uint32_t)(x))
 #define ARGI(i) (i == 1 ? R[1] : i == 2 ? R[2] : i == 3 ? R[8] : R[9])
@@ -456,7 +452,7 @@ extern "C" void fle_swap_ctx_set_hint(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setHint(ri, (BLContextHint)(uint32_t)R[2], (uint32_t)R[8]));
-    sync_state(p);
+    memcpy(p->gs.hints, &RI(p)->state->hints, 3);
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_style(void) {
@@ -467,14 +463,16 @@ extern "C" void fle_swap_ctx_set_style(void) {
     { const uint32_t slot_ = (uint32_t)R[2] & 1u; p->gtype[slot_] = last_gtype; p->gext[slot_] = last_gext; }
     RET(ri->virt->setStyle(ri, (BLContextStyleSlot)(uint32_t)R[2], s, (BLContextStyleTransformMode)(uint32_t)R[9]));
     style_done(&st);
-    sync_state(p);
+    const BLContextState *cs = RI(p)->state;
+    p->gs.styleType[0] = cs->styleType[0]; p->gs.styleType[1] = cs->styleType[1];
+    p->gs.styleAlpha[0] = cs->styleAlpha[0]; p->gs.styleAlpha[1] = cs->styleAlpha[1];
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_global_alpha(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setGlobalAlpha(ri, X[1].f64[0]));
-    sync_state(p);
+    p->gs.globalAlpha = RI(p)->state->globalAlpha;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_comp_op(void) {
@@ -482,35 +480,36 @@ extern "C" void fle_swap_ctx_set_comp_op(void) {
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     stat_add(1, (uint32_t)R[2], 0);
     RET(ri->virt->setCompOp(ri, (BLCompOp)(uint32_t)R[2]));
-    sync_state(p);
+    p->gs.compOp = RI(p)->state->compOp;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_fill_rule(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setFillRule(ri, (BLFillRule)(uint32_t)R[2]));
-    sync_state(p);
+    p->gs.fillRule = RI(p)->state->fillRule;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_width(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeWidth(ri, X[1].f64[0]));
-    sync_state(p);
+    p->gs.width = RI(p)->state->strokeOptions.width;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_caps(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeCaps(ri, (BLStrokeCap)(uint32_t)R[2]));
-    sync_state(p);
+    const BLContextState *cs = RI(p)->state;
+    p->gs.startCap = cs->strokeOptions.startCap; p->gs.endCap = cs->strokeOptions.endCap;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_set_stroke_join(void) {
     B2dEntry b2d_entry_;
     Proxy *p = P_of(R[1]); BLContextImpl *ri = RI(p);
     RET(ri->virt->setStrokeJoin(ri, (BLStrokeJoin)(uint32_t)R[2]));
-    sync_state(p);
+    p->gs.join = RI(p)->state->strokeOptions.join;
     check_mirror(p, __func__);
 }
 extern "C" void fle_swap_ctx_clip_to_rect_d(void) {

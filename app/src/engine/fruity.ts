@@ -293,6 +293,7 @@ export class FruityEngine {
     const describe = typeof ex.fle_desk_describe === 'function' ? (ex.fle_desk_describe as () => number) : null;
     const scene = typeof ex.fle_desk_scene === 'function' ? (ex.fle_desk_scene as () => number) : null;
     const sceneMode = typeof ex.fle_desk_scene_mode === 'function' ? (ex.fle_desk_scene_mode as (on: number) => void) : null;
+    const sceneDirty = typeof ex.fle_desk_scene_dirty === 'function' ? (ex.fle_desk_scene_dirty as () => number) : null;
     const front = typeof ex.fle_webview2_front === 'function' ? (ex.fle_webview2_front as () => number) : null;
     const mem = this.memory;
     const decoder = new TextDecoder('latin1');
@@ -300,6 +301,7 @@ export class FruityEngine {
       compose: () => compose(),
       resync: () => resync(),
       ...(scene && sceneMode ? { scene: () => scene(), sceneMode: (on: number) => sceneMode(on) } : {}),
+      ...(sceneDirty ? { sceneDirty: () => sceneDirty() } : {}),
       ...(front ? { front: () => front() } : {}),
       describe: () => {
         if (!describe) return '';
