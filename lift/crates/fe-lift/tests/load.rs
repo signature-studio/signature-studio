@@ -332,6 +332,7 @@ const N_USER32: u64 = 19;
 const N_WININET: u64 = 21;
 const N_WINSPOOL: u64 = 23;
 const N_NTDLL: u64 = 25;
+const N_IMM32: u64 = 43;
 
 // ---------------------------------------------------------------------------------------------
 // 2. LoadLibraryW / LoadLibraryA / LoadLibraryExW
@@ -386,7 +387,8 @@ fn load_library_w_of_a_delay_only_dll_fails_with_126() {
     // name no code, the value is decision 0015's).
     // decision 0119: uxtheme.dll (N = 38) and wtsapi32.dll (N = 37) are virtual modules now and are no longer in this list of absent names (old: both here, 8 names; new: 6)
     // decision 0122: dwmapi.dll (N = 39) is a virtual module now and is no longer in this list (old: 6 names, dwmapi and DWMAPI.DLL first; new: 4)
-    let names = ["imm32.dll", "msimg32", "propsys.dll", "windowscodecs"];
+    // Issue #1370: imm32.dll is a virtual module now (N = 43, tests/load.rs load_library_a_uses_the_same_names), so it is no longer absent
+    let names = ["msimg32", "propsys.dll", "windowscodecs"];
     let mut body = String::new();
     for n in names {
         body += &format!("    LLW(\"{n}\");\n");
@@ -402,11 +404,11 @@ fn load_library_w_of_a_delay_only_dll_fails_with_126() {
 fn load_library_a_uses_the_same_names() {
     let got = lines(
         "lla-names",
-        "    LLA(\"kernel32\");\n    LLA(\"USER32.DLL\");\n    LLA(\"Shell32.dll\");\n    LLA(\"ntdll\");\n    LLA(\"imm32.dll\");\n    LLA(\"IMM32\");\n", // decision 0122: dwmapi.dll is a module (old: LLA("dwmapi.dll") here, "0 126"); imm32 is still absent
+        "    LLA(\"kernel32\");\n    LLA(\"USER32.DLL\");\n    LLA(\"Shell32.dll\");\n    LLA(\"ntdll\");\n    LLA(\"imm32.dll\");\n    LLA(\"IMM32\");\n", // decision 0122: dwmapi.dll is a module (old: LLA("dwmapi.dll") here, "0 126"); Issue #1370: imm32.dll is a module too (N = 43)
     );
     assert_eq!(
         got,
-        [format!("{} 5", h(N_KERNEL32)), format!("{} 5", h(N_USER32)), format!("{} 5", h(N_SHELL32)), format!("{} 5", h(N_NTDLL)), "0 126".into(), "0 126".into()]
+        [format!("{} 5", h(N_KERNEL32)), format!("{} 5", h(N_USER32)), format!("{} 5", h(N_SHELL32)), format!("{} 5", h(N_NTDLL)), format!("{} 5", h(N_IMM32)), format!("{} 5", h(N_IMM32))]
     );
 }
 
@@ -429,14 +431,14 @@ fn load_library_ex_w_flags() {
         body += &format!("    LLEX(\"user32.dll\", {f:#x}u);\n");
     }
     // decision 0119: UXTHEME is a virtual module now (N = 38, the handle h(38)); dwmapi.dll is still absent (old: both 126)
-    // decision 0122: dwmapi.dll is a virtual module too (N = 39; old: still absent, 126); imm32.dll takes its place in the absent pair
+    // decision 0122: dwmapi.dll is a virtual module too (N = 39; old: still absent, 126); Issue #1370: imm32.dll is a virtual module too (N = 43), msimg32.dll stays absent
     body += "    LLEX(\"imm32.dll\", 0u);\n    LLEX(\"msimg32.dll\", 0x800u);\n";
     let got = lines("llex-flags", &body);
     assert_eq!(got.len(), flags.len() + 2);
     for (i, (f, label)) in flags.iter().enumerate() {
         assert_eq!(got[i], format!("{} 5", h(N_USER32)), "{label} ({f:#x})");
     }
-    assert_eq!(got[flags.len()], "0 126");
+    assert_eq!(got[flags.len()], format!("{} 5", h(N_IMM32)));
     assert_eq!(got[flags.len() + 1], "0 126");
 }
 
@@ -457,7 +459,7 @@ fn reference_counts_follow_load_and_free() {
     SHOW(fle_imp_FreeLibrary, fle_module_handle(k), 0, 0);
     SHOW(fle_imp_FreeLibrary, fle_module_handle(k), 0, 0);
     printf("k %u\n", fle_load_refcount(k));
-    printf("past %u\n", fle_load_refcount(42));
+    printf("past %u\n", fle_load_refcount(43));
 "#;
     let got = lines("refcount", body);
     let k = h(N_KERNEL32);
@@ -662,7 +664,7 @@ fn avrt_and_powrprof_have_nothing_to_find_and_dwmapi_and_uxtheme_stay_absent() {
     // answers its handle and leaves the last error (5) now; old: "0 126". dwmapi stays absent.)
     let body = r#"
     uint64_t a, p, f;
-    SETLE(5); LLW("imm32.dll"); /* decision 0122: dwmapi is a virtual module (N = 39: "h(39) 5"); imm32 stays absent and takes its place here (old: LLW("dwmapi") gave "0 126") */
+    SETLE(5); LLW("msimg32.dll"); /* decision 0122: dwmapi is a virtual module (N = 39: "h(39) 5"); Issue #1370: imm32 is a module now (N = 43), msimg32 stays absent and takes its place here */
     a = callv(fle_imp_LoadLibraryW, A(u"avrt"), 0, 0);
     SETLE(5); LLW("UxTheme.dll");
     p = callv(fle_imp_LoadLibraryW, A(u"PowrProf.dll"), 0, 0);
@@ -690,7 +692,7 @@ fn avrt_and_powrprof_follow_the_free_library_rule_of_the_other_virtual_modules()
     SHOW(fle_imp_FreeLibrary, fle_module_handle(31), 0, 0);
     SHOW(fle_imp_FreeLibrary, fle_module_handle(31), 0, 0);
     printf("count %u %u\n", fle_load_refcount(30), fle_load_refcount(31));
-    printf("past %u\n", fle_load_refcount(42)); /* Issue #1355: 42 modules (webview2loader.dll after combase.dll); 41 modules (old: decision 0238: 41 modules, combase.dll after kernelbase.dll) */
+    printf("past %u\n", fle_load_refcount(43)); /* Issue #1355: 42 modules (webview2loader.dll after combase.dll); 41 modules (old: decision 0238: 41 modules, combase.dll after kernelbase.dll) */
 "#;
     let got = lines("avrt-refs", body);
     let (a, p) = (h(N_AVRT), h(N_POWRPROF));
@@ -719,7 +721,7 @@ fn avrt_and_powrprof_follow_the_free_library_rule_of_the_other_virtual_modules()
                 "LLW(\"avrt\"); callv(fle_imp_FreeLibrary, fle_module_handle(30), 0, 0); callv(fle_imp_FreeLibrary, fle_module_handle(30), 0, 0);",
                 "reference count would reach zero",
             ),
-            ("past-the-new-end", "callv(fle_imp_FreeLibrary, fle_module_handle(42), 0, 0);", "not a virtual module handle"), // Issue #1355: 42 modules (webview2loader.dll is N = 42); 41 before (decision 0238: combase.dll is N = 41)
+            ("past-the-new-end", "callv(fle_imp_FreeLibrary, fle_module_handle(43), 0, 0);", "not a virtual module handle"), // Issue #1355: 42 modules (webview2loader.dll is N = 42); 41 before (decision 0238: combase.dll is N = 41)
         ],
     );
 }
@@ -781,7 +783,7 @@ fn set_dll_directory_does_not_change_what_a_load_finds() {
     // The directory is only stored: the virtual file system holds no module file, so loads answer as before.
     let got = lines(
         "setdlldir-load",
-        "    SHOW(fle_imp_SetDllDirectoryW, u\"C:\\\\Plugins\", 0, 0);\n    LLW(\"kernel32\");\n    LLW(\"imm32\");\n", // decision 0122: imm32 (old: dwmapi, which is a virtual module now)
+        "    SHOW(fle_imp_SetDllDirectoryW, u\"C:\\\\Plugins\", 0, 0);\n    LLW(\"kernel32\");\n    LLW(\"msimg32\");\n", // Issue #1370: msimg32 (imm32 is a module now); decision 0122: imm32 (old: dwmapi, which is a virtual module now)
     );
     assert_eq!(got, ["1 5".to_string(), format!("{} 5", h(N_KERNEL32)), "0 126".into()]);
 }
@@ -943,7 +945,7 @@ fn get_proc_address_then_dispatch_reaches_the_loader_answers() {
 
 int main(void)
 {
-    static const uint16_t dw[] = { 'i','m','m','3','2', 0 }; /* decision 0122: dwmapi is a virtual module now; imm32 is still absent (old: "dwmapi") */
+    static const uint16_t dw[] = { 'm','s','i','m','g','3','2', 0 }; /* Issue #1370: imm32 is a module now, msimg32 is still absent (decision 0122: dwmapi is a virtual module now; old: "dwmapi") */
     static const char ll[] = "LoadLibraryW";
     static const char ih[] = "ImageNtHeader";
     uint64_t va;
@@ -972,7 +974,7 @@ int main(void)
     let run = Command::new(&exe).output().unwrap();
     let out = String::from_utf8_lossy(&run.stdout).to_string();
     assert!(run.status.success(), "{out}\n{}", String::from_utf8_lossy(&run.stderr));
-    // LoadLibraryW("imm32") reached through GetProcAddress and fle_dispatch: NULL and 126 (decision 0122: it was "dwmapi", which is a virtual module now). imagehlp's ImageNtHeader is
+    // LoadLibraryW("msimg32") (Issue #1370: imm32 is a module now) reached through GetProcAddress and fle_dispatch: NULL and 126 (decision 0122: it was "dwmapi", which is a virtual module now). imagehlp's ImageNtHeader is
     // reachable through the imagehlp.dll handle (module 8 = index 7).
     assert_eq!(out.lines().collect::<Vec<_>>(), ["ll 0", "le 126", "ih found"]);
 }

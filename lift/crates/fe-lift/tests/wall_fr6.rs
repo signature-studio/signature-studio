@@ -1139,9 +1139,9 @@ int main(int argc, char **argv)
             (void)d;
         }
     } else if (!strcmp(s, "absent")) {
-        static const char *const names[] = { "imm32.dll", "msimg32", "propsys.dll", "windowscodecs" };
+        static const char *const names[] = { "msimg32", "propsys.dll", "windowscodecs" };
         unsigned i;
-        for (i = 0; i < 4; i++) { prep(A(wide(names[i])), 0, 0, 0); fle_imp_LoadLibraryW(); printf("%s %llx %llu\n", names[i], U(R[0]), U(le())); }
+        for (i = 0; i < 3; i++) { prep(A(wide(names[i])), 0, 0, 0); fle_imp_LoadLibraryW(); printf("%s %llx %llu\n", names[i], U(R[0]), U(le())); }
     } else {
         printf("no scenario %s\n", s);
         return 3;
@@ -1208,7 +1208,7 @@ fn wtsapi32_and_uxtheme_load_by_every_spelling_and_each_has_only_its_own_row() {
             format!("UxTheme.DLL {hu} 5"),
             format!("gmh-wts {hw} 5"),
             format!("gmh-ux {hu} 5"),
-            format!("count 42 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
+            format!("count 43 name36 wtsapi32.dll name37 uxtheme.dll handle36 {hw} handle37 {hu}"), // decision 0238: 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended; old: 38)
             // the process loaded each at start (count 1, FreeLibrary page) plus three LoadLibraryW calls
             "refs 4 4".to_string(),
             "wts!WTSRegisterSessionNotification found 5".to_string(),
@@ -1223,11 +1223,12 @@ fn wtsapi32_and_uxtheme_load_by_every_spelling_and_each_has_only_its_own_row() {
 }
 
 #[test]
-fn the_four_names_that_remain_absent_still_fail_with_126() {
+fn the_three_names_that_remain_absent_still_fail_with_126() {
+    // Issue #1370: imm32.dll is virtual module N = 43, so it is no longer one of the absent names (old name `the_four_names_that_remain_absent_still_fail_with_126`).
     // Decision 0122: dwmapi.dll is virtual module N = 39 (old name `the_five_names_that_remain_absent_still_fail_with_126`: dwmapi, DWMAPI.DLL, imm32.dll, msimg32, propsys.dll, windowscodecs).
     let got = mod_lines(&["absent"]);
-    assert_eq!(got.len(), 4);
-    for (l, n) in got.iter().zip(["imm32.dll", "msimg32", "propsys.dll", "windowscodecs"]) {
+    assert_eq!(got.len(), 3);
+    for (l, n) in got.iter().zip(["msimg32", "propsys.dll", "windowscodecs"]) {
         assert_eq!(l, &format!("{n} 0 126"));
     }
     let t = std::fs::read_to_string(rt_dir().join("fle_load.c")).unwrap();
@@ -1235,7 +1236,7 @@ fn the_four_names_that_remain_absent_still_fail_with_126() {
     let list = &t[a..a + t[a..].find("};").unwrap()];
     let names: Vec<&str> = list.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
     // Issue #1355: old: the four names above and "webview2loader.dll" (decision 0126 wall 86, S-webview2-absent); webview2loader.dll is a virtual module now (N = 42)
-    assert_eq!(names, ["imm32.dll", "msimg32.dll", "propsys.dll", "windowscodecs.dll"]);
+    assert_eq!(names, ["msimg32.dll", "propsys.dll", "windowscodecs.dll"]);
 }
 
 // ---- a second thread stops every new API ----
