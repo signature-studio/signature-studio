@@ -5,7 +5,8 @@
 //                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR] [--report-only]     (run.sh does the same from the repository)
 //   --area <領域>: the scenarios of tools/e2e/scenarios/<領域>/ (the 13 areas: page input file menus windows audio settings plugins topbar resilience visual perf delivery).
 //     Each file there default-exports defineScenario({ id, covers, displays, expectFail, run }) (lib/scenario.mjs). The files are found by the runner (no table to edit).
-//   --scenarios <set>: an older set (scenarios/<set>/index.mjs, { name, expectFail, run } objects: smoke, browser-face); each of them runs in a page of its own, as before.
+//   --scenarios <set>: an older set (scenarios/<set>/index.mjs, { name, expectFail, run } objects: smoke, browser-face, regression); each of them runs in a page of its own, as before.
+//     regression (Issue #1408): one scenario per report of the owner. A mark (expectFail) of an older set must be one of its ALLOWED_MARKS or 'new' (checkMarks); a mark may be a list (a scenario with two known defects).
 //   --list: starts nothing. One JSON line per area: { area, scenarios, covers, features } (features: the rows of tools/e2e/features/). With --area, that area's line only.
 //   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
 //   --budget: a number with s, m or h. A scenario that would start after the budget is not run: it is written with skipped: true (the row then fails).
@@ -21,19 +22,22 @@
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
 // 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests
-// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed. The count of scenarios is that of the set (browser-face: 1).
+// (its stuckToasts is only written to the JSON); no scenario is skipped. The row's expectFail lists the marks of its scenarios: [{name, issue}] (a scenario with two marks gives two entries).
+// A scenario that carries a mark and passes (ok, and 0 pageErrors, consoleErrors, stuckToasts and failedRequests) is warned about on stderr: remove the mark. Temporary files are in the repository's .tmp-e2e-* and are removed.
+// The count of scenarios is that of the set (browser-face: 1).
 // Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
 // stop report and the report's lines (lib/stop.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DISPLAY, launchBrowser, newPage, startFrameClock, installRafCounter, startRafSampler } from './lib/browser.mjs';
+import { startProxy } from './lib/proxy.mjs';
 import { Guest } from './lib/guest.mjs';
 import { attachDetectors, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
 import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
-import { AREAS, legacyScenario } from './lib/scenario.mjs';
+import { AREAS, checkMarks, legacyScenario, marksOf } from './lib/scenario.mjs';
 import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses, runPasses } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
@@ -70,12 +74,13 @@ export async function loadArea(area) {
   return out;
 }
 
-/** an older set (scenarios/<set>/index.mjs): its objects as legacy scenarios of that set */
+/** an older set (scenarios/<set>/index.mjs): its objects as legacy scenarios of that set; its marks must be its ALLOWED_MARKS (or new) */
 export async function loadLegacySet(set) {
   const file = path.join(scenariosDir, set, 'index.mjs');
-  if (!/^[a-z][a-z0-9-]*$/.test(set) || !fs.existsSync(file)) throw new Error(`--scenarios ${set}: no set at scenarios/${set}/index.mjs (smoke, browser-face; or --area <領域>)`);
-  const all = (await import(pathToFileURL(file).href)).default;
-  return all.map((s) => legacyScenario(s, set));
+  if (!/^[a-z][a-z0-9-]*$/.test(set) || !fs.existsSync(file)) throw new Error(`--scenarios ${set}: no set at scenarios/${set}/index.mjs (smoke, browser-face, regression; or --area <領域>)`);
+  const mod = await import(pathToFileURL(file).href);
+  checkMarks(mod.default, mod.ALLOWED_MARKS ?? null);
+  return mod.default.map((s) => legacyScenario(s, set));
 }
 
 /** the engine's stop of the page (its log and state), through lib/stop.mjs */
@@ -85,9 +90,16 @@ async function engineStopOf(page, cdp, origin) {
   return stopOf(lines, (await g.state())?.exit ?? null);
 }
 
+/** a scenario with a mark that passes (ok, and every counter 0) is warned about on stderr: its mark is to be removed (a failure is not raised by it) */
+function warnIfPassed(out) {
+  const clean = out.ok === true && out.error === null && out.pageErrors === 0 && out.consoleErrors === 0 && out.stuckToasts === 0 && out.failedRequests === 0 && out.engineStops === 0;
+  if (!clean) return;
+  for (const m of marksOf(out.expectFail)) process.stderr.write(`warning: expectFail scenario passed: ${out.name} ${m}. remove the mark\n`);
+}
+
 function newResult(sc, repeat, d) {
   return {
-    id: sc.id, name: sc.name ?? sc.id, area: sc.area, covers: sc.covers ?? [], repeat, expectFail: sc.expectFail ?? null,
+    id: sc.id, name: sc.name ?? sc.id, area: sc.area, covers: sc.covers ?? [], repeat, expectFail: sc.expectFail ?? null, expect: sc.expect ?? null,
     ok: false, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0,
     engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [], display: d.name,
   };
@@ -156,6 +168,7 @@ async function runLegacy(sc, d, env) {
     if (pg) await pg.context.close().catch(() => {});
   }
   log(`${sc.name} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}, fps ${out.achievedFps}`);
+  warnIfPassed(out);
   return { result: out, frames };
 }
 
@@ -241,6 +254,7 @@ async function runShared(sc, repeat, d, env, sh, index) {
     await sh.guest.shot(path.join(dir, 'end.png')).catch(() => {});
   }
   log(`${sc.id} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}`);
+  warnIfPassed(out);
   return out;
 }
 
@@ -255,6 +269,7 @@ async function runRow(d, items, env, served, budget) {
     display: { width: DISPLAY.width, height: DISPLAY.height, dpr: d.dpr, refreshHzTarget: DISPLAY.refreshHzTarget, achievedFps: 0, cssWidth: d.cssWidth, cssHeight: d.cssHeight },
     name: d.name, delivery: env.delivery ? env.delivery.delivery : null, servedHeadersMatch: served?.servedHeadersMatch === true, accessGate: served?.accessGate ?? null,
     wireContentEncoding: served?.wireContentEncoding ?? null, servedChecks: served?.checks ?? [], scenarios: [], error: null,
+    expectFail: items.flatMap(({ sc }) => marksOf(sc.expectFail).map((issue) => ({ name: sc.name, issue }))),
   };
   if (!env.browser || !env.delivery) {
     row.error = env.setupError ?? 'the delivery or the browser did not start';
@@ -355,7 +370,8 @@ async function main() {
       log(env.setupError);
     }
     if (env.delivery) {
-      env.browser = await launchBrowser(env.clock);
+      env.proxy = await startProxy({ origin: env.delivery.origin, token: env.delivery.newToken() });
+      env.browser = await launchBrowser(env.clock, env.proxy.port);
       env.browserCdp = await env.browser.newBrowserCDPSession();
     }
     for (const name of names) {
@@ -370,6 +386,7 @@ async function main() {
     log(`run: ${String(e?.stack ?? e)}`);
   } finally {
     if (env.browser) await env.browser.close().catch(() => {});
+    if (env.proxy) await env.proxy.close().catch(() => {});
     if (env.delivery) await env.delivery.close().catch(() => {});
     fs.rmSync(workDir, { recursive: true, force: true });
     wranglerDirs.forEach((d, i) => { if (!hadWrangler[i]) fs.rmSync(d, { recursive: true, force: true }); });

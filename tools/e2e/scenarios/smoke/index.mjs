@@ -10,4 +10,7 @@ import contextMenuNone from './context-menu-none.mjs';
 import clipboardLoad from './clipboard-load-permission.mjs';
 import clipboardNoToast from './clipboard-no-toast.mjs';
 
+// the marks the smoke set carries (run.mjs refuses any other mark): #1499 (plugin-manager-opens) is open
+export const ALLOWED_MARKS = ['#1499'];
+
 export default [start, knob, fileOpen, cursorSize, pluginManager, pluginDatabase, pageChrome, contextMenuNone, clipboardLoad, clipboardNoToast];

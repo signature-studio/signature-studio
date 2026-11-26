@@ -6,11 +6,35 @@ const SCENARIO_ID = /^([a-z]+)\/([a-z0-9][a-z0-9-]*)$/;
 const FEATURE_ID = /^([a-z]+)\/[^/\s]+\/[^/\s]+$/;
 const MARK = /^#\d+$/;
 
-/** the mark of a known defect: null (none), `#<Issue の番号>`, or 'new' (a defect found by this scenario, not yet an Issue) */
+/** one mark: `#<Issue の番号>` or 'new' (a defect found by this scenario, not yet an Issue) */
+const oneMark = (m) => {
+  if (m === 'new' || (typeof m === 'string' && MARK.test(m))) return m;
+  throw new Error(`expectFail ${JSON.stringify(m)}: use null, '#<Issue の番号>', 'new' or a list of them`);
+};
+
+/** the mark of a known defect: null (none), one mark, or a list of marks (a scenario with two known defects: each one is a mark) */
 export function checkMark(expectFail) {
   if (expectFail === null || expectFail === undefined) return null;
-  if (expectFail === 'new' || (typeof expectFail === 'string' && MARK.test(expectFail))) return expectFail;
-  throw new Error(`expectFail ${JSON.stringify(expectFail)}: use null, '#<Issue の番号>' or 'new'`);
+  if (Array.isArray(expectFail)) {
+    if (expectFail.length === 0) throw new Error('expectFail: an empty list (use null)');
+    return expectFail.map(oneMark);
+  }
+  return oneMark(expectFail);
+}
+
+/** a scenario's marks as a list: none (null), one mark, or a list of marks */
+export const marksOf = (e) => (e === null || e === undefined ? [] : [e].flat());
+
+/** the marks of a set of scenarios: each mark is 'new' or an issue of the set's allowed list (a mark outside that list is refused) */
+export function checkMarks(scenarios, allowed) {
+  for (const sc of scenarios) {
+    for (const m of marksOf(sc.expectFail)) {
+      if (m === 'new') continue;
+      if (!MARK.test(String(m)) || !Array.isArray(allowed) || !allowed.includes(m)) {
+        throw new Error(`scenario ${sc.name ?? sc.id}: expectFail ${JSON.stringify(m)} is not one of the allowed marks (${(allowed ?? []).join(', ')}) or new`);
+      }
+    }
+  }
 }
 
 /** the area of a scenario ID (`<領域>/<名前>`) or a feature ID (`<領域>/<種類>/<名前>`); null when the area is not one of the 13 */
@@ -43,9 +67,12 @@ export function defineScenario(s) {
   return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail: checkMark(s.expectFail), run: s.run };
 }
 
-/** a scenario of the older set form ({ name, expectFail, beforeLoad?, run }; scenarios/<set>/index.mjs, set = smoke or browser-face): it has no covers, and each runs in a page of its own */
+/** a scenario of the older set form ({ name, expectFail, run, beforeLoad?, expect? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression): it has no covers, and each runs in a page of its own */
 export function legacyScenario(s, set = 'smoke') {
-  return { kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: ['4k-dpr1', '4k-dpr2', '4k-random'], expectFail: checkMark(s.expectFail ?? null), beforeLoad: s.beforeLoad, run: s.run };
+  return {
+    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: ['4k-dpr1', '4k-dpr2', '4k-random'], expectFail: checkMark(s.expectFail ?? null),
+    expect: s.expect ?? null, beforeLoad: s.beforeLoad, run: s.run,
+  };
 }
 
 /** the sort order of the shards and of the output: the IDs in ascending string order */

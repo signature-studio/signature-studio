@@ -1,7 +1,7 @@
 // The registry of scenarios (lib/scenario.mjs) and the run's plan (lib/plan.mjs): what a scenario must declare, the shards, the budget, the displays and the acceptance.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AREAS, areaOf, checkMark, defineScenario, legacyScenario, shardOf } from '../lib/scenario.mjs';
+import { AREAS, areaOf, checkMark, checkMarks, defineScenario, legacyScenario, marksOf, shardOf } from '../lib/scenario.mjs';
 import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses } from '../lib/plan.mjs';
 
 const ok = { kind: 'scenario', run: () => ({ ok: true }) };
@@ -35,6 +35,18 @@ test('an expectFail mark is null, #<number> or new', () => {
   assert.equal(checkMark('#1421'), '#1421');
   assert.equal(checkMark('new'), 'new');
   assert.throws(() => checkMark('#abc'));
+});
+
+test('a list of marks: each is a mark; checkMarks refuses an issue outside the allowed list, and takes new', () => {
+  assert.deepEqual(checkMark(['#1395', '#1419']), ['#1395', '#1419']);
+  assert.throws(() => checkMark([]), /empty/);
+  assert.throws(() => checkMark(['#1', 'x']), /expectFail/);
+  assert.deepEqual(marksOf(null), []);
+  assert.deepEqual(marksOf('#1'), ['#1']);
+  assert.deepEqual(marksOf(['#1', '#2']), ['#1', '#2']);
+  assert.throws(() => checkMarks([{ name: 'a', expectFail: '#1' }], ['#1502']), /allowed/);
+  checkMarks([{ name: 'b', expectFail: ['#1502', 'new'] }, { name: 'c', expectFail: null }], ['#1502']);
+  checkMarks([{ name: 'd', expectFail: 'new' }], null);
 });
 
 test('areaOf reads the area of a scenario ID or a feature ID', () => {

@@ -24,6 +24,7 @@ node tools/e2e/run.mjs --list
 |---|---|
 | `--scenarios smoke` | 旧い形の集合(`scenarios/smoke/index.mjs`)。各シナリオは、それぞれ新しいページで動く(従来どおり)。 |
 | `--scenarios browser-face` | 旧い形の集合(`scenarios/browser-face/index.mjs`、#1419)。Browser の面のタブを切り替え、console エラーを数える。各シナリオは、それぞれ新しいページで動く。 |
+| `--scenarios regression` | 依頼者の報告 1 件 1 シナリオの回帰(`scenarios/regression/index.mjs`、#1408)。旧い形で、各シナリオは新しいページで動く。 |
 | `--area <領域>` | `scenarios/<領域>/` の全て。13 領域: `page` `input` `file` `menus` `windows` `audio` `settings` `plugins` `topbar` `resilience` `visual` `perf` `delivery`。 |
 | `--list` | 起動しない。領域ごとに 1 行の JSON: `{"area","scenarios","covers","features"}`(`--area` を付けると、その 1 行)。 |
 | `--shard i/n` | シナリオの ID を昇順に並べ、`index % n === i - 1` のものを動かす(決定的)。 |
@@ -200,6 +201,13 @@ export default defineScenario({
 - `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(Issue #1482: 印は外した。右クリックで読まず、通知が出ない)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。
   - Issue #1482 の 3 件: (g) `context-menu-none`(各領域で右クリック 20 回。ブラウザのメニューが抑止されること)、(h) `clipboard-load-permission`(権限 prompt で読み込み、最初のクリック後に readText の要求が 1 回以上あること)、(i) `clipboard-no-toast`(権限 denied で Ctrl+V・Ctrl+C をし、通知の要素が出ないこと)。
 - `scenarios/browser-face/`(Issue #1419): (a) `browser-face-tabs`。Browser の面のタブを切り替えて 10 秒待ち、console エラーを数える。集合の件数は 1(`run.mjs` の行の判定は、集合の件数で数える)。
+- `lib/proxy.mjs`: 配信への転送。ブラウザの要求を経由させ、アクセスのトークンを、トークンの無い要求(オーディオのワークレットの取得を含む)に付ける。本番では配信の前の認証の端が、ページの全ての要求に付けるのと同じ。
+- `scenarios/regression/` (#1408): 依頼者の報告 1 件 1 シナリオ(R01〜R18)。各ファイルの先頭の定数に、名前・期待・印を書く。`index.mjs` の `ALLOWED_MARKS` が、印に使える番号(開いている Issue)の一覧。`common.mjs` は、窓の表(子の窓と、絶対の位置・窓の style)、既定のプロジェクトの起動、メニュー、設定の頁(タブの枠)、画素の比較、オーディオの数字を読む。
+  - 実行: `bash tools/e2e/run.sh --scenarios regression --displays 4k-dpr1,4k-dpr2`。一部だけ試すには `--only 名前,名前`(開発用)。
+  - 印の付いたシナリオが全て通ったときは、stderr に `warning: expectFail scenario passed: <name> <issue>. remove the mark` を出す(通ったのに失敗扱いの時は出さない: 消えない表示・ページの例外・停止があれば、通ったとはみなさない)。
+  - 出力の行の `expectFail` に、印の一覧(`[{"name","issue"}]`)を出す。1 つのシナリオに印が 2 つあるとき(R11)は、そのシナリオの `expectFail` を配列にし、一覧に 2 件出す。
+  - 印の番号は `index.mjs` の `ALLOWED_MARKS`(`common.mjs` の `OPEN_ISSUES`)に在るものだけ。閉じた Issue の印は付けない。
+  - 測れない操作(窓の表に出ない文字・頁のタイル)は、そのシナリオを落とし、報告に書く。推測の座標では判定しない。
 
 ## 120 Hz の方法と実測
 
