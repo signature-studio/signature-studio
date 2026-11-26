@@ -55,6 +55,8 @@ const DRIVER: &str = r#"
 #include "fle_vfs.h"
 
 uint64_t R[16];
+/* the trace switch of the page (harness side; this driver has no page): no trace */
+int fle_win_api_trace_on(void) { return 0; }
 static uint64_t stk[0x2000] __attribute__((aligned(4096)));
 #define E0 ((uint64_t)(uintptr_t)stk + 0x8000 + 8)
 #define TOP ((uint64_t)(uintptr_t)stk + sizeof stk)
@@ -283,7 +285,10 @@ int main(int argc, char **argv)
 }
 "#;
 
-const RUNTIME_FILES: [&str; 16] = [
+const RUNTIME_FILES: [&str; 19] = [
+    "fle_load.c",
+    "fle_modules.c",
+    "fle_realmod.c",
     "fle_winmm.c",
     "fle_spi.c",
     "fle_sysmetrics.c",
@@ -597,15 +602,84 @@ fn version_info_size_stops_for_a_path_that_exists_in_the_virtual_file_system() {
     stops(&["fvs", "C:\\", "buf"], "the path exists in the virtual file system", 0, "00000000");
 }
 
+/// #1415: a name with no directory part is searched in the order of LoadLibrary (fle_load.c search_volume: the application folder C:\Program Files\Image-Line\FL Studio 21, C:\Windows\System32,
+/// C:\Windows, the current folder C:\). The file is the first one that the search finds; none found is ERROR_FILE_NOT_FOUND (Learn GetFileVersionInfoSizeW: the search sequence of LoadLibrary).
+/// ILSvg_x64.dll is installed in ...\FL Studio 21\Shared, a folder that the search does not visit: the answer is not found.
+#[test]
+fn version_info_size_of_a_bare_name_that_the_search_does_not_find_is_file_not_found() {
+    assert_eq!(lines(&["fvs", "ILSvg_x64.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "ILSvg_x64.dll", "null"]), ["ret 0 handle 55555555 le 2"]);
+    let shared = [
+        "mkdir=C:\\Program Files",
+        "mkdir=C:\\Program Files\\Image-Line",
+        "mkdir=C:\\Program Files\\Image-Line\\FL Studio 21",
+        "mkdir=C:\\Program Files\\Image-Line\\FL Studio 21\\Shared",
+        "mkfile=C:\\Program Files\\Image-Line\\FL Studio 21\\Shared\\ILSvg_x64.dll",
+    ];
+    let mut a = vec!["fvs", "ILSvg_x64.dll", "buf"];
+    a.extend(shared);
+    assert_eq!(lines(&a), ["ret 0 handle 0 le 2"]);
+    // a file of the search order, under another name, is not that file (the search is by name)
+    let mut b = vec!["fvs", "ILSvg_x64.dll", "buf"];
+    b.extend(["mkdir=C:\\Windows", "mkdir=C:\\Windows\\System32", "mkfile=C:\\Windows\\System32\\ILSvg_x64.dll.bak"]);
+    assert_eq!(lines(&b), ["ret 0 handle 0 le 2"]);
+}
+
+#[test]
+fn version_info_size_of_a_bare_name_stops_at_the_first_file_of_the_search_order_and_names_that_path() {
+    let app = "\"C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll\"";
+    let sys = "\"C:\\Windows\\System32\\appmod.dll\"";
+    let folders = ["mkdir=C:\\Program Files", "mkdir=C:\\Program Files\\Image-Line", "mkdir=C:\\Program Files\\Image-Line\\FL Studio 21", "mkdir=C:\\Windows", "mkdir=C:\\Windows\\System32"];
+    // only System32 holds the file: the second place of the order
+    let mut s = vec!["fvs", "appmod.dll", "buf"];
+    s.extend(folders);
+    s.push("mkfile=C:\\Windows\\System32\\appmod.dll");
+    stops(&s, &format!("GetFileVersionInfoSizeW: the path exists in the virtual file system: {sys}"), 0, "00000000");
+    // the application folder holds it too: the first place of the order wins
+    let mut a = s.clone();
+    a.push("mkfile=C:\\Program Files\\Image-Line\\FL Studio 21\\appmod.dll");
+    stops(&a, &format!("the path exists in the virtual file system: {app}"), 0, "00000000");
+}
+
+#[test]
+fn version_info_size_of_the_engine_by_its_bare_name_is_the_engine_and_not_a_missing_file() {
+    // the application folder is the engine's folder (FLE_VIRTUAL_DLL_PATH): the engine's own file is the first file of the order
+    stops(&["fvs", "FLEngine_x64.dll", "buf"], "GetFileVersionInfoSizeW: the path is the engine's own and no resource reader is linked", 0, "00000000");
+}
+
+/// #1415: the version calls search a bare name with the search of LoadLibrary (fle_load_find_file calls search_volume, the one search), and fle_vfs.c has no search of its own.
+#[test]
+fn the_version_calls_and_loadlibrary_share_one_search_for_a_bare_name() {
+    let vfs = std::fs::read_to_string(runtime_dir().join("fle_vfs.c")).unwrap();
+    let load = std::fs::read_to_string(runtime_dir().join("fle_load.c")).unwrap();
+    assert_eq!(vfs.matches("fle_load_find_file(").count(), 2, "fle_vfs.c: one declaration and one call, in version_path, which both version calls share");
+    assert!(!vfs.contains("search_volume"), "fle_vfs.c has a search of its own");
+    assert!(load.contains("uint16_t *fle_load_find_file(const char *api, const uint16_t *u, size_t n)"));
+    assert_eq!(load.matches("search_volume(api, rel, rn, 0, 0, found)").count(), 1, "fle_load.c: load_by_name's search (own 0) is the one LoadLibrary call of a bare name");
+    assert!(load.contains("search_volume(api, rel, rn, 0, 1, found)"), "the version search is the same function with the engine's own file counted");
+}
+
 #[test]
 fn version_info_size_stops_for_the_forms_the_page_leaves_open() {
     // the handle variable is written (0) before the stop in every case where the pointer is given
     stops(&["fvs", "null", "buf"], "GetFileVersionInfoSizeW: lptstrFilename is NULL", 0, "55555555");
-    // Issue #1418: a name with no directory part is not found in the current directory: 0 and ERROR_FILE_NOT_FOUND (the search sequence is not modelled; warned once)
-    assert_eq!(lines(&["fvs", "kernel32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    // Issue #1418: an empty name is ERROR_BAD_PATHNAME (Wine, dlls/kernelbase/version.c, GetFileVersionInfoSizeExW)
     assert_eq!(lines(&["fvs", "", "buf"]), ["ret 0 handle 0 le a1"]);
     // a name with a directory part is resolved by the file system rules of decision 0018 (here: C:\ + y.dll, missing)
     assert_eq!(lines(&["fvs", "x\\..\\y.dll", "null"]), ["ret 0 handle 55555555 le 2"]);
+    // #1382: a colon in a directory component is ERROR_INVALID_NAME (123), as the other path calls answer (parse_units sets bad)
+    assert_eq!(lines(&["fvs", "C:\\a:b\\c.dll", "buf"]), ["ret 0 handle 0 le 7b"]);
+}
+
+/// #1415: the modules of the table, the roster and the API set schema are not files of the volume (decision 0018): a bare name for them is searched like any other (decision 0098), so it is not found
+/// (0, ERROR_FILE_NOT_FOUND, *lpdwHandle 0). The guest's caller of comctl32.dll takes a size of 0 as "no version information" (f_44ada0).
+#[test]
+fn version_info_size_of_a_module_name_the_volume_holds_no_file_for_is_file_not_found() {
+    assert_eq!(lines(&["fvs", "kernel32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "comctl32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "ws2_32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "api-ms-win-core-string-l1-1-0.dll", "buf"]), ["ret 0 handle 0 le 2"]);
+    assert_eq!(lines(&["fvs", "imm32.dll", "buf"]), ["ret 0 handle 0 le 2"]);
 }
 
 // ---- 7. SHGetMalloc and the IMalloc object (unit 235) ----
@@ -981,7 +1055,7 @@ int main(void)
         cmd.arg(f);
     }
     // decision 0139: fle_dsound.c mixes with powf (volume and pan in hundredths of a dB), so every program that links all the runtime files needs -lm
-    let cc = cmd.arg("-o").arg(&exe).arg(&src).arg(&main_c).arg("-lm").env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
+    let cc = cmd.arg("-o").arg(&exe).arg(&src).arg(&main_c).arg("-lm").arg("-Wl,--wrap=pthread_mutex_lock").arg("-Wl,--wrap=pthread_mutex_unlock").env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed: {}", String::from_utf8_lossy(&cc.stderr));
     let r = Command::new(&exe).env("TMPDIR", dir.join("tmp")).output().unwrap();
     let out = String::from_utf8_lossy(&r.stdout).to_string();
