@@ -4,7 +4,7 @@ import { MAIN_FORM, newWindows, openLids, windowTable } from '../../lib/common.m
 
 export default defineScenario({
   id: 'file/new-project-empty',
-  covers: ['file/template/minimal-empty-empty'],
+  covers: ['file/template/minimal-empty-empty', 'file/new/ctrl-n'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const main = t.top.some((w) => w.cls === MAIN_FORM);

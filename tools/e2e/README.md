@@ -103,6 +103,18 @@ export default defineScenario({
 - `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
 - 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
 - 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+### 見た目(visual)のゴールデン(#1496)
+
+- 画素の期待値は `golden/visual/<kind>.tsv`(`キー<TAB>ハッシュ<TAB>許容誤差`)。kind は `window`・`theme`・`language`・`dpr`・`start`。ハッシュは矩形の RGB バイト列の SHA-256(`lib/picture.mjs` の `regionHash`)。
+- 同じ場所の `<kind>.cells.tsv` は、矩形を 16 x 16 の区画に分けた、区画ごとの平均の R・G・B(16 進)。ハッシュが違うときは、区画の判定で差を見る: 平均のどれかのチャンネルが 8(255 中)を超えて動いた区画の割合が、行の許容誤差以内なら `within`、超えたら `differs`(`lib/visual.mjs` の `judgeGolden`)。許容誤差の既定は 0.02(256 区画のうち 5 区画まで)。
+- キーの無い行は、その実行の画素を初回の値として書く(`recorded`)。キーには DPR を含める(`@dpr1.25` など)。
+- 更新: 値を変える理由を報告に書いた時だけ。該当の行(`<kind>.tsv` と `<kind>.cells.tsv` の両方)を消し、同じ DPR の実行で書き直す。変わった時は、報告に区画の割合を書く。
+- 判定の式(`lib/visual.mjs`): 縁は、窓の矩形の 4 辺それぞれで、外側と内側の対比が 20 以上、縁の線の幅(外側にも内側にも似ない画素)が 2 以下、柔らかい帯(10〜90 %)が 2 以下。黒い領域は全体の 64 x 64 の区画で、全画素が 0 の数が 0。文字は上部バー(TNewMenu)の色の数が 8 以上、輝度の幅が 40 以上。カーソルは `image-set` で、宣言された倍率が DPR に一致(0.01 以内)。
+- DPR のシナリオは、CDP の Emulation で DPR を設定し(物理の大きさを保つ)、測って、最後に戻す。乱数の 2 点は、シード 1496 で引いた固定の値(キーに値が入る)。
+- 表示: visual の全件は `4k-dpr1`(DPR 1。乱数の表示は使わない。キーが毎回変わるため)。
+- 黒い領域: 数えるのは Browser 窓(`TEdgeBrowser`)の外だけ。Browser 窓の範囲の黒い区画は `browserBlack` として別に出す(判定には入れない。原因は未確認)。
+- エンジンが止まった場合: 次の visual の場面の開始で、ページを読み直して曲を開き直す(`lib/visual.mjs` の `recover`。DPR は行の基準に戻す)。
+- 印 `new` の場面(窓の縁・テキスト欄のカーソル・DPR 2.06 の設定窓)は、判定の式に合わない値、または測れない値が出た場面。値は run の出力に残る。
 ## 音声の領域(#1491)
 
 - `tools/e2e/lib/audio.mjs`: 操作と読み取りの共通部品と、判定(`CHECKS`)。各シナリオ(`scenarios/audio/`)は、判定の名前と引数を `runCheck` に渡す。

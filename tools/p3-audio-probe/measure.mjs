@@ -14,6 +14,7 @@
 // Issue #1401: notInInstallerList (every path that notInInstaller counts, not only the first 10; scan-demos.mjs reads it). The wait for the project's title ends at once when the engine is 'exited' or 'error' (the state), not after its 180 s limit.
 // Issue #1335: underrunSpans (the page's underrun spans after the AudioContext started, from its history: ms after the start and the quanta; read at the end of a run). The title wait of a project also ends on a title that changed from the one before the open (other than "Song info").
 // --make-sound --song (Issue #1335): after the Kick row, the top bar's PAT/SONG switch is pressed (songMode: its box changes), the Playlist (class TEventEditForm, caption "Playlist -"; F5 opens it when it is not listed) gets a clip of Pattern 1 drawn at the first bar of Track 1 (playlistClips: the clip box changes). songPixels: the changed pixels of the switch's box and of the clip box. Then Space and the 10 s window as in --make-sound.
+// --profile FILE in a run (Issue #1339, with or without --make-sound --song): the window is 10 s from the playback's start (the non-silent quanta rise after the Space key: playbackWaitMs is the wait); the CDP CPU profile of the engine's Worker covers the window (the boot's settings; the profile is a measurement and adds CDP calls). The profile's "profile" field is the file.
 // --make-sound (Issue #1401): the sound is made by the FL operations, not read from a project. The room is 1836 x 1056 CSS px at DPR 1 (as tools/smoke/welcome-flow.mjs sets it). The Welcome's usage-data box is closed with "No thanks" and its Default row is double-clicked (flow A of welcome-flow.mjs); the project's "Problems loading the project" box is closed with Enter and the "Remix a song" box with Escape. Then the Channel rack's (TStepSeqForm) Kick row is clicked step by step (the points are fractions of the rack's rectangle); a step is lit when the rectangle's picture changes between the clicks. Then Space starts the transport and the probe reads the audio for 10 s as in a run. makeSound: the steps' result (litSteps, the rack, the boxes, the Basic 808 lines of the engine's log). --shot FILE (a test aid): a PNG of the page after the steps is written to FILE. Not combined with a project, --load or --boot.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,7 +26,7 @@ import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.
 import { stageAssets } from '../boot-check/stage-assets.mjs';
 import { armExpression, takeExpression, pcmReport } from './waveform.mjs';
 
-const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]] [--make-sound [--song] [--shot FILE]]\n';
+const USAGE = 'usage: node tools/p3-audio-probe/measure.mjs <absolute path to the bundle directory raw/<name>> [<absolute path to a .flp project>] [--load none|ui] [--app <dir>] [--sound] [--profile FILE] [--boot [--press-at S] [--trace FILE] [--profile FILE] [--pubs FILE]] [--make-sound [--song] [--shot FILE]]\n';
 const argv = process.argv.slice(2);
 const boot = argv.includes('--boot');
 const makeSound = argv.includes('--make-sound');
@@ -34,7 +35,7 @@ const li = argv.indexOf('--load');
 const load = li < 0 ? 'none' : argv[li + 1];
 const BOOT_VALUE_OPTS = ['--press-at', '--trace', '--profile', '--pubs'];
 const valueOf = (name) => { const i = argv.indexOf(name); return i < 0 ? undefined : argv[i + 1]; };
-const bootOptUsed = BOOT_VALUE_OPTS.some((o) => argv.includes(o));
+const bootOptUsed = ['--press-at', '--trace', '--pubs'].some((o) => argv.includes(o));
 const pressRaw = valueOf('--press-at');
 const pressAt = pressRaw === undefined ? 0 : Number(pressRaw);
 const tracePath = valueOf('--trace') ?? null;
@@ -83,6 +84,8 @@ const METRONOME = { x: 750, y: 19 };
 const SOUND_RISE_QUANTA = 20;
 const SOUND_WAIT_MS = 5000;
 const PCM_WAIT_MS = 5000;
+// Issue #1339: --profile waits this long at most for the playback's start after the Space key
+const PROFILE_START_MS = 10000;
 // the start-up consent box ("Help us improve FL Studio by sending usage data") is drawn in the guest picture (not a window). Its "No thanks" button is at this guest pixel on the 780x480 screen that the default window gives (measured with a screenshot: the box is gone after the press, the status line reads "last input: button L up at screen (513, 308)")
 const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };
 // --boot (#1334): the room (the stage: the whole viewport since Issue #1481, the header and the monitor panel are hidden) is 1836x1056 CSS px at the device pixel ratio of the user's machine (1.7647 = 30/17: the guest screen is then 3240x1863 device px, floor of the room times the ratio); the poll of engine-idle; the three read times after engine-idle (+10, +70, +90 s; bootLast60sAt90s is the one the acceptance reads)
@@ -182,7 +185,7 @@ async function main() {
     await S('Page.enable');
     // --sound (#1422) uses the boot room too: the metronome button's place is measured in that room (tools/p2-frames/measure.mjs)
     if (boot || soundOn) await S('Emulation.setDeviceMetricsOverride', { width: BOOT_VIEWPORT.width, height: BOOT_VIEWPORT.height, deviceScaleFactor: BOOT_VIEWPORT.dpr, mobile: false });
-    if (boot) await S('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+    if (boot || profilePath !== null) await S('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
 
     navAt = Date.now();
     const nav = await S('Page.navigate', { url: `http://127.0.0.1:${port}/` });
@@ -241,6 +244,20 @@ async function main() {
       log('sound', { startMs: out.soundStartMs });
     }
 
+    // Issue #1339: --profile in a run: the window starts at the playback's start (the non-silent quanta rise by SOUND_RISE_QUANTA after the Space key, as --sound counts it), and the engine Worker's CPU profile covers the same 10 s
+    const engine = profilePath === null ? null : await engineWorker(cdp, workers);
+    if (profilePath !== null && engine === null) throw new Error('no engine Worker with fleAudioWorkerState (--profile needs it)');
+    if (engine !== null) {
+      const n0 = (await audioNow()).nonSilentQuanta;
+      const tp = Date.now();
+      for (;;) {
+        if ((await audioNow()).nonSilentQuanta > n0 + SOUND_RISE_QUANTA) break;
+        if (Date.now() - tp >= PROFILE_START_MS) throw new Error(`the playback did not start within ${PROFILE_START_MS} ms after the Space key (nonSilentQuanta stayed at ${n0})`);
+        await sleep(50);
+      }
+      out.playbackWaitMs = Date.now() - tp;
+      await profileStart(cdp, engine);
+    }
     const pcmIdx = await ev(armExpression());
     const d0 = await audioNow();
     const p0 = await presentsNow();
@@ -256,6 +273,7 @@ async function main() {
     }
     stop.done = true;
     if (ui) await ui;
+    if (engine !== null) { await profileStop(cdp, engine, profilePath, true); out.profile = profilePath; }
     out.measuredMs = Date.now() - m0;
     const d1 = await audioNow();
     const p1 = await presentsNow();

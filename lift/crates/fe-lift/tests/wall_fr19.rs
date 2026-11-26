@@ -251,7 +251,7 @@ fn the_new_import_rows_are_appended_at_the_end_of_the_response_table_in_a_fixed_
     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
     let rows: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
     let k = rows_0144::ROWS_0144.len();
-    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1 - 1; // Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that, decision 0372 1 row (tests/rows_0372) after that
+    let n = rows.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1 - 1 - 7; // Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1370 appends 7 more (the imm32.dll rows) after that; Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0147 appends 1 row (tests/rows_0147) after these, decision 0267 1 row (tests/rows_0267) after that, decision 0372 1 row (tests/rows_0372) after that
     for (i, (dll, name)) in rows_0144::ROWS_0144.iter().enumerate() {
         let want = format!("(\"{dll}\", \"{name}\", \"fle_imp_{name}\", \"jmp_imp:{name}\"),");
         assert_eq!(rows[n - k + i].trim(), want, "row {i} of decision 0144");

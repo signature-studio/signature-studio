@@ -70,6 +70,11 @@ function diff(before, after) {
   return out;
 }
 
+/** the judge: in every region the browser's contextmenu events are all cancelled by the page (so no browser menu shows) and there are some (a synthetic region: all N); none is in a frame. The presses are not judged (notes only) */
+export function judge(regions) {
+  return regions.every((r) => r.events > 0 && r.prevented === r.events && r.inFrame === 0 && (r.kind === 'real' || r.events === N));
+}
+
 export default {
   name: 'context-menu-none',
   expectFail: null,
@@ -89,9 +94,9 @@ export default {
     regions.push(await region(guest, page, 'toolbar', await page.evaluate(BOX('#toolbar')), '#toolbar'));
     regions.push(await region(guest, page, 'sidebar', await page.evaluate(BOX('aside')), 'aside'));
     for (const r of regions) log(`${r.region} (${r.kind}): ${r.prevented}/${r.events} cancelled, editable ${r.editable}, in a frame ${r.inFrame}`);
-    // the judge: every contextmenu the browser sends is cancelled (so no browser menu shows), the events are there (a synthetic region: all N; a real one: some presses reached the page),
-    // and a real region's right presses that did not reach the page are reported in the notes (the browser sends no contextmenu for them, so they show no menu either)
-    const ok = regions.every((r) => r.events > 0 && r.prevented === r.events && (r.kind === 'real' ? r.presses > 0 : r.events === N));
+    // the judge (judge()): every contextmenu the browser sends is cancelled (so no browser menu shows), the events are there (a synthetic region: all N), none is in a frame.
+    // The presses are reported in the notes only: a real region's presses (the window's pointerdown count) can read 0 while its contextmenu events are all cancelled.
+    const ok = judge(regions);
     notes.push(...regions.map((r) => `${r.region} (${r.kind}): ${N} right clicks, ${r.presses} presses reached the page (${r.pressesCancelled} cancelled by its pointer handling), ${r.events} contextmenu events, ${r.prevented} cancelled; editable targets ${r.editable}, in a frame ${r.inFrame}, targets ${JSON.stringify(r.tags)}, focused ${JSON.stringify(r.focus)}`));
     return { ok, engineState: first.state, notes, results: regions };
   },

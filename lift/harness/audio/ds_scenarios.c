@@ -502,6 +502,31 @@ static void sc_notify_alone(void)   /* nobody waits for the events: the schedule
     }
 }
 
+static void sc_notify_bytes(void)   /* the offsets are bytes and need not be on a frame (4 bytes here): each is signaled at the first frame that starts at or after it (Learn DSBPOSITIONNOTIFY: dwOffset in bytes) */
+{
+    rig_t r = rig_make(44100, 882, 0x8000 | 0x10000 | 0x100);
+    uint64_t nt = 0;
+    struct { uint32_t off; uint32_t pad; uint64_t h; } pos[2];
+
+    g_evs[0] = H_EVENT(0, 0); g_evs[1] = H_EVENT(0, 0);
+    pos[0].off = 1; pos[0].pad = 0; pos[0].h = g_evs[0];
+    pos[1].off = 3527; pos[1].pad = 0; pos[1].h = g_evs[1];
+    VC(r.sec, QI, A(IID_Notify), A(&nt));
+    printf("SetNotificationPositions(byte offsets 1, 3527) %llx\n", U(VC(nt, N_SETPOS, 2, A(pos))));
+    VC(r.sec, B_SETCURPOS, 0);
+    VC(r.sec, B_PLAY, 0, 0, 1);
+    g_never = H_EVENT(1, 0);
+    H_CREATE(VA(3), 0);
+    {
+        uint64_t hs[2] = { g_evs[0], g_evs[1] };
+        uint64_t w = STUB(fle_imp_WaitForMultipleObjects, 2, A(hs), 0, INF);
+
+        printf("byte notification: index %llu at %llu ticks\n", U(w), U(TICKS()));
+        w = STUB(fle_imp_WaitForMultipleObjects, 2, A(hs), 0, INF);
+        printf("byte notification: index %llu at %llu ticks\n", U(w), U(TICKS()));
+    }
+}
+
 static void sc_formats(void)   /* mono, 8-bit, float32, volume and pan, two buffers mixed */
 {
     wfx_t f16 = pcm(44100, 2, 16), m16 = pcm(44100, 1, 16), u8 = pcm(44100, 2, 8), fl = flt(44100, 2);
@@ -796,7 +821,7 @@ static void sc_stop_bad_this(void) { rig_t r = rig_make(44100, 882, 0x8000); VC(
 
 static const struct { const char *name; void (*fn)(void); int stops; } S[] = {
     { "enum", sc_enum, 0 }, { "create", sc_create, 0 }, { "errors", sc_errors, 0 }, { "play", sc_play, 0 }, { "stop_resume", sc_stop_resume, 0 }, { "notify", sc_notify, 0 },
-    { "notify_alone", sc_notify_alone, 0 }, { "rt_mixer", sc_rt_mixer, 0 }, { "late_write", sc_late_write, 0 }, { "late_write_sine", sc_late_write_sine, 0 }, { "formats", sc_formats, 0 }, { "ring_header", sc_ring_header, 0 },
+    { "notify_alone", sc_notify_alone, 0 }, { "notify_bytes", sc_notify_bytes, 0 }, { "rt_mixer", sc_rt_mixer, 0 }, { "late_write", sc_late_write, 0 }, { "late_write_sine", sc_late_write_sine, 0 }, { "formats", sc_formats, 0 }, { "ring_header", sc_ring_header, 0 },
     { "stop_setfx", sc_stop_setfx, 1 }, { "stop_duplicate", sc_stop_duplicate, 1 }, { "stop_3d", sc_stop_3d, 1 }, { "stop_after_release", sc_stop_after_release, 1 }, { "stop_resample", sc_stop_resample, 1 },
     { "stop_second_primary", sc_stop_second_primary, 1 }, { "stop_writeprimary", sc_stop_writeprimary, 1 }, { "stop_bad_this", sc_stop_bad_this, 1 },
 };

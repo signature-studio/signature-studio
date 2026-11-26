@@ -785,6 +785,15 @@ const TABLE: &[(&str, &str, &str, &str)] = &[
     // Issue #1382 (appended: decision 0015, append only): kernel32!CompareStringOrdinal (runtime/fle_locale.c), reached by GetProcAddress (no IAT slot). The Theme page's style code (f_44b7e0) asks for it;
     // without the row the answer was 0 and the guest called 0 when a theme was chosen (f_44b9b0).
     ("kernel32.dll", "CompareStringOrdinal", "fle_imp_CompareStringOrdinal", "jmp_imp:CompareStringOrdinal"),
+    // Issue #1370 (provisional; appended: decision 0015, append only): imm32.dll is virtual module N = 43 (runtime/fle_modules.c). FLEngine delay-loads these seven IME
+    // functions; runtime/fle_win.c answers them as a Windows with no IME does.
+    ("imm32.dll", "ImmGetContext", "fle_imp_ImmGetContext", "jmp_imp:ImmGetContext"),
+    ("imm32.dll", "ImmReleaseContext", "fle_imp_ImmReleaseContext", "jmp_imp:ImmReleaseContext"),
+    ("imm32.dll", "ImmAssociateContextEx", "fle_imp_ImmAssociateContextEx", "jmp_imp:ImmAssociateContextEx"),
+    ("imm32.dll", "ImmIsIME", "fle_imp_ImmIsIME", "jmp_imp:ImmIsIME"),
+    ("imm32.dll", "ImmGetConversionStatus", "fle_imp_ImmGetConversionStatus", "jmp_imp:ImmGetConversionStatus"),
+    ("imm32.dll", "ImmSetConversionStatus", "fle_imp_ImmSetConversionStatus", "jmp_imp:ImmSetConversionStatus"),
+    ("imm32.dll", "ImmSetOpenStatus", "fle_imp_ImmSetOpenStatus", "jmp_imp:ImmSetOpenStatus"),
 ];
 
 /// First pseudo-VA handed out by GetProcAddress (docs/decisions/0015-virtual-modules.md). Row `k` of

@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-filter.fruity_filter_x64.dll	Plugins\Fruity\Effects\Fruity Filter\Fruity Filter_x64.dll	本体	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c	3780608	existing	--pdata	-

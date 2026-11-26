@@ -24,7 +24,7 @@ const HOOK_EXISTING: &str = "lift/harness/hooks/fruity-delphi-effect-hook-points
 const XMOD_DIR: &str = "lift/out-app/xmod";
 const N0_ARGS: &str = "lift/harness/hyb/n0.args";
 const ALIGN: u64 = 0x1_0000;
-/// The end of the image area (Issue #1379): Balance's base 0xC1D0000 + 750 MiB, which holds the 160 second-wave images (748,158,976 B of
+/// The end of the image area (Issue #1379): Balance's base 0xC1D0000 + 750 MiB, which holds Balance, Filter (Issue #1370) and the 160 second-wave images (748,158,976 B of
 /// SizeOfImage, with 5% to spare). Must be the -sGLOBAL_BASE of link.rsp (the test the_global_base_is_the_one_of_the_link).
 const GLOBAL_BASE: u64 = 0x3AFD_0000;
 const FLENGINE_PE: &str = "binaries/win64/FLEngine_x64.dll";
@@ -66,7 +66,8 @@ pub struct Dll {
     pub size: u64,
     pub hook: Hook,
     pub args: Vec<String>,
-    /// RVAs that are left out of the direct list (the C part lifts them). A setjmp's entry is one: the C caller registers the landing.
+    /// RVAs that are left out of the direct list (the C part lifts them), added by hand to the ones found by itself: the functions that call
+    /// the guest's setjmp (`setjmp-entries` of fe-decode, Issue #1370). Such a caller registers the landing in C.
     pub omit: Vec<u64>,
 }
 
@@ -742,6 +743,7 @@ pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
     let rebased = format!("{work}/{rebased_name}");
     let _ = fs::remove_file(&rebased);
     run_cmd(&[format!("{bin}/fe-pe"), "rebase".into(), format!("{HOST_DIR}/{host}"), base_hex.into(), rebased.clone()], "fe-pe rebase")?;
+    let setjmp = setjmp_entries(bin, &rebased)?;
     let wasm = format!("{work}/{key}.wasm");
     let report = format!("{work}/{key}.tsv");
     let mut argv = vec![format!("{bin}/fe-wasmgen"), rebased, wasm];
@@ -750,7 +752,8 @@ pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
     argv.extend(["--report".to_string(), report.clone()]);
     run_cmd(&argv, "fe-wasmgen")?;
     let ok = report_ok(&fs::read_to_string(&report).map_err(|e| format!("{report}: {e}"))?)?;
-    let omit = vas_of(omit)?;
+    let mut omit = vas_of(omit)?;
+    omit.extend(setjmp);
     if let Some(va) = omit.iter().find(|v| !ok.contains(v)) {
         return Err(format!("{key}: the omit VA {va:#x} is not emitted ok (the omit column of plugin.tsv does not name a direct function)"));
     }
@@ -828,6 +831,21 @@ fn is_plugin_unit(name: &str) -> bool {
     name.strip_prefix('m').and_then(|r| r.strip_suffix(".c")).and_then(|r| r.split_once('-')).is_some_and(|(k, n)| digits(k) && digits(n))
 }
 
+/// The VAs of the functions that call the guest's setjmp (fe-decode setjmp-entries on the rebased DLL, the VAs of the report). Their landings are
+/// registered by the C code, so they are left out of the direct list with the `omit` column (Issue #1370: the automatic part of it).
+fn setjmp_entries(bin: &str, rebased: &str) -> Result<BTreeSet<u64>, String> {
+    let text = run_output(&[format!("{bin}/fe-decode"), "setjmp-entries".into(), rebased.into()], "fe-decode setjmp-entries")?;
+    text.lines().filter(|l| !l.trim().is_empty()).map(hex).collect()
+}
+
+fn run_output(argv: &[String], label: &str) -> Result<String, String> {
+    let out = Command::new(&argv[0]).args(&argv[1..]).output().map_err(|e| format!("{label}: {e}"))?;
+    if !out.status.success() {
+        return Err(format!("{label}: {}", out.status));
+    }
+    String::from_utf8(out.stdout).map_err(|e| format!("{label}: {e}"))
+}
+
 fn run_cmd(argv: &[String], label: &str) -> Result<(), String> {
     let status = Command::new(&argv[0]).args(&argv[1..]).status().map_err(|e| format!("{label}: {e}"))?;
     if status.success() {
@@ -868,6 +886,17 @@ mod tests {
         dlls.extend(parse_plugin("sytrus", include_str!("../../../plugins/sytrus/plugin.tsv")).unwrap());
         assert_eq!(plugin_db_names(&dlls).unwrap(), ["Fruity Balance", "Sytrus"]);
         assert!(plugin_db_names(&[balance(), balance()]).is_err());
+    }
+
+    #[test]
+    fn the_filter_row_is_the_installer_file_and_its_entry_is_found_by_setjmp_entries() {
+        let d = parse_plugin("fruity-filter", include_str!("../../../plugins/fruity-filter/plugin.tsv")).unwrap().remove(0);
+        assert_eq!(d.name(), "effects.fruity-filter.fruity_filter_x64.dll");
+        assert_eq!(d.installer_name(), "fruity filter_x64.dll");
+        assert_eq!(d.sha256, "f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c");
+        assert_eq!(d.size, 3780608);
+        assert_eq!(d.hook, Hook::Existing);
+        assert!(d.omit.is_empty(), "the entry 0x2cdf20 comes from fe-decode setjmp-entries (run_list), not from the omit column");
     }
 
     #[test]
@@ -1005,7 +1034,7 @@ mod tests {
         out
     }
 
-    /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 159 DLLs of the plan, with the first wave's Balance and Sytrus (lift/plugins). Their file names are
+    /// The second wave (Issue #1379, tools/plugin-layout/wave2-plugins.mjs): 159 DLLs of the plan, with the first wave's Balance, Filter and Sytrus (lift/plugins). Their file names are
     /// not unique, and their keys are. With SizeOfImage (inputs/plugin-image-sizes.tsv, by SHA-256) they fit the image area: each base is 64 KiB
     /// aligned, after the one before it by that one's size, from Balance's base (0xC1D0000, after oggio's end 0xC1CF000) to below GLOBAL_BASE.
     /// The wave's folders may be in lift/plugins already (Issue #1479): the test runs on a copy that has them, and on lift/plugins as it is.
@@ -1023,7 +1052,7 @@ mod tests {
         let state = format!("{root}/state");
         copy_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")), Path::new(&state));
         write_wave_folders(&table, &state);
-        assert_eq!(read_rows_from(&state).unwrap().len(), 161, "the copy of lift/plugins and the wave's 159 rows");
+        assert_eq!(read_rows_from(&state).unwrap().len(), 162, "the copy of lift/plugins (Balance, Filter, Sytrus) and the wave's 159 rows");
         let stale = format!("{root}/stale");
         fs::create_dir_all(format!("{stale}/old")).unwrap();
         fs::write(format!("{stale}/old/plugin.tsv"), format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.old.old_x64.dll\tPlugins\\Fruity\\Effects\\Old\\Old_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64))).unwrap();
@@ -1035,11 +1064,11 @@ mod tests {
         };
         for plugins in [state.as_str(), concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")] {
             let dlls = second_wave_dlls(plugins, &wave).unwrap();
-            assert_eq!(dlls.len(), 161);
+            assert_eq!(dlls.len(), 162);
             let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
             let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
             assert_eq!(bases[0], 0xC1D0000);
-            let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance").map(|d| align_up(image_of(d), ALIGN)).sum();
+            let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance" && d.plugin != "fruity-filter").map(|d| align_up(image_of(d), ALIGN)).sum();
             assert_eq!(wave_total, 748_158_976);
             for pair in bases.windows(2).zip(sizes.iter()) {
                 assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);

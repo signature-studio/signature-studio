@@ -12,7 +12,6 @@ oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084
 elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3
 # 2026-11-16 (R6-12): the two Fruity plugin DLLs of gen-direct.sh (decision 0313 G9-c) were not extracted by this table, so the gen stage failed in the workflow.
 # Their SHA-256 are those the extractor verified from the installer 26.1.7.5653 (evidence/R6-12.md section 5: extract_fl.py exit 0, "all SHA-256 verified").
-fruity filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
 # 2026-11-17 (R5-6a, decision 0408): Fruity Delay 2, the tenth module. The SHA-256 is the one extract_fl.py verifies from the installer 26.1.7.5653 (evidence/R5-6a.md section 2).
 fruity delay 2_x64.dll	lift/out-plugins/fruity_delay2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc
 # 2026-11-22 (#1321): the other Fruity Effects and Generators DLLs of the installer (inputs/fl-installer-files.tsv, kind dll), minus the OpenGL VFX list of inputs/vfx-deferred.tsv (171 DLLs; the three rows above are three of them). Each destination is the install-relative path under plugins/ (the same tree as lift/out-app/host-extra/plugins/ of the plugin-builtin extraction). Each SHA-256 is the one of the inventory, which equals the file of that tree.

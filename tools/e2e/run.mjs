@@ -189,6 +189,16 @@ async function closeShared(sh) {
 /** one scenario in the shard's page: File > New first (an empty project), then the scenario; the counts are the scenario's own (the differences) */
 async function runShared(sc, repeat, d, env, sh, index) {
   const out = newResult(sc, repeat, d);
+  // the file area (#1488): an engine that an earlier scenario of the page stopped would stop every later one; the page is loaded again first (the file area only)
+  if (sc.area === 'file') {
+    const st = await sh.guest.state().catch(() => null);
+    if (st && (st.state === 'error' || st.state === 'exited')) {
+      log(`${sc.id}: the engine is ${st.state} (an earlier scenario's stop): the page is loaded again`);
+      await sh.pg.page.goto(`${env.delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
+      await installToastWatch(sh.pg.page);
+      await startProject(sh.guest);
+    }
+  }
   const before = { pageErrors: sh.det.pageErrors, consoleErrors: sh.det.consoleErrors, failedRequests: sh.det.failedRequests, stops: sh.watch.w.stops, dumps: sh.guest.dumpRetries };
   let logStart = 0;
   try {

@@ -1451,11 +1451,12 @@ fn dwmapi_is_virtual_module_39_with_the_handle_of_the_formula_and_dwm_flush_is_i
     let list = &t[a..a + t[a..].find("};").unwrap()];
     let stripped = strip_comments(list);
     let names: Vec<&str> = stripped.split('"').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s).collect();
-    assert_eq!(names.len(), 41);   // decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
+    assert_eq!(names.len(), 43);   // Issue #1370: imm32.dll (N = 43, index 42) is appended after webview2loader.dll (N = 42). decision 0238: kernelbase.dll (N = 40) and combase.dll (N = 41) are appended after dwmapi.dll (old: 39)
     assert_eq!(names[38], "dwmapi.dll");
     assert_eq!(names[37], "uxtheme.dll");
     assert_eq!(names[39], "kernelbase.dll");
     assert_eq!(names[40], "combase.dll");
+    assert_eq!(names[42], "imm32.dll");
 }
 
 #[test]

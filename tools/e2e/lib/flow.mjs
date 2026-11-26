@@ -69,6 +69,35 @@ export async function dismissProblems(guest) {
   return true;
 }
 
+export const MISSING_PLUGINS = 'TMissingPluginsForm';
+
+/**
+ * the "Problems loading the project" box (TMissingPluginsForm) that a project with missing plugins brings: Enter answers it (its default button), and Escape when it stays.
+ * It is looked for until it has not been seen for `settleMs` (a box can come after the project's load); `limitMs` bounds the whole. Returns the number of answers.
+ */
+export async function clearProblems(guest, { settleMs = 0, limitMs = 20000 } = {}) {
+  const isBox = async () => (await guest.windows().catch(() => [])).some((x) => x.cls === MISSING_PLUGINS);
+  const t0 = Date.now();
+  let quietSince = Date.now();
+  let n = 0;
+  while (Date.now() - t0 < limitMs) {
+    if (await isBox()) {
+      n++;
+      await guest.key('Enter', 'Enter', 13);
+      await sleep(1000);
+      if (await isBox()) {
+        await guest.escape();
+        await sleep(800);
+      }
+      quietSince = Date.now();
+    } else {
+      if (Date.now() - quietSince >= settleMs) break;
+      await sleep(500);
+    }
+  }
+  return n;
+}
+
 /** Ctrl+O opens the engine's Open box: the page's file box (#filedlg-input) or the file manager in selection mode (#fx-input-files) */
 export async function openProjectFile(guest, cdp, projectPath, log) {
   if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
