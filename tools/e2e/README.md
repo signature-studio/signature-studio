@@ -78,7 +78,7 @@ export default defineScenario({
 | file | `new-project-empty`・`menu-first-item-chosen`・`open-box-shows` |
 | menus | `file-popup-opens`・`edit-popup-opens`・`down-moves-highlight` |
 | windows | `f8-opens-plugin-list`・`main-form-present`・`right-click-mixer-menu` |
-| audio | `output-starts-on-click`(通る)・`quanta-while-open`・`no-underrun-while-idle`(印 `new`、後述) |
+| audio | `output-starts-on-click`・`quanta-while-open`・`no-underrun-while-idle`(#1491 で通るようにした。下の「音声の領域」) |
 | settings | `f10-opens-midi-settings`・`pages-listed`・`sections-under-midi` |
 | plugins | `balance-lazy-entry`・`sytrus-lazy-entry`・`manifest-lists-plugins` |
 | topbar | `menu-bar-visible`・`toolbar-panels-present`・`control-bar-present` |
@@ -103,12 +103,22 @@ export default defineScenario({
 - `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
 - 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
 - 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+## 音声の領域(#1491)
 
+- `tools/e2e/lib/audio.mjs`: 操作と読み取りの共通部品と、判定(`CHECKS`)。各シナリオ(`scenarios/audio/`)は、判定の名前と引数を `runCheck` に渡す。
+- 読み方: 装置(`deviceState` と量子)は、エンジンの起動から再生中であり、無音でも量子を取る。**トランスポートが動いているかは、上部バーの時刻表示の画素(`TIME_REGION`)が動くこと、または非無音の量子が増えること**で見る(`isPlaying`)。量子の数だけでは再生を判定できない。
+- 途切れ(underrun)は、再生の窓の前に 1.5 秒の warm-up を置き、その後の窓で数える(`underrunQuanta` の差)。
+- 位置(`PLACE`)は、3840 x 2160 のゲストの画素(4k-dpr1)。期待値ではなく、押す場所。
+- 機能の表 `features/audio.tsv`(43 件)のうち、印の無いシナリオが覆うものは 38 件(88%)。覆えていないのは 5 件: 拍子(`audio/transport/time-signature`。拍子の部品を画面で見つけていない。トップバーのテンポ・メトロノーム・カウントインの右クリックのメニューに無い)、ルーティング(`audio/route/insert-output`。インサートの ▲ は、キックの音を変えない。キックはマスターへ直接届く)、録音(`record-toggle`・`record-play`・`count-in-clicks`。下の「録音」)。90% の 39 件には 1 件足りない。
+- 追加の 4 本(#1491): `export-wav-nonsilent`・`export-wav-length`(File > Export > Wave file の Start → 保存されたファイル `window.__app.saved` を `parseWav` で読む。長さは 1 小節 = 4 拍・130 BPM = 1.846 s、±0.03 s。130 BPM は新規の曲の既定のテンポ)、`pan-master-wheel`(マスターのつまみ `PLACE.masterKnob` を 4 目盛り回すと、左右の釣り合い `balanceOf` が 0.1 超動き、戻すと 0.05 未満に戻る)、`solo-insert-1-silences`(インサート 1 の LED を Ctrl+クリック(`modClick`)するとキックの音が消え、もう一度で戻る)。
+- キックの拍(`kickSteps`): 既定の曲のチャンネルラックのキックの 1・5・9・13 拍を押すと、再生で音が出る(`nonSilentQuanta` が 400 を超える)。メトロノームは切る(`setMetronome`。ボタンの画素の明るさで判定。前の場面が点けたままのことがあるため)。
+- 録音(製品の欠陥。印 `new`): 録音ボタンは一度押すと待機になる。二度目の押しで戻らないことがある。待機の間は Space で再生が始まらない(音も出ない)。このため、録音の場面は同じシャードの最後に走るよう、ID を `zz-` で始める(`zz-record-arm-then-play`・`zz-record-button-toggle`・`zz-record-button-toggle-wide`・`zz-count-in-clicks-before-record`。ID の並びは `run.mjs` のシャードの順)。
+- 印 `new` の 4 本: 上の録音の 4 本(`zz-record-arm-then-play`: 待機で Space が再生を始めない。`zz-count-in-clicks-before-record`: 待機で音が出ない。`zz-record-button-toggle`: 一度目は変わり二度目で戻るが、通らないことがある。`zz-record-button-toggle-wide`: 一度目で画素が変わらない)。
+- 印を外した 3 本(#1491): `cycles-3`・`repeat-12288`・`master-fader-down-200`。録音の場面の後に走ったために音が無かったもので、録音の場面を最後に回したら通った(実行の行は報告に書く)。
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
 - 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。通ったら標準エラーに警告を出す(`judge.jq`)。
-- `new` の印を付けた見本: `audio/quanta-while-open`・`audio/no-underrun-while-idle`。音声のワークレットは読み込まれる(`nodeReady` が真。`audio/output-starts-on-click` は通る)が、音声の標本(クォンタ)が測った間に増えない(`quanta +0`)。試験の環境の音声出力か製品かは未確認。印は、原因を見て Issue を起こし、外す。
 - ワークレットの読み込みは、以前は HTTP 403 だった(Worker の Access の検査が、ワークレットの要求にトークンのヘッダーを付けられていなかった)。試験の中継(`lib/delivery.mjs` の `startAccessProxy`)が、トークンの無い要求にだけ付けて直した。
 
 ## 機能の一覧(`inventory.mjs`)と網羅率(`coverage.mjs`)

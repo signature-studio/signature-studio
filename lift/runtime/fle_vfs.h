@@ -66,7 +66,7 @@ void fle_imp_GetModuleFileNameA(void);
 void fle_imp_GetWindowsDirectoryW(void);
 void fle_imp_GetSystemDirectoryW(void);
 
-/* version!GetFileVersionInfoSizeW (decision 0098, PROVISIONAL): DWORD f(LPCWSTR lptstrFilename rcx, LPDWORD lpdwHandle rdx). A path that is not in the
+/* version!GetFileVersionInfoSizeW (decision 0098, PROVISIONAL; #1415 searches a name with no directory part as LoadLibrary does): DWORD f(LPCWSTR lptstrFilename rcx, LPDWORD lpdwHandle rdx). A path that is not in the
  * virtual file system returns 0 with the file-system error (2 or 3) and *lpdwHandle = 0; a path that is stops by name. */
 void fle_imp_GetFileVersionInfoSizeW(void);
 

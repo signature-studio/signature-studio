@@ -198,3 +198,9 @@
 217	#1503	ツマミの右クリックのメニューを開くと、許可済みのクリップボードを読んでしまう: メニューを開く時は読まず、貼り付けを選んだ時だけ読む	Task
 218	#1504	DEDZII を開いた後、ファイル管理の状態表示(fx-status)が 10 秒を超えて残る: 残る条件を特定して直す	Task
 219	#1505	Settings の Theme の頁に、テーマのタイルが出ず、13 件のテーマを切り替えられない: 頁の一覧が見つからない原因を特定して直す	Task
+220	#1506	E2E の基盤を直す: `--displays` の宣言・印つきの失敗の停止の判定・予算の分け方・所要時間と失敗の記録	Task
+221	#1507	E2E の windows と settings を、表示の倍率(DPR)に依らない位置で書く	Task
+222	#1508	E2E の plugins を、挿入の手順と観測を直して書く	Task
+223	#1509	E2E の topbar・page・resilience・perf を直す	Task
+224	#1510	F8 で Plugin list を開くと Channel rack が見えないままになり、F12 で Plugin list が残る	Task
+225	#1511	FL が読み込もうとして見つからない共有の DLL を、全て棚卸しし、足す束の Issue の下書きを作る(Shared・ffmpeg・Python・System の DLL)	Task
