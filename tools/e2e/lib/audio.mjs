@@ -3,7 +3,7 @@
 // The places (PLACE) are guest pixels where the controls are drawn at the 3840 x 2160 guest (4k-dpr1 and 4k-random: the guest is the same at any DPR). They are where to click,
 // not what is expected: a check reads the number that changes (a counter, the output, a picture region's hash) before and after the action.
 import { sleep } from './flow.mjs';
-import { pixelHashRegion } from './common.mjs';
+import { pixelHashRegion, openMenu, waitWindow, windowTable, picture } from './common.mjs';
 import { armExpression, takeExpression, pcmReport } from '../../p3-audio-probe/waveform.mjs';
 
 export const PLACE = {
@@ -16,7 +16,15 @@ export const PLACE = {
   kickLed: { x: 390, y: 144 },
   masterLed: { x: 461, y: 1790 },
   masterFader: { x: 461, y: 1883 },
+  masterKnob: { x: 461, y: 1820 },
+  insertLed: { x: 515, y: 1791 },
+  exportItem: { x: 60, y: 270 },
+  waveItem: { x: 262, y: 286 },
 };
+/** the kick's step cells of the Channel rack (the first channel of the default project): step k (1-based) in the row of the kick */
+export const kickStep = (k) => ({ x: 596 + 16 * (k - 1), y: 144 });
+/** the beats of one bar (steps 1, 5, 9, 13) of the kick: the sound the transport makes when the project has no other sound */
+export const KICK_BEATS = [1, 5, 9, 13];
 /** a square region around a place (guest px), for the picture's hash */
 export const boxAt = (p, r = 14) => ({ x: p.x - r, y: p.y - r, w: 2 * r, h: 2 * r });
 /** the time display (bars:beats:ticks) of the top bar: its picture changes only while the song position moves, so it tells whether the transport runs */
@@ -184,6 +192,110 @@ export async function pcmOf(guest, ms) {
 export async function clicksIn(guest, sec) {
   const c = await captureLevel(guest, sec);
   return c === null ? null : c.onsets;
+}
+
+/** a click with modifier keys (CDP: Alt 1, Ctrl 2, Shift 8): the Mixer's solo is Ctrl+click on the insert's LED */
+export const CTRL = 2;
+export async function modClick(guest, p, modifiers = 0) {
+  await guest.move(p);
+  await guest.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', buttons: 1, clickCount: 1, modifiers });
+  await sleep(60);
+  await guest.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', buttons: 0, clickCount: 1, modifiers });
+  await sleep(200);
+}
+
+/** the metronome's state from its button's picture: the lit button is warm (red above 200), the unlit one grey (the Tick sound is on when lit) */
+export async function metronomeOn(guest) {
+  await rest(guest);
+  const pic = await picture(guest);
+  return pic.bytes[METRONOME_PIXEL.y * pic.stride + 4 * METRONOME_PIXEL.x] > 200;
+}
+/** the metronome set on or off (clicked when it is not in that state; the earlier scenarios may leave it on) */
+export async function setMetronome(guest, on) {
+  if ((await metronomeOn(guest)) !== on) { await clickAt(guest, PLACE.metronome); await sleep(500); }
+  return metronomeOn(guest);
+}
+const METRONOME_PIXEL = { x: 741, y: 12 };
+
+/** the kick's beats are on (the sound of the default project): the metronome is off (its clicks would be heard with the kick), the steps are clicked; when the kick makes no sound after that, the steps were on already and the clicks turned them off, so they are clicked again */
+export async function kickSteps(guest) {
+  const metronome = await setMetronome(guest, false);
+  const clicks = async () => { for (const k of KICK_BEATS) { await guest.click(kickStep(k).x, kickStep(k).y); await sleep(150); } };
+  await clicks();
+  await rest(guest);
+  await playStart(guest, WARM_MS);
+  let w = await windowOf(guest, 1500);
+  await playStop(guest);
+  if (w.nonSilent <= SOUND_MIN) {
+    await clicks();
+    await rest(guest);
+    await playStart(guest, WARM_MS);
+    w = await windowOf(guest, 1500);
+    await playStop(guest);
+  }
+  return { sound: w.nonSilent > SOUND_MIN, nonSilent: w.nonSilent, metronomeOn: metronome };
+}
+
+/** the output's left and right levels over `sec` seconds (the rms of each channel; the capture of the output as armCapture gives it) */
+const takeStereoExpression = (index) => `(() => { const a = window.__app.audio; if (!a || a.captures.length <= ${index}) return null; const c = a.captures.splice(${index}, 1)[0]; const f = c.frames; const n = f.length / 2; let sl = 0, sr = 0, nan = 0; for (let i = 0; i < n; i++) { const l = f[2 * i], r = f[2 * i + 1]; if (!Number.isFinite(l) || !Number.isFinite(r)) { nan++; continue; } sl += l * l; sr += r * r; } return { valid: c.valid, frames: n, nan, rmsL: Math.sqrt(sl / n), rmsR: Math.sqrt(sr / n) }; })()`;
+export async function captureStereo(guest, sec = 2) {
+  const frames = Math.floor(44100 * sec);
+  const index = await guest.ev(`(() => { const a = window.__app.audio; const i = a.captures.length; a.armCapture(${frames}, true); return i; })()`);
+  const t0 = Date.now();
+  while (Date.now() - t0 < sec * 1000 + 12000) {
+    const r = await guest.ev(takeStereoExpression(index)).catch(() => null);
+    if (r !== null) return r;
+    await sleep(250);
+  }
+  return null;
+}
+/** the left-right balance of a capture: -1 (all left) to 1 (all right); 0 when the channels are equal */
+export const balanceOf = (c) => (c && c.rmsL + c.rmsR > 0 ? (c.rmsL - c.rmsR) / (c.rmsL + c.rmsR) : null);
+
+/** a WAV file's header and samples (16 or 32 bits, PCM or float): the rate, the channels, the frames, the duration, the peak and the share of non-zero samples */
+export function parseWav(b) {
+  if (b.length < 44 || b.toString('latin1', 0, 4) !== 'RIFF' || b.toString('latin1', 8, 12) !== 'WAVE') return { valid: false, reason: 'not a RIFF WAVE' };
+  let p = 12, fmt = null, data = null;
+  while (p + 8 <= b.length) {
+    const id = b.toString('latin1', p, p + 4), size = b.readUInt32LE(p + 4);
+    if (id === 'fmt ') fmt = { format: b.readUInt16LE(p + 8), channels: b.readUInt16LE(p + 10), rate: b.readUInt32LE(p + 12), bits: b.readUInt16LE(p + 22) };
+    if (id === 'data') { data = { off: p + 8, size: Math.min(size, b.length - (p + 8)) }; break; }
+    p += 8 + size + (size & 1);
+  }
+  if (fmt === null || data === null) return { valid: false, reason: 'no fmt or data chunk' };
+  const bps = fmt.bits / 8;
+  const frames = Math.floor(data.size / (fmt.channels * bps));
+  let peak = 0, nonZero = 0, samples = 0;
+  for (let i = 0; i + bps <= data.size; i += bps) {
+    const v = fmt.bits === 16 ? b.readInt16LE(data.off + i) / 32768 : fmt.format === 3 ? b.readFloatLE(data.off + i) : NaN;
+    if (!Number.isFinite(v)) return { valid: false, reason: 'unsupported sample format', ...fmt };
+    const a = Math.abs(v);
+    if (a > peak) peak = a;
+    if (a > 0) nonZero++;
+    samples++;
+  }
+  return { valid: true, ...fmt, frames, duration: frames / fmt.rate, peak, nonZeroFraction: samples ? nonZero / samples : 0, bytes: b.length };
+}
+
+/** File > Export > Wave file, then Start in the render form: the file the engine wrote (the page's saved files) as a WAV (parseWav). Its name and the form's left-open state are reported */
+export async function exportWav(guest, { limit = 90000 } = {}) {
+  await openMenu(guest, 'File');
+  await guest.click(PLACE.exportItem.x, PLACE.exportItem.y);
+  await sleep(900);
+  await guest.click(PLACE.waveItem.x, PLACE.waveItem.y);
+  const form = await waitWindow(guest, 'TWAVRenderForm', 6000);
+  if (form === null) return { valid: false, reason: 'the render form did not open' };
+  // a file of the same name replaces its entry (SavedFilesView), so the count does not move: the time of the last entry tells the new file
+  const lastKey = `window.__app.saved.map((f) => f.at).join(',')`;
+  const k0 = await guest.ev(lastKey);
+  await guest.click(form.x + form.w - 38, form.y + form.h - 24);
+  const got = await waitUntil(async () => (await guest.ev(lastKey)) !== k0, limit, 500);
+  if (!got) return { valid: false, reason: `no file was saved within ${limit} ms` };
+  const b64 = await guest.ev(`(() => { const f = window.__app.saved[window.__app.saved.length - 1]; const u = new Uint8Array(f.data); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); })()`);
+  const name = await guest.ev('window.__app.saved[window.__app.saved.length - 1].name');
+  await sleep(500);
+  const leftOpen = (await windowTable(guest)).top.some((w) => w.cls === 'TWAVRenderForm');
+  return { name, leftOpen, ...parseWav(Buffer.from(b64, 'base64')) };
 }
 
 /** the number of the window the sound check uses: the transport started, `warm` ms passed */
@@ -556,6 +668,57 @@ export const CHECKS = {
   async 'channel-led'(guest, { r = 10 } = {}) {
     const c = await clickChangesPicture(guest, PLACE.kickLed, r);
     return { ok: c.changed, results: { changed: c.changed, restored: c.restored }, notes: [`channel LED picture changed ${c.changed}, restored ${c.restored}`] };
+  },
+
+  // the export: the kick's beats are played and rendered (Pattern mode, one bar at the New project's tempo). The length is one bar: 4 beats at 130 BPM (the Default
+  // template's tempo, shown in the top bar); the render's tail is kept ("Leave remainder"), so the file may be a few ms longer than the bar
+  async 'export-wav'(guest, { mode = 'nonsilent', tempo = 130, tolerance = 0.03 } = {}) {
+    const k = await kickSteps(guest);
+    const w = await exportWav(guest);
+    const expectSec = (4 * 60) / tempo;
+    const formatOk = w.valid === true && w.channels === 2 && w.bits === 16 && w.format === 1;
+    const nonSilent = formatOk && w.peak > 0.05 && w.nonZeroFraction > 0.2;
+    const lengthOk = formatOk && Math.abs(w.duration - expectSec) <= tolerance;
+    const ok = k.sound && (mode === 'length' ? lengthOk : nonSilent);
+    const results = { mode, kickSound: k.sound, kickNonSilent: k.nonSilent, metronomeOn: k.metronomeOn, valid: w.valid, reason: w.reason ?? null, rate: w.rate ?? null, channels: w.channels ?? null, bits: w.bits ?? null, format: w.format ?? null, frames: w.frames ?? null, durationSec: w.duration ?? null, expectedSec: expectSec, peak: w.peak ?? null, nonZeroFraction: w.nonZeroFraction ?? null, leftOpen: w.leftOpen ?? null, fileName: w.name ?? null };
+    return { ok, results, notes: [`export ${w.name ?? 'none'}: ${w.valid ? `${w.channels} ch, ${w.bits} bit, ${w.rate} Hz, ${w.duration?.toFixed(4)} s (expected ${expectSec.toFixed(4)} s), peak ${w.peak?.toFixed(3)}, non-zero ${w.nonZeroFraction?.toFixed(3)}` : `not valid: ${w.reason}`}`] };
+  },
+
+  // the master knob (the big knob of the Mixer's Master track) moves the balance: a capture of each state (before, turned, back). Turned by 4 notches, the balance moves by > 0.1; back, it is within 0.05 of the start
+  async 'pan-master'(guest, { notches = 4 } = {}) {
+    const k = await kickSteps(guest);
+    await playStart(guest, WARM_MS);
+    const c0 = await captureStereo(guest, 2);
+    await guest.wheel(PLACE.masterKnob.x, PLACE.masterKnob.y, notches, 120);
+    await rest(guest);
+    await sleep(400);
+    const c1 = await captureStereo(guest, 2);
+    await guest.wheel(PLACE.masterKnob.x, PLACE.masterKnob.y, notches, -120);
+    await rest(guest);
+    await sleep(400);
+    const c2 = await captureStereo(guest, 2);
+    await playStop(guest);
+    const b0 = balanceOf(c0), b1 = balanceOf(c1), b2 = balanceOf(c2);
+    const ok = k.sound && [b0, b1, b2].every((b) => Number.isFinite(b)) && Math.abs(b1 - b0) > 0.1 && Math.abs(b2 - b0) < 0.05;
+    return { ok, results: { notches, kickNonSilent: k.nonSilent, metronomeOn: k.metronomeOn, balanceStart: b0, balanceTurned: b1, balanceBack: b2, rmsStart: c0 && [c0.rmsL, c0.rmsR], rmsTurned: c1 && [c1.rmsL, c1.rmsR] }, notes: [`master knob ${notches} notches: balance ${b0?.toFixed(3)} -> ${b1?.toFixed(3)} -> back ${b2?.toFixed(3)}`] };
+  },
+
+  // the solo of the Mixer's insert 1 (Ctrl+click on its LED): the kick sounds (the Master carries it), the solo silences the output, the second Ctrl+click brings it back
+  async 'solo-insert'(guest) {
+    const k = await kickSteps(guest);
+    await playStart(guest, WARM_MS);
+    const before = await windowOf(guest, 2000);
+    await modClick(guest, PLACE.insertLed, CTRL);
+    await rest(guest);
+    await sleep(500);
+    const soloed = await windowOf(guest, 2000);
+    await modClick(guest, PLACE.insertLed, CTRL);
+    await rest(guest);
+    await sleep(500);
+    const back = await windowOf(guest, 2000);
+    await playStop(guest);
+    const ok = k.sound && before.nonSilent > SOUND_MIN && soloed.nonSilent <= SILENT_MAX && back.nonSilent > SOUND_MIN;
+    return { ok, results: { metronomeOn: k.metronomeOn, beforeNonSilent: before.nonSilent, soloedNonSilent: soloed.nonSilent, backNonSilent: back.nonSilent }, notes: [`solo on insert 1: non-silent +${before.nonSilent} before, +${soloed.nonSilent} soloed, +${back.nonSilent} after the second click`] };
   },
 };
 

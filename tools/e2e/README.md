@@ -107,14 +107,16 @@ export default defineScenario({
 - 読み方: 装置(`deviceState` と量子)は、エンジンの起動から再生中であり、無音でも量子を取る。**トランスポートが動いているかは、上部バーの時刻表示の画素(`TIME_REGION`)が動くこと、または非無音の量子が増えること**で見る(`isPlaying`)。量子の数だけでは再生を判定できない。
 - 途切れ(underrun)は、再生の窓の前に 1.5 秒の warm-up を置き、その後の窓で数える(`underrunQuanta` の差)。
 - 位置(`PLACE`)は、3840 x 2160 のゲストの画素(4k-dpr1)。期待値ではなく、押す場所。
-- 機能の表 `features/audio.tsv`(43 件)のうち、覆えたものは 34 件(79%)。覆えていないのは 9 件: 拍子・ソロ・ルーティング・パン・Export の wav の 2 件(操作を確かめていない)と、録音の待機(印 `new`)に依る 3 件(録音のボタン・録音の再生・カウントインの音)。
-- 印 `new` の 7 本: `record-arm-then-play`・`count-in-clicks-before-record`・`record-button-toggle`・`record-button-toggle-wide`(録音の待機で Space が再生を始めない・ボタンの画素が変わらない)、`cycles-3`・`repeat-12288`・`master-fader-down-200`(前の録音の場面の後に音が無い・フェーダーが既に下がっていた。原因は未確認)。
-
+- 機能の表 `features/audio.tsv`(43 件)のうち、印の無いシナリオが覆うものは 38 件(88%)。覆えていないのは 5 件: 拍子(`audio/transport/time-signature`。拍子の部品を画面で見つけていない。トップバーのテンポ・メトロノーム・カウントインの右クリックのメニューに無い)、ルーティング(`audio/route/insert-output`。インサートの ▲ は、キックの音を変えない。キックはマスターへ直接届く)、録音(`record-toggle`・`record-play`・`count-in-clicks`。下の「録音」)。90% の 39 件には 1 件足りない。
+- 追加の 4 本(#1491): `export-wav-nonsilent`・`export-wav-length`(File > Export > Wave file の Start → 保存されたファイル `window.__app.saved` を `parseWav` で読む。長さは 1 小節 = 4 拍・130 BPM = 1.846 s、±0.03 s。130 BPM は新規の曲の既定のテンポ)、`pan-master-wheel`(マスターのつまみ `PLACE.masterKnob` を 4 目盛り回すと、左右の釣り合い `balanceOf` が 0.1 超動き、戻すと 0.05 未満に戻る)、`solo-insert-1-silences`(インサート 1 の LED を Ctrl+クリック(`modClick`)するとキックの音が消え、もう一度で戻る)。
+- キックの拍(`kickSteps`): 既定の曲のチャンネルラックのキックの 1・5・9・13 拍を押すと、再生で音が出る(`nonSilentQuanta` が 400 を超える)。メトロノームは切る(`setMetronome`。ボタンの画素の明るさで判定。前の場面が点けたままのことがあるため)。
+- 録音(製品の欠陥。印 `new`): 録音ボタンは一度押すと待機になる。二度目の押しで戻らないことがある。待機の間は Space で再生が始まらない(音も出ない)。このため、録音の場面は同じシャードの最後に走るよう、ID を `zz-` で始める(`zz-record-arm-then-play`・`zz-record-button-toggle`・`zz-record-button-toggle-wide`・`zz-count-in-clicks-before-record`。ID の並びは `run.mjs` のシャードの順)。
+- 印 `new` の 4 本: 上の録音の 4 本(`zz-record-arm-then-play`: 待機で Space が再生を始めない。`zz-count-in-clicks-before-record`: 待機で音が出ない。`zz-record-button-toggle`: 一度目は変わり二度目で戻るが、通らないことがある。`zz-record-button-toggle-wide`: 一度目で画素が変わらない)。
+- 印を外した 3 本(#1491): `cycles-3`・`repeat-12288`・`master-fader-down-200`。録音の場面の後に走ったために音が無かったもので、録音の場面を最後に回したら通った(実行の行は報告に書く)。
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
 - 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。通ったら標準エラーに警告を出す(`judge.jq`)。
-- 音声の領域(#1491)の印 `new` の 7 本は、`audio/record-arm-then-play` ほか(音声の領域の節を見る)。`audio/quanta-while-open` と `audio/no-underrun-while-idle` は、旧い印の原因が、測り方(`quantaWhileOpen` は再生の量子を含まない)だったため、印を外した。
 - ワークレットの読み込みは、以前は HTTP 403 だった(Worker の Access の検査が、ワークレットの要求にトークンのヘッダーを付けられていなかった)。試験の中継(`lib/delivery.mjs` の `startAccessProxy`)が、トークンの無い要求にだけ付けて直した。
 
 ## 機能の一覧(`inventory.mjs`)と網羅率(`coverage.mjs`)

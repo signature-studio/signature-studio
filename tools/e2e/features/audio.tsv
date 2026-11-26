@@ -12,7 +12,7 @@ audio/output/resume-after-stop	output	停止の後の開始で、また音が出
 audio/transport/play	transport	Space で再生が始まる	再生の量子(playing)が増える	quantaWhilePlaying の差
 audio/transport/stop	transport	Space で停止し、再生の量子が止まる	停止の後の playing の差が 0	quantaWhilePlaying の差
 audio/transport/pause-resume	transport	停止して、もう一度開始すると再開する	停止中は playing が増えず、再開後は増える	quantaWhilePlaying の差
-audio/transport/record-toggle	transport	録音ボタンで録音の待機が切り替わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(録音のボタン)
+audio/transport/record-toggle	transport	録音ボタンで録音の待機が切り替わる	録音ボタンの画素が一度目の操作で変わる(二度目で戻らない: 印 new)	pixelHashRegion(録音のボタン)
 audio/transport/record-play	transport	録音を待機にして Space を押すと再生が始まる	再生の量子が増える	quantaWhilePlaying の差
 audio/transport/count-in-toggle	transport	カウントインのボタンで状態が変わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(カウントインのボタン)
 audio/transport/count-in-clicks	transport	カウントイン(録音の前の拍)が音になる	録音待機で Space の後、4 秒以内に非無音になる	nonSilentQuanta の増え
@@ -22,7 +22,7 @@ audio/transport/pattern-play	transport	Pattern モードで再生が始まる	�
 audio/transport/loop-toggle	transport	上部バーのループのボタンで状態が変わる	ボタンの画素が変わり、二回目で戻る(ボタンの役は未確認)	pixelHashRegion(ループのボタン)
 audio/transport/tempo-change	transport	テンポの値が変わる	テンポの箱の画素が変わる(ホイールで 3 目盛り)	pixelHashRegion(テンポの箱)
 audio/transport/tempo-speed	transport	テンポを下げると拍が減り、上げると増える	8 秒のクリック数が、回した向きに従う	キャプチャの立ち上がり(onset)の数
-audio/transport/time-signature	transport	拍子を変えると拍の数が変わる	(未覆: 拍子の部品を特定していない)	—
+audio/transport/time-signature	transport	拍子を変えると拍の数が変わる	(未覆: 拍子の部品を画面で見つけていない。トップバーのテンポ・メトロノーム・カウントインの右クリックのメニューに拍子は無い)	—
 audio/metronome/on	metronome	メトロノームを入れると、再生中に音が出る	非無音が 20 量子より多く増え、途切れが 0	nonSilentQuanta, underrunQuanta
 audio/metronome/off	metronome	メトロノームを切ると、再生は続くが音は消える	非無音が 2 量子以下、再生の量子は増える	nonSilentQuanta, quantaWhilePlaying
 audio/metronome/button-changes	metronome	メトロノームのボタンで表示が変わる	ボタンの画素が変わり、二回目で戻る	pixelHashRegion(メトロノームのボタン)
@@ -37,8 +37,8 @@ audio/pcm/beat-clicks	pcm	メトロノームのクリックの数が、テンポ
 audio/volume/master-fader	volume	マスターのフェーダーで出力の大きさが変わる	下げると peak が 0.8 倍未満、上げると rms が増える	キャプチャの peak と rms
 audio/mute/master-led	mute	マスターの LED で出力が消え、戻すと鳴る	消えた間の非無音が 2 以下、戻すと 20 より多く増える	nonSilentQuanta
 audio/mute/channel-led	mute	チャンネルの LED で表示が変わる	画素が変わり、二回目で戻る(音は測っていない)	pixelHashRegion(チャンネルの LED)
-audio/solo/insert-1	solo	インサートのソロで、他のチャンネルの音が消える	(未覆: ソロの操作を確かめていない)	—
-audio/route/insert-output	route	ミキサーの出力先を変えると、音の経路が変わる	(未覆: 出力先の操作を確かめていない)	—
-audio/pan/master	pan	パンを変えると左右の比が変わる	(未覆: パンのつまみを特定していない)	—
-audio/export/wav-nonsilent	export	Export の wav の出力が非無音	(未覆: 保存の窓の応答を扱っていない)	—
-audio/export/wav-length	export	wav の長さが再生の長さと合う	(未覆: 同上)	—
+audio/solo/insert-1	solo	インサートのソロで、他のチャンネルの音が消える	ミキサーのインサート 1 のソロ(Ctrl+クリック)で、キックの音が消え、もう一度で戻る(ソロ中の非無音 2 以下)	非無音の量子(窓 2 秒)の差。キックの拍を鳴らす
+audio/route/insert-output	route	ミキサーの出力先を変えると、音の経路が変わる	(未覆: 出力先の変化を音で確かめる操作を見つけていない。インサートの ▲ を押してもキックの音は変わらない。キックはマスターへ直接届く。チャンネルの振り先の操作も見つけていない)	—
+audio/pan/master	pan	パンを変えると左右の比が変わる	マスターのつまみを 4 目盛り回すと左右の釣り合いが動き、戻すと元に戻る(釣り合いの差 0.1 超、戻りは 0.05 未満)	captureStereo の左右の二乗平均(釣り合い)。キックの拍を鳴らし、メトロノームは切る
+audio/export/wav-nonsilent	export	Export の wav の出力が非無音	書き出した wav の標本が非無音(ピーク 0.05 超、非ゼロの標本 20% 超。16 bit・2 ch)	保存されたファイル(window.__app.saved)を parseWav で読む
+audio/export/wav-length	export	wav の長さが再生の長さと合う	書き出した wav の長さが 1 小節(4 拍・130 BPM = 1.846 s)と 0.03 s 以内で合う	parseWav の duration。テンポは新規の曲(Default)の 130 BPM
