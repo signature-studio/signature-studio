@@ -13,7 +13,7 @@ export function attachDetectors(page) {
   const d = { pageErrors: 0, consoleErrors: 0, failedRequests: 0, details: [] };
   const note = (s) => { if (d.details.length < MAX_DETAILS) d.details.push(s.slice(0, 300)); };
   page.on('pageerror', (e) => { d.pageErrors++; note(`pageerror: ${String(e?.message ?? e)}`); });
-  page.on('console', (m) => { if (m.type() === 'error') { d.consoleErrors++; note(`console.error: ${m.text()}`); } });
+  page.on('console', (m) => { if (m.type() === 'error') { d.consoleErrors++; note(`console.error: ${m.text()} (at ${m.location().url || '-'})`); } });
   page.on('requestfailed', (r) => { d.failedRequests++; note(`requestfailed: ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`); });
   page.on('response', (r) => { if (r.status() >= 400) { d.failedRequests++; note(`HTTP ${r.status()}: ${r.url()}`); } });
   return d;

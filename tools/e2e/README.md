@@ -23,6 +23,7 @@ node tools/e2e/run.mjs --list
 | 引数 | 意味 |
 |---|---|
 | `--scenarios smoke` | 旧い形の集合(`scenarios/smoke/index.mjs`)。各シナリオは、それぞれ新しいページで動く(従来どおり)。 |
+| `--scenarios browser-face` | 旧い形の集合(`scenarios/browser-face/index.mjs`、#1419)。Browser の面のタブを切り替え、console エラーを数える。各シナリオは、それぞれ新しいページで動く。 |
 | `--area <領域>` | `scenarios/<領域>/` の全て。13 領域: `page` `input` `file` `menus` `windows` `audio` `settings` `plugins` `topbar` `resilience` `visual` `perf` `delivery`。 |
 | `--list` | 起動しない。領域ごとに 1 行の JSON: `{"area","scenarios","covers","features"}`(`--area` を付けると、その 1 行)。 |
 | `--shard i/n` | シナリオの ID を昇順に並べ、`index % n === i - 1` のものを動かす(決定的)。 |
@@ -176,6 +177,7 @@ export default defineScenario({
 - `features/`: 手で書く見出し行と `.min`、`generated/`(一覧の生成物。コミットする)。
 - `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(Issue #1482: 印は外した。右クリックで読まず、通知が出ない)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。
   - Issue #1482 の 3 件: (g) `context-menu-none`(各領域で右クリック 20 回。ブラウザのメニューが抑止されること)、(h) `clipboard-load-permission`(権限 prompt で読み込み、最初のクリック後に readText の要求が 1 回以上あること)、(i) `clipboard-no-toast`(権限 denied で Ctrl+V・Ctrl+C をし、通知の要素が出ないこと)。
+- `scenarios/browser-face/`(Issue #1419): (a) `browser-face-tabs`。Browser の面のタブを切り替えて 10 秒待ち、console エラーを数える。集合の件数は 1(`run.mjs` の行の判定は、集合の件数で数える)。
 
 ## 120 Hz の方法と実測
 
