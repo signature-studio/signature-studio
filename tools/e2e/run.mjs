@@ -85,6 +85,8 @@ async function runScenario(sc, d, env) {
     guest = new Guest(pg.page, pg.cdp, delivery.origin);
     guest.shots = shotsDir ? path.join(shotsDir, `${d.name}-${String(d.dpr).replace('.', '_')}`, sc.name) : null;
     if (guest.shots) fs.mkdirSync(guest.shots, { recursive: true });
+    // a scenario that must act before the page's own scripts run (a permission state set for the load; a counter the page's load calls) has beforeLoad
+    if (sc.beforeLoad) await sc.beforeLoad({ page: pg.page, browserCdp, browserContextId: pg.browserContextId, origin: delivery.origin });
     await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
     await installToastWatch(pg.page);
     if (env.clock === 'begin') clock = await startFrameClock(pg.cdp);

@@ -5,6 +5,7 @@
 // style sheets (CSSOM, which the CSP does not stop) and its background from the page, and the bridge (window.chrome.webview) is made by the page as the window's own object once the
 // document has loaded. The frame runs no script of its own (sandbox: allow-same-origin only), so the pointer and keyboard input stay with the frame and are not sent to the engine.
 import type { FromWorker } from '../engine/protocol.ts';
+import { suppressContextMenu } from '../input/context-menu.ts';
 
 /** the mark this Issue puts on the face's iframe (tools/browser-panel/measure.mjs counts the iframes that carry it) */
 export const FACE_ATTR = 'data-fl-webview2';
@@ -221,6 +222,7 @@ export class WebView2Face {
     const win = frame.contentWindow as FaceWindow | null;
     const doc = frame.contentDocument;
     if (!win || !doc) { this.host.log('warn', 'the face has no document to set up'); return; }
+    suppressContextMenu(win);   // Issue #1482: a frame's events do not reach the page's document
     doc.documentElement.style.background = FACE_BACKGROUND;
     doc.adoptedStyleSheets = this.styles.map((css) => {
       const sheet = new win.CSSStyleSheet();
