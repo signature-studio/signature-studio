@@ -192,3 +192,9 @@
 211	#1497	E2E の領域 perf: 起動の時間・描画の fps と遅延・アイドルの CPU・メモリ・マウス 1000 Hz の下の音声の途切れを、基準との比の粗い上限で門にするシナリオを足す	Task
 212	#1498	E2E の領域 delivery: manifest.json の lazy の全ての取得と sha256、ヘッダー・圧縮・オフライン・キャッシュ・ビーコンの形の、期待する結果のシナリオを足す	Task
 213	#1499	FL の Plugin Manager(外部の PluginManager.exe)を、VM の中で動かす: 実行ファイルの起動の要求を、同じ engine の中の、もう 1 つのゲストに結ぶ	Task
+214	#1500	fe-lift の試験: 試験の native な link が未定義のシンボルで落ち、約 730 件が新しく失敗する(`fle_thread.c` の `__real_pthread_mutex_unlock`・`fle_glob.c` の関数・`fle_clip_host_probe`)	Task
+215	#1501	FL の Plugin Manager を VM の中で動かす(段 B): 起動の要求を、同じ engine の中のゲストのスレッドに結び、窓を出す	Task
+216	#1502	FL の Recent(最近開いたファイル)を、ページの再読込をまたいで保持する(続き): 閉じる時の FL の後始末を時間の枠つきで走らせ、書かれた Recent を journal に載せる	Task
+217	#1503	ツマミの右クリックのメニューを開くと、許可済みのクリップボードを読んでしまう: メニューを開く時は読まず、貼り付けを選んだ時だけ読む	Task
+218	#1504	DEDZII を開いた後、ファイル管理の状態表示(fx-status)が 10 秒を超えて残る: 残る条件を特定して直す	Task
+219	#1505	Settings の Theme の頁に、テーマのタイルが出ず、13 件のテーマを切り替えられない: 頁の一覧が見つからない原因を特定して直す	Task
