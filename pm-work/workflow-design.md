@@ -87,6 +87,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - ラベル `failed` が無い。ただし、本文が `/retry` で始まる `issue_comment` のときだけ、`failed` は無視される(start が `failed` を外す)。
 
 判定の理由は select の標準エラーに 1 件ずつ出す(「起動しなかった理由」を Actions のログで見られる)。
+- 読みの上限: `gh api` の応答が既定の maxBuffer(1 MB)を超えると ENOBUFS で select が落ち、起動しない(#1371 がこれで起動しなかった。閉じた #1370 のブロッカーの一覧は本文を含めて 1,129,714 バイト)。`tools/select-targets.mjs` は maxBuffer を 256 MB にし、読む項目を `--jq` で絞る(本文は取らない)。100 件を超える依存は 2 ページ目を読まない(未対応。今の件数は 44 件)。試験は `spec/workflow.test.sh` の (g2)。
 
 ## 6. ラベル(承認後に PM が作る。エージェントは作らない)
 
