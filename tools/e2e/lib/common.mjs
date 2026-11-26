@@ -7,7 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseDump, absoluteRect, childrenOfClass } from './dump.mjs';
 import { decodePicture, regionHash, blackTiles } from './picture.mjs';
-import { closeWelcome, dismissProblems, noThanks, sleep, WELCOME, waitProjectOpen, waitStable } from './flow.mjs';
+import { clearProblems, closeWelcome, dismissProblems, noThanks, sleep, WELCOME, waitProjectOpen, waitStable } from './flow.mjs';
 import { armExpression, takeExpression, pcmReport } from '../../p3-audio-probe/waveform.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +16,8 @@ export const POPUP = 'TQuickPopupMenuWindow';
 export const MENU_BAR = 'TNewMenu';
 export const MAIN_FORM = 'TFruityLoopsMainForm';
 export const GDPR = 'TGDPRModule';
+export const NEW_PROJECT_FORM = 'TNewProjForm';
+export const SHOP_FORM = 'TInAppShopForm';
 /** the menu bar's labels and their places as fractions of the bar's width (x) and height (y), the same as tools/crash-hunt (its LABELS) */
 export const MENU_LABELS = [['File', 0.051], ['Edit', 0.147], ['Add', 0.235], ['Patterns', 0.375], ['View', 0.525], ['Options', 0.666], ['Tools', 0.819], ['Help', 0.94]];
 export const LABEL_FY = 0.45;
@@ -177,15 +179,30 @@ export async function startProject(guest) {
   return { opened: end.opened, state: end.state, title: end.title, waitedMs: end.waitedMs };
 }
 
-/** File > New by its key (Ctrl+N): an empty project. A box that the new project brings up is closed with Escape (its own windows only: the base is the windows at the start) */
+/**
+ * File > New by its key (Ctrl+N): an empty project. The New project form (TNewProjForm, titled "Save as": the name and the place) takes Enter (its OK), which makes
+ * the new project (the title becomes Project_1.flp). The trial window that comes after it (TInAppShopForm) is closed with Escape. Any other box the new project brings
+ * up is closed with Escape (its own windows only: the base is the windows at the start). Escape on the form itself cancels the New (no project is made).
+ */
 export async function resetProject(guest) {
+  await clearProblems(guest, { settleMs: 2000 });
+  // a drop-down left by the last scenario takes the Enter of the New form, so it is closed first
+  for (let i = 0; i < 4 && (await guest.windows()).some((x) => x.cls === POPUP); i++) {
+    await guest.escape();
+    await sleep(400);
+  }
   const base = await openLids(guest);
   await guest.focusDesktop();
   await guest.ctrl('KeyN', 'n', 78);
-  await sleep(1500);
+  const form = await waitWindow(guest, NEW_PROJECT_FORM, 8000);
+  if (form) {
+    await guest.key('Enter', 'Enter', 13);
+    await sleep(1500);
+    await waitWindow(guest, SHOP_FORM, 4000);
+  }
   const left = await closeNew(guest, base);
   await sleep(500);
-  return { left: left.map((w) => ({ cls: w.cls, title: w.title })) };
+  return { form: form !== null, left: left.map((w) => ({ cls: w.cls, title: w.title })) };
 }
 
 /** the page reloaded: the start is run again (the usage box, the Welcome, the default project); returns the title before and after */
