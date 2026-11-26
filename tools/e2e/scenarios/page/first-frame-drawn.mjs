@@ -4,7 +4,7 @@ import { noBlackRegions, picture } from '../../lib/common.mjs';
 
 export default defineScenario({
   id: 'page/first-frame-drawn',
-  covers: ['page/module/beacon'],
+  covers: ['page/module/beacon', 'page/frame/not-mostly-black'],
   async run({ guest }) {
     const pic = await picture(guest);
     const total = Math.ceil(pic.w / 64) * Math.ceil(pic.h / 64);
