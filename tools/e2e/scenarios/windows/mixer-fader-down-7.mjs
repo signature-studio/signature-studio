@@ -1,0 +1,11 @@
+// windows/mixer-fader-down-7: Mixer fader 7 is dragged down by 40 px: its picture changes.
+import { defineScenario } from '../../lib/scenario.mjs';
+import { mixerFader } from '../../lib/windows.mjs';
+
+export default defineScenario({
+  id: 'windows/mixer-fader-down-7',
+  covers: ['windows/mixer/fader'],
+  async run({ guest }) {
+    return mixerFader(guest, 6, -40);
+  },
+});
