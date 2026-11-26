@@ -255,8 +255,9 @@ else
 fi
 # e2e-full.yml(全シナリオの非ゲート)は、200 行以内・1 行 80 字以内。if は workflow_run の成功と always() だけ(e2e.yml とは別の分類)
 FULL=$here/../.github/workflows/e2e-full.yml; FD=$L/f; mkdir -p "$FD"
-pad "$FULL" 62 "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
-pad "$FULL" 63 "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+NF=$(wc -l < "$FULL")
+pad "$FULL" $((200 - NF)) "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
+pad "$FULL" $((201 - NF)) "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
 cp "$FULL" "$FD/e2e-full.yml"; ok "deploy-lint: 守っている e2e-full.yml は通る(always() の段の if を含む)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
 { cat "$FULL"; echo "      - {if: github.ref == 'refs/heads/main', run: npm ci}"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if でブランチで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
 sed "s/always() && github.event.workflow_run.conclusion == 'success'/always() \&\& github.event_name == 'push'/" "$FULL" > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の report の if をイベントに変えると見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1

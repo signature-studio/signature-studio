@@ -26,9 +26,15 @@ jobs:
           - {area: menus, i: 1, n: 3}
           - {area: menus, i: 2, n: 3}
           - {area: menus, i: 3, n: 3}
-          - {area: windows, i: 1, n: 3}
-          - {area: windows, i: 2, n: 3}
-          - {area: windows, i: 3, n: 3}
+          - {area: windows, i: 1, n: 9}
+          - {area: windows, i: 2, n: 9}
+          - {area: windows, i: 3, n: 9}
+          - {area: windows, i: 4, n: 9}
+          - {area: windows, i: 5, n: 9}
+          - {area: windows, i: 6, n: 9}
+          - {area: windows, i: 7, n: 9}
+          - {area: windows, i: 8, n: 9}
+          - {area: windows, i: 9, n: 9}
           - {area: audio, i: 1, n: 3}
           - {area: audio, i: 2, n: 3}
           - {area: audio, i: 3, n: 3}
