@@ -42,8 +42,8 @@ fn work_dir() -> PathBuf {
     d
 }
 
-const RT_FILES: [&str; 14] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 15] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -166,6 +166,7 @@ fn run_src(name: &str, top: &str, body: &str, env: &[(&str, &str)], use_harness_
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(src_dir()).arg("-I").arg(rt_dir());
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         if !use_harness_object && o.file_name().unwrap() == "wrp1_vst3.o" {
             continue;

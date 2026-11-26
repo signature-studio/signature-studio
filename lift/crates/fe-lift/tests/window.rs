@@ -67,7 +67,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-win"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_win.c", true), ("fle_class.c", true), ("fle_callback.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
@@ -1267,14 +1267,15 @@ fn source_uses_no_host_window_display_queue_clock_thread_process_or_file_and_cal
     );
     assert!(code.contains("fle_set_last_error(FLE_ERROR_INVALID_WINDOW_HANDLE)"));
     assert!(code.contains("fle_set_last_error(FLE_ERROR_NOT_ENOUGH_QUOTA_W)"));
-    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only
+    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only. `long long` is 64 bits on every target (C99) and is allowed (the trace casts)
     let b = code.as_bytes();
     let mut i = 0;
     while let Some(p) = code[i..].find("long") {
         let at = i + p;
         let before = at == 0 || !(b[at - 1].is_ascii_alphanumeric() || b[at - 1] == b'_');
         let after = at + 4 >= b.len() || !(b[at + 4].is_ascii_alphanumeric() || b[at + 4] == b'_');
-        assert!(!(before && after), "fle_win.c uses `long` near byte {at}");
+        let long_long = code[at + 4..].trim_start().starts_with("long") || code[..at].trim_end().ends_with("long");
+        assert!(!(before && after && !long_long), "fle_win.c uses `long` near byte {at}");
         i = at + 4;
     }
     // exactly the three messages, one call site each, in this order, through fle_call_guest; the class table through fle_class_lookup

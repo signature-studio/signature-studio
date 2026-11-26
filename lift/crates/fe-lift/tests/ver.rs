@@ -174,7 +174,7 @@ fn runtime_mask_matches_hand_computed_layout() {
     let cc = Command::new("clang")
         .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"])
         .arg(&rt)
-        .arg(rt.join("fle_imports.c"))
+        .arg(rt.join("fle_imports.c")).arg(rt.join("fle_glob.c")).arg(rt.join("fle_env.c"))
         .arg("-o")
         .arg(&exe)
         .arg(&c)

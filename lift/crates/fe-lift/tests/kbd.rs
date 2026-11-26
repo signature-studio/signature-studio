@@ -68,6 +68,7 @@ struct Objs {
     kbd: PathBuf,
     locale: PathBuf,
     imports: PathBuf,
+    glob: PathBuf,
     env: PathBuf,
 }
 
@@ -82,7 +83,7 @@ fn objs() -> &'static Objs {
             clang_c(&base.join(name), &o, ours);
             o
         };
-        Objs { kbd: one("fle_kbd.c", true), locale: one("fle_locale.c", false), imports: one("fle_imports.c", false), env: one("fle_env.c", false) }
+        Objs { kbd: one("fle_kbd.c", true), locale: one("fle_locale.c", false), imports: one("fle_imports.c", false), glob: one("fle_glob.c", false), env: one("fle_env.c", false) }
     })
 }
 
@@ -149,7 +150,7 @@ fn compile_main_with(name: &str, top: &str, body: &str, objs: &[&Path], extra_c:
 
 fn compile_main(name: &str, top: &str, body: &str) -> PathBuf {
     let o = objs();
-    compile_main_with(name, top, body, &[&o.kbd, &o.locale, &o.imports, &o.env], None)
+    compile_main_with(name, top, body, &[&o.kbd, &o.locale, &o.imports, &o.glob, &o.env], None)
 }
 
 fn exec(exe: &Path, args: &[&str]) -> Out {
@@ -337,7 +338,7 @@ fn the_low_word_is_the_lcid_and_the_high_word_is_not_derived_from_it() {
         r#"
     printf("%llx %llx\n", U(KBL(0)), U(fle_kbd_hkl()));
 "#,
-        &[&o.kbd, &o.imports, &o.env],
+        &[&o.kbd, &o.imports, &o.glob, &o.env],
         Some("#include <stdint.h>\n#include \"fle_locale.h\"\nconst fle_locale_t fle_emulated_locale = { .lcid = 0x00020407, .acp = 1252, .oemcp = 437 };\n"),
     );
     let r = exec(&exe, &[]);

@@ -85,7 +85,7 @@ pub fn run(name: &str, body: &str) -> Out {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c"] {
         cmd.arg(rt.join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).arg(&c).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

@@ -45,7 +45,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-screen1"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for name in ["fle_gdc.c", "fle_sysmetrics.c", "fle_imports.c", "fle_env.c"] {
+        for name in ["fle_gdc.c", "fle_sysmetrics.c", "fle_imports.c", "fle_glob.c", "fle_env.c"] {
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&runtime_dir().join(name), &o);
             v.push(o);

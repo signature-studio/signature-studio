@@ -76,6 +76,7 @@ pub fn objs() -> &'static Vec<PathBuf> {
             ("fle_sys.c", false),
             ("fle_proc.c", false),
             ("fle_imports.c", false),
+            ("fle_glob.c", false),
             ("fle_env.c", false),
         ] {
             let base = if ours { src_dir() } else { runtime_dir() };

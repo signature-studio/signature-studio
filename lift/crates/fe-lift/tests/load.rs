@@ -234,7 +234,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (f, strict) in [("fle_load", true), ("fle_imagehlp", true), ("fle_env", false), ("fle_imports", false), ("fle_modules", false), ("fle_string", false)] {
+        for (f, strict) in [("fle_load", true), ("fle_imagehlp", true), ("fle_env", false), ("fle_imports", false), ("fle_glob", false), ("fle_modules", false), ("fle_string", false)] {
             let src = if f == "fle_load" || f == "fle_imagehlp" { src_dir().join(format!("{f}.c")) } else { runtime_dir().join(format!("{f}.c")) };
             let obj = dir.join(format!("{f}.o"));
             clang_obj(&src, &obj, strict);
@@ -924,6 +924,7 @@ fn all_runtime_sources() -> Vec<PathBuf> {
     }
     v.sort();
     v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     v
 }
 

@@ -82,7 +82,7 @@ fn objs() -> &'static Vec<PathBuf> {
             ("fle_gdi.c", false),
             ("fle_raster.c", false),
             ("fle_gdc.c", false),
-            ("fle_imports.c", false),
+            ("fle_imports.c", false), ("fle_glob.c", false),
             ("fle_env.c", false),
             ("fle_modules.c", false),
             ("fle_string.c", false),

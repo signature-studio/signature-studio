@@ -172,8 +172,8 @@ fn resp_rows(c: &str) -> Vec<(String, String, u64)> {
 // 2. The driver: the real fle_win.c, fle_class.c, fle_thread.c and the files they work with; a stub guest window procedure that logs every message
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 25] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 26] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c", "fle_gdc.c", "fle_gdi.c", "fle_cursor.c", "fle_raster.c", "fle_monitor.c", "fle_ole.c", "fle_reg.c",
     "fle_layered.c", "fle_modules.c", "fle_realmod.c", "fle_load.c",
 ];
@@ -183,7 +183,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd.arg("-I").arg(src_dir()).arg("-I").arg(rt_dir()).arg(src).arg("-o").arg(obj).env("TMPDIR", work_dir().join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {}: {}", src.display(), String::from_utf8_lossy(&cc.stderr));
@@ -203,6 +203,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, is_ours);
             v.push(o);
         }
+        let mo = dir.join("mutex_real_stub.o");
+        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
+        v.push(mo);
         v
     })
 }
@@ -461,7 +464,7 @@ fn the_4_rows_of_decision_0140_are_the_last_rows_in_the_order_given_and_no_pseud
     let rows = resp_rows(&c);
     assert_eq!(rows.len(), st.resp_entries);
     let k = rows_0140::ROWS_0140.len();
-    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1; // Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
+    let n = rows.len() - rows_0144::ROWS_0144.len() - rows_0147::ROWS_0147.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len() - 4 - 1 - 1; // Issue #1382 appends 1 more (kernel32!CompareStringOrdinal, after the row of #1391); Issue #1391: the K32GetProcessMemoryInfo row is after them; Issue #1355: the 4 rows of webview2loader.dll are after these; // decision 0372 appends 1 row (tests/rows_0372) after those of decision 0267; decision 0267 appends 1 row after those of 0147; decision 0147 appends 1 row after those of 0144; decision 0144 appends 2 rows (tests/wall_fr19.rs) after these
     // the rows before are the 3 of decision 0139 (tests/wall_fr15.rs), whose last row is dsound!DirectSoundEnumerateW; HEAD 93881c0 has 601 rows (598 of decision 0136 + 3), decision 0140 appends 4 (decision 0015: append only)
     assert_eq!(n, 601 + k, "the 601 rows of HEAD 93881c0 and the {k} of decision 0140");
     assert_eq!((rows[n - k - 1].0.as_str(), rows[n - k - 1].1.as_str()), ("dsound.dll", "DirectSoundEnumerateW"), "the row before the new ones is the last row of decision 0139");

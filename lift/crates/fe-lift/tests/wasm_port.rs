@@ -92,7 +92,7 @@ static uint64_t callv(void (*f)(void), const uint64_t *a)
 #define A(x) ((uint64_t)(uintptr_t)(x))
 "#;
 
-const RT_FILES: [&str; 8] = ["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_host.c", "fle_proc.c", "fle_time.c"];
+const RT_FILES: [&str; 9] = ["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_host.c", "fle_proc.c", "fle_time.c"];
 
 #[test]
 fn native_host_tid_is_the_linux_tid_and_get_current_thread_id_returns_the_virtual_value() {
@@ -131,7 +131,7 @@ fn wasm_thread_id_is_a_fixed_nonzero_value_used_by_every_owner_check() {
 "#
     );
     // the sources that include fle_host.h but do not need emscripten headers
-    let o = build_run("wp-tid-wasm", &src, &["-D__EMSCRIPTEN__", "-DFLE_VMEM_ARENA"], true, &["fle_imports.c", "fle_sys.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_host.c", "fle_proc.c", "fle_time.c"], &[]);
+    let o = build_run("wp-tid-wasm", &src, &["-D__EMSCRIPTEN__", "-DFLE_VMEM_ARENA"], true, &["fle_imports.c", "fle_glob.c", "fle_sys.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_host.c", "fle_proc.c", "fle_time.c"], &[]);
     assert!(o.ok, "{}", o.stderr);
     // the host tid stays the constant 1 (owner slots); the guest value is the same 4097 as on native (decision 0056)
     assert_eq!(o.stdout.lines().collect::<Vec<_>>(), ["tid 1", "tid_again 1", "get_current_thread_id 4097"]);
@@ -202,7 +202,7 @@ int main(void)
 }}
 "#
     );
-    let o = build_run("wp-arena", &src, &["-DFLE_VMEM_ARENA"], false, &["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_host.c"], &[]);
+    let o = build_run("wp-arena", &src, &["-DFLE_VMEM_ARENA"], false, &["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_host.c"], &[]);
     assert!(o.ok, "signal {:?}: {}\n{}", o.signal, o.stderr, o.stdout);
     let want = [
         "a_nonnull 1 granule 0",
@@ -269,7 +269,7 @@ int main(void)
 }}
 "#
     );
-    let o = build_run("wp-arena-top", &src, &["-DFLE_VMEM_ARENA"], false, &["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_host.c"], &[]);
+    let o = build_run("wp-arena-top", &src, &["-DFLE_VMEM_ARENA"], false, &["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_host.c"], &[]);
     assert!(o.ok, "signal {:?}: {}\n{}", o.signal, o.stderr, o.stdout);
     let want = [
         "t1_above_lo 1 granule 0",
