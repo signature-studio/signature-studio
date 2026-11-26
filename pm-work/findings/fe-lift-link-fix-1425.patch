@@ -1,0 +1,271 @@
+diff --git a/lift/crates/fe-lift/tests/callback.rs b/lift/crates/fe-lift/tests/callback.rs
+index 7b0e17ff..0e6d335d 100644
+--- a/lift/crates/fe-lift/tests/callback.rs
++++ b/lift/crates/fe-lift/tests/callback.rs
+@@ -287,6 +287,7 @@ fn driver() -> &'static PathBuf {
+             .arg(&rt)
+             .arg(&obj)
+             .arg(rt.join("fle_env.c"))
++            .arg(rt.join("fle_glob.c"))
+             .arg(rt.join("fle_imports.c"))
+             .arg("-o")
+             .arg(&exe)
+@@ -692,6 +693,7 @@ fn all_runtime_sources() -> Vec<PathBuf> {
+         .collect();
+     v.sort();
+     v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
++    v.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
+     v
+ }
+ 
+diff --git a/lift/crates/fe-lift/tests/known-failures.txt b/lift/crates/fe-lift/tests/known-failures.txt
+index 72c320c4..1755e1c7 100644
+--- a/lift/crates/fe-lift/tests/known-failures.txt
++++ b/lift/crates/fe-lift/tests/known-failures.txt
+@@ -49,7 +49,6 @@ wall_fr12 a_directory_line_makes_the_directory_and_the_ones_above_it_without_a_f
+ wall_fr12 the_idle_core_and_the_wrapper_generator_have_no_host_dependency_beyond_the_standard_library
+ wall_fr18 mutations_are_caught
+ wall_fr19 the_hooks_in_the_other_runtime_files_are_local_and_the_new_file_is_what_wasm_can_run
+-wall_fr20 post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions_and_no_pseudo_va_moved
+ wall_fr21 the_api_probe_lists_agree_and_leave_out_the_five_names_of_the_g8_probe
+ wall_fr3 a4_multi_refuses_reg_seed_without_the_fruity_build_or_with_a_bad_file
+ wall_fr3 a_caller_fle_reg_seed_does_not_seed_a_run_that_did_not_ask_for_it
+diff --git a/lift/crates/fe-lift/tests/support/clip_host_stub.c b/lift/crates/fe-lift/tests/support/clip_host_stub.c
+index fa9a1019..66b277ef 100644
+--- a/lift/crates/fe-lift/tests/support/clip_host_stub.c
++++ b/lift/crates/fe-lift/tests/support/clip_host_stub.c
+@@ -1,6 +1,6 @@
+-/* Test-only definitions of the page's clipboard library (#1389, fle_clip.c). The browser build defines both in harness/web/clip/fle_clip_lib.js (an emscripten JS library);
+- * a native test has no page and no text: a SetClipboardData text is dropped, and a read answers NULL, which fle_clip.c takes as "no text". Linked by the tests that compile
+- * runtime/fle_*.c, never into a product build. */
++/* Test-only definitions of the page's clipboard library (#1389 and #1406, fle_clip.c). The browser build defines all three in harness/web/clip/fle_clip_lib.js (an emscripten JS library);
++ * a native test has no page and no text: a SetClipboardData text is dropped, a read answers NULL, which fle_clip.c takes as "no text", and the format probe answers 0 (no text).
++ * Linked by the tests that compile runtime/fle_*.c, never into a product build. */
+ #include <stddef.h>
+ #include <stdint.h>
+ 
+@@ -14,3 +14,8 @@ void *fle_clip_host_read(void)
+ {
+     return NULL;
+ }
++
++int fle_clip_host_probe(void)
++{
++    return 0;
++}
+diff --git a/lift/crates/fe-lift/tests/support/mutex_real_stub.c b/lift/crates/fe-lift/tests/support/mutex_real_stub.c
+new file mode 100644
+index 00000000..e3a5e91f
+--- /dev/null
++++ b/lift/crates/fe-lift/tests/support/mutex_real_stub.c
+@@ -0,0 +1,9 @@
++/* Test-only definition of __real_pthread_mutex_unlock (#1382, fle_thread.c). The product links wrap pthread_mutex_lock and pthread_mutex_unlock (lift/harness/web/link.rsp: --wrap), and
++ * the wrapper calls the libc's function under its __real_ name, which the linker resolves to that function. A native test link has no --wrap, so this gives the name the libc's function.
++ * Linked by the tests that compile runtime/fle_thread.c, never into a product build. */
++#include <pthread.h>
++
++int __real_pthread_mutex_unlock(pthread_mutex_t *m)
++{
++    return pthread_mutex_unlock(m);
++}
+diff --git a/lift/crates/fe-lift/tests/wall_fr20.rs b/lift/crates/fe-lift/tests/wall_fr20.rs
+index b7bca752..41cd3bdc 100644
+--- a/lift/crates/fe-lift/tests/wall_fr20.rs
++++ b/lift/crates/fe-lift/tests/wall_fr20.rs
+@@ -171,8 +171,8 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+     let rows = resp_rows(&c);
+     assert_eq!(rows.len(), st.resp_entries);
+     let k = rows_0147::ROWS_0147.len();
+-    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
+-    // decision 0015: append only. HEAD 7b82424 ends with user32!GetLayeredWindowAttributes (decision 0140); once decision 0144's rows are in the tree they come between (the check is "last row", not "after row 605")
++    // decision 0015: append only. The rows of the later decisions (0267, 0372 and the rows that came after them, Issue #1355, #1391, #1382) follow this block, so its end is found by name, not counted from the end
++    let n = rows.iter().position(|(dll, name, _)| dll == "user32.dll" && name == "PostThreadMessageW").expect("the row of decision 0147") + 1;
+     for (i, (dll, name)) in rows_0147::ROWS_0147.iter().enumerate() {
+         assert_eq!((rows[n - k + i].0.as_str(), rows[n - k + i].1.as_str()), (*dll, *name), "row {i} of decision 0147");
+     }
+@@ -185,8 +185,9 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
+     // and in the source table, right before the row of decision 0267
+     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
+     let table: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
+-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len()].trim().to_string();
+-    assert_eq!(last, "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
++    let at = table.iter().position(|l| l.contains("\"PostThreadMessageW\"")).expect("the source row of decision 0147");
++    assert_eq!(table[at].trim(), "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
++    assert!(table[at + 1..].iter().any(|l| l.contains("\"SetWindowPlacement\"")), "the row of decision 0267 comes after it");
+ }
+ 
+ #[test]
+@@ -205,9 +206,9 @@ fn the_thunk_is_answered_under_user32_and_under_no_other_dll() {
+ // 2. The driver
+ // ---------------------------------------------------------------------------------------------
+ 
+-const RT_FILES: [&str; 18] = [
++const RT_FILES: [&str; 19] = [
+     "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+-    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c",
++    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_glob.c",
+ ];
+ 
+ fn clang_c(src: &Path, obj: &Path, strict: bool) {
+@@ -234,6 +235,9 @@ fn objs() -> &'static Vec<PathBuf> {
+             clang_c(&base.join(name), &o, is_ours);
+             v.push(o);
+         }
++        let mo = dir.join("mutex_real_stub.o");
++        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
++        v.push(mo);
+         v
+     })
+ }
+diff --git a/lift/crates/fe-lift/tests/wall_fr9t.rs b/lift/crates/fe-lift/tests/wall_fr9t.rs
+index 7f37452d..3215e90d 100644
+--- a/lift/crates/fe-lift/tests/wall_fr9t.rs
++++ b/lift/crates/fe-lift/tests/wall_fr9t.rs
+@@ -30,9 +30,9 @@ fn work_dir() -> PathBuf {
+     d
+ }
+ 
+-const FILES: [&str; 18] = [
++const FILES: [&str; 19] = [
+     "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+-    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c",
++    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_glob.c",
+ ];
+ 
+ fn clang_obj(src: &Path, obj: &Path, strict: bool, extra: &[&str]) {
+@@ -63,6 +63,9 @@ fn scen_exe() -> &'static PathBuf {
+         let so = dir.join("thread_scenarios.o");
+         clang_obj(&th_dir().join("thread_scenarios.c"), &so, false, &[]);
+         objs.push(so);
++        let mo = dir.join("mutex_real_stub.o");
++        clang_obj(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true, &[]);
++        objs.push(mo);
+         let exe = dir.join("scen");
+         let mut cmd = Command::new("clang");
+         cmd.arg("-pie").arg("-o").arg(&exe);
+diff --git a/pm-work/findings/perf-windows-browser/183-result.md b/pm-work/findings/perf-windows-browser/183-result.md
+new file mode 100644
+index 00000000..0bab3a28
+--- /dev/null
++++ b/pm-work/findings/perf-windows-browser/183-result.md
+@@ -0,0 +1,77 @@
++# 183: DispatchMessage の深度 2 の切り替えの許可と、スレッドの優先度の既定(#1425)の測定
++
++判定: 差し戻し(取り消す)
++
++測定: `node tools/ab/run.mjs p3 <基準> <変更後> 3` と `node tools/ab/run.mjs p2 <基準> <変更後> 3`(1 組 = 基準 1 run と変更後 1 run。3 組。`--dpr 1.75 --play 1 --hz 1000 --mouse 20 --sound`(p3)、`--dpr 1.75 --load a`(p2))。基準は main の版(675a1537)、変更後は次の変更を入れた版。
++
++- `fle_callback.c` / `.h`: 深度 2 の許可の旗 `depth2_allowed`(`fle_callback_depth2_allowed` / `fle_callback_depth2_allow`)。
++- `fle_thread.c`: `save_ctx` / `load_ctx` で許可の旗をスレッドごとに保存・復元。`fle_progress_slice` は、深度 2 で許可の旗が立つ時だけ、深度 1 と同じに切り替える。`prio_on` の既定を 1 にする。
++- `fle_win.c`: `dispatch_message` が、深度 1 から呼ばれた時だけ、WndProc と TIMERPROC の呼び出しの間に許可を立て、終わったら戻す。
++- `fle_seh.c` / `.h`: SEH の飛び先で、許可の旗を登録の時の値に戻す(深度と同じ扱い)。
++
++変更は `lift/runtime/` の上の 4 組。試験(`wall_fr20`・`wall_fr9t`・`callback`)と起動・流れ A〜D は、変更後で通った(受け入れの前半)。判定の前に、`p3` の 3 組を先に測り、判定が「差し戻し」と決まったので、`p2` を続けて測った。
++
++## p3 の 6 回の run(基準 3 run・変更後 3 run。`tools/ab/run.mjs p3`)
++
++| 版 | run | pcmRepeat8192 | pcmEligible | underrunDelta | last60sUnderruns | nonSilentDelta |
++|---|---|---|---|---|---|---|
++| 基準 | 1 | 0 | 34718 | 22 | 22 | 1146 |
++| 基準 | 2 | 0 | 34718 | 8 | 8 | 1146 |
++| 基準 | 3 | 0 | 34718 | 8 | 8 | 1146 |
++| 変更後 | 1 | 0.2060 | 28223 | 8 | 8 | 1271 |
++| 変更後 | 2 | 0.2492 | 25877 | 11 | 11 | 925 |
++| 変更後 | 3 | 0.3377 | 30899 | 11 | 11 | 1148 |
++
++error は 6 回とも null、playing・inputRateOk は 6 回とも true。
++
++## p3 の中央値と判定
++
++| 指標 | 基準 | 変更後 | 読み |
++|---|---|---|---|
++| pcmRepeat8192 | 0 | 0.2492 | 増えた。残す条件(変更後が基準の 0.5 倍以下)を満たさない |
++| underrunDelta | 8 | 11 | 増えた(基準以下の条件を満たさない) |
++| last60sUnderruns | 8 | 11 | 増えた(同上) |
++| nonSilentDelta | 1146 | 1148 | 変わらない |
++
++gates(`tools/ab/gates.mjs`): 変更後の全 run の pcmRepeat8192 が 0.01 未満、の判定が FAIL(3 run とも 0.2 以上)。underrunDelta と last60sUnderruns の変更後の中央値が基準の中央値以下、の判定も FAIL。他の判定は PASS。
++
++## p2 の 6 回の run(`tools/ab/run.mjs p2`)
++
++| 版 | run | minWindowFps | inputDropped | inputToPresentMsP95 (ms) | 結果 |
++|---|---|---|---|---|---|
++| 基準 | 1 | 6.31 | 106 | 82.335 | error null |
++| 基準 | 2 | 4.87 | 94 | 93.125 | error null |
++| 基準 | 3 | 6.96 | 86 | 75.945 | error null |
++| 変更後 | 1 | (なし) | (なし) | (なし) | error: `evaluate: Error: the picture is being shown: ask again`(計測の道具が画面の取得で落ちた。製品の停止ではない) |
++| 変更後 | 2 | (なし) | (なし) | (なし) | error: 同上 |
++| 変更後 | 3 | 10 | 0 | 62.17 | error null |
++
++基準の中央値: minWindowFps 6.31、inputDropped 94、inputToPresentMsP95 82.335。変更後は 1 run しか値が無く、中央値を比べられない。`minWindowFps` の回帰が無いことは、この測定では確かめられなかった。
++
++## 判定
++
++差し戻し(取り消す)。残す条件「`pcmRepeat8192` の基準の中央値が数値(0)で、変更後の中央値が基準の 0.5 倍以下」を満たさない。変更後の中央値は 0.2492 で、3 run とも基準(全 run が 0)より大きい。音の繰り返し(古いバッファの循環)は減らず、増えた。underrun の中央値も 8 から 11 に増えた。
++
++`lift/runtime/` の変更(許可・優先度の既定・SEH の復元)は取り消した。変更は入れない。
++
++測定の結果から、原因は絞れていない。深度 2 の許可と優先度の既定を分けて測っていない。次に試すなら、どちらか 1 つだけを入れて、`p3` を測り直す(新しい Issue)。
++
++## 取り消した後の受け入れ(同じ版どうしの測定)
++
++取り消した版(`lift/` と `app/` が基準と同一。engine と bundle の sha256 は基準と同じ `909275082f8b`)で、受け入れのコマンドを、基準と変更後の組み(3 組)で測り直した。試験・起動・流れ A〜D は通った。
++
++| 指標 | run 1 | run 2 | run 3 | 中央値(基準 / 変更後) |
++|---|---|---|---|---|
++| p3 pcmRepeat8192(基準 / 変更後) | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
++| p3 pcmEligible(基準 / 変更後) | 34718 / 34718 | 34718 / 34718 | 34718 / 34718 | — |
++| p3 underrunDelta(基準 / 変更後) | 7 / 11 | 11 / 11 | 11 / 11 | 11 / 11 |
++| p3 nonSilentDelta(基準 / 変更後) | 1146 / 1146 | 1146 / 1146 | 1146 / 1146 | 1146 / 1146 |
++| p2 minWindowFps(基準 / 変更後) | 8.16 / 9 | 7.99 / 7.62 | 3.77 / 7.98 | 7.99 / 7.98 |
++
++p3 の判定: pass が true(全ての gate が PASS)。p2 の判定: pass が true(error null・inputRateOk true・minWindowFps 中央値 7.98 ≥ 0.9 × 7.99)。同じ版どうしでも underrunDelta は 7〜11 の幅で動く(基準 run 1 だけが 7)。この幅が、上の「取り消した版の中央値の判定」(underrun の 8 → 11)が、変更の効果ではなく測定のばらつきの範囲に入り得ることを示す。
++
++## 同じ作業で直した試験と道具(残す)
++
++- fe-lift の試験 `wall_fr20`・`wall_fr9t`・`callback` は、変更の前の main でも link が切れていた(`fle_glob.c` が `fle_imports.c` の `fle_glob_fixed_*` を満たさない。`fle_thread.c` の `__wrap_pthread_mutex_unlock` が `__real_pthread_mutex_unlock` を満たさない。`fle_clip_host_probe` が無い)。試験の link だけを直した(`tests/support/mutex_real_stub.c` を足し、`fle_glob.c` を link に加え、`clip_host_stub.c` に `fle_clip_host_probe` を足した)。
++- `wall_fr20` の「0147 の行は最後の行」の試験は、後から足された行(#1355・#1391・#1382)の数を数えていて、古い前提で落ちていた。0147 の行を名前で探すように直した。`tests/known-failures.txt` から 1 件を消し、`spec/fe-lift-test.test.mjs` の件数を 60 から 59 にした。
++- `tools/p3-audio-probe/measure-live.mjs` は、`inputs/p3-project.tsv` の最初の列を、`.flp` の path のときだけ案件として読む。#1401 の行は手順の名前(`default-channel-rack-steps`)で、案件のファイルではないため、起動時の Default の案件を使う。これが無いと `tools/ab/run.mjs p3` と `p2` が、最初の run で止まった。
+diff --git a/spec/fe-lift-test.test.mjs b/spec/fe-lift-test.test.mjs
+index a97a3081..8d0484f3 100644
+--- a/spec/fe-lift-test.test.mjs
++++ b/spec/fe-lift-test.test.mjs
+@@ -62,7 +62,7 @@ try {
+   ok('parse: 結果の行が無い binary は、解析の上で止まった(resultSeen が偽)', [pc.blocks[0].resultSeen, pc.blocks[0].label], [false, 'wall_e1']);
+ 
+   // known の一覧
+-  ok('known: 実際の known-failures.txt は 60 件(#1416 で int_more2 の CPU に依る 1 件を足した)', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 60);
++  ok('known: 実際の known-failures.txt は 59 件(#1416 で int_more2 の CPU に依る 1 件を足した。#1427 で wall_fr20 の 1 件が直った)', loadKnown(fs.readFileSync(REAL_KNOWN, 'utf8')).size, 59);
+   ok('known: 見出し・空行を読まず、CRLF も扱う', [...loadKnown('# a\r\n\r\nwall_r x y\r\n')], ['wall_r x y']);
+ 
+   // 判定
+diff --git a/tools/p3-audio-probe/measure-live.mjs b/tools/p3-audio-probe/measure-live.mjs
+index e41ef406..e8f4f967 100644
+--- a/tools/p3-audio-probe/measure-live.mjs
++++ b/tools/p3-audio-probe/measure-live.mjs
+@@ -1,7 +1,7 @@
+ // Live audio probe (Issue #1349): the page is opened in a room of 1836x1056 CSS px at the device pixel ratio --dpr (1.7647 by default: the guest screen is 3240x1863 device px), the engine's idle is waited for (t0 = the first observation of engine-idle), and the audio output's numbers are read at t0+10 s (reference), t0+70 s (start of the window) and t0+130 s (end of the window).
+ // In the window: --play 1 presses Space at its start; --hz H --mouse S move the pointer for S seconds on a circle (radius 400 CSS px, one turn per second) over the guest's desktop, sent from here with CDP Input.dispatchMouseEvent (no button, no reply awaited, batches on each wake-up). The nominal send rate is 1.2 x H (so the page receives at least H in every second).
+ // The product is not changed: every input is sent from here. The AudioContext is started before the window by a press and a release on the status line (the browser's gesture rule). The start-up consent box is not closed (its "No thanks" position is measured for another screen size).
+-// --project: the .flp to open (File > Open). Without it, inputs/p3-project.tsv (#1335) names it when that file exists: its first data row (not '#', not empty), first tab-separated column, a path relative to the repository or absolute. Without either, the start-up Default project is used.
++// --project: the .flp to open (File > Open). Without it, inputs/p3-project.tsv (#1335) names it when that file exists: its first data row (not '#', not empty), first tab-separated column when that column is a .flp path (relative to the repository or absolute; #1401's name column names none). Without either, the start-up Default project is used.
+ // --profile FILE (#1349, a measurement: it adds CDP calls): the CDP CPU profile of the engine's Worker over the window (its interval is the same as measure.mjs's); tools/p3-audio-probe/profile-names.mjs reads it.
+ // --app <dir> (#1422): the page measured is the app of that directory (default: this repository's app). --sound (#1422): after the transport starts, the metronome button of the guest's top bar is pressed (the place and steps of tools/p2-frames/measure.mjs --load b), so the Default project makes sound; without a rise of 20 non-silent quanta within 5 s the run fails.
+ // PCM repeat (#1422): the output of the window's first 8 s is taken (the page computes its summary, the samples stay there): pcmRepeat8192 (the share of non-silent frames equal to the ones 8192 frames earlier; null below 1000 comparisons), pcmEligible, pcmNeighbors (the other lags, as controls), pcmCaptureFrames, pcmCaptureValid, pcmNonFiniteSamples. tools/p3-audio-probe/waveform.mjs.
+@@ -45,13 +45,15 @@ if (!argsOk || (projectRaw !== undefined && !path.isAbsolute(projectRaw))) {
+ const bundleDir = path.resolve(positional[0]);
+ const here = path.dirname(fileURLToPath(import.meta.url));
+ const repo = path.resolve(here, '..', '..');
+-// the project named by inputs/p3-project.tsv (#1335): its first data row's first column
++// the project named by inputs/p3-project.tsv (#1335): its first data row's first column, when that column is a .flp path. The #1401 row names a procedure (default-channel-rack-steps: the
++// steps are in its second column), not a project, so the start-up Default project stands (the steps are the Default project's Kick)
+ function listedProject() {
+   const listFile = path.join(repo, 'inputs', 'p3-project.tsv');
+   if (!fs.existsSync(listFile)) return null;
+   const row = fs.readFileSync(listFile, 'utf8').split('\n').map((l) => l.trimEnd()).find((l) => l !== '' && !l.startsWith('#'));
+   if (row === undefined) return null;
+   const first = row.split('\t')[0];
++  if (!/\.flp$/i.test(first)) return null;
+   return path.resolve(repo, first);
+ }
+ const projectFile = projectRaw !== undefined ? path.resolve(projectRaw) : listedProject();
