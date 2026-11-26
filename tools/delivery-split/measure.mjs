@@ -5,7 +5,7 @@
 //   reads (Issue #1341): the engine's reads of a real module's image, from its line `image-read: <file name> requested=<0|1> <ms>` (the page takes the time of the line: atMs, ms since the navigation, the clock of elapsedMs; requested true when the guest asked for the module). Always an array; [] when the engine read none.
 //   Issue #1342: the same line also names the instantiation of a real module's separate wasm module (`image-read: fruity_balance_x64.6800000.wasm requested=1 <ms>`, written when the guest asks for the module; xmod.ts).
 //   scene (Issue #1342): after the first idle (the numbers above are taken before it), the scene asks the guest for Fruity Balance: the Welcome window is closed as tools/smoke/welcome-flow.mjs does (flow A),
-//   Ctrl+O opens the engine's Open dialog (the page's file manager in selection mode), the project Data/Demo projects/NewStuff.flp (host-extra/resources of the bundle's out directory; its project names Fruity Balance, and the guest asks for the plug-in when it opens)
+//   Ctrl+O opens the engine's Open dialog (the page's file manager in selection mode), the project (Issue #1370: the runs take the scenes in turn; the Balance scene is NewStuff.flp, the Filter scene is Asher Postman - Future House.flp; the guest asks for the plug-in when the project opens)
 //   is copied in, chosen and opened. The reads above are the reads after the scene. (Fruity Balance.flp in Data/System/Render tests does not name the plug-in in its project: the guest never asks for Balance.)
 //   scene: { steps, error, state (the page's state after the scene), welcome ('listed' | 'none'), workers: [{ type, script }] (the Workers of the browser context at the end) }; null when the first idle was not reached.
 //   rssMb (Issue #1379): the largest sum of the VmRSS (resident memory, 1 MB = 1,048,576 B) of the browser: the Chrome process and every process under it, sampled every second from the first idle to the end of the scene. null when no sample was taken. This is the memory the judge uses.
@@ -37,6 +37,7 @@ if (!Number.isInteger(RUNS) || RUNS < 1 || RUNS > 5) {
 const bundleDir = path.resolve(bundleArg);
 const BUNDLE = path.basename(bundleDir);
 const brDir = path.resolve(bundleDir, '..', '..', 'br', BUNDLE);
+const outDir = path.resolve(bundleDir, '..', '..', '..');
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const appDir = path.join(repo, 'app');
@@ -75,7 +76,6 @@ const timed = (p, ms, what) => {
 };
 
 // Issue #1342: the scene of the guest's request for Fruity Balance (see the header). The room and the places of the controls are those of tools/smoke/welcome-flow.mjs (its offsets are measured at the room 1836 x 1056).
-const SCENE_FILE = ['Data', 'Demo projects', 'NewStuff.flp'];
 const SCENE_ROOM_W = 1836, SCENE_ROOM_H = 1056;
 // the view before the navigation (as tools/smoke/welcome-flow.mjs): the Welcome window is placed when it is created, so a smaller view puts it at (0, 0) for the whole scene
 const SCENE_VIEW_START = { width: 2176, height: 1092 };
@@ -97,8 +97,30 @@ function parseWindows(text) {
   });
 }
 
+// Issue #1370: the resources are host-extra/resources (the resources task) or else host/resources (the installer's files: the seed's rows give the same SHA-256)
+function resourcesRoot() {
+  const root = [path.join(outDir, 'host-extra', 'resources'), path.join(outDir, 'host', 'resources')].find((d) => fs.existsSync(d));
+  if (!root) throw new Error(`no resources folder under ${outDir} (host-extra/resources or host/resources)`);
+  return root;
+}
+
+/** the Balance scene's project: NewStuff.flp (Issue #1342), host-extra/resources's when it is there, else the seed's copy (the same installer file) */
+function balanceProject() {
+  const extra = path.join(resourcesRoot(), 'Data', 'Demo projects', 'NewStuff.flp');
+  const seed = path.join(outDir, 'host', 'lift', 'out-idle1', 'inputs', 'install', 'Data', 'Demo projects', 'NewStuff.flp');
+  return fs.existsSync(extra) ? extra : seed;
+}
+
+/** the Filter scene's project (Issue #1370): Asher Postman - Future House.flp, fixed (PM's decision on run 45843683192's evidence: its Balance and Filter both ask, engine-idle). host-extra/resources's when it is there, else host/resources's; neither gives an error */
+function filterProject() {
+  const rel = path.join('Data', 'Demo projects', 'Demo songs', 'Asher Postman - Future House.flp');
+  const found = [path.join(outDir, 'host-extra', 'resources', rel), path.join(outDir, 'host', 'resources', rel)].find((p) => fs.existsSync(p));
+  if (!found) throw new Error(`no ${rel} under ${outDir} (host-extra/resources or host/resources)`);
+  return found;
+}
+
 /** the scene: Welcome closed ("No thanks", then the Default row by a double click), Ctrl+O, the project given to the open box; returns what it did and the reads after it */
-async function runScene({ S, ev, cdp, browserContextId, projectPath, shotPath }) {
+async function runScene({ S, ev, cdp, browserContextId, projectPath, read, shotPath }) {
   const steps = [];
   const out = { steps, error: null, state: null, welcome: null, workers: null, reads: null };
   const windows = async () => {
@@ -253,7 +275,7 @@ async function runScene({ S, ev, cdp, browserContextId, projectPath, shotPath })
     for (;;) {
       await dismissProblems().catch(() => 0);
       snap = await ev(SNAPSHOT).catch(() => null);
-      if (snap && snap.imageReads.some((r) => /balance/i.test(r.name))) break;
+      if (snap && snap.imageReads.some((r) => read.test(r.name))) break;
       if (snap && (snap.state === 'error' || snap.state === 'exited')) break;
       if (Date.now() - t1 >= SCENE_STEP_LIMIT_MS) break;
       await sleep(1000);
@@ -263,7 +285,7 @@ async function runScene({ S, ev, cdp, browserContextId, projectPath, shotPath })
     out.state = snap?.state ?? null;
     out.reads = (snap?.imageReads ?? []).map((r) => ({ name: r.name, atMs: num(r.atMs), requested: r.requested === true }));
     steps.push(`reads after the scene: ${out.reads.map((r) => `${r.name} requested=${r.requested}`).join(', ') || 'none'}`);
-    out.logTail = await ev("window.__app.engineLog().filter((l) => /balance|real module|image-read|LoadLibrary|Problems|\\.flp|filedlg|opened|plug|xmod|trap|abort|exit|stop/i.test(l)).slice(-60)").catch(() => null);
+    out.logTail = await ev("window.__app.engineLog().filter((l) => /balance|filter|real module|image-read|LoadLibrary|Problems|\\.flp|filedlg|opened|plug|xmod|trap|abort|exit|stop/i.test(l)).slice(-60)").catch(() => null);
     out.logEnd = await ev("window.__app.engineLog().slice(-25)").catch(() => null);
     out.exit = await ev("JSON.stringify({ state: window.__app.state, exit: window.__app.exit, error: window.__app.error })").catch(() => null);
     const end = await S('Page.captureScreenshot', { format: 'png' }).catch(() => null);
@@ -328,7 +350,7 @@ function fetchesOf(resources, byUrl) {
   return out;
 }
 
-async function measureOnce(port) {
+async function measureOnce(port, scene) {
   const t0 = Date.now();
   const out = { state: null, standIn: null, error: null, elapsedMs: null, preStart: [], lazy: [], preStartDoneMs: null, lazyStartMs: null, lazyDoneMs: null, lazyWaitFirstMs: null, lazyWaitLast: null, fetches: [], reads: [], scene: null, rssMb: null, engineMemoryBytes: null };
   const root = fs.mkdtempSync(path.join(repo, '.tmp-delivery-run-'));
@@ -378,10 +400,6 @@ async function measureOnce(port) {
     else if (snap.state !== 'engine-idle') out.error = `state ${snap.state} at the end (no engine-idle within ${WAIT_LIMIT_MS} ms)`;
     if (snap?.state === 'engine-idle' && out.elapsedMs === null) out.error = 'the engine is idle but the page has no idle mark';
     if (snap?.state === 'engine-idle') {
-      // host-extra/resources is restored only by the resources task; the same file (the installer's, the same SHA-256) is in the host tree of the seed
-      const extraPath = path.join(bundleDir, '..', '..', '..', 'host-extra', 'resources', ...SCENE_FILE);
-      const seedPath = path.join(bundleDir, '..', '..', '..', 'host', 'lift', 'out-idle1', 'inputs', 'install', 'Data', 'Demo projects', 'NewStuff.flp');
-      const projectPath = fs.existsSync(extraPath) ? extraPath : seedPath;
       // rssMb (Issue #1379): the largest sum of the browser's VmRSS, sampled now and every second until the scene has ended (the memory the engine uses, not the address space)
       let rssKiB = null;
       const sample = () => { const k = browserRssKiB(chrome.proc.pid); if (k > 0 && (rssKiB === null || k > rssKiB)) rssKiB = k; };
@@ -389,13 +407,13 @@ async function measureOnce(port) {
       const sampler = setInterval(sample, 1000);
       let sc;
       try {
-        sc = await runScene({ S, ev, cdp, browserContextId, projectPath, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
+        sc = await runScene({ S, ev, cdp, browserContextId, projectPath: scene.project, read: scene.read, shotPath: path.join(repo, '.tmp-delivery-scene-fail.png') });
       } finally {
         clearInterval(sampler);
         sample();
         out.rssMb = rssKiB === null ? null : Math.round((rssKiB / 1024) * 10) / 10;
       }
-      out.scene = { steps: sc.steps, error: sc.error, state: sc.state, welcome: sc.welcome, workers: sc.workers, logTail: sc.logTail, logEnd: sc.logEnd, exit: sc.exit };
+      out.scene = { name: scene.name, project: path.relative(repo, scene.project), steps: sc.steps, error: sc.error, state: sc.state, welcome: sc.welcome, workers: sc.workers, logTail: sc.logTail, logEnd: sc.logEnd, exit: sc.exit };
       if (sc.reads) out.reads = sc.reads;
       process.stderr.write(`scene: ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);
     }
@@ -416,13 +434,16 @@ async function main() {
   let server = null;
   try {
     if (!fs.existsSync(brDir)) throw new Error(`no ${brDir}: the brotli directory of the bundle must be next to raw/`);
+    // Issue #1370: the runs take the scenes in turn (run 1 the Balance scene, run 2 the Filter scene, ...): the engine stops after a Fruity plug-in's first request (imm32.dll, decision 0015), so one run cannot show both
+    const scenes = [{ name: 'Fruity Balance', project: balanceProject(), read: /balance/i }, { name: 'Fruity Filter', project: filterProject(), read: /filter/i }];
+    process.stderr.write(`scenes: ${scenes.map((s) => `${s.name} = ${path.relative(repo, s.project)}`).join('; ')}\n`);
     stageAssets({ rawDir: bundleDir, brDir, assets, bundle: BUNDLE });
     process.env.FL_ASSETS_DIR = assets;
     const vite = await import(pathToFileURL(createRequire(path.join(appDir, 'package.json')).resolve('vite')).href);
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
     for (let i = 0; i < RUNS; i++) {
-      const r = await measureOnce(port);
+      const r = await measureOnce(port, scenes[i % scenes.length]);
       process.stdout.write(JSON.stringify(r) + '\n');
     }
   } finally {

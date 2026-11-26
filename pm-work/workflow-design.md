@@ -87,6 +87,7 @@ Issue N が対象になるのは、次をすべて満たすとき(select の判�
 - ラベル `failed` が無い。ただし、本文が `/retry` で始まる `issue_comment` のときだけ、`failed` は無視される(start が `failed` を外す)。
 
 判定の理由は select の標準エラーに 1 件ずつ出す(「起動しなかった理由」を Actions のログで見られる)。
+- 読みの上限: `gh api` の応答が既定の maxBuffer(1 MB)を超えると ENOBUFS で select が落ち、起動しない(#1371 がこれで起動しなかった。閉じた #1370 のブロッカーの一覧は本文を含めて 1,129,714 バイト)。`tools/select-targets.mjs` は maxBuffer を 256 MB にし、読む項目を `--jq` で絞る(本文は取らない)。100 件を超える依存は 2 ページ目を読まない(未対応。今の件数は 44 件)。試験は `spec/workflow.test.sh` の (g2)。
 
 ## 6. ラベル(承認後に PM が作る。エージェントは作らない)
 
@@ -247,6 +248,8 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 ## 20. 全シナリオの E2E(e2e-full.yml。非ゲート。Issue #1407・#1485)
 
 - 構成。`.github/workflows/e2e-full.yml`(`name: e2e-full`)は、`workflow_run`(`workflows: [e2e]`・`types: [completed]`)で起動する。job `shard` は e2e が成功した時だけ動き、領域とシャードの matrix を、`run.mjs --area <領域> --shard i/n` で回す。job `report` は `always()` で、全シャードの結果から網羅の表を作る。
+- 群(concurrency)。`group` は e2e の結論が success の時だけ `e2e-full-main`(新しい成功が古い run を取り消す)、それ以外は run ごと(`e2e-full-${{ github.run_id }}`)。
+- 群を分けた理由: e2e が取り消された時も workflow_run は来て、その skip の run が、同じ群で動く正しい run を `cancel-in-progress` で取り消していた(実例 45880900455。約 45 分の run が最後まで走らなかった)。
 - 別のワークフローにした理由: e2e.yml に足すと deploy(e2e の成功を待つ)が全シナリオを待つことになる。e2e-full は deploy の前提ではない。落ちても本番は替わらない(非ゲート)。
 - matrix の決め方: シャード数は、`.min` の最小件数とシナリオのファイル数の多い方を 30 で割って切り上げる。ただし、シナリオのファイル数で頭打ちにする(空のシャードは `run.mjs` が「no scenario is selected」で落ちるため)。今の matrix は 52 行(上限 80)。領域の Issue がシナリオを足したら n を増やす。増やさないと、1 シャードが予算 35 分を超え、超えた分は skipped になって赤になる。
 - 表示は `4k-dpr1,4k-dpr2` の 2 行(random は使わない)。1 job の上限は 60 分。`--budget 35m` の後は新しいシナリオを始めない。

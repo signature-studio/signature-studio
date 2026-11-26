@@ -95,17 +95,33 @@ export async function newWindows(guest, base) {
   return { pops: fresh.filter((w) => w.cls === POPUP).sort((a, b) => a.lid - b.lid), others: fresh.filter((w) => w.cls !== POPUP), all };
 }
 
-/** Escape until no top-level window is new since the baseline (8 rounds at most); returns the windows still open that are new */
+/**
+ * Escape until no top-level window is new since the baseline (8 rounds at most); returns the windows still open that are new.
+ * After each Escape the close is awaited (waitFewer), not a fixed wait: the Plugin list closes later than 400 ms, and an Escape sent while it is still closing
+ * reaches the main form with nothing open, which hides the Channel rack (Issue #1510).
+ */
 export async function closeNew(guest, base) {
   await guest.focusDesktop();
   for (let i = 0; i < 8; i++) {
     const { pops, others } = await newWindows(guest, base);
-    if (pops.length === 0 && others.length === 0) return [];
+    const n = pops.length + others.length;
+    if (n === 0) return [];
     await guest.escape();
-    await sleep(400);
+    await waitFewer(guest, base, n, 5000);
   }
   const { pops, others } = await newWindows(guest, base);
   return [...pops, ...others];
+}
+
+/** waits (on the window table, every 150 ms) until fewer than `n` windows are new since the baseline, or `ms` pass; true when they are fewer */
+export async function waitFewer(guest, base, n, ms) {
+  const t0 = Date.now();
+  for (;;) {
+    const { pops, others } = await newWindows(guest, base);
+    if (pops.length + others.length < n) return true;
+    if (Date.now() - t0 >= ms) return false;
+    await sleep(150);
+  }
 }
 
 /** the menu bar's rectangle (guest px) of the table (its TNewMenu child), or null */

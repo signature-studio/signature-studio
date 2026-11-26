@@ -1,0 +1,125 @@
+diff --git a/lift/runtime/fle_thread.c b/lift/runtime/fle_thread.c
+index 928bffed..47ecca4d 100644
+--- a/lift/runtime/fle_thread.c
++++ b/lift/runtime/fle_thread.c
+@@ -1606,3 +1606,120 @@ void fle_thread_wait_sent(const char *api, fle_sent *s, unsigned to)
+         if (fle_win_process_sent) fle_win_process_sent(api);
+     }
+ }
++
++/* DIAG-1429 (temporary; removed before commit) */
++unsigned fle_diag_cur(void) { return cur; }
++#define D1429_N (1u << 19)
++struct d1429e { uint64_t addr, mcaller, mseq, fcaller, fseq, msize, fowner, fslot; unsigned mcur, fcur, st; };
++static struct d1429e *d1429_t;
++static uint64_t d1429_rel, d1429_seq, d1429_depth, d1429_conc, d1429_dbl, d1429_bad, d1429_r4, d1429_thunk, d1429_mallocs, d1429_frees;
++
++static struct d1429e *d1429_slot(uint64_t a)
++{
++    uint64_t h = ((a >> 4) * 0x9E3779B97F4A7C15ull) >> 45;
++    unsigned k;
++    for (k = 0; k < D1429_N; k++) {
++        struct d1429e *e = &d1429_t[(h + k) & (D1429_N - 1)];
++        if (e->st == 0 || e->addr == a) return e;
++    }
++    return NULL;
++}
++
++static void d1429_hook(uint64_t va, void (*fn)(void))
++{
++    int is_m;
++    uint64_t arg, ret0, ret1, x, prc = 0, fownerv = 0, fslotv = 0;
++    unsigned c;
++    struct d1429e *e;
++
++    if (R[4] == 0 && d1429_r4++ < 8) fprintf(stderr, "diag1429: R[4]=0 at va %#llx cur %u\n", (unsigned long long)va, cur);
++    if (va == 0x412ae0) {
++        if (d1429_thunk++ < 200) {
++            uint64_t p = R[1];
++            fprintf(stderr, "diag1429: thunk start cur %u param %#llx [param] %#llx ret %#llx seq %llu\n", cur, (unsigned long long)p,
++                    (unsigned long long)(p >= 0x10000 ? fle_ld(p, 8) : 0), (unsigned long long)(R[4] >= 0x10000 ? fle_ld(R[4], 8) : 0), (unsigned long long)d1429_seq);
++        }
++        fn();
++        return;
++    }
++    if (va != 0x407a50 && va != 0x407e20) {
++        fn();
++        return;
++    }
++    is_m = va == 0x407a50;
++    arg = R[1];
++    ret0 = R[4] >= 0x10000 ? fle_ld(R[4], 8) : 0;
++    ret1 = R[4] >= 0x10000 ? fle_ld(R[4] + 0x30, 8) : 0;
++    c = cur;
++    if (d1429_depth > 0 && d1429_conc++ < 30)
++        fprintf(stderr, "diag1429: CONCURRENT %s cur %u depth %llu arg %#llx ret %#llx/%#llx seq %llu\n", is_m ? "malloc" : "free", c, (unsigned long long)d1429_depth,
++                (unsigned long long)arg, (unsigned long long)ret0, (unsigned long long)ret1, (unsigned long long)d1429_seq);
++    if (!is_m && arg >= 0x10000) prc = (uint32_t)fle_ld(arg + 8, 4);
++    d1429_depth++;
++    fn();
++    d1429_depth--;
++    if (is_m) {
++        x = R[0];
++        d1429_mallocs++;
++        if (!x) return;
++        e = d1429_slot(x);
++        if (!e) return;
++        if (e->st == 1 && d1429_dbl++ < 40)
++            fprintf(stderr, "diag1429: DOUBLE malloc %#llx (size %#llx) now cur %u ret %#llx/%#llx seq %llu; was malloc cur %u ret %#llx/%#llx seq %llu; freed cur %u ret %#llx seq %llu\n",
++                    (unsigned long long)x, (unsigned long long)arg, c, (unsigned long long)ret0, (unsigned long long)ret1, (unsigned long long)(d1429_seq + 1),
++                    e->mcur, (unsigned long long)0, (unsigned long long)e->mcaller, (unsigned long long)e->mseq, e->fcur, (unsigned long long)e->fcaller, (unsigned long long)e->fseq);
++        e->addr = x;
++        e->st = 1;
++        e->mcaller = ret1;
++        e->msize = arg;
++        e->mseq = ++d1429_seq;
++        e->mcur = c;
++        return;
++    }
++    x = arg;
++    d1429_frees++;
++    if (!x) return;
++    fownerv = 0;
++    fslotv = R[6];
++    if (ret1 == 0x412e7c) {
++        fownerv = R[4] >= 0x10000 ? fle_ld(R[4] + 0x70, 8) : 0;
++        if (d1429_rel++ < 120) {
++            char txt[49];
++            unsigned k;
++            uint64_t dp = x + 0x10;
++            for (k = 0; k < 48; k++) {
++                uint8_t ch = (uint8_t)fle_ld(dp + k, 1);
++                txt[k] = (ch >= 0x20 && ch < 0x7f) ? (char)ch : '.';
++            }
++            txt[48] = 0;
++            e = d1429_slot(x);
++            fprintf(stderr,
++                    "diag1429: REL block %#llx cur %u refcount-before %#llx slot %#llx owner %#llx state %u seq %llu msize %#llx mcaller %#llx mseq %llu prev-free cur %u owner %#llx slot %#llx seq %llu text \"%s\"\n",
++                    (unsigned long long)x, c, (unsigned long long)prc, (unsigned long long)fslotv, (unsigned long long)fownerv, e ? e->st : 9u,
++                    (unsigned long long)(d1429_seq + 1), (unsigned long long)(e ? e->msize : 0), (unsigned long long)(e ? e->mcaller : 0),
++                    (unsigned long long)(e ? e->mseq : 0), e ? e->fcur : 0u, (unsigned long long)(e ? e->fowner : 0), (unsigned long long)(e ? e->fslot : 0),
++                    (unsigned long long)(e ? e->fseq : 0), txt);
++        }
++    }
++    e = d1429_slot(x);
++    if (!e) return;
++    if (e->st != 1) {
++        if (d1429_bad++ < 40)
++            fprintf(stderr, "diag1429: BAD free %#llx cur %u ret %#llx/%#llx seq %llu; state %u last malloc cur %u caller %#llx seq %llu; last free cur %u caller %#llx seq %llu\n",
++                    (unsigned long long)x, c, (unsigned long long)ret0, (unsigned long long)ret1, (unsigned long long)(d1429_seq + 1), e->st,
++                    e->mcur, (unsigned long long)e->mcaller, (unsigned long long)e->mseq, e->fcur, (unsigned long long)e->fcaller, (unsigned long long)e->fseq);
++        return;
++    }
++    e->st = 2;
++    e->fcaller = ret1;
++    e->fowner = fownerv;
++    e->fslot = fslotv;
++    e->fseq = ++d1429_seq;
++    e->fcur = c;
++}
++
++__attribute__((constructor)) static void d1429_init(void)
++{
++    d1429_t = (struct d1429e *)calloc(D1429_N, sizeof *d1429_t);
++    fle_dispatch_hook = d1429_hook;
++}

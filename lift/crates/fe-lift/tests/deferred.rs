@@ -391,7 +391,7 @@ int main(int argc, char **argv)
         printf("handle32 %llx\n", U(fle_module_handle(32)));
         printf("handle33 %llx\n", U(fle_module_handle(33)));
         printf("deferred %d %d %d %d\n", fle_module_is_deferred(31), fle_module_is_deferred(32), fle_module_is_deferred(33), fle_module_is_deferred(34));
-        printf("past %p\n", (const void *)fle_module_name(42)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
+        printf("past %p\n", (const void *)fle_module_name(43)); /* Issue #1370: 43 modules (imm32.dll is index 42); decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
     } else if (!strcmp(s, "load")) {
         LLW("blend2d.dll"); LLW("Blend2D.dll"); LLW("BLEND2D"); LLW("blend2d.dll.");
         LLW("quickfontcache_x64.dll"); LLW("QuickFontCache_x64.dll"); LLW("QUICKFONTCACHE_X64"); LLW("quickfontcache_x64.dll.");
@@ -406,7 +406,7 @@ int main(int argc, char **argv)
         printf("count %u %u\n", fle_load_refcount(32), fle_load_refcount(33));
         free_lib(M(33)); free_lib(M(33)); free_lib(M(34));
         printf("count %u %u\n", fle_load_refcount(32), fle_load_refcount(33));
-        printf("past %u\n", fle_load_refcount(42)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
+        printf("past %u\n", fle_load_refcount(43)); /* decision 0238: 41 modules (combase.dll after kernelbase.dll); 40 modules (decision 0122: 39; decision 0119: 38; old: 36) */
     } else if (!strcmp(s, "gmh")) {
         const char *const a[] = { "blend2d.dll", "Blend2D.dll", "BLEND2D", "blend2d", "blend2d.dll.", "blend2d.", "blend2d.dll.dll", "blend2d2.dll",
             "quickfontcache_x64.dll", "QuickFontCache_x64.dll", "QUICKFONTCACHE_X64", "quickfontcache_x64", "quickfontcache_x64.dll.",
@@ -447,8 +447,8 @@ int main(int argc, char **argv)
     } else if (!strcmp(s, "free-blend-count-one")) { free_lib(M(33));
     } else if (!strcmp(s, "free-qfc-count-one")) { free_lib(M(34));
     } else if (!strcmp(s, "free-blend-after-balanced")) { LLW("blend2d.dll"); free_lib(M(33)); free_lib(M(33));
-    } else if (!strcmp(s, "free-past-the-table")) { free_lib(M(43)); /* decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) was the first handle past 39 after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39) past 38; old: M(37), the first handle past 36 modules) */
-    } else if (!strcmp(s, "gpa-past-the-table")) { gpa(M(43), "AggCreateInstance"); /* decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39); old: M(37)) */
+    } else if (!strcmp(s, "free-past-the-table")) { free_lib(M(44)); /* Issue #1370: M(n) is entry n - 1, so the first handle past the 43 modules is M(44); decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) was the first handle past 39 after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39) past 38; old: M(37), the first handle past 36 modules) */
+    } else if (!strcmp(s, "gpa-past-the-table")) { gpa(M(44), "AggCreateInstance"); /* Issue #1370: M(44) (see free-past-the-table); decision 0238: past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: past the 40 modules (M(40) after decision 0122); decision 0122: past the 39 modules (decision 0119: M(39); old: M(37)) */
     } else if (!strcmp(s, "gpa-misaligned")) { gpa(M(33) + 1, "AggCreateInstance");
     } else if (!strcmp(s, "gpa-ordinal")) { prep(M(33), 1, 0); fle_imp_GetProcAddress(); out();
     } else if (!strcmp(s, "near-1")) { LLW("blend2d2.dll");
@@ -621,7 +621,7 @@ fn the_table_has_the_two_deferred_modules_n33_and_n34_and_shcore_after_them() {
     // Decision 0099 appended shcore.dll (N = 35, index 34) after the two deferred modules; decision 0118 appended rpcrt4.dll (N = 36, index 35); decision 0119 appended
     // wtsapi32.dll (N = 37) and uxtheme.dll (N = 38): the count is 38 (old: 36).
     let got = lines("table");
-    assert_eq!(got[0], "count 42"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: dwmapi.dll, 39; old: 38)
+    assert_eq!(got[0], "count 43"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: dwmapi.dll, 39; old: 38)
     assert_eq!(got[1], "name32 blend2d.dll");
     assert_eq!(got[2], "name33 quickfontcache_x64.dll");
     assert_eq!(got[3], format!("handle32 {:x}", handle(N_BLEND2D)));

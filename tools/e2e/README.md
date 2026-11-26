@@ -98,6 +98,7 @@ export default defineScenario({
 - `audioProbe(guest, ms)`: 音声の状態の前後の値と、出力の標本の要約(`tools/p3-audio-probe/waveform.mjs` を使う)。
 - `persist(page, guest)`: 再読み込みの後に、起動し直して曲が開くかを確かめる。
 - `resetProject(guest)`(File > New)・`startProject(guest)`(利用データの箱・Welcome・Problems の箱を閉じ、既定の曲を開く)。
+- `closeNew(guest, base)`(Escape で新しい窓を閉じる): Escape の後は、窓が消えるまで窓の表で待つ(`waitFewer`、最大 5 秒)。固定の待ちでは、閉じ終わる前の二度目の Escape が主窓に届き、Channel rack が隠れる(#1510)。
 
 ### プラグインの領域(#1493)
 

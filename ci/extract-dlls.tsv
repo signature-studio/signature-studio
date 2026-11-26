@@ -12,7 +12,6 @@ oggio_x64.dll	lift/out-sampledec/oggio_x64.dll	b26c544f5d3987331bbc946d4e5ec3084
 elastique_x64.dll	lift/out-sampledec/elastique_x64.dll	8551e92209cdd2ce4e6a97e62861e3a8378d0d1e4daf40767130f03ddc1689c3
 # 2026-11-16 (R6-12): the two Fruity plugin DLLs of gen-direct.sh (decision 0313 G9-c) were not extracted by this table, so the gen stage failed in the workflow.
 # Their SHA-256 are those the extractor verified from the installer 26.1.7.5653 (evidence/R6-12.md section 5: extract_fl.py exit 0, "all SHA-256 verified").
-fruity filter_x64.dll	lift/out-plugins/fruity_filter_x64.dll	f4801444224236132b61983b7b81d0d3f89395085a1dc5430653a5edb7273d6c
 # 2026-11-17 (R5-6a, decision 0408): Fruity Delay 2, the tenth module. The SHA-256 is the one extract_fl.py verifies from the installer 26.1.7.5653 (evidence/R5-6a.md section 2).
 fruity delay 2_x64.dll	lift/out-plugins/fruity_delay2_x64.dll	c4fed60da5034d5c04019a4992563334aa6eb89e2adc211214aaca520ea928fc
 # 2026-11-22 (#1321): the other Fruity Effects and Generators DLLs of the installer (inputs/fl-installer-files.tsv, kind dll), minus the OpenGL VFX list of inputs/vfx-deferred.tsv (171 DLLs; the three rows above are three of them). Each destination is the install-relative path under plugins/ (the same tree as lift/out-app/host-extra/plugins/ of the plugin-builtin extraction). Each SHA-256 is the one of the inventory, which equals the file of that tree.
@@ -185,5 +184,3 @@ Wasp_x64.dll	plugins/Plugins/Fruity/Generators/Wasp/Wasp_x64.dll	561fd51a85f390c
 Wave Traveller_x64.dll	plugins/Plugins/Fruity/Generators/Wave Traveller/Wave Traveller_x64.dll	5b3c10affd99582514f9ccef55aa65f162d2e8bdfe3ac545ab5026c1d8a2d7d5
 # 2026-11-25 (#1395): ILSvg_x64.dll, the language DLL of the installer (1,504,256 B). Extracted to lift/out-plugins/shared.ilsvg.ilsvg_x64.dll, the key name in lift/plugins/ilsvg/plugin.tsv (the plugin段 of fe-build reads it: plugins.rs host_file); not lifted. When lift/plugins/ilsvg/plugin.tsv is on main, remove this row (the same DLL in two rows is extracted twice).
 ILSvg_x64.dll	lift/out-plugins/shared.ilsvg.ilsvg_x64.dll	92f76fefa88a8a70446492dc755324d2338bf382e11518e6f17d798f11342ba0
-# 2026-11-27 (#1429): Reverb_x64.dll, the reverb DLL of the installer (492,544 B). Sytrus loads it by its bare name (LoadLibraryW "Reverb_x64.dll", the 126 that stopped the engine). Extracted to lift/out-plugins/reverb_x64.dll, the key name in lift/plugins/reverb/plugin.tsv (the plugin step of fe-build reads it: plugins.rs host_file); not lifted. When lift/plugins/reverb/plugin.tsv (added by #1429) is on main, remove this row (the same DLL in two rows is extracted twice).
-Reverb_x64.dll	lift/out-plugins/reverb_x64.dll	892423bcce3d516eb42d303566e8a15a23a9ae9014fbc589c79afa542019ba40

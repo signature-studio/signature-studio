@@ -59,7 +59,8 @@ function validate(dlls) {
     if (!d.key.endsWith('.dll')) throw at('the key ends with .dll (it is the realmod name and the stem of the rebased file)');
     if (keys.has(d.key)) throw at('the key is not unique');
     keys.add(d.key);
-    if (d.guest.split('\\').length < 3 || d.guest.includes('/')) throw at('the guest path is Plugins\\...\\file (backslashes, at least three parts)');
+    const parts = d.guest.split('\\').length;
+    if ((parts < 3 && !(parts === 2 && d.guest.startsWith('Shared\\'))) || d.guest.includes('/')) throw at('the guest path is Plugins\\...\\file (backslashes, at least three parts) or Shared\\file (Issue #1429)');
     if (guests.has(d.guest.toLowerCase())) throw at('the guest path is not unique');
     guests.add(d.guest.toLowerCase());
     if (!base.toLowerCase().endsWith('.dll')) throw at('the file is not a DLL');
@@ -153,7 +154,7 @@ export function pluginRows(dir) {
     seed: [
       ...dlls.map((d) => {
         const parts = d.guest.split('\\');
-        return [GUEST_ROOT + d.guest, `${SEED_ROOT}/${parts.slice(0, -2).join('/')}/${d.key}`, d.sha256];
+        return [GUEST_ROOT + d.guest, [SEED_ROOT, ...parts.slice(0, -2), d.key].join('/'), d.sha256];
       }),
       ...data.map((d) => [GUEST_ROOT + d.guest, `${LAZY_FILE}${dataHost(d.guest)}`, d.sha256]),
     ],
