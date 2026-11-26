@@ -4,6 +4,7 @@ import { defineScenario } from '../../lib/scenario.mjs';
 export default defineScenario({
   id: 'delivery/lazy-module-served',
   covers: ['delivery/lazy/fruity-filter-x64-7000000-dll'],
+  displays: ['4k-dpr1'],
   async run({ page, origin }) {
     const r = await page.evaluate(async (o) => {
       const m = await (await fetch(`${o}/assets/manifest.json`)).json();
