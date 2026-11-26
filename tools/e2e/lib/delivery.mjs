@@ -137,14 +137,19 @@ export async function startDelivery({ appDir, workDir, objects, log }) {
   const proxy = await startAccessProxy(port, () => access.token());
   const pageOrigin = `http://127.0.0.1:${proxy.port}`;
   log(`delivery a: wrangler dev --local on ${origin}, the page on ${pageOrigin} (Access in front)`);
-  return {
+  live = {
     origin: pageOrigin, upstream: origin, delivery: 'a', token: access.token(),
     accessEnv: { ACCESS_TEAM_DOMAIN: access.team, ACCESS_AUD: access.aud, ACCESS_CERTS_URL: jwks.url },
     newToken: () => access.token(),
-    close: async () => { await proxy.close().catch(() => {}); await stopChild(child, jwks, out); },
+    close: async () => { live = null; await proxy.close().catch(() => {}); await stopChild(child, jwks, out); },
     wranglerLog: () => tail(logFile),
   };
+  return live;
 }
+
+/** the delivery of this run while it runs (null before and after): the delivery area's scenarios read the test Access settings and the Worker's own address from it */
+let live = null;
+export const liveDelivery = () => live;
 
 function tail(file, n = 4000) {
   try { const s = fs.readFileSync(file, 'utf8'); return s.slice(-n); } catch { return ''; }
