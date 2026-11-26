@@ -11,8 +11,10 @@ menus/item/file-8	item	File > #8	drop-down lid 162	Down x 8 from the label; 10 i
 menus/item/file-9	item	File > #9	drop-down lid 162	Down x 9 from the label; 10 items	index
 menus/item/file-10	item	File > #10	drop-down lid 162	Down x 10 from the label; 10 items	index
 menus/menu/edit	menu	Edit	TNewMenu lid 81 (bar 4,4 293x33)	label place: bar fraction x 0.147 y 0.45; drop-down lid 163 at 34,36 116x87	index
-menus/item/edit-1	item	Edit > #1	drop-down lid 163	Down x 1 from the label; 2 items	index
-menus/item/edit-2	item	Edit > #2	drop-down lid 163	Down x 2 from the label; 2 items	index
+menus/item/edit-1	item	Edit > #1	drop-down lid 163	Down x 1 from the label; 4 items	index
+menus/item/edit-2	item	Edit > #2	drop-down lid 163	Down x 2 from the label; 4 items	index
+menus/item/edit-3	item	Edit > #3	drop-down lid 163	Down x 3 from the label; 4 items	index
+menus/item/edit-4	item	Edit > #4	drop-down lid 163	Down x 4 from the label; 4 items	index
 menus/menu/add	menu	Add	TNewMenu lid 81 (bar 4,4 293x33)	label place: bar fraction x 0.235 y 0.45; drop-down lid 164 at 59,36 345x231	index
 menus/item/add-1	item	Add > #1	drop-down lid 164	Down x 1 from the label; 14 items	index
 menus/item/add-2	item	Add > #2	drop-down lid 164	Down x 2 from the label; 14 items	index

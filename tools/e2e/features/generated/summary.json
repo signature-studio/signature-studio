@@ -1,7 +1,7 @@
 {
-  "total": 763,
+  "total": 765,
   "perArea": {
-    "menus": 155,
+    "menus": 157,
     "windows": 8,
     "topbar": 22,
     "settings": 97,
@@ -11,7 +11,7 @@
     "delivery": 235
   },
   "unnamed": {
-    "menus": 155,
+    "menus": 157,
     "windows": 4,
     "topbar": 21,
     "settings": 35,
@@ -22,13 +22,13 @@
   "fl": {
     "ok": true,
     "error": null,
-    "menus": 155,
+    "menus": 157,
     "windows": 8,
     "topbar": 22,
     "settings": 77
   },
   "perFile": {
-    "menus": 155,
+    "menus": 157,
     "windows": 8,
     "topbar": 22,
     "settings": 77,

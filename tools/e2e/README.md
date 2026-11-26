@@ -116,7 +116,7 @@ export default defineScenario({
 
 | ファイル | 中身 | 件数(この runner・この実行) |
 |---|---|---|
-| `menus.tsv` | 上部の 8 つの見出し(窓の表のバーの位置。見出しの名前は `MENU_LABELS`)と、各プルダウンの項目(Down キーで画素が繰り返すまでの数) | 155(見出し 8、項目 147。実行ごとに数件揺れる) |
+| `menus.tsv` | 上部の 8 つの見出し(窓の表のバーの位置。見出しの名前は `MENU_LABELS`)と、各プルダウンの項目(Down キーで画素が繰り返すまでの数) | 157(見出し 8、項目 149。実行ごとに 155〜159 の間で揺れる) |
 | `windows.tsv` | F5〜F12・Alt+F8 で開く窓(題名あり)、右クリックのプルダウン 3(Channel rack・Mixer・Playlist)、ブラウザの埋め込みの Web 表示(`TEdgeBrowser`、子窓) | 8 |
 | `topbar.tsv` | 主窓の下の上部バーの部品(`TWPControl`・`TQuickControlBar`・`TQuickEditToolBar`・`TQuickEditToolbarPanel`・`TNewMenu`) | 22 |
 | `settings.tsv` | F10 の設定窓の頁(選択欄の走査で読んだ 10 頁)と、頁ごとの節・一覧・その他の子窓。言語とテーマ(`resources.tsv`)を含めた数 | 97(FL 77 と、言語・テーマ 20) |
@@ -126,11 +126,11 @@ export default defineScenario({
 | `page.tsv` | 本体のモジュールの機能 8(`app/src/`) | 8 |
 | `delivery.tsv` | bundle の manifest.json の lazy の全て | 235 |
 
-合計 763(`summary.json` の `total`)。領域ごとは `perArea`(menus 155・windows 8・topbar 22・settings 97・plugins 147・file 91・page 8・delivery 235。resources の 20 は settings に入る)。`nameSource = memory` は 528 件、`index` は 235 件(`unnamed`: メニュー 155、ファイル 10、上部バー 21、設定 35、窓 4、プラグイン 2、page 8)。
+合計 765(`summary.json` の `total`)。領域ごとは `perArea`(menus 157・windows 8・topbar 22・settings 97・plugins 147・file 91・page 8・delivery 235。resources の 20 は settings に入る)。`nameSource = memory` は 528 件、`index` は 237 件(`unnamed`: メニュー 157、ファイル 10、上部バー 21、設定 35、窓 4、プラグイン 2、page 8)。
 
 **取れなかった・まだ読んでいないもの**(この実行で。runner の値。この機械とは別枠。nproc 4):
 
-- メニューの名前(155 件は全て `nameSource index`): プルダウンの窓(`TQuickPopupMenuWindow`)は、窓の表に子も題名も無く、矩形だけが出る。ゲストのメモリの `&` 付きの文字列(`&New` の周りを `guestText` で `radius` 600 に読む)は、UI の全体の文字列をアルファベット順に並べた一つの表(`&Insert`・`&Invert`・…・`&Open`・`&Options`)で、プルダウンの項目の順とは対応しない。項目の矩形からこの表へ結ぶ規則(項目のポインタの経路)は確かめられなかった。名前は付けず、`#n` で書いた。
+- メニューの名前(157 件は全て `nameSource index`): プルダウンの窓(`TQuickPopupMenuWindow`)は、窓の表に子も題名も無く、矩形だけが出る。ゲストのメモリの `&` 付きの文字列(`&New` の周りを `guestText` で `radius` 600 に読む)は、UI の全体の文字列をアルファベット順に並べた一つの表(`&Insert`・`&Invert`・…・`&Open`・`&Options`)で、プルダウンの項目の順とは対応しない。項目の矩形からこの表へ結ぶ規則(項目のポインタの経路)は確かめられなかった。名前は付けず、`#n` で書いた。
 - メニューの階層: 上位のプルダウンの項目だけ。サブメニューは歩いていない。項目数は実行ごとに数件揺れる(Down で画素が繰り返すまでの数え方。原因は未確認)。
 - 設定窓の頁: 選択欄の上の 10 頁(MIDI・Audio・General・File・Theme・Project・Info・Debug・Account・About)の題名は、窓の表の題名から読んだ。仕様の 16 頁とは差がある。選択欄の隙間(Theme と Project の間、Info と Debug の間)は、クリックしても頁が変わらなかった。残りの頁は見つかっていない。
 - 窓: ブラウザのタブ(8 の枠)は、窓の表では無名の `TVectorPanel` の 1 つで、枠ごとには読んでいない。ミキサーのインサートは窓ではなく描画(窓の表には無名の `TVectorPanel` のみ)。ピアノロールは、チャンネルの左端・名前・ステップの位置を単クリック・二重クリックしても開かなかった(窓の表に子窓が出ない)。ブラウザの右クリックは、試した位置ではプルダウンが出ない。右クリックは、設定窓の走査(F10 と Escape)の後では Channel rack と Playlist が窓の表から消えたため、設定より前に読む(`inventory.mjs` の `main`)。
