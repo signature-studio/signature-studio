@@ -1,270 +1,245 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageClipboard } from '../../src/engine/clipboard.ts';
 
-// the page's status line is the one element the page makes; the document is a stand-in with the members the page uses (its listeners can be fired)
-class FakeElement {
-  id = '';
-  hidden = false;
-  textContent = '';
-  readonly style = { cssText: '' };
-  readonly children: FakeElement[] = [];
-  private readonly attrs = new Map<string, string>();
-  private readonly listeners = new Map<string, Array<() => void>>();
-  setAttribute(k: string, v: string): void { this.attrs.set(k, v); }
-  getAttribute(k: string): string | null { return this.attrs.get(k) ?? null; }
-  append(...els: FakeElement[]): void { this.children.push(...els); }
-  addEventListener(type: string, fn: () => void): void { this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]); }
-  click(): void { for (const fn of this.listeners.get('click') ?? []) fn(); }
-}
-
-interface FakeDoc {
-  doc: Document;
-  appended: FakeElement[];
-  fire(type: string, ev: Record<string, unknown>): void;
-}
-
-function fakeDocument(): FakeDoc {
-  const appended: FakeElement[] = [];
-  const listeners = new Map<string, Array<(ev: unknown) => void>>();
-  const doc = {
-    createElement: () => new FakeElement(),
-    addEventListener: (type: string, fn: (ev: unknown) => void) => { listeners.set(type, [...(listeners.get(type) ?? []), fn]); },
-    body: { append: (el: FakeElement) => { appended.push(el); } },
-  };
-  return {
-    doc: doc as unknown as Document,
-    appended,
-    fire: (type, ev) => { for (const fn of listeners.get(type) ?? []) fn(ev); },
-  };
+// the window of the page is a stand-in: its listeners can be fired (the page adds no element and no paste listener: Issue #1482)
+class FakeWindow {
+  private readonly listeners = new Map<string, Array<(ev: unknown) => void>>();
+  addEventListener(type: string, fn: (ev: unknown) => void): void { this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]); }
+  fire(type: string, ev: Record<string, unknown> = {}): void { for (const fn of this.listeners.get(type) ?? []) fn(ev); }
+  types(): string[] { return [...this.listeners.keys()]; }
 }
 
 const permissions = (states: Record<string, string>) => ({ query: async ({ name }: { name: string }) => ({ state: states[name] ?? 'prompt' }) });
-const desktop = (text: string) => ({ target: { id: 'desktop' }, clipboardData: { getData: () => text } });
+const flush = async (): Promise<void> => { for (let i = 0; i < 50; i++) await Promise.resolve(); };
+
+function page(states: Record<string, string>, api: Record<string, unknown>) {
+  vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn(async () => undefined), ...api }, permissions: permissions(states) });
+  const win = new FakeWindow();
+  const pc = new PageClipboard();
+  pc.attach(win as unknown as Window);
+  return { pc, win };
+}
 
 beforeEach(() => { vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }); });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe('the questions about the formats (#1406): they read nothing and show nothing', () => {
+describe('the page listens to no paste event and shows nothing (#1482)', () => {
+  it('attach registers the press, key, release and focus listeners, and no paste listener', () => {
+    const { win } = page({}, { readText: vi.fn() });
+    expect(win.types().sort()).toEqual(['focus', 'keydown', 'pointerdown', 'pointerup']);
+  });
+
+  it('a refused read gives no text and records the reason only', async () => {
+    const readText = vi.fn(async () => 'x');
+    const { pc, win } = page({ 'clipboard-read': 'denied' }, { readText });
+    win.fire('keydown', { code: 'KeyV' });
+    expect(await pc.read()).toBeNull();
+    expect(readText).not.toHaveBeenCalled();
+    expect(pc.state.refusal).toBe('clipboard-read: denied');
+  });
+});
+
+describe('the questions about the formats (#1406): they read nothing', () => {
   it('under prompt with nothing known, the clipboard is said to hold text, and no read or prompt is made', async () => {
     const readText = vi.fn(async () => 'text');
-    const read = vi.fn(async () => []);
-    vi.stubGlobal('navigator', { clipboard: { readText, read, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'prompt' }) });
-    const { doc, appended } = fakeDocument();
-    const pc = new PageClipboard(doc);
+    const { pc } = page({ 'clipboard-read': 'prompt' }, { readText, read: vi.fn() });
     expect(await pc.probe()).toBe(true);
     expect(readText).not.toHaveBeenCalled();
-    expect(read).not.toHaveBeenCalled();
-    expect(appended).toHaveLength(0);
-    expect(pc.state.message).toBeNull();
+  });
+
+  it('under granted with nothing known, a question reads nothing either', async () => {
+    const readText = vi.fn(async () => 'text');
+    const { pc } = page({ 'clipboard-read': 'granted' }, { readText });
+    expect(await pc.probe()).toBe(true);
+    expect(readText).not.toHaveBeenCalled();
   });
 
   it('under denied, the clipboard is said to hold no text', async () => {
     const readText = vi.fn(async () => 'text');
-    vi.stubGlobal('navigator', { clipboard: { readText, read: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, appended } = fakeDocument();
-    const pc = new PageClipboard(doc);
+    const { pc } = page({ 'clipboard-read': 'denied' }, { readText });
     expect(await pc.probe()).toBe(false);
     expect(readText).not.toHaveBeenCalled();
-    expect(appended).toHaveLength(0);
-  });
-
-  it('under granted, the formats of navigator.clipboard.read() say whether there is text (no prompt, kept for a moment)', async () => {
-    const read = vi.fn(async () => [{ types: ['image/png'] }]);
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), read, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const pc = new PageClipboard(fakeDocument().doc);
-    expect(await pc.probe()).toBe(false);
-    expect(await pc.probe()).toBe(false);
-    expect(read).toHaveBeenCalledOnce();
-    read.mockResolvedValueOnce([{ types: ['text/plain'] }]);
-    expect(await new PageClipboard(fakeDocument().doc).probe()).toBe(true);
   });
 
   it('the text the page knows decides the question, before the permission does', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), read: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const pc = new PageClipboard(fakeDocument().doc);
-    pc.pasted('12.5');
+    const { pc } = page({ 'clipboard-read': 'denied' }, { readText: vi.fn() });
+    await pc.write('12.5');
     expect(await pc.probe()).toBe(true);
-    pc.pasted('');
+    await pc.write('');
     expect(await pc.probe()).toBe(false);
   });
 });
 
-describe('the paste of Ctrl+V: the paste event\'s text, with no read and no prompt', () => {
-  it('the paste event of the desktop gives the text to the next GetClipboardData, even when the permission is denied', async () => {
-    const readText = vi.fn(async () => 'other');
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, appended, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('paste', desktop('fl-text'));
+describe('a paste: GetClipboardData reads the clipboard through readText', () => {
+  it('Ctrl+V (a key, then the engine asks) reads the clipboard text', async () => {
+    const readText = vi.fn(async () => 'fl-text');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    win.fire('keydown', { code: 'KeyV' });
     expect(await pc.read()).toBe('fl-text');
-    expect(readText).not.toHaveBeenCalled();
+    expect(readText).toHaveBeenCalledOnce();
     expect(pc.state.lastRead).toBe('fl-text');
-    expect(appended).toHaveLength(0);
   });
 
-  it('a paste event outside the desktop is not the engine\'s', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(async () => 'x'), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('paste', { target: { id: 'name' }, clipboardData: { getData: () => 'not for the engine' } });
-    expect(pc.state.pastes).toBe(0);
-  });
-
-  it('the paste text is for one GetClipboardData: the next one (a paste from the menu) reads the clipboard', async () => {
+  it('a paste from the menu (a left click, then the engine asks) reads the clipboard text', async () => {
     const readText = vi.fn(async () => 'menu');
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('paste', desktop('ctrl-v'));
-    expect(await pc.read()).toBe('ctrl-v');
-    expect(readText).not.toHaveBeenCalled();
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    win.fire('pointerup', { button: 0 });
     expect(await pc.read()).toBe('menu');
     expect(readText).toHaveBeenCalledOnce();
   });
 
-  it('a press of a button drops a paste text that no GetClipboardData took', async () => {
-    const readText = vi.fn(async () => 'menu');
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('paste', desktop('stale'));
-    fire('pointerdown', { button: 0 });
-    expect(await pc.read()).toBe('menu');
-  });
-});
-
-describe('the knob\'s right click asks for the value (FL\'s check), and the menu\'s paste reads', () => {
-  it('after a right button release, GetClipboardData reads nothing: the known text, or a number under prompt', async () => {
-    const readText = vi.fn(async () => 'secret');
-    vi.stubGlobal('navigator', { clipboard: { readText, read: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'prompt' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 2 });
-    expect(await pc.read()).toBe('0');
-    expect(readText).not.toHaveBeenCalled();
-    expect(pc.state.message).toBeNull();
-  });
-
-  it('a right-click question under denied gives no text', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 2 });
-    expect(await pc.read()).toBeNull();
-    expect(pc.state.message).toBeNull();
-  });
-
-  it('after a left release the menu\'s paste reads: under denied it reads nothing, gives no text, and shows the reason once for 5 s', async () => {
-    const readText = vi.fn(async () => 'text');
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, appended, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 2 });
-    fire('pointerup', { button: 0 });
-    expect(await pc.read()).toBeNull();
-    expect(readText).not.toHaveBeenCalled();
-    expect(pc.state.message).toMatch(/clipboard-read: denied/);
-    expect(appended).toHaveLength(1);
-    expect(appended[0]?.getAttribute('role')).toBe('status');
-    expect(appended[0]?.hidden).toBe(false);
-    expect(appended[0]?.children[0]?.textContent).toBe(pc.state.message);
-    vi.advanceTimersByTime(4900);
-    expect(appended[0]?.hidden).toBe(false);
-    vi.advanceTimersByTime(200);
-    expect(appended[0]?.hidden).toBe(true);
-    expect(pc.state.message).toBeNull();
-  });
-
-  it('a reason shown again while it is up is still one status line, and its hiding moves on', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, appended, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 0 });
-    await pc.read();
-    vi.advanceTimersByTime(3000);
-    await pc.read();
-    expect(appended).toHaveLength(1);
-    vi.advanceTimersByTime(3000);
-    expect(appended[0]?.hidden).toBe(false);
-    vi.advanceTimersByTime(2000);
-    expect(appended[0]?.hidden).toBe(true);
-  });
-
-  it('the close button hides the reason at once', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'denied' }) });
-    const { doc, appended, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 0 });
-    await pc.read();
-    const close = appended[0]?.children[1];
-    expect(close?.getAttribute('aria-label')).toBe('Close');
-    close?.click();
-    expect(appended[0]?.hidden).toBe(true);
-    expect(pc.state.message).toBeNull();
-  });
-
-  it('a menu paste under granted reads the clipboard and gives its text', async () => {
-    const readText = vi.fn(async () => 'granted-text');
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const { doc, appended, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 0 });
-    expect(await pc.read()).toBe('granted-text');
+  it('a key after a right release is not the right-click question: Ctrl+V after a right click reads', async () => {
+    const readText = vi.fn(async () => 'paste');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    win.fire('pointerup', { button: 2 });
+    win.fire('keydown', { code: 'KeyV' });
+    expect(await pc.read()).toBe('paste');
     expect(readText).toHaveBeenCalledOnce();
-    expect(appended).toHaveLength(0);
   });
 
-  it('a read that the browser fails gives no text and names the failure', async () => {
+  it('a read the browser fails gives no text and names the failure', async () => {
     const readText = vi.fn(async () => { throw Object.assign(new Error('Document is not focused.'), { name: 'NotAllowedError' }); });
-    vi.stubGlobal('navigator', { clipboard: { readText, writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'granted' }) });
-    const { doc, fire } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    fire('pointerup', { button: 0 });
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    win.fire('pointerup', { button: 0 });
     expect(await pc.read()).toBeNull();
     expect(pc.state.lastRead).toBeNull();
-    expect(pc.state.message).toMatch(/NotAllowedError: Document is not focused/);
+    expect(pc.state.refusal).toMatch(/NotAllowedError: Document is not focused/);
   });
-});
 
-describe('the earlier behaviour that stays (#1389): Copy, and a browser without a Clipboard API', () => {
-  it('a browser without a Clipboard API gives no text and says so', async () => {
+  it('a browser without a Clipboard API gives no text and records it', async () => {
     vi.stubGlobal('navigator', { permissions: permissions({}) });
-    const { doc } = fakeDocument();
-    const pc = new PageClipboard(doc);
+    const pc = new PageClipboard();
+    pc.attach(new FakeWindow() as unknown as Window);
     expect(await pc.probe()).toBe(false);
     expect(await pc.read()).toBeNull();
     await pc.write('x');
-    expect(pc.state.message).toMatch(/no Clipboard API/);
+    expect(pc.state.refusal).toMatch(/no Clipboard API/);
     expect(pc.state.writes).toBe(1);
   });
+});
 
-  it('a write the browser refuses is not made; a granted write is made, its text recorded, and the text is known to the questions', async () => {
-    const writeText = vi.fn(async () => undefined);
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText }, permissions: permissions({ 'clipboard-write': 'denied' }) });
-    const { doc } = fakeDocument();
-    const pc = new PageClipboard(doc);
-    await pc.write('FLEX (FL)');
-    expect(writeText).not.toHaveBeenCalled();
-    expect(pc.state.message).toMatch(/clipboard-write: denied/);
-    expect(pc.state.lastWritten).toBe('FLEX (FL)');
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), read: vi.fn(), writeText }, permissions: permissions({ 'clipboard-write': 'granted', 'clipboard-read': 'denied' }) });
-    await pc.write('FLEX (FL)');
-    expect(writeText).toHaveBeenCalledWith('FLEX (FL)');
-    expect(pc.state.message).toBeNull();
-    expect(pc.state.writes).toBe(2);
-    expect(await pc.probe()).toBe(true);
+describe('FL\'s right-click question (#1406): nothing is read', () => {
+  it('after a right button release, GetClipboardData reads nothing: the known text, or a number under prompt', async () => {
+    const readText = vi.fn(async () => 'secret');
+    const { pc, win } = page({ 'clipboard-read': 'prompt' }, { readText, read: vi.fn() });
+    win.fire('pointerup', { button: 2 });
+    expect(await pc.read()).toBe('0');
+    expect(readText).not.toHaveBeenCalled();
+    expect(pc.state.refusal).toBeNull();
+  });
+
+  it('the known text answers the question', async () => {
+    const readText = vi.fn(async () => 'secret');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    await pc.write('12');
+    win.fire('pointerup', { button: 2 });
+    expect(await pc.read()).toBe('12');
+    expect(readText).not.toHaveBeenCalled();
+  });
+
+  it('a right-click question under denied gives no text and reads nothing', async () => {
+    const readText = vi.fn(async () => 'x');
+    const { pc, win } = page({ 'clipboard-read': 'denied' }, { readText });
+    win.fire('pointerup', { button: 2 });
+    expect(await pc.read()).toBeNull();
+    expect(readText).not.toHaveBeenCalled();
+  });
+
+  it('the question is over after a moment: a later read is a paste', async () => {
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    const readText = vi.fn(async () => 'later');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    win.fire('pointerup', { button: 2 });
+    now += 1600;
+    expect(await pc.read()).toBe('later');
+    expect(readText).toHaveBeenCalledOnce();
+  });
+});
+
+describe('the permission is asked at the load (#1482)', () => {
+  it('under prompt, the page calls readText once at its load (the browser asks the person)', async () => {
+    const readText = vi.fn(async () => 'first');
+    const { pc } = page({ 'clipboard-read': 'prompt' }, { readText });
+    await pc.start();
+    expect(readText).toHaveBeenCalledOnce();
+    expect(pc.state.refusal).toBeNull();
+  });
+
+  it('under granted, the load reads the text the page knows (and a focus reads it again)', async () => {
+    const readText = vi.fn(async () => 'kept');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    await pc.start();
+    expect(readText).toHaveBeenCalledOnce();
+    win.fire('focus');
+    await flush();
+    expect(readText).toHaveBeenCalledTimes(2);
+  });
+
+  it('under prompt, a focus reads nothing (the request is not repeated)', async () => {
+    const readText = vi.fn(async () => 'x');
+    const { pc, win } = page({ 'clipboard-read': 'prompt' }, { readText });
+    await pc.start();
+    win.fire('focus');
+    await flush();
+    expect(readText).toHaveBeenCalledOnce();
+  });
+
+  it('under denied, the load asks for nothing', async () => {
+    const readText = vi.fn(async () => 'x');
+    const { pc } = page({ 'clipboard-read': 'denied' }, { readText });
+    await pc.start();
+    expect(readText).not.toHaveBeenCalled();
+  });
+
+  it('a request the browser refuses at the load (no focus) is made again at the first press or key, once', async () => {
+    const readText = vi.fn(async () => { throw Object.assign(new Error('Document is not focused.'), { name: 'NotAllowedError' }); });
+    const { pc, win } = page({ 'clipboard-read': 'prompt' }, { readText });
+    await pc.start();
+    expect(readText).toHaveBeenCalledOnce();
+    expect(pc.state.refusal).toMatch(/NotAllowedError/);
+    win.fire('pointerdown', { button: 0 });
+    await flush();
+    expect(readText).toHaveBeenCalledTimes(2);
+    win.fire('keydown', { code: 'KeyA' });
+    win.fire('pointerdown', { button: 0 });
+    await flush();
+    expect(readText).toHaveBeenCalledTimes(2);
   });
 
   it('refresh records both permission states, and "unknown" when the browser has no Permissions API', async () => {
-    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText: vi.fn() }, permissions: permissions({ 'clipboard-read': 'prompt', 'clipboard-write': 'granted' }) });
-    const pc = new PageClipboard(fakeDocument().doc);
+    const { pc } = page({ 'clipboard-read': 'prompt', 'clipboard-write': 'granted' }, {});
     await pc.refresh();
     expect(pc.state.readPermission).toBe('prompt');
     expect(pc.state.writePermission).toBe('granted');
     vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText: vi.fn() } });
-    const other = new PageClipboard(fakeDocument().doc);
+    const other = new PageClipboard();
     await other.refresh();
     expect(other.state.readPermission).toBe('unknown');
     expect(other.state.writePermission).toBe('unknown');
+  });
+});
+
+describe('Copy (#1389) and its refusal, silent', () => {
+  it('a write the browser refuses is not made; a granted write is made, its text recorded, and the text is known to the questions', async () => {
+    const writeText = vi.fn(async () => undefined);
+    const { pc } = page({ 'clipboard-write': 'denied' }, { writeText });
+    await pc.write('FLEX (FL)');
+    expect(writeText).not.toHaveBeenCalled();
+    expect(pc.state.refusal).toBe('clipboard-write: denied');
+    expect(pc.state.lastWritten).toBe('FLEX (FL)');
+    vi.stubGlobal('navigator', { clipboard: { readText: vi.fn(), writeText }, permissions: permissions({ 'clipboard-write': 'granted', 'clipboard-read': 'denied' }) });
+    await pc.write('FLEX (FL)');
+    expect(writeText).toHaveBeenCalledWith('FLEX (FL)');
+    expect(pc.state.refusal).toBeNull();
+    expect(pc.state.writes).toBe(2);
+    expect(await pc.probe()).toBe(true);
+  });
+
+  it('a write the browser fails names the failure in state.refusal only', async () => {
+    const writeText = vi.fn(async () => { throw Object.assign(new Error('not focused'), { name: 'NotAllowedError' }); });
+    const { pc } = page({ 'clipboard-write': 'granted' }, { writeText });
+    await pc.write('x');
+    expect(pc.state.refusal).toMatch(/NotAllowedError: not focused/);
   });
 });

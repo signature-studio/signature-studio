@@ -1,6 +1,7 @@
 // Page entry: loads the bundle (/assets/manifest.json), shows the start-up stages, progress and errors, starts the engine Worker and shows the engine's desktop on its one canvas. The page has no URL parameters (decision 0243).
 import './style.css';
 import { attachDesktopInput } from './input/pointer.ts';
+import { suppressContextMenu } from './input/context-menu.ts';
 import { describeRaw, IN, type RawInput } from './input/events.ts';
 import { TaskbarRestore } from './ui/taskbar.ts';
 import { fetchAsset, fetchManifest, hashModeOfThisBrowser, loadPack, loadWasm, LoadError, type LoadedPack, type Progress } from './bundle/loader.ts';
@@ -178,9 +179,12 @@ let endRequested = false;
 
 /** C-6 (#1310) / #1347: the window-API trace asked for (on, or off); the engine's start takes it, so the trace covers the start-up too */
 let apiTraceWanted = false;
-// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts)
-const pageClipboard = new PageClipboard(document);
-void pageClipboard.refresh();
+// #1389: the engine's Copy and Paste reach the operating system's clipboard through the page (clipboard.ts); #1482: through the Clipboard API only
+const pageClipboard = new PageClipboard();
+pageClipboard.attach(window);
+void pageClipboard.start();
+// #1482: the browser's own context menu never shows on the page (context-menu.ts)
+suppressContextMenu(document);
 const app: AppApi = {
   assetsReport: () => assetsNow(),
   state: 'idle', manifest: null, engineKind: null, exit: null, error: null, timeline: {}, details: {}, features: null, summary: null, lazy: [], imageReads: [], inputEvents: 0, latency: new LatencyTracker(400, { framesAreChanges: false }), cursor: { css: 'default', why: 'not asked yet' }, cursorRecord: { unmapped: [], made: 0, unresolved: 0 }, driverStats: null, engineMemoryBytes: null, hostFiles: null, idleTrace: {}, idles: [], lastChanged: null, hz: { hz: null, measurement: null, warning: null },

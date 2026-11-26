@@ -1,6 +1,6 @@
 // (b) knob-right-click-permissions: a right click on the Volume knob of the first channel in the Channel rack, under each clipboard permission state
 // (prompt, denied, granted). FL's context menu must open; the page must not read the clipboard (navigator.clipboard.read / readText: 0 calls); the
-// page's status line must stay hidden (no visible role=status region); no clipboard permission may change. Issue #1406 (the permission notice does not go away) is the expected failure.
+// page must show no notice (no visible role=status / role=alert / aria-live region: Issue #1482 removed the notice); no clipboard permission may change.
 import { closeWelcome, dismissProblems, noThanks, sleep, WELCOME, waitProjectOpen, waitStable } from '../../lib/flow.mjs';
 import { clipboardReads, countClipboardReads, permissionStates, toastState } from '../../lib/detect.mjs';
 
@@ -25,7 +25,7 @@ async function setPermission(browserCdp, browserContextId, origin, state) {
 
 export default {
   name: 'knob-right-click-permissions',
-  expectFail: '#1406',
+  expectFail: null,
   async run({ guest, page, browserCdp, browserContextId, origin, log }) {
     const notes = [];
     const first = await waitStable(guest, 180000);

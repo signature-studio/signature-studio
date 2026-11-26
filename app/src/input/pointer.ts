@@ -67,7 +67,6 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions): 
     const d = wheel.add(e.deltaY, e.deltaMode, performance.now());
     if (d !== 0) tracker.wheel(p.x, p.y, d);
   };
-  const onContext = (e: Event): void => { if (opts.enabled()) e.preventDefault(); };
   const onKey = (down: boolean) => (e: KeyboardEvent): void => {
     if (!opts.enabled()) return;
     const d = keyPolicy(e, { sendTab: opts.sendTab?.() ?? false });
@@ -103,7 +102,7 @@ export function attachDesktopInput(el: HTMLElement, opts: DesktopInputOptions): 
     : fn);
   const el_: [string, AnyListener, AddEventListenerOptions?][] = [
     ['pointerdown', onDown as unknown as AnyListener], ['pointermove', onPointer('pointermove') as unknown as AnyListener], ['pointerup', onUp as unknown as AnyListener],
-    ['pointercancel', onPointer('pointercancel') as unknown as AnyListener], ['wheel', onWheel as unknown as AnyListener, { passive: false }], ['contextmenu', onContext as unknown as AnyListener],
+    ['pointercancel', onPointer('pointercancel') as unknown as AnyListener], ['wheel', onWheel as unknown as AnyListener, { passive: false }],
     ['auxclick', stop as unknown as AnyListener], ['dragstart', stop as unknown as AnyListener], ['selectstart', stop as unknown as AnyListener],
     ['keydown', onKey(true) as unknown as AnyListener], ['keyup', onKey(false) as unknown as AnyListener], ['blur', release as unknown as AnyListener],
   ];
