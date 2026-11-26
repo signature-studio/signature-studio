@@ -1,0 +1,78 @@
+id	kind	name	source	how	nameSource
+settings/selector/page-tabs	selector	TQuickSheetSelector #23	lid 23 TQuickSheetSelector under lid 22	at 5,33 658x32; the pages are the places clicked along it	index
+settings/page/midi	page	MIDI	lid 24 TVectorSheet under lid 22	tab at x 6 of the selector (guest px from its left)	memory
+settings/section/output	section	Output	lid 25 TVectorPanel	under the page lid 24 (MIDI), at 24,8 608x280 vis 0	memory
+settings/section/input	section	Input	lid 26 TVectorPanel	under the page lid 24 (MIDI), at 24,296 608x386 vis 0	memory
+settings/list/midi-tquickstringgrid-1	list	TQuickStringGrid #1 in MIDI	lid 27 TQuickStringGrid	under the page lid 24 (MIDI), at 7,27 594x175 vis 0	index
+settings/list/midi-tquickstringgrid-2	list	TQuickStringGrid #2 in MIDI	lid 28 TQuickStringGrid	under the page lid 24 (MIDI), at 7,27 594x176 vis 0	index
+settings/section/external-sync	section	External sync	lid 174 TVectorPanel	under the page lid 24 (MIDI), at 24,690 608x83 vis 0	memory
+settings/control/midi-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in MIDI	lid 175 TQuickScrollBoxScroller	under the page lid 24 (MIDI), at 639,0 17x829 vis 0	index
+settings/control/midi-tquickscrollboxscroller-2	control	TQuickScrollBoxScroller #2 in MIDI	lid 226 TQuickScrollBoxScroller	under the page lid 24 (MIDI), at 577,0 17x176 vis 0	index
+settings/control/midi-tquickscrollboxscroller-3	control	TQuickScrollBoxScroller #3 in MIDI	lid 227 TQuickScrollBoxScroller	under the page lid 24 (MIDI), at 577,0 17x175 vis 0	index
+settings/page/audio	page	Audio	lid 176 TVectorSheet under lid 22	tab at x 54 of the selector (guest px from its left)	memory
+settings/section/mixer	section	Mixer	lid 177 TVectorPanel	under the page lid 176 (Audio), at 24,438 608x141 vis 0	memory
+settings/section/input-output	section	Input / output	lid 178 TVectorPanel	under the page lid 176 (Audio), at 24,16 608x324 vis 0	memory
+settings/section/cpu	section	CPU	lid 180 TVectorPanel	under the page lid 176 (Audio), at 24,348 608x82 vis 0	memory
+settings/control/audio-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Audio	lid 230 TQuickScrollBoxScroller	under the page lid 176 (Audio), at 639,0 17x829 vis 0	index
+settings/page/general	page	General	lid 181 TVectorSheet under lid 22	tab at x 114 of the selector (guest px from its left)	memory
+settings/section/system	section	System	lid 182 TVectorPanel	under the page lid 181 (General), at 24,993 608x60 vis 0	memory
+settings/section/display-requires-a-restart-to-take-effect	section	Display ?(requires a restart to take effect)?	lid 183 TVectorPanel	under the page lid 181 (General), at 24,16 608x339 vis 0	memory
+settings/section/advanced	section	Advanced	lid 184 TVectorPanel	under the page lid 181 (General), at 24,1643 608x273 vis 0	memory
+settings/section/miscellaneous	section	Miscellaneous	lid 185 TVectorPanel	under the page lid 181 (General), at 24,1185 608x450 vis 0	memory
+settings/section/input-2	section	Input	lid 186 TVectorPanel	under the page lid 181 (General), at 24,520 608x187 vis 0	memory
+settings/section/updates-and-privacy	section	Updates and privacy	lid 187 TVectorPanel	under the page lid 181 (General), at 24,1061 608x116 vis 0	memory
+settings/section/language-requires-a-restart-to-take-effect	section	Language ?(requires a restart to take effect)?	lid 188 TVectorPanel	under the page lid 181 (General), at 24,363 608x149 vis 0	memory
+settings/section/hints-and-warnings	section	Hints and warnings	lid 189 TVectorPanel	under the page lid 181 (General), at 24,894 608x91 vis 0	memory
+settings/section/undo-history	section	Undo history	lid 190 TVectorPanel	under the page lid 181 (General), at 24,715 608x171 vis 0	memory
+settings/control/general-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in General	lid 191 TQuickScrollBoxScroller	under the page lid 181 (General), at 639,0 17x829 vis 0	index
+settings/page/file	page	File	lid 29 TVectorSheet under lid 22	tab at x 186 of the selector (guest px from its left)	memory
+settings/section/browser-extra-search-folders	section	Browser extra search folders	lid 30 TVectorPanel	under the page lid 29 (File), at 24,187 608x418 vis 0	memory
+settings/list/file-tquickstringgrid-1	list	TQuickStringGrid #1 in File	lid 31 TQuickStringGrid	under the page lid 29 (File), at 7,27 594x384 vis 0	index
+settings/section/external-tools	section	External tools	lid 32 TVectorPanel	under the page lid 29 (File), at 24,614 608x171 vis 0	memory
+settings/list/file-tquickstringgrid-2	list	TQuickStringGrid #2 in File	lid 33 TQuickStringGrid	under the page lid 29 (File), at 7,27 477x97 vis 0	index
+settings/control/file-tquickstringgridheader-1	control	TQuickStringGridHeader #1 in File	lid 194 TQuickStringGridHeader	under the page lid 29 (File), at 0,0 460x19 vis 0	index
+settings/control/file-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in File	lid 195 TQuickScrollBoxScroller	under the page lid 29 (File), at 460,0 17x97 vis 0	index
+settings/control/file-tquickstringgridheader-2	control	TQuickStringGridHeader #2 in File	lid 196 TQuickStringGridHeader	under the page lid 29 (File), at 0,0 577x19 vis 0	index
+settings/control/file-tquickscrollboxscroller-2	control	TQuickScrollBoxScroller #2 in File	lid 197 TQuickScrollBoxScroller	under the page lid 29 (File), at 577,0 17x384 vis 0	index
+settings/section/backup	section	Backup	lid 198 TVectorPanel	under the page lid 29 (File), at 24,16 608x91 vis 0	memory
+settings/section/plugins	section	Plugins	lid 200 TVectorPanel	under the page lid 29 (File), at 1,1 140x62 vis 0	memory
+settings/section/user-data-folder	section	User data folder	lid 201 TVectorPanel	under the page lid 29 (File), at 149,1 460x62 vis 0	memory
+settings/section/troubleshooting	section	Troubleshooting	lid 202 TVectorPanel	under the page lid 29 (File), at 24,794 608x19 vis 0	memory
+settings/page/theme	page	Theme	lid 203 TVectorSheet under lid 22	tab at x 234 of the selector (guest px from its left)	memory
+settings/section/presets	section	Presets	lid 209 TVectorPanel	under the page lid 203 (Theme), at 24,16 608x494 vis 0	memory
+settings/list/theme-tquickstringgrid-1	list	TQuickStringGrid #1 in Theme	lid 210 TQuickStringGrid	under the page lid 203 (Theme), at 0,27 608x467 vis 0	index
+settings/section/adjustments	section	Adjustments	lid 211 TVectorPanel	under the page lid 203 (Theme), at 24,518 608x169 vis 0	memory
+settings/section/options	section	Options	lid 212 TVectorPanel	under the page lid 203 (Theme), at 24,695 608x81 vis 0	memory
+settings/control/theme-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Theme	lid 213 TQuickScrollBoxScroller	under the page lid 203 (Theme), at 591,0 17x467 vis 0	index
+settings/page/project	page	Project	lid 217 TVectorSheet under lid 22	tab at x 306 of the selector (guest px from its left)	memory
+settings/section/advanced-2	section	Advanced	lid 218 TVectorPanel	under the page lid 217 (Project), at 24,396 608x19 vis 0	memory
+settings/section/data-folder	section	Data folder	lid 219 TVectorPanel	under the page lid 217 (Project), at 24,16 608x147 vis 0	memory
+settings/section/time-settings	section	Time settings	lid 220 TVectorPanel	under the page lid 217 (Project), at 24,171 608x149 vis 0	memory
+settings/section/playlist	section	Playlist	lid 221 TVectorPanel	under the page lid 217 (Project), at 24,423 608x60 vis 0	memory
+settings/section/fl-studio-remote	section	FL Studio Remote	lid 222 TVectorPanel	under the page lid 217 (Project), at 24,491 608x79 vis 0	memory
+settings/control/project-tquickedit-1	control	TQuickEdit #1 in Project	lid 223 TQuickEdit	under the page lid 217 (Project), at 103,32 321x23 vis 0	index
+settings/control/project-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Project	lid 224 TQuickScrollBoxScroller	under the page lid 217 (Project), at 0,19 321x4 vis 0	index
+settings/section/fl-cloud	section	FL Cloud	lid 225 TVectorPanel	under the page lid 217 (Project), at 24,328 608x60 vis 0	memory
+settings/page/info	page	Info	lid 193 TVectorSheet under lid 22	tab at x 378 of the selector (guest px from its left)	memory
+settings/control/info-tquickmemo-1	control	TQuickMemo #1 in Info	lid 231 TQuickMemo	under the page lid 193 (Info), at 24,131 608x571 vis 0	index
+settings/control/info-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Info	lid 232 TQuickScrollBoxScroller	under the page lid 193 (Info), at 591,0 17x571 vis 0	index
+settings/control/info-tquickedit-1	control	TQuickEdit #1 in Info	lid 233 TQuickEdit	under the page lid 193 (Info), at 24,730 608x20 vis 0	index
+settings/control/info-tquickscrollboxscroller-2	control	TQuickScrollBoxScroller #2 in Info	lid 234 TQuickScrollBoxScroller	under the page lid 193 (Info), at 0,16 608x4 vis 0	index
+settings/control/info-tquickedit-2	control	TQuickEdit #2 in Info	lid 235 TQuickEdit	under the page lid 193 (Info), at 24,83 401x20 vis 0	index
+settings/control/info-tquickscrollboxscroller-3	control	TQuickScrollBoxScroller #3 in Info	lid 236 TQuickScrollBoxScroller	under the page lid 193 (Info), at 0,16 401x4 vis 0	index
+settings/control/info-tquickedit-3	control	TQuickEdit #3 in Info	lid 237 TQuickEdit	under the page lid 193 (Info), at 453,83 158x20 vis 0	index
+settings/control/info-tquickscrollboxscroller-4	control	TQuickScrollBoxScroller #4 in Info	lid 238 TQuickScrollBoxScroller	under the page lid 193 (Info), at 0,16 158x4 vis 0	index
+settings/control/info-tquickedit-4	control	TQuickEdit #4 in Info	lid 239 TQuickEdit	under the page lid 193 (Info), at 24,32 401x23 vis 0	index
+settings/control/info-tquickscrollboxscroller-5	control	TQuickScrollBoxScroller #5 in Info	lid 240 TQuickScrollBoxScroller	under the page lid 193 (Info), at 0,19 401x4 vis 0	index
+settings/page/debug	page	Debug	lid 214 TVectorSheet under lid 22	tab at x 438 of the selector (guest px from its left)	memory
+settings/control/debug-tquickmemo-1	control	TQuickMemo #1 in Debug	lid 215 TQuickMemo	under the page lid 214 (Debug), at 24,16 608x797 vis 0	index
+settings/control/debug-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Debug	lid 216 TQuickScrollBoxScroller	under the page lid 214 (Debug), at 591,0 17x797 vis 0	index
+settings/page/account	page	Account	lid 245 TVectorSheet under lid 22	tab at x 498 of the selector (guest px from its left)	memory
+settings/section/fl-studio-license	section	FL Studio license??	lid 246 TVectorPanel	under the page lid 245 (Account), at 24,16 608x165 vis 0	memory
+settings/section/fl-cloud-2	section	FL Cloud	lid 247 TVectorPanel	under the page lid 245 (Account), at 24,189 608x176 vis 0	memory
+settings/list/account-tquickstringgrid-1	list	TQuickStringGrid #1 in Account	lid 249 TQuickStringGrid	under the page lid 245 (Account), at 3,5 578x63 vis 0	index
+settings/control/account-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in Account	lid 250 TQuickScrollBoxScroller	under the page lid 245 (Account), at 561,0 17x63 vis 0	index
+settings/page/about	page	About	lid 241 TVectorSheet under lid 22	tab at x 570 of the selector (guest px from its left)	memory
+settings/control/about-tquickmemo-1	control	TQuickMemo #1 in About	lid 242 TQuickMemo	under the page lid 241 (About), at 271,98 357x731 vis 1	index
+settings/control/about-tquickscrollboxscroller-1	control	TQuickScrollBoxScroller #1 in About	lid 243 TQuickScrollBoxScroller	under the page lid 241 (About), at 353,0 4x731 vis 0	index
+settings/control/about-twpcontrol-1	control	TWPControl #1 in About	lid 244 TWPControl	under the page lid 241 (About), at 271,98 357x32 vis 1	index

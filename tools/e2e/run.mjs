@@ -1,89 +1,105 @@
 #!/usr/bin/env node
-// E2E (Issue #1407): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
+// E2E (Issue #1407, extended by #1485): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
 // physical pixels, 120 Hz by the BeginFrame clock (lib/browser.mjs), with real mouse and key events (lib/guest.mjs).
-// Usage: node tools/e2e/run.mjs [--scenarios smoke] [--only NAME[,NAME]] [--displays 4k-dpr1,4k-dpr2,4k-random] [--clock raf|begin] [--shots DIR]     (run.sh does the same from the repository)
+// Usage: node tools/e2e/run.mjs [--scenarios smoke | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
+//                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR]     (run.sh does the same from the repository)
+//   --area <領域>: the scenarios of tools/e2e/scenarios/<領域>/ (the 13 areas: page input file menus windows audio settings plugins topbar resilience visual perf delivery).
+//     Each file there default-exports defineScenario({ id, covers, displays, expectFail, run }) (lib/scenario.mjs). The files are found by the runner (no table to edit).
+//   --scenarios smoke: the older set (scenarios/smoke/index.mjs, { name, expectFail, run } objects); each of them runs in a page of its own, as before.
+//   --list: starts nothing. One JSON line per area: { area, scenarios, covers, features } (features: the rows of tools/e2e/features/). With --area, that area's line only.
+//   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
+//   --budget: a number with s, m or h. A scenario that would start after the budget is not run: it is written with skipped: true (the row then fails).
+//   --only: IDs (page/canvas-fills-viewport) or the older names (file-open-demo).
+//   --displays: 4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR);
+//     dpr:<number> (e.g. dpr:1.25: CSS px 3840 / DPR, 2160 / DPR). Areas default to 4k-dpr1,4k-random; the smoke set to 4k-dpr1,4k-dpr2,4k-random.
 //   --clock: raf (default: the page's own rAF, the frame-rate limit off) or begin (120 Hz by the BeginFrame clock; see lib/browser.mjs).
-//   --displays: 4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080 CSS px, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR).
-//   --only: a test aid, only the named scenarios of the set are run (e.g. --only file-open-demo); each row then has that many scenarios.
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
-//   --engine-logs DIR: a test aid, the engine log of each scenario (every line the page keeps) is written to DIR/<display>-<dpr>-<scenario>.log (the directory is made).
+//   --engine-logs DIR: a test aid, the engine log of each scenario (the lines the page keeps, from the scenario's start) is written to DIR/<display>-<dpr>-<id>.log.
+// A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
-// 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect, named by its issue) has 0 pageErrors, 0 consoleErrors and 0 failedRequests
-// (its stuckToasts is only written to the JSON). Temporary files are in the repository's .tmp-e2e-* and are removed.
+// 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests
+// (its stuckToasts is only written to the JSON); no scenario is skipped. Temporary files are in the repository's .tmp-e2e-* and are removed.
 // Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
 // stop report and the report's lines (lib/stop.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DISPLAY, launchBrowser, newPage, startFrameClock, installRafCounter, startRafSampler } from './lib/browser.mjs';
 import { Guest } from './lib/guest.mjs';
 import { attachDetectors, installToastWatch, toastState, watchEngine } from './lib/detect.mjs';
 import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
+import { AREAS, legacyScenario } from './lib/scenario.mjs';
+import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses } from './lib/plan.mjs';
+import { resetProject, startProject } from './lib/common.mjs';
+import { readFeatures } from './coverage.mjs';
+
+export { displayRows, rowPasses };
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
 const appDir = path.join(repo, 'app');
+const scenariosDir = path.join(here, 'scenarios');
+const featuresDir = path.join(here, 'features');
 const BUNDLE = 'fl-Oz';
 const bundleDir = path.join(repo, 'lift', 'out-app', 'bundle', 'raw', BUNDLE);
 const brDir = path.join(repo, 'lift', 'out-app', 'bundle', 'br', BUNDLE);
+const SMOKE_DISPLAYS = '4k-dpr1,4k-dpr2,4k-random';
 
 const log = (...a) => process.stderr.write(`${new Date().toISOString().slice(11, 19)} ${a.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')}\n`);
 const round2 = (v) => Math.round(v * 100) / 100;
+const fileTag = (d) => `${d.name}-${String(d.dpr).replace('.', '_').replace(':', '-')}`;
 
-function parseArgs(argv) {
-  const a = {};
-  for (let i = 0; i < argv.length; i++) {
-    const t = argv[i];
-    if (!t.startsWith('--')) throw new Error(`unexpected argument ${t}`);
-    const v = argv[++i];
-    if (v === undefined) throw new Error(`--${t.slice(2)} needs a value`);
-    a[t.slice(2)] = v;
+/** the scenarios of one area: the files of scenarios/<area>/ (not index.mjs, not _-prefixed), each a defineScenario; the area of a file must be its folder's */
+export async function loadArea(area) {
+  const dir = path.join(scenariosDir, area);
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const f of fs.readdirSync(dir).sort()) {
+    if (!f.endsWith('.mjs') || f === 'index.mjs' || f.startsWith('_')) continue;
+    const mod = await import(pathToFileURL(path.join(dir, f)).href);
+    const sc = mod.default;
+    if (!sc || sc.kind !== 'scenario') throw new Error(`scenarios/${area}/${f}: default-export defineScenario({...})`);
+    if (sc.area !== area) throw new Error(`scenarios/${area}/${f}: the scenario ${sc.id} is of area ${sc.area}`);
+    out.push(sc);
   }
-  return a;
+  return out;
 }
 
-/** the rows of one display name: the CSS size of the 3840 x 2160 physical picture at the DPR */
-export function displayRows(name, rnd = Math.random) {
-  const row = (n, dpr) => ({ name: n, dpr, cssWidth: Math.round(DISPLAY.width / dpr), cssHeight: Math.round(DISPLAY.height / dpr) });
-  if (name === '4k-dpr1') return [row(name, 1)];
-  if (name === '4k-dpr2') return [row(name, 2)];
-  if (name === '4k-random') {
-    return [0, 1].map(() => row(name, Math.round((1.01 + rnd() * 1.99) * 100) / 100));
-  }
-  throw new Error(`no display ${name} (4k-dpr1, 4k-dpr2, 4k-random)`);
+/** the older smoke set: its objects as legacy scenarios */
+export async function loadSmoke() {
+  const all = (await import(pathToFileURL(path.join(scenariosDir, 'smoke', 'index.mjs')).href)).default;
+  return all.map(legacyScenario);
 }
 
-/** the acceptance of one row of `n` scenarios (the same rule as judge.jq, which the job runs on the output) */
-export function rowPasses(row, n = 3) {
-  return row.servedHeadersMatch === true && row.error === null && row.scenarios.length === n
-    && row.scenarios.every((s) => (s.expectFail !== null
-      ? s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0
-      : s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
-}
-
-/** the engine's log of the page and its stop fact, read when the engine has stopped (lib/stop.mjs) */
+/** the engine's stop of the page (its log and state), through lib/stop.mjs */
 async function engineStopOf(page, cdp, origin) {
   const g = new Guest(page, cdp, origin);
-  const lines = await g.ev("window.__app ? window.__app.engineLog() : []");
+  const lines = await g.ev('window.__app ? window.__app.engineLog() : []');
   return stopOf(lines, (await g.state())?.exit ?? null);
 }
 
-async function runScenario(sc, d, env) {
-  const { browser, browserCdp, delivery, shotsDir } = env;
-  const out = {
-    name: sc.name, ok: false, expectFail: sc.expectFail ?? null, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0,
-    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [],
+function newResult(sc, repeat, d) {
+  return {
+    id: sc.id, name: sc.name ?? sc.id, area: sc.area, covers: sc.covers ?? [], repeat, expectFail: sc.expectFail ?? null,
+    ok: false, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0,
+    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [], display: d.name,
   };
+}
+
+/** one scenario of the older set: a page of its own (the start is the scenario's own) */
+async function runLegacy(sc, d, env) {
+  const { browser, browserCdp, delivery, shotsDir } = env;
+  const out = newResult(sc, 1, d);
   let pg = null, clock = null, sampler = null, watch = null, det = null, guest = null;
   const frames = { n: 0, s: 0 };
   try {
     pg = await newPage(browser, { cssWidth: d.cssWidth, cssHeight: d.cssHeight, dpr: d.dpr, origin: delivery.origin, token: delivery.newToken() });
     det = attachDetectors(pg.page);
     guest = new Guest(pg.page, pg.cdp, delivery.origin);
-    guest.shots = shotsDir ? path.join(shotsDir, `${d.name}-${String(d.dpr).replace('.', '_')}`, sc.name) : null;
+    guest.shots = shotsDir ? path.join(shotsDir, fileTag(d), sc.name) : null;
     if (guest.shots) fs.mkdirSync(guest.shots, { recursive: true });
     // a scenario that must act before the page's own scripts run (a permission state set for the load; a counter the page's load calls) has beforeLoad
     if (sc.beforeLoad) await sc.beforeLoad({ page: pg.page, browserCdp, browserContextId: pg.browserContextId, origin: delivery.origin });
@@ -112,7 +128,7 @@ async function runScenario(sc, d, env) {
     if (env.logsDir && pg) {
       const lines = await new Guest(pg.page, pg.cdp, delivery.origin).ev('window.__app ? window.__app.engineLog() : []').catch(() => []);
       fs.mkdirSync(env.logsDir, { recursive: true });
-      fs.writeFileSync(path.join(env.logsDir, `${d.name}-${String(d.dpr).replace('.', '_')}-${sc.name}.log`), `${lines.join('\n')}\n`);
+      fs.writeFileSync(path.join(env.logsDir, `${fileTag(d)}-${sc.name}.log`), `${lines.join('\n')}\n`);
     }
     if (stopped && pg) out.engineStop = await engineStopOf(pg.page, pg.cdp, delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
     const t = pg ? await toastState(pg.page).catch(() => ({ stuck: 0, ids: [] })) : { stuck: 0, ids: [] };
@@ -139,7 +155,88 @@ async function runScenario(sc, d, env) {
   return { result: out, frames };
 }
 
-async function runRow(d, env, served) {
+/** the page of a shard's row: started once (the delivery's origin, the start of the project); the scenarios run in it */
+async function openShared(d, env) {
+  const { browser, delivery } = env;
+  const pg = await newPage(browser, { cssWidth: d.cssWidth, cssHeight: d.cssHeight, dpr: d.dpr, origin: delivery.origin, token: delivery.newToken() });
+  const det = attachDetectors(pg.page);
+  const guest = new Guest(pg.page, pg.cdp, delivery.origin);
+  const sh = { pg, det, guest, clock: null, sampler: null, watch: null, frames: { n: 0, s: 0 }, start: null };
+  await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
+  await installToastWatch(pg.page);
+  if (env.clock === 'begin') sh.clock = await startFrameClock(pg.cdp);
+  await installRafCounter(pg.page);
+  sh.sampler = startRafSampler(pg.page);
+  sh.watch = watchEngine(guest);
+  log(`${d.name} (DPR ${d.dpr}): the page started`);
+  sh.start = await startProject(guest);
+  log(`${d.name} (DPR ${d.dpr}): project ${sh.start.opened ? 'open' : 'not open'} (state ${sh.start.state})`);
+  return sh;
+}
+
+async function closeShared(sh) {
+  if (!sh) return;
+  if (sh.sampler) { const s = await sh.sampler.stop(); sh.frames = { n: s.frames, s: s.seconds }; }
+  if (sh.clock) await sh.clock.stop();
+  if (sh.watch) await sh.watch.stop();
+  await sh.pg.context.close().catch(() => {});
+}
+
+/** one scenario in the shard's page: File > New first (an empty project), then the scenario; the counts are the scenario's own (the differences) */
+async function runShared(sc, repeat, d, env, sh, index) {
+  const out = newResult(sc, repeat, d);
+  const before = { pageErrors: sh.det.pageErrors, consoleErrors: sh.det.consoleErrors, failedRequests: sh.det.failedRequests, stops: sh.watch.w.stops, dumps: sh.guest.dumpRetries };
+  let logStart = 0;
+  try {
+    logStart = (await sh.guest.ev('window.__app ? window.__app.engineLog().length : 0')) ?? 0;
+    const reset = await resetProject(sh.guest);
+    if (reset.left.length) out.notes.push(`after File > New, open: ${JSON.stringify(reset.left)}`);
+    const r = await sc.run({ guest: sh.guest, page: sh.pg.page, cdp: sh.pg.cdp, browserCdp: env.browserCdp, browserContextId: sh.pg.browserContextId, origin: env.delivery.origin, repo, log: (m) => log(`  ${sc.id}: ${m}`), index });
+    out.ok = r.ok === true;
+    out.engineState = r.engineState ?? null;
+    out.notes.push(...(r.notes ?? []));
+    if (r.results) out.results = r.results;
+  } catch (e) {
+    out.error = String(e?.stack ?? e).slice(0, 800);
+  }
+  const eng = sh.watch.w;
+  out.pageErrors = sh.det.pageErrors - before.pageErrors;
+  out.consoleErrors = sh.det.consoleErrors - before.consoleErrors;
+  out.failedRequests = sh.det.failedRequests - before.failedRequests;
+  out.engineStops = eng.stops - before.stops;
+  out.engineStuckRunning = eng.stuckRunning;
+  out.engineRunningMaxMs = eng.runningMs;
+  if (eng.stopReason && out.engineStops > 0) out.engineStopReason = eng.stopReason.slice(0, 300);
+  if (out.engineState === null && eng.last) out.engineState = eng.last.state;
+  out.dumpRetries = sh.guest.dumpRetries - before.dumps;
+  const t = await toastState(sh.pg.page).catch(() => ({ stuck: 0, ids: [] }));
+  out.stuckToasts = t.stuck;
+  out.stuckIds = t.ids;
+  out.details = sh.det.details.slice(-12);
+  const stopped = out.engineStops > 0 || out.engineState === 'error' || out.engineState === 'exited';
+  if (stopped) out.engineStop = await engineStopOf(sh.pg.page, sh.pg.cdp, env.delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
+  if (env.logsDir) {
+    const lines = await sh.guest.ev(`window.__app ? window.__app.engineLog().slice(${logStart}) : []`).catch(() => []);
+    fs.mkdirSync(env.logsDir, { recursive: true });
+    fs.writeFileSync(path.join(env.logsDir, `${fileTag(d)}-${sc.id.replace('/', '-')}.log`), `${lines.join('\n')}\n`);
+  }
+  out.ok = out.ok && out.error === null && out.engineStops === 0 && !eng.stuckRunning;
+  if (env.shotsDir) {
+    const dir = path.join(env.shotsDir, fileTag(d), sc.id.replace('/', '-'));
+    fs.mkdirSync(dir, { recursive: true });
+    await sh.guest.shot(path.join(dir, 'end.png')).catch(() => {});
+  }
+  log(`${sc.id} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}`);
+  return out;
+}
+
+/** the rows of one display name, each with the scenarios of the plan that run in it: those whose displays include the name, or all of them when --displays names the displays */
+function rowsOf(name, items, explicit) {
+  const picked = items.filter((it) => explicit || it.sc.displays.includes(name));
+  return displayRows(name).map((d) => ({ d, items: picked }));
+}
+
+async function runRow(d, items, env, served, budget) {
   const row = {
     display: { width: DISPLAY.width, height: DISPLAY.height, dpr: d.dpr, refreshHzTarget: DISPLAY.refreshHzTarget, achievedFps: 0, cssWidth: d.cssWidth, cssHeight: d.cssHeight },
     name: d.name, delivery: env.delivery ? env.delivery.delivery : null, servedHeadersMatch: served?.servedHeadersMatch === true, accessGate: served?.accessGate ?? null,
@@ -150,11 +247,34 @@ async function runRow(d, env, served) {
     return row;
   }
   let frames = 0, seconds = 0;
-  for (const sc of env.scenarios) {
-    const { result, frames: f } = await runScenario(sc, d, env);
-    row.scenarios.push(result);
-    frames += f.n;
-    seconds += f.s;
+  let sh = null;
+  let index = 0;
+  try {
+    for (const { sc, repeat } of items) {
+      if (budget.expired()) {
+        row.scenarios.push({ ...newResult(sc, repeat, d), skipped: true, ok: false });
+        log(`${sc.id}: skipped (the budget of ${budget.elapsedMs()} ms is past)`);
+        continue;
+      }
+      if (sc.kind === 'legacy') {
+        const { result, frames: f } = await runLegacy(sc, d, env);
+        row.scenarios.push({ ...result, repeat });
+        frames += f.n;
+        seconds += f.s;
+        continue;
+      }
+      if (sh === null) sh = await openShared(d, env);
+      row.scenarios.push(await runShared(sc, repeat, d, env, sh, index++));
+    }
+  } catch (e) {
+    row.error = `row ${d.name} (DPR ${d.dpr}): ${String(e?.stack ?? e).slice(0, 800)}`;
+    log(row.error);
+  } finally {
+    if (sh) {
+      await closeShared(sh);
+      frames += sh.frames.n;
+      seconds += sh.frames.s;
+    }
   }
   row.display.achievedFps = seconds > 0 ? round2(frames / seconds) : 0;
   row.display.rafFrames = frames;
@@ -162,31 +282,61 @@ async function runRow(d, env, served) {
   return row;
 }
 
+/** the set the run takes: --area (the area's files), else --scenarios (smoke by default) */
+async function loadSet(args) {
+  if (args.area !== undefined) {
+    if (!AREAS.includes(args.area)) throw new Error(`--area ${args.area}: the areas are ${AREAS.join(', ')}`);
+    return loadArea(args.area);
+  }
+  const set = args.scenarios ?? 'smoke';
+  if (set === 'smoke') return loadSmoke();
+  throw new Error(`--scenarios ${set}: only smoke (or --area <領域>)`);
+}
+
+/** the --list lines: one per area (or the one area given) */
+async function listLines(args) {
+  const features = readFeatures(featuresDir);
+  const areas = args.area !== undefined ? [args.area] : AREAS;
+  const lines = [];
+  for (const area of areas) {
+    const scs = await loadArea(area);
+    const covers = new Set(scs.flatMap((s) => s.covers));
+    lines.push({ area, scenarios: scs.length, covers: covers.size, features: features.filter((f) => f.area === area).length });
+  }
+  return lines;
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const set = args.scenarios ?? 'smoke';
-  const all = (await import(`./scenarios/${set}/index.mjs`)).default;
-  const only = args.only === undefined ? null : args.only.split(',').map((s) => s.trim()).filter(Boolean);
-  if (only !== null && (only.length === 0 || only.some((n) => !all.some((s) => s.name === n)))) {
-    throw new Error(`--only: ${args.only} is not a scenario of the set ${set} (${all.map((s) => s.name).join(', ')})`);
+  if (args.list) {
+    for (const line of await listLines(args)) process.stdout.write(`${JSON.stringify(line)}\n`);
+    return 0;
   }
-  const scenarios = only === null ? all : all.filter((s) => only.includes(s.name));
-  const names = (args.displays ?? '4k-dpr1,4k-dpr2,4k-random').split(',').map((s) => s.trim()).filter(Boolean);
-  const plan = names.flatMap((n) => displayRows(n).map((d) => ({ ...d, display: n })));
+  const all = await loadSet(args);
+  const only = args.only === undefined ? null : args.only.split(',').map((s) => s.trim()).filter(Boolean);
+  const shard = args.shard === undefined ? null : parseShard(args.shard);
+  const repeat = args.repeat === undefined ? 1 : parseRepeat(args.repeat);
+  const budgetMs = args.budget === undefined ? null : parseBudget(args.budget);
+  const picked = planScenarios(all, { only, shard, repeat });
+  if (picked.length === 0) throw new Error('no scenario is selected (check --area, --only, --shard)');
+  const explicit = args.displays !== undefined;
+  const names = explicit ? args.displays.split(',').map((s) => s.trim()).filter(Boolean) : [...new Set(picked.flatMap((p) => p.sc.displays))];
   const shotsDir = args.shots ? path.resolve(args.shots) : null;
-  const logsDir = args["engine-logs"] ? path.resolve(args["engine-logs"]) : null;
+  const logsDir = args['engine-logs'] ? path.resolve(args['engine-logs']) : null;
   if (!fs.existsSync(bundleDir)) throw new Error(`no bundle at ${bundleDir} (fe-build bundle)`);
   const workDir = fs.mkdtempSync(path.join(repo, '.tmp-e2e-'));
-  const wranglerDir = path.join(appDir, '.wrangler');
-  const hadWrangler = fs.existsSync(wranglerDir);
-  const env = { scenarios, shotsDir, logsDir, clock: args.clock ?? 'raf', browser: null, browserCdp: null, delivery: null, served: null, setupError: null };
+  const wranglerDirs = [path.join(appDir, '.wrangler'), path.join(repo, '.wrangler')];
+  const hadWrangler = wranglerDirs.map((d) => fs.existsSync(d));
+  const env = { shotsDir, logsDir, clock: args.clock ?? 'raf', browser: null, browserCdp: null, delivery: null, served: null, setupError: null };
+  const budget = budgetClock(budgetMs);
   const rows = [];
+  const expected = [];
   try {
     const objects = bundleObjects(bundleDir, brDir, BUNDLE);
     const brFile = objects.find((o) => o.key.startsWith(`${BUNDLE}/`) && o.httpMetadata.contentEncoding === 'br').key.slice(BUNDLE.length + 1);
     try {
       env.delivery = await startDelivery({ appDir, workDir, objects, log });
-      env.served = await probeServed({ origin: env.delivery.origin, token: env.delivery.newToken(), bundle: BUNDLE, brFile, objects, accessEnv: env.delivery.accessEnv, manifestCacheStored: RAW_CACHE });
+      env.served = await probeServed({ origin: env.delivery.upstream, token: env.delivery.newToken(), bundle: BUNDLE, brFile, objects, accessEnv: env.delivery.accessEnv, manifestCacheStored: RAW_CACHE });
       log('served headers', { match: env.served.servedHeadersMatch, accessGate: env.served.accessGate, wireContentEncoding: env.served.wireContentEncoding });
     } catch (e) {
       env.setupError = `delivery: ${String(e?.stack ?? e).slice(0, 1500)}`;
@@ -196,10 +346,13 @@ async function main() {
       env.browser = await launchBrowser(env.clock);
       env.browserCdp = await env.browser.newBrowserCDPSession();
     }
-    for (const d of plan) {
-      const row = await runRow(d, env, env.served);
-      rows.push(row);
-      process.stdout.write(JSON.stringify(row) + '\n');
+    for (const name of names) {
+      for (const { d, items } of rowsOf(name, picked, explicit)) {
+        expected.push(items.length);
+        const row = await runRow(d, items, env, env.served, budget);
+        rows.push(row);
+        process.stdout.write(`${JSON.stringify(row)}\n`);
+      }
     }
   } catch (e) {
     log(`run: ${String(e?.stack ?? e)}`);
@@ -207,9 +360,9 @@ async function main() {
     if (env.browser) await env.browser.close().catch(() => {});
     if (env.delivery) await env.delivery.close().catch(() => {});
     fs.rmSync(workDir, { recursive: true, force: true });
-    if (!hadWrangler) fs.rmSync(wranglerDir, { recursive: true, force: true });
+    wranglerDirs.forEach((d, i) => { if (!hadWrangler[i]) fs.rmSync(d, { recursive: true, force: true }); });
   }
-  const ok = rows.length === plan.length && rows.every((r) => rowPasses(r, scenarios.length));
+  const ok = rows.length === expected.length && rows.every((r, i) => rowPasses(r, expected[i]));
   log(`rows ${rows.length}, accepted ${ok}`);
   return ok ? 0 : 1;
 }

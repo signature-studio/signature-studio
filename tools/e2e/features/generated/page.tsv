@@ -1,0 +1,9 @@
+id	kind	name	source	how	nameSource
+page/module/clipboard	module	the clipboard (copy and paste text between the guest and the browser)	app/src/engine/clipboard.ts	the file is in the repository	index
+page/module/cursor	module	the guest cursor drawn by the page	app/src/engine/cursor-picture.ts	the file is in the repository	index
+page/module/file-select	module	the file box and the file manager of the Open and Save	app/src/files/select.ts	the file is in the repository	index
+page/module/persist	module	the stored copy of the bundle and the registry (kept across a reload)	app/src/engine/regstore.ts	the file is in the repository	index
+page/module/audio-start	module	the audio output: the AudioContext and its worklet	app/src/audio/page-audio.ts	the file is in the repository	index
+page/module/resize	module	the picture follows the window (the guest screen of the page size)	app/src/engine/desk.ts	the file is in the repository	index
+page/module/beacon	module	the measurement beacons of the start and the run	app/src/perf/beacon.ts	the file is in the repository	index
+page/module/delivery	module	the bundle files (manifest, lazy modules, the engine) from the delivery	app/src/bundle/loader.ts	the file is in the repository	index
