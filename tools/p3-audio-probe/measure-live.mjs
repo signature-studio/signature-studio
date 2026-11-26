@@ -1,7 +1,7 @@
 // Live audio probe (Issue #1349): the page is opened in a room of 1836x1056 CSS px at the device pixel ratio --dpr (1.7647 by default: the guest screen is 3240x1863 device px), the engine's idle is waited for (t0 = the first observation of engine-idle), and the audio output's numbers are read at t0+10 s (reference), t0+70 s (start of the window) and t0+130 s (end of the window).
 // In the window: --play 1 presses Space at its start; --hz H --mouse S move the pointer for S seconds on a circle (radius 400 CSS px, one turn per second) over the guest's desktop, sent from here with CDP Input.dispatchMouseEvent (no button, no reply awaited, batches on each wake-up). The nominal send rate is 1.2 x H (so the page receives at least H in every second).
 // The product is not changed: every input is sent from here. The AudioContext is started before the window by a press and a release on the status line (the browser's gesture rule). The start-up consent box is not closed (its "No thanks" position is measured for another screen size).
-// --project: the .flp to open (File > Open). Without it, inputs/p3-project.tsv (#1335) names it when that file exists: its first data row (not '#', not empty), first tab-separated column, a path relative to the repository or absolute. Without either, the start-up Default project is used.
+// --project: the .flp to open (File > Open). Without it, inputs/p3-project.tsv (#1335) names it when that file exists: its first data row (not '#', not empty), first tab-separated column, a path relative to the repository or absolute, when that column ends with .flp (the row of #1401 names steps, not a file: then the start-up Default project is used). Without either, the start-up Default project is used.
 // --profile FILE (#1349, a measurement: it adds CDP calls): the CDP CPU profile of the engine's Worker over the window (its interval is the same as measure.mjs's); tools/p3-audio-probe/profile-names.mjs reads it.
 // --app <dir> (#1422): the page measured is the app of that directory (default: this repository's app). --sound (#1422): after the transport starts, the metronome button of the guest's top bar is pressed (the place and steps of tools/p2-frames/measure.mjs --load b), so the Default project makes sound; without a rise of 20 non-silent quanta within 5 s the run fails.
 // PCM repeat (#1422): the output of the window's first 8 s is taken (the page computes its summary, the samples stay there): pcmRepeat8192 (the share of non-silent frames equal to the ones 8192 frames earlier; null below 1000 comparisons), pcmEligible, pcmNeighbors (the other lags, as controls), pcmCaptureFrames, pcmCaptureValid, pcmNonFiniteSamples. tools/p3-audio-probe/waveform.mjs.
@@ -52,6 +52,7 @@ function listedProject() {
   const row = fs.readFileSync(listFile, 'utf8').split('\n').map((l) => l.trimEnd()).find((l) => l !== '' && !l.startsWith('#'));
   if (row === undefined) return null;
   const first = row.split('\t')[0];
+  if (!first.endsWith('.flp')) return null;   // (#1401) the row names the steps of a sound made by the FL operations, not a project file: the Default project is used
   return path.resolve(repo, first);
 }
 const projectFile = projectRaw !== undefined ? path.resolve(projectRaw) : listedProject();

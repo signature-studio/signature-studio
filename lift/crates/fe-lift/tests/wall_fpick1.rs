@@ -146,7 +146,7 @@ fn run_env(name: &str, globals: &str, main: &str, envs: &[(&str, &str)]) -> (i32
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-Wno-unused-function", "-Wno-unused-parameter", "-fPIE", "-pie"]);
     cmd.arg("-I").arg(rt()).arg(&c);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c", "fle_filedlg.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c", "fle_filedlg.c"] {
         cmd.arg(rt().join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
@@ -213,7 +213,7 @@ fn the_browser_branch_is_always_compiled_and_the_page_and_the_volume_are_weak_re
     let nm = String::from_utf8_lossy(&Command::new("nm").arg(&o).output().unwrap().stdout).to_string();
     assert!(nm.lines().any(|l| l.trim_end().ends_with(" w fle_filedlg_host_pick")), "{nm}");
     assert!(nm.lines().any(|l| l.contains(" T fle_filedlg_saved_poll")), "{nm}");
-    for f in ["fle_vfs_make_dirs", "fle_vfs_put_file", "fle_vfs_file_state"] {
+    for f in ["fle_vfs_make_dirs", "fle_vfs_put_file", "fle_vfs_file_state", "fle_filedlg_host_poll", "fle_thread_sleep"] {
         assert!(nm.lines().any(|l| l.trim_end().ends_with(&format!(" w {f}"))), "{f} must be a weak reference\n{nm}");
     }
 }
@@ -327,6 +327,70 @@ fn a_save_target_is_made_with_its_folder_and_reported_once_when_the_engine_has_f
     assert_eq!(&l[8..9], ["poll-again (null)"]);
     assert!(l[9].starts_with("poll-rewrite1") && l[9].ends_with("(null)"), "{l:?}");
     assert!(l[10].starts_with("poll-rewrite2 6\t") && l[10].ends_with("\tC:\\Users\\user\\Documents\\Out.wav"), "{l:?}");
+}
+
+#[test]
+fn the_picker_waits_for_the_page_through_the_guest_scheduler_and_the_other_threads_run_meanwhile() {
+    // the request is recorded at once (NULL), then each wait is a guest sleep of 1 ms (the other thread, here a counter) and a poll; the answer is read once, at the third poll
+    let globals = r#"
+static int host_picks, host_polls, sleeps, ticks, ticks_at_answer = -1;
+void fle_thread_sleep(const char *api, uint32_t ms)
+{
+    if (strcmp(api, "filedlg") != 0 || ms != 1) { printf("bad sleep %s %u\n", api, ms); exit(6); }
+    sleeps++;
+    ticks++;   /* the other guest thread runs */
+}
+const char *fle_filedlg_host_pick(const char *req)
+{
+    (void)req;
+    host_picks++;
+    return NULL;
+}
+const char *fle_filedlg_host_poll(void)
+{
+    uint8_t *d1 = malloc(7);
+    char *a = malloc(1024);
+    host_polls++;
+    if (host_polls < 3) return NULL;
+    ticks_at_answer = ticks;
+    memcpy(d1, "FLPDATA", 7);
+    snprintf(a, 1024, "OK\nR\t%llu\t7\tC:\\Users\\user\\Downloads\\Sampler.flp\n", U(P(d1)));
+    return a;
+}
+"#;
+    let main = format!(
+        r#"{OPEN}
+    uint64_t item = 0, name = 0;
+    printf("show %#llx\n", U(vcall(d, 3, 0, 0, 0)));
+    printf("picks %d polls %d sleeps %d ticks-at-answer %d\n", host_picks, host_polls, sleeps, ticks_at_answer);
+    vcall(d, 20, P(&item), 0, 0);
+    vcall(item, 5, 0x80058000u, P(&name), 0);
+    show_path("  result", name);
+"#
+    );
+    let (rc, l) = run("fpick1-wait", globals, &main);
+    assert_eq!(rc, 0, "{l:?}");
+    assert_eq!(l, ["show 0", "picks 1 polls 3 sleeps 3 ticks-at-answer 3", "  result C:\\Users\\user\\Downloads\\Sampler.flp"]);
+}
+
+#[test]
+fn a_picker_that_has_to_wait_without_the_guest_scheduler_stops_by_name() {
+    // fle_thread.c is not linked here: the wait cannot give the processor to anybody, so the run stops (fle_stop aborts) instead of cancelling the dialog
+    let globals = r#"
+const char *fle_filedlg_host_pick(const char *req)
+{
+    (void)req;
+    return NULL;
+}
+const char *fle_filedlg_host_poll(void)
+{
+    return NULL;
+}
+"#;
+    let main = format!("{OPEN}\n    vcall(d, 3, 0, 0, 0);\n    printf(\"not reached\\n\");\n");
+    let (rc, l) = run("fpick1-noscheduler", globals, &main);
+    assert_ne!(rc, 0, "{l:?}");
+    assert!(!l.iter().any(|x| x == "not reached"), "{l:?}");
 }
 
 #[test]

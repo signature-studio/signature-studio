@@ -1,6 +1,7 @@
 // tools/ab/base.mjs (#1422, fixed for #1423-#1427): the base tree of an A/B run. The base is the tracked tree of a ref (git archive) plus the git-ignored
 // inputs that the engine and bundle builds only read (lift/out-app/host, host-extra, external, and the blend2d tarball). The inputs are hard links to the
-// working tree (not copies: host is 858 MB); the builds write their output into their own directories, and the links are checked after the build.
+// working tree (not copies: host is 858 MB); the builds write their output into their own directories, and the links are checked after the build. The Plugin database the engine build
+// writes into the host tree (lift/out-app/host/lift/out-plugindb) is that output, not an input: it is not linked.
 // A write into a link changes the working tree's file, so verify reports every linked file whose size, times or inode changed since the preparation.
 // Usage: node tools/ab/base.mjs <ref> <dest> [path...] prepares <dest> from <ref> (only the given paths of the tracked tree, when there are some; stdout: one JSON line)
 //        node tools/ab/base.mjs --verify <dest>        exit 0 when no linked input changed, 1 when one did (or there is no manifest)
@@ -14,6 +15,10 @@ const REQUIRED_DIRS = ['lift/out-app/host'];
 const OPTIONAL_DIRS = ['lift/out-app/host-extra', 'lift/out-app/external'];
 const OPTIONAL_FILE = /^blend2d-[0-9a-f]+\.tar\.gz$/;
 const LINK_FALLBACK = new Set(['EXDEV', 'EPERM', 'EMLINK', 'ENOTSUP', 'EACCES']);
+// build output that the engine build writes into the host tree on every build (fe-build, crates/fe-build/src/plugins.rs: the Plugin database): not an input, so it is not linked
+// (a link would make the base build write the working tree's files, and verify would report them). The base build writes its own copy.
+const GENERATED_DIRS = ['lift/out-app/host/lift/out-plugindb'];
+const isGenerated = (rel) => GENERATED_DIRS.some((g) => rel === g || rel.startsWith(`${g}/`));
 
 // the tracked files of ref (under the given paths when there are some) into dest
 function gitArchive(tree, ref, dest, paths) {
@@ -51,11 +56,12 @@ function filesUnder(tree, rel) {
 }
 
 // link (or copy, when the link fails) every file of src into dst; directories are made in dst, symbolic links are made again
-export function linkTree(src, dst, link, counts) {
+export function linkTree(src, dst, link, counts, skip = () => false) {
+  if (skip(src)) return;
   const st = fs.lstatSync(src);
   if (st.isDirectory()) {
     fs.mkdirSync(dst, { recursive: true });
-    for (const name of fs.readdirSync(src).sort()) linkTree(path.join(src, name), path.join(dst, name), link, counts);
+    for (const name of fs.readdirSync(src).sort()) linkTree(path.join(src, name), path.join(dst, name), link, counts, skip);
   } else if (st.isSymbolicLink()) {
     fs.symlinkSync(fs.readlinkSync(src), dst);
     counts.symlinked += 1;
@@ -79,8 +85,8 @@ export function prepareBase({ tree, dest, ref, paths = [], archive, link = fs.li
   const counts = { linked: 0, copied: 0, symlinked: 0 };
   const entries = [];
   for (const rel of inputs) {
-    linkTree(path.join(tree, rel), path.join(dest, rel), link, counts);
-    entries.push(...filesUnder(tree, rel));
+    linkTree(path.join(tree, rel), path.join(dest, rel), link, counts, (p) => isGenerated(path.relative(tree, p)));
+    entries.push(...filesUnder(tree, rel).filter((e) => !isGenerated(e.rel)));
   }
   fs.writeFileSync(`${dest}-inputs.json`, JSON.stringify({ tree, dest, entries }) + '\n');
   return { dest, inputs, ...counts };
