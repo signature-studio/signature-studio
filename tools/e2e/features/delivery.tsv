@@ -1,1 +1,54 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+delivery/header/coop	header	Cross-Origin-Opener-Policy on the document	same-origin	document-coop: a fetch of / in the page
+delivery/header/coep	header	Cross-Origin-Embedder-Policy on the document	require-corp	document-coep: a fetch of / in the page
+delivery/header/csp	header	Content-Security-Policy on the document	the CSP of app/shared/headers.ts, exactly	document-security-headers: a fetch of / in the page
+delivery/header/x-robots-tag	header	X-Robots-Tag on the document	noindex, nofollow	document-privacy-headers: a fetch of / in the page
+delivery/header/nosniff	header	X-Content-Type-Options on the document	nosniff	document-privacy-headers: a fetch of / in the page
+delivery/header/referrer-policy	header	Referrer-Policy on the document	no-referrer	document-privacy-headers: a fetch of / in the page
+delivery/header/corp	header	Cross-Origin-Resource-Policy on an asset	same-origin	assets-corp: HEAD of the manifest in the page
+delivery/header/accept-ranges	header	Accept-Ranges on a start-up asset	bytes	assets-accept-ranges-etag: HEAD of the four start-up assets
+delivery/header/etag	header	ETag on a start-up asset	a quoted MD5 of the stored object	assets-accept-ranges-etag: HEAD of the four start-up assets
+delivery/header/vary	header	Vary on a start-up asset	contains Accept-Encoding	assets-accept-ranges-etag: HEAD of the four start-up assets
+delivery/header/served-match	header	the served headers against app/shared/headers.ts (wire and Worker)	servedHeadersMatch and the Access gate	header-served-match: lib/served.mjs probe
+delivery/cache/manifest-no-cache	cache	the manifests (root and bundle) are no-cache	no-cache, no-transform	assets-cache-manifest: HEAD of both manifests in the page
+delivery/cache/immutable-hashed	cache	the hashed objects are immutable	the cacheControlFor rule for every object (max-age=31536000, immutable)	assets-cache-immutable: HEAD of every object in the page
+delivery/cache/no-transform	cache	every object under /assets/ carries no-transform	no-transform	assets-no-transform: HEAD of every object in the page
+delivery/cache/url-names-content	cache	each URL names its content	the first 12 hex digits of the SHA-256 in the URL, no repeats	url-names-content: the manifest's references
+delivery/cache/url-names-version	cache	the bundle version is the engine's SHA-256 prefix	bundle.version and the engine URL name the same version	url-names-version: the manifest
+delivery/cache/stored-copy-current	cache	the page's stored copies (OPFS) are the bundle's own	every entry is named by a SHA-256 of this manifest	stored-copy-current: the OPFS listing in the page
+delivery/compression/content-encoding-br	compression	Content-Encoding of the brotli objects	br, and Content-Length = the stored size = the file on disk	content-encoding-br: HEAD of every object through the Worker
+delivery/compression/encoded-size	compression	the stored size of each brotli object	the manifest's encodedSize is the size of the file	content-encoding-br: HEAD of every object through the Worker
+delivery/compression/manifest-identity	compression	the manifest has no Content-Encoding	none	content-encoding-br: HEAD of the manifest through the Worker
+delivery/compression/br-decodes-to-raw	compression	the brotli object decodes to the raw bytes	decoded SHA-256 and size = the manifest's	br-decodes-to-raw: GET through the Worker, then brotli decode
+delivery/compression/body-is-stored-bytes	compression	the body is the stored file	the body has the SHA-256 of the file on disk	br-decodes-to-raw: GET through the Worker
+delivery/compression/wire-decoded-glue	compression	the engine glue as the browser decodes it	SHA-256 and size = the manifest's	wire-decoded-glue: fetch in the page
+delivery/range/partial-206	range	a byte range of a stored object	206, Content-Range of the stored size, the bytes asked	range-partial-206: GET with Range through the Worker
+delivery/range/unsatisfiable-416	range	a range past the end of a stored object	416, Content-Range bytes */size	range-unsatisfiable-416: GET with Range through the Worker
+delivery/conditional/etag-304	conditional	If-None-Match with the ETag	304	conditional-etag-304: HEAD, then HEAD with If-None-Match
+delivery/method/head-no-body	method	HEAD of an object	200, Content-Length of the stored size, no body	method-head-no-body: HEAD through the Worker
+delivery/method/post-405	method	POST to an object	405, Allow GET, HEAD	method-post-405: POST through the Worker
+delivery/path/bad-400	path	a path that climbs out of the bundle	400	path-bad-400: GET of an encoded .. segment through the Worker
+delivery/path/missing-404	path	a name the bucket does not hold	404	path-missing-404: HEAD through the Worker
+delivery/access/valid-token-passes	access	a valid token on the wire	200	access-valid-token: GET on the Worker's address with the run's token
+delivery/access/proxy-token-passes	access	the page's request through Access	200	access-proxy-token-passes: fetch in the page
+delivery/access/no-token-refused	access	no token on the wire	403 for the manifest and the document	access-no-token-refused: GET on the Worker's address without a token
+delivery/access/bad-signature-refused	access	a token with a changed payload	403	access-bad-signature-refused: GET with a tampered token
+delivery/access/unknown-kid-refused	access	a token under a key the certificates do not name	403	access-unknown-kid-refused: GET with a token of another key
+delivery/manifest/served-json	manifest	the manifest served to the page	200, JSON, schema 1, the lazy list of the bundle	manifest-served: fetch in the page
+delivery/manifest/root-equals-bundle	manifest	the root manifest is the bundle's own	the same bytes as the bundle's manifest.json	manifest-root-equals-bundle: GET of both manifests through the Worker
+delivery/manifest/schema-valid	manifest	the manifest passes the schema	valid	manifest-schema-valid: validateManifest of the bundle's manifest
+delivery/boot/pre-boot-bytes	boot	the bytes taken before the engine starts	the four start-up assets, decoded bytes = the manifest's (ratio 1)	pre-boot-bytes: window.__app.assetsReport
+delivery/boot/engine-idle	boot	the delivered bundle starts the engine	engine-idle, no error, no stand-in screen	engine-idle: window.__app state
+delivery/boot/lazy-after-engine	boot	the lazy downloads start after the engine	lazy_start is not before engine_start	lazy-after-engine-start: the timeline
+delivery/boot/assets-report-clean	boot	the start-up assets' report	no fail code and a known origin for each asset	assets-report-clean: window.__app.assetsReport
+delivery/network/slow-start-completes	network	a start on a slow network (latency and bandwidth limited)	engine-idle, the progress rows shown, no uncaught error	network-slow-start: a page of its own, emulated network
+delivery/network/offline-mid-start	network	the network is cut while the start-up downloads	the error state, with the error panel naming what and where	network-offline-mid-start: a page of its own, cut after the first download row
+delivery/network/offline-after-start	network	the network is cut after the engine has started	the engine does not stop (no error, no exit) 10 s after the cut	network-offline-after-start: a page of its own, cut at engine-idle
+delivery/error/panel-shown	error	the error panel of a failed start	#error is visible, with what and where	network-offline-mid-start: the panel's text
+delivery/error/no-uncaught	error	the failures of a start	no uncaught page error	network-offline-mid-start: the page's own error count
+delivery/beacon/first-idle-form	beacon	the measurement beacon's form	beaconProblems is empty	beacon-first-idle-form: the page's own beacon, captured as it is sent
+delivery/beacon/known-keys	beacon	the beacon's top-level fields	only the known fields	beacon-known-keys: the page's own beacon
+delivery/beacon/no-personal-field	beacon	the beacon's content	no personal field name, no token, no e-mail-shaped text	beacon-no-personal-field: the page's own beacon
+delivery/beacon/post-accepted	beacon	the beacon's POST	204, application/json	beacon-post-accepted: the page's own POST and its answer
+delivery/beacon/refuses-wrong-type	beacon	a beacon that is not application/json	415	beacon-refuses-wrong-type: POST through the Worker
+delivery/beacon/refuses-oversize	beacon	a beacon over the size limit	413	beacon-refuses-oversize: POST through the Worker
