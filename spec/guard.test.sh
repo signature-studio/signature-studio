@@ -253,4 +253,16 @@ FAKE
 else
   echo "FAIL flags・judge: 環境に git の名義が無い(判定の検査は名義が要る。skip して通さない)"; fail=1
 fi
+# e2e-full.yml(全シナリオの非ゲート)は、200 行以内・1 行 80 字以内。if は workflow_run の成功と always() だけ(e2e.yml とは別の分類)
+FULL=$here/../.github/workflows/e2e-full.yml; FD=$L/f; mkdir -p "$FD"
+pad "$FULL" 62 "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 200 行(ちょうど上限)なら通る" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
+pad "$FULL" 63 "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml が 201 行なら見つかる(上限は 200 行)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+cp "$FULL" "$FD/e2e-full.yml"; ok "deploy-lint: 守っている e2e-full.yml は通る(always() の段の if を含む)" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 0
+{ cat "$FULL"; echo "      - {if: github.ref == 'refs/heads/main', run: npm ci}"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if でブランチで段を飛ばすと見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+sed "s/always() && github.event.workflow_run.conclusion == 'success'/always() \&\& github.event_name == 'push'/" "$FULL" > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の report の if をイベントに変えると見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+sed "s/== 'success'/== 'failure'/" "$FULL" > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if が failure の形なら見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "      - {if: failure(), run: npm ci}"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の if: failure() は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "# $(printf 'x%.0s' $(seq 1 81))"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の 81 字の行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "      - run: bash ci/x.sh"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml のシェルスクリプトの実行は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
+{ cat "$FULL"; echo "on: workflow_dispatch"; } > "$FD/e2e-full.yml"; ok "deploy-lint: e2e-full.yml の workflow_dispatch は見つかる" "$(rc bash "$g/deploy-lint.sh" "$FD/e2e-full.yml")" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail

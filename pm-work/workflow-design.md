@@ -242,3 +242,14 @@ deploy で `[skip ci]` を使わない(依頼者の指示。main の push が de
 - 120 Hz に届かない事実(achievedFps)は JSON に出るが、門は落とさない(runner に GPU が無い)。
 - 時間の上限: e2e の job は `timeout-minutes: 120`(ハングを止める)。旧版の既知の限界(段に上限が無く、止まれば run を取り消すしかなかった)を、job の構成に改めて解消した。
 - 行数の制約(依頼者の決まり L-007 の 100 行): deploy.yml は 100 行以内、e2e.yml は 200 行以内。どちらも 1 行 80 字以内・シェルスクリプトを実行しない・ローカル action と再利用ワークフローと composite action を使わない・Makefile を作らない。`guard/deploy-lint.sh` が、ファイル名で上限を決めて検査する。deploy.yml の `if:` は e2e の成功の 1 つだけを許す。e2e.yml の `if:` は、ブランチ・イベントで段を飛ばさない。台帳 L-007 の書き換えは PM が行う。
+
+## 20. 全シナリオの E2E(e2e-full.yml。非ゲート。Issue #1407・#1485)
+
+- 構成。`.github/workflows/e2e-full.yml`(`name: e2e-full`)は、`workflow_run`(`workflows: [e2e]`・`types: [completed]`)で起動する。job `shard` は e2e が成功した時だけ動き、領域とシャードの matrix を、`run.mjs --area <領域> --shard i/n` で回す。job `report` は `always()` で、全シャードの結果から網羅の表を作る。
+- 別のワークフローにした理由: e2e.yml に足すと deploy(e2e の成功を待つ)が全シナリオを待つことになる。e2e-full は deploy の前提ではない。落ちても本番は替わらない(非ゲート)。
+- matrix の決め方: シャード数は、`.min` の最小件数とシナリオのファイル数の多い方を 30 で割って切り上げる。ただし、シナリオのファイル数で頭打ちにする(空のシャードは `run.mjs` が「no scenario is selected」で落ちるため)。今の matrix は 46 行(上限 80)。領域の Issue がシナリオを足したら n を増やす。増やさないと、1 シャードが予算 35 分を超え、超えた分は skipped になって赤になる。
+- 表示は `4k-dpr1,4k-dpr2` の 2 行(random は使わない)。1 job の上限は 60 分。`--budget 35m` の後は新しいシナリオを始めない。
+- 結果の読み方: 表は領域ごとに、シナリオ・結果(シナリオ×表示)・ok・印つき(既知の欠陥の失敗)・印なし(門の失敗。ここを直す)・網羅(機能)・通ったシナリオ数と最小(`.min`)を出す。印なしの失敗は、表の下に id と表示で並ぶ。
+- 判定は 2 段。各シャードは `run.mjs` の受け入れ(印なしの失敗で赤)。report は `tools/e2e/judge-coverage.jq` で、領域ごとの `.min` を下回ると赤。
+- 公開の artifact は、結果の JSON(保持 14 日)と coverage.json だけ。画像は上げない。R2 の鍵は、キャッシュの取得の段だけに渡す。
+- 未確認: 各シャードの実時間(cargo build と bundle の取得を含む)は、この runner ではまだ計測していない。

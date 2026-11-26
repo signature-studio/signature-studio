@@ -1348,4 +1348,57 @@ ok "設計(x): 「19」の節に、既に在る欠陥は expectFail(Issue の番
 DS19B=$(awk '/^## 19[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
 ok "設計(y): 「19」の節に、2 つのワークフロー・workflow_run・matrix のシャード・キャッシュの鍵 bundle-<sha>・deploy が e2e.yml の成功の後にだけ動くことを書いた" "$(for w in '2 つのワークフロー' 'workflow_run' 'matrix' 'bundle-' 'e2e.yml が成功した後'; do grep -cF -- "$w" <<<"$DS19B"; done | awk '{s+=($1>0)} END{print s}')" 5
 ok "設計(y): 「19」の節に、100 行の制約(L-007)を守った理由を書いた(deploy.yml 100 行・e2e.yml 200 行・80 字)" "$(for w in '100 行' '200 行' 'L-007' '80 字'; do grep -cF -- "$w" <<<"$DS19B"; done | awk '{s+=($1>0)} END{print s}')" 4
+# (z) 全シナリオの E2E(e2e-full.yml。非ゲート)。e2e が成功した後に、領域とシャードごとに全シナリオを回し、網羅の表を作る。deploy の前提ではない(設計の「20」)
+XF=$top/.github/workflows/e2e-full.yml; pj "$XF" > "$T/xf.json" 2>>"$T/pj.err"; XJ=$T/xf.json
+ok "e2e-full(z): YAML として読める" "$(test -s "$XJ" && echo yes)" yes
+ok "e2e-full(z): on は workflow_run だけ。workflows は e2e、types は completed" "$(jq -c '[(.on | keys), .on.workflow_run.workflows, .on.workflow_run.types]' "$XJ")" '[["workflow_run"],["e2e"],["completed"]]'
+ok "e2e-full(z): schedule・workflow_dispatch・workflow_call を置かない(行の数)" "$(grep -cE 'schedule|workflow_dispatch|workflow_call' "$XF")" 0
+ok "e2e-full(z): concurrency は group e2e-full の固定で、cancel-in-progress は真" "$(jq -Sc '.concurrency' "$XJ")" '{"cancel-in-progress":true,"group":"e2e-full"}'
+ok "e2e-full(z): job は shard と report の 2 つ。report は shard の後" "$(jq -r '[(.jobs | keys | sort | join(",")), .jobs.report.needs] | join("/")' "$XJ")" "report,shard/shard"
+ok "e2e-full(z): shard は e2e の成功の時だけ動く(job の if)" "$(jq -r '.jobs.shard.if' "$XJ")" "github.event.workflow_run.conclusion == 'success'"
+ok "e2e-full(z): report は always() で、e2e の成功の時だけ動く(shard が落ちても表を作る)" "$(jq -r '.jobs.report.if' "$XJ")" "always() && github.event.workflow_run.conclusion == 'success'"
+ok "e2e-full(z): matrix の fail-fast は偽(1 シャードの失敗で、他を止めない)" "$(jq -r '.jobs.shard.strategy["fail-fast"] | tostring' "$XJ")" false
+ok "e2e-full(z): checkout は workflow_run の head_sha を取る(shard と report の両方)" "$(jq -r '[.jobs[].steps[] | select((.uses // "") == "actions/checkout@v7.0.1") | .with.ref] | unique | join(",")' "$XJ")" '${{ github.event.workflow_run.head_sha }}'
+ok "e2e-full(z): キャッシュの鍵は bundle-<head_sha>・fail-on-cache-miss: true" "$(jq -r '[.jobs.shard.steps[] | select((.uses // "") | test("runs-on/cache")) | "\(.with.key)|\(.with["fail-on-cache-miss"])"] | join(",")' "$XJ")" 'bundle-${{ github.event.workflow_run.head_sha }}|true'
+ok "e2e-full(z): キャッシュに置く物は app/dist と lift/out-app/bundle(e2e と同じ)" "$(jq -r '[.jobs.shard.steps[] | select((.uses // "") | test("runs-on/cache")) | .with.path | split("\n") | map(select(length > 0)) | join(",")][0]' "$XJ")" "app/dist,lift/out-app/bundle"
+ok "e2e-full(z): secrets は R2_CACHE_ASSETS の 2 つだけ(R2_ARTIFACT・CLOUDFLARE は無い)" "$(jq -r '.jobs | tostring | [scan("secrets[.][A-Z0-9_]+")] | unique | join(",")' "$XJ")" "secrets.R2_CACHE_ASSETS_ACCESS_KEY_ID,secrets.R2_CACHE_ASSETS_SECRET_ACCESS_KEY"
+ok "e2e-full(z): R2 の鍵を渡すのは、キャッシュの取得の段だけ(run の段には無い)" "$(jq -r '[.jobs.shard.steps[] | select(tostring | test("secrets[.]")) | (.uses // "")] | unique | join(",")' "$XJ")" "runs-on/cache@v5.0.7"
+ok "e2e-full(z): shard の手順は e2e の e2e job と同じ(npm ci・cargo・endpoint・依存の導入の行)" "$(jq -c '[.jobs.e2e.steps[] | select(.run != null) | .run | split("\n")[0]][0:4]' "$ER")" "$(jq -c '[.jobs.shard.steps[] | select(.run != null) | .run | split("\n")[0]][0:4]' "$XJ")"
+ok "e2e-full(z): node は 26(e2e と同じ)" "$(jq -c '[.jobs.shard.steps[] | select((.uses // "") | test("setup-node")) | .with["node-version"]]' "$XJ")" '[26]'
+XM=$(jq -c '[.jobs.shard.strategy.matrix.include[]]' "$XJ")
+ok "e2e-full(z): matrix の総数は 80 以下(GitHub の runner の並列の上限の都合)" "$(jq 'length <= 80' <<<"$XM")" true
+ok "e2e-full(z): matrix の各行は area・i・n の 3 つだけ" "$(jq 'all(.[]; keys == ["area","i","n"])' <<<"$XM")" true
+ok "e2e-full(z): matrix の領域の集合は tools/e2e/features/*.min の領域の集合と一致する" "$([ "$(jq -r '[.[].area] | unique | sort | join(" ")' <<<"$XM")" = "$(ls "$top"/tools/e2e/features/*.min | xargs -n1 basename | sed 's/[.]min$//' | sort | paste -sd' ')" ] && echo same)" same
+ok "e2e-full(z): 各領域の i は 1..n を全て持ち、n は領域の中で一定" "$(jq -r 'group_by(.area) | map((map(.n) | unique | length == 1) and ((map(.i) | sort) == [range(1; .[0].n + 1)])) | all' <<<"$XM")" true
+ok "e2e-full(z): 空のシャードが無い: 各領域の n は、そのディレクトリのシナリオの数を超えない(run.mjs は 0 件で落ちる)" "$(for a in $(jq -r '[.[].area] | unique | .[]' <<<"$XM"); do n=$(jq -r --arg a "$a" '[.[] | select(.area == $a)][0].n' <<<"$XM"); c=$(find "$top/tools/e2e/scenarios/$a" -maxdepth 1 -name '*.mjs' ! -name '_*' ! -name index.mjs | wc -l); [ "$n" -le "$c" ] || echo "$a"; done | wc -l)" 0
+XRUN=$(jq -r '[.jobs.shard.steps[] | select((.run // "") | test("tools/e2e/run[.]mjs")) | .run][0] // ""' "$XJ")
+ok "e2e-full(z): 動かす段は run.mjs を node で呼び、--area・--shard を matrix から、--displays 4k-dpr1,4k-dpr2 と --budget を渡す" "$(for w in 'node tools/e2e/run.mjs --area ${{ matrix.area }}' '--shard ${{ matrix.i }}/${{ matrix.n }}' '--displays 4k-dpr1,4k-dpr2' '--budget 35m' '> "$RUNNER_TEMP/e2e.jsonl"'; do grep -cF -- "$w" <<<"$XRUN"; done | paste -sd' ')" "1 1 1 1 1"
+ok "e2e-full(z): 動かす段は run.sh や bash を実行しない(node で呼ぶ。依頼者の制約)" "$(grep -cE 'run[.]sh|bash|[.]sh([^a-z]|$)' <<<"$XRUN")" 0
+ok "e2e-full(z): 表示は 4k-dpr1 と 4k-dpr2 の 2 行(random は使わない)" "$(grep -cF -- 'random' "$XF")" 0
+ok "e2e-full(z): job の時間の上限は 60 分(45 分の見込み。予算 35 分の後に、新しいシナリオを始めない)" "$(jq -r '.jobs.shard["timeout-minutes"] | tostring' "$XJ")" 60
+ok "e2e-full(z): artifact は結果の JSON と coverage だけ(png・webp の画像を上げない)" "$(grep -ciE 'png|webp' "$XF")" 0
+ok "e2e-full(z): 各シャードの artifact は e2e-full-<領域>-<i>・保持 14 日・if: always()・無ければ無視・出力は e2e.jsonl" "$(jq -c '[.jobs.shard.steps[] | select((.uses // "") | test("upload-artifact")) | [.if, .with.name, .with["retention-days"], .with["if-no-files-found"], .with.path]][0]' "$XJ")" '["always()","e2e-full-${{ matrix.area }}-${{ matrix.i }}",14,"ignore","${{ runner.temp }}/e2e.jsonl"]'
+ok "e2e-full(z): 網羅の artifact は e2e-full-coverage(保持 14 日・if: always()・coverage.json)" "$(jq -c '[.jobs.report.steps[] | select((.uses // "") | test("upload-artifact")) | [.if, .with.name, .with["retention-days"], .with.path]][0]' "$XJ")" '["always()","e2e-full-coverage",14,"${{ runner.temp }}/coverage.json"]'
+ok "e2e-full(z): report は shard の artifact を e2e-full-* の名前で取り、results の下に置く" "$(jq -c '[.jobs.report.steps[] | select((.uses // "") | test("download-artifact")) | .with] | .[0] | [.pattern, .path]' "$XJ")" '["e2e-full-*","${{ runner.temp }}/results"]'
+ok "e2e-full(z): report は matrix の job を needs に持つ(shard)。e2e の run には依らない" "$(jq -r '.jobs.report.needs' "$XJ")" shard
+XRS=$(jq -r '[.jobs.report.steps[] | select(.name == "網羅と結果の表") | .run][0] // ""' "$XJ")
+ok "e2e-full(z): 網羅の判定は judge-coverage.jq を coverage.json に対して行い、0 で終わるかで決まる" "$(jq -r '[.jobs.report.steps[] | select((.run // "") | test("judge-coverage[.]jq")) | .run][0]' "$XJ")" 'jq -e -f tools/e2e/judge-coverage.jq "$RUNNER_TEMP/coverage.json"'
+XRT=$T/xrt; mkdir -p "$XRT/results/e2e-full-page-1"
+printf '%s\n' '{"name":"4k-dpr1","servedHeadersMatch":true,"error":null,"scenarios":[{"id":"page/a","area":"page","covers":[],"ok":true,"expectFail":null,"skipped":false,"pageErrors":0,"consoleErrors":0,"failedRequests":0,"stuckToasts":0},{"id":"page/b","area":"page","covers":[],"ok":false,"expectFail":null,"skipped":false,"pageErrors":0,"consoleErrors":0,"failedRequests":0,"stuckToasts":0}]}' > "$XRT/results/e2e-full-page-1/e2e.jsonl"
+: > "$XRT/sum.md"
+XRC=$(cd "$top" && RUNNER_TEMP=$XRT GITHUB_STEP_SUMMARY=$XRT/sum.md bash -eo pipefail -c "$XRS" > /dev/null 2>&1; echo $?)
+XJC=$(cd "$top" && jq -e -f tools/e2e/judge-coverage.jq "$XRT/coverage.json" > /dev/null 2>&1; echo $?)
+ok "e2e-full(z): 網羅の表が動く: 領域の行(シナリオ・結果・ok・印なし)と、印なしの失敗の名指し、最小に届かない時の判定の落ち" "$XRC/$(grep -cE '^\| page \| 2 \| 2 \| 1 \| 0 \| 1 \| ' "$XRT/sum.md")/$(grep -cxF -- '- page/b (4k-dpr1)' "$XRT/sum.md")/$XJC" "0/1/1/1"
+mkdir -p "$T/xrt0/results"; : > "$T/xrt0/sum.md"
+XRC0=$(cd "$top" && RUNNER_TEMP=$T/xrt0 GITHUB_STEP_SUMMARY=$T/xrt0/sum.md bash -eo pipefail -c "$XRS" > /dev/null 2>&1; echo $?)
+XJC0=$(cd "$top" && jq -e -f tools/e2e/judge-coverage.jq "$T/xrt0/coverage.json" > /dev/null 2>&1; echo $?)
+ok "e2e-full(z): 結果が 1 つも無くても、表は作られ(0)、網羅の判定は落ちる(赤になる)" "$XRC0/$XJC0" "0/1"
+ok "e2e-full(z): guard/deploy-lint.sh が e2e-full.yml を通す" "$(bash "$top/guard/deploy-lint.sh" "$XF" > /dev/null 2>&1; echo $?)" 0
+ok "e2e-full(z): 行数は 200 行以下、1 行は 80 字以内" "$(( $(wc -l < "$XF") <= 200 ))/$(awk 'length($0)>80' "$XF" | wc -l)" "1/0"
+ok "e2e-full(z): guard/scan.sh が e2e-full.yml を通す(vendor の名・Cloudflare の識別子・add-mask が無い)" "$(bash "$top/guard/scan.sh" "$XF" > /dev/null 2>&1; echo $?)" 0
+ok "actions.lock: e2e-full.yml の一覧は、その uses と一致する(gh actions-lock が作る)" "$(L=$(pj "$top/.github/workflows/actions.lock"); [ "$(jq -c '.workflows[".github/workflows/e2e-full.yml"] | sort' <<<"$L")" = "$(jq -c '[.. | objects | .uses? // empty] | unique | sort' "$XJ")" ] && echo same)" same
+XD=$(awk '/^## 20[.]/{f=1;next} /^## /{f=0} f' "$top/pm-work/workflow-design.md")
+ok "設計(z): 「20」の節に、非ゲート・deploy の前提ではない・matrix の決め方・網羅の表の読み方を書いた" "$(for w in '非ゲート' 'deploy' 'matrix' '網羅' '印なし'; do grep -cF -- "$w" <<<"$XD"; done | awk '{s+=($1>0)} END{print s}')" 5
+ok "設計(z): 「20」の節は 10 行以内" "$([ "$(grep -c . <<<"$XD")" -le 10 ] && echo yes)" yes
+ok "AGENTS.md: 置き場所の .github/workflows/ の行に e2e-full.yml(全シナリオ・非ゲート)が在る" "$(grep -cF 'e2e-full.yml' <(awk '/^## 置き場所/{f=1;next} /^## /{f=0} f' "$top/AGENTS.md"))" 1
 [ -e "$T/failed" ] && fail=1; rm -rf "$T"; exit $fail
