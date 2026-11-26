@@ -42,6 +42,7 @@ fn run_with(name: &str, files: &[&str], src: &str, args: &[String], env: &[(&str
     for f in files {
         cmd.arg(rt().join(f));
     }
+    cmd.arg(manifest().join("tests/support/glob_fixed_stub.c"));
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {name}: {}", String::from_utf8_lossy(&cc.stderr));
     let mut r = Command::new(&exe);
@@ -578,7 +579,7 @@ fn the_menu_family_prints_exactly_what_wine_10_prints() {
     let exe = dir.join(&u);
     let mut cmd = Command::new("clang");
     cmd.args(["-O1", "-std=gnu11", "-w", "-fPIE", "-pie", "-DFLE_RUNTIME", "-x", "c"]).arg("-I").arg(rt()).arg(&battery);
-    for f in ["fle_crash1_menu.c", "fle_imports.c", "fle_env.c"] {
+    for f in ["fle_crash1_menu.c", "fle_imports.c", "fle_glob.c", "fle_env.c"] {
         cmd.arg(rt().join(f));
     }
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

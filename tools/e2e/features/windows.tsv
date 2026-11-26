@@ -1,1 +1,68 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+windows/rack/add	rack	Channel rack: add a channel (the + under the channels)	the rack's picture changes, or a drop-down opens	click the + (rack offset from the table's rectangle), then the picture and the drop-downs are read
+windows/rack/remove	rack	Channel rack: remove a channel	a channel's row is gone from the picture	not covered: the remove item of the channel's menu is not identified
+windows/rack/mute	rack	Channel rack: mute (LED)	the LED's picture changes on each press and comes back	press the LED of row 1 twice (the picture hash of the LED area)
+windows/rack/solo	rack	Channel rack: solo	the solo LED's picture changes	not covered: the solo button's place is not identified
+windows/rack/knob	rack	Channel rack: knob (drag)	the knob's picture changes when dragged	drag the knob of a row up and down (the hash of the knob area)
+windows/rack/graph-editor	rack	Channel rack: graph editor	the graph editor window opens and its value changes	not covered: the way to open the graph editor is not identified
+windows/rack/menu	rack	Channel rack: right-click menu	a drop-down (TQuickPopupMenuWindow) opens on a channel's name	right-click a channel's name; count the new drop-downs; Escape closes it
+windows/rack/select	rack	Channel rack: select a channel (name click)	the row's strip (the selection) changes	click a channel's name (the hash of the row strip)
+windows/step/toggle	step	Step sequencer: a step is pressed on and off	the row's steps picture changes on each press and comes back	press a step of the Channel rack twice (the hash of the row's steps)
+windows/step/open	step	Step sequencer: open the window	the Channel rack is shown in the window table	not covered: the step sequencer's own open and close are the rack's, not checked apart
+windows/playlist/tool-select	playlist	Playlist tool: select	the select tool is chosen and the grid changes with a drag	not covered: the tool buttons' places are not identified
+windows/playlist/tool-draw	playlist	Playlist tool: draw	a click places a clip	not covered as a tool choice: the clip-place scenarios use the default tool
+windows/playlist/tool-erase	playlist	Playlist tool: erase	a click removes a clip	not covered: the erase tool is not chosen
+windows/playlist/clip-place	playlist	Playlist clip: place (a click on the grid)	the grid's picture changes	click a cell of the grid (track and bar offsets from the table's rectangle)
+windows/playlist/clip-move	playlist	Playlist clip: move	the clip moves by the drag	not covered: the clip's drag is not measured
+windows/playlist/clip-delete	playlist	Playlist clip: delete	the clip is gone from the grid	not covered: the delete is not measured
+windows/playlist/track	playlist	Playlist track	a track's row is shown and its name is in the picture	not covered: the track rows' names are not read
+windows/playlist/zoom	playlist	Playlist: zoom (Ctrl + wheel)	the ruler's picture changes	not covered: the Ctrl + wheel does not change the grid's picture at the places measured
+windows/playlist/snap	playlist	Playlist: snap	the snap value changes	not covered: the snap's place is not identified
+windows/playlist/marker	playlist	Playlist: marker	a marker is placed on the ruler	not covered: the marker's place is not identified
+windows/playlist/range	playlist	Playlist: range selection	a range is selected (the picture changes)	not covered: the range drag is not measured
+windows/playlist/menu	playlist	Playlist: right-click menu	a drop-down opens on the grid	right-click the grid; count the new drop-downs
+windows/piano/open	piano	Piano roll: open (F7)	the Piano roll (a child of the main form, caption "Piano roll") is in the table	F7 with channel 1 selected; the child is read from the table
+windows/piano/close	piano	Piano roll: close	the Piano roll is gone from the table	Escape; the child is read from the table
+windows/piano/tool-pencil	piano	Piano roll tool: pencil	a click on the grid adds a note	not covered: the notes' grid positions are not measured
+windows/piano/tool-select	piano	Piano roll tool: select	a drag selects notes	not covered: the select tool is not measured
+windows/piano/note-add	piano	Piano roll: add a note	the note appears in the grid	not covered: the note's picture is not measured
+windows/piano/note-move	piano	Piano roll: move a note	the note moves by the drag	not covered: the note's drag is not measured
+windows/piano/note-delete	piano	Piano roll: delete a note	the note is gone from the grid	not covered: the delete is not measured
+windows/piano/chord	piano	Piano roll: chord (the chord tool)	chord notes are added	not covered: the chord tool is not opened
+windows/piano/riff	piano	Piano roll: riff (the riff machine)	riff notes are added	not covered: the riff machine needs the plugin Sytrus (a Warning box in the measured runs)
+windows/piano/snap	piano	Piano roll: snap	the snap value changes	not covered: the snap's place is not identified
+windows/piano/zoom	piano	Piano roll: zoom	the grid's picture changes	not covered: the zoom's place is not identified
+windows/piano/undo	piano	Piano roll: Undo	a change is taken back	not covered: no change of notes is measured
+windows/piano/redo	piano	Piano roll: Redo	a taken-back change is done again	not covered: no change of notes is measured
+windows/mixer/insert-select	mixer	Mixer insert: select (a click)	the insert's picture changes	click an insert slot (the insert area's hash)
+windows/mixer/insert-open	mixer	Mixer insert: open	the insert's plugin window opens	not covered: the open (double click) is not measured
+windows/mixer/insert-close	mixer	Mixer insert: close	the insert's plugin window closes	not covered: no insert window is opened
+windows/mixer/route	mixer	Mixer: routing	the routing changes	not covered: the routing's places are not identified
+windows/mixer/fx-slot	mixer	Mixer: FX slot (choose or remove a plugin)	the slot's picture changes	not covered: the slot's menu is not measured
+windows/mixer/fader	mixer	Mixer: fader (value)	the fader's picture changes when dragged	drag a fader up and down (the hash of the fader area)
+windows/mixer/meter	mixer	Mixer: meter	the meter's picture moves	not covered: the output is silent in the measured runs, so the meter does not move
+windows/browser/tab-1	browser	Browser tab 1	the tab strip's picture changes when pressed	press the tab (the hash of the strip)
+windows/browser/tab-2	browser	Browser tab 2	the tab strip's picture changes when pressed	press the tab (the hash of the strip)
+windows/browser/tab-3	browser	Browser tab 3	the tab strip's picture changes when pressed	not covered: the press does not change the strip's picture at the measured place
+windows/browser/tab-4	browser	Browser tab 4	the tab strip's picture changes when pressed	press the tab (the hash of the strip)
+windows/browser/tab-5	browser	Browser tab 5	the tab strip's picture changes when pressed	press the tab (the hash of the strip)
+windows/browser/tab-6	browser	Browser tab 6	the tab strip's picture changes when pressed	not covered: pressing tab 6 logs two console errors (a CSP violation for an inline style, and a font data URL), which fails the scenario
+windows/browser/tab-7	browser	Browser tab 7	the tab strip's picture changes when pressed	not covered: the press does not change the strip's picture at the measured place
+windows/browser/tab-8	browser	Browser tab 8	the tab strip's picture changes when pressed	press the tab (the hash of the strip)
+windows/browser/search	browser	Browser: search (type a text)	the list is narrowed	not covered: the Browser's list is not drawn (the web view is not in the runtime)
+windows/browser/preview	browser	Browser: preview (a sound)	a preview starts	not covered: the list is not drawn (the web view is not in the runtime); the sound is checked in #1491
+windows/event/open	event	Event editor: open	the Event editor (TEventEditForm) is in the table	F7 (the piano roll is the event editor's window)
+windows/event/value	event	Event editor: change a value	the value changes	not covered: the value's place is not identified
+windows/event/close	event	Event editor: close	the window is gone from the table	not covered as the event editor's own close (the piano roll's close is covered)
+windows/plugin/open	plugin	Plugin picker: open (F8)	the plugin list (TPlugListForm) is in the table	F8; the window is read from the table
+windows/plugin/value	plugin	Plugin picker: change a value	the value changes	not covered: the list's rows are not read
+windows/plugin/close	plugin	Plugin picker: close	the window is gone from the table	Escape
+windows/project/open	project	Project picker: open	the project picker is shown	not covered: the project picker is the Welcome window, shown only at the start
+windows/project/value	project	Project picker: change a value	the value changes	not covered: the Welcome window is not shown after the start
+windows/project/close	project	Project picker: close	the window is gone from the table	not covered: the Welcome window is not shown after the start
+windows/op/move	op	Window: move (drag the title)	the window's rectangle moves by the drag	drag the Settings window's title; the table's rectangle is read before and after
+windows/op/resize	op	Window: resize (drag an edge)	the height grows by the drag, the width stays	drag the Settings window's bottom edge; the table's rectangle is read
+windows/op/minimize	op	Window: minimize	the window is minimized	not covered: no minimize control is found in the window table or by a double click on the title
+windows/op/maximize	op	Window: maximize	the window fills the desk	not covered: a double click on the Settings title does not maximize it
+windows/op/close	op	Window: close (Escape)	the window is gone from the table	Escape on the Settings window and on the plugin list
+windows/op/f12	op	Window: F12 (close all)	only the main form is left in the table	F12 with the Settings window or the plugin list open

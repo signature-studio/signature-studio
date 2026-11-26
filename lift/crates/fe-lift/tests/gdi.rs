@@ -45,7 +45,7 @@ fn clang_c(src: &Path, obj: &Path, strict: bool) {
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-c"]);
     if strict {
-        cmd.arg("-Werror");
+        cmd.arg("-Werror").arg("-Wno-deprecated-declarations");
     }
     let cc = cmd
         .arg("-I")
@@ -69,7 +69,7 @@ fn objs() -> &'static Vec<PathBuf> {
         let dir = work_dir().join(etxt_common::per_process("obj-gdi"));
         std::fs::create_dir_all(&dir).unwrap();
         let mut v = Vec::new();
-        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_env.c", false)] {
+        for (name, ours) in [("fle_gdi.c", true), ("fle_raster.c", true), ("fle_gdc.c", false), ("fle_imports.c", false), ("fle_glob.c", false), ("fle_env.c", false)] {
             let base = if ours { src_dir() } else { runtime_dir() };
             let o = dir.join(name.replace(".c", ".o"));
             clang_c(&base.join(name), &o, ours);
@@ -1672,14 +1672,15 @@ fn source_uses_no_host_display_resource_clock_thread_process_or_file() {
     ] {
         assert!(!code.contains(bad), "fle_gdi.c must not use {bad}");
     }
-    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only
+    // `long` is not portable (32 bits on wasm32 and on Windows, 64 on Linux): fixed-width integers only. `long long` is 64 bits on every target (C99) and is allowed (the trace casts)
     let b = code.as_bytes();
     let mut i = 0;
     while let Some(p) = code[i..].find("long") {
         let at = i + p;
         let before = at == 0 || !(b[at - 1].is_ascii_alphanumeric() || b[at - 1] == b'_');
         let after = at + 4 >= b.len() || !(b[at + 4].is_ascii_alphanumeric() || b[at + 4] == b'_');
-        assert!(!(before && after), "fle_gdi.c uses `long` near byte {at}");
+        let long_long = code[at + 4..].trim_start().starts_with("long") || code[..at].trim_end().ends_with("long");
+        assert!(!(before && after && !long_long), "fle_gdi.c uses `long` near byte {at}");
         i = at + 4;
     }
     // the host thread id comes from the portability layer (decision 0045), and fle_stop is the stop

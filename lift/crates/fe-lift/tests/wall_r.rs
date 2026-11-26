@@ -283,7 +283,7 @@ int main(int argc, char **argv)
 }
 "#;
 
-const RUNTIME_FILES: [&str; 15] = [
+const RUNTIME_FILES: [&str; 16] = [
     "fle_winmm.c",
     "fle_spi.c",
     "fle_sysmetrics.c",
@@ -295,7 +295,7 @@ const RUNTIME_FILES: [&str; 15] = [
     "fle_gdi.c",
     "fle_raster.c", // decision 0126: fle_gdi.c calls the pixel model (fle_r_*, fle_raster_*)
     "fle_gdc.c",
-    "fle_imports.c",
+    "fle_imports.c", "fle_glob.c",
     "fle_env.c",
     "fle_reg.c",
     "fle_host.c",
@@ -976,6 +976,7 @@ int main(void)
         .collect();
     files.sort();
     files.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+    files.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
     for f in &files {
         cmd.arg(f);
     }

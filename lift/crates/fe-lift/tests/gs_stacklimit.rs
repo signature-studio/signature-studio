@@ -596,7 +596,7 @@ fn wasm_gives_the_same_results_as_native_for_the_generated_chkstk() {
 fn runtime_stop_paths_and_callback_keep_the_stack_limit() {
     let dir = out_dir();
     // fle_imports.c defines fle_tls_values and fle_set_last_error (fle_env.c needs it); fle_host.c has the address-fault stop
-    let mut sources: Vec<PathBuf> = ["fle_callback.c", "fle_env.c", "fle_imports.c", "fle_host.c"].iter().map(|f| rt().join(f)).collect();
+    let mut sources: Vec<PathBuf> = ["fle_callback.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_host.c"].iter().map(|f| rt().join(f)).collect();
     sources.sort();
     let c = gen_c();
     let exe = clang("gs-cb", &c, MAIN_CB, &sources);

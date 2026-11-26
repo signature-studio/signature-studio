@@ -30,8 +30,8 @@ fn work() -> PathBuf {
     d
 }
 
-const OBJS: [&str; 28] = [
-    "fle_api2_call", "fle_appview", "fle_callback", "fle_class", "fle_comctl", "fle_cursor", "fle_env", "fle_event", "fle_gdc", "fle_gdi", "fle_host", "fle_imports", "fle_input", "fle_layered", "fle_locale", "fle_mxcsr",
+const OBJS: [&str; 29] = [
+    "fle_api2_call", "fle_appview", "fle_callback", "fle_class", "fle_comctl", "fle_cursor", "fle_env", "fle_event", "fle_gdc", "fle_gdi", "fle_host", "fle_imports", "fle_glob", "fle_input", "fle_layered", "fle_locale", "fle_mxcsr",
     "fle_proc", "fle_raster", "fle_sys", "fle_thread", "fle_time", "fle_token", "fle_vfs", "fle_visrgn", "fle_vmap", "fle_vol", "fle_win", "fle_x87",
 ];
 const OBJS2: [&str; 3] = ["fle_x87ctl", "fle_wall_ia2", "fle_wall_ia2w"];
@@ -57,6 +57,7 @@ fn run_variant(tag: &str, defs: &[&str]) -> String {
     let exe = dir.join("create_seq");
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(rt()).arg(harness().join("create_seq.c"));
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in &objs {
         cmd.arg(o);
     }

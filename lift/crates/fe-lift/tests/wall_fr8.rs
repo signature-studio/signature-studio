@@ -237,8 +237,8 @@ fn the_names_that_stay_unanswered_are_not_rows() {
 // 2. The driver: real fle_thread.c and the files it works with, a stub fle_dispatch_table
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 14] = [
-    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
+const RT_FILES: [&str; 15] = [
+    "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_glob.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
     "fle_time.c",
 ];
 const RT_EXTRA: [&str; 4] = ["fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c"];
@@ -352,6 +352,7 @@ fn run_src_with(name: &str, top: &str, body: &str, more: &[&str]) -> Out {
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(src_dir()).arg("-I").arg(rt_dir());
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         cmd.arg(o);
     }

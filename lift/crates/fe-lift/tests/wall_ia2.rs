@@ -39,6 +39,7 @@ fn run(name: &str, files: &[&str], src: &str) -> (i32, Vec<String>, String) {
     for f in files {
         cmd.arg(rt().join(f));
     }
+    cmd.arg(manifest().join("tests/support/glob_fixed_stub.c"));
     let cc = cmd.arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");
     assert!(cc.status.success(), "clang failed for {name}: {}", String::from_utf8_lossy(&cc.stderr));
     let r = Command::new(&exe).output().expect("run failed");

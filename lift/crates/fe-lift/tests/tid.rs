@@ -31,7 +31,7 @@ fn work() -> PathBuf {
     d
 }
 
-const FILES: [&str; 8] = ["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_host.c", "fle_proc.c", "fle_time.c"];
+const FILES: [&str; 9] = ["fle_sys.c", "fle_vmap.c", "fle_vfs.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_host.c", "fle_proc.c", "fle_time.c"];
 
 const PRE: &str = r#"
 #include <stdio.h>

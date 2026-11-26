@@ -171,8 +171,8 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
     let rows = resp_rows(&c);
     assert_eq!(rows.len(), st.resp_entries);
     let k = rows_0147::ROWS_0147.len();
-    let n = rows.len() - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len(); // decision 0267 appends 1 row (tests/rows_0267) after this one, decision 0372 1 row (tests/rows_0372) after that
-    // decision 0015: append only. HEAD 7b82424 ends with user32!GetLayeredWindowAttributes (decision 0140); once decision 0144's rows are in the tree they come between (the check is "last row", not "after row 605")
+    // decision 0015: append only. The rows of the later decisions (0267, 0372 and the rows that came after them, Issue #1355, #1391, #1382) follow this block, so its end is found by name, not counted from the end
+    let n = rows.iter().position(|(dll, name, _)| dll == "user32.dll" && name == "PostThreadMessageW").expect("the row of decision 0147") + 1;
     for (i, (dll, name)) in rows_0147::ROWS_0147.iter().enumerate() {
         assert_eq!((rows[n - k + i].0.as_str(), rows[n - k + i].1.as_str()), (*dll, *name), "row {i} of decision 0147");
     }
@@ -185,8 +185,9 @@ fn post_thread_message_w_is_the_last_row_after_the_rows_of_the_earlier_decisions
     // and in the source table, right before the row of decision 0267
     let src = std::fs::read_to_string(manifest().join("src/imports_table.rs")).unwrap();
     let table: Vec<&str> = src.lines().filter(|l| l.trim_start().starts_with("(\"") && l.contains("\"fle_imp_")).collect();
-    let last = table[table.len() - 1 - rows_0267::ROWS_0267.len() - rows_0372::ROWS_0372.len()].trim().to_string();
-    assert_eq!(last, "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
+    let at = table.iter().position(|l| l.contains("\"PostThreadMessageW\"")).expect("the source row of decision 0147");
+    assert_eq!(table[at].trim(), "(\"user32.dll\", \"PostThreadMessageW\", \"fle_imp_PostThreadMessageW\", \"jmp_imp:PostThreadMessageW\"),");
+    assert!(table[at + 1..].iter().any(|l| l.contains("\"SetWindowPlacement\"")), "the row of decision 0267 comes after it");
 }
 
 #[test]
@@ -205,9 +206,9 @@ fn the_thunk_is_answered_under_user32_and_under_no_other_dll() {
 // 2. The driver
 // ---------------------------------------------------------------------------------------------
 
-const RT_FILES: [&str; 18] = [
+const RT_FILES: [&str; 19] = [
     "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
-    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c",
+    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_glob.c",
 ];
 
 fn clang_c(src: &Path, obj: &Path, strict: bool) {
@@ -234,6 +235,9 @@ fn objs() -> &'static Vec<PathBuf> {
             clang_c(&base.join(name), &o, is_ours);
             v.push(o);
         }
+        let mo = dir.join("mutex_real_stub.o");
+        clang_c(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true);
+        v.push(mo);
         v
     })
 }

@@ -191,6 +191,7 @@ fn run_top(name: &str, top: &str, entries: &str, n_extra: usize, body: &str) -> 
     std::fs::write(&c, src).unwrap();
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(rt_dir());
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         cmd.arg(o);
     }

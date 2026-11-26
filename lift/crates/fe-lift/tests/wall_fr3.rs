@@ -399,6 +399,7 @@ fn driver() -> &'static PathBuf {
             .collect();
         srcs.sort();
         srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/clip_host_stub.c"));
+        srcs.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/mutex_real_stub.c"));
         let exe = dir.join(&tag);
         let mut cmd = Command::new("clang");
         cmd.args(["-O0", "-std=gnu11", "-w", "-fno-builtin", "-fPIE", "-I"]).arg(&rt);
@@ -547,7 +548,7 @@ fn compile_and_run_reg_seed_selftest() -> (bool, String) {
     let h = harness_dir();
     let mut cmd = Command::new("clang");
     cmd.args(["-std=gnu11", "-O0", "-Wall", "-Wextra", "-Werror", "-fPIE", "-I"]).arg(&rt).arg("-I").arg(&h);
-    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_modules.c", "fle_string.c"] {
+    for f in ["fle_vfs.c", "fle_reg.c", "fle_env.c", "fle_imports.c", "fle_glob.c", "fle_modules.c", "fle_string.c"] {
         cmd.arg(rt.join(f));
     }
     let cc = cmd.arg(h.join("seeds/reg_seed_selftest.c")).arg("-o").arg(&exe).env("TMPDIR", dir.join("tmp")).output().expect("clang not found");

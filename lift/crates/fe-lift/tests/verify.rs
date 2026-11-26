@@ -125,7 +125,7 @@ fn local_free_thunk_calls_runtime() {
 }
 
 /// LocalFree runtime (fle_imports.c): NULL is ignored and returns NULL; a LocalAlloc
-/// pointer is freed and returns NULL. The C program reads only its own output.
+/// pointer is freed and returns NULL; a pointer that LocalAlloc did not give is not freed and comes back as the handle (the failure, #1382). The C program reads only its own output.
 #[test]
 fn local_free_runtime_returns_null_and_frees() {
     let rt = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../runtime");
@@ -136,7 +136,7 @@ fn local_free_runtime_returns_null_and_frees() {
 uint64_t R[16];\n\
 int main(void)\n{\n\
     R[1] = 0; fle_imp_LocalFree(); printf(\"%llx\\n\", (unsigned long long)R[0]);\n\
-    R[1] = (uint64_t)(uintptr_t)malloc(16); fle_imp_LocalFree(); printf(\"%llx\\n\", (unsigned long long)R[0]);\n\
+    { uint64_t m = (uint64_t)(uintptr_t)malloc(16); R[1] = m; fle_imp_LocalFree(); printf(\"%d\\n\", R[0] == m); }\n\
     R[1] = 0x40; R[2] = 8; fle_imp_LocalAlloc(); \
     R[1] = R[0]; fle_imp_LocalFree(); printf(\"%llx\\n\", (unsigned long long)R[0]);\n\
     return 0;\n}\n";
@@ -148,7 +148,7 @@ int main(void)\n{\n\
     let cc = Command::new("clang")
         .args(["-O0", "-std=gnu11", "-Wall", "-Wextra", "-fPIE", "-I"])
         .arg(&rt)
-        .arg(rt.join("fle_imports.c"))
+        .arg(rt.join("fle_imports.c")).arg(rt.join("fle_glob.c")).arg(rt.join("fle_env.c"))
         .arg(rt.join("fle_string.c"))
         .arg("-o")
         .arg(&exe)
@@ -160,7 +160,7 @@ int main(void)\n{\n\
     let run = Command::new(&exe).output().expect("run failed");
     assert!(run.status.success(), "C program failed");
     let got: Vec<String> = String::from_utf8(run.stdout).unwrap().lines().map(|l| l.trim().to_string()).collect();
-    assert_eq!(got, vec!["0", "0", "0"]);
+    assert_eq!(got, vec!["0", "1", "0"]);
 }
 
 #[test]

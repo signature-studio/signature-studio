@@ -30,9 +30,9 @@ fn work_dir() -> PathBuf {
     d
 }
 
-const FILES: [&str; 18] = [
+const FILES: [&str; 19] = [
     "fle_thread.c", "fle_win.c", "fle_class.c", "fle_event.c", "fle_sys.c", "fle_imports.c", "fle_proc.c", "fle_callback.c", "fle_env.c", "fle_vfs.c", "fle_vmap.c", "fle_vol.c", "fle_host.c",
-    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c",
+    "fle_time.c", "fle_x87ctl.c", "fle_mxcsr.c", "fle_x87.c", "fle_locale.c", "fle_glob.c",
 ];
 
 fn clang_obj(src: &Path, obj: &Path, strict: bool, extra: &[&str]) {
@@ -63,6 +63,9 @@ fn scen_exe() -> &'static PathBuf {
         let so = dir.join("thread_scenarios.o");
         clang_obj(&th_dir().join("thread_scenarios.c"), &so, false, &[]);
         objs.push(so);
+        let mo = dir.join("mutex_real_stub.o");
+        clang_obj(&manifest().join("tests/support/mutex_real_stub.c"), &mo, true, &[]);
+        objs.push(mo);
         let exe = dir.join("scen");
         let mut cmd = Command::new("clang");
         cmd.arg("-pie").arg("-o").arg(&exe);

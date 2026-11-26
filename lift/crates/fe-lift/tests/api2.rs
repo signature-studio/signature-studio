@@ -68,6 +68,7 @@ fn build_run(name: &str, src: &Path, extra: &[&str]) -> Out {
     let exe = work().join(etxt_common::uniq(name));
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(rt()).args(extra).arg(src);
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         cmd.arg(o);
     }
@@ -176,6 +177,7 @@ int main(int argc, char **argv)
     let exe = work().join(etxt_common::uniq("api2-stops"));
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(rt()).arg(&c);
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in objs() {
         cmd.arg(o);
     }
@@ -190,8 +192,8 @@ int main(int argc, char **argv)
     }
 }
 
-const WIN_OBJS: [&str; 30] = [
-    "fle_api2_call", "fle_appview", "fle_callback", "fle_class", "fle_comctl", "fle_cursor", "fle_env", "fle_event", "fle_gdc", "fle_gdi", "fle_host", "fle_imports", "fle_input", "fle_layered", "fle_locale", "fle_mxcsr", "fle_proc",
+const WIN_OBJS: [&str; 31] = [
+    "fle_api2_call", "fle_appview", "fle_callback", "fle_class", "fle_comctl", "fle_cursor", "fle_env", "fle_event", "fle_gdc", "fle_gdi", "fle_host", "fle_imports", "fle_glob", "fle_input", "fle_layered", "fle_locale", "fle_mxcsr", "fle_proc",
     "fle_raster", "fle_sys", "fle_thread", "fle_time", "fle_token", "fle_vfs", "fle_visrgn", "fle_vmap", "fle_vol", "fle_wall_ia2", "fle_wall_ia2w", "fle_win", "fle_x87",
 ];
 
@@ -212,6 +214,7 @@ fn window_update_region_cases_vs_wine_with_the_known_gaps() {
     let exe = work().join(etxt_common::uniq("win_upd"));
     let mut cmd = Command::new("clang");
     cmd.args(["-O0", "-std=gnu11", "-w", "-fPIE", "-pthread", "-I"]).arg(rt()).arg(harness().join("win_upd.c"));
+    cmd.arg(manifest().join("tests/support/mutex_real_stub.c"));
     for o in &objs {
         cmd.arg(o);
     }

@@ -15,7 +15,7 @@ node tools/e2e/run.mjs --list
 
 前提: `app/node_modules` と `app/dist`(`npm run build --prefix app`)、bundle(`lift/out-app/bundle/{raw,br}/fl-Oz`、`fe-build bundle`)。
 
-- stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0。
+- stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0(`--report-only` のときは、下の「判定の基準」の規則)。
 - 試験: `node --test tools/e2e/test/*.test.mjs`(Playwright を使わない。純粋な部分の試験)。
 
 ## 引数(`run.mjs`)
@@ -30,6 +30,7 @@ node tools/e2e/run.mjs --list
 | `--only ID[,ID]` | 領域の ID(`page/canvas-fills-viewport`)か、旧い名前(`file-open-demo`)。 |
 | `--budget 40m` | 単位 `s`・`m`・`h`。時間を過ぎたら、新しいシナリオを始めない。始めなかったものは `skipped: true`(その行は受け入れない)。 |
 | `--displays` | `4k-dpr1`(3840 x 2160 CSS px、DPR 1)、`4k-dpr2`(1920 x 1080、DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ)、`dpr:<数>`(例 `dpr:1.25`。CSS px は 3840 ÷ DPR、2160 ÷ DPR)。 |
+| `--report-only` | 結果を報告するだけで、シナリオの ok・カウンターでは落とさない。全ての行が出て(シナリオの行の数が揃い)、行の `error` が null なら終了コード 0。行や行の欠け・`error` は、従来どおり 1。ログに `report-only: exit 0`。行の構造(`servedHeadersMatch` など)は、呼び出す側が見る(受け入れの `node -e`)。 |
 | `--clock raf\|begin` | 既定は `raf`(下の「120 Hz」)。 |
 | `--shots DIR` / `--engine-logs DIR` | 試験用。画面の PNG と、エンジンのログ。 |
 
@@ -160,6 +161,7 @@ export default defineScenario({
 - `servedHeadersMatch` が真。`error` が無い。
 - 印の無いシナリオ: `ok`・`pageErrors` 0・`consoleErrors` 0・`stuckToasts` 0・`failedRequests` 0。`skipped` が無い。
 - 印の有るシナリオ: `pageErrors`・`consoleErrors`・`failedRequests` が 0。
+- `--report-only`(`runPasses`): 判定の代わりに、行の数とシナリオの行の数が揃い、行の `error` が null であること。シナリオの結果では落とさない。領域の受け入れは、これを使う(個々の ok と印は、`e2e-full` が見る)。
 
 ## 構成
 
