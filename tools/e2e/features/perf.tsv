@@ -1,1 +1,33 @@
-id	kind	name	source	how	nameSource
+id	kind	name	expected	how
+perf/startup/engine-idle	startup	起動(navigation から engine-idle まで)の 3 回の中央値	基準の比 1.5 以下	新しい context で 3 回起動し、state を 50 ms ごとに読む
+perf/startup/first-idle	startup	起動の最初の idle(timeline.idle)の 3 回の中央値	基準の比 1.5 以下	同じ 3 回の起動の timeline.idle(navigation からの ms)
+perf/render/min-fps-idle	render	操作の無い時の rAF の 1 秒窓の最小	基準の比 1/1.5 以上	共有ページの rAF の計数を 100 ms ごとに 8 秒読む
+perf/render/min-fps-mouse	render	マウスを 200 Hz で動かした時の rAF の 1 秒窓の最小	基準の比 1/1.5 以上	CDP の mouseMoved を 200 Hz(デスクトップの中央の楕円)で 8 秒
+perf/render/min-fps-mouse-1000hz	render	マウスを 1000 Hz で動かした時の rAF の 1 秒窓の最小	基準の比 1/1.5 以上	同じ道具で 1000 Hz を 8 秒
+perf/render/min-fps-menu	render	メニューの開閉を 10 回した時の rAF の 1 秒窓の最小	基準の比 1/1.5 以上	File の見出しを開いて Escape で閉じる(10 回)の間に計数
+perf/render/min-fps-new-project	render	File > New(Ctrl+N)を 3 回した時の rAF の 1 秒窓の最小	基準の比 1/1.5 以上	Ctrl+N を 3 回。その間に計数
+perf/latency/click-to-pixel	latency	File の見出しのクリックから画素の提示まで(中央値)	基準の比 1.5 以下	page の latency.records の入力の時刻と、それに答えた提示の時刻の差(6 回の中央値)
+perf/latency/key-to-pixel	latency	プルダウンで ↓ を押してから画素の提示まで(中央値)	基準の比 1.5 以下	File を開き、↓ を 6 回。latency.records による
+perf/latency/menu-open-edit	latency	Edit の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	latency.records(5 回の中央値)
+perf/latency/menu-open-add	latency	Add の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/latency/menu-open-patterns	latency	Patterns の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/latency/menu-open-view	latency	View の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/latency/menu-open-options	latency	Options の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/latency/menu-open-tools	latency	Tools の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/latency/menu-open-help	latency	Help の見出しのクリックからプルダウンの提示まで(中央値)	基準の比 1.5 以下	同上
+perf/cpu/idle-busy	cpu	操作の無い 60 秒の busyPct(エンジンの忙しい割合)の平均	基準の比 1.5 以下	__app.idles の busyMs の和を、窓の時間で割る
+perf/cpu/playing-busy	cpu	音が出ている 20 秒の busyPct	基準の比 1.5 以下	音を出し(F24・Space・メトロノーム)、その間の busyPct
+perf/cpu/after-menu-busy	cpu	メニューの開閉の後の 30 秒の busyPct	基準の比 1.5 以下	File を 10 回開閉した後、操作の無い 30 秒
+perf/cpu/after-audio-busy	cpu	音を止めた後の 20 秒の busyPct	基準の比 1.5 以下	音を出してから止め、操作の無い 20 秒
+perf/memory/idle-10min	memory	アイドルの 10 分の後の wasm メモリ(起動の後の比)	比 1.3 以下(増え続けない)	engineMemoryBytes を、起動の後と 10 分の後に読む
+perf/memory/menu-cycles	memory	メニューの開閉 10 回の後の wasm メモリ(前の比)	比 1.3 以下	開閉の前と後に読む
+perf/memory/new-project-cycles	memory	File > New 5 回の後の wasm メモリ(前の比)	比 1.3 以下	Ctrl+N 5 回の前と後に読む
+perf/memory/playing	memory	音が出ている 20 秒の後の wasm メモリ(前の比)	比 1.3 以下	音を出す前と 20 秒の後に読む
+perf/audio/underrun-mouse-1000hz	audio	音が出る状態で、マウスを 1000 Hz で 20 秒動かした時の underrun	0	音の出力の underrunQuanta の増分
+perf/audio/underrun-mouse-200hz	audio	音が出る状態で、マウスを 200 Hz で 20 秒動かした時の underrun	0	同上
+perf/audio/underrun-idle	audio	音が出る状態で、操作の無い 20 秒の underrun	0	同上
+perf/audio/quanta-mouse-1000hz	audio	マウス 1000 Hz の下で、出力が標本を取る(quantaWhilePlaying の増分)	0 より大きい	同上
+perf/engine/idle-after-menu	engine	メニューを閉じた後、engine-idle に戻る	真	File を開閉した後の state
+perf/ab/startup	ab	A/B: 起動の中央値(変更の前の版の値との比。golden/perf/ab-base.tsv)	比 1.5 以下	startup-ab-vs-base と同じ 3 回の起動
+perf/ab/render	ab	A/B: 操作の無い時の最小 fps(変更の前の版との比)	比 1/1.5 以上	rAF の 1 秒窓の最小
+perf/ab/latency	ab	A/B: File のクリックから提示までの中央値(変更の前の版との比)	比 1.5 以下	click-to-pixel と同じ道具
