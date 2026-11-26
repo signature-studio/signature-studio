@@ -3,7 +3,7 @@
 import { shardOf, sortById } from './scenario.mjs';
 
 export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
-const BOOLEAN_FLAGS = new Set(['list']);
+const BOOLEAN_FLAGS = new Set(['list', 'report-only']);
 
 /** the arguments: `--name value` pairs, and the flags of BOOLEAN_FLAGS (no value) */
 export function parseArgs(argv) {
@@ -66,6 +66,16 @@ export function rowPasses(row, n = row.scenarios?.length) {
     && row.scenarios.every((s) => s.skipped !== true && (s.expectFail !== null
       ? s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0
       : s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
+}
+
+/**
+ * the exit of a run over its rows, each with the expected count of its scenario lines. Without reportOnly: every row passes rowPasses.
+ * With reportOnly (--report-only: a run that reports the results and does not judge them): the lines are all there and every row's error is null; the scenario results do not count.
+ */
+export function runPasses(rows, expected, { reportOnly = false } = {}) {
+  if (rows.length !== expected.length) return false;
+  if (!reportOnly) return rows.every((r, i) => rowPasses(r, expected[i]));
+  return rows.every((r, i) => r.error === null && r.scenarios?.length === expected[i]);
 }
 
 /**

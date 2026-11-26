@@ -2,7 +2,7 @@
 // E2E (Issue #1407, extended by #1485): drives the production delivery (wrangler dev --local of app/worker/index.ts, with the bundle in its local R2) in Chromium at 3840 x 2160
 // physical pixels, 120 Hz by the BeginFrame clock (lib/browser.mjs), with real mouse and key events (lib/guest.mjs).
 // Usage: node tools/e2e/run.mjs [--scenarios smoke | --area <領域>] [--only ID[,ID]] [--shard i/n] [--repeat n] [--budget 40m] [--list]
-//                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR]     (run.sh does the same from the repository)
+//                              [--displays 4k-dpr1,4k-dpr2,4k-random,dpr:1.25] [--clock raf|begin] [--shots DIR] [--engine-logs DIR] [--report-only]     (run.sh does the same from the repository)
 //   --area <領域>: the scenarios of tools/e2e/scenarios/<領域>/ (the 13 areas: page input file menus windows audio settings plugins topbar resilience visual perf delivery).
 //     Each file there default-exports defineScenario({ id, covers, displays, expectFail, run }) (lib/scenario.mjs). The files are found by the runner (no table to edit).
 //   --scenarios smoke: the older set (scenarios/smoke/index.mjs, { name, expectFail, run } objects); each of them runs in a page of its own, as before.
@@ -15,6 +15,8 @@
 //   --clock: raf (default: the page's own rAF, the frame-rate limit off) or begin (120 Hz by the BeginFrame clock; see lib/browser.mjs).
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
 //   --engine-logs DIR: a test aid, the engine log of each scenario (the lines the page keeps, from the scenario's start) is written to DIR/<display>-<dpr>-<id>.log.
+//   --report-only: the run reports and does not judge the scenarios. Exit 0 when every row is printed with all its scenario lines and its error is null (runPasses), whatever the scenarios' ok and counters
+//     (the caller checks the rows' structure, e.g. servedHeadersMatch). A row or line missing, or an error (the setup, a row), still exits 1. The log says 'report-only: exit 0'.
 // A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
@@ -32,7 +34,7 @@ import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
 import { AREAS, legacyScenario } from './lib/scenario.mjs';
-import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses } from './lib/plan.mjs';
+import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses, runPasses } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
 
@@ -362,9 +364,12 @@ async function main() {
     fs.rmSync(workDir, { recursive: true, force: true });
     wranglerDirs.forEach((d, i) => { if (!hadWrangler[i]) fs.rmSync(d, { recursive: true, force: true }); });
   }
-  const ok = rows.length === expected.length && rows.every((r, i) => rowPasses(r, expected[i]));
-  log(`rows ${rows.length}, accepted ${ok}`);
-  return ok ? 0 : 1;
+  const accepted = runPasses(rows, expected);
+  log(`rows ${rows.length}, accepted ${accepted}`);
+  if (args['report-only'] !== true) return accepted ? 0 : 1;
+  const reported = runPasses(rows, expected, { reportOnly: true });
+  if (reported) log('report-only: exit 0');
+  return reported ? 0 : 1;
 }
 
 const self = process.argv[1] ? fs.realpathSync(process.argv[1]) : null;
