@@ -16,4 +16,7 @@ check('a number with the same start is not kept', onlyKeep('View/11/1', 'View/11
 check('a menu with the same start is not kept', onlyKeep('View/1', 'View/11'), false);
 check('another root is not kept', onlyKeep('View/11/1', 'File/3'), false);
 check('a key is not kept', onlyKeep('View/11/1', 'key F5'), false);
+check('a comma list keeps each of its items', onlyKeep('File/9/11,View/11/1', 'View/11/1'), true);
+check('a comma list keeps the items on the path to each of its items', onlyKeep('File/9/11,View/11/1', 'File/9'), true);
+check('a comma list keeps no item of none of them', onlyKeep('File/9/11,View/11/1', 'View/11/2'), false);
 process.exit(failed ? 1 : 0);

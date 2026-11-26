@@ -1,8 +1,8 @@
 // crash-hunt (Issue #1405, extended by #1417): walks the FL screen's operations in the lifted engine's page and records what each one did, one probe per path and DPR.
-// Usage: node tools/crash-hunt/hunt.mjs --out <directory> [--budget 50m] [--bundle <raw/<name>>] [--seed 20251125] [--resume]   (run through tools/crash-hunt/run.sh; needs app/node_modules and app/dist, as boot-bundle.mjs does).
+// Usage: node tools/crash-hunt/hunt.mjs --out <directory> [--budget 50m] [--bundle <raw/<name>>] [--seed 20251125] [--resume] [--only <id>[,<id>...]]   (run through tools/crash-hunt/run.sh; needs app/node_modules and app/dist, as boot-bundle.mjs does).
 //   --budget: a number with s, m or h (50m). --bundle: the bundle directory (default lift/out-app/bundle/raw/fl-Oz). --seed: the seed of the random DPR (1.01 to 2.24).
 //   --resume: continues from <out>/crash-hunt-state.json. --skip-startup: a test aid (the startup check is not run; startup is then null).
-//   --only <id> (e.g. View/11/1): probes that item only (and the items on its path, which open its submenus), in the DPR 1 walk, and stops after that walk.
+//   --only <id>[,<id>...] (e.g. View/11/1 or File/9/11,View/11/1): probes those items only (and the items on their paths, which open their submenus), in the DPR 1 walk, and stops after that walk.
 // Walk: two walks, one per DPR (1, then the random one). Each walk: (a) the menus: the 8 top labels of the bar (their places are the bar's fractions, the bar is found in the window table),
 //   every item of each drop-down, and the submenus opened by an item (up to 3 levels); the right-click menus of the four windows (Channel rack, Mixer, Playlist, Browser) and of the Mixer's master insert (group plugin: its submenus);
 //   (b) the keys F5 to F12, Alt+F8, Ctrl+O/E/P/F/I, Space; (c) the top bar's parts (left, right, wheel, drag: group top), the Settings window's tabs (F10: group settings) and the sections of each page,
@@ -173,7 +173,7 @@ function parseArgs(argv) {
   const out = get('--out');
   if (!out) throw new Error('--out is required');
   const only = get('--only');
-  if (only !== undefined && !/^[^/]+(\/\d+)+$/.test(only)) throw new Error(`--only ${only}: use a menu item id such as View/11/1`);
+  if (only !== undefined && !only.split(',').every((id) => /^[^/,]+(\/\d+)+$/.test(id))) throw new Error(`--only ${only}: use menu item ids such as View/11/1 (a comma list of them)`);
   return {
     budgetMs: Number(m[1]) * { s: 1000, m: 60000, h: 3600000 }[m[2]],
     out: path.resolve(out),
@@ -185,8 +185,8 @@ function parseArgs(argv) {
   };
 }
 
-/** --only <id> (a menu item such as View/11/1): the one walk probes the items on the path to it (their submenus open the next level) and the item itself; the other items are not probed. */
-export function onlyKeep(only, id) { return !only || only === id || only.startsWith(`${id}/`); }
+/** --only <id>[,<id>...] (menu items such as View/11/1): the one walk probes the items on the path to each of them (their submenus open the next level) and the item itself; the other items are not probed. */
+export function onlyKeep(only, id) { return !only || only.split(',').some((o) => o === id || o.startsWith(`${id}/`)); }
 
 /** the startup check: welcome-flow.mjs flow A (its line only); ok when not trapped, the first idle within 12.5 s and the start-up bytes within the limit */
 function startupCheck(bundle) {
@@ -395,7 +395,7 @@ class Session {
     const w = this.walk;
     const items = [];
     for (const root of this.roots.keys()) {
-      if (w.only && w.only.split('/')[0] !== root) continue;
+      if (w.only && !w.only.split(',').some((o) => o.split('/')[0] === root)) continue;
       const fresh = !w.nodes[root];
       if (fresh) {
         await this.closeAll();
@@ -646,13 +646,14 @@ function summarize(state, opts) {
   const menuItemsByDpr = state.walks.map((w) => ({ dpr: w.dpr, total: Object.values(w.nodes).reduce((a, n) => a + (n.n ?? 0), 0), counted: Object.keys(w.nodes).length }));
   const remaining = [];
   for (const w of state.walks) for (const t of w.queue) remaining.push(`dpr ${w.dpr}: ${taskLabel(t)}`);
-  if (state.walks.length < 2) remaining.push(`dpr (random): not started (the walk of DPR 1 is not complete)`);
+  const walksWanted = state.walks.length && state.walks[0].only ? 1 : 2;
+  if (state.walks.length < 2 && walksWanted === 2) remaining.push(`dpr (random): not started (the walk of DPR 1 is not complete)`);
   const notStarted = [
     { group: 'd', text: 'the Language (7) and Theme (13) switches: not done (the window table has no window per language or theme; the Settings tabs and their sections are walked)' },
     { group: 'c', text: 'the Mixer inserts other than the master insert\'s first slot (the rack is found in the window table; its first slot\'s menu is walked)' },
     { group: 'f', text: 'the built-in plugins one by one (#1371 tool not in the repository): the Mixer insert\'s submenus are walked (group plugin)' },
   ];
-  const complete = state.walks.length === 2 && state.walks.every((w) => w.complete);
+  const complete = state.walks.length === walksWanted && state.walks.every((w) => w.complete);
   const expectedList = probes.filter((p) => p.expected).map((p) => ({ id: p.id, path: p.path, dpr: p.dpr, state: p.state, reason: EXIT_REASON }));
   const fourIds = ['File/9/11', 'Add/14', 'View/11/1', 'File/10'];
   const fourFingerprints = fourIds.map((id) => ({ id, probes: probes.filter((p) => p.id === id).map((p) => ({ dpr: p.dpr, recheck: !!p.recheck, result: p.result, state: p.state, expected: !!p.expected, fingerprint: p.fingerprint, notes: p.notes })) }));
