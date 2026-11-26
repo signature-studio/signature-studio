@@ -163,7 +163,7 @@ export default defineScenario({
 - `lib/guest.mjs`: 操作(クリック・右クリック・ダブルクリック・ホイール・ドラッグ・キー・Ctrl+キー)と読み取り(窓の表、エンジンの状態)。座標はゲストの画素から CSS px へ写す。
 - `lib/detect.mjs`: 検出(`pageerror`・`console.error`・失敗した要求と 4xx/5xx・消えない表示・エンジンの停止と `running` の 90 秒・クリップボードの呼び出しと権限の変化)。
 - `lib/flow.mjs`: 起動の手順(利用データの確認、Welcome を閉じる、「Problems loading」の箱、Ctrl+O で開く)。
-- `lib/scenario.mjs`(登録・検査)、`lib/plan.mjs`(引数・表示・シャード・時間・判定。Playwright を使わない)、`lib/common.mjs`(共通の部品)、`lib/dump.mjs`(窓の表の読み)、`lib/picture.mjs`(画素)、`lib/inventory.mjs`(一覧の行)。
+- `lib/scenario.mjs`(登録・検査)、`lib/plan.mjs`(引数・表示・シャード・時間・判定。Playwright を使わない)、`lib/common.mjs`(共通の部品)、`lib/dump.mjs`(窓の表の読み)、`lib/picture.mjs`(画素)、`lib/inventory.mjs`(一覧の行)、`lib/topbar.mjs`(上部バーの部品の操作と、メモリの表示の値。`scenarios/topbar/`)。
 - `inventory.mjs`・`coverage.mjs`・`judge-coverage.jq`: 機能の一覧と網羅率。
 - `features/`: 手で書く見出し行と `.min`、`generated/`(一覧の生成物。コミットする)。
 - `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(Issue #1482: 印は外した。右クリックで読まず、通知が出ない)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。
