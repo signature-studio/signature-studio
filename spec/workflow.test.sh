@@ -170,6 +170,42 @@ fx $R/issues/23 "$(iss 23 open failed Task)"
 : > "$GHLOG"; ok "claim: /retry の 23 は running を付けてから failed を外す(外す → 付けの順だと二重に起動する)" "$(cl '[23]' true | jq -c .claimed 2>/dev/null)/$(a=$(grep -n 'issue edit 23 .*--add-label running' "$GHLOG" | cut -d: -f1); r=$(grep -n 'issue edit 23 .*--remove-label failed' "$GHLOG" | cut -d: -f1); [ -n "$a" ] && [ -n "$r" ] && [ "$a" -lt "$r" ] && echo add-first)" "[23]/add-first"
 : > "$GHLOG"; ok "claim: 普通の再起動(retry でない)は failed の 23 を選ばない" "$(cl '[23]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit' "$GHLOG")" "[]/0"
 : > "$GHLOG"; ok "claim: pm-hold の 20 は付けない" "$(cl '[20]' false | jq -c .claimed 2>/dev/null)/$(grep -c 'issue edit' "$GHLOG")" "[]/0"
+# (g2) 大きな応答: 閉じた #1370 のブロッカーの一覧は、本文を含めて 1 MB を超える(execFileSync の既定の maxBuffer 1 MB では ENOBUFS になった)。偽の gh は、--jq が在れば jq で絞り、RAW=1 のときは絞らずに生の応答を返す(maxBuffer だけで通ることを確かめる)
+BF=$T/fxbig; BIN=$T/bigbin; mkdir -p "$BF" "$BIN"
+cat > "$BIN/gh" <<'BGH'
+#!/usr/bin/env bash
+echo "$*" >> "$GHLOG"
+case "$1" in
+  api)
+    p=${2%%\?*}; f="$FX/$(printf '%s' "$p" | sed 's#/#__#g').json"
+    [ -f "$f" ] || { echo "fake gh: 無い: $p" >&2; exit 1; }
+    jqx=""; prev=""; for a in "$@"; do [ "$prev" = --jq ] && jqx=$a; prev=$a; done
+    if [ -n "$jqx" ] && [ -z "${RAW:-}" ]; then jq "$jqx" "$f"; else cat "$f"; fi ;;
+  issue) exit 0 ;;
+  *) echo "fake gh: 未対応: $*" >&2; exit 1 ;;
+esac
+BGH
+chmod +x "$BIN/gh"
+for n in $(seq 1371 1414); do
+  t=Task; b='[]'
+  [ "$n" = 1373 ] && t=Feature
+  [ "$n" = 1372 ] && b='[{"number":1370,"state":"closed"},{"number":1400,"state":"open"}]'
+  jq -n --argjson n "$n" --arg t "$t" '{number: $n, state: "open", labels: [], type: {name: $t}, body: ("x" * 50000)}' > "$BF/repos__o__r__issues__$n.json"
+  printf '%s' "$b" > "$BF/repos__o__r__issues__${n}__dependencies__blocked_by.json"
+  printf '[]' > "$BF/repos__o__r__issues__${n}__sub_issues.json"
+done
+jq -s '.' $(for n in $(seq 1371 1414); do printf '%s ' "$BF/repos__o__r__issues__$n.json"; done) > "$BF/repos__o__r__issues__1370__dependencies__blocking.json"
+printf '{"permission":"write"}' > "$BF/repos__o__r__collaborators__w__permission.json"
+BEV=$T/ev-big.json; printf '%s' '{"action":"closed","issue":{"number":1370},"sender":'"$W"'}' > "$BEV"
+bsel() { ( RAW=$1 GITHUB_EVENT_NAME=issues GITHUB_EVENT_PATH=$BEV GH_REPO=o/r FX=$BF GHLOG=$GHLOG PATH=$BIN:$PATH node "$top/tools/select-targets.mjs" select 2>"$T/big.err" ); }
+EXP=$(jq -cn '[range(1371; 1415) | select(. != 1372 and . != 1373)]')
+: > "$GHLOG"; out=$(bsel 1); rc=$?
+ok "select: 閉じた #1370 のブロッカーの応答が 1 MB を超えても(生の応答)、候補を返す(ENOBUFS にならない)" "$rc/$(jq -c .targets <<<"$out" 2>/dev/null)" "0/$EXP"
+ok "select: 生の応答でも、標準エラーに ENOBUFS を出さない" "$(grep -c ENOBUFS "$T/big.err")" 0
+: > "$GHLOG"; out=$(bsel ""); rc=$?
+ok "select: --jq で絞った応答でも、同じ候補を返す" "$rc/$(jq -c .targets <<<"$out" 2>/dev/null)" "0/$EXP"
+ok "select: 2 件の除外の理由は従来どおり(#1372 は blocked by の open、#1373 は Type)" "$(grep -c '#1372 は起動しない: blocked by の open が 1 件ある' "$T/big.err")/$(grep -c '#1373 は起動しない: Issue の Type が Task でない(Feature)' "$T/big.err")" "1/1"
+ok "select: 読みは --jq で絞る(本文を取らない。--jq が無いのは権限の読みだけ)" "$(grep '^api ' "$GHLOG" | grep -v -- '--jq' | grep -vc 'collaborators/')" 0
 # (h) tools/task-accept.mjs: 本文から、accept ブロックの 1 行を取り出す
 acc() { printf '%b' "$1" | ( cd "$top" && node tools/task-accept.mjs 2>"$T/acc.err" ); echo "rc=$?"; }
 ok "task-accept: accept ブロックの 1 行を、accept: の行として出す" "$(acc 'タスク\n\n```accept\nbash .tmp-x.sh\n```\n' | head -n 1)" "accept: bash .tmp-x.sh"
