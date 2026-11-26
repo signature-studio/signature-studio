@@ -1,6 +1,8 @@
 {
- "baselinePct": 47.37,
+ "baselinePct": 95.75,
+ "baselinePctAll": 47.37,
  "recordedFrom": "p3-profile.tsv",
  "instrTotal": 6094,
+ "instrVa": 3015,
  "instrDirect": 2887
 }

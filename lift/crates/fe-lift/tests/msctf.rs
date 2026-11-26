@@ -255,10 +255,10 @@ int main(int argc, char **argv)
         printf("name25 %s\n", fle_module_name(25));
         printf("name24 %s\n", fle_module_name(24));
         printf("handle25 %llx\n", U(fle_module_handle(25)));
-        printf("past %p\n", (const void *)fle_module_name(42)); /* decision 0238: 41 modules (kernelbase.dll and combase.dll appended); 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended); decision 0119: 38; old: 36, the end after rpcrt4.dll */
+        printf("past %p\n", (const void *)fle_module_name(43)); /* decision 0238: 41 modules (kernelbase.dll and combase.dll appended); 40 modules (kernelbase.dll appended); decision 0122: 39 modules (dwmapi.dll appended); decision 0119: 38; old: 36, the end after rpcrt4.dll */
     } else if (!strcmp(s, "lack")) {
         /* the seven names that decision 0029 defines as lacking (nine until decision 0099 made shcore.dll a module, eight until decision 0118 made rpcrt4.dll one) keep failing with 126 */
-        LLW("imm32.dll"); LLW("msimg32"); LLW("propsys");
+        LLW("msimg32"); LLW("propsys"); /* Issue #1370: imm32.dll is a module now (N = 43) */
         LLW("windowscodecs"); /* decision 0122: dwmapi.dll is a module now (N = 39; old: first here, 5 names; new: 4). Decision 0119: uxtheme.dll (N = 38) and wtsapi32.dll (N = 37) are modules (old: both here, 7 names) */
     } else if (!strcmp(s, "avrt-powrprof")) {
         /* decision 0088: N = 31 and 32. The table linked here is the generator's real response table: it has no row under either dll. */
@@ -279,7 +279,7 @@ int main(int argc, char **argv)
     } else if (!strcmp(s, "unknown-4")) { LLW("msctfime.ime");
     } else if (!strcmp(s, "unknown-5")) { LLW("msctfp.dll");
     } else if (!strcmp(s, "unknown-6")) { LLW("msctf.");
-    } else if (!strcmp(s, "handle-37")) { gpa(M(43), "SetInputScope"); /* decision 0238: a handle past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: a handle past the 40 modules (M(40) with 39 after decision 0122); decision 0122: a handle past the 39 modules (decision 0119: M(39) with 38; old: M(37) with 36) */
+    } else if (!strcmp(s, "handle-37")) { gpa(M(44), "SetInputScope"); /* Issue #1370: M(n) is entry n - 1; the first handle past the 43 modules is M(44). decision 0238: a handle past the 41 modules (M(41) with 40: kernelbase.dll only); decision 0238 earlier: a handle past the 40 modules (M(40) with 39 after decision 0122); decision 0122: a handle past the 39 modules (decision 0119: M(39) with 38; old: M(37) with 36) */
     } else if (!strcmp(s, "handle-25-plus-1")) { gpa(M(25) + 1, "SetInputScope");
     } else {
         printf("no scenario %s\n", s);
@@ -354,7 +354,7 @@ fn aborts(scenario: &str, must_say: &str) -> Out {
 fn msctf_is_the_26th_virtual_module() {
     // Decision 0055: appended after ntdll.dll (decision 0015: append only, never reorder).
     let got = lines("table");
-    assert_eq!(got[0], "count 42"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: 36)
+    assert_eq!(got[0], "count 43"); // decision 0238: kernelbase.dll and combase.dll appended (40 with kernelbase.dll only) (decision 0122: 39, dwmapi.dll appended) (decision 0119: 38, wtsapi32.dll and uxtheme.dll appended; old: 36)
     assert_eq!(got[1], "name25 msctf.dll");
     assert_eq!(got[2], "name24 ntdll.dll");
     assert_eq!(got[3], format!("handle25 {}", h(N_MSCTF)));
@@ -422,14 +422,15 @@ fn free_library_follows_the_reference_count_of_the_new_module() {
 }
 
 #[test]
-fn the_four_lacking_names_still_fail_with_126() {
+fn the_three_lacking_names_still_fail_with_126() {
+    // Issue #1370: imm32.dll is virtual module N = 43, so it is no longer one of the lacking names (the test was `the_four_lacking_names_still_fail_with_126`).
     // Decision 0122: dwmapi is virtual module N = 39 (old: the first of five lacking names; the test was `the_five_lacking_names_still_fail_with_126`).
     // Decision 0029: dwmapi, imm32, msimg32, propsys and windowscodecs are the names this environment lacks now (shcore was the ninth until decision 0099 made it
     // virtual module N = 35, rpcrt4 the eighth until decision 0118 made it N = 36, wtsapi32 the seventh until decision 0119 made it N = 37 and uxtheme the sixth
     // until decision 0119 made it N = 38).
     // msctf.dll is not one of them (decision 0055), and nothing else joins them.
     let got = lines("lack");
-    assert_eq!(got, ["0 126"; 4]);
+    assert_eq!(got, ["0 126"; 3]);
 }
 
 #[test]

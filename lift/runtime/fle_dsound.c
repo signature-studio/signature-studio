@@ -367,6 +367,12 @@ static void rewrite_unread(const ds_buf *b, uint32_t off_f, uint32_t n1_f, uint3
     }
 }
 
+/* Learn DSBPOSITIONNOTIFY: dwOffset is in bytes and need not be on a sample boundary. The play cursor is a frame index, so a byte offset is reached at the first frame that starts at or after it: the offset is rounded up to a frame. */
+static uint32_t notify_frame(const ds_buf *b, uint32_t off)
+{
+    return (uint32_t)(((uint64_t)off + b->fmt.align - 1u) / b->fmt.align);
+}
+
 static void fire_notifications(ds_buf *b, uint64_t from_abs, uint64_t to_abs)
 {
     uint32_t sf = size_frames(b), k;
@@ -389,7 +395,7 @@ static void fire_notifications(ds_buf *b, uint64_t from_abs, uint64_t to_abs)
                 uint32_t off = b->notify[k].off;
 
                 if (off == DSBPN_OFFSETSTOP) continue;
-                off /= b->fmt.align;
+                off = notify_frame(b, off);
                 if (started && off <= last) continue;
                 if (!have || off < best) {
                     best = off;
@@ -402,7 +408,7 @@ static void fire_notifications(ds_buf *b, uint64_t from_abs, uint64_t to_abs)
 
                 if (a > from_abs && a <= to_abs)
                     for (k = 0; k < b->nnotify; k++)
-                        if (b->notify[k].off != DSBPN_OFFSETSTOP && b->notify[k].off / b->fmt.align == best) {
+                        if (b->notify[k].off != DSBPN_OFFSETSTOP && notify_frame(b, b->notify[k].off) == best) {
                             if (fle_event_host_set(b->notify[k].h)) stats.notifications++;
                         }
             }
@@ -499,7 +505,7 @@ int fle_audio_next_tick(uint64_t *out)
             uint64_t off, a;
 
             if (b->notify[k].off == DSBPN_OFFSETSTOP) continue;
-            off = b->notify[k].off / b->fmt.align;
+            off = notify_frame(b, b->notify[k].off);
             a = (cur / sf) * sf + off;
             if (a <= cur) a += sf;
             if (!have || a < best) {
@@ -1215,9 +1221,9 @@ static void m_b_play(void)
     b->silent_until_coop = b->dev->coop == 0;
     b->playing = 1;
     restart_geometry(b, b->cursor);
-    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
     stats.plays++;
-    audio_sync();
+    audio_sync();   /* the first frames are in the ring before the state says PLAYING (the consumer starts on the state) */
+    fle_audio_ring_set_state(FLE_AUDIO_PLAYING);
     ret(HR_OK);
 }
 
@@ -1331,7 +1337,7 @@ static void m_n_qi(void)
 }
 
 /* IDirectSoundNotify::SetNotificationPositions(this, dwPositionNotifies edx, pcPositionNotifies r8): Learn: "The buffer must be stopped when this method is called"; "If a position-notify array has already been set, the method replaces the previous array";
- * DSBPN_OFFSETSTOP "should be the last item"; failures are DSERR_INVALIDPARAM / DSERR_OUTOFMEMORY (the "stopped" violation is DSERR_INVALIDCALL: S-ds-notify-playing) */
+ * DSBPN_OFFSETSTOP "should be the last item"; failures are DSERR_INVALIDPARAM / DSERR_OUTOFMEMORY (the "stopped" violation is DSERR_INVALIDCALL: S-ds-notify-playing). An offset is in bytes and need not be on a sample boundary: only its range is checked (notify_frame) */
 static void m_n_setpos(void)
 {
     ds_buf *b = this_buf(M_N_SETPOS, 1);
@@ -1357,7 +1363,7 @@ static void m_n_setpos(void)
     for (k = 0; k < n; k++) {
         a[k].off = (uint32_t)fle_ld(p + 16u * k, 4);
         a[k].h = fle_ld(p + 16u * k + 8, 8);
-        if ((a[k].off != DSBPN_OFFSETSTOP && (a[k].off >= b->size || a[k].off % b->fmt.align)) || fle_event_state(a[k].h) < 0 || (a[k].off == DSBPN_OFFSETSTOP && k + 1 != n)) {
+        if ((a[k].off != DSBPN_OFFSETSTOP && a[k].off >= b->size) || fle_event_state(a[k].h) < 0 || (a[k].off == DSBPN_OFFSETSTOP && k + 1 != n)) {
             free(a);
             ret(HR_INVALIDPARAM);
             return;

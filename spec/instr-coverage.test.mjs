@@ -10,17 +10,19 @@ const LISTED = fs.readFileSync(path.join(repo, 'lift/harness/hyb/lists/lowered-f
 const COUNT_TOOL = path.join(repo, 'tools/instr-coverage/profile-counts.mjs');
 const COVER_TOOL = path.join(repo, 'tools/instr-coverage/measure.mjs');
 
-test('measure: the direct share is the rows whose va is listed, and the baseline is recorded next to the TSV once', () => {
+test('measure: the share is over the lifted functions (the rows whose va is a VA); the baseline is recorded next to the TSV once', () => {
   const dir = fs.mkdtempSync(path.join(repo, '.tmp-instr-coverage-'));
   try {
     const tsv = path.join(dir, 'p3.tsv');
     fs.writeFileSync(tsv, `# note\nva\tmodule\tinstructions\n${LISTED}\tfle\t30\n0x1\tfle\t10\nfle_desk_scene\truntime\t60\n`);
     const r = JSON.parse(execFileSync('node', [COVER_TOOL, tsv], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
-    assert.deepEqual(r, { instrTotal: 100, instrDirect: 30, coveragePct: 30, baselinePct: 30 });
-    assert.equal(JSON.parse(fs.readFileSync(path.join(dir, 'p3.baseline.json'), 'utf8')).baselinePct, 30);
+    assert.deepEqual(r, { instrTotal: 100, instrVa: 40, instrDirect: 30, coveragePct: 75, baselinePct: 75, coveragePctAll: 30, baselinePctAll: 30 });
+    const base = JSON.parse(fs.readFileSync(path.join(dir, 'p3.baseline.json'), 'utf8'));
+    assert.equal(base.baselinePct, 75);
+    assert.equal(base.baselinePctAll, 30);
     fs.writeFileSync(tsv, `va\tmodule\tinstructions\n${LISTED}\tfle\t90\n0x1\tfle\t10\n`);
     const again = JSON.parse(execFileSync('node', [COVER_TOOL, tsv], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }));
-    assert.deepEqual(again, { instrTotal: 100, instrDirect: 90, coveragePct: 90, baselinePct: 30 });
+    assert.deepEqual(again, { instrTotal: 100, instrVa: 100, instrDirect: 90, coveragePct: 90, baselinePct: 75, coveragePctAll: 90, baselinePctAll: 30 });
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

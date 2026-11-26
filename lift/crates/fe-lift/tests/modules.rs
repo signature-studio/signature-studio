@@ -617,8 +617,8 @@ fn module_handles_follow_the_formula_and_are_distinct() {
     // 24 PE import DLLs, ntdll.dll (decision 0015), msctf.dll (decision 0055), the 4 API set names (decision 0081), avrt.dll and powrprof.dll (decision 0088),
     // the two deferred modules blend2d.dll and quickfontcache_x64.dll (decision 0096), shcore.dll (decision 0099), rpcrt4.dll (decision 0118),
     // wtsapi32.dll and uxtheme.dll (decision 0119; old: count 36, the end of the table after rpcrt4.dll), dwmapi.dll (decision 0122; old: count 38), kernelbase.dll (decision 0238; old: count 39).
-    assert_eq!(lines[0], "count 42");   // Issue #1355: webview2loader.dll (old: 41; decision 0238: kernelbase.dll and combase.dll, old: 39)
-    for (i, l) in lines[1..43].iter().enumerate() {
+    assert_eq!(lines[0], "count 43");   // Issue #1355: webview2loader.dll (old: 41; decision 0238: kernelbase.dll and combase.dll, old: 39)
+    for (i, l) in lines[1..44].iter().enumerate() {
         let f: Vec<&str> = l.split(' ').collect();
         assert_eq!(f[0], i.to_string());
         assert_eq!(f[2], format!("{:x}", handle_of(i as u64)));
@@ -636,7 +636,8 @@ fn module_handles_follow_the_formula_and_are_distinct() {
     assert_eq!(lines[40].split(' ').nth(1), Some("kernelbase.dll"));
     assert_eq!(lines[41].split(' ').nth(1), Some("combase.dll"));
     assert_eq!(lines[42].split(' ').nth(1), Some("webview2loader.dll"));
-    assert!(lines[43].contains("nil") || lines[43].ends_with(" (nil)") || lines[43].ends_with(" 0x0") || lines[43].ends_with(" 0"));
+    assert_eq!(lines[43].split(' ').nth(1), Some("imm32.dll")); // Issue #1370: index 42
+    assert!(lines[44].contains("nil") || lines[44].ends_with(" (nil)") || lines[44].ends_with(" 0x0") || lines[44].ends_with(" 0"));
 }
 
 fn real_dll() -> Option<Vec<u8>> {
@@ -786,8 +787,8 @@ fn undefined_cases_abort() {
         ("null-module-ordinal", "R[1] = 0; R[2] = 3; fle_imp_GetProcAddress();".to_string()),
         ("bad-handle", "R[1] = 0x12345678; R[2] = (uint64_t)(uintptr_t)\"GetLastError\"; fle_imp_GetProcAddress();".to_string()),
         ("handle-not-aligned", format!("R[1] = {k} + 1; R[2] = (uint64_t)(uintptr_t)\"GetLastError\"; fle_imp_GetProcAddress();")),
-        // Issue #1355: the table has 42 modules (webview2loader.dll is N = 42), so the first handle past it is h(42) (old: h(41) with 41 modules, decision 0238: h(40) with 40)
-        ("handle-past-table", format!("R[1] = {}; R[2] = (uint64_t)(uintptr_t)\"GetLastError\"; fle_imp_GetProcAddress();", h(42))),
+        // Issue #1370: the table has 43 modules (imm32.dll is N = 43, index 42), so the first handle past it is h(43) (Issue #1355: h(42) with 42 modules, h(41) with 41)
+        ("handle-past-table", format!("R[1] = {}; R[2] = (uint64_t)(uintptr_t)\"GetLastError\"; fle_imp_GetProcAddress();", h(43))),
         ("long-proc-name", format!("static char big[400]; memset(big, 'a', 399); R[1] = {k}; R[2] = (uint64_t)(uintptr_t)big; fle_imp_GetProcAddress();")),
         ("path-backslash", format!("R[1] = (uint64_t)(uintptr_t){}; fle_imp_GetModuleHandleW();", c_wide("c:\\windows\\kernel32.dll"))),
         ("path-slash", format!("R[1] = (uint64_t)(uintptr_t){}; fle_imp_GetModuleHandleW();", c_wide("dir/kernel32.dll"))),
