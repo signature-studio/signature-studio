@@ -4,7 +4,7 @@ import { closeNew, newWindows, openLids, openMenu } from '../../lib/common.mjs';
 
 export default defineScenario({
   id: 'input/menu-open-click',
-  covers: ['menus/menu/file'],
+  covers: ['input/mouse/left-click'],
   async run({ guest }) {
     const base = await openLids(guest);
     await openMenu(guest, 'File');

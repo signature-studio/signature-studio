@@ -1102,6 +1102,23 @@ fn load1_a_file_of_the_volume_that_is_not_a_module_of_the_build_stops_by_name() 
 }
 
 #[test]
+fn load1_a_bare_name_searches_the_current_folder_after_the_windows_folder() {
+    // #1415: Dynamic-link library search order (Microsoft Learn, 2023): the standard order of an unpackaged app (safe DLL search mode) is the application folder, the system folder, the 16-bit system folder, the Windows folder,
+    // the current folder, PATH. A file of the Windows folder wins over the same name in the current folder.
+    let body = r#"
+    put_file(u"C:\\Users\\user\\Downloads", u"C:\\Users\\user\\Downloads\\x.dll");
+    put_file(u"C:\\Windows\\System32", u"C:\\Windows\\System32\\x.dll");
+    callv(fle_imp_SetCurrentDirectoryW, A(u"C:\\Users\\user\\Downloads"), 0, 0);
+    callv(fle_imp_LoadLibraryW, A(u"x.dll"), 0, 0);
+    printf("returned %llx\n", U(R[0]));
+"#;
+    let o = run_main_with_prelude("l1-order-current-last", body);
+    assert!(!o.ok, "expected a stop, stdout {}", o.stdout);
+    assert!(!o.stdout.contains("returned"), "{}", o.stdout);
+    assert!(o.stderr.contains("holds a file at \"C:\\Windows\\System32\\x.dll\""), "{}", o.stderr);
+}
+
+#[test]
 fn load1_a_path_whose_name_is_a_virtual_module_and_forms_the_volume_does_not_model_stop_by_name() {
     let cases: [(&str, &str, &str); 10] = [
         ("virtual-full", "callv(fle_imp_LoadLibraryW, A(u\"c:\\\\windows\\\\kernel32.dll\"), 0, 0);", "a path to"),

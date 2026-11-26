@@ -49,6 +49,8 @@ test('a legacy scenario keeps its name and runs in a page of its own', () => {
   assert.equal(l.id, 'file-open-demo');
   assert.equal(l.expectFail, '#1421');
   assert.deepEqual(l.displays, ['4k-dpr1', '4k-dpr2', '4k-random']);
+  assert.equal(l.area, 'smoke');
+  assert.equal(legacyScenario({ name: 'browser-face-tabs', expectFail: null, run: () => ({ ok: true }) }, 'browser-face').area, 'browser-face');
 });
 
 test('a legacy scenario keeps its beforeLoad (the permission and the counter are set before the page loads)', () => {

@@ -1,0 +1,39 @@
+// file/import-midi: File > Import > MIDI file (the first item of the Import sub-menu): the engine's file box shows; a MIDI file is given to it (a minimal standard MIDI file that
+// the scenario writes into .tmp-e2e-import, and removes after); the box closes and the engine stays idle.
+import fs from 'node:fs';
+import path from 'node:path';
+import { defineScenario } from '../../lib/scenario.mjs';
+import { closeNew, menuPath, openLids } from '../../lib/common.mjs';
+import { dismissProblems } from '../../lib/flow.mjs';
+import { giveFiles, waitBox } from '../../lib/file.mjs';
+
+// a format 0 file with one track that holds only the end of track: MThd (6 bytes: format 0, 1 track, 96 ticks), MTrk (4 bytes: 00 FF 2F 00)
+const MIDI = Buffer.from([0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96, 0x4d, 0x54, 0x72, 0x6b, 0, 0, 0, 4, 0, 0xff, 0x2f, 0]);
+
+export default defineScenario({
+  id: 'file/import-midi',
+  covers: ['file/import/midi'],
+  async run(ctx) {
+    const { guest, cdp, repo } = ctx;
+    const dir = path.join(repo, '.tmp-e2e-import');
+    fs.mkdirSync(dir, { recursive: true });
+    const mid = path.join(dir, 'import-test.mid');
+    fs.writeFileSync(mid, MIDI);
+    try {
+      await dismissProblems(guest);
+      const base = await openLids(guest);
+      const id = await menuPath(guest, ['File', '#8', '#0']);
+      const box = await waitBox(guest, 30000);
+      const g = box === 'filedlg' ? await giveFiles(guest, cdp, [mid]) : { given: false, gone: null };
+      await closeNew(guest, base);
+      const st = await guest.state();
+      return {
+        ok: box === 'filedlg' && g.given === true && g.gone === true && st.state === 'engine-idle',
+        engineState: st.state,
+        notes: [`${id}: box ${box}; the ${MIDI.length}-byte .mid given ${g.given}; the box closed ${g.gone}; state ${st.state}`],
+      };
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  },
+});
