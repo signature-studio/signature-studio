@@ -96,6 +96,12 @@ export default defineScenario({
 - `persist(page, guest)`: 再読み込みの後に、起動し直して曲が開くかを確かめる。
 - `resetProject(guest)`(File > New)・`startProject(guest)`(利用データの箱・Welcome・Problems の箱を閉じ、既定の曲を開く)。
 
+### プラグインの領域(#1493)
+
+- `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
+- 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
+- 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
@@ -163,7 +169,7 @@ export default defineScenario({
 - `lib/guest.mjs`: 操作(クリック・右クリック・ダブルクリック・ホイール・ドラッグ・キー・Ctrl+キー)と読み取り(窓の表、エンジンの状態)。座標はゲストの画素から CSS px へ写す。
 - `lib/detect.mjs`: 検出(`pageerror`・`console.error`・失敗した要求と 4xx/5xx・消えない表示・エンジンの停止と `running` の 90 秒・クリップボードの呼び出しと権限の変化)。
 - `lib/flow.mjs`: 起動の手順(利用データの確認、Welcome を閉じる、「Problems loading」の箱、Ctrl+O で開く)。
-- `lib/scenario.mjs`(登録・検査)、`lib/plan.mjs`(引数・表示・シャード・時間・判定。Playwright を使わない)、`lib/common.mjs`(共通の部品)、`lib/dump.mjs`(窓の表の読み)、`lib/picture.mjs`(画素)、`lib/inventory.mjs`(一覧の行)。
+- `lib/scenario.mjs`(登録・検査)、`lib/plan.mjs`(引数・表示・シャード・時間・判定。Playwright を使わない)、`lib/common.mjs`(共通の部品)、`lib/dump.mjs`(窓の表の読み)、`lib/picture.mjs`(画素)、`lib/inventory.mjs`(一覧の行)、`lib/topbar.mjs`(上部バーの部品の操作と、メモリの表示の値。`scenarios/topbar/`)。
 - `inventory.mjs`・`coverage.mjs`・`judge-coverage.jq`: 機能の一覧と網羅率。
 - `features/`: 手で書く見出し行と `.min`、`generated/`(一覧の生成物。コミットする)。
 - `scenarios/smoke/`: (a) `start-welcome-default`、(b) `knob-right-click-permissions`(Issue #1482: 印は外した。右クリックで読まず、通知が出ない)、(c) `file-open-demo`(File > Open で DEDZII を開く。修正の前は約 5 秒後に engine が exit 134 で止まった(#1421)。修正後は開き、印は外してある)、(d) `plugin-manager-opens`(印 `#1499`: Options の項目を探し、Plugin Manager の窓が出て engine が 10 秒 engine-idle のままかを見る。Plugin Manager は別の実行ファイル(`System\Tools\Plugin Manager\PluginManager.exe`)で、#1499 までは窓が出ない。印の付いたシナリオは、ok を問わず、カウンタが 0 であることだけを見る)、(e) `plugin-database-lists-builtins`(Plugin database の `Installed\` の一覧の件数が、`lift/plugins/` の内蔵プラグインの数以上。件数はエンジンの listing(`enum-dir`)から読む)、(f) `page-chrome`(Issue #1481: 最初の idle で、キャンバスが窓いっぱいに出ること、キャンバス以外に見える要素が無いこと、本文に `data:image` の文字列が無いこと)。

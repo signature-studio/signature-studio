@@ -1,0 +1,11 @@
+// topbar/click-tquickedittoolbarpanel-10: a left click: the picture of the part changes, or a window opens, on the top bar's part tquickedittoolbarpanel-10 (its place from the window table).
+import { defineScenario } from '../../lib/scenario.mjs';
+import { partOperation } from '../../lib/topbar.mjs';
+
+export default defineScenario({
+  id: 'topbar/click-tquickedittoolbarpanel-10',
+  covers: ['topbar/click/tquickedittoolbarpanel-10', 'topbar/part/tquickedittoolbarpanel-10'],
+  async run({ guest }) {
+    return partOperation(guest, 'tquickedittoolbarpanel-10', 'click');
+  },
+});
