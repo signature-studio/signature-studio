@@ -25,6 +25,7 @@ const TOAST_WATCH = `(() => {
   const since = new Map();
   const stuck = new Set();
   const ids = [];
+  const info = [];
   const visible = (el) => {
     if (el.hidden) return false;
     const cs = getComputedStyle(el);
@@ -32,7 +33,7 @@ const TOAST_WATCH = `(() => {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   };
-  window.__e2eToast = { stuck: 0, ids: [], visible: 0, ids_visible: [] };
+  window.__e2eToast = { stuck: 0, ids: [], info: [], visible: 0, ids_visible: [] };
   setInterval(() => {
     const now = performance.now();
     const alive = new Set();
@@ -47,11 +48,16 @@ const TOAST_WATCH = `(() => {
       alive.add(el);
       const s = since.get(el);
       if (!s || s.text !== text) since.set(el, { text, t0: now });
-      else if (now - s.t0 > LIMIT && !stuck.has(el)) { stuck.add(el); ids.push(el.id || el.getAttribute('role') || el.tagName); }
+      else if (now - s.t0 > LIMIT && !stuck.has(el)) {
+        stuck.add(el);
+        ids.push(el.id || el.getAttribute('role') || el.tagName);
+        info.push({ id: el.id || null, role: el.getAttribute('role'), tag: el.tagName, dataError: el.dataset.error ?? null, text: text.slice(0, 160), textFirstSeenAtMs: Math.round(s.t0), markedAtMs: Math.round(now) });
+      }
     }
     for (const el of [...since.keys()]) if (!alive.has(el)) since.delete(el);
     window.__e2eToast.stuck = stuck.size;
     window.__e2eToast.ids = ids.slice(0, 20);
+    window.__e2eToast.info = info.slice(0, 20);
     window.__e2eToast.visible = shown;
     window.__e2eToast.ids_visible = shownIds.slice(0, 20);
   }, 250);
@@ -64,7 +70,7 @@ export async function installToastWatch(page) {
   await page.evaluate(TOAST_WATCH);
 }
 
-export const toastState = (page) => page.evaluate(() => (window.__e2eToast ? { ...window.__e2eToast } : { stuck: 0, ids: [], visible: 0, ids_visible: [] }));
+export const toastState = (page) => page.evaluate(() => (window.__e2eToast ? { ...window.__e2eToast } : { stuck: 0, ids: [], info: [], visible: 0, ids_visible: [] }));
 
 const CLIP_COUNT = `(() => { const c = navigator.clipboard; window.__e2eClip = { read: 0, readText: 0 }; for (const k of ['read', 'readText']) { const f = c[k].bind(c); c[k] = (...a) => { window.__e2eClip[k]++; return f(...a); }; } return true; })()`;
 export async function countClipboardReads(page) { await page.evaluate(CLIP_COUNT); }
