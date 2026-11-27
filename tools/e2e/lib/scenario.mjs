@@ -43,10 +43,32 @@ export function areaOf(id) {
   return m && AREAS.includes(m[1]) ? m[1] : null;
 }
 
+/** the mark of a known stop (expectStop): null, `#<Issue の番号>` or 'new', named in the error as expectStop; it needs a known failure (expectFail) */
+function stopMark(v, id, expectFail) {
+  if (v === undefined || v === null) return null;
+  let mark;
+  try {
+    mark = checkMark(v);
+  } catch {
+    throw new Error(`scenario ${id}: expectStop ${JSON.stringify(v)}: use '#<Issue の番号>' or 'new'`);
+  }
+  if (expectFail === null) throw new Error(`scenario ${id}: expectStop needs expectFail (a stop is allowed only in a known failure)`);
+  return mark;
+}
+
+/** the least time (ms) a scenario needs left in its display row's budget to start: a non-negative number */
+export function needsOf(ms, id = '?') {
+  if (ms === undefined || ms === null) return 0;
+  if (typeof ms !== 'number' || !(ms >= 0)) throw new Error(`scenario ${id}: needsMs is a number of ms from 0`);
+  return ms;
+}
+
 /**
- * defineScenario({ id, area?, covers, displays, expectFail, run(ctx) }).
+ * defineScenario({ id, area?, covers, displays, expectFail, expectStop?, needsMs?, run(ctx) }).
  * id is `<領域>/<名前>` (area is its first part; `area`, when given, must agree). covers: the feature IDs the scenario checks (`<領域>/<種類>/<名前>`).
- * displays: the display names (default DEFAULT_DISPLAYS). expectFail: null, '#<Issue>' or 'new'. run(ctx) returns { ok, notes, results }.
+ * displays: the display names (default DEFAULT_DISPLAYS). expectFail: null, '#<Issue>' or 'new'. expectStop: null, '#<Issue>' or 'new': the engine's stop is a known
+ * part of the failure (it needs expectFail; without it, a stop fails the scenario). needsMs: the least time left in the row's budget to start (default 0).
+ * run(ctx) returns { ok, notes, results }.
  */
 export function defineScenario(s) {
   if (!s || typeof s !== 'object') throw new Error('defineScenario needs an object');
@@ -64,17 +86,20 @@ export function defineScenario(s) {
   const displays = s.displays ?? DEFAULT_DISPLAYS;
   if (!Array.isArray(displays) || displays.length === 0) throw new Error(`scenario ${s.id}: displays is a non-empty array`);
   if (typeof s.run !== 'function') throw new Error(`scenario ${s.id}: run(ctx) is a function`);
-  return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail: checkMark(s.expectFail), run: s.run };
+  const expectFail = checkMark(s.expectFail);
+  const expectStop = stopMark(s.expectStop, s.id, expectFail);
+  return { kind: 'scenario', id: s.id, name: s.id, area: m[1], covers: [...covers], displays: [...displays], expectFail, expectStop, needsMs: needsOf(s.needsMs, s.id), run: s.run };
 }
 
-/** a scenario of the older set form ({ name, expectFail, run, beforeLoad?, expect?, displays? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression):
+/** a scenario of the older set form ({ name, expectFail, expectStop?, run, beforeLoad?, expect?, displays? }; scenarios/<set>/index.mjs, set = smoke, browser-face or regression):
  *  it has no covers, and each runs in a page of its own. displays: the names it declares (default: the three of the older form) */
 export function legacyScenario(s, set = 'smoke') {
   const displays = s.displays ?? ['4k-dpr1', '4k-dpr2', '4k-random'];
   if (!Array.isArray(displays) || displays.length === 0) throw new Error(`scenario ${s.name}: displays is a non-empty array`);
+  const expectFail = checkMark(s.expectFail ?? null);
   return {
-    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: [...displays], expectFail: checkMark(s.expectFail ?? null),
-    expect: s.expect ?? null, beforeLoad: s.beforeLoad, run: s.run,
+    kind: 'legacy', id: s.name, name: s.name, area: set, covers: [], displays: [...displays], expectFail,
+    expectStop: stopMark(s.expectStop, s.name, expectFail), needsMs: 0, expect: s.expect ?? null, beforeLoad: s.beforeLoad, run: s.run,
   };
 }
 

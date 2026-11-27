@@ -80,7 +80,7 @@ export const permissionStates = (page) => page.evaluate(() => Promise.all(['clip
 
 /** the engine's state, watched every 250 ms: the stops, and the time the state has been `running` (the longest run of it) */
 export function watchEngine(guest) {
-  const w = { stops: 0, stopReason: null, runningMs: 0, stuckRunning: false, last: null, error: null };
+  const w = { stops: 0, stopReason: null, exit: null, runningMs: 0, stuckRunning: false, last: null, error: null };
   let runStart = null;
   let busy = false;
   const timer = setInterval(async () => {
@@ -99,6 +99,8 @@ export function watchEngine(guest) {
       if (s && (s.state === 'exited' || s.state === 'error') && (w.last === null || w.last.state !== s.state)) {
         w.stops++;
         w.stopReason = s.exit ? `${s.exit.reason} code ${s.exit.code}: ${s.exit.message}` : (s.error ?? s.state);
+        // kept at the transition: the engine may be started again before its stop report is read
+        w.exit = s.exit && s.exit.reason ? { reason: s.exit.reason, code: s.exit.code, message: s.exit.message ?? '' } : null;
       }
       w.last = s;
     } catch (e) {

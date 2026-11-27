@@ -1,8 +1,10 @@
-// The plan of a run (Issue #1485): the arguments, the displays, the budget, the shard and the acceptance of a row. Pure (no browser), so the tests can use it.
+// The plan of a run (Issue #1485, #1506): the arguments, the displays and their rows, the budget of a row, the shard, the result of a scenario and the acceptance
+// of a scenario and of a row. Pure (no browser), so the tests can use it.
 // The display names: 4k-dpr1, 4k-dpr2, 4k-random (as before) and dpr:<number> (e.g. dpr:1.25): the CSS size is 3840 / DPR by 2160 / DPR.
 import { shardOf, sortById } from './scenario.mjs';
 
 export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
+export const FAIL_LOG_LINES = 200;
 const BOOLEAN_FLAGS = new Set(['list', 'report-only']);
 
 /** the arguments: `--name value` pairs, and the flags of BOOLEAN_FLAGS (no value) */
@@ -60,12 +62,74 @@ export function displayRows(name, rnd = Math.random) {
   throw new Error(`no display ${name} (4k-dpr1, 4k-dpr2, 4k-random, dpr:<number>)`);
 }
 
+/** the DPR a display name fixes: dpr:<n>, 4k-dpr1 (1), 4k-dpr2 (2); null for 4k-random (its two DPRs are drawn at random) */
+export function fixedDpr(name) {
+  if (name === '4k-random') return null;
+  return displayRows(name)[0].dpr;
+}
+
+/** the DPR check of a page: true when the page's DPR is the row's declared one, false when it is not, null when the row has no fixed DPR (4k-random) */
+export function dprMatches(name, pageDpr) {
+  const want = fixedDpr(name);
+  if (want === null) return null;
+  return Math.abs(pageDpr - want) < 1e-6;
+}
+
+/**
+ * the rows of one display name, each with the scenarios of the plan that declare that name (`items` are { sc, repeat }). --displays names the rows only:
+ * a scenario runs in a display only when its own displays include it. A row with no scenario is returned with no items (the caller drops it).
+ */
+export function rowsFor(name, items) {
+  const picked = items.filter((it) => it.sc.displays.includes(name));
+  return displayRows(name).map((d) => ({ d, items: picked }));
+}
+
 /** the acceptance of one row of `n` scenario results (the same rule as judge.jq, which the job runs on the output); n defaults to the row's own count */
 export function rowPasses(row, n = row.scenarios?.length) {
-  return row.servedHeadersMatch === true && row.error === null && row.scenarios.length === n
-    && row.scenarios.every((s) => s.skipped !== true && (s.expectFail !== null
-      ? s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0
-      : s.ok === true && s.pageErrors === 0 && s.consoleErrors === 0 && s.stuckToasts === 0 && s.failedRequests === 0));
+  return row.servedHeadersMatch === true && row.error === null && row.scenarios.length === n && row.scenarios.every(scenarioPasses);
+}
+
+/** the engine stopped in the scenario: its stop report (engineStops > 0), or the engine stayed in `running` for more than 90 s (engineStuckRunning) */
+export function stopped(s) {
+  return s.engineStops > 0 || s.engineStuckRunning === true;
+}
+
+/**
+ * the acceptance of one scenario result. A skipped scenario fails; a page whose DPR is not the declared one fails (dprOk false), marked or not.
+ * An unmarked scenario (expectFail null) is ok with no counter. A marked one (a known defect) is judged by its counters only: 0 pageErrors, consoleErrors and
+ * failedRequests (its ok and its stuckToasts are not judged), and no engine stop unless it declares the stop (expectStop: '#<Issue>' or 'new').
+ */
+export function scenarioPasses(s) {
+  if (s.skipped === true || s.dprOk === false) return false;
+  const quiet = s.pageErrors === 0 && s.consoleErrors === 0 && s.failedRequests === 0;
+  if ((s.expectFail ?? null) !== null) return quiet && ((s.expectStop ?? null) !== null || !stopped(s));
+  return s.ok === true && quiet && s.stuckToasts === 0;
+}
+
+/**
+ * a scenario result that gets the engine log's tail (failLog): an unmarked one that fails the acceptance, or a marked one whose engine stopped (a known failure
+ * without a stop has no log, so the JSON stays small). A skipped one is not run, so it has no log.
+ */
+export function needsFailLog(s) {
+  if (s.skipped === true) return false;
+  if ((s.expectFail ?? null) === null) return !scenarioPasses(s);
+  return stopped(s);
+}
+
+/** the last FAIL_LOG_LINES lines of a log (the lines since the scenario started, in the order the page keeps them) */
+export function tailLines(lines, n = FAIL_LOG_LINES) {
+  return lines.slice(Math.max(0, lines.length - n));
+}
+
+/** the result of one scenario in a row, before it runs: the fields of the JSON (the counts are 0, ok is false until the scenario has run) */
+export function scenarioResult(sc, repeat, d) {
+  return {
+    id: sc.id, name: sc.name ?? sc.id, area: sc.area, covers: sc.covers ?? [], repeat, displays: sc.displays ?? null,
+    expectFail: sc.expectFail ?? null, expectStop: sc.expectStop ?? null, expect: sc.expect ?? null,
+    ok: false, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0, dprOk: null, ms: 0,
+    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0,
+    error: null, notes: [], details: [], display: d.name,
+  };
 }
 
 /**
@@ -96,8 +160,17 @@ export function planScenarios(all, { only = null, shard = null, repeat = 1 } = {
   return out;
 }
 
-/** a budget clock: `expired()` is true once the budget has passed (no budget: never) */
+/**
+ * a budget clock (one per display row): `expired()` is true once the budget has passed (no budget: never); `remainingMs()` is the time left (Infinity with no budget);
+ * `canStart(needMs)` is true when the budget is not past and at least `needMs` is left (a scenario that needs 30 min does not start with less left).
+ */
 export function budgetClock(ms, now = () => Date.now()) {
   const t0 = now();
-  return { expired: () => ms !== null && now() - t0 >= ms, elapsedMs: () => now() - t0 };
+  const elapsed = () => now() - t0;
+  return {
+    expired: () => ms !== null && elapsed() >= ms,
+    elapsedMs: elapsed,
+    remainingMs: () => (ms === null ? Infinity : ms - elapsed()),
+    canStart: (needMs = 0) => ms === null || (elapsed() < ms && ms - elapsed() >= needMs),
+  };
 }
