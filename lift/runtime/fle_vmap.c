@@ -396,10 +396,11 @@ void fle_imp_VirtualQuery(void)
 
 /* ---- Inline hook points (decision 0105) ----
  * A module whose generated unit has hook points registers its image (base, SizeOfImage) and a table of the function entries whose first
- * 5 bytes the guest may overwrite with `jmp rel32` (fe-lift --hook-points). Single guest thread, as everything in this file. */
+ * 5 bytes the guest may overwrite with `jmp rel32` (fe-lift --hook-points). Single guest thread, as everything in this file.
+ * The two limits are constants, not options: 512 modules and 4096 pages (the two static tables are about 80 KB). */
 #define IH_SIZE      5u  /* jmp rel32 */
-#define IH_MAX_MODS  8u
-#define IH_MAX_PAGES 64u
+#define IH_MAX_MODS  512u
+#define IH_MAX_PAGES 4096u
 
 typedef struct {
     uint64_t base;
@@ -422,7 +423,14 @@ static unsigned ih_npages;
 
 void fle_hook_register(uint64_t base, uint64_t size, const fle_hook_point *pts, uint64_t n)
 {
-    if (ih_nmods >= IH_MAX_MODS) fle_stop("inline hook", "more modules with hook points than the runtime holds");
+    char why[200];
+
+    if (ih_nmods >= IH_MAX_MODS) {
+        snprintf(why, sizeof why,
+                 "more modules with hook points than the runtime holds: the module at base %#llx; %u modules are registered and the limit is %u",
+                 (unsigned long long)base, ih_nmods, IH_MAX_MODS);
+        fle_stop("inline hook", why);
+    }
     ih_mods[ih_nmods].base = base;
     ih_mods[ih_nmods].size = size;
     ih_mods[ih_nmods].pts = pts;
@@ -526,7 +534,11 @@ static void ih_protect(const char *api, const ih_mod *m, uint64_t addr, uint64_t
         for (i = 0; i < ih_npages; i++)
             if (ih_pages[i].page == pg) break;
         if (i == ih_npages) {
-            if (ih_npages >= IH_MAX_PAGES) fle_stop(api, "more pages of inline hook points than the runtime records");
+            if (ih_npages >= IH_MAX_PAGES) {
+                snprintf(why, sizeof why, "more pages of inline hook points than the runtime records: %u pages are recorded and the limit is %u",
+                         ih_npages, IH_MAX_PAGES);
+                fle_stop(api, why);
+            }
             ih_pages[ih_npages++].page = pg;
         }
         ih_pages[i].prot = np;
