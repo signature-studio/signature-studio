@@ -330,3 +330,7 @@ comctl32.dll ImageList_Draw fle_imp_ImageList_Draw
 comctl32.dll ImageList_DrawEx fle_imp_ImageList_DrawEx
 comctl32.dll ImageList_Read fle_imp_ImageList_Read
 comctl32.dll ImageList_Write fle_imp_ImageList_Write
+# Issue #1512 (LAMEenc_x64.dll, the MP3 encoder of Shared; lift/plugins/lameenc): beInitStream reads Debug / WriteLogFile of lame_enc.ini (runtime/fle_wall_ia2v.c: the file is not on the volume, nDefault answers, S-ia2-profile-int)
+kernel32.dll GetPrivateProfileIntA fle_imp_GetPrivateProfileIntA
+# Issue #1512 (LAMEenc_x64.dll): beWriteInfoTag shows a message box (runtime/fle_wall_ia2.c: the ANSI form of MessageBoxW, no window, the default button is answered, S-ia2-msgbox-default)
+user32.dll MessageBoxA fle_imp_MessageBoxA

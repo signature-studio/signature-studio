@@ -1,0 +1,13 @@
+# Issue #1512: small functions of LAMEenc_x64.dll that the DLL reaches only through a pointer in its data (the 8-byte values of .rdata and .data that point into .text, found by the
+# DIR64 relocations, and that are not a .pdata start: 8 distinct RVAs). Without them the engine stops at the first call through one of them ("indirect call to 0xcf9c270 is not a
+# known function entry": RVA 0x3c270, the pointer at RVA 0x5cd50). Each RVA was checked by its bytes (the function starts after a ret or an int3 or a zero byte of padding).
+# plugins.rs turns each row into a VA at the DLL's base and passes the file to the lift and to the wasm generator (--seeds).
+key	rva
+lameenc_x64.dll	0xbb30
+lameenc_x64.dll	0xade0
+lameenc_x64.dll	0x1fc70
+lameenc_x64.dll	0x31820
+lameenc_x64.dll	0x3c270
+lameenc_x64.dll	0x3c30c
+lameenc_x64.dll	0x3c3a4
+lameenc_x64.dll	0x4316c

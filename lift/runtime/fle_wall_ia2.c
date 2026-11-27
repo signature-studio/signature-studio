@@ -126,21 +126,51 @@ static void msg_ascii(char *out, size_t cap, uint64_t p)
     out[i] = 0;
 }
 
-void fle_imp_MessageBoxW(void)
+/* the ANSI form (MessageBoxA, Issue #1512): one byte per character; a byte of 0x80 or above is shown as '?' like the other non-ASCII text */
+static void msg_ansi(char *out, size_t cap, uint64_t p)
+{
+    size_t i = 0;
+
+    if (p == 0) { snprintf(out, cap, "(NULL)"); return; }
+    for (; i + 1 < cap; i++) {
+        uint8_t c = (uint8_t)fle_ld(p + i, 1);
+        if (c == 0) break;
+        out[i] = c >= 0x20 && c < 0x7f ? (char)c : (c == '\n' ? '/' : '?');
+    }
+    out[i] = 0;
+}
+
+static void message_box(const char *api, uint32_t type, const char *text, const char *cap)
 {
     static const uint8_t btn[7][4] = { { 1, 0, 0, 0 }, { 1, 2, 0, 0 }, { 3, 4, 5, 0 }, { 6, 7, 2, 0 }, { 6, 7, 0, 0 }, { 4, 2, 0, 0 }, { 2, 10, 11, 0 } };
     static const uint8_t nbtn[7] = { 1, 2, 3, 3, 2, 2, 3 };
-    uint32_t type = (uint32_t)R[9], kind = type & 0xFu, def = (type >> 8) & 3u;
-    char text[300], cap[120];
+    uint32_t kind = type & 0xFu, def = (type >> 8) & 3u;
     uint32_t id;
 
-    if (kind > 6) fle_stop("MessageBoxW", "uType holds a button set that the page does not list");
-    msg_ascii(text, sizeof text, R[2]);
-    msg_ascii(cap, sizeof cap, R[8]);
+    if (kind > 6) fle_stop(api, "uType holds a button set that the page does not list");
     if (def >= nbtn[kind]) def = 0;
     id = btn[kind][def];
-    fprintf(stderr, "fle: MessageBoxW NOT SHOWN, answered by the virtual machine with the default button (id %u; S-ia2-msgbox-default), type %#x, caller %#llx, caption \"%s\", text \"%s\"\n", (unsigned)id, (unsigned)type, (unsigned long long)fle_ld(R[4], 8), cap, text);
+    fprintf(stderr, "fle: %s NOT SHOWN, answered by the virtual machine with the default button (id %u; S-ia2-msgbox-default), type %#x, caller %#llx, caption \"%s\", text \"%s\"\n", api, (unsigned)id, (unsigned)type, (unsigned long long)fle_ld(R[4], 8), cap, text);
     R[0] = id;
+}
+
+void fle_imp_MessageBoxW(void)
+{
+    char text[300], cap[120];
+
+    msg_ascii(text, sizeof text, R[2]);
+    msg_ascii(cap, sizeof cap, R[8]);
+    message_box("MessageBoxW", (uint32_t)R[9], text, cap);
+}
+
+/* user32!MessageBoxA (wall ia2-W28's ANSI form, Issue #1512: LAMEenc_x64.dll's beWriteInfoTag calls it): the same answer as MessageBoxW, with the text and the caption read as ANSI bytes. */
+void fle_imp_MessageBoxA(void)
+{
+    char text[300], cap[120];
+
+    msg_ansi(text, sizeof text, R[2]);
+    msg_ansi(cap, sizeof cap, R[8]);
+    message_box("MessageBoxA", (uint32_t)R[9], text, cap);
 }
 
 /* ---- shell32!ShellExecuteW (wall ia2-W16 of decision 0171, met again by Help and Tools > Cloud items) ----
