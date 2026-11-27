@@ -1,0 +1,15 @@
+diff --git a/lift/crates/fe-wasmgen/src/lower.rs b/lift/crates/fe-wasmgen/src/lower.rs
+index c274de24..3c8d3014 100644
+--- a/lift/crates/fe-wasmgen/src/lower.rs
++++ b/lift/crates/fe-wasmgen/src/lower.rs
+@@ -4257,6 +4257,10 @@ impl<'a> L<'a> {
+                 M::Pextrw => self.c.simd_lane(0x19, i.immediate8() & 7),
+                 _ => return Err(format!("{m:?} to a general register")),
+             }
++            // Issue #1395: the mask and the lane are i32; set_reg extends a 32-bit destination itself, a 64-bit one (movmskpd r64 etc.) needs it here
++            if dst.size() == 8 {
++                self.c.i64_extend_i32_u();
++            }
+             return self.set_reg(dst);
+         }
+         if !dst.is_xmm() {
