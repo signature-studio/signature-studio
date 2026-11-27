@@ -118,7 +118,7 @@
 - ファイルの箱を待つ本(7 本): Ctrl+O を使う `file/new-after-demo`(`no open box ... 40 s after Ctrl+O`)・`file/open-box-shows`・`file/open-upload-multiple`・`file/save-as-dialog`・`file/save-as-template`(demo を `openDataFile` で開く)と、File メニューの箱を待つ `file/import-midi`・`file/open-menu-item`。#1519(File → Open を OPFS の窓にした。閉じている)は、この run の commit の後に入った(**コードで確認**)。箱の前提は古い可能性がある(推定。今の製品での結果は、確かめていない)。
 - 閉じた印 `file/z-persist-recent-list`(印 `#1409`・閉じている)は、再読込の後に engine が止まった(状態 `error`、§4 の系統 E。受理の規則で拒否)。#1502(閉じている。Recent を再読込をまたいで保つ)の後、印の前提は古い可能性がある。
 - 停止 2 件(`file/demo-product-demos-olbaid-sytrus-essentials`・`file/demo-product-demos-synth-dfr-overcome-sytrus`。系統 B)は、#1529 で扱う。
-- drop-downs 0(5 件)は #1527 で扱う。
+- drop-downs 0(5 件)と、項目を選んでも新しい窓が出ない 3 件(`file/export-master`・`file/export-video`・`file/export-project-data-files`。`menus/item/file-9-7`・`file-9-11`・`file-9-12` を指す)は、#1527 の「項目の効果」と同じ仕組みとして扱う。
 
 ### 3-5. input(16 件)→ 未起票
 
