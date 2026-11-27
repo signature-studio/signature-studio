@@ -67,6 +67,7 @@ const NAME_OF = {
 const RESTART_TITLE = 'Language change';
 const WELCOME = 'TWelcomeWizard';
 const NO_THANKS = { gw: 780, gh: 480, x: 513, y: 308 };   // the start-up consent box's "No thanks" (tools/p3-audio-probe/measure.mjs, measured on this screen)
+const NO_THANKS_WIDE = { gw: 1836, gh: 1056, x: 993, y: 548 };   // the same box on the 1836x1056 guest screen (tools/smoke/welcome-flow.mjs, flow B). Issue #1502: the Welcome is seen under it in the picture
 const PROBLEMS_TITLE = /Problems loading/;
 const DEMO_DIR = ['lift', 'out-app', 'host-extra', 'resources', 'Data', 'Demo projects'];
 const LIST_MAX = 200;
@@ -565,13 +566,14 @@ async function closeWelcome(sess) {
 /** the start-up consent box is pressed at its measured guest pixel on the screen it was measured on (tools/p3-audio-probe/measure.mjs dismissStartupBox) */
 async function dismissConsent(sess, files) {
   const s = await sess.ev('(() => { const g = window.__app.screen.guest; return { gw: g.width, gh: g.height }; })()');
-  if (s.gw !== NO_THANKS.gw || s.gh !== NO_THANKS.gh) {
+  const at = [NO_THANKS, NO_THANKS_WIDE].find((p) => p.gw === s.gw && p.gh === s.gh);
+  if (!at) {
     files.steps.push(`consent box not pressed: the guest screen is ${s.gw}x${s.gh}`);
     return;
   }
-  await sess.click(NO_THANKS.x, NO_THANKS.y);
+  await sess.click(at.x, at.y);
   await sleep(1500);
-  files.steps.push(`consent box: "No thanks" at guest (${NO_THANKS.x}, ${NO_THANKS.y})`);
+  files.steps.push(`consent box: "No thanks" at guest (${at.x}, ${at.y})`);
 }
 
 /** a "Problems loading the project" box (the front window's title) is closed with Enter; true when one was */
@@ -819,7 +821,8 @@ async function filesRun(sess, port, files, project, opts) {
   await sleep(EXIT_SETTLE_MS);
   mark = await recordOp(sess, ops, 'close', title0, mark, stem);
   files.closeRun = { state: st?.state ?? null, ms, bytesBefore: bytes0, bytesAfter: (await sess.ev(SIZE_OF_STATE)).bytes };
-  const closeLines = (await sess.log()).map((l) => String(l)).slice(closeFrom);
+  // Issue #1502: the scheduler's switches (fle-thread: switch) are left out of the close's lines: a wait that loops would fill the first 200 lines with them
+  const closeLines = (await sess.log()).map((l) => String(l)).slice(closeFrom).filter((l) => !/fle-thread: switch /.test(l));
   files.closeSequence = closeLines.filter((l) => CLOSE_SEQ_RE.test(l)).slice(0, CLOSE_MAX).map((l) => l.slice(0, 240));
   files.closeLines = closeLines.slice(0, CLOSE_ALL_MAX).map((l) => l.slice(0, 200));
   files.recentCause = closeCauseOf(closeLines, files.closeRun.state, ms);
@@ -841,6 +844,7 @@ async function filesRun(sess, port, files, project, opts) {
   files.filesReloadState = second.state.state;
   if (second.state.state !== 'engine-idle') throw new Error(`no engine-idle after the reload (state ${second.state.state}: ${second.state.error ?? ''})`);
   await sleep(3000);
+  await dismissConsent(sess, files);   // Issue #1502: the box is shown again at each start; it covers the Welcome in the picture
   await sess.shot('files-reloaded.png');
   files.restoredAfter = traceLines(await sess.log());
   files.pageLogAfter = await pageSaveLines(sess);
@@ -849,6 +853,8 @@ async function filesRun(sess, port, files, project, opts) {
   files.recentKept = files.recentModuleAfterReload.present && files.recentModuleAfterReload.captions.length >= 1;
   files.steps.push(`after the reload: the welcome's recent module ${files.recentModuleAfterReload.present ? `present, ${files.recentModuleAfterReload.captions.length} captions` : 'absent'}; recentKept ${files.recentKept}`);
   files.readSideAfterReload = readSideOf(await sess.log());
+  // Issue #1502: the order, in the reloaded start, of the Recent list's reads (MRU) and the Welcome's messages: the list is read before or after the Welcome is laid out
+  files.orderAfterReload = (await sess.log()).map((l, i) => [i, String(l)]).filter(([, l]) => /TWelcomeWizard/.test(l) || (/MRU/.test(l) && !/not found/.test(l))).slice(0, 200).map(([i, l]) => `${i} ${l.slice(0, 160)}`);
   await closeWelcome(sess);
   files.browserAfterReload = await browserTabs(sess, 'files-browser-reloaded');
   files.keptTabs = keptTabs(files.browserBefore, files.browserAfterOpen, files.browserAfterReload);

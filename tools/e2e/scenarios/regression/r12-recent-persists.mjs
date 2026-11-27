@@ -13,8 +13,6 @@ const SCENARIO = {
   name: 'recent-persists',
   report: 'R12',
   expect: 'File > Open of a uniquely named copy of a demo project; after a reload of the page its name is in the engine memory (the Recent list) without opening it again',
-  // the Recent list is not kept across a reload (#1502; #1409 and #1385 are closed)
-  expectFail: '#1502',
 };
 
 const holds = (guest, mark) => guest.ev(`window.__app.guestText([${JSON.stringify(mark)}], 0).then((g) => g.best !== null && g.best !== undefined)`);
