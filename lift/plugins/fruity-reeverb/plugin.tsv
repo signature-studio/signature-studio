@@ -1,0 +1,3 @@
+# Fruity Reeverb (Effects). hook: the three Delphi hook points of the plugin (inputs/plugin-hooks.tsv). omit: - (the setjmp entry is found by the automatic detection, #1370). args: --pdata.
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-reeverb.fruity_reeverb_x64.dll	Plugins\Fruity\Effects\Fruity Reeverb\Fruity Reeverb_x64.dll	本体	ba3a49e09cc29589c736cb95b1f636818b6a4fd4ce58301a7ca9f36bf06fa70d	3714048	rva:0x17d80,0x31f30,0x31f50	--pdata	-

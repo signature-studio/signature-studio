@@ -6,6 +6,7 @@ import { sleep } from '../../lib/flow.mjs';
 export default defineScenario({
   id: 'windows/f8-opens-plugin-list',
   covers: ['windows/window/tpluglistform'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const base = await openLids(guest);
     await guest.focusDesktop();

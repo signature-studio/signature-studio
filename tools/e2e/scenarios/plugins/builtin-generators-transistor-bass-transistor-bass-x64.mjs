@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-generators-transistor-bass-transistor-bass-x64',
   covers: ['plugins/generators/transistor-bass-transistor-bass-x64', 'plugins/window/generators-transistor-bass-transistor-bass-x64', 'plugins/param/generators-transistor-bass-transistor-bass-x64', 'plugins/audio/generators-transistor-bass-transistor-bass-x64', 'plugins/stop/generators-transistor-bass-transistor-bass-x64'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Transistor Bass", kind: 'generators' });
   },

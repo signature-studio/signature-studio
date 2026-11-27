@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-panomatic.fruity_panomatic_x64.dll	Plugins\Fruity\Effects\Fruity PanOMatic\Fruity PanOMatic_x64.dll	本体	1014317ac3a7f780a55308ca19ac3aad04f14b1eadaff9224d222603bfb5ef33	3759616	rva:0x17bc0,0x31d80,0x31da0	--pdata	-

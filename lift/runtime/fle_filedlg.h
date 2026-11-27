@@ -46,6 +46,9 @@ void fle_filedlg_set_picker(fle_filedlg_picker p);
 /* Called by ole32!CoCreateInstance (fle_ole.c) after its argument checks: 1 = handled (*hr is the HRESULT, *ppv written), 0 = not a class of this model (or the rows are not in this build). */
 int fle_filedlg_cocreate(uint64_t rclsid, uint64_t punkouter, uint32_t clsctx, uint64_t riid, uint64_t ppv, uint32_t *hr);
 
+/* File > Manage files (Issue #1521): shows the page's file window and returns when the person has closed it (1), or 0 without a host. */
+int fle_filedlg_manage_open(void);
+
 /* shell32!SHCreateItemFromParsingName: HRESULT f(PCWSTR pszPath rcx, IBindCtx *pbc rdx, REFIID riid r8, void **ppv r9).
  * shell32!SHGetKnownFolderPath: HRESULT f(REFKNOWNFOLDERID rfid rcx, DWORD dwFlags rdx, HANDLE hToken r8, PWSTR *ppszPath r9). */
 void fle_imp_SHCreateItemFromParsingName(void);

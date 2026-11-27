@@ -1,5 +1,7 @@
 // file/import-midi: File > Import > MIDI file (the first item of the Import sub-menu): the engine's file box shows; a MIDI file is given to it (a minimal standard MIDI file that
 // the scenario writes into .tmp-e2e-import, and removes after); the box closes and the engine stays idle.
+// expectFail #1527: in this build File > #8 is not the Import sub-menu (the drop-down's item #8 opens "Enter a template name", the Save as template box), so no item reaches
+// the file box. The File drop-down's item numbers are #1527's (the same cause as the drop-downs shown 0 of file/import-submenu and the other sub-menus).
 import fs from 'node:fs';
 import path from 'node:path';
 import { defineScenario } from '../../lib/scenario.mjs';
@@ -13,6 +15,7 @@ const MIDI = Buffer.from([0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0, 96,
 export default defineScenario({
   id: 'file/import-midi',
   covers: ['file/import/midi'],
+  expectFail: '#1527',
   async run(ctx) {
     const { guest, cdp, repo } = ctx;
     const dir = path.join(repo, '.tmp-e2e-import');
