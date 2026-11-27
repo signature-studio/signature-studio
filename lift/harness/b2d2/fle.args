@@ -1,1 +1,1 @@
---pdata --seeds lift/harness/seeds/flengine-seeds-thunks.txt --hook-points lift/harness/hooks/flengine-hook-points.txt --extra-imports lift/harness/seeds/ship6-imports.txt --seh-handler 0x112c0
+--pdata --seeds lift/harness/seeds/flengine-seeds-thunks.txt --hook-points lift/harness/hooks/flengine-hook-points.txt --hle-entries lift/harness/hooks/flengine-hle-entries.txt --extra-imports lift/harness/seeds/ship6-imports.txt --seh-handler 0x112c0
