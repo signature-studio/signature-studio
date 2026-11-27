@@ -1,5 +1,5 @@
-// file/open-box-shows: Ctrl+O shows the engine's open box (the page's #filedlg-input, or the file manager #fx-input-files). The box is answered with the installer's demo song
-// (lib/flow.mjs openProjectFile: the tool takes the browser's chooser, since a headless browser cancels a chooser at once and Escape does not close the box); the box is gone after the answer and the song opens.
+// file/open-box-shows: Ctrl+O shows the engine's open window: the page's file manager in selection mode (#fx-input-files, Issue #1519; no browser chooser). The window is answered with
+// the installer's demo song (lib/flow.mjs openProjectFile: the file is uploaded into the window, chosen, and Open pressed); the window is gone after the answer and the song opens.
 import path from 'node:path';
 import { defineScenario } from '../../lib/scenario.mjs';
 import { dataPath, openDataFile } from '../../lib/file.mjs';
