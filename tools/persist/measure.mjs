@@ -819,7 +819,8 @@ async function filesRun(sess, port, files, project, opts) {
   await sleep(EXIT_SETTLE_MS);
   mark = await recordOp(sess, ops, 'close', title0, mark, stem);
   files.closeRun = { state: st?.state ?? null, ms, bytesBefore: bytes0, bytesAfter: (await sess.ev(SIZE_OF_STATE)).bytes };
-  const closeLines = (await sess.log()).map((l) => String(l)).slice(closeFrom);
+  // Issue #1502: the scheduler's switches (fle-thread: switch) are left out of the close's lines: a wait that loops would fill the first 200 lines with them
+  const closeLines = (await sess.log()).map((l) => String(l)).slice(closeFrom).filter((l) => !/fle-thread: switch /.test(l));
   files.closeSequence = closeLines.filter((l) => CLOSE_SEQ_RE.test(l)).slice(0, CLOSE_MAX).map((l) => l.slice(0, 240));
   files.closeLines = closeLines.slice(0, CLOSE_ALL_MAX).map((l) => l.slice(0, 200));
   files.recentCause = closeCauseOf(closeLines, files.closeRun.state, ms);
