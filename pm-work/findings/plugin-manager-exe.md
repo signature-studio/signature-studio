@@ -1,120 +1,123 @@
 # PluginManager.exe(FL の Plugin Manager): 調査と設計(#1499)
 
-状態: 段 2 まで途中(接頭辞の 1 行だけ commit)。受け入れは未確認。
+状態: 段 1(PE の表)・段 2(VFS の lazy)・段 3(lift の方式と 1 つの wasm)は完了。受け入れは、この作業の木で通った(9 節。この再試行の実測。E2E の smoke は終了コード 0)。段 4〜6(起動の経路・窓・E2E の印を外す)は段 B(この Issue が閉じた後に起票)。
 
 ## 0. 要点
 
-- exe の本体は、この作業のジョブの木に無い。ファイルシステム全体を `find` で調べ、`PluginManager.exe` は見つからなかった(`lift/out-app/host` と `host-extra` も同じ)。取り出しの表(`ci/extract-dlls.tsv`・`ci/resources-prefixes.txt`・`ci/plugin-builtin-prefixes.txt`)のどれにも、この実行ファイルは在らなかった(接頭辞の 1 行は、この作業で足した)。
-- 作業者の段は、抽出物を main の鍵で R2 のキャッシュから復元する(`.github/workflows/agent.yml` の「抽出物を R2 のキャッシュから取る」。`fail-on-cache-miss: true`)。その鍵の入力に `ci/resources-prefixes.txt` が在る。だから、接頭辞の行が main に入るまで、exe は作業者の木に入らない。`pm-work/workflow-design.md` の 47 行目が、この順序を定めている(「新しい seed の行を足す Issue は、実物の接頭辞が `ci/resources-prefixes.txt` に在ることを、起票の前に確かめる(無ければ、先に足す。足す前に、作業者は受け入れを通せない)」)。
-- 判定は、受け入れの全体(`plugin-manager-opens` を含む)が通ったときだけ push する。exe が無い木では、窓は出ないので、この Issue の受け入れは 1 つの作業者のジョブでは通らない。段を分ける案を、末尾に書く。
-- 受け入れの実測(この作業のジョブ。9 節): 起動・流れ A〜D・`npm test`・`plugin-database-lists-builtins`・`file-open-demo` は通った。`plugin-manager-opens` は、両方の表示で ok が偽。受け入れの最後の判定(E2E の行の検査)で止まり、終了コードは 1。
+- 実行ファイルは、抽出の段で作業の木に入る(`lift/out-app/host-extra/resources/System/Tools/Plugin Manager/PluginManager.exe`。大きさ 7,158,856 B・SHA-256 は一覧の値と一致)。接頭辞の行は main の `dd2e9e2c` に在る。
+- PE は x86-64・GUI・Delphi(1 節)。`fe-pe` の道具で読めた。`fe-pe rebase`(0x10000000)も通った(reloc の 742 ブロック)。
+- 方式: 1 つの plugin の行(`lift/plugins/plugin-manager/plugin.tsv`、役割 補助)として、DLL と同じ lift の段を通す(3 節)。VFS は、固定の seed 表の `@lazy-file:` の 1 行と、`pack.args` の `--lazy-file` の 1 組(2 節)。
+- 観測した lift: `fe-lift lift` は、このファイルの 1 モジュールを 3.6 秒で C の unit 6 本(約 63 MB)にした。`fe-wasmgen` の lists 段は 25 秒で、21,902 行のうち 21,622 行が ok。
 
 ## 1. PE の表
 
-インストーラの一覧(`inputs/fl-installer-files.tsv` の 27399 行目)の値:
+道具: `lift/target/release/fe-pe pe-info` / `pe-exports` / `pe-pdata-info` / `rebase`(`fe-pe` を release で作ったもの)。対象は作業の木の実物(SHA-256 `66100a71…b2eb32f1e7` が一覧と一致)。runner の値。この機械とは別枠。
 
-| 項目 | 値 | 出所 |
+| 項目 | 値 | 出所(道具の出力) |
 |---|---|---|
-| 大きさ | 7,158,856 B | 一覧の bytes |
-| SHA-256 | 66100a71d04bddf340bc8f56a1823846662ad44f4b422c7059dad4b2eb32f1e7 | 一覧の sha256 |
-| 種類 | exe | 一覧の kind |
-| import する DLL(16 件) | winmm, shlwapi, comdlg32, comctl32, shell32, user32, version, oleaut32, advapi32, imagehlp, kernel32, shfolder, ole32, msacm32, api-ms-win-crt-string-l1-1-0, gdi32 | 一覧の imports |
+| Machine | 0x8664(AMD64。x86-64 である) | pe-info `machine` |
+| ImageBase | 0x400000 | pe-info `image_base` |
+| Subsystem | 2(WINDOWS_GUI。GUI である) | pe-info `subsystem` |
+| Characteristics | 0x0022(EXECUTABLE_IMAGE・LARGE_ADDRESS_AWARE。DLL ではない) | pe-info `characteristics` |
+| DllCharacteristics | 0x8160(DYNAMIC_BASE・NX_COMPAT・HIGH_ENTROPY_VA・TERMINAL_SERVER_AWARE) | pe-info `dll_char` |
+| AddressOfEntryPoint(RVA) | 0x4a6230(VA 0x4a6230 + 0x400000 = 0x8a6230) | pe-info `entry_rva` |
+| SizeOfImage / SizeOfHeaders | 0x6fa000(7,315,456 B) / 0x400 | pe-info `size_of_image` |
+| `.reloc` | 有る(RVA 0x5fb000・vsize 0x3e054)。rebase 0x10000000 で 742 ブロック・DIR64 123,691・ABSOLUTE 359 を直し、通った | pe-info sections / rebase |
+| セクション | 11 件: .text・.data・.bss・.idata・.didata・.edata・.tls・.rdata・.reloc・.pdata・.rsrc | pe-info sections |
+| `.pdata`(関数の入口) | 20,927 件(chained 0) | pe-pdata-info |
+| 輸出(export) | 2 件: `dbkFCallWrapperAddr`(RVA 0x5d52a8)・`__dbk_fcall_wrapper`(RVA 0x1c360)。FL の DLL の輸出と同じ名前 | pe-exports |
+| import する DLL | 16 件・576 名: kernel32 154・user32 207・gdi32 105・comctl32 30・ole32 19・oleaut32 18・shell32 16・advapi32 10・winmm 4・version 3・IMAGEHLP 3・shlwapi 2・comdlg32 2・SHFolder 1・msacm32 1・api-ms-win-crt-string-l1-1-0 1 | pe-info imports(一覧の imports と一致) |
+| Delphi の目印(文字列) | unit 名 `System.SysUtils` 76 回・`Vcl.Controls` 62 回・`Vcl.Graphics` 42 回・`Vcl.Dialogs` 35 回・`Vcl.StdCtrls` 24 回。フォーム型 `TPluginListForm` 6 回・`TNameEditForm` 3 回。`TObject` 289 回 | grep -a -o の出現数(実測) |
+| 範囲外の印 | `pe-init-table` は、この実行ファイルでは使えない(入口の参照が FL のエンジンの形でなく、「RVA 0xf768b0 is not mapped」で止まる) | pe-init-table(実測) |
 
-task の挙げた 11 件(winmm・shlwapi・comdlg32・comctl32・shell32・user32・version・oleaut32・advapi32・imagehlp・kernel32)は、全て一覧に在る。16 件の名前は、`lift/runtime`・`lift/harness` の C のソースに現れる(関数の単位の実装の有無は未確認)。
+Delphi の印は、輸出の表ではなく、文字列(unit 名と型名)から読んだ。輸出は 2 件だけ。
 
-未確認(exe の本体が無いので `fe-pe` を走らせられない): Machine・ImageBase・サブシステム(GUI か)・エントリの RVA・`.reloc` の有無・import の関数の一覧・Delphi の RTL の目印。x86-64 か否かも、ここでは確かめられない。
+## 2. VFS の置き場所: lazy の資源(`@lazy-file:`)
 
-## 2. VFS の置き場所: `resources` の仕組み(接頭辞の行 + seed 行 + lazy の組)
+- 固定の seed 表 `lift/harness/seeds/vfs-seed-idle1.tsv` の末尾に 1 行: guest `C:\Program Files\Image-Line\FL Studio 21\System\Tools\Plugin Manager\PluginManager.exe`・host `@lazy-file:resources/System/Tools/Plugin Manager/PluginManager.exe`・SHA-256 の値。
+- `lift/harness/web/pack.args` の末尾に 1 組: `--lazy-file lift/out-app/host/resources/System/Tools/Plugin Manager/PluginManager.exe=seed/resources/System/Tools/Plugin Manager/PluginManager.exe`。bundle の manifest の `lazy` の名前は `PluginManager.exe`(`app/scripts/pack-assets.mjs` は PATH の基底名を使う)。
+- 理由: 7 MB は、起動の前の大きさを増やさない。既存の resources(114 件の `@lazy-file:resources/...`)と同じ形で、起動の後に、要るとき(GetFileAttributesW の後の読み)だけ届く。
+- 生成の seed 行は作らない(`plugins.rs` の `seed_table`・`seed.args`・`pack_args` が、`.exe` の行を外す)。同じ guest path の行が 2 つになると、VFS の表が衝突するため。
+- 実物は `lift/out-app/host/resources/`(抽出の段が `ci/resources-prefixes.txt` の行で置く。全ての作業で `host/resources` にも置かれる)。
 
-決め: `ci/resources-prefixes.txt` に、完全なパス `System\Tools\Plugin Manager\PluginManager.exe` の 1 行を足す(commit 959e71ba)。seed 行と pack の組は、接頭辞が main に入った後の作業で足す(下の理由)。
+## 3. lift の方式と、1 つの wasm
 
-理由:
-- `lift/plugins/*/data.tsv`(#1478)は、プラグインの Data(`Plugins\Fruity\<種別>\<フォルダ>\Data\`)のための仕組み。取り出しは `ci/plugin-builtin-prefixes.txt`(`Plugins\Fruity\Effects\`・`Plugins\Fruity\Generators\`)の上で動く。exe は `System\Tools\` の下なので、その接頭辞に入らない。
-- `lift/plugins/*/plugin.tsv` の行は `.dll` に限られる(`lift/crates/fe-build/src/plugins.rs` の `validate`:「the file is not a DLL」)。realmod の入口は DllMain として呼ばれる(`lift/runtime/fle_realmod.c` の 235 行)。exe は同じ形に入らない(段 3)。
-- `resources` の一覧は、全ての作業の段で `lift/out-app/host-extra/resources` と `lift/out-app/host/resources` に置かれる(agent.yml の「言語・テーマ・テンプレート・プロジェクトを R2 のキャッシュから取る(全ての作業)」)。deploy の「resources を取り出す」も同じ一覧を読む。だから本番の bundle の入力にできる。
-- 大きさ: 一覧の完全なパスの行は、足す前が 27 件・4,830,812 B。足すと 28 件・11,989,668 B で、上限の 30,000,000 B 以下(`spec/workflow.test.sh` の (r5) が検査し、通った)。
-- lazy: exe は 7 MB で、起動に要らない(Options の Plugin Manager を開いた時だけ要る)。起動の前の pack に入れると、起動前の大きさが増える。既存の大きい resources は、`lift/harness/seeds/vfs-seed-idle1.tsv` の `@lazy-file:resources/...` の seed 行(114 件)と、`lift/harness/web/pack.args` の `--lazy-file` の組で配る。exe も同じ形にする。
-- 未着手: seed 行と pack の組。`app/scripts/pack-seed.mjs` は、seed 行の実物を木から読んで sha256 を照合する。接頭辞が main に入る前は、作業者の木に実物が無いので bundle が落ちる(`workflow-design.md` の「問題 A」と同じ型)。
+方式: (a) を選んだ。`lift/plugins/<名前>/plugin.tsv` の形を、exe に使えるように最小に広げる。(b)(exe 専用の表)は、同じ 4 つの表(modules・hyb・hybrid・pack)を二重に持つことになるので、取らなかった。
 
-## 3. lift(未着手。論点だけ)
+exe の行(`lift/plugins/plugin-manager/plugin.tsv`): key `plugin-manager.pluginmanager.dll`(realmod の名前は鍵。エンジンは、ファイル名から `.<基底>` と `.dll` を外した名前で表を引くので、鍵は `.dll` で終わる。ファイルの種類は guest の `.exe` で決める)・guest `System\Tools\Plugin Manager\PluginManager.exe`・役割 補助・hook none・args(既定の `--pdata`)・omit `-`。
 
-既存の `plugin.tsv` の形(本体・hook・args・omit)が exe に合わない点:
-- `validate` が `.dll` を要求する。
-- realmod の入口は `AddressOfEntryPoint` を DllMain(`DLL_PROCESS_ATTACH` など)として呼ぶ(`fle_realmod.c` の 235 行)。exe の入口は引数無しのスレッドの本体として呼ぶ。
-- hook の 3 点(Delphi エフェクトの hook)は、この exe には当たらない(`none`)。
-- omit(setjmp の入口)は、exe の中身を見るまで分からない。
+変えた箇所(すべて `.exe` の行に限る):
+- `lift/crates/fe-build/src/plugins.rs`: `validate` は、ファイル(guest の基底名)の拡張子が `.dll` か `.exe` であることを確かめる(鍵は `.dll` のまま)。`is_exe()` は guest の拡張子が `.exe`。`seed_table`・`seed.args`・`pack_args` の seed 行は `.exe` を外す(2 節)。`plugin_db_names` は変えない(本体の無いフォルダを飛ばすのは #1429 からの既存の挙動。exe の行は項目を作らない)。試験 2 件(exe の行・第 2 波の数え方)。
+- `app/scripts/lib/plugin-rows.mjs`(抽出の行の鏡。Rust と同じ規則): `.exe` を受ける。seed 行は作らない。
+- `tools/e2e/scenarios/smoke/plugin-database-lists-builtins.mjs`: この段では変えない。本体の無いフォルダを数えない処理は main(`b0ae9519`。`builtinPluginsOf`・`mainRows`)に在り、衝突では main の版を採った(9 節)。
+- `inputs/plugin-image-sizes.tsv`: 第 2 波の試験が image の大きさを引くので、exe の行を足す(SizeOfImage 7,315,456。1 節の値)。
+- `lift/plugins/plugin-manager/plugin.tsv`(新規)。
 
-最小の拡張の方針: 段 1 の PE の表(Machine・エントリ・`.reloc`)が無いと、拡張の形は決められない。段 1 の前に決めると、推測で共有の表を触ることになるので、決めない。
+流れ(生成の段 → 既存の段): 抽出(`app/scripts/extract-fl.mjs` が、`ci/extract-dlls.tsv` に `lift/plugins/*/plugin.tsv` の行を足した表で、`lift/out-plugins/plugin-manager.pluginmanager.dll` へ(中身は exe。sha256 で照合))→ lists(`fe-pe rebase` + `fe-wasmgen` の報告)→ gen-all(`modules.tsv` の行。`--pdata --extra-imports ship6`)→ hybrid(`--separate` の 1 本)→ wasm の `plugin-manager.pluginmanager.exe.<base>.wasm` が `xmod/` に出る → pack(`--lazy-dll` の rebased 像と、`--lazy-file` の xmod)。
 
-## 4. 起動の経路(設計だけ。コードは書いていない)
+根拠の観測(この作業の手元の実測):
+- `fe-wasmgen`(lists と同じ引数。`--pdata` と `lift/harness/hyb/n0.args`): 25 秒。報告 21,902 行、ok 21,622。残りは「atomic RMW は C の道」95・「bit test」35 など。
+- `fe-lift lift`(1 モジュール・omit 空): 3.6 秒・exit 0。関数 21,960・命令 688,477・C の unit 6 本(m1-00〜m1-05、各約 10 MB)。`setjmp_landings 0`(omit は要らない)・`jumptabs 3`・`msvc_tables 2`・`unsupported 38`(IAT を経由する間接ジャンプ。今は lift しない。段 4 で扱う)。
+- rebase の出力名は `plugin-manager.pluginmanager.<基底>.dll`。hybrid の出力は `plugin-manager.pluginmanager.<基底>.wasm`(fe-wasmgen は、モジュールの file の stem に `.wasm` を付ける)。manifest の `lazy` の wasm の名前は、`manager` を含み `.wasm` で終わる。
+
+wasm の大きさ: 16,085,407 B(`lift/out-app/xmod/` の生の wasm。bundle の br は 2,225,582 B)。
+
+## 4. 起動の経路(設計だけ。段 B)
 
 現状:
-- `fle_imp_ShellExecuteW`(`lift/runtime/fle_wall_ia2.c` の 152 行)は、関連付け無し(31)を返す(決定 `S-ia2-shellexecute-noassoc`)。`ShellExecuteA`・`ShellExecuteExW` は `lift/runtime/fle_api2_shell.c` で同じ。
-- `GetModuleHandle(NULL)` は、engine の像を返す(`lift/runtime/fle_env.c` の 406 行)。
-- `ExitProcess` は `fle_stop` で、engine を止める(`lift/runtime/fle_proc.c` の 279 行)。
+- `fle_imp_ShellExecuteW`(`lift/runtime/fle_wall_ia2.c`)は、関連付け無し(31)を返す(決定 `S-ia2-shellexecute-noassoc`)。`ShellExecuteA`・`ShellExecuteExW` は `lift/runtime/fle_api2_shell.c` で同じ。
+- 協調スレッド(`lift/runtime/fle_thread.c`): `fle_thread_spawn(body, arg)` で、ゲストのスレッドを作れる。
+- realmod の読み込み(`fle_realmod_find_path` の接尾辞の照合。今回の exe の接尾辞は `system/tools/plugin manager/pluginmanager.exe`。realmod の名前は `plugin-manager.pluginmanager.dll`)。
 
-使える部品:
-- 協調スレッド(決定 0122、`lift/runtime/fle_thread.c`): 1 つのホストのスレッドの上に、ゲストごとのスタック。切り替えは `schedule()` と `fle_progress_slice()` だけなので、engine の本体は止まらない。`fle_thread_spawn(body, arg)`(`lift/runtime/fle_thread.h` の 173 行)で作れる。
-- realmod の読み込み: `fle_realmod_find_path`(接尾辞の照合。`Dll::suffix` と同じ規則)、`fle_realmod_load`・`fle_realmod_getproc`(`lift/runtime/fle_realmod.h`)。
-- 待ち: `WaitForSingleObject` は、スレッドの handle を受ける(決定 0122。`lift/runtime/fle_event.c` の 210 行)。
-
-設計(決めることの一覧。FL がどの呼び出しを使うかは、実測で決める):
-1. 呼び出し: `ShellExecuteW` の lpFile が、この exe の完全なパスの接尾辞に一致するときだけ、realmod を読み、入口を `fle_thread_spawn` の本体(`fle_call_guest(entry, ...)`)として走らせる。戻り値は 33 以上(成功)。それ以外の URL・ファイル種類は、今まで通り 31。決定 `S-ia2-shellexecute-noassoc` の範囲は、この exe に限る。
-2. `GetModuleHandle(NULL)`: exe のスレッドからは exe の基底を返す必要がある(Delphi の HInstance と、リソースの読み込み)。スレッドごとの既定の像を持たせる。他のスレッドは今のまま。要決定。
-3. `ExitProcess`: exe のスレッドからの呼び出しは、そのスレッドの終了として扱い、engine は止めない。他のスレッドからの呼び出しは、今のまま `fle_stop`。要決定。
-4. 待ちと終了コード: `ShellExecuteExW` の `hProcess`(SEE_MASK_NOCLOSEPROCESS のとき)は、そのスレッドの handle を返す。`GetExitCodeProcess` は、スレッドの終了コードを返す。要決定。
-5. コマンドラインとカレントディレクトリ: `lpParameters` は exe のコマンドラインに入れる。`lpDirectory` の既定は exe のフォルダ(`System\Tools\Plugin Manager\`)。FL の実際の値は未確認。
-6. `-flpath`: FLEngine の文字列からの推定で、未確認。
-
-観測(9 節の E2E。両方の表示で同じ): Options の 6 番目を選ぶと、FL は `C:\Program Files\Image-Line\FL Studio 21\System\Tools\Plugin Manager\PluginManager.exe` を `GetFileAttributesW` で調べ、無い(`missing-path`)。その後の `ShellExecute` の行は、E2E の記録に無い(6 番目の行数は記録されていない)。つまり、FL は起動の前に、この完全なパスの存在を確かめる。段 4 の呼び出しを決めるときは、この存在の確認が通った後の呼び出し(`ShellExecuteW`・`ShellExecuteExW`・`CreateProcessW` のどれか)を、exe が在る木で実測する。ビルドの記録では、`CreateProcessW` も C の runtime で未モデルと出ている(起動の論点として残す)。
+段 B で決めること(この段では結ばない): ShellExecuteW の lpFile が、この接尾辞に一致するとき、realmod を読み、入口をスレッドとして走らせる。`GetModuleHandle(NULL)`・`ExitProcess`・終了コードの扱い。
 
 ## 5. 窓(未着手)
 
-Plugin Manager の窓のクラスと題名は、exe を動かした後に、窓の表で確かめる。今の窓の表の実測(`pm-work/findings/crash-hunt-2026-11-25.json`)は、`TPlugListForm`(題名 `PlugList`)と `TPluginMonitorForm`(題名 `Plugin performance monitor`)。Plugin Manager の窓は、まだ確かめていない。
+Plugin Manager の窓の表(クラスと題名)は、窓が出た後に確かめる。exe には `TPluginListForm` の型名が在る(1 節)。今の窓の表の実測(`pm-work/findings/crash-hunt-2026-11-25.json`)の `TPlugListForm`(題名 `PlugList`)とは別物かも知れない。確かめるのは段 B。
 
 ## 6. E2E(`plugin-manager-opens`)
 
-`tools/e2e/scenarios/smoke/plugin-manager-opens.mjs` の `expectFail: '#1499'` の印は、外していない。外すのは、受け入れで ok になったとき。今は exe が作業者の木に無いので、窓は出ず、ok にならない。実測(9 節): 両方の表示で `ok: false`・`engineStops: 0`・`engine-idle` のまま。窓は 10 秒の間に現れなかった(`no Plugin Manager window in the window table 10 s after the item`)。
+`tools/e2e/scenarios/smoke/plugin-manager-opens.mjs` の `expectFail: '#1499'` の印は残す(窓が出るのは段 B の後)。
 
 ## 7. 段ごとの進み
 
 | 段 | 状態 | 中身 |
 |---|---|---|
-| 1 PE | 未着手(入力が無い) | 一覧の値だけ。PE の表は未確認 |
-| 2 VFS | 途中 | 接頭辞の 1 行を commit(959e71ba)。seed 行と pack の組は未着手(接頭辞が main に入るまで足せない) |
-| 3 lift | 未着手 | 論点だけ(段 3 の節) |
-| 4 起動 | 未着手 | 設計だけ(段 4 の節)。コードは無い |
-| 5 窓 | 未着手 | 窓の表は未確認 |
-| 6 E2E | 未着手 | 印は残した |
+| 1 PE | 完了(道具の出力。1 節) | pe-info・pe-exports・pe-pdata-info・rebase・strings |
+| 2 VFS | 完了(manifest の lazy に `PluginManager.exe`) | 固定の seed の 1 行・pack.args の 1 組(2 節) |
+| 3 lift | 完了(wasm 16,085,407 B・br 2,225,582 B。起動・流れ A〜D・npm test も通った) | plugin 行(3 節)。hybrid の separate は 3 本 |
+| 4 起動 | 未着手(段 B) | 設計だけ(4 節)。観測: ShellExecuteW が exe のパスで呼ばれ、関連付け無し(31)で返る(9 節) |
+| 5 窓 | 未着手(段 B) | — |
+| 6 E2E | 印は残した(段 B で外す)。smoke は全て ok(expectFail の `plugin-manager-opens` を除く) | 9 節 |
 
-## 8. 監査への依頼: 段を分ける
+## 8. 監査への依頼
 
-1. 接頭辞の 1 行(959e71ba)を main に入れる。次の extract で、接頭辞の一覧の鍵が変わるので取り直され、exe が `lift/out-app/host-extra/resources` に入る。
-2. 次の Issue(または、この Issue の再試行): PE の表(段 1)・seed 行と pack の組(段 2 の続き)・lift の方式(段 3)。受け入れは、bundle が通り、`plugin-manager-opens` の手前の確認(起動の確認・流れ A〜D)まで。
-3. その次: 起動の経路・窓・E2E(段 4〜6)。受け入れは、`plugin-manager-opens` が ok になるまで。
+1. 段 A(この Issue)は、受け入れを通すまでを 1 つの作業とする。受け入れの中の `plugin-manager-opens` は印(`expectFail`)のままなので、ok は要らない。
+2. 段 B は、この Issue が閉じた後に起票する(4 節・5 節・6 節)。
 
-この Issue の受け入れを 1 回で通すことは、今の木では出来ない。
+## 9. この作業の受け入れの実測(この再試行の run)
 
-## 9. この作業の受け入れの実測
+実エンジン: この runner で、作業の木(main の `1dc942df` に段 A の変更を載せたもの。前回の差分を取り込み、衝突を解いたもの)に対して、`npm run build --prefix app`・`cargo build --release --locked`・`fe-build engine`・`fe-build bundle` を実行し、`boot-bundle`(engine-idle を観測)・`welcome-flow`(流れ A〜D の 4 行)・manifest の `lazy`・PE の表・`npm test --prefix app`・`run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2`・`guard/scan.sh` の出力を観測した。受け入れのコマンドは終了コード 0 で通った(`ACCEPT_EXIT=0`・`rows 2, accepted true`・`scan: 0 finding(s) in 0 file(s).`)。加えて `cargo test --release --locked -p fe-build`(30 件・終了コード 0)・`spec/guard.test.sh`(104 件 ok)・`spec/workflow.test.sh`(602 件 ok)・`spec/plugin-rows.test.mjs`・`spec/place-plugin-dlls.test.mjs`・`tools/e2e/test/plugin-database-lists-builtins.test.mjs`(8 件)も通した。
 
-実エンジン: 受け入れコマンドを、この作業のジョブの木で実行した(`npm run build`・`fe-build engine`・`fe-build bundle`・boot-check・welcome-flow・`npm test`・`tools/e2e/run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2`)。終了コードは 1(E2E の行の検査で止まった。`guard/scan.sh` は走っていない。単独では、指摘 0 件・終了コード 0)。
-
-runner の値。この機械とは別枠。nproc 4・loadavg [2.41,1.87,1.85](流れの記録の末尾の値)。
+runner の値。この機械とは別枠。nproc 4。loadavg は作業の開始時 0.55 0.53 0.24、流れ D の後 2.48 1.81 1.91。
 
 | 検査 | 結果 | 値 |
 |---|---|---|
-| 起動(boot.json) | 通った | engine-idle・standIn false・error null・elapsedMs 11,338 |
-| 流れ A〜D | 通った(4 行) | 4 行とも error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true。B と D は welcomeClosed true。elapsedMs 11,144〜11,351。preBootBytes 313,271,260 |
-| `npm test --prefix app` | 通った | 74 ファイル通過・1 件飛ばし。1,455 件通過・10 件飛ばし |
-| E2E の 2 表示の行 | 通らない | 行は 2 つ。`plugin-manager-opens` は、両方で `ok: false`・`expectFail: "#1499"`(この Issue の受け入れは `expectFail: null` を要する) |
+| 起動(boot.json) | 通った | engine-idle・standIn false・error null・elapsedMs 9,187・coldMs 9,378(受け入れの上限 12,500 以下。P1 の 10 秒の内) |
+| 流れ A〜D | 通った(4 行) | 4 行とも error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true。B と D は welcomeClosed true。elapsedMs 7,896〜8,238 |
+| manifest の lazy | 通った | `PluginManager.exe`(7,158,856 B・encodedSize 1,761,276)・`plugin-manager.pluginmanager.cf60000.wasm`(16,085,407 B・encodedSize 2,225,326)・`plugin-manager.pluginmanager.cf60000.dll`(7,158,856 B・encodedSize 1,761,921) |
+| PE の表 | 通った | 表の行 16(`ImageBase`・`Machine` を含む。受け入れは 12 行以上) |
+| `npm test --prefix app` | 通った | Test Files 75 passed・1 skipped(76)。Tests 1,465 passed・10 skipped(1,475) |
+| E2E smoke(2 表示) | 通った | 行は 2 つ。両方 error null・servedHeadersMatch true。achievedFps は 46.25(4k-dpr1)・47.41(4k-dpr2)。`plugin-manager-opens` は両表示で ok false(expectFail #1499。期待どおり)。他の 9 件は両表示とも ok true。`plugin-database-lists-builtins` は両表示で「3 entries listed (3 built-in plugins)」 |
+| `guard/scan.sh` | 通った | 0 finding(s) |
 
-E2E の各シナリオ(両表示の同じ結果):
-- `start-welcome-default`: ok true
-- `file-open-demo`: ok true
-- `plugin-database-lists-builtins`: ok true(lift/plugins/ の 2 件が一覧に出る)
-- `knob-right-click-permissions`: ok false・`expectFail: "#1406"`(この Issue と無関係の、既存の既知の印)
-- `plugin-manager-opens`: ok false。Options の 1〜5 は設定の窓を開く。6 番目は `GetFileAttributesW` の `missing-path`(上の観測)。窓は現れず、engine は `engine-idle` のまま 10 秒
+注:
+- 衝突(`tools/e2e/scenarios/smoke/plugin-database-lists-builtins.mjs`): main の版(`b0ae9519` の `mainRows`・`builtinPluginsOf`)を採った。前回の差分の同じ目的の変更(本体の無いフォルダで throw せず飛ばす `builtinPlugins`・その注釈)は取り除いた。この file は main(`1dc942df`)と同一になる。
+- `lift/crates/fe-build/src/plugins.rs`・`inputs/plugin-image-sizes.tsv` は、自動の併合で衝突しなかった。`cargo test` の複写の数(lift/plugins の 164 行)は通った。
+- 抽出の木: 受け入れの前に `tools/place-plugin-dlls.mjs`(判定と同じ順)を呼んだ。出力は `{"placed":1,"present":113,"missing":0,"mismatch":0}`。複写した物の sha256 は `66100a71…b2eb32f1e7`(一覧の値と一致)。
+- lift の lists(`fe-wasmgen`): `plugin-manager.pluginmanager.dll: listed 21622, emitted ok 21622, listed but not emitted 0`。
+- wasm の大きさ: 16,085,407 B(`lift/out-app/bundle/raw/fl-Oz/manifest.json` の size)。
+- Options の 6 番目で `fle: ShellExecuteW NOT CARRIED OUT (no association in the virtual machine; S-ia2-shellexecute-noassoc)` が出て、答えは 31(SE_ERR_NOASSOC)。窓は出ない(段 B)。
+- E2E の fps: smoke の `achievedFps` は目標の 120 fps に届いていない(段 A の対象外。runner の値)。
 
-Plugin Manager の窓の表の行(クラスと題名): 無し。
-
-段ごとの状態は 7 節のとおり。
+判定: 受理(段 A。段 1〜3 と受け入れは通った。段 4〜6 は段 B)。

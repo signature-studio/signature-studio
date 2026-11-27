@@ -119,6 +119,13 @@ impl Dll {
     pub fn suffix(&self) -> String {
         self.guest.replace('\\', "/").to_lowercase()
     }
+
+    /// A program (the installer's file is an .exe: the Plugin Manager, Issue #1499), not a DLL. It is lifted as a module of its own, like a DLL. Its VFS
+    /// row is the fixed seed table's (a lazy file of the resources), so the seed rows of the plugins leave it out, and its folder has no 本体 row
+    /// (no database entry). Its key still ends with .dll: the engine finds a realmod by the rebased file's name without the base.
+    pub fn is_exe(&self) -> bool {
+        self.basename().to_lowercase().ends_with(".exe")
+    }
 }
 
 /// `lift/plugins/<name>/plugin.tsv`: the header, then the rows of one plugin.
@@ -343,8 +350,9 @@ pub fn validate(dlls: &[Dll]) -> Result<(), String> {
         if !guests.insert(d.guest.to_lowercase()) {
             return Err(at("the guest path is not unique"));
         }
-        if !d.basename().to_lowercase().ends_with(".dll") {
-            return Err(at("the file is not a DLL"));
+        let file = d.basename().to_lowercase();
+        if !file.ends_with(".dll") && !file.ends_with(".exe") {
+            return Err(at("the file is not a DLL or an .exe"));
         }
         if d.sha256.len() != 64 || !d.sha256.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)) {
             return Err(at("sha256 is 64 lower case hex digits"));
@@ -646,7 +654,7 @@ pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)], data: &[Data]) -> Result<Str
         lines.push("--lazy-dll".into());
         lines.push(d.rebased(*base));
     }
-    for (d, _) in dlls {
+    for (d, _) in dlls.iter().filter(|(d, _)| !d.is_exe()) {
         let seed = d.seed_file();
         lines.push("--lazy-file".into());
         lines.push(format!("{HOST_DIR}/{seed}=seed/{seed}"));
@@ -663,10 +671,11 @@ pub fn pack_args(fixed: &str, dlls: &[(&Dll, u64)], data: &[Data]) -> Result<Str
     Ok(lines.join("\n") + "\n")
 }
 
-/// The seed table of the build: the fixed rows, then the seed row of each DLL, then the seed row of each Data file (Issue #1478).
+/// The seed table of the build: the fixed rows, then the seed row of each DLL (not of an .exe: its row is in the fixed table), then the seed row of
+/// each Data file (Issue #1478).
 pub fn seed_table(fixed: &str, dlls: &[Dll], data: &[Data]) -> String {
     let mut seed = fixed.to_string();
-    for d in dlls {
+    for d in dlls.iter().filter(|d| !d.is_exe()) {
         seed.push_str(&format!("{}\n", seed_row(d)));
     }
     for d in data {
@@ -690,7 +699,9 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     let mut seed_args = read_text(FIXED_SEED_ARGS)?;
     for d in &dlls {
         extract.push_str(&format!("{}\n", extract_row(d)));
-        seed_args.push_str(&format!("--lazy\n{}\n", d.seed_file()));
+        if !d.is_exe() {
+            seed_args.push_str(&format!("--lazy\n{}\n", d.seed_file()));
+        }
     }
     write(&format!("{OUT_DIR}/extract-dlls.tsv"), &extract)?;
     let seed = seed_table(&read_text(FIXED_SEED)?, &dlls, &data);
@@ -1002,6 +1013,26 @@ mod tests {
     }
 
     #[test]
+    fn an_exe_row_is_a_module_but_no_seed_row_and_no_database_entry() {
+        let text = format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\nplugin-manager.pluginmanager.dll\tSystem\\Tools\\Plugin Manager\\PluginManager.exe\t補助\t{}\t7158856\tnone\t\t-\n", "a".repeat(64));
+        let dlls = parse_plugin("plugin-manager", &text).unwrap();
+        validate(&dlls).unwrap();
+        let d = &dlls[0];
+        assert!(d.is_exe());
+        assert_eq!(d.rebased(0x6a00000), "plugin-manager.pluginmanager.6a00000.dll");
+        assert_eq!(module_row(d, 0x6a00000, None), "plugin-manager.pluginmanager.dll\tlift/out-plugins/plugin-manager.pluginmanager.dll\t0x6a00000\t--pdata --extra-imports lift/harness/seeds/ship6-imports.txt\tsystem/tools/plugin manager/pluginmanager.exe");
+        assert!(plugin_db_names(&dlls).unwrap().is_empty());
+        assert_eq!(seed_table("", &dlls, &[]), "");
+        let pack = pack_args("--args\n/data/FLEngine_x64.dll\n", &[(d, 0x6a00000)], &[]).unwrap();
+        assert!(pack.contains("--lazy-dll\nplugin-manager.pluginmanager.6a00000.dll\n"));
+        assert!(!pack.contains("seed/"));
+        let wrong = text.replace("PluginManager.exe\t", "PluginManager.txt\t");
+        assert!(validate(&parse_plugin("plugin-manager", &wrong).unwrap()).is_err());
+        let not_dll_key = text.replace("pluginmanager.dll\t", "pluginmanager.exe\t");
+        assert!(validate(&parse_plugin("plugin-manager", &not_dll_key).unwrap()).is_err());
+    }
+
+    #[test]
     fn the_hook_points_of_balance_are_the_three_of_the_delphi_runtime() {
         let rvas = rvas_of_hook_file(include_str!("../../../harness/hooks/fruity-delphi-effect-hook-points.txt")).unwrap();
         assert_eq!(rvas.iter().map(|r| 0x6800000 + r).collect::<Vec<u64>>(), vec![0x6817bc0, 0x6831d70, 0x6831d90]);
@@ -1154,7 +1185,7 @@ mod tests {
         let state = format!("{root}/state");
         copy_dir(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")), Path::new(&state));
         write_wave_folders(&table, &state);
-        assert_eq!(read_rows_from(&state).unwrap().len(), 163, "the copy of lift/plugins (Balance, Filter, Sytrus, Reverb) and the wave's 159 rows");
+        assert_eq!(read_rows_from(&state).unwrap().len(), 164, "the copy of lift/plugins (Balance, Filter, Sytrus, Reverb and the Plugin Manager's .exe) and the wave's 159 rows");
         let stale = format!("{root}/stale");
         fs::create_dir_all(format!("{stale}/old")).unwrap();
         fs::write(format!("{stale}/old/plugin.tsv"), format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.old.old_x64.dll\tPlugins\\Fruity\\Effects\\Old\\Old_x64.dll\t本体\t{}\t10\tnone\t\t-\n", "a".repeat(64))).unwrap();
@@ -1166,11 +1197,11 @@ mod tests {
         };
         for plugins in [state.as_str(), concat!(env!("CARGO_MANIFEST_DIR"), "/../../plugins")] {
             let dlls = second_wave_dlls(plugins, &wave).unwrap();
-            assert_eq!(dlls.len(), 163);
+            assert_eq!(dlls.len(), 164);
             let sizes: Vec<u64> = dlls.iter().map(image_of).collect();
             let bases = assign_bases(0xC1CF000, &sizes).expect("the images fit below GLOBAL_BASE");
             assert_eq!(bases[0], 0xC1D0000);
-            let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance" && d.plugin != "fruity-filter").map(|d| align_up(image_of(d), ALIGN)).sum();
+            let wave_total: u64 = dlls.iter().filter(|d| d.plugin != "fruity-balance" && d.plugin != "fruity-filter" && !d.is_exe()).map(|d| align_up(image_of(d), ALIGN)).sum();
             assert_eq!(wave_total, 748_158_976 + 524_288, "the wave's 748,158,976 B and Reverb's 516,096 B of SizeOfImage (aligned: 524,288)");
             for pair in bases.windows(2).zip(sizes.iter()) {
                 assert!(pair.0[1] >= pair.0[0] + align_up(*pair.1, ALIGN), "the images at {:#x} and {:#x} overlap", pair.0[0], pair.0[1]);
@@ -1198,9 +1229,10 @@ mod tests {
     }
 
     /// The first wave's folders (tools/plugin-layout/wave2-plugins.mjs, FIRST_WAVE): their DLLs are in lift/plugins, and not in the table.
-    /// Reverb_x64.dll (Issue #1429, a helper of Sytrus in Shared) is in lift/plugins too, and not in the table.
+    /// Reverb_x64.dll (Issue #1429, a helper of Sytrus in Shared) is in lift/plugins too, and not in the table. The Plugin Manager's .exe (Issue #1499)
+    /// is in lift/plugins too, and not in the table.
     fn first_wave_folder(guest: &str) -> bool {
-        const FIRST_WAVE: [&str; 5] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus", r"Shared\Reverb_x64.dll"];
+        const FIRST_WAVE: [&str; 6] = [r"Plugins\Fruity\Effects\Fruity Balance", r"Plugins\Fruity\Effects\Fruity Filter", r"Plugins\Fruity\Effects\Fruity Delay 2", r"Plugins\Fruity\Generators\Sytrus", r"Shared\Reverb_x64.dll", r"System\Tools\Plugin Manager\PluginManager.exe"];
         let folder = guest.split('\\').take(4).collect::<Vec<&str>>().join("\\");
         FIRST_WAVE.iter().any(|f| f.eq_ignore_ascii_case(&folder))
     }

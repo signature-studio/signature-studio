@@ -63,7 +63,7 @@ function validate(dlls) {
     if ((parts < 3 && !(parts === 2 && d.guest.startsWith('Shared\\'))) || d.guest.includes('/')) throw at('the guest path is Plugins\\...\\file (backslashes, at least three parts) or Shared\\file (Issue #1429)');
     if (guests.has(d.guest.toLowerCase())) throw at('the guest path is not unique');
     guests.add(d.guest.toLowerCase());
-    if (!base.toLowerCase().endsWith('.dll')) throw at('the file is not a DLL');
+    if (!/\.(dll|exe)$/.test(base.toLowerCase())) throw at('the file is not a DLL or an .exe');
     if (!/^[0-9a-f]{64}$/.test(d.sha256)) throw at('sha256 is 64 lower case hex digits');
   }
 }
@@ -135,8 +135,8 @@ function validateData(data, dlls) {
 
 // { extract: [[installer name, host path, SHA-256]], seed: [[guest path, host path, SHA-256]] }, in the order of the keys (the DLLs), then the Data rows by guest path.
 // The host path is named by the key (plugins.rs host_file, seed_file); the installer name is the file's name in lower case (installer_name).
-export function pluginRows(dir) {
-  if (!fs.existsSync(dir)) return { extract: [], seed: [] };
+// A row whose file is an .exe (Issue #1499) is extracted, but it has no seed row here: its VFS row is the fixed seed table's (plugins.rs seed_table).
+function readPlugins(dir) {
   const folders = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isDirectory()).sort();
   const dlls = [], data = [];
   for (const folder of folders) {
@@ -149,14 +149,29 @@ export function pluginRows(dir) {
   validate(dlls);
   data.sort((a, b) => (a.guest < b.guest ? -1 : a.guest > b.guest ? 1 : 0));
   validateData(data, dlls);
+  return { dlls, data };
+}
+
+const isExe = (guest) => /\.exe$/i.test(guest.split('\\').pop());
+
+export function pluginRows(dir) {
+  if (!fs.existsSync(dir)) return { extract: [], seed: [] };
+  const { dlls, data } = readPlugins(dir);
   return {
     extract: dlls.map((d) => [d.guest.split('\\').pop().toLowerCase(), `${HOST_ROOT}/${d.key}`, d.sha256]),
     seed: [
-      ...dlls.map((d) => {
+      ...dlls.filter((d) => !isExe(d.guest)).map((d) => {
         const parts = d.guest.split('\\');
         return [GUEST_ROOT + d.guest, [SEED_ROOT, ...parts.slice(0, -2), d.key].join('/'), d.sha256];
       }),
       ...data.map((d) => [GUEST_ROOT + d.guest, `${LAZY_FILE}${dataHost(d.guest)}`, d.sha256]),
     ],
   };
+}
+
+// The .exe rows (Issue #1499): { host, guest, sha256 } of each, host being its extraction (lift/out-plugins/<key>). The file is the installer's, and it is
+// the resources' file too (its VFS row is the fixed seed table's), so a missing extraction is placed from the resources (tools/place-plugin-dlls.mjs).
+export function pluginExes(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return readPlugins(dir).dlls.filter((d) => isExe(d.guest)).map((d) => ({ host: `${HOST_ROOT}/${d.key}`, guest: d.guest, sha256: d.sha256 }));
 }
