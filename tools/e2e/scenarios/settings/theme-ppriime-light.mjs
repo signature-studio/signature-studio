@@ -5,7 +5,7 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/theme-ppriime-light',
   covers: ["settings/theme/ppriime-light","settings/list/theme-tquickstringgrid-1"],
-  displays: ["4k-dpr1"],
+  displays: ["4k-dpr1", "4k-dpr2"],
   expectFail: null,
   run(ctx) {
     return S.themeRun(ctx, "PPRIIME Light", 1, 1);

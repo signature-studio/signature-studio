@@ -405,6 +405,8 @@ const char *fle_appfile_cmdline_a(void) __attribute__((weak));
 
 /* ucrtbase / api-ms-win-crt-string!memset (Issue #1501,段 B: the Plugin Manager's own code calls it through the import). void *memset(void *dest rcx, int c rdx, size_t count r8):
  * fills count bytes at dest with the byte (c as unsigned char) and returns dest. The C standard gives it; no Windows page is needed. A count of 0 changes nothing. */
+/* weak: the plugin worker's vst_crt.c defines its own (it notes the call first) */
+__attribute__((weak))
 void fle_imp_memset(void)
 {
     uint64_t dst = R[1], n = R[8];

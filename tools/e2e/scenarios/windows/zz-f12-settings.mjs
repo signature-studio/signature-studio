@@ -5,6 +5,7 @@ import { f12CloseAll } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/zz-f12-settings',
   covers: ['windows/op/f12'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return f12CloseAll(guest, 'F10');
   },

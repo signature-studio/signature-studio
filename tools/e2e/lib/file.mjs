@@ -86,39 +86,49 @@ export async function openDataFile(ctx, abs, ms = 150000) {
     box = await openProjectFile(guest, cdp, abs, log);
   } catch (e) {
     const windows = (await guest.windows().catch(() => [])).map((w) => `${w.cls}|${w.title}`).slice(0, 10);
-    return { box: null, opened: false, state: (await guest.state())?.state ?? null, title: null, titleBefore: before?.title ?? null, logHit: null, error: `${String(e?.message ?? e).slice(0, 200)}; windows ${JSON.stringify(windows)}` };
+    return { box: null, opened: false, state: (await guest.state())?.state ?? null, title: null, titleBefore: before?.title ?? null, logHit: null, boxLeft: null, boxTitle: null, mainForm: null, problemsAnswers: 0, error: `${String(e?.message ?? e).slice(0, 200)}; windows ${JSON.stringify(windows)}` };
   }
   return waitOpened(guest, { box, name: path.basename(abs), before, logStart, ms });
 }
 
-/** waits until the project is open (see openDataFile), or the engine stopped, or the limit */
+/** waits until the project is open (see openDataFile), or the engine stopped, or the limit. The Problems box's answers (problemsAnswers) and what is left of it (boxLeft, boxTitle) and the main form (mainForm) are the facts of the judge */
 export async function waitOpened(guest, { box, name, before, logStart, ms }) {
   const t0 = Date.now();
   let hit = null;
   let st = null;
+  let answers = 0;
   while (Date.now() - t0 < ms) {
     st = await guest.state().catch(() => null);
     if (st && (st.state === 'error' || st.state === 'exited')) break;
     const lines = await logSince(guest, logStart);
     hit = lines.find((l) => l.includes(name)) ?? hit;
     if (st && st.state === 'engine-idle' && (st.title !== before?.title || hit !== null) && Date.now() - t0 > 2500) break;
-    await clearProblems(guest);
+    answers += await clearProblems(guest);
     await sleep(500);
   }
   await sleep(1500);
-  await clearProblems(guest);
-  await clearMissingPlugins(guest);
+  answers += await clearProblems(guest);
+  answers += await clearMissingPlugins(guest);
   const end = (await guest.state().catch(() => null)) ?? { state: 'unreadable', title: null };
   // the title is the main form's (the table's), not the page's: while the Problems box is up the page's title is the box's
   const table = await windowTable(guest).catch(() => null);
   const main = table ? table.top.find((w) => w.cls === MAIN_FORM) : null;
+  const problems = table ? table.top.find((w) => w.cls === MISSING_PLUGINS) : null;
   const title = main ? main.title : end.title;
-  const boxLeft = table ? table.top.some((w) => w.cls === MISSING_PLUGINS) : false;
+  const boxLeft = table ? !!problems : false;
   const changed = title !== (before?.title ?? null);
   return {
     box, opened: end.state === 'engine-idle' && !boxLeft && (changed || hit !== null), state: end.state, title, titleBefore: before?.title ?? null,
-    titleChanged: changed, logHit: hit, boxLeft, waitedMs: Date.now() - t0,
+    titleChanged: changed, logHit: hit, boxLeft, boxTitle: problems ? problems.title : null, mainForm: table ? !!main : null, mainTitle: main ? main.title : null,
+    pageTitle: end.title ?? null, problemsAnswers: answers, error: null, waitedMs: Date.now() - t0,
   };
+}
+
+/** the facts of an opening for a note: the Problems box (its answers, and whether it is left and its title), the main form (its title, or none), and the error when the opening threw */
+export function openFacts(r) {
+  const box = r.boxLeft === null ? 'box unread' : r.boxLeft ? `box left "${r.boxTitle}"` : 'no box left';
+  const main = r.mainForm === null ? 'main form unread' : r.mainForm ? `main form title "${r.mainTitle}"` : 'no main form';
+  return `problems answered ${r.problemsAnswers ?? 0}, ${box}, ${main}${r.error ? `; error ${r.error}` : ''}`;
 }
 
 /** Ctrl+O, then the files given to the box (several files, or a folder): the facts of what the box did */
