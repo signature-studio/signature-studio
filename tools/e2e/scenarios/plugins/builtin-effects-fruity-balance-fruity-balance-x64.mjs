@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-effects-fruity-balance-fruity-balance-x64',
   covers: ['plugins/effects/fruity-balance-fruity-balance-x64', 'plugins/window/effects-fruity-balance-fruity-balance-x64', 'plugins/param/effects-fruity-balance-fruity-balance-x64', 'plugins/audio/effects-fruity-balance-fruity-balance-x64', 'plugins/stop/effects-fruity-balance-fruity-balance-x64'],
-  expectFail: '#1484',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Fruity Balance", kind: 'effects' });
   },

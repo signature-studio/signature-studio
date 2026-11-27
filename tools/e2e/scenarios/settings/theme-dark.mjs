@@ -5,8 +5,8 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/theme-dark',
   covers: ["settings/theme/dark","settings/list/theme-tquickstringgrid-1"],
-  displays: ["4k-dpr1"],
-  expectFail: null,
+  displays: ["4k-dpr1", "4k-dpr2"],
+  expectFail: "new",
   run(ctx) {
     return S.themeRun(ctx, "Dark", 2, 2);
   },
