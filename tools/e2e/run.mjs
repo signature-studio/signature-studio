@@ -9,10 +9,13 @@
 //     regression (Issue #1408): one scenario per report of the owner. A mark (expectFail) of an older set must be one of its ALLOWED_MARKS or 'new' (checkMarks); a mark may be a list (a scenario with two known defects).
 //   --list: starts nothing. One JSON line per area: { area, scenarios, covers, features } (features: the rows of tools/e2e/features/). With --area, that area's line only.
 //   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
-//   --budget: a number with s, m or h. A scenario that would start after the budget is not run: it is written with skipped: true (the row then fails).
+//   --budget: a number with s, m or h. Each display row has its own budget (a clock made per row). A scenario that would start after the row's budget has passed, or
+//     that needs more time than the row has left (needsMs, e.g. resilience/wait-idle-30min: 30 min), is not run: it is written with skipped: true (the row then fails).
 //   --only: IDs (page/canvas-fills-viewport) or the older names (file-open-demo).
-//   --displays: 4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR);
-//     dpr:<number> (e.g. dpr:1.25: CSS px 3840 / DPR, 2160 / DPR). Areas default to 4k-dpr1,4k-random; the smoke set to 4k-dpr1,4k-dpr2,4k-random.
+//   --displays: the rows to run. A scenario runs in a row only when its own displays (the declaration) include that row's display name; --displays does not widen a scenario.
+//     4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR);
+//     dpr:<number> (e.g. dpr:1.25: CSS px 3840 / DPR, 2160 / DPR). Without --displays the rows are the names the selected scenarios declare (areas: 4k-dpr1,4k-random; the smoke set: 4k-dpr1,4k-dpr2,4k-random).
+//     A row's page must have the row's DPR (a fixed DPR; dprOk): a page at another DPR fails the scenario.
 //   --clock: raf (default: the page's own rAF, the frame-rate limit off) or begin (120 Hz by the BeginFrame clock; see lib/browser.mjs).
 //   --shots DIR: a test aid, PNG pictures of the page after each scenario are written to DIR (the directory is made; nothing is removed).
 //   --engine-logs DIR: a test aid, the engine log of each scenario (the lines the page keeps, from the scenario's start) is written to DIR/<display>-<dpr>-<id>.log.
@@ -20,13 +23,15 @@
 //     (the caller checks the rows' structure, e.g. servedHeadersMatch). A row or line missing, or an error (the setup, a row), still exits 1. The log says 'report-only: exit 0'.
 // A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
-// Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq): servedHeadersMatch; the scenarios; each scenario that has no expectFail is ok with 0 pageErrors,
-// 0 consoleErrors, 0 stuckToasts and 0 failedRequests; each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests
-// (its stuckToasts is only written to the JSON); no scenario is skipped. The row's expectFail lists the marks of its scenarios: [{name, issue}] (a scenario with two marks gives two entries).
+// Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq, lib/plan.mjs scenarioPasses): servedHeadersMatch; the scenarios; no scenario is skipped;
+// each scenario has dprOk not false (its page is at the row's DPR); each scenario that has no expectFail is ok with 0 pageErrors, 0 consoleErrors, 0 stuckToasts and 0 failedRequests;
+// each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests, and no engine stop (engineStops 0 and not engineStuckRunning)
+// unless it declares the stop (expectStop: '#<Issue>' or 'new'); its stuckToasts and ok are only written to the JSON. The row's expectFail lists the marks of its scenarios: [{name, issue}] (a scenario with two marks gives two entries).
 // A scenario that carries a mark and passes (ok, and 0 pageErrors, consoleErrors, stuckToasts and failedRequests) is warned about on stderr: remove the mark. Temporary files are in the repository's .tmp-e2e-* and are removed.
 // The count of scenarios is that of the set (browser-face: 1).
-// Each scenario has engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own
-// stop report and the report's lines (lib/stop.mjs).
+// Each scenario has: ms (the time from its start to its end), displays (its declared displays), dprOk (the page's DPR is the row's: true, false, or null for the random row),
+// engineStop: null, or when the engine stopped (engineStops > 0, or its state is error or exited) the engine's stop: the facts of its own stop report and the report's lines (lib/stop.mjs),
+// and failLog: when the scenario fails the acceptance, the last 200 lines of the engine log since its start (no picture).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -38,11 +43,11 @@ import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
 import { AREAS, checkMarks, legacyScenario, marksOf } from './lib/scenario.mjs';
-import { budgetClock, displayRows, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowPasses, runPasses } from './lib/plan.mjs';
+import { budgetClock, dprMatches, needsFailLog, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowsFor, runPasses, scenarioResult, tailLines } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
 
-export { displayRows, rowPasses };
+export { displayRows, rowPasses } from './lib/plan.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
@@ -84,10 +89,10 @@ export async function loadLegacySet(set) {
 }
 
 /** the engine's stop of the page (its log and state), through lib/stop.mjs */
-async function engineStopOf(page, cdp, origin) {
+async function engineStopOf(page, cdp, origin, watchedExit = null) {
   const g = new Guest(page, cdp, origin);
   const lines = await g.ev('window.__app ? window.__app.engineLog() : []');
-  return stopOf(lines, (await g.state())?.exit ?? null);
+  return stopOf(lines, (await g.state())?.exit ?? watchedExit);
 }
 
 /** a scenario with a mark that passes (ok, and every counter 0) is warned about on stderr: its mark is to be removed (a failure is not raised by it) */
@@ -97,18 +102,33 @@ function warnIfPassed(out) {
   for (const m of marksOf(out.expectFail)) process.stderr.write(`warning: expectFail scenario passed: ${out.name} ${m}. remove the mark\n`);
 }
 
-function newResult(sc, repeat, d) {
-  return {
-    id: sc.id, name: sc.name ?? sc.id, area: sc.area, covers: sc.covers ?? [], repeat, expectFail: sc.expectFail ?? null, expect: sc.expect ?? null,
-    ok: false, pageErrors: 0, consoleErrors: 0, stuckToasts: 0, failedRequests: 0,
-    engineState: null, engineStops: 0, engineStuckRunning: false, engineRunningMaxMs: 0, engineStop: null, dumpRetries: 0, beginFrames: 0, beginFrameErrors: 0, error: null, notes: [], details: [], display: d.name,
-  };
+/** the page's DPR is the row's declared one (lib/plan.mjs dprMatches; the random row is not checked). A page at another DPR does not run the scenario: it throws, and the error says why */
+async function checkDpr(page, d, out) {
+  const got = await page.evaluate(() => window.devicePixelRatio);
+  out.dprOk = dprMatches(d.name, got);
+  if (out.dprOk === false) throw new Error(`the page's DPR is ${got}, the display ${d.name} declares ${d.dpr}: the scenario is not run`);
 }
 
+/** the engine log's tail of a scenario that fails the acceptance (failLog): the last lines since its start; none when it passes or is skipped */
+function attachFailLog(out, lines) {
+  if (needsFailLog(out)) out.failLog = tailLines(lines ?? []);
+}
+
+/** the engine log's position at the start of a scenario in a shared page: the count of lines and the page's load time (a scenario may reload the page) */
+const logMark = (guest) => guest.ev('({ n: window.__app ? window.__app.engineLog().length : 0, t: performance.timeOrigin })');
+
+/** the lines the page keeps since the mark: after a reload in the scenario the log is a new one (all of its lines are since the start), so it is read from 0 */
+const linesSince = (guest, mark) => guest.ev(`(() => {
+  const reloaded = performance.timeOrigin !== ${JSON.stringify(mark.t)};
+  const L = window.__app ? window.__app.engineLog() : [];
+  return { lines: L.slice(reloaded ? 0 : ${Number(mark.n)}), reloaded };
+})()`);
+
 /** one scenario of the older set: a page of its own (the start is the scenario's own) */
-async function runLegacy(sc, d, env) {
+async function runLegacy(sc, d, env, budget) {
   const { browser, browserCdp, delivery, shotsDir } = env;
-  const out = newResult(sc, 1, d);
+  const out = scenarioResult(sc, 1, d);
+  const t0 = Date.now();
   let pg = null, clock = null, sampler = null, watch = null, det = null, guest = null;
   const frames = { n: 0, s: 0 };
   try {
@@ -120,13 +140,14 @@ async function runLegacy(sc, d, env) {
     // a scenario that must act before the page's own scripts run (a permission state set for the load; a counter the page's load calls) has beforeLoad
     if (sc.beforeLoad) await sc.beforeLoad({ page: pg.page, browserCdp, browserContextId: pg.browserContextId, origin: delivery.origin });
     await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
+    await checkDpr(pg.page, d, out);
     await installToastWatch(pg.page);
     if (env.clock === 'begin') clock = await startFrameClock(pg.cdp);
     await installRafCounter(pg.page);
     sampler = startRafSampler(pg.page);
     watch = watchEngine(guest);
     log(`${sc.name} (${d.name}, DPR ${d.dpr}): started`);
-    const r = await sc.run({ guest, page: pg.page, cdp: pg.cdp, browserCdp, browserContextId: pg.browserContextId, origin: delivery.origin, repo, log: (m) => log(`  ${sc.name}: ${m}`) });
+    const r = await sc.run({ guest, page: pg.page, cdp: pg.cdp, browserCdp, browserContextId: pg.browserContextId, origin: delivery.origin, repo, budget, log: (m) => log(`  ${sc.name}: ${m}`) });
     out.ok = r.ok === true;
     out.engineState = r.engineState ?? null;
     out.notes = r.notes ?? [];
@@ -141,12 +162,6 @@ async function runLegacy(sc, d, env) {
     const eng = watch ? await watch.stop() : null;
     out.dumpRetries = guest ? guest.dumpRetries : 0;
     const stopped = eng !== null && (eng.stops > 0 || out.engineState === 'error' || out.engineState === 'exited');
-    if (env.logsDir && pg) {
-      const lines = await new Guest(pg.page, pg.cdp, delivery.origin).ev('window.__app ? window.__app.engineLog() : []').catch(() => []);
-      fs.mkdirSync(env.logsDir, { recursive: true });
-      fs.writeFileSync(path.join(env.logsDir, `${fileTag(d)}-${sc.name}.log`), `${lines.join('\n')}\n`);
-    }
-    if (stopped && pg) out.engineStop = await engineStopOf(pg.page, pg.cdp, delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
     const t = pg ? await toastState(pg.page).catch(() => ({ stuck: 0, ids: [] })) : { stuck: 0, ids: [] };
     out.stuckToasts = t.stuck;
     out.stuckIds = t.ids;
@@ -166,9 +181,17 @@ async function runLegacy(sc, d, env) {
     out.achievedFps = frames.s > 0 ? round2(frames.n / frames.s) : 0;
     out.rafFrames = frames.n;
     out.rafSeconds = round2(frames.s);
+    const lines = pg && (env.logsDir || needsFailLog(out)) ? await new Guest(pg.page, pg.cdp, delivery.origin).ev('window.__app ? window.__app.engineLog() : []').catch(() => []) : null;
+    if (env.logsDir && lines) {
+      fs.mkdirSync(env.logsDir, { recursive: true });
+      fs.writeFileSync(path.join(env.logsDir, `${fileTag(d)}-${sc.name}.log`), `${lines.join('\n')}\n`);
+    }
+    attachFailLog(out, lines);
+    if (stopped && pg) out.engineStop = await engineStopOf(pg.page, pg.cdp, delivery.origin, eng?.exit ?? null).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
     if (pg) await pg.context.close().catch(() => {});
+    out.ms = Date.now() - t0;
   }
-  log(`${sc.name} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}, fps ${out.achievedFps}`);
+  log(`${sc.name} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}, fps ${out.achievedFps}, ${out.ms} ms`);
   warnIfPassed(out);
   return { result: out, frames };
 }
@@ -201,8 +224,9 @@ async function closeShared(sh) {
 }
 
 /** one scenario in the shard's page: File > New first (an empty project), then the scenario; the counts are the scenario's own (the differences) */
-async function runShared(sc, repeat, d, env, sh, index) {
-  const out = newResult(sc, repeat, d);
+async function runShared(sc, repeat, d, env, sh, index, budget) {
+  const out = scenarioResult(sc, repeat, d);
+  const t0 = Date.now();
   // the file area (#1488): an engine that an earlier scenario of the page stopped would stop every later one; the page is loaded again first (the file area only)
   if (sc.area === 'file') {
     const st = await sh.guest.state().catch(() => null);
@@ -214,12 +238,13 @@ async function runShared(sc, repeat, d, env, sh, index) {
     }
   }
   const before = { pageErrors: sh.det.pageErrors, consoleErrors: sh.det.consoleErrors, failedRequests: sh.det.failedRequests, stops: sh.watch.w.stops, dumps: sh.guest.dumpRetries };
-  let logStart = 0;
+  let mark = { n: 0, t: null };
   try {
-    logStart = (await sh.guest.ev('window.__app ? window.__app.engineLog().length : 0')) ?? 0;
+    mark = await logMark(sh.guest);
     const reset = await resetProject(sh.guest);
     if (reset.left.length) out.notes.push(`after File > New, open: ${JSON.stringify(reset.left)}`);
-    const r = await sc.run({ guest: sh.guest, page: sh.pg.page, cdp: sh.pg.cdp, browserCdp: env.browserCdp, browserContextId: sh.pg.browserContextId, origin: env.delivery.origin, repo, log: (m) => log(`  ${sc.id}: ${m}`), index });
+    await checkDpr(sh.pg.page, d, out);
+    const r = await sc.run({ guest: sh.guest, page: sh.pg.page, cdp: sh.pg.cdp, browserCdp: env.browserCdp, browserContextId: sh.pg.browserContextId, origin: env.delivery.origin, repo, budget, log: (m) => log(`  ${sc.id}: ${m}`), index });
     out.ok = r.ok === true;
     out.engineState = r.engineState ?? null;
     out.notes.push(...(r.notes ?? []));
@@ -243,27 +268,25 @@ async function runShared(sc, repeat, d, env, sh, index) {
   if (t.info && t.info.length > 0) out.stuckInfo = t.info;
   out.details = sh.det.details.slice(-12);
   const stopped = out.engineStops > 0 || out.engineState === 'error' || out.engineState === 'exited';
-  if (stopped) out.engineStop = await engineStopOf(sh.pg.page, sh.pg.cdp, env.delivery.origin).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
-  if (env.logsDir) {
-    const lines = await sh.guest.ev(`window.__app ? window.__app.engineLog().slice(${logStart}) : []`).catch(() => []);
+  if (stopped) out.engineStop = await engineStopOf(sh.pg.page, sh.pg.cdp, env.delivery.origin, eng.exit).catch((e) => ({ error: String(e?.message ?? e).slice(0, 300), report: [] }));
+  out.ok = out.ok && out.error === null && out.engineStops === 0 && !eng.stuckRunning;
+  const since = env.logsDir || needsFailLog(out) ? await linesSince(sh.guest, mark).catch(() => null) : null;
+  const lines = since?.lines ?? null;
+  if (since?.reloaded) out.notes.push('the page was reloaded in the scenario: its engine log is the new one (the lines are from its load)');
+  if (env.logsDir && lines) {
     fs.mkdirSync(env.logsDir, { recursive: true });
     fs.writeFileSync(path.join(env.logsDir, `${fileTag(d)}-${sc.id.replace('/', '-')}.log`), `${lines.join('\n')}\n`);
   }
-  out.ok = out.ok && out.error === null && out.engineStops === 0 && !eng.stuckRunning;
+  attachFailLog(out, lines);
   if (env.shotsDir) {
     const dir = path.join(env.shotsDir, fileTag(d), sc.id.replace('/', '-'));
     fs.mkdirSync(dir, { recursive: true });
     await sh.guest.shot(path.join(dir, 'end.png')).catch(() => {});
   }
-  log(`${sc.id} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}`);
+  out.ms = Date.now() - t0;
+  log(`${sc.id} (${d.name}, DPR ${d.dpr}): ok ${out.ok}, engine ${out.engineState}, errors ${out.pageErrors}/${out.consoleErrors}/${out.failedRequests}, stuck ${out.stuckToasts}, ${out.ms} ms`);
   warnIfPassed(out);
   return out;
-}
-
-/** the rows of one display name, each with the scenarios of the plan that run in it: those whose displays include the name, or all of them when --displays names the displays */
-function rowsOf(name, items, explicit) {
-  const picked = items.filter((it) => explicit || it.sc.displays.includes(name));
-  return displayRows(name).map((d) => ({ d, items: picked }));
 }
 
 async function runRow(d, items, env, served, budget) {
@@ -282,20 +305,20 @@ async function runRow(d, items, env, served, budget) {
   let index = 0;
   try {
     for (const { sc, repeat } of items) {
-      if (budget.expired()) {
-        row.scenarios.push({ ...newResult(sc, repeat, d), skipped: true, ok: false });
-        log(`${sc.id}: skipped (the budget of ${budget.elapsedMs()} ms is past)`);
+      if (!budget.canStart(sc.needsMs)) {
+        row.scenarios.push({ ...scenarioResult(sc, repeat, d), skipped: true, ok: false });
+        log(`${sc.id}: skipped (the budget of ${d.name}: ${Math.round(budget.elapsedMs())} ms used, ${Math.round(budget.remainingMs())} ms left, the scenario needs ${sc.needsMs} ms)`);
         continue;
       }
       if (sc.kind === 'legacy') {
-        const { result, frames: f } = await runLegacy(sc, d, env);
+        const { result, frames: f } = await runLegacy(sc, d, env, budget);
         row.scenarios.push({ ...result, repeat });
         frames += f.n;
         seconds += f.s;
         continue;
       }
       if (sh === null) sh = await openShared(d, env);
-      row.scenarios.push(await runShared(sc, repeat, d, env, sh, index++));
+      row.scenarios.push(await runShared(sc, repeat, d, env, sh, index++, budget));
     }
   } catch (e) {
     row.error = `row ${d.name} (DPR ${d.dpr}): ${String(e?.stack ?? e).slice(0, 800)}`;
@@ -348,8 +371,9 @@ async function main() {
   const budgetMs = args.budget === undefined ? null : parseBudget(args.budget);
   const picked = planScenarios(all, { only, shard, repeat });
   if (picked.length === 0) throw new Error('no scenario is selected (check --area, --only, --shard)');
-  const explicit = args.displays !== undefined;
-  const names = explicit ? args.displays.split(',').map((s) => s.trim()).filter(Boolean) : [...new Set(picked.flatMap((p) => p.sc.displays))];
+  const names = args.displays !== undefined ? args.displays.split(',').map((s) => s.trim()).filter(Boolean) : [...new Set(picked.flatMap((p) => p.sc.displays))];
+  const plan = names.flatMap((name) => rowsFor(name, picked).filter((r) => r.items.length > 0));
+  if (plan.length === 0) throw new Error(`no selected scenario declares the displays ${names.join(', ')}`);
   const shotsDir = args.shots ? path.resolve(args.shots) : null;
   const logsDir = args['engine-logs'] ? path.resolve(args['engine-logs']) : null;
   if (!fs.existsSync(bundleDir)) throw new Error(`no bundle at ${bundleDir} (fe-build bundle)`);
@@ -357,7 +381,6 @@ async function main() {
   const wranglerDirs = [path.join(appDir, '.wrangler'), path.join(repo, '.wrangler')];
   const hadWrangler = wranglerDirs.map((d) => fs.existsSync(d));
   const env = { shotsDir, logsDir, clock: args.clock ?? 'raf', browser: null, browserCdp: null, delivery: null, served: null, setupError: null };
-  const budget = budgetClock(budgetMs);
   const rows = [];
   const expected = [];
   try {
@@ -376,13 +399,11 @@ async function main() {
       env.browser = await launchBrowser(env.clock, env.proxy.port);
       env.browserCdp = await env.browser.newBrowserCDPSession();
     }
-    for (const name of names) {
-      for (const { d, items } of rowsOf(name, picked, explicit)) {
-        expected.push(items.length);
-        const row = await runRow(d, items, env, env.served, budget);
-        rows.push(row);
-        process.stdout.write(`${JSON.stringify(row)}\n`);
-      }
+    for (const { d, items } of plan) {
+      expected.push(items.length);
+      const row = await runRow(d, items, env, env.served, budgetClock(budgetMs));
+      rows.push(row);
+      process.stdout.write(`${JSON.stringify(row)}\n`);
     }
   } catch (e) {
     log(`run: ${String(e?.stack ?? e)}`);
