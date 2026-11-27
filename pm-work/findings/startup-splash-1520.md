@@ -26,13 +26,13 @@
 
 - DLL の文字列(`lift/out-app/host/binaries/win64/FLEngine_x64.dll`): `SplashBox`(ASCII と UTF-16)、`NOSPLASH`・`SplashImage`・`SplashAnim`(UTF-16 のみ)。
 - 抑止の有無: 起動の引数は `lift/harness/web/pack.args` の `--args` に DLL の列だけで、`NOSPLASH` は無い。`GetCommandLineW` は仮想の DLL パス 1 つを返す(`lift/runtime/fle_env.c` の `fle_imp_GetCommandLineW`。引数無し)。レジストリの seed(`lift/harness/seeds/reg-seed-*.tsv`)に `SplashBox` は無い(`git grep` 0 件)。よって、読んだ範囲では抑止は無く、既定で表示される。harness も抑止していない。
-- 描画の関数: `lift/crates/fe-lift/src/imports_table.rs:763` の注釈では、`UpdateLayeredWindow`・`UpdateLayeredWindowIndirect` は `f_71e570`(`TLightweightLayeredControl`)から呼ばれる。**スプラッシュの描画の関数だと確かめたのは、注釈と、窓の記録・絵(2-2・2-4)による。逆アセンブルでは確かめていない**。
+- 描画の関数: `lift/runtime/fle_layered.h:2` と `lift/crates/fe-lift/src/imports_table.rs:763` の注釈では、`TLightweightLayeredControl`(`f_71e570`、番地 0x71e570)が `UpdateLayeredWindow`・`UpdateLayeredWindowIndirect` を呼ぶ。**確かめたのは、注釈と、窓の記録・絵(2-2・2-4)まで。実行時の呼び出し元の番地(`f_71e570` の中の、どの呼び出しかの確認)と、この関数がスプラッシュ専用の描画かどうかは確かめていない**(逆アセンブルも、呼び出し元の記録もしていない)。
 - 画像: seed に `Artwork\Wallpapers\Splash.png`(800 x 400、パレット)と `Artwork\Themes\DEDZII\dedzii_splash.png`(20000 x 569)がある。窓の 334 x 476 とは一致しない(画像そのものではなく、窓の中に描かれた絵)。ページは画像を読まない(`git grep -i splash -- app/` は 0 件。`<img>`・`background-image`・data URL も 0 件、E2E の (e))。
 
 ### 2-2. エンジンの記録(実測。DPR 1 の run)
 
-- 窓の表: 最初の可視の最上位窓は lid 8、class `TLightweightLayeredControl`(ログの 1256 行の後の表)。最初の idle は 4400 行の後。
-- 描画の呼び出し: ログ 1265 行 `[err] first non-background pixel on a drawing surface (decision 0126): written by UpdateLayeredWindowIndirect into the surface of top-level window lid 8`。
+- 窓の表(ログの 1257 行。1 始まり): 最初の可視の最上位窓は lid 8、class `TLightweightLayeredControl`、rect (1754, 843, 334 x 476)、visible 1、z 0、**thread 2**(TApplication の thread 0 とは別。FL が起動の間に作る窓の持ち主のスレッド)。最初の idle はログの 4400 行の後。
+- 描画の呼び出し(ログの 1266 行): `[err] first non-background pixel on a drawing surface (decision 0126): written by UpdateLayeredWindowIndirect into the surface of top-level window lid 8`。続く行: `surface of top-level window lid 8: 334 x 476 (BGRX 32-bit top-down), calls that wrote 1, non-zero pixels 57324 of 158984, distinct colours 12174`。描いた呼び出しは 1 回。
 - 描画の呼び出しは、最初の idle より前に、エンジン内で行われる。
 
 ### 2-3. 以前、canvas に出なかった理由(前回の読みと実測)
