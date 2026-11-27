@@ -191,7 +191,9 @@ static void get_module_handle(const char *api, int wide)
     uint64_t i;
 
     if (p == 0) {
-        R[0] = FLE_EXE_HANDLE;
+        /* Issue #1499 (段 B): on the thread of a program started by ShellExecute, the file that made the process is the program's image */
+        uint64_t prog = FLE_REALMOD_PRESENT() ? fle_realmod_running_base() : 0;
+        R[0] = prog != 0 ? prog : FLE_EXE_HANDLE;
         return;
     }
     for (;;) {

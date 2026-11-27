@@ -7,7 +7,7 @@ mod gen_all;
 
 fn usage() -> ExitCode {
     eprintln!("usage: fe-lift gen-all --modules TSV --fle-args FILE --host DIR --out DIR --split-bytes N [--omit-list FILE] [--extra-rows FILE]");
-    eprintln!("usage: fe-lift lift FILE OUT.c [--pdata] [--seeds SEEDS.txt] [--hook-points HOOKS.txt] [--site-overrides SITES.txt] [--hle-entries HLE.txt] [--swap-entries SWAP.txt] [--prune-list PRUNE.tsv] [--seh-handler RVA]... [--extra-imports ROWS.txt]");
+    eprintln!("usage: fe-lift lift FILE OUT.c [--pdata] [--reloc-seeds] [--rva-tables TABLES.txt] [--seeds SEEDS.txt] [--hook-points HOOKS.txt] [--site-overrides SITES.txt] [--hle-entries HLE.txt] [--swap-entries SWAP.txt] [--prune-list PRUNE.tsv] [--seh-handler RVA]... [--extra-imports ROWS.txt]");
     eprintln!("       fe-lift lift FILE PREFIX --split-bytes N [--omit-list OMIT.txt] (the units PREFIX-NN.c and PREFIX-tables.txt; OUT.c is not written)");
     ExitCode::from(64)
 }
@@ -19,6 +19,8 @@ fn usage() -> ExitCode {
 fn extra_seeds(
     data: &[u8],
     pdata: bool,
+    reloc_seeds: bool,
+    rva_tables: Option<&str>,
     seeds_file: Option<&str>,
     opts: &fe_decode::Options,
 ) -> Result<Vec<u64>, String> {
@@ -27,6 +29,17 @@ fn extra_seeds(
         let pe = fe_pe::Pe::parse(data).map_err(|e| e.to_string())?;
         v.extend(fe_decode::pdata_seeds(&pe)?);
         v.extend(fe_decode::adjustor::adjustor_seeds(&pe)?);
+    }
+    if reloc_seeds {
+        // Issue #1395 (--reloc-seeds): the code addresses a base relocation slot holds that have no .pdata entry (the same seeds as fe-wasmgen --reloc-seeds)
+        let pe = fe_pe::Pe::parse(data).map_err(|e| e.to_string())?;
+        v.extend(fe_decode::relocseeds::reloc_seeds(&pe)?.not_function);
+    }
+    if let Some(p) = rva_tables {
+        // Issue #1395 (--rva-tables): the entries of the switch tables of the file (the same seeds as fe-wasmgen --rva-tables)
+        let pe = fe_pe::Pe::parse(data).map_err(|e| e.to_string())?;
+        let tables = fe_decode::relocseeds::rva_tables(&std::fs::read_to_string(p).map_err(|e| format!("{p}: {e}"))?)?;
+        v.extend(fe_decode::relocseeds::rva_table_seeds(&pe, &tables)?);
     }
     if let Some(p) = seeds_file {
         let s = std::fs::read_to_string(p).map_err(|e| format!("{p}: {e}"))?;
@@ -93,6 +106,8 @@ fn run(
     input: &str,
     output: &str,
     pdata: bool,
+    reloc_seeds: bool,
+    rva_tables: Option<&str>,
     seeds_file: Option<&str>,
     hooks_file: Option<&str>,
     sites_file: Option<&str>,
@@ -105,7 +120,7 @@ fn run(
     split: Option<&fe_lift::split::Split>,
 ) -> Result<(), String> {
     let data = std::fs::read(input).map_err(|e| format!("{input}: {e}"))?;
-    let mut extra = extra_seeds(&data, pdata, seeds_file, opts)?;
+    let mut extra = extra_seeds(&data, pdata, reloc_seeds, rva_tables, seeds_file, opts)?;
     // Decision 0132: the except landings of the guest's exception handler(s) named by `--seh-handler` are function entries (seeds, last), and the functions that
     // hold them get the SEH entry wrapper. Without the option nothing here runs and the output is unchanged.
     let seh_l = if seh_handlers.is_empty() {
@@ -247,6 +262,8 @@ fn lift_main(args: &[String]) -> ExitCode {
         return usage();
     }
     let mut pdata = false;
+    let mut reloc_seeds = false;
+    let mut rva_tables: Option<&str> = None;
     let mut seeds_file: Option<&str> = None;
     let mut hooks_file: Option<&str> = None;
     let mut sites_file: Option<&str> = None;
@@ -263,6 +280,11 @@ fn lift_main(args: &[String]) -> ExitCode {
     while i < args.len() {
         match args[i].as_str() {
             "--pdata" => pdata = true,
+            "--reloc-seeds" => reloc_seeds = true,
+            "--rva-tables" if i + 1 < args.len() => {
+                rva_tables = Some(args[i + 1].as_str());
+                i += 1;
+            }
             "--seeds" if i + 1 < args.len() => {
                 seeds_file = Some(args[i + 1].as_str());
                 i += 1;
@@ -334,7 +356,7 @@ fn lift_main(args: &[String]) -> ExitCode {
         None => BTreeSet::new(),
     };
     let split = split_bytes.map(|max_bytes| fe_lift::split::Split { prefix: args[3].as_str(), max_bytes, omit: &omit });
-    match run(&args[2], &args[3], pdata, seeds_file, hooks_file, sites_file, hle_file, swap_file, prune_file, &seh_handlers, &opts, &gopt, split.as_ref()) {
+    match run(&args[2], &args[3], pdata, reloc_seeds, rva_tables, seeds_file, hooks_file, sites_file, hle_file, swap_file, prune_file, &seh_handlers, &opts, &gopt, split.as_ref()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("error: {e}");

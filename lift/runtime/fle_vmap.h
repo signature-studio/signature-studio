@@ -73,6 +73,7 @@ void fle_site_store32(uint64_t va, uint64_t addr, uint32_t expect, uint32_t nw);
  * DWORD sizeLow, LPCWSTR name). kernel32!MapViewOfFile: LPVOID f(HANDLE, DWORD access, DWORD offHigh, DWORD offLow,
  * SIZE_T bytes). kernel32!UnmapViewOfFile: BOOL f(LPCVOID). */
 void fle_imp_CreateFileMappingW(void);
+void fle_imp_OpenFileMappingW(void);
 void fle_imp_MapViewOfFile(void);
 void fle_imp_UnmapViewOfFile(void);
 

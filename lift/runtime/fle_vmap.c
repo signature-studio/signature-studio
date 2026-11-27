@@ -21,6 +21,7 @@
 #include "fle_sys.h"
 #include "fle_vfs.h"
 #include "fle_vmap.h"
+#include "fle_realmod.h"
 
 static long fle_vmap_owner_tid;
 
@@ -573,6 +574,9 @@ void fle_imp_VirtualProtect(void)
         ih_protect(api, m, addr, size, np, pold);
         return;
     }
+    /* Issue #1499 (段 B): a page of a program's image (fle_realmod.c) is not a registered image here, so its protection change stops by name (decision 0105) */
+    if (FLE_REALMOD_PRESENT() && fle_realmod_program_protect(addr, size) != 0)
+        fle_stop(api, "a protection change of a program's image: the program's code is patched by an inline hook (decision 0105); not modelled for a program's image (S-ia2-program-vprotect)");
     if (pold == 0) {
         fail(FLE_ERR_INVALID_PARAMETER_A, 0);
         return;
@@ -699,6 +703,19 @@ static void hook_once(void)
     if (hook_registered) return;
     fle_vfs_add_close_hook(vmap_close_hook);
     hook_registered = 1;
+}
+
+/* kernel32!OpenFileMappingW (Issue #1501,段 B: the Plugin Manager's start asks for a named mapping). HANDLE f(DWORD dwDesiredAccess ecx, BOOL bInheritHandle edx, LPCWSTR lpName r8). Learn: the function opens
+ * a named file mapping object; on failure the return value is NULL and GetLastError gives the reason (the page names no code for an unknown name; ERROR_FILE_NOT_FOUND (2) is the reading).
+ * A READING: a named object is never made by this runtime (CreateFileMappingW stops for a name), so no object of any name exists here and the call fails with ERROR_FILE_NOT_FOUND. The
+ * access mask and the inherit flag are not looked at. lpName NULL stops (the page does not define it). */
+void fle_imp_OpenFileMappingW(void)
+{
+    static const char api[] = "OpenFileMappingW";
+
+    fle_vmap_check_thread(api);
+    if (R[8] == 0) fle_stop(api, "lpName is NULL: the page does not define it");
+    fail(FLE_W32_ERR_FILE_NOT_FOUND, 0);
 }
 
 /* kernel32!CreateFileMappingW: HANDLE f(hFile rcx, lpFileMappingAttributes rdx, flProtect r8d, dwMaximumSizeHigh r9d,

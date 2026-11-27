@@ -414,7 +414,8 @@ export async function setDpr(ctx, value) {
   const st = stateOf(ctx.guest);
   if (!st.dprBase) st.dprBase = await ctx.guest.ev('({ w: window.innerWidth, h: window.innerHeight, d: window.devicePixelRatio })');
   const b = st.dprBase;
-  await ctx.cdp.send('Emulation.setDeviceMetricsOverride', { width: Math.round((b.w * b.d) / value), height: Math.round((b.h * b.d) / value), deviceScaleFactor: value, mobile: false });
+  // Guest.send: a CDP call that does not answer within 20 s is an error (a renderer that stopped does not answer; Issue #1528)
+  await ctx.guest.send('Emulation.setDeviceMetricsOverride', { width: Math.round((b.w * b.d) / value), height: Math.round((b.h * b.d) / value), deviceScaleFactor: value, mobile: false });
   await ctx.guest.waitFor(async () => (Math.abs((await ctx.guest.ev('window.devicePixelRatio')) - value) < 0.005 ? true : null), 20000, 'the ratio');
   await sleep(3000);
   return ctx.guest.ev('window.devicePixelRatio');
@@ -424,7 +425,7 @@ export async function setDpr(ctx, value) {
 export async function restoreDpr(ctx) {
   const b = stateOf(ctx.guest).dprBase;
   if (!b) return;
-  await ctx.cdp.send('Emulation.setDeviceMetricsOverride', { width: b.w, height: b.h, deviceScaleFactor: b.d, mobile: false });
+  await ctx.guest.send('Emulation.setDeviceMetricsOverride', { width: b.w, height: b.h, deviceScaleFactor: b.d, mobile: false });
   await ctx.guest.waitFor(async () => (Math.abs((await ctx.guest.ev('window.devicePixelRatio')) - b.d) < 0.005 ? true : null), 20000, 'the ratio back');
   await sleep(3000);
 }

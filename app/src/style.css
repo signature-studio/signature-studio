@@ -37,8 +37,11 @@ ul, ol { list-style: none; margin: 0; padding: 0; }
 #phases li[data-status="done"] { color: #b8e0b8; } #phases li[data-status="done"]::before { content: "\2713"; color: #8be28b; }
 #phases li[data-status="failed"] { color: #ff8b8b; } #phases li[data-status="failed"]::before { content: "\2717"; }
 #phases li small { display: block; color: #8a93a2; }
-#progress { margin-top: 6px; }
-#progress li { font-size: 12px; margin-bottom: 6px; } #progress progress { width: 100%; height: 8px; display: block; }
+/* Issue #1520: the start's modal, in the middle of the window over the black canvas, from the first paint until the engine starts (ui/loading-modal.ts removes it from the DOM) */
+#loading-modal { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2147482100; box-sizing: border-box; width: min(460px, calc(100vw - 32px)); padding: 16px 20px; background: #14161a; border: 1px solid #3a4150; box-shadow: 0 8px 32px rgba(0, 0, 0, .6); color: #d8dce2; font-size: 13px; }
+#loading-modal h2 { font-size: 14px; text-transform: none; letter-spacing: 0; color: #e8ecf2; margin: 0 0 10px; }
+#progress li { font-size: 12px; margin-bottom: 10px; } #progress li span { display: block; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#progress progress { width: 100%; height: 10px; display: block; }
 details { margin-top: 8px; border-top: 1px solid #2a2e36; padding-top: 6px; } summary { cursor: pointer; font-size: 12px; color: #aab2c0; }
 .scroll { max-height: 260px; overflow: auto; background: #0e1013; }
 #windows { border-collapse: collapse; font-size: 11px; width: 100%; } #windows th, #windows td { text-align: left; padding: 1px 6px; white-space: nowrap; } #windows th { position: sticky; top: 0; background: #1d2128; }

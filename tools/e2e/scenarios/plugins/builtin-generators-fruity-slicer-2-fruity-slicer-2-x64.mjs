@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-generators-fruity-slicer-2-fruity-slicer-2-x64',
   covers: ['plugins/generators/fruity-slicer-2-fruity-slicer-2-x64', 'plugins/window/generators-fruity-slicer-2-fruity-slicer-2-x64', 'plugins/param/generators-fruity-slicer-2-fruity-slicer-2-x64', 'plugins/audio/generators-fruity-slicer-2-fruity-slicer-2-x64', 'plugins/stop/generators-fruity-slicer-2-fruity-slicer-2-x64'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Fruity Slicer 2", kind: 'generators' });
   },

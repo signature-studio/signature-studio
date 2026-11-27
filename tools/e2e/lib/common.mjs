@@ -196,11 +196,13 @@ export async function startProject(guest) {
 }
 
 /**
- * File > New by its key (Ctrl+N): an empty project. The New project form (TNewProjForm, titled "Save as": the name and the place) takes Enter (its OK), which makes
- * the new project (the title becomes Project_1.flp). The trial window that comes after it (TInAppShopForm) is closed with Escape. Any other box the new project brings
- * up is closed with Escape (its own windows only: the base is the windows at the start). Escape on the form itself cancels the New (no project is made).
+ * File > New by its key (Ctrl+N): an empty project. With `newProject` (the File area's scenarios: run.mjs) the New project form (TNewProjForm, titled "Save as": the
+ * name and the place) takes Enter (its OK), which makes the new project (the title becomes Project_1.flp). The trial window that comes after it (TInAppShopForm) is
+ * closed with Escape. Any other box the new project brings up is closed with Escape (its own windows only: the base is the windows at the start).
+ * Without `newProject` the form is cancelled with Escape and the project stays: the trial window's web face stays over the desktop after its close (Issue #1531), and
+ * it takes the clicks of the desktop's centre for the rest of the page, so the other areas do not make a new project.
  */
-export async function resetProject(guest) {
+export async function resetProject(guest, { newProject = true } = {}) {
   await clearProblems(guest, { settleMs: 2000 });
   // a drop-down left by the last scenario takes the Enter of the New form, so it is closed first
   for (let i = 0; i < 4 && (await guest.windows()).some((x) => x.cls === POPUP); i++) {
@@ -211,14 +213,14 @@ export async function resetProject(guest) {
   await guest.focusDesktop();
   await guest.ctrl('KeyN', 'n', 78);
   const form = await waitWindow(guest, NEW_PROJECT_FORM, 8000);
-  if (form) {
+  if (form && newProject) {
     await guest.key('Enter', 'Enter', 13);
     await sleep(1500);
     await waitWindow(guest, SHOP_FORM, 4000);
   }
   const left = await closeNew(guest, base);
   await sleep(500);
-  return { form: form !== null, left: left.map((w) => ({ cls: w.cls, title: w.title })) };
+  return { form: form !== null, newProject, left: left.map((w) => ({ cls: w.cls, title: w.title })) };
 }
 
 /** the page reloaded: the start is run again (the usage box, the Welcome, the default project); returns the title before and after */
