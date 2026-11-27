@@ -157,3 +157,48 @@ runner の値。この機械とは別枠。nproc 4。loadavg は作業の開始�
 - 6 未完了: 受け入れは通らず。起動確認は 13,251 ms(上限 12,500 ms)。この runner では 3 回とも 13.2 秒前後で、段 A の 9,187 ms とは別の runner。今回の変更は起動の経路に入らないが、同じ版での基準は取っていない(未確認)。`plugin-manager-opens` は両表示で失敗。
 
 次の一手(段 B の続き): (1) exe のコードへの書き換え(inline hook)を、決定 0105 の注釈つきの hook 点として扱うか、exe の入口の前に起きる書き換えの元を特定する。(2) `GetFileVersionInfoSizeW`/`GetFileVersionInfoW`/`VerQueryValueW` を、exe の RT_VERSION 資源から答える(決定 0098 の拡張)。(3) 窓が出た後に、Plugin Manager の窓のクラスと題名を、この表に書く。
+
+## 11. 段 B(#1501)の再試行: 受理
+
+判定: 受理(受け入れの全部が通った。窓は出て、engine は 10 秒 engine-idle のまま)。
+
+実エンジン: この runner(nproc 4。作業の終わりの loadavg 1.34 2.70 2.71)で、`fe-build engine`・`fe-build bundle`・`boot-bundle`・`welcome-flow`・`npm test --prefix app`・`run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2`・`judge.jq`・`guard/scan.sh` を実行し、出力を観測した。加えて `spec/workflow.test.sh`(602 ok)・`spec/guard.test.sh`(104 ok)を通した。runner の値。この機械とは別枠。
+
+(a) 起動の要求の経路(観測): Options の 6 番目(Down x 6・Enter)で呼ばれたのは `ShellExecuteW`(verb `open`、lpFile は exe の完全なパス、parameters は ` -flpath "C:\Program Files\Image-Line\FL Studio 21\" -flcaption "FL Studio 2026" -deepscan`)。`ShellExecuteExW`・`CreateProcessW` は観測されなかった。engine のログの行: `[err] fle: ShellExecuteW starts the program "C:\Program Files\Image-Line\FL Studio 21\System\Tools\Plugin Manager\PluginManager.exe" as a thread of this engine (verb "open"; parameters " -flpath ..." are its command line's; the directory is not passed on; S-ia2-program-start)`。走ったゲストのスレッドは協調スレッド 1 本(`fle_thread_spawn`)で、本体は exe の AddressOfEntryPoint を引数なしで呼ぶ。exe の `ExitProcess` はそのスレッドだけを終える(engine は止めない)。この run では exe は終了せず、窓が残った。
+
+(b) 論点ごとの理由:
+- `GetModuleHandle(NULL)`: exe のスレッドからは exe の基底(段 B の前回の判断どおり。exe の起動は自分の資源を `FindResource` で読む)。
+- `ExitProcess`: exe のスレッドからは、そのスレッドだけを終える。
+- `hProcess`: `SEE_MASK_NOCLOSEPROCESS` のときだけ、exe のスレッドのハンドル。`GetExitCodeProcess` は未実装のまま(観測されていない)。
+- コマンドライン: exe のスレッドの `GetCommandLineW/A` は `"<path>"` と ShellExecute の parameters。カレントディレクトリは engine のまま(lpDirectory は観測されず、未対応)。
+- 戻り値: 成功は 33。動詞が NULL か `open` で、パスが VFS に在る exe の時だけ。それ以外は従来どおり 31(決定 `S-ia2-shellexecute-noassoc` の変更範囲は exe だけ)。
+
+今回の再試行で足したもの(この作業の差分。commit `95cd4fde`・`4e9239b0`・`80f269da`):
+- 方式の hook 点(exe の Delphi RTL の inline hook)。`lift/plugins/plugin-manager/plugin.tsv` の hook 列は `rva:0x1b650,0x38f50,0x38f70`。根拠は objdump の逆アセンブル: 5f6e00 が 3 つの hook 対象(0x9dd0a8・0x9dd0b0・0x9dd0b8)を据え、5fa97b・5fa9ac・5fa9cb が、それぞれ r8 = 0x41b650・0x438f50・0x438f70(原像の VA。ImageBase 0x400000 からの RVA は 0x1b650・0x38f50・0x38f70)、r9 = 0x5f1280・0x5f1170・0x5f11e0(差し替え先)で、5f6cf0 が `VirtualProtect(target, 5, 0x40, &old)` を呼ぶ。先頭 5 バイトは 55 56 53 c6 44・53 48 83 ec 20・55 48 83 ec 50 で、`lift/harness/hooks/fruity-delphi-effect-hook-points.txt` と同じ 3 種の型。段 B の前回の止めの 0xcf98f50・0xcf98f70 は、この 2 つ(base 0xcf60000 + RVA)。
+- exe の RT_VERSION: `GetFileVersionInfoSizeW`・`GetFileVersionInfoW` は、起動した exe のパスに対して、その image の RT_VERSION を答える(`fle_res_version_block_of`。決定 0129 の engine の版と同じ扱い)。
+- `PathCanonicalizeW`(新規。Learn の規則: "." は飛ばし、".." は前の区切りを消す。根の区切りは消さない。例 4 件と `C:\..` を standalone で照合した)。
+- `OpenFileMappingW`(新規。名前付きの物は run の中に作られない(CreateFileMappingW は名前で止まる)ので、ERROR_FILE_NOT_FOUND)。
+- `memset`(新規。C の定義どおり)。
+- `CreateMutexW`・`ReleaseMutex`(新規。event の表の自動リセットの物。初めは信号。名前は run の間だけ覚え、二度目は ERROR_ALREADY_EXISTS。読みの選択: bInitialOwner は使わない)。
+- `TextOutW`(新規の名前付きの停止。`GDI_TEXT_STOP`。文字の描画は決定 0111 のとおり未対応のまま)。
+- `lift/harness/hyb/c-imports-engine.txt`: 75 行を足した(73 行は exe の thunk が「C で答えられる」と分かる名前。C の実装が在るもの。CreateMutexW・ReleaseMutex の 2 行を含む。engine の他の関数の下ろし方も変わる。同じ C の関数を呼ぶので意味は変えないが、差は実測では見ていない)。足さなかった 15 件(`ShellExecuteA`・`ShellExecuteW`・タイマー・`MessageBoxW`・`TrackPopupMenu`・`DoDragDrop`・`CallNextHookEx`・`SendMessageA`・`DispatchMessageA`・`EnumSystemLocalesW`・OLE のクリップボード): スレッド・モーダルの待ち・コールバックを含み、wasm に下ろすと協調スレッドの中断の問題(#1515 の形)が起きうるため。exe の thunk がそれらに届いたら、名前付きでなく "unsupported" で止まる。
+
+(c) 窓の表: 窓が出た。クラス `TFLStudioPluginScannerMainForm`、題名 `FL Studio Plugin Manager v0.0`(E2E の notes。両表示)。題名の `v0.0` は未確認: この run では exe 自身の GetFileVersionInfo は呼ばれておらず(ログに出るのは FL64.exe の分だけ)、exe がどこから版を読むかは確かめていない。
+
+(d) 流れ A〜D(最後の bundle。runner の値): 4 行とも error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true。B と D は welcomeClosed true。elapsedMs 11,906・11,985・11,940・11,738。起動確認(boot.json)は engine-idle・standIn false・error null・elapsedMs 12,229。
+
+(e) `plugin-manager-opens`(両表示): 両方 ok true・expectFail null・engineStops 0・engine-idle(10 秒)。E2E smoke の judge.jq は通った(true)。`npm test --prefix app` は 76 files passed・1 skipped(1,470 passed・10 skipped)。`guard/scan.sh` は 0 finding。
+
+(f) やること 1〜6 の進み:
+- 1 完了(manifest の lazy に exe と wasm)。
+- 2 完了(上の (a))。
+- 3 完了: exe の入口を同じ engine の協調スレッドで走らせ、(b) の論点を決めた。今回の差分で、exe の RTL の hook 点・RT_VERSION・上の 5 つの API を足した。
+- 4 完了: 窓が窓の表に出た(c)。
+- 5 完了: smoke の `plugin-manager-opens` の印は外れている(前回の差分)。e2e-full の `tools/e2e/scenarios/plugins/plugin-manager-opens.mjs` は非ゲートのまま印 `#1499` が残っている(生成物。`_generate.mjs` の由来。受け入れの外)。
+- 6 完了: 受け入れが通った。
+
+残り(未確認・未着手):
+- 文字の描画(ExtTextOutW・DrawTextW・TextOutW・GetTextExtentPoint32W・GetTextMetricsW)は、決定 0111 のとおり名前付きの停止のまま。この run では、exe の窓がこれらを呼ぶ前に窓の表に出た(停止は出なかった)。窓の中身が描かれるかは未確認。
+- 未実装の import(この exe の 576 件のうち、C の定義が runtime に無いもの。CreateMutexW を足した後で約 45 件): 例 `AddVectoredExceptionHandler`・`AssignProcessToJobObject`・`CreateProcessW`・`GetExitCodeProcess`・`GlobalSize`・`GlobalDeleteAtom`・`HeapDestroy`・`IsBadWritePtr`・`SetEndOfFile`・`VirtualQueryEx`・`RtlUnwind`。届いたら、thunk の場合は名前の付いた停止ではなく "unsupported" で止まる。
+- 題名の `v0.0`(c)。
+- exe の `0x73c670`(8 バイトを書く別の hook の経路。VirtualProtect の大きさが 8)は、この run では届いていない。届いたら、ih_protect の規則(5 バイトの hook 点だけ答える)で止まる。
