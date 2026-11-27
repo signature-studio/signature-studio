@@ -202,8 +202,8 @@ export async function startProject(guest) {
  * Without `newProject` the form is cancelled with Escape and the project stays: the trial window's web face stays over the desktop after its close (Issue #1531), and
  * it takes the clicks of the desktop's centre for the rest of the page, so the other areas do not make a new project.
  */
-export async function resetProject(guest, { newProject = true } = {}) {
-  await clearProblems(guest, { settleMs: 2000 });
+export async function resetProject(guest, { newProject = true, settleMs = 2000 } = {}) {
+  await clearProblems(guest, { settleMs });
   // a drop-down left by the last scenario takes the Enter of the New form, so it is closed first
   for (let i = 0; i < 4 && (await guest.windows()).some((x) => x.cls === POPUP); i++) {
     await guest.escape();
