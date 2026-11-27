@@ -5,6 +5,7 @@
 # 2) タスクの受け入れコマンド(タスクのファイルの「accept: 」の行)が 0 で終わる。行が無いタスクは、この段を飛ばす。受け入れが boot.json を使うときは、失敗の原因の手がかり(起動確認の結果の 4 項目)を、失敗の直前に 1 行で出す
 # 3) BASE からの変更ファイルに、依頼者の決まりへの違反が無い(scan.sh、flags.sh)
 # 4) ハーネス(tools/・guard/・spec/・.github/・opencode.jsonc)を変えたなら、BASE に在る spec/guard.test.sh・spec/workflow.test.sh・spec/driver.test.sh を実行する。判定の中の spec は、判定を呼び直さない
+# 2) の前に、木に無い内蔵のプラグインの DLL を置く(tools/place-plugin-dlls.mjs。失敗しても止めず、行を判定の出力に残す)
 # 既知の限界: 4) の spec は作業者の作業ツリーの版で走る。作業者が spec を弱めれば、それを通す。
 base=${1:?usage: guard/judge.sh BASE TASKFILE}; task=${2:?usage: guard/judge.sh BASE TASKFILE}
 here=$(cd "$(dirname "$0")" && pwd)
@@ -23,6 +24,8 @@ accept_report() {
     echo "judge: 起動確認の結果が読めない: $(head -c 300 "$RUNNER_TEMP/boot.json" | tr '\n\r' '  ' | sed 's/ *$//')"
   fi
 }
+# 受け入れの前に、取った内蔵のプラグインの DLL を木に置く(tools/place-plugin-dlls.mjs があるときだけ)。失敗しても判定は続き、受け入れの結果で決まる。行は判定の出力に残す
+if [ -f tools/place-plugin-dlls.mjs ]; then node tools/place-plugin-dlls.mjs || echo "judge: 木に無い DLL が在る、または置けなかった(上の行。missing は源が無い物、mismatch は sha256 が違う物)"; fi
 if [ -n "$cmd" ]; then
   if [ -n "${RUNNER_TEMP:-}" ]; then rm -f "$RUNNER_TEMP/boot.json"; fi
   bash -c "$cmd" || { accept_report "$cmd"; echo "judge: 受け入れコマンドが失敗した"; exit 1; }

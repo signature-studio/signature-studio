@@ -49,3 +49,9 @@
 
 ## (g) Vocodex の入れ子の Data(PM の決定)
 Vocodex の `Synthesizer\Data\`(26 件・55,452 B)は、入れ子の本体 `Sytrus_x64.dll` の Data で、同じプラグインの中で要求される。#1461 の `lift/plugins/vocodex/data.tsv` に含める(54 行・443,736 B)。#1461 の本文は直した。下書き 068 は再生成すると戻るので、再生成する時は、この節に合わせて直す。
+
+## (h) 木に無い DLL(#1370 の連鎖の対策)
+
+- 束の受け入れは、`fe-build engine` の前に、作業の木へ自分の束の DLL を置く(`node tools/place-plugin-dlls.mjs`。`plugin-builtin` の作業は `lift/out-app/host-extra/plugins/` から sha256 で照合して複写する)。束の行は同じ job で足すので、job 開始時の抽出の木には無い。第 2 波の 041 の本文の受け入れ(`pm-work/issue-drafts/wave2/041-effects-01.md`)は、この手順を持たない(直していない。推定では、作業者の受け入れは plugins の段で止まる。実測ではない)。
+- 判定(`guard/judge.sh`)は、受け入れの前に同じ道具を呼び、作業の木にある他の束の DLL も置く。判定は main を取り込まない(取り込みは push の段の pull だけで、その後に受け入れは走らない)ので、置くのは作業ツリーの行の分。道具が 1 で終わっても判定は続き、受け入れの結果で決まる。
+- 限界: `host-extra/plugins` の外の DLL(`Shared\` など)は置けない(skipped)。その行の DLL は、抽出の木の作り直しでしか入らない。

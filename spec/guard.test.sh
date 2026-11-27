@@ -250,6 +250,16 @@ FAKE
   printf '2\n' > "$H3/tools/x.mjs"; git -C "$H3" commit -qam s9; printf '1\n' > "$T/rc-workflow.test.sh"; rm -f "$T/spec-runs.log"
   ( cd "$H3" && out=$(FAKE_T="$T" FAKE_G="$g" bash "$g/judge.sh" "$H3B" "$T/task-ok.md" 2>&1); echo "$?" > "$T/jrc"; printf '%s\n' "$out" > "$T/jout" )
   ok "判定: spec/workflow.test.sh が BASE に在るとき、ハーネスの変更で走り、失敗すれば落ちて名指しする" "$(cat "$T/jrc")/$(grep -c 'judge: ハーネスの変更がテストに通らない(spec/workflow.test.sh)' "$T/jout")/$(grep -c 'workflow.test.sh' "$T/spec-runs.log" 2>/dev/null)" 1/1/1
+  # 判定は、受け入れの前に、木へ内蔵のプラグインの DLL を置く道具(tools/place-plugin-dlls.mjs)を 1 回呼ぶ。道具が 1 で終わっても判定は続き、受け入れの結果で通る。偽の道具で確かめる
+  pd=$T/pd; rm -rf "$pd"; mkdir -p "$pd/tools"; git -C "$pd" init -q; printf 'x\n' > "$pd/a.txt"; git -C "$pd" add -A; git -C "$pd" commit -qm pdbase; PDB=$(git -C "$pd" rev-parse HEAD)
+  printf '%s\n' 'import fs from "node:fs"; fs.appendFileSync(process.env.PD_ORDER, "tool\n"); console.error("place-plugin-dlls: missing x"); process.exit(1);' > "$pd/tools/place-plugin-dlls.mjs"
+  printf 'y\n' > "$pd/b.txt"; git -C "$pd" add -A; git -C "$pd" commit -qm pdhead
+  printf 'accept: echo accept >> "%s"\n' "$T/pd-order" > "$T/task-pd.md"
+  rm -f "$T/pd-order"; ( cd "$pd" && out=$(PD_ORDER="$T/pd-order" bash "$g/judge.sh" "$PDB" "$T/task-pd.md" 2>&1); echo "$?" > "$T/pdrc"; printf '%s\n' "$out" > "$T/pdout" )
+  ok "判定: 受け入れの前に、道具 tools/place-plugin-dlls.mjs を 1 回呼ぶ(受け入れは道具の後に走る)" "$(paste -sd' ' "$T/pd-order" 2>/dev/null)" "tool accept"
+  ok "判定: 道具が 1 で終わっても、判定は受け入れの結果で通り、道具の行と、木に無い DLL の 1 行を出す" "$(cat "$T/pdrc")/$(grep -c 'place-plugin-dlls: missing x' "$T/pdout")/$(grep -c '木に無い DLL' "$T/pdout")/$(tail -n 1 "$T/pdout")" "0/1/1/judge: 通った"
+  # 道具が無いリポジトリ(従来の作業)では、呼ばずに通る(道具の行は出ない)
+  ( cd "$R" && out=$(bash "$g/judge.sh" "$base" "$T/task-ok.md" 2>&1); ok "判定: 道具が無い作業では、道具の行を出さず従来どおり通る" "$(grep -c 'place-plugin-dlls\|木に無い DLL' <<<"$out")/$(tail -n 1 <<<"$out")" "0/judge: 通った" )
 else
   echo "FAIL flags・judge: 環境に git の名義が無い(判定の検査は名義が要る。skip して通さない)"; fail=1
 fi
