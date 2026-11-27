@@ -21,7 +21,8 @@
 //   --engine-logs DIR: a test aid, the engine log of each scenario (the lines the page keeps, from the scenario's start) is written to DIR/<display>-<dpr>-<id>.log.
 //   --report-only: the run reports and does not judge the scenarios. Exit 0 when every row is printed with all its scenario lines and its error is null (runPasses), whatever the scenarios' ok and counters
 //     (the caller checks the rows' structure, e.g. servedHeadersMatch). A row or line missing, or an error (the setup, a row), still exits 1. The log says 'report-only: exit 0'.
-// A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
+// A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject: an empty project in the file area,
+// the project kept in the other areas, Issue #1531). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
 // Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq, lib/plan.mjs scenarioPasses): servedHeadersMatch; the scenarios; no scenario is skipped;
 // each scenario has dprOk not false (its page is at the row's DPR); each scenario that has no expectFail is ok with 0 pageErrors, 0 consoleErrors, 0 stuckToasts and 0 failedRequests;
@@ -241,7 +242,7 @@ async function runShared(sc, repeat, d, env, sh, index, budget) {
   let mark = { n: 0, t: null };
   try {
     mark = await logMark(sh.guest);
-    const reset = await resetProject(sh.guest);
+    const reset = await resetProject(sh.guest, { newProject: sc.area === 'file' });
     if (reset.left.length) out.notes.push(`after File > New, open: ${JSON.stringify(reset.left)}`);
     await checkDpr(sh.pg.page, d, out);
     const r = await sc.run({ guest: sh.guest, page: sh.pg.page, cdp: sh.pg.cdp, browserCdp: env.browserCdp, browserContextId: sh.pg.browserContextId, origin: env.delivery.origin, repo, budget, log: (m) => log(`  ${sc.id}: ${m}`), index });
