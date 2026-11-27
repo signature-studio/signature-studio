@@ -1,16 +1,16 @@
-// plugins/position-effects-fruity-filter-fruity-filter-x64: the window of Fruity Filter lies inside the desktop (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
+// plugins/position-effects-fruity-filter-fruity-filter-x64: the window of Fruity Filter lies inside the desktop, after the plugin is put into Mixer Insert 1 from the Plugin database (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
 import { defineScenario } from '../../lib/scenario.mjs';
-import { openPluginDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
+import { insertFromDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
 
 export default defineScenario({
   id: 'plugins/position-effects-fruity-filter-fruity-filter-x64',
   covers: ['plugins/window/effects-fruity-filter-fruity-filter-x64'],
   displays: ['4k-dpr1', '4k-random'],
-  expectFail: '#1484',
+  expectFail: '#1535',
   async run({ guest }) {
-    const db = await openPluginDatabase(guest);
-    if (!db.opened) return { ok: false, notes: [`the picker did not open (${db.error})`] };
+    const ins = await insertFromDatabase(guest, "Fruity Filter");
+    if (!ins.ok) return { ok: false, engineState: (await guest.state())?.state ?? null, notes: ins.notes, results: ins.results };
     const r = await pluginInDesktop(guest, "Fruity Filter");
-    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: r.notes };
+    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: [...ins.notes, ...r.notes], results: ins.results };
   },
 });
