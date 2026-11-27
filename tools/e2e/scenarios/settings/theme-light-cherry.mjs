@@ -5,7 +5,7 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/theme-light-cherry',
   covers: ["settings/theme/light-cherry","settings/list/theme-tquickstringgrid-1"],
-  displays: ["4k-dpr1"],
+  displays: ["4k-dpr1", "4k-dpr2"],
   expectFail: null,
   run(ctx) {
     return S.themeRun(ctx, "Light cherry", 3, 0);
