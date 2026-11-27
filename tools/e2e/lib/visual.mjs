@@ -315,7 +315,7 @@ async function gridProfileNow(guest, g) {
 }
 
 /** the guest point of a tile: in the top view when it is shown there; else the grid is scrolled to the bottom and the tile is at its content minus the measured shift */
-async function tilePoint(guest, g, sr, k) {
+export async function tilePoint(guest, g, sr, k) {
   const colW = g.w / 3;
   const cx = g.x + ((k % 3) + 0.5) * colW;
   const content = g.y + Math.floor(k / 3) * colW * TILE_PITCH + TILE_IMAGE_DY;
