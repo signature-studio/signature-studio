@@ -14,7 +14,7 @@ import type { FileDlgAnswer, FileDlgItem, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
 import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
 import { sceneGen } from './desk-gl.ts';
-import { DeskGate } from './desk-link.ts';
+import { DeskGate, PRESENTER_NONE, PRESENTER_SCENE } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
 import { IN, SC } from '../input/events.ts';
 import { openRegState, REG_STATE_LIMIT, type RegState } from './regstore.ts';
@@ -231,6 +231,7 @@ function readSettled(ptr: number, max: number): number {
   return (settledView as Int32Array)[(ptr >> 2) + max * RING_REC] ?? 0;
 }
 function inputPoll(ptr: number, max: number): number {
+  deskPoll();   // Issue #1520: before the driver exists too (the start-up): the picture is shown at the scheduler's points
   const d = driver, mem = fruity?.memory;
   if (!ring || !d || !d.ready || !mem) return 0;
   if (d.awaitingCount > 0 && inlineSince !== 0 && !inlineSettled && readSettled(ptr, max) === 1) inlineSettled = true;
@@ -298,6 +299,7 @@ function reportIdle(n: number, nowTicks: number, nextTicks: number, busyMs: numb
 // the engine is waiting: then let the driver decide (give queued input, or wait for the engine's next deadline). The picture is not composed here (C-2): the render Worker asks for it (onRender 'want'), and its own frame loop
 // is not held back by the engine's business, which is what the idle used to do with a compose every 20 ms while nothing moved
 function onEngineIdle(n: number, nowTicks: number, nextTicks: number): void {
+  idleAt = performance.now();
   const ck = trace.push(n, nowTicks, nextTicks);
   if (ck) checkpoints.push(ck);
   flushLogs();
@@ -464,7 +466,7 @@ function onRender(m: RenderToEngine): void {
   switch (m.cmd) {
     case 'want': sendDeskReady(); deskTick(true); break;
     case 'resync': compositor()?.resync(); break;
-    case 'scene-mode': { const api = compositor(); if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; } break; }
+    case 'scene-mode': sceneOn(); break;
     case 'pixels': { const d = pendingDump; pendingDump = null; if (d !== null) post({ t: 'desk-dump', width: m.width, height: m.height, data: m.data, windows: d }, [m.data]); break; }
     case 'pixels-error': pendingDump = null; post({ t: 'desk-dump-error', message: m.message }); break;
   }
@@ -530,6 +532,30 @@ function deskTick(reply: boolean, seqs?: number[]): boolean {
     if (tb !== null) post({ t: 'taskbar', lid: tb });
   }
   return changed;
+}
+
+/** decision 0240: the scene mode is on, once (the render Worker's WebGL2 presenter reads the description, not the picture) */
+function sceneOn(): void {
+  const api = compositor();
+  if (api && api.scene && api.sceneMode && !deskScene) { api.sceneMode(1); deskScene = true; }
+}
+
+// Issue #1520: the picture is shown while the engine runs without an idle (a start-up, a long run). The render Worker's question is answered only at the engine's idle, so the scheduler's points
+// (inputPoll) bring the picture up to date too: at most every DESK_POLL_MS, and only when no idle came for that long (at an idle the render Worker's own question does it). A compose waits for a presenter
+// to exist (the shared block says which): the first one must show the whole picture, and nothing composed before it would be shown.
+const DESK_POLL_MS = 50;
+let deskPollAt = -Infinity;
+let idleAt = -Infinity;
+function deskPoll(): void {
+  const t = performance.now();
+  if (t - deskPollAt < DESK_POLL_MS || t - idleAt < DESK_POLL_MS) return;
+  deskPollAt = t;
+  if (!port || !gate || !fruity) return;
+  sendDeskReady();
+  const mode = gate.presenter;
+  if (!deskReady || mode === PRESENTER_NONE) return;
+  if (mode === PRESENTER_SCENE) sceneOn();
+  try { deskTick(false); } catch (e) { log('error', `desktop present failed: ${String((e as Error)?.stack ?? e)}`); }
 }
 
 /** #1392: the picture of a cursor the guest loaded from one of its modules or made with CreateIconIndirect, read now (before the osstate that names the handle, which is posted when the key changes: a handle number can be made again for another cursor, so it is not kept) */

@@ -30,7 +30,7 @@ node tools/e2e/run.mjs --list
 | `--list` | 起動しない。領域ごとに 1 行の JSON: `{"area","scenarios","covers","features"}`(`--area` を付けると、その 1 行)。 |
 | `--shard i/n` | シナリオの ID を昇順に並べ、`index % n === i - 1` のものを動かす(決定的)。 |
 | `--repeat n` | 選んだ各シナリオを n 回動かす(行の各シナリオに `repeat`)。 |
-| `--only ID[,ID]` | 領域の ID(`page/canvas-fills-viewport`)か、旧い名前(`file-open-demo`)。 |
+| `--only ID[,ID]` | 領域の ID(`page/canvas-fills-viewport`)か、旧い名前(`file-open-demo`)。領域の ID は `--area` を省いても、その領域の全件から選ぶ(`--scenarios` を付けないとき。#1520)。 |
 | `--budget 40m` | 単位 `s`・`m`・`h`。予算は表示の行ごとに 1 つ(行ごとに時計を作る)。行の予算が過ぎたら、新しいシナリオを始めない。残りが、シナリオの `needsMs`(例 `resilience/wait-idle-30min` は 30 分)より少なければ、始めない。始めなかったものは `skipped: true`(その行は受け入れない)。 |
 | `--displays` | 行(表示)の選択。`4k-dpr1`(3840 x 2160 CSS px、DPR 1)、`4k-dpr2`(1920 x 1080、DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ)、`dpr:<数>`(例 `dpr:1.25`。CSS px は 3840 ÷ DPR、2160 ÷ DPR)。シナリオは、宣言の `displays` にその表示が在る物だけ、その行で動く。`--displays` はシナリオを広げない。 |
 | `--report-only` | 結果を報告するだけで、シナリオの ok・カウンター・停止・DPR では落とさない。全ての行が出て(シナリオの行の数が揃い)、行の `error` が null なら終了コード 0。行や行の欠け・`error` は、従来どおり 1。ログに `report-only: exit 0`。行の構造(`servedHeadersMatch` など)は、呼び出す側が見る(受け入れの `node -e`)。 |
