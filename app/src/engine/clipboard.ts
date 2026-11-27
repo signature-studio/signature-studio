@@ -7,8 +7,8 @@
 //  - a GetClipboardData right after a right button release is FL's right-click question (the knob's menu checks its value): it reads nothing either (#1406). It gets the text
 //    the page knows; with none it gets PLACEHOLDER (a 'denied' page gets no text).
 // The permission (#1482): at the page's load the browser's state of 'clipboard-read' is read; under 'prompt' (and under 'granted', which keeps the text the page knows up to date)
-// readText is called once, which asks the person under 'prompt'. A request the browser refuses (the document has no focus, ...) is made again at the first press or key.
-// Under 'granted' the text is read again when the window gets the focus. A right click never reads or asks.
+// readText is called once, which asks the person under 'prompt'. A request the browser refuses (the document has no focus, ...) is made again at the first left press or key.
+// Under 'granted' the text is read again when the window gets the focus, unless the right button is down. A right click never reads or asks (#1503).
 // The browser decides what the page may do: navigator.permissions gives the state of 'clipboard-read' and 'clipboard-write'. The engine is not stopped by any of this.
 
 export type ClipboardPermission = 'clipboard-read' | 'clipboard-write';
@@ -52,13 +52,15 @@ export class PageClipboard {
   /** the text the page knows: a read's text, a Copy's text (null: none yet) */
   private known: string | null = null;
   private lastButton: { button: number; at: number } | null = null;
-  /** the request made at the load was refused by the browser: the first press or key makes it again (once) */
+  /** the request made at the load was refused by the browser: the first left press or key makes it again (once) */
   private askAgain = false;
+  /** the right button is down (pressed, not yet released): nothing is read meanwhile (#1503) */
+  private rightDown = false;
 
   /** the page's listeners: the right button's release (the question's clock), a press or key that ends a question, and the window's focus */
   attach(win: Window): void {
-    win.addEventListener('pointerdown', () => { this.lastButton = null; void this.firstAction(); }, true);
-    win.addEventListener('pointerup', (e) => { this.lastButton = { button: e.button, at: performance.now() }; }, true);
+    win.addEventListener('pointerdown', (e) => { this.lastButton = null; this.rightDown = e.button === 2; if (!this.rightDown) void this.firstAction(); }, true);
+    win.addEventListener('pointerup', (e) => { this.lastButton = { button: e.button, at: performance.now() }; this.rightDown = false; }, true);
     win.addEventListener('keydown', () => { this.lastButton = null; void this.firstAction(); }, true);
     win.addEventListener('focus', () => { void this.onFocus(); });
   }
@@ -148,16 +150,16 @@ export class PageClipboard {
     }
   }
 
-  /** the first press or key of the page: a request the browser refused at the load is made again, once, when the permission is still 'prompt' */
+  /** the first left press or key of the page: a request the browser refused at the load is made again, once, when the permission is still 'prompt' */
   private async firstAction(): Promise<void> {
     if (!this.askAgain) return;
     this.askAgain = false;
     if ((await permissionState('clipboard-read')) === 'prompt') await this.readKnown();
   }
 
-  /** the window got the focus: under 'granted' the text the page knows is read again */
+  /** the window got the focus: under 'granted' the text the page knows is read again, unless the right button is down (a right click reads nothing, #1503) */
   private async onFocus(): Promise<void> {
     this.state.readPermission = await permissionState('clipboard-read');
-    if (this.state.readPermission === 'granted') await this.readKnown();
+    if (this.state.readPermission === 'granted' && !this.rightDown) await this.readKnown();
   }
 }

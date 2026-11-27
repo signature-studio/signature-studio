@@ -207,6 +207,35 @@ describe('the permission is asked at the load (#1482)', () => {
     expect(readText).toHaveBeenCalledTimes(2);
   });
 
+  it('a right press makes no request (#1503): the one refused at the load waits for a left press or a key', async () => {
+    const readText = vi.fn(async () => { throw Object.assign(new Error('Document is not focused.'), { name: 'NotAllowedError' }); });
+    const { pc, win } = page({ 'clipboard-read': 'prompt' }, { readText });
+    await pc.start();
+    win.fire('pointerdown', { button: 2 });
+    win.fire('pointerup', { button: 2 });
+    await flush();
+    expect(readText).toHaveBeenCalledOnce();
+    expect(await pc.read()).toBe('0');
+    expect(readText).toHaveBeenCalledOnce();
+    win.fire('pointerdown', { button: 0 });
+    await flush();
+    expect(readText).toHaveBeenCalledTimes(2);
+  });
+
+  it('under granted, a focus while the right button is down reads nothing (#1503)', async () => {
+    const readText = vi.fn(async () => 'kept');
+    const { pc, win } = page({ 'clipboard-read': 'granted' }, { readText });
+    await pc.start();
+    win.fire('pointerdown', { button: 2 });
+    win.fire('focus');
+    await flush();
+    expect(readText).toHaveBeenCalledOnce();
+    win.fire('pointerup', { button: 2 });
+    win.fire('focus');
+    await flush();
+    expect(readText).toHaveBeenCalledTimes(2);
+  });
+
   it('refresh records both permission states, and "unknown" when the browser has no Permissions API', async () => {
     const { pc } = page({ 'clipboard-read': 'prompt', 'clipboard-write': 'granted' }, {});
     await pc.refresh();

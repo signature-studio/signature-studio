@@ -9,8 +9,7 @@ const SCENARIO = {
   name: 'clipboard-permission-knob',
   report: 'R06',
   expect: 'knob right click, for prompt, denied and granted: the menu opens; 0 clipboard reads; no visible notice at 1.5 s, and none 5 s later (at 6.5 s); no permission changes',
-  // a read of the clipboard on a granted right click (#1503; #1406 is closed on main and is no mark)
-  expectFail: '#1503',
+  expectFail: null,
 };
 const VOLUME_KNOB = { dx: 406, dy: 145 };
 const STATES = ['prompt', 'denied', 'granted'];

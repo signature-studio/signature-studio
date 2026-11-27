@@ -16,7 +16,7 @@ export const CHANNEL_NAME_PLACE = { x: 520, y: 144 };
 // the issues the mark (expectFail) may name: the open issues of the defects this set's scenarios meet (the table of Issue #1408). A failure outside this list is
 // not marked (run.mjs refuses a mark outside it, and 'new' is the mark of a defect with no issue yet). A closed issue is never a mark (#1375, #1384, #1385,
 // #1387, #1389, #1391, #1392, #1402, #1406, #1421, #1482 are closed on main)
-export const OPEN_ISSUES = ['#1386', '#1395', '#1419', '#1429', '#1433', '#1502', '#1503'];
+export const OPEN_ISSUES = ['#1386', '#1395', '#1419', '#1429', '#1433', '#1502'];
 
 const LINE = /^(child )?lid (\d+)(?: parent lid (\d+))? at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/;
 /** the window table: one row per window or child, with the absolute place (ax, ay) of a child (its parent's place added) */
