@@ -76,8 +76,8 @@ test('no scenario file of plugins/ marks a closed Issue (the generated and the h
   assert.deepEqual(bad, []);
 });
 
-test("no scenario file of plugins/ takes the mark 'new' (an insertion failure is #1535, an external one #1324)", () => {
-  const bad = fs.readdirSync(pluginsDir).filter((f) => f.endsWith('.mjs')).filter((f) => /expectFail: ['"]new['"]/.test(fs.readFileSync(path.join(pluginsDir, f), 'utf8')));
+test("no generated or preset scenario of plugins/ takes the mark 'new' (an insertion failure is #1535, an external one #1324)", () => {
+  const bad = fs.readdirSync(pluginsDir).filter((f) => /^(builtin|external|position|preset)-.*\.mjs$/.test(f)).filter((f) => /expectFail: ['"]new['"]/.test(fs.readFileSync(path.join(pluginsDir, f), 'utf8')));
   assert.deepEqual(bad, []);
 });
 

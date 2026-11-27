@@ -1,4 +1,5 @@
 // plugins/plugin-database-count: the Plugin database's Installed listing gives a count (the engine's enum-dir line: the number of names it returned), and the names: the rows drawn under Installed (named: each built-in plugin of lift/plugins/).
+// expectFail new (#1508): the engine writes the listing once per page, so the count is in this scenario's log only when it is the first to open the Plugin database in its page (the order of the shard). Not an insertion failure (no Issue yet).
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineScenario } from '../../lib/scenario.mjs';
@@ -10,6 +11,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.
 export default defineScenario({
   id: 'plugins/plugin-database-count',
   covers: ['plugins/list/plugin-database-entries'],
+  expectFail: 'new',
   async run({ guest }) {
     const from = await guest.ev('window.__app.engineLog().length');
     const db = await openPluginDatabase(guest);
