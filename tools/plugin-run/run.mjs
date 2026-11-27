@@ -1,18 +1,24 @@
 #!/usr/bin/env node
-// tools/plugin-run/run.mjs <absolute path to the bundle directory raw/<name>> <plugin name> [<plugin name> ...] > plugin-run.jsonl   (Issue #1371)
+// tools/plugin-run/run.mjs <absolute path to the bundle directory raw/<name>> <plugin name> [<plugin name> ...] [--scene c|d|auto] > plugin-run.jsonl   (Issue #1371; scenes Issue #1524)
 // The effect plug-ins named. A name is a folder of lift/plugins/<name>/ (case, spaces and hyphens do not count: "Fruity Balance" is "fruity-balance").
-// Every main DLL of the folder (role 本体, key effects.*) is checked, one headless Chrome launch per DLL (a new profile, as tools/delivery-split/measure.mjs):
+// Every main DLL of the folder (role 本体, key effects.*) is checked, one headless Chrome launch per DLL and scene (a new profile, as tools/delivery-split/measure.mjs):
 //   1. the engine is idle (the page's state engine-idle); elapsedMs is the page's idle mark (ms since the navigation), the same clock as tools/delivery-split/measure.mjs;
-//   2. the scene asks the guest for the plug-in (scene (c): the smallest .flp under host-extra/resources (else host/resources) whose UTF-16LE text holds the plug-in's folder name is copied in and opened,
-//      as tools/delivery-split/measure.mjs does for Fruity Balance and Fruity Filter; Issue #1370: the names in a project are UTF-16LE);
+//   2. the scene asks the guest for the plug-in:
+//      scene (c): a project that names it. The candidates are the .flp files whose text holds the plug-in's name at a name boundary, as UTF-16LE or as ASCII (the internal name, the event 201 of a project):
+//      the characters before and after the name are not ASCII letters or digits, and a space after the name is not a boundary when a letter or digit follows it: "Fruity Delay Bank" and "Fruity Delay 2" are not "Fruity Delay".
+//      They are ordered by root (host-extra/resources first, then host/resources) and by size (the smaller first), and at most 5 are tried, one launch each; the first that asks for the plug-in is kept.
+//      scene (d): a project made from a template (Data/Templates under the roots): the template's first mixer insert plug-in is renamed to the plug-in and its state (212) is zeroed (tools/plugin-run/flp.mjs),
+//      and the project is opened as scene (c) opens one. The templates are taken in root order and path order; one with exactly one mixer insert plug-in is preferred. The project is written under the run's temporary directory.
+//      --scene c: scene (c) only; --scene d: scene (d) only; --scene auto (the default): scene (c) over the candidates, then scene (d) when no candidate asks for the plug-in (or there is none).
 //   3. instantiated: the page read the plug-in's separate wasm module with requested=1 (the line image-read: <stem>.c<base>.wasm requested=1 of the engine's stderr, xmod.ts);
 //   4. processed: Space starts the play and PLAY_MS pass. True when all of these hold: quantaWhilePlaying rises in that time (audio.detail()); no engine line written in that time is a failure
 //      (fle thread <n> failed, SuspendError, stopped here: they are listed in playFailures); the page's state is engine-idle after it.
 //      outputRms and nonSilentQuanta are recorded only: the samples of a project may be missing (the demo projects often play silence), so they are not part of processed.
-// stdout: one JSON line per main DLL: {"plugin":"Fruity Balance","instantiated":true,"processed":false,"error":null,"elapsedMs":1234.5,"playFailures":["..."],"outputRms":0,"nonSilentQuanta":0,"quantaWhilePlaying":400}
+// stdout: one JSON line per main DLL: {"plugin":"Fruity Balance","instantiated":true,"processed":false,"error":null,"elapsedMs":1234.5,"playFailures":["..."],"outputRms":0,"nonSilentQuanta":0,"quantaWhilePlaying":400,"sceneKind":"c","sceneFile":"...","candidatesTried":1}
 //   quantaWhilePlaying and nonSilentQuanta are the rises during the play; outputRms is audio.detail().rms after it. error is set only when the scene failed or the guest did not ask for the plug-in (a failure of the play is in playFailures).
+//   sceneKind is "c" or "d" for the scene that asked for the plug-in (null when none did); sceneFile is the project of scene (c) relative to the repository (null for scene (d) and when none asked); candidatesTried is the number of scene (c)'s projects tried (0 to 5).
 // stderr: the scene's steps, the play's numbers, and on a scene error the last engine lines. A failed scene leaves its screen in .tmp-plugin-run-fail-<name>.png (the name in lower case, spaces as hyphens).
-// Exit: 0 when every error is null, 1 otherwise (a name that is not an effect's folder stops the run before anything starts), 64 for a usage error (nothing on stdout).
+// Exit: 0 when every error is null, 1 otherwise (a name that is not an effect's folder stops the run before anything starts), 64 for a usage error (nothing on stdout; also a --scene value that is not c, d or auto).
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -20,6 +26,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
+import { encodeFlp, insertPluginsOf, parseFlp, renamePlugin } from './flp.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
@@ -30,6 +37,8 @@ const WAIT_LIMIT_MS = 180000;
 const POLL_MS = 1000;
 const CDP_TIMEOUT_MS = 20000;
 const SCENE_STEP_LIMIT_MS = 120000;
+const MAX_CANDIDATES = 5;
+const SCENES = ['c', 'd', 'auto'];
 
 // the isolation flags of tools/boot-check/boot-bundle.mjs (the same as tools/delivery-split/measure.mjs)
 const ISOLATION = [
@@ -108,15 +117,71 @@ function flpFiles(dir) {
   return out;
 }
 
-/** the project that names the plug-in (scene (c)): the smallest .flp whose UTF-16LE text holds the plug-in's folder name, in the first root that has one; null when none does */
-export function projectFor(name, roots) {
-  const needle = Buffer.from(name, 'utf16le');
+/** the code unit (1 byte for ASCII, 2 bytes for UTF-16LE) at byte `at` of `buf`; null outside the buffer */
+const unitAt = (buf, at, unit) => (at >= 0 && at + unit <= buf.length ? (unit === 2 ? buf.readUInt16LE(at) : buf[at]) : null);
+/** an ASCII letter or digit (英数字). Other characters, a non-ASCII letter included, do not touch a name */
+const isAsciiAlnum = (u) => u !== null && /^[0-9A-Za-z]$/.test(String.fromCharCode(u));
+const isSpace = (u) => u !== null && /^\s$/.test(String.fromCharCode(u));
+
+/** whether the name at byte `at` (`len` bytes, code units of `unit` bytes) is at a boundary: the unit before it is not a letter or digit, and the unit after it is not one either;
+ *  a space after it is a boundary unless a letter or digit follows the space ("Fruity Delay Bank", "Fruity Delay 2" are other names) */
+export function atBoundary(buf, at, len, unit = 2) {
+  if (isAsciiAlnum(unitAt(buf, at - unit, unit))) return false;
+  const after = unitAt(buf, at + len, unit);
+  if (isSpace(after)) return !isAsciiAlnum(unitAt(buf, at + len + unit, unit));
+  return !isAsciiAlnum(after);
+}
+
+/** the candidate projects of scene (c) (Issue #1524): the .flp files whose text holds the name at a boundary, as UTF-16LE or as ASCII (the internal name), in root order, then the smaller first (path order on a tie);
+ *  a file that another root gives under the same relative path is listed once (the first root's); at most `max` */
+export function candidatesFor(name, roots, max = Infinity) {
+  const needles = [[Buffer.from(name, 'utf16le'), 2], [Buffer.from(name, 'latin1'), 1]];
+  const out = [];
+  const seen = new Set();
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
-    const hits = flpFiles(root).filter((f) => fs.readFileSync(f).indexOf(needle) >= 0);
-    if (hits.length > 0) return hits.reduce((a, b) => (fs.statSync(b).size < fs.statSync(a).size ? b : a));
+    const hits = flpFiles(root).filter((f) => {
+      const buf = fs.readFileSync(f);
+      return needles.some(([needle, unit]) => {
+        for (let at = buf.indexOf(needle); at >= 0; at = buf.indexOf(needle, at + 1)) if (atBoundary(buf, at, needle.length, unit)) return true;
+        return false;
+      });
+    }).filter((f) => !seen.has(path.relative(root, f)));
+    for (const f of hits) seen.add(path.relative(root, f));
+    out.push(...hits.sort((a, b) => fs.statSync(a).size - fs.statSync(b).size));
   }
-  return null;
+  return out.slice(0, max);
+}
+
+/** the project that names the plug-in (scene (c)): the first candidate of candidatesFor; null when none does */
+export function projectFor(name, roots) {
+  return candidatesFor(name, roots, 1)[0] ?? null;
+}
+
+/** the template projects (Data/Templates under the roots): the .flp files, in root order, then path order */
+function templatesFor(roots) {
+  return roots.flatMap((root) => (fs.existsSync(path.join(root, 'Data', 'Templates')) ? flpFiles(path.join(root, 'Data', 'Templates')) : []));
+}
+
+/** the project of scene (d) (Issue #1524): the first template with exactly one mixer insert plug-in (else the first with one), its plug-in renamed to `name` and its state zeroed (flp.mjs), written into `dir`;
+ *  null when no template has a mixer insert plug-in */
+export function sceneProjectFor(name, roots, dir) {
+  const withInserts = [];
+  for (const f of templatesFor(roots)) {
+    let parsed;
+    try {
+      parsed = parseFlp(fs.readFileSync(f));
+    } catch {
+      continue;
+    }
+    const n = insertPluginsOf(parsed.events).length;
+    if (n > 0) withInserts.push({ file: f, parsed, n });
+  }
+  const pick = withInserts.find((t) => t.n === 1) ?? withInserts[0];
+  if (!pick) return null;
+  const project = path.join(dir, `${name.toLowerCase().replace(/\s+/g, '-')}.flp`);
+  fs.writeFileSync(project, encodeFlp(renamePlugin(pick.parsed, name)));
+  return { template: pick.file, project };
 }
 
 /** the reads of the plug-in's separate wasm module (its image-read line is named <stem>.c<base>.wasm, xmod.ts) */
@@ -135,33 +200,41 @@ export function playFailuresOf({ lines, state, stateNote = '', quanta, note = ''
   return out;
 }
 
+/** a result line passes (Issue #1524): the guest asked for the plug-in in scene (c) or (d), the plug-in was instantiated and processed, and error is null */
+export const passes = (r) => r.error === null && r.instantiated === true && r.processed === true && (r.sceneKind === 'c' || r.sceneKind === 'd');
+
 /** the windows of a window list: the lid at (x, y) and the class of each line (the page's format: lid N at (x, y) WxH ... class "..." title "...") */
 function parseWindows(text) {
   return text.split('\n').map((l) => /^lid (\d+) at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/.exec(l)).filter(Boolean).map((m) => {
     const names = /class "([^"]*)"/.exec(m[6]);
     const title = /title "([^"]*)"/.exec(m[6]);
-    return { x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]), cls: names ? names[1] : '', title: title ? title[1] : '' };
+    return { lid: Number(m[1]), x: Number(m[2]), y: Number(m[3]), w: Number(m[4]), h: Number(m[5]), cls: names ? names[1] : '', title: title ? title[1] : '' };
   });
 }
+
+/** a result line with nothing measured (the fields of the JSON line, in their order) */
+const blankRow = (plugin, error) => ({ plugin, instantiated: false, processed: false, error, elapsedMs: null, playFailures: [], outputRms: null, nonSilentQuanta: null, quantaWhilePlaying: null });
 
 const timed = (p, ms, what) => {
   let t;
   return Promise.race([p, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`timeout ${ms} ms: ${what}`)), ms); })]).finally(() => clearTimeout(t));
 };
 
-/** the scene: Welcome closed ("No thanks", then the Default row by a double click), Ctrl+O, the project given to the open box, the plug-in's wasm read awaited, one block of the output */
-async function runScene({ S, ev, projectPath, wasmRe }) {
+/** the scene: Welcome closed ("No thanks", then the Default row by a double click), then scene (c) or (d) (Ctrl+O, the project given to the open box),
+ *  the plug-in's wasm read awaited, one block of the output */
+async function runScene({ S, ev, scene, name, wasmRe }) {
   const steps = [];
   const out = { steps, error: null, state: null, welcome: null, reads: [], block: null };
-  const windows = async () => {
+  const retried = async (f) => {
     const t0 = Date.now();
     for (;;) {
-      try { return parseWindows(await ev(SCENE_WINDOWS)); } catch (e) {
+      try { return await f(); } catch (e) {
         if (!/ask again/.test(String(e?.message ?? e)) || Date.now() - t0 >= 15000) throw e;
         await sleep(100);
       }
     }
   };
+  const windows = async () => parseWindows(await retried(() => ev(SCENE_WINDOWS)));
   const wizard = async () => (await windows()).find((w) => w.cls === SCENE_WIZARD) ?? null;
   const pointAt = async (gx, gy) => {
     const g = await ev(SCENE_GEOMETRY);
@@ -281,10 +354,10 @@ async function runScene({ S, ev, projectPath, wasmRe }) {
     await untilIdle(async () => (await ev('document.title')) !== titleBefore && !(await wizard()), 'the project open');
     steps.push('the project is open (the title changed, the Welcome closed)');
     const dismissed = await dismissProblems();
-    if (dismissed) steps.push(`the Problems box closed ${dismissed} time(s) before Ctrl+O`);
+    if (dismissed) steps.push(`the Problems box closed ${dismissed} time(s) before the scene`);
     await ctrlO();
     steps.push('Ctrl+O');
-    if (!fs.existsSync(projectPath)) throw new Error(`no project file ${projectPath}`);
+    if (!fs.existsSync(scene.projectPath)) throw new Error(`no project file ${scene.projectPath}`);
     // the open box is the page's file box (#filedlg-input), or the file manager in selection mode (#fx-input-files: the file is copied in, then chosen in the list and Open is pressed)
     const t0 = Date.now();
     let box = null;
@@ -298,7 +371,8 @@ async function runScene({ S, ev, projectPath, wasmRe }) {
       if (!box) await sleep(500);
     }
     if (!box) throw new Error('no open box (#filedlg-input or #fx-input-files) 40 s after Ctrl+O');
-    const name = path.basename(projectPath);
+    const projectPath = scene.projectPath;
+    const fileName = path.basename(projectPath);
     const setFile = async (selector) => {
       const doc = await S('DOM.getDocument', {});
       const q = await S('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
@@ -317,18 +391,18 @@ async function runScene({ S, ev, projectPath, wasmRe }) {
     };
     if (box === 'filedlg') {
       await setFile('#filedlg-input');
-      steps.push(`${name} given to #filedlg-input`);
+      steps.push(`${fileName} given to #filedlg-input`);
     } else {
       await setFile('#fx-input-files');
-      const row = `#fx-list [data-name="${name}"]`;
+      const row = `#fx-list [data-name="${fileName}"]`;
       const t2 = Date.now();
       while (!(await ev(`!!document.querySelector(${JSON.stringify(row)})`))) {
-        if (Date.now() - t2 >= 30000) throw new Error(`${name} is not listed in the file manager 30 s after the upload`);
+        if (Date.now() - t2 >= 30000) throw new Error(`${fileName} is not listed in the file manager 30 s after the upload`);
         await sleep(500);
       }
       await clickSelector(row);
       await clickSelector('#fx-ok');
-      steps.push(`${name} uploaded into the file manager, chosen and Open pressed`);
+      steps.push(`${fileName} uploaded into the file manager, chosen and Open pressed`);
     }
     const t1 = Date.now();
     let snap = null;
@@ -356,9 +430,9 @@ async function runScene({ S, ev, projectPath, wasmRe }) {
   return out;
 }
 
-/** one launch: the plug-in's DLL named by `target`, from the navigation to the end of its scene; returns the JSON line's object */
-async function measureOnce(port, target, projectPath, shotDir) {
-  const out = { plugin: target.name, instantiated: false, processed: false, error: null, elapsedMs: null, playFailures: [], outputRms: null, nonSilentQuanta: null, quantaWhilePlaying: null };
+/** one launch: the plug-in's DLL named by `target`, in the scene given ({kind:'c' or 'd', projectPath}), from the navigation to the end of the scene; returns the JSON line's object */
+async function measureOnce(port, target, scene, shotDir) {
+  const out = blankRow(target.name, null);
   const wasmRe = wasmReadRe(target.stem);
   const root = fs.mkdtempSync(path.join(repo, '.tmp-plugin-run-'));
   let chrome = null, cdp = null;
@@ -393,21 +467,21 @@ async function measureOnce(port, target, projectPath, shotDir) {
     else if (snap.state !== 'engine-idle') out.error = `state ${snap.state} at the end (no engine-idle within ${WAIT_LIMIT_MS} ms)`;
     else if (out.elapsedMs === null) out.error = 'the engine is idle but the page has no idle mark';
     if (out.error === null) {
-      const sc = await runScene({ S, ev, projectPath, wasmRe });
+      const sc = await runScene({ S, ev, scene, name: target.name, wasmRe });
       out.instantiated = sc.reads.some((r) => wasmRe.test(r.name) && r.requested);
       out.processed = sc.block?.processed === true;
       out.playFailures = sc.block?.playFailures ?? [];
       out.outputRms = sc.block?.numbers?.outputRms ?? null;
       out.nonSilentQuanta = sc.block?.numbers?.nonSilentQuanta ?? null;
       out.quantaWhilePlaying = sc.block?.numbers?.quantaWhilePlaying ?? null;
-      out.error = sc.error ?? (out.instantiated ? null : `the guest did not ask for ${target.name} (no ${wasmRe} read with requested=1); state ${sc.state}`);
-      process.stderr.write(`scene: ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);
+      out.error = sc.error ?? (out.instantiated ? null : `the guest did not ask for ${target.name} in scene (${scene.kind}) (no ${wasmRe} read with requested=1); state ${sc.state}`);
+      process.stderr.write(`scene (${scene.kind}): ${sc.steps.join('; ')}${sc.error ? ` ERROR ${sc.error}` : ''}\n`);
     }
     if (out.error !== null) {
       const s = await S('Page.captureScreenshot', { format: 'png' }).catch(() => null);
       if (s) fs.writeFileSync(path.join(shotDir, `.tmp-plugin-run-fail-${target.folder.toLowerCase().replace(/\s+/g, '-')}.png`), Buffer.from(s.data, 'base64'));
-      const lines = await ev('window.__app.engineLog().slice(-25)').catch(() => null);
-      if (lines) process.stderr.write(`engine log (last 25):\n${lines.join('\n')}\n`);
+      const lines = await ev('window.__app.engineLog().filter((l) => !/memory-usage/.test(l)).slice(-40)').catch(() => null);
+      if (lines) process.stderr.write(`engine log (last 40, the memory-usage lines left out):\n${lines.join('\n')}\n`);
     }
   } catch (e) {
     out.error = String(e?.message ?? e).slice(0, 500);
@@ -416,14 +490,60 @@ async function measureOnce(port, target, projectPath, shotDir) {
     else if (chrome) chrome.proc.kill('SIGKILL');
     fs.rmSync(root, { recursive: true, force: true });
   }
-  process.stderr.write(`run: ${target.name} (${target.key}) ${out.error === null ? 'scene ok' : 'scene error'}, instantiated ${out.instantiated}, processed ${out.processed}, elapsedMs ${out.elapsedMs}\n`);
+  process.stderr.write(`run: ${target.name} (${target.key}) scene (${scene.kind}) ${out.error === null ? 'scene ok' : 'scene error'}, instantiated ${out.instantiated}, processed ${out.processed}, elapsedMs ${out.elapsedMs}\n`);
   return out;
 }
 
+/** the loop of scene (c) (Issue #1524): one attempt per candidate, in order; the first attempt that asks for the plug-in ends it. Returns the index of that candidate (-1 when none asked), its row, and the last row (null with no candidate) */
+export async function firstAsking(candidates, attempt) {
+  let last = null;
+  for (let i = 0; i < candidates.length; i++) {
+    const r = await attempt(candidates[i]);
+    if (r.instantiated) return { index: i, row: r, last: r };
+    last = r;
+  }
+  return { index: -1, row: null, last };
+}
+
+/** scene (d) (Issue #1524): the project made from a template (sceneProjectFor), opened as scene (c) opens its project; one line */
+async function measureSceneD(port, t, roots, workDir, tried) {
+  const made = sceneProjectFor(t.name, roots, workDir);
+  if (!made) return { ...blankRow(t.name, `no template under host-extra/resources or host/resources (Data/Templates) has a mixer insert plug-in to rename to ${t.name}`), sceneKind: null, sceneFile: null, candidatesTried: tried };
+  process.stderr.write(`scene (d) for ${t.name}: ${path.relative(repo, made.template)}, its first mixer insert plug-in renamed (the state zeroed)\n`);
+  const r = await measureOnce(port, t, { kind: 'd', projectPath: made.project }, repo);
+  return { ...r, sceneKind: r.instantiated ? 'd' : null, sceneFile: null, candidatesTried: tried };
+}
+
+/** one plug-in's line (Issue #1524): scene (c) over the candidates (the first that asks for the plug-in is kept), then scene (d) when the scene is auto and no candidate asks */
+async function measureTarget(port, t, roots, scene, workDir) {
+  const withScene = (r, sceneKind, sceneFile, candidatesTried) => ({ ...r, sceneKind, sceneFile, candidatesTried });
+  if (scene === 'd') return measureSceneD(port, t, roots, workDir, 0);
+  const cands = candidatesFor(t.name, roots, MAX_CANDIDATES);
+  process.stderr.write(`scene (c) for ${t.name}: ${cands.length ? cands.map((p) => path.relative(repo, p)).join(' | ') : 'no .flp names it (UTF-16LE or ASCII, at a name boundary) under host-extra/resources or host/resources'}\n`);
+  const { index, row, last } = await firstAsking(cands, (p) => measureOnce(port, t, { kind: 'c', projectPath: p }, repo));
+  if (index >= 0) return withScene(row, 'c', path.relative(repo, cands[index]), index + 1);
+  if (scene === 'c') {
+    if (last === null) return withScene(blankRow(t.name, `no .flp names ${t.name} (UTF-16LE or ASCII, at a name boundary) under host-extra/resources or host/resources`), null, null, 0);
+    return withScene({ ...last, error: `${last.error}; scene (c) tried ${cands.length} candidate(s)` }, null, null, cands.length);
+  }
+  process.stderr.write(`scene (d) for ${t.name}: ${cands.length ? `no candidate of ${cands.length} asked for it` : 'no candidate names it'}\n`);
+  const r = await measureSceneD(port, t, roots, workDir, cands.length);
+  if (r.sceneKind === 'd') return r;
+  return { ...r, error: `${r.error}; scene (c) tried ${cands.length} candidate(s)` };
+}
+
 async function main() {
-  const [bundleArg, ...names] = process.argv.slice(2);
-  if (!bundleArg || names.length === 0) {
-    process.stderr.write('usage: node tools/plugin-run/run.mjs <absolute path to the bundle directory raw/<name>> <plugin name> [<plugin name> ...]\n');
+  const [bundleArg, ...rest] = process.argv.slice(2);
+  const names = [];
+  let scene = 'auto';
+  let badScene = false;
+  for (let i = 0; i < rest.length; i++) {
+    if (rest[i] !== '--scene') names.push(rest[i]);
+    else if (SCENES.includes(rest[i + 1])) scene = rest[++i];
+    else badScene = true;
+  }
+  if (!bundleArg || names.length === 0 || badScene) {
+    process.stderr.write('usage: node tools/plugin-run/run.mjs <absolute path to the bundle directory raw/<name>> <plugin name> [<plugin name> ...] [--scene c|d|auto]\n');
     process.exit(64);
   }
   let targets;
@@ -450,11 +570,7 @@ async function main() {
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
     for (const t of targets) {
-      const project = projectFor(t.name, roots);
-      process.stderr.write(`scene (c) for ${t.name}: ${project ? path.relative(repo, project) : 'no .flp names it (UTF-16LE) under host-extra/resources or host/resources'}\n`);
-      const r = project
-        ? await measureOnce(port, t, project, repo)
-        : { plugin: t.name, instantiated: false, processed: false, error: `no .flp names ${t.name} under host-extra/resources or host/resources`, elapsedMs: null };
+      const r = await measureTarget(port, t, roots, scene, top);
       process.stdout.write(`${JSON.stringify(r)}\n`);
       if (r.error !== null) ok = false;
     }
