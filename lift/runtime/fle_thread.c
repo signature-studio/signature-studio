@@ -147,6 +147,7 @@ typedef struct {
 #endif
     twait w;
     fle_tqueue q;
+    uint64_t tr_site;   /* Issue #1502: the return address of the last traced wait of this thread (the trace prints a wait when its call site changes) */
 } thr;
 
 static thr T[FLE_THREAD_MAX];
@@ -176,6 +177,7 @@ int fle_thread_is_done(unsigned idx) { return idx < nthr && T[idx].state == T_DO
 int fle_thread_in_message_wait(unsigned idx) { return idx < nthr && T[idx].state == T_WAITING && (T[idx].w.kind == W_MSG_GET || T[idx].w.kind == W_MSG_WAIT || (T[idx].w.kind == W_OBJECTS && T[idx].w.msg)); }
 void fle_thread_set_idle_stop(int on) { idle_stop = on; }
 void fle_thread_set_trace(int on) { trace_on = on; }
+int fle_thread_trace_on(void) { return trace_on; }
 
 uint64_t *fle_thread_tls_values(void) { return nthr && cur ? T[cur].tls : NULL; }
 uint32_t *fle_thread_slot_last_error(void) { return nthr && cur ? &T[cur].last_error : NULL; }
@@ -744,13 +746,71 @@ static void park(void)
     T[cur].state = T_RUNNING;
 }
 
+/* Issue #1502: the guest stack words at rsp: " rsp <rsp> stack <the 8 words from rsp>" (the word at rsp is the return address of the call into the lifted caller) */
+static void words_at(char *buf, size_t n, uint64_t rsp)
+{
+    size_t len;
+    unsigned k;
+    int m;
+
+    if (n == 0) return;
+    m = snprintf(buf, n, " rsp %#llx stack", (unsigned long long)rsp);
+    len = (m < 0) ? 0 : ((size_t)m < n ? (size_t)m : n - 1);
+    for (k = 0; k < 8u && len + 1 < n; k++) {
+        m = snprintf(buf + len, n - len, " %#llx", (unsigned long long)fle_ld(rsp + 8u * k, 8));
+        if (m < 0 || (size_t)m >= n - len) break;
+        len += (size_t)m;
+    }
+}
+
+void fle_thread_trace_words(char *buf, size_t n) { words_at(buf, n, R[4]); }
+
+/* Issue #1502: true (and the site is kept) when the running call's site differs from the thread's last traced one; only with the trace on */
+static int trace_site_changed(void)
+{
+    uint64_t site;
+
+    if (!trace_on) return 0;
+    site = fle_ld(R[4], 8);
+    if (site == T[cur].tr_site) return 0;
+    T[cur].tr_site = site;
+    return 1;
+}
+
+/* Issue #1502: one line per thread of the table (its state, its start address, what it waits for and its stack words) when the trace is on */
+void fle_thread_trace_table(void)
+{
+    unsigned i;
+    char buf[480], w[320];
+    int n;
+
+    if (!trace_on) return;
+    for (i = 0; i < nthr; i++) {
+        thr *t = &T[i];
+        uint64_t rsp = i == cur ? R[4] : t->g.r[4];
+
+        if (t->state == T_DONE) continue;
+        words_at(w, sizeof w, rsp);
+        n = snprintf(buf, sizeof buf, "fle-thread: table %u state %d start %#llx wait %s%s\n", i, t->state, (unsigned long long)t->start,
+                     t->state == T_WAITING ? t->w.api : "-", w);
+        if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the table is the same */ }
+    }
+}
+
 static void begin_wait(int kind, const char *api, uint32_t ms)
 {
     twait *w = &T[cur].w;
+    char buf[480], sw[320];
+    int n;
 
     memset(w, 0, sizeof *w);
     w->kind = kind;
     w->api = api;
+    if (trace_site_changed()) {   /* Issue #1502: the wait of each thread, with its kind, time-out and call site (a loop of Sleep at one site is one line; the trace is on with the window-API trace) */
+        words_at(sw, sizeof sw, R[4]);
+        n = snprintf(buf, sizeof buf, "fle-thread: wait %s thread %u kind %d ms %u%s\n", api, cur, kind, ms, sw);
+        if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the wait is the same */ }
+    }
     if (ms != INFINITE_ && (kind == W_SLEEP || kind == W_OBJECTS)) {
         w->has_deadline = 1;
         w->deadline = ms_deadline(ms);
@@ -1403,6 +1463,15 @@ uint32_t fle_thread_wait_objects(const char *api, uint32_t n, const uint64_t *h,
     if (ms == 0) {
         if (msg) T[cur].q.changebits = 0;
         return FLE_WAIT_TIMEOUT_RESULT;
+    }
+    if (trace_site_changed()) {   /* Issue #1502: the objects of the wait (a thread's handle is one of the pseudo handles of fle_thread), at a call site that changed */
+        char buf[480], sw[320];
+        int m;
+
+        words_at(sw, sizeof sw, R[4]);
+        m = snprintf(buf, sizeof buf, "fle-thread: wait-objects %s thread %u n %u all %d h0 %#llx h1 %#llx ms %u%s\n", api, cur, n, all,
+                     (unsigned long long)(n > 0 ? h[0] : 0), (unsigned long long)(n > 1 ? h[1] : 0), ms, sw);
+        if (m > 0 && (size_t)m < sizeof buf && write(2, buf, (size_t)m) < 0) { /* the line is lost; the wait is the same */ }
     }
     if (nthr < 2) {
         fle_stop(api, ms == INFINITE_ ? "INFINITE time-out on objects that are not signaled would never return (no other thread exists)"
