@@ -23,7 +23,7 @@
 //     (the caller checks the rows' structure, e.g. servedHeadersMatch). A row or line missing, or an error (the setup, a row), still exits 1. The log says 'report-only: exit 0'.
 // A shard (or an area) starts the page ONCE per row: the scenarios run one after another in it, each after File > New (lib/common.mjs resetProject). The smoke set runs each in a page of its own.
 // stdout: one JSON line per display row (the JSON is written also when the run failed: its error fields say what). stderr: the log.
-// Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq, lib/plan.mjs scenarioPasses): servedHeadersMatch; the scenarios; no scenario is skipped;
+// Exit 0 only when every row meets the acceptance (rowPasses, the same rule as judge.jq, lib/plan.mjs scenarioPasses): servedHeadersMatch; the scenarios; no scenario is skipped or has an error (marked or not, Issue #1528);
 // each scenario has dprOk not false (its page is at the row's DPR); each scenario that has no expectFail is ok with 0 pageErrors, 0 consoleErrors, 0 stuckToasts and 0 failedRequests;
 // each scenario with an expectFail (a known defect: '#<Issue>' or 'new') has 0 pageErrors, 0 consoleErrors and 0 failedRequests, and no engine stop (engineStops 0 and not engineStuckRunning)
 // unless it declares the stop (expectStop: '#<Issue>' or 'new'); its stuckToasts and ok are only written to the JSON. The row's expectFail lists the marks of its scenarios: [{name, issue}] (a scenario with two marks gives two entries).

@@ -132,6 +132,8 @@ export default defineScenario({
 - 印を外した 3 本(#1491): `cycles-3`・`repeat-12288`・`master-fader-down-200`。録音の場面の後に走ったために音が無かったもので、録音の場面を最後に回したら通った(実行の行は報告に書く)。
 ## 印(expectFail)
 
+- error(実行が例外で止まった結果。例 `page.evaluate: Target crashed`)は、印の有無によらず落ちる(#1528。`lib/plan.mjs` の `scenarioPasses`・`judge.jq`)。
+- 描画プロセスが止まった(crash の事象、`Target crashed`、応答が無い)ときは、その本を error にして、ページを作り直す(領域の shard の `runRow`)。作り直したページの最初の本は、File > New で新しい曲が出来て、エンジンが待機していることを確かめてから走る。作り直せない(ページが開かない)本は、その本だけが error になり、次の本がもう一度ページを開く。
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
 - 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。エンジンが止まった(`engineStops` > 0、または `engineStuckRunning`)なら失敗する。通ったら標準エラーに警告を出す(`judge.jq`)。
 - 停止の宣言 `expectStop`: `defineScenario`(旧い集合の `index.mjs` の `{ name, … }` も同じ)に `expectStop: '#<Issue の番号>'` または `'new'` を書くと、そのシナリオの停止だけを許す。`expectFail` が無ければ読み込みで落ちる(停止は既知の欠陥の中でだけ許す)。カウンター(`pageErrors`・`consoleErrors`・`failedRequests`)は、停止を宣言しても 0 でなければならない。
