@@ -25,6 +25,7 @@
 //    The contrast an edge needs is 40 (of 255), except the menu's: 20, in either direction (its frame is dark on the black desktop: 28 at DPR 3; #1348).
 //  - blackShare: the share of the pixels of the Browser panel (TEdgeBrowser, main's row) whose R, G and B are all at most 16.
 //  - parts (main row and dynamic rows): the Tempo box's frame is measured; "song-position" and "pattern-selector" are estimated from it (measured: false).
+//    #1381: the Tempo box is searched in the top bar's rectangle (TQuickControlBar: x within [0.2, 0.3] of its width), not in the guest's width: scale.topBar is the bar's rectangle in each boot.
 //  - pointerErrPx (main row): presses at the centres of the three parts; the error is max |engine's guest pixel (hit: down ... ptr=x,y) - the guest pixel pressed| over the presses.
 //    pointerSentErrPx: the same from the page's own record of the presses it sent. pointerDiag: the input count, the element under each press, the log's last lines.
 //  - settings (#1358): the Settings window (F10) after the windows of the boot; debugLog: FL's start-up lines in the guest memory (the first idle, and the Debug page after it);
@@ -32,7 +33,13 @@
 //  - mainGuiScaling: "System" when FL's log line says "system set to N PPI" (inferred: the Display selection itself is not identified; #1358 10.4), else null.
 //  - restartNotice (dynamic rows): the page's element with data-restart-notice is shown.
 //  - displayLines (dynamic rows): the engine's "input: WM_DISPLAYCHANGE" lines of the step (count and the first two); dpiChangedLines: the WM_DPICHANGED lines of the step (0: not sent).
-//  - pluginScalePercent (plugin row): not measured in this build (the plugin window is not opened: its row's error says why).
+//  - plugin (#1381): the Fruity Balance window of the project that names it (tools/plugin-run's route: Ctrl+O, the file box; the Mixer is shown, its strip 17 is pressed, then Slot 5 is double-clicked).
+//    windowRect: the window (TPluginForm). pluginScalePercent: round(100 x the width of its GUI (the TWPControlForm child) / the same GUI's width at DPR 1 in the calibration boot).
+//    The GUI, not the outer window: the window's frame is rounded on its own (at 1.25 the outer width is 237 -> 295, 124; the GUI 227 -> 283, 125). pluginWindowPercent: the outer width's percent; pluginGuiHeightPercent: the GUI's height's percent.
+//    pluginDiag: the Mixer's rectangle, its children, the scale k (the Mixer's height over its height at DPR 1), the presses, the window's children, the GUI's rectangle. null when the window does not open (the row's error says why).
+//  - tooltip (#1381): the hint is drawn in the top bar's info line (TQuickControlBar), not in a window of its own; no new window appears on a hover. A hover over a part of the bar (Tempo, Song position, Pattern selector; 2.5 s each)
+//    counts when the picture outside that part changes under the hover, against the picture with the pointer on the bar's corner (the part's own highlight is not counted). tooltipHint.points: outside (the changed pixels of the hint: count and box). edgeWidth is null (no frame). The row's error says why when no hint is drawn.
+//    Not done: the hint is gone after the pointer left in most places, but the info line keeps the last hint until another control is hovered (checked at DPR 1.75 and 3), so "gone after the leave" is not a test here.
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,6 +47,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Cdp, freePort, launchChrome, shutdown, sleep } from '../boot-check/cdp.mjs';
 import { stageAssets } from '../boot-check/stage-assets.mjs';
+import { effectRows, resolveNames, projectFor, wasmReadRe } from '../plugin-run/run.mjs';
 
 const isMain = process.argv[1] !== undefined && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -122,11 +130,15 @@ export function randomDprs(count, [min, max], seedIn = crypto.randomBytes(4).rea
 const lumAt = (b, stride, x, y) => { const i = y * stride + 4 * x; return 0.299 * b[i] + 0.587 * b[i + 1] + 0.114 * b[i + 2]; };
 const BRIGHT_LO = 175, BRIGHT_HI = 215;
 
-/** the Tempo box: the longest run of bright interior pixels (the LCD's background) in the top band of the picture, x within [0.2 W, 0.3 W] (at DPR 1 it is guest x 437..490, y 13) */
-export function tempoBox(b, stride, w, h) {
-  const xa = Math.floor(0.2 * w), xb = Math.floor(0.3 * w), yb = Math.floor(0.04 * h);
+/** the Tempo box: the longest run of bright interior pixels (the LCD's background) in the top bar's rectangle (#1381: the bar's own width, not the guest's: x within [0.2, 0.3] of the bar, at DPR 1 it is guest x 437..490, y 13).
+ *  Without a bar (null), the top band of the picture is searched as before (x within [0.2 W, 0.3 W], y within 0.04 H). */
+export function tempoBox(b, stride, w, h, bar = null) {
+  const xa = bar ? Math.max(0, Math.floor(bar.ax + 0.2 * bar.w)) : Math.floor(0.2 * w);
+  const xb = bar ? Math.min(w - 1, Math.floor(bar.ax + 0.3 * bar.w)) : Math.floor(0.3 * w);
+  const ya = bar ? Math.max(0, bar.ay) : 0;
+  const yb = bar ? Math.min(h, bar.ay + bar.h) : Math.floor(0.04 * h);
   let best = null;
-  for (let y = 0; y < yb; y++) {
+  for (let y = ya; y < yb; y++) {
     let run = 0, start = -1;
     for (let x = xa; x <= xb; x++) {
       const l = lumAt(b, stride, x, y);
@@ -188,6 +200,8 @@ const DPR1_PARTS = {
   'song-position': { x: 500, y: 4, w: 129, h: 33 },
   'pattern-selector': { x: 592, y: 48, w: 47, h: 28 },
 };
+// #1381: the tooltip's three hovered parts (their DPR 1 places: the Tempo, the Song position and the Pattern selector; a hint is drawn in the top bar's info line)
+const TIP_PARTS = [DPR1_TEMPO, DPR1_PARTS['song-position'], DPR1_PARTS['pattern-selector']];
 
 /** the parts' places and centres in guest pixels: the Tempo box is measured in the picture; the others are its DPR 1 offsets scaled by the Tempo's scale */
 export function partPlaces(frame, s) {
@@ -268,9 +282,11 @@ export function bestText(scans) {
   return pick;
 }
 
-/** #1358: the Debug page's log as the guest memory holds it (the start-up lines); captured when it has a line */
+/** #1358: the Debug page's log as the guest memory holds it (the start-up lines); captured when it has a line.
+ *  #1381: a scan that holds FL's scaling line is preferred (the most lines of the others may be the project's log, read after the start-up) */
 export function debugLogOf(scans, why) {
-  const pick = bestText(scans);
+  const withFactor = scans.filter(([, s]) => s && s.best && s.best.lines.some((l) => SCALING_FACTOR_RE.test(l)));
+  const pick = bestText(withFactor.length ? withFactor : scans);
   const lines = pick ? pick.best.lines : [];
   const n = pick ? pick.best.lineCount : 0;
   const f = lines.map((l) => SCALING_FACTOR_RE.exec(l)).find((m) => m) ?? null;
@@ -414,6 +430,19 @@ async function cdpPress(S, x, y) {
   await sleep(300);
 }
 
+/** a double-click at a CSS point (two presses: the second has clickCount 2, which the engine reads as the double-click) */
+async function cdpDoublePress(S, x, y) {
+  await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'none', buttons: 0, pointerType: 'mouse' });
+  await sleep(60);
+  for (const k of [1, 2]) {
+    await S('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: k, pointerType: 'mouse' });
+    await sleep(80);
+    await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: k, pointerType: 'mouse' });
+    await sleep(150);
+  }
+  await sleep(1200);
+}
+
 /** the picture and the window table of the guest, read once (deskDumpBase64: nothing is drawn) */
 async function snapshot(ev) {
   const d = await ev(`window.__app.deskDumpBase64(true)`);
@@ -421,9 +450,12 @@ async function snapshot(ev) {
   return { b, stride: b.length / d.height, w: d.width, h: d.height, recs: windowTable(d.windows) };
 }
 
+/** #1381: the top bar's record (TQuickControlBar) of a snapshot, visible; null when the window table has none */
+const topBarOf = (s) => s.recs.find((r) => r.vis && r.cls === 'TQuickControlBar') ?? null;
+
 /** the Tempo box of a snapshot: its frame, the edge width of the frame, the parts (when the scale is known) */
 function tempoOf(s, ref) {
-  const box = tempoBox(s.b, s.stride, s.w, s.h);
+  const box = tempoBox(s.b, s.stride, s.w, s.h, topBarOf(s));
   if (!box) return { tempo: null, edgeWidth: null, parts: null, scale: null };
   const edges = tempoEdges(s.b, s.stride, box);
   const sc = ref && ref.tempoLen ? box.len / ref.tempoLen : null;
@@ -446,6 +478,35 @@ export function rectEdges(s, rect, minContrast = 40, anySign = false) {
   ].filter((v) => v !== null);
   return median(widths);
 }
+
+/** #1381: the pixels of a rectangle (guest px, clipped to the picture) that differ between two snapshots of the same size, not counting the pixels inside `skip`: { n, box } (box: the bounding box, guest px), or null when none differ */
+function changedBox(a, b, rec, skip = null) {
+  const x0 = Math.max(0, rec.ax), y0 = Math.max(0, rec.ay), x1 = Math.min(a.w, rec.ax + rec.w), y1 = Math.min(a.h, rec.ay + rec.h);
+  let n = 0, bx0 = Infinity, by0 = Infinity, bx1 = -1, by1 = -1;
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      if (skip && x >= skip.ax && x < skip.ax + skip.w && y >= skip.ay && y < skip.ay + skip.h) continue;
+      const i = y * a.stride + 4 * x, j = y * b.stride + 4 * x;
+      if (a.b[i] === b.b[j] && a.b[i + 1] === b.b[j + 1] && a.b[i + 2] === b.b[j + 2]) continue;
+      n++;
+      bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y);
+    }
+  }
+  return n ? { n, box: { x0: bx0, y0: by0, x1: bx1, y1: by1 } } : null;
+}
+
+/** #1381: the windows under a window (its children, grandchildren ...), in the window table's order */
+function descendantRecs(recs, lid) {
+  const under = new Set([lid]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const r of recs) if (!under.has(r.lid) && r.parent !== null && under.has(r.parent)) { under.add(r.lid); grew = true; }
+  }
+  return recs.filter((r) => r.lid !== lid && under.has(r.lid));
+}
+
+/** #1381: a window's line for a diagnosis: class, text, absolute rectangle */
+const recLine = (r) => `${r.child ? 'child ' : ''}${r.cls}${r.text ? ` "${r.text.slice(0, 40)}"` : ''} at ${r.ax},${r.ay} ${r.w}x${r.h}${r.vis ? '' : ' hidden'}`;
 
 /** #1355's rule: the share of the pixels of a rectangle (guest px) whose R, G and B are all at most 16 */
 export function blackShareOf(s, rect) {
@@ -578,11 +639,161 @@ function inputsOf(S, ev, v) {
     await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'none', buttons: 0, pointerType: 'mouse' });
     await sleep(2500);
   };
-  return { pressKey, pressGuest, hover };
+  // the pointer is moved to a guest point and the picture is read after 2.5 s (a hint of the hover is gone by then)
+  const leave = async (gx, gy) => {
+    const p = cssOf(gx, gy);
+    await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+    await sleep(2500);
+  };
+  return { pressKey, pressGuest, hover, leave };
 }
 
 const isVisible = (s, pred) => s.recs.find((r) => r.vis && pred(r)) ?? null;
 const named = (cls, text) => (r) => r.cls === cls && (text === undefined || r.text === text);
+
+// #1381: the plug-in's window (the route of #1371: the project that names the plug-in is opened, as tools/plugin-run/run.mjs does)
+const PLUGIN_NAME = 'Fruity Balance';
+let PLUGIN_CTX = null;
+
+/** the plug-in's effect row and the project file that names it (null when no .flp under host-extra/resources or host/resources does) */
+function pluginContext(bundleDir) {
+  const outDir = path.resolve(bundleDir, '..', '..', '..');
+  const roots = [path.join(outDir, 'host-extra', 'resources'), path.join(outDir, 'host', 'resources')];
+  const [target] = resolveNames([PLUGIN_NAME]);
+  return { target, project: projectFor(PLUGIN_NAME, roots), wasmRe: wasmReadRe(target.stem) };
+}
+
+/** the project is opened by Ctrl+O and the file box (#filedlg-input) gets its file; resolves when the plug-in's separate wasm module is read (requested or not) or 120 s pass */
+async function loadProject(S, ev, projectPath, wasmRe) {
+  const keyDown = (code, k, vk, m = 0) => S('Input.dispatchKeyEvent', { type: 'rawKeyDown', code, key: k, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: m });
+  const keyUp = (code, k, vk, m = 0) => S('Input.dispatchKeyEvent', { type: 'keyUp', code, key: k, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, modifiers: m });
+  await ev("document.getElementById('desktop').focus({ preventScroll: true }); true");
+  await sleep(100);
+  await keyDown('ControlLeft', 'Control', 0xa2, 2);
+  await sleep(40);
+  await keyDown('KeyO', 'o', 79, 2);
+  await sleep(40);
+  await keyUp('KeyO', 'o', 79, 2);
+  await sleep(40);
+  await keyUp('ControlLeft', 'Control', 0xa2, 0);
+  let box = null;
+  for (let i = 0; i < 40 && !box; i++) {
+    box = await ev("document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)");
+    if (!box) await sleep(500);
+  }
+  if (!box) {
+    const top = (await snapshot(ev)).recs.filter((r) => r.vis && !r.child).map((r) => `${r.cls}:${r.text}`);
+    throw new Error(`no open box (#filedlg-input or #fx-input-files) 20 s after Ctrl+O (top-level: ${top.join(', ')})`);
+  }
+  const setFile = async (selector) => {
+    const doc = await S('DOM.getDocument', {});
+    const q = await S('DOM.querySelector', { nodeId: doc.root.nodeId, selector });
+    if (!q.nodeId) throw new Error(`${selector} is not a node`);
+    await S('DOM.setFileInputFiles', { nodeId: q.nodeId, files: [projectPath] });
+  };
+  const clickSel = async (selector) => {
+    const r = await ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
+    if (!r) throw new Error(`no element ${selector}`);
+    await S('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y, button: 'none', buttons: 0, pointerType: 'mouse' });
+    await sleep(60);
+    await S('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x, y: r.y, button: 'left', buttons: 1, clickCount: 1, pointerType: 'mouse' });
+    await sleep(50);
+    await S('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x, y: r.y, button: 'left', buttons: 0, clickCount: 1, pointerType: 'mouse' });
+    await sleep(300);
+  };
+  if (box === 'filedlg') await setFile('#filedlg-input');
+  else {
+    // the file manager in selection mode: the file is copied in, then chosen in the list and Open is pressed (as tools/plugin-run/run.mjs)
+    await setFile('#fx-input-files');
+    const row = `#fx-list [data-name="${path.basename(projectPath)}"]`;
+    for (let i = 0; i < 60 && !(await ev(`!!document.querySelector(${JSON.stringify(row)})`)); i++) await sleep(500);
+    await clickSel(row);
+    await clickSel('#fx-ok');
+  }
+  const t0 = Date.now();
+  for (;;) {
+    const names = await ev(`window.__app.imageReads.map((r) => r.name)`).catch(() => []);
+    if (names.some((n) => wasmRe.test(n))) break;
+    if (Date.now() - t0 >= 120000) break;
+    await sleep(1000);
+  }
+  // the "Problems loading the project" box is modal (the plug-ins and samples the project names are missing here): Enter closes it, its default button
+  for (let i = 0; i < 4; i++) {
+    const s1 = await snapshot(ev);
+    if (!s1.recs.some((r) => r.vis && /Problems loading/.test(r.text))) break;
+    await keyDown('Enter', 'Enter', 0x0d);
+    await sleep(40);
+    await keyUp('Enter', 'Enter', 0x0d);
+    await sleep(1000);
+  }
+  await sleep(2000);
+}
+
+/** #1381: the plug-in's window: the project is opened once per boot, the Mixer is shown on top, and the insert slot of the plug-in is double-clicked (a new window that appears is the plug-in's).
+ *  The places are fractions of the Mixer window (measured at DPR 1 in this project: the strip 17 "Robot Vocal Double" holds Fruity Balance in Slot 5). */
+// the Mixer's places at DPR 1 (mixer-relative px, the calibration boot's Mixer of 1432x500): the strip 17's name area (the strips are anchored to the left edge),
+// and the Slot 5 of the selected strip (the inserts panel is anchored to the right edge). The Mixer's height is not clamped by the screen, its width is (at 2.35 it is 3301 of 3580):
+// the places scale with the Mixer's height over its height at DPR 1, and the right-anchored place is counted from the right edge.
+const MIXER_PLACES = { strip: { x: 831, y: 136 }, slot: { x: 1262, y: 145 } };
+async function openPlugin(ctx) {
+  const { S, ev, inputs, v } = ctx;
+  if (!PLUGIN_CTX) throw new Error(`no ${PLUGIN_NAME} row`);
+  if (!PLUGIN_CTX.project) throw new Error(`no .flp names ${PLUGIN_NAME} under host-extra/resources or host/resources`);
+  if (!ctx.projectLoaded) {
+    await closeStartDialogs(ctx);
+    await loadProject(S, ev, PLUGIN_CTX.project, PLUGIN_CTX.wasmRe);
+    ctx.projectLoaded = true;
+  }
+  await inputs.pressKey('F9', 120);
+  await sleep(800);
+  await inputs.pressKey('F9', 120);
+  const { s: sm, rec } = await openWindow('mixer', ctx);
+  const diag = (ctx.pluginDiag = { mixer: { ax: rec.ax, ay: rec.ay, w: rec.w, h: rec.h }, mixerKids: descendantRecs(sm.recs, rec.lid).map(recLine), scaleK: null, caption: null, pressed: [], plugin: null, pluginKids: null, gui: null });
+  const ref = REF && REF.mixer ? REF.mixer : { w: rec.w, h: rec.h };
+  const k = rec.h / ref.h;
+  diag.scaleK = k;
+  const at = (p) => ({ x: v.canvasRect.x + (Math.round(p.x) + 0.5) / v.dpr, y: v.canvasRect.y + (Math.round(p.y) + 0.5) / v.dpr });
+  const strip = at({ x: rec.ax + MIXER_PLACES.strip.x * k, y: rec.ay + MIXER_PLACES.strip.y * k });
+  await cdpPress(S, strip.x, strip.y);
+  await sleep(600);
+  // the Mixer's caption names the strip the press selected ("Mixer - <name>")
+  diag.caption = descendantRecs((await snapshot(ev)).recs, rec.lid).find((r) => r.cls === 'TNewCaption')?.text ?? null;
+  const slot = at({ x: rec.ax + rec.w - (ref.w - MIXER_PLACES.slot.x) * k, y: rec.ay + MIXER_PLACES.slot.y * k });
+  const before = new Set((await snapshot(ev)).recs.filter((r) => r.vis).map((r) => r.lid));
+  // the slot's own presses first (one press, a double-click, then Enter on the selected slot); the first that opens a window is the plug-in's
+  const tries = [['press', async () => cdpPress(S, slot.x, slot.y)], ['double', async () => cdpDoublePress(S, slot.x, slot.y)], ['enter', async () => inputs.pressKey('Enter', 13)]];
+  for (const [name, press] of tries) {
+    await press();
+    diag.pressed.push(name);
+    for (let i = 0; i < 12; i++) {
+      const s2 = await snapshot(ev);
+      const fresh = s2.recs.find((r) => r.vis && !before.has(r.lid) && r.cls === 'TPluginForm');
+      if (fresh) {
+        const kids = descendantRecs(s2.recs, fresh.lid);
+        diag.plugin = { ax: fresh.ax, ay: fresh.ay, w: fresh.w, h: fresh.h };
+        diag.pluginKids = kids.map(recLine);
+        // the plug-in's GUI (its TWPControlForm child, shown): the window's frame is not scaled with the GUI (a rounding of the frame moves the window's own width by a pixel)
+        const gui = kids.filter((r) => r.cls === 'TWPControlForm' && r.vis).sort((a, b) => b.w * b.h - a.w * a.h)[0] ?? null;
+        diag.gui = gui ? { w: gui.w, h: gui.h } : null;
+        return { s: s2, rec: fresh };
+      }
+      await sleep(500);
+    }
+  }
+  diag.afterFail = descendantRecs(await snapshot(ev).then((s3) => s3.recs), rec.lid).map(recLine).slice(0, 60);
+  throw new Error(`no window opened by the double-click on the Fruity Balance slot (mixer ${rec.ax},${rec.ay} ${rec.w}x${rec.h}; strip at ${strip.x.toFixed(1)},${strip.y.toFixed(1)} css, slot at ${slot.x.toFixed(1)},${slot.y.toFixed(1)} css)`);
+}
+
+/** the Welcome window and the missing-plug-ins dialog at the start are closed with Escape (while listed, at most four times) */
+async function closeStartDialogs(ctx) {
+  const { ev, inputs } = ctx;
+  for (let i = 0; i < 4; i++) {
+    const s0 = await snapshot(ev);
+    if (!isVisible(s0, named('TWelcomeWizard')) && !isVisible(s0, named('TMissingPluginsForm'))) break;
+    await inputs.pressKey('Escape', 27);
+    await sleep(2000);
+  }
+}
 
 /** opens (or finds open) the window `kind` and returns its snapshot and its record; throws with the reason when it cannot be opened */
 async function openWindow(kind, ctx) {
@@ -607,12 +818,7 @@ async function openWindow(kind, ctx) {
   };
   if (kind === 'welcome') return showBy(named('TWelcomeWizard'), 'the Welcome window (open at the start)');
   if (kind === 'main') {
-    for (let i = 0; i < 4; i++) {
-      const s0 = await snapshot(ev);
-      if (!isVisible(s0, named('TWelcomeWizard')) && !isVisible(s0, named('TMissingPluginsForm'))) break;
-      await inputs.pressKey('Escape', 27);
-      await sleep(2000);
-    }
+    await closeStartDialogs(ctx);
     return showBy(named('TFruityLoopsMainForm'), 'the main window');
   }
   if (kind === 'mixer') return showBy(named('TFXForm'), 'the Mixer', () => inputs.pressKey('F9', 120));
@@ -620,16 +826,36 @@ async function openWindow(kind, ctx) {
   if (kind === 'piano-roll') return showBy(named('TEventEditForm', 'Piano roll -'), 'the Piano roll', () => inputs.pressKey('F7', 118));
   if (kind === 'menu') return showBy(named('TQuickPopupMenuWindow'), 'the menu popup (a press on the menu bar at 30,20)', () => inputs.pressGuest(30, 20));
   if (kind === 'tooltip') {
-    const before = new Set((await snapshot(ev)).recs.filter((r) => !r.child).map((r) => r.lid));
-    for (const [gx, gy] of [[464, 20], [900, 20], [1460, 20]]) {
+    // #1381: the hint is drawn in the top bar (TQuickControlBar), not in a window of its own: a hover over a part of the bar draws it in the info line, outside the part.
+    await closeStartDialogs(ctx);
+    const s0 = await snapshot(ev);
+    const before = new Set(s0.recs.filter((r) => !r.child).map((r) => r.lid));
+    const bar = topBarOf(s0);
+    if (!bar) throw new Error('no top bar (TQuickControlBar) in the window table');
+    // the parts (the DPR 1 places: Tempo, Song position, Pattern selector) are left-anchored, so they move with the bar's height over its height at DPR 1
+    const k = REF && REF.topBar ? bar.h / REF.topBar.h : 1;
+    const points = [];
+    for (const part of TIP_PARTS) {
+      const gx = Math.round(bar.ax + (part.x + part.w / 2) * k), gy = Math.round(bar.ay + (part.y + part.h / 2) * k);
+      const place = { ax: Math.round(bar.ax + part.x * k) - 4, ay: Math.round(bar.ay + part.y * k) - 4, w: Math.round(part.w * k) + 8, h: Math.round(part.h * k) + 8 };
+      // the pointer is moved to the bar's corner (a place with no hint) before each part: every hover starts from the same picture
+      await inputs.leave(s0.w - 2, s0.h - 2);
+      const base = await snapshot(ev);
       await inputs.hover(gx, gy);
       const s = await snapshot(ev);
       const rec = s.recs.find((r) => !r.child && !before.has(r.lid)) ?? null;
-      if (rec) return { s, rec };
+      if (rec) return { s, rec, hint: null };
+      // a hint is drawn in the info line, outside the part hovered; the part's own change (its highlight) is not counted
+      const outside = changedBox(base, s, bar, place);
+      points.push({ x: gx, y: gy, outside: outside ? { px: outside.n, box: outside.box } : null });
     }
-    throw new Error('no tooltip window appeared: hovering over the top bar (3 points, 2.5 s each) showed no new top-level window');
+    const hits = points.filter((p) => p.outside);
+    const hint = { bar: { ax: bar.ax, ay: bar.ay, w: bar.w, h: bar.h }, k, points, edgeWidthWhy: 'the hint is not a window of its own: there is no frame whose edges are measured' };
+    ctx.tooltipHint = hint;
+    if (hits.length) return { s: s0, rec: null, hint };
+    throw new Error(`no tooltip: hovering over the top bar's parts (3 points, 2.5 s each) changed no picture outside the part hovered (no hint in the info line); no new top-level window appeared`);
   }
-  if (kind === 'plugin') throw new Error('no plugin window: no native plugin (Fruity Balance) is open in the project, and this tool does not insert one into a mixer slot');
+  if (kind === 'plugin') return openPlugin(ctx);
   throw new Error(`unknown window ${kind}`);
 }
 
@@ -667,10 +893,18 @@ async function pointerTest(ctx, points) {
 
 /** one row of a window of a static boot: the window is opened (or found), its rectangle and edges are measured; the main window also gets the parts, the Browser's blackShare and the pointer test */
 async function windowRow(kind, ctx) {
-  const row = { window: kind, windowRect: null, error: null, edgeWidth: null, blackShare: null, parts: null, pluginScalePercent: null, pointerErrPx: null, pointerSentErrPx: null, pointerPoints: null, pointerDiag: null };
+  const row = { window: kind, windowRect: null, error: null, edgeWidth: null, blackShare: null, parts: null, pluginScalePercent: null, pluginWindowPercent: null, pluginGuiHeightPercent: null, pluginDiag: null, tooltipHint: null, pointerErrPx: null, pointerSentErrPx: null, pointerPoints: null, pointerDiag: null };
   try {
     const { s, rec } = await openWindow(kind, ctx);
-    row.windowRect = { x: rec.ax, y: rec.ay, w: rec.w, h: rec.h, cls: rec.cls, title: rec.text };
+    if (rec) row.windowRect = { x: rec.ax, y: rec.ay, w: rec.w, h: rec.h, cls: rec.cls, title: rec.text };
+    // #1381: the plug-in's scale is the width of its GUI (TWPControlForm) against the same GUI at DPR 1 (the calibration boot), in percent; the outer window's width and the GUI's height are kept beside it
+    if (kind === 'plugin') {
+      const gui = ctx.pluginDiag?.gui ?? null;
+      const ref = REF && REF.pluginGui ? REF.pluginGui : null;
+      row.pluginScalePercent = gui && ref ? Math.round((100 * gui.w) / ref.w) : null;
+      row.pluginGuiHeightPercent = gui && ref ? Math.round((100 * gui.h) / ref.h) : null;
+      row.pluginWindowPercent = REF && REF.pluginW ? Math.round((100 * rec.w) / REF.pluginW) : null;
+    }
     if (kind === 'main') {
       const t = tempoOf(s, REF);
       row.edgeWidth = t.edgeWidth;
@@ -680,7 +914,7 @@ async function windowRow(kind, ctx) {
       // the presses are made after the other windows are measured (they change the top bar's state: they must not change what the other windows open with)
       if (t.parts) ctx.pointerPoints = ['tempo', 'song-position', 'pattern-selector'].map((k) => ({ x: t.parts[k].cx, y: t.parts[k].cy }));
       else row.pointerDiag = { why: 'the parts are not known (no reference: the calibration boot has none)' };
-    } else {
+    } else if (rec) {
       // the menu's frame is dark on the black desktop (its outside contrast is about 28 at 3x, #1348): its edges are measured with a contrast of at least 20 in either direction
       row.edgeWidth = kind === 'menu' ? rectEdges(s, rec, MENU_MIN_CONTRAST, true) : rectEdges(s, rec);
     }
@@ -688,6 +922,8 @@ async function windowRow(kind, ctx) {
     row.error = String(e?.message ?? e).slice(0, 300);
   } finally {
     if (kind === 'menu' || kind === 'tooltip') await ctx.inputs.pressKey('Escape', 27).catch(() => {});
+    if (kind === 'plugin') row.pluginDiag = ctx.pluginDiag ?? null;
+    if (kind === 'tooltip') row.tooltipHint = ctx.tooltipHint ?? null;
   }
   return row;
 }
@@ -772,8 +1008,9 @@ async function staticBoot({ dpr, viewport, port, root, rnd, windows }) {
     const fl = flScalingOf(s0, REF);
     const t0 = tempoOf(s0, REF);
     boot.flScalingPercent = fl.flScalingPercent;
-    boot.scale = { welcomeW: fl.welcomeW, tempoLen: t0.tempo ? t0.tempo.len : null, ratio: t0.scale };
-    reference = { welcomeW: fl.welcomeW, tempoLen: t0.tempo ? t0.tempo.len : null };
+    const bar = topBarOf(s0);
+    boot.scale = { welcomeW: fl.welcomeW, tempoLen: t0.tempo ? t0.tempo.len : null, ratio: t0.scale, topBar: bar ? { ax: bar.ax, ay: bar.ay, w: bar.w, h: bar.h } : null };
+    reference = { welcomeW: fl.welcomeW, tempoLen: t0.tempo ? t0.tempo.len : null, topBar: bar ? { w: bar.w, h: bar.h } : null };
     if (windows.length) {
       const inputs = inputsOf(S, ev, v);
       const ctx = { S, ev, v, inputs, pointerPoints: null };
@@ -890,14 +1127,18 @@ async function dynamicBoot({ steps, viewport, port, root, rnd }) {
 }
 
 // the viewport that gives the room ROOM_CSS: the page's layout outside the stage is fixed, so the viewport is corrected by the difference the page shows at DPR 1 (at most three boots)
-async function calibrate(port, root) {
+async function calibrate(port, root, windows) {
   let vp = { w: ROOM_CSS.w, h: ROOM_CSS.h };
   for (let i = 0; i < 3; i++) {
-    const r = await staticBoot({ dpr: 1, viewport: vp, port, root, rnd: null, windows: [] });
+    const r = await staticBoot({ dpr: 1, viewport: vp, port, root, rnd: null, windows: windows.includes('plugin') ? ['plugin'] : [] });
     process.stderr.write(`calibrate ${i}: viewport ${vp.w}x${vp.h} gives room ${JSON.stringify(r.room)}${r.error ? ` error ${r.error.slice(0, 300)}` : ''}\n`);
     if (r.error || !r.room) throw new Error(`calibration: ${r.error ?? 'no room'}`);
     if (Math.abs(r.room.w - ROOM_CSS.w) <= 2 && Math.abs(r.room.h - ROOM_CSS.h) <= 2) {
-      REF = r.reference && r.reference.tempoLen ? r.reference : null;
+      const pr = r.rows.find((x) => x.window === 'plugin') ?? null;
+      const plug = pr?.windowRect ?? null;
+      const mixer = pr?.pluginDiag?.mixer ?? null;
+      const gui = pr?.pluginDiag?.gui ?? null;
+      REF = r.reference && (r.reference.tempoLen || r.reference.welcomeW) ? { ...r.reference, pluginW: plug ? plug.w : null, pluginGui: gui, mixer: mixer ? { w: mixer.w, h: mixer.h } : null } : null;
       if (!REF) process.stderr.write('calibrate: no Tempo box or Welcome window in the picture: the scale and the parts are null\n');
       return vp;
     }
@@ -927,12 +1168,13 @@ async function main() {
   const assets = path.join(root, 'assets');
   let server = null, failed = false;
   try {
+    PLUGIN_CTX = opts.windows.includes('plugin') ? pluginContext(bundleDir) : null;
     stageAssets({ rawDir: bundleDir, brDir, assets, bundle: BUNDLE });
     process.env.FL_ASSETS_DIR = assets;
     const vite = await import(pathToFileURL(createRequire(path.join(appDir, 'package.json')).resolve('vite')).href);
     const port = await freePort();
     server = await vite.preview({ root: appDir, logLevel: 'silent', preview: { host: '127.0.0.1', port, strictPort: true } });
-    const vp = await calibrate(port, root);
+    const vp = await calibrate(port, root, opts.windows);
     const rnd = randomDprs(opts.random, opts.range, undefined, opts.dprs);
     for (const dpr of [...opts.dprs, ...rnd.values]) {
       const { rows } = await staticBoot({ dpr, viewport: vp, port, root, rnd, windows: opts.windows });
