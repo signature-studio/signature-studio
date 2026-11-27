@@ -15,7 +15,7 @@ export default defineScenario({
     const logStart = (await guest.ev('window.__app.engineLog().length').catch(() => 0)) ?? 0;
     const id = await menuPath(guest, ['File', '#3']);
     const box = await waitBox(guest, 30000);
-    if (box !== 'filedlg') {
+    if (box !== 'explorer') {
       return { ok: false, engineState: (await guest.state())?.state ?? null, notes: [`no file box after ${id} (box ${box})`] };
     }
     const abs = dataPath(repo, 'Data\\Demo projects\\NewStuff.flp');

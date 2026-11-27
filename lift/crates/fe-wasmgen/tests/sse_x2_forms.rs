@@ -242,8 +242,37 @@ fn cases() -> Vec<Case> {
         v.push(gp("pmovmskb", &[0x66, 0x0f, 0xd7, 0xc0], |a, _b| unsafe { _mm_movemask_epi8(a) as u32 as u64 }));
         v.push(gp("pextrw 5", &[0x66, 0x0f, 0xc5, 0xc0, 0x05], |a, _b| unsafe { _mm_extract_epi16::<5>(a) as u32 as u64 }));
         v.push(gp("pextrw 0", &[0x66, 0x0f, 0xc5, 0xc0, 0x00], |a, _b| unsafe { _mm_extract_epi16::<0>(a) as u32 as u64 }));
+        v.push(gp("movmskps rax", &[0x48, 0x0f, 0x50, 0xc0], |a, _b| unsafe { _mm_movemask_ps(_mm_castsi128_ps(a)) as u32 as u64 }));
+        v.push(gp("movmskpd rax", &[0x66, 0x48, 0x0f, 0x50, 0xc0], |a, _b| unsafe { _mm_movemask_pd(_mm_castsi128_pd(a)) as u32 as u64 }));
+        v.push(gp("pmovmskb rax", &[0x66, 0x48, 0x0f, 0xd7, 0xc0], |a, _b| unsafe { _mm_movemask_epi8(a) as u32 as u64 }));
+        v.push(gp("pextrw 5 rax", &[0x66, 0x48, 0x0f, 0xc5, 0xc0, 0x05], |a, _b| unsafe { _mm_extract_epi16::<5>(a) as u32 as u64 }));
     }
     v
+}
+
+#[test]
+fn gp_forms_decode_as_intended() {
+    use iced_x86::{Decoder, DecoderOptions, Instruction, Mnemonic, OpKind, Register};
+    let want = [
+        (Mnemonic::Movmskps, Register::EAX, &[0x0f, 0x50, 0xc0][..]),
+        (Mnemonic::Movmskps, Register::RAX, &[0x48, 0x0f, 0x50, 0xc0][..]),
+        (Mnemonic::Movmskpd, Register::EAX, &[0x66, 0x0f, 0x50, 0xc0][..]),
+        (Mnemonic::Movmskpd, Register::RAX, &[0x66, 0x48, 0x0f, 0x50, 0xc0][..]),
+        (Mnemonic::Pmovmskb, Register::EAX, &[0x66, 0x0f, 0xd7, 0xc0][..]),
+        (Mnemonic::Pmovmskb, Register::RAX, &[0x66, 0x48, 0x0f, 0xd7, 0xc0][..]),
+        (Mnemonic::Pextrw, Register::EAX, &[0x66, 0x0f, 0xc5, 0xc0, 0x05][..]),
+        (Mnemonic::Pextrw, Register::RAX, &[0x66, 0x48, 0x0f, 0xc5, 0xc0, 0x05][..]),
+    ];
+    for (m, r, b) in want {
+        let mut d = Decoder::with_ip(64, b, 0x401000, DecoderOptions::NONE);
+        let mut i = Instruction::default();
+        d.decode_out(&mut i);
+        assert_eq!(i.mnemonic(), m, "{:02x?}", b);
+        assert_eq!(i.len(), b.len(), "{:02x?}", b);
+        assert_eq!(i.op_kind(0), OpKind::Register, "{:02x?}", b);
+        assert_eq!(i.op0_register(), r, "{:02x?}", b);
+        assert_eq!(i.op1_register(), Register::XMM0, "{:02x?}", b);
+    }
 }
 
 #[test]
@@ -304,7 +333,8 @@ fn sse_x2_forms_match_the_host_cpu() {
         let outp = dir.join("out.bin");
         let o = Command::new("node").arg(&js).arg(&w).arg(&inp).arg(&outp).output().unwrap();
         if !o.status.success() {
-            failures.push(format!("{}: node: {}", c.name, String::from_utf8_lossy(&o.stderr).lines().next().unwrap_or("")));
+            let err = String::from_utf8_lossy(&o.stderr).into_owned();
+            failures.push(format!("{}: node: {}", c.name, err.lines().find(|l| l.contains("Error")).or(err.lines().next()).unwrap_or("")));
             continue;
         }
         let got = std::fs::read(&outp).unwrap();

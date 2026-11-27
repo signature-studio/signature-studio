@@ -147,3 +147,12 @@ test('rowPasses: a passing row, a skipped scenario, a failing one, and a mark sc
   assert.equal(rowPasses({ ...good, scenarios: [{ ...good.scenarios[0], ok: false, expectFail: '#1406' }] }, 1), true);
   assert.equal(rowPasses(good, 2), false);
 });
+
+test('--only with area IDs takes the areas of the IDs (no --area, no --scenarios)', async () => {
+  const { areasOfOnly } = await import('../lib/plan.mjs');
+  assert.deepEqual(areasOfOnly(['file/open-shows-opfs-window', 'file/save-shows-opfs-window', 'page/canvas-fills-viewport']), ['file', 'page']);
+  assert.equal(areasOfOnly(['file-open-demo']), null);
+  assert.equal(areasOfOnly(['file-open-demo', 'file/open-box-shows']), null);
+  assert.equal(areasOfOnly(['nope/x']), null);
+  assert.equal(areasOfOnly([]), null);
+});

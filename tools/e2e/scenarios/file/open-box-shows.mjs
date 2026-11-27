@@ -4,7 +4,7 @@ import path from 'node:path';
 import { defineScenario } from '../../lib/scenario.mjs';
 import { dataPath, openDataFile } from '../../lib/file.mjs';
 
-const BOX = "document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)";
+const BOX = "document.getElementById('fx-input-files') ? 'explorer' : null";
 const DEMO = path.join('Data', 'Demo projects', 'Demo songs', 'DEDZII - NIGHT TERROR.flp');
 
 export default defineScenario({

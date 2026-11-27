@@ -10,14 +10,15 @@ import { IdleTrace } from './idle-trace.ts';
 import { ReportThrottle } from './report-throttle.ts';
 import { TaskbarReport } from './taskbar-report.ts';
 import type { EngineToRender, FromWorker, GuestTextBest, GuestTextNear, RenderToEngine, ToWorker } from './protocol.ts';
-import type { FileDlgAnswer, FileDlgRequest } from './filedlg.ts';
+import type { FileDlgAnswer, FileDlgItem, FileDlgRequest } from './filedlg.ts';
 import { osStateKey, osStateOf } from './os-state.ts';
 import { deskGen, readDeskState, type DeskApi, type DeskState } from './desk.ts';
 import { sceneGen } from './desk-gl.ts';
 import { DeskGate } from './desk-link.ts';
 import { RingReader, takenAtSchedulerPoint } from '../input/ring.ts';
 import { IN, SC } from '../input/events.ts';
-import { openRegState, type RegState } from './regstore.ts';
+import { openRegState, REG_STATE_LIMIT, type RegState } from './regstore.ts';
+import { fileRecord, recentAfterOpen, recentListOf } from './recent.ts';
 import { stopAudioReport } from '../audio/worker-hook.ts'; // decision 0175: listens for { cmd: 'audio-init' } (the page sends it)
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -37,6 +38,8 @@ let fruity: FruityEngine | null = null;
 let driver: IdleDriver | null = null;
 /** Issue #1383: the saved HKCU tree of the virtual registry (regstore.ts); null when the browser keeps none */
 let regState: RegState | null = null;
+/** Issue #1502: FL's Recent list (the MRU values, newest first) as the journal holds it (recent.ts) */
+let recentList: string[] = [];
 const reports = new ReportThrottle();
 const trace = new IdleTrace();
 const checkpoints: { n: number; hash: number }[] = [];
@@ -107,6 +110,7 @@ async function init(m: Extract<ToWorker, { cmd: 'init' }>): Promise<void> {
   if (!m.assets.glue || !m.assets.dll || !m.assets.seed) throw new Error('the emscripten engine needs the glue, the seed pack and the DLL pack');
   regState = await openRegState(log);
   if (regState) mark('reg_state', { saved: regState.saved.length, bytes: regState.bytes });
+  recentList = regState ? recentListOf(regState.saved) : [];
   const host: FruityHost = {
     regSaved: () => regState?.saved ?? null,
     regPut: (record) => { regState?.put(record); },
@@ -324,6 +328,23 @@ function onFileDlgAnswer(id: number, answer: FileDlgAnswer): void {
   const taken = fruity.answerFileDlg(id, answer);
   mark('filedlg_answer', { id, taken, ok: answer.ok });
   if (!taken) log('warn', `the page answered file dialog ${id}, which the engine is not waiting for`);
+  else if (answer.ok) keepOpened(answer.items);
+}
+
+/** Issue #1502: a project the person opened is kept for the next start: its content (the journal's user's file, op 5) and its place at the top of FL's Recent list (the MRU values).
+ * FL's own exit does not write the list here, so the page records the open; the records go to the journal as the engine's own changes do (regstore.ts). Nothing is kept when the journal is not. */
+function keepOpened(items: FileDlgItem[]): void {
+  const item = items.find((i) => i.role === 'R');
+  if (!regState || !item || !item.file || item.file.size === 0 || item.file.size > REG_STATE_LIMIT) return;
+  const state = regState;
+  const path = item.path;
+  void item.file.arrayBuffer().then((buf) => {
+    if (regState !== state) return;
+    state.put(fileRecord(path, new Uint8Array(buf)));
+    const next = recentAfterOpen(recentList, path);
+    recentList = next.list;
+    for (const r of next.records) state.put(r);
+  }).catch((e: unknown) => log('warn', `the project is not kept for the next start: ${String((e as Error)?.message ?? e).slice(0, 200)}`));
 }
 // at the engine's idle: a Save target whose file the engine has finished writing goes to the page as a copy (never to a server; the page offers it as a download)
 function pollSavedFiles(): void {

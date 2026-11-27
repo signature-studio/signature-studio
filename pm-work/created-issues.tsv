@@ -214,3 +214,19 @@
 233	#1519	File→Open で、ブラウザのネイティブのファイル選択を出さず、OPFS のファイル管理の窓を出す: 窓の答えを FL へ返す	Task
 234	#1520	起動の順序を直す: 黒い canvas に HTML のモーダルでダウンロードの進捗を出し、起動の直前に消してから、FL のネイティブのスプラッシュを出す(スプラッシュは FL の表示のコードを lift して出す)	Task
 235	#1521	File メニューに『Manage files』を足す(『Revert to last backup』と『Exit』の間)。選ぶと OPFS のファイル管理の窓が出る	Task
+236	#1522	`wall_fr15` のエンジンの協調のミキサーの試験が、main で `rt_mixer: MISMATCH at 8193` で落ちる: 先読みの値(#1432)か通知位置の丸め(#1426)で、モデルと出力が食い違う	Task
+237	#1523	realmod の名前が 59 字を超えると、engine が起動の前に止まる: 名前の作業域を広げ、key の長さを生成の段で検査する	Task
+238	#1524	`tools/plugin-run` の場面の選び方を直す: 名前の部分一致で別の曲を選ぶ・名前を持つ曲が無い(場面 (a) を足す)	Task
+239	#1525	`fe-build`: Edison の build が、`the units of the compile lists are not written by gen: ["m10-01.c", "m10-02.c", "m10-03.c"]` で止まる	Task
+240	#1526	E2E の audio: Wave の書き出しが保存されず、その後の再生・画の判定が 22 本落ちる(窓の後始末と、保存されない原因の切り分け)	Task
+241	#1527	E2E の menus: 予算で 246 本が飛ばされ、項目の判定が 73 本落ちる(shard の割り方・項目の指定・閉じない箱)	Task
+242	#1528	E2E の visual: 描画の停止(Target crashed)の後、残りの 49 本が 1 ms で error になる(ページの作り直しと、error を受理しない判定)	Task
+243	#1529	製品: エンジンが止まる 4 系統(外部の取得の失敗・Sytrus の demo 2 本・Edit > #3 とその乱操作・書き出しの形式)	Task
+244	#1530	E2E の file: テンプレートを開いた後の判定が 37 本落ちる(タイトルが読めない・Problems の箱が残る疑い)と、Ctrl+O の箱を前提にした本	Task
+245	#1531	E2E の settings: 前回は DPR 1 で合格していた 14 本が落ちる(テーマ 11・表示 2・波形 1)。共通の準備(resetProject・Problems の箱)の変更が候補	Task
+240	#1526	E2E の audio: Wave の書き出しが保存されず、その後の再生・画の判定が 22 本落ちる(窓の後始末と、保存されない原因の切り分け)	Task
+241	#1527	E2E の menus: 予算で 246 本が飛ばされ、項目の判定が 73 本落ちる(shard の割り方・項目の指定・閉じない箱)	Task
+242	#1528	E2E の visual: 描画の停止(Target crashed)の後、残りの 49 本が 1 ms で error になる(ページの作り直しと、error を受理しない判定)	Task
+243	#1529	製品: エンジンが止まる 4 系統(外部の取得の失敗・Sytrus の demo 2 本・Edit > #3 とその乱操作・書き出しの形式)	Task
+244	#1530	E2E の file: テンプレートを開いた後の判定が 37 本落ちる(タイトルが読めない・Problems の箱が残る疑い)と、Ctrl+O の箱を前提にした本	Task
+245	#1531	E2E の settings: 前回は DPR 1 で合格していた 14 本が落ちる(テーマ 11・表示 2・波形 1)。共通の準備(resetProject・Problems の箱)の変更が候補	Task
