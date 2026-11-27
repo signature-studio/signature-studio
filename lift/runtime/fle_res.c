@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "fle_runtime.h"
@@ -243,6 +244,108 @@ static uint32_t walk(const char *api, const res_img *im, int mode, uint64_t valu
     return UINT32_MAX;
 }
 
+/* File > Manage files (Issue #1521). The DFM of the main form (RT_RCDATA 'TFRUITYLOOPSMAINFORM', pinned here by its data RVA and size) is
+ * read from a copy with one item more: the TQuickMenuItem 'ManageFilesMenu' after 'RevAutoSaveMenu' (Revert to last backup), with the
+ * Caption 'Manage files', OnClick 'FileMenuClick' (a published method of the form) and Tag MANAGE_FILES_TAG. FileMenuClick's host hook
+ * (fle_hle_manage_files_click, fle_hle.c) tells that item by its tag. The copy is made once, at the first use of the entry; LoadResource,
+ * SizeofResource and LockResource give the copy's VA and size for it. The stream is Delphi's (TReader, Classes.pas): an object is its class
+ * name, its name, its properties (name, value type, value; a zero length ends them) and its children (a zero ends them). Any other layout
+ * stops the run. */
+#define DFM_MAIN_RVA      UINT32_C(0x1745f88)
+#define DFM_MAIN_SIZE     UINT32_C(150246)
+#define MANAGE_FILES_TAG  UINT32_C(0x4d46)
+
+static uint64_t dfm_copy_va;
+static uint32_t dfm_copy_size;
+
+static uint32_t find_bytes(const uint8_t *s, uint32_t n, uint32_t from, const uint8_t *pat, uint32_t m)
+{
+    uint32_t i;
+    for (i = from; i + m <= n; i++) if (memcmp(s + i, pat, m) == 0) return i;
+    return UINT32_MAX;
+}
+
+/* the offset of an object header (its class name, then its name) in s[from..n) */
+static uint32_t find_object(const uint8_t *s, uint32_t n, uint32_t from, const char *cls, const char *name)
+{
+    uint8_t pat[512];
+    uint32_t mc = (uint32_t)strlen(cls), mn = (uint32_t)strlen(name), m = 0;
+    pat[m++] = (uint8_t)mc;
+    memcpy(pat + m, cls, mc);
+    m += mc;
+    pat[m++] = (uint8_t)mn;
+    memcpy(pat + m, name, mn);
+    m += mn;
+    return find_bytes(s, n, from, pat, m);
+}
+
+static uint32_t put_pstr(uint8_t *d, uint32_t at, const char *str)
+{
+    uint32_t m = (uint32_t)strlen(str);
+    d[at] = (uint8_t)m;
+    memcpy(d + at + 1, str, m);
+    return at + 1 + m;
+}
+
+/* the object of the item, as the stream holds it: class, name, the properties (Caption, Flags as an empty set, OnClick, Tag), the end of the properties and of the children */
+static uint32_t manage_item(uint8_t *d)
+{
+    uint32_t at = 0;
+    at = put_pstr(d, at, "TQuickMenuItem");
+    at = put_pstr(d, at, "ManageFilesMenu");
+    at = put_pstr(d, at, "Caption");
+    d[at++] = 0x06;
+    at = put_pstr(d, at, "Manage files");
+    at = put_pstr(d, at, "Flags");
+    d[at++] = 0x0b;
+    d[at++] = 0x00;
+    at = put_pstr(d, at, "OnClick");
+    d[at++] = 0x07;
+    at = put_pstr(d, at, "FileMenuClick");
+    at = put_pstr(d, at, "Tag");
+    d[at++] = 0x03;
+    d[at++] = (uint8_t)(MANAGE_FILES_TAG & 0xffu);
+    d[at++] = (uint8_t)(MANAGE_FILES_TAG >> 8);
+    d[at++] = 0x00;
+    d[at++] = 0x00;
+    return at;
+}
+
+static uint64_t dfm_main_build(const char *api, uint64_t src, uint32_t size)
+{
+    uint8_t *s, *d, ins[256];
+    uint32_t rev, at, n, ins_len, i;
+
+    s = malloc(size);
+    if (s == NULL) fle_stop(api, "out of memory (the copy of the main form's DFM)");
+    for (i = 0; i < size; i++) s[i] = (uint8_t)fle_ld(src + i, 1);
+    if (size < 4 || memcmp(s, "TPF0", 4) != 0) fle_stop(api, "the main form's DFM does not start with TPF0 (the copy is not made)");
+    rev = find_object(s, size, 4, "TQuickMenuItem", "RevAutoSaveMenu");
+    if (rev == UINT32_MAX) fle_stop(api, "the main form's DFM has no RevAutoSaveMenu item (the copy is not made)");
+    at = find_object(s, size, rev + 1, "TQuickMenuItem", "N91");
+    if (at == UINT32_MAX || at < 3 || s[at - 1] != 0 || s[at - 2] != 0 || s[at - 3] != 0) fle_stop(api, "the item after RevAutoSaveMenu is not the separator N91 at the expected place (the copy is not made)");
+    ins_len = manage_item(ins);
+    n = size + ins_len;
+    d = malloc(n);
+    if (d == NULL) fle_stop(api, "out of memory (the copy of the main form's DFM)");
+    memcpy(d, s, at);
+    memcpy(d + at, ins, ins_len);
+    memcpy(d + at + ins_len, s + at, size - at);
+    free(s);
+    dfm_copy_va = (uint64_t)(uintptr_t)d;
+    dfm_copy_size = n;
+    return dfm_copy_va;
+}
+
+/* the VA and size of a leaf's data: the copy of the main form's DFM when the leaf is that one (its copy is made at this first use), else as they are */
+static uint64_t dfm_main_data(const char *api, uint64_t va, uint32_t *size, uint64_t base)
+{
+    if (va != base + DFM_MAIN_RVA || *size != DFM_MAIN_SIZE) return va;
+    if (dfm_copy_va == 0) dfm_main_build(api, va, *size);
+    *size = dfm_copy_size;
+    return dfm_copy_va;
+}
+
 /* kernel32!FindResourceW (Microsoft Learn: FindResourceW). hModule rcx, lpName rdx, lpType r8 (the name comes
  * before the type). Success returns the HRSRC, here the VA of the 16-byte Resource Data Entry inside the mapped
  * image (decision 0025: the page says only "a handle to the specified resource's information block"; this value
@@ -284,7 +387,7 @@ void fle_imp_LoadResource(void)
     entry = walk(api, &im, WALK_ENTRY, hres);
     if (entry == UINT32_MAX) fle_stop(api, "hResInfo is not a resource handle returned by FindResourceW for this module");
     leaf_data(api, &im, entry, &va, &size);
-    R[0] = va;
+    R[0] = dfm_main_data(api, va, &size, im.base);
 }
 
 /* kernel32!LockResource (Microsoft Learn: LockResource). hResData rcx. "Do not pass any value as a parameter
@@ -301,6 +404,7 @@ void fle_imp_LockResource(void)
     /* LockResource gets no module: the data VA belongs to the image of the lifted DLL or to the one of a real module (decision 0104) */
     img_open(api, &im, FLE_EXE_HANDLE);
     if (hres == 0) fle_stop(api, "hResData is NULL (the page allows only a successful LoadResource result)");
+    if (dfm_copy_va != 0 && hres == dfm_copy_va) { R[0] = hres; return; }   /* the copy of the main form's DFM (dfm_main_data) is a LoadResource result too */
     found = walk(api, &im, WALK_DATA, hres) != UINT32_MAX;
     for (k = 0; !found && FLE_REALMOD_PRESENT() && (b = fle_realmod_base_of(k)) != 0; k++) {
         /* a module whose image is not mapped yet (fle_realmod_load maps it) gave no LoadResource result: its image is not read */
@@ -326,6 +430,7 @@ void fle_imp_SizeofResource(void)
     entry = walk(api, &im, WALK_ENTRY, hres);
     if (entry == UINT32_MAX) fle_stop(api, "hResInfo is not a resource handle returned by FindResourceW for this module");
     leaf_data(api, &im, entry, &va, &size);
+    dfm_main_data(api, va, &size, im.base);
     R[0] = size;
 }
 

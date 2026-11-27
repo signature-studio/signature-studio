@@ -36,7 +36,13 @@ const STOP = { 'file-9-11': '#1415', 'view-11-1': '#1416', 'add-14': '#1411', 't
 const randomOnly = (slug) => ['view-12', 'view-13', 'view-14'].includes(slug) || slug.startsWith('view-19');
 
 /** the items with no scenario: Exit ends the engine, and the run counts an exit as a stop (lib/detect.mjs), so the item cannot be judged */
-const NO_SCENARIO = { 'file-10': 'File > #10 (Exit): the engine exits, and the run counts an exit as a stop (lib/detect.mjs)' };
+const NO_SCENARIO = { 'file-11': 'File > #11 (Exit): the engine exits, and the run counts an exit as a stop (lib/detect.mjs). Issue #1521: Manage files is #10 (after Export, before Exit)' };
+
+/** File > Manage files (Issue #1521): the item between Revert to last backup and Exit, and the OPFS file window it opens. Both at DPR 1 and DPR 2 (lib/menus.mjs) */
+const MANAGE_FILES = [
+  { name: 'manage-files-order', fn: 'manageFilesOrder', desc: 'File > Manage files: the item is in the File drop-down between Revert to last backup and Exit (menus/manage-files-order).' },
+  { name: 'manage-files-opens-window', fn: 'manageFilesOpens', desc: 'File > Manage files: the choice opens the OPFS file window (menus/manage-files-opens-window).' },
+];
 
 /** the shortcuts. `map` is the menu item that the key duplicates, where the run showed it (F8 opens the same window as View > #6; Ctrl+N opens the Save as window, as File > #4) */
 const KEYS = [
@@ -123,6 +129,10 @@ function scenariosOf() {
       const restore = k.restore ? `async (g) => { ${k.restore} }` : 'null';
       add({ name: `key-${k.slug}`, covers: [], displays: ['4k-dpr1'], expectFail: null, note, stopNote: [], imports: ['shortcut', ...alt], body: `return withNote(await shortcut(ctx, '${k.label}', async (g) => { ${k.press} }, ${restore}), ${JSON.stringify(note)});`, desc: `${k.label}: the effect in the window table (a window, a submenu, a changed window or the title). No menu item of the list is named as its duplicate.` });
     }
+  }
+  for (const m of MANAGE_FILES) {
+    const note = 'displays: 4k-dpr1 and 4k-dpr2 (the item is read at both)';
+    add({ name: m.name, covers: [], displays: ['4k-dpr1', '4k-dpr2'], expectFail: null, note, stopNote: [], imports: [m.fn], body: `return withNote(await ${m.fn}(ctx), ${JSON.stringify(note)});`, desc: m.desc });
   }
   return out;
 }

@@ -5,6 +5,7 @@ import { settingsOpen } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/settings-f11',
   covers: ['windows/window/tmidiform-2'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return settingsOpen(guest, 'F11');
   },

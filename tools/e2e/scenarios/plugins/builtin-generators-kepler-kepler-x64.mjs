@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-generators-kepler-kepler-x64',
   covers: ['plugins/generators/kepler-kepler-x64', 'plugins/window/generators-kepler-kepler-x64', 'plugins/param/generators-kepler-kepler-x64', 'plugins/audio/generators-kepler-kepler-x64', 'plugins/stop/generators-kepler-kepler-x64'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Kepler", kind: 'generators' });
   },

@@ -5,6 +5,7 @@ import { MAIN_FORM, windowTable } from '../../lib/common.mjs';
 export default defineScenario({
   id: 'windows/main-form-present',
   covers: [],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const main = t.top.find((w) => w.cls === MAIN_FORM);

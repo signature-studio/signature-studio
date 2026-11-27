@@ -1,0 +1,3 @@
+# Fruity Delay Bank (Effects). hook: the three Delphi hook points (inputs/plugin-hooks.tsv). omit: - (the setjmp entry is found automatically, #1370).
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-delay-bank.fruity_delay_bank_x64.dll	Plugins\Fruity\Effects\Fruity Delay Bank\Fruity Delay Bank_x64.dll	本体	5632d1bc36add5a0f5ede997fb8e2f48d413b837b83eaea0f94d798f0baaddda	3917312	rva:0x17e90,0x32050,0x32070	--pdata	-

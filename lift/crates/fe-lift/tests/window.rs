@@ -1096,6 +1096,22 @@ fn def_window_proc_answers_zero_for_a_message_whose_learn_page_names_no_default_
 }
 
 #[test]
+fn def_window_proc_answers_zero_for_wm_undo() {
+    // Learn WM_UNDO (desktop-src/Controls/wm-undo.md): "An application sends a WM_UNDO message to an edit control"; the page does not mention DefWindowProc, so it is class C of decision 0222 and answers 0
+    // (WM_CUT, WM_COPY, WM_PASTE and WM_CLEAR, the same family, are answered already). Before this it stopped: the E2E's resilience/random-ops-09 stopped with "DefWindowProcW: message 0x304" after its 30th operation.
+    let l = lines(
+        "win-def-undo",
+        r#"
+    uint64_t h;
+    REGP("TPUtilWindow", VA_REC);
+    h = CW_OK("TPUtilWindow");
+    printf("%llx\n", U(DEF(h, 0x304, 0, 0)));
+"#,
+    );
+    assert_eq!(l, ["0"]);
+}
+
+#[test]
 fn def_window_proc_stops_for_every_other_message_a_true_nccalcsize_and_a_null_lparam() {
     let setup = "REGP(\"TPUtilWindow\", VA_REC); { uint64_t h = CW_OK(\"TPUtilWindow\"); (void)h; } { static uint8_t buf[80]; (void)buf; }";
     let msgs: Vec<(String, String)> = [

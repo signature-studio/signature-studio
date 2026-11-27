@@ -1,0 +1,5 @@
+# HLE entries of FLEngine_x64.dll (decision 0162; fe-lift lift --hle-entries). One entry per line: ADDR NAME (see lift/crates/fe-lift/src/hle.rs).
+# FileMenuClick (the published method of the main form, its address in the method table of TFruityLoopsMainForm: 0x121f770) is the OnClick of
+# the File > Manage files item (Issue #1521, the DFM copy of runtime/fle_res.c). The guard runs fle_hle_manage_files_click (runtime/fle_hle.c): it
+# handles the item (its Tag 0x4d46) and returns 0 for every other sender, which runs the lifted body.
+rva:0xe1f770 manage_files_click

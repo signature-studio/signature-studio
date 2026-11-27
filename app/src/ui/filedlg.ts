@@ -49,7 +49,7 @@ export class FileDialogView {
 
   show(id: number, request: FileDlgRequest): void {
     if (this.current) this.cancel('replaced by a newer dialog');
-    this.host.log?.('info', `the engine's ${request.save ? 'Save' : 'Open'} dialog offers: ${describeFilters(request)}`);
+    this.host.log?.('info', request.manage ? 'File > Manage files opens the file window' : `the engine's ${request.save ? 'Save' : 'Open'} dialog offers: ${describeFilters(request)}`);
     if (this.host.select) { this.current = { id, request }; this.buildSelect(id, request); return; }
     if (request.save) { this.saveNow(id, request); return; }
     if (request.options & FOS_PICKFOLDERS) { this.settle(id, 'open', 'refused', { ok: false, reason: 'The engine asked for a folder of its own virtual volume. There is none to choose from on this computer.' }); return; }
