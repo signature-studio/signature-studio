@@ -155,6 +155,11 @@ try {
   ok('Data: 同じ guest の行が 2 つなら、例外', fails(dataDir(`${DATA_HEAD}${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n${BLUR}\t${BLUR}\t${SHA_BLUR}\t152\n`), /not unique/), 'yes');
   ok('Data: 実物の lift/plugins/sytrus/data.tsv の 109 行は、Sytrus の seed の行(@lazy-file:)になる',
     pluginRows(path.join(ROOT, 'lift/plugins')).seed.filter((r) => r[1].startsWith('@lazy-file:plugins/Plugins/Fruity/Generators/Sytrus/Data/')).length, 109);
+  const SHA_EXE = '66100a71d04bddf340bc8f56a1823846662ad44f4b422c7059dad4b2eb32f1e7';
+  const EXE_ROW = ['plugin-manager.pluginmanager.dll', 'System\\Tools\\Plugin Manager\\PluginManager.exe', '補助', SHA_EXE, '7158856', 'none', '', '-'].join('\t');
+  const exe = pluginRows(plugins({ 'plugin-manager': `${HEADER}\n${EXE_ROW}\n` }));
+  ok('exe(#1499): 抽出の行は取り出し先の鍵の名。seed の行は無い(VFS は固定の表の行)', [exe.extract, exe.seed], [[['pluginmanager.exe', 'lift/out-plugins/plugin-manager.pluginmanager.dll', SHA_EXE]], []]);
+  ok('exe(#1499): 鍵が .exe で終わるなら、例外', fails(plugins({ 'plugin-manager': `${HEADER}\n${EXE_ROW.replace('.dll\t', '.exe\t')}\n` }), /ends with \.dll/), 'yes');
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

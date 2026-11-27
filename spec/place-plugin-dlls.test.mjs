@@ -148,6 +148,29 @@ try {
   const counts = mod ? mod.placeRows(f3, [{ guest: BLUR_GUEST, sha: digest(BLUR), targets: [BLUR_HOST] }], () => {}) : {};
   ok('Data の複写: 置き先(_ の綴り)に、源と同じ中身を置く', [counts.placed, same(host(f3, BLUR_HOST), BLUR)], [1, true]);
 
+  // (j) .exe の行(Issue #1499: PluginManager.exe): 取り出しの先が無ければ、resources の実物から複写する。源は接頭辞の外でも使う。seed の行は作らない
+  const EXE_GUEST = 'System\\Tools\\Plugin Manager\\PluginManager.exe';
+  const EXE_KEY = 'plugin-manager.pluginmanager.dll';
+  const EXE_RES = 'resources/System/Tools/Plugin Manager/PluginManager.exe';
+  const EXE_OUT = `lift/out-plugins/${EXE_KEY}`;
+  const exeRepo = (body) => {
+    const r = repo({ plugins: { 'plugin-manager': `${HEADER}\n${EXE_KEY}\t${EXE_GUEST}\t補助\t${digest(ALPHA)}\t${ALPHA.length}\tnone\t\t-\n` }, extra: {} });
+    fs.mkdirSync(path.dirname(host(r, EXE_RES)), { recursive: true });
+    if (body !== null) fs.writeFileSync(host(r, EXE_RES), body);
+    return r;
+  };
+  const je = exeRepo(ALPHA);
+  ok('exe の行: 取り出しの先だけが targets(源は resources の実物。seed の行は無い)',
+    mod ? mod.rowsOf(je).map((r) => [r.guest, r.targets, r.from]) : null, [[EXE_GUEST, [EXE_OUT], 'resources']]);
+  const rje = run(je);
+  ok('exe の行: 取り出しの先が無ければ、resources の実物から複写する', [rje.code, rje.out, same(host(je, EXE_OUT), ALPHA)], [0, OUT(1, 0, 0, 0), true]);
+  const jt = exeRepo(Buffer.from('tampered\n'));
+  const rjt = run(jt);
+  ok('exe の行: resources の実物の sha256 が違えば、複写せず mismatch に数えて exit 1', [rjt.code, rjt.out, fs.existsSync(host(jt, EXE_OUT)), /mismatch/.test(rjt.err)], [1, OUT(0, 0, 0, 1), false, true]);
+  const jm = exeRepo(null);
+  const rjm = run(jm);
+  ok('exe の行: resources に実物が無ければ、missing に数えて exit 1', [rjm.code, rjm.out, /missing/.test(rjm.err)], [1, OUT(0, 0, 1, 0), true]);
+
   // (h) 検査に落ちる plugin.tsv: exit 1 で、理由を標準エラーに出す(判定は、受け入れの結果で続く)
   const h = repo({ plugins: { bad: 'key\tguest\trole\n' } });
   const rh = run(h);

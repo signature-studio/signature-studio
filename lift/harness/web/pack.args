@@ -280,3 +280,5 @@ lift/out-app/plugins/ott/vst-ext.wasm=plugins/ott.wasm
 lift/out-app/plugins/serum2/vst-ext.wasm=plugins/serum2.wasm
 --lazy-file
 lift/out-app/plugins/vital/vst-ext.wasm=plugins/vital.wasm
+--lazy-file
+lift/out-app/host/resources/System/Tools/Plugin Manager/PluginManager.exe=seed/resources/System/Tools/Plugin Manager/PluginManager.exe

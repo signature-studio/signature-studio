@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { absoluteRect, childrenOfClass, parseDump, rootOf, subtree } from '../lib/dump.mjs';
-import { blackTiles, clipRect, decodePicture, regionHash } from '../lib/picture.mjs';
+import { blackRegions, blackTiles, clipRect, decodePicture, regionHash } from '../lib/picture.mjs';
 
 const TABLE = [
   'lid 14 at (0, 0) 3500x2124 style 0x94030000 alpha 0 key 000000 class "TFruityLoopsMainForm" title "FL Studio 2026"',
@@ -58,4 +58,30 @@ test('blackTiles counts the 64 x 64 tiles whose pixels are all 0 (a partial edge
   const q = picture(130, 64, () => [0, 0, 0]);
   assert.equal(blackTiles(q, 64), 3);
   assert.throws(() => decodePicture({ base64: Buffer.alloc(10).toString('base64'), width: 8, height: 8 }), /picture/);
+});
+
+test('blackRegions counts the 4-connected pure-black groups whose box is min px wide and high (the desktop colour is not black)', () => {
+  const big = picture(300, 200, (x, y) => (x >= 10 && x < 130 && y >= 20 && y < 150 ? [0, 0, 0] : [5, 7, 10]));
+  const r = blackRegions(big, 100);
+  assert.equal(r.bigCount, 1);
+  assert.deepEqual([r.big[0].w, r.big[0].h], [120, 130]);
+  assert.equal(blackRegions(big, 200).bigCount, 0);
+  const thin = picture(300, 200, (x) => (x < 50 ? [0, 0, 0] : [5, 7, 10]));
+  assert.equal(blackRegions(thin, 100).bigCount, 0);
+  assert.equal(blackRegions(thin, 100).groups, 1);
+  const dots = picture(300, 200, (x, y) => (x % 2 === 0 && y % 2 === 0 ? [0, 0, 0] : [5, 7, 10]));
+  assert.equal(blackRegions(dots, 2).bigCount, 0);
+  assert.equal(blackRegions(dots, 2).groups, 300 * 200 / 4);
+});
+
+test('blackRegions reads the rows by their stride (a row longer than width x 4 bytes)', () => {
+  const w = 120, h = 110, stride = w * 4 + 16;
+  const bytes = Buffer.alloc(stride * h, 0x7f);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * stride + 4 * x;
+    bytes[i] = 0; bytes[i + 1] = 0; bytes[i + 2] = 0; bytes[i + 3] = 255;
+  }
+  const pic = decodePicture({ base64: bytes.toString('base64'), width: w, height: h });
+  assert.equal(pic.stride, stride);
+  assert.equal(blackRegions(pic, 100).bigCount, 1);
 });

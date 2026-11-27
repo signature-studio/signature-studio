@@ -10,6 +10,8 @@
 #include "fle_raster.h"
 #include "fle_desk.h"
 void fle_desk_wrote(uint32_t lid, int64_t x0, int64_t y0, int64_t x1, int64_t y1) __attribute__((weak));   /* fle_desk.c; a link list without it (the native tests) leaves it null */
+void fle_win_surface_made(uint32_t lid) __attribute__((weak));   /* fle_win.c (Issue #1483): a surface of new pixels was made for lid */
+void fle_win_area_wrote(uint32_t lid, fle_rrect r) __attribute__((weak));   /* fle_win.c (Issue #1483): the written rectangle of lid gets the controllers' colour where it is zero */
 
 
 uint64_t trace_call_count(void) __attribute__((weak));
@@ -675,6 +677,7 @@ fle_rsurf *fle_raster_window_surface(uint32_t lid, uint32_t w, uint32_t h)
     s->w = w;
     s->h = h;
     ws_fill_view(s);
+    if (fle_win_surface_made) fle_win_surface_made(lid);
     return &s->view;
 }
 
@@ -842,6 +845,7 @@ void fle_raster_wrote(const fle_rsurf *surf, fle_rrect r, const char *api)
     if (!s) return;
     s->writes++;
     if (fle_desk_wrote) fle_desk_wrote(s->lid, r.x0, r.y0, r.x1, r.y1);   /* decision 0223: the desktop compositor (fle_desk.c) learns which part of a window's picture changed */
+    if (fle_win_area_wrote) fle_win_area_wrote(s->lid, r);
     if (evidence_seen || s->first_done) return;
     fle_r_clip(&r, &(fle_rrect){ 0, 0, (int64_t)s->w, (int64_t)s->h });
     for (int64_t y = r.y0; y < r.y1 && !any; y++) {
