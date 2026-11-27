@@ -4257,6 +4257,10 @@ impl<'a> L<'a> {
                 M::Pextrw => self.c.simd_lane(0x19, i.immediate8() & 7),
                 _ => return Err(format!("{m:?} to a general register")),
             }
+            // the mask and the lane are i32; set_reg extends only a 32-bit destination, so a 64-bit one is extended here
+            if dst.size() == 8 {
+                self.c.i64_extend_i32_u();
+            }
             return self.set_reg(dst);
         }
         if !dst.is_xmm() {

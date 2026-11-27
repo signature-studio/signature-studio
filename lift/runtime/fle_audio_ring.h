@@ -97,7 +97,8 @@ int fle_audio_external(void);
 void fle_audio_unlock_note(double first_frame, uint32_t frames);
 /* S-ds-late-write (decision 0241, PROVISIONAL): a region of a playing buffer was written (Unlock) after the device had already handed the frames of that region to the output ring. Hands the frames [first, first + frames) that
  * the output has NOT read yet to the output again, over the ones handed before, without moving the write position of the ring; the frames within fle_audio_rewrite_guard_frames() of the read position (and the ones already read) are
- * left alone. External consumer only: a no-op without one (the virtual clock never moves while guest code runs, so nothing is ever published stale there). */
+ * left alone. External consumer only: a no-op without one. Natively the frames are handed over up to `lead` ahead of the play cursor before the guest writes them, so a native run is exact only while the lead does not exceed the write-ahead of the mixer
+ * (one block; wall_fr15 rt_mixer). */
 void fle_audio_ring_rewrite(const float *lr, uint32_t frames, uint64_t first);
 /* The distance in frames from the consumed position within which a rewrite is not made (S-ds-rewrite-guard: two 128-frame quanta of the AudioWorklet, the one it may be reading and the next). */
 uint32_t fle_audio_rewrite_guard_frames(void);
