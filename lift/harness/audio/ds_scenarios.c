@@ -615,11 +615,16 @@ static void sc_ring_header(void)
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
+void fle_sim_external(int on);
+void fle_sim_follow_clock(uint64_t t0);
+/* rt_mixer_ext: the same with the external consumer of the browser (the stand-in of sim_transport.c: the AudioWorklet's read count follows the virtual clock), so that a write after the hand-over is put over the frames not yet read (S-ds-late-write) */
+static int rt_ext;
 static void sc_rt_mixer(void)
 {
     uint32_t blocks = g_argc > 2 ? (uint32_t)atoi(g_argv[2]) : 40, spin_ms = g_argc > 3 ? (uint32_t)atoi(g_argv[3]) : 0, spin_every = g_argc > 4 ? (uint32_t)atoi(g_argv[4]) : 0;
     uint32_t bf = g_argc > 5 ? (uint32_t)atoi(g_argv[5]) : 4096, block = bf * 4, total = 2 * block, written = 0, under = 0, polls = 0;
     int prev_half = 0;
+    if (rt_ext) fle_sim_external(1);
     rig_t r = rig_make(44100, 2 * bf, 0x8000 | 0x10000);
     uint64_t pl = 0, wr = 0, p1 = 0, p2 = 0;
     uint32_t n1 = 0, n2 = 0;
@@ -633,6 +638,7 @@ static void sc_rt_mixer(void)
     memset((void *)(uintptr_t)p1, 0, n1);
     VC(r.sec, B_UNLOCK, p1, n1, p2, n2);
     VC(r.sec, B_SETCURPOS, block);
+    if (rt_ext) fle_sim_follow_clock(TICKS());
     VC(r.sec, B_PLAY, 0, 0, 1);
     printf("rt_mixer: block %u frames, total %u bytes, %u blocks\n", bf, total, blocks);
     while (written < blocks) {
@@ -666,7 +672,7 @@ static void sc_rt_mixer(void)
     }
     printf("rt_mixer: written %u blocks, %u polls, the engine's underrun check fired %u times, first write at +%llu ticks of the virtual clock\n", written, polls, under, U(t_first_write));
     printf("rt_mixer: ring write_frames %llu read_frames %llu underruns %u\n", U(ring->write_frames), U(ring->read_frames), ring->underruns);
-    if (!ring->external_consumer) {
+    {
         /* the stream: zeros for the two blocks before the first written block is reached, then the sine, sample for sample (phase continuous) */
         float *d = fle_audio_ring_data();
         uint64_t k, bad = 0, n = ring->write_frames, limit = (uint64_t)blocks * bf, nz = 0;
@@ -682,7 +688,13 @@ static void sc_rt_mixer(void)
         }
         printf("rt_mixer: stream frames 0..%u non-zero: %llu; frames %u..%llu against the sine: %llu mismatches (ring write_frames %llu)\n", 2 * bf - 1, U(nz), 2 * bf, U(limit - 1), U(bad), U(n));
     }
+    if (rt_ext) {
+        const dsound_stats *s = fle_dsound_stats();
+
+        printf("rt_mixer: late writes: events=%llu applied=%llu lost=%llu\n", U(s->late_writes), U(s->late_write_applied), U(s->late_write_lost));
+    }
 }
+static void sc_rt_mixer_ext(void) { rt_ext = 1; sc_rt_mixer(); }
 
 
 /* ---- the stand-in for the AudioWorklet of decision 0241: harness/audio/sim_transport.c (linked in place of runtime/fle_audio_transport.c) ---- */
@@ -821,7 +833,7 @@ static void sc_stop_bad_this(void) { rig_t r = rig_make(44100, 882, 0x8000); VC(
 
 static const struct { const char *name; void (*fn)(void); int stops; } S[] = {
     { "enum", sc_enum, 0 }, { "create", sc_create, 0 }, { "errors", sc_errors, 0 }, { "play", sc_play, 0 }, { "stop_resume", sc_stop_resume, 0 }, { "notify", sc_notify, 0 },
-    { "notify_alone", sc_notify_alone, 0 }, { "notify_bytes", sc_notify_bytes, 0 }, { "rt_mixer", sc_rt_mixer, 0 }, { "late_write", sc_late_write, 0 }, { "late_write_sine", sc_late_write_sine, 0 }, { "formats", sc_formats, 0 }, { "ring_header", sc_ring_header, 0 },
+    { "notify_alone", sc_notify_alone, 0 }, { "notify_bytes", sc_notify_bytes, 0 }, { "rt_mixer", sc_rt_mixer, 0 }, { "rt_mixer_ext", sc_rt_mixer_ext, 0 }, { "late_write", sc_late_write, 0 }, { "late_write_sine", sc_late_write_sine, 0 }, { "formats", sc_formats, 0 }, { "ring_header", sc_ring_header, 0 },
     { "stop_setfx", sc_stop_setfx, 1 }, { "stop_duplicate", sc_stop_duplicate, 1 }, { "stop_3d", sc_stop_3d, 1 }, { "stop_after_release", sc_stop_after_release, 1 }, { "stop_resample", sc_stop_resample, 1 },
     { "stop_second_primary", sc_stop_second_primary, 1 }, { "stop_writeprimary", sc_stop_writeprimary, 1 }, { "stop_bad_this", sc_stop_bad_this, 1 },
 };

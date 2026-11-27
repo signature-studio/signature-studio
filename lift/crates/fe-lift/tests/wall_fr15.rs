@@ -170,7 +170,7 @@ fn the_list_of_scenarios() {
     let r = run(&["list"]);
     assert_eq!(r.code, Some(0));
     let names: Vec<&str> = r.out.iter().map(|s| s.as_str()).collect();
-    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "notify_bytes", "rt_mixer", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
+    assert_eq!(names, ["enum", "create", "errors", "play", "stop_resume", "notify", "notify_alone", "notify_bytes", "rt_mixer", "rt_mixer_ext", "late_write", "late_write_sine", "formats", "ring_header", "stop_setfx (stops)", "stop_duplicate (stops)", "stop_3d (stops)",
         "stop_after_release (stops)", "stop_resample (stops)", "stop_second_primary (stops)", "stop_writeprimary (stops)", "stop_bad_this (stops)"]);
 }
 
@@ -492,13 +492,19 @@ fn the_engines_polling_mixer_runs_against_the_model_in_virtual_time_without_an_u
     let w = o.iter().find(|l| l.starts_with("rt_mixer: written")).unwrap();
     assert!(w.contains("the engine's underrun check fired 0 times"), "{w}");
     assert!(o.iter().any(|l| l.contains("against the sine: 0 mismatches")), "{o:?}");
-    // S-audio-lead: the same engine geometry (two blocks of 4096 frames) at the default lead (60 ms) and at 90 ms: the stream is the sine sample for sample (the output reads `lead` frames ahead of the play cursor; the half is rewritten before it is read)
-    for lead in [None, Some("90")] {
-        let r = run_lead(&["rt_mixer", "6"], lead);
-        assert_eq!(r.code, Some(0), "{lead:?}: {}", r.err);
-        assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "{lead:?}: {:?}", r.out);
-        assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "{lead:?}: {:?}", r.out);
-    }
+    // S-audio-lead: the same engine geometry (two blocks of 4096 frames) at 90 ms: the stream is the sine sample for sample (the output reads `lead` frames ahead of the play cursor; the half is rewritten before it is read). The mixer writes a half one block (4096 frames) before
+    // the play cursor reaches it, so a lead of more than one block hands out frames that are not written yet. Without an external consumer nothing puts such a frame over (S-ds-late-write takes effect only with one): the default lead (300 ms = 13230 frames) is checked with the external consumer below.
+    let r = run_lead(&["rt_mixer", "6"], Some("90"));
+    assert_eq!(r.code, Some(0), "90 ms: {}", r.err);
+    assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "90 ms: {:?}", r.out);
+    assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "90 ms: {:?}", r.out);
+    // the default lead with the external consumer of the browser (rt_mixer_ext: the read count follows the clock): a write after the hand-over is put over the frames not read yet (rewrite_unread), so the stream is the sine sample for sample and no frame is lost
+    let r = run_lead(&["rt_mixer_ext", "6"], None);
+    assert_eq!(r.code, Some(0), "default lead: {}", r.err);
+    assert!(r.out.iter().any(|l| l.contains("against the sine: 0 mismatches")), "default lead: {:?}", r.out);
+    assert!(r.out.iter().any(|l| l.contains("the engine's underrun check fired 0 times")), "default lead: {:?}", r.out);
+    let lw = r.out.iter().find(|l| l.starts_with("rt_mixer: late writes:")).unwrap_or_else(|| panic!("no late writes line: {:?}", r.out));
+    assert!(field(lw, "events") > 0 && field(lw, "applied") > 0 && field(lw, "lost") == 0, "{lw}");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -560,7 +566,7 @@ fn every_slot_of_every_vtable_is_filled_and_the_offsets_the_engine_calls_are_the
 // ---------------------------------------------------------------------------------------------
 // 7. Decision 0241 (aud1, PROVISIONAL): S-ds-late-write. With an external consumer (here the stand-in of harness/audio/sim_transport.c: the play position is a count the scenario sets, the ring is the C ring) a write that comes after the
 //    device handed the frames to the output takes effect while it is still at least the guard (256 frames: S-ds-rewrite-guard) ahead of the output's read position; nearer frames are counted as lost. The scenarios run with the
-//    default lead of the runtime, 60 ms = 2646 frames; a device of 8192 frames plays LOOPING from frame 0 and is synchronised at consumed 1000 (3646 frames handed over, all silent) unless the 4th number says another.
+//    lead of FLE_AUDIO_LEAD_MS=60 (2646 frames; `late` sets it, the default of the runtime is 300 ms); a device of 8192 frames plays LOOPING from frame 0 and is synchronised at consumed 1000 (3646 frames handed over, all silent) unless the 4th number says another.
 // ---------------------------------------------------------------------------------------------
 
 fn late(consumed: u64, first: u64, n: u64, presync: u64) -> Vec<String> {
