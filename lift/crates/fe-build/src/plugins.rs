@@ -1228,7 +1228,8 @@ mod tests {
 
     /// The second wave's folders as pm-work/tools/gen-wave-plugins.mjs writes them: the folder without its kind prefix (with the prefix when
     /// another folder has the same name), and the keys `<kind>.<folder>.<file>`. The table's folders are `<kind>-<folder>` with their keys
-    /// `<kind>.<kind>-<folder>.<file>`, so the keys differ, and the guest paths are the same.
+    /// `<kind>.<kind>-<folder>.<file>`, so the keys differ, and the guest paths are the same. A folder that the copy has already (lift/plugins
+    /// has 12 of the wave's folders since Issue #1440) is kept as it is: it is the same folder.
     fn write_wave_folders(table: &str, state: &str) {
         let folders: Vec<String> = fs::read_dir(table).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
         let name_of = |folder: &str| folder.split_once('-').unwrap().1.to_string();
@@ -1236,6 +1237,9 @@ mod tests {
             let kind = folder.split_once('-').unwrap().0;
             let shared = folders.iter().filter(|f| name_of(f) == name_of(folder)).count() > 1;
             let dir = if shared { folder.clone() } else { name_of(folder) };
+            if Path::new(&format!("{state}/{dir}")).is_dir() {
+                continue;
+            }
             let text = fs::read_to_string(format!("{table}/{folder}/plugin.tsv")).unwrap();
             fs::create_dir(format!("{state}/{dir}")).unwrap();
             fs::write(format!("{state}/{dir}/plugin.tsv"), gen_form(kind, &dir, &text)).unwrap();
@@ -1430,9 +1434,7 @@ mod tests {
         assert_eq!(wave.len(), 551);
         assert_eq!(wave.iter().map(|d| d.size).sum::<u64>(), 9_438_441);
 
-        let mut dlls = read_plugins_from(plugins_dir()).unwrap();
-        dlls.extend(wave2_dlls(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-count")));
-        dlls.sort_by(|a, b| a.key.cmp(&b.key));
+        let dlls = second_wave_dlls(plugins_dir(), &wave2_dlls(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-wave2-count"))).unwrap();
         validate(&dlls).unwrap();
         let mut data = read_data_from(plugins_dir()).unwrap();
         data.extend(wave);
