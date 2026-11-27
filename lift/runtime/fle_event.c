@@ -8,7 +8,9 @@
  * Nothing here reads the host: no clock, no thread, no process, no file. */
 #define _GNU_SOURCE
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "fle_runtime.h"
 #include "fle_host.h"
@@ -132,6 +134,18 @@ static ev_ent *event_arg(const char *api, uint64_t h, uint64_t fail_ret)
  *  - not implemented, stop: a name (named events, ERROR_ALREADY_EXISTS and the shared namespace need an object table
  *    across kinds) and a security attributes structure.
  * The last error is left alone on success (the page says nothing about changing it; ERROR_ALREADY_EXISTS needs a name). */
+/* Issue #1502: one line per event call while the thread trace is on (the exit of the page; the trace is off otherwise). v: the state (create, set, reset, signaled), the time-out (wait) or the result (done) */
+static void ev_trace(const char *what, uint64_t h, uint32_t v)
+{
+    char buf[480], w[320] = "";
+    int n;
+
+    if (!fle_thread_trace_on || !fle_thread_trace_on()) return;
+    if (fle_thread_trace_words) fle_thread_trace_words(w, sizeof w);
+    n = snprintf(buf, sizeof buf, "fle-event: %s %#llx %u thread %u%s\n", what, (unsigned long long)h, (unsigned)v, fle_thread_current ? fle_thread_current() : 0u, w);
+    if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the event is the same */ }
+}
+
 void fle_imp_CreateEventW(void)
 {
     static const char api[] = "CreateEventW";
@@ -157,6 +171,7 @@ void fle_imp_CreateEventW(void)
     evs_n++;
     evs_live++;
     R[0] = FLE_EVENT_HANDLE_BASE + 4u * evs_n;
+    ev_trace("create", R[0], evs[evs_n - 1].signaled);
 }
 
 /* kernel32!SetEvent: BOOL f(hEvent rcx). Learn (SetEvent): the event becomes signaled; the return value is nonzero. A
@@ -171,6 +186,7 @@ void fle_imp_SetEvent(void)
     fle_event_check_thread("SetEvent");
     e = event_arg("SetEvent", R[1], 0);
     if (!e) return;
+    ev_trace("set", R[1], 1);
     e->signaled = 1;
     R[0] = 1;
     if (fle_thread_wake_check) fle_thread_wake_check(); /* decision 0122: a thread that waits for this event becomes ready (an auto-reset event goes to the first waiter) */
@@ -185,6 +201,7 @@ void fle_imp_ResetEvent(void)
     fle_event_check_thread("ResetEvent");
     e = event_arg("ResetEvent", R[1], 0);
     if (!e) return;
+    ev_trace("reset", R[1], 0);
     e->signaled = 0;
     R[0] = 1;
 }
@@ -215,13 +232,16 @@ void fle_imp_WaitForSingleObject(void)
     }
     e = event_arg(api, R[1], FLE_WAIT_FAILED);
     if (!e) return;
+    ev_trace("wait", R[1], ms);
     if (e->signaled) {
         if (!e->manual) e->signaled = 0;
         R[0] = FLE_WAIT_OBJECT_0;
+        ev_trace("done-signaled", R[1], e->manual);
         return;
     }
     if (ms == 0) {
         R[0] = FLE_WAIT_TIMEOUT;
+        ev_trace("done-timeout", R[1], 0);
         return;
     }
     if (fle_thread_wait_objects && fle_thread_count && fle_thread_count() > 1) {
