@@ -5,6 +5,7 @@ import { mixerInsert } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/zz-mixer-insert-7',
   covers: ['windows/mixer/insert-select'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   expectFail: 'new',
   async run({ guest }) {
     return mixerInsert(guest, 6);

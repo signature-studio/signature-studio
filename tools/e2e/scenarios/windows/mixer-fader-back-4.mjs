@@ -5,6 +5,7 @@ import { mixerFaderRoundTrip } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/mixer-fader-back-4',
   covers: ['windows/mixer/fader'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return mixerFaderRoundTrip(guest, 3);
   },

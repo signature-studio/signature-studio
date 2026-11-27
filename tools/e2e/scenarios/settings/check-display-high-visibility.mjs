@@ -5,7 +5,7 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/check-display-high-visibility',
   covers: ["settings/check/display-high-visibility"],
-  displays: ["4k-dpr1"],
+  displays: ["4k-dpr1", "4k-dpr2"],
   expectFail: null,
   run(ctx) {
     return S.checkRun(ctx, "General", /^Display/, 21, 316);

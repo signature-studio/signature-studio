@@ -57,3 +57,38 @@ pub fn reloc_seeds(pe: &Pe<'_>) -> Result<RelocSeeds, String> {
 pub fn reloc_pdata_seeds(pe: &Pe<'_>) -> Result<Vec<u64>, String> {
     Ok(reloc_seeds(pe)?.seeds)
 }
+
+/// Issue #1395 (`--rva-tables`): the rows of a table file, `RVA COUNT` (hex RVA, decimal count; `#` comments). Each names a table of
+/// `COUNT` 32-bit values that hold RVAs from the ImageBase (the switch tables of MSVC code that jumps to `ImageBase + entry`, whose
+/// targets are other functions, so the analysis has no function entry for them).
+pub fn rva_tables(text: &str) -> Result<Vec<(u32, usize)>, String> {
+    let mut out = Vec::new();
+    for l in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
+        let f: Vec<&str> = l.split_whitespace().collect();
+        let rva = f.first().and_then(|r| u32::from_str_radix(r.trim_start_matches("0x"), 16).ok());
+        let n = f.get(1).and_then(|n| n.parse::<usize>().ok());
+        let (Some(rva), Some(n), 2) = (rva, n, f.len()) else {
+            return Err(format!("bad table row: {l}"));
+        };
+        out.push((rva, n));
+    }
+    Ok(out)
+}
+
+/// The code addresses that the entries of the tables of `rva_tables` hold (ImageBase + entry, inside `.text`), ascending.
+pub fn rva_table_seeds(pe: &Pe<'_>, tables: &[(u32, usize)]) -> Result<Vec<u64>, String> {
+    let text = Text::from_pe(pe)?;
+    let base = pe.optional.image_base;
+    let mut out = BTreeSet::new();
+    for &(rva, n) in tables {
+        let raw = pe.slice_at_rva(rva, 4 * n).map_err(|e| format!("table {rva:#x}: {e}"))?;
+        for k in 0..n {
+            let v = u32::from_le_bytes(raw[4 * k..4 * k + 4].try_into().unwrap());
+            let va = base + v as u64;
+            if text.contains(va) {
+                out.insert(va);
+            }
+        }
+    }
+    Ok(out.into_iter().collect())
+}

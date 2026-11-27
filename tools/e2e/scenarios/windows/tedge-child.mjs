@@ -5,6 +5,7 @@ import { browserWebChild } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/tedge-child',
   covers: ['windows/child/tedgebrowser'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return browserWebChild(guest);
   },

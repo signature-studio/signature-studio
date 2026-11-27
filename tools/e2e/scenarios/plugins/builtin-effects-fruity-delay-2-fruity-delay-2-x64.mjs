@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-effects-fruity-delay-2-fruity-delay-2-x64',
   covers: ['plugins/effects/fruity-delay-2-fruity-delay-2-x64', 'plugins/window/effects-fruity-delay-2-fruity-delay-2-x64', 'plugins/param/effects-fruity-delay-2-fruity-delay-2-x64', 'plugins/audio/effects-fruity-delay-2-fruity-delay-2-x64', 'plugins/stop/effects-fruity-delay-2-fruity-delay-2-x64'],
-  expectFail: '#1484',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Fruity Delay 2", kind: 'effects' });
   },

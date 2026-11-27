@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/external-vital',
   covers: ['plugins/external/vital', 'plugins/window/vital', 'plugins/param/vital', 'plugins/audio/vital', 'plugins/stop/vital'],
-  expectFail: '#1338',
+  expectFail: '#1324',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Vital", kind: 'external' });
   },
