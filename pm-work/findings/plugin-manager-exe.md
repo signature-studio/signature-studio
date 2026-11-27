@@ -202,3 +202,5 @@ runner の値。この機械とは別枠。nproc 4。loadavg は作業の開始�
 - 未実装の import(この exe の 576 件のうち、C の定義が runtime に無いもの。CreateMutexW を足した後で約 45 件): 例 `AddVectoredExceptionHandler`・`AssignProcessToJobObject`・`CreateProcessW`・`GetExitCodeProcess`・`GlobalSize`・`GlobalDeleteAtom`・`HeapDestroy`・`IsBadWritePtr`・`SetEndOfFile`・`VirtualQueryEx`・`RtlUnwind`。届いたら、thunk の場合は名前の付いた停止ではなく "unsupported" で止まる。
 - 題名の `v0.0`(c)。
 - exe の `0x73c670`(8 バイトを書く別の hook の経路。VirtualProtect の大きさが 8)は、この run では届いていない。届いたら、ih_protect の規則(5 バイトの hook 点だけ答える)で止まる。
+
+注(マージ後): 作業の終わりに main(`b87bdb05`)を取り込んだ(衝突は `lift/runtime/fle_event.c` の 2 箇所: 本作業の `ev_make`・CreateMutexW と、main の #1502 の `ev_trace`。両方を残した。`ev_trace` は `ev_make` の中で "create" を出す)。取り込み後の木(`b41da049`)で、`lift/runtime/*.c` の全件を `gcc -fsyntax-only` で検査(誤り 0)、`npm test --prefix app`(77 files passed・1 skipped。1,476 passed)を通した。取り込み後の受け入れ全体(`fe-build engine` から E2E まで)は、時間の上限(開始から 4 時間 30 分)のため再実行していない(未確認)。
