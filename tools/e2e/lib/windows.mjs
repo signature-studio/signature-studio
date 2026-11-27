@@ -4,6 +4,7 @@
 import { absoluteRect, childrenOfClass } from './dump.mjs';
 import { closeNew, newWindows, openLids, pixelHashRegion, windowTable } from './common.mjs';
 import { sleep } from './flow.mjs';
+import { box, boxH, place, placeH } from './layout.mjs';
 
 export const RACK = 'TStepSeqForm';
 export const PLAYLIST = 'TEventEditForm';
@@ -13,7 +14,7 @@ export const SETTINGS = 'TMIDIForm';
 export const PLUGIN_LIST = 'TPlugListForm';
 
 /** the keys, as Guest.key takes them (code, key, Windows virtual key) */
-export const KEYS = { F7: ['F7', 'F7', 118], F8: ['F8', 'F8', 119], F10: ['F10', 'F10', 121], F11: ['F11', 'F11', 122], F12: ['F12', 'F12', 123], Escape: ['Escape', 'Escape', 27] };
+export const KEYS = { F6: ['F6', 'F6', 117], F7: ['F7', 'F7', 118], F8: ['F8', 'F8', 119], F10: ['F10', 'F10', 121], F11: ['F11', 'F11', 122], F12: ['F12', 'F12', 123], Escape: ['Escape', 'Escape', 27] };
 
 const rect = (x, y, w, h) => ({ x, y, w, h });
 export { rect };
@@ -42,21 +43,39 @@ export async function press(guest, name, ms = 1200) {
   await sleep(ms);
 }
 
+/**
+ * the Channel rack is shown again after a window was closed (Issue #1507, the cleanup of the chain): when the table has no shown rack, F6 shows it (F6 toggles
+ * the rack); returns whether the rack is shown in the table now. The cause of a hidden rack is #1510's.
+ */
+export async function rackBack(guest) {
+  const shown = async () => (await childRect(guest, RACK)) !== null;
+  if (await shown()) return true;
+  await guest.focusDesktop();
+  await guest.key(...KEYS.F6);
+  await sleep(1200);
+  return shown();
+}
+
 /** the windows of the top level and the child windows whose text starts with `prefix` */
 export async function childTexts(guest, cls, prefix) {
   const t = await windowTable(guest);
   return childrenOfClass(t, [cls]).filter((c) => c.text.startsWith(prefix)).map((c) => ({ lid: c.lid, text: c.text, vis: c.vis, w: c.w, h: c.h }));
 }
 
-/** the Channel rack: the offsets of its rows, steps and buttons (guest px from the rack's top-left). Row i is 30 px apart from row 0 */
-export const RACK_LAYOUT = { rowY0: 62, rowH: 30, ledX: 18, nameX: 110, knobX: 40, stepX0: 219, stepW: 15.5, plusX: 145, plusY: 235 };
+/**
+ * the Channel rack: the places of its rows, steps and buttons as ratios of the rack (Issue #1507). The rack is 499 x 246 guest px at DPR 1 (the window table): x is the
+ * DPR 1 offset over 499 (the width), y over 246 (the height). At DPR 2 the rack is 998 x 492 and the same ratios give the same parts (lib/layout.mjs).
+ */
+export const RACK_LAYOUT = { rowY0: 62 / 246, rowH: 30 / 246, ledX: 18 / 499, nameX: 110 / 499, knobX: 40 / 499, stepX0: 219 / 499, stepW: 15.5 / 499, plusX: 145 / 499, plusY: 235 / 246 };
+/** the y ratio of a row's centre line */
+const rowY = (row) => RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH;
 export function rackPoint(rack, row, col) {
-  return { x: rack.x + RACK_LAYOUT.stepX0 + (col + 0.5) * RACK_LAYOUT.stepW, y: rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH };
+  return place(rack, RACK_LAYOUT.stepX0 + (col + 0.5) * RACK_LAYOUT.stepW, rowY(row));
 }
 
 /** the grid of steps of the Channel rack (one row's steps as a rectangle, for the hash) */
 export function rowStepsRect(rack, row) {
-  return rect(rack.x + RACK_LAYOUT.stepX0, rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH - 10, 16 * RACK_LAYOUT.stepW, 20);
+  return box(rack, RACK_LAYOUT.stepX0, rowY(row) - 10 / 246, 16 * RACK_LAYOUT.stepW, 20 / 246);
 }
 
 /** a result: the checks, the values and the notes of one scenario */
@@ -94,8 +113,8 @@ export async function stepToggle(guest, row, col) {
 /** the mute button of a channel's row: pressed twice; the row's LED area changes each time */
 export async function muteToggle(guest, row) {
   const rack = await rackOf(guest);
-  const led = rect(rack.x + RACK_LAYOUT.ledX - 12, rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH - 8, 36, 16);
-  const p = { x: rack.x + RACK_LAYOUT.ledX, y: rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH };
+  const led = box(rack, RACK_LAYOUT.ledX - 12 / 499, rowY(row) - 8 / 246, 36 / 499, 16 / 246);
+  const p = place(rack, RACK_LAYOUT.ledX, rowY(row));
   const h0 = await hash(guest, led);
   await guest.click(p.x, p.y);
   await sleep(600);
@@ -110,9 +129,10 @@ export async function muteToggle(guest, row) {
 /** a channel's name: clicked; the row's strip changes (its selection) */
 export async function selectChannel(guest, row) {
   const rack = await rackOf(guest);
-  const strip = rect(rack.x + 100, rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH - 10, 380, 20);
+  const strip = box(rack, 100 / 499, rowY(row) - 10 / 246, 380 / 499, 20 / 246);
   const h0 = await hash(guest, strip);
-  await guest.click(rack.x + RACK_LAYOUT.nameX, rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH);
+  const name = place(rack, RACK_LAYOUT.nameX, rowY(row));
+  await guest.click(name.x, name.y);
   await sleep(600);
   const h1 = await hash(guest, strip);
   return done(h0 !== h1, { row, changed: h0 !== h1 }, [`select row ${row + 1}: strip changed ${h0 !== h1}`]);
@@ -121,10 +141,11 @@ export async function selectChannel(guest, row) {
 /** the knob of a channel's row: dragged up by `dy` guest px; the knob's area changes */
 export async function knobDrag(guest, row, dy = 30) {
   const rack = await rackOf(guest);
-  const y = rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH;
-  const knob = rect(rack.x + RACK_LAYOUT.knobX - 12, y - 10, 24, 20);
+  const knob = box(rack, RACK_LAYOUT.knobX - 12 / 499, rowY(row) - 10 / 246, 24 / 499, 20 / 246);
   const h0 = await hash(guest, knob);
-  await guest.drag({ x: rack.x + RACK_LAYOUT.knobX, y }, { x: rack.x + RACK_LAYOUT.knobX, y: y - dy }, 10);
+  const from = place(rack, RACK_LAYOUT.knobX, rowY(row));
+  const to = place(rack, RACK_LAYOUT.knobX, rowY(row) - dy / 246);
+  await guest.drag(from, to, 10);
   await sleep(600);
   const h1 = await hash(guest, knob);
   return done(h0 !== h1, { row, dy, changed: h0 !== h1 }, [`knob row ${row + 1} dragged ${dy} px: changed ${h0 !== h1}`]);
@@ -134,7 +155,8 @@ export async function knobDrag(guest, row, dy = 30) {
 export async function rowMenu(guest, row) {
   const rack = await rackOf(guest);
   const base = await openLids(guest);
-  await guest.rightClick(rack.x + RACK_LAYOUT.nameX, rack.y + RACK_LAYOUT.rowY0 + row * RACK_LAYOUT.rowH, 1000);
+  const name = place(rack, RACK_LAYOUT.nameX, rowY(row));
+  await guest.rightClick(name.x, name.y, 1000);
   await sleep(800);
   const { pops } = await newWindows(guest, base);
   const p = pops[0] ?? null;
@@ -148,7 +170,8 @@ export async function plusButton(guest) {
   const whole = rect(rack.x, rack.y, rack.w, rack.h);
   const h0 = await hash(guest, whole);
   const base = await openLids(guest);
-  await guest.click(rack.x + RACK_LAYOUT.plusX, rack.y + RACK_LAYOUT.plusY);
+  const plus = place(rack, RACK_LAYOUT.plusX, RACK_LAYOUT.plusY);
+  await guest.click(plus.x, plus.y);
   await sleep(800);
   const h1 = await hash(guest, whole);
   const { pops } = await newWindows(guest, base);
@@ -157,12 +180,26 @@ export async function plusButton(guest) {
   return done(changed || pops.length > 0, { rackChanged: changed, drops: pops.length }, [`+: rack changed ${changed}, drop-downs ${pops.length}`]);
 }
 
+/**
+ * the DPI scale of the Playlist now (Issue #1507): its caption (a TNewCaption "Playlist ...", 23 guest px high at DPR 1, 46 at DPR 2) over 23. The Playlist's own
+ * size is cut by the screen at DPR 2 (2969 x 2078 at DPR 1, 2095 x 1996 at DPR 2), so it is not the scale; its top-left and offsets are.
+ */
+const PLAYLIST_CAPTION_H1 = 23;
+export async function playlistScale(guest) {
+  const t = await windowTable(guest);
+  const cap = childrenOfClass(t, ['TNewCaption']).find((c) => c.vis && c.text.startsWith('Playlist'));
+  const r = cap ? absoluteRect(t, cap.lid) : null;
+  if (!r) throw new Error('the Playlist caption (TNewCaption "Playlist ...") is not shown in the table');
+  return r.h / PLAYLIST_CAPTION_H1;
+}
+
 /** a Playlist cell (track t, bar b): clicked with the default tool; the grid changes */
 export async function playlistCell(guest, t, b) {
   const pl = await childRect(guest, PLAYLIST);
   if (!pl) throw new Error('the Playlist (TEventEditForm) is not shown');
-  const grid = rect(pl.x + 280, pl.y + 60, 1200, 520);
-  const p = { x: pl.x + 300 + b * 60, y: pl.y + 100 + t * 48 };
+  const s = await playlistScale(guest);
+  const grid = rect(pl.x + 280 * s, pl.y + 60 * s, 1200 * s, 520 * s);
+  const p = { x: pl.x + (300 + b * 60) * s, y: pl.y + (100 + t * 48) * s };
   const h0 = await hash(guest, grid);
   await guest.click(p.x, p.y);
   await sleep(700);
@@ -176,22 +213,33 @@ export async function browserTab(guest, k) {
   const s = absoluteRect(t, 107);
   if (!s) throw new Error('the Browser tab strip (lid 107) is not in the table');
   const h0 = await hash(guest, s);
-  await guest.click(s.x + 22 + k * 44, s.y + 18);
+  // the strip is 352 x 36 guest px at DPR 1: a tab is 44 px apart from the first one, 22 px in from the strip's left
+  const tab = place(s, (22 + k * 44) / 352, 18 / 36);
+  await guest.click(tab.x, tab.y);
   await sleep(600);
   const h1 = await hash(guest, s);
   return done(h0 !== h1, { tab: k + 1, changed: h0 !== h1 }, [`browser tab ${k + 1}: strip changed ${h0 !== h1}`]);
 }
 
+/**
+ * the Mixer (TFXForm) is 500 guest px high at DPR 1 and 1000 at DPR 2, but its width is cut by the screen (3436 at DPR 1, 3029 at DPR 2): its parts are placed
+ * by the height. mixAt: the place of a DPR 1 offset (dx from the Mixer's left, dy from its top, guest px) (Issue #1507)
+ */
+const MIXER_H1 = 500;
+const mixAt = (mx, dx, dy) => placeH(mx, dx / MIXER_H1, dy / MIXER_H1);
+
 /** a Mixer insert (slot k from 0): clicked; the mixer's insert area changes */
 export async function mixerInsert(guest, k) {
   const mx = await childRect(guest, MIXER);
   if (!mx) throw new Error('the Mixer (TFXForm) is not shown');
-  const area = rect(mx.x + 100, mx.y + 60, 2600, 400);
+  const area = boxH(mx, 100 / 500, 60 / 500, 2600 / 500, 400 / 500);
   // another slot is pressed first: a slot that is already selected (by the fader of its own slot) does not change its picture
-  await guest.click(mx.x + 127 + 44 * (k === 0 ? 1 : 0), mx.y + 120);
+  const other = mixAt(mx, 127 + 44 * (k === 0 ? 1 : 0), 120);
+  await guest.click(other.x, other.y);
   await sleep(600);
   const h0 = await hash(guest, area);
-  await guest.click(mx.x + 127 + 44 * k, mx.y + 120);
+  const slot = mixAt(mx, 127 + 44 * k, 120);
+  await guest.click(slot.x, slot.y);
   await sleep(600);
   const h1 = await hash(guest, area);
   return done(h0 !== h1, { slot: k + 1, changed: h0 !== h1 }, [`insert ${k + 1}: area changed ${h0 !== h1}`]);
@@ -201,10 +249,9 @@ export async function mixerInsert(guest, k) {
 export async function mixerFader(guest, k, dy = 40) {
   const mx = await childRect(guest, MIXER);
   if (!mx) throw new Error('the Mixer (TFXForm) is not shown');
-  const x = mx.x + 127 + 44 * k;
-  const area = rect(x - 16, mx.y + 236, 32, 44);
+  const area = boxH(mx, (127 + 44 * k - 16) / 500, 236 / 500, 32 / 500, 44 / 500);
   const h0 = await hash(guest, area);
-  await guest.drag({ x, y: mx.y + 258 }, { x, y: mx.y + 258 - dy }, 10);
+  await guest.drag(mixAt(mx, 127 + 44 * k, 258), mixAt(mx, 127 + 44 * k, 258 - dy), 10);
   await sleep(600);
   const h1 = await hash(guest, area);
   return done(h0 !== h1, { slot: k + 1, dy, changed: h0 !== h1 }, [`fader ${k + 1} dragged ${dy}: changed ${h0 !== h1}`]);
@@ -233,7 +280,9 @@ export async function settingsMove(guest, dx, dy) {
   const { w, base } = await openByKey(guest, 'F10', SETTINGS);
   if (!w) { await closeNew(guest, base); return done(false, {}, ['no Settings window']); }
   const before = { x: w.x, y: w.y, w: w.w, h: w.h };
-  await guest.drag({ x: w.x + 300, y: w.y + 12 }, { x: w.x + 300 + dx, y: w.y + 12 + dy }, 12);
+  // the caption row: 300 px from the left and 12 px from the top at DPR 1 (a ratio of the settings window, 668 x 900 there)
+  const grab = place(w, 300 / 668, 12 / 900);
+  await guest.drag(grab, { x: grab.x + dx, y: grab.y + dy }, 12);
   await sleep(800);
   const now = await lidRect(guest, w.lid);
   await closeNew(guest, base);
@@ -320,8 +369,9 @@ export async function pianoRoll(guest, selectFirst = true) {
 /** the Playlist's right-click: a drop-down opens on the grid */
 export async function playlistMenu(guest) {
   const pl = await childRect(guest, PLAYLIST);
+  const s = await playlistScale(guest);
   const base = await openLids(guest);
-  await guest.rightClick(pl.x + 20, pl.y + 60, 1000);
+  await guest.rightClick(pl.x + 20 * s, pl.y + 60 * s, 1000);
   await sleep(800);
   const { pops } = await newWindows(guest, base);
   const left = await closeNew(guest, base);
@@ -340,13 +390,12 @@ export async function browserWebChild(guest) {
 export async function mixerFaderRoundTrip(guest, k) {
   const mx = await childRect(guest, MIXER);
   if (!mx) throw new Error('the Mixer (TFXForm) is not shown');
-  const x = mx.x + 127 + 44 * k;
-  const area = rect(x - 16, mx.y + 236, 32, 44);
+  const area = boxH(mx, (127 + 44 * k - 16) / 500, 236 / 500, 32 / 500, 44 / 500);
   const h0 = await hash(guest, area);
-  await guest.drag({ x, y: mx.y + 258 }, { x, y: mx.y + 218 }, 10);
+  await guest.drag(mixAt(mx, 127 + 44 * k, 258), mixAt(mx, 127 + 44 * k, 218), 10);
   await sleep(600);
   const h1 = await hash(guest, area);
-  await guest.drag({ x, y: mx.y + 218 }, { x, y: mx.y + 258 }, 10);
+  await guest.drag(mixAt(mx, 127 + 44 * k, 218), mixAt(mx, 127 + 44 * k, 258), 10);
   await sleep(600);
   const h2 = await hash(guest, area);
   const raised = h0 !== h1, lowered = h1 !== h2;

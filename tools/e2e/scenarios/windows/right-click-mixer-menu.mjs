@@ -7,6 +7,7 @@ import { sleep } from '../../lib/flow.mjs';
 export default defineScenario({
   id: 'windows/right-click-mixer-menu',
   covers: ['windows/popup/right-click-mixer'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     const t = await windowTable(guest);
     const w = childrenOfClass(t, ['TFXForm']).find((c) => c.vis);

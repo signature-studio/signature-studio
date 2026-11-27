@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-notebook-2.fruity_notebook_2_x64.dll	Plugins\Fruity\Effects\Fruity NoteBook 2\Fruity NoteBook 2_x64.dll	本体	cd577f546f839f51078967823c062859e22aefe41ff308f03cfc10a4eecc17ec	3612672	rva:0x17ba0,0x31db0,0x31dd0	--pdata	-

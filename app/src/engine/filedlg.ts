@@ -18,6 +18,8 @@ export interface FileDlgRequest {
   folder: string | null;
   /** [display name, spec like "*.flp;*.zip"] */
   filters: [string | null, string | null][];
+  /** Issue #1521: File > Manage files asks for the file window only (no choice is made; the answer is not used) */
+  manage?: boolean;
 }
 
 /** R: the file the dialog returns; E: another file put on the volume next to it (a sample of the project); S: the target of a Save dialog (the engine writes it); D: the folder a folder dialog returns (decision 0216) */
@@ -204,5 +206,7 @@ export function parseRequest(x: unknown): FileDlgRequest | null {
     if (!Array.isArray(f)) return null;
     filters.push([str(f[0]), str(f[1])]);
   }
-  return { save: !!r.save, options: r.options, filterIndex: r.filterIndex, title: str(r.title), okLabel: str(r.okLabel), fileName: str(r.fileName), defaultExt: str(r.defaultExt), folder: str(r.folder), filters };
+  const req: FileDlgRequest = { save: !!r.save, options: r.options, filterIndex: r.filterIndex, title: str(r.title), okLabel: str(r.okLabel), fileName: str(r.fileName), defaultExt: str(r.defaultExt), folder: str(r.folder), filters };
+  if (r.manage === true) req.manage = true;
+  return req;
 }
