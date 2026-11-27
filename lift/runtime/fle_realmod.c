@@ -45,7 +45,7 @@ static int table_ready;
 static void table_check(const char *api)
 {
     uint64_t i, j, n = fle_realmod_count;
-    char why[200];
+    char why[512]; /* the messages hold a name of 255 characters (Issue #1523) */
 
     if (table_ready) return;
     if (n > RM_MAX) fle_stop(api, "fle_realmod_count is larger than the 192 real modules this runtime holds");
@@ -174,7 +174,7 @@ static void read_headers(const char *api, int idx)
 {
     rm_t *m = &mods[idx];
     uint64_t base = fle_realmod_table[idx].base, lfanew, opt, rva;
-    char why[200];
+    char why[512]; /* the message holds a name of 255 characters (Issue #1523) */
 
     if (m->headers) return;
     if (fle_realmod_map_image) fle_realmod_map_image(api, idx);

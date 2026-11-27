@@ -24,13 +24,14 @@ export default defineScenario({
       const base = await openLids(guest);
       const id = await menuPath(guest, ['File', '#8', '#0']);
       const box = await waitBox(guest, 30000);
-      const g = box === 'filedlg' ? await giveFiles(guest, cdp, [mid]) : { given: false, gone: null };
+      const diag = box === 'explorer' ? '' : JSON.stringify(await guest.ev("(() => { const a = window.__app; const r = a.fileDlg.requests; return { requests: r.length, last: r.length ? { save: r[r.length - 1].save, options: r[r.length - 1].request.options, filters: r[r.length - 1].request.filters.length } : null, history: a.fileDlg.history.slice(-3), open: a.fileDlg.open }; })()").catch((e) => String(e?.message ?? e)));
+      const g = box === 'explorer' ? await giveFiles(guest, cdp, [mid]) : { given: false, gone: null };
       await closeNew(guest, base);
       const st = await guest.state();
       return {
-        ok: box === 'filedlg' && g.given === true && g.gone === true && st.state === 'engine-idle',
+        ok: box === 'explorer' && g.given === true && g.gone === true && st.state === 'engine-idle',
         engineState: st.state,
-        notes: [`${id}: box ${box}; the ${MIDI.length}-byte .mid given ${g.given}; the box closed ${g.gone}; state ${st.state}`],
+        notes: [`${id}: box ${box}; the ${MIDI.length}-byte .mid given ${g.given}; the box closed ${g.gone}; state ${st.state}${diag ? `; page ${diag}` : ''}`],
       };
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });

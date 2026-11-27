@@ -25,7 +25,7 @@ async function menusUsable(guest) {
  */
 export async function ensureEngine({ guest, page }) {
   const s = await waitStable(guest, 60000);
-  const boxUp = await guest.ev("!!document.getElementById('filedlg-input')").catch(() => true);
+  const boxUp = await guest.ev("!!document.getElementById('fx-input-files')").catch(() => true);
   const usable = s.state === 'engine-idle' && !boxUp && (await menusUsable(guest).catch(() => false));
   if (usable) return { restarted: false, state: s.state };
   await page.reload({ waitUntil: 'load', timeout: 120000 });
@@ -37,7 +37,7 @@ export async function ensureEngine({ guest, page }) {
 async function snapshot(guest) {
   const table = await windowTable(guest);
   const st = await guest.state();
-  const box = await guest.ev("!!document.getElementById('filedlg-input')").catch(() => false);
+  const box = await guest.ev("!!document.getElementById('fx-input-files')").catch(() => false);
   return { table, lids: new Set(table.top.map((w) => w.lid)), title: st?.title ?? null, state: st?.state ?? null, box };
 }
 

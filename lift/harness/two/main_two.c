@@ -69,21 +69,23 @@ static double ms_since_start(void) {
 }
 
 /* #1341: the name fle_realmod_table gives a real module, from its file name "<stem>.<base hex>.dll" (fe-lift writes a rebased file so, decision 0080 D1): the stem in lower case and ".dll",
- * so "fruity_balance_x64.6800000.dll" is "fruity_balance_x64.dll". Returns 0, or -1 when the file name has no base suffix. */
-static int rm_table_name(const char *path, char *out, size_t n) {
+ * so "fruity_balance_x64.6800000.dll" is "fruity_balance_x64.dll". Returns 0, -1 when the file name has no base suffix, or -2 when the name does not fit in out
+ * (Issue #1523: out is `want` in main, 256 bytes with the NUL; *len is the length of the name then, and is set whenever the base suffix is found). */
+static int rm_table_name(const char *path, char *out, size_t n, size_t *len) {
     const char *base = strrchr(path, '/'), *ext, *p;
-    size_t len, i, stem;
+    size_t flen, i, stem;
     base = base ? base + 1 : path;
-    len = strlen(base);
-    if (len < 5 || strcmp(base + len - 4, ".dll") != 0) return -1;
-    ext = base + len - 4;
+    flen = strlen(base);
+    if (flen < 5 || strcmp(base + flen - 4, ".dll") != 0) return -1;
+    ext = base + flen - 4;
     for (p = ext; p > base && p[-1] != '.'; p--) {}
     if (p == base || p - 1 == base) return -1;
     for (i = 0; p + i < ext; i++)
         if (!isxdigit((unsigned char)p[i])) return -1;
     if (i == 0) return -1;
     stem = (size_t)(p - 1 - base);
-    if (stem + 5 > n) return -1;
+    *len = stem + 4;
+    if (stem + 5 > n) return -2;
     for (i = 0; i < stem; i++) out[i] = (char)tolower((unsigned char)base[i]);
     memcpy(out + stem, ".dll", 5);
     return 0;
@@ -113,7 +115,7 @@ void fle_realmod_map_image(const char *api, int idx) {
            (unsigned long long)rimg.entry, rimg.nimports, rimg.nexports);
     printf("real module table: name=%s base=%#llx\n", fle_realmod_table[idx].name, (unsigned long long)fle_realmod_table[idx].base);
     if (fle_xmod_load && fle_xmod_load(path)) { /* #1342: the code of this module is a separate wasm module, instantiated by the page at this request; one line, as image-read above */
-        char wname[256];
+        char wname[272]; /* Issue #1523: a file name of a 255 character key with its base is 264 characters; with .wasm 266 with the NUL */
         snprintf(wname, sizeof wname, "%.*s.wasm", (int)(strlen(name) - 4), name);
         fprintf(stderr, "image-read: %s requested=1 %.1f\n", wname, ms_since_start());
     }
@@ -193,9 +195,15 @@ int main(int argc, char **argv) {
     }
     for (uint64_t i = 0; i < fle_realmod_count; i++) rm_file_of[i] = -1;
     for (int k = 0; k < nreal; k++) {
-        char want[64];
+        char want[256]; /* Issue #1523: the key is 255 characters at most (fe-build plugins.rs), with its NUL */
         int idx = -1;
-        if (rm_table_name(rpath[k], want, sizeof want) != 0) {
+        size_t len = 0;
+        int got = rm_table_name(rpath[k], want, sizeof want, &len);
+        if (got == -2) {
+            fprintf(stderr, "the real module file %s: its name is %zu characters, the limit is %zu (the name is held in a %zu byte buffer of main_two.c)\n", rpath[k], len, sizeof want - 1, sizeof want);
+            return 2;
+        }
+        if (got != 0) {
             fprintf(stderr, "the real module file %s has no base suffix (<name>.<base hex>.dll)\n", rpath[k]);
             return 2;
         }
