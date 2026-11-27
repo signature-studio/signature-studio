@@ -6,7 +6,7 @@
 // 束: Effects の束の後に Generators の束。名前順に 3 フォルダずつ(各種類の最後の束だけ端数)。下書き番号は --start(既定 041)から。
 // 段: 束の先頭から 15 束ずつ。段 1 は blocked_by が #1370・#1371 だけ。段 2 は段 1 の先頭 3 束も、段 3 は段 2 の先頭 3 束も blocked_by に足す(同時に走る束を段で抑える)。
 // フォルダの dir: lift/plugins/<dir>/。dir はフォルダの名前を小文字にし、空白をハイフンにしたもの。Effects と Generators で同じ名前の 2 フォルダは、dir を <種別>-<名前> にする。
-// key: <種別の小文字>.<dir>.<DLL の名(小文字。空白は _)>。hook: 本体の 要・既存 は hook 点の表の 3 つの RVA(rva:)、他は none。omit は -(setjmp の入口は #1370 の自動の検出が決める)。args は --pdata。
+// key: <種別の小文字>.<dir>.<DLL の名(小文字。空白は _)>。hook: 本体の 要・既存 は hook 点の表の 3 つの RVA(rva:)、他は none。omit は -(setjmp の入口は #1370 の自動の検出が決める)。args は --pdata。accept は fe-build engine の直前に node tools/place-plugin-dlls.mjs を 1 回入れ、本文の「1 プラグインの入れ方」に、その手順の 1 行を書く(木に無い束の DLL は、受け入れの前に置く)。
 // 本文: テンプレート(既定 pm-work/issue-drafts/wave2-template.md)の @@...@@ を束の内容で置き換える。plugin.tsv の行は、本文の tsv の段に全文で書く。
 // 拒否(終了コード 1。何も書かない): テンプレートに @@ 以外の未確定の語が在る、本文に #数字 や L-0 が在る、置き換えの後に @@ が残る、後回しと VFX の DLL の集合が違う、第 1 波の 4 フォルダが表に無い、本体の無いフォルダが在る、dir・key・guest が一意でない、禁止の数値が散文に在る(SHA-256 の列を除く)。
 // --dry-run: 件数と段と先頭 5 件を出す。検査は同じに行い、書かない。
@@ -245,7 +245,7 @@ const acceptOf = (p) => {
   return [
     tests,
     ...dataTests,
-    'npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && lift/target/release/fe-build engine && lift/target/release/fe-build bundle',
+    'npm run build --prefix app && cargo build --release --locked --manifest-path lift/Cargo.toml && rm -rf lift/out-app/b2d-src lift/out-app/gen && node tools/place-plugin-dlls.mjs && lift/target/release/fe-build engine && lift/target/release/fe-build bundle',
     'node tools/boot-check/boot-bundle.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" > "$RUNNER_TEMP/boot.json"',
     `node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.exit(r.error==null&&r.state==="engine-idle"&&r.standIn===false&&r.elapsedMs<=12500?0:1)' "$RUNNER_TEMP/boot.json"`,
     `node tools/plugin-run/run.mjs "$PWD/lift/out-app/bundle/raw/fl-Oz" ${slugArgs} > "$RUNNER_TEMP/plugin-run.jsonl"`,
