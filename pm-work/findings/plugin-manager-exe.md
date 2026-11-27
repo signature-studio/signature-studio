@@ -121,3 +121,39 @@ runner の値。この機械とは別枠。nproc 4。loadavg は作業の開始�
 - E2E の fps: smoke の `achievedFps` は目標の 120 fps に届いていない(段 A の対象外。runner の値)。
 
 判定: 受理(段 A。段 1〜3 と受け入れは通った。段 4〜6 は段 B)。
+
+## 10. 段 B(#1501): 起動・窓・E2E の印
+
+判定: 差し戻し(受け入れは通らず)。exe の入口を同じ engine の協調スレッドで走らせるところまでは実測で届いた。窓は出ていない。
+
+実エンジン: この runner(nproc 4。作業の終わりの loadavg 1.45 2.51 2.63)で、`fe-build engine`・`fe-build bundle` を 3 回実行した(最後の版は 3 回目。最後の 1 行の変更は、この後にビルドしていない)。`boot-bundle`(engine-idle・13,251 ms)・`welcome-flow`(流れ A〜D の 4 行)・`npm test --prefix app`(76 files passed・1 skipped。1,468 passed)・`run.mjs --scenarios smoke --displays 4k-dpr1,4k-dpr2`(`plugin-manager-opens` だけ ok false。他の 10 本は両表示 ok true)・`guard/scan.sh`(0 finding)・`spec/workflow.test.sh`(602 ok)を観測した。
+
+(a) 起動の要求の経路:
+- 観測: Options の 6 番目(Down x 6・Enter)で呼ばれたのは `ShellExecuteW`。verb `open`、lpFile は `C:\Program Files\Image-Line\FL Studio 21\System\Tools\Plugin Manager\PluginManager.exe`、parameters は ` -flpath "C:\Program Files\Image-Line\FL Studio 21\" -flcaption "FL Studio 2026" -deepscan`。`ShellExecuteExW`・`CreateProcessW` は観測されなかった。
+- 行(今の版): `fle: ShellExecuteW starts the program "C:\Program Files\Image-Line\FL Studio 21\System\Tools\Plugin Manager\PluginManager.exe" as a thread of this engine (verb "open"; parameters " -flpath ..." are its command line's; the directory is not passed on; S-ia2-program-start)`。
+- 走ったゲストのスレッド: `ShellExecuteW` が協調スレッドを 1 つ作り(`fle_thread_spawn`)、その本体が exe の AddressOfEntryPoint を引数なしで呼ぶ。終了は `ExitProcess` のときだけ、そのスレッドを終える(engine は止めない)。
+- 初回の実測の問題: `[js] fle thread 26 failed: SuspendError: trying to suspend JS frames`。分離 wasm(exe の lazy の wasm)の呼び出しが JS の stub(`app/src/engine/xmod.ts`)を経由するため、待ちで中断できない。#1515 と同じ原因。候補の 07 パッチのうち `xmod.ts` と `xmod.test.ts` の部分を当てて解消した(JS の枠を、wasm の関数表の中継にする。`ott-host.ts` の部分は含めない)。この後の実測で `SuspendError` は 0 件。
+
+(b) 論点ごとの理由:
+- `GetModuleHandle(NULL)`: exe のスレッドからは exe の基底を返す。理由: exe の起動は `FindResource(GetModuleHandle(NULL))` で自分のフォームの資源を読むため。他のスレッドは従来どおり `FLE_EXE_HANDLE`。
+- `ExitProcess`: exe のスレッドからは、そのスレッドだけを終える(`fle_realmod_program_end` → `fle_thread_end_running`)。他のスレッドは従来どおり止める。
+- `hProcess` と `GetExitCodeProcess`: `SEE_MASK_NOCLOSEPROCESS` のときだけ、exe のスレッドのハンドルを hProcess にする(その待ちが exe の終了を表す)。`GetExitCodeProcess` は未実装のまま(観測されていない)。
+- コマンドライン: exe のスレッドの `GetCommandLineW/A` は `"<path>"` と ShellExecute の parameters(実測で FL が `-flpath` などを渡していたため)。カレントディレクトリは engine のまま(lpDirectory は観測されず、未対応)。
+- 戻り値: 成功は 33。`ShellExecuteExW` は hInstApp 33 と TRUE。動詞が NULL か `open` で、パスが VFS に在る exe の時だけ。それ以外は従来どおり 31(決定 `S-ia2-shellexecute-noassoc` の範囲はこの exe だけ)。`CreateProcessW` は観測されず、変えていない。
+- `LoadLibrary` で同じ exe を読む要求は止める(DllMain として呼ばないため)。
+
+(c) 窓の表: 窓は出ていない(未確認)。停止の前に exe 由来の窓として `TApplication`・`TPUtilWindow`・`TLightweightLayeredControl`(lid 8、thread 2)が現れた。Plugin Manager の窓のクラスと題名は確かめられていない。
+
+(d) 流れ A〜D(最後の版。runner の値): 4 行とも error null・engine-idle・standIn false・trapped false・hostErrors 0・opened true。B と D は welcomeClosed true。elapsedMs 12,595・12,921・12,721・12,601。
+
+(e) `plugin-manager-opens`(両表示): 両方 ok false、expectFail null、engineStops 1。停止は下の (f)。
+
+(f) やること 1〜6 の進み:
+- 1 完了: manifest の lazy に `PluginManager.exe`(7,158,856 B)と `plugin-manager.pluginmanager.cf60000.wasm`(16,085,407 B)。
+- 2 完了: 上の (a)。
+- 3 途中: exe の入口を協調スレッドで走らせる。`GetModuleFileNameW`(exe の基底)・`GetCommandLineW/A`・`VirtualProtect` の一部を、exe のスレッドに合わせた。最後の止まり: exe のコードの 5 バイトの書き換え(`VirtualProtect` 0xcf98f50 と 0xcf98f70。旧 0x20・新 0x40。`jmp rel32` の inline hook と見られる。未確認)。決定 0105 に従い、この変更は止めに戻した(この止めの版は、ビルドも測定もしていない。構文検査のみ)。その前の版では、この書き換えを黙って TRUE で通したため、後の `GetFileVersionInfoSizeW`(exe の版の資源。決定 0098 で仮想ファイルの版資源は未対応)まで進んだ。
+- 4 未完了: 窓は出ていない。
+- 5 完了: `tools/e2e/scenarios/smoke/plugin-manager-opens.mjs` の `expectFail` を `null` にした。`smoke/index.mjs` の `ALLOWED_MARKS` は `[]`。`spec/workflow.test.sh` の検査を新しい状態に合わせた。注: `tools/e2e/scenarios/plugins/plugin-manager-opens.mjs`(e2e-full。非ゲート)は、まだ印 `#1499` のまま。
+- 6 未完了: 受け入れは通らず。起動確認は 13,251 ms(上限 12,500 ms)。この runner では 3 回とも 13.2 秒前後で、段 A の 9,187 ms とは別の runner。今回の変更は起動の経路に入らないが、同じ版での基準は取っていない(未確認)。`plugin-manager-opens` は両表示で失敗。
+
+次の一手(段 B の続き): (1) exe のコードへの書き換え(inline hook)を、決定 0105 の注釈つきの hook 点として扱うか、exe の入口の前に起きる書き換えの元を特定する。(2) `GetFileVersionInfoSizeW`/`GetFileVersionInfoW`/`VerQueryValueW` を、exe の RT_VERSION 資源から答える(決定 0098 の拡張)。(3) 窓が出た後に、Plugin Manager の窓のクラスと題名を、この表に書く。

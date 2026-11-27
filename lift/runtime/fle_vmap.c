@@ -21,6 +21,7 @@
 #include "fle_sys.h"
 #include "fle_vfs.h"
 #include "fle_vmap.h"
+#include "fle_realmod.h"
 
 static long fle_vmap_owner_tid;
 
@@ -573,6 +574,9 @@ void fle_imp_VirtualProtect(void)
         ih_protect(api, m, addr, size, np, pold);
         return;
     }
+    /* Issue #1499 (段 B): a page of a program's image (fle_realmod.c) is not a registered image here, so its protection change stops by name (decision 0105) */
+    if (FLE_REALMOD_PRESENT() && fle_realmod_program_protect(addr, size) != 0)
+        fle_stop(api, "a protection change of a program's image: the program's code is patched by an inline hook (decision 0105); not modelled for a program's image (S-ia2-program-vprotect)");
     if (pold == 0) {
         fail(FLE_ERR_INVALID_PARAMETER_A, 0);
         return;

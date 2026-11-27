@@ -7,6 +7,7 @@
 #include "fle_imports.h"
 #include "fle_env.h"
 #include "fle_callback.h"
+#include "fle_realmod.h"
 
 /* ---- calls that are answered without a model (Issue #1418) ----
  * The table holds the APIs in the order they were first warned about; a name beyond FLE_WARN_NAMES_MAX is counted in warn_total only. */
@@ -410,6 +411,12 @@ const char *fle_appfile_cmdline_a(void) __attribute__((weak));
 void fle_imp_GetCommandLineW(void)
 {
     static uint16_t *cmd;
+    /* Issue #1499 (段 B): the thread of a program started by ShellExecute has the program's command line (fle_realmod.c) */
+    const uint16_t *own = FLE_REALMOD_PRESENT() ? fle_realmod_running_cmdline_w() : NULL;
+    if (own != NULL) {
+        R[0] = (uint64_t)(uintptr_t)own;
+        return;
+    }
     if (cmd == NULL && fle_appfile_cmdline_w) cmd = (uint16_t *)(uintptr_t)fle_appfile_cmdline_w();
     if (cmd == NULL) {
         static const char q[] = "\"" FLE_VIRTUAL_DLL_PATH "\"";
@@ -425,6 +432,12 @@ void fle_imp_GetCommandLineW(void)
 void fle_imp_GetCommandLineA(void)
 {
     static char *cmd;
+    /* Issue #1499 (段 B): the thread of a program started by ShellExecute has the program's command line (fle_realmod.c) */
+    const char *own = FLE_REALMOD_PRESENT() ? fle_realmod_running_cmdline_a() : NULL;
+    if (own != NULL) {
+        R[0] = (uint64_t)(uintptr_t)own;
+        return;
+    }
     if (cmd == NULL && fle_appfile_cmdline_a) {
         const char *t = fle_appfile_cmdline_a();
         if (t) {

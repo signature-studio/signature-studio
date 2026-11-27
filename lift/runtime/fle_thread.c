@@ -1355,6 +1355,12 @@ void fle_imp_ExitThread(void)
     thread_finish(code);
 }
 
+void fle_thread_end_running(uint32_t code)
+{
+    if (!nthr || cur == 0) fle_stop("ExitProcess", "the first thread would end the process (not modelled)");
+    thread_finish(code);
+}
+
 void fle_imp_GetExitCodeThread(void)
 {
     static const char api[] = "GetExitCodeThread";

@@ -1,7 +1,9 @@
 # The Plugin Manager (Options item 6, Issue #1499): PluginManager.exe, a program of its own (x86-64, GUI, Delphi), not a plugin. Its role is 補助, and its folder
 # has no 本体 row, so it has no Plugin database entry. The key ends with .dll: the engine finds a realmod by the rebased file's name without its base, so the key is the
 # name the realmod has. Its VFS row is in lift/harness/seeds/vfs-seed-idle1.tsv (a lazy file of the resources) and its pack line in lift/harness/web/pack.args; the lift
-# reads the host file that the extraction puts at lift/out-plugins/<key> (ci/extract-dlls.tsv). hook: none (no CreatePlugInstance export, no Fruity effect hook points).
+# reads the host file that the extraction puts at lift/out-plugins/<key> (ci/extract-dlls.tsv). hook: the three Delphi RTL hook points of the program (no CreatePlugInstance export):
+# the same three functions that the Fruity effects patch (lift/harness/hooks/fruity-delphi-effect-hook-points.txt), at the RVAs of the program's own copies (Issue #1501): 0x1b650
+# (55 56 53 c6 44), 0x38f50 (53 48 83 ec 20), 0x38f70 (55 48 83 ec 50). The installer's hook objects are the ones made at 0x5fa997/0x5fa9bf/0x5fa9e7 (r8 = the original).
 # omit: - (fe-lift lift reports setjmp_landings 0). See pm-work/findings/plugin-manager-exe.md.
 key	guest	role	sha256	size	hook	args	omit
-plugin-manager.pluginmanager.dll	System\Tools\Plugin Manager\PluginManager.exe	補助	66100a71d04bddf340bc8f56a1823846662ad44f4b422c7059dad4b2eb32f1e7	7158856	none		-
+plugin-manager.pluginmanager.dll	System\Tools\Plugin Manager\PluginManager.exe	補助	66100a71d04bddf340bc8f56a1823846662ad44f4b422c7059dad4b2eb32f1e7	7158856	rva:0x1b650,0x38f50,0x38f70		-

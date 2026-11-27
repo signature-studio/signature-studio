@@ -171,6 +171,8 @@ unsigned fle_thread_current(void) FLE_THREAD_REF;
 void fle_thread_sleep(const char *api, uint32_t ms) FLE_THREAD_REF;
 /* Decision 0171: a new thread that runs the C function body(arg) (see fle_thread.c); returns its handle, 0 on failure. */
 uint64_t fle_thread_spawn(void (*body)(uint64_t), uint64_t arg) FLE_THREAD_REF;
+/* Issue #1499 (段 B): the running thread ends with `code`, as ExitThread ends it (a program's thread that calls ExitProcess). Does not return. The first thread is not ended here. */
+void fle_thread_end_running(uint32_t code) FLE_THREAD_REF;
 /* kernel32!SwitchToThread: 1 when another thread ran, 0 when there was none ready. */
 int fle_thread_switch(void) FLE_THREAD_REF;
 /* Waits for the objects (events: fle_event.c; threads). ms is the time-out in ms (0xFFFFFFFF = INFINITE). `msg` != 0 adds the input of the thread's queue (MsgWait...,
