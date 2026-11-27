@@ -4544,6 +4544,7 @@ uint64_t fle_gdi_dc_font(uint64_t hdc)
 }
 #define GDI_TEXT_STOP(Name, Why) void fle_imp_##Name(void) { if (fle_text_hook) fle_text_hook(#Name, R[1]); fle_stop(#Name, Why " (decision 0111)"); }
 GDI_TEXT_STOP(ExtTextOutW, GDI_WHY_GLYPH)
+GDI_TEXT_STOP(TextOutW, GDI_WHY_GLYPH)
 GDI_TEXT_STOP(GetTextMetricsW, GDI_WHY_TEXT)
 GDI_TEXT_STOP(GetTextExtentPoint32W, GDI_WHY_TEXT)
 GDI_TEXT_STOP(GetTextExtentPointW, GDI_WHY_TEXT)

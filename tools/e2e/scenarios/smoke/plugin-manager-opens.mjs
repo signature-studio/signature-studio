@@ -1,8 +1,8 @@
 // (d) plugin-manager-opens (Issue #1484): the Options menu's item that opens the Plugin Manager opens its window, and the engine stays engine-idle for 10 s after.
-// The Plugin Manager is PluginManager.exe (System\Tools\Plugin Manager\ in the installer), a program of its own: the engine has no association for it
-// (S-ia2-shellexecute-noassoc: ShellExecuteW answers 31 and starts nothing). The item is found by the engine's own line that names the file: the Options
-// menu's items are chosen one by one (Down presses, then Enter), and each item's new engine lines are read. The window must then appear in the window table.
-// expectFail '#1499': the window does not open until the file is there (#1499). Until then only the page and the engine's counters are judged.
+// The Plugin Manager is PluginManager.exe (System\Tools\Plugin Manager\ in the installer), a program of its own: ShellExecuteW of its path starts it as a thread of
+// the engine (#1499, S-ia2-program-start); any other file has no association (S-ia2-shellexecute-noassoc: ShellExecuteW answers 31 and starts nothing). The item is
+// found by the engine's own line that names the file: the Options menu's items are chosen one by one (Down presses, then Enter), and each item's new engine lines
+// are read. The window must then appear in the window table, and the engine must stay engine-idle for 10 s after.
 import { closeWelcome, dismissProblems, noThanks, sleep, WELCOME, waitProjectOpen, waitStable } from '../../lib/flow.mjs';
 
 const MENU_BAR = 'TNewMenu';
@@ -59,7 +59,7 @@ async function optionsLabel(guest) {
 
 export default {
   name: 'plugin-manager-opens',
-  expectFail: '#1499',
+  expectFail: null,
   async run({ guest, log }) {
     const notes = [];
     const first = await waitStable(guest, 180000);

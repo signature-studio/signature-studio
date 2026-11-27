@@ -7,6 +7,7 @@
 #include "fle_runtime.h"
 #include "fle_imports.h"
 #include "fle_env.h"
+#include "fle_realmod.h"
 #include "fle_wall_ia2.h"
 
 /* ---- user32!GetKeyNameTextW (wall ia2-W18) ----
@@ -152,8 +153,14 @@ void fle_imp_MessageBoxW(void)
 void fle_imp_ShellExecuteW(void)
 {
     char op[40], file[300], par[200];
+    uint64_t started;
 
     if (R[8] == 0) fle_stop("ShellExecuteW", "lpFile is NULL: the page gives no behaviour");
+    /* Issue #1499 (段 B): the path of the table's program (PluginManager.exe) is started as a thread of this engine instead (fle_realmod.c, S-ia2-program-start); the answer is a value above 32 */
+    if (FLE_REALMOD_PRESENT() && fle_realmod_shell_program("ShellExecuteW", R[2], R[8], R[9], &started)) {
+        R[0] = 33;
+        return;
+    }
     msg_ascii(op, sizeof op, R[2]);
     msg_ascii(file, sizeof file, R[8]);
     msg_ascii(par, sizeof par, R[9]);

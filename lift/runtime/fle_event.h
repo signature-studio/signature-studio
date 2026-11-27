@@ -27,6 +27,8 @@
 /* kernel32!CreateEventW: HANDLE f(LPSECURITY_ATTRIBUTES, BOOL bManualReset, BOOL bInitialState, LPCWSTR lpName).
  * kernel32!SetEvent, ResetEvent: BOOL f(HANDLE). kernel32!WaitForSingleObject: DWORD f(HANDLE, DWORD dwMilliseconds). */
 void fle_imp_CreateEventW(void);
+void fle_imp_CreateMutexW(void);
+void fle_imp_ReleaseMutex(void);
 void fle_imp_SetEvent(void);
 void fle_imp_ResetEvent(void);
 void fle_imp_WaitForSingleObject(void);

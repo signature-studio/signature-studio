@@ -9,9 +9,11 @@
 #include "fle_imports.h"
 #include "fle_env.h"
 #include "fle_api2.h"
+#include "fle_realmod.h"
 
 #define ERR_NO_ASSOCIATION 1155u
 #define SE_ERR_NOASSOC 31u
+#define SEE_MASK_NOCLOSEPROCESS 0x00000040u
 
 /* ---- ShellExecute, the answer of the virtual machine: no association ----
  * S-ia2-shellexecute-noassoc (decision 0171, fle_wall_ia2.c, kept): no program is associated with a URL or a file type in the virtual machine's registry (decision 0129) and no process is ever started, so the call answers the failure the page defines for that case; it
@@ -62,12 +64,19 @@ void fle_imp_ShellExecuteA(void)
 void fle_imp_ShellExecuteExW(void)
 {
     static const char api[] = "ShellExecuteExW";
-    uint64_t p = R[1];
+    uint64_t p = R[1], started = 0;
     char op[40], file[300], par[200];
 
     if (p == 0) fle_stop(api, "pExecInfo is NULL: the page gives no behaviour");
     if (fle_ld(p, 4) < 112u) fle_stop(api, "cbSize is smaller than the 112 bytes of SHELLEXECUTEINFOW: the page gives no behaviour");
     if (fle_ld(p + 24, 8) == 0) fle_stop(api, "lpFile is NULL: the page gives no behaviour (a class or ID list may be used instead)");
+    /* Issue #1499 (段 B): the table's program is started as a thread of this engine (fle_realmod.c). hProcess is that thread when SEE_MASK_NOCLOSEPROCESS is set, else NULL (Learn). */
+    if (FLE_REALMOD_PRESENT() && fle_realmod_shell_program(api, fle_ld(p + 16, 8), fle_ld(p + 24, 8), fle_ld(p + 32, 8), &started)) {
+        fle_st(p + 56, 8, 33);
+        fle_st(p + 104, 8, (fle_ld(p + 4, 4) & SEE_MASK_NOCLOSEPROCESS) ? started : 0);
+        R[0] = 1;
+        return;
+    }
     ascii_of_w(op, sizeof op, fle_ld(p + 16, 8));
     ascii_of_w(file, sizeof file, fle_ld(p + 24, 8));
     ascii_of_w(par, sizeof par, fle_ld(p + 32, 8));
