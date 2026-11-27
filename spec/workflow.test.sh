@@ -636,7 +636,7 @@ ok "接頭辞(r5): 一覧の完全なパスの行(\\ で終わらない行)は�
 ok "接頭辞(r5): 設計の文書に、一覧の行の形と、完全なパスの大きさの上限を書いた" "$(grep -cF 'インストール先からの完全なパス。インストーラの一覧の guest' "$top/pm-work/workflow-design.md")" 1
 # (r7) #1395 の DLL(Shared\ILSvg_x64.dll)は、抽出の表の 1 行で作業ツリーに取り出す(lift はしない)。抽出先は plugin の行が作る形(lift/out-plugins/<key>。key は plugin.tsv の key 名。plugins.rs の host_file)。大きさと SHA-256 は一覧の値
 ILSI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\ILSvg_x64.dll" {print $2"\t"$3}' "$INST")
-ok "抽出の表(r7): ci/extract-dlls.tsv に ILSvg_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/shared.ilsvg.ilsvg_x64.dll(plugin.tsv の key 名。plugin の段が読む場所)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$ILSI" 'BEGIN{split(I, a, "\t")} $1 == "ILSvg_x64.dll" {n++; if ($2 == "lift/out-plugins/shared.ilsvg.ilsvg_x64.dll" && $3 == a[2] && a[1] == "1504256") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
+ok "抽出の表(r7): ci/extract-dlls.tsv に ILSvg_x64.dll の行が 1 つ在り、抽出先は lift/out-plugins/ilsvg_x64.dll(plugin.tsv の key 名。plugin の段が読む場所。bare 名は fle_realmod_find が完全一致で引く)、大きさと SHA-256 は一覧の値と一致する" "$(awk -F'\t' -v I="$ILSI" 'BEGIN{split(I, a, "\t")} $1 == "ILSvg_x64.dll" {n++; if ($2 == "lift/out-plugins/ilsvg_x64.dll" && $3 == a[2] && a[1] == "1504256") ok++} END{print n+0"/"ok+0}' "$top/ci/extract-dlls.tsv")" "1/1"
 # (r8) #1429 の DLL(Shared\Reverb_x64.dll)は、lift/plugins/reverb/plugin.tsv の補助の行で取り出す(抽出の表には無い。同じ DLL の二重の抽出を避ける)。key は bare 名(Sytrus の LoadLibraryW は bare 名で、fle_realmod_find が完全一致で比べる)。大きさと SHA-256 は一覧の値
 RVI=$(awk -F'\t' 'NR>2 && $1 == "Shared\\Reverb_x64.dll" {print $2"\t"$3}' "$INST")
 ok "抽出の表(r8): ci/extract-dlls.tsv に Reverb_x64.dll の行は無い(plugin.tsv の行が取り出す)" "$(grep -c '^Reverb_x64' "$top/ci/extract-dlls.tsv")" 0

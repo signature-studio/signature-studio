@@ -16,6 +16,7 @@ node tools/e2e/run.mjs --list
 前提: `app/node_modules` と `app/dist`(`npm run build --prefix app`)、bundle(`lift/out-app/bundle/{raw,br}/fl-Oz`、`fe-build bundle`)。
 
 - stdout: 表示の行ごとに 1 行の JSON。stderr: 経過。終了コードは、全ての行が受け入れを満たしたときだけ 0(`--report-only` のときは、下の「判定の基準」の規則)。
+- 各シナリオの結果: `displays`(宣言の表示)・`ms`(開始から終了までのミリ秒)・`dprOk`(ページの DPR が行の表示と同じか。`4k-random` の行は null)・`expectStop`(停止の宣言)・`failLog`(判定で落ちたシナリオだけ。エンジンのログの、そのシナリオの開始から後の末尾 200 行。画像は無い)。
 - 試験: `node --test tools/e2e/test/*.test.mjs`(Playwright を使わない。純粋な部分の試験)。
 
 ## 引数(`run.mjs`)
@@ -30,13 +31,13 @@ node tools/e2e/run.mjs --list
 | `--shard i/n` | シナリオの ID を昇順に並べ、`index % n === i - 1` のものを動かす(決定的)。 |
 | `--repeat n` | 選んだ各シナリオを n 回動かす(行の各シナリオに `repeat`)。 |
 | `--only ID[,ID]` | 領域の ID(`page/canvas-fills-viewport`)か、旧い名前(`file-open-demo`)。 |
-| `--budget 40m` | 単位 `s`・`m`・`h`。時間を過ぎたら、新しいシナリオを始めない。始めなかったものは `skipped: true`(その行は受け入れない)。 |
-| `--displays` | `4k-dpr1`(3840 x 2160 CSS px、DPR 1)、`4k-dpr2`(1920 x 1080、DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ)、`dpr:<数>`(例 `dpr:1.25`。CSS px は 3840 ÷ DPR、2160 ÷ DPR)。 |
-| `--report-only` | 結果を報告するだけで、シナリオの ok・カウンターでは落とさない。全ての行が出て(シナリオの行の数が揃い)、行の `error` が null なら終了コード 0。行や行の欠け・`error` は、従来どおり 1。ログに `report-only: exit 0`。行の構造(`servedHeadersMatch` など)は、呼び出す側が見る(受け入れの `node -e`)。 |
+| `--budget 40m` | 単位 `s`・`m`・`h`。予算は表示の行ごとに 1 つ(行ごとに時計を作る)。行の予算が過ぎたら、新しいシナリオを始めない。残りが、シナリオの `needsMs`(例 `resilience/wait-idle-30min` は 30 分)より少なければ、始めない。始めなかったものは `skipped: true`(その行は受け入れない)。 |
+| `--displays` | 行(表示)の選択。`4k-dpr1`(3840 x 2160 CSS px、DPR 1)、`4k-dpr2`(1920 x 1080、DPR 2)、`4k-random`(DPR を 1.01〜3.00 の乱数で 2 つ)、`dpr:<数>`(例 `dpr:1.25`。CSS px は 3840 ÷ DPR、2160 ÷ DPR)。シナリオは、宣言の `displays` にその表示が在る物だけ、その行で動く。`--displays` はシナリオを広げない。 |
+| `--report-only` | 結果を報告するだけで、シナリオの ok・カウンター・停止・DPR では落とさない。全ての行が出て(シナリオの行の数が揃い)、行の `error` が null なら終了コード 0。行や行の欠け・`error` は、従来どおり 1。ログに `report-only: exit 0`。行の構造(`servedHeadersMatch` など)は、呼び出す側が見る(受け入れの `node -e`)。 |
 | `--clock raf\|begin` | 既定は `raf`(下の「120 Hz」)。 |
 | `--shots DIR` / `--engine-logs DIR` | 試験用。画面の PNG と、エンジンのログ。 |
 
-領域のシナリオは、表示の指定がなければ、各シナリオの `displays`(既定は `4k-dpr1`・`4k-random`)で動く。`--displays` を付けると、選んだシナリオは全てその表示で動く。
+領域のシナリオは、表示の指定がなければ、各シナリオの `displays`(既定は `4k-dpr1`・`4k-random`)で動く。`--displays` を付けると、行は指定した表示だけになり、各行では、その表示を宣言したシナリオだけが動く(宣言に無い表示では動かない)。指定した表示を宣言するシナリオが 1 本も無ければ、行が無いので落ちる。
 
 **起動は 1 シャードで 1 回。** 領域(`--area`)の実行では、行ごとにページを 1 つ作って起動し、シナリオの間は `File > New`(Ctrl+N。`lib/common.mjs` の `resetProject`)で空の曲に戻してから、次のシナリオを動かす。旧い形(`smoke`)は、従来どおりシナリオごとに新しいページ。
 
@@ -132,7 +133,9 @@ export default defineScenario({
 ## 印(expectFail)
 
 - 印の無いシナリオ: `ok` が真で、`pageErrors`・`consoleErrors`・`stuckToasts`・`failedRequests` が 0。
-- 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。通ったら標準エラーに警告を出す(`judge.jq`)。
+- 印 `#<Issue の番号>`(既に Issue がある既知の欠陥)・`new`(このシナリオが見つけた欠陥で、まだ Issue が無い): `ok` は問わない。`pageErrors`・`consoleErrors`・`failedRequests` が 0。`stuckToasts` は問わない(JSON に出す)。エンジンが止まった(`engineStops` > 0、または `engineStuckRunning`)なら失敗する。通ったら標準エラーに警告を出す(`judge.jq`)。
+- 停止の宣言 `expectStop`: `defineScenario`(旧い集合の `index.mjs` の `{ name, … }` も同じ)に `expectStop: '#<Issue の番号>'` または `'new'` を書くと、そのシナリオの停止だけを許す。`expectFail` が無ければ読み込みで落ちる(停止は既知の欠陥の中でだけ許す)。カウンター(`pageErrors`・`consoleErrors`・`failedRequests`)は、停止を宣言しても 0 でなければならない。
+- 予算の残り: `defineScenario` の `needsMs`(開始に必要な残りの予算。既定 0)。残りが足りなければ、そのシナリオは `skipped: true` になる。`ctx.budget.remainingMs()` で、行の残りを読める。
 - ワークレットの読み込みは、以前は HTTP 403 だった(Worker の Access の検査が、ワークレットの要求にトークンのヘッダーを付けられていなかった)。試験の中継(`lib/delivery.mjs` の `startAccessProxy`)が、トークンの無い要求にだけ付けて直した。
 
 ## 機能の一覧(`inventory.mjs`)と網羅率(`coverage.mjs`)
@@ -184,8 +187,10 @@ export default defineScenario({
 ## 判定の基準(`judge.jq`・`rowPasses`)
 
 - `servedHeadersMatch` が真。`error` が無い。
-- 印の無いシナリオ: `ok`・`pageErrors` 0・`consoleErrors` 0・`stuckToasts` 0・`failedRequests` 0。`skipped` が無い。
-- 印の有るシナリオ: `pageErrors`・`consoleErrors`・`failedRequests` が 0。
+- 全てのシナリオ: `skipped` が無い。`dprOk` が偽でない(ページの DPR が行の表示の DPR と同じ。`4k-random` の行は確かめない)。
+- 印の無いシナリオ: `ok`・`pageErrors` 0・`consoleErrors` 0・`stuckToasts` 0・`failedRequests` 0。
+- 印の有るシナリオ: `pageErrors`・`consoleErrors`・`failedRequests` が 0。エンジンの停止が無い(`engineStops` 0・`engineStuckRunning` が偽)。ただし `expectStop` が在るシナリオは停止を問わない。
+- 判定で落ちたシナリオ(`skipped` を除く)には `failLog`(エンジンのログの末尾 200 行)が付く。
 - `--report-only`(`runPasses`): 判定の代わりに、行の数とシナリオの行の数が揃い、行の `error` が null であること。シナリオの結果では落とさない。領域の受け入れは、これを使う(個々の ok と印は、`e2e-full` が見る)。
 
 ## 構成

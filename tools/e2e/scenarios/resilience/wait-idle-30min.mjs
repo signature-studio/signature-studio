@@ -1,6 +1,7 @@
 // resilience/wait-idle-30min: nothing is sent for 30 minutes (no action; the time is the difference of the clock, checked every 5 s; the limit is 35 minutes).
 // Expected: no stop; the engine's memory at 30 min is at most 1.10 times the value at 10 min (the engine's own report, every minute); while the sound was playing during the wait,
 // the output's underrun count did not rise (when it did not play, no underrun is counted, and the note says so).
+// It does not start with less than 30 min left in its display row's budget (needsMs: the runner skips it, skipped: true); results.budgetLeftMs is the row's budget left at the start.
 import { defineScenario } from '../../lib/scenario.mjs';
 import { startIfStopped } from '../../lib/resilience.mjs';
 import { sleep } from '../../lib/flow.mjs';
@@ -15,8 +16,10 @@ export default defineScenario({
   id: 'resilience/wait-idle-30min',
   covers: ['resilience/soak/idle-30min-no-stop', 'resilience/soak/idle-30min-no-underrun', 'resilience/soak/idle-30min-memory-flat'],
   displays: ['4k-dpr1'],
-  async run({ guest, page, log }) {
+  needsMs: SPAN,
+  async run({ guest, page, log, budget }) {
     await startIfStopped(guest, page, log);
+    const budgetLeftMs = Math.round(budget.remainingMs());
     const t0 = Date.now();
     const a0 = await audioNumbers(guest);
     const mem = [];
@@ -47,7 +50,7 @@ export default defineScenario({
       ok: stops === 0 && elapsed >= SPAN && memOk && underOk && state === 'engine-idle', engineState: state,
       notes: [`${Math.round(elapsed / 60000)} min with nothing sent: stops ${stops}; memory at 10 min ${at10?.bytes ?? 'unknown'}, at the end ${last.bytes ?? 'unknown'}, ratio ${ratio} (limit ${MEM_RATIO}); ${audioNote}`],
       results: {
-        minutes: Math.round((elapsed / 60000) * 100) / 100, stops, states: seen, memory: mem, memoryRatio: ratio, memoryLimit: MEM_RATIO,
+        minutes: Math.round((elapsed / 60000) * 100) / 100, stops, states: seen, memory: mem, memoryRatio: ratio, memoryLimit: MEM_RATIO, budgetLeftMs,
         audio: { playing, quantaWhilePlaying: played, underruns: under, counted: playing },
       },
     };
