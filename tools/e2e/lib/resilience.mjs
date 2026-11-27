@@ -198,12 +198,16 @@ export async function cycleWindow(guest, { cls, open, close }, n) {
   return out;
 }
 
-/** the engine's stop as lib/stop.mjs reads it from the page's log (taken before any load of the page, which clears the log); null when the engine is not stopped */
+/** the engine's stop as lib/stop.mjs reads it from the page's log (taken before any load of the page, which clears the log); null when the engine is not stopped.
+ *  The report's last lines reach the page late: the harness' "fruity: exit code" line ends its stdout report, and the engine's stderr line of the stop ("fle: ...") comes after it,
+ *  so the log is read once the exit code line is in it (6 s at most), and again 1 s later for the stderr line. */
 export async function stopReport(guest) {
   const st = await guest.state().catch(() => null);
   if (!st || (st.state !== 'error' && st.state !== 'exited')) return null;
-  const lines = await guest.ev('window.__app.engineLog()').catch(() => []);
-  return stopOf(lines, st.exit ?? null);
+  const linesNow = () => guest.ev('window.__app.engineLog()').catch(() => []);
+  await waitUntil(async () => (await linesNow()).some((l) => /exit code \d+/.test(l)), 6000, 250);
+  await sleep(1000);
+  return stopOf(await linesNow(), st.exit ?? null);
 }
 
 /** a column of seeded operations (the ID's seed; `weights` picks the kinds): the table is read every 20 operations, and the engine must be idle at the end.
