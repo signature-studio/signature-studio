@@ -924,7 +924,7 @@ static void m_b_release(void)
 }
 
 /* S-ds-write-cursor (0295): the write cursor that the guest sees leads the play cursor by DS_WRITE_CURSOR_MS (Learn, IDirectSoundBuffer::GetCurrentPosition: "The write cursor always leads the play cursor, typically by about 15 milliseconds' worth of audio data"). It is NOT the
- * hand-over lead (FLE_AUDIO_LEAD_MS, S-audio-lead, 60 ms: how far audio_sync fills the output ahead of the play cursor); the two do not share a variable. A write between the two is still applied: rewrite_unread (S-ds-late-write) accepts a write down to a guard of 256 frames before the output's read position. */
+ * hand-over lead (FLE_AUDIO_LEAD_MS, S-audio-lead, 300 ms: how far audio_sync fills the output ahead of the play cursor); the two do not share a variable. A write between the two is still applied: rewrite_unread (S-ds-late-write) accepts a write down to a guard of 256 frames before the output's read position. */
 #define DS_WRITE_CURSOR_MS 15u
 
 /* the play and write cursors in bytes after a synchronisation */
