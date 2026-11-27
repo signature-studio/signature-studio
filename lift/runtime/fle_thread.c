@@ -760,15 +760,14 @@ static int next_deadline(uint64_t *out)
  * A thread that gives the processor up itself (Sleep(0), SwitchToThread: Learn Sleep "relinquish the remainder of its time slice to any other thread that is ready to run") or that waits goes to the ready thread of the highest priority. */
 static int ui_turn_active;
 static uint64_t ui_turn_until, ui_turn_cooldown;
-static double ui_turn_start_ms, ui_turn_until_ms, ui_turn_cooldown_ms, ui_turn_active_cd_ms;
+static double ui_turn_start_ms, ui_turn_until_ms, ui_turn_cooldown_ms;
+static double ui_turn_active_min_cd_ms, ui_turn_active_ratio, ui_turn_active_max_cd_ms;
 #define UI_TURN_BUDGET_TICKS     20000u  /* 2.0 ms virtual fallback (native) */
 #define UI_TURN_COOLDOWN_TICKS   20000u  /* 2.0 ms virtual fallback (native) */
-#define UI_TURN_BUDGET_MS        2.0     /* wall ms baseline budget per UI turn */
-#define UI_TURN_COOLDOWN_MS      4.6     /* wall ms baseline cooldown */
 #define UI_TURN_MIN_COOLDOWN_MS  0.4     /* do not arm cooldown for sub-0.4ms quick input/DwmFlush wakes */
 
 static uint64_t ablk_gen;
-static double ablk_ms, ablk_est_ms = 25.0, ablk_last_ms = -1.0;
+static double ablk_ms, ablk_est_ms = 25.0, ablk_peak_ms = 28.0, ablk_last_ms = -1.0;
 static int ablk_running;
 
 static void audio_block_update(double now_ms, int audio_running)
@@ -785,7 +784,11 @@ static void audio_block_update(double now_ms, int audio_running)
         if (ablk_gen != 0u && ablk_ms > 2.0) {
             ablk_est_ms = ablk_est_ms * 0.80 + ablk_ms * 0.20;
             if (ablk_est_ms < 18.0) ablk_est_ms = 18.0;
-            if (ablk_est_ms > 36.0) ablk_est_ms = 36.0;
+            if (ablk_est_ms > 38.0) ablk_est_ms = 38.0;
+            if (ablk_ms > ablk_peak_ms) ablk_peak_ms = ablk_ms;
+            else ablk_peak_ms = ablk_peak_ms * 0.95 + ablk_ms * 0.05;
+            if (ablk_peak_ms < 24.0) ablk_peak_ms = 24.0;
+            if (ablk_peak_ms > 42.0) ablk_peak_ms = 42.0;
         }
         ablk_gen = g;
         ablk_ms = 0.0;
@@ -796,26 +799,37 @@ static void audio_block_update(double now_ms, int audio_running)
 
 static double audio_headroom_ms(double now_ms)
 {
-    double slack, rem;
+    double slack, est, rem;
 
     (void)now_ms;
     if (!fle_audio_slack_ms) return (fle_audio_has_slack && fle_audio_has_slack()) ? 30.0 : -1.0;
     slack = fle_audio_slack_ms();
     if (slack >= 1e8) return 1e9;
-    if (slack < 24.0) return -1.0;
-    rem = (ablk_ms < ablk_est_ms) ? (ablk_est_ms - ablk_ms) : 8.0;
-    if (rem < 8.0) rem = 8.0;
-    return slack - (rem + 14.0);
+    if (slack < 22.0) return -1.0;
+    est = ablk_est_ms * 1.15;
+    if (ablk_peak_ms > est) est = ablk_peak_ms;
+    rem = (ablk_ms < est) ? (est - ablk_ms) : 10.0;
+    if (rem < 10.0) rem = 10.0;
+    return slack - (rem + 12.0);
 }
 
-static void pick_ui_pacing(double headroom_ms, double *budget_ms, double *cd_ms)
+static void pick_ui_pacing(double headroom_ms, double *budget_ms, double *min_cd_ms, double *ratio, double *max_cd_ms)
 {
-    if (headroom_ms >= 16.0) {
-        *budget_ms = 2.0;
-        *cd_ms = 4.6;
+    if (headroom_ms >= 20.0) {
+        *budget_ms = 4.2;
+        *min_cd_ms = 1.0;
+        *ratio = 1.25;
+        *max_cd_ms = 6.0;
+    } else if (headroom_ms >= 8.0) {
+        *budget_ms = 3.6;
+        *min_cd_ms = 1.4;
+        *ratio = 1.65;
+        *max_cd_ms = 7.0;
     } else {
-        *budget_ms = 1.6;
-        *cd_ms = 5.0;
+        *budget_ms = 2.4;
+        *min_cd_ms = 2.0;
+        *ratio = 2.20;
+        *max_cd_ms = 8.0;
     }
 }
 
@@ -823,10 +837,12 @@ static void arm_ui_cooldown(double now_ms)
 {
     if (now_ms >= 0.0) {
         double ui_used = now_ms - ui_turn_start_ms;
-        double base_cd = ui_turn_active_cd_ms > 0.0 ? ui_turn_active_cd_ms : UI_TURN_COOLDOWN_MS;
-        double debt_cd = ui_used > 0.0 ? ui_used * 2.2 : 0.0;
-        double cd = debt_cd > base_cd ? debt_cd : base_cd;
-        if (cd > 10.0) cd = 10.0;
+        double min_cd = ui_turn_active_min_cd_ms > 0.0 ? ui_turn_active_min_cd_ms : 1.0;
+        double ratio = ui_turn_active_ratio > 0.0 ? ui_turn_active_ratio : 1.25;
+        double max_cd = ui_turn_active_max_cd_ms > 0.0 ? ui_turn_active_max_cd_ms : 6.0;
+        double cd = ui_used > 0.0 ? ui_used * ratio : min_cd;
+        if (cd < min_cd) cd = min_cd;
+        if (cd > max_cd) cd = max_cd;
         ui_turn_cooldown_ms = now_ms + cd;
     } else {
         ui_turn_cooldown = now_ticks() + UI_TURN_COOLDOWN_TICKS;
@@ -837,13 +853,29 @@ static int vclock_wall_init;
 static double vclock_wall0, vclock_last_ms, last_sched_ms = -1e9;
 static uint64_t vclock_ticks0;
 
-static void vclock_wall_after_idle(double now_ms)
+static void vclock_wall_after_idle(double now_ms, int keep_anchor)
 {
+    uint64_t now;
+
     if (now_ms < 0.0) return;
-    vclock_wall_init = 1;
-    vclock_wall0 = now_ms;
-    vclock_last_ms = now_ms;
-    vclock_ticks0 = now_ticks();
+    now = now_ticks();
+    if (!keep_anchor || !vclock_wall_init || now_ms < vclock_last_ms || now_ms - vclock_last_ms > 200.0) {
+        vclock_wall_init = 1;
+        vclock_wall0 = now_ms;
+        vclock_last_ms = now_ms;
+        vclock_ticks0 = now;
+        return;
+    }
+    {
+        double dt = now_ms - vclock_wall0;
+        uint64_t expected = dt > 0.0 ? vclock_ticks0 + (uint64_t)(dt * (double)FLE_TICKS_PER_MS) : vclock_ticks0;
+
+        if (now > expected || expected > now + 3u * FLE_TICKS_PER_MS) {
+            vclock_wall0 = now_ms;
+            vclock_ticks0 = now;
+        }
+        vclock_last_ms = now_ms;
+    }
 }
 
 static void vclock_wall_sync(double now_ms)
@@ -876,7 +908,7 @@ static void vclock_wall_sync(double now_ms)
     target = vclock_ticks0 + (uint64_t)(dt * (double)FLE_TICKS_PER_MS);
     if (target > now) {
         fle_sys_clock_advance_to(target);
-    } else if (now > target + 2u * FLE_TICKS_PER_MS) {
+    } else if (now > target + 1u * FLE_TICKS_PER_MS) {
         vclock_wall0 = now_ms;
         vclock_ticks0 = now;
         return;
@@ -918,11 +950,13 @@ static int schedule_ex(int slice)
             headroom > 0.0 &&
             (now_ms >= 0.0 ? now_ms >= ui_turn_cooldown_ms : now_ticks() >= ui_turn_cooldown) &&
             pick_other_ui() >= 0) {
-            double budget_ms = UI_TURN_BUDGET_MS, cd_ms = UI_TURN_COOLDOWN_MS;
+            double budget_ms = 4.2, min_cd_ms = 1.0, ratio = 1.25, max_cd_ms = 6.0;
 
-            pick_ui_pacing(headroom, &budget_ms, &cd_ms);
+            pick_ui_pacing(headroom, &budget_ms, &min_cd_ms, &ratio, &max_cd_ms);
             ui_turn_active = 1;
-            ui_turn_active_cd_ms = cd_ms;
+            ui_turn_active_min_cd_ms = min_cd_ms;
+            ui_turn_active_ratio = ratio;
+            ui_turn_active_max_cd_ms = max_cd_ms;
             if (now_ms >= 0.0) {
                 ui_turn_start_ms = now_ms;
                 ui_turn_until_ms = now_ms + budget_ms;
@@ -979,7 +1013,7 @@ static int schedule_ex(int slice)
                 if (have && adv > nx) adv = nx;                     /* a deadline is never skipped */
                 fle_sys_clock_advance_to(adv);
             }
-            vclock_wall_after_idle(after_ms);
+            vclock_wall_after_idle(after_ms, hr == 2);
             continue;
         }
         /* decision 0139: with an external audio consumer (the AudioWorklet) the idle host above has the first say (it knows the page); when it does not apply (the first thread is not waiting for input) a buffer that plays paces the clock in real time */
@@ -996,14 +1030,14 @@ static int schedule_ex(int slice)
                 audio_block_update(after_ms, 0);
                 if (w == 0) stop_report("MessageLoop", "idle: the browser ended the wait (the session was closed by the page while the audio device played)");
                 if (w == 1) {
-                    vclock_wall_after_idle(after_ms);
+                    vclock_wall_after_idle(after_ms, 0);
                     continue;   /* an input event was posted: evaluate again */
                 }
                 if (dl > now_ticks()) fle_sys_clock_advance_to(dl);
-                vclock_wall_after_idle(after_ms);
+                vclock_wall_after_idle(after_ms, 0);
                 continue;
             }
-            vclock_wall_after_idle(now_ms);
+            vclock_wall_after_idle(now_ms, 0);
             continue;
         }
         if (!next_deadline(&dl)) stop_report("scheduler", "deadlock: no thread can run and no thread waits with a time-out (nothing can wake any of them)");

@@ -515,6 +515,14 @@ static int64_t load_int(uint64_t a, unsigned size) {
     return 0;
 }
 
+static __attribute__((noinline, cold)) void fld_m_slow(uint64_t a, unsigned size) {
+    fle_f80 v;
+    X = 0;
+    v = load_mem(a, size);
+    commit(0);
+    push(v);
+}
+
 void fle_x87_fld_m(uint64_t a, unsigned size) {
     fle_f80 v;
     unsigned t = top(), p = (t - 1u) & 7u;
@@ -542,8 +550,6 @@ void fle_x87_fld_m(uint64_t a, unsigned size) {
             fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * p))) | (1u << (2u * p)));
             return;
         }
-        X = 0;
-        v = from_f64(bits);
     } else if (__builtin_expect(size == 4, 1)) {
         uint32_t bits;
         if (__builtin_expect(((a | (a + 3u)) >> 32) == 0u, 1)) memcpy(&bits, (const void *)(uintptr_t)a, 4);
@@ -563,14 +569,8 @@ void fle_x87_fld_m(uint64_t a, unsigned size) {
             fle_x87.tw = (uint16_t)((tg & ~(3u << (2u * p))) | (1u << (2u * p)));
             return;
         }
-        X = 0;
-        v = from_f32(bits);
-    } else {
-        X = 0;
-        v = load_mem(a, size);
     }
-    commit(0);
-    push(v);
+    fld_m_slow(a, size);
 }
 
 void fle_x87_fild(uint64_t a, unsigned size) {
@@ -619,87 +619,8 @@ void fle_x87_fld_const(unsigned k) {
     push(C[k][rc == 0 ? 0 : rc == 2 ? 2 : 1]);
 }
 
-void fle_x87_fst_m(uint64_t a, unsigned size, unsigned popit) {
-    fle_f80 v;
-    int up = 0, fast_inc = 0;
-    unsigned fast_pe = 0u;
-    uint64_t out_bits = 0u;
-    unsigned t = top();
-    unsigned tg = fle_x87.tw;
-    begin_fast();
-    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u, 0)) {
-        fail("stack underflow (empty ST(i)); stack faults are not modelled");
-    }
-    v = fle_x87_r[t];
-    if (__builtin_expect(size == 8, 1)) {
-        unsigned raw_e = v.se & 0x7fffu;
-        if (__builtin_expect(((raw_e - 15361u) < 2045u) & ((v.m >> 63) != 0u), 1)) {
-            uint64_t rem = v.m & 0x7ffu;
-            uint64_t keep = v.m >> 11;
-            unsigned e_biased = raw_e - (16383u - 1023u);
-            if (__builtin_expect(rem == 0u, 1)) {
-                out_bits = ((uint64_t)(v.se & 0x8000u) << 48) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
-                goto fast_store;
-            }
-            {
-                int sign = v.se >> 15;
-                int rc = rc_mode();
-                int rb = (int)((rem >> 10) & 1u);
-                int st = (rem & 0x3ffu) != 0u;
-                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
-                keep += (uint64_t)inc;
-                if (__builtin_expect((keep >> 53) != 0u, 0)) {
-                    keep >>= 1;
-                    e_biased++;
-                }
-                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
-                    X = EX_PE;
-                    commit((unsigned)inc);
-                }
-                out_bits = ((uint64_t)sign << 63) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
-                fast_inc = inc;
-                fast_pe = EX_PE;
-                goto fast_store;
-            }
-        } else if (raw_e == 0u && v.m == 0u) {
-            out_bits = (uint64_t)(v.se & 0x8000u) << 48;
-            goto fast_store;
-        }
-    } else if (__builtin_expect(size == 4, 1)) {
-        unsigned raw_e = v.se & 0x7fffu;
-        if (__builtin_expect(((raw_e - 16257u) < 253u) & ((v.m >> 63) != 0u), 1)) {
-            uint64_t rem = v.m & UINT64_C(0xffffffffff);
-            uint64_t keep = v.m >> 40;
-            unsigned e_biased = raw_e - (16383u - 127u);
-            if (rem == 0u) {
-                out_bits = ((uint64_t)(v.se & 0x8000u) << 16) | ((uint64_t)e_biased << 23) | (keep & 0x7fffffu);
-                goto fast_store;
-            }
-            {
-                int sign = v.se >> 15;
-                int rc = rc_mode();
-                int rb = (int)((rem >> 39) & 1u);
-                int st = (rem & UINT64_C(0x7fffffffff)) != 0u;
-                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
-                keep += (uint64_t)inc;
-                if (__builtin_expect((keep >> 24) != 0u, 0)) {
-                    keep >>= 1;
-                    e_biased++;
-                }
-                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
-                    X = EX_PE;
-                    commit((unsigned)inc);
-                }
-                out_bits = ((uint64_t)sign << 31) | ((uint64_t)e_biased << 23) | (keep & 0x7fffffu);
-                fast_inc = inc;
-                fast_pe = EX_PE;
-                goto fast_store;
-            }
-        } else if (raw_e == 0u && v.m == 0u) {
-            out_bits = (uint64_t)(v.se & 0x8000u) << 16;
-            goto fast_store;
-        }
-    }
+static __attribute__((noinline, cold)) void fst_m_slow(uint64_t a, unsigned size, unsigned popit, fle_f80 v) {
+    int up = 0;
     X = 0;
     if (size == 10) {
         commit(0);
@@ -711,17 +632,98 @@ void fle_x87_fst_m(uint64_t a, unsigned size, unsigned popit) {
         fle_st(a, size, b);
     }
     if (popit) pop();
-    return;
+}
 
-fast_store:
-    if (size == 8u) {
-        if (__builtin_expect(((a | (a + 7u)) >> 32) == 0u, 1)) memcpy((void *)(uintptr_t)a, &out_bits, 8);
-        else fle_st(a, 8, out_bits);
-    } else {
-        uint32_t out32 = (uint32_t)out_bits;
+void fle_x87_fst_m(uint64_t a, unsigned size, unsigned popit) {
+    fle_f80 v;
+    int fast_inc = 0;
+    unsigned fast_pe = 0u;
+    unsigned t = top();
+    unsigned tg = fle_x87.tw;
+    begin_fast();
+    if (__builtin_expect(((tg >> (2u * t)) & 3u) == 3u, 0)) {
+        fail("stack underflow (empty ST(i)); stack faults are not modelled");
+    }
+    v = fle_x87_r[t];
+    if (__builtin_expect(size == 8, 1)) {
+        unsigned raw_e = v.se & 0x7fffu;
+        uint64_t out64;
+        if (__builtin_expect(((raw_e - 15361u) < 2045u) & ((v.m >> 63) != 0u), 1)) {
+            uint64_t rem = v.m & 0x7ffu;
+            uint64_t keep = v.m >> 11;
+            unsigned e_biased = raw_e - (16383u - 1023u);
+            if (__builtin_expect(rem == 0u, 1)) {
+                out64 = ((uint64_t)(v.se & 0x8000u) << 48) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
+            } else {
+                int sign = v.se >> 15;
+                int rc = rc_mode();
+                int rb = (int)((rem >> 10) & 1u);
+                int st = (rem & 0x3ffu) != 0u;
+                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
+                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
+                    fst_m_slow(a, size, popit, v);
+                    return;
+                }
+                keep += (uint64_t)inc;
+                if (__builtin_expect((keep >> 53) != 0u, 0)) {
+                    keep >>= 1;
+                    e_biased++;
+                }
+                out64 = ((uint64_t)sign << 63) | ((uint64_t)e_biased << 52) | (keep & UINT64_C(0xfffffffffffff));
+                fast_inc = inc;
+                fast_pe = EX_PE;
+            }
+        } else if (raw_e == 0u && v.m == 0u) {
+            out64 = (uint64_t)(v.se & 0x8000u) << 48;
+        } else {
+            fst_m_slow(a, size, popit, v);
+            return;
+        }
+        if (__builtin_expect(((a | (a + 7u)) >> 32) == 0u, 1)) memcpy((void *)(uintptr_t)a, &out64, 8);
+        else fle_st(a, 8, out64);
+        goto fast_finish;
+    } else if (__builtin_expect(size == 4, 1)) {
+        unsigned raw_e = v.se & 0x7fffu;
+        uint32_t out32;
+        if (__builtin_expect(((raw_e - 16257u) < 253u) & ((v.m >> 63) != 0u), 1)) {
+            uint64_t rem = v.m & UINT64_C(0xffffffffff);
+            uint64_t keep = v.m >> 40;
+            unsigned e_biased = raw_e - (16383u - 127u);
+            if (rem == 0u) {
+                out32 = (uint32_t)(((uint64_t)(v.se & 0x8000u) << 16) | ((uint64_t)e_biased << 23) | (keep & 0x7fffffu));
+            } else {
+                int sign = v.se >> 15;
+                int rc = rc_mode();
+                int rb = (int)((rem >> 39) & 1u);
+                int st = (rem & UINT64_C(0x7fffffffff)) != 0u;
+                int inc = __builtin_expect(rc == 0, 1) ? (rb && (st || (keep & 1u))) : (rc == 1 ? sign : (rc == 2 ? !sign : 0));
+                if (__builtin_expect((fle_x87.cw & EX_PE) == 0u, 0)) {
+                    fst_m_slow(a, size, popit, v);
+                    return;
+                }
+                keep += (uint64_t)inc;
+                if (__builtin_expect((keep >> 24) != 0u, 0)) {
+                    keep >>= 1;
+                    e_biased++;
+                }
+                out32 = ((uint32_t)sign << 31) | ((uint32_t)e_biased << 23) | (uint32_t)(keep & 0x7fffffu);
+                fast_inc = inc;
+                fast_pe = EX_PE;
+            }
+        } else if (raw_e == 0u && v.m == 0u) {
+            out32 = (uint32_t)(v.se & 0x8000u) << 16;
+        } else {
+            fst_m_slow(a, size, popit, v);
+            return;
+        }
         if (__builtin_expect(((a | (a + 3u)) >> 32) == 0u, 1)) memcpy((void *)(uintptr_t)a, &out32, 4);
         else fle_st(a, 4, out32);
+        goto fast_finish;
     }
+    fst_m_slow(a, size, popit, v);
+    return;
+
+fast_finish:
     if (popit) {
         fle_x87.tw = (uint16_t)(tg | (3u << (2u * t)));
         fle_x87.sw = (uint16_t)((fle_x87.sw & ~(SW_C1 | 0x3800u)) | (fast_inc ? SW_C1 : 0u) | fast_pe | (((t + 1u) & 7u) << 11));
@@ -890,81 +892,17 @@ static __attribute__((noinline, cold)) void round80_and_commit_slow(int sign, in
     commit_known(t, pd, popit, res.m, res.se, tag, up, x_flags);
 }
 
-/* Fast normal rounding + register commit helper kept out-of-line so binop_fast_commit stays compact under -Oz. */
-static __attribute__((noinline)) void round_commit_fast(int sign, int64_t e, uint64_t hi, uint64_t lo, int sticky, int pbits, int rc, unsigned t, unsigned pd, unsigned popit) {
-    if (__builtin_expect(e < -16382 || e >= 16383, 0)) {
-        round80_and_commit_slow(sign, e, hi, lo, sticky, pbits, rc, t, pd, popit);
-        return;
-    }
-    uint64_t m;
-    int rb, st, inc = 0;
-    if (__builtin_expect(pbits == 64 && rc == 0, 1)) {
-        rb = (int)(lo >> 63);
-        st = ((lo << 1) != 0) | sticky;
-        inc = rb && (st || (hi & 1u));
-        m = hi + (uint64_t)inc;
-        if (__builtin_expect(m == 0 && inc, 0)) {
-            e++;
-            m = UINT64_C(0x8000000000000000);
-        }
-        commit_known(t, pd, popit, m, (uint16_t)((sign ? 0x8000u : 0u) | (unsigned)(e + 16383)), 0u, inc, (rb | st) ? EX_PE : 0u);
-        return;
-    }
-    {
-        uint64_t keep;
-        if (pbits == 64) {
-            keep = hi;
-            rb = (int)(lo >> 63);
-            st = ((lo << 1) != 0) | sticky;
-        } else if (pbits == 53) {
-            keep = hi >> 11;
-            rb = (int)((hi >> 10) & 1u);
-            st = (((hi & 0x3ffu) | lo) != 0) | sticky;
-        } else {
-            keep = hi >> 40;
-            rb = (int)((hi >> 39) & 1u);
-            st = (((hi & UINT64_C(0x7fffffffff)) | lo) != 0) | sticky;
-        }
-        int inexact = rb | st;
-        if (__builtin_expect(rc == 0, 1)) {
-            inc = rb && (st || (keep & 1u));
-        } else if (rc == 1) {
-            inc = inexact && sign;
-        } else if (rc == 2) {
-            inc = inexact && !sign;
-        }
-        keep += (uint64_t)inc;
-        if (pbits == 64) {
-            if (__builtin_expect(keep == 0 && inc, 0)) {
-                e++;
-                m = UINT64_C(0x8000000000000000);
-            } else {
-                m = keep;
-            }
-        } else if (pbits == 53) {
-            if (__builtin_expect((keep >> 53) != 0u, 0)) {
-                keep >>= 1;
-                e++;
-            }
-            m = keep << 11;
-        } else {
-            if (__builtin_expect((keep >> 24) != 0u, 0)) {
-                keep >>= 1;
-                e++;
-            }
-            m = keep << 40;
-        }
-        commit_known(t, pd, popit, m, (uint16_t)((sign ? 0x8000u : 0u) | (unsigned)(e + 16383)), 0u, inc, inexact ? EX_PE : 0u);
-    }
-}
-
 /* Fast path for ADD/SUB/SUBR/MUL when exceptions are masked and both operands are finite normals or zeros; commits directly with zero pointer out-params. */
-static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am, uint16_t ase, uint64_t bm, uint16_t bse, unsigned t, unsigned pd, unsigned popit, uint16_t cw) {
+static inline __attribute__((always_inline)) int binop_fast_commit(unsigned op, uint64_t am, uint16_t ase, uint64_t bm, uint16_t bse, unsigned t, unsigned pd, unsigned popit, uint16_t cw) {
     uint32_t ea = ase & 0x7fffu, eb = bse & 0x7fffu;
     unsigned pc = (cw >> 8) & 3u;
     int pbits = (pc == 3u || pc == 1u) ? 64 : (pc == 2u ? 53 : 24);
     int rc = (cw >> 10) & 3;
     int a_norm, b_norm;
+    int rsign;
+    int64_t re;
+    uint64_t rhi, rlo;
+    int rsticky = 0;
 
     if (__builtin_expect(((cw & 0x3Fu) != 0x3Fu) | (op > FLE_X87_MUL), 0)) {
         return 0;
@@ -999,8 +937,12 @@ static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am,
                     commit_known(t, pd, popit, res.m, res.se, 0u, 0, 0u);
                     return 1;
                 }
-                round_commit_fast(sx, (int64_t)ex - 16383, xm, 0, 0, pbits, rc, t, pd, popit);
-                return 1;
+                rsign = sx;
+                re = (int64_t)ex - 16383;
+                rhi = xm;
+                rlo = 0;
+                rsticky = 0;
+                goto do_round;
             }
         }
     }
@@ -1014,8 +956,12 @@ static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am,
             lo <<= 1;
             e -= 1;
         }
-        round_commit_fast(sign, e, hi, lo, 0, pbits, rc, t, pd, popit);
-        return 1;
+        rsign = sign;
+        re = e;
+        rhi = hi;
+        rlo = lo;
+        rsticky = 0;
+        goto do_round;
     }
     {
         int sa = (int)(ase >> 15) ^ (op == FLE_X87_SUBR);
@@ -1055,8 +1001,12 @@ static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am,
                 hi = (hi >> 1) | UINT64_C(0x8000000000000000);
                 e += 1;
             }
-            round_commit_fast(sx, e, hi, lo, sticky, pbits, rc, t, pd, popit);
-            return 1;
+            rsign = sx;
+            re = e;
+            rhi = hi;
+            rlo = lo;
+            rsticky = sticky;
+            goto do_round;
         } else {
             uint64_t lo = sticky ? ~y_lo : (UINT64_C(0) - y_lo);
             uint64_t borrow = (sticky || y_lo != 0) ? 1u : 0u;
@@ -1079,9 +1029,102 @@ static __attribute__((noinline)) int binop_fast_commit(unsigned op, uint64_t am,
                 lo = 0;
                 e -= 64 + s;
             }
-            round_commit_fast(sx, e, hi, lo, sticky, pbits, rc, t, pd, popit);
-            return 1;
+            rsign = sx;
+            re = e;
+            rhi = hi;
+            rlo = lo;
+            rsticky = sticky;
         }
+    }
+
+do_round:
+    if (__builtin_expect(re < -16382 || re >= 16383, 0)) {
+        round80_and_commit_slow(rsign, re, rhi, rlo, rsticky, pbits, rc, t, pd, popit);
+        return 1;
+    }
+    if (__builtin_expect(pbits == 64 && rc == 0, 1)) {
+        int rb = (int)(rlo >> 63);
+        int st = ((rlo << 1) != 0) | rsticky;
+        int inc = rb && (st || (rhi & 1u));
+        uint64_t m = rhi + (uint64_t)inc;
+        if (__builtin_expect(m == 0 && inc, 0)) {
+            re++;
+            m = UINT64_C(0x8000000000000000);
+        }
+        commit_known(t, pd, popit, m, (uint16_t)((rsign ? 0x8000u : 0u) | (unsigned)(re + 16383)), 0u, inc, (rb | st) ? EX_PE : 0u);
+        return 1;
+    } else if (__builtin_expect(pbits == 53 && rc == 0, 1)) {
+        uint64_t keep = rhi >> 11;
+        int rb = (int)((rhi >> 10) & 1u);
+        int st = (((rhi & 0x3ffu) | rlo) != 0) | rsticky;
+        int inc = rb && (st || (keep & 1u));
+        keep += (uint64_t)inc;
+        if (__builtin_expect((keep >> 53) != 0u, 0)) {
+            keep >>= 1;
+            re++;
+        }
+        commit_known(t, pd, popit, keep << 11, (uint16_t)((rsign ? 0x8000u : 0u) | (unsigned)(re + 16383)), 0u, inc, (rb | st) ? EX_PE : 0u);
+        return 1;
+    } else if (__builtin_expect(pbits == 24 && rc == 0, 1)) {
+        uint64_t keep = rhi >> 40;
+        int rb = (int)((rhi >> 39) & 1u);
+        int st = (((rhi & UINT64_C(0x7fffffffff)) | rlo) != 0) | rsticky;
+        int inc = rb && (st || (keep & 1u));
+        keep += (uint64_t)inc;
+        if (__builtin_expect((keep >> 24) != 0u, 0)) {
+            keep >>= 1;
+            re++;
+        }
+        commit_known(t, pd, popit, keep << 40, (uint16_t)((rsign ? 0x8000u : 0u) | (unsigned)(re + 16383)), 0u, inc, (rb | st) ? EX_PE : 0u);
+        return 1;
+    }
+    {
+        uint64_t m, keep;
+        int rb, st, inc = 0;
+        if (pbits == 64) {
+            keep = rhi;
+            rb = (int)(rlo >> 63);
+            st = ((rlo << 1) != 0) | rsticky;
+        } else if (pbits == 53) {
+            keep = rhi >> 11;
+            rb = (int)((rhi >> 10) & 1u);
+            st = (((rhi & 0x3ffu) | rlo) != 0) | rsticky;
+        } else {
+            keep = rhi >> 40;
+            rb = (int)((rhi >> 39) & 1u);
+            st = (((rhi & UINT64_C(0x7fffffffff)) | rlo) != 0) | rsticky;
+        }
+        int inexact = rb | st;
+        if (rc == 0) {
+            inc = rb && (st || (keep & 1u));
+        } else if (rc == 1) {
+            inc = inexact && rsign;
+        } else if (rc == 2) {
+            inc = inexact && !rsign;
+        }
+        keep += (uint64_t)inc;
+        if (pbits == 64) {
+            if (__builtin_expect(keep == 0 && inc, 0)) {
+                re++;
+                m = UINT64_C(0x8000000000000000);
+            } else {
+                m = keep;
+            }
+        } else if (pbits == 53) {
+            if (__builtin_expect((keep >> 53) != 0u, 0)) {
+                keep >>= 1;
+                re++;
+            }
+            m = keep << 11;
+        } else {
+            if (__builtin_expect((keep >> 24) != 0u, 0)) {
+                keep >>= 1;
+                re++;
+            }
+            m = keep << 40;
+        }
+        commit_known(t, pd, popit, m, (uint16_t)((rsign ? 0x8000u : 0u) | (unsigned)(re + 16383)), 0u, inc, inexact ? EX_PE : 0u);
+        return 1;
     }
 }
 
@@ -1309,16 +1352,12 @@ void fle_x87_arith_m(unsigned op, uint64_t addr, unsigned size) {
         if (__builtin_expect((e - 1u) < 0x7feu, 1)) {
             b.m = UINT64_C(0x8000000000000000) | ((bits & UINT64_C(0xfffffffffffff)) << 11);
             b.se = (uint16_t)(((bits >> 48) & 0x8000u) | (e + (16383u - 1023u)));
-            if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, t, 0u, cw), 1)) return;
-            arith_m_slow(op, a, addr, size, t, 1, b);
-            return;
+            goto have_b;
         }
         if ((bits & UINT64_C(0x7fffffffffffffff)) == 0u) {
             b.m = 0u;
             b.se = (uint16_t)((bits >> 48) & 0x8000u);
-            if (binop_fast_commit(op, a.m, a.se, 0u, b.se, t, t, 0u, cw)) return;
-            arith_m_slow(op, a, addr, size, t, 1, b);
-            return;
+            goto have_b;
         }
     } else if (__builtin_expect(size == 4, 1)) {
         uint32_t bits;
@@ -1328,19 +1367,20 @@ void fle_x87_arith_m(unsigned op, uint64_t addr, unsigned size) {
         if (__builtin_expect((e - 1u) < 0xfeu, 1)) {
             b.m = UINT64_C(0x8000000000000000) | ((uint64_t)(bits & 0x7fffffu) << 40);
             b.se = (uint16_t)(((bits >> 16) & 0x8000u) | (e + (16383u - 127u)));
-            if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, t, 0u, cw), 1)) return;
-            arith_m_slow(op, a, addr, size, t, 1, b);
-            return;
+            goto have_b;
         }
         if ((bits & 0x7fffffffu) == 0u) {
             b.m = 0u;
             b.se = (uint16_t)((bits >> 16) & 0x8000u);
-            if (binop_fast_commit(op, a.m, a.se, 0u, b.se, t, t, 0u, cw)) return;
-            arith_m_slow(op, a, addr, size, t, 1, b);
-            return;
+            goto have_b;
         }
     }
     arith_m_slow(op, a, addr, size, t, 0, a);
+    return;
+
+have_b:
+    if (__builtin_expect(binop_fast_commit(op, a.m, a.se, b.m, b.se, t, t, 0u, cw), 1)) return;
+    arith_m_slow(op, a, addr, size, t, 1, b);
 }
 
 void fle_x87_arith_i(unsigned op, uint64_t addr, unsigned size) {

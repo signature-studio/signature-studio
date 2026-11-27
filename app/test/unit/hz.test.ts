@@ -31,15 +31,15 @@ describe('the engine environment (decision 0182)', () => {
 });
 
 describe('the display rate: rounding a measured rate to the nearest standard rate (S-hz-standard, S-hz-round)', () => {
-  it('the standard list includes high refresh rates up to 144 Hz', () => { expect(STANDARD_HZ).toEqual([60, 75, 90, 120, 144]); });
+  it('the standard list includes high refresh rates up to 300 Hz', () => { expect(STANDARD_HZ).toEqual([60, 75, 90, 120, 144, 165, 180, 240, 300]); });
   it.each([
-    [60, 60], [59.94, 60], [61, 60], [75, 75], [74.9, 75], [90, 90], [100, 90], [119.88, 120], [120, 120], [143.9, 144], [144, 144], [165, 144], [180, 144], [239.76, 144], [240, 144],
-    [30, 60], [48, 60], [50, 60], [24, 60], [360, 144], [1000, 144],
-    [67, 60], [68, 75], [82, 75], [83, 90], [103, 90], [105, 120], [131, 120], [132, 144], [154, 144], [155, 144], [172, 144], [173, 144], [198, 144], [201, 144],
+    [60, 60], [59.94, 60], [61, 60], [75, 75], [74.9, 75], [90, 90], [100, 90], [119.88, 120], [120, 120], [143.9, 144], [144, 144], [165, 165], [180, 180], [239.76, 240], [240, 240],
+    [30, 60], [48, 60], [50, 60], [24, 60], [300, 300], [360, 300], [1000, 300],
+    [67, 60], [68, 75], [82, 75], [83, 90], [103, 90], [105, 120], [131, 120], [132, 144], [154, 144], [155, 165], [172, 165], [173, 180], [207, 180], [208, 240], [268, 240], [269, 300],
   ])('%f Hz -> %i', (m, want) => { expect(roundToStandardHz(m)).toBe(want); });
-  it('no measured rate gives more than 144, and every rate at or above 144 gives 144', () => {
-    for (let m = 1; m <= 2000; m += 0.5) expect(roundToStandardHz(m)).toBeLessThanOrEqual(144);
-    for (const m of [144, 165, 180, 240, 300, 360, 500, 1000]) expect(roundToStandardHz(m)).toBe(144);
+  it('no measured rate gives more than 300, and every rate at or above 300 gives 300', () => {
+    for (let m = 1; m <= 2000; m += 0.5) expect(roundToStandardHz(m)).toBeLessThanOrEqual(300);
+    for (const m of [300, 360, 500, 1000]) expect(roundToStandardHz(m)).toBe(300);
   });
   it('nonsense is the default', () => {
     expect(roundToStandardHz(0)).toBe(HZ_DEFAULT);
@@ -50,7 +50,7 @@ describe('the display rate: rounding a measured rate to the nearest standard rat
 });
 
 describe('measureFrameRate (a fake frame clock)', () => {
-  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 144], [1000 / 165, 144], [1000 / 75, 75], [1000 / 180, 144], [1000 / 240, 144], [1000 / 30, 60]])('steady frames %f ms -> %i Hz', async (iv, want) => {
+  it.each([[1000 / 60, 60], [1000 / 120, 120], [1000 / 144, 144], [1000 / 165, 165], [1000 / 75, 75], [1000 / 180, 180], [1000 / 240, 240], [1000 / 300, 300], [1000 / 30, 60]])('steady frames %f ms -> %i Hz', async (iv, want) => {
     const f = fakeHost(() => iv);
     const p = measureFrameRate(f.host);
     run(f.host);
@@ -67,7 +67,7 @@ describe('measureFrameRate (a fake frame clock)', () => {
     const b = fakeHost(() => 1000 / 240); const pb = measureFrameRate(b.host); run(b.host); const mb = await pb;
     expect(ma.intervals).toBeGreaterThanOrEqual(29); expect(ma.intervals).toBeLessThanOrEqual(32);
     expect(mb.intervals).toBeGreaterThanOrEqual(119); expect(mb.intervals).toBeLessThanOrEqual(122);
-    expect(ma.hz).toBe(60); expect(mb.hz).toBe(144);
+    expect(ma.hz).toBe(60); expect(mb.hz).toBe(240);
   });
   it('late frames of the page\'s start-up do not move the answer (median): every 7th frame is 5x late, the first intervals are slow', async () => {
     const f = fakeHost((i) => (i < 5 ? 80 : i % 7 === 0 ? 5 * (1000 / 120) : 1000 / 120));

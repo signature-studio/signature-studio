@@ -425,66 +425,92 @@ static void ch_rows(int64_t y0, int64_t y1)
 /* A copy with a ternary operation. The source rectangle must lie inside the source surface (the caller checks: BitBlt "only does clipping on the destination DC"). The same surface as source and destination
  * is handled like memmove: the rows (and, in a row, the columns) are visited in the direction that does not overwrite what is still to be read. The unused byte of a 32-bit pixel is copied by a plain SRCCOPY
  * between two surfaces of the same format (bytes, decision 0111) and is 0 otherwise. */
+typedef uint64_t fle_r_v2u64 __attribute__((vector_size(16), aligned(1)));
+
+static inline __attribute__((always_inline)) fle_r_v2u64 diff_load_px4(const uint8_t *p, fle_r_v2u64 vm, int mask_alpha)
+{
+    fle_r_v2u64 v;
+
+    memcpy(&v, p, 16);
+    if (mask_alpha) v &= vm;
+    return v;
+}
+
+static inline __attribute__((always_inline)) void diff_store_px4(uint8_t *tp, const uint8_t *fp, fle_r_v2u64 vm, int mask_alpha)
+{
+    fle_r_v2u64 v = diff_load_px4(fp, vm, mask_alpha);
+
+    memcpy(tp, &v, 16);
+}
+
 static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, const uint8_t *from, int64_t x0, int64_t y, int64_t cnt, int mask_alpha)
 {
-    typedef uint64_t fle_r_v2u64 __attribute__((vector_size(16), aligned(1)));
     static const uint8_t keep3d[8] = { 0xFFu, 0xFFu, 0xFFu, 0x00u, 0xFFu, 0xFFu, 0xFFu, 0x00u };
     uint64_t m64;
     fle_r_v2u64 vm;
+    const uint8_t *fp = from;
+    uint8_t *tp = to;
     int64_t k = 0, span_x0 = 0, span_x1 = 0, gap = 0;
     int span_open = 0;
 
     memcpy(&m64, keep3d, 8);
     vm = (fle_r_v2u64){ m64, m64 };
 
-    for (; k + 32 <= cnt; k += 32) {
-        const uint8_t *fp = from + (uint64_t)k * 4u;
-        uint8_t *tp = to + (uint64_t)k * 4u;
-        fle_r_v2u64 v0, v1, v2, v3, v4, v5, v6, v7;
-        fle_r_v2u64 o0, o1, o2, o3, o4, o5, o6, o7;
-        fle_r_v2u64 d_lo, d_hi, dd;
+    for (;;) {
+        if (!span_open) {
+            for (; k + 16 <= cnt; k += 16, fp += 64, tp += 64) {
+                fle_r_v2u64 o, d;
 
-        memcpy(&v0, fp, 16); memcpy(&v1, fp + 16, 16); memcpy(&v2, fp + 32, 16); memcpy(&v3, fp + 48, 16);
-        memcpy(&v4, fp + 64, 16); memcpy(&v5, fp + 80, 16); memcpy(&v6, fp + 96, 16); memcpy(&v7, fp + 112, 16);
-        if (mask_alpha) { v0 &= vm; v1 &= vm; v2 &= vm; v3 &= vm; v4 &= vm; v5 &= vm; v6 &= vm; v7 &= vm; }
-        memcpy(&o0, tp, 16); memcpy(&o1, tp + 16, 16); memcpy(&o2, tp + 32, 16); memcpy(&o3, tp + 48, 16);
-        memcpy(&o4, tp + 64, 16); memcpy(&o5, tp + 80, 16); memcpy(&o6, tp + 96, 16); memcpy(&o7, tp + 112, 16);
-        d_lo = (o0 ^ v0) | (o1 ^ v1) | (o2 ^ v2) | (o3 ^ v3);
-        d_hi = (o4 ^ v4) | (o5 ^ v5) | (o6 ^ v6) | (o7 ^ v7);
-        dd = d_lo | d_hi;
-        if (__builtin_expect((dd[0] | dd[1]) == 0u, 1)) {
-            if (span_open) {
-                gap += 32;
-                if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
+                memcpy(&o, tp, 16);      d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                if (__builtin_expect((d[0] | d[1]) != 0u, 0)) {
+                    diff_store_px4(tp, fp, vm, mask_alpha);
+                    diff_store_px4(tp + 16, fp + 16, vm, mask_alpha);
+                    diff_store_px4(tp + 32, fp + 32, vm, mask_alpha);
+                    diff_store_px4(tp + 48, fp + 48, vm, mask_alpha);
+                    span_x0 = x0 + k;
+                    span_x1 = x0 + k + 16;
+                    span_open = 1;
+                    gap = 0;
+                    k += 16; fp += 64; tp += 64;
+                    break;
+                }
             }
-            continue;
+            if (k + 16 > cnt && !span_open) break;
         }
-        if ((d_lo[0] | d_lo[1]) != 0u) {
-            memcpy(tp, &v0, 16); memcpy(tp + 16, &v1, 16); memcpy(tp + 32, &v2, 16); memcpy(tp + 48, &v3, 16);
-            if (!span_open) { span_x0 = x0 + k; span_open = 1; }
-            span_x1 = x0 + k + 16;
-            gap = 0;
-        } else if (span_open) {
-            gap += 16;
-            if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
-        }
-        if ((d_hi[0] | d_hi[1]) != 0u) {
-            memcpy(tp + 64, &v4, 16); memcpy(tp + 80, &v5, 16); memcpy(tp + 96, &v6, 16); memcpy(tp + 112, &v7, 16);
-            if (!span_open) { span_x0 = x0 + k + 16; span_open = 1; }
-            span_x1 = x0 + k + 32;
-            gap = 0;
-        } else if (span_open) {
-            gap += 16;
-            if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
+        if (span_open) {
+            for (; k + 16 <= cnt; k += 16, fp += 64, tp += 64) {
+                fle_r_v2u64 o, d;
+
+                memcpy(&o, tp, 16);      d  = o ^ diff_load_px4(fp, vm, mask_alpha);
+                memcpy(&o, tp + 16, 16); d |= o ^ diff_load_px4(fp + 16, vm, mask_alpha);
+                memcpy(&o, tp + 32, 16); d |= o ^ diff_load_px4(fp + 32, vm, mask_alpha);
+                memcpy(&o, tp + 48, 16); d |= o ^ diff_load_px4(fp + 48, vm, mask_alpha);
+                if (__builtin_expect((d[0] | d[1]) == 0u, 1)) {
+                    gap += 16;
+                    if (gap >= 128) {
+                        df_add_span(span_x0, y, span_x1, y + 1);
+                        span_open = 0;
+                        k += 16; fp += 64; tp += 64;
+                        break;
+                    }
+                } else {
+                    diff_store_px4(tp, fp, vm, mask_alpha);
+                    diff_store_px4(tp + 16, fp + 16, vm, mask_alpha);
+                    diff_store_px4(tp + 32, fp + 32, vm, mask_alpha);
+                    diff_store_px4(tp + 48, fp + 48, vm, mask_alpha);
+                    span_x1 = x0 + k + 16;
+                    gap = 0;
+                }
+            }
+            if (k + 16 > cnt) break;
         }
     }
-    for (; k + 4 <= cnt; k += 4) {
-        const uint8_t *fp = from + (uint64_t)k * 4u;
-        uint8_t *tp = to + (uint64_t)k * 4u;
-        fle_r_v2u64 vv, vo, dd;
+    for (; k + 4 <= cnt; k += 4, fp += 16, tp += 16) {
+        fle_r_v2u64 vv = diff_load_px4(fp, vm, mask_alpha), vo, dd;
 
-        memcpy(&vv, fp, 16);
-        if (mask_alpha) vv &= vm;
         memcpy(&vo, tp, 16);
         dd = vo ^ vv;
         if ((dd[0] | dd[1]) == 0u) {
@@ -499,25 +525,41 @@ static inline __attribute__((always_inline)) void diff_blit_row(uint8_t *to, con
             gap = 0;
         }
     }
-    for (; k < cnt; k++) {
+    for (; k < cnt; k++, fp += 4, tp += 4) {
         uint32_t v, o;
 
-        memcpy(&v, from + (uint64_t)k * 4u, 4);
+        memcpy(&v, fp, 4);
         if (mask_alpha) v &= 0x00FFFFFFu;
-        memcpy(&o, to + (uint64_t)k * 4u, 4);
+        memcpy(&o, tp, 4);
         if (o == v) {
             if (span_open) {
                 gap++;
                 if (gap >= 128) { df_add_span(span_x0, y, span_x1, y + 1); span_open = 0; }
             }
         } else {
-            memcpy(to + (uint64_t)k * 4u, &v, 4);
+            memcpy(tp, &v, 4);
             if (!span_open) { span_x0 = x0 + k; span_open = 1; }
             span_x1 = x0 + k + 1;
             gap = 0;
         }
     }
     if (span_open) df_add_span(span_x0, y, span_x1, y + 1);
+}
+
+static __attribute__((noinline)) uint64_t diff_blit_rect(const fle_rsurf *d, const fle_rsurf *s, const fle_rrect *r, int64_t dx, int64_t dy, int64_t sx, int64_t sy, int mask_alpha)
+{
+    int64_t cnt = r->x1 - r->x0, rows = r->y1 - r->y0;
+    intptr_t dstep = d->bottom_up ? -(intptr_t)d->stride : (intptr_t)d->stride;
+    intptr_t sstep = s->bottom_up ? -(intptr_t)s->stride : (intptr_t)s->stride;
+    uint8_t *to = fle_r_row(d, (uint32_t)r->y0) + (uint64_t)r->x0 * 4u;
+    const uint8_t *from = fle_r_row(s, (uint32_t)(sy + (r->y0 - dy))) + (uint64_t)(sx + (r->x0 - dx)) * 4u;
+    int64_t y = r->y0;
+
+    for (int64_t i = 0; i < rows; i++, y++, to += dstep, from += sstep) {
+        if (mask_alpha) diff_blit_row(to, from, r->x0, y, cnt, 1);
+        else diff_blit_row(to, from, r->x0, y, cnt, 0);
+    }
+    return (uint64_t)rows * (uint64_t)cnt;
 }
 
 uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64_t dy, int64_t w, int64_t h, const fle_rsurf *s, int64_t sx, int64_t sy, uint32_t idx, uint32_t pat)
@@ -543,20 +585,10 @@ uint64_t fle_r_blit(const fle_rsurf *d, const fle_rrect *clip, int64_t dx, int64
     if (cmp && ch_any) ch_rows(r.y0, r.y1);   /* alpha2b: a row has differed already: this call is copied as before and is all "may have changed" */
     diff = df_active && !same_surface && d->bpp == 32 && (bytes || fast);
     if (df_active && !diff) df_unknown = 1;
+    if (diff) return diff_blit_rect(d, s, &r, dx, dy, sx, sy, bytes ? 0 : 1);
     for (int64_t i = 0; i < r.y1 - r.y0; i++) {
         int64_t y = down ? r.y1 - 1 - i : r.y0 + i;
         int64_t sy_ = sy + (y - dy);
-
-        if (diff) {
-            uint8_t *to = fle_r_row(d, (uint32_t)y) + (uint64_t)r.x0 * 4u;
-            const uint8_t *from = fle_r_row(s, (uint32_t)sy_) + (uint64_t)(sx + (r.x0 - dx)) * 4u;
-            int64_t cnt = r.x1 - r.x0;
-
-            if (bytes) diff_blit_row(to, from, r.x0, y, cnt, 0);
-            else diff_blit_row(to, from, r.x0, y, cnt, 1);
-            n += (uint64_t)cnt;
-            continue;
-        }
 
         if (bytes && cmp && !ch_any) {
             typedef uint32_t fle_r_v4u __attribute__((vector_size(16), aligned(1)));

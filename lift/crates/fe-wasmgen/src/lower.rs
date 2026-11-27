@@ -155,6 +155,7 @@ struct L<'a> {
     /// decision 0181 (--mx-rc): RC (0..3) of the C path's MXCSR when PE is set and PM masked, else 4; NONE when the option is off
     mx_rcl: u32,
     mx_bypass: bool,
+    lc_local: u32,
     src_ov: Option<u32>,
     fall: Option<usize>,
     /// Dispatch-loop mode (irreducible functions): the local that holds the next block, and the number of blocks.
@@ -254,8 +255,39 @@ impl<'a> L<'a> {
         self.tmp_free.append(&mut self.tmp_used);
     }
 
+    fn flush_lc(&mut self) {
+        if self.lc_local != NONE {
+            self.c.local_get(self.lc_local);
+            self.c.global_set(3);
+        }
+    }
+
+    fn reload_lc(&mut self) {
+        if self.lc_local != NONE {
+            self.c.global_get(3);
+            self.c.local_set(self.lc_local);
+        }
+    }
+
     fn emit_loop_tick(&mut self) {
         if self.cx.loop_slice == 0 || self.cx.dry {
+            return;
+        }
+        if self.lc_local != NONE {
+            let lc = self.lc_local;
+            self.c.local_get(lc);
+            self.c.i32_const(1);
+            self.c.i32_sub();
+            self.c.local_tee(lc);
+            self.c.i32_const(0);
+            self.c.i32_le_s();
+            self.c.if_();
+            self.c.i32_const(4096);
+            self.c.global_set(3);
+            self.c.call(self.cx.loop_slice);
+            self.c.global_get(3);
+            self.c.local_set(lc);
+            self.c.end();
             return;
         }
         let t = self.tmp(Ty::I32);
@@ -1330,7 +1362,9 @@ impl<'a> L<'a> {
                 self.c.i64_store(o);
             }
             self.sync_saved_regs(&sig.params());
+            self.flush_lc();
             self.c.call(fi);
+            self.reload_lc();
             for rg in sig.results() {
                 let l = self.reg_loc(rg);
                 let o = self.c.reg_base((r + 8 * rg as i32) as u32);
@@ -1358,7 +1392,9 @@ impl<'a> L<'a> {
             let l = self.reg_loc(r);
             self.c.local_get(l);
         }
+        self.flush_lc();
         self.c.call(fi);
+        self.reload_lc();
         let rs = sig.results();
         for &r in rs.iter().rev() {
             let l = self.reg_loc(r);
@@ -1409,6 +1445,7 @@ impl<'a> L<'a> {
             self.c.i64_store(o);
         }
         self.sync_saved_regs(ins);
+        self.flush_lc();
         match target {
             Some(tt) => {
                 self.c.local_get(tt);
@@ -1416,6 +1453,7 @@ impl<'a> L<'a> {
             }
             None => self.c.call(fi),
         }
+        self.reload_lc();
         for &rg in outs {
             let l = self.reg_loc(rg);
             let o = self.c.reg_base((r + 8 * rg as i32) as u32);
@@ -1568,6 +1606,7 @@ impl<'a> L<'a> {
             let l = self.reg_loc(r);
             self.c.local_get(l);
         }
+        self.flush_lc();
         self.c.local_get(tt);
         self.c.call(self.cx.ti_helper);
         let v = self.tmp(Ty::I64);
@@ -1584,6 +1623,7 @@ impl<'a> L<'a> {
         self.c_stub_inner(self.cx.c_dispatch, Some(tt), Some(ret), &[1, 2, 8, 9, 0], &[0]);
         self.mx_guard_refresh();
         self.c.end();
+        self.reload_lc();
         if rl != 0 {
             self.xreload(rl);
         }
@@ -1623,11 +1663,13 @@ impl<'a> L<'a> {
             self.c.i64_const((va + i.len() as u64) as i64);
             self.c.i64_store(0);
             self.c.local_get(t);
+            self.flush_lc();
             for r in [1usize, 2, 8, 9] {
                 let l = self.reg_loc(r);
                 self.c.local_get(l);
             }
             self.c.call(fi);
+            self.reload_lc();
             let ra = self.reg_loc(RAX);
             self.c.local_set(ra);
             return Ok(());
@@ -1745,6 +1787,7 @@ impl<'a> L<'a> {
         self.c.i32_wrap_i64();
         self.c.i64_const((va + i.len() as u64) as i64);
         self.c.i64_store(0);
+        self.flush_lc();
         self.c.local_get(t);
         for r in [1usize, 2, 8, 9, 0] {
             let l = self.reg_loc(r);
@@ -1755,6 +1798,7 @@ impl<'a> L<'a> {
         self.c.i32_const(self.cx.text_lo as i32);
         self.c.i32_sub();
         self.c.call_indirect(self.cx.ui_ty, 0);
+        self.reload_lc();
         let ra = self.reg_loc(RAX);
         self.c.local_set(ra);
         Ok(())
@@ -5417,6 +5461,7 @@ impl<'a> L<'a> {
     }
 
     fn emit_return_nf(&mut self) {
+        self.flush_lc();
         for r in self.sig.results() {
             let l = self.reg_loc(r);
             self.c.local_get(l);
@@ -5552,6 +5597,7 @@ impl<'a> L<'a> {
                 self.trap_if();
                 self.flush_rsp();
                 let rl = self.reg_loc(RSP);
+                self.flush_lc();
                 self.c.local_get(rl);
                 for r in [1usize, 2, 8, 9, 0] {
                     let l = self.reg_loc(r);
@@ -5562,6 +5608,7 @@ impl<'a> L<'a> {
                 self.c.i32_const(self.cx.text_lo as i32);
                 self.c.i32_sub();
                 self.c.call_indirect(self.cx.ui_ty, 0);
+                self.reload_lc();
                 let ra = self.reg_loc(RAX);
                 self.c.local_set(ra);
                 self.emit_return_nf();
@@ -5591,6 +5638,7 @@ impl<'a> L<'a> {
                 }
                 let fi = *self.cx.import_idx.get(&name).ok_or("import not declared")?;
                 self.flush_rsp();
+                self.flush_lc();
                 let rl = self.reg_loc(RSP);
                 self.c.local_get(rl);
                 for r in [1usize, 2, 8, 9] {
@@ -5598,6 +5646,7 @@ impl<'a> L<'a> {
                     self.c.local_get(l);
                 }
                 self.c.call(fi);
+                self.reload_lc();
                 let ra = self.reg_loc(RAX);
                 self.c.local_set(ra);
                 self.emit_return_nf();
@@ -5978,6 +6027,7 @@ fn lower_fn(f: &Fun, cfg: &Cfg, fl: &FlagInfo, sig: Sig, cx: &Ctx<'_>, skip: &Ha
         src_ov: None,
         fall: None,
         dispatch_pc: None,
+        lc_local: NONE,
         stats,
     };
     l.reg_local[RSP] = 0;
@@ -5990,6 +6040,14 @@ fn lower_fn(f: &Fun, cfg: &Cfg, fl: &FlagInfo, sig: Sig, cx: &Ctx<'_>, skip: &Ha
         l.c.tls_base_get();
         l.c.local_set(b);
         crate::wasm::TLS_LOCAL.with(|c| c.set(b));
+    }
+    let call_count = f.nodes.values().filter(|n| matches!(n, crate::ir::Node::Insn(i) if i.mnemonic() == Mnemonic::Call)).count()
+        + f.blocks.iter().filter(|b| matches!(b.term, Term::Tail(_) | Term::TailIndirect | Term::TailImport(_))).count();
+    if cx.loop_slice != 0 && !cx.dry && (!cfg.reducible || cfg.is_header.iter().any(|&h| h)) && call_count <= 4 {
+        let lc = l.new_local(Ty::I32);
+        l.c.global_get(3);
+        l.c.local_set(lc);
+        l.lc_local = lc;
     }
     if let Some(xp) = l.xp {
         l.xreload(xp.entry);

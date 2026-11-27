@@ -2376,11 +2376,9 @@ void fle_imp_BitBlt(void)
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], cx = (int32_t)(uint32_t)R[9], cy = (int32_t)(uint32_t)fle_arg(5);
     int32_t x1 = (int32_t)(uint32_t)fle_arg(7), y1 = (int32_t)(uint32_t)fle_arg(8);
     uint32_t rop = (uint32_t)fle_arg(9);
-    char pre[200];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer between DCs (rop 0x%x, %d x %d to (%d, %d) from (%d, %d))", (unsigned)rop, (int)cx, (int)cy, (int)x, (int)y, (int)x1, (int)y1);
-    blit_call(api, pre, R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
+    blit_call(api, "pixel transfer between DCs", R[1], x, y, cx, cy, fle_arg(6), x1, y1, rop, 0, 0, 0);
 }
 
 /* Decision 0319 section 14 (alpha1, PROVISIONAL): the 32-bit pixels of a rectangle of a DC, for the drag image of ImageList_DragEnter / DragMove / DragShowNolock (fle_imagelist.c). Device units of the DC (a window DC from
@@ -2391,15 +2389,13 @@ void fle_imp_BitBlt(void)
 int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *argb, uint32_t alpha_const, uint32_t *saved, uint8_t *valid)
 {
     target t;
-    char pre[120];
     int32_t i, j;
     uint64_t n = 0;
     fle_rrect bnd = { 0, 0, 0, 0 };
     int have = 0;
 
     if (w <= 0 || h <= 0) return 1;
-    snprintf(pre, sizeof pre, "drawing the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
-    get_target(api, pre, hdc, "hdc", &t);
+    get_target(api, "drawing the drag image", hdc, "hdc", &t);
     if (valid) memset(valid, 0, (size_t)w * (size_t)h);
     if (!target_live(api, &t)) return 1;
     if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
@@ -2441,15 +2437,13 @@ int fle_gdi_dc_blend32(const char *api, uint64_t hdc, int32_t x, int32_t y, int3
 int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_t w, int32_t h, const uint32_t *px, const uint8_t *valid)
 {
     target t;
-    char pre[120];
     int32_t i, j;
     uint64_t n = 0;
     fle_rrect bnd = { 0, 0, 0, 0 };
     int have = 0;
 
     if (w <= 0 || h <= 0) return 1;
-    snprintf(pre, sizeof pre, "restoring the background of the drag image (%d x %d at (%d, %d))", (int)w, (int)h, (int)x, (int)y);
-    get_target(api, pre, hdc, "hdc", &t);
+    get_target(api, "restoring the background of the drag image", hdc, "hdc", &t);
     if (!target_live(api, &t)) return 1;
     if (!fle_r_direct(&t.s) || t.s.bpp != 32) return 0;
     for (j = 0; j < h; j++) {
@@ -2478,16 +2472,15 @@ int fle_gdi_dc_put32(const char *api, uint64_t hdc, int32_t x, int32_t y, int32_
 void fle_imp_PatBlt(void)
 {
     static const char api[] = "PatBlt";
+    static const char pre[] = "painting a rectangle with the selected brush";
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], w = (int32_t)(uint32_t)R[9], h = (int32_t)(uint32_t)fle_arg(5);
     uint32_t rop = (uint32_t)fle_arg(6), idx, pat = 0;
     target t;
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[200];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "painting a rectangle with the selected brush (rop 0x%x, %d x %d at (%d, %d))", (unsigned)rop, (int)w, (int)h, (int)x, (int)y);
     if (!fle_r_rop3_valid(rop & ~UINT32_C(0x40000000), &idx)) pixel_stop(api, pre, "rop is not one of the 256 ternary raster-operation codes of the page");
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
@@ -2522,6 +2515,7 @@ void fle_imp_PatBlt(void)
 void fle_imp_FillRect(void)
 {
     static const char api[] = "FillRect";
+    static const char pre[] = "filling a rectangle with a brush";
     uint64_t prc = R[2], hbr = R[8];
     int32_t l, t_, rt, b;
     uint32_t cref;
@@ -2530,10 +2524,8 @@ void fle_imp_FillRect(void)
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[120];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "filling a rectangle with a brush (hbr 0x%" PRIx64 ")", hbr);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");
@@ -2567,6 +2559,7 @@ void fle_imp_FillRect(void)
 void fle_imp_ScrollDC(void)
 {
     static const char api[] = "ScrollDC";
+    static const char pre[] = "scrolling the bits of a DC";
     uint64_t hdc = R[1], prc_scroll = R[9], prc_clip = fle_arg(5), hrgn = fle_arg(6), prc_update = fle_arg(7);
     int32_t dx = (int32_t)(uint32_t)R[2], dy = (int32_t)(uint32_t)R[8], ox = 0, oy = 0;
     target t;
@@ -2575,11 +2568,9 @@ void fle_imp_ScrollDC(void)
     const fle_rrect *cl;
     uint32_t nc, k, bpp;
     uint64_t npx = 0;
-    char pre[160];
     int chk;
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "scrolling the bits of a DC (dx %d, dy %d)", (int)dx, (int)dy);
     get_target(api, pre, hdc, "hDC", &t);
     if (t.is_window) {
         fle_gdc_info gi;
@@ -2678,16 +2669,15 @@ void fle_imp_ScrollDC(void)
 void fle_imp_InvertRect(void)
 {
     static const char api[] = "InvertRect";
+    static const char pre[] = "inverting a rectangle";
     uint64_t prc = R[2];
     int32_t l, t_, rt, b;
     target t;
     gdi_dc *dc;
     fle_rrect r;
     uint64_t n;
-    char pre[80];
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "inverting a rectangle (hDC 0x%" PRIx64 ")", R[1]);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");
@@ -3714,10 +3704,9 @@ void fle_imp_StretchDIBits(void)
     int chk = 0;   /* decision 0245: fle_r_changed_begin was called */
     int64_t sx0, sy0, nrows;
     uint64_t n;
-    char pre[260];
+    static const char pre[] = "pixel transfer from a DIB";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer from a DIB (StretchDIBits rop 0x%x, iUsage %u, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (unsigned)usage, (int)wd, (int)hd, (int)xd, (int)yd, (int)ws, (int)hs, (int)xs, (int)ys);
     idx = ternary(api, pre, rop, 1);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
@@ -3798,10 +3787,9 @@ void fle_imp_SetDIBitsToDevice(void)
     int chk = 0;   /* decision 0245: fle_r_changed_begin was called */
     int64_t top_row, nrows;
     uint64_t n = 0;
-    char pre[260];
+    static const char pre[] = "pixel transfer from a DIB";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer from a DIB (SetDIBitsToDevice %u x %u to (%d, %d) from (%d, %d), StartScan %u, cLines %u, ColorUse %u)", (unsigned)w, (unsigned)h, (int)xd, (int)yd, (int)xs, (int)ys, (unsigned)start, (unsigned)nl, (unsigned)usage);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -3841,10 +3829,9 @@ void fle_imp_StretchBlt(void)
     int32_t x = (int32_t)(uint32_t)R[2], y = (int32_t)(uint32_t)R[8], wd = (int32_t)(uint32_t)R[9], hd = (int32_t)(uint32_t)fle_arg(5);
     int32_t xs = (int32_t)(uint32_t)fle_arg(7), ys = (int32_t)(uint32_t)fle_arg(8), ws = (int32_t)(uint32_t)fle_arg(9), hs = (int32_t)(uint32_t)fle_arg(10);
     uint32_t rop = (uint32_t)fle_arg(11);
-    char pre[220];
+    static const char pre[] = "pixel transfer between DCs";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "pixel transfer between DCs (StretchBlt rop 0x%x, %d x %d to (%d, %d) from %d x %d at (%d, %d))", (unsigned)rop, (int)wd, (int)hd, (int)x, (int)y, (int)ws, (int)hs, (int)xs, (int)ys);
     blit_call(api, pre, R[1], x, y, wd, hd, fle_arg(6), xs, ys, rop, 1, ws, hs);
 }
 
@@ -3860,10 +3847,9 @@ void fle_imp_GetPixel(void)
     target t;
     gdi_dc *dc;
     fle_rrect r;
-    char pre[100];
+    static const char pre[] = "reading a pixel";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "reading a pixel (GetPixel at (%d, %d))", (int)x, (int)y);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -3889,10 +3875,9 @@ static void set_pixel(const char *api, int v)
     target t;
     gdi_dc *dc;
     fle_rrect r;
-    char pre[110];
+    static const char pre[] = "setting a pixel";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "setting a pixel (%s at (%d, %d), colour 0x%x)", api, (int)x, (int)y, (unsigned)color);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4092,10 +4077,9 @@ void fle_imp_LineTo(void)
     int inv;
     uint32_t col;
     uint64_t n = 0;
-    char pre[100];
+    static const char pre[] = "drawing a line";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a line (LineTo (%d, %d))", (int)x, (int)y);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4136,10 +4120,9 @@ void fle_imp_Rectangle(void)
     int inv, hollow;
     uint32_t pen, fill;
     uint64_t n = 0;
-    char pre[110];
+    static const char pre[] = "drawing a rectangle";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a rectangle (Rectangle (%d, %d, %d, %d))", (int)l, (int)t_, (int)r, (int)b);
     get_target(api, pre, R[1], "hdc", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hdc");
@@ -4186,10 +4169,9 @@ void fle_imp_FrameRect(void)
     gdi_dc *dc;
     fle_rrect q;
     uint64_t n = 0;
-    char pre[110];
+    static const char pre[] = "drawing a frame";
 
     fle_gdi_check_thread(api);
-    snprintf(pre, sizeof pre, "drawing a frame (FrameRect hbr 0x%" PRIx64 ")", hbr);
     get_target(api, pre, R[1], "hDC", &t);
     dc = target_attrs(R[1]);
     mode_check(api, pre, dc, "hDC");

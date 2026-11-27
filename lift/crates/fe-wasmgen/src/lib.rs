@@ -997,20 +997,16 @@ pub fn compile(data: &[u8], extra: &[u64], specs: &[fe_decode::Spec], conf: &Con
         ti_k = (8 * fit.len() as u32).max(16).next_power_of_two().trailing_zeros().min(16);
         let ut_idx = module.type_index(ut_ft.clone());
         let mut c = Code::new();
-        for a in [landing, hook] {
-            c.i32_const(0);
-            c.i32_load(a);
-            c.if_();
-            c.i32_const(0);
-            c.i64_const(0);
-            c.return_();
-            c.end();
-        }
+        c.i32_const(0);
+        c.i32_load(landing);
+        c.i32_const(0);
+        c.i32_load(hook);
+        c.i32_or();
         c.local_get(6);
         c.i64_const(32);
         c.i64_shr_u();
-        c.i64_eqz();
-        c.i32_eqz();
+        c.i32_wrap_i64();
+        c.i32_or();
         c.if_();
         c.i32_const(0);
         c.i64_const(0);
