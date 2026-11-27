@@ -1,11 +1,14 @@
-// The page's answer to the engine's file dialogs (decision 0193, fpick1; Issue #1481: no box is shown). The engine is suspended in IFileOpenDialog::Show / IFileSaveDialog::Show.
-// Open: the browser's own file chooser (a hidden file input, #filedlg-input, several files at once) is opened from here: at once when the browser says a press of a key or a click was just made,
-// else at the person's next press of a key or click on the page (the browser opens a chooser only from such a gesture). The Files the person chooses go to the Worker, never to a server.
-// Save: nothing to ask: the engine writes the suggested name, and SavedFilesView hands the written file to the browser's download. A folder dialog is refused.
+// The page's answer to the engine's file dialogs (decision 0193, fpick1; decision 0216 stage 2, Issue #1519). The engine is suspended in IFileOpenDialog::Show / IFileSaveDialog::Show.
+// With the host's `select` (the page's file manager window, files/engine-dialog.ts): every Open, Save and folder request is answered in that window, and no browser chooser is opened.
+// Without it (the fallback, kept for a host that has no window): Open opens the browser's own file chooser (a hidden file input, #filedlg-input, several files at once), at once when the browser says a press of a key or a click was just made,
+// else at the person's next press of a key or click on the page (the browser opens a chooser only from such a gesture). Save: the engine writes the suggested name, and SavedFilesView hands the written file to the browser's download. A folder dialog is refused.
+// The Files the person chooses go to the Worker, never to a server.
 import { acceptFor, describeFilters, planOpenFile, planOpenFolder, planSave, suggestedSaveName, FOS_PICKFOLDERS, type FileDlgAnswer, type FileDlgItem, type FileDlgRequest } from '../engine/filedlg.ts';
 
 export interface FileDlgHost {
   answer(id: number, answer: FileDlgAnswer): void;
+  /** Issue #1519: the file manager window answers the dialog (Open, Save, folder). It is built in `root` and calls `done` once with the answer; it returns what undoes it */
+  select?(id: number, request: FileDlgRequest, root: HTMLElement, done: (a: FileDlgAnswer) => void): () => void;
   /** the dialog is over (answered, cancelled or refused): give the keyboard back to the desktop */
   closed?(): void;
   /** a line for the page's log (what the engine offered, why a choice was refused) */
@@ -28,6 +31,8 @@ export class FileDialogView {
   private input: HTMLInputElement | null = null;
   /** removes the listeners that open the chooser at the person's next gesture (null: none is waiting) */
   private disarm: (() => void) | null = null;
+  /** what the host's select window undoes when the dialog is over (null: no window is shown) */
+  private disposeSelect: (() => void) | null = null;
   /** when the chooser was last opened (performance.now) */
   private openedAt = -Infinity;
   /** what the page has done with dialogs, for the tests and the page's log (no file names) */
@@ -45,6 +50,7 @@ export class FileDialogView {
   show(id: number, request: FileDlgRequest): void {
     if (this.current) this.cancel('replaced by a newer dialog');
     this.host.log?.('info', `the engine's ${request.save ? 'Save' : 'Open'} dialog offers: ${describeFilters(request)}`);
+    if (this.host.select) { this.current = { id, request }; this.buildSelect(id, request); return; }
     if (request.save) { this.saveNow(id, request); return; }
     if (request.options & FOS_PICKFOLDERS) { this.settle(id, 'open', 'refused', { ok: false, reason: 'The engine asked for a folder of its own virtual volume. There is none to choose from on this computer.' }); return; }
     this.current = { id, request };
@@ -59,9 +65,27 @@ export class FileDialogView {
   /** the engine ended: nobody is left to answer the dialog it asked */
   hide(): void {
     this.disarmChooser();
+    const dispose = this.disposeSelect;
+    this.disposeSelect = null;
+    dispose?.();
+    delete this.root.dataset.select;
     this.current = null;
     this.input = null;
     this.root.replaceChildren();
+  }
+
+  /** Issue #1519: the file manager window (the host's select) is the dialog: it is built in the root and answers through answerSelect */
+  private buildSelect(id: number, request: FileDlgRequest): void {
+    this.root.dataset.select = '1';
+    this.disposeSelect = this.host.select!(id, request, this.root, (a) => this.answerSelect(id, a));
+  }
+
+  private answerSelect(id: number, a: FileDlgAnswer): void {
+    const c = this.current;
+    if (!c || c.id !== id) return;
+    const kind = c.request.save ? 'save' : 'open';
+    if (!a.ok) { this.settle(id, kind, 'cancelled', a); return; }
+    this.settle(id, kind, 'answered', a, a.items.length, a.items.reduce((n, i) => n + (i.file?.size ?? 0), 0));
   }
 
   /** a Save: the suggested name is the target (no box asks for another) */
@@ -138,14 +162,15 @@ export class FileDialogView {
   }
 }
 
-/** the files the engine wrote (Save dialog targets): kept in this page's memory (the tests read them), and handed to the browser's download as soon as the engine has written them (Issue #1481: no list is shown) */
+/** the files the engine wrote (Save dialog targets): kept in this page's memory (the tests read them), and handed to the browser's download as soon as the engine has written them (Issue #1481: no list is shown); not when the person chose the place in the file window (Issue #1519: the file is in the window's storage then) */
 export class SavedFilesView {
   readonly files: { name: string; guestPath: string; size: number; data: ArrayBuffer; at: number }[] = [];
 
-  add(f: { name: string; guestPath: string; size: number; data: ArrayBuffer }): void {
+  add(f: { name: string; guestPath: string; size: number; data: ArrayBuffer }, download = true): void {
     const i = this.files.findIndex((x) => x.guestPath.toLowerCase() === f.guestPath.toLowerCase());
     const rec = { ...f, at: Date.now() };
     if (i >= 0) this.files[i] = rec; else this.files.push(rec);
+    if (!download) return;
     const url = URL.createObjectURL(new Blob([f.data], { type: 'application/octet-stream' }));
     const a = el('a', { href: url, download: f.name });
     document.body.append(a);

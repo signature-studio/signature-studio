@@ -1,5 +1,5 @@
-//! Decision 0169: the window path and the C-path call of the hybrid mode for CVTSI2SS (32/64), CVTSD2SI and CVTSS2SI (32/64). The module is compiled in hybrid mode with the MXCSR window
-//! (hybrid_r / hybrid_x / hybrid_mx, the C runtime's imports), the one C function it calls on the slow path (`c.fle_hyb_mx`, kinds 33..38 of lift/harness/hyb1/hybrid_glue.c) is replaced
+//! Decision 0169: the window path and the C-path call of the hybrid mode for CVTSI2SS (32/64), CVTSD2SI and CVTSS2SI (32/64), and the truncating CVTTSD2SI and CVTTSS2SI (32/64). The module is compiled in hybrid mode with the MXCSR window
+//! (hybrid_r / hybrid_x / hybrid_mx, the C runtime's imports), the one C function it calls on the slow path (`c.fle_hyb_mx`, kinds 21..24 and 33..38 of lift/harness/hyb1/hybrid_glue.c) is replaced
 //! by a JS function that computes what the C path's function computes (the architectural result under the default MXCSR), and the result is compared with the host CPU, with MXCSR in
 //! memory in the state the window needs (PE set, PM masked: every input in the window takes the fast path) and in the state it does not (every input takes the C-path call).
 //! The stub is checked by the same comparison: a wrong stub or a wrong window shows as a difference from the host CPU. Skipped (and passing) when node is missing or the host is not x86-64.
@@ -90,6 +90,10 @@ fn host_flags(k: usize, b: &[u8; 32]) -> u32 {
             2 => { asm!("cvtsd2si {r:e}, {x}", r = out(reg) r32, x = in(xmm_reg) x2, options(nostack)); let _ = r32; }
             3 => { asm!("cvtsd2si {r}, {x}", r = out(reg) r64, x = in(xmm_reg) x2, options(nostack)); let _ = r64; }
             4 => { asm!("cvtss2si {r:e}, {x}", r = out(reg) r32, x = in(xmm_reg) x1, options(nostack)); let _ = r32; }
+            6 => { asm!("cvttsd2si {r:e}, {x}", r = out(reg) r32, x = in(xmm_reg) x2, options(nostack)); let _ = r32; }
+            7 => { asm!("cvttsd2si {r}, {x}", r = out(reg) r64, x = in(xmm_reg) x2, options(nostack)); let _ = r64; }
+            8 => { asm!("cvttss2si {r:e}, {x}", r = out(reg) r32, x = in(xmm_reg) x1, options(nostack)); let _ = r32; }
+            9 => { asm!("cvttss2si {r}, {x}", r = out(reg) r64, x = in(xmm_reg) x1, options(nostack)); let _ = r64; }
             _ => { asm!("cvtss2si {r}, {x}", r = out(reg) r64, x = in(xmm_reg) x1, options(nostack)); let _ = r64; }
         }
         let _ = d;
@@ -133,6 +137,10 @@ fn cases() -> Vec<Case> {
         Case { name: "cvtsd2si r64", insn: vec![0xf2, 0x48, 0x0f, 0x2d, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvtsd_si64(xd(b, 16)) as u64) } },
         Case { name: "cvtss2si r32", insn: vec![0xf3, 0x0f, 0x2d, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvtss_si32(x(b, 16)) as u32 as u64) } },
         Case { name: "cvtss2si r64", insn: vec![0xf3, 0x48, 0x0f, 0x2d, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvtss_si64(x(b, 16)) as u64) } },
+        Case { name: "cvttsd2si r32", insn: vec![0xf2, 0x0f, 0x2c, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvttsd_si32(xd(b, 16)) as u32 as u64) } },
+        Case { name: "cvttsd2si r64", insn: vec![0xf2, 0x48, 0x0f, 0x2c, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvttsd_si64(xd(b, 16)) as u64) } },
+        Case { name: "cvttss2si r32", insn: vec![0xf3, 0x0f, 0x2c, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvttss_si32(x(b, 16)) as u32 as u64) } },
+        Case { name: "cvttss2si r64", insn: vec![0xf3, 0x48, 0x0f, 0x2c, 0xc1], gp_in: false, xmm_out: false, want: |b| unsafe { out_i(_mm_cvttss_si64(x(b, 16)) as u64) } },
     ]
 }
 
@@ -205,6 +213,10 @@ imports.c.fle_hyb_mx=(kind,imm)=>{
   const sdv=new DataView(mem.buffer,BUF+16,16);
   const rdv=new DataView(mem.buffer,BUF+32,16);
   switch(kind){
+    case 21: rdv.setBigUint64(0, toI(Math.trunc(sdv.getFloat64(0,true)),32), true); break;
+    case 22: rdv.setBigUint64(0, toI(Math.trunc(sdv.getFloat64(0,true)),64), true); break;
+    case 23: rdv.setBigUint64(0, toI(Math.trunc(sdv.getFloat32(0,true)),32), true); break;
+    case 24: rdv.setBigUint64(0, toI(Math.trunc(sdv.getFloat32(0,true)),64), true); break;
     case 33: rdv.setUint32(0, i2f(BigInt(sdv.getInt32(0,true))), true); break;
     case 34: rdv.setUint32(0, i2f(sdv.getBigInt64(0,true)), true); break;
     case 35: rdv.setBigUint64(0, toI(sdv.getFloat64(0,true),32), true); break;

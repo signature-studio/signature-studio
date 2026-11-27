@@ -11,7 +11,7 @@
 //   --shard i/n: the scenarios sorted by ID, the index % n === i - 1 (deterministic). --repeat n: each selected scenario n times (the row carries `repeat`).
 //   --budget: a number with s, m or h. Each display row has its own budget (a clock made per row). A scenario that would start after the row's budget has passed, or
 //     that needs more time than the row has left (needsMs, e.g. resilience/wait-idle-30min: 30 min), is not run: it is written with skipped: true (the row then fails).
-//   --only: IDs (page/canvas-fills-viewport) or the older names (file-open-demo).
+//   --only: IDs (page/canvas-fills-viewport) or the older names (file-open-demo). IDs with an area (file/open-box-shows) and no --area or --scenarios take the scenarios of those areas.
 //   --displays: the rows to run. A scenario runs in a row only when its own displays (the declaration) include that row's display name; --displays does not widen a scenario.
 //     4k-dpr1 (3840 x 2160 CSS px, DPR 1); 4k-dpr2 (1920 x 1080, DPR 2); 4k-random (two DPRs drawn at random from 1.01 to 3.00: CSS px 3840 / DPR, 2160 / DPR);
 //     dpr:<number> (e.g. dpr:1.25: CSS px 3840 / DPR, 2160 / DPR). Without --displays the rows are the names the selected scenarios declare (areas: 4k-dpr1,4k-random; the smoke set: 4k-dpr1,4k-dpr2,4k-random).
@@ -43,7 +43,7 @@ import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
 import { AREAS, checkMarks, legacyScenario, marksOf } from './lib/scenario.mjs';
-import { budgetClock, dprMatches, needsFailLog, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowsFor, runPasses, scenarioResult, tailLines } from './lib/plan.mjs';
+import { areasOfOnly, budgetClock, dprMatches, needsFailLog, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowsFor, runPasses, scenarioResult, tailLines } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
 
@@ -342,6 +342,9 @@ async function loadSet(args) {
     if (!AREAS.includes(args.area)) throw new Error(`--area ${args.area}: the areas are ${AREAS.join(', ')}`);
     return loadArea(args.area);
   }
+  // --only with area IDs (file/open-...) and no --scenarios: the scenarios of those areas (the set of the IDs), not the smoke set
+  const areas = args.scenarios === undefined && args.only !== undefined ? areasOfOnly(args.only.split(',').map((s) => s.trim()).filter(Boolean)) : null;
+  if (areas !== null) return (await Promise.all(areas.map((a) => loadArea(a)))).flat();
   return loadLegacySet(args.scenarios ?? 'smoke');
 }
 
