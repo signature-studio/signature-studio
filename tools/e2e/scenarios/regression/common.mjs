@@ -16,7 +16,7 @@ export const CHANNEL_NAME_PLACE = { x: 520, y: 144 };
 // the issues the mark (expectFail) may name: the open issues of the defects this set's scenarios meet (the table of Issue #1408). A failure outside this list is
 // not marked (run.mjs refuses a mark outside it, and 'new' is the mark of a defect with no issue yet). A closed issue is never a mark (#1375, #1384, #1385,
 // #1387, #1389, #1391, #1392, #1402, #1406, #1421, #1482 are closed on main)
-export const OPEN_ISSUES = ['#1386', '#1395', '#1419', '#1429', '#1433', '#1502'];
+export const OPEN_ISSUES = ['#1386', '#1395', '#1419', '#1429', '#1502'];
 
 const LINE = /^(child )?lid (\d+)(?: parent lid (\d+))? at \((-?\d+), (-?\d+)\) (\d+)x(\d+)(.*)$/;
 /** the window table: one row per window or child, with the absolute place (ax, ay) of a child (its parent's place added) */
@@ -189,17 +189,32 @@ export function changedIn(a, b, r) {
   }
   return { n, total };
 }
-/** the changed pixels of the whole picture that lie outside the rectangle */
-export function changedOutside(a, b, r) {
-  let n = 0;
+/** the changed pixels of the whole picture that lie outside the rectangle and the excluded rectangles: their count, and their bounding box (null when none) */
+export function changedOutside(a, b, r, excluded = []) {
+  const inside = (q, x, y) => x >= q.x && x < q.x + q.w && y >= q.y && y < q.y + q.h;
+  let n = 0, x0 = Infinity, y0 = Infinity, x1 = -1, y1 = -1;
   for (let y = 0; y < a.h; y++) {
     for (let x = 0; x < a.w; x++) {
-      if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) continue;
+      if (inside(r, x, y) || excluded.some((q) => inside(q, x, y))) continue;
       const i = y * a.stride + 4 * x, j = y * b.stride + 4 * x;
-      if (a.bytes[i] !== b.bytes[j] || a.bytes[i + 1] !== b.bytes[j + 1] || a.bytes[i + 2] !== b.bytes[j + 2]) n++;
+      if (a.bytes[i] === b.bytes[j] && a.bytes[i + 1] === b.bytes[j + 1] && a.bytes[i + 2] === b.bytes[j + 2]) continue;
+      n++;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
     }
   }
-  return n;
+  return { n, box: n ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : null };
+}
+/**
+ * the top bar's measured values (Memory Usage, CPU Load and Frame Rate show the engine's own numbers, so they change by themselves: #1433): the CPU panel,
+ * the shown TQuickEditToolbarPanel of the bar's row that ends where the splitter begins (the splitter is the 13th shown TQuickEditToolbarPanel by lid, as
+ * tools/e2e/lib/topbar.mjs names it). The rectangle is the window table's (guest px at any DPR). null when the panel is not in the table.
+ */
+export function topbarMeasuredRect(rows) {
+  const panels = rows.filter((w) => w.child && w.cls === 'TQuickEditToolbarPanel' && w.vis).sort((a, b) => a.lid - b.lid);
+  const splitter = panels[12];
+  if (!splitter) return null;
+  const cpu = panels.find((w) => w.parent === splitter.parent && Math.abs(w.ax + w.w - splitter.ax) <= 4);
+  return cpu ? { x: cpu.ax, y: cpu.ay, w: cpu.w, h: cpu.h } : null;
 }
 /** the share of the rectangle's pixels that are black (the sum of R, G, B under 24: not painted) */
 export function blankShare(a, r) {
