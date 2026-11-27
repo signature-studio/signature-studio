@@ -281,6 +281,7 @@ async function runShared(sc, repeat, d, env, sh, index, budget) {
   if (env.shotsDir) {
     const dir = path.join(env.shotsDir, fileTag(d), sc.id.replace('/', '-'));
     fs.mkdirSync(dir, { recursive: true });
+    sh.guest.shots = dir;
     await sh.guest.shot(path.join(dir, 'end.png')).catch(() => {});
   }
   out.ms = Date.now() - t0;
