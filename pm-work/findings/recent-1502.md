@@ -70,3 +70,54 @@ runner の値(この機械とは別枠。nproc 4、loadavg 3.1〜1.9)。
 
 - MRU の key と値の名前(`recent.ts`)を app に定数として置いた。制約と食い違う。代案: FL の読みを trace から取る(実装の量が増える)。
 - 判定の中身: 名前の一致は、曲の復元だけで満たせる(下の 5)。Recent の保持を判定するなら、MRU の読みと、項目の文字の走査を入れる必要がある。e2e の判定(`tools/e2e/`)は変えないという制約がある。
+
+## 8. 4 回目(この回。受け入れの通し直しと、(a)(b)(c) の実測: 11:58〜13:50 UTC)
+
+実エンジン: この runner で受け入れの 1 行を最後まで実行した(`ACCEPT_EXIT=0`。12:01〜12:41 UTC。commit `19093e76`)。続けて `tools/persist/measure.mjs --files-only` を 3 回走らせた(12:45・12:51・13:2x UTC)。製品は変えていない(測定の道具だけを変えた。下の 8.5)。runner の値(この機械とは別枠。nproc 4、loadavg 1.7〜2.6)。
+
+### 8.1 受け入れ(受理)
+
+- 起動(boot.json): `engine-idle`、`error` null、`standIn` false、`elapsedMs` 9,126(20,000 以下)。
+- 流れ A〜D: A 8,886 ms、B 8,777 ms、C 8,191 ms、D 8,132 ms。4 つとも `error` null・`engine-idle`・`trapped` false・`hostErrors` 0・`opened` true。B と D は `welcomeClosed` true。
+- `npm test --prefix app`: Test Files 77 passed | 1 skipped (78)、Tests 1476 passed | 10 skipped (1486)。
+- `recent-persists`(2 行。印なし。`expectFail` は null):
+  - `{"display":"4k-dpr1","name":"recent-persists","ok":true,"expectFail":null,"pageErrors":0,"consoleErrors":0,"failedRequests":0,"stuckToasts":0,"results":{"sanity":true,"after":true},"notes":["the \"Problems loading the project\" box was closed","\"e2e-recent-eb5d74c3.flp\" after the open in the engine memory: true","after the reload (first state engine-idle): true"],"achievedFps":38.5}`
+  - `{"display":"4k-dpr2","name":"recent-persists","ok":true,"expectFail":null,"pageErrors":0,"consoleErrors":0,"failedRequests":0,"stuckToasts":0,"results":{"sanity":true,"after":true},"notes":["the \"Problems loading the project\" box was closed","\"e2e-recent-0511775c.flp\" after the open in the engine memory: true","after the reload (first state engine-idle): true"],"achievedFps":40.33}`
+- `bash guard/scan.sh`: 0 件(commit 後の検査: `scan: 0 finding(s) in 11 file(s).`)。
+
+### 8.2 目標 1(Recent の窓が出る条件)
+
+- (a) 再読込の後、FL が MRU の値を読んだか: **実測・受理**。製品の経路(File > Open → 閉じる要求 → 再読込)の、再読込の後の読み: `RegQueryValueExW "HKCU\Software\Image-Line\FL Studio 26\MRU" "1" -> found type=1 size=100 value="C:\Users\user\Downloads\persist-check-10854-0.flp?"`(2 回)。この値は、開いた時に `recentAfterOpen` が書き、journal から起動の前に戻った物。
+- (b) Welcome の窓に Recent が出るか: **実測・出ない**。`files-reloaded.png`(再読込の後。同意の窓を押した後)の Welcome に、Recent の見出しも項目も無い。区画は「Start a new project」「Load a demo project」(What's new in FL Studio 2026.1.7・Future House・Bien Duro)「Select an edition」「Online」で、Recent を入れる前の `files-consent.png` と同じ。窓の表の `TRecentFilesModule` も `present: false`。
+- (c) 出ない理由の見立て: **推定(一部は静的解析の事実。実行時には未確認)**。
+  - 静的(`lift/out-app/host/binaries/win64/FLEngine_x64.dll`。読み取りだけ): `TRecentFilesModule` は 2 箇所で作られる。(i) `TWelcomeWizard.FormShow`(0x11449d0。`+0x810` が 0 の時に作る)、(ii) 0x114d4f3(別の関数。作られる時期は未確認)。
+  - 静的: Welcome の並びを組む関数 0x1144f70 は、モジュールの `+0x6c9` が 0 でないとモジュールを、0 なら `+0x828`(デモの一覧)を使う。`+0x6c9` は一覧の作成(0x1149840。MRU の `0`〜`49` を読む)の中で、値が 1 つ見つかるたびに 1 になる(0x1149785)。一覧の作成を呼ぶのは、0x11495a0 と 0x114d950 の 2 つの方法(仮想呼び出し。どちらの実体かは未確認)。
+  - 実測(ログの位置。`measure.mjs` の `orderAfterReload`): 再読込の後の MRU の読み(50 回)は、Welcome の窓の表示(`ShowWindow` の `cls="TWelcomeWizard"`、位置 12374 付近)より前に 1 回だけ。表示の後に MRU を読む行は無い。
+  - 見立て(推定): 再読込の後の一覧の作成は、Welcome の表示より前に 1 回だけ走る。Welcome が使う (i) の実体には一覧の作成が呼ばれず、`+0x6c9` が 0 のまま、デモの一覧が出る(一覧の作成を走らせたのが (i) の実体かどうかは未確認)。**確かめる手段**: (i) の実体で一覧の作成(0x1149840)が呼ばれるかを、trace で見る(次の Issue)。
+- 陽性の対照(注入した値)でも、窓の表には出なかった(前回までと同じ)。
+
+### 8.3 目標 2(閉じる時の後始末を枠つきで走らせる)
+
+- 枠: 4 秒(`app/src/engine/client.ts` の `EXIT_FRAME_MS` = 4000)。枠を超えたら `stop()` で打ち切る。ページを離れる動作は待たない(枠は `setTimeout`)。
+- 測定: 閉じる要求から停止まで 4,034 ms・4,051 ms(枠で打ち切り。`closeRun.state` は `exited`)。
+- 書き: 閉じる区間の書きは 0(`registry writes 0; file writes 0`)。`DestroyWindow` は 1 件(`TPUtilWindow`)。
+- 待ち(実測・trace): `fruity: exit: calling instance->vtable[0] slot0=0x12541b0` の後、スレッド 0 が `fle-event: wait 0x7ffa80004f40 4294967295`(INFINITE)で止まる。戻り先は 0x666a1b(生成 C の `f_6669c0`)。このイベントを立てる行は、閉じた後の区間に無い。PM の指示どおり、この件はこの Issue では追わない。
+- 注: 枠の `setTimeout` は、ページが生きている間だけ動く。ページが破棄されると走らない。journal への記録は開いた時に行うので、これに依らない。
+
+### 8.4 目標 3(書いた物を journal に載せる)
+
+- 開いた時(`app/src/engine/worker.ts` の `keepOpened`)に、journal(`/fl/state/hkcu.log`)へ次を載せる(既存の形。#1383・#1385 は変えていない)。
+  - 曲の内容: user's file(op 5)。パス `C:\Users\user\Downloads\<名前>`。
+  - MRU: キー `Software\Image-Line\FL Studio 26\MRU`(`app/src/engine/recent.ts` の `RECENT_KEY`。FL の読みで実測した名前。PM の決定 ①)の値 `"1"`〜`"49"`(REG_SZ)。開いた曲が `"1"`。
+- 再読込の後、FL は `"1"` を読む(8.2 の (a))。ただし Welcome には出ない(8.2 の (b))。
+
+### 8.5 測定の道具の変更(`tools/persist/measure.mjs`。受け入れには使わない)
+
+- 同意の窓の「No thanks」を、1836x1056 の画面でも押す(`NO_THANKS_WIDE`。`welcome-flow.mjs` の流れ B と同じ位置)。再読込の後にも押してから撮る(`files-reloaded.png`)。
+- `files.orderAfterReload`: 再読込の後の、MRU の値の読みと、`TWelcomeWizard` の行を、ログの位置つきで出す。
+
+### 8.6 次の Issue にすべき点(PM へ)
+
+1. (c) の確認: (i) の実体(`TWelcomeWizard.FormShow` が作るモジュール)で一覧の作成 0x1149840 が呼ばれるかを trace する。呼ばれないなら、Welcome の並びを一覧の後に組み直すか、一覧の作成を (i) の実体に向ける。
+2. 閉じる時の待ち(スレッド 0 がイベント 0x7ffa80004f40 を INFINITE で待つ)。この Issue では追わない(PM の指示)。
+3. 起動の時間 9,126 ms(P1 の 10 秒には届かない。受け入れの上限 20 秒の内)。
