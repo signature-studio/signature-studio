@@ -5,6 +5,7 @@ import { settingsResize } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/settings-resize-b',
   covers: ['windows/op/resize'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return settingsResize(guest, 60);
   },

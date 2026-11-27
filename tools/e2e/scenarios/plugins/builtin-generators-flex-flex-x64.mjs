@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-generators-flex-flex-x64',
   covers: ['plugins/generators/flex-flex-x64', 'plugins/window/generators-flex-flex-x64', 'plugins/param/generators-flex-flex-x64', 'plugins/audio/generators-flex-flex-x64', 'plugins/stop/generators-flex-flex-x64'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "FLEX", kind: 'generators' });
   },
