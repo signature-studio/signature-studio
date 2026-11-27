@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // spec/piano-roll-notes.test.mjs : tools/piano-roll-tools/measure.mjs の数え方(countNotes: 後にだけ現れた色の連結成分のうち、幅・高さ 4 px 以上の物)と、窓の一色の割合(dominantShare)を、合成の画面で確かめる。
 // 判定の式は受け入れと同じ(notes が 1 以上は通り、0 は落ちる)。合成の画面だけを使い、実機の画面は使わない。終了コード 0 = 全部通った。
-import { countNotes, dominantShare } from '../tools/piano-roll-tools/measure.mjs';
+import { areaHash, countNotes, dominantShare } from '../tools/piano-roll-tools/measure.mjs';
 
 const W = 60, H = 40;
 const BG = 0x102030ff, NOTE = 0x40c080ff, OTHER = 0xffff00ff;
@@ -64,6 +64,13 @@ const judge = (notes) => (notes >= 1 ? 'pass' : 'fail');
   check('dominantShare: a 3x3 dot: the background covers at least 95% (not painted)', dot.share >= 0.95, true);
   const block = dominantShare(picture([{ x: 0, y: 0, w: 12, h: 40, c: NOTE }]), ALL);
   check('dominantShare: a 12x40 block: the background covers 80% (painted)', [block.share, block.colour === BG], [0.8, true]);
+}
+
+{
+  const a = picture([{ x: 5, y: 5, w: 4, h: 4, c: NOTE }]);
+  check('areaHash: the same pixels give the same hash', areaHash(a, ALL) === areaHash(picture([{ x: 5, y: 5, w: 4, h: 4, c: NOTE }]), ALL), true);
+  check('areaHash: a changed pixel changes the hash', areaHash(a, ALL) !== areaHash(picture([{ x: 5, y: 5, w: 4, h: 4, c: OTHER }]), ALL), true);
+  check('areaHash: a rectangle outside the picture has no hash (null)', areaHash(a, { x: 100, y: 100, w: 4, h: 4 }), null);
 }
 
 if (failed) console.log(`${failed} check(s) failed`);

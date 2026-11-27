@@ -39,6 +39,7 @@
 #include "fle_dispatch.h"
 #include "fle_env.h"
 #include "fle_runtime.h"
+#include "fle_win.h"   /* Issue #1502: fle_win_api_trace_on (the thread trace of the exit call follows the window-API trace) */
 #include "fle_thread.h" /* decision 0122: the thread table, the queues and the virtual clock in the stop report (weak: a link without fle_thread.c prints nothing) */
 #include "fle_gdi.h"   /* decision 0129: the font selected into a DC and its LOGFONTW, for the record of the first text-drawing call */
 #include "fle_sys.h"   /* decision 0129: the virtual clock (ms) for the stable-idle report */
@@ -994,6 +995,30 @@ int fruity_precheck(void) {
     return 0;
 }
 
+/* Issue #1502: the window was closed, so FL64.exe calls instance->vtable[0](instance) (0x140007789-0x1400077b9; a reading): the application's shutdown (a reading: it may write
+ * the settings and the Recent list). It runs here as FL64.exe runs it. The page ends the engine when this does not return in time (client.ts, EXIT_FRAME_MS). The thread trace is on
+ * with the window-API trace (a diagnosis of a wait: fle_thread's "fle-thread:" lines on stderr). */
+static void exit_sequence(uint64_t instance) {
+    uint64_t vt = 0, s0 = 0, rax2;
+    char nb[160];
+
+    if (!instance || !peek(instance, &vt, 8) || !peek(vt, &s0, 8)) {
+        printf("fruity: exit: the instance is not readable: instance->vtable[0] is not called\n");
+        return;
+    }
+    printf("fruity: exit: calling instance->vtable[0] slot0=%#llx (%s) with rcx=instance %#llx\n", ULL(s0), func_name(s0, nb, sizeof nb), ULL(instance));
+    fflush(stdout);
+    if (fle_thread_set_trace) fle_thread_set_trace(fle_win_api_trace_on());
+    if (fle_thread_trace_table) fle_thread_trace_table();
+    trace_set_call_limit(trace_call_count() + cfg_max_calls);
+    active = 1;
+    rax2 = fle_call_guest(s0, instance, 0, 0, 0);
+    active = 0;
+    if (fle_thread_set_trace) fle_thread_set_trace(0);
+    printf("fruity: exit: instance->vtable[0] RETURNED (rax=%#llx) after %llu lifted entries\n", ULL(rax2), ULL(trace_call_count() - calls_at_start));
+    fflush(stdout);
+}
+
 /* ---- the call ---- */
 int fruity_run(uint64_t entry_sp) {
     uint64_t rax;
@@ -1086,7 +1111,7 @@ int fruity_run(uint64_t entry_sp) {
     printf("fruity: rax=%#llx instance=%#llx\n", ULL(rax), ULL(instance_slot));
     printf("fruity: CreateFruityInstance RETURNED (eax=%d) after %llu lifted entries\n", eax, ULL(trace_call_count() - calls_at_start));
     if ((eax & ~2) == 0) {
-        printf("fruity: FL64.exe would now call instance->vtable[0](instance) (0x140007789-0x1400077b9; a reading). NOT done in stage 1: recorded only\n");
+        exit_sequence(instance_slot);
     } else if (eax == -2) {
         printf("fruity: FL64.exe would show MessageBoxA \"Verification error\" for -2 (0x140007791-0x1400077aa; a reading). Not done\n");
     } else {

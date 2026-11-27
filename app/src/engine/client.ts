@@ -9,6 +9,9 @@ import { newDeskControl } from './desk-link.ts';
 
 export interface ExitInfo { reason: 'finished' | 'stopped' | 'trap'; code: number; message: string; presents: number }
 
+/** Issue #1502: the time the engine has, after the page is left, to close FL and run FL's shutdown (a frame: the engine is ended when it is longer) */
+export const EXIT_FRAME_MS = 4000;
+
 export interface ClientEvents {
   log(level: 'info' | 'warn' | 'error', text: string): void;
   exit(info: ExitInfo): void;
@@ -54,6 +57,7 @@ export class EngineClient {
   private readonly readbacks = new Map<string, (m: FromWorker) => void>();
   private readyResolve: (() => void) | null = null;
   private exitInfo: ExitInfo | null = null;
+  private exitAsked = false;
   private exitWaiters: ((i: ExitInfo) => void)[] = [];
   private isIdle = false;
   private readonly events: ClientEvents;
@@ -134,8 +138,21 @@ export class EngineClient {
   }
 
   start(): void { this.send({ cmd: 'start' }); }
-  /** Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once) */
-  exitRequest(): void { this.worker?.postMessage({ cmd: 'exit-request' } satisfies ToWorker); }
+  /**
+   * Issue #1385: the page is left (pagehide): the engine closes the FL main window, so FL closes the files it keeps open (the Worker's onExitRequest; once).
+   * Issue #1502: the close is followed by FL's shutdown (instance->vtable[0]; a reading: the settings and the Recent list may be written there). The engine has EXIT_FRAME_MS for it;
+   * when it has not ended by then it is ended (an idle engine) or its Worker is terminated. pagehide does not wait: the frame is a timer.
+   */
+  exitRequest(): void {
+    if (this.exitAsked || !this.worker) return;
+    this.exitAsked = true;
+    this.worker.postMessage({ cmd: 'exit-request' } satisfies ToWorker);
+    setTimeout(() => {
+      if (this.exitInfo !== null) return;
+      this.events.log('warn', `the page is left: the engine did not end within ${EXIT_FRAME_MS / 1000} s; it is ended now`);
+      this.stop();
+    }, EXIT_FRAME_MS);
+  }
   /** decision 0193: the person's answer to the engine's file dialog `id` (the File objects go to the Worker, which reads them into the engine's memory) */
   /** Issue #1362: the page's face of the Browser panel has loaded the document of the navigation (the engine fires its events at its next idle) */
   webview2Loaded(): void { this.worker?.postMessage({ cmd: 'webview2-loaded' } satisfies ToWorker); }
