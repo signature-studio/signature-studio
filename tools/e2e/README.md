@@ -104,8 +104,11 @@ export default defineScenario({
 ### プラグインの領域(#1493)
 
 - `scenarios/plugins/_generate.mjs`(引数なし。リポジトリから実行する)が、`features/generated/plugins.tsv`(内蔵 142 件と外部 3 件)から、1 プラグイン 1 本ずつ 4 段のシナリオ(`builtin-<種類>-<名前>.mjs`・`external-<名前>.mjs`)と、窓の位置のシナリオ(`position-<…>.mjs`)を作る。`features/plugins.tsv`(機能の表。窓・パラメータ・音声・止まらないの 4 行ずつ、ほかにツールとプリセットの行)も同じ道具が書く。生成物は commit する。`_` で始まるファイルは、`run.mjs` が読まない。
-- 印: 印の番号は `pm-work/created-issues.tsv` の題名で引く(内蔵は「内蔵エフェクト N」「内蔵インストゥルメント N」の行、外部は「Serum 2 を…」の行)。表に無い物は `'new'`。Fruity Balance・Fruity Filter・Fruity Delay 2・Sytrus は、読み込みの前に Plugin database の一覧が空なので(#1484)、その番号を付ける。
-- 挿入の経路(`lib/plugins.mjs`): Mixer の挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。
+- 生成のやり方: `node tools/e2e/scenarios/plugins/_generate.mjs`(リポジトリの根から。引数なし)。生成物(`builtin-*`・`external-*`・`position-*`・`features/plugins.tsv`)は commit する。生成物は手で編集しない。`_generate.mjs` は、取り込まれても何も書かない(関数は試験の `tools/e2e/test/plugin-marks.test.mjs` が使う)。
+- 印(`_generate.mjs` の `markOf`、#1508): 内蔵は、名前を含む開いている束の Issue の番号(題名が「内蔵エフェクト N」「内蔵インストゥルメント N」の行)。束が無い物は `#1535`(Plugin database に行が描かれない件。挿入の段で落ちる)。外部 3 本(Serum 2・OTT・Vital)は `#1324`(開いた Feature)。閉じた番号(`CLOSED_ISSUES`: #1315・#1319・#1336・#1337・#1338・#1400・#1484)は印にしない。単独の名前の行(例: #1342)は束ではないので印にしない。`#1535` が直ったら、その作業が `INSERT_MARK` の印を外す。
+- 前提の確認(#1508): 件数は一致する。Installed の enum-dir の件数は 3 で、`lift/plugins/` の内蔵 3 本(fruity-balance・fruity-filter・sytrus)と同数。名前はエンジンのログに出ないので、一覧に出る名前は確かめられない。Installed の行は描かれず(画素で読む)、項目は選べない。
+- 挿入(`lib/plugins.mjs` の `insertFromDatabase`、#1508): Mixer を `ensureMixer`(F9)で出し、挿入 1 を遅い二度押しで選ぶ → 右の欄の Slot 1 → picker(More plugins…・Plugin database・表示の切替)→ Plugin database の項目で、Browser が Plugin database(Installed)を出す。挿入欄の位置は Mixer の大きさに対する割合で求める(DPI で拡大されるため)。Installed の行が描かれているかは、Installed を選んで Right を押した後の行の領域の画素で読む(`installedRowsShown`)。行が描かれなければ、項目は選べないので、挿入はせず、結果(`results.named`・`notes`)に書く。この build では行は描かれない。行が描かれた場合も、項目の行の位置は未測定なので、`insertFromDatabase` は ok にしない。
+- 一覧の観測: `databaseLines(guest, from)` は、シナリオの開始時のエンジンのログの長さ `from` を必ず渡す(既定は無い)。件数は `installedCount`(enum-dir の行の数)で、`results.count` に出す。エンジンは一覧を、ページの最初に 1 回だけ書くので、同じページの後のシナリオでは件数は無い(`results.count` は null)。名前は、ログに出ないので、描かれた行(画素)でしか読めない(`results.named`)。
 ### 見た目(visual)のゴールデン(#1496)
 
 - 画素の期待値は `golden/visual/<kind>.tsv`(`キー<TAB>ハッシュ<TAB>許容誤差`)。kind は `window`・`theme`・`language`・`dpr`・`start`。ハッシュは矩形の RGB バイト列の SHA-256(`lib/picture.mjs` の `regionHash`)。

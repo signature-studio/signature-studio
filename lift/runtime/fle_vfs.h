@@ -55,6 +55,7 @@ void fle_imp_DeleteFileW(void);
 void fle_imp_CopyFileW(void);
 void fle_imp_MoveFileW(void);
 void fle_imp_GetFullPathNameW(void);
+void fle_imp_PathCanonicalizeW(void);
 void fle_imp_GetCurrentDirectoryW(void);
 void fle_imp_SetCurrentDirectoryW(void);
 void fle_imp_GetTempPathW(void);

@@ -1008,6 +1008,24 @@ static int browser_picker(const fle_filedlg_request *rq, uint16_t ***paths, unsi
     return 1;
 }
 
+/* File > Manage files (Issue #1521, fle_hle.c): the page shows its file window (the plain file manager, with no choice to make) and the guest
+ * waits for the person to close it, as it waits for a dialog; the answer is not used. Without a host picker nothing is shown. */
+int fle_filedlg_manage_open(void)
+{
+    static const char req[] = "{\"manage\":true,\"save\":false,\"options\":0,\"filterIndex\":0,\"title\":null,\"okLabel\":null,\"fileName\":null,\"defaultExt\":null,\"folder\":null,\"filters\":[]}";
+    char *ans;
+
+    if (!FLE_HAS_HOST_PICK) return 0;
+    ans = (char *)fle_filedlg_host_pick(req);
+    while (ans == NULL && FLE_HAS_HOST_POLL) {
+        if (fle_thread_sleep == NULL) fle_stop("filedlg", "the file window waits for the person through the guest scheduler, and fle_thread.c is not linked (decision 0122)");
+        fle_thread_sleep("filedlg", 1);
+        ans = (char *)fle_filedlg_host_poll();
+    }
+    free(ans);
+    return 1;
+}
+
 /* ---- the dialog ---- */
 void fle_imp_IFileOpenDialog_SetFileTypes(void)
 {

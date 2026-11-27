@@ -123,6 +123,8 @@ void fle_imp_SetEnvironmentVariableW(void);
 void fle_imp_ExpandEnvironmentStringsW(void);
 /* kernel32!GetCommandLineW: LPWSTR GetCommandLineW(void). */
 void fle_imp_GetCommandLineW(void);
+/* api-ms-win-crt-string!memset (Issue #1501): void *memset(void *dest, int c, size_t count). */
+void fle_imp_memset(void);
 /* kernel32!GetStartupInfoW: void GetStartupInfoW(LPSTARTUPINFOW lpStartupInfo). */
 void fle_imp_GetStartupInfoW(void);
 /* kernel32!GetCommandLineA: LPSTR GetCommandLineA(void). The ASCII text of GetCommandLineW (decision 0078). */

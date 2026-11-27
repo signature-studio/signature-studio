@@ -39,6 +39,7 @@
 #include "fle_sse.h"
 #include "fle_sse_more.h"
 #include "fle_mxcsr.h"
+#include "fle_filedlg.h"
 
 #if defined(__clang__)
 #pragma clang fp contract(off)
@@ -362,4 +363,14 @@ int fle_hle_warp_bilin(void) {
     if (fle_hle_warp_bilin_run()) { g_wst.handled++; return 1; }
     g_wst.fallback++;
     return 0;
+}
+
+/* File > Manage files (Issue #1521): FileMenuClick, the form's OnClick, is also the OnClick of the item 'ManageFilesMenu' (the DFM copy of fle_res.c).
+ * The sender (rdx) is the item: its Tag is the TComponent field at +0x18 (the DFM's Tag writes that field). That item opens the file window
+ * (fle_filedlg_manage_open) and the lifted body does not run for it. Any other sender runs the lifted body (0). */
+int fle_hle_manage_files_click(void) {
+    uint64_t sender = R[2];
+    if (sender == 0 || fle_ld(sender + 0x18u, 4) != 0x4d46u) return 0;
+    (void)fle_filedlg_manage_open();
+    return 1;
 }

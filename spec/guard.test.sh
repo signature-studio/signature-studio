@@ -141,6 +141,18 @@ cp "$T/tools/write.txt" "$T/spec/write.txt"; cp "$T/tools/write.txt" "$T/pm-work
 ( cd "$T" && ok "scan: wrangler.jsonc を読むだけの行(書きの関数と同じ行でも)は見つけない" "$(bash "$g/scan.sh" tools/read.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: wrangler.noperf.jsonc・wrangler.deploy.json は見つけない" "$(bash "$g/scan.sh" tools/other.txt 2>/dev/null | grep -c '^wranglergen')" 0 )
 ( cd "$T" && ok "scan: spec/・pm-work/・*.md は対象外" "$(bash "$g/scan.sh" spec/write.txt pm-work/write.tsv notes.md 2>/dev/null | grep -c '^wranglergen')" 0 )
+# plugin の link は lift/runtime/fle_*.c の全部と plugin-worker の .c を入れる。両方が強く定義した fle_imp_* は wasm-ld が二重定義で落とす(#1501 段 B の memset)。runtime 側は weak にする
+fidefs() { awk '/^[A-Za-z_]/ && match($0, /fle_imp_[A-Za-z0-9_]+\([^)]*\)[ \t]*(\{|$)/) { n = substr($0, RSTART, RLENGTH); sub(/\(.*/, "", n); print n, (prev ~ /^__attribute__\(\(weak\)\)[ \t]*$/ || $0 ~ /^__attribute__\(\(weak\)\)/) ? "weak" : "strong" } { prev = $0 }' "$@"; }
+dupdef() { fidefs "$2"/*.c | awk '{ print $1 }' | sort -u > "$T/plugin-defs.txt"; fidefs "$1"/fle_*.c | awk '$2 == "strong" { print $1 }' | sort -u | comm -12 - "$T/plugin-defs.txt"; }
+mkdir -p "$T/lk/rt" "$T/lk/rtw" "$T/lk/rtp" "$T/lk/pw"
+printf 'void fle_imp_memset(void)\n{\n}\n' > "$T/lk/rt/fle_env.c"
+printf '/* x */\n__attribute__((weak))\nvoid fle_imp_memset(void)\n{\n}\n' > "$T/lk/rtw/fle_env.c"
+printf 'void fle_imp_memset(void) __attribute__((weak));\n' > "$T/lk/rtp/fle_env.c"
+printf 'void fle_imp_memset(void)\n{\n}\n' > "$T/lk/pw/vst_crt.c"
+ok "link: 両方が強く定義した fle_imp_* は見つかる(検査の網羅)" "$(dupdef "$T/lk/rt" "$T/lk/pw" | paste -sd, -)" "fle_imp_memset"
+ok "link: runtime 側が weak なら、二重定義として見つけない" "$(dupdef "$T/lk/rtw" "$T/lk/pw" | wc -l | tr -d ' ')" 0
+ok "link: 宣言(; で終わり、weak の印が付く)は、定義として数えない" "$(dupdef "$T/lk/rtp" "$T/lk/pw" | wc -l | tr -d ' ')" 0
+ok "link: lift/runtime/fle_*.c が強く定義し、plugin-worker の .c も定義する fle_imp_* は無い(無ければ空)" "$(dupdef "$here/../lift/runtime" "$here/../lift/harness/web/mt1/plugin-worker" | paste -sd, -)" ""
 # リポジトリの外を参照しない(依頼者の指示 2026-11-19)
 ok "guard/ が、リポジトリの外を参照しない" "$(grep -nE '\$HOME|~/|systemctl|/\.local/|/\.config/|/tmp|TMPDIR|mktemp' "$g"/*.sh | wc -l)" 0
 # 旗と判定(git の差分を使う)

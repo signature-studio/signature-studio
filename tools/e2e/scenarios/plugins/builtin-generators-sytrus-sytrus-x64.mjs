@@ -5,7 +5,7 @@ import { pluginSteps } from '../../lib/plugins.mjs';
 export default defineScenario({
   id: 'plugins/builtin-generators-sytrus-sytrus-x64',
   covers: ['plugins/generators/sytrus-sytrus-x64', 'plugins/window/generators-sytrus-sytrus-x64', 'plugins/param/generators-sytrus-sytrus-x64', 'plugins/audio/generators-sytrus-sytrus-x64', 'plugins/stop/generators-sytrus-sytrus-x64'],
-  expectFail: '#1484',
+  expectFail: '#1535',
   async run({ guest }) {
     return pluginSteps(guest, { name: "Sytrus", kind: 'generators' });
   },

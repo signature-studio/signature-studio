@@ -7,6 +7,7 @@ export default defineScenario({
   covers: ["settings/language/es"],
   displays: ["4k-dpr1"],
   expectFail: "new",
+  expectStop: "new",
   run(ctx) {
     return S.languageRun(ctx, 2);
   },
