@@ -8,9 +8,7 @@
  * Nothing here reads the host: no clock, no thread, no process, no file. */
 #define _GNU_SOURCE
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "fle_runtime.h"
 #include "fle_host.h"
@@ -137,13 +135,7 @@ static ev_ent *event_arg(const char *api, uint64_t h, uint64_t fail_ret)
 /* Issue #1502: one line per event call while the thread trace is on (the exit of the page; the trace is off otherwise). v: the state (create, set, reset, signaled), the time-out (wait) or the result (done) */
 static void ev_trace(const char *what, uint64_t h, uint32_t v)
 {
-    char buf[480], w[320] = "";
-    int n;
-
-    if (!fle_thread_trace_on || !fle_thread_trace_on()) return;
-    if (fle_thread_trace_words) fle_thread_trace_words(w, sizeof w);
-    n = snprintf(buf, sizeof buf, "fle-event: %s %#llx %u thread %u%s\n", what, (unsigned long long)h, (unsigned)v, fle_thread_current ? fle_thread_current() : 0u, w);
-    if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the event is the same */ }
+    if (fle_thread_trace_event) fle_thread_trace_event(what, h, v);
 }
 
 /* A new object of the table (the handle is returned in R[0] by the callers); stops when the table is full. */

@@ -746,15 +746,27 @@ static void park(void)
     T[cur].state = T_RUNNING;
 }
 
-/* Issue #1502: the guest stack words at rsp: " rsp <rsp> stack <the 8 words from rsp>" (the word at rsp is the return address of the call into the lifted caller) */
-static void words_at(char *buf, size_t n, uint64_t rsp)
+/* the top of the guest stack of thread idx: the StackBase of its TEB (fle_teb for the first thread, registered by fle_teb_set_stack; the others get theirs in create_thread_core). 0 when none is registered */
+static uint64_t stack_top(unsigned idx)
+{
+    uint8_t *teb = idx ? T[idx].teb : fle_teb;
+    uint64_t top = 0;
+
+    if (teb) memcpy(&top, teb + FLE_TEB_STACKBASE, sizeof top);
+    return top;
+}
+
+/* Issue #1502: the guest stack words at rsp: " rsp top-<d> stack <the 8 words from rsp>", d = top - rsp (the distance below the top of the thread's stack). rsp is not printed as an address:
+ * under native the stack lies in host memory, and its address moves from run to run. The word at rsp is the return address of the call into the lifted caller */
+static void words_at(char *buf, size_t n, uint64_t rsp, uint64_t top)
 {
     size_t len;
     unsigned k;
     int m;
 
     if (n == 0) return;
-    m = snprintf(buf, n, " rsp %#llx stack", (unsigned long long)rsp);
+    if (top && rsp <= top) m = snprintf(buf, n, " rsp top-%#llx stack", (unsigned long long)(top - rsp));
+    else m = snprintf(buf, n, " rsp ? stack");
     len = (m < 0) ? 0 : ((size_t)m < n ? (size_t)m : n - 1);
     for (k = 0; k < 8u && len + 1 < n; k++) {
         m = snprintf(buf + len, n - len, " %#llx", (unsigned long long)fle_ld(rsp + 8u * k, 8));
@@ -763,7 +775,17 @@ static void words_at(char *buf, size_t n, uint64_t rsp)
     }
 }
 
-void fle_thread_trace_words(char *buf, size_t n) { words_at(buf, n, R[4]); }
+/* Issue #1502: one "fle-event:" line for an event call while the trace is on (fle_event.c calls it through the hook; the line is written here, so fle_event.c reads no host output) */
+void fle_thread_trace_event(const char *what, uint64_t h, uint32_t v)
+{
+    char buf[480], w[320] = "";
+    int n;
+
+    if (!trace_on) return;
+    words_at(w, sizeof w, R[4], stack_top(cur));
+    n = snprintf(buf, sizeof buf, "fle-event: %s %#llx %u thread %u%s\n", what, (unsigned long long)h, (unsigned)v, fle_thread_current(), w);
+    if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the event is the same */ }
+}
 
 /* Issue #1502: true (and the site is kept) when the running call's site differs from the thread's last traced one; only with the trace on */
 static int trace_site_changed(void)
@@ -790,7 +812,7 @@ void fle_thread_trace_table(void)
         uint64_t rsp = i == cur ? R[4] : t->g.r[4];
 
         if (t->state == T_DONE) continue;
-        words_at(w, sizeof w, rsp);
+        words_at(w, sizeof w, rsp, stack_top(i));
         n = snprintf(buf, sizeof buf, "fle-thread: table %u state %d start %#llx wait %s%s\n", i, t->state, (unsigned long long)t->start,
                      t->state == T_WAITING ? t->w.api : "-", w);
         if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the table is the same */ }
@@ -807,7 +829,7 @@ static void begin_wait(int kind, const char *api, uint32_t ms)
     w->kind = kind;
     w->api = api;
     if (trace_site_changed()) {   /* Issue #1502: the wait of each thread, with its kind, time-out and call site (a loop of Sleep at one site is one line; the trace is on with the window-API trace) */
-        words_at(sw, sizeof sw, R[4]);
+        words_at(sw, sizeof sw, R[4], stack_top(cur));
         n = snprintf(buf, sizeof buf, "fle-thread: wait %s thread %u kind %d ms %u%s\n", api, cur, kind, ms, sw);
         if (n > 0 && (size_t)n < sizeof buf && write(2, buf, (size_t)n) < 0) { /* the line is lost; the wait is the same */ }
     }
@@ -1474,7 +1496,7 @@ uint32_t fle_thread_wait_objects(const char *api, uint32_t n, const uint64_t *h,
         char buf[480], sw[320];
         int m;
 
-        words_at(sw, sizeof sw, R[4]);
+        words_at(sw, sizeof sw, R[4], stack_top(cur));
         m = snprintf(buf, sizeof buf, "fle-thread: wait-objects %s thread %u n %u all %d h0 %#llx h1 %#llx ms %u%s\n", api, cur, n, all,
                      (unsigned long long)(n > 0 ? h[0] : 0), (unsigned long long)(n > 1 ? h[1] : 0), ms, sw);
         if (m > 0 && (size_t)m < sizeof buf && write(2, buf, (size_t)m) < 0) { /* the line is lost; the wait is the same */ }

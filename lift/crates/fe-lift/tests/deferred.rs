@@ -366,6 +366,7 @@ static void map_fake_image(void)
     size_t opt = 0x80 + 24;
     if (b != (uint8_t *)RM_BASE) { fprintf(stderr, "the fake image cannot be mapped at %#llx\n", U(RM_BASE)); exit(2); }
     w16(b, 0, 0x5a4d); w32(b, 0x3c, 0x80); w32(b, 0x80, 0x4550);
+    w16(b, 0x80 + 22, 0x2000);                              /* FileHeader.Characteristics: IMAGE_FILE_DLL (without it the image is a program, fle_realmod.c) */
     w16(b, opt, 0x20b);
     w32(b, opt + 16, (uint32_t)(DLLMAIN_VA - RM_BASE));   /* AddressOfEntryPoint */
     w32(b, opt + 112, 0x400); w32(b, opt + 116, 0x100);    /* export directory */

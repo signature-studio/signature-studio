@@ -1416,6 +1416,7 @@ fn dll_thread_attach_and_detach_are_delivered_to_the_real_modules_in_the_new_thr
     static uint16_t nm[] = { 's','t','u','b','d','l','l','.','d','l','l', 0 };
     if (img == MAP_FAILED) { printf("mmap failed\n"); return 1; }
     img[0] = 'M'; img[1] = 'Z'; *(uint32_t *)(img + 0x3c) = 0x80; *(uint32_t *)(img + 0x80) = 0x4550;
+    *(uint16_t *)(img + 0x80 + 22) = 0x2000; /* FileHeader.Characteristics: IMAGE_FILE_DLL (without it the image is a program, fle_realmod.c) */
     *(uint16_t *)(img + 0x80 + 24) = 0x20b; *(uint32_t *)(img + 0x80 + 24 + 16) = 0x1000;
     CALL4(fle_imp_LoadLibraryW, A(nm), 0, 0, 0);
     printf("loaded %llx notices %u\n", U(R[0]), nn);
