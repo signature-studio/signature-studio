@@ -893,8 +893,13 @@ pub fn check_units(listed: &[String]) -> Result<Vec<String>, String> {
             found.insert(name);
         }
     }
+    check_gen_units(listed, &found)
+}
+
+/// check_units on the names of the units gen wrote (`found`: the .c files of lift/out-app/gen/src without common.c).
+fn check_gen_units(listed: &[String], found: &BTreeSet<String>) -> Result<Vec<String>, String> {
     let want: BTreeSet<String> = listed.iter().map(|p| Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
-    let absent: Vec<&String> = want.difference(&found).collect();
+    let absent: Vec<&String> = want.difference(found).collect();
     if !absent.is_empty() {
         return Err(format!("the units of the compile lists are not written by gen: {absent:?}"));
     }
@@ -1089,6 +1094,37 @@ mod tests {
         assert!(!is_plugin_unit("fle-acm.c"));
         assert!(!is_plugin_unit("m11-06.o"));
         assert!(!is_plugin_unit("mx-00.c"));
+    }
+
+    /// Issue #1525: a plugin of two DLLs (a main DLL and a helper) gets the module numbers K and K+1 after the fixed modules (the rows of
+    /// lift/harness/b2d2/modules.tsv), in the order of the keys. gen writes units 00..03 of the main module and unit 00 of the helper (as the
+    /// Edison run of #1435 did). The listed units are those of the fixed modules, so the check passes, and the plugin's units are the extra ones.
+    #[test]
+    fn the_units_of_a_two_dll_plugin_are_extra_units_and_the_listed_ones_still_stop() {
+        let sha = "a".repeat(64);
+        let text = format!(
+            "key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.edison.edison_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Edison_x64.dll\t本体\t{sha}\t10\tnone\t\t-\neffects.edison.testdll_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\TestDll_x64.dll\t補助\t{sha}\t20\tnone\t\t-\n"
+        );
+        let mut keys: Vec<String> = parse_plugin("edison", &text).unwrap().into_iter().map(|d| d.key).collect();
+        keys.sort();
+        assert_eq!(keys, ["effects.edison.edison_x64.dll", "effects.edison.testdll_x64.dll"]);
+        let fixed = include_str!("../../../harness/b2d2/modules.tsv").lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count();
+        let (main, helper) = (fixed + 1, fixed + 2);
+        let listed: Vec<String> = include_str!("../../../harness/two/plain-units.txt").split_whitespace().chain(include_str!("../../../harness/two/ai-units.txt").split_whitespace()).map(String::from).collect();
+        let module_of = |k: usize| format!("m{k}-");
+        let mut written: BTreeSet<String> = listed
+            .iter()
+            .map(|p| p.rsplit('/').next().unwrap_or_default().to_string())
+            .filter(|u| !u.starts_with(&module_of(main)) && !u.starts_with(&module_of(helper)))
+            .collect();
+        written.extend((0..4).map(|n| format!("m{main}-{n:02}.c")));
+        written.insert(format!("m{helper}-00.c"));
+        let extra = check_gen_units(&listed, &written).unwrap();
+        let mut expected: Vec<String> = (0..4).map(|n| format!("m{main}-{n:02}.c")).chain([format!("m{helper}-00.c")]).collect();
+        expected.sort();
+        assert_eq!(extra, expected);
+        written.remove("m1-00.c");
+        assert!(check_gen_units(&listed, &written).is_err(), "a listed unit that gen does not write must still stop the build");
     }
 
     #[test]
