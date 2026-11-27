@@ -156,12 +156,24 @@ function checkFlags() {
   if (!read('hybrid.cmd').includes(`${FLAGS}/${name}-wasm-opt.args`)) throw new Error(`hybrid.cmd must name ${FLAGS}/${name}-wasm-opt.args`);
 }
 
+// fe-build's check_units: a unit that gen wrote and the lists do not name is a plugin's unit (m<K>-<NN>.c), compiled with the plain units (Issue #1525)
+function pluginUnits(listed) {
+  const named = new Set(listed.map((src) => src.slice(src.lastIndexOf('/') + 1)));
+  const extra = fs.readdirSync(`${OUT_APP}/gen/src`).filter((file) => file.endsWith('.c') && file !== 'common.c' && !named.has(file)).sort();
+  const other = extra.find((file) => !/^m\d+-\d+\.c$/.test(file));
+  if (other !== undefined) throw new Error(`gen wrote ${other}, which the lists do not name and which is not a plugin unit (m<K>-<NN>.c)`);
+  return extra.map((file) => `${OUT_APP}/gen/src/${file}`);
+}
+
 function makePlan() {
   const unitFlags = `${FLAGS}/${name}-cflags-u.args`;
   const aiFlags = `${FLAGS}/${name}-cflags-ai.args`;
+  const plainUnits = words(`${HARNESS}/two/plain-units.txt`);
+  const aiUnits = words(`${HARNESS}/two/ai-units.txt`);
   const genUnits = [
-    ...words(`${HARNESS}/two/plain-units.txt`).map((src) => ({ src, flags: unitFlags })),
-    ...words(`${HARNESS}/two/ai-units.txt`).map((src) => ({ src, flags: aiFlags })),
+    ...plainUnits.map((src) => ({ src, flags: unitFlags })),
+    ...aiUnits.map((src) => ({ src, flags: aiFlags })),
+    ...pluginUnits([...plainUnits, ...aiUnits]).map((src) => ({ src, flags: unitFlags })),
     { src: `${OUT_APP}/gen/common.c`, flags: unitFlags },
   ].map((unit) => ({ ...unit, obj: objOf(unit.src) }));
   const rtObjs = fs.readdirSync('lift/runtime').filter((file) => file.startsWith('fle_') && file.endsWith('.c')).sort().map((file) => `${OUT_APP}/obj/rt/${stem(file)}.o`);

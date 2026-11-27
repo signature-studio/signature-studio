@@ -40,11 +40,3 @@ lift/out-app/gen/src/m8-00.c
 lift/out-app/gen/src/m8-01.c
 lift/out-app/gen/src/m8-02.c
 lift/out-app/gen/src/m8-03.c
-lift/out-app/gen/src/m9-00.c
-lift/out-app/gen/src/m9-01.c
-lift/out-app/gen/src/m9-02.c
-lift/out-app/gen/src/m9-03.c
-lift/out-app/gen/src/m10-00.c
-lift/out-app/gen/src/m10-01.c
-lift/out-app/gen/src/m10-02.c
-lift/out-app/gen/src/m10-03.c
