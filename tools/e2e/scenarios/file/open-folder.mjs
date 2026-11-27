@@ -1,23 +1,30 @@
-// file/open-folder: a folder given to the open box (Ctrl+O). A folder is not a project: the engine stays idle and does not stop; what the box did is in the notes.
-// When the box is still open after the attempt (the folder was refused), it is answered with a demo song, so that the next scenario starts clean.
+// file/open-folder: a folder given to the engine's Open window (File > Open; Issue #1519: the window takes a folder into its list, as an upload). A folder is not a project: the window
+// refuses it (it says Choose a file and stays), the scenario closes it with its Cancel, and the engine stays idle and does not stop; what the window did is in the notes.
 import { defineScenario } from '../../lib/scenario.mjs';
-import { dataPath, giveFiles, openFilesAtOnce, waitBox } from '../../lib/file.mjs';
+import { clickElement, dataPath, openFilesAtOnce } from '../../lib/file.mjs';
+import { sleep, WINDOW } from '../../lib/flow.mjs';
 
 export default defineScenario({
   id: 'file/open-folder',
   covers: ['file/open/folder'],
   async run(ctx) {
-    const { guest, cdp, repo } = ctx;
-    const r = await openFilesAtOnce(ctx, [dataPath(repo, 'Data\\Demo projects\\Demo songs')]);
-    let answered = false;
-    if ((await waitBox(guest, 1500)) === 'filedlg') {
-      answered = (await giveFiles(guest, cdp, [dataPath(repo, 'Data\\Demo projects\\NewStuff.flp')])).given === true;
+    const { guest, repo } = ctx;
+    const folder = dataPath(repo, 'Data\\Demo projects\\Demo songs');
+    const r = await openFilesAtOnce(ctx, [folder]);
+    let closed = false;
+    if (r.refused) {
+      await clickElement(guest, '#fx-close');
+      const t0 = Date.now();
+      while (Date.now() - t0 < 10000) {
+        if ((await guest.ev(WINDOW)) === null) { closed = true; break; }
+        await sleep(300);
+      }
     }
     const st = await guest.state();
     return {
-      ok: st.state === 'engine-idle',
+      ok: r.given === true && r.refused === true && closed && st.state === 'engine-idle',
       engineState: st.state,
-      notes: [`folder given: box ${r.box}, given ${r.given}${r.error ? `, refused: ${r.error.slice(0, 160)}` : ''}; the box answered after it ${answered}; title "${st.title}", state ${st.state}`],
+      notes: [`folder given ${r.given}${r.error ? `, error ${r.error.slice(0, 160)}` : ''}; the window refused it ${r.refused === true}; closed with Cancel ${closed}; title "${st.title}", state ${st.state}`],
     };
   },
 });

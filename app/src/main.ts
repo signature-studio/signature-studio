@@ -40,6 +40,7 @@ import { FileDialogView, SavedFilesView } from './ui/filedlg.ts';
 import { PageClipboard, type ClipboardState } from './engine/clipboard.ts';
 import type { FileDlgRequest } from './engine/filedlg.ts';
 import { filesUsage } from './files/usage.ts';
+import { EngineFiles } from './files/engine-dialog.ts';
 import { AssetStore } from './bundle/assetstore.ts';
 import { AssetsRecorder, assetLines, resourceLookupFromPerformance, sourceSummary, type AssetsReport } from './bundle/assets-report.ts';
 import type { AssetRef, LazyRef } from './bundle/manifest.ts';
@@ -158,8 +159,9 @@ interface AppApi {
 declare global { interface Window { __app?: AppApi } }
 
 const view = new DesktopView($('desktop'));
-// decision 0193 / Issue #1481: the engine's file dialogs are answered by the person through the browser's file chooser (ui/filedlg.ts); the answer (File objects) goes to the Worker, never to a server
-const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), log: (kind, text) => addLog(kind, text) });
+// decision 0193 / 0216 (opfs1) / Issue #1519: the engine's Open, Save and folder dialogs are answered by the person in the page's file manager window (OPFS, files/engine-dialog.ts), never by the browser's own chooser; the answer goes to the Worker, never to a server
+const engineFiles = new EngineFiles((kind, text) => addLog(kind, text));
+const fileDlgView = new FileDialogView($('filedlg'), { answer: (id, answer) => client.answerFileDlg(id, answer), closed: () => $('desktop').focus({ preventScroll: true }), log: (kind, text) => addLog(kind, text), select: engineFiles.select });
 const savedView = new SavedFilesView();
 const logEl = $('log');
 const addLog = (level: string, text: string): void => {
@@ -733,8 +735,11 @@ const client = new EngineClient({
   },
   fileDlgProgress: (id, done, total) => fileDlgView.progress(id, done, total),
   savedFile(f) {
-    addLog('info', `the engine finished writing a file it was asked to save (${f.size} bytes); it is listed under "Files the engine wrote"`);
-    savedView.add(f);
+    // a Save whose place the person chose in the file window is copied to that OPFS path (engine-dialog.ts onSavedFile), so it is not handed to the browser's download too
+    const chosen = engineFiles.pendingSaves.has(f.guestPath.toLowerCase());
+    addLog('info', chosen ? `the engine finished writing a file (${f.size} bytes) to the place the person chose in the file window` : `the engine finished writing a file it was asked to save (${f.size} bytes); it is listed under "Files the engine wrote"`);
+    savedView.add(f, !chosen);
+    void engineFiles.onSavedFile(f);
   },
   inputDone: (items) => app.latency.done(items),
   inputDropped: (seq, reason) => app.latency.dropped(seq, reason),

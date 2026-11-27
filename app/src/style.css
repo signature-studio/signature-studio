@@ -51,7 +51,7 @@ details { margin-top: 8px; border-top: 1px solid #2a2e36; padding-top: 6px; } su
 .perf-table tr[data-status="miss"] td:nth-child(2) { color: #ff8b8b; font-weight: 700; } .perf-table tr[data-status="met"] td:nth-child(2) { color: #8be28b; } .perf-table tr[data-status="na"] td:nth-child(2) { color: #8a93a2; } .perf-notice { font-size: 11px; line-height: 1.5; background: #1d2128; border-left: 3px solid #5b9bd5; padding: 4px 8px; margin: 4px 0; } .perf-notice p { margin: 3px 0; }
 
 
-/* Issue #1481: the engine's Open dialog has no box; its file input is made inside #filedlg (ui/filedlg.ts) and the box takes no room (display: contents) */
+/* Issue #1481 / #1519: the engine's file dialogs are the file manager window, built inside #filedlg (files/files.css); when none is open, #filedlg takes no room (display: contents) */
 #filedlg { display: contents; }
 
 /* decision 0212 : the whole page is the viewport; the header is its natural height, the monitor panel is the 340 px column on the right, and EVERYTHING ELSE is the desktop (the guest's screen). The toolbar and the

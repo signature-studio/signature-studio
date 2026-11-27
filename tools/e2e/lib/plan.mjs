@@ -1,11 +1,21 @@
 // The plan of a run (Issue #1485, #1506): the arguments, the displays and their rows, the budget of a row, the shard, the result of a scenario and the acceptance
 // of a scenario and of a row. Pure (no browser), so the tests can use it.
 // The display names: 4k-dpr1, 4k-dpr2, 4k-random (as before) and dpr:<number> (e.g. dpr:1.25): the CSS size is 3840 / DPR by 2160 / DPR.
-import { shardOf, sortById } from './scenario.mjs';
+import { areaOf, shardOf, sortById } from './scenario.mjs';
 
 export const DISPLAY = { width: 3840, height: 2160, refreshHzTarget: 120 };
 export const FAIL_LOG_LINES = 200;
 const BOOLEAN_FLAGS = new Set(['list', 'report-only']);
+
+/**
+ * the areas of the IDs of `--only` (`<領域>/<名前>`), when every ID has one of the 13 areas (the scenarios are then the areas' own, with no --area or --scenarios); else null
+ */
+export function areasOfOnly(only) {
+  if (!Array.isArray(only) || only.length === 0) return null;
+  const areas = only.map((id) => areaOf(id));
+  if (areas.some((a) => a === null)) return null;
+  return [...new Set(areas)];
+}
 
 /** the arguments: `--name value` pairs, and the flags of BOOLEAN_FLAGS (no value) */
 export function parseArgs(argv) {

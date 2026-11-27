@@ -73,11 +73,12 @@ export class Guest {
     await this.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y, button: 'none', buttons: 0, pointerType: 'mouse' });
     await sleep(60);
   }
-  async press(c, button, clickCount) {
+  /** a press and release; `modifiers` as CDP's (2 = Ctrl), 0 by default */
+  async press(c, button, clickCount, modifiers = 0) {
     const buttons = button === 'right' ? 2 : 1;
-    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button, buttons, clickCount, pointerType: 'mouse' });
+    await this.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button, buttons, clickCount, modifiers, pointerType: 'mouse' });
     await sleep(50);
-    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button, buttons: 0, clickCount, pointerType: 'mouse' });
+    await this.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button, buttons: 0, clickCount, modifiers, pointerType: 'mouse' });
     await sleep(100);
   }
   /** a click (or `clicks` clicks in a row, the second with clickCount 2) with the left button, or the right one */

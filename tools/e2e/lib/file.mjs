@@ -3,9 +3,10 @@
 // of a file onto the desktop, and the engine's log since a mark. The data files are the installer's, in the bundle's host resources (lift/out-app/host/resources);
 // the names are the installer's (inputs/fl-installer-files.tsv). The save and the export are checked by what the engine wrote, not by the browser's download.
 import path from 'node:path';
-import { clearProblems, MISSING_PLUGINS, openProjectFile, sleep } from './flow.mjs';
+import { clearProblems, clickElement, clickRow, MISSING_PLUGINS, openProjectFile, sleep, uploadToWindow, WINDOW, waitListing } from './flow.mjs';
 import { closeNew, MAIN_FORM, menuPath, openLids, newWindows, windowTable } from './common.mjs';
 
+export { clickElement };
 export const SHOP = 'TInAppShopForm';
 
 /** the title of the main form in the window table (the project's title), or null */
@@ -19,8 +20,6 @@ export async function mainTitle(guest) {
 export function clearMissingPlugins(guest, settleMs = 3000) {
   return clearProblems(guest, { settleMs });
 }
-const BOX = "document.getElementById('filedlg-input') ? 'filedlg' : (document.getElementById('fx-input-files') ? 'explorer' : null)";
-
 /** the absolute path of an installer file (`Data\Templates\...` as in inputs/fl-installer-files.tsv) in the host resources of the bundle */
 export function dataPath(repo, rel) {
   return path.join(repo, 'lift', 'out-app', 'host', 'resources', ...String(rel).split('\\'));
@@ -46,29 +45,31 @@ export async function savedFiles(guest) {
   return list ?? [];
 }
 
-/** the open box has come: waits for the file box of the page (or the file manager in selection mode); returns 'filedlg' | 'explorer' | null */
+/** the engine's Open / Save window is up (the page's file manager in selection mode, Issue #1519): waits for it; returns 'explorer' | null */
 export async function waitBox(guest, ms = 40000) {
   const t0 = Date.now();
   let box = null;
   while (!box && Date.now() - t0 < ms) {
-    box = await guest.ev(BOX);
+    box = await guest.ev(WINDOW);
     if (!box) await sleep(500);
   }
   return box;
 }
 
-/** the files given to the open box (the page's file input: DOM.setFileInputFiles with the paths); the box is answered at once (the single answer of lib/flow.mjs) */
-export async function giveFiles(guest, cdp, files) {
+/**
+ * the files (or a folder) given to the engine's Open window: each is uploaded into the window's list; the first `choose` of them (all by default) are chosen (the first is clicked, the others added with Ctrl),
+ * and Open is pressed. `gone` is true when the window closed after the answer (the engine took it); false when the window stays (the window refused the choice, e.g. a folder).
+ */
+export async function giveFiles(guest, cdp, files, { choose = files.length } = {}) {
   const box = await waitBox(guest);
-  if (box !== 'filedlg') return { box, given: false };
-  await cdp.send('Page.setInterceptFileChooserDialog', { enabled: true });
-  const doc = await cdp.send('DOM.getDocument', {});
-  const q = await cdp.send('DOM.querySelector', { nodeId: doc.root.nodeId, selector: '#filedlg-input' });
-  if (!q.nodeId) return { box, given: false };
-  await cdp.send('DOM.setFileInputFiles', { nodeId: q.nodeId, files });
+  if (box !== 'explorer') return { box, given: false };
+  await waitListing(guest);
+  await uploadToWindow(guest, cdp, files);
+  for (let i = 0; i < choose; i++) await clickRow(guest, path.basename(files[i]), { ctrl: i > 0 });
+  await clickElement(guest, '#fx-ok');
   const t0 = Date.now();
-  while ((await guest.ev(BOX)) !== null && Date.now() - t0 < 60000) await sleep(500);
-  return { box, given: true, gone: (await guest.ev(BOX)) === null };
+  while ((await guest.ev(WINDOW)) !== null && Date.now() - t0 < 15000) await sleep(500);
+  return { box, given: true, gone: (await guest.ev(WINDOW)) === null, uploaded: files.length, chosen: choose };
 }
 
 /**
@@ -121,7 +122,7 @@ export async function waitOpened(guest, { box, name, before, logStart, ms }) {
 }
 
 /** Ctrl+O, then the files given to the box (several files, or a folder): the facts of what the box did */
-export async function openFilesAtOnce(ctx, files) {
+export async function openFilesAtOnce(ctx, files, { choose = files.length } = {}) {
   const { guest, cdp } = ctx;
   await clearProblems(guest);
   await clearMissingPlugins(guest);
@@ -132,12 +133,17 @@ export async function openFilesAtOnce(ctx, files) {
   await guest.ctrl('KeyO', 'o', 79);
   let given = null;
   try {
-    given = await giveFiles(guest, cdp, files);
+    given = await giveFiles(guest, cdp, files, { choose });
   } catch (e) {
     return { box: null, given: false, opened: false, state: (await guest.state())?.state ?? null, title: null, error: String(e?.message ?? e).slice(0, 300) };
   }
+  if (given.given && given.gone === false) {
+    // the window stays: it refused the choice (a folder, or several files for one choice); it is left to the caller to close it
+    const st = (await guest.state().catch(() => null)) ?? { state: null };
+    return { box: given.box, given: true, gone: false, refused: true, opened: false, state: st.state, title: null, titleBefore: before.title, files: files.length };
+  }
   const end = await waitOpened(guest, { box: given.box, name: path.basename(files[0]), before, logStart, ms: 120000 });
-  return { ...end, given: given.given, gone: given.gone ?? null, files: files.length };
+  return { ...end, given: given.given, gone: given.gone ?? null, files: files.length, chosen: choose };
 }
 
 /** the trial window (TInAppShopForm) that a Save or an Export brings up is closed with Escape when it is there */
@@ -202,15 +208,6 @@ export async function dropFile(guest, abs, gx, gy) {
   await guest.send('Input.dispatchDragEvent', { type: 'drop', x: p.x, y: p.y, data });
   await sleep(300);
   await guest.send('Input.setInterceptDrags', { enabled: false }).catch(() => {});
-}
-
-/** a click on an element of the page (its centre), for the file manager's own buttons (#fx-close is its Cancel) */
-export async function clickElement(guest, selector) {
-  const r = await guest.ev(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
-  if (!r) return false;
-  await guest.move(r);
-  await guest.press(r, 'left', 1);
-  return true;
 }
 
 /** the engine's Open or Save dialog is on the page (the file manager in selection mode): its state, and the number of its dialogs so far */
