@@ -207,3 +207,4 @@
 226	#1512	共有の DLL 1: LAMEenc_x64.dll を実モジュールにして、MP3 の書き出しの止まりを直す	Task
 227	#1513	共有の DLL 2: WavpackDLL_x64.dll と oggio_x64.dll を実モジュールにして、既定の曲の読み込みの 126 と OGG の書き出しを揃える	Task
 228	#1514	共有の DLL 3: EasyFLAC_x64.dll を実モジュールにして、FLAC の音声の読み書きを揃える	Task
+229	#1515	分離 wasm のプラグインを含む曲を再生すると、協調スレッドが `SuspendError: trying to suspend JS frames` で失敗する(5 回中 3 回)	Task

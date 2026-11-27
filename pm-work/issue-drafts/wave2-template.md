@@ -14,6 +14,7 @@
 ## 1 プラグインの入れ方(第 1 波の経験)
 
 - フォルダごとに `lift/plugins/<dir>/plugin.tsv` を 1 つ足す(`<dir>` は各見出しの名前)。見出しは 8 列(`key`・`guest`・`role`・`sha256`・`size`・`hook`・`args`・`omit`)、区切りは TAB。下の表を、そのまま書く。
+- 受け入れの前に `node tools/place-plugin-dlls.mjs` が、この束の DLL(と Data)を、`lift/out-app/host-extra/plugins/`(`plugin-builtin` の作業の木に在る)から木に置く。`missing` が出たら、`plugin.tsv`/`data.tsv` の行の `guest`・`sha256` が `host-extra/plugins/MANIFEST.tsv` と合っているかを確かめる。
 - 共有のファイルは 1 行も変えない: `ci/`・`inputs/`・`lift/harness/`・`lift/runtime/`・`lift/crates/`・`app/`・`tools/` の既存の物(表・一覧・試験の期待値を含む)。生成の段が `lift/plugins/` から表を作る。だから、この束の commit は `lift/plugins/` の中だけになる。
 - `hook`: 下の表のとおり。`rva:` の 3 つは hook 点の表の RVA(本体の 要・既存)。`none` は、不要の DLL と、補助の DLL。
 - `omit`: 表のとおり `-` と書く。setjmp を呼ぶ関数の入口は、#{{126}} で入った自動の検出が決める。手で推測した値は書かない。読み込みの後に `ExitProcess`(終了コード 0)で止まったら、その停止を報告して止まる(第 1 波の Filter の型)。

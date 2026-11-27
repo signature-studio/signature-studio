@@ -65,6 +65,13 @@ test('a legacy scenario keeps its name and runs in a page of its own', () => {
   assert.equal(legacyScenario({ name: 'browser-face-tabs', expectFail: null, run: () => ({ ok: true }) }, 'browser-face').area, 'browser-face');
 });
 
+test('a legacy scenario may declare its displays (the names it is calibrated at); a bad list is refused', () => {
+  const run = () => ({ ok: true });
+  assert.deepEqual(legacyScenario({ name: 'x', run, displays: ['4k-dpr1', '4k-dpr2'] }).displays, ['4k-dpr1', '4k-dpr2']);
+  assert.throws(() => legacyScenario({ name: 'x', run, displays: [] }), /displays/);
+  assert.throws(() => legacyScenario({ name: 'x', run, displays: '4k-dpr1' }), /displays/);
+});
+
 test('a legacy scenario keeps its beforeLoad (the permission and the counter are set before the page loads)', () => {
   const beforeLoad = async () => {};
   const l = legacyScenario({ name: 'clipboard-no-toast', expectFail: null, beforeLoad, run: () => ({ ok: true }) });

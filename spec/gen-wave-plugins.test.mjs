@@ -45,6 +45,12 @@ try {
   ok('実物の --dry-run: DLL と フォルダの数(Effects 112・Generators 70。フォルダ 90・51)', [/DLL: Effects 112 件、Generators 70 件\(計 182 件\)/.test(rd), /フォルダ: Effects 90、Generators 51\(計 141\)/.test(rd)], [true, true]);
   ok('実物の --dry-run: 除く(VFX 系 7 フォルダ・DLL 19 件。lift/plugins/ に在る 4 フォルダ・DLL 4 件)', [/除く: VFX 系 7 フォルダ\(DLL 19 件\)、lift\/plugins\/ に在る 4 フォルダ\(DLL 4 件\)/.test(rd)], [true]);
   ok('実物の --dry-run: 残りと束(Effects 85 フォルダ・Generators 45 フォルダ。29 束・15 束。041〜084)', [/残り: Effects 85 フォルダ\(本体 86 件\)、Generators 45 フォルダ\(本体 45 件\)/.test(rd), /束\(3 フォルダずつ\): Effects 29 束、Generators 15 束。計 44 束。下書き番号 041〜084/.test(rd)], [true, true]);
+  // 木に無い束の DLL は、受け入れの前に置く(tools/place-plugin-dlls.mjs)。accept では fe-build engine の直前に 1 回在り、本文の「1 プラグインの入れ方」に、その手順の 1 行が在る
+  const PLACE = 'node tools/place-plugin-dlls.mjs && lift/target/release/fe-build engine';
+  const PLACE_NOTE = '- 受け入れの前に `node tools/place-plugin-dlls.mjs` が、この束の DLL(と Data)を、';
+  const realBodies = fs.readdirSync(outReal).filter((f) => f.endsWith('.md')).map((f) => fs.readFileSync(path.join(outReal, f), 'utf8'));
+  ok('実物の 44 束の accept: node tools/place-plugin-dlls.mjs が fe-build engine の直前に 1 回在り、fe-build engine は 1 回だけ', realBodies.map((b) => spawnSync(process.execPath, [TASK_ACCEPT], { input: b, encoding: 'utf8' }).stdout).filter((a) => a.split(PLACE).length === 2 && a.split('fe-build engine').length === 2).length, 44);
+  ok('実物の 44 束の本文: 手順の 1 行が「1 プラグインの入れ方」の節に 1 つ在り、停止の型より前にある', realBodies.filter((b) => b.split(PLACE_NOTE).length === 2 && b.indexOf('## 1 プラグインの入れ方') < b.indexOf(PLACE_NOTE) && b.indexOf(PLACE_NOTE) < b.indexOf('## 停止が出たときの型')).length, 44);
 
   // 偽の分類の表: フォルダ単位。Effects は 9 フォルダ(lift/plugins/ に在る 3・VFX 1 を除き 5)、Generators は 4 フォルダ(lift/plugins/ に在る Sytrus 1・VFX 1 を除き 2)
   const P = 'Plugins\\Fruity\\';
@@ -140,6 +146,7 @@ try {
     return [a.status, a.stdout.startsWith('accept: ')];
   }), [[0, true], [0, true], [0, true]]);
   ok('accept: 各フォルダの dir(名前の slug)を引用符で囲んだ引数を差し込む(041 は 3 フォルダ、042 は Fake Two を含む 2 フォルダ、043 は 2 フォルダ)', [b041.includes("'fake-a' 'fake-b' 'fake-c'"), b042.includes("'fake-d' 'fake-two'"), b043.includes("'fake-g1' 'fake-g2'")], [true, true, true]);
+  ok('偽の表の束も、place-plugin-dlls の手順の 1 行と、accept の直前の 1 回を持つ', drafts.map((b) => [b.includes(PLACE_NOTE), b.split(PLACE).length === 2]), [[true, true], [true, true], [true, true]]);
 
   // 既存の表(検査の中の固定の表。親の 021・022 と、テンプレートが参照する番号は試験用)と、試験用のマイルストーン表を読む create-issues の dry-run で、parent・blocked_by・本文の参照が解決され、検査が通る。実物の表・実物の下書きには依存しない
   const table = path.join(tmp, 'table.tsv');
