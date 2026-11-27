@@ -5,7 +5,7 @@ import * as S from '../../lib/settings.mjs';
 export default defineScenario({
   id: 'settings/list-file-folders-select',
   covers: ["settings/list/file-tquickstringgrid-1"],
-  displays: ["4k-dpr1"],
+  displays: ["4k-dpr1", "4k-dpr2"],
   expectFail: null,
   run(ctx) {
     return S.gridRun(ctx, "File", "Browser extra search folders", 0);

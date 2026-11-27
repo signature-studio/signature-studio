@@ -17,6 +17,7 @@
 int fle_win_api_trace_on(void) __attribute__((weak));
 #include "fle_com.h"
 #include "fle_thread.h"
+#include "fle_realmod.h"
 #include "fle_sys.h"
 
 /* Same rule as the other runtime files: the first caller owns the state, another thread stops the run. */
@@ -280,6 +281,9 @@ void fle_imp_ExitProcess(void)
 {
     char why[160];
 
+    /* Issue #1499 (段 B): a program started by ShellExecute (fle_realmod.c) is a thread of this engine: its ExitProcess ends that thread only, and returns here
+     * only when the running thread is not a program's. */
+    if (FLE_REALMOD_PRESENT()) fle_realmod_program_end((uint32_t)R[1]);
     snprintf(why, sizeof why, "the program asked to end the process (exit code %u); stopped here, not exited", (unsigned)(uint32_t)R[1]);
     fle_stop("ExitProcess", why);
 }

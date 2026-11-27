@@ -5,6 +5,7 @@ import { rowMenu } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/rack-menu-r3',
   covers: ['windows/rack/menu', 'windows/popup/right-click-channel-rack'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return rowMenu(guest, 2);
   },

@@ -1,16 +1,16 @@
-// plugins/position-generators-transistor-bass-transistor-bass-x64: the window of Transistor Bass lies inside the desktop (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
+// plugins/position-generators-transistor-bass-transistor-bass-x64: the window of Transistor Bass lies inside the desktop, after the plugin is put into Mixer Insert 1 from the Plugin database (the display's DPR may be random: the guest picture is the same size). A generated scenario. Do not edit by hand.
 import { defineScenario } from '../../lib/scenario.mjs';
-import { openPluginDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
+import { insertFromDatabase, pluginInDesktop } from '../../lib/plugins.mjs';
 
 export default defineScenario({
   id: 'plugins/position-generators-transistor-bass-transistor-bass-x64',
   covers: ['plugins/window/generators-transistor-bass-transistor-bass-x64'],
   displays: ['4k-dpr1', '4k-random'],
-  expectFail: 'new',
+  expectFail: '#1535',
   async run({ guest }) {
-    const db = await openPluginDatabase(guest);
-    if (!db.opened) return { ok: false, notes: [`the picker did not open (${db.error})`] };
+    const ins = await insertFromDatabase(guest, "Transistor Bass");
+    if (!ins.ok) return { ok: false, engineState: (await guest.state())?.state ?? null, notes: ins.notes, results: ins.results };
     const r = await pluginInDesktop(guest, "Transistor Bass");
-    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: r.notes };
+    return { ok: r.inside, engineState: (await guest.state())?.state ?? null, notes: [...ins.notes, ...r.notes], results: ins.results };
   },
 });

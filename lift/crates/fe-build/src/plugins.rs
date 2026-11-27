@@ -695,6 +695,28 @@ fn write(path: &str, text: &str) -> Result<(), String> {
     fs::write(path, text).map_err(|e| format!("{path}: {e}"))
 }
 
+/// The seed file of a DLL is the installer's file, which the extraction puts in the host tree `tree` (HOST_DIR) from the seed rows. A host tree
+/// that was extracted before the plugin row was there (the base of a run) has the DLL under its key and not the seed file: the seed file is
+/// then copied from the key's file, whose SHA-256 must be the row's. A seed file that is there is kept. An .exe has no seed row (seed_table).
+fn seed_copies(tree: &str, dlls: &[Dll]) -> Result<(), String> {
+    for d in dlls.iter().filter(|d| !d.is_exe()) {
+        let seed = format!("{tree}/{}", d.seed_file());
+        if Path::new(&seed).exists() {
+            continue;
+        }
+        let host = format!("{tree}/{}", d.host_file());
+        let got = crate::sha256_hex(&host)?;
+        if got != d.sha256 {
+            return Err(format!("{host}: SHA-256 {got}, expected {} (the plugin row of {})", d.sha256, d.key));
+        }
+        if let Some(dir) = Path::new(&seed).parent() {
+            fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        }
+        fs::copy(&host, &seed).map_err(|e| format!("{seed}: {e}"))?;
+    }
+    Ok(())
+}
+
 /// The tables of the build, from the plugin rows and the fixed rows. `with_base` is false in the extraction (no host yet): the
 /// extraction table and the seed table do not depend on the bases, and the lists are left alone. With the bases, lists/ gets the
 /// fixed lists again (the lists stage then writes the plugins' lists, so no list of a removed plugin is left behind).
@@ -722,6 +744,7 @@ pub fn generate(with_base: bool) -> Result<(), String> {
     if !with_base {
         return Ok(());
     }
+    seed_copies(HOST_DIR, &dlls)?;
     let lists = format!("{OUT_DIR}/lists");
     let _ = fs::remove_dir_all(&lists);
     fs::create_dir_all(&lists).map_err(|e| format!("{lists}: {e}"))?;
@@ -819,6 +842,16 @@ fn direct_list(ok: &BTreeSet<u64>, left_out: &BTreeSet<u64>) -> Vec<u64> {
     ok.iter().copied().filter(|v| !left_out.contains(v)).collect()
 }
 
+/// The argv of the lists stage's fe-wasmgen: the rebased DLL, the wasm, the row's arguments (plugin.tsv's args, as they are: the paths are the
+/// repository root's), the N0 arguments, and the report.
+fn list_argv(bin: &str, rebased: &str, wasm: &str, args: &str, n0: &str, report: &str) -> Vec<String> {
+    let mut argv = vec![format!("{bin}/fe-wasmgen"), rebased.to_string(), wasm.to_string()];
+    argv.extend(args.split_whitespace().map(String::from));
+    argv.extend(n0.split_whitespace().map(String::from));
+    argv.extend(["--report".to_string(), report.to_string()]);
+    argv
+}
+
 /// The lists stage (one plugin DLL): the DLL rebased at its base, then the fe-wasmgen report of it (the direct functions: the ones
 /// that are emitted, `status` ok), without the hook points and the omit VAs. The result is lists/lowered-<key>.txt.
 pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
@@ -833,11 +866,8 @@ pub fn run_list(key: &str, bin: &str) -> Result<(), String> {
     let setjmp = setjmp_entries(bin, &rebased)?;
     let wasm = format!("{work}/{key}.wasm");
     let report = format!("{work}/{key}.tsv");
-    let mut argv = vec![format!("{bin}/fe-wasmgen"), rebased, wasm];
-    argv.extend(args.split_whitespace().map(String::from));
-    argv.extend(fs::read_to_string(N0_ARGS).map_err(|e| format!("{N0_ARGS}: {e}"))?.split_whitespace().map(String::from));
-    argv.extend(["--report".to_string(), report.clone()]);
-    run_cmd(&argv, "fe-wasmgen")?;
+    let n0 = fs::read_to_string(N0_ARGS).map_err(|e| format!("{N0_ARGS}: {e}"))?;
+    run_cmd(&list_argv(bin, &rebased, &wasm, args, &n0, &report), "fe-wasmgen")?;
     let ok = report_ok(&fs::read_to_string(&report).map_err(|e| format!("{report}: {e}"))?)?;
     let mut omit = vas_of(omit)?;
     omit.extend(setjmp);
@@ -900,8 +930,13 @@ pub fn check_units(listed: &[String]) -> Result<Vec<String>, String> {
             found.insert(name);
         }
     }
+    check_gen_units(listed, &found)
+}
+
+/// check_units on the names of the units gen wrote (`found`: the .c files of lift/out-app/gen/src without common.c).
+fn check_gen_units(listed: &[String], found: &BTreeSet<String>) -> Result<Vec<String>, String> {
     let want: BTreeSet<String> = listed.iter().map(|p| Path::new(p).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();
-    let absent: Vec<&String> = want.difference(&found).collect();
+    let absent: Vec<&String> = want.difference(found).collect();
     if !absent.is_empty() {
         return Err(format!("the units of the compile lists are not written by gen: {absent:?}"));
     }
@@ -1113,6 +1148,37 @@ mod tests {
         assert!(!is_plugin_unit("fle-acm.c"));
         assert!(!is_plugin_unit("m11-06.o"));
         assert!(!is_plugin_unit("mx-00.c"));
+    }
+
+    /// Issue #1525: a plugin of two DLLs (a main DLL and a helper) gets the module numbers K and K+1 after the fixed modules (the rows of
+    /// lift/harness/b2d2/modules.tsv), in the order of the keys. gen writes units 00..03 of the main module and unit 00 of the helper (as the
+    /// Edison run of #1435 did). The listed units are those of the fixed modules, so the check passes, and the plugin's units are the extra ones.
+    #[test]
+    fn the_units_of_a_two_dll_plugin_are_extra_units_and_the_listed_ones_still_stop() {
+        let sha = "a".repeat(64);
+        let text = format!(
+            "key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.edison.edison_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\Edison_x64.dll\t本体\t{sha}\t10\tnone\t\t-\neffects.edison.testdll_x64.dll\tPlugins\\Fruity\\Effects\\Edison\\TestDll_x64.dll\t補助\t{sha}\t20\tnone\t\t-\n"
+        );
+        let mut keys: Vec<String> = parse_plugin("edison", &text).unwrap().into_iter().map(|d| d.key).collect();
+        keys.sort();
+        assert_eq!(keys, ["effects.edison.edison_x64.dll", "effects.edison.testdll_x64.dll"]);
+        let fixed = include_str!("../../../harness/b2d2/modules.tsv").lines().filter(|l| !l.trim().is_empty() && !l.starts_with('#')).count();
+        let (main, helper) = (fixed + 1, fixed + 2);
+        let listed: Vec<String> = include_str!("../../../harness/two/plain-units.txt").split_whitespace().chain(include_str!("../../../harness/two/ai-units.txt").split_whitespace()).map(String::from).collect();
+        let module_of = |k: usize| format!("m{k}-");
+        let mut written: BTreeSet<String> = listed
+            .iter()
+            .map(|p| p.rsplit('/').next().unwrap_or_default().to_string())
+            .filter(|u| !u.starts_with(&module_of(main)) && !u.starts_with(&module_of(helper)))
+            .collect();
+        written.extend((0..4).map(|n| format!("m{main}-{n:02}.c")));
+        written.insert(format!("m{helper}-00.c"));
+        let extra = check_gen_units(&listed, &written).unwrap();
+        let mut expected: Vec<String> = (0..4).map(|n| format!("m{main}-{n:02}.c")).chain([format!("m{helper}-00.c")]).collect();
+        expected.sort();
+        assert_eq!(extra, expected);
+        written.remove("m1-00.c");
+        assert!(check_gen_units(&listed, &written).is_err(), "a listed unit that gen does not write must still stop the build");
     }
 
     #[test]
@@ -1392,5 +1458,54 @@ mod tests {
         assert!(lazy_rows <= streams.min(reg), "the lazy rows of the seed table are one stream each");
         assert!(seed_rows <= entries, "the seed table's rows");
         assert!(lazy_items <= items, "the lazy files of the manifest");
+    }
+
+    /// Issue #1395: a seed file that is missing is copied from the host file of its row (a work tree made before the row); the host file's
+    /// SHA-256 must be the row's; a seed file that is there is kept (its host file is not read).
+    #[test]
+    fn a_missing_seed_file_is_copied_from_the_host_file_of_its_row_and_a_seed_file_that_is_there_is_kept() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-seed-copies");
+        let _scratch = Scratch::new(root);
+        let sha_abc = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        let text = format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\neffects.seedcopy.seedcopy_x64.dll\tPlugins\\Fruity\\Effects\\Seed Copy\\Seed Copy_x64.dll\t本体\t{sha_abc}\t3\tnone\t\t-\n");
+        let dlls = parse_plugin("seed-copy", &text).unwrap();
+        let d = &dlls[0];
+        let tree = format!("{root}/{HOST_DIR}");
+        let host = format!("{tree}/{}", d.host_file());
+        let seed = format!("{tree}/{}", d.seed_file());
+        fs::create_dir_all(Path::new(&host).parent().unwrap()).unwrap();
+        fs::write(&host, "abc").unwrap();
+        seed_copies(&tree, &dlls).unwrap();
+        assert_eq!(fs::read_to_string(&seed).unwrap(), "abc");
+        fs::write(&seed, "kept").unwrap();
+        fs::write(&host, "xyz").unwrap();
+        seed_copies(&tree, &dlls).unwrap();
+        assert_eq!(fs::read_to_string(&seed).unwrap(), "kept", "a seed file that is there is not touched");
+        fs::remove_file(&seed).unwrap();
+        let err = seed_copies(&tree, &dlls).unwrap_err();
+        assert!(err.contains("SHA-256") && err.contains(d.key.as_str()), "{err}");
+        assert!(!Path::new(&seed).exists(), "a host file with another SHA-256 is not copied");
+        let exe = parse_plugin("pm", &format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\npm.pluginmanager.dll\tSystem\\Tools\\Plugin Manager\\PluginManager.exe\t補助\t{sha_abc}\t3\tnone\t\t-\n")).unwrap();
+        seed_copies(&tree, &exe).unwrap();
+        assert!(!Path::new(&format!("{tree}/{}", exe[0].seed_file())).exists(), "an .exe has no seed row, so no seed file");
+    }
+
+    /// Issue #1395 (the args of a plugin row): `--reloc-seeds` and `--rva-tables FILE` reach fe-lift (module_row, gen-all), the hybrid's
+    /// fe-wasmgen (hyb_row) and the lists stage's fe-wasmgen (list_argv), with the table's path as the row gives it (the repository root).
+    #[test]
+    fn the_rva_table_args_of_a_row_reach_fe_lift_the_hybrid_and_the_lists_stage() {
+        let text = format!("key\tguest\trole\tsha256\tsize\thook\targs\tomit\nreal.lame.lame_x64.dll\tPlugins\\Fruity\\Effects\\Lame\\Lame_x64.dll\t本体\t{}\t10\tnone\t--pdata --reloc-seeds --rva-tables lift/plugins/lame/rva-tables.txt\t-\n", "a".repeat(64));
+        let d = parse_plugin("lame", &text).unwrap().remove(0);
+        let want = ["--pdata", "--reloc-seeds", "--rva-tables", "lift/plugins/lame/rva-tables.txt"];
+        assert_eq!(d.args, want);
+        let row = module_row(&d, 0x6800000, None);
+        assert!(row.contains("\t--pdata --reloc-seeds --rva-tables lift/plugins/lame/rva-tables.txt --extra-imports "), "{row}");
+        assert_eq!(hyb_row(&d, 0x6800000), format!("{}\t{}\t--pdata --reloc-seeds --rva-tables lift/plugins/lame/rva-tables.txt", d.key, d.rebased(0x6800000)));
+        let n0 = include_str!("../../../harness/hyb/n0.args");
+        let argv = list_argv("lift/out-app/plugins/work", "lift/out-app/plugins/work/x.6800000.dll", "lift/out-app/plugins/work/x.wasm", &d.args.join(" "), n0, "r.tsv");
+        assert_eq!(argv[0], "lift/out-app/plugins/work/fe-wasmgen");
+        assert!(argv.windows(want.len()).any(|w| w.iter().map(String::as_str).eq(want)), "{argv:?}");
+        assert_eq!(argv.last().map(String::as_str), Some("r.tsv"));
+        assert_eq!(argv.iter().filter(|a| a.as_str() == "--report").count(), 1);
     }
 }

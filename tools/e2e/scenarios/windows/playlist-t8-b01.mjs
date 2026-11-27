@@ -5,6 +5,7 @@ import { playlistCell } from '../../lib/windows.mjs';
 export default defineScenario({
   id: 'windows/playlist-t8-b01',
   covers: ['windows/playlist/clip-place'],
+  displays: ['4k-dpr1', '4k-random', '4k-dpr2'],
   async run({ guest }) {
     return playlistCell(guest, 7, 0);
   },

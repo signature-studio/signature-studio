@@ -102,4 +102,24 @@ extern const uint64_t fle_realmod_path_count;
 /* Index of the real module for the path u[0..n), or -1 (no entry matches, or the path has a non-ASCII unit). */
 int fle_realmod_find_path(const uint16_t *u, size_t n) FLE_REALMOD_REF;
 
+/* Issue #1499 (段 B): a program of the table is an .exe image (its PE Characteristics have no IMAGE_FILE_DLL) whose path-table suffix ends in ".exe". ShellExecuteW and ShellExecuteExW
+ * start it when the file is the program's path on the virtual volume (fle_vfs_peek_file finds it) and the verb is NULL or "open" (the only verb a program has here). The start is a new
+ * cooperative thread that runs the image's entry point with no argument (fle_realmod_shell_program). Its handle is returned in *thread: that thread is the program's process here
+ * (hProcess of SHELLEXECUTEINFOW, when SEE_MASK_NOCLOSEPROCESS is set). Returns 1 when the program was started, 0 when the call is not for one (the caller answers as before).
+ * The parameters and the directory of ShellExecute are not passed on: the command line stays the engine's. */
+int fle_realmod_shell_program(const char *api, uint64_t verb, uint64_t file, uint64_t params, uint64_t *thread) FLE_REALMOD_REF;
+/* Issue #1499 (段 B): ExitProcess on a program's thread ends only that thread, with `code`; the engine goes on. Returns only when the running thread is not a program's thread. */
+void fle_realmod_program_end(uint32_t code) FLE_REALMOD_REF;
+/* Issue #1499 (段 B): the image base of the program that the running thread is, or 0 (GetModuleHandle(NULL) of such a thread is this base). */
+uint64_t fle_realmod_running_base(void) FLE_REALMOD_REF;
+/* Issue #1499 (段 B): the command line of the program that the running thread is (the quoted path and the parameters of ShellExecute; UTF-16 and ASCII), or NULL. */
+const uint16_t *fle_realmod_running_cmdline_w(void) FLE_REALMOD_REF;
+const char *fle_realmod_running_cmdline_a(void) FLE_REALMOD_REF;
+/* Issue #1501 (段 B): the base of the program whose path u[0..n) names, when its image is in memory (it was started), else 0 (its version resource is the one of that image). */
+uint64_t fle_realmod_program_image_base(const uint16_t *u, size_t n) FLE_REALMOD_REF;
+/* Issue #1499 (段 B): the full path that the program of real module idx was started from, copied to out (n bytes with the NUL); its length, or -1 when the module is not a program or the path does not fit. */
+int fle_realmod_program_file(int idx, char *out, unsigned n) FLE_REALMOD_REF;
+/* Issue #1499 (段 B): the protection of the program's image page at addr..addr+size (0x20 or 0x04), or 0 when the range is not in a program's image. */
+uint32_t fle_realmod_program_protect(uint64_t addr, uint64_t size) FLE_REALMOD_REF;
+
 #endif
