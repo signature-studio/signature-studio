@@ -136,6 +136,21 @@ export function tailLines(lines, n = FAIL_LOG_LINES) {
   return lines.slice(Math.max(0, lines.length - n));
 }
 
+const PAGE_GONE = /Target crashed|Page crashed|Session closed|has been closed/;
+
+/**
+ * the page of a shard is gone after a scenario (Issue #1528): its renderer stopped (the page's crash event, or Target crashed in the scenario's error), or the page
+ * is closed. The page is then made again for the next scenario; an error that is only the scenario's own (a timeout, a missing window) leaves the page as it is.
+ */
+export function pageGone({ crashed = false, closed = false, error = null } = {}) {
+  return crashed === true || closed === true || (error !== null && PAGE_GONE.test(String(error)));
+}
+
+/** a scenario that did not run (its page did not start): an error, not ok, its counts 0; it fails the acceptance whether marked or not */
+export function erroredScenario(sc, repeat, d, error, ms = 0) {
+  return { ...scenarioResult(sc, repeat, d), ok: false, error: String(error).slice(0, 800), ms };
+}
+
 /** the result of one scenario in a row, before it runs: the fields of the JSON (the counts are 0, ok is false until the scenario has run) */
 export function scenarioResult(sc, repeat, d) {
   return {

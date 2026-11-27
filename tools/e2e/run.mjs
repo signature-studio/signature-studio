@@ -43,7 +43,7 @@ import { bundleObjects, RAW_CACHE, startDelivery } from './lib/delivery.mjs';
 import { probeServed } from './lib/served.mjs';
 import { stopOf } from './lib/stop.mjs';
 import { AREAS, checkMarks, legacyScenario, marksOf } from './lib/scenario.mjs';
-import { areasOfOnly, budgetClock, dprMatches, needsFailLog, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowsFor, runPasses, scenarioResult, tailLines } from './lib/plan.mjs';
+import { areasOfOnly, budgetClock, dprMatches, erroredScenario, needsFailLog, pageGone, parseArgs, parseBudget, parseRepeat, parseShard, planScenarios, rowsFor, runPasses, scenarioResult, tailLines } from './lib/plan.mjs';
 import { resetProject, startProject } from './lib/common.mjs';
 import { readFeatures } from './coverage.mjs';
 
@@ -196,23 +196,32 @@ async function runLegacy(sc, d, env, budget) {
   return { result: out, frames };
 }
 
-/** the page of a shard's row: started once (the delivery's origin, the start of the project); the scenarios run in it */
+/**
+ * the page of a shard's row: started once (the delivery's origin, the start of the project); the scenarios run in it. A page whose renderer stopped is made again
+ * by runRow (Issue #1528); `crashed` is set by the page's crash event, `recreated` marks a page made again (its File > New is checked by its first scenario).
+ */
 async function openShared(d, env) {
   const { browser, delivery } = env;
   const pg = await newPage(browser, { cssWidth: d.cssWidth, cssHeight: d.cssHeight, dpr: d.dpr, origin: delivery.origin, token: delivery.newToken() });
   const det = attachDetectors(pg.page);
   const guest = new Guest(pg.page, pg.cdp, delivery.origin);
-  const sh = { pg, det, guest, clock: null, sampler: null, watch: null, frames: { n: 0, s: 0 }, start: null };
-  await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
-  await installToastWatch(pg.page);
-  if (env.clock === 'begin') sh.clock = await startFrameClock(pg.cdp);
-  await installRafCounter(pg.page);
-  sh.sampler = startRafSampler(pg.page);
-  sh.watch = watchEngine(guest);
-  log(`${d.name} (DPR ${d.dpr}): the page started`);
-  sh.start = await startProject(guest);
-  log(`${d.name} (DPR ${d.dpr}): project ${sh.start.opened ? 'open' : 'not open'} (state ${sh.start.state})`);
-  return sh;
+  const sh = { pg, det, guest, clock: null, sampler: null, watch: null, frames: { n: 0, s: 0 }, start: null, crashed: false, recreated: false };
+  pg.page.on('crash', () => { sh.crashed = true; log(`${d.name} (DPR ${d.dpr}): the page's renderer stopped (crash)`); });
+  try {
+    await pg.page.goto(`${delivery.origin}/`, { waitUntil: 'load', timeout: 120000 });
+    await installToastWatch(pg.page);
+    if (env.clock === 'begin') sh.clock = await startFrameClock(pg.cdp);
+    await installRafCounter(pg.page);
+    sh.sampler = startRafSampler(pg.page);
+    sh.watch = watchEngine(guest);
+    log(`${d.name} (DPR ${d.dpr}): the page started`);
+    sh.start = await startProject(guest);
+    log(`${d.name} (DPR ${d.dpr}): project ${sh.start.opened ? 'open' : 'not open'} (state ${sh.start.state})`);
+    return sh;
+  } catch (e) {
+    await closeShared(sh);
+    throw e;
+  }
 }
 
 async function closeShared(sh) {
@@ -243,6 +252,13 @@ async function runShared(sc, repeat, d, env, sh, index, budget) {
     mark = await logMark(sh.guest);
     const reset = await resetProject(sh.guest);
     if (reset.left.length) out.notes.push(`after File > New, open: ${JSON.stringify(reset.left)}`);
+    // a page made again (Issue #1528): File > New must make a new project (its form is shown, the engine is idle) before the scenario runs; until it does, each scenario checks it
+    if (sh.recreated) {
+      const st = (await sh.guest.state().catch(() => null))?.state ?? null;
+      if (!reset.form || st !== 'engine-idle') throw new Error(`the page was made again, but File > New did not make a new project (form ${reset.form}, engine ${st}): the scenario is not run`);
+      sh.recreated = false;
+      out.notes.push('the page was made again: File > New made a new project');
+    }
     await checkDpr(sh.pg.page, d, out);
     const r = await sc.run({ guest: sh.guest, page: sh.pg.page, cdp: sh.pg.cdp, browserCdp: env.browserCdp, browserContextId: sh.pg.browserContextId, origin: env.delivery.origin, repo, budget, log: (m) => log(`  ${sc.id}: ${m}`), index });
     out.ok = r.ok === true;
@@ -303,6 +319,7 @@ async function runRow(d, items, env, served, budget) {
   let frames = 0, seconds = 0;
   let sh = null;
   let index = 0;
+  let recreate = false;
   try {
     for (const { sc, repeat } of items) {
       if (!budget.canStart(sc.needsMs)) {
@@ -317,8 +334,32 @@ async function runRow(d, items, env, served, budget) {
         seconds += f.s;
         continue;
       }
-      if (sh === null) sh = await openShared(d, env);
-      row.scenarios.push(await runShared(sc, repeat, d, env, sh, index++, budget));
+      // a page that did not start is an error of this scenario (it did not run); the next scenario tries again (Issue #1528)
+      if (sh === null) {
+        const t0 = Date.now();
+        try {
+          sh = await openShared(d, env);
+        } catch (e) {
+          const err = `the page did not start (${d.name}, DPR ${d.dpr}): ${String(e?.stack ?? e)}`;
+          row.scenarios.push(erroredScenario(sc, repeat, d, err, Date.now() - t0));
+          log(`${sc.id}: ${String(e?.message ?? e).slice(0, 200)}`);
+          continue;
+        }
+        sh.recreated = recreate;
+        recreate = false;
+      }
+      const res = await runShared(sc, repeat, d, env, sh, index++, budget);
+      row.scenarios.push(res);
+      // the renderer stopped (Target crashed) or the page does not answer: the page is closed and the next scenario starts a new one (Issue #1528)
+      const unanswered = res.error !== null && !(await sh.guest.ev('1').then(() => true, () => false));
+      if (unanswered || pageGone({ crashed: sh.crashed, closed: sh.pg.page.isClosed(), error: res.error })) {
+        log(`${sc.id}: the page is gone (${res.error ? res.error.split('\n')[0] : 'closed'}): the next scenario starts a new page`);
+        await closeShared(sh);
+        frames += sh.frames.n;
+        seconds += sh.frames.s;
+        sh = null;
+        recreate = true;
+      }
     }
   } catch (e) {
     row.error = `row ${d.name} (DPR ${d.dpr}): ${String(e?.stack ?? e).slice(0, 800)}`;
