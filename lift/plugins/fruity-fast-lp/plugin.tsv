@@ -1,0 +1,2 @@
+key	guest	role	sha256	size	hook	args	omit
+effects.fruity-fast-lp.fruity_fast_lp_x64.dll	Plugins\Fruity\Effects\Fruity Fast LP\Fruity Fast LP_x64.dll	本体	6ddc8bc8ec416e17e312b076b7347a582542af73192256083205974e855a7b5e	3752448	rva:0x17bc0,0x31d70,0x31d90	--pdata	-
