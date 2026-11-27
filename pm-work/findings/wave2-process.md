@@ -55,3 +55,5 @@ Vocodex の `Synthesizer\Data\`(26 件・55,452 B)は、入れ子の本体 `Sytr
 - 束の受け入れは、`fe-build engine` の前に、作業の木へ自分の束の DLL を置く(`node tools/place-plugin-dlls.mjs`。`plugin-builtin` の作業は `lift/out-app/host-extra/plugins/` から sha256 で照合して複写する)。束の行は同じ job で足すので、job 開始時の抽出の木には無い。第 2 波の 041 の本文の受け入れ(`pm-work/issue-drafts/wave2/041-effects-01.md`)は、この手順を持たない(直していない。推定では、作業者の受け入れは plugins の段で止まる。実測ではない)。
 - 判定(`guard/judge.sh`)は、受け入れの前に同じ道具を呼び、作業の木にある他の束の DLL も置く。判定は main を取り込まない(取り込みは push の段の pull だけで、その後に受け入れは走らない)ので、置くのは作業ツリーの行の分。道具が 1 で終わっても判定は続き、受け入れの結果で決まる。
 - 限界: `host-extra/plugins` の外の DLL(`Shared\` など)は置けない(skipped)。その行の DLL は、抽出の木の作り直しでしか入らない。
+- 第 2 波の 44 件(#1434〜#1477。下書き 041〜084)の accept に `node tools/place-plugin-dlls.mjs && ` を `fe-build engine` の直前に 1 回入れ、本文の「1 プラグインの入れ方」に、その手順の 1 行を足した。生成器・テンプレート・下書き・試験(`spec/gen-wave-plugins.test.mjs`)も同じ。
+- 作業者の受け入れは、この手順が accept の式に在るので、木に無い束の DLL を `fe-build engine` の前に自分で置く(判定の前の呼び出しとは別に、受け入れの式でも置く)。`plugin-builtin` の取り出しが無い作業では置けないが、0 で続く(`missing`・`mismatch` が無ければ)。
