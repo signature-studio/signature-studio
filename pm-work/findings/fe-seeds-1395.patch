@@ -1,0 +1,211 @@
+diff --git a/lift/crates/fe-build/src/plugins.rs b/lift/crates/fe-build/src/plugins.rs
+index e943bb0b..a59ba448 100644
+--- a/lift/crates/fe-build/src/plugins.rs
++++ b/lift/crates/fe-build/src/plugins.rs
+@@ -679,6 +679,28 @@ fn write(path: &str, text: &str) -> Result<(), String> {
+     fs::write(path, text).map_err(|e| format!("{path}: {e}"))
+ }
+ 
++/// The seed file of a DLL is the installer's file, which the extraction puts in the host tree from the plugin rows. A host tree that was
++/// extracted before the plugin row was there (the base of a run) has the DLL under its key and not the seed file: the seed file is then
++/// copied from the key's file, whose SHA-256 must be the row's.
++fn seed_copies(dlls: &[Dll]) -> Result<(), String> {
++    for d in dlls {
++        let seed = format!("{HOST_DIR}/{}", d.seed_file());
++        if Path::new(&seed).exists() {
++            continue;
++        }
++        let host = format!("{HOST_DIR}/{}", d.host_file());
++        let got = crate::sha256_hex(&host)?;
++        if got != d.sha256 {
++            return Err(format!("{host}: SHA-256 {got}, expected {} (the plugin row of {})", d.sha256, d.key));
++        }
++        if let Some(dir) = Path::new(&seed).parent() {
++            fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
++        }
++        fs::copy(&host, &seed).map_err(|e| format!("{seed}: {e}"))?;
++    }
++    Ok(())
++}
++
+ /// The tables of the build, from the plugin rows and the fixed rows. `with_base` is false in the extraction (no host yet): the
+ /// extraction table and the seed table do not depend on the bases, and the lists are left alone. With the bases, lists/ gets the
+ /// fixed lists again (the lists stage then writes the plugins' lists, so no list of a removed plugin is left behind).
+@@ -704,6 +726,7 @@ pub fn generate(with_base: bool) -> Result<(), String> {
+     if !with_base {
+         return Ok(());
+     }
++    seed_copies(&dlls)?;
+     let lists = format!("{OUT_DIR}/lists");
+     let _ = fs::remove_dir_all(&lists);
+     fs::create_dir_all(&lists).map_err(|e| format!("{lists}: {e}"))?;
+diff --git a/lift/crates/fe-decode/src/relocseeds.rs b/lift/crates/fe-decode/src/relocseeds.rs
+index c2386d43..152cce73 100644
+--- a/lift/crates/fe-decode/src/relocseeds.rs
++++ b/lift/crates/fe-decode/src/relocseeds.rs
+@@ -57,3 +57,36 @@ pub fn reloc_seeds(pe: &Pe<'_>) -> Result<RelocSeeds, String> {
+ pub fn reloc_pdata_seeds(pe: &Pe<'_>) -> Result<Vec<u64>, String> {
+     Ok(reloc_seeds(pe)?.seeds)
+ }
++
++/// Issue #1395 (`--rva-tables`): the rows of a table file, `RVA COUNT` (hex RVA, decimal count; `#` comments). Each names a table of
++/// `COUNT` 32-bit values that hold RVAs from the ImageBase (the switch tables of MSVC code that jumps to `ImageBase + entry`, whose
++/// targets are other functions, so the analysis has no function entry for them).
++pub fn rva_tables(text: &str) -> Result<Vec<(u32, usize)>, String> {
++    let mut out = Vec::new();
++    for l in text.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')) {
++        let f: Vec<&str> = l.split_whitespace().collect();
++        let (Some(rva), Some(n)) = (f.first().and_then(|r| u32::from_str_radix(r.trim_start_matches("0x"), 16).ok()), f.get(1).and_then(|n| n.parse::<usize>().ok())) else {
++            return Err(format!("bad table row: {l}"));
++        };
++        out.push((rva, n));
++    }
++    Ok(out)
++}
++
++/// The code addresses that the entries of the tables of `rva_tables` hold (ImageBase + entry, inside `.text`), ascending.
++pub fn rva_table_seeds(pe: &Pe<'_>, tables: &[(u32, usize)]) -> Result<Vec<u64>, String> {
++    let text = Text::from_pe(pe)?;
++    let base = pe.optional.image_base;
++    let mut out = BTreeSet::new();
++    for &(rva, n) in tables {
++        let raw = pe.slice_at_rva(rva, 4 * n).map_err(|e| format!("table {rva:#x}: {e}"))?;
++        for k in 0..n {
++            let v = u32::from_le_bytes(raw[4 * k..4 * k + 4].try_into().unwrap());
++            let va = base + v as u64;
++            if text.contains(va) {
++                out.insert(va);
++            }
++        }
++    }
++    Ok(out.into_iter().collect())
++}
+diff --git a/lift/crates/fe-lift/src/main.rs b/lift/crates/fe-lift/src/main.rs
+index 3fdc570b..3958551f 100644
+--- a/lift/crates/fe-lift/src/main.rs
++++ b/lift/crates/fe-lift/src/main.rs
+@@ -19,6 +19,8 @@ fn usage() -> ExitCode {
+ fn extra_seeds(
+     data: &[u8],
+     pdata: bool,
++    reloc_seeds: bool,
++    rva_tables: Option<&str>,
+     seeds_file: Option<&str>,
+     opts: &fe_decode::Options,
+ ) -> Result<Vec<u64>, String> {
+@@ -28,6 +30,17 @@ fn extra_seeds(
+         v.extend(fe_decode::pdata_seeds(&pe)?);
+         v.extend(fe_decode::adjustor::adjustor_seeds(&pe)?);
+     }
++    if reloc_seeds {
++        // Issue #1395 (--reloc-seeds): the code addresses a base relocation slot holds that have no .pdata entry (the same seeds as fe-wasmgen --reloc-seeds)
++        let pe = fe_pe::Pe::parse(data).map_err(|e| e.to_string())?;
++        v.extend(fe_decode::relocseeds::reloc_seeds(&pe)?.not_function);
++    }
++    if let Some(p) = rva_tables {
++        // Issue #1395 (--rva-tables): the entries of the switch tables of the file (the same seeds as fe-wasmgen --rva-tables)
++        let pe = fe_pe::Pe::parse(data).map_err(|e| e.to_string())?;
++        let tables = fe_decode::relocseeds::rva_tables(&std::fs::read_to_string(p).map_err(|e| format!("{p}: {e}"))?)?;
++        v.extend(fe_decode::relocseeds::rva_table_seeds(&pe, &tables)?);
++    }
+     if let Some(p) = seeds_file {
+         let s = std::fs::read_to_string(p).map_err(|e| format!("{p}: {e}"))?;
+         for l in s.lines().map(str::trim).filter(|l| !l.is_empty()) {
+@@ -93,6 +106,8 @@ fn run(
+     input: &str,
+     output: &str,
+     pdata: bool,
++    reloc_seeds: bool,
++    rva_tables: Option<&str>,
+     seeds_file: Option<&str>,
+     hooks_file: Option<&str>,
+     sites_file: Option<&str>,
+@@ -105,7 +120,7 @@ fn run(
+     split: Option<&fe_lift::split::Split>,
+ ) -> Result<(), String> {
+     let data = std::fs::read(input).map_err(|e| format!("{input}: {e}"))?;
+-    let mut extra = extra_seeds(&data, pdata, seeds_file, opts)?;
++    let mut extra = extra_seeds(&data, pdata, reloc_seeds, rva_tables, seeds_file, opts)?;
+     // Decision 0132: the except landings of the guest's exception handler(s) named by `--seh-handler` are function entries (seeds, last), and the functions that
+     // hold them get the SEH entry wrapper. Without the option nothing here runs and the output is unchanged.
+     let seh_l = if seh_handlers.is_empty() {
+@@ -247,6 +262,8 @@ fn lift_main(args: &[String]) -> ExitCode {
+         return usage();
+     }
+     let mut pdata = false;
++    let mut reloc_seeds = false;
++    let mut rva_tables: Option<&str> = None;
+     let mut seeds_file: Option<&str> = None;
+     let mut hooks_file: Option<&str> = None;
+     let mut sites_file: Option<&str> = None;
+@@ -263,6 +280,11 @@ fn lift_main(args: &[String]) -> ExitCode {
+     while i < args.len() {
+         match args[i].as_str() {
+             "--pdata" => pdata = true,
++            "--reloc-seeds" => reloc_seeds = true,
++            "--rva-tables" if i + 1 < args.len() => {
++                rva_tables = Some(args[i + 1].as_str());
++                i += 1;
++            }
+             "--seeds" if i + 1 < args.len() => {
+                 seeds_file = Some(args[i + 1].as_str());
+                 i += 1;
+@@ -334,7 +356,7 @@ fn lift_main(args: &[String]) -> ExitCode {
+         None => BTreeSet::new(),
+     };
+     let split = split_bytes.map(|max_bytes| fe_lift::split::Split { prefix: args[3].as_str(), max_bytes, omit: &omit });
+-    match run(&args[2], &args[3], pdata, seeds_file, hooks_file, sites_file, hle_file, swap_file, prune_file, &seh_handlers, &opts, &gopt, split.as_ref()) {
++    match run(&args[2], &args[3], pdata, reloc_seeds, rva_tables, seeds_file, hooks_file, sites_file, hle_file, swap_file, prune_file, &seh_handlers, &opts, &gopt, split.as_ref()) {
+         Ok(()) => ExitCode::SUCCESS,
+         Err(e) => {
+             eprintln!("error: {e}");
+diff --git a/lift/crates/fe-wasmgen/src/main.rs b/lift/crates/fe-wasmgen/src/main.rs
+index 319d3114..e3cbe462 100644
+--- a/lift/crates/fe-wasmgen/src/main.rs
++++ b/lift/crates/fe-wasmgen/src/main.rs
+@@ -29,6 +29,8 @@ fn compile_cli(args: &[String]) -> ExitCode {
+     }
+     let mut conf = fe_wasmgen::Config { names: true, ..fe_wasmgen::Config::default() };
+     let mut pdata = false;
++    let mut reloc_seeds = false;
++    let mut rva_tables_file: Option<String> = None;
+     let mut seeds_file: Option<String> = None;
+     let mut rel_sites: Option<String> = None;
+     let mut report: Option<String> = None;
+@@ -36,6 +38,7 @@ fn compile_cli(args: &[String]) -> ExitCode {
+     while i < args.len() {
+         match args[i].as_str() {
+             "--pdata" => pdata = true,
++            "--reloc-seeds" => reloc_seeds = true,
+             "--adapt-all" => conf.adapt_all = true,
+             "--census" => conf.census = true,
+             "--hybrid-only" if i + 1 < args.len() => {
+@@ -105,6 +108,10 @@ fn compile_cli(args: &[String]) -> ExitCode {
+                 seeds_file = Some(args[i + 1].clone());
+                 i += 1;
+             }
++            "--rva-tables" if i + 1 < args.len() => {
++                rva_tables_file = Some(args[i + 1].clone());
++                i += 1;
++            }
+             "--report" if i + 1 < args.len() => {
+                 report = Some(args[i + 1].clone());
+                 i += 1;
+@@ -126,6 +133,17 @@ fn compile_cli(args: &[String]) -> ExitCode {
+         extra.extend(fe_decode::pdata_seeds(&pe).expect("pdata"));
+         extra.extend(fe_decode::adjustor::adjustor_seeds(&pe).expect("adjustors"));
+     }
++    if reloc_seeds {
++        // Issue #1395: the code addresses that a base relocation slot holds and that have no .pdata entry (the leaf functions of a vtable or a callback table; decision 0074 does not take them)
++        let pe = fe_pe::Pe::parse(&data).expect("pe");
++        extra.extend(fe_decode::relocseeds::reloc_seeds(&pe).expect("reloc seeds").not_function);
++    }
++    if let Some(p) = rva_tables_file {
++        // Issue #1395: the entries of the MSVC switch tables named in the file (ImageBase + entry; the targets are functions of their own)
++        let pe = fe_pe::Pe::parse(&data).expect("pe");
++        let tables = fe_decode::relocseeds::rva_tables(&std::fs::read_to_string(&p).expect("rva tables")).expect("rva tables");
++        extra.extend(fe_decode::relocseeds::rva_table_seeds(&pe, &tables).expect("rva table seeds"));
++    }
+     if let Some(p) = seeds_file {
+         let s = std::fs::read_to_string(&p).expect("seeds");
+         extra.extend(s.lines().filter_map(parse_hex));
