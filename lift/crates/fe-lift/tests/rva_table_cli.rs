@@ -58,3 +58,24 @@ fn the_rva_table_file_is_read_and_a_missing_or_bad_one_stops_the_lift() {
     assert!(out.is_file(), "the lift writes its output");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Without the options the output is the output of a run that adds no seed: a table file that names no table and `--reloc-seeds` on an
+/// image without base relocations add nothing, so the two outputs are the same bytes.
+#[test]
+fn without_the_options_the_output_is_the_output_of_a_run_that_adds_no_seed() {
+    let dir = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../../.tmp-rva-table-plain"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let pe = dir.join("image.dll");
+    std::fs::write(&pe, image()).unwrap();
+    let none = dir.join("none.txt");
+    std::fs::write(&none, "# no table\n").unwrap();
+    let plain = dir.join("plain.c");
+    let added = dir.join("added.c");
+    let o = cli(&["lift", text(&pe), text(&plain)]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    let o = cli(&["lift", text(&pe), text(&added), "--reloc-seeds", "--rva-tables", text(&none)]);
+    assert!(o.status.success(), "{}", String::from_utf8_lossy(&o.stderr));
+    assert_eq!(std::fs::read(&plain).unwrap(), std::fs::read(&added).unwrap());
+    let _ = std::fs::remove_dir_all(&dir);
+}
