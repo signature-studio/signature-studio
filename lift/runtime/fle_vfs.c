@@ -1859,6 +1859,60 @@ static uint32_t fit(const char *api, const uint16_t *s, size_t len, uint32_t nbu
     return (uint32_t)(len + 1);
 }
 
+/* shlwapi!PathCanonicalizeW (Issue #1501,段 B: the Plugin Manager's start calls it). BOOL f(LPWSTR pszBuf rcx, LPCWSTR pszPath rdx). Learn (PathCanonicalizeW): the function "removes navigation
+ * elements such as "." and ".." to produce a direct, well-formed path"; ".." removes the segment before it, "." skips the segment that follows it, "The root segment of the path cannot be removed", and more ".."
+ * than segments gives the root alone (examples: "A:\name_1\.\name_2\..\name_3" gives "A:\name_1\name_3"; "C:\.." gives "C:\"). The return value is TRUE when a result is computed. A buffer of MAX_PATH units is
+ * the page's rule; the input is at most MAX_PATH - 1 units (the page's "maximum length MAX_PATH"; a longer one stops by fle_w_read_alloc). The root is "X:\" or "\" (a backslash alone). The kept
+ * trailing backslash of a path that ends with a segment and a backslash is a READING (the page's examples have none). Not modelled, stop by name: a UNC path ("\\"), a drive-relative path ("X:name"),
+ * a "/" separator (the page's rules give none of these). An empty path gives an empty result with TRUE (a reading: nothing to remove). */
+void fle_imp_PathCanonicalizeW(void)
+{
+    static const char api[] = "PathCanonicalizeW";
+    uint64_t dst = R[1], src = R[2];
+    uint16_t *s, *o;
+    size_t n, root, p, q, olen = 0, nseg = 0, k;
+    size_t *pos;
+
+    if (dst == 0) fle_stop(api, "pszBuf is NULL: the page does not define it");
+    if (src == 0) fle_stop(api, "pszPath is NULL: the page does not define it");
+    s = fle_w_read_alloc(api, src, MAX_PATH_UNITS, &n);
+    for (k = 0; k < n; k++)
+        if (s[k] == '/') fle_stop(api, "a path with a '/' separator: the page's rules give none for it (not modelled)");
+    root = 0;
+    if (n >= 3 && ((s[0] | 0x20) >= 'a' && (s[0] | 0x20) <= 'z') && s[1] == ':' && s[2] == '\\') root = 3;
+    else if (n >= 2 && s[0] == '\\' && s[1] == '\\') fle_stop(api, "a UNC path: the page's rules for it are not modelled");
+    else if (n >= 2 && s[1] == ':') fle_stop(api, "a drive-relative path (X:name): the page's rules for it are not modelled");
+    else if (n >= 1 && s[0] == '\\') root = 1;
+    o = malloc((n + 2) * sizeof *o);
+    pos = malloc((n + 2) * sizeof *pos);
+    if (!o || !pos) fle_stop(api, "out of memory");
+    for (k = 0; k < root; k++) o[olen++] = s[k];
+    for (p = root; p < n;) {
+        if (s[p] == '\\') {
+            p++;
+            continue;
+        }
+        for (q = p; q < n && s[q] != '\\'; q++) {}
+        if (q - p == 1 && s[p] == '.') {
+            /* "." : the segment is skipped */
+        } else if (q - p == 2 && s[p] == '.' && s[p + 1] == '.') {
+            if (nseg > 0) olen = pos[--nseg];
+        } else {
+            pos[nseg++] = olen;
+            if (olen > 0 && o[olen - 1] != '\\') o[olen++] = '\\';
+            for (k = p; k < q; k++) o[olen++] = s[k];
+        }
+        p = q;
+    }
+    if (n > 0 && s[n - 1] == '\\' && nseg > 0 && o[olen - 1] != '\\') o[olen++] = '\\';
+    o[olen] = 0;
+    fle_w_write(dst, o, olen + 1);
+    R[0] = 1;
+    free(o);
+    free(pos);
+    free(s);
+}
+
 /* kernel32!GetFullPathNameW (MSDN: GetFullPathNameW). lpFileName rcx, nBufferLength edx, lpBuffer r8,
  * lpFilePart r9. Joins the current directory, resolves "." and "..", keeps a trailing backslash, and does not
  * check that the path exists (page). The return value is the length without the NUL, or the required size

@@ -403,6 +403,17 @@ void fle_imp_ExpandEnvironmentStringsW(void)
 const uint16_t *fle_appfile_cmdline_w(void) __attribute__((weak));
 const char *fle_appfile_cmdline_a(void) __attribute__((weak));
 
+/* ucrtbase / api-ms-win-crt-string!memset (Issue #1501,段 B: the Plugin Manager's own code calls it through the import). void *memset(void *dest rcx, int c rdx, size_t count r8):
+ * fills count bytes at dest with the byte (c as unsigned char) and returns dest. The C standard gives it; no Windows page is needed. A count of 0 changes nothing. */
+void fle_imp_memset(void)
+{
+    uint64_t dst = R[1], n = R[8];
+    uint8_t c = (uint8_t)R[2];
+
+    if (n != 0) memset((void *)fle_addr(dst, (unsigned)n, 1), c, (size_t)n);
+    R[0] = dst;
+}
+
 /* kernel32!GetCommandLineW (MSDN: GetCommandLineW): a pointer to the process command line, owned by the system
  * (the guest must not free or modify it). The process here is the lifted DLL (GetModuleHandleW(NULL) returns it,
  * decision 0015), so the command line is its virtual path in quotes, no arguments. The page says the OS may
